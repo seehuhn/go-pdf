@@ -126,12 +126,12 @@ The following information applies to simple PDF fonts.
 
   - If the CFF format is used, the font is embedded using the `FontFile3` entry
     in the font descriptor, and the `Subtype` entry in the font dictionary is
-    set to `Type1C`.  Only fonts which do not use CIDFont operators in their
-    Top DICT are allowed, because Glyph names are required.
+    set to `Type1C`.  Glyph names are required, and thus fonts which use CIDFont
+    operators in their Top DICT cannot be used.
 
   - OpenType fonts are embedded using the `FontFile3` entry in the font
     descriptor, and the `Subtype` entry in the font dictionary is set to
-    `OpenType`.  The CFF fonts data is not allowed to use CIDFont operators.
+    `OpenType`.  The CFF font data is not allowed to use CIDFont operators.
     The following OpenType tables are required: "CFF " and "cmap".
 
 - `MMType1` fonts are embedded as ordinary Type 1 fonts (a snapshot of the

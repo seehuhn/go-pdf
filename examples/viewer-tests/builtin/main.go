@@ -217,10 +217,10 @@ func (f *fontTables) MakeColumns(G standard.Font) error {
 				if !ext.IsZero() {
 					w := gi.WidthX * fontSize / 1000
 					page.Rectangle(
-						x+32-w/2+ext.LLx.AsFloat(fontSize/1000),
-						y+ext.LLy.AsFloat(fontSize/1000),
-						(ext.URx - ext.LLx).AsFloat(fontSize/1000),
-						(ext.URy - ext.LLy).AsFloat(fontSize/1000))
+						x+32-w/2+ext.LLx*fontSize/1000,
+						y+ext.LLy*fontSize/1000,
+						(ext.URx-ext.LLx)*fontSize/1000,
+						(ext.URy-ext.LLy)*fontSize/1000)
 				}
 
 				tmpGlyph++

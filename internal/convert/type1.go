@@ -17,6 +17,7 @@
 package convert
 
 import (
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/psenc"
@@ -189,9 +190,16 @@ func ToAFM(info *sfnt.Font) (*afm.Metrics, error) {
 	for i := 0; i < n; i++ {
 		gid := glyph.ID(i)
 		name := info.GlyphName(gid)
+		bbox := info.GlyphBBox(gid)
+		bboxAFM := rect.Rect{ // TODO(voss): use the font matrix
+			LLx: float64(bbox.LLx) / float64(info.UnitsPerEm) * 1000,
+			LLy: float64(bbox.LLy) / float64(info.UnitsPerEm) * 1000,
+			URx: float64(bbox.URx) / float64(info.UnitsPerEm) * 1000,
+			URy: float64(bbox.URy) / float64(info.UnitsPerEm) * 1000,
+		}
 		newGlyphs[name] = &afm.GlyphInfo{
 			WidthX: float64(info.GlyphWidth(gid)),
-			BBox:   info.GlyphBBox(gid),
+			BBox:   bboxAFM,
 			// TODO(voss): ligatures
 		}
 	}

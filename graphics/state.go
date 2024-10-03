@@ -22,10 +22,10 @@ import (
 	"slices"
 	"strings"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
 // Parameters collects all graphical parameters of the PDF processor.

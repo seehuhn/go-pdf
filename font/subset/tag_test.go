@@ -26,3 +26,31 @@ func TestGetSubsetTag(t *testing.T) {
 		t.Error("wrong tag " + tag)
 	}
 }
+
+func TestIsValidTag(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		{"Valid tag", "ABCDEF", true},
+		{"Valid tag with different letters", "XYZPQR", true},
+		{"Empty string", "", false},
+		{"Too short", "ABCDE", false},
+		{"Too long", "ABCDEFG", false},
+		{"Lowercase letters", "abcdef", false},
+		{"Mixed case", "ABCDEf", false},
+		{"Numbers", "A1CDEF", false},
+		{"Special characters", "A@CDEF", false},
+		{"Unicode characters", "АBCDEF", false}, // first letter cyrillic
+		{"Spaces", "ABC EF", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsValidTag(tt.input); got != tt.want {
+				t.Errorf("IsValidTag(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}

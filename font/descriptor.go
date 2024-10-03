@@ -206,8 +206,8 @@ func ExtractDescriptor(r pdf.Getter, obj pdf.Object) (*Descriptor, error) {
 	return res, nil
 }
 
-// AsDict converts the font descriptor to a PDF dictionary,
-// ready for storing in a PDF file.
+// AsDict converts the font descriptor to a PDF dictionary.
+// This does not include the `FontFile`, `FontFile2`, or `FontFile3` entries.
 func (d *Descriptor) AsDict() pdf.Dict {
 	var flags pdf.Integer
 	if d.IsFixedPitch {

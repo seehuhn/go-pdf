@@ -36,12 +36,12 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/header"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/pdf/pagetree"
 )
 

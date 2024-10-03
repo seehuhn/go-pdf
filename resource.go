@@ -19,7 +19,6 @@ package pdf
 import (
 	"errors"
 	"fmt"
-	"io"
 )
 
 // Embedder represents a PDF resource (a font, image, pattern, etc.) which has
@@ -50,10 +49,10 @@ type Unused struct{}
 // The ResourceManager must be closed with the [Close] method before the PDF
 // file is closed.
 type ResourceManager struct {
-	Out        *Writer
-	embedded   map[any]embRes
-	needsClose []io.Closer
-	isClosed   bool
+	Out       *Writer
+	embedded  map[any]embRes
+	finishers []Finisher
+	isClosed  bool
 }
 
 // NewResourceManager creates a new ResourceManager.
@@ -69,13 +68,17 @@ type embRes struct {
 	Emb any
 }
 
+type Finisher interface {
+	Finish(*ResourceManager) error
+}
+
 // ResourceManagerEmbed embeds a resource in the PDF file.
 //
 // If the resource is already present in the file, the existing resource is
 // returned.
 //
-// If the embedded type, T, is an io.Closer, the Close() method will be called
-// when the ResourceManager is closed.
+// If the embedded type, T, implements [Finisher], the Finish() method will be
+// called when the ResourceManager is closed.
 //
 // Once Go supports methods with type parameters, this function can be turned
 // into a method on [ResourceManager].
@@ -96,25 +99,33 @@ func ResourceManagerEmbed[T any](rm *ResourceManager, r Embedder[T]) (Object, T,
 
 	rm.embedded[r] = embRes{Val: val, Emb: emb}
 
-	if closer, ok := any(emb).(io.Closer); ok {
-		rm.needsClose = append(rm.needsClose, closer)
+	if finisher, ok := any(emb).(Finisher); ok {
+		rm.finishers = append(rm.finishers, finisher)
 	}
 
 	return val, emb, nil
 }
 
-// Close closes all embedded resources which implement [io.Closer].
+// Close runs the Finish methods of all embedded resources where the Go
+// representation implemented the [Finisher] interface.
 //
-// After Close has been called, no more resources can be embedded.
+// After Close has been called, the resource manager can no longer be used.
 func (rm *ResourceManager) Close() error {
 	if rm.isClosed {
 		return nil
 	}
-	for _, r := range rm.needsClose {
-		if err := r.Close(); err != nil {
+
+	for len(rm.finishers) > 0 {
+		r := rm.finishers[0]
+		k := copy(rm.finishers, rm.finishers[1:])
+		rm.finishers = rm.finishers[:k]
+
+		if err := r.Finish(rm); err != nil {
 			return err
 		}
 	}
+
+	rm.isClosed = true
 	return nil
 }
 

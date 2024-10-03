@@ -45,4 +45,18 @@ func Tag(origGid []glyph.ID, origNumGlyphs int) string {
 	return string(buf[:])
 }
 
+func IsValidTag(s string) bool {
+	if len(s) != 6 {
+		return false
+	}
+
+	for _, char := range s {
+		if char < 'A' || char > 'Z' {
+			return false
+		}
+	}
+
+	return true
+}
+
 var TagRegexp = regexp.MustCompile(`^([A-Z]{6})\+(.*)$`)

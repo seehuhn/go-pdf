@@ -347,17 +347,13 @@ func toRunes(obj postscript.Object) ([]rune, error) {
 func (c *ToUnicodeInfo) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	rosRef, _, err := pdf.ResourceManagerEmbed(rm, toUnicodeROS)
-	if err != nil {
-		return nil, zero, err
-	}
+	opt := rm.Out.GetOptions()
 
 	// TODO(voss): review this once
 	// https://github.com/pdf-association/pdf-issues/issues/462 is resolved.
-	dict := pdf.Dict{
-		"Type":          pdf.Name("CMap"),
-		"CMapName":      c.MakeName(),
-		"CIDSystemInfo": rosRef,
+	dict := pdf.Dict{}
+	if opt.HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("CMap")
 	}
 	if c.Parent != nil {
 		parent, _, err := pdf.ResourceManagerEmbed(rm, c.Parent)
@@ -367,8 +363,13 @@ func (c *ToUnicodeInfo) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, 
 		dict["UseCMap"] = parent
 	}
 
+	var filters []pdf.Filter
+	if !opt.HasAny(pdf.OptPretty) {
+		filters = append(filters, pdf.FilterCompress{})
+	}
+
 	ref := rm.Out.Alloc()
-	stm, err := rm.Out.OpenStream(ref, dict, pdf.FilterCompress{})
+	stm, err := rm.Out.OpenStream(ref, dict, filters...)
 	if err != nil {
 		return nil, zero, err
 	}

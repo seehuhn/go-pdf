@@ -70,7 +70,7 @@ func (f *embeddedGlyfComposite) AppendEncoded(s pdf.String, gid glyph.ID, rr []r
 	return s, width
 }
 
-func (f *embeddedGlyfComposite) Close() error {
+func (f *embeddedGlyfComposite) Finish(*pdf.ResourceManager) error {
 	if f.closed {
 		return nil
 	}

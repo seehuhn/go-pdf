@@ -20,9 +20,9 @@ import (
 	"errors"
 	"fmt"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
 // This file implements all text-related PDF operators.  The operators
@@ -368,7 +368,7 @@ func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {
 			w.Err = fmt.Errorf("TextShowKernedRaw: invalid argument type %T", arg)
 			return
 		}
-		if delta != 0 {
+		if delta != 0 { // TODO(voss): move outisde the loop?
 			delta *= -w.State.TextFontSize / 1000
 			if wMode == 0 {
 				w.TextMatrix = matrix.Translate(delta*w.State.TextHorizontalScaling, 0).Mul(w.TextMatrix)

@@ -19,11 +19,11 @@ package testcases
 import (
 	"math"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/gofont"
-	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
 var Paper = &pdf.Rectangle{

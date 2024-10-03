@@ -20,9 +20,9 @@ import (
 	"bytes"
 	"time"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
 // Properties has data for a form XObject.

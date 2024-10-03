@@ -20,6 +20,7 @@ import (
 	"errors"
 	"slices"
 
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
@@ -157,10 +158,10 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	return ref, res, nil
 }
 
-func scaleBoxesGlyf(bboxes []funit.Rect16, unitsPerEm uint16) []pdf.Rectangle {
-	res := make([]pdf.Rectangle, len(bboxes))
+func scaleBoxesGlyf(bboxes []funit.Rect16, unitsPerEm uint16) []rect.Rect {
+	res := make([]rect.Rect, len(bboxes))
 	for i, b := range bboxes {
-		res[i] = pdf.Rectangle{
+		res[i] = rect.Rect{
 			LLx: float64(b.LLx) / float64(unitsPerEm),
 			LLy: float64(b.LLy) / float64(unitsPerEm),
 			URx: float64(b.URx) / float64(unitsPerEm),

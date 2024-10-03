@@ -19,7 +19,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"regexp"
 	"sort"
@@ -224,7 +223,7 @@ func doit() error {
 			page.TextEnd()
 			l.yPos -= 30
 
-			err = Y.(io.Closer).Close()
+			err = Y.(pdf.Finisher).Finish(page.RM)
 			if err != nil {
 				return err
 			}

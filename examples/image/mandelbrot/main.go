@@ -22,11 +22,11 @@ import (
 	"log"
 	"math"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/standard"
 	pdfimage "seehuhn.de/go/pdf/graphics/image"
-	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
 func main() {

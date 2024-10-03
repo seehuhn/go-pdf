@@ -20,6 +20,7 @@ import (
 	"errors"
 	"slices"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -32,7 +33,7 @@ import (
 
 // Properties contains global information about a Type 3 font.
 type Properties struct {
-	FontMatrix [6]float64
+	FontMatrix matrix.Matrix
 
 	Ascent       funit.Int16
 	Descent      funit.Int16
@@ -149,7 +150,7 @@ func (f *embedded) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.Str
 	return append(s, c), width
 }
 
-func (f *embedded) Close() error {
+func (f *embedded) Finish(*pdf.ResourceManager) error {
 	if f.closed {
 		return nil
 	}

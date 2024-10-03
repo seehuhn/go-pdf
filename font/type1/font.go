@@ -22,6 +22,7 @@ import (
 	"math"
 	"slices"
 
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
@@ -78,11 +79,11 @@ func New(psFont *type1.Font, metrics *afm.Metrics, opt *font.Options) (*Instance
 
 	geometry := &font.Geometry{}
 	widths := make([]float64, len(glyphNames))
-	extents := make([]pdf.Rectangle, len(glyphNames))
+	extents := make([]rect.Rect, len(glyphNames))
 	for i, name := range glyphNames {
 		g := psFont.Glyphs[name]
 		widths[i] = float64(g.WidthX) * psFont.FontMatrix[0]
-		extents[i] = glyphBoxtoPDF(g.BBox(), psFont.FontMatrix[:])
+		extents[i] = psFont.GlyphBBoxPDF(name)
 	}
 	geometry.UnderlinePosition = float64(psFont.FontInfo.UnderlinePosition) * psFont.FontMatrix[3]
 	geometry.UnderlineThickness = float64(psFont.FontInfo.UnderlineThickness) * psFont.FontMatrix[3]
@@ -227,31 +228,6 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	return ref, res, nil
 }
 
-func glyphBoxtoPDF(b funit.Rect16, fMat []float64) pdf.Rectangle {
-	bPDF := pdf.Rectangle{
-		LLx: math.Inf(+1),
-		LLy: math.Inf(+1),
-		URx: math.Inf(-1),
-		URy: math.Inf(-1),
-	}
-	corners := []struct{ x, y funit.Int16 }{
-		{b.LLx, b.LLy},
-		{b.LLx, b.URy},
-		{b.URx, b.LLy},
-		{b.URx, b.URy},
-	}
-	for _, c := range corners {
-		xf := float64(c.x)
-		yf := float64(c.y)
-		x, y := fMat[0]*xf+fMat[2]*yf+fMat[4], fMat[1]*xf+fMat[3]*yf+fMat[5]
-		bPDF.LLx = min(bPDF.LLx, x)
-		bPDF.LLy = min(bPDF.LLy, y)
-		bPDF.URx = max(bPDF.URx, x)
-		bPDF.URy = max(bPDF.URy, y)
-	}
-	return bPDF
-}
-
 type embeddedSimple struct {
 	w   *pdf.Writer
 	ref pdf.Reference
@@ -279,7 +255,7 @@ func (f *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (p
 	return append(s, c), f.widths[gid]
 }
 
-func (f *embeddedSimple) Close() error {
+func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 	if f.closed {
 		return nil
 	}

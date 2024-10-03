@@ -23,7 +23,9 @@ import (
 	"sort"
 
 	"golang.org/x/exp/maps"
+
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
@@ -83,22 +85,22 @@ func doit(fname string) error {
 
 	fmt.Printf("%d fonts on %d pages\n", len(allFonts), numPages)
 	for _, fontRef := range allFonts {
-		font, err := pdf.GetDict(r, fontRef)
+		fontDict, err := pdf.GetDict(r, fontRef)
 		if err != nil {
 			return err
 		}
-		subtype, err := pdf.GetName(r, font["Subtype"])
+		subtype, err := pdf.GetName(r, fontDict["Subtype"])
 		if err != nil {
 			return err
 		}
-		fontName, err := pdf.GetName(r, font["BaseFont"])
+		fontName, err := pdf.GetName(r, fontDict["BaseFont"])
 		if err != nil {
 			return err
 		}
 		var fontDesc pdf.Dict
 		var encoding string
 		if subtype == "Type0" {
-			descendantFonts, err := pdf.GetArray(r, font["DescendantFonts"])
+			descendantFonts, err := pdf.GetArray(r, fontDict["DescendantFonts"])
 			if err != nil {
 				return err
 			}
@@ -117,15 +119,15 @@ func doit(fname string) error {
 			if err != nil {
 				return err
 			}
-			encoding = pdf.AsString(font["Encoding"])
+			encoding = pdf.AsString(fontDict["Encoding"])
 		} else {
-			fontDesc, err = pdf.GetDict(r, font["FontDescriptor"])
+			fontDesc, err = pdf.GetDict(r, fontDict["FontDescriptor"])
 			if err != nil {
 				return err
 			}
 		}
 		if fontDesc == nil {
-			if subtype == "Type1" && isBuiltinFont[fontName] {
+			if subtype == "Type1" && font.IsStandard[string(fontName)] {
 				subtype = "builtin"
 			} else if subtype != "Type3" {
 				return errors.New("no font descriptor for " + string(fontName) + " " + string(subtype))
@@ -204,21 +206,4 @@ func doit(fname string) error {
 	fmt.Println()
 
 	return nil
-}
-
-var isBuiltinFont = map[pdf.Name]bool{
-	"Courier":               true,
-	"Courier-Bold":          true,
-	"Courier-BoldOblique":   true,
-	"Courier-Oblique":       true,
-	"Helvetica":             true,
-	"Helvetica-Bold":        true,
-	"Helvetica-BoldOblique": true,
-	"Helvetica-Oblique":     true,
-	"Times-Roman":           true,
-	"Times-Bold":            true,
-	"Times-BoldItalic":      true,
-	"Times-Italic":          true,
-	"Symbol":                true,
-	"ZapfDingbats":          true,
 }

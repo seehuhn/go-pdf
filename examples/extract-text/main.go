@@ -23,8 +23,9 @@ import (
 	"math"
 	"os"
 
+	"seehuhn.de/go/geom/matrix"
+
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/reader"
 )

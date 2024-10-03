@@ -17,11 +17,11 @@
 package ghostscript
 
 import (
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/postscript/funit"
 )
 

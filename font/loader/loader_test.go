@@ -18,9 +18,11 @@ package loader
 
 import (
 	"io"
+	"maps"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/type1"
 )
@@ -56,25 +58,10 @@ func TestBuiltin(t *testing.T) {
 func TestStandardFonts(t *testing.T) {
 	loader := NewFontLoader()
 
-	names := []string{
-		"Courier",
-		"Courier-Bold",
-		"Courier-BoldOblique",
-		"Courier-Oblique",
-		"Helvetica",
-		"Helvetica-Bold",
-		"Helvetica-BoldOblique",
-		"Helvetica-Oblique",
-		"Times-Roman",
-		"Times-Bold",
-		"Times-BoldItalic",
-		"Times-Italic",
-		"Symbol",
-		"ZapfDingbats",
-	}
+	names := maps.Keys(font.IsStandard)
 
 	// Type 1 font files
-	for _, name := range names {
+	for name := range names {
 		t.Run(name, func(t *testing.T) {
 			// Make sure the type file is found ...
 			r, err := loader.Open(name, FontTypeType1)

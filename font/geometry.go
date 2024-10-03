@@ -17,6 +17,7 @@
 package font
 
 import (
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 )
 
@@ -30,8 +31,8 @@ type Geometry struct {
 	UnderlinePosition  float64
 	UnderlineThickness float64
 
-	GlyphExtents []pdf.Rectangle // indexed by GID
-	Widths       []float64       // indexed by GID, PDF text space units
+	GlyphExtents []rect.Rect // indexed by GID
+	Widths       []float64   // indexed by GID, PDF text space units
 }
 
 // GetGeometry returns the geometry of a font.

@@ -20,9 +20,9 @@ import (
 	"errors"
 	"math"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
 // This function contains convenience methods for drawing text.

@@ -21,6 +21,7 @@ import (
 	"log"
 	"math"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
@@ -28,7 +29,6 @@ import (
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/image"
-	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/pdf/graphics/pattern"
 	"seehuhn.de/go/pdf/graphics/shading"
 )

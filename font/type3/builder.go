@@ -24,6 +24,7 @@ import (
 	"sort"
 
 	"golang.org/x/exp/maps"
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
@@ -82,13 +83,13 @@ func (b *Builder) Finish(prop *Properties) (*Font, error) {
 
 	resources := b.page.Resources
 
-	glyphExtents := make([]pdf.Rectangle, len(glyphNames))
+	glyphExtents := make([]rect.Rect, len(glyphNames))
 	widths := make([]float64, len(glyphNames))
 	for i, name := range glyphNames {
 		if i == 0 {
 			continue
 		}
-		glyphExtents[i] = glyphBoxtoPDF(b.Glyphs[name].BBox, prop.FontMatrix[:])
+		glyphExtents[i] = glyphBoxToPDF(b.Glyphs[name].BBox, prop.FontMatrix[:])
 		widths[i] = float64(b.Glyphs[name].WidthX) * prop.FontMatrix[0]
 	}
 
@@ -119,8 +120,8 @@ func (b *Builder) Finish(prop *Properties) (*Font, error) {
 	return res, nil
 }
 
-func glyphBoxtoPDF(b funit.Rect16, M []float64) pdf.Rectangle {
-	bPDF := pdf.Rectangle{
+func glyphBoxToPDF(b funit.Rect16, M []float64) rect.Rect {
+	bPDF := rect.Rect{
 		LLx: math.Inf(+1),
 		LLy: math.Inf(+1),
 		URx: math.Inf(-1),

@@ -63,7 +63,7 @@ func (f *embeddedCFFSimple) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune)
 	return append(s, c), width
 }
 
-func (f *embeddedCFFSimple) Close() error {
+func (f *embeddedCFFSimple) Finish(*pdf.ResourceManager) error {
 	if f.closed {
 		return nil
 	}

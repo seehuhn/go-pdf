@@ -390,11 +390,11 @@ func TestAsPDF(t *testing.T) {
 				}
 
 				var enc2 *Encoding
-				var obj pdf.Native
+				var obj pdf.Object
 				var err error
 				switch tp {
 				case 'A':
-					obj, err = enc1.AsPDFType1(testBuiltinEncoding, nonSymbolicExt, pdf.OptPretty|pdf.OptDictTypes)
+					obj, err = enc1.AsPDFType1(nonSymbolicExt, pdf.OptPretty|pdf.OptDictTypes)
 					if err != nil {
 						t.Fatal(err)
 					}

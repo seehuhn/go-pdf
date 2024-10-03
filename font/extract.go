@@ -157,6 +157,8 @@ func (t EmbeddingTypeOld) MustBe(expected EmbeddingTypeOld) error {
 type Dicts struct {
 	// PostScriptName is the BaseFont entry of the font dictionary
 	// or CIDFont dictionary.  It does not include the subset tag.
+	//
+	// TODO(voss): change this to string?
 	PostScriptName pdf.Name
 
 	// SubsetTag is the tag used to identify a font subset.
@@ -331,8 +333,7 @@ func (d *Dicts) IsSymbolic() bool {
 		return d.FontDescriptor.IsSymbolic
 	}
 
-	n := d.PostScriptName
-	return n == "Symbol" || n == "ZapfDingbats"
+	return IsStandardSymbolic[string(d.PostScriptName)]
 }
 
 func (d *Dicts) IsNonSymbolic() bool {
@@ -340,19 +341,7 @@ func (d *Dicts) IsNonSymbolic() bool {
 		return !d.FontDescriptor.IsSymbolic
 	}
 
-	n := d.PostScriptName
-	return n == "Courier" ||
-		n == "Courier-Bold" ||
-		n == "Courier-Oblique" ||
-		n == "Courier-BoldOblique" ||
-		n == "Helvetica" ||
-		n == "Helvetica-Bold" ||
-		n == "Helvetica-Oblique" ||
-		n == "Helvetica-BoldOblique" ||
-		n == "Times-Roman" ||
-		n == "Times-Bold" ||
-		n == "Times-Italic" ||
-		n == "Times-BoldItalic"
+	return IsStandardNonSymbolic[string(d.PostScriptName)]
 }
 
 func (d *Dicts) IsStandardFont() bool {
@@ -360,19 +349,5 @@ func (d *Dicts) IsStandardFont() bool {
 		return false
 	}
 
-	n := d.PostScriptName
-	return n == "Courier" ||
-		n == "Courier-Bold" ||
-		n == "Courier-Oblique" ||
-		n == "Courier-BoldOblique" ||
-		n == "Helvetica" ||
-		n == "Helvetica-Bold" ||
-		n == "Helvetica-Oblique" ||
-		n == "Helvetica-BoldOblique" ||
-		n == "Times-Roman" ||
-		n == "Times-Bold" ||
-		n == "Times-Italic" ||
-		n == "Times-BoldItalic" ||
-		n == "Symbol" ||
-		n == "ZapfDingbats"
+	return IsStandard[string(d.PostScriptName)]
 }

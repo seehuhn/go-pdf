@@ -272,10 +272,10 @@ func (info *FontDict) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 			bbox := psFont.BBox()
 			q := 1000 * psFont.FontInfo.FontMatrix[0]
 			fontBBox = &pdf.Rectangle{
-				LLx: bbox.LLx.AsFloat(q),
-				LLy: bbox.LLy.AsFloat(q),
-				URx: bbox.URx.AsFloat(q),
-				URy: bbox.URy.AsFloat(q),
+				LLx: bbox.LLx * q,
+				LLy: bbox.LLy * q,
+				URx: bbox.URx * q,
+				URy: bbox.URy * q,
 			}
 		} else {
 			metrics := info.Metrics

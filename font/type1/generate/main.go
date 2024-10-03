@@ -45,7 +45,6 @@ func Generate(fname string) error {
 		return err
 	}
 
-	// Parse the "out.html" template file.
 	tmpl := template.Must(template.New("out").Parse(outTmpl))
 
 	// Execute the template with the data.
@@ -77,7 +76,6 @@ func getData() (Data, error) {
 		}
 	}
 	return data, nil
-
 }
 
 func getFontData(data Data, G standard.Font) error {

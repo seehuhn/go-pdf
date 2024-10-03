@@ -17,19 +17,19 @@
 package type3
 
 import (
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/pdfenc"
-	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
 // EmbedInfo contains the information needed to embed a type 3 font into a PDF document.
 type EmbedInfo struct {
 	Glyphs map[string]pdf.Reference
 
-	FontMatrix [6]float64
+	FontMatrix matrix.Matrix
 
 	// Name is the resource name for the font (required for PDF-1.0, optional otherwise).
 	Name pdf.Name

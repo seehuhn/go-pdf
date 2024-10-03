@@ -20,8 +20,8 @@ import (
 	"errors"
 	"fmt"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
 // This file implements the operators in the "General Graphics State" and

@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"io"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/pdf/reader/scanner"
 )
 
@@ -34,8 +34,7 @@ type Reader struct {
 	R      pdf.Getter
 	loader *loader.FontLoader
 
-	scanner         *scanner.Scanner
-	nextInternalRef uint32
+	scanner *scanner.Scanner
 
 	fontCache map[pdf.Reference]FontFromFile
 

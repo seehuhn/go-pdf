@@ -25,6 +25,7 @@ import (
 	"math"
 	"slices"
 
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/postscript/funit"
 
 	"seehuhn.de/go/sfnt"
@@ -168,10 +169,10 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	return ref, res, nil
 }
 
-func scaleBoxesCFF(bboxes []funit.Rect16, fMat []float64) []pdf.Rectangle {
-	res := make([]pdf.Rectangle, len(bboxes))
+func scaleBoxesCFF(bboxes []funit.Rect16, fMat []float64) []rect.Rect {
+	res := make([]rect.Rect, len(bboxes))
 	for i, b := range bboxes {
-		bPDF := pdf.Rectangle{
+		bPDF := rect.Rect{
 			LLx: math.Inf(+1),
 			LLy: math.Inf(+1),
 			URx: math.Inf(-1),

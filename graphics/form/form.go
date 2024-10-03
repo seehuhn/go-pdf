@@ -19,8 +19,8 @@ package form
 import (
 	"errors"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
 type Form struct {

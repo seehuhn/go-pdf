@@ -241,10 +241,10 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	bbox := F.BBox()
 	q := 1000 * F.FontInfo.FontMatrix[0]
 	fontBBox = &pdf.Rectangle{
-		LLx: bbox.LLx.AsFloat(q),
-		LLy: bbox.LLy.AsFloat(q),
-		URx: bbox.URx.AsFloat(q),
-		URy: bbox.URy.AsFloat(q),
+		LLx: bbox.LLx * q,
+		LLy: bbox.LLy * q,
+		URx: bbox.URx * q,
+		URy: bbox.URy * q,
 	}
 	fontDescRef := w.Alloc()
 	fontDesc := &font.Descriptor{

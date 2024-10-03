@@ -8,9 +8,10 @@ weight = 100
 
 ## API
 
-- Complete the transition from `cmap.Info` to `cmap.InfoNew`.
+- Complete the transition from `cmap.Info` to `cmap.InfoNew`,
+  and then clean up the cmap package API.
 - Finalise the font API.
-- decide whether matrices are `[6]float64` or `[]float64`
+- centralise all 2D geometry in seehuhn.de/go/geom
 
 ## General
 
@@ -32,10 +33,9 @@ weight = 100
 
 ## Fonts
 
+- reconsider PostScriptName for *sfnt.Font.
 - test that the widths of the `.notdef` character is correct for the
   standard 14 fonts
-- (optionally) write encodings that can be interpreted without reading
-  the font program?
 
 ## Testing
 

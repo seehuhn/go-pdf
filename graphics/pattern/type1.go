@@ -22,10 +22,10 @@ import (
 	"fmt"
 	"io"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/graphics/matrix"
 )
 
 // TilingProperties describes the properties of a tiling pattern.

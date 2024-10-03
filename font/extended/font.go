@@ -18,8 +18,8 @@
 package extended
 
 import (
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/postscript/afm"
-	"seehuhn.de/go/postscript/funit"
 	pstype1 "seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/pdf/font"
@@ -80,7 +80,7 @@ func (f Font) New(opt *font.Options) (*type1.Instance, error) {
 	// is resolved.
 	for _, name := range []string{"space", "uni00A0", "uni2002"} {
 		if g, ok := metrics.Glyphs[name]; ok {
-			g.BBox = funit.Rect16{}
+			g.BBox = rect.Rect{}
 		}
 	}
 

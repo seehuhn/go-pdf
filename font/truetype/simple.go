@@ -68,7 +68,7 @@ func (f *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (p
 	return append(s, c), width
 }
 
-func (f *embeddedSimple) Close() error {
+func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 	if f.closed {
 		return nil
 	}

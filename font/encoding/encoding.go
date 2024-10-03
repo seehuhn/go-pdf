@@ -61,6 +61,8 @@ func (e *Encoding) Allocate(glyphName string) cmap.CID {
 	return cid
 }
 
+// UseBuiltinEncoding maps a character code to the corresponding glyph
+// of the built-in encoding.
 func (e *Encoding) UseBuiltinEncoding(code byte) cmap.CID {
 	cid := 1 + cmap.CID(code)
 	e.enc[code] = cid
@@ -92,123 +94,127 @@ func (e *Encoding) Decode(code byte) cmap.CID {
 
 // AsPDFType1 returns the /Encoding entry for Type1 font dictionary.
 //
-// If `builtin` is not nil, it will be used as the builtin encoding of the
-// font. If the argument nonSymbolicExt is true, the function assumes that the
+// If the argument nonSymbolicExt is true, the function assumes that the
 // font has the non-symbolic flag set in the font descriptor and that the font
-// will not be embedded into the PDF file.
+// is not be embedded in the PDF file.
 //
 // The resulting PDF object describes an encoding which maps all characters
 // mapped by e in the specified way, but it may also map additional codes.
-func (e *Encoding) AsPDFType1(builtin []string, nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Native, error) {
+func (e *Encoding) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, error) {
 	type candInfo struct {
 		encName     pdf.Native
 		enc         []string
 		differences pdf.Array
-		impossible  bool
 	}
 
-	// First try whether we can match the encoding without using an encoding
-	// dictionary.
-	var candidates []*candInfo
-	candidates = append(candidates,
-		&candInfo{encName: nil, enc: builtin},
-		&candInfo{encName: pdf.Name("WinAnsiEncoding"), enc: pdfenc.WinAnsi.Encoding[:]},
-		&candInfo{encName: pdf.Name("MacRomanEncoding"), enc: pdfenc.MacRoman.Encoding[:]},
-		&candInfo{encName: pdf.Name("MacExpertEncoding"), enc: pdfenc.MacExpert.Encoding[:]},
-	)
-candidateLoop:
-	for _, cand := range candidates {
-		for code := range 256 {
-			cid := e.enc[code]
-			if cid == 0 {
-				// If we don't use a code, this code can't conflict.
-				continue
-			}
+	// First check whether we can use the built-in encoding.
+	canUseBuiltIn := true
+	for code := range 256 {
+		cid := e.enc[code]
+		if e.GlyphName(cid) != "" {
+			canUseBuiltIn = false
+			break
+		}
+	}
+	if canUseBuiltIn {
+		return nil, nil
+	}
 
-			glyphName := e.GlyphName(cid)
-			if glyphName == "" {
-				if cand.encName == nil {
-					// If we can, just use the built-in encoding.
-					continue
-				} else if code < len(builtin) {
-					// Otherwise, if we know the glyph name in the built-in
-					// encoding, we can try to find this glyph name in the
-					// named encodings.
-					glyphName = builtin[code]
-				} else {
-					// If we don't know the glyph name, none of the named
-					// encodings can be used.
-					//
-					// Note: this assumes that the built-in encoding is tried
-					// first.
-					break candidateLoop
+	canUseNamed := true
+	for code := range 256 {
+		cid := e.enc[code]
+		if cid == 0 {
+			continue
+		}
+		if e.GlyphName(cid) == "" {
+			canUseNamed = false
+			break
+		}
+	}
+
+	// Then try whether we can use one of the named encodings.
+	if canUseNamed {
+		candidates := []*candInfo{
+			{encName: pdf.Name("WinAnsiEncoding"), enc: pdfenc.WinAnsi.Encoding[:]},
+			{encName: pdf.Name("MacRomanEncoding"), enc: pdfenc.MacRoman.Encoding[:]},
+			{encName: pdf.Name("MacExpertEncoding"), enc: pdfenc.MacExpert.Encoding[:]},
+		}
+	candidateLoop:
+		for _, cand := range candidates {
+			for code := range 256 {
+				cid := e.enc[code]
+				if cid != 0 && e.GlyphName(cid) != cand.enc[code] {
+					// we got a conflict, try the next candidate
+					continue candidateLoop
 				}
 			}
-
-			if code < len(cand.enc) && cand.enc[code] == glyphName {
-				continue
-			}
-
-			// If we got a conflict, try the next candidate.
-			continue candidateLoop
+			return cand.encName, nil
 		}
-		return cand.encName, nil
 	}
 
 	// If we need an encoding dictionary, use the base encoding which leads to
 	// the smallest Differences array.
-	if nonSymbolicExt {
-		// If a font has the non-symbolic flag set in the font descriptor and
-		// the font is not embedded, a missing `BaseEncoding` field represents
-		// the standard encoding.  In all other cases, a missing `BaseEncoding`
-		// field represents the font's built-in encoding.
-		candidates[0] = &candInfo{encName: nil, enc: pdfenc.Standard.Encoding[:]}
-	}
-candidateLoop2:
-	for _, cand := range candidates {
+
+	var candidates []*candInfo
+	if canUseNamed {
+		candidates = []*candInfo{
+			{encName: pdf.Name("WinAnsiEncoding"), enc: pdfenc.WinAnsi.Encoding[:]},
+			{encName: pdf.Name("MacRomanEncoding"), enc: pdfenc.MacRoman.Encoding[:]},
+			{encName: pdf.Name("MacExpertEncoding"), enc: pdfenc.MacExpert.Encoding[:]},
+		}
+		if nonSymbolicExt {
+			// If a font has the non-symbolic flag set in the font descriptor and
+			// the font is not embedded, a missing `BaseEncoding` field represents
+			// the standard encoding.  (In all other cases, a missing `BaseEncoding`
+			// field represents the font's built-in encoding.)
+			candidates = append(candidates,
+				&candInfo{encName: nil, enc: pdfenc.Standard.Encoding[:]},
+			)
+		}
+		for _, cand := range candidates {
+			lastDiff := 999
+			for code := range 256 {
+				glyphName := e.GlyphName(e.enc[code])
+				if glyphName == "" || glyphName == cand.enc[code] {
+					continue
+				}
+
+				if code != lastDiff+1 {
+					cand.differences = append(cand.differences, pdf.Integer(code))
+				}
+				cand.differences = append(cand.differences, pdf.Name(glyphName))
+				lastDiff = code
+			}
+		}
+	} else {
+		if nonSymbolicExt {
+			return nil, errors.New("invalid encoding")
+		}
+
+		var diff pdf.Array
 		lastDiff := 999
 		for code := range 256 {
-			cid := e.enc[code]
-			if cid == 0 {
-				// If we don't use a code, this code can't conflict.
-				continue
-			}
-
-			glyphName := e.GlyphName(cid)
+			glyphName := e.GlyphName(e.enc[code])
 			if glyphName == "" {
-				if cand.encName == nil && !nonSymbolicExt {
-					// If we can, just use the built-in encoding.
-					continue
-				} else if code < len(builtin) {
-					// Otherwise, if we know the glyph name in the built-in
-					// encoding, we can use this glyph name.
-					glyphName = builtin[code]
-				} else {
-					// If we don't know the glyph name, named encodings cannot
-					// be used.
-					cand.impossible = true
-					continue candidateLoop2
-				}
-			}
-
-			if code < len(cand.enc) && cand.enc[code] == glyphName {
 				continue
 			}
 
 			if code != lastDiff+1 {
-				cand.differences = append(cand.differences, pdf.Integer(code))
+				diff = append(diff, pdf.Integer(code))
 			}
-			cand.differences = append(cand.differences, pdf.Name(glyphName))
+			diff = append(diff, pdf.Name(glyphName))
 			lastDiff = code
 		}
+
+		candidates = append(candidates, &candInfo{
+			encName:     nil,
+			differences: diff,
+		})
 	}
 
 	var bestDict pdf.Dict
 	bestDiffLength := 999
 	for _, cand := range candidates {
-		if cand.impossible {
-			continue
-		}
 		if L := len(cand.differences); L < bestDiffLength {
 			bestDiffLength = L
 			bestDict = pdf.Dict{}
@@ -241,7 +247,7 @@ candidateLoop2:
 //
 // The glyph names for all mapped codes must be known (either via the encoding,
 // or via the builtin encoding).  Otherwise an error is returned.
-func (e *Encoding) AsPDFTrueType(builtin []string, opt pdf.OutputOptions) (pdf.Native, error) {
+func (e *Encoding) AsPDFTrueType(builtin []string, opt pdf.OutputOptions) (pdf.Object, error) {
 	// First check that all glyph names are known.
 	for code := range 256 {
 		cid := e.enc[code]
@@ -337,7 +343,7 @@ candidateLoop:
 // font.
 //
 // On success, the function returns a [pdf.Dict] object.
-func (e *Encoding) AsPDFType3(opt pdf.OutputOptions) (pdf.Native, error) {
+func (e *Encoding) AsPDFType3(opt pdf.OutputOptions) (pdf.Object, error) {
 	dict := pdf.Dict{}
 	if opt.HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Encoding")

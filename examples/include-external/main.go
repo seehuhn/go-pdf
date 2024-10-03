@@ -21,12 +21,12 @@ import (
 	"io"
 	"log"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/form"
-	"seehuhn.de/go/pdf/graphics/matrix"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/pdfcopy"
 )
