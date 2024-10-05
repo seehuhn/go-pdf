@@ -244,6 +244,10 @@ func (d *Type1Dicts) Finish(rm *pdf.ResourceManager) error {
 		}
 
 		glyphName := d.Encoding.GlyphName(cid)
+		if glyphName == "" && code < len(d.BuiltinEncoding) && d.BuiltinEncoding[code] != ".notdef" {
+			glyphName = d.BuiltinEncoding[code]
+		}
+
 		if glyphName == "" {
 			if d.Text[code] != "" {
 				needsToUnicode = true
