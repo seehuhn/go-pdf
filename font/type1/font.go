@@ -36,6 +36,7 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/internal/stdmtx"
 )
 
 //go:generate go run ./generate/
@@ -362,7 +363,7 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 // ww must be the widths of the 256 encoded characters, given in PDF text space
 // units times 1000.
 func isStandard(fontName string, enc []string, ww []float64) bool {
-	m, ok := builtinMetrics[fontName]
+	m, ok := stdmtx.Metrics[fontName]
 	if !ok {
 		return false
 	}

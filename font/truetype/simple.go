@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1/names"
 
@@ -252,7 +253,7 @@ func (info *FontDictSimple) Embed(w *pdf.Writer, fontDictRef pdf.Reference) erro
 	}
 
 	bbox := sfnt.BBox()
-	fontBBox := &pdf.Rectangle{
+	fontBBox := rect.Rect{
 		LLx: bbox.LLx.AsFloat(q),
 		LLy: bbox.LLy.AsFloat(q),
 		URx: bbox.URx.AsFloat(q),

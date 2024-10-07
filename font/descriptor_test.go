@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/tempfile"
 	"seehuhn.de/go/sfnt/os2"
@@ -40,7 +41,7 @@ func TestRoundTrip(t *testing.T) {
 		IsAllCap:     true,
 		IsSmallCap:   true,
 		ForceBold:    true,
-		FontBBox:     &pdf.Rectangle{LLx: 10, LLy: 20, URx: 30, URy: 40},
+		FontBBox:     rect.Rect{LLx: 10, LLy: 20, URx: 30, URy: 40},
 		ItalicAngle:  50,
 		Ascent:       60,
 		Descent:      -70,
@@ -93,7 +94,7 @@ func FuzzFontDescriptor(f *testing.F) {
 		IsAllCap:     true,
 		IsSmallCap:   true,
 		ForceBold:    true,
-		FontBBox:     &pdf.Rectangle{LLx: 100, LLy: 200, URx: 300, URy: 400},
+		FontBBox:     rect.Rect{LLx: 100, LLy: 200, URx: 300, URy: 400},
 		ItalicAngle:  -10,
 		Ascent:       800,
 		Descent:      -200,

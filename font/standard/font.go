@@ -18,6 +18,8 @@
 package standard
 
 import (
+	"strings"
+
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/loader"
@@ -73,8 +75,10 @@ func (f Font) New(opt *font.Options) (*type1.Instance, error) {
 	afmData.Close()
 
 	// Fix up the fonts
+	family := strings.SplitN(name, "-", 2)[0]
 
 	psFont.FontName = name
+	psFont.FamilyName = family
 	psFont.Encoding = restrictGlyphList(f, psFont.Glyphs)
 	metrics.FontName = name
 	metrics.Encoding = restrictGlyphList(f, metrics.Glyphs)

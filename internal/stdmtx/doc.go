@@ -14,26 +14,5 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package type1
-
-import (
-	"fmt"
-
-	"seehuhn.de/go/pdf/internal/stdmtx"
-)
-
-// GetStandardWidth returns the width of glyphs in the 14 standard PDF fonts.
-// The width is given in PDF glyph space units (i.e. are multiplied by 1000).
-func GetStandardWidth(fontName, glyphName string) (float64, error) {
-	m, ok := stdmtx.Metrics[fontName]
-	if !ok {
-		return 0, fmt.Errorf("unknown standard font %q", fontName)
-	}
-
-	w, ok := m.Widths[glyphName]
-	if !ok {
-		return 0, fmt.Errorf("unknown glyph %q in font %q", glyphName, fontName)
-	}
-
-	return w, nil
-}
+// Package stdmtx provides font metrics for the standard 14 fonts.
+package stdmtx

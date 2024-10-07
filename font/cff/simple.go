@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math"
 
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/postscript/funit"
 
 	"seehuhn.de/go/sfnt/cff"
@@ -252,7 +253,7 @@ func (info *FontDictSimple) Embed(w *pdf.Writer, fontDictRef pdf.Reference) erro
 
 	bbox := cff.BBox()
 	// TODO(voss): use the full font matrix
-	fontBBox := &pdf.Rectangle{
+	fontBBox := rect.Rect{
 		LLx: bbox.LLx.AsFloat(q),
 		LLy: bbox.LLy.AsFloat(q),
 		URx: bbox.URx.AsFloat(q),

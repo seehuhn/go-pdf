@@ -22,6 +22,7 @@ import (
 	"os"
 
 	"golang.org/x/image/font/gofont/goregular"
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
@@ -171,7 +172,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 
 	bbox := f.ttf.BBox()
 	q := 1000 / float64(f.ttf.UnitsPerEm)
-	fontBBox := &pdf.Rectangle{
+	fontBBox := rect.Rect{
 		LLx: bbox.LLx.AsFloat(q),
 		LLy: bbox.LLy.AsFloat(q),
 		URx: bbox.URx.AsFloat(q),

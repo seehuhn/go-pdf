@@ -69,8 +69,7 @@ func (f *Type1Font) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, e
 		if len(ps.Encoding) == 256 {
 			builtinEncoding = ps.Encoding
 		}
-		bbox := ps.FontBBoxPDF()
-		fd.FontBBox = &pdf.Rectangle{LLx: bbox.LLx, LLy: bbox.LLy, URx: bbox.URx, URy: bbox.URy}
+		fd.FontBBox = ps.FontBBoxPDF()
 		fd.IsItalic = ps.ItalicAngle != 0
 		fd.ItalicAngle = ps.ItalicAngle
 		fd.IsFixedPitch = ps.IsFixedPitch
@@ -83,8 +82,7 @@ func (f *Type1Font) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, e
 		if len(m.Encoding) == 256 {
 			builtinEncoding = m.Encoding
 		}
-		bbox := m.FontBBoxPDF()
-		fd.FontBBox = &pdf.Rectangle{LLx: bbox.LLx, LLy: bbox.LLy, URx: bbox.URx, URy: bbox.URy}
+		fd.FontBBox = m.FontBBoxPDF()
 		fd.CapHeight = m.CapHeight
 		fd.XHeight = m.XHeight
 		fd.Ascent = m.Ascent

@@ -17,6 +17,7 @@
 package type1
 
 import (
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -24,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/widths"
+	"seehuhn.de/go/pdf/internal/stdmtx"
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/type1"
 )
@@ -150,7 +152,7 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*FontDict, error) {
 					ww[i] = float64(x)
 				}
 			}
-		} else if m, ok := builtinMetrics[string(dicts.PostScriptName)]; ok {
+		} else if m, ok := stdmtx.Metrics[string(dicts.PostScriptName)]; ok {
 			for i, name := range encoding {
 				ww[i] = m.Widths[name]
 			}
@@ -260,7 +262,7 @@ func (info *FontDict) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 
 		isSymbolic := false
 		var italicAngle float64
-		var fontBBox *pdf.Rectangle
+		var fontBBox rect.Rect
 		if psFont := info.Font; psFont != nil {
 			for name := range psFont.Glyphs {
 				if name != ".notdef" && !pdfenc.StandardLatin.Has[name] {
@@ -271,7 +273,7 @@ func (info *FontDict) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 			italicAngle = psFont.FontInfo.ItalicAngle
 			bbox := psFont.BBox()
 			q := 1000 * psFont.FontInfo.FontMatrix[0]
-			fontBBox = &pdf.Rectangle{
+			fontBBox = rect.Rect{
 				LLx: bbox.LLx * q,
 				LLy: bbox.LLy * q,
 				URx: bbox.URx * q,

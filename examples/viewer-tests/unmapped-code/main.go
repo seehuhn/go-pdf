@@ -19,6 +19,7 @@ package main
 import (
 	"log"
 
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/psenc"
@@ -237,10 +238,10 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		return nil, nil, err
 	}
 
-	var fontBBox *pdf.Rectangle
+	var fontBBox rect.Rect
 	bbox := F.BBox()
 	q := 1000 * F.FontInfo.FontMatrix[0]
-	fontBBox = &pdf.Rectangle{
+	fontBBox = rect.Rect{
 		LLx: bbox.LLx * q,
 		LLy: bbox.LLy * q,
 		URx: bbox.URx * q,

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 
+	"seehuhn.de/go/geom/rect"
 	pscid "seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
 
@@ -257,7 +258,7 @@ func (info *FontDictCFFComposite) Embed(w *pdf.Writer, fontDictRef pdf.Reference
 	bbox := sfnt.BBox()
 
 	q := 1000 / float64(sfnt.UnitsPerEm)
-	fontBBox := &pdf.Rectangle{
+	fontBBox := rect.Rect{
 		LLx: bbox.LLx.AsFloat(q),
 		LLy: bbox.LLy.AsFloat(q),
 		URx: bbox.URx.AsFloat(q),

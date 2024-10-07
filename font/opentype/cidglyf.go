@@ -21,6 +21,7 @@ import (
 	"io"
 	"math"
 
+	"seehuhn.de/go/geom/rect"
 	pscid "seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
 
@@ -202,7 +203,7 @@ func (info *FontDictGlyfComposite) Embed(w *pdf.Writer, fontDictRef pdf.Referenc
 	}
 
 	bbox := otf.BBox()
-	fontBBox := &pdf.Rectangle{
+	fontBBox := rect.Rect{
 		LLx: bbox.LLx.AsFloat(q),
 		LLy: bbox.LLy.AsFloat(q),
 		URx: bbox.URx.AsFloat(q),

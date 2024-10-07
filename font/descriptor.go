@@ -19,8 +19,11 @@ package font
 import (
 	"math"
 
-	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/geom/rect"
+
 	"seehuhn.de/go/sfnt/os2"
+
+	"seehuhn.de/go/pdf"
 )
 
 // Descriptor represents a PDF font descriptor.
@@ -46,18 +49,18 @@ type Descriptor struct {
 	IsSmallCap   bool // flag
 	ForceBold    bool // flag
 
-	FontBBox     *pdf.Rectangle // required, except for Type 3 fonts
-	ItalicAngle  float64        // required
-	Ascent       float64        // required, except for Type 3 fonts
-	Descent      float64        // negative, required, except for Type 3 fonts
-	Leading      float64        // optional (default: 0)
-	CapHeight    float64        // required, except if no latin chars or for Type 3 fonts
-	XHeight      float64        // optional (default: 0)
-	StemV        float64        // required, except for Type 3 fonts (0 = unknown, set to -1 for Type 3 fonts)
-	StemH        float64        // optional (default: 0)
-	MaxWidth     float64        // optional (default: 0)
-	AvgWidth     float64        // optional (default: 0)
-	MissingWidth float64        // optional (default: 0)
+	FontBBox     rect.Rect // required, except for Type 3 fonts
+	ItalicAngle  float64   // required
+	Ascent       float64   // required, except for Type 3 fonts
+	Descent      float64   // negative, required, except for Type 3 fonts
+	Leading      float64   // optional (default: 0)
+	CapHeight    float64   // required, except if no latin chars or for Type 3 fonts
+	XHeight      float64   // optional (default: 0)
+	StemV        float64   // required, except for Type 3 fonts (0 = unknown, set to -1 for Type 3 fonts)
+	StemH        float64   // optional (default: 0)
+	MaxWidth     float64   // optional (default: 0)
+	AvgWidth     float64   // optional (default: 0)
+	MissingWidth float64   // optional (default: 0)
 }
 
 // ExtractDescriptor reads the font descriptor from a PDF file.
@@ -131,7 +134,14 @@ func ExtractDescriptor(r pdf.Getter, obj pdf.Object) (*Descriptor, error) {
 	if err != nil {
 		return nil, pdf.Wrap(err, "FontBBox")
 	}
-	res.FontBBox = fontBBox
+	if fontBBox != nil {
+		res.FontBBox = rect.Rect{
+			LLx: fontBBox.LLx,
+			LLy: fontBBox.LLy,
+			URx: fontBBox.URx,
+			URy: fontBBox.URy,
+		}
+	}
 
 	italicAngle, err := pdf.GetNumber(r, fontDescriptor["ItalicAngle"])
 	if err != nil {
@@ -272,8 +282,9 @@ func (d *Descriptor) AsDict() pdf.Dict {
 	if d.FontWeight != 0 {
 		dict["FontWeight"] = pdf.Integer(d.FontWeight.Rounded())
 	}
-	if d.FontBBox != nil {
-		dict["FontBBox"] = d.FontBBox
+	if !d.FontBBox.IsZero() {
+		b := d.FontBBox
+		dict["FontBBox"] = &pdf.Rectangle{LLx: b.LLx, LLy: b.LLy, URx: b.URx, URy: b.URy}
 	}
 	if d.Ascent != 0 {
 		dict["Ascent"] = pdf.Number(d.Ascent)
