@@ -85,6 +85,7 @@ func New(psFont *type1.Font, metrics *afm.Metrics, opt *font.Options) (*Instance
 		g := psFont.Glyphs[name]
 		widths[i] = float64(g.WidthX) * psFont.FontMatrix[0]
 		extents[i] = psFont.GlyphBBoxPDF(name)
+		extents[i].Scale(1000)
 	}
 	geometry.UnderlinePosition = float64(psFont.FontInfo.UnderlinePosition) * psFont.FontMatrix[3]
 	geometry.UnderlineThickness = float64(psFont.FontInfo.UnderlineThickness) * psFont.FontMatrix[3]

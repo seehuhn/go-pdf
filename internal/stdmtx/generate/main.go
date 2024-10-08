@@ -23,6 +23,7 @@ import (
 	"text/template"
 
 	"seehuhn.de/go/geom/rect"
+
 	"seehuhn.de/go/pdf/font/standard"
 )
 
@@ -105,12 +106,7 @@ func getFontData(data Data, font standard.Font) error {
 		panic("unreachable: " + family)
 	}
 
-	// TODO(voss): why do some numbers come out as 52.00000000000001?
 	bbox := F.Font.FontBBoxPDF()
-	bbox.LLx *= 1000
-	bbox.LLy *= 1000
-	bbox.URx *= 1000
-	bbox.URy *= 1000
 
 	widths := make(map[string]float64)
 	for name, info := range F.Metrics.Glyphs {
@@ -166,6 +162,8 @@ import (
 	"seehuhn.de/go/sfnt/os2"
 )
 
+// FontData contains metrics for one of the 14 standard fonts.
+// All lengths are in PDF glyph space units.
 type FontData struct {
 	FontFamily   string
 	FontWeight   os2.Weight
@@ -184,7 +182,7 @@ type FontData struct {
 	Widths map[string]float64
 }
 
-var Metrics map[string]*FontData = metrics;
+var Metrics map[string]*FontData = metrics
 
 var metrics = map[string]*FontData{
 {{- range $fontName, $metrics := . }}
@@ -194,7 +192,7 @@ var metrics = map[string]*FontData{
 		IsFixedPitch: {{ $metrics.IsFixedPitch }},
 		IsSerif: {{ $metrics.IsSerif }},
 		IsSymbolic: {{ $metrics.IsSymbolic }},
-		FontBBox: rect.Rect{ {{ $metrics.FontBBox.LLx }}, {{ $metrics.FontBBox.LLy }}, {{ $metrics.FontBBox.URx }}, {{ $metrics.FontBBox.URy }} },
+		FontBBox: rect.Rect{ LLx: {{ $metrics.FontBBox.LLx }}, LLy: {{ $metrics.FontBBox.LLy }}, URx: {{ $metrics.FontBBox.URx }}, URy: {{ $metrics.FontBBox.URy }} },
 		ItalicAngle: {{ $metrics.ItalicAngle }},
 		Ascent: {{ $metrics.Ascent }},
 		Descent: {{ $metrics.Descent }},

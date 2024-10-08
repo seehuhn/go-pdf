@@ -16,3 +16,5 @@
 
 // Package stdmtx provides font metrics for the standard 14 fonts.
 package stdmtx
+
+//go:generate go run ./generate/

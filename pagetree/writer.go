@@ -332,6 +332,7 @@ func (w *Writer) checkInvariants() {
 				invalid = true
 			}
 		}
+		first = false
 		if invalid {
 			var dd []int
 			for j := 0; j <= i; j++ {

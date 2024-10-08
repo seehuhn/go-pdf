@@ -271,7 +271,7 @@ func (info *FontDict) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 				}
 			}
 			italicAngle = psFont.FontInfo.ItalicAngle
-			bbox := psFont.BBox()
+			bbox := psFont.FontBBox()
 			q := 1000 * psFont.FontInfo.FontMatrix[0]
 			fontBBox = rect.Rect{
 				LLx: bbox.LLx * q,

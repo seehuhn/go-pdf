@@ -239,7 +239,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	}
 
 	var fontBBox rect.Rect
-	bbox := F.BBox()
+	bbox := F.FontBBox()
 	q := 1000 * F.FontInfo.FontMatrix[0]
 	fontBBox = rect.Rect{
 		LLx: bbox.LLx * q,

@@ -40,12 +40,12 @@ seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5 h1:X3EdZgozH+/MKCx+N/1ZkEfN
 seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5/go.mod h1:se0NAaAL9aI9pRBRK0EvlY3572GJTsF0J7RwMXEiKz4=
 seehuhn.de/go/dijkstra v0.9.3 h1:uVbFjlAuhlwV45qM7S4Wz+C7XlfbgAaTfcZX1r8OgIA=
 seehuhn.de/go/dijkstra v0.9.3/go.mod h1:YcrFNNQ1BIVFI0xIYnNa/StiSKQXuQIID8zgZjwAOFE=
-seehuhn.de/go/geom v0.0.0-20241003112646-ac2039c5d52a h1:fVuxq1N+TbeCBbMvhdFSQZj3TB6qqlRTI0N3iflDSxk=
-seehuhn.de/go/geom v0.0.0-20241003112646-ac2039c5d52a/go.mod h1:zECeMkxCtCykTdJmzoIbjCQRf9OJurOXenhzHm0rW4o=
+seehuhn.de/go/geom v0.0.0-20241008120652-aada228c2941 h1:tt3frO/ncWTG+DKQDVh9QC2Z526yEDYJfmH/asxiotA=
+seehuhn.de/go/geom v0.0.0-20241008120652-aada228c2941/go.mod h1:zECeMkxCtCykTdJmzoIbjCQRf9OJurOXenhzHm0rW4o=
 seehuhn.de/go/icc v0.0.0-20240801195843-cfc244e2c55a h1:AonqL6dUBDUJu06ueS8G44KVwtiZvONQSXdlYn/jzy8=
 seehuhn.de/go/icc v0.0.0-20240801195843-cfc244e2c55a/go.mod h1:wOBOA24OpXamCfQt//QaJnvlLdQFSTAq4525fJRcem8=
-seehuhn.de/go/postscript v0.5.1-0.20241003113924-44d6482e7e57 h1:HOgkqXBRIQm7iS3BJFNjqZtOB3i+7QZGalbx6fZNi9c=
-seehuhn.de/go/postscript v0.5.1-0.20241003113924-44d6482e7e57/go.mod h1:s6uRV/9LCzzU7IbbPDcyp3th/P7KAeH33zRLzQ64Tko=
+seehuhn.de/go/postscript v0.5.1-0.20241008121001-8b4ec5f2dc52 h1:wNMo1ztmNXe0lBrFFpVP6pI5SCYdjOQcIUUpQRQgEsM=
+seehuhn.de/go/postscript v0.5.1-0.20241008121001-8b4ec5f2dc52/go.mod h1:s6uRV/9LCzzU7IbbPDcyp3th/P7KAeH33zRLzQ64Tko=
 seehuhn.de/go/sfnt v0.5.1-0.20240917221416-7f741b7e724b h1:5D1Imw8G4mSeLxqzbYvU//3H4J+T+fX60uxzxa4Zzks=
 seehuhn.de/go/sfnt v0.5.1-0.20240917221416-7f741b7e724b/go.mod h1:eNVAWX0znX7H0qi5jwHPsOoWRlDVZD7V0dFr0TU0zZ8=
 seehuhn.de/go/xmp v0.3.0 h1:663c5gVv5fJfpKFpWKE0d/LlnPaPXJpD6WHRSEnESzo=
