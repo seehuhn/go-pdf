@@ -25,7 +25,7 @@ type FontData struct {
 	StemV        float64
 	StemH        float64
 
-	Widths map[string]float64
+	Width map[string]float64
 }
 
 var Metrics map[string]*FontData = metrics
@@ -45,7 +45,7 @@ var metrics = map[string]*FontData{
 		XHeight:      417,
 		StemV:        51,
 		StemH:        52,
-		Widths: map[string]float64{
+		Width: map[string]float64{
 			".notdef":        600,
 			"A":              600,
 			"AE":             600,
@@ -292,7 +292,7 @@ var metrics = map[string]*FontData{
 		XHeight:      437,
 		StemV:        108,
 		StemH:        103,
-		Widths: map[string]float64{
+		Width: map[string]float64{
 			".notdef":        600,
 			"A":              600,
 			"AE":             600,
@@ -539,7 +539,7 @@ var metrics = map[string]*FontData{
 		XHeight:      437,
 		StemV:        112,
 		StemH:        103,
-		Widths: map[string]float64{
+		Width: map[string]float64{
 			".notdef":        600,
 			"A":              600,
 			"AE":             600,
@@ -786,7 +786,7 @@ var metrics = map[string]*FontData{
 		XHeight:      417,
 		StemV:        53,
 		StemH:        51,
-		Widths: map[string]float64{
+		Width: map[string]float64{
 			".notdef":        600,
 			"A":              600,
 			"AE":             600,
@@ -1033,7 +1033,7 @@ var metrics = map[string]*FontData{
 		XHeight:      524,
 		StemV:        93,
 		StemH:        81,
-		Widths: map[string]float64{
+		Width: map[string]float64{
 			".notdef":        278,
 			"A":              667,
 			"AE":             1000,
@@ -1280,7 +1280,7 @@ var metrics = map[string]*FontData{
 		XHeight:      540,
 		StemV:        139,
 		StemH:        124,
-		Widths: map[string]float64{
+		Width: map[string]float64{
 			".notdef":        278,
 			"A":              722,
 			"AE":             1000,
@@ -1527,7 +1527,7 @@ var metrics = map[string]*FontData{
 		XHeight:      540,
 		StemV:        143,
 		StemH:        113,
-		Widths: map[string]float64{
+		Width: map[string]float64{
 			".notdef":        278,
 			"A":              722,
 			"AE":             1000,
@@ -1774,7 +1774,7 @@ var metrics = map[string]*FontData{
 		XHeight:      524,
 		StemV:        89,
 		StemH:        81,
-		Widths: map[string]float64{
+		Width: map[string]float64{
 			".notdef":        278,
 			"A":              667,
 			"AE":             1000,
@@ -2021,7 +2021,7 @@ var metrics = map[string]*FontData{
 		XHeight:      500,
 		StemV:        88,
 		StemH:        56,
-		Widths: map[string]float64{
+		Width: map[string]float64{
 			".notdef":        250,
 			"Alpha":          722,
 			"Beta":           667,
@@ -2228,7 +2228,7 @@ var metrics = map[string]*FontData{
 		XHeight:      461,
 		StemV:        138,
 		StemH:        33,
-		Widths: map[string]float64{
+		Width: map[string]float64{
 			".notdef":        250,
 			"A":              722,
 			"AE":             1000,
@@ -2475,7 +2475,7 @@ var metrics = map[string]*FontData{
 		XHeight:      449,
 		StemV:        118,
 		StemH:        33,
-		Widths: map[string]float64{
+		Width: map[string]float64{
 			".notdef":        250,
 			"A":              667,
 			"AE":             944,
@@ -2722,7 +2722,7 @@ var metrics = map[string]*FontData{
 		XHeight:      432,
 		StemV:        78,
 		StemH:        23,
-		Widths: map[string]float64{
+		Width: map[string]float64{
 			".notdef":        250,
 			"A":              611,
 			"AE":             889,
@@ -2969,7 +2969,7 @@ var metrics = map[string]*FontData{
 		XHeight:      450,
 		StemV:        83,
 		StemH:        38,
-		Widths: map[string]float64{
+		Width: map[string]float64{
 			".notdef":        250,
 			"A":              722,
 			"AE":             889,
@@ -3216,7 +3216,7 @@ var metrics = map[string]*FontData{
 		XHeight:      567,
 		StemV:        0,
 		StemH:        0,
-		Widths: map[string]float64{
+		Width: map[string]float64{
 			".notdef": 278,
 			"a1":      974,
 			"a10":     692,

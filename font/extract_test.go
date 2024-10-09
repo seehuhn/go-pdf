@@ -163,7 +163,7 @@ func extractFont(r pdf.Getter, fontDict pdf.Object) (Dict, error) {
 	if err != nil {
 		return nil, err
 	}
-	switch dicts.Type {
+	switch dicts.FontTypeOld {
 	case font.CFFComposite:
 		return cff.ExtractComposite(r, dicts)
 	case font.CFFSimple:

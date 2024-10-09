@@ -25,7 +25,6 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/widths"
-	"seehuhn.de/go/pdf/internal/stdmtx"
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/type1"
 )
@@ -70,7 +69,7 @@ type FontDict struct {
 // is included in the file.  `Metrics` is always present, and contains
 // all information available in the PDF file.
 func Extract(r pdf.Getter, dicts *font.Dicts) (*FontDict, error) {
-	if err := dicts.Type.MustBe(font.Type1); err != nil {
+	if err := dicts.FontTypeOld.MustBe(font.Type1); err != nil {
 		return nil, err
 	}
 
@@ -118,43 +117,31 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*FontDict, error) {
 
 	res.ResName, _ = pdf.GetName(r, dicts.FontDict["Name"])
 
-	if dicts.FontDescriptor != nil {
-		res.IsSerif = dicts.FontDescriptor.IsSerif
-		res.IsScript = dicts.FontDescriptor.IsScript
-		res.IsAllCap = dicts.FontDescriptor.IsAllCap
-		res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
-	}
+	res.IsSerif = dicts.FontDescriptor.IsSerif
+	res.IsScript = dicts.FontDescriptor.IsScript
+	res.IsAllCap = dicts.FontDescriptor.IsAllCap
+	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
 
 	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
 		res.ToUnicode = info
 	}
 
-	useMetrics := psFont == nil || dicts.FontDescriptor != nil
-	if useMetrics {
-		ww := make([]float64, 256) // text space units times 1000
-		widthsDict, _ := pdf.GetArray(r, dicts.FontDict["Widths"])
-		if widthsDict != nil {
-			var defaultWidth float64
-			if dicts.FontDescriptor != nil {
-				defaultWidth = dicts.FontDescriptor.MissingWidth
-			}
+	ww := make([]float64, 256) // text space units times 1000
+	widthsDict, _ := pdf.GetArray(r, dicts.FontDict["Widths"])
+	if widthsDict != nil {
+		defaultWidth := dicts.FontDescriptor.MissingWidth
 
-			firstChar, _ := pdf.GetInteger(r, dicts.FontDict["FirstChar"])
-			if firstChar < 0 {
-				firstChar = 0
-			} else if firstChar > 256 {
-				firstChar = 256
-			}
-			for i := range ww {
-				ww[i] = defaultWidth
-				if i >= int(firstChar) && i < int(firstChar)+len(widthsDict) {
-					x, _ := pdf.GetNumber(r, widthsDict[i-int(firstChar)])
-					ww[i] = float64(x)
-				}
-			}
-		} else if m, ok := stdmtx.Metrics[string(dicts.PostScriptName)]; ok {
-			for i, name := range encoding {
-				ww[i] = m.Widths[name]
+		firstChar, _ := pdf.GetInteger(r, dicts.FontDict["FirstChar"])
+		if firstChar < 0 {
+			firstChar = 0
+		} else if firstChar > 256 {
+			firstChar = 256
+		}
+		for i := range ww {
+			ww[i] = defaultWidth
+			if i >= int(firstChar) && i < int(firstChar)+len(widthsDict) {
+				x, _ := pdf.GetNumber(r, widthsDict[i-int(firstChar)])
+				ww[i] = float64(x)
 			}
 		}
 
@@ -174,12 +161,10 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*FontDict, error) {
 				metrics.Glyphs[name] = &afm.GlyphInfo{WidthX: ww[i]}
 			}
 		}
-		if dicts.FontDescriptor != nil {
-			metrics.Ascent = dicts.FontDescriptor.Ascent
-			metrics.Descent = dicts.FontDescriptor.Descent
-			metrics.CapHeight = dicts.FontDescriptor.CapHeight
-			metrics.XHeight = dicts.FontDescriptor.XHeight
-		}
+		metrics.Ascent = dicts.FontDescriptor.Ascent
+		metrics.Descent = dicts.FontDescriptor.Descent
+		metrics.CapHeight = dicts.FontDescriptor.CapHeight
+		metrics.XHeight = dicts.FontDescriptor.XHeight
 		res.Metrics = metrics
 	}
 

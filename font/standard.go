@@ -18,6 +18,8 @@ package font
 
 // IsStandard determines whether a font is one of the 14 standard PDF Type 1 fonts.
 // This is based solely on the font's PostScript name.
+//
+// TODO(voss): use the [stdmtx] package instead.
 var IsStandard = map[string]bool{
 	"Courier":               true,
 	"Courier-Bold":          true,
@@ -35,15 +37,10 @@ var IsStandard = map[string]bool{
 	"ZapfDingbats":          true,
 }
 
-// IsStandardSymbolic determines whether a font is one of the 2 standard
-// symbolic fonts.
-var IsStandardSymbolic = map[string]bool{
-	"Symbol":       true,
-	"ZapfDingbats": true,
-}
-
 // IsStandardNonSymbolic determines whether a font is one of the 12 standard
 // non-symbolic fonts.
+//
+// TODO(voss): use the [stdmtx] package instead.
 var IsStandardNonSymbolic = map[string]bool{
 	"Courier":               true,
 	"Courier-Bold":          true,

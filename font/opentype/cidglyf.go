@@ -336,7 +336,7 @@ func (info *FontDictGlyfComposite) Embed(w *pdf.Writer, fontDictRef pdf.Referenc
 
 // ExtractGlyfComposite extracts information for a composite OpenType/glyf font.
 func ExtractGlyfComposite(r pdf.Getter, dicts *font.Dicts) (*FontDictGlyfComposite, error) {
-	if err := dicts.Type.MustBe(font.OpenTypeGlyfComposite); err != nil {
+	if err := dicts.FontTypeOld.MustBe(font.OpenTypeGlyfComposite); err != nil {
 		return nil, err
 	}
 	res := &FontDictGlyfComposite{}

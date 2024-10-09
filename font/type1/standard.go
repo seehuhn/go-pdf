@@ -30,7 +30,7 @@ func GetStandardWidth(fontName, glyphName string) (float64, error) {
 		return 0, fmt.Errorf("unknown standard font %q", fontName)
 	}
 
-	w, ok := m.Widths[glyphName]
+	w, ok := m.Width[glyphName]
 	if !ok {
 		return 0, fmt.Errorf("unknown glyph %q in font %q", glyphName, fontName)
 	}

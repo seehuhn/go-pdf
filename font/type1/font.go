@@ -373,7 +373,7 @@ func isStandard(fontName string, enc []string, ww []float64) bool {
 		if glyphName == ".notdef" || glyphName == notdefForce {
 			continue
 		}
-		w, ok := m.Widths[glyphName]
+		w, ok := m.Width[glyphName]
 		if !ok {
 			return false
 		}

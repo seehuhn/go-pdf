@@ -31,8 +31,10 @@ import (
 // See section 9.8.1 of PDF 32000-2:2020.
 type Descriptor struct {
 	// FontName (required, except for Type 3 fonts) is the PostScript name of the font.
-	// This field is used primarily for the purpose of determining if a font has been subset.
+	// If the font has been subsetted, the name is prefixed with a subset tag
+	// of the form "AAAAAA+".
 	//
+	// This field is used primarily for the purpose of determining if a font has been subset.
 	// See https://github.com/pdf-association/pdf-issues/issues/11 .
 	FontName string
 

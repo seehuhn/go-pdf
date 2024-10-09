@@ -337,7 +337,7 @@ func (info *FontDictComposite) Embed(w *pdf.Writer, fontDictRef pdf.Reference) e
 // ExtractComposite extracts information about a composite TrueType font.
 // This is the reverse of [FontDictComposite.Embed].
 func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*FontDictComposite, error) {
-	if err := dicts.Type.MustBe(font.TrueTypeComposite); err != nil {
+	if err := dicts.FontTypeOld.MustBe(font.TrueTypeComposite); err != nil {
 		return nil, err
 	}
 	res := &FontDictComposite{}

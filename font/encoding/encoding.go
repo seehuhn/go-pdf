@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/pdfenc"
 )
@@ -372,8 +373,8 @@ func (e *Encoding) AsPDFType3(opt pdf.OutputOptions) (pdf.Object, error) {
 	return dict, nil
 }
 
-func ExtractType1(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (*Encoding, error) {
-	obj, err := pdf.Resolve(r, obj)
+func ExtractType1(r pdf.Getter, dicts *font.Dicts) (*Encoding, error) {
+	obj, err := pdf.Resolve(r, dicts.FontDict["Encoding"])
 	if err != nil {
 		return nil, err
 	}
@@ -405,7 +406,7 @@ func ExtractType1(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (*Encoding,
 			if err != nil {
 				return nil, err
 			}
-		} else if nonSymbolicExt {
+		} else if dicts.IsNonSymbolic() && dicts.IsExternal() {
 			e.initStandardEncoding()
 		} else {
 			e.initBuiltInEncoding()

@@ -208,7 +208,7 @@ func printObject(args ...string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("**", dicts.Type.String(), "font", dicts.PostScriptName)
+		fmt.Println("**", dicts.DictType.String(), "font", dicts.PostScriptName)
 		fmt.Println()
 		fmt.Print("Font dict: ")
 		err = e.show(dicts.FontDict)

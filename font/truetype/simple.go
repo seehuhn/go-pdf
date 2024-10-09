@@ -142,7 +142,7 @@ type FontDictSimple struct {
 // ExtractSimple extracts information about a simple TrueType font.
 // This is the inverse of [FontDictSimple.Embed].
 func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*FontDictSimple, error) {
-	if err := dicts.Type.MustBe(font.TrueTypeSimple); err != nil {
+	if err := dicts.FontTypeOld.MustBe(font.TrueTypeSimple); err != nil {
 		return nil, err
 	}
 

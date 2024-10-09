@@ -227,7 +227,7 @@ func (info *EmbedInfo) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 
 // Extract extracts information about a type 3 font from a PDF file.
 func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
-	if err := dicts.Type.MustBe(font.Type3); err != nil {
+	if err := dicts.FontTypeOld.MustBe(font.Type3); err != nil {
 		return nil, err
 	}
 

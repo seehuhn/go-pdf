@@ -62,8 +62,8 @@ func TestSamples(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if dicts.Type != sample.Type {
-				t.Errorf("got %q, want %q", dicts.Type, sample.Type)
+			if dicts.FontTypeOld != sample.Type {
+				t.Errorf("got %q, want %q", dicts.FontTypeOld, sample.Type)
 			}
 		})
 	}

@@ -270,7 +270,7 @@ func (info *FontDictGlyfSimple) Embed(w *pdf.Writer, fontDictRef pdf.Reference) 
 
 // ExtractGlyfSimple extracts information about a simple OpenType font.
 func ExtractGlyfSimple(r pdf.Getter, dicts *font.Dicts) (*FontDictGlyfSimple, error) {
-	if err := dicts.Type.MustBe(font.OpenTypeGlyfSimple); err != nil {
+	if err := dicts.FontTypeOld.MustBe(font.OpenTypeGlyfSimple); err != nil {
 		return nil, err
 	}
 

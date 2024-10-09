@@ -160,7 +160,7 @@ type FontDictCFFComposite struct {
 // ExtractCFFComposite extracts information about a composite OpenType/CFF font from a PDF file.
 // This is the inverse of [FontDictCFFComposite.Embed].
 func ExtractCFFComposite(r pdf.Getter, dicts *font.Dicts) (*FontDictCFFComposite, error) {
-	if err := dicts.Type.MustBe(font.OpenTypeCFFComposite); err != nil {
+	if err := dicts.FontTypeOld.MustBe(font.OpenTypeCFFComposite); err != nil {
 		return nil, err
 	}
 

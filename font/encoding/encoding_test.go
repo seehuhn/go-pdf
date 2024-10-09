@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/pdfenc"
 )
 
@@ -394,11 +395,22 @@ func TestAsPDF(t *testing.T) {
 				var err error
 				switch tp {
 				case 'A':
+					dicts := &font.Dicts{
+						DictType:       font.DictTypeSimpleType1,
+						FontDict:       pdf.Dict{},
+						FontDescriptor: &font.Descriptor{},
+					}
+					if !nonSymbolicExt {
+						dicts.FontDescriptor.IsSymbolic = true
+					}
+
 					obj, err = enc1.AsPDFType1(nonSymbolicExt, pdf.OptPretty|pdf.OptDictTypes)
 					if err != nil {
 						t.Fatal(err)
 					}
-					enc2, err = ExtractType1(nil, obj, nonSymbolicExt)
+					dicts.FontDict["Encoding"] = obj
+
+					enc2, err = ExtractType1(nil, dicts)
 					if err != nil {
 						t.Fatal(err)
 					}

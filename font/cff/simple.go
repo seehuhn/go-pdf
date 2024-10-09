@@ -145,7 +145,7 @@ type FontDictSimple struct {
 // ExtractSimple extracts information about a simple CFF font from a PDF file.
 // This is the inverse of [FontDictSimple.Embed].
 func ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*FontDictSimple, error) {
-	if err := dicts.Type.MustBe(font.CFFSimple); err != nil {
+	if err := dicts.FontTypeOld.MustBe(font.CFFSimple); err != nil {
 		return nil, err
 	}
 

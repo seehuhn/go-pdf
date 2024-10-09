@@ -74,9 +74,7 @@ func (r *Reader) readSimpleFont(info *font.Dicts, toUni *cmap.ToUnicodeInfo) (F 
 	var enc *encoding.Encoding
 	switch info.DictType {
 	case font.DictTypeSimpleType1:
-		isNonSymbolic := info.IsNonSymbolic()
-		isExternal := info.FontData == nil
-		enc, err = encoding.ExtractType1(r.R, info.FontDict["Encoding"], isNonSymbolic && isExternal)
+		enc, err = encoding.ExtractType1(r.R, info)
 		if err != nil {
 			return nil, err
 		}
@@ -146,10 +144,8 @@ func (r *Reader) extractWidths(info *font.Dicts) ([]float64, error) {
 	}
 
 	widths := make([]float64, 256)
-	if info.FontDescriptor != nil {
-		for c := range widths {
-			widths[c] = info.FontDescriptor.MissingWidth / 1000
-		}
+	for c := range widths {
+		widths[c] = info.FontDescriptor.MissingWidth / 1000
 	}
 	w, err := pdf.GetArray(r.R, info.FontDict["Widths"])
 	if err != nil {

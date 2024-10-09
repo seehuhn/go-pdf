@@ -179,7 +179,7 @@ type FontData struct {
 	StemV        float64
 	StemH        float64
 
-	Widths map[string]float64
+	Width map[string]float64
 }
 
 var Metrics map[string]*FontData = metrics
@@ -200,7 +200,7 @@ var metrics = map[string]*FontData{
 		XHeight: {{ $metrics.XHeight }},
 		StemV: {{ $metrics.StemV }},
 		StemH: {{ $metrics.StemH }},
-        Widths: map[string]float64{
+        Width: map[string]float64{
         {{- range $char, $width := $metrics.Widths }}
             "{{ $char }}": {{ $width }},
         {{- end }}
