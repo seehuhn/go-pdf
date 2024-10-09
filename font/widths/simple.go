@@ -18,6 +18,7 @@ package widths
 
 import (
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 )
 
 // Info contains the FirstChar, LastChar and Widths entries of
@@ -75,4 +76,50 @@ func EncodeSimple(ww []float64) *Info {
 		Widths:       Widths,
 		MissingWidth: MissingWidth,
 	}
+}
+
+// ExtractSimple extracts glyph widths from a simple font. The returned slice
+// has length 256 and is indexed by character code. Widths values are given in
+// PDF glyph space units.
+//
+// The function ignores errors from malformed PDF files as much as possible,
+// and uses FontDescriptor.MissingWidth for glyphs where a width cannot be
+// inferred.
+func ExtractSimple(r pdf.Getter, dicts *font.Dicts) ([]float64, error) {
+	res := make([]float64, 256)
+	if dicts.FontDescriptor != nil {
+		for c := range res {
+			res[c] = dicts.FontDescriptor.MissingWidth
+		}
+	}
+
+	firstChar, err := pdf.GetInteger(r, dicts.FontDict["FirstChar"])
+	if err != nil && !pdf.IsMalformed(err) {
+		return nil, err
+	}
+	widths, err := pdf.GetArray(r, dicts.FontDict["Widths"])
+	if err != nil && !pdf.IsMalformed(err) {
+		return nil, err
+	}
+
+	for firstChar < 0 && len(widths) > 0 {
+		firstChar++
+		widths = widths[1:]
+	}
+
+	// Now we have either firstChar >= 0 or widths is empty.
+
+	code := firstChar
+	for code < 256 && len(widths) > 0 {
+		width, err := pdf.GetNumber(r, widths[0])
+		if err != nil && !pdf.IsMalformed(err) {
+			return nil, err
+		} else if err == nil {
+			res[code] = float64(width)
+		}
+		code++
+		widths = widths[1:]
+	}
+
+	return res, nil
 }
