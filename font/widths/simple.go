@@ -107,7 +107,7 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) ([]float64, error) {
 		widths = widths[1:]
 	}
 
-	// Now we have either firstChar >= 0 or widths is empty.
+	// Now either firstChar >= 0, or widths is empty.
 
 	code := firstChar
 	for code < 256 && len(widths) > 0 {
