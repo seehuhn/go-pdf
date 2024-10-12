@@ -58,9 +58,7 @@ func (f *Type1Font) PostScriptName() string {
 
 func (f *Type1Font) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
 	ref := rm.Out.Alloc()
-	fd := &font.Descriptor{
-		IsSymbolic: false,
-	}
+	fd := &font.Descriptor{}
 	var builtinEncoding []string
 	if ps := f.Font; ps != nil {
 		fd.FontName = ps.FontName
@@ -102,11 +100,15 @@ func (f *Type1Font) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, e
 }
 
 type Type1Dicts struct {
-	Ref             pdf.Reference
-	Name            pdf.Name
-	SubsetTag       string
-	PostScriptName  string
-	Descriptor      *font.Descriptor
+	Ref            pdf.Reference
+	Name           pdf.Name
+	SubsetTag      string
+	PostScriptName string
+
+	// Descriptor is the font descriptor dictionary.
+	// To following fields are ignored: FontName, MissingWidth.
+	Descriptor *font.Descriptor
+
 	BuiltinEncoding []string
 	Encoding        *encoding.Encoding
 	Font            any // TODO(voss): use an interface type here?
@@ -131,8 +133,8 @@ func (d *Type1Dicts) DecodeWidth(s pdf.String) (float64, int) {
 func (d *Type1Dicts) Finish(rm *pdf.ResourceManager) error {
 	w := rm.Out
 
-	var fontName string
 	if d.Font != nil {
+		var fontName string
 		switch f := d.Font.(type) {
 		case *type1.Font:
 			fontName = f.FontName
@@ -152,9 +154,9 @@ func (d *Type1Dicts) Finish(rm *pdf.ResourceManager) error {
 		default:
 			return fmt.Errorf("unsupported font type: %T", d.Font)
 		}
-	}
-	if d.Font != nil && fontName != d.PostScriptName {
-		return fmt.Errorf("font name mismatch: %s != %s", fontName, d.PostScriptName)
+		if fontName != d.PostScriptName {
+			return fmt.Errorf("font name mismatch: %s != %s", fontName, d.PostScriptName)
+		}
 	}
 	if d.SubsetTag != "" && !subset.IsValidTag(d.SubsetTag) {
 		return fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
@@ -201,6 +203,7 @@ func (d *Type1Dicts) Finish(rm *pdf.ResourceManager) error {
 	var fontFileRef pdf.Reference
 	if d.Descriptor != nil {
 		desc := d.Descriptor.AsDict()
+		desc["FontName"] = pdf.Name(baseFont)
 
 		widthRef := w.Alloc()
 		widthInfo := widths.EncodeSimple(d.Width[:])
