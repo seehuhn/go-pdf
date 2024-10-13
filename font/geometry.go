@@ -34,7 +34,8 @@ type Geometry struct {
 	UnderlineThickness float64
 
 	GlyphExtents []rect.Rect // indexed by GID
-	Widths       []float64   // indexed by GID, PDF text space units
+
+	Widths []float64 // indexed by GID, PDF text space units
 }
 
 // GetGeometry returns the geometry of a font.
@@ -63,10 +64,10 @@ func (g *Geometry) BoundingBox(fontSize float64, gg *GlyphSeq) *pdf.Rectangle {
 		}
 
 		b := &pdf.Rectangle{
-			LLx: bbox.LLx*fontSize + xPos,
-			LLy: bbox.LLy*fontSize + glyph.Rise,
-			URx: bbox.URx*fontSize + xPos,
-			URy: bbox.URy*fontSize + glyph.Rise,
+			LLx: bbox.LLx*fontSize/1000 + xPos,
+			LLy: bbox.LLy*fontSize/1000 + glyph.Rise,
+			URx: bbox.URx*fontSize/1000 + xPos,
+			URy: bbox.URy*fontSize/1000 + glyph.Rise,
 		}
 		res.Extend(b)
 		xPos += glyph.Advance

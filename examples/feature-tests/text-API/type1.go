@@ -99,6 +99,10 @@ func (f *Type1Font) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, e
 	return ref, dicts, nil
 }
 
+type Type1FontData interface {
+	GetEncoding() []string
+}
+
 type Type1Dicts struct {
 	Ref            pdf.Reference
 	Name           pdf.Name
@@ -111,7 +115,7 @@ type Type1Dicts struct {
 
 	BuiltinEncoding []string
 	Encoding        *encoding.Encoding
-	Font            any // TODO(voss): use an interface type here?
+	Font            Type1FontData
 	Width           [256]float64
 	Text            [256]string
 }
