@@ -80,6 +80,12 @@ const (
 	// OptDictTypes adds optional dictionary /Type arguments.
 	OptDictTypes
 
+	// OptTrimStandardFonts omits the font descriptor and glyph width
+	// information from font dictionaries for the 14 standard PDF fonts, where
+	// possible.  This can reduce file size but may affect compatibility with
+	// some PDF readers.
+	OptTrimStandardFonts
+
 	// optObjStm allows the use of object streams.
 	optObjStm
 

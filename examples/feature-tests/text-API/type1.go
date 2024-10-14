@@ -37,6 +37,7 @@ import (
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/widths"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/internal/stdmtx"
 )
 
 var _ font.Font = (*Type1Font)(nil)
@@ -59,14 +60,10 @@ func (f *Type1Font) PostScriptName() string {
 func (f *Type1Font) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
 	ref := rm.Out.Alloc()
 	fd := &font.Descriptor{}
-	var builtinEncoding []string
 	if ps := f.Font; ps != nil {
 		fd.FontName = ps.FontName
 		fd.FontFamily = ps.FamilyName
 		fd.FontWeight = os2.WeightFromString(ps.Weight)
-		if len(ps.Encoding) == 256 {
-			builtinEncoding = ps.Encoding
-		}
 		fd.FontBBox = ps.FontBBoxPDF()
 		fd.IsItalic = ps.ItalicAngle != 0
 		fd.ItalicAngle = ps.ItalicAngle
@@ -77,9 +74,6 @@ func (f *Type1Font) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, e
 	}
 	if m := f.Metrics; m != nil {
 		fd.FontName = m.FontName
-		if len(m.Encoding) == 256 {
-			builtinEncoding = m.Encoding
-		}
 		fd.FontBBox = m.FontBBoxPDF()
 		fd.CapHeight = m.CapHeight
 		fd.XHeight = m.XHeight
@@ -90,11 +84,11 @@ func (f *Type1Font) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, e
 		fd.IsFixedPitch = m.IsFixedPitch
 	}
 	dicts := &Type1Dicts{
-		Ref:             ref,
-		PostScriptName:  f.Font.FontName,
-		Descriptor:      fd,
-		BuiltinEncoding: builtinEncoding,
-		Encoding:        encoding.New(),
+		Ref:            ref,
+		PostScriptName: f.Font.FontName,
+		Descriptor:     fd,
+		Encoding:       encoding.New(),
+		Font:           f.Font,
 	}
 	return ref, dicts, nil
 }
@@ -113,11 +107,12 @@ type Type1Dicts struct {
 	// To following fields are ignored: FontName, MissingWidth.
 	Descriptor *font.Descriptor
 
-	BuiltinEncoding []string
-	Encoding        *encoding.Encoding
-	Font            Type1FontData
-	Width           [256]float64
-	Text            [256]string
+	Encoding *encoding.Encoding
+	Width    [256]float64
+	Text     [256]string
+
+	// Font (optional) is the font data to embed.
+	Font Type1FontData
 }
 
 func (d *Type1Dicts) WritingMode() cmap.WritingMode {
@@ -165,10 +160,6 @@ func (d *Type1Dicts) Finish(rm *pdf.ResourceManager) error {
 	if d.SubsetTag != "" && !subset.IsValidTag(d.SubsetTag) {
 		return fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
 	}
-	canOmit := font.IsStandard[d.PostScriptName] && pdf.GetVersion(w) < pdf.V2_0 && d.Font == nil
-	if d.Descriptor == nil && !canOmit {
-		return errors.New("missing font descriptor")
-	}
 
 	var baseFont pdf.Name
 	if d.SubsetTag != "" {
@@ -186,12 +177,7 @@ func (d *Type1Dicts) Finish(rm *pdf.ResourceManager) error {
 		fontDict["Name"] = d.Name
 	}
 
-	var isNonSymbolic bool
-	if d.Descriptor != nil {
-		isNonSymbolic = !d.Descriptor.IsSymbolic
-	} else {
-		isNonSymbolic = font.IsStandardNonSymbolic[d.PostScriptName]
-	}
+	isNonSymbolic := !d.Descriptor.IsSymbolic
 	isExternal := d.Font == nil
 	encoding, err := d.Encoding.AsPDFType1(isNonSymbolic && isExternal, w.GetOptions())
 	if err != nil {
@@ -205,36 +191,50 @@ func (d *Type1Dicts) Finish(rm *pdf.ResourceManager) error {
 	compressedRefs := []pdf.Reference{d.Ref}
 
 	var fontFileRef pdf.Reference
-	if d.Descriptor != nil {
-		desc := d.Descriptor.AsDict()
-		desc["FontName"] = pdf.Name(baseFont)
 
-		widthRef := w.Alloc()
-		widthInfo := widths.EncodeSimple(d.Width[:])
-		fontDict["FirstChar"] = widthInfo.FirstChar
-		fontDict["LastChar"] = widthInfo.LastChar
-		fontDict["Widths"] = widthRef
-		if widthInfo.MissingWidth != 0 {
-			desc["MissingWidth"] = pdf.Number(widthInfo.MissingWidth)
-		} else {
-			delete(desc, "MissingWidth")
+	stdInfo, isStdFont := stdmtx.Metrics[d.PostScriptName]
+	trimFontDict := (isStdFont &&
+		rm.Out.GetOptions().HasAny(pdf.OptTrimStandardFonts) &&
+		d.Font == nil)
+	if trimFontDict {
+		// TODO(voss): check that the widths are compatible
+		// TODO(voss): check that the font descriptor is compatible
+		_ = stdInfo
+	}
+
+	desc := d.Descriptor.AsDict()
+	desc["FontName"] = pdf.Name(baseFont)
+
+	widthRef := w.Alloc()
+	widthInfo := widths.EncodeSimple(d.Width[:])
+	fontDict["FirstChar"] = widthInfo.FirstChar
+	fontDict["LastChar"] = widthInfo.LastChar
+	fontDict["Widths"] = widthRef
+	if widthInfo.MissingWidth != 0 {
+		desc["MissingWidth"] = pdf.Number(widthInfo.MissingWidth)
+	} else {
+		delete(desc, "MissingWidth")
+	}
+
+	descRef := w.Alloc()
+	fontDict["FontDescriptor"] = descRef
+
+	compressedObjects = append(compressedObjects, desc, widthInfo.Widths)
+	compressedRefs = append(compressedRefs, descRef, widthRef)
+
+	if d.Font != nil {
+		fontFileRef = w.Alloc()
+		switch d.Font.(type) {
+		case *type1.Font:
+			desc["FontFile"] = fontFileRef
+		case *cff.Font, *sfnt.Font:
+			desc["FontFile3"] = fontFileRef
 		}
+	}
 
-		descRef := w.Alloc()
-		fontDict["FontDescriptor"] = descRef
-
-		compressedObjects = append(compressedObjects, desc, widthInfo.Widths)
-		compressedRefs = append(compressedRefs, descRef, widthRef)
-
-		if d.Font != nil {
-			fontFileRef = w.Alloc()
-			switch d.Font.(type) {
-			case *type1.Font:
-				desc["FontFile"] = fontFileRef
-			case *cff.Font, *sfnt.Font:
-				desc["FontFile3"] = fontFileRef
-			}
-		}
+	var builtinEncoding []string
+	if d.Font != nil {
+		builtinEncoding = d.Font.GetEncoding()
 	}
 
 	needsToUnicode := false
@@ -249,8 +249,8 @@ func (d *Type1Dicts) Finish(rm *pdf.ResourceManager) error {
 		}
 
 		glyphName := d.Encoding.GlyphName(cid)
-		if glyphName == "" && code < len(d.BuiltinEncoding) && d.BuiltinEncoding[code] != ".notdef" {
-			glyphName = d.BuiltinEncoding[code]
+		if glyphName == "" && code < len(builtinEncoding) && builtinEncoding[code] != ".notdef" {
+			glyphName = builtinEncoding[code]
 		}
 
 		if glyphName == "" {
