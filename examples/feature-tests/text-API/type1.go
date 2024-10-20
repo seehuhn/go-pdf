@@ -19,6 +19,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 
 	"seehuhn.de/go/postscript/afm"
@@ -94,14 +95,22 @@ func (f *Type1Font) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, e
 }
 
 type Type1FontData interface {
+	PostScriptName() string
 	GetEncoding() []string
+	WidthsMapPDF() map[string]float64
 }
+
+var (
+	_ Type1FontData = (*type1.Font)(nil)
+	_ Type1FontData = (*cff.Font)(nil)
+	_ Type1FontData = (*sfnt.Font)(nil)
+)
 
 type Type1Dicts struct {
 	Ref            pdf.Reference
-	Name           pdf.Name
-	SubsetTag      string
 	PostScriptName string
+	SubsetTag      string
+	Name           pdf.Name
 
 	// Descriptor is the font descriptor dictionary.
 	// To following fields are ignored: FontName, MissingWidth.
@@ -112,6 +121,7 @@ type Type1Dicts struct {
 	Text     [256]string
 
 	// Font (optional) is the font data to embed.
+	// This must be one of *type1.Font, *cff.Font, or *sfnt.Font.
 	Font Type1FontData
 }
 
@@ -133,15 +143,11 @@ func (d *Type1Dicts) Finish(rm *pdf.ResourceManager) error {
 	w := rm.Out
 
 	if d.Font != nil {
-		var fontName string
 		switch f := d.Font.(type) {
-		case *type1.Font:
-			fontName = f.FontName
 		case *cff.Font:
 			if f.IsCIDKeyed() {
 				return errors.New("CID-keyed fonts not allowed")
 			}
-			fontName = f.FontName
 		case *sfnt.Font:
 			o, _ := f.Outlines.(*cff.Outlines)
 			if o == nil {
@@ -149,10 +155,11 @@ func (d *Type1Dicts) Finish(rm *pdf.ResourceManager) error {
 			} else if o.IsCIDKeyed() {
 				return errors.New("CID-keyed fonts not allowed")
 			}
-			fontName = f.PostScriptName()
 		default:
 			return fmt.Errorf("unsupported font type: %T", d.Font)
 		}
+
+		fontName := d.Font.PostScriptName()
 		if fontName != d.PostScriptName {
 			return fmt.Errorf("font name mismatch: %s != %s", fontName, d.PostScriptName)
 		}
@@ -179,62 +186,65 @@ func (d *Type1Dicts) Finish(rm *pdf.ResourceManager) error {
 
 	isNonSymbolic := !d.Descriptor.IsSymbolic
 	isExternal := d.Font == nil
-	encoding, err := d.Encoding.AsPDFType1(isNonSymbolic && isExternal, w.GetOptions())
+	encodingObject, err := d.Encoding.AsPDFType1(isNonSymbolic && isExternal, w.GetOptions())
 	if err != nil {
 		return err
 	}
-	if encoding != nil {
-		fontDict["Encoding"] = encoding
+	if encodingObject != nil {
+		fontDict["Encoding"] = encodingObject
 	}
+
+	// TODO(voss): to construct the widths array, we need to know the actual
+	// encoding used.  Since `encodingObject` may map more codes than `d.Encoding`,
+	// we need to use `encodingObject` to construct the widths array.
 
 	compressedObjects := []pdf.Object{fontDict}
 	compressedRefs := []pdf.Reference{d.Ref}
 
-	var fontFileRef pdf.Reference
-
 	stdInfo, isStdFont := stdmtx.Metrics[d.PostScriptName]
-	trimFontDict := (isStdFont &&
-		rm.Out.GetOptions().HasAny(pdf.OptTrimStandardFonts) &&
-		d.Font == nil)
-	if trimFontDict {
-		// TODO(voss): check that the widths are compatible
-		// TODO(voss): check that the font descriptor is compatible
-		_ = stdInfo
-	}
-
-	desc := d.Descriptor.AsDict()
-	desc["FontName"] = pdf.Name(baseFont)
-
-	widthRef := w.Alloc()
-	widthInfo := widths.EncodeSimple(d.Width[:])
-	fontDict["FirstChar"] = widthInfo.FirstChar
-	fontDict["LastChar"] = widthInfo.LastChar
-	fontDict["Widths"] = widthRef
-	if widthInfo.MissingWidth != 0 {
-		desc["MissingWidth"] = pdf.Number(widthInfo.MissingWidth)
-	} else {
-		delete(desc, "MissingWidth")
-	}
-
-	descRef := w.Alloc()
-	fontDict["FontDescriptor"] = descRef
-
-	compressedObjects = append(compressedObjects, desc, widthInfo.Widths)
-	compressedRefs = append(compressedRefs, descRef, widthRef)
-
-	if d.Font != nil {
-		fontFileRef = w.Alloc()
-		switch d.Font.(type) {
-		case *type1.Font:
-			desc["FontFile"] = fontFileRef
-		case *cff.Font, *sfnt.Font:
-			desc["FontFile3"] = fontFileRef
-		}
-	}
 
 	var builtinEncoding []string
 	if d.Font != nil {
 		builtinEncoding = d.Font.GetEncoding()
+	} else if isStdFont {
+		builtinEncoding = stdInfo.Encoding
+	}
+
+	var fontFileRef pdf.Reference
+	trimFontDict := (d.Font == nil &&
+		isStdFont &&
+		rm.Out.GetOptions().HasAny(pdf.OptTrimStandardFonts) &&
+		widthsAreCompatible() &&
+		fontDescriptorIsCompatible(d.Descriptor, stdInfo))
+	if !trimFontDict {
+		descRef := w.Alloc()
+		desc := d.Descriptor.AsDict()
+		desc["FontName"] = pdf.Name(baseFont)
+		if d.Font != nil {
+			fontFileRef = w.Alloc()
+			switch d.Font.(type) {
+			case *type1.Font:
+				desc["FontFile"] = fontFileRef
+			case *cff.Font, *sfnt.Font:
+				desc["FontFile3"] = fontFileRef
+			}
+		}
+
+		fontDict["FontDescriptor"] = descRef
+
+		widthRef := w.Alloc()
+		widthInfo := widths.EncodeSimple(d.Width[:])
+		fontDict["FirstChar"] = widthInfo.FirstChar
+		fontDict["LastChar"] = widthInfo.LastChar
+		fontDict["Widths"] = widthRef
+		if widthInfo.MissingWidth != 0 {
+			desc["MissingWidth"] = pdf.Number(widthInfo.MissingWidth)
+		} else {
+			delete(desc, "MissingWidth")
+		}
+
+		compressedObjects = append(compressedObjects, desc, widthInfo.Widths)
+		compressedRefs = append(compressedRefs, descRef, widthRef)
 	}
 
 	needsToUnicode := false
@@ -347,6 +357,51 @@ func (d *Type1Dicts) Finish(rm *pdf.ResourceManager) error {
 	}
 
 	return nil
+}
+
+func widthsAreCompatible() bool {
+	// TODO(voss): implement
+	return true
+}
+
+func fontDescriptorIsCompatible(fd *font.Descriptor, stdInfo *stdmtx.FontData) bool {
+	if fd.FontFamily != "" && fd.FontFamily != stdInfo.FontFamily {
+		return false
+	}
+	if fd.FontWeight != 0 && fd.FontWeight != stdInfo.FontWeight {
+		return false
+	}
+	if fd.IsFixedPitch != stdInfo.IsFixedPitch {
+		return false
+	}
+	if fd.IsSerif != stdInfo.IsSerif {
+		return false
+	}
+	if fd.IsSymbolic != stdInfo.IsSymbolic {
+		return false
+	}
+	if math.Abs(fd.ItalicAngle-stdInfo.ItalicAngle) > 0.1 {
+		return false
+	}
+	if fd.Ascent != 0 && math.Abs(fd.Ascent-stdInfo.Ascent) > 0.5 {
+		return false
+	}
+	if fd.Descent != 0 && math.Abs(fd.Descent-stdInfo.Descent) > 0.5 {
+		return false
+	}
+	if fd.CapHeight != 0 && math.Abs(fd.CapHeight-stdInfo.CapHeight) > 0.5 {
+		return false
+	}
+	if fd.XHeight != 0 && math.Abs(fd.XHeight-stdInfo.XHeight) > 0.5 {
+		return false
+	}
+	if fd.StemV != 0 && math.Abs(fd.StemV-stdInfo.StemV) > 0.5 {
+		return false
+	}
+	if fd.StemH != 0 && math.Abs(fd.StemH-stdInfo.StemH) > 0.5 {
+		return false
+	}
+	return true
 }
 
 func type1Rune(w *graphics.Writer, f *type1.Font, r rune) {

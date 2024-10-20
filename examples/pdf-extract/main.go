@@ -123,6 +123,15 @@ func extractPages(w io.Writer, inputFile string, pages *PageRange) error {
 			return err
 		}
 
+		// We remove the annotations here, because they may reference pages
+		// which we don't want to include; these references would force these
+		// pages to be included in the output files as well (with no entries in
+		// the output page tree, but taking up space).
+		//
+		// TODO(voss): keep annotations which reference pages which are
+		// included in the output file.
+		delete(pageIn, "Annots")
+
 		pageOut, err := copy.CopyDict(pageIn)
 		if err != nil {
 			return err

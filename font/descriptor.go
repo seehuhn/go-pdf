@@ -42,23 +42,23 @@ type Descriptor struct {
 	FontStretch os2.Width  // optional
 	FontWeight  os2.Weight // optional
 
-	IsFixedPitch bool // flag
-	IsSerif      bool // flag
-	IsSymbolic   bool // flag
-	IsScript     bool // flag
-	IsItalic     bool // flag
-	IsAllCap     bool // flag
-	IsSmallCap   bool // flag
-	ForceBold    bool // flag
+	IsFixedPitch bool
+	IsSerif      bool
+	IsSymbolic   bool
+	IsScript     bool
+	IsItalic     bool
+	IsAllCap     bool
+	IsSmallCap   bool
+	ForceBold    bool
 
 	FontBBox     rect.Rect // required, except for Type 3 fonts
-	ItalicAngle  float64   // required
+	ItalicAngle  float64   // required; degrees counterclockwise from vertical
 	Ascent       float64   // required, except for Type 3 fonts
-	Descent      float64   // negative, required, except for Type 3 fonts
+	Descent      float64   // negative; required, except for Type 3 fonts
 	Leading      float64   // optional (default: 0)
 	CapHeight    float64   // required, except if no latin chars or for Type 3 fonts
 	XHeight      float64   // optional (default: 0)
-	StemV        float64   // required, except for Type 3 fonts (0 = unknown, set to -1 for Type 3 fonts)
+	StemV        float64   // required, except for Type 3 fonts; 0 = unknown, set to -1 for Type 3 fonts
 	StemH        float64   // optional (default: 0)
 	MaxWidth     float64   // optional (default: 0)
 	AvgWidth     float64   // optional (default: 0)

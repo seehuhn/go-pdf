@@ -443,12 +443,9 @@ func TestAsPDF(t *testing.T) {
 
 					want := sample.names[code]
 					cid2 := enc2.Decode(byte(code))
-					got := ".notdef"
-					if cid2 != 0 {
-						got = enc2.GlyphName(cid2)
-						if got == "" {
-							got = testBuiltinEncoding[code]
-						}
+					got := enc2.GlyphName(cid2)
+					if got == "" {
+						got = testBuiltinEncoding[code]
 					}
 					if got != want {
 						t.Errorf("code %d -> CID %d -> %q, want %q", code, cid2, enc2.GlyphName(cid2), want)

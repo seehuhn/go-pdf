@@ -30,8 +30,7 @@ import (
 //
 // CID values can represent either glyph names, or entries in the built-in
 // encoding of a font.  The interpretation of CID values is specific to the
-// encoder instance which was used to allocate them.  CID 0 is reserved for
-// unmapped codes.
+// encoder instance.  CID 0 is reserved for unmapped codes.
 type Encoding struct {
 	enc        [256]cmap.CID
 	glyphNames []string
@@ -49,6 +48,9 @@ func New() *Encoding {
 func (e *Encoding) Allocate(glyphName string) cmap.CID {
 	if glyphName == "" {
 		panic("encoding: missing glyph name")
+	}
+	if glyphName == ".notdef" {
+		return 0
 	}
 
 	for i, prevName := range e.glyphNames {
@@ -72,9 +74,12 @@ func (e *Encoding) UseBuiltinEncoding(code byte) cmap.CID {
 
 // GlyphName returns the glyph name associated with a CID.
 //
-// For unmapped codes (CID 0) and codes mapped via the built-in encoding, the
-// empty string is returned.
+// For codes mapped via the built-in encoding, the empty string is returned.
 func (e *Encoding) GlyphName(cid cmap.CID) string {
+	if cid == 0 {
+		return ".notdef"
+	}
+
 	base := cmap.CID(1 + 256)
 	if cid < base {
 		return ""
@@ -111,8 +116,7 @@ func (e *Encoding) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.O
 	// First check whether we can use the built-in encoding.
 	canUseBuiltIn := true
 	for code := range 256 {
-		cid := e.enc[code]
-		if e.GlyphName(cid) != "" {
+		if cid := e.enc[code]; cid != 0 && e.GlyphName(cid) != "" {
 			canUseBuiltIn = false
 			break
 		}
@@ -121,19 +125,14 @@ func (e *Encoding) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.O
 		return nil, nil
 	}
 
+	// Then try whether we can use one of the named encodings.
 	canUseNamed := true
 	for code := range 256 {
-		cid := e.enc[code]
-		if cid == 0 {
-			continue
-		}
-		if e.GlyphName(cid) == "" {
+		if cid := e.enc[code]; e.GlyphName(cid) == "" {
 			canUseNamed = false
 			break
 		}
 	}
-
-	// Then try whether we can use one of the named encodings.
 	if canUseNamed {
 		candidates := []*candInfo{
 			{encName: pdf.Name("WinAnsiEncoding"), enc: pdfenc.WinAnsi.Encoding[:]},
@@ -143,8 +142,7 @@ func (e *Encoding) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.O
 	candidateLoop:
 		for _, cand := range candidates {
 			for code := range 256 {
-				cid := e.enc[code]
-				if cid != 0 && e.GlyphName(cid) != cand.enc[code] {
+				if cid := e.enc[code]; cid != 0 && e.GlyphName(cid) != cand.enc[code] {
 					// we got a conflict, try the next candidate
 					continue candidateLoop
 				}
@@ -176,7 +174,7 @@ func (e *Encoding) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.O
 			lastDiff := 999
 			for code := range 256 {
 				glyphName := e.GlyphName(e.enc[code])
-				if glyphName == "" || glyphName == cand.enc[code] {
+				if glyphName == "" || glyphName == ".notdef" || glyphName == cand.enc[code] {
 					continue
 				}
 
@@ -196,7 +194,7 @@ func (e *Encoding) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.O
 		lastDiff := 999
 		for code := range 256 {
 			glyphName := e.GlyphName(e.enc[code])
-			if glyphName == "" {
+			if glyphName == "" || glyphName == ".notdef" {
 				continue
 			}
 
@@ -252,9 +250,6 @@ func (e *Encoding) AsPDFTrueType(builtin []string, opt pdf.OutputOptions) (pdf.O
 	// First check that all glyph names are known.
 	for code := range 256 {
 		cid := e.enc[code]
-		if cid == 0 {
-			continue
-		}
 		if e.GlyphName(cid) != "" {
 			continue
 		}

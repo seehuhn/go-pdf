@@ -252,11 +252,11 @@ func (info *FontDictComposite) Embed(w *pdf.Writer, fontDictRef pdf.Reference) e
 	glyphWidths := cff.Widths()
 	if cff.GIDToCID != nil {
 		for gid, w := range glyphWidths {
-			ww[cmap.CID(cff.GIDToCID[gid])] = w.AsFloat(q)
+			ww[cmap.CID(cff.GIDToCID[gid])] = w * q
 		}
 	} else {
 		for gid, w := range glyphWidths {
-			ww[cmap.CID(gid)] = w.AsFloat(q)
+			ww[cmap.CID(gid)] = w * q
 		}
 	}
 	W, DW := widths.EncodeComposite(ww, pdf.GetVersion(w))

@@ -94,21 +94,16 @@ func (r *Reader) readSimpleFont(info *font.Dicts, toUni *cmap.ToUnicodeInfo) (F 
 	if info.FontDict["Widths"] == nil && info.IsStandardFont() {
 		widths = make([]float64, 256)
 		for code := range 256 {
-			var glyphName string
 			cid := enc.Decode(byte(code))
-			if cid == 0 {
-				glyphName = ".notdef"
-			} else {
-				glyphName = enc.GlyphName(cid)
-				if glyphName == "" {
-					switch info.PostScriptName {
-					case "Symbol":
-						glyphName = pdfenc.Symbol.Encoding[code]
-					case "ZapfDingbats":
-						glyphName = pdfenc.ZapfDingbats.Encoding[code]
-					default:
-						glyphName = pdfenc.Standard.Encoding[code]
-					}
+			glyphName := enc.GlyphName(cid)
+			if glyphName == "" {
+				switch info.PostScriptName {
+				case "Symbol":
+					glyphName = pdfenc.Symbol.Encoding[code]
+				case "ZapfDingbats":
+					glyphName = pdfenc.ZapfDingbats.Encoding[code]
+				default:
+					glyphName = pdfenc.Standard.Encoding[code]
 				}
 			}
 			w, err := type1.GetStandardWidth(string(info.PostScriptName), glyphName)

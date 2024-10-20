@@ -19,7 +19,6 @@
 package walker
 
 import (
-	"fmt"
 	"iter"
 
 	"seehuhn.de/go/pdf"
@@ -48,85 +47,111 @@ func New(r pdf.Getter) *Walker {
 }
 
 // PreOrder returns an iterator that traverses the PDF document structure in pre-order.
-// For each object, it yields the object's reference (if any) and the object itself.
-// If the object is not an indirect object, the reference is nil.
+// For each object, it yields a path to the object and the object itself.
+// For indirect objects, the same path is yielded twice: once for the reference
+// and once for the resolved object.
 //
 // In pre-order traversal, each node is visited before its children. This means
 // that for complex nested structures like dictionaries or arrays, the container
 // object is yielded before its contents.
 //
-// The iterator cannot be used concurrently.
-func (w *Walker) PreOrder() iter.Seq2[pdf.Reference, pdf.Native] {
-	return func(yield func(pdf.Reference, pdf.Native) bool) {
+// Iterators cannot be used concurrently.
+func (w *Walker) PreOrder() iter.Seq2[[]pdf.Object, pdf.Native] {
+	return func(yield func([]pdf.Object, pdf.Native) bool) {
 		w.walk(yield, true)
 	}
 }
 
 // PostOrder returns an iterator that traverses the PDF document structure in post-order.
-// For each object, it yields the object's reference (if any) and the object itself.
-// If the object is not an indirect object, the reference is nil.
+// For each object, it yields a path to the object and the object itself.
+// For indirect objects, the same path is yielded twice: once for the reference
+// and once for the resolved object.
 //
 // In post-order traversal, each node is visited after its children. This means
 // that for complex nested structures like dictionaries or arrays, the contents
 // are yielded before the container object itself.
 //
-// The iterator cannot be used concurrently.
-func (w *Walker) PostOrder() iter.Seq2[pdf.Reference, pdf.Native] {
-	return func(yield func(pdf.Reference, pdf.Native) bool) {
+// Iterators cannot be used concurrently.
+func (w *Walker) PostOrder() iter.Seq2[[]pdf.Object, pdf.Native] {
+	return func(yield func([]pdf.Object, pdf.Native) bool) {
 		w.walk(yield, false)
 	}
 }
 
-func (w *Walker) walk(yield func(pdf.Reference, pdf.Native) bool, preOrder bool) {
-	w.Err = nil
-	visited := make(map[pdf.Reference]struct{})
-
-	meta := w.GetMeta()
-	if ref, ok := meta.Trailer["Root"].(pdf.Reference); ok {
-		visited[ref] = struct{}{}
-	}
-	if ref, ok := meta.Trailer["Info"].(pdf.Reference); ok {
-		visited[ref] = struct{}{}
-	}
-
-	fmt.Println(pdf.AsString(meta.Trailer))
-	if !w.walkObject(pdf.AsDict(meta.Info), yield, preOrder, visited) {
-		return
-	}
-	if !w.walkObject(pdf.AsDict(meta.Catalog), yield, preOrder, visited) {
-		return
-	}
-	if !w.walkObject(meta.Trailer, yield, preOrder, visited) {
-		return
-	}
+type data struct {
+	r        pdf.Getter
+	yield    func([]pdf.Object, pdf.Native) bool
+	path     []pdf.Object
+	preOrder bool
+	visited  map[pdf.Reference]struct{}
+	err      error
 }
 
-func (w *Walker) walkObject(obj pdf.Native, yield func(pdf.Reference, pdf.Native) bool, preOrder bool, visited map[pdf.Reference]struct{}) bool {
+func (w *Walker) walk(yield func([]pdf.Object, pdf.Native) bool, preOrder bool) {
+	meta := w.GetMeta()
+
+	d := &data{
+		r:        w.Getter,
+		yield:    yield,
+		preOrder: preOrder,
+		visited:  make(map[pdf.Reference]struct{}),
+	}
+
+	if ref, ok := meta.Trailer["Info"].(pdf.Reference); ok {
+		d.visited[ref] = struct{}{}
+	}
+	if ref, ok := meta.Trailer["Root"].(pdf.Reference); ok {
+		d.visited[ref] = struct{}{}
+	}
+
+	d.path = append(d.path[:0], pdf.Name("info"))
+	d.walkObject(pdf.AsDict(meta.Info))
+	d.path = append(d.path[:0], pdf.Name("catalog"))
+	d.walkObject(pdf.AsDict(meta.Catalog))
+	d.path = append(d.path[:0], pdf.Name("trailer"))
+	d.walkObject(meta.Trailer)
+
+	w.Err = d.err
+}
+
+// walkObject traverses the object obj recursively.
+// It returns false if the traversal should be aborted.
+func (d *data) walkObject(obj pdf.Native) bool {
+	if d.err != nil {
+		return false
+	}
 	if obj == nil {
 		return true
 	}
 
+	k := len(d.path)
+
 	// resolve references
 	ref, isReference := obj.(pdf.Reference)
 	if isReference {
-		if _, alreadyVisited := visited[ref]; alreadyVisited || ref == 0 {
+		cont := d.yield(d.path[:k], ref)
+		if !cont {
+			return false
+		}
+
+		if _, alreadyVisited := d.visited[ref]; alreadyVisited || ref == 0 {
 			return true
 		}
-		visited[ref] = struct{}{}
+		d.visited[ref] = struct{}{}
 
-		resolved, err := w.Get(ref, true)
+		resolved, err := d.r.Get(ref, true)
 		if err != nil {
-			w.Err = err
+			d.err = err
 			return false
 		}
 
 		if stm, isStream := resolved.(*pdf.Stream); isStream {
 			// Because the Length depends on whether or not the stream is
-			// encrypted, it is not safe to use when writing the object to
-			// another PDF file. To allow easy copying for PDF file contents
-			// using the Walker, we remove the Length key from the stream
-			// dictionary here, to trigger automatic recalculation of the
-			// appropriate Length for any output file.
+			// encrypted or not, it is not safe to unconditionally re-use when
+			// writing the object to another PDF file. To allow easy copying
+			// for PDF file contents using the Walker, we remove the Length key
+			// from the stream dictionary here, to trigger automatic
+			// recalculation of the appropriate Length for any output file.
 			delete(stm.Dict, "Length")
 		}
 
@@ -134,8 +159,8 @@ func (w *Walker) walkObject(obj pdf.Native, yield func(pdf.Reference, pdf.Native
 	}
 
 	// for pre-order traversal, yield the object before visiting its children
-	if preOrder {
-		cont := yield(ref, obj)
+	if d.preOrder {
+		cont := d.yield(d.path[:k], obj)
 		if !cont {
 			return false
 		}
@@ -144,34 +169,33 @@ func (w *Walker) walkObject(obj pdf.Native, yield func(pdf.Reference, pdf.Native
 	// iterate over children
 	switch v := obj.(type) {
 	case pdf.Array:
-		for _, item := range v {
-			cont := w.walkObject(item.AsPDF(0), yield, preOrder, visited)
+		for i, item := range v {
+			d.path = append(d.path[:k], pdf.Integer(i))
+			cont := d.walkObject(native(item))
 			if !cont {
 				return false
 			}
 		}
 	case pdf.Dict:
 		keys := v.SortedKeys()
-		for _, k := range keys {
-			var native pdf.Native
-			if obj := v[k]; obj != nil {
-				native = obj.AsPDF(0)
-			}
-			cont := w.walkObject(native, yield, preOrder, visited)
+		for _, key := range keys {
+			native := native(v[key])
+			d.path = append(d.path[:k], key)
+			cont := d.walkObject(native)
 			if !cont {
 				return false
 			}
 		}
 	case *pdf.Stream:
-		cont := w.walkObject(v.Dict, yield, preOrder, visited)
+		cont := d.walkObject(v.Dict)
 		if !cont {
 			return false
 		}
 	}
 
 	// for post-order traversal, yield the object after visiting its children
-	if !preOrder {
-		cont := yield(ref, obj)
+	if !d.preOrder {
+		cont := d.yield(d.path[:k], obj)
 		if !cont {
 			return false
 		}
@@ -180,15 +204,9 @@ func (w *Walker) walkObject(obj pdf.Native, yield func(pdf.Reference, pdf.Native
 	return true
 }
 
-func (w *Walker) IndirectObjects() iter.Seq2[pdf.Reference, pdf.Native] {
-	return func(yield func(pdf.Reference, pdf.Native) bool) {
-		for ref, obj := range w.PreOrder() {
-			if ref == 0 || obj == nil {
-				continue
-			}
-			if !yield(ref, obj) {
-				return
-			}
-		}
+func native(obj pdf.Object) pdf.Native {
+	if obj == nil {
+		return nil
 	}
+	return obj.AsPDF(0)
 }
