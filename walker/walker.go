@@ -51,9 +51,7 @@ func New(r pdf.Getter) *Walker {
 // For indirect objects, the same path is yielded twice: once for the reference
 // and once for the resolved object.
 //
-// In pre-order traversal, each node is visited before its children. This means
-// that for complex nested structures like dictionaries or arrays, the container
-// object is yielded before its contents.
+// In pre-order traversal, each node is visited before its children.
 //
 // Iterators cannot be used concurrently.
 func (w *Walker) PreOrder() iter.Seq2[[]pdf.Object, pdf.Native] {
@@ -67,9 +65,7 @@ func (w *Walker) PreOrder() iter.Seq2[[]pdf.Object, pdf.Native] {
 // For indirect objects, the same path is yielded twice: once for the reference
 // and once for the resolved object.
 //
-// In post-order traversal, each node is visited after its children. This means
-// that for complex nested structures like dictionaries or arrays, the contents
-// are yielded before the container object itself.
+// In post-order traversal, each node is visited after its children.
 //
 // Iterators cannot be used concurrently.
 func (w *Walker) PostOrder() iter.Seq2[[]pdf.Object, pdf.Native] {

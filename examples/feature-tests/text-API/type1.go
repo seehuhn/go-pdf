@@ -35,6 +35,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/widths"
 	"seehuhn.de/go/pdf/graphics"
@@ -58,6 +59,10 @@ func (f *Type1Font) PostScriptName() string {
 	return ""
 }
 
+// Embed returns a reference to the font dictionary, and a Go object
+// representing the font data.
+//
+// This implements the [font.Embedder] interface.
 func (f *Type1Font) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
 	ref := rm.Out.Alloc()
 	fd := &font.Descriptor{}
@@ -85,29 +90,22 @@ func (f *Type1Font) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, e
 		fd.IsFixedPitch = m.IsFixedPitch
 	}
 	dicts := &Type1Dicts{
-		Ref:            ref,
+		ref:            ref,
 		PostScriptName: f.Font.FontName,
-		Descriptor:     fd,
-		Encoding:       encoding.New(),
-		Font:           f.Font,
+
+		Descriptor: fd,
+
+		Encoding: encoding.New(),
+
+		Font: f.Font,
 	}
 	return ref, dicts, nil
 }
 
-type Type1FontData interface {
-	PostScriptName() string
-	GetEncoding() []string
-	WidthsMapPDF() map[string]float64
-}
-
-var (
-	_ Type1FontData = (*type1.Font)(nil)
-	_ Type1FontData = (*cff.Font)(nil)
-	_ Type1FontData = (*sfnt.Font)(nil)
-)
+var _ font.Embedded = (*Type1Dicts)(nil)
 
 type Type1Dicts struct {
-	Ref            pdf.Reference
+	ref            pdf.Reference
 	PostScriptName string
 	SubsetTag      string
 	Name           pdf.Name
@@ -117,13 +115,24 @@ type Type1Dicts struct {
 	Descriptor *font.Descriptor
 
 	Encoding *encoding.Encoding
-	Width    [256]float64
+	Widths   [256]float64
 	Text     [256]string
 
 	// Font (optional) is the font data to embed.
 	// This must be one of *type1.Font, *cff.Font, or *sfnt.Font.
 	Font Type1FontData
 }
+
+type Type1FontData interface {
+	PostScriptName() string
+	GetEncoding() []string
+}
+
+var (
+	_ Type1FontData = (*type1.Font)(nil)
+	_ Type1FontData = (*cff.Font)(nil)
+	_ Type1FontData = (*sfnt.Font)(nil)
+)
 
 func (d *Type1Dicts) WritingMode() cmap.WritingMode {
 	return cmap.Horizontal
@@ -133,39 +142,46 @@ func (d *Type1Dicts) DecodeWidth(s pdf.String) (float64, int) {
 	if len(s) == 0 {
 		return 0, 0
 	}
-	code := s[0]
-	return d.Width[code], 1
+	return d.Widths[s[0]], 1
 }
 
 // Finish writes the font dictionary to the PDF file.
 // This implements [pdf.Finisher].
 func (d *Type1Dicts) Finish(rm *pdf.ResourceManager) error {
+	_, _, err := pdf.ResourceManagerEmbed(rm, d)
+	return err
+}
+
+func (d *Type1Dicts) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
+
 	w := rm.Out
 
+	// Check that all data is valid and consistent.
 	if d.Font != nil {
 		switch f := d.Font.(type) {
 		case *cff.Font:
 			if f.IsCIDKeyed() {
-				return errors.New("CID-keyed fonts not allowed")
+				return d.ref, zero, errors.New("CID-keyed fonts not allowed")
 			}
 		case *sfnt.Font:
 			o, _ := f.Outlines.(*cff.Outlines)
 			if o == nil {
-				return errors.New("missing CFF table")
+				return d.ref, zero, errors.New("missing CFF table")
 			} else if o.IsCIDKeyed() {
-				return errors.New("CID-keyed fonts not allowed")
+				return d.ref, zero, errors.New("CID-keyed fonts not allowed")
 			}
 		default:
-			return fmt.Errorf("unsupported font type: %T", d.Font)
+			return d.ref, zero, fmt.Errorf("unsupported font type %T", d.Font)
 		}
 
 		fontName := d.Font.PostScriptName()
 		if fontName != d.PostScriptName {
-			return fmt.Errorf("font name mismatch: %s != %s", fontName, d.PostScriptName)
+			return d.ref, zero, fmt.Errorf("font name mismatch: %s != %s", fontName, d.PostScriptName)
 		}
 	}
 	if d.SubsetTag != "" && !subset.IsValidTag(d.SubsetTag) {
-		return fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
+		return d.ref, zero, fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
 	}
 
 	var baseFont pdf.Name
@@ -186,35 +202,27 @@ func (d *Type1Dicts) Finish(rm *pdf.ResourceManager) error {
 
 	isNonSymbolic := !d.Descriptor.IsSymbolic
 	isExternal := d.Font == nil
-	encodingObject, err := d.Encoding.AsPDFType1(isNonSymbolic && isExternal, w.GetOptions())
+	encodingObj, err := d.Encoding.AsPDFType1(isNonSymbolic && isExternal, w.GetOptions())
 	if err != nil {
-		return err
+		return d.ref, zero, err
 	}
-	if encodingObject != nil {
-		fontDict["Encoding"] = encodingObject
+	if encodingObj != nil {
+		fontDict["Encoding"] = encodingObj
 	}
-
-	// TODO(voss): to construct the widths array, we need to know the actual
-	// encoding used.  Since `encodingObject` may map more codes than `d.Encoding`,
-	// we need to use `encodingObject` to construct the widths array.
 
 	compressedObjects := []pdf.Object{fontDict}
-	compressedRefs := []pdf.Reference{d.Ref}
+	compressedRefs := []pdf.Reference{d.ref}
 
 	stdInfo, isStdFont := stdmtx.Metrics[d.PostScriptName]
 
-	var builtinEncoding []string
-	if d.Font != nil {
-		builtinEncoding = d.Font.GetEncoding()
-	} else if isStdFont {
-		builtinEncoding = stdInfo.Encoding
-	}
+	// Since `encodingObject` may map more codes than `d.Encoding`,
+	// we need to use `encodingObject` to check the glyph width.
 
 	var fontFileRef pdf.Reference
 	trimFontDict := (d.Font == nil &&
 		isStdFont &&
-		rm.Out.GetOptions().HasAny(pdf.OptTrimStandardFonts) &&
-		widthsAreCompatible() &&
+		w.GetOptions().HasAny(pdf.OptTrimStandardFonts) &&
+		widthsAreCompatible(d.Widths[:], stdInfo, encodingObj) &&
 		fontDescriptorIsCompatible(d.Descriptor, stdInfo))
 	if !trimFontDict {
 		descRef := w.Alloc()
@@ -233,7 +241,7 @@ func (d *Type1Dicts) Finish(rm *pdf.ResourceManager) error {
 		fontDict["FontDescriptor"] = descRef
 
 		widthRef := w.Alloc()
-		widthInfo := widths.EncodeSimple(d.Width[:])
+		widthInfo := widths.EncodeSimple(d.Widths[:])
 		fontDict["FirstChar"] = widthInfo.FirstChar
 		fontDict["LastChar"] = widthInfo.LastChar
 		fontDict["Widths"] = widthRef
@@ -247,10 +255,17 @@ func (d *Type1Dicts) Finish(rm *pdf.ResourceManager) error {
 		compressedRefs = append(compressedRefs, descRef, widthRef)
 	}
 
+	var builtinEncoding []string
+	if d.Font != nil {
+		builtinEncoding = d.Font.GetEncoding()
+	} else if isStdFont {
+		builtinEncoding = stdInfo.Encoding
+	}
+
 	needsToUnicode := false
 	for code := range 256 {
 		cid := d.Encoding.Decode(byte(code))
-		if cid == 0 {
+		if cid == 0 { // unmapped code
 			if d.Text[code] != "" {
 				needsToUnicode = true
 				break
@@ -281,86 +296,135 @@ func (d *Type1Dicts) Finish(rm *pdf.ResourceManager) error {
 		tuInfo := cmap.MakeSimpleToUnicode(d.Text[:])
 		ref, _, err := pdf.ResourceManagerEmbed(rm, tuInfo)
 		if err != nil {
-			return fmt.Errorf("ToUnicode cmap: %w", err)
+			return d.ref, zero, fmt.Errorf("ToUnicode cmap: %w", err)
 		}
 		fontDict["ToUnicode"] = ref
 	}
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return pdf.Wrap(err, "Type 1 font dicts")
+		return d.ref, zero, pdf.Wrap(err, "Type 1 font dicts")
 	}
 
 	switch f := d.Font.(type) {
 	case *type1.Font:
 		length1 := pdf.NewPlaceholder(w, 10)
 		length2 := pdf.NewPlaceholder(w, 10)
-		fontFileDict := pdf.Dict{
+		fontStmDict := pdf.Dict{
 			"Length1": length1,
 			"Length2": length2,
 			"Length3": pdf.Integer(0),
 		}
-		fontFileStream, err := w.OpenStream(fontFileRef, fontFileDict, pdf.FilterCompress{})
+		fontStm, err := w.OpenStream(fontFileRef, fontStmDict, pdf.FilterCompress{})
 		if err != nil {
-			return fmt.Errorf("open Type1 stream: %w", err)
+			return d.ref, zero, fmt.Errorf("open Type1 stream: %w", err)
 		}
-		l1, l2, err := f.WritePDF(fontFileStream)
+		l1, l2, err := f.WritePDF(fontStm)
 		if err != nil {
-			return fmt.Errorf("write Type1 stream: %w", err)
+			return d.ref, zero, fmt.Errorf("write Type1 stream: %w", err)
 		}
 		err = length1.Set(pdf.Integer(l1))
 		if err != nil {
-			return fmt.Errorf("Type1 stream: length1: %w", err)
+			return d.ref, zero, fmt.Errorf("Type1 stream: length1: %w", err)
 		}
 		err = length2.Set(pdf.Integer(l2))
 		if err != nil {
-			return fmt.Errorf("Type1 stream: length2: %w", err)
+			return d.ref, zero, fmt.Errorf("Type1 stream: length2: %w", err)
 		}
-		err = fontFileStream.Close()
+		err = fontStm.Close()
 		if err != nil {
-			return fmt.Errorf("close Type1 stream: %w", err)
+			return d.ref, zero, fmt.Errorf("close Type1 stream: %w", err)
 		}
 
 	case *cff.Font:
-		fontFileDict := pdf.Dict{
+		fontStmDict := pdf.Dict{
 			"Subtype": pdf.Name("Type1C"),
 		}
-		fontFileStream, err := w.OpenStream(fontFileRef, fontFileDict, pdf.FilterCompress{})
+		fontStm, err := w.OpenStream(fontFileRef, fontStmDict, pdf.FilterCompress{})
 		if err != nil {
-			return fmt.Errorf("open CFF stream: %w", err)
+			return d.ref, zero, fmt.Errorf("open CFF stream: %w", err)
 		}
-		err = f.Write(fontFileStream)
+		err = f.Write(fontStm)
 		if err != nil {
-			return fmt.Errorf("write CFF stream: %w", err)
+			return d.ref, zero, fmt.Errorf("write CFF stream: %w", err)
 		}
-		err = fontFileStream.Close()
+		err = fontStm.Close()
 		if err != nil {
-			return fmt.Errorf("close CFF stream: %w", err)
+			return d.ref, zero, fmt.Errorf("close CFF stream: %w", err)
 		}
 
 	case *sfnt.Font:
-		fontFileDict := pdf.Dict{
+		fontStmDict := pdf.Dict{
 			"Subtype": pdf.Name("OpenType"),
 		}
-		fontFileStream, err := w.OpenStream(fontFileRef, fontFileDict, pdf.FilterCompress{})
+		fontStm, err := w.OpenStream(fontFileRef, fontStmDict, pdf.FilterCompress{})
 		if err != nil {
-			return fmt.Errorf("open OpenType stream: %w", err)
+			return d.ref, zero, fmt.Errorf("open OpenType stream: %w", err)
 		}
-		err = f.WriteOpenTypeCFFPDF(fontFileStream)
+		err = f.WriteOpenTypeCFFPDF(fontStm)
 		if err != nil {
-			return fmt.Errorf("write OpenType stream: %w", err)
+			return d.ref, zero, fmt.Errorf("write OpenType stream: %w", err)
 		}
-		err = fontFileStream.Close()
+		err = fontStm.Close()
 		if err != nil {
-			return fmt.Errorf("close OpenType stream: %w", err)
+			return d.ref, zero, fmt.Errorf("close OpenType stream: %w", err)
 		}
 	}
 
-	return nil
+	return d.ref, zero, nil
 }
 
-func widthsAreCompatible() bool {
-	// TODO(voss): implement
+// widthsAreCompatible returns true if the glyph widths ww are compatible with
+// the standard font metrics.  The object encObj is the value of the font
+// dictionary's Encoding entry.  It most be valid and must be a direct object.
+func widthsAreCompatible(ww []float64, info *stdmtx.FontData, encObj pdf.Object) bool {
+	// decode the enc object by hand
+	// TODO(voss): extract this into a helper function
+	var enc []string
+	switch obj := encObj.(type) {
+	case nil:
+		enc = info.Encoding
+	case pdf.Name:
+		switch obj {
+		case "WinAnsiEncoding":
+			enc = pdfenc.WinAnsi.Encoding[:]
+		case "MacRomanEncoding":
+			enc = pdfenc.MacRoman.Encoding[:]
+		case "MacExpertEncoding":
+			enc = pdfenc.MacExpert.Encoding[:]
+		default:
+			panic("unreachable")
+		}
+	case pdf.Dict:
+		enc := info.Encoding
+		switch obj["BaseEncoding"] {
+		case pdf.Name("WinAnsiEncoding"):
+			enc = pdfenc.WinAnsi.Encoding[:]
+		case pdf.Name("MacRomanEncoding"):
+			enc = pdfenc.MacRoman.Encoding[:]
+		case pdf.Name("MacExpertEncoding"):
+			enc = pdfenc.MacExpert.Encoding[:]
+		}
+		if diff, _ := obj["Differences"].(pdf.Array); len(diff) > 0 {
+			enc = slices.Clone(enc)
+			idx := 0
+			for _, obj := range diff {
+				switch obj := obj.(type) {
+				case pdf.Name:
+					enc[idx] = string(obj)
+					idx++
+				case pdf.Integer:
+					idx = int(obj)
+				}
+			}
+		}
+	}
+
+	for code, name := range enc {
+		if math.Abs(ww[code]-info.Width[name]) > 0.5 {
+			return false
+		}
+	}
 	return true
 }
 
