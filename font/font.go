@@ -88,8 +88,16 @@ type EmbeddedLayouter interface {
 
 // CodeInfo contains information associated with a character code.
 type CodeInfo struct {
-	CID    cmap.CID
+	// CID allows to look up the glyph in the underlying font.
+	CID cmap.CID
+
+	// Notdef specifies which glyph to show if the requested glyph is not
+	// present in the font.
 	Notdef cmap.CID
-	Text   string
-	W      float64
+
+	// Text is the text representation of the character.
+	Text string
+
+	// W is the width of the corresponding glyph in PDF glyph space units.
+	W float64
 }

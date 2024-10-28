@@ -28,8 +28,8 @@ import (
 )
 
 func main() {
-	fileTmple := flag.String("t", "{{ .BaseName }} {{ .Pages }}", "file output template")
-	summaryTmpl := flag.String("T", "total: {{ .Files }} files, {{ .Bytes }} bytes, {{ .Pages }} pages, {{ .Errors }} errors", "summary output template")
+	fileTmple := flag.String("t", "{{ .Pages }} {{ .BaseName }}", "file output template")
+	summaryTmpl := flag.String("s", "total: {{ .Files }} files, {{ .Bytes }} bytes, {{ .Pages }} pages, {{ .Errors }} errors", "summary output template")
 	flag.Parse()
 
 	runner := &runner{}

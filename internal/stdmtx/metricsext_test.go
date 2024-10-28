@@ -43,7 +43,7 @@ func TestGeometry(t *testing.T) {
 
 		for glyphName := range F.Font.Glyphs {
 			genWidth := mtx.Width[glyphName]
-			actualWidth := F.GlyphWidthPDF(glyphName)
+			actualWidth := F.Font.GlyphWidthPDF(glyphName)
 
 			// Check that we are not off by a factor of 1000 (e.g., using text
 			// space units instead of glyph space units).
