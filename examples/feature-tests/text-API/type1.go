@@ -23,10 +23,10 @@ import (
 	"math/bits"
 	"slices"
 	"sort"
-
-	"golang.org/x/exp/maps"
+	"unicode"
 
 	"seehuhn.de/go/postscript/afm"
+	"seehuhn.de/go/postscript/psenc"
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/postscript/type1/names"
 
@@ -41,38 +41,124 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/font/widths"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/stdmtx"
 )
 
-var _ font.Font = (*Type1Font)(nil)
+// TODO(voss): try to make an interface type which can hold either of
+//     *type1.Font
+//     *type1.Font with additional kerning information
+//     *afm.Metrics
+// And then get rid of the duplication caused by the two fields Font and Metrics.
+
+// TODO(voss): gracefully deal with fonts where the .notdef glyph is missing?
+
+var (
+	_ font.Font = (*Type1Font)(nil)
+)
 
 type Type1Font struct {
-	Font    *type1.Font
-	Metrics *afm.Metrics
+	Font       *type1.Font
+	Metrics    *afm.Metrics
+	psFontName string
+
+	// glyphNames is the list of all glyph names available in the font
+	// (excluding .notdef), in alphabetical order.
+	glyphNames []string
+
+	// runeToName maps runes to their corresponding glyph names.
+	// The unicode Private Use Areas are used to represent glyphs
+	// which don't have a natural unicode mapping, or alternative
+	// glyphs which map to an already used unicode code point.
+	runeToName map[rune]string
+}
+
+// NewType1 creates a new Type1Font from a Type 1 font and its AFM metrics.
+// Both font and metrics are optional, but at least one must be provided.
+func NewType1(font *type1.Font, metrics *afm.Metrics) (*Type1Font, error) {
+	if font == nil && metrics == nil {
+		return nil, errors.New("both font and metrics are nil")
+	}
+
+	var psName string
+	if font != nil {
+		psName = font.FontName
+	} else {
+		psName = metrics.FontName
+	}
+
+	isDingbats := psName == "ZapfDingbats"
+
+	var glyphNames []string
+	if font != nil {
+		for glyphName := range font.Glyphs {
+			if glyphName != ".notdef" {
+				glyphNames = append(glyphNames, glyphName)
+			}
+		}
+	} else {
+		for glyphName := range metrics.Glyphs {
+			if glyphName != ".notdef" {
+				glyphNames = append(glyphNames, glyphName)
+			}
+		}
+	}
+	sort.Strings(glyphNames)
+
+	runeToName := make(map[rune]string)
+	customCode := rune(0xE000) // start of the first PUA
+	for _, glyphName := range glyphNames {
+		rr := names.ToUnicode(glyphName, isDingbats)
+
+		r := unicode.ReplacementChar
+		if len(rr) == 1 && !isPrivateUse(rr[0]) {
+			r = rr[0]
+		}
+
+		if _, exists := runeToName[r]; exists || r == unicode.ReplacementChar {
+			r = customCode
+
+			customCode++
+			if customCode == 0x00_F900 {
+				// we overflowed the first PUA, jump to the next
+				customCode = 0x0F_0000
+			}
+		}
+
+		runeToName[r] = glyphName
+	}
+
+	f := &Type1Font{
+		Font:       font,
+		Metrics:    metrics,
+		psFontName: psName,
+
+		glyphNames: glyphNames,
+		runeToName: runeToName,
+	}
+	return f, nil
+}
+
+func isPrivateUse(r rune) bool {
+	return (r >= 0xE000 && r <= 0xF8FF) || // BMP PUA
+		(r >= 0xF0000 && r <= 0xFFFFD) || // Supplementary PUA-A
+		(r >= 0x100000 && r <= 0x10FFFD) // Supplementary PUA-B
 }
 
 func (f *Type1Font) PostScriptName() string {
-	if f.Font != nil {
-		return f.Font.FontName
-	}
-	if f.Metrics != nil {
-		return f.Metrics.FontName
-	}
-	return ""
+	return f.psFontName
 }
 
 // GlyphWidthPDF computes the width of a glyph in PDF glyph space units.
 // If the glyph does not exist, the width of the .notdef glyph is returned.
 func (f *Type1Font) GlyphWidthPDF(glyphName string) float64 {
+	var w float64
 	if f.Font != nil {
-		return f.Font.GlyphWidthPDF(glyphName)
+		w = f.Font.GlyphWidthPDF(glyphName)
+	} else {
+		w = f.Metrics.GlyphWidthPDF(glyphName)
 	}
-	if f.Metrics != nil {
-		return f.Metrics.GlyphWidthPDF(glyphName)
-	}
-	return 0
+	w = math.Round(w*10) / 10
+	return w
 }
 
 // Embed returns a reference to the font dictionary, and a Go object
@@ -80,119 +166,69 @@ func (f *Type1Font) GlyphWidthPDF(glyphName string) float64 {
 //
 // This implements the [font.Embedder] interface.
 func (f *Type1Font) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
-	ref := rm.Out.Alloc()
-	dicts := f.makeDicts(ref)
-	return ref, dicts, nil
+	t := f.newTypesetter(rm)
+	return t.ref, t, nil
 }
 
-func (f *Type1Font) makeDicts(ref pdf.Reference) *Type1Dicts {
-	fd := &font.Descriptor{}
-	if ps := f.Font; ps != nil {
-		fd.FontName = ps.FontName
-		fd.FontFamily = ps.FamilyName
-		fd.FontWeight = os2.WeightFromString(ps.Weight)
-		fd.FontBBox = ps.FontBBoxPDF()
-		fd.IsItalic = ps.ItalicAngle != 0
-		fd.ItalicAngle = ps.ItalicAngle
-		fd.IsFixedPitch = ps.IsFixedPitch
-		fd.ForceBold = ps.Private.ForceBold
-		fd.StemV = ps.Private.StdVW
-		fd.StemH = ps.Private.StdHW
-	}
-	if m := f.Metrics; m != nil {
-		fd.FontName = m.FontName
-		fd.FontBBox = m.FontBBoxPDF()
-		fd.CapHeight = m.CapHeight
-		fd.XHeight = m.XHeight
-		fd.Ascent = m.Ascent
-		fd.Descent = m.Descent
-		fd.IsItalic = m.ItalicAngle != 0
-		fd.ItalicAngle = m.ItalicAngle
-		fd.IsFixedPitch = m.IsFixedPitch
-	}
-	dicts := &Type1Dicts{
-		ref:            ref,
-		PostScriptName: f.Font.FontName,
-		Descriptor:     fd,
-		Encoding:       encoding.New(),
-		Font:           f.Font,
-	}
-	return dicts
-}
-
-func (f *Type1Font) newTypesetter() *Typesetter {
-	runeToName := make(map[rune]string)
-
-	var glyphNames []string
-	if f.Font != nil {
-		glyphNames = maps.Keys(f.Font.Glyphs)
-	} else {
-		glyphNames = maps.Keys(f.Metrics.Glyphs)
-	}
-
-	// Sort the names so that ".notdef" comes first, and the rest is sorted
-	// alphabetically.
-	sort.Slice(glyphNames, func(i, j int) bool {
-		iIsNotdef := glyphNames[i] == ".notdef"
-		jIsNotdef := glyphNames[j] == ".notdef"
-		if iIsNotdef && !jIsNotdef {
-			return true
-		}
-		if jIsNotdef && !iIsNotdef {
-			return false
-		}
-		return glyphNames[i] < glyphNames[j]
-	})
-
-	isZapf := f.PostScriptName() == "ZapfDingbats"
-
-	replacementRune := rune(0xE000) // start of the first PUA
-	for _, glyphName := range glyphNames {
-		rr := names.ToUnicode(glyphName, isZapf)
-		if len(rr) != 1 {
-			continue
-		}
-		r := rr[0]
-
-		for {
-			_, exists := runeToName[r]
-			if !exists {
-				break
-			}
-			r = replacementRune
-			replacementRune++
-			if replacementRune == 0xF900 {
-				// we overflowed the first PUA, jump to the next
-				replacementRune = 0x0F_0000
-			}
-		}
-
-		runeToName[r] = glyphName
-	}
-
-	return &Typesetter{
-		runeToCode: make(map[rune]byte),
-		codeToInfo: make(map[byte]*font.CodeInfo),
-
-		glyphNames: glyphNames,
-		runeToName: runeToName,
-		isZapf:     isZapf,
-	}
-}
+var (
+	_ font.Embedded = (*Typesetter)(nil)
+	_ pdf.Finisher  = (*Typesetter)(nil)
+)
 
 type Typesetter struct {
-	Type1Font
+	rm  *pdf.ResourceManager
+	ref pdf.Reference
+
+	*Type1Font
 
 	runeToCode map[rune]byte
 	codeToInfo map[byte]*font.CodeInfo
-
-	glyphNames []string
-	runeToName map[rune]string
-	isZapf     bool
 }
 
-func (t *Typesetter) AppendEncoded(codes pdf.String, gid glyph.ID, s string) pdf.String {
+func (f *Type1Font) newTypesetter(rm *pdf.ResourceManager) *Typesetter {
+	return &Typesetter{
+		rm:  rm,
+		ref: rm.Out.Alloc(),
+
+		Type1Font: f,
+
+		runeToCode: make(map[rune]byte),
+		codeToInfo: make(map[byte]*font.CodeInfo),
+	}
+}
+
+// WritingMode returns 0 to indicate horizontal writing.
+//
+// This implements the [font.Embedded] interface.
+func (t *Typesetter) WritingMode() cmap.WritingMode {
+	return cmap.Horizontal
+}
+
+// DecodeWidth reads one character code from the given string and returns
+// the width of the corresponding glyph in PDF text space units (still to
+// be multiplied by the font size) as well as the number of bytes consumed.
+//
+// This implements the [font.Embedded] interface.
+func (t *Typesetter) DecodeWidth(s pdf.String) (float64, int) {
+	if len(s) == 0 {
+		return 0, 0
+	}
+
+	c := s[0]
+	info, ok := t.codeToInfo[c]
+	var w float64 // PDF glyph space units
+	if ok {
+		w = info.W
+	} else {
+		w = t.GlyphWidthPDF(".notdef")
+	}
+	return w / 1000, 1
+}
+
+func (t *Typesetter) AppendEncoded(codes pdf.String, s string) pdf.String {
 	for _, r := range s {
+		text := string([]rune{r})
+
 		code, seen := t.runeToCode[r]
 		if seen {
 			codes = append(codes, code)
@@ -200,27 +236,38 @@ func (t *Typesetter) AppendEncoded(codes pdf.String, gid glyph.ID, s string) pdf
 		}
 
 		glyphName := t.getName(r)
-		code = t.findCode(glyphName, t.isZapf)
-		cid := t.nameToCID(glyphName)
-
+		code = t.registerGlyph(glyphName, text, t.GlyphWidthPDF(glyphName))
 		t.runeToCode[r] = code
-		t.codeToInfo[code] = &font.CodeInfo{
-			CID:    cid,
-			Notdef: 0,
-			Text:   string([]rune{r}),
-			W:      t.GlyphWidthPDF(glyphName),
-		}
+
 		codes = append(codes, code)
 	}
 	return codes
 }
 
-func (t *Typesetter) nameToCID(name string) cmap.CID {
+func (t *Typesetter) registerGlyph(glyphName, text string, w float64) byte {
+	code := t.newCode(glyphName, text, t.psFontName == "ZapfDingbats")
+	t.codeToInfo[code] = &font.CodeInfo{
+		CID:    t.getCID(glyphName),
+		Notdef: 0,
+		Text:   text,
+		W:      w,
+	}
+	return code
+}
+
+func (t *Typesetter) getCID(name string) cmap.CID {
 	i := sort.SearchStrings(t.glyphNames, name)
 	if i < len(t.glyphNames) && t.glyphNames[i] == name {
-		return cmap.CID(i)
+		return cmap.CID(i) + 1
 	}
 	return 0
+}
+
+func (t *Typesetter) getGlyphName(cid cmap.CID) string {
+	if int(cid) == 0 {
+		return ".notdef"
+	}
+	return t.glyphNames[cid-1]
 }
 
 func (t *Typesetter) getName(r rune) string {
@@ -230,26 +277,26 @@ func (t *Typesetter) getName(r rune) string {
 	return ".notdef"
 }
 
-func (t *Typesetter) findCode(glyphName string, isZapf bool) byte {
+func (t *Typesetter) newCode(glyphName, text string, isDingbats bool) byte {
 	bestScore := -1
 	bestCode := byte(0)
-	for codeInt := 0; codeInt < 256; codeInt++ {
+	for codeInt, stdName := range pdfenc.Standard.Encoding {
 		code := byte(codeInt)
+
 		if _, alreadyUsed := t.codeToInfo[code]; alreadyUsed {
 			continue
 		}
 
-		stdName := pdfenc.Standard.Encoding[code]
 		if stdName == glyphName {
-			// If r is in the standard encoding, and the corresponding
-			// code is still free, then use it.
+			// If r is in the standard encoding (and the corresponding
+			// code is still available) then use it.
 			return code
 		}
 
 		var score int
 		switch {
 		case code == 0:
-			// try to reserve the first code for the .notdef glyph
+			// try to reserve code 0 for the .notdef glyph
 			score = 10
 		case code == 32:
 			// try to keep code 32 for the space character
@@ -261,7 +308,14 @@ func (t *Typesetter) findCode(glyphName string, isZapf bool) byte {
 			score = 30
 		}
 
-		if rr := names.ToUnicode(glyphName, isZapf); len(rr) == 1 {
+		// As a last resort, try to match the last bits of the unicode code point.
+		rr := []rune(text)
+		if len(rr) == 0 {
+			rr = names.ToUnicode(glyphName, isDingbats)
+		}
+		if len(rr) > 0 {
+			// Because combining characters come after the base character,
+			// we use the first character here.
 			score += bits.TrailingZeros16(uint16(rr[0]) ^ uint16(code))
 		}
 
@@ -273,30 +327,122 @@ func (t *Typesetter) findCode(glyphName string, isZapf bool) byte {
 	return bestCode
 }
 
-var _ font.Embedded = (*Type1Dicts)(nil)
-
-type Type1Dicts struct {
-	ref            pdf.Reference
-	PostScriptName string
-	SubsetTag      string
-	Name           pdf.Name
-
-	// Descriptor is the font descriptor dictionary.
-	// To following fields are ignored: FontName, MissingWidth.
-	Descriptor *font.Descriptor
-
-	Encoding *encoding.Encoding
-	Widths   [256]float64
-	Text     [256]string
-
-	// Font (optional) is the font data to embed.
-	// This must be one of *type1.Font, *cff.Font, or *sfnt.Font.
-	Font Type1FontData
+func (t *Typesetter) glyphsUsed() map[string]struct{} {
+	all := make(map[string]struct{})
+	for _, info := range t.codeToInfo {
+		glyphName := t.getGlyphName(info.CID)
+		all[glyphName] = struct{}{}
+	}
+	return all
 }
 
-type Type1FontData interface {
-	PostScriptName() string
-	GetEncoding() []string
+func clone[T any](x *T) *T {
+	y := *x
+	return &y
+}
+
+// Finish writes the font dictionary to the PDF file.
+// After this has been called, no new codes can be allocated.
+func (t *Typesetter) Finish(rm *pdf.ResourceManager) error {
+	var subsetTag string
+	psFont := t.Type1Font.Font
+	if glyphsUsed := t.glyphsUsed(); len(glyphsUsed) < len(t.glyphNames) && psFont != nil {
+		// subset the font
+
+		psSubset := clone(psFont)
+		psSubset.Glyphs = make(map[string]*type1.Glyph)
+		if glyph, ok := psFont.Glyphs[".notdef"]; ok {
+			psSubset.Glyphs[".notdef"] = glyph
+		}
+		for name := range glyphsUsed {
+			if glyph, ok := psFont.Glyphs[name]; ok {
+				psSubset.Glyphs[name] = glyph
+			}
+		}
+		// We always use the standard encoding here to minimize the
+		// size of the embedded font data.  The actual encoding is then
+		// set in the PDF font dictionary.
+		psSubset.Encoding = psenc.StandardEncoding[:]
+		psFont = psSubset
+
+		// TODO(voss): find a better way to generate a subset tag
+		var gg []glyph.ID
+		for gid, glyphName := range t.glyphNames {
+			if _, used := glyphsUsed[glyphName]; used {
+				gg = append(gg, glyph.ID(gid+1))
+			}
+		}
+		subsetTag = subset.Tag(gg, len(t.glyphNames)+1)
+	}
+
+	fd := &font.Descriptor{}
+	if ps := t.Font; ps != nil {
+		fd.FontName = ps.FontName
+		fd.FontFamily = ps.FamilyName
+		fd.FontWeight = os2.WeightFromString(ps.Weight)
+		fd.FontBBox = ps.FontBBoxPDF()
+		fd.IsItalic = ps.ItalicAngle != 0
+		fd.ItalicAngle = ps.ItalicAngle
+		fd.IsFixedPitch = ps.IsFixedPitch
+		fd.ForceBold = ps.Private.ForceBold
+		fd.StemV = ps.Private.StdVW
+		fd.StemH = ps.Private.StdHW
+	}
+	if m := t.Metrics; m != nil {
+		fd.FontName = m.FontName
+		fd.FontBBox = m.FontBBoxPDF()
+		fd.CapHeight = m.CapHeight
+		fd.XHeight = m.XHeight
+		fd.Ascent = m.Ascent
+		fd.Descent = m.Descent
+		fd.IsItalic = m.ItalicAngle != 0
+		fd.ItalicAngle = m.ItalicAngle
+		fd.IsFixedPitch = m.IsFixedPitch
+	}
+
+	dicts := &Type1Dicts{
+		ref:            t.ref,
+		PostScriptName: t.PostScriptName(),
+		SubsetTag:      subsetTag,
+		Descriptor:     fd,
+		Encoding:       &encoding.Encoding2{},
+		Font:           psFont,
+	}
+
+	notdefWidth := t.GlyphWidthPDF(".notdef")
+	for code := range 256 {
+		info, ok := t.codeToInfo[byte(code)]
+		if ok {
+			dicts.Widths[code] = info.W
+			dicts.Text[code] = info.Text
+			dicts.Encoding.Enc[code] = t.getGlyphName(info.CID)
+		} else {
+			dicts.Widths[code] = notdefWidth
+		}
+	}
+	if dicts.Widths[0] == dicts.Widths[255] {
+		fd.MissingWidth = dicts.Widths[0]
+	} else {
+		left := 1
+		for dicts.Widths[left] == dicts.Widths[0] {
+			left++
+		}
+		right := 1
+		for dicts.Widths[255-right] == dicts.Widths[255] {
+			right++
+		}
+		if left >= right && left > 1 {
+			fd.MissingWidth = dicts.Widths[0]
+		} else if right > 1 {
+			fd.MissingWidth = dicts.Widths[255]
+		}
+	}
+
+	_, _, err := pdf.ResourceManagerEmbed(rm, dicts)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 var (
@@ -304,6 +450,35 @@ var (
 	_ Type1FontData = (*cff.Font)(nil)
 	_ Type1FontData = (*sfnt.Font)(nil)
 )
+
+type Type1FontData interface {
+	PostScriptName() string
+	GetEncoding() []string
+}
+
+var _ font.Embedded = (*Type1Dicts)(nil)
+
+// Type1Dicts represents a Type 1 font dictionary.
+type Type1Dicts struct {
+	ref            pdf.Reference
+	PostScriptName string
+	SubsetTag      string
+	Name           pdf.Name
+
+	// Descriptor is the font descriptor dictionary.
+	// To FontName field is ignored.
+	Descriptor *font.Descriptor
+
+	Encoding *encoding.Encoding2
+	Widths   [256]float64
+	Text     [256]string
+
+	// Font (optional) is the font data to embed.
+	// This must be one of *type1.Font, *cff.Font, or *sfnt.Font.
+	//
+	// TODO(voss): replace this with `func() (Type1FontData, error)`?
+	Font Type1FontData
+}
 
 func (d *Type1Dicts) WritingMode() cmap.WritingMode {
 	return cmap.Horizontal
@@ -316,13 +491,6 @@ func (d *Type1Dicts) DecodeWidth(s pdf.String) (float64, int) {
 	return d.Widths[s[0]], 1
 }
 
-// Finish writes the font dictionary to the PDF file.
-// This implements [pdf.Finisher].
-func (d *Type1Dicts) Finish(rm *pdf.ResourceManager) error {
-	_, _, err := pdf.ResourceManagerEmbed(rm, d)
-	return err
-}
-
 func (d *Type1Dicts) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
@@ -331,6 +499,8 @@ func (d *Type1Dicts) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 	// Check that all data is valid and consistent.
 	if d.Font != nil {
 		switch f := d.Font.(type) {
+		case *type1.Font:
+			// pass
 		case *cff.Font:
 			if f.IsCIDKeyed() {
 				return d.ref, zero, errors.New("CID-keyed fonts not allowed")
@@ -384,14 +554,11 @@ func (d *Type1Dicts) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 	compressedObjects := []pdf.Object{fontDict}
 	compressedRefs := []pdf.Reference{d.ref}
 
-	stdInfo, isStdFont := stdmtx.Metrics[d.PostScriptName]
-
-	// Since `encodingObject` may map more codes than `d.Encoding`,
-	// we need to use `encodingObject` to check the glyph width.
+	stdInfo := stdmtx.Metrics[d.PostScriptName]
 
 	var fontFileRef pdf.Reference
 	trimFontDict := (d.Font == nil &&
-		isStdFont &&
+		stdInfo != nil &&
 		w.GetOptions().HasAny(pdf.OptTrimStandardFonts) &&
 		widthsAreCompatible(d.Widths[:], stdInfo, encodingObj) &&
 		fontDescriptorIsCompatible(d.Descriptor, stdInfo))
@@ -411,32 +578,46 @@ func (d *Type1Dicts) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 
 		fontDict["FontDescriptor"] = descRef
 
-		widthRef := w.Alloc()
-		widthInfo := widths.EncodeSimple(d.Widths[:])
-		fontDict["FirstChar"] = widthInfo.FirstChar
-		fontDict["LastChar"] = widthInfo.LastChar
-		fontDict["Widths"] = widthRef
-		if widthInfo.MissingWidth != 0 {
-			desc["MissingWidth"] = pdf.Number(widthInfo.MissingWidth)
-		} else {
-			delete(desc, "MissingWidth")
+		lastChar := 255
+		for lastChar > 0 && d.Widths[lastChar] == d.Descriptor.MissingWidth {
+			lastChar--
+		}
+		firstChar := 0
+		for firstChar < lastChar && d.Widths[firstChar] == d.Descriptor.MissingWidth {
+			firstChar++
+		}
+		widths := make(pdf.Array, 0, lastChar-firstChar+1)
+		for i := firstChar; i <= lastChar; i++ {
+			widths = append(widths, pdf.Number(d.Widths[i]))
 		}
 
-		compressedObjects = append(compressedObjects, desc, widthInfo.Widths)
-		compressedRefs = append(compressedRefs, descRef, widthRef)
+		fontDict["FirstChar"] = pdf.Integer(firstChar)
+		fontDict["LastChar"] = pdf.Integer(lastChar)
+
+		if len(widths) > 3 {
+			widthRef := w.Alloc()
+			fontDict["Widths"] = widthRef
+			compressedObjects = append(compressedObjects, widths)
+			compressedRefs = append(compressedRefs, widthRef)
+		} else {
+			fontDict["Widths"] = widths
+		}
+
+		compressedObjects = append(compressedObjects, desc)
+		compressedRefs = append(compressedRefs, descRef)
 	}
 
 	var builtinEncoding []string
 	if d.Font != nil {
 		builtinEncoding = d.Font.GetEncoding()
-	} else if isStdFont {
+	} else if stdInfo != nil {
 		builtinEncoding = stdInfo.Encoding
 	}
 
 	needsToUnicode := false
 	for code := range 256 {
-		cid := d.Encoding.Decode(byte(code))
-		if cid == 0 { // unmapped code
+		glyphName := d.Encoding.Enc[code]
+		if glyphName == "" { // unmapped code
 			if d.Text[code] != "" {
 				needsToUnicode = true
 				break
@@ -444,17 +625,15 @@ func (d *Type1Dicts) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 			continue
 		}
 
-		glyphName := d.Encoding.GlyphName(cid)
-		if glyphName == "" && code < len(builtinEncoding) && builtinEncoding[code] != ".notdef" {
-			glyphName = builtinEncoding[code]
-		}
-
-		if glyphName == "" {
-			if d.Text[code] != "" {
+		if glyphName == encoding.UseBuiltin {
+			if code < len(builtinEncoding) && builtinEncoding[code] != ".notdef" {
+				glyphName = builtinEncoding[code]
+			} else {
+				// The encoding does not have enough information to determine
+				// the glyph name.
 				needsToUnicode = true
 				break
 			}
-			continue
 		}
 
 		rr := names.ToUnicode(glyphName, d.PostScriptName == "ZapfDingbats")
@@ -545,12 +724,17 @@ func (d *Type1Dicts) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 	return d.ref, zero, nil
 }
 
-// widthsAreCompatible returns true if the glyph widths ww are compatible with
+// widthsAreCompatible returns true, if the glyph widths ww are compatible with
 // the standard font metrics.  The object encObj is the value of the font
-// dictionary's Encoding entry.  It most be valid and must be a direct object.
+// dictionary's Encoding entry.
+//
+// EncObj must be valid and must be a direct object.  Do not pass encObj values
+// read from files without validation.
 func widthsAreCompatible(ww []float64, info *stdmtx.FontData, encObj pdf.Object) bool {
-	// decode the enc object by hand
-	// TODO(voss): extract this into a helper function
+	// Since the encoding dictionary may encode more code points than
+	// strictly needed, we can't use the encoding vector and instead
+	// usethe encoding dictionary here.
+
 	var enc []string
 	switch obj := encObj.(type) {
 	case nil:
@@ -637,47 +821,4 @@ func fontDescriptorIsCompatible(fd *font.Descriptor, stdInfo *stdmtx.FontData) b
 		return false
 	}
 	return true
-}
-
-func type1Rune(w *graphics.Writer, f *type1.Font, r rune) {
-	cmap := make(map[rune]string)
-	for glyphName := range f.Glyphs {
-		rr := names.ToUnicode(glyphName, f.FontName == "ZapfDingbats")
-		if len(rr) != 1 {
-			panic("unexpected number of runes")
-		}
-		cmap[rr[0]] = glyphName
-	}
-	enc := encoding.New()
-
-	// -----------------------------------------------------------------------
-
-	glyphName, ok := cmap[r]
-	if !ok {
-		panic("missing rune")
-	}
-	gidInt := slices.Index(f.GlyphList(), glyphName)
-	if gidInt < 0 {
-		panic("missing")
-	}
-	gid := glyph.ID(gidInt)
-	text := string([]rune{r})
-
-	code, isNew := allocateCode(gid, text)
-	if isNew {
-		// builtinEncoding[code] = glyphName
-
-		cid := enc.Allocate(glyphName)
-		w := f.Glyphs[glyphName].WidthX
-
-		info := &font.CodeInfo{
-			CID:    cid,
-			Notdef: 0,
-			Text:   string([]rune{r}),
-			W:      w,
-		}
-		setCodeInfo(code, info)
-	}
-
-	w.TextShowRaw(code)
 }

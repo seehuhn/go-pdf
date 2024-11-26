@@ -69,6 +69,7 @@ type embRes struct {
 }
 
 type Finisher interface {
+	// TODO(voss): should the ResourceManager argument be removed?
 	Finish(*ResourceManager) error
 }
 

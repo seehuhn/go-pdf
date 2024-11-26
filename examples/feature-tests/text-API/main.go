@@ -17,20 +17,47 @@
 package main
 
 import (
-	"fmt"
-
-	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/internal/makefont"
 )
 
 func main() {
-	fmt.Println("hello, world")
+	err := doit()
+	if err != nil {
+		panic(err)
+	}
 }
 
-func allocateCode(gid glyph.ID, text string) ([]byte, bool) {
-	panic("not implemented")
-}
+func doit() error {
+	out, err := document.CreateSinglePage("test.pdf", document.A5r, pdf.V2_0, nil)
+	if err != nil {
+		return err
+	}
 
-func setCodeInfo(code []byte, info *font.CodeInfo) {
-	panic("not implemented")
+	psFont := makefont.Type1()
+	f1, err := NewType1(psFont, nil)
+	if err != nil {
+		return err
+	}
+
+	// temporary hack to get a Typesetter
+	_, q, err := pdf.ResourceManagerEmbed(out.RM, f1)
+	if err != nil {
+		return err
+	}
+	q2 := q.(*Typesetter)
+	s := q2.AppendEncoded(nil, "Hello, World!")
+
+	out.TextSetFont(f1, 12)
+	out.TextBegin()
+	out.TextFirstLine(100, 100)
+	out.TextShowRaw(s)
+	out.TextEnd()
+
+	err = out.Close()
+	if err != nil {
+		return err
+	}
+	return nil
 }

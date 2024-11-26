@@ -69,6 +69,10 @@ type Embedded interface {
 	// the width of the corresponding glyph in PDF text space units (still to
 	// be multiplied by the font size) and the number of bytes read from the
 	// string.
+	//
+	// TODO(voss): should this use glyph space units?
+	//
+	// TODO(voss): what should happen if the argument is the empty string?
 	DecodeWidth(pdf.String) (float64, int)
 }
 
