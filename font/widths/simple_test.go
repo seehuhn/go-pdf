@@ -222,7 +222,7 @@ func TestExtractGlyphWidthsSimple(t *testing.T) {
 				FontDict:       tt.fontDict,
 				FontDescriptor: tt.fontDesc,
 			}
-			got, err := ExtractSimple(newMockGetter(), dicts)
+			got, err := ExtractSimple(&MockGetter{}, dicts)
 			if err != nil {
 				t.Errorf("ExtractGlyphWidthsSimple() error = %v", err)
 				return
@@ -236,10 +236,6 @@ func TestExtractGlyphWidthsSimple(t *testing.T) {
 
 // MockGetter is a mock implementation of pdf.Getter for testing
 type MockGetter struct{}
-
-func newMockGetter() *MockGetter {
-	return &MockGetter{}
-}
 
 func (m *MockGetter) Get(ref pdf.Reference, canObjStm bool) (pdf.Native, error) {
 	return nil, nil

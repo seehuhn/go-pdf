@@ -405,8 +405,12 @@ func (t *Typesetter) Finish(rm *pdf.ResourceManager) error {
 		PostScriptName: t.PostScriptName(),
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
-		Encoding:       &encoding.Encoding2{},
-		Font:           psFont,
+		Encoding:       &encoding.Type1{},
+	}
+	if psFont != nil {
+		dicts.GetFont = func() (Type1FontData, error) {
+			return psFont, nil
+		}
 	}
 
 	notdefWidth := t.GlyphWidthPDF(".notdef")
@@ -415,7 +419,7 @@ func (t *Typesetter) Finish(rm *pdf.ResourceManager) error {
 		if ok {
 			dicts.Widths[code] = info.W
 			dicts.Text[code] = info.Text
-			dicts.Encoding.Enc[code] = t.getGlyphName(info.CID)
+			dicts.Encoding[code] = t.getGlyphName(info.CID)
 		} else {
 			dicts.Widths[code] = notdefWidth
 		}
@@ -469,15 +473,13 @@ type Type1Dicts struct {
 	// To FontName field is ignored.
 	Descriptor *font.Descriptor
 
-	Encoding *encoding.Encoding2
+	Encoding *encoding.Type1
 	Widths   [256]float64
 	Text     [256]string
 
-	// Font (optional) is the font data to embed.
-	// This must be one of *type1.Font, *cff.Font, or *sfnt.Font.
-	//
-	// TODO(voss): replace this with `func() (Type1FontData, error)`?
-	Font Type1FontData
+	// GetFont (optional) returns the font data to embed.
+	// This return font must be one of *type1.Font, *cff.Font, or *sfnt.Font.
+	GetFont func() (Type1FontData, error)
 }
 
 func (d *Type1Dicts) WritingMode() cmap.WritingMode {
@@ -491,14 +493,85 @@ func (d *Type1Dicts) DecodeWidth(s pdf.String) (float64, int) {
 	return d.Widths[s[0]], 1
 }
 
+func ExtractType1Dicts(r pdf.Getter, obj pdf.Object) (*Type1Dicts, error) {
+	dict, err := pdf.GetDictTyped(r, obj, "Font")
+	if err != nil {
+		return nil, err
+	}
+	subtype, err := pdf.GetName(r, dict["Subtype"])
+	if err != nil {
+		return nil, err
+	}
+	if subtype != "" && subtype != "Type1" {
+		return nil, &pdf.MalformedFileError{
+			Err: fmt.Errorf("expected font subtype Type1, got %q", subtype),
+		}
+	}
+
+	d := &Type1Dicts{}
+	d.ref, _ = obj.(pdf.Reference)
+
+	baseFont, err := pdf.GetName(r, dict["BaseFont"])
+	if err != nil {
+		return nil, err
+	}
+	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
+		d.PostScriptName = m[2]
+		d.SubsetTag = m[1]
+	} else {
+		d.PostScriptName = string(baseFont)
+	}
+
+	stdInfo := stdmtx.Metrics[d.PostScriptName]
+
+	d.Name, _ = pdf.GetName(r, dict["Name"])
+
+	fd, err := font.ExtractDescriptor(r, dict["Descriptor"])
+	if err != nil {
+		return nil, err
+	}
+	if fd == nil && stdInfo != nil {
+		fd = &font.Descriptor{
+			FontName:     d.PostScriptName,
+			FontFamily:   stdInfo.FontFamily,
+			FontStretch:  os2.WidthNormal,
+			FontWeight:   stdInfo.FontWeight,
+			IsFixedPitch: stdInfo.IsFixedPitch,
+			IsSerif:      stdInfo.IsSerif,
+			IsSymbolic:   stdInfo.IsSymbolic,
+			IsItalic:     stdInfo.ItalicAngle != 0,
+			FontBBox:     stdInfo.FontBBox,
+			ItalicAngle:  stdInfo.ItalicAngle,
+			Ascent:       stdInfo.Ascent,
+			Descent:      stdInfo.Descent,
+			CapHeight:    stdInfo.CapHeight,
+			XHeight:      stdInfo.XHeight,
+			StemV:        stdInfo.StemV,
+			StemH:        stdInfo.StemH,
+		}
+	}
+	d.Descriptor = fd
+	panic("not implemented")
+}
+
 func (d *Type1Dicts) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	w := rm.Out
 
+	var psFont Type1FontData
+	if d.GetFont != nil {
+		font, err := d.GetFont()
+		if err != nil {
+			return d.ref, zero, err
+		}
+		psFont = font
+	}
+
 	// Check that all data is valid and consistent.
-	if d.Font != nil {
-		switch f := d.Font.(type) {
+
+	if psFont != nil {
+		switch f := psFont.(type) {
 		case *type1.Font:
 			// pass
 		case *cff.Font:
@@ -513,12 +586,7 @@ func (d *Type1Dicts) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 				return d.ref, zero, errors.New("CID-keyed fonts not allowed")
 			}
 		default:
-			return d.ref, zero, fmt.Errorf("unsupported font type %T", d.Font)
-		}
-
-		fontName := d.Font.PostScriptName()
-		if fontName != d.PostScriptName {
-			return d.ref, zero, fmt.Errorf("font name mismatch: %s != %s", fontName, d.PostScriptName)
+			return d.ref, zero, fmt.Errorf("unsupported font type %T", psFont)
 		}
 	}
 	if d.SubsetTag != "" && !subset.IsValidTag(d.SubsetTag) {
@@ -542,8 +610,8 @@ func (d *Type1Dicts) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 	}
 
 	isNonSymbolic := !d.Descriptor.IsSymbolic
-	isExternal := d.Font == nil
-	encodingObj, err := d.Encoding.AsPDFType1(isNonSymbolic && isExternal, w.GetOptions())
+	isExternal := psFont == nil
+	encodingObj, err := d.Encoding.AsPDF(isNonSymbolic && isExternal, w.GetOptions())
 	if err != nil {
 		return d.ref, zero, err
 	}
@@ -557,7 +625,7 @@ func (d *Type1Dicts) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 	stdInfo := stdmtx.Metrics[d.PostScriptName]
 
 	var fontFileRef pdf.Reference
-	trimFontDict := (d.Font == nil &&
+	trimFontDict := (psFont == nil &&
 		stdInfo != nil &&
 		w.GetOptions().HasAny(pdf.OptTrimStandardFonts) &&
 		widthsAreCompatible(d.Widths[:], stdInfo, encodingObj) &&
@@ -566,9 +634,9 @@ func (d *Type1Dicts) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 		descRef := w.Alloc()
 		desc := d.Descriptor.AsDict()
 		desc["FontName"] = pdf.Name(baseFont)
-		if d.Font != nil {
+		if psFont != nil {
 			fontFileRef = w.Alloc()
-			switch d.Font.(type) {
+			switch psFont.(type) {
 			case *type1.Font:
 				desc["FontFile"] = fontFileRef
 			case *cff.Font, *sfnt.Font:
@@ -608,15 +676,15 @@ func (d *Type1Dicts) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 	}
 
 	var builtinEncoding []string
-	if d.Font != nil {
-		builtinEncoding = d.Font.GetEncoding()
+	if psFont != nil {
+		builtinEncoding = psFont.GetEncoding()
 	} else if stdInfo != nil {
 		builtinEncoding = stdInfo.Encoding
 	}
 
 	needsToUnicode := false
 	for code := range 256 {
-		glyphName := d.Encoding.Enc[code]
+		glyphName := d.Encoding[code]
 		if glyphName == "" { // unmapped code
 			if d.Text[code] != "" {
 				needsToUnicode = true
@@ -656,7 +724,7 @@ func (d *Type1Dicts) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 		return d.ref, zero, pdf.Wrap(err, "Type 1 font dicts")
 	}
 
-	switch f := d.Font.(type) {
+	switch f := psFont.(type) {
 	case *type1.Font:
 		length1 := pdf.NewPlaceholder(w, 10)
 		length2 := pdf.NewPlaceholder(w, 10)

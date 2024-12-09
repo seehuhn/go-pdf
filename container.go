@@ -143,6 +143,8 @@ func getIntegerNoObjStm(r Getter, obj Object) (Integer, error) {
 // GetDictTyped resolves any indirect reference and checks that the resulting
 // object is a dictionary.  The function also checks that the "Type" entry of
 // the dictionary, if set, is equal to the given type.
+//
+// If the object is `null`, the function returns `nil, nil`.
 func GetDictTyped(r Getter, obj Object, tp Name) (Dict, error) {
 	dict, err := GetDict(r, obj)
 	if dict == nil || err != nil {

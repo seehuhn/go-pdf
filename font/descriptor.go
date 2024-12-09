@@ -66,9 +66,11 @@ type Descriptor struct {
 }
 
 // ExtractDescriptor reads the font descriptor from a PDF file.
+//
+// If obj is nil, the function returns nil, nil.
 func ExtractDescriptor(r pdf.Getter, obj pdf.Object) (*Descriptor, error) {
 	fontDescriptor, err := pdf.GetDictTyped(r, obj, "FontDescriptor")
-	if err != nil {
+	if fontDescriptor == nil {
 		return nil, err
 	}
 

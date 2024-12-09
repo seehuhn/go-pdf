@@ -23,17 +23,23 @@ import (
 	"seehuhn.de/go/pdf/font/pdfenc"
 )
 
-type Encoding2 struct {
-	// Enc gives the glyph name for each code point.
-	// The empty string is used for unmapped glyphs.
-	// The special value "@" indicates that the corresponding glyph from the
-	// build-in encoding should be used.
-	Enc [256]string
-}
+// Type1 gives the glyph name for each code point.
+// The empty string is used for unmapped glyphs.
+// The special value [UseBuiltin] indicates that the corresponding glyph from
+// the build-in encoding should be used.
+//
+// TODO(voss): use `func(code byte) string` instead?
+type Type1 [256]string
 
 const UseBuiltin = "@"
 
-// AsPDFType1 returns the /Encoding entry for Type1 font dictionary.
+// ExtractType1New extracts the encoding from the /Encoding entry of a Type1 font
+// dictionary.
+func ExtractType1New(r pdf.Getter, obj pdf.Object) (*Type1, error) {
+	panic("not implemented")
+}
+
+// AsPDF returns the /Encoding entry for Type1 font dictionary.
 //
 // If the argument nonSymbolicExt is true, the function assumes that the font
 // has the non-symbolic flag set in the font descriptor and that the font is
@@ -43,7 +49,7 @@ const UseBuiltin = "@"
 // The resulting PDF object describes an encoding which maps all characters
 // mapped by e to the given glyph name, but it may also imply glyph names for
 // the unmapped codes.
-func (e *Encoding2) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, error) {
+func (e *Type1) AsPDF(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, error) {
 	type candInfo struct {
 		encName     pdf.Native
 		enc         []string
@@ -53,7 +59,7 @@ func (e *Encoding2) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.
 	// First check whether we can use the built-in encoding.
 	canUseBuiltIn := true
 	for code := range 256 {
-		if e.Enc[code] != "" && e.Enc[code] != UseBuiltin {
+		if e[code] != "" && e[code] != UseBuiltin {
 			canUseBuiltIn = false
 			break
 		}
@@ -66,7 +72,7 @@ func (e *Encoding2) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.
 	// use a named encoding.
 	noBuiltin := true
 	for code := range 256 {
-		if e.Enc[code] == UseBuiltin {
+		if e[code] == UseBuiltin {
 			noBuiltin = false
 			break
 		}
@@ -80,7 +86,7 @@ func (e *Encoding2) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.
 	candidateLoop:
 		for _, cand := range candidates {
 			for code := range 256 {
-				if glyphName := e.Enc[code]; glyphName != "" && glyphName != cand.enc[code] {
+				if glyphName := e[code]; glyphName != "" && glyphName != cand.enc[code] {
 					// we got a conflict, try the next candidate
 					continue candidateLoop
 				}
@@ -110,7 +116,7 @@ func (e *Encoding2) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.
 		for _, cand := range candidates {
 			lastDiff := 999
 			for code := range 256 {
-				glyphName := e.Enc[code]
+				glyphName := e[code]
 				if glyphName == "" || glyphName == cand.enc[code] {
 					continue
 				}
@@ -134,7 +140,7 @@ func (e *Encoding2) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.
 		var diff pdf.Array
 		lastDiff := 999
 		for code := range 256 {
-			glyphName := e.Enc[code]
+			glyphName := e[code]
 			if glyphName == "" || glyphName == UseBuiltin {
 				continue
 			}
