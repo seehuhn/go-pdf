@@ -400,12 +400,14 @@ func (t *Typesetter) Finish(rm *pdf.ResourceManager) error {
 		fd.IsFixedPitch = m.IsFixedPitch
 	}
 
+	enc := make(map[byte]string)
+
 	dicts := &Type1Dicts{
 		ref:            t.ref,
 		PostScriptName: t.PostScriptName(),
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
-		Encoding:       &encoding.Type1{},
+		Encoding:       func(code byte) string { return enc[code] },
 	}
 	if psFont != nil {
 		dicts.GetFont = func() (Type1FontData, error) {
@@ -419,7 +421,7 @@ func (t *Typesetter) Finish(rm *pdf.ResourceManager) error {
 		if ok {
 			dicts.Widths[code] = info.W
 			dicts.Text[code] = info.Text
-			dicts.Encoding[code] = t.getGlyphName(info.CID)
+			enc[byte(code)] = t.getGlyphName(info.CID)
 		} else {
 			dicts.Widths[code] = notdefWidth
 		}
@@ -473,7 +475,7 @@ type Type1Dicts struct {
 	// To FontName field is ignored.
 	Descriptor *font.Descriptor
 
-	Encoding *encoding.Type1
+	Encoding encoding.Type1
 	Widths   [256]float64
 	Text     [256]string
 
@@ -684,7 +686,7 @@ func (d *Type1Dicts) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 
 	needsToUnicode := false
 	for code := range 256 {
-		glyphName := d.Encoding[code]
+		glyphName := d.Encoding(byte(code))
 		if glyphName == "" { // unmapped code
 			if d.Text[code] != "" {
 				needsToUnicode = true

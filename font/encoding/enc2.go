@@ -27,16 +27,113 @@ import (
 // The empty string is used for unmapped glyphs.
 // The special value [UseBuiltin] indicates that the corresponding glyph from
 // the build-in encoding should be used.
-//
-// TODO(voss): use `func(code byte) string` instead?
-type Type1 [256]string
+type Type1 func(code byte) string
 
 const UseBuiltin = "@"
 
+// useBuiltinEncoding is a Type1 encoding function that always returns UseBuiltin
+var (
+	useBuiltinEncoding Type1 = func(code byte) string {
+		return UseBuiltin
+	}
+	useWinAnsiEncoding Type1 = func(code byte) string {
+		return pdfenc.WinAnsi.Encoding[code]
+	}
+	useMacRomanEncoding Type1 = func(code byte) string {
+		return pdfenc.MacRoman.Encoding[code]
+	}
+	useMacExpertEncoding Type1 = func(code byte) string {
+		return pdfenc.MacExpert.Encoding[code]
+	}
+	useStandardEncoding Type1 = func(code byte) string {
+		return pdfenc.Standard.Encoding[code]
+	}
+)
+
 // ExtractType1New extracts the encoding from the /Encoding entry of a Type1 font
 // dictionary.
-func ExtractType1New(r pdf.Getter, obj pdf.Object) (*Type1, error) {
-	panic("not implemented")
+//
+// If the argument nonSymbolicExt is true, the function assumes that the font
+// has the non-symbolic flag set in the font descriptor and that the font is
+// not be embedded in the PDF file.
+//
+// If /Encoding is malformed, the font's built-in encoding is used as a
+// fallback.
+func ExtractType1New(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Type1, error) {
+	obj, err := pdf.Resolve(r, obj)
+	if err != nil {
+		return nil, err
+	}
+
+	if name, ok := obj.(pdf.Name); ok {
+		switch name {
+		case "WinAnsiEncoding":
+			return useWinAnsiEncoding, nil
+		case "MacRomanEncoding":
+			return useMacRomanEncoding, nil
+		case "MacExpertEncoding":
+			return useMacExpertEncoding, nil
+		}
+	}
+
+	dict, _ := obj.(pdf.Dict)
+	if dict == nil {
+		return useBuiltinEncoding, nil
+	}
+	if err := pdf.CheckDictType(r, dict, "Encoding"); err != nil {
+		return useBuiltinEncoding, err
+	}
+
+	// If we reach this point, we have found an encoding dictionary.
+
+	var baseEnc Type1
+	baseEncName, _ := pdf.GetName(r, dict["BaseEncoding"])
+	switch baseEncName {
+	case "WinAnsiEncoding":
+		baseEnc = useWinAnsiEncoding
+	case "MacRomanEncoding":
+		baseEnc = useMacRomanEncoding
+	case "MacExpertEncoding":
+		baseEnc = useMacExpertEncoding
+	default:
+		if nonSymbolicExt { // non-symbolic and not embedded
+			baseEnc = useStandardEncoding
+		} else { // symbolic or embedded
+			baseEnc = useBuiltinEncoding
+		}
+	}
+
+	differences := make(map[byte]string)
+	if diffArray, _ := pdf.GetArray(r, dict["Differences"]); diffArray != nil {
+		currentCode := pdf.Integer(-1)
+		for _, item := range diffArray {
+			item, err = pdf.Resolve(r, item)
+			if err != nil {
+				return nil, err
+			}
+
+			switch item := item.(type) {
+			case pdf.Integer:
+				currentCode = item
+
+			case pdf.Name:
+				if currentCode >= 0 && currentCode < 256 {
+					differences[byte(currentCode)] = string(item)
+					currentCode++
+				}
+			}
+		}
+	}
+	if len(differences) == 0 {
+		return baseEnc, nil
+	}
+
+	return func(code byte) string {
+		if glyphName, ok := differences[code]; ok {
+			return glyphName
+		}
+		return baseEnc(code)
+	}, nil
 }
 
 // AsPDF returns the /Encoding entry for Type1 font dictionary.
@@ -49,7 +146,7 @@ func ExtractType1New(r pdf.Getter, obj pdf.Object) (*Type1, error) {
 // The resulting PDF object describes an encoding which maps all characters
 // mapped by e to the given glyph name, but it may also imply glyph names for
 // the unmapped codes.
-func (e *Type1) AsPDF(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, error) {
+func (e Type1) AsPDF(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, error) {
 	type candInfo struct {
 		encName     pdf.Native
 		enc         []string
@@ -59,7 +156,7 @@ func (e *Type1) AsPDF(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, e
 	// First check whether we can use the built-in encoding.
 	canUseBuiltIn := true
 	for code := range 256 {
-		if e[code] != "" && e[code] != UseBuiltin {
+		if e(byte(code)) != "" && e(byte(code)) != UseBuiltin {
 			canUseBuiltIn = false
 			break
 		}
@@ -72,7 +169,7 @@ func (e *Type1) AsPDF(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, e
 	// use a named encoding.
 	noBuiltin := true
 	for code := range 256 {
-		if e[code] == UseBuiltin {
+		if e(byte(code)) == UseBuiltin {
 			noBuiltin = false
 			break
 		}
@@ -86,7 +183,7 @@ func (e *Type1) AsPDF(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, e
 	candidateLoop:
 		for _, cand := range candidates {
 			for code := range 256 {
-				if glyphName := e[code]; glyphName != "" && glyphName != cand.enc[code] {
+				if glyphName := e(byte(code)); glyphName != "" && glyphName != cand.enc[code] {
 					// we got a conflict, try the next candidate
 					continue candidateLoop
 				}
@@ -116,7 +213,7 @@ func (e *Type1) AsPDF(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, e
 		for _, cand := range candidates {
 			lastDiff := 999
 			for code := range 256 {
-				glyphName := e[code]
+				glyphName := e(byte(code))
 				if glyphName == "" || glyphName == cand.enc[code] {
 					continue
 				}
@@ -140,7 +237,7 @@ func (e *Type1) AsPDF(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, e
 		var diff pdf.Array
 		lastDiff := 999
 		for code := range 256 {
-			glyphName := e[code]
+			glyphName := e(byte(code))
 			if glyphName == "" || glyphName == UseBuiltin {
 				continue
 			}
