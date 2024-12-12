@@ -31,7 +31,6 @@ type Type1 func(code byte) string
 
 const UseBuiltin = "@"
 
-// useBuiltinEncoding is a Type1 encoding function that always returns UseBuiltin
 var (
 	useBuiltinEncoding Type1 = func(code byte) string {
 		return UseBuiltin
@@ -50,8 +49,8 @@ var (
 	}
 )
 
-// ExtractType1New extracts the encoding from the /Encoding entry of a Type1 font
-// dictionary.
+// ExtractType1New extracts the encoding from the /Encoding entry of a Type1
+// font dictionary.
 //
 // If the argument nonSymbolicExt is true, the function assumes that the font
 // has the non-symbolic flag set in the font descriptor and that the font is
@@ -146,6 +145,8 @@ func ExtractType1New(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Type1, 
 // The resulting PDF object describes an encoding which maps all characters
 // mapped by e to the given glyph name, but it may also imply glyph names for
 // the unmapped codes.
+//
+// TODO(voss): either rename this, or implement [pdf.Object].
 func (e Type1) AsPDF(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, error) {
 	type candInfo struct {
 		encName     pdf.Native
@@ -192,8 +193,8 @@ func (e Type1) AsPDF(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, er
 		}
 	}
 
-	// If we reach this point, we need an encoding dictionary. We use the base
-	// encoding which leads to the smallest Differences array.
+	// If we reach this point, we need an encoding dictionary. We choose the
+	// base encoding which leads to the smallest Differences array.
 
 	var candidates []*candInfo
 	if noBuiltin {
@@ -227,11 +228,11 @@ func (e Type1) AsPDF(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, er
 		}
 	} else {
 		if nonSymbolicExt {
-			// If a font is marked as symbolic in the font descriptor or the
-			// font is embedded, a missing `BaseEncoding` field represents the
-			// font's built-in encoding. Since one these conditions is
-			// violated, there is no way to refer to the built-in encoding.
-			return nil, errors.New("invalid encoding")
+			// If the font is marked as non-symbolic in the font descriptor and
+			// the font is not embedded, a missing `BaseEncoding` field
+			// represents the standard encoding. In this case, there is no way
+			// to refer to the built-in encoding.
+			return nil, errInvalidEncoding
 		}
 
 		var diff pdf.Array
@@ -276,3 +277,5 @@ func (e Type1) AsPDF(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, er
 	}
 	return bestDict, nil
 }
+
+var errInvalidEncoding = errors.New("invalid encoding")
