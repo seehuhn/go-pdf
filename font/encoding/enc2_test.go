@@ -17,6 +17,7 @@
 package encoding
 
 import (
+	"fmt"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -166,5 +167,76 @@ func TestType1Encoding(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestType1Roundtrip(t *testing.T) {
+	var cases = []Type1{
+		useBuiltinEncoding,
+		useWinAnsiEncoding,
+		useMacRomanEncoding,
+		useMacExpertEncoding,
+		useStandardEncoding,
+		func(code byte) string {
+			switch code {
+			case 30:
+				return "Gandalf"
+			case 31:
+				return "Elrond"
+			case 32:
+				return "Galadriel"
+			case 100:
+				return "Gimli"
+			case 101:
+				return "Frodo"
+			case 102:
+				return "Sam"
+			default:
+				return useWinAnsiEncoding(code)
+			}
+		},
+		func(code byte) string {
+			switch code {
+			case 0:
+				return "Gandalf"
+			case 2:
+				return "Elrond"
+			case 4:
+				return "Galadriel"
+			case 126:
+				return "Gimli"
+			case 128:
+				return "Frodo"
+			case 130:
+				return "Sam"
+			default:
+				return useBuiltinEncoding(code)
+			}
+		},
+	}
+	for i, enc1 := range cases {
+		for _, nonSymbolicExt := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%d/%v", i, nonSymbolicExt), func(t *testing.T) {
+				obj, err := enc1.AsPDF(nonSymbolicExt, 0)
+				if err == errInvalidEncoding {
+					t.Skip("encoding cannot be represented as PDF object")
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				enc2, err := ExtractType1New(&MockGetter{}, obj, nonSymbolicExt)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				for code := range 256 {
+					if got, want := enc1(byte(code)), enc2(byte(code)); got != want {
+						t.Errorf("encoding mismatch at %d: got %q, want %q", code, got, want)
+						break
+					}
+				}
+			})
+		}
 	}
 }
