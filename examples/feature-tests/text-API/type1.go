@@ -476,8 +476,12 @@ type Type1Dicts struct {
 	Descriptor *font.Descriptor
 
 	Encoding encoding.Type1
-	Widths   [256]float64
-	Text     [256]string
+
+	// Widths contains the glyph widths corresponding to the character codes,
+	// in PDF glyph space units.
+	Widths [256]float64
+
+	Text [256]string
 
 	// GetFont (optional) returns the font data to embed.
 	// This return font must be one of *type1.Font, *cff.Font, or *sfnt.Font.
@@ -496,11 +500,11 @@ func (d *Type1Dicts) DecodeWidth(s pdf.String) (float64, int) {
 }
 
 func ExtractType1Dicts(r pdf.Getter, obj pdf.Object) (*Type1Dicts, error) {
-	dict, err := pdf.GetDictTyped(r, obj, "Font")
+	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
 		return nil, err
 	}
-	subtype, err := pdf.GetName(r, dict["Subtype"])
+	subtype, err := pdf.GetName(r, fontDict["Subtype"])
 	if err != nil {
 		return nil, err
 	}
@@ -513,7 +517,7 @@ func ExtractType1Dicts(r pdf.Getter, obj pdf.Object) (*Type1Dicts, error) {
 	d := &Type1Dicts{}
 	d.ref, _ = obj.(pdf.Reference)
 
-	baseFont, err := pdf.GetName(r, dict["BaseFont"])
+	baseFont, err := pdf.GetName(r, fontDict["BaseFont"])
 	if err != nil {
 		return nil, err
 	}
@@ -526,12 +530,13 @@ func ExtractType1Dicts(r pdf.Getter, obj pdf.Object) (*Type1Dicts, error) {
 
 	stdInfo := stdmtx.Metrics[d.PostScriptName]
 
-	d.Name, _ = pdf.GetName(r, dict["Name"])
+	d.Name, _ = pdf.GetName(r, fontDict["Name"])
 
-	fd, err := font.ExtractDescriptor(r, dict["Descriptor"])
+	fdDict, err := pdf.GetDictTyped(r, obj, "FontDescriptor")
 	if err != nil {
 		return nil, err
 	}
+	fd, _ := font.ExtractDescriptor(r, fdDict)
 	if fd == nil && stdInfo != nil {
 		fd = &font.Descriptor{
 			FontName:     d.PostScriptName,
@@ -551,9 +556,74 @@ func ExtractType1Dicts(r pdf.Getter, obj pdf.Object) (*Type1Dicts, error) {
 			StemV:        stdInfo.StemV,
 			StemH:        stdInfo.StemH,
 		}
+	} else if fd == nil { // only for invalid PDF files
+		fd = &font.Descriptor{
+			FontName: d.PostScriptName,
+		}
 	}
 	d.Descriptor = fd
-	panic("not implemented")
+
+	isNonSymbolic := !fd.IsSymbolic
+	isExternal := fdDict["FontFile"] == nil && fdDict["FontFile3"] == nil
+	nonSymbolicExt := isNonSymbolic && isExternal
+	enc, err := encoding.ExtractType1New(r, fontDict["Encoding"], nonSymbolicExt)
+	if err != nil {
+		return nil, err
+	}
+	d.Encoding = enc
+
+	firstChar, _ := pdf.GetInteger(r, fontDict["FirstChar"])
+	widths, _ := pdf.GetArray(r, fontDict["Widths"])
+	if widths != nil && len(widths) <= 256 {
+		for c := range widths {
+			d.Widths[c] = fd.MissingWidth
+		}
+		for i, w := range widths {
+			w, err := pdf.GetNumber(r, w)
+			if err != nil {
+				continue
+			}
+			if firstChar >= pdf.Integer(0-i) && firstChar < pdf.Integer(256-i) {
+				code := byte(firstChar + pdf.Integer(i))
+				d.Widths[code] = float64(w)
+			}
+		}
+	} else if stdInfo != nil {
+		for c := range 256 {
+			w, ok := stdInfo.Width[enc(byte(c))]
+			if !ok {
+				w = stdInfo.Width[".notdef"]
+			}
+			d.Widths[c] = w
+		}
+	}
+
+	toUnicode, err := cmap.ExtractToUnicodeNew(r, fontDict["ToUnicode"])
+	if err != nil && !pdf.IsMalformed(err) {
+		return nil, err
+	}
+	if toUnicode != nil {
+		// TODO(voss): implement an iterator in toUnicode to do this
+		// more efficiently?
+		for code := range 256 {
+			rr := toUnicode.Lookup([]byte{byte(code)})
+			d.Text[code] = string(rr)
+		}
+	} else {
+		for code := range 256 {
+			glyphName := enc(byte(code))
+			if glyphName == "" || glyphName == encoding.UseBuiltin || glyphName == ".notdef" {
+				continue
+			}
+
+			rr := names.ToUnicode(glyphName, d.PostScriptName == "ZapfDingbats")
+			d.Text[code] = string(rr)
+		}
+	}
+
+	// TODO(voss): set the `GetFont` function
+
+	return d, nil
 }
 
 func (d *Type1Dicts) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
@@ -647,6 +717,8 @@ func (d *Type1Dicts) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 		}
 
 		fontDict["FontDescriptor"] = descRef
+
+		// TODO(voss): introduce a helper function for this
 
 		lastChar := 255
 		for lastChar > 0 && d.Widths[lastChar] == d.Descriptor.MissingWidth {

@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 )
 
 // Getter represents a PDF file opened for reading.
@@ -120,12 +121,34 @@ var (
 	GetArray   = resolveAndCast[Array]
 	GetBoolean = resolveAndCast[Boolean]
 	GetDict    = resolveAndCast[Dict]
-	GetInteger = resolveAndCast[Integer]
 	GetName    = resolveAndCast[Name]
 	GetReal    = resolveAndCast[Real]
 	GetStream  = resolveAndCast[*Stream]
 	GetString  = resolveAndCast[String]
 )
+
+// GetInteger resolves any indirect reference and returns the object as an
+// Integer.  If the object is `null`, the function returns 0, nil.
+// Integers are returned as is.
+// Floating point values are silently rounded to the nearest integer.
+// All other object types result in an error.
+func GetInteger(r Getter, obj Object) (Integer, error) {
+	resolved, err := Resolve(r, obj)
+	if err != nil {
+		return 0, err
+	}
+
+	switch x := resolved.(type) {
+	case Integer:
+		return x, nil
+	case Real:
+		return Integer(math.Round(float64(x))), nil
+	default:
+		return 0, &MalformedFileError{
+			Err: fmt.Errorf("expected Integer but got %T", resolved),
+		}
+	}
+}
 
 func getIntegerNoObjStm(r Getter, obj Object) (Integer, error) {
 	obj, err := resolve(r, obj, false)

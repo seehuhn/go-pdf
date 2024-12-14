@@ -57,13 +57,8 @@ func TestRoundTrip(t *testing.T) {
 
 	data, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
 	fdDict := fd1.AsDict()
-	fdRef := data.Alloc()
-	err := data.Put(fdRef, fdDict)
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	fd2, err := ExtractDescriptor(data, fdRef)
+	fd2, err := ExtractDescriptor(data, fdDict)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,12 +127,8 @@ func FuzzFontDescriptor(f *testing.F) {
 
 		data, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
 		fdDict = fd1.AsDict()
-		fdRef := data.Alloc()
-		err = data.Put(fdRef, fdDict)
-		if err != nil {
-			t.Fatal(err)
-		}
-		fd2, err := ExtractDescriptor(data, fdRef)
+
+		fd2, err := ExtractDescriptor(data, fdDict)
 		if err != nil {
 			t.Fatal(err)
 		}

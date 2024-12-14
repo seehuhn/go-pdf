@@ -26,6 +26,7 @@ type FontData struct {
 	StemV        float64
 	StemH        float64
 
+	// Width contains the width of each glyph, in PDF glyph space units.
 	Width map[string]float64
 
 	Encoding []string

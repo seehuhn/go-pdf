@@ -62,16 +62,17 @@ type Descriptor struct {
 	StemH        float64   // optional (default: 0)
 	MaxWidth     float64   // optional (default: 0)
 	AvgWidth     float64   // optional (default: 0)
-	MissingWidth float64   // optional (default: 0)
+	MissingWidth float64   // optional (default: 0), PDF glyph space units
 }
 
-// ExtractDescriptor reads the font descriptor from a PDF file.
+// ExtractDescriptor extracts information from a FontDescriptor dictionary.
 //
 // If obj is nil, the function returns nil, nil.
-func ExtractDescriptor(r pdf.Getter, obj pdf.Object) (*Descriptor, error) {
-	fontDescriptor, err := pdf.GetDictTyped(r, obj, "FontDescriptor")
+//
+// TODO(voss): be more robust against malformed FontDescriptor dictionaries.
+func ExtractDescriptor(r pdf.Getter, fontDescriptor pdf.Dict) (*Descriptor, error) {
 	if fontDescriptor == nil {
-		return nil, err
+		return nil, nil
 	}
 
 	res := &Descriptor{}
