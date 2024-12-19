@@ -27,7 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/internal/debug/tempfile"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
 var _ pdf.Embedder[pdf.Unused] = (*InfoNew)(nil)
@@ -220,7 +220,7 @@ end
 func TestExtractCMAP(t *testing.T) {
 	// Write a CMap "by hand".
 
-	data, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
+	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
 
 	rosRef, _, err := pdf.ResourceManagerEmbed(rm, testROS)
@@ -507,7 +507,7 @@ func TestExtractPredefined(t *testing.T) {
 		"Identity-V",
 	}
 	for _, name := range names {
-		data, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
+		data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 		t.Run(string(name), func(t *testing.T) {
 			info, err := ExtractNew(data, name)
 			if err != nil {
@@ -533,7 +533,7 @@ func TestExtractLoop(t *testing.T) {
 	// Try different loop lengths:
 	for n := 1; n <= 3; n++ {
 		t.Run(fmt.Sprintf("%d", n), func(t *testing.T) {
-			data, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
+			data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(data)
 			ros := &CIDSystemInfo{
 				Registry:   "Test",
@@ -613,7 +613,7 @@ func TestExtractLoop(t *testing.T) {
 }
 
 func TestEmbedCMap(t *testing.T) {
-	data, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
+	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
 	ref, _, err := pdf.ResourceManagerEmbed(rm, testToUniInfoChild)
 	if err != nil {

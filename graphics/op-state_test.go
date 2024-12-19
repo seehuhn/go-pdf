@@ -25,13 +25,13 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/internal/debug/tempfile"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
 func TestPushPop(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
-			data, _ := tempfile.NewTempWriter(v, nil)
+			data, _ := memfile.NewPDFWriter(v, nil)
 			rm := pdf.NewResourceManager(data)
 
 			buf := &bytes.Buffer{}
@@ -58,7 +58,7 @@ func TestPushPop(t *testing.T) {
 }
 
 func TestPushPopErr1(t *testing.T) {
-	data, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
+	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(data)
 
 	buf := &bytes.Buffer{}
@@ -74,7 +74,7 @@ func TestPushPopErr1(t *testing.T) {
 }
 
 func TestPushPopErr2(t *testing.T) {
-	data, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
+	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
 
 	buf := &bytes.Buffer{}
@@ -93,7 +93,7 @@ func TestPushPopErr2(t *testing.T) {
 func TestPushPopInText(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
-			data, _ := tempfile.NewTempWriter(v, nil)
+			data, _ := memfile.NewPDFWriter(v, nil)
 			rm := pdf.NewResourceManager(data)
 
 			buf := &bytes.Buffer{}
@@ -118,7 +118,7 @@ func TestPushPopInText(t *testing.T) {
 }
 
 func TestWriterCTM(t *testing.T) {
-	data, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
+	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(data)
 
 	buf := &bytes.Buffer{}

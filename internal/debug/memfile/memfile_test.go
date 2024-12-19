@@ -14,16 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package tempfile
+package memfile
 
 import (
 	"io"
 	"testing"
 )
 
-var _ io.Reader = (*MemFile)(nil)
-var _ io.Writer = (*MemFile)(nil)
-var _ io.Seeker = (*MemFile)(nil)
+var _ io.ReadWriteSeeker = (*MemFile)(nil)
 
 func TestMemFile_Write(t *testing.T) {
 	f := New()
@@ -105,9 +103,9 @@ func TestMemFile_WriteAtOffset(t *testing.T) {
 	f.Seek(7, io.SeekStart)
 	f.Write([]byte("Universe!"))
 
-	if string(f.Data) != "Hello, Universe!" {
-		t.Errorf("Write at offset produced %q; want %q",
-			string(f.Data), "Hello, Universe!")
+	const want = "Hello, Universe!"
+	if string(f.Data) != want {
+		t.Errorf("Write at offset produced %q; want %q", string(f.Data), want)
 	}
 }
 
@@ -117,6 +115,7 @@ func TestMemFile_WriteExtend(t *testing.T) {
 	f.Write([]byte("Hello"))
 
 	if string(f.Data) != "\x00\x00\x00\x00\x00Hello" {
-		t.Errorf("Write extension produced %q; want %q", string(f.Data), "\x00\x00\x00\x00\x00Hello")
+		t.Errorf("Write extension produced %q; want %q",
+			string(f.Data), "\x00\x00\x00\x00\x00Hello")
 	}
 }

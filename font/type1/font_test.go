@@ -29,8 +29,8 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/font/pdfenc"
-	"seehuhn.de/go/pdf/internal/debug/tempfile"
-	"seehuhn.de/go/pdf/internal/makefont"
+	"seehuhn.de/go/pdf/internal/debug/makefont"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/type1"
 )
@@ -42,7 +42,7 @@ func TestToUnicode(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		for _, X := range []string{"A", "B"} {
 			t.Run(v.String()+X, func(t *testing.T) {
-				data, _ := tempfile.NewTempWriter(v, nil)
+				data, _ := memfile.NewPDFWriter(v, nil)
 				rm := pdf.NewResourceManager(data)
 
 				l := F.Layout(nil, 10, "AB")
@@ -109,7 +109,7 @@ func TestNotdefGlyph(t *testing.T) {
 	// Try both the built-in version (PDF-1.7) and the embedded version (PDF-2.0)
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
-			data, _ := tempfile.NewTempWriter(v, nil)
+			data, _ := memfile.NewPDFWriter(v, nil)
 			rm := pdf.NewResourceManager(data)
 
 			ref, E, err := pdf.ResourceManagerEmbed(rm, F)
@@ -168,7 +168,7 @@ func TestEncoding(t *testing.T) {
 	}
 
 	// Embed the font
-	data, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
+	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(data)
 
 	ref, E, err := pdf.ResourceManagerEmbed(rm, F)
@@ -222,7 +222,7 @@ func TestDefaultFontRoundTrip(t *testing.T) {
 		ToUnicode: toUnicode,
 	}
 
-	rw, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
+	rw, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	ref := rw.Alloc()
 	err := info1.Embed(rw, ref)
 	if err != nil {
@@ -284,7 +284,7 @@ func TestRoundTrip(t *testing.T) {
 		ToUnicode: toUnicode,
 	}
 
-	rw, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
+	rw, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	ref := rw.Alloc()
 	err := info1.Embed(rw, ref)
 	if err != nil {

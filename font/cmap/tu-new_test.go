@@ -27,7 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/internal/debug/tempfile"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
 var _ pdf.Embedder[pdf.Unused] = (*ToUnicodeInfo)(nil)
@@ -227,7 +227,7 @@ func BenchmarkMakeName(b *testing.B) {
 func TestExtractToUnicode(t *testing.T) {
 	// Write a ToUnicode CMap "by hand".
 
-	data, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
+	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
 
 	rosRef, _, err := pdf.ResourceManagerEmbed(rm, toUnicodeROS)
@@ -416,7 +416,7 @@ func TestExtractToUnicodeLoop(t *testing.T) {
 	// Try different loop lengths:
 	for n := 1; n <= 3; n++ {
 		t.Run(fmt.Sprintf("%d", n), func(t *testing.T) {
-			data, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
+			data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(data)
 			rosRef, _, err := pdf.ResourceManagerEmbed(rm, toUnicodeROS)
 			if err != nil {
@@ -489,7 +489,7 @@ func TestExtractToUnicodeLoop(t *testing.T) {
 }
 
 func TestEmbedToUnicode(t *testing.T) {
-	data, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
+	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
 
 	ref, _, err := pdf.ResourceManagerEmbed(rm, testToUniInfoChild)

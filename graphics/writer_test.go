@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/internal/debug/tempfile"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
 type dummyResource pdf.Reference
@@ -34,7 +34,7 @@ func (r dummyResource) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, e
 // TestGetResourceName1 tests that resources of all categories can be
 // added to the resource dictionary.
 func TestGetResourceName1(t *testing.T) {
-	data, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
+	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(data)
 
 	ref := data.Alloc()

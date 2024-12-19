@@ -22,12 +22,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/internal/debug/tempfile"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
 func TestFindPages(t *testing.T) {
-	doc, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
+	doc, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 
 	numPages := 234
 	pageRefsIn := make([]pdf.Reference, numPages)
@@ -58,7 +58,7 @@ func TestFindPages(t *testing.T) {
 }
 
 func TestIterator(t *testing.T) {
-	data, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
+	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 
 	n := 10
 	refs := make([]pdf.Reference, n)

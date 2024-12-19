@@ -19,7 +19,7 @@ package main
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/internal/makefont"
+	"seehuhn.de/go/pdf/internal/debug/makefont"
 )
 
 func main() {

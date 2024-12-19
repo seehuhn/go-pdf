@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package tempfile
+package memfile
 
 import (
 	"errors"
@@ -22,6 +22,8 @@ import (
 )
 
 // MemFile is a temporary in-memory file.
+//
+// This type implements the [io.ReadWriteSeeker] interface.
 type MemFile struct {
 	// Data are the file contents.
 	Data []byte

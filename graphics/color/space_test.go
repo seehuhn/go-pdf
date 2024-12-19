@@ -23,7 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
-	"seehuhn.de/go/pdf/internal/debug/tempfile"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
 // color.Space implements pdf.Embedder
@@ -92,7 +92,7 @@ var testColorSpaces = []Space{
 func TestDecodeSpace(t *testing.T) {
 	for i, space := range testColorSpaces {
 		t.Run(fmt.Sprintf("%02d-%s", i, space.ColorSpaceFamily()), func(t *testing.T) {
-			r, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
+			r, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(r)
 
 			obj, _, err := pdf.ResourceManagerEmbed(rm, space)

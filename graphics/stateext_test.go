@@ -24,7 +24,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/internal/debug/tempfile"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
 // TestTextLayout1 tests that no text content is lost when a glyph sequence
@@ -32,7 +32,7 @@ import (
 func TestTextLayout1(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
-			data, _ := tempfile.NewTempWriter(v, nil)
+			data, _ := memfile.NewPDFWriter(v, nil)
 			rm := pdf.NewResourceManager(data)
 
 			F, err := gofont.Regular.New(nil)
@@ -70,7 +70,7 @@ func TestTextLayout1(t *testing.T) {
 func TestTextLayout2(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
-			data, _ := tempfile.NewTempWriter(v, nil)
+			data, _ := memfile.NewPDFWriter(v, nil)
 			rm := pdf.NewResourceManager(data)
 
 			F, err := gofont.Regular.New(nil)
@@ -106,7 +106,7 @@ func TestTextLayout2(t *testing.T) {
 // TestTextLayout3 tests that the width of a glyph sequence scales
 // with the font size.
 func TestTextLayout3(t *testing.T) {
-	data, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
+	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
 
 	F, err := gofont.Regular.New(nil)

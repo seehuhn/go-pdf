@@ -22,8 +22,6 @@ import (
 	"golang.org/x/image/font/gofont/goregular"
 
 	"seehuhn.de/go/sfnt"
-
-	"seehuhn.de/go/pdf/internal/convert"
 )
 
 // TrueType returns a font with glyf outlines.
@@ -39,7 +37,7 @@ func TrueType() *sfnt.Font {
 // OpenType returns a font with CFF outlines and not CIDFont operators.
 func OpenType() *sfnt.Font {
 	info := TrueType()
-	info, err := convert.ToCFF(info)
+	info, err := toCFF(info)
 	if err != nil {
 		panic(err)
 	}
@@ -49,7 +47,7 @@ func OpenType() *sfnt.Font {
 // OpenTypeCID returns a font with CFF outlines and CIDFont operators.
 func OpenTypeCID() *sfnt.Font {
 	info := OpenType()
-	info, err := convert.ToCFFCID(info)
+	info, err := toCFFCID(info)
 	if err != nil {
 		panic(err)
 	}
@@ -60,7 +58,7 @@ func OpenTypeCID() *sfnt.Font {
 // multiple private dictionaries.
 func OpenTypeCID2() *sfnt.Font {
 	info := OpenType()
-	info, err := convert.ToCFFCID2(info)
+	info, err := toCFFCID2(info)
 	if err != nil {
 		panic(err)
 	}

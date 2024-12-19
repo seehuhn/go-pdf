@@ -114,14 +114,14 @@ func (e *Encoding) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.O
 	}
 
 	// First check whether we can use the built-in encoding.
-	canUseBuiltIn := true
+	canUseBuiltin := true
 	for code := range 256 {
 		if cid := e.enc[code]; cid != 0 && e.GlyphName(cid) != "" {
-			canUseBuiltIn = false
+			canUseBuiltin = false
 			break
 		}
 	}
-	if canUseBuiltIn {
+	if canUseBuiltin {
 		return nil, nil
 	}
 
@@ -378,7 +378,7 @@ func ExtractType1(r pdf.Getter, dicts *font.Dicts) (*Encoding, error) {
 
 	switch obj := obj.(type) {
 	case nil:
-		e.initBuiltInEncoding()
+		e.initBuiltinEncoding()
 
 	case pdf.Name:
 		err := e.initNamedEncoding(obj)
@@ -404,7 +404,7 @@ func ExtractType1(r pdf.Getter, dicts *font.Dicts) (*Encoding, error) {
 		} else if dicts.IsNonSymbolic() && dicts.IsExternal() {
 			e.initStandardEncoding()
 		} else {
-			e.initBuiltInEncoding()
+			e.initBuiltinEncoding()
 		}
 
 		// apply the differences
@@ -448,7 +448,7 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
 
 	switch obj := obj.(type) {
 	case nil:
-		e.initBuiltInEncoding()
+		e.initBuiltinEncoding()
 
 	case pdf.Name:
 		err := e.initNamedEncoding(obj)
@@ -551,7 +551,7 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
 	return e, nil
 }
 
-func (e *Encoding) initBuiltInEncoding() {
+func (e *Encoding) initBuiltinEncoding() {
 	for code := range 256 {
 		e.UseBuiltinEncoding(byte(code))
 	}

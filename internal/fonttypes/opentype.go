@@ -20,7 +20,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/opentype"
-	"seehuhn.de/go/pdf/internal/makefont"
+	"seehuhn.de/go/pdf/internal/debug/makefont"
 	"seehuhn.de/go/sfnt"
 )
 

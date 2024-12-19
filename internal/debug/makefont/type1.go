@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,15 +14,29 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package tempfile
+package makefont
 
-import "seehuhn.de/go/pdf"
+import (
+	"seehuhn.de/go/postscript/afm"
+	"seehuhn.de/go/postscript/type1"
+)
 
-func NewTempWriter(v pdf.Version, opt *pdf.WriterOptions) (*pdf.Writer, *MemFile) {
-	tmpFile := New()
-	w, err := pdf.NewWriter(tmpFile, v, opt)
+// Type1 returns a Type1 font.
+func Type1() *type1.Font {
+	info := TrueType()
+	psFont, err := toType1(info)
 	if err != nil {
 		panic(err)
 	}
-	return w, tmpFile
+	return psFont
+}
+
+// AFM returns the font metrics for the font returned by [Type1].
+func AFM() *afm.Metrics {
+	info := TrueType()
+	metrics, err := toAFM(info)
+	if err != nil {
+		panic(err)
+	}
+	return metrics
 }

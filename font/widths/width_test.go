@@ -22,13 +22,13 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/internal/debug/tempfile"
-	"seehuhn.de/go/pdf/internal/makefont"
+	"seehuhn.de/go/pdf/internal/debug/makefont"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/reader"
 )
 
 func TestWidthsFull(t *testing.T) {
-	data, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
+	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
 
 	// TODO(voss): iterate over all font types

@@ -35,16 +35,16 @@ var (
 	useBuiltinEncoding Type1 = func(code byte) string {
 		return UseBuiltin
 	}
-	useWinAnsiEncoding Type1 = func(code byte) string {
+	WinAnsi Type1 = func(code byte) string {
 		return pdfenc.WinAnsi.Encoding[code]
 	}
-	useMacRomanEncoding Type1 = func(code byte) string {
+	MacRoman Type1 = func(code byte) string {
 		return pdfenc.MacRoman.Encoding[code]
 	}
-	useMacExpertEncoding Type1 = func(code byte) string {
+	MacExpert Type1 = func(code byte) string {
 		return pdfenc.MacExpert.Encoding[code]
 	}
-	useStandardEncoding Type1 = func(code byte) string {
+	Standard Type1 = func(code byte) string {
 		return pdfenc.Standard.Encoding[code]
 	}
 )
@@ -67,11 +67,11 @@ func ExtractType1New(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Type1, 
 	if name, ok := obj.(pdf.Name); ok {
 		switch name {
 		case "WinAnsiEncoding":
-			return useWinAnsiEncoding, nil
+			return WinAnsi, nil
 		case "MacRomanEncoding":
-			return useMacRomanEncoding, nil
+			return MacRoman, nil
 		case "MacExpertEncoding":
-			return useMacExpertEncoding, nil
+			return MacExpert, nil
 		}
 	}
 
@@ -89,14 +89,14 @@ func ExtractType1New(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Type1, 
 	baseEncName, _ := pdf.GetName(r, dict["BaseEncoding"])
 	switch baseEncName {
 	case "WinAnsiEncoding":
-		baseEnc = useWinAnsiEncoding
+		baseEnc = WinAnsi
 	case "MacRomanEncoding":
-		baseEnc = useMacRomanEncoding
+		baseEnc = MacRoman
 	case "MacExpertEncoding":
-		baseEnc = useMacExpertEncoding
+		baseEnc = MacExpert
 	default:
 		if nonSymbolicExt { // non-symbolic and not embedded
-			baseEnc = useStandardEncoding
+			baseEnc = Standard
 		} else { // symbolic or embedded
 			baseEnc = useBuiltinEncoding
 		}
@@ -155,14 +155,14 @@ func (e Type1) AsPDF(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, er
 	}
 
 	// First check whether we can use the built-in encoding.
-	canUseBuiltIn := true
+	canUseBuiltin := true
 	for code := range 256 {
 		if e(byte(code)) != "" && e(byte(code)) != UseBuiltin {
-			canUseBuiltIn = false
+			canUseBuiltin = false
 			break
 		}
 	}
-	if canUseBuiltIn {
+	if canUseBuiltin {
 		return nil, nil
 	}
 

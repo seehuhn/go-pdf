@@ -26,14 +26,14 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/internal/debug/tempfile"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/dummyfont"
 )
 
 // TestParameters verifies that the graphics state is correctly updated by the
 // reader.
 func TestParameters(t *testing.T) {
-	data, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
+	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(data)
 
 	// We start by creating a content stream where we set various graphics

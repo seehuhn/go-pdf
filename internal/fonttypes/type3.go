@@ -19,7 +19,7 @@ package fonttypes
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/internal/makefont"
+	"seehuhn.de/go/pdf/internal/debug/makefont"
 )
 
 // Type3 is a Type 3 font.

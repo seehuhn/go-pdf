@@ -33,7 +33,7 @@ import (
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/font/type3"
-	"seehuhn.de/go/pdf/internal/debug/tempfile"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 	"seehuhn.de/go/pdf/pagetree"
 )
@@ -112,7 +112,7 @@ func FuzzExtract(f *testing.F) {
 			t.Skip("font X not found")
 		}
 
-		data, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
+		data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 		ref := data.Alloc()
 		err = info.Embed(data, ref)
 		if err != nil {

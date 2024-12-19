@@ -20,12 +20,12 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/internal/debug/tempfile"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
 func TestCopyReference(t *testing.T) {
 	// build a chain of references: c -> b -> a -> 42
-	orig, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
+	orig, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	a := orig.Alloc()
 	err := orig.Put(a, pdf.Integer(42))
 	if err != nil {
@@ -43,7 +43,7 @@ func TestCopyReference(t *testing.T) {
 	}
 
 	// copy the chain
-	dest, _ := tempfile.NewTempWriter(pdf.V2_0, nil)
+	dest, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	copier := NewCopier(dest, orig)
 	copiedC, err := copier.CopyReference(c)
 	if err != nil {

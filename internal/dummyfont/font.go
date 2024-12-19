@@ -29,18 +29,21 @@ import (
 	pdfcff "seehuhn.de/go/pdf/font/cff"
 )
 
+// Deprecated: use seehuhn.de/go/pdf/internal/fonttypes instead.
+//
+// TODO(voss): remove
 func Must() font.Font {
-	F, err := New()
+	F, err := new()
 	if err != nil {
 		panic(err)
 	}
 	return F
 }
 
-// New creates a simple font for testing purposes.
+// new creates a simple font for testing purposes.
 // The only glyphs available are the space and the capital letter A.
 // The font is embedded as a simple CFF font.
-func New() (font.Font, error) {
+func new() (font.Font, error) {
 	encoding := make([]glyph.ID, 256)
 	encoding[' '] = 1
 	encoding['A'] = 2

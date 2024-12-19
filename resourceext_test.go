@@ -22,14 +22,14 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/gofont"
-	"seehuhn.de/go/pdf/internal/debug/tempfile"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
 // TestResourceManager creates a document which uses a font on two different
 // pages, and checks that the font is only embedded once.
 func TestResourceManager(t *testing.T) {
-	buf := tempfile.New()
+	buf := memfile.New()
 
 	// part 1: create a document with a font
 

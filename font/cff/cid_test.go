@@ -24,8 +24,8 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/internal/debug/tempfile"
-	"seehuhn.de/go/pdf/internal/makefont"
+	"seehuhn.de/go/pdf/internal/debug/makefont"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -64,7 +64,7 @@ func TestRoundTripComposite(t *testing.T) {
 		IsScript:   otf.IsScript,
 	}
 
-	rw, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
+	rw, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 
 	ref := rw.Alloc()
 	err := info1.Embed(rw, ref)

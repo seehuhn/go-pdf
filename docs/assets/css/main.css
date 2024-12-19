@@ -120,3 +120,11 @@ th {
     text-align: left;
     text-indent: -2px;
 }
+
+/* formatted code */
+code {
+    background-color: #f1f5fb;
+    color: #111;
+    padding: 2px 4px;
+    font-size: 1.1em;
+}

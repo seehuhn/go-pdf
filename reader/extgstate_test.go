@@ -25,7 +25,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/internal/debug/tempfile"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/dummyfont"
 )
 
@@ -107,7 +107,7 @@ func TestExtGState(t *testing.T) {
 	}
 
 	// step 1: embed this graphics state into a PDF file
-	data, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
+	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(data)
 
 	ext1Ref, ext1embedded, err := pdf.ResourceManagerEmbed(rm, ext1)

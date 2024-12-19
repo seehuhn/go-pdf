@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package convert
+package makefont
 
 import (
 	"seehuhn.de/go/geom/rect"
@@ -28,8 +28,8 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-// ToType1 constructs a Type1 font from an sfnt.
-func ToType1(info *sfnt.Font) (*type1.Font, error) {
+// toType1 constructs a Type1 font from an sfnt.
+func toType1(info *sfnt.Font) (*type1.Font, error) {
 	// TODO(voss): base this on ToCFF()
 
 	info = clone(info)
@@ -181,7 +181,7 @@ func ToType1(info *sfnt.Font) (*type1.Font, error) {
 	return res, nil
 }
 
-func ToAFM(info *sfnt.Font) (*afm.Metrics, error) {
+func toAFM(info *sfnt.Font) (*afm.Metrics, error) {
 	info = clone(info)
 	info.EnsureGlyphNames()
 

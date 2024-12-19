@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package convert
+package makefont
 
 import (
 	"seehuhn.de/go/pdf/font/pdfenc"
@@ -27,12 +27,12 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-// ToCFF converts "glyf" outlines to "CFF" outlines.
+// toCFF converts "glyf" outlines to "CFF" outlines.
 //
 // The result is inefficient, since we we are using the naive way to
 // convert quadratic bezier curves to cubic bezier curves.  Do not use
 // this function in production code.
-func ToCFF(info *sfnt.Font) (*sfnt.Font, error) {
+func toCFF(info *sfnt.Font) (*sfnt.Font, error) {
 	if info.IsCFF() {
 		return info, nil
 	}
@@ -174,9 +174,9 @@ func ToCFF(info *sfnt.Font) (*sfnt.Font, error) {
 	return info, nil
 }
 
-// ToCFFCID modifies a font to use CFF CIDFont operators.
-func ToCFFCID(info *sfnt.Font) (*sfnt.Font, error) {
-	info, err := ToCFF(info)
+// toCFFCID modifies a font to use CFF CIDFont operators.
+func toCFFCID(info *sfnt.Font) (*sfnt.Font, error) {
+	info, err := toCFF(info)
 	if err != nil {
 		return nil, err
 	}
@@ -197,10 +197,10 @@ func ToCFFCID(info *sfnt.Font) (*sfnt.Font, error) {
 	return info, nil
 }
 
-// ToCFFCID2 modifies a font to use CFF CIDFont operators
+// toCFFCID2 modifies a font to use CFF CIDFont operators
 // with multiple private dictionaries.
-func ToCFFCID2(info *sfnt.Font) (*sfnt.Font, error) {
-	info, err := ToCFFCID(info)
+func toCFFCID2(info *sfnt.Font) (*sfnt.Font, error) {
+	info, err := toCFFCID(info)
 	if err != nil {
 		return nil, err
 	}
@@ -219,9 +219,4 @@ func ToCFFCID2(info *sfnt.Font) (*sfnt.Font, error) {
 	}
 
 	return info, nil
-}
-
-func clone[T any](x *T) *T {
-	y := *x
-	return &y
 }

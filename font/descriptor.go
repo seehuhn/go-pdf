@@ -32,7 +32,7 @@ import (
 type Descriptor struct {
 	// FontName (required, except for Type 3 fonts) is the PostScript name of the font.
 	// If the font has been subsetted, the name is prefixed with a subset tag
-	// of the form "AAAAAA+".
+	// of the form "ABCDEF+".
 	//
 	// This field is used primarily for the purpose of determining if a font has been subset.
 	// See https://github.com/pdf-association/pdf-issues/issues/11 .
@@ -44,12 +44,16 @@ type Descriptor struct {
 
 	IsFixedPitch bool
 	IsSerif      bool
-	IsSymbolic   bool
-	IsScript     bool
-	IsItalic     bool
-	IsAllCap     bool
-	IsSmallCap   bool
-	ForceBold    bool
+
+	// IsSymbolic is true if some glyphs are outside the Adobe Standard Latin
+	// character set (see [pdfenc.StandardLatin]).
+	IsSymbolic bool
+
+	IsScript   bool
+	IsItalic   bool
+	IsAllCap   bool
+	IsSmallCap bool
+	ForceBold  bool
 
 	FontBBox     rect.Rect // required, except for Type 3 fonts
 	ItalicAngle  float64   // required; degrees counterclockwise from vertical

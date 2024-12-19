@@ -25,7 +25,7 @@ import (
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/font/type3"
-	"seehuhn.de/go/pdf/internal/debug/tempfile"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 )
 
@@ -51,7 +51,7 @@ var (
 func TestSpaceIsBlank(t *testing.T) {
 	for _, sample := range fonttypes.All {
 		t.Run(sample.Label, func(t *testing.T) {
-			data, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
+			data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(data)
 
 			F := sample.MakeFont(rm)

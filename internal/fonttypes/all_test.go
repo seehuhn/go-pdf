@@ -23,7 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/internal/debug/tempfile"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
 func TestSamples(t *testing.T) {
@@ -72,7 +72,7 @@ func TestSamples(t *testing.T) {
 // TestPostScriptName ensures that the .PostScriptName method of all fonts
 // works correctly.
 func TestPostScriptName(t *testing.T) {
-	data, _ := tempfile.NewTempWriter(pdf.V1_7, nil)
+	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(data)
 
 	for _, sample := range All {
