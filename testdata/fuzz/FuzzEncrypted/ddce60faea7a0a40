@@ -1,2 +1,0 @@
-go test fuzz v1
-[]byte("%PDF-1.0A00 0obj<</Encrypt<>/ID[()()]/Length 40/Size 0/W[0 0 1]>>stream\n0000000000000000000000000000000000000000endstreamendobjstartxref10")
