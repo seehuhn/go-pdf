@@ -24,7 +24,7 @@ import (
 )
 
 // Type1 gives the glyph name for each code point.
-// The empty string is used for unmapped glyphs.
+// The empty string indicates unused codes.
 // The special value [UseBuiltin] indicates that the corresponding glyph from
 // the build-in encoding should be used.
 type Type1 func(code byte) string

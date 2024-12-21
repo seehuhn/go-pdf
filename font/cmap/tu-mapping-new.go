@@ -26,8 +26,8 @@ import (
 // MakeSimpleToUnicode creates a ToUnicodeInfo object for the encoding of a
 // simple font. The text slice must have 256 elements, where each element is
 // the Unicode representation of the corresponding code point.
-func MakeSimpleToUnicode(text []string) *ToUnicodeInfo {
-	g := tuEncSimple(text)
+func MakeSimpleToUnicode(data map[byte]string) *ToUnicodeInfo {
+	g := tuEncSimple(data)
 	ee, err := dag.ShortestPath(g, 256)
 	if err != nil {
 		panic("unreachable")
@@ -42,18 +42,18 @@ func MakeSimpleToUnicode(text []string) *ToUnicodeInfo {
 		case 1:
 			res.Singles = append(res.Singles, ToUnicodeSingle{
 				Code:  []byte{byte(code)},
-				Value: []rune(text[code]),
+				Value: []rune(data[byte(code)]),
 			})
 		case 2:
 			res.Ranges = append(res.Ranges, ToUnicodeRange{
 				First:  []byte{byte(code)},
 				Last:   []byte{byte(code + int(e.num) - 1)},
-				Values: [][]rune{[]rune(text[code])},
+				Values: [][]rune{[]rune(data[byte(code)])},
 			})
 		case 3:
 			values := make([][]rune, int(e.num))
 			for i := 0; i < int(e.num); i++ {
-				values[i] = []rune(text[code+i])
+				values[i] = []rune(data[byte(code+i)])
 			}
 			res.Ranges = append(res.Ranges, ToUnicodeRange{
 				First:  []byte{byte(code)},
@@ -77,11 +77,11 @@ type edge struct {
 	num uint16
 }
 
-type tuEncSimple []string
+type tuEncSimple map[byte]string
 
 func (g tuEncSimple) AppendEdges(ee []edge, v int) []edge {
 	gapLen := 0
-	for v+gapLen < 256 && g[v+gapLen] == "" {
+	for v+gapLen < 256 && g[byte(v+gapLen)] == "" {
 		gapLen++
 	}
 	if gapLen > 0 {
@@ -89,15 +89,15 @@ func (g tuEncSimple) AppendEdges(ee []edge, v int) []edge {
 	}
 
 	runLen := 1
-	current := g[v]
-	for v+runLen < 256 && g[v+runLen] != "" {
+	current := g[byte(v)]
+	for v+runLen < 256 && g[byte(v+runLen)] != "" {
 		u16 := utf16.Encode([]rune(current))
 		if u16[len(u16)-1] == 0xFFFF {
 			break
 		}
 		u16[len(u16)-1]++
 		next := string(utf16.Decode(u16))
-		if g[v+runLen] != next {
+		if g[byte(v+runLen)] != next {
 			break
 		}
 
@@ -107,11 +107,11 @@ func (g tuEncSimple) AppendEdges(ee []edge, v int) []edge {
 	if runLen == 1 {
 		ee = append(ee, edge{1, uint16(v)})
 	}
-	if v+runLen >= 256 || g[v+runLen] == "" {
+	if v+runLen >= 256 || g[byte(v+runLen)] == "" {
 		return ee
 	}
 
-	for v+runLen < 256 && g[v+runLen] != "" {
+	for v+runLen < 256 && g[byte(v+runLen)] != "" {
 		runLen++
 	}
 	return append(ee, edge{3, uint16(runLen)})

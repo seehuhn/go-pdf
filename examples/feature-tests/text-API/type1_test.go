@@ -20,12 +20,14 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	"seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
-	"seehuhn.de/go/postscript/type1"
 )
 
 func TestType1DictsRoundtrip(t *testing.T) {
@@ -48,7 +50,7 @@ func TestType1DictsRoundtrip(t *testing.T) {
 		StemH:        F1.Private.StdHW,
 		MissingWidth: F1.GlyphWidthPDF(".notdef"),
 	}
-	dicts1 := &Type1Dicts{
+	dicts1 := &TypeFontDict{
 		Ref:            data.Alloc(),
 		PostScriptName: F1.PostScriptName(),
 		Descriptor:     fd,
@@ -84,7 +86,7 @@ func TestType1DictsRoundtrip(t *testing.T) {
 
 // compareType1Dicts compares two Type1Dicts.
 // d1 must be the original, d2 the one that was read back from the PDF file.
-func compareType1Dicts(t *testing.T, d1, d2 *Type1Dicts) {
+func compareType1Dicts(t *testing.T, d1, d2 *TypeFontDict) {
 	t.Helper()
 
 	if d1.Ref != d2.Ref {
@@ -105,11 +107,17 @@ func compareType1Dicts(t *testing.T, d1, d2 *Type1Dicts) {
 	for code := range 256 { // compare Encoding
 		name1 := d1.Encoding(byte(code))
 		name2 := d2.Encoding(byte(code))
-		if name1 != "" && name1 != name2 {
+		if name1 == "" {
+			continue
+		}
+		if name1 != name2 {
 			t.Errorf("Encoding(%d): got %s, want %s", code, name2, name1)
 		}
 	}
 	for code := range 256 { // compare Widths
+		if d1.Encoding(byte(code)) == "" {
+			continue
+		}
 		w1 := d1.Width[code]
 		w2 := d2.Width[code]
 		if w1 != w2 {
@@ -117,9 +125,12 @@ func compareType1Dicts(t *testing.T, d1, d2 *Type1Dicts) {
 		}
 	}
 	for code := range 256 { // compare Text
+		if d1.Encoding(byte(code)) == "" {
+			continue
+		}
 		text1 := d1.Text[code]
 		text2 := d2.Text[code]
-		if text1 != "" && text1 != text2 {
+		if text1 != text2 {
 			t.Errorf("Text[%d]: got %s, want %s", code, text2, text1)
 		}
 	}

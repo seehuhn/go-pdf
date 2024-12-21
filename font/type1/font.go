@@ -39,8 +39,6 @@ import (
 	"seehuhn.de/go/pdf/internal/stdmtx"
 )
 
-//go:generate go run ./generate/
-
 // Instance is a Type 1 font instance which can be embedded into a PDF file.
 //
 // Use [New] to create new font instances.
