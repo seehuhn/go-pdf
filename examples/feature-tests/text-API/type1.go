@@ -403,7 +403,7 @@ func (t *Typesetter) Finish(rm *pdf.ResourceManager) error {
 
 	enc := make(map[byte]string)
 
-	dicts := &TypeFontDict{
+	dicts := &Type1FontDict{
 		Ref:            t.ref,
 		PostScriptName: t.PostScriptName(),
 		SubsetTag:      subsetTag,
@@ -465,10 +465,10 @@ type Type1FontData interface {
 	BuiltinEncoding() []string
 }
 
-var _ font.Embedded = (*TypeFontDict)(nil)
+var _ font.Embedded = (*Type1FontDict)(nil)
 
-// TypeFontDict represents a Type 1 font dictionary.
-type TypeFontDict struct {
+// Type1FontDict represents a Type 1 font dictionary.
+type Type1FontDict struct {
 	Ref            pdf.Reference
 	PostScriptName string
 	SubsetTag      string
@@ -493,11 +493,11 @@ type TypeFontDict struct {
 	GetFont func() (Type1FontData, error)
 }
 
-func (d *TypeFontDict) WritingMode() cmap.WritingMode {
+func (d *Type1FontDict) WritingMode() cmap.WritingMode {
 	return cmap.Horizontal
 }
 
-func (d *TypeFontDict) DecodeWidth(s pdf.String) (float64, int) {
+func (d *Type1FontDict) DecodeWidth(s pdf.String) (float64, int) {
 	if len(s) == 0 {
 		return 0, 0
 	}
@@ -505,7 +505,7 @@ func (d *TypeFontDict) DecodeWidth(s pdf.String) (float64, int) {
 }
 
 // ExtractType1Dicts reads a Type 1 font dictionary from a PDF file.
-func ExtractType1Dicts(r pdf.Getter, obj pdf.Object) (*TypeFontDict, error) {
+func ExtractType1Dicts(r pdf.Getter, obj pdf.Object) (*Type1FontDict, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
 		return nil, err
@@ -520,7 +520,7 @@ func ExtractType1Dicts(r pdf.Getter, obj pdf.Object) (*TypeFontDict, error) {
 		}
 	}
 
-	d := &TypeFontDict{}
+	d := &Type1FontDict{}
 	d.Ref, _ = obj.(pdf.Reference)
 
 	baseFont, err := pdf.GetName(r, fontDict["BaseFont"])
@@ -708,7 +708,7 @@ func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (Type1FontData, error), e
 }
 
 // Embed adds the font dictionary to the PDF file.
-func (d *TypeFontDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (d *Type1FontDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	var psFont Type1FontData

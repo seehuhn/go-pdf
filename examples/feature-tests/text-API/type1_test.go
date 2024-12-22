@@ -50,7 +50,7 @@ func TestType1DictsRoundtrip(t *testing.T) {
 		StemH:        F1.Private.StdHW,
 		MissingWidth: F1.GlyphWidthPDF(".notdef"),
 	}
-	dicts1 := &TypeFontDict{
+	dicts1 := &Type1FontDict{
 		Ref:            data.Alloc(),
 		PostScriptName: F1.PostScriptName(),
 		Descriptor:     fd,
@@ -86,7 +86,7 @@ func TestType1DictsRoundtrip(t *testing.T) {
 
 // compareType1Dicts compares two Type1Dicts.
 // d1 must be the original, d2 the one that was read back from the PDF file.
-func compareType1Dicts(t *testing.T, d1, d2 *TypeFontDict) {
+func compareType1Dicts(t *testing.T, d1, d2 *Type1FontDict) {
 	t.Helper()
 
 	if d1.Ref != d2.Ref {
@@ -104,30 +104,26 @@ func compareType1Dicts(t *testing.T, d1, d2 *TypeFontDict) {
 	if d := cmp.Diff(d1.Descriptor, d2.Descriptor); d != "" {
 		t.Errorf("Descriptor: %s", d)
 	}
-	for code := range 256 { // compare Encoding
-		name1 := d1.Encoding(byte(code))
-		name2 := d2.Encoding(byte(code))
-		if name1 == "" {
+
+	// compare encoding, widths and text
+	for code := range 256 {
+		if d1.Encoding(byte(code)) == "" {
+			// unused codes are not guaranteed to have correct values
 			continue
 		}
+
+		name1 := d1.Encoding(byte(code))
+		name2 := d2.Encoding(byte(code))
 		if name1 != name2 {
 			t.Errorf("Encoding(%d): got %s, want %s", code, name2, name1)
 		}
-	}
-	for code := range 256 { // compare Widths
-		if d1.Encoding(byte(code)) == "" {
-			continue
-		}
+
 		w1 := d1.Width[code]
 		w2 := d2.Width[code]
 		if w1 != w2 {
 			t.Errorf("Widths[%d]: got %f, want %f", code, w2, w1)
 		}
-	}
-	for code := range 256 { // compare Text
-		if d1.Encoding(byte(code)) == "" {
-			continue
-		}
+
 		text1 := d1.Text[code]
 		text2 := d2.Text[code]
 		if text1 != text2 {
