@@ -204,6 +204,9 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 		outOpt &= ^(optObjStm | optXRefStream)
 		outOpt |= OptPretty
 	}
+	if v < V2_0 {
+		outOpt |= OptTrimStandardFonts
+	}
 
 	pdf := &Writer{
 		meta: MetaInfo{

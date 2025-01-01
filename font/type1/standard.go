@@ -18,9 +18,57 @@ package type1
 
 import (
 	"fmt"
+	"math"
 
+	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/internal/stdmtx"
 )
+
+// IsStandard returns true if the font is one of the standard 14 PDF fonts.
+// This is determined by the font name, the set of glyphs used, and the glyph
+// widths.
+//
+// ww must be the widths of the 256 encoded characters, given in PDF text space
+// units times 1000.
+func isStandard(fontName string, enc []string, ww []float64) bool {
+	m, ok := stdmtx.Metrics[fontName]
+	if !ok {
+		return false
+	}
+
+	for i, glyphName := range enc {
+		if glyphName == ".notdef" || glyphName == notdefForce {
+			continue
+		}
+		w, ok := m.Width[glyphName]
+		if !ok {
+			return false
+		}
+		if math.Abs(ww[i]-w) > 0.5 {
+			return false
+		}
+	}
+	return true
+}
+
+// widthsAreCompatible returns true, if the glyph widths ww are compatible with
+// the standard font metrics.  The object encObj is the value of the font
+// dictionary's Encoding entry.
+//
+// EncObj must be valid and must be a direct object.  Do not pass encObj values
+// read from files without validation.
+func widthsAreCompatible(ww []float64, enc encoding.Type1, info *stdmtx.FontData) bool {
+	for code := range 256 {
+		name := enc(byte(code))
+		if name == "" {
+			continue
+		}
+		if math.Abs(ww[code]-info.Width[name]) > 0.5 {
+			return false
+		}
+	}
+	return true
+}
 
 // GetStandardWidth returns the width of glyphs in the 14 standard PDF fonts.
 // The width is given in PDF glyph space units (i.e. are multiplied by 1000).

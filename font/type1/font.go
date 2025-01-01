@@ -29,14 +29,13 @@ import (
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/os2"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/internal/stdmtx"
 )
 
 // Instance is a Type 1 font instance which can be embedded into a PDF file.
@@ -279,8 +278,6 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 			fontName)
 	}
 
-	origFontName := f.psFont.FontName
-
 	encoding := make([]string, 256)
 	ww := make([]float64, 256)
 	for c, gid := range f.Encoding {
@@ -295,6 +292,13 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 	fontData := f.psFont
 	metricsData := f.metrics
 	var subsetTag string
+
+	var postScriptName string
+	if fontData != nil {
+		postScriptName = fontData.FontName
+	} else {
+		postScriptName = metricsData.FontName
+	}
 
 	omitFontData := fontData == nil || pdf.GetVersion(f.w) < pdf.V2_0 && isStandard(f.psFont.FontInfo.FontName, encoding, ww)
 	if !omitFontData { // only subset the font, if the font is embedded
@@ -346,52 +350,68 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 		subsetTag = subset.Tag(ss, psFull.NumGlyphs())
 	}
 
-	var toUnicode *cmap.ToUnicode
+	fd := &font.Descriptor{}
+	if fontData != nil {
+		fd.FontName = fontData.FontName
+		fd.FontFamily = fontData.FamilyName
+		fd.FontWeight = os2.WeightFromString(fontData.Weight)
+		fd.FontBBox = fontData.FontBBoxPDF()
+		fd.IsItalic = fontData.ItalicAngle != 0
+		fd.ItalicAngle = fontData.ItalicAngle
+		fd.IsFixedPitch = fontData.IsFixedPitch
+		fd.ForceBold = fontData.Private.ForceBold
+		fd.StemV = fontData.Private.StdVW
+		fd.StemH = fontData.Private.StdHW
+	}
+	if metricsData != nil {
+		fd.FontName = metricsData.FontName
+		fd.FontBBox = metricsData.FontBBoxPDF()
+		fd.CapHeight = metricsData.CapHeight
+		fd.XHeight = metricsData.XHeight
+		fd.Ascent = metricsData.Ascent
+		fd.Descent = metricsData.Descent
+		fd.IsItalic = metricsData.ItalicAngle != 0
+		fd.ItalicAngle = metricsData.ItalicAngle
+		fd.IsFixedPitch = metricsData.IsFixedPitch
+	}
+	fd.IsSerif = f.isSerif
+	fd.IsSymbolic = f.isSymbolic()
+	dict := &FontDict{
+		Ref:            f.ref,
+		PostScriptName: postScriptName,
+		SubsetTag:      subsetTag,
+		Descriptor:     fd,
+		Encoding: func(code byte) string {
+			return encoding[code]
+		},
+	}
+	copy(dict.Width[:], ww)
+
 	toUniMap := f.ToUnicodeNew()
-	for c, name := range encoding {
-		got := names.ToUnicode(name, origFontName == "ZapfDingbats")
-		want := toUniMap[string(rune(c))]
-		if !slices.Equal(got, want) {
-			toUnicode = cmap.NewToUnicodeNew(charcode.Simple, toUniMap)
-			break
+	for code := range 256 {
+		dict.Text[code] = string(toUniMap[string(rune(code))])
+	}
+	if !omitFontData {
+		dict.GetFont = func() (FontData, error) {
+			return fontData, nil
 		}
 	}
 
-	info := &FontDictOld{
-		Font:      fontData,
-		Metrics:   metricsData,
-		SubsetTag: subsetTag,
-		Encoding:  encoding,
-		ToUnicode: toUnicode,
-	}
-	return info.Embed(f.w, f.ref)
+	rm := pdf.NewResourceManager(f.w) // TODO(voss): move this into the caller
+	_, _, err := pdf.ResourceManagerEmbed(rm, dict)
+	return err
 }
 
-// IsStandard returns true if the font is one of the standard 14 PDF fonts.
-// This is determined by the font name, the set of glyphs used, and the glyph
-// widths.
-//
-// ww must be the widths of the 256 encoded characters, given in PDF text space
-// units times 1000.
-func isStandard(fontName string, enc []string, ww []float64) bool {
-	m, ok := stdmtx.Metrics[fontName]
-	if !ok {
-		return false
-	}
-
-	for i, glyphName := range enc {
-		if glyphName == ".notdef" || glyphName == notdefForce {
+func (f *embeddedSimple) isSymbolic() bool {
+	for _, glyphName := range f.glyphNames {
+		if glyphName == "" || glyphName == ".notdef" {
 			continue
 		}
-		w, ok := m.Width[glyphName]
-		if !ok {
-			return false
-		}
-		if math.Abs(ww[i]-w) > 0.5 {
-			return false
+		if !pdfenc.StandardLatin.Has[glyphName] {
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 func clone[T any](x *T) *T {

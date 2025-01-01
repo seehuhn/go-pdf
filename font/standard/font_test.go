@@ -22,7 +22,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
@@ -76,37 +75,6 @@ func TestEmbedBuiltin(t *testing.T) {
 			}
 		})
 	}
-}
-
-// TestExtractBuiltin tests that one of the 14 standard PDF fonts,
-// once embedded, can be extracted again.
-func TestExtractBuiltin(t *testing.T) {
-	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	ref := data.Alloc()
-	fontDict := pdf.Dict{
-		"Type":     pdf.Name("Font"),
-		"Subtype":  pdf.Name("Type1"),
-		"BaseFont": pdf.Name("Times-Roman"),
-	}
-	err := data.Put(ref, fontDict)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	dicts, err := font.ExtractDicts(data, ref)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	info, err := type1.ExtractOld(data, dicts)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_ = info
-	// if !info.IsStandard() {
-	// 	t.Errorf("built-in font not recognized")
-	// }
 }
 
 // TestGlyphLists tests that the glyph lists of the 14 standard PDF
