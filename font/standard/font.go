@@ -29,7 +29,7 @@ import (
 	pstype1 "seehuhn.de/go/postscript/type1"
 )
 
-// Font identifies the individualfonts.
+// Font identifies the individual fonts.
 type Font string
 
 // Constants for the 14 standard PDF fonts.
@@ -95,8 +95,8 @@ func (f Font) New(opt *font.Options) (*type1.Instance, error) {
 		}
 	}
 
-	// Some metrics missing from our .afm files.  We infer values for
-	// these from other metrics.
+	// Ascent and descent are missing from our .afm files.  We infer values for
+	// these from glyph metrics.
 	for _, name := range []string{"d", "bracketleft", "bar"} {
 		if glyph, ok := metrics.Glyphs[name]; ok {
 			y := float64(glyph.BBox.URy)
@@ -139,7 +139,23 @@ func (f Font) New(opt *font.Options) (*type1.Instance, error) {
 		}
 	}
 
-	return type1.New(psFont, metrics, opt)
+	res, err := type1.New(psFont, metrics, opt)
+	if err != nil {
+		return nil, err
+	}
+
+	switch psFont.FamilyName {
+	case "Courier", "Times":
+		res.IsSerif = true
+	case "Helvetica":
+		// pass
+	case "Symbol", "ZapfDingbats":
+		res.IsSymbolic = true
+	default:
+		panic("unreachable: " + family)
+	}
+
+	return res, nil
 }
 
 // Must returns a new font instance for the given standard font and options.

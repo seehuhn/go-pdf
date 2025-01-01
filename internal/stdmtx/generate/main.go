@@ -93,19 +93,6 @@ func getFontData(data Data, font standard.Font) error {
 		panic("unreachable")
 	}
 
-	isSerif := false
-	isSymbolic := false
-	switch family {
-	case "Courier", "Times":
-		isSerif = true
-	case "Helvetica":
-		// pass
-	case "Symbol", "ZapfDingbats":
-		isSymbolic = true
-	default:
-		panic("unreachable: " + family)
-	}
-
 	bbox := F.Font.FontBBoxPDF()
 
 	widths := make(map[string]float64)
@@ -125,8 +112,8 @@ func getFontData(data Data, font standard.Font) error {
 		FontFamily:   family,
 		FontWeight:   weight,
 		IsFixedPitch: F.Font.IsFixedPitch,
-		IsSerif:      isSerif,
-		IsSymbolic:   isSymbolic,
+		IsSerif:      F.IsSerif,
+		IsSymbolic:   F.IsSymbolic,
 		FontBBox:     bbox,
 		ItalicAngle:  F.Font.ItalicAngle,
 		Ascent:       F.Metrics.Ascent,

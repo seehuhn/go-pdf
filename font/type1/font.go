@@ -51,6 +51,12 @@ type Instance struct {
 	// about kerning and ligatures.
 	*afm.Metrics
 
+	IsSerif    bool
+	IsScript   bool
+	IsAllCap   bool
+	IsSmallCap bool
+	IsSymbolic bool
+
 	*font.Geometry
 
 	lig  map[glyph.Pair]glyph.ID
@@ -219,6 +225,11 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 
 		psFont:     psFont,
 		metrics:    metrics,
+		isSerif:    f.IsSerif,
+		isScript:   f.IsScript,
+		isAllCap:   f.IsAllCap,
+		isSmallCap: f.IsSmallCap,
+		isSymbolic: f.IsSymbolic,
 		glyphNames: glyphNames,
 		widths:     f.Widths,
 
@@ -233,6 +244,11 @@ type embeddedSimple struct {
 
 	psFont     *type1.Font
 	metrics    *afm.Metrics
+	isSerif    bool
+	isScript   bool
+	isAllCap   bool
+	isSmallCap bool
+	isSymbolic bool
 	glyphNames []string
 	widths     []float64
 
