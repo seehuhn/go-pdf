@@ -112,23 +112,20 @@ func FuzzExtract(f *testing.F) {
 			t.Skip("font X not found")
 		}
 
-		data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+		data, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
 		ref := data.Alloc()
 		err = info.Embed(data, ref)
 		if err != nil {
 			t.Fatal(err)
 		}
+		err = data.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 
+		_ = buf
 		// fmt.Println("writing debug.pdf")
-		// fd, err := os.Create("debug.pdf")
-		// if err != nil {
-		// 	t.Fatal(err)
-		// }
-		// err = data.Write(fd)
-		// if err != nil {
-		// 	t.Fatal(err)
-		// }
-		// err = fd.Close()
+		// err = os.WriteFile("debug.pdf", buf.Data, 0644)
 		// if err != nil {
 		// 	t.Fatal(err)
 		// }

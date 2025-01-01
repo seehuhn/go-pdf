@@ -70,6 +70,10 @@ type FontDictOld struct {
 // The `Font` field in the result is only filled if the font program
 // is included in the file.  `Metrics` is always present, and contains
 // all information available in the PDF file.
+//
+// Deprecated: use [ExtractDict] instead.
+//
+// TODO(voss): remove
 func ExtractOld(r pdf.Getter, dicts *font.Dicts) (*FontDictOld, error) {
 	if err := dicts.FontTypeOld.MustBe(font.Type1); err != nil {
 		return nil, err

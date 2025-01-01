@@ -377,33 +377,33 @@ func (t *Typesetter) Finish(rm *pdf.ResourceManager) error {
 	}
 
 	fd := &font.Descriptor{}
-	if ps := t.Font; ps != nil {
-		fd.FontName = ps.FontName
-		fd.FontFamily = ps.FamilyName
-		fd.FontWeight = os2.WeightFromString(ps.Weight)
-		fd.FontBBox = ps.FontBBoxPDF()
-		fd.IsItalic = ps.ItalicAngle != 0
-		fd.ItalicAngle = ps.ItalicAngle
-		fd.IsFixedPitch = ps.IsFixedPitch
-		fd.ForceBold = ps.Private.ForceBold
-		fd.StemV = ps.Private.StdVW
-		fd.StemH = ps.Private.StdHW
+	if fontData := t.Font; fontData != nil {
+		fd.FontName = fontData.FontName
+		fd.FontFamily = fontData.FamilyName
+		fd.FontWeight = os2.WeightFromString(fontData.Weight)
+		fd.FontBBox = fontData.FontBBoxPDF()
+		fd.IsItalic = fontData.ItalicAngle != 0
+		fd.ItalicAngle = fontData.ItalicAngle
+		fd.IsFixedPitch = fontData.IsFixedPitch
+		fd.ForceBold = fontData.Private.ForceBold
+		fd.StemV = fontData.Private.StdVW
+		fd.StemH = fontData.Private.StdHW
 	}
-	if m := t.Metrics; m != nil {
-		fd.FontName = m.FontName
-		fd.FontBBox = m.FontBBoxPDF()
-		fd.CapHeight = m.CapHeight
-		fd.XHeight = m.XHeight
-		fd.Ascent = m.Ascent
-		fd.Descent = m.Descent
-		fd.IsItalic = m.ItalicAngle != 0
-		fd.ItalicAngle = m.ItalicAngle
-		fd.IsFixedPitch = m.IsFixedPitch
+	if metricsData := t.Metrics; metricsData != nil {
+		fd.FontName = metricsData.FontName
+		fd.FontBBox = metricsData.FontBBoxPDF()
+		fd.CapHeight = metricsData.CapHeight
+		fd.XHeight = metricsData.XHeight
+		fd.Ascent = metricsData.Ascent
+		fd.Descent = metricsData.Descent
+		fd.IsItalic = metricsData.ItalicAngle != 0
+		fd.ItalicAngle = metricsData.ItalicAngle
+		fd.IsFixedPitch = metricsData.IsFixedPitch
 	}
 
 	enc := make(map[byte]string)
 
-	dicts := &Type1FontDict{
+	dict := &FontDict{
 		Ref:            t.ref,
 		PostScriptName: t.PostScriptName(),
 		SubsetTag:      subsetTag,
@@ -411,7 +411,7 @@ func (t *Typesetter) Finish(rm *pdf.ResourceManager) error {
 		Encoding:       func(code byte) string { return enc[code] },
 	}
 	if psFont != nil {
-		dicts.GetFont = func() (Type1FontData, error) {
+		dict.GetFont = func() (FontData, error) {
 			return psFont, nil
 		}
 	}
@@ -420,32 +420,32 @@ func (t *Typesetter) Finish(rm *pdf.ResourceManager) error {
 	for code := range 256 {
 		info, ok := t.codeToInfo[byte(code)]
 		if ok {
-			dicts.Width[code] = info.W
-			dicts.Text[code] = info.Text
+			dict.Width[code] = info.W
+			dict.Text[code] = info.Text
 			enc[byte(code)] = t.getGlyphName(info.CID)
 		} else {
-			dicts.Width[code] = notdefWidth
+			dict.Width[code] = notdefWidth
 		}
 	}
-	if dicts.Width[0] == dicts.Width[255] {
-		fd.MissingWidth = dicts.Width[0]
+	if dict.Width[0] == dict.Width[255] {
+		fd.MissingWidth = dict.Width[0]
 	} else {
 		left := 1
-		for dicts.Width[left] == dicts.Width[0] {
+		for dict.Width[left] == dict.Width[0] {
 			left++
 		}
 		right := 1
-		for dicts.Width[255-right] == dicts.Width[255] {
+		for dict.Width[255-right] == dict.Width[255] {
 			right++
 		}
 		if left >= right && left > 1 {
-			fd.MissingWidth = dicts.Width[0]
+			fd.MissingWidth = dict.Width[0]
 		} else if right > 1 {
-			fd.MissingWidth = dicts.Width[255]
+			fd.MissingWidth = dict.Width[255]
 		}
 	}
 
-	_, _, err := pdf.ResourceManagerEmbed(rm, dicts)
+	_, _, err := pdf.ResourceManagerEmbed(rm, dict)
 	if err != nil {
 		return err
 	}
@@ -453,22 +453,22 @@ func (t *Typesetter) Finish(rm *pdf.ResourceManager) error {
 }
 
 var (
-	_ Type1FontData = (*type1.Font)(nil)
-	_ Type1FontData = (*cff.Font)(nil)
-	_ Type1FontData = (*sfnt.Font)(nil)
+	_ FontData = (*type1.Font)(nil)
+	_ FontData = (*cff.Font)(nil)
+	_ FontData = (*sfnt.Font)(nil)
 )
 
-// Type1FontData is a font which can be used with a Type 1 font dictionary.
+// FontData is a font which can be used with a Type 1 font dictionary.
 // This must be one of [*type1.Font], [*cff.Font] or [*sfnt.Font].
-type Type1FontData interface {
+type FontData interface {
 	PostScriptName() string
 	BuiltinEncoding() []string
 }
 
-var _ font.Embedded = (*Type1FontDict)(nil)
+var _ font.Embedded = (*FontDict)(nil)
 
-// Type1FontDict represents a Type 1 font dictionary.
-type Type1FontDict struct {
+// FontDict represents a Type 1 font dictionary.
+type FontDict struct {
 	Ref            pdf.Reference
 	PostScriptName string
 	SubsetTag      string
@@ -490,22 +490,22 @@ type Type1FontDict struct {
 
 	// GetFont (optional) returns the font data to embed.
 	// If this is nil, the font data is not embedded in the PDF file.
-	GetFont func() (Type1FontData, error)
+	GetFont func() (FontData, error)
 }
 
-func (d *Type1FontDict) WritingMode() cmap.WritingMode {
+func (d *FontDict) WritingMode() cmap.WritingMode {
 	return cmap.Horizontal
 }
 
-func (d *Type1FontDict) DecodeWidth(s pdf.String) (float64, int) {
+func (d *FontDict) DecodeWidth(s pdf.String) (float64, int) {
 	if len(s) == 0 {
 		return 0, 0
 	}
 	return d.Width[s[0]], 1
 }
 
-// ExtractType1Dicts reads a Type 1 font dictionary from a PDF file.
-func ExtractType1Dicts(r pdf.Getter, obj pdf.Object) (*Type1FontDict, error) {
+// ExtractDict reads a Type 1 font dictionary from a PDF file.
+func ExtractDict(r pdf.Getter, obj pdf.Object) (*FontDict, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
 		return nil, err
@@ -520,7 +520,7 @@ func ExtractType1Dicts(r pdf.Getter, obj pdf.Object) (*Type1FontDict, error) {
 		}
 	}
 
-	d := &Type1FontDict{}
+	d := &FontDict{}
 	d.Ref, _ = obj.(pdf.Reference)
 
 	baseFont, err := pdf.GetName(r, fontDict["BaseFont"])
@@ -640,13 +640,13 @@ func ExtractType1Dicts(r pdf.Getter, obj pdf.Object) (*Type1FontDict, error) {
 	return d, nil
 }
 
-func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (Type1FontData, error), error) {
+func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (FontData, error), error) {
 	s, err := pdf.GetStream(r, fd["FontFile"])
 	if err != nil && !pdf.IsMalformed(err) {
 		return nil, err
 	}
 	if s != nil {
-		getFont := func() (Type1FontData, error) {
+		getFont := func() (FontData, error) {
 			fontData, err := pdf.DecodeStream(r, s, 0)
 			if err != nil {
 				return nil, err
@@ -671,7 +671,7 @@ func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (Type1FontData, error), e
 	subType, _ := pdf.GetName(r, s.Dict["Subtype"])
 	switch subType {
 	case "Type1C":
-		getFont := func() (Type1FontData, error) {
+		getFont := func() (FontData, error) {
 			fontData, err := pdf.DecodeStream(r, s, 0)
 			if err != nil {
 				return nil, err
@@ -689,7 +689,7 @@ func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (Type1FontData, error), e
 		return getFont, nil
 
 	case "OpenType":
-		getFont := func() (Type1FontData, error) {
+		getFont := func() (FontData, error) {
 			fontData, err := pdf.DecodeStream(r, s, 0)
 			if err != nil {
 				return nil, err
@@ -708,10 +708,10 @@ func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (Type1FontData, error), e
 }
 
 // Embed adds the font dictionary to the PDF file.
-func (d *Type1FontDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (d *FontDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	var psFont Type1FontData
+	var psFont FontData
 	if d.GetFont != nil {
 		font, err := d.GetFont()
 		if err != nil {

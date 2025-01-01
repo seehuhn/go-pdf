@@ -131,7 +131,7 @@ The following information applies to simple PDF fonts.
 
   - OpenType fonts are embedded using the `FontFile3` entry in the font
     descriptor, and the `Subtype` entry in the font dictionary is set to
-    `OpenType`.  The CFF font data is not allowed to use CIDFont operators.
+    `OpenType`.  The CFF font is not allowed to use CIDFont operators.
     The following OpenType tables are required: "CFF " and "cmap".
 
 - `MMType1` fonts are embedded as ordinary Type 1 fonts (a snapshot of the

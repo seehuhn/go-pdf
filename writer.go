@@ -305,9 +305,6 @@ func (pdf *Writer) Close() error {
 		}
 	}
 
-	// Make sure we don't accidentally write beyond the end of file.
-	pdf.w = nil
-
 	return nil
 }
 

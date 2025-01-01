@@ -50,14 +50,14 @@ func TestType1DictsRoundtrip(t *testing.T) {
 		StemH:        F1.Private.StdHW,
 		MissingWidth: F1.GlyphWidthPDF(".notdef"),
 	}
-	dicts1 := &Type1FontDict{
+	dicts1 := &FontDict{
 		Ref:            data.Alloc(),
 		PostScriptName: F1.PostScriptName(),
 		Descriptor:     fd,
 		Encoding:       encoding.Standard,
 		Width:          [256]float64{}, // TODO(voss): fill in
 		Text:           [256]string{},  // TODO(voss): fill in
-		GetFont: func() (Type1FontData, error) {
+		GetFont: func() (FontData, error) {
 			return F1, nil
 		},
 	}
@@ -66,7 +66,7 @@ func TestType1DictsRoundtrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dicts2, err := ExtractType1Dicts(data, ref)
+	dicts2, err := ExtractDict(data, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestType1DictsRoundtrip(t *testing.T) {
 
 // compareType1Dicts compares two Type1Dicts.
 // d1 must be the original, d2 the one that was read back from the PDF file.
-func compareType1Dicts(t *testing.T, d1, d2 *Type1FontDict) {
+func compareType1Dicts(t *testing.T, d1, d2 *FontDict) {
 	t.Helper()
 
 	if d1.Ref != d2.Ref {
