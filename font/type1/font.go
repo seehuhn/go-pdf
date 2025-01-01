@@ -55,7 +55,6 @@ type Instance struct {
 	IsScript   bool
 	IsAllCap   bool
 	IsSmallCap bool
-	IsSymbolic bool
 
 	*font.Geometry
 
@@ -229,7 +228,6 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		isScript:   f.IsScript,
 		isAllCap:   f.IsAllCap,
 		isSmallCap: f.IsSmallCap,
-		isSymbolic: f.IsSymbolic,
 		glyphNames: glyphNames,
 		widths:     f.Widths,
 
@@ -248,7 +246,6 @@ type embeddedSimple struct {
 	isScript   bool
 	isAllCap   bool
 	isSmallCap bool
-	isSymbolic bool
 	glyphNames []string
 	widths     []float64
 
@@ -299,7 +296,7 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 	metricsData := f.metrics
 	var subsetTag string
 
-	omitFontData := pdf.GetVersion(f.w) < pdf.V2_0 && isStandard(f.psFont.FontInfo.FontName, encoding, ww)
+	omitFontData := fontData == nil || pdf.GetVersion(f.w) < pdf.V2_0 && isStandard(f.psFont.FontInfo.FontName, encoding, ww)
 	if !omitFontData { // only subset the font, if the font is embedded
 		psFull := f.psFont
 

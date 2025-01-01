@@ -233,4 +233,3 @@ var standardLatinHas = map[string]bool{
 	"zcaron":         true,
 	"zero":           true,
 }
-

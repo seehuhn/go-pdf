@@ -554,7 +554,6 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*FontDict, error) {
 			FontWeight:   stdInfo.FontWeight,
 			IsFixedPitch: stdInfo.IsFixedPitch,
 			IsSerif:      stdInfo.IsSerif,
-			IsSymbolic:   stdInfo.IsSymbolic,
 			IsItalic:     stdInfo.ItalicAngle != 0,
 			FontBBox:     stdInfo.FontBBox,
 			ItalicAngle:  stdInfo.ItalicAngle,
@@ -564,6 +563,9 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*FontDict, error) {
 			XHeight:      stdInfo.XHeight,
 			StemV:        stdInfo.StemV,
 			StemH:        stdInfo.StemH,
+		}
+		if stdInfo.FontFamily == "Symbol" || stdInfo.FontFamily == "ZapfDingbats" {
+			fd.IsSymbolic = true
 		}
 	} else if fd == nil { // only possible for invalid PDF files
 		fd = &font.Descriptor{
@@ -963,9 +965,6 @@ func fontDescriptorIsCompatible(fd *font.Descriptor, stdInfo *stdmtx.FontData) b
 		return false
 	}
 	if fd.IsSerif != stdInfo.IsSerif {
-		return false
-	}
-	if fd.IsSymbolic != stdInfo.IsSymbolic {
 		return false
 	}
 	if math.Abs(fd.ItalicAngle-stdInfo.ItalicAngle) > 0.1 {

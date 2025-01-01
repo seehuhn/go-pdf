@@ -206,7 +206,7 @@ func writeLatin(data map[pdf.Name]record, fname string) error {
 			return err
 		}
 	}
-	_, err = w.WriteString("}\n\n")
+	_, err = w.WriteString("}\n")
 	if err != nil {
 		return err
 	}
