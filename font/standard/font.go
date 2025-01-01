@@ -150,7 +150,7 @@ func (f Font) New(opt *font.Options) (*type1.Instance, error) {
 	case "Helvetica":
 		// pass
 	case "Symbol", "ZapfDingbats":
-		res.IsSymbolic = true
+		// pass
 	default:
 		panic("unreachable: " + family)
 	}

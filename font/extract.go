@@ -357,8 +357,8 @@ func ExtractDicts(r pdf.Getter, fontDictRef pdf.Object) (*Dicts, error) {
 }
 
 // fixStandardFont fills in missing information for the 14 standard fonts.
-// The information conerned is the Font Descriptor and the glyhh widths,
-// both of which are optional before PDF 2.0.
+// The information concerned is the Font Descriptor and the glyph widths,
+// both of which were optional before PDF 2.0.
 func (d *Dicts) fixStandardFont(r pdf.Getter, info *stdmtx.FontData) {
 	missingWidth := info.Width[".notdef"]
 
@@ -373,7 +373,6 @@ func (d *Dicts) fixStandardFont(r pdf.Getter, info *stdmtx.FontData) {
 			FontWeight:   info.FontWeight,
 			IsFixedPitch: info.IsFixedPitch,
 			IsSerif:      info.IsSerif,
-			IsSymbolic:   info.IsSymbolic,
 			IsItalic:     info.ItalicAngle != 0,
 			FontBBox:     info.FontBBox,
 			ItalicAngle:  info.ItalicAngle,
@@ -384,6 +383,9 @@ func (d *Dicts) fixStandardFont(r pdf.Getter, info *stdmtx.FontData) {
 			StemV:        info.StemV,
 			StemH:        info.StemH,
 			MissingWidth: missingWidth,
+		}
+		if info.FontFamily == "Symbol" || info.FontFamily == "ZapfDingbats" {
+			d.FontDescriptor.IsSymbolic = true
 		}
 	}
 
