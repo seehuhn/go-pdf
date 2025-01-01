@@ -98,7 +98,7 @@ func TestExtractBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info, err := type1.Extract(data, dicts)
+	info, err := type1.ExtractOld(data, dicts)
 	if err != nil {
 		t.Fatal(err)
 	}

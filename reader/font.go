@@ -39,8 +39,6 @@ type FontFromFile interface {
 }
 
 // ReadFont extracts a font from a PDF file.
-//
-// TODO(voss): can we get rid of the `name` parameter?
 func (r *Reader) ReadFont(ref pdf.Object) (F FontFromFile, err error) {
 	if ref, ok := ref.(pdf.Reference); ok {
 		if res, ok := r.fontCache[ref]; ok {

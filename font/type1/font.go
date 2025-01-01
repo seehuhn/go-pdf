@@ -344,7 +344,7 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 		}
 	}
 
-	info := &FontDict{
+	info := &FontDictOld{
 		Font:      fontData,
 		Metrics:   metricsData,
 		SubsetTag: subsetTag,

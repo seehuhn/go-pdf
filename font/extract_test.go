@@ -183,7 +183,7 @@ func extractFont(r pdf.Getter, fontDict pdf.Object) (Dict, error) {
 	case font.TrueTypeSimple:
 		return truetype.ExtractSimple(r, dicts)
 	case font.Type1:
-		return type1.Extract(r, dicts)
+		return type1.ExtractOld(r, dicts)
 	case font.Type3:
 		return type3.Extract(r, dicts)
 

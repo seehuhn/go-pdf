@@ -35,7 +35,7 @@ type Dict interface {
 }
 
 var (
-	_ Dict = (*type1.FontDict)(nil)
+	_ Dict = (*type1.FontDictOld)(nil)
 	_ Dict = (*cff.FontDictSimple)(nil)
 	_ Dict = (*cff.FontDictComposite)(nil)
 	_ Dict = (*truetype.FontDictSimple)(nil)

@@ -29,8 +29,10 @@ import (
 	"seehuhn.de/go/postscript/type1"
 )
 
-// FontDict is the information needed to embed a Type 1 font.
-type FontDict struct {
+// FontDictOld is the information needed to embed a Type 1 font.
+//
+// TODO(voss): remove
+type FontDictOld struct {
 	// Font (optional) is the (subsetted as needed) font to embed.
 	// This is non-nil, if and only if the font program is embedded.
 	// At least one of `Font` and `Metrics` must be non-nil.
@@ -63,12 +65,12 @@ type FontDict struct {
 	ToUnicode *cmap.ToUnicode
 }
 
-// Extract extracts information about a Type 1 font from a PDF file.
+// ExtractOld extracts information about a Type 1 font from a PDF file.
 //
 // The `Font` field in the result is only filled if the font program
 // is included in the file.  `Metrics` is always present, and contains
 // all information available in the PDF file.
-func Extract(r pdf.Getter, dicts *font.Dicts) (*FontDict, error) {
+func ExtractOld(r pdf.Getter, dicts *font.Dicts) (*FontDictOld, error) {
 	if err := dicts.FontTypeOld.MustBe(font.Type1); err != nil {
 		return nil, err
 	}
@@ -76,7 +78,7 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*FontDict, error) {
 	// We ignore errors as much as possible, to allow for reading of malformed
 	// PDF files.
 
-	res := &FontDict{}
+	res := &FontDictOld{}
 
 	var psFont *type1.Font
 	if dicts.FontData != nil {
@@ -172,7 +174,7 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*FontDict, error) {
 }
 
 // Embed implements the [font.Dict] interface.
-func (info *FontDict) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
+func (info *FontDictOld) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 	postScriptName := info.PostScriptName()
 	fontName := postScriptName
 	if info.SubsetTag != "" {
@@ -335,7 +337,7 @@ func (info *FontDict) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 }
 
 // PostScriptName returns the PostScript name of the font.
-func (info *FontDict) PostScriptName() string {
+func (info *FontDictOld) PostScriptName() string {
 	if info.Font != nil {
 		return info.Font.FontInfo.FontName
 	}
@@ -343,7 +345,7 @@ func (info *FontDict) PostScriptName() string {
 }
 
 // BuiltinEncoding returns the builtin encoding vector for this font.
-func (info *FontDict) BuiltinEncoding() []string {
+func (info *FontDictOld) BuiltinEncoding() []string {
 	if info.Font != nil {
 		return info.Font.Encoding
 	}
@@ -352,7 +354,7 @@ func (info *FontDict) BuiltinEncoding() []string {
 
 // GetWidths returns the widths of the 256 encoded characters.
 // The returned widths are given in PDF text space units.
-func (info *FontDict) GetWidths() []float64 {
+func (info *FontDictOld) GetWidths() []float64 {
 	ww := make([]float64, 256)
 	if psFont := info.Font; psFont != nil {
 		q := psFont.FontInfo.FontMatrix[0]
@@ -379,7 +381,7 @@ func (info *FontDict) GetWidths() []float64 {
 
 // GlyphList returns the list of glyph names, in a standardised order.
 // Glyph IDs, where used, are indices into this list.
-func (info *FontDict) GlyphList() []string {
+func (info *FontDictOld) GlyphList() []string {
 	if info.Font != nil {
 		return info.Font.GlyphList()
 	}

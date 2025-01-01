@@ -24,6 +24,8 @@ import (
 
 // GetStandardWidth returns the width of glyphs in the 14 standard PDF fonts.
 // The width is given in PDF glyph space units (i.e. are multiplied by 1000).
+//
+// TODO(voss): remove
 func GetStandardWidth(fontName, glyphName string) (float64, error) {
 	m, ok := stdmtx.Metrics[fontName]
 	if !ok {
