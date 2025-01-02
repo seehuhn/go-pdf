@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/internal/stdmtx"
 )
@@ -66,6 +67,43 @@ func widthsAreCompatible(ww []float64, enc encoding.Type1, info *stdmtx.FontData
 		if math.Abs(ww[code]-info.Width[name]) > 0.5 {
 			return false
 		}
+	}
+	return true
+}
+
+func fontDescriptorIsCompatible(fd *font.Descriptor, stdInfo *stdmtx.FontData) bool {
+	if fd.FontFamily != "" && fd.FontFamily != stdInfo.FontFamily {
+		return false
+	}
+	if fd.FontWeight != 0 && fd.FontWeight != stdInfo.FontWeight {
+		return false
+	}
+	if fd.IsFixedPitch != stdInfo.IsFixedPitch {
+		return false
+	}
+	if fd.IsSerif != stdInfo.IsSerif {
+		return false
+	}
+	if math.Abs(fd.ItalicAngle-stdInfo.ItalicAngle) > 0.1 {
+		return false
+	}
+	if fd.Ascent != 0 && math.Abs(fd.Ascent-stdInfo.Ascent) > 0.5 {
+		return false
+	}
+	if fd.Descent != 0 && math.Abs(fd.Descent-stdInfo.Descent) > 0.5 {
+		return false
+	}
+	if fd.CapHeight != 0 && math.Abs(fd.CapHeight-stdInfo.CapHeight) > 0.5 {
+		return false
+	}
+	if fd.XHeight != 0 && math.Abs(fd.XHeight-stdInfo.XHeight) > 0.5 {
+		return false
+	}
+	if fd.StemV != 0 && math.Abs(fd.StemV-stdInfo.StemV) > 0.5 {
+		return false
+	}
+	if fd.StemH != 0 && math.Abs(fd.StemH-stdInfo.StemH) > 0.5 {
+		return false
 	}
 	return true
 }
