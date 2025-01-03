@@ -162,7 +162,7 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*FontDict, error) {
 	isNonSymbolic := !fd.IsSymbolic
 	isExternal := fdDict["FontFile"] == nil && fdDict["FontFile3"] == nil
 	nonSymbolicExt := isNonSymbolic && isExternal
-	enc, err := encoding.ExtractType1New(r, fontDict["Encoding"], nonSymbolicExt)
+	enc, err := encoding.ExtractType1(r, fontDict["Encoding"], nonSymbolicExt)
 	if err != nil {
 		return nil, err
 	}

@@ -154,7 +154,7 @@ func TestType1Encoding(t *testing.T) {
 	r := &MockGetter{}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			enc, err := ExtractType1New(r, c.encoding, c.nonSymbolicExt)
+			enc, err := ExtractType1(r, c.encoding, c.nonSymbolicExt)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -225,7 +225,7 @@ func TestType1Roundtrip(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				enc2, err := ExtractType1New(&MockGetter{}, obj, nonSymbolicExt)
+				enc2, err := ExtractType1(&MockGetter{}, obj, nonSymbolicExt)
 				if err != nil {
 					t.Fatal(err)
 				}

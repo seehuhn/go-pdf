@@ -300,7 +300,7 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 		postScriptName = metricsData.FontName
 	}
 
-	omitFontData := fontData == nil || pdf.GetVersion(f.w) < pdf.V2_0 && isStandard(f.psFont.FontInfo.FontName, encoding, ww)
+	omitFontData := fontData == nil || pdf.GetVersion(f.w) < pdf.V2_0 && isStandard(postScriptName, encoding, ww)
 	if !omitFontData { // only subset the font, if the font is embedded
 		psFull := f.psFont
 
