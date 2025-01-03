@@ -368,7 +368,12 @@ func (e *Encoding) AsPDFType3(opt pdf.OutputOptions) (pdf.Object, error) {
 	return dict, nil
 }
 
-func ExtractType1(r pdf.Getter, dicts *font.Dicts) (*Encoding, error) {
+// ExtractType1Old extracts an encoding from a Type1 font dictionary.
+//
+// Deprecated: Use [ExtractType1] instead.
+//
+// TODO(voss): remove
+func ExtractType1Old(r pdf.Getter, dicts *font.Dicts) (*Encoding, error) {
 	obj, err := pdf.Resolve(r, dicts.FontDict["Encoding"])
 	if err != nil {
 		return nil, err

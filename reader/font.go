@@ -72,7 +72,7 @@ func (r *Reader) readSimpleFont(info *font.Dicts, toUni *cmap.ToUnicodeInfo) (F 
 	var enc *encoding.Encoding
 	switch info.DictType {
 	case font.DictTypeSimpleType1:
-		enc, err = encoding.ExtractType1(r.R, info)
+		enc, err = encoding.ExtractType1Old(r.R, info)
 		if err != nil {
 			return nil, err
 		}

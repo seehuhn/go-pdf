@@ -410,7 +410,7 @@ func TestAsPDF(t *testing.T) {
 					}
 					dicts.FontDict["Encoding"] = obj
 
-					enc2, err = ExtractType1(nil, dicts)
+					enc2, err = ExtractType1Old(nil, dicts)
 					if err != nil {
 						t.Fatal(err)
 					}

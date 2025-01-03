@@ -26,7 +26,7 @@ import (
 // Type1 gives the glyph name for each code point.
 // The empty string indicates unused codes.
 // The special value [UseBuiltin] indicates that the corresponding glyph from
-// the build-in encoding should be used.
+// the built-in encoding should be used.
 type Type1 func(code byte) string
 
 const UseBuiltin = "@"
@@ -49,7 +49,7 @@ var (
 	}
 )
 
-// ExtractType1New extracts the encoding from the /Encoding entry of a Type1
+// ExtractType1 extracts the encoding from the /Encoding entry of a Type1
 // font dictionary.
 //
 // If the argument nonSymbolicExt is true, the function assumes that the font
@@ -58,7 +58,7 @@ var (
 //
 // If /Encoding is malformed, the font's built-in encoding is used as a
 // fallback.
-func ExtractType1New(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Type1, error) {
+func ExtractType1(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Type1, error) {
 	obj, err := pdf.Resolve(r, obj)
 	if err != nil {
 		return nil, err
@@ -264,9 +264,6 @@ func (e Type1) AsPDF(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, er
 		if L := len(cand.differences); L < bestDiffLength {
 			bestDiffLength = L
 			bestDict = pdf.Dict{}
-			if opt.HasAny(pdf.OptDictTypes) {
-				bestDict["Type"] = pdf.Name("Encoding")
-			}
 			if cand.encName != nil {
 				bestDict["BaseEncoding"] = cand.encName
 			}
@@ -274,6 +271,9 @@ func (e Type1) AsPDF(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, er
 				bestDict["Differences"] = cand.differences
 			}
 		}
+	}
+	if opt.HasAny(pdf.OptDictTypes) {
+		bestDict["Type"] = pdf.Name("Encoding")
 	}
 	return bestDict, nil
 }
