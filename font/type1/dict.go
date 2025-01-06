@@ -102,6 +102,10 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*FontDict, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
 		return nil, err
+	} else if fontDict == nil {
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("missing font dictionary"),
+		}
 	}
 	subtype, err := pdf.GetName(r, fontDict["Subtype"])
 	if err != nil {

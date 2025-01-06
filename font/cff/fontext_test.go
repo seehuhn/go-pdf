@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,17 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package opentype_test
+package cff_test
 
 import (
 	"testing"
 
+	sfntcff "seehuhn.de/go/sfnt/cff"
+
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font/opentype"
+	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
-	"seehuhn.de/go/sfnt"
 )
 
 func TestEmbedSimple(t *testing.T) {
@@ -33,7 +34,7 @@ func TestEmbedSimple(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	fontData := makefont.OpenType()
-	fontInstance, err := opentype.New(fontData, nil)
+	fontInstance, err := cff.New(fontData, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +80,7 @@ func TestEmbedSimple(t *testing.T) {
 	} else if F == nil {
 		t.Fatal("GetFont method returned nil")
 	}
-	_, ok := F.(*sfnt.Font)
+	_, ok := F.(*sfntcff.Font)
 	if !ok {
 		t.Errorf("wrong font type: %T", F)
 	}
