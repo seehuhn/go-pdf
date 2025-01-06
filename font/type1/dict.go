@@ -561,6 +561,7 @@ type Code interface {
 	CID() cmap.CID
 
 	// Width returns the width of the glyph for the current character code.
+	// The value is in PDF glyph space units (1/1000th of text space units).
 	Width() float64
 
 	// Text returns the text content for the current character code.

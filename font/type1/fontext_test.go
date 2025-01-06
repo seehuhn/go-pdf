@@ -21,13 +21,76 @@ import (
 	"testing"
 
 	"seehuhn.de/go/geom/matrix"
+
+	pstype1 "seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/internal/debug/makefont"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 	"seehuhn.de/go/pdf/reader"
 )
+
+func TestEmbed(t *testing.T) {
+	// step 1: embed a font instance into a simple PDF file
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w)
+
+	fontData := makefont.Type1()
+	fontMetrics := makefont.AFM()
+	fontInstance, err := type1.New(fontData, fontMetrics, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ref, _, err := pdf.ResourceManagerEmbed(rm, fontInstance)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// make sure a few glyphs are included and encoded
+	fontInstance.Layout(nil, 12, "Hello")
+
+	err = rm.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// step 2: read back the font and verify that everything is as expected
+	dict, err := type1.ExtractDict(w, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if dict.Ref != ref {
+		t.Errorf("wrong object reference: expected %v, got %v", ref, dict.Ref)
+	}
+	if dict.PostScriptName != fontData.PostScriptName() {
+		t.Errorf("wrong PostScript name: expected %v, got %v",
+			fontData.PostScriptName(), dict.PostScriptName)
+	}
+	if len(dict.SubsetTag) != 6 {
+		t.Errorf("wrong subset tag: %q", dict.SubsetTag)
+	}
+
+	// TODO(voss): more tests
+
+	if dict.GetFont == nil {
+		t.Fatal("GetFont method is nil")
+	}
+	F, err := dict.GetFont()
+	if err != nil {
+		t.Fatal(err)
+	} else if F == nil {
+		t.Fatal("GetFont method returned nil")
+	}
+	_, ok := F.(*pstype1.Font)
+	if !ok {
+		t.Errorf("wrong font type: %T", F)
+	}
+}
 
 func TestTextContent(t *testing.T) {
 	text := `“Hello World!”`
