@@ -96,7 +96,7 @@ func (f *MemFile) Seek(offset int64, whence int) (int64, error) {
 	}
 
 	f.Offset = newOffset
-	return newOffset, nil // Return the new offset, not the old one
+	return newOffset, nil
 }
 
 var (

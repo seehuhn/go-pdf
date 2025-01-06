@@ -222,7 +222,9 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*FontDict, error) {
 		// more efficiently?
 		for code := range 256 {
 			rr := toUnicode.Lookup([]byte{byte(code)})
-			d.Text[code] = string(rr)
+			if rr != nil {
+				d.Text[code] = string(rr)
+			}
 		}
 	}
 

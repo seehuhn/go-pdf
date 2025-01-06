@@ -214,6 +214,8 @@ func (info *ToUnicodeInfo) GetSimpleMapping() map[byte]string {
 	return res
 }
 
+// Lookup returns the unicode string for the given character code.
+// If the code is not defined in the ToUnicode map, nil is returned.
 func (info *ToUnicodeInfo) Lookup(code []byte) []rune {
 	for _, s := range info.Singles {
 		if bytes.Equal(s.Code, code) {

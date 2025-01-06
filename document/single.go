@@ -25,6 +25,8 @@ import (
 	"seehuhn.de/go/pdf/pagetree"
 )
 
+// CreateSinglePage creates a new PDF document consisting of a single page.
+// The document is written to the file with the given name.
 func CreateSinglePage(fileName string, pageSize *pdf.Rectangle, v pdf.Version, opt *pdf.WriterOptions) (*Page, error) {
 	out, err := pdf.Create(fileName, v, opt)
 	if err != nil {
@@ -33,6 +35,8 @@ func CreateSinglePage(fileName string, pageSize *pdf.Rectangle, v pdf.Version, o
 	return singlePage(out, pageSize)
 }
 
+// WriteSinglePage creates a new PDF document consisting of a single page.
+// The document is written to the given writer.
 func WriteSinglePage(w io.Writer, pageSize *pdf.Rectangle, v pdf.Version, opt *pdf.WriterOptions) (*Page, error) {
 	out, err := pdf.NewWriter(w, v, opt)
 	if err != nil {
