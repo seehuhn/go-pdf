@@ -259,7 +259,7 @@ func (fb *fontBuilder) Build(enc *encInfo) (font.Font, error) {
 
 	q := 1000 / float64(newTTF.UnitsPerEm)
 
-	bbox := newTTF.BBox()
+	bbox := newTTF.FontBBox()
 	pdfBBox := &pdf.Rectangle{
 		LLx: bbox.LLx.AsFloat(q),
 		LLy: bbox.LLy.AsFloat(q),

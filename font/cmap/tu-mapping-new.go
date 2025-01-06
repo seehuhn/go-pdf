@@ -24,8 +24,7 @@ import (
 )
 
 // MakeSimpleToUnicode creates a ToUnicodeInfo object for the encoding of a
-// simple font. The text slice must have 256 elements, where each element is
-// the Unicode representation of the corresponding code point.
+// simple font.
 func MakeSimpleToUnicode(data map[byte]string) *ToUnicodeInfo {
 	g := tuEncSimple(data)
 	ee, err := dag.ShortestPath(g, 256)
@@ -79,9 +78,17 @@ type edge struct {
 
 type tuEncSimple map[byte]string
 
+func (g tuEncSimple) has(code int) bool {
+	if code < 0 || code >= 256 {
+		return false
+	}
+	_, ok := g[byte(code)]
+	return ok
+}
+
 func (g tuEncSimple) AppendEdges(ee []edge, v int) []edge {
 	gapLen := 0
-	for v+gapLen < 256 && g[byte(v+gapLen)] == "" {
+	for v+gapLen < 256 && !g.has(v+gapLen) {
 		gapLen++
 	}
 	if gapLen > 0 {
@@ -90,7 +97,7 @@ func (g tuEncSimple) AppendEdges(ee []edge, v int) []edge {
 
 	runLen := 1
 	current := g[byte(v)]
-	for v+runLen < 256 && g[byte(v+runLen)] != "" {
+	for len(current) > 0 && g.has(v+runLen) {
 		u16 := utf16.Encode([]rune(current))
 		if u16[len(u16)-1] == 0xFFFF {
 			break
@@ -105,13 +112,15 @@ func (g tuEncSimple) AppendEdges(ee []edge, v int) []edge {
 		runLen++
 	}
 	if runLen == 1 {
-		ee = append(ee, edge{1, uint16(v)})
+		ee = append(ee, edge{1, 1})
+	} else {
+		ee = append(ee, edge{2, uint16(runLen)})
 	}
-	if v+runLen >= 256 || g[byte(v+runLen)] == "" {
+	if !g.has(v + runLen) {
 		return ee
 	}
 
-	for v+runLen < 256 && g[byte(v+runLen)] != "" {
+	for g.has(v + runLen) {
 		runLen++
 	}
 	return append(ee, edge{3, uint16(runLen)})

@@ -55,10 +55,18 @@ var _ font.Embedded = (*FontDict)(nil)
 
 // FontDict represents a Type 1 font dictionary.
 type FontDict struct {
-	Ref            pdf.Reference
+	Ref pdf.Reference
+
+	// PostScriptName is the PostScript name of the font,
+	// without any subset tag.
 	PostScriptName string
-	SubsetTag      string
-	Name           pdf.Name
+
+	SubsetTag string
+
+	// Name is deprecated and is normally empty.
+	// For PDF 1.0 this was the name the font was referenced by from
+	// within content streams.
+	Name pdf.Name
 
 	// Descriptor is the font descriptor.
 	Descriptor *font.Descriptor
@@ -428,8 +436,8 @@ func (d *FontDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 	for code := range 256 {
 		glyphName := d.Encoding(byte(code))
 		switch glyphName {
-		case "":
-			// unused code, nothing to do
+		case "", ".notdef":
+			// unused character code, nothing to do
 
 		case encoding.UseBuiltin:
 			if d.Text[code] != "" {

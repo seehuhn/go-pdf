@@ -196,7 +196,7 @@ func (info *FontDictComposite) Embed(w *pdf.Writer, fontDictRef pdf.Reference) e
 		CIDToGIDMap = w.Alloc()
 	}
 
-	bbox := ttf.BBox()
+	bbox := ttf.FontBBox()
 	fontBBox := rect.Rect{
 		LLx: bbox.LLx.AsFloat(q),
 		LLy: bbox.LLy.AsFloat(q),

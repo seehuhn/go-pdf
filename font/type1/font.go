@@ -75,7 +75,7 @@ func New(psFont *type1.Font, metrics *afm.Metrics, opt *font.Options) (*Instance
 		opt = &font.Options{}
 	}
 	if opt.Composite {
-		return nil, errors.New("Type 1 fonts do not support composite embedding")
+		return nil, errors.New("composite embedding for Type 1 fonts not supported")
 	}
 
 	glyphNames := psFont.GlyphList()
@@ -281,11 +281,10 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 	encoding := make([]string, 256)
 	ww := make([]float64, 256)
 	for c, gid := range f.Encoding {
-		name := f.glyphNames[gid]
-		if name == ".notdef" && f.CodeIsUsed(byte(c)) {
-			name = notdefForce
+		if !f.CodeIsUsed(byte(c)) {
+			continue
 		}
-		encoding[c] = name
+		encoding[c] = f.glyphNames[gid]
 		ww[c] = f.widths[gid] * 1000
 	}
 
@@ -366,10 +365,10 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 	if metricsData != nil {
 		fd.FontName = metricsData.FontName
 		fd.FontBBox = metricsData.FontBBoxPDF()
-		fd.CapHeight = metricsData.CapHeight
-		fd.XHeight = metricsData.XHeight
-		fd.Ascent = metricsData.Ascent
-		fd.Descent = metricsData.Descent
+		fd.CapHeight = math.Round(metricsData.CapHeight)
+		fd.XHeight = math.Round(metricsData.XHeight)
+		fd.Ascent = math.Round(metricsData.Ascent)
+		fd.Descent = math.Round(metricsData.Descent)
 		fd.IsItalic = metricsData.ItalicAngle != 0
 		fd.ItalicAngle = metricsData.ItalicAngle
 		fd.IsFixedPitch = metricsData.IsFixedPitch

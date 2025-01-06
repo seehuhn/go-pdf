@@ -181,6 +181,39 @@ func (info *ToUnicodeInfo) writeBinary(h hash.Hash, maxGen int) {
 	}
 }
 
+// GetSimpleMapping returns a map from one-byte character codes to strings.
+func (info *ToUnicodeInfo) GetSimpleMapping() map[byte]string {
+	res := make(map[byte]string)
+
+	for _, r := range info.Ranges {
+		if len(r.First) != 1 || len(r.Last) != 1 || r.First[0] > r.Last[0] {
+			continue
+		}
+		n := int(r.Last[0]) - int(r.First[0]) + 1
+		values := r.Values
+		switch len(values) {
+		case n:
+			for i := range n {
+				res[r.First[0]+byte(i)] = string(values[i])
+			}
+		case 1:
+			u16 := utf16.Encode(values[0])
+			for i := range n {
+				res[r.First[0]+byte(i)] = string(utf16.Decode(u16))
+				u16[len(u16)-1] += 1
+			}
+		}
+	}
+
+	for _, s := range info.Singles {
+		if len(s.Code) == 1 {
+			res[s.Code[0]] = string(s.Value)
+		}
+	}
+
+	return res
+}
+
 func (info *ToUnicodeInfo) Lookup(code []byte) []rune {
 	for _, s := range info.Singles {
 		if bytes.Equal(s.Code, code) {

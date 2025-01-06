@@ -98,7 +98,7 @@ func doit() error {
 		case "Type 1 Fonts":
 			gen = fonttypes.Type1WithMetrics
 			ffKey = "FontFile"
-		case "Builtin Fonts":
+		case "Standard Fonts":
 			gen = fonttypes.Standard
 		case "Simple CFF Fonts":
 			gen = fonttypes.CFFSimple

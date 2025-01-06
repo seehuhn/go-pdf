@@ -181,7 +181,7 @@ func (info *FontDictGlyfSimple) Embed(w *pdf.Writer, fontDictRef pdf.Reference) 
 		{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
 	}
 
-	bbox := otf.BBox()
+	bbox := otf.FontBBox()
 	fontBBox := rect.Rect{
 		LLx: bbox.LLx.AsFloat(q),
 		LLy: bbox.LLy.AsFloat(q),

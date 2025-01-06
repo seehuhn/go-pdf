@@ -32,7 +32,7 @@ type Type1 func(code byte) string
 const UseBuiltin = "@"
 
 var (
-	useBuiltinEncoding Type1 = func(code byte) string {
+	Builtin Type1 = func(code byte) string {
 		return UseBuiltin
 	}
 	WinAnsi Type1 = func(code byte) string {
@@ -54,7 +54,7 @@ var (
 //
 // If the argument nonSymbolicExt is true, the function assumes that the font
 // has the non-symbolic flag set in the font descriptor and that the font is
-// not be embedded in the PDF file.
+// not embedded in the PDF file.
 //
 // If /Encoding is malformed, the font's built-in encoding is used as a
 // fallback.
@@ -77,10 +77,10 @@ func ExtractType1(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Type1, err
 
 	dict, _ := obj.(pdf.Dict)
 	if dict == nil {
-		return useBuiltinEncoding, nil
+		return Builtin, nil
 	}
 	if err := pdf.CheckDictType(r, dict, "Encoding"); err != nil {
-		return useBuiltinEncoding, err
+		return Builtin, err
 	}
 
 	// If we reach this point, we have found an encoding dictionary.
@@ -98,7 +98,7 @@ func ExtractType1(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Type1, err
 		if nonSymbolicExt { // non-symbolic and not embedded
 			baseEnc = Standard
 		} else { // symbolic or embedded
-			baseEnc = useBuiltinEncoding
+			baseEnc = Builtin
 		}
 	}
 

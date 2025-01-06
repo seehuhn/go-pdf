@@ -252,7 +252,7 @@ func (info *FontDictSimple) Embed(w *pdf.Writer, fontDictRef pdf.Reference) erro
 		{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
 	}
 
-	bbox := sfnt.BBox()
+	bbox := sfnt.FontBBox()
 	fontBBox := rect.Rect{
 		LLx: bbox.LLx.AsFloat(q),
 		LLy: bbox.LLy.AsFloat(q),

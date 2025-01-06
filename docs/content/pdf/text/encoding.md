@@ -19,8 +19,6 @@ For each code, 0 to 255, the encoding can specify one of the following:
     case, the code is mapped to a glyph name using the font's built-in
     encoding.
 
-Sometimes a code may not map to any glyph name.
-
 ## PDF Implementation
 
 The encoding for a font is specified by the `/Encoding` field of the font
@@ -59,8 +57,8 @@ dictionary.  This field is interpreted as follows:
             as non-symbolic in the font descriptor, the "base encoding" is the
             "standard encoding" (Table D.2 in ISO 32000-2:2020).
 
-        Note that an absent `\BaseEncoding` is interpreted slightly
-        differently to an absent `\Encoding` field.
+        Note that an absent `/BaseEncoding` is interpreted slightly
+        differently to an absent `/Encoding` field.
 
       - If the `/Differences` field is present, it describes the differences
         between the "base encoding" and the final encoding.  Otherwise the

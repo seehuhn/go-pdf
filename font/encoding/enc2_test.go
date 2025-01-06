@@ -172,7 +172,7 @@ func TestType1Encoding(t *testing.T) {
 
 func TestType1Roundtrip(t *testing.T) {
 	var cases = []Type1{
-		useBuiltinEncoding,
+		Builtin,
 		WinAnsi,
 		MacRoman,
 		MacExpert,
@@ -210,7 +210,7 @@ func TestType1Roundtrip(t *testing.T) {
 			case 130:
 				return "Sam"
 			default:
-				return useBuiltinEncoding(code)
+				return Builtin(code)
 			}
 		},
 	}

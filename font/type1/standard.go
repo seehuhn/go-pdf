@@ -38,7 +38,7 @@ func isStandard(fontName string, enc []string, ww []float64) bool {
 	}
 
 	for i, glyphName := range enc {
-		if glyphName == ".notdef" || glyphName == notdefForce {
+		if glyphName == "" || glyphName == ".notdef" || glyphName == notdefForce {
 			continue
 		}
 		w, ok := m.Width[glyphName]
