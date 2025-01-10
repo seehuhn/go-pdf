@@ -91,6 +91,13 @@ func (r RangeNew) String() string {
 	return fmt.Sprintf("% 02x-% 02x: %d", r.First, r.Last, r.Value)
 }
 
+// CID is a character identifier.
+//
+// CID values are used to look up glyphs in a CIDFont.
+// The interpretation of a CID value depends on the corresponding
+// CIDSystemInfo.
+//
+// The special value 0 is used to indicate a missing glyph.
 type CID uint32
 
 // ExtractNew extracts a CMap from a PDF object.

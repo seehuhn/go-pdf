@@ -27,6 +27,10 @@ import (
 )
 
 // EncodeComposite constructs the W and DW entries for a CIDFont dictionary.
+//
+// Deprecated: use [EncodeComposite2] instead.
+//
+// TODO(voss): remove
 func EncodeComposite(widths map[cmap.CID]float64, v pdf.Version) (pdf.Array, pdf.Number) {
 	var ww []cidWidth
 	for cid, w := range widths {
@@ -77,6 +81,47 @@ func EncodeComposite(widths map[cmap.CID]float64, v pdf.Version) (pdf.Array, pdf
 	return res, pdf.Number(dw)
 }
 
+// EncodeComposite2 constructs the W and DW entries for a CIDFont dictionary.
+func EncodeComposite2(widths map[cmap.CID]float64, dw float64) pdf.Array {
+	var ww []cidWidth
+	for cid, w := range widths {
+		ww = append(ww, cidWidth{cid, w})
+	}
+	sort.Slice(ww, func(i, j int) bool {
+		return ww[i].CID < ww[j].CID
+	})
+
+	g := wwGraph{ww, dw}
+	ee, err := dag.ShortestPath(g, len(ww))
+	if err != nil {
+		panic(err)
+	}
+
+	var res pdf.Array
+	pos := 0
+	for _, e := range ee {
+		switch {
+		case e > 0:
+			wiScaled := pdf.Number(ww[pos].GlyphWidth)
+			res = append(res,
+				pdf.Integer(ww[pos].CID),
+				pdf.Integer(ww[pos+int(e)-1].CID),
+				wiScaled)
+		case e < 0:
+			var wi pdf.Array
+			for i := pos; i < pos+int(-e); i++ {
+				wi = append(wi, pdf.Number(ww[i].GlyphWidth))
+			}
+			res = append(res,
+				pdf.Integer(ww[pos].CID),
+				wi)
+		}
+		pos = g.To(pos, e)
+	}
+
+	return res
+}
+
 type cidWidth struct {
 	CID        cmap.CID
 	GlyphWidth float64
@@ -97,7 +142,7 @@ type wwEdge int16
 
 func (g wwGraph) AppendEdges(ee []wwEdge, v int) []wwEdge {
 	ww := g.ww
-	if ww[v].GlyphWidth == g.dw {
+	if math.Abs(ww[v].GlyphWidth-g.dw) < 0.01 {
 		return append(ee, 0)
 	}
 

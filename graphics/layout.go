@@ -144,14 +144,14 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 		xActual += glyphWidth * param.TextHorizontalScaling
 		xWanted += g.Advance
 	}
-	xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) * 1000 / param.TextFontSize))
+	xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) / param.TextFontSize / param.TextHorizontalScaling * 1000))
 	if xOffsetInt != 0 {
 		if len(run) > 0 {
 			out = append(out, run)
 			run = nil
 		}
 		out = append(out, -xOffsetInt)
-		xActual += float64(xOffsetInt) / 1000 * param.TextFontSize
+		xActual += float64(xOffsetInt) / 1000 * param.TextFontSize * param.TextHorizontalScaling
 	}
 	flush()
 	w.TextMatrix = matrix.Translate(xActual, 0).Mul(w.TextMatrix)

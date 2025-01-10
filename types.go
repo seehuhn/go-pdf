@@ -633,6 +633,9 @@ func (x Array) AsPDF(opt OutputOptions) Native {
 }
 
 // Dict represent a Dictionary object in a PDF file.
+//
+// Entries which map to a nil value are equivalent to missing entries,
+// and are not included in PDF output.
 type Dict map[Name]Object
 
 func (x Dict) isNative() {}

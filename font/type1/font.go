@@ -197,7 +197,7 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 		g := seq.Seq[i]
 		if i > base {
 			if adj, ok := f.kern[glyph.Pair{Left: prev, Right: g.GID}]; ok {
-				seq.Seq[len(seq.Seq)-1].Advance += float64(adj) * ptSize / 1000
+				seq.Seq[i-1].Advance += float64(adj) * ptSize / 1000
 			}
 		}
 		prev = g.GID

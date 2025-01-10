@@ -156,6 +156,9 @@ func TestDict_NilValue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !strings.Contains(buf.String(), "good") {
+		panic("test is broken")
+	}
 	if strings.Contains(buf.String(), "bad") {
 		t.Error("nil entry in dict")
 	}

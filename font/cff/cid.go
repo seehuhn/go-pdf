@@ -151,7 +151,7 @@ type FontDictComposite struct {
 
 	CMap *cmap.Info
 
-	UnitsPerEm uint16 // TODO(voss): get this from the font matrix instead?
+	UnitsPerEm uint16 // TODO(voss): use the font matrix instead
 
 	Ascent    funit.Int16
 	Descent   funit.Int16

@@ -112,6 +112,11 @@ func (r ToUnicodeRange) All(codec *charcode.Codec) iter.Seq2[uint32, []rune] {
 	}
 }
 
+// IsEmpty returns true if the ToUnicodeInfo object does not contain any mappings.
+func (info *ToUnicodeInfo) IsEmpty() bool {
+	return len(info.Singles) == 0 && len(info.Ranges) == 0 && info.Parent == nil
+}
+
 // MakeName returns a unique name for the ToUnicodeInfo object.
 //
 // TODO(voss): reconsider once

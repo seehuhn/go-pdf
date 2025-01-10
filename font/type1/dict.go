@@ -55,10 +55,11 @@ var _ font.Embedded = (*FontDict)(nil)
 
 // FontDict represents a Type 1 font dictionary.
 type FontDict struct {
+	// Ref is the reference to the font dictionary in the PDF file.
 	Ref pdf.Reference
 
-	// PostScriptName is the PostScript name of the font,
-	// without any subset tag.
+	// PostScriptName is the PostScript name of the font
+	// (without any subset tag).
 	PostScriptName string
 
 	SubsetTag string
@@ -311,7 +312,9 @@ func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (FontData, error), error)
 // Embed adds the font dictionary to the PDF file.
 //
 // The FontName field in the font descriptor is ignored and the correct value
-// is set automatically.
+// is set automatically.  TODO(voss): don't do this
+//
+// TODO(voss): rename to `Finish()`?
 func (d *FontDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
@@ -328,24 +331,24 @@ func (d *FontDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 	if d.Ref == 0 {
 		return nil, zero, errors.New("missing font dictionary reference")
 	}
-	if psFont != nil {
-		switch f := psFont.(type) {
-		case *type1.Font:
-			// pass
-		case *cff.Font:
-			if f.IsCIDKeyed() {
-				return nil, zero, errors.New("CID-keyed fonts not allowed")
-			}
-		case *sfnt.Font:
-			o, _ := f.Outlines.(*cff.Outlines)
-			if o == nil {
-				return nil, zero, errors.New("missing CFF table")
-			} else if o.IsCIDKeyed() {
-				return nil, zero, errors.New("CID-keyed fonts not allowed")
-			}
-		default:
-			return nil, zero, fmt.Errorf("unsupported font type %T", psFont)
+	switch f := psFont.(type) {
+	case nil:
+		// pass
+	case *type1.Font:
+		// pass
+	case *cff.Font:
+		if f.IsCIDKeyed() {
+			return nil, zero, errors.New("CID-keyed fonts not allowed")
 		}
+	case *sfnt.Font:
+		o, _ := f.Outlines.(*cff.Outlines)
+		if o == nil {
+			return nil, zero, errors.New("missing CFF table")
+		} else if o.IsCIDKeyed() {
+			return nil, zero, errors.New("CID-keyed fonts not allowed")
+		}
+	default:
+		return nil, zero, fmt.Errorf("unsupported font type %T", psFont)
 	}
 	if d.SubsetTag != "" && !subset.IsValidTag(d.SubsetTag) {
 		return nil, zero, fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
@@ -395,7 +398,7 @@ func (d *FontDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 	if !trimFontDict {
 		fdRef := w.Alloc()
 		fdDict := d.Descriptor.AsDict()
-		fdDict["FontName"] = pdf.Name(baseFont)
+		fdDict["FontName"] = fontDict["BaseFont"]
 		if psFont != nil {
 			fontFileRef = w.Alloc()
 			switch psFont.(type) {
@@ -554,11 +557,16 @@ func (d *FontDict) Codes(s pdf.String) iter.Seq[Code] {
 	}
 }
 
-// Code represents a character code in a font. It provides methods to access
-// the CID, width, and text content associated with the character code.
+// Code represents a character code in a font. It provides methods to find the
+// corresponding glyph, glyph width, and text content associated with the
+// character code.
 type Code interface {
 	// CID returns the CID (Character Identifier) for the current character code.
 	CID() cmap.CID
+
+	// NotdefCID returns the CID to use in case the original CID is not present
+	// in the font.
+	NotdefCID() cmap.CID
 
 	// Width returns the width of the glyph for the current character code.
 	// The value is in PDF glyph space units (1/1000th of text space units).
@@ -574,18 +582,22 @@ type type1Code struct {
 	c byte
 }
 
-// CID returns the CID (Character Identifier) for the current character code.
 func (c *type1Code) CID() cmap.CID {
-	// TODO(voss): find a way to select glyphs using CID values
-	return cmap.CID(c.c)
+	// TODO(voss): document the meaning of these CID values
+	if glyphName := c.d.Encoding(c.c); glyphName == ".notdef" || glyphName == "" {
+		return 0
+	}
+	return cmap.CID(c.c) + 1
 }
 
-// Width returns the width of the glyph for the current character code.
+func (c *type1Code) NotdefCID() cmap.CID {
+	return 0
+}
+
 func (c *type1Code) Width() float64 {
 	return c.d.Width[c.c]
 }
 
-// Text returns the text content for the current character code.
 func (c *type1Code) Text() string {
 	return c.d.Text[c.c]
 }

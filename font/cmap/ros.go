@@ -71,19 +71,24 @@ func (ROS *CIDSystemInfo) String() string {
 	return ROS.Registry + "-" + ROS.Ordering + "-" + strconv.Itoa(int(ROS.Supplement))
 }
 
+// AsPDF converts the CIDSystemInfo object into a PDF object.
+//
+// This implements the [pdf.Object] interface.
+func (ROS *CIDSystemInfo) AsPDF(pdf.OutputOptions) pdf.Native {
+	return pdf.Dict{
+		"Registry":   pdf.String(ROS.Registry),
+		"Ordering":   pdf.String(ROS.Ordering),
+		"Supplement": ROS.Supplement,
+	}
+}
+
 // Embed converts the CIDSystemInfo object into a PDF object.
 // This implements the [pdf.Embedder] interface.
 func (ROS *CIDSystemInfo) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	dict := pdf.Dict{
-		"Registry":   pdf.String(ROS.Registry),
-		"Ordering":   pdf.String(ROS.Ordering),
-		"Supplement": ROS.Supplement,
-	}
-
 	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, dict)
+	err := rm.Out.Put(ref, ROS)
 	if err != nil {
 		return nil, zero, err
 	}

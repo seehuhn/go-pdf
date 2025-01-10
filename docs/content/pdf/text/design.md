@@ -30,7 +30,7 @@ may not available for fonts extracted from PDF files.
   - GID/name -> character code: could be (a) from a pre-defined encoding, or (b)
     constructed on the fly
 
-## Glyph ID Values
+## Glyph ID Values
 
 I normally address the glyphs in a font file by a Glyph ID (GID).
 In Go, use the data type `seehuhn.de/go/sfnt/glyph.ID` for this,
@@ -53,7 +53,7 @@ The map of character codes to glyphs can differ between PDF files, but is the
 same for all content streams within a PDF file.
 
 
-## Text Positioning
+## Text Positioning
 
 Some information is required to keep track of the current text position in
 content streams.  This information is available for all fonts generated within
