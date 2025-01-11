@@ -68,7 +68,7 @@ func writeTestFile(filename string) error {
 	w.TextShowRaw(pdf.String("ABC"))
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("]")
+	w.TextShow("] codes: A B C")
 	w.TextSecondLine(0, -12)
 	w.TextShow("[")
 	w.TextSetFont(testFont, 10)
@@ -76,15 +76,16 @@ func writeTestFile(filename string) error {
 	w.TextShowRaw(pdf.String("abc"))
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("]")
+	w.TextShow("] codes: a b c")
 	w.TextSecondLine(0, -14)
 	w.TextShow("These three glyphs are assigned CIDs 0, 1, and 2.")
 	w.TextSecondLine(0, -13)
 	w.TextShow("The CMap embedded in the PDF file also maps CIDs 3 and 4,")
 	w.TextNextLine()
-	w.TextShow("and the CIDFont dictionary assigns widths to all five CIDs.")
+	w.TextShow("and the CIDFont dictionary assigns widths CIDs 0, …, 4.")
 	w.TextNextLine()
 	w.TextShow("The assigned widths are 1000, 3000, 1000, 2000 and 4000.")
+	w.TextNextLine()
 	w.TextNextLine()
 	w.TextShow("Notdef ranges in the CMap are used to assign custom notdef characters")
 	w.TextNextLine()
@@ -95,7 +96,7 @@ func writeTestFile(filename string) error {
 	w.TextFirstLine(36, 370)
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("A character code:")
+	w.TextShow("An invalid character code:")
 	w.TextSecondLine(0, -14)
 	w.TextShow("[")
 	w.TextSetFont(testFont, 10)
@@ -103,7 +104,7 @@ func writeTestFile(filename string) error {
 	w.TextShowRaw(pdf.String("!"))
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("]")
+	w.TextShow("] code: !")
 	w.TextEnd()
 
 	w.TextBegin()
@@ -118,7 +119,7 @@ func writeTestFile(filename string) error {
 	w.TextShowRaw(pdf.String("X"))
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("]")
+	w.TextShow("] code: X")
 	w.TextEnd()
 
 	w.TextBegin()
@@ -133,7 +134,7 @@ func writeTestFile(filename string) error {
 	w.TextShowRaw(pdf.String("D"))
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("]")
+	w.TextShow("] code: D")
 	w.TextEnd()
 
 	w.TextBegin()
@@ -148,7 +149,7 @@ func writeTestFile(filename string) error {
 	w.TextShowRaw(pdf.String("x"))
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("]")
+	w.TextShow("] code: x")
 	w.TextEnd()
 
 	w.TextBegin()
@@ -163,7 +164,7 @@ func writeTestFile(filename string) error {
 	w.TextShowRaw(pdf.String("d"))
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("]")
+	w.TextShow("] code: d")
 	w.TextEnd()
 
 	w.TextBegin()
@@ -178,7 +179,7 @@ func writeTestFile(filename string) error {
 	w.TextShowRaw(pdf.String("z"))
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("]")
+	w.TextShow("] code: z")
 	w.TextEnd()
 
 	w.TextBegin()
@@ -193,7 +194,7 @@ func writeTestFile(filename string) error {
 	w.TextShowRaw(pdf.String("y"))
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("]")
+	w.TextShow("] code: y")
 	w.TextEnd()
 
 	return w.Close()
@@ -252,7 +253,11 @@ func makeTestFont() *testFont {
 		FDSelect: func(glyph.ID) int {
 			return 0
 		},
-		ROS:      testCharacterCollection,
+		ROS: &cff.CIDSystemInfo{
+			Registry:   "seehuhn.de",
+			Ordering:   "Test",
+			Supplement: 0,
+		},
 		GIDToCID: []cid.CID{0, 1, 2}, // identity GID <-> CID mapping
 	}
 	fontCFF := &cff.Font{
@@ -263,22 +268,47 @@ func makeTestFont() *testFont {
 		Outlines: o,
 	}
 
+	cmap := &cmap.InfoNew{
+		Name: "TestCMap",
+		ROS: &cmap.CIDSystemInfo{
+			Registry:   o.ROS.Registry,
+			Ordering:   o.ROS.Ordering,
+			Supplement: pdf.Integer(o.ROS.Supplement),
+		},
+		WMode: cmap.Horizontal,
+		CodeSpaceRange: []charcode.Range{
+			{Low: []byte{'A'}, High: []byte{'Z'}},
+			{Low: []byte{'a'}, High: []byte{'z'}},
+		},
+		CIDRanges: []cmap.RangeNew{
+			// Map all glyphs twice (including the missing CIDs 3 and 4).
+			{First: []byte{'A'}, Last: []byte{'E'}, Value: 0},
+			{First: []byte{'a'}, Last: []byte{'e'}, Value: 0},
+		},
+		CIDSingles: []cmap.SingleNew{
+			{Code: []byte{'y'}, Value: 3},
+		},
+		NotdefRanges: []cmap.RangeNew{
+			// Codes 'y' and 'z' use a non-existent glyph as the notdef character.
+			{First: []byte{'y'}, Last: []byte{'z'}, Value: 4},
+			// For the rest of the lowercase range we use the alternative
+			// notdef glyph (CID 1).
+			{First: []byte{'a'}, Last: []byte{'x'}, Value: 1},
+		},
+	}
+
 	res := &testFont{
 		data: fontCFF,
+		cmap: cmap,
 	}
 	return res
-}
-
-var testCharacterCollection = &cff.CIDSystemInfo{
-	Registry:   "seehuhn.de",
-	Ordering:   "Test",
-	Supplement: 0,
 }
 
 var _ font.Font = (*testFont)(nil)
 
 type testFont struct {
 	data *cff.Font
+	cmap *cmap.InfoNew
 }
 
 func (f *testFont) PostScriptName() string {
@@ -292,44 +322,17 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		FontName:   "Test",
 		FontFamily: "Test",
 		FontBBox:   rect.Rect{LLx: 0, LLy: 0, URx: 3000, URy: 1000},
-		Ascent:     1000,
+		Ascent:     800,
 		Descent:    0,
 		Leading:    1000,
-		CapHeight:  1000,
+		CapHeight:  800,
 		XHeight:    500,
 	}
 	dicts := &cidfont.Type0Dict{
 		Ref:            fontDictRef,
 		PostScriptName: "Test",
 		Descriptor:     fd,
-		Encoding: &cmap.InfoNew{
-			Name: "TestCMap",
-			ROS: &cmap.CIDSystemInfo{
-				Registry:   testCharacterCollection.Registry,
-				Ordering:   testCharacterCollection.Ordering,
-				Supplement: pdf.Integer(testCharacterCollection.Supplement),
-			},
-			WMode: cmap.Horizontal,
-			CodeSpaceRange: []charcode.Range{
-				{Low: []byte{'A'}, High: []byte{'Z'}},
-				{Low: []byte{'a'}, High: []byte{'z'}},
-			},
-			CIDRanges: []cmap.RangeNew{
-				// Map all glyphs twice (including the missing CIDs 3 and 4).
-				{First: []byte{'A'}, Last: []byte{'E'}, Value: 0},
-				{First: []byte{'a'}, Last: []byte{'e'}, Value: 0},
-			},
-			CIDSingles: []cmap.SingleNew{
-				{Code: []byte{'y'}, Value: 3},
-			},
-			NotdefRanges: []cmap.RangeNew{
-				// Codes 'y' and 'z' use a non-existent glyph as the notdef character.
-				{First: []byte{'y'}, Last: []byte{'z'}, Value: 4},
-				// For the rest of the lowercase range we use the alternative
-				// notdef glyph (CID 1).
-				{First: []byte{'a'}, Last: []byte{'x'}, Value: 1},
-			},
-		},
+		Encoding:       f.cmap,
 		Width: map[cmap.CID]float64{
 			0: 1000,
 			1: 3000,
@@ -338,16 +341,6 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 			4: 4000,
 		},
 		DefaultWidth: 1000,
-		Text: &cmap.ToUnicodeInfo{
-			CodeSpaceRange: []charcode.Range{
-				{Low: []byte{'A'}, High: []byte{'Z'}},
-				{Low: []byte{'a'}, High: []byte{'z'}},
-			},
-			Ranges: []cmap.ToUnicodeRange{
-				{First: []byte{'A'}, Last: []byte{'Z'}, Values: [][]rune{{'A'}}},
-				{First: []byte{'a'}, Last: []byte{'z'}, Values: [][]rune{{'a'}}},
-			},
-		},
 		GetFont: func() (cidfont.Type0FontData, error) {
 			return f.data, nil
 		},

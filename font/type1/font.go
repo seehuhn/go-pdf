@@ -78,7 +78,12 @@ func New(psFont *type1.Font, metrics *afm.Metrics, opt *font.Options) (*Instance
 		return nil, errors.New("composite embedding for Type 1 fonts not supported")
 	}
 
-	glyphNames := psFont.GlyphList()
+	var glyphNames []string
+	if psFont != nil {
+		glyphNames = psFont.GlyphList()
+	} else {
+		glyphNames = metrics.GlyphList()
+	}
 
 	geometry := &font.Geometry{}
 	widths := make([]float64, len(glyphNames))
@@ -146,7 +151,7 @@ func New(psFont *type1.Font, metrics *afm.Metrics, opt *font.Options) (*Instance
 // IsConsistent checks whether the font metrics are compatible with the
 // given font.
 func isConsistent(F *type1.Font, M *afm.Metrics) bool {
-	if M == nil {
+	if F == nil || M == nil {
 		return true
 	}
 	for name, glyph := range F.Glyphs {
@@ -299,7 +304,7 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 		postScriptName = metricsData.FontName
 	}
 
-	omitFontData := fontData == nil || pdf.GetVersion(f.w) < pdf.V2_0 && isStandard(postScriptName, encoding, ww)
+	omitFontData := isStandard(postScriptName, encoding, ww)
 	if !omitFontData { // only subset the font, if the font is embedded
 		psFull := f.psFont
 

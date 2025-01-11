@@ -117,6 +117,11 @@ func (d *Type0Dict) Finish(rm *pdf.ResourceManager) error {
 		cidFontName = pdf.Name(d.PostScriptName)
 	}
 
+	cidSystemInfo, _, err := pdf.ResourceManagerEmbed(rm, d.Encoding.ROS)
+	if err != nil {
+		return err
+	}
+
 	encoding, _, err := pdf.ResourceManagerEmbed(rm, d.Encoding)
 	if err != nil {
 		return err
@@ -147,7 +152,7 @@ func (d *Type0Dict) Finish(rm *pdf.ResourceManager) error {
 		"Type":           pdf.Name("Font"),
 		"Subtype":        pdf.Name("CIDFontType0"),
 		"BaseFont":       pdf.Name(cidFontName),
-		"CIDSystemInfo":  d.Encoding.ROS,
+		"CIDSystemInfo":  cidSystemInfo,
 		"FontDescriptor": fdRef,
 		// we set the width information later
 	}
