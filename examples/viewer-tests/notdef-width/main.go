@@ -57,7 +57,7 @@ func writeTestFile(filename string) error {
 	}
 
 	w.TextBegin()
-	w.TextFirstLine(36, 532)
+	w.TextFirstLine(36, 550)
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
 	w.TextShow("The glyphs in the test font (red) are mapped using two different code ranges:")
@@ -68,7 +68,7 @@ func writeTestFile(filename string) error {
 	w.TextShowRaw(pdf.String("ABC"))
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("] codes: A B C")
+	w.TextShow("] codes: A B C, code space range A-Z")
 	w.TextSecondLine(0, -12)
 	w.TextShow("[")
 	w.TextSetFont(testFont, 10)
@@ -76,27 +76,30 @@ func writeTestFile(filename string) error {
 	w.TextShowRaw(pdf.String("abc"))
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("] codes: a b c")
+	w.TextShow("] codes: a b c, code space range a-z")
 	w.TextSecondLine(0, -14)
 	w.TextShow("These three glyphs are assigned CIDs 0, 1, and 2.")
 	w.TextSecondLine(0, -13)
 	w.TextShow("The CMap embedded in the PDF file also maps CIDs 3 and 4,")
 	w.TextNextLine()
-	w.TextShow("and the CIDFont dictionary assigns widths CIDs 0, …, 4.")
+	w.TextShow("which are missing from the embedded font.")
+	w.TextNextLine()
+	w.TextNextLine()
+	w.TextShow("The CIDFont dictionary assigns widths to CIDs 0, …, 4.")
 	w.TextNextLine()
 	w.TextShow("The assigned widths are 1000, 3000, 1000, 2000 and 4000.")
 	w.TextNextLine()
 	w.TextNextLine()
 	w.TextShow("Notdef ranges in the CMap are used to assign custom notdef characters")
 	w.TextNextLine()
-	w.TextShow("for some codes.")
+	w.TextShow("for some code ranges.")
 	w.TextEnd()
 
 	w.TextBegin()
 	w.TextFirstLine(36, 370)
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("An invalid character code:")
+	w.TextShow("Test 1: An invalid character code")
 	w.TextSecondLine(0, -14)
 	w.TextShow("[")
 	w.TextSetFont(testFont, 10)
@@ -111,7 +114,7 @@ func writeTestFile(filename string) error {
 	w.TextFirstLine(36, 320)
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("A valid, unmapped code:")
+	w.TextShow("Test 2: A valid, unmapped code")
 	w.TextSecondLine(0, -14)
 	w.TextShow("[")
 	w.TextSetFont(testFont, 10)
@@ -126,7 +129,7 @@ func writeTestFile(filename string) error {
 	w.TextFirstLine(36, 270)
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("A valid code, mapped to CID 3 (missing):")
+	w.TextShow("Test 3: A valid code, mapped to CID 3 (missing)")
 	w.TextSecondLine(0, -14)
 	w.TextShow("[")
 	w.TextSetFont(testFont, 10)
@@ -141,7 +144,7 @@ func writeTestFile(filename string) error {
 	w.TextFirstLine(36, 220)
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("A valid, unmapped code, notdef = CID 1:")
+	w.TextShow("Test 4: A valid, unmapped code; notdef = CID 1")
 	w.TextSecondLine(0, -14)
 	w.TextShow("[")
 	w.TextSetFont(testFont, 10)
@@ -156,7 +159,7 @@ func writeTestFile(filename string) error {
 	w.TextFirstLine(36, 170)
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("A valid code, mapped to CID 3 (missing), notdef = CID 1:")
+	w.TextShow("Test 5: A valid code, mapped to CID 3 (missing); notdef = CID 1")
 	w.TextSecondLine(0, -14)
 	w.TextShow("[")
 	w.TextSetFont(testFont, 10)
@@ -171,7 +174,7 @@ func writeTestFile(filename string) error {
 	w.TextFirstLine(36, 120)
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("A valid, unmapped code, notdef = CID 4 (missing):")
+	w.TextShow("Test 6: A valid, unmapped code; notdef = CID 4 (missing)")
 	w.TextSecondLine(0, -14)
 	w.TextShow("[")
 	w.TextSetFont(testFont, 10)
@@ -186,7 +189,7 @@ func writeTestFile(filename string) error {
 	w.TextFirstLine(36, 70)
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("A valid code, mapped to CID 3 (missing), notdef = CID 4 (missing):")
+	w.TextShow("test 7: A valid code, mapped to CID 3 (missing); notdef = CID 4 (missing)")
 	w.TextSecondLine(0, -14)
 	w.TextShow("[")
 	w.TextSetFont(testFont, 10)
@@ -241,7 +244,7 @@ func makeTestFont() *testFont {
 		Glyphs: glyphs,
 		Private: []*type1.PrivateDict{
 			{
-				BlueValues: []funit.Int16{-100, 0, 900, 1000},
+				BlueValues: []funit.Int16{-10, 0, 990, 1000},
 				BlueScale:  0,
 				BlueShift:  0,
 				BlueFuzz:   0,
@@ -281,7 +284,7 @@ func makeTestFont() *testFont {
 			{Low: []byte{'a'}, High: []byte{'z'}},
 		},
 		CIDRanges: []cmap.RangeNew{
-			// Map all glyphs twice (including the missing CIDs 3 and 4).
+			// Two mappings for each glyph (including the missing CIDs 3 and 4).
 			{First: []byte{'A'}, Last: []byte{'E'}, Value: 0},
 			{First: []byte{'a'}, Last: []byte{'e'}, Value: 0},
 		},
