@@ -92,7 +92,7 @@ func writeTestFile(filename string) error {
 	w.TextNextLine()
 	w.TextShow("Notdef ranges in the CMap are used to assign custom notdef characters")
 	w.TextNextLine()
-	w.TextShow("for some code ranges.")
+	w.TextShow("for some code ranges: CID 1 for a-x, CID 4 for y-z.")
 	w.TextEnd()
 
 	w.TextBegin()
@@ -323,13 +323,10 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 
 	fd := &font.Descriptor{
 		FontName:   "Test",
-		FontFamily: "Test",
+		IsSymbolic: true,
 		FontBBox:   rect.Rect{LLx: 0, LLy: 0, URx: 3000, URy: 1000},
 		Ascent:     800,
-		Descent:    0,
-		Leading:    1000,
 		CapHeight:  800,
-		XHeight:    500,
 	}
 	dicts := &cidfont.Type0Dict{
 		Ref:            fontDictRef,
@@ -375,6 +372,10 @@ func (e *testFontEmbedded) DecodeWidth(s pdf.String) (float64, int) {
 	switch s[0] {
 	case 'B', 'b':
 		return 3000, 1
+	case 'D', 'd':
+		return 2000, 1
+	case 'E', 'e':
+		return 4000, 1
 	default:
 		return 1000, 1
 	}
