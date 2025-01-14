@@ -17,7 +17,16 @@
 package main
 
 import (
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/rect"
+
+	"seehuhn.de/go/postscript/cid"
+	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/postscript/type1"
+
+	"seehuhn.de/go/sfnt/cff"
+	"seehuhn.de/go/sfnt/glyph"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
@@ -26,12 +35,6 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/postscript/cid"
-	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1"
-
-	"seehuhn.de/go/sfnt/cff"
-	"seehuhn.de/go/sfnt/glyph"
 )
 
 func main() {
@@ -47,6 +50,8 @@ func writeTestFile(filename string) error {
 
 	black := color.DeviceGray(0)
 	red := color.DeviceRGB(0.9, 0, 0)
+	gray1 := color.DeviceGray(0.9)
+	gray2 := color.DeviceGray(0.75)
 
 	opt := &pdf.WriterOptions{
 		HumanReadable: true,
@@ -63,12 +68,13 @@ func writeTestFile(filename string) error {
 	w.TextShow("The glyphs in the test font (red) are mapped using two different code ranges:")
 	w.TextSecondLine(0, -14)
 	w.TextShow("[")
+	xBase, _ := w.GetTextPositionDevice() // record the current horizontal position
 	w.TextSetFont(testFont, 10)
 	w.SetFillColor(red)
 	w.TextShowRaw(pdf.String("ABC"))
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("] codes: A B C, code space range A-Z")
+	w.TextShow("] codes: A B C, code space range A–Z")
 	w.TextSecondLine(0, -12)
 	w.TextShow("[")
 	w.TextSetFont(testFont, 10)
@@ -76,7 +82,7 @@ func writeTestFile(filename string) error {
 	w.TextShowRaw(pdf.String("abc"))
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
-	w.TextShow("] codes: a b c, code space range a-z")
+	w.TextShow("] codes: a b c, code space range a–z")
 	w.TextSecondLine(0, -14)
 	w.TextShow("These three glyphs are assigned CIDs 0, 1, and 2.")
 	w.TextSecondLine(0, -13)
@@ -85,15 +91,23 @@ func writeTestFile(filename string) error {
 	w.TextShow("which are missing from the embedded font.")
 	w.TextNextLine()
 	w.TextNextLine()
-	w.TextShow("The CIDFont dictionary assigns widths to CIDs 0, …, 4.")
+	w.TextShow("The CIDFont dictionary assigns widths to CIDs 0, 1, …, 4.")
 	w.TextNextLine()
 	w.TextShow("The assigned widths are 1000, 3000, 1000, 2000 and 4000.")
 	w.TextNextLine()
 	w.TextNextLine()
 	w.TextShow("Notdef ranges in the CMap are used to assign custom notdef characters")
 	w.TextNextLine()
-	w.TextShow("for some code ranges: CID 1 for a-x, CID 4 for y-z.")
+	w.TextShow("for some code ranges: CID 1 for a–x, CID 4 for y–z.")
 	w.TextEnd()
+
+	w.SetStrokeColor(gray1)
+	w.SetLineWidth(0.5)
+	for _, step := range []float64{0, 10, 20, 30, 40} {
+		w.MoveTo(xBase+step, 385)
+		w.LineTo(xBase+step, 45)
+	}
+	w.Stroke()
 
 	w.TextBegin()
 	w.TextFirstLine(36, 370)
@@ -198,6 +212,22 @@ func writeTestFile(filename string) error {
 	w.TextSetFont(textFont, 10)
 	w.SetFillColor(black)
 	w.TextShow("] code: y")
+	w.TextEnd()
+
+	w.Transform(matrix.Translate(xBase-2.5, 43))
+	w.Transform(matrix.RotateDeg(-90))
+	w.TextBegin()
+	w.TextSetFont(textFont, 7)
+	w.SetFillColor(gray2)
+	w.TextShow("0")
+	w.TextSecondLine(0, 10)
+	w.TextShow("1000")
+	w.TextNextLine()
+	w.TextShow("2000")
+	w.TextNextLine()
+	w.TextShow("3000")
+	w.TextNextLine()
+	w.TextShow("4000")
 	w.TextEnd()
 
 	return w.Close()
