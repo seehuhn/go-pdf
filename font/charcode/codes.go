@@ -63,6 +63,8 @@ func (r Range) Matches(s pdf.String) bool {
 type CodeSpaceRange []Range
 
 // AllCodes returns an iterator over all character codes in the given PDF string.
+//
+// The returned codes always contain at least one byte.
 func (c CodeSpaceRange) AllCodes(s pdf.String) func(yield func(code pdf.String, valid bool) bool) {
 	return func(yield func(pdf.String, bool) bool) {
 		for len(s) > 0 {
@@ -77,6 +79,8 @@ func (c CodeSpaceRange) AllCodes(s pdf.String) func(yield func(code pdf.String, 
 
 // firstCode returns the length of the first character code from the given PDF string,
 // together with a boolean indicating whether the code was valid.
+//
+// If s is non-empty, the returned length is at least 1.
 //
 // See the algorithm from section 9.7.6.3 of the PDF-2.0 spec.
 func (c CodeSpaceRange) firstCode(s pdf.String) (int, bool) {

@@ -322,7 +322,8 @@ rangesLoop:
 	if c.Parent != nil {
 		return c.Parent.LookupCID(code)
 	}
-	return 0
+
+	return c.LookupNotdefCID(code)
 }
 
 func (c *InfoNew) LookupNotdefCID(code []byte) CID {

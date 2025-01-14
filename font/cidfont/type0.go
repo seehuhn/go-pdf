@@ -17,8 +17,10 @@
 package cidfont
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 
 	"seehuhn.de/go/pdf"
@@ -33,6 +35,8 @@ import (
 // Type0FontData is a font which can be used with a Type 0 CIDFont.
 // This must be one of [*cff.Font] or [*sfnt.Font].
 type Type0FontData interface{}
+
+var _ font.Embedded = (*Type0Dict)(nil)
 
 // Type0Dict holds the information from the font dictionary and CIDFont dictionary
 // of a Type 0 (CFF-based) CIDFont.
@@ -67,6 +71,156 @@ type Type0Dict struct {
 	// GetFont (optional) returns the font data to embed.
 	// If this is nil, the font data is not embedded in the PDF file.
 	GetFont func() (Type0FontData, error)
+}
+
+// ExtractType0 extracts the information from a Type 0 CIDFont from a PDF file.
+func ExtractType0(r pdf.Getter, obj pdf.Object) (*Type0Dict, error) {
+	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
+	if err != nil {
+		return nil, err
+	} else if fontDict == nil {
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("missing font dictionary"),
+		}
+	}
+	subtype, err := pdf.GetName(r, fontDict["Subtype"])
+	if err != nil {
+		return nil, err
+	}
+	if subtype != "" && subtype != "Type0" {
+		return nil, &pdf.MalformedFileError{
+			Err: fmt.Errorf("expected font subtype Type0, got %q", subtype),
+		}
+	}
+
+	a, err := pdf.GetArray(r, fontDict["DescendantFonts"])
+	if err != nil {
+		return nil, err
+	} else if len(a) != 1 {
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("invalid DescendantFonts array"),
+		}
+	}
+	cidFontDict, err := pdf.GetDictTyped(r, a[0], "Font")
+	if err != nil {
+		return nil, err
+	} else if cidFontDict == nil {
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("missing CIDFont dictionary"),
+		}
+	}
+	subtype, err = pdf.GetName(r, cidFontDict["Subtype"])
+	if err != nil {
+		return nil, err
+	} else if subtype != "CIDFontType0" {
+		return nil, &pdf.MalformedFileError{
+			Err: fmt.Errorf("expected CIDFontType0, got %q", subtype),
+		}
+	}
+
+	d := &Type0Dict{}
+	d.Ref, _ = obj.(pdf.Reference)
+
+	// fields in the font dictionary
+
+	d.Encoding, err = cmap.ExtractNew(r, fontDict["Encoding"])
+	if err != nil {
+		return nil, err
+	}
+
+	d.Text, err = cmap.ExtractToUnicodeNew(r, fontDict["ToUnicode"])
+	if pdf.IsReadError(err) {
+		return nil, err
+	}
+
+	// fields in the CIDFont dictionary
+
+	baseFont, err := pdf.GetName(r, cidFontDict["BaseFont"])
+	if err != nil {
+		return nil, err
+	}
+	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
+		d.PostScriptName = m[2]
+		d.SubsetTag = m[1]
+	} else {
+		d.PostScriptName = string(baseFont)
+	}
+
+	fdDict, err := pdf.GetDictTyped(r, cidFontDict["FontDescriptor"], "FontDescriptor")
+	if pdf.IsReadError(err) {
+		return nil, err
+	}
+	d.Descriptor, _ = font.ExtractDescriptor(r, fdDict)
+	if d.Descriptor == nil { // only possible for invalid PDF files
+		d.Descriptor = &font.Descriptor{
+			FontName: d.PostScriptName,
+		}
+	}
+
+	d.Width, err = widths.ExtractComposite(r, cidFontDict["W"])
+	if err != nil {
+		return nil, err
+	}
+	dw, err := pdf.GetNumber(r, cidFontDict["DW"])
+	if pdf.IsReadError(err) {
+		return nil, err
+	}
+	d.DefaultWidth = float64(dw)
+
+	getFont, err := makeFontReader(r, fdDict)
+	if pdf.IsReadError(err) {
+		return nil, err
+	}
+	d.GetFont = getFont
+
+	return d, nil
+}
+
+func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (Type0FontData, error), error) {
+	s, err := pdf.GetStream(r, fd["FontFile3"])
+	if pdf.IsReadError(err) {
+		return nil, err
+	} else if s == nil {
+		return nil, nil
+	}
+
+	subType, _ := pdf.GetName(r, s.Dict["Subtype"])
+	switch subType {
+	case "CIDFontType0C":
+		getFont := func() (Type0FontData, error) {
+			fontData, err := pdf.DecodeStream(r, s, 0)
+			if err != nil {
+				return nil, err
+			}
+			body, err := io.ReadAll(fontData)
+			if err != nil {
+				return nil, err
+			}
+			font, err := cff.Read(bytes.NewReader(body))
+			if err != nil {
+				return nil, err
+			}
+			return font, nil
+		}
+		return getFont, nil
+
+	case "OpenType":
+		getFont := func() (Type0FontData, error) {
+			fontData, err := pdf.DecodeStream(r, s, 0)
+			if err != nil {
+				return nil, err
+			}
+			font, err := sfnt.Read(fontData)
+			if err != nil {
+				return nil, err
+			}
+			return font, nil
+		}
+		return getFont, nil
+
+	default:
+		return nil, nil
+	}
 }
 
 // Finish embeds the font data in the PDF file.
@@ -225,4 +379,29 @@ func (d *Type0Dict) Finish(rm *pdf.ResourceManager) error {
 	}
 
 	return nil
+}
+
+func (d *Type0Dict) WritingMode() cmap.WritingMode {
+	return d.Encoding.WMode
+}
+
+// DecodeWidth reads one character code from the given string and returns
+// the width of the corresponding glyph in PDF text space units (still to
+// be multiplied by the font size) and the number of bytes read from the
+// string.
+//
+// This implements the [font.Embedded] interface.
+func (d *Type0Dict) DecodeWidth(s pdf.String) (float64, int) {
+	enc := d.Encoding
+	for code, valid := range enc.CodeSpaceRange.AllCodes(s) {
+		if valid {
+			cid := enc.LookupCID(code)
+			if width, ok := d.Width[cid]; ok {
+				return width, len(code)
+			}
+			return d.DefaultWidth, len(code)
+		}
+		return d.Width[0], 1
+	}
+	return 0, 0
 }

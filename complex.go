@@ -36,6 +36,8 @@ type Number float64
 // GetNumber is a helper function for reading numeric values from a PDF file.
 // This resolves indirect references and makes sure the resulting object is an
 // Integer or a Real.
+//
+// TODO(voss): should this return float64?
 func GetNumber(r Getter, obj Object) (Number, error) {
 	obj, err := Resolve(r, obj)
 	if err != nil {

@@ -108,6 +108,12 @@ func IsMalformed(err error) bool {
 	return false
 }
 
+// IsReadError returns true if the error the error is non-nil
+// and not a [MalformedFileError].
+func IsReadError(err error) bool {
+	return err != nil && !IsMalformed(err)
+}
+
 // VersionError is returned when trying to use a feature in a PDF file which is
 // not supported by the PDF version used.  Use [CheckVersion] to create
 // VersionError objects.
