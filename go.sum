@@ -40,8 +40,8 @@ seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5 h1:X3EdZgozH+/MKCx+N/1ZkEfN
 seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5/go.mod h1:se0NAaAL9aI9pRBRK0EvlY3572GJTsF0J7RwMXEiKz4=
 seehuhn.de/go/dijkstra v0.9.3 h1:uVbFjlAuhlwV45qM7S4Wz+C7XlfbgAaTfcZX1r8OgIA=
 seehuhn.de/go/dijkstra v0.9.3/go.mod h1:YcrFNNQ1BIVFI0xIYnNa/StiSKQXuQIID8zgZjwAOFE=
-seehuhn.de/go/geom v0.0.0-20241008120652-aada228c2941 h1:tt3frO/ncWTG+DKQDVh9QC2Z526yEDYJfmH/asxiotA=
-seehuhn.de/go/geom v0.0.0-20241008120652-aada228c2941/go.mod h1:zECeMkxCtCykTdJmzoIbjCQRf9OJurOXenhzHm0rW4o=
+seehuhn.de/go/geom v0.0.0-20250114140758-af83eac7b27c h1:s833+ZNToU5voOt2jRdJR/tVPA4YwWhPi87IT4UyHMI=
+seehuhn.de/go/geom v0.0.0-20250114140758-af83eac7b27c/go.mod h1:zECeMkxCtCykTdJmzoIbjCQRf9OJurOXenhzHm0rW4o=
 seehuhn.de/go/icc v0.0.0-20240801195843-cfc244e2c55a h1:AonqL6dUBDUJu06ueS8G44KVwtiZvONQSXdlYn/jzy8=
 seehuhn.de/go/icc v0.0.0-20240801195843-cfc244e2c55a/go.mod h1:wOBOA24OpXamCfQt//QaJnvlLdQFSTAq4525fJRcem8=
 seehuhn.de/go/postscript v0.5.1-0.20250105173611-268a18474c41 h1:p94rxxgqsIlVgguz62ReC8nmT94CKK9ofppfbfn5AUk=

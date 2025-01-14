@@ -10,7 +10,7 @@ require (
 	golang.org/x/term v0.16.0
 	golang.org/x/text v0.16.0
 	seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5
-	seehuhn.de/go/geom v0.0.0-20241008120652-aada228c2941
+	seehuhn.de/go/geom v0.0.0-20250114140758-af83eac7b27c
 	seehuhn.de/go/icc v0.0.0-20240801195843-cfc244e2c55a
 	seehuhn.de/go/postscript v0.5.1-0.20250105173611-268a18474c41
 	seehuhn.de/go/sfnt v0.5.1-0.20250105173915-8f8db86dd99b
