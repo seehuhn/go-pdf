@@ -128,7 +128,7 @@ func (f *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 		IsScript:     subsetSfnt.IsScript,
 		IsItalic:     subsetSfnt.IsItalic,
 		ForceBold:    subsetCFF.Private[0].ForceBold,
-		FontBBox:     subsetSfnt.FontBBoxPDF(),
+		FontBBox:     subsetSfnt.FontBBoxPDF().Rounded(),
 		ItalicAngle:  subsetSfnt.ItalicAngle,
 		Ascent:       math.Round(ascent.AsFloat(q)),
 		Descent:      math.Round(descent.AsFloat(q)),
@@ -158,6 +158,5 @@ func (f *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 		res.Text[code[0]] = string(text)
 	}
 
-	_, _, err = pdf.ResourceManagerEmbed(rm, res)
-	return err
+	return res.Finish(rm)
 }

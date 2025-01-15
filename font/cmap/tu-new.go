@@ -292,7 +292,7 @@ func safeExtractToUnicode(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object)
 	parent := stmObj.Dict["UseCMap"]
 	if parent != nil {
 		parentInfo, err := safeExtractToUnicode(r, cycle, parent)
-		if err != nil && !pdf.IsMalformed(err) {
+		if pdf.IsReadError(err) {
 			return nil, err
 		}
 		res.Parent = parentInfo

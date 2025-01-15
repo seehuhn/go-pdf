@@ -295,7 +295,6 @@ func (r *Rectangle) String() string {
 func (r *Rectangle) AsPDF(opt OutputOptions) Native {
 	res := make(Array, 4)
 	for i, x := range []float64{r.LLx, r.LLy, r.URx, r.URy} {
-		x = math.Round(100*x) / 100
 		res[i] = Number(x).AsPDF(opt)
 	}
 	return res

@@ -94,11 +94,11 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) ([]float64, error) {
 	}
 
 	firstChar, err := pdf.GetInteger(r, dicts.FontDict["FirstChar"])
-	if err != nil && !pdf.IsMalformed(err) {
+	if pdf.IsReadError(err) {
 		return nil, err
 	}
 	widths, err := pdf.GetArray(r, dicts.FontDict["Widths"])
-	if err != nil && !pdf.IsMalformed(err) {
+	if pdf.IsReadError(err) {
 		return nil, err
 	}
 
@@ -112,7 +112,7 @@ func ExtractSimple(r pdf.Getter, dicts *font.Dicts) ([]float64, error) {
 	code := firstChar
 	for code < 256 && len(widths) > 0 {
 		width, err := pdf.GetNumber(r, widths[0])
-		if err != nil && !pdf.IsMalformed(err) {
+		if pdf.IsReadError(err) {
 			return nil, err
 		} else if err == nil {
 			res[code] = float64(width)

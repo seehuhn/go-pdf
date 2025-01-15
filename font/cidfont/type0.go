@@ -271,6 +271,7 @@ func (d *Type0Dict) Finish(rm *pdf.ResourceManager) error {
 		cidFontName = pdf.Name(d.PostScriptName)
 	}
 
+	// TODO(voss): How do we get the correct ROS for Identity-H/V?
 	cidSystemInfo, _, err := pdf.ResourceManagerEmbed(rm, d.Encoding.ROS)
 	if err != nil {
 		return err
@@ -308,7 +309,7 @@ func (d *Type0Dict) Finish(rm *pdf.ResourceManager) error {
 		"BaseFont":       pdf.Name(cidFontName),
 		"CIDSystemInfo":  cidSystemInfo,
 		"FontDescriptor": fdRef,
-		// we set the width information later
+		// we set the glyph width information later
 	}
 
 	fdDict := d.Descriptor.AsDict()

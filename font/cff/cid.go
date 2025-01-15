@@ -318,7 +318,7 @@ func (info *FontDictComposite) Embed(w *pdf.Writer, fontDictRef pdf.Reference) e
 		IsAllCap:     info.IsAllCap,
 		IsSmallCap:   info.IsSmallCap,
 		ForceBold:    cff.Private[0].ForceBold,
-		FontBBox:     fontBBox,
+		FontBBox:     fontBBox.Rounded(),
 		ItalicAngle:  cff.ItalicAngle,
 		Ascent:       info.Ascent.AsFloat(q),
 		Descent:      info.Descent.AsFloat(q),

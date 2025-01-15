@@ -177,7 +177,7 @@ func safeExtractCMap(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object) (*In
 
 	if parent != nil {
 		res.Parent, err = safeExtractCMap(r, cycle, parent)
-		if err != nil && !pdf.IsMalformed(err) {
+		if pdf.IsReadError(err) {
 			return nil, err
 		}
 	}

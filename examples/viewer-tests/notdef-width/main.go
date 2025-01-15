@@ -288,7 +288,7 @@ func makeTestFont() *testFont {
 		},
 		ROS: &cff.CIDSystemInfo{
 			Registry:   "seehuhn.de",
-			Ordering:   "Test",
+			Ordering:   "test",
 			Supplement: 0,
 		},
 		GIDToCID: []cid.CID{0, 1, 2}, // identity GID <-> CID mapping

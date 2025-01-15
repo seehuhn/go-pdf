@@ -359,7 +359,7 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 		fd.FontName = fontData.FontName
 		fd.FontFamily = fontData.FamilyName
 		fd.FontWeight = os2.WeightFromString(fontData.Weight)
-		fd.FontBBox = fontData.FontBBoxPDF()
+		fd.FontBBox = fontData.FontBBoxPDF().Rounded()
 		fd.IsItalic = fontData.ItalicAngle != 0
 		fd.ItalicAngle = fontData.ItalicAngle
 		fd.IsFixedPitch = fontData.IsFixedPitch
@@ -369,7 +369,7 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 	}
 	if metricsData != nil {
 		fd.FontName = metricsData.FontName
-		fd.FontBBox = metricsData.FontBBoxPDF()
+		fd.FontBBox = metricsData.FontBBoxPDF().Rounded()
 		fd.CapHeight = math.Round(metricsData.CapHeight)
 		fd.XHeight = math.Round(metricsData.XHeight)
 		fd.Ascent = math.Round(metricsData.Ascent)
@@ -402,8 +402,7 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 	}
 
 	rm := pdf.NewResourceManager(f.w) // TODO(voss): move this into the caller
-	_, _, err := pdf.ResourceManagerEmbed(rm, dict)
-	return err
+	return dict.Finish(rm)
 }
 
 func (f *embeddedSimple) isSymbolic() bool {

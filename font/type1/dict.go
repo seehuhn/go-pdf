@@ -140,7 +140,7 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*FontDict, error) {
 	d.Name, _ = pdf.GetName(r, fontDict["Name"])
 
 	fdDict, err := pdf.GetDictTyped(r, fontDict["FontDescriptor"], "FontDescriptor")
-	if err != nil && !pdf.IsMalformed(err) {
+	if pdf.IsReadError(err) {
 		return nil, err
 	}
 	fd, _ := font.ExtractDescriptor(r, fdDict)
@@ -219,7 +219,7 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*FontDict, error) {
 	}
 
 	toUnicode, err := cmap.ExtractToUnicodeNew(r, fontDict["ToUnicode"])
-	if err != nil && !pdf.IsMalformed(err) {
+	if pdf.IsReadError(err) {
 		return nil, err
 	}
 	if toUnicode != nil {
@@ -234,7 +234,7 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*FontDict, error) {
 	}
 
 	getFont, err := makeFontReader(r, fdDict)
-	if err != nil && !pdf.IsMalformed(err) {
+	if pdf.IsReadError(err) {
 		return nil, err
 	}
 	d.GetFont = getFont
@@ -244,7 +244,7 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*FontDict, error) {
 
 func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (FontData, error), error) {
 	s, err := pdf.GetStream(r, fd["FontFile"])
-	if err != nil && !pdf.IsMalformed(err) {
+	if pdf.IsReadError(err) {
 		return nil, err
 	}
 	if s != nil {
@@ -263,7 +263,7 @@ func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (FontData, error), error)
 	}
 
 	s, err = pdf.GetStream(r, fd["FontFile3"])
-	if err != nil && !pdf.IsMalformed(err) {
+	if pdf.IsReadError(err) {
 		return nil, err
 	}
 	if s == nil {
@@ -313,23 +313,19 @@ func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (FontData, error), error)
 //
 // The FontName field in the font descriptor is ignored and the correct value
 // is set automatically.  TODO(voss): don't do this
-//
-// TODO(voss): rename to `Finish()`?
-func (d *FontDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-
+func (d *FontDict) Finish(rm *pdf.ResourceManager) error {
 	var psFont FontData
 	if d.GetFont != nil {
 		font, err := d.GetFont()
 		if err != nil {
-			return nil, zero, err
+			return err
 		}
 		psFont = font
 	}
 
 	// Check that all data are valid and consistent.
 	if d.Ref == 0 {
-		return nil, zero, errors.New("missing font dictionary reference")
+		return errors.New("missing font dictionary reference")
 	}
 	switch f := psFont.(type) {
 	case nil:
@@ -338,20 +334,20 @@ func (d *FontDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 		// pass
 	case *cff.Font:
 		if f.IsCIDKeyed() {
-			return nil, zero, errors.New("CID-keyed fonts not allowed")
+			return errors.New("CID-keyed fonts not allowed")
 		}
 	case *sfnt.Font:
 		o, _ := f.Outlines.(*cff.Outlines)
 		if o == nil {
-			return nil, zero, errors.New("missing CFF table")
+			return errors.New("missing CFF table")
 		} else if o.IsCIDKeyed() {
-			return nil, zero, errors.New("CID-keyed fonts not allowed")
+			return errors.New("CID-keyed fonts not allowed")
 		}
 	default:
-		return nil, zero, fmt.Errorf("unsupported font type %T", psFont)
+		return fmt.Errorf("unsupported font type %T", psFont)
 	}
 	if d.SubsetTag != "" && !subset.IsValidTag(d.SubsetTag) {
-		return nil, zero, fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
+		return fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
 	}
 
 	w := rm.Out
@@ -376,7 +372,7 @@ func (d *FontDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 	isExternal := psFont == nil
 	encodingObj, err := d.Encoding.AsPDF(isNonSymbolic && isExternal, w.GetOptions())
 	if err != nil {
-		return nil, zero, err
+		return err
 	}
 	if encodingObj != nil {
 		fontDict["Encoding"] = encodingObj
@@ -464,14 +460,14 @@ func (d *FontDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 		tuInfo := cmap.MakeSimpleToUnicode(toUnicodeData)
 		ref, _, err := pdf.ResourceManagerEmbed(rm, tuInfo)
 		if err != nil {
-			return nil, zero, fmt.Errorf("ToUnicode cmap: %w", err)
+			return fmt.Errorf("ToUnicode cmap: %w", err)
 		}
 		fontDict["ToUnicode"] = ref
 	}
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return nil, zero, pdf.Wrap(err, "Type 1 font dicts")
+		return pdf.Wrap(err, "Type 1 font dicts")
 	}
 
 	switch f := psFont.(type) {
@@ -485,23 +481,23 @@ func (d *FontDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 		}
 		fontStm, err := w.OpenStream(fontFileRef, fontStmDict, pdf.FilterCompress{})
 		if err != nil {
-			return nil, zero, fmt.Errorf("open Type1 stream: %w", err)
+			return fmt.Errorf("open Type1 stream: %w", err)
 		}
 		l1, l2, err := f.WritePDF(fontStm)
 		if err != nil {
-			return nil, zero, fmt.Errorf("write Type1 stream: %w", err)
+			return fmt.Errorf("write Type1 stream: %w", err)
 		}
 		err = length1.Set(pdf.Integer(l1))
 		if err != nil {
-			return nil, zero, fmt.Errorf("Type1 stream: length1: %w", err)
+			return fmt.Errorf("Type1 stream: length1: %w", err)
 		}
 		err = length2.Set(pdf.Integer(l2))
 		if err != nil {
-			return nil, zero, fmt.Errorf("Type1 stream: length2: %w", err)
+			return fmt.Errorf("Type1 stream: length2: %w", err)
 		}
 		err = fontStm.Close()
 		if err != nil {
-			return nil, zero, fmt.Errorf("close Type1 stream: %w", err)
+			return fmt.Errorf("close Type1 stream: %w", err)
 		}
 
 	case *cff.Font:
@@ -510,15 +506,15 @@ func (d *FontDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 		}
 		fontStm, err := w.OpenStream(fontFileRef, fontStmDict, pdf.FilterCompress{})
 		if err != nil {
-			return nil, zero, fmt.Errorf("open CFF stream: %w", err)
+			return fmt.Errorf("open CFF stream: %w", err)
 		}
 		err = f.Write(fontStm)
 		if err != nil {
-			return nil, zero, fmt.Errorf("write CFF stream: %w", err)
+			return fmt.Errorf("write CFF stream: %w", err)
 		}
 		err = fontStm.Close()
 		if err != nil {
-			return nil, zero, fmt.Errorf("close CFF stream: %w", err)
+			return fmt.Errorf("close CFF stream: %w", err)
 		}
 
 	case *sfnt.Font:
@@ -527,19 +523,19 @@ func (d *FontDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 		}
 		fontStm, err := w.OpenStream(fontFileRef, fontStmDict, pdf.FilterCompress{})
 		if err != nil {
-			return nil, zero, fmt.Errorf("open OpenType stream: %w", err)
+			return fmt.Errorf("open OpenType stream: %w", err)
 		}
 		err = f.WriteOpenTypeCFFPDF(fontStm)
 		if err != nil {
-			return nil, zero, fmt.Errorf("write OpenType stream: %w", err)
+			return fmt.Errorf("write OpenType stream: %w", err)
 		}
 		err = fontStm.Close()
 		if err != nil {
-			return nil, zero, fmt.Errorf("close OpenType stream: %w", err)
+			return fmt.Errorf("close OpenType stream: %w", err)
 		}
 	}
 
-	return d.Ref, zero, nil
+	return nil
 }
 
 // Codes returns an iterator over the character codes in the given PDF string.

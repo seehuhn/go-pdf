@@ -289,11 +289,11 @@ func (info *FontDictSimple) Embed(w *pdf.Writer, fontDictRef pdf.Reference) erro
 		IsAllCap:     info.IsAllCap,
 		IsSmallCap:   info.IsSmallCap,
 		ForceBold:    info.ForceBold,
-		FontBBox:     fontBBox,
+		FontBBox:     fontBBox.Rounded(),
 		ItalicAngle:  sfnt.ItalicAngle,
-		Ascent:       sfnt.Ascent.AsFloat(q),
-		Descent:      sfnt.Descent.AsFloat(q),
-		CapHeight:    sfnt.CapHeight.AsFloat(q),
+		Ascent:       math.Round(sfnt.Ascent.AsFloat(q)),
+		Descent:      math.Round(sfnt.Descent.AsFloat(q)),
+		CapHeight:    math.Round(sfnt.CapHeight.AsFloat(q)),
 		MissingWidth: widthsInfo.MissingWidth,
 	}
 	fontDescriptor := fd.AsDict()

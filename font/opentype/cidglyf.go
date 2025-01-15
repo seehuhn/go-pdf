@@ -253,7 +253,7 @@ func (info *FontDictGlyfComposite) Embed(w *pdf.Writer, fontDictRef pdf.Referenc
 		IsAllCap:     info.IsAllCap,
 		IsSmallCap:   info.IsSmallCap,
 		ForceBold:    info.ForceBold,
-		FontBBox:     fontBBox,
+		FontBBox:     fontBBox.Rounded(),
 		ItalicAngle:  otf.ItalicAngle,
 		Ascent:       otf.Ascent.AsFloat(q),
 		Descent:      otf.Descent.AsFloat(q),

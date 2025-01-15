@@ -254,11 +254,11 @@ func (info *FontDictComposite) Embed(w *pdf.Writer, fontDictRef pdf.Reference) e
 		IsAllCap:     info.IsAllCap,
 		IsSmallCap:   info.IsSmallCap,
 		ForceBold:    info.ForceBold,
-		FontBBox:     fontBBox,
+		FontBBox:     fontBBox.Rounded(),
 		ItalicAngle:  ttf.ItalicAngle,
-		Ascent:       ttf.Ascent.AsFloat(q),
-		Descent:      ttf.Descent.AsFloat(q),
-		CapHeight:    ttf.CapHeight.AsFloat(q),
+		Ascent:       math.Round(ttf.Ascent.AsFloat(q)),
+		Descent:      math.Round(ttf.Descent.AsFloat(q)),
+		CapHeight:    math.Round(ttf.CapHeight.AsFloat(q)),
 	}
 	fontDescriptor := fd.AsDict()
 	fontDescriptor["FontFile2"] = fontFileRef

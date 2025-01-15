@@ -218,11 +218,11 @@ func (info *FontDictGlyfSimple) Embed(w *pdf.Writer, fontDictRef pdf.Reference) 
 		IsAllCap:     info.IsAllCap,
 		IsSmallCap:   info.IsSmallCap,
 		ForceBold:    info.ForceBold,
-		FontBBox:     fontBBox,
+		FontBBox:     fontBBox.Rounded(),
 		ItalicAngle:  otf.ItalicAngle,
-		Ascent:       otf.Ascent.AsFloat(q),
-		Descent:      otf.Descent.AsFloat(q),
-		CapHeight:    otf.CapHeight.AsFloat(q),
+		Ascent:       math.Round(otf.Ascent.AsFloat(q)),
+		Descent:      math.Round(otf.Descent.AsFloat(q)),
+		CapHeight:    math.Round(otf.CapHeight.AsFloat(q)),
 		MissingWidth: widthsInfo.MissingWidth,
 	}
 	fontDescriptor := fd.AsDict()

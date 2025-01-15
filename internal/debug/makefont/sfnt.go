@@ -34,7 +34,7 @@ func TrueType() *sfnt.Font {
 	return info
 }
 
-// OpenType returns a font with CFF outlines and not CIDFont operators.
+// OpenType returns a font with CFF outlines, not using CIDFont operators.
 func OpenType() *sfnt.Font {
 	info := TrueType()
 	info, err := toCFF(info)

@@ -439,9 +439,5 @@ func (t *Typesetter) Finish(rm *pdf.ResourceManager) error {
 		}
 	}
 
-	_, _, err := pdf.ResourceManagerEmbed(rm, dict)
-	if err != nil {
-		return err
-	}
-	return nil
+	return dict.Finish(rm)
 }

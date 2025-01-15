@@ -30,7 +30,7 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-func TestType1DictsRoundtrip(t *testing.T) {
+func TestType1DictRoundtrip(t *testing.T) {
 	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
 
@@ -41,13 +41,13 @@ func TestType1DictsRoundtrip(t *testing.T) {
 		FontFamily:   F1.FamilyName,
 		IsFixedPitch: F1.IsFixedPitch,
 		IsSymbolic:   true,
-		FontBBox:     F1.FontBBox(),
+		FontBBox:     F1.FontBBoxPDF(),
 		Ascent:       M1.Ascent,
 		Descent:      M1.Descent,
 		CapHeight:    M1.CapHeight,
 		XHeight:      M1.XHeight,
-		StemV:        F1.Private.StdVW,
-		StemH:        F1.Private.StdHW,
+		StemV:        F1.Private.StdVW * (F1.FontMatrix[0] * 1000),
+		StemH:        F1.Private.StdHW * (F1.FontMatrix[3] * 1000),
 		MissingWidth: F1.GlyphWidthPDF(".notdef"),
 	}
 	dicts1 := &FontDict{
@@ -61,12 +61,12 @@ func TestType1DictsRoundtrip(t *testing.T) {
 			return F1, nil
 		},
 	}
-	ref, _, err := pdf.ResourceManagerEmbed(rm, dicts1)
+	err := dicts1.Finish(rm)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dicts2, err := ExtractDict(data, ref)
+	dicts2, err := ExtractDict(data, dicts1.Ref)
 	if err != nil {
 		t.Fatal(err)
 	}

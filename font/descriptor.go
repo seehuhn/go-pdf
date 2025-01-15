@@ -294,10 +294,10 @@ func (d *Descriptor) AsDict() pdf.Dict {
 	if !d.FontBBox.IsZero() {
 		b := d.FontBBox
 		dict["FontBBox"] = &pdf.Rectangle{
-			LLx: math.Floor(b.LLx),
-			LLy: math.Floor(b.LLy),
-			URx: math.Ceil(b.URx),
-			URy: math.Ceil(b.URy),
+			LLx: b.LLx,
+			LLy: b.LLy,
+			URx: b.URx,
+			URy: b.URy,
 		}
 	}
 	if d.Ascent != 0 {
