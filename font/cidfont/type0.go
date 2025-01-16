@@ -325,7 +325,7 @@ func (d *Type0Dict) Finish(rm *pdf.ResourceManager) error {
 
 	ww := widths.EncodeComposite2(d.Width, d.DefaultWidth)
 	switch {
-	case len(ww) > 10:
+	case len(ww) > 10: // TODO(voss): count the element of the flattened array
 		wwRef := w.Alloc()
 		cidFontDict["W"] = wwRef
 		compressedObjects = append(compressedObjects, ww)

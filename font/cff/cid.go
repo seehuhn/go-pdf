@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/rect"
 	pscid "seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
@@ -122,6 +123,11 @@ func (f *embeddedComposite) Finish(*pdf.ResourceManager) error {
 			Supplement: sup,
 		}
 		subsetCFF.GIDToCID = gidToCID
+		if subsetCFF.FontMatrices == nil {
+			for range subsetCFF.Private {
+				subsetCFF.FontMatrices = append(subsetCFF.FontMatrices, matrix.Identity)
+			}
+		}
 	}
 
 	info := FontDictComposite{
@@ -261,6 +267,7 @@ func (info *FontDictComposite) Embed(w *pdf.Writer, fontDictRef pdf.Reference) e
 	}
 	W, DW := widths.EncodeComposite(ww, pdf.GetVersion(w))
 
+	// TODO(voss): correctly handle the FontMatrices
 	bbox := cff.BBox()
 	fontBBox := rect.Rect{
 		LLx: bbox.LLx.AsFloat(q),

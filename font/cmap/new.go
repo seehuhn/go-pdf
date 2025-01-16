@@ -98,6 +98,8 @@ func (r RangeNew) String() string {
 // CIDSystemInfo.
 //
 // The special value 0 is used to indicate a missing glyph.
+//
+// TODO(voss): merge with cid.CID
 type CID uint32
 
 // ExtractNew extracts a CMap from a PDF object.

@@ -169,6 +169,8 @@ func compareType0Dicts(t *testing.T, d1, d2 *Type0Dict) {
 
 // compareOpentypeFont compares two *cff.Font objects.
 func compareOpentypeFont(t *testing.T, f1, f2 *sfnt.Font) {
+	t.Helper()
+
 	f1 = f1.Clone()
 	o1 := f1.Outlines.(*cff.Outlines)
 	f1.Outlines = nil

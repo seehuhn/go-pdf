@@ -17,6 +17,7 @@
 package makefont
 
 import (
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
@@ -86,6 +87,9 @@ func toCFF(info *sfnt.Font) (*sfnt.Font, error) {
 				BlueValues: []funit.Int16{
 					bottomMin, bottomMax, topMin, topMax,
 				},
+				BlueScale: 0.039625,
+				BlueShift: 7,
+				BlueFuzz:  1,
 			},
 		},
 		Encoding: encoding,
@@ -192,6 +196,7 @@ func toCFFCID(info *sfnt.Font) (*sfnt.Font, error) {
 	for i := range outlines.GIDToCID {
 		outlines.GIDToCID[i] = cid.CID(i)
 	}
+	outlines.FontMatrices = []matrix.Matrix{matrix.Identity}
 	info.Outlines = outlines
 
 	return info, nil
@@ -217,6 +222,7 @@ func toCFFCID2(info *sfnt.Font) (*sfnt.Font, error) {
 		}
 		return 1
 	}
+	outlines.FontMatrices = []matrix.Matrix{matrix.Identity, matrix.Identity}
 
 	return info, nil
 }

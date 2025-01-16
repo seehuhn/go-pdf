@@ -222,8 +222,9 @@ func (w *Writer) TextFirstLine(x, y float64) {
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(x), w.coord(y), "Td")
 }
 
-// TextSecondLine moves to the start of the next line of text and sets
-// the leading to -dy.  Usually, dy is negative, to get a positive leading.
+// TextSecondLine moves to the point (dx, dy) relative to the start of the
+// current line of text.   The function also sets the leading to -dy.
+// Usually, dy is negative.
 //
 // This implements the PDF graphics operator "TD".
 func (w *Writer) TextSecondLine(dx, dy float64) {

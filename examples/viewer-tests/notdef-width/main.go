@@ -275,9 +275,9 @@ func makeTestFont() *testFont {
 		Private: []*type1.PrivateDict{
 			{
 				BlueValues: []funit.Int16{-10, 0, 990, 1000},
-				BlueScale:  0,
-				BlueShift:  0,
-				BlueFuzz:   0,
+				BlueScale:  0.039625,
+				BlueShift:  7,
+				BlueFuzz:   1,
 				StdHW:      100,
 				StdVW:      100,
 				ForceBold:  false,
@@ -345,14 +345,14 @@ type testFont struct {
 }
 
 func (f *testFont) PostScriptName() string {
-	return "Test"
+	return f.data.FontName
 }
 
 func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
 	fontDictRef := rm.Out.Alloc()
 
 	fd := &font.Descriptor{
-		FontName:   "Test",
+		FontName:   f.data.FontName,
 		IsSymbolic: true,
 		FontBBox:   rect.Rect{LLx: 0, LLy: 0, URx: 3000, URy: 1000},
 		Ascent:     800,
@@ -360,7 +360,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	}
 	dicts := &cidfont.Type0Dict{
 		Ref:            fontDictRef,
-		PostScriptName: "Test",
+		PostScriptName: f.data.FontName,
 		Descriptor:     fd,
 		Encoding:       f.cmap,
 		Width: map[cmap.CID]float64{

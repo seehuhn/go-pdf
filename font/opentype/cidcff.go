@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 
+	"seehuhn.de/go/geom/matrix"
 	pscid "seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
 
@@ -127,6 +128,10 @@ func (f *embeddedCFFComposite) Finish(*pdf.ResourceManager) error {
 			Supplement: sup,
 		}
 		outlines.GIDToCID = gidToCID
+		outlines.FontMatrices = make([]matrix.Matrix, len(outlines.Private))
+		for i := range outlines.Private {
+			outlines.FontMatrices[i] = matrix.Identity
+		}
 	}
 
 	info := FontDictCFFComposite{
