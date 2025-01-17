@@ -68,7 +68,7 @@ func writeTestFile(filename string) error {
 	w.TextShow("The glyphs in the test font (red) are mapped using two different code ranges:")
 	w.TextSecondLine(0, -14)
 	w.TextShow("[")
-	xBase, _ := w.GetTextPositionDevice() // record the current horizontal position
+	xBase, _ := w.GetTextPositionUser() // record the current horizontal position
 	w.TextSetFont(testFont, 10)
 	w.SetFillColor(red)
 	w.TextShowRaw(pdf.String("ABC"))

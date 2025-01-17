@@ -15,9 +15,9 @@ when I found the existing text to be unclear or ambiguous:
 - https://github.com/pdf-association/pdf-issues/issues/473
 - https://github.com/pdf-association/pdf-issues/issues/472
 - https://github.com/pdf-association/pdf-issues/issues/471
-- https://github.com/pdf-association/pdf-issues/issues/469
-- https://github.com/pdf-association/pdf-issues/issues/462
-- https://github.com/pdf-association/pdf-issues/issues/453
+- https://github.com/pdf-association/pdf-issues/issues/469 [fixed]
+- https://github.com/pdf-association/pdf-issues/issues/462 [fixed]
+- https://github.com/pdf-association/pdf-issues/issues/453 [fixed]
 - https://github.com/pdf-association/pdf-issues/issues/402 [fixed]
 - https://github.com/pdf-association/pdf-issues/issues/398 [fixed]
 - https://github.com/pdf-association/pdf-issues/issues/397 [fixed]
@@ -48,6 +48,7 @@ when I found the existing text to be unclear or ambiguous:
 While writing this library, I have also filed several bug reports against other
 projects.  Here is a list:
 
+- https://bugzilla.mozilla.org/show_bug.cgi?id=1942298
 - https://github.com/golang/go/issues/69507 [fixed]
 - https://github.com/google/go-cmp/issues/350
 - https://github.com/google/go-cmp/issues/335

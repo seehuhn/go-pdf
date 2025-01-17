@@ -55,53 +55,100 @@ func create(fname string) error {
 		return err
 	}
 
-	// colors
-
-	black := color.DeviceGray(0)
-	red := color.DeviceRGB(0.9, 0, 0)
-	blue := color.DeviceRGB(0, 0, 0.9)
-
 	// fonts
-
 	const fontSize = 12
 
 	noteFont, err := standard.TimesRoman.New(nil)
 	if err != nil {
 		return err
 	}
-	note := text.F{Font: noteFont, Size: fontSize}
+	black := color.DeviceGray(0)
+	note := text.F{Font: noteFont, Size: fontSize, Color: black}
 
 	origFont, err := pdfcff.New(data.origFont, nil)
 	if err != nil {
 		return err
 	}
-	orig := text.F{Font: origFont, Size: fontSize}
+	blue := color.DeviceRGB(0, 0, 0.9)
+	orig := text.F{Font: origFont, Size: fontSize, Color: blue}
 
-	test := text.F{Font: data.testFont, Size: fontSize}
+	red := color.DeviceRGB(0.9, 0, 0)
+	test := text.F{Font: data.testFont, Size: fontSize, Color: red}
+	testL := text.F{Font: data.testFont, Size: 100, Color: red}
 
-	opt := &pdf.WriterOptions{
-		HumanReadable: true,
-	}
-	w, err := document.CreateSinglePage(fname, document.A5, pdf.V2_0, opt)
+	w, err := document.CreateSinglePage(fname, document.A5, pdf.V2_0, nil)
 	if err != nil {
 		return err
 	}
 	w.SetFontNameInternal(origFont, "Orig")
 	w.SetFontNameInternal(data.testFont, "Test")
 
+	// draw the text, including the large test glyphs
+	var x, y float64
 	text.Show(w.Writer,
-		text.M{X: 36, Y: 500},
-		note, black, "The blue text is rendered using a regular font,",
-		text.NewLine,
-		"while the red text is rendered using the test font:",
-		text.NewLine,
-		orig, blue, "These two lines should look the same",
-		text.NewLine,
-		test, red, pdf.String("These two lines should look the same"),
-		text.NewLine,
-		text.NewLine,
-		note, black, "The boxes are meant to tightly enclose the following glyphs:",
+		text.M{X: 36, Y: 530},
+		note, "This file shows two versions of the same font.", text.NL,
+		"One version is a regular CFF font, while the other version has", text.NL,
+		"the coordinates of the glyph outlines rescaled, and the", text.NL,
+		"font matrix is modified to compensate for this.  Different", text.NL,
+		"scalings are used for uppercase and lowercase letters.", text.NL,
+		text.NL,
+		note, "Test 1: check that the font still renders correctly.", text.NL,
+		"Blue text is rendered using the original font,", text.NL,
+		"red text is rendered using the modified font:", text.NL,
+		orig, "These two lines should look the same", text.NL,
+		test, pdf.String("These two lines should look the same"), text.NL,
+		text.NL,
+		note, "Test 2: show some glyphs together with their bounding boxes.", text.NL,
+		"The boxes should tightly enclose the glyphs:",
+		text.M{X: 36, Y: -110},
+		text.RecordPos{UserX: &x, UserY: &y},
+		testL, pdf.String("ABC"),
+		text.M{X: 0, Y: -100},
+		testL, pdf.String("abc"),
 	)
+
+	// draw the bounding boxes
+	cff := data.testFont.cff
+
+	w.PushGraphicsState()
+	w.SetLineWidth(0.5)
+
+	x0 := x
+
+	bbox := data.testFont.cff.GlyphBBoxPDF(cff.FontMatrix, 2+0)
+	bbox.Scale(100.0 / 1000.0) // convert to font size 100, and from glyph space
+	w.Rectangle(x+bbox.LLx, y+bbox.LLy, bbox.Dx(), bbox.Dy())
+	x += 100 * cff.GlyphWidthPDF(2+0) / 1000
+
+	bbox = data.testFont.cff.GlyphBBoxPDF(cff.FontMatrix, 2+1)
+	bbox.Scale(100.0 / 1000.0)
+	w.Rectangle(x+bbox.LLx, y+bbox.LLy, bbox.Dx(), bbox.Dy())
+	x += 100 * cff.GlyphWidthPDF(2+1) / 1000
+
+	bbox = data.testFont.cff.GlyphBBoxPDF(cff.FontMatrix, 2+2)
+	bbox.Scale(100.0 / 1000.0)
+	w.Rectangle(x+bbox.LLx, y+bbox.LLy, bbox.Dx(), bbox.Dy())
+
+	x = x0 // second line
+	y -= 100
+
+	bbox = data.testFont.cff.GlyphBBoxPDF(cff.FontMatrix, 2+26+0)
+	bbox.Scale(100.0 / 1000.0) // convert to font size 100, and from glyph space
+	w.Rectangle(x+bbox.LLx, y+bbox.LLy, bbox.Dx(), bbox.Dy())
+	x += 100 * cff.GlyphWidthPDF(2+26+0) / 1000
+
+	bbox = data.testFont.cff.GlyphBBoxPDF(cff.FontMatrix, 2+26+1)
+	bbox.Scale(100.0 / 1000.0)
+	w.Rectangle(x+bbox.LLx, y+bbox.LLy, bbox.Dx(), bbox.Dy())
+	x += 100 * cff.GlyphWidthPDF(2+26+1) / 1000
+
+	bbox = data.testFont.cff.GlyphBBoxPDF(cff.FontMatrix, 2+26+2)
+	bbox.Scale(100.0 / 1000.0)
+	w.Rectangle(x+bbox.LLx, y+bbox.LLy, bbox.Dx(), bbox.Dy())
+
+	w.Stroke()
+	w.PopGraphicsState()
 
 	return w.Close()
 }
@@ -231,7 +278,7 @@ func makeTestFonts() (*testFonts, error) {
 	q := orig.FontMatrix[3] * 1000
 	res := &testFonts{
 		testFont: &testFont{
-			data:      testCFF,
+			cff:       testCFF,
 			ascent:    math.Round(orig.Ascent.AsFloat(q)),
 			descent:   math.Round(orig.Descent.AsFloat(q)),
 			capHeight: math.Round(orig.CapHeight.AsFloat(q)),
@@ -267,7 +314,7 @@ func rescaleGlyph(g *cff.Glyph, xScale, yScale float64) *cff.Glyph {
 var _ font.Font = (*testFont)(nil)
 
 type testFont struct {
-	data      *cff.Font
+	cff       *cff.Font
 	ascent    float64 // PDF glyph space units
 	descent   float64 // PDF glyph space units, negative
 	capHeight float64
@@ -275,16 +322,16 @@ type testFont struct {
 }
 
 func (f *testFont) PostScriptName() string {
-	return f.data.FontName
+	return f.cff.FontName
 }
 
 func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
 	fontDictRef := rm.Out.Alloc()
 
 	fd := &font.Descriptor{
-		FontName:   f.data.FontName,
+		FontName:   f.cff.FontName,
 		IsSymbolic: true,
-		FontBBox:   f.data.FontBBoxPDF(),
+		FontBBox:   f.cff.FontBBoxPDF(),
 		Ascent:     f.ascent,
 		Descent:    f.descent,
 		CapHeight:  f.capHeight,
@@ -292,20 +339,20 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	}
 
 	ww := make(map[cmap.CID]float64)
-	for gid, cid := range f.data.GIDToCID {
-		w := f.data.GlyphWidthPDF(glyph.ID(gid))
+	for gid, cid := range f.cff.GIDToCID {
+		w := f.cff.GlyphWidthPDF(glyph.ID(gid))
 		ww[cmap.CID(cid)] = w
 	}
 
 	dicts := &cidfont.Type0Dict{
 		Ref:            fontDictRef,
-		PostScriptName: f.data.FontName,
+		PostScriptName: f.cff.FontName,
 		Descriptor:     fd,
 		Encoding:       f.cmap,
 		Width:          ww,
-		DefaultWidth:   f.data.GlyphWidthPDF(0),
+		DefaultWidth:   f.cff.GlyphWidthPDF(0),
 		GetFont: func() (cidfont.Type0FontData, error) {
-			return f.data, nil
+			return f.cff, nil
 		},
 	}
 	err := dicts.Finish(rm)
@@ -317,7 +364,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		ref:  fontDictRef,
 		cmap: f.cmap,
 		ww:   ww,
-		dw:   f.data.GlyphWidthPDF(0),
+		dw:   f.cff.GlyphWidthPDF(0),
 	}
 	return fontDictRef, e, nil
 }

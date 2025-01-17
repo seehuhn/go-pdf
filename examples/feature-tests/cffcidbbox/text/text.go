@@ -45,6 +45,9 @@ func Show(w *graphics.Writer, args ...interface{}) {
 				leading = math.Round(v.Size*15) / 10
 			}
 			leadingSet = false
+			if v.Color != nil {
+				w.SetFillColor(v.Color)
+			}
 		case string:
 			w.TextShow(v)
 		case pdf.String:
@@ -58,6 +61,14 @@ func Show(w *graphics.Writer, args ...interface{}) {
 				w.TextSecondLine(0, -leading)
 				leadingSet = true
 			}
+		case RecordPos:
+			x, y := w.GetTextPositionUser()
+			if v.UserX != nil {
+				*v.UserX = x
+			}
+			if v.UserY != nil {
+				*v.UserY = y
+			}
 		default:
 			panic(fmt.Sprintf("unexpected argument type %T", v))
 		}
@@ -67,13 +78,18 @@ func Show(w *graphics.Writer, args ...interface{}) {
 
 type nl struct{}
 
-var NewLine = nl{}
+var NL = nl{}
 
 type M struct {
 	X, Y float64
 }
 
 type F struct {
-	Font font.Font
-	Size float64
+	Font  font.Font
+	Size  float64
+	Color color.Color
+}
+
+type RecordPos struct {
+	UserX, UserY *float64
 }

@@ -209,6 +209,8 @@ func (w *Writer) TextSetRise(rise float64) {
 }
 
 // TextFirstLine moves to the start of the next line of text.
+// The new text position is (x, y), relative to the start of the current line
+// (or to the current point if there is no current line).
 //
 // This implements the PDF graphics operator "Td".
 func (w *Writer) TextFirstLine(x, y float64) {

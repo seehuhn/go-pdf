@@ -281,6 +281,16 @@ func (s State) GetTextPositionDevice() (float64, float64) {
 	return M[4], M[5]
 }
 
+// GetTextPositionUser returns the current text position in user coordinates.
+func (s State) GetTextPositionUser() (float64, float64) {
+	if err := s.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
+		panic(err)
+	}
+	M := matrix.Matrix{s.TextFontSize * s.TextHorizontalScaling, 0, 0, s.TextFontSize, 0, s.TextRise}
+	M = M.Mul(s.TextMatrix)
+	return M[4], M[5]
+}
+
 // StateBits is a bit mask for the fields of the State struct.
 type StateBits uint64
 
