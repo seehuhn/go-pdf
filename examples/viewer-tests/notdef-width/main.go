@@ -291,7 +291,8 @@ func makeTestFont() *testFont {
 			Ordering:   "test",
 			Supplement: 0,
 		},
-		GIDToCID: []cid.CID{0, 1, 2}, // identity GID <-> CID mapping
+		GIDToCID:     []cid.CID{0, 1, 2}, // identity GID <-> CID mapping
+		FontMatrices: []matrix.Matrix{matrix.Identity},
 	}
 	fontCFF := &cff.Font{
 		FontInfo: &type1.FontInfo{
