@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package type1
+package simple
 
 import (
 	"testing"
@@ -50,14 +50,14 @@ func TestType1DictRoundtrip(t *testing.T) {
 		StemH:        F1.Private.StdHW * (F1.FontMatrix[3] * 1000),
 		MissingWidth: F1.GlyphWidthPDF(".notdef"),
 	}
-	dicts1 := &FontDict{
+	dicts1 := &Type1Dict{
 		Ref:            data.Alloc(),
 		PostScriptName: F1.PostScriptName(),
 		Descriptor:     fd,
 		Encoding:       encoding.Standard,
 		Width:          [256]float64{}, // TODO(voss): fill in
 		Text:           [256]string{},  // TODO(voss): fill in
-		GetFont: func() (FontData, error) {
+		GetFont: func() (Type1FontData, error) {
 			return F1, nil
 		},
 	}
@@ -66,7 +66,7 @@ func TestType1DictRoundtrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dicts2, err := ExtractDict(data, dicts1.Ref)
+	dicts2, err := ExtractType1Dict(data, dicts1.Ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestType1DictRoundtrip(t *testing.T) {
 
 // compareType1Dicts compares two Type1Dicts.
 // d1 must be the original, d2 the one that was read back from the PDF file.
-func compareType1Dicts(t *testing.T, d1, d2 *FontDict) {
+func compareType1Dicts(t *testing.T, d1, d2 *Type1Dict) {
 	t.Helper()
 
 	if d1.Ref != d2.Ref {
@@ -143,6 +143,7 @@ func compareType1Fonts(t *testing.T, f1, f2 *type1.Font) {
 	if d := cmp.Diff(glyphs1, glyphs2); d != "" {
 		t.Errorf("GlyphList: %s", d)
 	}
+
 	// TODO(voss): why are the actually glyphs slightly different?
 	// (Apparently this is caused by discretisation errors.)
 

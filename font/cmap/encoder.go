@@ -30,6 +30,11 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
+var (
+	_ CIDEncoder = (*identityEncoder)(nil)
+	_ CIDEncoder = (*utf8Encoder)(nil)
+)
+
 // CIDEncoder constructs and stores mappings from character codes
 // to CID values and from character codes to unicode strings.
 type CIDEncoder interface {
@@ -42,8 +47,14 @@ type CIDEncoder interface {
 	// CMap returns the mapping from character codes to CID values.
 	CMap() *Info
 
+	// CMapNew returns the mapping from character codes to CID values.
+	CMapNew() *InfoNew
+
 	// ToUnicode returns a PDF ToUnicode CMap.
 	ToUnicode() *ToUnicode
+
+	// ToUnicodeNew returns a PDF ToUnicode CMap.
+	ToUnicodeNew() *ToUnicodeInfo
 
 	// Subset is the set of all GIDs which have been used with AppendEncoded.
 	// The returned slice is sorted and always starts with GID 0.
@@ -85,8 +96,16 @@ func (e *identityEncoder) CMap() *Info {
 	return New(e.g2c.ROS(), charcode.UCS2, m)
 }
 
+func (e *identityEncoder) CMapNew() *InfoNew {
+	panic("not implemented")
+}
+
 func (e *identityEncoder) ToUnicode() *ToUnicode {
 	return NewToUnicode(charcode.UCS2, e.toUnicode)
+}
+
+func (e *identityEncoder) ToUnicodeNew() *ToUnicodeInfo {
+	panic("not implemented")
 }
 
 func (e *identityEncoder) Subset() []glyph.ID {
@@ -208,12 +227,20 @@ func (e *utf8Encoder) CMap() *Info {
 	return New(e.g2c.ROS(), utf8cs, e.cmap)
 }
 
+func (e *utf8Encoder) CMapNew() *InfoNew {
+	panic("not implemented")
+}
+
 func (e *utf8Encoder) ToUnicode() *ToUnicode {
 	toUnicode := make(map[charcode.CharCode][]rune)
 	for k, v := range e.cache {
 		toUnicode[v] = []rune(k.rr)
 	}
 	return NewToUnicode(utf8cs, toUnicode)
+}
+
+func (e *utf8Encoder) ToUnicodeNew() *ToUnicodeInfo {
+	panic("not implemented")
 }
 
 func (e *utf8Encoder) Subset() []glyph.ID {

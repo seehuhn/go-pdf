@@ -35,6 +35,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/pdf/font/subset"
 )
 
@@ -380,7 +381,7 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 	}
 	fd.IsSerif = f.isSerif
 	fd.IsSymbolic = f.isSymbolic()
-	dict := &FontDict{
+	dict := &simple.Type1Dict{
 		Ref:            f.ref,
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
@@ -396,7 +397,7 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 		dict.Text[code[0]] = string(text)
 	}
 	if !omitFontData {
-		dict.GetFont = func() (FontData, error) {
+		dict.GetFont = func() (simple.Type1FontData, error) {
 			return fontData, nil
 		}
 	}

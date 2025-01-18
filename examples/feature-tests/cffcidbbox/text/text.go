@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
-func Show(w *graphics.Writer, args ...interface{}) {
+func Show(w *graphics.Writer, args ...any) {
 	var leading float64
 	var leadingSet bool
 

@@ -70,8 +70,8 @@ func NewToUnicode(cs charcode.CodeSpaceRange, m map[charcode.CharCode][]rune) *T
 	return info
 }
 
-// NewToUnicodeNew constructs a ToUnicode cmap from the given mapping.
-func NewToUnicodeNew(cs charcode.CodeSpaceRange, m map[string][]rune) *ToUnicode {
+// NewToUnicode2 constructs a ToUnicode cmap from the given mapping.
+func NewToUnicode2(cs charcode.CodeSpaceRange, m map[string][]rune) *ToUnicode {
 	m2 := make(map[charcode.CharCode][]rune, len(m))
 	for cStr, v := range m {
 		code, k := cs.Decode(pdf.String(cStr))

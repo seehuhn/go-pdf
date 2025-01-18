@@ -27,8 +27,8 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/font/type1"
 )
 
 type embeddedSimple struct {
@@ -101,14 +101,14 @@ func (f *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		}
 	}
 
-	q := subsetCFF.FontMatrix[3] * 1000
-
-	ascent := subsetSfnt.Ascent
-	descent := subsetSfnt.Descent
-	lineGap := subsetSfnt.LineGap
+	qh := subsetCFF.FontMatrix[0] * 1000
+	qv := subsetCFF.FontMatrix[3] * 1000
+	ascent := subsetSfnt.Ascent.AsFloat(qv)
+	descent := subsetSfnt.Descent.AsFloat(qv)
+	lineGap := subsetSfnt.LineGap.AsFloat(qv)
 	var leading float64
 	if lineGap > 0 {
-		leading = (ascent - descent + lineGap).AsFloat(q)
+		leading = ascent - descent + lineGap
 	}
 	fd := &font.Descriptor{
 		FontName:     subsetTag + "+" + subsetCFF.FontName,
@@ -123,21 +123,21 @@ func (f *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		ForceBold:    subsetCFF.Private[0].ForceBold,
 		FontBBox:     subsetSfnt.FontBBoxPDF().Rounded(),
 		ItalicAngle:  subsetSfnt.ItalicAngle,
-		Ascent:       math.Round(ascent.AsFloat(q)),
-		Descent:      math.Round(descent.AsFloat(q)),
+		Ascent:       math.Round(ascent),
+		Descent:      math.Round(descent),
 		Leading:      math.Round(leading),
-		CapHeight:    math.Round(subsetSfnt.CapHeight.AsFloat(q)),
-		XHeight:      math.Round(subsetSfnt.XHeight.AsFloat(q)),
-		StemV:        subsetCFF.Private[0].StdVW,
-		StemH:        subsetCFF.Private[0].StdHW,
+		CapHeight:    math.Round(subsetSfnt.CapHeight.AsFloat(qv)),
+		XHeight:      math.Round(subsetSfnt.XHeight.AsFloat(qv)),
+		StemV:        math.Round(subsetCFF.Private[0].StdVW * qh),
+		StemH:        math.Round(subsetCFF.Private[0].StdHW * qv),
 	}
-	res := &type1.FontDict{
+	res := &simple.Type1Dict{
 		Ref:            f.ref,
 		PostScriptName: subsetCFF.FontName,
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
 		Encoding:       encoding.Builtin,
-		GetFont:        func() (type1.FontData, error) { return subsetCFF, nil },
+		GetFont:        func() (simple.Type1FontData, error) { return subsetCFF, nil },
 	}
 
 	ww := subsetCFF.WidthsPDF()

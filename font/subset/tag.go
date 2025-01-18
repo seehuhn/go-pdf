@@ -60,3 +60,10 @@ func IsValidTag(s string) bool {
 }
 
 var TagRegexp = regexp.MustCompile(`^([A-Z]{6})\+(.*)$`)
+
+func Join(tag, name string) string {
+	if tag == "" {
+		return name
+	}
+	return tag + "+" + name
+}

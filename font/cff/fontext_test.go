@@ -23,7 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -53,7 +53,7 @@ func TestEmbedSimple(t *testing.T) {
 	}
 
 	// step 2: read back the font and verify that everything is as expected
-	dict, err := type1.ExtractDict(w, ref)
+	dict, err := simple.ExtractType1Dict(w, ref)
 	if err != nil {
 		t.Fatal(err)
 	}

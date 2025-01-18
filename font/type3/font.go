@@ -178,7 +178,7 @@ func (f *embedded) Finish(*pdf.ResourceManager) error {
 		got := names.ToUnicode(name, false)
 		want := toUniMap[string(rune(c))]
 		if !slices.Equal(got, want) {
-			toUnicode = cmap.NewToUnicodeNew(charcode.Simple, toUniMap)
+			toUnicode = cmap.NewToUnicode2(charcode.Simple, toUniMap)
 			break
 		}
 	}

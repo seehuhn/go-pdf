@@ -35,8 +35,8 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/pdf/font/subset"
-	pdft1 "seehuhn.de/go/pdf/font/type1"
 )
 
 // TODO(voss): try to make an interface type which can hold either of
@@ -397,7 +397,7 @@ func (t *Typesetter) Finish(rm *pdf.ResourceManager) error {
 
 	enc := make(map[byte]string)
 
-	dict := &pdft1.FontDict{
+	dict := &simple.Type1Dict{
 		Ref:            t.ref,
 		PostScriptName: t.PostScriptName(),
 		SubsetTag:      subsetTag,
@@ -405,7 +405,7 @@ func (t *Typesetter) Finish(rm *pdf.ResourceManager) error {
 		Encoding:       func(code byte) string { return enc[code] },
 	}
 	if psFont != nil {
-		dict.GetFont = func() (pdft1.FontData, error) {
+		dict.GetFont = func() (simple.Type1FontData, error) {
 			return psFont, nil
 		}
 	}

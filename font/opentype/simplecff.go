@@ -28,8 +28,8 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/font/type1"
 )
 
 type embeddedCFFSimple struct {
@@ -138,13 +138,13 @@ func (f *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 		StemV:        subsetCFF.Private[0].StdVW,
 		StemH:        subsetCFF.Private[0].StdHW,
 	}
-	res := &type1.FontDict{
+	res := &simple.Type1Dict{
 		Ref:            f.ref,
 		PostScriptName: subsetCFF.FontName,
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
 		Encoding:       encoding.Builtin,
-		GetFont:        func() (type1.FontData, error) { return subsetSfnt, nil },
+		GetFont:        func() (simple.Type1FontData, error) { return subsetSfnt, nil },
 	}
 
 	ww := subsetCFF.WidthsPDF()

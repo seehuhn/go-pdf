@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package type1
+package simple
 
 import (
 	"bytes"
@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"math"
 
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/postscript/type1/names"
@@ -39,22 +40,22 @@ import (
 )
 
 var (
-	_ FontData = (*type1.Font)(nil)
-	_ FontData = (*cff.Font)(nil)
-	_ FontData = (*sfnt.Font)(nil)
+	_ Type1FontData = (*type1.Font)(nil)
+	_ Type1FontData = (*cff.Font)(nil)
+	_ Type1FontData = (*sfnt.Font)(nil)
 )
 
-// FontData is a font which can be used with a Type 1 font dictionary.
+// Type1FontData is a font which can be used with a Type 1 font dictionary.
 // This must be one of [*type1.Font], [*cff.Font] or [*sfnt.Font].
-type FontData interface {
+type Type1FontData interface {
 	PostScriptName() string
 	BuiltinEncoding() []string
 }
 
-var _ font.Embedded = (*FontDict)(nil)
+var _ font.Embedded = (*Type1Dict)(nil)
 
-// FontDict represents a Type 1 font dictionary.
-type FontDict struct {
+// Type1Dict represents a Type 1 font dictionary.
+type Type1Dict struct {
 	// Ref is the reference to the font dictionary in the PDF file.
 	Ref pdf.Reference
 
@@ -84,22 +85,22 @@ type FontDict struct {
 
 	// GetFont (optional) returns the font data to embed.
 	// If this is nil, the font data is not embedded in the PDF file.
-	GetFont func() (FontData, error)
+	GetFont func() (Type1FontData, error)
 }
 
-func (d *FontDict) WritingMode() cmap.WritingMode {
+func (d *Type1Dict) WritingMode() cmap.WritingMode {
 	return cmap.Horizontal
 }
 
-func (d *FontDict) DecodeWidth(s pdf.String) (float64, int) {
+func (d *Type1Dict) DecodeWidth(s pdf.String) (float64, int) {
 	if len(s) == 0 {
 		return 0, 0
 	}
 	return d.Width[s[0]], 1
 }
 
-// ExtractDict reads a Type 1 font dictionary from a PDF file.
-func ExtractDict(r pdf.Getter, obj pdf.Object) (*FontDict, error) {
+// ExtractType1Dict reads a Type 1 font dictionary from a PDF file.
+func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
 		return nil, err
@@ -118,7 +119,7 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*FontDict, error) {
 		}
 	}
 
-	d := &FontDict{}
+	d := &Type1Dict{}
 	d.Ref, _ = obj.(pdf.Reference)
 
 	baseFont, err := pdf.GetName(r, fontDict["BaseFont"])
@@ -242,13 +243,13 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*FontDict, error) {
 	return d, nil
 }
 
-func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (FontData, error), error) {
+func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (Type1FontData, error), error) {
 	s, err := pdf.GetStream(r, fd["FontFile"])
 	if pdf.IsReadError(err) {
 		return nil, err
 	}
 	if s != nil {
-		getFont := func() (FontData, error) {
+		getFont := func() (Type1FontData, error) {
 			fontData, err := pdf.DecodeStream(r, s, 0)
 			if err != nil {
 				return nil, err
@@ -273,7 +274,7 @@ func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (FontData, error), error)
 	subType, _ := pdf.GetName(r, s.Dict["Subtype"])
 	switch subType {
 	case "Type1C":
-		getFont := func() (FontData, error) {
+		getFont := func() (Type1FontData, error) {
 			fontData, err := pdf.DecodeStream(r, s, 0)
 			if err != nil {
 				return nil, err
@@ -291,7 +292,7 @@ func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (FontData, error), error)
 		return getFont, nil
 
 	case "OpenType":
-		getFont := func() (FontData, error) {
+		getFont := func() (Type1FontData, error) {
 			fontData, err := pdf.DecodeStream(r, s, 0)
 			if err != nil {
 				return nil, err
@@ -313,8 +314,8 @@ func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (FontData, error), error)
 //
 // The FontName field in the font descriptor is ignored and the correct value
 // is set automatically.  TODO(voss): don't do this
-func (d *FontDict) Finish(rm *pdf.ResourceManager) error {
-	var psFont FontData
+func (d *Type1Dict) Finish(rm *pdf.ResourceManager) error {
+	var psFont Type1FontData
 	if d.GetFont != nil {
 		font, err := d.GetFont()
 		if err != nil {
@@ -384,8 +385,6 @@ func (d *FontDict) Finish(rm *pdf.ResourceManager) error {
 	stdInfo := stdmtx.Metrics[d.PostScriptName]
 
 	var fontFileRef pdf.Reference
-	// TODO(voss): make sure that this matches the code in
-	// [embeddedSimple.Finish] (file "font.go")
 	trimFontDict := (psFont == nil &&
 		stdInfo != nil &&
 		w.GetOptions().HasAny(pdf.OptTrimStandardFonts) &&
@@ -541,7 +540,7 @@ func (d *FontDict) Finish(rm *pdf.ResourceManager) error {
 // Codes returns an iterator over the character codes in the given PDF string.
 // The iterator yields Code instances that provide access to the CID, width,
 // and text content associated with each character code.
-func (d *FontDict) Codes(s pdf.String) iter.Seq[Code] {
+func (d *Type1Dict) Codes(s pdf.String) iter.Seq[Code] {
 	return func(yield func(Code) bool) {
 		pos := &type1Code{d: d}
 		for _, c := range s {
@@ -574,7 +573,7 @@ type Code interface {
 
 // type1Code is an implementation of the Code interface for a simple font.
 type type1Code struct {
-	d *FontDict
+	d *Type1Dict
 	c byte
 }
 
@@ -596,4 +595,60 @@ func (c *type1Code) Width() float64 {
 
 func (c *type1Code) Text() string {
 	return c.d.Text[c.c]
+}
+
+// widthsAreCompatible returns true, if the glyph widths ww are compatible with
+// the standard font metrics.  The object encObj is the value of the font
+// dictionary's Encoding entry.
+//
+// EncObj must be valid and must be a direct object.  Do not pass encObj values
+// read from files without validation.
+func widthsAreCompatible(ww []float64, enc encoding.Type1, info *stdmtx.FontData) bool {
+	for code := range 256 {
+		name := enc(byte(code))
+		if name == "" {
+			continue
+		}
+		if math.Abs(ww[code]-info.Width[name]) > 0.5 {
+			return false
+		}
+	}
+	return true
+}
+
+func fontDescriptorIsCompatible(fd *font.Descriptor, stdInfo *stdmtx.FontData) bool {
+	if fd.FontFamily != "" && fd.FontFamily != stdInfo.FontFamily {
+		return false
+	}
+	if fd.FontWeight != 0 && fd.FontWeight != stdInfo.FontWeight {
+		return false
+	}
+	if fd.IsFixedPitch != stdInfo.IsFixedPitch {
+		return false
+	}
+	if fd.IsSerif != stdInfo.IsSerif {
+		return false
+	}
+	if math.Abs(fd.ItalicAngle-stdInfo.ItalicAngle) > 0.1 {
+		return false
+	}
+	if fd.Ascent != 0 && math.Abs(fd.Ascent-stdInfo.Ascent) > 0.5 {
+		return false
+	}
+	if fd.Descent != 0 && math.Abs(fd.Descent-stdInfo.Descent) > 0.5 {
+		return false
+	}
+	if fd.CapHeight != 0 && math.Abs(fd.CapHeight-stdInfo.CapHeight) > 0.5 {
+		return false
+	}
+	if fd.XHeight != 0 && math.Abs(fd.XHeight-stdInfo.XHeight) > 0.5 {
+		return false
+	}
+	if fd.StemV != 0 && math.Abs(fd.StemV-stdInfo.StemV) > 0.5 {
+		return false
+	}
+	if fd.StemH != 0 && math.Abs(fd.StemH-stdInfo.StemH) > 0.5 {
+		return false
+	}
+	return true
 }
