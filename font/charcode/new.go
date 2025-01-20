@@ -138,7 +138,6 @@ func (c *Codec) Decode(s []byte) (code uint32, consumed int, valid bool) {
 		case invalidConsume1:
 			if len(s) > 0 {
 				code |= uint32(s[0]) << (8 * consumed)
-				s = s[1:]
 				consumed++
 			}
 			fallthrough
@@ -192,6 +191,86 @@ func (c *Codec) AppendCode(s []byte, code uint32) []byte {
 			cur = next
 		}
 	}
+}
+
+// CodeSpaceRange returns a CodeSpaceRange which contains exactly the same codes
+// as the one used to create the Codec.
+func (c *Codec) CodeSpaceRange() CodeSpaceRange {
+	return c.walk(nil, 0, nil, nil)
+}
+
+// walk traverses a sub-tree, constructing a CodeSpaceRange by recursively
+// visiting nodes and appending ranges defined by the low and high byte slices.
+//
+// Parameters:
+// - csr: slice to append the ranges to
+// - cur: the root of the sub-tree
+// - low: current lower bound of the range
+// - high: current upper bound of the range
+//
+// Returns:
+// - CodeSpaceRange: The extended CodeSpaceRange after traversing the sub-tree.
+func (c *Codec) walk(csr CodeSpaceRange, cur uint16, low, high []byte) CodeSpaceRange {
+	var nextLow byte
+	for {
+		nextHigh := c.nodes[cur].bound
+		low2 := append(low, nextLow)
+		high2 := append(high, nextHigh)
+		switch c.nodes[cur].child {
+		case validLeaf:
+			r := Range{Low: clone(low2), High: clone(high2)}
+			if k := canMerge(csr, r); k >= 0 {
+				csr[len(csr)-1].High[k] = high2[k]
+			} else {
+				csr = append(csr, r)
+			}
+		case invalidConsume0, invalidConsume1, invalidConsume2, invalidConsume3:
+			// pass
+		default:
+			csr = c.walk(csr, c.nodes[cur].child, low2, high2)
+		}
+
+		if nextHigh == 0xFF {
+			return csr
+		}
+		nextLow = nextHigh + 1
+		cur++
+	}
+}
+
+func canMerge(csr CodeSpaceRange, r Range) int {
+	if len(csr) == 0 {
+		return -1
+	}
+
+	last := csr[len(csr)-1]
+	if len(last.Low) != len(r.Low) {
+		return -1
+	}
+
+	// We can merge the ranges, the ranges for one byte are adjacent,
+	// and the ranges for all other bytes are equal.
+
+	adjIdx := -1
+	for i := 0; i < len(r.Low)-1; i++ {
+		isEqual := last.Low[i] == r.Low[i] && last.High[i] == r.High[i]
+		if isEqual {
+			continue
+		}
+
+		isAdjacent := int(last.High[i])+1 == int(r.Low[i])
+		if !isAdjacent || adjIdx != -1 {
+			return -1
+		}
+		adjIdx = i
+	}
+	return adjIdx
+}
+
+func clone(b []byte) []byte {
+	res := make([]byte, len(b))
+	copy(res, b)
+	return res
 }
 
 // tree is an intermediate representation of the lookup tree.

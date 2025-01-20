@@ -419,6 +419,58 @@ var testCases = []testRanges{
 			},
 		},
 	},
+
+	{
+		name: "gap",
+		ranges: []Range{
+			{Low: []byte{0x00}, High: []byte{0x1f}},
+			{Low: []byte{0x30}, High: []byte{0xff}},
+		},
+		cases: []testCase{
+			{
+				name:        "start of first range",
+				input:       []byte{0x00},
+				wantCode:    0x00,
+				wantConsume: 1,
+				wantValid:   true,
+			},
+			{
+				name:        "end of first range",
+				input:       []byte{0x1f},
+				wantCode:    0x1f,
+				wantConsume: 1,
+				wantValid:   true,
+			},
+			{
+				name:        "start of gap",
+				input:       []byte{0x20},
+				wantCode:    0x20,
+				wantConsume: 1,
+				wantValid:   false,
+			},
+			{
+				name:        "end of gap",
+				input:       []byte{0x2f},
+				wantCode:    0x2f,
+				wantConsume: 1,
+				wantValid:   false,
+			},
+			{
+				name:        "start of second range",
+				input:       []byte{0x30},
+				wantCode:    0x30,
+				wantConsume: 1,
+				wantValid:   true,
+			},
+			{
+				name:        "end of second range",
+				input:       []byte{0xff},
+				wantCode:    0xff,
+				wantConsume: 1,
+				wantValid:   true,
+			},
+		},
+	},
 }
 
 func TestCodecDecode(t *testing.T) {
@@ -536,6 +588,22 @@ func TestCodecDeduplication(t *testing.T) {
 		if cc[i] != cc[1] {
 			t.Fatalf("expected shared sub-tree %d, got %d", cc[1], cc[i])
 		}
+	}
+}
+
+func TestCodecCodeSpaceRange(t *testing.T) {
+	for i, r := range testCases {
+		t.Run(fmt.Sprintf("%02d-%s", i+1, r.name), func(t *testing.T) {
+			csr1 := r.ranges
+			c, err := NewCodec(csr1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			csr2 := c.CodeSpaceRange()
+			if !csr1.isEquivalent(csr2) {
+				t.Errorf("CodeSpaceRange() = %v, want %v", csr2, csr1)
+			}
+		})
 	}
 }
 
