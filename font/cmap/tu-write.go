@@ -27,7 +27,7 @@ import (
 )
 
 // Embed adds the ToUnicode cmap to a PDF file.
-func (info *ToUnicode) Embed(w *pdf.Writer, ref pdf.Reference) error {
+func (info *ToUnicodeOld) Embed(w *pdf.Writer, ref pdf.Reference) error {
 	stm, err := w.OpenStream(ref, nil, pdf.FilterCompress{})
 	if err != nil {
 		return err
@@ -43,7 +43,7 @@ func (info *ToUnicode) Embed(w *pdf.Writer, ref pdf.Reference) error {
 	return nil
 }
 
-func (info *ToUnicode) Write(w io.Writer) error {
+func (info *ToUnicodeOld) Write(w io.Writer) error {
 	return toUnicodeTmpl.Execute(w, info)
 }
 
@@ -51,15 +51,15 @@ var toUnicodeTmpl = template.Must(template.New("tounicode").Funcs(template.FuncM
 	"B": func(x []byte) string {
 		return fmt.Sprintf("<%02x>", x)
 	},
-	"SingleChunks": chunks[SingleTUEntry],
-	"Single": func(cs charcode.CodeSpaceRange, s SingleTUEntry) string {
+	"SingleChunks": chunks[ToUnicodeSingleOld],
+	"Single": func(cs charcode.CodeSpaceRange, s ToUnicodeSingleOld) string {
 		var buf []byte
 		buf = cs.Append(buf, s.Code)
 		val := hexString(string(s.Value))
 		return fmt.Sprintf("<%x> %s", buf, val)
 	},
-	"RangeChunks": chunks[RangeTUEntry],
-	"Range": func(cs charcode.CodeSpaceRange, s RangeTUEntry) string {
+	"RangeChunks": chunks[ToUnicodeRangeOld],
+	"Range": func(cs charcode.CodeSpaceRange, s ToUnicodeRangeOld) string {
 		var first, last []byte
 		first = cs.Append(first, s.First)
 		last = cs.Append(last, s.Last)

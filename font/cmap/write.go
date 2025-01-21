@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/postscript"
 )
 
-func (info *Info) Embed(w *pdf.Writer, ref pdf.Reference, other map[string]pdf.Reference) error {
+func (info *InfoOld) Embed(w *pdf.Writer, ref pdf.Reference, other map[string]pdf.Reference) error {
 	dict := pdf.Dict{
 		"Type":     pdf.Name("CMap"),
 		"CMapName": pdf.Name(info.Name),
@@ -69,7 +69,7 @@ func (info *Info) Embed(w *pdf.Writer, ref pdf.Reference, other map[string]pdf.R
 	return nil
 }
 
-func (info *Info) Write(w io.Writer) error {
+func (info *InfoOld) Write(w io.Writer) error {
 	return cmapTmpl.Execute(w, info)
 }
 
@@ -85,14 +85,14 @@ var cmapTmpl = template.Must(template.New("cmap").Funcs(template.FuncMap{
 	"B": func(x []byte) string {
 		return fmt.Sprintf("<%02x>", x)
 	},
-	"SingleChunks": chunks[SingleEntry],
-	"Single": func(cs charcode.CodeSpaceRange, s SingleEntry) string {
+	"SingleChunks": chunks[SingleOld],
+	"Single": func(cs charcode.CodeSpaceRange, s SingleOld) string {
 		var buf []byte
 		buf = cs.Append(buf, s.Code)
 		return fmt.Sprintf("<%x> %d", buf, s.Value)
 	},
-	"RangeChunks": chunks[RangeEntry],
-	"Range": func(cs charcode.CodeSpaceRange, s RangeEntry) string {
+	"RangeChunks": chunks[RangeOld],
+	"Range": func(cs charcode.CodeSpaceRange, s RangeOld) string {
 		var first, last []byte
 		first = cs.Append(first, s.First)
 		last = cs.Append(last, s.Last)

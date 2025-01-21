@@ -172,7 +172,7 @@ func (f *embedded) Finish(*pdf.ResourceManager) error {
 		}
 	}
 
-	var toUnicode *cmap.ToUnicode
+	var toUnicode *cmap.ToUnicodeOld
 	toUniMap := f.ToUnicodeNew()
 	for c, name := range encoding {
 		got := names.ToUnicode(name, false)

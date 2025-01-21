@@ -79,7 +79,7 @@ func TestCustom2(t *testing.T) {
 		{Low: []byte{0x10, 0x80}, High: []byte{0x30, 0xA0}},
 	}
 
-	seen := make(map[CharCode]bool)
+	seen := make(map[CharCodeOld]bool)
 	var buf []byte
 	for c1 := byte(0x10); c1 <= 0x30; c1++ {
 		for c2 := byte(0x80); c2 <= 0xA0; c2++ {
@@ -131,7 +131,7 @@ func TestCustom3(t *testing.T) {
 		}
 	}
 
-	for code := CharCode(0); code < 1000; code++ {
+	for code := CharCodeOld(0); code < 1000; code++ {
 		buf := cs.Append(nil, code)
 		code2, k := cs.Decode(buf)
 		if k != len(buf) {

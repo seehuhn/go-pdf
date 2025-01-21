@@ -155,7 +155,7 @@ type FontDictComposite struct {
 	// or the empty string if this is the full font.
 	SubsetTag string
 
-	CMap *cmap.Info
+	CMap *cmap.InfoOld
 
 	UnitsPerEm uint16 // TODO(voss): use the font matrix instead
 
@@ -169,7 +169,7 @@ type FontDictComposite struct {
 	IsSmallCap bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode *cmap.ToUnicode
+	ToUnicode *cmap.ToUnicodeOld
 }
 
 // ExtractComposite extracts information about a composite CFF font from a PDF file.
@@ -218,7 +218,7 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*FontDictComposite, erro
 	res.IsAllCap = dicts.FontDescriptor.IsAllCap
 	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
 
-	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], cmapInfo.CodeSpaceRange); info != nil {
+	if info, _ := cmap.ExtractToUnicodeOld(r, dicts.FontDict["ToUnicode"], cmapInfo.CodeSpaceRange); info != nil {
 		res.ToUnicode = info
 	}
 

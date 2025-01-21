@@ -27,7 +27,7 @@ import (
 )
 
 // GetMappingNew returns the mapping information from info.
-func (info *ToUnicode) GetMappingNew() map[string][]rune {
+func (info *ToUnicodeOld) GetMappingNew() map[string][]rune {
 	m := info.GetMapping()
 	m2 := make(map[string][]rune, len(m))
 	var s pdf.String
@@ -39,8 +39,8 @@ func (info *ToUnicode) GetMappingNew() map[string][]rune {
 }
 
 // GetMapping returns the mapping information from info.
-func (info *ToUnicode) GetMapping() map[charcode.CharCode][]rune {
-	res := make(map[charcode.CharCode][]rune)
+func (info *ToUnicodeOld) GetMapping() map[charcode.CharCodeOld][]rune {
+	res := make(map[charcode.CharCodeOld][]rune)
 	for _, s := range info.Singles {
 		res[s.Code] = s.Value
 	}
@@ -74,7 +74,7 @@ func c(rr []rune) []rune {
 // To make efficient use of range entries, the generated mapping may be a
 // superset of the original mapping, i.e. it may contain entries for charcodes
 // which were not mapped in the original mapping.
-func (info *ToUnicode) SetMapping(m map[charcode.CharCode][]rune) {
+func (info *ToUnicodeOld) SetMapping(m map[charcode.CharCodeOld][]rune) {
 	entries := make([]tuEntry, 0, len(m))
 	for code, val := range m {
 		entries = append(entries, tuEntry{code, val})
@@ -97,12 +97,12 @@ func (info *ToUnicode) SetMapping(m map[charcode.CharCode][]rune) {
 	v := 0
 	for _, e := range ee {
 		if e == 0 {
-			info.Singles = append(info.Singles, SingleTUEntry{
+			info.Singles = append(info.Singles, ToUnicodeSingleOld{
 				Code:  entries[v].code,
 				Value: entries[v].value,
 			})
 		} else if e < 0 {
-			info.Ranges = append(info.Ranges, RangeTUEntry{
+			info.Ranges = append(info.Ranges, ToUnicodeRangeOld{
 				First:  entries[v].code,
 				Last:   entries[v-int(e)-1].code,
 				Values: [][]rune{entries[v].value},
@@ -112,7 +112,7 @@ func (info *ToUnicode) SetMapping(m map[charcode.CharCode][]rune) {
 			for i := v; i < v+int(e); i++ {
 				values = append(values, entries[i].value)
 			}
-			info.Ranges = append(info.Ranges, RangeTUEntry{
+			info.Ranges = append(info.Ranges, ToUnicodeRangeOld{
 				First:  entries[v].code,
 				Last:   entries[v+int(e)-1].code,
 				Values: values,
@@ -123,7 +123,7 @@ func (info *ToUnicode) SetMapping(m map[charcode.CharCode][]rune) {
 }
 
 type tuEntry struct {
-	code  charcode.CharCode
+	code  charcode.CharCodeOld
 	value []rune
 }
 
@@ -164,7 +164,7 @@ vertexLoop:
 					break vertexLoop
 				}
 			} else {
-				if m1.code-m0.code != charcode.CharCode(m1.value[i]-g.bufR[i]) {
+				if m1.code-m0.code != charcode.CharCodeOld(m1.value[i]-g.bufR[i]) {
 					break vertexLoop
 				}
 			}

@@ -27,8 +27,8 @@ import (
 )
 
 // GetMapping returns the mapping information from info.
-func (info *Info) GetMapping() map[charcode.CharCode]cid.CID {
-	res := make(map[charcode.CharCode]cid.CID)
+func (info *InfoOld) GetMapping() map[charcode.CharCodeOld]cid.CID {
+	res := make(map[charcode.CharCodeOld]cid.CID)
 	for _, s := range info.Singles {
 		res[s.Code] = s.Value
 	}
@@ -47,7 +47,7 @@ func (info *Info) GetMapping() map[charcode.CharCode]cid.CID {
 // To make efficient use of range entries, the generated mapping may be a
 // superset of the original mapping, i.e. it may contain entries for charcodes
 // which were not mapped in the original mapping.
-func (info *Info) SetMapping(m map[charcode.CharCode]cid.CID) {
+func (info *InfoOld) SetMapping(m map[charcode.CharCodeOld]cid.CID) {
 	entries := make([]entry, 0, len(m))
 	for code, val := range m {
 		entries = append(entries, entry{code, val})
@@ -70,12 +70,12 @@ func (info *Info) SetMapping(m map[charcode.CharCode]cid.CID) {
 	v := 0
 	for _, e := range ee {
 		if e == 0 {
-			info.Singles = append(info.Singles, SingleEntry{
+			info.Singles = append(info.Singles, SingleOld{
 				Code:  entries[v].code,
 				Value: entries[v].value,
 			})
 		} else {
-			info.Ranges = append(info.Ranges, RangeEntry{
+			info.Ranges = append(info.Ranges, RangeOld{
 				First: entries[v].code,
 				Last:  entries[v+int(e)-1].code,
 				Value: entries[v].value,
@@ -86,7 +86,7 @@ func (info *Info) SetMapping(m map[charcode.CharCode]cid.CID) {
 }
 
 type entry struct {
-	code  charcode.CharCode
+	code  charcode.CharCodeOld
 	value cid.CID
 }
 
@@ -115,7 +115,7 @@ func (g *encoder) AppendEdges(ee []int16, v int) []int16 {
 		if !bytes.Equal(g.buf0[:len(g.buf0)-1], g.buf1[:len(g.buf1)-1]) {
 			break
 		}
-		if m1.code-m0.code != charcode.CharCode(m1.value-m0.value) {
+		if m1.code-m0.code != charcode.CharCodeOld(m1.value-m0.value) {
 			break
 		}
 		l++

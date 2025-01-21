@@ -62,7 +62,7 @@ func generateSampleFile(fname string) error {
 			{Low: []byte{0x42, 0x00}, High: []byte{0x42, 0xFF}},
 			{Low: []byte{0x43}, High: []byte{0xFF}},
 		},
-		CIDRanges: []cmap.RangeNew{
+		CIDRanges: []cmap.Range{
 			{
 				First: []byte{0x41},
 				Last:  []byte{0x43},

@@ -60,7 +60,7 @@ func generateSampleFile(fname string) error {
 		CodeSpaceRange: charcode.CodeSpaceRange{
 			{Low: []byte{0x30, 0x30}, High: []byte{0x32, 0x32}},
 		},
-		CIDRanges: []cmap.RangeNew{
+		CIDRanges: []cmap.Range{
 			{
 				First: []byte{0x30, 0x30},
 				Last:  []byte{0x32, 0x32},

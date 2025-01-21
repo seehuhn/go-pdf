@@ -98,7 +98,7 @@ func TestType1DictRoundtrip(t *testing.T) {
 		}
 		cid := cmap.CID(fontCFF.GIDToCID[gid])
 		dicts1.Encoding.CIDSingles = append(dicts1.Encoding.CIDSingles,
-			cmap.SingleNew{Code: []byte{byte(code)}, Value: cid})
+			cmap.Single{Code: []byte{byte(code)}, Value: cid})
 		dicts1.Width[cid] = F1.GlyphWidthPDF(gid)
 		dicts1.Text.Singles = append(dicts1.Text.Singles,
 			cmap.ToUnicodeSingle{Code: []byte{byte(code)}, Value: string(rr)})

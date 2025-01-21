@@ -219,7 +219,7 @@ func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
 		d.Text[code] = string(rr)
 	}
 
-	toUnicode, err := cmap.ExtractToUnicodeNew(r, fontDict["ToUnicode"])
+	toUnicode, err := cmap.ExtractToUnicode(r, fontDict["ToUnicode"])
 	if pdf.IsReadError(err) {
 		return nil, err
 	}

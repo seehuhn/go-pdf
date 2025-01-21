@@ -131,7 +131,7 @@ type FontDictGlyfSimple struct {
 	IsSmallCap bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode *cmap.ToUnicode
+	ToUnicode *cmap.ToUnicodeOld
 }
 
 // Embed adds the font to a PDF file.
@@ -323,7 +323,7 @@ func ExtractGlyfSimple(r pdf.Getter, dicts *font.Dicts) (*FontDictGlyfSimple, er
 	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
 	res.ForceBold = dicts.FontDescriptor.ForceBold
 
-	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
+	if info, _ := cmap.ExtractToUnicodeOld(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
 		res.ToUnicode = info
 	}
 

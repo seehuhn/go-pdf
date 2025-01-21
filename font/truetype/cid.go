@@ -130,7 +130,7 @@ type FontDictComposite struct {
 	// or the empty string if this is the full font.
 	SubsetTag string
 
-	CMap *cmap.Info
+	CMap *cmap.InfoOld
 
 	CIDToGID []glyph.ID
 
@@ -140,7 +140,7 @@ type FontDictComposite struct {
 	IsSmallCap bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode *cmap.ToUnicode
+	ToUnicode *cmap.ToUnicodeOld
 }
 
 // Embed adds a composite TrueType font to a PDF file.
@@ -427,7 +427,7 @@ func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*FontDictComposite, erro
 
 	// TODO(voss): read the widths from the CIDFont dictionary
 
-	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], cmapInfo.CodeSpaceRange); info != nil {
+	if info, _ := cmap.ExtractToUnicodeOld(r, dicts.FontDict["ToUnicode"], cmapInfo.CodeSpaceRange); info != nil {
 		res.ToUnicode = info
 	}
 

@@ -29,12 +29,12 @@ func TestMapping(t *testing.T) {
 		{Low: []byte{0x10, 0x12}, High: []byte{0x10, 0x7F}},
 		{Low: []byte{0x11, 0x80, 0x80}, High: []byte{0x11, 0xFF, 0xFF}},
 	}
-	info := &Info{
+	info := &InfoOld{
 		Name:           "Test",
 		CodeSpaceRange: cs,
 		CSFile:         cs,
 	}
-	m1 := map[charcode.CharCode]cid.CID{
+	m1 := map[charcode.CharCodeOld]cid.CID{
 		0:  0, // single 1
 		2:  1, // range ...
 		3:  2,

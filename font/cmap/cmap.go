@@ -28,36 +28,36 @@ import (
 	"seehuhn.de/go/postscript/cid"
 )
 
-// Info holds the information for a PDF CMap.
-type Info struct {
+// InfoOld holds the information for a PDF CMap.
+type InfoOld struct {
 	Name string
 	ROS  *CIDSystemInfo
 	charcode.CodeSpaceRange
 	CSFile  charcode.CodeSpaceRange // TODO(voss): remove this
 	WMode   int
 	UseCMap string
-	Singles []SingleEntry
-	Ranges  []RangeEntry
+	Singles []SingleOld
+	Ranges  []RangeOld
 }
 
-// SingleEntry specifies that character code Code represents the given CID.
-type SingleEntry struct {
-	Code  charcode.CharCode
+// SingleOld specifies that character code Code represents the given CID.
+type SingleOld struct {
+	Code  charcode.CharCodeOld
 	Value cid.CID
 }
 
-// RangeEntry describes a range of character codes with consecutive CIDs.
+// RangeOld describes a range of character codes with consecutive CIDs.
 // First and Last are the first and last code points in the range.
 // Value is the CID of the first code point in the range.
-type RangeEntry struct {
-	First charcode.CharCode
-	Last  charcode.CharCode
+type RangeOld struct {
+	First charcode.CharCodeOld
+	Last  charcode.CharCodeOld
 	Value cid.CID
 }
 
-// New allocates a new CMap object.
-func New(ROS *CIDSystemInfo, cs charcode.CodeSpaceRange, m map[charcode.CharCode]cid.CID) *Info {
-	info := &Info{
+// FromMapOld allocates a new CMap object.
+func FromMapOld(ROS *CIDSystemInfo, cs charcode.CodeSpaceRange, m map[charcode.CharCodeOld]cid.CID) *InfoOld {
+	info := &InfoOld{
 		ROS:            ROS,
 		CodeSpaceRange: cs,
 		CSFile:         cs,
@@ -80,7 +80,7 @@ func New(ROS *CIDSystemInfo, cs charcode.CodeSpaceRange, m map[charcode.CharCode
 }
 
 // IsIdentity returns true if all codes are equal to the corresponding CID.
-func (info *Info) IsIdentity() bool {
+func (info *InfoOld) IsIdentity() bool {
 	for _, s := range info.Singles {
 		if int(s.Code) != int(s.Value) {
 			return false
@@ -95,7 +95,7 @@ func (info *Info) IsIdentity() bool {
 }
 
 // MaxCID returns the largest CID used by this CMap.
-func (info *Info) MaxCID() cid.CID {
+func (info *InfoOld) MaxCID() cid.CID {
 	var maxCID cid.CID
 	for _, s := range info.Singles {
 		if s.Value > maxCID {
@@ -111,7 +111,7 @@ func (info *Info) MaxCID() cid.CID {
 	return maxCID
 }
 
-func makeName(m map[charcode.CharCode]cid.CID) string {
+func makeName(m map[charcode.CharCodeOld]cid.CID) string {
 	codes := maps.Keys(m)
 	slices.Sort(codes)
 	h := sha256.New()

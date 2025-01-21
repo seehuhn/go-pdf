@@ -56,7 +56,7 @@ func (r *Reader) ReadFont(ref pdf.Object) (F FontFromFile, err error) {
 		return nil, err
 	}
 
-	toUni, err := cmap.ExtractToUnicodeNew(r.R, info.FontDict["ToUnicode"])
+	toUni, err := cmap.ExtractToUnicode(r.R, info.FontDict["ToUnicode"])
 	if err != nil {
 		return nil, err
 	}

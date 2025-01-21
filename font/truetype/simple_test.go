@@ -44,7 +44,7 @@ func TestRoundTripSimple(t *testing.T) {
 	encoding[65] = cmapInfo.Lookup('A')
 	encoding[66] = cmapInfo.Lookup('C')
 
-	m := map[charcode.CharCode][]rune{
+	m := map[charcode.CharCodeOld][]rune{
 		65: {'A'},
 		66: {'C'},
 	}

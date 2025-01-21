@@ -151,10 +151,10 @@ func (e *SimpleEncoder) Subset() []glyph.ID {
 
 // ToUnicode returns the mapping from character codes to unicode strings.
 // This can be used to construct a PDF ToUnicode CMap.
-func (e *SimpleEncoder) ToUnicode() map[charcode.CharCode][]rune {
-	toUnicode := make(map[charcode.CharCode][]rune)
+func (e *SimpleEncoder) ToUnicode() map[charcode.CharCodeOld][]rune {
+	toUnicode := make(map[charcode.CharCodeOld][]rune)
 	for k, v := range e.code {
-		toUnicode[charcode.CharCode(v)] = []rune(k.rr)
+		toUnicode[charcode.CharCodeOld(v)] = []rune(k.rr)
 	}
 	return toUnicode
 }

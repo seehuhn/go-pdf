@@ -28,7 +28,7 @@ import (
 )
 
 // Extract reads a CMap from a PDF file.
-func Extract(r pdf.Getter, obj pdf.Object) (*Info, error) {
+func Extract(r pdf.Getter, obj pdf.Object) (*InfoOld, error) {
 	obj, err := pdf.Resolve(r, obj)
 	if err != nil {
 		return nil, err
@@ -56,13 +56,13 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Info, error) {
 	}
 }
 
-func Read(r io.Reader, other map[string]*Info) (*Info, error) {
+func Read(r io.Reader, other map[string]*InfoOld) (*InfoOld, error) {
 	raw, err := postscript.ReadCMap(r)
 	if err != nil {
 		return nil, err
 	}
 
-	res := &Info{
+	res := &InfoOld{
 		ROS:            &CIDSystemInfo{},
 		CodeSpaceRange: nil,
 		WMode:          0,
@@ -113,7 +113,7 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 	var rr []charcode.Range
 	if codeMap.UseCMap != "" {
 		if other == nil {
-			other = make(map[string]*Info)
+			other = make(map[string]*InfoOld)
 		}
 		if other, ok := other[string(codeMap.UseCMap)]; ok {
 			rr = append(rr, other.CodeSpaceRange...)
@@ -139,7 +139,7 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 		if cid, ok := m.Dst.(postscript.Integer); !ok {
 			return nil, fmt.Errorf("invalid CID %v", m.Dst)
 		} else {
-			res.Singles = append(res.Singles, SingleEntry{
+			res.Singles = append(res.Singles, SingleOld{
 				Code:  code,
 				Value: pscid.CID(cid),
 			})
@@ -158,7 +158,7 @@ func Read(r io.Reader, other map[string]*Info) (*Info, error) {
 		if cid, ok := m.Dst.(postscript.Integer); !ok {
 			return nil, fmt.Errorf("invalid CID %v", m.Dst)
 		} else {
-			res.Ranges = append(res.Ranges, RangeEntry{
+			res.Ranges = append(res.Ranges, RangeOld{
 				First: low,
 				Last:  high,
 				Value: pscid.CID(cid),

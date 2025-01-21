@@ -209,13 +209,13 @@ func makeTestFonts() (*testFonts, error) {
 
 	newCID := cid.CID(len(newGlyphs))
 	GIDToCID = append(GIDToCID, newCID)
-	cmapData.CIDSingles = append(cmapData.CIDSingles, cmap.SingleNew{Code: []byte{' '}, Value: cmap.CID(newCID)})
+	cmapData.CIDSingles = append(cmapData.CIDSingles, cmap.Single{Code: []byte{' '}, Value: cmap.CID(newCID)})
 	gid := lookup.Lookup(' ')
 	newGlyphs = append(newGlyphs, rescaleGlyph(origOutlines.Glyphs[gid], qx, qy))
 
 	for c := 'A'; c <= 'Z'; c++ {
 		newCID := cid.CID(len(newGlyphs))
-		cmapData.CIDSingles = append(cmapData.CIDSingles, cmap.SingleNew{Code: []byte{byte(c)}, Value: cmap.CID(newCID)})
+		cmapData.CIDSingles = append(cmapData.CIDSingles, cmap.Single{Code: []byte{byte(c)}, Value: cmap.CID(newCID)})
 		GIDToCID = append(GIDToCID, newCID)
 		gid := lookup.Lookup(c)
 		newGlyphs = append(newGlyphs, rescaleGlyph(origOutlines.Glyphs[gid], qx, qy))
@@ -236,7 +236,7 @@ func makeTestFonts() (*testFonts, error) {
 
 	for c := 'a'; c <= 'z'; c++ {
 		newCID := cid.CID(len(newGlyphs))
-		cmapData.CIDSingles = append(cmapData.CIDSingles, cmap.SingleNew{Code: []byte{byte(c)}, Value: cmap.CID(newCID)})
+		cmapData.CIDSingles = append(cmapData.CIDSingles, cmap.Single{Code: []byte{byte(c)}, Value: cmap.CID(newCID)})
 		GIDToCID = append(GIDToCID, newCID)
 		gid := lookup.Lookup(c)
 		newGlyphs = append(newGlyphs, rescaleGlyph(origOutlines.Glyphs[gid], qx, qy))

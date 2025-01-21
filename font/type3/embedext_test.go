@@ -49,7 +49,7 @@ func TestRoundTrip(t *testing.T) {
 		},
 	}
 
-	m := map[charcode.CharCode][]rune{
+	m := map[charcode.CharCodeOld][]rune{
 		65: {'A'},
 		66: {'C'},
 	}

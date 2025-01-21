@@ -20,15 +20,15 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// CharCode represents a character code within a [CodeSpaceRange] as a non-negative integer.
+// CharCodeOld represents a character code within a [CodeSpaceRange] as a non-negative integer.
 //
 // TODO(voss): remove in favour of the uint32 values used in [Codec].
-type CharCode int
+type CharCodeOld int
 
-func (r Range) numCodes() CharCode {
-	var numCodes CharCode = 1
+func (r Range) numCodes() CharCodeOld {
+	var numCodes CharCodeOld = 1
 	for i, low := range r.Low {
-		numCodes *= CharCode(r.High[i]-low) + 1
+		numCodes *= CharCodeOld(r.High[i]-low) + 1
 	}
 	return numCodes
 }
@@ -96,7 +96,7 @@ func (c CodeSpaceRange) firstCode(s pdf.String) (int, bool) {
 // Append appends the given character code to the given PDF string.
 //
 // TODO(voss): remove in favour of [Codec.AppendCode].
-func (c CodeSpaceRange) Append(s pdf.String, code CharCode) pdf.String {
+func (c CodeSpaceRange) Append(s pdf.String, code CharCodeOld) pdf.String {
 	for _, r := range c {
 		if numCodes := r.numCodes(); code >= numCodes {
 			code -= numCodes
@@ -108,7 +108,7 @@ func (c CodeSpaceRange) Append(s pdf.String, code CharCode) pdf.String {
 			s = append(s, 0)
 		}
 		for i := len(r.Low) - 1; i >= 0; i-- {
-			k := CharCode(r.High[i]) - CharCode(r.Low[i]) + 1
+			k := CharCodeOld(r.High[i]) - CharCodeOld(r.Low[i]) + 1
 			s[n+i] = r.Low[i] + byte(code%k)
 			code /= k
 		}
@@ -123,8 +123,8 @@ func (c CodeSpaceRange) Append(s pdf.String, code CharCode) pdf.String {
 // and the length is either 0 (if the string is empty) or 1.
 //
 // TODO(voss): Remove in favour of [Codec.Decode].
-func (c CodeSpaceRange) Decode(s pdf.String) (CharCode, int) {
-	var base CharCode
+func (c CodeSpaceRange) Decode(s pdf.String) (CharCodeOld, int) {
+	var base CharCodeOld
 tryNextRange:
 	for _, r := range c {
 		numCodes := r.numCodes()
@@ -133,7 +133,7 @@ tryNextRange:
 			continue tryNextRange
 		}
 
-		var code CharCode
+		var code CharCodeOld
 		for i := 0; i < len(r.Low); i++ {
 			b := s[i]
 			if b < r.Low[i] || b > r.High[i] {
@@ -141,8 +141,8 @@ tryNextRange:
 				continue tryNextRange
 			}
 
-			k := CharCode(r.High[i]) - CharCode(r.Low[i]) + 1
-			code = code*k + CharCode(b-r.Low[i])
+			k := CharCodeOld(r.High[i]) - CharCodeOld(r.Low[i]) + 1
+			code = code*k + CharCodeOld(b-r.Low[i])
 		}
 		return code + base, len(r.Low)
 	}

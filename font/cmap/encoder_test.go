@@ -50,7 +50,7 @@ func TestAppendEncoded(t *testing.T) {
 	}
 
 	// Check that the cmap and tounicode maps are correct
-	expectedMapping := map[charcode.CharCode]cid.CID{
+	expectedMapping := map[charcode.CharCodeOld]cid.CID{
 		runeToCode('A'):      1,
 		runeToCode('B'):      2,
 		runeToCode('C'):      3,
@@ -58,11 +58,11 @@ func TestAppendEncoded(t *testing.T) {
 		runeToCode('\uE000'): 4,
 		runeToCode('\uE001'): 5,
 	}
-	expectedCMap := New(g2c.ROS(), utf8cs, expectedMapping)
+	expectedCMap := FromMapOld(g2c.ROS(), utf8cs, expectedMapping)
 	if !reflect.DeepEqual(e.CMap(), expectedCMap) {
 		t.Errorf("CMap returned %v, expected %v", e.CMap(), expectedCMap)
 	}
-	expectedToUnicode := NewToUnicode(utf8cs, map[charcode.CharCode][]rune{
+	expectedToUnicode := NewToUnicode(utf8cs, map[charcode.CharCodeOld][]rune{
 		runeToCode('A'):      {'A'},
 		runeToCode('B'):      {'B'},
 		runeToCode('C'):      {'C'},

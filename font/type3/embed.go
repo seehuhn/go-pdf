@@ -53,7 +53,7 @@ type EmbedInfo struct {
 	IsSmallCap   bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode *cmap.ToUnicode
+	ToUnicode *cmap.ToUnicodeOld
 }
 
 // Embed implements the [font.Dict] interface.
@@ -335,7 +335,7 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 		res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
 	}
 
-	if info, _ := cmap.ExtractToUnicode(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
+	if info, _ := cmap.ExtractToUnicodeOld(r, dicts.FontDict["ToUnicode"], charcode.Simple); info != nil {
 		res.ToUnicode = info
 	}
 

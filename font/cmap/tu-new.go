@@ -36,13 +36,15 @@ import (
 
 // ToUnicodeFile represents the contents of a ToUnicode CMap.
 // Such a CMap maps character codes to unicode strings.
+//
+// This structure closely resembles the structure of a ToUnicode CMap file.
 type ToUnicodeFile struct {
 	charcode.CodeSpaceRange
 
 	Singles []ToUnicodeSingle
 	Ranges  []ToUnicodeRange
 
-	Parent *ToUnicodeFile // This corresponds to the UseCMap entry in the PDF spec.
+	Parent *ToUnicodeFile
 }
 
 // ToUnicodeSingle specifies that character code Code represents the given unicode string.
@@ -68,8 +70,8 @@ func (r ToUnicodeRange) String() string {
 
 // All returns all assigned texts of valid codes within a range.
 // The argument codec is used to determine which codes are valid.
-func (r ToUnicodeRange) All(codec *charcode.Codec) iter.Seq2[uint32, string] {
-	return func(yield func(uint32, string) bool) {
+func (r ToUnicodeRange) All(codec *charcode.Codec) iter.Seq2[charcode.Code, string] {
+	return func(yield func(charcode.Code, string) bool) {
 		L := len(r.First)
 		if L != len(r.Last) || L == 0 {
 			return
@@ -265,7 +267,7 @@ rangesLoop:
 	return "", false
 }
 
-func ExtractToUnicodeNew(r pdf.Getter, obj pdf.Object) (*ToUnicodeFile, error) {
+func ExtractToUnicode(r pdf.Getter, obj pdf.Object) (*ToUnicodeFile, error) {
 	cycle := pdf.NewCycleChecker()
 	return safeExtractToUnicode(r, cycle, obj)
 }

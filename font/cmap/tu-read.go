@@ -27,9 +27,9 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
-// ExtractToUnicode extracts a ToUnicode CMap from a PDF file.
+// ExtractToUnicodeOld extracts a ToUnicode CMap from a PDF file.
 // If cs is not nil, it overrides the code space range given inside the CMap.
-func ExtractToUnicode(r pdf.Getter, obj pdf.Object, cs charcode.CodeSpaceRange) (*ToUnicode, error) {
+func ExtractToUnicodeOld(r pdf.Getter, obj pdf.Object, cs charcode.CodeSpaceRange) (*ToUnicodeOld, error) {
 	stm, err := pdf.GetStream(r, obj)
 	if err != nil {
 		return nil, err
@@ -45,7 +45,7 @@ func ExtractToUnicode(r pdf.Getter, obj pdf.Object, cs charcode.CodeSpaceRange) 
 
 // ReadToUnicode reads a ToUnicode CMap.
 // If cs is not nil, it overrides the code space range given inside the CMap.
-func ReadToUnicode(r io.Reader, cs charcode.CodeSpaceRange) (*ToUnicode, error) {
+func ReadToUnicode(r io.Reader, cs charcode.CodeSpaceRange) (*ToUnicodeOld, error) {
 	raw, err := postscript.ReadCMap(r)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func ReadToUnicode(r io.Reader, cs charcode.CodeSpaceRange) (*ToUnicode, error) 
 		cs = csRanges
 	}
 
-	res := &ToUnicode{
+	res := &ToUnicodeOld{
 		CS: cs,
 	}
 
@@ -80,7 +80,7 @@ func ReadToUnicode(r io.Reader, cs charcode.CodeSpaceRange) (*ToUnicode, error) 
 		if err != nil {
 			return nil, err
 		}
-		res.Singles = append(res.Singles, SingleTUEntry{
+		res.Singles = append(res.Singles, ToUnicodeSingleOld{
 			Code:  code,
 			Value: []rune(s),
 		})
@@ -101,7 +101,7 @@ func ReadToUnicode(r io.Reader, cs charcode.CodeSpaceRange) (*ToUnicode, error) 
 			if err != nil {
 				return nil, err
 			}
-			res.Ranges = append(res.Ranges, RangeTUEntry{
+			res.Ranges = append(res.Ranges, ToUnicodeRangeOld{
 				First:  low,
 				Last:   high,
 				Values: [][]rune{[]rune(s)},
@@ -118,7 +118,7 @@ func ReadToUnicode(r io.Reader, cs charcode.CodeSpaceRange) (*ToUnicode, error) 
 				}
 				values = append(values, []rune(s))
 			}
-			res.Ranges = append(res.Ranges, RangeTUEntry{
+			res.Ranges = append(res.Ranges, ToUnicodeRangeOld{
 				First:  low,
 				Last:   high,
 				Values: values,

@@ -46,16 +46,16 @@ func TestRoundTripGlyfComposite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmapData := make(map[charcode.CharCode]cid.CID)
-	cmapData[charcode.CharCode('A')] = cid.CID(fontCMap.Lookup('A'))
-	cmapData[charcode.CharCode('B')] = cid.CID(fontCMap.Lookup('B'))
-	cmapData[charcode.CharCode('C')] = cid.CID(fontCMap.Lookup('C'))
-	cmapInfo := cmap.New(ros, cs, cmapData)
+	cmapData := make(map[charcode.CharCodeOld]cid.CID)
+	cmapData[charcode.CharCodeOld('A')] = cid.CID(fontCMap.Lookup('A'))
+	cmapData[charcode.CharCodeOld('B')] = cid.CID(fontCMap.Lookup('B'))
+	cmapData[charcode.CharCodeOld('C')] = cid.CID(fontCMap.Lookup('C'))
+	cmapInfo := cmap.FromMapOld(ros, cs, cmapData)
 
-	m := make(map[charcode.CharCode][]rune, 8)
-	m[charcode.CharCode('A')] = []rune{'A'}
-	m[charcode.CharCode('B')] = []rune{'B'}
-	m[charcode.CharCode('C')] = []rune{'C'}
+	m := make(map[charcode.CharCodeOld][]rune, 8)
+	m[charcode.CharCodeOld('A')] = []rune{'A'}
+	m[charcode.CharCodeOld('B')] = []rune{'B'}
+	m[charcode.CharCodeOld('C')] = []rune{'C'}
 	toUnicode := cmap.NewToUnicode(cs, m)
 
 	maxCID := cid.CID(fontCMap.Lookup('C'))

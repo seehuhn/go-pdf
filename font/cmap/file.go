@@ -23,15 +23,23 @@ import (
 	"sync"
 	"text/template"
 
+	"seehuhn.de/go/postscript"
+	"seehuhn.de/go/postscript/cid"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/postscript"
 )
 
 // References:
 // - section 9.7.5 (CMaps) in ISO 32000-2:2020
 // - https://adobe-type-tools.github.io/font-tech-notes/pdfs/5014.CIDFont_Spec.pdf
 // - https://adobe-type-tools.github.io/font-tech-notes/pdfs/5099.CMapResources.pdf
+
+// CID represents a character identifier.  This identifies a character within
+// a character collection.
+//
+// TODO(voss): remove in favour of [cid.CID]
+type CID = cid.CID
 
 // File represents the information for a CMap used with a PDF composite
 // font.  This describes a mapping from character codes (one or more bytes) to
@@ -44,12 +52,12 @@ type File struct {
 	WMode WritingMode
 
 	charcode.CodeSpaceRange
-	CIDSingles    []SingleNew
-	CIDRanges     []RangeNew
-	NotdefSingles []SingleNew
-	NotdefRanges  []RangeNew
+	CIDSingles    []Single
+	CIDRanges     []Range
+	NotdefSingles []Single
+	NotdefRanges  []Range
 
-	Parent *File // This corresponds to the UseCMap entry in the PDF spec.
+	Parent *File
 }
 
 // WritingMode is the "writing mode" of a PDF font (horizontal or vertical).
@@ -75,7 +83,7 @@ const (
 )
 
 // SingleEntry specifies that character code Code represents the given CID.
-type SingleNew struct {
+type Single struct {
 	Code  []byte
 	Value CID
 }
@@ -83,26 +91,15 @@ type SingleNew struct {
 // RangeEntry describes a range of character codes with consecutive CIDs.
 // First and Last are the first and last code points in the range.
 // Value is the CID of the first code point in the range.
-type RangeNew struct {
+type Range struct {
 	First []byte
 	Last  []byte
 	Value CID
 }
 
-func (r RangeNew) String() string {
+func (r Range) String() string {
 	return fmt.Sprintf("% 02x-% 02x: %d", r.First, r.Last, r.Value)
 }
-
-// CID is a character identifier.
-//
-// CID values are used to look up glyphs in a CIDFont.
-// The interpretation of a CID value depends on the corresponding
-// CIDSystemInfo.
-//
-// The special value 0 is used to indicate a missing glyph.
-//
-// TODO(voss): merge with cid.CID
-type CID uint32
 
 // ExtractNew extracts a CMap from a PDF object.
 // The argument must be the name of a predefined CMap or a stream containing a CMap.
@@ -250,7 +247,7 @@ func readCMap(r io.Reader) (*File, pdf.Object, error) {
 		if !ok || cid < 0 || cid > 0xFFFF_FFFF {
 			continue
 		}
-		res.CIDSingles = append(res.CIDSingles, SingleNew{
+		res.CIDSingles = append(res.CIDSingles, Single{
 			Code:  entry.Src,
 			Value: CID(cid),
 		})
@@ -263,7 +260,7 @@ func readCMap(r io.Reader) (*File, pdf.Object, error) {
 		if !ok || cid < 0 || cid > 0xFFFF_FFFF {
 			continue
 		}
-		res.CIDRanges = append(res.CIDRanges, RangeNew{
+		res.CIDRanges = append(res.CIDRanges, Range{
 			First: entry.Low,
 			Last:  entry.High,
 			Value: CID(cid),
@@ -277,7 +274,7 @@ func readCMap(r io.Reader) (*File, pdf.Object, error) {
 		if !ok || cid < 0 || cid > 0xFFFF_FFFF {
 			continue
 		}
-		res.NotdefSingles = append(res.NotdefSingles, SingleNew{
+		res.NotdefSingles = append(res.NotdefSingles, Single{
 			Code:  entry.Src,
 			Value: CID(cid),
 		})
@@ -290,7 +287,7 @@ func readCMap(r io.Reader) (*File, pdf.Object, error) {
 		if !ok || cid < 0 || cid > 0xFFFF_FFFF {
 			continue
 		}
-		res.NotdefRanges = append(res.NotdefRanges, RangeNew{
+		res.NotdefRanges = append(res.NotdefRanges, Range{
 			First: entry.Low,
 			Last:  entry.High,
 			Value: CID(cid),
@@ -449,12 +446,12 @@ var cmapTmplNew = template.Must(template.New("cmap").Funcs(template.FuncMap{
 	"B": func(x []byte) string {
 		return fmt.Sprintf("<%02x>", x)
 	},
-	"SingleChunks": chunks[SingleNew],
-	"Single": func(s SingleNew) string {
+	"SingleChunks": chunks[Single],
+	"Single": func(s Single) string {
 		return fmt.Sprintf("<%x> %d", s.Code, s.Value)
 	},
-	"RangeChunks": chunks[RangeNew],
-	"Range": func(r RangeNew) string {
+	"RangeChunks": chunks[Range],
+	"Range": func(r Range) string {
 		return fmt.Sprintf("<%x> <%x> %d", r.First, r.Last, r.Value)
 	},
 }).Parse(`{{if .HeaderComment -}}

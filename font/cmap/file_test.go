@@ -150,17 +150,17 @@ end
 			{Low: []byte{0x00}, High: []byte{0xFE}},
 			{Low: []byte{0xFF, 0x00}, High: []byte{0xFF, 0xFF}},
 		},
-		CIDSingles: []SingleNew{
+		CIDSingles: []Single{
 			{Code: []byte{0x20}, Value: 2},
 			{Code: []byte{0x22}, Value: 3},
 		},
-		CIDRanges: []RangeNew{
+		CIDRanges: []Range{
 			{First: []byte{0xFF, 0x20}, Last: []byte{0xFF, 0xFF}, Value: 5},
 		},
-		NotdefSingles: []SingleNew{
+		NotdefSingles: []Single{
 			{Code: []byte{0x21}, Value: 1},
 		},
-		NotdefRanges: []RangeNew{
+		NotdefRanges: []Range{
 			{First: []byte{0x00}, Last: []byte{0x1F}, Value: 0},
 			{First: []byte{0xFF, 0x00}, Last: []byte{0xFF, 0x1F}, Value: 4},
 		},
@@ -179,16 +179,16 @@ end
 		CodeSpaceRange: []charcode.Range{
 			{Low: []byte{0x00, 0x00}, High: []byte{0x00, 0xFF}},
 		},
-		CIDSingles: []SingleNew{
+		CIDSingles: []Single{
 			{Code: []byte{0x20}, Value: 1},
 		},
-		CIDRanges: []RangeNew{
+		CIDRanges: []Range{
 			{First: []byte{0x21}, Last: []byte{0x23}, Value: 2},
 		},
-		NotdefSingles: []SingleNew{
+		NotdefSingles: []Single{
 			{Code: []byte{0x24}, Value: 5},
 		},
-		NotdefRanges: []RangeNew{
+		NotdefRanges: []Range{
 			{First: []byte{0x25}, Last: []byte{0x27}, Value: 6},
 		},
 	}
@@ -200,16 +200,16 @@ end
 		CodeSpaceRange: []charcode.Range{
 			{Low: []byte{0x00, 0x00}, High: []byte{0x00, 0xFF}},
 		},
-		CIDSingles: []SingleNew{
+		CIDSingles: []Single{
 			{Code: []byte{0x28}, Value: 9},
 		},
-		CIDRanges: []RangeNew{
+		CIDRanges: []Range{
 			{First: []byte{0x29}, Last: []byte{0x2B}, Value: 10},
 		},
-		NotdefSingles: []SingleNew{
+		NotdefSingles: []Single{
 			{Code: []byte{0x2C}, Value: 13},
 		},
-		NotdefRanges: []RangeNew{
+		NotdefRanges: []Range{
 			{First: []byte{0x2D}, Last: []byte{0x2F}, Value: 14},
 		},
 	}
@@ -307,7 +307,7 @@ func TestExtractCMAP(t *testing.T) {
 		t.Errorf("unexpected code space range: %v", parent.CodeSpaceRange)
 	}
 	if !reflect.DeepEqual(parent.CIDSingles,
-		[]SingleNew{{Code: []byte{0x20}, Value: 1}}) {
+		[]Single{{Code: []byte{0x20}, Value: 1}}) {
 		t.Errorf("unexpected CID singles: %v", parent.CIDSingles)
 	}
 }
@@ -348,22 +348,22 @@ func TestReadCMap(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(info.CIDSingles,
-		[]SingleNew{{Code: []byte{0x20}, Value: 1}}) {
+		[]Single{{Code: []byte{0x20}, Value: 1}}) {
 		t.Errorf("unexpected CID singles: %v", info.CIDSingles)
 	}
 
 	if !reflect.DeepEqual(info.CIDRanges,
-		[]RangeNew{{First: []byte{0x22}, Last: []byte{0x24}, Value: 3}}) {
+		[]Range{{First: []byte{0x22}, Last: []byte{0x24}, Value: 3}}) {
 		t.Errorf("unexpected CID ranges: %v", info.CIDRanges)
 	}
 
 	if !reflect.DeepEqual(info.NotdefSingles,
-		[]SingleNew{{Code: []byte{0x21}, Value: 2}}) {
+		[]Single{{Code: []byte{0x21}, Value: 2}}) {
 		t.Errorf("unexpected notdef singles: %v", info.NotdefSingles)
 	}
 
 	if !reflect.DeepEqual(info.NotdefRanges,
-		[]RangeNew{{First: []byte{0x25}, Last: []byte{0x27}, Value: 6}}) {
+		[]Range{{First: []byte{0x25}, Last: []byte{0x27}, Value: 6}}) {
 		t.Errorf("unexpected notdef ranges: %v", info.NotdefRanges)
 	}
 }
@@ -557,7 +557,7 @@ func TestExtractLoop(t *testing.T) {
 					CodeSpaceRange: charcode.CodeSpaceRange{
 						{Low: []byte{0x00}, High: []byte{0xFF}},
 					},
-					CIDSingles: []SingleNew{
+					CIDSingles: []Single{
 						{Code: []byte{0x02 + byte(i)}, Value: CID(1 + i)},
 					},
 				}
@@ -620,7 +620,7 @@ func TestEmbedCMap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info2, err := ExtractToUnicodeNew(data, ref)
+	info2, err := ExtractToUnicode(data, ref)
 	if err != nil {
 		t.Fatal(err)
 	}

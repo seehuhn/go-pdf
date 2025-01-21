@@ -44,13 +44,13 @@ func TestRoundTripCFFComposite(t *testing.T) {
 		Ordering:   "Sonderbar",
 		Supplement: 13,
 	}
-	cmapData := make(map[charcode.CharCode]cid.CID, 8)
-	for code := charcode.CharCode(0); code < 8; code++ {
+	cmapData := make(map[charcode.CharCodeOld]cid.CID, 8)
+	for code := charcode.CharCodeOld(0); code < 8; code++ {
 		cmapData[code] = cid.CID(2*code + 1)
 	}
-	cmapInfo := cmap.New(ros, cs, cmapData)
-	m := make(map[charcode.CharCode][]rune, 8)
-	for code := charcode.CharCode(0); code < 8; code++ {
+	cmapInfo := cmap.FromMapOld(ros, cs, cmapData)
+	m := make(map[charcode.CharCodeOld][]rune, 8)
+	for code := charcode.CharCodeOld(0); code < 8; code++ {
 		m[code] = []rune{'X', '0' + rune(code)}
 	}
 	toUnicode := cmap.NewToUnicode(cs, m)

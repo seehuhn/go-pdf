@@ -64,9 +64,9 @@ end`
 }
 
 func TestRoundtrip(t *testing.T) {
-	info := &ToUnicode{
+	info := &ToUnicodeOld{
 		CS: charcode.Simple,
-		Singles: []SingleTUEntry{
+		Singles: []ToUnicodeSingleOld{
 			{
 				Code:  65,
 				Value: []rune{'A'},
@@ -76,7 +76,7 @@ func TestRoundtrip(t *testing.T) {
 				Value: []rune("ffl"),
 			},
 		},
-		Ranges: []RangeTUEntry{
+		Ranges: []ToUnicodeRangeOld{
 			{
 				First:  96,
 				Last:   112,

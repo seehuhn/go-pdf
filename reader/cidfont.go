@@ -30,7 +30,7 @@ type CIDFont struct {
 	codec *charcode.Codec
 	cmap  *cmap.File
 	toUni *cmap.ToUnicodeFile
-	dec   map[uint32]*font.CodeInfo
+	dec   map[charcode.Code]*font.CodeInfo
 
 	notdef *font.CodeInfo
 
@@ -80,7 +80,7 @@ func (r *Reader) readCompositeFont(info *font.Dicts, toUni *cmap.ToUnicodeFile) 
 		codec: codec,
 		cmap:  encoding,
 		toUni: toUni,
-		dec:   make(map[uint32]*font.CodeInfo),
+		dec:   make(map[charcode.Code]*font.CodeInfo),
 
 		notdef: notdef,
 

@@ -39,7 +39,7 @@ func TestToUnicodeRangeIter(t *testing.T) {
 	}
 
 	type pair struct {
-		code uint32
+		code charcode.Code
 		text string
 	}
 	type testCase struct {
@@ -275,7 +275,7 @@ func TestExtractToUnicode(t *testing.T) {
 
 	}
 
-	child, err := ExtractToUnicodeNew(data, childRef)
+	child, err := ExtractToUnicode(data, childRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -462,7 +462,7 @@ func TestExtractToUnicodeLoop(t *testing.T) {
 				}
 			}
 
-			info, err := ExtractToUnicodeNew(data, refs[0])
+			info, err := ExtractToUnicode(data, refs[0])
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -497,7 +497,7 @@ func TestEmbedToUnicode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info, err := ExtractToUnicodeNew(data, ref)
+	info, err := ExtractToUnicode(data, ref)
 	if err != nil {
 		t.Fatal(err)
 	}

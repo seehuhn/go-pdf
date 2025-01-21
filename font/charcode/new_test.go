@@ -25,7 +25,7 @@ import (
 type testCase struct {
 	name        string
 	input       []byte
-	wantCode    uint32
+	wantCode    Code
 	wantConsume int
 	wantValid   bool
 }

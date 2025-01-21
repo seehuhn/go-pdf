@@ -45,13 +45,13 @@ type CIDEncoder interface {
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 
 	// CMap returns the mapping from character codes to CID values.
-	CMap() *Info
+	CMap() *InfoOld
 
 	// CMapNew returns the mapping from character codes to CID values.
 	CMapNew() *File
 
 	// ToUnicode returns a PDF ToUnicode CMap.
-	ToUnicode() *ToUnicode
+	ToUnicode() *ToUnicodeOld
 
 	// ToUnicodeNew returns a PDF ToUnicode CMap.
 	ToUnicodeNew() *ToUnicodeFile
@@ -68,7 +68,7 @@ type CIDEncoder interface {
 func NewCIDEncoderIdentity(g2c GIDToCID) CIDEncoder {
 	return &identityEncoder{
 		g2c:       g2c,
-		toUnicode: make(map[charcode.CharCode][]rune),
+		toUnicode: make(map[charcode.CharCodeOld][]rune),
 		used:      make(map[glyph.ID]struct{}),
 	}
 }
@@ -76,31 +76,31 @@ func NewCIDEncoderIdentity(g2c GIDToCID) CIDEncoder {
 type identityEncoder struct {
 	g2c GIDToCID
 
-	toUnicode map[charcode.CharCode][]rune
+	toUnicode map[charcode.CharCodeOld][]rune
 	used      map[glyph.ID]struct{}
 }
 
 func (e *identityEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
 	cid := e.g2c.CID(gid, rr)
-	code := charcode.CharCode(cid)
+	code := charcode.CharCodeOld(cid)
 	e.toUnicode[code] = rr
 	e.used[gid] = struct{}{}
 	return charcode.UCS2.Append(s, code)
 }
 
-func (e *identityEncoder) CMap() *Info {
-	m := make(map[charcode.CharCode]pscid.CID)
+func (e *identityEncoder) CMap() *InfoOld {
+	m := make(map[charcode.CharCodeOld]pscid.CID)
 	for code := range e.toUnicode {
 		m[code] = pscid.CID(code)
 	}
-	return New(e.g2c.ROS(), charcode.UCS2, m)
+	return FromMapOld(e.g2c.ROS(), charcode.UCS2, m)
 }
 
 func (e *identityEncoder) CMapNew() *File {
 	panic("not implemented")
 }
 
-func (e *identityEncoder) ToUnicode() *ToUnicode {
+func (e *identityEncoder) ToUnicode() *ToUnicodeOld {
 	return NewToUnicode(charcode.UCS2, e.toUnicode)
 }
 
@@ -149,9 +149,9 @@ func (e *identityEncoder) AllCIDs(s pdf.String) iter.Seq2[[]byte, pscid.CID] {
 func NewCIDEncoderUTF8(g2c GIDToCID) CIDEncoder {
 	return &utf8Encoder{
 		g2c:   g2c,
-		cache: make(map[key]charcode.CharCode),
-		cmap:  make(map[charcode.CharCode]pscid.CID),
-		rev:   make(map[pscid.CID]charcode.CharCode),
+		cache: make(map[key]charcode.CharCodeOld),
+		cmap:  make(map[charcode.CharCodeOld]pscid.CID),
+		rev:   make(map[pscid.CID]charcode.CharCodeOld),
 		next:  0xE000,
 	}
 }
@@ -159,9 +159,9 @@ func NewCIDEncoderUTF8(g2c GIDToCID) CIDEncoder {
 type utf8Encoder struct {
 	g2c GIDToCID
 
-	cache map[key]charcode.CharCode
-	cmap  map[charcode.CharCode]pscid.CID
-	rev   map[pscid.CID]charcode.CharCode
+	cache map[key]charcode.CharCodeOld
+	cmap  map[charcode.CharCodeOld]pscid.CID
+	rev   map[pscid.CID]charcode.CharCodeOld
 	next  rune
 }
 
@@ -211,8 +211,8 @@ func (e *utf8Encoder) CodeAndCID(s pdf.String, gid glyph.ID, rr []rune) (pdf.Str
 	return utf8cs.Append(s, code), cid
 }
 
-func runeToCode(r rune) charcode.CharCode {
-	code := charcode.CharCode(r)
+func runeToCode(r rune) charcode.CharCodeOld {
+	code := charcode.CharCodeOld(r)
 	if code >= 0x01_0000 {
 		code += 0x01_0000 + 0x0800 + 0x0080
 	} else if code >= 0x00_0800 {
@@ -223,16 +223,16 @@ func runeToCode(r rune) charcode.CharCode {
 	return code
 }
 
-func (e *utf8Encoder) CMap() *Info {
-	return New(e.g2c.ROS(), utf8cs, e.cmap)
+func (e *utf8Encoder) CMap() *InfoOld {
+	return FromMapOld(e.g2c.ROS(), utf8cs, e.cmap)
 }
 
 func (e *utf8Encoder) CMapNew() *File {
 	panic("not implemented")
 }
 
-func (e *utf8Encoder) ToUnicode() *ToUnicode {
-	toUnicode := make(map[charcode.CharCode][]rune)
+func (e *utf8Encoder) ToUnicode() *ToUnicodeOld {
+	toUnicode := make(map[charcode.CharCodeOld][]rune)
 	for k, v := range e.cache {
 		toUnicode[v] = []rune(k.rr)
 	}

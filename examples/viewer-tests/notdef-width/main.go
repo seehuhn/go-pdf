@@ -314,15 +314,15 @@ func makeTestFont() *testFont {
 			{Low: []byte{'A'}, High: []byte{'Z'}},
 			{Low: []byte{'a'}, High: []byte{'z'}},
 		},
-		CIDRanges: []cmap.RangeNew{
+		CIDRanges: []cmap.Range{
 			// Two mappings for each glyph (including the missing CIDs 3 and 4).
 			{First: []byte{'A'}, Last: []byte{'E'}, Value: 0},
 			{First: []byte{'a'}, Last: []byte{'e'}, Value: 0},
 		},
-		CIDSingles: []cmap.SingleNew{
+		CIDSingles: []cmap.Single{
 			{Code: []byte{'y'}, Value: 3},
 		},
-		NotdefRanges: []cmap.RangeNew{
+		NotdefRanges: []cmap.Range{
 			// Codes 'y' and 'z' use a non-existent glyph as the notdef character.
 			{First: []byte{'y'}, Last: []byte{'z'}, Value: 4},
 			// For the rest of the lowercase range we use the alternative

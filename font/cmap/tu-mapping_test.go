@@ -24,7 +24,7 @@ import (
 )
 
 func TestFromMapping(t *testing.T) {
-	m := map[charcode.CharCode][]rune{
+	m := map[charcode.CharCodeOld][]rune{
 		'A': []rune("A"), // single
 		'B': []rune("X"), // single
 		'C': []rune("C"), // range ...
@@ -33,7 +33,7 @@ func TestFromMapping(t *testing.T) {
 		'F': []rune("F"),
 		'G': []rune("G"),
 	}
-	info := &ToUnicode{
+	info := &ToUnicodeOld{
 		CS: charcode.Simple,
 	}
 	info.SetMapping(m)
@@ -55,12 +55,12 @@ func TestFromMapping(t *testing.T) {
 }
 
 func TestFromMapping2(t *testing.T) {
-	m := map[charcode.CharCode][]rune{
+	m := map[charcode.CharCodeOld][]rune{
 		'A': []rune("A"), // range ...
 		'C': []rune("C"),
 		'E': []rune("E"),
 	}
-	info := &ToUnicode{
+	info := &ToUnicodeOld{
 		CS: charcode.Simple,
 	}
 	info.SetMapping(m)
@@ -71,7 +71,7 @@ func TestFromMapping2(t *testing.T) {
 		t.Fatalf("expected 1 range, got %d", len(info.Ranges))
 	}
 	r := info.Ranges[0]
-	rExpected := RangeTUEntry{
+	rExpected := ToUnicodeRangeOld{
 		First:  'A',
 		Last:   'E',
 		Values: [][]rune{[]rune("A")},

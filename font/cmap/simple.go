@@ -18,7 +18,7 @@ package cmap
 
 import "seehuhn.de/go/pdf"
 
-func (info *ToUnicode) GetSimpleMapping() [][]rune {
+func (info *ToUnicodeOld) GetSimpleMapping() [][]rune {
 	cs := info.CS
 	res := make([][]rune, 256)
 	var s pdf.String
