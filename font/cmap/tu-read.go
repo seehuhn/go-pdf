@@ -76,13 +76,13 @@ func ReadToUnicode(r io.Reader, cs charcode.CodeSpaceRange) (*ToUnicode, error) 
 		if code < 0 || len(c.Src) != k {
 			return nil, fmt.Errorf("tounicode: invalid code <%02x>", c.Src)
 		}
-		rr, err := toRunes(c.Dst)
+		s, err := toString(c.Dst)
 		if err != nil {
 			return nil, err
 		}
 		res.Singles = append(res.Singles, SingleTUEntry{
 			Code:  code,
-			Value: rr,
+			Value: []rune(s),
 		})
 	}
 	for _, r := range codeMap.BfRanges {
@@ -97,14 +97,14 @@ func ReadToUnicode(r io.Reader, cs charcode.CodeSpaceRange) (*ToUnicode, error) 
 
 		switch r := r.Dst.(type) {
 		case postscript.String:
-			rr, err := toRunes(r)
+			s, err := toString(r)
 			if err != nil {
 				return nil, err
 			}
 			res.Ranges = append(res.Ranges, RangeTUEntry{
 				First:  low,
 				Last:   high,
-				Values: [][]rune{rr},
+				Values: [][]rune{[]rune(s)},
 			})
 		case postscript.Array:
 			if len(r) != int(high)-int(low)+1 {
@@ -112,11 +112,11 @@ func ReadToUnicode(r io.Reader, cs charcode.CodeSpaceRange) (*ToUnicode, error) 
 			}
 			var values [][]rune
 			for code := low; code <= high; code++ {
-				rr, err := toRunes(r[code-low])
+				s, err := toString(r[code-low])
 				if err != nil {
 					return nil, err
 				}
-				values = append(values, rr)
+				values = append(values, []rune(s))
 			}
 			res.Ranges = append(res.Ranges, RangeTUEntry{
 				First:  low,

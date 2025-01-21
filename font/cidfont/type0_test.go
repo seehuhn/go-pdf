@@ -62,7 +62,7 @@ func TestType1DictRoundtrip(t *testing.T) {
 		Ref:            data.Alloc(),
 		PostScriptName: F1.PostScriptName(),
 		Descriptor:     fd,
-		Encoding: &cmap.InfoNew{
+		Encoding: &cmap.File{
 			Name:  "Test",
 			ROS:   &cmap.CIDSystemInfo{Registry: "seehuhn.de", Ordering: "test"},
 			WMode: cmap.Horizontal,
@@ -72,7 +72,7 @@ func TestType1DictRoundtrip(t *testing.T) {
 		},
 		Width:        map[cmap.CID]float64{}, // TODO(voss)
 		DefaultWidth: F1.GlyphWidthPDF(0),
-		Text: &cmap.ToUnicodeInfo{
+		Text: &cmap.ToUnicodeFile{
 			CodeSpaceRange: []charcode.Range{
 				{Low: []byte{0x00}, High: []byte{0xFF}},
 			},
@@ -101,7 +101,7 @@ func TestType1DictRoundtrip(t *testing.T) {
 			cmap.SingleNew{Code: []byte{byte(code)}, Value: cid})
 		dicts1.Width[cid] = F1.GlyphWidthPDF(gid)
 		dicts1.Text.Singles = append(dicts1.Text.Singles,
-			cmap.ToUnicodeSingle{Code: []byte{byte(code)}, Value: rr})
+			cmap.ToUnicodeSingle{Code: []byte{byte(code)}, Value: string(rr)})
 	}
 
 	err = dicts1.Finish(rm)

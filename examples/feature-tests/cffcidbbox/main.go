@@ -185,7 +185,7 @@ func makeTestFonts() (*testFonts, error) {
 
 	var newGlyphs []*cff.Glyph
 	var GIDToCID []cid.CID
-	cmapData := &cmap.InfoNew{
+	cmapData := &cmap.File{
 		Name: "TestCMap",
 		ROS: &cmap.CIDSystemInfo{
 			Registry: "seehuhn.de",
@@ -318,7 +318,7 @@ type testFont struct {
 	ascent    float64 // PDF glyph space units
 	descent   float64 // PDF glyph space units, negative
 	capHeight float64
-	cmap      *cmap.InfoNew
+	cmap      *cmap.File
 }
 
 func (f *testFont) PostScriptName() string {
@@ -371,7 +371,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 
 type testFontEmbedded struct {
 	ref  pdf.Reference
-	cmap *cmap.InfoNew
+	cmap *cmap.File
 	ww   map[cmap.CID]float64
 	dw   float64
 }

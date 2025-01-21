@@ -25,14 +25,14 @@ import (
 
 // MakeSimpleToUnicode creates a ToUnicodeInfo object for the encoding of a
 // simple font.
-func MakeSimpleToUnicode(data map[byte]string) *ToUnicodeInfo {
+func MakeSimpleToUnicode(data map[byte]string) *ToUnicodeFile {
 	g := tuEncSimple(data)
 	ee, err := dag.ShortestPath(g, 256)
 	if err != nil {
 		panic("unreachable")
 	}
 
-	res := &ToUnicodeInfo{
+	res := &ToUnicodeFile{
 		CodeSpaceRange: charcode.Simple,
 	}
 	code := 0
@@ -41,18 +41,18 @@ func MakeSimpleToUnicode(data map[byte]string) *ToUnicodeInfo {
 		case 1:
 			res.Singles = append(res.Singles, ToUnicodeSingle{
 				Code:  []byte{byte(code)},
-				Value: []rune(data[byte(code)]),
+				Value: data[byte(code)],
 			})
 		case 2:
 			res.Ranges = append(res.Ranges, ToUnicodeRange{
 				First:  []byte{byte(code)},
 				Last:   []byte{byte(code + int(e.num) - 1)},
-				Values: [][]rune{[]rune(data[byte(code)])},
+				Values: []string{data[byte(code)]},
 			})
 		case 3:
-			values := make([][]rune, int(e.num))
+			values := make([]string, int(e.num))
 			for i := 0; i < int(e.num); i++ {
-				values[i] = []rune(data[byte(code+i)])
+				values[i] = data[byte(code+i)]
 			}
 			res.Ranges = append(res.Ranges, ToUnicodeRange{
 				First:  []byte{byte(code)},

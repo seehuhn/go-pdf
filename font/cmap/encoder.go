@@ -48,13 +48,13 @@ type CIDEncoder interface {
 	CMap() *Info
 
 	// CMapNew returns the mapping from character codes to CID values.
-	CMapNew() *InfoNew
+	CMapNew() *File
 
 	// ToUnicode returns a PDF ToUnicode CMap.
 	ToUnicode() *ToUnicode
 
 	// ToUnicodeNew returns a PDF ToUnicode CMap.
-	ToUnicodeNew() *ToUnicodeInfo
+	ToUnicodeNew() *ToUnicodeFile
 
 	// Subset is the set of all GIDs which have been used with AppendEncoded.
 	// The returned slice is sorted and always starts with GID 0.
@@ -96,7 +96,7 @@ func (e *identityEncoder) CMap() *Info {
 	return New(e.g2c.ROS(), charcode.UCS2, m)
 }
 
-func (e *identityEncoder) CMapNew() *InfoNew {
+func (e *identityEncoder) CMapNew() *File {
 	panic("not implemented")
 }
 
@@ -104,7 +104,7 @@ func (e *identityEncoder) ToUnicode() *ToUnicode {
 	return NewToUnicode(charcode.UCS2, e.toUnicode)
 }
 
-func (e *identityEncoder) ToUnicodeNew() *ToUnicodeInfo {
+func (e *identityEncoder) ToUnicodeNew() *ToUnicodeFile {
 	panic("not implemented")
 }
 
@@ -227,7 +227,7 @@ func (e *utf8Encoder) CMap() *Info {
 	return New(e.g2c.ROS(), utf8cs, e.cmap)
 }
 
-func (e *utf8Encoder) CMapNew() *InfoNew {
+func (e *utf8Encoder) CMapNew() *File {
 	panic("not implemented")
 }
 
@@ -239,7 +239,7 @@ func (e *utf8Encoder) ToUnicode() *ToUnicode {
 	return NewToUnicode(utf8cs, toUnicode)
 }
 
-func (e *utf8Encoder) ToUnicodeNew() *ToUnicodeInfo {
+func (e *utf8Encoder) ToUnicodeNew() *ToUnicodeFile {
 	panic("not implemented")
 }
 

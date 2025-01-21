@@ -227,9 +227,9 @@ func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
 		// TODO(voss): implement an iterator on toUnicode to do this
 		// more efficiently?
 		for code := range 256 {
-			rr := toUnicode.Lookup([]byte{byte(code)})
-			if rr != nil {
-				d.Text[code] = string(rr)
+			rr, found := toUnicode.Lookup([]byte{byte(code)})
+			if found {
+				d.Text[code] = rr
 			}
 		}
 	}

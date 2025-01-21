@@ -302,7 +302,7 @@ func makeTestFont() *testFont {
 		Outlines: o,
 	}
 
-	cmap := &cmap.InfoNew{
+	cmap := &cmap.File{
 		Name: "TestCMap",
 		ROS: &cmap.CIDSystemInfo{
 			Registry:   o.ROS.Registry,
@@ -342,7 +342,7 @@ var _ font.Font = (*testFont)(nil)
 
 type testFont struct {
 	data *cff.Font
-	cmap *cmap.InfoNew
+	cmap *cmap.File
 }
 
 func (f *testFont) PostScriptName() string {

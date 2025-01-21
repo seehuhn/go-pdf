@@ -30,7 +30,7 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-var _ pdf.Embedder[pdf.Unused] = (*ToUnicodeInfo)(nil)
+var _ pdf.Embedder[pdf.Unused] = (*ToUnicodeFile)(nil)
 
 func TestToUnicodeRangeIter(t *testing.T) {
 	simple, err := charcode.NewCodec(charcode.Simple)
@@ -40,7 +40,7 @@ func TestToUnicodeRangeIter(t *testing.T) {
 
 	type pair struct {
 		code uint32
-		text []rune
+		text string
 	}
 	type testCase struct {
 		codec *charcode.Codec
@@ -53,16 +53,16 @@ func TestToUnicodeRangeIter(t *testing.T) {
 			r: ToUnicodeRange{
 				First: []byte{0xF0},
 				Last:  []byte{0xF2},
-				Values: [][]rune{
-					[]rune("fl"),
-					[]rune("fi"),
-					[]rune("ffl"),
+				Values: []string{
+					"fl",
+					"fi",
+					"ffl",
 				},
 			},
 			want: []pair{
-				{code: 0xF0, text: []rune("fl")},
-				{code: 0xF1, text: []rune("fi")},
-				{code: 0xF2, text: []rune("ffl")},
+				{code: 0xF0, text: "fl"},
+				{code: 0xF1, text: "fi"},
+				{code: 0xF2, text: "ffl"},
 			},
 		},
 		{
@@ -70,13 +70,13 @@ func TestToUnicodeRangeIter(t *testing.T) {
 			r: ToUnicodeRange{
 				First:  []byte{0x41},
 				Last:   []byte{0x44},
-				Values: [][]rune{[]rune("A")},
+				Values: []string{"A"},
 			},
 			want: []pair{
-				{code: 0x41, text: []rune("A")},
-				{code: 0x42, text: []rune("B")},
-				{code: 0x43, text: []rune("C")},
-				{code: 0x44, text: []rune("D")},
+				{code: 0x41, text: "A"},
+				{code: 0x42, text: "B"},
+				{code: 0x43, text: "C"},
+				{code: 0x44, text: "D"},
 			},
 		},
 	}
@@ -156,46 +156,46 @@ end
 end
 `)
 
-	testToUniInfoParent = &ToUnicodeInfo{
+	testToUniInfoParent = &ToUnicodeFile{
 		CodeSpaceRange: []charcode.Range{
 			{Low: []byte{0x00}, High: []byte{0xFE}},
 			{Low: []byte{0xFF, 0x00}, High: []byte{0xFF, 0xFE}},
 			{Low: []byte{0xFF, 0xFF, 0x00}, High: []byte{0xFF, 0xFF, 0xFF}},
 		},
 		Singles: []ToUnicodeSingle{
-			{Code: []byte{0x02}, Value: []rune("A")},
-			{Code: []byte{0x04}, Value: []rune("C")},
-			{Code: []byte{0x05}, Value: []rune("日")},
+			{Code: []byte{0x02}, Value: "A"},
+			{Code: []byte{0x04}, Value: "C"},
+			{Code: []byte{0x05}, Value: "日"},
 		},
 		Ranges: []ToUnicodeRange{
 			{
 				First:  []byte{0x07},
 				Last:   []byte{0x09},
-				Values: [][]rune{[]rune("G"), []rune("H"), []rune("I")},
+				Values: []string{"G", "H", "I"},
 			},
 		},
 	}
-	testToUniInfoChild = &ToUnicodeInfo{
+	testToUniInfoChild = &ToUnicodeFile{
 		CodeSpaceRange: []charcode.Range{
 			{Low: []byte{0x00}, High: []byte{0xFE}},
 			{Low: []byte{0xFF, 0x00}, High: []byte{0xFF, 0xFE}},
 			{Low: []byte{0xFF, 0xFF, 0x00}, High: []byte{0xFF, 0xFF, 0xFF}},
 		},
 		Singles: []ToUnicodeSingle{
-			{Code: []byte{0x02}, Value: []rune("A")},
-			{Code: []byte{0x04}, Value: []rune("C")},
-			{Code: []byte{0x05}, Value: []rune("日")},
+			{Code: []byte{0x02}, Value: "A"},
+			{Code: []byte{0x04}, Value: "C"},
+			{Code: []byte{0x05}, Value: "日"},
 		},
 		Ranges: []ToUnicodeRange{
 			{
 				First:  []byte{0x07},
 				Last:   []byte{0x09},
-				Values: [][]rune{[]rune("G"), []rune("H"), []rune("I")},
+				Values: []string{"G", "H", "I"},
 			},
 			{
 				First:  []byte{0xFF, 0x10},
 				Last:   []byte{0xFF, 0x20},
-				Values: [][]rune{[]rune("XA")},
+				Values: []string{"XA"},
 			},
 		},
 		Parent: testToUniInfoParent,
@@ -285,7 +285,7 @@ func TestExtractToUnicode(t *testing.T) {
 	}
 	if !reflect.DeepEqual(child.Singles,
 		[]ToUnicodeSingle{
-			{Code: []byte{0x3A, 0x51}, Value: []rune("\U0002003E")},
+			{Code: []byte{0x3A, 0x51}, Value: "\U0002003E"},
 		}) {
 		t.Errorf("unexpected singles: %v", child.Singles)
 	}
@@ -309,12 +309,12 @@ func TestExtractToUnicode(t *testing.T) {
 			{
 				First:  []byte{0x00, 0x00},
 				Last:   []byte{0x00, 0x5E},
-				Values: [][]rune{[]rune(" ")},
+				Values: []string{" "},
 			},
 			{
 				First:  []byte{0x00, 0x5f},
 				Last:   []byte{0x00, 0x61},
-				Values: [][]rune{[]rune("ff"), []rune("fi"), []rune("ffl")},
+				Values: []string{"ff", "fi", "ffl"},
 			},
 		}) {
 		t.Errorf("unexpected ranges: %v", parent.Ranges)
@@ -337,8 +337,8 @@ func TestReadToUnicode(t *testing.T) {
 	}
 	if !reflect.DeepEqual(info.Singles,
 		[]ToUnicodeSingle{
-			{Code: []byte{0x02}, Value: []rune("A")},
-			{Code: []byte{0x80, 0x01}, Value: []rune("B")},
+			{Code: []byte{0x02}, Value: "A"},
+			{Code: []byte{0x80, 0x01}, Value: "B"},
 		}) {
 		t.Errorf("unexpected singles: %v", info.Singles)
 	}
@@ -347,17 +347,17 @@ func TestReadToUnicode(t *testing.T) {
 			{
 				First:  []byte{0x03},
 				Last:   []byte{0x05},
-				Values: [][]rune{[]rune("C")},
+				Values: []string{"C"},
 			},
 			{
 				First:  []byte{0x80, 0x02},
 				Last:   []byte{0x80, 0x04},
-				Values: [][]rune{[]rune("E"), []rune("D"), []rune("F")},
+				Values: []string{"E", "D", "F"},
 			},
 			{
 				First:  []byte{0x80, 0x05},
 				Last:   []byte{0x80, 0x07},
-				Values: [][]rune{[]rune("G")},
+				Values: []string{"G"},
 			},
 		}) {
 		t.Errorf("unexpected ranges: %v", info.Ranges)
@@ -373,7 +373,7 @@ func FuzzReadToUnicode(f *testing.F) {
 	f.Add(testToUniCMapFull)
 
 	buf := &bytes.Buffer{}
-	for _, info := range []*ToUnicodeInfo{testToUniInfoParent, testToUniInfoChild} {
+	for _, info := range []*ToUnicodeFile{testToUniInfoParent, testToUniInfoChild} {
 		buf.Reset()
 		err := toUnicodeTmplNew.Execute(buf, info)
 		if err != nil {
@@ -425,16 +425,16 @@ func TestExtractToUnicodeLoop(t *testing.T) {
 
 			// construct a loop of n CMaps
 			refs := make([]pdf.Reference, n)
-			cmaps := make([]*ToUnicodeInfo, n)
+			cmaps := make([]*ToUnicodeFile, n)
 			for i := range refs {
 				refs[i] = data.Alloc()
 
-				cmaps[i] = &ToUnicodeInfo{
+				cmaps[i] = &ToUnicodeFile{
 					CodeSpaceRange: []charcode.Range{
 						{Low: []byte{0x00}, High: []byte{0xFF}},
 					},
 					Singles: []ToUnicodeSingle{
-						{Code: []byte{0x02 + byte(i)}, Value: []rune{'A' + rune(i)}},
+						{Code: []byte{0x02 + byte(i)}, Value: string('A' + rune(i))},
 					},
 				}
 			}

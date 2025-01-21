@@ -28,8 +28,8 @@ import (
 
 type CIDFont struct {
 	codec *charcode.Codec
-	cmap  *cmap.InfoNew
-	toUni *cmap.ToUnicodeInfo
+	cmap  *cmap.File
+	toUni *cmap.ToUnicodeFile
 	dec   map[uint32]*font.CodeInfo
 
 	notdef *font.CodeInfo
@@ -38,7 +38,7 @@ type CIDFont struct {
 	dw     float64
 }
 
-func (r *Reader) readCompositeFont(info *font.Dicts, toUni *cmap.ToUnicodeInfo) (F FontFromFile, err error) {
+func (r *Reader) readCompositeFont(info *font.Dicts, toUni *cmap.ToUnicodeFile) (F FontFromFile, err error) {
 	fontDict := info.FontDict
 	cidFontDict := info.CIDFontDict
 
@@ -117,9 +117,9 @@ func (f *CIDFont) Decode(s pdf.String) (*font.CodeInfo, int) {
 		w = f.dw
 	}
 
-	var text []rune
+	var text string
 	if f.toUni != nil {
-		text = f.toUni.Lookup(s[:k])
+		text, _ = f.toUni.Lookup(s[:k])
 	} else {
 		// TODO(voss): try the ToUnicode CMaps for the Adobe standard
 		// character collections.
@@ -128,7 +128,7 @@ func (f *CIDFont) Decode(s pdf.String) (*font.CodeInfo, int) {
 	res := &font.CodeInfo{
 		CID:    CID1,
 		Notdef: CID2,
-		Text:   string(text),
+		Text:   text,
 		W:      w,
 	}
 	f.dec[code] = res

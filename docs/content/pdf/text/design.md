@@ -5,7 +5,27 @@ date = 2024-08-31T23:13:27+01:00
 
 # Some design considerations for the font API
 
-## Extracting Text
+## Information in a Font Dictionary
+
+A font dictionary contains the following information:
+
+### Simple Fonts
+
+- map from codes to glyph names/IDs
+- width for each code
+- text content for each code (via glyph name and/or ToUnicode CMap)
+
+Fonts allow to locate glyphs via the glyph name or the builtin encoding.
+
+### Composite Fonts
+
+- character collection (for interpretation of CIDs)
+- map from codes to CIDs (in the CMap)
+- width/offsets for each CID
+- text for each code (via CID and/or ToUnicode CMap)
+- writing mode
+
+Fonts allow to locate glyphs via the CID.
 
 ## Typesetting New Text
 
@@ -26,9 +46,9 @@ may not available for fonts extracted from PDF files.
 - Simple Fonts
 
   The following steps are performed:
-  - rune -> GID/name: this uses information from the font file
-  - GID/name -> character code: could be (a) from a pre-defined encoding, or (b)
-    constructed on the fly
+  - rune -> name/GID: this uses information from the font file
+  - name/GID -> character code: could be (a) from a pre-defined encoding, or
+    (b) constructed on the fly
 
 ## Glyph ID Values
 
@@ -40,6 +60,8 @@ as GIDs.  The GID 0 refers the the `.notdef` glyph (except for Type3 fonts,
 where it does not refer to any glyph at all).
 
 The map of GIDs to glyphs is fixed for any given font instance.
+
+TODO(voss): can this scheme work with external fonts, before they are loaded?
 
 ## Character Codes
 

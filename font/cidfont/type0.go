@@ -54,7 +54,7 @@ type Type0Dict struct {
 	Descriptor *font.Descriptor
 
 	// Encoding specifies how character codes are mapped to CID values.
-	Encoding *cmap.InfoNew
+	Encoding *cmap.File
 
 	// Width is a map from CID values to glyph widths (in PDF glyph space units).
 	Width map[cmap.CID]float64
@@ -66,7 +66,7 @@ type Type0Dict struct {
 	// TODO(voss): vertical glyph metrics
 
 	// Text specifies how character codes are mapped to Unicode strings.
-	Text *cmap.ToUnicodeInfo
+	Text *cmap.ToUnicodeFile
 
 	// GetFont (optional) returns the font data to embed.
 	// If this is nil, the font data is not embedded in the PDF file.

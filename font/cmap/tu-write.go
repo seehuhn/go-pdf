@@ -55,7 +55,7 @@ var toUnicodeTmpl = template.Must(template.New("tounicode").Funcs(template.FuncM
 	"Single": func(cs charcode.CodeSpaceRange, s SingleTUEntry) string {
 		var buf []byte
 		buf = cs.Append(buf, s.Code)
-		val := hexRunes(s.Value)
+		val := hexString(string(s.Value))
 		return fmt.Sprintf("<%x> %s", buf, val)
 	},
 	"RangeChunks": chunks[RangeTUEntry],
@@ -64,11 +64,11 @@ var toUnicodeTmpl = template.Must(template.New("tounicode").Funcs(template.FuncM
 		first = cs.Append(first, s.First)
 		last = cs.Append(last, s.Last)
 		if len(s.Values) == 1 {
-			return fmt.Sprintf("<%x> <%x> %s", first, last, hexRunes(s.Values[0]))
+			return fmt.Sprintf("<%x> <%x> %s", first, last, hexString(string(s.Values[0])))
 		}
 		var repl []string
 		for _, v := range s.Values {
-			repl = append(repl, hexRunes(v))
+			repl = append(repl, hexString(string(v)))
 		}
 		return fmt.Sprintf("<%x> <%x> [%s]", first, last, strings.Join(repl, " "))
 	},

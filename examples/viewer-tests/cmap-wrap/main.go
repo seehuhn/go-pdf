@@ -50,7 +50,7 @@ func generateSampleFile(fname string) error {
 		return err
 	}
 
-	cmap := &cmap.InfoNew{
+	cmap := &cmap.File{
 		Name: "Test",
 		ROS: &cmap.CIDSystemInfo{
 			Registry:   "Adobe",
@@ -98,12 +98,12 @@ func generateSampleFile(fname string) error {
 // embedding, and as the `font.Embedded` after embedding.
 type testFont struct {
 	ttf   *sfnt.Font
-	cmap  *cmap.InfoNew
+	cmap  *cmap.File
 	codec *charcode.Codec
 }
 
 // NewTestFont creates a new test font with the given cmap.
-func NewTestFont(rm *pdf.ResourceManager, cmap *cmap.InfoNew) (*testFont, error) {
+func NewTestFont(rm *pdf.ResourceManager, cmap *cmap.File) (*testFont, error) {
 	// Create a font with just the glyphs for "ABC".
 	ttf, err := sfnt.Read(bytes.NewReader(goregular.TTF))
 	if err != nil {

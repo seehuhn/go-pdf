@@ -33,10 +33,12 @@ import (
 // - https://adobe-type-tools.github.io/font-tech-notes/pdfs/5014.CIDFont_Spec.pdf
 // - https://adobe-type-tools.github.io/font-tech-notes/pdfs/5099.CMapResources.pdf
 
-// InfoNew represents the information for a CMap used with a PDF composite
+// File represents the information for a CMap used with a PDF composite
 // font.  This describes a mapping from character codes (one or more bytes) to
 // character identifiers (CIDs).
-type InfoNew struct {
+//
+// This structure closely resembles the structure of a CMap file.
+type File struct {
 	Name  pdf.Name
 	ROS   *CIDSystemInfo
 	WMode WritingMode
@@ -47,7 +49,7 @@ type InfoNew struct {
 	NotdefSingles []SingleNew
 	NotdefRanges  []RangeNew
 
-	Parent *InfoNew // This corresponds to the UseCMap entry in the PDF spec.
+	Parent *File // This corresponds to the UseCMap entry in the PDF spec.
 }
 
 // WritingMode is the "writing mode" of a PDF font (horizontal or vertical).
@@ -104,7 +106,7 @@ type CID uint32
 
 // ExtractNew extracts a CMap from a PDF object.
 // The argument must be the name of a predefined CMap or a stream containing a CMap.
-func ExtractNew(r pdf.Getter, obj pdf.Object) (*InfoNew, error) {
+func ExtractNew(r pdf.Getter, obj pdf.Object) (*File, error) {
 	predefinedMu.Lock()
 	defer predefinedMu.Unlock()
 
@@ -113,7 +115,7 @@ func ExtractNew(r pdf.Getter, obj pdf.Object) (*InfoNew, error) {
 }
 
 // This must be called with predefinedMu locked.
-func safeExtractCMap(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object) (*InfoNew, error) {
+func safeExtractCMap(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object) (*File, error) {
 	if err := cycle.Check(obj); err != nil {
 		return nil, err
 	}
@@ -192,7 +194,7 @@ func safeExtractCMap(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object) (*In
 	return res, nil
 }
 
-func readCMap(r io.Reader) (*InfoNew, pdf.Object, error) {
+func readCMap(r io.Reader) (*File, pdf.Object, error) {
 	raw, err := postscript.ReadCMap(r)
 	if err != nil {
 		return nil, nil, err
@@ -202,7 +204,7 @@ func readCMap(r io.Reader) (*InfoNew, pdf.Object, error) {
 		return nil, nil, pdf.Errorf("invalid CMapType: %d", tp)
 	}
 
-	res := &InfoNew{}
+	res := &File{}
 	var parent pdf.Object
 
 	if name, _ := raw["CMapName"].(postscript.Name); name != "" {
@@ -298,7 +300,7 @@ func readCMap(r io.Reader) (*InfoNew, pdf.Object, error) {
 	return res, parent, nil
 }
 
-func (c *InfoNew) LookupCID(code []byte) CID {
+func (c *File) LookupCID(code []byte) CID {
 	for _, s := range c.CIDSingles {
 		if bytes.Equal(s.Code, code) {
 			return s.Value
@@ -328,7 +330,7 @@ rangesLoop:
 	return c.LookupNotdefCID(code)
 }
 
-func (c *InfoNew) LookupNotdefCID(code []byte) CID {
+func (c *File) LookupNotdefCID(code []byte) CID {
 	for _, s := range c.NotdefSingles {
 		if bytes.Equal(s.Code, code) {
 			return s.Value
@@ -355,7 +357,7 @@ rangesLoop:
 	return 0
 }
 
-func (c *InfoNew) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (c *File) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	predefinedMu.Lock()
@@ -394,7 +396,7 @@ func (c *InfoNew) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 
 	data := templateData{
 		HeaderComment: opt.HasAny(pdf.OptPretty),
-		InfoNew:       c,
+		File:          c,
 	}
 
 	ref := rm.Out.Alloc()
@@ -430,7 +432,7 @@ func chunks[T any](x []T) [][]T {
 
 type templateData struct {
 	HeaderComment bool
-	*InfoNew
+	*File
 }
 
 // cmapTmplNew is a template for generating a CMap stream.
@@ -524,6 +526,6 @@ end`))
 
 var (
 	predefinedMu   sync.Mutex
-	predefinedCMap = make(map[pdf.Name]*InfoNew)
-	predefinedName = make(map[*InfoNew]pdf.Name)
+	predefinedCMap = make(map[pdf.Name]*File)
+	predefinedName = make(map[*File]pdf.Name)
 )

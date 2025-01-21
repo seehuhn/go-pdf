@@ -68,7 +68,7 @@ func (r *Reader) ReadFont(ref pdf.Object) (F FontFromFile, err error) {
 	}
 }
 
-func (r *Reader) readSimpleFont(info *font.Dicts, toUni *cmap.ToUnicodeInfo) (F FontFromFile, err error) {
+func (r *Reader) readSimpleFont(info *font.Dicts, toUni *cmap.ToUnicodeFile) (F FontFromFile, err error) {
 	var enc *encoding.Encoding
 	switch info.DictType {
 	case font.DictTypeSimpleType1:
@@ -164,7 +164,7 @@ type SimpleFont struct {
 	enc    *encoding.Encoding
 	info   []*font.CodeInfo
 	widths []float64
-	toUni  *cmap.ToUnicodeInfo
+	toUni  *cmap.ToUnicodeFile
 }
 
 func (f *SimpleFont) WritingMode() cmap.WritingMode {
@@ -194,14 +194,11 @@ func (f *SimpleFont) Decode(s pdf.String) (*font.CodeInfo, int) {
 
 	cid := f.enc.Decode(code)
 
-	var text []rune
-	if f.toUni != nil {
-		text = f.toUni.Lookup(s[:1])
-	}
-	if text == nil {
+	text, found := f.toUni.Lookup(s[:1])
+	if !found {
 		glyphName := f.enc.GlyphName(cid)
 		if glyphName != "" {
-			text = names.ToUnicode(glyphName, false)
+			text = string(names.ToUnicode(glyphName, false))
 		}
 	}
 	// TODO(voss): any other methods for extracting the text mapping???

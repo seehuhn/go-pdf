@@ -73,7 +73,7 @@ func (csr CodeSpaceRange) matchLen(s []byte) int {
 	return 0
 }
 
-// isEquivalent returns true if and only if the two code space ranges contain
+// isEquivalent returns true if and only if the two code space ranges describe
 // the same set of character codes.
 func (csr CodeSpaceRange) isEquivalent(other CodeSpaceRange) bool {
 	for code := range testSequences(csr, other).All() {

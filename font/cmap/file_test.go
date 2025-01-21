@@ -30,7 +30,7 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-var _ pdf.Embedder[pdf.Unused] = (*InfoNew)(nil)
+var _ pdf.Embedder[pdf.Unused] = (*File)(nil)
 
 // The following variabes contain test CMap data used in the tests below.
 var (
@@ -135,7 +135,7 @@ end
 
 	// testInfoFull is an InfoNew struct which uses all fields of the struct.
 	// This is used to test the template used to format a CMap file.
-	testInfoFull = &InfoNew{
+	testInfoFull = &File{
 		Name: "Test",
 		ROS: &CIDSystemInfo{
 			Registry:   "Test",
@@ -143,7 +143,7 @@ end
 			Supplement: 3,
 		},
 		WMode: Horizontal,
-		Parent: &InfoNew{
+		Parent: &File{
 			Name: "Other",
 		},
 		CodeSpaceRange: []charcode.Range{
@@ -172,7 +172,7 @@ end
 		Registry: "Seehuhn",
 		Ordering: "Test",
 	}
-	testInfoParent = &InfoNew{
+	testInfoParent = &File{
 		Name:  "Test1",
 		ROS:   testROS,
 		WMode: Vertical,
@@ -192,7 +192,7 @@ end
 			{First: []byte{0x25}, Last: []byte{0x27}, Value: 6},
 		},
 	}
-	testInfoChild = &InfoNew{
+	testInfoChild = &File{
 		Name:   "Test2",
 		ROS:    testROS,
 		WMode:  Vertical,
@@ -377,9 +377,9 @@ func FuzzReadCMap(f *testing.F) {
 	f.Add(testCMapFull)
 
 	buf := &bytes.Buffer{}
-	for _, info := range []*InfoNew{testInfoFull, testInfoParent, testInfoChild} {
+	for _, info := range []*File{testInfoFull, testInfoParent, testInfoChild} {
 		buf.Reset()
-		err := cmapTmplNew.Execute(buf, templateData{InfoNew: info})
+		err := cmapTmplNew.Execute(buf, templateData{File: info})
 		if err != nil {
 			f.Fatal(err)
 		}
@@ -416,7 +416,7 @@ func FuzzReadCMap(f *testing.F) {
 		}
 
 		buf := &bytes.Buffer{}
-		err = cmapTmplNew.Execute(buf, templateData{InfoNew: info})
+		err = cmapTmplNew.Execute(buf, templateData{File: info})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -547,11 +547,11 @@ func TestExtractLoop(t *testing.T) {
 
 			// construct a loop of n CMaps
 			refs := make([]pdf.Reference, n)
-			cmaps := make([]*InfoNew, n)
+			cmaps := make([]*File, n)
 			for i := range refs {
 				refs[i] = data.Alloc()
 
-				cmaps[i] = &InfoNew{
+				cmaps[i] = &File{
 					Name: pdf.Name(fmt.Sprintf("Test%d", i)),
 					ROS:  ros,
 					CodeSpaceRange: charcode.CodeSpaceRange{
@@ -576,7 +576,7 @@ func TestExtractLoop(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				err = cmapTmplNew.Execute(stm, templateData{InfoNew: cmaps[i]})
+				err = cmapTmplNew.Execute(stm, templateData{File: cmaps[i]})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -634,7 +634,7 @@ func TestCMapTemplate(t *testing.T) {
 	buf := &bytes.Buffer{}
 
 	// check that the template renders without error
-	err := cmapTmplNew.Execute(buf, templateData{InfoNew: testInfoFull})
+	err := cmapTmplNew.Execute(buf, templateData{File: testInfoFull})
 	if err != nil {
 		t.Fatal(err)
 	}
