@@ -21,10 +21,30 @@ import (
 	"sort"
 
 	"seehuhn.de/go/dag"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript/cid"
 )
+
+// Code represents a character code in a font. It provides methods to find the
+// corresponding glyph, glyph width, and text content associated with the
+// character code.
+type Code interface {
+	// CID returns the CID (Character Identifier) for the current character code.
+	CID() CID
+
+	// NotdefCID returns the CID to use in case the original CID is not present
+	// in the font.
+	NotdefCID() CID
+
+	// Width returns the width of the glyph for the current character code.
+	// The value is in PDF glyph space units (1/1000th of text space units).
+	Width() float64
+
+	// Text returns the text content for the current character code.
+	Text() string
+}
 
 // GetMapping returns the mapping information from info.
 func (info *InfoOld) GetMapping() map[charcode.CharCodeOld]cid.CID {

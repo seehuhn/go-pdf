@@ -21,10 +21,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"math"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/widths"
@@ -405,4 +407,41 @@ func (d *Type0Dict) DecodeWidth(s pdf.String) (float64, int) {
 		return d.Width[0], 1
 	}
 	return 0, 0
+}
+
+// Codes returns an iterator over the character codes in the given PDF string.
+// The iterator yields Code instances that provide access to the CID, width,
+// and text content associated with each character code.
+func (d *Type0Dict) Codes(s pdf.String) iter.Seq[cmap.Code] {
+	panic("not implemented") // TODO(voss): Implement
+	// return func(yield func(cmap.Code) bool) {
+	// 	...
+	// }
+}
+
+type type0Code struct {
+	d    *Type0Dict
+	code charcode.Code
+}
+
+// CID returns the CID (Character Identifier) for the current character code.
+func (c *type0Code) CID() cmap.CID {
+	panic("not implemented") // TODO: Implement
+}
+
+// NotdefCID returns the CID to use in case the original CID is not present
+// in the font.
+func (c *type0Code) NotdefCID() cmap.CID {
+	panic("not implemented") // TODO: Implement
+}
+
+// Width returns the width of the glyph for the current character code.
+// The value is in PDF glyph space units (1/1000th of text space units).
+func (c *type0Code) Width() float64 {
+	panic("not implemented") // TODO: Implement
+}
+
+// Text returns the text content for the current character code.
+func (c *type0Code) Text() string {
+	panic("not implemented") // TODO: Implement
 }

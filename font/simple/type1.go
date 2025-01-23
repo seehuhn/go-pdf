@@ -88,17 +88,6 @@ type Type1Dict struct {
 	GetFont func() (Type1FontData, error)
 }
 
-func (d *Type1Dict) WritingMode() cmap.WritingMode {
-	return cmap.Horizontal
-}
-
-func (d *Type1Dict) DecodeWidth(s pdf.String) (float64, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-	return d.Width[s[0]], 1
-}
-
 // ExtractType1Dict reads a Type 1 font dictionary from a PDF file.
 func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
@@ -537,11 +526,22 @@ func (d *Type1Dict) Finish(rm *pdf.ResourceManager) error {
 	return nil
 }
 
+func (d *Type1Dict) WritingMode() cmap.WritingMode {
+	return cmap.Horizontal
+}
+
+func (d *Type1Dict) DecodeWidth(s pdf.String) (float64, int) {
+	if len(s) == 0 {
+		return 0, 0
+	}
+	return d.Width[s[0]], 1
+}
+
 // Codes returns an iterator over the character codes in the given PDF string.
 // The iterator yields Code instances that provide access to the CID, width,
 // and text content associated with each character code.
-func (d *Type1Dict) Codes(s pdf.String) iter.Seq[Code] {
-	return func(yield func(Code) bool) {
+func (d *Type1Dict) Codes(s pdf.String) iter.Seq[cmap.Code] {
+	return func(yield func(cmap.Code) bool) {
 		pos := &type1Code{d: d}
 		for _, c := range s {
 			pos.c = c
@@ -550,25 +550,6 @@ func (d *Type1Dict) Codes(s pdf.String) iter.Seq[Code] {
 			}
 		}
 	}
-}
-
-// Code represents a character code in a font. It provides methods to find the
-// corresponding glyph, glyph width, and text content associated with the
-// character code.
-type Code interface {
-	// CID returns the CID (Character Identifier) for the current character code.
-	CID() cmap.CID
-
-	// NotdefCID returns the CID to use in case the original CID is not present
-	// in the font.
-	NotdefCID() cmap.CID
-
-	// Width returns the width of the glyph for the current character code.
-	// The value is in PDF glyph space units (1/1000th of text space units).
-	Width() float64
-
-	// Text returns the text content for the current character code.
-	Text() string
 }
 
 // type1Code is an implementation of the Code interface for a simple font.

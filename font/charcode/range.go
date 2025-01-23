@@ -76,12 +76,16 @@ func (csr CodeSpaceRange) matchLen(s []byte) int {
 // isEquivalent returns true if and only if the two code space ranges describe
 // the same set of character codes.
 func (csr CodeSpaceRange) isEquivalent(other CodeSpaceRange) bool {
+	return csr.getDifference(other) == nil
+}
+
+func (csr CodeSpaceRange) getDifference(other CodeSpaceRange) []byte {
 	for code := range testSequences(csr, other).All() {
 		if csr.matchLen(code) != other.matchLen(code) {
-			return false
+			return code
 		}
 	}
-	return true
+	return nil
 }
 
 type seqGen [][]byte

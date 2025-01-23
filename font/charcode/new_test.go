@@ -471,6 +471,16 @@ var testCases = []testRanges{
 			},
 		},
 	},
+
+	{
+		name: "different cuts",
+		ranges: []Range{
+			{Low: []byte{0x00, 0x00, 0x00}, High: []byte{0xFF, 0xFF, 0x00}},
+			{Low: []byte{0x00, 0x00, 0x01}, High: []byte{0x7F, 0xFF, 0x01}},
+			{Low: []byte{0x00, 0x00, 0x02}, High: []byte{0xFF, 0x7F, 0x02}},
+		},
+		cases: []testCase{},
+	},
 }
 
 func TestCodecDecode(t *testing.T) {
@@ -601,7 +611,15 @@ func TestCodecCodeSpaceRange(t *testing.T) {
 			}
 			csr2 := c.CodeSpaceRange()
 			if !csr1.isEquivalent(csr2) {
-				t.Errorf("CodeSpaceRange() = %v, want %v", csr2, csr1)
+				t.Errorf("CodeSpaceRanges differ for % x", csr1.getDifference(csr2))
+				fmt.Println("before:")
+				for _, r := range csr1 {
+					fmt.Printf("  % x - % x\n", r.Low, r.High)
+				}
+				fmt.Println("after:")
+				for _, r := range csr2 {
+					fmt.Printf("  % x - % x\n", r.Low, r.High)
+				}
 			}
 		})
 	}

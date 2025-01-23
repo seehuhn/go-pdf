@@ -391,26 +391,31 @@ func (c *File) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		filters = append(filters, pdf.FilterCompress{})
 	}
 
-	data := templateData{
-		HeaderComment: opt.HasAny(pdf.OptPretty),
-		File:          c,
-	}
-
 	ref := rm.Out.Alloc()
 	stm, err := rm.Out.OpenStream(ref, dict, filters...)
 	if err != nil {
 		return nil, zero, err
 	}
-	err = cmapTmplNew.Execute(stm, data)
+
+	err = c.WriteTo(stm, opt.HasAny(pdf.OptPretty))
 	if err != nil {
 		return nil, zero, fmt.Errorf("embedding cmap: %w", err)
 	}
+
 	err = stm.Close()
 	if err != nil {
 		return nil, zero, err
 	}
 
 	return ref, zero, nil
+}
+
+func (c *File) WriteTo(w io.Writer, pretty bool) error {
+	data := templateData{
+		HeaderComment: pretty,
+		File:          c,
+	}
+	return cmapTmplNew.Execute(w, data)
 }
 
 const chunkSize = 100
