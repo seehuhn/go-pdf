@@ -12,8 +12,8 @@ require (
 	seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5
 	seehuhn.de/go/geom v0.0.0-20250115091222-3cab61c7096a
 	seehuhn.de/go/icc v0.0.0-20240801195843-cfc244e2c55a
-	seehuhn.de/go/postscript v0.5.1-0.20250105173611-268a18474c41
-	seehuhn.de/go/sfnt v0.5.1-0.20250116222643-6bb3225a9afc
+	seehuhn.de/go/postscript v0.5.1-0.20250124144726-204d9fcbd73d
+	seehuhn.de/go/sfnt v0.5.1-0.20250124145614-7b0e76172d03
 	seehuhn.de/go/xmp v0.3.0
 )
 

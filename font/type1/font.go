@@ -403,7 +403,7 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 	}
 
 	rm := pdf.NewResourceManager(f.w) // TODO(voss): move this into the caller
-	return dict.Finish(rm)
+	return dict.WriteToPDF(rm)
 }
 
 func (f *embeddedSimple) isSymbolic() bool {

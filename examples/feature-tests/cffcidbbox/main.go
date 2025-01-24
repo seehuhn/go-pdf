@@ -262,7 +262,7 @@ func makeTestFonts() (*testFonts, error) {
 			}
 			return 1
 		},
-		ROS:      &cff.CIDSystemInfo{Registry: "seehuhn.de", Ordering: "test"},
+		ROS:      &cid.SystemInfo{Registry: "seehuhn.de", Ordering: "test"},
 		GIDToCID: GIDToCID,
 		FontMatrices: []matrix.Matrix{
 			{0.001, 0, 0, 0.0005, 0, 0},
@@ -348,6 +348,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		Ref:            fontDictRef,
 		PostScriptName: f.cff.FontName,
 		Descriptor:     fd,
+		ROS:            f.cmap.ROS,
 		Encoding:       f.cmap,
 		Width:          ww,
 		DefaultWidth:   f.cff.GlyphWidthPDF(0),
@@ -355,7 +356,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 			return f.cff, nil
 		},
 	}
-	err := dicts.Finish(rm)
+	err := dicts.WriteToPDF(rm)
 	if err != nil {
 		return nil, nil, err
 	}

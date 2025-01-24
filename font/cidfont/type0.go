@@ -21,12 +21,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"iter"
 	"math"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/widths"
@@ -55,7 +53,13 @@ type Type0Dict struct {
 	// Descriptor is the font descriptor.
 	Descriptor *font.Descriptor
 
+	// ROS describes the character collection covered by the font.
+	ROS *cmap.CIDSystemInfo
+
 	// Encoding specifies how character codes are mapped to CID values.
+	//
+	// The Encoding.ROS field must either be compatible with the ROS field
+	// above, or must be one of Identity-H or Identity-V.
 	Encoding *cmap.File
 
 	// Width is a map from CID values to glyph widths (in PDF glyph space units).
@@ -72,6 +76,11 @@ type Type0Dict struct {
 
 	// GetFont (optional) returns the font data to embed.
 	// If this is nil, the font data is not embedded in the PDF file.
+	//
+	// If subsetting is required, GetFont must return the subsetted font data.
+	//
+	// If GetFont is not nil, the returned font must have a ROS field
+	// which is compatible with the ROS field above.
 	GetFont func() (Type0FontData, error)
 }
 
@@ -225,9 +234,8 @@ func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (Type0FontData, error), e
 	}
 }
 
-// Finish embeds the font data in the PDF file.
-// This implements the [pdf.Finisher] interface.
-func (d *Type0Dict) Finish(rm *pdf.ResourceManager) error {
+// WriteToPDF embeds the font data in the PDF file.
+func (d *Type0Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	w := rm.Out
 
 	var fontData Type0FontData
@@ -273,8 +281,7 @@ func (d *Type0Dict) Finish(rm *pdf.ResourceManager) error {
 		cidFontName = pdf.Name(d.PostScriptName)
 	}
 
-	// TODO(voss): How do we get the correct ROS for Identity-H/V?
-	cidSystemInfo, _, err := pdf.ResourceManagerEmbed(rm, d.Encoding.ROS)
+	cidSystemInfo, _, err := pdf.ResourceManagerEmbed(rm, d.ROS)
 	if err != nil {
 		return err
 	}
@@ -327,7 +334,7 @@ func (d *Type0Dict) Finish(rm *pdf.ResourceManager) error {
 
 	ww := widths.EncodeComposite2(d.Width, d.DefaultWidth)
 	switch {
-	case len(ww) > 10: // TODO(voss): count the element of the flattened array
+	case moreThanTen(ww):
 		wwRef := w.Alloc()
 		cidFontDict["W"] = wwRef
 		compressedObjects = append(compressedObjects, ww)
@@ -384,6 +391,22 @@ func (d *Type0Dict) Finish(rm *pdf.ResourceManager) error {
 	return nil
 }
 
+// moreThanTen returns true if the flattened array has more than 10 elements.
+func moreThanTen(a pdf.Array) bool {
+	count := 0
+	for _, obj := range a {
+		if a, ok := obj.(pdf.Array); ok {
+			count += len(a)
+		} else {
+			count++
+		}
+		if count > 10 {
+			return true
+		}
+	}
+	return false
+}
+
 func (d *Type0Dict) WritingMode() cmap.WritingMode {
 	return d.Encoding.WMode
 }
@@ -407,41 +430,4 @@ func (d *Type0Dict) DecodeWidth(s pdf.String) (float64, int) {
 		return d.Width[0], 1
 	}
 	return 0, 0
-}
-
-// Codes returns an iterator over the character codes in the given PDF string.
-// The iterator yields Code instances that provide access to the CID, width,
-// and text content associated with each character code.
-func (d *Type0Dict) Codes(s pdf.String) iter.Seq[cmap.Code] {
-	panic("not implemented") // TODO(voss): Implement
-	// return func(yield func(cmap.Code) bool) {
-	// 	...
-	// }
-}
-
-type type0Code struct {
-	d    *Type0Dict
-	code charcode.Code
-}
-
-// CID returns the CID (Character Identifier) for the current character code.
-func (c *type0Code) CID() cmap.CID {
-	panic("not implemented") // TODO: Implement
-}
-
-// NotdefCID returns the CID to use in case the original CID is not present
-// in the font.
-func (c *type0Code) NotdefCID() cmap.CID {
-	panic("not implemented") // TODO: Implement
-}
-
-// Width returns the width of the glyph for the current character code.
-// The value is in PDF glyph space units (1/1000th of text space units).
-func (c *type0Code) Width() float64 {
-	panic("not implemented") // TODO: Implement
-}
-
-// Text returns the text content for the current character code.
-func (c *type0Code) Text() string {
-	panic("not implemented") // TODO: Implement
 }

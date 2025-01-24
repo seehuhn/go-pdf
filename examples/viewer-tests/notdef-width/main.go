@@ -286,7 +286,7 @@ func makeTestFont() *testFont {
 		FDSelect: func(glyph.ID) int {
 			return 0
 		},
-		ROS: &cff.CIDSystemInfo{
+		ROS: &cid.SystemInfo{
 			Registry:   "seehuhn.de",
 			Ordering:   "test",
 			Supplement: 0,
@@ -363,6 +363,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		Ref:            fontDictRef,
 		PostScriptName: f.data.FontName,
 		Descriptor:     fd,
+		ROS:            f.cmap.ROS,
 		Encoding:       f.cmap,
 		Width: map[cmap.CID]float64{
 			0: 1000,
@@ -376,7 +377,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 			return f.data, nil
 		},
 	}
-	err := dicts.Finish(rm)
+	err := dicts.WriteToPDF(rm)
 	if err != nil {
 		return nil, nil, err
 	}

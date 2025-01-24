@@ -26,6 +26,26 @@ Error Handling
   PDF written by this library should be 100% conformant to the
   PDF spec.
 
+
+Deduplication
+-------------
+
+- The type
+  [`ResourceManager`](https://pkg.go.dev/seehuhn.de/go/pdf@v0.5.1-0.20250106103048-1692b734110c#ResourceManager)
+  helps to ensure that only a single copy of a given object is embedded in the
+  PDF file.  This is useful for sharing resources (fonts, images, ...) between
+  different pages.
+
+- To be used with a `ResourceManager`, objects must implement the [`Embedder`
+  interface](https://pkg.go.dev/seehuhn.de/go/pdf@v0.5.1-0.20250106103048-1692b734110c#Embedder),
+  by providing a method `Embed(*pdf.ResourceManager) (pdf.Native, T, error)`
+  for some type `T`.  The object can either use the `Embed` method to embed the
+  object straight away, or it can defer embedding the object by returning a
+  type `T` with a `Finish(*pdf.ResourceManager) error` method.  In the latter
+  case, the resource manager will call `Finish` when the resource manager is
+  closed.
+
+
 Naming
 ------
 
@@ -44,3 +64,14 @@ Naming
     - [`cff.ExtractSimple(r pdf.Getter, dicts *font.Dicts) (*cff.FontDictSimple, error)`](https://pkg.go.dev/seehuhn.de/go/pdf/font/cff#ExtractSimple)
 
   In all cases, the first argument is a `pdf.Getter`.
+
+- Methods of the form `AsPDF(pdf.OutputOptions) pdf.Native` are used to convert
+  objects to their PDF representation.  This is only used for relatively simple
+  objects, which do not need to be written as indirect objects.
+
+- Methods with signature `WriteToPDF(*pdf.ResourceManager) error`
+  are used to write objects to a PDF file as one or more indirect objects.
+
+- Methods with signature `Embed(*pdf.ResourceManager) (pdf.Native, T, error)`
+  and optionally `Finish(*pdf.ResourceManager) error` are used to write objects
+  to the PDF file, in cases when deduplication is required.

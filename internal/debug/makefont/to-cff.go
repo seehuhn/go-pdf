@@ -187,7 +187,7 @@ func toCFFCID(info *sfnt.Font) (*sfnt.Font, error) {
 
 	outlines := clone(info.Outlines.(*cff.Outlines))
 	outlines.Encoding = nil
-	outlines.ROS = &cff.CIDSystemInfo{
+	outlines.ROS = &cid.SystemInfo{
 		Registry:   "Seehuhn",
 		Ordering:   "Sonderbar",
 		Supplement: 0,

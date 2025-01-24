@@ -439,5 +439,5 @@ func (t *Typesetter) Finish(rm *pdf.ResourceManager) error {
 		}
 	}
 
-	return dict.Finish(rm)
+	return dict.WriteToPDF(rm)
 }

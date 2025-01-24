@@ -151,5 +151,5 @@ func (f *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		res.Text[code[0]] = string(text)
 	}
 
-	return res.Finish(rm)
+	return res.WriteToPDF(rm)
 }

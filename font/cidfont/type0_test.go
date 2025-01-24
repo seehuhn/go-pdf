@@ -58,13 +58,15 @@ func TestType1DictRoundtrip(t *testing.T) {
 		StemV:        fontCFF.Private[0].StdVW * (F1.FontMatrix[0] * 1000),
 		StemH:        fontCFF.Private[0].StdHW * (F1.FontMatrix[3] * 1000),
 	}
+	ros := &cmap.CIDSystemInfo{Registry: "seehuhn.de", Ordering: "test"}
 	dicts1 := &Type0Dict{
 		Ref:            data.Alloc(),
 		PostScriptName: F1.PostScriptName(),
 		Descriptor:     fd,
+		ROS:            ros,
 		Encoding: &cmap.File{
 			Name:  "Test",
-			ROS:   &cmap.CIDSystemInfo{Registry: "seehuhn.de", Ordering: "test"},
+			ROS:   ros,
 			WMode: cmap.Horizontal,
 			CodeSpaceRange: []charcode.Range{
 				{Low: []byte{0x00}, High: []byte{0xFF}},
@@ -104,7 +106,7 @@ func TestType1DictRoundtrip(t *testing.T) {
 			cmap.ToUnicodeSingle{Code: []byte{byte(code)}, Value: string(rr)})
 	}
 
-	err = dicts1.Finish(rm)
+	err = dicts1.WriteToPDF(rm)
 	if err != nil {
 		t.Fatal(err)
 	}

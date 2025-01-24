@@ -21,6 +21,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/postscript/cid"
 	pscid "seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
 
@@ -122,7 +123,7 @@ func (f *embeddedCFFComposite) Finish(*pdf.ResourceManager) error {
 		if ros.Supplement > 0 && ros.Supplement < 0x1000_0000 {
 			sup = int32(ros.Supplement)
 		}
-		outlines.ROS = &cff.CIDSystemInfo{
+		outlines.ROS = &cid.SystemInfo{
 			Registry:   ros.Registry,
 			Ordering:   ros.Ordering,
 			Supplement: sup,

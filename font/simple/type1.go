@@ -303,7 +303,7 @@ func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (Type1FontData, error), e
 //
 // The FontName field in the font descriptor is ignored and the correct value
 // is set automatically.  TODO(voss): don't do this
-func (d *Type1Dict) Finish(rm *pdf.ResourceManager) error {
+func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	var psFont Type1FontData
 	if d.GetFont != nil {
 		font, err := d.GetFont()

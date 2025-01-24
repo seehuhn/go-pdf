@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/rect"
+	"seehuhn.de/go/postscript/cid"
 	pscid "seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
 
@@ -117,16 +118,16 @@ func (f *embeddedComposite) Finish(*pdf.ResourceManager) error {
 		if ros.Supplement > 0 && ros.Supplement < 0x1000_0000 {
 			sup = int32(ros.Supplement)
 		}
-		subsetCFF.ROS = &cff.CIDSystemInfo{
+		subsetCFF.ROS = &cid.SystemInfo{
 			Registry:   ros.Registry,
 			Ordering:   ros.Ordering,
 			Supplement: sup,
 		}
 		subsetCFF.GIDToCID = gidToCID
-		if subsetCFF.FontMatrices == nil {
-			for range subsetCFF.Private {
-				subsetCFF.FontMatrices = append(subsetCFF.FontMatrices, matrix.Identity)
-			}
+		for len(subsetCFF.FontMatrices) < len(subsetCFF.Private) {
+			// TODO(voss): I think it would be more normal to have the identity
+			// matrix in the top dict, and the real font matrix here?
+			subsetCFF.FontMatrices = append(subsetCFF.FontMatrices, matrix.Identity)
 		}
 	}
 

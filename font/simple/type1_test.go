@@ -61,7 +61,7 @@ func TestType1DictRoundtrip(t *testing.T) {
 			return F1, nil
 		},
 	}
-	err := dicts1.Finish(rm)
+	err := dicts1.WriteToPDF(rm)
 	if err != nil {
 		t.Fatal(err)
 	}
