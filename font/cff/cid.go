@@ -17,9 +17,7 @@
 package cff
 
 import (
-	"bytes"
 	"fmt"
-	"math"
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/rect"
@@ -65,7 +63,7 @@ func (f *embeddedComposite) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune)
 	return s, width
 }
 
-func (f *embeddedComposite) Finish(*pdf.ResourceManager) error {
+func (f *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 	if f.closed {
 		return nil
 	}
@@ -92,7 +90,7 @@ func (f *embeddedComposite) Finish(*pdf.ResourceManager) error {
 	}
 
 	ros := f.ROS()
-	toUnicode := f.ToUnicode()
+	toUnicode := f.ToUnicodeNew()
 
 	cmapInfo := f.CMap()
 
@@ -144,7 +142,7 @@ func (f *embeddedComposite) Finish(*pdf.ResourceManager) error {
 		IsSerif:    subsetOTF.IsSerif,
 		IsScript:   subsetOTF.IsScript,
 	}
-	return info.Embed(f.w, f.ref)
+	return info.Embed(rm, f.ref)
 }
 
 // FontDictComposite is the information needed to embed a CFF font as a composite PDF font.
@@ -170,66 +168,12 @@ type FontDictComposite struct {
 	IsSmallCap bool
 
 	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode *cmap.ToUnicodeOld
+	ToUnicode *cmap.ToUnicodeFile
 }
 
-// ExtractComposite extracts information about a composite CFF font from a PDF file.
-// This is the reverse of [FontDictComposite.Embed].
-func ExtractComposite(r pdf.Getter, dicts *font.Dicts) (*FontDictComposite, error) {
-	if err := dicts.FontTypeOld.MustBe(font.CFFComposite); err != nil {
-		return nil, err
-	}
-	res := &FontDictComposite{}
+func (info *FontDictComposite) Embed(rm *pdf.ResourceManager, fontDictRef pdf.Reference) error {
+	w := rm.Out
 
-	stmObj, err := pdf.GetStream(r, dicts.FontData)
-	if err != nil {
-		return nil, err
-	}
-	data, err := pdf.ReadAll(r, stmObj)
-	if err != nil {
-		return nil, err
-	}
-	cff, err := cff.Read(bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	res.Font = cff
-
-	postScriptName, _ := pdf.GetName(r, dicts.CIDFontDict["BaseFont"])
-	if m := subset.TagRegexp.FindStringSubmatch(string(postScriptName)); m != nil {
-		res.SubsetTag = m[1]
-	}
-
-	cmapInfo, err := cmap.Extract(r, dicts.FontDict["Encoding"])
-	if err != nil {
-		return nil, err
-	}
-	res.CMap = cmapInfo
-
-	// TODO(voss): be more robust here
-	unitsPerEm := uint16(math.Round(1 / float64(cff.FontMatrix[0])))
-	q := 1000 / float64(unitsPerEm)
-
-	res.UnitsPerEm = unitsPerEm
-	res.Ascent = funit.Int16(math.Round(dicts.FontDescriptor.Ascent / q))
-	res.Descent = funit.Int16(math.Round(dicts.FontDescriptor.Descent / q))
-	res.CapHeight = funit.Int16(math.Round(dicts.FontDescriptor.CapHeight / q))
-	res.IsSerif = dicts.FontDescriptor.IsSerif
-	res.IsScript = dicts.FontDescriptor.IsScript
-	res.IsAllCap = dicts.FontDescriptor.IsAllCap
-	res.IsSmallCap = dicts.FontDescriptor.IsSmallCap
-
-	if info, _ := cmap.ExtractToUnicodeOld(r, dicts.FontDict["ToUnicode"], cmapInfo.CodeSpaceRange); info != nil {
-		res.ToUnicode = info
-	}
-
-	return res, nil
-}
-
-// Embed adds a composite CFF font to a PDF file.
-// This implements the [font.Dict] interface.
-// This is the reverse of [ExtractComposite]
-func (info *FontDictComposite) Embed(w *pdf.Writer, fontDictRef pdf.Reference) error {
 	err := pdf.CheckVersion(w, "composite CFF fonts", pdf.V1_3)
 	if err != nil {
 		return err
@@ -290,10 +234,12 @@ func (info *FontDictComposite) Embed(w *pdf.Writer, fontDictRef pdf.Reference) e
 		"Encoding":        encoding,
 		"DescendantFonts": pdf.Array{cidFontRef},
 	}
-	var toUnicodeRef pdf.Reference
 	if info.ToUnicode != nil {
-		toUnicodeRef = w.Alloc()
-		fontDict["ToUnicode"] = toUnicodeRef
+		ref, _, err := pdf.ResourceManagerEmbed(rm, info.ToUnicode)
+		if err != nil {
+			return err
+		}
+		fontDict["ToUnicode"] = ref
 	}
 
 	ROS := pdf.Dict{
@@ -361,13 +307,6 @@ func (info *FontDictComposite) Embed(w *pdf.Writer, fontDictRef pdf.Reference) e
 
 	if ref, ok := encoding.(pdf.Reference); ok {
 		err = cmapInfo.Embed(w, ref, nil)
-		if err != nil {
-			return err
-		}
-	}
-
-	if toUnicodeRef != 0 {
-		err = info.ToUnicode.Embed(w, toUnicodeRef)
 		if err != nil {
 			return err
 		}

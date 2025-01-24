@@ -26,9 +26,9 @@ import (
 )
 
 func NewFile(codec *charcode.Codec, data map[charcode.Code]Code) *File {
-	res := &File{}
-
-	res.CodeSpaceRange = codec.CodeSpaceRange()
+	res := &File{
+		CodeSpaceRange: codec.CodeSpaceRange(),
+	}
 
 	// group together codes which only differ in the last byte
 	type entry struct {

@@ -105,7 +105,27 @@ func (e *identityEncoder) ToUnicode() *ToUnicodeOld {
 }
 
 func (e *identityEncoder) ToUnicodeNew() *ToUnicodeFile {
-	panic("not implemented")
+	// TODO(voss): rewrite this one we don't need to support `*ToUnicodeOld`
+	// anymore.
+
+	csr := charcode.UCS2
+	codec, err := charcode.NewCodec(csr)
+	if err != nil {
+		panic(err)
+	}
+
+	m := make(map[charcode.Code]string)
+	var buf []byte
+	for codeOld, rr := range e.toUnicode {
+		buf = csr.Append(buf[:0], charcode.CharCodeOld(codeOld))
+		codeNew, l, valid := codec.Decode(buf)
+		if !valid || l != len(buf) {
+			panic("invalid code")
+		}
+		m[codeNew] = string(rr)
+	}
+
+	return NewToUnicodeFile(codec, m)
 }
 
 func (e *identityEncoder) Subset() []glyph.ID {
@@ -240,7 +260,27 @@ func (e *utf8Encoder) ToUnicode() *ToUnicodeOld {
 }
 
 func (e *utf8Encoder) ToUnicodeNew() *ToUnicodeFile {
-	panic("not implemented")
+	// TODO(voss): rewrite this one we don't need to support `*ToUnicodeOld`
+	// anymore.
+
+	csr := utf8cs
+	codec, err := charcode.NewCodec(csr)
+	if err != nil {
+		panic(err)
+	}
+
+	m := make(map[charcode.Code]string)
+	var buf []byte
+	for key, codeOld := range e.cache {
+		buf = csr.Append(buf[:0], charcode.CharCodeOld(codeOld))
+		codeNew, l, valid := codec.Decode(buf)
+		if !valid || l != len(buf) {
+			panic("invalid code")
+		}
+		m[codeNew] = string(key.rr)
+	}
+
+	return NewToUnicodeFile(codec, m)
 }
 
 func (e *utf8Encoder) Subset() []glyph.ID {

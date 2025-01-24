@@ -17,13 +17,106 @@
 package cmap
 
 import (
+	"slices"
+	"sort"
 	"unicode/utf16"
 
+	"golang.org/x/exp/maps"
 	"seehuhn.de/go/dag"
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
-// MakeSimpleToUnicode creates a ToUnicodeInfo object for the encoding of a
+// NewToUnicodeFile creates a ToUnicodeFile object.
+func NewToUnicodeFile(codec *charcode.Codec, data map[charcode.Code]string) *ToUnicodeFile {
+	res := &ToUnicodeFile{
+		CodeSpaceRange: codec.CodeSpaceRange(),
+	}
+
+	// group together codes which only differ in the last byte
+	type entry struct {
+		code charcode.Code
+		x    byte
+	}
+	ranges := make(map[string][]entry)
+	var buf []byte
+	for code := range data {
+		buf = codec.AppendCode(buf[:0], code)
+		l := len(buf)
+		key := string(buf[:l-1])
+		ranges[key] = append(ranges[key], entry{code, buf[l-1]})
+	}
+
+	// find all ranges, in sorted order
+	keys := maps.Keys(ranges)
+	sort.Slice(keys, func(i, j int) bool {
+		return slices.Compare([]byte(keys[i]), []byte(keys[j])) < 0
+	})
+
+	// for each range, add the required CIDRanges and CIDSingles
+	for _, key := range keys {
+		info := ranges[key]
+		sort.Slice(info, func(i, j int) bool {
+			return info[i].x < info[j].x
+		})
+
+		start := 0
+		for i := 1; i <= len(info); i++ {
+			if i == len(info) || info[i].x != info[i-1].x+1 {
+				first := make([]byte, len(key)+1)
+				copy(first, key)
+				first[len(key)] = info[start].x
+				if i-start > 1 {
+					last := make([]byte, len(key)+1)
+					copy(last, key)
+					last[len(key)] = info[i-1].x
+
+					needsList := false
+					for j := start; j < i-1; j++ {
+						if data[info[j+1].code] != nextString(data[info[j].code]) {
+							needsList = true
+							break
+						}
+					}
+
+					var values []string
+					if needsList {
+						values = make([]string, i-start)
+						for j := start; j < i; j++ {
+							values[j-start] = data[info[j].code]
+						}
+					} else {
+						values = []string{data[info[start].code]}
+					}
+
+					res.Ranges = append(res.Ranges, ToUnicodeRange{
+						First:  first,
+						Last:   last,
+						Values: values,
+					})
+				} else {
+					res.Singles = append(res.Singles, ToUnicodeSingle{
+						Code:  first,
+						Value: data[info[start].code],
+					})
+				}
+				start = i
+			}
+		}
+	}
+
+	return res
+}
+
+func nextString(s string) string {
+	rr := []rune(s)
+	if len(rr) == 0 {
+		return ""
+	}
+	rr[len(rr)-1]++
+	return string(rr)
+}
+
+// MakeSimpleToUnicode creates a ToUnicodeFile object for the encoding of a
 // simple font.
 func MakeSimpleToUnicode(data map[byte]string) *ToUnicodeFile {
 	g := tuEncSimple(data)
