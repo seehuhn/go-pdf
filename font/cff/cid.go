@@ -18,21 +18,19 @@ package cff
 
 import (
 	"fmt"
+	"math"
 
 	"seehuhn.de/go/geom/matrix"
-	"seehuhn.de/go/geom/rect"
-	"seehuhn.de/go/postscript/cid"
 	pscid "seehuhn.de/go/postscript/cid"
-	"seehuhn.de/go/postscript/funit"
 
 	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cidfont"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/font/widths"
 )
 
 type embeddedComposite struct {
@@ -90,13 +88,12 @@ func (f *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 	}
 
 	ros := f.ROS()
+	cmapInfo := f.CMapNew()
 	toUnicode := f.ToUnicodeNew()
 
-	cmapInfo := f.CMap()
-
-	// If the CFF font is CID-keyed, *i.e.* if it contain a `ROS` operator,
-	// then the `charset` table in the CFF font describes the mapping from CIDs
-	// to glyphs.  Otherwise, the CID is used as the glyph index directly.
+	// If the CFF font is CID-keyed, then the `charset` table in the CFF font
+	// describes the mapping from CIDs to glyphs.  Otherwise, the CID is used
+	// as the glyph index directly.
 	isIdentity := true
 	for gid, cid := range gidToCID {
 		if cid != 0 && cid != pscid.CID(gid) {
@@ -116,7 +113,7 @@ func (f *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 		if ros.Supplement > 0 && ros.Supplement < 0x1000_0000 {
 			sup = int32(ros.Supplement)
 		}
-		subsetCFF.ROS = &cid.SystemInfo{
+		subsetCFF.ROS = &pscid.SystemInfo{
 			Registry:   ros.Registry,
 			Ordering:   ros.Ordering,
 			Supplement: sup,
@@ -129,188 +126,59 @@ func (f *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 		}
 	}
 
-	info := FontDictComposite{
-		Font:      subsetCFF,
-		SubsetTag: subsetTag,
-		CMap:      cmapInfo,
-		ToUnicode: toUnicode,
-
-		UnitsPerEm: subsetOTF.UnitsPerEm,
-		Ascent:     subsetOTF.Ascent,
-		Descent:    subsetOTF.Descent,
-		CapHeight:  subsetOTF.CapHeight,
-		IsSerif:    subsetOTF.IsSerif,
-		IsScript:   subsetOTF.IsScript,
-	}
-	return info.Embed(rm, f.ref)
-}
-
-// FontDictComposite is the information needed to embed a CFF font as a composite PDF font.
-type FontDictComposite struct {
-	// Font is the font to embed (already subsetted, if needed).
-	Font *cff.Font
-
-	// SubsetTag should be a unique tag for the font subset,
-	// or the empty string if this is the full font.
-	SubsetTag string
-
-	CMap *cmap.InfoOld
-
-	UnitsPerEm uint16 // TODO(voss): use the font matrix instead
-
-	Ascent    funit.Int16
-	Descent   funit.Int16
-	CapHeight funit.Int16
-	IsSerif   bool
-	IsScript  bool
-
-	IsAllCap   bool
-	IsSmallCap bool
-
-	// ToUnicode (optional) is a map from character codes to unicode strings.
-	ToUnicode *cmap.ToUnicodeFile
-}
-
-func (info *FontDictComposite) Embed(rm *pdf.ResourceManager, fontDictRef pdf.Reference) error {
-	w := rm.Out
-
-	err := pdf.CheckVersion(w, "composite CFF fonts", pdf.V1_3)
-	if err != nil {
-		return err
-	}
-
-	cff := info.Font
-
-	cidFontName := cff.FontInfo.FontName
-	if info.SubsetTag != "" {
-		cidFontName = info.SubsetTag + "+" + cidFontName
-	}
-
-	// make a PDF CMap
-	cmapInfo := info.CMap
-	var encoding pdf.Object
-	if cmapInfo.IsPredefined() {
-		encoding = pdf.Name(cmapInfo.Name)
-	} else {
-		encoding = w.Alloc()
-	}
-
-	unitsPerEm := info.UnitsPerEm
-
-	q := 1000 / float64(unitsPerEm)
+	postScriptName := subsetCFF.FontInfo.FontName // TODO(voss): try to set this correctly
 
 	ww := make(map[cmap.CID]float64)
-	glyphWidths := cff.Widths()
-	if cff.GIDToCID != nil {
-		for gid, w := range glyphWidths {
-			ww[cmap.CID(cff.GIDToCID[gid])] = w * q
-		}
-	} else {
-		for gid, w := range glyphWidths {
-			ww[cmap.CID(gid)] = w * q
-		}
+	for gid, cid := range gidToCID {
+		ww[cid] = subsetCFF.GlyphWidthPDF(glyph.ID(gid))
 	}
-	W, DW := widths.EncodeComposite(ww, pdf.GetVersion(w))
+	dw := subsetCFF.GlyphWidthPDF(0)
 
-	// TODO(voss): correctly handle the FontMatrices
-	bbox := cff.BBox()
-	fontBBox := rect.Rect{
-		LLx: bbox.LLx.AsFloat(q),
-		LLy: bbox.LLy.AsFloat(q),
-		URx: bbox.URx.AsFloat(q),
-		URy: bbox.URy.AsFloat(q),
-	}
+	isSymbolic := false
 
-	isSymbolic := true // TODO(voss): try to set this correctly
-
-	cidFontRef := w.Alloc()
-	fontDescriptorRef := w.Alloc()
-	fontFileRef := w.Alloc()
-
-	fontDict := pdf.Dict{
-		"Type":            pdf.Name("Font"),
-		"Subtype":         pdf.Name("Type0"),
-		"BaseFont":        pdf.Name(cidFontName + "-" + cmapInfo.Name),
-		"Encoding":        encoding,
-		"DescendantFonts": pdf.Array{cidFontRef},
+	qh := subsetCFF.FontMatrix[0] * 1000
+	qv := subsetCFF.FontMatrix[3] * 1000
+	ascent := subsetOTF.Ascent.AsFloat(qv)
+	descent := subsetOTF.Descent.AsFloat(qv)
+	lineGap := subsetOTF.LineGap.AsFloat(qv)
+	var leading float64
+	if lineGap > 0 {
+		leading = ascent - descent + lineGap
 	}
-	if info.ToUnicode != nil {
-		ref, _, err := pdf.ResourceManagerEmbed(rm, info.ToUnicode)
-		if err != nil {
-			return err
-		}
-		fontDict["ToUnicode"] = ref
-	}
-
-	ROS := pdf.Dict{
-		"Registry":   pdf.String(info.CMap.ROS.Registry),
-		"Ordering":   pdf.String(info.CMap.ROS.Ordering),
-		"Supplement": pdf.Integer(info.CMap.ROS.Supplement),
-	}
-
-	cidFontDict := pdf.Dict{
-		"Type":           pdf.Name("Font"),
-		"Subtype":        pdf.Name("CIDFontType0"),
-		"BaseFont":       pdf.Name(cidFontName),
-		"CIDSystemInfo":  ROS,
-		"FontDescriptor": fontDescriptorRef,
-	}
-	if DW != 1000 {
-		cidFontDict["DW"] = pdf.Number(DW)
-	}
-	if W != nil {
-		cidFontDict["W"] = W
-	}
-
 	fd := &font.Descriptor{
-		FontName:     cidFontName,
-		IsFixedPitch: cff.IsFixedPitch,
-		IsSerif:      info.IsSerif,
+		FontName:     subset.Join(subsetTag, postScriptName),
+		FontFamily:   subsetOTF.FamilyName,
+		FontStretch:  subsetOTF.Width,
+		FontWeight:   subsetOTF.Weight,
+		IsFixedPitch: subsetOTF.IsFixedPitch(),
+		IsSerif:      subsetOTF.IsSerif,
 		IsSymbolic:   isSymbolic,
-		IsScript:     info.IsScript,
-		IsItalic:     cff.ItalicAngle != 0,
-		IsAllCap:     info.IsAllCap,
-		IsSmallCap:   info.IsSmallCap,
-		ForceBold:    cff.Private[0].ForceBold,
-		FontBBox:     fontBBox.Rounded(),
-		ItalicAngle:  cff.ItalicAngle,
-		Ascent:       info.Ascent.AsFloat(q),
-		Descent:      info.Descent.AsFloat(q),
-		CapHeight:    info.CapHeight.AsFloat(q),
+		IsScript:     subsetOTF.IsScript,
+		IsItalic:     subsetOTF.IsItalic,
+		ForceBold:    subsetCFF.Private[0].ForceBold,
+		FontBBox:     subsetOTF.FontBBoxPDF().Rounded(),
+		ItalicAngle:  subsetOTF.ItalicAngle,
+		Ascent:       math.Round(ascent),
+		Descent:      math.Round(descent),
+		Leading:      math.Round(leading),
+		CapHeight:    math.Round(subsetOTF.CapHeight.AsFloat(qv)),
+		XHeight:      math.Round(subsetOTF.XHeight.AsFloat(qv)),
+		StemV:        math.Round(subsetCFF.Private[0].StdVW * qh),
+		StemH:        math.Round(subsetCFF.Private[0].StdHW * qv),
 	}
-	fontDescriptor := fd.AsDict()
-	fontDescriptor["FontFile3"] = fontFileRef
-
-	compressedRefs := []pdf.Reference{fontDictRef, cidFontRef, fontDescriptorRef}
-	compressedObjects := []pdf.Object{fontDict, cidFontDict, fontDescriptor}
-	err = w.WriteCompressed(compressedRefs, compressedObjects...)
-	if err != nil {
-		return pdf.Wrap(err, "composite CFF font dicts")
+	info := &cidfont.Type0Dict{
+		Ref:            f.ref,
+		PostScriptName: postScriptName,
+		SubsetTag:      subsetTag,
+		Descriptor:     fd,
+		ROS:            ros,
+		Encoding:       cmapInfo,
+		Width:          ww,
+		DefaultWidth:   dw,
+		Text:           toUnicode,
+		GetFont: func() (cidfont.Type0FontData, error) {
+			return subsetCFF, nil
+		},
 	}
-
-	// See section 9.9 of PDF 32000-1:2008 for details.
-	fontFileDict := pdf.Dict{
-		"Subtype": pdf.Name("CIDFontType0C"),
-	}
-	fontFileStream, err := w.OpenStream(fontFileRef, fontFileDict, pdf.FilterCompress{})
-	if err != nil {
-		return err
-	}
-	err = cff.Write(fontFileStream)
-	if err != nil {
-		return fmt.Errorf("CFF font program %q: %w", cidFontName, err)
-	}
-	err = fontFileStream.Close()
-	if err != nil {
-		return err
-	}
-
-	if ref, ok := encoding.(pdf.Reference); ok {
-		err = cmapInfo.Embed(w, ref, nil)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return info.WriteToPDF(rm)
 }

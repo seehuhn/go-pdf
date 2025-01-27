@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/postscript"
 )
 
-func (info *InfoOld) Embed(w *pdf.Writer, ref pdf.Reference, other map[string]pdf.Reference) error {
+func (info *FileOld) Embed(w *pdf.Writer, ref pdf.Reference, other map[string]pdf.Reference) error {
 	dict := pdf.Dict{
 		"Type":     pdf.Name("CMap"),
 		"CMapName": pdf.Name(info.Name),
@@ -69,7 +69,7 @@ func (info *InfoOld) Embed(w *pdf.Writer, ref pdf.Reference, other map[string]pd
 	return nil
 }
 
-func (info *InfoOld) Write(w io.Writer) error {
+func (info *FileOld) Write(w io.Writer) error {
 	return cmapTmpl.Execute(w, info)
 }
 

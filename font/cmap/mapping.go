@@ -47,7 +47,7 @@ type Code interface {
 }
 
 // GetMapping returns the mapping information from info.
-func (info *InfoOld) GetMapping() map[charcode.CharCodeOld]cid.CID {
+func (info *FileOld) GetMapping() map[charcode.CharCodeOld]cid.CID {
 	res := make(map[charcode.CharCodeOld]cid.CID)
 	for _, s := range info.Singles {
 		res[s.Code] = s.Value
@@ -67,7 +67,7 @@ func (info *InfoOld) GetMapping() map[charcode.CharCodeOld]cid.CID {
 // To make efficient use of range entries, the generated mapping may be a
 // superset of the original mapping, i.e. it may contain entries for charcodes
 // which were not mapped in the original mapping.
-func (info *InfoOld) SetMapping(m map[charcode.CharCodeOld]cid.CID) {
+func (info *FileOld) SetMapping(m map[charcode.CharCodeOld]cid.CID) {
 	entries := make([]entry, 0, len(m))
 	for code, val := range m {
 		entries = append(entries, entry{code, val})

@@ -130,7 +130,7 @@ type FontDictComposite struct {
 	// or the empty string if this is the full font.
 	SubsetTag string
 
-	CMap *cmap.InfoOld
+	CMap *cmap.FileOld
 
 	CIDToGID []glyph.ID
 

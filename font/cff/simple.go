@@ -111,7 +111,7 @@ func (f *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		leading = ascent - descent + lineGap
 	}
 	fd := &font.Descriptor{
-		FontName:     subsetTag + "+" + subsetCFF.FontName,
+		FontName:     subset.Join(subsetTag, subsetCFF.FontName),
 		FontFamily:   subsetSfnt.FamilyName,
 		FontStretch:  subsetSfnt.Width,
 		FontWeight:   subsetSfnt.Weight,

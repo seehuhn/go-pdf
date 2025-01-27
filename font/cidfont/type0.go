@@ -286,9 +286,14 @@ func (d *Type0Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 		return err
 	}
 
-	encoding, _, err := pdf.ResourceManagerEmbed(rm, d.Encoding)
-	if err != nil {
-		return err
+	var encoding pdf.Object
+	if d.Encoding.IsPredefined() {
+		encoding = pdf.Name(d.Encoding.Name)
+	} else {
+		encoding, _, err = pdf.ResourceManagerEmbed(rm, d.Encoding)
+		if err != nil {
+			return err
+		}
 	}
 
 	var toUni pdf.Object
@@ -310,6 +315,7 @@ func (d *Type0Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 		"Encoding":        encoding,
 		"DescendantFonts": pdf.Array{cidFontRef},
 		"ToUnicode":       toUni,
+		"XX_Seehuhn":      pdf.Boolean(true),
 	}
 
 	cidFontDict := pdf.Dict{

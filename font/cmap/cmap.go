@@ -28,8 +28,8 @@ import (
 	"seehuhn.de/go/postscript/cid"
 )
 
-// InfoOld holds the information for a PDF CMap.
-type InfoOld struct {
+// FileOld holds the information for a PDF CMap.
+type FileOld struct {
 	Name string
 	ROS  *CIDSystemInfo
 	charcode.CodeSpaceRange
@@ -56,8 +56,8 @@ type RangeOld struct {
 }
 
 // FromMapOld allocates a new CMap object.
-func FromMapOld(ROS *CIDSystemInfo, cs charcode.CodeSpaceRange, m map[charcode.CharCodeOld]cid.CID) *InfoOld {
-	info := &InfoOld{
+func FromMapOld(ROS *CIDSystemInfo, cs charcode.CodeSpaceRange, m map[charcode.CharCodeOld]cid.CID) *FileOld {
+	info := &FileOld{
 		ROS:            ROS,
 		CodeSpaceRange: cs,
 		CSFile:         cs,
@@ -80,7 +80,7 @@ func FromMapOld(ROS *CIDSystemInfo, cs charcode.CodeSpaceRange, m map[charcode.C
 }
 
 // IsIdentity returns true if all codes are equal to the corresponding CID.
-func (info *InfoOld) IsIdentity() bool {
+func (info *FileOld) IsIdentity() bool {
 	for _, s := range info.Singles {
 		if int(s.Code) != int(s.Value) {
 			return false
@@ -95,7 +95,7 @@ func (info *InfoOld) IsIdentity() bool {
 }
 
 // MaxCID returns the largest CID used by this CMap.
-func (info *InfoOld) MaxCID() cid.CID {
+func (info *FileOld) MaxCID() cid.CID {
 	var maxCID cid.CID
 	for _, s := range info.Singles {
 		if s.Value > maxCID {

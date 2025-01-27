@@ -63,6 +63,8 @@ type Type1Dict struct {
 	// (without any subset tag).
 	PostScriptName string
 
+	// SubsetTag can be set to indicate that the font has been subsetted.
+	// If non-empty, the value must be a sequence of 6 uppercase letters.
 	SubsetTag string
 
 	// Name is deprecated and is normally empty.
@@ -223,16 +225,16 @@ func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
 		}
 	}
 
-	getFont, err := makeFontReader(r, fdDict)
+	getFontType1, err := makeType1Reader(r, fdDict)
 	if pdf.IsReadError(err) {
 		return nil, err
 	}
-	d.GetFont = getFont
+	d.GetFont = getFontType1
 
 	return d, nil
 }
 
-func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (Type1FontData, error), error) {
+func makeType1Reader(r pdf.Getter, fd pdf.Dict) (func() (Type1FontData, error), error) {
 	s, err := pdf.GetStream(r, fd["FontFile"])
 	if pdf.IsReadError(err) {
 		return nil, err
@@ -350,9 +352,10 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	}
 
 	fontDict := pdf.Dict{
-		"Type":     pdf.Name("Font"),
-		"Subtype":  pdf.Name("Type1"),
-		"BaseFont": baseFont,
+		"Type":       pdf.Name("Font"),
+		"Subtype":    pdf.Name("Type1"),
+		"BaseFont":   baseFont,
+		"XX_Seehuhn": pdf.Boolean(true),
 	}
 	if d.Name != "" {
 		fontDict["Name"] = d.Name

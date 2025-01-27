@@ -39,8 +39,15 @@ func openPredefined(name string) (io.ReadCloser, error) {
 }
 
 // IsPredefined returns true if the CMap is one of the CMaps predefined in PDF.
-func (info *InfoOld) IsPredefined() bool {
+func (info *FileOld) IsPredefined() bool {
 	_, ok := builtinCS[info.Name]
+	return ok
+}
+
+// IsPredefined returns true if the CMap is one of the CMaps predefined in PDF.
+// The result is based exclusively on the name of the CMap.
+func (info *File) IsPredefined() bool {
+	_, ok := builtinCS[string(info.Name)]
 	return ok
 }
 

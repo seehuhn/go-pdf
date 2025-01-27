@@ -153,7 +153,7 @@ type FontDictCFFComposite struct {
 	// or the empty string if this is the full font.
 	SubsetTag string
 
-	CMap *cmap.InfoOld
+	CMap *cmap.FileOld
 
 	IsAllCap   bool
 	IsSmallCap bool

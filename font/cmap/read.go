@@ -28,7 +28,7 @@ import (
 )
 
 // Extract reads a CMap from a PDF file.
-func Extract(r pdf.Getter, obj pdf.Object) (*InfoOld, error) {
+func Extract(r pdf.Getter, obj pdf.Object) (*FileOld, error) {
 	obj, err := pdf.Resolve(r, obj)
 	if err != nil {
 		return nil, err
@@ -56,13 +56,13 @@ func Extract(r pdf.Getter, obj pdf.Object) (*InfoOld, error) {
 	}
 }
 
-func Read(r io.Reader, other map[string]*InfoOld) (*InfoOld, error) {
+func Read(r io.Reader, other map[string]*FileOld) (*FileOld, error) {
 	raw, err := postscript.ReadCMap(r)
 	if err != nil {
 		return nil, err
 	}
 
-	res := &InfoOld{
+	res := &FileOld{
 		ROS:            &CIDSystemInfo{},
 		CodeSpaceRange: nil,
 		WMode:          0,
@@ -113,7 +113,7 @@ func Read(r io.Reader, other map[string]*InfoOld) (*InfoOld, error) {
 	var rr []charcode.Range
 	if codeMap.UseCMap != "" {
 		if other == nil {
-			other = make(map[string]*InfoOld)
+			other = make(map[string]*FileOld)
 		}
 		if other, ok := other[string(codeMap.UseCMap)]; ok {
 			rr = append(rr, other.CodeSpaceRange...)

@@ -45,7 +45,7 @@ type CIDEncoder interface {
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 
 	// CMap returns the mapping from character codes to CID values.
-	CMap() *InfoOld
+	CMap() *FileOld
 
 	// CMapNew returns the mapping from character codes to CID values.
 	CMapNew() *File
@@ -88,7 +88,7 @@ func (e *identityEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) p
 	return charcode.UCS2.Append(s, code)
 }
 
-func (e *identityEncoder) CMap() *InfoOld {
+func (e *identityEncoder) CMap() *FileOld {
 	m := make(map[charcode.CharCodeOld]pscid.CID)
 	for code := range e.toUnicode {
 		m[code] = pscid.CID(code)
@@ -96,8 +96,38 @@ func (e *identityEncoder) CMap() *InfoOld {
 	return FromMapOld(e.g2c.ROS(), charcode.UCS2, m)
 }
 
+type cidCode CID
+
+func (c cidCode) CID() CID       { return CID(c) }
+func (c cidCode) NotdefCID() CID { return 0 }
+func (c cidCode) Width() float64 { return 0 }
+func (c cidCode) Text() string   { return "" }
+
 func (e *identityEncoder) CMapNew() *File {
-	panic("not implemented")
+	// TODO(voss): should we just return the predefined Identity-H CMap?
+
+	csr := charcode.UCS2
+	codec, err := charcode.NewCodec(csr)
+	if err != nil {
+		panic(err)
+	}
+
+	m := make(map[charcode.Code]Code)
+	var buf []byte
+	for codeOld := range e.toUnicode {
+		buf = csr.Append(buf[:0], codeOld)
+		codeNew, l, valid := codec.Decode(buf)
+		if !valid || l != len(buf) {
+			panic("invalid code")
+		}
+		m[codeNew] = cidCode(codeOld)
+	}
+
+	res := NewFile(codec, m)
+	res.Name = "Identity-H" // TODO(voss): what to do here?
+	res.ROS = &CIDSystemInfo{Registry: "Adobe", Ordering: "Identity"}
+	res.WMode = Horizontal // TODO(voss): fill this in
+	return res
 }
 
 func (e *identityEncoder) ToUnicode() *ToUnicodeOld {
@@ -105,7 +135,7 @@ func (e *identityEncoder) ToUnicode() *ToUnicodeOld {
 }
 
 func (e *identityEncoder) ToUnicodeNew() *ToUnicodeFile {
-	// TODO(voss): rewrite this one we don't need to support `*ToUnicodeOld`
+	// TODO(voss): rewrite this, once we don't need to support `*ToUnicodeOld`
 	// anymore.
 
 	csr := charcode.UCS2
@@ -117,7 +147,7 @@ func (e *identityEncoder) ToUnicodeNew() *ToUnicodeFile {
 	m := make(map[charcode.Code]string)
 	var buf []byte
 	for codeOld, rr := range e.toUnicode {
-		buf = csr.Append(buf[:0], charcode.CharCodeOld(codeOld))
+		buf = csr.Append(buf[:0], codeOld)
 		codeNew, l, valid := codec.Decode(buf)
 		if !valid || l != len(buf) {
 			panic("invalid code")
@@ -243,12 +273,34 @@ func runeToCode(r rune) charcode.CharCodeOld {
 	return code
 }
 
-func (e *utf8Encoder) CMap() *InfoOld {
+func (e *utf8Encoder) CMap() *FileOld {
 	return FromMapOld(e.g2c.ROS(), utf8cs, e.cmap)
 }
 
 func (e *utf8Encoder) CMapNew() *File {
-	panic("not implemented")
+	csr := charcode.UCS2
+	codec, err := charcode.NewCodec(csr)
+	if err != nil {
+		panic(err)
+	}
+
+	m := make(map[charcode.Code]Code)
+	var buf []byte
+	for codeOld, cidOld := range e.cmap {
+		buf = csr.Append(buf[:0], codeOld)
+		codeNew, l, valid := codec.Decode(buf)
+		if !valid || l != len(buf) {
+			panic("invalid code")
+		}
+		m[codeNew] = cidCode(cidOld)
+	}
+
+	res := NewFile(codec, m)
+	// TODO(voss): what to do here?
+	res.Name = "Seehuhn-Test"
+	res.ROS = &CIDSystemInfo{Registry: "Seehuhn", Ordering: "Test"}
+	res.WMode = Horizontal // TODO(voss): fill this in
+	return res
 }
 
 func (e *utf8Encoder) ToUnicode() *ToUnicodeOld {
@@ -260,7 +312,7 @@ func (e *utf8Encoder) ToUnicode() *ToUnicodeOld {
 }
 
 func (e *utf8Encoder) ToUnicodeNew() *ToUnicodeFile {
-	// TODO(voss): rewrite this one we don't need to support `*ToUnicodeOld`
+	// TODO(voss): rewrite this, once we don't need to support `*ToUnicodeOld`
 	// anymore.
 
 	csr := utf8cs
