@@ -419,7 +419,7 @@ func TestAsPDF(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					enc2, err = ExtractType3(nil, obj)
+					enc2, err = ExtractType3Old(nil, obj)
 					if err != nil {
 						t.Fatal(err)
 					}

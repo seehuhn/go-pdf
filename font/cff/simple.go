@@ -137,7 +137,7 @@ func (f *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
 		Encoding:       encoding.Builtin,
-		GetFont:        func() (simple.Type1FontData, error) { return subsetCFF, nil },
+		GetFont:        func() (any, error) { return subsetCFF, nil },
 	}
 
 	ww := subsetCFF.WidthsPDF()

@@ -118,7 +118,7 @@ func (f *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 		leading = (ascent - descent + lineGap).AsFloat(q)
 	}
 	fd := &font.Descriptor{
-		FontName:     subsetTag + "+" + subsetCFF.FontName,
+		FontName:     subset.Join(subsetTag, subsetCFF.FontName),
 		FontFamily:   subsetSfnt.FamilyName,
 		FontStretch:  subsetSfnt.Width,
 		FontWeight:   subsetSfnt.Weight,
@@ -144,7 +144,7 @@ func (f *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
 		Encoding:       encoding.Builtin,
-		GetFont:        func() (simple.Type1FontData, error) { return subsetSfnt, nil },
+		GetFont:        func() (any, error) { return subsetSfnt, nil },
 	}
 
 	ww := subsetCFF.WidthsPDF()

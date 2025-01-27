@@ -82,7 +82,7 @@ func (r *Reader) readSimpleFont(info *font.Dicts, toUni *cmap.ToUnicodeFile) (F 
 			return nil, err
 		}
 	case font.DictTypeType3:
-		enc, err = encoding.ExtractType3(r.R, info.FontDict["Encoding"])
+		enc, err = encoding.ExtractType3Old(r.R, info.FontDict["Encoding"])
 		if err != nil {
 			return nil, err
 		}

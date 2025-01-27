@@ -57,7 +57,7 @@ func TestType1DictRoundtrip(t *testing.T) {
 		Encoding:       encoding.Standard,
 		Width:          [256]float64{}, // TODO(voss): fill in
 		Text:           [256]string{},  // TODO(voss): fill in
-		GetFont: func() (Type1FontData, error) {
+		GetFont: func() (any, error) {
 			return F1, nil
 		},
 	}

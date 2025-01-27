@@ -248,15 +248,9 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 	}
 	res.Glyphs = glyphs
 
-	fontMatrix, err := pdf.GetArray(r, dicts.FontDict["FontMatrix"])
+	res.FontMatrix, err = pdf.GetMatrix(r, dicts.FontDict["FontMatrix"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "FontMatrix")
-	}
-	if len(fontMatrix) == 6 {
-		for i, x := range fontMatrix {
-			xi, _ := pdf.GetNumber(r, x)
-			res.FontMatrix[i] = float64(xi)
-		}
 	}
 	if res.FontMatrix == matrix.Zero {
 		res.FontMatrix = [6]float64{0.001, 0, 0, 0.001, 0, 0}
@@ -315,13 +309,9 @@ func Extract(r pdf.Getter, dicts *font.Dicts) (*EmbedInfo, error) {
 		}
 	}
 
-	resources, _ := pdf.GetDict(r, dicts.FontDict["Resources"])
-	if resources != nil {
-		res.Resources = &pdf.Resources{}
-		err := pdf.DecodeDict(r, res.Resources, resources)
-		if err != nil {
-			return nil, pdf.Wrap(err, "Resources")
-		}
+	res.Resources, err = pdf.GetResources(r, dicts.FontDict["Resources"])
+	if pdf.IsReadError(err) {
+		return nil, err
 	}
 
 	if dicts.FontDescriptor != nil {

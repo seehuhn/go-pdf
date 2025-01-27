@@ -278,4 +278,49 @@ func (e Type1) AsPDF(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, er
 	return bestDict, nil
 }
 
+// ExtractType3 extracts the encoding from the /Encoding entry of a Type3
+// font dictionary.
+func ExtractType3(r pdf.Getter, obj pdf.Object) (Type1, error) {
+	dict, err := pdf.GetDictTyped(r, obj, "Encoding")
+	if err != nil {
+		return nil, err
+	}
+
+	diffArray, err := pdf.GetArray(r, dict["Differences"])
+	if err != nil {
+		return nil, err
+	}
+
+	differences := make(map[byte]string)
+
+	currentCode := pdf.Integer(-1)
+	for _, item := range diffArray {
+		item, err = pdf.Resolve(r, item)
+		if err != nil {
+			return nil, err
+		}
+
+		switch item := item.(type) {
+		case pdf.Integer:
+			currentCode = item
+
+		case pdf.Name:
+			if currentCode >= 0 && currentCode < 256 {
+				differences[byte(currentCode)] = string(item)
+				currentCode++
+			}
+		}
+	}
+
+	if len(differences) == 0 {
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("missing /Differences array"),
+		}
+	}
+
+	return func(code byte) string {
+		return differences[code]
+	}, nil
+}
+
 var errInvalidEncoding = errors.New("invalid encoding")

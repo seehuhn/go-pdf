@@ -21,10 +21,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"math"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/widths"
@@ -35,8 +37,6 @@ import (
 // Type0FontData is a font which can be used with a Type 0 CIDFont.
 // This must be one of [*cff.Font] or [*sfnt.Font].
 type Type0FontData interface{}
-
-var _ font.Embedded = (*Type0Dict)(nil)
 
 // Type0Dict holds the information from the font dictionary and CIDFont dictionary
 // of a Type 0 (CFF-based) CIDFont.
@@ -413,27 +413,75 @@ func moreThanTen(a pdf.Array) bool {
 	return false
 }
 
-func (d *Type0Dict) WritingMode() cmap.WritingMode {
-	return d.Encoding.WMode
+// GetScanner returns a font.Scanner for the font.
+func (d *Type0Dict) GetScanner() (font.Scanner, error) {
+	var csr charcode.CodeSpaceRange
+	csr = append(csr, d.Encoding.CodeSpaceRange...)
+	csr = append(csr, d.Text.CodeSpaceRange...)
+	codec, err := charcode.NewCodec(csr)
+	if err != nil {
+		// In case the two code spaces are not compatible, try to use only the
+		// code space from the encoding.
+		csr = append(csr[:0], d.Encoding.CodeSpaceRange...)
+		codec, err = charcode.NewCodec(csr)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	s := &type0Scanner{
+		Type0Dict: d,
+		codec:     codec,
+		cache:     make(map[charcode.Code]*font.Code),
+	}
+	return s, nil
 }
 
-// DecodeWidth reads one character code from the given string and returns
-// the width of the corresponding glyph in PDF text space units (still to
-// be multiplied by the font size) and the number of bytes read from the
-// string.
-//
-// This implements the [font.Embedded] interface.
-func (d *Type0Dict) DecodeWidth(s pdf.String) (float64, int) {
-	enc := d.Encoding
-	for code, valid := range enc.CodeSpaceRange.AllCodes(s) {
-		if valid {
-			cid := enc.LookupCID(code)
-			if width, ok := d.Width[cid]; ok {
-				return width, len(code)
+type type0Scanner struct {
+	*Type0Dict
+	codec *charcode.Codec
+	cache map[charcode.Code]*font.Code
+}
+
+func (s *type0Scanner) Codes(str pdf.String) iter.Seq[*font.Code] {
+	return func(yield func(*font.Code) bool) {
+		for len(str) > 0 {
+			code, k, isValid := s.codec.Decode(str)
+
+			res, seen := s.cache[code]
+			if !seen {
+				code := str[:k]
+
+				res = &font.Code{}
+				if isValid {
+					res.CID = s.Encoding.LookupCID(code)
+					res.Notdef = s.Encoding.LookupNotdefCID(code)
+				} else {
+					res.CID = s.Encoding.LookupNotdefCID(code)
+				}
+				w, ok := s.Width[res.CID]
+				if ok {
+					res.Width = w
+				} else {
+					res.Width = s.DefaultWidth
+				}
+
+				if s.Text != nil {
+					res.Text, _ = s.Text.Lookup(code)
+				}
+				// TODO(voss): as a fallback, try to get the text from the CID
 			}
-			return d.DefaultWidth, len(code)
+
+			str = str[k:]
+			if !yield(res) {
+				return
+			}
 		}
-		return d.Width[0], 1
 	}
-	return 0, 0
+}
+
+func init() {
+	font.RegisterReader("CIDFontType0", func(r pdf.Getter, obj pdf.Object) (font.FromFile, error) {
+		return ExtractType0(r, obj)
+	})
 }

@@ -355,9 +355,12 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 		subsetTag = subset.Tag(ss, psFull.NumGlyphs())
 	}
 
-	fd := &font.Descriptor{}
+	fd := &font.Descriptor{
+		FontName:   subset.Join(subsetTag, postScriptName),
+		IsSerif:    f.isSerif,
+		IsSymbolic: f.isSymbolic(),
+	}
 	if fontData != nil {
-		fd.FontName = fontData.FontName
 		fd.FontFamily = fontData.FamilyName
 		fd.FontWeight = os2.WeightFromString(fontData.Weight)
 		fd.FontBBox = fontData.FontBBoxPDF().Rounded()
@@ -369,7 +372,6 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 		fd.StemH = fontData.Private.StdHW
 	}
 	if metricsData != nil {
-		fd.FontName = metricsData.FontName
 		fd.FontBBox = metricsData.FontBBoxPDF().Rounded()
 		fd.CapHeight = math.Round(metricsData.CapHeight)
 		fd.XHeight = math.Round(metricsData.XHeight)
@@ -379,8 +381,6 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 		fd.ItalicAngle = metricsData.ItalicAngle
 		fd.IsFixedPitch = metricsData.IsFixedPitch
 	}
-	fd.IsSerif = f.isSerif
-	fd.IsSymbolic = f.isSymbolic()
 	dict := &simple.Type1Dict{
 		Ref:            f.ref,
 		PostScriptName: postScriptName,
@@ -397,7 +397,7 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 		dict.Text[code[0]] = string(text)
 	}
 	if !omitFontData {
-		dict.GetFont = func() (simple.Type1FontData, error) {
+		dict.GetFont = func() (any, error) {
 			return fontData, nil
 		}
 	}

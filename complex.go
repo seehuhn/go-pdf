@@ -28,6 +28,7 @@ import (
 	"unicode/utf16"
 
 	"golang.org/x/text/language"
+	"seehuhn.de/go/geom/matrix"
 )
 
 // A Number is either an Integer or a Real.
@@ -351,6 +352,35 @@ func (r *Rectangle) Extend(other *Rectangle) {
 	}
 }
 
+func GetMatrix(r Getter, obj Object) (m matrix.Matrix, err error) {
+	defer func() {
+		if err != nil {
+			err = Wrap(err, "GetMatrix")
+		}
+	}()
+
+	a, err := GetArray(r, obj)
+	if err != nil {
+		return matrix.Matrix{}, err
+	}
+
+	if len(a) != 6 {
+		return m, &MalformedFileError{
+			Err: fmt.Errorf("expected 6 numbers, got %d", len(a)),
+		}
+	}
+
+	for i, x := range a {
+		xi, err := GetNumber(r, x)
+		if err != nil {
+			return m, err
+		}
+		m[i] = float64(xi)
+	}
+
+	return m, nil
+}
+
 // Catalog represents a PDF Document Catalog.  The only required field in this
 // structure is Pages, which specifies the root of the page tree.
 // This struct can be used with the [DecodeDict] and [AsDict] functions.
@@ -441,6 +471,26 @@ type Resources struct {
 	Font       Dict  `pdf:"optional"` // maps resource names to font dictionaries
 	ProcSet    Array `pdf:"optional"` // predefined procedure set names
 	Properties Dict  `pdf:"optional"` // maps resource names to property list dictionaries for marked content
+}
+
+func GetResources(r Getter, obj Object) (res *Resources, err error) {
+	defer func() {
+		if err != nil {
+			err = Wrap(err, "GetResources")
+		}
+	}()
+
+	dict, err := GetDict(r, obj)
+	if dict == nil {
+		return nil, err
+	}
+
+	res = &Resources{}
+	if err := DecodeDict(r, res, dict); err != nil {
+		return nil, err
+	}
+
+	return res, nil
 }
 
 // IsEmpty returns true if no resources are defined.

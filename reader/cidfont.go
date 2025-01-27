@@ -48,15 +48,15 @@ func (r *Reader) readCompositeFont(info *font.Dicts, toUni *cmap.ToUnicodeFile) 
 	}
 
 	// Fix the code space range.
-	var cs charcode.CodeSpaceRange
-	cs = append(cs, encoding.CodeSpaceRange...)
-	cs = append(cs, toUni.CodeSpaceRange...)
-	codec, err := charcode.NewCodec(cs)
+	var csr charcode.CodeSpaceRange
+	csr = append(csr, encoding.CodeSpaceRange...)
+	csr = append(csr, toUni.CodeSpaceRange...)
+	codec, err := charcode.NewCodec(csr)
 	if err != nil {
 		// In case the two code spaces are not compatible, try to use only the
 		// code space from the encoding.
-		cs = append(cs[:0], encoding.CodeSpaceRange...)
-		codec, err = charcode.NewCodec(cs)
+		csr = append(csr[:0], encoding.CodeSpaceRange...)
+		codec, err = charcode.NewCodec(csr)
 	}
 	if err != nil {
 		return nil, err

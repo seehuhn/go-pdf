@@ -24,6 +24,7 @@ import (
 	"iter"
 	"math"
 
+	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/postscript/type1/names"
 
@@ -38,21 +39,6 @@ import (
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/internal/stdmtx"
 )
-
-var (
-	_ Type1FontData = (*type1.Font)(nil)
-	_ Type1FontData = (*cff.Font)(nil)
-	_ Type1FontData = (*sfnt.Font)(nil)
-)
-
-// Type1FontData is a font which can be used with a Type 1 font dictionary.
-// This must be one of [*type1.Font], [*cff.Font] or [*sfnt.Font].
-type Type1FontData interface {
-	PostScriptName() string
-	BuiltinEncoding() []string
-}
-
-var _ font.Embedded = (*Type1Dict)(nil)
 
 // Type1Dict represents a Type 1 font dictionary.
 type Type1Dict struct {
@@ -87,7 +73,8 @@ type Type1Dict struct {
 
 	// GetFont (optional) returns the font data to embed.
 	// If this is nil, the font data is not embedded in the PDF file.
-	GetFont func() (Type1FontData, error)
+	// Otherwise, this is one of [*type1.Font], [*cff.Font] or [*sfnt.Font].
+	GetFont func() (any, error)
 }
 
 // ExtractType1Dict reads a Type 1 font dictionary from a PDF file.
@@ -199,7 +186,6 @@ func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
 	}
 
 	// First try to derive text content from the glyph names.
-	// This can be overridden by the ToUnicode CMap, below.
 	for code := range 256 {
 		glyphName := enc(byte(code))
 		if glyphName == "" || glyphName == encoding.UseBuiltin || glyphName == ".notdef" {
@@ -209,7 +195,7 @@ func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
 		rr := names.ToUnicode(glyphName, d.PostScriptName == "ZapfDingbats")
 		d.Text[code] = string(rr)
 	}
-
+	// the ToUnicode cmap, if present, overrides the derived text content
 	toUnicode, err := cmap.ExtractToUnicode(r, fontDict["ToUnicode"])
 	if pdf.IsReadError(err) {
 		return nil, err
@@ -234,13 +220,13 @@ func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
 	return d, nil
 }
 
-func makeType1Reader(r pdf.Getter, fd pdf.Dict) (func() (Type1FontData, error), error) {
+func makeType1Reader(r pdf.Getter, fd pdf.Dict) (func() (any, error), error) {
 	s, err := pdf.GetStream(r, fd["FontFile"])
 	if pdf.IsReadError(err) {
 		return nil, err
 	}
 	if s != nil {
-		getFont := func() (Type1FontData, error) {
+		getFont := func() (any, error) {
 			fontData, err := pdf.DecodeStream(r, s, 0)
 			if err != nil {
 				return nil, err
@@ -265,7 +251,7 @@ func makeType1Reader(r pdf.Getter, fd pdf.Dict) (func() (Type1FontData, error), 
 	subType, _ := pdf.GetName(r, s.Dict["Subtype"])
 	switch subType {
 	case "Type1C":
-		getFont := func() (Type1FontData, error) {
+		getFont := func() (any, error) {
 			fontData, err := pdf.DecodeStream(r, s, 0)
 			if err != nil {
 				return nil, err
@@ -283,7 +269,7 @@ func makeType1Reader(r pdf.Getter, fd pdf.Dict) (func() (Type1FontData, error), 
 		return getFont, nil
 
 	case "OpenType":
-		getFont := func() (Type1FontData, error) {
+		getFont := func() (any, error) {
 			fontData, err := pdf.DecodeStream(r, s, 0)
 			if err != nil {
 				return nil, err
@@ -301,12 +287,9 @@ func makeType1Reader(r pdf.Getter, fd pdf.Dict) (func() (Type1FontData, error), 
 	}
 }
 
-// Embed adds the font dictionary to the PDF file.
-//
-// The FontName field in the font descriptor is ignored and the correct value
-// is set automatically.  TODO(voss): don't do this
+// WriteToPDF adds the font dictionary to the PDF file.
 func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
-	var psFont Type1FontData
+	var psFont any
 	if d.GetFont != nil {
 		font, err := d.GetFont()
 		if err != nil {
@@ -322,12 +305,15 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	switch f := psFont.(type) {
 	case nil:
 		// pass
+
 	case *type1.Font:
 		// pass
+
 	case *cff.Font:
 		if f.IsCIDKeyed() {
 			return errors.New("CID-keyed fonts not allowed")
 		}
+
 	case *sfnt.Font:
 		o, _ := f.Outlines.(*cff.Outlines)
 		if o == nil {
@@ -335,6 +321,7 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 		} else if o.IsCIDKeyed() {
 			return errors.New("CID-keyed fonts not allowed")
 		}
+
 	default:
 		return fmt.Errorf("unsupported font type %T", psFont)
 	}
@@ -529,58 +516,6 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	return nil
 }
 
-func (d *Type1Dict) WritingMode() cmap.WritingMode {
-	return cmap.Horizontal
-}
-
-func (d *Type1Dict) DecodeWidth(s pdf.String) (float64, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-	return d.Width[s[0]], 1
-}
-
-// Codes returns an iterator over the character codes in the given PDF string.
-// The iterator yields Code instances that provide access to the CID, width,
-// and text content associated with each character code.
-func (d *Type1Dict) Codes(s pdf.String) iter.Seq[cmap.Code] {
-	return func(yield func(cmap.Code) bool) {
-		pos := &type1Code{d: d}
-		for _, c := range s {
-			pos.c = c
-			if !yield(pos) {
-				return
-			}
-		}
-	}
-}
-
-// type1Code is an implementation of the Code interface for a simple font.
-type type1Code struct {
-	d *Type1Dict
-	c byte
-}
-
-func (c *type1Code) CID() cmap.CID {
-	// TODO(voss): document the meaning of these CID values
-	if glyphName := c.d.Encoding(c.c); glyphName == ".notdef" || glyphName == "" {
-		return 0
-	}
-	return cmap.CID(c.c) + 1
-}
-
-func (c *type1Code) NotdefCID() cmap.CID {
-	return 0
-}
-
-func (c *type1Code) Width() float64 {
-	return c.d.Width[c.c]
-}
-
-func (c *type1Code) Text() string {
-	return c.d.Text[c.c]
-}
-
 // widthsAreCompatible returns true, if the glyph widths ww are compatible with
 // the standard font metrics.  The object encObj is the value of the font
 // dictionary's Encoding entry.
@@ -635,4 +570,29 @@ func fontDescriptorIsCompatible(fd *font.Descriptor, stdInfo *stdmtx.FontData) b
 		return false
 	}
 	return true
+}
+
+func (d *Type1Dict) GetScanner() (font.Scanner, error) {
+	return d, nil
+}
+
+func (d *Type1Dict) Codes(s pdf.String) iter.Seq[*font.Code] {
+	return func(yield func(*font.Code) bool) {
+		var code font.Code
+		for _, c := range s {
+			code.CID = cid.CID(c) + 1
+			code.Width = d.Width[c]
+			code.Text = d.Text[c]
+
+			if !yield(&code) {
+				return
+			}
+		}
+	}
+}
+
+func init() {
+	font.RegisterReader("Type1", func(r pdf.Getter, obj pdf.Object) (font.FromFile, error) {
+		return ExtractType1Dict(r, obj)
+	})
 }

@@ -519,7 +519,7 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
 	return e, nil
 }
 
-func ExtractType3(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
+func ExtractType3Old(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
 	dict, err := pdf.GetDictTyped(r, obj, "Encoding")
 	if err != nil {
 		return nil, err
