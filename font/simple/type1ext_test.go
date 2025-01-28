@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package simple
+package simple_test
 
 import (
 	"testing"
@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/encoding"
+	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -50,7 +51,7 @@ func TestType1DictRoundtrip(t *testing.T) {
 		StemH:        F1.Private.StdHW * (F1.FontMatrix[3] * 1000),
 		MissingWidth: F1.GlyphWidthPDF(".notdef"),
 	}
-	dicts1 := &Type1Dict{
+	dicts1 := &simple.Type1Dict{
 		Ref:            data.Alloc(),
 		PostScriptName: F1.PostScriptName(),
 		Descriptor:     fd,
@@ -66,7 +67,7 @@ func TestType1DictRoundtrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dicts2, err := ExtractType1Dict(data, dicts1.Ref)
+	dicts2, err := simple.ExtractType1Dict(data, dicts1.Ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +87,7 @@ func TestType1DictRoundtrip(t *testing.T) {
 
 // compareType1Dicts compares two Type1Dicts.
 // d1 must be the original, d2 the one that was read back from the PDF file.
-func compareType1Dicts(t *testing.T, d1, d2 *Type1Dict) {
+func compareType1Dicts(t *testing.T, d1, d2 *simple.Type1Dict) {
 	t.Helper()
 
 	if d1.Ref != d2.Ref {

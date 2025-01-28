@@ -18,16 +18,15 @@ package type3
 
 import (
 	"errors"
-	"slices"
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
+	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/type1/names"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
@@ -160,46 +159,48 @@ func (f *embedded) Finish(*pdf.ResourceManager) error {
 		return errors.New("too many distinct glyphs used in Type 3 font")
 	}
 
-	glyphs := make(map[string]pdf.Reference)
+	glyphs := make(map[pdf.Name]pdf.Reference)
 	encoding := make([]string, 256)
 	widths := make([]float64, 256)
 	for i, gid := range f.Encoding {
-		name := f.GlyphNames[gid]
-		if g, ok := f.Glyphs[name]; ok {
-			glyphs[name] = g.Ref
+		glyphpName := f.GlyphNames[gid]
+		if g, ok := f.Glyphs[glyphpName]; ok {
+			glyphs[pdf.Name(glyphpName)] = g.Ref
 			widths[i] = g.WidthX
-			encoding[i] = name
+			encoding[i] = glyphpName
 		}
 	}
 
-	var toUnicode *cmap.ToUnicodeOld
-	toUniMap := f.ToUnicodeNew()
-	for c, name := range encoding {
-		got := names.ToUnicode(name, false)
-		want := toUniMap[string(rune(c))]
-		if !slices.Equal(got, want) {
-			toUnicode = cmap.NewToUnicode2(charcode.Simple, toUniMap)
+	isSymbolic := false
+	for name := range glyphs {
+		if !pdfenc.StandardLatin.Has[string(name)] {
+			isSymbolic = true
 			break
 		}
 	}
 
-	info := &EmbedInfo{
-		Glyphs:     glyphs,
-		FontMatrix: f.FontMatrix,
-		Encoding:   encoding,
-		Widths:     widths,
-		Resources:  f.Resources,
-
-		ItalicAngle: f.ItalicAngle,
-
+	fd := &font.Descriptor{
 		IsFixedPitch: f.Font.Geometry.IsFixedPitch(),
 		IsSerif:      f.IsSerif,
+		IsSymbolic:   isSymbolic,
 		IsScript:     f.IsScript,
-		ForceBold:    f.ForceBold,
+		IsItalic:     f.ItalicAngle != 0,
 		IsAllCap:     f.IsAllCap,
 		IsSmallCap:   f.IsSmallCap,
-
-		ToUnicode: toUnicode,
+		ForceBold:    f.ForceBold,
+		ItalicAngle:  f.ItalicAngle,
 	}
-	return info.Embed(f.w, f.ref)
+
+	res := &simple.Type3Dict{
+		Ref:        f.ref,
+		FontMatrix: f.FontMatrix,
+		CharProcs:  glyphs,
+		Encoding:   func(code byte) string { return encoding[code] },
+		Descriptor: fd,
+		Width:      [256]float64{},
+		Resources:  f.Resources,
+	}
+	copy(res.Width[:], widths)
+
+	return res.WriteToPDF(f.RM)
 }

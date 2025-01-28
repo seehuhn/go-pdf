@@ -186,11 +186,9 @@ func (d *Type3Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	w := rm.Out
 
 	fontDict := pdf.Dict{
-		"Type":    pdf.Name("Font"),
-		"Subtype": pdf.Name("Type3"),
-		"FontBBox": pdf.Array{ // computed by PDF processor
-			pdf.Number(0), pdf.Number(0), pdf.Number(0), pdf.Number(0),
-		},
+		"Type":     pdf.Name("Font"),
+		"Subtype":  pdf.Name("Type3"),
+		"FontBBox": &pdf.Rectangle{}, // required, but [0 0 0 0] is always valid
 		"FontMatrix": pdf.Array{
 			pdf.Number(d.FontMatrix[0]),
 			pdf.Number(d.FontMatrix[1]),
@@ -225,7 +223,10 @@ func (d *Type3Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	if err != nil {
 		return fmt.Errorf("/Encoding: %w", err)
 	}
-	fontDict["Encoding"] = encodingObj
+	encodingRef := w.Alloc()
+	fontDict["Encoding"] = encodingRef
+	compressedObjects = append(compressedObjects, encodingObj)
+	compressedRefs = append(compressedRefs, encodingRef)
 
 	// TODO(voss): Introduce a helper function for constructing the widths
 	// array.

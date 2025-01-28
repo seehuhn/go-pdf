@@ -576,7 +576,7 @@ func (d *Type1Dict) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		var code font.Code
 		for _, c := range s {
-			code.CID = cid.CID(c) + 1
+			code.CID = cid.CID(c) + 1 // leave CID 0 for notdef
 			code.Width = d.Width[c]
 			code.Text = d.Text[c]
 

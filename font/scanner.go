@@ -55,6 +55,11 @@ func RegisterReader(tp pdf.Name, fn ReaderFunc) {
 	if readers == nil {
 		readers = make(map[pdf.Name]ReaderFunc)
 	}
+
+	if _, alreadyPresent := readers[tp]; alreadyPresent {
+		panic(fmt.Sprintf("conflicting readers for font type %s", tp))
+	}
+
 	readers[tp] = fn
 }
 
