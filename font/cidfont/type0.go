@@ -315,7 +315,7 @@ func (d *Type0Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 		"Encoding":        encoding,
 		"DescendantFonts": pdf.Array{cidFontRef},
 		"ToUnicode":       toUni,
-		"XX_Seehuhn":      pdf.Boolean(true),
+		"XX_Seehuhn":      pdf.Boolean(true), // TODO(voss): remove
 	}
 
 	cidFontDict := pdf.Dict{
