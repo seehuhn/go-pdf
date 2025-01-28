@@ -68,6 +68,9 @@ type Type3Dict struct {
 }
 
 // ExtractType3Dict extracts a Type 3 font dictionary from a PDF file.
+//
+// The function tries to extract as much information as possible from the
+// dictionary, even if it is malformed.
 func ExtractType3Dict(r pdf.Getter, obj pdf.Object) (*Type3Dict, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
@@ -81,9 +84,9 @@ func ExtractType3Dict(r pdf.Getter, obj pdf.Object) (*Type3Dict, error) {
 	if err != nil {
 		return nil, err
 	}
-	if subtype != "" && subtype != "Type1" {
+	if subtype != "" && subtype != "Type3" {
 		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("expected font subtype Type1, got %q", subtype),
+			Err: fmt.Errorf("expected font subtype Type3, got %q", subtype),
 		}
 	}
 
@@ -93,8 +96,8 @@ func ExtractType3Dict(r pdf.Getter, obj pdf.Object) (*Type3Dict, error) {
 	d.Name, _ = pdf.GetName(r, fontDict["Name"])
 
 	d.FontMatrix, _ = pdf.GetMatrix(r, fontDict["FontMatrix"])
-	if d.FontMatrix == matrix.Zero {
-		d.FontMatrix = matrix.Identity
+	if d.FontMatrix == matrix.Zero { // fallback in case of invalid matrix
+		d.FontMatrix = matrix.Matrix{0.001, 0, 0, 0.001, 0, 0}
 	}
 
 	charProcs, err := pdf.GetDict(r, fontDict["CharProcs"])
@@ -130,7 +133,7 @@ func ExtractType3Dict(r pdf.Getter, obj pdf.Object) (*Type3Dict, error) {
 	firstChar, _ := pdf.GetInteger(r, fontDict["FirstChar"])
 	widths, _ := pdf.GetArray(r, fontDict["Widths"])
 	if widths != nil && len(widths) <= 256 && firstChar >= 0 && firstChar < 256 {
-		for c := range widths {
+		for c := range d.Width {
 			d.Width[c] = defaultWidth
 		}
 		for i, w := range widths {
@@ -178,9 +181,125 @@ func ExtractType3Dict(r pdf.Getter, obj pdf.Object) (*Type3Dict, error) {
 	return d, nil
 }
 
-// WriteToPDF adds the font dictionary to the PDF file.
+// WriteToPDF adds the Type 3 font dictionary to the PDF file.
 func (d *Type3Dict) WriteToPDF(rm *pdf.ResourceManager) error {
-	panic("not implemented")
+	w := rm.Out
+
+	fontDict := pdf.Dict{
+		"Type":    pdf.Name("Font"),
+		"Subtype": pdf.Name("Type3"),
+		"FontBBox": pdf.Array{ // computed by PDF processor
+			pdf.Number(0), pdf.Number(0), pdf.Number(0), pdf.Number(0),
+		},
+		"FontMatrix": pdf.Array{
+			pdf.Number(d.FontMatrix[0]),
+			pdf.Number(d.FontMatrix[1]),
+			pdf.Number(d.FontMatrix[2]),
+			pdf.Number(d.FontMatrix[3]),
+			pdf.Number(d.FontMatrix[4]),
+			pdf.Number(d.FontMatrix[5]),
+		},
+	}
+
+	if d.Name != "" {
+		fontDict["Name"] = d.Name
+	}
+
+	compressedObjects := []pdf.Object{fontDict}
+	compressedRefs := []pdf.Reference{d.Ref}
+
+	charProcsDict := make(pdf.Dict, len(d.CharProcs))
+	for name, ref := range d.CharProcs {
+		charProcsDict[name] = ref
+	}
+	if len(charProcsDict) > 5 {
+		charProcsRef := w.Alloc()
+		fontDict["CharProcs"] = charProcsRef
+		compressedObjects = append(compressedObjects, charProcsDict)
+		compressedRefs = append(compressedRefs, charProcsRef)
+	} else {
+		fontDict["CharProcs"] = charProcsDict
+	}
+
+	encodingObj, err := d.Encoding.AsPDFType3(w.GetOptions())
+	if err != nil {
+		return fmt.Errorf("/Encoding: %w", err)
+	}
+	fontDict["Encoding"] = encodingObj
+
+	// TODO(voss): Introduce a helper function for constructing the widths
+	// array.
+	var dw float64
+	if d.Descriptor != nil {
+		dw = d.Descriptor.MissingWidth
+	}
+	firstChar, lastChar := 0, 255
+	for lastChar > 0 && d.Width[lastChar] == dw {
+		lastChar--
+	}
+	for firstChar < lastChar && d.Width[firstChar] == dw {
+		firstChar++
+	}
+	widths := make(pdf.Array, lastChar-firstChar+1)
+	for i := range widths {
+		widths[i] = pdf.Number(d.Width[firstChar+i])
+	}
+	fontDict["FirstChar"] = pdf.Integer(firstChar)
+	fontDict["LastChar"] = pdf.Integer(lastChar)
+	if len(widths) > 10 {
+		widthRef := w.Alloc()
+		fontDict["Widths"] = widthRef
+		compressedObjects = append(compressedObjects, widths)
+		compressedRefs = append(compressedRefs, widthRef)
+	} else {
+		fontDict["Widths"] = widths
+	}
+
+	if d.Descriptor != nil {
+		fdRef := w.Alloc()
+		fdDict := d.Descriptor.AsDict()
+		fontDict["FontDescriptor"] = fdRef
+		compressedObjects = append(compressedObjects, fdDict)
+		compressedRefs = append(compressedRefs, fdRef)
+	}
+
+	if d.Resources != nil {
+		resRef := w.Alloc()
+		resDict := pdf.AsDict(d.Resources)
+		fontDict["Resources"] = resRef
+		compressedObjects = append(compressedObjects, resDict)
+		compressedRefs = append(compressedRefs, resRef)
+	}
+
+	toUnicodeData := make(map[byte]string)
+	for code := range 256 {
+		glyphName := d.Encoding(byte(code))
+		switch glyphName {
+		case "":
+			// unused character code, nothing to do
+
+		default:
+			rr := names.ToUnicode(glyphName, false)
+			if text := d.Text[code]; text != string(rr) {
+				toUnicodeData[byte(code)] = text
+			}
+		}
+	}
+	if len(toUnicodeData) > 0 {
+		tuInfo := cmap.MakeSimpleToUnicode(toUnicodeData)
+		ref, _, err := pdf.ResourceManagerEmbed(rm, tuInfo)
+		if err != nil {
+			return fmt.Errorf("ToUnicode cmap: %w", err)
+		}
+		fontDict["ToUnicode"] = ref
+	}
+
+	err = w.WriteCompressed(compressedRefs, compressedObjects...)
+	if err != nil {
+		return pdf.Wrap(err, "Type 3 font dicts")
+	}
+
+	return nil
 }
 
 func (d *Type3Dict) GetScanner() (font.Scanner, error) {
@@ -191,7 +310,7 @@ func (d *Type3Dict) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		var code font.Code
 		for _, c := range s {
-			code.CID = cid.CID(c) + 1
+			code.CID = cid.CID(c) + 1 // leave CID 0 for notdef
 			code.Width = d.Width[c]
 			code.Text = d.Text[c]
 

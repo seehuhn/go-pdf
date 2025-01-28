@@ -217,7 +217,7 @@ func TestType1Roundtrip(t *testing.T) {
 	for i, enc1 := range cases {
 		for _, nonSymbolicExt := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%d/%v", i, nonSymbolicExt), func(t *testing.T) {
-				obj, err := enc1.AsPDF(nonSymbolicExt, 0)
+				obj, err := enc1.AsPDFType1(nonSymbolicExt, 0)
 				if err == errInvalidEncoding {
 					t.Skip("encoding cannot be represented as PDF object")
 				}

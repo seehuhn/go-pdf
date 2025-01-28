@@ -350,7 +350,7 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	isNonSymbolic := !d.Descriptor.IsSymbolic
 	isExternal := psFont == nil
-	encodingObj, err := d.Encoding.AsPDF(isNonSymbolic && isExternal, w.GetOptions())
+	encodingObj, err := d.Encoding.AsPDFType1(isNonSymbolic && isExternal, w.GetOptions())
 	if err != nil {
 		return err
 	}
@@ -372,7 +372,6 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	if !trimFontDict {
 		fdRef := w.Alloc()
 		fdDict := d.Descriptor.AsDict()
-		fdDict["FontName"] = fontDict["BaseFont"]
 		if psFont != nil {
 			fontFileRef = w.Alloc()
 			switch psFont.(type) {
@@ -382,22 +381,22 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 				fdDict["FontFile3"] = fontFileRef
 			}
 		}
-
 		fontDict["FontDescriptor"] = fdRef
+		compressedObjects = append(compressedObjects, fdDict)
+		compressedRefs = append(compressedRefs, fdRef)
 
 		// TODO(voss): Introduce a helper function for constructing the widths
 		// array.
-		lastChar := 255
+		firstChar, lastChar := 0, 255
 		for lastChar > 0 && d.Width[lastChar] == d.Descriptor.MissingWidth {
 			lastChar--
 		}
-		firstChar := 0
 		for firstChar < lastChar && d.Width[firstChar] == d.Descriptor.MissingWidth {
 			firstChar++
 		}
-		widths := make(pdf.Array, 0, lastChar-firstChar+1)
-		for i := firstChar; i <= lastChar; i++ {
-			widths = append(widths, pdf.Number(d.Width[i]))
+		widths := make(pdf.Array, lastChar-firstChar+1)
+		for i := range widths {
+			widths[i] = pdf.Number(d.Width[firstChar+i])
 		}
 
 		fontDict["FirstChar"] = pdf.Integer(firstChar)
@@ -410,9 +409,6 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 		} else {
 			fontDict["Widths"] = widths
 		}
-
-		compressedObjects = append(compressedObjects, fdDict)
-		compressedRefs = append(compressedRefs, fdRef)
 	}
 
 	toUnicodeData := make(map[byte]string)

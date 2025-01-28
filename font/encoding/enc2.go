@@ -135,7 +135,7 @@ func ExtractType1(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Type1, err
 	}, nil
 }
 
-// AsPDF returns the /Encoding entry for Type1 font dictionary.
+// AsPDFType1 returns the /Encoding entry for Type1 font dictionary.
 //
 // If the argument nonSymbolicExt is true, the function assumes that the font
 // has the non-symbolic flag set in the font descriptor and that the font is
@@ -145,9 +145,7 @@ func ExtractType1(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Type1, err
 // The resulting PDF object describes an encoding which maps all characters
 // mapped by e to the given glyph name, but it may also imply glyph names for
 // the unmapped codes.
-//
-// TODO(voss): either rename this, or implement [pdf.Object].
-func (e Type1) AsPDF(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, error) {
+func (e Type1) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, error) {
 	type candInfo struct {
 		encName     pdf.Native
 		enc         []string
@@ -321,6 +319,34 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (Type1, error) {
 	return func(code byte) string {
 		return differences[code]
 	}, nil
+}
+
+// AsPDFType3 returns the /Encoding entry for Type3 font dictionary.
+func (e Type1) AsPDFType3(opt pdf.OutputOptions) (pdf.Object, error) {
+	var differences pdf.Array
+
+	lastDiff := 999
+	for code := range 256 {
+		glyphName := e(byte(code))
+		if glyphName == "" {
+			continue
+		}
+
+		if code != lastDiff+1 {
+			differences = append(differences, pdf.Integer(code))
+		}
+		differences = append(differences, pdf.Name(glyphName))
+		lastDiff = code
+	}
+
+	dict := pdf.Dict{
+		"Differences": differences,
+	}
+	if opt.HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Encoding")
+	}
+
+	return dict, nil
 }
 
 var errInvalidEncoding = errors.New("invalid encoding")
