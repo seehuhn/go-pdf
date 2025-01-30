@@ -231,7 +231,7 @@ func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Font) error {
 		if info.GlyphBBox(glyph.ID(gid)).IsZero() {
 			continue
 		}
-		wf := 24 * info.GlyphWidthPDF(glyph.ID(gid))
+		wf := 24 * info.GlyphWidthPDF(glyph.ID(gid)) / 1000
 		if total+wf > f.textWidth {
 			break
 		}

@@ -49,11 +49,11 @@ func (f *embeddedCFFSimple) DecodeWidth(s pdf.String) (float64, int) {
 		return 0, 0
 	}
 	gid := f.Encoding[s[0]]
-	return f.sfnt.GlyphWidthPDF(gid), 1
+	return f.sfnt.GlyphWidthPDF(gid) / 1000, 1
 }
 
 func (f *embeddedCFFSimple) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
-	width := f.sfnt.GlyphWidthPDF(gid)
+	width := f.sfnt.GlyphWidthPDF(gid) / 1000
 	c := f.SimpleEncoder.GIDToCode(gid, rr)
 	return append(s, c), width
 }
@@ -113,9 +113,9 @@ func (f *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 	ascent := subsetSfnt.Ascent
 	descent := subsetSfnt.Descent
 	lineGap := subsetSfnt.LineGap
-	var leading float64
+	var leadingPDF float64
 	if lineGap > 0 {
-		leading = (ascent - descent + lineGap).AsFloat(q)
+		leadingPDF = (ascent - descent + lineGap).AsFloat(q)
 	}
 	fd := &font.Descriptor{
 		FontName:     subset.Join(subsetTag, subsetCFF.FontName),
@@ -132,11 +132,12 @@ func (f *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 		ItalicAngle:  subsetSfnt.ItalicAngle,
 		Ascent:       math.Round(ascent.AsFloat(q)),
 		Descent:      math.Round(descent.AsFloat(q)),
-		Leading:      math.Round(leading),
+		Leading:      math.Round(leadingPDF),
 		CapHeight:    math.Round(subsetSfnt.CapHeight.AsFloat(q)),
 		XHeight:      math.Round(subsetSfnt.XHeight.AsFloat(q)),
 		StemV:        subsetCFF.Private[0].StdVW,
 		StemH:        subsetCFF.Private[0].StdHW,
+		MissingWidth: subsetSfnt.GlyphWidthPDF(0),
 	}
 	res := &simple.Type1Dict{
 		Ref:            f.ref,
@@ -146,17 +147,11 @@ func (f *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 		Encoding:       encoding.Builtin,
 		GetFont:        func() (any, error) { return subsetSfnt, nil },
 	}
-
-	ww := subsetCFF.WidthsPDF()
-	fd.MissingWidth = ww[0]
 	for code := range 256 {
-		res.Width[code] = ww[subsetCFF.Encoding[code]]
+		gid := subsetCFF.Encoding[code]
+		res.Width[code] = subsetSfnt.GlyphWidthPDF(gid)
 	}
-
-	tu := f.SimpleEncoder.ToUnicodeNew()
-	for code, text := range tu {
-		res.Text[code[0]] = string(text)
-	}
+	f.SimpleEncoder.FillText(&res.Text)
 
 	return res.WriteToPDF(rm)
 }

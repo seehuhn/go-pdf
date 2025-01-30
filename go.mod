@@ -13,7 +13,7 @@ require (
 	seehuhn.de/go/geom v0.0.0-20250115091222-3cab61c7096a
 	seehuhn.de/go/icc v0.0.0-20240801195843-cfc244e2c55a
 	seehuhn.de/go/postscript v0.5.1-0.20250124144726-204d9fcbd73d
-	seehuhn.de/go/sfnt v0.5.1-0.20250127093942-6cc03f33d381
+	seehuhn.de/go/sfnt v0.5.1-0.20250130143505-a391841461c8
 	seehuhn.de/go/xmp v0.3.0
 )
 

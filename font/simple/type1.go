@@ -354,9 +354,17 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 		fontDict["Name"] = d.Name
 	}
 
+	stdInfo := stdmtx.Metrics[d.PostScriptName]
+
 	isNonSymbolic := !d.Descriptor.IsSymbolic
 	isExternal := psFont == nil
-	encodingObj, err := d.Encoding.AsPDFType1(isNonSymbolic && isExternal, w.GetOptions())
+	baseIsStd := isNonSymbolic && isExternal
+	if stdInfo != nil {
+		// Don't make any assumptions about the base encoding for the
+		// standard fonts.
+		baseIsStd = false
+	}
+	encodingObj, err := d.Encoding.AsPDFType1(baseIsStd, w.GetOptions())
 	if err != nil {
 		return err
 	}
@@ -366,8 +374,6 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	compressedObjects := []pdf.Object{fontDict}
 	compressedRefs := []pdf.Reference{d.Ref}
-
-	stdInfo := stdmtx.Metrics[d.PostScriptName]
 
 	var fontFileRef pdf.Reference
 	trimFontDict := (psFont == nil &&

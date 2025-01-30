@@ -168,3 +168,11 @@ func (e *SimpleEncoder) ToUnicodeNew() map[string][]rune {
 	}
 	return toUnicode
 }
+
+// ToUnicodeNew returns the mapping from character codes to unicode strings.
+// This can be used to construct a PDF ToUnicode CMap.
+func (e *SimpleEncoder) FillText(text *[256]string) {
+	for k, c := range e.code {
+		(*text)[c] = k.rr
+	}
+}

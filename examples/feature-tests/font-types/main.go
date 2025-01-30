@@ -53,7 +53,7 @@ func doit() error {
 		rightMargin: 144.0,
 	}
 
-	doc, err := document.CreateMultiPage("fonts.pdf", paper, pdf.V1_7, nil)
+	doc, err := document.CreateMultiPage("test.pdf", paper, pdf.V1_7, nil)
 	if err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func doit() error {
 
 		page.TextBegin()
 		if gen != nil {
-			intro = append(intro, "", fmt.Sprintf("Example (see `fonts%02d.pdf`):", fontNo))
+			intro = append(intro, "", fmt.Sprintf("Example (see `test%02d.pdf`):", fontNo))
 		}
 		for i, line := range intro {
 			switch i {
@@ -312,9 +312,12 @@ func doit() error {
 }
 
 func writeSinglePage(gen func(*pdf.ResourceManager) font.Layouter, no int) error {
-	fname := fmt.Sprintf("fonts%02d.pdf", no)
+	fname := fmt.Sprintf("test%02d.pdf", no)
 
-	page, err := document.CreateSinglePage(fname, document.A5r, pdf.V1_7, nil)
+	opt := &pdf.WriterOptions{
+		HumanReadable: true,
+	}
+	page, err := document.CreateSinglePage(fname, document.A5r, pdf.V1_7, opt)
 	if err != nil {
 		return err
 	}

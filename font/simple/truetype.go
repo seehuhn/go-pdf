@@ -22,11 +22,9 @@ import (
 	"iter"
 
 	"seehuhn.de/go/postscript/cid"
-	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/cff"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -35,6 +33,8 @@ import (
 	"seehuhn.de/go/pdf/font/subset"
 )
 
+// TrueTypeDict represents a TrueType font dictionary.
+// This can correspond either to a TrueType or an OpenType font.
 type TrueTypeDict struct {
 	// Ref is the reference to the font dictionary in the PDF file.
 	Ref pdf.Reference
@@ -65,13 +65,16 @@ type TrueTypeDict struct {
 	// Text gives the text content for each character code.
 	Text [256]string
 
+	// IsOpenType is true if the font is embedded as OpenType font.
+	IsOpenType bool
+
 	// GetFont (optional) returns the font data to embed.
 	// If this is nil, the font data is not embedded in the PDF file.
 	// Otherwise, this is an [*sfnt.Font].
 	GetFont func() (any, error)
 }
 
-// ExtractTrueTypeDict reads a Type 1 font dictionary from a PDF file.
+// ExtractTrueTypeDict reads a TrueType font dictionary from a PDF file.
 func ExtractTrueTypeDict(r pdf.Getter, obj pdf.Object) (*TrueTypeDict, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
@@ -171,6 +174,8 @@ func ExtractTrueTypeDict(r pdf.Getter, obj pdf.Object) (*TrueTypeDict, error) {
 		}
 	}
 
+	_, d.IsOpenType = fontDict["FontFile3"]
+
 	getFont, err := makeTrueTypeReader(r, fdDict)
 	if pdf.IsReadError(err) {
 		return nil, err
@@ -265,6 +270,9 @@ func (d *TrueTypeDict) WriteToPDF(rm *pdf.ResourceManager) error {
 	default:
 		return fmt.Errorf("unsupported font type %T", psFont)
 	}
+	if d.IsOpenType && d.GetFont == nil {
+		return errors.New("missing OpenType font data")
+	}
 	if d.SubsetTag != "" && !subset.IsValidTag(d.SubsetTag) {
 		return fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
 	}
@@ -307,10 +315,9 @@ func (d *TrueTypeDict) WriteToPDF(rm *pdf.ResourceManager) error {
 	fdDict := d.Descriptor.AsDict()
 	if psFont != nil {
 		fontFileRef = w.Alloc()
-		switch psFont.(type) {
-		case *type1.Font:
-			fdDict["FontFile"] = fontFileRef
-		case *cff.Font, *sfnt.Font:
+		if !d.IsOpenType {
+			fdDict["FontFile2"] = fontFileRef
+		} else {
 			fdDict["FontFile3"] = fontFileRef
 		}
 	}
@@ -376,27 +383,44 @@ func (d *TrueTypeDict) WriteToPDF(rm *pdf.ResourceManager) error {
 		return pdf.Wrap(err, "Type 1 font dicts")
 	}
 
-	switch f := psFont.(type) {
-	case *sfnt.Font:
-		length1 := pdf.NewPlaceholder(w, 10)
-		fontStmDict := pdf.Dict{
-			"Length1": length1,
-		}
-		fontStm, err := w.OpenStream(fontFileRef, fontStmDict, pdf.FilterCompress{})
-		if err != nil {
-			return fmt.Errorf("open TrueType stream: %w", err)
-		}
-		l1, err := f.WriteTrueTypePDF(fontStm)
-		if err != nil {
-			return fmt.Errorf("write TrueType stream: %w", err)
-		}
-		err = length1.Set(pdf.Integer(l1))
-		if err != nil {
-			return fmt.Errorf("TrueType stream: length1: %w", err)
-		}
-		err = fontStm.Close()
-		if err != nil {
-			return fmt.Errorf("close TrueType stream: %w", err)
+	if f := psFont.(*sfnt.Font); f != nil {
+		if !d.IsOpenType {
+			length1 := pdf.NewPlaceholder(w, 10)
+			fontStmDict := pdf.Dict{
+				"Length1": length1,
+			}
+			fontStm, err := w.OpenStream(fontFileRef, fontStmDict, pdf.FilterCompress{})
+			if err != nil {
+				return fmt.Errorf("open TrueType stream: %w", err)
+			}
+			l1, err := f.WriteTrueTypePDF(fontStm)
+			if err != nil {
+				return fmt.Errorf("write TrueType stream: %w", err)
+			}
+			err = length1.Set(pdf.Integer(l1))
+			if err != nil {
+				return fmt.Errorf("TrueType stream: length1: %w", err)
+			}
+			err = fontStm.Close()
+			if err != nil {
+				return fmt.Errorf("close TrueType stream: %w", err)
+			}
+		} else {
+			fontFileDict := pdf.Dict{
+				"Subtype": pdf.Name("OpenType"),
+			}
+			fontStm, err := w.OpenStream(fontFileRef, fontFileDict, pdf.FilterCompress{})
+			if err != nil {
+				return fmt.Errorf("open OpenType stream: %w", err)
+			}
+			_, err = f.WriteTrueTypePDF(fontStm)
+			if err != nil {
+				return fmt.Errorf("write OpenType stream: %w", err)
+			}
+			err = fontStm.Close()
+			if err != nil {
+				return fmt.Errorf("close OpenType stream: %w", err)
+			}
 		}
 	}
 
