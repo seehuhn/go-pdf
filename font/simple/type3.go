@@ -197,6 +197,7 @@ func (d *Type3Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 			pdf.Number(d.FontMatrix[4]),
 			pdf.Number(d.FontMatrix[5]),
 		},
+		"XX_Seehuhn": pdf.Boolean(true), // TODO(voss): remove
 	}
 
 	if d.Name != "" {

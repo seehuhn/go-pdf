@@ -161,6 +161,7 @@ The following information applies to simple PDF fonts.
 
 - The spec describes a variety of mechanisms to map a single-byte code `c` to a
   glyph in a TrueType font:
+
   1. Use a (1,0) "cmap" subtable to map `c` to a GID.
   2. In a (3,0) "cmap" subtable, look up either `c`, `c+0xF000`, `c+0xF100`,
      or `c+0xF200` to get a GID.
@@ -177,8 +178,9 @@ The following information applies to simple PDF fonts.
   of simple TrueType fonts and to use composite fonts with the `Encoding` set
   to `Identity-H` and `CIDToGIDMap` set to `Identity`, instead.
 
-  I plan to implement the following behaviour: In each of the four cases, try
-  the following methods and use the first one that succeeds:
+  I plan to always use method 1 when writing PDF files, and
+  the following behaviour when reading files: In each of the
+  four cases, try the following methods and use the first one that succeeds:
 
   |             | non-symbolic | symbolic   |
   | ----------: | :----------: | :--------: |

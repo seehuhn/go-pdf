@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"slices"
+	"sort"
 	"strings"
 
 	"golang.org/x/exp/maps"
@@ -36,9 +37,9 @@ func main() {
 }
 
 func run() error {
-	version := pdf.V1_2
-	useSymbolic := true
-	useEncoding := true
+	version := pdf.V1_7
+	useSymbolic := false
+	useEncoding := false
 	base := uint16(0x0000)
 
 	var methods string
@@ -77,6 +78,15 @@ func run() error {
 	out.Println(black, textFont,
 		fmt.Sprintf("PDF version %s, symbolic=%t, encoding=%t, base=0x%04X",
 			version, useSymbolic, useEncoding, base))
+	out.Println()
+	out.Println(`A: Use a (1,0) subtable to map c to a glyph.`)
+	out.Println(`B: Use a (3,0) subtable to map c+base to a glyph.`)
+	out.Println(`C: Use the encoding to map c to a Mac OS Roman name,`)
+	out.Println(`    then use a (1,0) subtable to map the name to a glyph.`)
+	out.Println(`D: Use the encoding to map c to a glyph name,`)
+	out.Println(`    then use a (3,1) subtable to map the name to a glyph.`)
+	out.Println(`E: Use the encoding to map c to a glyph name,`)
+	out.Println(`    then use the PostScript table to map the name to a glyph.`)
 	out.Println()
 
 	type node struct {
@@ -179,22 +189,36 @@ func run() error {
 			}
 			todo = append(todo, node{tag, choices})
 		}
-		X, err := fb.Build(enc)
+		X, err := fb.BuildFont(enc)
 		if err != nil {
 			return err
 		}
-		sel := string(cc)
+
+		rev := make(map[string][]byte)
+		rev[enc.cmap_1_0] = append(rev[enc.cmap_1_0], 'A')
+		rev[enc.cmap_3_0] = append(rev[enc.cmap_3_0], 'B')
+		rev[enc.cmap_1_0_enc] = append(rev[enc.cmap_1_0_enc], 'C')
+		rev[enc.cmap_3_1] = append(rev[enc.cmap_3_1], 'D')
+		rev[enc.post] = append(rev[enc.post], 'E')
 
 		var tags []string
-		tags = append(tags, "sel="+sel)
-		if len(xxx) <= 6 {
-			tags = append(tags, "XXX="+strings.Join(xxx, "|"))
-		}
-
 		if len(cur.choices) > 6-len(xxx) {
 			tags = append(tags, fmt.Sprintf("%d orders", len(cur.choices)))
 		} else {
 			tags = append(tags, strings.Join(cur.choices, "|"))
+		}
+
+		keys := maps.Keys(rev)
+		sort.Strings(keys)
+		for _, tag := range keys {
+			if len(tag) > 0 {
+				mm := rev[tag]
+				tags = append(tags, fmt.Sprintf("%s:%s", tag, string(mm)))
+			}
+		}
+
+		if len(xxx) > 0 && len(xxx) < 6 {
+			tags = append(tags, "XXX="+strings.Join(xxx, "|"))
 		}
 
 		slices.Sort(cc)

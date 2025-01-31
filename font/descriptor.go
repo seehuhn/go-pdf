@@ -17,7 +17,9 @@
 package font
 
 import (
+	"fmt"
 	"math"
+	"strings"
 
 	"seehuhn.de/go/geom/rect"
 
@@ -346,3 +348,36 @@ const (
 	flagSmallCap    pdf.Integer = 1 << 17 // lowercase glyphs are smaller versions of the corresponding uppercase glyphs
 	flagForceBold   pdf.Integer = 1 << 18 // enhance boldness at small pixel sizes
 )
+
+var flagNames = map[pdf.Integer]string{
+	flagFixedPitch:  "FixedPitch",
+	flagSerif:       "Serif",
+	flagSymbolic:    "Symbolic",
+	flagScript:      "Script",
+	flagNonsymbolic: "Nonsymbolic",
+	flagItalic:      "Italic",
+	flagAllCap:      "AllCap",
+	flagSmallCap:    "SmallCap",
+	flagForceBold:   "ForceBold",
+}
+
+// FormatFlags returns a human-readable string representation of the flags.
+func FormatFlags(flags pdf.Integer) string {
+	if flags == 0 {
+		return "0"
+	}
+
+	var result []string
+	for i := 0; i < 32; i++ {
+		bit := pdf.Integer(1 << i)
+		if flags&bit != 0 {
+			if name, exists := flagNames[bit]; exists {
+				result = append(result, name)
+			} else {
+				result = append(result, fmt.Sprintf("%d", i))
+			}
+		}
+	}
+
+	return strings.Join(result, ", ")
+}

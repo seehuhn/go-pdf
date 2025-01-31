@@ -35,14 +35,14 @@ Results
 
 |           | Preview  |  Ghostscript  |  Acrobat Reader  |  FireFox  | Chrome  |
 | :-------: | :------: | :-----------: | :--------------: | :-------: | :-----: |
-| 2.0/+S/+E | DBC      |  BDA          |  DBA             |  BE       |  DBEA   |
-| 2.0/+S/-E | BA       |  BA           |  BA              |  BA       |  BA     |
-| 2.0/-S/+E | DBC      |  DC           |  DC              |  DC       |  DC     |
-| 2.0/-S/-E | B        |  -            |  -               |  A        |  AB     |
+| 2.0/+S/+E | DBC      |  BDA          |  DBA             |  BE       |  DBEA   | B
+| 2.0/-S/+E | DBC      |  DC           |  DC              |  DC       |  DC     | C
+| 2.0/+S/-E | BA       |  BA           |  BA              |  BA       |  BA     | BA
+| 2.0/-S/-E | B        |  -            |  -               |  A        |  AB     | -
 |           |          |               |                  |           |         |
 | 1.2/+S/+E | DBC      |  BDA          |  DBA             |  BE       |  DBEA   |
-| 1.2/+S/-E | BA       |  BA           |  BA              |  BA       |  BA     |
 | 1.2/-S/+E | DBC      |  DC           |  DC              |  DC       |  DC     |
+| 1.2/+S/-E | BA       |  BA           |  BA              |  BA       |  BA     |
 | 1.2/-S/-E | B        |  -            |  -               |  A        |  AB     |
 
 

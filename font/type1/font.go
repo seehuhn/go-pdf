@@ -358,7 +358,7 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 	fd := &font.Descriptor{
 		FontName:   subset.Join(subsetTag, postScriptName),
 		IsSerif:    f.isSerif,
-		IsSymbolic: f.isSymbolic(),
+		IsSymbolic: isSymbolic(fontData),
 	}
 	if fontData != nil {
 		fd.FontFamily = fontData.FamilyName
@@ -406,9 +406,9 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 	return dict.WriteToPDF(rm)
 }
 
-func (f *embeddedSimple) isSymbolic() bool {
-	for _, glyphName := range f.glyphNames {
-		if glyphName == "" || glyphName == ".notdef" {
+func isSymbolic(f *type1.Font) bool {
+	for glyphName := range f.Glyphs {
+		if glyphName == ".notdef" {
 			continue
 		}
 		if !pdfenc.StandardLatin.Has[glyphName] {

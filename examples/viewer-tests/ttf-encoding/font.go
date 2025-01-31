@@ -102,16 +102,20 @@ type encInfo struct {
 	post         string
 }
 
-func (fb *fontBuilder) Build(enc *encInfo) (font.Font, error) {
+// BuildFont constructs a new TrueType font which uses a selection of methods
+// to map codes to glyphs.  To make it possible to tell apart which method
+// a viewer uses, different mappings map the same codes to different
+// glyphs.  The glyphs are chosen to spell the strings given in enc.
+func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Font, error) {
 	// provisionally construct the subset of glyphs that are used
-
 	runeUsed := make(map[rune]struct{})
+	yes := struct{}{}
 	for _, s := range []string{enc.cmap_1_0, enc.cmap_1_0_enc, enc.cmap_3_0, enc.cmap_3_1, enc.post} {
 		for _, r := range s {
-			runeUsed[r] = struct{}{}
+			runeUsed[r] = yes
 		}
 	}
-	runeUsed['X'] = struct{}{}
+	runeUsed['X'] = yes
 	runes := maps.Keys(runeUsed)
 	slices.Sort(runes)
 

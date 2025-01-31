@@ -438,7 +438,15 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 
 	page.TextBegin()
 	lineNo := 0
+
+	flagsY := 0.0
+	var flagsVal pdf.Integer
 	for i, key := range keys {
+		if title == "Font Descriptor" && key == "Flags" {
+			flagsVal, _ = fontDict[key].(pdf.Integer)
+			flagsY = l.yPos - l.F["dict"].ascent
+		}
+
 		switch lineNo {
 		case 0:
 			page.TextFirstLine(xBase, l.yPos-l.F["dict"].ascent)
@@ -468,6 +476,17 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 	}
 	l.yPos++
 	page.TextEnd()
+
+	if flagsY != 0 {
+		page.PushGraphicsState()
+		page.TextBegin()
+		page.TextFirstLine(xBase+maxWidth+10, flagsY)
+		page.SetFillColor(color.DeviceGray(0.5))
+		page.TextShow("# " + font.FormatFlags(flagsVal))
+		page.TextEnd()
+		page.PopGraphicsState()
+	}
+
 	y2 := l.yPos - 2
 	l.yPos -= 4
 
