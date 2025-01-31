@@ -137,15 +137,17 @@ func ExtractType1(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Type1, err
 
 // AsPDFType1 returns the /Encoding entry for Type1 font dictionary.
 //
-// If the argument nonSymbolicExt is true, the function assumes that the font
-// has the non-symbolic flag set in the font descriptor and that the font is
-// not be embedded in the PDF file.  In this case, the built-in encoding must
-// either be used for all mapped codes, or not at all.
+// If the argument baseIsStd is true, Differences arrays record changes from
+// the standard encoding. Otherwise, Differences arrays record changes from the
+// built-in encoding. The flag baseIsStd should be set if the non-symbolic flag
+// set in the font descriptor and that the font is not be embedded in the PDF
+// file. If the flag is set, the built-in encoding must either be used for all
+// mapped codes, or not at all.
 //
 // The resulting PDF object describes an encoding which maps all characters
 // mapped by e to the given glyph name, but it may also imply glyph names for
 // the unmapped codes.
-func (e Type1) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, error) {
+func (e Type1) AsPDFType1(baseIsStd bool, opt pdf.OutputOptions) (pdf.Object, error) {
 	type candInfo struct {
 		encName     pdf.Native
 		enc         []string
@@ -201,7 +203,7 @@ func (e Type1) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Objec
 			{encName: pdf.Name("MacRomanEncoding"), enc: pdfenc.MacRoman.Encoding[:]},
 			{encName: pdf.Name("MacExpertEncoding"), enc: pdfenc.MacExpert.Encoding[:]},
 		}
-		if nonSymbolicExt {
+		if baseIsStd {
 			// If a font is marked as non-symbolic in the font descriptor and
 			// the font is not embedded, a missing `BaseEncoding` field
 			// represents the standard encoding.
@@ -225,7 +227,7 @@ func (e Type1) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Objec
 			}
 		}
 	} else {
-		if nonSymbolicExt {
+		if baseIsStd {
 			// If the font is marked as non-symbolic in the font descriptor and
 			// the font is not embedded, a missing `BaseEncoding` field
 			// represents the standard encoding. In this case, there is no way

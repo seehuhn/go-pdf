@@ -37,9 +37,9 @@ func main() {
 }
 
 func run() error {
-	version := pdf.V1_7
+	version := pdf.V2_0
 	useSymbolic := false
-	useEncoding := false
+	useEncoding := true
 	base := uint16(0x0000)
 
 	var methods string
@@ -111,7 +111,7 @@ func run() error {
 			// no choice to make, this is a leaf node
 			out.Println(
 				black, labelFont, cur.tag,
-				textFont, ": the order is ", blue, cur.choices[0])
+				textFont, ": order ", blue, cur.choices[0])
 			continue
 		}
 
@@ -187,7 +187,9 @@ func run() error {
 			default:
 				panic(fmt.Sprintf("unexpected selector type %q", c))
 			}
-			todo = append(todo, node{tag, choices})
+			if c != 'X' {
+				todo = append(todo, node{tag, choices})
+			}
 		}
 		X, err := fb.BuildFont(enc)
 		if err != nil {
@@ -217,16 +219,23 @@ func run() error {
 			}
 		}
 
-		if len(xxx) > 0 && len(xxx) < 6 {
-			tags = append(tags, "XXX="+strings.Join(xxx, "|"))
-		}
-
-		slices.Sort(cc)
-		out.Println(black,
+		aa := []any{
+			black,
 			labelFont, cur.tag,
 			textFont, ": go to ",
 			X, pdf.String(markerString),
-			textFont, gray, " "+strings.Join(tags, ", "))
+			textFont, gray, " " + strings.Join(tags, ", "),
+		}
+
+		if len(xxx) > 0 && len(xxx) < 6 {
+			if len(xxx) == 1 {
+				aa = append(aa, ", ", black, "XXX -> order ", blue, xxx[0])
+			} else {
+				aa = append(aa, ", XXX->"+strings.Join(xxx, "|"))
+			}
+		}
+
+		out.Println(aa...)
 	}
 
 	err = out.Close()

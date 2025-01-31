@@ -178,9 +178,15 @@ The following information applies to simple PDF fonts.
   of simple TrueType fonts and to use composite fonts with the `Encoding` set
   to `Identity-H` and `CIDToGIDMap` set to `Identity`, instead.
 
-  I plan to always use method 1 when writing PDF files, and
-  the following behaviour when reading files: In each of the
-  four cases, try the following methods and use the first one that succeeds:
+  Writing: I plan to use the following methods:
+
+  |             | non-symbolic | symbolic   |
+  | ----------: | :----------: | :--------: |
+  | encoding    | 4            | 2          |
+  | no encoding | 1            | avoid      |
+
+  Reading: I plan to try the methods in the following order and to use the
+  first one which succeeds:
 
   |             | non-symbolic | symbolic   |
   | ----------: | :----------: | :--------: |

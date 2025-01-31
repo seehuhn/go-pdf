@@ -242,20 +242,20 @@ func makeTrueTypeReader(r pdf.Getter, fd pdf.Dict) (func() (any, error), error) 
 
 // WriteToPDF adds the font dictionary to the PDF file.
 func (d *TrueTypeDict) WriteToPDF(rm *pdf.ResourceManager) error {
-	var psFont any
+	var ttfFont any
 	if d.GetFont != nil {
 		font, err := d.GetFont()
 		if err != nil {
 			return err
 		}
-		psFont = font
+		ttfFont = font
 	}
 
 	// Check that all data are valid and consistent.
 	if d.Ref == 0 {
 		return errors.New("missing font dictionary reference")
 	}
-	switch f := psFont.(type) {
+	switch f := ttfFont.(type) {
 	case nil:
 		// pass
 
@@ -268,7 +268,7 @@ func (d *TrueTypeDict) WriteToPDF(rm *pdf.ResourceManager) error {
 		}
 
 	default:
-		return fmt.Errorf("unsupported font type %T", psFont)
+		return fmt.Errorf("unsupported font type %T", ttfFont)
 	}
 	if d.IsOpenType && d.GetFont == nil {
 		return errors.New("missing OpenType font data")
@@ -297,7 +297,7 @@ func (d *TrueTypeDict) WriteToPDF(rm *pdf.ResourceManager) error {
 	}
 
 	isNonSymbolic := !d.Descriptor.IsSymbolic
-	isExternal := psFont == nil
+	isExternal := ttfFont == nil
 	// TODO(voss): implement TrueType constraints
 	encodingObj, err := d.Encoding.AsPDFType1(isNonSymbolic && isExternal, w.GetOptions())
 	if err != nil {
@@ -313,7 +313,7 @@ func (d *TrueTypeDict) WriteToPDF(rm *pdf.ResourceManager) error {
 	var fontFileRef pdf.Reference
 	fdRef := w.Alloc()
 	fdDict := d.Descriptor.AsDict()
-	if psFont != nil {
+	if ttfFont != nil {
 		fontFileRef = w.Alloc()
 		if !d.IsOpenType {
 			fdDict["FontFile2"] = fontFileRef
@@ -383,7 +383,7 @@ func (d *TrueTypeDict) WriteToPDF(rm *pdf.ResourceManager) error {
 		return pdf.Wrap(err, "Type 1 font dicts")
 	}
 
-	if f := psFont.(*sfnt.Font); f != nil {
+	if f := ttfFont.(*sfnt.Font); f != nil {
 		if !d.IsOpenType {
 			length1 := pdf.NewPlaceholder(w, 10)
 			fontStmDict := pdf.Dict{
