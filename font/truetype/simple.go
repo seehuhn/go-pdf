@@ -21,7 +21,6 @@ import (
 	"math"
 
 	"seehuhn.de/go/postscript/type1/names"
-
 	"seehuhn.de/go/sfnt"
 	sfntcmap "seehuhn.de/go/sfnt/cmap"
 	"seehuhn.de/go/sfnt/glyph"
@@ -41,7 +40,7 @@ type embeddedSimple struct {
 
 	sfnt *sfnt.Font
 
-	*encoding.SimpleEncoder
+	*encoding.TrueTypeEncoder
 
 	closed bool
 }
@@ -71,11 +70,11 @@ func (f *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	}
 	f.closed = true
 
-	if f.SimpleEncoder.Overflow() {
+	if f.TrueTypeEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q",
 			f.sfnt.PostScriptName())
 	}
-	enc := f.SimpleEncoder.Encoding
+	enc := f.TrueTypeEncoder.Encoding
 
 	origSfnt := f.sfnt.Clone()
 	origSfnt.CMapTable = nil
@@ -84,7 +83,7 @@ func (f *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	origSfnt.Gpos = nil
 
 	// subset the font
-	subsetGID := f.SimpleEncoder.Subset()
+	subsetGID := f.TrueTypeEncoder.Subset()
 	subsetTag := subset.Tag(subsetGID, origSfnt.NumGlyphs())
 	subsetSfnt, err := origSfnt.Subset(subsetGID)
 	if err != nil {
@@ -100,26 +99,94 @@ func (f *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		subsetEncoding[i] = subsetGid[gid]
 	}
 
-	// Mark the font as "symbolic", and use a (1, 0) "cmap" subtable to map
-	// character codes to glyphs.
-	//
-	// TODO(voss): also try the two allowed encodings for "non-symbolic" fonts.
-	//
-	// TODO(voss): revisit this, once
-	// https://github.com/pdf-association/pdf-issues/issues/316 is resolved.
-	isSymbolic := true
-	subtable := sfntcmap.Format4{}
-	for code, gid := range subsetEncoding {
-		if gid == 0 {
+	postScriptName := subsetSfnt.PostScriptName()
+
+	// Follow the advice of section 9.6.5.4 of ISO 32000-2:2020:
+	// Only make the font as non-symbolic, if it can be encoded either
+	// using "MacRomanEncoding" or "WinAnsiEncoding".
+	var isSymbolic bool
+	var dictEnc encoding.Type1
+	canMacRoman := true
+	canWinAnsi := true
+	var needsFormat12 bool
+	var text [256]string
+	f.TrueTypeEncoder.FillText(&text)
+	for code, s := range text {
+		if !f.TrueTypeEncoder.CodeIsUsed(byte(code)) {
 			continue
 		}
-		subtable[uint16(code)] = gid
+		rr := []rune(s)
+		if len(rr) != 1 {
+			canMacRoman = false
+			canWinAnsi = false
+			break
+		}
+		r := rr[0]
+		if r >= 0x1_0000 {
+			needsFormat12 = true
+		}
+		glyphName := names.FromUnicode(r)
+		if pdfenc.MacRoman.Encoding[code] != glyphName {
+			canMacRoman = false
+		}
+		if pdfenc.WinAnsi.Encoding[code] != glyphName {
+			canWinAnsi = false
+		}
+		if !(canMacRoman || canWinAnsi) {
+			break
+		}
 	}
-	subsetSfnt.CMapTable = sfntcmap.Table{
-		{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
-	}
+	if !(canMacRoman || canWinAnsi) {
+		// Mark the font as "symbolic", and use a (1, 0) "cmap" subtable to map
+		// character codes to glyphs.
+		isSymbolic = true
+		dictEnc = encoding.Builtin
 
-	postScriptName := subsetSfnt.PostScriptName()
+		subtable := sfntcmap.Format4{}
+		for code, gid := range subsetEncoding {
+			if gid == 0 {
+				continue
+			}
+			subtable[uint16(code)] = gid
+		}
+		subsetSfnt.CMapTable = sfntcmap.Table{
+			{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
+		}
+	} else {
+		isSymbolic = false
+		dictEnc = func(code byte) string {
+			if !f.TrueTypeEncoder.CodeIsUsed(byte(code)) {
+				return ""
+			}
+			return names.FromUnicode([]rune(text[code])[0])
+		}
+
+		if needsFormat12 {
+			subtable := sfntcmap.Format12{}
+			for code, gid := range subsetEncoding {
+				if !f.TrueTypeEncoder.CodeIsUsed(byte(code)) {
+					continue
+				}
+				r := []rune(text[code])[0]
+				subtable[uint32(r)] = gid
+			}
+			subsetSfnt.CMapTable = sfntcmap.Table{
+				{PlatformID: 3, EncodingID: 1}: subtable.Encode(0),
+			}
+		} else {
+			subtable := sfntcmap.Format4{}
+			for code, gid := range subsetEncoding {
+				if !f.TrueTypeEncoder.CodeIsUsed(byte(code)) {
+					continue
+				}
+				r := []rune(text[code])[0]
+				subtable[uint16(r)] = gid
+			}
+			subsetSfnt.CMapTable = sfntcmap.Table{
+				{PlatformID: 3, EncodingID: 1}: subtable.Encode(0),
+			}
+		}
+	}
 
 	q := subsetSfnt.FontMatrix[3] * 1000
 
@@ -155,7 +222,7 @@ func (f *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
-		Encoding:       encoding.Builtin,
+		Encoding:       dictEnc,
 		IsOpenType:     false,
 		GetFont:        func() (any, error) { return subsetSfnt, nil },
 	}
@@ -163,67 +230,7 @@ func (f *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		gid := subsetEncoding[code]
 		res.Width[code] = subsetSfnt.GlyphWidthPDF(gid)
 	}
-	f.SimpleEncoder.FillText(&res.Text)
+	f.TrueTypeEncoder.FillText(&res.Text)
 
 	return res.WriteToPDF(rm)
-}
-
-// ExtractEncoding tries to extract an encoding vector from the given encoding
-// dictionary.  See section 9.6.5.4 of ISO 32000-2:2020.
-//
-// TODO(voss): revisit this, once
-// https://github.com/pdf-association/pdf-issues/issues/316 is resolved.
-func ExtractEncoding(r pdf.Getter, encodingDict pdf.Object, ttf *sfnt.Font) []glyph.ID {
-	if encodingEntry, _ := pdf.Resolve(r, encodingDict); encodingEntry != nil {
-		encodingNames, _ := encoding.UndescribeEncodingType1(r, encodingEntry, pdfenc.Standard.Encoding[:])
-		for i, name := range encodingNames {
-			if name == ".notdef" {
-				encodingNames[i] = pdfenc.Standard.Encoding[i]
-			}
-		}
-
-		cmap, _ := ttf.CMapTable.GetNoLang(3, 1)
-		if cmap != nil {
-			encoding := make([]glyph.ID, 256)
-			for code, name := range encodingNames {
-				rr := names.ToUnicode(name, false)
-				if len(rr) == 1 {
-					encoding[code] = cmap.Lookup(rr[0])
-				}
-			}
-			return encoding
-		}
-		// TODO(voss): also try to use a (1,0) subtable together with encodingNames
-	}
-
-	cmap, _ := ttf.CMapTable.GetNoLang(3, 0)
-	if cmap != nil {
-		encoding := make([]glyph.ID, 256)
-		for code := rune(0); code < 256; code++ {
-			for _, pfx := range []rune{0xF000, 0xF100, 0xF200, 0x0000} {
-				if cmap.Lookup(pfx+code) != 0 {
-					encoding[code] = cmap.Lookup(pfx | code)
-					break
-				}
-			}
-		}
-		return encoding
-	}
-
-	cmap, _ = ttf.CMapTable.GetNoLang(1, 0)
-	if cmap != nil {
-		encoding := make([]glyph.ID, 256)
-		for code := rune(0); code < 256; code++ {
-			encoding[code] = cmap.Lookup(code)
-		}
-		return encoding
-	}
-
-	// encoding := make([]glyph.ID, 256)
-	// for i := range encoding {
-	// 	encoding[i] = glyph.ID(i)
-	// }
-	// return encoding
-
-	return nil
 }

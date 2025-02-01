@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -21,29 +21,21 @@ import (
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
-	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/postscript/type1/names"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-// SimpleEncoder constructs and stores mappings from one-byte character codes
-// to GID values and from one-byte character codes to unicode strings.
-type SimpleEncoder struct {
+type TrueTypeEncoder struct {
 	Encoding []glyph.ID
 	code     map[key]byte
 	key      map[byte]key
 }
 
-type key struct {
-	gid glyph.ID
-	rr  string
-}
-
 // NewSimpleEncoder allocates a new SimpleEncoder.
-func NewSimpleEncoder() *SimpleEncoder {
-	res := &SimpleEncoder{
+func NewTrueTypeEncoder() *TrueTypeEncoder {
+	res := &TrueTypeEncoder{
 		Encoding: make([]glyph.ID, 256),
 		code:     make(map[key]byte),
 		key:      make(map[byte]key),
@@ -52,14 +44,14 @@ func NewSimpleEncoder() *SimpleEncoder {
 }
 
 // WritingMode implements the [font.NewFont] interface.
-func (e *SimpleEncoder) WritingMode() cmap.WritingMode {
+func (e *TrueTypeEncoder) WritingMode() cmap.WritingMode {
 	return cmap.Horizontal // simple fonts are always horizontal
 }
 
 // GIDToCode returns the character code for the given glyph ID (allocating new
 // codes as needed).  It also records the fact that the character code
 // corresponds to the given unicode string.
-func (e *SimpleEncoder) GIDToCode(gid glyph.ID, rr []rune) byte {
+func (e *TrueTypeEncoder) GIDToCode(gid glyph.ID, rr []rune) byte {
 	k := key{gid, string(rr)}
 
 	// Rules for choosing the code:
@@ -83,7 +75,7 @@ func (e *SimpleEncoder) GIDToCode(gid glyph.ID, rr []rune) byte {
 	return code
 }
 
-func (e *SimpleEncoder) allocateCode(r rune) byte {
+func (e *TrueTypeEncoder) allocateCode(r rune) byte {
 	if len(e.code) >= 256 {
 		// Once all codes are used up, simply return 0 for everything.
 		return 0
@@ -97,14 +89,14 @@ func (e *SimpleEncoder) allocateCode(r rune) byte {
 		}
 		var score int
 		q := rune(code)
-		stdName := pdfenc.Standard.Encoding[code]
-		if stdName == ".notdef" {
+		winAnsiName := pdfenc.WinAnsi.Encoding[code]
+		if winAnsiName == ".notdef" {
 			// fill up the unused slots first
 			score += 100
 		} else {
-			q = names.ToUnicode(stdName, false)[0]
+			q = names.ToUnicode(winAnsiName, false)[0]
 			if q == r {
-				// If r is in the standard encoding, and the corresponding
+				// If r is in the WinAnsi encoding, and the corresponding
 				// code is still free, then use it.
 				bestCode = code
 				break
@@ -126,19 +118,19 @@ func (e *SimpleEncoder) allocateCode(r rune) byte {
 // CodeIsUsed returns true if the given code has already been allocated.
 // This can be used to distinguish between codes which have
 // explicitly been mapped to GID 0 and codes which are not used.
-func (e *SimpleEncoder) CodeIsUsed(code byte) bool {
+func (e *TrueTypeEncoder) CodeIsUsed(code byte) bool {
 	_, used := e.key[code]
 	return used
 }
 
 // Overflow returns true if the encoder has run out of codes.
-func (e *SimpleEncoder) Overflow() bool {
+func (e *TrueTypeEncoder) Overflow() bool {
 	return len(e.code) > 256
 }
 
 // Subset returns the subset of glyph IDs which are used by this encoder.
 // The result is sorted and always include the glyph ID 0.
-func (e *SimpleEncoder) Subset() []glyph.ID {
+func (e *TrueTypeEncoder) Subset() []glyph.ID {
 	gidUsed := make(map[glyph.ID]bool, len(e.code)+1)
 	gidUsed[0] = true
 	for key := range e.code {
@@ -149,29 +141,9 @@ func (e *SimpleEncoder) Subset() []glyph.ID {
 	return subset
 }
 
-// ToUnicode returns the mapping from character codes to unicode strings.
-// This can be used to construct a PDF ToUnicode CMap.
-func (e *SimpleEncoder) ToUnicode() map[charcode.CharCodeOld][]rune {
-	toUnicode := make(map[charcode.CharCodeOld][]rune)
-	for k, v := range e.code {
-		toUnicode[charcode.CharCodeOld(v)] = []rune(k.rr)
-	}
-	return toUnicode
-}
-
 // ToUnicodeNew returns the mapping from character codes to unicode strings.
 // This can be used to construct a PDF ToUnicode CMap.
-func (e *SimpleEncoder) ToUnicodeNew() map[string][]rune {
-	toUnicode := make(map[string][]rune, len(e.code))
-	for k, c := range e.code {
-		toUnicode[string([]byte{c})] = []rune(k.rr)
-	}
-	return toUnicode
-}
-
-// ToUnicodeNew returns the mapping from character codes to unicode strings.
-// This can be used to construct a PDF ToUnicode CMap.
-func (e *SimpleEncoder) FillText(text *[256]string) {
+func (e *TrueTypeEncoder) FillText(text *[256]string) {
 	for k, c := range e.code {
 		(*text)[c] = k.rr
 	}

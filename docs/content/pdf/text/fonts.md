@@ -183,7 +183,7 @@ The following information applies to simple PDF fonts.
   |             | non-symbolic | symbolic   |
   | ----------: | :----------: | :--------: |
   | encoding    | 4            | 2          |
-  | no encoding | 1            | avoid      |
+  | no encoding | avoid        | 1          |
 
   Reading: I plan to try the methods in the following order and to use the
   first one which succeeds:

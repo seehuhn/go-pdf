@@ -69,7 +69,7 @@ func (r *Reader) ReadFont(ref pdf.Object) (F FontFromFile, err error) {
 }
 
 func (r *Reader) readSimpleFont(info *font.Dicts, toUni *cmap.ToUnicodeFile) (F FontFromFile, err error) {
-	var enc *encoding.Encoding
+	var enc *encoding.EncodingOld
 	switch info.DictType {
 	case font.DictTypeSimpleType1:
 		enc, err = encoding.ExtractType1Old(r.R, info)
@@ -161,7 +161,7 @@ func (r *Reader) extractWidths(info *font.Dicts) ([]float64, error) {
 }
 
 type SimpleFont struct {
-	enc    *encoding.Encoding
+	enc    *encoding.EncodingOld
 	info   []*font.CodeInfo
 	widths []float64
 	toUni  *cmap.ToUnicodeFile

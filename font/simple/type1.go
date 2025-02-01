@@ -348,7 +348,7 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 		"Type":       pdf.Name("Font"),
 		"Subtype":    pdf.Name("Type1"),
 		"BaseFont":   baseFont,
-		"XX_Seehuhn": pdf.Boolean(true), // TODO(voss): remove
+		"XX_Seehuhn": pdf.Name("Type1"), // TODO(voss): remove
 	}
 	if d.Name != "" {
 		fontDict["Name"] = d.Name

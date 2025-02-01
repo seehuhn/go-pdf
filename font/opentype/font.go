@@ -170,11 +170,11 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	} else { // glyf outlines
 		if !opt.Composite {
 			embedded = &embeddedGlyfSimple{
-				w:             w,
-				ref:           ref,
-				sfnt:          f.Font,
-				SimpleEncoder: encoding.NewSimpleEncoder(),
-				closed:        false,
+				w:               w,
+				ref:             ref,
+				sfnt:            f.Font,
+				TrueTypeEncoder: encoding.NewTrueTypeEncoder(),
+				closed:          false,
 			}
 		} else {
 			var gidToCID cmap.GIDToCID

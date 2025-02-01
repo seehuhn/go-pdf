@@ -108,14 +108,15 @@ func (f *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 		}
 	}
 
-	q := subsetSfnt.FontMatrix[3] * 1000
+	qh := subsetSfnt.FontMatrix[0] * 1000
+	qv := subsetSfnt.FontMatrix[3] * 1000
 
 	ascent := subsetSfnt.Ascent
 	descent := subsetSfnt.Descent
 	lineGap := subsetSfnt.LineGap
 	var leadingPDF float64
 	if lineGap > 0 {
-		leadingPDF = (ascent - descent + lineGap).AsFloat(q)
+		leadingPDF = (ascent - descent + lineGap).AsFloat(qv)
 	}
 	fd := &font.Descriptor{
 		FontName:     subset.Join(subsetTag, subsetCFF.FontName),
@@ -130,13 +131,13 @@ func (f *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 		ForceBold:    subsetCFF.Private[0].ForceBold,
 		FontBBox:     subsetSfnt.FontBBoxPDF().Rounded(),
 		ItalicAngle:  subsetSfnt.ItalicAngle,
-		Ascent:       math.Round(ascent.AsFloat(q)),
-		Descent:      math.Round(descent.AsFloat(q)),
+		Ascent:       math.Round(ascent.AsFloat(qv)),
+		Descent:      math.Round(descent.AsFloat(qv)),
 		Leading:      math.Round(leadingPDF),
-		CapHeight:    math.Round(subsetSfnt.CapHeight.AsFloat(q)),
-		XHeight:      math.Round(subsetSfnt.XHeight.AsFloat(q)),
-		StemV:        subsetCFF.Private[0].StdVW,
-		StemH:        subsetCFF.Private[0].StdHW,
+		CapHeight:    math.Round(subsetSfnt.CapHeight.AsFloat(qv)),
+		XHeight:      math.Round(subsetSfnt.XHeight.AsFloat(qv)),
+		StemV:        math.Round(subsetCFF.Private[0].StdVW * qh),
+		StemH:        math.Round(subsetCFF.Private[0].StdHW * qv),
 		MissingWidth: subsetSfnt.GlyphWidthPDF(0),
 	}
 	res := &simple.Type1Dict{

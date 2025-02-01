@@ -134,7 +134,7 @@ func (f *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 	}
 	dw := subsetCFF.GlyphWidthPDF(0)
 
-	isSymbolic := false
+	isSymbolic := false // TODO(voss): set this correctly
 
 	qh := subsetCFF.FontMatrix[0] * 1000
 	qv := subsetCFF.FontMatrix[3] * 1000

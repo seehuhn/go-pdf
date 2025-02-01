@@ -26,26 +26,30 @@ import (
 	"seehuhn.de/go/pdf/font/pdfenc"
 )
 
-// An Encoding describes a mapping between one-byte character codes and CIDs.
+// An EncodingOld describes a mapping between one-byte character codes and CIDs.
 //
 // CID values can represent either glyph names, or entries in the built-in
 // encoding of a font.  The interpretation of CID values is specific to the
 // encoder instance.  CID 0 is reserved for unmapped codes.
-type Encoding struct {
+//
+// TODO(voss): remove
+//
+// Deprecated: Use one of the other implementations instead.
+type EncodingOld struct {
 	enc        [256]cmap.CID
 	glyphNames []string
 }
 
 // New allocates a new Encoding object.
-func New() *Encoding {
-	return &Encoding{}
+func New() *EncodingOld {
+	return &EncodingOld{}
 }
 
 // Allocate allocates a new CID for a named glyph.
 //
 // If a CID has already been allocated for the glyph name, the same CID is
 // returned.  Otherwise, a new CID is allocated and returned.
-func (e *Encoding) Allocate(glyphName string) cmap.CID {
+func (e *EncodingOld) Allocate(glyphName string) cmap.CID {
 	if glyphName == "" {
 		panic("encoding: missing glyph name")
 	}
@@ -66,7 +70,7 @@ func (e *Encoding) Allocate(glyphName string) cmap.CID {
 
 // UseBuiltinEncoding maps a character code to the corresponding glyph
 // of the built-in encoding.
-func (e *Encoding) UseBuiltinEncoding(code byte) cmap.CID {
+func (e *EncodingOld) UseBuiltinEncoding(code byte) cmap.CID {
 	cid := 1 + cmap.CID(code)
 	e.enc[code] = cid
 	return cid
@@ -75,7 +79,7 @@ func (e *Encoding) UseBuiltinEncoding(code byte) cmap.CID {
 // GlyphName returns the glyph name associated with a CID.
 //
 // For codes mapped via the built-in encoding, the empty string is returned.
-func (e *Encoding) GlyphName(cid cmap.CID) string {
+func (e *EncodingOld) GlyphName(cid cmap.CID) string {
 	if cid == 0 {
 		return ".notdef"
 	}
@@ -94,7 +98,7 @@ func (e *Encoding) GlyphName(cid cmap.CID) string {
 
 // Decode returns the CID associated with a character code.
 // If the code is not mapped, 0 is returned.
-func (e *Encoding) Decode(code byte) cmap.CID {
+func (e *EncodingOld) Decode(code byte) cmap.CID {
 	return e.enc[code]
 }
 
@@ -106,7 +110,7 @@ func (e *Encoding) Decode(code byte) cmap.CID {
 //
 // The resulting PDF object describes an encoding which maps all characters
 // mapped by e in the specified way, but it may also map additional codes.
-func (e *Encoding) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, error) {
+func (e *EncodingOld) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.Object, error) {
 	type candInfo struct {
 		encName     pdf.Native
 		enc         []string
@@ -246,7 +250,7 @@ func (e *Encoding) AsPDFType1(nonSymbolicExt bool, opt pdf.OutputOptions) (pdf.O
 //
 // The glyph names for all mapped codes must be known (either via the encoding,
 // or via the builtin encoding).  Otherwise an error is returned.
-func (e *Encoding) AsPDFTrueType(builtin []string, opt pdf.OutputOptions) (pdf.Object, error) {
+func (e *EncodingOld) AsPDFTrueType(builtin []string, opt pdf.OutputOptions) (pdf.Object, error) {
 	// First check that all glyph names are known.
 	for code := range 256 {
 		cid := e.enc[code]
@@ -339,7 +343,7 @@ candidateLoop:
 // font.
 //
 // On success, the function returns a [pdf.Dict] object.
-func (e *Encoding) AsPDFType3(opt pdf.OutputOptions) (pdf.Object, error) {
+func (e *EncodingOld) AsPDFType3(opt pdf.OutputOptions) (pdf.Object, error) {
 	dict := pdf.Dict{}
 	if opt.HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Encoding")
@@ -373,7 +377,7 @@ func (e *Encoding) AsPDFType3(opt pdf.OutputOptions) (pdf.Object, error) {
 // Deprecated: Use [ExtractType1] instead.
 //
 // TODO(voss): remove
-func ExtractType1Old(r pdf.Getter, dicts *font.Dicts) (*Encoding, error) {
+func ExtractType1Old(r pdf.Getter, dicts *font.Dicts) (*EncodingOld, error) {
 	obj, err := pdf.Resolve(r, dicts.FontDict["Encoding"])
 	if err != nil {
 		return nil, err
@@ -443,7 +447,7 @@ func ExtractType1Old(r pdf.Getter, dicts *font.Dicts) (*Encoding, error) {
 	return e, nil
 }
 
-func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
+func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*EncodingOld, error) {
 	obj, err := pdf.Resolve(r, obj)
 	if err != nil {
 		return nil, err
@@ -519,7 +523,7 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
 	return e, nil
 }
 
-func ExtractType3Old(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
+func ExtractType3Old(r pdf.Getter, obj pdf.Object) (*EncodingOld, error) {
 	dict, err := pdf.GetDictTyped(r, obj, "Encoding")
 	if err != nil {
 		return nil, err
@@ -556,13 +560,13 @@ func ExtractType3Old(r pdf.Getter, obj pdf.Object) (*Encoding, error) {
 	return e, nil
 }
 
-func (e *Encoding) initBuiltinEncoding() {
+func (e *EncodingOld) initBuiltinEncoding() {
 	for code := range 256 {
 		e.UseBuiltinEncoding(byte(code))
 	}
 }
 
-func (e *Encoding) initNamedEncoding(name pdf.Name) error {
+func (e *EncodingOld) initNamedEncoding(name pdf.Name) error {
 	var enc []string
 	switch name {
 	case "WinAnsiEncoding":
@@ -585,7 +589,7 @@ func (e *Encoding) initNamedEncoding(name pdf.Name) error {
 	return nil
 }
 
-func (e *Encoding) initStandardEncoding() {
+func (e *EncodingOld) initStandardEncoding() {
 	for code, name := range pdfenc.Standard.Encoding {
 		if name == ".notdef" {
 			continue

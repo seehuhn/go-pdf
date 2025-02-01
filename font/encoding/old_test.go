@@ -285,7 +285,7 @@ var testBuiltinEncoding = []string{
 }
 
 type sampleEncoding struct {
-	enc   *Encoding
+	enc   *EncodingOld
 	names []string
 }
 
@@ -390,7 +390,7 @@ func TestAsPDF(t *testing.T) {
 					return
 				}
 
-				var enc2 *Encoding
+				var enc2 *EncodingOld
 				var obj pdf.Object
 				var err error
 				switch tp {

@@ -197,10 +197,10 @@ func (f *embedded) Finish(*pdf.ResourceManager) error {
 		CharProcs:  glyphs,
 		Encoding:   func(code byte) string { return encoding[code] },
 		Descriptor: fd,
-		Width:      [256]float64{},
 		Resources:  f.Resources,
 	}
 	copy(res.Width[:], widths)
+	f.SimpleEncoder.FillText(&res.Text)
 
 	return res.WriteToPDF(f.RM)
 }
