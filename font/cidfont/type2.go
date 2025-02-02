@@ -17,7 +17,6 @@
 package cidfont
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -32,11 +31,12 @@ import (
 	"seehuhn.de/go/pdf/font/widths"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
-// Type0Dict holds the information from the font dictionary and CIDFont dictionary
+// Type2Dict holds the information from the font dictionary and CIDFont dictionary
 // of a Type 0 (CFF-based) CIDFont.
-type Type0Dict struct {
+type Type2Dict struct {
 	// Ref is the reference to the font dictionary in the PDF file.
 	Ref pdf.Reference
 
@@ -70,19 +70,22 @@ type Type0Dict struct {
 	// Text specifies how character codes are mapped to Unicode strings.
 	Text *cmap.ToUnicodeFile
 
-	// GetFont (optional) returns the font data to embed. If this is nil, the
-	// font data is not embedded in the PDF file.
-	//
-	// If subsetting is required, GetFont must return the subsetted font data.
-	//
-	// The value returned by GetFont must be one of [*cff.Font] or
-	// [*sfnt.Font], and must have a ROS field which is compatible with the ROS
-	// field above.
+	// IsOpenType is true if the font is embedded as OpenType font.
+	IsOpenType bool
+
+	// GetFont (optional) returns the font data to embed.
+	// If this is nil, the font data is not embedded in the PDF file.
+	// Otherwise, the value returned by GetFont is an [*sfnt.Font].
 	GetFont func() (any, error)
+
+	// CIDToGID (optional, only used if GetFont is non-nil) maps CID values to
+	// GID values. If this is missing, the GID values are the same as the CID
+	// values.
+	CIDToGID []glyph.ID
 }
 
-// ExtractType0 extracts the information from a Type 0 CIDFont from a PDF file.
-func ExtractType0(r pdf.Getter, obj pdf.Object) (*Type0Dict, error) {
+// ExtractType2 extracts the information from a Type 0 CIDFont from a PDF file.
+func ExtractType2(r pdf.Getter, obj pdf.Object) (*Type2Dict, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
 		return nil, err
@@ -120,13 +123,13 @@ func ExtractType0(r pdf.Getter, obj pdf.Object) (*Type0Dict, error) {
 	subtype, err = pdf.GetName(r, cidFontDict["Subtype"])
 	if err != nil {
 		return nil, err
-	} else if subtype != "CIDFontType0" {
+	} else if subtype != "CIDFontType2" {
 		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("expected CIDFontType0, got %q", subtype),
+			Err: fmt.Errorf("expected CIDFontType2, got %q", subtype),
 		}
 	}
 
-	d := &Type0Dict{}
+	d := &Type2Dict{}
 	d.Ref, _ = obj.(pdf.Reference)
 
 	// fields in the font dictionary
@@ -175,7 +178,46 @@ func ExtractType0(r pdf.Getter, obj pdf.Object) (*Type0Dict, error) {
 	}
 	d.DefaultWidth = float64(dw)
 
-	getFont, err := makeFontReader(r, fdDict)
+	c2g, err := pdf.Resolve(r, cidFontDict["CIDToGIDMap"])
+	if err != nil {
+		return nil, err
+	}
+	switch c2g := c2g.(type) {
+	case pdf.Name:
+		if c2g != "Identity" {
+			return nil, &pdf.MalformedFileError{
+				Err: fmt.Errorf("unsupported CIDToGIDMap: %q", c2g),
+			}
+		}
+
+	case *pdf.Stream:
+		in, err := pdf.DecodeStream(r, c2g, 0)
+		if err != nil {
+			return nil, err
+		}
+		cid2gidData, err := io.ReadAll(in)
+		if err == nil && len(cid2gidData)%2 != 0 {
+			err = &pdf.MalformedFileError{
+				Err: errors.New("odd length CIDToGIDMap"),
+			}
+		}
+		if err != nil {
+			return nil, err
+		}
+		d.CIDToGID = make([]glyph.ID, len(cid2gidData)/2)
+		for i := range d.CIDToGID {
+			d.CIDToGID[i] = glyph.ID(cid2gidData[2*i])<<8 | glyph.ID(cid2gidData[2*i+1])
+		}
+
+	default:
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("missing/invalid CIDToGIDMap"),
+		}
+	}
+
+	_, d.IsOpenType = fontDict["FontFile3"]
+
+	getFont, err := makeGlyfReader(r, fdDict)
 	if pdf.IsReadError(err) {
 		return nil, err
 	}
@@ -184,34 +226,39 @@ func ExtractType0(r pdf.Getter, obj pdf.Object) (*Type0Dict, error) {
 	return d, nil
 }
 
-func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (any, error), error) {
-	s, err := pdf.GetStream(r, fd["FontFile3"])
+func makeGlyfReader(r pdf.Getter, fd pdf.Dict) (func() (any, error), error) {
+	s, err := pdf.GetStream(r, fd["FontFile2"])
 	if pdf.IsReadError(err) {
 		return nil, err
-	} else if s == nil {
-		return nil, nil
 	}
-
-	subType, _ := pdf.GetName(r, s.Dict["Subtype"])
-	switch subType {
-	case "CIDFontType0C":
+	if s != nil {
 		getFont := func() (any, error) {
 			fontData, err := pdf.DecodeStream(r, s, 0)
 			if err != nil {
 				return nil, err
 			}
-			body, err := io.ReadAll(fontData)
+			font, err := sfnt.Read(fontData)
 			if err != nil {
 				return nil, err
 			}
-			font, err := cff.Read(bytes.NewReader(body))
-			if err != nil {
-				return nil, err
+			if !font.IsGlyf() {
+				return nil, errors.New("missing glyf table")
 			}
 			return font, nil
 		}
 		return getFont, nil
+	}
 
+	s, err = pdf.GetStream(r, fd["FontFile3"])
+	if pdf.IsReadError(err) {
+		return nil, err
+	}
+	if s == nil {
+		return nil, nil
+	}
+
+	subType, _ := pdf.GetName(r, s.Dict["Subtype"])
+	switch subType {
 	case "OpenType":
 		getFont := func() (any, error) {
 			fontData, err := pdf.DecodeStream(r, s, 0)
@@ -221,6 +268,9 @@ func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (any, error), error) {
 			font, err := sfnt.Read(fontData)
 			if err != nil {
 				return nil, err
+			}
+			if !font.IsGlyf() {
+				return nil, errors.New("missing glyf table")
 			}
 			return font, nil
 		}
@@ -232,7 +282,7 @@ func makeFontReader(r pdf.Getter, fd pdf.Dict) (func() (any, error), error) {
 }
 
 // WriteToPDF embeds the font data in the PDF file.
-func (d *Type0Dict) WriteToPDF(rm *pdf.ResourceManager) error {
+func (d *Type2Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	w := rm.Out
 
 	var fontData any
@@ -267,6 +317,9 @@ func (d *Type0Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	default:
 		return fmt.Errorf("unsupported font type %T", fontData)
 	}
+	if d.IsOpenType && d.GetFont == nil {
+		return errors.New("missing OpenType font data")
+	}
 	if d.SubsetTag != "" && !subset.IsValidTag(d.SubsetTag) {
 		return fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
 	}
@@ -278,6 +331,8 @@ func (d *Type0Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 		return err
 	}
 
+	// TODO(voss): If the [...] TrueType font program is not embedded in the
+	// PDF file, the Encoding entry shall be a predefined CMap name.
 	var encoding pdf.Object
 	if d.Encoding.IsPredefined() {
 		encoding = pdf.Name(d.Encoding.Name)
@@ -303,7 +358,7 @@ func (d *Type0Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	fontDict := pdf.Dict{
 		"Type":            pdf.Name("Font"),
 		"Subtype":         pdf.Name("Type0"),
-		"BaseFont":        pdf.Name(baseFont + "-" + d.Encoding.Name),
+		"BaseFont":        baseFont,
 		"Encoding":        encoding,
 		"DescendantFonts": pdf.Array{cidFontRef},
 		"ToUnicode":       toUni,
@@ -312,11 +367,12 @@ func (d *Type0Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	cidFontDict := pdf.Dict{
 		"Type":           pdf.Name("Font"),
-		"Subtype":        pdf.Name("CIDFontType0"),
+		"Subtype":        pdf.Name("CIDFontType2"),
 		"BaseFont":       pdf.Name(baseFont),
 		"CIDSystemInfo":  cidSystemInfo,
 		"FontDescriptor": fdRef,
 		// we set the glyph width information later
+		// we set CIDToGIDMap later
 	}
 
 	fdDict := d.Descriptor.AsDict()
@@ -324,7 +380,11 @@ func (d *Type0Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	var fontFileRef pdf.Reference
 	if fontData != nil {
 		fontFileRef = w.Alloc()
-		fdDict["FontFile3"] = fontFileRef
+		if !d.IsOpenType {
+			fdDict["FontFile2"] = fontFileRef
+		} else {
+			fdDict["FontFile3"] = fontFileRef
+		}
 	}
 
 	compressedObjects := []pdf.Object{fontDict, cidFontDict, fdDict}
@@ -344,43 +404,79 @@ func (d *Type0Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 		cidFontDict["DW"] = pdf.Number(d.DefaultWidth)
 	}
 
+	var c2gRef pdf.Reference
+	if len(d.CIDToGID) != 0 {
+		c2gRef = w.Alloc()
+		cidFontDict["CIDToGIDMap"] = c2gRef
+	} else if fontData != nil {
+		cidFontDict["CIDToGIDMap"] = pdf.Name("Identity")
+	}
+
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
 		return pdf.Wrap(err, "composite OpenType/CFF font dicts")
 	}
 
-	// See section 9.9 of PDF 32000-1:2008 for details.
-	switch f := fontData.(type) {
-	case *cff.Font:
-		fontFileDict := pdf.Dict{
-			"Subtype": pdf.Name("CIDFontType0C"),
+	if f := fontData.(*sfnt.Font); f != nil {
+		if !d.IsOpenType {
+			length1 := pdf.NewPlaceholder(w, 10)
+			fontStmDict := pdf.Dict{
+				"Length1": length1,
+			}
+			fontStm, err := w.OpenStream(fontFileRef, fontStmDict, pdf.FilterCompress{})
+			if err != nil {
+				return fmt.Errorf("open TrueType stream: %w", err)
+			}
+			l1, err := f.WriteTrueTypePDF(fontStm)
+			if err != nil {
+				return fmt.Errorf("write TrueType stream: %w", err)
+			}
+			err = length1.Set(pdf.Integer(l1))
+			if err != nil {
+				return fmt.Errorf("TrueType stream: length1: %w", err)
+			}
+			err = fontStm.Close()
+			if err != nil {
+				return fmt.Errorf("close TrueType stream: %w", err)
+			}
+		} else {
+			fontFileDict := pdf.Dict{
+				"Subtype": pdf.Name("OpenType"),
+			}
+			fontStm, err := w.OpenStream(fontFileRef, fontFileDict, pdf.FilterCompress{})
+			if err != nil {
+				return fmt.Errorf("open OpenType stream: %w", err)
+			}
+			_, err = f.WriteTrueTypePDF(fontStm)
+			if err != nil {
+				return fmt.Errorf("write OpenType stream: %w", err)
+			}
+			err = fontStm.Close()
+			if err != nil {
+				return fmt.Errorf("close OpenType stream: %w", err)
+			}
 		}
-		fontFileStream, err := w.OpenStream(fontFileRef, fontFileDict, pdf.FilterCompress{})
-		if err != nil {
-			return err
-		}
-		err = f.Write(fontFileStream)
-		if err != nil {
-			return fmt.Errorf("CFF font program %q: %w", baseFont, err)
-		}
-		err = fontFileStream.Close()
-		if err != nil {
-			return err
-		}
+	}
 
-	case *sfnt.Font:
-		fontFileDict := pdf.Dict{
-			"Subtype": pdf.Name("OpenType"),
-		}
-		fontFileStream, err := w.OpenStream(fontFileRef, fontFileDict, pdf.FilterCompress{})
+	if c2gRef != 0 {
+		c2gStm, err := w.OpenStream(c2gRef, nil,
+			pdf.FilterCompress{
+				"Predictor": pdf.Integer(12),
+				"Columns":   pdf.Integer(2),
+			})
 		if err != nil {
 			return err
 		}
-		err = f.WriteOpenTypeCFFPDF(fontFileStream)
-		if err != nil {
-			return fmt.Errorf("OpenType/CFF font program %q: %w", baseFont, err)
+		cid2gid := make([]byte, 2*len(d.CIDToGID))
+		for cid, gid := range d.CIDToGID {
+			cid2gid[2*cid] = byte(gid >> 8)
+			cid2gid[2*cid+1] = byte(gid)
 		}
-		err = fontFileStream.Close()
+		_, err = c2gStm.Write(cid2gid)
+		if err != nil {
+			return err
+		}
+		err = c2gStm.Close()
 		if err != nil {
 			return err
 		}
@@ -389,24 +485,8 @@ func (d *Type0Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	return nil
 }
 
-// moreThanTen returns true if the flattened array has more than 10 elements.
-func moreThanTen(a pdf.Array) bool {
-	count := 0
-	for _, obj := range a {
-		if a, ok := obj.(pdf.Array); ok {
-			count += len(a)
-		} else {
-			count++
-		}
-		if count > 10 {
-			return true
-		}
-	}
-	return false
-}
-
 // GetScanner returns a font.Scanner for the font.
-func (d *Type0Dict) GetScanner() (font.Scanner, error) {
+func (d *Type2Dict) GetScanner() (font.Scanner, error) {
 	var csr charcode.CodeSpaceRange
 	csr = append(csr, d.Encoding.CodeSpaceRange...)
 	csr = append(csr, d.Text.CodeSpaceRange...)
@@ -421,21 +501,21 @@ func (d *Type0Dict) GetScanner() (font.Scanner, error) {
 		return nil, err
 	}
 
-	s := &type0Scanner{
-		Type0Dict: d,
+	s := &type2Scanner{
+		Type2Dict: d,
 		codec:     codec,
 		cache:     make(map[charcode.Code]*font.Code),
 	}
 	return s, nil
 }
 
-type type0Scanner struct {
-	*Type0Dict
+type type2Scanner struct {
+	*Type2Dict
 	codec *charcode.Codec
 	cache map[charcode.Code]*font.Code
 }
 
-func (s *type0Scanner) Codes(str pdf.String) iter.Seq[*font.Code] {
+func (s *type2Scanner) Codes(str pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		for len(str) > 0 {
 			code, k, isValid := s.codec.Decode(str)
@@ -473,7 +553,7 @@ func (s *type0Scanner) Codes(str pdf.String) iter.Seq[*font.Code] {
 }
 
 func init() {
-	font.RegisterReader("CIDFontType0", func(r pdf.Getter, obj pdf.Object) (font.FromFile, error) {
-		return ExtractType0(r, obj)
+	font.RegisterReader("CIDFontType2", func(r pdf.Getter, obj pdf.Object) (font.FromFile, error) {
+		return ExtractType2(r, obj)
 	})
 }

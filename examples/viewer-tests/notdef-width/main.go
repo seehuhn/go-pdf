@@ -373,7 +373,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 			4: 4000,
 		},
 		DefaultWidth: 1000,
-		GetFont: func() (cidfont.Type0FontData, error) {
+		GetFont: func() (any, error) {
 			return f.data, nil
 		},
 	}

@@ -70,7 +70,7 @@ type TrueTypeDict struct {
 
 	// GetFont (optional) returns the font data to embed.
 	// If this is nil, the font data is not embedded in the PDF file.
-	// Otherwise, this is an [*sfnt.Font].
+	// Otherwise, the value returned by GetFont is an [*sfnt.Font].
 	GetFont func() (any, error)
 }
 
@@ -176,7 +176,7 @@ func ExtractTrueTypeDict(r pdf.Getter, obj pdf.Object) (*TrueTypeDict, error) {
 
 	_, d.IsOpenType = fontDict["FontFile3"]
 
-	getFont, err := makeTrueTypeReader(r, fdDict)
+	getFont, err := makeGlyfReader(r, fdDict)
 	if pdf.IsReadError(err) {
 		return nil, err
 	}
@@ -185,7 +185,7 @@ func ExtractTrueTypeDict(r pdf.Getter, obj pdf.Object) (*TrueTypeDict, error) {
 	return d, nil
 }
 
-func makeTrueTypeReader(r pdf.Getter, fd pdf.Dict) (func() (any, error), error) {
+func makeGlyfReader(r pdf.Getter, fd pdf.Dict) (func() (any, error), error) {
 	s, err := pdf.GetStream(r, fd["FontFile2"])
 	if pdf.IsReadError(err) {
 		return nil, err

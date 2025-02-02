@@ -352,7 +352,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		Encoding:       f.cmap,
 		Width:          ww,
 		DefaultWidth:   f.cff.GlyphWidthPDF(0),
-		GetFont: func() (cidfont.Type0FontData, error) {
+		GetFont: func() (any, error) {
 			return f.cff, nil
 		},
 	}

@@ -176,7 +176,7 @@ func (f *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 		Width:          ww,
 		DefaultWidth:   dw,
 		Text:           toUnicode,
-		GetFont: func() (cidfont.Type0FontData, error) {
+		GetFont: func() (any, error) {
 			return subsetCFF, nil
 		},
 	}

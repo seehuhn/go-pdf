@@ -80,7 +80,7 @@ func TestType1DictRoundtrip(t *testing.T) {
 			},
 			Singles: []cmap.ToUnicodeSingle{},
 		},
-		GetFont: func() (Type0FontData, error) {
+		GetFont: func() (any, error) {
 			return F1, nil
 		},
 	}
