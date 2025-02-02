@@ -44,6 +44,8 @@ type Type0Dict struct {
 	// (without any subset tag).
 	PostScriptName string
 
+	// SubsetTag can be set to indicate that the font has been subsetted.
+	// If non-empty, the value must be a sequence of 6 uppercase letters.
 	SubsetTag string
 
 	// Descriptor is the font descriptor.
@@ -307,7 +309,6 @@ func (d *Type0Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 		"Encoding":        encoding,
 		"DescendantFonts": pdf.Array{cidFontRef},
 		"ToUnicode":       toUni,
-		"XX_Seehuhn":      pdf.Boolean(true), // TODO(voss): remove
 	}
 
 	cidFontDict := pdf.Dict{

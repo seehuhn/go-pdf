@@ -30,12 +30,11 @@ import (
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/widths"
 	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-// Type2Dict holds the information from the font dictionary and CIDFont dictionary
-// of a Type 0 (CFF-based) CIDFont.
+// Type2Dict holds the information from the font dictionary and CIDFont
+// dictionary of a Type 2 (TrueType-based) CIDFont.
 type Type2Dict struct {
 	// Ref is the reference to the font dictionary in the PDF file.
 	Ref pdf.Reference
@@ -44,6 +43,8 @@ type Type2Dict struct {
 	// (without any subset tag).
 	PostScriptName string
 
+	// SubsetTag can be set to indicate that the font has been subsetted.
+	// If non-empty, the value must be a sequence of 6 uppercase letters.
 	SubsetTag string
 
 	// Descriptor is the font descriptor.
@@ -55,7 +56,7 @@ type Type2Dict struct {
 	// Encoding specifies how character codes are mapped to CID values.
 	//
 	// The Encoding.ROS field must either be compatible with the ROS field
-	// above, or must be one of Identity-H or Identity-V.
+	// above, or the cmap must be one of Identity-H or Identity-V.
 	Encoding *cmap.File
 
 	// Width is a map from CID values to glyph widths (in PDF glyph space units).
@@ -301,16 +302,11 @@ func (d *Type2Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	switch f := fontData.(type) {
 	case nil:
 		// pass
-	case *cff.Font:
-		err := pdf.CheckVersion(w, "composite CFF fonts", pdf.V1_3)
-		if err != nil {
-			return err
-		}
 	case *sfnt.Font:
-		if !f.IsCFF() {
-			return errors.New("CFF table missing")
+		if !f.IsGlyf() {
+			return errors.New("missing glyf table")
 		}
-		err := pdf.CheckVersion(w, "composite OpenType/CFF fonts", pdf.V1_6)
+		err := pdf.CheckVersion(w, "composite OpenType/glyf fonts", pdf.V1_1)
 		if err != nil {
 			return err
 		}
@@ -362,7 +358,6 @@ func (d *Type2Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 		"Encoding":        encoding,
 		"DescendantFonts": pdf.Array{cidFontRef},
 		"ToUnicode":       toUni,
-		"XX_Seehuhn":      pdf.Boolean(true), // TODO(voss): remove
 	}
 
 	cidFontDict := pdf.Dict{

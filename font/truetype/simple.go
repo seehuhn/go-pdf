@@ -188,14 +188,14 @@ func (f *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		}
 	}
 
-	q := subsetSfnt.FontMatrix[3] * 1000
+	qv := subsetSfnt.FontMatrix[3] * 1000
 
 	ascent := subsetSfnt.Ascent
 	descent := subsetSfnt.Descent
 	lineGap := subsetSfnt.LineGap
 	var leadingPDF float64
 	if lineGap > 0 {
-		leadingPDF = (ascent - descent + lineGap).AsFloat(q)
+		leadingPDF = (ascent - descent + lineGap).AsFloat(qv)
 	}
 
 	fd := &font.Descriptor{
@@ -210,11 +210,11 @@ func (f *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		IsItalic:     subsetSfnt.IsItalic,
 		FontBBox:     subsetSfnt.FontBBoxPDF().Rounded(),
 		ItalicAngle:  subsetSfnt.ItalicAngle,
-		Ascent:       math.Round(ascent.AsFloat(q)),
-		Descent:      math.Round(descent.AsFloat(q)),
+		Ascent:       math.Round(ascent.AsFloat(qv)),
+		Descent:      math.Round(descent.AsFloat(qv)),
 		Leading:      math.Round(leadingPDF),
-		CapHeight:    math.Round(subsetSfnt.CapHeight.AsFloat(q)),
-		XHeight:      math.Round(subsetSfnt.XHeight.AsFloat(q)),
+		CapHeight:    math.Round(subsetSfnt.CapHeight.AsFloat(qv)),
+		XHeight:      math.Round(subsetSfnt.XHeight.AsFloat(qv)),
 		MissingWidth: subsetSfnt.GlyphWidthPDF(0),
 	}
 	res := &simple.TrueTypeDict{
