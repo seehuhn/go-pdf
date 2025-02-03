@@ -18,62 +18,10 @@ package cmap
 
 import (
 	"bytes"
-	"reflect"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/postscript/cid"
 )
-
-func TestAppendEncoded(t *testing.T) {
-	// Create a new utf8Encoder instance
-	g2c := NewGIDToCIDIdentity()
-	e := NewCIDEncoderUTF8(g2c).(*utf8Encoder)
-
-	// Append some encoded characters
-	s := pdf.String{}
-	for i := 0; i < 2; i++ {
-		s = e.AppendEncoded(s, 1, []rune{'A'})
-		s = e.AppendEncoded(s, 2, []rune{'B'})
-		s = e.AppendEncoded(s, 3, []rune{'C'})
-		s = e.AppendEncoded(s, 4, []rune{'A'})     // two glyphs with the same unicode
-		s = e.AppendEncoded(s, 1, []rune{'a'})     // same glyph with a different unicode
-		s = e.AppendEncoded(s, 5, []rune("Hello")) // a multi-rune glyph
-	}
-
-	// Check that the encoded characters are correct
-	expected := pdf.String("ABC\uE000a\uE001ABC\uE000a\uE001")
-	if !bytes.Equal(s, expected) {
-		t.Errorf("AppendEncoded returned %v, expected %v", s, expected)
-	}
-
-	// Check that the cmap and tounicode maps are correct
-	expectedMapping := map[charcode.CharCodeOld]cid.CID{
-		runeToCode('A'):      1,
-		runeToCode('B'):      2,
-		runeToCode('C'):      3,
-		runeToCode('a'):      1,
-		runeToCode('\uE000'): 4,
-		runeToCode('\uE001'): 5,
-	}
-	expectedCMap := FromMapOld(g2c.ROS(), utf8cs, expectedMapping)
-	if !reflect.DeepEqual(e.CMap(), expectedCMap) {
-		t.Errorf("CMap returned %v, expected %v", e.CMap(), expectedCMap)
-	}
-	expectedToUnicode := NewToUnicode(utf8cs, map[charcode.CharCodeOld][]rune{
-		runeToCode('A'):      {'A'},
-		runeToCode('B'):      {'B'},
-		runeToCode('C'):      {'C'},
-		runeToCode('a'):      {'a'},
-		runeToCode('\uE000'): {'A'},
-		runeToCode('\uE001'): {'H', 'e', 'l', 'l', 'o'},
-	})
-	if d := cmp.Diff(e.ToUnicode(), expectedToUnicode); d != "" {
-		t.Errorf("ToUnicode returned diff %v", d)
-	}
-}
 
 func TestUTF8(t *testing.T) {
 	// verify that the encoding equals standard UTF-8 encoding

@@ -45,16 +45,10 @@ type CIDEncoder interface {
 	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
 
 	// CMap returns the mapping from character codes to CID values.
-	CMap() *FileOld
-
-	// CMapNew returns the mapping from character codes to CID values.
-	CMapNew() *File
+	CMap() *File
 
 	// ToUnicode returns a PDF ToUnicode CMap.
-	ToUnicode() *ToUnicodeOld
-
-	// ToUnicodeNew returns a PDF ToUnicode CMap.
-	ToUnicodeNew() *ToUnicodeFile
+	ToUnicode() *ToUnicodeFile
 
 	// Subset is the set of all GIDs which have been used with AppendEncoded.
 	// The returned slice is sorted and always starts with GID 0.
@@ -88,14 +82,6 @@ func (e *identityEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) p
 	return charcode.UCS2.Append(s, code)
 }
 
-func (e *identityEncoder) CMap() *FileOld {
-	m := make(map[charcode.CharCodeOld]pscid.CID)
-	for code := range e.toUnicode {
-		m[code] = pscid.CID(code)
-	}
-	return FromMapOld(e.g2c.ROS(), charcode.UCS2, m)
-}
-
 type cidCode CID
 
 func (c cidCode) CID() CID       { return CID(c) }
@@ -103,7 +89,7 @@ func (c cidCode) NotdefCID() CID { return 0 }
 func (c cidCode) Width() float64 { return 0 }
 func (c cidCode) Text() string   { return "" }
 
-func (e *identityEncoder) CMapNew() *File {
+func (e *identityEncoder) CMap() *File {
 	// TODO(voss): should we just return the predefined Identity-H CMap?
 
 	csr := charcode.UCS2
@@ -130,11 +116,7 @@ func (e *identityEncoder) CMapNew() *File {
 	return res
 }
 
-func (e *identityEncoder) ToUnicode() *ToUnicodeOld {
-	return NewToUnicode(charcode.UCS2, e.toUnicode)
-}
-
-func (e *identityEncoder) ToUnicodeNew() *ToUnicodeFile {
+func (e *identityEncoder) ToUnicode() *ToUnicodeFile {
 	// TODO(voss): rewrite this, once we don't need to support `*ToUnicodeOld`
 	// anymore.
 
@@ -273,11 +255,7 @@ func runeToCode(r rune) charcode.CharCodeOld {
 	return code
 }
 
-func (e *utf8Encoder) CMap() *FileOld {
-	return FromMapOld(e.g2c.ROS(), utf8cs, e.cmap)
-}
-
-func (e *utf8Encoder) CMapNew() *File {
+func (e *utf8Encoder) CMap() *File {
 	csr := charcode.UCS2
 	codec, err := charcode.NewCodec(csr)
 	if err != nil {
@@ -303,15 +281,7 @@ func (e *utf8Encoder) CMapNew() *File {
 	return res
 }
 
-func (e *utf8Encoder) ToUnicode() *ToUnicodeOld {
-	toUnicode := make(map[charcode.CharCodeOld][]rune)
-	for k, v := range e.cache {
-		toUnicode[v] = []rune(k.rr)
-	}
-	return NewToUnicode(utf8cs, toUnicode)
-}
-
-func (e *utf8Encoder) ToUnicodeNew() *ToUnicodeFile {
+func (e *utf8Encoder) ToUnicode() *ToUnicodeFile {
 	// TODO(voss): rewrite this, once we don't need to support `*ToUnicodeOld`
 	// anymore.
 

@@ -22,26 +22,8 @@ import (
 	"strings"
 	"text/template"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 )
-
-// Embed adds the ToUnicode cmap to a PDF file.
-func (info *ToUnicodeOld) Embed(w *pdf.Writer, ref pdf.Reference) error {
-	stm, err := w.OpenStream(ref, nil, pdf.FilterCompress{})
-	if err != nil {
-		return err
-	}
-	err = info.Write(stm)
-	if err != nil {
-		return fmt.Errorf("embedding ToUnicode cmap: %w", err)
-	}
-	err = stm.Close()
-	if err != nil {
-		return err
-	}
-	return nil
-}
 
 func (info *ToUnicodeOld) Write(w io.Writer) error {
 	return toUnicodeTmpl.Execute(w, info)

@@ -392,9 +392,9 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 	}
 	copy(dict.Width[:], ww)
 
-	toUniMap := f.ToUnicodeNew()
+	toUniMap := f.ToUnicode()
 	for code, text := range toUniMap {
-		dict.Text[code[0]] = string(text)
+		dict.Text[code[0]] = text
 	}
 	if !omitFontData {
 		dict.GetFont = func() (any, error) {

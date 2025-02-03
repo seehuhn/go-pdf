@@ -17,6 +17,7 @@
 package widths_test
 
 import (
+	"math"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -72,7 +73,7 @@ func TestWidthsFull(t *testing.T) {
 
 		wFromFont := ww[i]
 		wFromPDF := info.W
-		if wFromPDF != wFromFont {
+		if math.Abs(wFromPDF-wFromFont) > 0.0005 {
 			t.Errorf("widths differ for code 0x% 02x: %f vs %f", s[:k], wFromPDF, wFromFont)
 		}
 

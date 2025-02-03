@@ -27,35 +27,6 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
-// Extract reads a CMap from a PDF file.
-func Extract(r pdf.Getter, obj pdf.Object) (*FileOld, error) {
-	obj, err := pdf.Resolve(r, obj)
-	if err != nil {
-		return nil, err
-	}
-	switch obj := obj.(type) {
-	case pdf.Name:
-		r, err := openPredefined(string(obj))
-		if err != nil {
-			return nil, err
-		}
-		defer r.Close()
-		return Read(r, nil)
-	case *pdf.Stream:
-		if _, ok := obj.Dict["UseCMap"].(pdf.Name); ok {
-			panic("not implemented: UseCMap") // TODO(voss): implement this
-		}
-
-		r, err := pdf.DecodeStream(r, obj, 0)
-		if err != nil {
-			return nil, err
-		}
-		return Read(r, nil)
-	default:
-		return nil, fmt.Errorf("invalid CMap object: %v", obj)
-	}
-}
-
 func Read(r io.Reader, other map[string]*FileOld) (*FileOld, error) {
 	raw, err := postscript.ReadCMap(r)
 	if err != nil {

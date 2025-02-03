@@ -42,13 +42,13 @@ func (f *embeddedSimple) DecodeWidth(s pdf.String) (float64, int) {
 		return 0, 0
 	}
 	gid := f.Encoding[s[0]]
-	return f.sfnt.GlyphWidthPDF(gid) / 1000, 1
+	return math.Round(f.sfnt.GlyphWidthPDF(gid)) / 1000, 1
 }
 
 func (f *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
 	width := f.sfnt.GlyphWidthPDF(gid) / 1000
 	c := f.SimpleEncoder.GIDToCode(gid, rr)
-	return append(s, c), width
+	return append(s, c), math.Round(width*1000) / 1000
 }
 
 func (f *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
@@ -141,14 +141,14 @@ func (f *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	}
 
 	ww := subsetCFF.WidthsPDF()
-	fd.MissingWidth = ww[0]
+	fd.MissingWidth = math.Round(ww[0])
 	for code := range 256 {
-		res.Width[code] = ww[subsetCFF.Encoding[code]]
+		res.Width[code] = math.Round(ww[subsetCFF.Encoding[code]])
 	}
 
-	tu := f.SimpleEncoder.ToUnicodeNew()
+	tu := f.SimpleEncoder.ToUnicode()
 	for code, text := range tu {
-		res.Text[code[0]] = string(text)
+		res.Text[code[0]] = text
 	}
 
 	return res.WriteToPDF(rm)

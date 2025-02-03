@@ -49,7 +49,7 @@ func (f *embeddedComposite) DecodeWidth(s pdf.String) (float64, int) {
 		gid := f.GID(cid)
 		// TODO(voss): deal with different Font Matrices for different private dicts.
 		width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
-		return width, len(code)
+		return math.Round(width*1000) / 1000, len(code)
 	}
 	return 0, 0
 }
@@ -58,7 +58,7 @@ func (f *embeddedComposite) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune)
 	// TODO(voss): deal with different Font Matrices for different private dicts.
 	width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
 	s = f.CIDEncoder.AppendEncoded(s, gid, rr)
-	return s, width
+	return s, math.Round(width*1000) / 1000
 }
 
 func (f *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
@@ -88,8 +88,8 @@ func (f *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 	}
 
 	ros := f.ROS()
-	cmapInfo := f.CMapNew()
-	toUnicode := f.ToUnicodeNew()
+	cmapInfo := f.CMap()
+	toUnicode := f.ToUnicode()
 
 	// If the CFF font is CID-keyed, then the `charset` table in the CFF font
 	// describes the mapping from CIDs to glyphs.  Otherwise, the CID is used
@@ -130,9 +130,9 @@ func (f *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 
 	ww := make(map[cmap.CID]float64)
 	for gid, cid := range gidToCID {
-		ww[cid] = subsetCFF.GlyphWidthPDF(glyph.ID(gid))
+		ww[cid] = math.Round(subsetCFF.GlyphWidthPDF(glyph.ID(gid)))
 	}
-	dw := subsetCFF.GlyphWidthPDF(0)
+	dw := math.Round(subsetCFF.GlyphWidthPDF(0))
 
 	isSymbolic := false // TODO(voss): set this correctly
 

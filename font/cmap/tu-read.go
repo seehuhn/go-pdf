@@ -23,25 +23,8 @@ import (
 
 	"seehuhn.de/go/postscript"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 )
-
-// ExtractToUnicodeOld extracts a ToUnicode CMap from a PDF file.
-// If cs is not nil, it overrides the code space range given inside the CMap.
-func ExtractToUnicodeOld(r pdf.Getter, obj pdf.Object, cs charcode.CodeSpaceRange) (*ToUnicodeOld, error) {
-	stm, err := pdf.GetStream(r, obj)
-	if err != nil {
-		return nil, err
-	} else if stm == nil {
-		return nil, nil
-	}
-	data, err := pdf.DecodeStream(r, stm, 0)
-	if err != nil {
-		return nil, err
-	}
-	return ReadToUnicode(data, cs)
-}
 
 // ReadToUnicode reads a ToUnicode CMap.
 // If cs is not nil, it overrides the code space range given inside the CMap.

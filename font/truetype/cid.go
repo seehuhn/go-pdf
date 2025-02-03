@@ -84,8 +84,8 @@ func (f *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 		return fmt.Errorf("TrueType font subset: %w", err)
 	}
 
-	toUnicode := f.ToUnicodeNew()
-	cmapInfo := f.CMapNew()
+	toUnicode := f.ToUnicode()
+	cmapInfo := f.CMap()
 
 	postScriptName := subsetSfnt.PostScriptName()
 

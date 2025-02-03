@@ -21,7 +21,6 @@ import (
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
-	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/postscript/type1/names"
@@ -151,20 +150,10 @@ func (e *SimpleEncoder) Subset() []glyph.ID {
 
 // ToUnicode returns the mapping from character codes to unicode strings.
 // This can be used to construct a PDF ToUnicode CMap.
-func (e *SimpleEncoder) ToUnicode() map[charcode.CharCodeOld][]rune {
-	toUnicode := make(map[charcode.CharCodeOld][]rune)
-	for k, v := range e.code {
-		toUnicode[charcode.CharCodeOld(v)] = []rune(k.rr)
-	}
-	return toUnicode
-}
-
-// ToUnicodeNew returns the mapping from character codes to unicode strings.
-// This can be used to construct a PDF ToUnicode CMap.
-func (e *SimpleEncoder) ToUnicodeNew() map[string][]rune {
-	toUnicode := make(map[string][]rune, len(e.code))
+func (e *SimpleEncoder) ToUnicode() map[string]string {
+	toUnicode := make(map[string]string, len(e.code))
 	for k, c := range e.code {
-		toUnicode[string([]byte{c})] = []rune(k.rr)
+		toUnicode[string([]byte{c})] = k.rr
 	}
 	return toUnicode
 }

@@ -189,10 +189,10 @@ func (f *embeddedCFFComposite) Finish(rm *pdf.ResourceManager) error {
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
 		ROS:            ros,
-		Encoding:       f.CMapNew(),
+		Encoding:       f.CMap(),
 		Width:          ww,
 		DefaultWidth:   dw,
-		Text:           f.ToUnicodeNew(),
+		Text:           f.ToUnicode(),
 		GetFont: func() (any, error) {
 			return subsetOTF, nil
 		},

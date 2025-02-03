@@ -140,6 +140,7 @@ func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
 			XHeight:      stdInfo.XHeight,
 			StemV:        stdInfo.StemV,
 			StemH:        stdInfo.StemH,
+			MissingWidth: stdInfo.Width[".notdef"],
 		}
 		if stdInfo.FontFamily == "Symbol" || stdInfo.FontFamily == "ZapfDingbats" {
 			fd.IsSymbolic = true
@@ -398,6 +399,11 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 
 		// TODO(voss): Introduce a helper function for constructing the widths
 		// array.
+		//
+		// TODO(voss): Only include used codes?
+		//
+		// TODO(voss): don't rely on MissingWidth if the font descriptor
+		// is not included.
 		firstChar, lastChar := 0, 255
 		for lastChar > 0 && d.Width[lastChar] == d.Descriptor.MissingWidth {
 			lastChar--
@@ -523,6 +529,25 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	return nil
 }
 
+func (d *Type1Dict) GetScanner() (font.Scanner, error) {
+	return d, nil
+}
+
+func (d *Type1Dict) Codes(s pdf.String) iter.Seq[*font.Code] {
+	return func(yield func(*font.Code) bool) {
+		var code font.Code
+		for _, c := range s {
+			code.CID = cid.CID(c) + 1 // leave CID 0 for notdef
+			code.Width = d.Width[c]
+			code.Text = d.Text[c]
+
+			if !yield(&code) {
+				return
+			}
+		}
+	}
+}
+
 // widthsAreCompatible returns true, if the glyph widths ww are compatible with
 // the standard font metrics.  The object encObj is the value of the font
 // dictionary's Encoding entry.
@@ -577,25 +602,6 @@ func fontDescriptorIsCompatible(fd *font.Descriptor, stdInfo *stdmtx.FontData) b
 		return false
 	}
 	return true
-}
-
-func (d *Type1Dict) GetScanner() (font.Scanner, error) {
-	return d, nil
-}
-
-func (d *Type1Dict) Codes(s pdf.String) iter.Seq[*font.Code] {
-	return func(yield func(*font.Code) bool) {
-		var code font.Code
-		for _, c := range s {
-			code.CID = cid.CID(c) + 1 // leave CID 0 for notdef
-			code.Width = d.Width[c]
-			code.Text = d.Text[c]
-
-			if !yield(&code) {
-				return
-			}
-		}
-	}
 }
 
 func init() {
