@@ -95,7 +95,7 @@ func printObject(args ...string) error {
 		return err
 	}
 	for _, err := range r.Errors {
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr, err)
 	}
 	defer r.Close()
 

@@ -17,7 +17,9 @@
 package simple
 
 import (
+	"bytes"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -33,15 +35,15 @@ func TestType1Roundtrip(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		for i, d := range testDicts {
 			t.Run(fmt.Sprintf("D%dv%s-%s", i, v, d.PostScriptName), func(t *testing.T) {
-				w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+				w, _ := memfile.NewPDFWriter(v, nil)
 
 				// == Write ==
 
-				d := clone(d)
-				d.Ref = w.Alloc()
+				d1 := clone(d)
+				d1.Ref = w.Alloc()
 
 				rm := pdf.NewResourceManager(w)
-				err := d.WriteToPDF(rm)
+				err := d1.WriteToPDF(rm)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -52,7 +54,7 @@ func TestType1Roundtrip(t *testing.T) {
 
 				// == Read ==
 
-				e, err := ExtractType1Dict(w, d.Ref)
+				d2, err := ExtractType1Dict(w, d1.Ref)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -61,33 +63,143 @@ func TestType1Roundtrip(t *testing.T) {
 				// We compare these manually here, and zero the values for the comparison
 				// below.
 				for code := range 256 {
-					if d.Encoding(byte(code)) != "" {
-						if d.Encoding(byte(code)) != e.Encoding(byte(code)) {
-							t.Errorf("glyphName[%d]: %q != %q", code, d.Encoding(byte(code)), e.Encoding(byte(code)))
+					if d1.Encoding(byte(code)) != "" {
+						if d1.Encoding(byte(code)) != d2.Encoding(byte(code)) {
+							t.Errorf("glyphName[%d]: %q != %q", code, d1.Encoding(byte(code)), d2.Encoding(byte(code)))
 						}
-						if d.Text[code] != e.Text[code] {
-							t.Errorf("text[%d]: %q != %q", code, d.Text[code], e.Text[code])
+						if d1.Text[code] != d2.Text[code] {
+							t.Errorf("text[%d]: %q != %q", code, d1.Text[code], d2.Text[code])
 						}
-						if d.Width[code] != e.Width[code] {
-							t.Errorf("width[%d]: %f != %f", code, d.Width[code], e.Width[code])
+						if d1.Width[code] != d2.Width[code] {
+							t.Errorf("width[%d]: %f != %f", code, d1.Width[code], d2.Width[code])
 						}
 					}
 
-					d.Text[code] = ""
-					e.Text[code] = ""
-					d.Width[code] = 0
-					e.Width[code] = 0
+					d1.Text[code] = ""
+					d2.Text[code] = ""
+					d1.Width[code] = 0
+					d2.Width[code] = 0
 				}
 
-				d.Encoding = nil
-				e.Encoding = nil
+				d1.Encoding = nil
+				d2.Encoding = nil
 
-				if d := cmp.Diff(d, e); d != "" {
+				if d := cmp.Diff(d1, d2); d != "" {
 					t.Fatal(d)
 				}
 			})
 		}
 	}
+}
+
+func FuzzType1Dict(f *testing.F) {
+	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
+		for _, d := range testDicts {
+			out := memfile.New()
+			opt := &pdf.WriterOptions{
+				HumanReadable: true,
+			}
+			w, err := pdf.NewWriter(out, v, opt)
+			if err != nil {
+				f.Fatal(err)
+			}
+
+			ref := w.Alloc()
+			d := clone(d)
+			d.Ref = ref
+
+			rm := pdf.NewResourceManager(w)
+			err = d.WriteToPDF(rm)
+			if err != nil {
+				f.Fatal(err)
+			}
+			err = rm.Close()
+			if err != nil {
+				f.Fatal(err)
+			}
+
+			w.GetMeta().Trailer["Seeh:X"] = ref
+
+			err = w.Close()
+			if err != nil {
+				f.Fatal(err)
+			}
+
+			f.Add(out.Data)
+		}
+	}
+
+	f.Fuzz(func(t *testing.T, fileData []byte) {
+		// Get "random" Type1Dict from PDF.
+		// Make sure we don't panic on random input.
+		opt := &pdf.ReaderOptions{
+			ErrorHandling: pdf.ErrorHandlingReport,
+		}
+		r, err := pdf.NewReader(bytes.NewReader(fileData), opt)
+		if err != nil {
+			t.Skip("broken PDF: " + err.Error())
+		}
+		obj := r.GetMeta().Trailer["Seeh:X"]
+		if obj == nil {
+			pdf.Format(os.Stdout, pdf.OptPretty, r.GetMeta().Trailer)
+			t.Skip("broken reference")
+		}
+		d1, err := ExtractType1Dict(r, obj)
+		if err != nil {
+			t.Skip("broken Type1Dict")
+		}
+
+		// Write the Type1Dict back to a new PDF file.
+		// Make sure we can write arbitrary Type1Dicts.
+		w, _ := memfile.NewPDFWriter(r.GetMeta().Version, nil)
+		d1.Ref = w.Alloc()
+
+		rm := pdf.NewResourceManager(w)
+		err = d1.WriteToPDF(rm)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = rm.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Read back the data.
+		// Make sure we get the same Type1Dict back.
+		d2, err := ExtractType1Dict(w, d1.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Text and glyph for unused codes are arbitrary after roundtrip.
+		// We compare these manually here, and zero the values for the comparison
+		// below.
+		for code := range 256 {
+			if d1.Encoding(byte(code)) != "" {
+				if d1.Encoding(byte(code)) != d2.Encoding(byte(code)) {
+					t.Errorf("glyphName[%d]: %q != %q", code, d1.Encoding(byte(code)), d2.Encoding(byte(code)))
+				}
+				if d1.Text[code] != d2.Text[code] {
+					t.Errorf("text[%d]: %q != %q", code, d1.Text[code], d2.Text[code])
+				}
+				if d1.Width[code] != d2.Width[code] {
+					t.Errorf("width[%d]: %f != %f", code, d1.Width[code], d2.Width[code])
+				}
+			}
+
+			d1.Text[code] = ""
+			d2.Text[code] = ""
+			d1.Width[code] = 0
+			d2.Width[code] = 0
+		}
+
+		d1.Encoding = nil
+		d2.Encoding = nil
+
+		if d := cmp.Diff(d1, d2); d != "" {
+			t.Fatal(d)
+		}
+	})
 }
 
 var testDicts = []*Type1Dict{

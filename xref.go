@@ -119,9 +119,10 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 		}
 
 		if first {
-			for _, key := range []Name{"Root", "Encrypt", "Info", "ID"} {
-				val, ok := dict[key]
-				if ok {
+			for key, val := range dict {
+				if key == "Root" || key == "Encrypt" || key == "Info" || key == "ID" ||
+					key.isSecondClassName() ||
+					key.isThirdClassName() {
 					trailer[key] = val
 				}
 			}

@@ -134,7 +134,7 @@ func ExtractTrueTypeDict(r pdf.Getter, obj pdf.Object) (*TrueTypeDict, error) {
 	firstChar, _ := pdf.GetInteger(r, fontDict["FirstChar"])
 	widths, _ := pdf.GetArray(r, fontDict["Widths"])
 	if widths != nil && len(widths) <= 256 && firstChar >= 0 && firstChar < 256 {
-		for c := range widths {
+		for c := range d.Width {
 			d.Width[c] = fd.MissingWidth
 		}
 		for i, w := range widths {

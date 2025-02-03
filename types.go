@@ -587,6 +587,23 @@ func (x Name) AsPDF(opt OutputOptions) Native {
 	return x
 }
 
+func (x Name) isSecondClassName() bool {
+	k := len(x)
+	if k > 5 {
+		k = 5
+	}
+	for _, c := range x[:k] {
+		if c == ':' || c == '_' {
+			return true
+		}
+	}
+	return false
+}
+
+func (x Name) isThirdClassName() bool {
+	return len(x) >= 2 && x[0] == 'X' && x[1] == 'X'
+}
+
 // ParseName parses a PDF name from the given buffer.  The buffer must include
 // the leading slash.
 func ParseName(buf []byte) (Name, error) {

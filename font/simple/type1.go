@@ -53,9 +53,9 @@ type Type1Dict struct {
 	// If non-empty, the value must be a sequence of 6 uppercase letters.
 	SubsetTag string
 
-	// Name is deprecated and is normally empty.
-	// For PDF 1.0 this was the name the font was referenced by from
-	// within content streams.
+	// Name is deprecated and should be left empty.
+	// Only used in PDF 1.0 where it was the name used to reference the font
+	// from within content streams.
 	Name pdf.Name
 
 	// Descriptor is the font descriptor.
@@ -164,7 +164,7 @@ func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
 	firstChar, _ := pdf.GetInteger(r, fontDict["FirstChar"])
 	widths, _ := pdf.GetArray(r, fontDict["Widths"])
 	if widths != nil && len(widths) <= 256 && firstChar >= 0 && firstChar < 256 {
-		for c := range widths {
+		for c := range d.Width {
 			d.Width[c] = fd.MissingWidth
 		}
 		for i, w := range widths {
@@ -399,16 +399,12 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 
 		// TODO(voss): Introduce a helper function for constructing the widths
 		// array.
-		//
-		// TODO(voss): Only include used codes?
-		//
-		// TODO(voss): don't rely on MissingWidth if the font descriptor
-		// is not included.
 		firstChar, lastChar := 0, 255
-		for lastChar > 0 && d.Width[lastChar] == d.Descriptor.MissingWidth {
+		dw := d.Descriptor.MissingWidth
+		for lastChar > 0 && (d.Encoding(byte(lastChar)) == "" || d.Width[lastChar] == dw) {
 			lastChar--
 		}
-		for firstChar < lastChar && d.Width[firstChar] == d.Descriptor.MissingWidth {
+		for firstChar < lastChar && (d.Encoding(byte(firstChar)) == "" || d.Width[firstChar] == dw) {
 			firstChar++
 		}
 		widths := make(pdf.Array, lastChar-firstChar+1)
@@ -458,7 +454,7 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return pdf.Wrap(err, "Type 1 font dicts")
+		return fmt.Errorf("font dicts: %w", err)
 	}
 
 	switch f := psFont.(type) {
@@ -556,11 +552,11 @@ func (d *Type1Dict) Codes(s pdf.String) iter.Seq[*font.Code] {
 // read from files without validation.
 func widthsAreCompatible(ww []float64, enc encoding.Type1, info *stdmtx.FontData) bool {
 	for code := range 256 {
-		name := enc(byte(code))
-		if name == "" {
+		glyphName := enc(byte(code))
+		if glyphName == "" {
 			continue
 		}
-		if math.Abs(ww[code]-info.Width[name]) > 0.5 {
+		if math.Abs(ww[code]-info.Width[glyphName]) > 0.5 {
 			return false
 		}
 	}
