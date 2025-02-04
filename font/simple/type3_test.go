@@ -24,20 +24,16 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"seehuhn.de/go/geom/rect"
-
-	"seehuhn.de/go/sfnt/os2"
-
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
-	"seehuhn.de/go/pdf/internal/stdmtx"
 )
 
-func TestType1Roundtrip(t *testing.T) {
+func TestType3Roundtrip(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
-		for i, d := range type1Dicts {
-			t.Run(fmt.Sprintf("D%dv%s-%s", i, v, d.PostScriptName), func(t *testing.T) {
+		for i, d := range type3Dicts {
+			t.Run(fmt.Sprintf("D%dv%s-%s", i, v, d.Name), func(t *testing.T) {
 				w, _ := memfile.NewPDFWriter(v, nil)
 
 				// == Write ==
@@ -57,7 +53,7 @@ func TestType1Roundtrip(t *testing.T) {
 
 				// == Read ==
 
-				d2, err := ExtractType1Dict(w, d1.Ref)
+				d2, err := ExtractType3Dict(w, d1.Ref)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -95,9 +91,9 @@ func TestType1Roundtrip(t *testing.T) {
 	}
 }
 
-func FuzzType1Dict(f *testing.F) {
+func FuzzType3Dict(f *testing.F) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
-		for _, d := range type1Dicts {
+		for _, d := range type3Dicts {
 			out := memfile.New()
 			opt := &pdf.WriterOptions{
 				HumanReadable: true,
@@ -133,7 +129,7 @@ func FuzzType1Dict(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, fileData []byte) {
-		// Get "random" Type1Dict from PDF.
+		// Get "random" Type3Dict from PDF.
 		// Make sure we don't panic on random input.
 		opt := &pdf.ReaderOptions{
 			ErrorHandling: pdf.ErrorHandlingReport,
@@ -147,13 +143,13 @@ func FuzzType1Dict(f *testing.F) {
 			pdf.Format(os.Stdout, pdf.OptPretty, r.GetMeta().Trailer)
 			t.Skip("broken reference")
 		}
-		d1, err := ExtractType1Dict(r, obj)
+		d1, err := ExtractType3Dict(r, obj)
 		if err != nil {
-			t.Skip("broken Type1Dict")
+			t.Skip("broken Type3Dict")
 		}
 
-		// Write the Type1Dict back to a new PDF file.
-		// Make sure we can write arbitrary Type1Dicts.
+		// Write the Type3Dict back to a new PDF file.
+		// Make sure we can write arbitrary Type3Dicts.
 		w, _ := memfile.NewPDFWriter(r.GetMeta().Version, nil)
 		d1.Ref = w.Alloc()
 
@@ -168,8 +164,8 @@ func FuzzType1Dict(f *testing.F) {
 		}
 
 		// Read back the data.
-		// Make sure we get the same Type1Dict back.
-		d2, err := ExtractType1Dict(w, d1.Ref)
+		// Make sure we get the same Type3Dict back.
+		d2, err := ExtractType3Dict(w, d1.Ref)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -205,132 +201,84 @@ func FuzzType1Dict(f *testing.F) {
 	})
 }
 
-var type1Dicts = []*Type1Dict{
+var type3Dicts = []*Type3Dict{
 	{
-		PostScriptName: "Test",
+		Name: "Test1",
+		Encoding: func(code byte) string {
+			switch code {
+			case 65:
+				return "A"
+			case 66:
+				return "B"
+			default:
+				return ""
+			}
+		},
+		Width: makeTestWidth(65, 100.0, 66, 100.0),
+		Text:  makeTestText(65, "A", "B"),
+		CharProcs: map[pdf.Name]pdf.Reference{
+			"A": pdf.NewReference(1, 0),
+			"B": pdf.NewReference(2, 0),
+		},
+		FontMatrix: matrix.Scale(0.001, 0.001),
+	},
+
+	{
+		Name: "Test2",
 		Descriptor: &font.Descriptor{
 			FontName:     "Test",
-			IsFixedPitch: true,
-			IsSerif:      false,
-			IsSymbolic:   true,
-			IsScript:     false,
-			IsItalic:     true,
-			IsAllCap:     false,
-			IsSmallCap:   true,
-			ForceBold:    false,
-			FontBBox: rect.Rect{
-				LLx: 0,
-				LLy: -100,
-				URx: 200,
-				URy: 300,
-			},
-			ItalicAngle: 10,
-			Ascent:      250,
-			Descent:     -50,
-			Leading:     450,
-			CapHeight:   150,
-			XHeight:     50,
-			StemV:       75,
-			StemH:       25,
+			IsFixedPitch: false,
+			IsSerif:      true,
+			IsSymbolic:   false,
+			IsScript:     true,
+			IsItalic:     false,
+			IsAllCap:     true,
+			IsSmallCap:   false,
+			ForceBold:    true,
+			ItalicAngle:  10,
+			Ascent:       250,
+			Descent:      -50,
+			Leading:      450,
+			CapHeight:    150,
+			XHeight:      50,
+			StemV:        75,
+			StemH:        25,
 		},
 		Encoding: func(code byte) string {
 			switch code {
 			case 65:
 				return "A"
+			case 66:
+				return "funny"
+			case 67:
+				return "C"
+			case 68:
+				return "D"
+			case 69:
+				return "E"
+			case 70:
+				return "F"
 			default:
 				return ""
 			}
 		},
-		Width: makeTestWidth(65, 100.0),
-		Text:  makeTestText(65, "A"),
-	},
-	makeTestDictStandard("Courier"),
-	makeTestDictStandard("Times-Roman"),
-	makeTestDictStandard("Symbol"),
-}
-
-func makeTestWidth(args ...any) (ww [256]float64) {
-	for i := 0; i+1 < len(args); i += 2 {
-		code := args[i].(int)
-		width := args[i+1].(float64)
-		ww[code] = width
-	}
-	return
-}
-
-func makeTestText(args ...any) (tt [256]string) {
-	for i := 0; i+1 < len(args); i += 2 {
-		code := args[i].(int)
-		text := args[i+1].(string)
-		tt[code] = text
-	}
-	return
-}
-
-func makeTestDictStandard(fontName string) *Type1Dict {
-	stdInfo := stdmtx.Metrics[fontName]
-
-	type g struct {
-		code  byte
-		name  string
-		width float64
-	}
-	var gg []g
-	for code, name := range stdInfo.Encoding {
-		if name == "" || name == ".notdef" {
-			continue
-		}
-		width := stdInfo.Width[name]
-		gg = append(gg, g{byte(code), name, width})
-		if len(gg) > 5 {
-			break
-		}
-	}
-	// use a non-trivial encoding
-	gg[0].code, gg[1].code = gg[1].code, gg[0].code
-
-	enc := make(map[byte]string)
-	for _, g := range gg {
-		enc[g.code] = g.name
-	}
-
-	fd := &font.Descriptor{
-		FontName:     fontName,
-		FontFamily:   stdInfo.FontFamily,
-		FontStretch:  os2.WidthNormal,
-		FontWeight:   stdInfo.FontWeight,
-		IsFixedPitch: stdInfo.IsFixedPitch,
-		IsSerif:      stdInfo.IsSerif,
-		IsItalic:     stdInfo.ItalicAngle != 0,
-		FontBBox:     stdInfo.FontBBox,
-		ItalicAngle:  stdInfo.ItalicAngle,
-		Ascent:       stdInfo.Ascent,
-		Descent:      stdInfo.Descent,
-		CapHeight:    stdInfo.CapHeight,
-		XHeight:      stdInfo.XHeight,
-		StemV:        stdInfo.StemV,
-		StemH:        stdInfo.StemH,
-		MissingWidth: stdInfo.Width[".notdef"],
-	}
-	if stdInfo.FontFamily == "Symbol" || stdInfo.FontFamily == "ZapfDingbats" {
-		fd.IsSymbolic = true
-	}
-	d := &Type1Dict{
-		PostScriptName: fontName,
-		Descriptor:     fd,
-		Encoding: func(code byte) string {
-			return enc[code]
+		Width: makeTestWidth(65, 100.0, 66, 120.0, 67, 110.0, 68, 90.0, 69, 80.0, 70, 70.0),
+		Text:  makeTestText(65, "A", 66, "🗿", 67, "C", 68, "D", 69, "E", 70, "F"),
+		CharProcs: map[pdf.Name]pdf.Reference{
+			"A":     pdf.NewReference(1, 0),
+			"funny": pdf.NewReference(2, 0),
+			"B":     pdf.NewReference(3, 0),
+			"C":     pdf.NewReference(4, 0),
+			"D":     pdf.NewReference(5, 0),
+			"E":     pdf.NewReference(6, 0),
+			"F":     pdf.NewReference(7, 0),
 		},
-	}
-	for _, g := range gg {
-		d.Width[g.code] = g.width
-		d.Text[g.code] = g.name
-	}
-
-	return d
-}
-
-func clone[T any](v *T) *T {
-	copy := *v
-	return &copy
+		FontBBox:   &pdf.Rectangle{LLx: 0, LLy: -100, URx: 200, URy: 300},
+		FontMatrix: matrix.Scale(0.001, 0.001),
+		Resources: &pdf.Resources{
+			Font: map[pdf.Name]pdf.Object{
+				"F0": pdf.Name("Just for testing"),
+			},
+		},
+	},
 }

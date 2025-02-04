@@ -36,41 +36,41 @@ type Type3Dict struct {
 	// Ref is the reference to the font dictionary in the PDF file.
 	Ref pdf.Reference
 
-	// Name (optional since PDF 1.1) is deprecated and is normally empty. For
-	// PDF 1.0 this was the name the font was referenced by from within content
-	// streams.
+	// Name is deprecated and should be left empty.
+	// Only used in PDF 1.0 where it was the name used to reference the font
+	// from within content streams.
 	Name pdf.Name
-
-	// The FontMatrix maps glyph space to text space.
-	FontMatrix matrix.Matrix
-
-	// CharProcs maps the name of each glyph to the content stream which paints
-	// the glyph for that character.
-	CharProcs map[pdf.Name]pdf.Reference
-
-	// Encoding maps character codes to glyph names.
-	Encoding encoding.Type1
 
 	// Descriptor (optional) is the font descriptor.
 	Descriptor *font.Descriptor
+
+	// Encoding maps character codes to glyph names.
+	Encoding encoding.Type1
 
 	// Width contains the glyph widths for all character codes
 	// (PDF glyph space units).
 	Width [256]float64
 
+	// Text gives the text content for each character code.
+	Text [256]string
+
+	// CharProcs maps the name of each glyph to the content stream which paints
+	// the glyph for that character.
+	CharProcs map[pdf.Name]pdf.Reference
+
+	// FontBBox (optional) is the font bounding box in glyph space units.
+	FontBBox *pdf.Rectangle
+
+	// The FontMatrix maps glyph space to text space.
+	FontMatrix matrix.Matrix
+
 	// Resources (optional) holds named resources directly used by contents
 	// streams referenced by CharProcs, when the content stream does not itself
 	// have a resource dictionary.
 	Resources *pdf.Resources
-
-	// Text gives the text content for each character code.
-	Text [256]string
 }
 
-// ExtractType3Dict extracts a Type 3 font dictionary from a PDF file.
-//
-// The function tries to extract as much information as possible from the
-// dictionary, even if it is malformed.
+// ExtractType3Dict reads a Type 3 font dictionary from a PDF file.
 func ExtractType3Dict(r pdf.Getter, obj pdf.Object) (*Type3Dict, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
@@ -94,23 +94,6 @@ func ExtractType3Dict(r pdf.Getter, obj pdf.Object) (*Type3Dict, error) {
 	d.Ref, _ = obj.(pdf.Reference)
 
 	d.Name, _ = pdf.GetName(r, fontDict["Name"])
-
-	d.FontMatrix, _ = pdf.GetMatrix(r, fontDict["FontMatrix"])
-	if d.FontMatrix == matrix.Zero { // fallback in case of invalid matrix
-		d.FontMatrix = matrix.Matrix{0.001, 0, 0, 0.001, 0, 0}
-	}
-
-	charProcs, err := pdf.GetDict(r, fontDict["CharProcs"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "CharProcs")
-	}
-	glyphs := make(map[pdf.Name]pdf.Reference, len(charProcs))
-	for name, ref := range charProcs {
-		if ref, ok := ref.(pdf.Reference); ok {
-			glyphs[name] = ref
-		}
-	}
-	d.CharProcs = glyphs
 
 	enc, err := encoding.ExtractType3(r, fontDict["Encoding"])
 	if err != nil {
@@ -147,11 +130,6 @@ func ExtractType3Dict(r pdf.Getter, obj pdf.Object) (*Type3Dict, error) {
 		}
 	}
 
-	d.Resources, err = pdf.GetResources(r, fontDict["Resources"])
-	if pdf.IsReadError(err) {
-		return nil, err
-	}
-
 	// First try to derive text content from the glyph names.
 	for code := range 256 {
 		glyphName := enc(byte(code))
@@ -178,17 +156,60 @@ func ExtractType3Dict(r pdf.Getter, obj pdf.Object) (*Type3Dict, error) {
 		}
 	}
 
+	charProcs, err := pdf.GetDict(r, fontDict["CharProcs"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "CharProcs")
+	}
+	glyphs := make(map[pdf.Name]pdf.Reference, len(charProcs))
+	for name, ref := range charProcs {
+		if ref, ok := ref.(pdf.Reference); ok {
+			glyphs[name] = ref
+		}
+	}
+	d.CharProcs = glyphs
+
+	fontBBox, _ := pdf.GetRectangle(r, fontDict["FontBBox"])
+	if fontBBox != nil && !fontBBox.IsZero() {
+		d.FontBBox = fontBBox
+	}
+
+	d.FontMatrix, _ = pdf.GetMatrix(r, fontDict["FontMatrix"])
+	if d.FontMatrix == matrix.Zero { // fallback in case of invalid matrix
+		d.FontMatrix = matrix.Matrix{0.001, 0, 0, 0.001, 0, 0}
+	}
+
+	d.Resources, err = pdf.GetResources(r, fontDict["Resources"])
+	if pdf.IsReadError(err) {
+		return nil, err
+	}
+
 	return d, nil
 }
 
 // WriteToPDF adds the Type 3 font dictionary to the PDF file.
 func (d *Type3Dict) WriteToPDF(rm *pdf.ResourceManager) error {
+	// Check that all data are valid and consistent.
+	if d.Ref == 0 {
+		return errors.New("missing font dictionary reference")
+	}
+	if d.CharProcs == nil {
+		return errors.New("no glyphs found")
+	}
+	if d.FontMatrix.IsZero() {
+		return errors.New("invalid FontMatrix")
+	}
+
 	w := rm.Out
 
+	fontBBox := d.FontBBox
+	if fontBBox == nil {
+		// In the file, the field is required but [0 0 0 0] is always valid.
+		fontBBox = &pdf.Rectangle{}
+	}
 	fontDict := pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type3"),
-		"FontBBox": &pdf.Rectangle{}, // required, but [0 0 0 0] is always valid
+		"FontBBox": fontBBox,
 		"FontMatrix": pdf.Array{
 			pdf.Number(d.FontMatrix[0]),
 			pdf.Number(d.FontMatrix[1]),
@@ -198,7 +219,6 @@ func (d *Type3Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 			pdf.Number(d.FontMatrix[5]),
 		},
 	}
-
 	if d.Name != "" {
 		fontDict["Name"] = d.Name
 	}
@@ -230,15 +250,15 @@ func (d *Type3Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	// TODO(voss): Introduce a helper function for constructing the widths
 	// array.
-	var dw float64
+	var defaultWidth float64
 	if d.Descriptor != nil {
-		dw = d.Descriptor.MissingWidth
+		defaultWidth = d.Descriptor.MissingWidth
 	}
 	firstChar, lastChar := 0, 255
-	for lastChar > 0 && d.Width[lastChar] == dw {
+	for lastChar > 0 && (d.Encoding(byte(lastChar)) == "" || d.Width[lastChar] == defaultWidth) {
 		lastChar--
 	}
-	for firstChar < lastChar && d.Width[firstChar] == dw {
+	for firstChar < lastChar && (d.Encoding(byte(firstChar)) == "" || d.Width[firstChar] == defaultWidth) {
 		firstChar++
 	}
 	widths := make(pdf.Array, lastChar-firstChar+1)
@@ -264,14 +284,6 @@ func (d *Type3Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 		compressedRefs = append(compressedRefs, fdRef)
 	}
 
-	if d.Resources != nil {
-		resRef := w.Alloc()
-		resDict := pdf.AsDict(d.Resources)
-		fontDict["Resources"] = resRef
-		compressedObjects = append(compressedObjects, resDict)
-		compressedRefs = append(compressedRefs, resRef)
-	}
-
 	toUnicodeData := make(map[byte]string)
 	for code := range 256 {
 		glyphName := d.Encoding(byte(code))
@@ -293,6 +305,14 @@ func (d *Type3Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 			return fmt.Errorf("ToUnicode cmap: %w", err)
 		}
 		fontDict["ToUnicode"] = ref
+	}
+
+	if d.Resources != nil {
+		resRef := w.Alloc()
+		resDict := pdf.AsDict(d.Resources)
+		fontDict["Resources"] = resRef
+		compressedObjects = append(compressedObjects, resDict)
+		compressedRefs = append(compressedRefs, resRef)
 	}
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)

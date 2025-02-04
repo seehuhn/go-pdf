@@ -111,12 +111,12 @@ func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
 		d.PostScriptName = string(baseFont)
 	}
 
+	d.Name, _ = pdf.GetName(r, fontDict["Name"])
+
 	// StdInfo will be non-nil, if the PostScript name indicates one of the
 	// standard 14 fonts. In this case, we use the corresponding metrics as
 	// default values, in case they are missing from the font dictionary.
 	stdInfo := stdmtx.Metrics[d.PostScriptName]
-
-	d.Name, _ = pdf.GetName(r, fontDict["Name"])
 
 	fdDict, err := pdf.GetDictTyped(r, fontDict["FontDescriptor"], "FontDescriptor")
 	if pdf.IsReadError(err) {
@@ -161,11 +161,12 @@ func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
 	}
 	d.Encoding = enc
 
+	defaultWidth := fd.MissingWidth
 	firstChar, _ := pdf.GetInteger(r, fontDict["FirstChar"])
 	widths, _ := pdf.GetArray(r, fontDict["Widths"])
 	if widths != nil && len(widths) <= 256 && firstChar >= 0 && firstChar < 256 {
 		for c := range d.Width {
-			d.Width[c] = fd.MissingWidth
+			d.Width[c] = defaultWidth
 		}
 		for i, w := range widths {
 			w, err := pdf.GetNumber(r, w)
@@ -399,19 +400,18 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 
 		// TODO(voss): Introduce a helper function for constructing the widths
 		// array.
+		defaultWidth := d.Descriptor.MissingWidth
 		firstChar, lastChar := 0, 255
-		dw := d.Descriptor.MissingWidth
-		for lastChar > 0 && (d.Encoding(byte(lastChar)) == "" || d.Width[lastChar] == dw) {
+		for lastChar > 0 && (d.Encoding(byte(lastChar)) == "" || d.Width[lastChar] == defaultWidth) {
 			lastChar--
 		}
-		for firstChar < lastChar && (d.Encoding(byte(firstChar)) == "" || d.Width[firstChar] == dw) {
+		for firstChar < lastChar && (d.Encoding(byte(firstChar)) == "" || d.Width[firstChar] == defaultWidth) {
 			firstChar++
 		}
 		widths := make(pdf.Array, lastChar-firstChar+1)
 		for i := range widths {
 			widths[i] = pdf.Number(d.Width[firstChar+i])
 		}
-
 		fontDict["FirstChar"] = pdf.Integer(firstChar)
 		fontDict["LastChar"] = pdf.Integer(lastChar)
 		if len(widths) > 10 {
@@ -428,7 +428,7 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	for code := range 256 {
 		glyphName := d.Encoding(byte(code))
 		switch glyphName {
-		case "", ".notdef":
+		case "":
 			// unused character code, nothing to do
 
 		case encoding.UseBuiltin:
