@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package simple
+package dict
 
 import (
 	"bytes"
@@ -53,7 +53,7 @@ func TestType3Roundtrip(t *testing.T) {
 
 				// == Read ==
 
-				d2, err := ExtractType3Dict(w, d1.Ref)
+				d2, err := ExtractType3(w, d1.Ref)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -143,7 +143,7 @@ func FuzzType3Dict(f *testing.F) {
 			pdf.Format(os.Stdout, pdf.OptPretty, r.GetMeta().Trailer)
 			t.Skip("broken reference")
 		}
-		d1, err := ExtractType3Dict(r, obj)
+		d1, err := ExtractType3(r, obj)
 		if err != nil {
 			t.Skip("broken Type3Dict")
 		}
@@ -165,7 +165,7 @@ func FuzzType3Dict(f *testing.F) {
 
 		// Read back the data.
 		// Make sure we get the same Type3Dict back.
-		d2, err := ExtractType3Dict(w, d1.Ref)
+		d2, err := ExtractType3(w, d1.Ref)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -201,7 +201,7 @@ func FuzzType3Dict(f *testing.F) {
 	})
 }
 
-var type3Dicts = []*Type3Dict{
+var type3Dicts = []*Type3{
 	{
 		Name: "Test1",
 		Encoding: func(code byte) string {

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package simple
+package dict
 
 import (
 	"errors"
@@ -24,18 +24,17 @@ import (
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/type1/names"
 
-	"seehuhn.de/go/sfnt"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
+	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/subset"
 )
 
-// TrueTypeDict represents a TrueType font dictionary.
+// TrueType represents a TrueType font dictionary.
 // This can correspond either to a TrueType or an OpenType font.
-type TrueTypeDict struct {
+type TrueType struct {
 	// Ref is the reference to the font dictionary in the PDF file.
 	Ref pdf.Reference
 
@@ -65,17 +64,18 @@ type TrueTypeDict struct {
 	// Text gives the text content for each character code.
 	Text [256]string
 
-	// IsOpenType is true if the font is embedded as OpenType font.
-	IsOpenType bool
+	// FontType gives the type of glyph outline data. Possible values are
+	// [glyphdata.TrueType] and [glyphdata.OpenTypeGlyf], or [glyphdata.None]
+	// if the font is not embedded.
+	FontType glyphdata.Type
 
-	// GetFont (optional) returns the font data to embed.
-	// If this is nil, the font data is not embedded in the PDF file.
-	// Otherwise, the value returned by GetFont is an [*sfnt.Font].
-	GetFont func() (any, error)
+	// FontRef is the reference to the glyph outline data in the PDF file,
+	// if the font is embedded.
+	FontRef pdf.Reference
 }
 
-// ExtractTrueTypeDict reads a TrueType font dictionary from a PDF file.
-func ExtractTrueTypeDict(r pdf.Getter, obj pdf.Object) (*TrueTypeDict, error) {
+// ExtractTrueType reads a TrueType font dictionary from a PDF file.
+func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*TrueType, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
 		return nil, err
@@ -94,7 +94,7 @@ func ExtractTrueTypeDict(r pdf.Getter, obj pdf.Object) (*TrueTypeDict, error) {
 		}
 	}
 
-	d := &TrueTypeDict{}
+	d := &TrueType{}
 	d.Ref, _ = obj.(pdf.Reference)
 
 	baseFont, err := pdf.GetName(r, fontDict["BaseFont"])
@@ -122,8 +122,22 @@ func ExtractTrueTypeDict(r pdf.Getter, obj pdf.Object) (*TrueTypeDict, error) {
 	}
 	d.Descriptor = fd
 
+	if ref, _ := fontDict["FontFile2"].(pdf.Reference); ref != 0 {
+		d.FontType = glyphdata.TrueType
+		d.FontRef = ref
+	} else if ref, _ := fontDict["FontFile3"].(pdf.Reference); ref != 0 {
+		if stm, _ := pdf.GetStream(r, ref); stm != nil {
+			subType, _ := pdf.GetName(r, stm.Dict["Subtype"])
+			switch subType {
+			case "OpenType":
+				d.FontType = glyphdata.OpenTypeGlyf
+				d.FontRef = ref
+			}
+		}
+	}
+
 	isNonSymbolic := !fd.IsSymbolic
-	isExternal := fdDict["FontFile2"] == nil && fdDict["FontFile3"] == nil
+	isExternal := d.FontRef == 0
 	nonSymbolicExt := isNonSymbolic && isExternal
 	enc, err := encoding.ExtractType1(r, fontDict["Encoding"], nonSymbolicExt)
 	if err != nil {
@@ -174,104 +188,31 @@ func ExtractTrueTypeDict(r pdf.Getter, obj pdf.Object) (*TrueTypeDict, error) {
 		}
 	}
 
-	_, d.IsOpenType = fontDict["FontFile3"]
-
-	getFont, err := makeGlyfReader(r, fdDict)
-	if pdf.IsReadError(err) {
-		return nil, err
-	}
-	d.GetFont = getFont
-
 	return d, nil
 }
 
-func makeGlyfReader(r pdf.Getter, fd pdf.Dict) (func() (any, error), error) {
-	s, err := pdf.GetStream(r, fd["FontFile2"])
-	if pdf.IsReadError(err) {
-		return nil, err
-	}
-	if s != nil {
-		getFont := func() (any, error) {
-			fontData, err := pdf.DecodeStream(r, s, 0)
-			if err != nil {
-				return nil, err
-			}
-			font, err := sfnt.Read(fontData)
-			if err != nil {
-				return nil, err
-			}
-			if !font.IsGlyf() {
-				return nil, errors.New("missing glyf table")
-			}
-			return font, nil
-		}
-		return getFont, nil
-	}
-
-	s, err = pdf.GetStream(r, fd["FontFile3"])
-	if pdf.IsReadError(err) {
-		return nil, err
-	}
-	if s == nil {
-		return nil, nil
-	}
-
-	subType, _ := pdf.GetName(r, s.Dict["Subtype"])
-	switch subType {
-	case "OpenType":
-		getFont := func() (any, error) {
-			fontData, err := pdf.DecodeStream(r, s, 0)
-			if err != nil {
-				return nil, err
-			}
-			font, err := sfnt.Read(fontData)
-			if err != nil {
-				return nil, err
-			}
-			if !font.IsGlyf() {
-				return nil, errors.New("missing glyf table")
-			}
-			return font, nil
-		}
-		return getFont, nil
-
-	default:
-		return nil, nil
-	}
-}
-
 // WriteToPDF adds the font dictionary to the PDF file.
-func (d *TrueTypeDict) WriteToPDF(rm *pdf.ResourceManager) error {
-	var ttfFont any
-	if d.GetFont != nil {
-		font, err := d.GetFont()
-		if err != nil {
-			return err
-		}
-		ttfFont = font
-	}
-
+func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager) error {
 	// Check that all data are valid and consistent.
 	if d.Ref == 0 {
 		return errors.New("missing font dictionary reference")
 	}
-	switch f := ttfFont.(type) {
-	case nil:
-		// pass
-
-	case *sfnt.Font:
-		if !f.IsGlyf() {
-			return errors.New("missing glyf table")
-		}
+	if (d.FontType == glyphdata.None) != (d.FontRef == 0) {
+		return errors.New("missing font reference or type")
+	}
+	switch d.FontType {
+	case glyphdata.None:
+		// not embedded
+	case glyphdata.TrueType:
 		if err := pdf.CheckVersion(rm.Out, "embedded TrueType font", pdf.V1_1); err != nil {
 			return err
 		}
-
+	case glyphdata.OpenTypeGlyf:
+		if err := pdf.CheckVersion(rm.Out, "embedded OpenType/glyf font", pdf.V1_6); err != nil {
+			return err
+		}
 	default:
-		return fmt.Errorf("unsupported font type %T", ttfFont)
-	}
-	if d.IsOpenType && d.GetFont == nil {
-		return errors.New("missing OpenType font data")
+		return fmt.Errorf("invalid font type %s", d.FontType)
 	}
 	if d.SubsetTag != "" && !subset.IsValidTag(d.SubsetTag) {
 		return fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
@@ -296,7 +237,7 @@ func (d *TrueTypeDict) WriteToPDF(rm *pdf.ResourceManager) error {
 	}
 
 	isNonSymbolic := !d.Descriptor.IsSymbolic
-	isExternal := ttfFont == nil
+	isExternal := d.FontRef == 0
 	// TODO(voss): implement TrueType constraints
 	encodingObj, err := d.Encoding.AsPDFType1(isNonSymbolic && isExternal, w.GetOptions())
 	if err != nil {
@@ -309,16 +250,13 @@ func (d *TrueTypeDict) WriteToPDF(rm *pdf.ResourceManager) error {
 	compressedObjects := []pdf.Object{fontDict}
 	compressedRefs := []pdf.Reference{d.Ref}
 
-	var fontFileRef pdf.Reference
 	fdRef := w.Alloc()
 	fdDict := d.Descriptor.AsDict()
-	if ttfFont != nil {
-		fontFileRef = w.Alloc()
-		if !d.IsOpenType {
-			fdDict["FontFile2"] = fontFileRef
-		} else {
-			fdDict["FontFile3"] = fontFileRef
-		}
+	switch d.FontType {
+	case glyphdata.TrueType:
+		fdDict["FontFile2"] = d.FontRef
+	case glyphdata.OpenTypeGlyf:
+		fdDict["FontFile3"] = d.FontRef
 	}
 	fontDict["FontDescriptor"] = fdRef
 	compressedObjects = append(compressedObjects, fdDict)
@@ -382,59 +320,18 @@ func (d *TrueTypeDict) WriteToPDF(rm *pdf.ResourceManager) error {
 		return pdf.Wrap(err, "Type 1 font dicts")
 	}
 
-	if f := ttfFont.(*sfnt.Font); f != nil {
-		if !d.IsOpenType {
-			length1 := pdf.NewPlaceholder(w, 10)
-			fontStmDict := pdf.Dict{
-				"Length1": length1,
-			}
-			fontStm, err := w.OpenStream(fontFileRef, fontStmDict, pdf.FilterCompress{})
-			if err != nil {
-				return fmt.Errorf("open TrueType stream: %w", err)
-			}
-			l1, err := f.WriteTrueTypePDF(fontStm)
-			if err != nil {
-				return fmt.Errorf("write TrueType stream: %w", err)
-			}
-			err = length1.Set(pdf.Integer(l1))
-			if err != nil {
-				return fmt.Errorf("TrueType stream: length1: %w", err)
-			}
-			err = fontStm.Close()
-			if err != nil {
-				return fmt.Errorf("close TrueType stream: %w", err)
-			}
-		} else {
-			fontFileDict := pdf.Dict{
-				"Subtype": pdf.Name("OpenType"),
-			}
-			fontStm, err := w.OpenStream(fontFileRef, fontFileDict, pdf.FilterCompress{})
-			if err != nil {
-				return fmt.Errorf("open OpenType stream: %w", err)
-			}
-			_, err = f.WriteTrueTypePDF(fontStm)
-			if err != nil {
-				return fmt.Errorf("write OpenType stream: %w", err)
-			}
-			err = fontStm.Close()
-			if err != nil {
-				return fmt.Errorf("close OpenType stream: %w", err)
-			}
-		}
-	}
-
 	return nil
 }
 
-func (d *TrueTypeDict) GetScanner() (font.Scanner, error) {
+func (d *TrueType) GetScanner() (font.Scanner, error) {
 	return d, nil
 }
 
-func (d *TrueTypeDict) WritingMode() cmap.WritingMode {
+func (d *TrueType) WritingMode() cmap.WritingMode {
 	return cmap.Horizontal
 }
 
-func (d *TrueTypeDict) Codes(s pdf.String) iter.Seq[*font.Code] {
+func (d *TrueType) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		var code font.Code
 		for _, c := range s {
@@ -449,7 +346,7 @@ func (d *TrueTypeDict) Codes(s pdf.String) iter.Seq[*font.Code] {
 	}
 }
 
-func (d *TrueTypeDict) DecodeWidth(s pdf.String) (float64, int) {
+func (d *TrueType) DecodeWidth(s pdf.String) (float64, int) {
 	if len(s) == 0 {
 		return 0, 0
 	}
@@ -459,6 +356,6 @@ func (d *TrueTypeDict) DecodeWidth(s pdf.String) (float64, int) {
 
 func init() {
 	font.RegisterReader("TrueType", func(r pdf.Getter, obj pdf.Object) (font.FromFile, error) {
-		return ExtractTrueTypeDict(r, obj)
+		return ExtractTrueType(r, obj)
 	})
 }

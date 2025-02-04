@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package simple
+package dict
 
 import (
 	"errors"
@@ -31,8 +31,8 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 )
 
-// Type3Dict represents a Type 3 font dictionary.
-type Type3Dict struct {
+// Type3 represents a Type 3 font dictionary.
+type Type3 struct {
 	// Ref is the reference to the font dictionary in the PDF file.
 	Ref pdf.Reference
 
@@ -70,8 +70,8 @@ type Type3Dict struct {
 	Resources *pdf.Resources
 }
 
-// ExtractType3Dict reads a Type 3 font dictionary from a PDF file.
-func ExtractType3Dict(r pdf.Getter, obj pdf.Object) (*Type3Dict, error) {
+// ExtractType3 reads a Type 3 font dictionary from a PDF file.
+func ExtractType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func ExtractType3Dict(r pdf.Getter, obj pdf.Object) (*Type3Dict, error) {
 		}
 	}
 
-	d := &Type3Dict{}
+	d := &Type3{}
 	d.Ref, _ = obj.(pdf.Reference)
 
 	d.Name, _ = pdf.GetName(r, fontDict["Name"])
@@ -187,7 +187,7 @@ func ExtractType3Dict(r pdf.Getter, obj pdf.Object) (*Type3Dict, error) {
 }
 
 // WriteToPDF adds the Type 3 font dictionary to the PDF file.
-func (d *Type3Dict) WriteToPDF(rm *pdf.ResourceManager) error {
+func (d *Type3) WriteToPDF(rm *pdf.ResourceManager) error {
 	// Check that all data are valid and consistent.
 	if d.Ref == 0 {
 		return errors.New("missing font dictionary reference")
@@ -323,15 +323,15 @@ func (d *Type3Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	return nil
 }
 
-func (d *Type3Dict) GetScanner() (font.Scanner, error) {
+func (d *Type3) GetScanner() (font.Scanner, error) {
 	return d, nil
 }
 
-func (d *Type3Dict) WritingMode() cmap.WritingMode {
+func (d *Type3) WritingMode() cmap.WritingMode {
 	return cmap.Horizontal
 }
 
-func (d *Type3Dict) Codes(s pdf.String) iter.Seq[*font.Code] {
+func (d *Type3) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		var code font.Code
 		for _, c := range s {
@@ -346,7 +346,7 @@ func (d *Type3Dict) Codes(s pdf.String) iter.Seq[*font.Code] {
 	}
 }
 
-func (d *Type3Dict) DecodeWidth(s pdf.String) (float64, int) {
+func (d *Type3) DecodeWidth(s pdf.String) (float64, int) {
 	if len(s) == 0 {
 		return 0, 0
 	}
@@ -356,6 +356,6 @@ func (d *Type3Dict) DecodeWidth(s pdf.String) (float64, int) {
 
 func init() {
 	font.RegisterReader("Type3", func(r pdf.Getter, obj pdf.Object) (font.FromFile, error) {
-		return ExtractType3Dict(r, obj)
+		return ExtractType3(r, obj)
 	})
 }

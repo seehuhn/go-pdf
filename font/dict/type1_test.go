@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package simple
+package dict
 
 import (
 	"bytes"
@@ -57,7 +57,7 @@ func TestType1Roundtrip(t *testing.T) {
 
 				// == Read ==
 
-				d2, err := ExtractType1Dict(w, d1.Ref)
+				d2, err := ExtractType1(w, d1.Ref)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -147,7 +147,7 @@ func FuzzType1Dict(f *testing.F) {
 			pdf.Format(os.Stdout, pdf.OptPretty, r.GetMeta().Trailer)
 			t.Skip("broken reference")
 		}
-		d1, err := ExtractType1Dict(r, obj)
+		d1, err := ExtractType1(r, obj)
 		if err != nil {
 			t.Skip("broken Type1Dict")
 		}
@@ -169,7 +169,7 @@ func FuzzType1Dict(f *testing.F) {
 
 		// Read back the data.
 		// Make sure we get the same Type1Dict back.
-		d2, err := ExtractType1Dict(w, d1.Ref)
+		d2, err := ExtractType1(w, d1.Ref)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -205,7 +205,7 @@ func FuzzType1Dict(f *testing.F) {
 	})
 }
 
-var type1Dicts = []*Type1Dict{
+var type1Dicts = []*Type1{
 	{
 		PostScriptName: "Test",
 		Descriptor: &font.Descriptor{
@@ -267,7 +267,7 @@ func makeTestText(args ...any) (tt [256]string) {
 	return
 }
 
-func makeTestDictStandard(fontName string) *Type1Dict {
+func makeTestDictStandard(fontName string) *Type1 {
 	stdInfo := stdmtx.Metrics[fontName]
 
 	type g struct {
@@ -315,7 +315,7 @@ func makeTestDictStandard(fontName string) *Type1Dict {
 	if stdInfo.FontFamily == "Symbol" || stdInfo.FontFamily == "ZapfDingbats" {
 		fd.IsSymbolic = true
 	}
-	d := &Type1Dict{
+	d := &Type1{
 		PostScriptName: fontName,
 		Descriptor:     fd,
 		Encoding: func(code byte) string {

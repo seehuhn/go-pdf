@@ -31,8 +31,10 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/font/cidfont"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/pdf/font/glyphdata/cffglyphs"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
 )
@@ -352,6 +354,13 @@ func (f *testFont) PostScriptName() string {
 func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
 	fontDictRef := rm.Out.Alloc()
 
+	fontType := glyphdata.CFF
+	fontRef := rm.Out.Alloc()
+	err := cffglyphs.Embed(rm.Out, fontType, fontRef, f.data)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	fd := &font.Descriptor{
 		FontName:   f.data.FontName,
 		IsSymbolic: true,
@@ -359,7 +368,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		Ascent:     800,
 		CapHeight:  800,
 	}
-	dicts := &cidfont.Type0Dict{
+	dicts := &dict.CIDFontType0{
 		Ref:            fontDictRef,
 		PostScriptName: f.data.FontName,
 		Descriptor:     fd,
@@ -373,11 +382,10 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 			4: 4000,
 		},
 		DefaultWidth: 1000,
-		GetFont: func() (any, error) {
-			return f.data, nil
-		},
+		FontType:     fontType,
+		FontRef:      fontRef,
 	}
-	err := dicts.WriteToPDF(rm)
+	err = dicts.WriteToPDF(rm)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -26,9 +26,11 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding"
+	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs"
 	"seehuhn.de/go/pdf/font/pdfenc"
-	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/pdf/font/subset"
 )
 
@@ -140,13 +142,22 @@ func (f *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 		StemH:        math.Round(subsetCFF.Private[0].StdHW * qv),
 		MissingWidth: subsetSfnt.GlyphWidthPDF(0),
 	}
-	res := &simple.Type1Dict{
+
+	fontType := glyphdata.OpenTypeCFFSimple
+	fontRef := rm.Out.Alloc()
+	err = opentypeglyphs.Embed(rm.Out, fontType, fontRef, subsetSfnt)
+	if err != nil {
+		return err
+	}
+
+	res := &dict.Type1{
 		Ref:            f.ref,
 		PostScriptName: subsetCFF.FontName,
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
 		Encoding:       encoding.Builtin,
-		GetFont:        func() (any, error) { return subsetSfnt, nil },
+		FontType:       fontType,
+		FontRef:        fontRef,
 	}
 	for code := range 256 {
 		gid := subsetCFF.Encoding[code]

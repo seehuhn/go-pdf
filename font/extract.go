@@ -28,6 +28,10 @@ import (
 )
 
 // DictType represents the different types of font dictionaries in PDF.
+//
+// TODO(voss): remove
+//
+// Deprecated: use [glyphdata.Type] instead.
 type DictType int
 
 func (t DictType) String() string {
@@ -58,6 +62,10 @@ const (
 )
 
 // DataType represents the different types of font data in PDF.
+//
+// TODO(voss): remove
+//
+// Deprecated: use [glyphdata.Type] instead.
 type DataType int
 
 // List of all font data types supported by PDF.

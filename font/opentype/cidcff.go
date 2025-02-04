@@ -29,8 +29,10 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cidfont"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 )
@@ -183,7 +185,15 @@ func (f *embeddedCFFComposite) Finish(rm *pdf.ResourceManager) error {
 		StemV:        math.Round(outlines.Private[0].StdVW * qh),
 		StemH:        math.Round(outlines.Private[0].StdHW * qv),
 	}
-	info := &cidfont.Type0Dict{
+
+	fontType := glyphdata.OpenTypeCFF
+	fontRef := rm.Out.Alloc()
+	err = opentypeglyphs.Embed(rm.Out, fontType, fontRef, subsetOTF)
+	if err != nil {
+		return err
+	}
+
+	info := &dict.CIDFontType0{
 		Ref:            f.ref,
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
@@ -193,9 +203,8 @@ func (f *embeddedCFFComposite) Finish(rm *pdf.ResourceManager) error {
 		Width:          ww,
 		DefaultWidth:   dw,
 		Text:           f.ToUnicode(),
-		GetFont: func() (any, error) {
-			return subsetOTF, nil
-		},
+		FontType:       fontType,
+		FontRef:        fontRef,
 	}
 	return info.WriteToPDF(rm)
 }

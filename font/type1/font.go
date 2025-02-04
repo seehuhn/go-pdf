@@ -33,9 +33,11 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding"
+	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/pdf/font/glyphdata/type1glyphs"
 	"seehuhn.de/go/pdf/font/pdfenc"
-	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/pdf/font/subset"
 )
 
@@ -272,7 +274,7 @@ func (f *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (p
 	return append(s, c), f.widths[gid]
 }
 
-func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
+func (f *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	if f.closed {
 		return nil
 	}
@@ -381,7 +383,7 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 		fd.ItalicAngle = metricsData.ItalicAngle
 		fd.IsFixedPitch = metricsData.IsFixedPitch
 	}
-	dict := &simple.Type1Dict{
+	dict := &dict.Type1{
 		Ref:            f.ref,
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
@@ -397,12 +399,17 @@ func (f *embeddedSimple) Finish(*pdf.ResourceManager) error {
 		dict.Text[code[0]] = text
 	}
 	if !omitFontData {
-		dict.GetFont = func() (any, error) {
-			return fontData, nil
+		fontType := glyphdata.Type1
+		fontRef := rm.Out.Alloc()
+		err := type1glyphs.Embed(rm.Out, fontType, fontRef, fontData)
+		if err != nil {
+			return err
 		}
+
+		dict.FontType = fontType
+		dict.FontRef = fontRef
 	}
 
-	rm := pdf.NewResourceManager(f.w) // TODO(voss): move this into the caller
 	return dict.WriteToPDF(rm)
 }
 

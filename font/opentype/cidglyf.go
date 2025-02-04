@@ -28,8 +28,10 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cidfont"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs"
 	"seehuhn.de/go/pdf/font/subset"
 )
 
@@ -154,7 +156,15 @@ func (f *embeddedGlyfComposite) Finish(rm *pdf.ResourceManager) error {
 		CapHeight:    math.Round(subsetSfnt.CapHeight.AsFloat(qv)),
 		XHeight:      math.Round(subsetSfnt.XHeight.AsFloat(qv)),
 	}
-	d := &cidfont.Type2Dict{
+
+	fontType := glyphdata.OpenTypeGlyf
+	fontRef := rm.Out.Alloc()
+	err = opentypeglyphs.Embed(f.w, fontType, fontRef, subsetSfnt)
+	if err != nil {
+		return err
+	}
+
+	d := &dict.CIDFontType2{
 		Ref:            f.ref,
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
@@ -164,10 +174,8 @@ func (f *embeddedGlyfComposite) Finish(rm *pdf.ResourceManager) error {
 		Width:          ww,
 		DefaultWidth:   subsetSfnt.GlyphWidthPDF(0),
 		Text:           toUnicode,
-		IsOpenType:     true,
-		GetFont: func() (any, error) {
-			return subsetSfnt, nil
-		},
+		FontType:       fontType,
+		FontRef:        fontRef,
 	}
 	if !isIdentity {
 		d.CIDToGID = cidToGID

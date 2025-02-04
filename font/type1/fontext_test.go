@@ -22,11 +22,9 @@ import (
 
 	"seehuhn.de/go/geom/matrix"
 
-	pstype1 "seehuhn.de/go/postscript/type1"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/font/simple"
+	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
@@ -60,7 +58,7 @@ func TestEmbed(t *testing.T) {
 	}
 
 	// step 2: read back the font and verify that everything is as expected
-	dict, err := simple.ExtractType1Dict(w, ref)
+	dict, err := dict.ExtractType1(w, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,20 +75,6 @@ func TestEmbed(t *testing.T) {
 	}
 
 	// TODO(voss): more tests
-
-	if dict.GetFont == nil {
-		t.Fatal("GetFont method is nil")
-	}
-	F, err := dict.GetFont()
-	if err != nil {
-		t.Fatal(err)
-	} else if F == nil {
-		t.Fatal("GetFont method returned nil")
-	}
-	_, ok := F.(*pstype1.Font)
-	if !ok {
-		t.Errorf("wrong font type: %T", F)
-	}
 }
 
 func TestTextContent(t *testing.T) {
@@ -133,7 +117,7 @@ func TestTextContent(t *testing.T) {
 	r.ParsePage(pageRef, matrix.Identity)
 
 	// step 3: read back the font dictionary to inspect it.
-	dict, err := simple.ExtractType1Dict(page.Out, ref)
+	dict, err := dict.ExtractType1(page.Out, ref)
 	if err != nil {
 		t.Fatal(err)
 	}

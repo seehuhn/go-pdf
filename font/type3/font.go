@@ -23,9 +23,9 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
-	"seehuhn.de/go/pdf/font/simple"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -191,7 +191,7 @@ func (f *embedded) Finish(*pdf.ResourceManager) error {
 		ItalicAngle:  f.ItalicAngle,
 	}
 
-	res := &simple.Type3Dict{
+	res := &dict.Type3{
 		Ref:        f.ref,
 		FontMatrix: f.FontMatrix,
 		CharProcs:  glyphs,

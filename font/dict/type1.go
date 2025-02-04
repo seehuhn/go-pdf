@@ -14,34 +14,30 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package simple
+package dict
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"iter"
 	"math"
 
 	"seehuhn.de/go/postscript/cid"
-	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/postscript/type1/names"
 
-	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/os2"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
+	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/internal/stdmtx"
 )
 
-// Type1Dict represents a Type 1 font dictionary.
-type Type1Dict struct {
+// Type1 represents a Type 1 font dictionary.
+type Type1 struct {
 	// Ref is the reference to the font dictionary in the PDF file.
 	Ref pdf.Reference
 
@@ -71,14 +67,19 @@ type Type1Dict struct {
 	// Text gives the text content for each character code.
 	Text [256]string
 
-	// GetFont (optional) returns the font data to embed.
-	// If this is nil, the font data is not embedded in the PDF file.
-	// Otherwise, this is one of [*type1.Font], [*cff.Font] or [*sfnt.Font].
-	GetFont func() (any, error)
+	// FontType gives the type of glyph outline data.
+	// Possible values are [glyphdata.Type1], [glyphdata.CFFSimple],
+	// and [glyphdata.OpenTypeCFFSimple], or [glyphdata.None] if the font
+	// is not embedded.
+	FontType glyphdata.Type
+
+	// FontRef is the reference to the glyph outline data in the PDF file,
+	// if the font is embedded.
+	FontRef pdf.Reference
 }
 
-// ExtractType1Dict reads a Type 1 font dictionary from a PDF file.
-func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
+// ExtractType1 reads a Type 1 font dictionary from a PDF file.
+func ExtractType1(r pdf.Getter, obj pdf.Object) (*Type1, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
 		return nil, err
@@ -97,7 +98,7 @@ func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
 		}
 	}
 
-	d := &Type1Dict{}
+	d := &Type1{}
 	d.Ref, _ = obj.(pdf.Reference)
 
 	baseFont, err := pdf.GetName(r, fontDict["BaseFont"])
@@ -152,8 +153,27 @@ func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
 	}
 	d.Descriptor = fd
 
+	if ref, _ := fdDict["FontFile"].(pdf.Reference); ref != 0 {
+		d.FontType = glyphdata.Type1
+		d.FontRef = ref
+	} else if ref, _ := fdDict["FontFile3"].(pdf.Reference); ref != 0 {
+		if stm, _ := pdf.GetStream(r, ref); stm != nil {
+			subType, _ := pdf.GetName(r, stm.Dict["Subtype"])
+			switch subType {
+			case "Type1C":
+				d.FontType = glyphdata.CFFSimple
+				d.FontRef = ref
+			case "OpenType":
+				d.FontType = glyphdata.OpenTypeCFFSimple
+				d.FontRef = ref
+			default:
+				return nil, nil
+			}
+		}
+	}
+
 	isNonSymbolic := !fd.IsSymbolic
-	isExternal := fdDict["FontFile"] == nil && fdDict["FontFile3"] == nil
+	isExternal := d.FontRef == 0
 	nonSymbolicExt := isNonSymbolic && isExternal
 	enc, err := encoding.ExtractType1(r, fontDict["Encoding"], nonSymbolicExt)
 	if err != nil {
@@ -187,16 +207,10 @@ func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
 		}
 	}
 
-	getFont, err := makeType1Reader(r, fdDict)
-	if pdf.IsReadError(err) {
-		return nil, err
-	}
-	d.GetFont = getFont
-
 	// First try to derive text content from the glyph names.
 	for code := range 256 {
 		glyphName := enc(byte(code))
-		if d.GetFont == nil && stdInfo != nil && glyphName == encoding.UseBuiltin {
+		if d.FontRef == 0 && stdInfo != nil && glyphName == encoding.UseBuiltin {
 			glyphName = stdInfo.Encoding[code]
 		}
 		if glyphName == "" || glyphName == encoding.UseBuiltin || glyphName == ".notdef" {
@@ -225,116 +239,30 @@ func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
 	return d, nil
 }
 
-func makeType1Reader(r pdf.Getter, fd pdf.Dict) (func() (any, error), error) {
-	s, err := pdf.GetStream(r, fd["FontFile"])
-	if pdf.IsReadError(err) {
-		return nil, err
-	}
-	if s != nil {
-		getFont := func() (any, error) {
-			fontData, err := pdf.DecodeStream(r, s, 0)
-			if err != nil {
-				return nil, err
-			}
-			font, err := type1.Read(fontData)
-			if err != nil {
-				return nil, err
-			}
-			return font, nil
-		}
-		return getFont, nil
-	}
-
-	s, err = pdf.GetStream(r, fd["FontFile3"])
-	if pdf.IsReadError(err) {
-		return nil, err
-	}
-	if s == nil {
-		return nil, nil
-	}
-
-	subType, _ := pdf.GetName(r, s.Dict["Subtype"])
-	switch subType {
-	case "Type1C":
-		getFont := func() (any, error) {
-			fontData, err := pdf.DecodeStream(r, s, 0)
-			if err != nil {
-				return nil, err
-			}
-			body, err := io.ReadAll(fontData)
-			if err != nil {
-				return nil, err
-			}
-			font, err := cff.Read(bytes.NewReader(body))
-			if err != nil {
-				return nil, err
-			}
-			return font, nil
-		}
-		return getFont, nil
-
-	case "OpenType":
-		getFont := func() (any, error) {
-			fontData, err := pdf.DecodeStream(r, s, 0)
-			if err != nil {
-				return nil, err
-			}
-			font, err := sfnt.Read(fontData)
-			if err != nil {
-				return nil, err
-			}
-			if !font.IsCFF() {
-				return nil, errors.New("missing CFF table")
-			}
-			if cff := font.Outlines.(*cff.Outlines); cff.IsCIDKeyed() {
-				return nil, errors.New("CID-keyed fonts not allowed")
-			}
-			return font, nil
-		}
-		return getFont, nil
-
-	default:
-		return nil, nil
-	}
-}
-
 // WriteToPDF adds the font dictionary to the PDF file.
-func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
-	var psFont any
-	if d.GetFont != nil {
-		font, err := d.GetFont()
-		if err != nil {
-			return err
-		}
-		psFont = font
-	}
-
+func (d *Type1) WriteToPDF(rm *pdf.ResourceManager) error {
 	// Check that all data are valid and consistent.
 	if d.Ref == 0 {
 		return errors.New("missing font dictionary reference")
 	}
-	switch f := psFont.(type) {
-	case nil:
-		// pass
-
-	case *type1.Font:
-		// pass
-
-	case *cff.Font:
-		if f.IsCIDKeyed() {
-			return errors.New("CID-keyed fonts not allowed")
+	if (d.FontType == glyphdata.None) != (d.FontRef == 0) {
+		return errors.New("missing font reference or type")
+	}
+	switch d.FontType {
+	case glyphdata.None:
+		// not embedded
+	case glyphdata.Type1:
+		// ok
+	case glyphdata.CFFSimple:
+		if err := pdf.CheckVersion(rm.Out, "embedded CFF font", pdf.V1_2); err != nil {
+			return err
 		}
-
-	case *sfnt.Font:
-		o, _ := f.Outlines.(*cff.Outlines)
-		if o == nil {
-			return errors.New("missing CFF table")
-		} else if o.IsCIDKeyed() {
-			return errors.New("CID-keyed fonts not allowed")
+	case glyphdata.OpenTypeCFFSimple:
+		if err := pdf.CheckVersion(rm.Out, "embedded OpenType/CFF font", pdf.V1_6); err != nil {
+			return err
 		}
-
 	default:
-		return fmt.Errorf("unsupported font type %T", psFont)
+		return fmt.Errorf("invalid font type %s", d.FontType)
 	}
 	if d.SubsetTag != "" && !subset.IsValidTag(d.SubsetTag) {
 		return fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
@@ -361,7 +289,7 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	stdInfo := stdmtx.Metrics[d.PostScriptName]
 
 	isNonSymbolic := !d.Descriptor.IsSymbolic
-	isExternal := psFont == nil
+	isExternal := d.FontRef == 0
 	baseIsStd := isNonSymbolic && isExternal
 	if stdInfo != nil {
 		// Don't make any assumptions about the base encoding for the
@@ -379,8 +307,7 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	compressedObjects := []pdf.Object{fontDict}
 	compressedRefs := []pdf.Reference{d.Ref}
 
-	var fontFileRef pdf.Reference
-	trimFontDict := (psFont == nil &&
+	trimFontDict := ((d.FontRef == 0) &&
 		stdInfo != nil &&
 		w.GetOptions().HasAny(pdf.OptTrimStandardFonts) &&
 		widthsAreCompatible(d.Width[:], d.Encoding, stdInfo) &&
@@ -388,14 +315,11 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	if !trimFontDict {
 		fdRef := w.Alloc()
 		fdDict := d.Descriptor.AsDict()
-		if psFont != nil {
-			fontFileRef = w.Alloc()
-			switch psFont.(type) {
-			case *type1.Font:
-				fdDict["FontFile"] = fontFileRef
-			case *cff.Font, *sfnt.Font:
-				fdDict["FontFile3"] = fontFileRef
-			}
+		switch d.FontType {
+		case glyphdata.Type1:
+			fdDict["FontFile"] = d.FontRef
+		case glyphdata.CFFSimple, glyphdata.OpenTypeCFFSimple:
+			fdDict["FontFile3"] = d.FontRef
 		}
 		fontDict["FontDescriptor"] = fdRef
 		compressedObjects = append(compressedObjects, fdDict)
@@ -460,83 +384,18 @@ func (d *Type1Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 		return fmt.Errorf("font dicts: %w", err)
 	}
 
-	switch f := psFont.(type) {
-	case *type1.Font:
-		length1 := pdf.NewPlaceholder(w, 10)
-		length2 := pdf.NewPlaceholder(w, 10)
-		fontStmDict := pdf.Dict{
-			"Length1": length1,
-			"Length2": length2,
-			"Length3": pdf.Integer(0),
-		}
-		fontStm, err := w.OpenStream(fontFileRef, fontStmDict, pdf.FilterCompress{})
-		if err != nil {
-			return fmt.Errorf("open Type1 stream: %w", err)
-		}
-		l1, l2, err := f.WritePDF(fontStm)
-		if err != nil {
-			return fmt.Errorf("write Type1 stream: %w", err)
-		}
-		err = length1.Set(pdf.Integer(l1))
-		if err != nil {
-			return fmt.Errorf("Type1 stream: length1: %w", err)
-		}
-		err = length2.Set(pdf.Integer(l2))
-		if err != nil {
-			return fmt.Errorf("Type1 stream: length2: %w", err)
-		}
-		err = fontStm.Close()
-		if err != nil {
-			return fmt.Errorf("close Type1 stream: %w", err)
-		}
-
-	case *cff.Font:
-		fontStmDict := pdf.Dict{
-			"Subtype": pdf.Name("Type1C"),
-		}
-		fontStm, err := w.OpenStream(fontFileRef, fontStmDict, pdf.FilterCompress{})
-		if err != nil {
-			return fmt.Errorf("open CFF stream: %w", err)
-		}
-		err = f.Write(fontStm)
-		if err != nil {
-			return fmt.Errorf("write CFF stream: %w", err)
-		}
-		err = fontStm.Close()
-		if err != nil {
-			return fmt.Errorf("close CFF stream: %w", err)
-		}
-
-	case *sfnt.Font:
-		fontStmDict := pdf.Dict{
-			"Subtype": pdf.Name("OpenType"),
-		}
-		fontStm, err := w.OpenStream(fontFileRef, fontStmDict, pdf.FilterCompress{})
-		if err != nil {
-			return fmt.Errorf("open OpenType stream: %w", err)
-		}
-		err = f.WriteOpenTypeCFFPDF(fontStm)
-		if err != nil {
-			return fmt.Errorf("write OpenType stream: %w", err)
-		}
-		err = fontStm.Close()
-		if err != nil {
-			return fmt.Errorf("close OpenType stream: %w", err)
-		}
-	}
-
 	return nil
 }
 
-func (d *Type1Dict) GetScanner() (font.Scanner, error) {
+func (d *Type1) GetScanner() (font.Scanner, error) {
 	return d, nil
 }
 
-func (d *Type1Dict) WritingMode() cmap.WritingMode {
+func (d *Type1) WritingMode() cmap.WritingMode {
 	return cmap.Horizontal
 }
 
-func (d *Type1Dict) Codes(s pdf.String) iter.Seq[*font.Code] {
+func (d *Type1) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		var code font.Code
 		for _, c := range s {
@@ -551,7 +410,7 @@ func (d *Type1Dict) Codes(s pdf.String) iter.Seq[*font.Code] {
 	}
 }
 
-func (d *Type1Dict) DecodeWidth(s pdf.String) (float64, int) {
+func (d *Type1) DecodeWidth(s pdf.String) (float64, int) {
 	if len(s) == 0 {
 		return 0, 0
 	}
@@ -617,6 +476,6 @@ func fontDescriptorIsCompatible(fd *font.Descriptor, stdInfo *stdmtx.FontData) b
 
 func init() {
 	font.RegisterReader("Type1", func(r pdf.Getter, obj pdf.Object) (font.FromFile, error) {
-		return ExtractType1Dict(r, obj)
+		return ExtractType1(r, obj)
 	})
 }

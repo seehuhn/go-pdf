@@ -19,11 +19,9 @@ package cff_test
 import (
 	"testing"
 
-	sfntcff "seehuhn.de/go/sfnt/cff"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/font/simple"
+	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -53,7 +51,7 @@ func TestEmbedSimple(t *testing.T) {
 	}
 
 	// step 2: read back the font and verify that everything is as expected
-	dict, err := simple.ExtractType1Dict(w, ref)
+	dict, err := dict.ExtractType1(w, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,18 +68,4 @@ func TestEmbedSimple(t *testing.T) {
 	}
 
 	// TODO(voss): more tests
-
-	if dict.GetFont == nil {
-		t.Fatal("GetFont method is nil")
-	}
-	F, err := dict.GetFont()
-	if err != nil {
-		t.Fatal(err)
-	} else if F == nil {
-		t.Fatal("GetFont method returned nil")
-	}
-	_, ok := F.(*sfntcff.Font)
-	if !ok {
-		t.Errorf("wrong font type: %T", F)
-	}
 }
