@@ -327,6 +327,10 @@ func (d *Type3Dict) GetScanner() (font.Scanner, error) {
 	return d, nil
 }
 
+func (d *Type3Dict) WritingMode() cmap.WritingMode {
+	return cmap.Horizontal
+}
+
 func (d *Type3Dict) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		var code font.Code
@@ -340,6 +344,14 @@ func (d *Type3Dict) Codes(s pdf.String) iter.Seq[*font.Code] {
 			}
 		}
 	}
+}
+
+func (d *Type3Dict) DecodeWidth(s pdf.String) (float64, int) {
+	if len(s) == 0 {
+		return 0, 0
+	}
+	code := s[0]
+	return d.Width[code] * d.FontMatrix[0], 1
 }
 
 func init() {

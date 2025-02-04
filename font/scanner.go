@@ -22,8 +22,10 @@ import (
 	"iter"
 	"sync"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/postscript/cid"
+
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/cmap"
 )
 
 type FromFile interface {
@@ -31,14 +33,31 @@ type FromFile interface {
 }
 
 type Code struct {
-	CID    cid.CID
+	CID cid.CID
+
 	Notdef cid.CID
-	Width  float64
-	Text   string
+
+	// Width is the glyph width in PDF glyph space units.
+	Width float64
+
+	Text string
 }
 
+var _ Embedded = Scanner(nil)
+
+// Scanner is an embedded font with information about the encoding.
+//
+// TODO(voss): merge with Scanner
 type Scanner interface {
+	// WritingMode indicates whether the font is for horizontal or vertical
+	// writing.
+	WritingMode() cmap.WritingMode
+
+	// Codes iterates over the character codes in a PDF string.
 	Codes(s pdf.String) iter.Seq[*Code]
+
+	// TODO(voss): remove
+	DecodeWidth(pdf.String) (float64, int)
 }
 
 type ReaderFunc func(r pdf.Getter, obj pdf.Object) (FromFile, error)

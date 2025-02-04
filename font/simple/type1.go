@@ -187,9 +187,18 @@ func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
 		}
 	}
 
+	getFont, err := makeType1Reader(r, fdDict)
+	if pdf.IsReadError(err) {
+		return nil, err
+	}
+	d.GetFont = getFont
+
 	// First try to derive text content from the glyph names.
 	for code := range 256 {
 		glyphName := enc(byte(code))
+		if d.GetFont == nil && stdInfo != nil && glyphName == encoding.UseBuiltin {
+			glyphName = stdInfo.Encoding[code]
+		}
 		if glyphName == "" || glyphName == encoding.UseBuiltin || glyphName == ".notdef" {
 			continue
 		}
@@ -212,12 +221,6 @@ func ExtractType1Dict(r pdf.Getter, obj pdf.Object) (*Type1Dict, error) {
 			}
 		}
 	}
-
-	getFont, err := makeType1Reader(r, fdDict)
-	if pdf.IsReadError(err) {
-		return nil, err
-	}
-	d.GetFont = getFont
 
 	return d, nil
 }
@@ -529,6 +532,10 @@ func (d *Type1Dict) GetScanner() (font.Scanner, error) {
 	return d, nil
 }
 
+func (d *Type1Dict) WritingMode() cmap.WritingMode {
+	return cmap.Horizontal
+}
+
 func (d *Type1Dict) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		var code font.Code
@@ -542,6 +549,14 @@ func (d *Type1Dict) Codes(s pdf.String) iter.Seq[*font.Code] {
 			}
 		}
 	}
+}
+
+func (d *Type1Dict) DecodeWidth(s pdf.String) (float64, int) {
+	if len(s) == 0 {
+		return 0, 0
+	}
+	code := s[0]
+	return d.Width[code] / 1000, 1
 }
 
 // widthsAreCompatible returns true, if the glyph widths ww are compatible with

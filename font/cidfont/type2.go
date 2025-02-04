@@ -480,6 +480,10 @@ func (d *Type2Dict) WriteToPDF(rm *pdf.ResourceManager) error {
 	return nil
 }
 
+func (d *Type2Dict) WritingMode() cmap.WritingMode {
+	return d.Encoding.WMode
+}
+
 // GetScanner returns a font.Scanner for the font.
 func (d *Type2Dict) GetScanner() (font.Scanner, error) {
 	var csr charcode.CodeSpaceRange
@@ -545,6 +549,14 @@ func (s *type2Scanner) Codes(str pdf.String) iter.Seq[*font.Code] {
 			}
 		}
 	}
+}
+
+func (d *type2Scanner) DecodeWidth(s pdf.String) (float64, int) {
+	var w float64
+	for c := range d.Codes(s) {
+		w += c.Width
+	}
+	return w / 1000, len(s)
 }
 
 func init() {

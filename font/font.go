@@ -62,6 +62,8 @@ type Font interface {
 //
 // The functions of this interface provide the information required to
 // keep track of the current text position in a PDF content stream.
+//
+// TODO(voss): merge with Scanner
 type Embedded interface {
 	WritingMode() cmap.WritingMode
 
@@ -70,9 +72,7 @@ type Embedded interface {
 	// be multiplied by the font size) and the number of bytes read from the
 	// string.
 	//
-	// TODO(voss): should this use PDF glyph space units?
-	//
-	// TODO(voss): what should happen if the argument is the empty string?
+	// TODO(voss): remove
 	DecodeWidth(pdf.String) (float64, int)
 }
 
