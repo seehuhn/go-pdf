@@ -36,6 +36,8 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 )
 
+var _ font.Font = (*Instance)(nil)
+
 // Instance represents a CFF font.
 type Instance struct {
 	*sfnt.Font

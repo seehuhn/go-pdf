@@ -29,6 +29,8 @@ import (
 	"seehuhn.de/go/sfnt"
 )
 
+var _ font.Font = (*Instance)(nil)
+
 // Instance is an OpenType font instance.
 type Instance struct {
 	*sfnt.Font

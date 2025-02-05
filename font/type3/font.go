@@ -142,10 +142,10 @@ func (f *embedded) DecodeWidth(s pdf.String) (float64, int) {
 	return width, 1
 }
 
-func (f *embedded) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
+func (f *embedded) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
 	name := f.GlyphNames[gid]
 	width := float64(f.Glyphs[name].WidthX) * f.Font.FontMatrix[0]
-	c := f.GIDToCode(gid, rr)
+	c := f.GIDToCode(gid, text)
 	return append(s, c), width
 }
 

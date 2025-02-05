@@ -60,9 +60,9 @@ func (f *embeddedComposite) DecodeWidth(s pdf.String) (float64, int) {
 	return 0, 0
 }
 
-func (f *embeddedComposite) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
+func (f *embeddedComposite) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
 	width := float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
-	s = f.CIDEncoder.AppendEncoded(s, gid, rr)
+	s = f.CIDEncoder.AppendEncoded(s, gid, text)
 	return s, width
 }
 

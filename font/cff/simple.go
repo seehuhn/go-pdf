@@ -47,9 +47,9 @@ func (f *embeddedSimple) DecodeWidth(s pdf.String) (float64, int) {
 	return math.Round(f.sfnt.GlyphWidthPDF(gid)) / 1000, 1
 }
 
-func (f *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
+func (f *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
 	width := f.sfnt.GlyphWidthPDF(gid) / 1000
-	c := f.SimpleEncoder.GIDToCode(gid, rr)
+	c := f.SimpleEncoder.GIDToCode(gid, text)
 	return append(s, c), math.Round(width*1000) / 1000
 }
 

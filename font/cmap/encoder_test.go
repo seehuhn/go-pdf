@@ -34,7 +34,7 @@ func TestUTF8(t *testing.T) {
 			continue
 		}
 
-		buf = enc.AppendEncoded(buf[:0], 0, []rune{r})
+		buf = enc.AppendEncoded(buf[:0], 0, string(r))
 		buf2 := []byte(string(r))
 		if !bytes.Equal(buf, buf2) {
 			t.Fatalf("AppendEncoded(0x%04x) = %v, want %v", r, buf, buf2)

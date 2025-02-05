@@ -42,7 +42,7 @@ type CIDEncoder interface {
 	// to the given PDF string (allocating new codes as needed).
 	// It also records the fact that the character code corresponds to the
 	// given unicode string.
-	AppendEncoded(pdf.String, glyph.ID, []rune) pdf.String
+	AppendEncoded(pdf.String, glyph.ID, string) pdf.String
 
 	// CMap returns the mapping from character codes to CID values.
 	CMap() *File
@@ -74,7 +74,8 @@ type identityEncoder struct {
 	used      map[glyph.ID]struct{}
 }
 
-func (e *identityEncoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
+func (e *identityEncoder) AppendEncoded(s pdf.String, gid glyph.ID, text string) pdf.String {
+	rr := []rune(text)
 	cid := e.g2c.CID(gid, rr)
 	code := charcode.CharCodeOld(cid)
 	e.toUnicode[code] = rr
@@ -202,7 +203,8 @@ type key struct {
 	rr  string
 }
 
-func (e *utf8Encoder) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) pdf.String {
+func (e *utf8Encoder) AppendEncoded(s pdf.String, gid glyph.ID, text string) pdf.String {
+	rr := []rune(text)
 	s, _ = e.CodeAndCID(s, gid, rr)
 	return s
 }

@@ -58,8 +58,8 @@ func (e *SimpleEncoder) WritingMode() cmap.WritingMode {
 // GIDToCode returns the character code for the given glyph ID (allocating new
 // codes as needed).  It also records the fact that the character code
 // corresponds to the given unicode string.
-func (e *SimpleEncoder) GIDToCode(gid glyph.ID, rr []rune) byte {
-	k := key{gid, string(rr)}
+func (e *SimpleEncoder) GIDToCode(gid glyph.ID, text string) byte {
+	k := key{gid, text}
 
 	// Rules for choosing the code:
 	// 1. If the combination of `gid` and `rr` has previously been used,
@@ -71,6 +71,7 @@ func (e *SimpleEncoder) GIDToCode(gid glyph.ID, rr []rune) byte {
 
 	// 2. Allocate a new code based on the last rune in rr.
 	var r rune
+	rr := []rune(text)
 	if len(rr) > 0 {
 		r = rr[len(rr)-1]
 	}

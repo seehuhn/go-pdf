@@ -63,9 +63,12 @@ type Font interface {
 // The functions of this interface provide the information required to
 // keep track of the current text position in a PDF content stream.
 //
-// TODO(voss): merge with Scanner
+// TODO(voss): merge with [Scanner] and [EmbeddedLayouter]
 type Embedded interface {
 	WritingMode() cmap.WritingMode
+
+	// Codes iterates over the character codes in a PDF string.
+	// Codes(s pdf.String) iter.Seq[*Code]
 
 	// DecodeWidth reads one character code from the given string and returns
 	// the width of the corresponding glyph in PDF text space units (still to
@@ -87,7 +90,7 @@ type EmbeddedLayouter interface {
 	//
 	// As a side effect, this function may allocate codes for the given
 	// glyph/text combination in the font's encoding.
-	AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64)
+	AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64)
 }
 
 // CodeInfo contains information associated with a character code.

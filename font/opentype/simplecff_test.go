@@ -27,45 +27,49 @@ import (
 )
 
 func TestEmbedSimple(t *testing.T) {
-	// step 1: embed a font instance into a simple PDF file
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	rm := pdf.NewResourceManager(w)
+	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
+		t.Run(v.String(), func(t *testing.T) {
+			// step 1: embed a font instance into a simple PDF file
+			w, _ := memfile.NewPDFWriter(v, nil)
+			rm := pdf.NewResourceManager(w)
 
-	fontData := makefont.OpenType()
-	fontInstance, err := opentype.New(fontData, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+			fontData := makefont.OpenType()
+			fontInstance, err := opentype.New(fontData, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	ref, _, err := pdf.ResourceManagerEmbed(rm, fontInstance)
-	if err != nil {
-		t.Fatal(err)
-	}
+			ref, _, err := pdf.ResourceManagerEmbed(rm, fontInstance)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	// make sure a few glyphs are included and encoded
-	fontInstance.Layout(nil, 12, "Hello")
+			// make sure a few glyphs are included and encoded
+			fontInstance.Layout(nil, 12, "Hello")
 
-	err = rm.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+			err = rm.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	// step 2: read back the font and verify that everything is as expected
-	dict, err := dict.ExtractType1(w, ref)
-	if err != nil {
-		t.Fatal(err)
-	}
+			// step 2: read back the font and verify that everything is as expected
+			dict, err := dict.ExtractType1(w, ref)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	if dict.Ref != ref {
-		t.Errorf("wrong object reference: expected %v, got %v", ref, dict.Ref)
-	}
-	if dict.PostScriptName != fontData.PostScriptName() {
-		t.Errorf("wrong PostScript name: expected %v, got %v",
-			fontData.PostScriptName(), dict.PostScriptName)
-	}
-	if len(dict.SubsetTag) != 6 {
-		t.Errorf("wrong subset tag: %q", dict.SubsetTag)
-	}
+			if dict.Ref != ref {
+				t.Errorf("wrong object reference: expected %v, got %v", ref, dict.Ref)
+			}
+			if dict.PostScriptName != fontData.PostScriptName() {
+				t.Errorf("wrong PostScript name: expected %v, got %v",
+					fontData.PostScriptName(), dict.PostScriptName)
+			}
+			if len(dict.SubsetTag) != 6 {
+				t.Errorf("wrong subset tag: %q", dict.SubsetTag)
+			}
 
-	// TODO(voss): more tests
+			// TODO(voss): more tests
+		})
+	}
 }

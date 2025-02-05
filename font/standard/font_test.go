@@ -55,7 +55,7 @@ func TestEmbedBuiltin(t *testing.T) {
 
 			gg := F.Layout(nil, 10, testText)
 			for _, g := range gg.Seq { // allocate codes
-				E.(font.EmbeddedLayouter).AppendEncoded(nil, g.GID, g.Text)
+				E.(font.EmbeddedLayouter).AppendEncoded(nil, g.GID, string(g.Text))
 			}
 
 			err = rm.Close()

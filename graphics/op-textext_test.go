@@ -181,7 +181,7 @@ func TestTextShowRaw2(t *testing.T) {
 
 				for _, g := range r.TextLayout(nil, testString).Seq {
 					xx = append(xx, r.TextMatrix[4])
-					s, _ = E.(font.EmbeddedLayouter).AppendEncoded(s[:0], g.GID, g.Text)
+					s, _ = E.(font.EmbeddedLayouter).AppendEncoded(s[:0], g.GID, string(g.Text))
 
 					r.TextShowRaw(s)
 				}
@@ -202,7 +202,7 @@ func TestTextShowRaw2(t *testing.T) {
 				for i, g := range r.TextLayout(nil, testString).Seq {
 					r.TextBegin()
 					r.TextFirstLine(xx[i], 10)
-					s, _ = E.(font.EmbeddedLayouter).AppendEncoded(s[:0], g.GID, g.Text)
+					s, _ = E.(font.EmbeddedLayouter).AppendEncoded(s[:0], g.GID, string(g.Text))
 					r.TextShowRaw(s)
 					r.TextEnd()
 				}

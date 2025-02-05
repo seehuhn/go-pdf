@@ -34,6 +34,8 @@ import (
 	"seehuhn.de/go/pdf/font/subset"
 )
 
+var _ font.Embedded = (*embeddedCFFSimple)(nil)
+
 type embeddedCFFSimple struct {
 	w   *pdf.Writer
 	ref pdf.Reference
@@ -54,9 +56,9 @@ func (f *embeddedCFFSimple) DecodeWidth(s pdf.String) (float64, int) {
 	return f.sfnt.GlyphWidthPDF(gid) / 1000, 1
 }
 
-func (f *embeddedCFFSimple) AppendEncoded(s pdf.String, gid glyph.ID, rr []rune) (pdf.String, float64) {
+func (f *embeddedCFFSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
 	width := f.sfnt.GlyphWidthPDF(gid) / 1000
-	c := f.SimpleEncoder.GIDToCode(gid, rr)
+	c := f.SimpleEncoder.GIDToCode(gid, text)
 	return append(s, c), width
 }
 

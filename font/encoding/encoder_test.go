@@ -30,13 +30,13 @@ func TestSimpleEncoder(t *testing.T) {
 	codes := make(map[byte]int)
 	for i := 0; i < 256; i++ {
 		gid := max(glyph.ID(i), 10)
-		c := e.GIDToCode(gid, []rune{rune(i + 32)})
+		c := e.GIDToCode(gid, string(rune(i+32)))
 		if _, seen := codes[c]; seen {
 			t.Errorf("%d: code %d used twice", i, c)
 		}
 		codes[c] = i
 
-		c2 := e.GIDToCode(gid, []rune{rune(i + 32)})
+		c2 := e.GIDToCode(gid, string(rune(i+32)))
 		if c != c2 {
 			t.Errorf("%d: code %d != %d", i, c, c2)
 		}
