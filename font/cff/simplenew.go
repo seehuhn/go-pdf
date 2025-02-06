@@ -94,6 +94,57 @@ func newEmbeddedSimpleNew(ref pdf.Reference, font *cff.Font) *embeddedSimpleNew 
 	return e
 }
 
+func (e *embeddedSimpleNew) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
+	key := key{Gid: gid, Text: text}
+	if code, ok := e.Code[key]; !ok {
+		return append(s, code), e.Width[gid]
+	}
+
+	glyphName := e.GetGlyphName(gid, text)
+
+	var code byte
+	if len(e.Code) < 256 {
+		code = e.allocateCode(glyphName, e.Font.FontName == "ZapfDingbats", &pdfenc.Standard)
+	}
+
+	e.Code[key] = code
+	e.Enc[code] = glyphName
+	e.Text[code] = text
+	e.Width[gid] = e.Font.GlyphWidthPDF(gid)
+	return append(s, code), e.Width[gid]
+}
+
+// GetGlyphName returns the name of the glyph with the given ID.
+// If the glyph name is not known, the function constructs a new name.
+func (e *embeddedSimpleNew) GetGlyphName(gid glyph.ID, text string) string {
+	glyphName := e.Font.Outlines.Glyphs[gid].Name
+	if glyphName == "" {
+		if gid == 0 {
+			glyphName = ".notdef"
+		} else if text == "" {
+			glyphName = fmt.Sprintf("orn%03d", len(e.Code))
+		} else {
+			var parts []string
+			for _, r := range text {
+				parts = append(parts, names.FromUnicode(r))
+			}
+
+			for i := range parts {
+				if len(glyphName)+1+len(parts[i]) > 25 {
+					break
+				}
+				if glyphName != "" {
+					glyphName += "_"
+				}
+				glyphName += parts[i]
+			}
+		}
+		// TODO(voss): check for duplicates
+	}
+
+	return glyphName
+}
+
 func (e *embeddedSimpleNew) allocateCode(glyphName string, dingbats bool, target *pdfenc.Encoding) byte {
 	var r rune
 	rr := names.ToUnicode(glyphName, dingbats)
@@ -132,27 +183,6 @@ func (e *embeddedSimpleNew) allocateCode(glyphName string, dingbats bool, target
 	}
 
 	return bestCode
-}
-
-func (e *embeddedSimpleNew) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
-	key := key{Gid: gid, Text: text}
-	if code, ok := e.Code[key]; !ok {
-		return append(s, code), e.Width[gid]
-	}
-
-	// TODO(voss): invent glyph names, if needed.
-	glyphName := e.Font.Outlines.Glyphs[gid].Name
-
-	var code byte
-	if len(e.Code) < 256 {
-		code = e.allocateCode(glyphName, e.Font.FontName == "ZapfDingbats", &pdfenc.Standard)
-	}
-
-	e.Code[key] = code
-	e.Enc[code] = glyphName
-	e.Text[code] = text
-	e.Width[gid] = e.Font.GlyphWidthPDF(gid)
-	return append(s, code), e.Width[gid]
 }
 
 func (e *embeddedSimpleNew) Finish(rm *pdf.ResourceManager) error {
