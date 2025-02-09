@@ -94,11 +94,11 @@ func (b *Builder) Finish(prop *Properties) (*Font, error) {
 	}
 
 	geometry := &font.Geometry{
-		Ascent:           float64(prop.Ascent) * prop.FontMatrix[3],
-		Descent:          float64(prop.Descent) * prop.FontMatrix[3],
-		BaseLineDistance: float64(prop.BaseLineSkip) * prop.FontMatrix[3],
-		GlyphExtents:     glyphExtents,
-		Widths:           widths,
+		Ascent:       float64(prop.Ascent) * prop.FontMatrix[3],
+		Descent:      float64(prop.Descent) * prop.FontMatrix[3],
+		Leading:      float64(prop.BaseLineSkip) * prop.FontMatrix[3],
+		GlyphExtents: glyphExtents,
+		Widths:       widths,
 	}
 
 	cmap := map[rune]glyph.ID{}

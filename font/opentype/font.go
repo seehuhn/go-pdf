@@ -68,7 +68,7 @@ func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
 
 			Ascent:             float64(info.Ascent) * info.FontMatrix[3],
 			Descent:            float64(info.Descent) * info.FontMatrix[3],
-			BaseLineDistance:   float64(info.Ascent-info.Descent+info.LineGap) * info.FontMatrix[3],
+			Leading:            float64(info.Ascent-info.Descent+info.LineGap) * info.FontMatrix[3],
 			UnderlinePosition:  float64(info.UnderlinePosition) * info.FontMatrix[3],
 			UnderlineThickness: float64(info.UnderlineThickness) * info.FontMatrix[3],
 		}
@@ -79,7 +79,7 @@ func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
 
 			Ascent:             float64(info.Ascent) / float64(info.UnitsPerEm),
 			Descent:            float64(info.Descent) / float64(info.UnitsPerEm),
-			BaseLineDistance:   float64(info.Ascent-info.Descent+info.LineGap) / float64(info.UnitsPerEm),
+			Leading:            float64(info.Ascent-info.Descent+info.LineGap) / float64(info.UnitsPerEm),
 			UnderlinePosition:  float64(info.UnderlinePosition) / float64(info.UnitsPerEm),
 			UnderlineThickness: float64(info.UnderlineThickness) / float64(info.UnitsPerEm),
 		}

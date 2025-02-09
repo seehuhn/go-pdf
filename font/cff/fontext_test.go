@@ -32,7 +32,7 @@ func TestEmbedSimple(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	fontData := makefont.OpenType()
-	fontInstance, err := cff.New(fontData, nil)
+	fontInstance, err := cff.Old(fontData, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

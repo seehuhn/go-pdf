@@ -180,8 +180,8 @@ func (f *fontTables) WriteHeader(title, fileName string) error {
 	gBody := f.bodyFont.GetGeometry()
 	gMono := f.monoFont.GetGeometry()
 	v1 := 12 * gBody.Ascent
-	v2 := 12*(gBody.BaseLineDistance-gBody.Ascent) + 10*gMono.Ascent
-	v3 := 10*(gMono.BaseLineDistance-gMono.Ascent) + 12
+	v2 := 12*(gBody.Leading-gBody.Ascent) + 10*gMono.Ascent
+	v3 := 10*(gMono.Leading-gMono.Ascent) + 12
 	total := v1 + v2 + v3
 
 	err := f.MakeSpace(total)

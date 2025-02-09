@@ -39,7 +39,7 @@ func Show(w *graphics.Writer, args ...any) {
 			w.TextSetFont(v.Font, v.Size)
 			leading = 0
 			if l, ok := v.Font.(font.Layouter); ok {
-				leading = l.GetGeometry().BaseLineDistance * v.Size
+				leading = l.GetGeometry().Leading * v.Size
 			}
 			if leading <= 0 {
 				leading = math.Round(v.Size*15) / 10

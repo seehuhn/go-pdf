@@ -203,9 +203,9 @@ func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Font) error {
 	bodyFont := f.bodyFont
 	gBody := bodyFont.GetGeometry()
 	v1 := 10 * gBody.Ascent
-	v2 := 10*(gBody.BaseLineDistance-gBody.Ascent) + 7*gBody.Ascent
-	v3 := 7*(gBody.BaseLineDistance-gBody.Ascent) + 24*gX.Ascent
-	v4 := 24*(gX.BaseLineDistance-gX.Ascent) + 12
+	v2 := 10*(gBody.Leading-gBody.Ascent) + 7*gBody.Ascent
+	v3 := 7*(gBody.Leading-gBody.Ascent) + 24*gX.Ascent
+	v4 := 24*(gX.Leading-gX.Ascent) + 12
 	totalPartHeight := v1 + v2 + v3 + v4
 
 	var parts []string

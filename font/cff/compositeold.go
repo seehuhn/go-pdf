@@ -35,18 +35,18 @@ import (
 	"seehuhn.de/go/pdf/font/subset"
 )
 
-type embeddedComposite struct {
+type embeddedCompositeOld struct {
 	embedded
 
 	cmap.GIDToCID
 	cmap.CIDEncoder
 }
 
-func (f *embeddedComposite) WritingMode() cmap.WritingMode {
+func (f *embeddedCompositeOld) WritingMode() cmap.WritingMode {
 	return 0 // TODO(voss): implement
 }
 
-func (f *embeddedComposite) DecodeWidth(s pdf.String) (float64, int) {
+func (f *embeddedCompositeOld) DecodeWidth(s pdf.String) (float64, int) {
 	for code, cid := range f.AllCIDs(s) {
 		gid := f.GID(cid)
 		// TODO(voss): deal with different Font Matrices for different private dicts.
@@ -56,14 +56,14 @@ func (f *embeddedComposite) DecodeWidth(s pdf.String) (float64, int) {
 	return 0, 0
 }
 
-func (f *embeddedComposite) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
+func (f *embeddedCompositeOld) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
 	// TODO(voss): deal with different Font Matrices for different private dicts.
 	width := float64(f.sfnt.GlyphWidth(gid)) * f.sfnt.FontMatrix[0]
 	s = f.CIDEncoder.AppendEncoded(s, gid, text)
 	return s, math.Round(width*1000) / 1000
 }
 
-func (f *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
+func (f *embeddedCompositeOld) Finish(rm *pdf.ResourceManager) error {
 	if f.closed {
 		return nil
 	}

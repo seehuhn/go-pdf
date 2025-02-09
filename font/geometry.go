@@ -29,7 +29,7 @@ import (
 type Geometry struct {
 	Ascent             float64
 	Descent            float64 // negative
-	BaseLineDistance   float64
+	Leading            float64
 	UnderlinePosition  float64
 	UnderlineThickness float64
 
@@ -40,12 +40,12 @@ type Geometry struct {
 
 // GetGeometry returns the geometry of a font.
 func (g *Geometry) GetGeometry() *Geometry {
-	if g.BaseLineDistance == 0 {
+	if g.Leading == 0 {
 		x := 1.0
 		if g.Ascent != 0 || g.Descent != 0 {
-			g.BaseLineDistance = g.Ascent - g.Descent
+			g.Leading = g.Ascent - g.Descent
 		}
-		g.BaseLineDistance = 1.2 * x
+		g.Leading = 1.2 * x
 	}
 
 	return g

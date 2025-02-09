@@ -64,7 +64,7 @@ func (f cffEmbedder) font(*pdf.ResourceManager) font.Layouter {
 		opt = &font.Options{Composite: true}
 	}
 
-	F, err := cff.New(info, opt)
+	F, err := cff.Old(info, opt)
 	if err != nil {
 		panic(err)
 	}
