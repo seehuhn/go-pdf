@@ -33,13 +33,17 @@ type FromFile interface {
 }
 
 type Code struct {
+	// CID allows to look up the glyph in the underlying font.
 	CID cid.CID
 
+	// Notdef specifies which glyph to show if the requested glyph is not
+	// present in the font.
 	Notdef cid.CID
 
 	// Width is the glyph width in PDF glyph space units.
 	Width float64
 
+	// Text is the text representation of the character.
 	Text string
 }
 

@@ -92,19 +92,3 @@ type EmbeddedLayouter interface {
 	// glyph/text combination in the font's encoding.
 	AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64)
 }
-
-// CodeInfo contains information associated with a character code.
-type CodeInfo struct {
-	// CID allows to look up the glyph in the underlying font.
-	CID cmap.CID
-
-	// Notdef specifies which glyph to show if the requested glyph is not
-	// present in the font.
-	Notdef cmap.CID
-
-	// Text is the text representation of the character.
-	Text string
-
-	// W is the width of the corresponding glyph in PDF glyph space units.
-	W float64
-}

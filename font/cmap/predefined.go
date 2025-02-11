@@ -46,8 +46,8 @@ func (info *FileOld) IsPredefined() bool {
 
 // IsPredefined returns true if the CMap is one of the CMaps predefined in PDF.
 // The result is based exclusively on the name of the CMap.
-func (info *File) IsPredefined() bool {
-	_, ok := builtinCS[string(info.Name)]
+func (c *File) IsPredefined() bool {
+	_, ok := builtinCS[string(c.Name)]
 	return ok
 }
 

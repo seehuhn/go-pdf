@@ -31,7 +31,7 @@ import (
 type FontFromFile interface {
 	font.Embedded
 
-	Decode(s pdf.String) (*font.CodeInfo, int)
+	Decode(s pdf.String) (*font.Code, int)
 
 	FontData() interface{}
 
@@ -119,7 +119,7 @@ func (r *Reader) readSimpleFont(info *font.Dicts, toUni *cmap.ToUnicodeFile) (F 
 
 	res := &SimpleFont{
 		enc:    enc,
-		info:   make([]*font.CodeInfo, 256),
+		info:   make([]*font.Code, 256),
 		widths: widths,
 		toUni:  toUni,
 	}
@@ -162,7 +162,7 @@ func (r *Reader) extractWidths(info *font.Dicts) ([]float64, error) {
 
 type SimpleFont struct {
 	enc    *encoding.EncodingOld
-	info   []*font.CodeInfo
+	info   []*font.Code
 	widths []float64
 	toUni  *cmap.ToUnicodeFile
 }
@@ -183,7 +183,7 @@ func (f *SimpleFont) DecodeWidth(s pdf.String) (float64, int) {
 	return f.widths[code], 1
 }
 
-func (f *SimpleFont) Decode(s pdf.String) (*font.CodeInfo, int) {
+func (f *SimpleFont) Decode(s pdf.String) (*font.Code, int) {
 	if len(s) == 0 {
 		return nil, 0
 	}
@@ -203,11 +203,11 @@ func (f *SimpleFont) Decode(s pdf.String) (*font.CodeInfo, int) {
 	}
 	// TODO(voss): any other methods for extracting the text mapping???
 
-	res := &font.CodeInfo{
+	res := &font.Code{
 		CID:    cid,
 		Notdef: 0,
 		Text:   string(text),
-		W:      f.widths[code],
+		Width:  f.widths[code],
 	}
 
 	f.info[code] = res

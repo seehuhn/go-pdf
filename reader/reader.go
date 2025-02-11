@@ -603,7 +603,7 @@ func (r *Reader) processText(s pdf.String) {
 		for len(s) > 0 {
 			info, k := F.Decode(s)
 
-			width := info.W*r.TextFontSize + r.TextCharacterSpacing
+			width := info.Width*r.TextFontSize + r.TextCharacterSpacing
 			if k == 1 && s[0] == ' ' {
 				width += r.TextWordSpacing
 			}

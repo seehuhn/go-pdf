@@ -30,9 +30,9 @@ type CIDFont struct {
 	codec *charcode.Codec
 	cmap  *cmap.File
 	toUni *cmap.ToUnicodeFile
-	dec   map[charcode.Code]*font.CodeInfo
+	dec   map[charcode.Code]*font.Code
 
-	notdef *font.CodeInfo
+	notdef *font.Code
 
 	widths map[cmap.CID]float64
 	dw     float64
@@ -71,16 +71,16 @@ func (r *Reader) readCompositeFont(info *font.Dicts, toUni *cmap.ToUnicodeFile) 
 	if !ok {
 		cid0Width = dw
 	}
-	notdef := &font.CodeInfo{
-		Text: string([]rune{unicode.ReplacementChar}),
-		W:    cid0Width,
+	notdef := &font.Code{
+		Text:  string([]rune{unicode.ReplacementChar}),
+		Width: cid0Width,
 	}
 
 	res := &CIDFont{
 		codec: codec,
 		cmap:  encoding,
 		toUni: toUni,
-		dec:   make(map[charcode.Code]*font.CodeInfo),
+		dec:   make(map[charcode.Code]*font.Code),
 
 		notdef: notdef,
 
@@ -95,7 +95,7 @@ func (f *CIDFont) WritingMode() cmap.WritingMode {
 	return f.cmap.WMode
 }
 
-func (f *CIDFont) Decode(s pdf.String) (*font.CodeInfo, int) {
+func (f *CIDFont) Decode(s pdf.String) (*font.Code, int) {
 	code, k, ok := f.codec.Decode(s)
 	if !ok {
 		return f.notdef, k
@@ -125,11 +125,11 @@ func (f *CIDFont) Decode(s pdf.String) (*font.CodeInfo, int) {
 		// character collections.
 	}
 
-	res := &font.CodeInfo{
+	res := &font.Code{
 		CID:    CID1,
 		Notdef: CID2,
 		Text:   text,
-		W:      w,
+		Width:  w,
 	}
 	f.dec[code] = res
 	return res, k
@@ -140,7 +140,7 @@ func (f *CIDFont) DecodeWidth(s pdf.String) (float64, int) {
 		return 0, 0
 	}
 	ci, k := f.Decode(s)
-	return ci.W, k
+	return ci.Width, k
 }
 
 func (f *CIDFont) FontData() interface{} {
