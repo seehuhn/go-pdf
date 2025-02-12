@@ -140,12 +140,7 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	var embedded font.Embedded
 	if f.Font.IsCFF() {
 		if !opt.Composite {
-			embedded = &embeddedCFFSimple{
-				w:             w,
-				ref:           ref,
-				sfnt:          f.Font,
-				SimpleEncoder: encoding.NewSimpleEncoder(),
-			}
+			embedded = newEmbeddedCFFSimple(ref, f.Font)
 		} else {
 			var gidToCID cmap.GIDToCID
 			if opt.MakeGIDToCID != nil {

@@ -67,7 +67,7 @@ func create(fname string) error {
 	black := color.DeviceGray(0)
 	note := text.F{Font: noteFont, Size: fontSize, Color: black}
 
-	origFont, err := pdfcff.Old(data.origFont, nil)
+	origFont, err := pdfcff.New(data.origFont, nil)
 	if err != nil {
 		return err
 	}

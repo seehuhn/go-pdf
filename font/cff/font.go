@@ -23,7 +23,7 @@ import (
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
@@ -185,45 +185,60 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 //
 // This implements the [font.Font] interface.
 func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
-	if f.Opt.Composite {
-		return nil, nil, errors.New("composite fonts: not implemented")
-	}
-
 	ref := rm.Out.Alloc()
 
-	enc := make(map[byte]string)
-	dict := &dict.Type1{
-		Ref:            ref,
-		PostScriptName: f.Font.FontName,
-		// SubsetTag will be set later, in Finish()
-		// Descriptor will be set later, in Finish()
-		Encoding: func(code byte) string {
-			return enc[code]
-		},
-		// FontType will be set later, in Finish()
-		// FontRef will be set later, in Finish()
+	opt := f.Opt
+
+	var res font.Embedded
+	if opt.Composite {
+		err := pdf.CheckVersion(rm.Out, "composite CFF fonts", pdf.V1_3)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		var gidToCID cmap.GIDToCID
+		if opt.MakeGIDToCID != nil {
+			gidToCID = opt.MakeGIDToCID()
+		} else {
+			gidToCID = cmap.NewGIDToCIDIdentity()
+		}
+
+		var cidEncoder cmap.CIDEncoder
+		if opt.MakeEncoder != nil {
+			cidEncoder = opt.MakeEncoder(gidToCID)
+		} else {
+			cidEncoder = cmap.NewCIDEncoderIdentity(gidToCID)
+		}
+
+		e := embedded{
+			w:    rm.Out,
+			ref:  ref,
+			Font: f.Font,
+
+			Stretch:  f.Stretch,
+			Weight:   f.Weight,
+			IsSerif:  f.IsSerif,
+			IsScript: f.IsScript,
+
+			Ascent:    f.Ascent,
+			Descent:   f.Descent,
+			Leading:   f.Leading,
+			CapHeight: f.CapHeight,
+			XHeight:   f.XHeight,
+		}
+		res = &embeddedCompositeOld{
+			embedded:   e,
+			GIDToCID:   gidToCID,
+			CIDEncoder: cidEncoder,
+		}
+	} else {
+		err := pdf.CheckVersion(rm.Out, "simple CFF fonts", pdf.V1_2)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		res = newEmbeddedSimple(ref, f)
 	}
-	e := &embeddedSimple{
-		Font: f.Font,
 
-		Stretch:  f.Stretch,
-		Weight:   f.Weight,
-		IsSerif:  f.IsSerif,
-		IsScript: f.IsScript,
-
-		Ascent:    f.Ascent,
-		Descent:   f.Descent,
-		Leading:   f.Leading,
-		CapHeight: f.CapHeight,
-		XHeight:   f.XHeight,
-
-		Type1:    dict,
-		Code:     make(map[key]byte),
-		Encoding: enc,
-
-		GidToGlyph:    make(map[glyph.ID]string),
-		GlyphNameUsed: make(map[string]bool),
-	}
-
-	return e.Ref, e, nil
+	return ref, res, nil
 }

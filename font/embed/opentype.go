@@ -38,7 +38,7 @@ func OpenTypeFont(info *sfnt.Font, opt *font.Options) (font.Layouter, error) {
 	var F font.Layouter
 	var err error
 	if info.IsCFF() {
-		F, err = cff.Old(info, opt)
+		F, err = cff.New(info, opt)
 	} else {
 		F, err = truetype.New(info, opt)
 	}

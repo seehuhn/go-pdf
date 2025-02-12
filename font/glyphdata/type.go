@@ -27,6 +27,16 @@ const (
 	CFF
 	CFFSimple
 	OpenTypeCFF
+
+	// OpenTypeCFFSimple indicates that glyph outlines are provided in OpenType
+	// format, with font data given within a "CFF" table.  The CFF font data
+	// does not use CIDFont operators.
+	//
+	// This can be used for [seehuhn.de/go/pdf/font/dict.Type1] and
+	// [seehuhn.de/go/pdf/font/dict.CIDFontType0] font dictionaries.
+	//
+	// Font data can be embedded using [seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs.Embed],
+	// and extracted using [seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs.Extract].
 	OpenTypeCFFSimple
 
 	// OpenTypeGlyf indicates that glyph outlines as an OpenType font with a

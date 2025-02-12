@@ -24,6 +24,10 @@ import (
 	"seehuhn.de/go/sfnt"
 )
 
+// Embed embeds the glyph data of a font into a PDF file.
+//
+// The following font types are supported: [glyphdata.OpenTypeCFFSimple],
+// [glyphdata.OpenTypeCFF], [glyphdata.TrueType], and [glyphdata.OpenTypeGlyf].
 func Embed(w *pdf.Writer, tp glyphdata.Type, ref pdf.Reference, data *sfnt.Font) error {
 	switch tp {
 	case glyphdata.OpenTypeCFFSimple, glyphdata.OpenTypeCFF:

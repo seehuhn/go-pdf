@@ -52,7 +52,7 @@ func doit() error {
 		MakeGIDToCID: cmap.NewGIDToCIDIdentity,
 		MakeEncoder:  cmap.NewCIDEncoderUTF8,
 	}
-	F, err := cff.Old(info, opt)
+	F, err := cff.New(info, opt)
 	if err != nil {
 		return err
 	}

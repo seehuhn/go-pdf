@@ -18,6 +18,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"os"
 	"regexp"
@@ -31,7 +32,11 @@ import (
 	"seehuhn.de/go/pdf/internal/fonttypes"
 )
 
+var writeIndividual = flag.Bool("a", false, "write individual font examples")
+
 func main() {
+	flag.Parse()
+
 	err := doit()
 	if err != nil {
 		panic(err)
@@ -53,7 +58,9 @@ func doit() error {
 		rightMargin: 144.0,
 	}
 
-	doc, err := document.CreateMultiPage("test.pdf", paper, pdf.V1_7, nil)
+	outName := "test.pdf"
+	fmt.Println("writing", outName, "...")
+	doc, err := document.CreateMultiPage(outName, paper, pdf.V1_7, nil)
 	if err != nil {
 		return err
 	}
@@ -89,6 +96,8 @@ func doit() error {
 	for _, s := range sections {
 		title := s.title
 		intro := s.lines
+
+		fmt.Println("-", title)
 
 		var gen func(rm *pdf.ResourceManager) font.Layouter
 		var ffKey pdf.Name
@@ -162,7 +171,7 @@ func doit() error {
 		page.SetFillColor(color.DeviceGray(0))
 
 		page.TextBegin()
-		if gen != nil {
+		if gen != nil && *writeIndividual {
 			intro = append(intro, "", fmt.Sprintf("Example (see `test%02d.pdf`):", fontNo))
 		}
 		for i, line := range intro {
@@ -201,7 +210,7 @@ func doit() error {
 		page.TextEnd()
 		l.yPos -= -l.F["text"].descent
 
-		if gen != nil {
+		if gen != nil && *writeIndividual {
 			err = writeSinglePage(gen, fontNo)
 			if err != nil {
 				return err
@@ -307,6 +316,8 @@ func doit() error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Println("done")
 
 	return nil
 }

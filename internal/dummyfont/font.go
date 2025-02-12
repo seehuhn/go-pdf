@@ -86,5 +86,5 @@ func new() (font.Font, error) {
 	subtable['A'] = 2
 	fontData.InstallCMap(subtable)
 
-	return pdfcff.Old(fontData, nil)
+	return pdfcff.New(fontData, nil)
 }

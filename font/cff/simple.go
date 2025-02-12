@@ -48,7 +48,7 @@ var _ interface {
 } = (*embeddedSimple)(nil)
 
 // embeddedSimple represents an [Instance] which has been embedded in a PDF
-// file if the Composite option is not set.  There should be at most on
+// file if the Composite option is not set.  There should be at most one
 // embeddedSimple for each [Instance] in a PDF file.
 type embeddedSimple struct {
 	Font *cff.Font
@@ -70,11 +70,55 @@ type embeddedSimple struct {
 
 	GidToGlyph    map[glyph.ID]string
 	GlyphNameUsed map[string]bool
+
+	finished bool
 }
 
 type key struct {
 	Gid  glyph.ID
 	Text string
+}
+
+func newEmbeddedSimple(ref pdf.Reference, f *Instance) *embeddedSimple {
+	enc := make(map[byte]string)
+
+	dict := &dict.Type1{
+		Ref:            ref,
+		PostScriptName: f.Font.FontName,
+		// SubsetTag will be set later, in Finish()
+		// Descriptor will be set later, in Finish()
+		Encoding: func(code byte) string {
+			return enc[code]
+		},
+		// FontType will be set later, in Finish()
+		// FontRef will be set later, in Finish()
+	}
+
+	e := &embeddedSimple{
+		Font: f.Font,
+
+		Stretch:  f.Stretch,
+		Weight:   f.Weight,
+		IsSerif:  f.IsSerif,
+		IsScript: f.IsScript,
+
+		Ascent:    f.Ascent,
+		Descent:   f.Descent,
+		Leading:   f.Leading,
+		CapHeight: f.CapHeight,
+		XHeight:   f.XHeight,
+
+		Type1:    dict,
+		Code:     make(map[key]byte),
+		Encoding: enc,
+
+		GidToGlyph:    make(map[glyph.ID]string),
+		GlyphNameUsed: make(map[string]bool),
+	}
+	e.GidToGlyph[0] = ".notdef"
+	e.GlyphNameUsed[".notdef"] = true
+
+	return e
 }
 
 func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
@@ -83,14 +127,14 @@ func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) 
 	if !ok {
 		glyphName := e.GlyphName(gid, text)
 		if len(e.Code) < 256 {
-			code = e.AllocateCode(glyphName, e.Font.FontName == "ZapfDingbats", &pdfenc.Standard)
+			code = e.AllocateCode(glyphName, e.PostScriptName == "ZapfDingbats", &pdfenc.WinAnsi)
 			e.Encoding[code] = glyphName
 			e.Text[code] = text
-			e.Width[gid] = math.Round(e.Font.GlyphWidthPDF(gid))
+			e.Width[code] = math.Round(e.Font.GlyphWidthPDF(gid))
 		}
 		e.Code[key] = code
 	}
-	return append(s, code), e.Width[gid]
+	return append(s, code), e.Width[code] / 1000
 }
 
 // GlyphName returns a name for the given glyph.
@@ -102,13 +146,9 @@ func (e *embeddedSimple) GlyphName(gid glyph.ID, text string) string {
 		return glyphName
 	}
 
-	// For compatibility with old readers, we try to keep glyph names below or
-	// at 31 characters, on a best-effort basis.
 	glyphName := e.Font.Outlines.Glyphs[gid].Name
 	if glyphName == "" {
-		if gid == 0 {
-			glyphName = ".notdef"
-		} else if text == "" {
+		if text == "" {
 			glyphName = fmt.Sprintf("orn%03d", len(e.GlyphNameUsed)+1)
 		} else {
 			var parts []string
@@ -116,6 +156,8 @@ func (e *embeddedSimple) GlyphName(gid glyph.ID, text string) string {
 				parts = append(parts, names.FromUnicode(r))
 			}
 
+			// For compatibility with old readers, we try to keep glyph names below or
+			// at 31 characters, on a best-effort basis.
 			for i := range parts {
 				if len(glyphName)+1+len(parts[i]) > 31-5 { // try to leave space for a suffix
 					break
@@ -184,8 +226,13 @@ func (e *embeddedSimple) AllocateCode(glyphName string, dingbats bool, target *p
 // Finish is called when the resource manager is closed.
 // At this point the subset of glyphs to be embedded is known.
 func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
+	if e.finished {
+		return nil
+	}
+	e.finished = true
+
 	if len(e.Code) > 256 {
-		return fmt.Errorf("too many distinct glyphs used in font %q", e.Font.FontName)
+		return fmt.Errorf("too many distinct glyphs used in font %q", e.PostScriptName)
 	}
 
 	fontInfo := e.Font.FontInfo
@@ -250,7 +297,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	qv := subsetCFF.FontMatrix[3] * 1000
 
 	fd := &font.Descriptor{
-		FontName:     subset.Join(subsetTag, subsetCFF.FontName),
+		FontName:     subset.Join(subsetTag, e.PostScriptName),
 		FontFamily:   subsetCFF.FamilyName,
 		FontStretch:  e.Stretch,
 		FontWeight:   e.Weight,
