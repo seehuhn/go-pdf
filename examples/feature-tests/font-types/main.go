@@ -488,6 +488,13 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 	l.yPos++
 	page.TextEnd()
 
+	if maxWidth < titleWitdhPDF {
+		maxWidth = titleWitdhPDF
+	}
+	if maxWidth < 170 {
+		maxWidth = 170
+	}
+
 	if flagsY != 0 {
 		page.PushGraphicsState()
 		page.TextBegin()
@@ -501,15 +508,10 @@ func (l *layout) ShowDict(page *document.Page, fontDict pdf.Dict, title string, 
 	y2 := l.yPos - 2
 	l.yPos -= 4
 
-	wPDF := maxWidth
-	if wPDF < titleWitdhPDF {
-		wPDF = titleWitdhPDF
-	}
-
 	_ = y1
-	page.Rectangle(xBase-4, y2, wPDF+8, y0-y2)
+	page.Rectangle(xBase-4, y2, maxWidth+8, y0-y2)
 	page.MoveTo(xBase-4, y1)
-	page.LineTo(xBase+wPDF+4, y1)
+	page.LineTo(xBase+maxWidth+4, y1)
 	page.Stroke()
 
 	l.yPos -= 18
