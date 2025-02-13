@@ -18,6 +18,7 @@ package cff
 
 import (
 	"errors"
+	"math"
 	"slices"
 
 	"seehuhn.de/go/geom/rect"
@@ -109,11 +110,11 @@ func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
 		IsSerif:  info.IsSerif,
 		IsScript: info.IsScript,
 
-		Ascent:    ascent,
-		Descent:   descent,
-		Leading:   leading,
-		CapHeight: capHeight,
-		XHeight:   xHeight,
+		Ascent:    math.Round(ascent),
+		Descent:   math.Round(descent),
+		Leading:   math.Round(leading),
+		CapHeight: math.Round(capHeight),
+		XHeight:   math.Round(xHeight),
 
 		layouter: layouter,
 	}
@@ -210,9 +211,8 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 			cidEncoder = cmap.NewCIDEncoderIdentity(gidToCID)
 		}
 
-		e := embedded{
-			w:    rm.Out,
-			ref:  ref,
+		res = &embeddedComposite{
+			Ref:  ref,
 			Font: f.Font,
 
 			Stretch:  f.Stretch,
@@ -225,9 +225,7 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 			Leading:   f.Leading,
 			CapHeight: f.CapHeight,
 			XHeight:   f.XHeight,
-		}
-		res = &embeddedCompositeOld{
-			embedded:   e,
+
 			GIDToCID:   gidToCID,
 			CIDEncoder: cidEncoder,
 		}
@@ -241,4 +239,9 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	}
 
 	return ref, res, nil
+}
+
+func clone[T any](obj *T) *T {
+	new := *obj
+	return &new
 }

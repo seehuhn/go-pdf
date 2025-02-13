@@ -24,10 +24,27 @@ import (
 
 const subsetModulus = 26 * 26 * 26 * 26 * 26 * 26
 
-// Tag constructs a 6-letter tag (range AAAAAA to ZZZZZZ) to describe
-// a subset of glyphs of a font.  This is used for the /BaseFont entry in PDF
-// Font dictionaries and the /FontName entry in FontDescriptor dictionaries.
+// Tag constructs a 6-letter tag (range AAAAAA to ZZZZZZ) to describe a subset
+// of glyphs of a font.  This is used for the /BaseFont entry in PDF Font
+// dictionaries and the /FontName entry in FontDescriptor dictionaries.
+//
+// If origGid contains all glyphs in the correct order, the empty string is
+// returned.
 func Tag(origGid []glyph.ID, origNumGlyphs int) string {
+	if len(origGid) == origNumGlyphs {
+		// If all glyphs are included in order, we don't need a subset
+		needTag := false
+		for i, gid := range origGid {
+			if glyph.ID(i) != gid {
+				needTag = true
+				break
+			}
+		}
+		if !needTag {
+			return ""
+		}
+	}
+
 	// mix all the information into a single uint32
 	X := uint32(origNumGlyphs)
 	for _, gid := range origGid {

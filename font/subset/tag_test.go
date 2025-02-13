@@ -20,13 +20,6 @@ import (
 	"testing"
 )
 
-func TestGetSubsetTag(t *testing.T) {
-	tag := Tag(nil, 0)
-	if tag != "AAAAAA" {
-		t.Error("wrong tag " + tag)
-	}
-}
-
 func TestIsValidTag(t *testing.T) {
 	tests := []struct {
 		name  string
