@@ -27,6 +27,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/glyphdata"
@@ -44,6 +45,10 @@ type embeddedGlyfSimple struct {
 	*encoding.TrueTypeEncoder
 
 	closed bool
+}
+
+func (*embeddedGlyfSimple) WritingMode() cmap.WritingMode {
+	return cmap.Horizontal
 }
 
 func (f *embeddedGlyfSimple) DecodeWidth(s pdf.String) (float64, int) {

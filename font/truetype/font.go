@@ -148,9 +148,8 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		}
 
 		res = &embeddedSimple{
-			w:               w,
-			ref:             ref,
-			sfnt:            f.Font,
+			Ref:             ref,
+			Font:            f.Font,
 			TrueTypeEncoder: encoding.NewTrueTypeEncoder(),
 		}
 	}

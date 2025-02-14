@@ -18,6 +18,7 @@ package truetype
 
 import (
 	"fmt"
+	"iter"
 	"math"
 
 	"seehuhn.de/go/postscript/type1/names"
@@ -36,20 +37,29 @@ import (
 	"seehuhn.de/go/pdf/font/subset"
 )
 
-type embeddedSimple struct {
-	w   *pdf.Writer
-	ref pdf.Reference
+var _ interface {
+	font.EmbeddedLayouter
+	font.Scanner
+	pdf.Finisher
+} = (*embeddedSimple)(nil)
 
-	sfnt *sfnt.Font
+type embeddedSimple struct {
+	Ref  pdf.Reference
+	Font *sfnt.Font
 
 	*encoding.TrueTypeEncoder
 
-	closed bool
+	finished bool
 }
 
 // WritingMode implements the [font.Embedded] interface.
 func (f *embeddedSimple) WritingMode() cmap.WritingMode {
-	return 0
+	return cmap.Horizontal
+}
+
+// Codes iterates over the character codes in a PDF string.
+func (f *embeddedSimple) Codes(s pdf.String) iter.Seq[*font.Code] {
+	panic("not implemented") // TODO: Implement
 }
 
 func (f *embeddedSimple) DecodeWidth(s pdf.String) (float64, int) {
@@ -57,28 +67,28 @@ func (f *embeddedSimple) DecodeWidth(s pdf.String) (float64, int) {
 		return 0, 0
 	}
 	gid := f.Encoding[s[0]]
-	return f.sfnt.GlyphWidthPDF(gid) / 1000, 1
+	return f.Font.GlyphWidthPDF(gid) / 1000, 1
 }
 
 func (f *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
-	width := float64(f.sfnt.GlyphWidth(gid)) / float64(f.sfnt.UnitsPerEm)
+	width := float64(f.Font.GlyphWidth(gid)) / float64(f.Font.UnitsPerEm)
 	c := f.GIDToCode(gid, []rune(text))
 	return append(s, c), width
 }
 
 func (f *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
-	if f.closed {
+	if f.finished {
 		return nil
 	}
-	f.closed = true
+	f.finished = true
 
 	if f.TrueTypeEncoder.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q",
-			f.sfnt.PostScriptName())
+			f.Font.PostScriptName())
 	}
 	enc := f.TrueTypeEncoder.Encoding
 
-	origSfnt := f.sfnt.Clone()
+	origSfnt := f.Font.Clone()
 	origSfnt.CMapTable = nil
 	origSfnt.Gdef = nil
 	origSfnt.Gsub = nil
@@ -220,27 +230,30 @@ func (f *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		MissingWidth: subsetSfnt.GlyphWidthPDF(0),
 	}
 
-	fontType := glyphdata.TrueType
-	fontRef := rm.Out.Alloc()
-	err = opentypeglyphs.Embed(rm.Out, fontType, fontRef, subsetSfnt)
-	if err != nil {
-		return err
-	}
-
-	res := &dict.TrueType{
-		Ref:            f.ref,
+	dict := &dict.TrueType{
+		Ref:            f.Ref,
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
 		Encoding:       dictEnc,
-		FontType:       fontType,
-		FontRef:        fontRef,
+		FontType:       glyphdata.TrueType,
+		FontRef:        rm.Out.Alloc(),
 	}
 	for code := range 256 {
 		gid := subsetEncoding[code]
-		res.Width[code] = subsetSfnt.GlyphWidthPDF(gid)
+		dict.Width[code] = subsetSfnt.GlyphWidthPDF(gid)
 	}
-	f.TrueTypeEncoder.FillText(&res.Text)
+	f.TrueTypeEncoder.FillText(&dict.Text)
 
-	return res.WriteToPDF(rm)
+	err = dict.WriteToPDF(rm)
+	if err != nil {
+		return err
+	}
+
+	err = opentypeglyphs.Embed(rm.Out, dict.FontType, dict.FontRef, subsetSfnt)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

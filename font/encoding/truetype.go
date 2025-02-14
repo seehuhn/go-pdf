@@ -21,7 +21,6 @@ import (
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/postscript/type1/names"
 	"seehuhn.de/go/sfnt/glyph"
@@ -41,11 +40,6 @@ func NewTrueTypeEncoder() *TrueTypeEncoder {
 		key:      make(map[byte]key),
 	}
 	return res
-}
-
-// WritingMode implements the [font.NewFont] interface.
-func (e *TrueTypeEncoder) WritingMode() cmap.WritingMode {
-	return cmap.Horizontal // simple fonts are always horizontal
 }
 
 // GIDToCode returns the character code for the given glyph ID (allocating new
