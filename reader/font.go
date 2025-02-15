@@ -17,6 +17,8 @@
 package reader
 
 import (
+	"fmt"
+
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/pdf"
@@ -24,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
-	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/internal/stdmtx"
 )
 
 // FontFromFile represents a font which has been extracted from a PDF file.
@@ -104,9 +106,9 @@ func (r *Reader) readSimpleFont(info *font.Dicts, toUni *cmap.ToUnicodeFile) (F 
 					glyphName = pdfenc.Standard.Encoding[code]
 				}
 			}
-			w, err := type1.GetStandardWidth(string(info.PostScriptName), glyphName)
+			w, err := getStandardWidth(string(info.PostScriptName), glyphName)
 			if err != nil {
-				w, _ = type1.GetStandardWidth(string(info.PostScriptName), ".notdef")
+				w, _ = getStandardWidth(string(info.PostScriptName), ".notdef")
 			}
 			widths[code] = w / 1000
 		}
@@ -124,6 +126,24 @@ func (r *Reader) readSimpleFont(info *font.Dicts, toUni *cmap.ToUnicodeFile) (F 
 		toUni:  toUni,
 	}
 	return res, nil
+}
+
+// getStandardWidth returns the width of glyphs in the 14 standard PDF fonts.
+// The width is given in PDF glyph space units (i.e. are multiplied by 1000).
+//
+// TODO(voss): remove
+func getStandardWidth(fontName, glyphName string) (float64, error) {
+	m, ok := stdmtx.Metrics[fontName]
+	if !ok {
+		return 0, fmt.Errorf("unknown standard font %q", fontName)
+	}
+
+	w, ok := m.Width[glyphName]
+	if !ok {
+		return 0, fmt.Errorf("unknown glyph %q in font %q", glyphName, fontName)
+	}
+
+	return w, nil
 }
 
 func (r *Reader) extractWidths(info *font.Dicts) ([]float64, error) {

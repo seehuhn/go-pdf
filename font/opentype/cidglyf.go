@@ -17,7 +17,6 @@
 package opentype
 
 import (
-	"fmt"
 	"math"
 
 	pscid "seehuhn.de/go/postscript/cid"
@@ -84,10 +83,7 @@ func (f *embeddedGlyfComposite) Finish(rm *pdf.ResourceManager) error {
 	// subset the font
 	subsetGID := f.CIDEncoder.Subset()
 	subsetTag := subset.Tag(subsetGID, origOTF.NumGlyphs())
-	subsetSfnt, err := origOTF.Subset(subsetGID)
-	if err != nil {
-		return fmt.Errorf("OpenType/glyf font subset: %w", err)
-	}
+	subsetSfnt := origOTF.Subset(subsetGID)
 
 	toUnicode := f.ToUnicode()
 	cmapInfo := f.CMap()
@@ -159,7 +155,7 @@ func (f *embeddedGlyfComposite) Finish(rm *pdf.ResourceManager) error {
 
 	fontType := glyphdata.OpenTypeGlyf
 	fontRef := rm.Out.Alloc()
-	err = opentypeglyphs.Embed(f.w, fontType, fontRef, subsetSfnt)
+	err := opentypeglyphs.Embed(f.w, fontType, fontRef, subsetSfnt)
 	if err != nil {
 		return err
 	}

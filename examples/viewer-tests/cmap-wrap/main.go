@@ -121,10 +121,7 @@ func NewTestFont(rm *pdf.ResourceManager, cmap *cmap.File) (*testFont, error) {
 		gid := lookup.Lookup(r)
 		glyphs = append(glyphs, gid)
 	}
-	ttf, err = ttf.Subset(glyphs)
-	if err != nil {
-		return nil, err
-	}
+	ttf = ttf.Subset(glyphs)
 
 	// fix all glyph widths to 2000 PDF glyphs space units
 	outlines := ttf.Outlines.(*glyf.Outlines)

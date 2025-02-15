@@ -220,10 +220,7 @@ func (e *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 	glyphs := maps.Keys(gidIsUsed)
 	slices.Sort(glyphs)
 
-	subsetSfnt, err := e.Font.Subset(glyphs)
-	if err != nil {
-		return err
-	}
+	subsetSfnt := e.Font.Subset(glyphs)
 	subsetTag := subset.Tag(glyphs, e.Font.NumGlyphs())
 	e.SubsetTag = subsetTag
 
@@ -301,7 +298,7 @@ func (e *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 	e.FontType = glyphdata.OpenTypeCFFSimple
 	e.FontRef = rm.Out.Alloc()
 
-	err = e.Type1.WriteToPDF(rm)
+	err := e.Type1.WriteToPDF(rm)
 	if err != nil {
 		return err
 	}

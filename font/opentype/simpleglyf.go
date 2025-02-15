@@ -86,10 +86,7 @@ func (f *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
 	// subset the font
 	subsetGID := f.TrueTypeEncoder.Subset()
 	subsetTag := subset.Tag(subsetGID, origSfnt.NumGlyphs())
-	subsetSfnt, err := origSfnt.Subset(subsetGID)
-	if err != nil {
-		return fmt.Errorf("font subset: %w", err)
-	}
+	subsetSfnt := origSfnt.Subset(subsetGID)
 
 	subsetGid := make(map[glyph.ID]glyph.ID)
 	for gNew, gOld := range subsetGID {
@@ -221,7 +218,7 @@ func (f *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
 
 	fontType := glyphdata.OpenTypeGlyf
 	fontRef := rm.Out.Alloc()
-	err = opentypeglyphs.Embed(rm.Out, fontType, fontRef, subsetSfnt)
+	err := opentypeglyphs.Embed(rm.Out, fontType, fontRef, subsetSfnt)
 	if err != nil {
 		return err
 	}

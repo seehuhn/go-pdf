@@ -24,7 +24,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/sfnt"
 )
@@ -147,11 +146,7 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 			return nil, nil, err
 		}
 
-		res = &embeddedSimple{
-			Ref:             ref,
-			Font:            f.Font,
-			TrueTypeEncoder: encoding.NewTrueTypeEncoder(),
-		}
+		res = newEmbeddedSimple(ref, f.Font)
 	}
 
 	return ref, res, nil

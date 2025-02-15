@@ -14,38 +14,42 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package cff
+package simpleenc
 
 import (
 	"errors"
 	"fmt"
+	"iter"
 	"math/bits"
 	"slices"
 	"strings"
 
 	"golang.org/x/exp/maps"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt/glyph"
 
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
 )
 
 const maxNameLength = 31
 
-// GlyphData manages the encoding and metadata of glyphs for simple PDF fonts.
+// Table manages the encoding and metadata of glyphs for simple PDF fonts.
 //
 // It constructs a mapping from single-byte codes to
 //   - character IDs (CIDs),
 //   - glyph widths, and
 //   - associated text content.
 //
-// If a glyph is used with different text content, different codes are used
-// to allow for different ToUnicode mappings.
-type GlyphData struct {
+// If a glyph is used with different text content (for example space and
+// no-break space), different codes are used to allow for different ToUnicode
+// mappings.
+type Table struct {
 	code   map[glyphKey]byte
 	info   map[byte]*codeInfo
 	notdef *codeInfo
@@ -55,7 +59,7 @@ type GlyphData struct {
 
 	isZapfDingbats bool
 	overflow       bool
-	encoding       *pdfenc.Encoding
+	baseEnc        *pdfenc.Encoding
 }
 
 type glyphKey struct {
@@ -64,71 +68,95 @@ type glyphKey struct {
 }
 
 type codeInfo struct {
-	Width float64
+	GID   glyph.ID
+	Width float64 // PDF glyph space units
 	Text  string
 }
 
-// NewGlyphData creates a glyphData and registers the .notdef glyph.
-func NewGlyphData(notdefWidth float64, isZapfDingbats bool, base *pdfenc.Encoding) *GlyphData {
-	gd := &GlyphData{
+// NewTable creates and initialises a new SomeName object.
+//
+// The notdefWidth parameter is the default width of the ".notdef" glyph,
+// in PDF glyph space units.
+func NewTable(notdefWidth float64, isZapfDingbats bool, base *pdfenc.Encoding) *Table {
+	gd := &Table{
 		code:           make(map[glyphKey]byte),
 		info:           make(map[byte]*codeInfo),
-		notdef:         &codeInfo{Width: notdefWidth},
+		notdef:         &codeInfo{GID: 0, Text: "", Width: notdefWidth},
 		glyphName:      make(map[glyph.ID]string),
 		glyphNameUsed:  make(map[string]bool),
 		isZapfDingbats: isZapfDingbats,
-		encoding:       base,
+		baseEnc:        base,
 	}
 	gd.glyphName[0] = ".notdef"
 	gd.glyphNameUsed[".notdef"] = true
 	return gd
 }
 
-// Code looks up the code for a (gid,text) pair, returning the code byte
-// and whether it already exists.
-func (gd *GlyphData) Code(gid glyph.ID, text string) (byte, bool) {
+// IsUsed returns true if the given code is used.
+func (t *Table) IsUsed(c byte) bool {
+	_, ok := t.info[c]
+	return ok
+}
+
+// Code returns the code for the given glyph ID and text.
+// If the code is not found, the function returns (0,false).
+func (t *Table) Code(gid glyph.ID, text string) (byte, bool) {
 	k := glyphKey{gid: gid, text: text}
-	c, ok := gd.code[k]
+	c, ok := t.code[k]
 	return c, ok
 }
 
-// Get returns the CID, width and text for the given code,
-// The .notdef glyph is used for undefined codes.
-func (gd *GlyphData) Get(c byte) (cid.CID, float64, string) {
-	info, ok := gd.info[c]
+func (t *Table) get(c byte) *codeInfo {
+	info, ok := t.info[c]
 	if !ok {
-		info = gd.notdef
-		return 0, info.Width, info.Text
+		return t.notdef
 	}
-	glyphCID := cid.CID(c) + 1 // CID 0 is reserved for .notdef
-	return glyphCID, info.Width, info.Text
+	return info
 }
 
-var ErrOverflow = errors.New("too many glyphs")
+func (t *Table) GID(c byte) glyph.ID {
+	return t.get(c).GID
+}
 
-// NewCode finds a new code for the combination of glyph ID and text.
+// Width returns the width of the glyph for the given code, in PDF glyph space
+// units.
+func (t *Table) Width(c byte) float64 {
+	return t.get(c).Width
+}
+
+func (t *Table) Text(c byte) string {
+	return t.get(c).Text
+}
+
+// NewCode allocates a new code for the given glyph ID and text. It also
+// allocates a unique glyph name for the glyph.
 //
-// If baseGlyphName is a valid glyph name, it is used as the default name for
-// the glyph.  The new code is chosen using a heuristic based on the glyph name
-// and first rune in text.
+// The new glyph name is chosen using a heuristic based on baseGlyphName
+// (optional) and text. The new code is chosen using a heuristic based on the
+// glyph name and first rune in text.
 //
-// Only 256 codes are available. Once all codes are used, the function returns
-// an error.
-func (gd *GlyphData) NewCode(gid glyph.ID, baseGlyphName, text string, width float64) (byte, error) {
+// The last argument is the width of the glyph in PDF glyph space units.
+//
+// Only 256 codes are available. Once all codes are used up, the function
+// returns an error.
+func (t *Table) NewCode(gid glyph.ID, baseGlyphName, text string, width float64) (byte, error) {
 	key := glyphKey{gid: gid, text: text}
-	if c, ok := gd.code[key]; ok {
-		return c, nil
+	if _, ok := t.code[key]; ok {
+		return 0, ErrDuplicateCode
 	}
 
-	if len(gd.info) >= 256 {
-		gd.overflow = true
+	if len(t.info) >= 256 {
+		t.overflow = true
 		return 0, ErrOverflow
 	}
 
-	glyphName := gd.makeGlyphName(gid, baseGlyphName, text)
+	glyphName := t.makeGlyphName(gid, baseGlyphName, text)
 
 	var r rune
-	rr := names.ToUnicode(glyphName, gd.isZapfDingbats)
+	rr := names.ToUnicode(glyphName, t.isZapfDingbats)
+	if len(rr) == 0 {
+		rr = []rune(text)
+	}
 	if len(rr) > 0 {
 		r = rr[0]
 	}
@@ -137,7 +165,7 @@ func (gd *GlyphData) NewCode(gid glyph.ID, baseGlyphName, text string, width flo
 	bestCode := byte(0)
 	for codeInt := 0; codeInt < 256; codeInt++ {
 		code := byte(codeInt)
-		if _, used := gd.info[code]; used {
+		if _, used := t.info[code]; used {
 			continue
 		}
 
@@ -145,7 +173,7 @@ func (gd *GlyphData) NewCode(gid glyph.ID, baseGlyphName, text string, width flo
 		// point at least once.
 
 		score := 0
-		stdName := gd.encoding.Encoding[code]
+		stdName := t.baseEnc.Encoding[code]
 		if stdName == glyphName {
 			bestCode = code
 			break
@@ -161,15 +189,15 @@ func (gd *GlyphData) NewCode(gid glyph.ID, baseGlyphName, text string, width flo
 		}
 	}
 
-	gd.info[bestCode] = &codeInfo{Width: width, Text: text}
-	gd.code[key] = bestCode
+	t.info[bestCode] = &codeInfo{GID: gid, Width: width, Text: text}
+	t.code[key] = bestCode
 
 	return bestCode, nil
 }
 
 // makeGlyphName returns a unique name for the given glyph.
-func (gd *GlyphData) makeGlyphName(gid glyph.ID, defaultGlyphName, text string) string {
-	if name, ok := gd.glyphName[gid]; ok {
+func (t *Table) makeGlyphName(gid glyph.ID, defaultGlyphName, text string) string {
+	if name, ok := t.glyphName[gid]; ok {
 		return name
 	}
 
@@ -188,15 +216,15 @@ func (gd *GlyphData) makeGlyphName(gid glyph.ID, defaultGlyphName, text string) 
 	base := glyphName
 nameLoop:
 	for {
-		if isValid(glyphName) && !gd.glyphNameUsed[glyphName] {
+		if isValid(glyphName) && !t.glyphNameUsed[glyphName] {
 			break
 		}
 		if len(base) == 0 || len(glyphName) > maxNameLength {
 			// Try one more name than gd.glyphNameUsed has elements.
 			// This guarantees that we find a free name.
-			for idx := len(gd.glyphNameUsed); idx >= 0; idx-- {
+			for idx := len(t.glyphNameUsed); idx >= 0; idx-- {
 				glyphName = fmt.Sprintf("orn%03d", idx) // at most 256 glyphs, so 3 digits are enough
-				if !gd.glyphNameUsed[glyphName] {
+				if !t.glyphNameUsed[glyphName] {
 					break nameLoop
 				}
 			}
@@ -204,8 +232,8 @@ nameLoop:
 		alt++
 		glyphName = fmt.Sprintf("%s.alt%d", base, alt)
 	}
-	gd.glyphName[gid] = glyphName
-	gd.glyphNameUsed[glyphName] = true
+	t.glyphName[gid] = glyphName
+	t.glyphNameUsed[glyphName] = true
 	return glyphName
 }
 
@@ -236,20 +264,21 @@ func isValid(s string) bool {
 	return true
 }
 
-func (gd *GlyphData) GlyphName(gid glyph.ID) string {
-	return gd.glyphName[gid]
+// GlyphName returns the chosen glyph name for the given glyph ID.
+func (t *Table) GlyphName(gid glyph.ID) string {
+	return t.glyphName[gid]
 }
 
 // Overflow checks if more than 256 codes are required.
-func (gd *GlyphData) Overflow() bool {
-	return gd.overflow
+func (t *Table) Overflow() bool {
+	return t.overflow
 }
 
 // Subset returns a sorted list of the glyphs used.
-func (gd *GlyphData) Subset() []glyph.ID {
+func (t *Table) Subset() []glyph.ID {
 	gidIsUsed := make(map[glyph.ID]struct{})
 	gidIsUsed[0] = struct{}{} // always include .notdef
-	for k := range gd.code {
+	for k := range t.code {
 		gidIsUsed[k.gid] = struct{}{}
 	}
 	glyphs := maps.Keys(gidIsUsed)
@@ -258,37 +287,84 @@ func (gd *GlyphData) Subset() []glyph.ID {
 }
 
 // Encoding returns the Type1 encoding corresponding to the glyph data.
-func (gd *GlyphData) Encoding() encoding.Type1 {
+func (t *Table) Encoding() encoding.Type1 {
 	enc := make(map[byte]string)
-	for k, c := range gd.code {
-		enc[c] = gd.glyphName[k.gid]
+	for k, c := range t.code {
+		enc[c] = t.glyphName[k.gid]
 	}
 	return func(c byte) string { return enc[c] }
 }
 
 // DefaultWidth returns a good value for the DefaultWidth entry in the font
 // descriptor.
-func (gd *GlyphData) DefaultWidth() float64 {
-	_, w1, _ := gd.Get(0)
+func (t *Table) DefaultWidth() float64 {
+	w1 := t.Width(0)
 	n1 := 1
 	for c := 1; c < 256; c++ {
-		if _, w, _ := gd.Get(byte(c)); w != w1 {
+		if w := t.Width(byte(c)); w != w1 {
 			break
 		}
 		n1++
 	}
 
-	_, w2, _ := gd.Get(255)
+	w2 := t.Width(255)
 	n2 := 1
 	for c := 254; c >= 0; c-- {
-		if _, w, _ := gd.Get(byte(c)); w != w2 {
+		if w := t.Width(byte(c)); w != w2 {
 			break
 		}
 		n2++
 	}
 
-	if n1 >= n2 {
+	if max(n1, n2) == 1 && w1 != w2 {
+		// Only one value would be covered by the default width.
+		// We can just as well store this one value in the Widths array
+		// instead of in the font descriptor.
+		return 0
+	} else if n1 >= n2 {
 		return w1
 	}
 	return w2
 }
+
+// Codes returns an iterator over the characters in the PDF string. Each code
+// includes the CID, width, and associated text. Missing glyphs map to CID 0
+// (notdef).
+func (t *Table) Codes(s pdf.String) iter.Seq[*font.Code] {
+	return func(yield func(*font.Code) bool) {
+		var code font.Code
+		for _, c := range s {
+			info := t.get(c)
+			if info.GID == 0 {
+				code.CID = 0
+			} else {
+				code.CID = cid.CID(c) + 1 // CID 0 is reserved for .notdef
+			}
+			code.Width = info.Width
+			code.Text = info.Text
+
+			if !yield(&code) {
+				return
+			}
+		}
+	}
+}
+
+// IsSymbolic returns true if glyphs outside the standard Latin character set
+// are used.
+func (t *Table) IsSymbolic() bool {
+	for glyphName := range t.glyphNameUsed {
+		if glyphName == ".notdef" {
+			continue
+		}
+		if !pdfenc.StandardLatin.Has[glyphName] {
+			return true
+		}
+	}
+	return false
+}
+
+var (
+	ErrDuplicateCode = errors.New("duplicate code")
+	ErrOverflow      = errors.New("too many glyphs")
+)

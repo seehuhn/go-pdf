@@ -90,11 +90,11 @@ func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
 	}
 
 	qv := info.FontMatrix[3] * 1000
-	ascent := float64(info.Ascent) * qv
-	descent := float64(info.Descent) * qv
-	leading := float64(info.Ascent-info.Descent+info.LineGap) * qv
-	capHeight := float64(info.CapHeight) * qv
-	xHeight := float64(info.XHeight) * qv
+	ascent := math.Round(float64(info.Ascent) * qv)
+	descent := math.Round(float64(info.Descent) * qv)
+	leading := math.Round(float64(info.Ascent-info.Descent+info.LineGap) * qv)
+	capHeight := math.Round(float64(info.CapHeight) * qv)
+	xHeight := math.Round(float64(info.XHeight) * qv)
 
 	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
 	if err != nil {
@@ -110,11 +110,11 @@ func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
 		IsSerif:  info.IsSerif,
 		IsScript: info.IsScript,
 
-		Ascent:    math.Round(ascent),
-		Descent:   math.Round(descent),
-		Leading:   math.Round(leading),
-		CapHeight: math.Round(capHeight),
-		XHeight:   math.Round(xHeight),
+		Ascent:    ascent,
+		Descent:   descent,
+		Leading:   leading,
+		CapHeight: capHeight,
+		XHeight:   xHeight,
 
 		layouter: layouter,
 	}

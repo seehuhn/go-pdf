@@ -17,7 +17,6 @@
 package truetype
 
 import (
-	"fmt"
 	"math"
 
 	pscid "seehuhn.de/go/postscript/cid"
@@ -81,10 +80,7 @@ func (f *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 	// subset the font
 	subsetGID := f.CIDEncoder.Subset()
 	subsetTag := subset.Tag(subsetGID, origTTF.NumGlyphs())
-	subsetSfnt, err := origTTF.Subset(subsetGID)
-	if err != nil {
-		return fmt.Errorf("TrueType font subset: %w", err)
-	}
+	subsetSfnt := origTTF.Subset(subsetGID)
 
 	toUnicode := f.ToUnicode()
 	cmapInfo := f.CMap()
@@ -156,7 +152,7 @@ func (f *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 
 	fontType := glyphdata.TrueType
 	fontRef := rm.Out.Alloc()
-	err = opentypeglyphs.Embed(f.w, fontType, fontRef, subsetSfnt)
+	err := opentypeglyphs.Embed(f.w, fontType, fontRef, subsetSfnt)
 	if err != nil {
 		return err
 	}

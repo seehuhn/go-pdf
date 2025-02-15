@@ -21,7 +21,7 @@ import "fmt"
 type Type int
 
 const (
-	// None indicates that no glyph data is embedded.
+	// None indicates that no glyph outlines are embedded.
 	None Type = iota
 
 	CFF

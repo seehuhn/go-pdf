@@ -303,6 +303,7 @@ func (d *Descriptor) AsDict() pdf.Dict {
 		}
 	}
 	if d.Ascent != 0 {
+		// TODO(voss): required, except for Type 3 fonts
 		dict["Ascent"] = pdf.Number(d.Ascent)
 	}
 	if d.Descent != 0 {

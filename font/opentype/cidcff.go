@@ -17,7 +17,6 @@
 package opentype
 
 import (
-	"fmt"
 	"math"
 
 	"seehuhn.de/go/geom/matrix"
@@ -85,10 +84,7 @@ func (f *embeddedCFFComposite) Finish(rm *pdf.ResourceManager) error {
 	// subset the font
 	subsetGID := f.CIDEncoder.Subset()
 	subsetTag := subset.Tag(subsetGID, origSfnt.NumGlyphs())
-	subsetOTF, err := origSfnt.Subset(subsetGID)
-	if err != nil {
-		return fmt.Errorf("OpenType/CFF font subset: %w", err)
-	}
+	subsetOTF := origSfnt.Subset(subsetGID)
 
 	origGIDToCID := f.GIDToCID.GIDToCID(origSfnt.NumGlyphs())
 	gidToCID := make([]pscid.CID, len(subsetGID))
@@ -188,7 +184,7 @@ func (f *embeddedCFFComposite) Finish(rm *pdf.ResourceManager) error {
 
 	fontType := glyphdata.OpenTypeCFF
 	fontRef := rm.Out.Alloc()
-	err = opentypeglyphs.Embed(rm.Out, fontType, fontRef, subsetOTF)
+	err := opentypeglyphs.Embed(rm.Out, fontType, fontRef, subsetOTF)
 	if err != nil {
 		return err
 	}

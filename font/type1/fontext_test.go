@@ -17,6 +17,7 @@
 package type1_test
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -105,12 +106,23 @@ func TestTextContent(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	os.WriteFile("debug.pdf", mem.Data, 0644)
+
 	// step 2: extract the encoded string from the content stream
 	var textString pdf.String
 	r := reader.New(page.Out, nil)
 	r.EveryOp = func(op string, args []pdf.Object) error {
-		if op == "Tj" {
-			textString = args[0].(pdf.String)
+		switch op {
+		case "Tj":
+			textString = append(textString, args[0].(pdf.String)...)
+		case "TJ":
+			a := args[0].(pdf.Array)
+			for _, arg := range a {
+				switch arg := arg.(type) {
+				case pdf.String:
+					textString = append(textString, arg...)
+				}
+			}
 		}
 		return nil
 	}

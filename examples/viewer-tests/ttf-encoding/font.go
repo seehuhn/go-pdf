@@ -253,10 +253,7 @@ func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Font, error) {
 
 	// build the subset	font
 
-	newTTF, err := fb.base.Subset(glyphs)
-	if err != nil {
-		return nil, fmt.Errorf("gofont: %w", err)
-	}
+	newTTF := fb.base.Subset(glyphs)
 	newTTF.CMapTable = make(sfntcmap.Table)
 	newTTF.FamilyName = fmt.Sprintf("Test%03d", fb.num)
 	fb.num++

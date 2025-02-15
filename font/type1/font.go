@@ -18,9 +18,7 @@ package type1
 
 import (
 	"errors"
-	"fmt"
 	"math"
-	"slices"
 
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/postscript/afm"
@@ -29,16 +27,9 @@ import (
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt/glyph"
-	"seehuhn.de/go/sfnt/os2"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/dict"
-	"seehuhn.de/go/pdf/font/encoding"
-	"seehuhn.de/go/pdf/font/glyphdata"
-	"seehuhn.de/go/pdf/font/glyphdata/type1glyphs"
-	"seehuhn.de/go/pdf/font/pdfenc"
-	"seehuhn.de/go/pdf/font/subset"
 )
 
 // Instance is a Type 1 font instance which can be embedded into a PDF file.
@@ -171,6 +162,9 @@ func isConsistent(F *type1.Font, M *afm.Metrics) bool {
 
 // PostScriptName returns the PostScript name of the font.
 func (f *Instance) PostScriptName() string {
+	if f.Metrics != nil {
+		return f.Metrics.FontName
+	}
 	return f.Font.FontInfo.FontName
 }
 
@@ -214,223 +208,24 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 	return seq
 }
 
+func (f *Instance) GlyphWidthPDF(glyphName string) float64 {
+	if f.Metrics != nil {
+		return f.Metrics.GlyphWidthPDF(glyphName)
+	} else {
+		return f.Font.GlyphWidthPDF(glyphName)
+	}
+}
+
 // Embed adds the font to a PDF file.
 //
 // This implements the [font.Font] interface.
 func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
-	psFont := f.Font
-	metrics := f.Metrics
-
-	glyphNames := psFont.GlyphList()
-
-	w := rm.Out
-	ref := w.Alloc()
-	res := &embeddedSimple{
-		ref: ref,
-		w:   w,
-
-		psFont:     psFont,
-		metrics:    metrics,
-		isSerif:    f.IsSerif,
-		isScript:   f.IsScript,
-		isAllCap:   f.IsAllCap,
-		isSmallCap: f.IsSmallCap,
-		glyphNames: glyphNames,
-		widths:     f.Widths,
-
-		SimpleEncoder: encoding.NewSimpleEncoder(),
-	}
+	ref := rm.Out.Alloc()
+	res := newEmbeddedSimple(ref, f)
 	return ref, res, nil
-}
-
-type embeddedSimple struct {
-	w   *pdf.Writer
-	ref pdf.Reference
-
-	psFont     *type1.Font
-	metrics    *afm.Metrics
-	isSerif    bool
-	isScript   bool
-	isAllCap   bool
-	isSmallCap bool
-	glyphNames []string
-	widths     []float64
-
-	*encoding.SimpleEncoder
-
-	closed bool
-}
-
-func (f *embeddedSimple) DecodeWidth(s pdf.String) (float64, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-	gid := f.Encoding[s[0]]
-	return f.widths[gid], 1
-}
-
-func (f *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
-	c := f.GIDToCode(gid, text)
-	return append(s, c), f.widths[gid]
-}
-
-func (f *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
-	if f.closed {
-		return nil
-	}
-	f.closed = true
-
-	if f.SimpleEncoder.Overflow() {
-		fontName := f.psFont.FontInfo.FontName
-		return fmt.Errorf("too many distinct glyphs used in font %q",
-			fontName)
-	}
-
-	encoding := make([]string, 256)
-	ww := make([]float64, 256)
-	for c, gid := range f.Encoding {
-		if !f.CodeIsUsed(byte(c)) {
-			continue
-		}
-		encoding[c] = f.glyphNames[gid]
-		ww[c] = f.widths[gid] * 1000
-	}
-
-	fontData := f.psFont
-	metricsData := f.metrics
-	var subsetTag string
-
-	var postScriptName string
-	if fontData != nil {
-		postScriptName = fontData.FontName
-	} else {
-		postScriptName = metricsData.FontName
-	}
-
-	omitFontData := isStandard(postScriptName, encoding, ww)
-	if !omitFontData { // only subset the font, if the font is embedded
-		psFull := f.psFont
-
-		// make sure notdefForce is listed in the Differences array
-		e2 := slices.Clone(encoding)
-		for i, name := range e2 {
-			if name == notdefForce {
-				e2[i] = ".notdef"
-			}
-		}
-
-		psSubset := clone(psFull)
-		psSubset.Glyphs = make(map[string]*type1.Glyph)
-		if _, ok := psFull.Glyphs[".notdef"]; ok {
-			psSubset.Glyphs[".notdef"] = psFull.Glyphs[".notdef"]
-		}
-		for _, name := range encoding {
-			if _, ok := psFull.Glyphs[name]; ok {
-				psSubset.Glyphs[name] = psFull.Glyphs[name]
-			}
-		}
-		psSubset.Encoding = e2
-		fontData = psSubset
-
-		if metricsData != nil {
-			metricsSubset := clone(metricsData)
-			metricsSubset.Glyphs = make(map[string]*afm.GlyphInfo)
-
-			if _, ok := metricsData.Glyphs[".notdef"]; ok {
-				metricsSubset.Glyphs[".notdef"] = metricsData.Glyphs[".notdef"]
-			}
-			for _, name := range encoding {
-				if _, ok := metricsData.Glyphs[name]; ok {
-					metricsSubset.Glyphs[name] = metricsData.Glyphs[name]
-				}
-			}
-			metricsSubset.Encoding = e2
-			metricsData = metricsSubset
-		}
-
-		var ss []glyph.ID
-		for origGid, name := range f.glyphNames {
-			if _, ok := psSubset.Glyphs[name]; ok {
-				ss = append(ss, glyph.ID(origGid))
-			}
-		}
-		subsetTag = subset.Tag(ss, psFull.NumGlyphs())
-	}
-
-	fd := &font.Descriptor{
-		FontName:   subset.Join(subsetTag, postScriptName),
-		IsSerif:    f.isSerif,
-		IsSymbolic: isSymbolic(fontData),
-	}
-	if fontData != nil {
-		fd.FontFamily = fontData.FamilyName
-		fd.FontWeight = os2.WeightFromString(fontData.Weight)
-		fd.FontBBox = fontData.FontBBoxPDF().Rounded()
-		fd.IsItalic = fontData.ItalicAngle != 0
-		fd.ItalicAngle = fontData.ItalicAngle
-		fd.IsFixedPitch = fontData.IsFixedPitch
-		fd.ForceBold = fontData.Private.ForceBold
-		fd.StemV = fontData.Private.StdVW
-		fd.StemH = fontData.Private.StdHW
-	}
-	if metricsData != nil {
-		fd.FontBBox = metricsData.FontBBoxPDF().Rounded()
-		fd.CapHeight = math.Round(metricsData.CapHeight)
-		fd.XHeight = math.Round(metricsData.XHeight)
-		fd.Ascent = math.Round(metricsData.Ascent)
-		fd.Descent = math.Round(metricsData.Descent)
-		fd.IsItalic = metricsData.ItalicAngle != 0
-		fd.ItalicAngle = metricsData.ItalicAngle
-		fd.IsFixedPitch = metricsData.IsFixedPitch
-	}
-	dict := &dict.Type1{
-		Ref:            f.ref,
-		PostScriptName: postScriptName,
-		SubsetTag:      subsetTag,
-		Descriptor:     fd,
-		Encoding: func(code byte) string {
-			return encoding[code]
-		},
-	}
-	copy(dict.Width[:], ww)
-
-	toUniMap := f.ToUnicode()
-	for code, text := range toUniMap {
-		dict.Text[code[0]] = text
-	}
-	if !omitFontData {
-		fontType := glyphdata.Type1
-		fontRef := rm.Out.Alloc()
-		err := type1glyphs.Embed(rm.Out, fontType, fontRef, fontData)
-		if err != nil {
-			return err
-		}
-
-		dict.FontType = fontType
-		dict.FontRef = fontRef
-	}
-
-	return dict.WriteToPDF(rm)
-}
-
-func isSymbolic(f *type1.Font) bool {
-	for glyphName := range f.Glyphs {
-		if glyphName == ".notdef" {
-			continue
-		}
-		if !pdfenc.StandardLatin.Has[glyphName] {
-			return true
-		}
-	}
-	return false
 }
 
 func clone[T any](x *T) *T {
 	y := *x
 	return &y
 }
-
-// NotdefForce is a glyph name which is unlikely to be used by any real-world
-// font. We map code points to this glyph name, when the user requests to
-// typeset the .notdef glyph.
-const notdefForce = ".notdef.force"

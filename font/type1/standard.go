@@ -17,9 +17,9 @@
 package type1
 
 import (
-	"fmt"
 	"math"
 
+	"seehuhn.de/go/pdf/font/encoding/simpleenc"
 	"seehuhn.de/go/pdf/internal/stdmtx"
 )
 
@@ -29,41 +29,31 @@ import (
 //
 // ww must be the widths of the 256 encoded characters, given in PDF text space
 // units times 1000.
-func isStandard(fontName string, enc []string, ww []float64) bool {
+func isStandard(fontName string, t *simpleenc.Table) bool {
 	m, ok := stdmtx.Metrics[fontName]
 	if !ok {
 		return false
 	}
 
-	for i, glyphName := range enc {
-		if glyphName == "" || glyphName == ".notdef" || glyphName == notdefForce {
+	for code := range 256 {
+		if !t.IsUsed(byte(code)) {
 			continue
 		}
-		w, ok := m.Width[glyphName]
+
+		gid := t.GID(byte(code))
+		glyphName := t.GlyphName(gid)
+
+		wStd, ok := m.Width[glyphName]
 		if !ok {
+			// The glyph is not in the standard font.
 			return false
 		}
-		if math.Abs(ww[i]-w) > 0.5 {
+
+		wOurs := t.Width(byte(code))
+
+		if math.Abs(wStd-wOurs) > 0.5 {
 			return false
 		}
 	}
 	return true
-}
-
-// GetStandardWidth returns the width of glyphs in the 14 standard PDF fonts.
-// The width is given in PDF glyph space units (i.e. are multiplied by 1000).
-//
-// TODO(voss): remove
-func GetStandardWidth(fontName, glyphName string) (float64, error) {
-	m, ok := stdmtx.Metrics[fontName]
-	if !ok {
-		return 0, fmt.Errorf("unknown standard font %q", fontName)
-	}
-
-	w, ok := m.Width[glyphName]
-	if !ok {
-		return 0, fmt.Errorf("unknown glyph %q in font %q", glyphName, fontName)
-	}
-
-	return w, nil
 }

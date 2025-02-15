@@ -31,6 +31,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/encoding/simpleenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/cffglyphs"
 	"seehuhn.de/go/pdf/font/pdfenc"
@@ -44,7 +45,7 @@ var _ interface {
 } = (*embeddedSimple)(nil)
 
 // embeddedSimple represents an [Instance] which has been embedded in a PDF
-// file if the Composite option is not set.  There should be at most one
+// file, if the Composite option is not set.  There should be at most one
 // embeddedSimple for each [Instance] in a PDF file.
 type embeddedSimple struct {
 	Ref  pdf.Reference
@@ -61,7 +62,7 @@ type embeddedSimple struct {
 	CapHeight float64 // PDF glyph space units
 	XHeight   float64 // PDF glyph space units
 
-	gd *GlyphData
+	gd *simpleenc.Table
 
 	finished bool
 }
@@ -79,7 +80,7 @@ func newEmbeddedSimple(ref pdf.Reference, f *Instance) *embeddedSimple {
 		Leading:   f.Leading,
 		CapHeight: f.CapHeight,
 		XHeight:   f.XHeight,
-		gd: NewGlyphData(
+		gd: simpleenc.NewTable(
 			math.Round(f.Font.GlyphWidthPDF(0)),
 			f.Font.FontName == "ZapfDingbats",
 			&pdfenc.WinAnsi,
@@ -89,30 +90,21 @@ func newEmbeddedSimple(ref pdf.Reference, f *Instance) *embeddedSimple {
 	return e
 }
 
+// WritingMode implements the [font.Embedded] interface.
 func (*embeddedSimple) WritingMode() cmap.WritingMode {
 	return cmap.Horizontal
 }
 
-// Codes returns an iterator over the characters in the PDF string. Each code
-// includes the CID, width, and associated text. Missing glyphs map to CID 0
-// (notdef).
+// Codes iterates over the character codes in a PDF string.
 func (e *embeddedSimple) Codes(s pdf.String) iter.Seq[*font.Code] {
-	return func(yield func(*font.Code) bool) {
-		var code font.Code
-		for _, c := range s {
-			code.CID, code.Width, code.Text = e.gd.Get(c)
-			if !yield(&code) {
-				return
-			}
-		}
-	}
+	return e.gd.Codes(s)
 }
 
 func (e *embeddedSimple) DecodeWidth(s pdf.String) (float64, int) {
 	if len(s) == 0 {
 		return 0, 0
 	}
-	_, w, _ := e.gd.Get(s[0])
+	w := e.gd.Width(s[0])
 	return w / 1000, 1
 }
 
@@ -123,15 +115,16 @@ func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) 
 			return s, 0
 		}
 
+		glyphName := e.Font.Outlines.Glyphs[gid].Name
 		width := math.Round(e.Font.GlyphWidthPDF(gid))
 		var err error
-		c, err = e.gd.NewCode(gid, e.Font.Outlines.Glyphs[gid].Name, text, width)
+		c, err = e.gd.NewCode(gid, glyphName, text, width)
 		if err != nil {
 			return s, 0
 		}
 	}
 
-	_, w, _ := e.gd.Get(c)
+	w := e.gd.Width(c)
 	return append(s, c), w / 1000
 }
 
@@ -144,7 +137,8 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	e.finished = true
 
 	if e.gd.Overflow() {
-		return fmt.Errorf("too many distinct glyphs used in font %q", e.Font.FontName)
+		return fmt.Errorf("too many distinct glyphs used in font %q",
+			e.Font.FontName)
 	}
 
 	fontInfo := e.Font.FontInfo
@@ -187,51 +181,44 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	// minimise font size.
 	subsetOutlines.Encoding = cff.StandardEncoding(subsetOutlines.Glyphs)
 
-	subsetCFF := &cff.Font{
+	subsetFont := &cff.Font{
 		FontInfo: fontInfo,
 		Outlines: subsetOutlines,
 	}
 
 	// construct the font dictionary and font descriptor
-	isSymbolic := false
-	for _, gid := range glyphs {
-		if gid == 0 {
-			continue
-		}
-		if !pdfenc.StandardLatin.Has[e.gd.GlyphName(gid)] {
-			isSymbolic = true
-			break
-		}
-	}
+	qh := subsetFont.FontMatrix[0] * 1000
+	qv := subsetFont.FontMatrix[3] * 1000
 
-	qh := subsetCFF.FontMatrix[0] * 1000
-	qv := subsetCFF.FontMatrix[3] * 1000
+	italicAngle := math.Round(subsetFont.ItalicAngle*10) / 10
+
+	postScriptName := subsetFont.FontName
 
 	fd := &font.Descriptor{
-		FontName:     subset.Join(subsetTag, e.Font.FontName),
-		FontFamily:   subsetCFF.FamilyName,
+		FontName:     subset.Join(subsetTag, postScriptName),
+		FontFamily:   subsetFont.FamilyName,
 		FontStretch:  e.Stretch,
 		FontWeight:   e.Weight,
-		IsFixedPitch: subsetCFF.IsFixedPitch,
+		IsFixedPitch: subsetFont.IsFixedPitch,
 		IsSerif:      e.IsSerif,
-		IsSymbolic:   isSymbolic,
+		IsSymbolic:   e.gd.IsSymbolic(),
 		IsScript:     e.IsScript,
-		IsItalic:     subsetCFF.ItalicAngle != 0,
-		ForceBold:    subsetCFF.Private[0].ForceBold,
-		FontBBox:     subsetCFF.FontBBoxPDF().Rounded(),
-		ItalicAngle:  subsetCFF.ItalicAngle,
+		IsItalic:     italicAngle != 0,
+		ForceBold:    subsetFont.Private[0].ForceBold,
+		FontBBox:     subsetFont.FontBBoxPDF().Rounded(),
+		ItalicAngle:  italicAngle,
 		Ascent:       e.Ascent,
 		Descent:      e.Descent,
 		Leading:      e.Leading,
 		CapHeight:    e.CapHeight,
 		XHeight:      e.XHeight,
-		StemV:        math.Round(subsetCFF.Private[0].StdVW * qh),
-		StemH:        math.Round(subsetCFF.Private[0].StdHW * qv),
+		StemV:        math.Round(subsetFont.Private[0].StdVW * qh),
+		StemH:        math.Round(subsetFont.Private[0].StdHW * qv),
 		MissingWidth: e.gd.DefaultWidth(),
 	}
-	dict := dict.Type1{
+	dict := &dict.Type1{
 		Ref:            e.Ref,
-		PostScriptName: e.Font.FontName,
+		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
 		Encoding:       e.gd.Encoding(),
@@ -239,7 +226,11 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		FontRef:        rm.Out.Alloc(),
 	}
 	for c := range 256 {
-		_, dict.Width[c], dict.Text[c] = e.gd.Get(byte(c))
+		if !e.gd.IsUsed(byte(c)) {
+			continue
+		}
+		dict.Width[c] = e.gd.Width(byte(c))
+		dict.Text[c] = e.gd.Text(byte(c))
 	}
 
 	err := dict.WriteToPDF(rm)
@@ -247,7 +238,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		return err
 	}
 
-	err = cffglyphs.Embed(rm.Out, dict.FontType, dict.FontRef, subsetCFF)
+	err = cffglyphs.Embed(rm.Out, dict.FontType, dict.FontRef, subsetFont)
 	if err != nil {
 		return err
 	}
