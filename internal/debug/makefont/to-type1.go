@@ -185,6 +185,9 @@ func toAFM(info *sfnt.Font) (*afm.Metrics, error) {
 	info = clone(info)
 	info.EnsureGlyphNames()
 
+	qh := info.FontMatrix[0] * 1000
+	qv := info.FontMatrix[3] * 1000
+
 	n := info.NumGlyphs()
 	newGlyphs := make(map[string]*afm.GlyphInfo, n)
 	for i := 0; i < n; i++ {
@@ -192,13 +195,13 @@ func toAFM(info *sfnt.Font) (*afm.Metrics, error) {
 		name := info.GlyphName(gid)
 		bbox := info.GlyphBBox(gid)
 		bboxAFM := rect.Rect{ // TODO(voss): use the font matrix
-			LLx: float64(bbox.LLx) / float64(info.UnitsPerEm) * 1000,
-			LLy: float64(bbox.LLy) / float64(info.UnitsPerEm) * 1000,
-			URx: float64(bbox.URx) / float64(info.UnitsPerEm) * 1000,
-			URy: float64(bbox.URy) / float64(info.UnitsPerEm) * 1000,
+			LLx: float64(bbox.LLx) * qh,
+			LLy: float64(bbox.LLy) * qh,
+			URx: float64(bbox.URx) * qh,
+			URy: float64(bbox.URy) * qh,
 		}
 		newGlyphs[name] = &afm.GlyphInfo{
-			WidthX: float64(info.GlyphWidth(gid)),
+			WidthX: info.GlyphWidthPDF(gid),
 			BBox:   bboxAFM,
 			// TODO(voss): ligatures
 		}
@@ -214,18 +217,17 @@ func toAFM(info *sfnt.Font) (*afm.Metrics, error) {
 		}
 	}
 
-	q := 1000.0 / float64(info.UnitsPerEm)
 	res := &afm.Metrics{
 		Glyphs:             newGlyphs,
 		Encoding:           encoding,
 		FontName:           info.PostScriptName(),
 		FullName:           info.FullName(),
-		CapHeight:          info.CapHeight.AsFloat(q),
-		XHeight:            info.XHeight.AsFloat(q),
-		Ascent:             info.Ascent.AsFloat(q),
-		Descent:            info.Descent.AsFloat(q),
-		UnderlinePosition:  float64(info.UnderlinePosition) * q,
-		UnderlineThickness: float64(info.UnderlineThickness) * q,
+		CapHeight:          info.CapHeight.AsFloat(qv),
+		XHeight:            info.XHeight.AsFloat(qv),
+		Ascent:             info.Ascent.AsFloat(qv),
+		Descent:            info.Descent.AsFloat(qv),
+		UnderlinePosition:  float64(info.UnderlinePosition) * qv,
+		UnderlineThickness: float64(info.UnderlineThickness) * qv,
 		ItalicAngle:        info.ItalicAngle,
 		IsFixedPitch:       info.IsFixedPitch(),
 		// TODO(voss): kerning

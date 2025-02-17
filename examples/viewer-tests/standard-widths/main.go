@@ -18,17 +18,18 @@ package main
 
 import (
 	"log"
-	"math"
 
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/rect"
 
 	"seehuhn.de/go/sfnt/glyph"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/font/type3"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -64,33 +65,36 @@ func run(filename string) error {
 	descent := geom.Descent * fontSize
 	leading := ascent - descent
 
-	builder := type3.NewBuilder(doc.RM)
 	markerWidth := 1.0 / fontSize * 1000
-	markerAscent := funit.Int16(math.Round(ascent / fontSize * 1000))
-	markerDescent := funit.Int16(math.Round(descent / fontSize * 1000))
-	bbox := funit.Rect16{
-		LLx: 0,
-		LLy: markerDescent,
-		URx: funit.Int16(math.Round(markerWidth)),
-		URy: markerAscent,
+	markerAscent := ascent / fontSize * 1000
+	markerDescent := descent / fontSize * 1000
+	markerFont := &type3.Font{
+		Glyphs: []*type3.Glyph{
+			{},
+			{
+				Name:  "I",
+				Width: markerWidth,
+				BBox: rect.Rect{
+					LLx: 0,
+					LLy: markerDescent,
+					URx: markerWidth,
+					URy: markerAscent,
+				},
+				Draw: func(w *graphics.Writer) {
+					w.Rectangle(0, float64(markerDescent),
+						markerWidth, float64(markerAscent)-float64(markerDescent))
+					w.Fill()
+				},
+			},
+		},
+		FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},
 	}
-	// TODO(voss): why does "|" instead of "I" not work?
-	g, err := builder.AddGlyph("I", markerWidth, bbox, true)
-	if err != nil {
-		return err
+	M := &type3.Instance{
+		Font: markerFont,
+		CMap: map[rune]glyph.ID{
+			'I': 1,
+		},
 	}
-	g.Rectangle(0, float64(markerDescent),
-		float64(markerWidth), float64(markerAscent)-float64(markerDescent))
-	g.Fill()
-	err = g.Close()
-	if err != nil {
-		return err
-	}
-
-	prop := &type3.Properties{
-		FontMatrix: [6]float64{0.001, 0, 0, 0.001, 0, 0},
-	}
-	M, err := builder.Finish(prop)
 
 	gid := glyph.ID(0)
 	numGlyphs := min(glyph.ID(len(geom.Widths)), 256)

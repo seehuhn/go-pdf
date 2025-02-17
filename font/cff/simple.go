@@ -18,7 +18,6 @@ package cff
 
 import (
 	"fmt"
-	"iter"
 	"math"
 
 	"seehuhn.de/go/geom/matrix"
@@ -29,7 +28,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
@@ -62,7 +60,7 @@ type embeddedSimple struct {
 	CapHeight float64 // PDF glyph space units
 	XHeight   float64 // PDF glyph space units
 
-	gd *simpleenc.Table
+	*simpleenc.Table
 
 	finished bool
 }
@@ -80,7 +78,7 @@ func newEmbeddedSimple(ref pdf.Reference, f *Instance) *embeddedSimple {
 		Leading:   f.Leading,
 		CapHeight: f.CapHeight,
 		XHeight:   f.XHeight,
-		gd: simpleenc.NewTable(
+		Table: simpleenc.NewTable(
 			math.Round(f.Font.GlyphWidthPDF(0)),
 			f.Font.FontName == "ZapfDingbats",
 			&pdfenc.WinAnsi,
@@ -90,26 +88,8 @@ func newEmbeddedSimple(ref pdf.Reference, f *Instance) *embeddedSimple {
 	return e
 }
 
-// WritingMode implements the [font.Embedded] interface.
-func (*embeddedSimple) WritingMode() cmap.WritingMode {
-	return cmap.Horizontal
-}
-
-// Codes iterates over the character codes in a PDF string.
-func (e *embeddedSimple) Codes(s pdf.String) iter.Seq[*font.Code] {
-	return e.gd.Codes(s)
-}
-
-func (e *embeddedSimple) DecodeWidth(s pdf.String) (float64, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-	w := e.gd.Width(s[0])
-	return w / 1000, 1
-}
-
 func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
-	c, ok := e.gd.Code(gid, text)
+	c, ok := e.Table.GetCode(gid, text)
 	if !ok {
 		if e.finished {
 			return s, 0
@@ -118,13 +98,13 @@ func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) 
 		glyphName := e.Font.Outlines.Glyphs[gid].Name
 		width := math.Round(e.Font.GlyphWidthPDF(gid))
 		var err error
-		c, err = e.gd.NewCode(gid, glyphName, text, width)
+		c, err = e.Table.AllocateCode(gid, glyphName, text, width)
 		if err != nil {
 			return s, 0
 		}
 	}
 
-	w := e.gd.Width(c)
+	w := e.Table.Width(c)
 	return append(s, c), w / 1000
 }
 
@@ -136,7 +116,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	}
 	e.finished = true
 
-	if e.gd.Overflow() {
+	if e.Table.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q",
 			e.Font.FontName)
 	}
@@ -145,7 +125,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	outlines := e.Font.Outlines
 
 	// subset the font, if needed
-	glyphs := e.gd.Subset()
+	glyphs := e.Table.Glyphs()
 	subsetTag := subset.Tag(glyphs, outlines.NumGlyphs())
 	var subsetOutlines *cff.Outlines
 	if subsetTag != "" {
@@ -167,7 +147,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	subsetOutlines.FontMatrices = nil
 	for gid, origGID := range glyphs { // fill in the glyph names
 		g := subsetOutlines.Glyphs[gid]
-		glyphName := e.gd.GlyphName(origGID)
+		glyphName := e.Table.GlyphName(origGID)
 		if g.Name == glyphName {
 			continue
 		}
@@ -201,7 +181,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		FontWeight:   e.Weight,
 		IsFixedPitch: subsetFont.IsFixedPitch,
 		IsSerif:      e.IsSerif,
-		IsSymbolic:   e.gd.IsSymbolic(),
+		IsSymbolic:   e.Table.IsSymbolic(),
 		IsScript:     e.IsScript,
 		IsItalic:     italicAngle != 0,
 		ForceBold:    subsetFont.Private[0].ForceBold,
@@ -214,23 +194,23 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		XHeight:      e.XHeight,
 		StemV:        math.Round(subsetFont.Private[0].StdVW * qh),
 		StemH:        math.Round(subsetFont.Private[0].StdHW * qv),
-		MissingWidth: e.gd.DefaultWidth(),
+		MissingWidth: e.Table.DefaultWidth(),
 	}
 	dict := &dict.Type1{
 		Ref:            e.Ref,
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
-		Encoding:       e.gd.Encoding(),
+		Encoding:       e.Table.Encoding(),
 		FontType:       glyphdata.CFFSimple,
 		FontRef:        rm.Out.Alloc(),
 	}
 	for c := range 256 {
-		if !e.gd.IsUsed(byte(c)) {
+		if !e.Table.IsUsed(byte(c)) {
 			continue
 		}
-		dict.Width[c] = e.gd.Width(byte(c))
-		dict.Text[c] = e.gd.Text(byte(c))
+		dict.Width[c] = e.Table.Width(byte(c))
+		dict.Text[c] = e.Table.Text(byte(c))
 	}
 
 	err := dict.WriteToPDF(rm)

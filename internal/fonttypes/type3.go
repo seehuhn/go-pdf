@@ -17,14 +17,13 @@
 package fonttypes
 
 import (
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
 )
 
 // Type3 is a Type 3 font.
-var Type3 = func(rm *pdf.ResourceManager) font.Layouter {
-	F, err := makefont.Type3(rm)
+var Type3 = func() font.Layouter {
+	F, err := makefont.Type3()
 	if err != nil {
 		panic(err)
 	}

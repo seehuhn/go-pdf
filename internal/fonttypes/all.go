@@ -17,7 +17,6 @@
 package fonttypes
 
 import (
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 )
 
@@ -26,7 +25,7 @@ type Sample struct {
 	Label       string
 	Description string
 	Type        font.EmbeddingTypeOld
-	MakeFont    func(*pdf.ResourceManager) font.Layouter
+	MakeFont    func() font.Layouter
 }
 
 // All is a list of example fonts, covering all supported font and

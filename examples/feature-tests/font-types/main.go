@@ -99,7 +99,7 @@ func doit() error {
 
 		fmt.Println("-", title)
 
-		var gen func(rm *pdf.ResourceManager) font.Layouter
+		var gen func() font.Layouter
 		var ffKey pdf.Name
 		switch title {
 		case "Simple PDF Fonts":
@@ -144,7 +144,7 @@ func doit() error {
 		}
 		var X font.Font
 		if gen != nil {
-			X = gen(doc.RM)
+			X = gen()
 		}
 
 		page := doc.AddPage()
@@ -322,7 +322,7 @@ func doit() error {
 	return nil
 }
 
-func writeSinglePage(gen func(*pdf.ResourceManager) font.Layouter, no int) error {
+func writeSinglePage(gen func() font.Layouter, no int) error {
 	fname := fmt.Sprintf("test%02d.pdf", no)
 
 	opt := &pdf.WriterOptions{
@@ -333,7 +333,7 @@ func writeSinglePage(gen func(*pdf.ResourceManager) font.Layouter, no int) error
 		return err
 	}
 
-	F := gen(page.RM)
+	F := gen()
 
 	page.TextBegin()
 	page.TextFirstLine(72, 72)

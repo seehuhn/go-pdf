@@ -33,6 +33,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
 )
@@ -92,43 +93,15 @@ func NewTable(notdefWidth float64, isZapfDingbats bool, base *pdfenc.Encoding) *
 	return gd
 }
 
-// IsUsed returns true if the given code is used.
-func (t *Table) IsUsed(c byte) bool {
-	_, ok := t.info[c]
-	return ok
-}
-
-// Code returns the code for the given glyph ID and text.
+// GetCode returns the code for the given glyph ID and text.
 // If the code is not found, the function returns (0,false).
-func (t *Table) Code(gid glyph.ID, text string) (byte, bool) {
+func (t *Table) GetCode(gid glyph.ID, text string) (byte, bool) {
 	k := glyphKey{gid: gid, text: text}
 	c, ok := t.code[k]
 	return c, ok
 }
 
-func (t *Table) get(c byte) *codeInfo {
-	info, ok := t.info[c]
-	if !ok {
-		return t.notdef
-	}
-	return info
-}
-
-func (t *Table) GID(c byte) glyph.ID {
-	return t.get(c).GID
-}
-
-// Width returns the width of the glyph for the given code, in PDF glyph space
-// units.
-func (t *Table) Width(c byte) float64 {
-	return t.get(c).Width
-}
-
-func (t *Table) Text(c byte) string {
-	return t.get(c).Text
-}
-
-// NewCode allocates a new code for the given glyph ID and text. It also
+// AllocateCode allocates a new code for the given glyph ID and text. It also
 // allocates a unique glyph name for the glyph.
 //
 // The new glyph name is chosen using a heuristic based on baseGlyphName
@@ -139,7 +112,7 @@ func (t *Table) Text(c byte) string {
 //
 // Only 256 codes are available. Once all codes are used up, the function
 // returns an error.
-func (t *Table) NewCode(gid glyph.ID, baseGlyphName, text string, width float64) (byte, error) {
+func (t *Table) AllocateCode(gid glyph.ID, baseGlyphName, text string, width float64) (byte, error) {
 	key := glyphKey{gid: gid, text: text}
 	if _, ok := t.code[key]; ok {
 		return 0, ErrDuplicateCode
@@ -264,6 +237,34 @@ func isValid(s string) bool {
 	return true
 }
 
+// IsUsed returns true if the given code is used.
+func (t *Table) IsUsed(c byte) bool {
+	_, ok := t.info[c]
+	return ok
+}
+
+func (t *Table) get(c byte) *codeInfo {
+	info, ok := t.info[c]
+	if !ok {
+		return t.notdef
+	}
+	return info
+}
+
+func (t *Table) GID(c byte) glyph.ID {
+	return t.get(c).GID
+}
+
+// Width returns the width of the glyph for the given code, in PDF glyph space
+// units.
+func (t *Table) Width(c byte) float64 {
+	return t.get(c).Width
+}
+
+func (t *Table) Text(c byte) string {
+	return t.get(c).Text
+}
+
 // GlyphName returns the chosen glyph name for the given glyph ID.
 func (t *Table) GlyphName(gid glyph.ID) string {
 	return t.glyphName[gid]
@@ -274,8 +275,8 @@ func (t *Table) Overflow() bool {
 	return t.overflow
 }
 
-// Subset returns a sorted list of the glyphs used.
-func (t *Table) Subset() []glyph.ID {
+// Glyphs returns a sorted list of the glyphs used.
+func (t *Table) Glyphs() []glyph.ID {
 	gidIsUsed := make(map[glyph.ID]struct{})
 	gidIsUsed[0] = struct{}{} // always include .notdef
 	for k := range t.code {
@@ -295,7 +296,43 @@ func (t *Table) Encoding() encoding.Type1 {
 	return func(c byte) string { return enc[c] }
 }
 
-// DefaultWidth returns a good value for the DefaultWidth entry in the font
+// WritingMode implements the [font.Embedded] interface.
+func (*Table) WritingMode() cmap.WritingMode {
+	return cmap.Horizontal
+}
+
+// Codes returns an iterator over the characters in the PDF string. Each code
+// includes the CID, width, and associated text. Missing glyphs map to CID 0
+// (notdef).
+func (t *Table) Codes(s pdf.String) iter.Seq[*font.Code] {
+	return func(yield func(*font.Code) bool) {
+		var code font.Code
+		for _, c := range s {
+			info := t.get(c)
+			if info.GID == 0 {
+				code.CID = 0
+			} else {
+				code.CID = cid.CID(c) + 1 // CID 0 is reserved for .notdef
+			}
+			code.Width = info.Width
+			code.Text = info.Text
+
+			if !yield(&code) {
+				return
+			}
+		}
+	}
+}
+
+func (t *Table) DecodeWidth(s pdf.String) (float64, int) {
+	if len(s) == 0 {
+		return 0, 0
+	}
+	w := t.Width(s[0])
+	return w / 1000, 1
+}
+
+// DefaultWidth returns a good value for the MissingWidth entry in the font
 // descriptor.
 func (t *Table) DefaultWidth() float64 {
 	w1 := t.Width(0)
@@ -325,29 +362,6 @@ func (t *Table) DefaultWidth() float64 {
 		return w1
 	}
 	return w2
-}
-
-// Codes returns an iterator over the characters in the PDF string. Each code
-// includes the CID, width, and associated text. Missing glyphs map to CID 0
-// (notdef).
-func (t *Table) Codes(s pdf.String) iter.Seq[*font.Code] {
-	return func(yield func(*font.Code) bool) {
-		var code font.Code
-		for _, c := range s {
-			info := t.get(c)
-			if info.GID == 0 {
-				code.CID = 0
-			} else {
-				code.CID = cid.CID(c) + 1 // CID 0 is reserved for .notdef
-			}
-			code.Width = info.Width
-			code.Text = info.Text
-
-			if !yield(&code) {
-				return
-			}
-		}
-	}
 }
 
 // IsSymbolic returns true if glyphs outside the standard Latin character set

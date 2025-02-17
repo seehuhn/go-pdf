@@ -20,11 +20,17 @@ import (
 	"math"
 
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/gofont"
+	"seehuhn.de/go/pdf/font/type3"
+	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/sfnt/glyph"
 )
+
+//go:generate go run generate.go
 
 var Paper = &pdf.Rectangle{
 	LLx: -50,
@@ -57,6 +63,39 @@ var All = []TestCase{
 		p.TextSetFont(E, 24)
 		p.TextFirstLine(10, 10)
 		p.TextShow("Hello, world!")
+		return nil
+	},
+
+	func(p *document.Page) error {
+		// Test the normal case for Type 3 fonts
+		unitsPerEm := 2000.0
+		q := 1 / unitsPerEm
+		F := &type3.Font{
+			Glyphs: []*type3.Glyph{
+				{},
+			},
+			FontMatrix: matrix.Matrix{q, 0, 0, q, 0, 0},
+		}
+		F.Glyphs = append(F.Glyphs, &type3.Glyph{
+			Name:  "A",
+			Width: unitsPerEm,
+			BBox:  rect.Rect{URx: unitsPerEm, URy: unitsPerEm},
+			Draw: func(w *graphics.Writer) {
+				a := 0.05 * unitsPerEm
+				b := 0.95 * unitsPerEm
+				w.SetLineWidth(2)
+				w.Rectangle(a, a, b, b)
+				w.Stroke()
+			},
+		})
+		E := &type3.Instance{
+			Font: F,
+			CMap: map[rune]glyph.ID{'A': 1},
+		}
+
+		p.TextSetFont(E, 10)
+		p.TextFirstLine(10, 10)
+		p.TextShow("AAAAAAAAAA")
 		return nil
 	},
 
@@ -290,5 +329,3 @@ func encodeText(rm *pdf.ResourceManager, F font.Layouter, s string) pdf.String {
 	}
 	return res
 }
-
-//go:generate go run generate.go

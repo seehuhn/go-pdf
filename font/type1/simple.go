@@ -18,7 +18,6 @@ package type1
 
 import (
 	"fmt"
-	"iter"
 	"math"
 
 	"seehuhn.de/go/postscript/afm"
@@ -30,7 +29,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
@@ -58,7 +56,7 @@ type embeddedSimple struct {
 	IsAllCap   bool
 	IsSmallCap bool
 
-	gd *simpleenc.Table
+	*simpleenc.Table
 
 	finished bool
 }
@@ -82,7 +80,7 @@ func newEmbeddedSimple(ref pdf.Reference, f *Instance) *embeddedSimple {
 		IsAllCap:   f.IsAllCap,
 		IsSmallCap: f.IsSmallCap,
 
-		gd: simpleenc.NewTable(
+		Table: simpleenc.NewTable(
 			f.GlyphWidthPDF(".notdef"),
 			f.PostScriptName() == "ZapfDingbats",
 			&pdfenc.WinAnsi,
@@ -91,26 +89,8 @@ func newEmbeddedSimple(ref pdf.Reference, f *Instance) *embeddedSimple {
 	return e
 }
 
-// WritingMode implements the [font.Embedded] interface.
-func (*embeddedSimple) WritingMode() cmap.WritingMode {
-	return cmap.Horizontal
-}
-
-// Codes iterates over the character codes in a PDF string.
-func (e *embeddedSimple) Codes(s pdf.String) iter.Seq[*font.Code] {
-	return e.gd.Codes(s)
-}
-
-func (e *embeddedSimple) DecodeWidth(s pdf.String) (float64, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-	w := e.gd.Width(s[0])
-	return w / 1000, 1
-}
-
 func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
-	c, ok := e.gd.Code(gid, text)
+	c, ok := e.Table.GetCode(gid, text)
 	if !ok {
 		if e.finished {
 			return s, 0
@@ -126,13 +106,13 @@ func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) 
 		width = math.Round(width)
 
 		var err error
-		c, err = e.gd.NewCode(gid, glyphName, text, width)
+		c, err = e.Table.AllocateCode(gid, glyphName, text, width)
 		if err != nil {
 			return s, 0
 		}
 	}
 
-	w := e.gd.Width(c)
+	w := e.Table.Width(c)
 	return append(s, c), w / 1000
 }
 
@@ -144,7 +124,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	}
 	e.finished = true
 
-	if e.gd.Overflow() {
+	if e.Table.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q",
 			e.Font.FontName)
 	}
@@ -162,9 +142,9 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		postScriptName = fontData.FontName
 	}
 
-	omitFontData := isStandard(postScriptName, e.gd)
+	omitFontData := isStandard(postScriptName, e.Table)
 
-	glyphs := e.gd.Subset()
+	glyphs := e.Table.Glyphs()
 	subsetTag := subset.Tag(glyphs, numGlyphs)
 
 	fontSubset := fontData
@@ -201,7 +181,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	fd := &font.Descriptor{
 		FontName:   subset.Join(subsetTag, postScriptName),
 		IsSerif:    e.IsSerif,
-		IsSymbolic: e.gd.IsSymbolic(),
+		IsSymbolic: e.Table.IsSymbolic(),
 	}
 	if fontSubset != nil {
 		fd.FontFamily = fontSubset.FamilyName
@@ -229,14 +209,14 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
-		Encoding:       e.gd.Encoding(),
+		Encoding:       e.Table.Encoding(),
 	}
 	for c := range 256 {
-		if !e.gd.IsUsed(byte(c)) {
+		if !e.Table.IsUsed(byte(c)) {
 			continue
 		}
-		dict.Width[c] = e.gd.Width(byte(c))
-		dict.Text[c] = e.gd.Text(byte(c))
+		dict.Width[c] = e.Table.Width(byte(c))
+		dict.Text[c] = e.Table.Text(byte(c))
 	}
 	if omitFontData {
 		dict.FontType = glyphdata.None

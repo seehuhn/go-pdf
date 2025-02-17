@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/geom/matrix"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
@@ -34,7 +35,7 @@ import (
 
 func TestTextPos(t *testing.T) {
 	for i, setup := range testcases.All {
-		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%02d", i), func(t *testing.T) {
 			page, err := document.WriteSinglePage(io.Discard, testcases.Paper, pdf.V1_7, nil)
 			if err != nil {
 				t.Fatal(err)
@@ -168,7 +169,7 @@ func TestTextShowRaw2(t *testing.T) {
 			// First print glyphs one-by-one and record the x positions.
 			var xx []float64
 			img1 := ghostscript.Render(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
-				F := sample.MakeFont(r.RM)
+				F := sample.MakeFont()
 
 				r.TextSetFont(F, fontSize)
 				r.TextBegin()
@@ -191,7 +192,7 @@ func TestTextShowRaw2(t *testing.T) {
 			})
 			// Then print each glyph at the recorded x positions.
 			img2 := ghostscript.Render(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
-				F := sample.MakeFont(r.RM)
+				F := sample.MakeFont()
 				r.TextSetFont(F, fontSize)
 
 				_, E, err := pdf.ResourceManagerEmbed(r.RM, F)

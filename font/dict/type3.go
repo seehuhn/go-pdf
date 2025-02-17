@@ -67,6 +67,9 @@ type Type3 struct {
 	// Resources (optional) holds named resources directly used by contents
 	// streams referenced by CharProcs, when the content stream does not itself
 	// have a resource dictionary.
+	//
+	// TODO(voss): Should this be a pdf.Object instead, so that an
+	// indirect reference can be used on writing?
 	Resources *pdf.Resources
 }
 

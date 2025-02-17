@@ -46,7 +46,7 @@ func TestExtractText(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			F := sample.MakeFont(doc.RM)
+			F := sample.MakeFont()
 
 			doc.TextSetFont(F, 12)
 			doc.TextBegin()

@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,221 +17,221 @@
 package cmap
 
 import (
-	"bytes"
+	"slices"
 	"sort"
+	"unicode/utf16"
 
+	"golang.org/x/exp/maps"
 	"seehuhn.de/go/dag"
-
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
-// GetMappingNew returns the mapping information from info.
-func (info *ToUnicodeOld) GetMappingNew() map[string][]rune {
-	m := info.GetMapping()
-	m2 := make(map[string][]rune, len(m))
-	var s pdf.String
-	for k, v := range m {
-		s = info.CS.Append(s[:0], k)
-		m2[string(s)] = v
+// NewToUnicodeFile creates a ToUnicodeFile object.
+func NewToUnicodeFile(codec *charcode.Codec, data map[charcode.Code]string) *ToUnicodeFile {
+	res := &ToUnicodeFile{
+		CodeSpaceRange: codec.CodeSpaceRange(),
 	}
-	return m2
-}
 
-// GetMapping returns the mapping information from info.
-func (info *ToUnicodeOld) GetMapping() map[charcode.CharCodeOld][]rune {
-	res := make(map[charcode.CharCodeOld][]rune)
-	for _, s := range info.Singles {
-		res[s.Code] = s.Value
+	// group together codes which only differ in the last byte
+	type entry struct {
+		code charcode.Code
+		x    byte
 	}
-	for _, r := range info.Ranges {
-		if len(r.Values) == 1 {
-			val := r.Values[0]
-			for code := r.First; code <= r.Last; code++ {
-				res[code] = val
-				if code < r.Last {
-					val = c(val)
-					val[len(val)-1]++
+	ranges := make(map[string][]entry)
+	var buf []byte
+	for code := range data {
+		buf = codec.AppendCode(buf[:0], code)
+		l := len(buf)
+		key := string(buf[:l-1])
+		ranges[key] = append(ranges[key], entry{code, buf[l-1]})
+	}
+
+	// find all ranges, in sorted order
+	keys := maps.Keys(ranges)
+	sort.Slice(keys, func(i, j int) bool {
+		return slices.Compare([]byte(keys[i]), []byte(keys[j])) < 0
+	})
+
+	// for each range, add the required CIDRanges and CIDSingles
+	for _, key := range keys {
+		info := ranges[key]
+		sort.Slice(info, func(i, j int) bool {
+			return info[i].x < info[j].x
+		})
+
+		start := 0
+		for i := 1; i <= len(info); i++ {
+			if i == len(info) || info[i].x != info[i-1].x+1 {
+				first := make([]byte, len(key)+1)
+				copy(first, key)
+				first[len(key)] = info[start].x
+				if i-start > 1 {
+					last := make([]byte, len(key)+1)
+					copy(last, key)
+					last[len(key)] = info[i-1].x
+
+					needsList := false
+					for j := start; j < i-1; j++ {
+						if data[info[j+1].code] != nextString(data[info[j].code]) {
+							needsList = true
+							break
+						}
+					}
+
+					var values []string
+					if needsList {
+						values = make([]string, i-start)
+						for j := start; j < i; j++ {
+							values[j-start] = data[info[j].code]
+						}
+					} else {
+						values = []string{data[info[start].code]}
+					}
+
+					res.Ranges = append(res.Ranges, ToUnicodeRange{
+						First:  first,
+						Last:   last,
+						Values: values,
+					})
+				} else {
+					res.Singles = append(res.Singles, ToUnicodeSingle{
+						Code:  first,
+						Value: data[info[start].code],
+					})
 				}
-			}
-		} else {
-			for code := r.First; code <= r.Last; code++ {
-				res[code] = r.Values[code-r.First]
+				start = i
 			}
 		}
 	}
+
 	return res
 }
 
-func c(rr []rune) []rune {
-	res := make([]rune, len(rr))
-	copy(res, rr)
-	return res
+func nextString(s string) string {
+	rr := []rune(s)
+	if len(rr) == 0 {
+		return ""
+	}
+	rr[len(rr)-1]++
+	return string(rr)
 }
 
-// SetMapping replaces the mapping information in info with the given mapping.
-//
-// To make efficient use of range entries, the generated mapping may be a
-// superset of the original mapping, i.e. it may contain entries for charcodes
-// which were not mapped in the original mapping.
-func (info *ToUnicodeOld) SetMapping(m map[charcode.CharCodeOld][]rune) {
-	entries := make([]tuEntry, 0, len(m))
-	for code, val := range m {
-		entries = append(entries, tuEntry{code, val})
-	}
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].code < entries[j].code
-	})
-
-	g := &tuEncoder{
-		cs: info.CS,
-		mm: entries,
-	}
-	ee, err := dag.ShortestPath[int16, uint32](g, len(entries))
+// MakeSimpleToUnicode creates a ToUnicodeFile object for the encoding of a
+// simple font.
+func MakeSimpleToUnicode(data map[byte]string) *ToUnicodeFile {
+	g := tuEncSimple(data)
+	ee, err := dag.ShortestPath(g, 256)
 	if err != nil {
-		panic(err)
+		panic("unreachable")
 	}
 
-	info.Singles = info.Singles[:0]
-	info.Ranges = info.Ranges[:0]
-	v := 0
+	res := &ToUnicodeFile{
+		CodeSpaceRange: charcode.Simple,
+	}
+	code := 0
 	for _, e := range ee {
-		if e == 0 {
-			info.Singles = append(info.Singles, ToUnicodeSingleOld{
-				Code:  entries[v].code,
-				Value: entries[v].value,
+		switch e.tp {
+		case 1:
+			res.Singles = append(res.Singles, ToUnicodeSingle{
+				Code:  []byte{byte(code)},
+				Value: data[byte(code)],
 			})
-		} else if e < 0 {
-			info.Ranges = append(info.Ranges, ToUnicodeRangeOld{
-				First:  entries[v].code,
-				Last:   entries[v-int(e)-1].code,
-				Values: [][]rune{entries[v].value},
+		case 2:
+			res.Ranges = append(res.Ranges, ToUnicodeRange{
+				First:  []byte{byte(code)},
+				Last:   []byte{byte(code + int(e.num) - 1)},
+				Values: []string{data[byte(code)]},
 			})
-		} else {
-			var values [][]rune
-			for i := v; i < v+int(e); i++ {
-				values = append(values, entries[i].value)
+		case 3:
+			values := make([]string, int(e.num))
+			for i := 0; i < int(e.num); i++ {
+				values[i] = data[byte(code+i)]
 			}
-			info.Ranges = append(info.Ranges, ToUnicodeRangeOld{
-				First:  entries[v].code,
-				Last:   entries[v+int(e)-1].code,
+			res.Ranges = append(res.Ranges, ToUnicodeRange{
+				First:  []byte{byte(code)},
+				Last:   []byte{byte(code + int(e.num) - 1)},
 				Values: values,
 			})
 		}
-		v = g.To(v, e)
+		code = g.To(code, e)
 	}
+	return res
 }
 
-type tuEntry struct {
-	code  charcode.CharCodeOld
-	value []rune
+// edge types:
+//
+//	0 = skip unmapped codes
+//	1 = use a single
+//	2 = use a range with increments
+//	3 = use a range with a list
+type edge struct {
+	tp  byte
+	num uint16
 }
 
-type tuEncoder struct {
-	cs   charcode.CodeSpaceRange
-	mm   []tuEntry
-	bufR []rune
-	buf0 pdf.String
-	buf1 pdf.String
+type tuEncSimple map[byte]string
+
+func (g tuEncSimple) has(code int) bool {
+	if code < 0 || code >= 256 {
+		return false
+	}
+	_, ok := g[byte(code)]
+	return ok
 }
 
-func (g *tuEncoder) AppendEdges(ee []int16, v int) []int16 {
-	if v < 0 || v >= len(g.mm) {
+func (g tuEncSimple) AppendEdges(ee []edge, v int) []edge {
+	gapLen := 0
+	for v+gapLen < 256 && !g.has(v+gapLen) {
+		gapLen++
+	}
+	if gapLen > 0 {
+		return append(ee, edge{0, uint16(gapLen)})
+	}
+
+	runLen := 1
+	current := g[byte(v)]
+	for len(current) > 0 && g.has(v+runLen) {
+		u16 := utf16.Encode([]rune(current))
+		if u16[len(u16)-1] == 0xFFFF {
+			break
+		}
+		u16[len(u16)-1]++
+		next := string(utf16.Decode(u16))
+		if g[byte(v+runLen)] != next {
+			break
+		}
+
+		current = next
+		runLen++
+	}
+	if runLen == 1 {
+		ee = append(ee, edge{1, 1})
+	} else {
+		ee = append(ee, edge{2, uint16(runLen)})
+	}
+	if !g.has(v + runLen) {
 		return ee
 	}
 
-	m0 := g.mm[v]
-	g.buf0 = g.cs.Append(g.buf0[:0], m0.code)
-	g.bufR = append(g.bufR[:0], m0.value...)
-
-	// Find the largest l such that entries v, ..., v+l-1 have codes which only
-	// differ in the last byte, and such that the difference between values and
-	// codes is constant.
-	l := 1
-vertexLoop:
-	for v+l < len(g.mm) {
-		m1 := g.mm[v+l]
-		g.buf1 = g.cs.Append(g.buf1[:0], m1.code)
-		if !bytes.Equal(g.buf0[:len(g.buf0)-1], g.buf1[:len(g.buf1)-1]) {
-			break
-		}
-		if len(g.bufR) != len(m1.value) || len(g.bufR) == 0 {
-			break
-		}
-		for i := range g.bufR {
-			if i < len(g.bufR)-1 {
-				if g.bufR[i] != m1.value[i] {
-					break vertexLoop
-				}
-			} else {
-				if m1.code-m0.code != charcode.CharCodeOld(m1.value[i]-g.bufR[i]) {
-					break vertexLoop
-				}
-			}
-		}
-		l++
+	for g.has(v + runLen) {
+		runLen++
 	}
-	if l > 1 {
-		// We can encode the entries v, ..., v+l-1 as a range of
-		// l consecutive codes/values.  We use -l to indicate this
-		// kind of range.
-		ee = append(ee, int16(-l))
-	} else {
-		// We use 0 to indicate an entry in the Singles list
-		ee = append(ee, 0)
-	}
-
-	// Find the largest k such that entries v, ..., v+k-1 have consecutive codes,
-	// and the codes only differ in the last byte.
-	k := 1
-	for v+k < len(g.mm) && int(g.mm[v+k].code) == int(m0.code)+k {
-		g.buf1 = g.cs.Append(g.buf1[:0], g.mm[v+k].code)
-		if !bytes.Equal(g.buf0[:len(g.buf0)-1], g.buf1[:len(g.buf1)-1]) {
-			break
-		}
-		k++
-	}
-	if k > l {
-		// We can encode the entries v+l, ..., v+k-1 as a range
-		// of k-l consecutive codes, using an array for the values.
-		// We use +l to indicate this kind of range.
-		ee = append(ee, int16(k))
-	}
-
-	return ee
+	return append(ee, edge{3, uint16(runLen)})
 }
 
-func (g *tuEncoder) Length(v int, e int16) uint32 {
-	// For simplicity we ignore the cost of the "begin...end" operators.
-	// For simplicity we assume all runes are in the BMP.
-
-	cost := uint32(0)
-	if e == 0 {
-		g.buf0 = g.cs.Append(g.buf0[:0], g.mm[v].code)
-		cost += 2*uint32(len(g.buf0)) + 3        // "<xx> "
-		cost += 4*uint32(len(g.mm[v].value)) + 3 // "<xxxx>\n"
-	} else if e < 0 {
-		g.buf0 = g.cs.Append(g.buf0[:0], g.mm[v].code)
-		g.buf1 = g.cs.Append(g.buf1[:0], g.mm[v-int(e)-1].code)
-		cost += 2*uint32(len(g.buf0)+len(g.buf1)) + 6 // "<xx> <xx> "
-		cost += 4*uint32(len(g.mm[v].value)) + 3      // "<xxxx>\n"
-	} else if e > 0 {
-		g.buf0 = g.cs.Append(g.buf0[:0], g.mm[v].code)
-		g.buf1 = g.cs.Append(g.buf1[:0], g.mm[v+int(e)-1].code)
-		cost += 2*uint32(len(g.buf0)+len(g.buf1)) + 8 // "<xx> <xx> []"
-		for i := v; i < v+int(e); i++ {
-			cost += 4*uint32(len(g.mm[v].value)) + 3 // "<xxxx> "
-		}
+func (g tuEncSimple) Length(v int, e edge) int {
+	switch e.tp {
+	case 1:
+		return 2
+	case 2:
+		return 3
+	case 3:
+		return 3 + int(e.num)
+	default:
+		return 0
 	}
-
-	return cost
 }
 
-func (g *tuEncoder) To(v int, e int16) int {
-	if e == 0 {
-		return v + 1
-	} else if e < 0 {
-		return v - int(e)
-	}
-	return v + int(e)
+func (g tuEncSimple) To(v int, e edge) int {
+	return v + int(e.num)
 }

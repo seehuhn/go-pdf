@@ -17,132 +17,166 @@
 package makefont
 
 import (
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font/type3"
-	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/geom/rect"
+
+	"seehuhn.de/go/postscript/type1/names"
+
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
+
+	"seehuhn.de/go/pdf/font/type3"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 // Type3 returns a Type3 font.
-func Type3(rm *pdf.ResourceManager) (*type3.Font, error) {
+func Type3() (*type3.Instance, error) {
 	info := clone(TrueType())
 	info.EnsureGlyphNames()
 
-	builder := type3.NewBuilder(rm)
-
-	prop := &type3.Properties{
-		FontMatrix:   info.FontMatrix,
-		Ascent:       info.Ascent,
-		Descent:      info.Descent,
-		BaseLineSkip: info.Ascent - info.Descent + info.LineGap,
-		ItalicAngle:  info.ItalicAngle,
-		IsFixedPitch: info.IsFixedPitch(),
-		IsSerif:      info.IsSerif,
-		IsScript:     info.IsScript,
+	font := &type3.Font{
+		Glyphs: []*type3.Glyph{
+			{}, // .notdef
+		},
+		PostScriptName:     info.PostScriptName(),
+		FontMatrix:         info.FontMatrix,
+		FontFamily:         info.FamilyName,
+		FontStretch:        info.Width,
+		FontWeight:         info.Weight,
+		IsFixedPitch:       info.IsFixedPitch(),
+		IsSerif:            info.IsSerif,
+		IsScript:           info.IsScript,
+		ItalicAngle:        info.ItalicAngle,
+		Ascent:             float64(info.Ascent),
+		Descent:            float64(info.Descent),
+		Leading:            float64(info.Ascent - info.Descent + info.LineGap),
+		CapHeight:          float64(info.CapHeight),
+		XHeight:            float64(info.XHeight),
+		UnderlinePosition:  float64(info.UnderlinePosition),
+		UnderlineThickness: float64(info.UnderlineThickness),
 	}
 
 	// convert glypf outlines to type 3 outlines
 	origOutlines := info.Outlines.(*glyf.Outlines)
 	for i, origGlyph := range origOutlines.Glyphs {
 		gid := glyph.ID(i)
-		name := info.GlyphName(gid)
-		if name == ".notdef" {
+		glyphName := info.GlyphName(gid)
+		if glyphName == ".notdef" {
 			continue
 		}
 
-		var bbox funit.Rect16
+		g := &type3.Glyph{
+			Name:  glyphName,
+			Width: float64(info.GlyphWidth(gid)),
+		}
+
 		if origGlyph != nil {
-			bbox = origGlyph.Rect16
-		}
-		newGlyph, err := builder.AddGlyph(name, float64(info.GlyphWidth(gid)), bbox, true)
-		if err != nil {
-			return nil, err
-		}
-
-		if origGlyph == nil {
-			goto done
-		}
-
-		switch g := origGlyph.Data.(type) {
-		case glyf.SimpleGlyph:
-			glyphInfo, err := g.Decode()
-			if err != nil {
-				panic(err)
+			bbox := origGlyph.Rect16
+			g.BBox = rect.Rect{
+				LLx: float64(bbox.LLx),
+				LLy: float64(bbox.LLy),
+				URx: float64(bbox.URx),
+				URy: float64(bbox.URy),
 			}
-
-			for _, cc := range glyphInfo.Contours {
-				var extended glyf.Contour
-				var prev glyf.Point
-				onCurve := true
-				for _, cur := range cc {
-					if !onCurve && !cur.OnCurve {
-						extended = append(extended, glyf.Point{
-							X:       (cur.X + prev.X) / 2,
-							Y:       (cur.Y + prev.Y) / 2,
-							OnCurve: true,
-						})
-					}
-					extended = append(extended, cur)
-					prev = cur
-					onCurve = cur.OnCurve
-				}
-				n := len(extended)
-
-				var offs int
-				for i := 0; i < len(extended); i++ {
-					if extended[i].OnCurve {
-						offs = i
-						break
-					}
-				}
-
-				newGlyph.MoveTo(float64(extended[offs].X), float64(extended[offs].Y))
-
-				i := 0
-				for i < n {
-					i0 := (i + offs) % n
-					if !extended[i0].OnCurve {
-						panic("not on curve")
-					}
-					i1 := (i0 + 1) % n
-					if extended[i1].OnCurve {
-						if i == n-1 {
-							break
-						}
-						newGlyph.LineTo(float64(extended[i1].X), float64(extended[i1].Y))
-						i++
-					} else {
-						// See the following link for converting truetype outlines
-						// to CFF outlines:
-						// https://pomax.github.io/bezierinfo/#reordering
-						i2 := (i1 + 1) % n
-						newGlyph.CurveTo(
-							float64(extended[i0].X)/3+float64(extended[i1].X)*2/3,
-							float64(extended[i0].Y)/3+float64(extended[i1].Y)*2/3,
-							float64(extended[i1].X)*2/3+float64(extended[i2].X)/3,
-							float64(extended[i1].Y)*2/3+float64(extended[i2].Y)/3,
-							float64(extended[i2].X),
-							float64(extended[i2].Y))
-						i += 2
-					}
-				}
-
-				newGlyph.ClosePath()
-			}
-			newGlyph.Fill()
-		case glyf.CompositeGlyph:
-			panic("not implemented")
+			d := &drawer{g: origGlyph}
+			g.Draw = d.Draw
 		}
 
-	done:
-		err = newGlyph.Close()
-		if err != nil {
-			return nil, err
-		}
+		font.Glyphs = append(font.Glyphs, g)
 	}
 
-	return builder.Finish(prop)
+	cmap := make(map[rune]glyph.ID)
+	for gid, g := range font.Glyphs {
+		rr := names.ToUnicode(g.Name, font.PostScriptName == "ZapfDingbats")
+		if len(rr) != 1 {
+			continue
+		}
+		cmap[rr[0]] = glyph.ID(gid)
+	}
+
+	inst := &type3.Instance{
+		Font: font,
+		CMap: cmap,
+	}
+	return inst, nil
+}
+
+type drawer struct {
+	g *glyf.Glyph
+}
+
+func (d *drawer) Draw(w *graphics.Writer) {
+	origGlyph := d.g
+
+	switch g := origGlyph.Data.(type) {
+	case glyf.SimpleGlyph:
+		glyphInfo, err := g.Decode()
+		if err != nil {
+			panic(err)
+		}
+
+		for _, cc := range glyphInfo.Contours {
+			var extended glyf.Contour
+			var prev glyf.Point
+			onCurve := true
+			for _, cur := range cc {
+				if !onCurve && !cur.OnCurve {
+					extended = append(extended, glyf.Point{
+						X:       (cur.X + prev.X) / 2,
+						Y:       (cur.Y + prev.Y) / 2,
+						OnCurve: true,
+					})
+				}
+				extended = append(extended, cur)
+				prev = cur
+				onCurve = cur.OnCurve
+			}
+			n := len(extended)
+
+			var offs int
+			for i := 0; i < len(extended); i++ {
+				if extended[i].OnCurve {
+					offs = i
+					break
+				}
+			}
+
+			w.MoveTo(float64(extended[offs].X), float64(extended[offs].Y))
+
+			i := 0
+			for i < n {
+				i0 := (i + offs) % n
+				if !extended[i0].OnCurve {
+					panic("not on curve")
+				}
+				i1 := (i0 + 1) % n
+				if extended[i1].OnCurve {
+					if i == n-1 {
+						break
+					}
+					w.LineTo(float64(extended[i1].X), float64(extended[i1].Y))
+					i++
+				} else {
+					// See the following link for converting truetype outlines
+					// to CFF outlines:
+					// https://pomax.github.io/bezierinfo/#reordering
+					i2 := (i1 + 1) % n
+					w.CurveTo(
+						float64(extended[i0].X)/3+float64(extended[i1].X)*2/3,
+						float64(extended[i0].Y)/3+float64(extended[i1].Y)*2/3,
+						float64(extended[i1].X)*2/3+float64(extended[i2].X)/3,
+						float64(extended[i1].Y)*2/3+float64(extended[i2].Y)/3,
+						float64(extended[i2].X),
+						float64(extended[i2].Y))
+					i += 2
+				}
+			}
+
+			w.ClosePath()
+		}
+		w.Fill()
+	case glyf.CompositeGlyph:
+		panic("not implemented")
+	}
 }
 
 func clone[T any](x *T) *T {

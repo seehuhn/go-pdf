@@ -1,0 +1,205 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+package type3
+
+import (
+	"errors"
+	"fmt"
+	"math"
+	"strconv"
+
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/encoding/simpleenc"
+	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/sfnt/glyph"
+)
+
+var _ interface {
+	font.EmbeddedLayouter
+	font.Scanner
+	pdf.Finisher
+} = (*embeddedSimple)(nil)
+
+// embeddedSimple represents an [Instance] which has been embedded in a PDF
+// file.
+type embeddedSimple struct {
+	Ref  pdf.Reference
+	Font *Font
+
+	*simpleenc.Table
+
+	finished bool
+}
+
+func newEmbeddedSimple(ref pdf.Reference, font *Font) *embeddedSimple {
+	e := &embeddedSimple{
+		Ref:   ref,
+		Font:  font,
+		Table: simpleenc.NewTable(0, false, &pdfenc.Standard),
+	}
+	return e
+}
+
+func (e *embeddedSimple) DecodeWidth(s pdf.String) (float64, int) {
+	if len(s) == 0 {
+		return 0, 0
+	}
+	w := e.Table.Width(s[0]) * e.Font.FontMatrix[0]
+	return w, 1
+}
+
+func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
+	c, ok := e.Table.GetCode(gid, text)
+	if !ok {
+		if e.finished {
+			return s, 0
+		}
+		g := e.Font.Glyphs[gid]
+
+		glyphName := g.Name
+		width := math.Round(g.Width)
+
+		var err error
+		c, err = e.Table.AllocateCode(gid, glyphName, text, width)
+		if err != nil {
+			return s, 0
+		}
+	}
+
+	w := e.Table.Width(c)
+	return append(s, c), w * e.Font.FontMatrix[0]
+}
+
+func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
+	if e.finished {
+		return nil
+	}
+	e.finished = true
+
+	if e.Table.Overflow() {
+		return errors.New("too many distinct glyphs used in Type 3 font")
+	}
+
+	glyphs := e.Table.Glyphs()
+
+	// Write the glyphs first, so that we can construct the resources
+	// dictionary. Here we use a common builder for all glyphs, so that a
+	// common resources dictionary for the whole font can be accumulated.
+	//
+	// TODO(voss):
+	//   - consider the discussion at
+	//     https://pdf-issues.pdfa.org/32000-2-2020/clause07.html#H7.8.3
+	//   - check where different PDF versions put the Resources dictionary
+	//   - make it configurable whether to use per-glyph resource dictionaries?
+	page := graphics.NewWriter(nil, rm)
+	charProcs := make(map[pdf.Name]pdf.Reference)
+	for _, gid := range glyphs {
+		g := e.Font.Glyphs[gid]
+		if g.Name == "" {
+			continue
+		}
+		gRef := rm.Out.Alloc()
+
+		charProcs[pdf.Name(g.Name)] = gRef
+
+		stm, err := rm.Out.OpenStream(gRef, nil, pdf.FilterCompress{})
+		if err != nil {
+			return err
+		}
+		page.NewStream(stm)
+
+		// TODO(voss): move "d0" and "d1" to the graphics package, and restrict
+		// the list of allowed operators depending on the choice.
+		if g.Color {
+			fmt.Fprintf(stm, "%s 0 d0\n", format(g.Width))
+		} else {
+			fmt.Fprintf(stm,
+				"%s 0 %s %s %s %s d1\n",
+				format(g.Width),
+				format(g.BBox.LLx),
+				format(g.BBox.LLy),
+				format(g.BBox.URx),
+				format(g.BBox.URy))
+		}
+		if g.Draw != nil {
+			g.Draw(page)
+		}
+		if page.Err != nil {
+			return page.Err
+		}
+		err = stm.Close()
+		if err != nil {
+			return err
+		}
+	}
+	resources := page.Resources
+
+	italicAngle := math.Round(e.Font.ItalicAngle*10) / 10
+
+	fd := &font.Descriptor{
+		FontName:     e.Font.PostScriptName,
+		FontFamily:   e.Font.FontFamily,
+		FontStretch:  e.Font.FontStretch,
+		FontWeight:   e.Font.FontWeight,
+		IsFixedPitch: e.Font.IsFixedPitch,
+		IsSerif:      e.Font.IsSerif,
+		IsSymbolic:   e.Table.IsSymbolic(),
+		IsScript:     e.Font.IsScript,
+		IsItalic:     italicAngle != 0,
+		IsAllCap:     e.Font.IsAllCap,
+		IsSmallCap:   e.Font.IsSmallCap,
+		ItalicAngle:  italicAngle,
+		Ascent:       e.Font.Ascent,
+		Descent:      e.Font.Descent,
+		Leading:      e.Font.Leading,
+		CapHeight:    e.Font.CapHeight,
+		XHeight:      e.Font.XHeight,
+		StemV:        -1,
+		MissingWidth: e.Table.DefaultWidth(),
+	}
+	dict := &dict.Type3{
+		Ref:        e.Ref,
+		Name:       pdf.Name(e.Font.PostScriptName),
+		Descriptor: fd,
+		Encoding:   e.Table.Encoding(),
+		CharProcs:  charProcs,
+		// FontBBox:   &pdf.Rectangle{},
+		FontMatrix: e.Font.FontMatrix,
+		Resources:  resources,
+	}
+	for c := range 256 {
+		if !e.Table.IsUsed(byte(c)) {
+			continue
+		}
+		dict.Width[c] = e.Table.Width(byte(c))
+		dict.Text[c] = e.Table.Text(byte(c))
+	}
+
+	err := dict.WriteToPDF(rm)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func format(x float64) string {
+	return strconv.FormatFloat(x, 'f', -1, 64)
+}

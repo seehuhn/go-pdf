@@ -55,11 +55,21 @@ func Show(w *graphics.Writer, args ...any) {
 		case color.Color:
 			w.SetFillColor(v)
 		case nl:
-			if leadingSet {
-				w.TextNextLine()
-			} else {
+			if !leadingSet {
 				w.TextSecondLine(0, -leading)
 				leadingSet = true
+			} else {
+				w.TextNextLine()
+			}
+		case *wrap:
+			for line := range v.Lines(w.CurrentFont, w.TextFontSize) {
+				w.TextShowGlyphs(line)
+				if !leadingSet {
+					w.TextSecondLine(0, -leading)
+					leadingSet = true
+				} else {
+					w.TextNextLine()
+				}
 			}
 		case RecordPos:
 			x, y := w.GetTextPositionUser()

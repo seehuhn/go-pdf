@@ -18,17 +18,15 @@ package truetype
 
 import (
 	"fmt"
-	"iter"
 	"math"
 
 	"seehuhn.de/go/postscript/type1/names"
 	"seehuhn.de/go/sfnt"
-	sfntcmap "seehuhn.de/go/sfnt/cmap"
+	"seehuhn.de/go/sfnt/cmap"
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
@@ -44,11 +42,14 @@ var _ interface {
 	pdf.Finisher
 } = (*embeddedSimple)(nil)
 
+// embeddedSimple represents an [Instance] which has been embedded in a PDF
+// file, if the Composite option is not set.  There should be at most one
+// embeddedSimple for each [Instance] in a PDF file.
 type embeddedSimple struct {
 	Ref  pdf.Reference
 	Font *sfnt.Font
 
-	gd *simpleenc.Table
+	*simpleenc.Table
 
 	finished bool
 }
@@ -57,8 +58,8 @@ func newEmbeddedSimple(ref pdf.Reference, font *sfnt.Font) *embeddedSimple {
 	e := &embeddedSimple{
 		Ref:  ref,
 		Font: font,
-		gd: simpleenc.NewTable(
-			font.GlyphWidthPDF(0),
+		Table: simpleenc.NewTable(
+			math.Round(font.GlyphWidthPDF(0)),
 			font.PostScriptName() == "ZapfDingbats",
 			&pdfenc.WinAnsi,
 		),
@@ -67,40 +68,23 @@ func newEmbeddedSimple(ref pdf.Reference, font *sfnt.Font) *embeddedSimple {
 	return e
 }
 
-// WritingMode implements the [font.Embedded] interface.
-func (*embeddedSimple) WritingMode() cmap.WritingMode {
-	return cmap.Horizontal
-}
-
-// Codes iterates over the character codes in a PDF string.
-func (e *embeddedSimple) Codes(s pdf.String) iter.Seq[*font.Code] {
-	return e.gd.Codes(s)
-}
-
-func (e *embeddedSimple) DecodeWidth(s pdf.String) (float64, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-	w := e.gd.Width(s[0])
-	return w / 1000, 1
-}
-
 func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
-	c, ok := e.gd.Code(gid, text)
+	c, ok := e.Table.GetCode(gid, text)
 	if !ok {
 		if e.finished {
 			return s, 0
 		}
 
+		glyphName := e.Font.GlyphName(gid)
 		width := math.Round(e.Font.GlyphWidthPDF(gid))
 		var err error
-		c, err = e.gd.NewCode(gid, e.Font.GlyphName(gid), text, width)
+		c, err = e.Table.AllocateCode(gid, glyphName, text, width)
 		if err != nil {
 			return s, 0
 		}
 	}
 
-	w := e.gd.Width(c)
+	w := e.Table.Width(c)
 	return append(s, c), w / 1000
 }
 
@@ -112,7 +96,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	}
 	e.finished = true
 
-	if e.gd.Overflow() {
+	if e.Table.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q",
 			e.Font.PostScriptName())
 	}
@@ -124,7 +108,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	origSfnt.Gsub = nil
 	origSfnt.Gpos = nil
 
-	glyphs := e.gd.Subset()
+	glyphs := e.Table.Glyphs()
 	subsetTag := subset.Tag(glyphs, origSfnt.NumGlyphs())
 	var subsetFont *sfnt.Font
 	if subsetTag != "" {
@@ -140,12 +124,12 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	canMacRoman := true
 	canWinAnsi := true
 	for code := range 256 {
-		gid := e.gd.GID(byte(code))
+		gid := e.Table.GID(byte(code))
 		if gid == 0 {
 			continue
 		}
 
-		glyphName := e.gd.GlyphName(gid)
+		glyphName := e.Table.GlyphName(gid)
 		if pdfenc.MacRoman.Encoding[code] != glyphName {
 			canMacRoman = false
 		}
@@ -165,15 +149,15 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 
 		dictEnc = encoding.Builtin
 
-		subtable := sfntcmap.Format4{}
+		subtable := cmap.Format4{}
 		for code := range 256 {
-			gid := e.gd.GID(byte(code))
+			gid := e.Table.GID(byte(code))
 			if gid == 0 {
 				continue
 			}
 			subtable[uint16(code)] = gid
 		}
-		subsetFont.CMapTable = sfntcmap.Table{
+		subsetFont.CMapTable = cmap.Table{
 			{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
 		}
 	} else {
@@ -181,11 +165,11 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		// map the names to unicode, and use a (3,1) "cmap" subtable to map
 		// unicode to GIDs.
 
-		dictEnc = e.gd.Encoding()
+		dictEnc = e.Table.Encoding()
 
 		var needsFormat12 bool
 		for _, origGid := range glyphs {
-			glyphName := e.gd.GlyphName(origGid)
+			glyphName := e.Table.GlyphName(origGid)
 			rr := names.ToUnicode(glyphName, subsetFont.PostScriptName() == "ZapfDingbats")
 			if len(rr) != 1 {
 				continue
@@ -197,29 +181,29 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		}
 
 		if !needsFormat12 {
-			subtable := sfntcmap.Format4{}
+			subtable := cmap.Format4{}
 			for gid, origGid := range glyphs {
-				glyphName := e.gd.GlyphName(origGid)
+				glyphName := e.Table.GlyphName(origGid)
 				rr := names.ToUnicode(glyphName, subsetFont.PostScriptName() == "ZapfDingbats")
 				if len(rr) != 1 {
 					continue
 				}
 				subtable[uint16(rr[0])] = glyph.ID(gid)
 			}
-			subsetFont.CMapTable = sfntcmap.Table{
+			subsetFont.CMapTable = cmap.Table{
 				{PlatformID: 3, EncodingID: 1}: subtable.Encode(0),
 			}
 		} else {
-			subtable := sfntcmap.Format12{}
+			subtable := cmap.Format12{}
 			for gid, origGid := range glyphs {
-				glyphName := e.gd.GlyphName(origGid)
+				glyphName := e.Table.GlyphName(origGid)
 				rr := names.ToUnicode(glyphName, subsetFont.PostScriptName() == "ZapfDingbats")
 				if len(rr) != 1 {
 					continue
 				}
 				subtable[uint32(rr[0])] = glyph.ID(gid)
 			}
-			subsetFont.CMapTable = sfntcmap.Table{
+			subsetFont.CMapTable = cmap.Table{
 				{PlatformID: 3, EncodingID: 1}: subtable.Encode(0),
 			}
 		}
@@ -235,6 +219,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	italicAngle := math.Round(subsetFont.ItalicAngle*10) / 10
 
 	postScriptName := subsetFont.PostScriptName()
+
 	fd := &font.Descriptor{
 		FontName:     subset.Join(subsetTag, postScriptName),
 		FontFamily:   subsetFont.FamilyName,
@@ -252,7 +237,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		Leading:      leading,
 		CapHeight:    capHeight,
 		XHeight:      xHeight,
-		MissingWidth: e.gd.DefaultWidth(),
+		MissingWidth: e.Table.DefaultWidth(),
 	}
 
 	dict := &dict.TrueType{
@@ -265,8 +250,11 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		FontRef:        rm.Out.Alloc(),
 	}
 	for c := range 256 {
-		dict.Width[c] = e.gd.Width(byte(c))
-		dict.Text[c] = e.gd.Text(byte(c))
+		if !e.Table.IsUsed(byte(c)) {
+			continue
+		}
+		dict.Width[c] = e.Table.Width(byte(c))
+		dict.Text[c] = e.Table.Text(byte(c))
 	}
 
 	err := dict.WriteToPDF(rm)

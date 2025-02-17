@@ -18,11 +18,15 @@ package ghostscript
 
 import (
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/rect"
+
+	"seehuhn.de/go/sfnt/glyph"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/type3"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/postscript/funit"
 )
 
 // FindTextPos finds the approximate text position in user coordinates,
@@ -55,33 +59,34 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 	M = M.Mul(s.CTM)
 	xc, yc := M.Apply(0, 0)
 
-	builder := type3.NewBuilder(r.Page.RM)
-	g, err := builder.AddGlyph("x", 0, funit.Rect16{LLx: -100, LLy: 1000, URx: 100, URy: 100}, false)
-	if err != nil {
-		return 0, 0, err
-	}
-	g.SetFillColor(color.DeviceRGB(1.0, 0, 0))
-	A := M.Inv()
-	p, q := A.Apply(xc-1, yc-1)
-	g.MoveTo(p*1000, q*1000)
-	p, q = A.Apply(xc+1, yc-1)
-	g.LineTo(p*1000, q*1000)
-	p, q = A.Apply(xc+1, yc+1)
-	g.LineTo(p*1000, q*1000)
-	p, q = A.Apply(xc-1, yc+1)
-	g.LineTo(p*1000, q*1000)
-	g.Fill()
-	err = g.Close()
-	if err != nil {
-		return 0, 0, err
-	}
-
-	prop := &type3.Properties{
+	markerFont := &type3.Font{
+		Glyphs: []*type3.Glyph{
+			{},
+		},
 		FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},
 	}
-	X, err := builder.Finish(prop)
-	if err != nil {
-		return 0, 0, err
+	markerFont.Glyphs = append(markerFont.Glyphs, &type3.Glyph{
+		Name:  "x",
+		Width: 0,
+		BBox:  rect.Rect{LLx: -100, LLy: 100, URx: 100, URy: 100},
+		Color: true,
+		Draw: func(w *graphics.Writer) {
+			w.SetFillColor(color.DeviceRGB(1.0, 0, 0))
+			A := M.Inv()
+			p, q := A.Apply(xc-1, yc-1)
+			w.MoveTo(p*1000, q*1000)
+			p, q = A.Apply(xc+1, yc-1)
+			w.LineTo(p*1000, q*1000)
+			p, q = A.Apply(xc+1, yc+1)
+			w.LineTo(p*1000, q*1000)
+			p, q = A.Apply(xc-1, yc+1)
+			w.LineTo(p*1000, q*1000)
+			w.Fill()
+		},
+	})
+	X := &type3.Instance{
+		Font: markerFont,
+		CMap: map[rune]glyph.ID{'x': 1},
 	}
 
 	r.Page.TextSetFont(X, 10)

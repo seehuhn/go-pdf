@@ -153,7 +153,7 @@ func BenchmarkTextLayout(b *testing.B) {
 	}
 }
 
-func writeDummyDocument(w io.Writer, makeFont func(*pdf.ResourceManager) font.Layouter) error {
+func writeDummyDocument(w io.Writer, makeFont func() font.Layouter) error {
 	words1 := strings.Fields(sampleText1)
 	words2 := strings.Fields(sampleText2)
 
@@ -163,7 +163,7 @@ func writeDummyDocument(w io.Writer, makeFont func(*pdf.ResourceManager) font.La
 		return err
 	}
 
-	F := makeFont(doc.RM)
+	F := makeFont()
 
 	setStyle := func(page *document.Page) {
 		page.TextSetFont(F, 10)

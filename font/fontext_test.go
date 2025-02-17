@@ -19,8 +19,6 @@ package font_test
 import (
 	"testing"
 
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 )
 
@@ -28,10 +26,7 @@ import (
 func TestSpaceIsBlank(t *testing.T) {
 	for _, sample := range fonttypes.All {
 		t.Run(sample.Label, func(t *testing.T) {
-			data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-			rm := pdf.NewResourceManager(data)
-
-			F := sample.MakeFont(rm)
+			F := sample.MakeFont()
 			gg := F.Layout(nil, 10, " ")
 			if len(gg.Seq) != 1 {
 				t.Fatalf("expected 1 glyph, got %d", len(gg.Seq))

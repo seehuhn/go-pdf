@@ -17,7 +17,6 @@
 package fonttypes
 
 import (
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
@@ -33,7 +32,7 @@ var (
 	TrueTypeComposite = trueTypeEmbedder{composite: true}.font
 )
 
-func (t trueTypeEmbedder) font(rm *pdf.ResourceManager) font.Layouter {
+func (t trueTypeEmbedder) font() font.Layouter {
 	info := makefont.TrueType()
 
 	var opt *font.Options

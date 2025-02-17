@@ -23,7 +23,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
 func TestSamples(t *testing.T) {
@@ -35,7 +34,7 @@ func TestSamples(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			F := sample.MakeFont(page.RM)
+			F := sample.MakeFont()
 
 			page.TextSetFont(F, 12)
 			page.TextBegin()
@@ -72,11 +71,8 @@ func TestSamples(t *testing.T) {
 // TestPostScriptName ensures that the .PostScriptName method of all fonts
 // works correctly.
 func TestPostScriptName(t *testing.T) {
-	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	rm := pdf.NewResourceManager(data)
-
 	for _, sample := range All {
-		F := sample.MakeFont(rm)
+		F := sample.MakeFont()
 
 		name := F.PostScriptName()
 
@@ -85,9 +81,6 @@ func TestPostScriptName(t *testing.T) {
 		case "Standard":
 			// There is no built-in Go-Regular font.
 			expected = "Helvetica"
-		case "Type3":
-			// Type 3 fonts don't have a PostScript name.
-			expected = ""
 		default:
 			expected = "Go-Regular"
 		}

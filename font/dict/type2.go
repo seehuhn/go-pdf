@@ -328,7 +328,7 @@ func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager) error {
 	compressedObjects := []pdf.Object{fontDict, cidFontDict, fdDict}
 	compressedRefs := []pdf.Reference{fontDictRef, cidFontRef, fdRef}
 
-	ww := widths.EncodeComposite2(d.Width, d.DefaultWidth)
+	ww := widths.EncodeComposite(d.Width, d.DefaultWidth)
 	switch {
 	case moreThanTen(ww):
 		wwRef := w.Alloc()

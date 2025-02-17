@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,80 +17,59 @@
 package cmap
 
 import (
+	"fmt"
+	"os"
 	"testing"
 
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/postscript/cid"
 )
 
-func TestMapping(t *testing.T) {
-	cs := charcode.CodeSpaceRange{
-		{Low: []byte{0x00}, High: []byte{0x0F}},
-		{Low: []byte{0x10, 0x12}, High: []byte{0x10, 0x7F}},
-		{Low: []byte{0x11, 0x80, 0x80}, High: []byte{0x11, 0xFF, 0xFF}},
+func TestNewFile(t *testing.T) {
+	ros := charcode.CodeSpaceRange{
+		{
+			Low:  []byte{0x00},
+			High: []byte{0xff},
+		},
 	}
-	info := &FileOld{
-		Name:           "Test",
-		CodeSpaceRange: cs,
-		CSFile:         cs,
-	}
-	m1 := map[charcode.CharCodeOld]cid.CID{
-		0:  0, // single 1
-		2:  1, // range ...
-		3:  2,
-		5:  3, // range ...
-		7:  5,
-		9:  7,
-		10: 9, // single 2
-
-		14: 10, // range ...
-		15: 11,
-		16: 12, // range ...
-		17: 13,
-
-		1000: 14, // single 3
-	}
-	info.SetMapping(m1)
-
-	if len(info.Singles) != 3 {
-		t.Errorf("expected 3 singles, got %d", len(info.Singles))
+	codec, err := charcode.NewCodec(ros)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	m2 := info.GetMapping()
-
-	for code, cid := range m1 {
-		if cid2, ok := m2[code]; !ok || cid2 != cid {
-			t.Errorf("mismatch for code %d: %d != %d", code, cid2, cid)
+	code := func(s string) charcode.Code {
+		x := []byte(s)
+		code, k, ok := codec.Decode(x)
+		if !ok || k != len(x) {
+			panic(fmt.Sprintf("invalid code: % x", x))
 		}
+		return code
 	}
+
+	data := map[charcode.Code]Code{
+		code("A"): testCode{2},
+		code("B"): testCode{3},
+		code("C"): testCode{4},
+		code("D"): testCode{5},
+		code("E"): testCode{6},
+
+		code("a"): testCode{2},
+		code("b"): testCode{3},
+		code("c"): testCode{4},
+		code("d"): testCode{5},
+		code("e"): testCode{6},
+
+		code("y"): testCode{2},
+	}
+
+	res := NewFile(codec, data)
+	res.WriteTo(os.Stdout, true)
 }
 
-func TestMappingPredefined(t *testing.T) {
-	for _, name := range allPredefined {
-		name := name
-		t.Run(name, func(t *testing.T) {
-			r, err := openPredefined(name)
-			if err != nil {
-				t.Fatal(err)
-			}
-			info, err := Read(r, nil)
-			if err != nil {
-				t.Fatal(err)
-			}
-			err = r.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			m1 := info.GetMapping()
-			info.SetMapping(m1)
-			m2 := info.GetMapping()
-
-			for code, cid := range m1 {
-				if cid2, ok := m2[code]; !ok || cid2 != cid {
-					t.Errorf("%s: mismatch for code %d: %d != %d", name, code, cid2, cid)
-				}
-			}
-		})
-	}
+type testCode struct {
+	cid CID
 }
+
+func (c testCode) CID() CID       { return c.cid }
+func (c testCode) NotdefCID() CID { return 0 }
+func (c testCode) Width() float64 { return 1000 }
+func (c testCode) Text() string   { return "" }

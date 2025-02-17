@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,14 +17,12 @@
 package cmap
 
 import (
-	"bytes"
+	"slices"
 	"sort"
 
-	"seehuhn.de/go/dag"
+	"golang.org/x/exp/maps"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/postscript/cid"
 )
 
 // Code represents a character code in a font. It provides methods to find the
@@ -46,147 +44,65 @@ type Code interface {
 	Text() string
 }
 
-// GetMapping returns the mapping information from info.
-func (info *FileOld) GetMapping() map[charcode.CharCodeOld]cid.CID {
-	res := make(map[charcode.CharCodeOld]cid.CID)
-	for _, s := range info.Singles {
-		res[s.Code] = s.Value
+func NewFile(codec *charcode.Codec, data map[charcode.Code]Code) *File {
+	res := &File{
+		CodeSpaceRange: codec.CodeSpaceRange(),
 	}
-	for _, r := range info.Ranges {
-		val := r.Value
-		for code := r.First; code <= r.Last; code++ {
-			res[code] = val
-			val++
-		}
-	}
-	return res
-}
 
-// SetMapping replaces the mapping information in info with the given mapping.
-//
-// To make efficient use of range entries, the generated mapping may be a
-// superset of the original mapping, i.e. it may contain entries for charcodes
-// which were not mapped in the original mapping.
-func (info *FileOld) SetMapping(m map[charcode.CharCodeOld]cid.CID) {
-	entries := make([]entry, 0, len(m))
-	for code, val := range m {
-		entries = append(entries, entry{code, val})
+	// group together codes which only differ in the last byte
+	type entry struct {
+		code charcode.Code
+		x    byte
 	}
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].code < entries[j].code
+	ranges := make(map[string][]entry)
+	var buf []byte
+	for code := range data {
+		buf = codec.AppendCode(buf[:0], code)
+		l := len(buf)
+		key := string(buf[:l-1])
+		ranges[key] = append(ranges[key], entry{code, buf[l-1]})
+	}
+
+	// find all ranges, in sorted order
+	keys := maps.Keys(ranges)
+	sort.Slice(keys, func(i, j int) bool {
+		return slices.Compare([]byte(keys[i]), []byte(keys[j])) < 0
 	})
 
-	g := &encoder{
-		cs: info.CodeSpaceRange,
-		mm: entries,
-	}
-	ee, err := dag.ShortestPath[int16, uint32](g, len(entries))
-	if err != nil {
-		panic(err)
-	}
+	// for each range, add the required CIDRanges and CIDSingles
+	for _, key := range keys {
+		info := ranges[key]
+		sort.Slice(info, func(i, j int) bool {
+			return info[i].x < info[j].x
+		})
 
-	info.Singles = info.Singles[:0]
-	info.Ranges = info.Ranges[:0]
-	v := 0
-	for _, e := range ee {
-		if e == 0 {
-			info.Singles = append(info.Singles, SingleOld{
-				Code:  entries[v].code,
-				Value: entries[v].value,
-			})
-		} else {
-			info.Ranges = append(info.Ranges, RangeOld{
-				First: entries[v].code,
-				Last:  entries[v+int(e)-1].code,
-				Value: entries[v].value,
-			})
+		start := 0
+		for i := 1; i <= len(info); i++ {
+			if i == len(info) ||
+				info[i].x != info[i-1].x+1 ||
+				data[info[i].code].CID() != data[info[i-1].code].CID()+1 {
+				first := make([]byte, len(key)+1)
+				copy(first, key)
+				first[len(key)] = info[start].x
+				if i-start > 1 {
+					last := make([]byte, len(key)+1)
+					copy(last, key)
+					last[len(key)] = info[i-1].x
+					res.CIDRanges = append(res.CIDRanges, Range{
+						First: first,
+						Last:  last,
+						Value: data[info[start].code].CID(),
+					})
+				} else {
+					res.CIDSingles = append(res.CIDSingles, Single{
+						Code:  first,
+						Value: data[info[start].code].CID(),
+					})
+				}
+				start = i
+			}
 		}
-		v = g.To(v, e)
-	}
-}
-
-type entry struct {
-	code  charcode.CharCodeOld
-	value cid.CID
-}
-
-type encoder struct {
-	cs   charcode.CodeSpaceRange
-	mm   []entry
-	buf0 pdf.String
-	buf1 pdf.String
-}
-
-func (g *encoder) AppendEdges(ee []int16, v int) []int16 {
-	if v < 0 || v >= len(g.mm) {
-		return ee
 	}
 
-	m0 := g.mm[v]
-	g.buf0 = g.cs.Append(g.buf0[:0], m0.code)
-
-	// Find the largest l such that entries v, ..., v+l-1 have codes which only
-	// differ in the last byte, and such that the difference between values and
-	// codes is constant.
-	l := 1
-	for v+l < len(g.mm) {
-		m1 := g.mm[v+l]
-		g.buf1 = g.cs.Append(g.buf1[:0], m1.code)
-		if !bytes.Equal(g.buf0[:len(g.buf0)-1], g.buf1[:len(g.buf1)-1]) {
-			break
-		}
-		if m1.code-m0.code != charcode.CharCodeOld(m1.value-m0.value) {
-			break
-		}
-		l++
-	}
-	if l > 1 {
-		// We can encode the entries v, ..., v+l-1 as a range of
-		// l consecutive codes/values.  We use l to indicate this
-		// kind of range.
-		ee = append(ee, int16(l))
-	} else {
-		// We use 0 to indicate an entry in the Singles list
-		ee = append(ee, 0)
-	}
-
-	return ee
-}
-
-func (g *encoder) Length(v int, e int16) uint32 {
-	// For simplicity we ignore the cost of the "begin...end" operators.
-
-	cost := uint32(0)
-	if e == 0 {
-		g.buf0 = g.cs.Append(g.buf0[:0], g.mm[v].code)
-		cost += 2*uint32(len(g.buf0)) + 3 // "<xx> "
-		cost += ndigit(g.mm[v].value) + 1 // "xxx\n"
-	} else {
-		g.buf0 = g.cs.Append(g.buf0[:0], g.mm[v].code)
-		cost += 4*uint32(len(g.buf0)) + 6 // "<xx> <xx> "
-		cost += ndigit(g.mm[v].value) + 1 // "xxx\n"
-	}
-
-	return cost
-}
-
-func ndigit(cid cid.CID) uint32 {
-	if cid < 10 {
-		return 1
-	} else if cid < 100 {
-		return 2
-	} else if cid < 1000 {
-		return 3
-	} else if cid < 10000 {
-		return 4
-	} else {
-		return 5
-	}
-}
-
-func (g *encoder) To(v int, e int16) int {
-	if e == 0 {
-		return v + 1
-	}
-	return v + int(e)
+	return res
 }

@@ -18,6 +18,6 @@ require (
 )
 
 require (
-	golang.org/x/sys v0.20.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
 	seehuhn.de/go/dijkstra v0.9.3 // indirect
 )

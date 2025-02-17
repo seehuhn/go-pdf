@@ -17,13 +17,12 @@
 package fonttypes
 
 import (
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 )
 
 // Standard makes one of the 14 standard PDF fonts.
-var Standard = func(rm *pdf.ResourceManager) font.Layouter {
+var Standard = func() font.Layouter {
 	F, err := standard.Helvetica.New(nil)
 	if err != nil {
 		panic(err)

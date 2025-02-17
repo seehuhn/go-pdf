@@ -148,12 +148,13 @@ func isConsistent(F *type1.Font, M *afm.Metrics) bool {
 	if F == nil || M == nil {
 		return true
 	}
+	qh := F.FontMatrix[0] * 1000
 	for name, glyph := range F.Glyphs {
 		metrics, ok := M.Glyphs[name]
 		if !ok {
 			return false
 		}
-		if math.Abs(glyph.WidthX-metrics.WidthX) > 0.5 {
+		if math.Abs(glyph.WidthX*qh-metrics.WidthX) > 0.5 {
 			return false
 		}
 	}

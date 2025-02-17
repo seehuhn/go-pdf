@@ -20,18 +20,17 @@ import (
 	"math"
 
 	"seehuhn.de/go/geom/matrix"
-	"seehuhn.de/go/sfnt"
 
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
 
+	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/examples/feature-tests/cffcidbbox/text"
 	"seehuhn.de/go/pdf/font"
 	pdfcff "seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -41,6 +40,7 @@ import (
 	"seehuhn.de/go/pdf/font/glyphdata/cffglyphs"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/text"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
 )
 

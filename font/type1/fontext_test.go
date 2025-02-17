@@ -17,7 +17,6 @@
 package type1_test
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -91,7 +90,7 @@ func TestTextContent(t *testing.T) {
 	pageRef := page.Out.Alloc() // fix the reference for the page dictionary
 	page.Ref = pageRef
 
-	F := fonttypes.Type1WithoutMetrics(page.RM)
+	F := fonttypes.Type1WithMetrics()
 	page.TextBegin()
 	page.TextSetFont(F, 12)
 	page.TextFirstLine(100, 100)
@@ -106,7 +105,7 @@ func TestTextContent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	os.WriteFile("debug.pdf", mem.Data, 0644)
+	// os.WriteFile("debug.pdf", mem.Data, 0644)
 
 	// step 2: extract the encoded string from the content stream
 	var textString pdf.String

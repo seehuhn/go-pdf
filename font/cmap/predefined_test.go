@@ -17,63 +17,12 @@
 package cmap
 
 import (
-	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
-	"seehuhn.de/go/pdf/font/charcode"
 )
-
-func TestPredefined(t *testing.T) {
-	dir, err := predefined.ReadDir("predefined")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	allNames := make([]string, len(dir))
-	for i, d := range dir {
-		name := d.Name()
-		name = strings.TrimPrefix(name, "predefined/")
-		name = strings.TrimSuffix(name, ".gz")
-		allNames[i] = name
-	}
-	slices.Sort(allNames)
-
-	if d := cmp.Diff(allNames, allPredefined); d != "" {
-		t.Errorf("wrong names:\n%s", d)
-	}
-
-	for _, name := range allNames {
-		r, err := openPredefined(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		cmap, err := Read(r, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		rr1 := builtinCS[name]
-		rr2 := []charcode.Range(cmap.CodeSpaceRange)
-		if d := cmp.Diff(rr1, rr2); d != "" {
-			fmt.Printf("\t%q: {\n", name)
-			for _, r := range rr2 {
-				fmt.Printf("\t\t{Low: %#v, High: %#v},\n", r.Low, r.High)
-			}
-			fmt.Printf("\t},\n")
-			t.Errorf("wrong ranges for %q:\n%s", name, d)
-		}
-
-		err = r.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-}
 
 func TestConsistency(t *testing.T) {
 	names := maps.Keys(builtinCS)

@@ -17,7 +17,6 @@
 package fonttypes
 
 import (
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
@@ -48,7 +47,7 @@ var (
 	CFFCID2Composite = cffEmbedder{2, true}.font
 )
 
-func (f cffEmbedder) font(*pdf.ResourceManager) font.Layouter {
+func (f cffEmbedder) font() font.Layouter {
 	var info *sfnt.Font
 	switch f.tp {
 	case 0:

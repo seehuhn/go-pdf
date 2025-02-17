@@ -17,7 +17,6 @@
 package fonttypes
 
 import (
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
@@ -32,7 +31,7 @@ var Type1WithoutMetrics = type1embedder{false}.font
 
 type type1embedder struct{ metrics bool }
 
-func (t type1embedder) font(rm *pdf.ResourceManager) font.Layouter {
+func (t type1embedder) font() font.Layouter {
 	info := makefont.Type1()
 
 	var afm *afm.Metrics

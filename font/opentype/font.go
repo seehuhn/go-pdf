@@ -24,7 +24,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/sfnt"
 )
@@ -166,13 +165,7 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		}
 	} else { // glyf outlines
 		if !opt.Composite {
-			embedded = &embeddedGlyfSimple{
-				w:               w,
-				ref:             ref,
-				sfnt:            f.Font,
-				TrueTypeEncoder: encoding.NewTrueTypeEncoder(),
-				closed:          false,
-			}
+			embedded = newEmbeddedGlyfSimple(ref, f.Font)
 		} else {
 			var gidToCID cmap.GIDToCID
 			if opt.MakeGIDToCID != nil {
@@ -241,4 +234,9 @@ func scaleBoxesCFF(bboxes []funit.Rect16, M []float64) []rect.Rect {
 		res[i] = bPDF
 	}
 	return res
+}
+
+func clone[T any](obj *T) *T {
+	new := *obj
+	return &new
 }

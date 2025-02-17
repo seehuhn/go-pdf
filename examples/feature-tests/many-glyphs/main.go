@@ -50,7 +50,7 @@ func run() error {
 	for _, sample := range fonttypes.All {
 		page := doc.AddPage()
 
-		F := sample.MakeFont(page.RM)
+		F := sample.MakeFont()
 
 		if sample.Type.IsComposite() {
 			drawPage(H, 32, page, F, sample.Description)

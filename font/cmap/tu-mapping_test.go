@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2023  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -16,67 +16,89 @@
 
 package cmap
 
-import (
-	"testing"
+import "testing"
 
-	"github.com/google/go-cmp/cmp"
-	"seehuhn.de/go/pdf/font/charcode"
-)
+func TestMakeSimpleToUnicode(t *testing.T) {
+	tests := []struct {
+		name  string
+		input map[byte]string
+	}{
+		{
+			name:  "empty_mapping",
+			input: map[byte]string{},
+		},
+		{
+			name: "single_ascii",
+			input: map[byte]string{
+				65: "A",
+			},
+		},
+		{
+			name: "consecutive_ascii",
+			input: map[byte]string{
+				65: "A",
+				66: "B",
+				67: "C",
+			},
+		},
+		{
+			name: "with_gaps",
+			input: map[byte]string{
+				65: "A",
+				// gap
+				70: "F",
+			},
+		},
+		{
+			name: "non_incrementing_sequence",
+			input: map[byte]string{
+				65: "A",
+				66: "Z",
+				67: "B",
+			},
+		},
+		{
+			name: "unicode_characters",
+			input: map[byte]string{
+				65: "α",
+				66: "β",
+				67: "γ",
+			},
+		},
+		{
+			name: "mixed_patterns",
+			input: map[byte]string{
+				10: "A", // single
+				20: "B", // start of incrementing sequence
+				21: "C",
+				22: "D",
+				30: "X", // start of non-incrementing sequence
+				31: "Z",
+				32: "Y",
+			},
+		},
+		{
+			name: "boundaries",
+			input: map[byte]string{
+				0:   "Α",
+				255: "Ω",
+			},
+		},
+	}
 
-func TestFromMapping(t *testing.T) {
-	m := map[charcode.CharCodeOld][]rune{
-		'A': []rune("A"), // single
-		'B': []rune("X"), // single
-		'C': []rune("C"), // range ...
-		'D': []rune("D"),
-		'E': []rune("E"),
-		'F': []rune("F"),
-		'G': []rune("G"),
-	}
-	info := &ToUnicodeOld{
-		CS: charcode.Simple,
-	}
-	info.SetMapping(m)
-	if len(info.Singles) != 2 {
-		t.Fatalf("expected 2 singles, got %d:\n%v", len(info.Singles), info)
-	}
-	if info.Singles[0].Code != 'A' {
-		t.Errorf("expected 'A', got %d", info.Singles[0].Code)
-	}
-	if info.Singles[1].Code != 'B' {
-		t.Errorf("expected 'B', got %d", info.Singles[1].Code)
-	}
-	if len(info.Ranges) != 1 {
-		t.Fatalf("expected 1 range, got %d", len(info.Ranges))
-	}
-	if info.Ranges[0].First != 'C' {
-		t.Errorf("expected 'C', got %d", info.Ranges[0].First)
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := MakeSimpleToUnicode(tt.input)
+			decoded := result.GetSimpleMapping()
 
-func TestFromMapping2(t *testing.T) {
-	m := map[charcode.CharCodeOld][]rune{
-		'A': []rune("A"), // range ...
-		'C': []rune("C"),
-		'E': []rune("E"),
-	}
-	info := &ToUnicodeOld{
-		CS: charcode.Simple,
-	}
-	info.SetMapping(m)
-	if len(info.Singles) != 0 {
-		t.Fatalf("expected 0 singles, got %d", len(info.Singles))
-	}
-	if len(info.Ranges) != 1 {
-		t.Fatalf("expected 1 range, got %d", len(info.Ranges))
-	}
-	r := info.Ranges[0]
-	rExpected := ToUnicodeRangeOld{
-		First:  'A',
-		Last:   'E',
-		Values: [][]rune{[]rune("A")},
-	}
-	if d := cmp.Diff(r, rExpected); d != "" {
-		t.Errorf("unexpected range: %s", d)
+			// Check that all mappings are preserved exactly
+			for b := byte(0); b < 255; b++ {
+				got := decoded[b]
+				want := tt.input[b]
+				if got != want {
+					t.Errorf("byte %d: got %q, want %q", b, got, want)
+				}
+			}
+		})
 	}
 }

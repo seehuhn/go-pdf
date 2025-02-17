@@ -19,12 +19,14 @@ package main
 import (
 	"log"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/rect"
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/postscript/psenc"
-	pst1 "seehuhn.de/go/postscript/type1"
 
+	"seehuhn.de/go/postscript/psenc"
+	"seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/sfnt/glyph"
+
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
@@ -32,6 +34,7 @@ import (
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/pdf/font/widths"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -59,10 +62,7 @@ func run() error {
 
 	X := &testFont{}
 
-	M, err := makeMarkerFont(page.RM)
-	if err != nil {
-		return err
-	}
+	M := makeMarkerFont()
 
 	yPos := paper.URy - 72 - 15
 
@@ -132,27 +132,33 @@ func run() error {
 	return page.Close()
 }
 
-// MakeMarkerFont creates a simple type3 font where "I" shows a gray, vertical
+// makeMarkerFont creates a simple type3 font where "I" shows a gray, vertical
 // line.
-func makeMarkerFont(rm *pdf.ResourceManager) (font.Font, error) {
-	builder := type3.NewBuilder(rm)
-
-	g, err := builder.AddGlyph("I", 50, funit.Rect16{LLy: -500, URx: 50, URy: 1500}, false)
-	if err != nil {
-		return nil, err
+func makeMarkerFont() font.Font {
+	markerFont := &type3.Font{
+		FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},
+		Glyphs: []*type3.Glyph{
+			{},
+			{
+				Name:  "I",
+				Width: 50,
+				BBox:  rect.Rect{LLy: -500, URx: 50, URy: 1500},
+				Color: true,
+				Draw: func(w *graphics.Writer) {
+					w.SetFillColor(color.DeviceGray(0.5))
+					w.Rectangle(0, -500, 50, 2000)
+					w.Fill()
+				},
+			},
+		},
 	}
-	g.SetFillColor(color.DeviceGray(0.5))
-	g.Rectangle(0, -500, 50, 2000)
-	g.Fill()
-	err = g.Close()
-	if err != nil {
-		return nil, err
+	F := &type3.Instance{
+		Font: markerFont,
+		CMap: map[rune]glyph.ID{
+			'I': 1,
+		},
 	}
-
-	prop := &type3.Properties{
-		FontMatrix: [6]float64{0.001, 0, 0, 0.001, 0, 0},
-	}
-	return builder.Finish(prop)
+	return F
 }
 
 // This is a modified version of the Times-Roman font,
@@ -178,20 +184,20 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	if err != nil {
 		return nil, nil, err
 	}
-	F, err := pst1.Read(fd)
+	F, err := type1.Read(fd)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// copy the glyphs we want to keep
 	oldGlyphs := F.Glyphs
-	F.Glyphs = make(map[string]*pst1.Glyph)
+	F.Glyphs = make(map[string]*type1.Glyph)
 	F.Glyphs["space"] = oldGlyphs["space"]
 	F.Glyphs["Yacute"] = oldGlyphs["Yacute"]
 	F.Glyphs["AEacute"] = oldGlyphs["AEacute"]
 
 	// Since the original font has a blank .notdef glyph, we draw one manually.
-	notdef := &pst1.Glyph{
+	notdef := &type1.Glyph{
 		WidthX: 500,
 	}
 	notdef.MoveTo(10, 10)

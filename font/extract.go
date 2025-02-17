@@ -72,7 +72,7 @@ type DataType int
 const (
 	DataUnknown DataType = iota
 	DataType1
-	DateType3
+	DataType3
 	DataCFF
 	DataTrueType
 	DataOpenType
