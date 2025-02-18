@@ -60,7 +60,7 @@ type embeddedSimple struct {
 	CapHeight float64 // PDF glyph space units
 	XHeight   float64 // PDF glyph space units
 
-	*simpleenc.Table
+	*simpleenc.Simple
 
 	finished bool
 }
@@ -78,7 +78,7 @@ func newEmbeddedSimple(ref pdf.Reference, f *Instance) *embeddedSimple {
 		Leading:   f.Leading,
 		CapHeight: f.CapHeight,
 		XHeight:   f.XHeight,
-		Table: simpleenc.NewTable(
+		Simple: simpleenc.NewSimple(
 			math.Round(f.Font.GlyphWidthPDF(0)),
 			f.Font.FontName == "ZapfDingbats",
 			&pdfenc.WinAnsi,
@@ -89,7 +89,7 @@ func newEmbeddedSimple(ref pdf.Reference, f *Instance) *embeddedSimple {
 }
 
 func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
-	c, ok := e.Table.GetCode(gid, text)
+	c, ok := e.Simple.GetCode(gid, text)
 	if !ok {
 		if e.finished {
 			return s, 0
@@ -98,13 +98,13 @@ func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) 
 		glyphName := e.Font.Outlines.Glyphs[gid].Name
 		width := math.Round(e.Font.GlyphWidthPDF(gid))
 		var err error
-		c, err = e.Table.AllocateCode(gid, glyphName, text, width)
+		c, err = e.Simple.AllocateCode(gid, glyphName, text, width)
 		if err != nil {
 			return s, 0
 		}
 	}
 
-	w := e.Table.Width(c)
+	w := e.Simple.Width(c)
 	return append(s, c), w / 1000
 }
 
@@ -116,7 +116,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	}
 	e.finished = true
 
-	if e.Table.Overflow() {
+	if e.Simple.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q",
 			e.Font.FontName)
 	}
@@ -125,7 +125,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	outlines := e.Font.Outlines
 
 	// subset the font, if needed
-	glyphs := e.Table.Glyphs()
+	glyphs := e.Simple.Glyphs()
 	subsetTag := subset.Tag(glyphs, outlines.NumGlyphs())
 	var subsetOutlines *cff.Outlines
 	if subsetTag != "" {
@@ -147,7 +147,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	subsetOutlines.FontMatrices = nil
 	for gid, origGID := range glyphs { // fill in the glyph names
 		g := subsetOutlines.Glyphs[gid]
-		glyphName := e.Table.GlyphName(origGID)
+		glyphName := e.Simple.GlyphName(origGID)
 		if g.Name == glyphName {
 			continue
 		}
@@ -181,7 +181,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		FontWeight:   e.Weight,
 		IsFixedPitch: subsetFont.IsFixedPitch,
 		IsSerif:      e.IsSerif,
-		IsSymbolic:   e.Table.IsSymbolic(),
+		IsSymbolic:   e.Simple.IsSymbolic(),
 		IsScript:     e.IsScript,
 		IsItalic:     italicAngle != 0,
 		ForceBold:    subsetFont.Private[0].ForceBold,
@@ -194,23 +194,23 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		XHeight:      e.XHeight,
 		StemV:        math.Round(subsetFont.Private[0].StdVW * qh),
 		StemH:        math.Round(subsetFont.Private[0].StdHW * qv),
-		MissingWidth: e.Table.DefaultWidth(),
+		MissingWidth: e.Simple.DefaultWidth(),
 	}
 	dict := &dict.Type1{
 		Ref:            e.Ref,
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
-		Encoding:       e.Table.Encoding(),
+		Encoding:       e.Simple.Encoding(),
 		FontType:       glyphdata.CFFSimple,
 		FontRef:        rm.Out.Alloc(),
 	}
 	for c := range 256 {
-		if !e.Table.IsUsed(byte(c)) {
+		if !e.Simple.IsUsed(byte(c)) {
 			continue
 		}
-		dict.Width[c] = e.Table.Width(byte(c))
-		dict.Text[c] = e.Table.Text(byte(c))
+		dict.Width[c] = e.Simple.Width(byte(c))
+		dict.Text[c] = e.Simple.Text(byte(c))
 	}
 
 	err := dict.WriteToPDF(rm)

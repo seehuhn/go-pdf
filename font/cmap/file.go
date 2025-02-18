@@ -101,9 +101,9 @@ func (r Range) String() string {
 	return fmt.Sprintf("% 02x-% 02x: %d", r.First, r.Last, r.Value)
 }
 
-// ExtractNew extracts a CMap from a PDF object.
+// Extract extracts a CMap from a PDF object.
 // The argument must be the name of a predefined CMap or a stream containing a CMap.
-func ExtractNew(r pdf.Getter, obj pdf.Object) (*File, error) {
+func Extract(r pdf.Getter, obj pdf.Object) (*File, error) {
 	predefinedMu.Lock()
 	defer predefinedMu.Unlock()
 

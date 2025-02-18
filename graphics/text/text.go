@@ -27,6 +27,10 @@ import (
 )
 
 func Show(w *graphics.Writer, args ...any) {
+	if w.Err != nil {
+		return
+	}
+
 	var leading float64
 	var leadingSet bool
 
@@ -48,6 +52,10 @@ func Show(w *graphics.Writer, args ...any) {
 			if v.Color != nil {
 				w.SetFillColor(v.Color)
 			}
+		case Leading:
+			leading = float64(v)
+			leadingSet = true
+			w.TextSetLeading(leading)
 		case string:
 			w.TextShow(v)
 		case pdf.String:
@@ -99,6 +107,8 @@ type F struct {
 	Size  float64
 	Color color.Color
 }
+
+type Leading float64
 
 type RecordPos struct {
 	UserX, UserY *float64

@@ -42,7 +42,7 @@ func (r *Reader) readCompositeFont(info *font.Dicts, toUni *cmap.ToUnicodeFile) 
 	fontDict := info.FontDict
 	cidFontDict := info.CIDFontDict
 
-	encoding, err := cmap.ExtractNew(r.R, fontDict["Encoding"])
+	encoding, err := cmap.Extract(r.R, fontDict["Encoding"])
 	if err != nil {
 		return nil, err
 	}

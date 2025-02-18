@@ -136,7 +136,7 @@ func ExtractCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 
 	// fields in the font dictionary
 
-	d.Encoding, err = cmap.ExtractNew(r, fontDict["Encoding"])
+	d.Encoding, err = cmap.Extract(r, fontDict["Encoding"])
 	if err != nil {
 		return nil, err
 	}

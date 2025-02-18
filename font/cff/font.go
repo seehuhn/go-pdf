@@ -182,7 +182,7 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 }
 
 // Embed adds the font to a PDF file.
-// This is usually called by [pdf.ResourceManagerEmbed], instead of being called directly.
+// The function is usually called by [pdf.ResourceManagerEmbed], instead of being called directly.
 //
 // This implements the [font.Font] interface.
 func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {

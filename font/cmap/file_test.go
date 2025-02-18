@@ -269,7 +269,7 @@ func TestExtractCMAP(t *testing.T) {
 
 	}
 
-	child, err := ExtractNew(data, childRef)
+	child, err := Extract(data, childRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -509,7 +509,7 @@ func TestExtractPredefined(t *testing.T) {
 	for _, name := range names {
 		data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 		t.Run(string(name), func(t *testing.T) {
-			info, err := ExtractNew(data, name)
+			info, err := Extract(data, name)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -586,7 +586,7 @@ func TestExtractLoop(t *testing.T) {
 				}
 			}
 
-			info, err := ExtractNew(data, refs[0])
+			info, err := Extract(data, refs[0])
 			if err != nil {
 				t.Fatal(err)
 			}

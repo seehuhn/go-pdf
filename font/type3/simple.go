@@ -43,16 +43,16 @@ type embeddedSimple struct {
 	Ref  pdf.Reference
 	Font *Font
 
-	*simpleenc.Table
+	*simpleenc.Simple
 
 	finished bool
 }
 
 func newEmbeddedSimple(ref pdf.Reference, font *Font) *embeddedSimple {
 	e := &embeddedSimple{
-		Ref:   ref,
-		Font:  font,
-		Table: simpleenc.NewTable(0, false, &pdfenc.Standard),
+		Ref:    ref,
+		Font:   font,
+		Simple: simpleenc.NewSimple(0, false, &pdfenc.Standard),
 	}
 	return e
 }
@@ -61,12 +61,12 @@ func (e *embeddedSimple) DecodeWidth(s pdf.String) (float64, int) {
 	if len(s) == 0 {
 		return 0, 0
 	}
-	w := e.Table.Width(s[0]) * e.Font.FontMatrix[0]
+	w := e.Simple.Width(s[0]) * e.Font.FontMatrix[0]
 	return w, 1
 }
 
 func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
-	c, ok := e.Table.GetCode(gid, text)
+	c, ok := e.Simple.GetCode(gid, text)
 	if !ok {
 		if e.finished {
 			return s, 0
@@ -77,13 +77,13 @@ func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) 
 		width := math.Round(g.Width)
 
 		var err error
-		c, err = e.Table.AllocateCode(gid, glyphName, text, width)
+		c, err = e.Simple.AllocateCode(gid, glyphName, text, width)
 		if err != nil {
 			return s, 0
 		}
 	}
 
-	w := e.Table.Width(c)
+	w := e.Simple.Width(c)
 	return append(s, c), w * e.Font.FontMatrix[0]
 }
 
@@ -93,11 +93,11 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	}
 	e.finished = true
 
-	if e.Table.Overflow() {
+	if e.Simple.Overflow() {
 		return errors.New("too many distinct glyphs used in Type 3 font")
 	}
 
-	glyphs := e.Table.Glyphs()
+	glyphs := e.Simple.Glyphs()
 
 	// Write the glyphs first, so that we can construct the resources
 	// dictionary. Here we use a common builder for all glyphs, so that a
@@ -160,7 +160,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		FontWeight:   e.Font.FontWeight,
 		IsFixedPitch: e.Font.IsFixedPitch,
 		IsSerif:      e.Font.IsSerif,
-		IsSymbolic:   e.Table.IsSymbolic(),
+		IsSymbolic:   e.Simple.IsSymbolic(),
 		IsScript:     e.Font.IsScript,
 		IsItalic:     italicAngle != 0,
 		IsAllCap:     e.Font.IsAllCap,
@@ -172,24 +172,24 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		CapHeight:    e.Font.CapHeight,
 		XHeight:      e.Font.XHeight,
 		StemV:        -1,
-		MissingWidth: e.Table.DefaultWidth(),
+		MissingWidth: e.Simple.DefaultWidth(),
 	}
 	dict := &dict.Type3{
 		Ref:        e.Ref,
 		Name:       pdf.Name(e.Font.PostScriptName),
 		Descriptor: fd,
-		Encoding:   e.Table.Encoding(),
+		Encoding:   e.Simple.Encoding(),
 		CharProcs:  charProcs,
 		// FontBBox:   &pdf.Rectangle{},
 		FontMatrix: e.Font.FontMatrix,
 		Resources:  resources,
 	}
 	for c := range 256 {
-		if !e.Table.IsUsed(byte(c)) {
+		if !e.Simple.IsUsed(byte(c)) {
 			continue
 		}
-		dict.Width[c] = e.Table.Width(byte(c))
-		dict.Text[c] = e.Table.Text(byte(c))
+		dict.Width[c] = e.Simple.Width(byte(c))
+		dict.Text[c] = e.Simple.Text(byte(c))
 	}
 
 	err := dict.WriteToPDF(rm)

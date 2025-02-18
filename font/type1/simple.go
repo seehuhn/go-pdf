@@ -56,7 +56,7 @@ type embeddedSimple struct {
 	IsAllCap   bool
 	IsSmallCap bool
 
-	*simpleenc.Table
+	*simpleenc.Simple
 
 	finished bool
 }
@@ -80,7 +80,7 @@ func newEmbeddedSimple(ref pdf.Reference, f *Instance) *embeddedSimple {
 		IsAllCap:   f.IsAllCap,
 		IsSmallCap: f.IsSmallCap,
 
-		Table: simpleenc.NewTable(
+		Simple: simpleenc.NewSimple(
 			f.GlyphWidthPDF(".notdef"),
 			f.PostScriptName() == "ZapfDingbats",
 			&pdfenc.WinAnsi,
@@ -90,7 +90,7 @@ func newEmbeddedSimple(ref pdf.Reference, f *Instance) *embeddedSimple {
 }
 
 func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
-	c, ok := e.Table.GetCode(gid, text)
+	c, ok := e.Simple.GetCode(gid, text)
 	if !ok {
 		if e.finished {
 			return s, 0
@@ -106,13 +106,13 @@ func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) 
 		width = math.Round(width)
 
 		var err error
-		c, err = e.Table.AllocateCode(gid, glyphName, text, width)
+		c, err = e.Simple.AllocateCode(gid, glyphName, text, width)
 		if err != nil {
 			return s, 0
 		}
 	}
 
-	w := e.Table.Width(c)
+	w := e.Simple.Width(c)
 	return append(s, c), w / 1000
 }
 
@@ -124,7 +124,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	}
 	e.finished = true
 
-	if e.Table.Overflow() {
+	if e.Simple.Overflow() {
 		return fmt.Errorf("too many distinct glyphs used in font %q",
 			e.Font.FontName)
 	}
@@ -142,9 +142,9 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		postScriptName = fontData.FontName
 	}
 
-	omitFontData := isStandard(postScriptName, e.Table)
+	omitFontData := isStandard(postScriptName, e.Simple)
 
-	glyphs := e.Table.Glyphs()
+	glyphs := e.Simple.Glyphs()
 	subsetTag := subset.Tag(glyphs, numGlyphs)
 
 	fontSubset := fontData
@@ -181,7 +181,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	fd := &font.Descriptor{
 		FontName:   subset.Join(subsetTag, postScriptName),
 		IsSerif:    e.IsSerif,
-		IsSymbolic: e.Table.IsSymbolic(),
+		IsSymbolic: e.Simple.IsSymbolic(),
 	}
 	if fontSubset != nil {
 		fd.FontFamily = fontSubset.FamilyName
@@ -209,14 +209,14 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
-		Encoding:       e.Table.Encoding(),
+		Encoding:       e.Simple.Encoding(),
 	}
 	for c := range 256 {
-		if !e.Table.IsUsed(byte(c)) {
+		if !e.Simple.IsUsed(byte(c)) {
 			continue
 		}
-		dict.Width[c] = e.Table.Width(byte(c))
-		dict.Text[c] = e.Table.Text(byte(c))
+		dict.Width[c] = e.Simple.Width(byte(c))
+		dict.Text[c] = e.Simple.Text(byte(c))
 	}
 	if omitFontData {
 		dict.FontType = glyphdata.None

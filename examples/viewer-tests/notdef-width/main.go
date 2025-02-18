@@ -1,22 +1,8 @@
-// seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 package main
 
 import (
+	"math"
+
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/rect"
 
@@ -37,251 +23,342 @@ import (
 	"seehuhn.de/go/pdf/font/glyphdata/cffglyphs"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/text"
 )
 
 func main() {
-	err := writeTestFile("test.pdf")
+	err := run("test.pdf")
 	if err != nil {
 		panic(err)
 	}
 }
 
-func writeTestFile(filename string) error {
-	textFont := standard.Helvetica.Must(nil)
-	testFont := makeTestFont()
+const (
+	margin    = 72.0
+	smallskip = 8.0
+)
 
-	black := color.DeviceGray(0)
-	red := color.DeviceRGB(0.9, 0, 0)
-	gray1 := color.DeviceGray(0.9)
-	gray2 := color.DeviceGray(0.75)
-
-	opt := &pdf.WriterOptions{
-		HumanReadable: true,
-	}
-	w, err := document.CreateSinglePage(filename, document.A5, pdf.V2_0, opt)
+func run(filename string) error {
+	page, err := document.CreateSinglePage(filename, document.A4, pdf.V2_0, nil)
 	if err != nil {
 		return err
 	}
 
-	w.TextBegin()
-	w.TextFirstLine(36, 550)
-	w.TextSetFont(textFont, 10)
-	w.SetFillColor(black)
-	w.TextShow("The glyphs in the test font (red) are mapped using two different code ranges:")
-	w.TextSecondLine(0, -14)
-	w.TextShow("[")
-	xBase, _ := w.GetTextPositionUser() // record the current horizontal position
-	w.TextSetFont(testFont, 10)
-	w.SetFillColor(red)
-	w.TextShowRaw(pdf.String("ABC"))
-	w.TextSetFont(textFont, 10)
-	w.SetFillColor(black)
-	w.TextShow("] codes: A B C, code space range A–Z")
-	w.TextSecondLine(0, -12)
-	w.TextShow("[")
-	w.TextSetFont(testFont, 10)
-	w.SetFillColor(red)
-	w.TextShowRaw(pdf.String("abc"))
-	w.TextSetFont(textFont, 10)
-	w.SetFillColor(black)
-	w.TextShow("] codes: a b c, code space range a–z")
-	w.TextSecondLine(0, -14)
-	w.TextShow("These three glyphs are assigned CIDs 0, 1, and 2.")
-	w.TextSecondLine(0, -13)
-	w.TextShow("The CMap embedded in the PDF file also maps CIDs 3 and 4,")
-	w.TextNextLine()
-	w.TextShow("which are missing from the embedded font.")
-	w.TextNextLine()
-	w.TextNextLine()
-	w.TextShow("The CIDFont dictionary assigns widths to CIDs 0, 1, …, 4.")
-	w.TextNextLine()
-	w.TextShow("The assigned widths are 1000, 3000, 1000, 2000 and 4000.")
-	w.TextNextLine()
-	w.TextNextLine()
-	w.TextShow("Notdef ranges in the CMap are used to assign custom notdef characters")
-	w.TextNextLine()
-	w.TextShow("for some code ranges: CID 1 for a–x, CID 4 for y–z.")
-	w.TextEnd()
-
-	w.SetStrokeColor(gray1)
-	w.SetLineWidth(0.5)
-	for _, step := range []float64{0, 10, 20, 30, 40} {
-		w.MoveTo(xBase+step, 385)
-		w.LineTo(xBase+step, 45)
+	titleFont, err := standard.TimesBold.New(nil)
+	if err != nil {
+		return err
 	}
-	w.Stroke()
+	title := text.F{
+		Font:  titleFont,
+		Size:  10,
+		Color: color.DeviceGray(0.2),
+	}
 
-	w.TextBegin()
-	w.TextFirstLine(36, 370)
-	w.TextSetFont(textFont, 10)
-	w.SetFillColor(black)
-	w.TextShow("Test 1: invalid character code")
-	w.TextSecondLine(0, -14)
-	w.TextShow("[")
-	w.TextSetFont(testFont, 10)
-	w.SetFillColor(red)
-	w.TextShowRaw(pdf.String("!"))
-	w.TextSetFont(textFont, 10)
-	w.SetFillColor(black)
-	w.TextShow("] code: !")
-	w.TextEnd()
+	noteFont, err := standard.TimesRoman.New(nil)
+	if err != nil {
+		return err
+	}
+	note := text.F{
+		Font:  noteFont,
+		Size:  10,
+		Color: color.DeviceGray(0.1),
+	}
+	label := text.F{
+		Font:  noteFont,
+		Size:  8,
+		Color: color.DeviceGray(0.5),
+	}
 
-	w.TextBegin()
-	w.TextFirstLine(36, 320)
-	w.TextSetFont(textFont, 10)
-	w.SetFillColor(black)
-	w.TextShow("Test 2: valid, unmapped code")
-	w.TextSecondLine(0, -14)
-	w.TextShow("[")
-	w.TextSetFont(testFont, 10)
-	w.SetFillColor(red)
-	w.TextShowRaw(pdf.String("X"))
-	w.TextSetFont(textFont, 10)
-	w.SetFillColor(black)
-	w.TextShow("] code: X")
-	w.TextEnd()
+	testFont := makeTestFont()
+	test := text.F{
+		Font:  testFont,
+		Size:  30,
+		Color: color.DeviceRGB(0, 0, 0.8),
+	}
 
-	w.TextBegin()
-	w.TextFirstLine(36, 270)
-	w.TextSetFont(textFont, 10)
-	w.SetFillColor(black)
-	w.TextShow("Test 3: valid code, mapped to CID 3 (missing)")
-	w.TextSecondLine(0, -14)
-	w.TextShow("[")
-	w.TextSetFont(testFont, 10)
-	w.SetFillColor(red)
-	w.TextShowRaw(pdf.String("D"))
-	w.TextSetFont(textFont, 10)
-	w.SetFillColor(black)
-	w.TextShow("] code: D")
-	w.TextEnd()
+	// -----------------------------------------------------------------------
 
-	w.TextBegin()
-	w.TextFirstLine(36, 220)
-	w.TextSetFont(textFont, 10)
-	w.SetFillColor(black)
-	w.TextShow("Test 4: valid, unmapped code; notdef = CID 1")
-	w.TextSecondLine(0, -14)
-	w.TextShow("[")
-	w.TextSetFont(testFont, 10)
-	w.SetFillColor(red)
-	w.TextShowRaw(pdf.String("x"))
-	w.TextSetFont(textFont, 10)
-	w.SetFillColor(black)
-	w.TextShow("] code: x")
-	w.TextEnd()
+	var y float64
 
-	w.TextBegin()
-	w.TextFirstLine(36, 170)
-	w.TextSetFont(textFont, 10)
-	w.SetFillColor(black)
-	w.TextShow("Test 5: valid code, mapped to CID 3 (missing); notdef = CID 1")
-	w.TextSecondLine(0, -14)
-	w.TextShow("[")
-	w.TextSetFont(testFont, 10)
-	w.SetFillColor(red)
-	w.TextShowRaw(pdf.String("d"))
-	w.TextSetFont(textFont, 10)
-	w.SetFillColor(black)
-	w.TextShow("] code: d")
-	w.TextEnd()
+	text.Show(page.Writer,
+		text.M{X: margin, Y: 800},
+		note,
+		text.Wrap(340,
+			"When decoding a PDF text string in a content stream, each code",
+			"is mapped to character identifier (CID),",
+			"which is then used to look up the corresponding glyph.",
+			"The decoder must handle the following cases:"),
+		" • code mapped to a CID, glyph present in the font", text.NL,
+		" • code mapped to a CID, no corresponding glyph in the font", text.NL,
+		" • valid code, not mapped to a CID", text.NL,
+		" • invalid code", text.NL,
+		text.NL,
+		text.Wrap(340,
+			"If there is no glyph, no CID, or no valid code,",
+			"usually the glyph for CID 0 is shown.",
+			"This glyph must always exist.",
+			"A “notdef range” in the CMap can be used to map ranges of codes",
+			"to alternative notdef CIDs, which are used in place of CID 0.",
+			"The decoder must handle these cases:"),
+		" • no notdef CID", text.NL,
+		" • notdef CID specified, glyph present in font", text.NL,
+		" • notdef CID specified, no corresponding glyph", text.NL,
+		text.NL,
+		text.Wrap(340,
+			"The PDF specification does not always clearly define which glyph width should be used in different cases.",
+			"This document helps to determine how different PDF viewers handle glyph width selection and display.",
+		),
+		text.NL,
+		title, "Control", text.NL,
+		note, text.Wrap(340,
+			"There should be six crosses, one in each green circle.",
+			"Otherwise this test file is broken.",
+		),
+		text.RecordPos{UserX: nil, UserY: &y},
+	)
 
-	w.TextBegin()
-	w.TextFirstLine(36, 120)
-	w.TextSetFont(textFont, 10)
-	w.SetFillColor(black)
-	w.TextShow("Test 6: valid, unmapped code; notdef = CID 4 (missing)")
-	w.TextSecondLine(0, -14)
-	w.TextShow("[")
-	w.TextSetFont(testFont, 10)
-	w.SetFillColor(red)
-	w.TextShowRaw(pdf.String("z"))
-	w.TextSetFont(textFont, 10)
-	w.SetFillColor(black)
-	w.TextShow("] code: z")
-	w.TextEnd()
+	y -= 4
+	showRow(page, test, &y, 'A', 0, 0)
+	showRow(page, test, &y, 'B', 1, 1)
+	showRow(page, test, &y, 'C', 2, 2)
+	y -= smallskip
 
-	w.TextBegin()
-	w.TextFirstLine(36, 70)
-	w.TextSetFont(textFont, 10)
-	w.SetFillColor(black)
-	w.TextShow("test 7: valid code, mapped to CID 3 (missing); notdef = CID 4 (missing)")
-	w.TextSecondLine(0, -14)
-	w.TextShow("[")
-	w.TextSetFont(testFont, 10)
-	w.SetFillColor(red)
-	w.TextShowRaw(pdf.String("y"))
-	w.TextSetFont(textFont, 10)
-	w.SetFillColor(black)
-	w.TextShow("] code: y")
-	w.TextEnd()
+	text.Show(page.Writer,
+		text.M{X: 330, Y: y - 40},
+		note,
+		text.Wrap(200,
+			"Crosses on the left indicate which glyph this PDF viewer shows,",
+			"crosses on the right show which width is used."),
+	)
+	page.SetStrokeColor(color.DeviceGray(0))
+	page.MoveTo(325, y-50)
+	page.LineTo(240, y-50)
+	page.MoveTo(245, y-47)
+	page.LineTo(240, y-50)
+	page.LineTo(245, y-53)
+	page.Stroke()
 
-	w.Transform(matrix.Translate(xBase-2.5, 43))
-	w.Transform(matrix.RotateDeg(-90))
-	w.TextBegin()
-	w.TextSetFont(textFont, 7)
-	w.SetFillColor(gray2)
-	w.TextShow("0")
-	w.TextSecondLine(0, 10)
-	w.TextShow("1000")
-	w.TextNextLine()
-	w.TextShow("2000")
-	w.TextNextLine()
-	w.TextShow("3000")
-	w.TextNextLine()
-	w.TextShow("4000")
-	w.TextEnd()
+	text.Show(page.Writer,
+		text.M{X: margin, Y: y},
+		title, "Test 1: glyph present", text.NL,
+		note, text.Wrap(340,
+			"The glyph should be shown, using its normal width.",
+		),
+		text.RecordPos{UserX: nil, UserY: &y},
+	)
+	y -= 4
+	showHeaders(page, label, &y)
+	showRow(page, test, &y, 'C', 2, 2)
+	y -= smallskip
 
-	return w.Close()
+	text.Show(page.Writer,
+		text.M{X: margin, Y: y},
+		title, "Test 2: CID with no glyph, no notdef CID", text.NL,
+		note, text.Wrap(340,
+			"The glyph for CID 0 should be shown,",
+			"but using the original glyph width.",
+		),
+		text.RecordPos{UserX: nil, UserY: &y},
+	)
+	y -= 4
+	showRow(page, test, &y, 'E', 0, 2)
+	y -= smallskip
+
+	text.Show(page.Writer,
+		text.M{X: margin, Y: y},
+		title, "Test 3: CID with no glyph, notdef glyph present", text.NL,
+		note, text.Wrap(340,
+			"The custom notdef glyph should be shown.",
+		),
+		text.RecordPos{UserX: nil, UserY: &y},
+	)
+	y -= 4
+	showRow(page, test, &y, 'e', 1, -1)
+	y -= smallskip
+
+	text.Show(page.Writer,
+		text.M{X: margin, Y: y},
+		title, "Test 4: CID with no glyph, notdef glyph specified but missing", text.NL,
+		note, text.Wrap(340,
+			"CID 0 should be shown.",
+		),
+		text.RecordPos{UserX: nil, UserY: &y},
+	)
+	y -= 4
+	showRow(page, test, &y, 'x', 0, -1)
+	y -= smallskip
+
+	text.Show(page.Writer,
+		text.M{X: margin, Y: y},
+		title, "Test 5: unmapped code, no notdef CID", text.NL,
+		note, text.Wrap(340,
+			"The glyph for CID 0 should be shown.",
+		),
+		text.RecordPos{UserX: nil, UserY: &y},
+	)
+	y -= 4
+	showRow(page, test, &y, '0', 0, 0)
+	y -= smallskip
+
+	text.Show(page.Writer,
+		text.M{X: margin, Y: y},
+		title, "Test 6: unmapped code, notdef glyph present", text.NL,
+		note, text.Wrap(340,
+			"The custom notdef glyph should be shown.",
+		),
+		text.RecordPos{UserX: nil, UserY: &y},
+	)
+	y -= 4
+	showRow(page, test, &y, '1', 1, 1)
+	y -= smallskip
+
+	text.Show(page.Writer,
+		text.M{X: margin, Y: y},
+		title, "Test 7: unmapped code, notdef glyph specified but missing", text.NL,
+		note, text.Wrap(340,
+			"CID 0 should be shown.",
+		),
+		text.RecordPos{UserX: nil, UserY: &y},
+	)
+	y -= 4
+	showRow(page, test, &y, '2', 0, 1)
+	y -= smallskip
+
+	text.Show(page.Writer,
+		text.M{X: margin, Y: y},
+		title, "Test 8: invalid code", text.NL,
+		note, text.Wrap(340,
+			"CID 0 should be shown, and the width of CID 0 should be used.",
+		),
+		text.RecordPos{UserX: nil, UserY: &y},
+	)
+	y -= 4
+	showRow(page, test, &y, '!', 0, 0)
+
+	// -----------------------------------------------------------------------
+
+	err = page.Close()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func showHeaders(page *document.Page, font text.F, y *float64) {
+	*y -= 32
+
+	q := 30.0 / 1000.0
+
+	M := matrix.Translate(margin+250*q+2, *y)
+	M = matrix.RotateDeg(90).Mul(M)
+
+	page.TextBegin()
+	page.TextSetFont(font.Font, font.Size)
+	page.SetFillColor(font.Color)
+	page.TextSetMatrix(M)
+	page.TextShow("CID 0")
+	page.TextSecondLine(0, -500*q)
+	page.TextShow("notdef")
+	page.TextNextLine()
+	page.TextShow("glyph")
+	page.TextFirstLine(0, -1500*q)
+	page.TextShow("width 0")
+	page.TextNextLine()
+	page.TextShow("CID 0 width")
+	page.TextNextLine()
+	page.TextShow("notdef wd")
+	page.TextNextLine()
+	page.TextShow("glyph width")
+	page.TextNextLine()
+	page.TextShow("default width")
+	page.TextEnd()
+
+	*y -= 11
+}
+
+func showRow(page *document.Page, test text.F, y *float64, code byte, gIdx, wIdx int) {
+	for i := 0; i < 3; i++ {
+		if i == gIdx {
+			good(page, *y, i)
+		} else {
+			choice(page, *y, i)
+		}
+	}
+	choice(page, *y, 5)
+	for j := 0; j < 3; j++ {
+		if j == wIdx {
+			good(page, *y, j+6)
+		} else {
+			choice(page, *y, j+6)
+		}
+	}
+	choice(page, *y, 9)
+	text.Show(page.Writer,
+		text.M{X: margin, Y: *y},
+		test,
+		pdf.String{code, 'D', 'D', 'D', 'D', 'D', 'A'},
+	)
+
+	*y -= 13
+}
+
+func choice(page *document.Page, y0 float64, idx int) {
+	page.SetLineWidth(0.8)
+	page.SetStrokeColor(color.DeviceGray(0.6))
+	circle(page, y0, idx)
+	page.Stroke()
+}
+
+func good(page *document.Page, y0 float64, idx int) {
+	page.SetFillColor(color.DeviceRGB(0.3, 1, 0.3))
+	circle(page, y0, idx)
+	page.Fill()
+}
+
+func circle(page *document.Page, y0 float64, idx int) {
+	q := 30.0 / 1000.0
+	x := margin + (250+500*float64(idx))*q
+	y := y0 + 150*q
+	page.Circle(x, y, 130*q)
 }
 
 func makeTestFont() *testFont {
 	var glyphs []*cff.Glyph
 
-	// CID 0: a 800x800 square, glyph width 1000 (regular notdef glyph)
-	g := &cff.Glyph{
+	g := &cff.Glyph{ // CID 0
+		Width: 500,
+	}
+	drawCross(g, 250, 150, 140, 32)
+	glyphs = append(glyphs, g)
+
+	g = &cff.Glyph{ // CID 1
 		Width: 1000,
 	}
-	g.MoveTo(0, 0)
-	g.LineTo(800, 0)
-	g.LineTo(800, 800)
-	g.LineTo(0, 800)
+	drawCross(g, 750, 150, 140, 32)
 	glyphs = append(glyphs, g)
 
-	// CID 1: a 2800x500 rectangle, glyph width 3000 (alternate notdef glyph)
-	g = &cff.Glyph{
-		Width: 3000,
+	g = &cff.Glyph{ // CID 2
+		Width: 1500,
 	}
-	g.MoveTo(0, 0)
-	g.LineTo(2800, 0)
-	g.LineTo(2800, 500)
-	g.LineTo(0, 500)
+	drawCross(g, 1250, 150, 140, 32)
 	glyphs = append(glyphs, g)
 
-	// CID 2: a 800x100 rectangle, glyph width 1000 (regular glyph)
-	g = &cff.Glyph{
-		Width: 1000,
+	g = &cff.Glyph{ // CID 3, blank
+		Width: 500,
 	}
-	g.MoveTo(0, 0)
-	g.LineTo(800, 0)
-	g.LineTo(800, 100)
-	g.LineTo(0, 100)
 	glyphs = append(glyphs, g)
-
-	// CID 3 is referenced in the CMap but missing in the font, glyph width 2000
-
-	// CID 4 is referenced in the CMap but missing in the font, glyph width 4000
 
 	o := &cff.Outlines{
 		Glyphs: glyphs,
 		Private: []*type1.PrivateDict{
 			{
-				BlueValues: []funit.Int16{-10, 0, 990, 1000},
+				BlueValues: []funit.Int16{-10, 0, 290, 300},
 				BlueScale:  0.039625,
 				BlueShift:  7,
 				BlueFuzz:   1,
-				StdHW:      100,
-				StdVW:      100,
+				StdHW:      20,
+				StdVW:      20,
 				ForceBold:  false,
 			},
 		},
@@ -293,7 +370,7 @@ func makeTestFont() *testFont {
 			Ordering:   "test",
 			Supplement: 0,
 		},
-		GIDToCID:     []cid.CID{0, 1, 2}, // identity GID <-> CID mapping
+		GIDToCID:     []cid.CID{0, 1, 2, 3},
 		FontMatrices: []matrix.Matrix{matrix.Identity},
 	}
 	fontCFF := &cff.Font{
@@ -314,28 +391,32 @@ func makeTestFont() *testFont {
 		WMode: cmap.Horizontal,
 		CodeSpaceRange: []charcode.Range{
 			{Low: []byte{'A'}, High: []byte{'Z'}},
-			{Low: []byte{'a'}, High: []byte{'z'}},
 		},
 		CIDRanges: []cmap.Range{
-			// Two mappings for each glyph (including the missing CIDs 3 and 4).
-			{First: []byte{'A'}, Last: []byte{'E'}, Value: 0},
-			{First: []byte{'a'}, Last: []byte{'e'}, Value: 0},
+			{First: []byte{'A'}, Last: []byte{'Z'}, Value: 0},
 		},
-		CIDSingles: []cmap.Single{
-			{Code: []byte{'y'}, Value: 3},
+		NotdefSingles: []cmap.Single{
+			{Code: []byte{'1'}, Value: 1},
+			{Code: []byte{'2'}, Value: 5},
 		},
 		NotdefRanges: []cmap.Range{
-			// Codes 'y' and 'z' use a non-existent glyph as the notdef character.
-			{First: []byte{'y'}, Last: []byte{'z'}, Value: 4},
-			// For the rest of the lowercase range we use the alternative
-			// notdef glyph (CID 1).
-			{First: []byte{'a'}, Last: []byte{'x'}, Value: 1},
+			{First: []byte{'a'}, Last: []byte{'w'}, Value: 1},
+			{First: []byte{'x'}, Last: []byte{'z'}, Value: 5},
 		},
 	}
 
 	res := &testFont{
 		data: fontCFF,
 		cmap: cmap,
+		widths: map[cid.CID]float64{
+			0: 500,
+			1: 1000,
+			2: 1500, // glyph present in the font
+			3: 500,
+			4: 1500, // missing glyph
+			5: 1000,
+		},
+		dw: 2000,
 	}
 	return res
 }
@@ -343,61 +424,65 @@ func makeTestFont() *testFont {
 var _ font.Font = (*testFont)(nil)
 
 type testFont struct {
-	data *cff.Font
-	cmap *cmap.File
+	data   *cff.Font
+	cmap   *cmap.File
+	widths map[cid.CID]float64
+	dw     float64
 }
 
 func (f *testFont) PostScriptName() string {
-	return f.data.FontName
+	return "Test"
 }
 
 func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
 	fontDictRef := rm.Out.Alloc()
 
-	fontType := glyphdata.CFF
-	fontRef := rm.Out.Alloc()
-	err := cffglyphs.Embed(rm.Out, fontType, fontRef, f.data)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	fd := &font.Descriptor{
 		FontName:   f.data.FontName,
 		IsSymbolic: true,
-		FontBBox:   rect.Rect{LLx: 0, LLy: 0, URx: 3000, URy: 1000},
-		Ascent:     800,
-		CapHeight:  800,
+		FontBBox:   rect.Rect{LLx: 0, LLy: 0, URx: 1500, URy: 300},
+		Ascent:     300,
+		Descent:    0,
+		Leading:    400,
+		StemV:      0,
 	}
-	dicts := &dict.CIDFontType0{
+	dict := &dict.CIDFontType0{
 		Ref:            fontDictRef,
 		PostScriptName: f.data.FontName,
 		Descriptor:     fd,
 		ROS:            f.cmap.ROS,
 		Encoding:       f.cmap,
-		Width: map[cmap.CID]float64{
-			0: 1000,
-			1: 3000,
-			2: 1000,
-			3: 2000,
-			4: 4000,
-		},
-		DefaultWidth: 1000,
-		FontType:     fontType,
-		FontRef:      fontRef,
+		Width:          f.widths,
+		DefaultWidth:   f.dw,
+		FontType:       glyphdata.CFF,
+		FontRef:        rm.Out.Alloc(),
 	}
-	err = dicts.WriteToPDF(rm)
+	err := dict.WriteToPDF(rm)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = cffglyphs.Embed(rm.Out, dict.FontType, dict.FontRef, f.data)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	e := &testFontEmbedded{
-		ref: fontDictRef,
+		ref:    fontDictRef,
+		cmap:   f.cmap,
+		widths: f.widths,
+		dw:     f.dw,
 	}
 	return fontDictRef, e, nil
 }
 
+var _ font.Embedded = (*testFontEmbedded)(nil)
+
 type testFontEmbedded struct {
-	ref pdf.Reference
+	ref    pdf.Reference
+	cmap   *cmap.File
+	widths map[cmap.CID]float64
+	dw     float64
 }
 
 func (e *testFontEmbedded) WritingMode() cmap.WritingMode {
@@ -409,14 +494,28 @@ func (e *testFontEmbedded) DecodeWidth(s pdf.String) (float64, int) {
 		return 0, 0
 	}
 
-	switch s[0] {
-	case 'B', 'b':
-		return 3000, 1
-	case 'D', 'd':
-		return 2000, 1
-	case 'E', 'e':
-		return 4000, 1
-	default:
-		return 1000, 1
+	cid := e.cmap.LookupCID([]byte{s[0]})
+	if w, ok := e.widths[cid]; ok {
+		return w, 1
+	} else {
+		return e.dw, 1
 	}
+}
+
+func drawCross(g *cff.Glyph, x, y, r, lw float64) {
+	a := math.Round(r / math.Sqrt(2))
+	b := math.Round(0.5 * lw / math.Sqrt(2))
+
+	g.MoveTo(x-a-b, y-a+b)
+	g.LineTo(x-a+b, y-a-b)
+	g.LineTo(x, y-2*b)
+	g.LineTo(x+a-b, y-a-b)
+	g.LineTo(x+a+b, y-a+b)
+	g.LineTo(x+2*b, y)
+	g.LineTo(x+a+b, y+a-b)
+	g.LineTo(x+a-b, y+a+b)
+	g.LineTo(x, y+2*b)
+	g.LineTo(x-a+b, y+a+b)
+	g.LineTo(x-a-b, y+a-b)
+	g.LineTo(x-2*b, y)
 }

@@ -29,7 +29,7 @@ import (
 //
 // ww must be the widths of the 256 encoded characters, given in PDF text space
 // units times 1000.
-func isStandard(fontName string, t *simpleenc.Table) bool {
+func isStandard(fontName string, t *simpleenc.Simple) bool {
 	m, ok := stdmtx.Metrics[fontName]
 	if !ok {
 		return false

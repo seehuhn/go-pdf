@@ -44,7 +44,7 @@ var _ interface {
 } = (*embeddedComposite)(nil)
 
 // embeddedComposite represents an [Instance] which has been embedded in a PDF
-// file if the Composite option is set.  There should be at most one
+// file if the Composite font option is set.  There should be at most one
 // embeddedComposite for each [Instance] in a PDF file.
 type embeddedComposite struct {
 	Ref  pdf.Reference
@@ -182,35 +182,37 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 		}
 	}
 
-	subsetCFF := &cff.Font{
+	subsetFont := &cff.Font{
 		FontInfo: fontInfo,
 		Outlines: subsetOutlines,
 	}
 
 	ww := make(map[cmap.CID]float64)
 	for gid, cid := range gidToCID {
-		ww[cid] = math.Round(subsetCFF.GlyphWidthPDF(glyph.ID(gid)))
+		ww[cid] = math.Round(subsetFont.GlyphWidthPDF(glyph.ID(gid)))
 	}
-	dw := math.Round(subsetCFF.GlyphWidthPDF(0))
+	dw := math.Round(subsetFont.GlyphWidthPDF(0))
 
 	isSymbolic := false // TODO(voss): set this correctly
 
-	qh := subsetCFF.FontMatrix[0] * 1000
-	qv := subsetCFF.FontMatrix[3] * 1000
+	qh := subsetFont.FontMatrix[0] * 1000
+	qv := subsetFont.FontMatrix[3] * 1000
+
+	italicAngle := math.Round(subsetFont.ItalicAngle*10) / 10
 
 	fd := &font.Descriptor{
 		FontName:     subset.Join(subsetTag, e.Font.FontName),
-		FontFamily:   subsetCFF.FamilyName,
+		FontFamily:   subsetFont.FamilyName,
 		FontStretch:  e.Stretch,
 		FontWeight:   e.Weight,
-		IsFixedPitch: subsetCFF.IsFixedPitch,
+		IsFixedPitch: subsetFont.IsFixedPitch,
 		IsSerif:      e.IsSerif,
 		IsSymbolic:   isSymbolic,
 		IsScript:     e.IsScript,
-		IsItalic:     subsetCFF.ItalicAngle != 0,
-		ForceBold:    subsetCFF.Private[0].ForceBold,
-		FontBBox:     subsetCFF.FontBBoxPDF().Rounded(),
-		ItalicAngle:  subsetCFF.ItalicAngle,
+		IsItalic:     italicAngle != 0,
+		ForceBold:    subsetFont.Private[0].ForceBold,
+		FontBBox:     subsetFont.FontBBoxPDF().Rounded(),
+		ItalicAngle:  italicAngle,
 		Ascent:       math.Round(e.Ascent),
 		Descent:      math.Round(e.Descent),
 		Leading:      math.Round(e.Leading),
@@ -239,7 +241,7 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 		return err
 	}
 
-	err = cffglyphs.Embed(rm.Out, dict.FontType, dict.FontRef, subsetCFF)
+	err = cffglyphs.Embed(rm.Out, dict.FontType, dict.FontRef, subsetFont)
 	if err != nil {
 		return err
 	}

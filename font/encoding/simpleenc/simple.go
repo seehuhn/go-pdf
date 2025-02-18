@@ -40,7 +40,7 @@ import (
 
 const maxNameLength = 31
 
-// Table manages the encoding and metadata of glyphs for simple PDF fonts.
+// Simple manages the encoding and metadata of glyphs for simple PDF fonts.
 //
 // It constructs a mapping from single-byte codes to
 //   - character IDs (CIDs),
@@ -50,7 +50,7 @@ const maxNameLength = 31
 // If a glyph is used with different text content (for example space and
 // no-break space), different codes are used to allow for different ToUnicode
 // mappings.
-type Table struct {
+type Simple struct {
 	code   map[glyphKey]byte
 	info   map[byte]*codeInfo
 	notdef *codeInfo
@@ -74,12 +74,12 @@ type codeInfo struct {
 	Text  string
 }
 
-// NewTable creates and initialises a new SomeName object.
+// NewSimple creates and initialises a new Table object.
 //
 // The notdefWidth parameter is the default width of the ".notdef" glyph,
 // in PDF glyph space units.
-func NewTable(notdefWidth float64, isZapfDingbats bool, base *pdfenc.Encoding) *Table {
-	gd := &Table{
+func NewSimple(notdefWidth float64, isZapfDingbats bool, base *pdfenc.Encoding) *Simple {
+	gd := &Simple{
 		code:           make(map[glyphKey]byte),
 		info:           make(map[byte]*codeInfo),
 		notdef:         &codeInfo{GID: 0, Text: "", Width: notdefWidth},
@@ -95,7 +95,7 @@ func NewTable(notdefWidth float64, isZapfDingbats bool, base *pdfenc.Encoding) *
 
 // GetCode returns the code for the given glyph ID and text.
 // If the code is not found, the function returns (0,false).
-func (t *Table) GetCode(gid glyph.ID, text string) (byte, bool) {
+func (t *Simple) GetCode(gid glyph.ID, text string) (byte, bool) {
 	k := glyphKey{gid: gid, text: text}
 	c, ok := t.code[k]
 	return c, ok
@@ -112,7 +112,7 @@ func (t *Table) GetCode(gid glyph.ID, text string) (byte, bool) {
 //
 // Only 256 codes are available. Once all codes are used up, the function
 // returns an error.
-func (t *Table) AllocateCode(gid glyph.ID, baseGlyphName, text string, width float64) (byte, error) {
+func (t *Simple) AllocateCode(gid glyph.ID, baseGlyphName, text string, width float64) (byte, error) {
 	key := glyphKey{gid: gid, text: text}
 	if _, ok := t.code[key]; ok {
 		return 0, ErrDuplicateCode
@@ -169,7 +169,7 @@ func (t *Table) AllocateCode(gid glyph.ID, baseGlyphName, text string, width flo
 }
 
 // makeGlyphName returns a unique name for the given glyph.
-func (t *Table) makeGlyphName(gid glyph.ID, defaultGlyphName, text string) string {
+func (t *Simple) makeGlyphName(gid glyph.ID, defaultGlyphName, text string) string {
 	if name, ok := t.glyphName[gid]; ok {
 		return name
 	}
@@ -238,12 +238,12 @@ func isValid(s string) bool {
 }
 
 // IsUsed returns true if the given code is used.
-func (t *Table) IsUsed(c byte) bool {
+func (t *Simple) IsUsed(c byte) bool {
 	_, ok := t.info[c]
 	return ok
 }
 
-func (t *Table) get(c byte) *codeInfo {
+func (t *Simple) get(c byte) *codeInfo {
 	info, ok := t.info[c]
 	if !ok {
 		return t.notdef
@@ -251,32 +251,32 @@ func (t *Table) get(c byte) *codeInfo {
 	return info
 }
 
-func (t *Table) GID(c byte) glyph.ID {
+func (t *Simple) GID(c byte) glyph.ID {
 	return t.get(c).GID
 }
 
 // Width returns the width of the glyph for the given code, in PDF glyph space
 // units.
-func (t *Table) Width(c byte) float64 {
+func (t *Simple) Width(c byte) float64 {
 	return t.get(c).Width
 }
 
-func (t *Table) Text(c byte) string {
+func (t *Simple) Text(c byte) string {
 	return t.get(c).Text
 }
 
 // GlyphName returns the chosen glyph name for the given glyph ID.
-func (t *Table) GlyphName(gid glyph.ID) string {
+func (t *Simple) GlyphName(gid glyph.ID) string {
 	return t.glyphName[gid]
 }
 
 // Overflow checks if more than 256 codes are required.
-func (t *Table) Overflow() bool {
+func (t *Simple) Overflow() bool {
 	return t.overflow
 }
 
 // Glyphs returns a sorted list of the glyphs used.
-func (t *Table) Glyphs() []glyph.ID {
+func (t *Simple) Glyphs() []glyph.ID {
 	gidIsUsed := make(map[glyph.ID]struct{})
 	gidIsUsed[0] = struct{}{} // always include .notdef
 	for k := range t.code {
@@ -288,7 +288,7 @@ func (t *Table) Glyphs() []glyph.ID {
 }
 
 // Encoding returns the Type1 encoding corresponding to the glyph data.
-func (t *Table) Encoding() encoding.Type1 {
+func (t *Simple) Encoding() encoding.Type1 {
 	enc := make(map[byte]string)
 	for k, c := range t.code {
 		enc[c] = t.glyphName[k.gid]
@@ -297,14 +297,14 @@ func (t *Table) Encoding() encoding.Type1 {
 }
 
 // WritingMode implements the [font.Embedded] interface.
-func (*Table) WritingMode() cmap.WritingMode {
+func (*Simple) WritingMode() cmap.WritingMode {
 	return cmap.Horizontal
 }
 
 // Codes returns an iterator over the characters in the PDF string. Each code
 // includes the CID, width, and associated text. Missing glyphs map to CID 0
 // (notdef).
-func (t *Table) Codes(s pdf.String) iter.Seq[*font.Code] {
+func (t *Simple) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		var code font.Code
 		for _, c := range s {
@@ -324,7 +324,7 @@ func (t *Table) Codes(s pdf.String) iter.Seq[*font.Code] {
 	}
 }
 
-func (t *Table) DecodeWidth(s pdf.String) (float64, int) {
+func (t *Simple) DecodeWidth(s pdf.String) (float64, int) {
 	if len(s) == 0 {
 		return 0, 0
 	}
@@ -334,7 +334,7 @@ func (t *Table) DecodeWidth(s pdf.String) (float64, int) {
 
 // DefaultWidth returns a good value for the MissingWidth entry in the font
 // descriptor.
-func (t *Table) DefaultWidth() float64 {
+func (t *Simple) DefaultWidth() float64 {
 	w1 := t.Width(0)
 	n1 := 1
 	for c := 1; c < 256; c++ {
@@ -366,7 +366,7 @@ func (t *Table) DefaultWidth() float64 {
 
 // IsSymbolic returns true if glyphs outside the standard Latin character set
 // are used.
-func (t *Table) IsSymbolic() bool {
+func (t *Simple) IsSymbolic() bool {
 	for glyphName := range t.glyphNameUsed {
 		if glyphName == ".notdef" {
 			continue
