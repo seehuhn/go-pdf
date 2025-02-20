@@ -94,6 +94,56 @@ func NewSimple(notdefWidth float64, isZapfDingbats bool, base *pdfenc.Encoding) 
 	return gd
 }
 
+// WritingMode implements the [font.Embedded] interface.
+func (*Simple) WritingMode() cmap.WritingMode {
+	return cmap.Horizontal
+}
+
+func (t *Simple) DecodeWidth(s pdf.String) (float64, int) {
+	if len(s) == 0 {
+		return 0, 0
+	}
+	w := t.Width(s[0])
+	return w / 1000, 1
+}
+
+// Codes returns an iterator over the characters in the PDF string. Each code
+// includes the CID, width, and associated text. Missing glyphs map to CID 0
+// (notdef).
+func (t *Simple) Codes(s pdf.String) iter.Seq[*font.Code] {
+	return func(yield func(*font.Code) bool) {
+		var code font.Code
+		for _, c := range s {
+			info := t.get(c)
+			if info.GID == 0 {
+				code.CID = 0
+			} else {
+				code.CID = cid.CID(c) + 1 // CID 0 is reserved for .notdef
+			}
+			code.Width = info.Width
+			code.Text = info.Text
+
+			if !yield(&code) {
+				return
+			}
+		}
+	}
+}
+
+func (t *Simple) MappedCodes() iter.Seq2[byte, *font.Code] {
+	return func(yield func(byte, *font.Code) bool) {
+		var code font.Code
+		for c, info := range t.info {
+			code.CID = cid.CID(c) + 1 // CID 0 is reserved for .notdef
+			code.Width = info.Width
+			code.Text = info.Text
+			if !yield(c, &code) {
+				return
+			}
+		}
+	}
+}
+
 // GetCode returns the code for the given glyph ID and text.
 // If the code is not found, the function returns (0,false).
 func (t *Simple) GetCode(gid glyph.ID, text string) (byte, bool) {
@@ -238,12 +288,6 @@ func isValid(s string) bool {
 	return true
 }
 
-// IsUsed returns true if the given code is used.
-func (t *Simple) IsUsed(c byte) bool {
-	_, ok := t.info[c]
-	return ok
-}
-
 func (t *Simple) get(c byte) *codeInfo {
 	info, ok := t.info[c]
 	if !ok {
@@ -295,42 +339,6 @@ func (t *Simple) Encoding() encoding.Type1 {
 		enc[c] = t.glyphName[k.gid]
 	}
 	return func(c byte) string { return enc[c] }
-}
-
-// WritingMode implements the [font.Embedded] interface.
-func (*Simple) WritingMode() cmap.WritingMode {
-	return cmap.Horizontal
-}
-
-// Codes returns an iterator over the characters in the PDF string. Each code
-// includes the CID, width, and associated text. Missing glyphs map to CID 0
-// (notdef).
-func (t *Simple) Codes(s pdf.String) iter.Seq[*font.Code] {
-	return func(yield func(*font.Code) bool) {
-		var code font.Code
-		for _, c := range s {
-			info := t.get(c)
-			if info.GID == 0 {
-				code.CID = 0
-			} else {
-				code.CID = cid.CID(c) + 1 // CID 0 is reserved for .notdef
-			}
-			code.Width = info.Width
-			code.Text = info.Text
-
-			if !yield(&code) {
-				return
-			}
-		}
-	}
-}
-
-func (t *Simple) DecodeWidth(s pdf.String) (float64, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-	w := t.Width(s[0])
-	return w / 1000, 1
 }
 
 // DefaultWidth returns a good value for the MissingWidth entry in the font

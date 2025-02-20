@@ -16,6 +16,6 @@
 
 // Package cidenc provides encodings for CID fonts.
 //
-// This combines the information from the CMap, the ToUnicode CMap
-// and the width information from the CIDFont dictionary.
+// This combines most of the information from the CMap, the ToUnicode CMap and
+// the width information from the CIDFont dictionary.
 package cidenc

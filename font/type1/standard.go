@@ -35,21 +35,16 @@ func isStandard(fontName string, t *simpleenc.Simple) bool {
 		return false
 	}
 
-	for code := range 256 {
-		if !t.IsUsed(byte(code)) {
-			continue
-		}
-
+	for code, info := range t.MappedCodes() {
 		gid := t.GID(byte(code))
 		glyphName := t.GlyphName(gid)
-
 		wStd, ok := m.Width[glyphName]
 		if !ok {
 			// The glyph is not in the standard font.
 			return false
 		}
 
-		wOurs := t.Width(byte(code))
+		wOurs := info.Width
 
 		if math.Abs(wStd-wOurs) > 0.5 {
 			return false

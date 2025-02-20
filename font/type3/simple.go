@@ -184,12 +184,9 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		FontMatrix: e.Font.FontMatrix,
 		Resources:  resources,
 	}
-	for c := range 256 {
-		if !e.Simple.IsUsed(byte(c)) {
-			continue
-		}
-		dict.Width[c] = e.Simple.Width(byte(c))
-		dict.Text[c] = e.Simple.Text(byte(c))
+	for c, info := range e.Simple.MappedCodes() {
+		dict.Width[c] = info.Width
+		dict.Text[c] = info.Text
 	}
 
 	err := dict.WriteToPDF(rm)
