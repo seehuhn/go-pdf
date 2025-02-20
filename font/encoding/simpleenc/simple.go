@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"golang.org/x/exp/maps"
+	"golang.org/x/text/unicode/norm"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/postscript/cid"
@@ -51,7 +52,7 @@ const maxNameLength = 31
 // no-break space), different codes are used to allow for different ToUnicode
 // mappings.
 type Simple struct {
-	code   map[glyphKey]byte
+	code   map[gidText]byte
 	info   map[byte]*codeInfo
 	notdef *codeInfo
 
@@ -63,7 +64,7 @@ type Simple struct {
 	baseEnc        *pdfenc.Encoding
 }
 
-type glyphKey struct {
+type gidText struct {
 	gid  glyph.ID
 	text string
 }
@@ -80,7 +81,7 @@ type codeInfo struct {
 // in PDF glyph space units.
 func NewSimple(notdefWidth float64, isZapfDingbats bool, base *pdfenc.Encoding) *Simple {
 	gd := &Simple{
-		code:           make(map[glyphKey]byte),
+		code:           make(map[gidText]byte),
 		info:           make(map[byte]*codeInfo),
 		notdef:         &codeInfo{GID: 0, Text: "", Width: notdefWidth},
 		glyphName:      make(map[glyph.ID]string),
@@ -96,7 +97,7 @@ func NewSimple(notdefWidth float64, isZapfDingbats bool, base *pdfenc.Encoding) 
 // GetCode returns the code for the given glyph ID and text.
 // If the code is not found, the function returns (0,false).
 func (t *Simple) GetCode(gid glyph.ID, text string) (byte, bool) {
-	k := glyphKey{gid: gid, text: text}
+	k := gidText{gid: gid, text: text}
 	c, ok := t.code[k]
 	return c, ok
 }
@@ -113,7 +114,7 @@ func (t *Simple) GetCode(gid glyph.ID, text string) (byte, bool) {
 // Only 256 codes are available. Once all codes are used up, the function
 // returns an error.
 func (t *Simple) AllocateCode(gid glyph.ID, baseGlyphName, text string, width float64) (byte, error) {
-	key := glyphKey{gid: gid, text: text}
+	key := gidText{gid: gid, text: text}
 	if _, ok := t.code[key]; ok {
 		return 0, ErrDuplicateCode
 	}
@@ -128,7 +129,7 @@ func (t *Simple) AllocateCode(gid glyph.ID, baseGlyphName, text string, width fl
 	var r rune
 	rr := names.ToUnicode(glyphName, t.isZapfDingbats)
 	if len(rr) == 0 {
-		rr = []rune(text)
+		rr = []rune(norm.NFD.String(text))
 	}
 	if len(rr) > 0 {
 		r = rr[0]
@@ -142,8 +143,8 @@ func (t *Simple) AllocateCode(gid glyph.ID, baseGlyphName, text string, width fl
 			continue
 		}
 
-		// We checked above that at most 255 codes are used, so we reach this
-		// point at least once.
+		// We checked above that at most 255 codes are used.  Thus, at least
+		// one code is free and we always reach this point.
 
 		score := 0
 		stdName := t.baseEnc.Encoding[code]

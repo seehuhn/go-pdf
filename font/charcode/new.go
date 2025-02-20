@@ -25,6 +25,9 @@ import (
 )
 
 // Code represents a character code within a [Codec].
+// The code is a uint32 value, where the bytes of the code are stored in
+// little-endian order.  The number of bytes in the code is determined by
+// the corresponding [Codec].
 type Code uint32
 
 // A Codec efficiently converts between sequences of bytes and uint32 character codes.
