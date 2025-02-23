@@ -189,11 +189,11 @@ func makeTestFonts() (*testFonts, error) {
 	var GIDToCID []cid.CID
 	cmapData := &cmap.File{
 		Name: "TestCMap",
-		ROS: &cmap.CIDSystemInfo{
+		ROS: &font.CIDSystemInfo{
 			Registry: "seehuhn.de",
 			Ordering: "test",
 		},
-		WMode: cmap.Horizontal,
+		WMode: font.Horizontal,
 		CodeSpaceRange: []charcode.Range{
 			{Low: []byte{0x00}, High: []byte{0xFF}},
 		},
@@ -385,8 +385,8 @@ type testFontEmbedded struct {
 	dw   float64
 }
 
-func (e *testFontEmbedded) WritingMode() cmap.WritingMode {
-	return cmap.Horizontal
+func (e *testFontEmbedded) WritingMode() font.WritingMode {
+	return font.Horizontal
 }
 
 func (e *testFontEmbedded) DecodeWidth(s pdf.String) (float64, int) {

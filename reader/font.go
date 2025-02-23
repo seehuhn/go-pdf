@@ -187,8 +187,8 @@ type SimpleFont struct {
 	toUni  *cmap.ToUnicodeFile
 }
 
-func (f *SimpleFont) WritingMode() cmap.WritingMode {
-	return cmap.Horizontal
+func (f *SimpleFont) WritingMode() font.WritingMode {
+	return font.Horizontal
 }
 
 // DecodeWidth reads one character code from the given string and returns

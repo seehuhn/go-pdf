@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/encoding/cidenc"
 )
 
 func main() {
@@ -50,7 +51,7 @@ func doit() error {
 		Language:     language.German,
 		Composite:    true,
 		MakeGIDToCID: cmap.NewGIDToCIDIdentity,
-		MakeEncoder:  cmap.NewCIDEncoderUTF8,
+		MakeEncoder:  cidenc.NewCompositeUtf8,
 	}
 	F, err := cff.New(info, opt)
 	if err != nil {

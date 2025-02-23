@@ -399,12 +399,12 @@ func makeTestFont() *testFont {
 
 	cmap := &cmap.File{
 		Name: "TestCMap",
-		ROS: &cmap.CIDSystemInfo{
+		ROS: &font.CIDSystemInfo{
 			Registry:   o.ROS.Registry,
 			Ordering:   o.ROS.Ordering,
 			Supplement: pdf.Integer(o.ROS.Supplement),
 		},
-		WMode: cmap.Horizontal,
+		WMode: font.Horizontal,
 		CodeSpaceRange: []charcode.Range{
 			{Low: []byte{'A'}, High: []byte{'Z'}},
 		},
@@ -501,8 +501,8 @@ type testFontEmbedded struct {
 	dw     float64
 }
 
-func (e *testFontEmbedded) WritingMode() cmap.WritingMode {
-	return cmap.Horizontal
+func (e *testFontEmbedded) WritingMode() font.WritingMode {
+	return font.Horizontal
 }
 
 func (e *testFontEmbedded) DecodeWidth(s pdf.String) (float64, int) {

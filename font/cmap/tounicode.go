@@ -31,6 +31,7 @@ import (
 	"seehuhn.de/go/postscript"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
@@ -125,15 +126,13 @@ func (info *ToUnicodeFile) IsEmpty() bool {
 func (info *ToUnicodeFile) MakeName() pdf.Name {
 	h := md5.New()
 	info.writeBinary(h, 3)
-	return pdf.Name(fmt.Sprintf("seehuhn.de-%x-UTF16", h.Sum(nil)))
+	return pdf.Name(fmt.Sprintf("seehuhn-%x-UTF16", h.Sum(nil)))
 }
 
 // writeBinary writes a binary representation of the ToUnicodeInfo object to
 // the [hash.Hash] h.  The maxGen parameter limits the number of parent
 // references, to avoid infinite recursion.
 func (info *ToUnicodeFile) writeBinary(h hash.Hash, maxGen int) {
-	// h.Write is guaranteed to never return an error
-
 	if maxGen <= 0 {
 		return
 	}
@@ -515,7 +514,7 @@ end
 
 // TODO(voss): reconsider once
 // https://github.com/pdf-association/pdf-issues/issues/344 is resoved.
-var toUnicodeROS = &CIDSystemInfo{
+var toUnicodeROS = &font.CIDSystemInfo{
 	Registry: "Adobe",
 	Ordering: "UCS",
 }

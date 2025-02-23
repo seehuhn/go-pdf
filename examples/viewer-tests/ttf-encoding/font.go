@@ -34,7 +34,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1/names"
@@ -399,8 +398,8 @@ func (f *funnyFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, e
 	return fontDictRef, f, nil
 }
 
-func (f *funnyFont) WritingMode() cmap.WritingMode {
-	return cmap.Horizontal
+func (f *funnyFont) WritingMode() font.WritingMode {
+	return font.Horizontal
 }
 
 func (f *funnyFont) DecodeWidth(s pdf.String) (float64, int) {

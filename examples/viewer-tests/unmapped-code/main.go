@@ -29,7 +29,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/font/type3"
@@ -310,7 +309,7 @@ type testFontEmbedded struct {
 	W   []float64
 }
 
-func (f *testFontEmbedded) WritingMode() cmap.WritingMode {
+func (f *testFontEmbedded) WritingMode() font.WritingMode {
 	return 0
 }
 

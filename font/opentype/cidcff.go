@@ -42,13 +42,13 @@ type embeddedCFFComposite struct {
 
 	sfnt *sfnt.Font
 
-	cmap.GIDToCID
+	font.GIDToCID
 	cmap.CIDEncoder
 
 	closed bool
 }
 
-func (f *embeddedCFFComposite) WritingMode() cmap.WritingMode {
+func (f *embeddedCFFComposite) WritingMode() font.WritingMode {
 	return 0 // TODO(voss): implement vertical writing mode
 }
 

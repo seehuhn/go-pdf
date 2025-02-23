@@ -25,7 +25,6 @@ import (
 	"seehuhn.de/go/postscript/cid"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font/cmap"
 )
 
 type FromFile interface {
@@ -55,7 +54,7 @@ var _ Embedded = Scanner(nil)
 type Scanner interface {
 	// WritingMode indicates whether the font is for horizontal or vertical
 	// writing.
-	WritingMode() cmap.WritingMode
+	WritingMode() WritingMode
 
 	// Codes iterates over the character codes in a PDF string.
 	Codes(s pdf.String) iter.Seq[*Code]

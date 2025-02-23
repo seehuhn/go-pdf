@@ -23,25 +23,16 @@ import (
 	"slices"
 
 	"golang.org/x/exp/maps"
+
+	"seehuhn.de/go/pdf/font"
 	pscid "seehuhn.de/go/postscript/cid"
+
 	"seehuhn.de/go/sfnt/glyph"
 )
 
-// GIDToCID encodes a mapping from Glyph Identifier (GID) values to Character
-// Identifier (CID) values.
-type GIDToCID interface {
-	CID(glyph.ID, []rune) pscid.CID
-
-	GID(pscid.CID) glyph.ID
-
-	ROS() *CIDSystemInfo
-
-	GIDToCID(numGlyph int) []pscid.CID
-}
-
 // NewGIDToCIDSequential returns a GIDToCID which assigns CID values
 // sequentially, starting with 1.
-func NewGIDToCIDSequential() GIDToCID {
+func NewGIDToCIDSequential() font.GIDToCID {
 	return &gidToCIDSequential{
 		g2c: make(map[glyph.ID]pscid.CID),
 		c2g: make(map[pscid.CID]glyph.ID),
@@ -69,7 +60,7 @@ func (g *gidToCIDSequential) GID(cid pscid.CID) glyph.ID {
 }
 
 // ROS implements the [GIDToCID] interface.
-func (g *gidToCIDSequential) ROS() *CIDSystemInfo {
+func (g *gidToCIDSequential) ROS() *font.CIDSystemInfo {
 	h := sha256.New()
 	h.Write([]byte("seehuhn.de/go/pdf/font/cmap.gidToCIDSequential\n"))
 	binary.Write(h, binary.BigEndian, uint64(len(g.g2c)))
@@ -81,7 +72,7 @@ func (g *gidToCIDSequential) ROS() *CIDSystemInfo {
 	}
 	sum := h.Sum(nil)
 
-	return &CIDSystemInfo{
+	return &font.CIDSystemInfo{
 		Registry:   "Seehuhn",
 		Ordering:   fmt.Sprintf("%x", sum[:8]),
 		Supplement: 0,
@@ -99,7 +90,7 @@ func (g *gidToCIDSequential) GIDToCID(numGlyph int) []pscid.CID {
 
 // NewGIDToCIDIdentity returns a GIDToCID which uses the GID values
 // directly as CID values.
-func NewGIDToCIDIdentity() GIDToCID {
+func NewGIDToCIDIdentity() font.GIDToCID {
 	return &gidToCIDIdentity{}
 }
 
@@ -116,8 +107,8 @@ func (g *gidToCIDIdentity) GID(cid pscid.CID) glyph.ID {
 }
 
 // ROS implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) ROS() *CIDSystemInfo {
-	return &CIDSystemInfo{
+func (g *gidToCIDIdentity) ROS() *font.CIDSystemInfo {
+	return &font.CIDSystemInfo{
 		Registry:   "Adobe",
 		Ordering:   "Identity",
 		Supplement: 0,

@@ -18,22 +18,11 @@ package cidenc
 
 import (
 	"errors"
-	"iter"
 
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/postscript/cid"
-)
 
-type Encoding interface {
-	WritingMode() cmap.WritingMode
-	DecodeWidth(s pdf.String) (float64, int)
-	Codes(s pdf.String) iter.Seq[*font.Code]
-	GetCode(cid cid.CID, text string) (charcode.Code, bool)
-	AllocateCode(cidVal cid.CID, text string, width float64) (charcode.Code, error)
-}
+	"seehuhn.de/go/pdf/font/charcode"
+)
 
 type cidText struct {
 	cid  cid.CID

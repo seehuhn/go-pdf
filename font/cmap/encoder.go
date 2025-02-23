@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
@@ -59,7 +60,7 @@ type CIDEncoder interface {
 
 // NewCIDEncoderIdentity returns an encoder where two-byte codes
 // are used directly as CID values.
-func NewCIDEncoderIdentity(g2c GIDToCID) CIDEncoder {
+func NewCIDEncoderIdentity(g2c font.GIDToCID) CIDEncoder {
 	return &identityEncoder{
 		g2c:       g2c,
 		toUnicode: make(map[charcode.CharCodeOld][]rune),
@@ -68,7 +69,7 @@ func NewCIDEncoderIdentity(g2c GIDToCID) CIDEncoder {
 }
 
 type identityEncoder struct {
-	g2c GIDToCID
+	g2c font.GIDToCID
 
 	toUnicode map[charcode.CharCodeOld][]rune
 	used      map[glyph.ID]struct{}
@@ -83,13 +84,6 @@ func (e *identityEncoder) AppendEncoded(s pdf.String, gid glyph.ID, text string)
 	return charcode.UCS2.Append(s, code)
 }
 
-type cidCode CID
-
-func (c cidCode) CID() CID       { return CID(c) }
-func (c cidCode) NotdefCID() CID { return 0 }
-func (c cidCode) Width() float64 { return 0 }
-func (c cidCode) Text() string   { return "" }
-
 func (e *identityEncoder) CMap() *File {
 	// TODO(voss): should we just return the predefined Identity-H CMap?
 
@@ -99,7 +93,7 @@ func (e *identityEncoder) CMap() *File {
 		panic(err)
 	}
 
-	m := make(map[charcode.Code]Code)
+	m := make(map[charcode.Code]font.Code)
 	var buf []byte
 	for codeOld := range e.toUnicode {
 		buf = csr.Append(buf[:0], codeOld)
@@ -107,38 +101,21 @@ func (e *identityEncoder) CMap() *File {
 		if !valid || l != len(buf) {
 			panic("invalid code")
 		}
-		m[codeNew] = cidCode(codeOld)
+		m[codeNew] = font.Code{CID: pscid.CID(codeOld)} // TODO(voss): is this right?
 	}
 
-	res := NewFile(codec, m)
-	res.Name = "Identity-H" // TODO(voss): what to do here?
-	res.ROS = &CIDSystemInfo{Registry: "Adobe", Ordering: "Identity"}
-	res.WMode = Horizontal // TODO(voss): fill this in
+	res := &File{
+		Name:  "Identity-H", // TODO(voss): what to do here?
+		ROS:   &font.CIDSystemInfo{Registry: "Adobe", Ordering: "Identity"},
+		WMode: font.Horizontal, // TODO(voss): fill this in
+	}
+	res.SetMapping(codec, m)
 	return res
 }
 
+// TODO(voss): remove
 func (e *identityEncoder) ToUnicode() *ToUnicodeFile {
-	// TODO(voss): rewrite this, once we don't need to support `*ToUnicodeOld`
-	// anymore.
-
-	csr := charcode.UCS2
-	codec, err := charcode.NewCodec(csr)
-	if err != nil {
-		panic(err)
-	}
-
-	m := make(map[charcode.Code]string)
-	var buf []byte
-	for codeOld, rr := range e.toUnicode {
-		buf = csr.Append(buf[:0], codeOld)
-		codeNew, l, valid := codec.Decode(buf)
-		if !valid || l != len(buf) {
-			panic("invalid code")
-		}
-		m[codeNew] = string(rr)
-	}
-
-	return NewToUnicodeFile(codec, m)
+	return nil
 }
 
 func (e *identityEncoder) Subset() []glyph.ID {
@@ -179,7 +156,7 @@ func (e *identityEncoder) AllCIDs(s pdf.String) iter.Seq2[[]byte, pscid.CID] {
 
 // NewCIDEncoderUTF8 returns an encoder where character codes equal the UTF-8
 // encoding of the text content, where possible.
-func NewCIDEncoderUTF8(g2c GIDToCID) CIDEncoder {
+func NewCIDEncoderUTF8(g2c font.GIDToCID) CIDEncoder {
 	return &utf8Encoder{
 		g2c:   g2c,
 		cache: make(map[key]charcode.CharCodeOld),
@@ -190,7 +167,7 @@ func NewCIDEncoderUTF8(g2c GIDToCID) CIDEncoder {
 }
 
 type utf8Encoder struct {
-	g2c GIDToCID
+	g2c font.GIDToCID
 
 	cache map[key]charcode.CharCodeOld
 	cmap  map[charcode.CharCodeOld]pscid.CID
@@ -264,7 +241,7 @@ func (e *utf8Encoder) CMap() *File {
 		panic(err)
 	}
 
-	m := make(map[charcode.Code]Code)
+	m := make(map[charcode.Code]font.Code)
 	var buf []byte
 	for codeOld, cidOld := range e.cmap {
 		buf = csr.Append(buf[:0], codeOld)
@@ -272,39 +249,21 @@ func (e *utf8Encoder) CMap() *File {
 		if !valid || l != len(buf) {
 			panic("invalid code")
 		}
-		m[codeNew] = cidCode(cidOld)
+		m[codeNew] = font.Code{CID: cidOld}
 	}
 
-	res := NewFile(codec, m)
-	// TODO(voss): what to do here?
-	res.Name = "Seehuhn-Test"
-	res.ROS = &CIDSystemInfo{Registry: "Seehuhn", Ordering: "Test"}
-	res.WMode = Horizontal // TODO(voss): fill this in
+	res := &File{
+		ROS:   &font.CIDSystemInfo{Registry: "Seehuhn", Ordering: "Test"},
+		WMode: font.Horizontal, // TODO(voss): fill this in
+	}
+	res.SetMapping(codec, m)
+	res.UpdateName()
 	return res
 }
 
+// TODO(voss): remove
 func (e *utf8Encoder) ToUnicode() *ToUnicodeFile {
-	// TODO(voss): rewrite this, once we don't need to support `*ToUnicodeOld`
-	// anymore.
-
-	csr := utf8cs
-	codec, err := charcode.NewCodec(csr)
-	if err != nil {
-		panic(err)
-	}
-
-	m := make(map[charcode.Code]string)
-	var buf []byte
-	for key, codeOld := range e.cache {
-		buf = csr.Append(buf[:0], charcode.CharCodeOld(codeOld))
-		codeNew, l, valid := codec.Decode(buf)
-		if !valid || l != len(buf) {
-			panic("invalid code")
-		}
-		m[codeNew] = string(key.rr)
-	}
-
-	return NewToUnicodeFile(codec, m)
+	return nil
 }
 
 func (e *utf8Encoder) Subset() []glyph.ID {

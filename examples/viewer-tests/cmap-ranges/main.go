@@ -52,7 +52,7 @@ func generateSampleFile(fname string) error {
 
 	cmap := &cmap.File{
 		Name: "Test",
-		ROS: &cmap.CIDSystemInfo{
+		ROS: &font.CIDSystemInfo{
 			Registry:   "Adobe",
 			Ordering:   "Japan1",
 			Supplement: 0,
@@ -256,10 +256,10 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	return fontDictRef, f, nil
 }
 
-// WritingMode returns [cmap.Horizontal].
+// WritingMode returns [font.Horizontal].
 // This implements the [font.Font] interface.
-func (f *testFont) WritingMode() cmap.WritingMode {
-	return cmap.Horizontal
+func (f *testFont) WritingMode() font.WritingMode {
+	return font.Horizontal
 }
 
 // DecodeWidth reads one character code from the given string and returns

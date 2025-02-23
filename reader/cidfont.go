@@ -91,7 +91,7 @@ func (r *Reader) readCompositeFont(info *font.Dicts, toUni *cmap.ToUnicodeFile) 
 	return res, nil
 }
 
-func (f *CIDFont) WritingMode() cmap.WritingMode {
+func (f *CIDFont) WritingMode() font.WritingMode {
 	return f.cmap.WMode
 }
 

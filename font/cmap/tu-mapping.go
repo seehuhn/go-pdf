@@ -22,12 +22,14 @@ import (
 	"unicode/utf16"
 
 	"golang.org/x/exp/maps"
+
 	"seehuhn.de/go/dag"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
 // NewToUnicodeFile creates a ToUnicodeFile object.
-func NewToUnicodeFile(codec *charcode.Codec, data map[charcode.Code]string) *ToUnicodeFile {
+func NewToUnicodeFile(codec *charcode.Codec, data map[charcode.Code]font.Code) *ToUnicodeFile {
 	res := &ToUnicodeFile{
 		CodeSpaceRange: codec.CodeSpaceRange(),
 	}
@@ -72,7 +74,7 @@ func NewToUnicodeFile(codec *charcode.Codec, data map[charcode.Code]string) *ToU
 
 					needsList := false
 					for j := start; j < i-1; j++ {
-						if data[info[j+1].code] != nextString(data[info[j].code]) {
+						if data[info[j+1].code].Text != nextString(data[info[j].code].Text) {
 							needsList = true
 							break
 						}
@@ -82,10 +84,10 @@ func NewToUnicodeFile(codec *charcode.Codec, data map[charcode.Code]string) *ToU
 					if needsList {
 						values = make([]string, i-start)
 						for j := start; j < i; j++ {
-							values[j-start] = data[info[j].code]
+							values[j-start] = data[info[j].code].Text
 						}
 					} else {
-						values = []string{data[info[start].code]}
+						values = []string{data[info[start].code].Text}
 					}
 
 					res.Ranges = append(res.Ranges, ToUnicodeRange{
@@ -96,7 +98,7 @@ func NewToUnicodeFile(codec *charcode.Codec, data map[charcode.Code]string) *ToU
 				} else {
 					res.Singles = append(res.Singles, ToUnicodeSingle{
 						Code:  first,
-						Value: data[info[start].code],
+						Value: data[info[start].code].Text,
 					})
 				}
 				start = i

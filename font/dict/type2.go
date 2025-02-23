@@ -51,7 +51,7 @@ type CIDFontType2 struct {
 	Descriptor *font.Descriptor
 
 	// ROS describes the character collection covered by the font.
-	ROS *cmap.CIDSystemInfo
+	ROS *font.CIDSystemInfo
 
 	// Encoding specifies how character codes are mapped to CID values.
 	//
@@ -382,7 +382,7 @@ func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager) error {
 	return nil
 }
 
-func (d *CIDFontType2) WritingMode() cmap.WritingMode {
+func (d *CIDFontType2) WritingMode() font.WritingMode {
 	return d.Encoding.WMode
 }
 

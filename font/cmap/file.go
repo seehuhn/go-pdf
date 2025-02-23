@@ -18,7 +18,10 @@ package cmap
 
 import (
 	"bytes"
+	"crypto/md5"
+	"encoding/binary"
 	"fmt"
+	"hash"
 	"io"
 	"sync"
 	"text/template"
@@ -27,6 +30,7 @@ import (
 	"seehuhn.de/go/postscript/cid"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
@@ -48,39 +52,18 @@ type CID = cid.CID
 // This structure closely resembles the structure of a CMap file.
 type File struct {
 	Name  pdf.Name
-	ROS   *CIDSystemInfo
-	WMode WritingMode
+	ROS   *font.CIDSystemInfo
+	WMode font.WritingMode
 
 	charcode.CodeSpaceRange
-	CIDSingles    []Single
-	CIDRanges     []Range
+	CIDSingles []Single
+	CIDRanges  []Range
+
 	NotdefSingles []Single
 	NotdefRanges  []Range
 
 	Parent *File
 }
-
-// WritingMode is the "writing mode" of a PDF font (horizontal or vertical).
-type WritingMode int
-
-func (m WritingMode) String() string {
-	switch m {
-	case Horizontal:
-		return "horizontal"
-	case Vertical:
-		return "vertical"
-	default:
-		return fmt.Sprintf("WritingMode(%d)", m)
-	}
-}
-
-const (
-	// Horizontal indicates horizontal writing mode.
-	Horizontal WritingMode = 0
-
-	// Vertical indicates vertical writing mode.
-	Vertical WritingMode = 1
-)
 
 // SingleEntry specifies that character code Code represents the given CID.
 type Single struct {
@@ -166,11 +149,11 @@ func safeExtractCMap(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object) (*Fi
 	if name, _ := pdf.GetName(r, dict["CMapName"]); name != "" {
 		res.Name = name
 	}
-	if ros, _ := ExtractCIDSystemInfo(r, dict["CIDSystemInfo"]); ros != nil {
+	if ros, _ := font.ExtractCIDSystemInfo(r, dict["CIDSystemInfo"]); ros != nil {
 		res.ROS = ros
 	}
 	if x, _ := pdf.GetInteger(r, dict["WMode"]); x == 1 {
-		res.WMode = Vertical
+		res.WMode = font.Vertical
 	}
 	if p := dict["UseCMap"]; p != nil {
 		parent = p
@@ -208,10 +191,10 @@ func readCMap(r io.Reader) (*File, pdf.Object, error) {
 		res.Name = pdf.Name(name)
 	}
 	if wMode, _ := raw["WMode"].(postscript.Integer); wMode == 1 {
-		res.WMode = Vertical
+		res.WMode = font.Vertical
 	}
 	if rosDict, _ := raw["CIDSystemInfo"].(postscript.Dict); rosDict != nil {
-		ros := &CIDSystemInfo{}
+		ros := &font.CIDSystemInfo{}
 		if registry, _ := rosDict["Registry"].(postscript.String); registry != nil {
 			ros.Registry = string(registry)
 		}
@@ -297,15 +280,15 @@ func readCMap(r io.Reader) (*File, pdf.Object, error) {
 	return res, parent, nil
 }
 
-func (c *File) LookupCID(code []byte) CID {
-	for _, s := range c.CIDSingles {
+func (f *File) LookupCID(code []byte) CID {
+	for _, s := range f.CIDSingles {
 		if bytes.Equal(s.Code, code) {
 			return s.Value
 		}
 	}
 
 rangesLoop:
-	for _, r := range c.CIDRanges {
+	for _, r := range f.CIDRanges {
 		if len(r.First) != len(code) || len(r.Last) != len(code) {
 			continue
 		}
@@ -320,22 +303,22 @@ rangesLoop:
 		return r.Value + CID(index)
 	}
 
-	if c.Parent != nil {
-		return c.Parent.LookupCID(code)
+	if f.Parent != nil {
+		return f.Parent.LookupCID(code)
 	}
 
-	return c.LookupNotdefCID(code)
+	return f.LookupNotdefCID(code)
 }
 
-func (c *File) LookupNotdefCID(code []byte) CID {
-	for _, s := range c.NotdefSingles {
+func (f *File) LookupNotdefCID(code []byte) CID {
+	for _, s := range f.NotdefSingles {
 		if bytes.Equal(s.Code, code) {
 			return s.Value
 		}
 	}
 
 rangesLoop:
-	for _, r := range c.NotdefRanges {
+	for _, r := range f.NotdefRanges {
 		if len(r.First) != len(code) || len(r.Last) != len(code) {
 			continue
 		}
@@ -348,37 +331,106 @@ rangesLoop:
 		return r.Value
 	}
 
-	if c.Parent != nil {
-		return c.Parent.LookupNotdefCID(code)
+	if f.Parent != nil {
+		return f.Parent.LookupNotdefCID(code)
 	}
 	return 0
 }
 
-func (c *File) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+// UpdateName updates the Name field of the CMap to a unique value based on the
+// content of the CMap.
+func (info *File) UpdateName() {
+	h := md5.New()
+	info.writeBinary(h, 3)
+	info.Name = pdf.Name(fmt.Sprintf("seehuhn-%x", h.Sum(nil)))
+}
+
+// writeBinary writes a binary representation of the ToUnicodeInfo object to
+// the [hash.Hash] h.  The maxGen parameter limits the number of parent
+// references, to avoid infinite recursion.
+func (info *File) writeBinary(h hash.Hash, maxGen int) {
+	if maxGen <= 0 {
+		return
+	}
+
+	const magic uint32 = 0x5dafbce2
+	binary.Write(h, binary.BigEndian, magic)
+
+	var buf [binary.MaxVarintLen64]byte
+	writeInt := func(x int) {
+		k := binary.PutUvarint(buf[:], uint64(x))
+		h.Write(buf[:k])
+	}
+	writeBytes := func(b []byte) {
+		writeInt(len(b))
+		h.Write(b)
+	}
+
+	writeInt(len(info.CodeSpaceRange))
+	for _, r := range info.CodeSpaceRange {
+		writeBytes(r.Low)
+		writeBytes(r.High)
+	}
+
+	writeInt(len(info.CIDSingles))
+	for _, s := range info.CIDSingles {
+		writeBytes(s.Code)
+		writeInt(int(s.Value))
+	}
+
+	writeInt(len(info.CIDRanges))
+	for _, r := range info.CIDRanges {
+		writeBytes(r.First)
+		writeBytes(r.Last)
+		writeInt(int(r.Value))
+	}
+
+	writeInt(len(info.NotdefSingles))
+	for _, s := range info.NotdefSingles {
+		writeBytes(s.Code)
+		writeInt(int(s.Value))
+	}
+
+	writeInt(len(info.NotdefRanges))
+	for _, r := range info.NotdefRanges {
+		writeBytes(r.First)
+		writeBytes(r.Last)
+		writeInt(int(r.Value))
+	}
+
+	if info.Parent != nil {
+		writeInt(1)
+		info.Parent.writeBinary(h, maxGen-1)
+	} else {
+		writeInt(0)
+	}
+}
+
+func (f *File) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	predefinedMu.Lock()
-	predefinedName, ok := predefinedName[c]
+	predefinedName, ok := predefinedName[f]
 	predefinedMu.Unlock()
 	if ok {
 		return predefinedName, zero, nil
 	}
 
-	ros, _, err := pdf.ResourceManagerEmbed(rm, c.ROS)
+	ros, _, err := pdf.ResourceManagerEmbed(rm, f.ROS)
 	if err != nil {
 		return nil, zero, err
 	}
 
 	dict := pdf.Dict{
 		"Type":          pdf.Name("CMap"),
-		"CMapName":      pdf.Name(c.Name),
+		"CMapName":      pdf.Name(f.Name),
 		"CIDSystemInfo": ros,
 	}
-	if c.WMode != Horizontal {
-		dict["WMode"] = pdf.Integer(c.WMode)
+	if f.WMode != font.Horizontal {
+		dict["WMode"] = pdf.Integer(f.WMode)
 	}
-	if c.Parent != nil {
-		parent, _, err := pdf.ResourceManagerEmbed(rm, c.Parent)
+	if f.Parent != nil {
+		parent, _, err := pdf.ResourceManagerEmbed(rm, f.Parent)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -397,7 +449,7 @@ func (c *File) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		return nil, zero, err
 	}
 
-	err = c.WriteTo(stm, opt.HasAny(pdf.OptPretty))
+	err = f.WriteTo(stm, opt.HasAny(pdf.OptPretty))
 	if err != nil {
 		return nil, zero, fmt.Errorf("embedding cmap: %w", err)
 	}
@@ -410,10 +462,10 @@ func (c *File) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	return ref, zero, nil
 }
 
-func (c *File) WriteTo(w io.Writer, pretty bool) error {
+func (f *File) WriteTo(w io.Writer, pretty bool) error {
 	data := templateData{
 		HeaderComment: pretty,
-		File:          c,
+		File:          f,
 	}
 	return cmapTmplNew.Execute(w, data)
 }

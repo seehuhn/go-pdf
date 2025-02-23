@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/encoding/cidenc"
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
@@ -197,19 +198,18 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 			return nil, nil, err
 		}
 
-		var gidToCID cmap.GIDToCID
+		// TODO(voss): make this configurable
+		makeGIDToCID := cmap.NewGIDToCIDIdentity
 		if opt.MakeGIDToCID != nil {
-			gidToCID = opt.MakeGIDToCID()
-		} else {
-			gidToCID = cmap.NewGIDToCIDIdentity()
+			makeGIDToCID = opt.MakeGIDToCID
 		}
+		gidToCID := makeGIDToCID()
 
-		var cidEncoder cmap.CIDEncoder
+		makeEncoder := cidenc.NewCompositeIdentity
 		if opt.MakeEncoder != nil {
-			cidEncoder = opt.MakeEncoder(gidToCID)
-		} else {
-			cidEncoder = cmap.NewCIDEncoderIdentity(gidToCID)
+			makeEncoder = opt.MakeEncoder
 		}
+		encoder := makeEncoder(f.Font.GlyphWidthPDF(0), opt.WritingMode)
 
 		res = &embeddedComposite{
 			Ref:  ref,
@@ -227,7 +227,7 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 			XHeight:   f.XHeight,
 
 			GIDToCID:   gidToCID,
-			CIDEncoder: cidEncoder,
+			CIDEncoder: encoder,
 		}
 	} else {
 		err := pdf.CheckVersion(rm.Out, "simple CFF fonts", pdf.V1_2)

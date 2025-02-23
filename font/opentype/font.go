@@ -141,19 +141,9 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		if !opt.Composite {
 			embedded = newEmbeddedCFFSimple(ref, f.Font)
 		} else {
-			var gidToCID cmap.GIDToCID
-			if opt.MakeGIDToCID != nil {
-				gidToCID = opt.MakeGIDToCID()
-			} else {
-				gidToCID = cmap.NewGIDToCIDIdentity()
-			}
-
-			var cidEncoder cmap.CIDEncoder
-			if opt.MakeEncoder != nil {
-				cidEncoder = opt.MakeEncoder(gidToCID)
-			} else {
-				cidEncoder = cmap.NewCIDEncoderIdentity(gidToCID)
-			}
+			// TODO(voss): make this configurable
+			gidToCID := cmap.NewGIDToCIDIdentity()
+			cidEncoder := cmap.NewCIDEncoderIdentity(gidToCID)
 
 			embedded = &embeddedCFFComposite{
 				w:          w,
@@ -167,19 +157,9 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		if !opt.Composite {
 			embedded = newEmbeddedGlyfSimple(ref, f.Font)
 		} else {
-			var gidToCID cmap.GIDToCID
-			if opt.MakeGIDToCID != nil {
-				gidToCID = opt.MakeGIDToCID()
-			} else {
-				gidToCID = cmap.NewGIDToCIDSequential()
-			}
-
-			var cidEncoder cmap.CIDEncoder
-			if opt.MakeEncoder != nil {
-				cidEncoder = opt.MakeEncoder(gidToCID)
-			} else {
-				cidEncoder = cmap.NewCIDEncoderIdentity(gidToCID)
-			}
+			// TODO(voss): make this configurable
+			gidToCID := cmap.NewGIDToCIDSequential()
+			cidEncoder := cmap.NewCIDEncoderIdentity(gidToCID)
 
 			embedded = &embeddedGlyfComposite{
 				w:          w,

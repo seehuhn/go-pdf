@@ -22,32 +22,19 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
-// Code represents a character code in a font. It provides methods to find the
-// corresponding glyph, glyph width, and text content associated with the
-// character code.
-type Code interface {
-	// CID returns the CID (Character Identifier) for the current character code.
-	CID() CID
-
-	// NotdefCID returns the CID to use in case the original CID is not present
-	// in the font.
-	NotdefCID() CID
-
-	// Width returns the width of the glyph for the current character code.
-	// The value is in PDF glyph space units (1/1000th of text space units).
-	Width() float64
-
-	// Text returns the text content for the current character code.
-	Text() string
-}
-
-func NewFile(codec *charcode.Codec, data map[charcode.Code]Code) *File {
-	res := &File{
-		CodeSpaceRange: codec.CodeSpaceRange(),
-	}
+// SetMapping updates a cmap File with a new mapping.
+// This replaces the CodeSpaceRange and CIDSingles/CIDRanges fields.
+//
+// Codes which are already correctly set in a parent cmap are not included in
+// the new mapping.
+func (f *File) SetMapping(codec *charcode.Codec, data map[charcode.Code]font.Code) {
+	f.CodeSpaceRange = codec.CodeSpaceRange()
+	f.CIDSingles = nil
+	f.CIDRanges = nil
 
 	// group together codes which only differ in the last byte
 	type entry struct {
@@ -56,8 +43,14 @@ func NewFile(codec *charcode.Codec, data map[charcode.Code]Code) *File {
 	}
 	ranges := make(map[string][]entry)
 	var buf []byte
-	for code := range data {
+	for code, info := range data {
 		buf = codec.AppendCode(buf[:0], code)
+		if f.Parent != nil {
+			parentCID := f.Parent.LookupCID(buf)
+			if parentCID == info.CID {
+				continue
+			}
+		}
 		l := len(buf)
 		key := string(buf[:l-1])
 		ranges[key] = append(ranges[key], entry{code, buf[l-1]})
@@ -80,7 +73,7 @@ func NewFile(codec *charcode.Codec, data map[charcode.Code]Code) *File {
 		for i := 1; i <= len(info); i++ {
 			if i == len(info) ||
 				info[i].x != info[i-1].x+1 ||
-				data[info[i].code].CID() != data[info[i-1].code].CID()+1 {
+				data[info[i].code].CID != data[info[i-1].code].CID+1 {
 				first := make([]byte, len(key)+1)
 				copy(first, key)
 				first[len(key)] = info[start].x
@@ -88,21 +81,19 @@ func NewFile(codec *charcode.Codec, data map[charcode.Code]Code) *File {
 					last := make([]byte, len(key)+1)
 					copy(last, key)
 					last[len(key)] = info[i-1].x
-					res.CIDRanges = append(res.CIDRanges, Range{
+					f.CIDRanges = append(f.CIDRanges, Range{
 						First: first,
 						Last:  last,
-						Value: data[info[start].code].CID(),
+						Value: data[info[start].code].CID,
 					})
 				} else {
-					res.CIDSingles = append(res.CIDSingles, Single{
+					f.CIDSingles = append(f.CIDSingles, Single{
 						Code:  first,
-						Value: data[info[start].code].CID(),
+						Value: data[info[start].code].CID,
 					})
 				}
 				start = i
 			}
 		}
 	}
-
-	return res
 }

@@ -41,14 +41,14 @@ type embeddedGlyfComposite struct {
 
 	sfnt *sfnt.Font
 
-	cmap.GIDToCID
+	font.GIDToCID
 	cmap.CIDEncoder
 
 	closed bool
 }
 
 // WritingMode implements the [font.Embedded] interface.
-func (f *embeddedGlyfComposite) WritingMode() cmap.WritingMode {
+func (f *embeddedGlyfComposite) WritingMode() font.WritingMode {
 	// TODO(voss): implement this
 	return 0
 }

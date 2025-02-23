@@ -31,7 +31,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/font/standard"
 )
@@ -218,8 +217,8 @@ func (f *funnyFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, e
 	return fontDictRef, f, nil
 }
 
-func (f *funnyFont) WritingMode() cmap.WritingMode {
-	return cmap.Horizontal
+func (f *funnyFont) WritingMode() font.WritingMode {
+	return font.Horizontal
 }
 
 // DecodeWidth reads one character code from the given string and returns

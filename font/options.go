@@ -17,8 +17,13 @@
 package font
 
 import (
+	"iter"
+
 	"golang.org/x/text/language"
-	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/postscript/cid"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
 // Options allows to customize fonts for embedding into PDF files.
@@ -32,6 +37,36 @@ type Options struct {
 	// Composite specifies whether to embed the font as a composite font.
 	Composite bool
 
-	MakeGIDToCID func() cmap.GIDToCID                // only used for composite fonts
-	MakeEncoder  func(cmap.GIDToCID) cmap.CIDEncoder // only used for composite fonts
+	// WritingMode gives the writing direction (horizontal or vertical)
+	// for the font.  Vertical writing is only possible with composite fonts.
+	WritingMode WritingMode
+
+	// TODO(voss): re-enable the following field
+	MakeGIDToCID func() GIDToCID // only used for composite fonts
+
+	// TODO(voss): clean this up
+	MakeEncoder func(cid0Width float64, wMode WritingMode) CIDEncoder // only used for composite fonts
+}
+
+// GIDToCID encodes a mapping from Glyph Identifier (GID) values to Character
+// Identifier (CID) values.
+type GIDToCID interface {
+	CID(glyph.ID, []rune) cid.CID
+
+	GID(cid.CID) glyph.ID
+
+	ROS() *CIDSystemInfo
+
+	GIDToCID(numGlyph int) []cid.CID
+}
+
+type CIDEncoder interface {
+	WritingMode() WritingMode
+	DecodeWidth(s pdf.String) (float64, int)
+	Codes(s pdf.String) iter.Seq[*Code]
+	Codec() *charcode.Codec
+	GetCode(cid cid.CID, text string) (charcode.Code, bool)
+	AllocateCode(cidVal cid.CID, text string, width float64) (charcode.Code, error)
+	Width(code charcode.Code) float64
+	MappedCodes() iter.Seq2[charcode.Code, *Code]
 }

@@ -34,7 +34,6 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
 )
@@ -95,8 +94,8 @@ func NewSimple(notdefWidth float64, isZapfDingbats bool, base *pdfenc.Encoding) 
 }
 
 // WritingMode implements the [font.Embedded] interface.
-func (*Simple) WritingMode() cmap.WritingMode {
-	return cmap.Horizontal
+func (*Simple) WritingMode() font.WritingMode {
+	return font.Horizontal
 }
 
 func (t *Simple) DecodeWidth(s pdf.String) (float64, int) {
@@ -164,7 +163,7 @@ func (t *Simple) GetCode(gid glyph.ID, text string) (byte, bool) {
 // Only 256 codes are available. Once all codes are used up, the function
 // returns an error.
 func (t *Simple) AllocateCode(gid glyph.ID, baseGlyphName, text string, width float64) (byte, error) {
-	key := gidText{gid: gid, text: text}
+	key := gidText{gid: gid, text: text} // TODO(voss): should this include the width?
 	if _, ok := t.code[key]; ok {
 		return 0, ErrDuplicateCode
 	}

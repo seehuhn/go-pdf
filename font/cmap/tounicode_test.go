@@ -206,7 +206,7 @@ func TestMakeName(t *testing.T) {
 	name1 := testToUniInfoParent.MakeName()
 	name2 := testToUniInfoChild.MakeName()
 
-	namePat := regexp.MustCompile(`^seehuhn.de-[0-9a-f]{32}-UTF16$`)
+	namePat := regexp.MustCompile(`^seehuhn-[0-9a-f]{32}-UTF16$`)
 	for _, name := range []pdf.Name{name1, name2} {
 		if !namePat.MatchString(string(name)) {
 			t.Errorf("invalid name: %q", name)

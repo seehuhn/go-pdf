@@ -155,10 +155,11 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		g.Name = glyphName
 		subsetOutlines.Glyphs[gid] = g
 	}
+
 	// The real encoding is set in the PDF font dictionary, so that readers can
 	// know the meaning of codes without having to parse the font file. Here we
 	// set the built-in encoding of the font to the standard encoding, to
-	// minimise font size.
+	// minimise font file size.
 	subsetOutlines.Encoding = cff.StandardEncoding(subsetOutlines.Glyphs)
 
 	subsetFont := &cff.Font{

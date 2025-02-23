@@ -20,17 +20,18 @@ import (
 	"iter"
 
 	"golang.org/x/text/unicode/norm"
+
+	"seehuhn.de/go/postscript/cid"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/postscript/cid"
 )
 
-var _ Encoding = (*CompositeUTF8)(nil)
+var _ font.CIDEncoder = (*compositeUTF8)(nil)
 
-type CompositeUTF8 struct {
-	wMode cmap.WritingMode
+type compositeUTF8 struct {
+	wMode font.WritingMode
 
 	codec     *charcode.Codec
 	info      map[charcode.Code]*codeInfo
@@ -41,12 +42,12 @@ type CompositeUTF8 struct {
 	nextPrivate rune
 }
 
-func NewCompositeUtf8(cid0Width float64, wMode cmap.WritingMode) *CompositeUTF8 {
+func NewCompositeUtf8(cid0Width float64, wMode font.WritingMode) font.CIDEncoder {
 	codec, err := charcode.NewCodec(utf8cs)
 	if err != nil {
 		panic(err)
 	}
-	e := &CompositeUTF8{
+	e := &compositeUTF8{
 		wMode:       wMode,
 		codec:       codec,
 		info:        make(map[charcode.Code]*codeInfo),
@@ -59,11 +60,11 @@ func NewCompositeUtf8(cid0Width float64, wMode cmap.WritingMode) *CompositeUTF8 
 
 // WritingMode indicates whether the font is for horizontal or vertical
 // writing.
-func (e *CompositeUTF8) WritingMode() cmap.WritingMode {
+func (e *compositeUTF8) WritingMode() font.WritingMode {
 	return e.wMode
 }
 
-func (e *CompositeUTF8) DecodeWidth(s pdf.String) (float64, int) {
+func (e *compositeUTF8) DecodeWidth(s pdf.String) (float64, int) {
 	for code := range e.Codes(s) {
 		return code.Width / 1000, len(s)
 	}
@@ -71,7 +72,7 @@ func (e *CompositeUTF8) DecodeWidth(s pdf.String) (float64, int) {
 }
 
 // Codes iterates over the character codes in a PDF string.
-func (e *CompositeUTF8) Codes(s pdf.String) iter.Seq[*font.Code] {
+func (e *compositeUTF8) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(yield *font.Code) bool) {
 		var code font.Code
 		for len(s) > 0 {
@@ -103,7 +104,11 @@ func (e *CompositeUTF8) Codes(s pdf.String) iter.Seq[*font.Code] {
 	}
 }
 
-func (e *CompositeUTF8) GetCode(cid cid.CID, text string) (charcode.Code, bool) {
+func (e *compositeUTF8) Codec() *charcode.Codec {
+	return e.codec
+}
+
+func (e *compositeUTF8) GetCode(cid cid.CID, text string) (charcode.Code, bool) {
 	key := cidText{cid, text}
 	code, ok := e.code[key]
 	return code, ok
@@ -115,7 +120,7 @@ func (e *CompositeUTF8) GetCode(cid cid.CID, text string) (charcode.Code, bool) 
 // encoding where possible.
 //
 // The last argument is the width of the glyph in PDF glyph space units.
-func (e *CompositeUTF8) AllocateCode(cidVal cid.CID, text string, width float64) (charcode.Code, error) {
+func (e *compositeUTF8) AllocateCode(cidVal cid.CID, text string, width float64) (charcode.Code, error) {
 	key := cidText{cidVal, text}
 	if _, ok := e.code[key]; ok {
 		return 0, ErrDuplicateCode
@@ -132,7 +137,7 @@ func (e *CompositeUTF8) AllocateCode(cidVal cid.CID, text string, width float64)
 	return code, nil
 }
 
-func (e *CompositeUTF8) makeCode(text string) (charcode.Code, error) {
+func (e *compositeUTF8) makeCode(text string) (charcode.Code, error) {
 	if rr := []rune(norm.NFC.String(text)); len(rr) == 1 {
 		code := runeToCode(rr[0])
 		if _, alreadUsed := e.info[code]; !alreadUsed {
@@ -153,6 +158,35 @@ func (e *CompositeUTF8) makeCode(text string) (charcode.Code, error) {
 		code := runeToCode(r)
 		if _, alreadUsed := e.info[code]; !alreadUsed {
 			return code, nil
+		}
+	}
+}
+
+func (e *compositeUTF8) get(c charcode.Code) *codeInfo {
+	if info, ok := e.info[c]; ok {
+		return info
+	}
+	return &codeInfo{
+		CID:   0,
+		Width: e.cid0Width,
+		Text:  "",
+	}
+}
+
+func (e *compositeUTF8) Width(c charcode.Code) float64 {
+	return e.get(c).Width
+}
+
+func (e *compositeUTF8) MappedCodes() iter.Seq2[charcode.Code, *font.Code] {
+	return func(yield func(charcode.Code, *font.Code) bool) {
+		var code font.Code
+		for c, info := range e.info {
+			code.CID = info.CID
+			code.Width = info.Width
+			code.Text = info.Text
+			if !yield(c, &code) {
+				return
+			}
 		}
 	}
 }

@@ -19,17 +19,17 @@ package cidenc
 import (
 	"iter"
 
+	"seehuhn.de/go/postscript/cid"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/postscript/cid"
 )
 
-var _ Encoding = (*CompositeIdentity)(nil)
+var _ font.CIDEncoder = (*compositeIdentity)(nil)
 
-type CompositeIdentity struct {
-	wMode cmap.WritingMode
+type compositeIdentity struct {
+	wMode font.WritingMode
 
 	codec  *charcode.Codec
 	info   map[charcode.Code]*codeInfo
@@ -39,12 +39,12 @@ type CompositeIdentity struct {
 	code map[cidText]charcode.Code
 }
 
-func NewCompositeIdentity(cid0Width float64, wMode cmap.WritingMode) *CompositeIdentity {
+func NewCompositeIdentity(cid0Width float64, wMode font.WritingMode) font.CIDEncoder {
 	codec, err := charcode.NewCodec(charcode.UCS2)
 	if err != nil {
 		panic(err)
 	}
-	e := &CompositeIdentity{
+	e := &compositeIdentity{
 		wMode:  wMode,
 		codec:  codec,
 		info:   make(map[charcode.Code]*codeInfo),
@@ -60,11 +60,11 @@ func NewCompositeIdentity(cid0Width float64, wMode cmap.WritingMode) *CompositeI
 
 // WritingMode indicates whether the font is for horizontal or vertical
 // writing.
-func (e *CompositeIdentity) WritingMode() cmap.WritingMode {
+func (e *compositeIdentity) WritingMode() font.WritingMode {
 	return e.wMode
 }
 
-func (e *CompositeIdentity) DecodeWidth(s pdf.String) (float64, int) {
+func (e *compositeIdentity) DecodeWidth(s pdf.String) (float64, int) {
 	for code := range e.Codes(s) {
 		return code.Width / 1000, len(s)
 	}
@@ -72,7 +72,7 @@ func (e *CompositeIdentity) DecodeWidth(s pdf.String) (float64, int) {
 }
 
 // Codes iterates over the character codes in a PDF string.
-func (e *CompositeIdentity) Codes(s pdf.String) iter.Seq[*font.Code] {
+func (e *compositeIdentity) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(yield *font.Code) bool) {
 		var code font.Code
 		for len(s) > 0 {
@@ -111,7 +111,11 @@ func (e *CompositeIdentity) Codes(s pdf.String) iter.Seq[*font.Code] {
 	}
 }
 
-func (e *CompositeIdentity) GetCode(cid cid.CID, text string) (charcode.Code, bool) {
+func (e *compositeIdentity) Codec() *charcode.Codec {
+	return e.codec
+}
+
+func (e *compositeIdentity) GetCode(cid cid.CID, text string) (charcode.Code, bool) {
 	key := cidText{cid, text}
 	code, ok := e.code[key]
 	return code, ok
@@ -120,7 +124,7 @@ func (e *CompositeIdentity) GetCode(cid cid.CID, text string) (charcode.Code, bo
 // AllocateCode allocates a new code for the given character ID and text.
 //
 // The last argument is the width of the glyph in PDF glyph space units.
-func (e *CompositeIdentity) AllocateCode(cidVal cid.CID, text string, width float64) (charcode.Code, error) {
+func (e *compositeIdentity) AllocateCode(cidVal cid.CID, text string, width float64) (charcode.Code, error) {
 	key := cidText{cidVal, text}
 	if _, ok := e.code[key]; ok {
 		return 0, ErrDuplicateCode
@@ -136,4 +140,33 @@ func (e *CompositeIdentity) AllocateCode(cidVal cid.CID, text string, width floa
 	e.code[key] = code
 
 	return code, nil
+}
+
+func (e *compositeIdentity) get(c charcode.Code) *codeInfo {
+	if info, ok := e.info[c]; ok {
+		return info
+	}
+	return &codeInfo{
+		CID:   0,
+		Width: e.cid0.Width,
+		Text:  "",
+	}
+}
+
+func (e *compositeIdentity) Width(c charcode.Code) float64 {
+	return e.get(c).Width
+}
+
+func (e *compositeIdentity) MappedCodes() iter.Seq2[charcode.Code, *font.Code] {
+	return func(yield func(charcode.Code, *font.Code) bool) {
+		var code font.Code
+		for c, info := range e.info {
+			code.CID = info.CID
+			code.Width = info.Width
+			code.Text = info.Text
+			if !yield(c, &code) {
+				return
+			}
+		}
+	}
 }

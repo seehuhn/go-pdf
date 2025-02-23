@@ -391,8 +391,8 @@ func (d *Type1) GetScanner() (font.Scanner, error) {
 	return d, nil
 }
 
-func (d *Type1) WritingMode() cmap.WritingMode {
-	return cmap.Horizontal
+func (d *Type1) WritingMode() font.WritingMode {
+	return font.Horizontal
 }
 
 func (d *Type1) Codes(s pdf.String) iter.Seq[*font.Code] {

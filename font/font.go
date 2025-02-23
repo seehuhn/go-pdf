@@ -17,7 +17,8 @@
 package font
 
 import (
-	"seehuhn.de/go/pdf/font/cmap"
+	"fmt"
+
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
@@ -58,6 +59,28 @@ type Font interface {
 	pdf.Embedder[Embedded]
 }
 
+// WritingMode is the "writing mode" of a PDF font (horizontal or vertical).
+type WritingMode int
+
+func (m WritingMode) String() string {
+	switch m {
+	case Horizontal:
+		return "horizontal"
+	case Vertical:
+		return "vertical"
+	default:
+		return fmt.Sprintf("WritingMode(%d)", m)
+	}
+}
+
+const (
+	// Horizontal indicates horizontal writing mode.
+	Horizontal WritingMode = 0
+
+	// Vertical indicates vertical writing mode.
+	Vertical WritingMode = 1
+)
+
 // Embedded represents a font which is already embedded in a PDF file.
 //
 // The functions of this interface provide the information required to
@@ -65,7 +88,7 @@ type Font interface {
 //
 // TODO(voss): merge with [Scanner] and [EmbeddedLayouter]
 type Embedded interface {
-	WritingMode() cmap.WritingMode
+	WritingMode() WritingMode
 
 	// Codes iterates over the character codes in a PDF string.
 	// Codes(s pdf.String) iter.Seq[*Code]

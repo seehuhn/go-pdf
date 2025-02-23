@@ -17,8 +17,10 @@
 package cff
 
 import (
-	"iter"
 	"math"
+	"slices"
+
+	"golang.org/x/exp/maps"
 
 	"seehuhn.de/go/geom/matrix"
 
@@ -30,6 +32,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/glyphdata"
@@ -61,52 +64,30 @@ type embeddedComposite struct {
 	CapHeight float64 // PDF glyph space units
 	XHeight   float64 // PDF glyph space units
 
-	cmap.GIDToCID
-	cmap.CIDEncoder
+	font.GIDToCID
+	font.CIDEncoder
 
 	finished bool
 }
 
-func (e *embeddedComposite) WritingMode() cmap.WritingMode {
-	return 0 // TODO(voss): implement
-}
+func (e *embeddedComposite) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
+	cid := e.GIDToCID.CID(gid, []rune(text))
+	c, ok := e.CIDEncoder.GetCode(cid, text)
+	if !ok {
+		if e.finished {
+			return s, 0
+		}
 
-// Codes returns an iterator over the characters in the PDF string. Each code
-// includes the CID, width, and associated text. Missing glyphs map to CID 0
-// (notdef).
-func (e *embeddedComposite) Codes(s pdf.String) iter.Seq[*font.Code] {
-	return func(yield func(*font.Code) bool) {
-		var code font.Code
-		for _, cid := range e.AllCIDs(s) {
-			gid := e.GID(cid)
-
-			// TODO(voss): finish this
-
-			code.CID = cid
-			// c.Notdef = ...
-			code.Width = e.Font.GlyphWidthPDF(gid)
-			// c.Text = ...
-
-			if !yield(&code) {
-				break
-			}
+		width := math.Round(e.Font.GlyphWidthPDF(gid))
+		var err error
+		c, err = e.CIDEncoder.AllocateCode(cid, text, width)
+		if err != nil {
+			return s, 0
 		}
 	}
-}
 
-func (e *embeddedComposite) DecodeWidth(s pdf.String) (float64, int) {
-	for code, cid := range e.AllCIDs(s) {
-		gid := e.GID(cid)
-		width := e.Font.GlyphWidthPDF(gid)
-		return math.Round(width) / 1000, len(code)
-	}
-	return 0, 0
-}
-
-func (e *embeddedComposite) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
-	width := e.Font.GlyphWidthPDF(gid)
-	s = e.CIDEncoder.AppendEncoded(s, gid, text)
-	return s, math.Round(width) / 1000
+	w := e.CIDEncoder.Width(c)
+	return e.CIDEncoder.Codec().AppendCode(s, c), w / 1000
 }
 
 // Finish is called when the resource manager is closed.
@@ -121,7 +102,14 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 	outlines := e.Font.Outlines
 
 	// subset the font
-	glyphs := e.CIDEncoder.Subset()
+	glyphSet := make(map[glyph.ID]struct{})
+	glyphSet[e.GIDToCID.GID(0)] = struct{}{}
+	for _, info := range e.CIDEncoder.MappedCodes() {
+		glyphSet[e.GIDToCID.GID(info.CID)] = struct{}{}
+	}
+
+	glyphs := maps.Keys(glyphSet)
+	slices.Sort(glyphs)
 
 	// subset the font, if needed
 	subsetTag := subset.Tag(glyphs, outlines.NumGlyphs())
@@ -139,8 +127,19 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 	}
 
 	ros := e.ROS()
-	cmapInfo := e.CMap()
-	toUnicode := e.ToUnicode()
+
+	m := make(map[charcode.Code]font.Code)
+	for code, val := range e.CIDEncoder.MappedCodes() {
+		m[code] = *val
+	}
+	cmapInfo := &cmap.File{
+		Name:  "",
+		ROS:   ros,
+		WMode: e.CIDEncoder.WritingMode(),
+	}
+	cmapInfo.SetMapping(e.CIDEncoder.Codec(), m)
+	cmapInfo.UpdateName()
+	toUnicode := cmap.NewToUnicodeFile(e.CIDEncoder.Codec(), m)
 
 	// If the CFF font is CID-keyed, then the `charset` table in the CFF font
 	// describes the mapping from CIDs to glyphs.  Otherwise, the CID is used

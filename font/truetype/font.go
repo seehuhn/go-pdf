@@ -119,19 +119,9 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 			return nil, nil, err
 		}
 
-		var gidToCID cmap.GIDToCID
-		if opt.MakeGIDToCID != nil {
-			gidToCID = opt.MakeGIDToCID()
-		} else {
-			gidToCID = cmap.NewGIDToCIDSequential()
-		}
-
-		var cidEncoder cmap.CIDEncoder
-		if opt.MakeEncoder != nil {
-			cidEncoder = opt.MakeEncoder(gidToCID)
-		} else {
-			cidEncoder = cmap.NewCIDEncoderIdentity(gidToCID)
-		}
+		// TODO(voss): make this configurable
+		gidToCID := cmap.NewGIDToCIDSequential()
+		cidEncoder := cmap.NewCIDEncoderIdentity(gidToCID)
 
 		res = &embeddedComposite{
 			w:          w,

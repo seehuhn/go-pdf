@@ -26,6 +26,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -137,12 +138,12 @@ end
 	// This is used to test the template used to format a CMap file.
 	testInfoFull = &File{
 		Name: "Test",
-		ROS: &CIDSystemInfo{
+		ROS: &font.CIDSystemInfo{
 			Registry:   "Test",
 			Ordering:   "Random",
 			Supplement: 3,
 		},
-		WMode: Horizontal,
+		WMode: font.Horizontal,
 		Parent: &File{
 			Name: "Other",
 		},
@@ -168,14 +169,14 @@ end
 
 	// The following two InfoNew structs are used to test embedding a chain of
 	// CMaps.
-	testROS = &CIDSystemInfo{
+	testROS = &font.CIDSystemInfo{
 		Registry: "Seehuhn",
 		Ordering: "Test",
 	}
 	testInfoParent = &File{
 		Name:  "Test1",
 		ROS:   testROS,
-		WMode: Vertical,
+		WMode: font.Vertical,
 		CodeSpaceRange: []charcode.Range{
 			{Low: []byte{0x00, 0x00}, High: []byte{0x00, 0xFF}},
 		},
@@ -195,7 +196,7 @@ end
 	testInfoChild = &File{
 		Name:   "Test2",
 		ROS:    testROS,
-		WMode:  Vertical,
+		WMode:  font.Vertical,
 		Parent: testInfoParent,
 		CodeSpaceRange: []charcode.Range{
 			{Low: []byte{0x00, 0x00}, High: []byte{0x00, 0xFF}},
@@ -277,8 +278,8 @@ func TestExtractCMAP(t *testing.T) {
 	if child.Name != "TestV" {
 		t.Errorf("expected name %q, got %q", "TestV", child.Name)
 	}
-	if child.WMode != Vertical {
-		t.Errorf("expected writing mode %v, got %v", Vertical, child.WMode)
+	if child.WMode != font.Vertical {
+		t.Errorf("expected writing mode %v, got %v", font.Vertical, child.WMode)
 	}
 	if !reflect.DeepEqual(child.ROS, testROS) {
 		t.Errorf("unexpected ROS: %v", child.ROS)
@@ -292,8 +293,8 @@ func TestExtractCMAP(t *testing.T) {
 	if parent.Name != "TestH" {
 		t.Errorf("expected parent name %q, got %q", "TestH", parent.Name)
 	}
-	if parent.WMode != Horizontal {
-		t.Errorf("expected parent writing mode %v, got %v", Horizontal, parent.WMode)
+	if parent.WMode != font.Horizontal {
+		t.Errorf("expected parent writing mode %v, got %v", font.Horizontal, parent.WMode)
 	}
 	if !reflect.DeepEqual(parent.ROS, testROS) {
 		t.Errorf("unexpected parent ROS: %v", parent.ROS)
@@ -324,8 +325,8 @@ func TestReadCMap(t *testing.T) {
 		t.Errorf("expected name %q, got %q", "Test1", info.Name)
 	}
 
-	if info.WMode != Vertical {
-		t.Errorf("expected writing mode %v, got %v", Horizontal, info.WMode)
+	if info.WMode != font.Vertical {
+		t.Errorf("expected writing mode %v, got %v", font.Horizontal, info.WMode)
 	}
 
 	if parent != pdf.Name("Test2") {
@@ -515,11 +516,11 @@ func TestExtractPredefined(t *testing.T) {
 			}
 
 			if strings.HasSuffix(string(info.Name), "H") {
-				if info.WMode != Horizontal {
+				if info.WMode != font.Horizontal {
 					t.Errorf("expected horizontal writing mode, got %v", info.WMode)
 				}
 			} else {
-				if info.WMode != Vertical {
+				if info.WMode != font.Vertical {
 					t.Errorf("expected vertical writing mode, got %v", info.WMode)
 				}
 			}
@@ -535,7 +536,7 @@ func TestExtractLoop(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", n), func(t *testing.T) {
 			data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(data)
-			ros := &CIDSystemInfo{
+			ros := &font.CIDSystemInfo{
 				Registry:   "Test",
 				Ordering:   "Simple",
 				Supplement: 0,
