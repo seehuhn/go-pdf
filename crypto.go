@@ -629,10 +629,7 @@ func (sec *stdSecHandler) KeyForRef(cf *cryptFilter, ref Reference) ([]byte, err
 		if cf.Cipher == cipherAES {
 			h.Write([]byte("sAlT"))
 		}
-		l := sec.keyBytes + 5
-		if l > 16 {
-			l = 16
-		}
+		l := min(sec.keyBytes+5, 16)
 		return h.Sum(nil)[:l], nil
 	case 6:
 		return key, nil
@@ -713,7 +710,7 @@ func (sec *stdSecHandler) computeFileEncyptionKey(paddedUserPwd []byte) []byte {
 	key := h.Sum(nil)
 
 	if sec.R >= 3 {
-		for i := 0; i < 50; i++ {
+		for range 50 {
 			h.Reset()
 			h.Write(key[:sec.keyBytes])
 			key = h.Sum(key[:0])
@@ -743,7 +740,7 @@ func slowHash(passwd, salt, U []byte) []byte {
 		// checking the user password or creating the user key, K1 is the
 		// concatenation of the input password and K.
 		K1 = K1[:0]
-		for j := 0; j < 64; j++ {
+		for range 64 {
 			K1 = append(K1, passwd...)
 			K1 = append(K1, K...)
 			K1 = append(K1, U...)
@@ -808,7 +805,7 @@ func (sec *stdSecHandler) computeO(paddedUserPwd, paddedOwnerPwd []byte) []byte 
 	h.Write(paddedOwnerPwd)
 	sum := h.Sum(nil)
 	if sec.R >= 3 {
-		for i := 0; i < 50; i++ {
+		for range 50 {
 			h.Reset()
 			// The spec does not mention the truncation, but this seems to be
 			// required anyway.
@@ -896,7 +893,7 @@ func (sec *stdSecHandler) authenticateOwner(paddedOwnerPwd []byte) error {
 	h.Write(paddedOwnerPwd)
 	sum := h.Sum(nil)
 	if sec.R >= 3 {
-		for i := 0; i < 50; i++ {
+		for range 50 {
 			h.Reset()
 			// The spec does not mention the truncation, but this seems to be
 			// required anyway.

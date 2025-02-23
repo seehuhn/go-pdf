@@ -145,7 +145,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 
 	ID, ok := trailer["ID"].(Array)
 	if ok && len(ID) >= 2 {
-		for i := 0; i < 2; i++ {
+		for i := range 2 {
 			s, ok := ID[i].(String)
 			if !ok {
 				break

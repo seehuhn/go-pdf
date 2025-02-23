@@ -61,7 +61,7 @@ func Error(msg string) error {
 	return &MalformedFileError{Err: errors.New(msg)}
 }
 
-func Errorf(format string, args ...interface{}) error {
+func Errorf(format string, args ...any) error {
 	return &MalformedFileError{Err: fmt.Errorf(format, args...)}
 }
 

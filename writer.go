@@ -490,7 +490,7 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 	N := len(objects)
 	head := &bytes.Buffer{}
 	body := &bytes.Buffer{}
-	for i := 0; i < N; i++ {
+	for i := range N {
 		ref := refs[i]
 		idx := strconv.Itoa(int(ref.Number())) + " " + strconv.Itoa(body.Len()) + "\n"
 		_, err := head.WriteString(idx)

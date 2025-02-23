@@ -24,8 +24,6 @@ import (
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/font/encoding/cidenc"
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
@@ -197,44 +195,12 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		if err != nil {
 			return nil, nil, err
 		}
-
-		// TODO(voss): make this configurable
-		makeGIDToCID := cmap.NewGIDToCIDIdentity
-		if opt.MakeGIDToCID != nil {
-			makeGIDToCID = opt.MakeGIDToCID
-		}
-		gidToCID := makeGIDToCID()
-
-		makeEncoder := cidenc.NewCompositeIdentity
-		if opt.MakeEncoder != nil {
-			makeEncoder = opt.MakeEncoder
-		}
-		encoder := makeEncoder(f.Font.GlyphWidthPDF(0), opt.WritingMode)
-
-		res = &embeddedComposite{
-			Ref:  ref,
-			Font: f.Font,
-
-			Stretch:  f.Stretch,
-			Weight:   f.Weight,
-			IsSerif:  f.IsSerif,
-			IsScript: f.IsScript,
-
-			Ascent:    f.Ascent,
-			Descent:   f.Descent,
-			Leading:   f.Leading,
-			CapHeight: f.CapHeight,
-			XHeight:   f.XHeight,
-
-			GIDToCID:   gidToCID,
-			CIDEncoder: encoder,
-		}
+		res = newEmbeddedComposite(ref, f)
 	} else {
 		err := pdf.CheckVersion(rm.Out, "simple CFF fonts", pdf.V1_2)
 		if err != nil {
 			return nil, nil, err
 		}
-
 		res = newEmbeddedSimple(ref, f)
 	}
 

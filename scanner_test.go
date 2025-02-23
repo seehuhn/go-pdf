@@ -42,10 +42,7 @@ func TestRefill(t *testing.T) {
 		s.bufPos += inc
 		err := s.refill()
 		total := int(s.filePos) + s.bufPos
-		expectUsed := scannerBufSize
-		if expectUsed > n-total {
-			expectUsed = n - total
-		}
+		expectUsed := min(scannerBufSize, n-total)
 		if err != nil || s.bufPos != 0 || s.bufEnd != expectUsed {
 			errStr := "nil"
 			if err != nil {

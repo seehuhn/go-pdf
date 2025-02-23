@@ -439,10 +439,7 @@ func (r *Reader) lastOccurence(pat string, size int64) (int64, error) {
 	k := int64(len(pat))
 	pos := size
 	for pos >= k {
-		start := pos - chunkSize
-		if start < 0 {
-			start = 0
-		}
+		start := max(pos-chunkSize, 0)
 		_, err := r.r.Seek(start, io.SeekStart)
 		if err != nil {
 			return 0, err

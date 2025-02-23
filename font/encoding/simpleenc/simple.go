@@ -48,8 +48,8 @@ const maxNameLength = 31
 //   - associated text content.
 //
 // If a glyph is used with different text content (for example space and
-// no-break space), different codes are used to allow for different ToUnicode
-// mappings.
+// no-break space), different codes are allocated to allow for different
+// ToUnicode mappings.
 type Simple struct {
 	code   map[gidText]byte
 	info   map[byte]*codeInfo

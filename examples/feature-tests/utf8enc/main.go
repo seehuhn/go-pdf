@@ -20,13 +20,12 @@ import (
 	"golang.org/x/text/language"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/sfnt"
 
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding/cidenc"
+	"seehuhn.de/go/pdf/internal/debug/makefont"
 )
 
 func main() {
@@ -37,30 +36,35 @@ func main() {
 }
 
 func doit() error {
-	page, err := document.CreateSinglePage("test.pdf", document.A4, pdf.V1_7, nil)
+	pdfOpt := &pdf.WriterOptions{
+		HumanReadable: false,
+	}
+	page, err := document.CreateSinglePage("test.pdf", document.A4, pdf.V1_7, pdfOpt)
 	if err != nil {
 		return err
 	}
 
-	info, err := sfnt.ReadFile("../../../../../otf/SourceSerif4-Regular.otf")
+	cffFont := makefont.OpenType()
+	fontOpt := &font.Options{
+		Language:    language.German,
+		Composite:   true,
+		MakeEncoder: cidenc.NewCompositeUtf8,
+	}
+	F1, err := cff.New(cffFont, fontOpt)
+	if err != nil {
+		return err
+	}
+	F2, err := cff.New(cffFont, nil)
 	if err != nil {
 		return err
 	}
 
-	opt := &font.Options{
-		Language:     language.German,
-		Composite:    true,
-		MakeGIDToCID: cmap.NewGIDToCIDIdentity,
-		MakeEncoder:  cidenc.NewCompositeUtf8,
-	}
-	F, err := cff.New(info, opt)
-	if err != nil {
-		return err
-	}
-
-	page.TextSetFont(F, 36)
 	page.TextBegin()
 	page.TextFirstLine(100, 700)
+	page.TextSetFont(F1, 36)
+	page.TextShow("„Größenwahn“")
+	page.TextSecondLine(0, -40)
+	page.TextSetFont(F2, 36)
 	page.TextShow("„Größenwahn“")
 	page.TextEnd()
 

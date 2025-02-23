@@ -43,7 +43,7 @@ var _ interface {
 } = (*embeddedSimple)(nil)
 
 // embeddedSimple represents an [Instance] which has been embedded in a PDF
-// file, if the Composite option is not set.  There should be at most one
+// file, if the Composite font option is not set.  There should be at most one
 // embeddedSimple for each [Instance] in a PDF file.
 type embeddedSimple struct {
 	Ref  pdf.Reference
@@ -66,23 +66,29 @@ type embeddedSimple struct {
 }
 
 func newEmbeddedSimple(ref pdf.Reference, f *Instance) *embeddedSimple {
+	notdefWidth := math.Round(f.Font.GlyphWidthPDF(0))
+	encoder := simpleenc.NewSimple(
+		notdefWidth,
+		f.Font.FontName == "ZapfDingbats",
+		&pdfenc.WinAnsi,
+	)
+
 	e := &embeddedSimple{
-		Ref:       ref,
-		Font:      f.Font,
-		Stretch:   f.Stretch,
-		Weight:    f.Weight,
-		IsSerif:   f.IsSerif,
-		IsScript:  f.IsScript,
+		Ref:  ref,
+		Font: f.Font,
+
+		Stretch:  f.Stretch,
+		Weight:   f.Weight,
+		IsSerif:  f.IsSerif,
+		IsScript: f.IsScript,
+
 		Ascent:    f.Ascent,
 		Descent:   f.Descent,
 		Leading:   f.Leading,
 		CapHeight: f.CapHeight,
 		XHeight:   f.XHeight,
-		Simple: simpleenc.NewSimple(
-			math.Round(f.Font.GlyphWidthPDF(0)),
-			f.Font.FontName == "ZapfDingbats",
-			&pdfenc.WinAnsi,
-		),
+
+		Simple: encoder,
 	}
 
 	return e
@@ -126,6 +132,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 
 	// subset the font, if needed
 	glyphs := e.Simple.Glyphs()
+
 	subsetTag := subset.Tag(glyphs, outlines.NumGlyphs())
 	var subsetOutlines *cff.Outlines
 	if subsetTag != "" {

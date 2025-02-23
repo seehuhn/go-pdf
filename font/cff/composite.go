@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/geom/matrix"
 
 	"seehuhn.de/go/postscript/cid"
+	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyph"
@@ -35,8 +36,10 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/encoding/cidenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/cffglyphs"
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 )
 
@@ -70,6 +73,44 @@ type embeddedComposite struct {
 	finished bool
 }
 
+func newEmbeddedComposite(ref pdf.Reference, f *Instance) *embeddedComposite {
+	opt := f.Opt
+
+	makeGIDToCID := cmap.NewGIDToCIDIdentity
+	if opt.MakeGIDToCID != nil {
+		makeGIDToCID = opt.MakeGIDToCID
+	}
+	gidToCID := makeGIDToCID()
+
+	makeEncoder := cidenc.NewCompositeIdentity
+	if opt.MakeEncoder != nil {
+		makeEncoder = opt.MakeEncoder
+	}
+	notdefWidth := math.Round(f.Font.GlyphWidthPDF(0))
+	encoder := makeEncoder(notdefWidth, opt.WritingMode)
+
+	e := &embeddedComposite{
+		Ref:  ref,
+		Font: f.Font,
+
+		Stretch:  f.Stretch,
+		Weight:   f.Weight,
+		IsSerif:  f.IsSerif,
+		IsScript: f.IsScript,
+
+		Ascent:    f.Ascent,
+		Descent:   f.Descent,
+		Leading:   f.Leading,
+		CapHeight: f.CapHeight,
+		XHeight:   f.XHeight,
+
+		GIDToCID:   gidToCID,
+		CIDEncoder: encoder,
+	}
+
+	return e
+}
+
 func (e *embeddedComposite) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
 	cid := e.GIDToCID.CID(gid, []rune(text))
 	c, ok := e.CIDEncoder.GetCode(cid, text)
@@ -101,17 +142,15 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 	fontInfo := e.Font.FontInfo
 	outlines := e.Font.Outlines
 
-	// subset the font
+	// subset the font, if needed
 	glyphSet := make(map[glyph.ID]struct{})
 	glyphSet[e.GIDToCID.GID(0)] = struct{}{}
 	for _, info := range e.CIDEncoder.MappedCodes() {
 		glyphSet[e.GIDToCID.GID(info.CID)] = struct{}{}
 	}
-
 	glyphs := maps.Keys(glyphSet)
 	slices.Sort(glyphs)
 
-	// subset the font, if needed
 	subsetTag := subset.Tag(glyphs, outlines.NumGlyphs())
 	var subsetOutlines *cff.Outlines
 	if subsetTag != "" {
@@ -141,19 +180,16 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 	cmapInfo.UpdateName()
 	toUnicode := cmap.NewToUnicodeFile(e.CIDEncoder.Codec(), m)
 
-	// If the CFF font is CID-keyed, then the `charset` table in the CFF font
-	// describes the mapping from CIDs to glyphs.  Otherwise, the CID is used
-	// as the glyph index directly.
-	isIdentity := true
+	// Simple CFF fonts can only have one private dict, and ...
+	canUseSimple := len(subsetOutlines.Private) == 1
+	// ... they assume that CID values equal GID values.
 	for GID, CID := range gidToCID {
 		if CID != 0 && CID != cid.CID(GID) {
-			isIdentity = false
+			canUseSimple = false
 			break
 		}
 	}
-
-	mustUseCID := len(subsetOutlines.Private) > 1
-	if isIdentity && !mustUseCID { // convert to simple font
+	if canUseSimple { // convert to simple font
 		subsetOutlines.ROS = nil
 		subsetOutlines.GIDToCID = nil
 		if len(subsetOutlines.FontMatrices) > 0 && subsetOutlines.FontMatrices[0] != matrix.Identity {
@@ -161,6 +197,7 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 			fontInfo.FontMatrix = subsetOutlines.FontMatrices[0].Mul(fontInfo.FontMatrix)
 		}
 		subsetOutlines.FontMatrices = nil
+		// TODO(voss): make sure all glyphs have names
 		subsetOutlines.Encoding = cff.StandardEncoding(subsetOutlines.Glyphs)
 	} else { // Make the font CID-keyed.
 		subsetOutlines.Encoding = nil
@@ -186,13 +223,28 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 		Outlines: subsetOutlines,
 	}
 
-	ww := make(map[cmap.CID]float64)
-	for gid, cid := range gidToCID {
-		ww[cid] = math.Round(subsetFont.GlyphWidthPDF(glyph.ID(gid)))
-	}
+	// construct the font dictionary and font descriptor
 	dw := math.Round(subsetFont.GlyphWidthPDF(0))
+	ww := make(map[cmap.CID]float64)
+	for _, info := range e.CIDEncoder.MappedCodes() {
+		ww[info.CID] = info.Width
+	}
 
-	isSymbolic := false // TODO(voss): set this correctly
+	postScriptName := subsetFont.FontName
+
+	isSymbolic := false
+	for _, info := range e.CIDEncoder.MappedCodes() {
+		rr := []rune(info.Text)
+		if len(rr) != 1 {
+			isSymbolic = true
+			break
+		}
+		glyphName := names.FromUnicode(rr[0])
+		if !pdfenc.StandardLatin.Has[glyphName] {
+			isSymbolic = true
+			break
+		}
+	}
 
 	qh := subsetFont.FontMatrix[0] * 1000
 	qv := subsetFont.FontMatrix[3] * 1000
@@ -200,7 +252,7 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 	italicAngle := math.Round(subsetFont.ItalicAngle*10) / 10
 
 	fd := &font.Descriptor{
-		FontName:     subset.Join(subsetTag, e.Font.FontName),
+		FontName:     subset.Join(subsetTag, postScriptName),
 		FontFamily:   subsetFont.FamilyName,
 		FontStretch:  e.Stretch,
 		FontWeight:   e.Weight,
@@ -212,18 +264,18 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 		ForceBold:    subsetFont.Private[0].ForceBold,
 		FontBBox:     subsetFont.FontBBoxPDF().Rounded(),
 		ItalicAngle:  italicAngle,
-		Ascent:       math.Round(e.Ascent),
-		Descent:      math.Round(e.Descent),
-		Leading:      math.Round(e.Leading),
-		CapHeight:    math.Round(e.CapHeight),
-		XHeight:      math.Round(e.XHeight),
+		Ascent:       e.Ascent,
+		Descent:      e.Descent,
+		Leading:      e.Leading,
+		CapHeight:    e.CapHeight,
+		XHeight:      e.XHeight,
 		StemV:        math.Round(subsetOutlines.Private[0].StdVW * qh),
 		StemH:        math.Round(subsetOutlines.Private[0].StdHW * qv),
 	}
 
 	dict := &dict.CIDFontType0{
 		Ref:            e.Ref,
-		PostScriptName: e.Font.FontName,
+		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
 		ROS:            ros,

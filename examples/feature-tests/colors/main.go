@@ -103,8 +103,8 @@ func showCalRGBColors(doc *document.MultiPage, F font.Layouter) error {
 	}
 
 	imgData := goimage.NewNRGBA(goimage.Rect(0, 0, 256, 256))
-	for i := 0; i < 256; i++ {
-		for j := 0; j < 256; j++ {
+	for i := range 256 {
+		for j := range 256 {
 			idx := i*imgData.Stride + j*4
 			imgData.Pix[idx+0] = 128
 			imgData.Pix[idx+1] = uint8(j)
@@ -152,8 +152,8 @@ func showLabColors(doc *document.MultiPage, F font.Layouter) error {
 	}
 
 	imgData := goimage.NewNRGBA(goimage.Rect(0, 0, 256, 256))
-	for i := 0; i < 256; i++ {
-		for j := 0; j < 256; j++ {
+	for i := range 256 {
+		for j := range 256 {
 			idx := i*imgData.Stride + j*4
 			imgData.Pix[idx+0] = 128
 			imgData.Pix[idx+1] = uint8(j)
@@ -207,9 +207,9 @@ func showIndexed(doc *document.MultiPage, F font.Layouter) error {
 	numColors := 32
 
 	bases := []int{2, 3, 5}
-	for i := 0; i < numColors; i++ {
+	for i := range numColors {
 		var x [3]float64
-		for j := 0; j < 3; j++ {
+		for j := range 3 {
 			x[j] = halton(i, bases[j])
 		}
 		col, err := lab.New(x[0]*100, x[1]*200-100, x[2]*200-100)
@@ -224,7 +224,7 @@ func showIndexed(doc *document.MultiPage, F font.Layouter) error {
 	}
 
 	img := image.NewIndexed(numColors, 1, cs)
-	for i := 0; i < numColors; i++ {
+	for i := range numColors {
 		img.Pix[i] = uint8(i)
 	}
 
