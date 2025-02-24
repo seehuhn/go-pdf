@@ -29,10 +29,13 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/pdf/font/glyphdata/type1glyphs"
 	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/font/standard"
+	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/type3"
-	"seehuhn.de/go/pdf/font/widths"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
@@ -211,37 +214,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	notdef.ClosePath()
 	F.Glyphs[".notdef"] = notdef
 
-	// we manually write the font to the PDF file
 	F.Encoding = psenc.StandardEncoding[:]
-
-	fontFileRef := w.Alloc()
-	length1 := pdf.NewPlaceholder(w, 10)
-	length2 := pdf.NewPlaceholder(w, 10)
-	fontFileDict := pdf.Dict{
-		"Length1": length1,
-		"Length2": length2,
-		"Length3": pdf.Integer(0),
-	}
-	fontFileStream, err := w.OpenStream(fontFileRef, fontFileDict, pdf.FilterCompress{})
-	if err != nil {
-		return nil, nil, err
-	}
-	l1, l2, err := F.WritePDF(fontFileStream)
-	if err != nil {
-		return nil, nil, err
-	}
-	err = length1.Set(pdf.Integer(l1))
-	if err != nil {
-		return nil, nil, err
-	}
-	err = length2.Set(pdf.Integer(l2))
-	if err != nil {
-		return nil, nil, err
-	}
-	err = fontFileStream.Close()
-	if err != nil {
-		return nil, nil, err
-	}
 
 	var fontBBox rect.Rect
 	bbox := F.FontBBox()
@@ -252,9 +225,8 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		URx: bbox.URx * q,
 		URy: bbox.URy * q,
 	}
-	fontDescRef := w.Alloc()
 	fontDesc := &font.Descriptor{
-		FontName:     "AAAAAA+NimbusRoman-Regular",
+		FontName:     subset.Join("AAAAAA", "NimbusRoman-Regular"),
 		IsSerif:      true,
 		FontBBox:     fontBBox,
 		Ascent:       1000,
@@ -264,42 +236,53 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		XHeight:      500,
 		MissingWidth: 500,
 	}
-	fontDescDict := fontDesc.AsDict()
-	fontDescDict["FontFile"] = fontFileRef
-	w.Put(fontDescRef, fontDescDict)
 
-	encoding := pdf.Dict{
-		"Type":         pdf.Name("Encoding"),
-		"BaseEncoding": pdf.Name("WinAnsiEncoding"),
-		"Differences": pdf.Array{
-			pdf.Integer(65), pdf.Name("AEacute"), pdf.Name("does.not.exist"),
-		},
+	enc := func(code byte) string {
+		switch code {
+		case ' ':
+			return "space"
+		case 'A':
+			return "AEacute"
+		case 'B':
+			return "does.not.exist"
+		case 0o335:
+			return "Yacute"
+		default:
+			return ""
+		}
+	}
+	dd := dict.Type1{
+		Ref:            fontDictRef,
+		PostScriptName: "NimbusRoman-Regular",
+		SubsetTag:      "AAAAAA",
+		Descriptor:     fontDesc,
+		Encoding:       enc,
+		FontType:       glyphdata.Type1,
+		FontRef:        w.Alloc(),
+	}
+	for code := range 256 {
+		dd.Width[code] = 500
+	}
+	dd.Width[' '] = F.Glyphs["space"].WidthX * F.FontInfo.FontMatrix[0] * 1000
+	dd.Width['A'] = F.Glyphs["AEacute"].WidthX * F.FontInfo.FontMatrix[0] * 1000
+	dd.Width[0o335] = F.Glyphs["Yacute"].WidthX * F.FontInfo.FontMatrix[0] * 1000
+	dd.Text[' '] = " "
+	dd.Text['A'] = "Ǽ"
+	dd.Text[0o335] = "Ý"
+
+	err = dd.WriteToPDF(rm)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	ww := make([]float64, 256)
-	for i := 0; i < 256; i++ {
-		ww[i] = 500
+	err = type1glyphs.Embed(w, dd.FontType, dd.FontRef, F)
+	if err != nil {
+		return nil, nil, err
 	}
-	ww[' '] = F.Glyphs["space"].WidthX * F.FontInfo.FontMatrix[0] * 1000
-	ww[65] = F.Glyphs["AEacute"].WidthX * F.FontInfo.FontMatrix[0] * 1000
-	ww[0o335] = F.Glyphs["Yacute"].WidthX * F.FontInfo.FontMatrix[0] * 1000
-	widthsInfo := widths.EncodeSimple(ww)
-
-	fontDict := pdf.Dict{
-		"Type":           pdf.Name("Font"),
-		"Subtype":        pdf.Name("Type1"),
-		"BaseFont":       pdf.Name("AAAAAA+NimbusRoman-Regular"),
-		"FirstChar":      widthsInfo.FirstChar,
-		"LastChar":       widthsInfo.LastChar,
-		"Widths":         widthsInfo.Widths,
-		"Encoding":       encoding,
-		"FontDescriptor": fontDescRef,
-	}
-	w.Put(fontDictRef, fontDict)
 
 	res := &testFontEmbedded{
 		Ref: fontDictRef,
-		W:   ww,
+		W:   dd.Width[:],
 	}
 	return fontDictRef, res, nil
 }

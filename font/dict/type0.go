@@ -28,7 +28,6 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/font/widths"
 )
 
 // CIDFontType0 holds the information from the font dictionary and CIDFont
@@ -277,7 +276,7 @@ func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager) error {
 	compressedObjects := []pdf.Object{fontDict, cidFontDict, fdDict}
 	compressedRefs := []pdf.Reference{fontDictRef, cidFontRef, fdRef}
 
-	ww := widths.EncodeComposite(d.Width, d.DefaultWidth)
+	ww := encodeComposite(d.Width, d.DefaultWidth)
 	switch {
 	case moreThanTen(ww):
 		wwRef := w.Alloc()
