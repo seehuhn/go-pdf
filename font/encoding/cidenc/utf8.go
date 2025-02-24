@@ -37,13 +37,13 @@ type compositeUTF8 struct {
 	info      map[charcode.Code]*codeInfo
 	cid0Width float64
 
-	code map[cidText]charcode.Code
+	code map[key]charcode.Code
 
 	nextPrivate rune
 }
 
 func NewCompositeUtf8(cid0Width float64, wMode font.WritingMode) font.CIDEncoder {
-	codec, err := charcode.NewCodec(utf8cs)
+	codec, err := charcode.NewCodec(charcode.UTF8)
 	if err != nil {
 		panic(err)
 	}
@@ -52,14 +52,12 @@ func NewCompositeUtf8(cid0Width float64, wMode font.WritingMode) font.CIDEncoder
 		codec:       codec,
 		info:        make(map[charcode.Code]*codeInfo),
 		cid0Width:   cid0Width,
-		code:        make(map[cidText]charcode.Code),
+		code:        make(map[key]charcode.Code),
 		nextPrivate: 0x00_E000,
 	}
 	return e
 }
 
-// WritingMode indicates whether the font is for horizontal or vertical
-// writing.
 func (e *compositeUTF8) WritingMode() font.WritingMode {
 	return e.wMode
 }
@@ -71,7 +69,6 @@ func (e *compositeUTF8) DecodeWidth(s pdf.String) (float64, int) {
 	return 0, 0
 }
 
-// Codes iterates over the character codes in a PDF string.
 func (e *compositeUTF8) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(yield *font.Code) bool) {
 		var code font.Code
@@ -109,19 +106,13 @@ func (e *compositeUTF8) Codec() *charcode.Codec {
 }
 
 func (e *compositeUTF8) GetCode(cid cid.CID, text string) (charcode.Code, bool) {
-	key := cidText{cid, text}
+	key := key{cid, text}
 	code, ok := e.code[key]
 	return code, ok
 }
 
-// AllocateCode allocates a new code for the given character ID and text.
-//
-// The new code is chosen using based on the text, and equals the utf-8
-// encoding where possible.
-//
-// The last argument is the width of the glyph in PDF glyph space units.
 func (e *compositeUTF8) AllocateCode(cidVal cid.CID, text string, width float64) (charcode.Code, error) {
-	key := cidText{cidVal, text}
+	key := key{cidVal, text}
 	if _, ok := e.code[key]; ok {
 		return 0, ErrDuplicateCode
 	}
@@ -162,6 +153,14 @@ func (e *compositeUTF8) makeCode(text string) (charcode.Code, error) {
 	}
 }
 
+func runeToCode(r rune) charcode.Code {
+	var code charcode.Code
+	for i, b := range []byte(string(r)) {
+		code |= charcode.Code(b) << (8 * i)
+	}
+	return code
+}
+
 func (e *compositeUTF8) get(c charcode.Code) *codeInfo {
 	if info, ok := e.info[c]; ok {
 		return info
@@ -189,20 +188,4 @@ func (e *compositeUTF8) MappedCodes() iter.Seq2[charcode.Code, *font.Code] {
 			}
 		}
 	}
-}
-
-func runeToCode(r rune) charcode.Code {
-	var code charcode.Code
-	for i, b := range []byte(string(r)) {
-		code |= charcode.Code(b) << (8 * i)
-	}
-	return code
-}
-
-// utf8cs represents UTF-8-encoded character codes.
-var utf8cs = charcode.CodeSpaceRange{
-	{Low: []byte{0x00}, High: []byte{0x7F}},
-	{Low: []byte{0xC2, 0x80}, High: []byte{0xDF, 0xBF}},
-	{Low: []byte{0xE0, 0x80, 0x80}, High: []byte{0xEF, 0xBF, 0xBF}},
-	{Low: []byte{0xF0, 0x80, 0x80, 0x80}, High: []byte{0xF4, 0xBF, 0xBF, 0xBF}},
 }

@@ -170,7 +170,7 @@ func ExtractCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 		}
 	}
 
-	d.Width, err = widths.ExtractComposite(r, cidFontDict["W"])
+	d.Width, err = decodeComposite(r, cidFontDict["W"])
 	if err != nil {
 		return nil, err
 	}

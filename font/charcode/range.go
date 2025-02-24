@@ -46,6 +46,15 @@ var (
 	// UCS2 represents a two-byte encoding.
 	// Character codes are two bytes long, and are stored in big-endian order.
 	UCS2 = CodeSpaceRange{{[]byte{0x00, 0x00}, []byte{0xFF, 0xFF}}}
+
+	// UTF8 is the code space range for the UTF-8 encoding.
+	// Codes are between 1 and 4 bytes long.
+	UTF8 = CodeSpaceRange{
+		{Low: []byte{0x00}, High: []byte{0x7F}},
+		{Low: []byte{0xC2, 0x80}, High: []byte{0xDF, 0xBF}},
+		{Low: []byte{0xE0, 0x80, 0x80}, High: []byte{0xEF, 0xBF, 0xBF}},
+		{Low: []byte{0xF0, 0x80, 0x80, 0x80}, High: []byte{0xF4, 0xBF, 0xBF, 0xBF}},
+	}
 )
 
 // matchLen returns the number number of leading bytes in s which can be

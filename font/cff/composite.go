@@ -131,8 +131,6 @@ func (e *embeddedComposite) AppendEncoded(s pdf.String, gid glyph.ID, text strin
 	return e.CIDEncoder.Codec().AppendCode(s, c), w / 1000
 }
 
-// Finish is called when the resource manager is closed.
-// At this point the subset of glyphs to be embedded is known.
 func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 	if e.finished {
 		return nil

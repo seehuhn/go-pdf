@@ -36,7 +36,7 @@ type compositeIdentity struct {
 	notdef []notdefRange
 	cid0   *notdefInfo
 
-	code map[cidText]charcode.Code
+	code map[key]charcode.Code
 }
 
 func NewCompositeIdentity(cid0Width float64, wMode font.WritingMode) font.CIDEncoder {
@@ -53,13 +53,11 @@ func NewCompositeIdentity(cid0Width float64, wMode font.WritingMode) font.CIDEnc
 			CID:   0,
 			Width: cid0Width,
 		},
-		code: make(map[cidText]charcode.Code),
+		code: make(map[key]charcode.Code),
 	}
 	return e
 }
 
-// WritingMode indicates whether the font is for horizontal or vertical
-// writing.
 func (e *compositeIdentity) WritingMode() font.WritingMode {
 	return e.wMode
 }
@@ -71,7 +69,6 @@ func (e *compositeIdentity) DecodeWidth(s pdf.String) (float64, int) {
 	return 0, 0
 }
 
-// Codes iterates over the character codes in a PDF string.
 func (e *compositeIdentity) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(yield *font.Code) bool) {
 		var code font.Code
@@ -116,30 +113,34 @@ func (e *compositeIdentity) Codec() *charcode.Codec {
 }
 
 func (e *compositeIdentity) GetCode(cid cid.CID, text string) (charcode.Code, bool) {
-	key := cidText{cid, text}
+	key := key{cid, text}
 	code, ok := e.code[key]
 	return code, ok
 }
 
-// AllocateCode allocates a new code for the given character ID and text.
-//
-// The last argument is the width of the glyph in PDF glyph space units.
 func (e *compositeIdentity) AllocateCode(cidVal cid.CID, text string, width float64) (charcode.Code, error) {
-	key := cidText{cidVal, text}
+	key := key{cidVal, text}
 	if _, ok := e.code[key]; ok {
 		return 0, ErrDuplicateCode
 	}
 
-	if cidVal >= 0x01_0000 {
-		return 0, ErrOverflow
+	code, err := e.makeCode(cidVal)
+	if err != nil {
+		return 0, err
 	}
-
-	code := charcode.Code(cidVal&0xFF00)>>8 | charcode.Code(cidVal&0x00FF)<<8
 
 	e.info[code] = &codeInfo{CID: cidVal, Width: width, Text: text}
 	e.code[key] = code
 
 	return code, nil
+}
+
+func (e *compositeIdentity) makeCode(cidVal cid.CID) (charcode.Code, error) {
+	if cidVal >= 0x01_0000 {
+		return 0, ErrOverflow
+	}
+
+	return charcode.Code(cidVal&0xFF00)>>8 | charcode.Code(cidVal&0x00FF)<<8, nil
 }
 
 func (e *compositeIdentity) get(c charcode.Code) *codeInfo {

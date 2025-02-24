@@ -24,7 +24,8 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
-type cidText struct {
+// TODO(voss): include the width
+type key struct {
 	cid  cid.CID
 	text string
 }

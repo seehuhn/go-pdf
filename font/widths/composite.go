@@ -136,23 +136,6 @@ func (g wwGraph) To(v int, e wwEdge) int {
 	return v + step
 }
 
-func mostFrequent(ww []cidWidth) float64 {
-	hist := make(map[float64]int)
-	for _, wi := range ww {
-		hist[wi.GlyphWidth]++
-	}
-
-	bestCount := 0
-	bestVal := 0.0
-	for wi, count := range hist {
-		if count > bestCount || (count == bestCount && wi < bestVal) {
-			bestCount = count
-			bestVal = wi
-		}
-	}
-	return bestVal
-}
-
 // DecodeComposite decodes the W and DW entries of a CIDFont dictionary.
 func DecodeComposite(r pdf.Getter, ref pdf.Object, dwObj pdf.Object) (map[cmap.CID]float64, float64, error) {
 	w, err := pdf.GetArray(r, ref)
@@ -227,7 +210,7 @@ func DecodeComposite(r pdf.Getter, ref pdf.Object, dwObj pdf.Object) (map[cmap.C
 	return res, float64(dw), nil
 }
 
-// DecodeComposite decodes the W entry of a CIDFont dictionary.
+// ExtractComposite decodes the W entry of a CIDFont dictionary.
 func ExtractComposite(r pdf.Getter, obj pdf.Object) (map[cmap.CID]float64, error) {
 	w, err := pdf.GetArray(r, obj)
 	if err != nil {

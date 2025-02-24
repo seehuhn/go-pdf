@@ -56,7 +56,7 @@ func TestUTF8CS(t *testing.T) {
 			}
 		}
 	}
-	if d := cmp.Diff(utf8cs, cs); d != "" {
+	if d := cmp.Diff(charcode.UTF8, cs); d != "" {
 		t.Error(d)
 	}
 }
