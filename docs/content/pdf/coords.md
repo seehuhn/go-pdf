@@ -1,7 +1,6 @@
 +++
 title = 'Coordinate Systems'
 date = 2024-10-08T09:11:34+01:00
-draft = true
 +++
 
 # Coordinate Systems

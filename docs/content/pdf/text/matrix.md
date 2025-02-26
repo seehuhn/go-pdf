@@ -1,7 +1,7 @@
 +++
 title = 'Font Matrices'
 date = 2025-01-04T19:16:53Z
-draft = true
+weight = 90
 +++
 
 # Font Matrices

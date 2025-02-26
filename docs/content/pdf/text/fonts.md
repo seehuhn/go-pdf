@@ -1,11 +1,11 @@
 +++
-title = 'Font Summary'
+title = 'PDF Font Types'
 date = 2024-09-18T11:13:08+01:00
-draft = true
+weight = 10
 +++
 
 
-# Font Summary
+# PDF Font Types
 
 The table lists all font types allowed in PDF 2.0.
 
@@ -70,10 +70,7 @@ Glyph names are then mapped to glyphs in the font file.
 The following information applies to simple PDF fonts.
 
 - Using information from the `Encoding` entry in the font dictionary, character
-  codes are mapped to glyph names, and glyph names are mapped to glyphs in the
-  font file using the rules outlined below.
-
-- If a glyph is not present in the font, the `.notdef` glyph is used instead.
+  codes are mapped to glyph names, and glyph names are mapped to glyphs.
 
 - Simple fonts only support horizontal writing. Glyph widths are described by
   the `Widths` entry in the font dictionary and the `MissingWidth` entry of the
@@ -95,25 +92,7 @@ The following information applies to simple PDF fonts.
   For `MMType1` fonts, space characters in the font name are replaced with
   underscore characters.
 
-- The `Encoding` entry in the font dictionary describes how character codes
-  are mapped to glyph names:
-  - If `Encoding` is not set, the font's built-in encoding is used.
-  - If `Encoding` is one of `MacRomanEncoding`, `MacExpertEncoding`, or
-    `WinAnsiEncoding`, the corresponding encoding from appendix D of the spec
-    is used.
-  - If `Encoding` is a PDF dictionary, first construct a "base encoding":
-    - If `BaseEncoding` is one of `MacRomanEncoding`, `MacExpertEncoding`, or
-      `WinAnsiEncoding`, the corresponding encoding is used as the base
-      encoding.
-    - Otherwise, if the font is neither embedded nor symbolic,
-      `StandardEncoding` is used.
-    - Otherwise, the font's built-in encoding is used.
-
-    Then, the updates described by the `Differences` array are applied to the
-    base encoding to get the final encoding.
-
-- Glyphs are selected by glyph name, using information stored in the font
-  data.
+- Glyphs can be selected by glyph name or using the built-in encoding.
 
 - Embedding:
   - If original Type 1 format is used, the font is embedded using the `FontFile`
@@ -150,49 +129,6 @@ The following information applies to simple PDF fonts.
   table), or it may be "derived from the name by which the font is known in the
   host operating system".
 
-- There are some restrictions on the `Encoding` entry in the font
-  dictionary:
-  - Sometimes between PDF-1.4 and PDF-1.7, use of of `MacExpertEncoding`
-    was disallowed or at least discouraged.
-  - Use of the `Differences` array is discouraged.
-
-  In addition, after the table is constructed, any undefined entries in the
-  table are filled using the Standard Encoding.
-
-- The spec describes a variety of mechanisms to map a single-byte code `c` to a
-  glyph in a TrueType font:
-
-  1. Use a (1,0) "cmap" subtable to map `c` to a GID.
-  2. In a (3,0) "cmap" subtable, look up either `c`, `c+0xF000`, `c+0xF100`,
-     or `c+0xF200` to get a GID.
-  3. Use the encoding to map `c` to a name, use Mac OS Roman to map the name to
-     a code, and use a (1,0) "cmap" subtable to map this code to a GID.
-  4. Use the encoding to map `c` to a name, use the Adobe Glyph List to map the
-     name to unicode, and use a (3,1) "cmap" subtable to map this character to a
-     GID.
-  5. Use the encoding to map `c` to a name, and use the "post" table to look
-     up the glyph.
-
-  It is not completely specified which method should be used under which
-  circumstances.  Because of this ambiguity, the spec recommends to avoid use
-  of simple TrueType fonts and to use composite fonts with the `Encoding` set
-  to `Identity-H` and `CIDToGIDMap` set to `Identity`, instead.
-
-  Writing: I plan to use the following methods:
-
-  |             | non-symbolic | symbolic   |
-  | ----------: | :----------: | :--------: |
-  | encoding    | 4            | 2          |
-  | no encoding | avoid        | 1          |
-
-  Reading: I plan to try the methods in the following order and to use the
-  first one which succeeds:
-
-  |             | non-symbolic | symbolic   |
-  | ----------: | :----------: | :--------: |
-  | encoding    | 4, 3         | 4, 2, 5, 1 |
-  | no encoding | 2, 1         | 2, 1       |
-
 - Embedding:
   - TrueType fonts are embedded using the `FontFile2` entry in the font
     descriptor.  The `length1` entry in the stream dictionary gives the length
@@ -212,10 +148,6 @@ The following information applies to simple PDF fonts.
 
 - The font name is optional.  If it is present, it is given by the `Name` entry
   in the Type3 font dictionary and the `FontName` entry in the font descriptor.
-
-- The `Encoding` entry in the font dictionary maps character codes to glyph
-  names.  The complete encoding is given by the `Differences` entry in
-  `Encoding` dict.
 
 - The glyph descriptions are given by the `CharProcs` entry in the font
   dictionary.  The `CharProcs` entry is a dictionary glyph names to content
@@ -241,35 +173,6 @@ The following information applies to composite PDF fonts.
   composite fonts are distinguished by the `Subtype` entry in the CIDFont
   dictionary.
 
-- The `Encoding` entry in the font dictionary specifies a CMap which
-  defines which byte sequences form valid character codes, and which
-  CID values these character codes map to.
-
-  If the byte sequence does not start with a valid character code, the
-  following things happen:
-
-  1. The longes prefix of the byte sequence which forms the start of a valid
-     character code is identified. The number of input bytes consumed is the
-     length of the shortest valid code which starts with this prefix.  In
-     particular, if no valid code starts with the first byte of the given code,
-     the number of bytes consumed is the length of the shortest code overall.
-  2. CID 0 is used.
-
-  If a valid code is found, the following things happen:
-
-  1. If there is a `cidchar` or `cidrange` mapping for the code,
-     the resulting CID is used.
-  2. Otherwise, if there is a `notdef` mapping for the code,
-     the resulting CID is used.
-  3. Otherwise, CID 0 is used.
-
-- CIDs are mapped to glyphs as explained below for the different font types.
-  If the font does not contain a glyph for a CID, the following things happen:
-
-  1. If the CMap contains a `notdef` mapping for the corresponding code, and
-     there is a glyph for the CID from the `notdef` mapping, this glyph is shown.
-  2. Otherwise, the glyph for CID 0 is shown.
-
 - The `WMode` entry of the CMap specifies the writing mode (horizontal or
   vertical).
 
@@ -284,11 +187,6 @@ The following information applies to composite PDF fonts.
     `DW2` array, and half of the horizontal advance width is used for the
     horizontal component of the offset vector.
 
-- The `CIDSystemInfo` entry in the CIDFont dictionary and in the CMap specifies
-  a "character collection". A character collection maps CID values to
-  characters.  If a standard character collection is used, CID values
-  can be mapped to Unicode values.
-
 ### CFF and OpenType with CFF glyph outlines
 
 - The `Subtype` in the CIDFont dictionary is `CIDFontType0`.
@@ -296,11 +194,6 @@ The following information applies to composite PDF fonts.
 - The PostScript name of the font is given by the `BaseFont` entry in the
   CIDFont dictionary and the `FontName` entry in the font descriptor.  The name
   may be prefixed by a subset tag (e.g. `ABCDEF+Times-Roman`).
-
-- The mapping of CIDs to glyphs depends on the CFF font variant:
-  - Some CFF fonts use "CIDFont operators" to map CIDs to glyphs.
-    If such a mapping is present, it is used.
-  - If the CFF font does not use CIDFont operators, the CID is used as the GID.
 
 - Embedding:
   - CFF font data is embedded using the `FontFile3` entry in the font
@@ -319,13 +212,6 @@ The following information applies to composite PDF fonts.
   tag (e.g. `ABCDEF+Times-Roman`). The given name is either the PostScript name
   of the font (if present in the TrueType `"name"` table), or it is "derived
   from the name by which the font is known in the host operating system".
-
-- Glyph selection depends on whether the font is embedded:
-  - If the font is embedded, the `CIDToGIDMap` entry in the CIDFont dictionary
-    is used to map CIDs to GIDs.
-  - If the font is not embedded, CID values are mapped to unicode values, and
-    the font's "cmap" table is used to map unicode values to glyphs. The spec
-    requires that one of the pre-defined CMaps must be used in this case.
 
 - Embedding:
   - TrueType fonts are embedded using the `FontFile2` entry in the font

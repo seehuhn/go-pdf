@@ -1,7 +1,6 @@
 +++
 title = 'Operators'
 date = 2024-09-15T12:46:50+01:00
-draft = true
 +++
 
 # Operators in a PDF file

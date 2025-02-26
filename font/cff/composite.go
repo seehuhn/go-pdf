@@ -17,6 +17,7 @@
 package cff
 
 import (
+	"fmt"
 	"math"
 	"slices"
 
@@ -76,12 +77,13 @@ type embeddedComposite struct {
 func newEmbeddedComposite(ref pdf.Reference, f *Instance) *embeddedComposite {
 	opt := f.Opt
 
-	makeGIDToCID := cmap.NewGIDToCIDIdentity
+	makeGIDToCID := cmap.NewGIDToCIDSequential
 	if opt.MakeGIDToCID != nil {
 		makeGIDToCID = opt.MakeGIDToCID
 	}
 	gidToCID := makeGIDToCID()
 
+	// TODO(voss): make sure we get `/Identity-H` instead of a CMap stream.
 	makeEncoder := cidenc.NewCompositeIdentity
 	if opt.MakeEncoder != nil {
 		makeEncoder = opt.MakeEncoder
@@ -139,28 +141,28 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 
 	fontInfo := e.Font.FontInfo
 	outlines := e.Font.Outlines
+	postScriptName := fontInfo.FontName
 
-	// subset the font, if needed
-	glyphSet := make(map[glyph.ID]struct{})
-	glyphSet[e.GIDToCID.GID(0)] = struct{}{}
+	// Subset the font, if needed.
+	// To minimise file size, we arrange the glyphs in order of increasing CID.
+	cidSet := make(map[cid.CID]struct{})
+	cidSet[0] = struct{}{}
 	for _, info := range e.CIDEncoder.MappedCodes() {
-		glyphSet[e.GIDToCID.GID(info.CID)] = struct{}{}
+		cidSet[info.CID] = struct{}{}
 	}
-	glyphs := maps.Keys(glyphSet)
-	slices.Sort(glyphs)
+	cidList := maps.Keys(cidSet)
+	slices.Sort(cidList)
 
+	glyphs := make([]glyph.ID, len(cidList))
+	for i, cidVal := range cidList {
+		glyphs[i] = e.GIDToCID.GID(cidVal)
+	}
 	subsetTag := subset.Tag(glyphs, outlines.NumGlyphs())
 	var subsetOutlines *cff.Outlines
 	if subsetTag != "" {
 		subsetOutlines = outlines.Subset(glyphs)
 	} else {
 		subsetOutlines = clone(outlines)
-	}
-
-	origGIDToCID := e.GIDToCID.GIDToCID(outlines.NumGlyphs())
-	gidToCID := make([]cid.CID, subsetOutlines.NumGlyphs())
-	for i, gid := range glyphs {
-		gidToCID[i] = origGIDToCID[gid]
 	}
 
 	ros := e.ROS()
@@ -181,8 +183,8 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 	// Simple CFF fonts can only have one private dict, and ...
 	canUseSimple := len(subsetOutlines.Private) == 1
 	// ... they assume that CID values equal GID values.
-	for GID, CID := range gidToCID {
-		if CID != 0 && CID != cid.CID(GID) {
+	for subsetGID, CID := range cidList {
+		if CID != 0 && CID != cid.CID(subsetGID) {
 			canUseSimple = false
 			break
 		}
@@ -195,7 +197,38 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 			fontInfo.FontMatrix = subsetOutlines.FontMatrices[0].Mul(fontInfo.FontMatrix)
 		}
 		subsetOutlines.FontMatrices = nil
-		// TODO(voss): make sure all glyphs have names
+
+		// make sure all glyphs have names
+		glyphText := make(map[glyph.ID]string)
+		for _, info := range e.CIDEncoder.MappedCodes() {
+			gid := e.GIDToCID.GID(info.CID)
+			if glyphText[gid] == "" || info.Text != "" && info.Text < glyphText[gid] {
+				glyphText[gid] = info.Text
+			}
+		}
+		glyphNameUsed := make(map[string]int)
+		for subsetGID, origGID := range glyphs {
+			name := string(names.ToUnicode(glyphText[origGID], postScriptName == "ZapfDingbats"))
+			if origGID == 0 {
+				name = ".notdef"
+			} else if name == "" {
+				name = fmt.Sprintf("orn%03d", subsetGID)
+			}
+			suffix := ""
+			switch glyphNameUsed[name] {
+			case 0:
+			case 1:
+				suffix = ".alt"
+			default:
+				suffix = fmt.Sprintf(".alt%d", glyphNameUsed[name])
+			}
+			glyphNameUsed[name]++
+			name += suffix
+			subsetOutlines.Glyphs[subsetGID].Name = name
+		}
+
+		// The encoding is not used here.  We can minimise font size by using
+		// the standard encoding.
 		subsetOutlines.Encoding = cff.StandardEncoding(subsetOutlines.Glyphs)
 	} else { // Make the font CID-keyed.
 		subsetOutlines.Encoding = nil
@@ -208,11 +241,15 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 			Ordering:   ros.Ordering,
 			Supplement: sup,
 		}
-		subsetOutlines.GIDToCID = gidToCID
+		subsetOutlines.GIDToCID = cidList
 		for len(subsetOutlines.FontMatrices) < len(subsetOutlines.Private) {
 			// TODO(voss): I think it would be more normal to have the identity
 			// matrix in the top dict, and the real font matrix here?
 			subsetOutlines.FontMatrices = append(subsetOutlines.FontMatrices, matrix.Identity)
+		}
+		// remove any glyph names
+		for _, g := range subsetOutlines.Glyphs {
+			g.Name = ""
 		}
 	}
 
@@ -227,8 +264,6 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 	for _, info := range e.CIDEncoder.MappedCodes() {
 		ww[info.CID] = info.Width
 	}
-
-	postScriptName := subsetFont.FontName
 
 	isSymbolic := false
 	for _, info := range e.CIDEncoder.MappedCodes() {

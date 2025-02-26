@@ -1,6 +1,7 @@
 +++
 title = 'Some design considerations for the font API'
 date = 2024-08-31T23:13:27+01:00
+weight = 100
 +++
 
 # Some design considerations for the font API
