@@ -46,11 +46,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	labelFont, err := standard.Helvetica.New(nil)
+	labelFont, err := standard.Helvetica.New()
 	if err != nil {
 		log.Fatal(err)
 	}
-	titleFont, err := standard.HelveticaBold.New(nil)
+	titleFont, err := standard.HelveticaBold.New()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func (f *fontSamples) AddTitle(title string, fontSize, a, b float64) error {
 
 func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Font) error {
 	f.fontNo++
-	opt := &font.Options{
+	opt := &embed.Options{
 		Composite: true,
 		Language:  language.AmericanEnglish,
 	}

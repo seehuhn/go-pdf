@@ -60,7 +60,7 @@ func doit() error {
 		},
 	}
 
-	F, err := standard.Helvetica.New(nil)
+	F, err := standard.Helvetica.New()
 	if err != nil {
 		return err
 	}

@@ -60,7 +60,7 @@ func create(fname string) error {
 	// fonts
 	const fontSize = 12
 
-	noteFont, err := standard.TimesRoman.New(nil)
+	noteFont, err := standard.TimesRoman.New()
 	if err != nil {
 		return err
 	}

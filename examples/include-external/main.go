@@ -45,11 +45,11 @@ func run() error {
 		return err
 	}
 
-	B, err := standard.TimesBold.New(nil)
+	B, err := standard.TimesBold.New()
 	if err != nil {
 		return err
 	}
-	F, err := standard.TimesRoman.New(nil)
+	F, err := standard.TimesRoman.New()
 	if err != nil {
 		return err
 	}

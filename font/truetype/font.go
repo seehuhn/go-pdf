@@ -20,13 +20,24 @@ import (
 	"errors"
 	"slices"
 
+	"golang.org/x/text/language"
+
 	"seehuhn.de/go/geom/rect"
+
+	"seehuhn.de/go/sfnt"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/sfnt"
 )
+
+type Options struct {
+	Language     language.Tag
+	GsubFeatures map[string]bool
+	GposFeatures map[string]bool
+	Composite    bool
+}
 
 // Instance represents a TrueType font together with the font options.
 // This implements the [font.Font] interface.
@@ -36,19 +47,19 @@ type Instance struct {
 
 	layouter *sfnt.Layouter
 
-	Opt *font.Options
+	Opt *Options
 }
 
 // New makes a PDF TrueType font from a sfnt.Font.
 // The font info must be an OpenType/TrueType font with glyf outlines.
 // The font can be embedded as a simple font or as a composite font.
-func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
+func New(info *sfnt.Font, opt *Options) (*Instance, error) {
 	if !info.IsGlyf() {
 		return nil, errors.New("no glyf outlines in font")
 	}
 
 	if opt == nil {
-		opt = &font.Options{}
+		opt = &Options{}
 	}
 
 	geometry := &font.Geometry{
@@ -106,7 +117,7 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
 	opt := f.Opt
 	if opt == nil {
-		opt = &font.Options{}
+		opt = &Options{}
 	}
 
 	w := rm.Out

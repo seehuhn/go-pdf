@@ -20,6 +20,7 @@ import (
 	"math"
 	"slices"
 
+	"golang.org/x/text/language"
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -28,6 +29,13 @@ import (
 	"seehuhn.de/go/sfnt"
 )
 
+type Options struct {
+	Language     language.Tag
+	GsubFeatures map[string]bool
+	GposFeatures map[string]bool
+	Composite    bool
+}
+
 var _ font.Font = (*Instance)(nil)
 
 // Instance is an OpenType font instance.
@@ -35,7 +43,7 @@ type Instance struct {
 	*sfnt.Font
 	*font.Geometry
 	layouter *sfnt.Layouter
-	Opt      *font.Options
+	Opt      *Options
 }
 
 // New makes a PDF font from an OpenType/TrueType font.
@@ -49,9 +57,9 @@ type Instance struct {
 // TrueType outlines, it is often more efficient to embed the font as a
 // TrueType font instead of an OpenType font.  Consider using
 // [seehuhn.de/go/pdf/font/truetype.New] instead of this function.
-func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
+func New(info *sfnt.Font, opt *Options) (*Instance, error) {
 	if opt == nil {
-		opt = &font.Options{}
+		opt = &Options{}
 	}
 
 	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
@@ -133,7 +141,7 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 
 	opt := f.Opt
 	if opt == nil {
-		opt = &font.Options{}
+		opt = &Options{}
 	}
 
 	var embedded font.Embedded

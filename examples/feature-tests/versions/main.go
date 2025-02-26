@@ -49,7 +49,7 @@ func main() {
 				log.Fatal(err)
 			}
 
-			F, err := standard.TimesRoman.New(nil)
+			F, err := standard.TimesRoman.New()
 			if err != nil {
 				log.Fatal(err)
 			}

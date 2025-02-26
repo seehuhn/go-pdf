@@ -34,7 +34,7 @@ func TestGeometry(t *testing.T) {
 			continue
 		}
 
-		F, err := font.New(nil)
+		F, err := font.New()
 		if err != nil {
 			t.Fatal(err)
 		}

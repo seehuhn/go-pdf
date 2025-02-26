@@ -39,7 +39,7 @@ func TestEmbed(t *testing.T) {
 
 	fontData := makefont.Type1()
 	fontMetrics := makefont.AFM()
-	fontInstance, err := type1.New(fontData, fontMetrics, nil)
+	fontInstance, err := type1.New(fontData, fontMetrics)
 	if err != nil {
 		t.Fatal(err)
 	}

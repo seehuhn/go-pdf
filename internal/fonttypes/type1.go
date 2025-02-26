@@ -39,7 +39,7 @@ func (t type1embedder) font() font.Layouter {
 		afm = makefont.AFM()
 	}
 
-	F, err := type1.New(info, afm, nil)
+	F, err := type1.New(info, afm)
 	if err != nil {
 		panic(err)
 	}

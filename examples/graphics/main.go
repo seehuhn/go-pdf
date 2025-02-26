@@ -35,7 +35,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	F, err := standard.Helvetica.New(nil)
+	F, err := standard.Helvetica.New()
 	if err != nil {
 		log.Fatal(err)
 	}

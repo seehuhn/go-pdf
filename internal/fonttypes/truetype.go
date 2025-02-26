@@ -35,9 +35,9 @@ var (
 func (t trueTypeEmbedder) font() font.Layouter {
 	info := makefont.TrueType()
 
-	var opt *font.Options
+	var opt *truetype.Options
 	if t.composite {
-		opt = &font.Options{
+		opt = &truetype.Options{
 			Composite: true,
 		}
 	}

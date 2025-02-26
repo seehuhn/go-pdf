@@ -59,11 +59,11 @@ func run(fname string) error {
 	page.DrawXObject(img)
 	page.PopGraphicsState()
 
-	roman, err := standard.TimesRoman.New(nil)
+	roman, err := standard.TimesRoman.New()
 	if err != nil {
 		return err
 	}
-	bold, err := standard.TimesBold.New(nil)
+	bold, err := standard.TimesBold.New()
 	if err != nil {
 		return err
 	}

@@ -76,7 +76,7 @@ func getAllData() (Data, error) {
 }
 
 func getFontData(data Data, font standard.Font) error {
-	F, err := font.New(nil)
+	F, err := font.New()
 	if err != nil {
 		return err
 	}

@@ -34,7 +34,6 @@ import (
 	"golang.org/x/image/font/gofont/gosmallcaps"
 	"golang.org/x/image/font/gofont/gosmallcapsitalic"
 
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/sfnt"
 )
@@ -62,7 +61,7 @@ const (
 )
 
 // New returns a new font instance for the given Go font and options.
-func (f Font) New(opt *font.Options) (*truetype.Instance, error) {
+func (f Font) New(opt *truetype.Options) (*truetype.Instance, error) {
 	data, ok := ttf[f]
 	if !ok {
 		return nil, fmt.Errorf("gofont: unknown font %d", f)

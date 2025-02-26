@@ -42,7 +42,7 @@ func run() error {
 		return err
 	}
 
-	H, err := standard.Helvetica.New(nil)
+	H, err := standard.Helvetica.New()
 	if err != nil {
 		return err
 	}

@@ -32,6 +32,9 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
+type Options struct {
+}
+
 // Instance is a Type 1 font instance which can be embedded into a PDF file.
 //
 // Use [New] to create new font instances.
@@ -54,22 +57,12 @@ type Instance struct {
 	lig  map[glyph.Pair]glyph.ID
 	kern map[glyph.Pair]funit.Int16
 	cmap map[rune]glyph.ID
-
-	// Opt controls some aspects of font embedding.
-	Opt *font.Options
 }
 
 // New creates a new Type 1 PDF font from a Type 1 PostScript font.
-func New(psFont *type1.Font, metrics *afm.Metrics, opt *font.Options) (*Instance, error) {
+func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 	if !isConsistent(psFont, metrics) {
 		return nil, errors.New("inconsistent Type 1 font metrics")
-	}
-
-	if opt == nil {
-		opt = &font.Options{}
-	}
-	if opt.Composite {
-		return nil, errors.New("composite embedding for Type 1 fonts not supported")
 	}
 
 	var glyphNames []string
@@ -138,7 +131,6 @@ func New(psFont *type1.Font, metrics *afm.Metrics, opt *font.Options) (*Instance
 		lig:      lig,
 		kern:     kern,
 		cmap:     cmap,
-		Opt:      opt,
 	}, nil
 }
 

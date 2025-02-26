@@ -40,7 +40,7 @@ func run() error {
 		return err
 	}
 
-	font, err := standard.HelveticaBold.New(nil)
+	font, err := standard.HelveticaBold.New()
 	if err != nil {
 		return err
 	}

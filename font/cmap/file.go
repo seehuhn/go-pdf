@@ -49,7 +49,7 @@ type CID = cid.CID
 // font.  This describes a mapping from character codes (one or more bytes) to
 // character identifiers (CIDs).
 //
-// This structure closely resembles the structure of a CMap file.
+// This structure reflects the structure of a CMap file.
 type File struct {
 	Name  pdf.Name
 	ROS   *font.CIDSystemInfo
@@ -65,7 +65,7 @@ type File struct {
 	Parent *File
 }
 
-// SingleEntry specifies that character code Code represents the given CID.
+// SingleEntry specifies that character code `Code` represents the CID `Value`.
 type Single struct {
 	Code  []byte
 	Value CID
@@ -409,6 +409,7 @@ func (info *File) writeBinary(h hash.Hash, maxGen int) {
 func (f *File) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
+	// TODO(voss): use a more specific check for predefined CMaps?
 	predefinedMu.Lock()
 	predefinedName, ok := predefinedName[f]
 	predefinedMu.Unlock()

@@ -19,7 +19,6 @@ package font
 import (
 	"iter"
 
-	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript/cid"
@@ -28,25 +27,23 @@ import (
 
 // Options allows to customize fonts for embedding into PDF files.
 // Not all fields apply to all font types.
-type Options struct {
-	Language language.Tag
+// type Options struct {
+// 	Language language.Tag
 
-	GsubFeatures map[string]bool
-	GposFeatures map[string]bool
+// 	GsubFeatures map[string]bool
+// 	GposFeatures map[string]bool
 
-	// Composite specifies whether to embed the font as a composite font.
-	Composite bool
+// 	// Composite specifies whether to embed the font as a composite font.
+// 	Composite bool
 
-	// WritingMode gives the writing direction (horizontal or vertical)
-	// for the font.  Vertical writing is only possible with composite fonts.
-	WritingMode WritingMode
+// 	// WritingMode gives the writing direction (horizontal or vertical)
+// 	// for the font.  Vertical writing is only possible with composite fonts.
+// 	WritingMode WritingMode
 
-	// TODO(voss): re-enable the following field
-	MakeGIDToCID func() GIDToCID // only used for composite fonts
+// 	MakeGIDToCID func() GIDToCID // only used for composite fonts
 
-	// TODO(voss): clean this up
-	MakeEncoder func(cid0Width float64, wMode WritingMode) CIDEncoder // only used for composite fonts
-}
+// 	MakeEncoder func(cid0Width float64, wMode WritingMode) CIDEncoder // only used for composite fonts
+// }
 
 // GIDToCID encodes a mapping from Glyph Identifier (GID) values to Character
 // Identifier (CID) values.

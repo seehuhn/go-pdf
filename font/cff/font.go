@@ -21,6 +21,7 @@ import (
 	"math"
 	"slices"
 
+	"golang.org/x/text/language"
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -31,6 +32,16 @@ import (
 	"seehuhn.de/go/sfnt/os2"
 )
 
+type Options struct {
+	Language     language.Tag
+	GsubFeatures map[string]bool
+	GposFeatures map[string]bool
+	Composite    bool
+	WritingMode  font.WritingMode                                                // only used for composite fonts
+	MakeGIDToCID func() font.GIDToCID                                            // only used for composite fonts
+	MakeEncoder  func(cid0Width float64, wMode font.WritingMode) font.CIDEncoder // only used for composite fonts
+}
+
 var _ interface {
 	font.Layouter
 } = (*Instance)(nil)
@@ -38,7 +49,7 @@ var _ interface {
 // Instance represents a CFF font which can be embedded in a PDF file.
 type Instance struct {
 	Font *cff.Font
-	Opt  *font.Options
+	Opt  *Options
 
 	Stretch  os2.Width
 	Weight   os2.Weight
@@ -60,9 +71,9 @@ type Instance struct {
 // depending on the options used.
 //
 // The sfnt.Font info must be an OpenType font with CFF outlines.
-func New(info *sfnt.Font, opt *font.Options) (*Instance, error) {
+func New(info *sfnt.Font, opt *Options) (*Instance, error) {
 	if opt == nil {
-		opt = &font.Options{}
+		opt = &Options{}
 	}
 
 	fontInfo := &type1.FontInfo{

@@ -66,19 +66,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	helvetica, err := standard.Helvetica.New(nil)
+	helvetica, err := standard.Helvetica.New()
 	if err != nil {
 		log.Fatal(err)
 	}
-	italic, err := standard.TimesItalic.New(nil)
+	italic, err := standard.TimesItalic.New()
 	if err != nil {
 		log.Fatal(err)
 	}
-	courier, err := standard.Courier.New(nil)
+	courier, err := standard.Courier.New()
 	if err != nil {
 		log.Fatal(err)
 	}
-	opt := &font.Options{
+	opt := &embed.Options{
 		Composite: true,
 	}
 	theFont, err := embed.OpenTypeFont(tt, opt)

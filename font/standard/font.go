@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"seehuhn.de/go/geom/rect"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/type1"
@@ -51,7 +50,7 @@ const (
 )
 
 // New returns a new font instance for the given standard font and options.
-func (f Font) New(opt *font.Options) (*type1.Instance, error) {
+func (f Font) New() (*type1.Instance, error) {
 	name := string(f)
 
 	fontData, err := builtin.Open(name, loader.FontTypeType1)
@@ -139,7 +138,7 @@ func (f Font) New(opt *font.Options) (*type1.Instance, error) {
 		}
 	}
 
-	res, err := type1.New(psFont, metrics, opt)
+	res, err := type1.New(psFont, metrics)
 	if err != nil {
 		return nil, err
 	}
@@ -160,8 +159,8 @@ func (f Font) New(opt *font.Options) (*type1.Instance, error) {
 
 // Must returns a new font instance for the given standard font and options.
 // It panics if the there is an error.
-func (f Font) Must(opt *font.Options) *type1.Instance {
-	inst, err := f.New(opt)
+func (f Font) Must() *type1.Instance {
+	inst, err := f.New()
 	if err != nil {
 		panic(err)
 	}

@@ -66,7 +66,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	labelFont, err := standard.Courier.New(nil)
+	labelFont, err := standard.Courier.New()
 	if err != nil {
 		log.Fatal(err)
 	}

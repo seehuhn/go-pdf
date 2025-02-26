@@ -17,14 +17,22 @@
 package embed
 
 import (
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/sfnt"
 )
 
+type Options struct {
+	Language     language.Tag
+	GsubFeatures map[string]bool
+	GposFeatures map[string]bool
+	Composite    bool
+}
+
 // OpenTypeFile loads and embeds an OpenType/TrueType font.
-func OpenTypeFile(fname string, opt *font.Options) (font.Layouter, error) {
+func OpenTypeFile(fname string, opt *Options) (font.Layouter, error) {
 	info, err := sfnt.ReadFile(fname)
 	if err != nil {
 		return nil, err
@@ -34,13 +42,28 @@ func OpenTypeFile(fname string, opt *font.Options) (font.Layouter, error) {
 }
 
 // OpenTypeFont embeds an OpenType/TrueType font.
-func OpenTypeFont(info *sfnt.Font, opt *font.Options) (font.Layouter, error) {
+func OpenTypeFont(info *sfnt.Font, opt *Options) (font.Layouter, error) {
 	var F font.Layouter
 	var err error
 	if info.IsCFF() {
-		F, err = cff.New(info, opt)
+		var o *cff.Options
+		if opt != nil {
+			o = &cff.Options{
+				Language:     opt.Language,
+				GsubFeatures: opt.GsubFeatures,
+				GposFeatures: opt.GposFeatures,
+				Composite:    opt.Composite,
+			}
+		}
+		F, err = cff.New(info, o)
 	} else {
-		F, err = truetype.New(info, opt)
+		o := &truetype.Options{
+			Language:     opt.Language,
+			GsubFeatures: opt.GsubFeatures,
+			GposFeatures: opt.GposFeatures,
+			Composite:    opt.Composite,
+		}
+		F, err = truetype.New(info, o)
 	}
 	if err != nil {
 		return nil, err

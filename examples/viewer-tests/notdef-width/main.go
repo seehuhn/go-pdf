@@ -60,7 +60,7 @@ func run(filename string) error {
 		return err
 	}
 
-	titleFont, err := standard.TimesBold.New(nil)
+	titleFont, err := standard.TimesBold.New()
 	if err != nil {
 		return err
 	}
@@ -70,7 +70,7 @@ func run(filename string) error {
 		Color: color.DeviceGray(0.2),
 	}
 
-	noteFont, err := standard.TimesRoman.New(nil)
+	noteFont, err := standard.TimesRoman.New()
 	if err != nil {
 		return err
 	}

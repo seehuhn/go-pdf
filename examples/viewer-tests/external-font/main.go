@@ -147,7 +147,7 @@ func write_pdf(filename string) error {
 		return err
 	}
 
-	labelFont, err := standard.TimesRoman.New(nil)
+	labelFont, err := standard.TimesRoman.New()
 	if err != nil {
 		return err
 	}

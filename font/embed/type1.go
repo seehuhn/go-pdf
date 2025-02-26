@@ -29,7 +29,7 @@ import (
 // The file `psname` can be either an .pfb or .pfa file.
 // The file `afmname` is the corresponding .afm file.
 // Both `psname` and `afmname` are optional, but at least one of them must be given.
-func Type1File(psname, afmname string, opt *font.Options) (font.Layouter, error) {
+func Type1File(psname, afmname string) (font.Layouter, error) {
 	var psFont *pst1.Font
 	var metrics *afm.Metrics
 	if psname != "" {
@@ -62,11 +62,11 @@ func Type1File(psname, afmname string, opt *font.Options) (font.Layouter, error)
 			return nil, err
 		}
 	}
-	return Type1Font(psFont, metrics, opt)
+	return Type1Font(psFont, metrics)
 }
 
 // Type1Font embeds a Type 1 font.
 // The `psFont` and `metrics` parameters are optional, but at least one of them must be given.
-func Type1Font(psFont *pst1.Font, metrics *afm.Metrics, opt *font.Options) (font.Layouter, error) {
-	return type1.New(psFont, metrics, opt)
+func Type1Font(psFont *pst1.Font, metrics *afm.Metrics) (font.Layouter, error) {
+	return type1.New(psFont, metrics)
 }

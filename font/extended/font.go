@@ -22,7 +22,6 @@ import (
 	"seehuhn.de/go/postscript/afm"
 	pstype1 "seehuhn.de/go/postscript/type1"
 
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/font/type1"
 )
@@ -49,7 +48,7 @@ const (
 )
 
 // New returns a new font instance for the given font and options.
-func (f Font) New(opt *font.Options) (*type1.Instance, error) {
+func (f Font) New() (*type1.Instance, error) {
 	name := fontName[f]
 
 	fontData, err := builtin.Open(name, loader.FontTypeType1)
@@ -128,7 +127,7 @@ func (f Font) New(opt *font.Options) (*type1.Instance, error) {
 		}
 	}
 
-	return type1.New(psFont, metrics, opt)
+	return type1.New(psFont, metrics)
 }
 
 var fontName = map[Font]string{

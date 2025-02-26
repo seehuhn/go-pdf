@@ -47,7 +47,7 @@ func run(filename string) error {
 		return err
 	}
 
-	F, err := standard.TimesRoman.New(nil)
+	F, err := standard.TimesRoman.New()
 	if err != nil {
 		return err
 	}

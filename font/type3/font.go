@@ -87,7 +87,7 @@ type Instance struct {
 	CMap map[rune]glyph.ID
 }
 
-func New(f *Font, opt *font.Options) (*Instance, error) {
+func New(f *Font) (*Instance, error) {
 	if len(f.Glyphs) == 0 || f.Glyphs[0].Name != "" {
 		return nil, errors.New("invalid glyph 0")
 	}
