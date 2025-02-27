@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package font
+package cmap
 
 import (
 	"strconv"
@@ -26,6 +26,8 @@ import (
 // A character collection implies an encoding which maps Character IDs to glyphs.
 //
 // See section 5.11.2 of the PLRM and section 9.7.3 of PDF 32000-1:2008.
+//
+// TODO(voss): which package should this be in?
 type CIDSystemInfo struct {
 	Registry   string
 	Ordering   string
@@ -75,6 +77,9 @@ func (ROS *CIDSystemInfo) String() string {
 //
 // This implements the [pdf.Object] interface.
 func (ROS *CIDSystemInfo) AsPDF(pdf.OutputOptions) pdf.Native {
+	if ROS == nil {
+		return nil
+	}
 	return pdf.Dict{
 		"Registry":   pdf.String(ROS.Registry),
 		"Ordering":   pdf.String(ROS.Ordering),

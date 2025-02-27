@@ -42,7 +42,7 @@ type embeddedCFFComposite struct {
 
 	sfnt *sfnt.Font
 
-	font.GIDToCID
+	cmap.GIDToCID
 	cmap.CIDEncoder
 
 	closed bool

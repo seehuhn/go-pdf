@@ -60,7 +60,7 @@ type CIDEncoder interface {
 
 // NewCIDEncoderIdentity returns an encoder where two-byte codes
 // are used directly as CID values.
-func NewCIDEncoderIdentity(g2c font.GIDToCID) CIDEncoder {
+func NewCIDEncoderIdentity(g2c GIDToCID) CIDEncoder {
 	return &identityEncoder{
 		g2c:       g2c,
 		toUnicode: make(map[charcode.CharCodeOld][]rune),
@@ -69,7 +69,7 @@ func NewCIDEncoderIdentity(g2c font.GIDToCID) CIDEncoder {
 }
 
 type identityEncoder struct {
-	g2c font.GIDToCID
+	g2c GIDToCID
 
 	toUnicode map[charcode.CharCodeOld][]rune
 	used      map[glyph.ID]struct{}
@@ -106,7 +106,7 @@ func (e *identityEncoder) CMap() *File {
 
 	res := &File{
 		Name:  "Identity-H", // TODO(voss): what to do here?
-		ROS:   &font.CIDSystemInfo{Registry: "Adobe", Ordering: "Identity"},
+		ROS:   &CIDSystemInfo{Registry: "Adobe", Ordering: "Identity"},
 		WMode: font.Horizontal, // TODO(voss): fill this in
 	}
 	res.SetMapping(codec, m)
@@ -156,7 +156,7 @@ func (e *identityEncoder) AllCIDs(s pdf.String) iter.Seq2[[]byte, pscid.CID] {
 
 // NewCIDEncoderUTF8 returns an encoder where character codes equal the UTF-8
 // encoding of the text content, where possible.
-func NewCIDEncoderUTF8(g2c font.GIDToCID) CIDEncoder {
+func NewCIDEncoderUTF8(g2c GIDToCID) CIDEncoder {
 	return &utf8Encoder{
 		g2c:   g2c,
 		cache: make(map[key]charcode.CharCodeOld),
@@ -167,7 +167,7 @@ func NewCIDEncoderUTF8(g2c font.GIDToCID) CIDEncoder {
 }
 
 type utf8Encoder struct {
-	g2c font.GIDToCID
+	g2c GIDToCID
 
 	cache map[key]charcode.CharCodeOld
 	cmap  map[charcode.CharCodeOld]pscid.CID
@@ -253,7 +253,7 @@ func (e *utf8Encoder) CMap() *File {
 	}
 
 	res := &File{
-		ROS:   &font.CIDSystemInfo{Registry: "Seehuhn", Ordering: "Test"},
+		ROS:   &CIDSystemInfo{Registry: "Seehuhn", Ordering: "Test"},
 		WMode: font.Horizontal, // TODO(voss): fill this in
 	}
 	res.SetMapping(codec, m)

@@ -52,7 +52,7 @@ func generateSampleFile(fname string) error {
 
 	cmap := &cmap.File{
 		Name: "Test",
-		ROS: &font.CIDSystemInfo{
+		ROS: &cmap.CIDSystemInfo{
 			Registry:   "Adobe",
 			Ordering:   "Japan1",
 			Supplement: 0,

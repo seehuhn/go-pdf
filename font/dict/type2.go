@@ -50,7 +50,7 @@ type CIDFontType2 struct {
 	Descriptor *font.Descriptor
 
 	// ROS describes the character collection covered by the font.
-	ROS *font.CIDSystemInfo
+	ROS *cmap.CIDSystemInfo
 
 	// Encoding specifies how character codes are mapped to CID values.
 	//

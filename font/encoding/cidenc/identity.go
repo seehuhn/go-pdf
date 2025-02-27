@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
-var _ font.CIDEncoder = (*compositeIdentity)(nil)
+var _ CIDEncoder = (*compositeIdentity)(nil)
 
 type compositeIdentity struct {
 	wMode font.WritingMode
@@ -39,7 +39,7 @@ type compositeIdentity struct {
 	code map[key]charcode.Code
 }
 
-func NewCompositeIdentity(cid0Width float64, wMode font.WritingMode) font.CIDEncoder {
+func NewCompositeIdentity(cid0Width float64, wMode font.WritingMode) CIDEncoder {
 	codec, err := charcode.NewCodec(charcode.UCS2)
 	if err != nil {
 		panic(err)

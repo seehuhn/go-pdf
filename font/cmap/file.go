@@ -52,7 +52,7 @@ type CID = cid.CID
 // This structure reflects the structure of a CMap file.
 type File struct {
 	Name  pdf.Name
-	ROS   *font.CIDSystemInfo
+	ROS   *CIDSystemInfo
 	WMode font.WritingMode
 
 	charcode.CodeSpaceRange
@@ -149,7 +149,7 @@ func safeExtractCMap(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object) (*Fi
 	if name, _ := pdf.GetName(r, dict["CMapName"]); name != "" {
 		res.Name = name
 	}
-	if ros, _ := font.ExtractCIDSystemInfo(r, dict["CIDSystemInfo"]); ros != nil {
+	if ros, _ := ExtractCIDSystemInfo(r, dict["CIDSystemInfo"]); ros != nil {
 		res.ROS = ros
 	}
 	if x, _ := pdf.GetInteger(r, dict["WMode"]); x == 1 {
@@ -194,7 +194,7 @@ func readCMap(r io.Reader) (*File, pdf.Object, error) {
 		res.WMode = font.Vertical
 	}
 	if rosDict, _ := raw["CIDSystemInfo"].(postscript.Dict); rosDict != nil {
-		ros := &font.CIDSystemInfo{}
+		ros := &CIDSystemInfo{}
 		if registry, _ := rosDict["Registry"].(postscript.String); registry != nil {
 			ros.Registry = string(registry)
 		}

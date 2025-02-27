@@ -48,7 +48,7 @@ type CIDFontType0 struct {
 	Descriptor *font.Descriptor
 
 	// ROS describes the character collection covered by the font.
-	ROS *font.CIDSystemInfo
+	ROS *cmap.CIDSystemInfo
 
 	// Encoding specifies how character codes are mapped to CID values.
 	//
@@ -162,6 +162,8 @@ func ExtractCIDFontType0(r pdf.Getter, obj pdf.Object) (*CIDFontType0, error) {
 		}
 	}
 
+	d.ROS, _ = cmap.ExtractCIDSystemInfo(r, cidFontDict["CIDSystemInfo"])
+
 	d.Width, err = decodeComposite(r, cidFontDict["W"])
 	if err != nil {
 		return nil, err
@@ -202,6 +204,8 @@ func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager) error {
 		return errors.New("missing font reference or type")
 	}
 	switch d.FontType {
+	case glyphdata.None:
+		// pass
 	case glyphdata.CFF:
 		err := pdf.CheckVersion(w, "composite CFF fonts", pdf.V1_3)
 		if err != nil {
@@ -267,7 +271,6 @@ func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager) error {
 	}
 
 	fdDict := d.Descriptor.AsDict()
-	fdDict["FontName"] = cidFontDict["BaseFont"]
 	switch d.FontType {
 	case glyphdata.CFF, glyphdata.OpenTypeCFF:
 		fdDict["FontFile3"] = d.FontRef
@@ -298,26 +301,6 @@ func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager) error {
 	return nil
 }
 
-// moreThanTen returns true if the flattened array has more than 10 elements.
-func moreThanTen(a pdf.Array) bool {
-	count := 0
-	for _, obj := range a {
-		if a, ok := obj.(pdf.Array); ok {
-			count += len(a)
-		} else {
-			count++
-		}
-		if count > 10 {
-			return true
-		}
-	}
-	return false
-}
-
-func (d *CIDFontType0) WritingMode() font.WritingMode {
-	return d.Encoding.WMode
-}
-
 // GetScanner returns a font.Scanner for the font.
 func (d *CIDFontType0) GetScanner() (font.Scanner, error) {
 	var csr charcode.CodeSpaceRange
@@ -346,6 +329,10 @@ type type0Scanner struct {
 	*CIDFontType0
 	codec *charcode.Codec
 	cache map[charcode.Code]*font.Code
+}
+
+func (s *type0Scanner) WritingMode() font.WritingMode {
+	return s.Encoding.WMode
 }
 
 func (s *type0Scanner) Codes(str pdf.String) iter.Seq[*font.Code] {
@@ -385,12 +372,12 @@ func (s *type0Scanner) Codes(str pdf.String) iter.Seq[*font.Code] {
 	}
 }
 
-func (d *type0Scanner) DecodeWidth(s pdf.String) (float64, int) {
+func (s *type0Scanner) DecodeWidth(str pdf.String) (float64, int) {
 	var w float64
-	for c := range d.Codes(s) {
+	for c := range s.Codes(str) {
 		w += c.Width
 	}
-	return w / 1000, len(s)
+	return w / 1000, len(str)
 }
 
 func init() {

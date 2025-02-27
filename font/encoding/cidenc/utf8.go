@@ -28,7 +28,7 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
-var _ font.CIDEncoder = (*compositeUTF8)(nil)
+var _ CIDEncoder = (*compositeUTF8)(nil)
 
 type compositeUTF8 struct {
 	wMode font.WritingMode
@@ -42,7 +42,7 @@ type compositeUTF8 struct {
 	nextPrivate rune
 }
 
-func NewCompositeUtf8(cid0Width float64, wMode font.WritingMode) font.CIDEncoder {
+func NewCompositeUtf8(cid0Width float64, wMode font.WritingMode) CIDEncoder {
 	codec, err := charcode.NewCodec(charcode.UTF8)
 	if err != nil {
 		panic(err)

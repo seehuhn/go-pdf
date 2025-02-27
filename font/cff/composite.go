@@ -68,8 +68,8 @@ type embeddedComposite struct {
 	CapHeight float64 // PDF glyph space units
 	XHeight   float64 // PDF glyph space units
 
-	font.GIDToCID
-	font.CIDEncoder
+	cmap.GIDToCID
+	cidenc.CIDEncoder
 
 	finished bool
 }
@@ -83,7 +83,7 @@ func newEmbeddedComposite(ref pdf.Reference, f *Instance) *embeddedComposite {
 	}
 	gidToCID := makeGIDToCID()
 
-	// TODO(voss): make sure we get `/Identity-H` instead of a CMap stream.
+	// TODO(voss): make sure we set `/Identity-H` instead of a CMap stream.
 	makeEncoder := cidenc.NewCompositeIdentity
 	if opt.MakeEncoder != nil {
 		makeEncoder = opt.MakeEncoder

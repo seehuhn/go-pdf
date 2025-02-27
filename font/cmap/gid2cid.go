@@ -24,43 +24,55 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"seehuhn.de/go/pdf/font"
-	pscid "seehuhn.de/go/postscript/cid"
+	"seehuhn.de/go/postscript/cid"
 
 	"seehuhn.de/go/sfnt/glyph"
 )
 
+// GIDToCID encodes a mapping from Glyph Identifier (GID) values to Character
+// Identifier (CID) values.
+type GIDToCID interface {
+	// TODO(voss): change the second argument to string
+	CID(glyph.ID, []rune) cid.CID
+
+	GID(cid.CID) glyph.ID
+
+	ROS() *CIDSystemInfo
+
+	GIDToCID(numGlyph int) []cid.CID
+}
+
 // NewGIDToCIDSequential returns a GIDToCID which assigns CID values
 // sequentially, starting with 1.
-func NewGIDToCIDSequential() font.GIDToCID {
+func NewGIDToCIDSequential() GIDToCID {
 	return &gidToCIDSequential{
-		g2c: make(map[glyph.ID]pscid.CID),
-		c2g: make(map[pscid.CID]glyph.ID),
+		g2c: make(map[glyph.ID]cid.CID),
+		c2g: make(map[cid.CID]glyph.ID),
 	}
 }
 
 type gidToCIDSequential struct {
-	g2c map[glyph.ID]pscid.CID
-	c2g map[pscid.CID]glyph.ID
+	g2c map[glyph.ID]cid.CID
+	c2g map[cid.CID]glyph.ID
 }
 
 // GID implements the [GIDToCID] interface.
-func (g *gidToCIDSequential) CID(gid glyph.ID, _ []rune) pscid.CID {
-	cid, ok := g.g2c[gid]
+func (g *gidToCIDSequential) CID(gid glyph.ID, _ []rune) cid.CID {
+	cidVal, ok := g.g2c[gid]
 	if !ok {
-		cid = pscid.CID(len(g.g2c) + 1)
-		g.g2c[gid] = cid
-		g.c2g[cid] = gid
+		cidVal = cid.CID(len(g.g2c) + 1)
+		g.g2c[gid] = cidVal
+		g.c2g[cidVal] = gid
 	}
-	return cid
+	return cidVal
 }
 
-func (g *gidToCIDSequential) GID(cid pscid.CID) glyph.ID {
+func (g *gidToCIDSequential) GID(cid cid.CID) glyph.ID {
 	return g.c2g[cid]
 }
 
 // ROS implements the [GIDToCID] interface.
-func (g *gidToCIDSequential) ROS() *font.CIDSystemInfo {
+func (g *gidToCIDSequential) ROS() *CIDSystemInfo {
 	h := sha256.New()
 	h.Write([]byte("seehuhn.de/go/pdf/font/cmap.gidToCIDSequential\n"))
 	binary.Write(h, binary.BigEndian, uint64(len(g.g2c)))
@@ -72,7 +84,7 @@ func (g *gidToCIDSequential) ROS() *font.CIDSystemInfo {
 	}
 	sum := h.Sum(nil)
 
-	return &font.CIDSystemInfo{
+	return &CIDSystemInfo{
 		Registry:   "Seehuhn",
 		Ordering:   fmt.Sprintf("%x", sum[:8]),
 		Supplement: 0,
@@ -80,8 +92,8 @@ func (g *gidToCIDSequential) ROS() *font.CIDSystemInfo {
 }
 
 // GIDToCID implements the [GIDToCID] interface.
-func (g *gidToCIDSequential) GIDToCID(numGlyph int) []pscid.CID {
-	res := make([]pscid.CID, numGlyph)
+func (g *gidToCIDSequential) GIDToCID(numGlyph int) []cid.CID {
+	res := make([]cid.CID, numGlyph)
 	for gid, cid := range g.g2c {
 		res[gid] = cid
 	}
@@ -90,25 +102,25 @@ func (g *gidToCIDSequential) GIDToCID(numGlyph int) []pscid.CID {
 
 // NewGIDToCIDIdentity returns a GIDToCID which uses the GID values
 // directly as CID values.
-func NewGIDToCIDIdentity() font.GIDToCID {
+func NewGIDToCIDIdentity() GIDToCID {
 	return &gidToCIDIdentity{}
 }
 
 type gidToCIDIdentity struct{}
 
 // GID implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) CID(gid glyph.ID, _ []rune) pscid.CID {
-	return pscid.CID(gid)
+func (g *gidToCIDIdentity) CID(gid glyph.ID, _ []rune) cid.CID {
+	return cid.CID(gid)
 }
 
 // CID implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) GID(cid pscid.CID) glyph.ID {
+func (g *gidToCIDIdentity) GID(cid cid.CID) glyph.ID {
 	return glyph.ID(cid)
 }
 
 // ROS implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) ROS() *font.CIDSystemInfo {
-	return &font.CIDSystemInfo{
+func (g *gidToCIDIdentity) ROS() *CIDSystemInfo {
+	return &CIDSystemInfo{
 		Registry:   "Adobe",
 		Ordering:   "Identity",
 		Supplement: 0,
@@ -116,10 +128,10 @@ func (g *gidToCIDIdentity) ROS() *font.CIDSystemInfo {
 }
 
 // GIDToCID implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) GIDToCID(numGlyph int) []pscid.CID {
-	res := make([]pscid.CID, numGlyph)
+func (g *gidToCIDIdentity) GIDToCID(numGlyph int) []cid.CID {
+	res := make([]cid.CID, numGlyph)
 	for i := range res {
-		res[i] = pscid.CID(i)
+		res[i] = cid.CID(i)
 	}
 	return res
 }

@@ -18,13 +18,43 @@ package cidenc
 
 import (
 	"errors"
+	"iter"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/postscript/cid"
 
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
-// TODO(voss): include the width
+// A CIDEncoder maps character codes to CIDs, glyph widths and text content.
+type CIDEncoder interface {
+	// WritingMode indicates whether the font is for horizontal or vertical
+	// writing.
+	WritingMode() font.WritingMode
+
+	// Codes iterates over the character codes in a PDF string.
+	// The iterator returns the information stored for each code.
+	Codes(s pdf.String) iter.Seq[*font.Code]
+
+	// MappedCodes iterates over all codes known to the encoder.
+	MappedCodes() iter.Seq2[charcode.Code, *font.Code]
+
+	// AllocateCode assigns a new code to a CID and stores the text and width.
+	AllocateCode(cidVal cid.CID, text string, width float64) (charcode.Code, error)
+
+	// DecodeWidth decodes the first character in a PDF string and returns its width.
+	// The second return value is the number of bytes consumed from the input string.
+	DecodeWidth(s pdf.String) (float64, int)
+
+	Codec() *charcode.Codec
+
+	GetCode(cid cid.CID, text string) (charcode.Code, bool)
+
+	Width(code charcode.Code) float64
+}
+
+// TODO(voss): include the width?
 type key struct {
 	cid  cid.CID
 	text string

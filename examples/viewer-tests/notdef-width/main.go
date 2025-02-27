@@ -393,7 +393,7 @@ func makeTestFont() *testFont {
 
 	cmap := &cmap.File{
 		Name: "TestCMap",
-		ROS: &font.CIDSystemInfo{
+		ROS: &cmap.CIDSystemInfo{
 			Registry:   o.ROS.Registry,
 			Ordering:   o.ROS.Ordering,
 			Supplement: pdf.Integer(o.ROS.Supplement),

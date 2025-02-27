@@ -22,14 +22,20 @@ import (
 	"slices"
 
 	"golang.org/x/text/language"
+
 	"seehuhn.de/go/geom/rect"
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
+
 	"seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/os2"
+
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/encoding/cidenc"
 )
 
 type Options struct {
@@ -37,9 +43,9 @@ type Options struct {
 	GsubFeatures map[string]bool
 	GposFeatures map[string]bool
 	Composite    bool
-	WritingMode  font.WritingMode                                                // only used for composite fonts
-	MakeGIDToCID func() font.GIDToCID                                            // only used for composite fonts
-	MakeEncoder  func(cid0Width float64, wMode font.WritingMode) font.CIDEncoder // only used for composite fonts
+	WritingMode  font.WritingMode                                                  // only used for composite fonts
+	MakeGIDToCID func() cmap.GIDToCID                                              // only used for composite fonts
+	MakeEncoder  func(cid0Width float64, wMode font.WritingMode) cidenc.CIDEncoder // only used for composite fonts
 }
 
 var _ interface {

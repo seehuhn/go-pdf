@@ -138,7 +138,7 @@ end
 	// This is used to test the template used to format a CMap file.
 	testInfoFull = &File{
 		Name: "Test",
-		ROS: &font.CIDSystemInfo{
+		ROS: &CIDSystemInfo{
 			Registry:   "Test",
 			Ordering:   "Random",
 			Supplement: 3,
@@ -169,7 +169,7 @@ end
 
 	// The following two InfoNew structs are used to test embedding a chain of
 	// CMaps.
-	testROS = &font.CIDSystemInfo{
+	testROS = &CIDSystemInfo{
 		Registry: "Seehuhn",
 		Ordering: "Test",
 	}
@@ -536,7 +536,7 @@ func TestExtractLoop(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", n), func(t *testing.T) {
 			data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(data)
-			ros := &font.CIDSystemInfo{
+			ros := &CIDSystemInfo{
 				Registry:   "Test",
 				Ordering:   "Simple",
 				Supplement: 0,
