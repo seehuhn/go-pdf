@@ -42,10 +42,7 @@ func run() error {
 		return err
 	}
 
-	H, err := standard.Helvetica.New()
-	if err != nil {
-		return err
-	}
+	H := standard.Helvetica.New()
 
 	for _, sample := range fonttypes.All {
 		page := doc.AddPage()

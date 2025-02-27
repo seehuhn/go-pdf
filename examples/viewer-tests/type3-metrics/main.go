@@ -50,10 +50,7 @@ func run(filename string) error {
 		return err
 	}
 
-	F, err := standard.TimesRoman.New()
-	if err != nil {
-		return err
-	}
+	F := standard.TimesRoman.New()
 	note := text.F{
 		Font:  F,
 		Size:  10,

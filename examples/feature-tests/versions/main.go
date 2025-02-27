@@ -49,10 +49,7 @@ func main() {
 				log.Fatal(err)
 			}
 
-			F, err := standard.TimesRoman.New()
-			if err != nil {
-				log.Fatal(err)
-			}
+			F := standard.TimesRoman.New()
 			geom := F.GetGeometry()
 
 			page.TextBegin()

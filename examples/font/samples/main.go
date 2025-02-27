@@ -46,14 +46,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	labelFont, err := standard.Helvetica.New()
-	if err != nil {
-		log.Fatal(err)
-	}
-	titleFont, err := standard.HelveticaBold.New()
-	if err != nil {
-		log.Fatal(err)
-	}
+	labelFont := standard.Helvetica.New()
+	titleFont := standard.HelveticaBold.New()
 
 	const margin = 50
 	f := fontSamples{

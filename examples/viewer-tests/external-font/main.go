@@ -147,10 +147,7 @@ func write_pdf(filename string) error {
 		return err
 	}
 
-	labelFont, err := standard.TimesRoman.New()
-	if err != nil {
-		return err
-	}
+	labelFont := standard.TimesRoman.New()
 	testFont1 := &funnyFont{true}
 	testFont2 := &funnyFont{false}
 

@@ -66,10 +66,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	labelFont, err := standard.Courier.New()
-	if err != nil {
-		log.Fatal(err)
-	}
+	labelFont := standard.Courier.New()
 
 	tree := pagetree.NewWriter(out)
 	rm := pdf.NewResourceManager(out)

@@ -35,10 +35,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	F, err := standard.Helvetica.New()
-	if err != nil {
-		log.Fatal(err)
-	}
+	F := standard.Helvetica.New()
 
 	x := 72.0
 	y := bbox.URy - 72.0

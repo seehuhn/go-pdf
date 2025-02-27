@@ -34,10 +34,7 @@ func TestGeometry(t *testing.T) {
 			continue
 		}
 
-		F, err := font.New()
-		if err != nil {
-			t.Fatal(err)
-		}
+		F := font.New()
 
 		genFontBBox := mtx.FontBBox
 

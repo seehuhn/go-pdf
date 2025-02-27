@@ -65,29 +65,17 @@ func doit() error {
 		return err
 	}
 
-	F, err := standard.TimesRoman.New()
-	if err != nil {
-		return err
-	}
+	F := standard.TimesRoman.New()
 	l.addFont("text", F, 10)
 
-	I, err := standard.TimesItalic.New()
-	if err != nil {
-		return err
-	}
+	I := standard.TimesItalic.New()
 	l.addFont("it", I, 10)
 
-	S, err := standard.Helvetica.New()
-	if err != nil {
-		return err
-	}
+	S := standard.Helvetica.New()
 	l.addFont("code", S, 9)
 	l.addFont("dict", S, 9)
 
-	SB, err := standard.HelveticaBold.New()
-	if err != nil {
-		return err
-	}
+	SB := standard.HelveticaBold.New()
 	l.addFont("chapter", SB, 24)
 	l.addFont("section", SB, 18)
 

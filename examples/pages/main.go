@@ -34,10 +34,7 @@ func main() {
 
 	rm := pdf.NewResourceManager(out)
 
-	font, err := standard.Helvetica.New()
-	if err != nil {
-		log.Fatal(err)
-	}
+	font := standard.Helvetica.New()
 
 	mediaBox := &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200}
 	pageTree := pagetree.NewWriter(out)

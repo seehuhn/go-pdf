@@ -57,10 +57,7 @@ func run() error {
 		return err
 	}
 
-	F, err := standard.Helvetica.New()
-	if err != nil {
-		return err
-	}
+	F := standard.Helvetica.New()
 
 	X := &testFont{}
 

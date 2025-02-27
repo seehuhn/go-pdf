@@ -40,10 +40,7 @@ func TestGlyphWidths(t *testing.T) {
 	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(data)
 
-	F, err := standard.TimesRoman.New()
-	if err != nil {
-		t.Fatal(err)
-	}
+	F := standard.TimesRoman.New()
 
 	gg0 := F.Layout(nil, 50, "AB")
 	if len(gg0.Seq) != 2 {
@@ -72,7 +69,7 @@ func TestGlyphWidths(t *testing.T) {
 	out.TextShowGlyphs(gg)
 	out.TextEnd()
 
-	err = rm.Close()
+	err := rm.Close()
 	if err != nil {
 		t.Fatal(err)
 	}

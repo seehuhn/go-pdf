@@ -40,10 +40,7 @@ func run() error {
 		return err
 	}
 
-	font, err := standard.HelveticaBold.New()
-	if err != nil {
-		return err
-	}
+	font := standard.HelveticaBold.New()
 
 	doc.TextSetFont(font, 50)
 	doc.TextBegin()

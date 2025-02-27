@@ -59,14 +59,8 @@ func run(fname string) error {
 	page.DrawXObject(img)
 	page.PopGraphicsState()
 
-	roman, err := standard.TimesRoman.New()
-	if err != nil {
-		return err
-	}
-	bold, err := standard.TimesBold.New()
-	if err != nil {
-		return err
-	}
+	roman := standard.TimesRoman.New()
+	bold := standard.TimesBold.New()
 	page.TextBegin()
 	page.TextFirstLine(72, bottom-20)
 	page.TextSetFont(bold, 10)

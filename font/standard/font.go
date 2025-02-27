@@ -49,8 +49,16 @@ const (
 	ZapfDingbats         Font = "ZapfDingbats"
 )
 
-// New returns a new font instance for the given standard font and options.
-func (f Font) New() (*type1.Instance, error) {
+// New returns a new font instance for the given standard font.
+func (f Font) New() *type1.Instance {
+	inst, err := f.newInternal()
+	if err != nil {
+		panic(err)
+	}
+	return inst
+}
+
+func (f Font) newInternal() (*type1.Instance, error) {
 	name := string(f)
 
 	fontData, err := builtin.Open(name, loader.FontTypeType1)
@@ -155,16 +163,6 @@ func (f Font) New() (*type1.Instance, error) {
 	}
 
 	return res, nil
-}
-
-// Must returns a new font instance for the given standard font and options.
-// It panics if the there is an error.
-func (f Font) Must() *type1.Instance {
-	inst, err := f.New()
-	if err != nil {
-		panic(err)
-	}
-	return inst
 }
 
 // Restrict the font to the character set guaranteed by the spec,

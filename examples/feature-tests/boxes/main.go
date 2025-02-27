@@ -35,6 +35,9 @@ func main() {
 
 func doit() error {
 	page, err := document.CreateSinglePage("boxes.pdf", nil, pdf.V1_7, nil)
+	if err != nil {
+		return err
+	}
 
 	page.PageDict["MediaBox"] = &pdf.Rectangle{LLx: 0, LLy: 0, URx: 600, URy: 600}
 	page.PageDict["CropBox"] = &pdf.Rectangle{LLx: 50, LLy: 50, URx: 550, URy: 550}
@@ -60,10 +63,7 @@ func doit() error {
 		},
 	}
 
-	F, err := standard.Helvetica.New()
-	if err != nil {
-		return err
-	}
+	F := standard.Helvetica.New()
 	geom := F.GetGeometry()
 
 	// draw a grid to show page coordinates

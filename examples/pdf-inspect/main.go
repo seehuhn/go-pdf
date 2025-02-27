@@ -344,9 +344,7 @@ func (e *explainer) rel(key string) error {
 		if key == "dict" {
 			obj = x.Dict
 		} else {
-			if strings.HasPrefix(key, "/") {
-				key = key[1:]
-			}
+			key = strings.TrimPrefix(key, "/")
 
 			var ok bool
 			obj, ok = x.Dict[pdf.Name(key)]

@@ -39,14 +39,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	titleFont, err := standard.TimesBold.New()
-	if err != nil {
-		log.Fatal(err)
-	}
-	bodyFont, err := standard.TimesRoman.New()
-	if err != nil {
-		log.Fatal(err)
-	}
+	titleFont := standard.TimesBold.New()
+	bodyFont := standard.TimesRoman.New()
 
 	f := fontTables{
 		doc: doc,
@@ -165,10 +159,7 @@ func (f *fontTables) MakeColumns(G standard.Font) error {
 	baseLineSkip := 12.0
 	colWidth := (f.textWidth + 32) / 4
 
-	fnt, err := G.New()
-	if err != nil {
-		return err
-	}
+	fnt := G.New()
 
 	afm := fnt.Metrics
 	glyphNames := afm.GlyphList()
@@ -242,10 +233,7 @@ func (f *fontTables) MakeColumns(G standard.Font) error {
 					// The builtin fonts are simple fonts, so we can only
 					// use up to 256 glyphs for each embedded copy of the
 					// font.
-					F, err = G.New()
-					if err != nil {
-						return err
-					}
+					F = G.New()
 					geom = F.GetGeometry()
 				}
 

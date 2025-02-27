@@ -60,20 +60,14 @@ func run(filename string) error {
 		return err
 	}
 
-	titleFont, err := standard.TimesBold.New()
-	if err != nil {
-		return err
-	}
+	titleFont := standard.TimesBold.New()
 	title := text.F{
 		Font:  titleFont,
 		Size:  10,
 		Color: color.DeviceGray(0.2),
 	}
 
-	noteFont, err := standard.TimesRoman.New()
-	if err != nil {
-		return err
-	}
+	noteFont := standard.TimesRoman.New()
 	note := text.F{
 		Font:  noteFont,
 		Size:  10,

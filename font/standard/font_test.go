@@ -33,11 +33,7 @@ func TestEmbedBuiltin(t *testing.T) {
 			data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(data)
 
-			F, err := G.New()
-			if err != nil {
-				t.Fatal(err)
-			}
-
+			F := G.New()
 			ref, E, err := pdf.ResourceManagerEmbed(rm, F)
 			if err != nil {
 				t.Fatal(err)
@@ -81,10 +77,7 @@ func TestEmbedBuiltin(t *testing.T) {
 // fonts are consistent between the .pfb and the .afm files.
 func TestGlyphLists(t *testing.T) {
 	for _, G := range All {
-		F, err := G.New()
-		if err != nil {
-			t.Fatal(err)
-		}
+		F := G.New()
 		psFont := F.Font
 		metrics := F.Metrics
 
@@ -100,10 +93,7 @@ func TestGlyphLists(t *testing.T) {
 // fonts are consistent between the .pfb and the .afm files.
 func TestGlyphWidths(t *testing.T) {
 	for _, G := range All {
-		F, err := G.New()
-		if err != nil {
-			t.Fatal(err)
-		}
+		F := G.New()
 		psFont := F.Font
 		metrics := F.Metrics
 
@@ -122,10 +112,7 @@ func TestGlyphWidths(t *testing.T) {
 // metrics file if and only if they are blank in the .pfb file.
 func TestBlankGlyphs(t *testing.T) {
 	for _, G := range All {
-		F, err := G.New()
-		if err != nil {
-			t.Fatal(err)
-		}
+		F := G.New()
 		psFont := F.Font
 		metrics := F.Metrics
 		for name, g := range psFont.Glyphs {
@@ -145,10 +132,7 @@ func TestBlankGlyphs(t *testing.T) {
 func TestLigatures(t *testing.T) {
 	ligatures := []string{"ﬀ=ff", "ﬁ=fi", "ﬂ=fl", "ﬃ=ffi", "ﬄ=ffl"}
 	for i, G := range All {
-		F, err := G.New()
-		if err != nil {
-			t.Fatal(err)
-		}
+		F := G.New()
 
 		geom := F.GetGeometry()
 

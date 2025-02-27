@@ -45,14 +45,8 @@ func run() error {
 		return err
 	}
 
-	B, err := standard.TimesBold.New()
-	if err != nil {
-		return err
-	}
-	F, err := standard.TimesRoman.New()
-	if err != nil {
-		return err
-	}
+	B := standard.TimesBold.New()
+	F := standard.TimesRoman.New()
 
 	figure, bbox, err := LoadFigure("fig.pdf", page.RM)
 	if err != nil {
@@ -113,6 +107,9 @@ func LoadFigure(fname string, rm *pdf.ResourceManager) (graphics.XObject, *pdf.R
 		return nil, nil, err
 	}
 	resourceObj, err := copier.Copy(origResources)
+	if err != nil {
+		return nil, nil, err
+	}
 	resourceDict := resourceObj.(pdf.Dict)
 	resources := &pdf.Resources{}
 	err = pdf.DecodeDict(nil, resources, resourceDict)
@@ -122,6 +119,9 @@ func LoadFigure(fname string, rm *pdf.ResourceManager) (graphics.XObject, *pdf.R
 
 	body := &bytes.Buffer{}
 	contents, err := pdf.Resolve(r, dict["Contents"])
+	if err != nil {
+		return nil, nil, err
+	}
 	switch x := contents.(type) {
 	case *pdf.Stream:
 		stm, err := pdf.DecodeStream(r, x, 0)
