@@ -106,7 +106,7 @@ func (f Font) newInternal() (*type1.Instance, error) {
 	// these from glyph metrics.
 	for _, name := range []string{"d", "bracketleft", "bar"} {
 		if glyph, ok := metrics.Glyphs[name]; ok {
-			y := float64(glyph.BBox.URy)
+			y := glyph.BBox.URy
 			if y > metrics.Ascent {
 				metrics.Ascent = y
 			}
@@ -114,7 +114,7 @@ func (f Font) newInternal() (*type1.Instance, error) {
 	}
 	for _, name := range []string{"p", "bracketleft", "bar"} {
 		if glyph, ok := metrics.Glyphs[name]; ok {
-			y := float64(glyph.BBox.LLy)
+			y := glyph.BBox.LLy
 			if y < metrics.Descent {
 				metrics.Descent = y
 			}

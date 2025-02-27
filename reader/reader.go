@@ -661,7 +661,7 @@ func convertDashPattern(dashPattern pdf.Array) (pat []float64, ok bool) {
 		if !ok {
 			return nil, false
 		}
-		pat[i] = float64(x)
+		pat[i] = x
 	}
 	return pat, true
 }

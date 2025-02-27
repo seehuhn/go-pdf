@@ -149,7 +149,7 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 		seq.Seq = append(seq.Seq, font.Glyph{
 			GID:     gid,
 			Text:    []rune{r},
-			Advance: float64(f.Font.Glyphs[gid].Width) * q,
+			Advance: f.Font.Glyphs[gid].Width * q,
 		})
 	}
 	return seq

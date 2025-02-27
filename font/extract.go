@@ -541,7 +541,7 @@ func (d *Dicts) IsStandardFont() bool {
 		return false
 	}
 
-	return IsStandard[string(d.PostScriptName)]
+	return IsStandard[d.PostScriptName]
 }
 
 // IsExternal returns true, if the font data is not included in the PDF

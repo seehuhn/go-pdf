@@ -74,7 +74,7 @@ fieldLoop:
 		case fInfo.Type == textStringType:
 			res[key] = fVal.Interface().(TextString)
 		case fInfo.Type == dateType:
-			res[key] = Date(fVal.Interface().(Date))
+			res[key] = fVal.Interface().(Date)
 		case fInfo.Type == languageType:
 			tag := fVal.Interface().(language.Tag)
 			if !tag.IsRoot() {

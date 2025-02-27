@@ -216,7 +216,7 @@ func (info *ToUnicodeFile) GetSimpleMapping() map[byte]string {
 
 	for _, s := range info.Singles {
 		if len(s.Code) == 1 {
-			res[s.Code[0]] = string(s.Value)
+			res[s.Code[0]] = s.Value
 		}
 	}
 

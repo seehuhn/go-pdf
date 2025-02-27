@@ -240,7 +240,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 		page.MoveTo(0, -10)
 		page.LineTo(0, 10)
 		page.MoveTo(0, 0)
-		w := float64(g.Width)
+		w := g.Width
 		page.LineTo(w, 0)
 		page.MoveTo(w-10, -10)
 		page.LineTo(w, 0)

@@ -36,7 +36,7 @@ func isStandard(fontName string, t *simpleenc.Simple) bool {
 	}
 
 	for code, info := range t.MappedCodes() {
-		gid := t.GID(byte(code))
+		gid := t.GID(code)
 		glyphName := t.GlyphName(gid)
 		wStd, ok := m.Width[glyphName]
 		if !ok {

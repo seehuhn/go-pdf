@@ -106,9 +106,9 @@ func (r *Reader) readSimpleFont(info *font.Dicts, toUni *cmap.ToUnicodeFile) (F 
 					glyphName = pdfenc.Standard.Encoding[code]
 				}
 			}
-			w, err := getStandardWidth(string(info.PostScriptName), glyphName)
+			w, err := getStandardWidth(info.PostScriptName, glyphName)
 			if err != nil {
-				w, _ = getStandardWidth(string(info.PostScriptName), ".notdef")
+				w, _ = getStandardWidth(info.PostScriptName, ".notdef")
 			}
 			widths[code] = w / 1000
 		}
@@ -226,7 +226,7 @@ func (f *SimpleFont) Decode(s pdf.String) (*font.Code, int) {
 	res := &font.Code{
 		CID:    cid,
 		Notdef: 0,
-		Text:   string(text),
+		Text:   text,
 		Width:  f.widths[code],
 	}
 

@@ -27,7 +27,7 @@ import (
 // the same as the postscript standard encoding.
 func TestStandardEncoding(t *testing.T) {
 	for code, name := range Standard.Encoding {
-		if string(name) != psenc.StandardEncoding[code] {
+		if name != psenc.StandardEncoding[code] {
 			t.Errorf("StandardEncoding[%d] = %q != %q", code, name, psenc.StandardEncoding[code])
 		}
 	}

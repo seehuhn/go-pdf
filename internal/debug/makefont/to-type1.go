@@ -43,7 +43,7 @@ func toType1(info *sfnt.Font) (*type1.Font, error) {
 		gid := glyph.ID(i)
 		name := info.GlyphName(gid)
 		newGlyph := &type1.Glyph{
-			WidthX: float64(info.GlyphWidth(gid)),
+			WidthX: info.GlyphWidth(gid),
 		}
 		if origGlyph == nil {
 			goto done

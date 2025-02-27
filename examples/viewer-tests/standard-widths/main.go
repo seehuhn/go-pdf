@@ -78,8 +78,7 @@ func run(filename string) error {
 					URy: markerAscent,
 				},
 				Draw: func(w *graphics.Writer) {
-					w.Rectangle(0, float64(markerDescent),
-						markerWidth, float64(markerAscent)-float64(markerDescent))
+					w.Rectangle(0, markerDescent, markerWidth, markerAscent-markerDescent)
 					w.Fill()
 				},
 			},

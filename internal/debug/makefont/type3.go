@@ -66,7 +66,7 @@ func Type3() (*type3.Instance, error) {
 
 		g := &type3.Glyph{
 			Name:  glyphName,
-			Width: float64(info.GlyphWidth(gid)),
+			Width: info.GlyphWidth(gid),
 		}
 
 		if origGlyph != nil {
