@@ -17,165 +17,232 @@
 package opentype
 
 import (
+	"fmt"
 	"math"
+	"slices"
 
-	pscid "seehuhn.de/go/postscript/cid"
+	"golang.org/x/exp/maps"
+
+	"seehuhn.de/go/postscript/cid"
+	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/encoding/cidenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs"
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 )
 
-type embeddedGlyfComposite struct {
-	w   *pdf.Writer
-	ref pdf.Reference
-	*font.Geometry
+var _ interface {
+	font.EmbeddedLayouter
+	font.Scanner
+	pdf.Finisher
+} = (*embeddedGlyfComposite)(nil)
 
-	sfnt *sfnt.Font
+type embeddedGlyfComposite struct {
+	Ref  pdf.Reference
+	Font *sfnt.Font
 
 	cmap.GIDToCID
-	cmap.CIDEncoder
+	cidenc.CIDEncoder
 
-	closed bool
+	finished bool
 }
 
-// WritingMode implements the [font.Embedded] interface.
-func (f *embeddedGlyfComposite) WritingMode() font.WritingMode {
-	// TODO(voss): implement this
-	return 0
-}
-
-func (f *embeddedGlyfComposite) DecodeWidth(s pdf.String) (float64, int) {
-	for code, cid := range f.AllCIDs(s) {
-		gid := f.GID(cid)
-		width := f.sfnt.GlyphWidth(gid) / float64(f.sfnt.UnitsPerEm)
-		return width, len(code)
+func newEmbeddedGlyfComposite(ref pdf.Reference, f *Instance) *embeddedGlyfComposite {
+	opt := f.Opt
+	if opt == nil {
+		opt = &Options{}
 	}
-	return 0, 0
+
+	makeGIDToCID := cmap.NewGIDToCIDSequential
+	if opt.MakeGIDToCID != nil {
+		makeGIDToCID = opt.MakeGIDToCID
+	}
+	gidToCID := makeGIDToCID()
+
+	makeEncoder := cidenc.NewCompositeIdentity
+	if opt.MakeEncoder != nil {
+		makeEncoder = opt.MakeEncoder
+	}
+	notdefWidth := math.Round(f.Font.GlyphWidthPDF(0))
+	encoder := makeEncoder(notdefWidth, opt.WritingMode)
+
+	e := &embeddedGlyfComposite{
+		Ref:  ref,
+		Font: f.Font,
+
+		GIDToCID:   gidToCID,
+		CIDEncoder: encoder,
+	}
+	return e
 }
 
-func (f *embeddedGlyfComposite) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
-	width := f.sfnt.GlyphWidth(gid) / float64(f.sfnt.UnitsPerEm)
-	s = f.CIDEncoder.AppendEncoded(s, gid, text)
-	return s, width
+func (e *embeddedGlyfComposite) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
+	cid := e.GIDToCID.CID(gid, []rune(text))
+	c, ok := e.CIDEncoder.GetCode(cid, text)
+	if !ok {
+		if e.finished {
+			return s, 0
+		}
+
+		width := math.Round(e.Font.GlyphWidthPDF(gid))
+		var err error
+		c, err = e.CIDEncoder.AllocateCode(cid, text, width)
+		if err != nil {
+			return s, 0
+		}
+	}
+
+	w := e.CIDEncoder.Width(c)
+	return e.CIDEncoder.Codec().AppendCode(s, c), w / 1000
 }
 
-func (f *embeddedGlyfComposite) Finish(rm *pdf.ResourceManager) error {
-	if f.closed {
+func (e *embeddedGlyfComposite) Finish(rm *pdf.ResourceManager) error {
+	if e.finished {
 		return nil
 	}
-	f.closed = true
+	e.finished = true
 
-	origOTF := f.sfnt.Clone()
-	origOTF.CMapTable = nil
-	origOTF.Gdef = nil
-	origOTF.Gsub = nil
-	origOTF.Gpos = nil
-
-	// subset the font
-	subsetGID := f.CIDEncoder.Subset()
-	subsetTag := subset.Tag(subsetGID, origOTF.NumGlyphs())
-	subsetSfnt := origOTF.Subset(subsetGID)
-
-	toUnicode := f.ToUnicode()
-	cmapInfo := f.CMap()
-
-	postScriptName := subsetSfnt.PostScriptName()
-
-	// TODO(voss): set this correctly
-	isSymbolic := true
-
-	//  The `CIDToGIDMap` entry in the CIDFont dictionary specifies the mapping
-	//  from CIDs to glyphs.
-	m := make(map[glyph.ID]pscid.CID)
-	origGIDToCID := f.GIDToCID.GIDToCID(origOTF.NumGlyphs())
-	for origGID, cid := range origGIDToCID {
-		m[glyph.ID(origGID)] = cid
+	if err := e.CIDEncoder.Error(); err != nil {
+		return pdf.Wrap(err, fmt.Sprintf("font %q", e.Font.PostScriptName()))
 	}
-	var maxCID pscid.CID
-	isIdentity := false
-	for _, origGID := range subsetGID {
-		cid := m[origGID]
-		if cid != pscid.CID(origGID) {
+
+	origFont := e.Font
+	postScriptName := origFont.PostScriptName()
+
+	origFont = origFont.Clone()
+	origFont.CMapTable = nil
+	origFont.Gdef = nil
+	origFont.Gsub = nil
+	origFont.Gpos = nil
+
+	// Subset the font, if needed.
+	// To minimise file size, we arrange the glyphs in order of increasing CID.
+	cidSet := make(map[cid.CID]struct{})
+	cidSet[0] = struct{}{}
+	for _, info := range e.CIDEncoder.MappedCodes() {
+		cidSet[info.CID] = struct{}{}
+	}
+	cidList := maps.Keys(cidSet)
+	slices.Sort(cidList)
+
+	glyphs := make([]glyph.ID, len(cidList))
+	for i, cidVal := range cidList {
+		glyphs[i] = e.GIDToCID.GID(cidVal)
+	}
+	subsetTag := subset.Tag(glyphs, origFont.NumGlyphs())
+
+	var subsetFont *sfnt.Font
+	if subsetTag != "" {
+		subsetFont = origFont.Subset(glyphs)
+	} else {
+		subsetFont = origFont
+	}
+
+	ros := e.ROS()
+
+	m := make(map[charcode.Code]font.Code)
+	for code, val := range e.CIDEncoder.MappedCodes() {
+		m[code] = *val
+	}
+	toUnicode := cmap.NewToUnicodeFile(e.CIDEncoder.Codec(), m)
+
+	// construct the font dictionary and font descriptor
+	dw := math.Round(subsetFont.GlyphWidthPDF(0))
+	ww := make(map[cmap.CID]float64)
+	for _, info := range e.CIDEncoder.MappedCodes() {
+		ww[info.CID] = info.Width
+	}
+
+	isSymbolic := false
+	for _, info := range e.CIDEncoder.MappedCodes() {
+		rr := []rune(info.Text)
+		if len(rr) != 1 {
+			isSymbolic = true
+			break
+		}
+		glyphName := names.FromUnicode(rr[0])
+		if !pdfenc.StandardLatin.Has[glyphName] {
+			isSymbolic = true
+			break
+		}
+	}
+
+	// The `CIDToGIDMap` entry in the CIDFont dictionary specifies the mapping
+	// from CIDs to glyphs.
+	maxCID := cidList[len(cidList)-1]
+	isIdentity := true
+	cidToGID := make([]glyph.ID, maxCID+1)
+	for subsetGID, cidVal := range cidList {
+		if cidVal != cid.CID(subsetGID) {
 			isIdentity = false
 		}
-		if cid > maxCID {
-			maxCID = cid
-		}
-	}
-	cidToGID := make([]glyph.ID, maxCID+1)
-	for subsetGID, origGID := range subsetGID {
-		cidToGID[m[origGID]] = glyph.ID(subsetGID)
+		cidToGID[cidVal] = glyph.ID(subsetGID)
 	}
 
-	qh := subsetSfnt.FontMatrix[0] * 1000
-	qv := subsetSfnt.FontMatrix[3] * 1000
+	qv := subsetFont.FontMatrix[3] * 1000
+	ascent := math.Round(float64(subsetFont.Ascent) * qv)
+	descent := math.Round(float64(subsetFont.Descent) * qv)
+	leading := math.Round(float64(subsetFont.Ascent-subsetFont.Descent+subsetFont.LineGap) * qv)
+	capHeight := math.Round(float64(subsetFont.CapHeight) * qv)
+	xHeight := math.Round(float64(subsetFont.XHeight) * qv)
 
-	outlines := subsetSfnt.Outlines.(*glyf.Outlines)
-	glyphWidths := outlines.Widths
-	ww := make(map[cmap.CID]float64, len(glyphWidths))
-	for cid, gid := range cidToGID {
-		ww[cmap.CID(cid)] = glyphWidths[gid].AsFloat(qh)
-	}
-
-	ascent := subsetSfnt.Ascent
-	descent := subsetSfnt.Descent
-	lineGap := subsetSfnt.LineGap
-	var leadingPDF float64
-	if lineGap > 0 {
-		leadingPDF = (ascent - descent + lineGap).AsFloat(qv)
-	}
+	italicAngle := math.Round(subsetFont.ItalicAngle*10) / 10
 
 	fd := &font.Descriptor{
 		FontName:     subset.Join(subsetTag, postScriptName),
-		FontFamily:   subsetSfnt.FamilyName,
-		FontStretch:  subsetSfnt.Width,
-		FontWeight:   subsetSfnt.Weight,
-		IsFixedPitch: subsetSfnt.IsFixedPitch(),
-		IsSerif:      subsetSfnt.IsSerif,
+		FontFamily:   subsetFont.FamilyName,
+		FontStretch:  subsetFont.Width,
+		FontWeight:   subsetFont.Weight,
+		IsFixedPitch: subsetFont.IsFixedPitch(),
+		IsSerif:      subsetFont.IsSerif,
 		IsSymbolic:   isSymbolic,
-		IsScript:     subsetSfnt.IsScript,
-		IsItalic:     subsetSfnt.IsItalic,
-		FontBBox:     subsetSfnt.FontBBoxPDF().Rounded(),
-		ItalicAngle:  subsetSfnt.ItalicAngle,
-		Ascent:       math.Round(ascent.AsFloat(qv)),
-		Descent:      math.Round(descent.AsFloat(qv)),
-		Leading:      math.Round(leadingPDF),
-		CapHeight:    math.Round(subsetSfnt.CapHeight.AsFloat(qv)),
-		XHeight:      math.Round(subsetSfnt.XHeight.AsFloat(qv)),
+		IsScript:     subsetFont.IsScript,
+		IsItalic:     subsetFont.IsItalic,
+		FontBBox:     subsetFont.FontBBoxPDF().Rounded(),
+		ItalicAngle:  italicAngle,
+		Ascent:       ascent,
+		Descent:      descent,
+		Leading:      leading,
+		CapHeight:    capHeight,
+		XHeight:      xHeight,
 	}
 
-	fontType := glyphdata.OpenTypeGlyf
-	fontRef := rm.Out.Alloc()
-	err := opentypeglyphs.Embed(f.w, fontType, fontRef, subsetSfnt)
+	dict := &dict.CIDFontType2{
+		Ref:            e.Ref,
+		PostScriptName: postScriptName,
+		SubsetTag:      subsetTag,
+		Descriptor:     fd,
+		ROS:            ros,
+		Encoding:       e.CIDEncoder.CMap(ros),
+		Width:          ww,
+		DefaultWidth:   dw,
+		Text:           toUnicode,
+		FontType:       glyphdata.OpenTypeGlyf,
+		FontRef:        rm.Out.Alloc(),
+	}
+	if !isIdentity {
+		dict.CIDToGID = cidToGID
+	}
+
+	err := dict.WriteToPDF(rm)
 	if err != nil {
 		return err
 	}
 
-	d := &dict.CIDFontType2{
-		Ref:            f.ref,
-		PostScriptName: postScriptName,
-		SubsetTag:      subsetTag,
-		Descriptor:     fd,
-		ROS:            cmapInfo.ROS, // TODO(voss): deal with Identity-H and Identity-V
-		Encoding:       cmapInfo,
-		Width:          ww,
-		DefaultWidth:   subsetSfnt.GlyphWidthPDF(0),
-		Text:           toUnicode,
-		FontType:       fontType,
-		FontRef:        fontRef,
-	}
-	if !isIdentity {
-		d.CIDToGID = cidToGID
+	err = opentypeglyphs.Embed(rm.Out, dict.FontType, dict.FontRef, subsetFont)
+	if err != nil {
+		return err
 	}
 
-	return d.WriteToPDF(rm)
+	return nil
 }

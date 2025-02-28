@@ -17,7 +17,6 @@
 package type3
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -93,8 +92,8 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	}
 	e.finished = true
 
-	if e.Simple.Overflow() {
-		return errors.New("too many distinct glyphs used in Type 3 font")
+	if err := e.Simple.Error(); err != nil {
+		return pdf.Errorf("Type3 font: %w", err)
 	}
 
 	glyphs := e.Simple.Glyphs()

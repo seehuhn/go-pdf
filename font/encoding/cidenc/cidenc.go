@@ -25,6 +25,7 @@ import (
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
 )
 
 // A CIDEncoder maps character codes to CIDs, glyph widths and text content.
@@ -43,6 +44,8 @@ type CIDEncoder interface {
 	// AllocateCode assigns a new code to a CID and stores the text and width.
 	AllocateCode(cidVal cid.CID, text string, width float64) (charcode.Code, error)
 
+	CMap(ros *cmap.CIDSystemInfo) *cmap.File
+
 	// DecodeWidth decodes the first character in a PDF string and returns its width.
 	// The second return value is the number of bytes consumed from the input string.
 	DecodeWidth(s pdf.String) (float64, int)
@@ -52,6 +55,8 @@ type CIDEncoder interface {
 	GetCode(cid cid.CID, text string) (charcode.Code, bool)
 
 	Width(code charcode.Code) float64
+
+	Error() error
 }
 
 // TODO(voss): include the width?

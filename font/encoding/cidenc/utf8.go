@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
 )
 
 var _ CIDEncoder = (*compositeUTF8)(nil)
@@ -172,6 +173,21 @@ func (e *compositeUTF8) get(c charcode.Code) *codeInfo {
 	}
 }
 
+func (e *compositeUTF8) CMap(ros *cmap.CIDSystemInfo) *cmap.File {
+	m := make(map[charcode.Code]font.Code)
+	for code, val := range e.MappedCodes() {
+		m[code] = *val
+	}
+	cmapInfo := &cmap.File{
+		Name:  "",
+		ROS:   ros,
+		WMode: e.wMode,
+	}
+	cmapInfo.SetMapping(e.Codec(), m)
+	cmapInfo.UpdateName()
+	return cmapInfo
+}
+
 func (e *compositeUTF8) Width(c charcode.Code) float64 {
 	return e.get(c).Width
 }
@@ -188,4 +204,8 @@ func (e *compositeUTF8) MappedCodes() iter.Seq2[charcode.Code, *font.Code] {
 			}
 		}
 	}
+}
+
+func (e *compositeUTF8) Error() error {
+	return nil // TODO(voss): implement
 }

@@ -202,7 +202,7 @@ func FuzzType0Dict(f *testing.F) {
 
 		// Write the Type1Dict back to a new PDF file.
 		// Make sure we can write arbitrary Type1Dicts.
-		w, _ := memfile.NewPDFWriter(r.GetMeta().Version, nil)
+		w, buf := memfile.NewPDFWriter(r.GetMeta().Version, nil)
 		rm := pdf.NewResourceManager(w)
 		ref := w.Alloc()
 
@@ -249,6 +249,13 @@ func FuzzType0Dict(f *testing.F) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		err = w.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_ = buf
+		os.WriteFile("debug.pdf", buf.Data, 0666)
 
 		// Read back the data.
 		// Make sure we get the same Type1Dict back.

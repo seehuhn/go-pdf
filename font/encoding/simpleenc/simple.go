@@ -38,8 +38,6 @@ import (
 	"seehuhn.de/go/pdf/font/pdfenc"
 )
 
-const maxNameLength = 31
-
 // Simple manages the encoding and metadata of glyphs for simple PDF fonts.
 //
 // It constructs a mapping from single-byte codes to
@@ -59,8 +57,9 @@ type Simple struct {
 	glyphNameUsed map[string]bool
 
 	isZapfDingbats bool
-	overflow       bool
 	baseEnc        *pdfenc.Encoding
+
+	err error
 }
 
 type gidText struct {
@@ -169,7 +168,7 @@ func (t *Simple) AllocateCode(gid glyph.ID, baseGlyphName, text string, width fl
 	}
 
 	if len(t.info) >= 256 {
-		t.overflow = true
+		t.err = ErrOverflow
 		return 0, ErrOverflow
 	}
 
@@ -225,7 +224,7 @@ func (t *Simple) makeGlyphName(gid glyph.ID, defaultGlyphName, text string) stri
 	}
 
 	glyphName := defaultGlyphName
-	if !isValid(glyphName) {
+	if !names.IsValid(glyphName) {
 		var parts []string
 		for _, r := range text {
 			parts = append(parts, names.FromUnicode(r))
@@ -239,10 +238,10 @@ func (t *Simple) makeGlyphName(gid glyph.ID, defaultGlyphName, text string) stri
 	base := glyphName
 nameLoop:
 	for {
-		if isValid(glyphName) && !t.glyphNameUsed[glyphName] {
+		if names.IsValid(glyphName) && !t.glyphNameUsed[glyphName] {
 			break
 		}
-		if len(base) == 0 || len(glyphName) > maxNameLength {
+		if len(base) == 0 || len(glyphName) > 31 {
 			// Try one more name than gd.glyphNameUsed has elements.
 			// This guarantees that we find a free name.
 			for idx := len(t.glyphNameUsed); idx >= 0; idx-- {
@@ -258,33 +257,6 @@ nameLoop:
 	t.glyphName[gid] = glyphName
 	t.glyphNameUsed[glyphName] = true
 	return glyphName
-}
-
-// isValid checks if s is a valid glyph name.
-//
-// See https://github.com/adobe-type-tools/agl-specification for details.
-func isValid(s string) bool {
-	if s == ".notdef" {
-		return true
-	}
-
-	if len(s) < 1 || len(s) > maxNameLength {
-		return false
-	}
-
-	firstChar := s[0]
-	if (firstChar >= '0' && firstChar <= '9') || firstChar == '.' {
-		return false
-	}
-
-	for _, char := range s {
-		if !(char >= 'A' && char <= 'Z' || char >= 'a' && char <= 'z' ||
-			char >= '0' && char <= '9' || char == '.' || char == '_') {
-			return false
-		}
-	}
-
-	return true
 }
 
 func (t *Simple) get(c byte) *codeInfo {
@@ -314,9 +286,11 @@ func (t *Simple) GlyphName(gid glyph.ID) string {
 	return t.glyphName[gid]
 }
 
-// Overflow checks if more than 256 codes are required.
-func (t *Simple) Overflow() bool {
-	return t.overflow
+// Error returns the first error that occurred during encoding.
+// The only possible error is ErrOverflow, if more than 256 distinct glyphs
+// are used.
+func (t *Simple) Error() error {
+	return t.err
 }
 
 // Glyphs returns a sorted list of the glyphs used.

@@ -241,7 +241,7 @@ func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager) error {
 	}
 
 	var toUni pdf.Object
-	if !d.Text.IsEmpty() {
+	if d.Text != nil {
 		toUni, _, err = pdf.ResourceManagerEmbed(rm, d.Text)
 		if err != nil {
 			return err

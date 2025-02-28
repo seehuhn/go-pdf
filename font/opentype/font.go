@@ -21,10 +21,13 @@ import (
 	"slices"
 
 	"golang.org/x/text/language"
+
 	"seehuhn.de/go/geom/rect"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/encoding/cidenc"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/sfnt"
 )
@@ -33,7 +36,12 @@ type Options struct {
 	Language     language.Tag
 	GsubFeatures map[string]bool
 	GposFeatures map[string]bool
+
+	// options for composite fonts
 	Composite    bool
+	WritingMode  font.WritingMode
+	MakeGIDToCID func() cmap.GIDToCID
+	MakeEncoder  func(cid0Width float64, wMode font.WritingMode) cidenc.CIDEncoder
 }
 
 var _ font.Font = (*Instance)(nil)
@@ -149,33 +157,13 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		if !opt.Composite {
 			embedded = newEmbeddedCFFSimple(ref, f.Font)
 		} else {
-			// TODO(voss): make this configurable
-			gidToCID := cmap.NewGIDToCIDIdentity()
-			cidEncoder := cmap.NewCIDEncoderIdentity(gidToCID)
-
-			embedded = &embeddedCFFComposite{
-				w:          w,
-				ref:        ref,
-				sfnt:       f.Font,
-				GIDToCID:   gidToCID,
-				CIDEncoder: cidEncoder,
-			}
+			embedded = newEmbeddedCFFComposite(ref, f)
 		}
-	} else { // glyf outlines
+	} else {
 		if !opt.Composite {
 			embedded = newEmbeddedGlyfSimple(ref, f.Font)
 		} else {
-			// TODO(voss): make this configurable
-			gidToCID := cmap.NewGIDToCIDSequential()
-			cidEncoder := cmap.NewCIDEncoderIdentity(gidToCID)
-
-			embedded = &embeddedGlyfComposite{
-				w:          w,
-				ref:        ref,
-				sfnt:       f.Font,
-				GIDToCID:   gidToCID,
-				CIDEncoder: cidEncoder,
-			}
+			embedded = newEmbeddedGlyfComposite(ref, f)
 		}
 	}
 

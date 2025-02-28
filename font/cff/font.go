@@ -42,10 +42,12 @@ type Options struct {
 	Language     language.Tag
 	GsubFeatures map[string]bool
 	GposFeatures map[string]bool
+
+	// options for composite fonts
 	Composite    bool
-	WritingMode  font.WritingMode                                                  // only used for composite fonts
-	MakeGIDToCID func() cmap.GIDToCID                                              // only used for composite fonts
-	MakeEncoder  func(cid0Width float64, wMode font.WritingMode) cidenc.CIDEncoder // only used for composite fonts
+	WritingMode  font.WritingMode
+	MakeGIDToCID func() cmap.GIDToCID
+	MakeEncoder  func(cid0Width float64, wMode font.WritingMode) cidenc.CIDEncoder
 }
 
 var _ interface {

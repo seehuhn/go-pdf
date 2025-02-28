@@ -17,7 +17,6 @@
 package type1
 
 import (
-	"fmt"
 	"math"
 
 	"seehuhn.de/go/postscript/afm"
@@ -124,9 +123,8 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	}
 	e.finished = true
 
-	if e.Simple.Overflow() {
-		return fmt.Errorf("too many distinct glyphs used in font %q",
-			e.Font.FontName)
+	if err := e.Simple.Error(); err != nil {
+		return pdf.Errorf("font %q: %w", e.Font.FontName, err)
 	}
 
 	fontData := e.Font

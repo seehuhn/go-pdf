@@ -61,6 +61,7 @@ func Error(msg string) error {
 	return &MalformedFileError{Err: errors.New(msg)}
 }
 
+// Errorf creates a new [MalformedFileError] with the given message.
 func Errorf(format string, args ...any) error {
 	return &MalformedFileError{Err: fmt.Errorf(format, args...)}
 }

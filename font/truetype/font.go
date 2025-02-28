@@ -29,6 +29,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/encoding/cidenc"
 	"seehuhn.de/go/postscript/funit"
 )
 
@@ -36,7 +37,11 @@ type Options struct {
 	Language     language.Tag
 	GsubFeatures map[string]bool
 	GposFeatures map[string]bool
+
 	Composite    bool
+	WritingMode  font.WritingMode
+	MakeGIDToCID func() cmap.GIDToCID
+	MakeEncoder  func(cid0Width float64, wMode font.WritingMode) cidenc.CIDEncoder
 }
 
 // Instance represents a TrueType font together with the font options.
@@ -123,34 +128,24 @@ func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	w := rm.Out
 	ref := w.Alloc()
 
-	var res font.Embedded
+	var embedded font.Embedded
 	if opt.Composite {
 		err := pdf.CheckVersion(w, "composite TrueType fonts", pdf.V1_3)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		// TODO(voss): make this configurable
-		gidToCID := cmap.NewGIDToCIDSequential()
-		cidEncoder := cmap.NewCIDEncoderIdentity(gidToCID)
-
-		res = &embeddedComposite{
-			w:          w,
-			ref:        ref,
-			sfnt:       f.Font,
-			GIDToCID:   gidToCID,
-			CIDEncoder: cidEncoder,
-		}
+		embedded = newEmbeddedComposite(ref, f)
 	} else {
 		err := pdf.CheckVersion(w, "simple TrueType fonts", pdf.V1_1)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		res = newEmbeddedSimple(ref, f.Font)
+		embedded = newEmbeddedSimple(ref, f.Font)
 	}
 
-	return ref, res, nil
+	return ref, embedded, nil
 }
 
 func scaleBoxesGlyf(bboxes []funit.Rect16, unitsPerEm uint16) []rect.Rect {

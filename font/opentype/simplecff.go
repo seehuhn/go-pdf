@@ -42,9 +42,6 @@ var _ interface {
 	pdf.Finisher
 } = (*embeddedCFFSimple)(nil)
 
-// embeddedSimple represents an [Instance] which has been embedded in a PDF
-// file, if the Composite option is not set.  There should be at most one
-// embeddedSimple for each [Instance] in a PDF file.
 type embeddedCFFSimple struct {
 	Ref  pdf.Reference
 	Font *sfnt.Font
@@ -58,13 +55,13 @@ func newEmbeddedCFFSimple(ref pdf.Reference, font *sfnt.Font) *embeddedCFFSimple
 	e := &embeddedCFFSimple{
 		Ref:  ref,
 		Font: font,
+
 		Simple: simpleenc.NewSimple(
 			math.Round(font.GlyphWidthPDF(0)),
 			font.PostScriptName() == "ZapfDingbats",
 			&pdfenc.WinAnsi,
 		),
 	}
-
 	return e
 }
 
@@ -88,33 +85,34 @@ func (e *embeddedCFFSimple) AppendEncoded(s pdf.String, gid glyph.ID, text strin
 	return append(s, c), w / 1000
 }
 
-// Finish is called when the resource manager is closed.
-// At this point the subset of glyphs to be embedded is known.
 func (e *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 	if e.finished {
 		return nil
 	}
 	e.finished = true
 
-	if e.Simple.Overflow() {
-		return fmt.Errorf("too many distinct glyphs used in font %q",
-			e.Font.PostScriptName())
+	if err := e.Simple.Error(); err != nil {
+		return pdf.Errorf("font %q: %w", e.Font.PostScriptName(), err)
 	}
 
-	// subset the font
-	origSfnt := e.Font.Clone()
-	origSfnt.CMapTable = nil
-	origSfnt.Gdef = nil
-	origSfnt.Gsub = nil
-	origSfnt.Gpos = nil
+	origFont := e.Font
+	postScriptName := origFont.PostScriptName()
 
+	origFont = origFont.Clone()
+	origFont.CMapTable = nil
+	origFont.Gdef = nil
+	origFont.Gsub = nil
+	origFont.Gpos = nil
+
+	// Subset the font, if needed.
 	glyphs := e.Simple.Glyphs()
-	subsetTag := subset.Tag(glyphs, origSfnt.NumGlyphs())
+	subsetTag := subset.Tag(glyphs, origFont.NumGlyphs())
+
 	var subsetFont *sfnt.Font
 	if subsetTag != "" {
-		subsetFont = origSfnt.Subset(glyphs)
+		subsetFont = origFont.Subset(glyphs)
 	} else {
-		subsetFont = origSfnt
+		subsetFont = origFont
 	}
 
 	// convert to a simple font, if needed:
@@ -122,11 +120,12 @@ func (e *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 	if len(subsetOutlines.Private) != 1 {
 		return fmt.Errorf("need exactly one private dict for a simple font")
 	}
-	subsetOutlines.ROS = nil
-	subsetOutlines.GIDToCID = nil
 	if len(subsetOutlines.FontMatrices) > 0 && subsetOutlines.FontMatrices[0] != matrix.Identity {
 		subsetFont.FontMatrix = subsetOutlines.FontMatrices[0].Mul(subsetFont.FontMatrix)
 	}
+
+	subsetOutlines.ROS = nil
+	subsetOutlines.GIDToCID = nil
 	subsetOutlines.FontMatrices = nil
 	for gid, origGID := range glyphs { // fill in the glyph names
 		g := subsetOutlines.Glyphs[gid]
@@ -143,6 +142,7 @@ func (e *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 	// set the built-in encoding of the font to the standard encoding, to
 	// minimise font size.
 	subsetOutlines.Encoding = cff.StandardEncoding(subsetOutlines.Glyphs)
+
 	subsetFont.Outlines = subsetOutlines
 
 	qh := subsetFont.FontMatrix[0] * 1000
@@ -154,8 +154,6 @@ func (e *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 	xHeight := math.Round(float64(subsetFont.XHeight) * qv)
 
 	italicAngle := math.Round(subsetFont.ItalicAngle*10) / 10
-
-	postScriptName := subsetFont.PostScriptName()
 
 	fd := &font.Descriptor{
 		FontName:     subset.Join(subsetTag, postScriptName),

@@ -306,8 +306,6 @@ func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) 
 	return append(s, c), w / 1000
 }
 
-// Finish is called when the resource manager is closed.
-// At this point the subset of glyphs to be embedded is known.
 func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	if e.finished {
 		return nil

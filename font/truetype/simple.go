@@ -21,6 +21,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/postscript/type1/names"
+
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cmap"
 	"seehuhn.de/go/sfnt/glyph"
@@ -42,9 +43,6 @@ var _ interface {
 	pdf.Finisher
 } = (*embeddedSimple)(nil)
 
-// embeddedSimple represents an [Instance] which has been embedded in a PDF
-// file, if the Composite option is not set.  There should be at most one
-// embeddedSimple for each [Instance] in a PDF file.
 type embeddedSimple struct {
 	Ref  pdf.Reference
 	Font *sfnt.Font
@@ -88,33 +86,30 @@ func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) 
 	return append(s, c), w / 1000
 }
 
-// Finish is called when the resource manager is closed.
-// At this point the subset of glyphs to be embedded is known.
 func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	if e.finished {
 		return nil
 	}
 	e.finished = true
 
-	if e.Simple.Overflow() {
-		return fmt.Errorf("too many distinct glyphs used in font %q",
-			e.Font.PostScriptName())
+	if err := e.Simple.Error(); err != nil {
+		return pdf.Wrap(err, fmt.Sprintf("font %q", e.Font.PostScriptName()))
 	}
 
 	// subset the font
-	origSfnt := e.Font.Clone()
-	origSfnt.CMapTable = nil
-	origSfnt.Gdef = nil
-	origSfnt.Gsub = nil
-	origSfnt.Gpos = nil
+	origFont := e.Font.Clone()
+	origFont.CMapTable = nil
+	origFont.Gdef = nil
+	origFont.Gsub = nil
+	origFont.Gpos = nil
 
 	glyphs := e.Simple.Glyphs()
-	subsetTag := subset.Tag(glyphs, origSfnt.NumGlyphs())
+	subsetTag := subset.Tag(glyphs, origFont.NumGlyphs())
 	var subsetFont *sfnt.Font
 	if subsetTag != "" {
-		subsetFont = origSfnt.Subset(glyphs)
+		subsetFont = origFont.Subset(glyphs)
 	} else {
-		subsetFont = origSfnt
+		subsetFont = origFont
 	}
 
 	// Follow the advice of section 9.6.5.4 of ISO 32000-2:2020:

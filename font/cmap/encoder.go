@@ -38,6 +38,8 @@ var (
 
 // CIDEncoder constructs and stores mappings from character codes
 // to CID values and from character codes to unicode strings.
+//
+// Deprecated: use cidenc.CIDEncoder instead.
 type CIDEncoder interface {
 	// AppendEncoded appends the character code for the given glyph ID
 	// to the given PDF string (allocating new codes as needed).
