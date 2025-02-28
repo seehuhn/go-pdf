@@ -19,8 +19,10 @@ package cmap
 import (
 	"compress/gzip"
 	"embed"
+	"errors"
 	"io"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
@@ -29,6 +31,46 @@ import (
 
 //go:embed predefined/*.gz
 var predefined embed.FS
+
+func Predefined(name string) *File {
+	seen := make(map[string]bool)
+
+	c, err := loadPredefined(name, seen)
+	if err != nil {
+		panic(err)
+	}
+	return c
+}
+
+func loadPredefined(name string, seen map[string]bool) (*File, error) {
+	if seen[name] {
+		return nil, errors.New("CMap loop detected")
+	}
+
+	fd, err := openPredefined(name)
+	if err != nil {
+		return nil, err
+	}
+
+	c, parent, err := readCMap(fd)
+	if err != nil {
+		return nil, err
+	}
+
+	err = fd.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	if pName, ok := parent.(pdf.Name); ok {
+		parent, err := loadPredefined(string(pName), seen)
+		if err != nil {
+			return nil, err
+		}
+		c.Parent = parent
+	}
+	return c, nil
+}
 
 func openPredefined(name string) (io.ReadCloser, error) {
 	fd, err := predefined.Open("predefined/" + name + ".gz")

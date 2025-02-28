@@ -39,13 +39,14 @@ func TestType1Roundtrip(t *testing.T) {
 		for i, d := range type1Dicts {
 			t.Run(fmt.Sprintf("D%dv%s-%s", i, v, d.PostScriptName), func(t *testing.T) {
 				w, _ := memfile.NewPDFWriter(v, nil)
+				rm := pdf.NewResourceManager(w)
+				ref := w.Alloc()
 
 				// == Write ==
 
 				d1 := clone(d)
-				d1.Ref = w.Alloc()
+				d1.Ref = ref
 
-				rm := pdf.NewResourceManager(w)
 				err := d1.WriteToPDF(rm)
 				if err != nil {
 					t.Fatal(err)
@@ -57,10 +58,12 @@ func TestType1Roundtrip(t *testing.T) {
 
 				// == Read ==
 
-				d2, err := ExtractType1(w, d1.Ref)
+				d2, err := ExtractType1(w, ref)
 				if err != nil {
 					t.Fatal(err)
 				}
+
+				// == Compare ==
 
 				// Text and glyph for unused codes are arbitrary after roundtrip.
 				// We compare these manually here, and zero the values for the comparison
@@ -83,7 +86,6 @@ func TestType1Roundtrip(t *testing.T) {
 					d1.Width[code] = 0
 					d2.Width[code] = 0
 				}
-
 				d1.Encoding = nil
 				d2.Encoding = nil
 
@@ -106,12 +108,12 @@ func FuzzType1Dict(f *testing.F) {
 			if err != nil {
 				f.Fatal(err)
 			}
+			rm := pdf.NewResourceManager(w)
 
 			ref := w.Alloc()
 			d := clone(d)
 			d.Ref = ref
 
-			rm := pdf.NewResourceManager(w)
 			err = d.WriteToPDF(rm)
 			if err != nil {
 				f.Fatal(err)
