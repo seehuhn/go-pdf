@@ -304,6 +304,7 @@ func makeTestDictStandard(fontName string) *Type1 {
 		IsFixedPitch: stdInfo.IsFixedPitch,
 		IsSerif:      stdInfo.IsSerif,
 		IsItalic:     stdInfo.ItalicAngle != 0,
+		IsSymbolic:   stdInfo.IsSymbolic,
 		FontBBox:     stdInfo.FontBBox,
 		ItalicAngle:  stdInfo.ItalicAngle,
 		Ascent:       stdInfo.Ascent,
@@ -313,9 +314,6 @@ func makeTestDictStandard(fontName string) *Type1 {
 		StemV:        stdInfo.StemV,
 		StemH:        stdInfo.StemH,
 		MissingWidth: stdInfo.Width[".notdef"],
-	}
-	if stdInfo.FontFamily == "Symbol" || stdInfo.FontFamily == "ZapfDingbats" {
-		fd.IsSymbolic = true
 	}
 	d := &Type1{
 		PostScriptName: fontName,

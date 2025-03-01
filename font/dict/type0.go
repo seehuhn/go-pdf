@@ -185,7 +185,7 @@ func ExtractCIDFontType0(r pdf.Getter, obj pdf.Object) (*CIDFontType0, error) {
 				d.FontType = glyphdata.OpenTypeCFF
 				d.FontRef = ref
 			default:
-				return nil, nil
+				d.FontType = glyphdata.None
 			}
 		}
 	}

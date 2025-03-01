@@ -264,14 +264,11 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	return fontDictRef, f, nil
 }
 
-// WritingMode returns [font.Horizontal].
 // This implements the [font.Font] interface.
 func (f *testFont) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
 
-// DecodeWidth reads one character code from the given string and returns
-// the width of the corresponding glyph.
 // This implements the [font.Embedded] interface.
 func (f *testFont) DecodeWidth(s pdf.String) (float64, int) {
 	_, k, _ := f.codec.Decode(s)

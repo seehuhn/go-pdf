@@ -96,12 +96,15 @@ func getFontData(data Data, font standard.Font) error {
 		widths[name] = info.WidthX
 	}
 
+	isSymbolic := false
 	encoding := "standardEncoding"
 	switch F.FontName {
 	case "Symbol":
 		encoding = "symbolEncoding"
+		isSymbolic = true
 	case "ZapfDingbats":
 		encoding = "zapfDingbatsEncoding"
+		isSymbolic = true
 	}
 
 	data[F.FontName] = &fontMetrics{
@@ -109,6 +112,7 @@ func getFontData(data Data, font standard.Font) error {
 		FontWeight:   weight,
 		IsFixedPitch: F.Font.IsFixedPitch,
 		IsSerif:      F.IsSerif,
+		IsSymbolic:   isSymbolic,
 		FontBBox:     bbox,
 		ItalicAngle:  F.Font.ItalicAngle,
 		Ascent:       F.Metrics.Ascent,
@@ -131,6 +135,7 @@ type fontMetrics struct {
 	FontWeight   string
 	IsFixedPitch bool
 	IsSerif      bool
+	IsSymbolic   bool
 	FontBBox     rect.Rect
 	ItalicAngle  float64
 	Ascent       float64
@@ -162,6 +167,7 @@ var metrics = map[string]*FontData{
 		FontWeight: {{ $metrics.FontWeight }},
 		IsFixedPitch: {{ $metrics.IsFixedPitch }},
 		IsSerif: {{ $metrics.IsSerif }},
+		IsSymbolic: {{ $metrics.IsSymbolic }},
 		FontBBox: rect.Rect{ LLx: {{ $metrics.FontBBox.LLx }}, LLy: {{ $metrics.FontBBox.LLy }}, URx: {{ $metrics.FontBBox.URx }}, URy: {{ $metrics.FontBBox.URy }} },
 		ItalicAngle: {{ $metrics.ItalicAngle }},
 		Ascent: {{ $metrics.Ascent }},

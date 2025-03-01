@@ -133,6 +133,7 @@ func ExtractType1(r pdf.Getter, obj pdf.Object) (*Type1, error) {
 			IsFixedPitch: stdInfo.IsFixedPitch,
 			IsSerif:      stdInfo.IsSerif,
 			IsItalic:     stdInfo.ItalicAngle != 0,
+			IsSymbolic:   stdInfo.IsSymbolic,
 			FontBBox:     stdInfo.FontBBox,
 			ItalicAngle:  stdInfo.ItalicAngle,
 			Ascent:       stdInfo.Ascent,
@@ -143,15 +144,13 @@ func ExtractType1(r pdf.Getter, obj pdf.Object) (*Type1, error) {
 			StemH:        stdInfo.StemH,
 			MissingWidth: stdInfo.Width[".notdef"],
 		}
-		if stdInfo.FontFamily == "Symbol" || stdInfo.FontFamily == "ZapfDingbats" {
-			fd.IsSymbolic = true
-		}
-	} else if fd == nil { // only possible for invalid PDF files
-		fd = &font.Descriptor{
-			FontName: d.PostScriptName,
-		}
 	}
 	d.Descriptor = fd
+
+	if fd == nil {
+		// prevent invalid PDF files from causing panics
+		fd = &font.Descriptor{}
+	}
 
 	if ref, _ := fdDict["FontFile"].(pdf.Reference); ref != 0 {
 		d.FontType = glyphdata.Type1
@@ -167,7 +166,7 @@ func ExtractType1(r pdf.Getter, obj pdf.Object) (*Type1, error) {
 				d.FontType = glyphdata.OpenTypeCFFSimple
 				d.FontRef = ref
 			default:
-				return nil, nil
+				d.FontType = glyphdata.None
 			}
 		}
 	}
@@ -236,51 +235,119 @@ func ExtractType1(r pdf.Getter, obj pdf.Object) (*Type1, error) {
 		}
 	}
 
+	d.Repair(r)
+
 	return d, nil
+}
+
+// Repair fixes invalid data in the font dictionary.
+// After Repair has been called, [Type1.validate] will return nil.
+func (d *Type1) Repair(r pdf.Getter) {
+	if d.Descriptor == nil {
+		d.Descriptor = &font.Descriptor{}
+	}
+
+	if v := pdf.GetVersion(r); v == pdf.V1_0 {
+		if d.Name == "" {
+			d.Name = "Font"
+		}
+	} else if v >= pdf.V2_0 {
+		d.Name = ""
+	}
+
+	m := subset.TagRegexp.FindStringSubmatch(d.Descriptor.FontName)
+	if m != nil {
+		if d.SubsetTag == "" {
+			d.SubsetTag = m[1]
+		}
+		if d.PostScriptName == "" {
+			d.PostScriptName = m[2]
+		}
+	} else if d.PostScriptName == "" {
+		d.PostScriptName = d.Descriptor.FontName
+	}
+	if d.PostScriptName == "" {
+		d.PostScriptName = "Font"
+	}
+	if !subset.IsValidTag(d.SubsetTag) {
+		d.SubsetTag = ""
+	}
+	d.Descriptor.FontName = subset.Join(d.SubsetTag, d.PostScriptName)
+
+	if d.FontRef == 0 {
+		d.FontType = glyphdata.None
+	}
+}
+
+// Check that all data are valid and consistent.
+func (d *Type1) validate(w *pdf.Writer) error {
+	if d.Descriptor == nil {
+		return errors.New("missing font descriptor")
+	}
+
+	if v := pdf.GetVersion(w); v == pdf.V1_0 {
+		if d.Name == "" {
+			return errors.New("missing font name")
+		}
+	} else if v >= pdf.V2_0 {
+		if d.Name != "" {
+			return errors.New("unexpected font name")
+		}
+	}
+	if d.PostScriptName == "" {
+		return errors.New("missing PostScript name")
+	}
+	if d.SubsetTag != "" && !subset.IsValidTag(d.SubsetTag) {
+		return fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
+	}
+	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)
+	if d.Descriptor.FontName != baseFont {
+		return fmt.Errorf("font name mismatch: %s != %s",
+			baseFont, d.Descriptor.FontName)
+	}
+
+	if (d.FontType == glyphdata.None) != (d.FontRef == 0) {
+		return errors.New("missing font reference or type")
+	}
+
+	return nil
 }
 
 // WriteToPDF adds the font dictionary to the PDF file.
 func (d *Type1) WriteToPDF(rm *pdf.ResourceManager) error {
-	// Check that all data are valid and consistent.
 	if d.Ref == 0 {
 		return errors.New("missing font dictionary reference")
 	}
-	if (d.FontType == glyphdata.None) != (d.FontRef == 0) {
-		return errors.New("missing font reference or type")
+
+	w := rm.Out
+
+	err := d.validate(w)
+	if err != nil {
+		return err
 	}
+
 	switch d.FontType {
 	case glyphdata.None:
 		// not embedded
 	case glyphdata.Type1:
 		// ok
 	case glyphdata.CFFSimple:
-		if err := pdf.CheckVersion(rm.Out, "embedded CFF font", pdf.V1_2); err != nil {
+		if err := pdf.CheckVersion(w, "embedded CFF font", pdf.V1_2); err != nil {
 			return err
 		}
 	case glyphdata.OpenTypeCFFSimple:
-		if err := pdf.CheckVersion(rm.Out, "embedded OpenType/CFF font", pdf.V1_6); err != nil {
+		if err := pdf.CheckVersion(w, "embedded OpenType/CFF font", pdf.V1_6); err != nil {
 			return err
 		}
 	default:
 		return fmt.Errorf("invalid font type %s", d.FontType)
 	}
-	if d.SubsetTag != "" && !subset.IsValidTag(d.SubsetTag) {
-		return fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
-	}
 
-	w := rm.Out
-
-	var baseFont pdf.Name
-	if d.SubsetTag != "" {
-		baseFont = pdf.Name(d.SubsetTag + "+" + d.PostScriptName)
-	} else {
-		baseFont = pdf.Name(d.PostScriptName)
-	}
-
+	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)
 	fontDict := pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("Type1"),
-		"BaseFont": baseFont,
+		"BaseFont": pdf.Name(baseFont),
 	}
 	if d.Name != "" {
 		fontDict["Name"] = d.Name
@@ -444,12 +511,20 @@ func fontDescriptorIsCompatible(fd *font.Descriptor, stdInfo *stdmtx.FontData) b
 	if fd.FontWeight != 0 && fd.FontWeight != stdInfo.FontWeight {
 		return false
 	}
+
 	if fd.IsFixedPitch != stdInfo.IsFixedPitch {
 		return false
 	}
 	if fd.IsSerif != stdInfo.IsSerif {
 		return false
 	}
+	if fd.IsSymbolic != stdInfo.IsSymbolic {
+		return false
+	}
+	if fd.IsScript || fd.IsItalic || fd.IsAllCap || fd.IsSmallCap || fd.ForceBold {
+		return false
+	}
+
 	if math.Abs(fd.ItalicAngle-stdInfo.ItalicAngle) > 0.1 {
 		return false
 	}

@@ -17,7 +17,10 @@
 package main
 
 import (
+	"fmt"
+	"iter"
 	"math"
+	"os"
 
 	"seehuhn.de/go/geom/matrix"
 
@@ -26,13 +29,13 @@ import (
 	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/cff"
+	sfntcff "seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
-	pdfcff "seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/cff"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
@@ -47,7 +50,8 @@ import (
 func main() {
 	err := create("test.pdf")
 	if err != nil {
-		panic(err)
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
 	}
 }
 
@@ -57,21 +61,21 @@ func create(fname string) error {
 		return err
 	}
 
-	// fonts
+	black := color.DeviceGray(0)
+	blue := color.DeviceRGB(0, 0, 0.9)
+	red := color.DeviceRGB(0.9, 0, 0)
+
 	const fontSize = 12
 
 	noteFont := standard.TimesRoman.New()
-	black := color.DeviceGray(0)
 	note := text.F{Font: noteFont, Size: fontSize, Color: black}
 
-	origFont, err := pdfcff.New(data.origFont, nil)
+	origFont, err := cff.New(data.origFont, nil)
 	if err != nil {
 		return err
 	}
-	blue := color.DeviceRGB(0, 0, 0.9)
 	orig := text.F{Font: origFont, Size: fontSize, Color: blue}
 
-	red := color.DeviceRGB(0.9, 0, 0)
 	test := text.F{Font: data.testFont, Size: fontSize, Color: red}
 	testL := text.F{Font: data.testFont, Size: 100, Color: red}
 
@@ -165,9 +169,9 @@ func makeTestFonts() (*testFonts, error) {
 	orig.Gsub = nil
 	orig.Gpos = nil
 
-	origOutlines := orig.Outlines.(*cff.Outlines)
+	origOutlines := orig.Outlines.(*sfntcff.Outlines)
 	if origOutlines.IsCIDKeyed() {
-		panic("expected non-CID-keyed font")
+		panic("expected simple font")
 	}
 
 	lookup, err := orig.CMapTable.GetBest()
@@ -182,7 +186,7 @@ func makeTestFonts() (*testFonts, error) {
 	// and set up font matrices to compensate for the rescaling.
 	// The new font only contains .notdef, ' ', 'A'-'Z' and 'a'-'z'.
 
-	var newGlyphs []*cff.Glyph
+	var newGlyphs []*sfntcff.Glyph
 	var GIDToCID []cid.CID
 	cmapData := &cmap.File{
 		Name: "TestCMap",
@@ -249,7 +253,7 @@ func makeTestFonts() (*testFonts, error) {
 	// construct the new font
 
 	fontInfo.FontName = "Test"
-	newOutlines := &cff.Outlines{
+	newOutlines := &sfntcff.Outlines{
 		Glyphs: newGlyphs,
 		Private: []*type1.PrivateDict{
 			private1,
@@ -269,7 +273,7 @@ func makeTestFonts() (*testFonts, error) {
 		},
 	}
 	fontInfo.FontMatrix = matrix.Identity
-	testCFF := &cff.Font{
+	testCFF := &sfntcff.Font{
 		FontInfo: fontInfo,
 		Outlines: newOutlines,
 	}
@@ -288,13 +292,13 @@ func makeTestFonts() (*testFonts, error) {
 	return res, nil
 }
 
-func rescaleGlyph(g *cff.Glyph, xScale, yScale float64) *cff.Glyph {
-	new := &cff.Glyph{
-		Cmds:  make([]cff.GlyphOp, len(g.Cmds)),
+func rescaleGlyph(g *sfntcff.Glyph, xScale, yScale float64) *sfntcff.Glyph {
+	new := &sfntcff.Glyph{
+		Cmds:  make([]sfntcff.GlyphOp, len(g.Cmds)),
 		Width: math.Round(g.Width * xScale),
 	}
 	for i, cmd := range g.Cmds {
-		newCmd := cff.GlyphOp{
+		newCmd := sfntcff.GlyphOp{
 			Op:   cmd.Op,
 			Args: make([]float64, len(cmd.Args)),
 		}
@@ -313,7 +317,7 @@ func rescaleGlyph(g *cff.Glyph, xScale, yScale float64) *cff.Glyph {
 var _ font.Font = (*testFont)(nil)
 
 type testFont struct {
-	cff       *cff.Font
+	cff       *sfntcff.Font
 	ascent    float64 // PDF glyph space units
 	descent   float64 // PDF glyph space units, negative
 	capHeight float64
@@ -386,6 +390,25 @@ func (e *testFontEmbedded) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
 
+func (e *testFontEmbedded) Codes(s pdf.String) iter.Seq[*font.Code] {
+	return func(yield func(*font.Code) bool) {
+		var code font.Code
+		for _, b := range s {
+			cid := e.cmap.LookupCID([]byte{b})
+			w, ok := e.ww[cid]
+			if !ok {
+				w = e.dw
+			}
+
+			code.CID = cid
+			code.Width = w
+			if !yield(&code) {
+				return
+			}
+		}
+	}
+}
+
 func (e *testFontEmbedded) DecodeWidth(s pdf.String) (float64, int) {
 	if len(s) == 0 {
 		return 0, 0
@@ -396,7 +419,7 @@ func (e *testFontEmbedded) DecodeWidth(s pdf.String) (float64, int) {
 	if !ok {
 		return e.dw, 1
 	}
-	return w, 1
+	return w / 1000, 1
 }
 
 func clone[T any](x *T) *T {

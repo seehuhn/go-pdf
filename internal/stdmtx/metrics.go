@@ -30,6 +30,7 @@ type FontData struct {
 	FontWeight   os2.Weight
 	IsFixedPitch bool
 	IsSerif      bool
+	IsSymbolic   bool
 	FontBBox     rect.Rect
 	ItalicAngle  float64
 	Ascent       float64

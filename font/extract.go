@@ -382,6 +382,7 @@ func (d *Dicts) fixStandardFont(r pdf.Getter, info *stdmtx.FontData) {
 			IsFixedPitch: info.IsFixedPitch,
 			IsSerif:      info.IsSerif,
 			IsItalic:     info.ItalicAngle != 0,
+			IsSymbolic:   info.IsSymbolic,
 			FontBBox:     info.FontBBox,
 			ItalicAngle:  info.ItalicAngle,
 			Ascent:       info.Ascent,
@@ -391,9 +392,6 @@ func (d *Dicts) fixStandardFont(r pdf.Getter, info *stdmtx.FontData) {
 			StemV:        info.StemV,
 			StemH:        info.StemH,
 			MissingWidth: missingWidth,
-		}
-		if info.FontFamily == "Symbol" || info.FontFamily == "ZapfDingbats" {
-			d.FontDescriptor.IsSymbolic = true
 		}
 	}
 

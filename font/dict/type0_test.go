@@ -197,7 +197,7 @@ func FuzzType0Dict(f *testing.F) {
 		}
 		d1, err := ExtractCIDFontType0(r, obj)
 		if err != nil {
-			t.Skip("broken Type1Dict")
+			t.Skip("no valid Type0 dict")
 		}
 
 		// Write the Type1Dict back to a new PDF file.
