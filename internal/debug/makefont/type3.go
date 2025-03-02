@@ -19,8 +19,6 @@ package makefont
 import (
 	"seehuhn.de/go/geom/rect"
 
-	"seehuhn.de/go/postscript/type1/names"
-
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 
@@ -84,20 +82,7 @@ func Type3() (*type3.Instance, error) {
 		font.Glyphs = append(font.Glyphs, g)
 	}
 
-	cmap := make(map[rune]glyph.ID)
-	for gid, g := range font.Glyphs {
-		rr := names.ToUnicode(g.Name, font.PostScriptName == "ZapfDingbats")
-		if len(rr) != 1 {
-			continue
-		}
-		cmap[rr[0]] = glyph.ID(gid)
-	}
-
-	inst := &type3.Instance{
-		Font: font,
-		CMap: cmap,
-	}
-	return inst, nil
+	return type3.New(font)
 }
 
 type drawer struct {

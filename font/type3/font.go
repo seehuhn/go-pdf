@@ -85,6 +85,8 @@ var _ interface {
 type Instance struct {
 	Font *Font
 	CMap map[rune]glyph.ID
+
+	*font.Geometry
 }
 
 func New(f *Font) (*Instance, error) {
@@ -100,38 +102,34 @@ func New(f *Font) (*Instance, error) {
 		}
 	}
 
+	qv := f.FontMatrix[3]
+	qh := f.FontMatrix[0]
+	ee := make([]rect.Rect, len(f.Glyphs))
+	ww := make([]float64, len(f.Glyphs))
+	for i, g := range f.Glyphs {
+		ee[i] = g.BBox
+		ww[i] = g.Width * qh
+	}
+	geom := &font.Geometry{
+		Ascent:             f.Ascent * qv,
+		Descent:            f.Descent * qv,
+		Leading:            f.Leading * qv,
+		UnderlinePosition:  f.UnderlinePosition * qv,
+		UnderlineThickness: f.UnderlineThickness * qv,
+		GlyphExtents:       ee,
+		Widths:             ww,
+	}
+
 	res := &Instance{
-		Font: f,
-		CMap: cmap,
+		Font:     f,
+		CMap:     cmap,
+		Geometry: geom,
 	}
 	return res, nil
 }
 
 func (f *Instance) PostScriptName() string {
 	return f.Font.PostScriptName
-}
-
-func (f *Instance) GetGeometry() *font.Geometry {
-	qv := f.Font.FontMatrix[3]
-	qh := f.Font.FontMatrix[0]
-
-	ee := make([]rect.Rect, len(f.Font.Glyphs))
-	ww := make([]float64, len(f.Font.Glyphs))
-	for i, g := range f.Font.Glyphs {
-		ee[i] = g.BBox
-		ww[i] = g.Width * qh
-	}
-
-	g := &font.Geometry{
-		Ascent:             f.Font.Ascent * qv,
-		Descent:            f.Font.Descent * qv,
-		Leading:            f.Font.Leading * qv,
-		UnderlinePosition:  f.Font.UnderlinePosition * qv,
-		UnderlineThickness: f.Font.UnderlineThickness * qv,
-		GlyphExtents:       ee,
-		Widths:             ww,
-	}
-	return g
 }
 
 func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {

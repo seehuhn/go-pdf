@@ -24,7 +24,6 @@ import (
 	"golang.org/x/text/language"
 
 	"seehuhn.de/go/geom/rect"
-
 	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt"
@@ -56,8 +55,8 @@ var _ interface {
 
 // Instance represents a CFF font which can be embedded in a PDF file.
 type Instance struct {
-	Font *cff.Font
-	Opt  *Options
+	*cff.Font
+	Opt *Options
 
 	Stretch  os2.Width
 	Weight   os2.Weight
@@ -70,6 +69,7 @@ type Instance struct {
 	CapHeight float64 // PDF glyph space units
 	XHeight   float64 // PDF glyph space units
 
+	*font.Geometry
 	layouter *sfnt.Layouter
 }
 
@@ -119,6 +119,21 @@ func New(info *sfnt.Font, opt *Options) (*Instance, error) {
 		return nil, err
 	}
 
+	glyphExtents := make([]rect.Rect, len(cffFont.Glyphs))
+	for gid := range cffFont.Glyphs {
+		glyphExtents[gid] = cffFont.GlyphBBoxPDF(cffFont.FontMatrix, glyph.ID(gid))
+	}
+	geom := &font.Geometry{
+		Ascent:             ascent / 1000,
+		Descent:            descent / 1000,
+		Leading:            leading / 1000,
+		UnderlinePosition:  float64(info.UnderlinePosition) * qv / 1000,
+		UnderlineThickness: float64(info.UnderlineThickness) * qv / 1000,
+
+		GlyphExtents: glyphExtents,
+		Widths:       info.WidthsPDF(),
+	}
+
 	f := &Instance{
 		Font: cffFont,
 		Opt:  opt,
@@ -134,38 +149,10 @@ func New(info *sfnt.Font, opt *Options) (*Instance, error) {
 		CapHeight: capHeight,
 		XHeight:   xHeight,
 
+		Geometry: geom,
 		layouter: layouter,
 	}
 	return f, nil
-}
-
-// PostScriptName returns the PostScript name of the font.
-//
-// This implements the [font.Font] interface.
-func (f *Instance) PostScriptName() string {
-	return f.Font.FontName
-}
-
-// GetGeometry returns font metrics required for typesetting.
-//
-// This implements the [font.Layouter] interface.
-func (f *Instance) GetGeometry() *font.Geometry {
-	glyphExtents := make([]rect.Rect, len(f.Font.Glyphs))
-	for gid := range f.Font.Glyphs {
-		glyphExtents[gid] = f.Font.GlyphBBoxPDF(f.Font.FontMatrix, glyph.ID(gid))
-	}
-
-	qv := f.Font.FontMatrix[3]
-	return &font.Geometry{
-		Ascent:             f.Ascent / 1000,
-		Descent:            f.Descent / 1000,
-		Leading:            f.Leading / 1000,
-		UnderlinePosition:  float64(f.Font.UnderlinePosition) * qv,
-		UnderlineThickness: float64(f.Font.UnderlineThickness) * qv,
-
-		GlyphExtents: glyphExtents,
-		Widths:       f.Font.WidthsPDF(),
-	}
 }
 
 // Layout appends a string to a glyph sequence, as a sequence of glyphs

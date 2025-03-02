@@ -44,15 +44,18 @@ type Options struct {
 	MakeEncoder  func(cid0Width float64, wMode font.WritingMode) cidenc.CIDEncoder
 }
 
+var _ interface {
+	font.Layouter
+} = (*Instance)(nil)
+
 // Instance represents a TrueType font together with the font options.
 // This implements the [font.Font] interface.
 type Instance struct {
 	*sfnt.Font
-	*font.Geometry
-
-	layouter *sfnt.Layouter
-
 	Opt *Options
+
+	*font.Geometry
+	layouter *sfnt.Layouter
 }
 
 // New makes a PDF TrueType font from a sfnt.Font.
