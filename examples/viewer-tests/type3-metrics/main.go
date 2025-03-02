@@ -34,14 +34,14 @@ import (
 )
 
 func main() {
-	err := run("test.pdf")
+	err := createDocument("test.pdf")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }
 
-func run(filename string) error {
+func createDocument(filename string) error {
 	opt := &pdf.WriterOptions{
 		HumanReadable: true,
 	}

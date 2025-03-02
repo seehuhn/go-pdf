@@ -294,6 +294,7 @@ func (d *Type1) validate(w *pdf.Writer) error {
 			return errors.New("unexpected font name")
 		}
 	}
+
 	if d.PostScriptName == "" {
 		return errors.New("missing PostScript name")
 	}
@@ -304,6 +305,10 @@ func (d *Type1) validate(w *pdf.Writer) error {
 	if d.Descriptor.FontName != baseFont {
 		return fmt.Errorf("font name mismatch: %s != %s",
 			baseFont, d.Descriptor.FontName)
+	}
+
+	if d.SubsetTag != "" && d.FontType == glyphdata.None {
+		return errors.New("external font data cannot be subsetted")
 	}
 
 	if (d.FontType == glyphdata.None) != (d.FontRef == 0) {
@@ -420,15 +425,17 @@ func (d *Type1) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	toUnicodeData := make(map[byte]string)
 	for code := range 256 {
+		if d.Text[code] == "" {
+			continue
+		}
+
 		glyphName := d.Encoding(byte(code))
 		switch glyphName {
 		case "":
 			// unused character code, nothing to do
 
 		case encoding.UseBuiltin:
-			if d.Text[code] != "" {
-				toUnicodeData[byte(code)] = d.Text[code]
-			}
+			toUnicodeData[byte(code)] = d.Text[code]
 
 		default:
 			rr := names.ToUnicode(glyphName, d.PostScriptName == "ZapfDingbats")

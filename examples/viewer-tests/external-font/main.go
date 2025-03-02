@@ -18,77 +18,88 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"iter"
 	"os"
 	"strings"
 	"time"
 
-	"golang.org/x/exp/maps"
-
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/postscript/afm"
+	"seehuhn.de/go/postscript/cid"
 	pstype1 "seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/loader"
+	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/encoding"
+	"seehuhn.de/go/pdf/font/extended"
+	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/standard"
+	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/text"
 )
 
+const TestFontName = "Test17755"
+
 func main() {
-	err := write_font("test.pfb")
+	err := createFont("test.pfb")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
 	}
 
-	err = write_pdf("test.pdf")
+	err = createDocument("test.pdf")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
 	}
 }
 
-func write_font(filename string) error {
-	name := "NimbusMonoPS-Regular"
+var (
+	fontBBox      rect.Rect
+	fontAscent    float64
+	fontDescent   float64
+	fontCapHeight float64
+	fontXHeight   float64
+	glyphWidths   float64
+)
 
-	builtin := loader.NewFontLoader()
-	fontData, err := builtin.Open(name, loader.FontTypeType1)
-	if err != nil {
-		return err
-	}
-	psFont, err := pstype1.Read(fontData)
-	if err != nil {
-		return err
-	}
-	fontData.Close()
+func createFont(filename string) error {
+	F := extended.NimbusMonoPSRegular.New()
 
-	psFont.FontInfo.FontName = "test"
+	psFont := F.Font
+	psFont.FontInfo.FontName = TestFontName
 	psFont.CreationDate = time.Now()
-
-	// codes: 121, 101, 115
-	// standard encoding: "yes"
-	// built-in encoding: "no "
-	include := map[string]bool{
-		"y":     true,
-		"e":     true,
-		"s":     true,
-		"n":     true,
-		"o":     true,
-		"space": true,
-	}
-	newGlyphs := make(map[string]*pstype1.Glyph)
-	for key := range psFont.Glyphs {
-		if include[key] {
-			newGlyphs[key] = psFont.Glyphs[key]
-		}
-	}
-	psFont.Glyphs = newGlyphs
-	fmt.Println(maps.Keys(newGlyphs))
-
-	// make the built-in encoding spell "no "
 	psFont.Encoding = make([]string, 256)
-	psFont.Encoding[121] = "n"
-	psFont.Encoding[101] = "o"
-	psFont.Encoding[115] = "space"
+
+	// include enough glyphs to spell either "STD" or "BIE"
+	newGlyphs := make(map[string]*pstype1.Glyph)
+	newGlyphs[".notdef"] = psFont.Glyphs[".notdef"]
+
+	// If the viewer uses the built-in encoding to display the text string
+	// "XNO", this should visually spell "BIE".
+	newGlyphs["B"] = psFont.Glyphs["B"]
+	newGlyphs["I"] = psFont.Glyphs["I"]
+	newGlyphs["E"] = psFont.Glyphs["E"]
+	psFont.Encoding['X'] = "B"
+	psFont.Encoding['N'] = "I"
+	psFont.Encoding['O'] = "E"
+
+	// If the viewer uses the standard encoding to display the text string
+	// "XNO", this should visually spell "STD".
+	newGlyphs["X"] = psFont.Glyphs["S"]
+	newGlyphs["N"] = psFont.Glyphs["T"]
+	newGlyphs["O"] = psFont.Glyphs["D"]
+
+	psFont.Glyphs = newGlyphs
+
+	fontBBox = psFont.FontBBoxPDF()
+	glyphWidths = psFont.GlyphWidthPDF("X")
+	fontAscent = F.Metrics.Ascent
+	fontDescent = F.Metrics.Descent
+	fontCapHeight = F.Metrics.CapHeight
+	fontXHeight = F.Metrics.XHeight
 
 	opt := &pstype1.WriterOptions{
 		Format: pstype1.FormatPFB,
@@ -138,31 +149,66 @@ func write_font(filename string) error {
 	return nil
 }
 
-func write_pdf(filename string) error {
+func createDocument(filename string) error {
 	opt := &pdf.WriterOptions{
 		HumanReadable: true,
 	}
-	doc, err := document.CreateSinglePage(filename, document.A5r, pdf.V1_7, opt)
+	doc, err := document.CreateSinglePage(filename, document.A5r, pdf.V2_0, opt)
 	if err != nil {
 		return err
 	}
 
-	labelFont := standard.TimesRoman.New()
-	testFont1 := &funnyFont{true}
-	testFont2 := &funnyFont{false}
+	body := text.F{
+		Font:  standard.TimesRoman.New(),
+		Size:  12,
+		Color: color.Black,
+	}
+	test1 := text.F{
+		Font:  &testFont{false},
+		Size:  12,
+		Color: color.Blue,
+	}
+	test2 := text.F{
+		Font:  &testFont{true},
+		Size:  12,
+		Color: color.Blue,
+	}
+	label := text.F{
+		Font:  extended.NimbusMonoPSRegular.New(),
+		Size:  12,
+		Color: color.Blue,
+	}
 
-	doc.TextBegin()
-	doc.TextFirstLine(36, 350)
-	doc.TextSetFont(labelFont, 24)
-	doc.TextShow("StandardEncoding used with Encoding dict: ")
-	doc.TextSetFont(testFont1, 24)
-	doc.TextShowRaw([]byte{121, 101, 115})
-	doc.TextSecondLine(0, -30)
-	doc.TextSetFont(labelFont, 24)
-	doc.TextShow("StandardEncoding used without Encoding dict: ")
-	doc.TextSetFont(testFont2, 24)
-	doc.TextShowRaw([]byte{121, 101, 115})
-	doc.TextEnd()
+	text.Show(doc.Writer,
+		text.M{X: 50, Y: 370},
+		body,
+		text.Wrap(400, `
+		This test file checks whether PDF viewers distinguish between
+		Type 1 font dictionaries that have no encoding dictionary and those
+		that have an empty encoding dictionary when using external
+		(non-embedded) fonts.`),
+		text.NL,
+		text.Wrap(400, `
+		For the test to work, the font file "test.pfb" must be
+		installed on the system, to make the font `+TestFontName+` available to the
+		PDF viewer.`),
+		text.NL,
+		"Test cases:",
+		text.NL,
+		"1. No encoding dictionary: ", test1, pdf.String("XNO"), body, text.NL,
+		"2. Empty encoding dictionary: ", test2, pdf.String("XNO"), body, text.NL,
+		text.NL,
+		text.Wrap(400, `
+		For each test case, a three-letter code should be displayed in blue.
+		The codes have the following meanings:`),
+		label, "BIE", body, " = the built-in encoding was used", text.NL,
+		label, "STD", body, " = the standard encoding was used", text.NL,
+		label, "XNO", body, " = the font was not loaded", text.NL,
+		text.NL,
+		text.Wrap(400, `
+		My reading of the PDF specification is that test case 1 should
+		show "BIE" and test case 2 should show "STD".`),
+	)
 
 	err = doc.Close()
 	if err != nil {
@@ -172,56 +218,73 @@ func write_pdf(filename string) error {
 	return nil
 }
 
-type funnyFont struct {
+type testFont struct {
 	useEncodingDict bool
 }
 
-func (f *funnyFont) PostScriptName() string {
-	return "test"
+func (f *testFont) PostScriptName() string {
+	return TestFontName
 }
 
-func (f *funnyFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
+func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
 	fontDictRef := rm.Out.Alloc()
 
-	fontDict := pdf.Dict{
-		"Type":      pdf.Name("Font"),
-		"Subtype":   pdf.Name("Type1"),
-		"BaseFont":  pdf.Name(f.PostScriptName()),
-		"FirstChar": pdf.Integer(101),
-		"LastChar":  pdf.Integer(101),
-		"Widths":    pdf.Array{pdf.Integer(600)},
-		"FontDescriptor": pdf.Dict{
-			"Type":         pdf.Name("FontDescriptor"),
-			"FontName":     pdf.Name(f.PostScriptName()),
-			"Flags":        pdf.Integer(32), // 4=symbolic, 32=non-symbolic
-			"FontBBox":     pdf.Array{pdf.Integer(-100), pdf.Integer(-100), pdf.Integer(700), pdf.Integer(1000)},
-			"ItalicAngle":  pdf.Integer(0),
-			"Ascent":       pdf.Integer(1000),
-			"Descent":      pdf.Integer(-200),
-			"CapHeight":    pdf.Integer(800),
-			"StemV":        pdf.Integer(0),
-			"MissingWidth": pdf.Integer(600),
-		},
+	fd := &font.Descriptor{
+		FontName:     TestFontName,
+		IsFixedPitch: true,
+		IsSerif:      true,
+		IsSymbolic:   false,
+		IsAllCap:     true,
+		FontBBox:     fontBBox,
+		Ascent:       fontAscent,
+		Descent:      fontDescent,
+		CapHeight:    fontCapHeight,
+		XHeight:      fontXHeight,
+		MissingWidth: glyphWidths,
+	}
+	dict := &dict.Type1{
+		Ref:            fontDictRef,
+		PostScriptName: TestFontName,
+		Descriptor:     fd,
+		FontType:       glyphdata.None,
 	}
 	if f.useEncodingDict {
-		fontDict["Encoding"] = pdf.Dict{
-			"Type": pdf.Name("Encoding"),
-		}
+		// The standard encoding is represented by an encoding dictionary
+		// without a /BaseEncoding field.
+		dict.Encoding = encoding.Standard
+	} else {
+		// The built-in encoding is represented by an absent /Encoding field.
+		dict.Encoding = encoding.Builtin
+	}
+	for i := range 256 {
+		dict.Width[i] = glyphWidths
 	}
 
-	rm.Out.Put(fontDictRef, fontDict)
+	err := dict.WriteToPDF(rm)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return fontDictRef, f, nil
 }
 
-func (f *funnyFont) WritingMode() font.WritingMode {
+func (f *testFont) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
 
-// DecodeWidth reads one character code from the given string and returns
-// the width of the corresponding glyph in PDF text space units (still to
-// be multiplied by the font size) and the number of bytes read from the
-// string.
-func (f *funnyFont) DecodeWidth(pdf.String) (float64, int) {
-	return 1000, 1
+func (f *testFont) Codes(s pdf.String) iter.Seq[*font.Code] {
+	return func(yield func(*font.Code) bool) {
+		var code font.Code
+		code.Width = glyphWidths
+		for _, c := range s {
+			code.CID = cid.CID(c) + 1 // leave CID 0 for .notdef
+			if !yield(&code) {
+				break
+			}
+		}
+	}
+}
+
+func (f *testFont) DecodeWidth(pdf.String) (float64, int) {
+	return glyphWidths / 1000, 1
 }

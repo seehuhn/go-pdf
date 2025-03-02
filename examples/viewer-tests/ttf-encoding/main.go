@@ -30,13 +30,13 @@ import (
 )
 
 func main() {
-	err := run()
+	err := createDocument("test.pdf")
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run() error {
+func createDocument(fname string) error {
 	version := pdf.V2_0
 	useSymbolic := false
 	useEncoding := true
@@ -71,7 +71,7 @@ func run() error {
 	gray := cs.New(0.7, 0.7, 0.7)
 	blue := cs.New(0, 0, 0.8)
 
-	out, err := NewOutput("test.pdf", version)
+	out, err := NewOutput(fname, version)
 	if err != nil {
 		return err
 	}

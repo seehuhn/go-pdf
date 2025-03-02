@@ -48,14 +48,14 @@ import (
 )
 
 func main() {
-	err := create("test.pdf")
+	err := createDocument("test.pdf")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }
 
-func create(fname string) error {
+func createDocument(fname string) error {
 	data, err := makeTestFonts()
 	if err != nil {
 		return err

@@ -48,7 +48,15 @@ const (
 )
 
 // New returns a new font instance for the given font and options.
-func (f Font) New() (*type1.Instance, error) {
+func (f Font) New() *type1.Instance {
+	inst, err := f.newInternal()
+	if err != nil {
+		panic(err)
+	}
+	return inst
+}
+
+func (f Font) newInternal() (*type1.Instance, error) {
 	name := fontName[f]
 
 	fontData, err := builtin.Open(name, loader.FontTypeType1)

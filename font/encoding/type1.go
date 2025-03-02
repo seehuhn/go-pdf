@@ -260,6 +260,21 @@ func (e Type1) AsPDFType1(baseIsStd bool, opt pdf.OutputOptions) (pdf.Object, er
 	var bestDict pdf.Dict
 	bestDiffLength := 999
 	for _, cand := range candidates {
+		if len(cand.differences) == 0 {
+			// Adobe Reader compatibility:
+			//
+			// Adobe Reader seems to require for there to be a non-empty
+			// /Differences array.  If we don't have any differences (because
+			// we are using the standard encoding), we just list one of the
+			// codes as a difference.
+			//
+			// TODO(voss): find out what other libraries are doing.
+			cand.differences = pdf.Array{
+				pdf.Integer(32),
+				pdf.Name(cand.enc[32]),
+			}
+		}
+
 		if L := len(cand.differences); L < bestDiffLength {
 			bestDiffLength = L
 			bestDict = pdf.Dict{}
@@ -274,6 +289,7 @@ func (e Type1) AsPDFType1(baseIsStd bool, opt pdf.OutputOptions) (pdf.Object, er
 	if opt.HasAny(pdf.OptDictTypes) {
 		bestDict["Type"] = pdf.Name("Encoding")
 	}
+
 	return bestDict, nil
 }
 

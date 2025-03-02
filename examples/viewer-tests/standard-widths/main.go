@@ -34,13 +34,13 @@ import (
 )
 
 func main() {
-	err := run("test.pdf")
+	err := createDocument("test.pdf")
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(filename string) error {
+func createDocument(filename string) error {
 	paper := document.A4
 	doc, err := document.CreateMultiPage(filename, paper, pdf.V1_7, nil)
 	if err != nil {

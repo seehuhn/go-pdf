@@ -19,29 +19,36 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"iter"
 	"os"
 
 	"golang.org/x/image/font/gofont/goregular"
+
+	"seehuhn.de/go/postscript/funit"
+
+	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/sfnt/glyf"
+	"seehuhn.de/go/sfnt/glyph"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/postscript/funit"
-	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/glyf"
-	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs"
 )
 
 func main() {
-	err := generateSampleFile("test.pdf")
+	err := createDocument("test.pdf")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }
 
-func generateSampleFile(fname string) error {
+func createDocument(fname string) error {
 	opts := &pdf.WriterOptions{
 		HumanReadable: true,
 	}
@@ -104,11 +111,12 @@ type testFont struct {
 
 // NewTestFont creates a new test font with the given cmap.
 func NewTestFont(rm *pdf.ResourceManager, cmap *cmap.File) (*testFont, error) {
-	// Create a font with just the glyphs for "ABC".
+	// Create a font with just the nine glyphs for "ABCDEFGHI".
 	ttf, err := sfnt.Read(bytes.NewReader(goregular.TTF))
 	if err != nil {
 		return nil, fmt.Errorf("gofont: %w", err)
 	}
+	ttf.Gdef = nil
 	ttf.Gsub = nil
 	ttf.Gpos = nil
 
@@ -152,111 +160,46 @@ func (f *testFont) PostScriptName() string {
 // This implements the [font.Font] interface.
 func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
 	fontDictRef := rm.Out.Alloc()
-	cidFontDictRef := rm.Out.Alloc()
-	fontDescriptorRef := rm.Out.Alloc()
-	cidToGIDRef := rm.Out.Alloc()
-	fontFileRef := rm.Out.Alloc()
 
-	rosRef, _, err := pdf.ResourceManagerEmbed(rm, f.cmap.ROS)
-	if err != nil {
-		return nil, nil, err
-	}
-	cmapRef, _, err := pdf.ResourceManagerEmbed(rm, f.cmap)
-	if err != nil {
-		return nil, nil, err
-	}
+	cidToGID := make([]glyph.ID, 43)
+	cidToGID[34] = 1 // CID 34 = GID 1 (A)
+	cidToGID[35] = 2 // CID 35 = GID 2 (B)
+	cidToGID[36] = 3 // CID 36 = GID 3 (C)
+	cidToGID[37] = 4 // CID 37 = GID 4 (D)
+	cidToGID[38] = 5 // CID 38 = GID 5 (E)
+	cidToGID[39] = 6 // CID 39 = GID 6 (F)
+	cidToGID[40] = 7 // CID 40 = GID 7 (G)
+	cidToGID[41] = 8 // CID 41 = GID 8 (H)
+	cidToGID[42] = 9 // CID 42 = GID 9 (I)
 
 	q := 1000 / float64(f.ttf.UnitsPerEm)
-	fontBBox := f.ttf.FontBBoxPDF()
-
-	fontDict := pdf.Dict{
-		"Type":            pdf.Name("Font"),
-		"Subtype":         pdf.Name("Type0"),
-		"BaseFont":        pdf.Name("Test"),
-		"Encoding":        cmapRef,
-		"DescendantFonts": pdf.Array{cidFontDictRef},
-	}
-	err = rm.Out.Put(fontDictRef, fontDict)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	cidFontDict := pdf.Dict{
-		"Type":           pdf.Name("Font"),
-		"Subtype":        pdf.Name("CIDFontType2"),
-		"BaseFont":       pdf.Name("Test"),
-		"CIDSystemInfo":  rosRef,
-		"FontDescriptor": fontDescriptorRef,
-		"DW":             pdf.Integer(2000),
-		"CIDToGIDMap":    cidToGIDRef,
-	}
-	err = rm.Out.Put(cidFontDictRef, cidFontDict)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	cidToGID := make([]byte, 43*2)
-	cidToGID[2*34+1] = 1 // CID 34 = GID 1 (A)
-	cidToGID[2*35+1] = 2 // CID 35 = GID 2 (B)
-	cidToGID[2*36+1] = 3 // CID 36 = GID 3 (C)
-	cidToGID[2*37+1] = 4 // CID 37 = GID 4 (D)
-	cidToGID[2*38+1] = 5 // CID 38 = GID 5 (E)
-	cidToGID[2*39+1] = 6 // CID 39 = GID 6 (F)
-	cidToGID[2*40+1] = 7 // CID 40 = GID 7 (G)
-	cidToGID[2*41+1] = 8 // CID 41 = GID 8 (H)
-	cidToGID[2*42+1] = 9 // CID 42 = GID 9 (I)
-	cidToGIDStream, err := rm.Out.OpenStream(cidToGIDRef, nil, pdf.FilterASCIIHex{})
-	if err != nil {
-		return nil, nil, err
-	}
-	_, err = cidToGIDStream.Write(cidToGID)
-	if err != nil {
-		return nil, nil, err
-	}
-	err = cidToGIDStream.Close()
-	if err != nil {
-		return nil, nil, err
-	}
 
 	fd := &font.Descriptor{
-		FontName:  "Test",
-		FontBBox:  fontBBox,
+		FontName:  "ABCDEF+Test",
+		FontBBox:  f.ttf.FontBBoxPDF(),
 		Ascent:    f.ttf.Ascent.AsFloat(q),
 		Descent:   f.ttf.Descent.AsFloat(q),
 		CapHeight: f.ttf.CapHeight.AsFloat(q),
 	}
-	fontDescriptor := fd.AsDict()
-	fontDescriptor["FontFile2"] = fontFileRef
-	err = rm.Out.Put(fontDescriptorRef, fontDescriptor)
+	dict := &dict.CIDFontType2{
+		Ref:            fontDictRef,
+		PostScriptName: "Test",
+		SubsetTag:      "ABCDEF",
+		Descriptor:     fd,
+		ROS:            f.cmap.ROS,
+		Encoding:       f.cmap,
+		DefaultWidth:   2000,
+		CIDToGID:       cidToGID,
+		FontType:       glyphdata.TrueType,
+		FontRef:        rm.Out.Alloc(),
+	}
+
+	err := dict.WriteToPDF(rm)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	var filters []pdf.Filter
-	opt := rm.Out.GetOptions()
-	if opt.HasAny(pdf.OptPretty) {
-		filters = append(filters, pdf.FilterASCII85{})
-	}
-	filters = append(filters, pdf.FilterCompress{})
-
-	length1 := pdf.NewPlaceholder(rm.Out, 10)
-	fontFileDict := pdf.Dict{
-		"Subtype": pdf.Name("TrueType"),
-		"Length1": length1,
-	}
-	fontFileStream, err := rm.Out.OpenStream(fontFileRef, fontFileDict, filters...)
-	if err != nil {
-		return nil, nil, err
-	}
-	n, err := f.ttf.WriteTrueTypePDF(fontFileStream)
-	if err != nil {
-		return nil, nil, err
-	}
-	err = length1.Set(pdf.Integer(n))
-	if err != nil {
-		return nil, nil, err
-	}
-	err = fontFileStream.Close()
+	err = opentypeglyphs.Embed(rm.Out, dict.FontType, dict.FontRef, f.ttf)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -264,13 +207,61 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	return fontDictRef, f, nil
 }
 
-// This implements the [font.Font] interface.
+// This implements the [font.Font] and [font.Embedded] interfaces.
 func (f *testFont) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
 
 // This implements the [font.Embedded] interface.
+func (f *testFont) Codes(s pdf.String) iter.Seq[*font.Code] {
+	return func(yield func(*font.Code) bool) {
+		var code font.Code
+		code.Width = 2000
+
+		for len(s) > 0 {
+			c, k, _ := f.codec.Decode(s)
+			switch c {
+			case 0x3030: // "00"
+				code.CID = 34
+				code.Text = "A"
+			case 0x3130: // "01"
+				code.CID = 35
+				code.Text = "B"
+			case 0x3230: // "02"
+				code.CID = 36
+				code.Text = "C"
+			case 0x3031: // "10"
+				code.CID = 34
+				code.Text = "D"
+			case 0x3131: // "11"
+				code.CID = 35
+				code.Text = "E"
+			case 0x3231: // "12"
+				code.CID = 36
+				code.Text = "F"
+			case 0x3032: // "20"
+				code.CID = 34
+				code.Text = "G"
+			case 0x3132: // "21"
+				code.CID = 35
+				code.Text = "H"
+			case 0x3232: // "22"
+				code.CID = 36
+				code.Text = "I"
+			default:
+				code.CID = 0
+				code.Text = ""
+			}
+			if !yield(&code) {
+				break
+			}
+			s = s[k:]
+		}
+	}
+}
+
+// This implements the [font.Embedded] interface.
 func (f *testFont) DecodeWidth(s pdf.String) (float64, int) {
 	_, k, _ := f.codec.Decode(s)
-	return 2000, k
+	return 2, k
 }

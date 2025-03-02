@@ -21,11 +21,13 @@ import (
 	"strings"
 
 	"seehuhn.de/go/geom/rect"
+
+	pstype1 "seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/postscript/afm"
-	pstype1 "seehuhn.de/go/postscript/type1"
 )
 
 // Font identifies the individual fonts.

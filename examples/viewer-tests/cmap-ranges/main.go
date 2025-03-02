@@ -41,14 +41,14 @@ import (
 )
 
 func main() {
-	err := generateSampleFile("test.pdf")
+	err := createDocument("test.pdf")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }
 
-func generateSampleFile(fname string) error {
+func createDocument(fname string) error {
 	opts := &pdf.WriterOptions{
 		HumanReadable: true,
 	}
@@ -99,7 +99,7 @@ func generateSampleFile(fname string) error {
 // testFont is a small subset of the Go Regular font, with a configurable cmap.
 // This is only useful for testing.
 //
-// For simplicity we the same structure both as the `font.Font` before
+// For simplicity we use this structure both as the `font.Font` before
 // embedding, and as the `font.Embedded` after embedding.
 type testFont struct {
 	ttf   *sfnt.Font
@@ -109,11 +109,12 @@ type testFont struct {
 
 // NewTestFont creates a new test font with the given cmap.
 func NewTestFont(rm *pdf.ResourceManager, cmap *cmap.File) (*testFont, error) {
-	// Create a font with just the glyphs for "ABC".
+	// Create a font with just the three glyphs for "ABC".
 	ttf, err := sfnt.Read(bytes.NewReader(goregular.TTF))
 	if err != nil {
 		return nil, fmt.Errorf("gofont: %w", err)
 	}
+	ttf.Gdef = nil
 	ttf.Gsub = nil
 	ttf.Gpos = nil
 
@@ -198,7 +199,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	return fontDictRef, f, nil
 }
 
-// This implements the [font.Embedded] interface.
+// This implements the [font.Font] and [font.Embedded] interfaces.
 func (f *testFont) WritingMode() font.WritingMode {
 	return font.Horizontal
 }

@@ -17,7 +17,10 @@
 package main
 
 import (
+	"fmt"
+	"iter"
 	"math"
+	"os"
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/rect"
@@ -43,9 +46,10 @@ import (
 )
 
 func main() {
-	err := run("test.pdf")
+	err := createDocument("test.pdf")
 	if err != nil {
-		panic(err)
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
 	}
 }
 
@@ -54,7 +58,7 @@ const (
 	smallskip = 8.0
 )
 
-func run(filename string) error {
+func createDocument(filename string) error {
 	page, err := document.CreateSinglePage(filename, document.A4, pdf.V2_0, nil)
 	if err != nil {
 		return err
@@ -441,7 +445,7 @@ type testFont struct {
 }
 
 func (f *testFont) PostScriptName() string {
-	return "Test"
+	return f.data.FontName
 }
 
 func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
@@ -499,6 +503,30 @@ func (e *testFontEmbedded) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
 
+func (e *testFontEmbedded) Codes(s pdf.String) iter.Seq[*font.Code] {
+	return func(yield func(*font.Code) bool) {
+		var code font.Code
+		for i := range s {
+			c := []byte{s[i]}
+			cid := e.cmap.LookupCID(c)
+			notdefCID := e.cmap.LookupNotdefCID(c)
+
+			width, ok := e.widths[cid]
+			if !ok {
+				width = e.dw
+			}
+
+			code.CID = cid
+			code.Notdef = notdefCID
+			code.Width = width
+
+			if !yield(&code) {
+				break
+			}
+		}
+	}
+}
+
 func (e *testFontEmbedded) DecodeWidth(s pdf.String) (float64, int) {
 	if len(s) == 0 {
 		return 0, 0
@@ -506,9 +534,9 @@ func (e *testFontEmbedded) DecodeWidth(s pdf.String) (float64, int) {
 
 	cid := e.cmap.LookupCID([]byte{s[0]})
 	if w, ok := e.widths[cid]; ok {
-		return w, 1
+		return w / 1000, 1
 	} else {
-		return e.dw, 1
+		return e.dw / 1000, 1
 	}
 }
 

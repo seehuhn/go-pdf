@@ -202,7 +202,7 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 	outOpt := defaultOutputOptions(v)
 	if opt.HumanReadable {
 		outOpt &= ^(optObjStm | optXRefStream)
-		outOpt |= OptPretty
+		outOpt |= OptPretty | OptDictTypes
 	}
 	if v < V2_0 {
 		outOpt |= OptTrimStandardFonts

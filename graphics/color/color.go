@@ -155,6 +155,32 @@ func values(c Color) []float64 {
 	}
 }
 
+var (
+	// Black represents the black color in the DeviceGray color space.
+	Black = DeviceGray(0)
+
+	// White represents the white color in the DeviceGray color space.
+	White = DeviceGray(1)
+
+	// Red represents the red color in the DeviceRGB color space.
+	Red = DeviceRGB(1, 0, 0)
+
+	// Green represents the green color in the DeviceRGB color space.
+	Green = DeviceRGB(0, 1, 0)
+
+	// Blue represents the blue color in the DeviceRGB color space.
+	Blue = DeviceRGB(0, 0, 1)
+
+	// Cyan represents the cyan color in the DeviceCMYK color space.
+	Cyan = DeviceCMYK(1, 0, 0, 0)
+
+	// Magenta represents the magenta color in the DeviceCMYK color space.
+	Magenta = DeviceCMYK(0, 1, 0, 0)
+
+	// Yellow represents the yellow color in the DeviceCMYK color space.
+	Yellow = DeviceCMYK(0, 0, 1, 0)
+)
+
 // Some commonly used white points.
 // These vectors can be used for the white point argument of the
 // [CalGray], [CalRGB], and [Lab] functions.

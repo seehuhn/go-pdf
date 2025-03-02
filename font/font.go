@@ -90,7 +90,11 @@ const (
 type Embedded interface {
 	WritingMode() WritingMode
 
-	// Codes iterates over the character codes in a PDF string.
+	// Codes iterates over the character codes in a PDF string, yielding
+	// information about each character code.
+	//
+	// IMPORTANT: The returned pointer points to memory that is reused across
+	// iterations. The caller must not modify the pointed-to structure.
 	// Codes(s pdf.String) iter.Seq[*Code]
 
 	// DecodeWidth reads one character code from the given string and returns

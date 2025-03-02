@@ -291,7 +291,7 @@ func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Font, error) {
 		newTTF.CMapTable[sfntcmap.Key{PlatformID: 3, EncodingID: 1}] = cmap_3_1.Encode(0)
 	}
 
-	res := &funnyFont{
+	res := &testFont{
 		ttf:       newTTF,
 		post:      postTable,
 		width:     pdfWidth,
@@ -309,7 +309,7 @@ func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Font, error) {
 
 var errIncompatibleContraints = errors.New("incompatible constraints")
 
-type funnyFont struct {
+type testFont struct {
 	ttf       *sfnt.Font
 	post      *post.Info
 	width     float64
@@ -322,11 +322,11 @@ type funnyFont struct {
 	symbolic bool
 }
 
-func (f *funnyFont) PostScriptName() string {
+func (f *testFont) PostScriptName() string {
 	return f.ttf.FamilyName
 }
 
-func (f *funnyFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
+func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
 	fontDictRef := rm.Out.Alloc()
 	fontDescriptorRef := rm.Out.Alloc()
 	fontFileRef := rm.Out.Alloc()
@@ -398,15 +398,15 @@ func (f *funnyFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, e
 	return fontDictRef, f, nil
 }
 
-func (f *funnyFont) WritingMode() font.WritingMode {
+func (f *testFont) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
 
-func (f *funnyFont) DecodeWidth(s pdf.String) (float64, int) {
+func (f *testFont) DecodeWidth(s pdf.String) (float64, int) {
 	if len(s) == 0 {
 		return 0, 0
 	}
-	return f.width, 1
+	return f.width / 1000, 1
 }
 
 var (
