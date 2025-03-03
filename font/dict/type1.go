@@ -36,6 +36,10 @@ import (
 	"seehuhn.de/go/pdf/internal/stdmtx"
 )
 
+var (
+	_ font.Dict = (*Type1)(nil)
+)
+
 // Type1 represents a Type 1 font dictionary.
 type Type1 struct {
 	// Ref is the reference to the font dictionary in the PDF file.
@@ -461,8 +465,12 @@ func (d *Type1) WriteToPDF(rm *pdf.ResourceManager) error {
 	return nil
 }
 
-func (d *Type1) GetScanner() (font.Embedded, error) {
+func (d *Type1) MakeFont() (font.FromFile, error) {
 	return d, nil
+}
+
+func (d *Type1) GetDict() font.Dict {
+	return d
 }
 
 func (d *Type1) WritingMode() font.WritingMode {
@@ -549,7 +557,7 @@ func fontDescriptorIsCompatible(fd *font.Descriptor, stdInfo *stdmtx.FontData) b
 }
 
 func init() {
-	font.RegisterReader("Type1", func(r pdf.Getter, obj pdf.Object) (font.FromFile, error) {
+	font.RegisterReader("Type1", func(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
 		return ExtractType1(r, obj)
 	})
 }

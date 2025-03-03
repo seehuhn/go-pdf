@@ -36,7 +36,7 @@ type Reader struct {
 
 	scanner *scanner.Scanner
 
-	fontCache map[pdf.Reference]FontFromFile
+	fontCache map[pdf.Reference]font.FromFile
 
 	Resources *pdf.Resources
 	graphics.State
@@ -57,7 +57,7 @@ func New(r pdf.Getter, loader *loader.FontLoader) *Reader {
 
 		scanner: scanner.NewScanner(),
 
-		fontCache: make(map[pdf.Reference]FontFromFile),
+		fontCache: make(map[pdf.Reference]font.FromFile),
 	}
 }
 
@@ -322,7 +322,7 @@ func (r *Reader) do() error {
 					if pdf.IsMalformed(err) {
 						break
 					} else if err != nil {
-						return pdf.Wrap(err, fmt.Sprintf("font %s", font))
+						return err
 					}
 					r.TextFont = F
 					r.TextFontSize = size
@@ -390,13 +390,13 @@ func (r *Reader) do() error {
 
 		case "Tj":
 			s := op.GetString()
-			if op.OK() {
+			if op.OK() && r.TextFont != nil {
 				r.processText(s)
 			}
 
 		case "'":
 			s := op.GetString()
-			if op.OK() {
+			if op.OK() && r.TextFont != nil {
 				r.TextLineMatrix = matrix.Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
 				r.TextMatrix = r.TextLineMatrix
 				r.processText(s)
@@ -406,7 +406,7 @@ func (r *Reader) do() error {
 			aw := op.GetNumber()
 			ac := op.GetNumber()
 			s := op.GetString()
-			if op.OK() {
+			if op.OK() && r.TextFont != nil {
 				r.TextWordSpacing = aw
 				r.TextCharacterSpacing = ac
 				r.Set |= graphics.StateTextWordSpacing | graphics.StateTextCharacterSpacing
@@ -415,7 +415,7 @@ func (r *Reader) do() error {
 
 		case "TJ":
 			a := op.GetArray()
-			if op.OK() {
+			if op.OK() && r.TextFont != nil {
 				for _, ai := range a {
 					var d float64
 					switch ai := ai.(type) {
@@ -431,9 +431,9 @@ func (r *Reader) do() error {
 					if d != 0 {
 						d = d / 1000 * r.TextFontSize
 						switch r.TextFont.WritingMode() {
-						case 0:
+						case font.Horizontal:
 							r.TextMatrix = matrix.Translate(-d*r.TextHorizontalScaling, 0).Mul(r.TextMatrix)
-						case 1:
+						case font.Vertical:
 							r.TextMatrix = matrix.Translate(0, -d).Mul(r.TextMatrix)
 						}
 					}

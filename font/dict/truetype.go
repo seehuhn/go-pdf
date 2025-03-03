@@ -32,6 +32,10 @@ import (
 	"seehuhn.de/go/pdf/font/subset"
 )
 
+var (
+	_ font.Dict = (*TrueType)(nil)
+)
+
 // TrueType represents a TrueType font dictionary.
 // This can correspond either to a TrueType or an OpenType font.
 type TrueType struct {
@@ -323,8 +327,12 @@ func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager) error {
 	return nil
 }
 
-func (d *TrueType) GetScanner() (font.Embedded, error) {
+func (d *TrueType) MakeFont() (font.FromFile, error) {
 	return d, nil
+}
+
+func (d *TrueType) GetDict() font.Dict {
+	return d
 }
 
 func (d *TrueType) WritingMode() font.WritingMode {
@@ -347,7 +355,7 @@ func (d *TrueType) Codes(s pdf.String) iter.Seq[*font.Code] {
 }
 
 func init() {
-	font.RegisterReader("TrueType", func(r pdf.Getter, obj pdf.Object) (font.FromFile, error) {
+	font.RegisterReader("TrueType", func(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
 		return ExtractTrueType(r, obj)
 	})
 }

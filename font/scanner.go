@@ -25,10 +25,15 @@ import (
 )
 
 type FromFile interface {
-	GetScanner() (Embedded, error)
+	Embedded
+	GetDict() Dict
 }
 
-type ReaderFunc func(r pdf.Getter, obj pdf.Object) (FromFile, error)
+type Dict interface {
+	MakeFont() (FromFile, error)
+}
+
+type ReaderFunc func(r pdf.Getter, obj pdf.Object) (Dict, error)
 
 var (
 	readerMutex sync.Mutex
@@ -50,7 +55,7 @@ func RegisterReader(tp pdf.Name, fn ReaderFunc) {
 	readers[tp] = fn
 }
 
-func Read(r pdf.Getter, obj pdf.Object) (FromFile, error) {
+func ReadDict(r pdf.Getter, obj pdf.Object) (Dict, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
 		return nil, err
@@ -91,7 +96,7 @@ func Read(r pdf.Getter, obj pdf.Object) (FromFile, error) {
 
 	read, ok := readers[fontType]
 	if !ok {
-		return nil, fmt.Errorf("unsupported font type: %s", fontType)
+		return nil, pdf.Errorf("unsupported font type: %s", fontType)
 	}
 
 	return read(r, fontDict)

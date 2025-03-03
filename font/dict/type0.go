@@ -301,8 +301,8 @@ func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager) error {
 	return nil
 }
 
-// GetScanner returns a font.Scanner for the font.
-func (d *CIDFontType0) GetScanner() (font.Embedded, error) {
+// MakeFont returns a font.Scanner for the font.
+func (d *CIDFontType0) MakeFont() (font.FromFile, error) {
 	var csr charcode.CodeSpaceRange
 	csr = append(csr, d.Encoding.CodeSpaceRange...)
 	csr = append(csr, d.Text.CodeSpaceRange...)
@@ -329,6 +329,10 @@ type type0Scanner struct {
 	*CIDFontType0
 	codec *charcode.Codec
 	cache map[charcode.Code]*font.Code
+}
+
+func (s *type0Scanner) GetDict() font.Dict {
+	return s.CIDFontType0
 }
 
 func (s *type0Scanner) WritingMode() font.WritingMode {
@@ -373,7 +377,7 @@ func (s *type0Scanner) Codes(str pdf.String) iter.Seq[*font.Code] {
 }
 
 func init() {
-	font.RegisterReader("CIDFontType0", func(r pdf.Getter, obj pdf.Object) (font.FromFile, error) {
+	font.RegisterReader("CIDFontType0", func(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
 		return ExtractCIDFontType0(r, obj)
 	})
 }

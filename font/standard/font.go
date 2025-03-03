@@ -51,6 +51,14 @@ const (
 	ZapfDingbats         Font = "ZapfDingbats"
 )
 
+func (f Font) String() string {
+	return string(f)
+}
+
+func (f Font) PostScriptName() string {
+	return string(f)
+}
+
 // New returns a new font instance for the given standard font.
 func (f Font) New() *type1.Instance {
 	inst, err := f.newInternal()

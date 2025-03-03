@@ -57,6 +57,3 @@ The optional action decides what to do with the current object:
 
 - `@contents` (when the current object is a page dictionary): Write the
   complete content stream of the page to stdout.
-
-- `@font` (when the current object is a font dictionary): Write human-readable
-  information about the font to stdout.

@@ -17,7 +17,8 @@
 package main
 
 import (
-	"log"
+	"fmt"
+	"os"
 
 	"seehuhn.de/go/sfnt/glyph"
 
@@ -30,14 +31,15 @@ import (
 )
 
 func main() {
-	err := run()
+	err := createDocument("test.pdf")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
 	}
 }
 
-func run() error {
-	doc, err := document.CreateMultiPage("test.pdf", nil, pdf.V1_7, nil)
+func createDocument(fname string) error {
+	doc, err := document.CreateMultiPage(fname, nil, pdf.V1_7, nil)
 	if err != nil {
 		return err
 	}
@@ -45,11 +47,12 @@ func run() error {
 	H := standard.Helvetica.New()
 
 	for _, sample := range fonttypes.All {
+		fmt.Println(sample.Description)
 		page := doc.AddPage()
 
 		F := sample.MakeFont()
 
-		if sample.Type.IsComposite() {
+		if sample.Composite {
 			drawPage(H, 32, page, F, sample.Description)
 		} else {
 			drawPage(H, 16, page, F, sample.Description)

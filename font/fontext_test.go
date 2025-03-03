@@ -21,6 +21,7 @@ import (
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/type1"
@@ -34,6 +35,14 @@ var (
 	_ font.Layouter = (*truetype.Instance)(nil)
 	_ font.Layouter = (*opentype.Instance)(nil)
 	_ font.Layouter = (*type3.Instance)(nil)
+)
+
+var (
+	_ font.Dict = (*dict.Type1)(nil)
+	_ font.Dict = (*dict.TrueType)(nil)
+	_ font.Dict = (*dict.Type3)(nil)
+	_ font.Dict = (*dict.CIDFontType0)(nil)
+	_ font.Dict = (*dict.CIDFontType2)(nil)
 )
 
 // TestSpaceIsBlank tests that space characters of common fonts are blank.

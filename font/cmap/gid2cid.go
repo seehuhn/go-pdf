@@ -45,9 +45,15 @@ type GIDToCID interface {
 // NewGIDToCIDSequential returns a GIDToCID which assigns CID values
 // sequentially, starting with 1.
 func NewGIDToCIDSequential() GIDToCID {
+	g2c := make(map[glyph.ID]cid.CID)
+	c2g := make(map[cid.CID]glyph.ID)
+
+	g2c[0] = 0
+	c2g[0] = 0
+
 	return &gidToCIDSequential{
-		g2c: make(map[glyph.ID]cid.CID),
-		c2g: make(map[cid.CID]glyph.ID),
+		g2c: g2c,
+		c2g: c2g,
 	}
 }
 
@@ -60,7 +66,7 @@ type gidToCIDSequential struct {
 func (g *gidToCIDSequential) CID(gid glyph.ID, _ []rune) cid.CID {
 	cidVal, ok := g.g2c[gid]
 	if !ok {
-		cidVal = cid.CID(len(g.g2c) + 1)
+		cidVal = cid.CID(len(g.g2c))
 		g.g2c[gid] = cidVal
 		g.c2g[cidVal] = gid
 	}

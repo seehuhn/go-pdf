@@ -34,7 +34,6 @@ import (
 	"golang.org/x/term"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/examples/pdf-inspect/meta"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
@@ -200,45 +199,6 @@ func printObject(args ...string) error {
 			}
 		default:
 			return fmt.Errorf("unexpected type %T for page contents", contents)
-		}
-		return nil
-
-	case "@font":
-		dicts, err := font.ExtractDicts(r, e.obj)
-		if err != nil {
-			return err
-		}
-		fmt.Println("**", dicts.DictType.String(), "font", dicts.PostScriptName)
-		fmt.Println()
-		fmt.Print("Font dict: ")
-		err = e.show(dicts.FontDict)
-		if err != nil {
-			return err
-		}
-		if dicts.CIDFontDict != nil {
-			fmt.Println()
-			fmt.Print("CID font dict: ")
-			err = e.show(dicts.CIDFontDict)
-			if err != nil {
-				return err
-			}
-		}
-		if dicts.FontDescriptor != nil {
-			fmt.Println()
-			fmt.Print("Font descriptor: ")
-			fontDescriptor := dicts.FontDescriptor.AsDict()
-			err = e.show(fontDescriptor)
-			if err != nil {
-				return err
-			}
-		}
-		if dicts.FontData != nil {
-			fmt.Println()
-			fmt.Print("Font program dict: ")
-			err = e.show(dicts.FontData.Dict)
-			if err != nil {
-				return err
-			}
 		}
 		return nil
 	}

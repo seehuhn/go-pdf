@@ -326,8 +326,12 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager) error {
 	return nil
 }
 
-func (d *Type3) GetScanner() (font.Embedded, error) {
+func (d *Type3) MakeFont() (font.FromFile, error) {
 	return d, nil
+}
+
+func (d *Type3) GetDict() font.Dict {
+	return d
 }
 
 func (d *Type3) WritingMode() font.WritingMode {
@@ -350,7 +354,7 @@ func (d *Type3) Codes(s pdf.String) iter.Seq[*font.Code] {
 }
 
 func init() {
-	font.RegisterReader("Type3", func(r pdf.Getter, obj pdf.Object) (font.FromFile, error) {
+	font.RegisterReader("Type3", func(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
 		return ExtractType3(r, obj)
 	})
 }

@@ -64,9 +64,10 @@ type Instance struct {
 //
 // If the font has CFF outlines, it is often more efficient to embed the CFF
 // glyph data without the OpenType wrapper. Consider using
-// [seehuhn.de/go/pdf/font/cff.New] instead of this function.  If the font has
-// TrueType outlines, it is often more efficient to embed the font as a
-// TrueType font instead of an OpenType font.  Consider using
+// [seehuhn.de/go/pdf/font/cff.New] instead of this function.
+//
+// If the font has TrueType outlines, it is often more efficient to embed the
+// font as a TrueType font instead of an OpenType font.  Consider using
 // [seehuhn.de/go/pdf/font/truetype.New] instead of this function.
 func New(info *sfnt.Font, opt *Options) (*Instance, error) {
 	if opt == nil {

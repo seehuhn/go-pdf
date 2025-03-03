@@ -24,8 +24,8 @@ import (
 type Sample struct {
 	Label       string
 	Description string
-	Type        font.EmbeddingTypeOld
 	MakeFont    func() font.Layouter
+	Composite   bool
 }
 
 // All is a list of example fonts, covering all supported font and
@@ -34,110 +34,110 @@ var All = []*Sample{
 	{
 		Label:       "CFFSimple1",
 		Description: "a simple CFF font",
-		Type:        font.CFFSimple,
 		MakeFont:    CFFSimple,
+		Composite:   false,
 	},
 	{
 		Label:       "CFFSimple2",
 		Description: "a simple CFF font (with CIDFont operators)",
-		Type:        font.CFFSimple,
 		MakeFont:    CFFCIDSimple,
+		Composite:   false,
 	},
 	{
 		Label:       "OpenTypeCFFSimple1",
 		Description: "a simple OpenType/CFF font",
-		Type:        font.OpenTypeCFFSimple,
 		MakeFont:    OpenTypeCFFSimple,
+		Composite:   false,
 	},
 	{
 		Label:       "OpenTypeCFFSimple2",
 		Description: "a simple OpenType/CFF font (with CIDFont operators)",
-		Type:        font.OpenTypeCFFSimple,
 		MakeFont:    OpenTypeCFFCIDSimple,
+		Composite:   false,
 	},
 	{
 		Label:       "TrueTypeSimple",
 		Description: "a simple TrueType font",
-		Type:        font.TrueTypeSimple,
 		MakeFont:    TrueTypeSimple,
+		Composite:   false,
 	},
 	{
 		Label:       "OpenTypeGlyfSimple",
 		Description: "a simple OpenType/Glyf font",
-		Type:        font.OpenTypeGlyfSimple,
 		MakeFont:    OpenTypeGlyfSimple,
+		Composite:   false,
 	},
 	{
 		Label:       "Standard",
 		Description: "a standard Type 1 font",
-		Type:        font.Type1,
 		MakeFont:    Standard,
+		Composite:   false,
 	},
 	{
 		Label:       "Type1a",
 		Description: "an embedded Type 1 font with metrics",
-		Type:        font.Type1,
 		MakeFont:    Type1WithMetrics,
+		Composite:   false,
 	},
 	{
 		Label:       "Type1b",
 		Description: "an embedded Type 1 font without metrics",
-		Type:        font.Type1,
 		MakeFont:    Type1WithoutMetrics,
+		Composite:   false,
 	},
 	{
 		Label:       "Type3",
 		Description: "a Type 3 font",
-		Type:        font.Type3,
 		MakeFont:    Type3,
+		Composite:   false,
 	},
 
 	{
 		Label:       "CFFComposite1",
 		Description: "a composite CFF font",
-		Type:        font.CFFComposite,
 		MakeFont:    CFFComposite,
+		Composite:   true,
 	},
 	{
 		Label:       "CFFComposite2",
 		Description: "a composite CFF font (with CIDFont operators)",
-		Type:        font.CFFComposite,
 		MakeFont:    CFFCIDComposite,
+		Composite:   true,
 	},
 	{
 		Label:       "CFFComposite3",
 		Description: "a composite CFF font (CIDFont operators and 2 private dicts)",
-		Type:        font.CFFComposite,
 		MakeFont:    CFFCID2Composite,
+		Composite:   true,
 	},
 	{
 		Label:       "OpenTypeCFFComposite1",
 		Description: "a composite OpenType/CFF font",
-		Type:        font.OpenTypeCFFComposite,
 		MakeFont:    OpenTypeCFFComposite,
+		Composite:   true,
 	},
 	{
 		Label:       "OpenTypeCFFComposite2",
 		Description: "a composite OpenType/CFF font (with CIDFont operators)",
-		Type:        font.OpenTypeCFFComposite,
 		MakeFont:    OpenTypeCFFCIDComposite,
+		Composite:   true,
 	},
 	{
 		Label:       "OpenTypeCFFComposite3",
 		Description: "a composite OpenType/CFF font (CIDFont operators and 2 private dicts)",
-		Type:        font.OpenTypeCFFComposite,
 		MakeFont:    OpenTypeCFFCID2Composite,
+		Composite:   true,
 	},
 	{
 		Label:       "TrueTypeComposite",
 		Description: "a composite TrueType font",
-		Type:        font.TrueTypeComposite,
 		MakeFont:    TrueTypeComposite,
+		Composite:   true,
 	},
 	{
 		Label:       "OpenTypeGlyfComposite",
 		Description: "a composite OpenType/Glyf font",
-		Type:        font.OpenTypeGlyfComposite,
 		MakeFont:    OpenTypeGlyfComposite,
+		Composite:   true,
 	},
 }
