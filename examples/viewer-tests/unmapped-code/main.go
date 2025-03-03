@@ -17,13 +17,15 @@
 package main
 
 import (
-	"log"
+	"fmt"
+	"os"
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/rect"
 
 	"seehuhn.de/go/postscript/psenc"
 	"seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
@@ -41,18 +43,19 @@ import (
 )
 
 func main() {
-	err := run()
+	err := createDocument("test.pdf")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
 	}
 }
 
-func run() error {
+func createDocument(fname string) error {
 	paper := document.A5r
 	opt := &pdf.WriterOptions{
 		HumanReadable: true,
 	}
-	page, err := document.CreateSinglePage("test.pdf", paper, pdf.V1_7, opt)
+	page, err := document.CreateSinglePage(fname, paper, pdf.V2_0, opt)
 	if err != nil {
 		return err
 	}
@@ -65,67 +68,39 @@ func run() error {
 
 	yPos := paper.URy - 72 - 15
 
+	type showBlock struct {
+		label string
+		code  pdf.String
+	}
+	blocks := []showBlock{
+		{"code used in WinAnsi encoding:", pdf.String{0o335}},
+		{"remapped code:", pdf.String{'A'}},
+		{"space character:", pdf.String{' '}},
+		{"code mapped to non-existent character:", pdf.String{'B'}},
+		{"unmapped code:", pdf.String{0o010}},
+	}
+
 	page.TextBegin()
-	page.TextSetFont(F, 10)
-	page.TextFirstLine(72, yPos)
-	gg := page.TextLayout(nil, "code used in WinAnsi encoding:")
-	gg.Align(190, 0)
-	page.TextShowGlyphs(gg)
-	page.TextSetFont(M, 10)
-	page.TextShow("I")
-	page.TextSetFont(X, 10)
-	page.TextShowRaw(pdf.String{0o335})
-	page.TextSetFont(M, 10)
-	page.TextShow("I")
-
-	page.TextSecondLine(0, -20)
-	page.TextSetFont(F, 10)
-	gg = page.TextLayout(nil, "remapped code:")
-	gg.Align(190, 0)
-	page.TextShowGlyphs(gg)
-	page.TextSetFont(M, 10)
-	page.TextShow("I")
-	page.TextSetFont(X, 10)
-	page.TextShowRaw(pdf.String{'A'})
-	page.TextSetFont(M, 10)
-	page.TextShow("I")
-
-	page.TextNextLine()
-	page.TextSetFont(F, 10)
-	gg = page.TextLayout(nil, "space character:")
-	gg.Align(190, 0)
-	page.TextShowGlyphs(gg)
-	page.TextSetFont(M, 10)
-	page.TextShow("I")
-	page.TextSetFont(X, 10)
-	page.TextShowRaw(pdf.String{' '})
-	page.TextSetFont(M, 10)
-	page.TextShow("I")
-
-	page.TextNextLine()
-	page.TextSetFont(F, 10)
-	gg = page.TextLayout(nil, "code mapped to non-existent character:")
-	gg.Align(190, 0)
-	page.TextShowGlyphs(gg)
-	page.TextSetFont(M, 10)
-	page.TextShow("I")
-	page.TextSetFont(X, 10)
-	page.TextShowRaw(pdf.String{'B'})
-	page.TextSetFont(M, 10)
-	page.TextShow("I")
-
-	page.TextNextLine()
-	page.TextSetFont(F, 10)
-	gg = page.TextLayout(nil, "unmapped code:")
-	gg.Align(190, 0)
-	page.TextShowGlyphs(gg)
-	page.TextSetFont(M, 10)
-	page.TextShow("I")
-	page.TextSetFont(X, 10)
-	page.TextShowRaw(pdf.String{0o010})
-	page.TextSetFont(M, 10)
-	page.TextShow("I")
-
+	for i, b := range blocks {
+		switch i {
+		case 0:
+			page.TextFirstLine(72, yPos)
+		case 1:
+			page.TextSecondLine(0, -20)
+		default:
+			page.TextNextLine()
+		}
+		page.TextSetFont(F, 10)
+		gg := page.TextLayout(nil, b.label)
+		gg.Align(190, 0)
+		page.TextShowGlyphs(gg)
+		page.TextSetFont(M, 10)
+		page.TextShow("I")
+		page.TextSetFont(X, 10)
+		page.TextShowRaw(b.code)
+		page.TextSetFont(M, 10)
+		page.TextShow("I")
+	}
 	page.TextEnd()
 
 	return page.Close()
@@ -213,19 +188,10 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 
 	F.Encoding = psenc.StandardEncoding[:]
 
-	var fontBBox rect.Rect
-	bbox := F.FontBBox()
-	q := 1000 * F.FontInfo.FontMatrix[0]
-	fontBBox = rect.Rect{
-		LLx: bbox.LLx * q,
-		LLy: bbox.LLy * q,
-		URx: bbox.URx * q,
-		URy: bbox.URy * q,
-	}
 	fontDesc := &font.Descriptor{
 		FontName:     subset.Join("AAAAAA", "NimbusRoman-Regular"),
 		IsSerif:      true,
-		FontBBox:     fontBBox,
+		FontBBox:     F.FontBBoxPDF(),
 		Ascent:       1000,
 		Descent:      100,
 		Leading:      2000,
@@ -297,5 +263,5 @@ func (f *testFontEmbedded) WritingMode() font.WritingMode {
 // the width of the corresponding glyph.
 // This implements the [font.Embedded] interface.
 func (f *testFontEmbedded) DecodeWidth(s pdf.String) (float64, int) {
-	return f.W[s[0]], 1
+	return f.W[s[0]] / 1000, 1
 }

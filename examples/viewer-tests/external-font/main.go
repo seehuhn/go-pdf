@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"seehuhn.de/go/geom/rect"
+
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/cid"
 	pstype1 "seehuhn.de/go/postscript/type1"
