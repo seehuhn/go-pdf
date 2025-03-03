@@ -61,44 +61,12 @@ const (
 	DictTypeCompositeTrueType
 )
 
-// DataType represents the different types of font data in PDF.
-//
-// TODO(voss): remove
-//
-// Deprecated: use [glyphdata.Type] instead.
-type DataType int
-
-// List of all font data types supported by PDF.
-const (
-	DataUnknown DataType = iota
-	DataType1
-	DataType3
-	DataCFF
-	DataTrueType
-	DataOpenType
-)
-
 // EmbeddingTypeOld represents the different ways font data
 // can be embedded in a PDF file.
 //
-// The different ways of embedding fonts in a PDF file are
-// represented by values of type [EmbeddingTypeOld]. There are seven different
-// types of embedded simple fonts:
-//   - Type 1: see [seehuhn.de/go/pdf/font/type1.FontDict]
-//   - Multiple Master Type 1 (not supported by this library)
-//   - CFF font data: see [seehuhn.de/go/pdf/font/cff.EmbedInfoSimple]
-//   - TrueType: see [seehuhn.de/go/pdf/font/truetype.EmbedInfoSimple]
-//   - OpenType with CFF glyph outlines: see [seehuhn.de/go/pdf/font/opentype.EmbedInfoCFFSimple]
-//   - OpenType with "glyf" glyph outlines: see [seehuhn.de/go/pdf/font/opentype.EmbedInfoGlyfSimple]
-//   - Type 3: see [seehuhn.de/go/pdf/font/type3.EmbedInfo]
+// Deprecated: use [DictType] instead.
 //
-// There are four different types of embedded composite fonts:
-//   - CFF font data: see [seehuhn.de/go/pdf/font/cff.EmbedInfoComposite]
-//   - TrueType: see [seehuhn.de/go/pdf/font/truetype.EmbedInfoComposite]
-//   - OpenType with CFF glyph outlines: see [seehuhn.de/go/pdf/font/opentype.EmbedInfoCFFComposite]
-//   - OpenType with "glyf" glyph outlines: see [seehuhn.de/go/pdf/font/opentype.EmbedInfoGlyfComposite]
-//
-// TODO(voss): Migrate to use [DictType] instead.
+// TODO(voss): remove
 type EmbeddingTypeOld int
 
 // List of all embedding types supported by PDF.

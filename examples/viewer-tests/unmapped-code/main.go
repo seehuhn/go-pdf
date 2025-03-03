@@ -261,10 +261,3 @@ func (f *testFontEmbedded) WritingMode() font.WritingMode {
 func (f *testFontEmbedded) Codes(s pdf.String) iter.Seq[*font.Code] {
 	panic("not implemented") // TODO: Implement
 }
-
-// DecodeWidth reads one character code from the given string and returns
-// the width of the corresponding glyph.
-// This implements the [font.Embedded] interface.
-func (f *testFontEmbedded) DecodeWidth(s pdf.String) (float64, int) {
-	return f.W[s[0]] / 1000, 1
-}

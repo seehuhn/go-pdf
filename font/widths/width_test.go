@@ -68,16 +68,12 @@ func TestWidthsFull(t *testing.T) {
 	}
 
 	i := 0
-	for len(s) > 0 {
-		info, k := D.Decode(s)
-
+	for info := range D.Codes(s) {
 		wFromFont := ww[i]
-		wFromPDF := info.Width
+		wFromPDF := info.Width / 1000
 		if math.Abs(wFromPDF-wFromFont) > 0.0005 {
-			t.Errorf("widths differ for code 0x% 02x: %f vs %f", s[:k], wFromPDF, wFromFont)
+			t.Errorf("widths differ for pos %d: %f vs %f", i, wFromPDF, wFromFont)
 		}
-
-		s = s[k:]
 		i++
 	}
 }

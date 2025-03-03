@@ -17,6 +17,7 @@
 package reader
 
 import (
+	"iter"
 	"unicode"
 
 	"seehuhn.de/go/pdf"
@@ -95,52 +96,8 @@ func (f *CIDFont) WritingMode() font.WritingMode {
 	return f.cmap.WMode
 }
 
-func (f *CIDFont) Decode(s pdf.String) (*font.Code, int) {
-	code, k, ok := f.codec.Decode(s)
-	if !ok {
-		return f.notdef, k
-	}
-
-	if ci, ok := f.dec[code]; ok {
-		return ci, k
-	}
-
-	CID1 := f.cmap.LookupCID(s[:k])
-	CID2 := f.cmap.LookupNotdefCID(s[:k])
-	if CID1 == 0 {
-		CID1 = CID2
-		CID2 = 0
-	}
-
-	w, ok := f.widths[CID1]
-	if !ok {
-		w = f.dw
-	}
-
-	var text string
-	if f.toUni != nil {
-		text, _ = f.toUni.Lookup(s[:k])
-	} else {
-		// TODO(voss): try the ToUnicode CMaps for the Adobe standard
-		// character collections.
-	}
-
-	res := &font.Code{
-		CID:    CID1,
-		Notdef: CID2,
-		Text:   text,
-		Width:  w,
-	}
-	f.dec[code] = res
-	return res, k
-}
-
-func (f *CIDFont) DecodeWidth(s pdf.String) (float64, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-	ci, k := f.Decode(s)
-	return ci.Width, k
+func (f *CIDFont) Codes(s pdf.String) iter.Seq[*font.Code] {
+	panic("not implemented") // TODO(voss): Implement
 }
 
 func (f *CIDFont) FontData() interface{} {

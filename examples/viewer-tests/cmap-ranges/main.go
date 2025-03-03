@@ -226,16 +226,11 @@ func (f *testFont) Codes(s pdf.String) iter.Seq[*font.Code] {
 				code.CID = 0
 				code.Text = ""
 			}
+			code.UseWordSpacing = (k == 1 && c == 0x20)
 			if !yield(&code) {
 				break
 			}
 			s = s[k:]
 		}
 	}
-}
-
-// This implements the [font.Embedded] interface.
-func (f *testFont) DecodeWidth(s pdf.String) (float64, int) {
-	_, k, _ := f.codec.Decode(s)
-	return 2, k
 }

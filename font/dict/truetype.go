@@ -323,7 +323,7 @@ func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager) error {
 	return nil
 }
 
-func (d *TrueType) GetScanner() (font.Scanner, error) {
+func (d *TrueType) GetScanner() (font.Embedded, error) {
 	return d, nil
 }
 
@@ -338,20 +338,12 @@ func (d *TrueType) Codes(s pdf.String) iter.Seq[*font.Code] {
 			code.CID = cid.CID(c) + 1 // leave CID 0 for notdef
 			code.Width = d.Width[c]
 			code.Text = d.Text[c]
-
+			code.UseWordSpacing = (c == 0x20)
 			if !yield(&code) {
 				return
 			}
 		}
 	}
-}
-
-func (d *TrueType) DecodeWidth(s pdf.String) (float64, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-	code := s[0]
-	return d.Width[code] / 1000, 1
 }
 
 func init() {

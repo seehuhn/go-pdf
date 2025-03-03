@@ -73,10 +73,10 @@ func TestTextShowRaw(t *testing.T) {
 
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			F := dummyfont.Must()
+
 			// first print all glyphs in one string
 			img1 := ghostscript.Render(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
-				F := dummyfont.Must()
-
 				r.TextBegin()
 				r.TextSetFont(F, c.fontSize)
 				r.TextSetMatrix(c.M)
@@ -90,8 +90,6 @@ func TestTextShowRaw(t *testing.T) {
 			// now print glyphs one-by-one and record the x positions
 			var xx []float64
 			img2 := ghostscript.Render(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
-				F := dummyfont.Must()
-
 				r.TextBegin()
 				r.TextSetFont(F, c.fontSize)
 				r.TextSetMatrix(c.M)
@@ -107,8 +105,6 @@ func TestTextShowRaw(t *testing.T) {
 			})
 			// finally, print each glyph at the recorded x positions
 			img3 := ghostscript.Render(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
-				F := dummyfont.Must()
-
 				r.TextSetFont(F, 100)
 				for i := range testString {
 					r.TextBegin()
@@ -166,11 +162,11 @@ func TestTextShowRaw2(t *testing.T) {
 			const fontSize = 100
 			var s pdf.String
 
+			F := sample.MakeFont()
+
 			// First print glyphs one-by-one and record the x positions.
 			var xx []float64
 			img1 := ghostscript.Render(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
-				F := sample.MakeFont()
-
 				r.TextSetFont(F, fontSize)
 				r.TextBegin()
 				r.TextFirstLine(10, 10)
@@ -192,7 +188,6 @@ func TestTextShowRaw2(t *testing.T) {
 			})
 			// Then print each glyph at the recorded x positions.
 			img2 := ghostscript.Render(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
-				F := sample.MakeFont()
 				r.TextSetFont(F, fontSize)
 
 				_, E, err := pdf.ResourceManagerEmbed(r.RM, F)

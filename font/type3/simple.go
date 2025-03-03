@@ -32,7 +32,7 @@ import (
 
 var _ interface {
 	font.EmbeddedLayouter
-	font.Scanner
+	font.Embedded
 	pdf.Finisher
 } = (*embeddedSimple)(nil)
 
@@ -54,14 +54,6 @@ func newEmbeddedSimple(ref pdf.Reference, font *Font) *embeddedSimple {
 		Simple: simpleenc.NewSimple(0, false, &pdfenc.Standard),
 	}
 	return e
-}
-
-func (e *embeddedSimple) DecodeWidth(s pdf.String) (float64, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-	w := e.Simple.Width(s[0]) * e.Font.FontMatrix[0]
-	return w, 1
 }
 
 func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
@@ -194,6 +186,10 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	}
 
 	return nil
+}
+
+func (e *embeddedSimple) ToTextSpace(x float64) float64 {
+	return x * e.Font.FontMatrix[0]
 }
 
 func format(x float64) string {

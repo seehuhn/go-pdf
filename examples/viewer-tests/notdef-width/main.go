@@ -519,24 +519,12 @@ func (e *testFontEmbedded) Codes(s pdf.String) iter.Seq[*font.Code] {
 			code.CID = cid
 			code.Notdef = notdefCID
 			code.Width = width
+			code.UseWordSpacing = (s[i] == 0x20)
 
 			if !yield(&code) {
 				break
 			}
 		}
-	}
-}
-
-func (e *testFontEmbedded) DecodeWidth(s pdf.String) (float64, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-
-	cid := e.cmap.LookupCID([]byte{s[0]})
-	if w, ok := e.widths[cid]; ok {
-		return w / 1000, 1
-	} else {
-		return e.dw / 1000, 1
 	}
 }
 

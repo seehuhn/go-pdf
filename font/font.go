@@ -18,7 +18,9 @@ package font
 
 import (
 	"fmt"
+	"iter"
 
+	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
@@ -81,12 +83,32 @@ const (
 	Vertical WritingMode = 1
 )
 
+type Code struct {
+	// CID allows to look up the glyph in the underlying font.
+	CID cid.CID
+
+	// Notdef specifies which glyph to show if the requested glyph is not
+	// present in the font.
+	Notdef cid.CID
+
+	// Width is the glyph width in PDF glyph space units.
+	Width float64
+
+	// UseWordSpacing whether PDF word spacing should be used for this code.
+	// This is true if the character code is a single byte with the value 0x20
+	// (irrespective of whether the character actually represents a space).
+	UseWordSpacing bool
+
+	// Text is the text representation of the character.
+	Text string
+}
+
 // Embedded represents a font which is already embedded in a PDF file.
 //
 // The functions of this interface provide the information required to
 // keep track of the current text position in a PDF content stream.
 //
-// TODO(voss): merge with [Scanner] and [EmbeddedLayouter]
+// TODO(voss): merge with [EmbeddedLayouter]
 type Embedded interface {
 	WritingMode() WritingMode
 
@@ -95,15 +117,7 @@ type Embedded interface {
 	//
 	// The returned pointer points to memory that is reused across iterations.
 	// The caller must not modify the pointed-to structure.
-	// Codes(s pdf.String) iter.Seq[*Code]
-
-	// DecodeWidth reads one character code from the given string and returns
-	// the width of the corresponding glyph in PDF text space units (still to
-	// be multiplied by the font size) and the number of bytes read from the
-	// string.
-	//
-	// TODO(voss): remove
-	DecodeWidth(pdf.String) (float64, int)
+	Codes(s pdf.String) iter.Seq[*Code]
 }
 
 // EmbeddedLayouter is an embedded font which can typeset new text.

@@ -385,24 +385,43 @@ func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {
 	w.writeObjects(a, pdf.Operator("TJ"))
 }
 
-func (w *Writer) updateTextPosition(s pdf.String) {
-	wmode := w.TextFont.WritingMode()
+type toTextSpacer interface {
+	ToTextSpace(float64) float64
+}
 
-	pos := 0
-	for pos < len(s) {
-		width, k := w.TextFont.DecodeWidth(s[pos:])
+func divideBy1000(x float64) float64 {
+	return x / 1000
+}
+
+func (w *Writer) updateTextPosition(s pdf.String) {
+	// TODO(voss): can this be merged with the corresponding code in
+	// reader/reader.go?
+
+	var toTextSpace func(float64) float64
+	if f, ok := w.TextFont.(toTextSpacer); ok {
+		// Type 3 fonts use the font matrix, ...
+		toTextSpace = f.ToTextSpace
+	} else {
+		// ... everybode else divides by 1000.
+		toTextSpace = divideBy1000
+	}
+
+	wmode := w.TextFont.WritingMode()
+	for info := range w.TextFont.Codes(s) {
+		width := toTextSpace(info.Width)
 		width = width*w.TextFontSize + w.TextCharacterSpacing
-		if k == 1 && s[pos] == ' ' {
+		if info.UseWordSpacing {
 			width += w.TextWordSpacing
+		}
+		if wmode == font.Horizontal {
+			width *= w.TextHorizontalScaling
 		}
 
 		switch wmode {
-		case 0: // horizontal
-			w.TextMatrix = matrix.Translate(width*w.TextHorizontalScaling, 0).Mul(w.TextMatrix)
-		case 1: // vertical
+		case font.Horizontal:
+			w.TextMatrix = matrix.Translate(width, 0).Mul(w.TextMatrix)
+		case font.Vertical:
 			w.TextMatrix = matrix.Translate(0, width).Mul(w.TextMatrix)
 		}
-
-		pos += k
 	}
 }

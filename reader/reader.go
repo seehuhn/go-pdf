@@ -80,6 +80,10 @@ func (r *Reader) ParsePage(page pdf.Object, ctm matrix.Matrix) error {
 	r.Reset()
 	r.State.CTM = ctm
 
+	// TODO(voss): do we need to worry about inherited resources? There is some
+	// code in seehuhn.de/go/pdf/pagetree that copies inherited resources from
+	// the parent, but this needs to be checked and documented.  Also, it
+	// reduces generality of the ParsePage method.
 	resourcesDict, err := pdf.GetDict(r.R, pageDict["Resources"])
 	if err != nil {
 		return err
@@ -103,6 +107,7 @@ func (r *Reader) parseContents(obj pdf.Object) error {
 	case *pdf.Stream:
 		err := r.parsePDFStream(contents)
 		if err != nil && err != io.ErrUnexpectedEOF {
+			// TODO(voss): add reference to the message, as it is done below
 			return pdf.Wrap(err, "content stream")
 		}
 	case pdf.Array:
@@ -176,7 +181,8 @@ func (r *Reader) do() error {
 				m[i] = op.GetNumber()
 			}
 			if op.OK() {
-				r.CTM = r.CTM.Mul(m) // TODO(voss): correct order?
+				// TODO(voss): correct order?  Add unit tests.
+				r.CTM = r.CTM.Mul(m)
 			}
 
 		case "w": // line width
@@ -592,49 +598,56 @@ func (r *Reader) do() error {
 	return r.scanner.Error()
 }
 
+type toTextSpacer interface {
+	ToTextSpace(float64) float64
+}
+
+func divideBy1000(x float64) float64 {
+	return x / 1000
+}
+
 func (r *Reader) processText(s pdf.String) {
-	switch F := r.TextFont.(type) {
-	case nil:
-		// TODO(voss): what to do here?
-		return
-	case FontFromFile:
-		wmode := F.WritingMode()
+	// TODO(voss): can this be merged with the corresponding code in op-text.go?
 
-		for len(s) > 0 {
-			info, k := F.Decode(s)
+	var toTextSpace func(float64) float64
+	if f, ok := r.TextFont.(toTextSpacer); ok {
+		// Type 3 fonts use the font matrix, ...
+		toTextSpace = f.ToTextSpace
+	} else {
+		// ... everybode else divides by 1000.
+		toTextSpace = divideBy1000
+	}
 
-			width := info.Width*r.TextFontSize + r.TextCharacterSpacing
-			if k == 1 && s[0] == ' ' {
-				width += r.TextWordSpacing
-			}
-			if wmode == 0 {
-				width *= r.TextHorizontalScaling
-			}
-
-			if r.DrawGlyph != nil {
-				g := font.Glyph{
-					// GID:     gid,
-					Advance: width,
-					Rise:    r.TextRise,
-					Text:    []rune(info.Text),
-				}
-				r.DrawGlyph(g)
-			}
-			if r.Text != nil {
-				r.Text(info.Text)
-			}
-
-			switch wmode {
-			case 0: // horizontal
-				r.TextMatrix = matrix.Translate(width, 0).Mul(r.TextMatrix)
-			case 1: // vertical
-				r.TextMatrix = matrix.Translate(0, width).Mul(r.TextMatrix)
-			}
-
-			s = s[k:]
+	wmode := r.TextFont.WritingMode()
+	for info := range r.TextFont.Codes(s) {
+		width := toTextSpace(info.Width)
+		width = width*r.TextFontSize + r.TextCharacterSpacing
+		if info.UseWordSpacing {
+			width += r.TextWordSpacing
 		}
-	default:
-		panic(fmt.Sprintf("unexpected font type %T", F))
+		if wmode == font.Horizontal {
+			width *= r.TextHorizontalScaling
+		}
+
+		if r.DrawGlyph != nil {
+			g := font.Glyph{
+				// GID:     gid,
+				Advance: width,
+				Rise:    r.TextRise,
+				Text:    []rune(info.Text),
+			}
+			r.DrawGlyph(g)
+		}
+		if r.Text != nil {
+			r.Text(info.Text)
+		}
+
+		switch wmode {
+		case font.Horizontal:
+			r.TextMatrix = matrix.Translate(width, 0).Mul(r.TextMatrix)
+		case font.Vertical:
+			r.TextMatrix = matrix.Translate(0, width).Mul(r.TextMatrix)
+		}
 	}
 }
 

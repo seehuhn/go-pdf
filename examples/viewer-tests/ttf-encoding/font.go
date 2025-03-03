@@ -409,13 +409,6 @@ func (f *testFont) Codes(s pdf.String) iter.Seq[*font.Code] {
 	}
 }
 
-func (f *testFont) DecodeWidth(s pdf.String) (float64, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-	return f.width / 1000, 1
-}
-
 var (
 	macOSRomanInv map[string]int
 )

@@ -46,10 +46,6 @@ type CIDEncoder interface {
 
 	CMap(ros *cmap.CIDSystemInfo) *cmap.File
 
-	// DecodeWidth decodes the first character in a PDF string and returns its width.
-	// The second return value is the number of bytes consumed from the input string.
-	DecodeWidth(s pdf.String) (float64, int)
-
 	Codec() *charcode.Codec
 
 	GetCode(cid cid.CID, text string) (charcode.Code, bool)

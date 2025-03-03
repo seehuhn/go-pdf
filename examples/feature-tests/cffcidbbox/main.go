@@ -402,6 +402,7 @@ func (e *testFontEmbedded) Codes(s pdf.String) iter.Seq[*font.Code] {
 
 			code.CID = cid
 			code.Width = w
+			code.UseWordSpacing = (b == 0x20)
 			if !yield(&code) {
 				return
 			}
@@ -409,20 +410,7 @@ func (e *testFontEmbedded) Codes(s pdf.String) iter.Seq[*font.Code] {
 	}
 }
 
-func (e *testFontEmbedded) DecodeWidth(s pdf.String) (float64, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-
-	cid := e.cmap.LookupCID(s[:1])
-	w, ok := e.ww[cid]
-	if !ok {
-		return e.dw, 1
-	}
-	return w / 1000, 1
-}
-
 func clone[T any](x *T) *T {
-	y := *x
-	return &y
+	copy := *x
+	return &copy
 }

@@ -19,48 +19,13 @@ package font
 import (
 	"errors"
 	"fmt"
-	"iter"
 	"sync"
-
-	"seehuhn.de/go/postscript/cid"
 
 	"seehuhn.de/go/pdf"
 )
 
 type FromFile interface {
-	GetScanner() (Scanner, error)
-}
-
-type Code struct {
-	// CID allows to look up the glyph in the underlying font.
-	CID cid.CID
-
-	// Notdef specifies which glyph to show if the requested glyph is not
-	// present in the font.
-	Notdef cid.CID
-
-	// Width is the glyph width in PDF glyph space units.
-	Width float64
-
-	// Text is the text representation of the character.
-	Text string
-}
-
-var _ Embedded = Scanner(nil)
-
-// Scanner is an embedded font with information about the encoding.
-//
-// TODO(voss): merge with Scanner
-type Scanner interface {
-	// WritingMode indicates whether the font is for horizontal or vertical
-	// writing.
-	WritingMode() WritingMode
-
-	// Codes iterates over the character codes in a PDF string.
-	Codes(s pdf.String) iter.Seq[*Code]
-
-	// TODO(voss): remove
-	DecodeWidth(pdf.String) (float64, int)
+	GetScanner() (Embedded, error)
 }
 
 type ReaderFunc func(r pdf.Getter, obj pdf.Object) (FromFile, error)

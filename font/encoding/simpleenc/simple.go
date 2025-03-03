@@ -97,14 +97,6 @@ func (*Simple) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
 
-func (t *Simple) DecodeWidth(s pdf.String) (float64, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-	w := t.Width(s[0])
-	return w / 1000, 1
-}
-
 // Codes returns an iterator over the characters in the PDF string. Each code
 // includes the CID, width, and associated text. Missing glyphs map to CID 0
 // (notdef).
@@ -120,7 +112,7 @@ func (t *Simple) Codes(s pdf.String) iter.Seq[*font.Code] {
 			}
 			code.Width = info.Width
 			code.Text = info.Text
-
+			code.UseWordSpacing = (c == 0x20)
 			if !yield(&code) {
 				return
 			}

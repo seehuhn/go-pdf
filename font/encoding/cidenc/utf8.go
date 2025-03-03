@@ -63,13 +63,6 @@ func (e *compositeUTF8) WritingMode() font.WritingMode {
 	return e.wMode
 }
 
-func (e *compositeUTF8) DecodeWidth(s pdf.String) (float64, int) {
-	for code := range e.Codes(s) {
-		return code.Width / 1000, len(s)
-	}
-	return 0, 0
-}
-
 func (e *compositeUTF8) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(yield *font.Code) bool) {
 		var code font.Code
@@ -92,6 +85,8 @@ func (e *compositeUTF8) Codes(s pdf.String) iter.Seq[*font.Code] {
 				code.Width = e.cid0Width
 				code.Text = ""
 			}
+
+			code.UseWordSpacing = (k == 1 && c == 0x20)
 
 			if !yield(&code) {
 				break

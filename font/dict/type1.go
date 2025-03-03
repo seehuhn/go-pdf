@@ -461,7 +461,7 @@ func (d *Type1) WriteToPDF(rm *pdf.ResourceManager) error {
 	return nil
 }
 
-func (d *Type1) GetScanner() (font.Scanner, error) {
+func (d *Type1) GetScanner() (font.Embedded, error) {
 	return d, nil
 }
 
@@ -476,20 +476,12 @@ func (d *Type1) Codes(s pdf.String) iter.Seq[*font.Code] {
 			code.CID = cid.CID(c) + 1 // leave CID 0 for notdef
 			code.Width = d.Width[c]
 			code.Text = d.Text[c]
-
+			code.UseWordSpacing = (c == 0x20)
 			if !yield(&code) {
 				return
 			}
 		}
 	}
-}
-
-func (d *Type1) DecodeWidth(s pdf.String) (float64, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-	code := s[0]
-	return d.Width[code] / 1000, 1
 }
 
 // widthsAreCompatible returns true, if the glyph widths ww are compatible with

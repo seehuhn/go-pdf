@@ -18,6 +18,7 @@ package reader
 
 import (
 	"fmt"
+	"iter"
 
 	"seehuhn.de/go/postscript/type1/names"
 
@@ -32,8 +33,6 @@ import (
 // FontFromFile represents a font which has been extracted from a PDF file.
 type FontFromFile interface {
 	font.Embedded
-
-	Decode(s pdf.String) (*font.Code, int)
 
 	FontData() interface{}
 
@@ -110,7 +109,7 @@ func (r *Reader) readSimpleFont(info *font.Dicts, toUni *cmap.ToUnicodeFile) (F 
 			if err != nil {
 				w, _ = getStandardWidth(info.PostScriptName, ".notdef")
 			}
-			widths[code] = w / 1000
+			widths[code] = w
 		}
 	} else {
 		widths, err = r.extractWidths(info)
@@ -146,6 +145,7 @@ func getStandardWidth(fontName, glyphName string) (float64, error) {
 	return w, nil
 }
 
+// extractWidths extracts the widths of the glyphs (in PDF glyph space units).
 func (r *Reader) extractWidths(info *font.Dicts) ([]float64, error) {
 	firstChar, err := pdf.GetInteger(r.R, info.FontDict["FirstChar"])
 	if err != nil {
@@ -158,7 +158,7 @@ func (r *Reader) extractWidths(info *font.Dicts) ([]float64, error) {
 
 	widths := make([]float64, 256)
 	for c := range widths {
-		widths[c] = info.FontDescriptor.MissingWidth / 1000
+		widths[c] = info.FontDescriptor.MissingWidth
 	}
 	w, err := pdf.GetArray(r.R, info.FontDict["Widths"])
 	if err != nil {
@@ -173,7 +173,7 @@ func (r *Reader) extractWidths(info *font.Dicts) ([]float64, error) {
 			if err != nil {
 				return nil, err
 			}
-			widths[code] = float64(w) / 1000
+			widths[code] = float64(w)
 		}
 	}
 
@@ -191,47 +191,35 @@ func (f *SimpleFont) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
 
-// DecodeWidth reads one character code from the given string and returns
-// the width of the corresponding glyph in PDF text space units (still to
-// be multiplied by the font size) and the number of bytes read from the
-// string.
-func (f *SimpleFont) DecodeWidth(s pdf.String) (float64, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-	code := s[0]
-	return f.widths[code], 1
-}
+func (f *SimpleFont) Codes(s pdf.String) iter.Seq[*font.Code] {
+	return func(yield func(*font.Code) bool) {
+		for _, code := range s {
+			info := f.info[code]
+			if info == nil {
+				cid := f.enc.Decode(code)
 
-func (f *SimpleFont) Decode(s pdf.String) (*font.Code, int) {
-	if len(s) == 0 {
-		return nil, 0
-	}
-	code := s[0]
-	if info := f.info[code]; info != nil {
-		return info, 1
-	}
+				text, found := f.toUni.Lookup(s[:1])
+				if !found {
+					glyphName := f.enc.GlyphName(cid)
+					if glyphName != "" {
+						text = string(names.ToUnicode(glyphName, false))
+					}
+				}
+				// TODO(voss): any other methods for extracting the text mapping???
 
-	cid := f.enc.Decode(code)
-
-	text, found := f.toUni.Lookup(s[:1])
-	if !found {
-		glyphName := f.enc.GlyphName(cid)
-		if glyphName != "" {
-			text = string(names.ToUnicode(glyphName, false))
+				info = &font.Code{
+					CID:    cid,
+					Notdef: 0,
+					Text:   text,
+					Width:  f.widths[code],
+				}
+				f.info[code] = info
+			}
+			if !yield(info) {
+				break
+			}
 		}
 	}
-	// TODO(voss): any other methods for extracting the text mapping???
-
-	res := &font.Code{
-		CID:    cid,
-		Notdef: 0,
-		Text:   text,
-		Width:  f.widths[code],
-	}
-
-	f.info[code] = res
-	return res, 1
 }
 
 func (f *SimpleFont) FontData() interface{} {

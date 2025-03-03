@@ -47,7 +47,7 @@ import (
 
 var _ interface {
 	font.EmbeddedLayouter
-	font.Scanner
+	font.Embedded
 	pdf.Finisher
 } = (*embeddedSimple)(nil)
 
@@ -269,27 +269,17 @@ func (*embeddedSimple) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
 
-// Codes returns an iterator over the characters in the PDF string. Each code
-// includes the CID, width, and associated text. Missing glyphs map to CID 0
-// (notdef).
 func (e *embeddedSimple) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		var code font.Code
 		for _, c := range s {
 			code.CID, code.Width, code.Text = e.gd.GetData(c)
+			code.UseWordSpacing = (c == 0x20)
 			if !yield(&code) {
 				return
 			}
 		}
 	}
-}
-
-func (e *embeddedSimple) DecodeWidth(s pdf.String) (float64, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-	_, w, _ := e.gd.GetData(s[0])
-	return w / 1000, 1
 }
 
 func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {

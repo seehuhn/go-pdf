@@ -46,7 +46,7 @@ import (
 
 var _ interface {
 	font.EmbeddedLayouter
-	font.Scanner
+	font.Embedded
 	pdf.Finisher
 } = (*embeddedCFFComposite)(nil)
 

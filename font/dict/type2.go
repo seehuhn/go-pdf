@@ -388,7 +388,7 @@ func (d *CIDFontType2) WritingMode() font.WritingMode {
 }
 
 // GetScanner returns a font.Scanner for the font.
-func (d *CIDFontType2) GetScanner() (font.Scanner, error) {
+func (d *CIDFontType2) GetScanner() (font.Embedded, error) {
 	var csr charcode.CodeSpaceRange
 	csr = append(csr, d.Encoding.CodeSpaceRange...)
 	csr = append(csr, d.Text.CodeSpaceRange...)
@@ -452,14 +452,6 @@ func (s *type2Scanner) Codes(str pdf.String) iter.Seq[*font.Code] {
 			}
 		}
 	}
-}
-
-func (d *type2Scanner) DecodeWidth(s pdf.String) (float64, int) {
-	var w float64
-	for c := range d.Codes(s) {
-		w += c.Width
-	}
-	return w / 1000, len(s)
 }
 
 func init() {

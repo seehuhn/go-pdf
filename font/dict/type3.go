@@ -326,7 +326,7 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager) error {
 	return nil
 }
 
-func (d *Type3) GetScanner() (font.Scanner, error) {
+func (d *Type3) GetScanner() (font.Embedded, error) {
 	return d, nil
 }
 
@@ -341,20 +341,12 @@ func (d *Type3) Codes(s pdf.String) iter.Seq[*font.Code] {
 			code.CID = cid.CID(c) + 1 // leave CID 0 for notdef
 			code.Width = d.Width[c]
 			code.Text = d.Text[c]
-
+			code.UseWordSpacing = (c == 0x20)
 			if !yield(&code) {
 				return
 			}
 		}
 	}
-}
-
-func (d *Type3) DecodeWidth(s pdf.String) (float64, int) {
-	if len(s) == 0 {
-		return 0, 0
-	}
-	code := s[0]
-	return d.Width[code] * d.FontMatrix[0], 1
 }
 
 func init() {

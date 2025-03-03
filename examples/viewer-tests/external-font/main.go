@@ -279,13 +279,10 @@ func (f *testFont) Codes(s pdf.String) iter.Seq[*font.Code] {
 		code.Width = glyphWidths
 		for _, c := range s {
 			code.CID = cid.CID(c) + 1 // leave CID 0 for .notdef
+			code.UseWordSpacing = (c == 0x20)
 			if !yield(&code) {
 				break
 			}
 		}
 	}
-}
-
-func (f *testFont) DecodeWidth(pdf.String) (float64, int) {
-	return glyphWidths / 1000, 1
 }

@@ -63,13 +63,6 @@ func (e *compositeIdentity) WritingMode() font.WritingMode {
 	return e.wMode
 }
 
-func (e *compositeIdentity) DecodeWidth(s pdf.String) (float64, int) {
-	for code := range e.Codes(s) {
-		return code.Width / 1000, len(s)
-	}
-	return 0, 0
-}
-
 func (e *compositeIdentity) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(yield *font.Code) bool) {
 		var code font.Code
