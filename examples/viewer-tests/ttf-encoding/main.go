@@ -18,7 +18,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"os"
 	"slices"
 	"sort"
 	"strings"
@@ -32,12 +32,13 @@ import (
 func main() {
 	err := createDocument("test.pdf")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
 	}
 }
 
 func createDocument(fname string) error {
-	version := pdf.V2_0
+	pdfVersion := pdf.V2_0
 	useSymbolic := false
 	useEncoding := true
 	base := uint16(0x0000)
@@ -71,17 +72,17 @@ func createDocument(fname string) error {
 	gray := cs.New(0.7, 0.7, 0.7)
 	blue := cs.New(0, 0, 0.8)
 
-	out, err := NewOutput(fname, version)
+	out, err := NewOutput(fname, pdfVersion)
 	if err != nil {
 		return err
 	}
 	out.Println(black, textFont,
 		fmt.Sprintf("PDF version %s, symbolic=%t, encoding=%t, base=0x%04X",
-			version, useSymbolic, useEncoding, base))
+			pdfVersion, useSymbolic, useEncoding, base))
 	out.Println()
 	out.Println(`A: Use a (1,0) subtable to map c to a glyph.`)
 	out.Println(`B: Use a (3,0) subtable to map c+base to a glyph.`)
-	out.Println(`C: Use the encoding to map c to a Mac OS Roman name,`)
+	out.Println(`C: Use the encoding to map c to a MacOS Roman name,`)
 	out.Println(`    then use a (1,0) subtable to map the name to a glyph.`)
 	out.Println(`D: Use the encoding to map c to a glyph name,`)
 	out.Println(`    then use a (3,1) subtable to map the name to a glyph.`)

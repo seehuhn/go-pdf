@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"iter"
 	"math"
 	"slices"
 
@@ -78,9 +79,9 @@ func NewFontBuilder() (*fontBuilder, error) {
 // 130: WinAnsi encoding for "quotesinglbase"
 // 131: WinAnsi encoding for "florin"
 // 132: WinAnsi encoding for "quotedblbase"
-// 196: Mac OS Roman encoding for "florin"
-// 226: Mac OS Roman encoding for "quotesinglbase"
-// 227: Mac OS Roman encoding for "quotedblbase"
+// 196: MacOS Roman encoding for "florin"
+// 226: MacOS Roman encoding for "quotesinglbase"
+// 227: MacOS Roman encoding for "quotedblbase"
 // 402: Unicode for "florin"
 // 8218: Unicode for "quotesinglbase"
 // 8222: Unicode for "quotedblbase"
@@ -180,7 +181,7 @@ func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Font, error) {
 		useCmap_3_0 = true
 	}
 
-	// method C: use the encoding to map `c` to a name, use Mac OS Roman to map
+	// method C: use the encoding to map `c` to a name, use MacOS Roman to map
 	// the name to a code, and then look up this code in a (1, 0) "cmap" to get
 	// the GID.
 	if enc.cmap_1_0_enc != "" {
@@ -400,6 +401,12 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 
 func (f *testFont) WritingMode() font.WritingMode {
 	return font.Horizontal
+}
+
+func (f *testFont) Codes(s pdf.String) iter.Seq[*font.Code] {
+	return func(yield func(*font.Code) bool) {
+		// TODO(voss): implement
+	}
 }
 
 func (f *testFont) DecodeWidth(s pdf.String) (float64, int) {

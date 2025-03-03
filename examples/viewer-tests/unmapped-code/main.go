@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"iter"
 	"os"
 
 	"seehuhn.de/go/geom/matrix"
@@ -154,11 +155,11 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 
 	// load the original font
 	ll := loader.NewFontLoader()
-	fd, err := ll.Open("Times-Roman", loader.FontTypeType1)
+	r, err := ll.Open("Times-Roman", loader.FontTypeType1)
 	if err != nil {
 		return nil, nil, err
 	}
-	F, err := type1.Read(fd)
+	F, err := type1.Read(r)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -188,18 +189,6 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 
 	F.Encoding = psenc.StandardEncoding[:]
 
-	fontDesc := &font.Descriptor{
-		FontName:     subset.Join("AAAAAA", "NimbusRoman-Regular"),
-		IsSerif:      true,
-		FontBBox:     F.FontBBoxPDF(),
-		Ascent:       1000,
-		Descent:      100,
-		Leading:      2000,
-		CapHeight:    1000,
-		XHeight:      500,
-		MissingWidth: 500,
-	}
-
 	enc := func(code byte) string {
 		switch code {
 		case ' ':
@@ -214,49 +203,63 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 			return ""
 		}
 	}
-	dd := dict.Type1{
+
+	fd := &font.Descriptor{
+		FontName:     subset.Join("AAAAAA", "NimbusRoman-Regular"),
+		IsSerif:      true,
+		FontBBox:     F.FontBBoxPDF(),
+		Ascent:       1000,
+		Descent:      100,
+		Leading:      2000,
+		CapHeight:    1000,
+		XHeight:      500,
+		MissingWidth: 500,
+	}
+	dict := dict.Type1{
 		Ref:            fontDictRef,
 		PostScriptName: "NimbusRoman-Regular",
 		SubsetTag:      "AAAAAA",
-		Descriptor:     fontDesc,
+		Descriptor:     fd,
 		Encoding:       enc,
 		FontType:       glyphdata.Type1,
 		FontRef:        w.Alloc(),
 	}
 	for code := range 256 {
-		dd.Width[code] = 500
+		dict.Width[code] = 500
 	}
-	dd.Width[' '] = F.Glyphs["space"].WidthX * F.FontInfo.FontMatrix[0] * 1000
-	dd.Width['A'] = F.Glyphs["AEacute"].WidthX * F.FontInfo.FontMatrix[0] * 1000
-	dd.Width[0o335] = F.Glyphs["Yacute"].WidthX * F.FontInfo.FontMatrix[0] * 1000
-	dd.Text[' '] = " "
-	dd.Text['A'] = "Ǽ"
-	dd.Text[0o335] = "Ý"
+	dict.Width[' '] = F.Glyphs["space"].WidthX * F.FontInfo.FontMatrix[0] * 1000
+	dict.Width['A'] = F.Glyphs["AEacute"].WidthX * F.FontInfo.FontMatrix[0] * 1000
+	dict.Width[0o335] = F.Glyphs["Yacute"].WidthX * F.FontInfo.FontMatrix[0] * 1000
+	dict.Text[' '] = " "
+	dict.Text['A'] = "Ǽ"
+	dict.Text[0o335] = "Ý"
 
-	err = dd.WriteToPDF(rm)
+	err = dict.WriteToPDF(rm)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	err = type1glyphs.Embed(w, dd.FontType, dd.FontRef, F)
+	err = type1glyphs.Embed(w, dict.FontType, dict.FontRef, F)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	res := &testFontEmbedded{
-		Ref: fontDictRef,
-		W:   dd.Width[:],
+		W: dict.Width[:],
 	}
 	return fontDictRef, res, nil
 }
 
 type testFontEmbedded struct {
-	Ref pdf.Reference
-	W   []float64
+	W []float64
 }
 
 func (f *testFontEmbedded) WritingMode() font.WritingMode {
 	return 0
+}
+
+func (f *testFontEmbedded) Codes(s pdf.String) iter.Seq[*font.Code] {
+	panic("not implemented") // TODO: Implement
 }
 
 // DecodeWidth reads one character code from the given string and returns
