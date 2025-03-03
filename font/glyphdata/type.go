@@ -24,6 +24,26 @@ const (
 	// None indicates that no glyph outlines are embedded.
 	None Type = iota
 
+	// Type1 indicates that glyph outlines are provided in Type 1 format.
+	//
+	// This can be used for [seehuhn.de/go/pdf/font/dict.Type1] font dictionaries.
+	//
+	// Font data can be embedded using [seehuhn.de/go/pdf/font/glyphdata/type1glyphs.Embed],
+	// and extracted using [seehuhn.de/go/pdf/font/glyphdata/type1glyphs.Extract].
+	Type1
+
+	// TrueType indicates that glyph outlines are provided in TrueType "glyf"
+	// format.
+	//
+	// This can be used for [seehuhn.de/go/pdf/font/dict.TrueType] and
+	// [seehuhn.de/go/pdf/font/dict.CIDFontType2] font dictionaries.
+	//
+	// Font data can be embedded using [seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs.Embed],
+	// and extracted using [seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs.Extract].
+	TrueType
+
+	Type3
+
 	CFF
 	CFFSimple
 	OpenTypeCFF
@@ -48,24 +68,6 @@ const (
 	// Font data can be embedded using [seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs.Embed],
 	// and extracted using [seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs.Extract].
 	OpenTypeGlyf
-
-	// TrueType indicates that glyph outlines are provided in TrueType "glyf"
-	// format.
-	//
-	// This can be used for [seehuhn.de/go/pdf/font/dict.TrueType] and
-	// [seehuhn.de/go/pdf/font/dict.CIDFontType2] font dictionaries.
-	//
-	// Font data can be embedded using [seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs.Embed],
-	// and extracted using [seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs.Extract].
-	TrueType
-
-	// Type1 indicates that glyph outlines are provided in Type 1 format.
-	//
-	// This can be used for [seehuhn.de/go/pdf/font/dict.Type1] font dictionaries.
-	//
-	// Font data can be embedded using [seehuhn.de/go/pdf/font/glyphdata/type1glyphs.Embed],
-	// and extracted using [seehuhn.de/go/pdf/font/glyphdata/type1glyphs.Extract].
-	Type1
 )
 
 func (t Type) String() string {
@@ -86,6 +88,8 @@ func (t Type) String() string {
 		return "TrueType"
 	case Type1:
 		return "Type1"
+	case Type3:
+		return "Type3"
 	default:
 		return fmt.Sprintf("Type(%d)", t)
 	}

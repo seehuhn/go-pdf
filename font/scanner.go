@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/glyphdata"
 )
 
 type FromFile interface {
@@ -29,8 +30,17 @@ type FromFile interface {
 	GetDict() Dict
 }
 
+// Dict represents a font dictionary.
+//
+// This must be one of the following types:
+//   - [seehuhn.de/go/pdf/font/dict.Type1]
+//   - [seehuhn.de/go/pdf/font/dict.TrueType]
+//   - [seehuhn.de/go/pdf/font/dict.Type3]
+//   - [seehuhn.de/go/pdf/font/dict.CIDFontType0]
+//   - [seehuhn.de/go/pdf/font/dict.CIDFontType2]
 type Dict interface {
 	MakeFont() (FromFile, error)
+	GlyphData() (glyphdata.Type, pdf.Reference)
 }
 
 type ReaderFunc func(r pdf.Getter, obj pdf.Object) (Dict, error)

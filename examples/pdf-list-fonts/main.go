@@ -25,7 +25,6 @@ import (
 	"golang.org/x/exp/maps"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
@@ -127,8 +126,8 @@ func doit(fname string) error {
 			}
 		}
 		if fontDesc == nil {
-			if subtype == "Type1" && font.IsStandard[string(fontName)] {
-				subtype = "builtin"
+			if subtype == "Type1" {
+				subtype = "standard"
 			} else if subtype != "Type3" {
 				return errors.New("no font descriptor for " + string(fontName) + " " + string(subtype))
 			}

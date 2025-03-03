@@ -36,7 +36,7 @@ var (
 	_ font.Dict = (*TrueType)(nil)
 )
 
-// TrueType represents a TrueType font dictionary.
+// TrueType represents the font dictionary of a simple TrueType font.
 // This can correspond either to a TrueType or an OpenType font.
 type TrueType struct {
 	// Ref is the reference to the font dictionary in the PDF file.
@@ -50,9 +50,9 @@ type TrueType struct {
 	// If non-empty, the value must be a sequence of 6 uppercase letters.
 	SubsetTag string
 
-	// Name is deprecated and is normally empty.
-	// For PDF 1.0 this was the name the font was referenced by from
-	// within content streams.
+	// Name is deprecated and should be left empty.
+	// Only used in PDF 1.0 where it was the name used to reference the font
+	// from within content streams.
 	Name pdf.Name
 
 	// Descriptor is the font descriptor.
@@ -68,9 +68,9 @@ type TrueType struct {
 	// Text gives the text content for each character code.
 	Text [256]string
 
-	// FontType gives the type of glyph outline data. Possible values are
-	// [glyphdata.TrueType] and [glyphdata.OpenTypeGlyf], or [glyphdata.None]
-	// if the font is not embedded.
+	// FontType gives the type of glyph outline data.
+	// Possible values are [glyphdata.TrueType] and [glyphdata.OpenTypeGlyf],
+	// or [glyphdata.None] if the font is not embedded.
 	FontType glyphdata.Type
 
 	// FontRef is the reference to the glyph outline data in the PDF file,
@@ -93,9 +93,7 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*TrueType, error) {
 		return nil, err
 	}
 	if subtype != "" && subtype != "TrueType" {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("expected font subtype TrueType, got %q", subtype),
-		}
+		return nil, pdf.Errorf("expected font subtype TrueType, got %q", subtype)
 	}
 
 	d := &TrueType{}
@@ -136,6 +134,8 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*TrueType, error) {
 			case "OpenType":
 				d.FontType = glyphdata.OpenTypeGlyf
 				d.FontRef = ref
+			default:
+				d.FontType = glyphdata.None
 			}
 		}
 	}
@@ -192,18 +192,102 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*TrueType, error) {
 		}
 	}
 
+	d.repair(r)
+
 	return d, nil
+}
+
+// repair fixes invalid data in the font dictionary.
+// After repair has been called, [TrueType.validate] will return nil.
+func (d *TrueType) repair(r pdf.Getter) {
+	if d.Descriptor == nil {
+		d.Descriptor = &font.Descriptor{}
+	}
+
+	if v := pdf.GetVersion(r); v == pdf.V1_0 {
+		if d.Name == "" {
+			d.Name = "Font"
+		}
+	} else if v >= pdf.V2_0 {
+		d.Name = ""
+	}
+
+	m := subset.TagRegexp.FindStringSubmatch(d.Descriptor.FontName)
+	if m != nil {
+		if d.SubsetTag == "" {
+			d.SubsetTag = m[1]
+		}
+		if d.PostScriptName == "" {
+			d.PostScriptName = m[2]
+		}
+	} else if d.PostScriptName == "" {
+		d.PostScriptName = d.Descriptor.FontName
+	}
+	if d.PostScriptName == "" {
+		d.PostScriptName = "Font"
+	}
+	if !subset.IsValidTag(d.SubsetTag) {
+		d.SubsetTag = ""
+	}
+	d.Descriptor.FontName = subset.Join(d.SubsetTag, d.PostScriptName)
+
+	if d.FontRef == 0 {
+		d.FontType = glyphdata.None
+	}
+}
+
+// validate checks that all data are valid and consistent.
+func (d *TrueType) validate(w *pdf.Writer) error {
+	if d.Descriptor == nil {
+		return errors.New("missing font descriptor")
+	}
+
+	if v := pdf.GetVersion(w); v == pdf.V1_0 {
+		if d.Name == "" {
+			return errors.New("missing font name")
+		}
+	} else if v >= pdf.V2_0 {
+		if d.Name != "" {
+			return errors.New("unexpected font name")
+		}
+	}
+
+	if d.PostScriptName == "" {
+		return errors.New("missing PostScript name")
+	}
+	if d.SubsetTag != "" && !subset.IsValidTag(d.SubsetTag) {
+		return fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
+	}
+	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)
+	if d.Descriptor.FontName != baseFont {
+		return fmt.Errorf("font name mismatch: %s != %s",
+			baseFont, d.Descriptor.FontName)
+	}
+
+	if d.SubsetTag != "" && d.FontType == glyphdata.None {
+		return errors.New("external font data cannot be subsetted")
+	}
+
+	if (d.FontType == glyphdata.None) != (d.FontRef == 0) {
+		return errors.New("missing font reference or type")
+	}
+
+	return nil
 }
 
 // WriteToPDF adds the font dictionary to the PDF file.
 func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager) error {
-	// Check that all data are valid and consistent.
 	if d.Ref == 0 {
 		return errors.New("missing font dictionary reference")
 	}
-	if (d.FontType == glyphdata.None) != (d.FontRef == 0) {
-		return errors.New("missing font reference or type")
+
+	w := rm.Out
+
+	err := d.validate(w)
+	if err != nil {
+		return err
 	}
+
 	switch d.FontType {
 	case glyphdata.None:
 		// not embedded
@@ -218,23 +302,12 @@ func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager) error {
 	default:
 		return fmt.Errorf("invalid font type %s", d.FontType)
 	}
-	if d.SubsetTag != "" && !subset.IsValidTag(d.SubsetTag) {
-		return fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
-	}
 
-	w := rm.Out
-
-	var baseFont pdf.Name
-	if d.SubsetTag != "" {
-		baseFont = pdf.Name(d.SubsetTag + "+" + d.PostScriptName)
-	} else {
-		baseFont = pdf.Name(d.PostScriptName)
-	}
-
+	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)
 	fontDict := pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("TrueType"),
-		"BaseFont": baseFont,
+		"BaseFont": pdf.Name(baseFont),
 	}
 	if d.Name != "" {
 		fontDict["Name"] = d.Name
@@ -268,40 +341,24 @@ func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	// TODO(voss): Introduce a helper function for constructing the widths
 	// array.
-	firstChar, lastChar := 0, 255
-	for lastChar > 0 && d.Width[lastChar] == d.Descriptor.MissingWidth {
-		lastChar--
-	}
-	for firstChar < lastChar && d.Width[firstChar] == d.Descriptor.MissingWidth {
-		firstChar++
-	}
-	widths := make(pdf.Array, lastChar-firstChar+1)
-	for i := range widths {
-		widths[i] = pdf.Number(d.Width[firstChar+i])
-	}
-
-	fontDict["FirstChar"] = pdf.Integer(firstChar)
-	fontDict["LastChar"] = pdf.Integer(lastChar)
-	if len(widths) > 10 {
-		widthRef := w.Alloc()
-		fontDict["Widths"] = widthRef
-		compressedObjects = append(compressedObjects, widths)
-		compressedRefs = append(compressedRefs, widthRef)
-	} else {
-		fontDict["Widths"] = widths
-	}
+	defaultWidth := d.Descriptor.MissingWidth
+	oo, rr := setSimpleWidths(w, fontDict, d.Width[:], d.Encoding, defaultWidth)
+	compressedObjects = append(compressedObjects, oo...)
+	compressedRefs = append(compressedRefs, rr...)
 
 	toUnicodeData := make(map[byte]string)
 	for code := range 256 {
+		if d.Text[code] == "" {
+			continue
+		}
+
 		glyphName := d.Encoding(byte(code))
 		switch glyphName {
-		case "", ".notdef":
+		case "":
 			// unused character code, nothing to do
 
 		case encoding.UseBuiltin:
-			if d.Text[code] != "" {
-				toUnicodeData[byte(code)] = d.Text[code]
-			}
+			toUnicodeData[byte(code)] = d.Text[code]
 
 		default:
 			rr := names.ToUnicode(glyphName, d.PostScriptName == "ZapfDingbats")
@@ -321,31 +378,43 @@ func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return pdf.Wrap(err, "Type 1 font dicts")
+		return fmt.Errorf("TrueType font dict: %w", err)
 	}
 
 	return nil
 }
 
+func (d *TrueType) GlyphData() (glyphdata.Type, pdf.Reference) {
+	return d.FontType, d.FontRef
+}
+
 func (d *TrueType) MakeFont() (font.FromFile, error) {
-	return d, nil
+	return ttFont{d}, nil
 }
 
-func (d *TrueType) GetDict() font.Dict {
-	return d
+var (
+	_ font.FromFile = ttFont{}
+)
+
+type ttFont struct {
+	Dict *TrueType
 }
 
-func (d *TrueType) WritingMode() font.WritingMode {
+func (f ttFont) GetDict() font.Dict {
+	return f.Dict
+}
+
+func (ttFont) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
 
-func (d *TrueType) Codes(s pdf.String) iter.Seq[*font.Code] {
+func (f ttFont) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		var code font.Code
 		for _, c := range s {
 			code.CID = cid.CID(c) + 1 // leave CID 0 for notdef
-			code.Width = d.Width[c]
-			code.Text = d.Text[c]
+			code.Width = f.Dict.Width[c]
+			code.Text = f.Dict.Text[c]
 			code.UseWordSpacing = (c == 0x20)
 			if !yield(&code) {
 				return

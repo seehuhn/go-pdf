@@ -24,11 +24,11 @@ import (
 )
 
 // Range represents a range of character codes.
+// Low and High must have the same length and must not be empty.
+//
 // To be within the range, a byte sequence must have the same length as Low
 // and High, and every byte in the sequence must be between the corresponding
 // bytes in Low and High (inclusive).
-//
-// Low and High must have the same length and must not be empty.
 type Range struct {
 	Low, High []byte
 }

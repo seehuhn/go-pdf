@@ -29,6 +29,11 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
+	"seehuhn.de/go/pdf/font/glyphdata"
+)
+
+var (
+	_ font.Dict = (*Type3)(nil)
 )
 
 // Type3 represents a Type 3 font dictionary.
@@ -88,9 +93,7 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
 		return nil, err
 	}
 	if subtype != "" && subtype != "Type3" {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("expected font subtype Type3, got %q", subtype),
-		}
+		return nil, pdf.Errorf("expected font subtype Type3, got %q", subtype)
 	}
 
 	d := &Type3{}
@@ -186,23 +189,45 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
 		return nil, err
 	}
 
+	d.repair()
+
 	return d, nil
 }
 
-// WriteToPDF adds the Type 3 font dictionary to the PDF file.
-func (d *Type3) WriteToPDF(rm *pdf.ResourceManager) error {
-	// Check that all data are valid and consistent.
-	if d.Ref == 0 {
-		return errors.New("missing font dictionary reference")
+// repair fixes invalid data in the font dictionary.
+// After repair has been called, Type3.validate will return nil.
+func (d *Type3) repair() {
+	if d.FontMatrix.IsZero() {
+		// Default Type3 font matrix maps 1000 units to 1 unit in text space
+		d.FontMatrix = matrix.Matrix{0.001, 0, 0, 0.001, 0, 0}
 	}
-	if d.CharProcs == nil {
-		return errors.New("no glyphs found")
-	}
+}
+
+// validate checks that all data are valid and consistent.
+func (d *Type3) validate() error {
 	if d.FontMatrix.IsZero() {
 		return errors.New("invalid FontMatrix")
 	}
 
+	if d.Encoding == nil {
+		return errors.New("missing Encoding")
+	}
+
+	return nil
+}
+
+// WriteToPDF adds the Type 3 font dictionary to the PDF file.
+func (d *Type3) WriteToPDF(rm *pdf.ResourceManager) error {
+	if d.Ref == 0 {
+		return errors.New("missing font dictionary reference")
+	}
+
 	w := rm.Out
+
+	err := d.validate()
+	if err != nil {
+		return err
+	}
 
 	fontBBox := d.FontBBox
 	if fontBBox == nil {
@@ -257,27 +282,9 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager) error {
 	if d.Descriptor != nil {
 		defaultWidth = d.Descriptor.MissingWidth
 	}
-	firstChar, lastChar := 0, 255
-	for lastChar > 0 && (d.Encoding(byte(lastChar)) == "" || d.Width[lastChar] == defaultWidth) {
-		lastChar--
-	}
-	for firstChar < lastChar && (d.Encoding(byte(firstChar)) == "" || d.Width[firstChar] == defaultWidth) {
-		firstChar++
-	}
-	widths := make(pdf.Array, lastChar-firstChar+1)
-	for i := range widths {
-		widths[i] = pdf.Number(d.Width[firstChar+i])
-	}
-	fontDict["FirstChar"] = pdf.Integer(firstChar)
-	fontDict["LastChar"] = pdf.Integer(lastChar)
-	if len(widths) > 10 {
-		widthRef := w.Alloc()
-		fontDict["Widths"] = widthRef
-		compressedObjects = append(compressedObjects, widths)
-		compressedRefs = append(compressedRefs, widthRef)
-	} else {
-		fontDict["Widths"] = widths
-	}
+	oo, rr := setSimpleWidths(w, fontDict, d.Width[:], d.Encoding, defaultWidth)
+	compressedObjects = append(compressedObjects, oo...)
+	compressedRefs = append(compressedRefs, rr...)
 
 	if d.Descriptor != nil {
 		fdRef := w.Alloc()
@@ -289,6 +296,10 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	toUnicodeData := make(map[byte]string)
 	for code := range 256 {
+		if d.Text[code] == "" {
+			continue
+		}
+
 		glyphName := d.Encoding(byte(code))
 		switch glyphName {
 		case "":
@@ -320,31 +331,43 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return pdf.Wrap(err, "Type 3 font dicts")
+		return fmt.Errorf("Type 3 font dict: %w", err)
 	}
 
 	return nil
 }
 
+func (d *Type3) GlyphData() (glyphdata.Type, pdf.Reference) {
+	return glyphdata.Type3, 0
+}
+
 func (d *Type3) MakeFont() (font.FromFile, error) {
-	return d, nil
+	return type3Font{d}, nil
 }
 
-func (d *Type3) GetDict() font.Dict {
-	return d
+var (
+	_ font.FromFile = type3Font{}
+)
+
+type type3Font struct {
+	Dict *Type3
 }
 
-func (d *Type3) WritingMode() font.WritingMode {
+func (f type3Font) GetDict() font.Dict {
+	return f.Dict
+}
+
+func (type3Font) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
 
-func (d *Type3) Codes(s pdf.String) iter.Seq[*font.Code] {
+func (f type3Font) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		var code font.Code
 		for _, c := range s {
 			code.CID = cid.CID(c) + 1 // leave CID 0 for notdef
-			code.Width = d.Width[c]
-			code.Text = d.Text[c]
+			code.Width = f.Dict.Width[c]
+			code.Text = f.Dict.Text[c]
 			code.UseWordSpacing = (c == 0x20)
 			if !yield(&code) {
 				return

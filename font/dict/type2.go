@@ -32,6 +32,10 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 )
 
+var (
+	_ font.Dict = (*CIDFontType2)(nil)
+)
+
 // CIDFontType2 holds the information from the font dictionary and CIDFont
 // dictionary of a Type 2 (TrueType-based) CIDFont.
 type CIDFontType2 struct {
@@ -329,7 +333,7 @@ func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager) error {
 	compressedObjects := []pdf.Object{fontDict, cidFontDict, fdDict}
 	compressedRefs := []pdf.Reference{fontDictRef, cidFontRef, fdRef}
 
-	ww := encodeComposite(d.Width, d.DefaultWidth)
+	ww := encodeCompositeWidths(d.Width, d.DefaultWidth)
 	switch {
 	case moreThanTen(ww):
 		wwRef := w.Alloc()
@@ -383,10 +387,6 @@ func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager) error {
 	return nil
 }
 
-func (d *CIDFontType2) WritingMode() font.WritingMode {
-	return d.Encoding.WMode
-}
-
 // MakeFont returns a font.Scanner for the font.
 func (d *CIDFontType2) MakeFont() (font.FromFile, error) {
 	var csr charcode.CodeSpaceRange
@@ -411,10 +411,18 @@ func (d *CIDFontType2) MakeFont() (font.FromFile, error) {
 	return s, nil
 }
 
+func (d *CIDFontType2) GlyphData() (glyphdata.Type, pdf.Reference) {
+	return d.FontType, d.FontRef
+}
+
 type type2Scanner struct {
 	*CIDFontType2
 	codec *charcode.Codec
 	cache map[charcode.Code]*font.Code
+}
+
+func (s *type2Scanner) WritingMode() font.WritingMode {
+	return s.Encoding.WMode
 }
 
 func (s *type2Scanner) GetDict() font.Dict {

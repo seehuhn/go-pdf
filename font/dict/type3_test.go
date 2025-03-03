@@ -215,7 +215,7 @@ var type3Dicts = []*Type3{
 			}
 		},
 		Width: makeTestWidth(65, 100.0, 66, 100.0),
-		Text:  makeTestText(65, "A", "B"),
+		Text:  makeTestText(65, "A", 66, "B"),
 		CharProcs: map[pdf.Name]pdf.Reference{
 			"A": pdf.NewReference(1, 0),
 			"B": pdf.NewReference(2, 0),

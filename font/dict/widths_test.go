@@ -107,7 +107,7 @@ func TestEncodeComposite(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			res := encodeComposite(tc.widthMap, tc.dw)
+			res := encodeCompositeWidths(tc.widthMap, tc.dw)
 			if !reflect.DeepEqual(res, tc.expected) {
 				t.Errorf("unexpected result\nGot: %#v\nExpected: %#v", res, tc.expected)
 			}
@@ -126,7 +126,7 @@ func TestWidthCompositeRoundTrip(t *testing.T) {
 		12: 103,
 		15: 104,
 	}
-	encoded := encodeComposite(in, 0)
+	encoded := encodeCompositeWidths(in, 0)
 
 	out, err := decodeComposite(mock.Getter, encoded)
 	if err != nil {

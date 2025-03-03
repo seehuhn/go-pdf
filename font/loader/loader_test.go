@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/internal/stdmtx"
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/type1"
 )
@@ -58,7 +58,7 @@ func TestBuiltin(t *testing.T) {
 func TestStandardFonts(t *testing.T) {
 	loader := NewFontLoader()
 
-	names := maps.Keys(font.IsStandard)
+	names := maps.Keys(stdmtx.Metrics)
 
 	// Type 1 font files
 	for name := range names {

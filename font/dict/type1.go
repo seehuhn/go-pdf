@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"math"
 
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/type1/names"
@@ -97,9 +96,7 @@ func ExtractType1(r pdf.Getter, obj pdf.Object) (*Type1, error) {
 		return nil, err
 	}
 	if subtype != "" && subtype != "Type1" {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("expected font subtype Type1, got %q", subtype),
-		}
+		return nil, pdf.Errorf("expected font subtype Type1, got %q", subtype)
 	}
 
 	d := &Type1{}
@@ -184,12 +181,11 @@ func ExtractType1(r pdf.Getter, obj pdf.Object) (*Type1, error) {
 	}
 	d.Encoding = enc
 
-	defaultWidth := fd.MissingWidth
 	firstChar, _ := pdf.GetInteger(r, fontDict["FirstChar"])
 	widths, _ := pdf.GetArray(r, fontDict["Widths"])
 	if widths != nil && len(widths) <= 256 && firstChar >= 0 && firstChar < 256 {
 		for c := range d.Width {
-			d.Width[c] = defaultWidth
+			d.Width[c] = fd.MissingWidth
 		}
 		for i, w := range widths {
 			w, err := pdf.GetNumber(r, w)
@@ -239,14 +235,14 @@ func ExtractType1(r pdf.Getter, obj pdf.Object) (*Type1, error) {
 		}
 	}
 
-	d.Repair(r)
+	d.repair(r)
 
 	return d, nil
 }
 
-// Repair fixes invalid data in the font dictionary.
-// After Repair has been called, [Type1.validate] will return nil.
-func (d *Type1) Repair(r pdf.Getter) {
+// repair fixes invalid data in the font dictionary.
+// After repair has been called, [Type1.validate] will return nil.
+func (d *Type1) repair(r pdf.Getter) {
 	if d.Descriptor == nil {
 		d.Descriptor = &font.Descriptor{}
 	}
@@ -401,30 +397,10 @@ func (d *Type1) WriteToPDF(rm *pdf.ResourceManager) error {
 		compressedObjects = append(compressedObjects, fdDict)
 		compressedRefs = append(compressedRefs, fdRef)
 
-		// TODO(voss): Introduce a helper function for constructing the widths
-		// array.
 		defaultWidth := d.Descriptor.MissingWidth
-		firstChar, lastChar := 0, 255
-		for lastChar > 0 && (d.Encoding(byte(lastChar)) == "" || d.Width[lastChar] == defaultWidth) {
-			lastChar--
-		}
-		for firstChar < lastChar && (d.Encoding(byte(firstChar)) == "" || d.Width[firstChar] == defaultWidth) {
-			firstChar++
-		}
-		widths := make(pdf.Array, lastChar-firstChar+1)
-		for i := range widths {
-			widths[i] = pdf.Number(d.Width[firstChar+i])
-		}
-		fontDict["FirstChar"] = pdf.Integer(firstChar)
-		fontDict["LastChar"] = pdf.Integer(lastChar)
-		if len(widths) > 10 {
-			widthRef := w.Alloc()
-			fontDict["Widths"] = widthRef
-			compressedObjects = append(compressedObjects, widths)
-			compressedRefs = append(compressedRefs, widthRef)
-		} else {
-			fontDict["Widths"] = widths
-		}
+		oo, rr := setSimpleWidths(w, fontDict, d.Width[:], d.Encoding, defaultWidth)
+		compressedObjects = append(compressedObjects, oo...)
+		compressedRefs = append(compressedRefs, rr...)
 	}
 
 	toUnicodeData := make(map[byte]string)
@@ -459,101 +435,49 @@ func (d *Type1) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return fmt.Errorf("font dicts: %w", err)
+		return fmt.Errorf("Type 1 font dict: %w", err)
 	}
 
 	return nil
 }
 
+func (d *Type1) GlyphData() (glyphdata.Type, pdf.Reference) {
+	return d.FontType, d.FontRef
+}
+
 func (d *Type1) MakeFont() (font.FromFile, error) {
-	return d, nil
+	return type1Font{d}, nil
 }
 
-func (d *Type1) GetDict() font.Dict {
-	return d
+var (
+	_ font.FromFile = type1Font{}
+)
+
+type type1Font struct {
+	Dict *Type1
 }
 
-func (d *Type1) WritingMode() font.WritingMode {
+func (f type1Font) GetDict() font.Dict {
+	return f.Dict
+}
+
+func (type1Font) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
 
-func (d *Type1) Codes(s pdf.String) iter.Seq[*font.Code] {
+func (f type1Font) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		var code font.Code
 		for _, c := range s {
 			code.CID = cid.CID(c) + 1 // leave CID 0 for notdef
-			code.Width = d.Width[c]
-			code.Text = d.Text[c]
+			code.Width = f.Dict.Width[c]
+			code.Text = f.Dict.Text[c]
 			code.UseWordSpacing = (c == 0x20)
 			if !yield(&code) {
 				return
 			}
 		}
 	}
-}
-
-// widthsAreCompatible returns true, if the glyph widths ww are compatible with
-// the standard font metrics.  The object encObj is the value of the font
-// dictionary's Encoding entry.
-//
-// EncObj must be valid and must be a direct object.  Do not pass encObj values
-// read from files without validation.
-func widthsAreCompatible(ww []float64, enc encoding.Type1, info *stdmtx.FontData) bool {
-	for code := range 256 {
-		glyphName := enc(byte(code))
-		if glyphName == "" {
-			continue
-		}
-		if math.Abs(ww[code]-info.Width[glyphName]) > 0.5 {
-			return false
-		}
-	}
-	return true
-}
-
-func fontDescriptorIsCompatible(fd *font.Descriptor, stdInfo *stdmtx.FontData) bool {
-	if fd.FontFamily != "" && fd.FontFamily != stdInfo.FontFamily {
-		return false
-	}
-	if fd.FontWeight != 0 && fd.FontWeight != stdInfo.FontWeight {
-		return false
-	}
-
-	if fd.IsFixedPitch != stdInfo.IsFixedPitch {
-		return false
-	}
-	if fd.IsSerif != stdInfo.IsSerif {
-		return false
-	}
-	if fd.IsSymbolic != stdInfo.IsSymbolic {
-		return false
-	}
-	if fd.IsScript || fd.IsItalic || fd.IsAllCap || fd.IsSmallCap || fd.ForceBold {
-		return false
-	}
-
-	if math.Abs(fd.ItalicAngle-stdInfo.ItalicAngle) > 0.1 {
-		return false
-	}
-	if fd.Ascent != 0 && math.Abs(fd.Ascent-stdInfo.Ascent) > 0.5 {
-		return false
-	}
-	if fd.Descent != 0 && math.Abs(fd.Descent-stdInfo.Descent) > 0.5 {
-		return false
-	}
-	if fd.CapHeight != 0 && math.Abs(fd.CapHeight-stdInfo.CapHeight) > 0.5 {
-		return false
-	}
-	if fd.XHeight != 0 && math.Abs(fd.XHeight-stdInfo.XHeight) > 0.5 {
-		return false
-	}
-	if fd.StemV != 0 && math.Abs(fd.StemV-stdInfo.StemV) > 0.5 {
-		return false
-	}
-	if fd.StemH != 0 && math.Abs(fd.StemH-stdInfo.StemH) > 0.5 {
-		return false
-	}
-	return true
 }
 
 func init() {

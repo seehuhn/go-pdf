@@ -22,10 +22,38 @@ import (
 	"golang.org/x/exp/maps"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/postscript/cid"
 )
 
-func encodeComposite(widthMap map[cid.CID]float64, dw float64) pdf.Array {
+func setSimpleWidths(w *pdf.Writer, fontDict pdf.Dict, ww []float64, enc encoding.Type1, defaultWidth float64) ([]pdf.Object, []pdf.Reference) {
+	firstChar, lastChar := 0, 255
+	for lastChar > 0 && (enc(byte(lastChar)) == "" || ww[lastChar] == defaultWidth) {
+		lastChar--
+	}
+	for firstChar < lastChar && (enc(byte(firstChar)) == "" || ww[firstChar] == defaultWidth) {
+		firstChar++
+	}
+
+	widths := make(pdf.Array, lastChar-firstChar+1)
+	for i := range widths {
+		widths[i] = pdf.Number(ww[firstChar+i])
+	}
+
+	fontDict["FirstChar"] = pdf.Integer(firstChar)
+	fontDict["LastChar"] = pdf.Integer(lastChar)
+
+	if len(widths) <= 10 {
+		fontDict["Widths"] = widths
+		return nil, nil
+	}
+
+	widthRef := w.Alloc()
+	fontDict["Widths"] = widthRef
+	return []pdf.Object{widths}, []pdf.Reference{widthRef}
+}
+
+func encodeCompositeWidths(widthMap map[cid.CID]float64, dw float64) pdf.Array {
 	cidSet := make(map[cid.CID]struct{})
 	for c, w := range widthMap {
 		if w != dw {
