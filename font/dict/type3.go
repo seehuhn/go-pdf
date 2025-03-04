@@ -101,12 +101,6 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
 
 	d.Name, _ = pdf.GetName(r, fontDict["Name"])
 
-	enc, err := encoding.ExtractType3(r, fontDict["Encoding"])
-	if err != nil {
-		return nil, err
-	}
-	d.Encoding = enc
-
 	fdDict, err := pdf.GetDictTyped(r, fontDict["FontDescriptor"], "FontDescriptor")
 	if pdf.IsReadError(err) {
 		return nil, err
@@ -114,27 +108,17 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
 	fd, _ := font.ExtractDescriptor(r, fdDict)
 	d.Descriptor = fd
 
+	enc, err := encoding.ExtractType3(r, fontDict["Encoding"])
+	if err != nil {
+		return nil, err
+	}
+	d.Encoding = enc
+
 	var defaultWidth float64
 	if fd != nil {
 		defaultWidth = fd.MissingWidth
 	}
-
-	firstChar, _ := pdf.GetInteger(r, fontDict["FirstChar"])
-	widths, _ := pdf.GetArray(r, fontDict["Widths"])
-	if widths != nil && len(widths) <= 256 && firstChar >= 0 && firstChar < 256 {
-		for c := range d.Width {
-			d.Width[c] = defaultWidth
-		}
-		for i, w := range widths {
-			w, err := pdf.GetNumber(r, w)
-			if err != nil {
-				continue
-			}
-			if code := firstChar + pdf.Integer(i); code < 256 {
-				d.Width[byte(code)] = float64(w)
-			}
-		}
-	}
+	getSimpleWidths(d.Width[:], r, fontDict, defaultWidth)
 
 	// First try to derive text content from the glyph names.
 	for code := range 256 {

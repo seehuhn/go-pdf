@@ -37,7 +37,7 @@ var (
 )
 
 // TrueType represents the font dictionary of a simple TrueType font.
-// This can correspond either to a TrueType or an OpenType font.
+// Embedded font data can either be TrueType or OpenType.
 type TrueType struct {
 	// Ref is the reference to the font dictionary in the PDF file.
 	Ref pdf.Reference
@@ -117,30 +117,23 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*TrueType, error) {
 		return nil, err
 	}
 	fd, _ := font.ExtractDescriptor(r, fdDict)
-	if fd == nil { // only possible for invalid PDF files
-		fd = &font.Descriptor{
-			FontName: d.PostScriptName,
-		}
-	}
 	d.Descriptor = fd
 
-	if ref, _ := fontDict["FontFile2"].(pdf.Reference); ref != 0 {
+	d.FontType = glyphdata.None
+	if ref, _ := fdDict["FontFile2"].(pdf.Reference); ref != 0 {
 		d.FontType = glyphdata.TrueType
 		d.FontRef = ref
-	} else if ref, _ := fontDict["FontFile3"].(pdf.Reference); ref != 0 {
+	} else if ref, _ := fdDict["FontFile3"].(pdf.Reference); ref != 0 {
 		if stm, _ := pdf.GetStream(r, ref); stm != nil {
 			subType, _ := pdf.GetName(r, stm.Dict["Subtype"])
-			switch subType {
-			case "OpenType":
+			if subType == "OpenType" {
 				d.FontType = glyphdata.OpenTypeGlyf
 				d.FontRef = ref
-			default:
-				d.FontType = glyphdata.None
 			}
 		}
 	}
 
-	isNonSymbolic := !fd.IsSymbolic
+	isNonSymbolic := fd != nil && !fd.IsSymbolic
 	isExternal := d.FontRef == 0
 	nonSymbolicExt := isNonSymbolic && isExternal
 	enc, err := encoding.ExtractType1(r, fontDict["Encoding"], nonSymbolicExt)
@@ -149,22 +142,11 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*TrueType, error) {
 	}
 	d.Encoding = enc
 
-	firstChar, _ := pdf.GetInteger(r, fontDict["FirstChar"])
-	widths, _ := pdf.GetArray(r, fontDict["Widths"])
-	if widths != nil && len(widths) <= 256 && firstChar >= 0 && firstChar < 256 {
-		for c := range d.Width {
-			d.Width[c] = fd.MissingWidth
-		}
-		for i, w := range widths {
-			w, err := pdf.GetNumber(r, w)
-			if err != nil {
-				continue
-			}
-			if code := firstChar + pdf.Integer(i); code < 256 {
-				d.Width[byte(code)] = float64(w)
-			}
-		}
+	var defaultWidth float64
+	if fd != nil {
+		defaultWidth = fd.MissingWidth
 	}
+	getSimpleWidths(d.Width[:], r, fontDict, defaultWidth)
 
 	// First try to derive text content from the glyph names.
 	for code := range 256 {
@@ -212,6 +194,12 @@ func (d *TrueType) repair(r pdf.Getter) {
 		d.Name = ""
 	}
 
+	if d.FontRef == 0 {
+		d.FontType = glyphdata.None
+	} else if d.FontType == glyphdata.None {
+		d.FontRef = 0
+	}
+
 	m := subset.TagRegexp.FindStringSubmatch(d.Descriptor.FontName)
 	if m != nil {
 		if d.SubsetTag == "" {
@@ -229,11 +217,10 @@ func (d *TrueType) repair(r pdf.Getter) {
 	if !subset.IsValidTag(d.SubsetTag) {
 		d.SubsetTag = ""
 	}
-	d.Descriptor.FontName = subset.Join(d.SubsetTag, d.PostScriptName)
-
-	if d.FontRef == 0 {
-		d.FontType = glyphdata.None
+	if d.FontType == glyphdata.None {
+		d.SubsetTag = ""
 	}
+	d.Descriptor.FontName = subset.Join(d.SubsetTag, d.PostScriptName)
 }
 
 // validate checks that all data are valid and consistent.

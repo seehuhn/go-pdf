@@ -33,26 +33,25 @@ import (
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
-	"seehuhn.de/go/pdf/internal/stdmtx"
 )
 
-func TestType1Roundtrip(t *testing.T) {
+func TestTrueTypeRoundtrip(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
-		for i, d := range t1Dicts {
+		for i, d := range ttDicts {
 			if v >= pdf.V2_0 && d.Name != "" {
 				continue
 			}
 
 			t.Run(fmt.Sprintf("D%dv%s-%s", i, v, d.PostScriptName), func(t *testing.T) {
-				checkRoundtripT1(t, d, v)
+				checkRoundtripTT(t, d, v)
 			})
 		}
 	}
 }
 
-func FuzzType1Dict(f *testing.F) {
+func FuzzTrueTypeDict(f *testing.F) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
-		for _, d := range t1Dicts {
+		for _, d := range ttDicts {
 			if v >= pdf.V2_0 && d.Name != "" {
 				continue
 			}
@@ -67,27 +66,10 @@ func FuzzType1Dict(f *testing.F) {
 			}
 			rm := pdf.NewResourceManager(w)
 
+			ref := w.Alloc()
 			d := clone(d)
-			d.Ref = w.Alloc()
-			if d.FontRef != 0 {
-				d.FontRef = w.Alloc()
-				// write a fake font data stream
-				var subtype pdf.Object
-				switch d.FontType {
-				case glyphdata.CFFSimple:
-					subtype = pdf.Name("Type1C")
-				case glyphdata.OpenTypeCFFSimple:
-					subtype = pdf.Name("OpenType")
-				}
-				stm, err := w.OpenStream(d.FontRef, pdf.Dict{"Subtype": subtype})
-				if err != nil {
-					f.Fatal(err)
-				}
-				err = stm.Close()
-				if err != nil {
-					f.Fatal(err)
-				}
-			}
+			d.Ref = ref
+
 			err = d.WriteToPDF(rm)
 			if err != nil {
 				f.Fatal(err)
@@ -97,7 +79,7 @@ func FuzzType1Dict(f *testing.F) {
 				f.Fatal(err)
 			}
 
-			w.GetMeta().Trailer["Seeh:X"] = d.Ref
+			w.GetMeta().Trailer["Seeh:X"] = ref
 
 			err = w.Close()
 			if err != nil {
@@ -109,7 +91,7 @@ func FuzzType1Dict(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, fileData []byte) {
-		// Get a "random" Type1Dict from the PDF file.
+		// Get a "random" TrueTypeDict from the PDF file.
 
 		// Make sure we don't panic on random input.
 		opt := &pdf.ReaderOptions{
@@ -124,17 +106,17 @@ func FuzzType1Dict(f *testing.F) {
 			pdf.Format(os.Stdout, pdf.OptPretty, r.GetMeta().Trailer)
 			t.Skip("broken reference")
 		}
-		d, err := ExtractType1(r, obj)
+		d, err := ExtractTrueType(r, obj)
 		if err != nil {
-			t.Skip("broken Type1Dict")
+			t.Skip("broken TrueTypeDict")
 		}
 
 		// Make sure we can write the dict, and read it back.
-		checkRoundtripT1(t, d, pdf.GetVersion(r))
+		checkRoundtripTT(t, d, pdf.GetVersion(r))
 	})
 }
 
-func checkRoundtripT1(t *testing.T, d1 *Type1, v pdf.Version) {
+func checkRoundtripTT(t *testing.T, d1 *TrueType, v pdf.Version) {
 	t.Helper()
 
 	d1 = clone(d1)
@@ -150,9 +132,7 @@ func checkRoundtripT1(t *testing.T, d1 *Type1, v pdf.Version) {
 		// write a fake font data stream
 		var subtype pdf.Object
 		switch d1.FontType {
-		case glyphdata.CFFSimple:
-			subtype = pdf.Name("Type1C")
-		case glyphdata.OpenTypeCFFSimple:
+		case glyphdata.OpenTypeGlyf:
 			subtype = pdf.Name("OpenType")
 		}
 		stm, err := w.OpenStream(d1.FontRef, pdf.Dict{"Subtype": subtype})
@@ -175,7 +155,7 @@ func checkRoundtripT1(t *testing.T, d1 *Type1, v pdf.Version) {
 
 	// == Read ==
 
-	d2, err := ExtractType1(w, d1.Ref)
+	d2, err := ExtractTrueType(w, d1.Ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +191,7 @@ func checkRoundtripT1(t *testing.T, d1 *Type1, v pdf.Version) {
 	}
 }
 
-var t1Dicts = []*Type1{
+var ttDicts = []*TrueType{
 	{
 		PostScriptName: "Test",
 		Descriptor: &font.Descriptor{
@@ -250,167 +230,23 @@ var t1Dicts = []*Type1{
 		Width: makeTestWidth(65, 100.0),
 		Text:  makeTestText(65, "A"),
 	},
-	makeTestDictStandard("Courier"),
-	makeTestDictStandard("Times-Roman"),
-	makeTestDictStandard("Symbol"),
 	{
-		PostScriptName: "Toaster",
-		SubsetTag:      "XXXXXX",
+		PostScriptName: "Troubadour-Bold",
+		SubsetTag:      "ABCDEF",
+		Name:           "Q",
 		Descriptor: &font.Descriptor{
-			FontName:     "XXXXXX+Toaster",
+			FontName:     "ABCDEF+Troubadour-Bold",
+			FontFamily:   "Toast",
+			FontStretch:  os2.WidthCondensed,
+			FontWeight:   os2.WeightBold,
 			IsFixedPitch: true,
-			FontBBox: rect.Rect{
-				LLx: 0,
-				LLy: -100,
-				URx: 200,
-				URy: 300,
-			},
-			Ascent:       250,
-			Descent:      -50,
-			CapHeight:    150,
-			MissingWidth: 199,
+			FontBBox:     rect.Rect{LLx: 10, LLy: 20, URx: 30, URy: 40},
+			MissingWidth: 666,
 		},
 		Encoding: func(c byte) string { return pdfenc.Standard.Encoding[c] },
-		Width:    makeConstWidth(199),
-		Text:     makeTestText(65, "A"),
-		FontType: glyphdata.Type1,
+		Width:    makeConstWidth(666),
+		Text:     [256]string{},
+		FontType: glyphdata.OpenTypeGlyf,
 		FontRef:  pdf.NewReference(999, 0),
 	},
-	{
-		PostScriptName: "Toaster",
-		SubsetTag:      "XXXXXX",
-		Descriptor: &font.Descriptor{
-			FontName:     "XXXXXX+Toaster",
-			IsFixedPitch: true,
-			FontBBox: rect.Rect{
-				LLx: 0,
-				LLy: -100,
-				URx: 200,
-				URy: 300,
-			},
-			Ascent:       250,
-			Descent:      -50,
-			CapHeight:    150,
-			MissingWidth: 199,
-		},
-		Encoding: func(c byte) string { return pdfenc.Standard.Encoding[c] },
-		Width:    makeConstWidth(199),
-		Text:     makeTestText(65, "A"),
-		FontType: glyphdata.CFFSimple,
-		FontRef:  pdf.NewReference(999, 0),
-	},
-	{
-		PostScriptName: "Trickster",
-		SubsetTag:      "XXXXXX",
-		Descriptor: &font.Descriptor{
-			FontName:     "XXXXXX+Trickster",
-			IsFixedPitch: true,
-			FontBBox: rect.Rect{
-				LLx: 0,
-				LLy: -100,
-				URx: 200,
-				URy: 300,
-			},
-			Ascent:       250,
-			Descent:      -50,
-			CapHeight:    150,
-			MissingWidth: 199,
-		},
-		Encoding: func(c byte) string { return pdfenc.Standard.Encoding[c] },
-		Width:    makeConstWidth(199),
-		Text:     makeTestText(65, "A"),
-		FontType: glyphdata.OpenTypeCFFSimple,
-		FontRef:  pdf.NewReference(999, 0),
-	},
-}
-
-func makeTestWidth(args ...any) (ww [256]float64) {
-	for i := 0; i+1 < len(args); i += 2 {
-		code := args[i].(int)
-		width := args[i+1].(float64)
-		ww[code] = width
-	}
-	return
-}
-
-func makeConstWidth(dw float64) (ww [256]float64) {
-	for i := range ww {
-		ww[i] = dw
-	}
-	return
-}
-
-func makeTestText(args ...any) (tt [256]string) {
-	for i := 0; i+1 < len(args); i += 2 {
-		code := args[i].(int)
-		text := args[i+1].(string)
-		tt[code] = text
-	}
-	return
-}
-
-func makeTestDictStandard(fontName string) *Type1 {
-	stdInfo := stdmtx.Metrics[fontName]
-
-	type g struct {
-		code  byte
-		name  string
-		width float64
-	}
-	var gg []g
-	for code, name := range stdInfo.Encoding {
-		if name == "" || name == ".notdef" {
-			continue
-		}
-		width := stdInfo.Width[name]
-		gg = append(gg, g{byte(code), name, width})
-		if len(gg) > 5 {
-			break
-		}
-	}
-	// use a non-trivial encoding
-	gg[0].code, gg[1].code = gg[1].code, gg[0].code
-
-	enc := make(map[byte]string)
-	for _, g := range gg {
-		enc[g.code] = g.name
-	}
-
-	fd := &font.Descriptor{
-		FontName:     fontName,
-		FontFamily:   stdInfo.FontFamily,
-		FontStretch:  os2.WidthNormal,
-		FontWeight:   stdInfo.FontWeight,
-		IsFixedPitch: stdInfo.IsFixedPitch,
-		IsSerif:      stdInfo.IsSerif,
-		IsItalic:     stdInfo.ItalicAngle != 0,
-		IsSymbolic:   stdInfo.IsSymbolic,
-		FontBBox:     stdInfo.FontBBox,
-		ItalicAngle:  stdInfo.ItalicAngle,
-		Ascent:       stdInfo.Ascent,
-		Descent:      stdInfo.Descent,
-		CapHeight:    stdInfo.CapHeight,
-		XHeight:      stdInfo.XHeight,
-		StemV:        stdInfo.StemV,
-		StemH:        stdInfo.StemH,
-		MissingWidth: stdInfo.Width[".notdef"],
-	}
-	d := &Type1{
-		PostScriptName: fontName,
-		Descriptor:     fd,
-		Encoding: func(code byte) string {
-			return enc[code]
-		},
-	}
-	for _, g := range gg {
-		d.Width[g.code] = g.width
-		d.Text[g.code] = g.name
-	}
-
-	return d
-}
-
-func clone[T any](v *T) *T {
-	copy := *v
-	return &copy
 }

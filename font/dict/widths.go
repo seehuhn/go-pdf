@@ -26,6 +26,29 @@ import (
 	"seehuhn.de/go/postscript/cid"
 )
 
+func getSimpleWidths(ww []float64, r pdf.Getter, fontDict pdf.Dict, defaultWidth float64) bool {
+	for c := range ww {
+		ww[c] = defaultWidth
+	}
+
+	firstChar, _ := pdf.GetInteger(r, fontDict["FirstChar"])
+	widths, _ := pdf.GetArray(r, fontDict["Widths"])
+	if widths == nil || len(widths) > 256 || firstChar < 0 || firstChar >= 256 {
+		return false
+	}
+
+	for i, w := range widths {
+		w, err := pdf.GetNumber(r, w)
+		if err != nil {
+			continue
+		}
+		if code := firstChar + pdf.Integer(i); code < 256 {
+			ww[code] = float64(w)
+		}
+	}
+	return true
+}
+
 func setSimpleWidths(w *pdf.Writer, fontDict pdf.Dict, ww []float64, enc encoding.Type1, defaultWidth float64) ([]pdf.Object, []pdf.Reference) {
 	firstChar, lastChar := 0, 255
 	for lastChar > 0 && (enc(byte(lastChar)) == "" || ww[lastChar] == defaultWidth) {

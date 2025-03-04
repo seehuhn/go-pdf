@@ -148,11 +148,7 @@ func ExtractType1(r pdf.Getter, obj pdf.Object) (*Type1, error) {
 	}
 	d.Descriptor = fd
 
-	if fd == nil {
-		// prevent invalid PDF files from causing panics
-		fd = &font.Descriptor{}
-	}
-
+	d.FontType = glyphdata.None
 	if ref, _ := fdDict["FontFile"].(pdf.Reference); ref != 0 {
 		d.FontType = glyphdata.Type1
 		d.FontRef = ref
@@ -166,13 +162,11 @@ func ExtractType1(r pdf.Getter, obj pdf.Object) (*Type1, error) {
 			case "OpenType":
 				d.FontType = glyphdata.OpenTypeCFFSimple
 				d.FontRef = ref
-			default:
-				d.FontType = glyphdata.None
 			}
 		}
 	}
 
-	isNonSymbolic := !fd.IsSymbolic
+	isNonSymbolic := fd != nil && !fd.IsSymbolic
 	isExternal := d.FontRef == 0
 	nonSymbolicExt := isNonSymbolic && isExternal
 	enc, err := encoding.ExtractType1(r, fontDict["Encoding"], nonSymbolicExt)
@@ -181,22 +175,11 @@ func ExtractType1(r pdf.Getter, obj pdf.Object) (*Type1, error) {
 	}
 	d.Encoding = enc
 
-	firstChar, _ := pdf.GetInteger(r, fontDict["FirstChar"])
-	widths, _ := pdf.GetArray(r, fontDict["Widths"])
-	if widths != nil && len(widths) <= 256 && firstChar >= 0 && firstChar < 256 {
-		for c := range d.Width {
-			d.Width[c] = fd.MissingWidth
-		}
-		for i, w := range widths {
-			w, err := pdf.GetNumber(r, w)
-			if err != nil {
-				continue
-			}
-			if code := firstChar + pdf.Integer(i); code < 256 {
-				d.Width[byte(code)] = float64(w)
-			}
-		}
-	} else if stdInfo != nil {
+	var defaultWidth float64
+	if fd != nil {
+		defaultWidth = fd.MissingWidth
+	}
+	if !getSimpleWidths(d.Width[:], r, fontDict, defaultWidth) && stdInfo != nil {
 		for c := range 256 {
 			w, ok := stdInfo.Width[enc(byte(c))]
 			if !ok {
@@ -255,6 +238,12 @@ func (d *Type1) repair(r pdf.Getter) {
 		d.Name = ""
 	}
 
+	if d.FontRef == 0 {
+		d.FontType = glyphdata.None
+	} else if d.FontType == glyphdata.None {
+		d.FontRef = 0
+	}
+
 	m := subset.TagRegexp.FindStringSubmatch(d.Descriptor.FontName)
 	if m != nil {
 		if d.SubsetTag == "" {
@@ -272,14 +261,13 @@ func (d *Type1) repair(r pdf.Getter) {
 	if !subset.IsValidTag(d.SubsetTag) {
 		d.SubsetTag = ""
 	}
-	d.Descriptor.FontName = subset.Join(d.SubsetTag, d.PostScriptName)
-
-	if d.FontRef == 0 {
-		d.FontType = glyphdata.None
+	if d.FontType == glyphdata.None {
+		d.SubsetTag = ""
 	}
+	d.Descriptor.FontName = subset.Join(d.SubsetTag, d.PostScriptName)
 }
 
-// Check that all data are valid and consistent.
+// validate checks that all data are valid and consistent.
 func (d *Type1) validate(w *pdf.Writer) error {
 	if d.Descriptor == nil {
 		return errors.New("missing font descriptor")
