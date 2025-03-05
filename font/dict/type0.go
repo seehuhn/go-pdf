@@ -57,7 +57,7 @@ type CIDFontType0 struct {
 	// Encoding specifies how character codes are mapped to CID values.
 	//
 	// The Encoding.ROS field must either be compatible with the ROS field
-	// above, or must be one of Identity-H or Identity-V.
+	// above, or the cmap must be one of Identity-H or Identity-V.
 	Encoding *cmap.File
 
 	// Width is a map from CID values to glyph widths (in PDF glyph space units).
@@ -73,8 +73,8 @@ type CIDFontType0 struct {
 	Text *cmap.ToUnicodeFile
 
 	// FontType gives the type of glyph outline data. Possible values are
-	// [glyphdata.CFF] and [glyphdata.OpenTypeCFF], or [glyphdata.None] if the
-	// font is not embedded.
+	// [glyphdata.CFF] and [glyphdata.OpenTypeCFF],
+	// or [glyphdata.None] if the font is not embedded.
 	FontType glyphdata.Type
 
 	// FontRef is the reference to the glyph outline data in the PDF file,
@@ -160,11 +160,6 @@ func ExtractCIDFontType0(r pdf.Getter, obj pdf.Object) (*CIDFontType0, error) {
 		return nil, err
 	}
 	d.Descriptor, _ = font.ExtractDescriptor(r, fdDict)
-	if d.Descriptor == nil { // only possible for invalid PDF files
-		d.Descriptor = &font.Descriptor{
-			FontName: d.PostScriptName,
-		}
-	}
 
 	d.ROS, _ = cmap.ExtractCIDSystemInfo(r, cidFontDict["CIDSystemInfo"])
 
@@ -178,6 +173,7 @@ func ExtractCIDFontType0(r pdf.Getter, obj pdf.Object) (*CIDFontType0, error) {
 	}
 	d.DefaultWidth = float64(dw)
 
+	d.FontType = glyphdata.None
 	if ref, _ := fdDict["FontFile3"].(pdf.Reference); ref != 0 {
 		if stm, _ := pdf.GetStream(r, ref); stm != nil {
 			subType, _ := pdf.GetName(r, stm.Dict["Subtype"])
@@ -188,46 +184,110 @@ func ExtractCIDFontType0(r pdf.Getter, obj pdf.Object) (*CIDFontType0, error) {
 			case "OpenType":
 				d.FontType = glyphdata.OpenTypeCFF
 				d.FontRef = ref
-			default:
-				d.FontType = glyphdata.None
 			}
 		}
 	}
+
+	d.repair()
+
 	return d, nil
 }
 
-// WriteToPDF embeds the font data in the PDF file.
-func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager) error {
-	w := rm.Out
-
-	// Check that all data are valid and consistent.
-	if d.Ref == 0 {
-		return errors.New("missing font dictionary reference")
+// repair can fix some problems with a font dictionary.
+// After repair has been run, validate is guaranteed to pass.
+func (d *CIDFontType0) repair() {
+	if d.Descriptor == nil {
+		d.Descriptor = &font.Descriptor{}
 	}
+
+	if d.FontRef == 0 {
+		d.FontType = glyphdata.None
+	} else if d.FontType == glyphdata.None {
+		d.FontRef = 0
+	}
+
+	m := subset.TagRegexp.FindStringSubmatch(d.Descriptor.FontName)
+	if m != nil {
+		if d.SubsetTag == "" {
+			d.SubsetTag = m[1]
+		}
+		if d.PostScriptName == "" {
+			d.PostScriptName = m[2]
+		}
+	} else if d.PostScriptName == "" {
+		d.PostScriptName = d.Descriptor.FontName
+	}
+	if d.PostScriptName == "" {
+		d.PostScriptName = "Font"
+	}
+	if !subset.IsValidTag(d.SubsetTag) {
+		d.SubsetTag = ""
+	}
+	if d.FontType == glyphdata.None {
+		d.SubsetTag = ""
+	}
+	d.Descriptor.FontName = subset.Join(d.SubsetTag, d.PostScriptName)
+}
+
+// validate performs some basic checks on the font dictionary.
+// This is guaranteed to pass after repair has been run.
+func (d *CIDFontType0) validate() error {
+	if d.Descriptor == nil {
+		return errors.New("missing font descriptor")
+	}
+
+	if d.PostScriptName == "" {
+		return errors.New("missing PostScript name")
+	}
+	if d.SubsetTag != "" && !subset.IsValidTag(d.SubsetTag) {
+		return fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
+	}
+	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)
+	if d.Descriptor.FontName != baseFont {
+		return fmt.Errorf("font name mismatch: %s != %s",
+			baseFont, d.Descriptor.FontName)
+	}
+
+	if d.SubsetTag != "" && d.FontType == glyphdata.None {
+		return errors.New("external font data cannot be subsetted")
+	}
+
 	if (d.FontType == glyphdata.None) != (d.FontRef == 0) {
 		return errors.New("missing font reference or type")
 	}
+
+	return nil
+}
+
+// WriteToPDF adds the font dictionary to the PDF file.
+func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager) error {
+	if d.Ref == 0 {
+		return errors.New("missing font dictionary reference")
+	}
+
+	w := rm.Out
+
 	switch d.FontType {
 	case glyphdata.None:
 		// pass
 	case glyphdata.CFF:
-		err := pdf.CheckVersion(w, "composite CFF fonts", pdf.V1_3)
-		if err != nil {
+		if err := pdf.CheckVersion(w, "embedded composite CFF fonts", pdf.V1_3); err != nil {
 			return err
 		}
 	case glyphdata.OpenTypeCFF:
-		err := pdf.CheckVersion(w, "composite OpenType/CFF fonts", pdf.V1_6)
-		if err != nil {
+		if err := pdf.CheckVersion(w, "embedded composite OpenType/CFF fonts", pdf.V1_6); err != nil {
 			return err
 		}
 	default:
 		return fmt.Errorf("invalid font type %s", d.FontType)
 	}
-	if d.SubsetTag != "" && !subset.IsValidTag(d.SubsetTag) {
-		return fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
+
+	err := d.validate()
+	if err != nil {
+		return err
 	}
 
-	baseFont := pdf.Name(subset.Join(d.SubsetTag, d.PostScriptName))
+	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)
 
 	cidSystemInfo, _, err := pdf.ResourceManagerEmbed(rm, d.ROS)
 	if err != nil {

@@ -70,10 +70,9 @@ type Type1 struct {
 	// Text gives the text content for each character code.
 	Text [256]string
 
-	// FontType gives the type of glyph outline data.
-	// Possible values are [glyphdata.Type1], [glyphdata.CFFSimple],
-	// and [glyphdata.OpenTypeCFFSimple], or [glyphdata.None] if the font
-	// is not embedded.
+	// FontType gives the type of glyph outline data. Possible values are
+	// [glyphdata.Type1], [glyphdata.CFFSimple], and [glyphdata.OpenTypeCFFSimple],
+	// or [glyphdata.None] if the font is not embedded.
 	FontType glyphdata.Type
 
 	// FontRef is the reference to the glyph outline data in the PDF file,
@@ -224,7 +223,7 @@ func ExtractType1(r pdf.Getter, obj pdf.Object) (*Type1, error) {
 }
 
 // repair fixes invalid data in the font dictionary.
-// After repair has been called, [Type1.validate] will return nil.
+// After repair() has been called, validate() will return nil.
 func (d *Type1) repair(r pdf.Getter) {
 	if d.Descriptor == nil {
 		d.Descriptor = &font.Descriptor{}
@@ -267,7 +266,6 @@ func (d *Type1) repair(r pdf.Getter) {
 	d.Descriptor.FontName = subset.Join(d.SubsetTag, d.PostScriptName)
 }
 
-// validate checks that all data are valid and consistent.
 func (d *Type1) validate(w *pdf.Writer) error {
 	if d.Descriptor == nil {
 		return errors.New("missing font descriptor")
@@ -321,9 +319,9 @@ func (d *Type1) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	switch d.FontType {
 	case glyphdata.None:
-		// not embedded
+		// pass
 	case glyphdata.Type1:
-		// ok
+		// always ok
 	case glyphdata.CFFSimple:
 		if err := pdf.CheckVersion(w, "embedded CFF font", pdf.V1_2); err != nil {
 			return err
@@ -434,26 +432,26 @@ func (d *Type1) GlyphData() (glyphdata.Type, pdf.Reference) {
 }
 
 func (d *Type1) MakeFont() (font.FromFile, error) {
-	return type1Font{d}, nil
+	return t1Font{d}, nil
 }
 
 var (
-	_ font.FromFile = type1Font{}
+	_ font.FromFile = t1Font{}
 )
 
-type type1Font struct {
+type t1Font struct {
 	Dict *Type1
 }
 
-func (f type1Font) GetDict() font.Dict {
+func (f t1Font) GetDict() font.Dict {
 	return f.Dict
 }
 
-func (type1Font) WritingMode() font.WritingMode {
+func (t1Font) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
 
-func (f type1Font) Codes(s pdf.String) iter.Seq[*font.Code] {
+func (f t1Font) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		var code font.Code
 		for _, c := range s {

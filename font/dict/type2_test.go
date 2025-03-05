@@ -32,19 +32,19 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-func TestType0RoundTrip(t *testing.T) {
+func TestType2RoundTrip(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
-		for i, d := range t0Dicts {
+		for i, d := range t2Dicts {
 			t.Run(fmt.Sprintf("D%dv%s-%s", i, v, d.PostScriptName), func(t *testing.T) {
-				checkRoundtripT0(t, d, v)
+				checkRoundtripT2(t, d, v)
 			})
 		}
 	}
 }
 
-func FuzzType0Dict(f *testing.F) {
+func FuzzType2Dict(f *testing.F) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
-		for _, d := range t0Dicts {
+		for _, d := range t2Dicts {
 			out := memfile.New()
 			opt := &pdf.WriterOptions{
 				HumanReadable: true,
@@ -63,7 +63,7 @@ func FuzzType0Dict(f *testing.F) {
 				var subtype pdf.Object
 				switch d.FontType {
 				case glyphdata.CFF:
-					subtype = pdf.Name("CIDFontType0C")
+					subtype = pdf.Name("CIDFontType2C")
 				case glyphdata.OpenTypeCFF:
 					subtype = pdf.Name("OpenType")
 				}
@@ -112,20 +112,20 @@ func FuzzType0Dict(f *testing.F) {
 			pdf.Format(os.Stdout, pdf.OptPretty, r.GetMeta().Trailer)
 			t.Skip("broken reference")
 		}
-		d, err := ExtractCIDFontType0(r, obj)
+		d, err := ExtractCIDFontType2(r, obj)
 		if err != nil {
-			t.Skip("no valid CIDFontType0 dict")
+			t.Skip("no valid CIDFontType2 dict")
 		}
 
 		// We need at version 1.6, in case an OpenType font is used.
 		v := max(pdf.GetVersion(r), pdf.V1_6)
 
 		// Make sure we can write the dict, and read it back.
-		checkRoundtripT0(t, d, v)
+		checkRoundtripT2(t, d, v)
 	})
 }
 
-func checkRoundtripT0(t *testing.T, d1 *CIDFontType0, v pdf.Version) {
+func checkRoundtripT2(t *testing.T, d1 *CIDFontType2, v pdf.Version) {
 	d1 = clone(d1)
 
 	w, _ := memfile.NewPDFWriter(v, nil)
@@ -139,9 +139,9 @@ func checkRoundtripT0(t *testing.T, d1 *CIDFontType0, v pdf.Version) {
 		// write a fake font data stream
 		var subtype pdf.Object
 		switch d1.FontType {
-		case glyphdata.CFF:
-			subtype = pdf.Name("CIDFontType0C")
-		case glyphdata.OpenTypeCFF:
+		case glyphdata.TrueType:
+			subtype = pdf.Name("CIDFontType2C")
+		case glyphdata.OpenTypeGlyf:
 			subtype = pdf.Name("OpenType")
 		}
 		stm, err := w.OpenStream(d1.FontRef, pdf.Dict{"Subtype": subtype})
@@ -164,7 +164,7 @@ func checkRoundtripT0(t *testing.T, d1 *CIDFontType0, v pdf.Version) {
 
 	// == Read ==
 
-	d2, err := ExtractCIDFontType0(w, d1.Ref)
+	d2, err := ExtractCIDFontType2(w, d1.Ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,31 +176,14 @@ func checkRoundtripT0(t *testing.T, d1 *CIDFontType0, v pdf.Version) {
 	}
 }
 
-var ros = &cmap.CIDSystemInfo{
-	Registry:   "Quire",
-	Ordering:   "Test",
-	Supplement: 2,
-}
-
-var t0Dicts = []*CIDFontType0{
+var t2Dicts = []*CIDFontType2{
 	{
 		PostScriptName: "Test",
 		Descriptor: &font.Descriptor{
 			FontName: "Test",
 		},
-		ROS: ros,
-		Encoding: &cmap.File{
-			Name:           "Test-cmap",
-			ROS:            ros,
-			WMode:          font.Vertical,
-			CodeSpaceRange: charcode.Simple,
-			CIDSingles: []cmap.Single{
-				{
-					Code:  []byte{' '},
-					Value: 1,
-				},
-			},
-		},
+		ROS:      ros,
+		Encoding: cmap.Predefined("Identity-H"),
 		Width: map[cmap.CID]float64{
 			0: 1000,
 			1: 500,
@@ -239,7 +222,7 @@ var t0Dicts = []*CIDFontType0{
 				},
 			},
 		},
-		FontType: glyphdata.OpenTypeCFF,
+		FontType: glyphdata.OpenTypeGlyf,
 		FontRef:  pdf.NewReference(999, 0),
 	},
 	{
@@ -281,7 +264,7 @@ var t0Dicts = []*CIDFontType0{
 			12: 1200,
 		},
 		DefaultWidth: 900,
-		FontType:     glyphdata.CFF,
+		FontType:     glyphdata.TrueType,
 		FontRef:      pdf.NewReference(999, 0),
 	},
 }

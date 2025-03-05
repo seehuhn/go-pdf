@@ -173,14 +173,20 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
 		return nil, err
 	}
 
-	d.repair()
+	d.repair(r)
 
 	return d, nil
 }
 
 // repair fixes invalid data in the font dictionary.
 // After repair has been called, Type3.validate will return nil.
-func (d *Type3) repair() {
+func (d *Type3) repair(r pdf.Getter) {
+	if v := pdf.GetVersion(r); v == pdf.V1_0 {
+		if d.Name == "" {
+			d.Name = "Font"
+		}
+	}
+
 	if d.FontMatrix.IsZero() {
 		// Default Type3 font matrix maps 1000 units to 1 unit in text space
 		d.FontMatrix = matrix.Matrix{0.001, 0, 0, 0.001, 0, 0}
@@ -188,7 +194,13 @@ func (d *Type3) repair() {
 }
 
 // validate checks that all data are valid and consistent.
-func (d *Type3) validate() error {
+func (d *Type3) validate(w *pdf.Writer) error {
+	if v := pdf.GetVersion(w); v == pdf.V1_0 {
+		if d.Name == "" {
+			return errors.New("missing font name")
+		}
+	}
+
 	if d.FontMatrix.IsZero() {
 		return errors.New("invalid FontMatrix")
 	}
@@ -208,7 +220,7 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	w := rm.Out
 
-	err := d.validate()
+	err := d.validate(w)
 	if err != nil {
 		return err
 	}
@@ -326,26 +338,26 @@ func (d *Type3) GlyphData() (glyphdata.Type, pdf.Reference) {
 }
 
 func (d *Type3) MakeFont() (font.FromFile, error) {
-	return type3Font{d}, nil
+	return t3Font{d}, nil
 }
 
 var (
-	_ font.FromFile = type3Font{}
+	_ font.FromFile = t3Font{}
 )
 
-type type3Font struct {
+type t3Font struct {
 	Dict *Type3
 }
 
-func (f type3Font) GetDict() font.Dict {
+func (f t3Font) GetDict() font.Dict {
 	return f.Dict
 }
 
-func (type3Font) WritingMode() font.WritingMode {
+func (t3Font) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
 
-func (f type3Font) Codes(s pdf.String) iter.Seq[*font.Code] {
+func (f t3Font) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		var code font.Code
 		for _, c := range s {

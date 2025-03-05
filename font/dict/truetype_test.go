@@ -117,8 +117,6 @@ func FuzzTrueTypeDict(f *testing.F) {
 }
 
 func checkRoundtripTT(t *testing.T, d1 *TrueType, v pdf.Version) {
-	t.Helper()
-
 	d1 = clone(d1)
 
 	w, _ := memfile.NewPDFWriter(v, nil)

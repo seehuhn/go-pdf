@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/type1/names"
+	"seehuhn.de/go/sfnt/os2"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -30,6 +31,7 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/internal/stdmtx"
 )
 
 var (
@@ -37,7 +39,6 @@ var (
 )
 
 // TrueType represents the font dictionary of a simple TrueType font.
-// Embedded font data can either be TrueType or OpenType.
 type TrueType struct {
 	// Ref is the reference to the font dictionary in the PDF file.
 	Ref pdf.Reference
@@ -68,7 +69,7 @@ type TrueType struct {
 	// Text gives the text content for each character code.
 	Text [256]string
 
-	// FontType gives the type of glyph outline data.
+	// FontType gives the type of glyph outline data. Possible values are
 	// Possible values are [glyphdata.TrueType] and [glyphdata.OpenTypeGlyf],
 	// or [glyphdata.None] if the font is not embedded.
 	FontType glyphdata.Type
@@ -112,11 +113,37 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*TrueType, error) {
 
 	d.Name, _ = pdf.GetName(r, fontDict["Name"])
 
+	// StdInfo will be non-nil, if the PostScript name indicates one of the
+	// standard 14 fonts. In this case, we use the corresponding metrics as
+	// default values, in case they are missing from the font dictionary.
+	stdInfo := stdmtx.Metrics[d.PostScriptName]
+
 	fdDict, err := pdf.GetDictTyped(r, fontDict["FontDescriptor"], "FontDescriptor")
 	if pdf.IsReadError(err) {
 		return nil, err
 	}
 	fd, _ := font.ExtractDescriptor(r, fdDict)
+	if fd == nil && stdInfo != nil {
+		fd = &font.Descriptor{
+			FontName:     d.PostScriptName,
+			FontFamily:   stdInfo.FontFamily,
+			FontStretch:  os2.WidthNormal,
+			FontWeight:   stdInfo.FontWeight,
+			IsFixedPitch: stdInfo.IsFixedPitch,
+			IsSerif:      stdInfo.IsSerif,
+			IsItalic:     stdInfo.ItalicAngle != 0,
+			IsSymbolic:   stdInfo.IsSymbolic,
+			FontBBox:     stdInfo.FontBBox,
+			ItalicAngle:  stdInfo.ItalicAngle,
+			Ascent:       stdInfo.Ascent,
+			Descent:      stdInfo.Descent,
+			CapHeight:    stdInfo.CapHeight,
+			XHeight:      stdInfo.XHeight,
+			StemV:        stdInfo.StemV,
+			StemH:        stdInfo.StemH,
+			MissingWidth: stdInfo.Width[".notdef"],
+		}
+	}
 	d.Descriptor = fd
 
 	d.FontType = glyphdata.None
@@ -126,7 +153,9 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*TrueType, error) {
 	} else if ref, _ := fdDict["FontFile3"].(pdf.Reference); ref != 0 {
 		if stm, _ := pdf.GetStream(r, ref); stm != nil {
 			subType, _ := pdf.GetName(r, stm.Dict["Subtype"])
-			if subType == "OpenType" {
+			switch subType {
+
+			case "OpenType":
 				d.FontType = glyphdata.OpenTypeGlyf
 				d.FontRef = ref
 			}
@@ -146,11 +175,22 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*TrueType, error) {
 	if fd != nil {
 		defaultWidth = fd.MissingWidth
 	}
-	getSimpleWidths(d.Width[:], r, fontDict, defaultWidth)
+	if !getSimpleWidths(d.Width[:], r, fontDict, defaultWidth) && stdInfo != nil {
+		for c := range 256 {
+			w, ok := stdInfo.Width[enc(byte(c))]
+			if !ok {
+				w = stdInfo.Width[".notdef"]
+			}
+			d.Width[c] = w
+		}
+	}
 
 	// First try to derive text content from the glyph names.
 	for code := range 256 {
 		glyphName := enc(byte(code))
+		if d.FontRef == 0 && stdInfo != nil && glyphName == encoding.UseBuiltin {
+			glyphName = stdInfo.Encoding[code]
+		}
 		if glyphName == "" || glyphName == encoding.UseBuiltin || glyphName == ".notdef" {
 			continue
 		}
@@ -180,7 +220,7 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*TrueType, error) {
 }
 
 // repair fixes invalid data in the font dictionary.
-// After repair has been called, [TrueType.validate] will return nil.
+// After repair() has been called, validate() will return nil.
 func (d *TrueType) repair(r pdf.Getter) {
 	if d.Descriptor == nil {
 		d.Descriptor = &font.Descriptor{}
@@ -223,7 +263,6 @@ func (d *TrueType) repair(r pdf.Getter) {
 	d.Descriptor.FontName = subset.Join(d.SubsetTag, d.PostScriptName)
 }
 
-// validate checks that all data are valid and consistent.
 func (d *TrueType) validate(w *pdf.Writer) error {
 	if d.Descriptor == nil {
 		return errors.New("missing font descriptor")
@@ -277,7 +316,7 @@ func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	switch d.FontType {
 	case glyphdata.None:
-		// not embedded
+		// pass
 	case glyphdata.TrueType:
 		if err := pdf.CheckVersion(rm.Out, "embedded TrueType font", pdf.V1_1); err != nil {
 			return err
@@ -326,8 +365,6 @@ func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager) error {
 	compressedObjects = append(compressedObjects, fdDict)
 	compressedRefs = append(compressedRefs, fdRef)
 
-	// TODO(voss): Introduce a helper function for constructing the widths
-	// array.
 	defaultWidth := d.Descriptor.MissingWidth
 	oo, rr := setSimpleWidths(w, fontDict, d.Width[:], d.Encoding, defaultWidth)
 	compressedObjects = append(compressedObjects, oo...)

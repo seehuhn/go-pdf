@@ -51,7 +51,7 @@ type CID = cid.CID
 //
 // This structure reflects the structure of a CMap file.
 type File struct {
-	Name  pdf.Name
+	Name  string
 	ROS   *CIDSystemInfo
 	WMode font.WritingMode
 
@@ -147,7 +147,7 @@ func safeExtractCMap(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object) (*Fi
 	}
 
 	if name, _ := pdf.GetName(r, dict["CMapName"]); name != "" {
-		res.Name = name
+		res.Name = string(name)
 	}
 	if ros, _ := ExtractCIDSystemInfo(r, dict["CIDSystemInfo"]); ros != nil {
 		res.ROS = ros
@@ -188,7 +188,7 @@ func readCMap(r io.Reader) (*File, pdf.Object, error) {
 	var parent pdf.Object
 
 	if name, _ := raw["CMapName"].(postscript.Name); name != "" {
-		res.Name = pdf.Name(name)
+		res.Name = string(name)
 	}
 	if wMode, _ := raw["WMode"].(postscript.Integer); wMode == 1 {
 		res.WMode = font.Vertical
@@ -342,7 +342,7 @@ rangesLoop:
 func (info *File) UpdateName() {
 	h := md5.New()
 	info.writeBinary(h, 3)
-	info.Name = pdf.Name(fmt.Sprintf("seehuhn-%x", h.Sum(nil)))
+	info.Name = fmt.Sprintf("seehuhn-%x", h.Sum(nil))
 }
 
 // writeBinary writes a binary representation of the ToUnicodeInfo object to
@@ -497,8 +497,8 @@ var cmapTmplNew = template.Must(template.New("cmap").Funcs(template.FuncMap{
 		x := postscript.String(s)
 		return x.PS()
 	},
-	"PN": func(s pdf.Name) string {
-		x := postscript.Name(string(s))
+	"PN": func(s string) string {
+		x := postscript.Name(s)
 		return x.PS()
 	},
 	"B": func(x []byte) string {

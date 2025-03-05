@@ -126,7 +126,7 @@ func FuzzType1Dict(f *testing.F) {
 		}
 		d, err := ExtractType1(r, obj)
 		if err != nil {
-			t.Skip("broken Type1Dict")
+			t.Skip("no valid Type1Dict")
 		}
 
 		// Make sure we can write the dict, and read it back.
@@ -135,8 +135,6 @@ func FuzzType1Dict(f *testing.F) {
 }
 
 func checkRoundtripT1(t *testing.T, d1 *Type1, v pdf.Version) {
-	t.Helper()
-
 	d1 = clone(d1)
 
 	w, _ := memfile.NewPDFWriter(v, nil)

@@ -553,7 +553,7 @@ func TestExtractLoop(t *testing.T) {
 				refs[i] = data.Alloc()
 
 				cmaps[i] = &File{
-					Name: pdf.Name(fmt.Sprintf("Test%d", i)),
+					Name: fmt.Sprintf("Test%d", i),
 					ROS:  ros,
 					CodeSpaceRange: charcode.CodeSpaceRange{
 						{Low: []byte{0x00}, High: []byte{0xFF}},
@@ -569,7 +569,7 @@ func TestExtractLoop(t *testing.T) {
 			for i := range n {
 				dict := pdf.Dict{
 					"Type":          pdf.Name("CMap"),
-					"CMapName":      cmaps[i].Name,
+					"CMapName":      pdf.Name(cmaps[i].Name),
 					"CIDSystemInfo": rosRef,
 					"UseCMap":       refs[(i+1)%n],
 				}
