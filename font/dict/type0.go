@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"math"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -60,16 +59,28 @@ type CIDFontType0 struct {
 	// above, or the cmap must be one of Identity-H or Identity-V.
 	Encoding *cmap.File
 
-	// Width is a map from CID values to glyph widths (in PDF glyph space units).
+	// Width (optional) is a map from CID values to glyph widths (in PDF glyph
+	// space units).  Only widths which are different from the default width
+	// need to be specified.
 	Width map[cmap.CID]float64
 
 	// DefaultWidth is the glyph width for CID values not in the Width map
 	// (in PDF glyph space units).
 	DefaultWidth float64
 
-	// TODO(voss): vertical glyph metrics
+	// VMetrics (optional) maps CIDs to their vertical metrics.
+	// These are used when the CMap in Encoding specifies vertical writing mode.
+	VMetrics map[cmap.CID]VMetrics
 
-	// Text specifies how character codes are mapped to Unicode strings.
+	// DefaultVMetrics contains the default vertical metrics.
+	// These are used when the CMap in Encoding specifies vertical writing mode,
+	// and the CID is not in the VMetrics map.
+	//
+	// For horizontal writing mode, set this to DefaultVMetricsDefault.
+	DefaultVMetrics DefaultVMetrics
+
+	// Text (optional) specifies how character codes are mapped to Unicode
+	// strings.
 	Text *cmap.ToUnicodeFile
 
 	// FontType gives the type of glyph outline data. Possible values are
@@ -163,15 +174,30 @@ func ExtractCIDFontType0(r pdf.Getter, obj pdf.Object) (*CIDFontType0, error) {
 
 	d.ROS, _ = cmap.ExtractCIDSystemInfo(r, cidFontDict["CIDSystemInfo"])
 
-	d.Width, err = decodeComposite(r, cidFontDict["W"])
+	d.Width, err = decodeCompositeWidths(r, cidFontDict["W"])
 	if err != nil {
 		return nil, err
 	}
-	dw, err := pdf.GetNumber(r, cidFontDict["DW"])
-	if pdf.IsReadError(err) {
+	if obj, ok := cidFontDict["DW"]; ok {
+		dw, err := pdf.GetNumber(r, obj)
+		if pdf.IsReadError(err) {
+			return nil, err
+		}
+		d.DefaultWidth = float64(dw)
+	} else {
+		d.DefaultWidth = DefaultWidthDefault
+	}
+
+	dw2, err := decodeVDefault(r, cidFontDict["DW2"])
+	if err != nil {
 		return nil, err
 	}
-	d.DefaultWidth = float64(dw)
+	d.DefaultVMetrics = dw2
+	w2, err := decodeVMetrics(r, cidFontDict["W2"])
+	if err != nil {
+		return nil, err
+	}
+	d.VMetrics = w2
 
 	d.FontType = glyphdata.None
 	if ref, _ := fdDict["FontFile3"].(pdf.Reference); ref != 0 {
@@ -343,7 +369,7 @@ func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager) error {
 	compressedObjects := []pdf.Object{fontDict, cidFontDict, fdDict}
 	compressedRefs := []pdf.Reference{fontDictRef, cidFontRef, fdRef}
 
-	ww := encodeCompositeWidths(d.Width, d.DefaultWidth)
+	ww := encodeCompositeWidths(d.Width)
 	switch {
 	case moreThanTen(ww):
 		wwRef := w.Alloc()
@@ -353,9 +379,12 @@ func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager) error {
 	case len(ww) != 0:
 		cidFontDict["W"] = ww
 	}
-	if math.Abs(d.DefaultWidth-1000) > 0.01 {
+	if d.DefaultWidth != DefaultWidthDefault {
 		cidFontDict["DW"] = pdf.Number(d.DefaultWidth)
 	}
+
+	cidFontDict["DW2"] = encodeVDefault(d.DefaultVMetrics)
+	cidFontDict["W2"] = encodeVMetrics(d.VMetrics)
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {

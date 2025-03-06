@@ -355,15 +355,16 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	}
 
 	dicts := &dict.CIDFontType0{
-		Ref:            fontDictRef,
-		PostScriptName: f.cff.FontName,
-		Descriptor:     fd,
-		ROS:            f.cmap.ROS,
-		Encoding:       f.cmap,
-		Width:          ww,
-		DefaultWidth:   f.cff.GlyphWidthPDF(0),
-		FontType:       fontType,
-		FontRef:        fontRef,
+		Ref:             fontDictRef,
+		PostScriptName:  f.cff.FontName,
+		Descriptor:      fd,
+		ROS:             f.cmap.ROS,
+		Encoding:        f.cmap,
+		Width:           ww,
+		DefaultWidth:    f.cff.GlyphWidthPDF(0),
+		DefaultVMetrics: dict.DefaultVMetricsDefault,
+		FontType:        fontType,
+		FontRef:         fontRef,
 	}
 	err = dicts.WriteToPDF(rm)
 	if err != nil {

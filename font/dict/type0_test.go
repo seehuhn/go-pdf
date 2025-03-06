@@ -22,6 +22,8 @@ import (
 	"os"
 	"testing"
 
+	"seehuhn.de/go/geom/rect"
+
 	"github.com/google/go-cmp/cmp"
 
 	"seehuhn.de/go/pdf"
@@ -206,6 +208,12 @@ var t0Dicts = []*CIDFontType0{
 			1: 500,
 		},
 		DefaultWidth: 750,
+		VMetrics: map[cmap.CID]VMetrics{
+			0: {OffsY: 800, DeltaY: -1000},
+			1: {OffsY: 880, DeltaY: -900},
+			2: {OffsY: 880, DeltaY: -900},
+		},
+		DefaultVMetrics: DefaultVMetrics{800, -800},
 		Text: &cmap.ToUnicodeFile{
 			CodeSpaceRange: charcode.Simple,
 			Singles: []cmap.ToUnicodeSingle{
@@ -283,5 +291,25 @@ var t0Dicts = []*CIDFontType0{
 		DefaultWidth: 900,
 		FontType:     glyphdata.CFF,
 		FontRef:      pdf.NewReference(999, 0),
+	},
+	{
+		PostScriptName: "Nil-Width",
+		Descriptor: &font.Descriptor{
+			FontName:     "Nil-Width",
+			IsFixedPitch: true,
+			FontBBox: rect.Rect{
+				LLx: 0,
+				LLy: 0,
+				URx: 1000,
+				URy: 1000,
+			},
+			Ascent:    1000,
+			Descent:   0,
+			CapHeight: 1000,
+		},
+		ROS:          ros,
+		Encoding:     cmap.Predefined("Identity-H"),
+		DefaultWidth: 1000,
+		FontType:     glyphdata.None,
 	},
 }

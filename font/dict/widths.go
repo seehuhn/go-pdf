@@ -26,6 +26,13 @@ import (
 	"seehuhn.de/go/postscript/cid"
 )
 
+const DefaultWidthDefault = 1000.0
+
+// getSimpleWidths populates ww with glyph widths from a font dictionary.
+// It sets default widths for all glyphs, then updates specific widths from
+// the Widths array in fontDict.
+//
+// Returns true if widths were successfully read.
 func getSimpleWidths(ww []float64, r pdf.Getter, fontDict pdf.Dict, defaultWidth float64) bool {
 	for c := range ww {
 		ww[c] = defaultWidth
@@ -49,6 +56,11 @@ func getSimpleWidths(ww []float64, r pdf.Getter, fontDict pdf.Dict, defaultWidth
 	return true
 }
 
+// setSimpleWidths updates fontDict with a FirstChar, LastChar, and Widths
+// array based on non-default width values in ww. It ignores unused codes.
+//
+// Returns any additional objects and their references if an indirect object is
+// created.
 func setSimpleWidths(w *pdf.Writer, fontDict pdf.Dict, ww []float64, enc encoding.Type1, defaultWidth float64) ([]pdf.Object, []pdf.Reference) {
 	firstChar, lastChar := 0, 255
 	for lastChar > 0 && (enc(byte(lastChar)) == "" || ww[lastChar] == defaultWidth) {
@@ -76,17 +88,67 @@ func setSimpleWidths(w *pdf.Writer, fontDict pdf.Dict, ww []float64, enc encodin
 	return []pdf.Object{widths}, []pdf.Reference{widthRef}
 }
 
-func encodeCompositeWidths(widthMap map[cid.CID]float64, dw float64) pdf.Array {
-	cidSet := make(map[cid.CID]struct{})
-	for c, w := range widthMap {
-		if w != dw {
-			cidSet[c] = struct{}{}
+func decodeCompositeWidths(r pdf.Getter, obj pdf.Object) (map[cid.CID]float64, error) {
+	w, err := pdf.GetArray(r, obj)
+	if w == nil {
+		return nil, err
+	}
+
+	res := make(map[cid.CID]float64)
+	for len(w) > 1 {
+		c0, err := pdf.GetInteger(r, w[0])
+		if err != nil {
+			return nil, err
+		}
+		obj1, err := pdf.Resolve(r, w[1])
+		if err != nil {
+			return nil, err
+		}
+		if c1, ok := obj1.(pdf.Integer); ok {
+			if len(w) < 3 || c0 < 0 || c1 < c0 || c1-c0 > 65536 {
+				return nil, pdf.Error("invalid W entry in CIDFont dictionary")
+			}
+			wi, err := pdf.GetNumber(r, w[2])
+			if err != nil {
+				return nil, err
+			}
+			for c := c0; c <= c1; c++ {
+				cid := cid.CID(c)
+				if pdf.Integer(cid) != c {
+					return nil, pdf.Error("invalid W entry in CIDFont dictionary")
+				}
+				res[cid] = float64(wi)
+			}
+			w = w[3:]
+		} else {
+			wi, err := pdf.GetArray(r, w[1])
+			if err != nil {
+				return nil, err
+			}
+			for _, wiObj := range wi {
+				wi, err := pdf.GetNumber(r, wiObj)
+				if err != nil {
+					return nil, err
+				}
+				cid := cid.CID(c0)
+				if pdf.Integer(cid) != c0 {
+					return nil, pdf.Error("invalid W entry in CIDFont dictionary")
+				}
+				res[cid] = float64(wi)
+				c0++
+			}
+			w = w[2:]
 		}
 	}
-	if len(cidSet) == 0 {
-		return nil
+	if len(w) != 0 {
+		return nil, pdf.Error("invalid W entry in CIDFont dictionary")
 	}
-	cidList := maps.Keys(cidSet)
+
+	return res, nil
+}
+
+func encodeCompositeWidths(widthMap map[cid.CID]float64) pdf.Array {
+	cidList := maps.Keys(widthMap)
 	slices.Sort(cidList)
 
 	// There are two ways to encode the widths:
@@ -143,63 +205,4 @@ func encodeCompositeWidths(widthMap map[cid.CID]float64, dw float64) pdf.Array {
 	}
 
 	return res
-}
-
-func decodeComposite(r pdf.Getter, obj pdf.Object) (map[cid.CID]float64, error) {
-	w, err := pdf.GetArray(r, obj)
-	if err != nil {
-		return nil, err
-	}
-
-	res := make(map[cid.CID]float64)
-	for len(w) > 1 {
-		c0, err := pdf.GetInteger(r, w[0])
-		if err != nil {
-			return nil, err
-		}
-		obj1, err := pdf.Resolve(r, w[1])
-		if err != nil {
-			return nil, err
-		}
-		if c1, ok := obj1.(pdf.Integer); ok {
-			if len(w) < 3 || c0 < 0 || c1 < c0 || c1-c0 > 65536 {
-				return nil, pdf.Error("invalid W entry in CIDFont dictionary")
-			}
-			wi, err := pdf.GetNumber(r, w[2])
-			if err != nil {
-				return nil, err
-			}
-			for c := c0; c <= c1; c++ {
-				cid := cid.CID(c)
-				if pdf.Integer(cid) != c {
-					return nil, pdf.Error("invalid W entry in CIDFont dictionary")
-				}
-				res[cid] = float64(wi)
-			}
-			w = w[3:]
-		} else {
-			wi, err := pdf.GetArray(r, w[1])
-			if err != nil {
-				return nil, err
-			}
-			for _, wiObj := range wi {
-				wi, err := pdf.GetNumber(r, wiObj)
-				if err != nil {
-					return nil, err
-				}
-				cid := cid.CID(c0)
-				if pdf.Integer(cid) != c0 {
-					return nil, pdf.Error("invalid W entry in CIDFont dictionary")
-				}
-				res[cid] = float64(wi)
-				c0++
-			}
-			w = w[2:]
-		}
-	}
-	if len(w) != 0 {
-		return nil, pdf.Error("invalid W entry in CIDFont dictionary")
-	}
-
-	return res, nil
 }

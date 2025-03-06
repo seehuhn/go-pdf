@@ -170,6 +170,17 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 		return true, err
 
 	case Array:
+		if x == nil {
+			if needSep {
+				_, err := io.WriteString(w, " ")
+				if err != nil {
+					return false, err
+				}
+			}
+			_, err := io.WriteString(w, "null")
+			return true, err
+		}
+
 		_, err := io.WriteString(w, "[")
 		if err != nil {
 			return false, err

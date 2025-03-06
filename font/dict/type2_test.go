@@ -263,8 +263,9 @@ var t2Dicts = []*CIDFontType2{
 			11: 1100,
 			12: 1200,
 		},
-		DefaultWidth: 900,
-		FontType:     glyphdata.TrueType,
-		FontRef:      pdf.NewReference(999, 0),
+		DefaultWidth:    900,
+		DefaultVMetrics: DefaultVMetricsDefault,
+		FontType:        glyphdata.TrueType,
+		FontRef:         pdf.NewReference(999, 0),
 	},
 }

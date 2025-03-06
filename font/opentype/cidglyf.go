@@ -218,17 +218,18 @@ func (e *embeddedGlyfComposite) Finish(rm *pdf.ResourceManager) error {
 	}
 
 	dict := &dict.CIDFontType2{
-		Ref:            e.Ref,
-		PostScriptName: postScriptName,
-		SubsetTag:      subsetTag,
-		Descriptor:     fd,
-		ROS:            ros,
-		Encoding:       e.CIDEncoder.CMap(ros),
-		Width:          ww,
-		DefaultWidth:   dw,
-		Text:           toUnicode,
-		FontType:       glyphdata.OpenTypeGlyf,
-		FontRef:        rm.Out.Alloc(),
+		Ref:             e.Ref,
+		PostScriptName:  postScriptName,
+		SubsetTag:       subsetTag,
+		Descriptor:      fd,
+		ROS:             ros,
+		Encoding:        e.CIDEncoder.CMap(ros),
+		Width:           ww,
+		DefaultWidth:    dw,
+		DefaultVMetrics: dict.DefaultVMetricsDefault,
+		Text:            toUnicode,
+		FontType:        glyphdata.OpenTypeGlyf,
+		FontRef:         rm.Out.Alloc(),
 	}
 	if !isIdentity {
 		dict.CIDToGID = cidToGID

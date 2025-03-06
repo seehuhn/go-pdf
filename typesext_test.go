@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,35 +14,38 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics
+package pdf_test
 
 import (
+	"fmt"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-// This file implements the "XObject operator".
-// The operator is defined in table 86 of ISO 32000-2:2020.
-
-// XObject represents a PDF XObject.
-type XObject interface {
-	Subtype() pdf.Name
-	pdf.Embedder[pdf.Unused]
-}
-
-// DrawXObject draws a PDF XObject on the page.
-// This can be used to draw images, forms, or other XObjects.
-//
-// This implements the PDF graphics operator "Do".
-func (w *Writer) DrawXObject(obj XObject) {
-	if !w.isValid("DrawXObject", objPage) {
-		return
+func TestArrayRoundTrip(t *testing.T) {
+	var cases = []pdf.Array{
+		nil,
+		{},
+		{pdf.Integer(1), pdf.Integer(2), pdf.Integer(3)},
+		{pdf.Integer(1), nil, pdf.Integer(3)},
+		{pdf.Array{}},
 	}
-
-	name, _, err := writerGetResourceName(w, catXObject, obj)
-	if err != nil {
-		w.Err = err
-		return
+	for i, a := range cases {
+		t.Run(fmt.Sprintf("case%d", i), func(t *testing.T) {
+			w, m := memfile.NewPDFWriter(pdf.V2_0, nil)
+			ref := w.Alloc()
+			w.Put(ref, a)
+			b, err := pdf.GetArray(w, ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if d := cmp.Diff(a, b); d != "" {
+				fmt.Println(string(m.Data))
+				t.Error(d)
+			}
+		})
 	}
-
-	w.writeObjects(name, pdf.Operator("Do"))
 }

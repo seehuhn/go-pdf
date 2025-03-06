@@ -174,16 +174,17 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		CapHeight: f.ttf.CapHeight.AsFloat(q),
 	}
 	dict := &dict.CIDFontType2{
-		Ref:            fontDictRef,
-		PostScriptName: "Test",
-		SubsetTag:      "AABBCC",
-		Descriptor:     fd,
-		ROS:            f.cmap.ROS,
-		Encoding:       f.cmap,
-		DefaultWidth:   2000,
-		CIDToGID:       cidToGID,
-		FontType:       glyphdata.TrueType,
-		FontRef:        rm.Out.Alloc(),
+		Ref:             fontDictRef,
+		PostScriptName:  "Test",
+		SubsetTag:       "AABBCC",
+		Descriptor:      fd,
+		ROS:             f.cmap.ROS,
+		Encoding:        f.cmap,
+		DefaultWidth:    2000,
+		DefaultVMetrics: dict.DefaultVMetricsDefault,
+		CIDToGID:        cidToGID,
+		FontType:        glyphdata.TrueType,
+		FontRef:         rm.Out.Alloc(),
 	}
 
 	err := dict.WriteToPDF(rm)

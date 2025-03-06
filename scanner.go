@@ -456,7 +456,10 @@ func (s *scanner) ReadName() (Name, error) {
 
 // ReadArray reads an array, starting after the opening "[".
 func (s *scanner) ReadArray() (Array, error) {
-	var array Array
+	// At this point we already have read the opening "[",
+	// so we don't want to return nil.
+	array := Array{}
+
 	integersSeen := 0
 	for {
 		err := s.SkipWhiteSpace()

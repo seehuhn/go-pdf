@@ -272,8 +272,6 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager) error {
 	compressedObjects = append(compressedObjects, encodingObj)
 	compressedRefs = append(compressedRefs, encodingRef)
 
-	// TODO(voss): Introduce a helper function for constructing the widths
-	// array.
 	var defaultWidth float64
 	if d.Descriptor != nil {
 		defaultWidth = d.Descriptor.MissingWidth

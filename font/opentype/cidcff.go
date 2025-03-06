@@ -256,17 +256,18 @@ func (e *embeddedCFFComposite) Finish(rm *pdf.ResourceManager) error {
 	}
 
 	dict := &dict.CIDFontType0{
-		Ref:            e.Ref,
-		PostScriptName: postScriptName,
-		SubsetTag:      subsetTag,
-		Descriptor:     fd,
-		ROS:            ros,
-		Encoding:       e.CIDEncoder.CMap(ros),
-		Width:          ww,
-		DefaultWidth:   dw,
-		Text:           toUnicode,
-		FontType:       glyphdata.OpenTypeCFF,
-		FontRef:        rm.Out.Alloc(),
+		Ref:             e.Ref,
+		PostScriptName:  postScriptName,
+		SubsetTag:       subsetTag,
+		Descriptor:      fd,
+		ROS:             ros,
+		Encoding:        e.CIDEncoder.CMap(ros),
+		Width:           ww,
+		DefaultWidth:    dw,
+		DefaultVMetrics: dict.DefaultVMetricsDefault,
+		Text:            toUnicode,
+		FontType:        glyphdata.OpenTypeCFF,
+		FontRef:         rm.Out.Alloc(),
 	}
 
 	err := dict.WriteToPDF(rm)
