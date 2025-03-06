@@ -309,6 +309,8 @@ func (d *CIDFontType2) repair() {
 	if d.FontType == glyphdata.None {
 		d.CIDToGID = nil
 	}
+
+	d.Descriptor.MissingWidth = 0
 }
 
 // validate performs some basic checks on the font dictionary.
@@ -340,6 +342,10 @@ func (d *CIDFontType2) validate() error {
 
 	if d.FontType == glyphdata.None && d.CIDToGID != nil {
 		return errors.New("CIDToGIDMap not allowed for external font")
+	}
+
+	if d.Descriptor.MissingWidth != 0 {
+		return errors.New("MissingWidth must be 0 for composite fonts")
 	}
 
 	return nil

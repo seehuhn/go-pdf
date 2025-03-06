@@ -113,12 +113,6 @@ func New(info *sfnt.Font, opt *Options) (*Instance, error) {
 	leading := math.Round(float64(info.Ascent-info.Descent+info.LineGap) * qv)
 	capHeight := math.Round(float64(info.CapHeight) * qv)
 	xHeight := math.Round(float64(info.XHeight) * qv)
-
-	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
-	if err != nil {
-		return nil, err
-	}
-
 	glyphExtents := make([]rect.Rect, len(cffFont.Glyphs))
 	for gid := range cffFont.Glyphs {
 		glyphExtents[gid] = cffFont.GlyphBBoxPDF(cffFont.FontMatrix, glyph.ID(gid))
@@ -132,6 +126,11 @@ func New(info *sfnt.Font, opt *Options) (*Instance, error) {
 
 		GlyphExtents: glyphExtents,
 		Widths:       info.WidthsPDF(),
+	}
+
+	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
+	if err != nil {
+		return nil, err
 	}
 
 	f := &Instance{

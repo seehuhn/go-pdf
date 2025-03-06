@@ -17,6 +17,9 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"golang.org/x/text/language"
 
 	"seehuhn.de/go/pdf"
@@ -28,17 +31,15 @@ import (
 )
 
 func main() {
-	err := doit()
+	err := createDocument("test.pdf")
 	if err != nil {
-		panic(err)
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
 	}
 }
 
-func doit() error {
-	pdfOpt := &pdf.WriterOptions{
-		HumanReadable: false,
-	}
-	page, err := document.CreateSinglePage("test.pdf", document.A4, pdf.V1_7, pdfOpt)
+func createDocument(fname string) error {
+	page, err := document.CreateSinglePage(fname, document.A4, pdf.V1_7, nil)
 	if err != nil {
 		return err
 	}
