@@ -183,7 +183,6 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		CapHeight: f.ttf.CapHeight.AsFloat(q),
 	}
 	dict := &dict.CIDFontType2{
-		Ref:             fontDictRef,
 		PostScriptName:  "Test",
 		SubsetTag:       "ABCDEF",
 		Descriptor:      fd,
@@ -196,7 +195,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		FontRef:         rm.Out.Alloc(),
 	}
 
-	err := dict.WriteToPDF(rm)
+	err := dict.WriteToPDF(rm, fontDictRef)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -41,9 +41,6 @@ var (
 // CIDFontType2 holds the information from the font dictionary and CIDFont
 // dictionary of a Type 2 (TrueType-based) CIDFont.
 type CIDFontType2 struct {
-	// Ref is the reference to the font dictionary in the PDF file.
-	Ref pdf.Reference
-
 	// PostScriptName is the PostScript name of the font
 	// (without any subset tag).
 	PostScriptName string
@@ -74,11 +71,11 @@ type CIDFontType2 struct {
 	DefaultWidth float64
 
 	// VMetrics (optional) maps CIDs to their vertical metrics.
-	// These are used when the CMap in Encoding specifies vertical writing mode.
+	// These are used when the CMap specifies vertical writing mode.
 	VMetrics map[cmap.CID]VMetrics
 
 	// DefaultVMetrics contains the default vertical metrics.
-	// These are used when the CMap in Encoding specifies vertical writing mode,
+	// These are used when the CMap specifies vertical writing mode,
 	// and the CID is not in the VMetrics map.
 	//
 	// For horizontal writing mode, set this to DefaultVMetricsDefault.
@@ -150,7 +147,6 @@ func ExtractCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 	}
 
 	d := &CIDFontType2{}
-	d.Ref, _ = obj.(pdf.Reference)
 
 	// fields in the font dictionary
 
@@ -354,12 +350,7 @@ func (d *CIDFontType2) validate() error {
 	return nil
 }
 
-// WriteToPDF adds the font dictionary to the PDF file.
-func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager) error {
-	if d.Ref == 0 {
-		return errors.New("missing font dictionary reference")
-	}
-
+func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager, fontDictRef pdf.Reference) error {
 	w := rm.Out
 
 	switch d.FontType {
@@ -411,7 +402,6 @@ func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager) error {
 		}
 	}
 
-	fontDictRef := d.Ref
 	cidFontRef := w.Alloc()
 	fdRef := w.Alloc()
 

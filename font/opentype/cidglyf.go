@@ -218,7 +218,6 @@ func (e *embeddedGlyfComposite) Finish(rm *pdf.ResourceManager) error {
 	}
 
 	dict := &dict.CIDFontType2{
-		Ref:             e.Ref,
 		PostScriptName:  postScriptName,
 		SubsetTag:       subsetTag,
 		Descriptor:      fd,
@@ -235,7 +234,7 @@ func (e *embeddedGlyfComposite) Finish(rm *pdf.ResourceManager) error {
 		dict.CIDToGID = cidToGID
 	}
 
-	err := dict.WriteToPDF(rm)
+	err := dict.WriteToPDF(rm, e.Ref)
 	if err != nil {
 		return err
 	}

@@ -63,9 +63,6 @@ func TestEmbed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if dict.Ref != ref {
-		t.Errorf("wrong object reference: expected %v, got %v", ref, dict.Ref)
-	}
 	if dict.PostScriptName != fontData.PostScriptName() {
 		t.Errorf("wrong PostScript name: expected %v, got %v",
 			fontData.PostScriptName(), dict.PostScriptName)

@@ -39,9 +39,6 @@ var (
 
 // Type3 holds the information from a Type 3 font dictionary.
 type Type3 struct {
-	// Ref is the reference to the font dictionary in the PDF file.
-	Ref pdf.Reference
-
 	// Name is deprecated and should be left empty.
 	// Only used in PDF 1.0 where it was the name used to reference the font
 	// from within content streams.
@@ -98,7 +95,6 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
 	}
 
 	d := &Type3{}
-	d.Ref, _ = obj.(pdf.Reference)
 
 	d.Name, _ = pdf.GetName(r, fontDict["Name"])
 
@@ -205,12 +201,7 @@ func (d *Type3) validate(w *pdf.Writer) error {
 	return nil
 }
 
-// WriteToPDF adds the Type 3 font dictionary to the PDF file.
-func (d *Type3) WriteToPDF(rm *pdf.ResourceManager) error {
-	if d.Ref == 0 {
-		return errors.New("missing font dictionary reference")
-	}
-
+func (d *Type3) WriteToPDF(rm *pdf.ResourceManager, fontDictRef pdf.Reference) error {
 	w := rm.Out
 
 	err := d.validate(w)
@@ -241,7 +232,7 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager) error {
 	}
 
 	compressedObjects := []pdf.Object{fontDict}
-	compressedRefs := []pdf.Reference{d.Ref}
+	compressedRefs := []pdf.Reference{fontDictRef}
 
 	charProcsDict := make(pdf.Dict, len(d.CharProcs))
 	for name, ref := range d.CharProcs {

@@ -66,9 +66,9 @@ func FuzzType1Dict(f *testing.F) {
 				f.Fatal(err)
 			}
 			rm := pdf.NewResourceManager(w)
+			fontDictRef := w.Alloc()
 
 			d := clone(d)
-			d.Ref = w.Alloc()
 			if d.FontRef != 0 {
 				d.FontRef = w.Alloc()
 				// write a fake font data stream
@@ -88,7 +88,7 @@ func FuzzType1Dict(f *testing.F) {
 					f.Fatal(err)
 				}
 			}
-			err = d.WriteToPDF(rm)
+			err = d.WriteToPDF(rm, fontDictRef)
 			if err != nil {
 				f.Fatal(err)
 			}
@@ -97,7 +97,7 @@ func FuzzType1Dict(f *testing.F) {
 				f.Fatal(err)
 			}
 
-			w.GetMeta().Trailer["Seeh:X"] = d.Ref
+			w.GetMeta().Trailer["Seeh:X"] = fontDictRef
 
 			err = w.Close()
 			if err != nil {
@@ -139,10 +139,10 @@ func checkRoundtripT1(t *testing.T, d1 *Type1, v pdf.Version) {
 
 	w, _ := memfile.NewPDFWriter(v, nil)
 	rm := pdf.NewResourceManager(w)
+	fontDictRef := w.Alloc()
 
 	// == Write ==
 
-	d1.Ref = w.Alloc()
 	if d1.FontRef != 0 {
 		d1.FontRef = w.Alloc()
 		// write a fake font data stream
@@ -162,7 +162,7 @@ func checkRoundtripT1(t *testing.T, d1 *Type1, v pdf.Version) {
 			t.Fatal(err)
 		}
 	}
-	err := d1.WriteToPDF(rm)
+	err := d1.WriteToPDF(rm, fontDictRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +173,7 @@ func checkRoundtripT1(t *testing.T, d1 *Type1, v pdf.Version) {
 
 	// == Read ==
 
-	d2, err := ExtractType1(w, d1.Ref)
+	d2, err := ExtractType1(w, fontDictRef)
 	if err != nil {
 		t.Fatal(err)
 	}

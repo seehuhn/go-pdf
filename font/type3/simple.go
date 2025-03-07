@@ -169,7 +169,6 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		MissingWidth: e.Simple.DefaultWidth(),
 	}
 	dict := &dict.Type3{
-		Ref:        e.Ref,
 		Name:       pdf.Name(e.Font.PostScriptName),
 		Descriptor: fd,
 		Encoding:   e.Simple.Encoding(),
@@ -183,7 +182,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		dict.Text[c] = info.Text
 	}
 
-	err := dict.WriteToPDF(rm)
+	err := dict.WriteToPDF(rm, e.Ref)
 	if err != nil {
 		return err
 	}

@@ -42,9 +42,6 @@ var (
 // TrueType holds the informtation from the font dictionary of a simple
 // TrueType font.
 type TrueType struct {
-	// Ref is the reference to the font dictionary in the PDF file.
-	Ref pdf.Reference
-
 	// PostScriptName is the PostScript name of the font
 	// (without any subset tag).
 	PostScriptName string
@@ -101,7 +98,6 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*TrueType, error) {
 	}
 
 	d := &TrueType{}
-	d.Ref, _ = obj.(pdf.Reference)
 
 	baseFont, err := pdf.GetName(r, fontDict["BaseFont"])
 	if err != nil {
@@ -304,12 +300,7 @@ func (d *TrueType) validate(w *pdf.Writer) error {
 	return nil
 }
 
-// WriteToPDF adds the font dictionary to the PDF file.
-func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager) error {
-	if d.Ref == 0 {
-		return errors.New("missing font dictionary reference")
-	}
-
+func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	w := rm.Out
 
 	switch d.FontType {
@@ -355,7 +346,7 @@ func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager) error {
 	}
 
 	compressedObjects := []pdf.Object{fontDict}
-	compressedRefs := []pdf.Reference{d.Ref}
+	compressedRefs := []pdf.Reference{ref}
 
 	fdRef := w.Alloc()
 	fdDict := d.Descriptor.AsDict()

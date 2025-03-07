@@ -457,7 +457,6 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		StemV:      0,
 	}
 	dict := &dict.CIDFontType0{
-		Ref:             fontDictRef,
 		PostScriptName:  f.data.FontName,
 		Descriptor:      fd,
 		ROS:             f.cmap.ROS,
@@ -468,7 +467,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		FontType:        glyphdata.CFF,
 		FontRef:         rm.Out.Alloc(),
 	}
-	err := dict.WriteToPDF(rm)
+	err := dict.WriteToPDF(rm, fontDictRef)
 	if err != nil {
 		return nil, nil, err
 	}

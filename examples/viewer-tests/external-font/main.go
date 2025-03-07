@@ -244,7 +244,6 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		MissingWidth: glyphWidths,
 	}
 	dict := &dict.Type1{
-		Ref:            fontDictRef,
 		PostScriptName: TestFontName,
 		Descriptor:     fd,
 		FontType:       glyphdata.None,
@@ -261,7 +260,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		dict.Width[i] = glyphWidths
 	}
 
-	err := dict.WriteToPDF(rm)
+	err := dict.WriteToPDF(rm, fontDictRef)
 	if err != nil {
 		return nil, nil, err
 	}

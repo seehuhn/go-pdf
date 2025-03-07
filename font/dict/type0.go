@@ -38,9 +38,6 @@ var (
 // CIDFontType0 holds the information from the font dictionary and CIDFont
 // dictionary of a Type 0 (CFF-based) CIDFont.
 type CIDFontType0 struct {
-	// Ref is the reference to the font dictionary in the PDF file.
-	Ref pdf.Reference
-
 	// PostScriptName is the PostScript name of the font
 	// (without any subset tag).
 	PostScriptName string
@@ -141,7 +138,6 @@ func ExtractCIDFontType0(r pdf.Getter, obj pdf.Object) (*CIDFontType0, error) {
 	}
 
 	d := &CIDFontType0{}
-	d.Ref, _ = obj.(pdf.Reference)
 
 	// fields in the font dictionary
 
@@ -293,12 +289,7 @@ func (d *CIDFontType0) validate() error {
 	return nil
 }
 
-// WriteToPDF adds the font dictionary to the PDF file.
-func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager) error {
-	if d.Ref == 0 {
-		return errors.New("missing font dictionary reference")
-	}
-
+func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	w := rm.Out
 
 	switch d.FontType {
@@ -346,7 +337,6 @@ func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager) error {
 		}
 	}
 
-	fontDictRef := d.Ref
 	cidFontRef := w.Alloc()
 	fdRef := w.Alloc()
 
@@ -375,7 +365,7 @@ func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager) error {
 	}
 
 	compressedObjects := []pdf.Object{fontDict, cidFontDict, fdDict}
-	compressedRefs := []pdf.Reference{fontDictRef, cidFontRef, fdRef}
+	compressedRefs := []pdf.Reference{ref, cidFontRef, fdRef}
 
 	ww := encodeCompositeWidths(d.Width)
 	switch {

@@ -22,11 +22,15 @@ import (
 	"golang.org/x/exp/maps"
 
 	"seehuhn.de/go/pdf"
+	_ "seehuhn.de/go/pdf/font" // for the doc strings
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/postscript/cid"
 )
 
-const DefaultWidthDefault = 1000.0
+// DefaultWidthDefault is the value of DefaultWidth which is used, if no
+// value is specified in the PDF file.  Using this value for the "DefaultWidth"
+// field in a composite font dictionary will slightly reduce PDF file size.
+const DefaultWidthDefault = 1000
 
 // getSimpleWidths populates ww with glyph widths from a font dictionary.
 // It sets default widths for all glyphs, then updates specific widths from

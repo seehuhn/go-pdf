@@ -256,7 +256,6 @@ func (e *embeddedCFFComposite) Finish(rm *pdf.ResourceManager) error {
 	}
 
 	dict := &dict.CIDFontType0{
-		Ref:             e.Ref,
 		PostScriptName:  postScriptName,
 		SubsetTag:       subsetTag,
 		Descriptor:      fd,
@@ -270,7 +269,7 @@ func (e *embeddedCFFComposite) Finish(rm *pdf.ResourceManager) error {
 		FontRef:         rm.Out.Alloc(),
 	}
 
-	err := dict.WriteToPDF(rm)
+	err := dict.WriteToPDF(rm, e.Ref)
 	if err != nil {
 		return err
 	}

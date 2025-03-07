@@ -178,7 +178,6 @@ func (e *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 		MissingWidth: e.Simple.DefaultWidth(),
 	}
 	dict := &dict.Type1{
-		Ref:            e.Ref,
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
@@ -191,7 +190,7 @@ func (e *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 		dict.Text[c] = info.Text
 	}
 
-	err := dict.WriteToPDF(rm)
+	err := dict.WriteToPDF(rm, e.Ref)
 	if err != nil {
 		return err
 	}

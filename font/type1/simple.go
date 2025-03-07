@@ -203,7 +203,6 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		fd.IsFixedPitch = metricsSubset.IsFixedPitch
 	}
 	dict := &dict.Type1{
-		Ref:            e.Ref,
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
@@ -220,7 +219,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		dict.FontRef = rm.Out.Alloc()
 	}
 
-	err := dict.WriteToPDF(rm)
+	err := dict.WriteToPDF(rm, e.Ref)
 	if err != nil {
 		return err
 	}

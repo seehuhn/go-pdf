@@ -389,7 +389,6 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		MissingWidth: e.gd.MissingWidth(),
 	}
 	dict := dict.Type1{
-		Ref:            e.Ref,
 		PostScriptName: e.Font.FontName,
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
@@ -401,7 +400,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		_, dict.Width[c], dict.Text[c] = e.gd.GetData(byte(c))
 	}
 
-	err := dict.WriteToPDF(rm)
+	err := dict.WriteToPDF(rm, e.Ref)
 	if err != nil {
 		return err
 	}

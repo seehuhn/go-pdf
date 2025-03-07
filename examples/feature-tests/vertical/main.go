@@ -197,8 +197,8 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		Descent:      math.Round(f.Descent),
 		CapHeight:    math.Round(f.CapHeight),
 	}
+	fontDictRef := rm.Out.Alloc()
 	dict := &dict.CIDFontType0{
-		Ref:             rm.Out.Alloc(),
 		PostScriptName:  f.Font.FontName,
 		SubsetTag:       subsetTag,
 		Descriptor:      fd,
@@ -218,7 +218,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		FontRef:  rm.Out.Alloc(),
 	}
 
-	err := dict.WriteToPDF(rm)
+	err := dict.WriteToPDF(rm, fontDictRef)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -233,5 +233,5 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		return nil, nil, err
 	}
 
-	return dict.Ref, e, nil
+	return fontDictRef, e, nil
 }

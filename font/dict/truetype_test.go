@@ -68,9 +68,8 @@ func FuzzTrueTypeDict(f *testing.F) {
 
 			ref := w.Alloc()
 			d := clone(d)
-			d.Ref = ref
 
-			err = d.WriteToPDF(rm)
+			err = d.WriteToPDF(rm, ref)
 			if err != nil {
 				f.Fatal(err)
 			}
@@ -124,7 +123,7 @@ func checkRoundtripTT(t *testing.T, d1 *TrueType, v pdf.Version) {
 
 	// == Write ==
 
-	d1.Ref = w.Alloc()
+	ref := w.Alloc()
 	if d1.FontRef != 0 {
 		d1.FontRef = w.Alloc()
 		// write a fake font data stream
@@ -142,7 +141,7 @@ func checkRoundtripTT(t *testing.T, d1 *TrueType, v pdf.Version) {
 			t.Fatal(err)
 		}
 	}
-	err := d1.WriteToPDF(rm)
+	err := d1.WriteToPDF(rm, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +152,7 @@ func checkRoundtripTT(t *testing.T, d1 *TrueType, v pdf.Version) {
 
 	// == Read ==
 
-	d2, err := ExtractTrueType(w, d1.Ref)
+	d2, err := ExtractTrueType(w, ref)
 	if err != nil {
 		t.Fatal(err)
 	}

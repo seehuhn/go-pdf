@@ -25,46 +25,50 @@ import (
 	"seehuhn.de/go/pdf/font/glyphdata"
 )
 
+// FromFile represents an immutable font from a PDF file.
 type FromFile interface {
 	Embedded
 	GetDict() Dict
 }
 
-// Dict represents a font dictionary.
+// Dict represents a font dictionary in a PDF file.
 //
-// This must be one of the following types:
+// This interface is implemented by the following types:
 //   - [seehuhn.de/go/pdf/font/dict.Type1]
 //   - [seehuhn.de/go/pdf/font/dict.TrueType]
 //   - [seehuhn.de/go/pdf/font/dict.Type3]
 //   - [seehuhn.de/go/pdf/font/dict.CIDFontType0]
 //   - [seehuhn.de/go/pdf/font/dict.CIDFontType2]
 type Dict interface {
+	// WriteToPDF adds this font dictionary to the PDF file using the given
+	// reference.
+	//
+	// The resource manager is used to deduplicate child objects
+	// like encoding dictionaries, CMap streams, etc.
+	WriteToPDF(*pdf.ResourceManager, pdf.Reference) error
+
+	// MakeFont returns a new font object that can be used to typeset text.
+	// The font is immutable, i.e. no new glyphs can be added and no new codes
+	// can be defined via the returned font object.
 	MakeFont() (FromFile, error)
+
+	// GlyphData returns information about the embedded font program associated
+	// with this font dictionary.
+	//
+	// The returned glyphdata.Type indicates the format of the embedded font
+	// program (such as Type1, TrueType, CFF, etc.) or [glyphdata.None] if the
+	// font is not embedded.
+	//
+	// The returned pdf.Reference points to the stream object containing the
+	// font program in the PDF file. The reference is zero, if and only if the
+	// the type is [glyphdata.None].
+	//
+	// This information can be used to extract the actual glyph outlines from
+	// the PDF file for rendering or further processing.
 	GlyphData() (glyphdata.Type, pdf.Reference)
 }
 
-type ReaderFunc func(r pdf.Getter, obj pdf.Object) (Dict, error)
-
-var (
-	readerMutex sync.Mutex
-	readers     map[pdf.Name]ReaderFunc
-)
-
-func RegisterReader(tp pdf.Name, fn ReaderFunc) {
-	readerMutex.Lock()
-	defer readerMutex.Unlock()
-
-	if readers == nil {
-		readers = make(map[pdf.Name]ReaderFunc)
-	}
-
-	if _, alreadyPresent := readers[tp]; alreadyPresent {
-		panic(fmt.Sprintf("conflicting readers for font type %s", tp))
-	}
-
-	readers[tp] = fn
-}
-
+// ReadDict reads a font dictionary from a PDF file.
 func ReadDict(r pdf.Getter, obj pdf.Object) (Dict, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
@@ -110,4 +114,26 @@ func ReadDict(r pdf.Getter, obj pdf.Object) (Dict, error) {
 	}
 
 	return read(r, fontDict)
+}
+
+type ReaderFunc func(r pdf.Getter, obj pdf.Object) (Dict, error)
+
+var (
+	readerMutex sync.Mutex
+	readers     map[pdf.Name]ReaderFunc
+)
+
+func RegisterReader(tp pdf.Name, fn ReaderFunc) {
+	readerMutex.Lock()
+	defer readerMutex.Unlock()
+
+	if readers == nil {
+		readers = make(map[pdf.Name]ReaderFunc)
+	}
+
+	if _, alreadyPresent := readers[tp]; alreadyPresent {
+		panic(fmt.Sprintf("conflicting readers for font type %s", tp))
+	}
+
+	readers[tp] = fn
 }

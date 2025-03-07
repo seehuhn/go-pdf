@@ -236,7 +236,6 @@ func (e *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
 	}
 
 	dict := &dict.TrueType{
-		Ref:            e.Ref,
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
@@ -249,7 +248,7 @@ func (e *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
 		dict.Text[c] = info.Text
 	}
 
-	err := dict.WriteToPDF(rm)
+	err := dict.WriteToPDF(rm, e.Ref)
 	if err != nil {
 		return err
 	}

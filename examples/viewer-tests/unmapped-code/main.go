@@ -217,7 +217,6 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		MissingWidth: 500,
 	}
 	dict := dict.Type1{
-		Ref:            fontDictRef,
 		PostScriptName: "NimbusRoman-Regular",
 		SubsetTag:      "AAAAAA",
 		Descriptor:     fd,
@@ -235,7 +234,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	dict.Text['A'] = "Ǽ"
 	dict.Text[0o335] = "Ý"
 
-	err = dict.WriteToPDF(rm)
+	err = dict.WriteToPDF(rm, fontDictRef)
 	if err != nil {
 		return nil, nil, err
 	}

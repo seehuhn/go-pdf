@@ -25,22 +25,27 @@ import (
 	"seehuhn.de/go/postscript/cid"
 )
 
+// DefaultVMetricsDefault is the value of DefaultVMetrics which is used, if no
+// value is specified in the PDF file.  Using this value for a "DefaultVMetrics"
+// field in a composite font dictionary will slightly reduce PDF file size.
 var DefaultVMetricsDefault = DefaultVMetrics{
 	OffsY:  880,
 	DeltaY: -1000,
 }
 
 type DefaultVMetrics struct {
-	// OffsY is the vertical component of the glyph position vector.
-	// (The horizontal component is half the glyph width used for horizontal
-	// writing.)
+	// OffsY is the vertical component of the glyph position vector, in PDF
+	// glyph space units.
 	//
-	// The effect of this is that the glyph is moved down by OffsY and left
-	// by half the glyph width, compared to horizontal writing.
+	// The effect of this is that the glyph is moved down by OffsY, compared to
+	// horizontal writing.
+	//
+	// There is no separate OffsX default value for vertical writing. Instead,
+	// half of the horizontal glyph width is used as the default.
 	OffsY float64
 
-	// DeltaY is the vertical displacement of the following glyph.
-	// (The horizontal displacement is always zero.)
+	// DeltaY is the vertical displacement of the following glyph, in PDF glyph
+	// space units. (The horizontal displacement is always zero.)
 	//
 	// This is normally negative, so that writing goes from top to bottom.
 	DeltaY float64
@@ -87,16 +92,18 @@ func encodeVDefault(metrics DefaultVMetrics) pdf.Array {
 
 // VMetrics represents the vertical metrics for an individual CID
 type VMetrics struct {
-	// OffsX is the horizontal component of the glyph position vector.
+	// OffsX is the horizontal component of the glyph position vector, in PDF
+	// glyph space units.
 	//
-	// The effect of this is that the glyph is moved left by OffsX, compared
-	// to horizontal writing.
+	// The effect of this is that the glyph is moved left by OffsX, compared to
+	// horizontal writing.
 	OffsX float64
 
-	// OffsY is the vertical component of the glyph position vector.
+	// OffsY is the vertical component of the glyph position vector, in PDF
+	// glyph space units.
 	//
-	// The effect of this is that the glyph is moved down by OffsY, compared
-	// to horizontal writing.
+	// The effect of this is that the glyph is moved down by OffsY, compared to
+	// horizontal writing.
 	OffsY float64
 
 	// DeltaY is the vertical displacement for the following glyph.

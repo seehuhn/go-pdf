@@ -41,9 +41,6 @@ var (
 
 // Type1 holds the information from a Type 1 font dictionary.
 type Type1 struct {
-	// Ref is the reference to the font dictionary in the PDF file.
-	Ref pdf.Reference
-
 	// PostScriptName is the PostScript name of the font
 	// (without any subset tag).
 	PostScriptName string
@@ -99,7 +96,6 @@ func ExtractType1(r pdf.Getter, obj pdf.Object) (*Type1, error) {
 	}
 
 	d := &Type1{}
-	d.Ref, _ = obj.(pdf.Reference)
 
 	baseFont, err := pdf.GetName(r, fontDict["BaseFont"])
 	if err != nil {
@@ -304,12 +300,7 @@ func (d *Type1) validate(w *pdf.Writer) error {
 	return nil
 }
 
-// WriteToPDF adds the font dictionary to the PDF file.
-func (d *Type1) WriteToPDF(rm *pdf.ResourceManager) error {
-	if d.Ref == 0 {
-		return errors.New("missing font dictionary reference")
-	}
-
+func (d *Type1) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	w := rm.Out
 
 	switch d.FontType {
@@ -363,7 +354,7 @@ func (d *Type1) WriteToPDF(rm *pdf.ResourceManager) error {
 	}
 
 	compressedObjects := []pdf.Object{fontDict}
-	compressedRefs := []pdf.Reference{d.Ref}
+	compressedRefs := []pdf.Reference{ref}
 
 	trimFontDict := ((d.FontRef == 0) &&
 		stdInfo != nil &&

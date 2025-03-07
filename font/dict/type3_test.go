@@ -35,14 +35,14 @@ func TestType3Roundtrip(t *testing.T) {
 		for i, d := range type3Dicts {
 			t.Run(fmt.Sprintf("D%dv%s-%s", i, v, d.Name), func(t *testing.T) {
 				w, _ := memfile.NewPDFWriter(v, nil)
+				rm := pdf.NewResourceManager(w)
+				fontDictRef := w.Alloc()
 
 				// == Write ==
 
 				d1 := clone(d)
-				d1.Ref = w.Alloc()
 
-				rm := pdf.NewResourceManager(w)
-				err := d1.WriteToPDF(rm)
+				err := d1.WriteToPDF(rm, fontDictRef)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -53,7 +53,7 @@ func TestType3Roundtrip(t *testing.T) {
 
 				// == Read ==
 
-				d2, err := ExtractType3(w, d1.Ref)
+				d2, err := ExtractType3(w, fontDictRef)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -103,12 +103,11 @@ func FuzzType3Dict(f *testing.F) {
 				f.Fatal(err)
 			}
 
-			ref := w.Alloc()
+			fontDictRef := w.Alloc()
 			d := clone(d)
-			d.Ref = ref
 
 			rm := pdf.NewResourceManager(w)
-			err = d.WriteToPDF(rm)
+			err = d.WriteToPDF(rm, fontDictRef)
 			if err != nil {
 				f.Fatal(err)
 			}
@@ -117,7 +116,7 @@ func FuzzType3Dict(f *testing.F) {
 				f.Fatal(err)
 			}
 
-			w.GetMeta().Trailer["Seeh:X"] = ref
+			w.GetMeta().Trailer["Seeh:X"] = fontDictRef
 
 			err = w.Close()
 			if err != nil {
@@ -151,10 +150,10 @@ func FuzzType3Dict(f *testing.F) {
 		// Write the Type3Dict back to a new PDF file.
 		// Make sure we can write arbitrary Type3Dicts.
 		w, _ := memfile.NewPDFWriter(r.GetMeta().Version, nil)
-		d1.Ref = w.Alloc()
-
 		rm := pdf.NewResourceManager(w)
-		err = d1.WriteToPDF(rm)
+		fontDictRef := w.Alloc()
+
+		err = d1.WriteToPDF(rm, fontDictRef)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -165,7 +164,7 @@ func FuzzType3Dict(f *testing.F) {
 
 		// Read back the data.
 		// Make sure we get the same Type3Dict back.
-		d2, err := ExtractType3(w, d1.Ref)
+		d2, err := ExtractType3(w, fontDictRef)
 		if err != nil {
 			t.Fatal(err)
 		}
