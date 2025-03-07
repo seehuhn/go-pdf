@@ -850,6 +850,8 @@ func (x Reference) String() string {
 // If the object contains custom implementations of the [Object] interface, the
 // `IsDirect` method of these objects is called recursively.  If no `IsDirect`
 // method is present, the function panics.
+//
+// TODO(voss): remove?
 func IsDirect(obj Object) bool {
 	native := obj.AsPDF(0)
 

@@ -188,7 +188,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		SubsetTag:       "ABCDEF",
 		Descriptor:      fd,
 		ROS:             f.cmap.ROS,
-		Encoding:        f.cmap,
+		CMap:            f.cmap,
 		DefaultWidth:    2000,
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
 		CIDToGID:        cidToGID,

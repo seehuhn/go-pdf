@@ -58,11 +58,11 @@ type CIDFontType2 struct {
 	// ROS describes the character collection covered by the font.
 	ROS *cid.SystemInfo
 
-	// Encoding specifies how character codes are mapped to CID values.
+	// CMap specifies how character codes are mapped to CID values.
 	//
-	// The Encoding.ROS field must either be compatible with the ROS field
+	// The CMap.ROS field must either be compatible with the ROS field
 	// above, or the cmap must be one of Identity-H or Identity-V.
-	Encoding *cmap.File
+	CMap *cmap.File
 
 	// Width (optional) is a map from CID values to glyph widths (in PDF glyph
 	// space units).  Only widths which are different from the default width
@@ -154,7 +154,7 @@ func ExtractCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 
 	// fields in the font dictionary
 
-	d.Encoding, err = cmap.Extract(r, fontDict["Encoding"])
+	d.CMap, err = cmap.Extract(r, fontDict["Encoding"])
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +267,7 @@ func ExtractCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 
 	d.repair()
 
-	if d.FontType == glyphdata.None && !d.Encoding.IsPredefined() {
+	if d.FontType == glyphdata.None && !d.CMap.IsPredefined() {
 		return nil, errors.New("custom encoding not allowed for external font")
 	}
 
@@ -382,7 +382,7 @@ func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager) error {
 		return err
 	}
 
-	if d.FontType == glyphdata.None && !d.Encoding.IsPredefined() {
+	if d.FontType == glyphdata.None && !d.CMap.IsPredefined() {
 		return errors.New("custom encoding not allowed for external font")
 	}
 
@@ -394,10 +394,10 @@ func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager) error {
 	}
 
 	var encoding pdf.Object
-	if d.Encoding.IsPredefined() {
-		encoding = pdf.Name(d.Encoding.Name)
+	if d.CMap.IsPredefined() {
+		encoding = pdf.Name(d.CMap.Name)
 	} else {
-		encoding, _, err = pdf.ResourceManagerEmbed(rm, d.Encoding)
+		encoding, _, err = pdf.ResourceManagerEmbed(rm, d.CMap)
 		if err != nil {
 			return err
 		}
@@ -513,13 +513,13 @@ func (d *CIDFontType2) GlyphData() (glyphdata.Type, pdf.Reference) {
 // MakeFont returns a [font.FromFile] for the font dictionary.
 func (d *CIDFontType2) MakeFont() (font.FromFile, error) {
 	var csr charcode.CodeSpaceRange
-	csr = append(csr, d.Encoding.CodeSpaceRange...)
+	csr = append(csr, d.CMap.CodeSpaceRange...)
 	csr = append(csr, d.Text.CodeSpaceRange...)
 	codec, err := charcode.NewCodec(csr)
 	if err != nil {
 		// In case the two code spaces are not compatible, try to use only the
 		// code space from the encoding.
-		csr = append(csr[:0], d.Encoding.CodeSpaceRange...)
+		csr = append(csr[:0], d.CMap.CodeSpaceRange...)
 		codec, err = charcode.NewCodec(csr)
 	}
 	if err != nil {
@@ -549,7 +549,7 @@ func (s *t2Font) GetDict() font.Dict {
 }
 
 func (s *t2Font) WritingMode() font.WritingMode {
-	return s.Encoding.WMode
+	return s.CMap.WMode
 }
 
 func (s *t2Font) Codes(str pdf.String) iter.Seq[*font.Code] {
@@ -563,10 +563,10 @@ func (s *t2Font) Codes(str pdf.String) iter.Seq[*font.Code] {
 
 				res = &font.Code{}
 				if isValid {
-					res.CID = s.Encoding.LookupCID(code)
-					res.Notdef = s.Encoding.LookupNotdefCID(code)
+					res.CID = s.CMap.LookupCID(code)
+					res.Notdef = s.CMap.LookupNotdefCID(code)
 				} else {
-					res.CID = s.Encoding.LookupNotdefCID(code)
+					res.CID = s.CMap.LookupNotdefCID(code)
 				}
 				w, ok := s.Width[res.CID]
 				if ok {

@@ -461,7 +461,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		PostScriptName:  f.data.FontName,
 		Descriptor:      fd,
 		ROS:             f.cmap.ROS,
-		Encoding:        f.cmap,
+		CMap:            f.cmap,
 		Width:           f.widths,
 		DefaultWidth:    f.dw,
 		DefaultVMetrics: dict.DefaultVMetricsDefault,

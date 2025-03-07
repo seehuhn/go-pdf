@@ -182,8 +182,8 @@ var t2Dicts = []*CIDFontType2{
 		Descriptor: &font.Descriptor{
 			FontName: "Test",
 		},
-		ROS:      ros,
-		Encoding: cmap.Predefined("Identity-H"),
+		ROS:  ros,
+		CMap: cmap.Predefined("Identity-H"),
 		Width: map[cmap.CID]float64{
 			0: 1000,
 			1: 500,
@@ -206,8 +206,8 @@ var t2Dicts = []*CIDFontType2{
 		Descriptor: &font.Descriptor{
 			FontName: "ABCDEF+Test",
 		},
-		ROS:      ros,
-		Encoding: cmap.Predefined("Identity-H"),
+		ROS:  ros,
+		CMap: cmap.Predefined("Identity-H"),
 		Width: map[cmap.CID]float64{
 			0: 1000,
 			1: 500,
@@ -231,7 +231,7 @@ var t2Dicts = []*CIDFontType2{
 			FontName: "Test",
 		},
 		ROS: ros,
-		Encoding: &cmap.File{
+		CMap: &cmap.File{
 			Name:           "Test-cmap",
 			ROS:            ros,
 			WMode:          font.Vertical,

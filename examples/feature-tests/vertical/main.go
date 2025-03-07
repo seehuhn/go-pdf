@@ -203,7 +203,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		SubsetTag:       subsetTag,
 		Descriptor:      fd,
 		ROS:             f.ROS,
-		Encoding:        encoding,
+		CMap:            encoding,
 		Width:           widths,
 		DefaultWidth:    defaultWidth,
 		VMetrics:        nil,

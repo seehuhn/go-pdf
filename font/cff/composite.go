@@ -274,7 +274,7 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 		SubsetTag:       subsetTag,
 		Descriptor:      fd,
 		ROS:             ros,
-		Encoding:        e.CIDEncoder.CMap(ros),
+		CMap:            e.CIDEncoder.CMap(ros),
 		Width:           ww,
 		DefaultWidth:    dw,
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
