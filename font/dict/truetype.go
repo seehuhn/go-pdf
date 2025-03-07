@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/type1/names"
+
 	"seehuhn.de/go/sfnt/os2"
 
 	"seehuhn.de/go/pdf"
@@ -38,7 +39,8 @@ var (
 	_ font.Dict = (*TrueType)(nil)
 )
 
-// TrueType represents the font dictionary of a simple TrueType font.
+// TrueType holds the informtation from the font dictionary of a simple
+// TrueType font.
 type TrueType struct {
 	// Ref is the reference to the font dictionary in the PDF file.
 	Ref pdf.Reference
@@ -70,7 +72,7 @@ type TrueType struct {
 	Text [256]string
 
 	// FontType gives the type of glyph outline data. Possible values are
-	// Possible values are [glyphdata.TrueType] and [glyphdata.OpenTypeGlyf],
+	// glyphdata.TrueType] and [glyphdata.OpenTypeGlyf],
 	// or [glyphdata.None] if the font is not embedded.
 	FontType glyphdata.Type
 
@@ -79,7 +81,8 @@ type TrueType struct {
 	FontRef pdf.Reference
 }
 
-// ExtractTrueType reads a TrueType font dictionary from a PDF file.
+// ExtractTrueType extracts the information of a TrueType font dictionary from
+// a PDF file.
 func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*TrueType, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
@@ -219,8 +222,8 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*TrueType, error) {
 	return d, nil
 }
 
-// repair fixes invalid data in the font dictionary.
-// After repair() has been called, validate() will return nil.
+// repair can fix some problems with a font dictionary.
+// After repair has been run, validate is guaranteed to pass.
 func (d *TrueType) repair(r pdf.Getter) {
 	if d.Descriptor == nil {
 		d.Descriptor = &font.Descriptor{}
@@ -309,11 +312,6 @@ func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	w := rm.Out
 
-	err := d.validate(w)
-	if err != nil {
-		return err
-	}
-
 	switch d.FontType {
 	case glyphdata.None:
 		// pass
@@ -329,7 +327,13 @@ func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager) error {
 		return fmt.Errorf("invalid font type %s", d.FontType)
 	}
 
+	err := d.validate(w)
+	if err != nil {
+		return err
+	}
+
 	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)
+
 	fontDict := pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("TrueType"),
@@ -412,6 +416,7 @@ func (d *TrueType) GlyphData() (glyphdata.Type, pdf.Reference) {
 	return d.FontType, d.FontRef
 }
 
+// MakeFont returns a [font.FromFile] for the font dictionary.
 func (d *TrueType) MakeFont() (font.FromFile, error) {
 	return ttFont{d}, nil
 }

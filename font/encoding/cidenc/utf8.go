@@ -168,7 +168,7 @@ func (e *compositeUTF8) get(c charcode.Code) *codeInfo {
 	}
 }
 
-func (e *compositeUTF8) CMap(ros *cmap.CIDSystemInfo) *cmap.File {
+func (e *compositeUTF8) CMap(ros *cid.SystemInfo) *cmap.File {
 	m := make(map[charcode.Code]font.Code)
 	for code, val := range e.MappedCodes() {
 		m[code] = *val

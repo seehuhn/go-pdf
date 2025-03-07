@@ -25,7 +25,9 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -230,7 +232,7 @@ func TestExtractToUnicode(t *testing.T) {
 	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
 
-	rosRef, _, err := pdf.ResourceManagerEmbed(rm, toUnicodeROS)
+	rosRef, err := pdf.ResourceManagerEmbedFunc(rm, font.WriteCIDSystemInfo, toUnicodeROS)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,7 +420,7 @@ func TestExtractToUnicodeLoop(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", n), func(t *testing.T) {
 			data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(data)
-			rosRef, _, err := pdf.ResourceManagerEmbed(rm, toUnicodeROS)
+			rosRef, err := pdf.ResourceManagerEmbedFunc(rm, font.WriteCIDSystemInfo, toUnicodeROS)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -119,10 +119,11 @@ func makeMarkerFont() font.Font {
 				Width: 50,
 				BBox:  rect.Rect{LLy: -500, URx: 50, URy: 1500},
 				Color: true,
-				Draw: func(w *graphics.Writer) {
+				Draw: func(w *graphics.Writer) error {
 					w.SetFillColor(color.DeviceGray(0.5))
 					w.Rectangle(0, -500, 50, 2000)
 					w.Fill()
+					return nil
 				},
 			},
 		},

@@ -34,10 +34,15 @@ type DefaultVMetrics struct {
 	// OffsY is the vertical component of the glyph position vector.
 	// (The horizontal component is half the glyph width used for horizontal
 	// writing.)
+	//
+	// The effect of this is that the glyph is moved down by OffsY and left
+	// by half the glyph width, compared to horizontal writing.
 	OffsY float64
 
-	// DeltaY is the vertical displacement for the following glyph.
+	// DeltaY is the vertical displacement of the following glyph.
 	// (The horizontal displacement is always zero.)
+	//
+	// This is normally negative, so that writing goes from top to bottom.
 	DeltaY float64
 }
 
@@ -83,13 +88,21 @@ func encodeVDefault(metrics DefaultVMetrics) pdf.Array {
 // VMetrics represents the vertical metrics for an individual CID
 type VMetrics struct {
 	// OffsX is the horizontal component of the glyph position vector.
+	//
+	// The effect of this is that the glyph is moved left by OffsX, compared
+	// to horizontal writing.
 	OffsX float64
 
 	// OffsY is the vertical component of the glyph position vector.
+	//
+	// The effect of this is that the glyph is moved down by OffsY, compared
+	// to horizontal writing.
 	OffsY float64
 
 	// DeltaY is the vertical displacement for the following glyph.
 	// (The horizontal displacement is always zero.)
+	//
+	// This is normally negative, so that writing goes from top to bottom.
 	DeltaY float64
 }
 

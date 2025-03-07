@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"iter"
 
+	"seehuhn.de/go/postscript/cid"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -51,7 +53,7 @@ type CIDFontType0 struct {
 	Descriptor *font.Descriptor
 
 	// ROS describes the character collection covered by the font.
-	ROS *cmap.CIDSystemInfo
+	ROS *cid.SystemInfo
 
 	// Encoding specifies how character codes are mapped to CID values.
 	//
@@ -172,7 +174,7 @@ func ExtractCIDFontType0(r pdf.Getter, obj pdf.Object) (*CIDFontType0, error) {
 	}
 	d.Descriptor, _ = font.ExtractDescriptor(r, fdDict)
 
-	d.ROS, _ = cmap.ExtractCIDSystemInfo(r, cidFontDict["CIDSystemInfo"])
+	d.ROS, _ = font.ExtractCIDSystemInfo(r, cidFontDict["CIDSystemInfo"])
 
 	d.Width, err = decodeCompositeWidths(r, cidFontDict["W"])
 	if err != nil {
@@ -321,7 +323,7 @@ func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)
 
-	cidSystemInfo, _, err := pdf.ResourceManagerEmbed(rm, d.ROS)
+	cidSystemInfo, err := pdf.ResourceManagerEmbedFunc(rm, font.WriteCIDSystemInfo, d.ROS)
 	if err != nil {
 		return err
 	}
@@ -389,12 +391,16 @@ func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager) error {
 		cidFontDict["DW"] = pdf.Number(d.DefaultWidth)
 	}
 
-	cidFontDict["DW2"] = encodeVDefault(d.DefaultVMetrics)
-	cidFontDict["W2"] = encodeVMetrics(d.VMetrics)
+	if dw2 := encodeVDefault(d.DefaultVMetrics); dw2 != nil {
+		cidFontDict["DW2"] = dw2
+	}
+	if w2 := encodeVMetrics(d.VMetrics); w2 != nil {
+		cidFontDict["W2"] = w2
+	}
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return pdf.Wrap(err, "composite OpenType/CFF font dicts")
+		return fmt.Errorf("CIDFontType0 dicts: %w", err)
 	}
 
 	return nil
@@ -420,7 +426,7 @@ func (d *CIDFontType0) MakeFont() (font.FromFile, error) {
 		return nil, err
 	}
 
-	s := &type0Font{
+	s := &t0Font{
 		CIDFontType0: d,
 		codec:        codec,
 		cache:        make(map[charcode.Code]*font.Code),
@@ -429,24 +435,24 @@ func (d *CIDFontType0) MakeFont() (font.FromFile, error) {
 }
 
 var (
-	_ font.FromFile = (*type0Font)(nil)
+	_ font.FromFile = (*t0Font)(nil)
 )
 
-type type0Font struct {
+type t0Font struct {
 	*CIDFontType0
 	codec *charcode.Codec
 	cache map[charcode.Code]*font.Code
 }
 
-func (s *type0Font) GetDict() font.Dict {
+func (s *t0Font) GetDict() font.Dict {
 	return s.CIDFontType0
 }
 
-func (s *type0Font) WritingMode() font.WritingMode {
+func (s *t0Font) WritingMode() font.WritingMode {
 	return s.Encoding.WMode
 }
 
-func (s *type0Font) Codes(str pdf.String) iter.Seq[*font.Code] {
+func (s *t0Font) Codes(str pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		for len(str) > 0 {
 			code, k, isValid := s.codec.Decode(str)

@@ -130,7 +130,10 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 				format(g.BBox.URy))
 		}
 		if g.Draw != nil {
-			g.Draw(page)
+			err = g.Draw(page)
+			if err != nil {
+				return err
+			}
 		}
 		if page.Err != nil {
 			return page.Err

@@ -75,7 +75,7 @@ type Glyph struct {
 	Width float64
 	BBox  rect.Rect
 	Color bool
-	Draw  func(*graphics.Writer)
+	Draw  func(*graphics.Writer) error
 }
 
 var _ interface {

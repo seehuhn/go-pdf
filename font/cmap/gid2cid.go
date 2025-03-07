@@ -37,7 +37,7 @@ type GIDToCID interface {
 
 	GID(cid.CID) glyph.ID
 
-	ROS() *CIDSystemInfo
+	ROS() *cid.SystemInfo
 
 	GIDToCID(numGlyph int) []cid.CID
 }
@@ -78,7 +78,7 @@ func (g *gidToCIDSequential) GID(cid cid.CID) glyph.ID {
 }
 
 // ROS implements the [GIDToCID] interface.
-func (g *gidToCIDSequential) ROS() *CIDSystemInfo {
+func (g *gidToCIDSequential) ROS() *cid.SystemInfo {
 	h := sha256.New()
 	h.Write([]byte("seehuhn.de/go/pdf/font/cmap.gidToCIDSequential\n"))
 	binary.Write(h, binary.BigEndian, uint64(len(g.g2c)))
@@ -90,7 +90,7 @@ func (g *gidToCIDSequential) ROS() *CIDSystemInfo {
 	}
 	sum := h.Sum(nil)
 
-	return &CIDSystemInfo{
+	return &cid.SystemInfo{
 		Registry:   "Seehuhn",
 		Ordering:   fmt.Sprintf("%x", sum[:8]),
 		Supplement: 0,
@@ -125,8 +125,8 @@ func (g *gidToCIDIdentity) GID(cid cid.CID) glyph.ID {
 }
 
 // ROS implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) ROS() *CIDSystemInfo {
-	return &CIDSystemInfo{
+func (g *gidToCIDIdentity) ROS() *cid.SystemInfo {
+	return &cid.SystemInfo{
 		Registry:   "Adobe",
 		Ordering:   "Identity",
 		Supplement: 0,

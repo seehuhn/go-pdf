@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"math"
 	"sync"
 	"text/template"
 
@@ -52,7 +53,7 @@ type CID = cid.CID
 // This structure reflects the structure of a CMap file.
 type File struct {
 	Name  string
-	ROS   *CIDSystemInfo
+	ROS   *cid.SystemInfo
 	WMode font.WritingMode
 
 	charcode.CodeSpaceRange
@@ -149,7 +150,7 @@ func safeExtractCMap(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object) (*Fi
 	if name, _ := pdf.GetName(r, dict["CMapName"]); name != "" {
 		res.Name = string(name)
 	}
-	if ros, _ := ExtractCIDSystemInfo(r, dict["CIDSystemInfo"]); ros != nil {
+	if ros, _ := font.ExtractCIDSystemInfo(r, dict["CIDSystemInfo"]); ros != nil {
 		res.ROS = ros
 	}
 	if x, _ := pdf.GetInteger(r, dict["WMode"]); x == 1 {
@@ -194,7 +195,7 @@ func readCMap(r io.Reader) (*File, pdf.Object, error) {
 		res.WMode = font.Vertical
 	}
 	if rosDict, _ := raw["CIDSystemInfo"].(postscript.Dict); rosDict != nil {
-		ros := &CIDSystemInfo{}
+		ros := &cid.SystemInfo{}
 		if registry, _ := rosDict["Registry"].(postscript.String); registry != nil {
 			ros.Registry = string(registry)
 		}
@@ -202,7 +203,11 @@ func readCMap(r io.Reader) (*File, pdf.Object, error) {
 			ros.Ordering = string(ordering)
 		}
 		if supplement, _ := rosDict["Supplement"].(postscript.Integer); supplement != 0 {
-			ros.Supplement = pdf.Integer(supplement)
+			var sup int32
+			if supplement >= 0 && supplement <= math.MaxInt32 {
+				sup = int32(supplement)
+			}
+			ros.Supplement = sup
 		}
 		if ros.Registry != "" || ros.Ordering != "" || ros.Supplement != 0 {
 			res.ROS = ros
@@ -417,7 +422,7 @@ func (f *File) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		return predefinedName, zero, nil
 	}
 
-	ros, _, err := pdf.ResourceManagerEmbed(rm, f.ROS)
+	ros, err := pdf.ResourceManagerEmbedFunc(rm, font.WriteCIDSystemInfo, f.ROS)
 	if err != nil {
 		return nil, zero, err
 	}

@@ -17,7 +17,6 @@
 package main
 
 import (
-	"bytes"
 	"io"
 	"log"
 
@@ -86,81 +85,77 @@ func LoadFigure(fname string, rm *pdf.ResourceManager) (graphics.XObject, *pdf.R
 	if err != nil {
 		return nil, nil, err
 	}
-	_, dict, err := pagetree.GetPage(r, 0)
+	_, pageDict, err := pagetree.GetPage(r, 0)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	cropBox := dict["CropBox"]
+	cropBox := pageDict["CropBox"]
 	if cropBox == nil {
-		cropBox = dict["MediaBox"]
+		cropBox = pageDict["MediaBox"]
 	}
 	bbox, err := pdf.GetRectangle(r, cropBox)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	copier := pdfcopy.NewCopier(rm.Out, r)
-
-	origResources, err := pdf.GetDict(r, dict["Resources"])
-	if err != nil {
-		return nil, nil, err
-	}
-	resourceObj, err := copier.Copy(origResources)
-	if err != nil {
-		return nil, nil, err
-	}
-	resourceDict := resourceObj.(pdf.Dict)
-	resources := &pdf.Resources{}
-	err = pdf.DecodeDict(nil, resources, resourceDict)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	body := &bytes.Buffer{}
-	contents, err := pdf.Resolve(r, dict["Contents"])
-	if err != nil {
-		return nil, nil, err
-	}
-	switch x := contents.(type) {
-	case *pdf.Stream:
-		stm, err := pdf.DecodeStream(r, x, 0)
-		if err != nil {
-			return nil, nil, err
-		}
-		_, err = io.Copy(body, stm)
-		if err != nil {
-			return nil, nil, err
-		}
-	case pdf.Array:
-		for _, ref := range x {
-			obj, err := pdf.GetStream(r, ref)
-			if err != nil {
-				return nil, nil, err
-			}
-			stm, err := pdf.DecodeStream(r, obj, 0)
-			if err != nil {
-				return nil, nil, err
-			}
-			_, err = io.Copy(body, stm)
-			if err != nil {
-				return nil, nil, err
-			}
-		}
-	}
-
-	err = r.Close()
-	if err != nil {
-		return nil, nil, err
-	}
-
 	obj := &form.Form{
-		Properties: &form.Properties{
-			BBox: bbox,
+		Draw: func(w *graphics.Writer) error {
+			copier := pdfcopy.NewCopier(rm.Out, r)
+
+			origResources, err := pdf.GetDict(r, pageDict["Resources"])
+			if err != nil {
+				return err
+			}
+			resourceObj, err := copier.Copy(origResources)
+			if err != nil {
+				return err
+			}
+			resourceDict := resourceObj.(pdf.Dict)
+			err = pdf.DecodeDict(nil, w.Resources, resourceDict)
+			if err != nil {
+				return err
+			}
+
+			contents, err := pdf.Resolve(r, pageDict["Contents"])
+			if err != nil {
+				return err
+			}
+			switch x := contents.(type) {
+			case *pdf.Stream:
+				stm, err := pdf.DecodeStream(r, x, 0)
+				if err != nil {
+					return err
+				}
+				_, err = io.Copy(w.Content, stm)
+				if err != nil {
+					return err
+				}
+			case pdf.Array:
+				for _, ref := range x {
+					obj, err := pdf.GetStream(r, ref)
+					if err != nil {
+						return err
+					}
+					stm, err := pdf.DecodeStream(r, obj, 0)
+					if err != nil {
+						return err
+					}
+					_, err = io.Copy(w.Content, stm)
+					if err != nil {
+						return err
+					}
+				}
+			}
+
+			err = r.Close()
+			if err != nil {
+				return err
+			}
+
+			return nil
 		},
-		Resources: resources,
-		Contents:  body.Bytes(),
-		RM:        rm,
+		BBox: *bbox,
 	}
 
 	return obj, bbox, nil

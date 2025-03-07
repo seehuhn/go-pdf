@@ -22,6 +22,8 @@ import (
 	"io"
 	"iter"
 
+	"seehuhn.de/go/postscript/cid"
+
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
@@ -54,7 +56,7 @@ type CIDFontType2 struct {
 	Descriptor *font.Descriptor
 
 	// ROS describes the character collection covered by the font.
-	ROS *cmap.CIDSystemInfo
+	ROS *cid.SystemInfo
 
 	// Encoding specifies how character codes are mapped to CID values.
 	//
@@ -101,7 +103,8 @@ type CIDFontType2 struct {
 	FontRef pdf.Reference
 }
 
-// ExtractCIDFontType2 extracts the information from a Type 0 CIDFont from a PDF file.
+// ExtractCIDFontType2 extracts the information of a Type 0 CIDFont from a PDF
+// file.
 func ExtractCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
@@ -180,7 +183,7 @@ func ExtractCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 	}
 	d.Descriptor, _ = font.ExtractDescriptor(r, fdDict)
 
-	d.ROS, _ = cmap.ExtractCIDSystemInfo(r, cidFontDict["CIDSystemInfo"])
+	d.ROS, _ = font.ExtractCIDSystemInfo(r, cidFontDict["CIDSystemInfo"])
 
 	d.Width, err = decodeCompositeWidths(r, cidFontDict["W"])
 	if err != nil {
@@ -385,7 +388,7 @@ func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)
 
-	cidSystemInfo, _, err := pdf.ResourceManagerEmbed(rm, d.ROS)
+	cidSystemInfo, err := pdf.ResourceManagerEmbedFunc(rm, font.WriteCIDSystemInfo, d.ROS)
 	if err != nil {
 		return err
 	}
@@ -456,8 +459,12 @@ func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager) error {
 		cidFontDict["DW"] = pdf.Number(d.DefaultWidth)
 	}
 
-	cidFontDict["DW2"] = encodeVDefault(d.DefaultVMetrics)
-	cidFontDict["W2"] = encodeVMetrics(d.VMetrics)
+	if dw2 := encodeVDefault(d.DefaultVMetrics); dw2 != nil {
+		cidFontDict["DW2"] = dw2
+	}
+	if w2 := encodeVMetrics(d.VMetrics); w2 != nil {
+		cidFontDict["W2"] = w2
+	}
 
 	var c2gRef pdf.Reference
 	if d.CIDToGID != nil {
@@ -469,7 +476,7 @@ func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return pdf.Wrap(err, "composite OpenType/CFF font dicts")
+		return fmt.Errorf("CIDFontType2 dicts: %w", err)
 	}
 
 	if c2gRef != 0 {
@@ -503,7 +510,7 @@ func (d *CIDFontType2) GlyphData() (glyphdata.Type, pdf.Reference) {
 	return d.FontType, d.FontRef
 }
 
-// MakeFont returns a font.Scanner for the font.
+// MakeFont returns a [font.FromFile] for the font dictionary.
 func (d *CIDFontType2) MakeFont() (font.FromFile, error) {
 	var csr charcode.CodeSpaceRange
 	csr = append(csr, d.Encoding.CodeSpaceRange...)
@@ -519,7 +526,7 @@ func (d *CIDFontType2) MakeFont() (font.FromFile, error) {
 		return nil, err
 	}
 
-	s := &type2Font{
+	s := &t2Font{
 		CIDFontType2: d,
 		codec:        codec,
 		cache:        make(map[charcode.Code]*font.Code),
@@ -528,24 +535,24 @@ func (d *CIDFontType2) MakeFont() (font.FromFile, error) {
 }
 
 var (
-	_ font.FromFile = (*type2Font)(nil)
+	_ font.FromFile = (*t2Font)(nil)
 )
 
-type type2Font struct {
+type t2Font struct {
 	*CIDFontType2
 	codec *charcode.Codec
 	cache map[charcode.Code]*font.Code
 }
 
-func (s *type2Font) GetDict() font.Dict {
+func (s *t2Font) GetDict() font.Dict {
 	return s.CIDFontType2
 }
 
-func (s *type2Font) WritingMode() font.WritingMode {
+func (s *t2Font) WritingMode() font.WritingMode {
 	return s.Encoding.WMode
 }
 
-func (s *type2Font) Codes(str pdf.String) iter.Seq[*font.Code] {
+func (s *t2Font) Codes(str pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		for len(str) > 0 {
 			code, k, isValid := s.codec.Decode(str)

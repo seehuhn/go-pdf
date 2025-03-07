@@ -85,11 +85,11 @@ type Finisher interface {
 func ResourceManagerEmbed[T any](rm *ResourceManager, r Embedder[T]) (Object, T, error) {
 	var zero T
 
-	if er, ok := rm.embedded[r]; ok {
-		return er.Val, er.Emb.(T), nil
+	if existing, ok := rm.embedded[r]; ok {
+		return existing.Val, existing.Emb.(T), nil
 	}
 	if rm.isClosed {
-		return nil, zero, fmt.Errorf("resource manager is already closed")
+		return nil, zero, errors.New("resource manager is already closed")
 	}
 
 	val, emb, err := r.Embed(rm)
@@ -104,6 +104,24 @@ func ResourceManagerEmbed[T any](rm *ResourceManager, r Embedder[T]) (Object, T,
 	}
 
 	return val, emb, nil
+}
+
+func ResourceManagerEmbedFunc[T any](rm *ResourceManager, f func(*ResourceManager, T) (Object, error), obj T) (Object, error) {
+	if existing, ok := rm.embedded[obj]; ok {
+		return existing.Val, nil
+	}
+	if rm.isClosed {
+		return nil, errors.New("resource manager is already closed")
+	}
+
+	val, err := f(rm, obj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to embed resource: %w", err)
+	}
+
+	rm.embedded[obj] = embRes{Val: val}
+
+	return val, nil
 }
 
 // Close runs the Finish methods of all embedded resources where the Go

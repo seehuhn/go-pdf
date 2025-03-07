@@ -77,9 +77,10 @@ func createDocument(filename string) error {
 					URx: markerWidth,
 					URy: markerAscent,
 				},
-				Draw: func(w *graphics.Writer) {
+				Draw: func(w *graphics.Writer) error {
 					w.Rectangle(0, markerDescent, markerWidth, markerAscent-markerDescent)
 					w.Fill()
+					return nil
 				},
 			},
 		},

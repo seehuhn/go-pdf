@@ -24,6 +24,7 @@ import (
 
 	"golang.org/x/image/font/gofont/goregular"
 
+	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
 
 	"seehuhn.de/go/sfnt"
@@ -59,7 +60,7 @@ func createDocument(fname string) error {
 
 	cmap := &cmap.File{
 		Name: "Test",
-		ROS: &cmap.CIDSystemInfo{
+		ROS: &cid.SystemInfo{
 			Registry:   "Adobe",
 			Ordering:   "Japan1",
 			Supplement: 0,

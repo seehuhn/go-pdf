@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/geom/rect"
+	"seehuhn.de/go/postscript/cid"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -178,7 +179,7 @@ func checkRoundtripT0(t *testing.T, d1 *CIDFontType0, v pdf.Version) {
 	}
 }
 
-var ros = &cmap.CIDSystemInfo{
+var ros = &cid.SystemInfo{
 	Registry:   "Quire",
 	Ordering:   "Test",
 	Supplement: 2,

@@ -148,7 +148,7 @@ func (e *compositeIdentity) get(c charcode.Code) *codeInfo {
 	}
 }
 
-func (e *compositeIdentity) CMap(*cmap.CIDSystemInfo) *cmap.File {
+func (e *compositeIdentity) CMap(*cid.SystemInfo) *cmap.File {
 	var name string
 	if e.wMode == font.Vertical {
 		name = "Identity-V"

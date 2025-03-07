@@ -25,6 +25,9 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	"seehuhn.de/go/postscript/cid"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -138,7 +141,7 @@ end
 	// This is used to test the template used to format a CMap file.
 	testInfoFull = &File{
 		Name: "Test",
-		ROS: &CIDSystemInfo{
+		ROS: &cid.SystemInfo{
 			Registry:   "Test",
 			Ordering:   "Random",
 			Supplement: 3,
@@ -169,7 +172,7 @@ end
 
 	// The following two InfoNew structs are used to test embedding a chain of
 	// CMaps.
-	testROS = &CIDSystemInfo{
+	testROS = &cid.SystemInfo{
 		Registry: "Seehuhn",
 		Ordering: "Test",
 	}
@@ -224,7 +227,7 @@ func TestExtractCMAP(t *testing.T) {
 	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
 
-	rosRef, _, err := pdf.ResourceManagerEmbed(rm, testROS)
+	rosRef, err := pdf.ResourceManagerEmbedFunc(rm, font.WriteCIDSystemInfo, testROS)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -536,12 +539,12 @@ func TestExtractLoop(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", n), func(t *testing.T) {
 			data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(data)
-			ros := &CIDSystemInfo{
+			ros := &cid.SystemInfo{
 				Registry:   "Test",
 				Ordering:   "Simple",
 				Supplement: 0,
 			}
-			rosRef, _, err := pdf.ResourceManagerEmbed(rm, ros)
+			rosRef, err := pdf.ResourceManagerEmbedFunc(rm, font.WriteCIDSystemInfo, ros)
 			if err != nil {
 				t.Fatal(err)
 			}

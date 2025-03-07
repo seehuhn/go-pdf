@@ -29,6 +29,7 @@ import (
 	"unicode/utf16"
 
 	"seehuhn.de/go/postscript"
+	"seehuhn.de/go/postscript/cid"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -513,7 +514,7 @@ end
 
 // TODO(voss): reconsider once
 // https://github.com/pdf-association/pdf-issues/issues/344 is resoved.
-var toUnicodeROS = &CIDSystemInfo{
+var toUnicodeROS = &cid.SystemInfo{
 	Registry: "Adobe",
 	Ordering: "UCS",
 }

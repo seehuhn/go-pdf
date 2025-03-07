@@ -22,6 +22,7 @@ import (
 	"iter"
 
 	"seehuhn.de/go/geom/matrix"
+
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/type1/names"
 
@@ -36,7 +37,7 @@ var (
 	_ font.Dict = (*Type3)(nil)
 )
 
-// Type3 represents a Type 3 font dictionary.
+// Type3 holds the information from a Type 3 font dictionary.
 type Type3 struct {
 	// Ref is the reference to the font dictionary in the PDF file.
 	Ref pdf.Reference
@@ -164,9 +165,6 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
 	}
 
 	d.FontMatrix, _ = pdf.GetMatrix(r, fontDict["FontMatrix"])
-	if d.FontMatrix == matrix.Zero { // fallback in case of invalid matrix
-		d.FontMatrix = matrix.Matrix{0.001, 0, 0, 0.001, 0, 0}
-	}
 
 	d.Resources, err = pdf.GetResources(r, fontDict["Resources"])
 	if pdf.IsReadError(err) {
@@ -179,7 +177,7 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
 }
 
 // repair fixes invalid data in the font dictionary.
-// After repair has been called, Type3.validate will return nil.
+// After repair() has been called, validate() will return nil.
 func (d *Type3) repair(r pdf.Getter) {
 	if v := pdf.GetVersion(r); v == pdf.V1_0 {
 		if d.Name == "" {
@@ -188,7 +186,6 @@ func (d *Type3) repair(r pdf.Getter) {
 	}
 
 	if d.FontMatrix.IsZero() {
-		// Default Type3 font matrix maps 1000 units to 1 unit in text space
 		d.FontMatrix = matrix.Matrix{0.001, 0, 0, 0.001, 0, 0}
 	}
 }
@@ -203,10 +200,6 @@ func (d *Type3) validate(w *pdf.Writer) error {
 
 	if d.FontMatrix.IsZero() {
 		return errors.New("invalid FontMatrix")
-	}
-
-	if d.Encoding == nil {
-		return errors.New("missing Encoding")
 	}
 
 	return nil

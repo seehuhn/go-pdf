@@ -190,7 +190,7 @@ func makeTestFonts() (*testFonts, error) {
 	var GIDToCID []cid.CID
 	cmapData := &cmap.File{
 		Name: "TestCMap",
-		ROS: &cmap.CIDSystemInfo{
+		ROS: &cid.SystemInfo{
 			Registry: "seehuhn.de",
 			Ordering: "test",
 		},

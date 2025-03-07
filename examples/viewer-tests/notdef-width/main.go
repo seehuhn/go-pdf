@@ -396,12 +396,8 @@ func makeTestFont() *testFont {
 	}
 
 	cmap := &cmap.File{
-		Name: "TestCMap",
-		ROS: &cmap.CIDSystemInfo{
-			Registry:   o.ROS.Registry,
-			Ordering:   o.ROS.Ordering,
-			Supplement: pdf.Integer(o.ROS.Supplement),
-		},
+		Name:  "TestCMap",
+		ROS:   o.ROS,
 		WMode: font.Horizontal,
 		CodeSpaceRange: []charcode.Range{
 			{Low: []byte{'A'}, High: []byte{'Z'}},

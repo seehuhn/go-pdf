@@ -89,7 +89,7 @@ type drawer struct {
 	g *glyf.Glyph
 }
 
-func (d *drawer) Draw(w *graphics.Writer) {
+func (d *drawer) Draw(w *graphics.Writer) error {
 	origGlyph := d.g
 
 	switch g := origGlyph.Data.(type) {
@@ -162,6 +162,7 @@ func (d *drawer) Draw(w *graphics.Writer) {
 	case glyf.CompositeGlyph:
 		panic("not implemented")
 	}
+	return nil
 }
 
 func clone[T any](x *T) *T {

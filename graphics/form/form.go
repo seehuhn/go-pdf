@@ -1,58 +1,66 @@
-// seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 package form
 
 import (
-	"errors"
+	"bytes"
+	"time"
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 type Form struct {
-	*Properties
-	Resources *pdf.Resources
-	Contents  []byte
-	RM        *pdf.ResourceManager
+	Draw         func(*graphics.Writer) error
+	BBox         pdf.Rectangle
+	Matrix       matrix.Matrix
+	Metadata     pdf.Reference
+	PieceInfo    pdf.Object
+	LastModified time.Time
+	// TODO(voss): StructParent, StructParents
+	OC      pdf.Object
+	AF      pdf.Object
+	Measure pdf.Object
+	PtData  pdf.Object
 }
 
-// IsDirect returns true if the Form object does not contain any
-// references to indirect PDF objects.
-func (f *Form) IsDirect() bool {
-	return f.Resources.IsDirect() && f.Properties.IsDirect()
+func (f *Form) Subtype() pdf.Name {
+	return "Form"
+}
+
+func (f *Form) validate() error {
+	if f.BBox.IsZero() {
+		return pdf.Error("missing BBox")
+	}
+	return nil
 }
 
 func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	if !f.IsDirect() && f.RM != rm {
-		return nil, zero, errors.New("Form: resource manager mismatch")
+	err := f.validate()
+	if err != nil {
+		return nil, pdf.Unused{}, err
 	}
 
+	buf := &bytes.Buffer{}
+	contents := graphics.NewWriter(buf, rm)
+	err = f.Draw(contents)
+	if err != nil {
+		return nil, pdf.Unused{}, err
+	}
+
+	ref := rm.Out.Alloc()
+
 	dict := pdf.Dict{
-		// "Type":     pdf.Name("XObject"),
-		"Subtype":  pdf.Name("Form"),
-		"FormType": pdf.Integer(1),
-		"BBox":     f.BBox,
+		"Subtype": pdf.Name("Form"),
+		"BBox":    &f.BBox,
+	}
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("XObject")
 	}
 	if f.Matrix != matrix.Identity && f.Matrix != matrix.Zero {
 		dict["Matrix"] = toPDF(f.Matrix[:])
 	}
-	if f.Resources != nil {
-		dict["Resources"] = pdf.AsDict(f.Resources)
+	if contents.Resources != nil {
+		dict["Resources"] = pdf.AsDict(contents.Resources)
 	}
 	if f.Metadata != 0 {
 		dict["Metadata"] = f.Metadata
@@ -66,12 +74,6 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	if f.OC != nil {
 		dict["OC"] = f.OC
 	}
-	if pdf.GetVersion(rm.Out) == pdf.V1_0 {
-		if f.DefaultName == "" {
-			return nil, zero, errors.New("Form.DefaultName must be set in PDF 1.0")
-		}
-		dict["Name"] = f.DefaultName
-	}
 	if f.AF != nil {
 		dict["AF"] = f.AF
 	}
@@ -82,25 +84,26 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["PtData"] = f.PtData
 	}
 
-	ref := rm.Out.Alloc()
 	stm, err := rm.Out.OpenStream(ref, dict, &pdf.FilterCompress{})
 	if err != nil {
-		return nil, zero, err
+		return nil, pdf.Unused{}, err
 	}
-	_, err = stm.Write(f.Contents)
+	_, err = stm.Write(buf.Bytes())
 	if err != nil {
-		return nil, zero, err
+		return nil, pdf.Unused{}, err
 	}
 	err = stm.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, pdf.Unused{}, err
 	}
 
-	return ref, zero, nil
+	return ref, pdf.Unused{}, nil
 }
 
-// Subtype returns /Form.
-// This implements the [graphics.XObject] interface.
-func (f *Form) Subtype() pdf.Name {
-	return "Form"
+func toPDF(x []float64) pdf.Array {
+	res := make(pdf.Array, len(x))
+	for i, xi := range x {
+		res[i] = pdf.Number(xi)
+	}
+	return res
 }

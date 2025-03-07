@@ -44,7 +44,7 @@ type CIDEncoder interface {
 	// AllocateCode assigns a new code to a CID and stores the text and width.
 	AllocateCode(cidVal cid.CID, text string, width float64) (charcode.Code, error)
 
-	CMap(ros *cmap.CIDSystemInfo) *cmap.File
+	CMap(ros *cid.SystemInfo) *cmap.File
 
 	Codec() *charcode.Codec
 

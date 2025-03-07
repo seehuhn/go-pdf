@@ -31,6 +31,7 @@ import (
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/cffglyphs"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/type1"
@@ -47,7 +48,7 @@ func main() {
 }
 
 func createDocument(fname string) error {
-	page, err := document.CreateSinglePage(fname, document.A5r, pdf.V2_0, nil)
+	page, err := document.CreateSinglePage(fname, document.A5, pdf.V2_0, nil)
 	if err != nil {
 		return err
 	}
@@ -58,10 +59,14 @@ func createDocument(fname string) error {
 	}
 
 	page.TextBegin()
-	page.TextSetFont(F, 32)
-	page.TextFirstLine(72, 400)
+	page.TextSetFont(F, 64)
+	page.TextFirstLine(72, 520)
 	page.TextShowRaw(pdf.String("HELLO"))
 	page.TextEnd()
+
+	page.SetFillColor(color.Red)
+	page.Circle(72, 520, 5)
+	page.Fill()
 
 	return page.Close()
 }
@@ -137,6 +142,7 @@ func makeFont() (font.Font, error) {
 	f := &testFont{
 		Font:      cffFont,
 		Geometry:  geom,
+		ROS:       ros,
 		Ascent:    ascent,
 		Descent:   descent,
 		CapHeight: capHeight,
@@ -147,6 +153,7 @@ func makeFont() (font.Font, error) {
 type testFont struct {
 	Font *cff.Font
 	*font.Geometry
+	ROS       *cid.SystemInfo
 	Ascent    float64
 	Descent   float64
 	CapHeight float64
@@ -162,18 +169,20 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 
 	defaultWidth := math.Round(subsetFont.GlyphWidthPDF(0))
 	widths := make(map[cid.CID]float64)
-
-	ros := &cmap.CIDSystemInfo{
-		Registry:   "Quire",
-		Ordering:   "ASCII",
-		Supplement: 0,
+	for gid, cid := range subsetFont.Outlines.GIDToCID {
+		w := math.Round(subsetFont.GlyphWidthPDF(glyph.ID(gid)))
+		if w == defaultWidth {
+			continue
+		}
+		widths[cid] = w
 	}
+
 	csASCII := charcode.CodeSpaceRange{
 		{Low: []byte{0x00}, High: []byte{0x7F}},
 	}
 	encoding := &cmap.File{
 		Name:           "Quire-ASCII-V",
-		ROS:            ros,
+		ROS:            f.ROS,
 		WMode:          font.Vertical,
 		CodeSpaceRange: csASCII,
 		CIDRanges: []cmap.Range{
@@ -193,7 +202,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		PostScriptName:  f.Font.FontName,
 		SubsetTag:       subsetTag,
 		Descriptor:      fd,
-		ROS:             ros,
+		ROS:             f.ROS,
 		Encoding:        encoding,
 		Width:           widths,
 		DefaultWidth:    defaultWidth,

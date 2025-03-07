@@ -70,7 +70,7 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 		Width: 0,
 		BBox:  rect.Rect{LLx: -100, LLy: 100, URx: 100, URy: 100},
 		Color: true,
-		Draw: func(w *graphics.Writer) {
+		Draw: func(w *graphics.Writer) error {
 			w.SetFillColor(color.DeviceRGB(1.0, 0, 0))
 			A := M.Inv()
 			p, q := A.Apply(xc-1, yc-1)
@@ -82,6 +82,7 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 			p, q = A.Apply(xc-1, yc+1)
 			w.LineTo(p*1000, q*1000)
 			w.Fill()
+			return nil
 		},
 	})
 	X := &type3.Instance{

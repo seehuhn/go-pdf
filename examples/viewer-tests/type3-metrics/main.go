@@ -146,11 +146,12 @@ func makeTestFont(unitsPerEm float64, rotate bool) font.Font {
 		Name:  "A",
 		Width: unitsPerEm,
 		BBox:  rect.Rect{URx: unitsPerEm, URy: unitsPerEm},
-		Draw: func(w *graphics.Writer) {
+		Draw: func(w *graphics.Writer) error {
 			a := 0.05 * unitsPerEm
 			b := 0.95 * unitsPerEm
 			w.Rectangle(a, a, b, b)
 			w.Fill()
+			return nil
 		},
 	})
 	res := &type3.Instance{

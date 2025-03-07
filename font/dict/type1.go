@@ -39,7 +39,7 @@ var (
 	_ font.Dict = (*Type1)(nil)
 )
 
-// Type1 represents a Type 1 font dictionary.
+// Type1 holds the information from a Type 1 font dictionary.
 type Type1 struct {
 	// Ref is the reference to the font dictionary in the PDF file.
 	Ref pdf.Reference
@@ -312,11 +312,6 @@ func (d *Type1) WriteToPDF(rm *pdf.ResourceManager) error {
 
 	w := rm.Out
 
-	err := d.validate(w)
-	if err != nil {
-		return err
-	}
-
 	switch d.FontType {
 	case glyphdata.None:
 		// pass
@@ -332,6 +327,11 @@ func (d *Type1) WriteToPDF(rm *pdf.ResourceManager) error {
 		}
 	default:
 		return fmt.Errorf("invalid font type %s", d.FontType)
+	}
+
+	err := d.validate(w)
+	if err != nil {
+		return err
 	}
 
 	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)
