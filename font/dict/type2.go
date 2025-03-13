@@ -504,9 +504,11 @@ func (d *CIDFontType2) GlyphData() (glyphdata.Type, pdf.Reference) {
 func (d *CIDFontType2) MakeFont() (font.FromFile, error) {
 	var csr charcode.CodeSpaceRange
 	csr = append(csr, d.CMap.CodeSpaceRange...)
-	csr = append(csr, d.Text.CodeSpaceRange...)
+	if d.Text != nil {
+		csr = append(csr, d.Text.CodeSpaceRange...)
+	}
 	codec, err := charcode.NewCodec(csr)
-	if err != nil {
+	if err != nil && d.Text != nil {
 		// In case the two code spaces are not compatible, try to use only the
 		// code space from the encoding.
 		csr = append(csr[:0], d.CMap.CodeSpaceRange...)

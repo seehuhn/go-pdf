@@ -68,11 +68,11 @@ type CIDFontType0 struct {
 	DefaultWidth float64
 
 	// VMetrics (optional) maps CIDs to their vertical metrics.
-	// These are used when the CMap in Encoding specifies vertical writing mode.
+	// These are used when the CMap specifies vertical writing mode.
 	VMetrics map[cmap.CID]VMetrics
 
 	// DefaultVMetrics contains the default vertical metrics.
-	// These are used when the CMap in Encoding specifies vertical writing mode,
+	// These are used when the CMap specifies vertical writing mode,
 	// and the CID is not in the VMetrics map.
 	//
 	// For horizontal writing mode, set this to DefaultVMetricsDefault.
@@ -404,9 +404,11 @@ func (d *CIDFontType0) GlyphData() (glyphdata.Type, pdf.Reference) {
 func (d *CIDFontType0) MakeFont() (font.FromFile, error) {
 	var csr charcode.CodeSpaceRange
 	csr = append(csr, d.CMap.CodeSpaceRange...)
-	csr = append(csr, d.Text.CodeSpaceRange...)
+	if d.Text != nil {
+		csr = append(csr, d.Text.CodeSpaceRange...)
+	}
 	codec, err := charcode.NewCodec(csr)
-	if err != nil {
+	if err != nil && d.Text != nil {
 		// In case the two code spaces are not compatible, try to use only the
 		// code space from the encoding.
 		csr = append(csr[:0], d.CMap.CodeSpaceRange...)
