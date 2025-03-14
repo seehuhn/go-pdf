@@ -94,13 +94,13 @@ type Code struct {
 	// Width is the glyph width in PDF glyph space units.
 	Width float64
 
+	// Text is the text representation of the character.
+	Text string
+
 	// UseWordSpacing whether PDF word spacing should be used for this code.
 	// This is true if the character code is a single byte with the value 0x20
 	// (irrespective of whether the character actually represents a space).
 	UseWordSpacing bool
-
-	// Text is the text representation of the character.
-	Text string
 }
 
 // Embedded represents a font which is already embedded in a PDF file.

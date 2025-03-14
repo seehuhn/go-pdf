@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/reader/scanner"
+	"seehuhn.de/go/postscript/cid"
 )
 
 // A Reader reads a PDF content stream.
@@ -42,8 +43,10 @@ type Reader struct {
 	graphics.State
 	stack []graphics.State
 
-	// User callbacks
+	// User callbacks.
+	// TODO(voss): clean up this list
 	DrawGlyph func(g font.Glyph) error
+	Character func(cid cid.CID, text string) error
 	Text      func(text string) error
 	UnknownOp func(op string, args []pdf.Object) error
 	EveryOp   func(op string, args []pdf.Object) error
@@ -629,6 +632,10 @@ func (r *Reader) processText(s pdf.String) {
 			width *= r.TextHorizontalScaling
 		}
 
+		// TODO(voss): check for error returns from the callbacks
+		if r.Character != nil {
+			r.Character(info.CID, info.Text)
+		}
 		if r.DrawGlyph != nil {
 			g := font.Glyph{
 				// GID:     gid,
