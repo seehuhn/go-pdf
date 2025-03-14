@@ -78,8 +78,7 @@ type TrueType struct {
 	FontRef pdf.Reference
 }
 
-// ExtractTrueType extracts the information of a TrueType font dictionary from
-// a PDF file.
+// ExtractTrueType reads a TrueType font dictionary from a PDF file.
 func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*TrueType, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
