@@ -19,17 +19,14 @@ package cmap
 import (
 	"slices"
 	"sort"
-	"unicode/utf16"
 
 	"golang.org/x/exp/maps"
 
-	"seehuhn.de/go/dag"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 )
 
 // NewToUnicodeFile creates a ToUnicodeFile object.
-func NewToUnicodeFile(codec *charcode.Codec, data map[charcode.Code]font.Code) *ToUnicodeFile {
+func NewToUnicodeFile(codec *charcode.Codec, data map[charcode.Code]string) *ToUnicodeFile {
 	res := &ToUnicodeFile{
 		CodeSpaceRange: codec.CodeSpaceRange(),
 	}
@@ -74,7 +71,7 @@ func NewToUnicodeFile(codec *charcode.Codec, data map[charcode.Code]font.Code) *
 
 					needsList := false
 					for j := start; j < i-1; j++ {
-						if data[info[j+1].code].Text != nextString(data[info[j].code].Text) {
+						if data[info[j+1].code] != nextString(data[info[j].code], 1) {
 							needsList = true
 							break
 						}
@@ -84,10 +81,10 @@ func NewToUnicodeFile(codec *charcode.Codec, data map[charcode.Code]font.Code) *
 					if needsList {
 						values = make([]string, i-start)
 						for j := start; j < i; j++ {
-							values[j-start] = data[info[j].code].Text
+							values[j-start] = data[info[j].code]
 						}
 					} else {
-						values = []string{data[info[start].code].Text}
+						values = []string{data[info[start].code]}
 					}
 
 					res.Ranges = append(res.Ranges, ToUnicodeRange{
@@ -98,7 +95,7 @@ func NewToUnicodeFile(codec *charcode.Codec, data map[charcode.Code]font.Code) *
 				} else {
 					res.Singles = append(res.Singles, ToUnicodeSingle{
 						Code:  first,
-						Value: data[info[start].code].Text,
+						Value: data[info[start].code],
 					})
 				}
 				start = i
@@ -109,131 +106,45 @@ func NewToUnicodeFile(codec *charcode.Codec, data map[charcode.Code]font.Code) *
 	return res
 }
 
-func nextString(s string) string {
+func (tu *ToUnicodeFile) GetMapping() (map[charcode.Code]string, error) {
+	codec, err := charcode.NewCodec(tu.CodeSpaceRange)
+	if err != nil {
+		return nil, err
+	}
+
+	m := make(map[charcode.Code]string)
+	for _, single := range tu.Singles {
+		code, k, valid := codec.Decode(single.Code)
+		if !valid || k != len(single.Code) {
+			continue
+		}
+		m[code] = single.Value
+	}
+	for _, r := range tu.Ranges {
+		if len(r.Values) == 0 {
+			continue
+		}
+		for i, codeBytes := range r.All1() {
+			code, k, valid := codec.Decode(codeBytes)
+			if !valid || k != len(codeBytes) {
+				continue
+			}
+
+			if i < len(r.Values) {
+				m[code] = r.Values[i]
+			} else {
+				m[code] = nextString(r.Values[0], i)
+			}
+		}
+	}
+	return m, nil
+}
+
+func nextString(s string, inc int) string {
 	rr := []rune(s)
 	if len(rr) == 0 {
 		return ""
 	}
-	rr[len(rr)-1]++
+	rr[len(rr)-1] += rune(inc)
 	return string(rr)
-}
-
-// MakeSimpleToUnicode creates a ToUnicodeFile object for the encoding of a
-// simple font.
-func MakeSimpleToUnicode(data map[byte]string) *ToUnicodeFile {
-	g := tuEncSimple(data)
-	ee, err := dag.ShortestPath(g, 256)
-	if err != nil {
-		panic("unreachable")
-	}
-
-	res := &ToUnicodeFile{
-		CodeSpaceRange: charcode.Simple,
-	}
-	code := 0
-	for _, e := range ee {
-		switch e.tp {
-		case 1:
-			res.Singles = append(res.Singles, ToUnicodeSingle{
-				Code:  []byte{byte(code)},
-				Value: data[byte(code)],
-			})
-		case 2:
-			res.Ranges = append(res.Ranges, ToUnicodeRange{
-				First:  []byte{byte(code)},
-				Last:   []byte{byte(code + int(e.num) - 1)},
-				Values: []string{data[byte(code)]},
-			})
-		case 3:
-			values := make([]string, int(e.num))
-			for i := 0; i < int(e.num); i++ {
-				values[i] = data[byte(code+i)]
-			}
-			res.Ranges = append(res.Ranges, ToUnicodeRange{
-				First:  []byte{byte(code)},
-				Last:   []byte{byte(code + int(e.num) - 1)},
-				Values: values,
-			})
-		}
-		code = g.To(code, e)
-	}
-	return res
-}
-
-// edge types:
-//
-//	0 = skip unmapped codes
-//	1 = use a single
-//	2 = use a range with increments
-//	3 = use a range with a list
-type edge struct {
-	tp  byte
-	num uint16
-}
-
-type tuEncSimple map[byte]string
-
-func (g tuEncSimple) has(code int) bool {
-	if code < 0 || code >= 256 {
-		return false
-	}
-	_, ok := g[byte(code)]
-	return ok
-}
-
-func (g tuEncSimple) AppendEdges(ee []edge, v int) []edge {
-	gapLen := 0
-	for v+gapLen < 256 && !g.has(v+gapLen) {
-		gapLen++
-	}
-	if gapLen > 0 {
-		return append(ee, edge{0, uint16(gapLen)})
-	}
-
-	runLen := 1
-	current := g[byte(v)]
-	for len(current) > 0 && g.has(v+runLen) {
-		u16 := utf16.Encode([]rune(current))
-		if u16[len(u16)-1] == 0xFFFF {
-			break
-		}
-		u16[len(u16)-1]++
-		next := string(utf16.Decode(u16))
-		if g[byte(v+runLen)] != next {
-			break
-		}
-
-		current = next
-		runLen++
-	}
-	if runLen == 1 {
-		ee = append(ee, edge{1, 1})
-	} else {
-		ee = append(ee, edge{2, uint16(runLen)})
-	}
-	if !g.has(v + runLen) {
-		return ee
-	}
-
-	for g.has(v + runLen) {
-		runLen++
-	}
-	return append(ee, edge{3, uint16(runLen)})
-}
-
-func (g tuEncSimple) Length(v int, e edge) int {
-	switch e.tp {
-	case 1:
-		return 2
-	case 2:
-		return 3
-	case 3:
-		return 3 + int(e.num)
-	default:
-		return 0
-	}
-}
-
-func (g tuEncSimple) To(v int, e edge) int {
-	return v + int(e.num)
 }

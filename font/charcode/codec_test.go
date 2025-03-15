@@ -19,6 +19,7 @@ package charcode
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"testing"
 )
 
@@ -625,6 +626,19 @@ func TestCodecCodeSpaceRange(t *testing.T) {
 	}
 }
 
+// TestCodecStandard tests the standard code space ranges
+// can be created without error.
+func TestCodecStandard(t *testing.T) {
+	for i, r := range []CodeSpaceRange{Simple, UCS2, UTF8} {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			_, err := NewCodec(r)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func FuzzRoundTrip(f *testing.F) {
 	for sel, tc := range testCases {
 		for _, c := range tc.cases {
@@ -670,10 +684,7 @@ func hasNonZero(slice []byte) bool {
 
 // BenchmarkCodecSingleByte benchmarks the Decode method for single-byte codes
 func BenchmarkCodecSingleByte(b *testing.B) {
-	csr := CodeSpaceRange{
-		{Low: []byte{0x00}, High: []byte{0xFF}},
-	}
-	c, err := NewCodec(csr)
+	c, err := NewCodec(Simple)
 	if err != nil {
 		b.Fatal(err)
 	}

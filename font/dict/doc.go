@@ -35,10 +35,10 @@
 //
 // Simple fonts select glyphs either by name or via the built-in encoding of a
 // font. By contrast, composite fonts select glyphs via a character identifier
-// (CID). To make simple fonts more similar to composite fonts, this library
-// introduces artificial CIDs for simple fonts. These values are defined to be
-// 0 for codes which map to the .notdef glyph, and the character code plus one
-// for all other codes.
+// (CID). To make simple fonts more consistent with composite fonts, this
+// library introduces artificial CIDs for simple fonts. These values are
+// defined to be 0 for unused codes, and the character code plus one for all
+// other codes.
 package dict
 
 import _ "seehuhn.de/go/pdf/font"

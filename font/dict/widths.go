@@ -65,7 +65,7 @@ func getSimpleWidths(ww []float64, r pdf.Getter, fontDict pdf.Dict, defaultWidth
 //
 // Returns any additional objects and their references if an indirect object is
 // created.
-func setSimpleWidths(w *pdf.Writer, fontDict pdf.Dict, ww []float64, enc encoding.Type1, defaultWidth float64) ([]pdf.Object, []pdf.Reference) {
+func setSimpleWidths(w *pdf.Writer, fontDict pdf.Dict, ww []float64, enc encoding.Simple, defaultWidth float64) ([]pdf.Object, []pdf.Reference) {
 	firstChar, lastChar := 0, 255
 	for lastChar > 0 && (enc(byte(lastChar)) == "" || ww[lastChar] == defaultWidth) {
 		lastChar--

@@ -23,28 +23,29 @@ import (
 	"seehuhn.de/go/pdf/font/pdfenc"
 )
 
-// Type1 gives the glyph name for each code point.
+// Simple represents the encoding of a simple font.
+// This is a map which gives the glyph name for each code point.
 // The empty string indicates unused codes.
 // The special value [UseBuiltin] indicates that the corresponding glyph from
 // the built-in encoding should be used.
-type Type1 func(code byte) string
+type Simple func(code byte) string
 
 const UseBuiltin = "@"
 
 var (
-	Builtin Type1 = func(code byte) string {
+	Builtin Simple = func(code byte) string {
 		return UseBuiltin
 	}
-	WinAnsi Type1 = func(code byte) string {
+	WinAnsi Simple = func(code byte) string {
 		return pdfenc.WinAnsi.Encoding[code]
 	}
-	MacRoman Type1 = func(code byte) string {
+	MacRoman Simple = func(code byte) string {
 		return pdfenc.MacRoman.Encoding[code]
 	}
-	MacExpert Type1 = func(code byte) string {
+	MacExpert Simple = func(code byte) string {
 		return pdfenc.MacExpert.Encoding[code]
 	}
-	Standard Type1 = func(code byte) string {
+	Standard Simple = func(code byte) string {
 		return pdfenc.Standard.Encoding[code]
 	}
 )
@@ -58,7 +59,7 @@ var (
 //
 // If /Encoding is malformed, the font's built-in encoding is used as a
 // fallback.
-func ExtractType1(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Type1, error) {
+func ExtractType1(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Simple, error) {
 	obj, err := pdf.Resolve(r, obj)
 	if err != nil {
 		return nil, err
@@ -85,7 +86,7 @@ func ExtractType1(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Type1, err
 
 	// If we reach this point, we have found an encoding dictionary.
 
-	var baseEnc Type1
+	var baseEnc Simple
 	baseEncName, _ := pdf.GetName(r, dict["BaseEncoding"])
 	switch baseEncName {
 	case "WinAnsiEncoding":
@@ -146,7 +147,7 @@ func ExtractType1(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Type1, err
 // The resulting PDF object describes an encoding which maps all characters
 // mapped by e to the given glyph name, but it may also imply glyph names for
 // the unmapped codes.
-func (e Type1) AsPDFType1(baseIsStd bool, opt pdf.OutputOptions) (pdf.Object, error) {
+func (e Simple) AsPDFType1(baseIsStd bool, opt pdf.OutputOptions) (pdf.Object, error) {
 	type candInfo struct {
 		encName     pdf.Native
 		enc         []string
@@ -295,7 +296,7 @@ func (e Type1) AsPDFType1(baseIsStd bool, opt pdf.OutputOptions) (pdf.Object, er
 
 // ExtractType3 extracts the encoding from the /Encoding entry of a Type3
 // font dictionary.
-func ExtractType3(r pdf.Getter, obj pdf.Object) (Type1, error) {
+func ExtractType3(r pdf.Getter, obj pdf.Object) (Simple, error) {
 	dict, err := pdf.GetDictTyped(r, obj, "Encoding")
 	if err != nil {
 		return nil, err
@@ -339,7 +340,7 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (Type1, error) {
 }
 
 // AsPDFType3 returns the /Encoding entry for Type3 font dictionary.
-func (e Type1) AsPDFType3(opt pdf.OutputOptions) (pdf.Object, error) {
+func (e Simple) AsPDFType3(opt pdf.OutputOptions) (pdf.Object, error) {
 	var differences pdf.Array
 
 	lastDiff := 999

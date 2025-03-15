@@ -69,70 +69,69 @@ func (r ToUnicodeRange) String() string {
 	return fmt.Sprintf("% 02x-% 02x: %q", r.First, r.Last, r.Values)
 }
 
-// All returns all assigned texts of valid codes within a range.
-// The argument codec is used to determine which codes are valid.
-func (r ToUnicodeRange) All(codec *charcode.Codec) iter.Seq2[charcode.Code, string] {
-	return func(yield func(charcode.Code, string) bool) {
-		L := len(r.First)
-		if L != len(r.Last) || L == 0 {
+// IsValid returns true if the ToUnicodeRange object is valid.
+func (r ToUnicodeRange) IsValid() bool {
+	if len(r.First) != len(r.Last) || len(r.First) == 0 {
+		return false
+	}
+	for i, f := range r.First {
+		if f > r.Last[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func (r ToUnicodeRange) All1() iter.Seq2[int, []byte] {
+	return func(yield func(int, []byte) bool) {
+		if !r.IsValid() {
 			return
 		}
 
-		seq := bytes.Clone(r.First)
-		offs := 0
+		idx := 0
+		buf := bytes.Clone(r.First)
 		for {
-			code, k, ok := codec.Decode(seq)
-			if ok && k == len(seq) {
-				var s string
-				if offs < len(r.Values) {
-					s = r.Values[offs]
-				} else {
-					rr := []rune(r.Values[0])
-					rr[len(rr)-1] += rune(offs)
-					s = string(rr)
-				}
-				if !yield(code, s) {
-					return
-				}
+			if !yield(idx, buf) {
+				return
 			}
-			offs++
 
-			pos := L - 1
+			pos := len(r.First) - 1
 			for pos >= 0 {
-				if seq[pos] < r.Last[pos] {
-					seq[pos]++
+				if buf[pos] < r.Last[pos] {
+					buf[pos]++
 					break
 				}
-				seq[pos] = r.First[pos]
+				buf[pos] = r.First[pos]
 				pos--
 			}
 			if pos < 0 {
 				break
 			}
+			idx++
 		}
 	}
 }
 
 // IsEmpty returns true if the ToUnicodeInfo object does not contain any mappings.
-func (info *ToUnicodeFile) IsEmpty() bool {
-	return info == nil ||
-		len(info.Singles) == 0 && len(info.Ranges) == 0 && info.Parent == nil
+func (tu *ToUnicodeFile) IsEmpty() bool {
+	return tu == nil ||
+		len(tu.Singles) == 0 && len(tu.Ranges) == 0 && tu.Parent == nil
 }
 
 // MakeName returns a unique name for the ToUnicodeInfo object.
 //
 // TODO(voss): reconsider once
 // https://github.com/pdf-association/pdf-issues/issues/344 is resoved.
-func (info *ToUnicodeFile) MakeName() pdf.Name {
+func (tu *ToUnicodeFile) MakeName() pdf.Name {
 	h := md5.New()
-	info.writeBinary(h, 3)
+	tu.writeBinary(h, 3)
 	return pdf.Name(fmt.Sprintf("seehuhn-%x-UTF16", h.Sum(nil)))
 }
 
 // writeBinary writes a binary representation of the ToUnicodeInfo object to
 // the [hash.Hash] h.  The maxGen parameter limits the number of parent
 // references, to avoid infinite recursion.
-func (info *ToUnicodeFile) writeBinary(h hash.Hash, maxGen int) {
+func (tu *ToUnicodeFile) writeBinary(h hash.Hash, maxGen int) {
 	if maxGen <= 0 {
 		return
 	}
@@ -157,20 +156,20 @@ func (info *ToUnicodeFile) writeBinary(h hash.Hash, maxGen int) {
 		}
 	}
 
-	writeInt(len(info.CodeSpaceRange))
-	for _, r := range info.CodeSpaceRange {
+	writeInt(len(tu.CodeSpaceRange))
+	for _, r := range tu.CodeSpaceRange {
 		writeBytes(r.Low)
 		writeBytes(r.High)
 	}
 
-	writeInt(len(info.Singles))
-	for _, s := range info.Singles {
+	writeInt(len(tu.Singles))
+	for _, s := range tu.Singles {
 		writeBytes(s.Code)
 		writeRunes(s.Value)
 	}
 
-	writeInt(len(info.Ranges))
-	for _, r := range info.Ranges {
+	writeInt(len(tu.Ranges))
+	for _, r := range tu.Ranges {
 		writeBytes(r.First)
 		writeBytes(r.Last)
 		writeInt(len(r.Values))
@@ -179,66 +178,30 @@ func (info *ToUnicodeFile) writeBinary(h hash.Hash, maxGen int) {
 		}
 	}
 
-	if info.Parent != nil {
+	if tu.Parent != nil {
 		writeInt(1)
-		info.Parent.writeBinary(h, maxGen-1)
+		tu.Parent.writeBinary(h, maxGen-1)
 	} else {
 		writeInt(0)
 	}
 }
 
-// GetSimpleMapping returns a map from one-byte character codes to strings.
-func (info *ToUnicodeFile) GetSimpleMapping() map[byte]string {
-	res := make(map[byte]string)
-
-	for _, r := range info.Ranges {
-		if len(r.First) != 1 || len(r.Last) != 1 || r.First[0] > r.Last[0] {
-			continue
-		}
-		n := int(r.Last[0]) - int(r.First[0]) + 1
-		values := r.Values
-		switch len(values) {
-		case n:
-			for i := range n {
-				res[r.First[0]+byte(i)] = values[i]
-			}
-		case 1:
-			rr := []rune(values[0])
-			if len(rr) == 0 {
-				continue
-			}
-			for i := range n {
-				res[r.First[0]+byte(i)] = string(rr)
-				rr[len(rr)-1] += 1
-			}
-		}
-	}
-
-	for _, s := range info.Singles {
-		if len(s.Code) == 1 {
-			res[s.Code[0]] = s.Value
-		}
-	}
-
-	return res
-}
-
 // Lookup returns the unicode string for the given character code,
 // together with a flag indicating whether the code was present in the
 // ToUnicode CMap.
-func (info *ToUnicodeFile) Lookup(code []byte) (string, bool) {
-	if info == nil {
+func (tu *ToUnicodeFile) Lookup(code []byte) (string, bool) {
+	if tu == nil {
 		return "", false
 	}
 
-	for _, s := range info.Singles {
+	for _, s := range tu.Singles {
 		if bytes.Equal(s.Code, code) {
 			return s.Value, true
 		}
 	}
 
 rangesLoop:
-	for _, r := range info.Ranges {
+	for _, r := range tu.Ranges {
 		if len(r.First) != len(code) || len(r.Last) != len(code) {
 			continue
 		}
@@ -260,8 +223,8 @@ rangesLoop:
 		}
 	}
 
-	if info.Parent != nil {
-		return info.Parent.Lookup(code)
+	if tu.Parent != nil {
+		return tu.Parent.Lookup(code)
 	}
 	return "", false
 }
@@ -392,7 +355,7 @@ func toString(obj postscript.Object) (string, error) {
 	return string(utf16.Decode(buf)), nil
 }
 
-func (c *ToUnicodeFile) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (tu *ToUnicodeFile) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	opt := rm.Out.GetOptions()
@@ -403,8 +366,8 @@ func (c *ToUnicodeFile) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, 
 	if opt.HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("CMap")
 	}
-	if c.Parent != nil {
-		parent, _, err := pdf.ResourceManagerEmbed(rm, c.Parent)
+	if tu.Parent != nil {
+		parent, _, err := pdf.ResourceManagerEmbed(rm, tu.Parent)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -421,7 +384,7 @@ func (c *ToUnicodeFile) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, 
 	if err != nil {
 		return nil, zero, err
 	}
-	err = toUnicodeTmplNew.Execute(stm, c)
+	err = toUnicodeTmplNew.Execute(stm, tu)
 	if err != nil {
 		return nil, zero, fmt.Errorf("embedding cmap: %w", err)
 	}

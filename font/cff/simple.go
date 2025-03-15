@@ -230,7 +230,7 @@ func (gd *GlyphData) Subset() []glyph.ID {
 	return glyphs
 }
 
-func (gd *GlyphData) Encoding() encoding.Type1 {
+func (gd *GlyphData) Encoding() encoding.Simple {
 	enc := make(map[byte]string)
 	for k, c := range gd.code {
 		enc[c] = gd.GlyphName[k.gid]

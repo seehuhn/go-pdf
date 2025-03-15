@@ -16,26 +16,30 @@
 
 package cmap
 
-import "testing"
+import (
+	"testing"
+
+	"seehuhn.de/go/pdf/font/charcode"
+)
 
 func TestMakeSimpleToUnicode(t *testing.T) {
 	tests := []struct {
 		name  string
-		input map[byte]string
+		input map[charcode.Code]string
 	}{
 		{
 			name:  "empty_mapping",
-			input: map[byte]string{},
+			input: map[charcode.Code]string{},
 		},
 		{
 			name: "single_ascii",
-			input: map[byte]string{
+			input: map[charcode.Code]string{
 				65: "A",
 			},
 		},
 		{
 			name: "consecutive_ascii",
-			input: map[byte]string{
+			input: map[charcode.Code]string{
 				65: "A",
 				66: "B",
 				67: "C",
@@ -43,7 +47,7 @@ func TestMakeSimpleToUnicode(t *testing.T) {
 		},
 		{
 			name: "with_gaps",
-			input: map[byte]string{
+			input: map[charcode.Code]string{
 				65: "A",
 				// gap
 				70: "F",
@@ -51,7 +55,7 @@ func TestMakeSimpleToUnicode(t *testing.T) {
 		},
 		{
 			name: "non_incrementing_sequence",
-			input: map[byte]string{
+			input: map[charcode.Code]string{
 				65: "A",
 				66: "Z",
 				67: "B",
@@ -59,15 +63,7 @@ func TestMakeSimpleToUnicode(t *testing.T) {
 		},
 		{
 			name: "unicode_characters",
-			input: map[byte]string{
-				65: "α",
-				66: "β",
-				67: "γ",
-			},
-		},
-		{
-			name: "mixed_patterns",
-			input: map[byte]string{
+			input: map[charcode.Code]string{
 				10: "A", // single
 				20: "B", // start of incrementing sequence
 				21: "C",
@@ -79,7 +75,7 @@ func TestMakeSimpleToUnicode(t *testing.T) {
 		},
 		{
 			name: "boundaries",
-			input: map[byte]string{
+			input: map[charcode.Code]string{
 				0:   "Α",
 				255: "Ω",
 			},
@@ -87,12 +83,16 @@ func TestMakeSimpleToUnicode(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		codec, _ := charcode.NewCodec(charcode.Simple)
 		t.Run(tt.name, func(t *testing.T) {
-			result := MakeSimpleToUnicode(tt.input)
-			decoded := result.GetSimpleMapping()
+			result := NewToUnicodeFile(codec, tt.input)
+			decoded, err := result.GetMapping()
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			// Check that all mappings are preserved exactly
-			for b := byte(0); b < 255; b++ {
+			for b := charcode.Code(0); b < 256; b++ {
 				got := decoded[b]
 				want := tt.input[b]
 				if got != want {

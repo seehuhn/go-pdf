@@ -115,7 +115,7 @@ func (e *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
 	// Follow the advice of section 9.6.5.4 of ISO 32000-2:2020:
 	// Only make the font as non-symbolic, if it can be encoded either
 	// using "MacRomanEncoding" or "WinAnsiEncoding".
-	var dictEnc encoding.Type1
+	var dictEnc encoding.Simple
 	canMacRoman := true
 	canWinAnsi := true
 	for code := range 256 {

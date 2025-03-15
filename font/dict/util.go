@@ -44,7 +44,7 @@ func moreThanTen(a pdf.Array) bool {
 // widthsAreCompatible returns true, if the glyph widths ww are compatible with
 // the standard font metrics.  The object encObj is the value of the font
 // dictionary's Encoding entry.
-func widthsAreCompatible(ww []float64, enc encoding.Type1, info *stdmtx.FontData) bool {
+func widthsAreCompatible(ww []float64, enc encoding.Simple, info *stdmtx.FontData) bool {
 	for code := range 256 {
 		glyphName := enc(byte(code))
 		if glyphName == "" {

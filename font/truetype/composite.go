@@ -150,9 +150,9 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 
 	ros := e.ROS()
 
-	m := make(map[charcode.Code]font.Code)
+	m := make(map[charcode.Code]string)
 	for code, val := range e.CIDEncoder.MappedCodes() {
-		m[code] = *val
+		m[code] = val.Text
 	}
 	toUnicode := cmap.NewToUnicodeFile(e.CIDEncoder.Codec(), m)
 

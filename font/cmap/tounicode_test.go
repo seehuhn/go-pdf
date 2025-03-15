@@ -35,23 +35,16 @@ import (
 var _ pdf.Embedder[pdf.Unused] = (*ToUnicodeFile)(nil)
 
 func TestToUnicodeRangeIter(t *testing.T) {
-	simple, err := charcode.NewCodec(charcode.Simple)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	type pair struct {
 		code charcode.Code
 		text string
 	}
 	type testCase struct {
-		codec *charcode.Codec
-		r     ToUnicodeRange
-		want  []pair
+		r    ToUnicodeRange
+		want map[charcode.Code]string
 	}
 	cases := []testCase{
 		{
-			codec: simple,
 			r: ToUnicodeRange{
 				First: []byte{0xF0},
 				Last:  []byte{0xF2},
@@ -61,32 +54,35 @@ func TestToUnicodeRangeIter(t *testing.T) {
 					"ffl",
 				},
 			},
-			want: []pair{
-				{code: 0xF0, text: "fl"},
-				{code: 0xF1, text: "fi"},
-				{code: 0xF2, text: "ffl"},
+			want: map[charcode.Code]string{
+				0xF0: "fl",
+				0xF1: "fi",
+				0xF2: "ffl",
 			},
 		},
 		{
-			codec: simple,
 			r: ToUnicodeRange{
 				First:  []byte{0x41},
 				Last:   []byte{0x44},
 				Values: []string{"A"},
 			},
-			want: []pair{
-				{code: 0x41, text: "A"},
-				{code: 0x42, text: "B"},
-				{code: 0x43, text: "C"},
-				{code: 0x44, text: "D"},
+			want: map[charcode.Code]string{
+				0x41: "A",
+				0x42: "B",
+				0x43: "C",
+				0x44: "D",
 			},
 		},
 	}
 
 	for _, c := range cases {
-		var got []pair
-		for code, text := range c.r.All(c.codec) {
-			got = append(got, pair{code, text})
+		tu := &ToUnicodeFile{
+			CodeSpaceRange: charcode.Simple,
+			Ranges:         []ToUnicodeRange{c.r},
+		}
+		got, err := tu.GetMapping()
+		if err != nil {
+			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(got, c.want) {
 			t.Errorf("unexpected result: got %v, want %v", got, c.want)

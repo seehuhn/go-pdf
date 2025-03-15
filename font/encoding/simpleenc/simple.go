@@ -298,7 +298,7 @@ func (t *Simple) Glyphs() []glyph.ID {
 }
 
 // Encoding returns the Type1 encoding corresponding to the glyph data.
-func (t *Simple) Encoding() encoding.Type1 {
+func (t *Simple) Encoding() encoding.Simple {
 	enc := make(map[byte]string)
 	for k, c := range t.code {
 		enc[c] = t.glyphName[k.gid]

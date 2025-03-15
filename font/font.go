@@ -97,9 +97,10 @@ type Code struct {
 	// Text is the text representation of the character.
 	Text string
 
-	// UseWordSpacing whether PDF word spacing should be used for this code.
-	// This is true if the character code is a single byte with the value 0x20
-	// (irrespective of whether the character actually represents a space).
+	// UseWordSpacing indicates whether PDF word spacing is added for this
+	// code. This is true if and only if the character code is a single byte
+	// with the value 0x20 (irrespective of whether the character actually
+	// represents a space).
 	UseWordSpacing bool
 }
 

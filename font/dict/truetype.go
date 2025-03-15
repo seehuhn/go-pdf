@@ -28,6 +28,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/glyphdata"
@@ -59,13 +60,15 @@ type TrueType struct {
 	Descriptor *font.Descriptor
 
 	// Encoding maps character codes to glyph names.
-	Encoding encoding.Type1
+	Encoding encoding.Simple
 
 	// Width contains the glyph widths for all character codes
 	// (PDF glyph space units).
 	Width [256]float64
 
 	// Text gives the text content for each character code.
+	//
+	// TODO(voss): convert to `Text *cmap.ToUnicodeFile`.
 	Text [256]string
 
 	// FontType gives the type of glyph outline data. Possible values are
@@ -364,7 +367,7 @@ func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error 
 	compressedObjects = append(compressedObjects, oo...)
 	compressedRefs = append(compressedRefs, rr...)
 
-	toUnicodeData := make(map[byte]string)
+	toUnicodeData := make(map[charcode.Code]string)
 	for code := range 256 {
 		if d.Text[code] == "" {
 			continue
@@ -376,17 +379,18 @@ func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error 
 			// unused character code, nothing to do
 
 		case encoding.UseBuiltin:
-			toUnicodeData[byte(code)] = d.Text[code]
+			toUnicodeData[charcode.Code(code)] = d.Text[code]
 
 		default:
 			rr := names.ToUnicode(glyphName, d.PostScriptName == "ZapfDingbats")
 			if text := d.Text[code]; text != string(rr) {
-				toUnicodeData[byte(code)] = text
+				toUnicodeData[charcode.Code(code)] = text
 			}
 		}
 	}
 	if len(toUnicodeData) > 0 {
-		tuInfo := cmap.MakeSimpleToUnicode(toUnicodeData)
+		codec, _ := charcode.NewCodec(charcode.Simple)
+		tuInfo := cmap.NewToUnicodeFile(codec, toUnicodeData)
 		ref, _, err := pdf.ResourceManagerEmbed(rm, tuInfo)
 		if err != nil {
 			return fmt.Errorf("ToUnicode cmap: %w", err)
@@ -431,7 +435,11 @@ func (f ttFont) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		var code font.Code
 		for _, c := range s {
-			code.CID = cid.CID(c) + 1 // leave CID 0 for notdef
+			if f.Dict.Encoding(c) == "" {
+				code.CID = 0
+			} else {
+				code.CID = cid.CID(c) + 1
+			}
 			code.Width = f.Dict.Width[c]
 			code.Text = f.Dict.Text[c]
 			code.UseWordSpacing = (c == 0x20)
