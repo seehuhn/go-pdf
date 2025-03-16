@@ -40,8 +40,8 @@ func TestStandardEncoding2(t *testing.T) {
 		if name == ".notdef" {
 			continue
 		}
-		rr := names.ToUnicode(name, false)
-		if len(rr) != 1 {
+		rr := names.ToUnicode(name, "")
+		if len([]rune(rr)) != 1 {
 			t.Errorf("StandardEncoding[%q] = %q, which is not a single unicode rune", name, rr)
 		}
 	}

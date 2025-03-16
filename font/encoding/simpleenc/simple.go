@@ -22,7 +22,6 @@ import (
 	"iter"
 	"math/bits"
 	"slices"
-	"strings"
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/text/unicode/norm"
@@ -56,8 +55,8 @@ type Simple struct {
 	glyphName     map[glyph.ID]string
 	glyphNameUsed map[string]bool
 
-	isZapfDingbats bool
-	baseEnc        *pdfenc.Encoding
+	fontName string
+	baseEnc  *pdfenc.Encoding
 
 	err error
 }
@@ -77,15 +76,15 @@ type codeInfo struct {
 //
 // The notdefWidth parameter is the default width of the ".notdef" glyph,
 // in PDF glyph space units.
-func NewSimple(notdefWidth float64, isZapfDingbats bool, base *pdfenc.Encoding) *Simple {
+func NewSimple(notdefWidth float64, fontName string, base *pdfenc.Encoding) *Simple {
 	gd := &Simple{
-		code:           make(map[gidText]byte),
-		info:           make(map[byte]*codeInfo),
-		notdef:         &codeInfo{GID: 0, Text: "", Width: notdefWidth},
-		glyphName:      make(map[glyph.ID]string),
-		glyphNameUsed:  make(map[string]bool),
-		isZapfDingbats: isZapfDingbats,
-		baseEnc:        base,
+		code:          make(map[gidText]byte),
+		info:          make(map[byte]*codeInfo),
+		notdef:        &codeInfo{GID: 0, Text: "", Width: notdefWidth},
+		glyphName:     make(map[glyph.ID]string),
+		glyphNameUsed: make(map[string]bool),
+		fontName:      fontName,
+		baseEnc:       base,
 	}
 	gd.glyphName[0] = ".notdef"
 	gd.glyphNameUsed[".notdef"] = true
@@ -167,12 +166,12 @@ func (t *Simple) AllocateCode(gid glyph.ID, baseGlyphName, text string, width fl
 	glyphName := t.makeGlyphName(gid, baseGlyphName, text)
 
 	var r rune
-	rr := names.ToUnicode(glyphName, t.isZapfDingbats)
+	rr := names.ToUnicode(glyphName, t.fontName)
 	if len(rr) == 0 {
-		rr = []rune(norm.NFD.String(text))
+		rr = norm.NFD.String(text)
 	}
 	if len(rr) > 0 {
-		r = rr[0]
+		r = []rune(rr)[0]
 	}
 
 	bestScore := -1
@@ -217,13 +216,7 @@ func (t *Simple) makeGlyphName(gid glyph.ID, defaultGlyphName, text string) stri
 
 	glyphName := defaultGlyphName
 	if !names.IsValid(glyphName) {
-		var parts []string
-		for _, r := range text {
-			parts = append(parts, names.FromUnicode(r))
-		}
-		if len(parts) > 0 {
-			glyphName = strings.Join(parts, "_")
-		}
+		glyphName = names.FromUnicode(text)
 	}
 
 	alt := 0

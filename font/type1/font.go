@@ -110,9 +110,8 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 	}
 
 	cmap := make(map[rune]glyph.ID)
-	isDingbats := psFont.FontName == "ZapfDingbats"
 	for gid, name := range glyphNames {
-		rr := names.ToUnicode(name, isDingbats)
+		rr := []rune(names.ToUnicode(name, psFont.FontName))
 		if len(rr) != 1 {
 			continue
 		}

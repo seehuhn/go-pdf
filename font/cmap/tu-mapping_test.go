@@ -83,9 +83,11 @@ func TestMakeSimpleToUnicode(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		codec, _ := charcode.NewCodec(charcode.Simple)
 		t.Run(tt.name, func(t *testing.T) {
-			result := NewToUnicodeFile(codec, tt.input)
+			result, err := NewToUnicodeFile(charcode.Simple, tt.input)
+			if err != nil {
+				t.Fatal(err)
+			}
 			decoded, err := result.GetMapping()
 			if err != nil {
 				t.Fatal(err)

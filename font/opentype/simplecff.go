@@ -58,7 +58,7 @@ func newEmbeddedCFFSimple(ref pdf.Reference, font *sfnt.Font) *embeddedCFFSimple
 
 		Simple: simpleenc.NewSimple(
 			math.Round(font.GlyphWidthPDF(0)),
-			font.PostScriptName() == "ZapfDingbats",
+			font.PostScriptName(),
 			&pdfenc.WinAnsi,
 		),
 	}
@@ -104,7 +104,7 @@ func (e *embeddedCFFSimple) Finish(rm *pdf.ResourceManager) error {
 	origFont.Gsub = nil
 	origFont.Gpos = nil
 
-	// Subset the font, if needed.
+	// subset the font, if needed
 	glyphs := e.Simple.Glyphs()
 	subsetTag := subset.Tag(glyphs, origFont.NumGlyphs())
 

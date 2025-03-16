@@ -11,8 +11,8 @@ require (
 	golang.org/x/text v0.16.0
 	seehuhn.de/go/geom v0.0.0-20250204091821-5a82ee1c4995
 	seehuhn.de/go/icc v0.0.0-20240801195843-cfc244e2c55a
-	seehuhn.de/go/postscript v0.5.1-0.20250228203749-e9e92c41aec4
-	seehuhn.de/go/sfnt v0.5.1-0.20250228204111-2e420dfef575
+	seehuhn.de/go/postscript v0.5.1-0.20250316102127-8863e3a3d4c4
+	seehuhn.de/go/sfnt v0.5.1-0.20250316115129-5aba6f02cda6
 	seehuhn.de/go/xmp v0.3.0
 )
 

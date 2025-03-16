@@ -154,7 +154,10 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 	for code, val := range e.CIDEncoder.MappedCodes() {
 		m[code] = val.Text
 	}
-	toUnicode := cmap.NewToUnicodeFile(e.CIDEncoder.Codec(), m)
+	toUnicode, err := cmap.NewToUnicodeFile(e.CIDEncoder.Codec().CodeSpaceRange(), m)
+	if err != nil {
+		return err
+	}
 
 	// construct the font dictionary and font descriptor
 	dw := math.Round(subsetFont.GlyphWidthPDF(0))
@@ -165,12 +168,7 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 
 	isSymbolic := false
 	for _, info := range e.CIDEncoder.MappedCodes() {
-		rr := []rune(info.Text)
-		if len(rr) != 1 {
-			isSymbolic = true
-			break
-		}
-		glyphName := names.FromUnicode(rr[0])
+		glyphName := names.FromUnicode(info.Text)
 		if !pdfenc.StandardLatin.Has[glyphName] {
 			isSymbolic = true
 			break
@@ -234,7 +232,7 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 		dict.CIDToGID = cidToGID
 	}
 
-	err := dict.WriteToPDF(rm, e.Ref)
+	err = dict.WriteToPDF(rm, e.Ref)
 	if err != nil {
 		return err
 	}

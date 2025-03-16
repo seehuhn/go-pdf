@@ -26,12 +26,16 @@ import (
 )
 
 // NewToUnicodeFile creates a ToUnicodeFile object.
-func NewToUnicodeFile(codec *charcode.Codec, data map[charcode.Code]string) *ToUnicodeFile {
+func NewToUnicodeFile(csr charcode.CodeSpaceRange, data map[charcode.Code]string) (*ToUnicodeFile, error) {
 	res := &ToUnicodeFile{
-		CodeSpaceRange: codec.CodeSpaceRange(),
+		CodeSpaceRange: csr,
 	}
 
 	// group together codes which only differ in the last byte
+	codec, err := charcode.NewCodec(csr)
+	if err != nil {
+		return nil, err
+	}
 	type entry struct {
 		code charcode.Code
 		x    byte
@@ -103,7 +107,7 @@ func NewToUnicodeFile(codec *charcode.Codec, data map[charcode.Code]string) *ToU
 		}
 	}
 
-	return res
+	return res, nil
 }
 
 func (tu *ToUnicodeFile) GetMapping() (map[charcode.Code]string, error) {

@@ -96,7 +96,7 @@ func New(f *Font) (*Instance, error) {
 
 	cmap := make(map[rune]glyph.ID)
 	for i, g := range f.Glyphs {
-		rr := names.ToUnicode(g.Name, f.PostScriptName == "ZapfDingbats")
+		rr := []rune(names.ToUnicode(g.Name, f.PostScriptName))
 		if len(rr) == 1 {
 			cmap[rr[0]] = glyph.ID(i)
 		}

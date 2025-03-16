@@ -222,7 +222,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 		page.TextFirstLine(ctx.pageSize.LLx+22, ctx.pageSize.URy-30)
 		page.TextShow(strings.Join(label, ", "))
 		if g.Name != "" {
-			rr := names.ToUnicode(g.Name, false)
+			rr := []rune(names.ToUnicode(g.Name, ""))
 			if len(rr) == 1 {
 				runeName := runenames.Name(rr[0])
 				page.TextSecondLine(0, -15)

@@ -81,7 +81,7 @@ func newEmbeddedSimple(ref pdf.Reference, f *Instance) *embeddedSimple {
 
 		Simple: simpleenc.NewSimple(
 			f.GlyphWidthPDF(".notdef"),
-			f.PostScriptName() == "ZapfDingbats",
+			f.PostScriptName(),
 			&pdfenc.WinAnsi,
 		),
 	}

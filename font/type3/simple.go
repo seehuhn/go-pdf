@@ -51,7 +51,7 @@ func newEmbeddedSimple(ref pdf.Reference, font *Font) *embeddedSimple {
 	e := &embeddedSimple{
 		Ref:    ref,
 		Font:   font,
-		Simple: simpleenc.NewSimple(0, false, &pdfenc.Standard),
+		Simple: simpleenc.NewSimple(0, "", &pdfenc.Standard),
 	}
 	return e
 }

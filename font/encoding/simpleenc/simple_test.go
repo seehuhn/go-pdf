@@ -46,7 +46,7 @@ func TestDefaultWidth(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			gd := NewSimple(defaultWidth, false, &pdfenc.WinAnsi)
+			gd := NewSimple(defaultWidth, "", &pdfenc.WinAnsi)
 			for _, e := range tc.entries {
 				gd.info[e.code] = &codeInfo{Width: e.width}
 			}

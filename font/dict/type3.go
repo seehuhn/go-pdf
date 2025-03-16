@@ -127,7 +127,7 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
 			continue
 		}
 
-		rr := names.ToUnicode(glyphName, false)
+		rr := names.ToUnicode(glyphName, "")
 		d.Text[code] = string(rr)
 	}
 	// the ToUnicode cmap, if present, overrides the derived text content
@@ -287,15 +287,17 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager, fontDictRef pdf.Reference) e
 			// unused character code, nothing to do
 
 		default:
-			rr := names.ToUnicode(glyphName, false)
+			rr := names.ToUnicode(glyphName, "")
 			if text := d.Text[code]; text != string(rr) {
 				toUnicodeData[charcode.Code(code)] = text
 			}
 		}
 	}
 	if len(toUnicodeData) > 0 {
-		codec, _ := charcode.NewCodec(charcode.Simple)
-		tuInfo := cmap.NewToUnicodeFile(codec, toUnicodeData)
+		tuInfo, err := cmap.NewToUnicodeFile(charcode.Simple, toUnicodeData)
+		if err != nil {
+			return err
+		}
 		ref, _, err := pdf.ResourceManagerEmbed(rm, tuInfo)
 		if err != nil {
 			return fmt.Errorf("ToUnicode cmap: %w", err)

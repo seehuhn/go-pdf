@@ -172,7 +172,10 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 			m[code] = val.Text
 		}
 	}
-	toUnicode := cmap.NewToUnicodeFile(e.CIDEncoder.Codec(), m)
+	toUnicode, err := cmap.NewToUnicodeFile(e.CIDEncoder.Codec().CodeSpaceRange(), m)
+	if err != nil {
+		return err
+	}
 
 	// Simple CFF fonts can only have one private dict, and ...
 	canUseSimple := len(subsetOutlines.Private) == 1
@@ -230,13 +233,8 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 
 	isSymbolic := false
 	for _, info := range e.CIDEncoder.MappedCodes() {
-		// TODO(voss): if the font is simple, use the existing glyph names
-		rr := []rune(info.Text)
-		if len(rr) != 1 {
-			isSymbolic = true
-			break
-		}
-		glyphName := names.FromUnicode(rr[0])
+		// TODO(voss): if the font is simple, use the existing glyph names?
+		glyphName := names.FromUnicode(info.Text)
 		if !pdfenc.StandardLatin.Has[glyphName] {
 			isSymbolic = true
 			break
@@ -284,7 +282,7 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 		FontRef:         rm.Out.Alloc(),
 	}
 
-	err := dict.WriteToPDF(rm, e.Ref)
+	err = dict.WriteToPDF(rm, e.Ref)
 	if err != nil {
 		return err
 	}

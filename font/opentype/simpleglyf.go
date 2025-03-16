@@ -58,7 +58,7 @@ func newEmbeddedGlyfSimple(ref pdf.Reference, font *sfnt.Font) *embeddedGlyfSimp
 		Font: font,
 		Simple: simpleenc.NewSimple(
 			math.Round(font.GlyphWidthPDF(0)),
-			font.PostScriptName() == "ZapfDingbats",
+			font.PostScriptName(),
 			&pdfenc.WinAnsi,
 		),
 	}
@@ -165,7 +165,7 @@ func (e *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
 		var needsFormat12 bool
 		for _, origGid := range glyphs {
 			glyphName := e.Simple.GlyphName(origGid)
-			rr := names.ToUnicode(glyphName, subsetFont.PostScriptName() == "ZapfDingbats")
+			rr := []rune(names.ToUnicode(glyphName, subsetFont.PostScriptName()))
 			if len(rr) != 1 {
 				continue
 			}
@@ -179,7 +179,7 @@ func (e *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
 			subtable := cmap.Format4{}
 			for gid, origGid := range glyphs {
 				glyphName := e.Simple.GlyphName(origGid)
-				rr := names.ToUnicode(glyphName, subsetFont.PostScriptName() == "ZapfDingbats")
+				rr := names.ToUnicode(glyphName, subsetFont.PostScriptName())
 				if len(rr) != 1 {
 					continue
 				}
@@ -192,7 +192,7 @@ func (e *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
 			subtable := cmap.Format12{}
 			for gid, origGid := range glyphs {
 				glyphName := e.Simple.GlyphName(origGid)
-				rr := names.ToUnicode(glyphName, subsetFont.PostScriptName() == "ZapfDingbats")
+				rr := names.ToUnicode(glyphName, subsetFont.PostScriptName())
 				if len(rr) != 1 {
 					continue
 				}

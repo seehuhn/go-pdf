@@ -197,7 +197,7 @@ func ExtractType1(r pdf.Getter, obj pdf.Object) (*Type1, error) {
 			continue
 		}
 
-		rr := names.ToUnicode(glyphName, d.PostScriptName == "ZapfDingbats")
+		rr := names.ToUnicode(glyphName, d.PostScriptName)
 		d.Text[code] = string(rr)
 	}
 	// the ToUnicode cmap, if present, overrides the derived text content
@@ -398,18 +398,20 @@ func (d *Type1) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 			toUnicodeData[charcode.Code(code)] = d.Text[code]
 
 		default:
-			rr := names.ToUnicode(glyphName, d.PostScriptName == "ZapfDingbats")
+			rr := names.ToUnicode(glyphName, d.PostScriptName)
 			if text := d.Text[code]; text != string(rr) {
 				toUnicodeData[charcode.Code(code)] = text
 			}
 		}
 	}
 	if len(toUnicodeData) > 0 {
-		codec, _ := charcode.NewCodec(charcode.Simple)
-		tuInfo := cmap.NewToUnicodeFile(codec, toUnicodeData)
+		tuInfo, err := cmap.NewToUnicodeFile(charcode.Simple, toUnicodeData)
+		if err != nil {
+			return err
+		}
 		ref, _, err := pdf.ResourceManagerEmbed(rm, tuInfo)
 		if err != nil {
-			return fmt.Errorf("ToUnicode cmap: %w", err)
+			return err
 		}
 		fontDict["ToUnicode"] = ref
 	}
