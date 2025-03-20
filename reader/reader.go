@@ -45,8 +45,12 @@ type Reader struct {
 
 	// User callbacks.
 	// TODO(voss): clean up this list
+	// TODO(voss): check the error returns
 	DrawGlyph func(g font.Glyph) error
 	Character func(cid cid.CID, text string) error
+	TextSpace func() error
+	TextNL    func() error
+
 	Text      func(text string) error
 	UnknownOp func(op string, args []pdf.Object) error
 	EveryOp   func(op string, args []pdf.Object) error
@@ -284,6 +288,9 @@ func (r *Reader) do() error {
 		case "ET":
 			if op.OK() {
 				r.Set &= ^graphics.StateTextMatrix
+				if r.TextNL != nil {
+					r.TextNL()
+				}
 			}
 
 		// Table 103 - Text state operators
@@ -360,6 +367,13 @@ func (r *Reader) do() error {
 			if op.OK() {
 				r.TextLineMatrix = matrix.Translate(tx, ty).Mul(r.TextLineMatrix)
 				r.TextMatrix = r.TextLineMatrix
+				if tx > 0 && ty == 0 {
+					if r.TextSpace != nil {
+						r.TextSpace()
+					}
+				} else if r.TextNL != nil {
+					r.TextNL()
+				}
 			}
 
 		case "TD":
@@ -370,6 +384,9 @@ func (r *Reader) do() error {
 				r.Set |= graphics.StateTextLeading
 				r.TextLineMatrix = matrix.Translate(tx, ty).Mul(r.TextLineMatrix)
 				r.TextMatrix = r.TextLineMatrix
+				if r.TextNL != nil {
+					r.TextNL()
+				}
 			}
 
 		case "Tm":
@@ -381,12 +398,18 @@ func (r *Reader) do() error {
 				r.TextMatrix = m
 				r.TextLineMatrix = m
 				r.Set |= graphics.StateTextMatrix
+				if r.TextNL != nil {
+					r.TextNL()
+				}
 			}
 
 		case "T*":
 			if op.OK() {
 				r.TextLineMatrix = matrix.Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
 				r.TextMatrix = r.TextLineMatrix
+				if r.TextNL != nil {
+					r.TextNL()
+				}
 			}
 
 		// Table 107 - Text-showing operators
@@ -402,6 +425,9 @@ func (r *Reader) do() error {
 			if op.OK() && r.TextFont != nil {
 				r.TextLineMatrix = matrix.Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
 				r.TextMatrix = r.TextLineMatrix
+				if r.TextNL != nil {
+					r.TextNL()
+				}
 				r.processText(s)
 			}
 
@@ -633,10 +659,10 @@ func (r *Reader) processText(s pdf.String) {
 		}
 
 		// TODO(voss): check for error returns from the callbacks
-		if r.Character != nil {
+		if r.Character != nil && r.TextRenderingMode != graphics.TextRenderingModeInvisible {
 			r.Character(info.CID, info.Text)
 		}
-		if r.DrawGlyph != nil {
+		if r.DrawGlyph != nil && r.TextRenderingMode != graphics.TextRenderingModeInvisible {
 			g := font.Glyph{
 				// GID:     gid,
 				Advance: width,
@@ -645,7 +671,7 @@ func (r *Reader) processText(s pdf.String) {
 			}
 			r.DrawGlyph(g)
 		}
-		if r.Text != nil {
+		if r.Text != nil && r.TextRenderingMode != graphics.TextRenderingModeInvisible {
 			r.Text(info.Text)
 		}
 

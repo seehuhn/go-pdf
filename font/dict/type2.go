@@ -496,6 +496,13 @@ func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager, fontDictRef pdf.Refer
 	return nil
 }
 
+// ImpliedText returns the default text content for a character identifier.
+// This is based on the CID and CID system info alone, and does not use
+// information from the ToUnicode cmap or the font file.
+func (d *CIDFontType2) ImpliedText(cid cid.CID) string {
+	panic("not implemented")
+}
+
 func (d *CIDFontType2) GlyphData() (glyphdata.Type, pdf.Reference) {
 	return d.FontType, d.FontRef
 }

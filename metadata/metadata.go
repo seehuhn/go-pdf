@@ -30,11 +30,7 @@ type Stream struct {
 }
 
 func ExtractStream(r pdf.Getter, ref pdf.Object) (*Stream, error) {
-	stm, err := pdf.GetStream(r, ref)
-	if err != nil {
-		return nil, err
-	}
-	body, err := pdf.DecodeStream(r, stm, 0)
+	body, err := pdf.GetStreamReader(r, ref)
 	if err != nil {
 		return nil, err
 	}

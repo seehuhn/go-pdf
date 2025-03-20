@@ -107,12 +107,7 @@ func showXMP(r *pdf.Reader, ref pdf.Reference) error {
 	fmt.Println(strings.Repeat("-", len(title)))
 	fmt.Println()
 
-	stm, err := pdf.GetStream(r, ref)
-	if err != nil {
-		return err
-	}
-
-	body, err := pdf.DecodeStream(r, stm, 0)
+	body, err := pdf.GetStreamReader(r, ref)
 	if err != nil {
 		return err
 	}

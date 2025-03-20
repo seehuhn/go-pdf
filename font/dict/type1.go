@@ -339,11 +339,16 @@ func (d *Type1) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	}
 
 	stdInfo := stdmtx.Metrics[d.PostScriptName]
+	trimFontDict := ((d.FontType == glyphdata.None) &&
+		stdInfo != nil &&
+		w.GetOptions().HasAny(pdf.OptTrimStandardFonts) &&
+		widthsAreCompatible(d.Width[:], d.Encoding, stdInfo) &&
+		fontDescriptorIsCompatible(d.Descriptor, stdInfo))
 
 	isNonSymbolic := !d.Descriptor.IsSymbolic
 	isExternal := d.FontRef == 0
 	baseIsStd := isNonSymbolic && isExternal
-	if stdInfo != nil {
+	if trimFontDict {
 		// Don't make any assumptions about the base encoding for the
 		// standard fonts.
 		baseIsStd = false
@@ -359,11 +364,6 @@ func (d *Type1) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	compressedObjects := []pdf.Object{fontDict}
 	compressedRefs := []pdf.Reference{ref}
 
-	trimFontDict := ((d.FontRef == 0) &&
-		stdInfo != nil &&
-		w.GetOptions().HasAny(pdf.OptTrimStandardFonts) &&
-		widthsAreCompatible(d.Width[:], d.Encoding, stdInfo) &&
-		fontDescriptorIsCompatible(d.Descriptor, stdInfo))
 	if !trimFontDict {
 		fdRef := w.Alloc()
 		fdDict := d.Descriptor.AsDict()
@@ -422,6 +422,23 @@ func (d *Type1) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	}
 
 	return nil
+}
+
+// ImpliedText returns the default text content for a character identifier.
+// This is based on the glyph name alone, and does not use information from the
+// ToUnicode cmap or the font file.
+func (d *Type1) ImpliedText(cid cid.CID) string {
+	if cid < 1 || cid > 256+1 {
+		return ""
+	}
+	code := byte(cid - 1)
+
+	glyphName := d.Encoding(code)
+	if glyphName == encoding.UseBuiltin {
+		return ""
+	}
+
+	return names.ToUnicode(glyphName, d.PostScriptName)
 }
 
 func (d *Type1) GlyphData() (glyphdata.Type, pdf.Reference) {

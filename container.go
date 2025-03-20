@@ -196,6 +196,18 @@ func CheckDictType(r Getter, obj Dict, wantType Name) error {
 	return nil
 }
 
+// GetStreamReader returns an io.Reader which returns the decoded
+// contents of a PDF stream.
+//
+// This is a convenience function, combining [GetStream] and [DecodeStream].
+func GetStreamReader(r Getter, ref Object) (io.Reader, error) {
+	stm, err := GetStream(r, ref)
+	if err != nil {
+		return nil, err
+	}
+	return DecodeStream(r, stm, 0)
+}
+
 // DecodeStream returns a reader for the decoded stream data.
 // If numFilters is non-zero, only the first numFilters filters are decoded.
 func DecodeStream(r Getter, x *Stream, numFilters int) (io.Reader, error) {

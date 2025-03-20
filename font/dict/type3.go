@@ -321,6 +321,20 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager, fontDictRef pdf.Reference) e
 	return nil
 }
 
+// ImpliedText returns the default text content for a character identifier.
+// This is based on the glyph name alone, and does not use information from the
+// ToUnicode cmap.
+func (d *Type3) ImpliedText(cid cid.CID) string {
+	if cid < 1 || cid > 256+1 {
+		return ""
+	}
+	code := byte(cid - 1)
+
+	glyphName := d.Encoding(code)
+
+	return names.ToUnicode(glyphName, "")
+}
+
 func (d *Type3) GlyphData() (glyphdata.Type, pdf.Reference) {
 	return glyphdata.Type3, 0
 }
