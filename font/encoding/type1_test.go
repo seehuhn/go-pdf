@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/postscript/type1/names"
 )
 
 type MockGetter struct{}
@@ -238,5 +239,13 @@ func TestType1Roundtrip(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// TestUseBuiltin checks that the UseBuiltin value is not a valid glyph name.
+func TestUseBuiltin(t *testing.T) {
+	s := names.ToUnicode(UseBuiltin, "")
+	if s != "" {
+		t.Errorf("UseBuiltin should not be a valid glyph name, got %q", s)
 	}
 }

@@ -482,4 +482,4 @@ var toUnicodeROS = &cid.SystemInfo{
 	Ordering: "UCS",
 }
 
-var brokenReplacement = "\uFFFD"
+const brokenReplacement = "\uFFFD"

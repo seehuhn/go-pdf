@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/pdf/font/mapping"
 	"seehuhn.de/go/pdf/font/subset"
 )
 
@@ -399,8 +400,9 @@ func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) er
 // ImpliedText returns the default text content for a character identifier.
 // This is based on the CID and CID System Info alone, and does not use
 // information from the ToUnicode cmap or the font file.
-func (d *CIDFontType0) ImpliedText(cid cid.CID) string {
-	panic("not implemented")
+func (d *CIDFontType0) ImpliedText() map[cid.CID]string {
+	m, _ := mapping.GetCIDTextMapping(d.ROS.Registry, d.ROS.Ordering)
+	return m
 }
 
 func (d *CIDFontType0) GlyphData() (glyphdata.Type, pdf.Reference) {

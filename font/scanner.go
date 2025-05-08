@@ -53,16 +53,14 @@ type Dict interface {
 	// can be defined via the returned font object.
 	MakeFont() (FromFile, error)
 
-	// ImpliedText returns the text content implied by the given character
+	// ImpliedText returns the text content implied by each character
 	// identifier.  For simple fonts, the cid is taken to be the character code
 	// plus one.
 	//
-	// The returned string is based on the CID alone and does not take
+	// The returned mapping is based on the CID only and does not take
 	// information from the ToUnicode map or from the font file itself into
 	// account.
-	//
-	// If the meaning of the cid is not known, the empty string is returned.
-	ImpliedText(cid cid.CID) string
+	ImpliedText() map[cid.CID]string
 
 	// GlyphData returns information about the embedded font program associated
 	// with this font dictionary.

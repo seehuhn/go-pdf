@@ -35,10 +35,6 @@ import (
 var _ pdf.Embedder[pdf.Unused] = (*ToUnicodeFile)(nil)
 
 func TestToUnicodeRangeIter(t *testing.T) {
-	type pair struct {
-		code charcode.Code
-		text string
-	}
 	type testCase struct {
 		r    ToUnicodeRange
 		want map[charcode.Code]string
