@@ -23,11 +23,13 @@ import (
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/cmap"
+	sfntcmap "seehuhn.de/go/sfnt/cmap"
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
@@ -144,7 +146,7 @@ func (e *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
 
 		dictEnc = encoding.Builtin
 
-		subtable := cmap.Format4{}
+		subtable := sfntcmap.Format4{}
 		for code := range 256 {
 			gid := e.Simple.GID(byte(code))
 			if gid == 0 {
@@ -152,7 +154,7 @@ func (e *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
 			}
 			subtable[uint16(code)] = gid
 		}
-		subsetFont.CMapTable = cmap.Table{
+		subsetFont.CMapTable = sfntcmap.Table{
 			{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
 		}
 	} else {
@@ -176,7 +178,7 @@ func (e *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
 		}
 
 		if !needsFormat12 {
-			subtable := cmap.Format4{}
+			subtable := sfntcmap.Format4{}
 			for gid, origGid := range glyphs {
 				glyphName := e.Simple.GlyphName(origGid)
 				rr := names.ToUnicode(glyphName, subsetFont.PostScriptName())
@@ -185,11 +187,11 @@ func (e *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
 				}
 				subtable[uint16(rr[0])] = glyph.ID(gid)
 			}
-			subsetFont.CMapTable = cmap.Table{
+			subsetFont.CMapTable = sfntcmap.Table{
 				{PlatformID: 3, EncodingID: 1}: subtable.Encode(0),
 			}
 		} else {
-			subtable := cmap.Format12{}
+			subtable := sfntcmap.Format12{}
 			for gid, origGid := range glyphs {
 				glyphName := e.Simple.GlyphName(origGid)
 				rr := names.ToUnicode(glyphName, subsetFont.PostScriptName())
@@ -198,7 +200,7 @@ func (e *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
 				}
 				subtable[uint32(rr[0])] = glyph.ID(gid)
 			}
-			subsetFont.CMapTable = cmap.Table{
+			subsetFont.CMapTable = sfntcmap.Table{
 				{PlatformID: 3, EncodingID: 1}: subtable.Encode(0),
 			}
 		}
@@ -243,9 +245,20 @@ func (e *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
 		FontType:       glyphdata.OpenTypeGlyf,
 		FontRef:        rm.Out.Alloc(),
 	}
+	implied := dict.ImpliedText()
+	m := make(map[charcode.Code]string)
 	for c, info := range e.Simple.MappedCodes() {
 		dict.Width[c] = info.Width
-		dict.Text[c] = info.Text
+		if info.Text != implied[info.CID] {
+			m[charcode.Code(c)] = info.Text
+		}
+	}
+	if len(m) > 0 {
+		tuInfo, err := cmap.NewToUnicodeFile(charcode.Simple, m)
+		if err != nil {
+			return err
+		}
+		dict.ToUnicode = tuInfo
 	}
 
 	err := dict.WriteToPDF(rm, e.Ref)

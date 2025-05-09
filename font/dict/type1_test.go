@@ -26,6 +26,8 @@ import (
 
 	"seehuhn.de/go/geom/rect"
 
+	"seehuhn.de/go/postscript/cid"
+
 	"seehuhn.de/go/sfnt/os2"
 
 	"seehuhn.de/go/pdf"
@@ -183,21 +185,22 @@ func checkRoundtripT1(t *testing.T, d1 *Type1, v pdf.Version) {
 	// Text and glyph for unused codes are arbitrary after roundtrip.
 	// We compare these manually here, and zero the values for the comparison
 	// below.
+	text1 := d1.TextMapping()
+	text2 := d2.TextMapping()
 	for code := range 256 {
 		if d1.Encoding(byte(code)) != "" {
 			if d1.Encoding(byte(code)) != d2.Encoding(byte(code)) {
 				t.Errorf("glyphName[%d]: %q != %q", code, d1.Encoding(byte(code)), d2.Encoding(byte(code)))
 			}
-			if d1.Text[code] != "" && d1.Text[code] != d2.Text[code] {
-				t.Errorf("text[%d]: %q != %q", code, d1.Text[code], d2.Text[code])
+			cid := cid.CID(code) + 1
+			if text1[cid] != text2[cid] {
+				t.Errorf("text[%d]: %q != %q", code, text1[cid], text2[cid])
 			}
 			if d1.Width[code] != d2.Width[code] {
 				t.Errorf("width[%d]: %f != %f", code, d1.Width[code], d2.Width[code])
 			}
 		}
 
-		d1.Text[code] = ""
-		d2.Text[code] = ""
 		d1.Width[code] = 0
 		d2.Width[code] = 0
 	}
@@ -246,7 +249,6 @@ var t1Dicts = []*Type1{
 			}
 		},
 		Width: makeTestWidth(65, 100.0),
-		Text:  makeTestText(65, "A"),
 	},
 	makeTestDictStandard("Courier"),
 	makeTestDictStandard("Times-Roman"),
@@ -270,7 +272,6 @@ var t1Dicts = []*Type1{
 		},
 		Encoding: func(c byte) string { return pdfenc.Standard.Encoding[c] },
 		Width:    makeConstWidth(199),
-		Text:     makeTestText(65, "A"),
 		FontType: glyphdata.Type1,
 		FontRef:  pdf.NewReference(999, 0),
 	},
@@ -293,7 +294,6 @@ var t1Dicts = []*Type1{
 		},
 		Encoding: func(c byte) string { return pdfenc.Standard.Encoding[c] },
 		Width:    makeConstWidth(199),
-		Text:     makeTestText(65, "A"),
 		FontType: glyphdata.CFFSimple,
 		FontRef:  pdf.NewReference(999, 0),
 	},
@@ -316,7 +316,6 @@ var t1Dicts = []*Type1{
 		},
 		Encoding: func(c byte) string { return pdfenc.Standard.Encoding[c] },
 		Width:    makeConstWidth(199),
-		Text:     makeTestText(65, "A"),
 		FontType: glyphdata.OpenTypeCFFSimple,
 		FontRef:  pdf.NewReference(999, 0),
 	},
@@ -334,15 +333,6 @@ func makeTestWidth(args ...any) (ww [256]float64) {
 func makeConstWidth(dw float64) (ww [256]float64) {
 	for i := range ww {
 		ww[i] = dw
-	}
-	return
-}
-
-func makeTestText(args ...any) (tt [256]string) {
-	for i := 0; i+1 < len(args); i += 2 {
-		code := args[i].(int)
-		text := args[i+1].(string)
-		tt[code] = text
 	}
 	return
 }
@@ -402,7 +392,6 @@ func makeTestDictStandard(fontName string) *Type1 {
 	}
 	for _, g := range gg {
 		d.Width[g.code] = g.width
-		d.Text[g.code] = g.name
 	}
 
 	return d

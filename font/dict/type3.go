@@ -55,10 +55,9 @@ type Type3 struct {
 	// (PDF glyph space units).
 	Width [256]float64
 
-	// Text gives the text content for each character code.
-	//
-	// TODO(voss): convert to `Text *cmap.ToUnicodeFile`.
-	Text [256]string
+	// ToUnicode (optional) specifies how character codes are mapped to Unicode
+	// strings.  This overrides the mapping implied by the glyph names.
+	ToUnicode *cmap.ToUnicodeFile
 
 	// CharProcs maps the name of each glyph to the content stream which paints
 	// the glyph for that character.
@@ -120,31 +119,11 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
 	}
 	getSimpleWidths(d.Width[:], r, fontDict, defaultWidth)
 
-	// First try to derive text content from the glyph names.
-	for code := range 256 {
-		glyphName := enc(byte(code))
-		if glyphName == "" {
-			continue
-		}
-
-		rr := names.ToUnicode(glyphName, "")
-		d.Text[code] = string(rr)
-	}
-	// the ToUnicode cmap, if present, overrides the derived text content
 	toUnicode, err := cmap.ExtractToUnicode(r, fontDict["ToUnicode"])
 	if pdf.IsReadError(err) {
 		return nil, err
 	}
-	if toUnicode != nil {
-		// TODO(voss): implement an iterator on toUnicode to do this
-		// more efficiently?
-		for code := range 256 {
-			rr, found := toUnicode.Lookup([]byte{byte(code)})
-			if found {
-				d.Text[code] = rr
-			}
-		}
-	}
+	d.ToUnicode = toUnicode
 
 	charProcs, err := pdf.GetDict(r, fontDict["CharProcs"])
 	if err != nil {
@@ -189,7 +168,8 @@ func (d *Type3) repair(r pdf.Getter) {
 	}
 }
 
-// validate checks that all data are valid and consistent.
+// validate performs some basic checks on the font dictionary.
+// This is guaranteed to pass after repair has been run.
 func (d *Type3) validate(w *pdf.Writer) error {
 	if v := pdf.GetVersion(w); v == pdf.V1_0 {
 		if d.Name == "" {
@@ -275,32 +255,10 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager, fontDictRef pdf.Reference) e
 		compressedRefs = append(compressedRefs, fdRef)
 	}
 
-	toUnicodeData := make(map[charcode.Code]string)
-	for code := range 256 {
-		if d.Text[code] == "" {
-			continue
-		}
-
-		glyphName := d.Encoding(byte(code))
-		switch glyphName {
-		case "":
-			// unused character code, nothing to do
-
-		default:
-			rr := names.ToUnicode(glyphName, "")
-			if text := d.Text[code]; text != string(rr) {
-				toUnicodeData[charcode.Code(code)] = text
-			}
-		}
-	}
-	if len(toUnicodeData) > 0 {
-		tuInfo, err := cmap.NewToUnicodeFile(charcode.Simple, toUnicodeData)
+	if d.ToUnicode != nil {
+		ref, _, err := pdf.ResourceManagerEmbed(rm, d.ToUnicode)
 		if err != nil {
 			return err
-		}
-		ref, _, err := pdf.ResourceManagerEmbed(rm, tuInfo)
-		if err != nil {
-			return fmt.Errorf("ToUnicode cmap: %w", err)
 		}
 		fontDict["ToUnicode"] = ref
 	}
@@ -324,6 +282,8 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager, fontDictRef pdf.Reference) e
 // ImpliedText returns the default text content for a character identifier.
 // This is based on the glyph name alone, and does not use information from the
 // ToUnicode cmap.
+//
+// CID values are taken to be the character code, plus one.
 func (d *Type3) ImpliedText() map[cid.CID]string {
 	m := make(map[cid.CID]string)
 	for code := range 256 {
@@ -337,10 +297,30 @@ func (d *Type3) ImpliedText() map[cid.CID]string {
 	return m
 }
 
+// TextMapping returns the mapping from character identifiers to text
+// content. This uses information from the ToUnicode cmap, if available,
+// with glyph names as a fallback.
+//
+// CID values are taken to be the character code, plus one.
+func (d *Type3) TextMapping() map[cid.CID]string {
+	m := d.ImpliedText()
+	if d.ToUnicode == nil {
+		return m
+	}
+
+	codec, _ := charcode.NewCodec(charcode.Simple)
+	for code, s := range d.ToUnicode.All(codec) {
+		cid := cid.CID(code) + 1
+		m[cid] = s
+	}
+	return m
+}
+
 func (d *Type3) GlyphData() (glyphdata.Type, pdf.Reference) {
 	return glyphdata.Type3, 0
 }
 
+// MakeFont returns a [font.FromFile] for the font dictionary.
 func (d *Type3) MakeFont() (font.FromFile, error) {
 	return t3Font{d}, nil
 }
@@ -371,7 +351,6 @@ func (f t3Font) Codes(s pdf.String) iter.Seq[*font.Code] {
 				code.CID = cid.CID(c) + 1
 			}
 			code.Width = f.Dict.Width[c]
-			code.Text = f.Dict.Text[c]
 			code.UseWordSpacing = (c == 0x20)
 			if !yield(&code) {
 				return

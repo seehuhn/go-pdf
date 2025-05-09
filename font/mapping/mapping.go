@@ -40,6 +40,8 @@ var (
 // GetCIDTextMapping returns a mapping from CID to text for the given registry
 // and ordering. If no mapping is known, an error is returned.  The returned
 // error in this case wraps [fs.ErrNotExist].
+//
+// The returned mapping is read-only and must not be modified by the caller.
 func GetCIDTextMapping(registry, ordering string) (map[cid.CID]string, error) {
 	resourceMutex.Lock()
 	defer resourceMutex.Unlock()

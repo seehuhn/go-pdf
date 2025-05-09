@@ -110,7 +110,6 @@ func (t *Simple) Codes(s pdf.String) iter.Seq[*font.Code] {
 				code.CID = cid.CID(c) + 1 // CID 0 is reserved for .notdef
 			}
 			code.Width = info.Width
-			code.Text = info.Text
 			code.UseWordSpacing = (c == 0x20)
 			if !yield(&code) {
 				return
@@ -119,9 +118,15 @@ func (t *Simple) Codes(s pdf.String) iter.Seq[*font.Code] {
 	}
 }
 
-func (t *Simple) MappedCodes() iter.Seq2[byte, *font.Code] {
-	return func(yield func(byte, *font.Code) bool) {
-		var code font.Code
+type Code struct {
+	CID   cid.CID
+	Width float64
+	Text  string
+}
+
+func (t *Simple) MappedCodes() iter.Seq2[byte, *Code] {
+	return func(yield func(byte, *Code) bool) {
+		var code Code
 		for c, info := range t.info {
 			code.CID = cid.CID(c) + 1 // CID 0 is reserved for .notdef
 			code.Width = info.Width

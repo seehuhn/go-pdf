@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/postscript/cid"
 )
 
-// FromFile represents an immutable font from a PDF file.
+// FromFile represents an immutable font read from a PDF file.
 type FromFile interface {
 	Embedded
 	GetDict() Dict
@@ -57,10 +57,11 @@ type Dict interface {
 	// identifier.  For simple fonts, the cid is taken to be the character code
 	// plus one.
 	//
-	// The returned mapping is based on the CID only and does not take
-	// information from the ToUnicode map or from the font file itself into
-	// account.
+	// The text content is based on the CID only and does not take information
+	// from the ToUnicode map or from the font file itself into account.
 	ImpliedText() map[cid.CID]string
+
+	TextMapping() map[cid.CID]string
 
 	// GlyphData returns information about the embedded font program associated
 	// with this font dictionary.

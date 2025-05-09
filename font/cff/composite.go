@@ -277,7 +277,7 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 		Width:           ww,
 		DefaultWidth:    dw,
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
-		Text:            toUnicode,
+		ToUnicode:       toUnicode,
 		FontType:        glyphdata.CFF,
 		FontRef:         rm.Out.Alloc(),
 	}

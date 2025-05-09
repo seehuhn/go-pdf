@@ -95,7 +95,7 @@ type Code struct {
 	Width float64
 
 	// Text is the text representation of the character.
-	Text string
+	// Text string
 
 	// UseWordSpacing indicates whether PDF word spacing is added for this
 	// code. This is true if and only if the character code is a single byte

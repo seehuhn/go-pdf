@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"iter"
 	"math"
 	"sync"
 	"text/template"
@@ -285,63 +286,6 @@ func readCMap(r io.Reader) (*File, pdf.Object, error) {
 	return res, parent, nil
 }
 
-func (f *File) LookupCID(code []byte) CID {
-	for _, s := range f.CIDSingles {
-		if bytes.Equal(s.Code, code) {
-			return s.Value
-		}
-	}
-
-rangesLoop:
-	for _, r := range f.CIDRanges {
-		if len(r.First) != len(code) || len(r.Last) != len(code) {
-			continue
-		}
-		var index int
-		for i, b := range code {
-			if b < r.First[i] || b > r.Last[i] {
-				continue rangesLoop
-			}
-			index = index*int(r.Last[i]-r.First[i]+1) + int(b-r.First[i])
-		}
-
-		return r.Value + CID(index)
-	}
-
-	if f.Parent != nil {
-		return f.Parent.LookupCID(code)
-	}
-
-	return f.LookupNotdefCID(code)
-}
-
-func (f *File) LookupNotdefCID(code []byte) CID {
-	for _, s := range f.NotdefSingles {
-		if bytes.Equal(s.Code, code) {
-			return s.Value
-		}
-	}
-
-rangesLoop:
-	for _, r := range f.NotdefRanges {
-		if len(r.First) != len(code) || len(r.Last) != len(code) {
-			continue
-		}
-		for i, b := range code {
-			if b < r.First[i] || b > r.Last[i] {
-				continue rangesLoop
-			}
-		}
-
-		return r.Value
-	}
-
-	if f.Parent != nil {
-		return f.Parent.LookupNotdefCID(code)
-	}
-	return 0
-}
-
 // UpdateName updates the Name field of the CMap to a unique value based on the
 // content of the CMap.
 func (info *File) UpdateName() {
@@ -411,10 +355,100 @@ func (info *File) writeBinary(h hash.Hash, maxGen int) {
 	}
 }
 
+func (f *File) All(codec *charcode.Codec) iter.Seq2[charcode.Code, cid.CID] {
+	return func(yield func(charcode.Code, cid.CID) bool) {
+		if f.Parent != nil {
+			for code, cid := range f.Parent.All(codec) {
+				if !yield(code, cid) {
+					return
+				}
+			}
+		}
+
+		for _, r := range f.CIDRanges {
+			for i, codeBytes := range codesInRange(r.First, r.Last) {
+				code, k, valid := codec.Decode(codeBytes)
+				if !valid || k != len(codeBytes) {
+					continue
+				}
+				if !yield(code, r.Value+CID(i)) {
+					return
+				}
+			}
+		}
+		for _, single := range f.CIDSingles {
+			code, k, valid := codec.Decode(single.Code)
+			if !valid || k != len(single.Code) {
+				continue
+			}
+			if !yield(code, single.Value) {
+				return
+			}
+		}
+	}
+}
+
+func (f *File) LookupCID(code []byte) CID {
+	for _, s := range f.CIDSingles {
+		if bytes.Equal(s.Code, code) {
+			return s.Value
+		}
+	}
+
+rangesLoop:
+	for _, r := range f.CIDRanges {
+		if len(r.First) != len(code) || len(r.Last) != len(code) {
+			continue
+		}
+		var index int
+		for i, b := range code {
+			if b < r.First[i] || b > r.Last[i] {
+				continue rangesLoop
+			}
+			index = index*int(r.Last[i]-r.First[i]+1) + int(b-r.First[i])
+		}
+
+		return r.Value + CID(index)
+	}
+
+	if f.Parent != nil {
+		return f.Parent.LookupCID(code)
+	}
+
+	return f.LookupNotdefCID(code)
+}
+
+func (f *File) LookupNotdefCID(code []byte) CID {
+	for _, s := range f.NotdefSingles {
+		if bytes.Equal(s.Code, code) {
+			return s.Value
+		}
+	}
+
+rangesLoop:
+	for _, r := range f.NotdefRanges {
+		if len(r.First) != len(code) || len(r.Last) != len(code) {
+			continue
+		}
+		for i, b := range code {
+			if b < r.First[i] || b > r.Last[i] {
+				continue rangesLoop
+			}
+		}
+
+		return r.Value
+	}
+
+	if f.Parent != nil {
+		return f.Parent.LookupNotdefCID(code)
+	}
+	return 0
+}
+
 func (f *File) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	// TODO(voss): use a more specific check for predefined CMaps?
+	// TODO(voss): decide this based on the CMap content?
 	predefinedMu.Lock()
 	predefinedName, ok := predefinedName[f]
 	predefinedMu.Unlock()

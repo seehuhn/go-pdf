@@ -17,6 +17,7 @@
 package cmap
 
 import (
+	intermaps "maps"
 	"slices"
 	"sort"
 
@@ -116,32 +117,7 @@ func (tu *ToUnicodeFile) GetMapping() (map[charcode.Code]string, error) {
 		return nil, err
 	}
 
-	m := make(map[charcode.Code]string)
-	for _, single := range tu.Singles {
-		code, k, valid := codec.Decode(single.Code)
-		if !valid || k != len(single.Code) {
-			continue
-		}
-		m[code] = single.Value
-	}
-	for _, r := range tu.Ranges {
-		if len(r.Values) == 0 {
-			continue
-		}
-		for i, codeBytes := range r.All1() {
-			code, k, valid := codec.Decode(codeBytes)
-			if !valid || k != len(codeBytes) {
-				continue
-			}
-
-			if i < len(r.Values) {
-				m[code] = r.Values[i]
-			} else {
-				m[code] = nextString(r.Values[0], i)
-			}
-		}
-	}
-	return m, nil
+	return intermaps.Collect(tu.All(codec)), nil
 }
 
 func nextString(s string, inc int) string {

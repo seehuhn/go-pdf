@@ -69,166 +69,6 @@ func (r ToUnicodeRange) String() string {
 	return fmt.Sprintf("% 02x-% 02x: %q", r.First, r.Last, r.Values)
 }
 
-// IsValid returns true if the ToUnicodeRange object is valid.
-func (r ToUnicodeRange) IsValid() bool {
-	if len(r.First) != len(r.Last) || len(r.First) == 0 {
-		return false
-	}
-	for i, f := range r.First {
-		if f > r.Last[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func (r ToUnicodeRange) All1() iter.Seq2[int, []byte] {
-	return func(yield func(int, []byte) bool) {
-		if !r.IsValid() {
-			return
-		}
-
-		idx := 0
-		buf := bytes.Clone(r.First)
-		for {
-			if !yield(idx, buf) {
-				return
-			}
-
-			pos := len(r.First) - 1
-			for pos >= 0 {
-				if buf[pos] < r.Last[pos] {
-					buf[pos]++
-					break
-				}
-				buf[pos] = r.First[pos]
-				pos--
-			}
-			if pos < 0 {
-				break
-			}
-			idx++
-		}
-	}
-}
-
-// IsEmpty returns true if the ToUnicodeInfo object does not contain any mappings.
-func (tu *ToUnicodeFile) IsEmpty() bool {
-	return tu == nil ||
-		len(tu.Singles) == 0 && len(tu.Ranges) == 0 && tu.Parent == nil
-}
-
-// MakeName returns a unique name for the ToUnicodeInfo object.
-//
-// TODO(voss): reconsider once
-// https://github.com/pdf-association/pdf-issues/issues/344 is resoved.
-func (tu *ToUnicodeFile) MakeName() pdf.Name {
-	h := md5.New()
-	tu.writeBinary(h, 3)
-	return pdf.Name(fmt.Sprintf("seehuhn-%x-UTF16", h.Sum(nil)))
-}
-
-// writeBinary writes a binary representation of the ToUnicodeInfo object to
-// the [hash.Hash] h.  The maxGen parameter limits the number of parent
-// references, to avoid infinite recursion.
-func (tu *ToUnicodeFile) writeBinary(h hash.Hash, maxGen int) {
-	if maxGen <= 0 {
-		return
-	}
-
-	const magic uint32 = 0x70e54f7a
-	binary.Write(h, binary.BigEndian, magic)
-
-	var buf [binary.MaxVarintLen64]byte
-	writeInt := func(x int) {
-		k := binary.PutUvarint(buf[:], uint64(x))
-		h.Write(buf[:k])
-	}
-	writeBytes := func(b []byte) {
-		writeInt(len(b))
-		h.Write(b)
-	}
-	writeRunes := func(s string) {
-		rr := []rune(s)
-		writeInt(len(rr))
-		for _, r := range rr {
-			writeInt(int(r))
-		}
-	}
-
-	writeInt(len(tu.CodeSpaceRange))
-	for _, r := range tu.CodeSpaceRange {
-		writeBytes(r.Low)
-		writeBytes(r.High)
-	}
-
-	writeInt(len(tu.Singles))
-	for _, s := range tu.Singles {
-		writeBytes(s.Code)
-		writeRunes(s.Value)
-	}
-
-	writeInt(len(tu.Ranges))
-	for _, r := range tu.Ranges {
-		writeBytes(r.First)
-		writeBytes(r.Last)
-		writeInt(len(r.Values))
-		for _, values := range r.Values {
-			writeRunes(values)
-		}
-	}
-
-	if tu.Parent != nil {
-		writeInt(1)
-		tu.Parent.writeBinary(h, maxGen-1)
-	} else {
-		writeInt(0)
-	}
-}
-
-// Lookup returns the unicode string for the given character code,
-// together with a flag indicating whether the code was present in the
-// ToUnicode CMap.
-func (tu *ToUnicodeFile) Lookup(code []byte) (string, bool) {
-	if tu == nil {
-		return "", false
-	}
-
-	for _, s := range tu.Singles {
-		if bytes.Equal(s.Code, code) {
-			return s.Value, true
-		}
-	}
-
-rangesLoop:
-	for _, r := range tu.Ranges {
-		if len(r.First) != len(code) || len(r.Last) != len(code) {
-			continue
-		}
-
-		var index int
-		for i, b := range code {
-			if b < r.First[i] || b > r.Last[i] {
-				continue rangesLoop
-			}
-			index = index*int(r.Last[i]-r.First[i]+1) + int(b-r.First[i])
-		}
-
-		if index < len(r.Values) {
-			return r.Values[index], true
-		} else {
-			rr := []rune(r.Values[0])
-			rr[len(rr)-1] += rune(index)
-			return string(rr), true
-		}
-	}
-
-	if tu.Parent != nil {
-		return tu.Parent.Lookup(code)
-	}
-	return "", false
-}
-
 func ExtractToUnicode(r pdf.Getter, obj pdf.Object) (*ToUnicodeFile, error) {
 	cycle := pdf.NewCycleChecker()
 	return safeExtractToUnicode(r, cycle, obj)
@@ -343,16 +183,164 @@ func readToUnicode(r io.Reader) (*ToUnicodeFile, error) {
 	return res, nil
 }
 
-func toString(obj postscript.Object) (string, error) {
-	dst, ok := obj.(postscript.String)
-	if !ok || len(dst)%2 != 0 {
-		return "", fmt.Errorf("invalid ToUnicode CMap")
+// IsEmpty returns true if the ToUnicodeInfo object does not contain any mappings.
+func (tu *ToUnicodeFile) IsEmpty() bool {
+	return tu == nil ||
+		len(tu.Singles) == 0 && len(tu.Ranges) == 0 && tu.Parent == nil
+}
+
+// MakeName returns a unique name for the ToUnicodeInfo object.
+//
+// TODO(voss): reconsider once
+// https://github.com/pdf-association/pdf-issues/issues/344 is resoved.
+func (tu *ToUnicodeFile) MakeName() pdf.Name {
+	h := md5.New()
+	tu.writeBinary(h, 3)
+	return pdf.Name(fmt.Sprintf("seehuhn-%x-UTF16", h.Sum(nil)))
+}
+
+// writeBinary writes a binary representation of the ToUnicodeInfo object to
+// the [hash.Hash] h.  The maxGen parameter limits the number of parent
+// references, to avoid infinite recursion.
+func (tu *ToUnicodeFile) writeBinary(h hash.Hash, maxGen int) {
+	if maxGen <= 0 {
+		return
 	}
-	buf := make([]uint16, 0, len(dst)/2)
-	for i := 0; i < len(dst); i += 2 {
-		buf = append(buf, uint16(dst[i])<<8|uint16(dst[i+1]))
+
+	const magic uint32 = 0x70e54f7a
+	binary.Write(h, binary.BigEndian, magic)
+
+	var buf [binary.MaxVarintLen64]byte
+	writeInt := func(x int) {
+		k := binary.PutUvarint(buf[:], uint64(x))
+		h.Write(buf[:k])
 	}
-	return string(utf16.Decode(buf)), nil
+	writeBytes := func(b []byte) {
+		writeInt(len(b))
+		h.Write(b)
+	}
+	writeRunes := func(s string) {
+		rr := []rune(s)
+		writeInt(len(rr))
+		for _, r := range rr {
+			writeInt(int(r))
+		}
+	}
+
+	writeInt(len(tu.CodeSpaceRange))
+	for _, r := range tu.CodeSpaceRange {
+		writeBytes(r.Low)
+		writeBytes(r.High)
+	}
+
+	writeInt(len(tu.Singles))
+	for _, s := range tu.Singles {
+		writeBytes(s.Code)
+		writeRunes(s.Value)
+	}
+
+	writeInt(len(tu.Ranges))
+	for _, r := range tu.Ranges {
+		writeBytes(r.First)
+		writeBytes(r.Last)
+		writeInt(len(r.Values))
+		for _, values := range r.Values {
+			writeRunes(values)
+		}
+	}
+
+	if tu.Parent != nil {
+		writeInt(1)
+		tu.Parent.writeBinary(h, maxGen-1)
+	} else {
+		writeInt(0)
+	}
+}
+
+func (tu *ToUnicodeFile) All(codec *charcode.Codec) iter.Seq2[charcode.Code, string] {
+	return func(yield func(charcode.Code, string) bool) {
+		if tu.Parent != nil {
+			for code, s := range tu.Parent.All(codec) {
+				if !yield(code, s) {
+					return
+				}
+			}
+		}
+
+		for _, r := range tu.Ranges {
+			if len(r.Values) == 0 {
+				continue
+			}
+			for i, codeBytes := range codesInRange(r.First, r.Last) {
+				code, k, valid := codec.Decode(codeBytes)
+				if !valid || k != len(codeBytes) {
+					continue
+				}
+
+				if i < len(r.Values) {
+					if !yield(code, r.Values[i]) {
+						return
+					}
+				} else {
+					if !yield(code, nextString(r.Values[0], i)) {
+						return
+					}
+				}
+			}
+		}
+		for _, single := range tu.Singles {
+			code, k, valid := codec.Decode(single.Code)
+			if !valid || k != len(single.Code) {
+				continue
+			}
+			if !yield(code, single.Value) {
+				return
+			}
+		}
+	}
+}
+
+// Lookup returns the unicode string for the given character code,
+// together with a flag indicating whether the code was present in the
+// ToUnicode CMap.
+func (tu *ToUnicodeFile) Lookup(code []byte) (string, bool) {
+	if tu == nil {
+		return "", false
+	}
+
+	for _, s := range tu.Singles {
+		if bytes.Equal(s.Code, code) {
+			return s.Value, true
+		}
+	}
+
+rangesLoop:
+	for _, r := range tu.Ranges {
+		if len(r.First) != len(code) || len(r.Last) != len(code) {
+			continue
+		}
+
+		var index int
+		for i, b := range code {
+			if b < r.First[i] || b > r.Last[i] {
+				continue rangesLoop
+			}
+			index = index*int(r.Last[i]-r.First[i]+1) + int(b-r.First[i])
+		}
+
+		if index < len(r.Values) {
+			return r.Values[index], true
+		} else {
+			rr := []rune(r.Values[0])
+			rr[len(rr)-1] += rune(index)
+			return string(rr), true
+		}
+	}
+
+	if tu.Parent != nil {
+		return tu.Parent.Lookup(code)
+	}
+	return "", false
 }
 
 func (tu *ToUnicodeFile) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
@@ -394,6 +382,18 @@ func (tu *ToUnicodeFile) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused,
 	}
 
 	return ref, zero, nil
+}
+
+func toString(obj postscript.Object) (string, error) {
+	dst, ok := obj.(postscript.String)
+	if !ok || len(dst)%2 != 0 {
+		return "", fmt.Errorf("invalid ToUnicode CMap")
+	}
+	buf := make([]uint16, 0, len(dst)/2)
+	for i := 0; i < len(dst); i += 2 {
+		buf = append(buf, uint16(dst[i])<<8|uint16(dst[i+1]))
+	}
+	return string(utf16.Decode(buf)), nil
 }
 
 func hexString(s string) string {

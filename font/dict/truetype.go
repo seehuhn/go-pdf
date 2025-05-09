@@ -40,8 +40,7 @@ var (
 	_ font.Dict = (*TrueType)(nil)
 )
 
-// TrueType holds the informtation from the font dictionary of a simple
-// TrueType font.
+// TrueType holds the informtation from a TrueType font dictionary.
 type TrueType struct {
 	// PostScriptName is the PostScript name of the font
 	// (without any subset tag).
@@ -66,13 +65,12 @@ type TrueType struct {
 	// (PDF glyph space units).
 	Width [256]float64
 
-	// Text gives the text content for each character code.
-	//
-	// TODO(voss): convert to `Text *cmap.ToUnicodeFile`.
-	Text [256]string
+	// ToUnicode (optional) specifies how character codes are mapped to Unicode
+	// strings.  This overrides the mapping implied by the glyph names.
+	ToUnicode *cmap.ToUnicodeFile
 
 	// FontType gives the type of glyph outline data. Possible values are
-	// glyphdata.TrueType] and [glyphdata.OpenTypeGlyf],
+	// [glyphdata.TrueType] and [glyphdata.OpenTypeGlyf],
 	// or [glyphdata.None] if the font is not embedded.
 	FontType glyphdata.Type
 
@@ -186,42 +184,19 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*TrueType, error) {
 		}
 	}
 
-	// First try to derive text content from the glyph names.
-	for code := range 256 {
-		glyphName := enc(byte(code))
-		if d.FontRef == 0 && stdInfo != nil && glyphName == encoding.UseBuiltin {
-			glyphName = stdInfo.Encoding[code]
-		}
-		if glyphName == "" || glyphName == encoding.UseBuiltin || glyphName == ".notdef" {
-			continue
-		}
-
-		rr := names.ToUnicode(glyphName, d.PostScriptName)
-		d.Text[code] = string(rr)
-	}
-	// the ToUnicode cmap, if present, overrides the derived text content
 	toUnicode, err := cmap.ExtractToUnicode(r, fontDict["ToUnicode"])
 	if pdf.IsReadError(err) {
 		return nil, err
 	}
-	if toUnicode != nil {
-		// TODO(voss): implement an iterator on toUnicode to do this
-		// more efficiently?
-		for code := range 256 {
-			rr, found := toUnicode.Lookup([]byte{byte(code)})
-			if found {
-				d.Text[code] = rr
-			}
-		}
-	}
+	d.ToUnicode = toUnicode
 
 	d.repair(r)
 
 	return d, nil
 }
 
-// repair can fix some problems with a font dictionary.
-// After repair has been run, validate is guaranteed to pass.
+// repair fixes invalid data in the font dictionary.
+// After repair() has been called, validate() will return nil.
 func (d *TrueType) repair(r pdf.Getter) {
 	if d.Descriptor == nil {
 		d.Descriptor = &font.Descriptor{}
@@ -264,6 +239,8 @@ func (d *TrueType) repair(r pdf.Getter) {
 	d.Descriptor.FontName = subset.Join(d.SubsetTag, d.PostScriptName)
 }
 
+// validate performs some basic checks on the font dictionary.
+// This is guaranteed to pass after repair has been run.
 func (d *TrueType) validate(w *pdf.Writer) error {
 	if d.Descriptor == nil {
 		return errors.New("missing font descriptor")
@@ -326,7 +303,6 @@ func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error 
 	}
 
 	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)
-
 	fontDict := pdf.Dict{
 		"Type":     pdf.Name("Font"),
 		"Subtype":  pdf.Name("TrueType"),
@@ -367,33 +343,8 @@ func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error 
 	compressedObjects = append(compressedObjects, oo...)
 	compressedRefs = append(compressedRefs, rr...)
 
-	toUnicodeData := make(map[charcode.Code]string)
-	for code := range 256 {
-		if d.Text[code] == "" {
-			continue
-		}
-
-		glyphName := d.Encoding(byte(code))
-		switch glyphName {
-		case "":
-			// unused character code, nothing to do
-
-		case encoding.UseBuiltin:
-			toUnicodeData[charcode.Code(code)] = d.Text[code]
-
-		default:
-			rr := names.ToUnicode(glyphName, d.PostScriptName)
-			if text := d.Text[code]; text != string(rr) {
-				toUnicodeData[charcode.Code(code)] = text
-			}
-		}
-	}
-	if len(toUnicodeData) > 0 {
-		tuInfo, err := cmap.NewToUnicodeFile(charcode.Simple, toUnicodeData)
-		if err != nil {
-			return err
-		}
-		ref, _, err := pdf.ResourceManagerEmbed(rm, tuInfo)
+	if d.ToUnicode != nil {
+		ref, _, err := pdf.ResourceManagerEmbed(rm, d.ToUnicode)
 		if err != nil {
 			return err
 		}
@@ -411,6 +362,8 @@ func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error 
 // ImpliedText returns the default text content for a character identifier.
 // This is based on the glyph name alone, and does not use information from the
 // ToUnicode cmap or the font file.
+//
+// CID values are taken to be the character code, plus one.
 func (d *TrueType) ImpliedText() map[cid.CID]string {
 	m := make(map[cid.CID]string)
 	for code := range 256 {
@@ -420,6 +373,25 @@ func (d *TrueType) ImpliedText() map[cid.CID]string {
 			cid := cid.CID(code) + 1
 			m[cid] = s
 		}
+	}
+	return m
+}
+
+// TextMapping returns the mapping from character identifiers to text
+// content. This uses information from the ToUnicode cmap, if available,
+// with glyph names as a fallback.
+//
+// CID values are taken to be the character code, plus one.
+func (d *TrueType) TextMapping() map[cid.CID]string {
+	m := d.ImpliedText()
+	if d.ToUnicode == nil {
+		return m
+	}
+
+	codec, _ := charcode.NewCodec(charcode.Simple)
+	for code, s := range d.ToUnicode.All(codec) {
+		cid := cid.CID(code) + 1
+		m[cid] = s
 	}
 	return m
 }
@@ -459,7 +431,6 @@ func (f ttFont) Codes(s pdf.String) iter.Seq[*font.Code] {
 				code.CID = cid.CID(c) + 1
 			}
 			code.Width = f.Dict.Width[c]
-			code.Text = f.Dict.Text[c]
 			code.UseWordSpacing = (c == 0x20)
 			if !yield(&code) {
 				return

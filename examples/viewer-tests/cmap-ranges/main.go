@@ -216,16 +216,12 @@ func (f *testFont) Codes(s pdf.String) iter.Seq[*font.Code] {
 			switch c {
 			case 0x41:
 				code.CID = 34
-				code.Text = "A"
 			case 0x42:
 				code.CID = 35
-				code.Text = "B"
 			case 0x43:
 				code.CID = 36
-				code.Text = "C"
 			default:
 				code.CID = 0
-				code.Text = ""
 			}
 			code.UseWordSpacing = (k == 1 && c == 0x20)
 			if !yield(&code) {

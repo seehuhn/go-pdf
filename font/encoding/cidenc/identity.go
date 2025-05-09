@@ -78,18 +78,15 @@ func (e *compositeIdentity) Codes(s pdf.String) iter.Seq[*font.Code] {
 				if info != nil { // code is mapped to a CID
 					code.CID = info.CID
 					code.Width = info.Width
-					code.Text = info.Text
 					code.Notdef = notdef.CID
 				} else { // unmapped code
 					code.CID = notdef.CID
 					code.Width = notdef.Width
-					code.Text = ""
 					code.Notdef = 0
 				}
 			} else { // invalid code
 				code.CID = e.cid0.CID
 				code.Width = e.cid0.Width
-				code.Text = ""
 				code.Notdef = 0
 			}
 
@@ -162,9 +159,9 @@ func (e *compositeIdentity) Width(c charcode.Code) float64 {
 	return e.get(c).Width
 }
 
-func (e *compositeIdentity) MappedCodes() iter.Seq2[charcode.Code, *font.Code] {
-	return func(yield func(charcode.Code, *font.Code) bool) {
-		var code font.Code
+func (e *compositeIdentity) MappedCodes() iter.Seq2[charcode.Code, *Code] {
+	return func(yield func(charcode.Code, *Code) bool) {
+		var code Code
 		for c, info := range e.info {
 			code.CID = info.CID
 			code.Width = info.Width

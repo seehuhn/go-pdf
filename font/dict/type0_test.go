@@ -215,7 +215,7 @@ var t0Dicts = []*CIDFontType0{
 			2: {OffsY: 880, DeltaY: -900},
 		},
 		DefaultVMetrics: DefaultVMetrics{800, -800},
-		Text: &cmap.ToUnicodeFile{
+		ToUnicode: &cmap.ToUnicodeFile{
 			CodeSpaceRange: charcode.Simple,
 			Singles: []cmap.ToUnicodeSingle{
 				{
@@ -239,7 +239,7 @@ var t0Dicts = []*CIDFontType0{
 			1: 500,
 		},
 		DefaultWidth: 750,
-		Text: &cmap.ToUnicodeFile{
+		ToUnicode: &cmap.ToUnicodeFile{
 			CodeSpaceRange: charcode.Simple,
 			Singles: []cmap.ToUnicodeSingle{
 				{

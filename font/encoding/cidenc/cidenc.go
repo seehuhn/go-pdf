@@ -28,6 +28,12 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 )
 
+type Code struct {
+	CID   cid.CID
+	Width float64
+	Text  string
+}
+
 // A CIDEncoder maps character codes to CIDs, glyph widths and text content.
 type CIDEncoder interface {
 	// WritingMode indicates whether the font is for horizontal or vertical
@@ -39,7 +45,7 @@ type CIDEncoder interface {
 	Codes(s pdf.String) iter.Seq[*font.Code]
 
 	// MappedCodes iterates over all codes known to the encoder.
-	MappedCodes() iter.Seq2[charcode.Code, *font.Code]
+	MappedCodes() iter.Seq2[charcode.Code, *Code]
 
 	// AllocateCode assigns a new code to a CID and stores the text and width.
 	AllocateCode(cidVal cid.CID, text string, width float64) (charcode.Code, error)

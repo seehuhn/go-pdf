@@ -647,6 +647,11 @@ func (r *Reader) processText(s pdf.String) {
 		toTextSpace = divideBy1000
 	}
 
+	var textMapping map[cid.CID]string
+	if F, ok := r.TextFont.(font.FromFile); ok {
+		textMapping = F.GetDict().TextMapping()
+	}
+
 	wmode := r.TextFont.WritingMode()
 	for info := range r.TextFont.Codes(s) {
 		width := toTextSpace(info.Width)
@@ -658,21 +663,23 @@ func (r *Reader) processText(s pdf.String) {
 			width *= r.TextHorizontalScaling
 		}
 
+		text := textMapping[info.CID]
+
 		// TODO(voss): check for error returns from the callbacks
 		if r.Character != nil && r.TextRenderingMode != graphics.TextRenderingModeInvisible {
-			r.Character(info.CID, info.Text)
+			r.Character(info.CID, text)
 		}
 		if r.DrawGlyph != nil && r.TextRenderingMode != graphics.TextRenderingModeInvisible {
 			g := font.Glyph{
 				// GID:     gid,
 				Advance: width,
 				Rise:    r.TextRise,
-				Text:    []rune(info.Text),
+				Text:    []rune(text),
 			}
 			r.DrawGlyph(g)
 		}
 		if r.Text != nil && r.TextRenderingMode != graphics.TextRenderingModeInvisible {
-			r.Text(info.Text)
+			r.Text(text)
 		}
 
 		switch wmode {

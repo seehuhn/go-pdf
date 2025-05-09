@@ -28,6 +28,8 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
@@ -208,9 +210,20 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		Descriptor:     fd,
 		Encoding:       e.Simple.Encoding(),
 	}
+	implied := dict.ImpliedText()
+	m := make(map[charcode.Code]string)
 	for c, info := range e.Simple.MappedCodes() {
 		dict.Width[c] = info.Width
-		dict.Text[c] = info.Text
+		if info.Text != implied[info.CID] {
+			m[charcode.Code(c)] = info.Text
+		}
+	}
+	if len(m) > 0 {
+		tuInfo, err := cmap.NewToUnicodeFile(charcode.Simple, m)
+		if err != nil {
+			return err
+		}
+		dict.ToUnicode = tuInfo
 	}
 	if omitFontData {
 		dict.FontType = glyphdata.None

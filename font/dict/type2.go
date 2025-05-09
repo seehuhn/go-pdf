@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"maps"
 
 	"seehuhn.de/go/postscript/cid"
 
@@ -39,8 +40,7 @@ var (
 	_ font.Dict = (*CIDFontType2)(nil)
 )
 
-// CIDFontType2 holds the information from the font dictionary and CIDFont
-// dictionary of a Type 2 (TrueType-based) CIDFont.
+// CIDFontType2 holds the information from a Type 2 CIDFont dictionary.
 type CIDFontType2 struct {
 	// PostScriptName is the PostScript name of the font
 	// (without any subset tag).
@@ -82,9 +82,9 @@ type CIDFontType2 struct {
 	// For horizontal writing mode, set this to DefaultVMetricsDefault.
 	DefaultVMetrics DefaultVMetrics
 
-	// Text (optional) specifies how character codes are mapped to Unicode
-	// strings.
-	Text *cmap.ToUnicodeFile
+	// ToUnicode (optional) specifies how character codes are mapped to Unicode
+	// strings.  This overrides the mapping implied by the CID values.
+	ToUnicode *cmap.ToUnicodeFile
 
 	// CIDToGID (optional, only allowed if the font is embedded) maps CID
 	// values to GID values. A nil value for embedded fonts means the
@@ -101,8 +101,7 @@ type CIDFontType2 struct {
 	FontRef pdf.Reference
 }
 
-// ExtractCIDFontType2 extracts the information of a Type 0 CIDFont from a PDF
-// file.
+// ExtractCIDFontType2 reads a Type 2 CIDFont dictionary from the PDF file.
 func ExtractCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
@@ -156,7 +155,7 @@ func ExtractCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 		return nil, err
 	}
 
-	d.Text, err = cmap.ExtractToUnicode(r, fontDict["ToUnicode"])
+	d.ToUnicode, err = cmap.ExtractToUnicode(r, fontDict["ToUnicode"])
 	if pdf.IsReadError(err) {
 		return nil, err
 	}
@@ -271,8 +270,8 @@ func ExtractCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 	return d, nil
 }
 
-// repair can fix some problems with a font dictionary.
-// After repair has been run, validate is guaranteed to pass.
+// repair fixes invalid data in the font dictionary.
+// After repair() has been called, validate() will return nil.
 func (d *CIDFontType2) repair() {
 	if d.Descriptor == nil {
 		d.Descriptor = &font.Descriptor{}
@@ -396,8 +395,8 @@ func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager, fontDictRef pdf.Refer
 	}
 
 	var toUni pdf.Object
-	if d.Text != nil {
-		toUni, _, err = pdf.ResourceManagerEmbed(rm, d.Text)
+	if d.ToUnicode != nil {
+		toUni, _, err = pdf.ResourceManagerEmbed(rm, d.ToUnicode)
 		if err != nil {
 			return err
 		}
@@ -497,11 +496,55 @@ func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager, fontDictRef pdf.Refer
 	return nil
 }
 
+func (d *CIDFontType2) Codec() (*charcode.Codec, error) {
+	// First try to use the the union of the code space ranges
+	// from the CMap and the ToUnicode cmap.
+	var csr charcode.CodeSpaceRange
+	csr = append(csr, d.CMap.CodeSpaceRange...)
+	if d.ToUnicode != nil {
+		csr = append(csr, d.ToUnicode.CodeSpaceRange...)
+	}
+	codec, err := charcode.NewCodec(csr)
+	if err == nil {
+		return codec, nil
+	}
+
+	// If this doesn't work, try to use the code space range alone.
+	return charcode.NewCodec(d.CMap.CodeSpaceRange)
+}
+
 // ImpliedText returns the default text content for a character identifier.
-// This is based on the CID and CID system info alone, and does not use
+// This is based on the CID and CID System Info alone, and does not use
 // information from the ToUnicode cmap or the font file.
 func (d *CIDFontType2) ImpliedText() map[cid.CID]string {
 	m, _ := mapping.GetCIDTextMapping(d.ROS.Registry, d.ROS.Ordering)
+	return m
+}
+
+// TextMapping returns the mapping from character identifiers to text
+// content. This uses information from the ToUnicode cmap, if available,
+// with glyph names as a fallback.
+func (d *CIDFontType2) TextMapping() map[cid.CID]string {
+	implied := d.ImpliedText()
+	if d.ToUnicode == nil {
+		return implied
+	}
+
+	codec, err := d.Codec()
+	if err != nil {
+		return nil
+	}
+
+	toUnicode := maps.Collect(d.ToUnicode.All(codec))
+
+	m := make(map[cid.CID]string)
+	for code, cid := range d.CMap.All(codec) {
+		if text, ok := toUnicode[code]; ok {
+			m[cid] = text
+		} else if text, ok := implied[cid]; ok {
+			m[cid] = text
+		}
+	}
 	return m
 }
 
@@ -511,18 +554,7 @@ func (d *CIDFontType2) GlyphData() (glyphdata.Type, pdf.Reference) {
 
 // MakeFont returns a [font.FromFile] for the font dictionary.
 func (d *CIDFontType2) MakeFont() (font.FromFile, error) {
-	var csr charcode.CodeSpaceRange
-	csr = append(csr, d.CMap.CodeSpaceRange...)
-	if d.Text != nil {
-		csr = append(csr, d.Text.CodeSpaceRange...)
-	}
-	codec, err := charcode.NewCodec(csr)
-	if err != nil && d.Text != nil {
-		// In case the two code spaces are not compatible, try to use only the
-		// code space from the encoding.
-		csr = append(csr[:0], d.CMap.CodeSpaceRange...)
-		codec, err = charcode.NewCodec(csr)
-	}
+	codec, err := d.Codec()
 	if err != nil {
 		return nil, err
 	}
@@ -560,14 +592,13 @@ func (s *t2Font) Codes(str pdf.String) iter.Seq[*font.Code] {
 
 			res, seen := s.cache[code]
 			if !seen {
-				code := str[:k]
-
 				res = &font.Code{}
+				codeBytes := str[:k]
 				if isValid {
-					res.CID = s.CMap.LookupCID(code)
-					res.Notdef = s.CMap.LookupNotdefCID(code)
+					res.CID = s.CMap.LookupCID(codeBytes)
+					res.Notdef = s.CMap.LookupNotdefCID(codeBytes)
 				} else {
-					res.CID = s.CMap.LookupNotdefCID(code)
+					res.CID = s.CMap.LookupNotdefCID(codeBytes)
 				}
 				w, ok := s.Width[res.CID]
 				if ok {
@@ -575,11 +606,7 @@ func (s *t2Font) Codes(str pdf.String) iter.Seq[*font.Code] {
 				} else {
 					res.Width = s.DefaultWidth
 				}
-
-				if s.Text != nil {
-					res.Text, _ = s.Text.Lookup(code)
-				}
-				// TODO(voss): as a fallback, try to get the text from the CID
+				s.cache[code] = res
 			}
 
 			str = str[k:]

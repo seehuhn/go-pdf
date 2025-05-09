@@ -74,16 +74,13 @@ func (e *compositeUTF8) Codes(s pdf.String) iter.Seq[*font.Code] {
 				if info != nil { // code is mapped to a CID
 					code.CID = info.CID
 					code.Width = info.Width
-					code.Text = info.Text
 				} else { // unmapped code
 					code.CID = 0
 					code.Width = e.cid0Width
-					code.Text = ""
 				}
 			} else { // invalid code
 				code.CID = 0
 				code.Width = e.cid0Width
-				code.Text = ""
 			}
 
 			code.UseWordSpacing = (k == 1 && c == 0x20)
@@ -171,7 +168,10 @@ func (e *compositeUTF8) get(c charcode.Code) *codeInfo {
 func (e *compositeUTF8) CMap(ros *cid.SystemInfo) *cmap.File {
 	m := make(map[charcode.Code]font.Code)
 	for code, val := range e.MappedCodes() {
-		m[code] = *val
+		m[code] = font.Code{
+			CID:   val.CID,
+			Width: val.Width,
+		}
 	}
 	cmapInfo := &cmap.File{
 		Name:  "",
@@ -187,9 +187,9 @@ func (e *compositeUTF8) Width(c charcode.Code) float64 {
 	return e.get(c).Width
 }
 
-func (e *compositeUTF8) MappedCodes() iter.Seq2[charcode.Code, *font.Code] {
-	return func(yield func(charcode.Code, *font.Code) bool) {
-		var code font.Code
+func (e *compositeUTF8) MappedCodes() iter.Seq2[charcode.Code, *Code] {
+	return func(yield func(charcode.Code, *Code) bool) {
+		var code Code
 		for c, info := range e.info {
 			code.CID = info.CID
 			code.Width = info.Width

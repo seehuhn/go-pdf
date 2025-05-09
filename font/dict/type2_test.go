@@ -189,7 +189,7 @@ var t2Dicts = []*CIDFontType2{
 			1: 500,
 		},
 		DefaultWidth: 750,
-		Text: &cmap.ToUnicodeFile{
+		ToUnicode: &cmap.ToUnicodeFile{
 			CodeSpaceRange: charcode.Simple,
 			Singles: []cmap.ToUnicodeSingle{
 				{
@@ -213,7 +213,7 @@ var t2Dicts = []*CIDFontType2{
 			1: 500,
 		},
 		DefaultWidth: 750,
-		Text: &cmap.ToUnicodeFile{
+		ToUnicode: &cmap.ToUnicodeFile{
 			CodeSpaceRange: charcode.Simple,
 			Singles: []cmap.ToUnicodeSingle{
 				{

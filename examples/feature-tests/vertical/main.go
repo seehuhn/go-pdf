@@ -208,7 +208,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		DefaultWidth:    defaultWidth,
 		VMetrics:        nil,
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
-		Text: &cmap.ToUnicodeFile{
+		ToUnicode: &cmap.ToUnicodeFile{
 			CodeSpaceRange: csASCII,
 			Ranges: []cmap.ToUnicodeRange{
 				{First: []byte{0x00}, Last: []byte{0x7f}, Values: []string{"\000"}},

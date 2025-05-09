@@ -32,6 +32,8 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/type1glyphs"
@@ -230,9 +232,15 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	dict.Width[' '] = F.Glyphs["space"].WidthX * F.FontInfo.FontMatrix[0] * 1000
 	dict.Width['A'] = F.Glyphs["AEacute"].WidthX * F.FontInfo.FontMatrix[0] * 1000
 	dict.Width[0o335] = F.Glyphs["Yacute"].WidthX * F.FontInfo.FontMatrix[0] * 1000
-	dict.Text[' '] = " "
-	dict.Text['A'] = "Ǽ"
-	dict.Text[0o335] = "Ý"
+	m := map[charcode.Code]string{
+		'A':   "Ǽ",
+		0o335: "Ý",
+	}
+	tu, err := cmap.NewToUnicodeFile(charcode.Simple, m)
+	if err != nil {
+		return nil, nil, err
+	}
+	dict.ToUnicode = tu
 
 	err = dict.WriteToPDF(rm, fontDictRef)
 	if err != nil {

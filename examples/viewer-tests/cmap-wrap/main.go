@@ -224,34 +224,24 @@ func (f *testFont) Codes(s pdf.String) iter.Seq[*font.Code] {
 			switch c {
 			case 0x3030: // "00"
 				code.CID = 34
-				code.Text = "A"
 			case 0x3130: // "01"
 				code.CID = 35
-				code.Text = "B"
 			case 0x3230: // "02"
 				code.CID = 36
-				code.Text = "C"
 			case 0x3031: // "10"
 				code.CID = 34
-				code.Text = "D"
 			case 0x3131: // "11"
 				code.CID = 35
-				code.Text = "E"
 			case 0x3231: // "12"
 				code.CID = 36
-				code.Text = "F"
 			case 0x3032: // "20"
 				code.CID = 34
-				code.Text = "G"
 			case 0x3132: // "21"
 				code.CID = 35
-				code.Text = "H"
 			case 0x3232: // "22"
 				code.CID = 36
-				code.Text = "I"
 			default:
 				code.CID = 0
-				code.Text = ""
 			}
 			if !yield(&code) {
 				break

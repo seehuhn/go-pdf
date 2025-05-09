@@ -26,9 +26,6 @@ import (
 // IsStandard returns true if the font is one of the standard 14 PDF fonts.
 // This is determined by the font name, the set of glyphs used, and the glyph
 // widths.
-//
-// ww must be the widths of the 256 encoded characters, given in PDF text space
-// units times 1000.
 func isStandard(fontName string, t *simpleenc.Simple) bool {
 	m, ok := stdmtx.Metrics[fontName]
 	if !ok {

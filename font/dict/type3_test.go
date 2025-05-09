@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/postscript/cid"
 )
 
 func TestType3Roundtrip(t *testing.T) {
@@ -61,21 +62,22 @@ func TestType3Roundtrip(t *testing.T) {
 				// Text and glyph for unused codes are arbitrary after roundtrip.
 				// We compare these manually here, and zero the values for the comparison
 				// below.
+				text1 := d1.TextMapping()
+				text2 := d2.TextMapping()
 				for code := range 256 {
 					if d1.Encoding(byte(code)) != "" {
 						if d1.Encoding(byte(code)) != d2.Encoding(byte(code)) {
 							t.Errorf("glyphName[%d]: %q != %q", code, d1.Encoding(byte(code)), d2.Encoding(byte(code)))
 						}
-						if d1.Text[code] != d2.Text[code] {
-							t.Errorf("text[%d]: %q != %q", code, d1.Text[code], d2.Text[code])
+						cid := cid.CID(code) + 1
+						if text1[cid] != text2[cid] {
+							t.Errorf("text[%d]: %q != %q", code, text1[cid], text2[cid])
 						}
 						if d1.Width[code] != d2.Width[code] {
 							t.Errorf("width[%d]: %f != %f", code, d1.Width[code], d2.Width[code])
 						}
 					}
 
-					d1.Text[code] = ""
-					d2.Text[code] = ""
 					d1.Width[code] = 0
 					d2.Width[code] = 0
 				}
@@ -172,21 +174,22 @@ func FuzzType3Dict(f *testing.F) {
 		// Text and glyph for unused codes are arbitrary after roundtrip.
 		// We compare these manually here, and zero the values for the comparison
 		// below.
+		text1 := d1.TextMapping()
+		text2 := d2.TextMapping()
 		for code := range 256 {
 			if d1.Encoding(byte(code)) != "" {
 				if d1.Encoding(byte(code)) != d2.Encoding(byte(code)) {
 					t.Errorf("glyphName[%d]: %q != %q", code, d1.Encoding(byte(code)), d2.Encoding(byte(code)))
 				}
-				if d1.Text[code] != d2.Text[code] {
-					t.Errorf("text[%d]: %q != %q", code, d1.Text[code], d2.Text[code])
+				cid := cid.CID(code) + 1
+				if text1[cid] != text2[cid] {
+					t.Errorf("text[%d]: %q != %q", code, text1[cid], text2[cid])
 				}
 				if d1.Width[code] != d2.Width[code] {
 					t.Errorf("width[%d]: %f != %f", code, d1.Width[code], d2.Width[code])
 				}
 			}
 
-			d1.Text[code] = ""
-			d2.Text[code] = ""
 			d1.Width[code] = 0
 			d2.Width[code] = 0
 		}
@@ -214,7 +217,6 @@ var type3Dicts = []*Type3{
 			}
 		},
 		Width: makeTestWidth(65, 100.0, 66, 100.0),
-		Text:  makeTestText(65, "A", 66, "B"),
 		CharProcs: map[pdf.Name]pdf.Reference{
 			"A": pdf.NewReference(1, 0),
 			"B": pdf.NewReference(2, 0),
@@ -262,7 +264,6 @@ var type3Dicts = []*Type3{
 			}
 		},
 		Width: makeTestWidth(65, 100.0, 66, 120.0, 67, 110.0, 68, 90.0, 69, 80.0, 70, 70.0),
-		Text:  makeTestText(65, "A", 66, "🗿", 67, "C", 68, "D", 69, "E", 70, "F"),
 		CharProcs: map[pdf.Name]pdf.Reference{
 			"A":     pdf.NewReference(1, 0),
 			"funny": pdf.NewReference(2, 0),
