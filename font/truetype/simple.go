@@ -245,7 +245,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		FontType:       glyphdata.TrueType,
 		FontRef:        rm.Out.Alloc(),
 	}
-	implied := dict.ImpliedText()
+	implied := dict.DefaultTextMapping()
 	m := make(map[charcode.Code]string)
 	for c, info := range e.Simple.MappedCodes() {
 		dict.Width[c] = info.Width

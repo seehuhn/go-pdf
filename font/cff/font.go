@@ -24,7 +24,6 @@ import (
 	"golang.org/x/text/language"
 
 	"seehuhn.de/go/geom/rect"
-	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
@@ -84,27 +83,9 @@ func New(info *sfnt.Font, opt *Options) (*Instance, error) {
 		opt = &Options{}
 	}
 
-	fontInfo := &type1.FontInfo{
-		FontName:           info.PostScriptName(),
-		Version:            info.Version.String(),
-		Notice:             info.Trademark,
-		Copyright:          info.Copyright,
-		FullName:           info.FullName(),
-		FamilyName:         info.FamilyName,
-		Weight:             info.Weight.String(),
-		ItalicAngle:        info.ItalicAngle,
-		IsFixedPitch:       info.IsFixedPitch(),
-		UnderlinePosition:  info.UnderlinePosition,
-		UnderlineThickness: info.UnderlineThickness,
-		FontMatrix:         info.FontMatrix,
-	}
-	outlines, ok := info.Outlines.(*cff.Outlines)
-	if !ok {
+	cffFont := info.AsCFF()
+	if cffFont == nil {
 		return nil, errors.New("no CFF outlines in font")
-	}
-	cffFont := &cff.Font{
-		FontInfo: fontInfo,
-		Outlines: outlines,
 	}
 
 	qv := info.FontMatrix[3] * 1000
@@ -186,7 +167,8 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 }
 
 // Embed adds the font to a PDF file.
-// The function is usually called by [pdf.ResourceManagerEmbed], instead of being called directly.
+// The function is usually called by [pdf.ResourceManagerEmbed],
+// instead of being called directly.
 //
 // This implements the [font.Font] interface.
 func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {

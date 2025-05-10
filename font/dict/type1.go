@@ -377,12 +377,12 @@ func (d *Type1) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	return nil
 }
 
-// ImpliedText returns the default text content for a character identifier.
+// DefaultTextMapping returns the default text content for a character identifier.
 // This is based on the glyph name alone, and does not use information from the
 // ToUnicode cmap or the font file.
 //
 // CID values are taken to be the character code, plus one.
-func (d *Type1) ImpliedText() map[cid.CID]string {
+func (d *Type1) DefaultTextMapping() map[cid.CID]string {
 	m := make(map[cid.CID]string)
 	for code := range 256 {
 		glyphName := d.Encoding(byte(code))
@@ -401,24 +401,26 @@ func (d *Type1) ImpliedText() map[cid.CID]string {
 //
 // CID values are taken to be the character code, plus one.
 func (d *Type1) TextMapping() map[cid.CID]string {
-	m := d.ImpliedText()
+	implied := d.DefaultTextMapping()
 	if d.ToUnicode == nil {
-		return m
+		return implied
 	}
 
 	codec, _ := charcode.NewCodec(charcode.Simple)
 	for code, s := range d.ToUnicode.All(codec) {
 		cid := cid.CID(code) + 1
-		m[cid] = s
+		implied[cid] = s
 	}
-	return m
+	return implied
 }
 
 func (d *Type1) GlyphData() (glyphdata.Type, pdf.Reference) {
 	return d.FontType, d.FontRef
 }
 
-// MakeFont returns a [font.FromFile] for the font dictionary.
+// MakeFont returns a new font object that can be used to typeset text.
+// The font is immutable, i.e. no new glyphs can be added and no new codes
+// can be defined via the returned font object.
 func (d *Type1) MakeFont() (font.FromFile, error) {
 	return t1Font{d}, nil
 }

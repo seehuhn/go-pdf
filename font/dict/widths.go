@@ -27,7 +27,7 @@ import (
 	"seehuhn.de/go/postscript/cid"
 )
 
-// DefaultWidthDefault is the value of DefaultWidth which is used, if no
+// DefaultWidthDefault is the value of DefaultWidth which is used if no
 // value is specified in the PDF file.  Using this value for the "DefaultWidth"
 // field in a composite font dictionary will slightly reduce PDF file size.
 const DefaultWidthDefault = 1000

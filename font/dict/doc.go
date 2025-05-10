@@ -19,8 +19,7 @@
 // Each struct in this package provides a direct, one-to-one representation of
 // a specific PDF font dictionary type as defined in the PDF specification. The
 // structs are designed to preserve all information that can be stored in a PDF
-// file introducing only limited. All structs implement the [font.Dict]
-// interface to enable polymorphic operations.
+// file. All structs implement the [font.Dict] interface.
 //
 // Each type of font dictionary is represented by a Go structure which holds
 // all the information from the dictionary. Functions with names starting with

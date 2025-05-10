@@ -53,14 +53,19 @@ type Dict interface {
 	// can be defined via the returned font object.
 	MakeFont() (FromFile, error)
 
-	// ImpliedText returns the text content implied by each character
+	// DefaultTextMapping returns the text content implied by each character
 	// identifier.  For simple fonts, the cid is taken to be the character code
 	// plus one.
 	//
 	// The text content is based on the CID only and does not take information
 	// from the ToUnicode map or from the font file itself into account.
-	ImpliedText() map[cid.CID]string
+	DefaultTextMapping() map[cid.CID]string
 
+	// TextMapping returns the mapping from character identifiers to text
+	// content for this font.  The mapping is based on the ToUnicode map
+	// and on the character encoding used in the font.
+	//
+	// TODO(voss): this is not right!  Text is mapped from codes, not from CIDs!
 	TextMapping() map[cid.CID]string
 
 	// GlyphData returns information about the embedded font program associated

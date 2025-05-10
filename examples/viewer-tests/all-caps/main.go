@@ -1,0 +1,208 @@
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"math"
+	"os"
+
+	"golang.org/x/image/font/gofont/goregular"
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs"
+	"seehuhn.de/go/pdf/font/standard"
+	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/text"
+	"seehuhn.de/go/postscript/cid"
+	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/sfnt/glyph"
+)
+
+func main() {
+	err := createDocument("test.pdf")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
+	}
+}
+
+func createDocument(filename string) error {
+	page, err := document.CreateSinglePage(filename, document.A4, pdf.V2_0, nil)
+	if err != nil {
+		return err
+	}
+
+	noteFont := standard.TimesRoman.New()
+	note := text.F{
+		Font:  noteFont,
+		Size:  10,
+		Color: color.DeviceGray(0.1),
+	}
+
+	test := text.F{
+		Font:  testFont{},
+		Size:  24,
+		Color: color.DeviceRGB(0, 0, 0.7),
+	}
+
+	text.Show(page.Writer,
+		text.M{X: 72, Y: 750},
+		note,
+		text.Wrap(340,
+			"This test file uses a composite font with one-byte character",
+			"codes, representing a subset of ASCII. The CID values chosen",
+			"are from the “Adobe-Japan1” character collection. Both",
+			"uppercase and lowercase codes are mapped to the same",
+			"(uppercase) CID value. A ToUnicode CMap is used to describe",
+			"the text content for the lowercase codes, while the",
+			"uppercase letters rely on the standard interpretation of the",
+			"CID values. In this scheme, the text “Hello World” should be",
+			"shown as “HELLO WORLD”, but when copying and pasting the",
+			"text from a PDF viewer, the lowercase letters should be",
+			"preserved.",
+		),
+		text.NL,
+		text.NL,
+		test,
+		pdf.String("Hello World"),
+	)
+
+	err = page.Close()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type testFont struct{}
+
+func (testFont) PostScriptName() string {
+	return "Test"
+}
+
+func (testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
+	fontDictRef := rm.Out.Alloc()
+	fontType := glyphdata.TrueType
+	fontFileRef := rm.Out.Alloc()
+
+	width := map[cmap.CID]float64{}
+	numCID := 34 + 26
+	cidToGID := make([]glyph.ID, numCID)
+
+	// Create a TrueType font with the required subset of glyphs.
+	origFont, err := sfnt.Read(bytes.NewReader(goregular.TTF))
+	if err != nil {
+		return nil, nil, err
+	}
+	cmapTable, err := origFont.CMapTable.GetBest()
+	if err != nil {
+		return nil, nil, err
+	}
+	var subsetGlyphs []glyph.ID
+	// CID 0 = GID 0 = .notdef
+	cidToGID[0] = glyph.ID(len(subsetGlyphs))
+	subsetGlyphs = append(subsetGlyphs, 0)
+	width[0] = origFont.GlyphWidthPDF(0)
+	// CID 1 = space
+	origGID := cmapTable.Lookup(' ')
+	cidToGID[1] = glyph.ID(len(subsetGlyphs))
+	width[1] = origFont.GlyphWidthPDF(origGID)
+	subsetGlyphs = append(subsetGlyphs, origGID)
+	for r := 'A'; r <= 'Z'; r++ {
+		// CID 34 = A, ...
+		cid := cmap.CID(r - 'A' + 34)
+		origGID = cmapTable.Lookup(r)
+		cidToGID[cid] = glyph.ID(len(subsetGlyphs))
+		width[cid] = origFont.GlyphWidthPDF(origGID)
+		subsetGlyphs = append(subsetGlyphs, origGID)
+	}
+	origFont.CMapTable = nil
+	origFont.Gdef = nil
+	origFont.Gsub = nil
+	origFont.Gpos = nil
+	subsetFont := origFont.Subset(subsetGlyphs)
+	err = opentypeglyphs.Embed(rm.Out, fontType, fontFileRef, subsetFont)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	qv := subsetFont.FontMatrix[3] * 1000
+	ascent := math.Round(float64(subsetFont.Ascent) * qv)
+	descent := math.Round(float64(subsetFont.Descent) * qv)
+	capHeight := math.Round(float64(subsetFont.CapHeight) * qv)
+
+	italicAngle := math.Round(subsetFont.ItalicAngle*10) / 10
+
+	// Create a PDF font dictionary for the font.
+	ros := &cid.SystemInfo{
+		Registry:   "Adobe",
+		Ordering:   "Japan1",
+		Supplement: 7,
+	}
+	fd := &font.Descriptor{
+		FontName:     "ABCDEF+" + subsetFont.PostScriptName(),
+		IsFixedPitch: subsetFont.IsFixedPitch(),
+		IsSerif:      subsetFont.IsSerif,
+		IsSymbolic:   false,
+		IsScript:     subsetFont.IsScript,
+		IsItalic:     subsetFont.IsItalic,
+		IsAllCap:     true,
+		IsSmallCap:   false,
+		FontBBox:     subsetFont.FontBBoxPDF(),
+		ItalicAngle:  italicAngle,
+		Ascent:       ascent,
+		Descent:      descent,
+		CapHeight:    capHeight,
+		StemV:        0,
+	}
+	cmapFile := &cmap.File{
+		Name:           "Seehuhn-Test",
+		ROS:            ros,
+		WMode:          font.Horizontal,
+		CodeSpaceRange: charcode.Simple,
+		CIDSingles: []cmap.Single{
+			{Code: []byte{' '}, Value: 1},
+		},
+		CIDRanges: []cmap.Range{
+			{First: []byte{'A'}, Last: []byte{'Z'}, Value: 34},
+			{First: []byte{'a'}, Last: []byte{'z'}, Value: 34},
+		},
+	}
+	toUnicode := &cmap.ToUnicodeFile{
+		CodeSpaceRange: charcode.Simple,
+		Ranges: []cmap.ToUnicodeRange{
+			{First: []byte{'a'}, Last: []byte{'z'}, Values: []string{"a"}},
+		},
+	}
+	dict := &dict.CIDFontType2{
+		PostScriptName:  subsetFont.PostScriptName(),
+		SubsetTag:       "ABCDEF",
+		Descriptor:      fd,
+		ROS:             ros,
+		CMap:            cmapFile,
+		Width:           width,
+		DefaultWidth:    width[0],
+		DefaultVMetrics: dict.DefaultVMetricsDefault,
+		ToUnicode:       toUnicode,
+		CIDToGID:        cidToGID,
+		FontType:        fontType,
+		FontRef:         fontFileRef,
+	}
+
+	err = dict.WriteToPDF(rm, fontDictRef)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	E, err := dict.MakeFont()
+	if err != nil {
+		return nil, nil, err
+	}
+	return fontDictRef, E, nil
+}

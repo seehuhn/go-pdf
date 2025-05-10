@@ -444,7 +444,6 @@ begincmap
 /CMapName {{PN .MakeName}} def
 /CMapType 2 def
 /CIDSystemInfo <</Registry (Adobe) /Ordering (UCS) /Supplement 0>> def
-
 {{with .CodeSpaceRange -}}
 {{len .}} begincodespacerange
 {{range . -}}
@@ -452,7 +451,6 @@ begincmap
 {{end -}}
 {{end -}}
 endcodespacerange
-
 {{range SingleChunks .Singles -}}
 {{len .}} beginbfchar
 {{range . -}}

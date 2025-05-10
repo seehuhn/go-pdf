@@ -267,10 +267,6 @@ func (t *Simple) Width(c byte) float64 {
 	return t.get(c).Width
 }
 
-func (t *Simple) Text(c byte) string {
-	return t.get(c).Text
-}
-
 // GlyphName returns the chosen glyph name for the given glyph ID.
 func (t *Simple) GlyphName(gid glyph.ID) string {
 	return t.glyphName[gid]

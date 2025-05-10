@@ -72,10 +72,11 @@ func newEmbeddedSimple(ref pdf.Reference, f *Instance) *embeddedSimple {
 		Ref:  ref,
 		Font: f.Font,
 
-		Stretch:   f.Stretch,
-		Weight:    f.Weight,
-		IsSerif:   f.IsSerif,
-		IsScript:  f.IsScript,
+		Stretch:  f.Stretch,
+		Weight:   f.Weight,
+		IsSerif:  f.IsSerif,
+		IsScript: f.IsScript,
+
 		Ascent:    f.Ascent,
 		Descent:   f.Descent,
 		Leading:   f.Leading,
@@ -212,7 +213,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		FontType:       glyphdata.CFFSimple,
 		FontRef:        rm.Out.Alloc(),
 	}
-	implied := dict.ImpliedText()
+	implied := dict.DefaultTextMapping()
 	m := make(map[charcode.Code]string)
 	for c, info := range e.Simple.MappedCodes() {
 		dict.Width[c] = info.Width

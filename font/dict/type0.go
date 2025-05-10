@@ -397,7 +397,7 @@ func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) er
 	return nil
 }
 
-func (d *CIDFontType0) Codec() (*charcode.Codec, error) {
+func (d *CIDFontType0) codec() (*charcode.Codec, error) {
 	// First try to use the the union of the code space ranges
 	// from the CMap and the ToUnicode cmap.
 	var csr charcode.CodeSpaceRange
@@ -414,10 +414,10 @@ func (d *CIDFontType0) Codec() (*charcode.Codec, error) {
 	return charcode.NewCodec(d.CMap.CodeSpaceRange)
 }
 
-// ImpliedText returns the default text content for a character identifier.
+// DefaultTextMapping returns the default text content for a character identifier.
 // This is based on the CID and CID System Info alone, and does not use
 // information from the ToUnicode cmap or the font file.
-func (d *CIDFontType0) ImpliedText() map[cid.CID]string {
+func (d *CIDFontType0) DefaultTextMapping() map[cid.CID]string {
 	m, _ := mapping.GetCIDTextMapping(d.ROS.Registry, d.ROS.Ordering)
 	return m
 }
@@ -426,12 +426,12 @@ func (d *CIDFontType0) ImpliedText() map[cid.CID]string {
 // content. This uses information from the ToUnicode cmap, if available,
 // with glyph names as a fallback.
 func (d *CIDFontType0) TextMapping() map[cid.CID]string {
-	implied := d.ImpliedText()
+	implied := d.DefaultTextMapping()
 	if d.ToUnicode == nil {
 		return implied
 	}
 
-	codec, err := d.Codec()
+	codec, err := d.codec()
 	if err != nil {
 		return nil
 	}
@@ -453,9 +453,11 @@ func (d *CIDFontType0) GlyphData() (glyphdata.Type, pdf.Reference) {
 	return d.FontType, d.FontRef
 }
 
-// MakeFont returns a [font.FromFile] object for the font dictionary.
+// MakeFont returns a new font object that can be used to typeset text.
+// The font is immutable, i.e. no new glyphs can be added and no new codes
+// can be defined via the returned font object.
 func (d *CIDFontType0) MakeFont() (font.FromFile, error) {
-	codec, err := d.Codec()
+	codec, err := d.codec()
 	if err != nil {
 		return nil, err
 	}
