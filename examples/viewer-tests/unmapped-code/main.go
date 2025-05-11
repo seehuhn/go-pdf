@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"iter"
 	"os"
 
 	"seehuhn.de/go/geom/matrix"
@@ -26,8 +25,6 @@ import (
 
 	"seehuhn.de/go/postscript/psenc"
 	"seehuhn.de/go/postscript/type1"
-
-	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
@@ -130,11 +127,9 @@ func makeMarkerFont() font.Font {
 			},
 		},
 	}
-	F := &type3.Instance{
-		Font: markerFont,
-		CMap: map[rune]glyph.ID{
-			'I': 1,
-		},
+	F, err := type3.New(markerFont)
+	if err != nil {
+		panic(err)
 	}
 	return F
 }
@@ -252,20 +247,10 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		return nil, nil, err
 	}
 
-	res := &testFontEmbedded{
-		W: dict.Width[:],
+	E, err := dict.MakeFont()
+	if err != nil {
+		return nil, nil, err
 	}
-	return fontDictRef, res, nil
-}
 
-type testFontEmbedded struct {
-	W []float64
-}
-
-func (f *testFontEmbedded) WritingMode() font.WritingMode {
-	return 0
-}
-
-func (f *testFontEmbedded) Codes(s pdf.String) iter.Seq[*font.Code] {
-	panic("not implemented") // TODO: Implement
+	return fontDictRef, E, nil
 }

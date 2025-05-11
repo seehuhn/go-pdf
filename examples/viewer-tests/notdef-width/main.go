@@ -98,8 +98,8 @@ func createDocument(filename string) error {
 		text.M{X: margin, Y: 800},
 		note,
 		text.Wrap(340,
-			"When decoding a PDF text string in a content stream, each code",
-			"is mapped to character identifier (CID),",
+			"When decoding a PDF text string for a composite font, each code",
+			"is mapped to a character identifier (CID),",
 			"which is then used to look up the corresponding glyph.",
 			"The decoder must handle the following cases:"),
 		" • code mapped to a CID, glyph present in the font", text.NL,
@@ -167,7 +167,7 @@ func createDocument(filename string) error {
 
 	text.Show(page.Writer,
 		text.M{X: margin, Y: y},
-		title, "Test 2: CID with no glyph, no notdef CID", text.NL,
+		title, "Test 2: missing glyph, no notdef CID", text.NL,
 		note, text.Wrap(340,
 			"The glyph for CID 0 should be shown,",
 			"but using the original glyph width.",
@@ -180,7 +180,7 @@ func createDocument(filename string) error {
 
 	text.Show(page.Writer,
 		text.M{X: margin, Y: y},
-		title, "Test 3: CID with no glyph, notdef glyph present", text.NL,
+		title, "Test 3: missing glyph, notdef glyph present", text.NL,
 		note, text.Wrap(340,
 			"The custom notdef glyph should be shown.",
 		),
@@ -192,7 +192,7 @@ func createDocument(filename string) error {
 
 	text.Show(page.Writer,
 		text.M{X: margin, Y: y},
-		title, "Test 4: CID with no glyph, notdef glyph specified but missing", text.NL,
+		title, "Test 4: missing glyph, notdef glyph specified but missing", text.NL,
 		note, text.Wrap(340,
 			"CID 0 should be shown.",
 		),
@@ -281,7 +281,7 @@ func showHeaders(page *document.Page, font text.F, y *float64) {
 	page.TextNextLine()
 	page.TextShow("CID 0 width")
 	page.TextNextLine()
-	page.TextShow("notdef wd")
+	page.TextShow("notdef width")
 	page.TextNextLine()
 	page.TextShow("glyph width")
 	page.TextNextLine()

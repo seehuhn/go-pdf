@@ -288,7 +288,7 @@ func (d *Type3) DefaultTextMapping() map[cid.CID]string {
 	m := make(map[cid.CID]string)
 	for code := range 256 {
 		glyphName := d.Encoding(byte(code))
-		s := names.ToUnicode(glyphName, string(d.Name)) // TODO(voss): is d.Name correct?
+		s := names.ToUnicode(glyphName, "")
 		if s != "" {
 			cid := cid.CID(code) + 1
 			m[cid] = s

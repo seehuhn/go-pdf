@@ -1,3 +1,19 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package main
 
 import (
@@ -22,6 +38,18 @@ import (
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/glyph"
 )
+
+const description = `
+This test file uses a composite font with one-byte character codes,
+representing a subset of ASCII. The CID values chosen are from the
+“Adobe-Japan1” character collection. Both uppercase and lowercase codes
+are mapped to the same (uppercase) CID value. A ToUnicode CMap is used to
+describe the text content for the lowercase codes, while the uppercase letters
+rely on the standard interpretation of the CID values. In this scheme,
+the text “Hello World” should be shown as “HELLO WORLD”, but when
+copying and pasting the text from a PDF viewer, the lowercase letters
+should be preserved.
+`
 
 func main() {
 	err := createDocument("test.pdf")
@@ -53,22 +81,9 @@ func createDocument(filename string) error {
 	text.Show(page.Writer,
 		text.M{X: 72, Y: 750},
 		note,
-		text.Wrap(340,
-			"This test file uses a composite font with one-byte character",
-			"codes, representing a subset of ASCII. The CID values chosen",
-			"are from the “Adobe-Japan1” character collection. Both",
-			"uppercase and lowercase codes are mapped to the same",
-			"(uppercase) CID value. A ToUnicode CMap is used to describe",
-			"the text content for the lowercase codes, while the",
-			"uppercase letters rely on the standard interpretation of the",
-			"CID values. In this scheme, the text “Hello World” should be",
-			"shown as “HELLO WORLD”, but when copying and pasting the",
-			"text from a PDF viewer, the lowercase letters should be",
-			"preserved.",
-		),
-		text.NL,
-		text.NL,
+		text.Wrap(340, description),
 		test,
+		text.NL,
 		pdf.String("Hello World"),
 	)
 
@@ -91,9 +106,9 @@ func (testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error
 	fontType := glyphdata.TrueType
 	fontFileRef := rm.Out.Alloc()
 
-	width := map[cmap.CID]float64{}
 	numCID := 34 + 26
 	cidToGID := make([]glyph.ID, numCID)
+	width := map[cmap.CID]float64{}
 
 	// Create a TrueType font with the required subset of glyphs.
 	origFont, err := sfnt.Read(bytes.NewReader(goregular.TTF))
@@ -105,7 +120,7 @@ func (testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error
 		return nil, nil, err
 	}
 	var subsetGlyphs []glyph.ID
-	// CID 0 = GID 0 = .notdef
+	// CID 0 = .notdef
 	cidToGID[0] = glyph.ID(len(subsetGlyphs))
 	subsetGlyphs = append(subsetGlyphs, 0)
 	width[0] = origFont.GlyphWidthPDF(0)
@@ -132,14 +147,12 @@ func (testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error
 		return nil, nil, err
 	}
 
+	// Create a PDF font dictionary for the font.
 	qv := subsetFont.FontMatrix[3] * 1000
 	ascent := math.Round(float64(subsetFont.Ascent) * qv)
 	descent := math.Round(float64(subsetFont.Descent) * qv)
 	capHeight := math.Round(float64(subsetFont.CapHeight) * qv)
 
-	italicAngle := math.Round(subsetFont.ItalicAngle*10) / 10
-
-	// Create a PDF font dictionary for the font.
 	ros := &cid.SystemInfo{
 		Registry:   "Adobe",
 		Ordering:   "Japan1",
@@ -155,7 +168,7 @@ func (testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error
 		IsAllCap:     true,
 		IsSmallCap:   false,
 		FontBBox:     subsetFont.FontBBoxPDF(),
-		ItalicAngle:  italicAngle,
+		ItalicAngle:  subsetFont.ItalicAngle,
 		Ascent:       ascent,
 		Descent:      descent,
 		CapHeight:    capHeight,
