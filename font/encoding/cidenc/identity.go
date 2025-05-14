@@ -79,15 +79,18 @@ func (e *compositeIdentity) Codes(s pdf.String) iter.Seq[*font.Code] {
 					code.CID = info.CID
 					code.Width = info.Width
 					code.Notdef = notdef.CID
+					code.Text = info.Text
 				} else { // unmapped code
 					code.CID = notdef.CID
 					code.Width = notdef.Width
 					code.Notdef = 0
+					code.Text = ""
 				}
 			} else { // invalid code
 				code.CID = e.cid0.CID
 				code.Width = e.cid0.Width
 				code.Notdef = 0
+				code.Text = ""
 			}
 
 			if !yield(&code) {

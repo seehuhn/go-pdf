@@ -16,10 +16,10 @@
 
 // Package dict implements reading and writing of PDF font dictionaries.
 //
-// Each struct in this package provides a direct, one-to-one representation of
-// a specific PDF font dictionary type as defined in the PDF specification. The
-// structs are designed to preserve all information that can be stored in a PDF
-// file. All structs implement the [font.Dict] interface.
+// The package supports all PDF font dictionary types defined in the PDF
+// specification. Each struct provides a one-to-one representation of its
+// corresponding dictionary type, preserving all information exactly as stored
+// in the PDF file. All structs implement the [font.Dict] interface.
 //
 // Each type of font dictionary is represented by a Go structure which holds
 // all the information from the dictionary. Functions with names starting with

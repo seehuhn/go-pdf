@@ -22,13 +22,11 @@ import (
 	"iter"
 
 	"seehuhn.de/go/postscript/cid"
-	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt/os2"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/glyphdata"
@@ -62,7 +60,7 @@ type TrueType struct {
 	Encoding encoding.Simple
 
 	// Width contains the glyph widths for all character codes
-	// (PDF glyph space units).
+	// (in PDF glyph space units).
 	Width [256]float64
 
 	// ToUnicode (optional) specifies how character codes are mapped to Unicode
@@ -74,8 +72,8 @@ type TrueType struct {
 	// or [glyphdata.None] if the font is not embedded.
 	FontType glyphdata.Type
 
-	// FontRef is the reference to the glyph outline data in the PDF file,
-	// if the font is embedded.
+	// FontRef is the reference to the glyph outline data in the PDF file.
+	// If the font is not embedded, this is 0.
 	FontRef pdf.Reference
 }
 
@@ -279,6 +277,8 @@ func (d *TrueType) validate(w *pdf.Writer) error {
 	return nil
 }
 
+// WriteToPDF adds the font dictionary to a PDF file using the given reference.
+// This implements the [font.Dict] interface.
 func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	w := rm.Out
 
@@ -359,43 +359,8 @@ func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error 
 	return nil
 }
 
-// DefaultTextMapping returns the default text content for a character identifier.
-// This is based on the glyph name alone, and does not use information from the
-// ToUnicode cmap or the font file.
-//
-// CID values are taken to be the character code, plus one.
-func (d *TrueType) DefaultTextMapping() map[cid.CID]string {
-	m := make(map[cid.CID]string)
-	for code := range 256 {
-		glyphName := d.Encoding(byte(code))
-		s := names.ToUnicode(glyphName, d.PostScriptName)
-		if s != "" {
-			cid := cid.CID(code) + 1
-			m[cid] = s
-		}
-	}
-	return m
-}
-
-// TextMapping returns the mapping from character identifiers to text
-// content. This uses information from the ToUnicode cmap, if available,
-// with glyph names as a fallback.
-//
-// CID values are taken to be the character code, plus one.
-func (d *TrueType) TextMapping() map[cid.CID]string {
-	implied := d.DefaultTextMapping()
-	if d.ToUnicode == nil {
-		return implied
-	}
-
-	codec, _ := charcode.NewCodec(charcode.Simple)
-	for code, s := range d.ToUnicode.All(codec) {
-		cid := cid.CID(code) + 1
-		implied[cid] = s
-	}
-	return implied
-}
-
+// GlyphData returns information about the embedded font program.
+// This implements the [font.Dict] interface.
 func (d *TrueType) GlyphData() (glyphdata.Type, pdf.Reference) {
 	return d.FontType, d.FontRef
 }
@@ -404,37 +369,44 @@ func (d *TrueType) GlyphData() (glyphdata.Type, pdf.Reference) {
 // The font is immutable, i.e. no new glyphs can be added and no new codes
 // can be defined via the returned font object.
 func (d *TrueType) MakeFont() (font.FromFile, error) {
-	return ttFont{d}, nil
+	textMap := simpleTextMap(d.PostScriptName, d.Encoding, d.ToUnicode)
+	F := &ttFont{
+		Dict: d,
+		Text: textMap,
+	}
+	return F, nil
 }
 
 var (
-	_ font.FromFile = ttFont{}
+	_ font.FromFile = &ttFont{}
 )
 
 type ttFont struct {
 	Dict *TrueType
+	Text map[byte]string
 }
 
-func (f ttFont) GetDict() font.Dict {
+func (f *ttFont) GetDict() font.Dict {
 	return f.Dict
 }
 
-func (ttFont) WritingMode() font.WritingMode {
+func (*ttFont) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
 
-func (f ttFont) Codes(s pdf.String) iter.Seq[*font.Code] {
+func (f *ttFont) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
-		var code font.Code
-		for _, c := range s {
-			if f.Dict.Encoding(c) == "" {
-				code.CID = 0
+		var res font.Code
+		for _, code := range s {
+			if f.Dict.Encoding(code) == "" {
+				res.CID = 0
 			} else {
-				code.CID = cid.CID(c) + 1
+				res.CID = cid.CID(code) + 1
 			}
-			code.Width = f.Dict.Width[c]
-			code.UseWordSpacing = (c == 0x20)
-			if !yield(&code) {
+			res.Width = f.Dict.Width[code]
+			res.UseWordSpacing = (code == 0x20)
+			res.Text = f.Text[code]
+			if !yield(&res) {
 				return
 			}
 		}

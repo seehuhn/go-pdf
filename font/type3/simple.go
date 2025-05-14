@@ -29,6 +29,7 @@ import (
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/postscript/type1/names"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
@@ -179,11 +180,11 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		FontMatrix: e.Font.FontMatrix,
 		Resources:  resources,
 	}
-	implied := dict.DefaultTextMapping()
 	m := make(map[charcode.Code]string)
 	for c, info := range e.Simple.MappedCodes() {
 		dict.Width[c] = info.Width
-		if info.Text != implied[info.CID] {
+		implied := names.ToUnicode(dict.Encoding(byte(c)), "")
+		if info.Text != implied {
 			m[charcode.Code(c)] = info.Text
 		}
 	}

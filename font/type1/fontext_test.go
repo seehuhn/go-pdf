@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"seehuhn.de/go/geom/matrix"
-	"seehuhn.de/go/postscript/cid"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
@@ -132,10 +131,12 @@ func TestTextContent(t *testing.T) {
 	}
 
 	s := &strings.Builder{}
-	m := dict.TextMapping()
-	for _, code := range textString {
-		cid := cid.CID(code) + 1
-		s.WriteString(m[cid])
+	E, err := dict.MakeFont()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for code := range E.Codes(textString) {
+		s.WriteString(code.Text)
 	}
 	if s.String() != text {
 		t.Fatalf("expected %q, got %q", text, s.String())

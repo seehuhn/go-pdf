@@ -25,7 +25,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"seehuhn.de/go/geom/rect"
-	"seehuhn.de/go/postscript/cid"
 
 	"seehuhn.de/go/sfnt/os2"
 
@@ -160,19 +159,19 @@ func checkRoundtripTT(t *testing.T, d1 *TrueType, v pdf.Version) {
 
 	// == Compare ==
 
-	// Text and glyph for unused codes are arbitrary after roundtrip.
-	// We compare these manually here, and zero the values for the comparison
+	// Text and width for unused codes are arbitrary after roundtrip. We
+	// compare these manually here, and zero the values before the comparison
 	// below.
-	text1 := d1.TextMapping()
-	text2 := d2.TextMapping()
-	for code := range 256 {
-		if d1.Encoding(byte(code)) != "" {
-			if d1.Encoding(byte(code)) != d2.Encoding(byte(code)) {
-				t.Errorf("glyphName[%d]: %q != %q", code, d1.Encoding(byte(code)), d2.Encoding(byte(code)))
+	text1 := simpleTextMap(d1.PostScriptName, d1.Encoding, d1.ToUnicode)
+	text2 := simpleTextMap(d2.PostScriptName, d2.Encoding, d2.ToUnicode)
+	for i := range 256 {
+		code := byte(i)
+		if d1.Encoding(code) != "" {
+			if d1.Encoding(code) != d2.Encoding(code) {
+				t.Errorf("glyphName[%d]: %q != %q", code, d1.Encoding(code), d2.Encoding(code))
 			}
-			cid := cid.CID(code) + 1
-			if text1[cid] != text2[cid] {
-				t.Errorf("text[%d]: %q != %q", code, text1[cid], text2[cid])
+			if text1[code] != text2[code] {
+				t.Errorf("text[%d]: %q != %q", code, text1[code], text2[code])
 			}
 			if d1.Width[code] != d2.Width[code] {
 				t.Errorf("width[%d]: %f != %f", code, d1.Width[code], d2.Width[code])

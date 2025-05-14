@@ -22,6 +22,7 @@ import (
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/psenc"
 	"seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/os2"
@@ -210,11 +211,11 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		Descriptor:     fd,
 		Encoding:       e.Simple.Encoding(),
 	}
-	implied := dict.DefaultTextMapping()
 	m := make(map[charcode.Code]string)
 	for c, info := range e.Simple.MappedCodes() {
 		dict.Width[c] = info.Width
-		if info.Text != implied[info.CID] {
+		implied := names.ToUnicode(dict.Encoding(byte(c)), dict.PostScriptName)
+		if info.Text != implied {
 			m[charcode.Code(c)] = info.Text
 		}
 	}

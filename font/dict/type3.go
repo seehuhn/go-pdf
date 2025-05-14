@@ -24,11 +24,9 @@ import (
 	"seehuhn.de/go/geom/matrix"
 
 	"seehuhn.de/go/postscript/cid"
-	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/glyphdata"
@@ -52,7 +50,7 @@ type Type3 struct {
 	Encoding encoding.Simple
 
 	// Width contains the glyph widths for all character codes
-	// (PDF glyph space units).
+	// (in PDF glyph space units).
 	Width [256]float64
 
 	// ToUnicode (optional) specifies how character codes are mapped to Unicode
@@ -69,7 +67,7 @@ type Type3 struct {
 	// The FontMatrix maps glyph space to text space.
 	FontMatrix matrix.Matrix
 
-	// Resources (optional) holds named resources directly used by contents
+	// Resources (optional) holds named resources directly used by content
 	// streams referenced by CharProcs, when the content stream does not itself
 	// have a resource dictionary.
 	//
@@ -184,7 +182,9 @@ func (d *Type3) validate(w *pdf.Writer) error {
 	return nil
 }
 
-func (d *Type3) WriteToPDF(rm *pdf.ResourceManager, fontDictRef pdf.Reference) error {
+// WriteToPDF adds the font dictionary to a PDF file using the given reference.
+// This implements the [font.Dict] interface.
+func (d *Type3) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	w := rm.Out
 
 	err := d.validate(w)
@@ -215,7 +215,7 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager, fontDictRef pdf.Reference) e
 	}
 
 	compressedObjects := []pdf.Object{fontDict}
-	compressedRefs := []pdf.Reference{fontDictRef}
+	compressedRefs := []pdf.Reference{ref}
 
 	charProcsDict := make(pdf.Dict, len(d.CharProcs))
 	for name, ref := range d.CharProcs {
@@ -279,43 +279,8 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager, fontDictRef pdf.Reference) e
 	return nil
 }
 
-// DefaultTextMapping returns the default text content for a character identifier.
-// This is based on the glyph name alone, and does not use information from the
-// ToUnicode cmap.
-//
-// CID values are taken to be the character code, plus one.
-func (d *Type3) DefaultTextMapping() map[cid.CID]string {
-	m := make(map[cid.CID]string)
-	for code := range 256 {
-		glyphName := d.Encoding(byte(code))
-		s := names.ToUnicode(glyphName, "")
-		if s != "" {
-			cid := cid.CID(code) + 1
-			m[cid] = s
-		}
-	}
-	return m
-}
-
-// TextMapping returns the mapping from character identifiers to text
-// content. This uses information from the ToUnicode cmap, if available,
-// with glyph names as a fallback.
-//
-// CID values are taken to be the character code, plus one.
-func (d *Type3) TextMapping() map[cid.CID]string {
-	implied := d.DefaultTextMapping()
-	if d.ToUnicode == nil {
-		return implied
-	}
-
-	codec, _ := charcode.NewCodec(charcode.Simple)
-	for code, s := range d.ToUnicode.All(codec) {
-		cid := cid.CID(code) + 1
-		implied[cid] = s
-	}
-	return implied
-}
-
+// GlyphData returns glyphdata.Type3 and 0.
+// The only purpose of this function is to implement the [font.Dict] interface.
 func (d *Type3) GlyphData() (glyphdata.Type, pdf.Reference) {
 	return glyphdata.Type3, 0
 }
@@ -324,37 +289,44 @@ func (d *Type3) GlyphData() (glyphdata.Type, pdf.Reference) {
 // The font is immutable, i.e. no new glyphs can be added and no new codes
 // can be defined via the returned font object.
 func (d *Type3) MakeFont() (font.FromFile, error) {
-	return t3Font{d}, nil
+	textMap := simpleTextMap("", d.Encoding, d.ToUnicode)
+	F := &t3Font{
+		Dict: d,
+		Text: textMap,
+	}
+	return F, nil
 }
 
 var (
-	_ font.FromFile = t3Font{}
+	_ font.FromFile = &t3Font{}
 )
 
 type t3Font struct {
 	Dict *Type3
+	Text map[byte]string
 }
 
-func (f t3Font) GetDict() font.Dict {
+func (f *t3Font) GetDict() font.Dict {
 	return f.Dict
 }
 
-func (t3Font) WritingMode() font.WritingMode {
+func (*t3Font) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
 
-func (f t3Font) Codes(s pdf.String) iter.Seq[*font.Code] {
+func (f *t3Font) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
-		var code font.Code
-		for _, c := range s {
-			if f.Dict.Encoding(c) == "" {
-				code.CID = 0
+		var res font.Code
+		for _, code := range s {
+			if f.Dict.Encoding(code) == "" {
+				res.CID = 0
 			} else {
-				code.CID = cid.CID(c) + 1
+				res.CID = cid.CID(code) + 1
 			}
-			code.Width = f.Dict.Width[c]
-			code.UseWordSpacing = (c == 0x20)
-			if !yield(&code) {
+			res.Width = f.Dict.Width[code]
+			res.UseWordSpacing = (code == 0x20)
+			res.Text = f.Text[code]
+			if !yield(&res) {
 				return
 			}
 		}

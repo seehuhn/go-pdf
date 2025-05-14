@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"iter"
 	"math"
 	"os"
 
@@ -477,51 +476,11 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		return nil, nil, err
 	}
 
-	e := &testFontEmbedded{
-		ref:    fontDictRef,
-		cmap:   f.cmap,
-		widths: f.widths,
-		dw:     f.dw,
+	E, err := dict.MakeFont()
+	if err != nil {
+		return nil, nil, err
 	}
-	return fontDictRef, e, nil
-}
-
-var _ font.Embedded = (*testFontEmbedded)(nil)
-
-type testFontEmbedded struct {
-	ref    pdf.Reference
-	cmap   *cmap.File
-	widths map[cmap.CID]float64
-	dw     float64
-}
-
-func (e *testFontEmbedded) WritingMode() font.WritingMode {
-	return font.Horizontal
-}
-
-func (e *testFontEmbedded) Codes(s pdf.String) iter.Seq[*font.Code] {
-	return func(yield func(*font.Code) bool) {
-		var code font.Code
-		for i := range s {
-			c := []byte{s[i]}
-			cid := e.cmap.LookupCID(c)
-			notdefCID := e.cmap.LookupNotdefCID(c)
-
-			width, ok := e.widths[cid]
-			if !ok {
-				width = e.dw
-			}
-
-			code.CID = cid
-			code.Notdef = notdefCID
-			code.Width = width
-			code.UseWordSpacing = (s[i] == 0x20)
-
-			if !yield(&code) {
-				break
-			}
-		}
-	}
+	return fontDictRef, E, nil
 }
 
 func drawCross(g *cff.Glyph, x, y, r, lw float64) {

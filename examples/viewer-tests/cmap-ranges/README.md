@@ -15,11 +15,11 @@ endcidrange
 ```
 
 Where CID 34 is 'A' in the Adobe-Japan1 character collection.
-The question is: does `<03>` now map to 'B' (because `<02>` is not a valid code),
-or to 'C' (because `<03>` is the third code in the range)?
+The question is: does `<43>` now map to 'B' (because `<02>` is not a valid code),
+or to 'C' (because `<43>` is the third code in the range)?
 
-The attached PDF file shows two glyphs.  The first one should be 'A'.
-The second one is the glyph encoded by `<03>`.
+The PDF file in this example shows two glyphs, with codes `<41>` and `<43>`.
+The first glyph should be 'A'. The second one is the glyph encoded by `<43>`.
 
 Result (Sept 2024):
 Most viewers I tried showed 'A C'.

@@ -25,9 +25,9 @@ import (
 	"seehuhn.de/go/postscript/cid"
 )
 
-// DefaultVMetricsDefault is the value of DefaultVMetrics which is used, if no
-// value is specified in the PDF file.  Using this value for a "DefaultVMetrics"
-// field in a composite font dictionary will slightly reduce PDF file size.
+// DefaultVMetricsDefault is the value of DefaultVMetrics used, if no value is
+// specified in the PDF file.  Using this value for a "DefaultVMetrics" field
+// in a composite font dictionary will slightly reduce PDF file size.
 var DefaultVMetricsDefault = DefaultVMetrics{
 	OffsY:  880,
 	DeltaY: -1000,
@@ -90,13 +90,13 @@ func encodeVDefault(metrics DefaultVMetrics) pdf.Array {
 	}
 }
 
-// VMetrics represents the vertical metrics for an individual CID
+// VMetrics represents the vertical metrics for an individual CID.
 type VMetrics struct {
 	// OffsX is the horizontal component of the glyph position vector, in PDF
 	// glyph space units.
 	//
-	// The effect of this is that the glyph is moved left by OffsX, compared to
-	// horizontal writing.
+	// The effect of this is that the glyph is moved left by OffsX units,
+	// compared to horizontal writing.
 	OffsX float64
 
 	// OffsY is the vertical component of the glyph position vector, in PDF
@@ -254,8 +254,9 @@ func encodeVMetrics(metrics map[cid.CID]VMetrics) pdf.Array {
 		}
 
 		// If we reach this point without having removed any elements from the
-		// slice cids, the loop above must have terminated for end == 0.  This
-		// means that all of the following are true:
+		// slice cids, the loop above must have terminated during the first
+		// iteration (end == 0). This implies that all of the following are
+		// true:
 		//  - end+1 < len(cids)
 		//  - cids[end]+1 == cids[end+1]
 		//  - metrics[cids[end]] == metrics[cids[end+1]]

@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"iter"
 	"math"
 	"os"
 
@@ -370,44 +369,12 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		return nil, nil, err
 	}
 
-	e := &testFontEmbedded{
-		ref:  fontDictRef,
-		cmap: f.cmap,
-		ww:   ww,
-		dw:   f.cff.GlyphWidthPDF(0),
+	E, err := dicts.MakeFont()
+	if err != nil {
+		return nil, nil, err
 	}
-	return fontDictRef, e, nil
-}
 
-type testFontEmbedded struct {
-	ref  pdf.Reference
-	cmap *cmap.File
-	ww   map[cmap.CID]float64
-	dw   float64
-}
-
-func (e *testFontEmbedded) WritingMode() font.WritingMode {
-	return font.Horizontal
-}
-
-func (e *testFontEmbedded) Codes(s pdf.String) iter.Seq[*font.Code] {
-	return func(yield func(*font.Code) bool) {
-		var code font.Code
-		for _, b := range s {
-			cid := e.cmap.LookupCID([]byte{b})
-			w, ok := e.ww[cid]
-			if !ok {
-				w = e.dw
-			}
-
-			code.CID = cid
-			code.Width = w
-			code.UseWordSpacing = (b == 0x20)
-			if !yield(&code) {
-				return
-			}
-		}
-	}
+	return fontDictRef, E, nil
 }
 
 func clone[T any](x *T) *T {

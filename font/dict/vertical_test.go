@@ -122,3 +122,24 @@ func TestVMetricsRoundtrip(t *testing.T) {
 		})
 	}
 }
+
+// TestEncodeVMetricsSingleEntry tests the case of encoding a map which
+// contains exactly one entry.
+func TestEncodeVMetricsSingleEntry(t *testing.T) {
+	metrics := map[cid.CID]VMetrics{
+		cid.CID(100): {
+			DeltaY: -1000,
+			OffsX:  500,
+			OffsY:  880,
+		},
+	}
+
+	result := encodeVMetrics(metrics)
+
+	if len(result) != 2 {
+		t.Errorf("Expected 2 elements (CID + array), got %d", len(result))
+	}
+	if result[0] != pdf.Integer(100) {
+		t.Errorf("Expected first element to be CID 100, got %v", result[0])
+	}
+}

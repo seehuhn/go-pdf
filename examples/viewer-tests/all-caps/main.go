@@ -123,18 +123,18 @@ func (testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error
 	// CID 0 = .notdef
 	cidToGID[0] = glyph.ID(len(subsetGlyphs))
 	subsetGlyphs = append(subsetGlyphs, 0)
-	width[0] = origFont.GlyphWidthPDF(0)
+	width[0] = math.Round(origFont.GlyphWidthPDF(0))
 	// CID 1 = space
 	origGID := cmapTable.Lookup(' ')
 	cidToGID[1] = glyph.ID(len(subsetGlyphs))
-	width[1] = origFont.GlyphWidthPDF(origGID)
+	width[1] = math.Round(origFont.GlyphWidthPDF(origGID))
 	subsetGlyphs = append(subsetGlyphs, origGID)
 	for r := 'A'; r <= 'Z'; r++ {
 		// CID 34 = A, ...
 		cid := cmap.CID(r - 'A' + 34)
 		origGID = cmapTable.Lookup(r)
 		cidToGID[cid] = glyph.ID(len(subsetGlyphs))
-		width[cid] = origFont.GlyphWidthPDF(origGID)
+		width[cid] = math.Round(origFont.GlyphWidthPDF(origGID))
 		subsetGlyphs = append(subsetGlyphs, origGID)
 	}
 	origFont.CMapTable = nil

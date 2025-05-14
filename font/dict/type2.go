@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"iter"
-	"maps"
 
 	"seehuhn.de/go/postscript/cid"
 
@@ -59,12 +58,12 @@ type CIDFontType2 struct {
 	// CMap specifies how character codes are mapped to CID values.
 	//
 	// The CMap.ROS field must either be compatible with the ROS field
-	// above, or the cmap must be one of Identity-H or Identity-V.
+	// above, or the CMap must be one of Identity-H or Identity-V.
 	CMap *cmap.File
 
 	// Width (optional) is a map from CID values to glyph widths (in PDF glyph
-	// space units).  Only widths which are different from the default width
-	// need to be specified.
+	// space units).  Only widths which are different from DefaultWidth need to
+	// be specified.
 	Width map[cmap.CID]float64
 
 	// DefaultWidth is the glyph width for CID values not in the Width map
@@ -83,7 +82,7 @@ type CIDFontType2 struct {
 	DefaultVMetrics DefaultVMetrics
 
 	// ToUnicode (optional) specifies how character codes are mapped to Unicode
-	// strings.  This overrides the mapping implied by the CID values.
+	// strings.  This overrides any mapping implied by the CID values.
 	ToUnicode *cmap.ToUnicodeFile
 
 	// CIDToGID (optional, only allowed if the font is embedded) maps CID
@@ -92,12 +91,12 @@ type CIDFontType2 struct {
 	CIDToGID []glyph.ID
 
 	// FontType gives the type of glyph outline data. Possible values are
-	// [glyphdata.TrueType] and [glyphdata.OpenTypeGlyf],
-	// or [glyphdata.None] if the font is not embedded.
+	// [glyphdata.TrueType] and [glyphdata.OpenTypeGlyf], or [glyphdata.None]
+	// if the font is not embedded.
 	FontType glyphdata.Type
 
-	// FontRef is the reference to the glyph outline data in the PDF file,
-	// if the font is embedded.
+	// FontRef is the reference to the glyph outline data in the PDF file.
+	// If the font is not embedded, this is 0.
 	FontRef pdf.Reference
 }
 
@@ -350,7 +349,9 @@ func (d *CIDFontType2) validate() error {
 	return nil
 }
 
-func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager, fontDictRef pdf.Reference) error {
+// WriteToPDF adds the font dictionary to a PDF file using the given reference.
+// This implements the [font.Dict] interface.
+func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	w := rm.Out
 
 	switch d.FontType {
@@ -433,7 +434,7 @@ func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager, fontDictRef pdf.Refer
 	}
 
 	compressedObjects := []pdf.Object{fontDict, cidFontDict, fdDict}
-	compressedRefs := []pdf.Reference{fontDictRef, cidFontRef, fdRef}
+	compressedRefs := []pdf.Reference{ref, cidFontRef, fdRef}
 
 	ww := encodeCompositeWidths(d.Width)
 	switch {
@@ -513,43 +514,31 @@ func (d *CIDFontType2) codec() (*charcode.Codec, error) {
 	return charcode.NewCodec(d.CMap.CodeSpaceRange)
 }
 
-// DefaultTextMapping returns the default text content for a character identifier.
-// This is based on the CID and CID System Info alone, and does not use
-// information from the ToUnicode cmap or the font file.
-func (d *CIDFontType2) DefaultTextMapping() map[cid.CID]string {
-	m, _ := mapping.GetCIDTextMapping(d.ROS.Registry, d.ROS.Ordering)
-	return m
-}
-
-// TextMapping returns the mapping from character identifiers to text
-// content. This uses information from the ToUnicode cmap, if available,
-// with glyph names as a fallback.
-func (d *CIDFontType2) TextMapping() map[cid.CID]string {
-	implied := d.DefaultTextMapping()
-	if d.ToUnicode == nil {
-		return implied
-	}
-
-	codec, err := d.codec()
-	if err != nil {
-		return nil
-	}
-
-	toUnicode := maps.Collect(d.ToUnicode.All(codec))
-
-	m := make(map[cid.CID]string)
-	for code, cid := range d.CMap.All(codec) {
-		if text, ok := toUnicode[code]; ok {
-			m[cid] = text
-		} else if text, ok := implied[cid]; ok {
-			m[cid] = text
-		}
-	}
-	return m
-}
-
+// GlyphData returns information about the embedded font program.
+// This implements the [font.Dict] interface.
 func (d *CIDFontType2) GlyphData() (glyphdata.Type, pdf.Reference) {
 	return d.FontType, d.FontRef
+}
+
+func (d *CIDFontType2) makeTextMap(codec *charcode.Codec) map[charcode.Code]string {
+	defaultTextMap, _ := mapping.GetCIDTextMapping(d.ROS.Registry, d.ROS.Ordering)
+
+	textMap := make(map[charcode.Code]string)
+	for code, cid := range d.CMap.All(codec) {
+		text := defaultTextMap[cid]
+		if text != "" {
+			textMap[code] = text
+		}
+	}
+	if d.ToUnicode != nil {
+		for code, text := range d.ToUnicode.All(codec) {
+			if text != "" {
+				textMap[code] = text
+			}
+		}
+	}
+
+	return textMap
 }
 
 // MakeFont returns a new font object that can be used to typeset text.
@@ -561,9 +550,12 @@ func (d *CIDFontType2) MakeFont() (font.FromFile, error) {
 		return nil, err
 	}
 
+	textMap := d.makeTextMap(codec)
+
 	s := &t2Font{
 		CIDFontType2: d,
 		codec:        codec,
+		text:         textMap,
 		cache:        make(map[charcode.Code]*font.Code),
 	}
 	return s, nil
@@ -576,6 +568,7 @@ var (
 type t2Font struct {
 	*CIDFontType2
 	codec *charcode.Codec
+	text  map[charcode.Code]string
 	cache map[charcode.Code]*font.Code
 }
 
@@ -608,6 +601,8 @@ func (s *t2Font) Codes(str pdf.String) iter.Seq[*font.Code] {
 				} else {
 					res.Width = s.DefaultWidth
 				}
+				res.UseWordSpacing = k == 1 && code == 0x20
+				res.Text = s.text[code]
 				s.cache[code] = res
 			}
 

@@ -23,7 +23,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/glyphdata"
-	"seehuhn.de/go/postscript/cid"
 )
 
 // FromFile represents an immutable font read from a PDF file.
@@ -34,7 +33,8 @@ type FromFile interface {
 
 // Dict represents a font dictionary in a PDF file.
 //
-// This interface is implemented by the following types:
+// This interface is implemented by the following types, corresponding to the
+// different font dictionary types supported by PDF:
 //   - [seehuhn.de/go/pdf/font/dict.Type1]
 //   - [seehuhn.de/go/pdf/font/dict.TrueType]
 //   - [seehuhn.de/go/pdf/font/dict.Type3]
@@ -53,34 +53,13 @@ type Dict interface {
 	// can be defined via the returned font object.
 	MakeFont() (FromFile, error)
 
-	// DefaultTextMapping returns the text content implied by each character
-	// identifier.  For simple fonts, the cid is taken to be the character code
-	// plus one.
+	// GlyphData returns information about the embedded font program.
 	//
-	// The text content is based on the CID only and does not take information
-	// from the ToUnicode map or from the font file itself into account.
-	DefaultTextMapping() map[cid.CID]string
-
-	// TextMapping returns the mapping from character identifiers to text
-	// content for this font.  The mapping is based on the ToUnicode map
-	// and on the character encoding used in the font.
-	//
-	// TODO(voss): this is not right!  Text is mapped from codes, not from CIDs!
-	TextMapping() map[cid.CID]string
-
-	// GlyphData returns information about the embedded font program associated
-	// with this font dictionary.
-	//
-	// The returned glyphdata.Type indicates the format of the embedded font
-	// program (such as Type1, TrueType, CFF, etc.) or [glyphdata.None] if the
-	// font is not embedded.
-	//
-	// The returned pdf.Reference points to the stream object containing the
-	// font program in the PDF file. The reference is zero, if and only if the
-	// the type is [glyphdata.None].
-	//
-	// This information can be used to extract the actual glyph outlines from
-	// the PDF file for rendering or further processing.
+	// Returns the format of the embedded font program (Type1, TrueType, CFF,
+	// etc.) as a glyphdata.Type, or glyphdata.None if the font is not
+	// embedded. Also returns a pdf.Reference to the stream object containing
+	// the font program. This reference is zero if and only if the type is
+	// glyphdata.None.
 	GlyphData() (glyphdata.Type, pdf.Reference)
 }
 

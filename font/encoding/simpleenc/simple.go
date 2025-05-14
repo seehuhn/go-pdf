@@ -111,6 +111,7 @@ func (t *Simple) Codes(s pdf.String) iter.Seq[*font.Code] {
 			}
 			code.Width = info.Width
 			code.UseWordSpacing = (c == 0x20)
+			code.Text = info.Text
 			if !yield(&code) {
 				return
 			}

@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"iter"
 	"os"
 	"strings"
 	"time"
@@ -26,7 +25,6 @@ import (
 	"seehuhn.de/go/geom/rect"
 
 	"seehuhn.de/go/postscript/afm"
-	"seehuhn.de/go/postscript/cid"
 	pstype1 "seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/pdf"
@@ -265,23 +263,10 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		return nil, nil, err
 	}
 
-	return fontDictRef, f, nil
-}
-
-func (f *testFont) WritingMode() font.WritingMode {
-	return font.Horizontal
-}
-
-func (f *testFont) Codes(s pdf.String) iter.Seq[*font.Code] {
-	return func(yield func(*font.Code) bool) {
-		var code font.Code
-		code.Width = glyphWidths
-		for _, c := range s {
-			code.CID = cid.CID(c) + 1 // leave CID 0 for .notdef
-			code.UseWordSpacing = (c == 0x20)
-			if !yield(&code) {
-				break
-			}
-		}
+	E, err := dict.MakeFont()
+	if err != nil {
+		return nil, nil, err
 	}
+
+	return fontDictRef, E, nil
 }

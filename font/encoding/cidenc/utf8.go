@@ -74,13 +74,16 @@ func (e *compositeUTF8) Codes(s pdf.String) iter.Seq[*font.Code] {
 				if info != nil { // code is mapped to a CID
 					code.CID = info.CID
 					code.Width = info.Width
+					code.Text = info.Text
 				} else { // unmapped code
 					code.CID = 0
 					code.Width = e.cid0Width
+					code.Text = ""
 				}
 			} else { // invalid code
 				code.CID = 0
 				code.Width = e.cid0Width
+				code.Text = ""
 			}
 
 			code.UseWordSpacing = (k == 1 && c == 0x20)

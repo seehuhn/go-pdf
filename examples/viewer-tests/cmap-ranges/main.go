@@ -19,16 +19,14 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"iter"
+	"math"
 	"os"
 
 	"golang.org/x/image/font/gofont/goregular"
 
 	"seehuhn.de/go/postscript/cid"
-	"seehuhn.de/go/postscript/funit"
 
 	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
@@ -39,7 +37,19 @@ import (
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs"
+	"seehuhn.de/go/pdf/font/standard"
+	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/text"
 )
+
+const description = `
+This file tests CMap file behavior when CID ranges span holes in the code space.
+The test font defines valid codes as 0x00-0x41 and 0x43-0xFF, excluding 0x42.
+The CMap maps range 0x41-0x43 to consecutive CIDs starting at 43 (representing the character “A”).
+The text contains codes 0x41 and 0x43.  There is some ambiguity:
+0x43 could be interpreted as “B” (the second valid code in the range)
+or “C” (the third element in the range).
+`
 
 func main() {
 	err := createDocument("test.pdf")
@@ -53,18 +63,118 @@ func createDocument(fname string) error {
 	opts := &pdf.WriterOptions{
 		HumanReadable: true,
 	}
-	out, err := document.CreateSinglePage(fname, document.A5r, pdf.V2_0, opts)
+	page, err := document.CreateSinglePage(fname, document.A5r, pdf.V2_0, opts)
 	if err != nil {
 		return err
 	}
 
-	cmap := &cmap.File{
+	noteFont := standard.TimesRoman.New()
+	note := text.F{
+		Font:  noteFont,
+		Size:  10,
+		Color: color.DeviceGray(0.1),
+	}
+
+	test := text.F{
+		Font:  testFont{},
+		Size:  24,
+		Color: color.DeviceRGB(0, 0, 0.7),
+	}
+
+	text.Show(page.Writer,
+		text.M{X: 50, Y: 370},
+		note,
+		text.Wrap(360, description),
+		test,
+		text.NL,
+		pdf.String{0x41, 0x43},
+	)
+
+	err = page.Close()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type testFont struct{}
+
+func (testFont) PostScriptName() string {
+	return "Test"
+}
+
+func (testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
+	fontDictRef := rm.Out.Alloc()
+	fontType := glyphdata.TrueType
+	fontFileRef := rm.Out.Alloc()
+
+	numCID := 34 + 3
+	cidToGID := make([]glyph.ID, numCID)
+	width := map[cmap.CID]float64{}
+
+	// Create a TrueType font with the required subset of glyphs.
+	origFont, err := sfnt.Read(bytes.NewReader(goregular.TTF))
+	if err != nil {
+		return nil, nil, err
+	}
+	cmapTable, err := origFont.CMapTable.GetBest()
+	if err != nil {
+		return nil, nil, err
+	}
+	var subsetGlyphs []glyph.ID
+	// CID 0 = .notdef
+	cidToGID[0] = glyph.ID(len(subsetGlyphs))
+	subsetGlyphs = append(subsetGlyphs, 0)
+	width[0] = math.Round(origFont.GlyphWidthPDF(0))
+	for r := 'A'; r <= 'C'; r++ {
+		// CID 34 = A, ...
+		cid := cmap.CID(r - 'A' + 34)
+		origGID := cmapTable.Lookup(r)
+		cidToGID[cid] = glyph.ID(len(subsetGlyphs))
+		width[cid] = math.Round(origFont.GlyphWidthPDF(origGID))
+		subsetGlyphs = append(subsetGlyphs, origGID)
+	}
+	origFont.CMapTable = nil
+	origFont.Gdef = nil
+	origFont.Gsub = nil
+	origFont.Gpos = nil
+	subsetFont := origFont.Subset(subsetGlyphs)
+	err = opentypeglyphs.Embed(rm.Out, fontType, fontFileRef, subsetFont)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Create a PDF font dictionary for the font.
+	qv := subsetFont.FontMatrix[3] * 1000
+	ascent := math.Round(float64(subsetFont.Ascent) * qv)
+	descent := math.Round(float64(subsetFont.Descent) * qv)
+	capHeight := math.Round(float64(subsetFont.CapHeight) * qv)
+
+	ros := &cid.SystemInfo{
+		Registry:   "Adobe",
+		Ordering:   "Japan1",
+		Supplement: 7,
+	}
+	fd := &font.Descriptor{
+		FontName:     "ABCDEF+" + subsetFont.PostScriptName(),
+		IsFixedPitch: subsetFont.IsFixedPitch(),
+		IsSerif:      subsetFont.IsSerif,
+		IsSymbolic:   false,
+		IsScript:     subsetFont.IsScript,
+		IsItalic:     subsetFont.IsItalic,
+		IsAllCap:     true,
+		IsSmallCap:   false,
+		FontBBox:     subsetFont.FontBBoxPDF().Rounded(),
+		ItalicAngle:  subsetFont.ItalicAngle,
+		Ascent:       ascent,
+		Descent:      descent,
+		CapHeight:    capHeight,
+		StemV:        0,
+	}
+	cmapFile := &cmap.File{
 		Name: "Test",
-		ROS: &cid.SystemInfo{
-			Registry:   "Adobe",
-			Ordering:   "Japan1",
-			Supplement: 0,
-		},
+		ROS:  ros,
 		CodeSpaceRange: charcode.CodeSpaceRange{
 			{Low: []byte{0x00}, High: []byte{0x41}},
 			{Low: []byte{0x42, 0x00}, High: []byte{0x42, 0xFF}},
@@ -78,156 +188,28 @@ func createDocument(fname string) error {
 			},
 		},
 	}
-
-	F, err := NewTestFont(out.RM, cmap)
-	if err != nil {
-		return err
-	}
-
-	out.TextSetFont(F, 20)
-	out.TextBegin()
-	out.TextFirstLine(50, 370)
-	out.TextShowRaw(pdf.String{0x41, 0x43})
-	out.TextEnd()
-
-	err = out.Close()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// testFont is a small subset of the Go Regular font, with a configurable cmap.
-// This is only useful for testing.
-//
-// For simplicity we use this structure both as the `font.Font` before
-// embedding, and as the `font.Embedded` after embedding.
-type testFont struct {
-	ttf   *sfnt.Font
-	cmap  *cmap.File
-	codec *charcode.Codec
-}
-
-// NewTestFont creates a new test font with the given cmap.
-func NewTestFont(rm *pdf.ResourceManager, cmap *cmap.File) (*testFont, error) {
-	// Create a font with just the three glyphs for "ABC".
-	ttf, err := sfnt.Read(bytes.NewReader(goregular.TTF))
-	if err != nil {
-		return nil, fmt.Errorf("gofont: %w", err)
-	}
-	ttf.Gdef = nil
-	ttf.Gsub = nil
-	ttf.Gpos = nil
-
-	glyphs := []glyph.ID{0} // always include the .notdef glyph
-	lookup, err := ttf.CMapTable.GetBest()
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range "ABC" {
-		gid := lookup.Lookup(r)
-		glyphs = append(glyphs, gid)
-	}
-	ttf = ttf.Subset(glyphs)
-
-	// fix all glyph widths to 2000 PDF glyphs space units
-	outlines := ttf.Outlines.(*glyf.Outlines)
-	dw := funit.Int16(2 * ttf.UnitsPerEm)
-	for i := range outlines.Widths {
-		outlines.Widths[i] = dw
-	}
-
-	codec, err := charcode.NewCodec(cmap.CodeSpaceRange)
-	if err != nil {
-		return nil, err
-	}
-
-	return &testFont{
-		ttf:   ttf,
-		cmap:  cmap,
-		codec: codec,
-	}, nil
-}
-
-// PostScriptName returns the PostScript name of the font.
-// This implements the [font.Font] interface.
-func (f *testFont) PostScriptName() string {
-	return "Test"
-}
-
-// Embed adds the font to a PDF file.
-// This implements the [font.Font] interface.
-func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
-	fontDictRef := rm.Out.Alloc()
-
-	cidToGID := make([]glyph.ID, 37)
-	cidToGID[34] = 1 // CID 34 = GID 1 (A)
-	cidToGID[35] = 2 // CID 35 = GID 2 (B)
-	cidToGID[36] = 3 // CID 36 = GID 3 (C)
-
-	q := 1000 / float64(f.ttf.UnitsPerEm)
-
-	fd := &font.Descriptor{
-		FontName:  "AABBCC+Test",
-		FontBBox:  f.ttf.FontBBoxPDF(),
-		Ascent:    f.ttf.Ascent.AsFloat(q),
-		Descent:   f.ttf.Descent.AsFloat(q),
-		CapHeight: f.ttf.CapHeight.AsFloat(q),
-	}
 	dict := &dict.CIDFontType2{
-		PostScriptName:  "Test",
-		SubsetTag:       "AABBCC",
+		PostScriptName:  subsetFont.PostScriptName(),
+		SubsetTag:       "ABCDEF",
 		Descriptor:      fd,
-		ROS:             f.cmap.ROS,
-		CMap:            f.cmap,
-		DefaultWidth:    2000,
+		ROS:             ros,
+		CMap:            cmapFile,
+		Width:           width,
+		DefaultWidth:    width[0],
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
 		CIDToGID:        cidToGID,
-		FontType:        glyphdata.TrueType,
-		FontRef:         rm.Out.Alloc(),
+		FontType:        fontType,
+		FontRef:         fontFileRef,
 	}
 
-	err := dict.WriteToPDF(rm, fontDictRef)
+	err = dict.WriteToPDF(rm, fontDictRef)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	err = opentypeglyphs.Embed(rm.Out, dict.FontType, dict.FontRef, f.ttf)
+	E, err := dict.MakeFont()
 	if err != nil {
 		return nil, nil, err
 	}
-
-	return fontDictRef, f, nil
-}
-
-// This implements the [font.Font] and [font.Embedded] interfaces.
-func (f *testFont) WritingMode() font.WritingMode {
-	return font.Horizontal
-}
-
-// This implements the [font.Embedded] interface.
-func (f *testFont) Codes(s pdf.String) iter.Seq[*font.Code] {
-	return func(yield func(*font.Code) bool) {
-		var code font.Code
-		code.Width = 2000
-
-		for len(s) > 0 {
-			c, k, _ := f.codec.Decode(s)
-			switch c {
-			case 0x41:
-				code.CID = 34
-			case 0x42:
-				code.CID = 35
-			case 0x43:
-				code.CID = 36
-			default:
-				code.CID = 0
-			}
-			code.UseWordSpacing = (k == 1 && c == 0x20)
-			if !yield(&code) {
-				break
-			}
-			s = s[k:]
-		}
-	}
+	return fontDictRef, E, nil
 }

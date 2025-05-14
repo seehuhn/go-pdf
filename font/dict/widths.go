@@ -66,6 +66,10 @@ func getSimpleWidths(ww []float64, r pdf.Getter, fontDict pdf.Dict, defaultWidth
 // Returns any additional objects and their references if an indirect object is
 // created.
 func setSimpleWidths(w *pdf.Writer, fontDict pdf.Dict, ww []float64, enc encoding.Simple, defaultWidth float64) ([]pdf.Object, []pdf.Reference) {
+	// Find the range [firstChar, lastChar] of characters that need encoding.
+	// The spec requires at least one character to be encoded.
+	// The firstChar < lastChar condition ensures firstChar <= lastChar,
+	// creating a one-element array when all chars have default width.
 	firstChar, lastChar := 0, 255
 	for lastChar > 0 && (enc(byte(lastChar)) == "" || ww[lastChar] == defaultWidth) {
 		lastChar--

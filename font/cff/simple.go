@@ -21,6 +21,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyph"
@@ -213,11 +214,11 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		FontType:       glyphdata.CFFSimple,
 		FontRef:        rm.Out.Alloc(),
 	}
-	implied := dict.DefaultTextMapping()
 	m := make(map[charcode.Code]string)
 	for c, info := range e.Simple.MappedCodes() {
 		dict.Width[c] = info.Width
-		if info.Text != implied[info.CID] {
+		implied := names.ToUnicode(dict.Encoding(byte(c)), dict.PostScriptName)
+		if info.Text != implied {
 			m[charcode.Code(c)] = info.Text
 		}
 	}

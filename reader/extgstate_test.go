@@ -31,7 +31,7 @@ import (
 
 // TestExtGState verifies that external graphics states are correctly read.
 func TestExtGState(t *testing.T) {
-	testFont := dummyfont.Must()
+	testFont := dummyfont.Must() // TODO(voss): use a different font
 
 	// We start by creating a graphics state with all possible parameters set.
 	ext1 := &graphics.ExtGState{}
