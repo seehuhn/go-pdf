@@ -35,21 +35,25 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/pdf/internal/pagerange"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/reader"
 )
 
-var pages = flag.String("p", "", "Only include text on pages `A-B`")
-var xRange = flag.String("x", "", "Only include text at x coordinates `A-B`")
-
-var pageMin, pageMax int
-var xRangeMin, xRangeMax float64
-
 func main() {
+	pages := &pagerange.PageRange{}
+	flag.Var(pages, "p", "range of pages to extract")
+	xRange := flag.String("x", "", "Only include text at x coordinates `A-B`")
+	showPageNumbers := flag.Bool("P", false, "show page numbers")
 	flag.Parse()
 
-	xRangeMin = math.Inf(-1)
-	xRangeMax = math.Inf(1)
+	if pages.Start < 1 {
+		pages.Start = 1
+		pages.End = math.MaxInt
+	}
+
+	xRangeMin := math.Inf(-1)
+	xRangeMax := math.Inf(1)
 	if *xRange != "" {
 		_, err := fmt.Sscanf(*xRange, "%f-%f", &xRangeMin, &xRangeMax)
 		if err != nil || xRangeMin >= xRangeMax {
@@ -57,24 +61,29 @@ func main() {
 		}
 	}
 
-	if *pages != "" {
-		_, err := fmt.Sscanf(*pages, "%d-%d", &pageMin, &pageMax)
-		if err != nil || pageMin < 1 || pageMax < pageMin {
-			log.Fatalf("invalid page range %q", *pages)
-		}
-	} else {
-		pageMin, pageMax = 1, math.MaxInt
+	e := &extractor{
+		pageMin:         pages.Start,
+		pageMax:         pages.End,
+		xRangeMin:       xRangeMin,
+		xRangeMax:       xRangeMax,
+		showPageNumbers: *showPageNumbers,
 	}
 
 	for _, fname := range flag.Args() {
-		err := extractText(fname)
+		err := e.extractText(fname)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 }
 
-func extractText(fname string) error {
+type extractor struct {
+	pageMin, pageMax     int
+	xRangeMin, xRangeMax float64
+	showPageNumbers      bool
+}
+
+func (e *extractor) extractText(fname string) error {
 	extraTextCache := make(map[font.Embedded]map[cid.CID]string)
 
 	fd, err := os.Open(fname)
@@ -86,6 +95,17 @@ func extractText(fname string) error {
 	r, err := pdf.NewReader(fd, nil)
 	if err != nil {
 		return err
+	}
+
+	numPages, err := pagetree.NumPages(r)
+	if err != nil {
+		return err
+	}
+
+	startPage := e.pageMin
+	endPage := e.pageMax
+	if endPage > numPages {
+		endPage = numPages
 	}
 
 	contents := reader.New(r, nil)
@@ -108,33 +128,32 @@ func extractText(fname string) error {
 			text = m[cid]
 		}
 
-		x, _ := contents.GetTextPositionDevice()
-		if x >= xRangeMin && x < xRangeMax {
+		// xUser, yUser := contents.GetTextPositionUser()
+
+		xDev, _ := contents.GetTextPositionDevice()
+		if xDev >= e.xRangeMin && xDev < e.xRangeMax {
 			fmt.Print(text)
 		}
 		return nil
 	}
 
-	pageNo := 0
-	for _, pageDict := range pagetree.NewIterator(r).All() {
-		pageNo++
-		if pageNo < pageMin {
-			continue
+	for pageNo := startPage; pageNo <= endPage; pageNo++ {
+		_, pageDict, err := pagetree.GetPage(r, pageNo-1)
+		if err != nil {
+			return err
 		}
 
-		fmt.Println("Page", pageNo)
-		fmt.Println()
+		if e.showPageNumbers {
+			fmt.Println("Page", pageNo)
+			fmt.Println()
+		}
 
-		err := contents.ParsePage(pageDict, matrix.Identity)
+		err = contents.ParsePage(pageDict, matrix.Identity)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		fmt.Println()
-
-		if pageNo > pageMax {
-			break
-		}
 	}
 	return nil
 }

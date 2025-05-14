@@ -23,6 +23,7 @@ import (
 	"os"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/pagerange"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/pdfcopy"
 )
@@ -30,7 +31,7 @@ import (
 func main() {
 	out := flag.String("o", "out.pdf", "output file name")
 	force := flag.Bool("f", false, "overwrite output file if it exists")
-	pages := &PageRange{}
+	pages := &pagerange.PageRange{}
 	flag.Var(pages, "p", "range of pages to extract")
 	flag.Parse()
 
@@ -88,7 +89,7 @@ func openOutputFile(outputFile string, forceOverwrite bool) (io.Writer, io.Close
 	return file, file, nil
 }
 
-func extractPages(w io.Writer, inputFile string, pages *PageRange) error {
+func extractPages(w io.Writer, inputFile string, pages *pagerange.PageRange) error {
 	in, err := pdf.Open(inputFile, nil)
 	if err != nil {
 		return err
@@ -128,7 +129,7 @@ func extractPages(w io.Writer, inputFile string, pages *PageRange) error {
 		// pages to be included in the output files as well (with no entries in
 		// the output page tree, but taking up space).
 		//
-		// TODO(voss): keep annotations which reference pages which are
+		// TODO(voss): keep annotations which only reference pages which are
 		// included in the output file.
 		delete(pageIn, "Annots")
 

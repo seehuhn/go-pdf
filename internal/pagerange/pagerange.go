@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package main
+package pagerange
 
 import (
 	"fmt"
@@ -22,7 +22,7 @@ import (
 	"strings"
 )
 
-// PageRange represents a range of pages in a PDF document.
+// PageRange represents a 1-based range of pages in a PDF document.
 type PageRange struct {
 	Start int
 	End   int
