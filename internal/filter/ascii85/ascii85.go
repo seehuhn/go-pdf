@@ -31,7 +31,7 @@ func Encode(w io.WriteCloser, width int) io.WriteCloser {
 }
 
 // Decode returns a new Reader which decodes data in ASCII85 format.
-func Decode(r io.Reader) io.Reader {
+func Decode(r io.Reader) io.ReadCloser {
 	return &ascii85Reader{r: r}
 }
 
@@ -146,6 +146,11 @@ func (r *ascii85Reader) Read(p []byte) (n int, err error) {
 		}
 	}
 	return n, r.immediateError
+}
+
+// Close is a no-op.
+func (r *ascii85Reader) Close() error {
+	return nil
 }
 
 type ascii85Writer struct {

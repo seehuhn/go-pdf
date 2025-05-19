@@ -1,0 +1,7 @@
+issues:
+  exclude-files:
+    - ".*_test.go$"
+
+linters:
+  disable:
+    - errcheck

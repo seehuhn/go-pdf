@@ -27,6 +27,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/glyphdata"
@@ -182,11 +183,7 @@ func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*TrueType, error) {
 		}
 	}
 
-	toUnicode, err := cmap.ExtractToUnicode(r, fontDict["ToUnicode"])
-	if pdf.IsReadError(err) {
-		return nil, err
-	}
-	d.ToUnicode = toUnicode
+	d.ToUnicode, _ = cmap.ExtractToUnicode(r, fontDict["ToUnicode"])
 
 	d.repair(r)
 
@@ -359,6 +356,10 @@ func (d *TrueType) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error 
 	return nil
 }
 
+func (d *TrueType) Codec() (*charcode.Codec, error) {
+	return charcode.NewCodec(charcode.Simple)
+}
+
 // GlyphData returns information about the embedded font program.
 // This implements the [font.Dict] interface.
 func (d *TrueType) GlyphData() (glyphdata.Type, pdf.Reference) {
@@ -414,7 +415,7 @@ func (f *ttFont) Codes(s pdf.String) iter.Seq[*font.Code] {
 }
 
 func init() {
-	font.RegisterReader("TrueType", func(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
+	registerReader("TrueType", func(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
 		return ExtractTrueType(r, obj)
 	})
 }

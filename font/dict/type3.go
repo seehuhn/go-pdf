@@ -27,6 +27,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/glyphdata"
@@ -117,11 +118,7 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
 	}
 	getSimpleWidths(d.Width[:], r, fontDict, defaultWidth)
 
-	toUnicode, err := cmap.ExtractToUnicode(r, fontDict["ToUnicode"])
-	if pdf.IsReadError(err) {
-		return nil, err
-	}
-	d.ToUnicode = toUnicode
+	d.ToUnicode, _ = cmap.ExtractToUnicode(r, fontDict["ToUnicode"])
 
 	charProcs, err := pdf.GetDict(r, fontDict["CharProcs"])
 	if err != nil {
@@ -279,6 +276,10 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	return nil
 }
 
+func (d *Type3) Codec() (*charcode.Codec, error) {
+	return charcode.NewCodec(charcode.Simple)
+}
+
 // GlyphData returns glyphdata.Type3 and 0.
 // The only purpose of this function is to implement the [font.Dict] interface.
 func (d *Type3) GlyphData() (glyphdata.Type, pdf.Reference) {
@@ -334,7 +335,7 @@ func (f *t3Font) Codes(s pdf.String) iter.Seq[*font.Code] {
 }
 
 func init() {
-	font.RegisterReader("Type3", func(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
+	registerReader("Type3", func(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
 		return ExtractType3(r, obj)
 	})
 }

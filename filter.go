@@ -88,7 +88,7 @@ type Filter interface {
 	Encode(Version, io.WriteCloser) (io.WriteCloser, error)
 
 	// Decode returns a reader which decodes data read from it.
-	Decode(Version, io.Reader) (io.Reader, error)
+	Decode(Version, io.Reader) (io.ReadCloser, error)
 }
 
 func makeFilter(filter Name, param Dict) Filter {
@@ -119,7 +119,7 @@ func (f *filterNotImplemented) Encode(Version, io.WriteCloser) (io.WriteCloser, 
 	return nil, fmt.Errorf("filter %s not implemented", f.Name)
 }
 
-func (f *filterNotImplemented) Decode(Version, io.Reader) (io.Reader, error) {
+func (f *filterNotImplemented) Decode(Version, io.Reader) (io.ReadCloser, error) {
 	return nil, fmt.Errorf("filter %s not implemented", f.Name)
 }
 
@@ -138,7 +138,7 @@ func (f FilterASCII85) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, erro
 }
 
 // Decode implements the [Filter] interface.
-func (f FilterASCII85) Decode(_ Version, r io.Reader) (io.Reader, error) {
+func (f FilterASCII85) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 	return ascii85.Decode(r), nil
 }
 
@@ -157,7 +157,7 @@ func (f FilterASCIIHex) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, err
 }
 
 // Decode implements the [Filter] interface.
-func (f FilterASCIIHex) Decode(_ Version, r io.Reader) (io.Reader, error) {
+func (f FilterASCIIHex) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 	return asciihex.Decode(r), nil
 }
 
@@ -184,7 +184,7 @@ func (f FilterCompress) Encode(v Version, w io.WriteCloser) (io.WriteCloser, err
 }
 
 // Decode implements the [Filter] interface.
-func (f FilterCompress) Decode(v Version, r io.Reader) (io.Reader, error) {
+func (f FilterCompress) Decode(v Version, r io.Reader) (io.ReadCloser, error) {
 	if v >= V1_2 {
 		return FilterFlate(f).Decode(v, r)
 	}
@@ -269,7 +269,7 @@ func (f FilterFlate) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error)
 }
 
 // Decode implements the [Filter] interface.
-func (f FilterFlate) Decode(v Version, r io.Reader) (io.Reader, error) {
+func (f FilterFlate) Decode(v Version, r io.Reader) (io.ReadCloser, error) {
 	ff, err := f.parseParameters(v)
 	if err != nil {
 		return nil, err
@@ -388,7 +388,7 @@ func (f FilterLZW) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error) {
 }
 
 // Decode implements the [Filter] interface.
-func (f FilterLZW) Decode(v Version, r io.Reader) (io.Reader, error) {
+func (f FilterLZW) Decode(v Version, r io.Reader) (io.ReadCloser, error) {
 	ff, err := f.parseParameters(v)
 	if err != nil {
 		return nil, err
@@ -456,13 +456,13 @@ func (ff *flateFilter) ToDict() Dict {
 }
 
 // Decode implements the [filter] interface.
-func (ff *flateFilter) Decode(r io.Reader) (io.Reader, error) {
-	var res io.Reader
+func (ff *flateFilter) Decode(r io.Reader) (io.ReadCloser, error) {
+	var res io.ReadCloser
 	var err error
 	if ff.IsLZW {
 		res = lzw.NewReader(r, ff.EarlyChange)
 	} else {
-		res, err = zlib.NewReader(r)
+		res, err = zlibNewReader(r)
 	}
 	if err != nil {
 		return nil, err
@@ -491,7 +491,7 @@ func (ff *flateFilter) Decode(r io.Reader) (io.Reader, error) {
 }
 
 type pngReader struct {
-	r io.Reader
+	r io.ReadCloser
 
 	bytesPerPixel int
 
@@ -500,7 +500,7 @@ type pngReader struct {
 	pend []byte // data already converted, but not yet read by client
 }
 
-func (ff *flateFilter) newPngReader(r io.Reader) *pngReader {
+func (ff *flateFilter) newPngReader(r io.ReadCloser) *pngReader {
 	res := &pngReader{
 		r: r,
 	}
@@ -545,11 +545,8 @@ func (r *pngReader) Read(b []byte) (int, error) {
 	return n, nil
 }
 
-var zlibWriterPool = sync.Pool{
-	New: func() interface{} {
-		zw, _ := zlib.NewWriterLevel(nil, zlib.BestCompression)
-		return zw
-	},
+func (r *pngReader) Close() error {
+	return r.r.Close()
 }
 
 // Encode implements the [filter] interface.
@@ -930,3 +927,43 @@ func appendFilter(dict Dict, name Name, parms Dict) {
 		}
 	}
 }
+
+func zlibNewReader(r io.Reader) (io.ReadCloser, error) {
+	obj := zlibReaderPool.Get()
+	if obj != nil {
+		zr := obj.(zlib.Resetter)
+		if err := zr.Reset(r, nil); err != nil {
+			return nil, err
+		}
+		return pooledZlibReader{obj.(io.ReadCloser)}, nil
+	}
+
+	zr, err := zlib.NewReader(r)
+	if err != nil {
+		return nil, err
+	}
+	return pooledZlibReader{zr}, nil
+}
+
+type pooledZlibReader struct {
+	io.ReadCloser
+}
+
+func (r pooledZlibReader) Close() error {
+	if err := r.ReadCloser.Close(); err != nil {
+		return err
+	}
+	zlibReaderPool.Put(r.ReadCloser)
+	return nil
+}
+
+var (
+	zlibReaderPool = &sync.Pool{}
+
+	zlibWriterPool = sync.Pool{
+		New: func() interface{} {
+			zw, _ := zlib.NewWriterLevel(nil, zlib.BestCompression)
+			return zw
+		},
+	}
+)

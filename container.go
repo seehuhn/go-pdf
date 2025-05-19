@@ -210,7 +210,7 @@ func GetStreamReader(r Getter, ref Object) (io.Reader, error) {
 
 // DecodeStream returns a reader for the decoded stream data.
 // If numFilters is non-zero, only the first numFilters filters are decoded.
-func DecodeStream(r Getter, x *Stream, numFilters int) (io.Reader, error) {
+func DecodeStream(r Getter, x *Stream, numFilters int) (io.ReadCloser, error) {
 	filters, err := getFilters(r, x)
 	if err != nil {
 		return nil, err
@@ -221,7 +221,7 @@ func DecodeStream(r Getter, x *Stream, numFilters int) (io.Reader, error) {
 		v = r.GetMeta().Version
 	}
 
-	out := x.R
+	out := io.NopCloser(x.R)
 	for i, fi := range filters {
 		if numFilters > 0 && i >= numFilters {
 			break

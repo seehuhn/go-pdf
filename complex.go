@@ -116,7 +116,7 @@ func (x String) AsTextString() TextString {
 	var s string
 	if bytes.HasPrefix(b, utf16Marker) {
 		buf := make([]uint16, 0, (len(b)-2)/2)
-		for i := 2; i < len(b); i += 2 {
+		for i := 2; i+1 < len(b); i += 2 {
 			buf = append(buf, uint16(b[i])<<8|uint16(b[i+1]))
 		}
 		rr := utf16.Decode(buf)

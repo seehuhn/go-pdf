@@ -20,6 +20,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 
+	"seehuhn.de/go/pdf/font/dict"
 	_ "seehuhn.de/go/pdf/font/dict" // import all font readers
 )
 
@@ -36,7 +37,7 @@ func (r *Reader) ReadFont(ref pdf.Object) (F font.FromFile, err error) {
 		}()
 	}
 
-	dict, err := font.ReadDict(r.R, ref)
+	dict, err := dict.Read(r.R, ref)
 	if err != nil {
 		return nil, err
 	}

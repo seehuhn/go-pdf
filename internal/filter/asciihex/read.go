@@ -23,7 +23,7 @@ import (
 )
 
 // Decode decodes data that has been encoded in ASCII hexadecimal form.
-func Decode(r io.Reader) io.Reader {
+func Decode(r io.Reader) io.ReadCloser {
 	return &reader{r: bufio.NewReader(r)}
 }
 
@@ -87,4 +87,11 @@ readLoop:
 	}
 
 	return n, r.err
+}
+
+func (r *reader) Close() error {
+	if r.err == nil || r.err == io.EOF {
+		return nil
+	}
+	return r.err
 }

@@ -146,10 +146,7 @@ func ExtractCIDFontType0(r pdf.Getter, obj pdf.Object) (*CIDFontType0, error) {
 		return nil, err
 	}
 
-	d.ToUnicode, err = cmap.ExtractToUnicode(r, fontDict["ToUnicode"])
-	if pdf.IsReadError(err) {
-		return nil, err
-	}
+	d.ToUnicode, _ = cmap.ExtractToUnicode(r, fontDict["ToUnicode"])
 
 	// fields in the CIDFont dictionary
 
@@ -398,7 +395,7 @@ func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) er
 	return nil
 }
 
-func (d *CIDFontType0) codec() (*charcode.Codec, error) {
+func (d *CIDFontType0) Codec() (*charcode.Codec, error) {
 	// First try to use the the union of the code space ranges
 	// from the CMap and the ToUnicode cmap.
 	var csr charcode.CodeSpaceRange
@@ -446,7 +443,7 @@ func (d *CIDFontType0) makeTextMap(codec *charcode.Codec) map[charcode.Code]stri
 // The font is immutable, i.e. no new glyphs can be added and no new codes
 // can be defined via the returned font object.
 func (d *CIDFontType0) MakeFont() (font.FromFile, error) {
-	codec, err := d.codec()
+	codec, err := d.Codec()
 	if err != nil {
 		return nil, err
 	}
@@ -516,7 +513,7 @@ func (s *t0Font) Codes(str pdf.String) iter.Seq[*font.Code] {
 }
 
 func init() {
-	font.RegisterReader("CIDFontType0", func(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
+	registerReader("CIDFontType0", func(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
 		return ExtractCIDFontType0(r, obj)
 	})
 }

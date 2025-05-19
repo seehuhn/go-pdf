@@ -210,7 +210,7 @@ func TestPngUp(t *testing.T) {
 			t.Errorf("wrong n: %d vs %d", n, len(in))
 		}
 
-		r := ff.newPngReader(buf)
+		r := ff.newPngReader(io.NopCloser(buf))
 		res, err := io.ReadAll(r)
 		if err != nil {
 			t.Error("unexpected error:", err)

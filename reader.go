@@ -332,7 +332,7 @@ func (r *Reader) Get(ref Reference, canObjStm bool) (_ Native, err error) {
 	return obj, nil
 }
 
-func getFromObjStm(r Getter, number uint32, sRef Reference, getInt getIntFn, enc *encryptInfo) (Native, error) {
+func getFromObjStm(r Getter, number uint32, sRef Reference, getInt getIntFn, enc *encryptInfo) (obj Native, err error) {
 	// We need to be careful to avoid infinite loops, in case reading from an
 	// object stream requires opening other object streams first.  This could
 	// be either caused by the stream object being contained in another object
@@ -354,6 +354,12 @@ func getFromObjStm(r Getter, number uint32, sRef Reference, getInt getIntFn, enc
 	if err != nil {
 		return nil, Wrap(err, "object stream "+sRef.String())
 	}
+	defer func() {
+		e2 := contents.Close()
+		if err == nil {
+			err = e2
+		}
+	}()
 
 	m := -1
 	for i, info := range contents.idx {
@@ -380,7 +386,7 @@ func getFromObjStm(r Getter, number uint32, sRef Reference, getInt getIntFn, enc
 		return nil, err
 	}
 
-	obj, err := contents.s.ReadObject()
+	obj, err = contents.s.ReadObject()
 	if err != nil {
 		return nil, err
 	}
@@ -499,6 +505,14 @@ func getObjStm(r Getter, stream *Stream, getInt getIntFn, enc *encryptInfo) (_ *
 	}
 
 	return &objStm{s: s, idx: idx}, nil
+}
+
+func (s *objStm) Close() error {
+	rc, ok := s.s.r.(io.Closer)
+	if ok {
+		return rc.Close()
+	}
+	return nil
 }
 
 // safeGetInteger returns a function that reads an integer from a getter.

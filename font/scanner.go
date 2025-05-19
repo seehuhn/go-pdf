@@ -17,17 +17,16 @@
 package font
 
 import (
-	"errors"
-	"fmt"
-	"sync"
-
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/glyphdata"
 )
 
 // FromFile represents an immutable font read from a PDF file.
 type FromFile interface {
 	Embedded
+
+	// GetDict returns the font dictionary of this font.
 	GetDict() Dict
 }
 
@@ -61,74 +60,7 @@ type Dict interface {
 	// the font program. This reference is zero if and only if the type is
 	// glyphdata.None.
 	GlyphData() (glyphdata.Type, pdf.Reference)
-}
 
-// ReadDict reads a font dictionary from a PDF file.
-func ReadDict(r pdf.Getter, obj pdf.Object) (Dict, error) {
-	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
-	if err != nil {
-		return nil, err
-	}
-
-	fontType, err := pdf.GetName(r, fontDict["Subtype"])
-	if err != nil {
-		return nil, err
-	}
-	fontDict["Subtype"] = fontType
-
-	if fontType == "Type0" {
-		a, err := pdf.GetArray(r, fontDict["DescendantFonts"])
-		if err != nil {
-			return nil, err
-		} else if len(a) < 1 {
-			return nil, &pdf.MalformedFileError{
-				Err: errors.New("composite font with no descendant fonts"),
-			}
-		}
-		fontDict["DescendantFonts"] = a
-
-		cidFontDict, err := pdf.GetDictTyped(r, a[0], "Font")
-		if err != nil {
-			return nil, err
-		}
-		a[0] = cidFontDict
-
-		fontType, err = pdf.GetName(r, cidFontDict["Subtype"])
-		if err != nil {
-			return nil, err
-		}
-		cidFontDict["Subtype"] = fontType
-	}
-
-	readerMutex.Lock()
-	defer readerMutex.Unlock()
-
-	read, ok := readers[fontType]
-	if !ok {
-		return nil, pdf.Errorf("unsupported font type: %s", fontType)
-	}
-
-	return read(r, fontDict)
-}
-
-type ReaderFunc func(r pdf.Getter, obj pdf.Object) (Dict, error)
-
-var (
-	readerMutex sync.Mutex
-	readers     map[pdf.Name]ReaderFunc
-)
-
-func RegisterReader(tp pdf.Name, fn ReaderFunc) {
-	readerMutex.Lock()
-	defer readerMutex.Unlock()
-
-	if readers == nil {
-		readers = make(map[pdf.Name]ReaderFunc)
-	}
-
-	if _, alreadyPresent := readers[tp]; alreadyPresent {
-		panic(fmt.Sprintf("conflicting readers for font type %s", tp))
-	}
-
-	readers[tp] = fn
+	// Codec allows to interpret character codes for the font.
+	Codec() (*charcode.Codec, error)
 }

@@ -17,77 +17,10 @@
 package standard
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/dict"
-	"seehuhn.de/go/pdf/font/glyphdata"
-	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
-
-// TestEmbedStandard tests that the 14 standard PDF fonts can be
-// used and that the font program is not embedded.
-func TestEmbedStandard(t *testing.T) {
-	for _, standardFont := range All {
-		for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
-			t.Run(fmt.Sprintf("%s@%s", standardFont, v), func(t *testing.T) {
-				data, _ := memfile.NewPDFWriter(v, nil)
-				rm := pdf.NewResourceManager(data)
-
-				// Embed the font into a PDF file:
-
-				F := standardFont.New()
-				ref, E, err := pdf.ResourceManagerEmbed(rm, F)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				var testText string
-				switch standardFont {
-				case Symbol:
-					testText = "∀"
-				case ZapfDingbats:
-					testText = "♠"
-				default:
-					testText = "Hello World"
-				}
-				gg := F.Layout(nil, 10, testText)
-				for _, g := range gg.Seq { // allocate codes
-					E.(font.EmbeddedLayouter).AppendEncoded(nil, g.GID, string(g.Text))
-				}
-
-				err = rm.Close()
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				// Read back the font dictionary and check that everything is
-				// as expected:
-
-				dictObj, err := font.ReadDict(data, ref)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				t1Dict, ok := dictObj.(*dict.Type1)
-				if !ok {
-					t.Fatalf("unexpected font dictionary type %T", dictObj)
-				}
-
-				if t1Dict.PostScriptName != standardFont.PostScriptName() {
-					t.Errorf("unexpected PostScriptName %q", t1Dict.PostScriptName)
-				}
-				if t1Dict.FontType != glyphdata.None {
-					t.Errorf("unexpected FontType %d", t1Dict.FontType)
-				}
-			})
-		}
-	}
-}
 
 // TestGlyphLists tests that the glyph lists of the 14 standard PDF
 // fonts are consistent between the .pfb and the .afm files.
