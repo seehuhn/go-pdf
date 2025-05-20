@@ -46,15 +46,22 @@ type Reader struct {
 	// User callbacks.
 	// TODO(voss): clean up this list
 	// TODO(voss): check the error returns
-	DrawGlyph func(g font.Glyph) error
 	Character func(cid cid.CID, text string) error
-	TextSpace func() error
-	TextNL    func() error
+	TextEvent func(event TextEvent, arg float64)
 
 	Text      func(text string) error
 	UnknownOp func(op string, args []pdf.Object) error
 	EveryOp   func(op string, args []pdf.Object) error
 }
+
+type TextEvent uint8
+
+const (
+	TextEventNone TextEvent = iota
+	TextEventSpace
+	TextEventNL
+	TextEventMove
+)
 
 // New creates a new Reader.
 func New(r pdf.Getter, loader *loader.FontLoader) *Reader {
@@ -288,9 +295,6 @@ func (r *Reader) do() error {
 		case "ET":
 			if op.OK() {
 				r.Set &= ^graphics.StateTextMatrix
-				if r.TextNL != nil {
-					r.TextNL()
-				}
 			}
 
 		// Table 103 - Text state operators
@@ -367,12 +371,8 @@ func (r *Reader) do() error {
 			if op.OK() {
 				r.TextLineMatrix = matrix.Translate(tx, ty).Mul(r.TextLineMatrix)
 				r.TextMatrix = r.TextLineMatrix
-				if tx > 0 && ty == 0 {
-					if r.TextSpace != nil {
-						r.TextSpace()
-					}
-				} else if r.TextNL != nil {
-					r.TextNL()
+				if r.TextEvent != nil {
+					r.TextEvent(TextEventNL, 0)
 				}
 			}
 
@@ -384,8 +384,8 @@ func (r *Reader) do() error {
 				r.Set |= graphics.StateTextLeading
 				r.TextLineMatrix = matrix.Translate(tx, ty).Mul(r.TextLineMatrix)
 				r.TextMatrix = r.TextLineMatrix
-				if r.TextNL != nil {
-					r.TextNL()
+				if r.TextEvent != nil {
+					r.TextEvent(TextEventNL, 0)
 				}
 			}
 
@@ -398,8 +398,8 @@ func (r *Reader) do() error {
 				r.TextMatrix = m
 				r.TextLineMatrix = m
 				r.Set |= graphics.StateTextMatrix
-				if r.TextNL != nil {
-					r.TextNL()
+				if r.TextEvent != nil {
+					r.TextEvent(TextEventMove, 0)
 				}
 			}
 
@@ -407,8 +407,8 @@ func (r *Reader) do() error {
 			if op.OK() {
 				r.TextLineMatrix = matrix.Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
 				r.TextMatrix = r.TextLineMatrix
-				if r.TextNL != nil {
-					r.TextNL()
+				if r.TextEvent != nil {
+					r.TextEvent(TextEventNL, 0)
 				}
 			}
 
@@ -425,8 +425,8 @@ func (r *Reader) do() error {
 			if op.OK() && r.TextFont != nil {
 				r.TextLineMatrix = matrix.Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
 				r.TextMatrix = r.TextLineMatrix
-				if r.TextNL != nil {
-					r.TextNL()
+				if r.TextEvent != nil {
+					r.TextEvent(TextEventNL, 0)
 				}
 				r.processText(s)
 			}
@@ -439,6 +439,11 @@ func (r *Reader) do() error {
 				r.TextWordSpacing = aw
 				r.TextCharacterSpacing = ac
 				r.Set |= graphics.StateTextWordSpacing | graphics.StateTextCharacterSpacing
+				r.TextLineMatrix = matrix.Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
+				r.TextMatrix = r.TextLineMatrix
+				if r.TextEvent != nil {
+					r.TextEvent(TextEventNL, 0)
+				}
 				r.processText(s)
 			}
 
@@ -458,6 +463,10 @@ func (r *Reader) do() error {
 						d = float64(ai)
 					}
 					if d != 0 {
+						if d < 0 && r.TextEvent != nil {
+							r.TextEvent(TextEventSpace, -d)
+						}
+
 						d = d / 1000 * r.TextFontSize
 						switch r.TextFont.WritingMode() {
 						case font.Horizontal:
@@ -661,15 +670,6 @@ func (r *Reader) processText(s pdf.String) {
 		// TODO(voss): check for error returns from the callbacks
 		if r.Character != nil && r.TextRenderingMode != graphics.TextRenderingModeInvisible {
 			r.Character(info.CID, info.Text)
-		}
-		if r.DrawGlyph != nil && r.TextRenderingMode != graphics.TextRenderingModeInvisible {
-			g := font.Glyph{
-				// GID:     gid,
-				Advance: width,
-				Rise:    r.TextRise,
-				Text:    []rune(info.Text),
-			}
-			r.DrawGlyph(g)
 		}
 		if r.Text != nil && r.TextRenderingMode != graphics.TextRenderingModeInvisible {
 			r.Text(info.Text)

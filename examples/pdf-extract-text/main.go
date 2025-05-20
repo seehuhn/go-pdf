@@ -22,6 +22,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"slices"
 
 	"seehuhn.de/go/geom/matrix"
 
@@ -84,8 +85,6 @@ type extractor struct {
 }
 
 func (e *extractor) extractText(fname string) error {
-	extraTextCache := make(map[font.Embedded]map[cid.CID]string)
-
 	fd, err := os.Open(fname)
 	if err != nil {
 		return err
@@ -108,14 +107,29 @@ func (e *extractor) extractText(fname string) error {
 		endPage = numPages
 	}
 
+	// -----------------------------------------------------------------------
+
+	extraTextCache := make(map[font.Embedded]map[cid.CID]string)
+	spaceWidth := make(map[font.Embedded]float64)
+
 	contents := reader.New(r, nil)
-	contents.TextSpace = func() error {
-		fmt.Print(" ")
-		return nil
-	}
-	contents.TextNL = func() error {
-		fmt.Println()
-		return nil
+	contents.TextEvent = func(op reader.TextEvent, arg float64) {
+		switch op {
+		case reader.TextEventSpace:
+			w0, ok := spaceWidth[contents.TextFont]
+			if !ok {
+				w0 = getSpaceWidth(contents.TextFont)
+				spaceWidth[contents.TextFont] = w0
+			}
+
+			if arg > 0.3*w0 {
+				fmt.Print(" ")
+			}
+		case reader.TextEventNL:
+			fmt.Println()
+		case reader.TextEventMove:
+			fmt.Println()
+		}
 	}
 	contents.Character = func(cid cid.CID, text string) error {
 		if text == "" {
@@ -137,6 +151,8 @@ func (e *extractor) extractText(fname string) error {
 		return nil
 	}
 
+	// -----------------------------------------------------------------------
+
 	for pageNo := startPage; pageNo <= endPage; pageNo++ {
 		_, pageDict, err := pagetree.GetPage(r, pageNo-1)
 		if err != nil {
@@ -156,6 +172,20 @@ func (e *extractor) extractText(fname string) error {
 		fmt.Println()
 	}
 	return nil
+}
+
+func getSpaceWidth(F font.Embedded) float64 {
+	Fe, ok := F.(font.FromFile)
+	if !ok {
+		return 280
+	}
+
+	d := Fe.GetDict()
+	if d == nil {
+		return 0
+	}
+
+	return spaceWidthHeuristic(d)
 }
 
 func getExtraMapping(r *pdf.Reader, F font.Embedded) map[cid.CID]string {
@@ -213,4 +243,58 @@ func getExtraMapping(r *pdf.Reader, F font.Embedded) map[cid.CID]string {
 		fmt.Printf("%v %T\n", tp, F)
 		return nil
 	}
+}
+
+type affine struct {
+	intercept, slope float64
+}
+
+var commonCharacters = map[string]affine{
+	" ": {0, 1},
+	" ": {0, 1},
+	")": {-43.01937, 1.0268},
+	"/": {-10.99708, 0.9623335},
+	"•": {-24.2725, 0.9956384},
+	"−": {-439.6255, 1.238626},
+	"∗": {91.30598, 0.7265824},
+	"1": {-130.7855, 0.9746186},
+	"a": {-131.2164, 0.9740258},
+	"A": {72.40703, 0.4928694},
+	"e": {-136.5258, 0.9895894},
+	"E": {-28.76257, 0.6957778},
+	"i": {51.62929, 0.8973944},
+	"ε": {-56.25771, 0.9947787},
+	"Ω": {-132.9966, 1.002173},
+	"中": {-356.8609, 1.215483},
+}
+
+func spaceWidthHeuristic(dict font.Dict) float64 {
+	guesses := []float64{280}
+	for _, info := range dict.Characters() {
+		if coef, ok := commonCharacters[info.Text]; ok && info.Width > 0 {
+			guesses = append(guesses, coef.intercept+coef.slope*info.Width)
+		}
+	}
+	slices.Sort(guesses)
+
+	// calculate the median
+	var guess float64
+	n := len(guesses)
+	if n%2 == 0 {
+		guess = (guesses[n/2-1] + guesses[n/2]) / 2
+	} else {
+		guess = guesses[n/2]
+	}
+
+	// adjustment to remove empirical bias
+	guess = 1.366239*guess - 139.183703
+
+	// clamp to approximate [0.01, 0.99] quantile range
+	if guess < 200 {
+		guess = 200
+	} else if guess > 1000 {
+		guess = 1000
+	}
+
+	return guess
 }

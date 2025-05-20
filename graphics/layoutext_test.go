@@ -34,6 +34,7 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 	"seehuhn.de/go/pdf/reader"
+	"seehuhn.de/go/postscript/cid"
 )
 
 func TestGlyphWidths(t *testing.T) {
@@ -75,10 +76,8 @@ func TestGlyphWidths(t *testing.T) {
 	}
 
 	in := reader.New(data, nil)
-	var ggOut []font.Glyph
 	var xxOut []float64
-	in.DrawGlyph = func(g font.Glyph) error {
-		ggOut = append(ggOut, g)
+	in.Character = func(cid cid.CID, text string) error {
 		x, _ := in.GetTextPositionDevice()
 		xxOut = append(xxOut, x)
 		return nil
