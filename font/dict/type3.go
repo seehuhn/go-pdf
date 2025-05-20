@@ -276,8 +276,32 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	return nil
 }
 
-func (d *Type3) Codec() (*charcode.Codec, error) {
-	return charcode.NewCodec(charcode.Simple)
+func (d *Type3) Codec() *charcode.Codec {
+	codec, _ := charcode.NewCodec(charcode.Simple)
+	return codec
+}
+
+func (d *Type3) Characters() iter.Seq2[charcode.Code, font.Code] {
+	return func(yield func(charcode.Code, font.Code) bool) {
+		textMap := simpleTextMap("", d.Encoding, d.ToUnicode)
+		for c := range 256 {
+			code := byte(c)
+			var info font.Code
+			if d.Encoding(code) != "" {
+				info = font.Code{
+					CID:            cid.CID(code) + 1,
+					Width:          d.Width[code],
+					Text:           textMap[code],
+					UseWordSpacing: code == 0x20,
+				}
+			} else {
+				continue
+			}
+			if !yield(charcode.Code(code), info) {
+				return
+			}
+		}
+	}
 }
 
 // GlyphData returns glyphdata.Type3 and 0.
@@ -289,13 +313,12 @@ func (d *Type3) GlyphData() (glyphdata.Type, pdf.Reference) {
 // MakeFont returns a new font object that can be used to typeset text.
 // The font is immutable, i.e. no new glyphs can be added and no new codes
 // can be defined via the returned font object.
-func (d *Type3) MakeFont() (font.FromFile, error) {
+func (d *Type3) MakeFont() font.FromFile {
 	textMap := simpleTextMap("", d.Encoding, d.ToUnicode)
-	F := &t3Font{
+	return &t3Font{
 		Dict: d,
 		Text: textMap,
 	}
-	return F, nil
 }
 
 var (

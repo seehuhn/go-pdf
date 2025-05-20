@@ -395,21 +395,33 @@ func (d *CIDFontType0) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) er
 	return nil
 }
 
-func (d *CIDFontType0) Codec() (*charcode.Codec, error) {
-	// First try to use the the union of the code space ranges
-	// from the CMap and the ToUnicode cmap.
-	var csr charcode.CodeSpaceRange
-	csr = append(csr, d.CMap.CodeSpaceRange...)
-	if d.ToUnicode != nil {
-		csr = append(csr, d.ToUnicode.CodeSpaceRange...)
-	}
-	codec, err := charcode.NewCodec(csr)
-	if err == nil {
-		return codec, nil
-	}
+func (d *CIDFontType0) Codec() *charcode.Codec {
+	return makeCodec(d.CMap, d.ToUnicode)
+}
 
-	// If this doesn't work, try to use the code space range alone.
-	return charcode.NewCodec(d.CMap.CodeSpaceRange)
+func (d *CIDFontType0) Characters() iter.Seq2[charcode.Code, font.Code] {
+	return func(yield func(charcode.Code, font.Code) bool) {
+		codec := d.Codec()
+		textMap := d.makeTextMap(codec)
+		var buf []byte
+		for code, cid := range d.CMap.All(codec) {
+			buf = codec.AppendCode(buf[:0], code)
+			width, ok := d.Width[cid]
+			if !ok {
+				width = d.DefaultWidth
+			}
+			info := font.Code{
+				CID:            cid,
+				Notdef:         d.CMap.LookupNotdefCID(buf),
+				Width:          width,
+				Text:           textMap[code],
+				UseWordSpacing: len(buf) == 1 && buf[0] == 0x20,
+			}
+			if !yield(code, info) {
+				return
+			}
+		}
+	}
 }
 
 // GlyphData returns information about the embedded font program.
@@ -442,21 +454,15 @@ func (d *CIDFontType0) makeTextMap(codec *charcode.Codec) map[charcode.Code]stri
 // MakeFont returns a new font object that can be used to typeset text.
 // The font is immutable, i.e. no new glyphs can be added and no new codes
 // can be defined via the returned font object.
-func (d *CIDFontType0) MakeFont() (font.FromFile, error) {
-	codec, err := d.Codec()
-	if err != nil {
-		return nil, err
-	}
-
+func (d *CIDFontType0) MakeFont() font.FromFile {
+	codec := d.Codec()
 	textMap := d.makeTextMap(codec)
-
-	s := &t0Font{
+	return &t0Font{
 		CIDFontType0: d,
 		codec:        codec,
 		text:         textMap,
 		cache:        make(map[charcode.Code]*font.Code),
 	}
-	return s, nil
 }
 
 var (

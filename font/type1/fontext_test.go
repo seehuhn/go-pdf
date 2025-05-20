@@ -131,10 +131,7 @@ func TestTextContent(t *testing.T) {
 	}
 
 	s := &strings.Builder{}
-	E, err := dict.MakeFont()
-	if err != nil {
-		t.Fatal(err)
-	}
+	E := dict.MakeFont()
 	for code := range E.Codes(textString) {
 		s.WriteString(code.Text)
 	}

@@ -33,6 +33,18 @@ type Range struct {
 	Low, High []byte
 }
 
+func (r Range) IsValid() bool {
+	if len(r.Low) != len(r.High) || len(r.Low) == 0 || len(r.Low) > 4 {
+		return false
+	}
+	for i := range r.Low {
+		if r.Low[i] > r.High[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // CodeSpaceRange describes the ranges of byte sequences which are valid
 // character codes for a given encoding.
 type CodeSpaceRange []Range

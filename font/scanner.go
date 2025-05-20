@@ -17,6 +17,8 @@
 package font
 
 import (
+	"iter"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/glyphdata"
@@ -50,7 +52,7 @@ type Dict interface {
 	// MakeFont returns a new font object that can be used to typeset text.
 	// The font is immutable, i.e. no new glyphs can be added and no new codes
 	// can be defined via the returned font object.
-	MakeFont() (FromFile, error)
+	MakeFont() FromFile
 
 	// GlyphData returns information about the embedded font program.
 	//
@@ -62,5 +64,7 @@ type Dict interface {
 	GlyphData() (glyphdata.Type, pdf.Reference)
 
 	// Codec allows to interpret character codes for the font.
-	Codec() (*charcode.Codec, error)
+	Codec() *charcode.Codec
+
+	Characters() iter.Seq2[charcode.Code, Code]
 }

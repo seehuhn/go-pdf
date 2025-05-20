@@ -369,10 +369,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		return nil, nil, err
 	}
 
-	E, err := dicts.MakeFont()
-	if err != nil {
-		return nil, nil, err
-	}
+	E := dicts.MakeFont()
 
 	return fontDictRef, E, nil
 }

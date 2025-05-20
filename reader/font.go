@@ -41,5 +41,5 @@ func (r *Reader) ReadFont(ref pdf.Object) (F font.FromFile, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return dict.MakeFont()
+	return dict.MakeFont(), nil
 }

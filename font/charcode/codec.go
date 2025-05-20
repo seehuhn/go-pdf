@@ -67,10 +67,10 @@ const (
 )
 
 // NewCodec returns a new Decoder for the given code space range.
-// If the code space range is invalid, an error is returned.
+// The only errors returned are if the code space range is invalid.
 func NewCodec(ranges CodeSpaceRange) (*Codec, error) {
 	for _, r := range ranges {
-		if len(r.Low) != len(r.High) || len(r.Low) == 0 || len(r.Low) > 4 {
+		if !r.IsValid() {
 			return nil, errInvalidCodeSpaceRange
 		}
 	}
