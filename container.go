@@ -200,7 +200,7 @@ func CheckDictType(r Getter, obj Dict, wantType Name) error {
 // contents of a PDF stream.
 //
 // This is a convenience function, combining [GetStream] and [DecodeStream].
-func GetStreamReader(r Getter, ref Object) (io.Reader, error) {
+func GetStreamReader(r Getter, ref Object) (io.ReadCloser, error) {
 	stm, err := GetStream(r, ref)
 	if err != nil {
 		return nil, err
