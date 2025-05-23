@@ -45,7 +45,11 @@ const (
 	Type3
 
 	CFF
+
+	// CFFSimple indicates that glyph outlines are provided in CFF format,
+	// and glyph names are present in the font data.
 	CFFSimple
+
 	OpenTypeCFF
 
 	// OpenTypeCFFSimple indicates that glyph outlines are provided in OpenType

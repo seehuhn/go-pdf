@@ -23,6 +23,42 @@ import (
 	"seehuhn.de/go/postscript/type1/names"
 )
 
+// makeCodec creates a character codec from CMap and ToUnicode information.
+// It attempts to use the union of code space ranges from both sources,
+// falling back to simpler codecs if needed.
+func makeCodec(cmap *cmap.File, toUnicode *cmap.ToUnicodeFile) *charcode.Codec {
+	// First try to use the the union of the code space ranges from the CMap
+	// and the ToUnicode cmap.  If this fails, remove code space ranges from
+	// the end one by one until we find a working codec.
+	var csr charcode.CodeSpaceRange
+	for _, r := range cmap.CodeSpaceRange {
+		if r.IsValid() {
+			csr = append(csr, r)
+		}
+	}
+	if toUnicode != nil {
+		for _, r := range toUnicode.CodeSpaceRange {
+			if r.IsValid() {
+				csr = append(csr, r)
+			}
+		}
+	}
+	for len(csr) > 0 {
+		codec, err := charcode.NewCodec(csr)
+		if err == nil {
+			return codec
+		}
+		csr = csr[:len(csr)-1]
+	}
+
+	// As a fallback, use one-byte codes.
+	codec, _ := charcode.NewCodec(charcode.Simple)
+	return codec
+}
+
+// simpleTextMap creates a mapping from character codes to Unicode text strings
+// for simple (non-composite) fonts. It combines information from the font's
+// encoding and optional ToUnicode CMap.
 func simpleTextMap(postScriptName string, encoding encoding.Simple, toUnicode *cmap.ToUnicodeFile) map[byte]string {
 	textMap := make(map[byte]string)
 	for code := range 256 {

@@ -35,7 +35,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/dict"
-	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/internal/pagerange"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/reader"
@@ -195,18 +194,11 @@ func getExtraMapping(r *pdf.Reader, F font.Embedded) map[cid.CID]string {
 	}
 
 	d := Fe.GetDict()
-	tp, ref := d.GlyphData()
-	if ref == 0 {
-		return nil
-	}
+	fontInfo := d.FontInfo()
 
-	switch d := d.(type) {
-	case *dict.CIDFontType2:
-		if tp != glyphdata.TrueType {
-			return nil
-		}
-
-		body, err := pdf.GetStreamReader(r, ref)
+	switch fontInfo := fontInfo.(type) {
+	case *dict.FontInfoGlyfEmbedded:
+		body, err := pdf.GetStreamReader(r, fontInfo.Ref)
 		if err != nil {
 			return nil
 		}
@@ -223,8 +215,8 @@ func getExtraMapping(r *pdf.Reader, F font.Embedded) map[cid.CID]string {
 
 		// method 1: use glyph names, if present
 		if outlines.Names != nil {
-			if d.CIDToGID != nil {
-				for cidVal, gid := range d.CIDToGID {
+			if fontInfo.CIDToGID != nil {
+				for cidVal, gid := range fontInfo.CIDToGID {
 					if int(gid) > len(outlines.Names) {
 						continue
 					}
@@ -233,14 +225,13 @@ func getExtraMapping(r *pdf.Reader, F font.Embedded) map[cid.CID]string {
 						continue
 					}
 
-					text := names.ToUnicode(name, d.PostScriptName)
+					text := names.ToUnicode(name, fontInfo.PostScriptName)
 					m[cid.CID(cidVal)] = string(text)
 				}
 			}
 		}
 		return m
 	default:
-		fmt.Printf("%v %T\n", tp, F)
 		return nil
 	}
 }

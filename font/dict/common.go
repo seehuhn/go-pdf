@@ -26,6 +26,7 @@ import (
 )
 
 // moreThanTen returns true if the flattened array has more than 10 elements.
+// This is used to determine whether to inline arrays or use indirect objects.
 func moreThanTen(a pdf.Array) bool {
 	count := 0
 	for _, obj := range a {
@@ -42,8 +43,8 @@ func moreThanTen(a pdf.Array) bool {
 }
 
 // widthsAreCompatible returns true, if the glyph widths ww are compatible with
-// the standard font metrics.  The object encObj is the value of the font
-// dictionary's Encoding entry.
+// the standard font metrics. The enc parameter provides the encoding used
+// to map character codes to glyph names.
 func widthsAreCompatible(ww []float64, enc encoding.Simple, info *stdmtx.FontData) bool {
 	for code := range 256 {
 		glyphName := enc(byte(code))
@@ -57,6 +58,9 @@ func widthsAreCompatible(ww []float64, enc encoding.Simple, info *stdmtx.FontDat
 	return true
 }
 
+// fontDescriptorIsCompatible checks if a font descriptor is compatible with
+// standard font metrics. This is used to determine if a standard font can
+// be used instead of embedding a custom font.
 func fontDescriptorIsCompatible(fd *font.Descriptor, stdInfo *stdmtx.FontData) bool {
 	if fd.FontFamily != "" && fd.FontFamily != stdInfo.FontFamily {
 		return false
@@ -99,5 +103,6 @@ func fontDescriptorIsCompatible(fd *font.Descriptor, stdInfo *stdmtx.FontData) b
 	if fd.StemH != 0 && math.Abs(fd.StemH-stdInfo.StemH) > 0.5 {
 		return false
 	}
+
 	return true
 }

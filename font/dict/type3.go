@@ -30,7 +30,6 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
-	"seehuhn.de/go/pdf/font/glyphdata"
 )
 
 var (
@@ -304,10 +303,14 @@ func (d *Type3) Characters() iter.Seq2[charcode.Code, font.Code] {
 	}
 }
 
-// GlyphData returns glyphdata.Type3 and 0.
-// The only purpose of this function is to implement the [font.Dict] interface.
-func (d *Type3) GlyphData() (glyphdata.Type, pdf.Reference) {
-	return glyphdata.Type3, 0
+// FontInfo returns information about the embedded font program.
+// The returned value is of type [*FontInfoType3].
+func (d *Type3) FontInfo() any {
+	return &FontInfoType3{
+		CharProcs:  d.CharProcs,
+		FontMatrix: d.FontMatrix,
+		Resources:  d.Resources,
+	}
 }
 
 // MakeFont returns a new font object that can be used to typeset text.

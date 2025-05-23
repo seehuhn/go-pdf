@@ -21,11 +21,13 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	"seehuhn.de/go/postscript/cid"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/debug/mock"
-	"seehuhn.de/go/postscript/cid"
 )
 
 func TestSimpleWidthsRoundTrip(t *testing.T) {
@@ -190,4 +192,121 @@ var compositeWidthTests = []struct {
 			},
 		},
 	},
+}
+
+func TestVMetricsRoundtrip(t *testing.T) {
+	testCases := []struct {
+		name    string
+		metrics map[cid.CID]VMetrics
+	}{
+		{
+			name:    "missing map",
+			metrics: nil,
+		},
+		{
+			name:    "empty map",
+			metrics: map[cid.CID]VMetrics{},
+		},
+		{
+			name: "single entry",
+			metrics: map[cid.CID]VMetrics{
+				42: {DeltaY: -1000, OffsX: 250, OffsY: 750},
+			},
+		},
+		{
+			name: "two consecutive CIDs with different metrics",
+			metrics: map[cid.CID]VMetrics{
+				20: {DeltaY: -900, OffsX: 400, OffsY: 800},
+				21: {DeltaY: -900, OffsX: 400, OffsY: 0},
+			},
+		},
+		{
+			name: "two consecutive CIDs with same metrics",
+			metrics: map[cid.CID]VMetrics{
+				20: {DeltaY: -900, OffsX: 400, OffsY: 800},
+				21: {DeltaY: -900, OffsX: 400, OffsY: 800},
+			},
+		},
+		{
+			name: "consecutive CIDs with different metrics",
+			metrics: map[cid.CID]VMetrics{
+				10: {DeltaY: -1000, OffsX: 250, OffsY: 750},
+				11: {DeltaY: -1000, OffsX: 300, OffsY: 760},
+				12: {DeltaY: -1000, OffsX: 350, OffsY: 770},
+			},
+		},
+		{
+			name: "consecutive CIDs with same metrics",
+			metrics: map[cid.CID]VMetrics{
+				20: {DeltaY: -900, OffsX: 400, OffsY: 800},
+				21: {DeltaY: -900, OffsX: 400, OffsY: 800},
+				22: {DeltaY: -900, OffsX: 400, OffsY: 800},
+			},
+		},
+		{
+			name: "non-consecutive CIDs",
+			metrics: map[cid.CID]VMetrics{
+				30: {DeltaY: -900, OffsX: 400, OffsY: 800},
+				35: {DeltaY: -950, OffsX: 450, OffsY: 850},
+				40: {DeltaY: -1000, OffsX: 500, OffsY: 900},
+			},
+		},
+		{
+			name: "mixed patterns",
+			metrics: map[cid.CID]VMetrics{
+				50: {DeltaY: -800, OffsX: 300, OffsY: 700},
+				51: {DeltaY: -800, OffsX: 300, OffsY: 700},
+				52: {DeltaY: -800, OffsX: 300, OffsY: 700},
+				60: {DeltaY: -900, OffsX: 400, OffsY: 800},
+				61: {DeltaY: -950, OffsX: 450, OffsY: 850},
+				62: {DeltaY: -1000, OffsX: 500, OffsY: 900},
+				70: {DeltaY: -1100, OffsX: 550, OffsY: 950},
+				80: {DeltaY: -1100, OffsX: 550, OffsY: 950},
+				81: {DeltaY: -1100, OffsX: 550, OffsY: 950},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			ref := buf.Alloc()
+
+			// Encode
+			encoded := encodeVMetrics(tc.metrics)
+			buf.Put(ref, encoded)
+
+			// Decode
+			decoded, err := decodeVMetrics(buf, ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Compare original and decoded
+			if d := cmp.Diff(tc.metrics, decoded); d != "" {
+				t.Error(d)
+			}
+		})
+	}
+}
+
+// TestEncodeVMetricsSingleEntry tests the case of encoding a map which
+// contains exactly one entry.
+func TestEncodeVMetricsSingleEntry(t *testing.T) {
+	metrics := map[cid.CID]VMetrics{
+		cid.CID(100): {
+			DeltaY: -1000,
+			OffsX:  500,
+			OffsY:  880,
+		},
+	}
+
+	result := encodeVMetrics(metrics)
+
+	if len(result) != 2 {
+		t.Errorf("Expected 2 elements (CID + array), got %d", len(result))
+	}
+	if result[0] != pdf.Integer(100) {
+		t.Errorf("Expected first element to be CID 100, got %v", result[0])
+	}
 }

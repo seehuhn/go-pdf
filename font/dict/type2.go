@@ -523,10 +523,20 @@ func (d *CIDFontType2) Characters() iter.Seq2[charcode.Code, font.Code] {
 	}
 }
 
-// GlyphData returns information about the embedded font program.
-// This implements the [font.Dict] interface.
-func (d *CIDFontType2) GlyphData() (glyphdata.Type, pdf.Reference) {
-	return d.FontType, d.FontRef
+// FontInfo returns information about the embedded font program.
+// The returned value is of type [*FontInfoGlyfEmbedded] or [*FontInfoGlyfExternal].
+func (d *CIDFontType2) FontInfo() any {
+	if d.FontRef != 0 {
+		return &FontInfoGlyfEmbedded{
+			PostScriptName: d.PostScriptName,
+			Ref:            d.FontRef,
+			CIDToGID:       d.CIDToGID,
+		}
+	}
+	return &FontInfoGlyfExternal{
+		PostScriptName: d.PostScriptName,
+		ROS:            d.ROS,
+	}
 }
 
 func (d *CIDFontType2) makeTextMap(codec *charcode.Codec) map[charcode.Code]string {

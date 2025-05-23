@@ -21,7 +21,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/font/glyphdata"
 )
 
 // FromFile represents an immutable font read from a PDF file.
@@ -54,14 +53,12 @@ type Dict interface {
 	// can be defined via the returned font object.
 	MakeFont() FromFile
 
-	// GlyphData returns information about the embedded font program.
-	//
-	// Returns the format of the embedded font program (Type1, TrueType, CFF,
-	// etc.) as a glyphdata.Type, or glyphdata.None if the font is not
-	// embedded. Also returns a pdf.Reference to the stream object containing
-	// the font program. This reference is zero if and only if the type is
-	// glyphdata.None.
-	GlyphData() (glyphdata.Type, pdf.Reference)
+	// FontInfo returns information about the embedded font program.
+	// The information can be used to load the font file and to extract
+	// the the glyph corresponding to a character identifier.
+	// The result is a pointer to one of the FontInfo* types
+	// defined in the font/dict package.
+	FontInfo() any
 
 	// Codec allows to interpret character codes for the font.
 	Codec() *charcode.Codec

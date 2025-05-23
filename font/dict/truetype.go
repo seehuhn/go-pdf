@@ -384,10 +384,15 @@ func (d *TrueType) Characters() iter.Seq2[charcode.Code, font.Code] {
 	}
 }
 
-// GlyphData returns information about the embedded font program.
-// This implements the [font.Dict] interface.
-func (d *TrueType) GlyphData() (glyphdata.Type, pdf.Reference) {
-	return d.FontType, d.FontRef
+// FontInfo returns information about the embedded font program.
+// The returned value is of type [*FontInfoSimple].
+func (d *TrueType) FontInfo() any {
+	return &FontInfoSimple{
+		PostScriptName: d.PostScriptName,
+		Ref:            d.FontRef,
+		FontType:       d.FontType,
+		Encoding:       d.Encoding,
+	}
 }
 
 // MakeFont returns a new font object that can be used to typeset text.
