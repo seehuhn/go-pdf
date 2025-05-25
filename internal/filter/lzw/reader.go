@@ -122,12 +122,11 @@ type Reader struct {
 	earlyChange uint16 // the off-by-one error allowed by the PDF spec
 }
 
-// NewReader creates a new [io.ReadCloser].
-// Reads from the returned io.ReadCloser read and decompress data from src.
-// If src does not also implement [io.ByteReader],
-// the decompressor may read more data than necessary from src.
-// It is the caller's responsibility to call [Close] on the ReadCloser when
-// finished reading.
+// NewReader creates a new [Reader].
+// The reader reads from reads and decompress data from src. If src does not
+// also implement [io.ByteReader], the decompressor may read more data than
+// necessary from src. It is the caller's responsibility to call [Close] on the
+// returned Reader when finished.
 func NewReader(src io.Reader, earlyChange bool) *Reader {
 	br, ok := src.(io.ByteReader)
 	if !ok && src != nil {
