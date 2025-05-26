@@ -24,8 +24,9 @@ import (
 
 // Writer encodes data using CCITT Fax compression.
 type Writer struct {
-	w *bufio.Writer
-	p Params
+	p      Params
+	w      *bufio.Writer
+	closed bool
 
 	lineBytes int
 	line      []byte
@@ -34,8 +35,6 @@ type Writer struct {
 
 	byteVal   byte
 	validBits int
-
-	closed bool
 
 	kCounter int
 }
@@ -170,7 +169,7 @@ func (w *Writer) flushLine() error {
 			return err
 		}
 
-		// Tag bit for G3 2D: 0 if next line is 2D, 1 if next line is 1D
+		// Tag bit for G3 2D: 0 = next line is 2D, 1 = next line is 1D
 		if w.p.K > 0 {
 			tagBit := 0
 			if w.kCounter == 0 {
@@ -205,11 +204,15 @@ func (w *Writer) Close() error {
 
 	if w.p.K < 0 {
 		// Group 4 EOFB: 000000000001000000000001
-		if err := w.writeBits(0x001, 12); err != nil {
+		if err := w.writeBits(0b000000000001_000000000001, 24); err != nil {
 			return err
 		}
-		if err := w.writeBits(0x001, 12); err != nil {
-			return err
+	} else if w.p.K == 0 && w.p.EndOfLine {
+		// the first of the six EOL markers is already written as part of the last line
+		for i := 1; i < 6; i++ {
+			if err := w.writeBits(0b000000000001, 12); err != nil {
+				return err
+			}
 		}
 	}
 

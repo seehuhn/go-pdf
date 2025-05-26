@@ -34,16 +34,16 @@ func TestSimpleWriteWithoutEOL(t *testing.T) {
 	w := NewWriter(buf, p)
 	n, err := w.Write([]byte{0xFF}) // one row, eight columns, all white
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatal(err)
 	} else if n != 1 {
 		t.Fatalf("unexpected number of bytes written: %d", n)
 	}
 	err = w.Close()
 	if err != nil {
-		t.Fatalf("unexpected error on close: %v", err)
+		t.Fatal(err)
 	}
 
-	expected := []byte{0b00000000, 0b0001_1001, 0b1_0000000}
+	expected := []byte{0b10011_000}
 	if d := cmp.Diff(expected, buf.Bytes()); d != "" {
 		t.Fatalf("unexpected output: %s", d)
 	}
@@ -60,13 +60,13 @@ func TestSimepleWriteWithEOL(t *testing.T) {
 	w := NewWriter(buf, p)
 	n, err := w.Write([]byte{0xFF}) // one row, eight columns, all white
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatal(err)
 	} else if n != 1 {
 		t.Fatalf("unexpected number of bytes written: %d", n)
 	}
 	err = w.Close()
 	if err != nil {
-		t.Fatalf("unexpected error on close: %v", err)
+		t.Fatal(err)
 	}
 
 	expected := []byte{0b00000000, 0b0001_1001, 0b1_0000000, 0b00001_000}
