@@ -49,14 +49,17 @@ func NewWriter(w io.Writer, p *Params) *Writer {
 	lineBytes := (pCopy.Columns + 7) / 8
 	currentLine := make([]byte, 0, lineBytes)
 
-	// Initialize reference line to all white
-	referenceLine := make([]byte, lineBytes)
-	if pCopy.BlackIs1 {
-		// When BlackIs1=true, white pixels are 0 (already initialized)
-	} else {
-		// When BlackIs1=false, white pixels are 1
-		for i := range referenceLine {
-			referenceLine[i] = 0xFF
+	var referenceLine []byte
+	if pCopy.K != 0 {
+		// Initialize reference line to all white
+		referenceLine := make([]byte, lineBytes)
+		if pCopy.BlackIs1 {
+			// When BlackIs1=true, white pixels are 0 (already initialized)
+		} else {
+			// When BlackIs1=false, white pixels are 1
+			for i := range referenceLine {
+				referenceLine[i] = 0xFF
+			}
 		}
 	}
 
@@ -66,13 +69,36 @@ func NewWriter(w io.Writer, p *Params) *Writer {
 		lineBytes: lineBytes,
 		line:      currentLine,
 		refLine:   referenceLine,
-		kCounter:  pCopy.K,
-	}
-	if pCopy.K >= 0 && out.p.EndOfLine {
-		// The T.4 spec requires an EOL marker before the first line
-		out.writeBits(0b0000_00000001, 12)
+		kCounter:  0, // start with 1D line
 	}
 	return out
+}
+
+// Close finalizes the CCITT Fax stream.
+func (w *Writer) Close() error {
+	if w.closed {
+		return nil
+	}
+
+	if w.p.K < 0 {
+		// Group 4 EOFB: 000000000001000000000001
+		if err := w.writeBits(0b000000000001_000000000001, 24); err != nil {
+			return err
+		}
+	} else if w.p.K == 0 && w.p.EndOfLine {
+		for range 6 {
+			if err := w.writeBits(0b000000000001, 12); err != nil {
+				return err
+			}
+		}
+	}
+
+	if err := w.flushBits(); err != nil {
+		return err
+	}
+
+	w.closed = true
+	return nil
 }
 
 func (w *Writer) Write(p []byte) (n int, err error) {
@@ -87,7 +113,7 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 		}
 
 		if len(w.line) == w.lineBytes {
-			err = w.flushLine()
+			err = w.writeRow()
 			if err != nil {
 				return n, err
 			}
@@ -98,8 +124,8 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 	return n, nil
 }
 
-func (w *Writer) writeBits(code uint32, length int) error {
-	if length <= 0 || length > 32 {
+func (w *Writer) writeBits(code uint32, length uint8) error {
+	if length > 32 {
 		return fmt.Errorf("writeBits: invalid length %d", length)
 	}
 
@@ -131,7 +157,7 @@ func (w *Writer) flushBits() error {
 	return w.w.Flush()
 }
 
-func (w *Writer) flushLine() error {
+func (w *Writer) writeRow() error {
 	// check that bits beyond w.p.Columns are zero
 	if w.p.Columns%8 != 0 {
 		lastByteIndex := (w.p.Columns - 1) / 8
@@ -144,13 +170,30 @@ func (w *Writer) flushLine() error {
 		}
 	}
 
+	// Write EOL for Group 3 modes
+	if w.p.EndOfLine && w.p.K >= 0 {
+		if err := w.writeBits(0b000000000001, 12); err != nil {
+			return err
+		}
+
+		// Tag bit for G3 2D: 0 = next line is 2D, 1 = next line is 1D
+		if w.p.K > 0 {
+			var tagBit uint32
+			if w.kCounter == 0 {
+				tagBit = 1
+			}
+			if err := w.writeBits(tagBit, 1); err != nil {
+				return err
+			}
+		}
+	}
+
 	var err error
 	if w.p.K < 0 {
 		err = w.encodeG4Line()
 	} else if w.p.K == 0 {
 		err = w.encode1DLine()
 	} else {
-		// Group 3 2D: Use K-counter logic matching the reader
 		if w.kCounter > 0 {
 			err = w.encode2DLine()
 			w.kCounter--
@@ -161,24 +204,6 @@ func (w *Writer) flushLine() error {
 	}
 	if err != nil {
 		return err
-	}
-
-	// Write EOL for Group 3 modes
-	if w.p.EndOfLine && w.p.K >= 0 {
-		if err := w.writeBits(0b000000000001, 12); err != nil {
-			return err
-		}
-
-		// Tag bit for G3 2D: 0 = next line is 2D, 1 = next line is 1D
-		if w.p.K > 0 {
-			tagBit := 0
-			if w.kCounter == 0 {
-				tagBit = 1
-			}
-			if err := w.writeBits(uint32(tagBit), 1); err != nil {
-				return err
-			}
-		}
 	}
 
 	if w.p.EncodedByteAlign {
@@ -192,73 +217,30 @@ func (w *Writer) flushLine() error {
 	return nil
 }
 
-// Close finalizes the CCITT Fax stream.
-func (w *Writer) Close() error {
-	if w.closed {
-		return nil
+func (w *Writer) whiteBit() byte {
+	if w.p.BlackIs1 {
+		return 0
 	}
-
-	if err := w.flushBits(); err != nil {
-		return err
-	}
-
-	if w.p.K < 0 {
-		// Group 4 EOFB: 000000000001000000000001
-		if err := w.writeBits(0b000000000001_000000000001, 24); err != nil {
-			return err
-		}
-	} else if w.p.K == 0 && w.p.EndOfLine {
-		// the first of the six EOL markers is already written as part of the last line
-		for i := 1; i < 6; i++ {
-			if err := w.writeBits(0b000000000001, 12); err != nil {
-				return err
-			}
-		}
-	}
-
-	if err := w.flushBits(); err != nil {
-		return err
-	}
-
-	w.closed = true
-	return nil
+	return 1
 }
 
-func (w *Writer) encode1DRun(runLength int, isWhite bool) error {
-	for runLength >= 2560 {
-		lastIndex := len(extMakeupEncodeTable) - 1
-		entry := extMakeupEncodeTable[lastIndex]
-		err := w.writeBits(entry.Code, int(entry.Width))
-		if err != nil {
+func (w *Writer) encode1DLine() error {
+	xpos := 0
+
+	// The spec requires that the first run is white
+	runBit := w.whiteBit()
+
+	for xpos < w.p.Columns {
+		runStart := xpos
+		for xpos < w.p.Columns && w.getPixel(w.line, xpos) == runBit {
+			xpos++
+		}
+		if err := w.encode1DRun(xpos-runStart, runBit); err != nil {
 			return err
 		}
-		runLength -= 2560
+		runBit = 1 - runBit // Toggle between white and black
 	}
-
-	if runLength >= 64 {
-		makeupIndex := (runLength / 64) - 1
-		var table []encodeNode
-		if isWhite {
-			table = whiteMakeupEncodeTable
-		} else {
-			table = blackMakeupEncodeTable
-		}
-		entry := table[makeupIndex]
-		err := w.writeBits(entry.Code, int(entry.Width))
-		if err != nil {
-			return err
-		}
-		runLength %= 64
-	}
-
-	var table []encodeNode
-	if isWhite {
-		table = whiteTermEncodeTable
-	} else {
-		table = blackTermEncodeTable
-	}
-	entry := table[runLength]
-	return w.writeBits(entry.Code, int(entry.Width))
+	return nil
 }
 
 // getPixel returns the bit value at column x.
@@ -284,47 +266,39 @@ func (w *Writer) getPixel(lineData []byte, x int) byte {
 	return (lineData[byteIndex] >> uint(bitIndex)) & 1
 }
 
-// findChangingElement finds the x-coordinate of the first pixel in lineData
-// at or after startX whose value is different from refValue.
-func (w *Writer) findChangingElement(lineData []byte, startX int, refValue byte) int {
-	for x := startX; x < w.p.Columns; x++ {
-		if w.getPixel(lineData, x) != refValue {
-			return x
-		}
-	}
-	return w.p.Columns
-}
-
-func (w *Writer) encode1DLine() error {
-	xpos := 0
-	isWhite := true
-
-	// Determine what bit value represents white
-	whiteBit := byte(0)
-	if !w.p.BlackIs1 {
-		whiteBit = 1
-	}
-
-	for xpos < w.p.Columns {
-		// Find the bit value we're looking for
-		lookingFor := whiteBit
-		if !isWhite {
-			lookingFor = 1 - whiteBit
-		}
-
-		// Count run length
-		runStart := xpos
-		for xpos < w.p.Columns && w.getPixel(w.line, xpos) == lookingFor {
-			xpos++
-		}
-		runLength := xpos - runStart
-
-		if err := w.encode1DRun(runLength, isWhite); err != nil {
+func (w *Writer) encode1DRun(runLength int, runBit byte) error {
+	for runLength >= 2560 {
+		lastIndex := len(extMakeupEncodeTable) - 1
+		entry := extMakeupEncodeTable[lastIndex]
+		err := w.writeBits(entry.Code, entry.Width)
+		if err != nil {
 			return err
 		}
-		isWhite = !isWhite
+		runLength -= 2560
 	}
-	return nil
+
+	if runLength >= 64 {
+		makeupIndex := runLength/64 - 1
+		var entry encodeNode
+		if runBit == w.whiteBit() {
+			entry = whiteMakeupEncodeTable[makeupIndex]
+		} else {
+			entry = blackMakeupEncodeTable[makeupIndex]
+		}
+		err := w.writeBits(entry.Code, entry.Width)
+		if err != nil {
+			return err
+		}
+		runLength %= 64
+	}
+
+	var entry encodeNode
+	if runBit == w.whiteBit() {
+		entry = whiteTermEncodeTable[runLength]
+	} else {
+		entry = blackTermEncodeTable[runLength]
+	}
+	return w.writeBits(entry.Code, entry.Width)
 }
 
 func (w *Writer) encodeG4Line() error {
@@ -367,7 +341,7 @@ func (w *Writer) encode2DLineInternal(isG4 bool) error {
 		if delta >= -3 && delta <= 3 {
 			// Vertical mode
 			var code uint32
-			var width int
+			var width uint8
 			switch delta {
 			case 0:
 				code, width = 0b1, 1
@@ -396,26 +370,29 @@ func (w *Writer) encode2DLineInternal(isG4 bool) error {
 			return err
 		}
 
-		// Determine colors for the two runs
-		whiteBit := byte(0)
-		if !w.p.BlackIs1 {
-			whiteBit = 1
-		}
-		isWhiteRun1 := a0Val == whiteBit
-		isWhiteRun2 := !isWhiteRun1
-
 		run1Length := a1 - a0
-		if err := w.encode1DRun(run1Length, isWhiteRun1); err != nil {
+		if err := w.encode1DRun(run1Length, a0Val); err != nil {
 			return err
 		}
 
 		a2 := w.findChangingElement(w.line, a1, w.getPixel(w.line, a1))
 		run2Length := a2 - a1
-		if err := w.encode1DRun(run2Length, isWhiteRun2); err != nil {
+		if err := w.encode1DRun(run2Length, 1-a0Val); err != nil {
 			return err
 		}
 
 		xpos = a2
 	}
 	return nil
+}
+
+// findChangingElement finds the x-coordinate of the first pixel in lineData
+// at or after startX whose value is different from refValue.
+func (w *Writer) findChangingElement(lineData []byte, startX int, refValue byte) int {
+	for x := startX; x < w.p.Columns; x++ {
+		if w.getPixel(lineData, x) != refValue {
+			return x
+		}
+	}
+	return w.p.Columns
 }

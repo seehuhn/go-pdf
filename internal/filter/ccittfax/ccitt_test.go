@@ -44,10 +44,11 @@ func TestRoundTripTriangle(t *testing.T) {
 	for _, blackIs1 := range []bool{false, true} {
 		t.Run(fmt.Sprintf("%t", blackIs1), func(t *testing.T) {
 			param := &Params{
-				BlackIs1: blackIs1,
-				Columns:  8,
-				MaxRows:  8,
-				K:        0,
+				BlackIs1:  blackIs1,
+				Columns:   8,
+				MaxRows:   8,
+				K:         0,
+				EndOfLine: true,
 			}
 
 			buf := &bytes.Buffer{}
@@ -119,8 +120,6 @@ func TestCompatibilitySimple(t *testing.T) {
 }
 
 func TestCompatibility(t *testing.T) {
-	t.Skip()
-
 	width := 62
 	height := 62
 	image := make([]byte, height*width/8)

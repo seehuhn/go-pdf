@@ -53,6 +53,7 @@ func TestSimepleWriteWithEOL(t *testing.T) {
 	p := &Params{
 		Columns:   8,
 		K:         0,
+		BlackIs1:  false,
 		EndOfLine: true,
 	}
 
@@ -69,7 +70,20 @@ func TestSimepleWriteWithEOL(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected := []byte{0b00000000, 0b0001_1001, 0b1_0000000, 0b00001_000}
+	expected := []byte{
+		0b00000000,
+		0b0001_1001,
+		0b1_0000000,
+		0b00001_000,
+		0b00000000,
+		0b1_0000000,
+		0b00001_000,
+		0b00000000,
+		0b1_0000000,
+		0b00001_000,
+		0b00000000,
+		0b10000000,
+	}
 	if d := cmp.Diff(expected, buf.Bytes()); d != "" {
 		t.Fatalf("unexpected output: %s", d)
 	}
