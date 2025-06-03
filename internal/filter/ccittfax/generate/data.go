@@ -29,24 +29,20 @@ var (
 	horizTable = []proto{
 		{0b001, 3, 0},
 	}
-	v0Table = []proto{
+	vertTable = []proto{
 		{0b1, 1, 0},
-	}
-	vrTable = []proto{
 		{0b011, 3, 1},
 		{0b000011, 6, 2},
 		{0b0000011, 7, 3},
-	}
-	vlTable = []proto{
-		{0b010, 3, 1},
-		{0b000010, 6, 2},
-		{0b0000010, 7, 3},
+		{0b010, 3, 0xFFFF},     // -1
+		{0b000010, 6, 0xFFFE},  // -2
+		{0b0000010, 7, 0xFFFD}, // -3
 	}
 	extTable = []proto{
 		{0b0000001, 7, 0},
 	}
 	eolvTable = []proto{
-		{0b0000001, 7, 0},
+		{0b0000000, 7, 0},
 	}
 	makeUpWTable = []proto{
 		{0b11011, 5, 64},

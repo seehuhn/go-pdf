@@ -9,20 +9,15 @@ import (
 
 // Reader decodes CCITT Fax compressed data.
 type Reader struct {
-	p Params
+	Params
 
-	// Bit reading state
 	r         *bufio.Reader
 	err       error  // Last read error, if any
 	current   uint32 // up to 4 bytes of input, valid bits MSB-aligned
 	validBits int    // number of valid bits in current
 
-	// Line buffers (pixel data, 1 bit per pixel, 0=white/1=black before BlackIs1 inversion)
 	line    []byte // Current line being decoded
 	refLine []byte // Reference line (previous line) for 2D decoding
-
-	// Decoding state
-	kCounter int
 
 	// numRows is the number of complete lines delivered to the caller.
 	numRows int
@@ -40,22 +35,33 @@ func NewReader(r io.Reader, p *Params) *Reader {
 	var refLine []byte
 	if pCopy.K != 0 {
 		refLine = make([]byte, lineBufSize) // all white
+		if pCopy.BlackIs1 {
+			// When BlackIs1=true, white pixels are 0 (already initialized)
+		} else {
+			// When BlackIs1=false, white pixels are 1
+			for i := range refLine {
+				refLine[i] = 0xFF
+			}
+		}
 	}
 
 	return &Reader{
-		p:        pCopy,
-		r:        bufio.NewReader(r),
-		line:     make([]byte, 0, lineBufSize),
-		refLine:  refLine,
-		kCounter: pCopy.K,
-		numRows:  0,
+		Params:  pCopy,
+		r:       bufio.NewReader(r),
+		line:    make([]byte, 0, lineBufSize),
+		refLine: refLine,
+		numRows: 0,
 	}
 }
 
 // Read decodes the next scan line into the provided buffer.
 // Returns the number of bytes written and any error.
 func (r *Reader) Read(buf []byte) (n int, err error) {
-	if len(r.line) == 0 && r.err == nil && (r.p.MaxRows == 0 || r.numRows < r.p.MaxRows) {
+	if len(buf) == 0 {
+		return 0, nil
+	}
+
+	if len(r.line) == 0 && r.err == nil && (r.MaxRows == 0 || r.numRows < r.MaxRows) {
 		r.decodeScanLine()
 	}
 
@@ -76,24 +82,26 @@ func (r *Reader) Read(buf []byte) (n int, err error) {
 }
 
 func (r *Reader) decodeScanLine() {
-	if r.p.K < 0 {
+	if r.K < 0 {
 		r.decodeG4ScanLine()
-	} else if r.p.K == 0 {
+	} else if r.K == 0 {
 		r.decodeG3ScanLine1D()
 	} else {
 		r.decodeG3ScanLine2D()
 	}
+
+	copy(r.refLine, r.line)
 }
 
 // decodeG4ScanLine decodes a single Group 4 (T.6) scanline.
 func (r *Reader) decodeG4ScanLine() {
 	// Group 4 fax uses pure 2D encoding for all lines
 	// with no EOL codes or line mode switching
-	r.decode2D(true)
+	r.decode2D()
 
 	// Check for EOFB (End of Facsimile Block)
 	// EOFB in Group 4 is 24 bits: 000000000001000000000001
-	if !r.p.IgnoreEndOfBlock && r.peekBits(12) == 0 {
+	if !r.IgnoreEndOfBlock && r.peekBits(12) == 1 {
 		r.consumeBits(12)
 		if r.peekBits(12) == 1 {
 			r.consumeBits(12)
@@ -112,11 +120,11 @@ func (r *Reader) decodeG3ScanLine1D() {
 
 	numEOL := 0
 
-	for xpos < r.p.Columns && r.err == nil {
+	for xpos < r.Columns && r.err == nil {
 		runLength, state := r.decodeRun(isWhite)
 
-		runLength = min(runLength, r.p.Columns-xpos)
-		r.fillRowBits(xpos, xpos+runLength, isWhite != r.p.BlackIs1)
+		runLength = min(runLength, r.Columns-xpos)
+		r.fillRowBits(xpos, xpos+runLength, isWhite != r.BlackIs1)
 		xpos += runLength
 
 		switch state {
@@ -124,7 +132,7 @@ func (r *Reader) decodeG3ScanLine1D() {
 			r.waitForOne()
 			if xpos == 0 {
 				numEOL++
-				if !r.p.IgnoreEndOfBlock && numEOL >= 6 {
+				if !r.IgnoreEndOfBlock && numEOL >= 6 {
 					r.err = io.EOF
 					return
 				}
@@ -140,29 +148,17 @@ func (r *Reader) decodeG3ScanLine1D() {
 }
 
 // decodeG3ScanLine2D decodes a Group 3 2D scanline (K > 0).
-// It follows the PDF specification: the first line is 1D, followed by K-1 2D lines, repeating.
 func (r *Reader) decodeG3ScanLine2D() {
-	// Handle K-counter cycling:
-	// - First line in group uses 1D encoding
-	// - K-1 lines use 2D encoding
-	if r.kCounter <= 0 {
-		r.decodeG3ScanLine1D()
-		r.kCounter = r.p.K - 1
-		if r.kCounter <= 0 {
-			r.kCounter = r.p.K
-		}
-		return
+	for r.peekBits(11) == 0 {
+		r.consumeBits(11)
+		r.waitForOne() // allow for fill bits
 	}
 
-	// Use 2D encoding for this line
-	use2D := r.decode2D(false)
-
-	// If the tag bit after EOL indicates 1D mode for the next line,
-	// reset the K counter
-	if !use2D {
-		r.kCounter = r.p.K
-	} else {
-		r.kCounter--
+	tp := r.readBits(1)
+	if tp == 1 { // 1D mode
+		r.decodeG3ScanLine1D()
+	} else { // 2D mode
+		r.decode2D()
 	}
 }
 
@@ -184,186 +180,61 @@ func (r *Reader) decodeRun(isWhite bool) (int, state) {
 
 // decode2D is a helper function that handles the common 2D decoding process
 // used by both Group 3 2D and Group 4 encodings.
-// Returns true if this line uses 2D encoding, false if next line should use 1D encoding.
-func (r *Reader) decode2D(isG4 bool) bool {
+func (r *Reader) decode2D() {
 	r.line = r.line[:0]
 
-	// For Group 3 only, handle EOL and tag bit at the beginning
-	if !isG4 && r.p.EndOfLine {
-		// Look for EOL (12 zeros followed by a 1)
-		for r.peekBits(12) == 0 {
-			r.consumeBits(12)
-			if r.readBits(1) == 1 {
-				// Found an EOL
+	white := r.whiteBit()
 
-				// For G3 2D, check tag bit to determine mode for next line
-				if r.readBits(1) == 1 {
-					// Tag bit = 1 means next line uses 1D encoding
-					r.kCounter = r.p.K // Reset K counter
-					return true        // This line still uses 2D encoding
-				}
-				// Tag bit = 0 means continue with 2D
-				break
-			}
-		}
-	}
+	a0 := -1
+	currentCol := white
+	for a0 < r.Columns && r.err == nil {
+		value := r.peekBits(7)
+		entry := mainTable[value]
 
-	// EOFB/RTC detection for Group 3 - check for consecutive EOLs
-	if !isG4 && r.p.EndOfLine {
-		eolCount := 0
-		for r.peekBits(12) == 0 && r.err == nil {
-			r.consumeBits(12)
-			if r.readBits(1) == 1 {
-				eolCount++
-				// 6 consecutive EOLs = RTC (Return to Control)
-				if !r.p.IgnoreEndOfBlock && eolCount >= 6 {
-					r.err = io.EOF
-					return false
+		if entry.State == S_EOL {
+			if r.peekBits(11) == 0 {
+				if a0 >= 0 {
+					// error ...
 				}
 			} else {
-				break
+				// error ...
 			}
+			break // End of line reached
+		} else {
+			r.consumeBits(int(entry.Width))
 		}
-	}
 
-	// Initialize positions
-	a0 := 0         // Current position on the line being decoded
-	isWhite := true // Color at a0 (assumed white at start of line)
+		b1, b2 := r.findB1B2(r.refLine, a0, currentCol)
 
-	// Main decoding loop - continue until we reach the end of the line
-	for a0 < r.p.Columns && r.err == nil {
-		// Find positions of changing elements
-		b1 := r.findNextChangingElement(r.refLine, a0)
-		b2 := r.findNextChangingElement(r.refLine, b1)
+		switch entry.State {
+		case S_Pass:
+			r.fillRowBits(a0, b2, currentCol == 1)
+			a0 = b2 // a0 jumps to position below b2
 
-		// Read code to determine mode
-		code := r.peekBits(4)
-
-		if code == 0b0001 {
-			// Pass mode: a0 jumps to position below b2
-			r.consumeBits(4)
-			a0 = b2
-		} else if code>>1 == 0b001 {
-			// Horizontal mode
-			r.consumeBits(3)
-
+		case S_Horiz:
 			// First run (of current color)
-			runLength, state := r.decodeRun(isWhite)
-			runLength = min(runLength, r.p.Columns-a0)
-			r.fillRowBits(a0, a0+runLength, isWhite != r.p.BlackIs1)
+			runLength, _ := r.decodeRun(currentCol == white)
+			runLength = min(runLength, r.Columns-a0)
+			a0 = max(a0, 0)
+			r.fillRowBits(a0, a0+runLength, currentCol == 1)
 			a0 += runLength
-
-			// If we got an EOL during run decoding, exit early
-			if state == S_EOL {
-				break
-			}
 
 			// Second run (of opposite color)
-			runLength, state = r.decodeRun(!isWhite)
-			runLength = min(runLength, r.p.Columns-a0)
-			r.fillRowBits(a0, a0+runLength, isWhite == r.p.BlackIs1)
+			runLength, _ = r.decodeRun(currentCol != white)
+			runLength = min(runLength, r.Columns-a0)
+			r.fillRowBits(a0, a0+runLength, currentCol == 0)
 			a0 += runLength
 
-			// If we got an EOL during run decoding, exit early
-			if state == S_EOL {
-				break
-			}
-		} else {
-			// Vertical mode
-			var offset int
-			if (code & 0b1000) != 0 {
-				// V(0)
-				offset = 0
-				r.consumeBits(1)
-			} else if (code & 0b0100) != 0 {
-				// V(R) or V(L)
-				offset = 1
-				if (code & 0b0010) != 0 {
-					offset = -1 // V(L)
-				}
-				r.consumeBits(3)
-			} else if (code & 0b0010) != 0 {
-				// V(R2) or V(L2)
-				offset = 2
-				if (code & 0b0001) != 0 {
-					offset = -2 // V(L2)
-				}
-				r.consumeBits(4)
-			} else {
-				// V(R3) or V(L3)
-				offset = 3
-				if (code & 0b0001) != 0 {
-					offset = -3 // V(L3)
-				}
-				r.consumeBits(6)
-			}
-
-			// Place a1 at offset from b1
-			a1 := b1 + offset
-
-			// Ensure a1 is within bounds
-			if a1 < a0 {
-				a1 = a0
-			}
-			if a1 > r.p.Columns {
-				a1 = r.p.Columns
-			}
-
-			// Fill from a0 to a1 with current color
-			r.fillRowBits(a0, a1, isWhite != r.p.BlackIs1)
-
-			// Move a0 to a1 and flip color
+		case S_Vert:
+			a1 := b1 + int(int16(entry.Param))
+			r.fillRowBits(a0, a1, currentCol == 1)
+			currentCol = 1 - currentCol
 			a0 = a1
-			isWhite = !isWhite
+
+		case S_Ext:
+			panic("not implemented: S_Ext")
 		}
 	}
-
-	// After decoding, copy current line to reference line for next scanline
-	lineBufSize := (r.p.Columns + 7) / 8
-	if len(r.refLine) < lineBufSize {
-		r.refLine = make([]byte, lineBufSize)
-	}
-	copy(r.refLine, r.line)
-
-	return true
-}
-
-// findNextChangingElement finds the next position where the bit value changes
-// from the color at the starting position.
-// It starts at bit position `start` and returns the position of the next color change,
-// or r.p.Columns if no change is found before the end of the line.
-func (r *Reader) findNextChangingElement(line []byte, start int) int {
-	if start < 0 {
-		panic("invalid start position")
-	}
-
-	startByteIndex := start / 8
-	startBitIndex := 7 - (start % 8)
-	var startBit byte
-	if startByteIndex >= len(line) {
-		// all bits beyond the end of the line are assummed to be 0
-		return r.p.Columns
-	}
-	startBit = (line[startByteIndex] >> startBitIndex) & 1
-
-	for pos := start + 1; pos < r.p.Columns; pos++ {
-		byteIndex := pos / 8
-		bitIndex := 7 - (pos % 8)
-
-		if byteIndex >= len(line) {
-			if startBit == 1 {
-				return pos
-			}
-			return r.p.Columns
-		}
-
-		bit := (line[byteIndex] >> bitIndex) & 1
-		if bit != startBit {
-			return pos
-		}
-	}
-
-	return r.p.Columns
 }
 
 // fillRowBits fills a range of bits in r.line. The line is taken to be a
@@ -391,6 +262,9 @@ func (r *Reader) fillRowBits(start, end int, fill bool) {
 
 	// Fill with 1s (black) from start to end
 	for pos := start; pos < end; pos++ {
+		if pos < 0 {
+			continue
+		}
 		bytePos := pos / 8
 		bitPos := 7 - (pos % 8) // MSB first: bit 7 is leftmost
 		r.line[bytePos] |= 1 << bitPos
@@ -427,6 +301,7 @@ func (b *Reader) readBits(n int) uint32 {
 	return res
 }
 
+// waitForOne consumes bits, one by one, until a 1 has been consumed.
 func (b *Reader) waitForOne() {
 	for b.err == nil && b.readBits(1) == 0 {
 		// pass

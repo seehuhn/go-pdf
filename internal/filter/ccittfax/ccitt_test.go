@@ -47,7 +47,7 @@ func TestRoundTripTriangle(t *testing.T) {
 				BlackIs1:  blackIs1,
 				Columns:   8,
 				MaxRows:   8,
-				K:         0,
+				K:         3,
 				EndOfLine: true,
 			}
 
@@ -108,7 +108,11 @@ func TestCompatibilitySimple(t *testing.T) {
 	if param.MaxRows > 0 {
 		h = param.MaxRows
 	}
-	r := ccitt.NewReader(bytes.NewReader(encoded), ccitt.MSB, subformat, param.Columns, h, &ccitt.Options{})
+	opt := &ccitt.Options{
+		Align:  param.EncodedByteAlign,
+		Invert: param.BlackIs1,
+	}
+	r := ccitt.NewReader(bytes.NewReader(encoded), ccitt.MSB, subformat, param.Columns, h, opt)
 
 	out, err := io.ReadAll(r)
 	if err != nil {
