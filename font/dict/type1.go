@@ -78,8 +78,8 @@ type Type1 struct {
 	FontRef pdf.Reference
 }
 
-// ExtractType1 reads a Type 1 font dictionary from a PDF file.
-func ExtractType1(r pdf.Getter, obj pdf.Object) (*Type1, error) {
+// ReadType1 reads a Type 1 font dictionary from a PDF file.
+func ReadType1(r pdf.Getter, obj pdf.Object) (*Type1, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
 		return nil, err
@@ -462,6 +462,6 @@ func (f *t1Font) Codes(s pdf.String) iter.Seq[*font.Code] {
 
 func init() {
 	registerReader("Type1", func(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
-		return ExtractType1(r, obj)
+		return ReadType1(r, obj)
 	})
 }

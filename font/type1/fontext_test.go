@@ -58,7 +58,7 @@ func TestEmbed(t *testing.T) {
 	}
 
 	// step 2: read back the font and verify that everything is as expected
-	dict, err := dict.ExtractType1(w, ref)
+	dict, err := dict.ReadType1(w, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestTextContent(t *testing.T) {
 	r.ParsePage(pageRef, matrix.Identity)
 
 	// step 3: read back the font dictionary to inspect it.
-	dict, err := dict.ExtractType1(page.Out, ref)
+	dict, err := dict.ReadType1(page.Out, ref)
 	if err != nil {
 		t.Fatal(err)
 	}

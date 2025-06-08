@@ -105,7 +105,7 @@ func FuzzTrueTypeDict(f *testing.F) {
 			pdf.Format(os.Stdout, pdf.OptPretty, r.GetMeta().Trailer)
 			t.Skip("broken reference")
 		}
-		d, err := ExtractTrueType(r, obj)
+		d, err := ReadTrueType(r, obj)
 		if err != nil {
 			t.Skip("broken TrueTypeDict")
 		}
@@ -152,7 +152,7 @@ func checkRoundtripTT(t *testing.T, d1 *TrueType, v pdf.Version) {
 
 	// == Read ==
 
-	d2, err := ExtractTrueType(w, ref)
+	d2, err := ReadTrueType(w, ref)
 	if err != nil {
 		t.Fatal(err)
 	}

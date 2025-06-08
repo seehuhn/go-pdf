@@ -33,10 +33,10 @@ type Form struct {
 	PieceInfo    pdf.Object
 	LastModified time.Time
 	// TODO(voss): StructParent, StructParents
-	OC      pdf.Object
-	AF      pdf.Object
-	Measure pdf.Object
-	PtData  pdf.Object
+	// TODO(voss): OC
+	// TODO(voss): AF
+	// TODO(voss): Measure
+	// TODO(voss): PtData
 }
 
 func (f *Form) Subtype() pdf.Name {
@@ -86,18 +86,6 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 	if !f.LastModified.IsZero() {
 		dict["LastModified"] = pdf.Date(f.LastModified)
-	}
-	if f.OC != nil {
-		dict["OC"] = f.OC
-	}
-	if f.AF != nil {
-		dict["AF"] = f.AF
-	}
-	if f.Measure != nil {
-		dict["Measure"] = f.Measure
-	}
-	if f.PtData != nil {
-		dict["PtData"] = f.PtData
 	}
 
 	stm, err := rm.Out.OpenStream(ref, dict, &pdf.FilterCompress{})

@@ -124,7 +124,7 @@ func FuzzType1Dict(f *testing.F) {
 			pdf.Format(os.Stdout, pdf.OptPretty, r.GetMeta().Trailer)
 			t.Skip("broken reference")
 		}
-		d, err := ExtractType1(r, obj)
+		d, err := ReadType1(r, obj)
 		if err != nil {
 			t.Skip("no valid Type1Dict")
 		}
@@ -173,7 +173,7 @@ func checkRoundtripT1(t *testing.T, d1 *Type1, v pdf.Version) {
 
 	// == Read ==
 
-	d2, err := ExtractType1(w, fontDictRef)
+	d2, err := ReadType1(w, fontDictRef)
 	if err != nil {
 		t.Fatal(err)
 	}

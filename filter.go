@@ -895,18 +895,18 @@ func (w *withClose) Close() error {
 	return w.close()
 }
 
-func appendFilter(dict Dict, name Name, parms Dict) {
-	switch filter := dict["Filter"].(type) {
+func appendFilter(streamDict Dict, name Name, parms Dict) {
+	switch filter := streamDict["Filter"].(type) {
 	case Name:
-		dict["Filter"] = Array{filter, name}
-		p0, _ := dict["DecodeParms"].(Dict)
+		streamDict["Filter"] = Array{filter, name}
+		p0, _ := streamDict["DecodeParms"].(Dict)
 		if len(p0)+len(parms) > 0 {
-			dict["DecodeParms"] = Array{p0, parms}
+			streamDict["DecodeParms"] = Array{p0, parms}
 		}
 
 	case Array:
-		dict["Filter"] = append(filter, name)
-		pp, _ := dict["DecodeParms"].(Array)
+		streamDict["Filter"] = append(filter, name)
+		pp, _ := streamDict["DecodeParms"].(Array)
 		needsParms := len(parms) > 0
 		for i := 0; i < len(pp) && !needsParms; i++ {
 			pi, _ := pp[i].(Dict)
@@ -917,13 +917,13 @@ func appendFilter(dict Dict, name Name, parms Dict) {
 				pp = append(pp, nil)
 			}
 			pp := pp[:len(filter)]
-			dict["DecodeParms"] = append(pp, parms)
+			streamDict["DecodeParms"] = append(pp, parms)
 		}
 
 	default:
-		dict["Filter"] = name
+		streamDict["Filter"] = name
 		if len(parms) > 0 {
-			dict["DecodeParms"] = parms
+			streamDict["DecodeParms"] = parms
 		}
 	}
 }

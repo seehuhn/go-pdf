@@ -76,8 +76,8 @@ type Type3 struct {
 	Resources *pdf.Resources
 }
 
-// ExtractType3 reads a Type 3 font dictionary from a PDF file.
-func ExtractType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
+// ReadType3 reads a Type 3 font dictionary from a PDF file.
+func ReadType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
 		return nil, err
@@ -362,6 +362,6 @@ func (f *t3Font) Codes(s pdf.String) iter.Seq[*font.Code] {
 
 func init() {
 	registerReader("Type3", func(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
-		return ExtractType3(r, obj)
+		return ReadType3(r, obj)
 	})
 }

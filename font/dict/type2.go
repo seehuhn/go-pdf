@@ -100,8 +100,8 @@ type CIDFontType2 struct {
 	FontRef pdf.Reference
 }
 
-// ExtractCIDFontType2 reads a Type 2 CIDFont dictionary from the PDF file.
-func ExtractCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
+// ReadCIDFontType2 reads a Type 2 CIDFont dictionary from the PDF file.
+func ReadCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
 		return nil, err
@@ -629,6 +629,6 @@ func (s *t2Font) Codes(str pdf.String) iter.Seq[*font.Code] {
 
 func init() {
 	registerReader("CIDFontType2", func(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
-		return ExtractCIDFontType2(r, obj)
+		return ReadCIDFontType2(r, obj)
 	})
 }

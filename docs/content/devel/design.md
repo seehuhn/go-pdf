@@ -75,3 +75,47 @@ Naming
 - Methods with signature `Embed(*pdf.ResourceManager) (pdf.Native, T, error)`
   and optionally `Finish(*pdf.ResourceManager) error` are used to write objects
   to the PDF file, in cases when deduplication is required.
+
+
+Composite Objects
+-----------------
+
+No reader:
+./go-pdf/function/function.go:func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+./go-pdf/font/cff/font.go:func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
+./go-pdf/font/opentype/font.go:func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
+./go-pdf/font/truetype/font.go:func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
+./go-pdf/font/type1/font.go:func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
+./go-pdf/font/type3/font.go:func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
+./go-pdf/graphics/extgstate.go:func (s *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Native, State, error) {
+./go-pdf/graphics/form/form.go:func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+./go-pdf/graphics/op-marks.go:func (mc *MarkedContent) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+./go-pdf/graphics/pattern/type1.go:func (p *type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+./go-pdf/graphics/pattern/type2.go:func (p *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+./go-pdf/graphics/shading/type1.go:func (s *Type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+./go-pdf/graphics/shading/type3.go:func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+./go-pdf/graphics/shading/type4.go:func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+
+With reader:
+cmap.Extract -> *cmap.File -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
+cmap.ExtractToUnicode -> *cmap.ToUnicodeFile -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
+color.ExtractSpace -> ...
+  ... -> *color.SpaceCalGray -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
+  ... -> *color.SpaceCalRGB -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
+  ... -> *color.SpaceLab -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
+  ... -> color.SpaceDeviceCMYK -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
+  ... -> color.SpaceDeviceGray -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
+  ... -> color.SpaceDeviceRGB -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
+  ... -> *color.SpaceICCBased -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
+  ... -> *color.spacePatternColored -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
+  ... -> *color.spacePatternUncolored -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
+  ... -> *color.SpaceDeviceN -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
+  ... -> *color.SpaceIndexed -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
+  ... -> *color.SpaceSeparation -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
+metadata.ExtractStream -> *metadata.Stream -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
+
+TODO:
+./go-pdf/graphics/image/dict.go:func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+./go-pdf/graphics/image/indexed.go:func (im *Indexed) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+./go-pdf/graphics/image/jpeg.go:func (im *jpegImage) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+./go-pdf/graphics/image/png.go:func (im *PNG) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {

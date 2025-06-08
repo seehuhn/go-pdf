@@ -78,8 +78,8 @@ type TrueType struct {
 	FontRef pdf.Reference
 }
 
-// ExtractTrueType reads a TrueType font dictionary from a PDF file.
-func ExtractTrueType(r pdf.Getter, obj pdf.Object) (*TrueType, error) {
+// ReadTrueType reads a TrueType font dictionary from a PDF file.
+func ReadTrueType(r pdf.Getter, obj pdf.Object) (*TrueType, error) {
 	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
 	if err != nil {
 		return nil, err
@@ -444,6 +444,6 @@ func (f *ttFont) Codes(s pdf.String) iter.Seq[*font.Code] {
 
 func init() {
 	registerReader("TrueType", func(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
-		return ExtractTrueType(r, obj)
+		return ReadTrueType(r, obj)
 	})
 }

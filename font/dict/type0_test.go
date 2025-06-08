@@ -115,7 +115,7 @@ func FuzzType0Dict(f *testing.F) {
 			pdf.Format(os.Stdout, pdf.OptPretty, r.GetMeta().Trailer)
 			t.Skip("broken reference")
 		}
-		d, err := ExtractCIDFontType0(r, obj)
+		d, err := ReadCIDFontType0(r, obj)
 		if err != nil {
 			t.Skip("no valid CIDFontType0 dict")
 		}
@@ -167,7 +167,7 @@ func checkRoundtripT0(t *testing.T, d1 *CIDFontType0, v pdf.Version) {
 
 	// == Read ==
 
-	d2, err := ExtractCIDFontType0(w, fontDictRef)
+	d2, err := ReadCIDFontType0(w, fontDictRef)
 	if err != nil {
 		t.Fatal(err)
 	}

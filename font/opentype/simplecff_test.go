@@ -61,7 +61,7 @@ func TestEmbedSimple(t *testing.T) {
 			}
 
 			// step 2: read back the font and verify that everything is as expected
-			dict, err := dict.ExtractType1(w, ref)
+			dict, err := dict.ReadType1(w, ref)
 			if err != nil {
 				t.Fatal(err)
 			}
