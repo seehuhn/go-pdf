@@ -60,7 +60,7 @@ func (w *Writer) setColor(c color.Color, fill bool) {
 
 	cs := c.ColorSpace()
 	var needsColorSpace bool
-	switch cs.ColorSpaceFamily() {
+	switch cs.Family() {
 	case color.FamilyDeviceGray, color.FamilyDeviceRGB, color.FamilyDeviceCMYK:
 		needsColorSpace = false
 	default:

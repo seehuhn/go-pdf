@@ -82,9 +82,9 @@ func ICCBased(profile []byte, metadata *metadata.Stream) (*SpaceICCBased, error)
 	return res, nil
 }
 
-// ColorSpaceFamily returns /ICCBased.
+// Family returns /ICCBased.
 // This implements the [Space] interface.
-func (s *SpaceICCBased) ColorSpaceFamily() pdf.Name {
+func (s *SpaceICCBased) Family() pdf.Name {
 	return FamilyICCBased
 }
 

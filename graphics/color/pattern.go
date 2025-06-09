@@ -39,9 +39,9 @@ type Pattern interface {
 // spacePatternColored is used for colored tiling patterns and shading patterns.
 type spacePatternColored struct{}
 
-// ColorSpaceFamily returns /Pattern.
+// Family returns /Pattern.
 // This implements the [Space] interface.
-func (s spacePatternColored) ColorSpaceFamily() pdf.Name {
+func (s spacePatternColored) Family() pdf.Name {
 	return FamilyPattern
 }
 
@@ -93,9 +93,9 @@ type spacePatternUncolored struct {
 	base Space
 }
 
-// ColorSpaceFamily returns /Pattern.
+// Family returns /Pattern.
 // This implements the [Space] interface.
-func (s spacePatternUncolored) ColorSpaceFamily() pdf.Name {
+func (s spacePatternUncolored) Family() pdf.Name {
 	return FamilyPattern
 }
 

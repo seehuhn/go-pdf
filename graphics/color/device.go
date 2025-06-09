@@ -33,9 +33,9 @@ func (s spaceDeviceGray) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused,
 	return FamilyDeviceGray, zero, nil
 }
 
-// ColorSpaceFamily returns /DeviceGray.
+// Family returns /DeviceGray.
 // This implements the [Space] interface.
-func (s spaceDeviceGray) ColorSpaceFamily() pdf.Name {
+func (s spaceDeviceGray) Family() pdf.Name {
 	return FamilyDeviceGray
 }
 
@@ -79,9 +79,9 @@ func (s spaceDeviceRGB) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, 
 	return FamilyDeviceRGB, zero, nil
 }
 
-// ColorSpaceFamily returns /DeviceRGB.
+// Family returns /DeviceRGB.
 // This implements the [Space] interface.
-func (s spaceDeviceRGB) ColorSpaceFamily() pdf.Name {
+func (s spaceDeviceRGB) Family() pdf.Name {
 	return FamilyDeviceRGB
 }
 
@@ -126,9 +126,9 @@ func (s spaceDeviceCMYK) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused,
 	return FamilyDeviceCMYK, zero, nil
 }
 
-// ColorSpaceFamily returns /DeviceCMYK.
+// Family returns /DeviceCMYK.
 // This implements the [Space] interface.
-func (s spaceDeviceCMYK) ColorSpaceFamily() pdf.Name {
+func (s spaceDeviceCMYK) Family() pdf.Name {
 	return FamilyDeviceCMYK
 }
 

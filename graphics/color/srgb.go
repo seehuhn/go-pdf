@@ -26,9 +26,9 @@ import (
 // This is a special case of the ICCBased color space.
 type spaceSRGB struct{}
 
-// ColorSpaceFamily returns /ICCBased.
+// Family returns /ICCBased.
 // This implements the [Space] interface.
-func (s spaceSRGB) ColorSpaceFamily() pdf.Name {
+func (s spaceSRGB) Family() pdf.Name {
 	return "ICCBased"
 }
 

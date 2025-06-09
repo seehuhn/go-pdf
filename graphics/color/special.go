@@ -61,7 +61,7 @@ func Indexed(colors []Color) (*SpaceIndexed, error) {
 		min = []float64{0, space.ranges[0], space.ranges[2]}
 		max = []float64{100, space.ranges[1], space.ranges[3]}
 	case spacePatternColored, spacePatternUncolored, *SpaceIndexed:
-		return nil, fmt.Errorf("Indexed: invalid base color space %s", space.ColorSpaceFamily())
+		return nil, fmt.Errorf("Indexed: invalid base color space %s", space.Family())
 	}
 
 	lookup := make(pdf.String, 0, len(colors)*len(min))
@@ -88,9 +88,9 @@ func Indexed(colors []Color) (*SpaceIndexed, error) {
 	}, nil
 }
 
-// ColorSpaceFamily returns /Indexed.
+// Family returns /Indexed.
 // This implements the [Space] interface.
-func (s *SpaceIndexed) ColorSpaceFamily() pdf.Name {
+func (s *SpaceIndexed) Family() pdf.Name {
 	return FamilyIndexed
 }
 
@@ -174,9 +174,9 @@ func Separation(colorant pdf.Name, alternate Space, trfm function.Func) (*SpaceS
 	}, nil
 }
 
-// ColorSpaceFamily returns /Separation.
+// Family returns /Separation.
 // This implements the [Space] interface.
-func (s *SpaceSeparation) ColorSpaceFamily() pdf.Name {
+func (s *SpaceSeparation) Family() pdf.Name {
 	return FamilySeparation
 }
 
@@ -292,9 +292,9 @@ func DeviceN(names []pdf.Name, alternate Space, trfm function.Func, attr pdf.Dic
 	}, nil
 }
 
-// ColorSpaceFamily returns /DeviceN.
+// Family returns /DeviceN.
 // This implements the [Space] interface.
-func (s *SpaceDeviceN) ColorSpaceFamily() pdf.Name {
+func (s *SpaceDeviceN) Family() pdf.Name {
 	return FamilyDeviceN
 }
 

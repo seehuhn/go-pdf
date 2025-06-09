@@ -1,7 +1,9 @@
 This program is a Go re-implementation of mkg3states.c from the libtiff
 library.  The C source was downloaded from
 https://github.com/vadz/libtiff/blob/cda4b06914040aae5302b4da511ea266dad8a104/libtiff/mkg3states.c
-and then translated to Go by Claude Sonnet 4 and updated by Gemini 2.5 Pro.
+translated to Go by Claude Sonnet 4,
+updated by Gemini 2.5 Pro,
+and then heavily modified by Jochen Voss.
 
 The original C code is licensed under the following terms:
 

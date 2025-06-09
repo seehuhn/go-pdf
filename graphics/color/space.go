@@ -26,8 +26,8 @@ import (
 
 // Space represents a PDF color space which can be embedded in a PDF file.
 type Space interface {
-	// ColorSpaceFamily returns the family of the color space.
-	ColorSpaceFamily() pdf.Name
+	// Family returns the family of the color space.
+	Family() pdf.Name
 
 	// Channels returns the dimensionality of the color space.
 	Channels() int
@@ -41,7 +41,7 @@ type Space interface {
 // IsSpecial reports whether the color space is a special color space.
 // The special color spaces are Pattern, Indexed, Separation, and DeviceN.
 func IsSpecial(s Space) bool {
-	switch s.ColorSpaceFamily() {
+	switch s.Family() {
 	case FamilyPattern, FamilyIndexed, FamilySeparation, FamilyDeviceN:
 		return true
 	default:

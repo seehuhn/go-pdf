@@ -67,7 +67,7 @@ func (im *PNG) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		cs = color.DeviceRGBSpace
 	}
 	if cs.Channels() != 3 {
-		return nil, zero, fmt.Errorf("unsupported color space: %v", cs.ColorSpaceFamily())
+		return nil, zero, fmt.Errorf("unsupported color space: %v", cs.Family())
 	}
 	csEmbedded, _, err := pdf.ResourceManagerEmbed(rm, cs)
 	if err != nil {

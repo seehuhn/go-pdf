@@ -91,7 +91,7 @@ var testColorSpaces = []Space{
 
 func TestDecodeSpace(t *testing.T) {
 	for i, space := range testColorSpaces {
-		t.Run(fmt.Sprintf("%02d-%s", i, space.ColorSpaceFamily()), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%02d-%s", i, space.Family()), func(t *testing.T) {
 			r, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(r)
 

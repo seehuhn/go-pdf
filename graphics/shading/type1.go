@@ -56,7 +56,7 @@ func (s *Type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	if s.ColorSpace == nil {
 		return nil, zero, errors.New("missing ColorSpace")
-	} else if s.ColorSpace.ColorSpaceFamily() == color.FamilyPattern {
+	} else if s.ColorSpace.Family() == color.FamilyPattern {
 		return nil, zero, errors.New("invalid ColorSpace")
 	}
 	if have := len(s.Background); have > 0 {

@@ -66,9 +66,9 @@ func CalGray(whitePoint, blackPoint []float64, gamma float64) (*SpaceCalGray, er
 	}, nil
 }
 
-// ColorSpaceFamily returns /CalGray.
+// Family returns /CalGray.
 // This implements the [Space] interface.
-func (s *SpaceCalGray) ColorSpaceFamily() pdf.Name {
+func (s *SpaceCalGray) Family() pdf.Name {
 	return FamilyCalGray
 }
 
@@ -216,9 +216,9 @@ func (s *SpaceCalRGB) Default() Color {
 	return colorCalRGB{Space: s}
 }
 
-// ColorSpaceFamily returns /CalRGB.
+// Family returns /CalRGB.
 // This implements the [Space] interface.
-func (s *SpaceCalRGB) ColorSpaceFamily() pdf.Name {
+func (s *SpaceCalRGB) Family() pdf.Name {
 	return FamilyCalRGB
 }
 
@@ -275,9 +275,9 @@ func Lab(whitePoint, blackPoint, ranges []float64) (*SpaceLab, error) {
 	}, nil
 }
 
-// ColorSpaceFamily returns /Lab.
+// Family returns /Lab.
 // This implements the [Space] interface.
-func (s *SpaceLab) ColorSpaceFamily() pdf.Name {
+func (s *SpaceLab) Family() pdf.Name {
 	return FamilyLab
 }
 

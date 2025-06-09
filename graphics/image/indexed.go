@@ -59,7 +59,7 @@ func (im *Indexed) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 	var zero pdf.Unused
 	cs, ok := im.ColorSpace.(*color.SpaceIndexed)
 	if !ok {
-		return nil, zero, fmt.Errorf("Indexed: invalid color space %q", im.ColorSpace.ColorSpaceFamily())
+		return nil, zero, fmt.Errorf("Indexed: invalid color space %q", im.ColorSpace.Family())
 	}
 
 	maxCol := uint8(cs.NumCol - 1)

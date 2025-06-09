@@ -66,7 +66,7 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	if s.ColorSpace == nil {
 		return nil, zero, errors.New("missing ColorSpace")
-	} else if s.ColorSpace.ColorSpaceFamily() == color.FamilyPattern {
+	} else if s.ColorSpace.Family() == color.FamilyPattern {
 		return nil, zero, errors.New("invalid ColorSpace")
 	}
 	numComponents := s.ColorSpace.Channels()
@@ -118,7 +118,7 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 				i, numValues, have)
 		}
 	}
-	if s.F != nil && s.ColorSpace.ColorSpaceFamily() == color.FamilyIndexed {
+	if s.F != nil && s.ColorSpace.Family() == color.FamilyIndexed {
 		return nil, zero, errors.New("Function not allowed for indexed color space")
 	}
 
