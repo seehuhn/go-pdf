@@ -80,18 +80,18 @@ func (w *Writer) Close() error {
 		return nil
 	}
 
-	if w.K < 0 {
+	if w.K < 0 && !w.IgnoreEndOfBlock {
 		// Group 4 EOFB: 000000000001000000000001
 		if err := w.writeBits(0b000000000001_000000000001, 24); err != nil {
 			return err
 		}
-	} else if w.K == 0 && w.EndOfLine {
+	} else if w.K == 0 && !w.IgnoreEndOfBlock {
 		for range 6 {
 			if err := w.writeBits(0b000000000001, 12); err != nil {
 				return err
 			}
 		}
-	} else if w.K > 0 && w.EndOfLine {
+	} else if w.K > 0 && !w.IgnoreEndOfBlock {
 		for range 6 {
 			if err := w.writeBits(0b0000000000011, 13); err != nil {
 				return err
@@ -217,7 +217,7 @@ func (w *Writer) writeRow() error {
 			return err
 		}
 	case w.K < 0:
-		err := w.encode2DLineG4()
+		err := w.encode2DLineG3()
 		if err != nil {
 			return err
 		}
@@ -342,78 +342,6 @@ func (w *Writer) encode2DLineG3() error {
 
 			a0 = a2
 		}
-	}
-	return nil
-}
-
-func (w *Writer) encode2DLineG4() error {
-	xpos := 0
-
-	for xpos < w.Columns {
-		a0 := xpos
-		a0Val := w.getPixel(w.line, a0)
-
-		a1 := w.endOfRun(w.line, a0, a0Val)
-
-		// G4: b1 is first changing element on ref line to the right of a0
-		b1 := w.endOfRun(w.refLine, a0, w.getPixel(w.refLine, a0))
-
-		b2 := w.endOfRun(w.refLine, b1, w.getPixel(w.refLine, b1))
-
-		if b2 < a1 {
-			// Pass mode
-			if err := w.writeBits(0b0001, 4); err != nil {
-				return err
-			}
-			xpos = b2
-			continue
-		}
-
-		delta := a1 - b1
-		if delta >= -3 && delta <= 3 {
-			// Vertical mode
-			var code uint32
-			var width uint8
-			switch delta {
-			case 0:
-				code, width = 0b1, 1
-			case 1:
-				code, width = 0b011, 3
-			case 2:
-				code, width = 0b000011, 6
-			case 3:
-				code, width = 0b0000011, 7
-			case -1:
-				code, width = 0b010, 3
-			case -2:
-				code, width = 0b000010, 6
-			case -3:
-				code, width = 0b0000010, 7
-			}
-			if err := w.writeBits(code, width); err != nil {
-				return err
-			}
-			xpos = a1
-			continue
-		}
-
-		// Horizontal mode
-		if err := w.writeBits(0b001, 3); err != nil {
-			return err
-		}
-
-		run1Length := a1 - a0
-		if err := w.encode1DRun(run1Length, a0Val); err != nil {
-			return err
-		}
-
-		a2 := w.endOfRun(w.line, a1, w.getPixel(w.line, a1))
-		run2Length := a2 - a1
-		if err := w.encode1DRun(run2Length, 1-a0Val); err != nil {
-			return err
-		}
-
-		xpos = a2
 	}
 	return nil
 }

@@ -25,9 +25,10 @@ import (
 
 func TestSimpleWriteWithoutEOL(t *testing.T) {
 	p := &Params{
-		Columns:   8,
-		K:         0,
-		EndOfLine: false,
+		Columns:          8,
+		K:                0,
+		EndOfLine:        false,
+		IgnoreEndOfBlock: true,
 	}
 
 	buf := &bytes.Buffer{}

@@ -65,14 +65,14 @@ func run(filename string) error {
 	page.SetFillColor(color.Blue)
 
 	page.PushGraphicsState()
-	circle1 := &image.ImageMask{Data: Circle(16)}
+	circle1 := &image.ImageMask{Data: Circle(17)}
 	page.Transform(matrix.Translate(36, 452))
 	page.Transform(matrix.Scale(100, 100))
 	page.DrawXObject(circle1)
 	page.PopGraphicsState()
 
 	page.PushGraphicsState()
-	circle2 := &image.ImageMask{Data: Circle(64), Interpolate: true}
+	circle2 := &image.ImageMask{Data: Circle(70), Interpolate: true}
 	page.Transform(matrix.Translate(186, 400))
 	page.Transform(matrix.Scale(100, 100))
 	page.DrawXObject(circle2)

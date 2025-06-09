@@ -915,9 +915,16 @@ func (f FilterCCITTFax) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, err
 		IgnoreEndOfBlock:       !ff.eob,
 		DamagedRowsBeforeError: ff.damagedRows,
 	}
+	ww := ccittfax.NewWriter(w, params)
 	return &withClose{
-		Writer: ccittfax.NewWriter(w, params),
-		close:  w.Close,
+		Writer: ww,
+		close: func() error {
+			err := ww.Close()
+			if err != nil {
+				return err
+			}
+			return w.Close()
+		},
 	}, nil
 }
 

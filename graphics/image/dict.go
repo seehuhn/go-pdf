@@ -356,15 +356,9 @@ func (m *ImageMask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 
 	ref := rm.Out.Alloc()
 	filters := []pdf.Filter{
-		// pdf.FilterCCITTFax{
-		// 	"Columns":    pdf.Integer(width),
-		// 	"EndOfLine":  pdf.Boolean(true),
-		// 	"EndOfBlock": pdf.Boolean(true),
-		// },
-		pdf.FilterCompress{
-			"BitsPerComponent": pdf.Integer(1),
-			"Columns":          pdf.Integer(width),
-			"Predictor":        pdf.Integer(15),
+		pdf.FilterCCITTFax{
+			"Columns": pdf.Integer(width),
+			"K":       pdf.Integer(-1),
 		},
 	}
 	w, err := rm.Out.OpenStream(ref, dict, filters...)
