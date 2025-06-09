@@ -57,6 +57,7 @@ import (
 
 	"seehuhn.de/go/pdf/internal/filter/ascii85"
 	"seehuhn.de/go/pdf/internal/filter/asciihex"
+	"seehuhn.de/go/pdf/internal/filter/ccittfax"
 	"seehuhn.de/go/pdf/internal/filter/lzw"
 )
 
@@ -101,6 +102,8 @@ func makeFilter(filter Name, param Dict) Filter {
 		return FilterFlate(param)
 	case "LZWDecode":
 		return FilterLZW(param)
+	case "CCITTFaxDecode":
+		return FilterCCITTFax(param)
 	default:
 		return &filterNotImplemented{Name: filter, Param: param}
 	}
@@ -331,6 +334,8 @@ type FilterLZW Dict
 
 // Info implements the [Filter] interface.
 func (f FilterLZW) Info(v Version) (Name, Dict, error) {
+	// TODO(voss): move the error handling into parseParameters
+
 	ff, err := f.parseParameters(v)
 	if err != nil {
 		return "", nil, err
@@ -851,6 +856,148 @@ func pngPaethEnc(out, cdat, pdat []byte, bpp int) {
 
 		out[i] = cdat[i] - x
 	}
+}
+
+type FilterCCITTFax Dict
+
+// Info returns the name and parameters of the filter,
+// as they should be written to the PDF file.
+func (f FilterCCITTFax) Info(_ Version) (Name, Dict, error) {
+	ff, err := f.parseParameters()
+	if err != nil {
+		return "", nil, err
+	}
+
+	res := Dict{}
+	if ff.K != 0 {
+		res["K"] = Integer(ff.K)
+	}
+	if ff.eol {
+		res["EndOfLine"] = Boolean(ff.eol)
+	}
+	if ff.byteAlign {
+		res["EncodedByteAlign"] = Boolean(ff.byteAlign)
+	}
+	if ff.columns != 1728 {
+		res["Columns"] = Integer(ff.columns)
+	}
+	if ff.rows > 0 {
+		res["Rows"] = Integer(ff.rows)
+	}
+	if ff.eob != true { // default is true
+		res["EndOfBlock"] = Boolean(ff.eob)
+	}
+	if ff.blackIs1 {
+		res["BlackIs1"] = Boolean(ff.blackIs1)
+	}
+	if ff.damagedRows > 0 {
+		res["DamagedRowsBeforeError"] = Integer(ff.damagedRows)
+	}
+
+	return "CCITTFaxDecode", res, nil
+}
+
+// Encode returns a writer which encodes data written to it.
+// The returned writer must be closed after use.
+func (f FilterCCITTFax) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, error) {
+	ff, err := f.parseParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	params := &ccittfax.Params{
+		Columns:                ff.columns,
+		K:                      ff.K,
+		MaxRows:                ff.rows,
+		EndOfLine:              ff.eol,
+		EncodedByteAlign:       ff.byteAlign,
+		BlackIs1:               ff.blackIs1,
+		IgnoreEndOfBlock:       !ff.eob,
+		DamagedRowsBeforeError: ff.damagedRows,
+	}
+	return &withClose{
+		Writer: ccittfax.NewWriter(w, params),
+		close:  w.Close,
+	}, nil
+}
+
+// Decode returns a reader which decodes data read from it.
+func (f FilterCCITTFax) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
+	ff, err := f.parseParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	params := &ccittfax.Params{
+		Columns:                ff.columns,
+		K:                      ff.K,
+		MaxRows:                ff.rows,
+		EndOfLine:              ff.eol,
+		EncodedByteAlign:       ff.byteAlign,
+		BlackIs1:               ff.blackIs1,
+		IgnoreEndOfBlock:       !ff.eob,
+		DamagedRowsBeforeError: ff.damagedRows,
+	}
+	return io.NopCloser(ccittfax.NewReader(r, params)), nil
+}
+
+func (f FilterCCITTFax) parseParameters() (*ccittFilter, error) {
+	res := &ccittFilter{ // set defaults
+		K:       0,
+		columns: 1728,
+		eob:     true,
+	}
+	if val, ok := f["K"].(Integer); ok {
+		if val < 0 {
+			val = -1
+		} else if val > Integer(maxInt) {
+			val = 999
+		}
+		res.K = int(val)
+	}
+	if val, ok := f["EndOfLine"].(Boolean); ok {
+		res.eol = bool(val)
+	}
+	if val, ok := f["EncodedByteAlign"].(Boolean); ok {
+		res.byteAlign = bool(val)
+	}
+	if val, ok := f["Columns"].(Integer); ok {
+		if val < 1 || val > Integer(maxInt) {
+			return nil, fmt.Errorf("invalid number of columns %d", val)
+		}
+		res.columns = int(val)
+	}
+	if val, ok := f["Rows"].(Integer); ok {
+		if val < 0 || val > Integer(maxInt) {
+			return nil, fmt.Errorf("invalid number of rows %d", val)
+		}
+		res.rows = int(val)
+	}
+	if val, ok := f["EndOfBlock"].(Boolean); ok {
+		res.eob = bool(val)
+	}
+	if val, ok := f["BlackIs1"].(Boolean); ok {
+		res.blackIs1 = bool(val)
+	}
+	if val, ok := f["DamagedRowsBeforeError"].(Integer); ok {
+		if val < 0 || val > Integer(maxInt) {
+			return nil, fmt.Errorf("invalid number of damaged rows %d", val)
+		}
+		res.damagedRows = int(val)
+	}
+
+	return res, nil
+}
+
+type ccittFilter struct {
+	K           int
+	eol         bool
+	byteAlign   bool
+	columns     int
+	rows        int
+	eob         bool
+	blackIs1    bool
+	damagedRows int
 }
 
 // intSize is either 32 or 64.
