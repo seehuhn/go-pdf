@@ -18,6 +18,7 @@ package makefont
 
 import (
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/funit"
@@ -30,9 +31,8 @@ import (
 
 // toCFF converts "glyf" outlines to "CFF" outlines.
 //
-// The result is inefficient, since we we are using the naive way to
-// convert quadratic bezier curves to cubic bezier curves.  Do not use
-// this function in production code.
+// Uses the standard quadratic-to-cubic conversion algorithm.
+// Do not use this function in production code.
 func toCFF(info *sfnt.Font) (*sfnt.Font, error) {
 	if info.IsCFF() {
 		return info, nil
@@ -100,74 +100,21 @@ func toCFF(info *sfnt.Font) (*sfnt.Font, error) {
 		gid := glyph.ID(i)
 		newGlyph := cff.NewGlyph(info.GlyphName(gid), info.GlyphWidth(gid))
 
-		var g glyf.SimpleGlyph
-		var ok bool
 		if origGlyph != nil {
-			g, ok = origGlyph.Data.(glyf.SimpleGlyph)
-		}
-		if !ok {
-			newOutlines.Glyphs = append(newOutlines.Glyphs, newGlyph)
-			continue
-		}
-		glyphInfo, err := g.Decode()
-		if err != nil {
-			panic(err)
-		}
-
-		for _, cc := range glyphInfo.Contours {
-			var extended glyf.Contour
-			var prev glyf.Point
-			onCurve := true
-			for _, cur := range cc {
-				if !onCurve && !cur.OnCurve {
-					extended = append(extended, glyf.Point{
-						X:       (cur.X + prev.X) / 2,
-						Y:       (cur.Y + prev.Y) / 2,
-						OnCurve: true,
-					})
-				}
-				extended = append(extended, cur)
-				prev = cur
-				onCurve = cur.OnCurve
-			}
-			n := len(extended)
-
-			var offs int
-			for i := 0; i < len(extended); i++ {
-				if extended[i].OnCurve {
-					offs = i
-					break
-				}
-			}
-
-			newGlyph.MoveTo(float64(extended[offs].X), float64(extended[offs].Y))
-
-			i := 0
-			for i < n {
-				i0 := (i + offs) % n
-				if !extended[i0].OnCurve {
-					panic("not on curve")
-				}
-				i1 := (i0 + 1) % n
-				if extended[i1].OnCurve {
-					if i == n-1 {
-						break
+			glyphPath := origOutlines.Glyphs.Path(gid)
+			for contour := range glyphPath.Contours() {
+				cubicContour := path.ToCubic(contour)
+				for cmd, pts := range cubicContour {
+					switch cmd {
+					case path.CmdMoveTo:
+						newGlyph.MoveTo(pts[0].X, pts[0].Y)
+					case path.CmdLineTo:
+						newGlyph.LineTo(pts[0].X, pts[0].Y)
+					case path.CmdCubeTo:
+						newGlyph.CurveTo(pts[0].X, pts[0].Y, pts[1].X, pts[1].Y, pts[2].X, pts[2].Y)
+					case path.CmdClose:
+						// CFF glyphs auto-close, no explicit close needed
 					}
-					newGlyph.LineTo(float64(extended[i1].X), float64(extended[i1].Y))
-					i++
-				} else {
-					// See the following link for converting truetype outlines
-					// to CFF outlines:
-					// https://pomax.github.io/bezierinfo/#reordering
-					i2 := (i1 + 1) % n
-					newGlyph.CurveTo(
-						float64(extended[i0].X)/3+float64(extended[i1].X)*2/3,
-						float64(extended[i0].Y)/3+float64(extended[i1].Y)*2/3,
-						float64(extended[i1].X)*2/3+float64(extended[i2].X)/3,
-						float64(extended[i1].Y)*2/3+float64(extended[i2].Y)/3,
-						float64(extended[i2].X),
-						float64(extended[i2].Y))
-					i += 2
 				}
 			}
 		}

@@ -17,6 +17,7 @@
 package makefont
 
 import (
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/geom/rect"
 
 	"seehuhn.de/go/sfnt/glyf"
@@ -75,7 +76,7 @@ func Type3() (*type3.Instance, error) {
 				URx: float64(bbox.URx),
 				URy: float64(bbox.URy),
 			}
-			d := &drawer{g: origGlyph}
+			d := &drawer{glyphs: origOutlines.Glyphs, gid: gid}
 			g.Draw = d.Draw
 		}
 
@@ -86,82 +87,28 @@ func Type3() (*type3.Instance, error) {
 }
 
 type drawer struct {
-	g *glyf.Glyph
+	glyphs glyf.Glyphs
+	gid    glyph.ID
 }
 
 func (d *drawer) Draw(w *graphics.Writer) error {
-	origGlyph := d.g
-
-	switch g := origGlyph.Data.(type) {
-	case glyf.SimpleGlyph:
-		glyphInfo, err := g.Decode()
-		if err != nil {
-			panic(err)
+	glyphPath := d.glyphs.Path(d.gid)
+	for contour := range glyphPath.Contours() {
+		cubicContour := path.ToCubic(contour)
+		for cmd, pts := range cubicContour {
+			switch cmd {
+			case path.CmdMoveTo:
+				w.MoveTo(pts[0].X, pts[0].Y)
+			case path.CmdLineTo:
+				w.LineTo(pts[0].X, pts[0].Y)
+			case path.CmdCubeTo:
+				w.CurveTo(pts[0].X, pts[0].Y, pts[1].X, pts[1].Y, pts[2].X, pts[2].Y)
+			case path.CmdClose:
+				w.ClosePath()
+			}
 		}
-
-		for _, cc := range glyphInfo.Contours {
-			var extended glyf.Contour
-			var prev glyf.Point
-			onCurve := true
-			for _, cur := range cc {
-				if !onCurve && !cur.OnCurve {
-					extended = append(extended, glyf.Point{
-						X:       (cur.X + prev.X) / 2,
-						Y:       (cur.Y + prev.Y) / 2,
-						OnCurve: true,
-					})
-				}
-				extended = append(extended, cur)
-				prev = cur
-				onCurve = cur.OnCurve
-			}
-			n := len(extended)
-
-			var offs int
-			for i := 0; i < len(extended); i++ {
-				if extended[i].OnCurve {
-					offs = i
-					break
-				}
-			}
-
-			w.MoveTo(float64(extended[offs].X), float64(extended[offs].Y))
-
-			i := 0
-			for i < n {
-				i0 := (i + offs) % n
-				if !extended[i0].OnCurve {
-					panic("not on curve")
-				}
-				i1 := (i0 + 1) % n
-				if extended[i1].OnCurve {
-					if i == n-1 {
-						break
-					}
-					w.LineTo(float64(extended[i1].X), float64(extended[i1].Y))
-					i++
-				} else {
-					// See the following link for converting truetype outlines
-					// to CFF outlines:
-					// https://pomax.github.io/bezierinfo/#reordering
-					i2 := (i1 + 1) % n
-					w.CurveTo(
-						float64(extended[i0].X)/3+float64(extended[i1].X)*2/3,
-						float64(extended[i0].Y)/3+float64(extended[i1].Y)*2/3,
-						float64(extended[i1].X)*2/3+float64(extended[i2].X)/3,
-						float64(extended[i1].Y)*2/3+float64(extended[i2].Y)/3,
-						float64(extended[i2].X),
-						float64(extended[i2].Y))
-					i += 2
-				}
-			}
-
-			w.ClosePath()
-		}
-		w.Fill()
-	case glyf.CompositeGlyph:
-		panic("not implemented")
 	}
+	w.Fill()
 	return nil
 }
 

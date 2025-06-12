@@ -410,6 +410,7 @@ func (d *Type1) FontInfo() any {
 		Ref:            d.FontRef,
 		FontType:       d.FontType,
 		Encoding:       d.Encoding,
+		IsSymbolic:     d.Descriptor.IsSymbolic,
 	}
 }
 

@@ -47,6 +47,8 @@ type FontInfoSimple struct {
 
 	// Encoding is the font's character encoding.
 	Encoding encoding.Simple
+
+	IsSymbolic bool
 }
 
 // FontInfoCID holds information about a CID-keyed font.
@@ -62,7 +64,8 @@ type FontInfoCID struct {
 	CIDIsUsed map[cid.CID]bool
 }
 
-// FontInfoGlyfEmbedded holds information about an embedded TrueType font program (glyf table).
+// FontInfoGlyfEmbedded holds information about an embedded TrueType font
+// program (glyf table), used for Type 2 CIDFonts.
 type FontInfoGlyfEmbedded struct {
 	// PostScriptName is the PostScript name of the font.
 	PostScriptName string
@@ -73,7 +76,8 @@ type FontInfoGlyfEmbedded struct {
 	CIDToGID []glyph.ID
 }
 
-// FontInfoGlyfExternal holds information about an external TrueType font program.
+// FontInfoGlyfExternal holds information about an external TrueType font
+// program, used for Type 2 CIDFonts.
 type FontInfoGlyfExternal struct {
 	// PostScriptName is the PostScript name of the font.
 	PostScriptName string

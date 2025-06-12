@@ -91,5 +91,5 @@ The following methods are tried in order when reading a TrueType font dictionary
 
 |             | non-symbolic | symbolic   |
 | ----------: | :----------: | :--------: |
-| encoding    | 4, 3         | 4, 2, 5, 1 |
+| encoding    | 4, 3, 2, 1   | 4, 2, 5, 1 |
 | no encoding | 2, 1         | 2, 1       |

@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	gocol "image/color"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
@@ -80,7 +81,7 @@ type Dict struct {
 
 	// Name is deprecated and should be left empty.
 	// Only used in PDF 1.0 where it was the name used to reference the image
-	// from within content streams.
+	// mask from within content streams.
 	Name pdf.Name
 
 	// TODO(voss): StructParent
@@ -105,74 +106,8 @@ var _ pdf.Embedder[pdf.Unused] = (*Dict)(nil)
 func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if d.ColorSpace == nil {
-		return nil, zero, errors.New("missing color space")
-	}
-
-	numChannels := d.ColorSpace.Channels()
-
-	if fam := d.ColorSpace.Family(); fam == color.FamilyPattern {
-		return nil, zero, fmt.Errorf("invalid image color space %q", fam)
-	}
-	switch d.BitsPerComponent {
-	case 1, 2, 4, 8:
-		// pass
-	case 16:
-		if err := pdf.CheckVersion(rm.Out, "16 bits per component", pdf.V1_5); err != nil {
-			return nil, zero, err
-		}
-	default:
-		return nil, zero, fmt.Errorf("invalid BitsPerComponent %d", d.BitsPerComponent)
-	}
-	if d.Intent != "" {
-		if err := pdf.CheckVersion(rm.Out, "rendering intents", pdf.V1_1); err != nil {
-			return nil, zero, err
-		}
-	}
-	if d.MaskImage != nil || d.MaskColors != nil {
-		if err := pdf.CheckVersion(rm.Out, "image masks", pdf.V1_3); err != nil {
-			return nil, zero, err
-		}
-		if d.MaskImage != nil && d.MaskColors != nil {
-			return nil, zero, errors.New("only one of MaskImage or MaskColors may be specified")
-		}
-		if d.MaskColors != nil && len(d.MaskColors) != 2*numChannels {
-			return nil, zero, fmt.Errorf("wrong MaskColors length: expected %d, got %d",
-				2*numChannels, len(d.MaskColors))
-		}
-		if d.MaskColors != nil {
-			maxVal := uint16(1<<d.BitsPerComponent - 1)
-			for i, v := range d.MaskColors {
-				if v > maxVal {
-					return nil, zero, fmt.Errorf("MaskColors[%d] value %d exceeds maximum %d", i, v, maxVal)
-				}
-			}
-		}
-	}
-	if d.Decode != nil && len(d.Decode) != 2*numChannels {
-		return nil, zero, fmt.Errorf("wrong Decode length: expected %d, got %d",
-			2*numChannels, len(d.Decode))
-	}
-	if d.Alternates != nil {
-		if err := pdf.CheckVersion(rm.Out, "image alternates", pdf.V1_3); err != nil {
-			return nil, zero, err
-		}
-		for _, alt := range d.Alternates {
-			if len(alt.Alternates) > 0 {
-				return nil, zero, errors.New("alternates of alternates not allowed")
-			}
-		}
-	}
-	if d.Name != "" {
-		v := pdf.GetVersion(rm.Out)
-		if v >= pdf.V2_0 {
-			return nil, zero, errors.New("unexpected /Name field")
-		}
-	}
-	if d.Metadata != nil {
-		if err := pdf.CheckVersion(rm.Out, "image metadata", pdf.V1_4); err != nil {
-			return nil, zero, err
-		}
+	if err := d.check(rm.Out); err != nil {
+		return nil, zero, err
 	}
 
 	dim := d.Data.Bounds()
@@ -240,8 +175,156 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["Metadata"] = ref
 	}
 
-	_ = dict
-	panic("not implemented")
+	ref := rm.Out.Alloc()
+	filters := []pdf.Filter{}
+	w, err := rm.Out.OpenStream(ref, dict, filters...)
+	if err != nil {
+		return nil, zero, fmt.Errorf("cannot open image stream: %w", err)
+	}
+
+	numChannels := d.ColorSpace.Channels()
+	buf := newPixRow(width*numChannels, d.BitsPerComponent)
+	for y := range height {
+		buf.reset()
+
+		for x := range width {
+			pixCol := d.Data.At(dim.Min.X+x, dim.Min.Y+y)
+			shift := 16 - d.BitsPerComponent
+			switch d.ColorSpace.Family() {
+			case color.FamilyDeviceGray, color.FamilyCalGray:
+				g16 := gocol.Gray16Model.Convert(pixCol).(gocol.Gray16).Y
+				buf.appendBits(g16 >> shift)
+
+			case color.FamilyDeviceRGB, color.FamilyCalRGB:
+				c16 := gocol.NRGBA64Model.Convert(pixCol).(gocol.NRGBA64)
+				buf.appendBits(c16.R >> shift)
+				buf.appendBits(c16.G >> shift)
+				buf.appendBits(c16.B >> shift)
+
+			case color.FamilyDeviceCMYK:
+				c16 := gocol.NRGBA64Model.Convert(pixCol).(gocol.NRGBA64)
+				c, m, y, k := rgbToCMYK(c16.R, c16.G, c16.B)
+				buf.appendBits(c >> shift)
+				buf.appendBits(m >> shift)
+				buf.appendBits(y >> shift)
+				buf.appendBits(k >> shift)
+
+			// TODO(voss): implement the remaining color spaces
+			case color.FamilyLab:
+				return nil, zero, errors.New("Lab color space not implemented")
+			case color.FamilyICCBased:
+				return nil, zero, errors.New("ICCBased color space not implemented")
+			case color.FamilyIndexed:
+				return nil, zero, errors.New("Indexed color space not implemented")
+			case color.FamilySeparation:
+				return nil, zero, errors.New("Separation color space not implemented")
+			case color.FamilyDeviceN:
+				return nil, zero, errors.New("DeviceN color space not implemented")
+			}
+		}
+
+		_, err = w.Write(buf.bytes)
+		if err != nil {
+			return nil, zero, err
+		}
+	}
+
+	err = w.Close()
+	if err != nil {
+		return nil, zero, err
+	}
+	return ref, zero, nil
+}
+
+func (d *Dict) check(out *pdf.Writer) error {
+	if fam := d.ColorSpace.Family(); fam == color.FamilyPattern {
+		return fmt.Errorf("invalid image color space %q", fam)
+	}
+
+	switch d.BitsPerComponent {
+	case 1, 2, 4, 8:
+		// pass
+	case 16:
+		if err := pdf.CheckVersion(out, "16 bits per image component", pdf.V1_5); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("invalid BitsPerComponent %d", d.BitsPerComponent)
+	}
+
+	if d.Intent != "" {
+		if err := pdf.CheckVersion(out, "rendering intents", pdf.V1_1); err != nil {
+			return err
+		}
+	}
+
+	numChannels := d.ColorSpace.Channels()
+	if d.MaskImage != nil || d.MaskColors != nil {
+		if err := pdf.CheckVersion(out, "image masks", pdf.V1_3); err != nil {
+			return err
+		}
+		if d.MaskImage != nil && d.MaskColors != nil {
+			return errors.New("only one of MaskImage or MaskColors may be specified")
+		}
+		if d.MaskColors != nil && len(d.MaskColors) != 2*numChannels {
+			return fmt.Errorf("wrong MaskColors length: expected %d, got %d",
+				2*numChannels, len(d.MaskColors))
+		}
+		if d.MaskColors != nil {
+			maxVal := uint16(1<<d.BitsPerComponent - 1)
+			for i, v := range d.MaskColors {
+				if v > maxVal {
+					return fmt.Errorf("MaskColors[%d] value %d exceeds maximum %d", i, v, maxVal)
+				}
+			}
+		}
+	}
+	if d.Decode != nil && len(d.Decode) != 2*numChannels {
+		return fmt.Errorf("wrong Decode length: expected %d, got %d",
+			2*numChannels, len(d.Decode))
+	}
+
+	if d.Alternates != nil {
+		if err := pdf.CheckVersion(out, "image alternates", pdf.V1_3); err != nil {
+			return err
+		}
+		for _, alt := range d.Alternates {
+			if len(alt.Alternates) > 0 {
+				return errors.New("alternates of alternates not allowed")
+			}
+		}
+	}
+
+	if d.Name != "" {
+		v := pdf.GetVersion(out)
+		if v >= pdf.V2_0 {
+			return errors.New("unexpected /Name field")
+		}
+	}
+
+	if d.Metadata != nil {
+		if err := pdf.CheckVersion(out, "image metadata", pdf.V1_4); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func rgbToCMYK(r, g, b uint16) (c, m, y, k uint16) {
+	maxVal := max(r, g, b)
+
+	if maxVal == 0 {
+		return 0, 0, 0, 0xffff
+	}
+
+	k = 0xffff - maxVal
+
+	c = uint16((uint32(maxVal-r) * 0xffff) / uint32(maxVal))
+	m = uint16((uint32(maxVal-g) * 0xffff) / uint32(maxVal))
+	y = uint16((uint32(maxVal-b) * 0xffff) / uint32(maxVal))
+
+	return c, m, y, k
 }
 
 type ImageMask struct {
@@ -295,27 +378,9 @@ func (m *ImageMask) Subtype() pdf.Name {
 
 func (m *ImageMask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	if m.Alternates != nil {
-		if err := pdf.CheckVersion(rm.Out, "image alternates", pdf.V1_3); err != nil {
-			return nil, zero, err
-		}
 
-		for _, alt := range m.Alternates {
-			if len(alt.Alternates) > 0 {
-				return nil, zero, errors.New("alternates of alternates not allowed")
-			}
-		}
-	}
-	if m.Name != "" {
-		v := pdf.GetVersion(rm.Out)
-		if v >= pdf.V2_0 {
-			return nil, zero, errors.New("unexpected /Name field")
-		}
-	}
-	if m.Metadata != nil {
-		if err := pdf.CheckVersion(rm.Out, "image metadata", pdf.V1_4); err != nil {
-			return nil, zero, err
-		}
+	if err := m.check(rm.Out); err != nil {
+		return nil, zero, err
 	}
 
 	dim := m.Data.Bounds()
@@ -377,7 +442,7 @@ func (m *ImageMask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 		}
 
 		for x := range width {
-			_, _, _, a := m.Data.At(x, y).RGBA()
+			_, _, _, a := m.Data.At(dim.Min.X+x, dim.Min.Y+y).RGBA()
 			if a < 0x8000 {
 				buf[x/8] |= 1 << (7 - x%8)
 			}
@@ -394,4 +459,31 @@ func (m *ImageMask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 		return nil, zero, err
 	}
 	return ref, zero, nil
+}
+
+func (m *ImageMask) check(out *pdf.Writer) error {
+	if m.Alternates != nil {
+		if err := pdf.CheckVersion(out, "image alternates", pdf.V1_3); err != nil {
+			return err
+		}
+
+		for _, alt := range m.Alternates {
+			if len(alt.Alternates) > 0 {
+				return errors.New("alternates of alternates not allowed")
+			}
+		}
+	}
+	if m.Name != "" {
+		v := pdf.GetVersion(out)
+		if v >= pdf.V2_0 {
+			return errors.New("unexpected /Name field")
+		}
+	}
+	if m.Metadata != nil {
+		if err := pdf.CheckVersion(out, "image metadata", pdf.V1_4); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
