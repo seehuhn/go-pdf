@@ -93,19 +93,17 @@ type drawer struct {
 
 func (d *drawer) Draw(w *graphics.Writer) error {
 	glyphPath := d.glyphs.Path(d.gid)
-	for contour := range glyphPath.Contours() {
-		cubicContour := path.ToCubic(contour)
-		for cmd, pts := range cubicContour {
-			switch cmd {
-			case path.CmdMoveTo:
-				w.MoveTo(pts[0].X, pts[0].Y)
-			case path.CmdLineTo:
-				w.LineTo(pts[0].X, pts[0].Y)
-			case path.CmdCubeTo:
-				w.CurveTo(pts[0].X, pts[0].Y, pts[1].X, pts[1].Y, pts[2].X, pts[2].Y)
-			case path.CmdClose:
-				w.ClosePath()
-			}
+	cubicPath := path.ToCubic(glyphPath)
+	for cmd, pts := range cubicPath {
+		switch cmd {
+		case path.CmdMoveTo:
+			w.MoveTo(pts[0].X, pts[0].Y)
+		case path.CmdLineTo:
+			w.LineTo(pts[0].X, pts[0].Y)
+		case path.CmdCubeTo:
+			w.CurveTo(pts[0].X, pts[0].Y, pts[1].X, pts[1].Y, pts[2].X, pts[2].Y)
+		case path.CmdClose:
+			w.ClosePath()
 		}
 	}
 	w.Fill()
