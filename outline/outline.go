@@ -38,7 +38,7 @@ func (tree *Tree) AddChild(title string) *Tree {
 	return child
 }
 
-func Read(r *pdf.Reader) (*Tree, error) {
+func Read(r pdf.Getter) (*Tree, error) {
 	root := r.GetMeta().Catalog.Outlines
 	if root == 0 {
 		return nil, nil
@@ -53,7 +53,7 @@ func Read(r *pdf.Reader) (*Tree, error) {
 	return tree, nil
 }
 
-func readNode(r *pdf.Reader, seen map[pdf.Reference]bool, node pdf.Reference) (*Tree, pdf.Dict, error) {
+func readNode(r pdf.Getter, seen map[pdf.Reference]bool, node pdf.Reference) (*Tree, pdf.Dict, error) {
 	if seen[node] {
 		return nil, nil, fmt.Errorf("outline tree contains a loop")
 	}
@@ -97,7 +97,7 @@ func readNode(r *pdf.Reader, seen map[pdf.Reference]bool, node pdf.Reference) (*
 	return tree, dict, nil
 }
 
-func readChildren(r *pdf.Reader, seen map[pdf.Reference]bool, node pdf.Reference) ([]*Tree, error) {
+func readChildren(r pdf.Getter, seen map[pdf.Reference]bool, node pdf.Reference) ([]*Tree, error) {
 	var res []*Tree
 	for node != 0 {
 		tree, dict, err := readNode(r, seen, node)

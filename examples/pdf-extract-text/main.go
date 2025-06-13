@@ -187,7 +187,7 @@ func getSpaceWidth(F font.Embedded) float64 {
 	return spaceWidthHeuristic(d)
 }
 
-func getExtraMapping(r *pdf.Reader, F font.Embedded) map[cid.CID]string {
+func getExtraMapping(r pdf.Getter, F font.Embedded) map[cid.CID]string {
 	Fe, ok := F.(font.FromFile)
 	if !ok {
 		return nil

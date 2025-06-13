@@ -32,9 +32,11 @@ import (
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/term"
+
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/examples/pdf-inspect/meta"
 	"seehuhn.de/go/pdf/pagetree"
+
+	"seehuhn.de/go/pdf/examples/pdf-inspect/meta"
 )
 
 var (
@@ -207,7 +209,7 @@ func printObject(args ...string) error {
 }
 
 type explainer struct {
-	r   *pdf.Reader
+	r   pdf.Getter
 	buf *bytes.Buffer
 
 	obj pdf.Object

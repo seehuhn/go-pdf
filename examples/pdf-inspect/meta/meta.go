@@ -28,7 +28,7 @@ import (
 )
 
 // ShowMetadata prints the metadata of a PDF file to stdout.
-func ShowMetadata(r *pdf.Reader) error {
+func ShowMetadata(r pdf.Getter) error {
 	m := r.GetMeta()
 
 	fmt.Println("PDF Version:", m.Version)
@@ -101,7 +101,7 @@ func showInfo(obj pdf.Object, info *pdf.Info) {
 	fmt.Println()
 }
 
-func showXMP(r *pdf.Reader, ref pdf.Reference) error {
+func showXMP(r pdf.Getter, ref pdf.Reference) error {
 	title := fmt.Sprintf("XMP Metadata stream (%s)", ref)
 	fmt.Println(title)
 	fmt.Println(strings.Repeat("-", len(title)))

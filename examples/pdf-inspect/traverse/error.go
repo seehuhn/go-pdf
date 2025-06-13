@@ -16,24 +16,13 @@
 
 package traverse
 
-import (
-	"seehuhn.de/go/pdf"
+import "fmt"
 
-	"seehuhn.de/go/pdf/examples/pdf-inspect/meta"
-)
-
-type metaCtx struct {
-	r pdf.Getter
+type KeyError struct {
+	Key string
+	Ctx string
 }
 
-func (c *metaCtx) Next(key string) (Context, error) {
-	return nil, &KeyError{Key: key, Ctx: "metadata"}
-}
-
-func (c *metaCtx) Show() error {
-	return meta.ShowMetadata(c.r)
-}
-
-func (c *metaCtx) Keys() ([]string, error) {
-	return nil, nil
+func (e *KeyError) Error() string {
+	return fmt.Sprintf("key %q not found in %s", e.Key, e.Ctx)
 }

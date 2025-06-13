@@ -174,7 +174,7 @@ func checkInvariants(nodes []*nodeInfo) error {
 	return nil
 }
 
-func walk(r *pdf.Reader, nodeRef, parentRef pdf.Reference, test *pdf.Integer) (pdf.Integer, error) {
+func walk(r pdf.Getter, nodeRef, parentRef pdf.Reference, test *pdf.Integer) (pdf.Integer, error) {
 	node, err := pdf.Resolve(r, nodeRef)
 	if err != nil {
 		return 0, err

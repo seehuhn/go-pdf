@@ -24,12 +24,21 @@ import (
 	"syscall"
 
 	"golang.org/x/term"
+
 	"seehuhn.de/go/pdf"
 )
 
 type Context interface {
+	// Next returns a child object.
 	Next(string) (Context, error)
+
+	// Show prints a textual description of the object to the standard output.
 	Show() error
+
+	// Keys lists the allowed keys for the Next method.
+	// Keywords which need to be used verbatim are enclosed in backticks,
+	// everything else is a human-readable description of what is allowed.
+	Keys() ([]string, error)
 }
 
 func Root(fileName string, passwords ...string) (*fileCtx, error) {
@@ -59,6 +68,9 @@ func Root(fileName string, passwords ...string) (*fileCtx, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO(voss): where should fd and r be closed?
+
 	c := &fileCtx{
 		fd: fd,
 		r:  r,
@@ -68,11 +80,7 @@ func Root(fileName string, passwords ...string) (*fileCtx, error) {
 
 type fileCtx struct {
 	fd *os.File
-	r  *pdf.Reader
-}
-
-func (c *fileCtx) Allowed() []string {
-	return []string{}
+	r  pdf.Getter
 }
 
 func (c *fileCtx) Next(key string) (Context, error) {
@@ -112,7 +120,7 @@ func (c *fileCtx) Next(key string) (Context, error) {
 			return cat.Next(key)
 		}
 	}
-	return &objectCtx{obj: obj}, nil
+	return &objectCtx{r: c.r, obj: obj}, nil
 }
 
 func (c *fileCtx) Show() error {
@@ -124,14 +132,19 @@ func (c *fileCtx) Show() error {
 	fmt.Println("file:", st.Name())
 	fmt.Println("size:", st.Size())
 	fmt.Println("modtime:", st.ModTime().Format("2006-01-02 15:04:05"))
-	fmt.Println()
-	fmt.Println("valid keys: `meta`, `catalog`, `info`, `trailer`, object reference, or catalog key")
 
 	return nil
 }
 
-func invalidKey(key string) error {
-	return fmt.Errorf("invalid key: %q", key)
+func (c *fileCtx) Keys() ([]string, error) {
+	return []string{
+		"`meta`",
+		"`catalog`",
+		"`info`",
+		"`trailer`",
+		"object reference",
+		"catalog key",
+	}, nil
 }
 
 var (

@@ -17,23 +17,23 @@
 package traverse
 
 import (
-	"seehuhn.de/go/pdf"
-
-	"seehuhn.de/go/pdf/examples/pdf-inspect/meta"
+	"io"
+	"os"
 )
 
-type metaCtx struct {
-	r pdf.Getter
+type rawStreamCtx struct {
+	r io.Reader
 }
 
-func (c *metaCtx) Next(key string) (Context, error) {
-	return nil, &KeyError{Key: key, Ctx: "metadata"}
+func (ctx *rawStreamCtx) Next(key string) (Context, error) {
+	return nil, &KeyError{Key: key, Ctx: "@raw stream"}
 }
 
-func (c *metaCtx) Show() error {
-	return meta.ShowMetadata(c.r)
+func (ctx *rawStreamCtx) Show() error {
+	_, err := io.Copy(os.Stdout, ctx.r)
+	return err
 }
 
-func (c *metaCtx) Keys() ([]string, error) {
+func (ctx *rawStreamCtx) Keys() ([]string, error) {
 	return nil, nil
 }
