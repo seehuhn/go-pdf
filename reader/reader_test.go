@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/dummyfont"
@@ -153,5 +154,91 @@ func TestParameters(t *testing.T) {
 	cmpFont := cmp.Comparer(fontsEqual)
 	if d := cmp.Diff(w.State, r.State, cmpFont); d != "" {
 		t.Errorf("State: %s", d)
+	}
+}
+
+// TestParsePage verifies that Reader.ParsePage correctly handles split content streams.
+func TestParsePage(t *testing.T) {
+	pdfData, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	stream1Ref := pdfData.Alloc()
+	stream1, err := pdfData.OpenStream(stream1Ref, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = stream1.Write([]byte("q\n1 0 0 1 100 200 cm\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stream1.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stream2Ref := pdfData.Alloc()
+	stream2, err := pdfData.OpenStream(stream2Ref, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = stream2.Write([]byte("5 w\nQ\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = stream2.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pageRef := pdfData.Alloc()
+	pageDict := pdf.Dict{
+		"Type":      pdf.Name("Page"),
+		"Contents":  pdf.Array{stream1Ref, stream2Ref},
+		"Resources": pdf.Dict{},
+	}
+	err = pdfData.Put(pageRef, pageDict)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = pdfData.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fontLoader := loader.NewFontLoader()
+	reader := New(pdfData, fontLoader)
+
+	type operation struct {
+		Op   string
+		Args []pdf.Object
+	}
+
+	var operations []operation
+	reader.EveryOp = func(op string, args []pdf.Object) error {
+		// clone arguments since scanner reuses the slice
+		var clonedArgs []pdf.Object
+		if len(args) > 0 {
+			clonedArgs = make([]pdf.Object, len(args))
+			copy(clonedArgs, args)
+		}
+		operations = append(operations, operation{Op: op, Args: clonedArgs})
+		return nil
+	}
+
+	err = reader.ParsePage(pageRef, matrix.Identity)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := []operation{
+		{Op: "q", Args: nil},
+		{Op: "cm", Args: []pdf.Object{pdf.Integer(1), pdf.Integer(0), pdf.Integer(0), pdf.Integer(1), pdf.Integer(100), pdf.Integer(200)}},
+		{Op: "w", Args: []pdf.Object{pdf.Integer(5)}},
+		{Op: "Q", Args: nil},
+	}
+
+	// Compare what we got to what we expected
+	if diff := cmp.Diff(expected, operations); diff != "" {
+		t.Errorf("operations mismatch (-want +got):\n%s", diff)
 	}
 }

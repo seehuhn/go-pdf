@@ -56,11 +56,14 @@ func (c *objectCtx) Next(key string) (Context, error) {
 				_, hasParent := x["Parent"]
 				_, hasContents := x["Contents"]
 				if hasParent && hasContents {
-					contents, err := pdf.Resolve(c.r, x["Contents"])
+					reader, err := pagetree.ContentStream(c.r, x)
 					if err != nil {
 						return nil, err
 					}
-					return c.createPageContentsStream(contents)
+					return &streamCtx{
+						r:    reader,
+						name: "page contents",
+					}, nil
 				}
 			}
 			return nil, &KeyError{Key: key, Ctx: "Page dict (missing Type/Parent/Contents)"}
@@ -86,12 +89,10 @@ func (c *objectCtx) Next(key string) (Context, error) {
 			}
 		}
 
-		if obj == nil {
-			var ok bool
-			obj, ok = x[pdf.Name(key)]
-			if !ok {
-				return nil, &KeyError{Key: key, Ctx: "Dict"}
-			}
+		var ok bool
+		obj, ok = x[pdf.Name(key)]
+		if !ok {
+			return nil, &KeyError{Key: key, Ctx: "Dict"}
 		}
 
 	case pdf.Array:
@@ -145,62 +146,6 @@ func (c *objectCtx) Next(key string) (Context, error) {
 	}
 
 	return &objectCtx{r: c.r, obj: obj}, nil
-}
-
-func (c *objectCtx) createPageContentsStream(contents pdf.Object) (Context, error) {
-	switch contents := contents.(type) {
-	case *pdf.Stream:
-		if c.r == nil {
-			// For testing with nil reader, just return the raw stream
-			return &streamCtx{
-				r:    contents.R,
-				name: "page contents (raw)",
-			}, nil
-		}
-		stmData, err := pdf.DecodeStream(c.r, contents, 0)
-		if err != nil {
-			return nil, err
-		}
-		return &streamCtx{
-			r:    stmData,
-			name: "page contents",
-		}, nil
-	case pdf.Array:
-		if c.r == nil {
-			// For testing with nil reader, just use the first stream if it exists
-			if len(contents) > 0 {
-				if stream, ok := contents[0].(*pdf.Stream); ok {
-					return &streamCtx{
-						r:    stream.R,
-						name: "page contents array (raw)",
-					}, nil
-				}
-			}
-			return nil, fmt.Errorf("cannot handle array contents with nil reader")
-		}
-		var readers []io.Reader
-		for i, elem := range contents {
-			stm, err := pdf.GetStream(c.r, elem)
-			if err != nil {
-				return nil, err
-			}
-			stmData, err := pdf.DecodeStream(c.r, stm, 0)
-			if err != nil {
-				return nil, err
-			}
-			readers = append(readers, stmData)
-			if i < len(contents)-1 {
-				// Add newlines between streams
-				readers = append(readers, strings.NewReader("\n"))
-			}
-		}
-		return &streamCtx{
-			r:    io.MultiReader(readers...),
-			name: "page contents array",
-		}, nil
-	default:
-		return nil, fmt.Errorf("unexpected type %T for page contents", contents)
-	}
 }
 
 func (c *objectCtx) Show() error {

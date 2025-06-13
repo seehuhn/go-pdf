@@ -17,17 +17,19 @@
 package reader
 
 import (
-	"fmt"
 	"io"
 
 	"seehuhn.de/go/geom/matrix"
+
+	"seehuhn.de/go/postscript/cid"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/reader/scanner"
-	"seehuhn.de/go/postscript/cid"
 )
 
 // A Reader reads a PDF content stream.
@@ -45,7 +47,6 @@ type Reader struct {
 
 	// User callbacks.
 	// TODO(voss): clean up this list
-	// TODO(voss): check the error returns
 	Character func(cid cid.CID, text string) error
 	TextEvent func(event TextEvent, arg float64)
 
@@ -107,52 +108,11 @@ func (r *Reader) ParsePage(page pdf.Object, ctm matrix.Matrix) error {
 		return err
 	}
 
-	return r.parseContents(pageDict["Contents"])
-}
-
-// parseContents parses a content stream.
-// Obj can be either a stream or an array of streams.
-func (r *Reader) parseContents(obj pdf.Object) error {
-	contents, err := pdf.Resolve(r.R, obj)
+	contentReader, err := pagetree.ContentStream(r.R, page)
 	if err != nil {
 		return err
 	}
-	switch contents := contents.(type) {
-	case *pdf.Stream:
-		err := r.parsePDFStream(contents)
-		if err != nil && err != io.ErrUnexpectedEOF {
-			// TODO(voss): add reference to the message, as it is done below
-			return pdf.Wrap(err, "content stream")
-		}
-	case pdf.Array:
-		for _, ref := range contents {
-			stm, err := pdf.GetStream(r.R, ref)
-			if err != nil {
-				return err
-			}
-			err = r.parsePDFStream(stm)
-			if err != nil && err != io.ErrUnexpectedEOF {
-				key := "content stream"
-				if ref, ok := ref.(pdf.Reference); ok {
-					key = fmt.Sprintf("content stream %s", ref)
-				}
-				return pdf.Wrap(err, key)
-			}
-		}
-	default:
-		return &pdf.MalformedFileError{
-			Err: fmt.Errorf("unexpected type %T for content stream", contents),
-		}
-	}
-	return nil
-}
-
-func (r *Reader) parsePDFStream(stm *pdf.Stream) error {
-	body, err := pdf.DecodeStream(r.R, stm, 0)
-	if err != nil {
-		return err
-	}
-	return r.ParseContentStream(body)
+	return r.ParseContentStream(contentReader)
 }
 
 // ParseContentStream parses a PDF content stream.
@@ -417,7 +377,10 @@ func (r *Reader) do() error {
 		case "Tj":
 			s := op.GetString()
 			if op.OK() && r.TextFont != nil {
-				r.processText(s)
+				err := r.processText(s)
+				if err != nil {
+					return err
+				}
 			}
 
 		case "'":
@@ -428,7 +391,10 @@ func (r *Reader) do() error {
 				if r.TextEvent != nil {
 					r.TextEvent(TextEventNL, 0)
 				}
-				r.processText(s)
+				err := r.processText(s)
+				if err != nil {
+					return err
+				}
 			}
 
 		case "\"":
@@ -444,7 +410,10 @@ func (r *Reader) do() error {
 				if r.TextEvent != nil {
 					r.TextEvent(TextEventNL, 0)
 				}
-				r.processText(s)
+				err := r.processText(s)
+				if err != nil {
+					return err
+				}
 			}
 
 		case "TJ":
@@ -454,7 +423,10 @@ func (r *Reader) do() error {
 					var d float64
 					switch ai := ai.(type) {
 					case pdf.String:
-						r.processText(ai)
+						err := r.processText(ai)
+						if err != nil {
+							return err
+						}
 					case pdf.Integer:
 						d = float64(ai)
 					case pdf.Real:
@@ -644,7 +616,7 @@ func divideBy1000(x float64) float64 {
 	return x / 1000
 }
 
-func (r *Reader) processText(s pdf.String) {
+func (r *Reader) processText(s pdf.String) error {
 	// TODO(voss): can this be merged with the corresponding code in op-text.go?
 
 	var toTextSpace func(float64) float64
@@ -667,12 +639,17 @@ func (r *Reader) processText(s pdf.String) {
 			width *= r.TextHorizontalScaling
 		}
 
-		// TODO(voss): check for error returns from the callbacks
 		if r.Character != nil && r.TextRenderingMode != graphics.TextRenderingModeInvisible {
-			r.Character(info.CID, info.Text)
+			err := r.Character(info.CID, info.Text)
+			if err != nil {
+				return err
+			}
 		}
 		if r.Text != nil && r.TextRenderingMode != graphics.TextRenderingModeInvisible {
-			r.Text(info.Text)
+			err := r.Text(info.Text)
+			if err != nil {
+				return err
+			}
 		}
 
 		switch wmode {
@@ -682,6 +659,7 @@ func (r *Reader) processText(s pdf.String) {
 			r.TextMatrix = matrix.Translate(0, width).Mul(r.TextMatrix)
 		}
 	}
+	return nil
 }
 
 func getNumber(x pdf.Object) (float64, bool) {
