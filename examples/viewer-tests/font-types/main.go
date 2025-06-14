@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/graphics/text"
 	"seehuhn.de/go/pdf/internal/fonttypes"
+	"seehuhn.de/go/pdf/internal/gibberish"
 )
 
 func main() {
@@ -48,9 +49,9 @@ func run() error {
 
 		text.Show(out.Writer,
 			text.M{X: 36, Y: 360}, F,
-			text.Wrap(500, `In the bustling metropolis of Docuville, where words flowed like rivers and fonts flourished in every corner, there lived a brave hero named Go-Pdf. With his trusty sidekick, Vector Graphics, Go-Pdf was known throughout the land for his ability to render crisp, clean documents with lightning speed. The citizens of Docuville relied on Go-Pdf to protect their precious files from the clutches of the dreaded Font Rasterizer, a monstrous villain who sought to pixelate and blur the beauty of their beloved typefaces.`),
+			text.Wrap(480, gibberish.Generate(100, 0)),
 			text.NL,
-			text.Wrap(500, `One fateful day, the Font Rasterizer launched a surprise attack on the city's central printing press, threatening to convert every letter into a jagged, low-resolution mess. Go-Pdf leapt into action, harnessing the power of his vector-based superpowers to combat the Font Rasterizer's bitmap-based brutality. With Vector Graphics at his side, Go-Pdf engaged in an epic battle, dodging pixelated projectiles and countering with sleek, scalable strokes. In the end, Go-Pdf emerged victorious, banishing the Font Rasterizer to the depths of the recycle bin and restoring clarity and legibility to the documents of Docuville once more.`),
+			text.Wrap(480, gibberish.Generate(80, 1)),
 		)
 
 		err = out.Close()

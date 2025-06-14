@@ -34,6 +34,6 @@ func (c *metaCtx) Show() error {
 	return meta.ShowMetadata(c.r)
 }
 
-func (c *metaCtx) Keys() ([]string, error) {
-	return nil, nil
+func (c *metaCtx) Keys() []string {
+	return nil
 }

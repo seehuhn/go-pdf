@@ -181,7 +181,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 			subtable := sfntcmap.Format4{}
 			for gid, origGid := range glyphs {
 				glyphName := e.Simple.GlyphName(origGid)
-				rr := names.ToUnicode(glyphName, subsetFont.PostScriptName())
+				rr := []rune(names.ToUnicode(glyphName, subsetFont.PostScriptName()))
 				if len(rr) != 1 {
 					continue
 				}
@@ -194,7 +194,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 			subtable := sfntcmap.Format12{}
 			for gid, origGid := range glyphs {
 				glyphName := e.Simple.GlyphName(origGid)
-				rr := names.ToUnicode(glyphName, subsetFont.PostScriptName())
+				rr := []rune(names.ToUnicode(glyphName, subsetFont.PostScriptName()))
 				if len(rr) != 1 {
 					continue
 				}

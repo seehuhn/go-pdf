@@ -38,10 +38,10 @@ type Context interface {
 	// Keys lists the allowed keys for the Next method.
 	// Keywords which need to be used verbatim are enclosed in backticks,
 	// everything else is a human-readable description of what is allowed.
-	Keys() ([]string, error)
+	Keys() []string
 }
 
-func Root(fileName string, passwords ...string) (*fileCtx, error) {
+func Root(fileName string, passwords ...string) (Context, error) {
 	tryPasswd := func(_ []byte, try int) string {
 		if try < len(passwords) {
 			return passwords[try]
@@ -116,7 +116,7 @@ func (c *fileCtx) Next(key string) (Context, error) {
 				return nil, err
 			}
 		} else { // ... or catalog key
-			cat := &objectCtx{obj: pdf.AsDict(meta.Catalog)}
+			cat := &objectCtx{r: c.r, obj: pdf.AsDict(meta.Catalog)}
 			return cat.Next(key)
 		}
 	}
@@ -136,7 +136,7 @@ func (c *fileCtx) Show() error {
 	return nil
 }
 
-func (c *fileCtx) Keys() ([]string, error) {
+func (c *fileCtx) Keys() []string {
 	return []string{
 		"`meta`",
 		"`catalog`",
@@ -144,7 +144,7 @@ func (c *fileCtx) Keys() ([]string, error) {
 		"`trailer`",
 		"object reference",
 		"catalog key",
-	}, nil
+	}
 }
 
 var (

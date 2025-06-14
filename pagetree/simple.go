@@ -98,7 +98,7 @@ func GetPage(r pdf.Getter, pageNo int) (pdf.Reference, pdf.Dict, error) {
 					}
 				}
 			}
-			delete(pageTreeNode, "Parent") // TODO(voss): why are we doing this?
+			delete(pageTreeNode, "Parent")
 			return ref, pageTreeNode, nil
 
 		case "Pages":

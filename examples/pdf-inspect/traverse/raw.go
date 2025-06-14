@@ -34,6 +34,6 @@ func (ctx *rawStreamCtx) Show() error {
 	return err
 }
 
-func (ctx *rawStreamCtx) Keys() ([]string, error) {
-	return nil, nil
+func (ctx *rawStreamCtx) Keys() []string {
+	return nil
 }

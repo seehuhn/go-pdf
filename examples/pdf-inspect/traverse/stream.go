@@ -32,8 +32,8 @@ func (c *streamCtx) Next(key string) (Context, error) {
 	return nil, &KeyError{Key: key, Ctx: "stream has no children"}
 }
 
-func (c *streamCtx) Keys() ([]string, error) {
-	return []string{}, nil
+func (c *streamCtx) Keys() []string {
+	return []string{}
 }
 
 func (c *streamCtx) Show() error {

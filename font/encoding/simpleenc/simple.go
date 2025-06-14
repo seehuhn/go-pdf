@@ -172,12 +172,12 @@ func (t *Simple) AllocateCode(gid glyph.ID, baseGlyphName, text string, width fl
 	glyphName := t.makeGlyphName(gid, baseGlyphName, text)
 
 	var r rune
-	rr := names.ToUnicode(glyphName, t.fontName)
+	rr := []rune(names.ToUnicode(glyphName, t.fontName))
 	if len(rr) == 0 {
-		rr = norm.NFD.String(text)
+		rr = []rune(norm.NFD.String(text))
 	}
 	if len(rr) > 0 {
-		r = []rune(rr)[0]
+		r = rr[0]
 	}
 
 	bestScore := -1

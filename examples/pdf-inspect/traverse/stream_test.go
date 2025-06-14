@@ -79,7 +79,7 @@ func TestStreamCtxNext(t *testing.T) {
 		t.Errorf("expected nil result but got %v", result)
 	}
 	if err == nil {
-		t.Errorf("expected error but got nil")
+		t.Error("expected error but got nil")
 	}
 	if _, ok := err.(*KeyError); !ok {
 		t.Errorf("expected *KeyError but got %T: %v", err, err)
@@ -92,10 +92,7 @@ func TestStreamCtxKeys(t *testing.T) {
 		name: "test stream",
 	}
 
-	keys, err := ctx.Keys()
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	keys := ctx.Keys()
 	if len(keys) != 0 {
 		t.Errorf("expected empty keys but got %v", keys)
 	}
@@ -109,14 +106,15 @@ func TestStreamNavigation(t *testing.T) {
 		expectError bool
 	}{
 		{
-			name:        "raw stream",
-			key:         "@raw",
+			name:        "encoded stream",
+			key:         "@encoded",
 			expectType:  "*traverse.rawStreamCtx",
 			expectError: false,
 		},
 		{
 			name:        "decoded stream (error - no reader)",
-			key:         "@stream",
+			key:         "@raw",
+			expectType:  "*traverse.streamCtx",
 			expectError: true,
 		},
 		{
@@ -153,7 +151,7 @@ func TestStreamNavigation(t *testing.T) {
 
 			if tt.expectError {
 				if err == nil {
-					t.Errorf("expected error but got nil")
+					t.Error("expected error but got nil")
 				}
 				return
 			}
@@ -164,7 +162,7 @@ func TestStreamNavigation(t *testing.T) {
 			}
 
 			if result == nil {
-				t.Errorf("expected result but got nil")
+				t.Error("expected result but got nil")
 				return
 			}
 
@@ -242,7 +240,7 @@ func TestPageContents(t *testing.T) {
 
 			if tt.expectError {
 				if err == nil {
-					t.Errorf("expected error but got nil")
+					t.Error("expected error but got nil")
 				}
 				return
 			}
@@ -253,7 +251,7 @@ func TestPageContents(t *testing.T) {
 			}
 
 			if result == nil {
-				t.Errorf("expected result but got nil")
+				t.Error("expected result but got nil")
 				return
 			}
 
@@ -264,7 +262,7 @@ func TestPageContents(t *testing.T) {
 			}
 
 			if streamCtx.r == nil {
-				t.Errorf("expected reader but got nil")
+				t.Error("expected reader but got nil")
 			}
 		})
 	}
@@ -300,7 +298,7 @@ func TestObjectCtxKeysWithSpecialActions(t *testing.T) {
 					"Length": pdf.Integer(100),
 				},
 			},
-			expected: []string{"`@raw`", "`@stream`", "`dict`", "stream dict keys"},
+			expected: []string{"`@encoded`", "`@raw`", "`dict`", "stream dict keys"},
 		},
 		{
 			name: "page dict with @contents",
@@ -334,12 +332,7 @@ func TestObjectCtxKeysWithSpecialActions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &objectCtx{obj: tt.obj}
-			result, err := ctx.Keys()
-
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			}
+			result := ctx.Keys()
 
 			if d := cmp.Diff(result, tt.expected); d != "" {
 				t.Errorf("keys mismatch (-got +want):\n%s", d)

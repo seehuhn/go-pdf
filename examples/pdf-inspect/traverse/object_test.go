@@ -162,7 +162,7 @@ func TestObjectCtxNext(t *testing.T) {
 				case *KeyError:
 					// pass
 				case nil:
-					t.Errorf("expected *KeyError but got nil")
+					t.Error("expected *KeyError but got nil")
 				default:
 					t.Errorf("expected *KeyError but got %T: %v", err, err)
 				}
@@ -173,7 +173,7 @@ func TestObjectCtxNext(t *testing.T) {
 			}
 
 			if res == nil {
-				t.Errorf("expected result but got nil")
+				t.Error("expected result but got nil")
 				return
 			}
 
@@ -233,14 +233,14 @@ func TestObjectCtxKeys(t *testing.T) {
 					"Length": pdf.Integer(100),
 				},
 			},
-			expected: []string{"`@raw`", "`@stream`", "`dict`", "stream dict keys"},
+			expected: []string{"`@encoded`", "`@raw`", "`dict`", "stream dict keys"},
 		},
 		{
 			name: "stream with empty dict",
 			obj: &pdf.Stream{
 				Dict: pdf.Dict{},
 			},
-			expected: []string{"`@raw`", "`@stream`", "`dict`"},
+			expected: []string{"`@encoded`", "`@raw`", "`dict`"},
 		},
 		{
 			name:     "scalar type",
@@ -257,12 +257,7 @@ func TestObjectCtxKeys(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &objectCtx{obj: tt.obj}
-			result, err := c.Keys()
-
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			}
+			result := c.Keys()
 
 			if d := cmp.Diff(result, tt.expected); d != "" {
 				t.Errorf("keys mismatch (-got +want):\n%s", d)
