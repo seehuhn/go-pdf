@@ -93,7 +93,7 @@ type drawer struct {
 
 func (d *drawer) Draw(w *graphics.Writer) error {
 	glyphPath := d.glyphs.Path(d.gid)
-	cubicPath := path.ToCubic(glyphPath)
+	cubicPath := glyphPath.ToCubic()
 	for cmd, pts := range cubicPath {
 		switch cmd {
 		case path.CmdMoveTo:

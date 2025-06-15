@@ -102,7 +102,7 @@ func toCFF(info *sfnt.Font) (*sfnt.Font, error) {
 
 		if origGlyph != nil {
 			glyphPath := origOutlines.Glyphs.Path(gid)
-			cubicPath := path.ToCubic(glyphPath)
+			cubicPath := glyphPath.ToCubic()
 			for cmd, pts := range cubicPath {
 				switch cmd {
 				case path.CmdMoveTo:
