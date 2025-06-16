@@ -76,7 +76,7 @@ func Type3() (*type3.Instance, error) {
 				URx: float64(bbox.URx),
 				URy: float64(bbox.URy),
 			}
-			d := &drawer{glyphs: origOutlines.Glyphs, gid: gid}
+			d := &drawer{outlines: origOutlines, gid: gid}
 			g.Draw = d.Draw
 		}
 
@@ -87,12 +87,12 @@ func Type3() (*type3.Instance, error) {
 }
 
 type drawer struct {
-	glyphs glyf.Glyphs
-	gid    glyph.ID
+	outlines *glyf.Outlines
+	gid      glyph.ID
 }
 
 func (d *drawer) Draw(w *graphics.Writer) error {
-	glyphPath := d.glyphs.Path(d.gid)
+	glyphPath := d.outlines.Path(d.gid)
 	cubicPath := glyphPath.ToCubic()
 	for cmd, pts := range cubicPath {
 		switch cmd {

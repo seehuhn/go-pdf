@@ -48,7 +48,7 @@ func toType1(info *sfnt.Font) (*type1.Font, error) {
 		}
 
 		if origGlyph != nil {
-			glyphPath := origOutlines.Glyphs.Path(gid)
+			glyphPath := origOutlines.Path(gid)
 			cubicPath := glyphPath.ToCubic()
 			for cmd, pts := range cubicPath {
 				switch cmd {
