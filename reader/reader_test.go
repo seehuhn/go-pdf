@@ -26,9 +26,9 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/loader"
+	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
-	"seehuhn.de/go/pdf/internal/dummyfont"
 )
 
 // TestParameters verifies that the graphics state is correctly updated by the
@@ -43,7 +43,7 @@ func TestParameters(t *testing.T) {
 	w := graphics.NewWriter(buf, rm)
 	w.Set = 0
 
-	testFont := dummyfont.Must()
+	testFont := standard.Helvetica.New()
 
 	w.SetLineWidth(12.3)
 	w.SetLineCap(graphics.LineCapRound)

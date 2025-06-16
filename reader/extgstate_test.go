@@ -24,14 +24,14 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
-	"seehuhn.de/go/pdf/internal/dummyfont"
 )
 
 // TestExtGState verifies that external graphics states are correctly read.
 func TestExtGState(t *testing.T) {
-	testFont := dummyfont.Must() // TODO(voss): use a different font
+	testFont := standard.Helvetica.New()
 
 	// We start by creating a graphics state with all possible parameters set.
 	ext1 := &graphics.ExtGState{}

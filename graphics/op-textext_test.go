@@ -28,7 +28,6 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics/testcases"
-	"seehuhn.de/go/pdf/internal/dummyfont"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 	"seehuhn.de/go/pdf/internal/ghostscript"
 )
@@ -73,7 +72,7 @@ func TestTextShowRaw(t *testing.T) {
 
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			F := dummyfont.Must()
+			F := fonttypes.CFFSimple()
 
 			// first print all glyphs in one string
 			img1 := ghostscript.Render(t, 200, 120, pdf.V1_7, func(r *document.Page) error {
