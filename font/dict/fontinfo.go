@@ -55,8 +55,10 @@ type FontInfoSimple struct {
 type FontInfoCID struct {
 	// PostScriptName is the PostScript name of the font.
 	PostScriptName string
+
 	// Ref is the PDF reference to the font object.
 	Ref pdf.Reference
+
 	// FontType indicates the underlying font program type (e.g., CIDFontType0, CIDFontType2).
 	FontType glyphdata.Type
 
@@ -69,6 +71,7 @@ type FontInfoCID struct {
 type FontInfoGlyfEmbedded struct {
 	// PostScriptName is the PostScript name of the font.
 	PostScriptName string
+
 	// Ref is the PDF reference to the font object.
 	Ref pdf.Reference
 

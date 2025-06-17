@@ -47,6 +47,10 @@ type Instance struct {
 	// about kerning and ligatures.
 	*afm.Metrics
 
+	// GlyphNames establishes the assignment between GIDs and glyph
+	// names.  The slice starts with ".notdef".
+	GlyphNames []string
+
 	IsSerif    bool
 	IsScript   bool
 	IsAllCap   bool
@@ -60,24 +64,19 @@ type Instance struct {
 }
 
 // New creates a new Type 1 PDF font from a Type 1 PostScript font.
+// The argument psFont must be present, metrics is optional.
 func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 	if !isConsistent(psFont, metrics) {
 		return nil, errors.New("inconsistent Type 1 font metrics")
 	}
 
-	var glyphNames []string
-	if psFont != nil {
-		glyphNames = psFont.GlyphList()
-	} else {
-		glyphNames = metrics.GlyphList()
-	}
+	glyphNames := psFont.GlyphList()
 
 	geometry := &font.Geometry{}
 	widths := make([]float64, len(glyphNames))
 	extents := make([]rect.Rect, len(glyphNames))
 	for i, name := range glyphNames {
-		g := psFont.Glyphs[name]
-		widths[i] = g.WidthX * psFont.FontMatrix[0]
+		widths[i] = psFont.GlyphWidthPDF(name)
 		extents[i] = psFont.GlyphBBoxPDF(name)
 	}
 	geometry.UnderlinePosition = float64(psFont.FontInfo.UnderlinePosition) * psFont.FontMatrix[3]
@@ -124,19 +123,20 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 	}
 
 	return &Instance{
-		Font:     psFont,
-		Metrics:  metrics,
-		Geometry: geometry,
-		lig:      lig,
-		kern:     kern,
-		cmap:     cmap,
+		Font:       psFont,
+		Metrics:    metrics,
+		GlyphNames: glyphNames,
+		Geometry:   geometry,
+		lig:        lig,
+		kern:       kern,
+		cmap:       cmap,
 	}, nil
 }
 
 // IsConsistent checks whether the font metrics are compatible with the
 // given font.
 func isConsistent(F *type1.Font, M *afm.Metrics) bool {
-	if F == nil || M == nil {
+	if M == nil {
 		return true
 	}
 	qh := F.FontMatrix[0] * 1000

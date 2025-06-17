@@ -128,7 +128,7 @@ func createFont(filename string) error {
 	for name, glyph := range psFont.Glyphs {
 		metrics.Glyphs[name] = &afm.GlyphInfo{
 			WidthX: glyph.WidthX,
-			BBox:   glyph.BBox(),
+			BBox:   psFont.GlyphBBoxPDF(name),
 		}
 	}
 	afmName := strings.TrimSuffix(filename, ".pfb") + ".afm"

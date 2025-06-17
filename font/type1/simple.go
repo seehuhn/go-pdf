@@ -48,10 +48,10 @@ var _ interface {
 // embeddedSimple represents an [Instance] which has been embedded in a PDF
 // file.
 type embeddedSimple struct {
-	Ref       pdf.Reference
-	Font      *type1.Font
-	Metrics   *afm.Metrics
-	GlyphList []string
+	Ref        pdf.Reference
+	Font       *type1.Font
+	Metrics    *afm.Metrics
+	GlyphNames []string
 
 	IsSerif    bool
 	IsScript   bool
@@ -64,18 +64,11 @@ type embeddedSimple struct {
 }
 
 func newEmbeddedSimple(ref pdf.Reference, f *Instance) *embeddedSimple {
-	var glyphList []string
-	if f.Metrics != nil {
-		glyphList = f.Metrics.GlyphList()
-	} else {
-		glyphList = f.Font.GlyphList()
-	}
-
 	e := &embeddedSimple{
-		Ref:       ref,
-		Font:      f.Font,
-		Metrics:   f.Metrics,
-		GlyphList: glyphList,
+		Ref:        ref,
+		Font:       f.Font,
+		Metrics:    f.Metrics,
+		GlyphNames: f.GlyphNames,
 
 		IsSerif:    f.IsSerif,
 		IsScript:   f.IsScript,
@@ -98,7 +91,7 @@ func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) 
 			return s, 0
 		}
 
-		glyphName := e.GlyphList[gid]
+		glyphName := e.GlyphNames[gid]
 		var width float64
 		if e.Metrics != nil {
 			width = e.Metrics.GlyphWidthPDF(glyphName)
@@ -158,7 +151,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 			fontSubset = clone(fontData)
 			fontSubset.Glyphs = make(map[string]*type1.Glyph)
 			for _, gid := range glyphs {
-				glyphName := e.GlyphList[gid]
+				glyphName := e.GlyphNames[gid]
 				if g, ok := fontData.Glyphs[glyphName]; ok {
 					fontSubset.Glyphs[glyphName] = g
 				}
@@ -170,7 +163,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 			metricsSubset := clone(metricsData)
 			metricsSubset.Glyphs = make(map[string]*afm.GlyphInfo)
 			for _, gid := range glyphs {
-				glyphName := e.GlyphList[gid]
+				glyphName := e.GlyphNames[gid]
 				if g, ok := metricsData.Glyphs[glyphName]; ok {
 					metricsSubset.Glyphs[glyphName] = g
 				}

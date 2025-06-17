@@ -11,10 +11,10 @@ require (
 	golang.org/x/image v0.18.0
 	golang.org/x/term v0.16.0
 	golang.org/x/text v0.16.0
-	seehuhn.de/go/geom v0.0.0-20250615075231-86b72097dec6
+	seehuhn.de/go/geom v0.0.0-20250617124314-d70fc9ed7ed7
 	seehuhn.de/go/icc v0.0.0-20240801195843-cfc244e2c55a
-	seehuhn.de/go/postscript v0.5.1-0.20250316102127-8863e3a3d4c4
-	seehuhn.de/go/sfnt v0.5.1-0.20250616144634-eed0c9f0c0d4
+	seehuhn.de/go/postscript v0.5.1-0.20250617124420-c7d64a012f44
+	seehuhn.de/go/sfnt v0.5.1-0.20250617124539-2498b3f75666
 	seehuhn.de/go/xmp v0.3.0
 )
 

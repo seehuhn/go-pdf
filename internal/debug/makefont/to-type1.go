@@ -115,10 +115,12 @@ func toType1(info *sfnt.Font) (*type1.Font, error) {
 	}
 
 	res := &type1.Font{
-		FontInfo:     info.GetFontInfo(),
-		Glyphs:       newOutlines,
-		Private:      Private,
-		Encoding:     encoding,
+		FontInfo: info.GetFontInfo(),
+		Outlines: &type1.Outlines{
+			Glyphs:   newOutlines,
+			Private:  Private,
+			Encoding: encoding,
+		},
 		CreationDate: info.CreationTime,
 	}
 
