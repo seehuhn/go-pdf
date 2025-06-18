@@ -114,6 +114,11 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		subsetFont = origFont
 	}
 
+	toSubset := make(map[glyph.ID]glyph.ID, len(glyphs))
+	for subsetGID, origGID := range glyphs {
+		toSubset[origGID] = glyph.ID(subsetGID)
+	}
+
 	// Follow the advice of section 9.6.5.4 of ISO 32000-2:2020:
 	// Only make the font as non-symbolic, if it can be encoded either
 	// using "MacRomanEncoding" or "WinAnsiEncoding".
@@ -152,7 +157,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 			if gid == 0 {
 				continue
 			}
-			subtable[uint16(code)] = gid
+			subtable[uint16(code)] = toSubset[gid]
 		}
 		subsetFont.CMapTable = sfntcmap.Table{
 			{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),

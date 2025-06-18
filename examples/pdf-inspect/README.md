@@ -5,55 +5,64 @@ Basic usage is to call `pdf-inspect` with a PDF file as the first argument,
 and more arguments to specify what to inspect.
 
 ```sh
-pdf-inspect [options] example.pdf [root] selector* [action]
+pdf-inspect [options] file.pdf [path]
 ```
 
 The following options are defined:
 
 - `-p password`: Use the given password to decrypt the PDF file.
-- `-show-metadata`: Show information from the Document Information dictionary
-  and the file metadata stream in Human-Readable form and exit.
 
-Root can be one of:
+The path argument is a sequence of selectors that traverse the PDF document
+structure, starting at file level.
 
-- `catalog` (default): The Document Catalog dictionary
+The first element of the path, if any, must be one of
+- `meta`: File metadata (name, size, modification time)
+- `catalog`: The Document Catalog dictionary
 - `info`: The Document Information dictionary
 - `trailer`: The file trailer dictionary
-- An PDF object number in the form of `n.g` where `n` is the object number and
-  `g` is the generation number, or just `n` if the generation number is 0.
+- an object reference: go to the corresponding indirect object
+  (e.g., `1` for object `1 0 R`)
+- a catalog key: go to the corresponding value in the catalog dictionary
+  (e.g., `Pages` for the page tree root).
 
-If no root is given, `catalog` is assumed.
 
-A sequence of selectors can be used to follow the logical structure of the PDF
-file, starting from the root. The meaning of each selector depends on the type
-of the current object:
+Along the path, the meaning of each selector depends on the type of the current
+object. Available navigation options are shown at the bottom of each output for
+easy discovery.
 
 - For dictionaries, the selector is interpreted as a dictionary key.
   The key name can optionally be prefixed with a slash `/`.
-  The new current object is the corresponding value in the dictionary.
+  The next object is the corresponding value in the dictionary.
 
-- As a special case, if the current object is the root of the page tree,
-  the selector can be a page number.  In this case, the current object is the
-  corresponding page dictionary.
+- If the current object is a page dictionary, the selector can be one of
+  * Dictionary keys, optionally prefixed with a slash `/`.
+    The next object is the value of the key.
+  * `@contents`: Write the complete content stream of the page to stdout.
 
-- If the current object is an array, the selector is interpreted as an index
-  (0-based).  The new current object is the array element at the index.
+- If the current object is a font dictionary:
+  * Dictionary keys, optionally prefixed with a slash `/`.
+    The next object is the value of the key.
+  * `@font`: Display detailed font information including PostScript name, descriptor, and font type.
 
-- If the current object is a stream, the selector is interpreted as a key in
-  the stream dictionary. The key name can optionally be prefixed with a slash
-  `/`. The new current object is the value of the key.  The special selector
-  `dict` can be used to access the stream dict as a whole.
+- If the current object is a font dictionary with an embedded font program:
+  * `@raw`: Output the binary font program to stdout.
+  * `load`: go to the embedded font program (TrueType or Type1), if any.
 
-The optional action decides what to do with the current object:
+- If the current object is a loaded font:
+  * `glyphs`: Display the glyph list with character mappings and bounding boxes.
 
-- `@show` (default): Print the current object to stdout in a human-readable
-  form.
+- As a special case, if the current object is the root of the page tree, the
+  selector can be a 1-based page number. In this case, the next object is
+  the corresponding page dictionary.
 
-- `@raw` (when the current object is a stream): Write the raw stream data to
-  stdout.  This does not apply any stream filters.
+- If the current object is an array, the selector is interpreted as a 0-based index.
+  Negative indices count from the end of the array, e.g., `-1` for the last element.
+  The next object is the array element at the index.
 
-- `@stream` (when the current object is a stream): Decode the stream data and
-  write it to stdout.
-
-- `@contents` (when the current object is a page dictionary): Write the
-  complete content stream of the page to stdout.
+- If the current object is a stream, following selectors are allowed:
+  * Keys in the stream dictionary, optionally prefixed with a slash `/`.
+    The next object is the value of the key.
+  * `dict` goes to the stream dictionary itself.
+  * `@raw` decodes the stream data and writes it to stdout.
+  * `@encoded` writes the encoded stream data to stdout without decoding any
+    stream filters.

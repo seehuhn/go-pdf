@@ -29,6 +29,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -86,12 +87,21 @@ func (c *fontDictCtx) Next(key string) (Context, error) {
 		return &rawStreamCtx{r: decoded}, nil
 	}
 
-	if key == "@load" {
-		if ttDict, ok := c.dict.(*dict.TrueType); ok {
-			if ttDict.FontRef != 0 && ttDict.FontType == glyphdata.TrueType {
-				sctx, err := newSfntCtx(c.r, ttDict.FontRef)
+	if key == "load" {
+		switch fontDict := c.dict.(type) {
+		case *dict.Type1:
+			if fontDict.FontRef != 0 {
+				t1ctx, err := newType1Ctx(c.r, fontDict.FontRef)
 				if err != nil {
-					return nil, fmt.Errorf("creating sfnt context for @load: %w", err)
+					return nil, fmt.Errorf("creating type1 context for `load`: %w", err)
+				}
+				return t1ctx, nil
+			}
+		case *dict.TrueType:
+			if fontDict.FontRef != 0 && fontDict.FontType == glyphdata.TrueType {
+				sctx, err := newSfntCtx(c.r, fontDict.FontRef)
+				if err != nil {
+					return nil, fmt.Errorf("creating sfnt context for `load`: %w", err)
 				}
 				return sctx, nil
 			}
@@ -121,9 +131,15 @@ func (c *fontDictCtx) Keys() []string {
 		keys = append(keys, "`@raw`")
 	}
 
+	if t1Dict, ok := c.dict.(*dict.Type1); ok {
+		if t1Dict.FontRef != 0 {
+			keys = append(keys, "`load`")
+		}
+	}
+
 	if ttDict, ok := c.dict.(*dict.TrueType); ok {
 		if ttDict.FontRef != 0 && ttDict.FontType == glyphdata.TrueType {
-			keys = append(keys, "`@load`")
+			keys = append(keys, "`load`")
 		}
 	}
 
@@ -196,26 +212,26 @@ type sfntCtx struct {
 // newSfntCtx creates a new font context by reading and parsing the font program.
 func newSfntCtx(getter pdf.Getter, fontRef pdf.Reference) (*sfntCtx, error) {
 	if fontRef == 0 {
-		return nil, errors.New("invalid font reference for @load")
+		return nil, errors.New("invalid font reference for `load`")
 	}
 
 	stm, err := pdf.GetStream(getter, fontRef)
 	if err != nil {
-		return nil, fmt.Errorf("getting font program stream for @load: %w", err)
+		return nil, fmt.Errorf("getting font program stream for `load`: %w", err)
 	}
 	if stm == nil {
-		return nil, errors.New("missing font program stream for @load")
+		return nil, errors.New("missing font program stream for `load`")
 	}
 
 	decoded, err := pdf.DecodeStream(getter, stm, 0)
 	if err != nil {
-		return nil, fmt.Errorf("decoding font program stream for @load: %w", err)
+		return nil, fmt.Errorf("decoding font program stream for `load`: %w", err)
 	}
 	defer decoded.Close()
 
 	sfont, err := sfnt.Read(decoded)
 	if err != nil {
-		return nil, fmt.Errorf("parsing sfnt font for @load: %w", err)
+		return nil, fmt.Errorf("parsing sfnt font for `load`: %w", err)
 	}
 
 	return &sfntCtx{font: sfont}, nil
@@ -365,6 +381,241 @@ func (c *sfntGlyphListCtx) Next(key string) (Context, error) {
 
 // Keys returns the list of navigable keys.
 func (c *sfntGlyphListCtx) Keys() []string {
+	return nil
+}
+
+// type1Ctx represents a parsed Type1 font for traversal.
+type type1Ctx struct {
+	font *type1.Font
+}
+
+// newType1Ctx creates a new Type1 font context by reading and parsing the font program.
+func newType1Ctx(getter pdf.Getter, fontRef pdf.Reference) (*type1Ctx, error) {
+	if fontRef == 0 {
+		return nil, errors.New("invalid font reference for `load`")
+	}
+
+	stm, err := pdf.GetStream(getter, fontRef)
+	if err != nil {
+		return nil, fmt.Errorf("getting font program stream for `load`: %w", err)
+	}
+	if stm == nil {
+		return nil, errors.New("missing font program stream for `load`")
+	}
+
+	decoded, err := pdf.DecodeStream(getter, stm, 0)
+	if err != nil {
+		return nil, fmt.Errorf("decoding font program stream for `load`: %w", err)
+	}
+	defer decoded.Close()
+
+	t1font, err := type1.Read(decoded)
+	if err != nil {
+		return nil, fmt.Errorf("parsing type1 font for `load`: %w", err)
+	}
+
+	return &type1Ctx{font: t1font}, nil
+}
+
+// Show displays basic information about the Type1 font.
+func (c *type1Ctx) Show() error {
+	if c.font == nil {
+		fmt.Println("type1.Font: (nil)")
+		return nil
+	}
+
+	fmt.Printf("FontName: %s\n", c.font.FontName)
+	if c.font.FullName != "" {
+		fmt.Printf("FullName: %s\n", c.font.FullName)
+	}
+	if c.font.FamilyName != "" {
+		fmt.Printf("FamilyName: %s\n", c.font.FamilyName)
+	}
+	if c.font.Weight != "" {
+		fmt.Printf("Weight: %s\n", c.font.Weight)
+	}
+	fmt.Printf("ItalicAngle: %.1f°\n", c.font.ItalicAngle)
+	fmt.Printf("IsFixedPitch: %t\n", c.font.IsFixedPitch)
+	fmt.Printf("UnderlinePosition: %.1f\n", c.font.UnderlinePosition)
+	fmt.Printf("UnderlineThickness: %.1f\n", c.font.UnderlineThickness)
+
+	if c.font.Glyphs != nil {
+		fmt.Printf("Number of Glyphs: %d\n", len(c.font.Glyphs))
+	}
+
+	if !c.font.CreationDate.IsZero() {
+		fmt.Printf("CreationDate: %s\n", c.font.CreationDate.Format("2006-01-02 15:04:05"))
+	}
+
+	return nil
+}
+
+// Next returns a new context for the given key.
+func (c *type1Ctx) Next(key string) (Context, error) {
+	if key == "glyphs" {
+		return newType1GlyphListCtx(c.font)
+	}
+	return nil, &KeyError{Key: key, Ctx: "type1 font"}
+}
+
+// Keys returns the available keys.
+func (c *type1Ctx) Keys() []string {
+	return []string{"`glyphs`"}
+}
+
+// type1GlyphListCtx represents a list of glyphs in a Type1 font.
+type type1GlyphListCtx struct {
+	font *type1.Font
+}
+
+// newType1GlyphListCtx creates a new Type1 glyph list context.
+func newType1GlyphListCtx(font *type1.Font) (*type1GlyphListCtx, error) {
+	if font == nil {
+		return nil, errors.New("cannot create glyph list context from nil font")
+	}
+	return &type1GlyphListCtx{font: font}, nil
+}
+
+// Show displays the list of glyphs with their properties.
+func (c *type1GlyphListCtx) Show() error {
+	const indent = "  "
+
+	fmt.Println("Glyph List (Type1 font):")
+	headerIndent := indent
+	fmt.Fprintf(os.Stdout, "%s Name               |   WidthX | BBox (LLx,LLy)-(URx,URy)\n", headerIndent)
+	fmt.Fprintf(os.Stdout, "%s--------------------|----------|-------------------------\n", headerIndent)
+
+	// Get all glyph names and sort them
+	glyphNames := make([]string, 0, len(c.font.Glyphs))
+	for name := range c.font.Glyphs {
+		glyphNames = append(glyphNames, name)
+	}
+	sort.Strings(glyphNames)
+
+	for _, name := range glyphNames {
+		glyph := c.font.Glyphs[name]
+
+		bboxStr := ""
+		if !glyph.IsBlank() {
+			bbox := c.font.GlyphBBoxPDF(name)
+			if !bbox.IsZero() {
+				bboxStr = fmt.Sprintf("(%g,%g)-(%g,%g)",
+					bbox.LLx, bbox.LLy,
+					bbox.URx, bbox.URy)
+			}
+		}
+
+		fmt.Fprintf(os.Stdout, "%s%-19s | %8g | %s\n",
+			headerIndent, name, glyph.WidthX, bboxStr)
+	}
+
+	return nil
+}
+
+// Next returns the context for the given key.
+func (c *type1GlyphListCtx) Next(key string) (Context, error) {
+	// Check if the key is a valid glyph name
+	if glyph, exists := c.font.Glyphs[key]; exists {
+		return newType1GlyphCtx(c.font, key, glyph)
+	}
+	return nil, &KeyError{Key: key, Ctx: "type1 glyph list"}
+}
+
+// Keys returns the list of navigable keys.
+func (c *type1GlyphListCtx) Keys() []string {
+	if c.font == nil || len(c.font.Glyphs) == 0 {
+		return nil
+	}
+	return []string{"glyph name"}
+}
+
+// type1GlyphCtx represents an individual Type1 glyph for traversal.
+type type1GlyphCtx struct {
+	font      *type1.Font
+	glyphName string
+	glyph     *type1.Glyph
+}
+
+// newType1GlyphCtx creates a new Type1 glyph context.
+func newType1GlyphCtx(font *type1.Font, glyphName string, glyph *type1.Glyph) (*type1GlyphCtx, error) {
+	if font == nil {
+		return nil, errors.New("cannot create glyph context from nil font")
+	}
+	if glyph == nil {
+		return nil, fmt.Errorf("glyph %q not found", glyphName)
+	}
+	return &type1GlyphCtx{
+		font:      font,
+		glyphName: glyphName,
+		glyph:     glyph,
+	}, nil
+}
+
+// Show displays detailed information about the individual glyph.
+func (c *type1GlyphCtx) Show() error {
+	fmt.Printf("Glyph: %s\n", c.glyphName)
+	fmt.Printf("WidthX: %g\n", c.glyph.WidthX)
+	fmt.Printf("WidthY: %g\n", c.glyph.WidthY)
+
+	// Show bounding box
+	if !c.glyph.IsBlank() {
+		bbox := c.font.GlyphBBoxPDF(c.glyphName)
+		if !bbox.IsZero() {
+			fmt.Printf("BBox: (%g,%g)-(%g,%g)\n", bbox.LLx, bbox.LLy, bbox.URx, bbox.URy)
+		}
+	}
+
+	// Show stems
+	if len(c.glyph.HStem) > 0 {
+		fmt.Printf("Horizontal Stems: %v\n", c.glyph.HStem)
+	}
+	if len(c.glyph.VStem) > 0 {
+		fmt.Printf("Vertical Stems: %v\n", c.glyph.VStem)
+	}
+
+	// Show outline path
+	if len(c.glyph.Cmds) > 0 {
+		fmt.Println("\nOutline Path:")
+		currentX, currentY := 0.0, 0.0
+
+		for i, cmd := range c.glyph.Cmds {
+			switch cmd.Op {
+			case type1.OpMoveTo:
+				if len(cmd.Args) >= 2 {
+					currentX, currentY = cmd.Args[0], cmd.Args[1]
+					fmt.Printf("  %d: MoveTo(%g, %g)\n", i, currentX, currentY)
+				}
+			case type1.OpLineTo:
+				if len(cmd.Args) >= 2 {
+					currentX, currentY = cmd.Args[0], cmd.Args[1]
+					fmt.Printf("  %d: LineTo(%g, %g)\n", i, currentX, currentY)
+				}
+			case type1.OpCurveTo:
+				if len(cmd.Args) >= 6 {
+					currentX, currentY = cmd.Args[4], cmd.Args[5]
+					fmt.Printf("  %d: CurveTo(%g, %g, %g, %g, %g, %g)\n", i,
+						cmd.Args[0], cmd.Args[1], cmd.Args[2], cmd.Args[3], currentX, currentY)
+				}
+			case type1.OpClosePath:
+				fmt.Printf("  %d: ClosePath()\n", i)
+			default:
+				fmt.Printf("  %d: %s(%v)\n", i, cmd.Op, cmd.Args)
+			}
+		}
+	} else {
+		fmt.Println("\nOutline Path: (empty)")
+	}
+
+	return nil
+}
+
+// Next returns a new context for the given key.
+func (c *type1GlyphCtx) Next(key string) (Context, error) {
+	return nil, &KeyError{Key: key, Ctx: "type1 glyph"}
+}
+
+// Keys returns the available keys.
+func (c *type1GlyphCtx) Keys() []string {
 	return nil
 }
 
