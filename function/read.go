@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -22,66 +22,76 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Read extracts a function from a PDF file.
-func Read(r pdf.Getter, obj pdf.Object) (Func, error) {
-	ref, isIndirect := obj.(pdf.Reference)
-	singleUse := !isIndirect
+// Read extracts a function from a PDF file and returns a pdf.Function.
+func Read(r pdf.Getter, obj pdf.Object) (pdf.Function, error) {
+	cycleChecker := pdf.NewCycleChecker()
+	return readWithCycleChecker(r, obj, cycleChecker)
+}
 
-	d, err := pdf.GetDict(r, obj)
-	if err != nil {
+// readWithCycleChecker extracts a function with cycle detection to prevent infinite recursion.
+func readWithCycleChecker(r pdf.Getter, obj pdf.Object, cycleChecker *pdf.CycleChecker) (pdf.Function, error) {
+	// Check for cycles before processing the object
+	if err := cycleChecker.Check(obj); err != nil {
 		return nil, err
 	}
 
-	ft, ok := d["FunctionType"]
-	if !ok {
-		var loc []string
-		if isIndirect {
-			loc = []string{ref.String()}
-		}
+	obj, err := pdf.Resolve(r, obj)
+	if err != nil {
+		return nil, err
+	} else if obj == nil {
 		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("missing /FunctionType entry"),
-			Loc: loc,
+			Err: fmt.Errorf("missing function object"),
 		}
 	}
 
-	ftNum, err := pdf.GetInteger(r, ft)
-	if err != nil {
-		return nil, err
-	}
-	switch ftNum {
-	case 2:
-		y0, err := fromPDF(r, d["C0"])
-		if err != nil {
-			return nil, err
-		}
-		y1, err := fromPDF(r, d["C1"])
-		if err != nil {
-			return nil, err
-		}
-		gamma, err := pdf.GetNumber(r, d["N"])
-		if err != nil {
-			return nil, err
-		}
-
-		if len(y0) != len(y1) {
+	switch obj := obj.(type) {
+	case pdf.Dict:
+		ft, ok := obj["FunctionType"]
+		if !ok {
 			return nil, &pdf.MalformedFileError{
-				Err: fmt.Errorf("inconsistent length of /C0 and /C1 arrays"),
+				Err: fmt.Errorf("missing /FunctionType entry"),
 			}
 		}
 
-		res := &Type2{
-			Y0:        y0,
-			Y1:        y1,
-			Gamma:     float64(gamma),
-			SingleUse: singleUse,
+		ftNum, err := pdf.GetInteger(r, ft)
+		if err != nil {
+			return nil, err
 		}
-		return res, nil
+		switch ftNum {
+		case 2:
+			return readType2(r, obj)
+		case 3:
+			return readType3(r, obj, cycleChecker)
+		default:
+			return nil, &pdf.MalformedFileError{
+				Err: fmt.Errorf("unsupported function type %d for dictionary", ftNum),
+			}
+		}
+	case *pdf.Stream:
+		ft, ok := obj.Dict["FunctionType"]
+		if !ok {
+			return nil, &pdf.MalformedFileError{
+				Err: fmt.Errorf("missing /FunctionType entry"),
+			}
+		}
 
-	case 0, 3, 4:
-		return nil, fmt.Errorf("function type %d not yet implemented", ftNum)
+		ftNum, err := pdf.GetInteger(r, ft)
+		if err != nil {
+			return nil, err
+		}
+		switch ftNum {
+		case 0:
+			return readType0(r, obj)
+		case 4:
+			return readType4(r, obj)
+		default:
+			return nil, &pdf.MalformedFileError{
+				Err: fmt.Errorf("unsupported function type %d for stream", ftNum),
+			}
+		}
 	default:
 		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("unsupported function type %d", ftNum),
+			Err: fmt.Errorf("function must be a dictionary or stream"),
 		}
 	}
 }

@@ -23,7 +23,6 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/function"
 )
 
 // == Indexed ================================================================
@@ -153,11 +152,11 @@ func (c colorIndexed) ColorSpace() Space {
 type SpaceSeparation struct {
 	colorant  pdf.Name
 	alternate Space
-	trfm      function.Func
+	trfm      pdf.Function
 }
 
 // Separation returns a new separation color space.
-func Separation(colorant pdf.Name, alternate Space, trfm function.Func) (*SpaceSeparation, error) {
+func Separation(colorant pdf.Name, alternate Space, trfm pdf.Function) (*SpaceSeparation, error) {
 	if IsSpecial(alternate) {
 		return nil, errors.New("Separation: invalid alternate color space")
 	}
@@ -238,12 +237,12 @@ func (c colorSeparation) ColorSpace() Space {
 type SpaceDeviceN struct {
 	colorants pdf.Array
 	alternate Space
-	trfm      function.Func
+	trfm      pdf.Function
 	attr      pdf.Dict
 }
 
 // DeviceN returns a new DeviceN color space.
-func DeviceN(names []pdf.Name, alternate Space, trfm function.Func, attr pdf.Dict) (*SpaceDeviceN, error) {
+func DeviceN(names []pdf.Name, alternate Space, trfm pdf.Function, attr pdf.Dict) (*SpaceDeviceN, error) {
 	namesArray := make(pdf.Array, len(names))
 	seen := make(map[pdf.Name]bool)
 	for i, name := range names {

@@ -540,3 +540,21 @@ func (r *Resources) IsDirect() bool {
 		IsDirect(r.ProcSet) &&
 		IsDirect(r.Properties)
 }
+
+// Function represents a PDF function.
+// Concrete implementations of this interface can be found in the
+// seehuhn.de/go/pdf/function package.
+type Function interface {
+	// FunctionType returns the type of the PDF function.
+	// This is one of 0, 2, 3, 4.
+	FunctionType() int
+
+	// Shape returns the number of input and output values of the function.
+	Shape() (m int, n int)
+
+	// Apply applies the function to the given m input values
+	// and returns the n output values.
+	Apply(...float64) []float64
+
+	Embedder[Unused]
+}

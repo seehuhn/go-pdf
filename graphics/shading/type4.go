@@ -22,7 +22,6 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -43,7 +42,7 @@ type Type4 struct {
 
 	Vertices []Type4Vertex
 
-	F          function.Func
+	F          pdf.Function
 	Background []float64
 	BBox       *pdf.Rectangle
 	AntiAlias  bool

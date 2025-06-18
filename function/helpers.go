@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,7 +18,8 @@ package function
 
 import "seehuhn.de/go/pdf"
 
-func toPDF(x []float64) pdf.Array {
+// arrayFromFloats converts a slice of float64 to a PDF Array.
+func arrayFromFloats(x []float64) pdf.Array {
 	res := make(pdf.Array, len(x))
 	for i, xi := range x {
 		res[i] = pdf.Number(xi)
@@ -26,7 +27,17 @@ func toPDF(x []float64) pdf.Array {
 	return res
 }
 
-func fromPDF(r pdf.Getter, obj pdf.Object) ([]float64, error) {
+// arrayFromInts converts a slice of int to a PDF Array.
+func arrayFromInts(x []int) pdf.Array {
+	res := make(pdf.Array, len(x))
+	for i, xi := range x {
+		res[i] = pdf.Integer(xi)
+	}
+	return res
+}
+
+// floatsFromPDF extracts a slice of float64 from a PDF Array.
+func floatsFromPDF(r pdf.Getter, obj pdf.Object) ([]float64, error) {
 	a, err := pdf.GetArray(r, obj)
 	if err != nil {
 		return nil, err
@@ -41,4 +52,56 @@ func fromPDF(r pdf.Getter, obj pdf.Object) ([]float64, error) {
 		res[i] = float64(num)
 	}
 	return res, nil
+}
+
+// intsFromPDF extracts a slice of int from a PDF Array.
+func intsFromPDF(r pdf.Getter, obj pdf.Object) ([]int, error) {
+	a, err := pdf.GetArray(r, obj)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]int, len(a))
+	for i, obj := range a {
+		num, err := pdf.GetInteger(r, obj)
+		if err != nil {
+			return nil, err
+		}
+		res[i] = int(num)
+	}
+	return res, nil
+}
+
+// clipValue clips a value to the given range [min, max].
+func clipValue(value, min, max float64) float64 {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
+}
+
+// interpolate performs linear interpolation.
+// y = yMin + ((x - xMin) × (yMax - yMin) / (xMax - xMin))
+func interpolate(x, xMin, xMax, yMin, yMax float64) float64 {
+	if xMax == xMin {
+		return yMin
+	}
+	return yMin + ((x-xMin)*(yMax-yMin))/(xMax-xMin)
+}
+
+// Deprecated functions for backward compatibility
+
+// toPDF converts a slice of float64 to a PDF Array.
+// Deprecated: use arrayFromFloats instead.
+func toPDF(x []float64) pdf.Array {
+	return arrayFromFloats(x)
+}
+
+// fromPDF extracts a slice of float64 from a PDF Array.
+// Deprecated: use floatsFromPDF instead.
+func fromPDF(r pdf.Getter, obj pdf.Object) ([]float64, error) {
+	return floatsFromPDF(r, obj)
 }

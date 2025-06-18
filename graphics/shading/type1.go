@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -33,7 +32,7 @@ type Type1 struct {
 
 	// F is either 2->n function or an array of n 2->1 functions, where n is
 	// the number of colour components of the ColorSpace.
-	F function.Func
+	F pdf.Function
 
 	// Domain (optional)
 	Domain []float64

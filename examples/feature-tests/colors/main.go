@@ -361,9 +361,10 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 
 func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
 	fn := &function.Type2{
-		Y0:    []float64{1, 0, 0},
-		Y1:    []float64{0, 1, 0},
-		Gamma: 1,
+		Domain: []float64{0, 1},
+		C0:     []float64{1, 0, 0},
+		C1:     []float64{0, 1, 0},
+		N:      1,
 	}
 
 	shadingData := &shading.Type3{

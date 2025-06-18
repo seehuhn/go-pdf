@@ -151,20 +151,29 @@ func (rm *ResourceManager) Close() error {
 	return nil
 }
 
-// A CycleChecker checks for infinite recursion in PDF objects.
+// CycleChecker detects circular references in PDF object structures to prevent
+// infinite recursion during object traversal. It maintains a set of visited
+// references and returns an error when a cycle is detected.
+//
+// CycleChecker is particularly useful when reading complex PDF structures like
+// nested functions, patterns, or other objects that may reference each other.
 type CycleChecker struct {
 	seen map[Reference]bool
 }
 
-// NewCycleChecker creates a new CycleChecker.
+// NewCycleChecker creates a new CycleChecker with an empty set of seen references.
 func NewCycleChecker() *CycleChecker {
 	return &CycleChecker{seen: make(map[Reference]bool)}
 }
 
-// Check checks whether the given object is part of a recursive structure. If
-// the object is not a reference, nil is returned.  If the object is a reference
-// which has been seen before, ErrRecursiveStructure is returned.  Otherwise,
-// nil is returned and the reference is marked as seen.
+// Check examines the given PDF object for circular references. If the object
+// is not a reference (i.e., it's a direct value), Check returns nil immediately.
+// If the object is a reference that has already been seen by this CycleChecker,
+// Check returns ErrCycle. Otherwise, Check marks the reference as seen and
+// returns nil.
+//
+// This method should be called before recursively processing any PDF object
+// that might contain references to other objects.
 func (s *CycleChecker) Check(obj Object) error {
 	ref, ok := obj.(Reference)
 	if !ok {
