@@ -88,7 +88,7 @@ type Parameters struct {
 	BlackGeneration   pdf.Object
 	UndercolorRemoval pdf.Object
 	TransferFunction  pdf.Object
-	Halftone          pdf.Object
+	Halftone          Halftone
 	HalftoneOriginX   float64 //  https://github.com/pdf-association/pdf-issues/issues/260
 	HalftoneOriginY   float64
 

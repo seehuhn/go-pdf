@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/function"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/image"
 	"seehuhn.de/go/pdf/graphics/pattern"
@@ -266,25 +267,22 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 	h := w * math.Sqrt(3)
 	r := 0.3 * w
 
-	prop := &pattern.TilingProperties{
+	pat := &pattern.Type1{
 		TilingType: 1,
 		BBox:       &pdf.Rectangle{URx: w, URy: h},
 		XStep:      w,
 		YStep:      h,
 		Matrix:     matrix.Identity,
-	}
-	builder := pattern.NewUncoloredBuilder(doc.RM, prop)
-
-	builder.Circle(0, 0, r)
-	builder.Circle(w, 0, r)
-	builder.Circle(w/2, h/2, r)
-	builder.Circle(0, h, r)
-	builder.Circle(w, h, r)
-	builder.Fill()
-
-	pat, err := builder.Finish()
-	if err != nil {
-		return err
+		Color:      false,
+		Draw: func(builder *graphics.Writer) error {
+			builder.Circle(0, 0, r)
+			builder.Circle(w, 0, r)
+			builder.Circle(w/2, h/2, r)
+			builder.Circle(0, h, r)
+			builder.Circle(w, h, r)
+			builder.Fill()
+			return nil
+		},
 	}
 	col := color.PatternUncolored(pat, color.DeviceRGB(1, 0, 0))
 
@@ -302,7 +300,7 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 	page.TextShow("A square filled with an uncolored tiling pattern (color space ‘Pattern’).")
 	page.TextEnd()
 
-	err = page.Close()
+	err := page.Close()
 	if err != nil {
 		return err
 	}
@@ -313,32 +311,29 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 	// 1/2^2 + (x/2)^2 = 1^2   =>   x = 2*sqrt(3)/2 = sqrt(3)
 
-	w := 12.0
-	h := w * math.Sqrt(3)
-	r := 0.3 * w
+	width := 12.0
+	height := width * math.Sqrt(3)
+	r := 0.3 * width
 
-	prop := &pattern.TilingProperties{
+	pat := &pattern.Type1{
 		TilingType: 1,
-		BBox:       &pdf.Rectangle{URx: w, URy: h},
-		XStep:      w,
-		YStep:      h,
+		BBox:       &pdf.Rectangle{URx: width, URy: height},
+		XStep:      width,
+		YStep:      height,
 		Matrix:     matrix.Identity,
-	}
-	builder := pattern.NewColoredBuilder(doc.RM, prop)
-
-	builder.SetFillColor(color.DeviceGray(0.5))
-	builder.Circle(0, 0, r)
-	builder.Circle(w, 0, r)
-	builder.Circle(0, h, r)
-	builder.Circle(w, h, r)
-	builder.Fill()
-	builder.SetFillColor(color.DeviceRGB(1, 0, 0))
-	builder.Circle(w/2, h/2, r)
-	builder.Fill()
-
-	pat, err := builder.Finish()
-	if err != nil {
-		return err
+		Color:      true,
+		Draw: func(w *graphics.Writer) error {
+			w.SetFillColor(color.DeviceGray(0.5))
+			w.Circle(0, 0, r)
+			w.Circle(width, 0, r)
+			w.Circle(0, height, r)
+			w.Circle(width, height, r)
+			w.Fill()
+			w.SetFillColor(color.DeviceRGB(1, 0, 0))
+			w.Circle(width/2, height/2, r)
+			w.Fill()
+			return nil
+		},
 	}
 	col := color.PatternColored(pat)
 
@@ -356,7 +351,7 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 	page.TextShow("A square filled with a colored tiling pattern (color space ’Pattern’).")
 	page.TextEnd()
 
-	err = page.Close()
+	err := page.Close()
 	if err != nil {
 		return err
 	}

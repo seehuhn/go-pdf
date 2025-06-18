@@ -1,3 +1,7 @@
 baseURL = 'https://seehuhn.github.io/go-pdf/'
 languageCode = 'en-GB'
 title = 'Go-PDF Documentation'
+
+[markup]
+  [markup.highlight]
+    style = 'emacs'

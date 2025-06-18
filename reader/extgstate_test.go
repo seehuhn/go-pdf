@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/halftone"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
@@ -85,12 +86,10 @@ func TestExtGState(t *testing.T) {
 	ext1.Set |= graphics.StateUndercolorRemoval
 	ext1.TransferFunction = pdf.Name("Default")
 	ext1.Set |= graphics.StateTransferFunction
-	ext1.Halftone = pdf.Dict{
-		"Type":         pdf.Name("Halftone"),
-		"HalftoneType": pdf.Integer(1),
-		"Frequency":    pdf.Integer(120),
-		"Angle":        pdf.Integer(30),
-		"SpotFunction": pdf.Name("Round"),
+	ext1.Halftone = &halftone.Type1{
+		Frequency:    120,
+		Angle:        30,
+		SpotFunction: pdf.Name("Round"),
 	}
 	ext1.Set |= graphics.StateHalftone
 	ext1.HalftoneOriginX = 12
@@ -137,6 +136,9 @@ func TestExtGState(t *testing.T) {
 		return true
 	})
 	fixObj := cmpopts.AcyclicTransformer("fixObj", func(x pdf.Object) pdf.Native {
+		if x == nil {
+			return nil
+		}
 		return x.AsPDF(0)
 	})
 	if d := cmp.Diff(ext1embedded, ext2, cmpFont, fixObj); d != "" {

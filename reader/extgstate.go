@@ -19,6 +19,7 @@ package reader
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/halftone"
 )
 
 // readExtGState reads an graphics state parameter dictionary from a PDF file.
@@ -236,7 +237,13 @@ func (r *Reader) readExtGState(ref pdf.Object) (graphics.State, error) {
 		case "TR2":
 			tr2 = v
 		case "HT":
-			param.Halftone = v
+			x, err := halftone.Read(r.R, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return zero, err
+			}
+			param.Halftone = x
 			set |= graphics.StateHalftone
 		case "HTO":
 			a, err := pdf.GetArray(r.R, v)

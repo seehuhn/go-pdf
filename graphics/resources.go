@@ -26,5 +26,15 @@ import (
 // method, or can be used as the basis of a shading pattern.
 type Shading interface {
 	ShadingType() int
+
+	pdf.Embedder[pdf.Unused]
+}
+
+// Halftone represents a PDF halftone dictionary or stream.
+type Halftone interface {
+	// HalftoneType returns the type of the PDF halftone.
+	// This is one of 1, 5, 6, 10 or 16.
+	HalftoneType() int
+
 	pdf.Embedder[pdf.Unused]
 }

@@ -23,15 +23,29 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/metadata"
 )
 
+// Form represents a PDF form XObject that can contain reusable graphics content.
 type Form struct {
-	Draw         func(*graphics.Writer) error
-	BBox         pdf.Rectangle
-	Matrix       matrix.Matrix
-	Metadata     pdf.Reference
-	PieceInfo    pdf.Object
+	// Draw is the function that renders the form's content.
+	Draw func(*graphics.Writer) error
+
+	// BBox is the form's bounding box in form coordinate space.
+	BBox pdf.Rectangle
+
+	// Matrix transforms form coordinates to user space coordinates.
+	Matrix matrix.Matrix
+
+	// Metadata is an optional reference to metadata for this form.
+	Metadata *metadata.Stream
+
+	// PieceInfo contains private application data.
+	PieceInfo pdf.Object
+
+	// LastModified is the date the form was last modified.
 	LastModified time.Time
+
 	// TODO(voss): StructParent, StructParents
 	// TODO(voss): OC
 	// TODO(voss): AF
@@ -39,6 +53,7 @@ type Form struct {
 	// TODO(voss): PtData
 }
 
+// Subtype returns the XObject subtype for forms.
 func (f *Form) Subtype() pdf.Name {
 	return "Form"
 }
@@ -50,17 +65,20 @@ func (f *Form) validate() error {
 	return nil
 }
 
+// Embed implements the pdf.Embedder interface for form XObjects.
 func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
+
 	err := f.validate()
 	if err != nil {
-		return nil, pdf.Unused{}, err
+		return nil, zero, err
 	}
 
 	buf := &bytes.Buffer{}
 	contents := graphics.NewWriter(buf, rm)
 	err = f.Draw(contents)
 	if err != nil {
-		return nil, pdf.Unused{}, err
+		return nil, zero, err
 	}
 
 	ref := rm.Out.Alloc()
@@ -78,8 +96,12 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	if contents.Resources != nil {
 		dict["Resources"] = pdf.AsDict(contents.Resources)
 	}
-	if f.Metadata != 0 {
-		dict["Metadata"] = f.Metadata
+	if f.Metadata != nil {
+		rmEmbedded, _, err := pdf.ResourceManagerEmbed(rm, f.Metadata)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["Metadata"] = rmEmbedded
 	}
 	if f.PieceInfo != nil {
 		dict["PieceInfo"] = f.PieceInfo
@@ -90,18 +112,18 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	stm, err := rm.Out.OpenStream(ref, dict, &pdf.FilterCompress{})
 	if err != nil {
-		return nil, pdf.Unused{}, err
+		return nil, zero, err
 	}
 	_, err = stm.Write(buf.Bytes())
 	if err != nil {
-		return nil, pdf.Unused{}, err
+		return nil, zero, err
 	}
 	err = stm.Close()
 	if err != nil {
-		return nil, pdf.Unused{}, err
+		return nil, zero, err
 	}
 
-	return ref, pdf.Unused{}, nil
+	return ref, zero, nil
 }
 
 func toPDF(x []float64) pdf.Array {

@@ -31,6 +31,7 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 )
 
+// Font represents a Type 3 font with user-defined glyph procedures.
 type Font struct {
 	// Glyphs is a list of glyphs in the font.
 	// An empty glyph without a name must be included at index 0,
@@ -70,25 +71,41 @@ type Font struct {
 	UnderlineThickness float64
 }
 
+// Glyph represents a single glyph in a Type 3 font.
 type Glyph struct {
-	Name  string
+	// Name is the PostScript name of the glyph.
+	Name string
+
+	// Width is the glyph's advance width in glyph coordinate units.
 	Width float64
-	BBox  rect.Rect
+
+	// BBox is the glyph's bounding box.
+	BBox rect.Rect
+
+	// Color indicates whether the glyph specifies color, or only describes a
+	// shape.
 	Color bool
-	Draw  func(*graphics.Writer) error
+
+	// Draw is the function that renders the glyph.
+	Draw func(*graphics.Writer) error
 }
 
 var _ interface {
 	font.Layouter
 } = (*Instance)(nil)
 
+// Instance represents a Type 3 font instance ready for embedding.
 type Instance struct {
+	// Font is the underlying Type 3 font definition.
 	Font *Font
+
+	// CMap maps Unicode code points to glyph IDs.
 	CMap map[rune]glyph.ID
 
 	*font.Geometry
 }
 
+// New creates a new Type 3 font instance from a font definition.
 func New(f *Font) (*Instance, error) {
 	if len(f.Glyphs) == 0 || f.Glyphs[0].Name != "" {
 		return nil, errors.New("invalid glyph 0")
@@ -128,10 +145,12 @@ func New(f *Font) (*Instance, error) {
 	return res, nil
 }
 
+// PostScriptName returns the PostScript name of the font.
 func (f *Instance) PostScriptName() string {
 	return f.Font.PostScriptName
 }
 
+// Layout converts a string to a sequence of positioned glyphs.
 func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
 	if seq == nil {
 		seq = &font.GlyphSeq{}
@@ -153,6 +172,7 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 	return seq
 }
 
+// Embed implements the pdf.Embedder interface for Type 3 fonts.
 func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
 	if len(f.Font.Glyphs) == 0 || f.Font.Glyphs[0].Name != "" {
 		return nil, nil, errors.New("invalid glyph 0")

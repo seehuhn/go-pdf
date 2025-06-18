@@ -55,8 +55,8 @@ type ExtGState struct {
 	BlackGeneration        pdf.Object
 	UndercolorRemoval      pdf.Object
 	TransferFunction       pdf.Object
-	Halftone               pdf.Object
-	HalftoneOriginX        float64 //  https://github.com/pdf-association/pdf-issues/issues/260
+	Halftone               Halftone
+	HalftoneOriginX        float64
 	HalftoneOriginY        float64
 	FlatnessTolerance      float64
 	SmoothnessTolerance    float64
@@ -201,9 +201,11 @@ func (s *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Native, State, error) {
 		res.TransferFunction = s.TransferFunction
 	}
 	if set&StateHalftone != 0 {
-		// TODO(voss): at least in the case of a stream, this needs to be
-		// embedded.
-		dict["HT"] = s.Halftone
+		htEmbedded, _, err := pdf.ResourceManagerEmbed(rm, s.Halftone)
+		if err != nil {
+			return nil, res, err
+		}
+		dict["HT"] = htEmbedded
 		res.Halftone = s.Halftone
 	}
 	if set&StateHalftoneOrigin != 0 {

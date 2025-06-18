@@ -68,6 +68,10 @@ type embRes struct {
 	Emb any
 }
 
+// Finisher is implemented by embedded objects that need to perform
+// finalization work when the ResourceManager is closed.
+// The Finish method is called automatically for any embedded object
+// whose type implements this interface.
 type Finisher interface {
 	Finish(*ResourceManager) error
 }

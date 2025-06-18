@@ -19,6 +19,6 @@ package pattern
 import "seehuhn.de/go/pdf/graphics/color"
 
 var (
-	_ color.Pattern = (*type1)(nil)
+	_ color.Pattern = (*Type1)(nil)
 	_ color.Pattern = (*Type2)(nil)
 )
