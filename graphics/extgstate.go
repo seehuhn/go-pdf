@@ -25,16 +25,13 @@ import (
 
 // ExtGState represents a combination of graphics state parameters. This
 // combination of parameters can then be set in a single command, using the
-// [Writer.SetExtGState] method.
-//
-// The parameters in an extended graphics state are a subset of the parameters
-// in the [Parameters] struct.  The missing parameters, for example colors,
-// cannot be controlled using an extended graphics state.
+// [Writer.SetExtGState] method.  The parameters here form a subset of the
+// parameters in the [Parameters] struct.  Parameters not present in the
+// ExtGState struct, for example colors, cannot be controlled using an extended
+// graphics state.
 type ExtGState struct {
 	Set StateBits
 
-	// This is a subset of the graphics parameters from the graphics.Parameters
-	// struct.
 	TextFont               font.Font
 	TextFontSize           float64
 	TextKnockout           bool

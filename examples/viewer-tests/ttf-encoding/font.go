@@ -208,7 +208,7 @@ func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Font, error) {
 		for i := range 3 {
 			code := markerString[i]
 			name := pdfenc.WinAnsi.Encoding[code]
-			uni := names.ToUnicode(name, "")
+			uni := []rune(names.ToUnicode(name, ""))
 			if len(uni) != 1 {
 				panic(fmt.Sprintf("expected 1 rune for %s, got %d", name, len(uni)))
 			}

@@ -226,7 +226,7 @@ func getExtraMapping(r pdf.Getter, F font.Embedded) map[cid.CID]string {
 					}
 
 					text := names.ToUnicode(name, fontInfo.PostScriptName)
-					m[cid.CID(cidVal)] = string(text)
+					m[cid.CID(cidVal)] = text
 				}
 			}
 		}

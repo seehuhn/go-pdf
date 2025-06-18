@@ -22,6 +22,7 @@ import (
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/rect"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
@@ -30,7 +31,6 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/text"
-	"seehuhn.de/go/sfnt/glyph"
 )
 
 func main() {
@@ -72,9 +72,9 @@ func createDocument(filename string) error {
 			Size:  12,
 			Color: blue,
 		}
-		testString[i], _ = E.(font.EmbeddedLayouter).AppendEncoded(testString[i], 1, "■")
-		testString[i], _ = E.(font.EmbeddedLayouter).AppendEncoded(testString[i], 1, "■")
-		testString[i], _ = E.(font.EmbeddedLayouter).AppendEncoded(testString[i], 1, "■")
+		testString[i], _ = E.(font.EmbeddedLayouter).AppendEncoded(testString[i], 1, "A")
+		testString[i], _ = E.(font.EmbeddedLayouter).AppendEncoded(testString[i], 1, "A")
+		testString[i], _ = E.(font.EmbeddedLayouter).AppendEncoded(testString[i], 1, "A")
 	}
 	for i, unitsPerEm := range []float64{1000, 2000} {
 		T := makeTestFont(unitsPerEm, true)
@@ -87,9 +87,9 @@ func createDocument(filename string) error {
 			Size:  12,
 			Color: blue,
 		}
-		testString[i+2], _ = E.(font.EmbeddedLayouter).AppendEncoded(testString[i+2], 1, "■")
-		testString[i+2], _ = E.(font.EmbeddedLayouter).AppendEncoded(testString[i+2], 1, "■")
-		testString[i+2], _ = E.(font.EmbeddedLayouter).AppendEncoded(testString[i+2], 1, "■")
+		testString[i+2], _ = E.(font.EmbeddedLayouter).AppendEncoded(testString[i+2], 1, "A")
+		testString[i+2], _ = E.(font.EmbeddedLayouter).AppendEncoded(testString[i+2], 1, "A")
+		testString[i+2], _ = E.(font.EmbeddedLayouter).AppendEncoded(testString[i+2], 1, "A")
 	}
 
 	text.Show(w.Writer,
@@ -154,11 +154,9 @@ func makeTestFont(unitsPerEm float64, rotate bool) font.Font {
 			return nil
 		},
 	})
-	res := &type3.Instance{
-		Font: F,
-		CMap: map[rune]glyph.ID{
-			'A': 1,
-		},
+	res, err := type3.New(F)
+	if err != nil {
+		panic(err)
 	}
 	return res
 }

@@ -170,8 +170,8 @@ func oct(s string) int {
 
 func sanityCheck(data map[pdf.Name]record) error {
 	for name, r := range data {
-		rr := names.ToUnicode(string(name), false)
-		if string(rr) != r.val {
+		rr := names.ToUnicode(string(name), "")
+		if rr != r.val {
 			return fmt.Errorf("%q: %q != %q %s", name, r.val, string(rr), string(rr))
 		}
 	}

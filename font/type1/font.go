@@ -76,7 +76,7 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 	widths := make([]float64, len(glyphNames))
 	extents := make([]rect.Rect, len(glyphNames))
 	for i, name := range glyphNames {
-		widths[i] = psFont.GlyphWidthPDF(name)
+		widths[i] = psFont.GlyphWidthPDF(name) / 1000
 		extents[i] = psFont.GlyphBBoxPDF(name)
 	}
 	geometry.UnderlinePosition = float64(psFont.FontInfo.UnderlinePosition) * psFont.FontMatrix[3]

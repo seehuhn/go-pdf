@@ -22,9 +22,8 @@ import (
 
 // Shading represents a PDF shading dictionary.
 //
-// Shadings can either be drawn to the page using the
-// [seehuhn.de/go/pdf/graphics.Writer.DrawShading] method, or can be used as
-// the basis of a shading pattern.
+// Shadings can either be drawn to the page using the [Writer.DrawShading]
+// method, or can be used as the basis of a shading pattern.
 type Shading interface {
 	ShadingType() int
 	pdf.Embedder[pdf.Unused]

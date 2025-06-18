@@ -25,6 +25,7 @@ import (
 	"os"
 
 	"seehuhn.de/go/geom/matrix"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	pdfimage "seehuhn.de/go/pdf/graphics/image"

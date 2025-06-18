@@ -408,7 +408,7 @@ const (
 		StateBlackPointCompensation | StateOverprint | StateOverprintMode |
 		StateFlatnessTolerance
 
-	// OpStateBits list the graphical parameters which can be set using
+	// OpStateBits lists the graphical parameters which can be set using
 	// graphics operators.
 	OpStateBits = StateStrokeColor | StateFillColor | StateTextCharacterSpacing |
 		StateTextWordSpacing | StateTextHorizontalScaling | StateTextLeading |
