@@ -28,8 +28,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
@@ -244,21 +242,10 @@ func (e *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
 		Encoding:       dictEnc,
 		FontType:       glyphdata.OpenTypeGlyf,
 		FontRef:        rm.Out.Alloc(),
+		ToUnicode:      e.Simple.ToUnicode(postScriptName),
 	}
-	m := make(map[charcode.Code]string)
 	for c, info := range e.Simple.MappedCodes() {
 		dict.Width[c] = info.Width
-		implied := names.ToUnicode(dict.Encoding(byte(c)), dict.PostScriptName)
-		if info.Text != implied {
-			m[charcode.Code(c)] = info.Text
-		}
-	}
-	if len(m) > 0 {
-		tuInfo, err := cmap.NewToUnicodeFile(charcode.Simple, m)
-		if err != nil {
-			return err
-		}
-		dict.ToUnicode = tuInfo
 	}
 
 	err := dict.WriteToPDF(rm, e.Ref)

@@ -27,6 +27,8 @@ import (
 )
 
 // NewToUnicodeFile creates a ToUnicodeFile object.
+//
+// The only error returned is if the CodeSpaceRange is invalid.
 func NewToUnicodeFile(csr charcode.CodeSpaceRange, data map[charcode.Code]string) (*ToUnicodeFile, error) {
 	res := &ToUnicodeFile{
 		CodeSpaceRange: csr,

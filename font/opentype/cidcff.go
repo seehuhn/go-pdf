@@ -17,7 +17,6 @@
 package opentype
 
 import (
-	"fmt"
 	"math"
 	"slices"
 
@@ -114,10 +113,6 @@ func (e *embeddedCFFComposite) Finish(rm *pdf.ResourceManager) error {
 		return nil
 	}
 	e.finished = true
-
-	if err := e.CIDEncoder.Error(); err != nil {
-		return pdf.Wrap(err, fmt.Sprintf("font %q", e.Font.PostScriptName()))
-	}
 
 	origFont := e.Font
 	postScriptName := origFont.PostScriptName()

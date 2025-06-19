@@ -190,9 +190,9 @@ func (e *compositeUTF8) Width(c charcode.Code) float64 {
 	return e.get(c).Width
 }
 
-func (e *compositeUTF8) MappedCodes() iter.Seq2[charcode.Code, *Code] {
-	return func(yield func(charcode.Code, *Code) bool) {
-		var code Code
+func (e *compositeUTF8) MappedCodes() iter.Seq2[charcode.Code, *Info] {
+	return func(yield func(charcode.Code, *Info) bool) {
+		var code Info
 		for c, info := range e.info {
 			code.CID = info.CID
 			code.Width = info.Width
@@ -202,8 +202,4 @@ func (e *compositeUTF8) MappedCodes() iter.Seq2[charcode.Code, *Code] {
 			}
 		}
 	}
-}
-
-func (e *compositeUTF8) Error() error {
-	return nil // TODO(voss): implement
 }

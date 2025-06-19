@@ -22,15 +22,12 @@ import (
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/psenc"
 	"seehuhn.de/go/postscript/type1"
-	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/os2"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
@@ -203,21 +200,10 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
 		Encoding:       e.Simple.Encoding(),
+		ToUnicode:      e.Simple.ToUnicode(postScriptName),
 	}
-	m := make(map[charcode.Code]string)
 	for c, info := range e.Simple.MappedCodes() {
 		dict.Width[c] = info.Width
-		implied := names.ToUnicode(dict.Encoding(byte(c)), dict.PostScriptName)
-		if info.Text != implied {
-			m[charcode.Code(c)] = info.Text
-		}
-	}
-	if len(m) > 0 {
-		tuInfo, err := cmap.NewToUnicodeFile(charcode.Simple, m)
-		if err != nil {
-			return err
-		}
-		dict.ToUnicode = tuInfo
 	}
 	if omitFontData {
 		dict.FontType = glyphdata.None

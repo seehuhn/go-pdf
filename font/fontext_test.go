@@ -17,32 +17,16 @@
 package font_test
 
 import (
+	"io"
 	"testing"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
-	"seehuhn.de/go/pdf/font/opentype"
-	"seehuhn.de/go/pdf/font/truetype"
-	"seehuhn.de/go/pdf/font/type1"
-	"seehuhn.de/go/pdf/font/type3"
+	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/fonttypes"
-)
-
-var (
-	_ font.Layouter = (*type1.Instance)(nil)
-	_ font.Layouter = (*cff.Instance)(nil)
-	_ font.Layouter = (*truetype.Instance)(nil)
-	_ font.Layouter = (*opentype.Instance)(nil)
-	_ font.Layouter = (*type3.Instance)(nil)
-)
-
-var (
-	_ font.Dict = (*dict.Type1)(nil)
-	_ font.Dict = (*dict.TrueType)(nil)
-	_ font.Dict = (*dict.Type3)(nil)
-	_ font.Dict = (*dict.CIDFontType0)(nil)
-	_ font.Dict = (*dict.CIDFontType2)(nil)
 )
 
 // TestSpaceIsBlank tests that space characters of common fonts are blank.
@@ -60,5 +44,123 @@ func TestSpaceIsBlank(t *testing.T) {
 					geom.GlyphExtents[gg.Seq[0].GID])
 			}
 		})
+	}
+}
+
+func TestToUnicodeSimple1(t *testing.T) {
+	for _, sample := range fonttypes.All {
+		if sample.Composite {
+			continue
+		}
+		t.Run(sample.Label, func(t *testing.T) {
+			const fontSize = 10
+			const fontName = "X"
+
+			F := sample.MakeFont()
+			seq := F.Layout(nil, fontSize, "ABC")
+			if len(seq.Seq) != 3 {
+				t.Fatalf("expected 3 glyphs, got %d", len(seq.Seq))
+			}
+
+			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			rm := pdf.NewResourceManager(buf)
+
+			page := graphics.NewWriter(io.Discard, rm)
+			page.SetFontNameInternal(F, fontName)
+			page.TextSetFont(F, fontSize)
+			page.TextBegin()
+			page.TextShowGlyphs(seq)
+			page.TextEnd()
+
+			if page.Err != nil {
+				t.Fatal(page.Err)
+			}
+			err := rm.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			ref := page.Resources.Font[fontName]
+			d, err := dict.Read(buf, ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			tu := getToUnicode(d)
+			if tu != nil {
+				t.Errorf("expected ToUnicode file for %q", sample.Label)
+			}
+		})
+	}
+}
+
+func TestToUnicodeSimple2(t *testing.T) {
+	for _, sample := range fonttypes.All {
+		if sample.Composite {
+			continue
+		}
+		t.Run(sample.Label, func(t *testing.T) {
+			const fontSize = 10
+			const fontName = "X"
+
+			F := sample.MakeFont()
+			seq := F.Layout(nil, fontSize, "ABC")
+			if len(seq.Seq) != 3 {
+				t.Fatalf("expected 3 glyphs, got %d", len(seq.Seq))
+			}
+			seq.Seq[1].Text = []rune{'D'} // one glyph with non-standard text
+
+			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			rm := pdf.NewResourceManager(buf)
+
+			page := graphics.NewWriter(io.Discard, rm)
+			page.SetFontNameInternal(F, fontName)
+			page.TextSetFont(F, fontSize)
+			page.TextBegin()
+			page.TextShowGlyphs(seq)
+			page.TextEnd()
+
+			if page.Err != nil {
+				t.Fatal(page.Err)
+			}
+			err := rm.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			ref := page.Resources.Font[fontName]
+			d, err := dict.Read(buf, ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			tu := getToUnicode(d)
+			if tu == nil {
+				t.Fatal("missing ToUnicode file")
+			}
+			if len(tu.Singles) != 1 {
+				t.Fatalf("expected 1 single mapping, got %d", len(tu.Singles))
+			}
+			if tu.Singles[0].Value != "D" {
+				t.Errorf("expected single mapping for 'D', got %q", tu.Singles[0].Value)
+			}
+		})
+	}
+}
+
+func getToUnicode(d font.Dict) *cmap.ToUnicodeFile {
+	switch d := d.(type) {
+	case *dict.Type1:
+		return d.ToUnicode
+	case *dict.TrueType:
+		return d.ToUnicode
+	case *dict.Type3:
+		return d.ToUnicode
+	case *dict.CIDFontType0:
+		return d.ToUnicode
+	case *dict.CIDFontType2:
+		return d.ToUnicode
+	default:
+		panic("unknown font dictionary type")
 	}
 }

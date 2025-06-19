@@ -28,7 +28,11 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 )
 
-type Code struct {
+// TODO(voss): add CIDEncoder implementations for the standard PDF CMaps.
+
+// TODO(voss): disentangle the width information from the CMap information.
+
+type Info struct {
 	CID   cid.CID
 	Width float64
 	Text  string
@@ -45,7 +49,7 @@ type CIDEncoder interface {
 	Codes(s pdf.String) iter.Seq[*font.Code]
 
 	// MappedCodes iterates over all codes known to the encoder.
-	MappedCodes() iter.Seq2[charcode.Code, *Code]
+	MappedCodes() iter.Seq2[charcode.Code, *Info]
 
 	// AllocateCode assigns a new code to a CID and stores the text and width.
 	AllocateCode(cidVal cid.CID, text string, width float64) (charcode.Code, error)
@@ -57,8 +61,6 @@ type CIDEncoder interface {
 	GetCode(cid cid.CID, text string) (charcode.Code, bool)
 
 	Width(code charcode.Code) float64
-
-	Error() error
 }
 
 // TODO(voss): include the width?

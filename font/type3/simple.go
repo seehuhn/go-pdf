@@ -23,13 +23,10 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/postscript/type1/names"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
@@ -172,28 +169,16 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		MissingWidth: e.Simple.DefaultWidth(),
 	}
 	dict := &dict.Type3{
-		Name:       pdf.Name(e.Font.PostScriptName),
 		Descriptor: fd,
 		Encoding:   e.Simple.Encoding(),
 		CharProcs:  charProcs,
 		// FontBBox:   &pdf.Rectangle{},
 		FontMatrix: e.Font.FontMatrix,
 		Resources:  resources,
+		ToUnicode:  e.Simple.ToUnicode(e.Font.PostScriptName),
 	}
-	m := make(map[charcode.Code]string)
 	for c, info := range e.Simple.MappedCodes() {
 		dict.Width[c] = info.Width
-		implied := names.ToUnicode(dict.Encoding(byte(c)), "")
-		if info.Text != implied {
-			m[charcode.Code(c)] = info.Text
-		}
-	}
-	if len(m) > 0 {
-		tuInfo, err := cmap.NewToUnicodeFile(charcode.Simple, m)
-		if err != nil {
-			return err
-		}
-		dict.ToUnicode = tuInfo
 	}
 
 	err := dict.WriteToPDF(rm, e.Ref)

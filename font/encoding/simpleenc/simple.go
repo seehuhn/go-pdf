@@ -40,9 +40,9 @@ import (
 // Simple manages the encoding and metadata of glyphs for simple PDF fonts.
 //
 // It constructs a mapping from single-byte codes to
-//   - character IDs (CIDs),
-//   - glyph widths, and
-//   - associated text content.
+//   - character IDs (CIDs)
+//   - glyph widths
+//   - text content
 //
 // If a glyph is used with different text content (for example space and
 // no-break space), different codes are allocated to allow for different

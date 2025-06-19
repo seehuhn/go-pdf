@@ -43,7 +43,7 @@ type Layouter interface {
 	// Layout appends a string to a glyph sequence.  The string is typeset at
 	// the given point size and the resulting GlyphSeq is returned.
 	//
-	// If seq is non-nil, a new glyph sequence is allocated.  If seq is not
+	// If seq is nil, a new glyph sequence is allocated.  If seq is not
 	// nil, the return value is guaranteed to be equal to seq.
 	Layout(seq *GlyphSeq, ptSize float64, s string) *GlyphSeq
 }
