@@ -61,6 +61,10 @@ type CIDEncoder interface {
 	GetCode(cid cid.CID, text string) (charcode.Code, bool)
 
 	Width(code charcode.Code) float64
+
+	// ToUnicode returns a ToUnicode CMap representing the text content
+	// of the mapped codes.
+	ToUnicode() *cmap.ToUnicodeFile
 }
 
 // TODO(voss): include the width?

@@ -170,10 +170,10 @@ func (e *compositeUTF8) get(c charcode.Code) *codeInfo {
 
 func (e *compositeUTF8) CMap(ros *cid.SystemInfo) *cmap.File {
 	m := make(map[charcode.Code]font.Code)
-	for code, val := range e.MappedCodes() {
-		m[code] = font.Code{
-			CID:   val.CID,
-			Width: val.Width,
+	for c, info := range e.info {
+		m[c] = font.Code{
+			CID:   info.CID,
+			Width: info.Width,
 		}
 	}
 	cmapInfo := &cmap.File{
@@ -202,4 +202,18 @@ func (e *compositeUTF8) MappedCodes() iter.Seq2[charcode.Code, *Info] {
 			}
 		}
 	}
+}
+
+func (e *compositeUTF8) ToUnicode() *cmap.ToUnicodeFile {
+	m := make(map[charcode.Code]string, len(e.info))
+	for c, info := range e.info {
+		m[c] = info.Text
+	}
+
+	toUnicode, err := cmap.NewToUnicodeFile(charcode.UTF8, m)
+	if err != nil {
+		panic("unreachable")
+	}
+
+	return toUnicode
 }

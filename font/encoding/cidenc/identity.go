@@ -175,3 +175,17 @@ func (e *compositeIdentity) MappedCodes() iter.Seq2[charcode.Code, *Info] {
 		}
 	}
 }
+
+func (e *compositeIdentity) ToUnicode() *cmap.ToUnicodeFile {
+	m := make(map[charcode.Code]string, len(e.info))
+	for c, info := range e.info {
+		m[c] = info.Text
+	}
+
+	toUnicode, err := cmap.NewToUnicodeFile(charcode.UCS2, m)
+	if err != nil {
+		panic("unreachable")
+	}
+
+	return toUnicode
+}

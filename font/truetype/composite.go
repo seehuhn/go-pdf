@@ -30,7 +30,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding/cidenc"
@@ -145,15 +144,6 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 
 	ros := e.ROS()
 
-	m := make(map[charcode.Code]string)
-	for code, val := range e.CIDEncoder.MappedCodes() {
-		m[code] = val.Text
-	}
-	toUnicode, err := cmap.NewToUnicodeFile(e.CIDEncoder.Codec().CodeSpaceRange(), m)
-	if err != nil {
-		return err
-	}
-
 	// construct the font dictionary and font descriptor
 	dw := math.Round(subsetFont.GlyphWidthPDF(0))
 	ww := make(map[cmap.CID]float64)
@@ -219,7 +209,7 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 		Width:           ww,
 		DefaultWidth:    dw,
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
-		ToUnicode:       toUnicode,
+		ToUnicode:       e.CIDEncoder.ToUnicode(),
 		FontType:        glyphdata.TrueType,
 		FontRef:         rm.Out.Alloc(),
 	}
@@ -227,7 +217,7 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 		dict.CIDToGID = cidToGID
 	}
 
-	err = dict.WriteToPDF(rm, e.Ref)
+	err := dict.WriteToPDF(rm, e.Ref)
 	if err != nil {
 		return err
 	}

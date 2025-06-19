@@ -18,6 +18,7 @@ package charcode
 
 import (
 	"bytes"
+	"strconv"
 	"testing"
 )
 
@@ -117,6 +118,18 @@ func TestSeqGen(t *testing.T) {
 				if gotSeqs[i] != tc.wantSeqs[i] {
 					t.Errorf("sequence %d = %v, want %v", i, gotSeqs[i], tc.wantSeqs[i])
 				}
+			}
+		})
+	}
+}
+
+// TestStandardRanges tests that the standard code space ranges are valid.
+func TestStandardRanges(t *testing.T) {
+	for i, r := range []CodeSpaceRange{Simple, UCS2, UTF8} {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			_, err := NewCodec(r)
+			if err != nil {
+				t.Fatal(err)
 			}
 		})
 	}

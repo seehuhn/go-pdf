@@ -19,7 +19,6 @@ package charcode
 import (
 	"bytes"
 	"fmt"
-	"strconv"
 	"testing"
 )
 
@@ -621,19 +620,6 @@ func TestCodecCodeSpaceRange(t *testing.T) {
 				for _, r := range csr2 {
 					fmt.Printf("  % x - % x\n", r.Low, r.High)
 				}
-			}
-		})
-	}
-}
-
-// TestCodecStandard tests the standard code space ranges
-// can be created without error.
-func TestCodecStandard(t *testing.T) {
-	for i, r := range []CodeSpaceRange{Simple, UCS2, UTF8} {
-		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			_, err := NewCodec(r)
-			if err != nil {
-				t.Fatal(err)
 			}
 		})
 	}

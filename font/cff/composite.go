@@ -33,7 +33,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding/cidenc"
@@ -166,17 +165,6 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 
 	ros := e.ROS()
 
-	m := make(map[charcode.Code]string)
-	for code, val := range e.CIDEncoder.MappedCodes() {
-		if val.Text != "" {
-			m[code] = val.Text
-		}
-	}
-	toUnicode, err := cmap.NewToUnicodeFile(e.CIDEncoder.Codec().CodeSpaceRange(), m)
-	if err != nil {
-		return err
-	}
-
 	// Simple CFF fonts can only have one private dict, and ...
 	canUseSimple := len(subsetOutlines.Private) == 1
 	// ... they assume that CID values equal GID values.
@@ -277,12 +265,12 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 		Width:           ww,
 		DefaultWidth:    dw,
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
-		ToUnicode:       toUnicode,
+		ToUnicode:       e.CIDEncoder.ToUnicode(),
 		FontType:        glyphdata.CFF,
 		FontRef:         rm.Out.Alloc(),
 	}
 
-	err = dict.WriteToPDF(rm, e.Ref)
+	err := dict.WriteToPDF(rm, e.Ref)
 	if err != nil {
 		return err
 	}
