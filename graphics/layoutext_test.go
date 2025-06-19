@@ -59,11 +59,11 @@ func TestGlyphWidths(t *testing.T) {
 			{
 				GID:     gg0.Seq[0].GID,
 				Advance: 100,
-				Text:    []rune("A"),
+				Text:    "A",
 			},
 			{
 				GID:  gg0.Seq[1].GID,
-				Text: []rune("B"),
+				Text: "B",
 			},
 		},
 	}

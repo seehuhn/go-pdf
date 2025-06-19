@@ -108,7 +108,7 @@ func TestToUnicodeSimple2(t *testing.T) {
 			if len(seq.Seq) != 3 {
 				t.Fatalf("expected 3 glyphs, got %d", len(seq.Seq))
 			}
-			seq.Seq[1].Text = []rune{'D'} // one glyph with non-standard text
+			seq.Seq[1].Text = "D" // one glyph with non-standard text
 
 			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(buf)

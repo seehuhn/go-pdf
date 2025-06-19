@@ -160,7 +160,7 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 			GID:     g.GID,
 			Advance: float64(g.Advance) * qh,
 			Rise:    float64(g.YOffset) * qv,
-			Text:    g.Text,
+			Text:    string(g.Text),
 		})
 	}
 	return seq

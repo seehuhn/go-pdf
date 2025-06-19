@@ -173,7 +173,7 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 		if i > 0 {
 			if repl, ok := f.lig[glyph.Pair{Left: prev, Right: gid}]; ok {
 				seq.Seq[len(seq.Seq)-1].GID = repl
-				seq.Seq[len(seq.Seq)-1].Text = append(seq.Seq[len(seq.Seq)-1].Text, r)
+				seq.Seq[len(seq.Seq)-1].Text = seq.Seq[len(seq.Seq)-1].Text + string(r)
 				seq.Seq[len(seq.Seq)-1].Advance = f.Widths[repl] * ptSize
 				prev = repl
 				continue
@@ -181,7 +181,7 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 		}
 		seq.Seq = append(seq.Seq, font.Glyph{
 			GID:     gid,
-			Text:    []rune{r},
+			Text:    string(r),
 			Advance: f.Widths[gid] * ptSize,
 		})
 		prev = gid

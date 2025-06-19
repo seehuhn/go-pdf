@@ -16,10 +16,15 @@
 
 package font
 
-import "seehuhn.de/go/sfnt/glyph"
+import (
+	"strings"
+
+	"seehuhn.de/go/sfnt/glyph"
+)
 
 // Glyph represents a single glyph.
 type Glyph struct {
+	// GID identifies the glyph within the font.
 	GID glyph.ID
 
 	// Advance is the advance width for the current glyph the client
@@ -32,7 +37,8 @@ type Glyph struct {
 	// font size.
 	Rise float64
 
-	Text []rune
+	// Text is the text content of the glyph.
+	Text string
 }
 
 // GlyphSeq represents a sequence of glyphs.
@@ -63,17 +69,11 @@ func (s *GlyphSeq) TotalWidth() float64 {
 
 // Text returns the text represented by the glyph sequence.
 func (s *GlyphSeq) Text() string {
-	n := 0
+	var res strings.Builder
 	for _, g := range s.Seq {
-		n += len(g.Text)
+		res.WriteString(g.Text)
 	}
-	res := make([]rune, 0, n)
-
-	for _, g := range s.Seq {
-		res = append(res, g.Text...)
-	}
-
-	return string(res)
+	return res.String()
 }
 
 // Append modifies s by appending the glyphs from other.
@@ -187,7 +187,7 @@ func (t *Typesetter) Layout(seq *GlyphSeq, text string) *GlyphSeq {
 	for i := base; i < len(seq.Seq); i++ {
 		advance := seq.Seq[i].Advance
 		advance += t.characterSpacing
-		if string(seq.Seq[i].Text) == " " {
+		if seq.Seq[i].Text == " " {
 			advance += t.wordSpacing
 		}
 		seq.Seq[i].Advance = advance * t.horizontalScaling

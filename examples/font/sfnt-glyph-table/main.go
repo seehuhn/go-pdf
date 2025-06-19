@@ -295,7 +295,7 @@ func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 		var label string
 		if r > 0 {
 			if r, ok := f.rev[gid]; ok {
-				g.Text = []rune{r}
+				g.Text = string(r)
 
 				// TODO(voss): fix this
 				// Try to establish a mapping from glyph ID to rune in the embedded

@@ -47,7 +47,7 @@ func (w *wrap) Lines(F font.Layouter, ptSize float64) iter.Seq[*font.GlyphSeq] {
 		breakPos := 0
 		currentWidth := 0.0
 		for i, g := range glyphs.Seq {
-			if string(g.Text) == " " {
+			if g.Text == " " {
 				breakPos = i
 			}
 			if currentWidth+g.Advance > w.width && breakPos > startPos {

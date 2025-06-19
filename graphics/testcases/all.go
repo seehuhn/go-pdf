@@ -326,7 +326,7 @@ func encodeText(rm *pdf.ResourceManager, F font.Layouter, s string) pdf.String {
 	gg := F.Layout(nil, 10, s)
 	var res pdf.String
 	for _, g := range gg.Seq {
-		res, _ = E.(font.EmbeddedLayouter).AppendEncoded(res, g.GID, string(g.Text))
+		res, _ = E.(font.EmbeddedLayouter).AppendEncoded(res, g.GID, g.Text)
 	}
 	return res
 }
