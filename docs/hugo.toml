@@ -5,3 +5,12 @@ title = 'Go-PDF Documentation'
 [markup]
   [markup.highlight]
     style = 'emacs'
+  [markup.goldmark]
+    [markup.goldmark.extensions]
+      [markup.goldmark.extensions.passthrough]
+        enable = true
+        [markup.goldmark.extensions.passthrough.delimiters]
+          block = [['\[', '\]'], ['$$', '$$']]
+          inline = [['\(', '\)']]
+[params]
+  math = true

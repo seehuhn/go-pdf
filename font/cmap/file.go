@@ -25,7 +25,6 @@ import (
 	"io"
 	"iter"
 	"math"
-	"sync"
 	"text/template"
 
 	"seehuhn.de/go/postscript"
@@ -67,13 +66,13 @@ type File struct {
 	Parent *File
 }
 
-// SingleEntry specifies that character code `Code` represents the CID `Value`.
+// Single specifies that character code `Code` represents the CID `Value`.
 type Single struct {
 	Code  []byte
 	Value CID
 }
 
-// RangeEntry describes a range of character codes with consecutive CIDs.
+// Range describes a range of character codes with consecutive CIDs.
 // First and Last are the first and last code points in the range.
 // Value is the CID of the first code point in the range.
 type Range struct {
@@ -89,14 +88,12 @@ func (r Range) String() string {
 // Extract extracts a CMap from a PDF object.
 // The argument must be the name of a predefined CMap or a stream containing a CMap.
 func Extract(r pdf.Getter, obj pdf.Object) (*File, error) {
-	predefinedMu.Lock()
-	defer predefinedMu.Unlock()
-
 	cycle := pdf.NewCycleChecker()
 	return safeExtractCMap(r, cycle, obj)
 }
 
-// This must be called with predefinedMu locked.
+// safeExtractCMap extracts a CMap from a PDF object with cycle detection.
+// The obj parameter can be a pdf.Name (for predefined CMaps) or a stream reference.
 func safeExtractCMap(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object) (*File, error) {
 	if err := cycle.Check(obj); err != nil {
 		return nil, err
@@ -107,22 +104,11 @@ func safeExtractCMap(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object) (*Fi
 		return nil, err
 	}
 
-	if name, ok := obj.(pdf.Name); ok {
-		if res, ok := predefinedCMap[name]; ok {
-			return res, nil
-		}
-	}
-
 	var body io.Reader
 	var dict pdf.Dict
 	switch obj := obj.(type) {
 	case pdf.Name:
-		stm, err := openPredefined(string(obj))
-		if err != nil {
-			return nil, err
-		}
-		defer stm.Close()
-		body = stm
+		return Predefined(string(obj))
 
 	case *pdf.Stream:
 		dict = obj.Dict
@@ -143,7 +129,7 @@ func safeExtractCMap(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object) (*Fi
 		return nil, pdf.Errorf("invalid CMap object type: %T", obj)
 	}
 
-	res, parent, err := readCMap(body)
+	res, parentName, err := readCMap(body)
 	if err != nil {
 		return nil, err
 	}
@@ -157,37 +143,39 @@ func safeExtractCMap(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object) (*Fi
 	if x, _ := pdf.GetInteger(r, dict["WMode"]); x == 1 {
 		res.WMode = font.Vertical
 	}
-	if p := dict["UseCMap"]; p != nil {
-		parent = p
-	}
 
-	if parent != nil {
-		res.Parent, err = safeExtractCMap(r, cycle, parent)
+	// Handle parent CMap
+	if useCMap := dict["UseCMap"]; useCMap != nil {
+		// Stream dictionary provides the parent CMap location
+		res.Parent, err = safeExtractCMap(r, cycle, useCMap)
+		if pdf.IsReadError(err) {
+			return nil, err
+		}
+	} else if parentName != "" {
+		// No stream dictionary, try predefined CMap
+		res.Parent, err = safeExtractCMap(r, cycle, parentName)
 		if pdf.IsReadError(err) {
 			return nil, err
 		}
 	}
 
-	if name, ok := obj.(pdf.Name); ok {
-		predefinedCMap[name] = res
-		predefinedName[res] = name
-	}
-
 	return res, nil
 }
 
-func readCMap(r io.Reader) (*File, pdf.Object, error) {
+// readCMap reads and parses a CMap from a PostScript stream.
+// It returns the parsed CMap, the parent CMap name (if any), and any error.
+func readCMap(r io.Reader) (*File, pdf.Name, error) {
 	raw, err := postscript.ReadCMap(r)
 	if err != nil {
-		return nil, nil, err
+		return nil, "", err
 	}
 
 	if tp, _ := raw["CMapType"].(postscript.Integer); !(tp == 0 || tp == 1) {
-		return nil, nil, pdf.Errorf("invalid CMapType: %d", tp)
+		return nil, "", pdf.Errorf("invalid CMapType: %d", tp)
 	}
 
 	res := &File{}
-	var parent pdf.Object
+	var parent pdf.Name
 
 	if name, _ := raw["CMapName"].(postscript.Name); name != "" {
 		res.Name = string(name)
@@ -288,16 +276,21 @@ func readCMap(r io.Reader) (*File, pdf.Object, error) {
 
 // UpdateName updates the Name field of the CMap to a unique value based on the
 // content of the CMap.
-func (info *File) UpdateName() {
+func (f *File) UpdateName() {
+	if f.IsPredefined() {
+		// predefined CMaps have a fixed, unique name
+		return
+	}
+
 	h := md5.New()
-	info.writeBinary(h, 3)
-	info.Name = fmt.Sprintf("seehuhn-%x", h.Sum(nil))
+	f.writeBinary(h, 3)
+	f.Name = fmt.Sprintf("seehuhn-%x", h.Sum(nil))
 }
 
 // writeBinary writes a binary representation of the ToUnicodeInfo object to
 // the [hash.Hash] h.  The maxGen parameter limits the number of parent
 // references, to avoid infinite recursion.
-func (info *File) writeBinary(h hash.Hash, maxGen int) {
+func (f *File) writeBinary(h hash.Hash, maxGen int) {
 	if maxGen <= 0 {
 		return
 	}
@@ -315,41 +308,41 @@ func (info *File) writeBinary(h hash.Hash, maxGen int) {
 		h.Write(b)
 	}
 
-	writeInt(len(info.CodeSpaceRange))
-	for _, r := range info.CodeSpaceRange {
+	writeInt(len(f.CodeSpaceRange))
+	for _, r := range f.CodeSpaceRange {
 		writeBytes(r.Low)
 		writeBytes(r.High)
 	}
 
-	writeInt(len(info.CIDSingles))
-	for _, s := range info.CIDSingles {
+	writeInt(len(f.CIDSingles))
+	for _, s := range f.CIDSingles {
 		writeBytes(s.Code)
 		writeInt(int(s.Value))
 	}
 
-	writeInt(len(info.CIDRanges))
-	for _, r := range info.CIDRanges {
+	writeInt(len(f.CIDRanges))
+	for _, r := range f.CIDRanges {
 		writeBytes(r.First)
 		writeBytes(r.Last)
 		writeInt(int(r.Value))
 	}
 
-	writeInt(len(info.NotdefSingles))
-	for _, s := range info.NotdefSingles {
+	writeInt(len(f.NotdefSingles))
+	for _, s := range f.NotdefSingles {
 		writeBytes(s.Code)
 		writeInt(int(s.Value))
 	}
 
-	writeInt(len(info.NotdefRanges))
-	for _, r := range info.NotdefRanges {
+	writeInt(len(f.NotdefRanges))
+	for _, r := range f.NotdefRanges {
 		writeBytes(r.First)
 		writeBytes(r.Last)
 		writeInt(int(r.Value))
 	}
 
-	if info.Parent != nil {
+	if f.Parent != nil {
 		writeInt(1)
-		info.Parent.writeBinary(h, maxGen-1)
+		f.Parent.writeBinary(h, maxGen-1)
 	} else {
 		writeInt(0)
 	}
@@ -449,11 +442,8 @@ func (f *File) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	// TODO(voss): decide this based on the CMap content?
-	predefinedMu.Lock()
-	predefinedName, ok := predefinedName[f]
-	predefinedMu.Unlock()
-	if ok {
-		return predefinedName, zero, nil
+	if f.IsPredefined() {
+		return pdf.Name(f.Name), zero, nil
 	}
 
 	ros, err := pdf.ResourceManagerEmbedFunc(rm, font.WriteCIDSystemInfo, f.ROS)
@@ -617,9 +607,3 @@ endcmap
 CMapName currentdict /CMap defineresource pop
 end
 end`))
-
-var (
-	predefinedMu   sync.Mutex
-	predefinedCMap = make(map[pdf.Name]*File)
-	predefinedName = make(map[*File]pdf.Name)
-)

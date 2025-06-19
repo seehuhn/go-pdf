@@ -600,7 +600,7 @@ func TestExtractLoop(t *testing.T) {
 					t.Errorf("expected name %q, got %q", cmaps[i].Name, info.Name)
 				}
 
-				// Make sure the parent chain is correct
+				// make sure the parent chain is correct
 				if i < n-1 {
 					if info.Parent == nil {
 						t.Fatalf("expected parent, got nil")

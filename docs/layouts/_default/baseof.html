@@ -9,6 +9,9 @@
         content="{{ with .Description }}{{ . }}{{ else }}{{ with .Summary }}{{ . }}{{ else }}{{ .Site.Params.description }}{{end }}{{ end }}">
     {{ $style := resources.Get "css/main.css" | resources.Minify | resources.Fingerprint }}
     <link rel="stylesheet" href="{{ $style.Permalink }}">
+    {{ if .Param "math" }}
+    {{ partialCached "math.html" . }}
+    {{ end }}
 
     {{ block "head" . }}{{ end }}
 </head>

@@ -17,34 +17,26 @@ PDF functions are available in PDF 1.2 and later, with Types 2 and 3 introduced 
 
 PDF functions are represented as either dictionaries or streams, depending on the function type:
 
-**Function Dictionary** contains common entries shared by all function types:
-
-| Key | Type | Description |
-|-----|------|-------------|
-| `FunctionType` | integer | The function type: 0 (Sampled), 2 (Exponential), 3 (Stitching), or 4 (PostScript calculator). |
-| `Domain` | array | Array of 2 × m numbers defining input ranges. For each input i, Domain[2i] ≤ xi ≤ Domain[2i+1]. |
-| `Range` | array | Array of 2 × n numbers defining output ranges. For each output j, Range[2j] ≤ yj ≤ Range[2j+1]. Required for Type 0 and 4. |
-
-## Function Types
-
 ### Type 0: Sampled Function
 
-Type 0 functions use a table of sample values with interpolation to approximate functions with bounded domains and ranges.
+Type 0 functions use a table of sample values with interpolation to approximate
+functions with bounded domains and ranges. The are represented as a stream.
+The stream dict contains the following keys:
 
 | Key | Type | Description |
 |-----|------|-------------|
 | `FunctionType` | integer | Must be `0`. |
-| `Domain` | array | Array of 2 × m numbers defining input ranges. |
-| `Range` | array | Array of 2 × n numbers defining output ranges. |
+| `Domain` | array | Array of \(2m\) numbers defining input ranges. For each input \(i\), Domain[2i] ≤ \(x_i\) ≤ Domain[2i+1]. |
+| `Range` | array | Array of \(2n\) numbers defining output ranges. For each output \(j\), Range[2j] ≤ \(y_j\) ≤ Range[2j+1]. |
 | `Size` | array | Array of m positive integers specifying number of samples in each input dimension. |
 | `BitsPerSample` | integer | Bits per sample value. Valid values: 1, 2, 4, 8, 12, 16, 24, 32. |
 | `Order` | integer | (Optional) Interpolation order. 1 for linear, 3 for cubic spline. Default: 1. |
-| `Encode` | array | (Optional) Array of 2 × m numbers for linear mapping of inputs to sample table indices. Default: [0 (Size₀-1) 0 (Size₁-1)...]. |
-| `Decode` | array | (Optional) Array of 2 × n numbers for linear mapping of samples to output range. Default: same as Range. |
+| `Encode` | array | (Optional) Array of \(2m\) numbers for linear mapping of inputs to sample table indices. Default: [0 (Size₀-1) 0 (Size₁-1)...]. |
+| `Decode` | array | (Optional) Array of \(2n\) numbers for linear mapping of samples to output range. Default: same as Range. |
 
 The stream contains Size₀ × Size₁ × ... × Sizeₘ₋₁ sample values, each using BitsPerSample bits. Samples are packed continuously with no padding at byte boundaries. For multidimensional input, the first dimension varies fastest. For multidimensional output, values are stored in Range order.
 
-To implement Type 0 functions, clip inputs to domain, encode to sample indices, interpolate between nearest samples, decode the result, and clip to range. The Decode array can creatively increase accuracy for specific range values.
+Type 0 functions clip inputs to domain, encode to sample indices, interpolate between nearest samples, decode the result, and clip to range.
 
 ### Type 2: Power Interpolation Function
 
@@ -54,8 +46,8 @@ Type 2 functions define power interpolation: y = C0 + x^N × (C1 - C0).
 | Key | Type | Description |
 |-----|------|-------------|
 | `FunctionType` | integer | Must be `2`. |
-| `Domain` | array | Array of 2 numbers defining input range. |
-| `Range` | array | (Optional) Array of 2 × n numbers defining output ranges. |
+| `Domain` | array | Array of 2 × m numbers defining input ranges. For each input i, Domain[2i] ≤ xi ≤ Domain[2i+1]. |
+| `Range` | array | (optional) Array of 2 × n numbers defining output ranges. For each output j, Range[2j] ≤ yj ≤ Range[2j+1]. |
 | `C0` | array | (Optional) Array of n numbers defining function result when x = 0.0. Default: [0.0]. |
 | `C1` | array | (Optional) Array of n numbers defining function result when x = 1.0. Default: [1.0]. |
 | `N` | number | The interpolation exponent. |
@@ -69,8 +61,8 @@ Type 3 functions combine multiple 1-input functions across different subdomains 
 | Key | Type | Description |
 |-----|------|-------------|
 | `FunctionType` | integer | Must be `3`. |
-| `Domain` | array | Array of 2 numbers [Domain₀ Domain₁] defining overall input range. |
-| `Range` | array | (Optional) Array of 2 × n numbers defining output ranges. |
+| `Domain` | array | Array of 2 × m numbers defining input ranges. For each input i, Domain[2i] ≤ xi ≤ Domain[2i+1]. |
+| `Range` | array | (Optional) Array of 2 × n numbers defining output ranges. For each output j, Range[2j] ≤ yj ≤ Range[2j+1]. |
 | `Functions` | array | Array of k 1-input functions to be stitched. All must have same output dimensionality. |
 | `Bounds` | array | Array of k-1 numbers defining subdomain boundaries. Must be in increasing order within Domain. |
 | `Encode` | array | Array of 2 × k numbers mapping each subdomain to corresponding function's domain. |
@@ -84,8 +76,8 @@ Type 4 functions use a subset of PostScript language to define arbitrary calcula
 | Key | Type | Description |
 |-----|------|-------------|
 | `FunctionType` | integer | Must be `4`. |
-| `Domain` | array | Array of 2 × m numbers defining input ranges. |
-| `Range` | array | Array of 2 × n numbers defining output ranges. |
+| `Domain` | array | Array of 2 × m numbers defining input ranges. For each input i, Domain[2i] ≤ xi ≤ Domain[2i+1]. |
+| `Range` | array | Array of 2 × n numbers defining output ranges. For each output j, Range[2j] ≤ yj ≤ Range[2j+1]. |
 
 The stream contains PostScript code enclosed in braces { }. Available operators include:
 - **Arithmetic**: abs, add, atan, ceiling, cos, cvi, cvr, div, exp, floor, idiv, ln, log, mod, mul, neg, round, sin, sqrt, sub, truncate

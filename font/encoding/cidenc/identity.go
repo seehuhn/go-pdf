@@ -155,7 +155,11 @@ func (e *compositeIdentity) CMap(*cid.SystemInfo) *cmap.File {
 	} else {
 		name = "Identity-H"
 	}
-	return cmap.Predefined(name)
+	c, err := cmap.Predefined(name)
+	if err != nil {
+		panic(err) // Identity CMaps should always exist
+	}
+	return c
 }
 
 func (e *compositeIdentity) Width(c charcode.Code) float64 {

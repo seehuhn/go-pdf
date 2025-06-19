@@ -233,7 +233,7 @@ var t0Dicts = []*CIDFontType0{
 			FontName: "ABCDEF+Test",
 		},
 		ROS:  ros,
-		CMap: cmap.Predefined("Identity-H"),
+		CMap: func() *cmap.File { c, _ := cmap.Predefined("Identity-H"); return c }(),
 		Width: map[cmap.CID]float64{
 			0: 1000,
 			1: 500,
@@ -309,7 +309,7 @@ var t0Dicts = []*CIDFontType0{
 			CapHeight: 1000,
 		},
 		ROS:          ros,
-		CMap:         cmap.Predefined("Identity-H"),
+		CMap:         func() *cmap.File { c, _ := cmap.Predefined("Identity-H"); return c }(),
 		DefaultWidth: 1000,
 		FontType:     glyphdata.None,
 	},
