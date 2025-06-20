@@ -42,16 +42,18 @@ type fixed struct {
 var _ CIDEncoder = (*fixed)(nil)
 
 // NewFromCMap creates a CIDEncoder from an existing CMap.
-func NewFromCMap(cmap *cmap.File) (CIDEncoder, error) {
+func NewFromCMap(cmap *cmap.File, cid0Width float64) (CIDEncoder, error) {
 	codec, err := charcode.NewCodec(cmap.CodeSpaceRange)
 	if err != nil {
 		return nil, err
 	}
+	width := make(map[cid.CID]float64)
+	width[0] = cid0Width
 	return &fixed{
 		cmap:  cmap,
 		codec: codec,
 		text:  make(map[charcode.Code]string),
-		width: make(map[cid.CID]float64),
+		width: width,
 	}, nil
 }
 
@@ -82,7 +84,7 @@ func (f *fixed) Codes(s pdf.String) iter.Seq[*font.Code] {
 				code.Text = f.text[c]
 			} else {
 				code.CID = 0
-				code.Width = 0
+				code.Width = f.width[0]
 				code.Text = ""
 			}
 			code.Notdef = 0

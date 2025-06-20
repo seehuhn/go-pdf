@@ -53,6 +53,7 @@ type embeddedComposite struct {
 	cidenc.CIDEncoder
 
 	finished bool
+	usedCIDs map[cid.CID]struct{}
 }
 
 func newEmbeddedComposite(ref pdf.Reference, f *Instance) *embeddedComposite {
@@ -80,6 +81,7 @@ func newEmbeddedComposite(ref pdf.Reference, f *Instance) *embeddedComposite {
 
 		GIDToCID:   gidToCID,
 		CIDEncoder: encoder,
+		usedCIDs:   make(map[cid.CID]struct{}),
 	}
 	return e
 }
@@ -99,6 +101,9 @@ func (e *embeddedComposite) AppendEncoded(s pdf.String, gid glyph.ID, text strin
 			return s, 0
 		}
 	}
+
+	// Track that this CID has been used
+	e.usedCIDs[cid] = struct{}{}
 
 	w := e.CIDEncoder.Width(c)
 	return e.CIDEncoder.Codec().AppendCode(s, c), w / 1000
@@ -122,9 +127,9 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 	// Subset the font, if needed.
 	// To minimise file size, we arrange the glyphs in order of increasing CID.
 	cidSet := make(map[cid.CID]struct{})
-	cidSet[0] = struct{}{}
-	for _, info := range e.CIDEncoder.MappedCodes() {
-		cidSet[info.CID] = struct{}{}
+	cidSet[0] = struct{}{} // Always include CID 0 (notdef)
+	for cidVal := range e.usedCIDs {
+		cidSet[cidVal] = struct{}{}
 	}
 	cidList := maps.Keys(cidSet)
 	slices.Sort(cidList)
@@ -147,16 +152,19 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 	// construct the font dictionary and font descriptor
 	dw := math.Round(subsetFont.GlyphWidthPDF(0))
 	ww := make(map[cmap.CID]float64)
-	for _, info := range e.CIDEncoder.MappedCodes() {
-		ww[info.CID] = info.Width
-	}
-
 	isSymbolic := false
+
 	for _, info := range e.CIDEncoder.MappedCodes() {
-		glyphName := names.FromUnicode(info.Text)
-		if !pdfenc.StandardLatin.Has[glyphName] {
-			isSymbolic = true
-			break
+		// Only include information for CIDs that were actually used
+		if _, used := e.usedCIDs[info.CID]; used || info.CID == 0 {
+			ww[info.CID] = info.Width
+
+			if !isSymbolic {
+				glyphName := names.FromUnicode(info.Text)
+				if !pdfenc.StandardLatin.Has[glyphName] {
+					isSymbolic = true
+				}
+			}
 		}
 	}
 
