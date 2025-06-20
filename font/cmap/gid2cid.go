@@ -24,6 +24,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	"seehuhn.de/go/pdf/font/mapping"
 	"seehuhn.de/go/postscript/cid"
 
 	"seehuhn.de/go/sfnt/glyph"
@@ -138,6 +139,67 @@ func (g *gidToCIDIdentity) GIDToCID(numGlyph int) []cid.CID {
 	res := make([]cid.CID, numGlyph)
 	for i := range res {
 		res[i] = cid.CID(i)
+	}
+	return res
+}
+
+type gid2CIDFromROS struct {
+	ros *cid.SystemInfo
+	g2c map[glyph.ID]cid.CID
+	c2g map[cid.CID]glyph.ID
+}
+
+func NewGIDToCIDFromROS(ros *cid.SystemInfo, cmap interface{ Lookup(rune) glyph.ID }) GIDToCID {
+	m, _ := mapping.GetCIDTextMapping(ros.Registry, ros.Ordering)
+	g2c := make(map[glyph.ID]cid.CID)
+	c2g := make(map[cid.CID]glyph.ID)
+	for cidValInt, s := range m {
+		rr := []rune(s)
+		if len(rr) != 1 {
+			continue
+		}
+		gid := cmap.Lookup(rr[0])
+		if gid == 0 {
+			continue // skip .notdef glyphs
+		}
+
+		cidVal := cid.CID(cidValInt)
+		if otherCid, ok := g2c[gid]; ok && otherCid < cidVal {
+			// in case several CIDs map to the same GID, we keep the smallest
+			// CID value
+
+			// TODO(voss): should we set c2g[cidVal] = gid in this case?
+
+			continue
+		}
+		g2c[gid] = cidVal
+		c2g[cidVal] = gid
+	}
+	return &gid2CIDFromROS{
+		ros: ros,
+		g2c: g2c,
+		c2g: c2g,
+	}
+}
+
+func (g *gid2CIDFromROS) CID(gid glyph.ID, _ []rune) cid.CID {
+	return g.g2c[gid]
+}
+
+func (g *gid2CIDFromROS) GID(cid cid.CID) glyph.ID {
+	return g.c2g[cid]
+}
+
+func (g *gid2CIDFromROS) ROS() *cid.SystemInfo {
+	return g.ros
+}
+
+func (g *gid2CIDFromROS) GIDToCID(numGlyph int) []cid.CID {
+	res := make([]cid.CID, numGlyph)
+	for gid, cidVal := range g.g2c {
+		if int(gid) < len(res) {
+			res[gid] = cidVal
+		}
 	}
 	return res
 }

@@ -29,16 +29,30 @@ import (
 )
 
 type Context interface {
-	// Next returns a child object.
-	Next(string) (Context, error)
-
 	// Show prints a textual description of the object to the standard output.
 	Show() error
 
 	// Keys lists the allowed keys for the Next method.
 	// Keywords which need to be used verbatim are enclosed in backticks,
 	// everything else is a human-readable description of what is allowed.
-	Keys() []string
+	Next() []Step
+}
+
+// Step represents an action which can be performed on a context to either move
+// to a child object or to get a new view of the same object.
+type Step struct {
+	// Match is a regular expression which is used to select a step
+	// from the key chosen by the user.
+	Match *regexp.Regexp
+
+	// Desc is a human-readable description of the step.
+	// For keywords this should be enclosed in backticks, e.g. "`meta`".
+	// Otherwise this should be a short description, e.g. "object reference".
+	Desc string
+
+	// Next returns the next context reached by this step.
+	// The caller must ensure that the key matches the Match regular expression.
+	Next func(key string) (Context, error)
 }
 
 func Root(fileName string, passwords ...string) (Context, error) {
@@ -83,44 +97,81 @@ type fileCtx struct {
 	r  pdf.Getter
 }
 
-func (c *fileCtx) Next(key string) (Context, error) {
+func (c *fileCtx) Next() []Step {
 	meta := c.r.GetMeta()
 
-	var obj pdf.Object
-	switch key {
-	case "meta":
-		return &metaCtx{r: c.r}, nil
-	case "catalog":
-		obj = pdf.AsDict(meta.Catalog)
-	case "info":
-		obj = pdf.AsDict(meta.Info)
-	case "trailer":
-		obj = meta.Trailer
-	default:
-		if m := objNumberRegexp.FindStringSubmatch(key); m != nil { // object reference ...
-			number, err := strconv.ParseUint(m[1], 10, 32)
-			if err != nil {
-				return nil, err
-			}
-			var generation uint16
-			if m[2] != "" {
-				tmp, err := strconv.ParseUint(m[2], 10, 16)
+	return []Step{
+		{
+			Match: regexp.MustCompile(`^meta$`),
+			Desc:  "`meta`",
+			Next: func(key string) (Context, error) {
+				return &metaCtx{r: c.r}, nil
+			},
+		},
+		{
+			Match: regexp.MustCompile(`^catalog$`),
+			Desc:  "`catalog`",
+			Next: func(key string) (Context, error) {
+				obj := pdf.AsDict(meta.Catalog)
+				return &objectCtx{r: c.r, obj: obj}, nil
+			},
+		},
+		{
+			Match: regexp.MustCompile(`^info$`),
+			Desc:  "`info`",
+			Next: func(key string) (Context, error) {
+				obj := pdf.AsDict(meta.Info)
+				return &objectCtx{r: c.r, obj: obj}, nil
+			},
+		},
+		{
+			Match: regexp.MustCompile(`^trailer$`),
+			Desc:  "`trailer`",
+			Next: func(key string) (Context, error) {
+				obj := meta.Trailer
+				return &objectCtx{r: c.r, obj: obj}, nil
+			},
+		},
+		{
+			Match: objNumberRegexp,
+			Desc:  "object reference",
+			Next: func(key string) (Context, error) {
+				m := objNumberRegexp.FindStringSubmatch(key)
+				number, err := strconv.ParseUint(m[1], 10, 32)
 				if err != nil {
 					return nil, err
 				}
-				generation = uint16(tmp)
-			}
-			ref := pdf.NewReference(uint32(number), generation)
-			obj, err = pdf.Resolve(c.r, ref)
-			if err != nil {
-				return nil, err
-			}
-		} else { // ... or catalog key
-			cat := &objectCtx{r: c.r, obj: pdf.AsDict(meta.Catalog)}
-			return cat.Next(key)
-		}
+				var generation uint16
+				if m[2] != "" {
+					tmp, err := strconv.ParseUint(m[2], 10, 16)
+					if err != nil {
+						return nil, err
+					}
+					generation = uint16(tmp)
+				}
+				ref := pdf.NewReference(uint32(number), generation)
+				obj, err := pdf.Resolve(c.r, ref)
+				if err != nil {
+					return nil, err
+				}
+				return &objectCtx{r: c.r, obj: obj}, nil
+			},
+		},
+		{
+			Match: regexp.MustCompile(`^.+$`),
+			Desc:  "catalog key",
+			Next: func(key string) (Context, error) {
+				cat := &objectCtx{r: c.r, obj: pdf.AsDict(meta.Catalog)}
+				steps := cat.Next()
+				for _, step := range steps {
+					if step.Match.MatchString(key) {
+						return step.Next(key)
+					}
+				}
+				return nil, &KeyError{Key: key, Ctx: "catalog key"}
+			},
+		},
 	}
-	return &objectCtx{r: c.r, obj: obj}, nil
 }
 
 func (c *fileCtx) Show() error {
@@ -134,17 +185,6 @@ func (c *fileCtx) Show() error {
 	fmt.Println("modtime:", st.ModTime().Format("2006-01-02 15:04:05"))
 
 	return nil
-}
-
-func (c *fileCtx) Keys() []string {
-	return []string{
-		"`meta`",
-		"`catalog`",
-		"`info`",
-		"`trailer`",
-		"object reference",
-		"catalog key",
-	}
 }
 
 var (

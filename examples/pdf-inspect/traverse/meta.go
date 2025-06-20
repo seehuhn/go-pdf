@@ -26,14 +26,10 @@ type metaCtx struct {
 	r pdf.Getter
 }
 
-func (c *metaCtx) Next(key string) (Context, error) {
-	return nil, &KeyError{Key: key, Ctx: "metadata"}
+func (c *metaCtx) Next() []Step {
+	return nil
 }
 
 func (c *metaCtx) Show() error {
 	return meta.ShowMetadata(c.r)
-}
-
-func (c *metaCtx) Keys() []string {
-	return nil
 }

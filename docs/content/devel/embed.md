@@ -72,6 +72,36 @@ will return the same PDF representation for later calls, without calling
 the `Embed` method again. For this to work, embedders must be "comparable".
 An easy way to ensure this is to implement embedders as pointer types.
 
+### Alternative: Function-Driven Embedding
+
+For cases where objects don't implement the Embedder interface, or when you
+need more control over the embedding process, the `ResourceManagerEmbedFunc`
+function provides an alternative approach:
+
+```go
+func ResourceManagerEmbedFunc[T any](rm *ResourceManager, f func(*ResourceManager, T) (Object, error), obj T) (Object, error)
+```
+
+This function embeds a resource using a custom embedding function instead of
+the Embedder interface. Like `ResourceManagerEmbed`, it prevents duplicate
+embedding by tracking already embedded objects.
+
+Example usage:
+
+```go
+embedFunc := func(rm *ResourceManager, data MyCustomData) (Object, error) {
+    ref := rm.Out.Alloc()
+    dict := pdf.Dict{
+        "Type": pdf.Name("CustomType"),
+        "Data": pdf.String(data.Value),
+    }
+    err := rm.Out.Put(ref, dict)
+    return ref, err
+}
+
+obj, err := pdf.ResourceManagerEmbedFunc(rm, embedFunc, myData)
+```
+
 ## Embedders
 
 File-independent objects must implement the [Embedder] interface to

@@ -36,11 +36,12 @@ func TestSimpleWidthsRoundTrip(t *testing.T) {
 	originalWidths := make([]float64, 256)
 	for i := range originalWidths {
 		if i >= 32 && i <= 126 { // Standard ASCII printable range
-			if i%3 == 0 {
+			switch i % 3 {
+			case 0:
 				originalWidths[i] = 500
-			} else if i%3 == 1 {
+			case 1:
 				originalWidths[i] = 600
-			} else {
+			default:
 				originalWidths[i] = 700
 			}
 		} else {

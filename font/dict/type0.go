@@ -250,6 +250,15 @@ func (d *CIDFontType0) repair() {
 	d.Descriptor.FontName = subset.Join(d.SubsetTag, d.PostScriptName)
 
 	d.Descriptor.MissingWidth = 0
+
+	if d.CMap.Name != "Identity-H" && d.CMap.Name != "Identity-V" ||
+		!d.CMap.IsPredefined() {
+		if d.ROS.Registry != d.CMap.ROS.Registry ||
+			d.ROS.Ordering != d.CMap.ROS.Ordering {
+			d.CMap = d.CMap.Clone()
+			d.CMap.ROS = d.ROS
+		}
+	}
 }
 
 // validate performs some basic checks on the font dictionary.
@@ -281,6 +290,16 @@ func (d *CIDFontType0) validate() error {
 
 	if d.Descriptor.MissingWidth != 0 {
 		return errors.New("MissingWidth must be 0 for composite fonts")
+	}
+
+	if d.CMap.Name != "Identity-H" && d.CMap.Name != "Identity-V" ||
+		!d.CMap.IsPredefined() {
+		if d.ROS.Registry != d.CMap.ROS.Registry ||
+			d.ROS.Ordering != d.CMap.ROS.Ordering {
+			return fmt.Errorf("ROS mismatch: %s %s != %s %s",
+				d.ROS.Registry, d.ROS.Ordering,
+				d.CMap.ROS.Registry, d.CMap.ROS.Ordering)
+		}
 	}
 
 	return nil

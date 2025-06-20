@@ -274,6 +274,12 @@ func readCMap(r io.Reader) (*File, pdf.Name, error) {
 	return res, parent, nil
 }
 
+// Clone returns a shallow copy of the CMap file.
+func (f *File) Clone() *File {
+	clone := *f
+	return &clone
+}
+
 // UpdateName updates the Name field of the CMap to a unique value based on the
 // content of the CMap.
 func (f *File) UpdateName() {

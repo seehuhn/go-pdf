@@ -25,6 +25,30 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// Helper function to navigate using the new Context interface
+func navigateStreamContext(ctx Context, key string) (Context, error) {
+	steps := ctx.Next()
+	for _, step := range steps {
+		if step.Match.MatchString(key) {
+			return step.Next(key)
+		}
+	}
+	return nil, &KeyError{Key: key, Ctx: "navigation"}
+}
+
+// Helper function to get available step descriptions (replaces Keys())
+func getStreamStepDescriptions(ctx Context) []string {
+	steps := ctx.Next()
+	if len(steps) == 0 {
+		return nil
+	}
+	descs := make([]string, len(steps))
+	for i, step := range steps {
+		descs[i] = step.Desc
+	}
+	return descs
+}
+
 func TestStreamCtxShow(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -74,7 +98,7 @@ func TestStreamCtxNext(t *testing.T) {
 		name: "test stream",
 	}
 
-	result, err := ctx.Next("any_key")
+	result, err := navigateStreamContext(ctx, "any_key")
 	if result != nil {
 		t.Errorf("expected nil result but got %v", result)
 	}
@@ -92,7 +116,7 @@ func TestStreamCtxKeys(t *testing.T) {
 		name: "test stream",
 	}
 
-	keys := ctx.Keys()
+	keys := getStreamStepDescriptions(ctx)
 	if len(keys) != 0 {
 		t.Errorf("expected empty keys but got %v", keys)
 	}
@@ -147,7 +171,7 @@ func TestStreamNavigation(t *testing.T) {
 			}
 
 			ctx := &objectCtx{obj: stream, r: nil} // Note: r is nil for this simple test
-			result, err := ctx.Next(tt.key)
+			result, err := navigateStreamContext(ctx, tt.key)
 
 			if tt.expectError {
 				if err == nil {
@@ -236,7 +260,7 @@ func TestPageContents(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &objectCtx{obj: tt.pageDict, r: nil} // Note: r is nil for this simple test
-			result, err := ctx.Next("@contents")
+			result, err := navigateStreamContext(ctx, "@contents")
 
 			if tt.expectError {
 				if err == nil {
@@ -308,7 +332,7 @@ func TestObjectCtxKeysWithSpecialActions(t *testing.T) {
 				"Contents": pdf.NewReference(2, 0),
 				"MediaBox": pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(612), pdf.Integer(792)},
 			},
-			expected: []string{"`@contents`", "dict keys"},
+			expected: []string{"`@contents`", "dict keys (with optional /)"},
 		},
 		{
 			name: "pages dict with page numbers",
@@ -317,7 +341,7 @@ func TestObjectCtxKeysWithSpecialActions(t *testing.T) {
 				"Kids":  pdf.Array{pdf.NewReference(1, 0), pdf.NewReference(2, 0)},
 				"Count": pdf.Integer(2),
 			},
-			expected: []string{"page numbers", "dict keys"},
+			expected: []string{"page numbers", "dict keys (with optional /)"},
 		},
 		{
 			name: "regular dict",
@@ -325,14 +349,14 @@ func TestObjectCtxKeysWithSpecialActions(t *testing.T) {
 				"Type":  pdf.Name("Catalog"),
 				"Pages": pdf.NewReference(1, 0),
 			},
-			expected: []string{"dict keys"},
+			expected: []string{"dict keys (with optional /)"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &objectCtx{obj: tt.obj}
-			result := ctx.Keys()
+			result := getStreamStepDescriptions(ctx)
 
 			if d := cmp.Diff(result, tt.expected); d != "" {
 				t.Errorf("keys mismatch (-got +want):\n%s", d)

@@ -23,6 +23,30 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// Helper function to navigate using the new Context interface
+func navigateContext(ctx Context, key string) (Context, error) {
+	steps := ctx.Next()
+	for _, step := range steps {
+		if step.Match.MatchString(key) {
+			return step.Next(key)
+		}
+	}
+	return nil, &KeyError{Key: key, Ctx: "navigation"}
+}
+
+// Helper function to get available step descriptions (replaces Keys())
+func getStepDescriptions(ctx Context) []string {
+	steps := ctx.Next()
+	if len(steps) == 0 {
+		return nil
+	}
+	descs := make([]string, len(steps))
+	for i, step := range steps {
+		descs[i] = step.Desc
+	}
+	return descs
+}
+
 func TestObjectCtxNext(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -155,7 +179,7 @@ func TestObjectCtxNext(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &objectCtx{obj: tt.obj}
-			res, err := c.Next(tt.key)
+			res, err := navigateContext(c, tt.key)
 
 			if tt.wantErr {
 				switch err.(type) {
@@ -204,12 +228,12 @@ func TestObjectCtxKeys(t *testing.T) {
 				"Title": pdf.String("Test"),
 				"Count": pdf.Integer(1),
 			},
-			expected: []string{"dict keys"},
+			expected: []string{"dict keys (with optional /)"},
 		},
 		{
 			name:     "empty dict",
 			obj:      pdf.Dict{},
-			expected: nil,
+			expected: []string{"dict keys (with optional /)"},
 		},
 		{
 			name: "array indices",
@@ -257,7 +281,7 @@ func TestObjectCtxKeys(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &objectCtx{obj: tt.obj}
-			result := c.Keys()
+			result := getStepDescriptions(c)
 
 			if d := cmp.Diff(result, tt.expected); d != "" {
 				t.Errorf("keys mismatch (-got +want):\n%s", d)

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -38,147 +39,178 @@ type objectCtx struct {
 	obj pdf.Object
 }
 
-func (c *objectCtx) Next(key string) (Context, error) {
-	var obj pdf.Object
-	var err error
-
+func (c *objectCtx) Next() []Step {
 	switch x := c.obj.(type) {
 	case pdf.Dict:
-		forceKey := false
-		if strings.HasPrefix(key, "/") {
-			key = key[1:]
-			forceKey = true
-		}
+		var steps []Step
 
 		// Special case: @contents for Page objects
-		if key == "@contents" {
-			tp, err := pdf.GetName(c.r, x["Type"])
-			if err == nil && tp == "Page" {
-				_, hasParent := x["Parent"]
-				_, hasContents := x["Contents"]
-				if hasParent && hasContents {
-					reader, err := pagetree.ContentStream(c.r, x)
-					if err != nil {
-						return nil, err
-					}
-					return &streamCtx{
-						r:    reader,
-						name: "page contents",
-					}, nil
-				}
-			}
-			return nil, &KeyError{Key: key, Ctx: "page dict"}
-		}
-
-		// Special case: @font for Font objects
-		if key == "@font" {
-			tp, err := pdf.GetName(c.r, x["Type"])
-			if err == nil && tp == "Font" {
-				_, hasSubtype := x["Subtype"]
-				if hasSubtype {
-					return newFontDictCtx(c.r, x)
-				}
-			}
-			return nil, &KeyError{Key: key, Ctx: "font dict"}
-		}
-
-		// Special case: Pages dict with numeric keys for page access
-		if !forceKey && intRegexp.MatchString(key) {
-			tp, err := pdf.GetName(c.r, x["Type"])
-			if err == nil && tp == "Pages" {
-				_, hasKids := x["Kids"]
-				_, hasCount := x["Count"]
-				if hasKids && hasCount {
-					if pageNo, err := strconv.ParseInt(key, 10, 0); err == nil {
-						obj, _, err = pagetree.GetPage(c.r, int(pageNo)-1)
+		tp, err := pdf.GetName(c.r, x["Type"])
+		if err == nil && tp == "Page" {
+			_, hasParent := x["Parent"]
+			_, hasContents := x["Contents"]
+			if hasParent && hasContents {
+				steps = append(steps, Step{
+					Match: regexp.MustCompile(`^@contents$`),
+					Desc:  "`@contents`",
+					Next: func(key string) (Context, error) {
+						reader, err := pagetree.ContentStream(c.r, x)
 						if err != nil {
 							return nil, err
 						}
-						// Page lookup succeeded, skip dict key lookup
-					} else {
-						// Fall through to regular dict key lookup
-						var ok bool
-						obj, ok = x[pdf.Name(key)]
-						if !ok {
-							return nil, &KeyError{Key: key, Ctx: "Dict"}
+						return &streamCtx{
+							r:    reader,
+							name: "page contents",
+						}, nil
+					},
+				})
+			}
+		}
+
+		// Special case: @font for Font objects
+		if err == nil && tp == "Font" {
+			_, hasSubtype := x["Subtype"]
+			if hasSubtype {
+				steps = append(steps, Step{
+					Match: regexp.MustCompile(`^@font$`),
+					Desc:  "`@font`",
+					Next: func(key string) (Context, error) {
+						return newFontDictCtx(c.r, x)
+					},
+				})
+			}
+		}
+
+		// Special case: Pages dict with numeric keys for page access
+		if err == nil && tp == "Pages" {
+			_, hasKids := x["Kids"]
+			_, hasCount := x["Count"]
+			if hasKids && hasCount {
+				steps = append(steps, Step{
+					Match: intRegexp,
+					Desc:  "page numbers",
+					Next: func(key string) (Context, error) {
+						pageNo, err := strconv.ParseInt(key, 10, 0)
+						if err != nil {
+							return nil, &KeyError{Key: key, Ctx: "page number"}
 						}
-					}
-				} else {
-					// Fall through to regular dict key lookup
-					var ok bool
-					obj, ok = x[pdf.Name(key)]
-					if !ok {
-						return nil, &KeyError{Key: key, Ctx: "Dict"}
-					}
-				}
-			} else {
-				// Fall through to regular dict key lookup
-				var ok bool
-				obj, ok = x[pdf.Name(key)]
+						ref, _, err := pagetree.GetPage(c.r, int(pageNo)-1)
+						if err != nil {
+							return nil, err
+						}
+						obj, err := pdf.Resolve(c.r, ref)
+						if err != nil {
+							return nil, err
+						}
+						return &objectCtx{r: c.r, obj: obj}, nil
+					},
+				})
+			}
+		}
+
+		// Regular dict key lookup - handle optional / prefix
+		steps = append(steps, Step{
+			Match: regexp.MustCompile(`^/?[^@].*$`),
+			Desc:  "dict keys (with optional /)",
+			Next: func(key string) (Context, error) {
+				// Remove leading / if present
+				key = strings.TrimPrefix(key, "/")
+				obj, ok := x[pdf.Name(key)]
 				if !ok {
 					return nil, &KeyError{Key: key, Ctx: "Dict"}
 				}
-			}
-		} else {
-			// Regular dict key lookup
-			var ok bool
-			obj, ok = x[pdf.Name(key)]
-			if !ok {
-				return nil, &KeyError{Key: key, Ctx: "Dict"}
-			}
-		}
+				obj, err := pdf.Resolve(c.r, obj)
+				if err != nil {
+					return nil, err
+				}
+				return &objectCtx{r: c.r, obj: obj}, nil
+			},
+		})
+
+		return steps
 
 	case pdf.Array:
-		idx, err := strconv.ParseInt(key, 10, 64)
-		if err != nil {
-			return nil, &KeyError{Key: key, Ctx: "Array"}
+		n := len(x)
+		if n == 0 {
+			return nil
 		}
-		// negative indices count from the end, as in Python
-		if idx < 0 && idx+int64(len(x)) >= 0 {
-			idx += int64(len(x))
-		}
-		if idx < 0 || idx >= int64(len(x)) {
-			return nil, &KeyError{Key: key, Ctx: "Array"}
-		}
-		obj = x[idx]
+		return []Step{{
+			Match: regexp.MustCompile(`^-?\d+$`),
+			Desc:  fmt.Sprintf("array indices (%d to %d)", -n, n-1),
+			Next: func(key string) (Context, error) {
+				idx, err := strconv.ParseInt(key, 10, 64)
+				if err != nil {
+					return nil, &KeyError{Key: key, Ctx: "Array"}
+				}
+				// negative indices count from the end, as in Python
+				if idx < 0 && idx+int64(len(x)) >= 0 {
+					idx += int64(len(x))
+				}
+				if idx < 0 || idx >= int64(len(x)) {
+					return nil, &KeyError{Key: key, Ctx: "Array"}
+				}
+				obj := x[idx]
+				obj, err = pdf.Resolve(c.r, obj)
+				if err != nil {
+					return nil, err
+				}
+				return &objectCtx{r: c.r, obj: obj}, nil
+			},
+		}}
 
 	case *pdf.Stream:
-		switch key {
-		case "@encoded":
-			return &rawStreamCtx{r: x.R}, nil
-		case "@raw":
-			if c.r == nil {
-				return nil, errors.New("reader is nil, cannot decode stream")
-			}
-			decoded, err := pdf.DecodeStream(c.r, x, 0)
-			if err != nil {
-				return nil, err
-			}
-			return &streamCtx{
-				r:    decoded,
-				name: "decoded stream",
-			}, nil
-		case "dict":
-			obj = x.Dict
-		default:
-			key = strings.TrimPrefix(key, "/")
-			var ok bool
-			obj, ok = x.Dict[pdf.Name(key)]
-			if !ok {
-				return nil, &KeyError{Key: key, Ctx: "Stream dict"}
-			}
+		var steps []Step
+		steps = append(steps, Step{
+			Match: regexp.MustCompile(`^@encoded$`),
+			Desc:  "`@encoded`",
+			Next: func(key string) (Context, error) {
+				return &rawStreamCtx{r: x.R}, nil
+			},
+		})
+		steps = append(steps, Step{
+			Match: regexp.MustCompile(`^@raw$`),
+			Desc:  "`@raw`",
+			Next: func(key string) (Context, error) {
+				if c.r == nil {
+					return nil, errors.New("reader is nil, cannot decode stream")
+				}
+				decoded, err := pdf.DecodeStream(c.r, x, 0)
+				if err != nil {
+					return nil, err
+				}
+				return &rawStreamCtx{r: decoded}, nil
+			},
+		})
+		steps = append(steps, Step{
+			Match: regexp.MustCompile(`^dict$`),
+			Desc:  "`dict`",
+			Next: func(key string) (Context, error) {
+				return &objectCtx{r: c.r, obj: x.Dict}, nil
+			},
+		})
+		if len(x.Dict) > 0 {
+			steps = append(steps, Step{
+				Match: regexp.MustCompile(`^/?[^@].*$`),
+				Desc:  "stream dict keys",
+				Next: func(key string) (Context, error) {
+					key = strings.TrimPrefix(key, "/")
+					obj, ok := x.Dict[pdf.Name(key)]
+					if !ok {
+						return nil, &KeyError{Key: key, Ctx: "Stream dict"}
+					}
+					obj, err := pdf.Resolve(c.r, obj)
+					if err != nil {
+						return nil, err
+					}
+					return &objectCtx{r: c.r, obj: obj}, nil
+				},
+			})
 		}
+		return steps
 
 	default:
-		return nil, &KeyError{Key: key, Ctx: fmt.Sprintf("%T", c.obj)}
+		return nil
 	}
-
-	obj, err = pdf.Resolve(c.r, obj)
-	if err != nil {
-		return nil, err
-	}
-
-	return &objectCtx{r: c.r, obj: obj}, nil
 }
 
 func (c *objectCtx) Show() error {
@@ -267,115 +299,6 @@ func (c *objectCtx) showDict(dict pdf.Dict) error {
 	}
 	fmt.Println(">>")
 	return nil
-}
-
-func (c *objectCtx) Keys() []string {
-	switch obj := c.obj.(type) {
-	case pdf.Dict:
-		var keys []string
-
-		// Check if this is a Page dict that supports @contents
-		if tp, err := pdf.GetName(c.r, obj["Type"]); err == nil && tp == "Page" {
-			_, hasParent := obj["Parent"]
-			_, hasContents := obj["Contents"]
-			if hasParent && hasContents {
-				keys = append(keys, "`@contents`")
-			}
-		}
-
-		// Check if this is a Font dict that supports @font
-		if tp, err := pdf.GetName(c.r, obj["Type"]); err == nil && tp == "Font" {
-			_, hasSubtype := obj["Subtype"]
-			if hasSubtype {
-				keys = append(keys, "`@font`")
-			}
-		}
-
-		// Check if this is a Pages dict that supports numeric navigation
-		if tp, err := pdf.GetName(c.r, obj["Type"]); err == nil && tp == "Pages" {
-			_, hasKids := obj["Kids"]
-			_, hasCount := obj["Count"]
-			if hasKids && hasCount {
-				keys = append(keys, "page numbers")
-			}
-		}
-
-		if len(obj) > 0 {
-			keys = append(keys, "dict keys")
-		}
-
-		return keys
-
-	case pdf.Array:
-		n := len(obj)
-		if n == 0 {
-			return nil
-		}
-		s := fmt.Sprintf("array indices (%d to %d)", -n, n-1)
-		return []string{s}
-
-	case *pdf.Stream:
-		ss := []string{"`@encoded`", "`@raw`", "`dict`"}
-		if len(obj.Dict) > 0 {
-			ss = append(ss, "stream dict keys")
-		}
-		return ss
-
-	default:
-		return nil
-	}
-}
-
-// Helper functions ported from main.go
-
-func dictKeys(obj pdf.Dict) []pdf.Name {
-	keys := maps.Keys(obj)
-	sort.Slice(keys, func(i, j int) bool {
-		if order(keys[i]) != order(keys[j]) {
-			return order(keys[i]) < order(keys[j])
-		}
-		return keys[i] < keys[j]
-	})
-	return keys
-}
-
-func order(key pdf.Name) int {
-	switch key {
-	case "Type":
-		return 0
-	case "Subtype":
-		return 1
-	case "DescendantFonts":
-		return 2
-	case "BaseFont":
-		return 3
-	case "Encoding":
-		return 4
-	case "FontDescriptor":
-		return 5
-	case "FirstChar":
-		return 10
-	case "LastChar":
-		return 11
-	case "Widths":
-		return 12
-	default:
-		return 999
-	}
-}
-
-func mostlyBinary(buf []byte) bool {
-	pos := 0
-	n := len(buf)
-	bad := 0
-	for pos < n {
-		r, size := utf8.DecodeRune(buf[pos:])
-		if (r < 32 && r != '\t' && r != '\n' && r != '\r') || r == utf8.RuneError {
-			bad++
-		}
-		pos += size
-	}
-	return bad > 16+n/10
 }
 
 func (c *objectCtx) explainSingleLine(obj pdf.Object) (string, error) {
@@ -478,4 +401,54 @@ func (c *objectCtx) explainShort(obj pdf.Object) (string, error) {
 		err := pdf.Format(&buf, 0, obj)
 		return buf.String(), err
 	}
+}
+
+func dictKeys(obj pdf.Dict) []pdf.Name {
+	keys := maps.Keys(obj)
+	sort.Slice(keys, func(i, j int) bool {
+		if order(keys[i]) != order(keys[j]) {
+			return order(keys[i]) < order(keys[j])
+		}
+		return keys[i] < keys[j]
+	})
+	return keys
+}
+
+func order(key pdf.Name) int {
+	switch key {
+	case "Type":
+		return 0
+	case "Subtype":
+		return 1
+	case "DescendantFonts":
+		return 2
+	case "BaseFont":
+		return 3
+	case "Encoding":
+		return 4
+	case "FontDescriptor":
+		return 5
+	case "FirstChar":
+		return 10
+	case "LastChar":
+		return 11
+	case "Widths":
+		return 12
+	default:
+		return 999
+	}
+}
+
+func mostlyBinary(buf []byte) bool {
+	pos := 0
+	n := len(buf)
+	bad := 0
+	for pos < n {
+		r, size := utf8.DecodeRune(buf[pos:])
+		if (r < 32 && r != '\t' && r != '\n' && r != '\r') || r == utf8.RuneError {
+			bad++
+		}
+		pos += size
+	}
+	return bad > 16+n/10
 }

@@ -35,6 +35,8 @@ import (
 type fixed struct {
 	cmap  *cmap.File
 	codec *charcode.Codec
+	all   map[cid.CID]charcode.Code
+	rev   map[charcode.Code]cid.CID
 	text  map[charcode.Code]string
 	width map[cid.CID]float64
 }
@@ -42,16 +44,28 @@ type fixed struct {
 var _ CIDEncoder = (*fixed)(nil)
 
 // NewFromCMap creates a CIDEncoder from an existing CMap.
+// This returns an error, if the CMap has an invalid code space range.
 func NewFromCMap(cmap *cmap.File, cid0Width float64) (CIDEncoder, error) {
 	codec, err := charcode.NewCodec(cmap.CodeSpaceRange)
 	if err != nil {
 		return nil, err
 	}
+
+	all := make(map[cid.CID]charcode.Code)
+	rev := make(map[charcode.Code]cid.CID)
+	for code, cid := range cmap.All(codec) {
+		all[cid] = code
+		rev[code] = cid
+	}
+
 	width := make(map[cid.CID]float64)
 	width[0] = cid0Width
+
 	return &fixed{
 		cmap:  cmap,
 		codec: codec,
+		all:   all,
+		rev:   rev,
 		text:  make(map[charcode.Code]string),
 		width: width,
 	}, nil
@@ -68,7 +82,6 @@ func (f *fixed) WritingMode() font.WritingMode {
 func (f *fixed) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		var code font.Code
-		var buf []byte
 		for len(s) > 0 {
 			c, k, valid := f.codec.Decode(s)
 			if !valid {
@@ -77,18 +90,23 @@ func (f *fixed) Codes(s pdf.String) iter.Seq[*font.Code] {
 			}
 
 			if valid {
-				buf = f.codec.AppendCode(buf[:0], c)
-				codeCID := f.cmap.LookupCID(buf)
-				code.CID = codeCID
-				code.Width = f.width[codeCID]
-				code.Text = f.text[c]
+				cid := f.rev[c]
+				code = font.Code{
+					CID: cid,
+					// Notdef:         ...
+					Width:          f.width[cid],
+					Text:           f.text[c],
+					UseWordSpacing: k == 1 && c == 0x20,
+				}
 			} else {
-				code.CID = 0
-				code.Width = f.width[0]
-				code.Text = ""
+				code = font.Code{
+					CID: 0,
+					// Notdef:         ...,
+					Width:          f.width[0],
+					Text:           f.text[c],
+					UseWordSpacing: k == 1 && c == 0x20,
+				}
 			}
-			code.Notdef = 0
-			code.UseWordSpacing = k == 1 && c == 0x20
 
 			if !yield(&code) {
 				return
@@ -102,36 +120,16 @@ func (f *fixed) Codes(s pdf.String) iter.Seq[*font.Code] {
 func (f *fixed) MappedCodes() iter.Seq2[charcode.Code, *Info] {
 	return func(yield func(charcode.Code, *Info) bool) {
 		var info Info
-		for _, single := range f.cmap.CIDSingles {
-			var code charcode.Code
-			for i, b := range single.Code {
-				code |= charcode.Code(b) << (8 * i)
+		for code, text := range f.text {
+			cid := f.rev[code]
+			info = Info{
+				CID:   cid,
+				Width: f.width[cid],
+				Text:  text,
 			}
-			info.CID = single.Value
-			info.Width = f.width[single.Value]
-			info.Text = f.text[code]
+
 			if !yield(code, &info) {
-				return
-			}
-		}
-		for _, cidRange := range f.cmap.CIDRanges {
-			var firstCode charcode.Code
-			for i, b := range cidRange.First {
-				firstCode |= charcode.Code(b) << (8 * i)
-			}
-			var lastCode charcode.Code
-			for i, b := range cidRange.Last {
-				lastCode |= charcode.Code(b) << (8 * i)
-			}
-			for code := firstCode; code <= lastCode; code++ {
-				offset := code - firstCode
-				cidVal := cidRange.Value + cid.CID(offset)
-				info.CID = cidVal
-				info.Width = f.width[cidVal]
-				info.Text = f.text[code]
-				if !yield(code, &info) {
-					return
-				}
+				break
 			}
 		}
 	}
@@ -139,9 +137,9 @@ func (f *fixed) MappedCodes() iter.Seq2[charcode.Code, *Info] {
 
 // AllocateCode assigns a new code to a CID and stores the text and width.
 func (f *fixed) AllocateCode(cidVal cid.CID, text string, width float64) (charcode.Code, error) {
-	code, found := f.GetCode(cidVal, text)
-	if !found {
-		return 0, errors.New("CID not found in fixed encoder")
+	code, ok := f.all[cidVal]
+	if !ok {
+		return 0, errors.New("CID not found in CMap")
 	}
 
 	if existingWidth, hasWidth := f.width[cidVal]; hasWidth {
@@ -175,39 +173,15 @@ func (f *fixed) Codec() *charcode.Codec {
 
 // GetCode returns the character code for the given CID.
 func (f *fixed) GetCode(cidVal cid.CID, text string) (charcode.Code, bool) {
-	for _, single := range f.cmap.CIDSingles {
-		if single.Value == cidVal {
-			var code charcode.Code
-			for i, b := range single.Code {
-				code |= charcode.Code(b) << (8 * i)
-			}
-			return code, true
-		}
+	if _, ok := f.width[cidVal]; !ok {
+		return 0, false
 	}
-	for _, cidRange := range f.cmap.CIDRanges {
-		var firstCode charcode.Code
-		for i, b := range cidRange.First {
-			firstCode |= charcode.Code(b) << (8 * i)
-		}
-		var lastCode charcode.Code
-		for i, b := range cidRange.Last {
-			lastCode |= charcode.Code(b) << (8 * i)
-		}
-		rangeSize := lastCode - firstCode + 1
-		if cidVal >= cidRange.Value && cidVal < cidRange.Value+cid.CID(rangeSize) {
-			offset := cidVal - cidRange.Value
-			return firstCode + charcode.Code(offset), true
-		}
-	}
-	return 0, false
+	return f.all[cidVal], true
 }
 
 // Width returns the width of the given character code.
 func (f *fixed) Width(code charcode.Code) float64 {
-	var buf []byte
-	buf = f.codec.AppendCode(buf[:0], code)
-	cidVal := f.cmap.LookupCID(buf)
-	return f.width[cidVal]
+	return f.width[f.rev[code]]
 }
 
 // ToUnicode returns a ToUnicode CMap representing the text content

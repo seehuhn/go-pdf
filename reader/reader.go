@@ -292,7 +292,7 @@ func (r *Reader) do() error {
 			size := op.GetNumber()
 			if op.OK() && r.Resources != nil && r.Resources.Font != nil {
 				if ref := r.Resources.Font[font]; ref != nil {
-					F, err := r.ReadFont(ref)
+					F, err := r.readFont(ref)
 					if pdf.IsMalformed(err) {
 						break
 					} else if err != nil {

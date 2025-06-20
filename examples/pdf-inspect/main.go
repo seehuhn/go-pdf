@@ -68,9 +68,20 @@ func showObject(args ...string) error {
 	}
 
 	for _, key := range args[1:] {
-		obj, err = obj.Next(key)
-		if err != nil {
-			return err
+		steps := obj.Next()
+		found := false
+		for _, step := range steps {
+			if step.Match.MatchString(key) {
+				obj, err = step.Next(key)
+				if err != nil {
+					return err
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("no match for key %q", key)
 		}
 	}
 	err = obj.Show()
@@ -78,12 +89,12 @@ func showObject(args ...string) error {
 		return err
 	}
 
-	keys := obj.Keys()
-	if len(keys) > 0 {
+	steps := obj.Next()
+	if len(steps) > 0 {
 		fmt.Println("")
 		fmt.Println("next:")
-		for _, key := range keys {
-			fmt.Printf("  • %s\n", key)
+		for _, step := range steps {
+			fmt.Printf("  • %s\n", step.Desc)
 		}
 	}
 

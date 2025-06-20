@@ -14,29 +14,29 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package cmap_test
+package dict_test
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
-	"golang.org/x/image/font/gofont/goregular"
-	"golang.org/x/text/language"
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/font/encoding/cidenc"
-	"seehuhn.de/go/pdf/font/truetype"
+	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/pdf/internal/fonttypes"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/reader"
-	"seehuhn.de/go/sfnt"
 )
 
-func TestPredefined(t *testing.T) {
-	const testText = "Hello"
+func TestType1Embedding(t *testing.T) {
+	const (
+		testText    = "Helllo"
+		uniqueChars = 4 // 'H', 'e', 'l', 'o'
+	)
 
 	buf := &bytes.Buffer{}
 
@@ -47,44 +47,7 @@ func TestPredefined(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fontInfo, err := sfnt.Read(bytes.NewReader(goregular.TTF))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	lookup, err := fontInfo.CMapTable.GetBest()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cmapInfo, err := cmap.Predefined("Adobe-Japan1-7")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	fontOpt := &truetype.Options{
-		Language:    language.English,
-		Composite:   true,
-		WritingMode: font.Horizontal,
-		MakeGIDToCID: func() cmap.GIDToCID {
-			return cmap.NewGIDToCIDFromROS(cmapInfo.ROS, lookup)
-		},
-		MakeEncoder: func(cid0Width float64, wMode font.WritingMode) cidenc.CIDEncoder {
-			if cmapInfo.WMode != wMode {
-				panic(fmt.Sprintf("cmap %s has wMode %d, but requested wMode is %d", cmapInfo.Name, cmapInfo.WMode, wMode))
-			}
-			enc, err := cidenc.NewFromCMap(cmapInfo, cid0Width)
-			if err != nil {
-				panic(err)
-			}
-			return enc
-		},
-	}
-
-	F, err := truetype.New(fontInfo, fontOpt)
-	if err != nil {
-		t.Fatal(err)
-	}
+	F := fonttypes.Type1WithMetrics()
 
 	fontRefObj, _, err := pdf.ResourceManagerEmbed(doc.RM, F)
 	if err != nil {
@@ -114,18 +77,40 @@ func TestPredefined(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	encoding, err := pdf.GetName(r, fontDict["Encoding"])
+	_, err = pdf.GetName(r, fontDict["Encoding"])
 	if err != nil {
 		t.Fatal(err)
-	} else if encoding != "Adobe-Japan1-7" {
-		t.Errorf("expected encoding 'Adobe-Japan1-7', got %q", encoding)
 	}
 
 	if _, present := fontDict["ToUnicode"]; present {
 		t.Error("unexpected ToUnicode entry in font dictionary")
 	}
 
-	// step 3: extract the text from the PDF document and check
+	// step 3: extract the font file and check
+	parsedDict, err := dict.Read(r, fontDict)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fontInfo, ok := parsedDict.FontInfo().(*dict.FontInfoSimple)
+	if !ok {
+		t.Fatal("expected FontInfoSimple type")
+	}
+	if fontInfo.FontType != glyphdata.Type1 {
+		t.Fatalf("expected font type %d, got %d", glyphdata.Type1, fontInfo.FontType)
+	}
+	fontData, err := pdf.GetStreamReader(r, fontInfo.Ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t1font, err := type1.Read(fontData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(t1font.Glyphs) != uniqueChars+1 { // +1 for the .notdef glyph
+		t.Errorf("expected %d unique glyphs, got %d", uniqueChars+1, len(t1font.Glyphs))
+	}
+
+	// step 4: extract the text from the PDF document and check
 	_, pageDict, err := pagetree.GetPage(r, 0)
 	if err != nil {
 		t.Fatal(err)

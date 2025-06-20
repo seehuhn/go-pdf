@@ -57,7 +57,7 @@ func (r *Reader) readExtGState(ref pdf.Object) (graphics.State, error) {
 				return zero, err
 			}
 
-			F, err := r.ReadFont(a[0])
+			F, err := r.readFont(a[0])
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {

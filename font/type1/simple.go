@@ -146,6 +146,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	} else if subsetTag != "" {
 		if fontData != nil {
 			fontSubset = clone(fontData)
+			fontSubset.Outlines = clone(fontData.Outlines)
 			fontSubset.Glyphs = make(map[string]*type1.Glyph)
 			for _, gid := range glyphs {
 				glyphName := e.GlyphNames[gid]

@@ -21,11 +21,10 @@ import (
 	"seehuhn.de/go/pdf/font"
 
 	"seehuhn.de/go/pdf/font/dict"
-	_ "seehuhn.de/go/pdf/font/dict" // import all font readers
 )
 
-// ReadFont extracts a font from a PDF file.
-func (r *Reader) ReadFont(ref pdf.Object) (F font.FromFile, err error) {
+// readFont extracts a font from a PDF file.
+func (r *Reader) readFont(ref pdf.Object) (F font.FromFile, err error) {
 	if ref, ok := ref.(pdf.Reference); ok {
 		if res, ok := r.fontCache[ref]; ok {
 			return res, nil

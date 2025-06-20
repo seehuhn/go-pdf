@@ -37,8 +37,6 @@ type SpaceICCBased struct {
 }
 
 // ICCBased returns a new ICC-based color space.
-//
-// TODO(voss): extract n and ranges from the profile data.
 func ICCBased(profile []byte, metadata *metadata.Stream) (*SpaceICCBased, error) {
 	if len(profile) == 0 {
 		return nil, errors.New("ICCBased: missing profile")

@@ -25,15 +25,11 @@ type rawStreamCtx struct {
 	r io.Reader
 }
 
-func (ctx *rawStreamCtx) Next(key string) (Context, error) {
-	return nil, &KeyError{Key: key, Ctx: "@raw stream"}
+func (ctx *rawStreamCtx) Next() []Step {
+	return nil
 }
 
 func (ctx *rawStreamCtx) Show() error {
 	_, err := io.Copy(os.Stdout, ctx.r)
 	return err
-}
-
-func (ctx *rawStreamCtx) Keys() []string {
-	return nil
 }

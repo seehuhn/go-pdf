@@ -18,7 +18,6 @@ package pdf
 
 import (
 	"bytes"
-	"fmt"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -136,11 +135,6 @@ ET
 	encInfo2 := AsString(encryptDict)
 
 	if encInfo1 != encInfo2 {
-		// TODO(voss): remove debug output
-		fmt.Println()
-		fmt.Println(encInfo1)
-		fmt.Println()
-		fmt.Println(encInfo2)
 		t.Error("encryption dictionaries differ")
 	}
 

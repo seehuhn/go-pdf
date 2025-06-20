@@ -98,7 +98,11 @@ func toCFF(info *sfnt.Font) (*sfnt.Font, error) {
 
 	for i, origGlyph := range origOutlines.Glyphs {
 		gid := glyph.ID(i)
-		newGlyph := cff.NewGlyph(info.GlyphName(gid), info.GlyphWidth(gid))
+		glyphName := info.GlyphName(gid)
+		if gid == 0 {
+			glyphName = ".notdef"
+		}
+		newGlyph := cff.NewGlyph(glyphName, info.GlyphWidth(gid))
 
 		if origGlyph != nil {
 			glyphPath := origOutlines.Path(gid)

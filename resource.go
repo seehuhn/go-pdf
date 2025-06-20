@@ -81,8 +81,8 @@ type Finisher interface {
 // If the resource is already present in the file, the existing resource is
 // returned.
 //
-// If the embedded type, T, implements [Finisher], the Finish() method will be
-// called when the ResourceManager is closed.
+// The embedded type, T, must be comparable.  If T implements [Finisher], the
+// Finish() method will be called when the ResourceManager is closed.
 //
 // Once Go supports methods with type parameters, this function can be turned
 // into a method on [ResourceManager].
@@ -110,6 +110,16 @@ func ResourceManagerEmbed[T any](rm *ResourceManager, r Embedder[T]) (Object, T,
 	return val, emb, nil
 }
 
+// ResourceManagerEmbedFunc embeds a resource using a function-driven approach.
+//
+// This function provides an alternative to the Embedder interface when you need
+// to embed objects that don't implement the Embedder interface, or when you need
+// more control over the embedding process.  The type T must be "comparable".
+//
+// If the resource is already present in the file, the existing resource is
+// returned without calling the embed function again.
+//
+// The function f must return the PDF representation of the embedded object.
 func ResourceManagerEmbedFunc[T any](rm *ResourceManager, f func(*ResourceManager, T) (Object, error), obj T) (Object, error) {
 	if existing, ok := rm.embedded[obj]; ok {
 		return existing.Val, nil

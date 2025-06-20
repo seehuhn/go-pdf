@@ -79,36 +79,6 @@ type codeInfo struct {
 	Text  string
 }
 
-type notdefRange struct {
-	Low, High charcode.Code
-	Info      *notdefInfo
-}
-
-type notdefInfo struct {
-	CID   cid.CID
-	Width float64 // PDF glyph space units
-}
-
-// inRange checks whether each byte of key is between the corresponding byte in
-// low and high.
-func inRange(key, low, high charcode.Code) bool {
-	// For every byte, (key - low) and (high - key) must have their MSB clear.
-	// If any MSB in any byte is set, the bitwise OR of the two differences
-	// will have a 1 in the corresponding byte's MSB.
-	return (((key - low) | (high - key)) & 0x80808080) == 0
-}
-
-// lookup finds the pointer associated with the region that contains key,
-// or returns nil if no such region exists.
-func lookup(regions []notdefRange, key charcode.Code) *notdefInfo {
-	for _, region := range regions {
-		if inRange(key, region.Low, region.High) {
-			return region.Info
-		}
-	}
-	return nil
-}
-
 var (
 	ErrDuplicateCode = errors.New("duplicate code")
 	ErrOverflow      = errors.New("too many glyphs")

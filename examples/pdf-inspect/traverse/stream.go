@@ -28,12 +28,8 @@ type streamCtx struct {
 	name string
 }
 
-func (c *streamCtx) Next(key string) (Context, error) {
-	return nil, &KeyError{Key: key, Ctx: "stream has no children"}
-}
-
-func (c *streamCtx) Keys() []string {
-	return []string{}
+func (c *streamCtx) Next() []Step {
+	return []Step{}
 }
 
 func (c *streamCtx) Show() error {
