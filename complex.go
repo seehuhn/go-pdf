@@ -58,7 +58,7 @@ func GetNumber(r Getter, obj Object) (Number, error) {
 	}
 }
 
-// PDF implements the [Object] interface.
+// AsPDF implements the [Object] interface.
 func (x Number) AsPDF(opt OutputOptions) Native {
 	var obj Native
 	if i := Integer(x); Number(i) == x {
@@ -71,7 +71,7 @@ func (x Number) AsPDF(opt OutputOptions) Native {
 
 type TextString string
 
-// AsTextString interprets x as a PDF "text string" and returns
+// GetTextString interprets x as a PDF "text string" and returns
 // the corresponding utf-8 encoded string.
 func GetTextString(r Getter, obj Object) (TextString, error) {
 	s, err := GetString(r, obj)
@@ -166,7 +166,7 @@ func GetDate(r Getter, obj Object) (Date, error) {
 	return s.AsDate()
 }
 
-// Date creates a PDF String object encoding the given date and time.
+// AsPDF creates a PDF String object encoding the given date and time.
 func (d Date) AsPDF(opt OutputOptions) Native {
 	s := time.Time(d).Format("D:20060102150405-0700")
 	k := len(s) - 2

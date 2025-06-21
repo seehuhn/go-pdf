@@ -147,7 +147,7 @@ func (t *Simple) GetCode(gid glyph.ID, text string) (byte, bool) {
 	return c, ok
 }
 
-// AllocateCode allocates a new code for the given glyph ID and text. It also
+// Encode allocates a new code for the given glyph ID and text. It also
 // allocates a unique glyph name for the glyph.
 //
 // The new glyph name is chosen using a heuristic based on baseGlyphName
@@ -158,7 +158,7 @@ func (t *Simple) GetCode(gid glyph.ID, text string) (byte, bool) {
 //
 // Only 256 codes are available. Once all codes are used up, the function
 // returns an error.
-func (t *Simple) AllocateCode(gid glyph.ID, baseGlyphName, text string, width float64) (byte, error) {
+func (t *Simple) Encode(gid glyph.ID, baseGlyphName, text string, width float64) (byte, error) {
 	key := gidText{gid: gid, text: text} // TODO(voss): should this include the width?
 	if _, ok := t.code[key]; ok {
 		return 0, ErrDuplicateCode

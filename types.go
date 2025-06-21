@@ -667,36 +667,36 @@ func (x Array) AsPDF(opt OutputOptions) Native {
 // and are not included in PDF output.
 type Dict map[Name]Object
 
-func (x Dict) isNative() {}
+func (d Dict) isNative() {}
 
-func (x Dict) String() string {
+func (d Dict) String() string {
 	res := []string{}
-	tp, ok := x["Type"].(Name)
+	tp, ok := d["Type"].(Name)
 	if ok {
 		res = append(res, string(tp)+" Dict")
 	} else {
 		res = append(res, "Dict")
 	}
-	if len(x) != 1 {
-		res = append(res, strconv.FormatInt(int64(len(x)), 10)+" entries")
+	if len(d) != 1 {
+		res = append(res, strconv.FormatInt(int64(len(d)), 10)+" entries")
 	} else {
 		res = append(res, "1 entry")
 	}
 	return "<" + strings.Join(res, ", ") + ">"
 }
 
-func (x Dict) AsPDF(opt OutputOptions) Native {
-	return x
+func (d Dict) AsPDF(opt OutputOptions) Native {
+	return d
 }
 
 // Clone makes a shallow copy of the dictionary.
-func (x Dict) Clone() Dict {
-	if x == nil {
+func (d Dict) Clone() Dict {
+	if d == nil {
 		return nil
 	}
 
-	rea := make(Dict, len(x))
-	for k, v := range x {
+	rea := make(Dict, len(d))
+	for k, v := range d {
 		rea[k] = v
 	}
 	return rea

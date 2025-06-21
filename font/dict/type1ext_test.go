@@ -21,12 +21,12 @@ import (
 	"testing"
 
 	"seehuhn.de/go/geom/matrix"
-	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/pdf/font/glyphdata/type1glyphs"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/reader"
@@ -95,19 +95,13 @@ func TestType1Embedding(t *testing.T) {
 	if !ok {
 		t.Fatal("expected FontInfoSimple type")
 	}
-	if fontInfo.FontType != glyphdata.Type1 {
-		t.Fatalf("expected font type %d, got %d", glyphdata.Type1, fontInfo.FontType)
-	}
-	fontData, err := pdf.GetStreamReader(r, fontInfo.Ref)
+
+	t1Font, err := type1glyphs.Extract(r, glyphdata.Type1, fontInfo.Ref)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t1font, err := type1.Read(fontData)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(t1font.Glyphs) != uniqueChars+1 { // +1 for the .notdef glyph
-		t.Errorf("expected %d unique glyphs, got %d", uniqueChars+1, len(t1font.Glyphs))
+	if len(t1Font.Glyphs) != uniqueChars+1 { // +1 for the .notdef glyph
+		t.Errorf("expected %d unique glyphs, got %d", uniqueChars+1, len(t1Font.Glyphs))
 	}
 
 	// step 4: extract the text from the PDF document and check

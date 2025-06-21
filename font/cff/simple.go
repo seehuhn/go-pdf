@@ -100,7 +100,7 @@ func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) 
 		glyphName := e.Font.Outlines.Glyphs[gid].Name
 		width := math.Round(e.Font.GlyphWidthPDF(gid))
 		var err error
-		c, err = e.Simple.AllocateCode(gid, glyphName, text, width)
+		c, err = e.Simple.Encode(gid, glyphName, text, width)
 		if err != nil {
 			return s, 0
 		}

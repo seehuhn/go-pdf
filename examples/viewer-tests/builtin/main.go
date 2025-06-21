@@ -239,11 +239,12 @@ func (f *fontTables) MakeColumns(G standard.Font) error {
 
 				y := yTop - baseLineSkip*float64(i)
 
-				if i == 0 {
+				switch i {
+				case 0:
 					page.TextFirstLine(x, y)
-				} else if i == 1 {
+				case 1:
 					page.TextSecondLine(0, -baseLineSkip)
-				} else {
+				default:
 					page.TextNextLine()
 				}
 

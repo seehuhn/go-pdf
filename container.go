@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 )
 
 // Getter represents a PDF file opened for reading.
@@ -199,11 +200,15 @@ func CheckDictType(r Getter, obj Dict, wantType Name) error {
 // GetStreamReader returns an io.Reader which returns the decoded
 // contents of a PDF stream.
 //
+// If ref is nil, the function returns an error which wraps os.ErrNotExist.
+//
 // This is a convenience function, combining [GetStream] and [DecodeStream].
 func GetStreamReader(r Getter, ref Object) (io.ReadCloser, error) {
 	stm, err := GetStream(r, ref)
 	if err != nil {
 		return nil, err
+	} else if stm == nil {
+		return nil, fmt.Errorf("no stream found: %w", os.ErrNotExist)
 	}
 	return DecodeStream(r, stm, 0)
 }

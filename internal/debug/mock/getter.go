@@ -19,7 +19,7 @@ package mock
 import "seehuhn.de/go/pdf"
 
 // Getter is a [pdf.Getter] which returns no objects.
-var Getter = getter{}
+var Getter pdf.Getter = getter{}
 
 type getter struct{}
 

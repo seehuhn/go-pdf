@@ -40,7 +40,7 @@ type Info struct {
 
 // A CIDEncoder maps character codes to CIDs, glyph widths and text content.
 type CIDEncoder interface {
-	// WritingMode indicates whether the font is for horizontal or vertical
+	// WritingMode indicates whether the encoding is for horizontal or vertical
 	// writing.
 	WritingMode() font.WritingMode
 
@@ -51,9 +51,11 @@ type CIDEncoder interface {
 	// MappedCodes iterates over all codes known to the encoder.
 	MappedCodes() iter.Seq2[charcode.Code, *Info]
 
-	// AllocateCode assigns a new code to a CID and stores the text and width.
-	AllocateCode(cidVal cid.CID, text string, width float64) (charcode.Code, error)
+	// Encode assigns a new code to a CID and stores the text and width.
+	Encode(cidVal cid.CID, text string, width float64) (charcode.Code, error)
 
+	// CMap returns a CMap object which describes the mapping
+	// from character codes to CIDs.
 	CMap(ros *cid.SystemInfo) *cmap.File
 
 	Codec() *charcode.Codec
@@ -67,7 +69,6 @@ type CIDEncoder interface {
 	ToUnicode() *cmap.ToUnicodeFile
 }
 
-// TODO(voss): include the width?
 type key struct {
 	cid  cid.CID
 	text string

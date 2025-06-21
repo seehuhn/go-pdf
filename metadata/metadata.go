@@ -34,6 +34,7 @@ func ExtractStream(r pdf.Getter, ref pdf.Object) (*Stream, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer body.Close()
 
 	packet, err := xmp.Read(body)
 	if err != nil {

@@ -135,8 +135,8 @@ func (f *fixed) MappedCodes() iter.Seq2[charcode.Code, *Info] {
 	}
 }
 
-// AllocateCode assigns a new code to a CID and stores the text and width.
-func (f *fixed) AllocateCode(cidVal cid.CID, text string, width float64) (charcode.Code, error) {
+// Encode assigns a new code to a CID and stores the text and width.
+func (f *fixed) Encode(cidVal cid.CID, text string, width float64) (charcode.Code, error) {
 	code, ok := f.all[cidVal]
 	if !ok {
 		return 0, errors.New("CID not found in CMap")
@@ -187,6 +187,10 @@ func (f *fixed) Width(code charcode.Code) float64 {
 // ToUnicode returns a ToUnicode CMap representing the text content
 // of the mapped codes.
 func (f *fixed) ToUnicode() *cmap.ToUnicodeFile {
+	// TODO(voss): for the /Identity-H and /Identity-V CMaps,
+	// we need to use the CIDSystemInfo of the font, rather than
+	// the one from the CMap here.
+
 	m := make(map[charcode.Code]string)
 
 	implied, _ := mapping.GetCIDTextMapping(f.cmap.ROS.Registry, f.cmap.ROS.Ordering)

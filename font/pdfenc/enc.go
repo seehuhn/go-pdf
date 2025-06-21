@@ -24,7 +24,7 @@ type Encoding struct {
 	Has      map[string]bool
 }
 
-// StandardEncoding is the Adobe Standard Encoding for Latin text.
+// Standard is the Adobe Standard Encoding for Latin text.
 //
 // See Appendix D.2 of PDF 32000-1:2008.
 var Standard = Encoding{
@@ -60,7 +60,7 @@ var MacRomanAlt = Encoding{
 	Has:      macRomanAltHas,
 }
 
-// MacExpertEncoding is an encoding which contains more obscure characters.
+// MacExpert is an encoding which contains more obscure characters.
 //
 // See Appendix D.4 of PDF 32000-1:2008.
 var MacExpert = Encoding{

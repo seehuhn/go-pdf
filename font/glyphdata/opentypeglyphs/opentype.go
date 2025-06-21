@@ -108,6 +108,10 @@ func Embed(w *pdf.Writer, tp glyphdata.Type, ref pdf.Reference, data *sfnt.Font)
 	return nil
 }
 
+// Extract extracts OpenType or TrueType font data from a PDF file.
+//
+// The following font types are supported: [glyphdata.OpenTypeCFFSimple],
+// [glyphdata.OpenTypeCFF], [glyphdata.TrueType], and [glyphdata.OpenTypeGlyf].
 func Extract(r pdf.Getter, tp glyphdata.Type, ref pdf.Object) (*sfnt.Font, error) {
 	stm, err := pdf.GetStream(r, ref)
 	if err != nil {
@@ -120,6 +124,7 @@ func Extract(r pdf.Getter, tp glyphdata.Type, ref pdf.Object) (*sfnt.Font, error
 	if err != nil {
 		return nil, err
 	}
+	defer fontData.Close()
 
 	data, err := sfnt.Read(fontData)
 	if err != nil {

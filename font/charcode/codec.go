@@ -49,7 +49,7 @@ type linearizedNode struct {
 	//
 	// - If child equals 0, the consumed byte
 	//   is the last byte of a valid character code and the lookup stops.
-	// - If child equals 0xFFFF - k, for k∈{0,1,2,3}, the input starts
+	// - If child equals 0xFFFF-k, for k∈{0,1,2,3}, the input starts
 	//   with an invalid character code.  The lookup stops and
 	//   an additional k bytes must be consumed to continue.
 	// - For all other cases, the child node is the index of the next node in

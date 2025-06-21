@@ -206,6 +206,7 @@ func (r *Reader) decode2D() {
 		entry := mainTable[value]
 
 		if entry.State == S_EOL {
+			// TODO(voss): add error handling
 			if r.peekBits(11) == 0 {
 				if a0 >= 0 {
 					// error ...
@@ -285,39 +286,39 @@ func (r *Reader) fillRowBits(start, end int, fill bool) {
 	}
 }
 
-func (b *Reader) peekBits(n int) uint32 {
+func (r *Reader) peekBits(n int) uint32 {
 	if n > 24 {
 		panic("invalid n")
 	}
 
-	for b.validBits < n {
+	for r.validBits < n {
 		var x byte
-		if b.err == nil { // after the first error, use an inifinite stream of zeros
-			x, b.err = b.r.ReadByte()
+		if r.err == nil { // after the first error, use an inifinite stream of zeros
+			x, r.err = r.r.ReadByte()
 		}
-		b.current |= uint32(x) << (24 - b.validBits)
-		b.validBits += 8
+		r.current |= uint32(x) << (24 - r.validBits)
+		r.validBits += 8
 	}
-	return b.current >> (32 - n)
+	return r.current >> (32 - n)
 }
 
-func (b *Reader) consumeBits(n int) {
-	if b.validBits < n {
-		b.peekBits(n)
+func (r *Reader) consumeBits(n int) {
+	if r.validBits < n {
+		r.peekBits(n)
 	}
-	b.current <<= n
-	b.validBits -= n
+	r.current <<= n
+	r.validBits -= n
 }
 
-func (b *Reader) readBits(n int) uint32 {
-	res := b.peekBits(n)
-	b.consumeBits(n)
+func (r *Reader) readBits(n int) uint32 {
+	res := r.peekBits(n)
+	r.consumeBits(n)
 	return res
 }
 
 // waitForOne consumes bits, one by one, until a 1 has been consumed.
-func (b *Reader) waitForOne() {
-	for b.err == nil && b.readBits(1) == 0 {
+func (r *Reader) waitForOne() {
+	for r.err == nil && r.readBits(1) == 0 {
 		// pass
 	}
 }

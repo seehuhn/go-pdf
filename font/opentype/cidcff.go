@@ -97,7 +97,7 @@ func (e *embeddedCFFComposite) AppendEncoded(s pdf.String, gid glyph.ID, text st
 
 		width := math.Round(e.Font.GlyphWidthPDF(gid))
 		var err error
-		c, err = e.CIDEncoder.AllocateCode(cid, text, width)
+		c, err = e.CIDEncoder.Encode(cid, text, width)
 		if err != nil {
 			return s, 0
 		}

@@ -91,17 +91,3 @@ func interpolate(x, xMin, xMax, yMin, yMax float64) float64 {
 	}
 	return yMin + ((x-xMin)*(yMax-yMin))/(xMax-xMin)
 }
-
-// Deprecated functions for backward compatibility
-
-// toPDF converts a slice of float64 to a PDF Array.
-// Deprecated: use arrayFromFloats instead.
-func toPDF(x []float64) pdf.Array {
-	return arrayFromFloats(x)
-}
-
-// fromPDF extracts a slice of float64 from a PDF Array.
-// Deprecated: use floatsFromPDF instead.
-func fromPDF(r pdf.Getter, obj pdf.Object) ([]float64, error) {
-	return floatsFromPDF(r, obj)
-}

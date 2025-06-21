@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,26 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package pdfenc
-
-// A CharacterSet is a collection of glyph names.
-type CharacterSet struct {
-	Has map[string]bool
-}
-
-// StandardLatin is the Adobe Standard Latin character set.
-// See appendix D.2 ("Latin character set and encodings") of ISO 32000-2:2020.
-var StandardLatin = CharacterSet{
-	Has: standardLatinHas,
-}
-
-// IsNonSymbolic returns true if all glyphs are in the Adobe Standard Latin
-// character set.
-func IsNonSymbolic(glyphNames []string) bool {
-	for _, name := range glyphNames {
-		if !StandardLatin.Has[name] {
-			return false
-		}
-	}
-	return true
-}
+// Package metadata provides support for XMP metadata streams in PDF files.
+//
+// XMP (Extensible Metadata Platform) metadata can be embedded in PDF files
+// to store document information such as title, author, creation date, and
+// other properties. This package handles reading and writing XMP metadata
+// streams that comply with the PDF specification.
+package metadata

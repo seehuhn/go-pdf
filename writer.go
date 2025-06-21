@@ -246,24 +246,24 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 
 // Close closes the Writer, flushing any unwritten data to the underlying
 // io.Writer.
-func (pdf *Writer) Close() error {
-	if pdf.inStream {
+func (w *Writer) Close() error {
+	if w.inStream {
 		return errors.New("Close() while stream is open")
 	}
 
-	trailer := pdf.meta.Trailer.Clone()
+	trailer := w.meta.Trailer.Clone()
 
-	catRef := pdf.Alloc()
-	err := pdf.Put(catRef, AsDict(pdf.meta.Catalog))
+	catRef := w.Alloc()
+	err := w.Put(catRef, AsDict(w.meta.Catalog))
 	if err != nil {
 		return fmt.Errorf("failed to write document catalog: %w", err)
 	}
 	trailer["Root"] = catRef
 
-	infoDict := AsDict(pdf.meta.Info)
+	infoDict := AsDict(w.meta.Info)
 	if len(infoDict) > 0 {
-		infoRef := pdf.Alloc()
-		err := pdf.Put(infoRef, infoDict)
+		infoRef := w.Alloc()
+		err := w.Put(infoRef, infoDict)
 		if err != nil {
 			return err
 		}
@@ -272,37 +272,37 @@ func (pdf *Writer) Close() error {
 		delete(trailer, "Info")
 	}
 
-	if pdf.meta.ID != nil {
-		trailer["ID"] = Array{String(pdf.meta.ID[0]), String(pdf.meta.ID[1])}
+	if w.meta.ID != nil {
+		trailer["ID"] = Array{String(w.meta.ID[0]), String(w.meta.ID[1])}
 	} else {
 		delete(trailer, "ID")
 	}
 
 	// don't encrypt the encryption dictionary and the xref dict
-	pdf.w.enc = nil
+	w.w.enc = nil
 
 	// write the cross reference table and trailer
-	xRefPos := pdf.w.pos
-	trailer["Size"] = Integer(pdf.nextRef)
-	if pdf.outputOptions.HasAny(optXRefStream) {
-		err = pdf.writeXRefStream(trailer)
+	xRefPos := w.w.pos
+	trailer["Size"] = Integer(w.nextRef)
+	if w.outputOptions.HasAny(optXRefStream) {
+		err = w.writeXRefStream(trailer)
 	} else {
-		err = pdf.writeXRefTable(trailer)
+		err = w.writeXRefTable(trailer)
 	}
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(pdf.w, "startxref\n%d\n%%%%EOF\n", xRefPos)
+	_, err = fmt.Fprintf(w.w, "startxref\n%d\n%%%%EOF\n", xRefPos)
 	if err != nil {
 		return err
 	}
 
-	err = pdf.w.w.Flush()
+	err = w.w.w.Flush()
 	if err != nil {
 		return err
 	}
-	if pdf.closeOrigW {
-		err = pdf.origW.(io.Closer).Close()
+	if w.closeOrigW {
+		err = w.origW.(io.Closer).Close()
 		if err != nil {
 			return err
 		}
@@ -312,18 +312,18 @@ func (pdf *Writer) Close() error {
 }
 
 // GetMeta returns the MetaInfo for the PDF file.
-func (pdf *Writer) GetMeta() *MetaInfo {
-	return &pdf.meta
+func (w *Writer) GetMeta() *MetaInfo {
+	return &w.meta
 }
 
-func (pdf *Writer) GetOptions() OutputOptions {
-	return pdf.outputOptions
+func (w *Writer) GetOptions() OutputOptions {
+	return w.outputOptions
 }
 
 // Alloc allocates an object number for a new indirect object.
-func (pdf *Writer) Alloc() Reference {
-	res := NewReference(pdf.nextRef, 0)
-	pdf.nextRef++
+func (w *Writer) Alloc() Reference {
+	res := NewReference(w.nextRef, 0)
+	w.nextRef++
 	return res
 }
 
@@ -331,13 +331,13 @@ func (pdf *Writer) Alloc() Reference {
 //
 // If the underlying io.Writer does not support seeking, Get will return an
 // error.
-func (pdf *Writer) Get(ref Reference, canObjStm bool) (obj Native, err error) {
-	r, ok := pdf.origW.(io.ReadSeeker)
+func (w *Writer) Get(ref Reference, canObjStm bool) (obj Native, err error) {
+	r, ok := w.origW.(io.ReadSeeker)
 	if !ok {
 		return nil, errors.New("Get() not supported by the underlying io.Writer")
 	}
 
-	entry := pdf.xref[ref.Number()]
+	entry := w.xref[ref.Number()]
 	if entry.IsFree() || entry.Generation != ref.Generation() {
 		return nil, nil
 	}
@@ -349,11 +349,11 @@ func (pdf *Writer) Get(ref Reference, canObjStm bool) (obj Native, err error) {
 				Loc: []string{"object " + ref.String()},
 			}
 		}
-		getInt := safeGetInteger(pdf, r, true)
-		return getFromObjStm(pdf, ref.Number(), entry.InStream, getInt, pdf.w.enc)
+		getInt := safeGetInteger(w, r, true)
+		return getFromObjStm(w, ref.Number(), entry.InStream, getInt, w.w.enc)
 	}
 
-	err = pdf.w.w.Flush()
+	err = w.w.w.Flush()
 	if err != nil {
 		return nil, err
 	}
@@ -369,7 +369,7 @@ func (pdf *Writer) Get(ref Reference, canObjStm bool) (obj Native, err error) {
 		}
 	}()
 
-	s, err := pdf.scannerFrom(entry.Pos, canObjStm)
+	s, err := w.scannerFrom(entry.Pos, canObjStm)
 	if err != nil {
 		return nil, err
 	}
@@ -402,14 +402,14 @@ func (w *Writer) scannerFrom(pos int64, canObjStm bool) (*scanner, error) {
 }
 
 // Put writes an indirect object to the PDF file, using the given reference.
-func (pdf *Writer) Put(ref Reference, obj Object) error {
-	if pdf.inStream {
-		pdf.afterStream = append(pdf.afterStream, allocatedObject{ref, obj})
+func (w *Writer) Put(ref Reference, obj Object) error {
+	if w.inStream {
+		w.afterStream = append(w.afterStream, allocatedObject{ref, obj})
 		return nil
 	}
 
 	if stm, isStream := obj.(*Stream); isStream {
-		w, err := pdf.OpenStream(ref, stm.Dict)
+		w, err := w.OpenStream(ref, stm.Dict)
 		if err != nil {
 			return err
 		}
@@ -422,27 +422,27 @@ func (pdf *Writer) Put(ref Reference, obj Object) error {
 			return err
 		}
 	} else {
-		err := pdf.setXRef(ref, &xRefEntry{Pos: pdf.w.pos, Generation: ref.Generation()})
+		err := w.setXRef(ref, &xRefEntry{Pos: w.w.pos, Generation: ref.Generation()})
 		if err != nil {
 			return fmt.Errorf("Writer.Put: %w", err)
 		}
-		pdf.w.ref = ref
+		w.w.ref = ref
 
-		_, err = fmt.Fprintf(pdf.w, "%d %d obj\n", ref.Number(), ref.Generation())
+		_, err = fmt.Fprintf(w.w, "%d %d obj\n", ref.Number(), ref.Generation())
 		if err != nil {
 			return err
 		}
-		err = Format(pdf.w, pdf.outputOptions, obj)
+		err = Format(w.w, w.outputOptions, obj)
 		if err != nil {
 			return err
 		}
-		_, err = pdf.w.Write([]byte("\nendobj\n"))
+		_, err = w.w.Write([]byte("\nendobj\n"))
 		if err != nil {
 			return err
 		}
 
-		if pdf.outputOptions.HasAny(OptPretty) {
-			_, err := pdf.w.Write([]byte("\n"))
+		if w.outputOptions.HasAny(OptPretty) {
+			_, err := w.w.Write([]byte("\n"))
 			if err != nil {
 				return err
 			}
@@ -458,8 +458,8 @@ func (pdf *Writer) Put(ref Reference, obj Object) error {
 // Object streams are only available for PDF version 1.5 and newer; in case
 // object streams are not available, the objects are written directly into the
 // PDF file, without compression.
-func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
-	if pdf.inStream {
+func (w *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
+	if w.inStream {
 		return errors.New("WriteCompressed() while stream is open")
 	}
 	err := checkCompressed(refs, objects)
@@ -467,10 +467,10 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 		return err
 	}
 
-	if !pdf.outputOptions.HasAny(optObjStm) {
+	if !w.outputOptions.HasAny(optObjStm) {
 		// If object streams are disabled, write the objects directly.
 		for i, obj := range objects {
-			err := pdf.Put(refs[i], obj)
+			err := w.Put(refs[i], obj)
 			if err != nil {
 				return fmt.Errorf("Writer.WriteCompressed (no object streams): %w", err)
 			}
@@ -478,9 +478,9 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 		return nil
 	}
 
-	sRef := pdf.Alloc()
+	sRef := w.Alloc()
 	for i, ref := range refs {
-		err := pdf.setXRef(ref, &xRefEntry{InStream: sRef, Pos: int64(i)})
+		err := w.setXRef(ref, &xRefEntry{InStream: sRef, Pos: int64(i)})
 		if err != nil {
 			return fmt.Errorf("Writer.WriteCompressed: %w", err)
 		}
@@ -502,7 +502,7 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 			// We buffer the first N-1 object to determine the starting offsets
 			// within the stream.  To reduce memory use, the last object is
 			// written separately at the end without buffering.
-			err = Format(body, pdf.outputOptions, objects[i])
+			err = Format(body, w.outputOptions, objects[i])
 			if err != nil {
 				return err
 			}
@@ -518,28 +518,28 @@ func (pdf *Writer) WriteCompressed(refs []Reference, objects ...Object) error {
 		"N":     Integer(N),
 		"First": Integer(head.Len()),
 	}
-	w, err := pdf.OpenStream(sRef, dict, FilterFlate{})
+	streamBody, err := w.OpenStream(sRef, dict, FilterFlate{})
 	if err != nil {
 		return err
 	}
 
-	_, err = w.Write(head.Bytes())
+	_, err = streamBody.Write(head.Bytes())
 	if err != nil {
 		return err
 	}
 
-	_, err = w.Write(body.Bytes())
+	_, err = streamBody.Write(body.Bytes())
 	if err != nil {
 		return err
 	}
 
 	// write the last object separately
-	err = Format(w, pdf.outputOptions, objects[N-1])
+	err = Format(streamBody, w.outputOptions, objects[N-1])
 	if err != nil {
 		return err
 	}
 
-	err = w.Close()
+	err = streamBody.Close()
 	if err != nil {
 		return err
 	}
@@ -570,16 +570,16 @@ func checkCompressed(refs []Reference, objects []Object) error {
 // Filters are specified in order from outermost to innermost.
 // When reading, filters are applied in the given order.
 // When writing, filters are applied in reverse order.
-func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error) {
-	if pdf.inStream {
+func (w *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error) {
+	if w.inStream {
 		return nil, errors.New("OpenStream() while stream is open")
 	}
 
-	err := pdf.setXRef(ref, &xRefEntry{Pos: pdf.w.pos, Generation: ref.Generation()})
+	err := w.setXRef(ref, &xRefEntry{Pos: w.w.pos, Generation: ref.Generation()})
 	if err != nil {
 		return nil, fmt.Errorf("Writer.OpenStream: %w", err)
 	}
-	pdf.w.ref = ref
+	w.w.ref = ref
 
 	// Copy dict, dict["Filter"], and dict["DecodeParms"], so that we don't
 	// modify the caller's dict.
@@ -596,40 +596,40 @@ func (pdf *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.W
 
 	var length *Placeholder
 	if _, exists := streamDict["Length"]; !exists {
-		length = NewPlaceholder(pdf, 12)
+		length = NewPlaceholder(w, 12)
 		streamDict["Length"] = length
 	}
 
-	var w io.WriteCloser = &streamWriter{
-		parent:     pdf,
+	var streamBody io.WriteCloser = &streamWriter{
+		parent:     w,
 		streamDict: streamDict,
 		ref:        ref,
 		length:     length,
 	}
 
-	if pdf.w.enc != nil {
-		enc, err := pdf.w.enc.EncryptStream(ref, w)
+	if w.w.enc != nil {
+		enc, err := w.w.enc.EncryptStream(ref, streamBody)
 		if err != nil {
 			return nil, err
 		}
-		w = enc
+		streamBody = enc
 	}
 
 	for _, filter := range filters {
-		w, err = filter.Encode(pdf.meta.Version, w)
+		streamBody, err = filter.Encode(w.meta.Version, streamBody)
 		if err != nil {
 			return nil, err
 		}
 
-		name, parms, err := filter.Info(pdf.meta.Version)
+		name, parms, err := filter.Info(w.meta.Version)
 		if err != nil {
 			return nil, err
 		}
 		appendFilter(streamDict, name, parms)
 	}
 
-	pdf.inStream = true
-	return w, nil
+	w.inStream = true
+	return streamBody, nil
 }
 
 type streamWriter struct {

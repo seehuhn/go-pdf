@@ -1,7 +1,10 @@
-issues:
-  exclude-files:
-    - ".*_test.go$"
-
+version: "2"
 linters:
   disable:
     - errcheck
+  settings:
+    staticcheck:
+      checks: ["all", "-QF1008", "-ST1003", "-QF1001", "-ST1005"]
+  exclusions:
+    paths:
+      - .*_test.go$

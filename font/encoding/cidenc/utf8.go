@@ -107,7 +107,7 @@ func (e *compositeUTF8) GetCode(cid cid.CID, text string) (charcode.Code, bool) 
 	return code, ok
 }
 
-func (e *compositeUTF8) AllocateCode(cidVal cid.CID, text string, width float64) (charcode.Code, error) {
+func (e *compositeUTF8) Encode(cidVal cid.CID, text string, width float64) (charcode.Code, error) {
 	key := key{cidVal, text}
 	if _, ok := e.code[key]; ok {
 		return 0, ErrDuplicateCode
@@ -135,11 +135,12 @@ func (e *compositeUTF8) makeCode(text string) (charcode.Code, error) {
 	for {
 		r := e.nextPrivate
 		e.nextPrivate++
-		if e.nextPrivate == 0x00_F900 {
+		switch e.nextPrivate {
+		case 0x00_F900:
 			e.nextPrivate = 0x0F_0000
-		} else if e.nextPrivate == 0x0F_FFFE {
+		case 0x0F_FFFE:
 			e.nextPrivate = 0x10_0000
-		} else if e.nextPrivate == 0x10_FFFE {
+		case 0x10_FFFE:
 			return 0, ErrOverflow
 		}
 		code := runeToCode(r)

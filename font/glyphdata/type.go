@@ -42,14 +42,20 @@ const (
 	// and extracted using [seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs.Extract].
 	TrueType
 
+	// Type3 indicates that glyph outlines are provided as PDF content streams.
 	Type3
 
+	// CFF indicates that glyph outlines are provided in CFF format,
+	// using CIDFont operators.
 	CFF
 
 	// CFFSimple indicates that glyph outlines are provided in CFF format,
 	// and glyph names are present in the font data.
 	CFFSimple
 
+	// OpenTypeCFF indicates that glyph outlines are provided in OpenType
+	// format, with font data given within a "CFF" table.  The CFF font data
+	// uses CIDFont operators.
 	OpenTypeCFF
 
 	// OpenTypeCFFSimple indicates that glyph outlines are provided in OpenType
@@ -63,7 +69,7 @@ const (
 	// and extracted using [seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs.Extract].
 	OpenTypeCFFSimple
 
-	// OpenTypeGlyf indicates that glyph outlines as an OpenType font with a
+	// OpenTypeGlyf indicates that glyph outlines are provided as an OpenType font with a
 	// "glyf" table.
 	//
 	// This can be used for [seehuhn.de/go/pdf/font/dict.TrueType] and

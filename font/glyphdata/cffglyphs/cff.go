@@ -26,6 +26,9 @@ import (
 	"seehuhn.de/go/sfnt/cff"
 )
 
+// Embed embeds CFF font data into a PDF file.
+//
+// The following font types are supported: [glyphdata.CFFSimple] and [glyphdata.CFF].
 func Embed(w *pdf.Writer, tp glyphdata.Type, ref pdf.Reference, data *cff.Font) error {
 	switch tp {
 	case glyphdata.CFFSimple:
@@ -73,6 +76,9 @@ func Embed(w *pdf.Writer, tp glyphdata.Type, ref pdf.Reference, data *cff.Font) 
 	return nil
 }
 
+// Extract extracts CFF font data from a PDF file.
+//
+// The following font types are supported: [glyphdata.CFFSimple] and [glyphdata.CFF].
 func Extract(r pdf.Getter, tp glyphdata.Type, ref pdf.Object) (*cff.Font, error) {
 	stm, err := pdf.GetStream(r, ref)
 	if err != nil {
@@ -85,6 +91,8 @@ func Extract(r pdf.Getter, tp glyphdata.Type, ref pdf.Object) (*cff.Font, error)
 	if err != nil {
 		return nil, err
 	}
+	defer body.Close()
+
 	bodyBytes, err := io.ReadAll(body)
 	if err != nil {
 		return nil, err

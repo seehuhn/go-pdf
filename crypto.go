@@ -138,8 +138,8 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 		}
 	}
 
-	switch {
-	case filter == "Standard":
+	switch filter {
+	case "Standard":
 		sec, err := openStdSecHandler(enc, keyBytes, r.meta.ID[0], readPwd)
 		if err != nil {
 			return nil, Wrap(err, "standard security handler")

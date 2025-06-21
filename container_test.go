@@ -16,10 +16,13 @@
 
 package pdf
 
-import "testing"
+import (
+	"errors"
+	"os"
+	"testing"
+)
 
 func TestGetDictTyped_NilObject(t *testing.T) {
-	mockGetter := new(MockGetter)
 	dict, err := GetDictTyped(mockGetter, nil, "test")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -29,13 +32,29 @@ func TestGetDictTyped_NilObject(t *testing.T) {
 	}
 }
 
-// MockGetter is a mock implementation of pdf.Getter for testing
-type MockGetter struct{}
-
-func (m *MockGetter) Get(ref Reference, canObjStm bool) (Native, error) {
-	return nil, nil
+func TestGetStreamReaderNull(t *testing.T) {
+	r, err := GetStreamReader(mockGetter, nil)
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("expected os.ErrNotExist, got %v", err)
+	}
+	if r != nil {
+		t.Errorf("expected nil reader, got %v", r)
+	}
 }
 
-func (m *MockGetter) GetMeta() *MetaInfo {
-	return nil
+// We can't use mock.Getter here, because this would lead to a dependency cycle.
+// Instead, we add a separate implementation here.
+var mockGetter Getter = mockGetterType{}
+
+type mockGetterType struct{}
+
+func (r mockGetterType) GetMeta() *MetaInfo {
+	m := &MetaInfo{
+		Version: V2_0,
+	}
+	return m
+}
+
+func (r mockGetterType) Get(ref Reference, canObjStm bool) (Native, error) {
+	return nil, nil
 }

@@ -17,11 +17,12 @@
 package traverse
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/pdf/font/glyphdata/type1glyphs"
 	"seehuhn.de/go/postscript/type1"
 )
 
@@ -31,31 +32,13 @@ type type1Ctx struct {
 }
 
 // newType1Ctx creates a new Type1 font context by reading and parsing the font program.
-func newType1Ctx(getter pdf.Getter, fontRef pdf.Reference) (*type1Ctx, error) {
-	if fontRef == 0 {
-		return nil, errors.New("invalid font reference for `load`")
-	}
-
-	stm, err := pdf.GetStream(getter, fontRef)
+func newType1Ctx(r pdf.Getter, fontRef pdf.Reference) (*type1Ctx, error) {
+	t1Font, err := type1glyphs.Extract(r, glyphdata.Type1, fontRef)
 	if err != nil {
-		return nil, fmt.Errorf("getting font program stream for `load`: %w", err)
-	}
-	if stm == nil {
-		return nil, errors.New("missing font program stream for `load`")
+		return nil, err
 	}
 
-	decoded, err := pdf.DecodeStream(getter, stm, 0)
-	if err != nil {
-		return nil, fmt.Errorf("decoding font program stream for `load`: %w", err)
-	}
-	defer decoded.Close()
-
-	t1font, err := type1.Read(decoded)
-	if err != nil {
-		return nil, fmt.Errorf("parsing type1 font for `load`: %w", err)
-	}
-
-	return &type1Ctx{font: t1font}, nil
+	return &type1Ctx{font: t1Font}, nil
 }
 
 // Show displays basic information about the Type1 font.

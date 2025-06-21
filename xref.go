@@ -463,63 +463,63 @@ func (r *Reader) lastOccurence(pat string, size int64) (int64, error) {
 
 // setXRef adds a new entry to the xref table.
 // If the entry is already present, an error is returned.
-func (pdf *Writer) setXRef(ref Reference, entry *xRefEntry) error {
-	_, seen := pdf.xref[ref.Number()]
+func (w *Writer) setXRef(ref Reference, entry *xRefEntry) error {
+	_, seen := w.xref[ref.Number()]
 	if seen {
 		return errDuplicateRef
 	}
-	if pdf.nextRef <= ref.Number() {
-		pdf.nextRef = ref.Number() + 1
+	if w.nextRef <= ref.Number() {
+		w.nextRef = ref.Number() + 1
 	}
-	pdf.xref[ref.Number()] = entry
+	w.xref[ref.Number()] = entry
 	return nil
 }
 
-func (pdf *Writer) writeXRefTable(xRefDict Dict) error {
-	_, err := fmt.Fprintf(pdf.w, "xref\n0 %d\n", pdf.nextRef)
+func (w *Writer) writeXRefTable(xRefDict Dict) error {
+	_, err := fmt.Fprintf(w.w, "xref\n0 %d\n", w.nextRef)
 	if err != nil {
 		return err
 	}
-	for i := uint32(0); i < pdf.nextRef; i++ {
-		entry := pdf.xref[i]
+	for i := uint32(0); i < w.nextRef; i++ {
+		entry := w.xref[i]
 		if entry != nil && entry.InStream != 0 {
 			return errors.New("cannot use xref tables with object streams")
 		}
 		if entry != nil && entry.Pos >= 0 {
-			_, err = fmt.Fprintf(pdf.w, "%010d %05d n\r\n",
+			_, err = fmt.Fprintf(w.w, "%010d %05d n\r\n",
 				entry.Pos, entry.Generation)
 		} else {
 			// free object
-			_, err = pdf.w.Write([]byte("0000000000 65535 f\r\n"))
+			_, err = w.w.Write([]byte("0000000000 65535 f\r\n"))
 		}
 		if err != nil {
 			return err
 		}
 	}
 
-	_, err = pdf.w.Write([]byte("trailer\n"))
+	_, err = w.w.Write([]byte("trailer\n"))
 	if err != nil {
 		return err
 	}
-	err = Format(pdf.w, pdf.outputOptions, xRefDict)
+	err = Format(w.w, w.outputOptions, xRefDict)
 	if err != nil {
 		return err
 	}
-	_, err = pdf.w.Write([]byte{'\n'})
+	_, err = w.w.Write([]byte{'\n'})
 	return err
 }
 
-func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
-	ref := pdf.Alloc()
+func (w *Writer) writeXRefStream(xRefDict Dict) error {
+	ref := w.Alloc()
 	// no more object allocations after this point
 
 	xRefDict["Type"] = Name("XRef")
-	xRefDict["Size"] = Integer(pdf.nextRef)
+	xRefDict["Size"] = Integer(w.nextRef)
 
 	maxField2 := int64(0)
 	maxField3 := uint16(0)
-	for i := uint32(0); i < pdf.nextRef; i++ {
-		entry := pdf.xref[i]
+	for i := uint32(0); i < w.nextRef; i++ {
+		entry := w.xref[i]
 		if entry == nil {
 			continue
 		}
@@ -558,13 +558,13 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 		"Columns":   Integer(1 + w2 + w3),
 	}
 	xRefBuf := &bytes.Buffer{}
-	wxRaw, err := filter.Encode(pdf.meta.Version, withDummyClose{xRefBuf})
+	wxRaw, err := filter.Encode(w.meta.Version, withDummyClose{xRefBuf})
 	if err != nil {
 		return err
 	}
 	wx := bufio.NewWriter(wxRaw)
-	for i := uint32(0); i < pdf.nextRef; i++ {
-		entry := pdf.xref[i]
+	for i := uint32(0); i < w.nextRef; i++ {
+		entry := w.xref[i]
 		if entry == nil {
 			err := wx.WriteByte(0)
 			if err != nil {
@@ -629,7 +629,7 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 	}
 	xRefData := xRefBuf.Bytes()
 
-	name, parms, err := filter.Info(pdf.meta.Version)
+	name, parms, err := filter.Info(w.meta.Version)
 	if err != nil {
 		return err
 	}
@@ -637,7 +637,7 @@ func (pdf *Writer) writeXRefStream(xRefDict Dict) error {
 	xRefDict["DecodeParms"] = parms
 	xRefDict["Length"] = Integer(len(xRefData))
 
-	swx, err := pdf.OpenStream(ref, xRefDict)
+	swx, err := w.OpenStream(ref, xRefDict)
 	if err != nil {
 		return err
 	}

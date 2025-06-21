@@ -17,13 +17,18 @@
 package type1glyphs
 
 import (
+	"errors"
 	"fmt"
+	"os"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/postscript/type1"
 )
 
+// Embed embeds Type 1 font data into a PDF file.
+//
+// Only [glyphdata.Type1] font type is supported.
 func Embed(w *pdf.Writer, tp glyphdata.Type, ref pdf.Reference, data *type1.Font) error {
 	if tp != glyphdata.Type1 {
 		return glyphdata.ErrWrongType
@@ -60,22 +65,19 @@ func Embed(w *pdf.Writer, tp glyphdata.Type, ref pdf.Reference, data *type1.Font
 	return nil
 }
 
+// Extract extracts Type 1 font data from a PDF file.
+//
+// Only [glyphdata.Type1] font type is supported.
 func Extract(r pdf.Getter, tp glyphdata.Type, ref pdf.Object) (*type1.Font, error) {
 	if tp != glyphdata.Type1 {
 		return nil, glyphdata.ErrWrongType
 	}
 
-	stm, err := pdf.GetStream(r, ref)
-	if err != nil {
-		return nil, err
-	} else if stm == nil {
+	body, err := pdf.GetStreamReader(r, ref)
+	if errors.Is(err, os.ErrNotExist) {
 		return nil, glyphdata.ErrNotFound
 	}
-
-	body, err := pdf.DecodeStream(r, stm, 0)
-	if err != nil {
-		return nil, err
-	}
+	defer body.Close()
 
 	return type1.Read(body)
 }

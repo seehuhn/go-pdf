@@ -40,10 +40,8 @@ func ShowMetadata(r pdf.Getter) error {
 	}
 	fmt.Println()
 
-	count := 0
 	if m.Info != nil {
 		showInfo(m.Trailer["Info"], m.Info)
-		count++
 	}
 
 	if m.Catalog.Metadata != 0 {
@@ -51,7 +49,6 @@ func ShowMetadata(r pdf.Getter) error {
 		if err != nil {
 			return err
 		}
-		count++
 	}
 
 	return nil
