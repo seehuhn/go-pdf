@@ -28,20 +28,36 @@ import (
 //
 // This type implements the [seehuhn.de/go/pdf/graphics.Shading] interface.
 type Type1 struct {
+	// ColorSpace defines the color space for shading color values.
 	ColorSpace color.Space
 
 	// F is either 2->n function or an array of n 2->1 functions, where n is
 	// the number of colour components of the ColorSpace.
 	F pdf.Function
 
-	// Domain (optional)
+	// Domain (optional) specifies the rectangular coordinate domain [xmin xmax
+	// ymin ymax]. The default is [0 1 0 1].
 	Domain []float64
 
-	Matrix     []float64
-	Background []float64
-	BBox       *pdf.Rectangle
-	AntiAlias  bool
+	// Matrix (optional) transforms domain coordinates to target coordinate
+	// space. Default: identity matrix [1 0 0 1 0 0].
+	Matrix []float64
 
+	// Background (optional) specifies the color for areas outside the
+	// transformed domain, when used in a shading pattern. The default is to
+	// leave points outside the transformed domain unpainted.
+	Background []float64
+
+	// BBox (optional) defines the shading's bounding box as a clipping
+	// boundary.
+	BBox *pdf.Rectangle
+
+	// AntiAlias controls whether to filter the shading function to prevent
+	// aliasing. Default: false.
+	AntiAlias bool
+
+	// SingleUse determines if shading is returned as dictionary (true) or
+	// reference (false).
 	SingleUse bool
 }
 

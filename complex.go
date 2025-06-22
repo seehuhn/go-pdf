@@ -552,9 +552,9 @@ type Function interface {
 	// Shape returns the number of input and output values of the function.
 	Shape() (m int, n int)
 
+	Embedder[Unused]
+
 	// Apply applies the function to the given m input values
 	// and returns the n output values.
 	Apply(...float64) []float64
-
-	Embedder[Unused]
 }

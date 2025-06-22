@@ -61,7 +61,7 @@ func (f *Type4) Apply(inputs ...float64) []float64 {
 	for i := 0; i < m; i++ {
 		min := f.Domain[2*i]
 		max := f.Domain[2*i+1]
-		clippedInputs[i] = clipValue(inputs[i], min, max)
+		clippedInputs[i] = clip(inputs[i], min, max)
 	}
 
 	// Execute PostScript program
@@ -86,7 +86,7 @@ func (f *Type4) Apply(inputs ...float64) []float64 {
 	for i := 0; i < n; i++ {
 		min := f.Range[2*i]
 		max := f.Range[2*i+1]
-		outputs[i] = clipValue(outputs[i], min, max)
+		outputs[i] = clip(outputs[i], min, max)
 	}
 
 	return outputs
@@ -186,7 +186,7 @@ func (f *Type4) makeType4SystemDict() postscript.Dict {
 func (f *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := f.verify(); err != nil {
+	if err := f.validate(); err != nil {
 		return nil, zero, err
 	}
 
@@ -224,8 +224,8 @@ func (f *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	return ref, zero, nil
 }
 
-// verify checks if the Type4 function is properly configured.
-func (f *Type4) verify() error {
+// validate checks if the Type4 function is properly configured.
+func (f *Type4) validate() error {
 	m, n := f.Shape()
 
 	if len(f.Domain) != 2*m {

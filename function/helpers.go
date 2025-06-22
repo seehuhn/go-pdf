@@ -42,6 +42,9 @@ func floatsFromPDF(r pdf.Getter, obj pdf.Object) ([]float64, error) {
 	if err != nil {
 		return nil, err
 	}
+	if a == nil {
+		return nil, nil
+	}
 
 	res := make([]float64, len(a))
 	for i, obj := range a {
@@ -60,6 +63,9 @@ func intsFromPDF(r pdf.Getter, obj pdf.Object) ([]int, error) {
 	if err != nil {
 		return nil, err
 	}
+	if a == nil {
+		return nil, nil
+	}
 
 	res := make([]int, len(a))
 	for i, obj := range a {
@@ -72,8 +78,8 @@ func intsFromPDF(r pdf.Getter, obj pdf.Object) ([]int, error) {
 	return res, nil
 }
 
-// clipValue clips a value to the given range [min, max].
-func clipValue(value, min, max float64) float64 {
+// clip clips a value to the given range [min, max].
+func clip(value, min, max float64) float64 {
 	if value < min {
 		return min
 	}
@@ -84,10 +90,9 @@ func clipValue(value, min, max float64) float64 {
 }
 
 // interpolate performs linear interpolation.
-// y = yMin + ((x - xMin) × (yMax - yMin) / (xMax - xMin))
 func interpolate(x, xMin, xMax, yMin, yMax float64) float64 {
-	if xMax == xMin {
+	if xMax <= xMin {
 		return yMin
 	}
-	return yMin + ((x-xMin)*(yMax-yMin))/(xMax-xMin)
+	return yMin + (x-xMin)*(yMax-yMin)/(xMax-xMin)
 }

@@ -213,6 +213,7 @@ func TestType0BitDepthFunction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tt.function.repair()
 			result := tt.function.Apply(tt.inputs...)
 			if len(result) != len(tt.expected) {
 				t.Fatalf("expected %d outputs, got %d", len(tt.expected), len(result))
@@ -306,6 +307,7 @@ func TestType0BitDepthRoundTrip(t *testing.T) {
 				UseCubic:      false,
 				Samples:       samples,
 			}
+			function.repair()
 
 			// Test extraction
 			for i, expectedVal := range sampleValues {
@@ -329,6 +331,7 @@ func TestType0CubicSpline1D(t *testing.T) {
 		UseCubic:      true,                    // Cubic spline
 		Samples:       []byte{0, 28, 113, 255}, // Scaled values: 0, 1, 4, 9
 	}
+	function.repair()
 
 	tests := []struct {
 		input     float64
@@ -371,6 +374,7 @@ func TestType0CubicSpline2D(t *testing.T) {
 		// Values: (0,0)=0, (0,1)=1, (0,2)=2, (1,0)=1, (1,1)=2, (1,2)=3, (2,0)=2, (2,1)=3, (2,2)=4
 		Samples: []byte{0, 64, 128, 64, 128, 191, 128, 191, 255},
 	}
+	function.repair()
 
 	tests := []struct {
 		input     []float64
@@ -431,6 +435,8 @@ func TestType0CubicVsLinear(t *testing.T) {
 		UseCubic:      true,                            // Cubic
 		Samples:       append([]byte(nil), samples...), // Copy
 	}
+	linearFunc.repair()
+	cubicFunc.repair()
 
 	// Test at a point between samples where cubic should be smoother
 	x := 0.375 // Between samples 1 and 2
@@ -467,6 +473,7 @@ func TestType0CubicSplineExactInterpolation(t *testing.T) {
 		UseCubic:      true,
 		Samples:       []byte{50, 100, 150, 200},
 	}
+	function.repair()
 
 	// Test exact interpolation at grid points
 	for i := 0; i < 4; i++ {
@@ -493,6 +500,7 @@ func TestType0CubicSplineSmall(t *testing.T) {
 		UseCubic:      true,
 		Samples:       []byte{0, 255},
 	}
+	linear2pt.repair()
 
 	result := linear2pt.Apply(0.5)
 	expected := 0.5 // Should be linear interpolation
@@ -641,6 +649,7 @@ func TestType0EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tt.function.repair()
 			result := tt.function.Apply(tt.inputs...)
 			if len(result) != len(tt.expected) {
 				t.Fatalf("Expected %d outputs, got %d", len(tt.expected), len(result))
@@ -677,6 +686,8 @@ func TestType0BoundaryConsistency(t *testing.T) {
 		UseCubic:      false,
 		Samples:       []byte{100, 200},
 	}
+	f1D.repair()
+	f2D.repair()
 
 	// Test upper boundary
 	result1D := f1D.Apply(1.5)      // Above domain

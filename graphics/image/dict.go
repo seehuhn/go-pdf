@@ -98,6 +98,8 @@ type Dict struct {
 
 	// Data describes the image data for the image.
 	// The alpha channel is ignored.
+	//
+	// TODO(voss): This is too unflexible.  What to do?
 	Data image.Image
 }
 
@@ -114,7 +116,7 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	width := dim.Dx()
 	height := dim.Dy()
 
-	cs, _, err := d.ColorSpace.Embed(rm)
+	csEmbedded, _, err := pdf.ResourceManagerEmbed(rm, d.ColorSpace)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -124,7 +126,7 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		"Subtype":          pdf.Name("Image"),
 		"Width":            pdf.Integer(width),
 		"Height":           pdf.Integer(height),
-		"ColorSpace":       cs,
+		"ColorSpace":       csEmbedded,
 		"BitsPerComponent": pdf.Integer(d.BitsPerComponent),
 	}
 	if d.Intent != "" {
@@ -176,7 +178,7 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	ref := rm.Out.Alloc()
-	filters := []pdf.Filter{}
+	filters := []pdf.Filter{} // TODO(voss): add filters
 	w, err := rm.Out.OpenStream(ref, dict, filters...)
 	if err != nil {
 		return nil, zero, fmt.Errorf("cannot open image stream: %w", err)

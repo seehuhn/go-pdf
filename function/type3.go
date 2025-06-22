@@ -69,7 +69,7 @@ func (f *Type3) Apply(inputs ...float64) []float64 {
 
 	// Clip input to domain
 	if len(f.Domain) >= 2 {
-		x = clipValue(x, f.Domain[0], f.Domain[1])
+		x = clip(x, f.Domain[0], f.Domain[1])
 	}
 
 	if len(f.Functions) == 0 {
@@ -94,7 +94,7 @@ func (f *Type3) Apply(inputs ...float64) []float64 {
 		for i := range n {
 			min := f.Range[2*i]
 			max := f.Range[2*i+1]
-			outputs[i] = clipValue(outputs[i], min, max)
+			outputs[i] = clip(outputs[i], min, max)
 		}
 	}
 
@@ -136,7 +136,7 @@ func (f *Type3) findSubdomain(x float64, k int) (int, [2]float64) {
 func (f *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := f.verify(); err != nil {
+	if err := f.validate(); err != nil {
 		return nil, zero, err
 	}
 
@@ -183,8 +183,8 @@ func (f *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	return ref, zero, nil
 }
 
-// verify checks if the Type3 function is properly configured.
-func (f *Type3) verify() error {
+// validate checks if the Type3 function is properly configured.
+func (f *Type3) validate() error {
 	// Domain validation
 	if len(f.Domain) != 2 {
 		return newInvalidFunctionError(3, "domain", "must have exactly 2 elements, got %d", len(f.Domain))

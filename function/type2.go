@@ -73,7 +73,7 @@ func (f *Type2) Apply(inputs ...float64) []float64 {
 
 	// Clip input to domain
 	if len(f.Domain) >= 2 {
-		x = clipValue(x, f.Domain[0], f.Domain[1])
+		x = clip(x, f.Domain[0], f.Domain[1])
 	}
 
 	// Get C0 and C1 arrays, using defaults if not specified
@@ -128,7 +128,7 @@ func (f *Type2) Apply(inputs ...float64) []float64 {
 		for i := 0; i < n; i++ {
 			min := f.Range[2*i]
 			max := f.Range[2*i+1]
-			outputs[i] = clipValue(outputs[i], min, max)
+			outputs[i] = clip(outputs[i], min, max)
 		}
 	}
 
@@ -139,7 +139,7 @@ func (f *Type2) Apply(inputs ...float64) []float64 {
 func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := f.verify(); err != nil {
+	if err := f.validate(); err != nil {
 		return nil, zero, err
 	}
 
@@ -184,8 +184,8 @@ func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	return ref, zero, nil
 }
 
-// verify checks if the Type2 function is properly configured.
-func (f *Type2) verify() error {
+// validate checks if the Type2 function is properly configured.
+func (f *Type2) validate() error {
 	// Domain validation
 	if len(f.Domain) != 0 && len(f.Domain) != 2 {
 		return newInvalidFunctionError(2, "domain", "must have 2 elements or be empty, got %d", len(f.Domain))

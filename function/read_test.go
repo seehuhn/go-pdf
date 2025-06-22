@@ -39,6 +39,8 @@ var testCases = map[int][]testCase{
 				Size:          []int{2, 2},
 				BitsPerSample: 8,
 				UseCubic:      false,
+				Encode:        []float64{0, 1, 0, 1},
+				Decode:        []float64{0, 1, 0, 1, 0, 1},
 				Samples:       []byte{0, 128, 255, 64, 192, 32, 255, 0, 128, 128, 64, 96},
 			},
 		},
@@ -63,6 +65,8 @@ var testCases = map[int][]testCase{
 				Size:          []int{3},
 				BitsPerSample: 16,
 				UseCubic:      false,
+				Encode:        []float64{0, 2},
+				Decode:        []float64{0, 1},
 				Samples:       []byte{0, 0, 128, 0, 255, 255},
 			},
 		},
@@ -74,6 +78,8 @@ var testCases = map[int][]testCase{
 				Size:          []int{5},
 				BitsPerSample: 8,
 				UseCubic:      true,
+				Encode:        []float64{0, 4},
+				Decode:        []float64{0, 1},
 				Samples:       []byte{0, 64, 128, 192, 255},
 			},
 		},
@@ -415,7 +421,7 @@ func TestFunctionEvaluation(t *testing.T) {
 func TestFunctionValidation(t *testing.T) {
 	tests := []struct {
 		name     string
-		function interface{ verify() error }
+		function interface{ validate() error }
 		wantErr  bool
 	}{
 		{
@@ -535,9 +541,9 @@ func TestFunctionValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.function.verify()
+			err := tt.function.validate()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("verify() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("validate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

@@ -17,12 +17,15 @@
 package function
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"math"
 
 	"seehuhn.de/go/pdf"
 )
+
+const maxSamples = 1 << 20
 
 // Type0 represents a Type 0 sampled function that uses a table of sample
 // values with interpolation to approximate functions with bounded domains
@@ -31,7 +34,7 @@ type Type0 struct {
 	// Domain defines the valid input ranges as [min0, max0, min1, max1, ...].
 	Domain []float64
 
-	// Range gives clipping regions for output ranges as [min0, max0, min1, max1, ...].
+	// Range gives clipping ranges for the output variables as [min0, max0, min1, max1, ...].
 	Range []float64
 
 	// Size specifies the number of samples in each input dimension.
@@ -44,11 +47,9 @@ type Type0 struct {
 	UseCubic bool
 
 	// Encode maps inputs to sample table indices as [min0, max0, min1, max1, ...].
-	// Default: [0, Size[0]-1, 0, Size[1]-1, ...].
 	Encode []float64
 
 	// Decode maps samples to output range as [min0, max0, min1, max1, ...].
-	// Default: same as Range.
 	Decode []float64
 
 	// Samples contains the raw sample data.
@@ -59,6 +60,80 @@ type Type0 struct {
 	// Each group of 4 contains [a, b, c, d] for one spline segment.
 	cubicCoefficients []float64
 	cubicShape        []int
+}
+
+// readType0 reads a Type 0 sampled function from a PDF stream object.
+func readType0(r pdf.Getter, stream *pdf.Stream) (*Type0, error) {
+	d := stream.Dict
+
+	domain, err := floatsFromPDF(r, d["Domain"])
+	if err != nil {
+		return nil, err
+	}
+
+	rangeArray, err := floatsFromPDF(r, d["Range"])
+	if err != nil {
+		return nil, err
+	}
+
+	size, err := intsFromPDF(r, d["Size"])
+	if err != nil {
+		return nil, err
+	}
+
+	bitsPerSample, err := pdf.GetInteger(r, d["BitsPerSample"])
+	if err != nil {
+		return nil, err
+	}
+
+	f := &Type0{
+		Domain:        domain,
+		Range:         rangeArray,
+		Size:          size,
+		BitsPerSample: int(bitsPerSample),
+		UseCubic:      false, // Default to linear interpolation
+	}
+
+	if orderObj, ok := d["Order"]; ok {
+		order, err := pdf.GetInteger(r, orderObj)
+		if err != nil {
+			return nil, err
+		}
+		f.UseCubic = (int(order) == 3)
+	}
+
+	if encodeObj, ok := d["Encode"]; ok {
+		f.Encode, err = floatsFromPDF(r, encodeObj)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if decodeObj, ok := d["Decode"]; ok {
+		f.Decode, err = floatsFromPDF(r, decodeObj)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Read stream data
+	stmReader, err := pdf.DecodeStream(r, stream, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer stmReader.Close()
+	f.Samples, err = io.ReadAll(stmReader)
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply repair to set defaults and fix up the function.
+	f.repair()
+	if err := f.validate(); err != nil {
+		return nil, err
+	}
+
+	return f, nil
 }
 
 // FunctionType returns 0 for Type 0 functions.
@@ -73,88 +148,265 @@ func (f *Type0) Shape() (int, int) {
 	return m, n
 }
 
-// Apply applies the function to the given input values and returns the output values.
+// Embed embeds the function into a PDF file.
+func (f *Type0) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
+
+	if err := pdf.CheckVersion(rm.Out, "Type 0 functions", pdf.V1_2); err != nil {
+		return nil, zero, err
+	}
+	if err := f.validate(); err != nil {
+		return nil, zero, err
+	}
+
+	dict := pdf.Dict{
+		"FunctionType":  pdf.Integer(0),
+		"Domain":        arrayFromFloats(f.Domain),
+		"Range":         arrayFromFloats(f.Range),
+		"Size":          arrayFromInts(f.Size),
+		"BitsPerSample": pdf.Integer(f.BitsPerSample),
+	}
+	if f.UseCubic {
+		dict["Order"] = pdf.Integer(3)
+	}
+	if !f.isDefaultEncode() {
+		dict["Encode"] = arrayFromFloats(f.Encode)
+	}
+	if !f.isDefaultDecode() {
+		dict["Decode"] = arrayFromFloats(f.Decode)
+	}
+
+	ref := rm.Out.Alloc()
+
+	stm, err := rm.Out.OpenStream(ref, dict, pdf.FilterCompress{})
+	if err != nil {
+		return nil, zero, err
+	}
+	_, err = stm.Write(f.Samples)
+	if err != nil {
+		return nil, zero, err
+	}
+	err = stm.Close()
+	if err != nil {
+		return nil, zero, err
+	}
+
+	return ref, zero, nil
+}
+
+// validate checks if the Type0 struct contains valid data
+func (f *Type0) validate() error {
+	m, n := f.Shape()
+	if m <= 0 || n <= 0 {
+		return newInvalidFunctionError(0, "Shape", "invalid shape (%d, %d)",
+			m, n)
+	}
+
+	if len(f.Domain) != 2*m {
+		return newInvalidFunctionError(0, "Domain", "length must be %d, got %d",
+			2*m, len(f.Domain))
+	}
+	for i := 0; i < len(f.Domain); i += 2 {
+		if f.Domain[i] >= f.Domain[i+1] {
+			return newInvalidFunctionError(0, "Domain", "need Domain[%d] < Domain[%d]",
+				i, i+1)
+		}
+	}
+
+	if len(f.Range) != 2*n {
+		return newInvalidFunctionError(0, "Range", "length must be %d, got %d", 2*n, len(f.Range))
+	}
+	for i := 0; i < len(f.Range); i += 2 {
+		if f.Range[i] >= f.Range[i+1] {
+			return newInvalidFunctionError(0, "Range", "need Range[%d] < Range[%d]",
+				i, i+1)
+		}
+	}
+
+	if len(f.Size) != m {
+		return newInvalidFunctionError(0, "Size", "invalid length %d != %d",
+			len(f.Size), m)
+	}
+	minSize := 1
+	if f.UseCubic {
+		minSize = 4
+	}
+	for i, size := range f.Size {
+		if size < minSize {
+			return newInvalidFunctionError(0, "Size", "invalid size[%d] = %d < %d",
+				i, size, minSize)
+		}
+	}
+
+	switch f.BitsPerSample {
+	case 1, 2, 4, 8, 12, 16, 24, 32:
+		// pass
+	default:
+		return newInvalidFunctionError(0, "BitsPerSample", "invalid value %d",
+			f.BitsPerSample)
+	}
+
+	if f.Encode != nil && len(f.Encode) != 2*m {
+		return newInvalidFunctionError(0, "Encode", "length must be %d, got %d",
+			2*m, len(f.Encode))
+	}
+	for i := 0; i < len(f.Encode); i += 2 {
+		if f.Encode[i] >= f.Encode[i+1] {
+			return newInvalidFunctionError(0, "Encode", "need Encode[%d] < Encode[%d]",
+				i, i+1)
+		}
+	}
+
+	if f.Decode != nil && len(f.Decode) != 2*n {
+		return newInvalidFunctionError(0, "Decode", "length must be %d, got %d",
+			2*n, len(f.Decode))
+	}
+	for i := 0; i < len(f.Decode); i += 2 {
+		if f.Decode[i] >= f.Decode[i+1] {
+			return newInvalidFunctionError(0, "Decode", "need Decode[%d] < Decode[%d]",
+				i, i+1)
+		}
+	}
+
+	totalSamples := 1
+	for _, size := range f.Size {
+		next := totalSamples * size
+		if totalSamples != next/size {
+			return errors.New("sample size overflow")
+		}
+		totalSamples = next
+	}
+
+	if totalSamples > maxSamples {
+		return errors.New("too many samples in Type 0 function")
+	}
+
+	totalBits := totalSamples * n * f.BitsPerSample
+	totalBytes := (totalBits + 7) / 8
+	if len(f.Samples) != totalBytes {
+		return newInvalidFunctionError(0, "Samples", "length must be %d bytes, got %d",
+			totalBytes, len(f.Samples))
+	}
+
+	return nil
+}
+
+// repair sets default values and tries to fix up mal-formed function dicts.
+func (f *Type0) repair() {
+	m, n := f.Shape()
+
+	if len(f.Domain) > 2*m {
+		f.Domain = f.Domain[:2*m]
+	}
+	if len(f.Range) > 2*n {
+		f.Range = f.Range[:2*n]
+	}
+	if len(f.Size) > m {
+		f.Size = f.Size[:m]
+	}
+	for _, size := range f.Size {
+		if size < 4 {
+			f.UseCubic = false
+			break
+		}
+	}
+
+	if len(f.Encode) == 0 { // set default Encode
+		f.Encode = make([]float64, 2*m)
+		for i := 0; i < min(m, len(f.Size)); i++ {
+			f.Encode[2*i] = 0
+			f.Encode[2*i+1] = float64(f.Size[i] - 1)
+		}
+	} else if len(f.Encode) > 2*m {
+		f.Encode = f.Encode[:2*m]
+	}
+
+	if len(f.Decode) == 0 { // set default Decode
+		f.Decode = make([]float64, len(f.Range))
+		copy(f.Decode, f.Range)
+	} else if len(f.Decode) > len(f.Range) {
+		f.Decode = f.Decode[:len(f.Range)]
+	}
+
+	// We don't need to worry about integer overflows here, because
+	// these will be checked in validate(), and decreasing the size
+	// of f.Samples in case of overflow will not cause any additional damage.
+	totalSamples := 1
+	for _, size := range f.Size {
+		totalSamples *= size
+	}
+	totalBits := totalSamples * n * f.BitsPerSample
+	totalBytes := (totalBits + 7) / 8
+	if len(f.Samples) > totalBytes && totalBytes > 0 {
+		f.Samples = f.Samples[:totalBytes]
+	}
+}
+
+// isDefaultEncode checks if the Encode array equals the default value
+func (f *Type0) isDefaultEncode() bool {
+	for i := range f.Size {
+		if f.Encode[2*i] != 0 || f.Encode[2*i+1] != float64(f.Size[i]-1) {
+			return false
+		}
+	}
+	return true
+}
+
+// isDefaultDecode checks if the Decode array equals the default value (same as Range)
+func (f *Type0) isDefaultDecode() bool {
+	for i := range f.Decode {
+		if f.Decode[i] != f.Range[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// Apply applies the function to the given input values.
 func (f *Type0) Apply(inputs ...float64) []float64 {
 	m, n := f.Shape()
 	if len(inputs) != m {
 		panic(fmt.Sprintf("expected %d inputs, got %d", m, len(inputs)))
 	}
 
-	// Validate that we have size information for all input dimensions
-	if len(f.Size) < m {
-		// Return zero values for malformed functions to avoid panic
-		return make([]float64, n)
-	}
-
-	// Check if we have any samples data
-	if len(f.Samples) == 0 {
-		// Return zero values for functions without sample data
-		return make([]float64, n)
-	}
-
-	// Clip inputs to domain
-	clippedInputs := make([]float64, m)
-	for i := 0; i < m; i++ {
-		min := f.Domain[2*i]
-		max := f.Domain[2*i+1]
-		clippedInputs[i] = clipValue(inputs[i], min, max)
-	}
-
-	// Apply encoding to get sample indices
-	encode := f.Encode
-	if encode == nil {
-		encode = make([]float64, 2*m)
-		for i := 0; i < m; i++ {
-			encode[2*i] = 0
-			encode[2*i+1] = float64(f.Size[i] - 1)
-		}
-	}
-
+	// encode the inputs
 	indices := make([]float64, m)
-	for i := 0; i < m; i++ {
-		indices[i] = interpolate(clippedInputs[i], f.Domain[2*i], f.Domain[2*i+1], encode[2*i], encode[2*i+1])
+	for i, val := range inputs {
+		// clip to domain
+		val = clip(val, f.Domain[2*i], f.Domain[2*i+1])
+
+		// apply encoding
+		val = interpolate(val, f.Domain[2*i], f.Domain[2*i+1], f.Encode[2*i], f.Encode[2*i+1])
+
+		// clip to number of samples
+		indices[i] = clip(val, 0, float64(f.Size[i]-1))
 	}
 
-	// Sample the function using interpolation
-	samples := f.sampleFunction(indices)
-
-	// Apply decoding
-	decode := f.Decode
-	if decode == nil {
-		decode = f.Range
+	// sample the function using interpolation
+	var samples []float64
+	if f.UseCubic {
+		samples = f.sampleCubic(indices)
+	} else {
+		samples = f.sampleLinear(indices)
 	}
 
+	// decode the output
 	outputs := make([]float64, n)
-	maxSample := float64((uint(1) << uint(f.BitsPerSample)) - 1)
-	for i := 0; i < n; i++ {
-		normalized := samples[i] / maxSample
-		outputs[i] = interpolate(normalized, 0, 1, decode[2*i], decode[2*i+1])
-	}
-
-	// Clip outputs to range
-	for i := 0; i < n; i++ {
-		min := f.Range[2*i]
-		max := f.Range[2*i+1]
-		outputs[i] = clipValue(outputs[i], min, max)
+	maxSample := float64((uint(1) << f.BitsPerSample) - 1)
+	for j, xj := range samples {
+		val := interpolate(xj, 0, maxSample, f.Decode[2*j], f.Decode[2*j+1])
+		outputs[j] = clip(val, f.Range[2*j], f.Range[2*j+1])
 	}
 
 	return outputs
 }
 
-// sampleFunction performs multidimensional interpolation on the sample table
-func (f *Type0) sampleFunction(indices []float64) []float64 {
+// sampleLinear performs multidimensional linear interpolation on the sample table
+func (f *Type0) sampleLinear(indices []float64) []float64 {
 	m, n := f.Shape()
 
-	if f.UseCubic {
-		// Use cubic spline interpolation
-		if len(f.cubicCoefficients) == 0 {
-			f.computeCubicCoefficients()
-		}
-		return f.evaluateCubicSpline(indices)
-	}
-
-	// Linear interpolation
 	if m == 1 {
+		// faster code for common single input case
 		return f.sample1D(indices[0], n)
 	}
 
@@ -231,7 +483,7 @@ func (f *Type0) sampleFunction(indices []float64) []float64 {
 	return result
 }
 
-// sample1D performs linear interpolation for 1-dimensional sample tables.
+// sample1D performs linear interpolation with a single input dimension.
 func (f *Type0) sample1D(index float64, n int) []float64 {
 	// Handle single sample case
 	if f.Size[0] <= 1 {
@@ -282,7 +534,7 @@ func (f *Type0) getSamplesAt(indices []int) []float64 {
 
 	// Calculate bit offset in the continuous bit stream
 	sampleIndex := linearIndex * n
-	for i := 0; i < n; i++ {
+	for i := range n {
 		samples[i] = f.extractSampleAtIndex(sampleIndex + i)
 	}
 
@@ -421,189 +673,6 @@ func (f *Type0) extractSampleAtIndex(sampleIndex int) float64 {
 	default:
 		return 0
 	}
-}
-
-// Embed embeds the function into a PDF file.
-func (f *Type0) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-
-	if err := f.verify(); err != nil {
-		return nil, zero, err
-	}
-
-	if err := pdf.CheckVersion(rm.Out, "Type 0 functions", pdf.V1_2); err != nil {
-		return nil, zero, err
-	}
-
-	// Build the function dictionary
-	dict := pdf.Dict{
-		"FunctionType":  pdf.Integer(0),
-		"Domain":        arrayFromFloats(f.Domain),
-		"Range":         arrayFromFloats(f.Range),
-		"Size":          arrayFromInts(f.Size),
-		"BitsPerSample": pdf.Integer(f.BitsPerSample),
-	}
-
-	if f.UseCubic {
-		dict["Order"] = pdf.Integer(3)
-	}
-
-	if f.Encode != nil {
-		dict["Encode"] = arrayFromFloats(f.Encode)
-	}
-
-	if f.Decode != nil {
-		dict["Decode"] = arrayFromFloats(f.Decode)
-	}
-
-	// Create stream with sample data
-	ref := rm.Out.Alloc()
-	stm, err := rm.Out.OpenStream(ref, dict, pdf.FilterCompress{})
-	if err != nil {
-		return nil, zero, err
-	}
-
-	if len(f.Samples) > 0 {
-		_, err = stm.Write(f.Samples)
-		if err != nil {
-			return nil, zero, err
-		}
-	}
-
-	err = stm.Close()
-	if err != nil {
-		return nil, zero, err
-	}
-
-	return ref, zero, nil
-}
-
-// verify checks if the Type0 function is properly configured.
-func (f *Type0) verify() error {
-	m, n := f.Shape()
-
-	if len(f.Domain) != 2*m {
-		return newInvalidFunctionError(0, "domain", "length must be 2*m (%d), got %d", 2*m, len(f.Domain))
-	}
-	if len(f.Range) != 2*n {
-		return newInvalidFunctionError(0, "range", "length must be 2*n (%d), got %d", 2*n, len(f.Range))
-	}
-	if len(f.Size) != m {
-		return newInvalidFunctionError(0, "size", "length must be m (%d), got %d", m, len(f.Size))
-	}
-
-	for i := 0; i < m; i++ {
-		if f.Size[i] <= 0 {
-			return newInvalidFunctionError(0, "size", "size[%d] must be positive, got %d", i, f.Size[i])
-		}
-	}
-
-	validBits := []int{1, 2, 4, 8, 12, 16, 24, 32}
-	validBitsPerSample := false
-	for _, bits := range validBits {
-		if f.BitsPerSample == bits {
-			validBitsPerSample = true
-			break
-		}
-	}
-	if !validBitsPerSample {
-		return newInvalidFunctionError(0, "bitsPerSample", "must be one of %v, got %d", validBits, f.BitsPerSample)
-	}
-
-	// No validation needed for UseCubic - it's always valid as a boolean
-
-	if f.Encode != nil && len(f.Encode) != 2*m {
-		return newInvalidFunctionError(0, "encode", "length must be 2*m (%d), got %d", 2*m, len(f.Encode))
-	}
-
-	if f.Decode != nil && len(f.Decode) != 2*n {
-		return newInvalidFunctionError(0, "decode", "length must be 2*n (%d), got %d", 2*n, len(f.Decode))
-	}
-
-	return nil
-}
-
-// readType0 reads a Type 0 sampled function from a PDF stream object.
-func readType0(r pdf.Getter, stream *pdf.Stream) (*Type0, error) {
-	d := stream.Dict
-	domain, err := floatsFromPDF(r, d["Domain"])
-	if err != nil {
-		return nil, fmt.Errorf("failed to read Domain: %w", err)
-	}
-
-	rangeArray, err := floatsFromPDF(r, d["Range"])
-	if err != nil {
-		return nil, fmt.Errorf("failed to read Range: %w", err)
-	}
-
-	size, err := intsFromPDF(r, d["Size"])
-	if err != nil {
-		return nil, fmt.Errorf("failed to read Size: %w", err)
-	}
-
-	bitsPerSample, err := pdf.GetInteger(r, d["BitsPerSample"])
-	if err != nil {
-		return nil, fmt.Errorf("failed to read BitsPerSample: %w", err)
-	}
-
-	f := &Type0{
-		Domain:        domain,
-		Range:         rangeArray,
-		Size:          size,
-		BitsPerSample: int(bitsPerSample),
-		UseCubic:      false, // Default to linear interpolation
-	}
-
-	if orderObj, ok := d["Order"]; ok {
-		order, err := pdf.GetInteger(r, orderObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read Order: %w", err)
-		}
-		f.UseCubic = (int(order) == 3)
-	}
-
-	if encodeObj, ok := d["Encode"]; ok {
-		f.Encode, err = floatsFromPDF(r, encodeObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read Encode: %w", err)
-		}
-	}
-
-	if decodeObj, ok := d["Decode"]; ok {
-		f.Decode, err = floatsFromPDF(r, decodeObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read Decode: %w", err)
-		}
-	}
-
-	// Read stream data
-	stmReader, err := pdf.DecodeStream(r, stream, 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode stream: %w", err)
-	}
-	defer stmReader.Close()
-
-	// Calculate expected data size
-	totalSamples := 1
-	for _, size := range f.Size {
-		totalSamples *= size
-	}
-	_, n := f.Shape()
-	bytesPerSample := (f.BitsPerSample + 7) / 8
-	expectedSize := totalSamples * n * bytesPerSample
-
-	f.Samples = make([]byte, expectedSize)
-	_, err = io.ReadFull(stmReader, f.Samples)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read sample data: %w", err)
-	}
-
-	// Precompute cubic spline coefficients if needed
-	if f.UseCubic {
-		f.computeCubicCoefficients()
-	}
-
-	return f, nil
 }
 
 // extractBitsGeneral extracts a specified number of bits starting at bitOffset.
@@ -999,8 +1068,12 @@ func (f *Type0) computeLinearIndex(indices, stride []int) int {
 	return idx
 }
 
-// evaluateCubicSpline evaluates the tensor product cubic spline at given indices
-func (f *Type0) evaluateCubicSpline(indices []float64) []float64 {
+// sampleCubic evaluates the tensor product cubic spline at given indices
+func (f *Type0) sampleCubic(indices []float64) []float64 {
+	if len(f.cubicCoefficients) == 0 {
+		f.computeCubicCoefficients()
+	}
+
 	m, n := f.Shape()
 
 	// Find cell containing the point and compute local coordinates
