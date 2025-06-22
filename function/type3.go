@@ -17,46 +17,45 @@
 package function
 
 import (
-	"errors"
 	"fmt"
 
 	"seehuhn.de/go/pdf"
 )
 
-// Type3 represents a Type 3 stitching function that combines multiple
-// 1-input functions across different subdomains to create a single function.
+// Type3 represents a piecewise defined function with a single input.
+// The PDF specification refers to this as a "stitching function".
 type Type3 struct {
-	// Domain defines the overall input range as [min, max]
+	// Domain defines the overall input range as [min, max].
 	Domain []float64
 
-	// Range defines the valid output ranges as [min0, max0, min1, max1, ...]
-	// This is optional for Type 3 functions
+	// Range (optional) defines the valid output ranges as [min0, max0, min1,
+	// max1, ...].
 	Range []float64
 
-	// Functions is the array of k 1-input functions to be stitched
-	// All must have the same output dimensionality
+	// Functions is the array of k functions to be combined.
+	// All functions must have 1 input and the same number of outputs.
 	Functions []pdf.Function
 
-	// Bounds defines the k-1 subdomain boundaries in increasing order within Domain
+	// Bounds defines the boundaries between subdomains.
+	// It must have k-1 elements, in increasing order, within the domain.
+	// The first function applies to the range [Domain[0], Bounds[0]),
+	// the second to [Bounds[0], Bounds[1]), ..., the last to
+	// [Bounds[k-2], Domain[1]].
 	Bounds []float64
 
 	// Encode maps each subdomain to corresponding function's domain as
-	// [min0, max0, min1, max1, ...]
+	// [min0, max0, min1, max1, ...].
 	Encode []float64
 }
 
-// FunctionType returns 3 for Type 3 functions.
+// FunctionType returns 3.
+// This implements the [pdf.Function] interface.
 func (f *Type3) FunctionType() int {
 	return 3
 }
 
 // Shape returns the number of input and output values of the function.
 func (f *Type3) Shape() (int, int) {
-	if len(f.Functions) == 0 {
-		return 1, 1 // Default case
-	}
-
-	// All functions must have the same output dimensionality
 	_, n := f.Functions[0].Shape()
 	return 1, n
 }
@@ -66,7 +65,6 @@ func (f *Type3) Apply(inputs ...float64) []float64 {
 	if len(inputs) != 1 {
 		panic(fmt.Sprintf("Type 3 function expects 1 input, got %d", len(inputs)))
 	}
-
 	x := inputs[0]
 
 	// Clip input to domain
@@ -93,7 +91,7 @@ func (f *Type3) Apply(inputs ...float64) []float64 {
 	// Clip outputs to range if specified
 	_, n := f.Shape()
 	if len(f.Range) >= 2*n {
-		for i := 0; i < n; i++ {
+		for i := range n {
 			min := f.Range[2*i]
 			max := f.Range[2*i+1]
 			outputs[i] = clipValue(outputs[i], min, max)
@@ -103,7 +101,8 @@ func (f *Type3) Apply(inputs ...float64) []float64 {
 	return outputs
 }
 
-// findSubdomain determines which subdomain contains the input value
+// findSubdomain determines which subdomain the input x belongs to and returns
+// the subdomain index and the corresponding domain boundaries.
 func (f *Type3) findSubdomain(x float64, k int) (int, [2]float64) {
 	if len(f.Domain) < 2 {
 		return 0, [2]float64{0, 1} // Default domain
@@ -136,6 +135,10 @@ func (f *Type3) findSubdomain(x float64, k int) (int, [2]float64) {
 // Embed embeds the function into a PDF file.
 func (f *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
+
+	if err := f.verify(); err != nil {
+		return nil, zero, err
+	}
 
 	if err := pdf.CheckVersion(rm.Out, "Type 3 functions", pdf.V1_3); err != nil {
 		return nil, zero, err
@@ -180,37 +183,37 @@ func (f *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	return ref, zero, nil
 }
 
-// validate checks if the Type3 function is properly configured.
-func (f *Type3) validate() error {
+// verify checks if the Type3 function is properly configured.
+func (f *Type3) verify() error {
 	// Domain validation
 	if len(f.Domain) != 2 {
-		return errors.New("domain must have exactly 2 elements")
+		return newInvalidFunctionError(3, "domain", "must have exactly 2 elements, got %d", len(f.Domain))
 	}
 
 	k := len(f.Functions)
 	if k == 0 {
-		return errors.New("at least one function must be specified")
+		return newInvalidFunctionError(3, "functions", "at least one function must be specified")
 	}
 
 	// Bounds validation
 	if len(f.Bounds) != k-1 {
-		return fmt.Errorf("bounds must have k-1 (%d) elements, got %d", k-1, len(f.Bounds))
+		return newInvalidFunctionError(3, "bounds", "must have k-1 (%d) elements, got %d", k-1, len(f.Bounds))
 	}
 
 	// Check bounds are in increasing order within domain
 	domain0, domain1 := f.Domain[0], f.Domain[1]
 	for i, bound := range f.Bounds {
 		if bound <= domain0 || bound >= domain1 {
-			return fmt.Errorf("bound[%d] = %f must be within domain [%f, %f]", i, bound, domain0, domain1)
+			return newInvalidFunctionError(3, "bounds", "bound[%d] = %f must be within domain [%f, %f]", i, bound, domain0, domain1)
 		}
 		if i > 0 && bound <= f.Bounds[i-1] {
-			return fmt.Errorf("bounds must be in increasing order: bounds[%d] = %f <= bounds[%d] = %f", i-1, f.Bounds[i-1], i, bound)
+			return newInvalidFunctionError(3, "bounds", "must be in increasing order: bounds[%d] = %f <= bounds[%d] = %f", i-1, f.Bounds[i-1], i, bound)
 		}
 	}
 
 	// Encode validation
 	if len(f.Encode) != 2*k {
-		return fmt.Errorf("encode must have 2*k (%d) elements, got %d", 2*k, len(f.Encode))
+		return newInvalidFunctionError(3, "encode", "must have 2*k (%d) elements, got %d", 2*k, len(f.Encode))
 	}
 
 	// Function validation - all must be 1-input and have same output dimensionality
@@ -218,10 +221,10 @@ func (f *Type3) validate() error {
 	for i, fn := range f.Functions {
 		m, n := fn.Shape()
 		if m != 1 {
-			return fmt.Errorf("function[%d] must have 1 input, got %d", i, m)
+			return newInvalidFunctionError(3, "functions", "function[%d] must have 1 input, got %d", i, m)
 		}
 		if n != expectedN {
-			return fmt.Errorf("function[%d] has %d outputs, expected %d", i, n, expectedN)
+			return newInvalidFunctionError(3, "functions", "function[%d] has %d outputs, expected %d", i, n, expectedN)
 		}
 	}
 
@@ -233,6 +236,7 @@ func (f *Type3) validate() error {
 	return nil
 }
 
+// readType3 reads a Type 3 piecewise defined function from a PDF dictionary.
 func readType3(r pdf.Getter, d pdf.Dict, cycleChecker *pdf.CycleChecker) (*Type3, error) {
 	domain, err := floatsFromPDF(r, d["Domain"])
 	if err != nil {

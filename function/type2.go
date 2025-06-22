@@ -17,7 +17,6 @@
 package function
 
 import (
-	"errors"
 	"fmt"
 	"math"
 
@@ -26,23 +25,24 @@ import (
 
 // Type2 represents a power interpolation function of the form
 // y = C0 + x^N × (C1 - C0).
+// The PDF specification refers to this as "exponential interpolation".
 type Type2 struct {
-	// Domain defines the valid input range as [min, max]
+	// Domain defines the valid input range as [min, max].
 	Domain []float64
 
-	// Range defines the valid output ranges as [min0, max0, min1, max1, ...]
-	// This is optional for Type 2 functions
+	// Range defines the valid output ranges as [min0, max0, min1, max1, ...].
+	// This is optional for Type 2 functions.
 	Range []float64
 
-	// C0 defines function result when x = 0.0
-	// Default: [0.0]
+	// C0 defines function result when x = 0.0.
+	// Default: [0.0].
 	C0 []float64
 
-	// C1 defines function result when x = 1.0
-	// Default: [1.0]
+	// C1 defines function result when x = 1.0.
+	// Default: [1.0].
 	C1 []float64
 
-	// N is the interpolation exponent
+	// N is the interpolation exponent.
 	N float64
 }
 
@@ -139,6 +139,10 @@ func (f *Type2) Apply(inputs ...float64) []float64 {
 func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
+	if err := f.verify(); err != nil {
+		return nil, zero, err
+	}
+
 	if err := pdf.CheckVersion(rm.Out, "Type 2 functions", pdf.V1_3); err != nil {
 		return nil, zero, err
 	}
@@ -180,11 +184,11 @@ func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	return ref, zero, nil
 }
 
-// validate checks if the Type2 function is properly configured.
-func (f *Type2) validate() error {
+// verify checks if the Type2 function is properly configured.
+func (f *Type2) verify() error {
 	// Domain validation
 	if len(f.Domain) != 0 && len(f.Domain) != 2 {
-		return errors.New("domain must have 2 elements or be empty")
+		return newInvalidFunctionError(2, "domain", "must have 2 elements or be empty, got %d", len(f.Domain))
 	}
 
 	if len(f.Domain) == 2 {
@@ -193,29 +197,30 @@ func (f *Type2) validate() error {
 
 		// If N is non-integer, x must be >= 0
 		if f.N != math.Floor(f.N) && min < 0 {
-			return fmt.Errorf("domain minimum must be >= 0 when N is non-integer, got %f", min)
+			return newInvalidFunctionError(2, "domain", "minimum must be >= 0 when N is non-integer, got %f", min)
 		}
 
 		// If N is negative, x must not be 0
 		if f.N < 0 && min <= 0 && max >= 0 {
-			return errors.New("domain must not include 0 when N is negative")
+			return newInvalidFunctionError(2, "domain", "must not include 0 when N is negative")
 		}
 	}
 
 	// Range validation
 	_, n := f.Shape()
 	if len(f.Range) != 0 && len(f.Range) != 2*n {
-		return fmt.Errorf("range must have 2*n (%d) elements or be empty", 2*n)
+		return newInvalidFunctionError(2, "range", "must have 2*n (%d) elements or be empty, got %d", 2*n, len(f.Range))
 	}
 
 	// C0 and C1 validation
 	if f.C0 != nil && f.C1 != nil && len(f.C0) != len(f.C1) {
-		return errors.New("C0 and C1 must have the same length")
+		return newInvalidFunctionError(2, "C0/C1", "must have the same length, got C0=%d, C1=%d", len(f.C0), len(f.C1))
 	}
 
 	return nil
 }
 
+// readType2 reads a Type 2 exponential interpolation function from a PDF dictionary.
 func readType2(r pdf.Getter, d pdf.Dict) (*Type2, error) {
 	domain, err := floatsFromPDF(r, d["Domain"])
 	if err != nil {

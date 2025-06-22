@@ -24,10 +24,10 @@
 //
 // This package supports all PDF function types:
 //
-//   - [Type0]: Sampled functions using tables of sample values with interpolation
-//   - [Type2]: Power interpolation functions defining y = C0 + x^N × (C1 - C0)
-//   - [Type3]: Stitching functions combining multiple 1-input functions across subdomains
-//   - [Type4]: PostScript calculator functions using PostScript language subset
+//   - [Type0]: Sampled functions using tables of sample values with interpolation.
+//   - [Type2]: Power interpolation functions defining y = C0 + x^N × (C1 - C0).
+//   - [Type3]: Piecewise defined 1-input functions.
+//   - [Type4]: Functions using PostScript language subset.
 //
 // All function types implement the [pdf.Function] interface.
 package function

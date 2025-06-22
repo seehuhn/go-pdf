@@ -40,6 +40,9 @@ type Type1 struct {
 	// SpotFunction defines the pixel adjustment order for gray levels.
 	// This can be a predefined spot function name (e.g., "SimpleDot", "Round", "Ellipse")
 	// or a custom function object.
+	//
+	// TODO(voss): add definitions for the predefined spot functions
+	// and turn this field into a pdf.Function.
 	SpotFunction pdf.Object
 
 	// AccurateScreens enables a more precise but computationally expensive

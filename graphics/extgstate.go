@@ -50,11 +50,11 @@ type ExtGState struct {
 	AlphaSourceFlag        bool
 	BlackPointCompensation pdf.Name
 	OverprintStroke        bool
-	OverprintFill          bool // for PDF<1.3 this must equal OverprintStroke
-	OverprintMode          int  // for PDF<1.3 this must be 0
-	BlackGeneration        pdf.Object
-	UndercolorRemoval      pdf.Object
-	TransferFunction       pdf.Object
+	OverprintFill          bool       // for PDF<1.3 this must equal OverprintStroke
+	OverprintMode          int        // for PDF<1.3 this must be 0
+	BlackGeneration        pdf.Object // TODO(voss): use pdf.Function
+	UndercolorRemoval      pdf.Object // TODO(voss): use pdf.Function
+	TransferFunction       pdf.Object // TODO(voss): use pdf.Function
 	Halftone               Halftone
 	HalftoneOriginX        float64
 	HalftoneOriginY        float64

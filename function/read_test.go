@@ -18,10 +18,12 @@ package function
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -36,7 +38,7 @@ var testCases = map[int][]testCase{
 				Range:         []float64{0, 1, 0, 1, 0, 1},
 				Size:          []int{2, 2},
 				BitsPerSample: 8,
-				Order:         1,
+				UseCubic:      false,
 				Samples:       []byte{0, 128, 255, 64, 192, 32, 255, 0, 128, 128, 64, 96},
 			},
 		},
@@ -47,7 +49,7 @@ var testCases = map[int][]testCase{
 				Range:         []float64{0, 1},
 				Size:          []int{4},
 				BitsPerSample: 8,
-				Order:         1,
+				UseCubic:      false,
 				Encode:        []float64{0, 3},
 				Decode:        []float64{0, 1},
 				Samples:       []byte{0, 85, 170, 255},
@@ -60,7 +62,7 @@ var testCases = map[int][]testCase{
 				Range:         []float64{0, 1},
 				Size:          []int{3},
 				BitsPerSample: 16,
-				Order:         1,
+				UseCubic:      false,
 				Samples:       []byte{0, 0, 128, 0, 255, 255},
 			},
 		},
@@ -71,7 +73,7 @@ var testCases = map[int][]testCase{
 				Range:         []float64{0, 1},
 				Size:          []int{5},
 				BitsPerSample: 8,
-				Order:         3,
+				UseCubic:      true,
 				Samples:       []byte{0, 64, 128, 192, 255},
 			},
 		},
@@ -257,6 +259,11 @@ func roundTripTest(t *testing.T, originalFunction pdf.Function) {
 	// Embed the function
 	embedded, _, err := originalFunction.Embed(rm)
 	if err != nil {
+		// If this is a validation error, the function is malformed and we can't test it
+		var invalidErr *InvalidFunctionError
+		if errors.As(err, &invalidErr) {
+			t.Skip("function failed validation: " + err.Error())
+		}
 		t.Fatal(err)
 	}
 
@@ -292,7 +299,9 @@ func roundTripTest(t *testing.T, originalFunction pdf.Function) {
 	}
 
 	// Use cmp.Diff to compare the original and read function
-	if diff := cmp.Diff(originalFunction, readFunction); diff != "" {
+	// Ignore unexported fields that are computed during evaluation
+	opts := cmpopts.IgnoreUnexported(Type0{})
+	if diff := cmp.Diff(originalFunction, readFunction, opts); diff != "" {
 		t.Errorf("round trip failed (-want +got):\n%s", diff)
 	}
 }
@@ -406,7 +415,7 @@ func TestFunctionEvaluation(t *testing.T) {
 func TestFunctionValidation(t *testing.T) {
 	tests := []struct {
 		name     string
-		function interface{ validate() error }
+		function interface{ verify() error }
 		wantErr  bool
 	}{
 		{
@@ -416,7 +425,7 @@ func TestFunctionValidation(t *testing.T) {
 				Range:         []float64{0, 1},
 				Size:          []int{2},
 				BitsPerSample: 8,
-				Order:         1, // Add valid order
+				UseCubic:      false, // Add valid interpolation
 				Samples:       []byte{0, 255},
 			},
 			wantErr: false,
@@ -526,9 +535,9 @@ func TestFunctionValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.function.validate()
+			err := tt.function.verify()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("verify() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -723,7 +732,7 @@ func FuzzApply(f *testing.F) {
 	})
 }
 
-// Helper functions
+// helper functions
 func abs(x float64) float64 {
 	if x < 0 {
 		return -x

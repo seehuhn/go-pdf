@@ -17,26 +17,23 @@
 package function
 
 import (
-	"errors"
 	"fmt"
 	"io"
-	"math"
-	"strconv"
-	"strings"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/postscript"
 )
 
 // Type4 represents a Type 4 PostScript calculator function that uses a subset
 // of PostScript language to define arbitrary calculations.
 type Type4 struct {
-	// Domain defines the valid input ranges as [min0, max0, min1, max1, ...]
+	// Domain defines the valid input ranges as [min0, max0, min1, max1, ...].
 	Domain []float64
 
-	// Range defines the valid output ranges as [min0, max0, min1, max1, ...]
+	// Range defines the valid output ranges as [min0, max0, min1, max1, ...].
 	Range []float64
 
-	// Program contains the PostScript code (without enclosing braces)
+	// Program contains the PostScript code (without enclosing braces).
 	Program string
 }
 
@@ -95,515 +92,103 @@ func (f *Type4) Apply(inputs ...float64) []float64 {
 	return outputs
 }
 
-// postScriptStack represents a PostScript operand stack
-type postScriptStack struct {
-	values []float64
-}
-
-func (s *postScriptStack) push(val float64) {
-	s.values = append(s.values, val)
-}
-
-func (s *postScriptStack) pop() (float64, error) {
-	if len(s.values) == 0 {
-		return 0, errors.New("stack underflow")
-	}
-	val := s.values[len(s.values)-1]
-	s.values = s.values[:len(s.values)-1]
-	return val, nil
-}
-
-func (s *postScriptStack) peek() (float64, error) {
-	if len(s.values) == 0 {
-		return 0, errors.New("stack underflow")
-	}
-	return s.values[len(s.values)-1], nil
-}
-
-// executePostScript executes the PostScript program with the given inputs
+// executePostScript executes the PostScript program with the given inputs using
+// a restricted PostScript interpreter that only supports PDF Type 4 operators.
 func (f *Type4) executePostScript(inputs []float64) ([]float64, error) {
-	// Initialize stack with input values
-	stack := &postScriptStack{}
+	// create a PostScript interpreter with Type 4 restricted operators
+	intp := postscript.NewInterpreter()
+
+	// create a custom system dictionary with only allowed operators
+	type4Dict := f.makeType4SystemDict()
+
+	// replace the system dictionary with our restricted one
+	intp.DictStack = []postscript.Dict{
+		type4Dict,
+		postscript.Dict{}, // userdict
+	}
+	intp.SystemDict = type4Dict
+
+	// push input values onto the stack
 	for _, input := range inputs {
-		stack.push(input)
+		intp.Stack = append(intp.Stack, postscript.Real(input))
 	}
 
-	// Tokenize and execute the program
-	tokens := f.tokenize(f.Program)
-	err := f.executeTokens(tokens, stack, 0)
+	// execute program without wrapping - the PostScript interpreter expects the program without outer braces
+	err := intp.ExecuteString(f.Program)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("PostScript execution error: %w", err)
 	}
 
-	// Return remaining stack values as outputs
-	return stack.values, nil
+	// convert stack values back to float64 slice
+	outputs := make([]float64, len(intp.Stack))
+	for i, obj := range intp.Stack {
+		switch v := obj.(type) {
+		case postscript.Integer:
+			outputs[i] = float64(v)
+		case postscript.Real:
+			outputs[i] = float64(v)
+		case postscript.Boolean:
+			if v {
+				outputs[i] = 1.0
+			} else {
+				outputs[i] = 0.0
+			}
+		default:
+			return nil, fmt.Errorf("invalid result type on stack: %T", obj)
+		}
+	}
+
+	return outputs, nil
 }
 
-// tokenize splits the PostScript program into tokens
-func (f *Type4) tokenize(program string) []string {
-	// Simple tokenization - split by whitespace and handle braces
-	program = strings.TrimSpace(program)
-	tokens := strings.Fields(program)
+// makeType4SystemDict creates a restricted system dictionary for Type 4 functions
+// containing only the operators allowed by the PDF specification.
+func (f *Type4) makeType4SystemDict() postscript.Dict {
+	// get a full system dictionary to copy implementations from
+	tempIntp := postscript.NewInterpreter()
+	systemDict := tempIntp.SystemDict
 
-	// Expand tokens that contain braces
-	var result []string
-	for _, token := range tokens {
-		if strings.Contains(token, "{") || strings.Contains(token, "}") {
-			// Split tokens containing braces
-			for i, char := range token {
-				if char == '{' || char == '}' {
-					if i > 0 {
-						result = append(result, token[:i])
-					}
-					result = append(result, string(char))
-					if i < len(token)-1 {
-						result = append(result, token[i+1:])
-					}
-					break
-				}
-			}
-		} else {
-			result = append(result, token)
+	// create Type 4 dictionary with only allowed operators from Table 42
+	type4Dict := postscript.Dict{
+		// add constants
+		"true":  postscript.Boolean(true),
+		"false": postscript.Boolean(false),
+	}
+
+	// list of operators allowed in Type 4 functions per PDF specification Table 42
+	allowedOps := []string{
+		// Arithmetic operators
+		"abs", "add", "atan", "ceiling", "cos", "cvi", "cvr", "div", "exp",
+		"floor", "idiv", "ln", "log", "mod", "mul", "neg", "round", "sin",
+		"sqrt", "sub", "truncate",
+
+		// Relational, boolean, and bitwise operators
+		"and", "bitshift", "eq", "ge", "gt", "le", "lt", "ne", "not", "or", "xor",
+
+		// Conditional operators
+		"if", "ifelse",
+
+		// Stack operators
+		"copy", "dup", "exch", "index", "pop", "roll",
+	}
+
+	// copy the actual implementations for allowed operators
+	for _, name := range allowedOps {
+		if impl, exists := systemDict[postscript.Name(name)]; exists {
+			type4Dict[postscript.Name(name)] = impl
 		}
 	}
 
-	return result
-}
-
-// executeTokens executes a sequence of PostScript tokens
-func (f *Type4) executeTokens(tokens []string, stack *postScriptStack, nestingLevel int) error {
-	if nestingLevel > 255 {
-		return errors.New("maximum nesting depth exceeded")
-	}
-
-	for i := 0; i < len(tokens); i++ {
-		token := tokens[i]
-
-		if token == "{" {
-			// Find matching closing brace
-			braceCount := 1
-			start := i + 1
-			end := start
-			for end < len(tokens) && braceCount > 0 {
-				switch tokens[end] {
-				case "{":
-					braceCount++
-				case "}":
-					braceCount--
-				}
-				end++
-			}
-			if braceCount > 0 {
-				return errors.New("unmatched opening brace")
-			}
-
-			// Execute the block
-			blockTokens := tokens[start : end-1]
-			err := f.executeTokens(blockTokens, stack, nestingLevel+1)
-			if err != nil {
-				return err
-			}
-
-			i = end - 1 // Skip to after the closing brace
-			continue
-		}
-
-		if token == "}" {
-			return errors.New("unmatched closing brace")
-		}
-
-		// Try to parse as number
-		if val, err := strconv.ParseFloat(token, 64); err == nil {
-			stack.push(val)
-			continue
-		}
-
-		// Execute operator
-		err := f.executeOperator(token, stack)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// executeOperator executes a PostScript operator
-func (f *Type4) executeOperator(op string, stack *postScriptStack) error {
-	switch op {
-	// Arithmetic operators
-	case "add":
-		b, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(a + b)
-
-	case "sub":
-		b, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(a - b)
-
-	case "mul":
-		b, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(a * b)
-
-	case "div":
-		b, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		if b == 0 {
-			return errors.New("division by zero")
-		}
-		stack.push(a / b)
-
-	case "idiv":
-		b, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		if b == 0 {
-			return errors.New("division by zero")
-		}
-		stack.push(math.Floor(a / b))
-
-	case "mod":
-		b, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		if b == 0 {
-			return errors.New("modulo by zero")
-		}
-		stack.push(math.Mod(a, b))
-
-	case "abs":
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(math.Abs(a))
-
-	case "neg":
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(-a)
-
-	case "ceiling":
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(math.Ceil(a))
-
-	case "floor":
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(math.Floor(a))
-
-	case "round":
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(math.Round(a))
-
-	case "truncate":
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(math.Trunc(a))
-
-	case "sqrt":
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(math.Sqrt(a))
-
-	case "sin":
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(math.Sin(a))
-
-	case "cos":
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(math.Cos(a))
-
-	case "atan":
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(math.Atan(a))
-
-	case "exp":
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(math.Exp(a))
-
-	case "ln":
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(math.Log(a))
-
-	case "log":
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(math.Log10(a))
-
-	case "cvi":
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(math.Trunc(a))
-
-	case "cvr":
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(a) // Already a real number
-
-	// Relational and Boolean operators
-	case "eq":
-		b, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		if a == b {
-			stack.push(1)
-		} else {
-			stack.push(0)
-		}
-
-	case "ne":
-		b, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		if a != b {
-			stack.push(1)
-		} else {
-			stack.push(0)
-		}
-
-	case "gt":
-		b, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		if a > b {
-			stack.push(1)
-		} else {
-			stack.push(0)
-		}
-
-	case "ge":
-		b, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		if a >= b {
-			stack.push(1)
-		} else {
-			stack.push(0)
-		}
-
-	case "lt":
-		b, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		if a < b {
-			stack.push(1)
-		} else {
-			stack.push(0)
-		}
-
-	case "le":
-		b, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		if a <= b {
-			stack.push(1)
-		} else {
-			stack.push(0)
-		}
-
-	case "and":
-		b, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		if a != 0 && b != 0 {
-			stack.push(1)
-		} else {
-			stack.push(0)
-		}
-
-	case "or":
-		b, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		if a != 0 || b != 0 {
-			stack.push(1)
-		} else {
-			stack.push(0)
-		}
-
-	case "xor":
-		b, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		if (a != 0) != (b != 0) {
-			stack.push(1)
-		} else {
-			stack.push(0)
-		}
-
-	case "not":
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		if a == 0 {
-			stack.push(1)
-		} else {
-			stack.push(0)
-		}
-
-	case "true":
-		stack.push(1)
-
-	case "false":
-		stack.push(0)
-
-	// Stack operators
-	case "pop":
-		_, err := stack.pop()
-		if err != nil {
-			return err
-		}
-
-	case "exch":
-		b, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		a, err := stack.pop()
-		if err != nil {
-			return err
-		}
-		stack.push(b)
-		stack.push(a)
-
-	case "dup":
-		a, err := stack.peek()
-		if err != nil {
-			return err
-		}
-		stack.push(a)
-
-	// Note: if and ifelse are handled during token execution, not here
-	// They require special parsing of the code blocks
-
-	default:
-		return fmt.Errorf("unknown operator: %s", op)
-	}
-
-	return nil
+	return type4Dict
 }
 
 // Embed embeds the function into a PDF file.
 func (f *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
+
+	if err := f.verify(); err != nil {
+		return nil, zero, err
+	}
 
 	if err := pdf.CheckVersion(rm.Out, "Type 4 functions", pdf.V1_3); err != nil {
 		return nil, zero, err
@@ -639,19 +224,19 @@ func (f *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	return ref, zero, nil
 }
 
-// validate checks if the Type4 function is properly configured.
-func (f *Type4) validate() error {
+// verify checks if the Type4 function is properly configured.
+func (f *Type4) verify() error {
 	m, n := f.Shape()
 
 	if len(f.Domain) != 2*m {
-		return errors.New("domain length must be 2*m")
+		return newInvalidFunctionError(4, "domain", "length must be 2*m (%d), got %d", 2*m, len(f.Domain))
 	}
 	if len(f.Range) != 2*n {
-		return errors.New("range length must be 2*n")
+		return newInvalidFunctionError(4, "range", "length must be 2*n (%d), got %d", 2*n, len(f.Range))
 	}
 
 	if f.Program == "" {
-		return errors.New("program cannot be empty")
+		return newInvalidFunctionError(4, "program", "cannot be empty")
 	}
 
 	// Basic syntax check - ensure braces are balanced
@@ -665,12 +250,13 @@ func (f *Type4) validate() error {
 		}
 	}
 	if braceCount != 0 {
-		return errors.New("unbalanced braces in program")
+		return newInvalidFunctionError(4, "program", "unbalanced braces (count: %d)", braceCount)
 	}
 
 	return nil
 }
 
+// readType4 reads a Type 4 function from a PDF stream object.
 func readType4(r pdf.Getter, stream *pdf.Stream) (*Type4, error) {
 	d := stream.Dict
 	domain, err := floatsFromPDF(r, d["Domain"])
