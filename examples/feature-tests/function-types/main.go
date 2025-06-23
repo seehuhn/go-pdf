@@ -26,6 +26,8 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/shading"
@@ -63,11 +65,17 @@ func createDocument(fname string) error {
 	F := &function.Type0{
 		Domain:        []float64{0, 1, 0, 1},
 		Range:         []float64{0, 1, 0, 1, 0, 1},
-		Size:          []int{2, 1},
+		Size:          []int{5, 1},
 		BitsPerSample: 8,
-		Encode:        []float64{0, 1, 0, 1},
+		Encode:        []float64{0, 4, 0, 4},
 		Decode:        []float64{0, 1, 0, 1, 0, 1},
-		Samples:       []byte{0, 255, 255, 0, 10, 100},
+		Samples: []byte{
+			0, 255, 255,
+			0, 0, 0,
+			255, 0, 0,
+			255, 255, 255,
+			0, 10, 100,
+		},
 	}
 	writer.testStrip(F)
 
@@ -83,12 +91,15 @@ type writer struct {
 	doc  *document.MultiPage
 	page *document.Page
 	yPos float64
+
+	label font.Layouter
 }
 
 func newWriter(doc *document.MultiPage) *writer {
 	w := &writer{
-		doc:  doc,
-		yPos: paper.URy - margin,
+		doc:   doc,
+		yPos:  paper.URy - margin,
+		label: standard.Helvetica.New(),
 	}
 
 	return w
@@ -122,14 +133,14 @@ func (w *writer) testStrip(f pdf.Function) error {
 	}
 
 	area1 := rect.Rect{
-		LLx: margin,
+		LLx: margin + 30,
 		LLy: w.yPos - stripHeight,
 		URx: paper.URx - margin,
 		URy: w.yPos,
 	}
 	w.yPos -= stripHeight + stripGap
 	area2 := rect.Rect{
-		LLx: margin,
+		LLx: margin + 30,
 		LLy: w.yPos - stripHeight,
 		URx: paper.URx - margin,
 		URy: w.yPos,
@@ -159,6 +170,13 @@ func (w *writer) testStrip(f pdf.Function) error {
 	}
 	w.page.DrawShading(s)
 
+	w.page.PushGraphicsState()
+	w.page.TextBegin()
+	w.page.TextSetFont(w.label, 8)
+	w.page.TextFirstLine(margin, area1.LLy+5)
+	w.page.TextShow("function")
+	w.page.TextEnd()
+
 	// method 2: Render the function to an image and draw the image.
 
 	img := &imageStrip{
@@ -174,6 +192,13 @@ func (w *writer) testStrip(f pdf.Function) error {
 	})
 	w.page.DrawXObject(img)
 	w.page.PopGraphicsState()
+
+	w.page.PushGraphicsState()
+	w.page.TextBegin()
+	w.page.TextSetFont(w.label, 8)
+	w.page.TextFirstLine(margin, area2.LLy+5)
+	w.page.TextShow("image")
+	w.page.TextEnd()
 
 	return nil
 }
