@@ -17,6 +17,8 @@
 package shading
 
 import (
+	"slices"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -28,18 +30,6 @@ func toPDF(x []float64) pdf.Array {
 	return res
 }
 
-func isEqual(x, y []float64) bool {
-	if len(x) != len(y) {
-		return false
-	}
-	for i := range x {
-		if x[i] != y[i] {
-			return false
-		}
-	}
-	return true
-}
-
 func isValues(x []float64, y ...float64) bool {
-	return isEqual(x, y)
+	return slices.Equal(x, y)
 }

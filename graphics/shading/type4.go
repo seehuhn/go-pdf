@@ -22,6 +22,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -31,27 +32,50 @@ import (
 //
 // This type implements the [seehuhn.de/go/pdf/graphics.Shading] interface.
 type Type4 struct {
-	ColorSpace        color.Space
-	BitsPerCoordinate int
-	BitsPerComponent  int
-	BitsPerFlag       int
+	// ColorSpace defines the color space for shading color values.
+	ColorSpace color.Space
 
-	// An array of numbers specifying how to map vertex coordinates and color
-	// components into the appropriate ranges of values.
+	// BitsPerCoordinate specifies the number of bits used to represent each vertex coordinate.
+	BitsPerCoordinate int
+
+	// BitsPerComponent specifies the number of bits used to represent each color component.
+	BitsPerComponent int
+
+	// BitsPerFlag specifies the number of bits used to represent the edge flag for each vertex.
+	BitsPerFlag int
+
+	// Decode specifies how to map vertex coordinates and color components into
+	// the appropriate ranges of values.
 	Decode []float64
 
+	// Vertices contains the vertex data for the triangle mesh.
 	Vertices []Type4Vertex
 
-	F          pdf.Function
+	// F (optional) is a 1->n function for mapping parametric values to colors.
+	F pdf.Function
+
+	// Background (optional) specifies the color for areas outside the
+	// shading's bounds, when used in a shading pattern.
 	Background []float64
-	BBox       *pdf.Rectangle
-	AntiAlias  bool
+
+	// BBox (optional) defines the shading's bounding box as a clipping boundary.
+	BBox *pdf.Rectangle
+
+	// AntiAlias controls whether to filter the shading function to prevent aliasing.
+	AntiAlias bool
 }
+
+var _ graphics.Shading = (*Type4)(nil)
 
 // Type4Vertex represents a single vertex in a type 4 shading.
 type Type4Vertex struct {
-	X, Y  float64
-	Flag  uint8
+	// X, Y are the vertex coordinates.
+	X, Y float64
+
+	// Flag determines how the vertex connects to other vertices (0, 1, or 2).
+	Flag uint8
+
+	// Color contains the color components for this vertex.
 	Color []float64
 }
 
@@ -80,7 +104,7 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	case 1, 2, 4, 8, 12, 16, 24, 32:
 		// pass
 	default:
-		return nil, zero, fmt.Errorf("invalid BitsPerComponent: %d", s.BitsPerComponent)
+		return nil, zero, fmt.Errorf("invalid BitsPerCoordinate: %d", s.BitsPerCoordinate)
 	}
 	switch s.BitsPerComponent {
 	case 1, 2, 4, 8, 12, 16:
@@ -160,12 +184,12 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		return nil, zero, err
 	}
 
-	// Write packed bit data for each vertex:
+	// write packed bit data for each vertex:
 	//   - s.BitsPerFlag bits for the flag
 	//   - s.BitsPerCoordinate bits for the x coordinate
 	//   - s.BitsPerCoordinate bits for the y coordinate
 	//   - numValues * s.BitsPerComponent bits for the color
-	// Most-significant bits use used first.
+	// most-significant bits are used first.
 	buf := make([]byte, vertexBytes)
 	var bufBytePos, bufBitsFree int
 	addBits := func(bits uint32, n int) {

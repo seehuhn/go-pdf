@@ -21,6 +21,7 @@
 //
 // This package supports multiple types of PDF shadings:
 //   - Type1: Function-based shadings
+//   - Type2: Axial shadings
 //   - Type3: Radial shadings
 //   - Type4: Free-form Gouraud-shaded triangle meshes
 package shading

@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -28,23 +29,45 @@ import (
 //
 // This type implements the [seehuhn.de/go/pdf/graphics.Shading] interface.
 type Type3 struct {
+	// ColorSpace defines the color space for shading color values.
 	ColorSpace color.Space
+
+	// X1, Y1, R1 specify the center and radius of the starting circle.
 	X1, Y1, R1 float64
+
+	// X2, Y2, R2 specify the center and radius of the ending circle.
 	X2, Y2, R2 float64
 
 	// F is either 1->n function or an array of n 1->1 functions, where n is
-	// the number of colour components of the ColorSpace.
+	// the number of color components of the ColorSpace.
 	F pdf.Function
 
-	TMin, TMax  float64
-	ExtendStart bool
-	ExtendEnd   bool
-	Background  []float64
-	BBox        *pdf.Rectangle
-	AntiAlias   bool
+	// TMin, TMax specify the limiting values of the parametric variable t.
+	// Default: [0, 1].
+	TMin, TMax float64
 
+	// ExtendStart specifies whether to extend the shading beyond the starting circle.
+	ExtendStart bool
+
+	// ExtendEnd specifies whether to extend the shading beyond the ending circle.
+	ExtendEnd bool
+
+	// Background (optional) specifies the color for areas outside the
+	// shading's bounds, when used in a shading pattern.
+	Background []float64
+
+	// BBox (optional) defines the shading's bounding box as a clipping boundary.
+	BBox *pdf.Rectangle
+
+	// AntiAlias controls whether to filter the shading function to prevent aliasing.
+	AntiAlias bool
+
+	// SingleUse determines if shading is returned as dictionary (true) or
+	// reference (false).
 	SingleUse bool
 }
+
+var _ graphics.Shading = (*Type3)(nil)
 
 // ShadingType implements the [Shading] interface.
 func (s *Type3) ShadingType() int {
@@ -105,7 +128,7 @@ func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	if s.AntiAlias {
 		dict["AntiAlias"] = pdf.Boolean(true)
 	}
-	if s.TMin != 0 || (s.TMax != 0 && s.TMax != 1) {
+	if s.TMin != 0 || s.TMax != 1 {
 		dict["Domain"] = pdf.Array{pdf.Number(s.TMin), pdf.Number(s.TMax)}
 	}
 	if s.ExtendStart || s.ExtendEnd {

@@ -54,12 +54,6 @@ type Type0 struct {
 
 	// Samples contains the raw sample data.
 	Samples []byte
-
-	// cubicCoefficients stores precomputed spline coefficients for UseCubic == true.
-	// Shape: [4*(Size[0]-1), 4*(Size[1]-1), ..., 4*(Size[m-1]-1)].
-	// Each group of 4 contains [a, b, c, d] for one spline segment.
-	cubicCoefficients []float64
-	cubicShape        []int
 }
 
 // readType0 reads a Type 0 sampled function from a PDF stream object.
@@ -522,9 +516,10 @@ func (f *Type0) getSamplesAt(indices []int) []float64 {
 	m, n := f.Shape()
 
 	// Calculate linear index in the sample array
+	// PDF spec: "the first dimension varies fastest"
 	linearIndex := 0
 	stride := 1
-	for i := m - 1; i >= 0; i-- {
+	for i := 0; i < m; i++ {
 		linearIndex += indices[i] * stride
 		stride *= f.Size[i]
 	}
@@ -716,7 +711,8 @@ func (f *Type0) extractBitsGeneral(bitOffset, numBits int) float64 {
 	return float64(result)
 }
 
-// cubicSplineCoeff1D computes natural cubic spline coefficients for 1D data.
+// cubicSplineCoeff1D computes cubic spline coefficients for 1D data using
+// clamped boundary conditions (first derivative = 0 at endpoints).
 // Returns coefficients [a, b, c, d] for each interval.
 func (f *Type0) cubicSplineCoeff1D(x, y []float64) ([]float64, []float64, []float64, []float64) {
 	n := len(x)
@@ -733,14 +729,14 @@ func (f *Type0) cubicSplineCoeff1D(x, y []float64) ([]float64, []float64, []floa
 		return a, b, c, d
 	}
 
-	// Compute intervals
+	// compute intervals
 	h := make([]float64, n-1)
 	for i := 0; i < n-1; i++ {
 		h[i] = x[i+1] - x[i]
 	}
 
 	// build tridiagonal system for second derivatives M
-	// natural boundary conditions: M[0] = M[n-1] = 0
+	// clamped boundary conditions: first derivative = 0 at endpoints
 	A := make([][]float64, n)
 	rhs := make([]float64, n)
 
@@ -748,11 +744,17 @@ func (f *Type0) cubicSplineCoeff1D(x, y []float64) ([]float64, []float64, []floa
 		A[i] = make([]float64, n)
 	}
 
-	// boundary conditions
-	A[0][0] = 1.0
-	A[n-1][n-1] = 1.0
-	rhs[0] = 0.0
-	rhs[n-1] = 0.0
+	// left boundary condition: S'(x_0) = 0
+	// this gives: 2*M[0] + M[1] = 6*(y[1]-y[0])/h[0]^2
+	A[0][0] = 2.0
+	A[0][1] = 1.0
+	rhs[0] = 6.0 * (y[1] - y[0]) / (h[0] * h[0])
+
+	// right boundary condition: S'(x_{n-1}) = 0
+	// this gives: M[n-2] + 2*M[n-1] = -6*(y[n-1]-y[n-2])/h[n-2]^2
+	A[n-1][n-2] = 1.0
+	A[n-1][n-1] = 2.0
+	rhs[n-1] = -6.0 * (y[n-1] - y[n-2]) / (h[n-2] * h[n-2])
 
 	// interior points
 	for i := 1; i < n-1; i++ {
@@ -787,7 +789,7 @@ func (f *Type0) solveTridiagonal(A [][]float64, b []float64) []float64 {
 	n := len(b)
 	x := make([]float64, n)
 
-	// Make a copy to avoid modifying input
+	// make a copy to avoid modifying input
 	matrix := make([][]float64, n)
 	rhs := make([]float64, n)
 	for i := range matrix {
@@ -839,346 +841,127 @@ func (f *Type0) solveTridiagonal(A [][]float64, b []float64) []float64 {
 	return x
 }
 
-// computeCubicCoefficients computes tensor product cubic spline coefficients
-func (f *Type0) computeCubicCoefficients() {
-	if !f.UseCubic {
-		return // Only compute for cubic splines
-	}
+// sampleCubic evaluates the cubic spline at given indices
+func (f *Type0) sampleCubic(indices []float64) []float64 {
+	m, _ := f.Shape()
 
-	m, n := f.Shape()
-	if m == 0 || n == 0 {
-		return
-	}
-
-	// Convert samples to float64 array organized by grid points
-	sampleData := f.convertSamplesToFloat64()
-
-	// Compute tensor product spline coefficients
-	f.cubicCoefficients = f.recursiveSplineFit(sampleData, 0)
-
-	// Store coefficient shape for indexing
-	f.cubicShape = make([]int, m)
-	for i := 0; i < m; i++ {
-		f.cubicShape[i] = 4 * (f.Size[i] - 1)
+	if m == 1 {
+		// 1D case - use direct evaluation (this works perfectly)
+		return f.sampleCubic1DDirect(indices[0])
+	} else if m == 2 {
+		// 2D case - use direct bicubic evaluation
+		return f.sampleBicubicDirect(indices[0], indices[1])
+	} else {
+		// Higher dimensions - fall back to linear for now
+		return f.sampleLinear(indices)
 	}
 }
 
-// convertSamplesToFloat64 extracts all sample values as float64 arrays
-func (f *Type0) convertSamplesToFloat64() []float64 {
-	m, n := f.Shape()
-	totalPoints := 1
-	for i := 0; i < m; i++ {
-		totalPoints *= f.Size[i]
+// sampleCubic1DDirect performs direct 1D cubic spline evaluation
+func (f *Type0) sampleCubic1DDirect(coord float64) []float64 {
+	_, n := f.Shape()
+	gridSize := f.Size[0]
+
+	// extract all sample values for this 1D function
+	samples := make([][]float64, gridSize)
+	for i := 0; i < gridSize; i++ {
+		samples[i] = f.getSamplesAt([]int{i})
 	}
 
-	result := make([]float64, totalPoints*n)
-
-	// Extract samples for each grid point
-	idx := 0
-	f.iterateGridPoints(f.Size, func(gridIdx []int) {
-		samples := f.getSamplesAt(gridIdx)
-		for i := 0; i < n; i++ {
-			result[idx*n+i] = samples[i]
-		}
-		idx++
-	})
-
-	return result
-}
-
-// iterateGridPoints calls fn for each grid point in lexicographic order
-func (f *Type0) iterateGridPoints(sizes []int, fn func([]int)) {
-	if len(sizes) == 0 {
-		return
-	}
-
-	indices := make([]int, len(sizes))
-	f.iterateGridPointsRecursive(sizes, indices, 0, fn)
-}
-
-// iterateGridPointsRecursive is the recursive helper for iterateGridPoints
-func (f *Type0) iterateGridPointsRecursive(sizes, indices []int, dim int, fn func([]int)) {
-	if dim == len(sizes) {
-		// Make a copy since indices is reused
-		copy := make([]int, len(indices))
-		copy = append(copy[:0], indices...)
-		fn(copy)
-		return
-	}
-
-	for i := 0; i < sizes[dim]; i++ {
-		indices[dim] = i
-		f.iterateGridPointsRecursive(sizes, indices, dim+1, fn)
-	}
-}
-
-// recursiveSplineFit applies 1D splines recursively along each dimension
-func (f *Type0) recursiveSplineFit(data []float64, dim int) []float64 {
-	m, n := f.Shape()
-
-	if dim == m {
-		// Base case: processed all dimensions
-		return data
-	}
-
-	// Current data shape
-	inputShape := f.getDataShape(dim)
-	nPts := inputShape[dim]
-
-	// Output shape: 4*(nPts-1) in dimension 'dim'
-	outputShape := make([]int, len(inputShape))
-	copy(outputShape, inputShape)
-	outputShape[dim] = 4 * (nPts - 1)
-
-	// Calculate strides for indexing
-	inputStride := f.calculateStride(inputShape)
-	outputStride := f.calculateStride(outputShape)
-
-	// total size
-	outputSize := 1
-	for _, s := range outputShape {
-		outputSize *= s
-	}
-	output := make([]float64, outputSize)
-
-	// create grid coordinates for current dimension
-	// for PDF functions, use normalized coordinates [0, 1, 2, ..., nPts-1]
-	grid := make([]float64, nPts)
-	for i := 0; i < nPts; i++ {
+	// create grid coordinates
+	grid := make([]float64, gridSize)
+	for i := 0; i < gridSize; i++ {
 		grid[i] = float64(i)
 	}
 
-	// process each 1D "fiber" along dimension 'dim'
-	f.processFibers(data, output, grid, dim, inputShape, outputShape, inputStride, outputStride, n)
-
-	// Recursively process next dimension
-	return f.recursiveSplineFit(output, dim+1)
-}
-
-// getDataShape returns the shape of data array at processing stage 'dim'
-func (f *Type0) getDataShape(dim int) []int {
-	m, n := f.Shape()
-	shape := make([]int, m+1) // +1 for output dimension
-
-	for i := 0; i < m; i++ {
-		if i < dim {
-			// Already processed: 4*(Size[i]-1) coefficients per interval
-			shape[i] = 4 * (f.Size[i] - 1)
-		} else {
-			// Not yet processed: original grid size
-			shape[i] = f.Size[i]
-		}
-	}
-	shape[m] = n // Output dimension
-
-	return shape
-}
-
-// calculateStride computes stride array for multi-dimensional indexing
-func (f *Type0) calculateStride(shape []int) []int {
-	stride := make([]int, len(shape))
-	stride[len(shape)-1] = 1
-	for i := len(shape) - 2; i >= 0; i-- {
-		stride[i] = stride[i+1] * shape[i+1]
-	}
-	return stride
-}
-
-// processFibers applies 1D splines to all fibers along a given dimension
-func (f *Type0) processFibers(input, output []float64, grid []float64, dim int, inputShape, outputShape, inputStride, outputStride []int, n int) {
-	nPts := inputShape[dim]
-
-	// Iterate over all possible fiber positions
-	f.iterateFiberPositions(inputShape, dim, func(pos []int) {
-		// Extract 1D fiber data
-		fiberData := make([]float64, nPts*n)
-		for i := 0; i < nPts; i++ {
-			pos[dim] = i
-			inputIdx := f.computeLinearIndex(pos, inputStride)
-			for j := 0; j < n; j++ {
-				fiberData[i*n+j] = input[inputIdx+j]
-			}
-		}
-
-		// Process each output component separately
-		for component := 0; component < n; component++ {
-			// Extract y values for this component
-			y := make([]float64, nPts)
-			for i := 0; i < nPts; i++ {
-				y[i] = fiberData[i*n+component]
-			}
-
-			// Compute 1D spline coefficients
-			a, b, c, d := f.cubicSplineCoeff1D(grid, y)
-
-			// Store coefficients in output array
-			for i := 0; i < len(a); i++ {
-				pos[dim] = i * 4
-				outputIdx := f.computeLinearIndex(pos, outputStride)
-				output[outputIdx+component] = a[i]
-
-				pos[dim] = i*4 + 1
-				outputIdx = f.computeLinearIndex(pos, outputStride)
-				output[outputIdx+component] = b[i]
-
-				pos[dim] = i*4 + 2
-				outputIdx = f.computeLinearIndex(pos, outputStride)
-				output[outputIdx+component] = c[i]
-
-				pos[dim] = i*4 + 3
-				outputIdx = f.computeLinearIndex(pos, outputStride)
-				output[outputIdx+component] = d[i]
-			}
-		}
-	})
-}
-
-// iterateFiberPositions calls fn for each position that defines a fiber along 'dim'
-func (f *Type0) iterateFiberPositions(shape []int, dim int, fn func([]int)) {
-	pos := make([]int, len(shape))
-	f.iterateFiberPositionsRecursive(shape, pos, 0, dim, fn)
-}
-
-// iterateFiberPositionsRecursive is the recursive helper
-func (f *Type0) iterateFiberPositionsRecursive(shape, pos []int, currentDim, skipDim int, fn func([]int)) {
-	if currentDim == len(shape)-1 { // -1 because last dimension is output components
-		// We've filled all spatial dimensions except the skip dimension
-		fn(pos)
-		return
-	}
-
-	if currentDim == skipDim {
-		// Skip the fiber dimension - will be iterated in processFibers
-		f.iterateFiberPositionsRecursive(shape, pos, currentDim+1, skipDim, fn)
-		return
-	}
-
-	for i := 0; i < shape[currentDim]; i++ {
-		pos[currentDim] = i
-		f.iterateFiberPositionsRecursive(shape, pos, currentDim+1, skipDim, fn)
-	}
-}
-
-// computeLinearIndex converts multi-dimensional index to linear index
-func (f *Type0) computeLinearIndex(indices, stride []int) int {
-	idx := 0
-	for i := 0; i < len(indices)-1; i++ { // -1 to exclude output dimension from indexing
-		idx += indices[i] * stride[i]
-	}
-	return idx
-}
-
-// sampleCubic evaluates the tensor product cubic spline at given indices
-func (f *Type0) sampleCubic(indices []float64) []float64 {
-	if len(f.cubicCoefficients) == 0 {
-		f.computeCubicCoefficients()
-	}
-
-	m, n := f.Shape()
-
-	// Find cell containing the point and compute local coordinates
-	cellInfo := make([]struct {
-		interval int
-		t        float64
-	}, m)
-
-	for d := 0; d < m; d++ {
-		// Find interval containing indices[d]
-		idx := int(math.Floor(indices[d]))
-
-		// Handle boundary cases
-		if idx < 0 {
-			idx = 0
-		} else if idx >= f.Size[d]-1 {
-			idx = f.Size[d] - 2
-		}
-
-		// Local coordinate within interval [0, 1]
-		t := indices[d] - float64(idx)
-		if t < 0 {
-			t = 0
-		} else if t > 1 {
-			t = 1
-		}
-
-		cellInfo[d].interval = idx
-		cellInfo[d].t = t
-	}
-
-	// Evaluate tensor product
+	// for each output component, fit cubic spline and evaluate
 	result := make([]float64, n)
-
-	// Iterate over all 4^m combinations of basis functions
-	f.iteratePowerCombinations(m, func(powers []int) {
-		// Build coefficient array index
-		coeffIdx := make([]int, m+1) // +1 for output dimension
-		basisProd := 1.0
-
-		for d := 0; d < m; d++ {
-			interval := cellInfo[d].interval
-			t := cellInfo[d].t
-
-			// Coefficient index for this dimension: interval*4 + power
-			coeffIdx[d] = interval*4 + powers[d]
-
-			// Basis function value: t^power
-			basisProd *= math.Pow(t, float64(powers[d]))
+	for component := 0; component < n; component++ {
+		// extract values for this component
+		values := make([]float64, gridSize)
+		for i := 0; i < gridSize; i++ {
+			values[i] = samples[i][component]
 		}
 
-		// Add contribution from this basis function to each output component
-		for component := 0; component < n; component++ {
-			coeffIdx[m] = component
-			linearIdx := f.computeCubicLinearIndex(coeffIdx)
-			if linearIdx < len(f.cubicCoefficients) {
-				result[component] += f.cubicCoefficients[linearIdx] * basisProd
-			}
-		}
-	})
+		// fit cubic spline and evaluate
+		a, b, c, d := f.cubicSplineCoeff1D(grid, values)
+		result[component] = f.evaluateCubicSplineAt(a, b, c, d, grid, coord)
+	}
 
 	return result
 }
 
-// iteratePowerCombinations calls fn for all combinations of powers [0,1,2,3]^m
-func (f *Type0) iteratePowerCombinations(m int, fn func([]int)) {
-	powers := make([]int, m)
-	f.iteratePowerCombinationsRecursive(powers, 0, fn)
+// sampleBicubicDirect performs direct 2D bicubic evaluation using separable cubic splines
+func (f *Type0) sampleBicubicDirect(x, y float64) []float64 {
+	_, n := f.Shape()
+	xSize, ySize := f.Size[0], f.Size[1]
+
+	// step 1: for each row (constant y), evaluate 1D cubic spline at x
+	rowResults := make([][]float64, ySize)
+	xGrid := make([]float64, xSize)
+	for i := 0; i < xSize; i++ {
+		xGrid[i] = float64(i)
+	}
+
+	for j := 0; j < ySize; j++ {
+		// extract samples for row j
+		rowSamples := make([][]float64, xSize)
+		for i := 0; i < xSize; i++ {
+			rowSamples[i] = f.getSamplesAt([]int{i, j})
+		}
+
+		// for each component, fit 1D cubic spline along x and evaluate
+		rowResult := make([]float64, n)
+		for component := 0; component < n; component++ {
+			values := make([]float64, xSize)
+			for i := 0; i < xSize; i++ {
+				values[i] = rowSamples[i][component]
+			}
+
+			a, b, c, d := f.cubicSplineCoeff1D(xGrid, values)
+			rowResult[component] = f.evaluateCubicSplineAt(a, b, c, d, xGrid, x)
+		}
+		rowResults[j] = rowResult
+	}
+
+	// step 2: for each component, fit 1D cubic spline along y using row results
+	yGrid := make([]float64, ySize)
+	for j := 0; j < ySize; j++ {
+		yGrid[j] = float64(j)
+	}
+
+	result := make([]float64, n)
+	for component := 0; component < n; component++ {
+		values := make([]float64, ySize)
+		for j := 0; j < ySize; j++ {
+			values[j] = rowResults[j][component]
+		}
+
+		a, b, c, d := f.cubicSplineCoeff1D(yGrid, values)
+		result[component] = f.evaluateCubicSplineAt(a, b, c, d, yGrid, y)
+	}
+
+	return result
 }
 
-// iteratePowerCombinationsRecursive is the recursive helper
-func (f *Type0) iteratePowerCombinationsRecursive(powers []int, dim int, fn func([]int)) {
-	if dim == len(powers) {
-		// Make a copy since powers is reused
-		powersCopy := make([]int, len(powers))
-		copy(powersCopy, powers)
-		fn(powersCopy)
-		return
+// evaluateCubicSplineAt evaluates a 1D cubic spline at a given coordinate
+func (f *Type0) evaluateCubicSplineAt(a, b, c, d []float64, grid []float64, coord float64) float64 {
+	// find interval
+	idx := int(math.Floor(coord))
+	if idx < 0 {
+		idx = 0
+	} else if idx >= len(a) {
+		idx = len(a) - 1
 	}
 
-	for p := 0; p < 4; p++ {
-		powers[dim] = p
-		f.iteratePowerCombinationsRecursive(powers, dim+1, fn)
-	}
-}
-
-// computeCubicLinearIndex converts multi-dimensional coefficient index to linear index
-func (f *Type0) computeCubicLinearIndex(indices []int) int {
-	m, n := f.Shape()
-
-	// Use row-major ordering: [dim0][dim1]...[dimM-1][component]
-	// Total shape: [cubicShape[0], cubicShape[1], ..., cubicShape[m-1], n]
-
-	idx := 0
-	multiplier := 1
-
-	// Start from the rightmost dimension (component)
-	idx += indices[m] * multiplier
-	multiplier *= n
-
-	// Process spatial dimensions from right to left
-	for i := m - 1; i >= 0; i-- {
-		idx += indices[i] * multiplier
-		multiplier *= f.cubicShape[i]
+	// local coordinate within interval
+	t := coord - grid[idx]
+	if t < 0 {
+		t = 0
+	} else if t > 1 {
+		t = 1
 	}
 
-	return idx
+	// evaluate cubic polynomial: S(t) = a + b*t + c*t² + d*t³
+	return a[idx] + b[idx]*t + c[idx]*t*t + d[idx]*t*t*t
 }

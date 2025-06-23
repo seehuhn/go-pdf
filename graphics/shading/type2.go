@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -25,28 +25,42 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
-// Type1 represents a type 1 (function-based) shading.
+// Type2 represents a type 2 (axial) shading.
 //
 // This type implements the [seehuhn.de/go/pdf/graphics.Shading] interface.
-type Type1 struct {
+type Type2 struct {
 	// ColorSpace defines the color space for shading color values.
 	ColorSpace color.Space
 
-	// F is either a 2->n function or an array of n 2->1 functions, where n is
-	// the number of color components of the ColorSpace.
+	// X0, Y0, X1, Y1 specify the starting and ending coordinates of the axis,
+	// expressed in the shading's target coordinate space.
+	X0, Y0, X1, Y1 float64
+
+	// F is a 1->n function where n is the number of color components of the
+	// ColorSpace. The function is called with values of the parametric
+	// variable t in the domain defined by TMin and TMax.
+	//
+	// TODO: Add support for array of n 1->1 functions as alternative to
+	// single 1->n function.
 	F pdf.Function
 
-	// Domain (optional) specifies the rectangular coordinate domain [xmin xmax
-	// ymin ymax]. The default is [0 1 0 1].
-	Domain []float64
+	// TMin, TMax specify the limiting values of the parametric variable t.
+	// The variable is considered to vary linearly between these two values
+	// as the color gradient varies between the starting and ending points
+	// of the axis. Default: [0.0, 1.0].
+	TMin, TMax float64
 
-	// Matrix (optional) transforms domain coordinates to target coordinate
-	// space. Default: identity matrix [1 0 0 1 0 0].
-	Matrix []float64
+	// ExtendStart specifies whether to extend the shading beyond the starting
+	// point of the axis. Default: false.
+	ExtendStart bool
+
+	// ExtendEnd specifies whether to extend the shading beyond the ending
+	// point of the axis. Default: false.
+	ExtendEnd bool
 
 	// Background (optional) specifies the color for areas outside the
-	// transformed domain, when used in a shading pattern. The default is to
-	// leave points outside the transformed domain unpainted.
+	// shading's bounds, when used in a shading pattern. The default is to
+	// leave such points unpainted.
 	Background []float64
 
 	// BBox (optional) defines the shading's bounding box as a clipping
@@ -54,7 +68,7 @@ type Type1 struct {
 	BBox *pdf.Rectangle
 
 	// AntiAlias controls whether to filter the shading function to prevent
-	// aliasing. Default: false.
+	// aliasing.
 	AntiAlias bool
 
 	// SingleUse determines if shading is returned as dictionary (true) or
@@ -62,15 +76,15 @@ type Type1 struct {
 	SingleUse bool
 }
 
-var _ graphics.Shading = (*Type1)(nil)
+var _ graphics.Shading = (*Type2)(nil)
 
 // ShadingType implements the [Shading] interface.
-func (s *Type1) ShadingType() int {
-	return 1
+func (s *Type2) ShadingType() int {
+	return 2
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (s *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	if s.ColorSpace == nil {
 		return nil, zero, errors.New("missing ColorSpace")
@@ -85,20 +99,22 @@ func (s *Type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 			return nil, zero, err
 		}
 	}
-	if m, _ := s.F.Shape(); m != 2 {
-		return nil, zero, fmt.Errorf("function must have 2 inputs, not %d", m)
+
+	// validate that starting and ending coordinates are not coincident
+	if s.X0 == s.X1 && s.Y0 == s.Y1 {
+		return nil, zero, errors.New("starting and ending coordinates must not be coincident")
+	}
+
+	if s.F == nil {
+		return nil, zero, errors.New("missing function")
+	}
+	if m, _ := s.F.Shape(); m != 1 {
+		return nil, zero, fmt.Errorf("function must have 1 input, not %d", m)
 	}
 
 	fn, _, err := pdf.ResourceManagerEmbed(rm, s.F)
 	if err != nil {
 		return nil, zero, err
-	}
-
-	if len(s.Domain) > 0 && (len(s.Domain) != 4 || s.Domain[0] > s.Domain[1] || s.Domain[2] > s.Domain[3]) {
-		return nil, zero, fmt.Errorf("invalid Domain: %v", s.Domain)
-	}
-	if len(s.Matrix) > 0 && len(s.Matrix) != 6 {
-		return nil, zero, errors.New("invalid Matrix")
 	}
 
 	csE, _, err := pdf.ResourceManagerEmbed(rm, s.ColorSpace)
@@ -107,9 +123,13 @@ func (s *Type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	dict := pdf.Dict{
-		"ShadingType": pdf.Integer(1),
+		"ShadingType": pdf.Integer(2),
 		"ColorSpace":  csE,
-		"Function":    fn,
+		"Coords": pdf.Array{
+			pdf.Number(s.X0), pdf.Number(s.Y0),
+			pdf.Number(s.X1), pdf.Number(s.Y1),
+		},
+		"Function": fn,
 	}
 	if len(s.Background) > 0 {
 		dict["Background"] = toPDF(s.Background)
@@ -120,11 +140,11 @@ func (s *Type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	if s.AntiAlias {
 		dict["AntiAlias"] = pdf.Boolean(true)
 	}
-	if len(s.Domain) > 0 && !isValues(s.Domain, 0, 1, 0, 1) {
-		dict["Domain"] = toPDF(s.Domain)
+	if s.TMin != 0 || s.TMax != 1 {
+		dict["Domain"] = pdf.Array{pdf.Number(s.TMin), pdf.Number(s.TMax)}
 	}
-	if len(s.Matrix) > 0 && !isValues(s.Matrix, 1, 0, 0, 1, 0, 0) {
-		dict["Matrix"] = toPDF(s.Matrix)
+	if s.ExtendStart || s.ExtendEnd {
+		dict["Extend"] = pdf.Array{pdf.Boolean(s.ExtendStart), pdf.Boolean(s.ExtendEnd)}
 	}
 
 	var data pdf.Native
