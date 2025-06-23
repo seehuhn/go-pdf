@@ -120,8 +120,8 @@ func FuzzFontDescriptor(f *testing.F) {
 		if err != nil {
 			t.Skip()
 		}
-		fd1, err := ExtractDescriptor(r, fdDict)
-		if err != nil {
+		fd1, _ := ExtractDescriptor(r, fdDict)
+		if fd1 == nil {
 			t.Skip()
 		}
 
