@@ -148,7 +148,8 @@ func (f *Type4) makeType4SystemDict() postscript.Dict {
 	tempIntp := postscript.NewInterpreter()
 	systemDict := tempIntp.SystemDict
 
-	// create Type 4 dictionary with only allowed operators from Table 42
+	// Create Type 4 dictionary with only allowed operators from Table 42
+	// of the PDF 2.0 specification.
 	type4Dict := postscript.Dict{
 		// add constants
 		"true":  postscript.Boolean(true),
