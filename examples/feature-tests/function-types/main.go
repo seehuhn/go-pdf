@@ -112,11 +112,12 @@ func createDocument(fname string) error {
 
 	writer.printf("Type 2 functions")
 	F2 := &function.Type2{
-		Domain: []float64{0, 1},
-		Range:  []float64{0, 1, 0, 1, 0, 1},
-		C0:     []float64{1, 0.2, 0},
-		C1:     []float64{0.1, 0.9, 1},
-		N:      0.8,
+		XMin:  0,
+		XMax:  1,
+		Range: []float64{0, 1, 0, 1, 0, 1},
+		C0:    []float64{1, 0.2, 0},
+		C1:    []float64{0.1, 0.9, 1},
+		N:     0.8,
 	}
 	writer.test1DStrip(F2)
 
@@ -126,11 +127,12 @@ func createDocument(fname string) error {
 		Range:  []float64{0, 1, 0, 1, 0, 1},
 		Functions: []pdf.Function{
 			&function.Type2{
-				Domain: []float64{0, 1},
-				Range:  []float64{0, 1, 0, 1, 0, 1},
-				C0:     []float64{1, 0, 0},
-				C1:     []float64{1, 1, 0},
-				N:      1.0,
+				XMin:  0,
+				XMax:  1,
+				Range: []float64{0, 1, 0, 1, 0, 1},
+				C0:    []float64{1, 0, 0},
+				C1:    []float64{1, 1, 0},
+				N:     1.0,
 			},
 			&function.Type4{
 				Domain:  []float64{0, 1},
@@ -138,11 +140,12 @@ func createDocument(fname string) error {
 				Program: `pop 0 0 0`,
 			},
 			&function.Type2{
-				Domain: []float64{0, 1},
-				Range:  []float64{0, 1, 0, 1, 0, 1},
-				C0:     []float64{1, 1, 0},
-				C1:     []float64{0, 0, 1},
-				N:      2.0,
+				XMin:  0,
+				XMax:  1,
+				Range: []float64{0, 1, 0, 1, 0, 1},
+				C0:    []float64{1, 1, 0},
+				C1:    []float64{0, 0, 1},
+				N:     2.0,
 			},
 		},
 		Bounds: []float64{0.5, 0.52},

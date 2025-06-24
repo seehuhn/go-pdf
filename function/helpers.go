@@ -16,7 +16,50 @@
 
 package function
 
-import "seehuhn.de/go/pdf"
+import (
+	"math"
+
+	"seehuhn.de/go/pdf"
+)
+
+// helper functions
+func abs(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+func isFinite(x float64) bool {
+	return !math.IsInf(x, 0) && !math.IsNaN(x)
+}
+
+// isRange checks if the given values x and y are finite and satisfy x <= y.
+func isRange(x, y float64) bool {
+	if math.IsInf(x, 0) || math.IsInf(y, 0) {
+		return false
+	}
+	return x <= y
+}
+
+// clip clips a value to the given range [min, max].
+func clip(value, min, max float64) float64 {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
+}
+
+// interpolate performs linear interpolation.
+func interpolate(x, xMin, xMax, yMin, yMax float64) float64 {
+	if xMax <= xMin {
+		return yMin
+	}
+	return yMin + (x-xMin)*(yMax-yMin)/(xMax-xMin)
+}
 
 // arrayFromFloats converts a slice of float64 to a PDF Array.
 func arrayFromFloats(x []float64) pdf.Array {
@@ -76,23 +119,4 @@ func intsFromPDF(r pdf.Getter, obj pdf.Object) ([]int, error) {
 		res[i] = int(num)
 	}
 	return res, nil
-}
-
-// clip clips a value to the given range [min, max].
-func clip(value, min, max float64) float64 {
-	if value < min {
-		return min
-	}
-	if value > max {
-		return max
-	}
-	return value
-}
-
-// interpolate performs linear interpolation.
-func interpolate(x, xMin, xMax, yMin, yMax float64) float64 {
-	if xMax <= xMin {
-		return yMin
-	}
-	return yMin + (x-xMin)*(yMax-yMin)/(xMax-xMin)
 }

@@ -23,23 +23,31 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Type2 represents a power interpolation function of the form
-// y = C0 + x^N × (C1 - C0).
-// The PDF specification refers to this as "exponential interpolation".
+// Type2 represents a power interpolation functions, of the form y = C0 + x^N ×
+// (C1 - C0).  These functions have a single input x and can have one or more
+// outputs. The PDF specification refers to this type of function as
+// "exponential interpolation".
 type Type2 struct {
-	// Domain defines the valid input range as [min, max].
-	Domain []float64
+	// XMin is the minimum value of the input range.  Input values x smaller
+	// than XMin are clipped to XMin.  This must be less than or equal to XMax.
+	XMin float64
 
-	// Range defines the valid output ranges as [min0, max0, min1, max1, ...].
-	// This is optional for Type 2 functions.
+	// XMax is the maximum value of the input range.  Input values x larger
+	// than XMax are clipped to XMax.  This must be greater than or equal
+	// to XMin.
+	XMax float64
+
+	// Range (optional) defines clipping ranges for the outputs, in the form
+	// [min0, max0, min1, max1, ...]. It this is missing, no clipping is
+	// applied.  If present, this must have the same length as C0 and C1.
 	Range []float64
 
 	// C0 defines function result when x = 0.0.
-	// Default: [0.0].
+	// This must contain at least one value and must have the same length as C1.
 	C0 []float64
 
 	// C1 defines function result when x = 1.0.
-	// Default: [1.0].
+	// This must contain at least one value and must have the same length as C0.
 	C1 []float64
 
 	// N is the interpolation exponent.
@@ -53,14 +61,7 @@ func (f *Type2) FunctionType() int {
 
 // Shape returns the number of input and output values of the function.
 func (f *Type2) Shape() (int, int) {
-	n := len(f.C0)
-	if len(f.C1) > n {
-		n = len(f.C1)
-	}
-	if n == 0 {
-		n = 1 // Default case
-	}
-	return 1, n
+	return 1, len(f.C0)
 }
 
 // Apply applies the function to the given input value and returns the output values.
@@ -69,12 +70,7 @@ func (f *Type2) Apply(inputs ...float64) []float64 {
 		panic(fmt.Sprintf("Type 2 function expects 1 input, got %d", len(inputs)))
 	}
 
-	x := inputs[0]
-
-	// Clip input to domain
-	if len(f.Domain) >= 2 {
-		x = clip(x, f.Domain[0], f.Domain[1])
-	}
+	x := clip(inputs[0], f.XMin, f.XMax)
 
 	// Get C0 and C1 arrays, using defaults if not specified
 	c0 := f.C0
@@ -139,11 +135,9 @@ func (f *Type2) Apply(inputs ...float64) []float64 {
 func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := f.validate(); err != nil {
-		return nil, zero, err
-	}
-
 	if err := pdf.CheckVersion(rm.Out, "Type 2 functions", pdf.V1_3); err != nil {
+		return nil, zero, err
+	} else if err := f.validate(); err != nil {
 		return nil, zero, err
 	}
 
@@ -153,12 +147,7 @@ func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		"N":            pdf.Number(f.N),
 	}
 
-	// Add domain (required) - ensure we always have a valid domain
-	domain := f.Domain
-	if len(domain) < 2 {
-		domain = []float64{0, 1} // Default domain
-	}
-	dict["Domain"] = arrayFromFloats(domain[:2])
+	dict["Domain"] = pdf.Array{pdf.Number(f.XMin), pdf.Number(f.XMax)}
 
 	// Add range (optional)
 	if len(f.Range) > 0 {
@@ -187,34 +176,43 @@ func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 // validate checks if the Type2 function is properly configured.
 func (f *Type2) validate() error {
 	// Domain validation
-	if len(f.Domain) != 0 && len(f.Domain) != 2 {
-		return newInvalidFunctionError(2, "domain", "must have 2 elements or be empty, got %d", len(f.Domain))
+	if !isRange(f.XMin, f.XMax) {
+		return newInvalidFunctionError(2, "Xmin/XMax", "invalid domain [%g,%g]",
+			f.XMin, f.XMax)
 	}
 
-	if len(f.Domain) == 2 {
-		// Check domain constraints for special exponents
-		min, max := f.Domain[0], f.Domain[1]
+	if len(f.C0) < 1 || len(f.C0) != len(f.C1) {
+		return newInvalidFunctionError(2, "C0/C1", "invalid length %d,%d",
+			len(f.C0), len(f.C1))
+	}
 
+	if !isFinite(f.N) {
+		return newInvalidFunctionError(2, "N", "must be a finite number, got %g", f.N)
+	}
+	if f.N != math.Trunc(f.N) && f.XMin < 0 {
 		// If N is non-integer, x must be >= 0
-		if f.N != math.Floor(f.N) && min < 0 {
-			return newInvalidFunctionError(2, "domain", "minimum must be >= 0 when N is non-integer, got %f", min)
-		}
-
+		return newInvalidFunctionError(2, "Domain",
+			"minimum must be >= 0 when N is non-integer, got %f", f.XMin)
+	}
+	if f.N < 0 && f.XMin <= 0 && f.XMax >= 0 {
 		// If N is negative, x must not be 0
-		if f.N < 0 && min <= 0 && max >= 0 {
-			return newInvalidFunctionError(2, "domain", "must not include 0 when N is negative")
-		}
+		return newInvalidFunctionError(2, "Domain", "must not include 0 when N is negative")
 	}
 
 	// Range validation
 	_, n := f.Shape()
-	if len(f.Range) != 0 && len(f.Range) != 2*n {
-		return newInvalidFunctionError(2, "range", "must have 2*n (%d) elements or be empty, got %d", 2*n, len(f.Range))
-	}
-
-	// C0 and C1 validation
-	if f.C0 != nil && f.C1 != nil && len(f.C0) != len(f.C1) {
-		return newInvalidFunctionError(2, "C0/C1", "must have the same length, got C0=%d, C1=%d", len(f.C0), len(f.C1))
+	if f.Range != nil {
+		if len(f.Range) != 2*n {
+			return newInvalidFunctionError(2, "Range", "invalid length %d",
+				len(f.Range))
+		}
+		for i := 0; i < n; i++ {
+			if !isRange(f.Range[2*i], f.Range[2*i+1]) {
+				return newInvalidFunctionError(2, "Range",
+					"invalid range for output %d: [%g, %g]",
+					i, f.Range[2*i], f.Range[2*i+1])
+			}
+		}
 	}
 
 	return nil
@@ -226,6 +224,9 @@ func readType2(r pdf.Getter, d pdf.Dict) (*Type2, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read Domain: %w", err)
 	}
+	if len(domain) < 2 || !isRange(domain[0], domain[1]) {
+		domain = []float64{0, 1}
+	}
 
 	n, err := pdf.GetNumber(r, d["N"])
 	if err != nil {
@@ -233,16 +234,12 @@ func readType2(r pdf.Getter, d pdf.Dict) (*Type2, error) {
 	}
 
 	f := &Type2{
-		Domain: domain,
-		N:      float64(n),
+		XMin: domain[0],
+		XMax: domain[1],
+		N:    float64(n),
 	}
 
 	// Ensure domain has exactly 2 elements to maintain round-trip consistency
-	if len(f.Domain) < 2 {
-		f.Domain = []float64{0, 1}
-	} else if len(f.Domain) > 2 {
-		f.Domain = f.Domain[:2]
-	}
 
 	if rangeObj, ok := d["Range"]; ok {
 		f.Range, err = floatsFromPDF(r, rangeObj)

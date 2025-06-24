@@ -88,45 +88,50 @@ var testCases = map[int][]testCase{
 		{
 			name: "basic Type2",
 			function: &Type2{
-				Domain: []float64{0, 1},
-				C0:     []float64{0.0},
-				C1:     []float64{1.0},
-				N:      1.0,
+				XMin: 0,
+				XMax: 1,
+				C0:   []float64{0.0},
+				C1:   []float64{1.0},
+				N:    1.0,
 			},
 		},
 		{
 			name: "Type2 with range",
 			function: &Type2{
-				Domain: []float64{0, 1},
-				Range:  []float64{0, 1, 0, 1, 0, 1},
-				C0:     []float64{1, 0, 0},
-				C1:     []float64{0, 1, 0},
-				N:      2.0,
+				XMin:  0,
+				XMax:  1,
+				Range: []float64{0, 1, 0, 1, 0, 1},
+				C0:    []float64{1, 0, 0},
+				C1:    []float64{0, 1, 0},
+				N:     2.0,
 			},
 		},
 		{
 			name: "Type2 exponential",
 			function: &Type2{
-				Domain: []float64{0, 1},
-				C0:     []float64{0.1, 0.2},
-				C1:     []float64{0.9, 0.8},
-				N:      0.5,
+				XMin: 0,
+				XMax: 1,
+				C0:   []float64{0.1, 0.2},
+				C1:   []float64{0.9, 0.8},
+				N:    0.5,
 			},
 		},
 		{
 			name: "Type2 linear interpolation",
 			function: &Type2{
-				Domain: []float64{0, 1},
-				C0:     []float64{0.2, 0.4, 0.6},
-				C1:     []float64{0.8, 0.6, 0.4},
-				N:      1.0,
+				XMin: 0,
+				XMax: 1,
+				C0:   []float64{0.2, 0.4, 0.6},
+				C1:   []float64{0.8, 0.6, 0.4},
+				N:    1.0,
 			},
 		},
 		{
 			name: "Type2 minimal",
 			function: &Type2{
-				Domain: []float64{0, 1},
-				N:      1.0,
+				XMin: 0,
+				XMax: 1,
+				N:    1.0,
 			},
 		},
 	},
@@ -137,16 +142,18 @@ var testCases = map[int][]testCase{
 				Domain: []float64{0, 1},
 				Functions: []pdf.Function{
 					&Type2{
-						Domain: []float64{0, 1},
-						C0:     []float64{1, 0, 0},
-						C1:     []float64{0, 1, 0},
-						N:      1.0,
+						XMin: 0,
+						XMax: 1,
+						C0:   []float64{1, 0, 0},
+						C1:   []float64{0, 1, 0},
+						N:    1.0,
 					},
 					&Type2{
-						Domain: []float64{0, 1},
-						C0:     []float64{0, 1, 0},
-						C1:     []float64{0, 0, 1},
-						N:      1.0,
+						XMin: 0,
+						XMax: 1,
+						C0:   []float64{0, 1, 0},
+						C1:   []float64{0, 0, 1},
+						N:    1.0,
 					},
 				},
 				Bounds: []float64{0.5},
@@ -160,16 +167,18 @@ var testCases = map[int][]testCase{
 				Range:  []float64{0, 1},
 				Functions: []pdf.Function{
 					&Type2{
-						Domain: []float64{0, 1},
-						C0:     []float64{0.0},
-						C1:     []float64{0.5},
-						N:      1.0,
+						XMin: 0,
+						XMax: 1,
+						C0:   []float64{0.0},
+						C1:   []float64{0.5},
+						N:    1.0,
 					},
 					&Type2{
-						Domain: []float64{0, 1},
-						C0:     []float64{0.5},
-						C1:     []float64{1.0},
-						N:      1.0,
+						XMin: 0,
+						XMax: 1,
+						C0:   []float64{0.5},
+						C1:   []float64{1.0},
+						N:    1.0,
 					},
 				},
 				Bounds: []float64{1.0},
@@ -181,9 +190,9 @@ var testCases = map[int][]testCase{
 			function: &Type3{
 				Domain: []float64{0, 3},
 				Functions: []pdf.Function{
-					&Type2{Domain: []float64{0, 1}, C0: []float64{0}, C1: []float64{1}, N: 1},
-					&Type2{Domain: []float64{0, 1}, C0: []float64{1}, C1: []float64{0}, N: 1},
-					&Type2{Domain: []float64{0, 1}, C0: []float64{0}, C1: []float64{1}, N: 2},
+					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{1}, N: 1},
+					&Type2{XMin: 0, XMax: 1, C0: []float64{1}, C1: []float64{0}, N: 1},
+					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{1}, N: 2},
 				},
 				Bounds: []float64{1.0, 2.0},
 				Encode: []float64{0, 1, 0, 1, 0, 1},
@@ -323,10 +332,11 @@ func TestFunctionEvaluation(t *testing.T) {
 		{
 			name: "Type2 linear",
 			function: &Type2{
-				Domain: []float64{0, 1},
-				C0:     []float64{0.0},
-				C1:     []float64{1.0},
-				N:      1.0,
+				XMin: 0,
+				XMax: 1,
+				C0:   []float64{0.0},
+				C1:   []float64{1.0},
+				N:    1.0,
 			},
 			inputs:    []float64{0.5},
 			expected:  []float64{0.5},
@@ -335,10 +345,11 @@ func TestFunctionEvaluation(t *testing.T) {
 		{
 			name: "Type2 quadratic",
 			function: &Type2{
-				Domain: []float64{0, 1},
-				C0:     []float64{0.0},
-				C1:     []float64{1.0},
-				N:      2.0,
+				XMin: 0,
+				XMax: 1,
+				C0:   []float64{0.0},
+				C1:   []float64{1.0},
+				N:    2.0,
 			},
 			inputs:    []float64{0.5},
 			expected:  []float64{0.25},
@@ -347,10 +358,11 @@ func TestFunctionEvaluation(t *testing.T) {
 		{
 			name: "Type2 multi-output",
 			function: &Type2{
-				Domain: []float64{0, 1},
-				C0:     []float64{1.0, 0.0, 0.0},
-				C1:     []float64{0.0, 1.0, 0.0},
-				N:      1.0,
+				XMin: 0,
+				XMax: 1,
+				C0:   []float64{1.0, 0.0, 0.0},
+				C1:   []float64{0.0, 1.0, 0.0},
+				N:    1.0,
 			},
 			inputs:    []float64{0.5},
 			expected:  []float64{0.5, 0.5, 0.0},
@@ -458,30 +470,33 @@ func TestFunctionValidation(t *testing.T) {
 		{
 			name: "valid Type2",
 			function: &Type2{
-				Domain: []float64{0, 1},
-				C0:     []float64{0.0},
-				C1:     []float64{1.0},
-				N:      1.0,
+				XMin: 0,
+				XMax: 1,
+				C0:   []float64{0.0},
+				C1:   []float64{1.0},
+				N:    1.0,
 			},
 			wantErr: false,
 		},
 		{
 			name: "Type2 C0/C1 length mismatch",
 			function: &Type2{
-				Domain: []float64{0, 1},
-				C0:     []float64{0.0, 0.0},
-				C1:     []float64{1.0},
-				N:      1.0,
+				XMin: 0,
+				XMax: 1,
+				C0:   []float64{0.0, 0.0},
+				C1:   []float64{1.0},
+				N:    1.0,
 			},
 			wantErr: true,
 		},
 		{
 			name: "Type2 negative domain with non-integer N",
 			function: &Type2{
-				Domain: []float64{-1, 1},
-				C0:     []float64{0.0},
-				C1:     []float64{1.0},
-				N:      0.5, // Non-integer with negative domain
+				XMin: -1,
+				XMax: 1,
+				C0:   []float64{0.0},
+				C1:   []float64{1.0},
+				N:    0.5, // Non-integer with negative domain
 			},
 			wantErr: true,
 		},
@@ -490,7 +505,7 @@ func TestFunctionValidation(t *testing.T) {
 			function: &Type3{
 				Domain: []float64{0, 1},
 				Functions: []pdf.Function{
-					&Type2{Domain: []float64{0, 1}, C0: []float64{0}, C1: []float64{1}, N: 1},
+					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{1}, N: 1},
 				},
 				Bounds: []float64{},
 				Encode: []float64{0, 1},
@@ -502,8 +517,8 @@ func TestFunctionValidation(t *testing.T) {
 			function: &Type3{
 				Domain: []float64{0, 1},
 				Functions: []pdf.Function{
-					&Type2{Domain: []float64{0, 1}, C0: []float64{0}, C1: []float64{1}, N: 1},
-					&Type2{Domain: []float64{0, 1}, C0: []float64{0}, C1: []float64{1}, N: 1},
+					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{1}, N: 1},
+					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{1}, N: 1},
 				},
 				Bounds: []float64{}, // Should have 1 bound for 2 functions
 				Encode: []float64{0, 1, 0, 1},
@@ -559,11 +574,12 @@ func TestDomainRangeClipping(t *testing.T) {
 		{
 			name: "Type2 input clipping",
 			function: &Type2{
-				Domain: []float64{0, 1},
-				Range:  []float64{0, 1},
-				C0:     []float64{0.0},
-				C1:     []float64{1.0},
-				N:      1.0,
+				XMin:  0,
+				XMax:  1,
+				Range: []float64{0, 1},
+				C0:    []float64{0.0},
+				C1:    []float64{1.0},
+				N:     1.0,
 			},
 			inputs:   []float64{-0.5}, // Below domain
 			expected: []float64{0.0},  // Should clip to domain min and evaluate
@@ -571,11 +587,12 @@ func TestDomainRangeClipping(t *testing.T) {
 		{
 			name: "Type2 input clipping upper",
 			function: &Type2{
-				Domain: []float64{0, 1},
-				Range:  []float64{0, 1},
-				C0:     []float64{0.0},
-				C1:     []float64{1.0},
-				N:      1.0,
+				XMin:  0,
+				XMax:  1,
+				Range: []float64{0, 1},
+				C0:    []float64{0.0},
+				C1:    []float64{1.0},
+				N:     1.0,
 			},
 			inputs:   []float64{1.5}, // Above domain
 			expected: []float64{1.0}, // Should clip to domain max and evaluate
@@ -583,11 +600,12 @@ func TestDomainRangeClipping(t *testing.T) {
 		{
 			name: "Type2 output clipping",
 			function: &Type2{
-				Domain: []float64{0, 1},
-				Range:  []float64{0.2, 0.8}, // Restricted output range
-				C0:     []float64{0.0},      // Would normally give 0.0
-				C1:     []float64{1.0},      // Would normally give 1.0
-				N:      1.0,
+				XMin:  0,
+				XMax:  1,
+				Range: []float64{0.2, 0.8}, // Restricted output range
+				C0:    []float64{0.0},      // Would normally give 0.0
+				C1:    []float64{1.0},      // Would normally give 1.0
+				N:     1.0,
 			},
 			inputs:   []float64{0.0},
 			expected: []float64{0.2}, // Should clip to range min
@@ -702,10 +720,11 @@ func FuzzApply(f *testing.F) {
 		switch functionType {
 		case 2:
 			fn = &Type2{
-				Domain: []float64{0, 1},
-				C0:     []float64{0},
-				C1:     []float64{1},
-				N:      1.0,
+				XMin: 0,
+				XMax: 1,
+				C0:   []float64{0},
+				C1:   []float64{1},
+				N:    1.0,
 			}
 		case 4:
 			fn = &Type4{
@@ -736,16 +755,4 @@ func FuzzApply(f *testing.F) {
 			}
 		}
 	})
-}
-
-// helper functions
-func abs(x float64) float64 {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-
-func isFinite(x float64) bool {
-	return !((x != x) || (x > 1e100) || (x < -1e100))
 }

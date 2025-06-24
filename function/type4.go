@@ -104,7 +104,7 @@ func (f *Type4) executePostScript(inputs []float64) ([]float64, error) {
 	// replace the system dictionary with our restricted one
 	intp.DictStack = []postscript.Dict{
 		type4Dict,
-		postscript.Dict{}, // userdict
+		{}, // userdict
 	}
 	intp.SystemDict = type4Dict
 
@@ -186,11 +186,9 @@ func (f *Type4) makeType4SystemDict() postscript.Dict {
 func (f *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := f.validate(); err != nil {
-		return nil, zero, err
-	}
-
 	if err := pdf.CheckVersion(rm.Out, "Type 4 functions", pdf.V1_3); err != nil {
+		return nil, zero, err
+	} else if err := f.validate(); err != nil {
 		return nil, zero, err
 	}
 

@@ -148,8 +148,7 @@ func (f *Type0) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	if err := pdf.CheckVersion(rm.Out, "Type 0 functions", pdf.V1_2); err != nil {
 		return nil, zero, err
-	}
-	if err := f.validate(); err != nil {
+	} else if err := f.validate(); err != nil {
 		return nil, zero, err
 	}
 

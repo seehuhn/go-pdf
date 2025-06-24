@@ -136,11 +136,9 @@ func (f *Type3) findSubdomain(x float64, k int) (int, [2]float64) {
 func (f *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := f.validate(); err != nil {
-		return nil, zero, err
-	}
-
 	if err := pdf.CheckVersion(rm.Out, "Type 3 functions", pdf.V1_3); err != nil {
+		return nil, zero, err
+	} else if err := f.validate(); err != nil {
 		return nil, zero, err
 	}
 
