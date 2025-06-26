@@ -196,7 +196,7 @@ func (f FilterCompress) Decode(v Version, r io.Reader) (io.ReadCloser, error) {
 
 // FilterFlate is the FlateDecode filter.
 //
-// The filter is represented by a dictionary of tiler parameters. The following
+// The filter is represented by a dictionary of filter parameters. The following
 // parameters are supported:
 //
 //   - "Predictor": A code that selects the predictor algorithm, if any.

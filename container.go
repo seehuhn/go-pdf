@@ -135,7 +135,7 @@ var (
 // All other object types result in an error.
 func GetInteger(r Getter, obj Object) (Integer, error) {
 	resolved, err := Resolve(r, obj)
-	if err != nil {
+	if resolved == nil {
 		return 0, err
 	}
 

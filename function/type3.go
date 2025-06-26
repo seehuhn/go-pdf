@@ -17,6 +17,7 @@
 package function
 
 import (
+	"errors"
 	"fmt"
 
 	"seehuhn.de/go/pdf"
@@ -72,10 +73,6 @@ func (f *Type3) Apply(inputs ...float64) []float64 {
 		x = clip(x, f.Domain[0], f.Domain[1])
 	}
 
-	if len(f.Functions) == 0 {
-		return []float64{0} // No functions defined
-	}
-
 	// Find which subdomain the input belongs to
 	k := len(f.Functions)
 	subdomainIndex, subdomain := f.findSubdomain(x, k)
@@ -103,6 +100,11 @@ func (f *Type3) Apply(inputs ...float64) []float64 {
 
 // findSubdomain determines which subdomain the input x belongs to and returns
 // the subdomain index and the corresponding domain boundaries.
+// This implements the PDF specification rules for Type 3 function intervals:
+//   - Normal intervals are half-open [a, b), closed on left, open on right
+//   - Last interval is always closed on right [a, b]
+//   - Special case: when Domain[0] = Bounds[0], first interval is [Domain[0], Bounds[0]]
+//     (closed on both sides) and second interval is (Bounds[0], ...] (open on left)
 func (f *Type3) findSubdomain(x float64, k int) (int, [2]float64) {
 	if len(f.Domain) < 2 {
 		return 0, [2]float64{0, 1} // Default domain
@@ -115,19 +117,56 @@ func (f *Type3) findSubdomain(x float64, k int) (int, [2]float64) {
 		return 0, [2]float64{domain0, domain1}
 	}
 
-	// Check first subdomain [Domain[0], Bounds[0])
-	if x < f.Bounds[0] {
-		return 0, [2]float64{domain0, f.Bounds[0]}
+	// Special case: when Domain[0] = Bounds[0]
+	// First interval is [Domain[0], Bounds[0]] (closed on both sides)
+	// Second interval is (Bounds[0], ...] (open on left)
+	specialCase := domain0 == f.Bounds[0]
+
+	if specialCase {
+		// For the special case Domain[0] = Bounds[0]:
+		// x = Domain[0] = Bounds[0] belongs to the first interval [Domain[0], Bounds[0]]
+		if x == domain0 {
+			return 0, [2]float64{domain0, f.Bounds[0]}
+		}
+		// All other values x > Bounds[0] go to subsequent intervals
+		// (which are open on the left)
 	}
 
-	// Check intermediate subdomains [Bounds[i], Bounds[i+1])
+	// Check first subdomain
+	if specialCase {
+		// In special case, first interval only contains the single point Domain[0] = Bounds[0]
+		// Since we already handled x == domain0 above, any x != domain0 goes to later intervals
+	} else {
+		// Normal case: first interval is [Domain[0], Bounds[0])
+		if x < f.Bounds[0] {
+			return 0, [2]float64{domain0, f.Bounds[0]}
+		}
+	}
+
+	// Check intermediate subdomains
 	for i := 0; i < len(f.Bounds)-1; i++ {
-		if x < f.Bounds[i+1] {
-			return i + 1, [2]float64{f.Bounds[i], f.Bounds[i+1]}
+		leftBound := f.Bounds[i]
+		rightBound := f.Bounds[i+1]
+
+		// For intermediate intervals [Bounds[i], Bounds[i+1])
+		// x = Bounds[i] is included (closed on left)
+		// x = Bounds[i+1] is excluded (open on right)
+		if x < rightBound {
+			// Special handling for the first intermediate interval in special case
+			if specialCase && i == 0 {
+				// Second interval in special case is (Bounds[0], Bounds[1])
+				// which is open on the left, so x = Bounds[0] should not be included
+				// But since we already handled x = Bounds[0] above, this is fine
+				return i + 1, [2]float64{leftBound, rightBound}
+			} else {
+				// Normal intermediate interval [Bounds[i], Bounds[i+1])
+				return i + 1, [2]float64{leftBound, rightBound}
+			}
 		}
 	}
 
 	// Last subdomain [Bounds[k-2], Domain[1]]
+	// This interval is always closed on the right
 	lastIndex := len(f.Bounds) - 1
 	return k - 1, [2]float64{f.Bounds[lastIndex], domain1}
 }
@@ -234,19 +273,19 @@ func (f *Type3) validate() error {
 	return nil
 }
 
-// readType3 reads a Type 3 piecewise defined function from a PDF dictionary.
-func readType3(r pdf.Getter, d pdf.Dict, cycleChecker *pdf.CycleChecker) (*Type3, error) {
-	domain, err := floatsFromPDF(r, d["Domain"])
+// extractType3 reads a Type 3 piecewise defined function from a PDF dictionary.
+func extractType3(r pdf.Getter, d pdf.Dict, cycleChecker *pdf.CycleChecker) (*Type3, error) {
+	domain, err := readFloats(r, d["Domain"])
 	if err != nil {
 		return nil, fmt.Errorf("failed to read Domain: %w", err)
 	}
 
-	bounds, err := floatsFromPDF(r, d["Bounds"])
+	bounds, err := readFloats(r, d["Bounds"])
 	if err != nil {
 		return nil, fmt.Errorf("failed to read Bounds: %w", err)
 	}
 
-	encode, err := floatsFromPDF(r, d["Encode"])
+	encode, err := readFloats(r, d["Encode"])
 	if err != nil {
 		return nil, fmt.Errorf("failed to read Encode: %w", err)
 	}
@@ -258,11 +297,14 @@ func readType3(r pdf.Getter, d pdf.Dict, cycleChecker *pdf.CycleChecker) (*Type3
 
 	functions := make([]pdf.Function, len(functionsArray))
 	for i, funcObj := range functionsArray {
-		fn, err := readWithCycleChecker(r, funcObj, cycleChecker)
+		fn, err := safeExtract(r, funcObj, cycleChecker)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read function %d: %w", i, err)
 		}
 		functions[i] = fn
+	}
+	if len(functions) == 0 {
+		return nil, errors.New("missing child functions")
 	}
 
 	f := &Type3{
@@ -278,7 +320,7 @@ func readType3(r pdf.Getter, d pdf.Dict, cycleChecker *pdf.CycleChecker) (*Type3
 	}
 
 	if rangeObj, ok := d["Range"]; ok {
-		f.Range, err = floatsFromPDF(r, rangeObj)
+		f.Range, err = readFloats(r, rangeObj)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read Range: %w", err)
 		}

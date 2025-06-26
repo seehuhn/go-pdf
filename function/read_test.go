@@ -18,12 +18,10 @@ package function
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -45,7 +43,7 @@ var testCases = map[int][]testCase{
 			},
 		},
 		{
-			name: "Type0 with encode/decode",
+			name: "Type0 with encode",
 			function: &Type0{
 				Domain:        []float64{-1, 1},
 				Range:         []float64{0, 1},
@@ -131,6 +129,8 @@ var testCases = map[int][]testCase{
 			function: &Type2{
 				XMin: 0,
 				XMax: 1,
+				C0:   []float64{0.0},
+				C1:   []float64{1.0},
 				N:    1.0,
 			},
 		},
@@ -267,23 +267,12 @@ func TestRoundTrip(t *testing.T) {
 }
 
 // roundTripTest performs a round-trip test for any function type
-func roundTripTest(t *testing.T, originalFunction pdf.Function) {
+func roundTripTest(t *testing.T, f1 pdf.Function) {
 	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	// Embed the function
-	embedded, _, err := originalFunction.Embed(rm)
-	if err != nil {
-		// If this is a validation error, the function is malformed and we can't test it
-		var invalidErr *InvalidFunctionError
-		if errors.As(err, &invalidErr) {
-			t.Skip("function failed validation: " + err.Error())
-		}
-		t.Fatal(err)
-	}
-
-	ref := buf.Alloc()
-	err = buf.Put(ref, embedded)
+	embedded, _, err := f1.Embed(rm)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,29 +283,12 @@ func roundTripTest(t *testing.T, originalFunction pdf.Function) {
 	}
 
 	// Read the function back
-	readFunction, err := Read(buf, ref)
+	f2, err := Extract(buf, embedded)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Check that the types match
-	if readFunction.FunctionType() != originalFunction.FunctionType() {
-		t.Fatalf("function type mismatch: expected %d, got %d",
-			originalFunction.FunctionType(), readFunction.FunctionType())
-	}
-
-	// Check that shapes match
-	origM, origN := originalFunction.Shape()
-	readM, readN := readFunction.Shape()
-	if origM != readM || origN != readN {
-		t.Fatalf("function shape mismatch: expected (%d,%d), got (%d,%d)",
-			origM, origN, readM, readN)
-	}
-
-	// Use cmp.Diff to compare the original and read function
-	// Ignore unexported fields that are computed during evaluation
-	opts := cmpopts.IgnoreUnexported(Type0{})
-	if diff := cmp.Diff(originalFunction, readFunction, opts); diff != "" {
+	if diff := cmp.Diff(f1, f2); diff != "" {
 		t.Errorf("round trip failed (-want +got):\n%s", diff)
 	}
 }
@@ -443,7 +415,8 @@ func TestFunctionValidation(t *testing.T) {
 				Range:         []float64{0, 1},
 				Size:          []int{2},
 				BitsPerSample: 8,
-				UseCubic:      false, // Add valid interpolation
+				Encode:        []float64{0, 1},
+				Decode:        []float64{0, 1},
 				Samples:       []byte{0, 255},
 			},
 			wantErr: false,
@@ -479,7 +452,7 @@ func TestFunctionValidation(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Type2 C0/C1 length mismatch",
+			name: "Type2 C0 vs C1 length mismatch",
 			function: &Type2{
 				XMin: 0,
 				XMax: 1,
@@ -631,24 +604,13 @@ func FuzzRead(f *testing.F) {
 	// Seed the fuzzer with valid test cases from all function types
 	for _, cases := range testCases {
 		for _, tc := range cases {
-			out := memfile.New()
 			opt := &pdf.WriterOptions{
 				HumanReadable: true,
 			}
-			w, err := pdf.NewWriter(out, pdf.V2_0, opt)
-			if err != nil {
-				f.Fatal(err)
-			}
+			w, out := memfile.NewPDFWriter(pdf.V2_0, opt)
 			rm := pdf.NewResourceManager(w)
 
-			ref := w.Alloc()
-
 			embedded, _, err := tc.function.Embed(rm)
-			if err != nil {
-				continue
-			}
-
-			err = w.Put(ref, embedded)
 			if err != nil {
 				continue
 			}
@@ -658,7 +620,7 @@ func FuzzRead(f *testing.F) {
 				continue
 			}
 
-			w.GetMeta().Trailer["Quir:X"] = ref
+			w.GetMeta().Trailer["Quir:X"] = embedded
 
 			err = w.Close()
 			if err != nil {
@@ -670,21 +632,19 @@ func FuzzRead(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, fileData []byte) {
-		// Get a "random" function from the PDF file.
-
 		// Make sure we don't panic on random input.
 		opt := &pdf.ReaderOptions{
 			ErrorHandling: pdf.ErrorHandlingReport,
 		}
 		r, err := pdf.NewReader(bytes.NewReader(fileData), opt)
 		if err != nil {
-			t.Skip("broken PDF: " + err.Error())
+			t.Skip("invalid PDF")
 		}
 		obj := r.GetMeta().Trailer["Quir:X"]
 		if obj == nil {
 			t.Skip("broken reference")
 		}
-		function, err := Read(r, obj)
+		function, err := Extract(r, obj)
 		if err != nil {
 			t.Skip("broken function")
 		}
@@ -697,7 +657,7 @@ func FuzzRead(f *testing.F) {
 		if m > 0 && m <= 10 { // Reasonable input size
 			inputs := make([]float64, m)
 			for i := range inputs {
-				inputs[i] = 0.5 // Use middle values
+				inputs[i] = 0.5
 			}
 			outputs := function.Apply(inputs...)
 			if len(outputs) != n {

@@ -212,7 +212,7 @@ func ExtractSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 			break
 		}
 
-		trfm, err := function.Read(r, d.args[2])
+		trfm, err := function.Extract(r, d.args[2])
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "tint transform"))
 			break
@@ -242,7 +242,7 @@ func ExtractSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 			break
 		}
 
-		trfm, err := function.Read(r, d.args[2])
+		trfm, err := function.Extract(r, d.args[2])
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "tint transform"))
 			break

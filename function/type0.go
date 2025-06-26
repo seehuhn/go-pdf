@@ -25,7 +25,7 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-const maxSamples = 1 << 20
+const maxSampleBits = 1 << 23 // 1MB
 
 // Type0 represents a Type 0 sampled function that uses a table of sample
 // values with interpolation to approximate functions with bounded domains
@@ -56,81 +56,8 @@ type Type0 struct {
 	Samples []byte
 }
 
-// readType0 reads a Type 0 sampled function from a PDF stream object.
-func readType0(r pdf.Getter, stream *pdf.Stream) (*Type0, error) {
-	d := stream.Dict
-
-	domain, err := floatsFromPDF(r, d["Domain"])
-	if err != nil {
-		return nil, err
-	}
-
-	rangeArray, err := floatsFromPDF(r, d["Range"])
-	if err != nil {
-		return nil, err
-	}
-
-	size, err := intsFromPDF(r, d["Size"])
-	if err != nil {
-		return nil, err
-	}
-
-	bitsPerSample, err := pdf.GetInteger(r, d["BitsPerSample"])
-	if err != nil {
-		return nil, err
-	}
-
-	f := &Type0{
-		Domain:        domain,
-		Range:         rangeArray,
-		Size:          size,
-		BitsPerSample: int(bitsPerSample),
-		UseCubic:      false, // Default to linear interpolation
-	}
-
-	if orderObj, ok := d["Order"]; ok {
-		order, err := pdf.GetInteger(r, orderObj)
-		if err != nil {
-			return nil, err
-		}
-		f.UseCubic = (int(order) == 3)
-	}
-
-	if encodeObj, ok := d["Encode"]; ok {
-		f.Encode, err = floatsFromPDF(r, encodeObj)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if decodeObj, ok := d["Decode"]; ok {
-		f.Decode, err = floatsFromPDF(r, decodeObj)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Read stream data
-	stmReader, err := pdf.DecodeStream(r, stream, 0)
-	if err != nil {
-		return nil, err
-	}
-	defer stmReader.Close()
-	f.Samples, err = io.ReadAll(stmReader)
-	if err != nil {
-		return nil, err
-	}
-
-	// Apply repair to set defaults and fix up the function.
-	f.repair()
-	if err := f.validate(); err != nil {
-		return nil, err
-	}
-
-	return f, nil
-}
-
-// FunctionType returns 0 for Type 0 functions.
+// FunctionType returns 0.
+// This implements the [pdf.Function] interface.
 func (f *Type0) FunctionType() int {
 	return 0
 }
@@ -140,6 +67,226 @@ func (f *Type0) Shape() (int, int) {
 	m := len(f.Domain) / 2
 	n := len(f.Range) / 2
 	return m, n
+}
+
+// extractType0 reads a Type 0 sampled function from a PDF stream object.
+func extractType0(r pdf.Getter, stream *pdf.Stream) (*Type0, error) {
+	d := stream.Dict
+
+	domain, err := readFloats(r, d["Domain"])
+	if err != nil {
+		return nil, err
+	}
+
+	rangeArray, err := readFloats(r, d["Range"])
+	if err != nil {
+		return nil, err
+	}
+
+	size, err := readInts(r, d["Size"])
+	if err != nil {
+		return nil, err
+	}
+
+	bitsPerSample, err := pdf.GetInteger(r, d["BitsPerSample"])
+	if err != nil {
+		return nil, err
+	}
+
+	order, err := pdf.GetInteger(r, d["Order"])
+	if err != nil {
+		return nil, err
+	}
+	useCubic := (int(order) == 3)
+
+	encode, err := readFloats(r, d["Encode"])
+	if err != nil {
+		return nil, err
+	}
+
+	decode, err := readFloats(r, d["Decode"])
+	if err != nil {
+		return nil, err
+	}
+
+	f := &Type0{
+		Domain:        domain,
+		Range:         rangeArray,
+		Size:          size,
+		BitsPerSample: int(bitsPerSample),
+		UseCubic:      useCubic,
+		Encode:        encode,
+		Decode:        decode,
+	}
+
+	stmReader, err := pdf.DecodeStream(r, stream, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer stmReader.Close()
+
+	f.Samples, err = io.ReadAll(stmReader)
+	if err != nil {
+		return nil, err
+	}
+
+	f.repair()
+	if err := f.validate(); err != nil {
+		return nil, err
+	}
+
+	return f, nil
+}
+
+// repair sets default values and tries to fix up mal-formed function dicts.
+func (f *Type0) repair() {
+	m, n := f.Shape()
+
+	if len(f.Domain) > 2*m {
+		f.Domain = f.Domain[:2*m]
+	}
+	if len(f.Range) > 2*n {
+		f.Range = f.Range[:2*n]
+	}
+	if len(f.Size) > m {
+		f.Size = f.Size[:m]
+	}
+	for _, size := range f.Size {
+		if size < 4 {
+			f.UseCubic = false
+			break
+		}
+	}
+
+	if len(f.Encode) == 0 {
+		f.Encode = make([]float64, 2*m)
+		for i := 0; i < min(m, len(f.Size)); i++ {
+			f.Encode[2*i] = 0
+			f.Encode[2*i+1] = float64(f.Size[i] - 1)
+		}
+	} else if len(f.Encode) > 2*m {
+		f.Encode = f.Encode[:2*m]
+	}
+
+	if len(f.Decode) == 0 {
+		f.Decode = make([]float64, len(f.Range))
+		copy(f.Decode, f.Range)
+	} else if len(f.Decode) > len(f.Range) {
+		f.Decode = f.Decode[:len(f.Range)]
+	}
+
+	// We don't need to worry about integer overflows here, because
+	// these will be checked in validate(), and decreasing the size
+	// of f.Samples in case of overflow will not cause any additional damage.
+	totalSamples := 1
+	for _, size := range f.Size {
+		totalSamples *= size
+	}
+	totalBits := totalSamples * n * f.BitsPerSample
+	totalBytes := (totalBits + 7) / 8
+	if len(f.Samples) > totalBytes {
+		f.Samples = f.Samples[:totalBytes]
+	}
+}
+
+// validate checks if the Type0 struct contains valid data
+func (f *Type0) validate() error {
+	m, n := f.Shape()
+	if m <= 0 || n <= 0 {
+		return newInvalidFunctionError(0, "Shape", "invalid shape (%d, %d)",
+			m, n)
+	}
+
+	if len(f.Domain) != 2*m {
+		return newInvalidFunctionError(0, "Domain", "invalid length %d != %d",
+			len(f.Domain), 2*m)
+	}
+	for i := 0; i < len(f.Domain); i += 2 {
+		if !isRange(f.Domain[i], f.Domain[i+1]) {
+			return newInvalidFunctionError(0, "Domain",
+				"invalid domain [%g,%g] for input %d",
+				f.Domain[i], f.Domain[i+1], i/2)
+		}
+	}
+
+	if len(f.Range) != 2*n {
+		return newInvalidFunctionError(0, "Range", "invalid length %d != %d",
+			len(f.Range), 2*n)
+	}
+	for i := 0; i < len(f.Range); i += 2 {
+		if !isRange(f.Range[i], f.Range[i+1]) {
+			return newInvalidFunctionError(0, "Range",
+				"invalid range [%g,%g] for output %d",
+				f.Range[i], f.Range[i+1], i/2)
+		}
+	}
+
+	if len(f.Size) != m {
+		return newInvalidFunctionError(0, "Size", "invalid length %d != %d",
+			len(f.Size), m)
+	}
+	for i, size := range f.Size {
+		if size < 1 {
+			return newInvalidFunctionError(0, "Size", "invalid size[%d] = %d < 1",
+				i, size)
+		}
+	}
+
+	switch f.BitsPerSample {
+	case 1, 2, 4, 8, 12, 16, 24, 32:
+		// pass
+	default:
+		return newInvalidFunctionError(0, "BitsPerSample", "invalid value %d",
+			f.BitsPerSample)
+	}
+
+	if len(f.Encode) != 2*m {
+		return newInvalidFunctionError(0, "Encode", "invalid length %d != %d",
+			len(f.Encode), 2*m)
+	}
+	for i := 0; i < len(f.Encode); i += 2 {
+		if !isRange(f.Encode[i], f.Encode[i+1]) {
+			return newInvalidFunctionError(0, "Encode",
+				"invalid encode [%g,%g] for input %d",
+				f.Encode[i], f.Encode[i+1], i/2)
+		}
+	}
+
+	if len(f.Decode) != 2*n {
+		return newInvalidFunctionError(0, "Decode", "length must be %d, got %d",
+			2*n, len(f.Decode))
+	}
+	for i := 0; i < len(f.Decode); i += 2 {
+		if f.Decode[i] >= f.Decode[i+1] {
+			return newInvalidFunctionError(0, "Decode", "need Decode[%d] < Decode[%d]",
+				i, i+1)
+		}
+	}
+
+	totalSamples := 1
+	for _, size := range f.Size {
+		next := totalSamples * size
+		if totalSamples != next/size {
+			return errors.New("sample size overflow")
+		}
+		totalSamples = next
+	}
+	totalBits := totalSamples * (n * f.BitsPerSample)
+	if totalSamples != totalBits/(n*f.BitsPerSample) {
+		return errors.New("sample size overflow")
+	}
+
+	if totalBits > maxSampleBits {
+		return errors.New("too many samples in Type 0 function")
+	}
+
+	totalBytes := (totalBits + 7) / 8
+	if len(f.Samples) != totalBytes {
+		return newInvalidFunctionError(0, "Samples", "length must be %d bytes, got %d",
+			totalBytes, len(f.Samples))
+	}
+
+	return nil
 }
 
 // Embed embeds the function into a PDF file.
@@ -171,7 +318,11 @@ func (f *Type0) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	ref := rm.Out.Alloc()
 
-	stm, err := rm.Out.OpenStream(ref, dict, pdf.FilterCompress{})
+	// TODO(voss): be more clever here
+	compress := pdf.FilterFlate{
+		"Predictor": pdf.Integer(15),
+	}
+	stm, err := rm.Out.OpenStream(ref, dict, compress)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -185,154 +336,6 @@ func (f *Type0) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	return ref, zero, nil
-}
-
-// validate checks if the Type0 struct contains valid data
-func (f *Type0) validate() error {
-	m, n := f.Shape()
-	if m <= 0 || n <= 0 {
-		return newInvalidFunctionError(0, "Shape", "invalid shape (%d, %d)",
-			m, n)
-	}
-
-	if len(f.Domain) != 2*m {
-		return newInvalidFunctionError(0, "Domain", "length must be %d, got %d",
-			2*m, len(f.Domain))
-	}
-	for i := 0; i < len(f.Domain); i += 2 {
-		if f.Domain[i] >= f.Domain[i+1] {
-			return newInvalidFunctionError(0, "Domain", "need Domain[%d] < Domain[%d]",
-				i, i+1)
-		}
-	}
-
-	if len(f.Range) != 2*n {
-		return newInvalidFunctionError(0, "Range", "length must be %d, got %d", 2*n, len(f.Range))
-	}
-	for i := 0; i < len(f.Range); i += 2 {
-		if f.Range[i] >= f.Range[i+1] {
-			return newInvalidFunctionError(0, "Range", "need Range[%d] < Range[%d]",
-				i, i+1)
-		}
-	}
-
-	if len(f.Size) != m {
-		return newInvalidFunctionError(0, "Size", "invalid length %d != %d",
-			len(f.Size), m)
-	}
-	minSize := 1
-	if f.UseCubic {
-		minSize = 4
-	}
-	for i, size := range f.Size {
-		if size < minSize {
-			return newInvalidFunctionError(0, "Size", "invalid size[%d] = %d < %d",
-				i, size, minSize)
-		}
-	}
-
-	switch f.BitsPerSample {
-	case 1, 2, 4, 8, 12, 16, 24, 32:
-		// pass
-	default:
-		return newInvalidFunctionError(0, "BitsPerSample", "invalid value %d",
-			f.BitsPerSample)
-	}
-
-	if f.Encode != nil && len(f.Encode) != 2*m {
-		return newInvalidFunctionError(0, "Encode", "length must be %d, got %d",
-			2*m, len(f.Encode))
-	}
-	for i := 0; i < len(f.Encode); i += 2 {
-		if f.Encode[i] >= f.Encode[i+1] {
-			return newInvalidFunctionError(0, "Encode", "need Encode[%d] < Encode[%d]",
-				i, i+1)
-		}
-	}
-
-	if f.Decode != nil && len(f.Decode) != 2*n {
-		return newInvalidFunctionError(0, "Decode", "length must be %d, got %d",
-			2*n, len(f.Decode))
-	}
-	for i := 0; i < len(f.Decode); i += 2 {
-		if f.Decode[i] >= f.Decode[i+1] {
-			return newInvalidFunctionError(0, "Decode", "need Decode[%d] < Decode[%d]",
-				i, i+1)
-		}
-	}
-
-	totalSamples := 1
-	for _, size := range f.Size {
-		next := totalSamples * size
-		if totalSamples != next/size {
-			return errors.New("sample size overflow")
-		}
-		totalSamples = next
-	}
-
-	if totalSamples > maxSamples {
-		return errors.New("too many samples in Type 0 function")
-	}
-
-	totalBits := totalSamples * n * f.BitsPerSample
-	totalBytes := (totalBits + 7) / 8
-	if len(f.Samples) != totalBytes {
-		return newInvalidFunctionError(0, "Samples", "length must be %d bytes, got %d",
-			totalBytes, len(f.Samples))
-	}
-
-	return nil
-}
-
-// repair sets default values and tries to fix up mal-formed function dicts.
-func (f *Type0) repair() {
-	m, n := f.Shape()
-
-	if len(f.Domain) > 2*m {
-		f.Domain = f.Domain[:2*m]
-	}
-	if len(f.Range) > 2*n {
-		f.Range = f.Range[:2*n]
-	}
-	if len(f.Size) > m {
-		f.Size = f.Size[:m]
-	}
-	for _, size := range f.Size {
-		if size < 4 {
-			f.UseCubic = false
-			break
-		}
-	}
-
-	if len(f.Encode) == 0 { // set default Encode
-		f.Encode = make([]float64, 2*m)
-		for i := 0; i < min(m, len(f.Size)); i++ {
-			f.Encode[2*i] = 0
-			f.Encode[2*i+1] = float64(f.Size[i] - 1)
-		}
-	} else if len(f.Encode) > 2*m {
-		f.Encode = f.Encode[:2*m]
-	}
-
-	if len(f.Decode) == 0 { // set default Decode
-		f.Decode = make([]float64, len(f.Range))
-		copy(f.Decode, f.Range)
-	} else if len(f.Decode) > len(f.Range) {
-		f.Decode = f.Decode[:len(f.Range)]
-	}
-
-	// We don't need to worry about integer overflows here, because
-	// these will be checked in validate(), and decreasing the size
-	// of f.Samples in case of overflow will not cause any additional damage.
-	totalSamples := 1
-	for _, size := range f.Size {
-		totalSamples *= size
-	}
-	totalBits := totalSamples * n * f.BitsPerSample
-	totalBytes := (totalBits + 7) / 8
-	if len(f.Samples) > totalBytes && totalBytes > 0 {
-		f.Samples = f.Samples[:totalBytes]
-	}
 }
 
 // isDefaultEncode checks if the Encode array equals the default value
@@ -362,20 +365,13 @@ func (f *Type0) Apply(inputs ...float64) []float64 {
 		panic(fmt.Sprintf("expected %d inputs, got %d", m, len(inputs)))
 	}
 
-	// encode the inputs
 	indices := make([]float64, m)
 	for i, val := range inputs {
-		// clip to domain
 		val = clip(val, f.Domain[2*i], f.Domain[2*i+1])
-
-		// apply encoding
 		val = interpolate(val, f.Domain[2*i], f.Domain[2*i+1], f.Encode[2*i], f.Encode[2*i+1])
-
-		// clip to number of samples
 		indices[i] = clip(val, 0, float64(f.Size[i]-1))
 	}
 
-	// sample the function using interpolation
 	var samples []float64
 	if f.UseCubic {
 		samples = f.sampleCubic(indices)
@@ -383,7 +379,6 @@ func (f *Type0) Apply(inputs ...float64) []float64 {
 		samples = f.sampleLinear(indices)
 	}
 
-	// decode the output
 	outputs := make([]float64, n)
 	maxSample := float64((uint(1) << f.BitsPerSample) - 1)
 	for j, xj := range samples {
@@ -399,7 +394,7 @@ func (f *Type0) sampleLinear(indices []float64) []float64 {
 	m, n := f.Shape()
 
 	if m == 1 {
-		// faster code for common single input case
+		// optimize for common single input case
 		return f.sample1D(indices[0], n)
 	}
 
@@ -408,7 +403,6 @@ func (f *Type0) sampleLinear(indices []float64) []float64 {
 	fractions := make([]float64, m)
 
 	for i := 0; i < m; i++ {
-		// Handle single sample case in this dimension
 		if f.Size[i] <= 1 {
 			floorIndices[i] = 0
 			fractions[i] = 0
@@ -441,7 +435,6 @@ func (f *Type0) sampleLinear(indices []float64) []float64 {
 		return f.getSamplesAt(floorIndices)
 	}
 
-	// Perform multilinear interpolation
 	numCorners := 1 << m
 	result := make([]float64, n)
 
@@ -454,7 +447,6 @@ func (f *Type0) sampleLinear(indices []float64) []float64 {
 				cornerIndices[dim] = floorIndices[dim]
 				weight *= 1 - fractions[dim]
 			} else {
-				// Ensure we don't go out of bounds
 				if floorIndices[dim]+1 < f.Size[dim] {
 					cornerIndices[dim] = floorIndices[dim] + 1
 				} else {
@@ -464,7 +456,7 @@ func (f *Type0) sampleLinear(indices []float64) []float64 {
 			}
 		}
 
-		// Skip corners with zero weight for efficiency
+		// skip corners with zero weight for efficiency
 		if weight > 0 {
 			cornerSamples := f.getSamplesAt(cornerIndices)
 			for i := 0; i < n; i++ {
@@ -478,7 +470,6 @@ func (f *Type0) sampleLinear(indices []float64) []float64 {
 
 // sample1D performs linear interpolation with a single input dimension.
 func (f *Type0) sample1D(index float64, n int) []float64 {
-	// Handle single sample case
 	if f.Size[0] <= 1 {
 		return f.getSamplesAt([]int{0})
 	}
@@ -494,7 +485,7 @@ func (f *Type0) sample1D(index float64, n int) []float64 {
 		i0, i1, frac = f.Size[0]-1, f.Size[0]-1, 0
 	}
 
-	// Optimization: avoid interpolation when fraction is exactly 0
+	// avoid interpolation when fraction is exactly 0
 	if frac == 0.0 {
 		return f.getSamplesAt([]int{i0})
 	}
@@ -526,7 +517,6 @@ func (f *Type0) getSamplesAt(indices []int) []float64 {
 	// Extract samples at this position
 	samples := make([]float64, n)
 
-	// Calculate bit offset in the continuous bit stream
 	sampleIndex := linearIndex * n
 	for i := range n {
 		samples[i] = f.extractSampleAtIndex(sampleIndex + i)
@@ -538,24 +528,20 @@ func (f *Type0) getSamplesAt(indices []int) []float64 {
 // extractSampleAtIndex extracts a single sample value at the given sample index
 // from the continuous bit stream
 func (f *Type0) extractSampleAtIndex(sampleIndex int) float64 {
-	// Bounds check
 	if sampleIndex < 0 {
 		return 0
 	}
 
-	// Calculate bit position in the continuous bit stream
 	bitOffset := sampleIndex * f.BitsPerSample
 	byteOffset := bitOffset / 8
 	bitInByte := bitOffset % 8
 
-	// Bounds check
 	if byteOffset >= len(f.Samples) || byteOffset < 0 {
 		return 0
 	}
 
 	switch f.BitsPerSample {
 	case 1:
-		// Extract 1 bit
 		mask := byte(1 << (7 - bitInByte))
 		if f.Samples[byteOffset]&mask != 0 {
 			return 1
@@ -563,14 +549,11 @@ func (f *Type0) extractSampleAtIndex(sampleIndex int) float64 {
 		return 0
 
 	case 2:
-		// Extract 2 bits
 		shift := 6 - bitInByte
 		if shift >= 0 {
-			// Fits in current byte
 			mask := byte(0x03 << shift)
 			return float64((f.Samples[byteOffset] & mask) >> shift)
 		} else {
-			// Spans two bytes
 			if byteOffset+1 >= len(f.Samples) {
 				return 0
 			}
@@ -580,15 +563,11 @@ func (f *Type0) extractSampleAtIndex(sampleIndex int) float64 {
 		}
 
 	case 4:
-		// Extract 4 bits
 		if bitInByte == 0 {
-			// High nibble
 			return float64((f.Samples[byteOffset] & 0xF0) >> 4)
 		} else if bitInByte == 4 {
-			// Low nibble
 			return float64(f.Samples[byteOffset] & 0x0F)
 		} else {
-			// Spans two bytes
 			if byteOffset+1 >= len(f.Samples) {
 				return 0
 			}
@@ -599,52 +578,43 @@ func (f *Type0) extractSampleAtIndex(sampleIndex int) float64 {
 		}
 
 	case 8:
-		// 8 bits = 1 byte, must be byte-aligned
 		if byteOffset >= len(f.Samples) {
 			return 0
 		}
 		return float64(f.Samples[byteOffset])
 
 	case 12:
-		// Extract 12 bits
 		if bitInByte == 0 {
-			// Starts at byte boundary: 8 bits from current + 4 bits from next
 			if byteOffset >= len(f.Samples) {
 				return 0
 			}
 			if byteOffset+1 >= len(f.Samples) {
-				// Only have partial data, use what we have
 				return float64(uint16(f.Samples[byteOffset]) << 4)
 			}
 			highByte := uint16(f.Samples[byteOffset]) << 4
 			lowNibble := uint16(f.Samples[byteOffset+1]) >> 4
 			return float64(highByte | lowNibble)
 		} else if bitInByte == 4 {
-			// Starts at nibble boundary: 4 bits from current + 8 bits from next
 			if byteOffset >= len(f.Samples) {
 				return 0
 			}
 			if byteOffset+1 >= len(f.Samples) {
-				// Only have partial data, use what we have
 				return float64(uint16(f.Samples[byteOffset]&0x0F) << 8)
 			}
 			highNibble := uint16(f.Samples[byteOffset]&0x0F) << 8
 			lowByte := uint16(f.Samples[byteOffset+1])
 			return float64(highNibble | lowByte)
 		} else {
-			// General case - spans multiple bytes
 			return f.extractBitsGeneral(bitOffset, 12)
 		}
 
 	case 16:
-		// Extract 16 bits, must be byte-aligned
 		if byteOffset >= len(f.Samples) || byteOffset+1 >= len(f.Samples) {
 			return 0
 		}
 		return float64(uint16(f.Samples[byteOffset])<<8 | uint16(f.Samples[byteOffset+1]))
 
 	case 24:
-		// Extract 24 bits, must be byte-aligned
 		if byteOffset >= len(f.Samples) || byteOffset+2 >= len(f.Samples) {
 			return 0
 		}
@@ -654,7 +624,6 @@ func (f *Type0) extractSampleAtIndex(sampleIndex int) float64 {
 		return float64(val)
 
 	case 32:
-		// Extract 32 bits, must be byte-aligned
 		if byteOffset >= len(f.Samples) || byteOffset+3 >= len(f.Samples) {
 			return 0
 		}
@@ -688,19 +657,16 @@ func (f *Type0) extractBitsGeneral(bitOffset, numBits int) float64 {
 			break
 		}
 
-		// How many bits can we read from this byte?
 		bitsInCurrentByte := 8 - bitInByte
 		bitsToRead := bitsRemaining
 		if bitsToRead > bitsInCurrentByte {
 			bitsToRead = bitsInCurrentByte
 		}
 
-		// Create mask and extract bits
 		mask := byte((1 << bitsToRead) - 1)
 		shift := bitsInCurrentByte - bitsToRead
 		bits := (f.Samples[byteOffset] >> shift) & mask
 
-		// Add to result
 		result = (result << bitsToRead) | uint32(bits)
 
 		bitsRemaining -= bitsToRead
@@ -719,7 +685,7 @@ func (f *Type0) cubicSplineCoeff1D(x, y []float64) ([]float64, []float64, []floa
 		panic("need at least 2 points for cubic spline")
 	}
 
-	// for 2 points, use linear interpolation
+	// fallback to linear interpolation for 2 points
 	if n == 2 {
 		a := []float64{y[0]}
 		b := []float64{(y[1] - y[0]) / (x[1] - x[0])}
@@ -728,7 +694,6 @@ func (f *Type0) cubicSplineCoeff1D(x, y []float64) ([]float64, []float64, []floa
 		return a, b, c, d
 	}
 
-	// compute intervals
 	h := make([]float64, n-1)
 	for i := 0; i < n-1; i++ {
 		h[i] = x[i+1] - x[i]
@@ -797,9 +762,7 @@ func (f *Type0) solveTridiagonal(A [][]float64, b []float64) []float64 {
 		rhs[i] = b[i]
 	}
 
-	// forward elimination
 	for i := 0; i < n-1; i++ {
-		// find pivot
 		maxRow := i
 		for k := i + 1; k < n; k++ {
 			if math.Abs(matrix[k][i]) > math.Abs(matrix[maxRow][i]) {
@@ -807,16 +770,14 @@ func (f *Type0) solveTridiagonal(A [][]float64, b []float64) []float64 {
 			}
 		}
 
-		// swap rows if needed
 		if maxRow != i {
 			matrix[i], matrix[maxRow] = matrix[maxRow], matrix[i]
 			rhs[i], rhs[maxRow] = rhs[maxRow], rhs[i]
 		}
 
-		// eliminate column
 		for k := i + 1; k < n; k++ {
 			if math.Abs(matrix[i][i]) < 1e-14 {
-				continue // Skip if pivot is too small
+				continue
 			}
 			factor := matrix[k][i] / matrix[i][i]
 			for j := i; j < n; j++ {
@@ -825,8 +786,6 @@ func (f *Type0) solveTridiagonal(A [][]float64, b []float64) []float64 {
 			rhs[k] -= factor * rhs[i]
 		}
 	}
-
-	// back substitution
 	for i := n - 1; i >= 0; i-- {
 		x[i] = rhs[i]
 		for j := i + 1; j < n; j++ {
@@ -845,13 +804,11 @@ func (f *Type0) sampleCubic(indices []float64) []float64 {
 	m, _ := f.Shape()
 
 	if m == 1 {
-		// 1D case - use direct evaluation (this works perfectly)
 		return f.sampleCubic1DDirect(indices[0])
 	} else if m == 2 {
-		// 2D case - use direct bicubic evaluation
 		return f.sampleBicubicDirect(indices[0], indices[1])
 	} else {
-		// Higher dimensions - fall back to linear for now
+		// higher dimensions fall back to linear for now
 		return f.sampleLinear(indices)
 	}
 }
@@ -861,28 +818,23 @@ func (f *Type0) sampleCubic1DDirect(coord float64) []float64 {
 	_, n := f.Shape()
 	gridSize := f.Size[0]
 
-	// extract all sample values for this 1D function
 	samples := make([][]float64, gridSize)
 	for i := 0; i < gridSize; i++ {
 		samples[i] = f.getSamplesAt([]int{i})
 	}
 
-	// create grid coordinates
 	grid := make([]float64, gridSize)
 	for i := 0; i < gridSize; i++ {
 		grid[i] = float64(i)
 	}
 
-	// for each output component, fit cubic spline and evaluate
 	result := make([]float64, n)
 	for component := 0; component < n; component++ {
-		// extract values for this component
 		values := make([]float64, gridSize)
 		for i := 0; i < gridSize; i++ {
 			values[i] = samples[i][component]
 		}
 
-		// fit cubic spline and evaluate
 		a, b, c, d := f.cubicSplineCoeff1D(grid, values)
 		result[component] = f.evaluateCubicSplineAt(a, b, c, d, grid, coord)
 	}
@@ -903,13 +855,11 @@ func (f *Type0) sampleBicubicDirect(x, y float64) []float64 {
 	}
 
 	for j := 0; j < ySize; j++ {
-		// extract samples for row j
 		rowSamples := make([][]float64, xSize)
 		for i := 0; i < xSize; i++ {
 			rowSamples[i] = f.getSamplesAt([]int{i, j})
 		}
 
-		// for each component, fit 1D cubic spline along x and evaluate
 		rowResult := make([]float64, n)
 		for component := 0; component < n; component++ {
 			values := make([]float64, xSize)
@@ -945,7 +895,6 @@ func (f *Type0) sampleBicubicDirect(x, y float64) []float64 {
 
 // evaluateCubicSplineAt evaluates a 1D cubic spline at a given coordinate
 func (f *Type0) evaluateCubicSplineAt(a, b, c, d []float64, grid []float64, coord float64) float64 {
-	// find interval
 	idx := int(math.Floor(coord))
 	if idx < 0 {
 		idx = 0
@@ -953,7 +902,6 @@ func (f *Type0) evaluateCubicSplineAt(a, b, c, d []float64, grid []float64, coor
 		idx = len(a) - 1
 	}
 
-	// local coordinate within interval
 	t := coord - grid[idx]
 	if t < 0 {
 		t = 0

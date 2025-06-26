@@ -54,7 +54,8 @@ type Type2 struct {
 	N float64
 }
 
-// FunctionType returns 2 for Type 2 functions.
+// FunctionType returns 2.
+// This implements the [pdf.Function] interface.
 func (f *Type2) FunctionType() int {
 	return 2
 }
@@ -72,7 +73,6 @@ func (f *Type2) Apply(inputs ...float64) []float64 {
 
 	x := clip(inputs[0], f.XMin, f.XMax)
 
-	// Get C0 and C1 arrays, using defaults if not specified
 	c0 := f.C0
 	if c0 == nil {
 		c0 = []float64{0.0}
@@ -83,11 +83,9 @@ func (f *Type2) Apply(inputs ...float64) []float64 {
 		c1 = []float64{1.0}
 	}
 
-	// Determine output size
 	_, n := f.Shape()
 	outputs := make([]float64, n)
-
-	// Calculate x^N
+	// optimize common cases to avoid math.Pow
 	var xPowN float64
 	switch f.N {
 	case 0:
@@ -105,21 +103,20 @@ func (f *Type2) Apply(inputs ...float64) []float64 {
 		if i < len(c0) {
 			c0Val = c0[i]
 		} else if len(c0) > 0 {
-			c0Val = c0[len(c0)-1] // Use last value if index out of bounds
+			c0Val = c0[len(c0)-1]
 		}
 
 		if i < len(c1) {
 			c1Val = c1[i]
 		} else if len(c1) > 0 {
-			c1Val = c1[len(c1)-1] // Use last value if index out of bounds
+			c1Val = c1[len(c1)-1]
 		} else {
-			c1Val = 1.0 // Default
+			c1Val = 1.0
 		}
 
 		outputs[i] = c0Val + xPowN*(c1Val-c0Val)
 	}
 
-	// Clip outputs to range if specified
 	if len(f.Range) >= 2*n {
 		for i := 0; i < n; i++ {
 			min := f.Range[2*i]
@@ -141,7 +138,6 @@ func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		return nil, zero, err
 	}
 
-	// Build the function dictionary
 	dict := pdf.Dict{
 		"FunctionType": pdf.Integer(2),
 		"N":            pdf.Number(f.N),
@@ -149,17 +145,14 @@ func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	dict["Domain"] = pdf.Array{pdf.Number(f.XMin), pdf.Number(f.XMax)}
 
-	// Add range (optional)
 	if len(f.Range) > 0 {
 		dict["Range"] = arrayFromFloats(f.Range)
 	}
 
-	// Add C0 (optional, default [0.0])
 	if f.C0 != nil {
 		dict["C0"] = arrayFromFloats(f.C0)
 	}
 
-	// Add C1 (optional, default [1.0])
 	if f.C1 != nil {
 		dict["C1"] = arrayFromFloats(f.C1)
 	}
@@ -190,12 +183,12 @@ func (f *Type2) validate() error {
 		return newInvalidFunctionError(2, "N", "must be a finite number, got %g", f.N)
 	}
 	if f.N != math.Trunc(f.N) && f.XMin < 0 {
-		// If N is non-integer, x must be >= 0
+		// non-integer exponents require non-negative base to avoid complex results
 		return newInvalidFunctionError(2, "Domain",
 			"minimum must be >= 0 when N is non-integer, got %f", f.XMin)
 	}
 	if f.N < 0 && f.XMin <= 0 && f.XMax >= 0 {
-		// If N is negative, x must not be 0
+		// negative exponents would cause division by zero at x=0
 		return newInvalidFunctionError(2, "Domain", "must not include 0 when N is negative")
 	}
 
@@ -218,9 +211,9 @@ func (f *Type2) validate() error {
 	return nil
 }
 
-// readType2 reads a Type 2 exponential interpolation function from a PDF dictionary.
-func readType2(r pdf.Getter, d pdf.Dict) (*Type2, error) {
-	domain, err := floatsFromPDF(r, d["Domain"])
+// extractType2 reads a Type 2 exponential interpolation function from a PDF dictionary.
+func extractType2(r pdf.Getter, d pdf.Dict) (*Type2, error) {
+	domain, err := readFloats(r, d["Domain"])
 	if err != nil {
 		return nil, fmt.Errorf("failed to read Domain: %w", err)
 	}
@@ -242,21 +235,21 @@ func readType2(r pdf.Getter, d pdf.Dict) (*Type2, error) {
 	// Ensure domain has exactly 2 elements to maintain round-trip consistency
 
 	if rangeObj, ok := d["Range"]; ok {
-		f.Range, err = floatsFromPDF(r, rangeObj)
+		f.Range, err = readFloats(r, rangeObj)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read Range: %w", err)
 		}
 	}
 
 	if c0Obj, ok := d["C0"]; ok {
-		f.C0, err = floatsFromPDF(r, c0Obj)
+		f.C0, err = readFloats(r, c0Obj)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read C0: %w", err)
 		}
 	}
 
 	if c1Obj, ok := d["C1"]; ok {
-		f.C1, err = floatsFromPDF(r, c1Obj)
+		f.C1, err = readFloats(r, c1Obj)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read C1: %w", err)
 		}

@@ -22,15 +22,15 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Read extracts a function from a PDF file and returns a pdf.Function.
-func Read(r pdf.Getter, obj pdf.Object) (pdf.Function, error) {
+// Extract extracts a function from a PDF file and returns a pdf.Function.
+func Extract(r pdf.Getter, obj pdf.Object) (pdf.Function, error) {
+	// Type 3 functions are recursive, so we need to check for cycles.
 	cycleChecker := pdf.NewCycleChecker()
-	return readWithCycleChecker(r, obj, cycleChecker)
+	return safeExtract(r, obj, cycleChecker)
 }
 
-// readWithCycleChecker extracts a function with cycle detection to prevent infinite recursion.
-func readWithCycleChecker(r pdf.Getter, obj pdf.Object, cycleChecker *pdf.CycleChecker) (pdf.Function, error) {
-	// Check for cycles before processing the object
+// safeExtract extracts a function with cycle detection to prevent infinite recursion.
+func safeExtract(r pdf.Getter, obj pdf.Object, cycleChecker *pdf.CycleChecker) (pdf.Function, error) {
 	if err := cycleChecker.Check(obj); err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func readWithCycleChecker(r pdf.Getter, obj pdf.Object, cycleChecker *pdf.CycleC
 		ft, ok := obj["FunctionType"]
 		if !ok {
 			return nil, &pdf.MalformedFileError{
-				Err: fmt.Errorf("missing /FunctionType entry"),
+				Err: fmt.Errorf("missing /FunctionType"),
 			}
 		}
 
@@ -59,19 +59,19 @@ func readWithCycleChecker(r pdf.Getter, obj pdf.Object, cycleChecker *pdf.CycleC
 		}
 		switch ftNum {
 		case 2:
-			return readType2(r, obj)
+			return extractType2(r, obj)
 		case 3:
-			return readType3(r, obj, cycleChecker)
+			return extractType3(r, obj, cycleChecker)
 		default:
 			return nil, &pdf.MalformedFileError{
-				Err: fmt.Errorf("unsupported function type %d for dictionary", ftNum),
+				Err: fmt.Errorf("invalid function type %d for dict", ftNum),
 			}
 		}
 	case *pdf.Stream:
 		ft, ok := obj.Dict["FunctionType"]
 		if !ok {
 			return nil, &pdf.MalformedFileError{
-				Err: fmt.Errorf("missing /FunctionType entry"),
+				Err: fmt.Errorf("missing /FunctionType"),
 			}
 		}
 
@@ -81,12 +81,12 @@ func readWithCycleChecker(r pdf.Getter, obj pdf.Object, cycleChecker *pdf.CycleC
 		}
 		switch ftNum {
 		case 0:
-			return readType0(r, obj)
+			return extractType0(r, obj)
 		case 4:
-			return readType4(r, obj)
+			return extractType4(r, obj)
 		default:
 			return nil, &pdf.MalformedFileError{
-				Err: fmt.Errorf("unsupported function type %d for stream", ftNum),
+				Err: fmt.Errorf("invalid function type %d for stream", ftNum),
 			}
 		}
 	default:
@@ -94,4 +94,40 @@ func readWithCycleChecker(r pdf.Getter, obj pdf.Object, cycleChecker *pdf.CycleC
 			Err: fmt.Errorf("function must be a dictionary or stream"),
 		}
 	}
+}
+
+// readFloats extracts a slice of float64 from a PDF Array.
+func readFloats(r pdf.Getter, obj pdf.Object) ([]float64, error) {
+	a, err := pdf.GetArray(r, obj)
+	if a == nil {
+		return nil, err
+	}
+
+	res := make([]float64, len(a))
+	for i, obj := range a {
+		num, err := pdf.GetNumber(r, obj)
+		if err != nil {
+			return nil, err
+		}
+		res[i] = float64(num)
+	}
+	return res, nil
+}
+
+// readInts extracts a slice of int from a PDF Array.
+func readInts(r pdf.Getter, obj pdf.Object) ([]int, error) {
+	a, err := pdf.GetArray(r, obj)
+	if a == nil {
+		return nil, err
+	}
+
+	res := make([]int, len(a))
+	for i, obj := range a {
+		num, err := pdf.GetInteger(r, obj)
+		if err != nil {
+			return nil, err
+		}
+		res[i] = int(num)
+	}
+	return res, nil
 }

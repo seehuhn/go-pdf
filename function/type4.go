@@ -255,17 +255,26 @@ func (f *Type4) validate() error {
 	return nil
 }
 
-// readType4 reads a Type 4 function from a PDF stream object.
-func readType4(r pdf.Getter, stream *pdf.Stream) (*Type4, error) {
+// extractType4 reads a Type 4 function from a PDF stream object.
+func extractType4(r pdf.Getter, stream *pdf.Stream) (*Type4, error) {
 	d := stream.Dict
-	domain, err := floatsFromPDF(r, d["Domain"])
-	if err != nil {
-		return nil, fmt.Errorf("failed to read Domain: %w", err)
+
+	var domain []float64
+	if domainObj, ok := d["Domain"]; ok {
+		var err error
+		domain, err = readFloats(r, domainObj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read Domain: %w", err)
+		}
 	}
 
-	rangeArray, err := floatsFromPDF(r, d["Range"])
-	if err != nil {
-		return nil, fmt.Errorf("failed to read Range: %w", err)
+	var rangeArray []float64
+	if rangeObj, ok := d["Range"]; ok {
+		var err error
+		rangeArray, err = readFloats(r, rangeObj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read Range: %w", err)
+		}
 	}
 
 	f := &Type4{

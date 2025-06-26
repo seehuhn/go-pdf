@@ -63,6 +63,9 @@ func interpolate(x, xMin, xMax, yMin, yMax float64) float64 {
 
 // arrayFromFloats converts a slice of float64 to a PDF Array.
 func arrayFromFloats(x []float64) pdf.Array {
+	if x == nil {
+		return nil
+	}
 	res := make(pdf.Array, len(x))
 	for i, xi := range x {
 		res[i] = pdf.Number(xi)
@@ -72,51 +75,12 @@ func arrayFromFloats(x []float64) pdf.Array {
 
 // arrayFromInts converts a slice of int to a PDF Array.
 func arrayFromInts(x []int) pdf.Array {
+	if x == nil {
+		return nil
+	}
 	res := make(pdf.Array, len(x))
 	for i, xi := range x {
 		res[i] = pdf.Integer(xi)
 	}
 	return res
-}
-
-// floatsFromPDF extracts a slice of float64 from a PDF Array.
-func floatsFromPDF(r pdf.Getter, obj pdf.Object) ([]float64, error) {
-	a, err := pdf.GetArray(r, obj)
-	if err != nil {
-		return nil, err
-	}
-	if a == nil {
-		return nil, nil
-	}
-
-	res := make([]float64, len(a))
-	for i, obj := range a {
-		num, err := pdf.GetNumber(r, obj)
-		if err != nil {
-			return nil, err
-		}
-		res[i] = float64(num)
-	}
-	return res, nil
-}
-
-// intsFromPDF extracts a slice of int from a PDF Array.
-func intsFromPDF(r pdf.Getter, obj pdf.Object) ([]int, error) {
-	a, err := pdf.GetArray(r, obj)
-	if err != nil {
-		return nil, err
-	}
-	if a == nil {
-		return nil, nil
-	}
-
-	res := make([]int, len(a))
-	for i, obj := range a {
-		num, err := pdf.GetInteger(r, obj)
-		if err != nil {
-			return nil, err
-		}
-		res[i] = int(num)
-	}
-	return res, nil
 }
