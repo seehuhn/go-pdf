@@ -19,6 +19,7 @@ package predict
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"testing"
 )
 
@@ -278,7 +279,7 @@ func TestNewReaderWithInvalidParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := bytes.NewReader([]byte{1, 2, 3})
+			r := io.NopCloser(bytes.NewReader([]byte{1, 2, 3}))
 			_, err := NewReader(r, &tt.params)
 			if err == nil {
 				t.Error("expected error from NewReader with invalid params")
@@ -350,7 +351,7 @@ func TestNewReaderWriterWithValidParams(t *testing.T) {
 	for i, params := range validParams {
 		t.Run(params.String(), func(t *testing.T) {
 			// Test NewReader
-			r := bytes.NewReader([]byte{1, 2, 3, 4, 5})
+			r := io.NopCloser(bytes.NewReader([]byte{1, 2, 3, 4, 5}))
 			reader, err := NewReader(r, &params)
 			if err != nil {
 				t.Errorf("test %d: unexpected error from NewReader: %v", i, err)

@@ -23,19 +23,41 @@ import (
 
 type Params struct {
 	// Colors is the number of color components per pixel.
+	// Valid range: at least 1, with predictor-specific limits:
+	// - TIFF predictor (2): maximum 60 components
+	// - PNG predictors (10-15): maximum 256 components
+	// Common values: 1 (grayscale), 3 (RGB), 4 (CMYK/RGBA).
+	// Only used if Predictor > 1.
 	Colors int
 
 	// BitsPerComponent is the number of bits used to represent each color component.
+	// Valid values: 1, 2, 4, 8, or 16.
+	// Most common value is 8 for typical images.
 	BitsPerComponent int
 
 	// Columns is the width of the image in pixels.
+	// Valid range: at least 1.
 	Columns int
 
 	// Predictor is the prediction algorithm to use.
+	// Valid values:
+	//   1: No prediction - pass through the data unchanged
+	//   2: TIFF horizontal differencing
+	//  10: PNG None filter (no prediction) - use predictor type 1 instead
+	//  11: PNG Sub filter (horizontal differencing)
+	//  12: PNG Up filter (vertical differencing)
+	//  13: PNG Average filter (average of left/up)
+	//  14: PNG Paeth filter (complex prediction)
+	//  15: PNG Optimum (auto-selects best per row) - better compressibility, slow to encode
 	Predictor int
 }
 
 func (p *Params) Validate() error {
+	if p.Predictor == 1 {
+		// Predictor 1 does not require any parameters
+		return nil
+	}
+
 	// Validate Colors
 	if p.Colors < 1 {
 		return errors.New("Colors must be at least 1")
@@ -95,12 +117,4 @@ func (p *Params) bytesPerRow() int {
 
 func (p *Params) bytesPerPixel() int {
 	return (p.bitsPerPixel() + 7) / 8 // For PNG predictors
-}
-
-func (p *Params) endMask() byte {
-	remainingBits := p.bitsPerRow() & 7
-	if remainingBits == 0 {
-		return 0xFF
-	}
-	return byte((1 << (8 - remainingBits)) - 1)
 }

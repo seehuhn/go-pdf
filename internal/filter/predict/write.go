@@ -29,7 +29,7 @@ type writer struct {
 	// State for processing
 	rowLeft    int      // Bytes remaining in current row
 	prevRow    []byte   // Previous row buffer (PNG predictors)
-	prevValues []uint32 // Previous component values (TIFF predictor)
+	prevValues []uint16 // Previous component values (TIFF predictor)
 	tempBuffer []byte   // Temporary buffer for partial data
 	tempLen    int      // Length of data in tempBuffer
 }
@@ -64,7 +64,7 @@ func NewWriter(w io.WriteCloser, p *Params) (io.WriteCloser, error) {
 		}
 	} else if p.Predictor == 2 {
 		// TIFF predictor - need previous component values
-		writer.prevValues = make([]uint32, p.Colors)
+		writer.prevValues = make([]uint16, p.Colors)
 	}
 
 	return writer, nil
@@ -144,132 +144,141 @@ func (w *writer) applyTIFFPredictor(rowData []byte) ([]byte, error) {
 	copy(result, rowData)
 
 	switch w.params.BitsPerComponent {
-	case 8:
-		w.applyTIFF8Bit(result)
-	case 16:
-		w.applyTIFF16Bit(result)
 	case 1:
 		w.applyTIFF1Bit(result)
 	case 2:
 		w.applyTIFF2Bit(result)
 	case 4:
 		w.applyTIFF4Bit(result)
-	}
-
-	// Reset previous values for next row
-	for i := range w.prevValues {
-		w.prevValues[i] = 0
+	case 8:
+		w.applyTIFF8Bit(result)
+	case 16:
+		w.applyTIFF16Bit(result)
 	}
 
 	return result, nil
 }
 
-func (w *writer) applyTIFF8Bit(data []byte) {
-	// Initialize first component values
-	for i := 0; i < w.params.Colors && i < len(data); i++ {
-		w.prevValues[i] = uint32(data[i])
-	}
-
-	// Apply differencing to subsequent components
-	for i := w.params.Colors; i < len(data); i++ {
-		componentIdx := i % w.params.Colors
-		original := data[i]
-		data[i] = byte(int(original) - int(w.prevValues[componentIdx]))
-		w.prevValues[componentIdx] = uint32(original)
-	}
-}
-
-func (w *writer) applyTIFF16Bit(data []byte) {
-	// Initialize first component values
-	for i := 0; i < w.params.Colors && i*2+1 < len(data); i++ {
-		w.prevValues[i] = uint32(data[i*2])<<8 | uint32(data[i*2+1])
-	}
-
-	// Apply differencing to subsequent components
-	for i := w.params.Colors * 2; i < len(data); i += 2 {
-		componentIdx := (i / 2) % w.params.Colors
-		current := uint32(data[i])<<8 | uint32(data[i+1])
-		diff := current - w.prevValues[componentIdx]
-		data[i] = byte(diff >> 8)
-		data[i+1] = byte(diff & 0xFF)
-		w.prevValues[componentIdx] = current
-	}
-}
-
 func (w *writer) applyTIFF1Bit(data []byte) {
-	// Complex bit-level processing for 1-bit components
-	// Implement according to spec's bit manipulation requirements
-	bitsPerRow := w.params.bitsPerPixel() * w.params.Columns
+	componentsPerRow := w.params.Colors * w.params.Columns
 
-	for bitPos := w.params.Colors; bitPos < bitsPerRow; bitPos++ {
-		byteIdx := bitPos / 8
-		bitIdx := 7 - (bitPos % 8)
-		componentIdx := bitPos % w.params.Colors
+	for byteIdx, original := range data {
+		var result byte
 
-		currentBit := (data[byteIdx] >> bitIdx) & 1
-		prevBit := byte(w.prevValues[componentIdx] & 1)
-		diffBit := currentBit ^ prevBit
+		for fragIdx := range 8 {
+			componentIdx := byteIdx*8 + fragIdx
+			if componentIdx >= componentsPerRow {
+				break
+			}
 
-		// Update the bit in place
-		if diffBit != 0 {
-			data[byteIdx] |= (1 << bitIdx)
-		} else {
-			data[byteIdx] &= ^(1 << bitIdx)
+			shift := 7 - fragIdx
+			current := (original >> shift) & 1
+
+			colorIdx := componentIdx % w.params.Colors
+			var predicted byte
+			if componentIdx < w.params.Colors {
+				// First pixel: no prediction
+				predicted = current
+			} else {
+				// Subsequent pixels: XOR with previous
+				predicted = current ^ byte(w.prevValues[colorIdx]&1)
+			}
+
+			result |= predicted << shift
+			w.prevValues[colorIdx] = uint16(current)
 		}
 
-		w.prevValues[componentIdx] = uint32(currentBit)
+		data[byteIdx] = result
 	}
 }
 
 func (w *writer) applyTIFF2Bit(data []byte) {
-	// For 2-bit components: 4 values per byte
-	// Use component-level differencing similar to 8-bit case
-	for byteIdx := 0; byteIdx < len(data); byteIdx++ {
-		original := data[byteIdx]
-		result := byte(0)
+	componentsPerRow := w.params.Colors * w.params.Columns
 
-		for bit2Idx := 0; bit2Idx < 4; bit2Idx++ {
-			componentIdx := (byteIdx*4 + bit2Idx) % w.params.Colors
-			if byteIdx*4+bit2Idx < w.params.Colors {
-				// First components in row - no prediction
-				component := (original >> (6 - bit2Idx*2)) & 0x03
-				result |= component << (6 - bit2Idx*2)
-				w.prevValues[componentIdx] = uint32(component)
-			} else {
-				// Apply prediction
-				component := (original >> (6 - bit2Idx*2)) & 0x03
-				diff := (component - byte(w.prevValues[componentIdx])) & 0x03
-				result |= diff << (6 - bit2Idx*2)
-				w.prevValues[componentIdx] = uint32(component)
+	for byteIdx, original := range data {
+		var result byte
+
+		for fragIdx := range 4 {
+			componentIdx := byteIdx*4 + fragIdx
+			if componentIdx >= componentsPerRow {
+				break
 			}
+
+			shift := 6 - fragIdx*2
+			current := (original >> shift) & 0x03
+
+			colorIdx := componentIdx % w.params.Colors
+			var predicted byte
+			if componentIdx < w.params.Colors {
+				// First pixel: no prediction
+				predicted = current
+			} else {
+				// Subsequent pixels: subtract previous
+				predicted = (current - byte(w.prevValues[colorIdx])) & 0x03
+			}
+
+			result |= predicted << shift
+			w.prevValues[colorIdx] = uint16(current)
 		}
+
 		data[byteIdx] = result
 	}
 }
 
 func (w *writer) applyTIFF4Bit(data []byte) {
-	// For 4-bit components: 2 values per byte
-	// Use component-level differencing similar to 8-bit case
-	for byteIdx := 0; byteIdx < len(data); byteIdx++ {
-		original := data[byteIdx]
-		result := byte(0)
+	componentsPerRow := w.params.Colors * w.params.Columns
 
-		for bit4Idx := 0; bit4Idx < 2; bit4Idx++ {
-			componentIdx := (byteIdx*2 + bit4Idx) % w.params.Colors
-			if byteIdx*2+bit4Idx < w.params.Colors {
-				// First components in row - no prediction
-				component := (original >> (4 - bit4Idx*4)) & 0x0F
-				result |= component << (4 - bit4Idx*4)
-				w.prevValues[componentIdx] = uint32(component)
-			} else {
-				// Apply prediction
-				component := (original >> (4 - bit4Idx*4)) & 0x0F
-				diff := (component - byte(w.prevValues[componentIdx])) & 0x0F
-				result |= diff << (4 - bit4Idx*4)
-				w.prevValues[componentIdx] = uint32(component)
+	for byteIdx, original := range data {
+		var result byte
+
+		for fragIdx := range 2 {
+			componentIdx := byteIdx*2 + fragIdx
+			if componentIdx >= componentsPerRow {
+				break
 			}
+
+			shift := 4 - fragIdx*4
+			current := (original >> shift) & 0x0F
+
+			colorIdx := componentIdx % w.params.Colors
+			var predicted byte
+			if componentIdx < w.params.Colors {
+				// First pixel: no prediction
+				predicted = current
+			} else {
+				// Subsequent pixels: subtract previous
+				predicted = (current - byte(w.prevValues[colorIdx])) & 0x0F
+			}
+
+			result |= predicted << shift
+			w.prevValues[colorIdx] = uint16(current)
 		}
+
 		data[byteIdx] = result
+	}
+}
+
+func (w *writer) applyTIFF8Bit(data []byte) {
+	for componentIdx, current := range data {
+		colorIdx := componentIdx % w.params.Colors
+		if componentIdx >= w.params.Colors {
+			data[componentIdx] = (current - byte(w.prevValues[colorIdx]))
+		}
+		w.prevValues[colorIdx] = uint16(current)
+	}
+}
+
+func (w *writer) applyTIFF16Bit(data []byte) {
+	for byteIdx := 0; byteIdx+1 < len(data); byteIdx += 2 {
+		current := uint16(data[byteIdx])<<8 | uint16(data[byteIdx+1])
+		componentIdx := byteIdx / 2
+		colorIdx := componentIdx % w.params.Colors
+		if componentIdx >= w.params.Colors {
+			predicted := current - w.prevValues[colorIdx]
+			data[byteIdx] = byte(predicted >> 8)
+			data[byteIdx+1] = byte(predicted)
+		}
+		w.prevValues[colorIdx] = current
 	}
 }
 

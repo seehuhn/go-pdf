@@ -18,6 +18,7 @@ package predict
 
 import (
 	"bytes"
+	"io"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -167,7 +168,7 @@ func TestPNGSubPredictor(t *testing.T) {
 	}
 
 	// Test decoding
-	reader, err := NewReader(bytes.NewReader(encodedData), &params)
+	reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &params)
 	if err != nil {
 		t.Fatalf("failed to create reader: %v", err)
 	}
@@ -237,7 +238,7 @@ func TestPNGUpPredictor(t *testing.T) {
 	}
 
 	// Test decoding
-	reader, err := NewReader(bytes.NewReader(encodedData), &params)
+	reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &params)
 	if err != nil {
 		t.Fatalf("failed to create reader: %v", err)
 	}
@@ -310,7 +311,7 @@ func TestPNGAveragePredictor(t *testing.T) {
 	}
 
 	// Test round-trip
-	reader, err := NewReader(bytes.NewReader(encodedData), &params)
+	reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &params)
 	if err != nil {
 		t.Fatalf("failed to create reader: %v", err)
 	}
@@ -383,7 +384,7 @@ func TestPNGPaethPredictor(t *testing.T) {
 	}
 
 	// Test round-trip
-	reader, err := NewReader(bytes.NewReader(encodedData), &params)
+	reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &params)
 	if err != nil {
 		t.Fatalf("failed to create reader: %v", err)
 	}
@@ -458,7 +459,7 @@ func TestPNGPredictorPreviousRowBufferManagement(t *testing.T) {
 	}
 
 	// Test decoding with buffer management
-	reader, err := NewReader(bytes.NewReader(encodedData), &params)
+	reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &params)
 	if err != nil {
 		t.Fatalf("failed to create reader: %v", err)
 	}
@@ -532,7 +533,7 @@ func TestPNGOptimumPredictor(t *testing.T) {
 	}
 
 	// Test decoding - should work regardless of which algorithms were chosen
-	reader, err := NewReader(bytes.NewReader(encodedData), &params)
+	reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &params)
 	if err != nil {
 		t.Fatalf("failed to create reader: %v", err)
 	}
@@ -657,7 +658,7 @@ func TestPNGDataSizeWithTagBytes(t *testing.T) {
 			}
 
 			// Test round-trip
-			reader, err := NewReader(bytes.NewReader(encodedData), &tt.params)
+			reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &tt.params)
 			if err != nil {
 				t.Fatalf("failed to create reader: %v", err)
 			}

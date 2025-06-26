@@ -23,7 +23,7 @@ import (
 // reader applies undoes the effects of a prediction filter on the data read from it.
 // This is used on decompressed data when reading LZW/Flate compressed streams in PDF.
 type reader struct {
-	r      io.Reader
+	r      io.ReadCloser
 	params *Params
 
 	// State for processing
@@ -40,7 +40,7 @@ type reader struct {
 // NewReader creates a new io.Reader that applies the prediction filter with the
 // given parameters. The function returns an error if the parameters are
 // invalid. For predictor 1 (no prediction), it returns the original reader.
-func NewReader(r io.Reader, p *Params) (io.Reader, error) {
+func NewReader(r io.ReadCloser, p *Params) (io.ReadCloser, error) {
 	if err := p.Validate(); err != nil {
 		return nil, err
 	}
@@ -74,6 +74,10 @@ func NewReader(r io.Reader, p *Params) (io.Reader, error) {
 	}
 
 	return reader, nil
+}
+
+func (r *reader) Close() error {
+	return r.r.Close()
 }
 
 // Read implements the [io.Reader] interface.
@@ -148,16 +152,16 @@ func (r *reader) decodeTIFFRow(encodedData []byte) ([]byte, error) {
 	copy(result, encodedData)
 
 	switch r.params.BitsPerComponent {
-	case 8:
-		r.decodeTIFF8Bit(result)
-	case 16:
-		r.decodeTIFF16Bit(result)
 	case 1:
 		r.decodeTIFF1Bit(result)
 	case 2:
 		r.decodeTIFF2Bit(result)
 	case 4:
 		r.decodeTIFF4Bit(result)
+	case 8:
+		r.decodeTIFF8Bit(result)
+	case 16:
+		r.decodeTIFF16Bit(result)
 	}
 
 	// Reset previous values for next row
@@ -166,6 +170,108 @@ func (r *reader) decodeTIFFRow(encodedData []byte) ([]byte, error) {
 	}
 
 	return result, nil
+}
+
+func (r *reader) decodeTIFF1Bit(data []byte) {
+	componentsPerRow := r.params.Colors * r.params.Columns
+
+	for byteIdx := range data {
+		original := data[byteIdx]
+		var result byte
+
+		for fragIdx := range 8 {
+			componentIdx := byteIdx*8 + fragIdx
+			if componentIdx >= componentsPerRow {
+				break
+			}
+
+			shift := 7 - fragIdx
+			encoded := (original >> shift) & 1
+
+			colorIdx := componentIdx % r.params.Colors
+			var current byte
+			if componentIdx < r.params.Colors {
+				// First pixel: no prediction was applied
+				current = encoded
+			} else {
+				// Subsequent pixels: reverse XOR with previous
+				current = encoded ^ byte(r.prevValues[colorIdx]&1)
+			}
+
+			result |= current << shift
+			r.prevValues[colorIdx] = uint32(current)
+		}
+
+		data[byteIdx] = result
+	}
+}
+
+func (r *reader) decodeTIFF2Bit(data []byte) {
+	componentsPerRow := r.params.Colors * r.params.Columns
+
+	for byteIdx := range data {
+		original := data[byteIdx]
+		var result byte
+
+		for fragIdx := range 4 {
+			componentIdx := byteIdx*4 + fragIdx
+			if componentIdx >= componentsPerRow {
+				break
+			}
+
+			shift := 6 - fragIdx*2
+			encoded := (original >> shift) & 0x03
+
+			colorIdx := componentIdx % r.params.Colors
+			var current byte
+			if componentIdx < r.params.Colors {
+				// First pixel: no prediction was applied
+				current = encoded
+			} else {
+				// Subsequent pixels: reverse subtraction with previous
+				current = (encoded + byte(r.prevValues[colorIdx])) & 0x03
+			}
+
+			result |= current << shift
+			r.prevValues[colorIdx] = uint32(current)
+		}
+
+		data[byteIdx] = result
+	}
+}
+
+func (r *reader) decodeTIFF4Bit(data []byte) {
+	componentsPerRow := r.params.Colors * r.params.Columns
+
+	for byteIdx := range data {
+		original := data[byteIdx]
+		var result byte
+
+		for fragIdx := range 2 {
+			componentIdx := byteIdx*2 + fragIdx
+			if componentIdx >= componentsPerRow {
+				break
+			}
+
+			shift := 4 - fragIdx*4
+			encoded := (original >> shift) & 0x0F
+
+			colorIdx := componentIdx % r.params.Colors
+			var current byte
+			if componentIdx < r.params.Colors {
+				// First pixel: no prediction was applied
+				current = encoded
+			} else {
+				// Subsequent pixels: reverse subtraction with previous
+				current = (encoded + byte(r.prevValues[colorIdx])) & 0x0F
+			}
+
+			result |= current << shift
+			r.prevValues[colorIdx] = uint32(current)
+		}
+
+		data[byteIdx] = result
+	}
 }
 
 func (r *reader) decodeTIFF8Bit(data []byte) {
@@ -197,81 +303,6 @@ func (r *reader) decodeTIFF16Bit(data []byte) {
 		data[i] = byte(current >> 8)
 		data[i+1] = byte(current & 0xFF)
 		r.prevValues[componentIdx] = current
-	}
-}
-
-func (r *reader) decodeTIFF1Bit(data []byte) {
-	bitsPerRow := r.params.bitsPerPixel() * r.params.Columns
-
-	for bitPos := r.params.Colors; bitPos < bitsPerRow; bitPos++ {
-		byteIdx := bitPos / 8
-		bitIdx := 7 - (bitPos % 8)
-		componentIdx := bitPos % r.params.Colors
-
-		diffBit := (data[byteIdx] >> bitIdx) & 1
-		prevBit := byte(r.prevValues[componentIdx] & 1)
-		currentBit := diffBit ^ prevBit
-
-		// Update the bit in place
-		if currentBit != 0 {
-			data[byteIdx] |= (1 << bitIdx)
-		} else {
-			data[byteIdx] &= ^(1 << bitIdx)
-		}
-
-		r.prevValues[componentIdx] = uint32(currentBit)
-	}
-}
-
-func (r *reader) decodeTIFF2Bit(data []byte) {
-	// For 2-bit components: 4 values per byte
-	// Reverse the component-level differencing
-	for byteIdx := 0; byteIdx < len(data); byteIdx++ {
-		encoded := data[byteIdx]
-		result := byte(0)
-
-		for bit2Idx := 0; bit2Idx < 4; bit2Idx++ {
-			componentIdx := (byteIdx*4 + bit2Idx) % r.params.Colors
-			if byteIdx*4+bit2Idx < r.params.Colors {
-				// First components in row - no prediction was applied
-				component := (encoded >> (6 - bit2Idx*2)) & 0x03
-				result |= component << (6 - bit2Idx*2)
-				r.prevValues[componentIdx] = uint32(component)
-			} else {
-				// Reverse prediction
-				diff := (encoded >> (6 - bit2Idx*2)) & 0x03
-				component := (diff + byte(r.prevValues[componentIdx])) & 0x03
-				result |= component << (6 - bit2Idx*2)
-				r.prevValues[componentIdx] = uint32(component)
-			}
-		}
-		data[byteIdx] = result
-	}
-}
-
-func (r *reader) decodeTIFF4Bit(data []byte) {
-	// For 4-bit components: 2 values per byte
-	// Reverse the component-level differencing
-	for byteIdx := 0; byteIdx < len(data); byteIdx++ {
-		encoded := data[byteIdx]
-		result := byte(0)
-
-		for bit4Idx := 0; bit4Idx < 2; bit4Idx++ {
-			componentIdx := (byteIdx*2 + bit4Idx) % r.params.Colors
-			if byteIdx*2+bit4Idx < r.params.Colors {
-				// First components in row - no prediction was applied
-				component := (encoded >> (4 - bit4Idx*4)) & 0x0F
-				result |= component << (4 - bit4Idx*4)
-				r.prevValues[componentIdx] = uint32(component)
-			} else {
-				// Reverse prediction
-				diff := (encoded >> (4 - bit4Idx*4)) & 0x0F
-				component := (diff + byte(r.prevValues[componentIdx])) & 0x0F
-				result |= component << (4 - bit4Idx*4)
-				r.prevValues[componentIdx] = uint32(component)
-			}
-		}
-		data[byteIdx] = result
 	}
 }
 

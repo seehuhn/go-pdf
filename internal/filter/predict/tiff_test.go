@@ -18,6 +18,7 @@ package predict
 
 import (
 	"bytes"
+	"io"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -139,7 +140,7 @@ func TestTIFFPredictorHorizontalDifferencing(t *testing.T) {
 			}
 
 			// Test decoding
-			reader, err := NewReader(bytes.NewReader(encodedData), &tt.params)
+			reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &tt.params)
 			if err != nil {
 				t.Fatalf("failed to create reader: %v", err)
 			}
@@ -213,7 +214,7 @@ func TestTIFFPredictorMultipleRows(t *testing.T) {
 	}
 
 	// Test decoding
-	reader, err := NewReader(bytes.NewReader(encodedData), &params)
+	reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &params)
 	if err != nil {
 		t.Fatalf("failed to create reader: %v", err)
 	}
@@ -310,7 +311,7 @@ func TestTIFFPredictorBoundaryConditions(t *testing.T) {
 				}
 			}
 
-			reader, err := NewReader(bytes.NewReader(encodedBuf.Bytes()), &tt.params)
+			reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedBuf.Bytes())), &tt.params)
 			if err != nil {
 				t.Fatalf("failed to create reader: %v", err)
 			}
@@ -383,7 +384,7 @@ func TestTIFFPredictorSubByteRoundTrip(t *testing.T) {
 			}
 
 			// Decode
-			reader, err := NewReader(bytes.NewReader(encodedBuf.Bytes()), &params)
+			reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedBuf.Bytes())), &params)
 			if err != nil {
 				t.Fatalf("failed to create reader: %v", err)
 			}

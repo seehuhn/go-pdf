@@ -68,7 +68,7 @@ func TestPartialReads(t *testing.T) {
 
 	for _, bufSize := range bufferSizes {
 		t.Run(fmt.Sprintf("buffer_size_%d", bufSize), func(t *testing.T) {
-			reader, err := NewReader(bytes.NewReader(encodedData), &params)
+			reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &params)
 			if err != nil {
 				t.Fatalf("failed to create reader: %v", err)
 			}
@@ -142,7 +142,7 @@ func TestPartialWrites(t *testing.T) {
 			}
 
 			// Verify by decoding
-			reader, err := NewReader(bytes.NewReader(encodedBuf.Bytes()), &params)
+			reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedBuf.Bytes())), &params)
 			if err != nil {
 				t.Fatalf("failed to create reader: %v", err)
 			}
@@ -207,7 +207,7 @@ func TestRowBoundaryHandling(t *testing.T) {
 	// Test reading with buffer size that splits across row boundaries
 	// Each row is 6 bytes + 1 tag byte = 7 bytes
 	// Use buffer size 5 to force boundary splits
-	reader, err := NewReader(bytes.NewReader(encodedData), &params)
+	reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &params)
 	if err != nil {
 		t.Fatalf("failed to create reader: %v", err)
 	}
@@ -274,7 +274,7 @@ func TestTagByteHandlingAcrossBoundaries(t *testing.T) {
 	// Test reading with buffer size that may split tag bytes from data
 	// Each row is 2 bytes + 1 tag byte = 3 bytes
 	// Use buffer size 2 to test tag byte handling
-	reader, err := NewReader(bytes.NewReader(encodedData), &params)
+	reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &params)
 	if err != nil {
 		t.Fatalf("failed to create reader: %v", err)
 	}
@@ -334,7 +334,7 @@ func TestEOFHandling(t *testing.T) {
 	encodedData := encodedBuf.Bytes()
 
 	// Test reading with exact buffer size
-	reader, err := NewReader(bytes.NewReader(encodedData), &params)
+	reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &params)
 	if err != nil {
 		t.Fatalf("failed to create reader: %v", err)
 	}
@@ -403,7 +403,7 @@ func TestStreamStatePreservation(t *testing.T) {
 	encodedData := encodedBuf.Bytes()
 
 	// Test reading with varying buffer sizes to stress state preservation
-	reader, err := NewReader(bytes.NewReader(encodedData), &params)
+	reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &params)
 	if err != nil {
 		t.Fatalf("failed to create reader: %v", err)
 	}
@@ -468,6 +468,15 @@ func (r *errorReader) Read(p []byte) (n int, err error) {
 	return n, nil
 }
 
+// Wrapper to add Close method for io.ReadCloser
+type errorReaderCloser struct {
+	*errorReader
+}
+
+func (r *errorReaderCloser) Close() error {
+	return nil
+}
+
 func TestErrorPropagation(t *testing.T) {
 	params := Params{
 		Colors:           1,
@@ -484,7 +493,8 @@ func TestErrorPropagation(t *testing.T) {
 		errorAfter: 3, // Error after reading 3 bytes
 	}
 
-	reader, err := NewReader(errorReader, &params)
+	errorReaderCloser := &errorReaderCloser{errorReader: errorReader}
+	reader, err := NewReader(errorReaderCloser, &params)
 	if err != nil {
 		t.Fatalf("failed to create reader: %v", err)
 	}

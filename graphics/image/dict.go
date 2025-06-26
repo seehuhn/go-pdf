@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"image"
 	gocol "image/color"
+	"io"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
@@ -29,6 +30,12 @@ import (
 )
 
 type Dict struct {
+	// Width is the width of the image in pixels.
+	Width int
+
+	// Height is the height of the image in pixels.
+	Height int
+
 	// ColorSpace is the color space in which image samples are specified.
 	// It can be any type of color space except Pattern.
 	ColorSpace color.Space
@@ -96,14 +103,69 @@ type Dict struct {
 	// TODO(voss): Measure
 	// TODO(voss): PtData
 
-	// Data describes the image data for the image.
-	// The alpha channel is ignored.
-	//
-	// TODO(voss): This is too unflexible.  What to do?
-	Data image.Image
+	// WriteData is a function that writes the image data to the provided writer.
+	// The data should be written row by row, with each row containing
+	// Width * ColorSpace.Channels() samples, each sample using BitsPerComponent bits.
+	WriteData func(io.Writer) error
 }
 
-var _ pdf.Embedder[pdf.Unused] = (*Dict)(nil)
+var _ Image = (*Dict)(nil)
+
+// Bounds returns the dimensions of the image.
+func (d *Dict) Bounds() Rectangle {
+	return Rectangle{
+		XMin: 0,
+		YMin: 0,
+		XMax: d.Width,
+		YMax: d.Height,
+	}
+}
+
+// Subtype returns the PDF XObject subtype for images.
+func (d *Dict) Subtype() pdf.Name {
+	return pdf.Name("Image")
+}
+
+// FromImage creates a Dict from an image.Image.
+// The ColorSpace and BitsPerComponent must be set appropriately for the image.
+func FromImage(img image.Image, colorSpace color.Space, bitsPerComponent int) *Dict {
+	bounds := img.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+
+	return &Dict{
+		Width:            width,
+		Height:           height,
+		ColorSpace:       colorSpace,
+		BitsPerComponent: bitsPerComponent,
+		WriteData: func(w io.Writer) error {
+			return writeImageData(w, img, colorSpace, bitsPerComponent)
+		},
+	}
+}
+
+// FromImageMask creates an ImageMask from an image.Image.
+// Only the alpha channel is used, with alpha values rounded to full opacity or full transparency.
+func FromImageMask(img image.Image) *ImageMask {
+	bounds := img.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+
+	return &ImageMask{
+		Width:  width,
+		Height: height,
+		WriteData: func(w io.Writer) error {
+			return writeImageMaskData(w, img)
+		},
+	}
+}
+
+// FromImageWithMask creates a Dict with an associated ImageMask from two image.Image objects.
+func FromImageWithMask(img image.Image, mask image.Image, colorSpace color.Space, bitsPerComponent int) *Dict {
+	dict := FromImage(img, colorSpace, bitsPerComponent)
+	dict.MaskImage = FromImageMask(mask)
+	return dict
+}
 
 func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
@@ -111,10 +173,6 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	if err := d.check(rm.Out); err != nil {
 		return nil, zero, err
 	}
-
-	dim := d.Data.Bounds()
-	width := dim.Dx()
-	height := dim.Dy()
 
 	csEmbedded, _, err := pdf.ResourceManagerEmbed(rm, d.ColorSpace)
 	if err != nil {
@@ -124,8 +182,8 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	dict := pdf.Dict{
 		"Type":             pdf.Name("XObject"),
 		"Subtype":          pdf.Name("Image"),
-		"Width":            pdf.Integer(width),
-		"Height":           pdf.Integer(height),
+		"Width":            pdf.Integer(d.Width),
+		"Height":           pdf.Integer(d.Height),
 		"ColorSpace":       csEmbedded,
 		"BitsPerComponent": pdf.Integer(d.BitsPerComponent),
 	}
@@ -178,57 +236,20 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	ref := rm.Out.Alloc()
-	filters := []pdf.Filter{} // TODO(voss): add filters
-	w, err := rm.Out.OpenStream(ref, dict, filters...)
+	compress := pdf.FilterCompress{
+		"Predictor":        pdf.Integer(15), // TODO(voss): check that this is a good choice
+		"Colors":           pdf.Integer(d.ColorSpace.Channels()),
+		"BitsPerComponent": pdf.Integer(d.BitsPerComponent),
+		"Columns":          pdf.Integer(d.Width),
+	}
+	w, err := rm.Out.OpenStream(ref, dict, compress)
 	if err != nil {
 		return nil, zero, fmt.Errorf("cannot open image stream: %w", err)
 	}
 
-	numChannels := d.ColorSpace.Channels()
-	buf := newPixRow(width*numChannels, d.BitsPerComponent)
-	for y := range height {
-		buf.reset()
-
-		for x := range width {
-			pixCol := d.Data.At(dim.Min.X+x, dim.Min.Y+y)
-			shift := 16 - d.BitsPerComponent
-			switch d.ColorSpace.Family() {
-			case color.FamilyDeviceGray, color.FamilyCalGray:
-				g16 := gocol.Gray16Model.Convert(pixCol).(gocol.Gray16).Y
-				buf.appendBits(g16 >> shift)
-
-			case color.FamilyDeviceRGB, color.FamilyCalRGB:
-				c16 := gocol.NRGBA64Model.Convert(pixCol).(gocol.NRGBA64)
-				buf.appendBits(c16.R >> shift)
-				buf.appendBits(c16.G >> shift)
-				buf.appendBits(c16.B >> shift)
-
-			case color.FamilyDeviceCMYK:
-				c16 := gocol.NRGBA64Model.Convert(pixCol).(gocol.NRGBA64)
-				c, m, y, k := rgbToCMYK(c16.R, c16.G, c16.B)
-				buf.appendBits(c >> shift)
-				buf.appendBits(m >> shift)
-				buf.appendBits(y >> shift)
-				buf.appendBits(k >> shift)
-
-			// TODO(voss): implement the remaining color spaces
-			case color.FamilyLab:
-				return nil, zero, errors.New("Lab color space not implemented")
-			case color.FamilyICCBased:
-				return nil, zero, errors.New("ICCBased color space not implemented")
-			case color.FamilyIndexed:
-				return nil, zero, errors.New("Indexed color space not implemented")
-			case color.FamilySeparation:
-				return nil, zero, errors.New("Separation color space not implemented")
-			case color.FamilyDeviceN:
-				return nil, zero, errors.New("DeviceN color space not implemented")
-			}
-		}
-
-		_, err = w.Write(buf.bytes)
-		if err != nil {
-			return nil, zero, err
-		}
+	err = d.WriteData(w)
+	if err != nil {
+		return nil, zero, err
 	}
 
 	err = w.Close()
@@ -239,6 +260,16 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 }
 
 func (d *Dict) check(out *pdf.Writer) error {
+	if d.Width <= 0 {
+		return fmt.Errorf("invalid image width %d", d.Width)
+	}
+	if d.Height <= 0 {
+		return fmt.Errorf("invalid image height %d", d.Height)
+	}
+	if d.WriteData == nil {
+		return errors.New("WriteData function cannot be nil")
+	}
+
 	if fam := d.ColorSpace.Family(); fam == color.FamilyPattern {
 		return fmt.Errorf("invalid image color space %q", fam)
 	}
@@ -329,7 +360,104 @@ func rgbToCMYK(r, g, b uint16) (c, m, y, k uint16) {
 	return c, m, y, k
 }
 
+// writeImageData writes image data from an image.Image to the provided writer.
+func writeImageData(w io.Writer, img image.Image, colorSpace color.Space, bitsPerComponent int) error {
+	bounds := img.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	numChannels := colorSpace.Channels()
+
+	buf := NewPixelRow(width*numChannels, bitsPerComponent)
+	for y := range height {
+		buf.Reset()
+
+		for x := range width {
+			pixCol := img.At(bounds.Min.X+x, bounds.Min.Y+y)
+			shift := 16 - bitsPerComponent
+			switch colorSpace.Family() {
+			case color.FamilyDeviceGray, color.FamilyCalGray:
+				g16 := gocol.Gray16Model.Convert(pixCol).(gocol.Gray16).Y
+				buf.AppendBits(g16 >> shift)
+
+			case color.FamilyDeviceRGB, color.FamilyCalRGB:
+				c16 := gocol.NRGBA64Model.Convert(pixCol).(gocol.NRGBA64)
+				buf.AppendBits(c16.R >> shift)
+				buf.AppendBits(c16.G >> shift)
+				buf.AppendBits(c16.B >> shift)
+
+			case color.FamilyDeviceCMYK:
+				c16 := gocol.NRGBA64Model.Convert(pixCol).(gocol.NRGBA64)
+				c, m, y, k := rgbToCMYK(c16.R, c16.G, c16.B)
+				buf.AppendBits(c >> shift)
+				buf.AppendBits(m >> shift)
+				buf.AppendBits(y >> shift)
+				buf.AppendBits(k >> shift)
+
+			// TODO(voss): implement the remaining color spaces
+			case color.FamilyLab:
+				return errors.New("Lab color space not implemented")
+			case color.FamilyICCBased:
+				return errors.New("ICCBased color space not implemented")
+			case color.FamilyIndexed:
+				return errors.New("Indexed color space not implemented")
+			case color.FamilySeparation:
+				return errors.New("Separation color space not implemented")
+			case color.FamilyDeviceN:
+				return errors.New("DeviceN color space not implemented")
+			}
+		}
+
+		_, err := w.Write(buf.Bytes())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// writeImageMaskData writes mask data from an image.Image to the provided writer.
+func writeImageMaskData(w io.Writer, img image.Image) error {
+	bounds := img.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+
+	// Mask data is encoded as a continuous bit stream, with the high-order bit
+	// of each byte first. Each row starts at a new byte boundary.
+	// 0 = opaque, 1 = transparent
+	rowBytes := (width + 7) / 8
+	buf := make([]byte, rowBytes)
+	for y := range height {
+		for i := range buf {
+			buf[i] = 0
+		}
+
+		for x := range width {
+			_, _, _, a := img.At(bounds.Min.X+x, bounds.Min.Y+y).RGBA()
+			if a < 0x8000 {
+				buf[x/8] |= 1 << (7 - x%8)
+			}
+		}
+
+		_, err := w.Write(buf)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type ImageMask struct {
+	// Width is the width of the image mask in pixels.
+	Width int
+
+	// Height is the height of the image mask in pixels.
+	Height int
+
+	// WriteData is a function that writes the mask data to the provided writer.
+	// The data should be written as a continuous bit stream, with each row
+	// starting at a new byte boundary. 0 = opaque, 1 = transparent.
+	WriteData func(io.Writer) error
+
 	// Interpolate enables edge smoothing for the mask to reduce jagged
 	// appearance in low-resolution stencil masks.
 	Interpolate bool
@@ -356,21 +484,16 @@ type ImageMask struct {
 	// TODO(voss): AF
 	// TODO(voss): Measure
 	// TODO(voss): PtData
-
-	// Data describes the shape of the image mask. Only the alpha channel is
-	// used, and alpha values are rounded to full opacity or full transparency.
-	Data image.Image
 }
 
 var _ Image = (*ImageMask)(nil)
 
 func (m *ImageMask) Bounds() Rectangle {
-	dim := m.Data.Bounds()
 	return Rectangle{
-		XMin: dim.Min.X,
-		YMin: dim.Min.Y,
-		XMax: dim.Max.X,
-		YMax: dim.Max.Y,
+		XMin: 0,
+		YMin: 0,
+		XMax: m.Width,
+		YMax: m.Height,
 	}
 }
 
@@ -385,15 +508,11 @@ func (m *ImageMask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 		return nil, zero, err
 	}
 
-	dim := m.Data.Bounds()
-	width := dim.Dx()
-	height := dim.Dy()
-
 	dict := pdf.Dict{
 		"Type":      pdf.Name("XObject"),
 		"Subtype":   pdf.Name("Image"),
-		"Width":     pdf.Integer(width),
-		"Height":    pdf.Integer(height),
+		"Width":     pdf.Integer(m.Width),
+		"Height":    pdf.Integer(m.Height),
 		"ImageMask": pdf.Boolean(true),
 	}
 	if m.Interpolate {
@@ -424,7 +543,7 @@ func (m *ImageMask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 	ref := rm.Out.Alloc()
 	filters := []pdf.Filter{
 		pdf.FilterCCITTFax{
-			"Columns": pdf.Integer(width),
+			"Columns": pdf.Integer(m.Width),
 			"K":       pdf.Integer(-1),
 		},
 	}
@@ -433,27 +552,9 @@ func (m *ImageMask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 		return nil, zero, fmt.Errorf("cannot open image mask stream: %w", err)
 	}
 
-	// Mask data is encoded as a continuous bit stream, with the high-order bit
-	// of each byte first. Each row starts at a new byte boundary.
-	// 0 = opaque, 1 = transparent
-	rowBytes := (width + 7) / 8
-	buf := make([]byte, rowBytes)
-	for y := range height {
-		for i := range buf {
-			buf[i] = 0
-		}
-
-		for x := range width {
-			_, _, _, a := m.Data.At(dim.Min.X+x, dim.Min.Y+y).RGBA()
-			if a < 0x8000 {
-				buf[x/8] |= 1 << (7 - x%8)
-			}
-		}
-
-		_, err = w.Write(buf)
-		if err != nil {
-			return nil, zero, err
-		}
+	err = m.WriteData(w)
+	if err != nil {
+		return nil, zero, err
 	}
 
 	err = w.Close()
@@ -464,6 +565,16 @@ func (m *ImageMask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 }
 
 func (m *ImageMask) check(out *pdf.Writer) error {
+	if m.Width <= 0 {
+		return fmt.Errorf("invalid image mask width %d", m.Width)
+	}
+	if m.Height <= 0 {
+		return fmt.Errorf("invalid image mask height %d", m.Height)
+	}
+	if m.WriteData == nil {
+		return errors.New("WriteData function cannot be nil")
+	}
+
 	if m.Alternates != nil {
 		if err := pdf.CheckVersion(out, "image alternates", pdf.V1_3); err != nil {
 			return err

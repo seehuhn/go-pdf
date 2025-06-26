@@ -16,28 +16,42 @@
 
 package image
 
-type pixRow struct {
+// PixelRow is a helper for efficiently packing pixel data into bytes
+// for PDF image streams. It handles arbitrary bits per pixel and
+// packs them into a byte array.
+type PixelRow struct {
 	bytes   []byte
 	byteIdx int
 	bitPos  int
 	numBits int // bits per append operation
 }
 
-func newPixRow(numElems, bitsPerElem int) *pixRow {
+// NewPixelRow creates a new PixelRow for packing image data.
+// numElems is the number of elements (pixels * channels) in the row.
+// bitsPerElem is the number of bits per element (1, 2, 4, 8, or 16).
+func NewPixelRow(numElems, bitsPerElem int) *PixelRow {
 	rowBytes := (numElems*bitsPerElem + 7) >> 3
-	return &pixRow{
+	return &PixelRow{
 		bytes:   make([]byte, rowBytes),
 		numBits: bitsPerElem,
 	}
 }
 
-func (r *pixRow) reset() {
+// Reset clears the row buffer and resets position counters.
+func (r *PixelRow) Reset() {
 	r.byteIdx = 0
 	r.bitPos = 0
 	clear(r.bytes)
 }
 
-func (r *pixRow) appendBits(bits uint16) {
+// Bytes returns the underlying byte slice containing the packed pixel data.
+func (r *PixelRow) Bytes() []byte {
+	return r.bytes
+}
+
+// AppendBits appends the specified number of bits to the row.
+// Only the low-order numBits bits of the value are used.
+func (r *PixelRow) AppendBits(bits uint16) {
 	bitsToDo := r.numBits
 
 	// fast path for 8 bit writes
