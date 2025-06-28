@@ -34,12 +34,14 @@ func isFinite(x float64) bool {
 	return !math.IsInf(x, 0) && !math.IsNaN(x)
 }
 
+// isPair checks if the given values x and y are finite.
+func isPair(x, y float64) bool {
+	return !math.IsInf(x, 0) && !math.IsInf(y, 0) && !math.IsNaN(x) && !math.IsNaN(y)
+}
+
 // isRange checks if the given values x and y are finite and satisfy x <= y.
 func isRange(x, y float64) bool {
-	if math.IsInf(x, 0) || math.IsInf(y, 0) {
-		return false
-	}
-	return x <= y
+	return !math.IsInf(x, 0) && !math.IsInf(y, 0) && x <= y
 }
 
 // clip clips a value to the given range [min, max].

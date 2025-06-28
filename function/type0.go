@@ -184,7 +184,7 @@ func (f *Type0) repair() {
 	}
 	totalBits := totalSamples * n * f.BitsPerSample
 	totalBytes := (totalBits + 7) / 8
-	if len(f.Samples) > totalBytes {
+	if totalBytes > 0 && len(f.Samples) > totalBytes {
 		f.Samples = f.Samples[:totalBytes]
 	}
 }
@@ -245,7 +245,7 @@ func (f *Type0) validate() error {
 			len(f.Encode), 2*m)
 	}
 	for i := 0; i < len(f.Encode); i += 2 {
-		if !isRange(f.Encode[i], f.Encode[i+1]) {
+		if !isPair(f.Encode[i], f.Encode[i+1]) {
 			return newInvalidFunctionError(0, "Encode",
 				"invalid encode [%g,%g] for input %d",
 				f.Encode[i], f.Encode[i+1], i/2)
@@ -257,9 +257,10 @@ func (f *Type0) validate() error {
 			2*n, len(f.Decode))
 	}
 	for i := 0; i < len(f.Decode); i += 2 {
-		if f.Decode[i] >= f.Decode[i+1] {
-			return newInvalidFunctionError(0, "Decode", "need Decode[%d] < Decode[%d]",
-				i, i+1)
+		if !isPair(f.Decode[i], f.Decode[i+1]) {
+			return newInvalidFunctionError(0, "Decode",
+				"invalid decode [%g,%g] for output %d",
+				f.Decode[i], f.Decode[i+1], i/2)
 		}
 	}
 
@@ -550,83 +551,39 @@ func (f *Type0) extractSampleAtIndex(sampleIndex int) float64 {
 
 	case 2:
 		shift := 6 - bitInByte
-		if shift >= 0 {
-			mask := byte(0x03 << shift)
-			return float64((f.Samples[byteOffset] & mask) >> shift)
-		} else {
-			if byteOffset+1 >= len(f.Samples) {
-				return 0
-			}
-			highBits := (f.Samples[byteOffset] & 0x01) << 1
-			lowBits := (f.Samples[byteOffset+1] & 0x80) >> 7
-			return float64(highBits | lowBits)
-		}
+		return float64((f.Samples[byteOffset] >> shift) & 0b00000011)
 
 	case 4:
 		if bitInByte == 0 {
-			return float64((f.Samples[byteOffset] & 0xF0) >> 4)
-		} else if bitInByte == 4 {
+			return float64(f.Samples[byteOffset] >> 4)
+		} else { // bitInByte == 4
 			return float64(f.Samples[byteOffset] & 0x0F)
-		} else {
-			if byteOffset+1 >= len(f.Samples) {
-				return 0
-			}
-			shift := 4 - bitInByte
-			highBits := (f.Samples[byteOffset] & ((1 << (8 - bitInByte)) - 1)) << shift
-			lowBits := (f.Samples[byteOffset+1] & (0xFF << (8 - shift))) >> (8 - shift)
-			return float64(highBits | lowBits)
 		}
 
 	case 8:
-		if byteOffset >= len(f.Samples) {
-			return 0
-		}
 		return float64(f.Samples[byteOffset])
 
 	case 12:
 		if bitInByte == 0 {
-			if byteOffset >= len(f.Samples) {
-				return 0
-			}
-			if byteOffset+1 >= len(f.Samples) {
-				return float64(uint16(f.Samples[byteOffset]) << 4)
-			}
 			highByte := uint16(f.Samples[byteOffset]) << 4
 			lowNibble := uint16(f.Samples[byteOffset+1]) >> 4
 			return float64(highByte | lowNibble)
-		} else if bitInByte == 4 {
-			if byteOffset >= len(f.Samples) {
-				return 0
-			}
-			if byteOffset+1 >= len(f.Samples) {
-				return float64(uint16(f.Samples[byteOffset]&0x0F) << 8)
-			}
+		} else { // bitInByte == 4
 			highNibble := uint16(f.Samples[byteOffset]&0x0F) << 8
 			lowByte := uint16(f.Samples[byteOffset+1])
 			return float64(highNibble | lowByte)
-		} else {
-			return f.extractBitsGeneral(bitOffset, 12)
 		}
 
 	case 16:
-		if byteOffset >= len(f.Samples) || byteOffset+1 >= len(f.Samples) {
-			return 0
-		}
 		return float64(uint16(f.Samples[byteOffset])<<8 | uint16(f.Samples[byteOffset+1]))
 
 	case 24:
-		if byteOffset >= len(f.Samples) || byteOffset+2 >= len(f.Samples) {
-			return 0
-		}
 		val := uint32(f.Samples[byteOffset])<<16 |
 			uint32(f.Samples[byteOffset+1])<<8 |
 			uint32(f.Samples[byteOffset+2])
 		return float64(val)
 
 	case 32:
-		if byteOffset >= len(f.Samples) || byteOffset+3 >= len(f.Samples) {
-			return 0
-		}
 		val := uint32(f.Samples[byteOffset])<<24 |
 			uint32(f.Samples[byteOffset+1])<<16 |
 			uint32(f.Samples[byteOffset+2])<<8 |
@@ -636,44 +593,6 @@ func (f *Type0) extractSampleAtIndex(sampleIndex int) float64 {
 	default:
 		return 0
 	}
-}
-
-// extractBitsGeneral extracts a specified number of bits starting at bitOffset.
-// This handles the general case where bits span multiple bytes.
-func (f *Type0) extractBitsGeneral(bitOffset, numBits int) float64 {
-	if numBits <= 0 || numBits > 32 {
-		return 0
-	}
-
-	var result uint32 = 0
-	bitsRemaining := numBits
-	currentBitOffset := bitOffset
-
-	for bitsRemaining > 0 {
-		byteOffset := currentBitOffset / 8
-		bitInByte := currentBitOffset % 8
-
-		if byteOffset >= len(f.Samples) {
-			break
-		}
-
-		bitsInCurrentByte := 8 - bitInByte
-		bitsToRead := bitsRemaining
-		if bitsToRead > bitsInCurrentByte {
-			bitsToRead = bitsInCurrentByte
-		}
-
-		mask := byte((1 << bitsToRead) - 1)
-		shift := bitsInCurrentByte - bitsToRead
-		bits := (f.Samples[byteOffset] >> shift) & mask
-
-		result = (result << bitsToRead) | uint32(bits)
-
-		bitsRemaining -= bitsToRead
-		currentBitOffset += bitsToRead
-	}
-
-	return float64(result)
 }
 
 // cubicSplineCoeff1D computes cubic spline coefficients for 1D data using

@@ -82,7 +82,7 @@ func TestType0BitDepthExtraction(t *testing.T) {
 		{
 			name:          "12-bit samples nibble-aligned",
 			bitsPerSample: 12,
-			samples:       []byte{0xAB, 0xCD, 0xEF, 0x12}, // ABC DEF 120
+			samples:       []byte{0xAB, 0xCD, 0xEF, 0x12, 0x00}, // ABC DEF 120 (need 5 bytes for 36 bits)
 			expectedVals:  []float64{0xABC, 0xDEF, 0x120},
 			description:   "3 samples of 12 bits each: 0xABC (bits 0-11), 0xDEF (bits 12-23), 0x120 (bits 24-35)",
 		},
