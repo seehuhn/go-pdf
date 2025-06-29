@@ -256,9 +256,13 @@ func getFilters(r Getter, x *Stream) ([]Filter, error) {
 	case nil:
 		// pass
 	case Name:
-		pDict, err := toDict(decodeParams)
-		if err != nil {
-			return nil, err
+		var pDict Dict
+		if decodeParams != nil {
+			var ok bool
+			pDict, ok = decodeParams.(Dict)
+			if !ok {
+				return nil, fmt.Errorf("wrong type, expected Dict but got %T", decodeParams)
+			}
 		}
 		res = append(res, makeFilter(f, pDict))
 	case Array:
@@ -281,11 +285,13 @@ func getFilters(r Getter, x *Stream) ([]Filter, error) {
 				if err != nil {
 					return nil, err
 				}
-				x, err := toDict(pai)
-				if err != nil {
-					return nil, err
+				if pai != nil {
+					var ok bool
+					pDict, ok = pai.(Dict)
+					if !ok {
+						return nil, fmt.Errorf("wrong type, expected Dict but got %T", pai)
+					}
 				}
-				pDict = x
 			}
 			res = append(res, makeFilter(name, pDict))
 		}

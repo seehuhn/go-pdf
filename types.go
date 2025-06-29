@@ -725,17 +725,6 @@ func (d Dict) SortedKeys() []Name {
 	return keys
 }
 
-// TODO(voss): remove this function
-func toDict(obj Object) (Dict, error) {
-	if obj == nil {
-		return nil, nil
-	}
-	dict, ok := obj.(Dict)
-	if !ok {
-		return nil, fmt.Errorf("wrong type, expected Dict but got %T", obj)
-	}
-	return dict, nil
-}
 
 // Stream represent a stream object in a PDF file.
 // Use the [DecodeStream] function to access the contents of the stream.

@@ -24,18 +24,18 @@ import (
 // Geometry collects the various dimensions connected to a font and to
 // the individual glyphs.
 //
-// TODO(voss): convert all fields to PDF glyph space units,
-// document this, and add tests to make sure implementations are correct.
+// TODO(voss): convert all fields to PDF glyph space units?
+// Add tests to make sure implementations are correct.
 type Geometry struct {
-	Ascent             float64
-	Descent            float64 // negative
-	Leading            float64
-	UnderlinePosition  float64
-	UnderlineThickness float64
+	Ascent             float64 // text space units
+	Descent            float64 // negative, text space units
+	Leading            float64 // text space units
+	UnderlinePosition  float64 // text space units
+	UnderlineThickness float64 // text space units
 
-	GlyphExtents []rect.Rect // indexed by GID
+	GlyphExtents []rect.Rect // indexed by GID, glyph space units
 
-	Widths []float64 // indexed by GID, PDF text space units
+	Widths []float64 // indexed by GID, text space units
 }
 
 // GetGeometry returns the geometry of a font.

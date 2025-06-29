@@ -82,7 +82,6 @@ func newEmbeddedComposite(ref pdf.Reference, f *Instance) *embeddedComposite {
 	}
 	gidToCID := makeGIDToCID()
 
-	// TODO(voss): make sure we use `/Identity-H` instead of writing a CMap stream.
 	makeEncoder := cidenc.NewCompositeIdentity
 	if opt.MakeEncoder != nil {
 		makeEncoder = opt.MakeEncoder

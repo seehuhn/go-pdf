@@ -86,6 +86,10 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 	if metrics != nil {
 		geometry.Ascent = metrics.Ascent / 1000
 		geometry.Descent = metrics.Descent / 1000
+	} else {
+		bbox := psFont.FontBBoxPDF()
+		geometry.Ascent = bbox.URy / 1000
+		geometry.Descent = bbox.LLy / 1000
 	}
 
 	nameGid := make(map[string]glyph.ID, len(glyphNames))
