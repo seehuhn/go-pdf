@@ -32,27 +32,35 @@ const maxSampleBits = 1 << 23 // 1MB
 // and ranges.
 type Type0 struct {
 	// Domain defines the valid input ranges as [min0, max0, min1, max1, ...].
+	// The length must be 2*m, where m is the number of input variables.
 	Domain []float64
 
 	// Range gives clipping ranges for the output variables as [min0, max0, min1, max1, ...].
+	// The length must be 2*n, where n is the number of output variables.
 	Range []float64
 
 	// Size specifies the number of samples in each input dimension.
+	// The length must be m, where m is the number of input variables.
 	Size []int
 
 	// BitsPerSample is the number of bits per sample value (1, 2, 4, 8, 12, 16, 24, 32).
 	BitsPerSample int
 
-	// UseCubic determines whether to use cubic spline interpolation (true) or linear interpolation (false).
+	// UseCubic determines whether to use Catmull-Rom spline interpolation (true) or
+	// linear interpolation (false).
 	UseCubic bool
 
 	// Encode maps inputs to sample table indices as [min0, max0, min1, max1, ...].
+	// The length must be 2*m, where m is the number of input variables.
 	Encode []float64
 
 	// Decode maps samples to output range as [min0, max0, min1, max1, ...].
+	// The length must be 2*n, where n is the number of output variables.
 	Decode []float64
 
 	// Samples contains the raw sample data.
+	// This contains Size[0] * Size[1] * ... * Size[m-1] * n * BitsPerSample bits,
+	// stored in a continuous bit stream (no padding), MSB first.
 	Samples []byte
 }
 
@@ -64,9 +72,7 @@ func (f *Type0) FunctionType() int {
 
 // Shape returns the number of input and output values of the function.
 func (f *Type0) Shape() (int, int) {
-	m := len(f.Domain) / 2
-	n := len(f.Range) / 2
-	return m, n
+	return len(f.Domain) / 2, len(f.Range) / 2
 }
 
 // extractType0 reads a Type 0 sampled function from a PDF stream object.
@@ -97,7 +103,6 @@ func extractType0(r pdf.Getter, stream *pdf.Stream) (*Type0, error) {
 	if err != nil {
 		return nil, err
 	}
-	useCubic := (int(order) == 3)
 
 	encode, err := readFloats(r, d["Encode"])
 	if err != nil {
@@ -114,7 +119,7 @@ func extractType0(r pdf.Getter, stream *pdf.Stream) (*Type0, error) {
 		Range:         rangeArray,
 		Size:          size,
 		BitsPerSample: int(bitsPerSample),
-		UseCubic:      useCubic,
+		UseCubic:      int(order) == 3,
 		Encode:        encode,
 		Decode:        decode,
 	}
@@ -138,7 +143,7 @@ func extractType0(r pdf.Getter, stream *pdf.Stream) (*Type0, error) {
 	return f, nil
 }
 
-// repair sets default values and tries to fix up mal-formed function dicts.
+// repair sets default values and tries to fix mal-formed function dicts.
 func (f *Type0) repair() {
 	m, n := f.Shape()
 
@@ -150,12 +155,6 @@ func (f *Type0) repair() {
 	}
 	if len(f.Size) > m {
 		f.Size = f.Size[:m]
-	}
-	for _, size := range f.Size {
-		if size < 4 {
-			f.UseCubic = false
-			break
-		}
 	}
 
 	if len(f.Encode) == 0 {
@@ -184,83 +183,72 @@ func (f *Type0) repair() {
 	}
 	totalBits := totalSamples * n * f.BitsPerSample
 	totalBytes := (totalBits + 7) / 8
+	// We need to be careful here, because integer overflow may lead
+	// to negative totalBytes:
 	if totalBytes > 0 && len(f.Samples) > totalBytes {
 		f.Samples = f.Samples[:totalBytes]
 	}
 }
 
-// validate checks if the Type0 struct contains valid data
+// validate checks if the Type0 struct contains valid data.
 func (f *Type0) validate() error {
 	m, n := f.Shape()
 	if m <= 0 || n <= 0 {
-		return newInvalidFunctionError(0, "Shape", "invalid shape (%d, %d)",
-			m, n)
+		return newInvalidFunctionError(0, "Shape", "invalid shape (%d, %d)", m, n)
 	}
 
 	if len(f.Domain) != 2*m {
-		return newInvalidFunctionError(0, "Domain", "invalid length %d != %d",
-			len(f.Domain), 2*m)
+		return newInvalidFunctionError(0, "Domain", "invalid length %d != %d", len(f.Domain), 2*m)
 	}
 	for i := 0; i < len(f.Domain); i += 2 {
 		if !isRange(f.Domain[i], f.Domain[i+1]) {
 			return newInvalidFunctionError(0, "Domain",
-				"invalid domain [%g,%g] for input %d",
-				f.Domain[i], f.Domain[i+1], i/2)
+				"invalid domain [%g,%g] for input %d", f.Domain[i], f.Domain[i+1], i/2)
 		}
 	}
 
 	if len(f.Range) != 2*n {
-		return newInvalidFunctionError(0, "Range", "invalid length %d != %d",
-			len(f.Range), 2*n)
+		return newInvalidFunctionError(0, "Range", "invalid length %d != %d", len(f.Range), 2*n)
 	}
 	for i := 0; i < len(f.Range); i += 2 {
 		if !isRange(f.Range[i], f.Range[i+1]) {
 			return newInvalidFunctionError(0, "Range",
-				"invalid range [%g,%g] for output %d",
-				f.Range[i], f.Range[i+1], i/2)
+				"invalid range [%g,%g] for output %d", f.Range[i], f.Range[i+1], i/2)
 		}
 	}
 
 	if len(f.Size) != m {
-		return newInvalidFunctionError(0, "Size", "invalid length %d != %d",
-			len(f.Size), m)
+		return newInvalidFunctionError(0, "Size", "invalid length %d != %d", len(f.Size), m)
 	}
 	for i, size := range f.Size {
 		if size < 1 {
-			return newInvalidFunctionError(0, "Size", "invalid size[%d] = %d < 1",
-				i, size)
+			return newInvalidFunctionError(0, "Size", "invalid size[%d] = %d < 1", i, size)
 		}
 	}
 
 	switch f.BitsPerSample {
 	case 1, 2, 4, 8, 12, 16, 24, 32:
-		// pass
 	default:
-		return newInvalidFunctionError(0, "BitsPerSample", "invalid value %d",
-			f.BitsPerSample)
+		return newInvalidFunctionError(0, "BitsPerSample", "invalid value %d", f.BitsPerSample)
 	}
 
 	if len(f.Encode) != 2*m {
-		return newInvalidFunctionError(0, "Encode", "invalid length %d != %d",
-			len(f.Encode), 2*m)
+		return newInvalidFunctionError(0, "Encode", "invalid length %d != %d", len(f.Encode), 2*m)
 	}
 	for i := 0; i < len(f.Encode); i += 2 {
 		if !isPair(f.Encode[i], f.Encode[i+1]) {
 			return newInvalidFunctionError(0, "Encode",
-				"invalid encode [%g,%g] for input %d",
-				f.Encode[i], f.Encode[i+1], i/2)
+				"invalid encode [%g,%g] for input %d", f.Encode[i], f.Encode[i+1], i/2)
 		}
 	}
 
 	if len(f.Decode) != 2*n {
-		return newInvalidFunctionError(0, "Decode", "length must be %d, got %d",
-			2*n, len(f.Decode))
+		return newInvalidFunctionError(0, "Decode", "invalid length %d != %d", 2*n, len(f.Decode))
 	}
 	for i := 0; i < len(f.Decode); i += 2 {
 		if !isPair(f.Decode[i], f.Decode[i+1]) {
 			return newInvalidFunctionError(0, "Decode",
-				"invalid decode [%g,%g] for output %d",
-				f.Decode[i], f.Decode[i+1], i/2)
+				"invalid decode [%g,%g] for output %d", f.Decode[i], f.Decode[i+1], i/2)
 		}
 	}
 
@@ -283,8 +271,7 @@ func (f *Type0) validate() error {
 
 	totalBytes := (totalBits + 7) / 8
 	if len(f.Samples) != totalBytes {
-		return newInvalidFunctionError(0, "Samples", "length must be %d bytes, got %d",
-			totalBytes, len(f.Samples))
+		return newInvalidFunctionError(0, "Samples", "invalid length %d != %d", len(f.Samples), totalBytes)
 	}
 
 	return nil
@@ -296,7 +283,8 @@ func (f *Type0) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	if err := pdf.CheckVersion(rm.Out, "Type 0 functions", pdf.V1_2); err != nil {
 		return nil, zero, err
-	} else if err := f.validate(); err != nil {
+	}
+	if err := f.validate(); err != nil {
 		return nil, zero, err
 	}
 
@@ -318,28 +306,21 @@ func (f *Type0) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	ref := rm.Out.Alloc()
-
-	// TODO(voss): be more clever here
-	compress := pdf.FilterFlate{
-		"Predictor": pdf.Integer(15),
-	}
-	stm, err := rm.Out.OpenStream(ref, dict, compress)
+	stm, err := rm.Out.OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
 		return nil, zero, err
 	}
-	_, err = stm.Write(f.Samples)
-	if err != nil {
+	if _, err := stm.Write(f.Samples); err != nil {
 		return nil, zero, err
 	}
-	err = stm.Close()
-	if err != nil {
+	if err := stm.Close(); err != nil {
 		return nil, zero, err
 	}
 
 	return ref, zero, nil
 }
 
-// isDefaultEncode checks if the Encode array equals the default value
+// isDefaultEncode checks if the Encode array equals the default value.
 func (f *Type0) isDefaultEncode() bool {
 	for i := range f.Size {
 		if f.Encode[2*i] != 0 || f.Encode[2*i+1] != float64(f.Size[i]-1) {
@@ -349,7 +330,7 @@ func (f *Type0) isDefaultEncode() bool {
 	return true
 }
 
-// isDefaultDecode checks if the Decode array equals the default value (same as Range)
+// isDefaultDecode checks if the Decode array equals the default value (same as Range).
 func (f *Type0) isDefaultDecode() bool {
 	for i := range f.Decode {
 		if f.Decode[i] != f.Range[i] {
@@ -390,20 +371,18 @@ func (f *Type0) Apply(inputs ...float64) []float64 {
 	return outputs
 }
 
-// sampleLinear performs multidimensional linear interpolation on the sample table
+// sampleLinear performs multidimensional linear interpolation on the sample table.
 func (f *Type0) sampleLinear(indices []float64) []float64 {
 	m, n := f.Shape()
 
 	if m == 1 {
-		// optimize for common single input case
 		return f.sample1D(indices[0], n)
 	}
 
-	// For multidimensional case, use separable linear interpolation
 	floorIndices := make([]int, m)
 	fractions := make([]float64, m)
 
-	for i := 0; i < m; i++ {
+	for i := range m {
 		if f.Size[i] <= 1 {
 			floorIndices[i] = 0
 			fractions[i] = 0
@@ -413,21 +392,19 @@ func (f *Type0) sampleLinear(indices []float64) []float64 {
 		floorIndices[i] = int(math.Floor(indices[i]))
 		fractions[i] = indices[i] - float64(floorIndices[i])
 
-		// Clamp to valid range with consistent boundary handling
 		if floorIndices[i] < 0 {
 			floorIndices[i] = 0
 			fractions[i] = 0
 		} else if floorIndices[i] >= f.Size[i]-1 {
-			// Consistent with 1D case: clamp to last sample
 			floorIndices[i] = f.Size[i] - 1
 			fractions[i] = 0
 		}
 	}
 
-	// Check if we can avoid interpolation (all fractions are 0)
+	// If all fractions are zero, we can avoid interpolation.
 	allExact := true
-	for i := 0; i < m; i++ {
-		if fractions[i] != 0.0 {
+	for _, frac := range fractions {
+		if frac != 0 {
 			allExact = false
 			break
 		}
@@ -438,16 +415,17 @@ func (f *Type0) sampleLinear(indices []float64) []float64 {
 
 	numCorners := 1 << m
 	result := make([]float64, n)
-
-	for corner := 0; corner < numCorners; corner++ {
+	for corner := range numCorners {
 		weight := 1.0
 		cornerIndices := make([]int, m)
 
-		for dim := 0; dim < m; dim++ {
+		for dim := range m {
 			if (corner>>dim)&1 == 0 {
+				// corner is at the lower edge in this dimension
 				cornerIndices[dim] = floorIndices[dim]
 				weight *= 1 - fractions[dim]
 			} else {
+				// corner is at the upper edge in this dimension
 				if floorIndices[dim]+1 < f.Size[dim] {
 					cornerIndices[dim] = floorIndices[dim] + 1
 				} else {
@@ -457,10 +435,9 @@ func (f *Type0) sampleLinear(indices []float64) []float64 {
 			}
 		}
 
-		// skip corners with zero weight for efficiency
 		if weight > 0 {
 			cornerSamples := f.getSamplesAt(cornerIndices)
-			for i := 0; i < n; i++ {
+			for i := range n {
 				result[i] += weight * cornerSamples[i]
 			}
 		}
@@ -479,45 +456,40 @@ func (f *Type0) sample1D(index float64, n int) []float64 {
 	i1 := i0 + 1
 	frac := index - float64(i0)
 
-	// Clamp to valid range with consistent boundary handling
 	if i0 < 0 {
 		i0, i1, frac = 0, 0, 0
 	} else if i0 >= f.Size[0]-1 {
 		i0, i1, frac = f.Size[0]-1, f.Size[0]-1, 0
 	}
 
-	// avoid interpolation when fraction is exactly 0
-	if frac == 0.0 {
+	if frac == 0 {
 		return f.getSamplesAt([]int{i0})
 	}
 
+	result := make([]float64, n)
 	samples0 := f.getSamplesAt([]int{i0})
 	samples1 := f.getSamplesAt([]int{i1})
-
-	result := make([]float64, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		result[i] = samples0[i]*(1-frac) + samples1[i]*frac
 	}
 
 	return result
 }
 
-// getSamplesAt extracts sample values at the given multidimensional index
+// getSamplesAt extracts sample values at the given multidimensional index.
+// Indices must have length m, the result has length n.
 func (f *Type0) getSamplesAt(indices []int) []float64 {
 	m, n := f.Shape()
 
-	// Calculate linear index in the sample array
-	// PDF spec: "the first dimension varies fastest"
+	// the first dimension varies fastest
 	linearIndex := 0
 	stride := 1
-	for i := 0; i < m; i++ {
+	for i := range m {
 		linearIndex += indices[i] * stride
 		stride *= f.Size[i]
 	}
 
-	// Extract samples at this position
 	samples := make([]float64, n)
-
 	sampleIndex := linearIndex * n
 	for i := range n {
 		samples[i] = f.extractSampleAtIndex(sampleIndex + i)
@@ -526,13 +498,8 @@ func (f *Type0) getSamplesAt(indices []int) []float64 {
 	return samples
 }
 
-// extractSampleAtIndex extracts a single sample value at the given sample index
-// from the continuous bit stream
+// extractSampleAtIndex extracts a single sample value from the continuous bit stream.
 func (f *Type0) extractSampleAtIndex(sampleIndex int) float64 {
-	if sampleIndex < 0 {
-		return 0
-	}
-
 	bitOffset := sampleIndex * f.BitsPerSample
 	byteOffset := bitOffset / 8
 	bitInByte := bitOffset % 8
@@ -551,14 +518,13 @@ func (f *Type0) extractSampleAtIndex(sampleIndex int) float64 {
 
 	case 2:
 		shift := 6 - bitInByte
-		return float64((f.Samples[byteOffset] >> shift) & 0b00000011)
+		return float64((f.Samples[byteOffset] >> shift) & 0x03)
 
 	case 4:
 		if bitInByte == 0 {
 			return float64(f.Samples[byteOffset] >> 4)
-		} else { // bitInByte == 4
-			return float64(f.Samples[byteOffset] & 0x0F)
 		}
+		return float64(f.Samples[byteOffset] & 0x0F)
 
 	case 8:
 		return float64(f.Samples[byteOffset])
@@ -568,11 +534,10 @@ func (f *Type0) extractSampleAtIndex(sampleIndex int) float64 {
 			highByte := uint16(f.Samples[byteOffset]) << 4
 			lowNibble := uint16(f.Samples[byteOffset+1]) >> 4
 			return float64(highByte | lowNibble)
-		} else { // bitInByte == 4
-			highNibble := uint16(f.Samples[byteOffset]&0x0F) << 8
-			lowByte := uint16(f.Samples[byteOffset+1])
-			return float64(highNibble | lowByte)
 		}
+		highNibble := uint16(f.Samples[byteOffset]&0x0F) << 8
+		lowByte := uint16(f.Samples[byteOffset+1])
+		return float64(highNibble | lowByte)
 
 	case 16:
 		return float64(uint16(f.Samples[byteOffset])<<8 | uint16(f.Samples[byteOffset+1]))
@@ -595,239 +560,123 @@ func (f *Type0) extractSampleAtIndex(sampleIndex int) float64 {
 	}
 }
 
-// cubicSplineCoeff1D computes cubic spline coefficients for 1D data using
-// clamped boundary conditions (first derivative = 0 at endpoints).
-// Returns coefficients [a, b, c, d] for each interval.
-func (f *Type0) cubicSplineCoeff1D(x, y []float64) ([]float64, []float64, []float64, []float64) {
-	n := len(x)
-	if n < 2 {
-		panic("need at least 2 points for cubic spline")
-	}
-
-	// fallback to linear interpolation for 2 points
-	if n == 2 {
-		a := []float64{y[0]}
-		b := []float64{(y[1] - y[0]) / (x[1] - x[0])}
-		c := []float64{0.0}
-		d := []float64{0.0}
-		return a, b, c, d
-	}
-
-	h := make([]float64, n-1)
-	for i := 0; i < n-1; i++ {
-		h[i] = x[i+1] - x[i]
-	}
-
-	// build tridiagonal system for second derivatives M
-	// clamped boundary conditions: first derivative = 0 at endpoints
-	A := make([][]float64, n)
-	rhs := make([]float64, n)
-
-	for i := range A {
-		A[i] = make([]float64, n)
-	}
-
-	// left boundary condition: S'(x_0) = 0
-	// this gives: 2*M[0] + M[1] = 6*(y[1]-y[0])/h[0]^2
-	A[0][0] = 2.0
-	A[0][1] = 1.0
-	rhs[0] = 6.0 * (y[1] - y[0]) / (h[0] * h[0])
-
-	// right boundary condition: S'(x_{n-1}) = 0
-	// this gives: M[n-2] + 2*M[n-1] = -6*(y[n-1]-y[n-2])/h[n-2]^2
-	A[n-1][n-2] = 1.0
-	A[n-1][n-1] = 2.0
-	rhs[n-1] = -6.0 * (y[n-1] - y[n-2]) / (h[n-2] * h[n-2])
-
-	// interior points
-	for i := 1; i < n-1; i++ {
-		A[i][i-1] = h[i-1]
-		A[i][i] = 2.0 * (h[i-1] + h[i])
-		A[i][i+1] = h[i]
-		rhs[i] = 6.0 * ((y[i+1]-y[i])/h[i] - (y[i]-y[i-1])/h[i-1])
-	}
-
-	// solve tridiagonal system for M (second derivatives)
-	M := f.solveTridiagonal(A, rhs)
-
-	// compute spline coefficients
-	a := make([]float64, n-1)
-	b := make([]float64, n-1)
-	c := make([]float64, n-1)
-	d := make([]float64, n-1)
-
-	for i := 0; i < n-1; i++ {
-		a[i] = y[i]
-		b[i] = (y[i+1]-y[i])/h[i] - h[i]*(2*M[i]+M[i+1])/6
-		c[i] = M[i] / 2
-		d[i] = (M[i+1] - M[i]) / (6 * h[i])
-	}
-
-	return a, b, c, d
-}
-
-// solveTridiagonal solves a tridiagonal system using Gaussian elimination.
-// This is suitable for the small systems typically found in PDF functions.
-func (f *Type0) solveTridiagonal(A [][]float64, b []float64) []float64 {
-	n := len(b)
-	x := make([]float64, n)
-
-	// make a copy to avoid modifying input
-	matrix := make([][]float64, n)
-	rhs := make([]float64, n)
-	for i := range matrix {
-		matrix[i] = make([]float64, n)
-		copy(matrix[i], A[i])
-		rhs[i] = b[i]
-	}
-
-	for i := 0; i < n-1; i++ {
-		maxRow := i
-		for k := i + 1; k < n; k++ {
-			if math.Abs(matrix[k][i]) > math.Abs(matrix[maxRow][i]) {
-				maxRow = k
-			}
-		}
-
-		if maxRow != i {
-			matrix[i], matrix[maxRow] = matrix[maxRow], matrix[i]
-			rhs[i], rhs[maxRow] = rhs[maxRow], rhs[i]
-		}
-
-		for k := i + 1; k < n; k++ {
-			if math.Abs(matrix[i][i]) < 1e-14 {
-				continue
-			}
-			factor := matrix[k][i] / matrix[i][i]
-			for j := i; j < n; j++ {
-				matrix[k][j] -= factor * matrix[i][j]
-			}
-			rhs[k] -= factor * rhs[i]
-		}
-	}
-	for i := n - 1; i >= 0; i-- {
-		x[i] = rhs[i]
-		for j := i + 1; j < n; j++ {
-			x[i] -= matrix[i][j] * x[j]
-		}
-		if math.Abs(matrix[i][i]) > 1e-14 {
-			x[i] /= matrix[i][i]
-		}
-	}
-
-	return x
-}
-
-// sampleCubic evaluates the cubic spline at given indices
+// sampleCubic performs multidimensional Catmull-Rom spline interpolation.
 func (f *Type0) sampleCubic(indices []float64) []float64 {
-	m, _ := f.Shape()
+	m, n := f.Shape()
 
-	if m == 1 {
-		return f.sampleCubic1DDirect(indices[0])
-	} else if m == 2 {
-		return f.sampleBicubicDirect(indices[0], indices[1])
-	} else {
-		// higher dimensions fall back to linear for now
-		return f.sampleLinear(indices)
+	fparts := make([]float64, m)
+	iparts := make([]int, m)
+	for i, idx := range indices {
+		ipart := int(math.Floor(idx))
+		fpart := idx - float64(ipart)
+		iparts[i] = ipart
+		fparts[i] = fpart
 	}
+
+	// Calculate bit offset for the base position.
+	factors := make([]int, m)
+	offset := 0
+	stride := 1
+	for i := range m {
+		factors[i] = stride * n * f.BitsPerSample
+		offset += iparts[i] * factors[i]
+		stride *= f.Size[i]
+	}
+
+	return f.interpolateCubicRecursive(fparts, iparts, factors, offset, m)
 }
 
-// sampleCubic1DDirect performs direct 1D cubic spline evaluation
-func (f *Type0) sampleCubic1DDirect(coord float64) []float64 {
+// interpolateCubicRecursive performs recursive multi-dimensional Catmull-Rom interpolation.
+func (f *Type0) interpolateCubicRecursive(fparts []float64, iparts []int, factors []int, offset int, mCurrent int) []float64 {
+	if mCurrent == 0 {
+		return f.getSamplesAtBitOffset(offset)
+	}
+
+	mTotal, _ := f.Shape()
+	mDim := mTotal - mCurrent
+
+	samples := f.interpolateCubicRecursive(fparts, iparts, factors, offset, mCurrent-1)
+
+	fpart := fparts[mDim]
+	if fpart == 0 {
+		return samples
+	}
+
+	ipart := iparts[mDim]
+	delta := factors[mDim]
+	size := f.Size[mDim]
+
+	samples1 := f.interpolateCubicRecursive(fparts, iparts, factors, offset+delta, mCurrent-1)
+
+	if size <= 2 {
+		// Linear interpolation for domains with only two sample points.
+		for j := range samples {
+			samples[j] += (samples1[j] - samples[j]) * fpart
+		}
+		return samples
+	}
+
+	if ipart == 0 {
+		// quadratic interpolation at the start of the domain (between first two points)
+		samples2 := f.interpolateCubicRecursive(fparts, iparts, factors, offset+2*delta, mCurrent-1)
+		for j := range samples {
+			samples[j] = interpolateQuadratic(fpart, samples[j], samples1[j], samples2[j])
+		}
+		return samples
+	}
+
+	if ipart == size-2 {
+		// quadratic interpolation at the end of the domain (between last two points)
+		samplesm1 := f.interpolateCubicRecursive(fparts, iparts, factors, offset-delta, mCurrent-1)
+		for j := range samples {
+			samples[j] = interpolateQuadratic(1-fpart, samples1[j], samples[j], samplesm1[j])
+		}
+		return samples
+	}
+
+	// full Catmull-Rom cubic interpolation for interior points
+	samplesm1 := f.interpolateCubicRecursive(fparts, iparts, factors, offset-delta, mCurrent-1)
+	samples2 := f.interpolateCubicRecursive(fparts, iparts, factors, offset+2*delta, mCurrent-1)
+	for j := range samples {
+		samples[j] = interpolateCatmullRom(fpart, samplesm1[j], samples[j], samples1[j], samples2[j])
+	}
+	return samples
+}
+
+// getSamplesAtBitOffset extracts n samples starting at a given bit offset.
+func (f *Type0) getSamplesAtBitOffset(offset int) []float64 {
 	_, n := f.Shape()
-	gridSize := f.Size[0]
-
-	samples := make([][]float64, gridSize)
-	for i := 0; i < gridSize; i++ {
-		samples[i] = f.getSamplesAt([]int{i})
+	samples := make([]float64, n)
+	firstSampleIndex := offset / f.BitsPerSample
+	for i := range n {
+		samples[i] = f.extractSampleAtIndex(firstSampleIndex + i)
 	}
-
-	grid := make([]float64, gridSize)
-	for i := 0; i < gridSize; i++ {
-		grid[i] = float64(i)
-	}
-
-	result := make([]float64, n)
-	for component := 0; component < n; component++ {
-		values := make([]float64, gridSize)
-		for i := 0; i < gridSize; i++ {
-			values[i] = samples[i][component]
-		}
-
-		a, b, c, d := f.cubicSplineCoeff1D(grid, values)
-		result[component] = f.evaluateCubicSplineAt(a, b, c, d, grid, coord)
-	}
-
-	return result
+	return samples
 }
 
-// sampleBicubicDirect performs direct 2D bicubic evaluation using separable cubic splines
-func (f *Type0) sampleBicubicDirect(x, y float64) []float64 {
-	_, n := f.Shape()
-	xSize, ySize := f.Size[0], f.Size[1]
+// interpolateCatmullRom performs 1D Catmull-Rom spline interpolation.
+// It computes an interpolated value between p1 and p2, using p0 and p3 as
+// control points to define the tangents.
+// The parameter t is expected to be in [0, 1].
+func interpolateCatmullRom(t, p0, p1, p2, p3 float64) float64 {
+	x := t + 1
+	xm1 := t
+	m2x := 1 - t
+	m3x := 2 - t
 
-	// step 1: for each row (constant y), evaluate 1D cubic spline at x
-	rowResults := make([][]float64, ySize)
-	xGrid := make([]float64, xSize)
-	for i := 0; i < xSize; i++ {
-		xGrid[i] = float64(i)
-	}
+	const a = -0.5
 
-	for j := 0; j < ySize; j++ {
-		rowSamples := make([][]float64, xSize)
-		for i := 0; i < xSize; i++ {
-			rowSamples[i] = f.getSamplesAt([]int{i, j})
-		}
+	c0 := a*x*x*x - 5*a*x*x + 8*a*x - 4*a
+	c1 := (a+2)*xm1*xm1*xm1 - (a+3)*xm1*xm1 + 1
+	c2 := (a+2)*m2x*m2x*m2x - (a+3)*m2x*m2x + 1
+	c3 := a*m3x*m3x*m3x - 5*a*m3x*m3x + 8*a*m3x - 4*a
 
-		rowResult := make([]float64, n)
-		for component := 0; component < n; component++ {
-			values := make([]float64, xSize)
-			for i := 0; i < xSize; i++ {
-				values[i] = rowSamples[i][component]
-			}
-
-			a, b, c, d := f.cubicSplineCoeff1D(xGrid, values)
-			rowResult[component] = f.evaluateCubicSplineAt(a, b, c, d, xGrid, x)
-		}
-		rowResults[j] = rowResult
-	}
-
-	// step 2: for each component, fit 1D cubic spline along y using row results
-	yGrid := make([]float64, ySize)
-	for j := 0; j < ySize; j++ {
-		yGrid[j] = float64(j)
-	}
-
-	result := make([]float64, n)
-	for component := 0; component < n; component++ {
-		values := make([]float64, ySize)
-		for j := 0; j < ySize; j++ {
-			values[j] = rowResults[j][component]
-		}
-
-		a, b, c, d := f.cubicSplineCoeff1D(yGrid, values)
-		result[component] = f.evaluateCubicSplineAt(a, b, c, d, yGrid, y)
-	}
-
-	return result
+	return c0*p0 + c1*p1 + c2*p2 + c3*p3
 }
 
-// evaluateCubicSplineAt evaluates a 1D cubic spline at a given coordinate
-func (f *Type0) evaluateCubicSplineAt(a, b, c, d []float64, grid []float64, coord float64) float64 {
-	idx := int(math.Floor(coord))
-	if idx < 0 {
-		idx = 0
-	} else if idx >= len(a) {
-		idx = len(a) - 1
-	}
-
-	t := coord - grid[idx]
-	if t < 0 {
-		t = 0
-	} else if t > 1 {
-		t = 1
-	}
-
-	// evaluate cubic polynomial: S(t) = a + b*t + c*t² + d*t³
-	return a[idx] + b[idx]*t + c[idx]*t*t + d[idx]*t*t*t
+// interpolateQuadratic performs quadratic interpolation at the boundaries
+// using the Catmull-Rom formula with a duplicated point.
+// The parameter t is in [0, 1], interpolating between p1 and p2.
+func interpolateQuadratic(t, p1, p2, p3 float64) float64 {
+	return interpolateCatmullRom(t, p1, p1, p2, p3)
 }

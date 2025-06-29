@@ -23,16 +23,16 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Type2 represents a power interpolation functions, of the form y = C0 + x^N ×
+// Type2 represents a power interpolation function, of the form y = C0 + x^N ×
 // (C1 - C0).  These functions have a single input x and can have one or more
 // outputs. The PDF specification refers to this type of function as
 // "exponential interpolation".
 type Type2 struct {
-	// XMin is the minimum value of the input range.  Input values x smaller
+	// XMin is the minimum value of the input range.  Input values smaller
 	// than XMin are clipped to XMin.  This must be less than or equal to XMax.
 	XMin float64
 
-	// XMax is the maximum value of the input range.  Input values x larger
+	// XMax is the maximum value of the input range.  Input values larger
 	// than XMax are clipped to XMax.  This must be greater than or equal
 	// to XMin.
 	XMax float64
@@ -42,12 +42,12 @@ type Type2 struct {
 	// applied.  If present, this must have the same length as C0 and C1.
 	Range []float64
 
-	// C0 defines function result when x = 0.0.
-	// This must contain at least one value and must have the same length as C1.
+	// C0 defines function result when x = 0.
+	// This must have the same length as C1.
 	C0 []float64
 
-	// C1 defines function result when x = 1.0.
-	// This must contain at least one value and must have the same length as C0.
+	// C1 defines function result when x = 1.
+	// This must have the same length as C0.
 	C1 []float64
 
 	// N is the interpolation exponent.
@@ -65,67 +65,117 @@ func (f *Type2) Shape() (int, int) {
 	return 1, len(f.C0)
 }
 
-// Apply applies the function to the given input value and returns the output values.
-func (f *Type2) Apply(inputs ...float64) []float64 {
-	if len(inputs) != 1 {
-		panic(fmt.Sprintf("Type 2 function expects 1 input, got %d", len(inputs)))
+// extractType2 reads a Type 2 exponential interpolation function from a PDF dictionary.
+func extractType2(r pdf.Getter, d pdf.Dict) (*Type2, error) {
+	domain, err := readFloats(r, d["Domain"])
+	if err != nil {
+		return nil, err
+	}
+	if len(domain) != 2 {
+		domain = []float64{0, 1}
 	}
 
-	x := clip(inputs[0], f.XMin, f.XMax)
-
-	c0 := f.C0
-	if c0 == nil {
-		c0 = []float64{0.0}
+	rnge, err := readFloats(r, d["Range"])
+	if err != nil {
+		return nil, err
 	}
 
-	c1 := f.C1
-	if c1 == nil {
-		c1 = []float64{1.0}
+	C0, err := readFloats(r, d["C0"])
+	if err != nil {
+		return nil, err
 	}
 
+	C1, err := readFloats(r, d["C1"])
+	if err != nil {
+		return nil, err
+	}
+
+	gamma, err := pdf.GetNumber(r, d["N"])
+	if err != nil {
+		return nil, err
+	}
+
+	f := &Type2{
+		XMin:  domain[0],
+		XMax:  domain[1],
+		Range: rnge,
+		C0:    C0,
+		C1:    C1,
+		N:     float64(gamma),
+	}
+
+	f.repair()
+	if err := f.validate(); err != nil {
+		return nil, err
+	}
+
+	return f, nil
+}
+
+// repair sets default values and tries to fix mal-formed function dicts.
+func (f *Type2) repair() {
+	if len(f.C0) == 0 {
+		f.C0 = []float64{0.0}
+	}
+	if len(f.C1) == 0 {
+		f.C1 = []float64{1.0}
+	}
+}
+
+// validate checks if the Type2 function is properly configured.
+func (f *Type2) validate() error {
 	_, n := f.Shape()
-	outputs := make([]float64, n)
-	// optimize common cases to avoid math.Pow
-	var xPowN float64
-	switch f.N {
-	case 0:
-		xPowN = 1.0
-	case 1:
-		xPowN = x
-	default:
-		xPowN = math.Pow(x, f.N)
+
+	if !isRange(f.XMin, f.XMax) {
+		return newInvalidFunctionError(2, "Xmin/XMax",
+			"invalid domain [%g,%g]",
+			f.XMin, f.XMax)
 	}
 
-	// Apply formula: y_j = C0_j + x^N × (C1_j - C0_j)
-	for i := 0; i < n; i++ {
-		var c0Val, c1Val float64
-
-		if i < len(c0) {
-			c0Val = c0[i]
-		} else if len(c0) > 0 {
-			c0Val = c0[len(c0)-1]
+	if f.Range != nil {
+		if len(f.Range) != 2*n {
+			return newInvalidFunctionError(2, "Range", "invalid length %d",
+				len(f.Range))
 		}
-
-		if i < len(c1) {
-			c1Val = c1[i]
-		} else if len(c1) > 0 {
-			c1Val = c1[len(c1)-1]
-		} else {
-			c1Val = 1.0
-		}
-
-		outputs[i] = c0Val + xPowN*(c1Val-c0Val)
-	}
-
-	if len(f.Range) >= 2*n {
-		for i := 0; i < n; i++ {
-			min := f.Range[2*i]
-			max := f.Range[2*i+1]
-			outputs[i] = clip(outputs[i], min, max)
+		for i := range n {
+			if !isRange(f.Range[2*i], f.Range[2*i+1]) {
+				return newInvalidFunctionError(2, "Range",
+					"invalid range for output %d: [%g, %g]",
+					i, f.Range[2*i], f.Range[2*i+1])
+			}
 		}
 	}
 
-	return outputs
+	if len(f.C0) < 1 || len(f.C0) != len(f.C1) {
+		return newInvalidFunctionError(2, "C0/C1",
+			"invalid lengths %d, %d",
+			len(f.C0), len(f.C1))
+	}
+	for i := range n {
+		if !isFinite(f.C0[i]) || !isFinite(f.C1[i]) {
+			return newInvalidFunctionError(2, "C0/C1",
+				"invalid value for output %d: C0=%g, C1=%g",
+				i, f.C0[i], f.C1[i])
+		}
+	}
+
+	if !isFinite(f.N) {
+		return newInvalidFunctionError(2, "N",
+			"must be a finite number, got %g", f.N)
+	}
+
+	// non-integer exponents require non-negative base
+	if f.N != math.Trunc(f.N) && f.XMin < 0 {
+		return newInvalidFunctionError(2, "Domain",
+			"minimum must be >= 0 when N is non-integer, got %f", f.XMin)
+	}
+	// negative exponents would cause division by zero at x=0
+	if f.N < 0 && f.XMin <= 0 && f.XMax >= 0 {
+		return newInvalidFunctionError(2, "Domain",
+			"must not include 0 when N is negative")
+	}
+
+	return nil
 }
 
 // Embed embeds the function into a PDF file.
@@ -134,26 +184,25 @@ func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	if err := pdf.CheckVersion(rm.Out, "Type 2 functions", pdf.V1_3); err != nil {
 		return nil, zero, err
-	} else if err := f.validate(); err != nil {
+	}
+	if err := f.validate(); err != nil {
 		return nil, zero, err
 	}
 
 	dict := pdf.Dict{
 		"FunctionType": pdf.Integer(2),
+		"Domain":       pdf.Array{pdf.Number(f.XMin), pdf.Number(f.XMax)},
 		"N":            pdf.Number(f.N),
 	}
 
-	dict["Domain"] = pdf.Array{pdf.Number(f.XMin), pdf.Number(f.XMax)}
-
-	if len(f.Range) > 0 {
+	if f.Range != nil {
 		dict["Range"] = arrayFromFloats(f.Range)
 	}
 
-	if f.C0 != nil {
+	if len(f.C0) != 1 || f.C0[0] != 0 {
 		dict["C0"] = arrayFromFloats(f.C0)
 	}
-
-	if f.C1 != nil {
+	if len(f.C1) != 1 || f.C1[0] != 1 {
 		dict["C1"] = arrayFromFloats(f.C1)
 	}
 
@@ -166,94 +215,28 @@ func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	return ref, zero, nil
 }
 
-// validate checks if the Type2 function is properly configured.
-func (f *Type2) validate() error {
-	// Domain validation
-	if !isRange(f.XMin, f.XMax) {
-		return newInvalidFunctionError(2, "Xmin/XMax", "invalid domain [%g,%g]",
-			f.XMin, f.XMax)
+// Apply applies the function to the given input value and returns the output values.
+func (f *Type2) Apply(inputs ...float64) []float64 {
+	if len(inputs) != 1 {
+		panic(fmt.Sprintf("Type 2 function expects 1 input, got %d", len(inputs)))
 	}
 
-	if len(f.C0) < 1 || len(f.C0) != len(f.C1) {
-		return newInvalidFunctionError(2, "C0/C1", "invalid length %d,%d",
-			len(f.C0), len(f.C1))
-	}
+	x := clip(inputs[0], f.XMin, f.XMax)
+	xPowN := math.Pow(x, f.N)
 
-	if !isFinite(f.N) {
-		return newInvalidFunctionError(2, "N", "must be a finite number, got %g", f.N)
-	}
-	if f.N != math.Trunc(f.N) && f.XMin < 0 {
-		// non-integer exponents require non-negative base to avoid complex results
-		return newInvalidFunctionError(2, "Domain",
-			"minimum must be >= 0 when N is non-integer, got %f", f.XMin)
-	}
-	if f.N < 0 && f.XMin <= 0 && f.XMax >= 0 {
-		// negative exponents would cause division by zero at x=0
-		return newInvalidFunctionError(2, "Domain", "must not include 0 when N is negative")
-	}
-
-	// Range validation
 	_, n := f.Shape()
+	outputs := make([]float64, n)
+	for i := range n {
+		outputs[i] = f.C0[i] + xPowN*(f.C1[i]-f.C0[i])
+	}
+
 	if f.Range != nil {
-		if len(f.Range) != 2*n {
-			return newInvalidFunctionError(2, "Range", "invalid length %d",
-				len(f.Range))
-		}
-		for i := 0; i < n; i++ {
-			if !isRange(f.Range[2*i], f.Range[2*i+1]) {
-				return newInvalidFunctionError(2, "Range",
-					"invalid range for output %d: [%g, %g]",
-					i, f.Range[2*i], f.Range[2*i+1])
-			}
+		for i := range n {
+			min := f.Range[2*i]
+			max := f.Range[2*i+1]
+			outputs[i] = clip(outputs[i], min, max)
 		}
 	}
 
-	return nil
-}
-
-// extractType2 reads a Type 2 exponential interpolation function from a PDF dictionary.
-func extractType2(r pdf.Getter, d pdf.Dict) (*Type2, error) {
-	domain, err := readFloats(r, d["Domain"])
-	if err != nil {
-		return nil, fmt.Errorf("failed to read Domain: %w", err)
-	}
-	if len(domain) < 2 || !isRange(domain[0], domain[1]) {
-		domain = []float64{0, 1}
-	}
-
-	n, err := pdf.GetNumber(r, d["N"])
-	if err != nil {
-		return nil, fmt.Errorf("failed to read N: %w", err)
-	}
-
-	f := &Type2{
-		XMin: domain[0],
-		XMax: domain[1],
-		N:    float64(n),
-	}
-
-	// Ensure domain has exactly 2 elements to maintain round-trip consistency
-
-	if rangeObj, ok := d["Range"]; ok {
-		f.Range, err = readFloats(r, rangeObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read Range: %w", err)
-		}
-	}
-
-	if c0Obj, ok := d["C0"]; ok {
-		f.C0, err = readFloats(r, c0Obj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read C0: %w", err)
-		}
-	}
-
-	if c1Obj, ok := d["C1"]; ok {
-		f.C1, err = readFloats(r, c1Obj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read C1: %w", err)
-		}
-	}
-
-	return f, nil
+	return outputs
 }

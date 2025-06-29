@@ -326,10 +326,10 @@ func TestType4PDFSpecExamples(t *testing.T) {
 			function: &Type4{
 				Domain:  []float64{0, 1, 0, 1},
 				Range:   []float64{0, 1, 0, 1},
-				Program: "exch dup", // x y -> y x -> y x (dup copies top element)
+				Program: "exch", // x y -> y x (exchange top two elements)
 			},
 			inputs:   []float64{0.3, 0.7},
-			expected: []float64{0.7, 0.3}, // After exch: 0.7, 0.3; after dup: 0.7, 0.3
+			expected: []float64{0.7, 0.3}, // After exch: 0.7, 0.3
 		},
 		{
 			name: "Arithmetic expression from spec",

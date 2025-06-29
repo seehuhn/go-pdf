@@ -19,6 +19,7 @@ package function
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -139,7 +140,8 @@ var testCases = map[int][]testCase{
 		{
 			name: "basic Type3",
 			function: &Type3{
-				Domain: []float64{0, 1},
+				XMin: 0,
+				XMax: 1,
 				Functions: []pdf.Function{
 					&Type2{
 						XMin: 0,
@@ -163,8 +165,9 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type3 with range",
 			function: &Type3{
-				Domain: []float64{0, 2},
-				Range:  []float64{0, 1},
+				XMin:  0,
+				XMax:  2,
+				Range: []float64{0, 1},
 				Functions: []pdf.Function{
 					&Type2{
 						XMin: 0,
@@ -188,7 +191,8 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type3 three functions",
 			function: &Type3{
-				Domain: []float64{0, 3},
+				XMin: 0,
+				XMax: 3,
 				Functions: []pdf.Function{
 					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{1}, N: 1},
 					&Type2{XMin: 0, XMax: 1, C0: []float64{1}, C1: []float64{0}, N: 1},
@@ -393,9 +397,9 @@ func TestFunctionEvaluation(t *testing.T) {
 				t.Fatalf("expected %d outputs, got %d", len(tt.expected), len(result))
 			}
 			for i, expected := range tt.expected {
-				if abs(result[i]-expected) > tt.tolerance {
+				if math.Abs(result[i]-expected) > tt.tolerance {
 					t.Errorf("output[%d]: expected %f, got %f (diff: %e)",
-						i, expected, result[i], abs(result[i]-expected))
+						i, expected, result[i], math.Abs(result[i]-expected))
 				}
 			}
 		})
@@ -476,7 +480,8 @@ func TestFunctionValidation(t *testing.T) {
 		{
 			name: "valid Type3",
 			function: &Type3{
-				Domain: []float64{0, 1},
+				XMin: 0,
+				XMax: 1,
 				Functions: []pdf.Function{
 					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{1}, N: 1},
 				},
@@ -488,7 +493,8 @@ func TestFunctionValidation(t *testing.T) {
 		{
 			name: "Type3 bounds count mismatch",
 			function: &Type3{
-				Domain: []float64{0, 1},
+				XMin: 0,
+				XMax: 1,
 				Functions: []pdf.Function{
 					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{1}, N: 1},
 					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{1}, N: 1},
@@ -592,7 +598,7 @@ func TestDomainRangeClipping(t *testing.T) {
 				t.Fatalf("expected %d outputs, got %d", len(tt.expected), len(result))
 			}
 			for i, expected := range tt.expected {
-				if abs(result[i]-expected) > 1e-10 {
+				if math.Abs(result[i]-expected) > 1e-10 {
 					t.Errorf("output[%d]: expected %f, got %f", i, expected, result[i])
 				}
 			}

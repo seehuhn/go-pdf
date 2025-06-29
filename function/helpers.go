@@ -22,14 +22,6 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// helper functions
-func abs(x float64) float64 {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-
 func isFinite(x float64) bool {
 	return !math.IsInf(x, 0) && !math.IsNaN(x)
 }

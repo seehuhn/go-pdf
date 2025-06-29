@@ -123,8 +123,9 @@ func createDocument(fname string) error {
 
 	writer.printf("Type 3 functions")
 	F3 := &function.Type3{
-		Domain: []float64{0, 1},
-		Range:  []float64{0, 1, 0, 1, 0, 1},
+		XMin:  0,
+		XMax:  1,
+		Range: []float64{0, 1, 0, 1, 0, 1},
 		Functions: []pdf.Function{
 			&function.Type2{
 				XMin:  0,

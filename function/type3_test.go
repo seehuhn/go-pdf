@@ -34,9 +34,10 @@ func TestType3BoundaryHandling(t *testing.T) {
 		}
 	}{
 		{
-			name: "Normal case: k=2, Domain[0] < Bounds[0] < Domain[1]",
+			name: "Normal case: k=2, XMin < Bounds[0] < XMax",
 			function: &Type3{
-				Domain: []float64{0, 2},
+				XMin: 0,
+				XMax: 2,
 				Functions: []pdf.Function{
 					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{1}, N: 1},
 					&Type2{XMin: 0, XMax: 1, C0: []float64{1}, C1: []float64{0}, N: 1},
@@ -58,14 +59,15 @@ func TestType3BoundaryHandling(t *testing.T) {
 			},
 		},
 		{
-			name: "Special case: k=2, Domain[0] = Bounds[0]",
+			name: "Special case: k=2, XMin = Bounds[0]",
 			function: &Type3{
-				Domain: []float64{0, 2},
+				XMin: 0,
+				XMax: 2,
 				Functions: []pdf.Function{
 					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{1}, N: 1},
 					&Type2{XMin: 0, XMax: 1, C0: []float64{1}, C1: []float64{0}, N: 1},
 				},
-				Bounds: []float64{0.0}, // Domain[0] = Bounds[0]
+				Bounds: []float64{0.0}, // XMin = Bounds[0]
 				Encode: []float64{0, 1, 0, 1},
 			},
 			testInputs: []struct {
@@ -82,7 +84,8 @@ func TestType3BoundaryHandling(t *testing.T) {
 		{
 			name: "Three functions: k=3, normal boundaries",
 			function: &Type3{
-				Domain: []float64{0, 3},
+				XMin: 0,
+				XMax: 3,
 				Functions: []pdf.Function{
 					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{1}, N: 1},
 					&Type2{XMin: 0, XMax: 1, C0: []float64{1}, C1: []float64{0}, N: 1},
@@ -109,7 +112,8 @@ func TestType3BoundaryHandling(t *testing.T) {
 		{
 			name: "Single function: k=1, no bounds",
 			function: &Type3{
-				Domain: []float64{0, 1},
+				XMin: 0,
+				XMax: 1,
 				Functions: []pdf.Function{
 					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{1}, N: 1},
 				},
@@ -126,23 +130,44 @@ func TestType3BoundaryHandling(t *testing.T) {
 				{1.0, 0, [2]float64{0, 1}}, // Right boundary
 			},
 		},
+		{
+			name: "Special case: k=3, XMin = Bounds[0]",
+			function: &Type3{
+				XMin: 0,
+				XMax: 3,
+				Functions: []pdf.Function{
+					&Type2{XMin: 0, XMax: 1, C0: []float64{0.2}, C1: []float64{0.2}, N: 1},
+					&Type2{XMin: 0, XMax: 1, C0: []float64{0.5}, C1: []float64{0.5}, N: 1},
+					&Type2{XMin: 0, XMax: 1, C0: []float64{0.9}, C1: []float64{0.9}, N: 1}},
+				Bounds: []float64{0.0, 2.0}, // XMin = Bounds[0]
+				Encode: []float64{0, 1, 0, 1, 0, 1},
+			},
+			testInputs: []struct {
+				input          float64
+				expectedFunc   int
+				expectedDomain [2]float64
+			}{
+				{0.0, 0, [2]float64{0, 0}},   // First interval [0, 0]
+				{0.001, 1, [2]float64{0, 2}}, // Second interval (0, 2)
+				{2.0, 2, [2]float64{2, 3}},   // Third interval [2, 3]
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			k := len(tt.function.Functions)
 			for _, test := range tt.testInputs {
-				actualFunc, actualDomain := tt.function.findSubdomain(test.input, k)
+				actualFunc, a, b := tt.function.findSubdomain(test.input)
 
 				if actualFunc != test.expectedFunc {
 					t.Errorf("input %.3f: expected function %d, got %d",
 						test.input, test.expectedFunc, actualFunc)
 				}
 
-				if actualDomain != test.expectedDomain {
+				if [2]float64{a, b} != test.expectedDomain {
 					t.Errorf("input %.3f: expected domain [%.3f, %.3f], got [%.3f, %.3f]",
 						test.input, test.expectedDomain[0], test.expectedDomain[1],
-						actualDomain[0], actualDomain[1])
+						a, b)
 				}
 			}
 		})
@@ -163,7 +188,8 @@ func TestType3ApplyWithBoundaries(t *testing.T) {
 		{
 			name: "Boundary value at 1.0 should use second function",
 			function: &Type3{
-				Domain: []float64{0, 2},
+				XMin: 0,
+				XMax: 2,
 				Functions: []pdf.Function{
 					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{0}, N: 1}, // Always returns 0
 					&Type2{XMin: 0, XMax: 1, C0: []float64{1}, C1: []float64{1}, N: 1}, // Always returns 1
@@ -176,14 +202,15 @@ func TestType3ApplyWithBoundaries(t *testing.T) {
 			// If incorrect, it might select function 0 (returns 0.0)
 		},
 		{
-			name: "Special case Domain[0] = Bounds[0], test boundary",
+			name: "Special case XMin = Bounds[0], test boundary",
 			function: &Type3{
-				Domain: []float64{0, 1},
+				XMin: 0,
+				XMax: 1,
 				Functions: []pdf.Function{
 					&Type2{XMin: 0, XMax: 1, C0: []float64{0.5}, C1: []float64{0.5}, N: 1}, // Always returns 0.5
 					&Type2{XMin: 0, XMax: 1, C0: []float64{0.8}, C1: []float64{0.8}, N: 1}, // Always returns 0.8
 				},
-				Bounds: []float64{0.0}, // Domain[0] = Bounds[0]
+				Bounds: []float64{0.0}, // XMin = Bounds[0]
 				Encode: []float64{0, 1, 0, 1},
 			},
 			input: 0.0,
@@ -198,8 +225,8 @@ func TestType3ApplyWithBoundaries(t *testing.T) {
 			// For the first test case, we expect result[0] = 1.0 if boundary handling is correct
 			// For the second test case, we expect result[0] = 0.5 if special case is handled correctly
 			expectedResult := map[string]float64{
-				"Boundary value at 1.0 should use second function":  1.0,
-				"Special case Domain[0] = Bounds[0], test boundary": 0.5,
+				"Boundary value at 1.0 should use second function": 1.0,
+				"Special case XMin = Bounds[0], test boundary":     0.5,
 			}[tt.name]
 
 			if len(result) != 1 {
