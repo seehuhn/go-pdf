@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package numtree implements PDF number trees.
+// Package nametree implements PDF name trees.
 //
-// Number trees serve a similar purpose to dictionaries, associating keys and
-// values, but using integer keys instead of name objects. The keys are stored
-// in sorted numerical order, and the data structure can represent an
-// arbitrarily large collection of key-value pairs with efficient lookup
-// without requiring the entire structure to be read from the PDF file.
+// Name trees serve a similar purpose to dictionaries, associating keys and
+// values, but using string keys that are ordered lexicographically. The data
+// structure can represent an arbitrarily large collection of key-value pairs
+// with efficient lookup without requiring the entire structure to be read
+// from the PDF file.
 //
 // This package provides two implementations:
 //   - InMemory: loads the entire tree into memory for fast access
 //   - FromFile: reads nodes on demand for memory-efficient access to large trees
 //
-// The Write function creates balanced number trees using a streaming B-tree
+// The Write function creates balanced name trees using a streaming B-tree
 // algorithm that processes entries incrementally with O(log n) memory usage.
-package numtree
+package nametree

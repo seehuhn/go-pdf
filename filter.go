@@ -514,8 +514,8 @@ func (f FilterCCITTFax) Info(_ Version) (Name, Dict, error) {
 	if ff.rows > 0 {
 		res["Rows"] = Integer(ff.rows)
 	}
-	if ff.eob != true { // default is true
-		res["EndOfBlock"] = Boolean(ff.eob)
+	if !ff.eob { // default is true
+		res["EndOfBlock"] = Boolean(false)
 	}
 	if ff.blackIs1 {
 		res["BlackIs1"] = Boolean(ff.blackIs1)

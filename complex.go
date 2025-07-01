@@ -22,6 +22,7 @@ package pdf
 import (
 	"bytes"
 	"fmt"
+	"iter"
 	"math"
 	"strings"
 	"time"
@@ -557,4 +558,32 @@ type Function interface {
 	// Apply applies the function to the given m input values
 	// and returns the n output values.
 	Apply(...float64) []float64
+}
+
+// NumberTree represents a PDF number tree.
+// A number tree is a dictionary that maps integer keys to values.
+// Implementations of this interface can be found in the
+// seehuhn.de/go/pdf/numtree package.
+type NumberTree interface {
+	// Lookup returns the value for a given key in the number tree.
+	// If the key is not found, it returns nil and [ErrKeyNotFound].
+	Lookup(key Integer) (Object, error)
+
+	All() iter.Seq2[Integer, Object]
+
+	Embedder[Unused]
+}
+
+// NameTree represents a PDF name tree.
+// A name tree is a dictionary that maps names to values.
+// Implementations of this interface can be found in the
+// seehuhn.de/go/pdf/nametree package.
+type NameTree interface {
+	// Lookup returns the value for a given key in the name tree.
+	// If the key is not found, it returns nil and [ErrKeyNotFound].
+	Lookup(key Name) (Object, error)
+
+	All() iter.Seq2[Name, Object]
+
+	Embedder[Unused]
 }

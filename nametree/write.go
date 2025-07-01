@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package numtree
+package nametree
 
 import (
 	"errors"
@@ -23,36 +23,36 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// maxChildren is the maximum number of children we allow in a node while writing a number tree.
+// maxChildren is the maximum number of children we allow in a node while writing a name tree.
 const maxChildren = 64
 
 type entry struct {
-	key   pdf.Integer
+	key   pdf.Name
 	value pdf.Object
 }
 
 type nodeInfo struct {
 	ref       pdf.Reference
 	depth     int
-	minKey    pdf.Integer
-	maxKey    pdf.Integer
+	minKey    string
+	maxKey    string
 	nodeCount int // number of child nodes (for intermediate) or entries (for leaf)
 }
 
-type numberTreeWriter struct {
+type nameTreeWriter struct {
 	w           *pdf.Writer
 	tail        []*nodeInfo // completed nodes at various depths
 	pendingLeaf []entry     // accumulating entries for current leaf
-	lastKey     pdf.Integer // for sort order validation
+	lastKey     pdf.Name    // for sort order validation
 	hasEntries  bool        // track if we've seen any entries
 }
 
-// Write creates a number tree in the PDF file.
+// Write creates a name tree in the PDF file.
 // The iterator `data` provides the key-value pairs.  The keys must be
 // returned in sorted order, and must not contain duplicates.
-// The return value is the reference to the number tree root.
-func Write(w *pdf.Writer, data iter.Seq2[pdf.Integer, pdf.Object]) (pdf.Reference, error) {
-	writer := &numberTreeWriter{
+// The return value is the reference to the name tree root.
+func Write(w *pdf.Writer, data iter.Seq2[pdf.Name, pdf.Object]) (pdf.Reference, error) {
+	writer := &nameTreeWriter{
 		w: w,
 	}
 
@@ -66,9 +66,9 @@ func Write(w *pdf.Writer, data iter.Seq2[pdf.Integer, pdf.Object]) (pdf.Referenc
 	return writer.finish()
 }
 
-func (w *numberTreeWriter) addEntry(key pdf.Integer, value pdf.Object) error {
+func (w *nameTreeWriter) addEntry(key pdf.Name, value pdf.Object) error {
 	// validate sort order
-	if w.hasEntries && key <= w.lastKey {
+	if w.hasEntries && string(key) <= string(w.lastKey) {
 		return errors.New("keys must be in sorted order")
 	}
 	w.lastKey = key
@@ -88,7 +88,7 @@ func (w *numberTreeWriter) addEntry(key pdf.Integer, value pdf.Object) error {
 	return nil
 }
 
-func (w *numberTreeWriter) completePendingLeaf() error {
+func (w *nameTreeWriter) completePendingLeaf() error {
 	if len(w.pendingLeaf) == 0 {
 		return nil
 	}
@@ -96,17 +96,17 @@ func (w *numberTreeWriter) completePendingLeaf() error {
 	// create leaf node
 	ref := w.w.Alloc()
 
-	var nums []pdf.Object
+	var names []pdf.Object
 	for _, e := range w.pendingLeaf {
-		nums = append(nums, e.key)
-		nums = append(nums, e.value)
+		names = append(names, pdf.String(e.key))
+		names = append(names, e.value)
 	}
 
 	node := pdf.Dict{
-		"Nums": pdf.Array(nums),
+		"Names": pdf.Array(names),
 		"Limits": pdf.Array{
-			w.pendingLeaf[0].key,
-			w.pendingLeaf[len(w.pendingLeaf)-1].key,
+			pdf.String(w.pendingLeaf[0].key),
+			pdf.String(w.pendingLeaf[len(w.pendingLeaf)-1].key),
 		},
 	}
 
@@ -119,8 +119,8 @@ func (w *numberTreeWriter) completePendingLeaf() error {
 	nodeInfo := &nodeInfo{
 		ref:       ref,
 		depth:     0,
-		minKey:    w.pendingLeaf[0].key,
-		maxKey:    w.pendingLeaf[len(w.pendingLeaf)-1].key,
+		minKey:    string(w.pendingLeaf[0].key),
+		maxKey:    string(w.pendingLeaf[len(w.pendingLeaf)-1].key),
 		nodeCount: len(w.pendingLeaf),
 	}
 	w.tail = append(w.tail, nodeInfo)
@@ -130,7 +130,7 @@ func (w *numberTreeWriter) completePendingLeaf() error {
 	return w.mergeTail()
 }
 
-func (w *numberTreeWriter) mergeTail() error {
+func (w *nameTreeWriter) mergeTail() error {
 	for {
 		n := len(w.tail)
 		if n < maxChildren || w.tail[n-1].depth != w.tail[n-maxChildren].depth {
@@ -144,7 +144,7 @@ func (w *numberTreeWriter) mergeTail() error {
 	return nil
 }
 
-func (w *numberTreeWriter) mergeNodes(start, end int) error {
+func (w *nameTreeWriter) mergeNodes(start, end int) error {
 	if start >= end {
 		return nil
 	}
@@ -162,8 +162,8 @@ func (w *numberTreeWriter) mergeNodes(start, end int) error {
 	node := pdf.Dict{
 		"Kids": pdf.Array(kids),
 		"Limits": pdf.Array{
-			children[0].minKey,
-			children[len(children)-1].maxKey,
+			pdf.String(children[0].minKey),
+			pdf.String(children[len(children)-1].maxKey),
 		},
 	}
 
@@ -187,12 +187,12 @@ func (w *numberTreeWriter) mergeNodes(start, end int) error {
 	return nil
 }
 
-func (w *numberTreeWriter) finish() (pdf.Reference, error) {
+func (w *nameTreeWriter) finish() (pdf.Reference, error) {
 	// complete any pending leaf
 	if len(w.pendingLeaf) > 0 {
-		// special case: if this is the only leaf, make it a root with Nums (no Limits)
+		// special case: if this is the only leaf, make it a root with Names (no Limits)
 		if len(w.tail) == 0 {
-			return w.writeRootWithNums()
+			return w.writeRootWithNames()
 		}
 		err := w.completePendingLeaf()
 		if err != nil {
@@ -205,7 +205,7 @@ func (w *numberTreeWriter) finish() (pdf.Reference, error) {
 		return 0, nil
 	}
 
-	// special case: single leaf becomes root with Nums (no Limits)
+	// special case: single leaf becomes root with Names (no Limits)
 	if len(w.tail) == 1 && w.tail[0].depth == 0 {
 		return w.writeRootFromSingleLeaf(w.tail[0])
 	}
@@ -230,25 +230,25 @@ func (w *numberTreeWriter) finish() (pdf.Reference, error) {
 	return root.ref, nil
 }
 
-func (w *numberTreeWriter) writeRootWithNums() (pdf.Reference, error) {
+func (w *nameTreeWriter) writeRootWithNames() (pdf.Reference, error) {
 	ref := w.w.Alloc()
 
-	var nums []pdf.Object
+	var names []pdf.Object
 	for _, e := range w.pendingLeaf {
-		nums = append(nums, e.key)
-		nums = append(nums, e.value)
+		names = append(names, pdf.String(e.key))
+		names = append(names, e.value)
 	}
 
-	// root node with Nums has no Limits
+	// root node with Names has no Limits
 	node := pdf.Dict{
-		"Nums": pdf.Array(nums),
+		"Names": pdf.Array(names),
 	}
 
 	err := w.w.Put(ref, node)
 	return ref, err
 }
 
-func (w *numberTreeWriter) writeRootFromSingleLeaf(leaf *nodeInfo) (pdf.Reference, error) {
+func (w *nameTreeWriter) writeRootFromSingleLeaf(leaf *nodeInfo) (pdf.Reference, error) {
 	// we need to rewrite the leaf as a root (without Limits)
 	// since we can't modify already written objects, create new root
 	ref := w.w.Alloc()
@@ -259,7 +259,7 @@ func (w *numberTreeWriter) writeRootFromSingleLeaf(leaf *nodeInfo) (pdf.Referenc
 	return ref, err
 }
 
-func (w *numberTreeWriter) writeRootWithKids(kidRef pdf.Reference) (pdf.Reference, error) {
+func (w *nameTreeWriter) writeRootWithKids(kidRef pdf.Reference) (pdf.Reference, error) {
 	ref := w.w.Alloc()
 	node := pdf.Dict{
 		"Kids": pdf.Array{kidRef},
@@ -268,7 +268,7 @@ func (w *numberTreeWriter) writeRootWithKids(kidRef pdf.Reference) (pdf.Referenc
 	return ref, err
 }
 
-func (w *numberTreeWriter) collapse() error {
+func (w *nameTreeWriter) collapse() error {
 	for len(w.tail) > 1 {
 		start := len(w.tail) - maxChildren
 		if start < 0 {
