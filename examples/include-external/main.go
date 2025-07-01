@@ -111,8 +111,7 @@ func LoadFigure(fname string, rm *pdf.ResourceManager) (graphics.XObject, *pdf.R
 			if err != nil {
 				return err
 			}
-			resourceDict := resourceObj.(pdf.Dict)
-			err = pdf.DecodeDict(nil, w.Resources, resourceDict)
+			w.Resources, err = pdf.ExtractResources(nil, resourceObj)
 			if err != nil {
 				return err
 			}

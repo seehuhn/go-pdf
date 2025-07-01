@@ -138,7 +138,7 @@ func ReadType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
 
 	d.FontMatrix, _ = pdf.GetMatrix(r, fontDict["FontMatrix"])
 
-	d.Resources, err = pdf.GetResources(r, fontDict["Resources"])
+	d.Resources, err = pdf.ExtractResources(r, fontDict["Resources"])
 	if pdf.IsReadError(err) {
 		return nil, err
 	}

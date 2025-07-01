@@ -474,10 +474,10 @@ type Resources struct {
 	Properties Dict  `pdf:"optional"` // maps resource names to property list dictionaries for marked content
 }
 
-func GetResources(r Getter, obj Object) (res *Resources, err error) {
+func ExtractResources(r Getter, obj Object) (res *Resources, err error) {
 	defer func() {
 		if err != nil {
-			err = Wrap(err, "GetResources")
+			err = Wrap(err, "ExtractResources")
 		}
 	}()
 
@@ -486,11 +486,49 @@ func GetResources(r Getter, obj Object) (res *Resources, err error) {
 		return nil, err
 	}
 
-	res = &Resources{}
-	if err := DecodeDict(r, res, dict); err != nil {
+	extGState, err := GetDict(r, dict["ExtGState"])
+	if err != nil {
+		return nil, err
+	}
+	colorSpace, err := GetDict(r, dict["ColorSpace"])
+	if err != nil {
+		return nil, err
+	}
+	pattern, err := GetDict(r, dict["Pattern"])
+	if err != nil {
+		return nil, err
+	}
+	shading, err := GetDict(r, dict["Shading"])
+	if err != nil {
+		return nil, err
+	}
+	xObject, err := GetDict(r, dict["XObject"])
+	if err != nil {
+		return nil, err
+	}
+	font, err := GetDict(r, dict["Font"])
+	if err != nil {
+		return nil, err
+	}
+	procSet, err := GetArray(r, dict["ProcSet"])
+	if err != nil {
+		return nil, err
+	}
+	properties, err := GetDict(r, dict["Properties"])
+	if err != nil {
 		return nil, err
 	}
 
+	res = &Resources{
+		ExtGState:  extGState,
+		ColorSpace: colorSpace,
+		Pattern:    pattern,
+		Shading:    shading,
+		XObject:    xObject,
+		Font:       font,
+		ProcSet:    procSet,
+		Properties: properties,
+	}
 	return res, nil
 }
 

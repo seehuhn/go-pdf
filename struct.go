@@ -122,10 +122,11 @@ fieldLoop:
 //   - "extra": the field is a map[string]string which contains all
 //     entries in the PDF dictionary which are not otherwise decoded.
 //
-// TODO(voss): remove the "allowstring" tag and always convert strings to names,
-// where needed.
-//
 // This function is the converse of [AsDict].
+//
+// Deprecated: This function will be removed.
+//
+// TODO(voss): remove
 func DecodeDict(r Getter, dst interface{}, src Dict) error {
 	v := reflect.Indirect(reflect.ValueOf(dst))
 	vt := v.Type()
