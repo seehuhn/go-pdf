@@ -21,6 +21,7 @@ package pdf
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"iter"
 	"math"
@@ -417,6 +418,101 @@ type Catalog struct {
 	Requirements      Object       `pdf:"optional"`
 	Collection        Object       `pdf:"optional"`
 	NeedsRendering    bool         `pdf:"optional"`
+	DSS               Object       `pdf:"optional"`
+	AF                Object       `pdf:"optional"`
+	DPartRoot         Object       `pdf:"optional"`
+}
+
+func ExtractCatalog(r Getter, obj Object) (*Catalog, error) {
+	dict, err := GetDictTyped(r, obj, "Catalog")
+	if err != nil {
+		return nil, err
+	}
+	if dict == nil {
+		return nil, &MalformedFileError{
+			Err: errors.New("catalog dictionary is missing"),
+		}
+	}
+
+	// Extract required Pages field
+	pagesObj := dict["Pages"]
+	if pagesObj == nil {
+		return nil, &MalformedFileError{
+			Err: errors.New("required field Pages is missing"),
+		}
+	}
+
+	// Try to get Pages as Reference, but be permissive
+	var pages Reference
+	if ref, ok := pagesObj.(Reference); ok {
+		pages = ref
+	} else {
+		// For malformed files, try to proceed anyway
+		pages = 0
+	}
+
+	// Extract optional fields
+	pageLayout, _ := GetName(r, dict["PageLayout"])
+	pageMode, _ := GetName(r, dict["PageMode"])
+
+	var outlines Reference
+	if ref, ok := dict["Outlines"].(Reference); ok {
+		outlines = ref
+	}
+
+	var threads Reference
+	if ref, ok := dict["Threads"].(Reference); ok {
+		threads = ref
+	}
+
+	var metadata Reference
+	if ref, ok := dict["Metadata"].(Reference); ok {
+		metadata = ref
+	}
+
+	// Extract Lang field
+	var lang language.Tag
+	if dict["Lang"] != nil {
+		langStr, err := GetTextString(r, dict["Lang"])
+		if err == nil && langStr != "" {
+			lang, _ = language.Parse(string(langStr))
+		}
+	}
+
+	// Extract NeedsRendering
+	needsRendering, _ := GetBoolean(r, dict["NeedsRendering"])
+
+	return &Catalog{
+		Pages:             pages,
+		PageLabels:        dict["PageLabels"],
+		Names:             dict["Names"],
+		Dests:             dict["Dests"],
+		ViewerPreferences: dict["ViewerPreferences"],
+		PageLayout:        pageLayout,
+		PageMode:          pageMode,
+		Outlines:          outlines,
+		Threads:           threads,
+		OpenAction:        dict["OpenAction"],
+		AA:                dict["AA"],
+		URI:               dict["URI"],
+		AcroForm:          dict["AcroForm"],
+		Metadata:          metadata,
+		StructTreeRoot:    dict["StructTreeRoot"],
+		MarkInfo:          dict["MarkInfo"],
+		Lang:              lang,
+		SpiderInfo:        dict["SpiderInfo"],
+		OutputIntents:     dict["OutputIntents"],
+		PieceInfo:         dict["PieceInfo"],
+		OCProperties:      dict["OCProperties"],
+		Perms:             dict["Perms"],
+		Legal:             dict["Legal"],
+		Requirements:      dict["Requirements"],
+		Collection:        dict["Collection"],
+		NeedsRendering:    bool(needsRendering),
+		DSS:               dict["DSS"],
+		AF:                dict["AF"],
+		DPartRoot:         dict["DPartRoot"],
+	}, nil
 }
 
 // Info represents a PDF Document Information Dictionary.

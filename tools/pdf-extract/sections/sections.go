@@ -283,3 +283,85 @@ func findNextAtLevel(node, target *outline.Tree, targetLevel, currentLevel int, 
 
 	return nil
 }
+
+// ListAll returns a list of all outline entries in the document.
+func ListAll(r pdf.Getter) ([]string, error) {
+	tree, err := outline.Read(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read outline: %w", err)
+	}
+	if tree == nil {
+		return nil, errors.New("document has no outline")
+	}
+
+	var sections []string
+	collectSections(tree, "", &sections)
+	return sections, nil
+}
+
+// collectSections recursively collects all section titles with indentation
+func collectSections(node *outline.Tree, indent string, sections *[]string) {
+	if node == nil {
+		return
+	}
+
+	if node.Title != "" {
+		*sections = append(*sections, indent+node.Title)
+	}
+
+	for _, child := range node.Children {
+		collectSections(child, indent+"  ", sections)
+	}
+}
+
+// FindNext finds the next section after the one matching the given pattern.
+// Returns the title of the next section, or an empty string if no next section exists.
+func FindNext(r pdf.Getter, pattern string) (string, error) {
+	regex, err := regexp.Compile(pattern)
+	if err != nil {
+		return "", fmt.Errorf("invalid regex pattern: %w", err)
+	}
+
+	tree, err := outline.Read(r)
+	if err != nil {
+		return "", fmt.Errorf("failed to read outline: %w", err)
+	}
+	if tree == nil {
+		return "", errors.New("document has no outline")
+	}
+
+	// build page number mapping
+	pageNumbers := make(map[pdf.Reference]int)
+	pageNo := 0
+	for ref := range pagetree.NewIterator(r).All() {
+		pageNumbers[ref] = pageNo
+		pageNo++
+	}
+
+	// find all matching sections
+	var matches []sectionMatch
+	err = findMatches(r, pageNumbers, tree, regex, &matches)
+	if err != nil {
+		return "", err
+	}
+
+	if len(matches) == 0 {
+		return "", fmt.Errorf("no outline entries match pattern %q", pattern)
+	}
+	if len(matches) > 1 {
+		return "", fmt.Errorf("pattern %q matches %d outline entries, expected exactly 1", pattern, len(matches))
+	}
+
+	match := matches[0]
+
+	// find the parent and level of the matched section
+	_, level := findParentAndLevel(tree, match.tree, nil, 0)
+
+	// find the next sibling at the same or higher level
+	nextSection := findNextSectionAtLevel(tree, match.tree, level)
+	if nextSection == nil {
+		return "", nil // no next section
+	}
+
+	return nextSection.Title, nil
+}

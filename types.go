@@ -725,7 +725,6 @@ func (d Dict) SortedKeys() []Name {
 	return keys
 }
 
-
 // Stream represent a stream object in a PDF file.
 // Use the [DecodeStream] function to access the contents of the stream.
 type Stream struct {

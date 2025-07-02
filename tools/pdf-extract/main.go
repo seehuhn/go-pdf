@@ -17,6 +17,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"math"
@@ -27,8 +28,10 @@ import (
 	"strings"
 
 	"seehuhn.de/go/geom/matrix"
+
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/type1/names"
+
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/glyf"
 
@@ -38,6 +41,7 @@ import (
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/pdfcopy"
 	"seehuhn.de/go/pdf/reader"
+
 	"seehuhn.de/go/pdf/tools/pdf-extract/sections"
 )
 
@@ -261,7 +265,7 @@ func (pe PDFExtractor) Process(doc pdf.Getter, pages *PageSet, outputFile string
 		return fmt.Errorf("failed to close output PDF: %w", err)
 	}
 
-	fmt.Printf("Extracted %d pages to %s\n", len(pageNums), outputFile)
+	fmt.Fprintf(os.Stderr, "Extracted %d pages to %s\n", len(pageNums), outputFile)
 	return nil
 }
 
@@ -358,7 +362,7 @@ func (te TextExtractor) Process(doc pdf.Getter, pages *PageSet, outputFile strin
 		fmt.Fprintln(outFile)
 	}
 
-	fmt.Printf("Extracted text from %d pages to %s\n", len(pageNums), outputFile)
+	fmt.Fprintf(os.Stderr, "Extracted text from %d pages to %s\n", len(pageNums), outputFile)
 	return nil
 }
 
@@ -480,33 +484,83 @@ func spaceWidthHeuristic(dict font.Dict) float64 {
 	return guess
 }
 
-// getOutputProcessor returns the appropriate processor based on file extension
-func getOutputProcessor(filename string) (OutputProcessor, error) {
-	ext := strings.ToLower(filepath.Ext(filename))
-	switch ext {
-	case ".pdf":
+// getOutputProcessor returns the appropriate processor based on file extension or explicit type
+func getOutputProcessor(filename, explicitType string) (OutputProcessor, error) {
+	var fileType string
+	if explicitType != "" {
+		fileType = explicitType
+	} else {
+		ext := strings.ToLower(filepath.Ext(filename))
+		switch ext {
+		case ".pdf":
+			fileType = "pdf"
+		case ".txt":
+			fileType = "txt"
+		default:
+			return nil, fmt.Errorf("unsupported output format: %s (supported: .pdf, .txt)", ext)
+		}
+	}
+
+	switch fileType {
+	case "pdf":
 		return PDFExtractor{}, nil
-	case ".txt":
+	case "txt":
 		return TextExtractor{}, nil
 	default:
-		return nil, fmt.Errorf("unsupported output format: %s (supported: .pdf, .txt)", ext)
+		return nil, fmt.Errorf("unsupported file type: %s (supported: pdf, txt)", fileType)
 	}
 }
 
 func main() {
-	if len(os.Args) < 2 {
-		log.Fatal("usage: pdf-extract FILENAME [region ...] [to OUTPUT_FILE]")
+	// define command line flags
+	var (
+		typeFlag        = flag.String("type", "", "output type (pdf or txt), overrides file extension")
+		showNextSection = flag.Bool("show-next-section", false, "show the name of the next section after processing")
+		help            = flag.Bool("help", false, "show help information")
+	)
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s [options] FILENAME [region ...] [to OUTPUT_FILE]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Extract pages or sections from a PDF file.\n\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nRegion types:\n")
+		fmt.Fprintf(os.Stderr, "  page N       - extract page N (1-based)\n")
+		fmt.Fprintf(os.Stderr, "  pages N-M    - extract pages N through M\n")
+		fmt.Fprintf(os.Stderr, "  pages odd    - extract odd-numbered pages\n")
+		fmt.Fprintf(os.Stderr, "  pages even   - extract even-numbered pages\n")
+		fmt.Fprintf(os.Stderr, "  section PAT  - extract section matching regex pattern PAT\n")
+		fmt.Fprintf(os.Stderr, "  sections     - list all sections in document\n")
+		fmt.Fprintf(os.Stderr, "  pages        - show total page count\n")
+		fmt.Fprintf(os.Stderr, "\nExamples:\n")
+		fmt.Fprintf(os.Stderr, "  %s doc.pdf page 1 to page1.pdf\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s doc.pdf section \"Introduction\" to intro.txt\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s doc.pdf sections\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s doc.pdf pages\n", os.Args[0])
 	}
 
-	filename := os.Args[1]
-	args := os.Args[2:]
+	flag.Parse()
+
+	if *help {
+		flag.Usage()
+		return
+	}
+
+	args := flag.Args()
+	if len(args) < 1 {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	filename := args[0]
+	regionArgs := args[1:]
 
 	// find "to" keyword to separate regions from output file
-	var regionArgs []string
+	var processedRegionArgs []string
 	var outputFile string
 
 	toIndex := -1
-	for i, arg := range args {
+	for i, arg := range regionArgs {
 		if arg == "to" {
 			toIndex = i
 			break
@@ -514,16 +568,16 @@ func main() {
 	}
 
 	if toIndex >= 0 {
-		regionArgs = args[:toIndex]
-		if toIndex+1 >= len(args) {
+		processedRegionArgs = regionArgs[:toIndex]
+		if toIndex+1 >= len(regionArgs) {
 			log.Fatal("expected output filename after 'to'")
 		}
-		outputFile = args[toIndex+1]
-		if toIndex+2 < len(args) {
+		outputFile = regionArgs[toIndex+1]
+		if toIndex+2 < len(regionArgs) {
 			log.Fatal("unexpected arguments after output filename")
 		}
 	} else {
-		regionArgs = args
+		processedRegionArgs = regionArgs
 	}
 
 	// open PDF
@@ -544,10 +598,53 @@ func main() {
 		initialPages.Pages[i] = PageBounds{YMin: math.Inf(-1), YMax: math.Inf(+1)} // infinite bounds means full page
 	}
 
+	// check for special cases that don't require full processing
+	if len(processedRegionArgs) == 1 {
+		switch processedRegionArgs[0] {
+		case "section", "sections":
+			sections, err := sections.ListAll(doc)
+			if err != nil {
+				log.Fatalf("failed to list sections: %v", err)
+			}
+			if len(sections) == 0 {
+				fmt.Println("No sections found in document")
+			} else {
+				fmt.Println("Sections:")
+				for _, section := range sections {
+					fmt.Println(section)
+				}
+			}
+			return
+		case "page", "pages":
+			fmt.Printf("Total pages: %d\n", totalPages)
+			return
+		}
+	}
+
 	// parse and apply regions
-	regions, err := parseRegions(regionArgs)
+	regions, err := parseRegions(processedRegionArgs)
 	if err != nil {
 		log.Fatalf("failed to parse regions: %v", err)
+	}
+
+	// check if we need to track the next section for -show-next-section flag
+	var nextSectionTitle string
+	if *showNextSection {
+		// find the first section region to use for next section lookup
+		var sectionPattern string
+		for _, region := range regions {
+			if sr, ok := region.(SectionRegion); ok {
+				sectionPattern = sr.Pattern
+				break
+			}
+		}
+		if sectionPattern == "" {
+			log.Fatal("-show-next-section can only be used with section-based selection")
+		}
+		nextSectionTitle, err = sections.FindNext(doc, sectionPattern)
+		if err != nil {
+			log.Fatalf("failed to find next section: %v", err)
+		}
 	}
 
 	currentPages := initialPages
@@ -560,7 +657,7 @@ func main() {
 
 	// handle output
 	if outputFile != "" {
-		processor, err := getOutputProcessor(outputFile)
+		processor, err := getOutputProcessor(outputFile, *typeFlag)
 		if err != nil {
 			log.Fatalf("output error: %v", err)
 		}
@@ -572,6 +669,11 @@ func main() {
 	} else {
 		// no output file specified, just print the result
 		printPageSet(currentPages, regions)
+	}
+
+	// show next section if requested
+	if *showNextSection && nextSectionTitle != "" {
+		fmt.Println(nextSectionTitle)
 	}
 }
 
@@ -591,7 +693,7 @@ func parseRegions(args []string) ([]Region, error) {
 			}
 			regions = append(regions, region)
 
-		case "section":
+		case "section", "sections":
 			if i+1 >= len(args) {
 				return nil, fmt.Errorf("expected section pattern after %q", args[i])
 			}
