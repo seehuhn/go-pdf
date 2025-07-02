@@ -19,7 +19,7 @@ package traverse
 import (
 	"seehuhn.de/go/pdf"
 
-	"seehuhn.de/go/pdf/examples/pdf-inspect/meta"
+	"seehuhn.de/go/pdf/tools/pdf-inspect/meta"
 )
 
 type metaCtx struct {

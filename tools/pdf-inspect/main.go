@@ -22,7 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"seehuhn.de/go/pdf/examples/pdf-inspect/traverse"
+	"seehuhn.de/go/pdf/tools/pdf-inspect/traverse"
 )
 
 var (
