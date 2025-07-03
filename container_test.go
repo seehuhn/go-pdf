@@ -43,7 +43,7 @@ func TestGetStreamReaderNull(t *testing.T) {
 }
 
 // We can't use mock.Getter here, because this would lead to a dependency cycle.
-// Instead, we add a separate implementation here.
+// Instead, we add a separate implementation.
 var mockGetter Getter = mockGetterType{}
 
 type mockGetterType struct{}

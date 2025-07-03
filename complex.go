@@ -21,7 +21,6 @@ package pdf
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"iter"
 	"math"
@@ -29,7 +28,6 @@ import (
 	"time"
 	"unicode/utf16"
 
-	"golang.org/x/text/language"
 	"seehuhn.de/go/geom/matrix"
 )
 
@@ -381,138 +379,6 @@ func GetMatrix(r Getter, obj Object) (m matrix.Matrix, err error) {
 	}
 
 	return m, nil
-}
-
-// Catalog represents a PDF Document Catalog.  The only required field in this
-// structure is Pages, which specifies the root of the page tree.
-// This struct can be used with the [DecodeDict] and [AsDict] functions.
-//
-// The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
-type Catalog struct {
-	_                 struct{} `pdf:"Type=Catalog"`
-	Version           Version  `pdf:"optional"`
-	Extensions        Object   `pdf:"optional"`
-	Pages             Reference
-	PageLabels        Object       `pdf:"optional"`
-	Names             Object       `pdf:"optional"`
-	Dests             Object       `pdf:"optional"`
-	ViewerPreferences Object       `pdf:"optional"`
-	PageLayout        Name         `pdf:"optional"`
-	PageMode          Name         `pdf:"optional"`
-	Outlines          Reference    `pdf:"optional"`
-	Threads           Reference    `pdf:"optional"`
-	OpenAction        Object       `pdf:"optional"`
-	AA                Object       `pdf:"optional"`
-	URI               Object       `pdf:"optional"`
-	AcroForm          Object       `pdf:"optional"`
-	Metadata          Reference    `pdf:"optional"`
-	StructTreeRoot    Object       `pdf:"optional"`
-	MarkInfo          Object       `pdf:"optional"`
-	Lang              language.Tag `pdf:"optional"`
-	SpiderInfo        Object       `pdf:"optional"`
-	OutputIntents     Object       `pdf:"optional"`
-	PieceInfo         Object       `pdf:"optional"`
-	OCProperties      Object       `pdf:"optional"`
-	Perms             Object       `pdf:"optional"`
-	Legal             Object       `pdf:"optional"`
-	Requirements      Object       `pdf:"optional"`
-	Collection        Object       `pdf:"optional"`
-	NeedsRendering    bool         `pdf:"optional"`
-	DSS               Object       `pdf:"optional"`
-	AF                Object       `pdf:"optional"`
-	DPartRoot         Object       `pdf:"optional"`
-}
-
-func ExtractCatalog(r Getter, obj Object) (*Catalog, error) {
-	dict, err := GetDictTyped(r, obj, "Catalog")
-	if err != nil {
-		return nil, err
-	}
-	if dict == nil {
-		return nil, &MalformedFileError{
-			Err: errors.New("catalog dictionary is missing"),
-		}
-	}
-
-	// Extract required Pages field
-	pagesObj := dict["Pages"]
-	if pagesObj == nil {
-		return nil, &MalformedFileError{
-			Err: errors.New("required field Pages is missing"),
-		}
-	}
-
-	// Try to get Pages as Reference, but be permissive
-	var pages Reference
-	if ref, ok := pagesObj.(Reference); ok {
-		pages = ref
-	} else {
-		// For malformed files, try to proceed anyway
-		pages = 0
-	}
-
-	// Extract optional fields
-	pageLayout, _ := GetName(r, dict["PageLayout"])
-	pageMode, _ := GetName(r, dict["PageMode"])
-
-	var outlines Reference
-	if ref, ok := dict["Outlines"].(Reference); ok {
-		outlines = ref
-	}
-
-	var threads Reference
-	if ref, ok := dict["Threads"].(Reference); ok {
-		threads = ref
-	}
-
-	var metadata Reference
-	if ref, ok := dict["Metadata"].(Reference); ok {
-		metadata = ref
-	}
-
-	// Extract Lang field
-	var lang language.Tag
-	if dict["Lang"] != nil {
-		langStr, err := GetTextString(r, dict["Lang"])
-		if err == nil && langStr != "" {
-			lang, _ = language.Parse(string(langStr))
-		}
-	}
-
-	// Extract NeedsRendering
-	needsRendering, _ := GetBoolean(r, dict["NeedsRendering"])
-
-	return &Catalog{
-		Pages:             pages,
-		PageLabels:        dict["PageLabels"],
-		Names:             dict["Names"],
-		Dests:             dict["Dests"],
-		ViewerPreferences: dict["ViewerPreferences"],
-		PageLayout:        pageLayout,
-		PageMode:          pageMode,
-		Outlines:          outlines,
-		Threads:           threads,
-		OpenAction:        dict["OpenAction"],
-		AA:                dict["AA"],
-		URI:               dict["URI"],
-		AcroForm:          dict["AcroForm"],
-		Metadata:          metadata,
-		StructTreeRoot:    dict["StructTreeRoot"],
-		MarkInfo:          dict["MarkInfo"],
-		Lang:              lang,
-		SpiderInfo:        dict["SpiderInfo"],
-		OutputIntents:     dict["OutputIntents"],
-		PieceInfo:         dict["PieceInfo"],
-		OCProperties:      dict["OCProperties"],
-		Perms:             dict["Perms"],
-		Legal:             dict["Legal"],
-		Requirements:      dict["Requirements"],
-		Collection:        dict["Collection"],
-		NeedsRendering:    bool(needsRendering),
-		DSS:               dict["DSS"],
-		AF:                dict["AF"],
-		DPartRoot:         dict["DPartRoot"],
-	}, nil
 }
 
 // Info represents a PDF Document Information Dictionary.
