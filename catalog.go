@@ -156,10 +156,9 @@ func ExtractCatalog(r Getter, obj Object) (*Catalog, error) {
 	dict, err := GetDictTyped(r, obj, "Catalog")
 	if err != nil {
 		return nil, err
-	}
-	if dict == nil {
+	} else if dict == nil {
 		return nil, &MalformedFileError{
-			Err: errors.New("catalog dictionary is missing"),
+			Err: errors.New("missing catalog dictionary"),
 		}
 	}
 
