@@ -1,0 +1,151 @@
+package annotation
+
+import "seehuhn.de/go/pdf"
+
+// Square represents a square annotation that displays a rectangle on the page.
+// When opened, it displays a popup window containing the text of the associated note.
+// The rectangle is inscribed within the annotation rectangle defined by the Rect entry.
+type Square struct {
+	Common
+	Markup
+
+	// BS (optional) is a border style dictionary specifying the line width
+	// and dash pattern that shall be used in drawing the rectangle.
+	BS pdf.Reference
+
+	// IC (optional; PDF 1.4) is an array of numbers in the range 0.0 to 1.0
+	// specifying the interior colour with which to fill the annotation's rectangle.
+	// The number of array elements determines the colour space:
+	// 0 - No colour; transparent
+	// 1 - DeviceGray
+	// 3 - DeviceRGB
+	// 4 - DeviceCMYK
+	IC []float64
+
+	// BE (optional; PDF 1.5) is a border effect dictionary describing an
+	// effect applied to the border described by the BS entry.
+	BE pdf.Reference
+
+	// RD (optional; PDF 1.5) describes the numerical differences between
+	// the Rect entry of the annotation and the actual boundaries of the
+	// underlying square. The four numbers correspond to the differences
+	// in default user space between the left, top, right, and bottom
+	// coordinates of Rect and those of the square, respectively.
+	RD []float64
+}
+
+var _ pdf.Annotation = (*Square)(nil)
+
+// AnnotationType returns "Square".
+// This implements the [pdf.Annotation] interface.
+func (s *Square) AnnotationType() string {
+	return "Square"
+}
+
+func extractSquare(r pdf.Getter, dict pdf.Dict) (*Square, error) {
+	square := &Square{}
+
+	// Extract common annotation fields
+	if err := extractCommon(r, dict, &square.Common); err != nil {
+		return nil, err
+	}
+
+	// Extract markup annotation fields
+	if err := extractMarkup(r, dict, &square.Markup); err != nil {
+		return nil, err
+	}
+
+	// Extract square-specific fields
+	// BS (optional)
+	if bs, ok := dict["BS"].(pdf.Reference); ok {
+		square.BS = bs
+	}
+
+	// IC (optional)
+	if ic, err := pdf.GetArray(r, dict["IC"]); err == nil && len(ic) > 0 {
+		colors := make([]float64, len(ic))
+		for i, color := range ic {
+			if num, err := pdf.GetNumber(r, color); err == nil {
+				colors[i] = float64(num)
+			}
+		}
+		square.IC = colors
+	}
+
+	// BE (optional)
+	if be, ok := dict["BE"].(pdf.Reference); ok {
+		square.BE = be
+	}
+
+	// RD (optional)
+	if rd, err := pdf.GetArray(r, dict["RD"]); err == nil && len(rd) == 4 {
+		diffs := make([]float64, 4)
+		for i, diff := range rd {
+			if num, err := pdf.GetNumber(r, diff); err == nil {
+				diffs[i] = float64(num)
+			}
+		}
+		square.RD = diffs
+	}
+
+	return square, nil
+}
+
+func (s *Square) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
+
+	dict := pdf.Dict{
+		"Type":    pdf.Name("Annot"),
+		"Subtype": pdf.Name("Square"),
+	}
+
+	// Add common annotation fields
+	if err := s.Common.fillDict(rm, dict); err != nil {
+		return nil, zero, err
+	}
+
+	// Add markup annotation fields
+	if err := s.Markup.fillDict(rm, dict); err != nil {
+		return nil, zero, err
+	}
+
+	// Add square-specific fields
+	// BS (optional)
+	if s.BS != 0 {
+		dict["BS"] = s.BS
+	}
+
+	// IC (optional)
+	if s.IC != nil {
+		if err := pdf.CheckVersion(rm.Out, "square annotation IC entry", pdf.V1_4); err != nil {
+			return nil, zero, err
+		}
+		icArray := make(pdf.Array, len(s.IC))
+		for i, color := range s.IC {
+			icArray[i] = pdf.Number(color)
+		}
+		dict["IC"] = icArray
+	}
+
+	// BE (optional)
+	if s.BE != 0 {
+		if err := pdf.CheckVersion(rm.Out, "square annotation BE entry", pdf.V1_5); err != nil {
+			return nil, zero, err
+		}
+		dict["BE"] = s.BE
+	}
+
+	// RD (optional)
+	if s.RD != nil && len(s.RD) == 4 {
+		if err := pdf.CheckVersion(rm.Out, "square annotation RD entry", pdf.V1_5); err != nil {
+			return nil, zero, err
+		}
+		rdArray := make(pdf.Array, 4)
+		for i, diff := range s.RD {
+			rdArray[i] = pdf.Number(diff)
+		}
+		dict["RD"] = rdArray
+	}
+
+	return dict, zero, nil
+}

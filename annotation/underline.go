@@ -1,0 +1,89 @@
+package annotation
+
+import "seehuhn.de/go/pdf"
+
+// Underline represents an underline annotation that appears as underlined text.
+// When opened, it displays a popup window containing the text of the associated note.
+type Underline struct {
+	Common
+	Markup
+
+	// QuadPoints (required) is an array of 8×n numbers specifying the coordinates
+	// of n quadrilaterals in default user space. Each quadrilateral encompasses
+	// a word or group of contiguous words in the text underlying the annotation.
+	// The coordinates for each quadrilateral are given in the order:
+	// x1 y1 x2 y2 x3 y3 x4 y4
+	// specifying the quadrilateral's four vertices in counterclockwise order.
+	QuadPoints []float64
+}
+
+var _ pdf.Annotation = (*Underline)(nil)
+
+// AnnotationType returns "Underline".
+// This implements the [pdf.Annotation] interface.
+func (u *Underline) AnnotationType() string {
+	return "Underline"
+}
+
+func extractUnderline(r pdf.Getter, dict pdf.Dict) (*Underline, error) {
+	underline := &Underline{}
+
+	// Extract common annotation fields
+	if err := extractCommon(r, dict, &underline.Common); err != nil {
+		return nil, err
+	}
+
+	// Extract markup annotation fields
+	if err := extractMarkup(r, dict, &underline.Markup); err != nil {
+		return nil, err
+	}
+
+	// Extract underline-specific fields
+	// QuadPoints (required)
+	if quadPoints, err := pdf.GetArray(r, dict["QuadPoints"]); err == nil && len(quadPoints) > 0 {
+		coords := make([]float64, len(quadPoints))
+		for i, point := range quadPoints {
+			if num, err := pdf.GetNumber(r, point); err == nil {
+				coords[i] = float64(num)
+			}
+		}
+		underline.QuadPoints = coords
+	}
+
+	return underline, nil
+}
+
+func (u *Underline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
+
+	if err := pdf.CheckVersion(rm.Out, "underline annotation", pdf.V1_3); err != nil {
+		return nil, zero, err
+	}
+
+	dict := pdf.Dict{
+		"Type":    pdf.Name("Annot"),
+		"Subtype": pdf.Name("Underline"),
+	}
+
+	// Add common annotation fields
+	if err := u.Common.fillDict(rm, dict); err != nil {
+		return nil, zero, err
+	}
+
+	// Add markup annotation fields
+	if err := u.Markup.fillDict(rm, dict); err != nil {
+		return nil, zero, err
+	}
+
+	// Add underline-specific fields
+	// QuadPoints (required)
+	if u.QuadPoints != nil && len(u.QuadPoints) > 0 {
+		quadArray := make(pdf.Array, len(u.QuadPoints))
+		for i, point := range u.QuadPoints {
+			quadArray[i] = pdf.Number(point)
+		}
+		dict["QuadPoints"] = quadArray
+	}
+
+	return dict, zero, nil
+}

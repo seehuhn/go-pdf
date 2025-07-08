@@ -22,7 +22,7 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Extract extracts a function from a PDF file and returns a pdf.Function.
+// Extract extracts a function from a PDF file.
 func Extract(r pdf.Getter, obj pdf.Object) (pdf.Function, error) {
 	// Type 3 functions are recursive, so we need to check for cycles.
 	cycleChecker := pdf.NewCycleChecker()

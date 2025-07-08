@@ -1,0 +1,151 @@
+package annotation
+
+import "seehuhn.de/go/pdf"
+
+// Circle represents a circle annotation that displays an ellipse on the page.
+// When opened, it displays a popup window containing the text of the associated note.
+// The ellipse is inscribed within the annotation rectangle defined by the Rect entry.
+type Circle struct {
+	Common
+	Markup
+
+	// BS (optional) is a border style dictionary specifying the line width
+	// and dash pattern that shall be used in drawing the ellipse.
+	BS pdf.Reference
+
+	// IC (optional; PDF 1.4) is an array of numbers in the range 0.0 to 1.0
+	// specifying the interior colour with which to fill the annotation's ellipse.
+	// The number of array elements determines the colour space:
+	// 0 - No colour; transparent
+	// 1 - DeviceGray
+	// 3 - DeviceRGB
+	// 4 - DeviceCMYK
+	IC []float64
+
+	// BE (optional; PDF 1.5) is a border effect dictionary describing an
+	// effect applied to the border described by the BS entry.
+	BE pdf.Reference
+
+	// RD (optional; PDF 1.5) describes the numerical differences between
+	// the Rect entry of the annotation and the actual boundaries of the
+	// underlying circle. The four numbers correspond to the differences
+	// in default user space between the left, top, right, and bottom
+	// coordinates of Rect and those of the circle, respectively.
+	RD []float64
+}
+
+var _ pdf.Annotation = (*Circle)(nil)
+
+// AnnotationType returns "Circle".
+// This implements the [pdf.Annotation] interface.
+func (c *Circle) AnnotationType() string {
+	return "Circle"
+}
+
+func extractCircle(r pdf.Getter, dict pdf.Dict) (*Circle, error) {
+	circle := &Circle{}
+
+	// Extract common annotation fields
+	if err := extractCommon(r, dict, &circle.Common); err != nil {
+		return nil, err
+	}
+
+	// Extract markup annotation fields
+	if err := extractMarkup(r, dict, &circle.Markup); err != nil {
+		return nil, err
+	}
+
+	// Extract circle-specific fields
+	// BS (optional)
+	if bs, ok := dict["BS"].(pdf.Reference); ok {
+		circle.BS = bs
+	}
+
+	// IC (optional)
+	if ic, err := pdf.GetArray(r, dict["IC"]); err == nil && len(ic) > 0 {
+		colors := make([]float64, len(ic))
+		for i, color := range ic {
+			if num, err := pdf.GetNumber(r, color); err == nil {
+				colors[i] = float64(num)
+			}
+		}
+		circle.IC = colors
+	}
+
+	// BE (optional)
+	if be, ok := dict["BE"].(pdf.Reference); ok {
+		circle.BE = be
+	}
+
+	// RD (optional)
+	if rd, err := pdf.GetArray(r, dict["RD"]); err == nil && len(rd) == 4 {
+		diffs := make([]float64, 4)
+		for i, diff := range rd {
+			if num, err := pdf.GetNumber(r, diff); err == nil {
+				diffs[i] = float64(num)
+			}
+		}
+		circle.RD = diffs
+	}
+
+	return circle, nil
+}
+
+func (c *Circle) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
+
+	dict := pdf.Dict{
+		"Type":    pdf.Name("Annot"),
+		"Subtype": pdf.Name("Circle"),
+	}
+
+	// Add common annotation fields
+	if err := c.Common.fillDict(rm, dict); err != nil {
+		return nil, zero, err
+	}
+
+	// Add markup annotation fields
+	if err := c.Markup.fillDict(rm, dict); err != nil {
+		return nil, zero, err
+	}
+
+	// Add circle-specific fields
+	// BS (optional)
+	if c.BS != 0 {
+		dict["BS"] = c.BS
+	}
+
+	// IC (optional)
+	if c.IC != nil {
+		if err := pdf.CheckVersion(rm.Out, "circle annotation IC entry", pdf.V1_4); err != nil {
+			return nil, zero, err
+		}
+		icArray := make(pdf.Array, len(c.IC))
+		for i, color := range c.IC {
+			icArray[i] = pdf.Number(color)
+		}
+		dict["IC"] = icArray
+	}
+
+	// BE (optional)
+	if c.BE != 0 {
+		if err := pdf.CheckVersion(rm.Out, "circle annotation BE entry", pdf.V1_5); err != nil {
+			return nil, zero, err
+		}
+		dict["BE"] = c.BE
+	}
+
+	// RD (optional)
+	if c.RD != nil && len(c.RD) == 4 {
+		if err := pdf.CheckVersion(rm.Out, "circle annotation RD entry", pdf.V1_5); err != nil {
+			return nil, zero, err
+		}
+		rdArray := make(pdf.Array, 4)
+		for i, diff := range c.RD {
+			rdArray[i] = pdf.Number(diff)
+		}
+		dict["RD"] = rdArray
+	}
+
+	return dict, zero, nil
+}

@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("%PDF-2.0\n%\x80\x80\x80\x80\n\n1 0 obj\n<<\n/Type /Catalog\n>>\nendobj\n\nxref\n0 2\n0000000000 65535 f\r\n0000000016 00000 n\r\ntrailer\n<<\n/ID [<b389ab649efb1ab9180a73351c1f0f95> <b389ab649efb1a\x00\x80180a73351c1f0f95>]\n/Quir:X <<\n/Type /Annot\n/Subtype /FreeText\n/CA 1 %0000000000000000000000000000000000000000000000000000000000000000000000000000000\n>> %000000000000000000\n>>0startxref053A000000")

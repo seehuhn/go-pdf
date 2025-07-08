@@ -587,3 +587,11 @@ type NameTree interface {
 
 	Embedder[Unused]
 }
+
+type Annotation interface {
+	// AnnotationType returns the type of the annotation, e.g. "Text", "Link",
+	// "Widget", etc.
+	AnnotationType() string
+
+	Embedder[Unused]
+}
