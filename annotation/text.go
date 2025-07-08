@@ -23,16 +23,16 @@ type Text struct {
 	Common
 	Markup
 
-	// Open specifies whether the annotation shall initially be displayed open.
+	// Open specifies whether the annotation is initially displayed open.
 	Open bool
 
-	// Name (optional) is the name of an icon that shall be used in displaying
+	// Name (optional) is the name of an icon that is used in displaying
 	// the annotation. Standard names include: Comment, Key, Note, Help,
 	// NewParagraph, Paragraph, Insert. Default value: Note.
 	Name pdf.Name
 
 	// State (optional; PDF 1.5) is the state to which the original annotation
-	// shall be set. Default: "Unmarked" if StateModel is "Marked"; "None" if
+	// is set. Default: "Unmarked" if StateModel is "Marked"; "None" if
 	// StateModel is "Review".
 	State string
 
@@ -45,7 +45,7 @@ var _ pdf.Annotation = (*Text)(nil)
 
 // AnnotationType returns "Text".
 // This implements the [pdf.Annotation] interface.
-func (t *Text) AnnotationType() string {
+func (t *Text) AnnotationType() pdf.Name {
 	return "Text"
 }
 

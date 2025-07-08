@@ -54,7 +54,7 @@ type Polyline struct {
 	Measure pdf.Reference
 
 	// Path (optional; PDF 2.0) is an array of n arrays, each supplying operands
-	// for path building operators (m, l, or c). If present, Vertices shall not be present.
+	// for path building operators (m, l, or c). If present, Vertices is not present.
 	// Each array contains pairs of values specifying points for path drawing operations.
 	Path [][]float64
 }
@@ -63,7 +63,7 @@ var _ pdf.Annotation = (*Polyline)(nil)
 
 // AnnotationType returns "PolyLine".
 // This implements the [pdf.Annotation] interface.
-func (p *Polyline) AnnotationType() string {
+func (p *Polyline) AnnotationType() pdf.Name {
 	return "PolyLine"
 }
 
@@ -126,8 +126,8 @@ func extractPolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
 
 	// Path (optional; PDF 2.0)
 	if path, err := pdf.GetArray(r, dict["Path"]); err == nil && len(path) > 0 {
-		pathArrays := make([][]float64, len(path))
-		for i, pathEntry := range path {
+		pathArrays := make([][]float64, 0, len(path))
+		for _, pathEntry := range path {
 			if pathArray, err := pdf.GetArray(r, pathEntry); err == nil {
 				coords := make([]float64, len(pathArray))
 				for j, coord := range pathArray {
@@ -135,10 +135,12 @@ func extractPolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
 						coords[j] = float64(num)
 					}
 				}
-				pathArrays[i] = coords
+				pathArrays = append(pathArrays, coords)
 			}
 		}
-		polyline.Path = pathArrays
+		if len(pathArrays) > 0 {
+			polyline.Path = pathArrays
+		}
 	}
 
 	return polyline, nil
@@ -176,7 +178,7 @@ func (p *Polyline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 	}
 
 	// LE (optional)
-	if p.LE != nil && len(p.LE) == 2 {
+	if len(p.LE) == 2 {
 		leArray := pdf.Array{p.LE[0], p.LE[1]}
 		dict["LE"] = leArray
 	}
@@ -204,19 +206,23 @@ func (p *Polyline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 	}
 
 	// Path (optional; PDF 2.0)
-	if p.Path != nil && len(p.Path) > 0 {
+	if len(p.Path) > 0 {
 		if err := pdf.CheckVersion(rm.Out, "polyline annotation Path entry", pdf.V2_0); err != nil {
 			return nil, zero, err
 		}
-		pathArray := make(pdf.Array, len(p.Path))
-		for i, pathEntry := range p.Path {
-			entryArray := make(pdf.Array, len(pathEntry))
-			for j, coord := range pathEntry {
-				entryArray[j] = pdf.Number(coord)
+		pathArray := make(pdf.Array, 0, len(p.Path))
+		for _, pathEntry := range p.Path {
+			if pathEntry != nil {
+				entryArray := make(pdf.Array, len(pathEntry))
+				for j, coord := range pathEntry {
+					entryArray[j] = pdf.Number(coord)
+				}
+				pathArray = append(pathArray, entryArray)
 			}
-			pathArray[i] = entryArray
 		}
-		dict["Path"] = pathArray
+		if len(pathArray) > 0 {
+			dict["Path"] = pathArray
+		}
 	}
 
 	return dict, zero, nil

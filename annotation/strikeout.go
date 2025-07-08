@@ -37,7 +37,7 @@ var _ pdf.Annotation = (*StrikeOut)(nil)
 
 // AnnotationType returns "StrikeOut".
 // This implements the [pdf.Annotation] interface.
-func (s *StrikeOut) AnnotationType() string {
+func (s *StrikeOut) AnnotationType() pdf.Name {
 	return "StrikeOut"
 }
 
@@ -93,7 +93,7 @@ func (s *StrikeOut) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 
 	// Add strikeout-specific fields
 	// QuadPoints (required)
-	if s.QuadPoints != nil && len(s.QuadPoints) > 0 {
+	if len(s.QuadPoints) > 0 {
 		quadArray := make(pdf.Array, len(s.QuadPoints))
 		for i, point := range s.QuadPoints {
 			quadArray[i] = pdf.Number(point)

@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
@@ -221,12 +222,12 @@ var testCases = map[string][]testCase{
 				},
 				L:   []float64{50, 225, 250, 225},
 				LE:  []pdf.Name{"Butt", "Butt"},
-				LL:  10.0,  // Leader line length
-				LLE: 5.0,   // Leader line extensions
-				Cap: true,  // Show caption
-				CP:  "Top", // Caption on top
+				LL:  10.0,            // Leader line length
+				LLE: 5.0,             // Leader line extensions
+				Cap: true,            // Show caption
+				CP:  "Top",           // Caption on top
 				CO:  []float64{0, 5}, // Caption offset
-				LLO: 2.0,  // Leader line offset
+				LLO: 2.0,             // Leader line offset
 			},
 		},
 		{
@@ -234,7 +235,7 @@ var testCases = map[string][]testCase{
 			annotation: &Line{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 100, LLy: 300, URx: 400, URy: 350},
-					F:    2, // Print flag
+					F:    2,                        // Print flag
 					C:    []float64{0.0, 0.0, 1.0}, // Blue border color
 				},
 				Markup: Markup{
@@ -295,7 +296,7 @@ var testCases = map[string][]testCase{
 					Subj: "Complex annotation",
 					IT:   "SquareCloud",
 				},
-				IC: []float64{0.9, 0.9, 0.9},    // Light gray interior
+				IC: []float64{0.9, 0.9, 0.9},      // Light gray interior
 				RD: []float64{5.0, 5.0, 5.0, 5.0}, // Rectangle differences
 			},
 		},
@@ -341,7 +342,7 @@ var testCases = map[string][]testCase{
 					Subj: "Complex circle annotation",
 					IT:   "CircleCloud",
 				},
-				IC: []float64{1.0, 1.0, 0.0},    // Yellow interior
+				IC: []float64{1.0, 1.0, 0.0},          // Yellow interior
 				RD: []float64{10.0, 10.0, 10.0, 10.0}, // Rectangle differences
 			},
 		},
@@ -374,7 +375,7 @@ var testCases = map[string][]testCase{
 					IT:   "PolygonCloud",
 				},
 				Vertices: []float64{150, 100, 300, 150, 250, 250, 100, 200}, // Quadrilateral
-				IC:       []float64{0.0, 1.0, 0.5}, // Green-cyan interior
+				IC:       []float64{0.0, 1.0, 0.5},                          // Green-cyan interior
 			},
 		},
 		{
@@ -411,7 +412,7 @@ var testCases = map[string][]testCase{
 					Subj: "Line path",
 				},
 				Vertices: []float64{75, 100, 150, 175, 225, 125, 275, 150}, // Zigzag line
-				LE:       []pdf.Name{"None", "OpenArrow"},                   // Arrow at end
+				LE:       []pdf.Name{"None", "OpenArrow"},                  // Arrow at end
 			},
 		},
 		{
@@ -428,7 +429,7 @@ var testCases = map[string][]testCase{
 				},
 				Vertices: []float64{150, 200, 200, 150, 300, 250, 350, 180},
 				LE:       []pdf.Name{"Circle", "Square"}, // Different endings
-				IC:       []float64{1.0, 0.0, 0.0},      // Red line endings
+				IC:       []float64{1.0, 0.0, 0.0},       // Red line endings
 			},
 		},
 		{
@@ -443,9 +444,9 @@ var testCases = map[string][]testCase{
 					Subj: "Bezier curve",
 				},
 				Path: [][]float64{
-					{250, 300},                         // moveto
-					{300, 250, 350, 350, 400, 300},     // curveto (6 coordinates)
-					{450, 320},                         // lineto
+					{250, 300},                     // moveto
+					{300, 250, 350, 350, 400, 300}, // curveto (6 coordinates)
+					{450, 320},                     // lineto
 				},
 				LE: []pdf.Name{"Butt", "Diamond"},
 			},
@@ -479,7 +480,7 @@ var testCases = map[string][]testCase{
 					Subj: "Study notes",
 				},
 				QuadPoints: []float64{
-					50, 300, 100, 300, 100, 320, 50, 320,   // First word
+					50, 300, 100, 300, 100, 320, 50, 320, // First word
 					110, 300, 160, 300, 160, 320, 110, 320, // Second word
 					170, 320, 250, 320, 250, 340, 170, 340, // Third word (different line)
 				},
@@ -576,10 +577,1260 @@ var testCases = map[string][]testCase{
 					Subj: "Major revision",
 				},
 				QuadPoints: []float64{
-					50, 900, 150, 900, 150, 920, 50, 920,     // First section
-					160, 900, 250, 900, 250, 920, 160, 920,   // Second section
-					50, 920, 300, 920, 300, 940, 50, 940,     // Third section (different line)
+					50, 900, 150, 900, 150, 920, 50, 920, // First section
+					160, 900, 250, 900, 250, 920, 160, 920, // Second section
+					50, 920, 300, 920, 300, 940, 50, 940, // Third section (different line)
 				},
+			},
+		},
+	},
+	"Caret": {
+		{
+			name: "basic caret annotation",
+			annotation: &Caret{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 110, URy: 120},
+					Contents: "Text insertion point",
+				},
+				Markup: Markup{
+					T:    "Editor",
+					Subj: "Insert text here",
+				},
+			},
+		},
+		{
+			name: "caret with paragraph symbol",
+			annotation: &Caret{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 200, LLy: 200, URx: 220, URy: 230},
+					NM:   "caret-001",
+				},
+				Markup: Markup{
+					T:            "Proofreader",
+					Subj:         "New paragraph needed",
+					CreationDate: time.Date(2023, 8, 20, 10, 15, 0, 0, time.UTC),
+				},
+				Sy: "P", // Paragraph symbol
+			},
+		},
+		{
+			name: "caret with rectangle differences",
+			annotation: &Caret{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 300, LLy: 300, URx: 330, URy: 335},
+					Contents: "Complex caret with spacing",
+				},
+				Markup: Markup{
+					T:    "Reviewer",
+					Subj: "Spacing adjustment",
+				},
+				RD: []float64{2.0, 3.0, 2.0, 5.0}, // Rectangle differences
+			},
+		},
+	},
+	"Stamp": {
+		{
+			name: "basic stamp annotation",
+			annotation: &Stamp{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 150, URy: 100},
+					Contents: "Approved document",
+				},
+				Markup: Markup{
+					T:    "Manager",
+					Subj: "Document approval",
+				},
+				Name: "Approved",
+			},
+		},
+		{
+			name: "stamp with default name",
+			annotation: &Stamp{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 200, LLy: 200, URx: 300, URy: 250},
+					NM:   "stamp-001",
+				},
+				Markup: Markup{
+					T:            "Editor",
+					Subj:         "Draft version",
+					CreationDate: time.Date(2023, 9, 10, 16, 30, 0, 0, time.UTC),
+				},
+				Name: "Draft", // Default value
+			},
+		},
+		{
+			name: "confidential stamp",
+			annotation: &Stamp{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 100, LLy: 300, URx: 250, URy: 350},
+					Contents: "Confidential material",
+				},
+				Markup: Markup{
+					T:    "Security Officer",
+					Subj: "Classification stamp",
+				},
+				Name: "Confidential",
+			},
+		},
+		{
+			name: "stamp with intent",
+			annotation: &Stamp{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 300, LLy: 400, URx: 450, URy: 450},
+					Contents: "Image stamp",
+				},
+				Markup: Markup{
+					T:  "Designer",
+					IT: "StampImage", // Intent: image stamp
+				},
+				Name: "Draft", // Default value (Name not written to PDF when IT != "Stamp")
+			},
+		},
+		{
+			name: "stamp with all standard values",
+			annotation: &Stamp{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 150, LLy: 500, URx: 300, URy: 550},
+					Contents: "Final document",
+				},
+				Markup: Markup{
+					T:  "Publisher",
+					IT: "Stamp", // Explicit rubber stamp intent
+				},
+				Name: "Final",
+			},
+		},
+	},
+	"Ink": {
+		{
+			name: "simple ink annotation",
+			annotation: &Ink{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 200, URy: 150},
+					Contents: "Handwritten note",
+				},
+				Markup: Markup{
+					T:    "Annotator",
+					Subj: "Hand drawing",
+				},
+				InkList: [][]float64{
+					{50, 100, 75, 120, 100, 110, 125, 130, 150, 125}, // Single stroke
+				},
+			},
+		},
+		{
+			name: "multi-stroke ink annotation",
+			annotation: &Ink{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 100, LLy: 200, URx: 300, URy: 350},
+					NM:   "ink-001",
+					C:    []float64{0.0, 0.0, 1.0}, // Blue ink
+				},
+				Markup: Markup{
+					T:            "Artist",
+					Subj:         "Sketch",
+					CreationDate: time.Date(2023, 10, 5, 14, 20, 0, 0, time.UTC),
+				},
+				InkList: [][]float64{
+					{100, 250, 150, 280, 200, 260}, // First stroke
+					{180, 300, 220, 320, 250, 310}, // Second stroke
+					{120, 320, 160, 340, 190, 330}, // Third stroke
+				},
+			},
+		},
+		{
+			name: "ink annotation with border style",
+			annotation: &Ink{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 200, LLy: 400, URx: 400, URy: 500},
+					Contents: "Stylized ink drawing",
+				},
+				Markup: Markup{
+					T:    "Designer",
+					Subj: "Stylized annotation",
+				},
+				InkList: [][]float64{
+					{200, 450, 250, 470, 300, 460, 350, 480, 400, 475},
+				},
+			},
+		},
+		{
+			name: "ink annotation with path (PDF 2.0)",
+			annotation: &Ink{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 150, LLy: 600, URx: 350, URy: 700},
+					Contents: "Curved ink path",
+				},
+				Markup: Markup{
+					T:    "Artist",
+					Subj: "Bezier curve drawing",
+				},
+				Path: [][]float64{
+					{150, 650},                     // moveto
+					{200, 620, 250, 680, 300, 650}, // curveto (6 coordinates)
+					{350, 670},                     // lineto
+				},
+			},
+		},
+		{
+			name: "complex ink annotation",
+			annotation: &Ink{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 50, LLy: 750, URx: 400, URy: 850},
+					Contents: "Complex freehand drawing",
+				},
+				Markup: Markup{
+					T:    "User",
+					Subj: "Signature and notes",
+				},
+				InkList: [][]float64{
+					{50, 800, 80, 810, 120, 790, 160, 805, 200, 795}, // Signature stroke 1
+					{180, 820, 220, 830, 260, 815, 300, 825},         // Signature stroke 2
+					{320, 780, 350, 790, 380, 785, 400, 795},         // Additional mark
+				},
+			},
+		},
+	},
+	"Popup": {
+		{
+			name: "basic popup annotation",
+			annotation: &Popup{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 150},
+					Contents: "Popup window content",
+				},
+			},
+		},
+		{
+			name: "popup with parent reference",
+			annotation: &Popup{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 150, LLy: 200, URx: 250, URy: 280},
+					NM:   "popup-001",
+				},
+				Parent: pdf.NewReference(123, 0), // Reference to parent annotation
+			},
+		},
+		{
+			name: "popup initially open",
+			annotation: &Popup{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 200, LLy: 300, URx: 350, URy: 400},
+					Contents: "Initially visible popup",
+				},
+				Open: true, // Initially displayed open
+			},
+		},
+		{
+			name: "popup with parent and open state",
+			annotation: &Popup{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 50, LLy: 400, URx: 180, URy: 480},
+					NM:   "popup-with-parent",
+				},
+				Parent: pdf.NewReference(456, 0), // Parent markup annotation
+				Open:   true,                     // Initially open
+			},
+		},
+		{
+			name: "minimal popup annotation",
+			annotation: &Popup{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 300, LLy: 500, URx: 400, URy: 550},
+				},
+				// No parent, not initially open (all defaults)
+			},
+		},
+	},
+	"FileAttachment": {
+		{
+			name: "basic file attachment",
+			annotation: &FileAttachment{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 80, URy: 80},
+					Contents: "Attached spreadsheet file",
+				},
+				Markup: Markup{
+					T:    "Data Analyst",
+					Subj: "Supporting data",
+				},
+				FS:   pdf.NewReference(100, 0), // File specification reference
+				Name: "Graph",                  // Icon for data files
+			},
+		},
+		{
+			name: "file attachment with default icon",
+			annotation: &FileAttachment{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 150, LLy: 150, URx: 180, URy: 180},
+					NM:   "attachment-001",
+				},
+				Markup: Markup{
+					T:            "Author",
+					Subj:         "Supporting document",
+					CreationDate: time.Date(2023, 11, 15, 9, 30, 0, 0, time.UTC),
+				},
+				FS: pdf.NewReference(200, 0), // File specification reference
+				// Name not set, should default to "PushPin"
+			},
+		},
+		{
+			name: "paperclip attachment",
+			annotation: &FileAttachment{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 250, LLy: 250, URx: 280, URy: 280},
+					Contents: "Attached document",
+				},
+				Markup: Markup{
+					T:    "Secretary",
+					Subj: "Office document",
+				},
+				FS:   pdf.NewReference(300, 0), // File specification reference
+				Name: "Paperclip",              // Paperclip icon
+			},
+		},
+		{
+			name: "tag attachment with metadata",
+			annotation: &FileAttachment{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 100, LLy: 350, URx: 130, URy: 380},
+					Contents: "Tagged reference file",
+					C:        []float64{0.9, 0.9, 0.9}, // Light gray background
+				},
+				Markup: Markup{
+					T:    "Librarian",
+					Subj: "Reference material",
+				},
+				FS:   pdf.NewReference(400, 0), // File specification reference
+				Name: "Tag",                    // Tag icon
+			},
+		},
+		{
+			name: "minimal file attachment",
+			annotation: &FileAttachment{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 300, LLy: 450, URx: 330, URy: 480},
+				},
+				Markup: Markup{
+					T: "User",
+				},
+				FS: pdf.NewReference(500, 0), // Required file specification
+				// Name will default to "PushPin"
+			},
+		},
+	},
+	"Sound": {
+		{
+			name: "basic sound annotation",
+			annotation: &Sound{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 130, URy: 130},
+					Contents: "Recorded audio note",
+				},
+				Markup: Markup{
+					T:    "Narrator",
+					Subj: "Audio explanation",
+				},
+				Sound: pdf.NewReference(600, 0), // Sound object reference
+				Name:  "Speaker",                // Default speaker icon
+			},
+		},
+		{
+			name: "microphone sound annotation",
+			annotation: &Sound{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 200, LLy: 200, URx: 230, URy: 230},
+					NM:   "sound-001",
+				},
+				Markup: Markup{
+					T:            "Reporter",
+					Subj:         "Field recording",
+					CreationDate: time.Date(2023, 12, 1, 15, 45, 0, 0, time.UTC),
+				},
+				Sound: pdf.NewReference(700, 0), // Sound object reference
+				Name:  "Mic",                    // Microphone icon
+			},
+		},
+		{
+			name: "sound annotation with default icon",
+			annotation: &Sound{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 300, LLy: 300, URx: 330, URy: 330},
+					Contents: "Audio clip",
+				},
+				Markup: Markup{
+					T:    "Audio Engineer",
+					Subj: "Sound sample",
+				},
+				Sound: pdf.NewReference(800, 0), // Sound object reference
+				Name:  "Speaker",                // Default value
+			},
+		},
+		{
+			name: "sound annotation with metadata",
+			annotation: &Sound{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 150, LLy: 400, URx: 180, URy: 430},
+					Contents: "Interview recording",
+					C:        []float64{1.0, 0.9, 0.8}, // Light orange background
+				},
+				Markup: Markup{
+					T:    "Journalist",
+					Subj: "Interview audio",
+				},
+				Sound: pdf.NewReference(900, 0), // Sound object reference
+				Name:  "Speaker",                // Explicit speaker icon
+			},
+		},
+		{
+			name: "minimal sound annotation",
+			annotation: &Sound{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 50, LLy: 500, URx: 80, URy: 530},
+				},
+				Markup: Markup{
+					T: "User",
+				},
+				Sound: pdf.NewReference(1000, 0), // Required sound object
+				Name:  "Speaker",                 // Default value
+			},
+		},
+	},
+	"Movie": {
+		{
+			name: "basic movie annotation",
+			annotation: &Movie{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 300, URy: 200},
+					Contents: "Educational video",
+				},
+				T:     "Introduction Video",
+				Movie: pdf.NewReference(500, 0), // Movie dictionary reference
+				A:     pdf.Boolean(true),        // Default activation
+			},
+		},
+		{
+			name: "movie annotation with title",
+			annotation: &Movie{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 200, LLy: 200, URx: 400, URy: 300},
+					NM:   "movie-001",
+				},
+				T:     "Training Module 1",
+				Movie: pdf.NewReference(600, 0), // Movie dictionary reference
+				A:     pdf.Boolean(false),       // Do not play automatically
+			},
+		},
+		{
+			name: "movie annotation with activation dictionary",
+			annotation: &Movie{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 250, URy: 150},
+					Contents: "Interactive presentation",
+					C:        []float64{0.2, 0.4, 0.8}, // Blue background
+				},
+				T:     "Interactive Demo",
+				Movie: pdf.NewReference(700, 0), // Movie dictionary reference
+				A:     pdf.NewReference(800, 0), // Movie activation dictionary
+			},
+		},
+		{
+			name: "movie annotation with default activation",
+			annotation: &Movie{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 300, LLy: 300, URx: 500, URy: 400},
+				},
+				Movie: pdf.NewReference(900, 0), // Movie dictionary reference
+				A:     pdf.Boolean(true),        // Explicit default value
+			},
+		},
+		{
+			name: "minimal movie annotation",
+			annotation: &Movie{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+				},
+				Movie: pdf.NewReference(1000, 0), // Required movie dictionary
+				A:     pdf.Boolean(true),         // Default value
+			},
+		},
+	},
+	"Screen": {
+		{
+			name: "basic screen annotation",
+			annotation: &Screen{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 400, URy: 300},
+					Contents: "Media playback region",
+				},
+				T: "Video Player",
+			},
+		},
+		{
+			name: "screen annotation with appearance characteristics",
+			annotation: &Screen{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 200, LLy: 200, URx: 500, URy: 400},
+					NM:   "screen-001",
+				},
+				T:  "Interactive Media",
+				MK: pdf.NewReference(1100, 0), // Appearance characteristics dictionary
+			},
+		},
+		{
+			name: "screen annotation with action",
+			annotation: &Screen{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 350, URy: 250},
+					Contents: "Click to play video",
+					C:        []float64{0.1, 0.1, 0.1}, // Dark background
+				},
+				T: "Action Trigger",
+				A: pdf.NewReference(1200, 0), // Action dictionary
+			},
+		},
+		{
+			name: "screen annotation with additional actions",
+			annotation: &Screen{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 300, LLy: 300, URx: 600, URy: 500},
+				},
+				T:  "Advanced Media Control",
+				AA: pdf.NewReference(1300, 0), // Additional-actions dictionary
+			},
+		},
+		{
+			name: "screen annotation with all features",
+			annotation: &Screen{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 150, LLy: 150, URx: 450, URy: 350},
+					Contents: "Full-featured media player",
+					C:        []float64{0.9, 0.9, 0.9}, // Light gray background
+				},
+				T:  "Complete Media Player",
+				MK: pdf.NewReference(1400, 0), // Appearance characteristics
+				A:  pdf.NewReference(1500, 0), // Action dictionary
+				AA: pdf.NewReference(1600, 0), // Additional-actions dictionary
+			},
+		},
+		{
+			name: "minimal screen annotation",
+			annotation: &Screen{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 100},
+				},
+				// Only required fields from Common
+			},
+		},
+	},
+	"Widget": {
+		{
+			name: "basic widget annotation",
+			annotation: &Widget{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 300, URy: 130},
+					Contents: "Text input field",
+				},
+				H: "I", // Default highlighting mode
+			},
+		},
+		{
+			name: "widget with push highlighting",
+			annotation: &Widget{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 200, LLy: 200, URx: 350, URy: 240},
+					NM:   "button-001",
+				},
+				H: "P", // Push highlighting
+			},
+		},
+		{
+			name: "widget with appearance characteristics",
+			annotation: &Widget{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 250, URy: 80},
+					Contents: "Button with custom appearance",
+				},
+				H:  "O",                       // Outline highlighting
+				MK: pdf.NewReference(1700, 0), // Appearance characteristics dictionary
+			},
+		},
+		{
+			name: "widget with action and additional actions",
+			annotation: &Widget{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 300, LLy: 300, URx: 500, URy: 340},
+					C:    []float64{0.8, 0.8, 1.0}, // Light blue background
+				},
+				H:  "I",                       // Default highlighting
+				A:  pdf.NewReference(1800, 0), // Action dictionary
+				AA: pdf.NewReference(1900, 0), // Additional-actions dictionary
+			},
+		},
+		{
+			name: "widget with border style",
+			annotation: &Widget{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 150, LLy: 150, URx: 400, URy: 190},
+					Contents: "Field with custom border",
+				},
+				H:  "N",                       // No highlighting
+				BS: pdf.NewReference(2000, 0), // Border style dictionary
+			},
+		},
+		{
+			name: "widget with parent field",
+			annotation: &Widget{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 250, LLy: 250, URx: 450, URy: 290},
+					NM:   "child-widget-001",
+				},
+				H:      "T",                       // Toggle highlighting (same as Push)
+				Parent: pdf.NewReference(2100, 0), // Parent field reference
+			},
+		},
+		{
+			name: "widget with all features",
+			annotation: &Widget{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 100, LLy: 400, URx: 350, URy: 450},
+					Contents: "Complete widget annotation",
+					C:        []float64{0.9, 0.9, 0.9}, // Light gray background
+				},
+				H:      "P",                       // Push highlighting
+				MK:     pdf.NewReference(2200, 0), // Appearance characteristics
+				A:      pdf.NewReference(2300, 0), // Action dictionary
+				AA:     pdf.NewReference(2400, 0), // Additional-actions dictionary
+				BS:     pdf.NewReference(2500, 0), // Border style dictionary
+				Parent: pdf.NewReference(2600, 0), // Parent field reference
+			},
+		},
+		{
+			name: "minimal widget annotation",
+			annotation: &Widget{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 30},
+				},
+				H: "I", // Default value
+			},
+		},
+	},
+	"PrinterMark": {
+		{
+			name: "basic printer's mark annotation",
+			annotation: &PrinterMark{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 100, URy: 100},
+					Contents: "Registration target",
+				},
+				MN: "RegistrationTarget",
+			},
+		},
+		{
+			name: "color bar printer's mark",
+			annotation: &PrinterMark{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 200, LLy: 780, URx: 400, URy: 800},
+					NM:   "colorbar-001",
+				},
+				MN: "ColorBar",
+			},
+		},
+		{
+			name: "cut mark printer's mark",
+			annotation: &PrinterMark{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 20, URy: 20},
+					Contents: "Corner cut mark",
+					C:        []float64{0.0, 0.0, 0.0}, // Black color
+				},
+				MN: "CutMark",
+			},
+		},
+		{
+			name: "printer's mark with border",
+			annotation: &PrinterMark{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 150, URy: 150},
+					Contents: "Registration mark with border",
+					Border: &Border{
+						HCornerRadius: 2.0,
+						VCornerRadius: 2.0,
+						Width:         2.0,
+					},
+				},
+				MN: "RegistrationTarget",
+			},
+		},
+		{
+			name: "printer's mark with print and readonly flags",
+			annotation: &PrinterMark{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 150, LLy: 150, URx: 200, URy: 200},
+					F:    6, // Print (2) + ReadOnly (4) flags as per spec
+				},
+				MN: "GrayRamp",
+			},
+		},
+		{
+			name: "minimal printer's mark annotation",
+			annotation: &PrinterMark{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 300, LLy: 300, URx: 320, URy: 320},
+				},
+				// MN field is optional, not specified here
+			},
+		},
+	},
+	"TrapNet": {
+		{
+			name: "trap network with LastModified",
+			annotation: &TrapNet{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
+					F:    6,                                                 // Print (2) + ReadOnly (4) flags as per spec
+				},
+				LastModified: "D:20231215103000Z",
+			},
+		},
+		{
+			name: "trap network with Version and AnnotStates",
+			annotation: &TrapNet{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
+					F:    6,                                                 // Print (2) + ReadOnly (4) flags as per spec
+					NM:   "trapnet-001",
+				},
+				Version: []pdf.Reference{
+					pdf.NewReference(100, 0), // Content stream
+					pdf.NewReference(101, 0), // Resource object
+					pdf.NewReference(102, 0), // Form XObject
+				},
+				AnnotStates: []pdf.Name{"N", "Off", ""}, // Mixed states including null
+			},
+		},
+		{
+			name: "trap network with FontFauxing",
+			annotation: &TrapNet{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
+					F:        6,                                                 // Print (2) + ReadOnly (4) flags
+					Contents: "Trap network with font substitutions",
+				},
+				LastModified: "D:20231201120000Z",
+				FontFauxing: []pdf.Reference{
+					pdf.NewReference(200, 0), // Substitute font 1
+					pdf.NewReference(201, 0), // Substitute font 2
+				},
+			},
+		},
+		{
+			name: "complex trap network",
+			annotation: &TrapNet{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
+					F:    6,                                                 // Print (2) + ReadOnly (4) flags
+					NM:   "complex-trapnet",
+				},
+				Version: []pdf.Reference{
+					pdf.NewReference(300, 0), // Page content stream
+					pdf.NewReference(301, 0), // Font resource
+					pdf.NewReference(302, 0), // Image resource
+					pdf.NewReference(303, 0), // Graphics state
+				},
+				AnnotStates: []pdf.Name{"N", "Off", "", "Hover"}, // Various annotation states
+				FontFauxing: []pdf.Reference{
+					pdf.NewReference(400, 0), // Helvetica substitute
+				},
+			},
+		},
+		{
+			name: "minimal trap network",
+			annotation: &TrapNet{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
+					F:    6,                                                 // Required Print + ReadOnly flags
+				},
+				LastModified: "D:20231201000000Z", // Minimal required field
+			},
+		},
+	},
+	"Watermark": {
+		{
+			name: "basic watermark annotation",
+			annotation: &Watermark{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 100},
+					Contents: "Confidential watermark",
+				},
+			},
+		},
+		{
+			name: "watermark with fixed print dictionary",
+			annotation: &Watermark{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 100, LLy: 100, URx: 300, URy: 150},
+					NM:   "watermark-001",
+				},
+				FixedPrint: &FixedPrint{
+					Matrix: []float64{1, 0, 0, 1, 72, -72}, // Translate 1 inch right and down
+					H:      0.0,                            // Left edge
+					V:      1.0,                            // Top edge
+				},
+			},
+		},
+		{
+			name: "watermark with percentage positioning",
+			annotation: &Watermark{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 150, URy: 50},
+					Contents: "Draft - Do Not Distribute",
+				},
+				FixedPrint: &FixedPrint{
+					Matrix: []float64{1, 0, 0, 1, 0, 0}, // Identity matrix
+					H:      0.5,                         // Center horizontally (50%)
+					V:      0.1,                         // Near top (10% from top)
+				},
+			},
+		},
+		{
+			name: "watermark with rotation matrix",
+			annotation: &Watermark{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 30},
+					Contents: "SAMPLE",
+				},
+				FixedPrint: &FixedPrint{
+					Matrix: []float64{0.707, 0.707, -0.707, 0.707, 0, 0}, // 45-degree rotation
+					H:      0.25,                                         // 25% from left
+					V:      0.75,                                         // 75% from bottom
+				},
+			},
+		},
+		{
+			name: "watermark with default values",
+			annotation: &Watermark{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 50, LLy: 50, URx: 250, URy: 100},
+				},
+				FixedPrint: &FixedPrint{
+					Matrix: []float64{1, 0, 0, 1, 0, 0}, // Identity matrix (default)
+					H:      0.0,                         // Default horizontal position
+					V:      0.0,                         // Default vertical position
+				},
+			},
+		},
+		{
+			name: "watermark bottom-right corner",
+			annotation: &Watermark{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 20},
+					Contents: "© 2023 Company Name",
+				},
+				FixedPrint: &FixedPrint{
+					Matrix: []float64{1, 0, 0, 1, -20, 20}, // Offset from edge for margins
+					H:      0.95,                           // 95% from left (near right edge)
+					V:      0.05,                           // 5% from bottom (near bottom edge)
+				},
+			},
+		},
+		{
+			name: "minimal watermark annotation",
+			annotation: &Watermark{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
+				},
+				// No FixedPrint dictionary - should be drawn without special media consideration
+			},
+		},
+	},
+	"3D": {
+		{
+			name: "basic 3D annotation",
+			annotation: &Annot3D{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 100, LLy: 100, URx: 400, URy: 300},
+				},
+				D: pdf.NewReference(100, 0), // 3D stream reference
+				I: true,                     // Default value for interactive flag
+			},
+		},
+		{
+			name: "3D annotation with view specification",
+			annotation: &Annot3D{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 350, URy: 250},
+					Contents: "Interactive 3D Model",
+					NM:       "3d-model-001",
+				},
+				D: pdf.NewReference(200, 0), // 3D stream reference
+				V: pdf.Integer(0),           // View index
+				I: true,                     // Default value for interactive flag
+			},
+		},
+		{
+			name: "3D annotation with activation dictionary",
+			annotation: &Annot3D{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 300, URy: 200},
+				},
+				D: pdf.NewReference(300, 0), // 3D stream reference
+				A: &ThreeDActivation{
+					A:   "PO",  // Activate on page open
+					AIS: "L",   // Live state
+					D:   "PC",  // Deactivate on page close
+					DIS: "U",   // Uninstantiated state
+					TB:  false, // No toolbar
+					NP:  true,  // Show navigation panel
+				},
+			},
+		},
+		{
+			name: "3D annotation with view box",
+			annotation: &Annot3D{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 400, URy: 300},
+				},
+				D: pdf.NewReference(400, 0),                                 // 3D stream reference
+				B: &pdf.Rectangle{LLx: -150, LLy: -100, URx: 150, URy: 100}, // View box in target coordinates
+				I: true,                                                     // Default value for interactive flag
+			},
+		},
+		{
+			name: "3D annotation with PDF 2.0 features",
+			annotation: &Annot3D{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 100, LLy: 100, URx: 500, URy: 400},
+					NM:   "advanced-3d-model",
+				},
+				D: pdf.NewReference(500, 0), // 3D stream reference
+				A: &ThreeDActivation{
+					A:           "XA",                     // Explicit activation
+					AIS:         "I",                      // Instantiated state
+					Style:       "Windowed",               // Windowed display
+					Window:      pdf.NewReference(501, 0), // Window dictionary
+					Transparent: true,                     // Transparent background
+				},
+				U:   pdf.NewReference(502, 0), // Units dictionary
+				GEO: pdf.NewReference(503, 0), // Geospatial information
+			},
+		},
+		{
+			name: "3D annotation with string view reference",
+			annotation: &Annot3D{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 200, LLy: 200, URx: 600, URy: 500},
+				},
+				D: pdf.NewReference(600, 0),  // 3D stream reference
+				V: pdf.String("DefaultView"), // View name
+				I: false,                     // Not interactive (non-default)
+			},
+		},
+		{
+			name: "3D annotation with name view reference",
+			annotation: &Annot3D{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 400, URy: 300},
+				},
+				D: pdf.NewReference(700, 0), // 3D stream reference
+				V: pdf.Name("F"),            // First view in VA array
+				I: true,                     // Default value for interactive flag
+			},
+		},
+		{
+			name: "comprehensive 3D annotation",
+			annotation: &Annot3D{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 450, URy: 350},
+					Contents: "Complex 3D Scene with Multiple Features",
+					NM:       "complex-3d-scene",
+					F:        1, // Invisible flag
+				},
+				D: pdf.NewReference(800, 0), // 3D stream reference
+				V: pdf.Integer(2),           // Third view (index 2)
+				A: &ThreeDActivation{
+					A:   "PV", // Activate on page visible
+					AIS: "L",  // Live state
+					D:   "PI", // Deactivate on page invisible
+					DIS: "I",  // Instantiated state
+					// TB: true, NP: false, Style: "Embedded", Transparent: false are defaults and won't be written
+				},
+				I: true,                                                     // Interactive
+				B: &pdf.Rectangle{LLx: -200, LLy: -150, URx: 200, URy: 150}, // Custom view box
+			},
+		},
+		{
+			name: "minimal 3D annotation",
+			annotation: &Annot3D{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 150},
+				},
+				D: pdf.NewReference(900, 0), // 3D stream reference (required)
+				I: true,                     // Default interactive flag
+			},
+		},
+	},
+	"Redact": {
+		{
+			name: "basic redaction annotation",
+			annotation: &Redact{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 100, LLy: 100, URx: 300, URy: 120},
+				},
+			},
+		},
+		{
+			name: "redaction with QuadPoints",
+			annotation: &Redact{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 50, LLy: 200, URx: 400, URy: 250},
+					Contents: "Redacted content area",
+				},
+				QuadPoints: []float64{
+					100, 210, 200, 210, 200, 240, 100, 240, // First quadrilateral
+					250, 210, 350, 210, 350, 240, 250, 240, // Second quadrilateral
+				},
+			},
+		},
+		{
+			name: "redaction with interior color",
+			annotation: &Redact{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 50},
+					NM:   "redact-001",
+				},
+				IC: []float64{0.0, 0.0, 0.0}, // Black interior color
+			},
+		},
+		{
+			name: "redaction with overlay text",
+			annotation: &Redact{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 100, LLy: 300, URx: 500, URy: 350},
+				},
+				OverlayText: "CONFIDENTIAL",
+				DA:          "/Helvetica 12 Tf 1 0 0 rg", // Red text appearance
+				Q:           1,                           // Centered
+			},
+		},
+		{
+			name: "redaction with repeating overlay text",
+			annotation: &Redact{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 50, LLy: 400, URx: 550, URy: 450},
+					Contents: "Large redacted area",
+				},
+				OverlayText: "REDACTED",
+				DA:          "/Arial 10 Tf 0.5 0.5 0.5 rg", // Gray text
+				Repeat:      true,
+				Q:           2, // Right-justified
+			},
+		},
+		{
+			name: "redaction with form XObject overlay",
+			annotation: &Redact{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 200, LLy: 500, URx: 400, URy: 550},
+					NM:   "redact-with-xobject",
+				},
+				RO: pdf.NewReference(100, 0), // Form XObject reference
+			},
+		},
+		{
+			name: "comprehensive redaction annotation",
+			annotation: &Redact{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 50, LLy: 600, URx: 450, URy: 700},
+					Contents: "Sensitive information requiring redaction",
+					NM:       "comprehensive-redact",
+					F:        4, // Print flag
+				},
+				Markup: Markup{
+					T:   "Redaction Tool",
+					RC:  pdf.String("This content contains sensitive information"),
+					IRT: pdf.NewReference(200, 0), // In reply to reference
+				},
+				QuadPoints: []float64{
+					75, 620, 175, 620, 175, 640, 75, 640, // First quad
+					200, 620, 300, 620, 300, 640, 200, 640, // Second quad
+					325, 620, 425, 620, 425, 640, 325, 640, // Third quad
+				},
+				IC:          []float64{0.8, 0.8, 0.8}, // Light gray background
+				OverlayText: "CLASSIFIED",
+				DA:          "/Times-Bold 14 Tf 1 0 0 rg", // Bold red text
+				Repeat:      false,
+				Q:           1, // Centered
+			},
+		},
+		{
+			name: "redaction with markup properties",
+			annotation: &Redact{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 100, LLy: 750, URx: 300, URy: 780},
+					F:    1, // Invisible flag
+				},
+				Markup: Markup{
+					T:    "Security Officer",
+					Subj: "Personal Information Redaction",
+				},
+				IC: []float64{1.0, 1.0, 0.0}, // Yellow background
+			},
+		},
+		{
+			name: "minimal redaction annotation",
+			annotation: &Redact{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 20},
+				},
+				// Only required fields (Subtype is automatically set)
+			},
+		},
+	},
+	"Projection": {
+		{
+			name: "basic projection annotation",
+			annotation: &Projection{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 150},
+					Contents: "3D measurement comment",
+				},
+				Markup: Markup{
+					T:    "3D Analyst",
+					Subj: "Measurement annotation",
+				},
+			},
+		},
+		{
+			name: "projection with external data dictionary",
+			annotation: &Projection{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 50, LLy: 200, URx: 300, URy: 250},
+					NM:   "proj-001",
+				},
+				Markup: Markup{
+					T:            "Measurement Tool",
+					CreationDate: time.Date(2023, 5, 10, 9, 15, 0, 0, time.UTC),
+					Subj:         "3D measurement association",
+				},
+				ExData: pdf.NewReference(500, 0), // Reference to external data dictionary
+			},
+		},
+		{
+			name: "projection with zero rect (no AP)",
+			annotation: &Projection{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 100, LLy: 300, URx: 100, URy: 350}, // Zero width
+					Contents: "Measurement with zero width rect",
+				},
+				Markup: Markup{
+					T:    "Specialist",
+					Subj: "Zero-dimension measurement",
+				},
+				ExData: pdf.NewReference(600, 0),
+			},
+		},
+		{
+			name: "comprehensive projection annotation",
+			annotation: &Projection{
+				Common: Common{
+					Rect:               pdf.Rectangle{LLx: 200, LLy: 400, URx: 500, URy: 500},
+					Contents:           "Comprehensive 3D measurement annotation",
+					NM:                 "comprehensive-projection",
+					F:                  2,                        // Print flag
+					C:                  []float64{0.0, 1.0, 0.0}, // Green color
+					StrokingOpacity:    0.9,
+					NonStrokingOpacity: 0.7,
+				},
+				Markup: Markup{
+					T:            "3D Measurement System",
+					Subj:         "Complex geospatial measurement",
+					RC:           pdf.String("Associated with 3D measurement data"),
+					CreationDate: time.Date(2023, 8, 20, 14, 30, 0, 0, time.UTC),
+					IRT:          pdf.NewReference(300, 0), // In reply to reference
+					IT:           "Group",
+				},
+				ExData: pdf.NewReference(700, 0), // External data dictionary with 3DM subtype
+			},
+		},
+		{
+			name: "minimal projection annotation",
+			annotation: &Projection{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 50, URy: 25},
+				},
+				Markup: Markup{
+					T: "User",
+				},
+				// No ExData - optional for projection annotations
+			},
+		},
+	},
+	"RichMedia": {
+		{
+			name: "basic rich media annotation",
+			annotation: &RichMedia{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 400, URy: 300},
+					Contents: "3D model annotation",
+				},
+				RichMediaContent: pdf.NewReference(500, 0), // Required reference
+			},
+		},
+		{
+			name: "rich media with settings",
+			annotation: &RichMedia{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 50, LLy: 200, URx: 350, URy: 400},
+					NM:   "richmedia-001",
+					F:    2, // Print flag
+				},
+				RichMediaContent:  pdf.NewReference(600, 0), // Required content dictionary
+				RichMediaSettings: pdf.NewReference(700, 0), // Optional settings dictionary
+			},
+		},
+		{
+			name: "comprehensive rich media annotation",
+			annotation: &RichMedia{
+				Common: Common{
+					Rect:               pdf.Rectangle{LLx: 200, LLy: 500, URx: 600, URy: 700},
+					Contents:           "Interactive 3D content with video and sound",
+					NM:                 "comprehensive-richmedia",
+					F:                  0,                        // No flags
+					C:                  []float64{0.5, 0.5, 0.5}, // Gray border
+					StrokingOpacity:    1.0,
+					NonStrokingOpacity: 0.8,
+					Border: &Border{
+						HCornerRadius: 5.0,
+						VCornerRadius: 5.0,
+						Width:         2.0,
+					},
+				},
+				RichMediaContent:  pdf.NewReference(800, 0), // Content with 3D, Sound, Video instances
+				RichMediaSettings: pdf.NewReference(900, 0), // Activation/deactivation settings
+			},
+		},
+		{
+			name: "minimal rich media annotation",
+			annotation: &RichMedia{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 150},
+				},
+				RichMediaContent: pdf.NewReference(400, 0), // Only required field
+				// No RichMediaSettings - uses defaults
+			},
+		},
+		{
+			name: "rich media with other fields",
+			annotation: &RichMedia{
+				Common: Common{
+					Rect:               pdf.Rectangle{LLx: 300, LLy: 800, URx: 500, URy: 900},
+					Contents:           "Rich media with additional fields",
+					NM:                 "richmedia-advanced",
+					StrokingOpacity:    0.9,
+					NonStrokingOpacity: 0.7,
+				},
+				RichMediaContent:  pdf.NewReference(1100, 0),
+				RichMediaSettings: pdf.NewReference(1200, 0),
 			},
 		},
 	},
@@ -620,6 +1871,7 @@ func roundTripTest(t *testing.T, a1 pdf.Annotation) {
 	// Use EquateComparable to handle language.Tag comparison
 	opts := []cmp.Option{
 		cmp.AllowUnexported(language.Tag{}),
+		cmpopts.EquateComparable(language.Tag{}),
 	}
 
 	// For Unknown annotations, we don't expect perfect round-trip
@@ -627,7 +1879,7 @@ func roundTripTest(t *testing.T, a1 pdf.Annotation) {
 	if _, isUnknown := a1.(*Unknown); isUnknown {
 		// Just verify basic properties are preserved
 		if a1.AnnotationType() != a2.AnnotationType() {
-			t.Errorf("annotation type mismatch: want %s, got %s", 
+			t.Errorf("annotation type mismatch: want %s, got %s",
 				a1.AnnotationType(), a2.AnnotationType())
 		}
 		return
@@ -693,18 +1945,18 @@ func TestUnknownAnnotation(t *testing.T) {
 func TestAnnotationTypes(t *testing.T) {
 	tests := []struct {
 		annotation   pdf.Annotation
-		expectedType string
+		expectedType pdf.Name
 	}{
 		{&Text{}, "Text"},
 		{&Link{}, "Link"},
 		{&FreeText{}, "FreeText"},
 		{&Line{}, "Line"},
-		{&Unknown{Data: pdf.Dict{"Subtype": pdf.Name("Custom")}}, "Custom"},
-		{&Unknown{Data: pdf.Dict{}}, "Unknown"},
+		{&Unknown{Type: "Custom", Data: pdf.Dict{"Subtype": pdf.Name("Custom")}}, "Custom"},
+		{&Unknown{Type: "Unknown", Data: pdf.Dict{}}, "Unknown"},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.expectedType, func(t *testing.T) {
+		t.Run(string(tt.expectedType), func(t *testing.T) {
 			if got := tt.annotation.AnnotationType(); got != tt.expectedType {
 				t.Errorf("AnnotationType() = %v, want %v", got, tt.expectedType)
 			}

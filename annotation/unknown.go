@@ -21,6 +21,9 @@ import "seehuhn.de/go/pdf"
 type Unknown struct {
 	Common
 
+	// Type is the subtype of the annotation
+	Type pdf.Name
+
 	// Data contains the raw data of the annotation.
 	Data pdf.Dict
 }
@@ -29,11 +32,8 @@ var _ pdf.Annotation = (*Unknown)(nil)
 
 // AnnotationType returns the subtype of the unknown annotation.
 // This implements the [pdf.Annotation] interface.
-func (u *Unknown) AnnotationType() string {
-	if subtype, ok := u.Data["Subtype"].(pdf.Name); ok {
-		return string(subtype)
-	}
-	return "Unknown"
+func (u *Unknown) AnnotationType() pdf.Name {
+	return u.Type
 }
 
 func (u *Unknown) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
@@ -60,7 +60,15 @@ func (u *Unknown) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 }
 
 func extractUnknown(r pdf.Getter, dict pdf.Dict) (*Unknown, error) {
+	subtype, err := pdf.GetName(r, dict["Subtype"])
+	if err != nil {
+		return nil, err
+	} else if subtype == "" {
+		return nil, pdf.Error("missing annotation subtype")
+	}
+
 	unknown := &Unknown{
+		Type: subtype,
 		Data: dict,
 	}
 

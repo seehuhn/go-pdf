@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("%PDF-1.0A00000000000000000000000000000000000000000000xref trailer<<  /Quir:X<< %000000\n/Subtype /Ink %00000000000\n/InkList[0]>>>>0startxref053")

@@ -21,6 +21,11 @@
 // links, markup annotations (highlighting, underlining, strikeouts, etc.),
 // geometric shapes (squares, circles, polygons), and form widgets.
 //
+// The most common annotation type is [Link], which represents clickable
+// areas in the PDF that can navigate to other pages or external URLs.
+// Other commonly used annotation types include [Widget] for form fields,
+// [Popup] for pop-up notes, and [Text] for simple text notes.
+//
 // All annotation types implement the [pdf.Annotation] interface. The function
 // [Extract] can be used to extract annotations from a PDF document.
 package annotation

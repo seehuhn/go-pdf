@@ -23,7 +23,7 @@ type FreeText struct {
 	Common
 	Markup
 
-	// DA (required) is the default appearance string that shall be used in
+	// DA (required) is the default appearance string that is used in
 	// formatting the text.
 	DA string
 
@@ -64,7 +64,7 @@ var _ pdf.Annotation = (*FreeText)(nil)
 
 // AnnotationType returns "FreeText".
 // This implements the [pdf.Annotation] interface.
-func (f *FreeText) AnnotationType() string {
+func (f *FreeText) AnnotationType() pdf.Name {
 	return "FreeText"
 }
 

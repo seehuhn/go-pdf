@@ -37,7 +37,7 @@ var _ pdf.Annotation = (*Underline)(nil)
 
 // AnnotationType returns "Underline".
 // This implements the [pdf.Annotation] interface.
-func (u *Underline) AnnotationType() string {
+func (u *Underline) AnnotationType() pdf.Name {
 	return "Underline"
 }
 
@@ -93,7 +93,7 @@ func (u *Underline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 
 	// Add underline-specific fields
 	// QuadPoints (required)
-	if u.QuadPoints != nil && len(u.QuadPoints) > 0 {
+	if len(u.QuadPoints) > 0 {
 		quadArray := make(pdf.Array, len(u.QuadPoints))
 		for i, point := range u.QuadPoints {
 			quadArray[i] = pdf.Number(point)

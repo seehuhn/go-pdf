@@ -52,7 +52,7 @@ type Polygon struct {
 	Measure pdf.Reference
 
 	// Path (optional; PDF 2.0) is an array of n arrays, each supplying operands
-	// for path building operators (m, l, or c). If present, Vertices shall not be present.
+	// for path building operators (m, l, or c). If present, Vertices is not present.
 	// Each array contains pairs of values specifying points for path drawing operations.
 	Path [][]float64
 }
@@ -61,7 +61,7 @@ var _ pdf.Annotation = (*Polygon)(nil)
 
 // AnnotationType returns "Polygon".
 // This implements the [pdf.Annotation] interface.
-func (p *Polygon) AnnotationType() string {
+func (p *Polygon) AnnotationType() pdf.Name {
 	return "Polygon"
 }
 
@@ -121,13 +121,19 @@ func extractPolygon(r pdf.Getter, dict pdf.Dict) (*Polygon, error) {
 		pathArrays := make([][]float64, len(path))
 		for i, pathEntry := range path {
 			if pathArray, err := pdf.GetArray(r, pathEntry); err == nil {
-				coords := make([]float64, len(pathArray))
-				for j, coord := range pathArray {
-					if num, err := pdf.GetNumber(r, coord); err == nil {
-						coords[j] = float64(num)
+				if len(pathArray) > 0 {
+					coords := make([]float64, len(pathArray))
+					for j, coord := range pathArray {
+						if num, err := pdf.GetNumber(r, coord); err == nil {
+							coords[j] = float64(num)
+						}
 					}
+					pathArrays[i] = coords
+				} else {
+					pathArrays[i] = []float64{} // Ensure empty slice instead of nil
 				}
-				pathArrays[i] = coords
+			} else {
+				pathArrays[i] = []float64{} // Default to empty slice if extraction fails
 			}
 		}
 		polygon.Path = pathArrays
@@ -195,17 +201,21 @@ func (p *Polygon) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 	}
 
 	// Path (optional; PDF 2.0)
-	if p.Path != nil && len(p.Path) > 0 {
+	if len(p.Path) > 0 {
 		if err := pdf.CheckVersion(rm.Out, "polygon annotation Path entry", pdf.V2_0); err != nil {
 			return nil, zero, err
 		}
 		pathArray := make(pdf.Array, len(p.Path))
 		for i, pathEntry := range p.Path {
-			entryArray := make(pdf.Array, len(pathEntry))
-			for j, coord := range pathEntry {
-				entryArray[j] = pdf.Number(coord)
+			if len(pathEntry) > 0 {
+				entryArray := make(pdf.Array, len(pathEntry))
+				for j, coord := range pathEntry {
+					entryArray[j] = pdf.Number(coord)
+				}
+				pathArray[i] = entryArray
+			} else {
+				pathArray[i] = pdf.Array{} // Empty array for empty path entries
 			}
-			pathArray[i] = entryArray
 		}
 		dict["Path"] = pathArray
 	}

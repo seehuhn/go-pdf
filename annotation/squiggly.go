@@ -37,7 +37,7 @@ var _ pdf.Annotation = (*Squiggly)(nil)
 
 // AnnotationType returns "Squiggly".
 // This implements the [pdf.Annotation] interface.
-func (s *Squiggly) AnnotationType() string {
+func (s *Squiggly) AnnotationType() pdf.Name {
 	return "Squiggly"
 }
 
@@ -93,7 +93,7 @@ func (s *Squiggly) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 
 	// Add squiggly-specific fields
 	// QuadPoints (required)
-	if s.QuadPoints != nil && len(s.QuadPoints) > 0 {
+	if len(s.QuadPoints) > 0 {
 		quadArray := make(pdf.Array, len(s.QuadPoints))
 		for i, point := range s.QuadPoints {
 			quadArray[i] = pdf.Number(point)

@@ -16,7 +16,9 @@
 
 package annotation
 
-import "seehuhn.de/go/pdf"
+import (
+	"seehuhn.de/go/pdf"
+)
 
 // Extract extracts an annotation from a PDF file.
 func Extract(r pdf.Getter, obj pdf.Object) (pdf.Annotation, error) {
@@ -55,6 +57,38 @@ func Extract(r pdf.Getter, obj pdf.Object) (pdf.Annotation, error) {
 		return extractSquiggly(r, dict)
 	case "StrikeOut":
 		return extractStrikeOut(r, dict)
+	case "Caret":
+		return extractCaret(r, dict)
+	case "Stamp":
+		return extractStamp(r, dict)
+	case "Ink":
+		return extractInk(r, dict)
+	case "Popup":
+		return extractPopup(r, dict)
+	case "FileAttachment":
+		return extractFileAttachment(r, dict)
+	case "Sound":
+		return extractSound(r, dict)
+	case "Movie":
+		return extractMovie(r, dict)
+	case "Screen":
+		return extractScreen(r, dict)
+	case "Widget":
+		return extractWidget(r, dict)
+	case "PrinterMark":
+		return extractPrinterMark(r, dict)
+	case "TrapNet":
+		return extractTrapNet(r, dict)
+	case "Watermark":
+		return extractWatermark(r, dict)
+	case "3D":
+		return extractAnnot3D(r, dict)
+	case "Redact":
+		return extractRedact(r, dict)
+	case "Projection":
+		return extractProjection(r, dict)
+	case "RichMedia":
+		return extractRichMedia(r, dict)
 	default:
 		return extractUnknown(r, dict)
 	}

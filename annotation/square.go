@@ -26,7 +26,7 @@ type Square struct {
 	Markup
 
 	// BS (optional) is a border style dictionary specifying the line width
-	// and dash pattern that shall be used in drawing the rectangle.
+	// and dash pattern that is used in drawing the rectangle.
 	BS pdf.Reference
 
 	// IC (optional; PDF 1.4) is an array of numbers in the range 0.0 to 1.0
@@ -54,7 +54,7 @@ var _ pdf.Annotation = (*Square)(nil)
 
 // AnnotationType returns "Square".
 // This implements the [pdf.Annotation] interface.
-func (s *Square) AnnotationType() string {
+func (s *Square) AnnotationType() pdf.Name {
 	return "Square"
 }
 
@@ -152,7 +152,7 @@ func (s *Square) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 	}
 
 	// RD (optional)
-	if s.RD != nil && len(s.RD) == 4 {
+	if len(s.RD) == 4 {
 		if err := pdf.CheckVersion(rm.Out, "square annotation RD entry", pdf.V1_5); err != nil {
 			return nil, zero, err
 		}

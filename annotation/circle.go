@@ -26,7 +26,7 @@ type Circle struct {
 	Markup
 
 	// BS (optional) is a border style dictionary specifying the line width
-	// and dash pattern that shall be used in drawing the ellipse.
+	// and dash pattern that is used in drawing the ellipse.
 	BS pdf.Reference
 
 	// IC (optional; PDF 1.4) is an array of numbers in the range 0.0 to 1.0
@@ -54,7 +54,7 @@ var _ pdf.Annotation = (*Circle)(nil)
 
 // AnnotationType returns "Circle".
 // This implements the [pdf.Annotation] interface.
-func (c *Circle) AnnotationType() string {
+func (c *Circle) AnnotationType() pdf.Name {
 	return "Circle"
 }
 
@@ -152,7 +152,7 @@ func (c *Circle) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 	}
 
 	// RD (optional)
-	if c.RD != nil && len(c.RD) == 4 {
+	if len(c.RD) == 4 {
 		if err := pdf.CheckVersion(rm.Out, "circle annotation RD entry", pdf.V1_5); err != nil {
 			return nil, zero, err
 		}

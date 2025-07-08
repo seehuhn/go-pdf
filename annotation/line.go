@@ -28,7 +28,7 @@ type Line struct {
 	L []float64
 
 	// BS (optional) is a border style dictionary specifying the width and
-	// dash pattern that shall be used in drawing the line.
+	// dash pattern that is used in drawing the line.
 	BS pdf.Reference
 
 	// LE (optional; PDF 1.4) is an array of two names specifying the line
@@ -52,7 +52,7 @@ type Line struct {
 	LLE float64
 
 	// Cap (optional; PDF 1.6) indicates whether the text specified by Contents
-	// or RC entries shall be replicated as a caption in the line's appearance.
+	// or RC entries are replicated as a caption in the line's appearance.
 	// Default value: false.
 	Cap bool
 
@@ -82,7 +82,7 @@ var _ pdf.Annotation = (*Line)(nil)
 
 // AnnotationType returns "Line".
 // This implements the [pdf.Annotation] interface.
-func (l *Line) AnnotationType() string {
+func (l *Line) AnnotationType() pdf.Name {
 	return "Line"
 }
 
@@ -202,7 +202,7 @@ func (l *Line) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	// Add line-specific fields
 	// L (required)
-	if l.L != nil && len(l.L) == 4 {
+	if len(l.L) == 4 {
 		lArray := make(pdf.Array, 4)
 		for i, coord := range l.L {
 			lArray[i] = pdf.Number(coord)
@@ -288,7 +288,7 @@ func (l *Line) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	// CO (optional)
-	if l.CO != nil && len(l.CO) == 2 {
+	if len(l.CO) == 2 {
 		if err := pdf.CheckVersion(rm.Out, "line annotation CO entry", pdf.V1_7); err != nil {
 			return nil, zero, err
 		}

@@ -22,11 +22,11 @@ import "seehuhn.de/go/pdf"
 type Link struct {
 	Common
 
-	// A (optional; PDF 1.1) is an action that shall be performed when the
+	// A (optional; PDF 1.1) is an action that is performed when the
 	// link annotation is activated. Mutually exclusive with Dest.
 	A pdf.Reference
 
-	// Dest (optional) is a destination that shall be displayed when the
+	// Dest (optional) is a destination that is displayed when the
 	// annotation is activated. Not permitted if A is present.
 	Dest pdf.Object
 
@@ -53,7 +53,7 @@ var _ pdf.Annotation = (*Link)(nil)
 
 // AnnotationType returns "Link".
 // This implements the [pdf.Annotation] interface.
-func (l *Link) AnnotationType() string {
+func (l *Link) AnnotationType() pdf.Name {
 	return "Link"
 }
 

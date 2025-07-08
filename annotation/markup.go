@@ -24,9 +24,9 @@ import (
 
 // Markup contains fields common to all markup annotations.
 type Markup struct {
-	// T (optional; PDF 1.1) is the text label that shall be displayed in the
+	// T (optional; PDF 1.1) is the text label that is displayed in the
 	// title bar of the annotation's popup window when open and active. This
-	// entry shall identify the user who added the annotation.
+	// entry identifies the user who added the annotation.
 	T string
 
 	// Popup (optional; PDF 1.3) is an indirect reference to a popup annotation
@@ -44,7 +44,7 @@ type Markup struct {
 
 	// IRT (required if RT is present; PDF 1.5) is a reference to the
 	// annotation that this annotation is "in reply to". Both annotations
-	// shall be on the same page.
+	// are on the same page.
 	IRT pdf.Reference
 
 	// Subj (optional; PDF 1.5) is the subject of the annotation, typically

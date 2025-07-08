@@ -37,7 +37,7 @@ var _ pdf.Annotation = (*Highlight)(nil)
 
 // AnnotationType returns "Highlight".
 // This implements the [pdf.Annotation] interface.
-func (h *Highlight) AnnotationType() string {
+func (h *Highlight) AnnotationType() pdf.Name {
 	return "Highlight"
 }
 
@@ -93,7 +93,7 @@ func (h *Highlight) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 
 	// Add highlight-specific fields
 	// QuadPoints (required)
-	if h.QuadPoints != nil && len(h.QuadPoints) > 0 {
+	if len(h.QuadPoints) > 0 {
 		quadArray := make(pdf.Array, len(h.QuadPoints))
 		for i, point := range h.QuadPoints {
 			quadArray[i] = pdf.Number(point)

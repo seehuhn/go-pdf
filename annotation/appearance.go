@@ -116,3 +116,62 @@ func (s AppearanceStates) AsPDF(pdf.OutputOptions) pdf.Native {
 func (s AppearanceStates) Get(state pdf.Name) pdf.Reference {
 	return s[state]
 }
+
+// ExtractAppearanceDict extracts an appearance dictionary from a PDF object.
+func ExtractAppearanceDict(r pdf.Getter, obj pdf.Object) (*AppearanceDict, error) {
+	d, err := pdf.GetDict(r, obj)
+	if err != nil || d == nil {
+		return nil, err
+	}
+
+	res := &AppearanceDict{}
+
+	res.Normal, err = extractAppearance(r, d["N"])
+	if err != nil {
+		return nil, err
+	}
+
+	res.RollOver, err = extractAppearance(r, d["R"])
+	if err != nil {
+		return nil, err
+	}
+
+	res.Down, err = extractAppearance(r, d["D"])
+	if err != nil {
+		return nil, err
+	}
+
+	if res.Normal == nil && res.RollOver == nil && res.Down == nil {
+		return nil, nil
+	}
+
+	return res, nil
+}
+
+// extractAppearance extracts an appearance from a PDF object.
+func extractAppearance(r pdf.Getter, obj pdf.Object) (Appearance, error) {
+	if obj == nil {
+		return nil, nil
+	}
+
+	// First, try to interpret as a dictionary of appearance states.
+	if d, err := pdf.GetDict(r, obj); err == nil && d != nil {
+		states := make(AppearanceStates)
+		for name, val := range d {
+			if ref, ok := val.(pdf.Reference); ok {
+				states[name] = ref
+			}
+		}
+		if len(states) > 0 {
+			return states, nil
+		}
+	}
+
+	// If it's not a dictionary of states, it should be a single appearance stream.
+	// A stream is always given by reference.
+	if ref, ok := obj.(pdf.Reference); ok {
+		return AppearanceStream(ref), nil
+	}
+
+	return nil, nil
+}

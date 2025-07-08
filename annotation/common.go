@@ -25,7 +25,7 @@ import (
 
 // Common contains fields common to all annotation dictionaries.
 type Common struct {
-	// Rect (required) is the rectangle that defines the position of the
+	// Rect is the rectangle that defines the position of the
 	// annotation on the page (in user space coordinates).
 	Rect pdf.Rectangle
 
@@ -47,12 +47,12 @@ type Common struct {
 	// freeform string.
 	M string
 
-	// F (optional; PDF 1.1) is a set of flags specifying various
-	// characteristics of the annotation. Default value: 0.
+	// F (PDF 1.1) is a set of flags specifying various
+	// characteristics of the annotation.
 	F pdf.Integer
 
 	// AP (optional; PDF 1.2) is an appearance dictionary specifying how the
-	// annotation shall be presented visually on the page.
+	// annotation is presented visually on the page.
 	AP *AppearanceDict
 
 	// AS (required if AP contains subdictionaries; PDF 1.2) is the
@@ -61,7 +61,7 @@ type Common struct {
 	AS pdf.Name
 
 	// Border (optional) specifies the characteristics of the annotation's
-	// border. Default value: [0 0 1].
+	// border.
 	Border *Border
 
 	// C (optional; PDF 1.1) is an array of numbers representing a color used
@@ -96,7 +96,7 @@ type Common struct {
 	// PDF 2.0, this field must be 1.0.
 	StrokingOpacity float64
 
-	// BM (optional; PDF 2.0) is the blend mode that shall be used when
+	// BM (optional; PDF 2.0) is the blend mode that is used when
 	// painting the annotation onto the page.
 	BM pdf.Name
 
@@ -307,9 +307,8 @@ func extractCommon(r pdf.Getter, dict pdf.Dict, common *Common) error {
 	}
 
 	// AP (optional)
-	if ap, ok := dict["AP"].(pdf.Reference); ok {
-		// TODO: implement appearance dictionary extraction
-		_ = ap
+	if ap, err := ExtractAppearanceDict(r, dict["AP"]); err == nil && ap != nil {
+		common.AP = ap
 	}
 
 	// AS (optional)
