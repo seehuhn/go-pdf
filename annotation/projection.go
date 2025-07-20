@@ -59,12 +59,15 @@ func extractProjection(r pdf.Getter, dict pdf.Dict) (*Projection, error) {
 	return projection, nil
 }
 
-// Embed writes the projection annotation to a PDF file.
 func (p *Projection) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	err := p.EmbedAt(rm, ref)
+	return ref, pdf.Unused{}, err
+}
 
+func (p *Projection) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	if err := pdf.CheckVersion(rm.Out, "projection annotation", pdf.V2_0); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	dict := pdf.Dict{
@@ -74,12 +77,12 @@ func (p *Projection) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 
 	// Add common annotation fields
 	if err := p.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	// Add markup annotation fields
 	if err := p.Markup.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	// ExData (optional)
@@ -87,5 +90,5 @@ func (p *Projection) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 		dict["ExData"] = p.ExData
 	}
 
-	return dict, zero, nil
+	return rm.Out.Put(ref, dict)
 }

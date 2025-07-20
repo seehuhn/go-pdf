@@ -144,6 +144,15 @@ func extractPolygon(r pdf.Getter, dict pdf.Dict) (*Polygon, error) {
 
 func (p *Polygon) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	if _, err := p.EmbedAt(rm, ref); err != nil {
+		return nil, zero, err
+	}
+	return ref, zero, nil
+}
+
+func (p *Polygon) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
+	var zero pdf.Unused
 
 	dict := pdf.Dict{
 		"Type":    pdf.Name("Annot"),
@@ -152,19 +161,19 @@ func (p *Polygon) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 
 	// Add common annotation fields
 	if err := p.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add markup annotation fields
 	if err := p.Markup.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add polygon-specific fields
 	// Vertices (required unless Path is present)
 	if p.Path == nil && p.Vertices != nil && len(p.Vertices) > 0 {
 		if err := pdf.CheckVersion(rm.Out, "polygon annotation", pdf.V1_5); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		verticesArray := make(pdf.Array, len(p.Vertices))
 		for i, vertex := range p.Vertices {
@@ -195,7 +204,7 @@ func (p *Polygon) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 	// Measure (optional)
 	if p.Measure != 0 {
 		if err := pdf.CheckVersion(rm.Out, "polygon annotation Measure entry", pdf.V1_7); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		dict["Measure"] = p.Measure
 	}
@@ -203,7 +212,7 @@ func (p *Polygon) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 	// Path (optional; PDF 2.0)
 	if len(p.Path) > 0 {
 		if err := pdf.CheckVersion(rm.Out, "polygon annotation Path entry", pdf.V2_0); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		pathArray := make(pdf.Array, len(p.Path))
 		for i, pathEntry := range p.Path {
@@ -220,5 +229,10 @@ func (p *Polygon) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 		dict["Path"] = pathArray
 	}
 
-	return dict, zero, nil
+	err := rm.Out.Put(ref, dict)
+	if err != nil {
+		return zero, err
+	}
+
+	return zero, nil
 }

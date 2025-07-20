@@ -60,10 +60,14 @@ func extractPrinterMark(r pdf.Getter, dict pdf.Dict) (*PrinterMark, error) {
 }
 
 func (p *PrinterMark) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	err := p.EmbedAt(rm, ref)
+	return ref, pdf.Unused{}, err
+}
 
+func (p *PrinterMark) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	if err := pdf.CheckVersion(rm.Out, "printer's mark annotation", pdf.V1_4); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	dict := pdf.Dict{
@@ -73,7 +77,7 @@ func (p *PrinterMark) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, er
 
 	// Add common annotation fields
 	if err := p.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	// Add printer's mark-specific fields
@@ -82,5 +86,5 @@ func (p *PrinterMark) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, er
 		dict["MN"] = p.MN
 	}
 
-	return dict, zero, nil
+	return rm.Out.Put(ref, dict)
 }

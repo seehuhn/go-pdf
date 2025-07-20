@@ -71,9 +71,18 @@ func extractSquiggly(r pdf.Getter, dict pdf.Dict) (*Squiggly, error) {
 
 func (s *Squiggly) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	if _, err := s.EmbedAt(rm, ref); err != nil {
+		return nil, zero, err
+	}
+	return ref, zero, nil
+}
+
+func (s *Squiggly) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
+	var zero pdf.Unused
 
 	if err := pdf.CheckVersion(rm.Out, "squiggly annotation", pdf.V1_4); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	dict := pdf.Dict{
@@ -83,12 +92,12 @@ func (s *Squiggly) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 
 	// Add common annotation fields
 	if err := s.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add markup annotation fields
 	if err := s.Markup.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add squiggly-specific fields
@@ -101,5 +110,10 @@ func (s *Squiggly) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 		dict["QuadPoints"] = quadArray
 	}
 
-	return dict, zero, nil
+	err := rm.Out.Put(ref, dict)
+	if err != nil {
+		return zero, err
+	}
+
+	return zero, nil
 }

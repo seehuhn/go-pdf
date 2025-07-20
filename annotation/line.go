@@ -184,6 +184,15 @@ func extractLine(r pdf.Getter, dict pdf.Dict) (*Line, error) {
 
 func (l *Line) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	if _, err := l.EmbedAt(rm, ref); err != nil {
+		return nil, zero, err
+	}
+	return ref, zero, nil
+}
+
+func (l *Line) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
+	var zero pdf.Unused
 
 	dict := pdf.Dict{
 		"Type":    pdf.Name("Annot"),
@@ -192,12 +201,12 @@ func (l *Line) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	// Add common annotation fields
 	if err := l.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add markup annotation fields
 	if err := l.Markup.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add line-specific fields
@@ -218,7 +227,7 @@ func (l *Line) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	// LE (optional)
 	if l.LE != nil {
 		if err := pdf.CheckVersion(rm.Out, "line annotation LE entry", pdf.V1_4); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		leArray := make(pdf.Array, len(l.LE))
 		for i, ending := range l.LE {
@@ -230,7 +239,7 @@ func (l *Line) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	// IC (optional)
 	if l.IC != nil {
 		if err := pdf.CheckVersion(rm.Out, "line annotation IC entry", pdf.V1_4); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		icArray := make(pdf.Array, len(l.IC))
 		for i, color := range l.IC {
@@ -242,7 +251,7 @@ func (l *Line) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	// LL (optional)
 	if l.LL != 0 {
 		if err := pdf.CheckVersion(rm.Out, "line annotation LL entry", pdf.V1_6); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		dict["LL"] = pdf.Number(l.LL)
 	}
@@ -250,7 +259,7 @@ func (l *Line) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	// LLE (optional)
 	if l.LLE != 0 {
 		if err := pdf.CheckVersion(rm.Out, "line annotation LLE entry", pdf.V1_6); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		dict["LLE"] = pdf.Number(l.LLE)
 	}
@@ -258,7 +267,7 @@ func (l *Line) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	// Cap (optional)
 	if l.Cap {
 		if err := pdf.CheckVersion(rm.Out, "line annotation Cap entry", pdf.V1_6); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		dict["Cap"] = pdf.Boolean(l.Cap)
 	}
@@ -266,7 +275,7 @@ func (l *Line) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	// LLO (optional)
 	if l.LLO != 0 {
 		if err := pdf.CheckVersion(rm.Out, "line annotation LLO entry", pdf.V1_7); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		dict["LLO"] = pdf.Number(l.LLO)
 	}
@@ -274,7 +283,7 @@ func (l *Line) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	// CP (optional)
 	if l.CP != "" {
 		if err := pdf.CheckVersion(rm.Out, "line annotation CP entry", pdf.V1_7); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		dict["CP"] = l.CP
 	}
@@ -282,7 +291,7 @@ func (l *Line) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	// Measure (optional)
 	if l.Measure != 0 {
 		if err := pdf.CheckVersion(rm.Out, "line annotation Measure entry", pdf.V1_7); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		dict["Measure"] = l.Measure
 	}
@@ -290,7 +299,7 @@ func (l *Line) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	// CO (optional)
 	if len(l.CO) == 2 {
 		if err := pdf.CheckVersion(rm.Out, "line annotation CO entry", pdf.V1_7); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		coArray := make(pdf.Array, 2)
 		for i, offset := range l.CO {
@@ -299,5 +308,10 @@ func (l *Line) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["CO"] = coArray
 	}
 
-	return dict, zero, nil
+	err := rm.Out.Put(ref, dict)
+	if err != nil {
+		return zero, err
+	}
+
+	return zero, nil
 }

@@ -44,8 +44,8 @@ var testCases = map[string][]testCase{
 					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 150},
 					Contents: "This is a text annotation",
 				},
-				Open: false,
-				Name: "Comment",
+				Open:     false,
+				IconName: "Comment",
 			},
 		},
 		{
@@ -54,18 +54,19 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:               pdf.Rectangle{LLx: 50, LLy: 50, URx: 150, URy: 100},
 					Contents:           "Text with markup",
-					NM:                 "annotation-1",
+					Name:               "annotation-1",
 					StrokingOpacity:    0.8,
 					NonStrokingOpacity: 0.6,
 				},
 				Markup: Markup{
-					T:            "Author Name",
+					User:         "Author Name",
 					CreationDate: time.Date(2023, 1, 15, 10, 30, 0, 0, time.UTC),
-					Subj:         "Test Subject",
+					Subject:      "Test Subject",
+					InReplyTo:    pdf.NewReference(1, 0),
 				},
-				Open:  true,
-				Name:  "Note",
-				State: "Marked",
+				Open:     true,
+				IconName: "Note",
+				State:    StateMarked,
 			},
 		},
 		{
@@ -74,8 +75,8 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
 					Contents: "Complete text annotation",
-					F:        4,                        // ReadOnly flag
-					C:        []float64{1.0, 0.0, 0.0}, // Red color
+					Flags:    4,                        // ReadOnly flag
+					Color:    []float64{1.0, 0.0, 0.0}, // Red color
 					Border: &Border{
 						HCornerRadius: 2.0,
 						VCornerRadius: 2.0,
@@ -85,15 +86,15 @@ var testCases = map[string][]testCase{
 					Lang: language.MustParse("en-US"),
 				},
 				Markup: Markup{
-					T:    "Test User",
-					Subj: "Complete annotation test",
-					RT:   "R",
-					IT:   "Note",
+					User:      "Test User",
+					Subject:   "Complete annotation test",
+					RT:        "R",
+					Intent:    "Note",
+					InReplyTo: pdf.NewReference(2, 0),
 				},
-				Open:       true,
-				Name:       "Insert",
-				State:      "Accepted",
-				StateModel: "Review",
+				Open:     true,
+				IconName: "Insert",
+				State:    StateAccepted,
 			},
 		},
 	},
@@ -152,9 +153,9 @@ var testCases = map[string][]testCase{
 					Contents: "Callout text",
 				},
 				Markup: Markup{
-					T:    "Reviewer",
-					Subj: "Callout comment",
-					IT:   "FreeTextCallout",
+					User:    "Reviewer",
+					Subject: "Callout comment",
+					Intent:  "FreeTextCallout",
 				},
 				DA: "/Arial 10 Tf 0 0 1 rg",
 				Q:  1,                                       // Centered
@@ -168,12 +169,12 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 50, LLy: 300, URx: 250, URy: 380},
 					Contents: "Styled free text",
-					C:        []float64{0.9, 0.9, 0.9}, // Light gray background
+					Color:    []float64{0.9, 0.9, 0.9}, // Light gray background
 				},
 				Markup: Markup{
-					T:            "Designer",
+					User:         "Designer",
 					CreationDate: time.Date(2023, 6, 1, 14, 0, 0, 0, time.UTC),
-					IT:           "FreeText",
+					Intent:       "FreeText",
 				},
 				DA: "/Times-Roman 14 Tf 0.2 0.2 0.8 rg",
 				Q:  2, // Right justified
@@ -200,8 +201,8 @@ var testCases = map[string][]testCase{
 					Contents: "Arrow line",
 				},
 				Markup: Markup{
-					T:  "Designer",
-					IT: "LineArrow",
+					User:   "Designer",
+					Intent: "LineArrow",
 				},
 				L:  []float64{60, 110, 240, 110},
 				LE: []pdf.Name{"OpenArrow", "ClosedArrow"},
@@ -216,9 +217,9 @@ var testCases = map[string][]testCase{
 					Contents: "Dimension line",
 				},
 				Markup: Markup{
-					T:            "Engineer",
+					User:         "Engineer",
 					CreationDate: time.Date(2023, 3, 15, 9, 0, 0, 0, time.UTC),
-					IT:           "LineDimension",
+					Intent:       "LineDimension",
 				},
 				L:   []float64{50, 225, 250, 225},
 				LE:  []pdf.Name{"Butt", "Butt"},
@@ -234,14 +235,14 @@ var testCases = map[string][]testCase{
 			name: "line with all fields",
 			annotation: &Line{
 				Common: Common{
-					Rect: pdf.Rectangle{LLx: 100, LLy: 300, URx: 400, URy: 350},
-					F:    2,                        // Print flag
-					C:    []float64{0.0, 0.0, 1.0}, // Blue border color
+					Rect:  pdf.Rectangle{LLx: 100, LLy: 300, URx: 400, URy: 350},
+					Flags: 2,                        // Print flag
+					Color: []float64{0.0, 0.0, 1.0}, // Blue border color
 				},
 				Markup: Markup{
-					T:    "Reviewer",
-					Subj: "Complete line annotation",
-					RT:   "R",
+					User:    "Reviewer",
+					Subject: "Complete line annotation",
+					RT:      "R",
 				},
 				L:   []float64{120, 325, 380, 325},
 				LE:  []pdf.Name{"Diamond", "Square"},
@@ -264,8 +265,8 @@ var testCases = map[string][]testCase{
 					Contents: "Square annotation",
 				},
 				Markup: Markup{
-					T:    "Author",
-					Subj: "Square subject",
+					User:    "Author",
+					Subject: "Square subject",
 				},
 			},
 		},
@@ -274,11 +275,11 @@ var testCases = map[string][]testCase{
 			annotation: &Square{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 200},
-					NM:   "square-001",
+					Name: "square-001",
 				},
 				Markup: Markup{
-					T:    "Designer",
-					Subj: "Color square",
+					User:    "Designer",
+					Subject: "Color square",
 				},
 				IC: []float64{1.0, 0.5, 0.0}, // RGB orange interior
 			},
@@ -289,12 +290,12 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 200, LLy: 200, URx: 350, URy: 300},
 					Contents: "Complex square",
-					C:        []float64{0.0, 0.0, 1.0}, // Blue border
+					Color:    []float64{0.0, 0.0, 1.0}, // Blue border
 				},
 				Markup: Markup{
-					T:    "Reviewer",
-					Subj: "Complex annotation",
-					IT:   "SquareCloud",
+					User:    "Reviewer",
+					Subject: "Complex annotation",
+					Intent:  "SquareCloud",
 				},
 				IC: []float64{0.9, 0.9, 0.9},      // Light gray interior
 				RD: []float64{5.0, 5.0, 5.0, 5.0}, // Rectangle differences
@@ -310,8 +311,8 @@ var testCases = map[string][]testCase{
 					Contents: "Circle annotation",
 				},
 				Markup: Markup{
-					T:    "Author",
-					Subj: "Circle subject",
+					User:    "Author",
+					Subject: "Circle subject",
 				},
 			},
 		},
@@ -320,11 +321,11 @@ var testCases = map[string][]testCase{
 			annotation: &Circle{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 150, LLy: 150, URx: 250, URy: 200},
-					NM:   "circle-001",
+					Name: "circle-001",
 				},
 				Markup: Markup{
-					T:    "Designer",
-					Subj: "Color circle",
+					User:    "Designer",
+					Subject: "Color circle",
 				},
 				IC: []float64{0.0, 1.0, 0.0}, // Green interior
 			},
@@ -335,12 +336,12 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 300, LLy: 300, URx: 450, URy: 450},
 					Contents: "Complex circle",
-					C:        []float64{1.0, 0.0, 0.0}, // Red border
+					Color:    []float64{1.0, 0.0, 0.0}, // Red border
 				},
 				Markup: Markup{
-					T:    "Reviewer",
-					Subj: "Complex circle annotation",
-					IT:   "CircleCloud",
+					User:    "Reviewer",
+					Subject: "Complex circle annotation",
+					Intent:  "CircleCloud",
 				},
 				IC: []float64{1.0, 1.0, 0.0},          // Yellow interior
 				RD: []float64{10.0, 10.0, 10.0, 10.0}, // Rectangle differences
@@ -356,8 +357,8 @@ var testCases = map[string][]testCase{
 					Contents: "Triangle polygon",
 				},
 				Markup: Markup{
-					T:    "Author",
-					Subj: "Triangle shape",
+					User:    "Author",
+					Subject: "Triangle shape",
 				},
 				Vertices: []float64{100, 50, 50, 150, 200, 150}, // Triangle vertices
 			},
@@ -367,12 +368,12 @@ var testCases = map[string][]testCase{
 			annotation: &Polygon{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 100, LLy: 100, URx: 300, URy: 250},
-					NM:   "polygon-001",
+					Name: "polygon-001",
 				},
 				Markup: Markup{
-					T:    "Designer",
-					Subj: "Colored polygon",
-					IT:   "PolygonCloud",
+					User:    "Designer",
+					Subject: "Colored polygon",
+					Intent:  "PolygonCloud",
 				},
 				Vertices: []float64{150, 100, 300, 150, 250, 250, 100, 200}, // Quadrilateral
 				IC:       []float64{0.0, 1.0, 0.5},                          // Green-cyan interior
@@ -386,9 +387,9 @@ var testCases = map[string][]testCase{
 					Contents: "Complex polygon with path",
 				},
 				Markup: Markup{
-					T:    "Engineer",
-					Subj: "Measured polygon",
-					IT:   "PolygonDimension",
+					User:    "Engineer",
+					Subject: "Measured polygon",
+					Intent:  "PolygonDimension",
 				},
 				Path: [][]float64{
 					{250, 200}, // moveto
@@ -408,8 +409,8 @@ var testCases = map[string][]testCase{
 					Contents: "Simple polyline",
 				},
 				Markup: Markup{
-					T:    "Author",
-					Subj: "Line path",
+					User:    "Author",
+					Subject: "Line path",
 				},
 				Vertices: []float64{75, 100, 150, 175, 225, 125, 275, 150}, // Zigzag line
 				LE:       []pdf.Name{"None", "OpenArrow"},                  // Arrow at end
@@ -420,12 +421,12 @@ var testCases = map[string][]testCase{
 			annotation: &Polyline{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 150, LLy: 150, URx: 350, URy: 250},
-					NM:   "polyline-001",
+					Name: "polyline-001",
 				},
 				Markup: Markup{
-					T:    "Designer",
-					Subj: "Colored polyline",
-					IT:   "PolyLineDimension",
+					User:    "Designer",
+					Subject: "Colored polyline",
+					Intent:  "PolyLineDimension",
 				},
 				Vertices: []float64{150, 200, 200, 150, 300, 250, 350, 180},
 				LE:       []pdf.Name{"Circle", "Square"}, // Different endings
@@ -440,8 +441,8 @@ var testCases = map[string][]testCase{
 					Contents: "Curved polyline",
 				},
 				Markup: Markup{
-					T:    "Artist",
-					Subj: "Bezier curve",
+					User:    "Artist",
+					Subject: "Bezier curve",
 				},
 				Path: [][]float64{
 					{250, 300},                     // moveto
@@ -461,8 +462,8 @@ var testCases = map[string][]testCase{
 					Contents: "Highlighted text",
 				},
 				Markup: Markup{
-					T:    "Reviewer",
-					Subj: "Important passage",
+					User:    "Reviewer",
+					Subject: "Important passage",
 				},
 				QuadPoints: []float64{100, 200, 200, 200, 200, 220, 100, 220}, // Single word quad
 			},
@@ -471,13 +472,13 @@ var testCases = map[string][]testCase{
 			name: "highlight with multiple quads",
 			annotation: &Highlight{
 				Common: Common{
-					Rect: pdf.Rectangle{LLx: 50, LLy: 300, URx: 250, URy: 340},
-					NM:   "highlight-001",
-					C:    []float64{1.0, 1.0, 0.0}, // Yellow highlight
+					Rect:  pdf.Rectangle{LLx: 50, LLy: 300, URx: 250, URy: 340},
+					Name:  "highlight-001",
+					Color: []float64{1.0, 1.0, 0.0}, // Yellow highlight
 				},
 				Markup: Markup{
-					T:    "Student",
-					Subj: "Study notes",
+					User:    "Student",
+					Subject: "Study notes",
 				},
 				QuadPoints: []float64{
 					50, 300, 100, 300, 100, 320, 50, 320, // First word
@@ -496,8 +497,8 @@ var testCases = map[string][]testCase{
 					Contents: "Underlined text",
 				},
 				Markup: Markup{
-					T:    "Editor",
-					Subj: "Emphasis added",
+					User:    "Editor",
+					Subject: "Emphasis added",
 				},
 				QuadPoints: []float64{150, 400, 300, 400, 300, 420, 150, 420}, // Single phrase
 			},
@@ -506,13 +507,13 @@ var testCases = map[string][]testCase{
 			name: "underline with markup fields",
 			annotation: &Underline{
 				Common: Common{
-					Rect: pdf.Rectangle{LLx: 75, LLy: 500, URx: 225, URy: 520},
-					NM:   "underline-001",
-					C:    []float64{0.0, 0.0, 1.0}, // Blue underline
+					Rect:  pdf.Rectangle{LLx: 75, LLy: 500, URx: 225, URy: 520},
+					Name:  "underline-001",
+					Color: []float64{0.0, 0.0, 1.0}, // Blue underline
 				},
 				Markup: Markup{
-					T:            "Proofreader",
-					Subj:         "Grammar correction",
+					User:         "Proofreader",
+					Subject:      "Grammar correction",
 					CreationDate: time.Date(2023, 6, 15, 14, 30, 0, 0, time.UTC),
 				},
 				QuadPoints: []float64{75, 500, 225, 500, 225, 520, 75, 520},
@@ -528,8 +529,8 @@ var testCases = map[string][]testCase{
 					Contents: "Spelling error",
 				},
 				Markup: Markup{
-					T:    "Spellchecker",
-					Subj: "Possible misspelling",
+					User:    "Spellchecker",
+					Subject: "Possible misspelling",
 				},
 				QuadPoints: []float64{200, 600, 350, 600, 350, 620, 200, 620}, // Misspelled word
 			},
@@ -538,13 +539,13 @@ var testCases = map[string][]testCase{
 			name: "squiggly with color",
 			annotation: &Squiggly{
 				Common: Common{
-					Rect: pdf.Rectangle{LLx: 100, LLy: 700, URx: 180, URy: 720},
-					NM:   "squiggly-001",
-					C:    []float64{1.0, 0.0, 0.0}, // Red squiggly
+					Rect:  pdf.Rectangle{LLx: 100, LLy: 700, URx: 180, URy: 720},
+					Name:  "squiggly-001",
+					Color: []float64{1.0, 0.0, 0.0}, // Red squiggly
 				},
 				Markup: Markup{
-					T:    "Grammar checker",
-					Subj: "Grammar issue",
+					User:    "Grammar checker",
+					Subject: "Grammar issue",
 				},
 				QuadPoints: []float64{100, 700, 180, 700, 180, 720, 100, 720},
 			},
@@ -559,8 +560,8 @@ var testCases = map[string][]testCase{
 					Contents: "Deleted text",
 				},
 				Markup: Markup{
-					T:    "Editor",
-					Subj: "Text to be removed",
+					User:    "Editor",
+					Subject: "Text to be removed",
 				},
 				QuadPoints: []float64{250, 800, 400, 800, 400, 820, 250, 820}, // Struck-out phrase
 			},
@@ -570,11 +571,11 @@ var testCases = map[string][]testCase{
 			annotation: &StrikeOut{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 50, LLy: 900, URx: 300, URy: 940},
-					NM:   "strikeout-001",
+					Name: "strikeout-001",
 				},
 				Markup: Markup{
-					T:    "Reviewer",
-					Subj: "Major revision",
+					User:    "Reviewer",
+					Subject: "Major revision",
 				},
 				QuadPoints: []float64{
 					50, 900, 150, 900, 150, 920, 50, 920, // First section
@@ -593,8 +594,8 @@ var testCases = map[string][]testCase{
 					Contents: "Text insertion point",
 				},
 				Markup: Markup{
-					T:    "Editor",
-					Subj: "Insert text here",
+					User:    "Editor",
+					Subject: "Insert text here",
 				},
 			},
 		},
@@ -603,11 +604,11 @@ var testCases = map[string][]testCase{
 			annotation: &Caret{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 200, LLy: 200, URx: 220, URy: 230},
-					NM:   "caret-001",
+					Name: "caret-001",
 				},
 				Markup: Markup{
-					T:            "Proofreader",
-					Subj:         "New paragraph needed",
+					User:         "Proofreader",
+					Subject:      "New paragraph needed",
 					CreationDate: time.Date(2023, 8, 20, 10, 15, 0, 0, time.UTC),
 				},
 				Sy: "P", // Paragraph symbol
@@ -621,8 +622,8 @@ var testCases = map[string][]testCase{
 					Contents: "Complex caret with spacing",
 				},
 				Markup: Markup{
-					T:    "Reviewer",
-					Subj: "Spacing adjustment",
+					User:    "Reviewer",
+					Subject: "Spacing adjustment",
 				},
 				RD: []float64{2.0, 3.0, 2.0, 5.0}, // Rectangle differences
 			},
@@ -637,8 +638,8 @@ var testCases = map[string][]testCase{
 					Contents: "Approved document",
 				},
 				Markup: Markup{
-					T:    "Manager",
-					Subj: "Document approval",
+					User:    "Manager",
+					Subject: "Document approval",
 				},
 				Name: "Approved",
 			},
@@ -648,11 +649,11 @@ var testCases = map[string][]testCase{
 			annotation: &Stamp{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 200, LLy: 200, URx: 300, URy: 250},
-					NM:   "stamp-001",
+					Name: "stamp-001",
 				},
 				Markup: Markup{
-					T:            "Editor",
-					Subj:         "Draft version",
+					User:         "Editor",
+					Subject:      "Draft version",
 					CreationDate: time.Date(2023, 9, 10, 16, 30, 0, 0, time.UTC),
 				},
 				Name: "Draft", // Default value
@@ -666,8 +667,8 @@ var testCases = map[string][]testCase{
 					Contents: "Confidential material",
 				},
 				Markup: Markup{
-					T:    "Security Officer",
-					Subj: "Classification stamp",
+					User:    "Security Officer",
+					Subject: "Classification stamp",
 				},
 				Name: "Confidential",
 			},
@@ -680,8 +681,8 @@ var testCases = map[string][]testCase{
 					Contents: "Image stamp",
 				},
 				Markup: Markup{
-					T:  "Designer",
-					IT: "StampImage", // Intent: image stamp
+					User:   "Designer",
+					Intent: "StampImage", // Intent: image stamp
 				},
 				Name: "Draft", // Default value (Name not written to PDF when IT != "Stamp")
 			},
@@ -694,8 +695,8 @@ var testCases = map[string][]testCase{
 					Contents: "Final document",
 				},
 				Markup: Markup{
-					T:  "Publisher",
-					IT: "Stamp", // Explicit rubber stamp intent
+					User:   "Publisher",
+					Intent: "Stamp", // Explicit rubber stamp intent
 				},
 				Name: "Final",
 			},
@@ -710,8 +711,8 @@ var testCases = map[string][]testCase{
 					Contents: "Handwritten note",
 				},
 				Markup: Markup{
-					T:    "Annotator",
-					Subj: "Hand drawing",
+					User:    "Annotator",
+					Subject: "Hand drawing",
 				},
 				InkList: [][]float64{
 					{50, 100, 75, 120, 100, 110, 125, 130, 150, 125}, // Single stroke
@@ -722,13 +723,13 @@ var testCases = map[string][]testCase{
 			name: "multi-stroke ink annotation",
 			annotation: &Ink{
 				Common: Common{
-					Rect: pdf.Rectangle{LLx: 100, LLy: 200, URx: 300, URy: 350},
-					NM:   "ink-001",
-					C:    []float64{0.0, 0.0, 1.0}, // Blue ink
+					Rect:  pdf.Rectangle{LLx: 100, LLy: 200, URx: 300, URy: 350},
+					Name:  "ink-001",
+					Color: []float64{0.0, 0.0, 1.0}, // Blue ink
 				},
 				Markup: Markup{
-					T:            "Artist",
-					Subj:         "Sketch",
+					User:         "Artist",
+					Subject:      "Sketch",
 					CreationDate: time.Date(2023, 10, 5, 14, 20, 0, 0, time.UTC),
 				},
 				InkList: [][]float64{
@@ -746,8 +747,8 @@ var testCases = map[string][]testCase{
 					Contents: "Stylized ink drawing",
 				},
 				Markup: Markup{
-					T:    "Designer",
-					Subj: "Stylized annotation",
+					User:    "Designer",
+					Subject: "Stylized annotation",
 				},
 				InkList: [][]float64{
 					{200, 450, 250, 470, 300, 460, 350, 480, 400, 475},
@@ -762,8 +763,8 @@ var testCases = map[string][]testCase{
 					Contents: "Curved ink path",
 				},
 				Markup: Markup{
-					T:    "Artist",
-					Subj: "Bezier curve drawing",
+					User:    "Artist",
+					Subject: "Bezier curve drawing",
 				},
 				Path: [][]float64{
 					{150, 650},                     // moveto
@@ -780,8 +781,8 @@ var testCases = map[string][]testCase{
 					Contents: "Complex freehand drawing",
 				},
 				Markup: Markup{
-					T:    "User",
-					Subj: "Signature and notes",
+					User:    "User",
+					Subject: "Signature and notes",
 				},
 				InkList: [][]float64{
 					{50, 800, 80, 810, 120, 790, 160, 805, 200, 795}, // Signature stroke 1
@@ -806,7 +807,7 @@ var testCases = map[string][]testCase{
 			annotation: &Popup{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 150, LLy: 200, URx: 250, URy: 280},
-					NM:   "popup-001",
+					Name: "popup-001",
 				},
 				Parent: pdf.NewReference(123, 0), // Reference to parent annotation
 			},
@@ -826,7 +827,7 @@ var testCases = map[string][]testCase{
 			annotation: &Popup{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 50, LLy: 400, URx: 180, URy: 480},
-					NM:   "popup-with-parent",
+					Name: "popup-with-parent",
 				},
 				Parent: pdf.NewReference(456, 0), // Parent markup annotation
 				Open:   true,                     // Initially open
@@ -851,8 +852,8 @@ var testCases = map[string][]testCase{
 					Contents: "Attached spreadsheet file",
 				},
 				Markup: Markup{
-					T:    "Data Analyst",
-					Subj: "Supporting data",
+					User:    "Data Analyst",
+					Subject: "Supporting data",
 				},
 				FS:   pdf.NewReference(100, 0), // File specification reference
 				Name: "Graph",                  // Icon for data files
@@ -863,11 +864,11 @@ var testCases = map[string][]testCase{
 			annotation: &FileAttachment{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 150, LLy: 150, URx: 180, URy: 180},
-					NM:   "attachment-001",
+					Name: "attachment-001",
 				},
 				Markup: Markup{
-					T:            "Author",
-					Subj:         "Supporting document",
+					User:         "Author",
+					Subject:      "Supporting document",
 					CreationDate: time.Date(2023, 11, 15, 9, 30, 0, 0, time.UTC),
 				},
 				FS: pdf.NewReference(200, 0), // File specification reference
@@ -882,8 +883,8 @@ var testCases = map[string][]testCase{
 					Contents: "Attached document",
 				},
 				Markup: Markup{
-					T:    "Secretary",
-					Subj: "Office document",
+					User:    "Secretary",
+					Subject: "Office document",
 				},
 				FS:   pdf.NewReference(300, 0), // File specification reference
 				Name: "Paperclip",              // Paperclip icon
@@ -895,11 +896,11 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 100, LLy: 350, URx: 130, URy: 380},
 					Contents: "Tagged reference file",
-					C:        []float64{0.9, 0.9, 0.9}, // Light gray background
+					Color:    []float64{0.9, 0.9, 0.9}, // Light gray background
 				},
 				Markup: Markup{
-					T:    "Librarian",
-					Subj: "Reference material",
+					User:    "Librarian",
+					Subject: "Reference material",
 				},
 				FS:   pdf.NewReference(400, 0), // File specification reference
 				Name: "Tag",                    // Tag icon
@@ -912,7 +913,7 @@ var testCases = map[string][]testCase{
 					Rect: pdf.Rectangle{LLx: 300, LLy: 450, URx: 330, URy: 480},
 				},
 				Markup: Markup{
-					T: "User",
+					User: "User",
 				},
 				FS: pdf.NewReference(500, 0), // Required file specification
 				// Name will default to "PushPin"
@@ -928,8 +929,8 @@ var testCases = map[string][]testCase{
 					Contents: "Recorded audio note",
 				},
 				Markup: Markup{
-					T:    "Narrator",
-					Subj: "Audio explanation",
+					User:    "Narrator",
+					Subject: "Audio explanation",
 				},
 				Sound: pdf.NewReference(600, 0), // Sound object reference
 				Name:  "Speaker",                // Default speaker icon
@@ -940,11 +941,11 @@ var testCases = map[string][]testCase{
 			annotation: &Sound{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 200, LLy: 200, URx: 230, URy: 230},
-					NM:   "sound-001",
+					Name: "sound-001",
 				},
 				Markup: Markup{
-					T:            "Reporter",
-					Subj:         "Field recording",
+					User:         "Reporter",
+					Subject:      "Field recording",
 					CreationDate: time.Date(2023, 12, 1, 15, 45, 0, 0, time.UTC),
 				},
 				Sound: pdf.NewReference(700, 0), // Sound object reference
@@ -959,8 +960,8 @@ var testCases = map[string][]testCase{
 					Contents: "Audio clip",
 				},
 				Markup: Markup{
-					T:    "Audio Engineer",
-					Subj: "Sound sample",
+					User:    "Audio Engineer",
+					Subject: "Sound sample",
 				},
 				Sound: pdf.NewReference(800, 0), // Sound object reference
 				Name:  "Speaker",                // Default value
@@ -972,11 +973,11 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 150, LLy: 400, URx: 180, URy: 430},
 					Contents: "Interview recording",
-					C:        []float64{1.0, 0.9, 0.8}, // Light orange background
+					Color:    []float64{1.0, 0.9, 0.8}, // Light orange background
 				},
 				Markup: Markup{
-					T:    "Journalist",
-					Subj: "Interview audio",
+					User:    "Journalist",
+					Subject: "Interview audio",
 				},
 				Sound: pdf.NewReference(900, 0), // Sound object reference
 				Name:  "Speaker",                // Explicit speaker icon
@@ -989,7 +990,7 @@ var testCases = map[string][]testCase{
 					Rect: pdf.Rectangle{LLx: 50, LLy: 500, URx: 80, URy: 530},
 				},
 				Markup: Markup{
-					T: "User",
+					User: "User",
 				},
 				Sound: pdf.NewReference(1000, 0), // Required sound object
 				Name:  "Speaker",                 // Default value
@@ -1014,7 +1015,7 @@ var testCases = map[string][]testCase{
 			annotation: &Movie{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 200, LLy: 200, URx: 400, URy: 300},
-					NM:   "movie-001",
+					Name: "movie-001",
 				},
 				T:     "Training Module 1",
 				Movie: pdf.NewReference(600, 0), // Movie dictionary reference
@@ -1027,7 +1028,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 250, URy: 150},
 					Contents: "Interactive presentation",
-					C:        []float64{0.2, 0.4, 0.8}, // Blue background
+					Color:    []float64{0.2, 0.4, 0.8}, // Blue background
 				},
 				T:     "Interactive Demo",
 				Movie: pdf.NewReference(700, 0), // Movie dictionary reference
@@ -1071,7 +1072,7 @@ var testCases = map[string][]testCase{
 			annotation: &Screen{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 200, LLy: 200, URx: 500, URy: 400},
-					NM:   "screen-001",
+					Name: "screen-001",
 				},
 				T:  "Interactive Media",
 				MK: pdf.NewReference(1100, 0), // Appearance characteristics dictionary
@@ -1083,7 +1084,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 350, URy: 250},
 					Contents: "Click to play video",
-					C:        []float64{0.1, 0.1, 0.1}, // Dark background
+					Color:    []float64{0.1, 0.1, 0.1}, // Dark background
 				},
 				T: "Action Trigger",
 				A: pdf.NewReference(1200, 0), // Action dictionary
@@ -1105,7 +1106,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 150, LLy: 150, URx: 450, URy: 350},
 					Contents: "Full-featured media player",
-					C:        []float64{0.9, 0.9, 0.9}, // Light gray background
+					Color:    []float64{0.9, 0.9, 0.9}, // Light gray background
 				},
 				T:  "Complete Media Player",
 				MK: pdf.NewReference(1400, 0), // Appearance characteristics
@@ -1139,7 +1140,7 @@ var testCases = map[string][]testCase{
 			annotation: &Widget{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 200, LLy: 200, URx: 350, URy: 240},
-					NM:   "button-001",
+					Name: "button-001",
 				},
 				H: "P", // Push highlighting
 			},
@@ -1159,8 +1160,8 @@ var testCases = map[string][]testCase{
 			name: "widget with action and additional actions",
 			annotation: &Widget{
 				Common: Common{
-					Rect: pdf.Rectangle{LLx: 300, LLy: 300, URx: 500, URy: 340},
-					C:    []float64{0.8, 0.8, 1.0}, // Light blue background
+					Rect:  pdf.Rectangle{LLx: 300, LLy: 300, URx: 500, URy: 340},
+					Color: []float64{0.8, 0.8, 1.0}, // Light blue background
 				},
 				H:  "I",                       // Default highlighting
 				A:  pdf.NewReference(1800, 0), // Action dictionary
@@ -1183,7 +1184,7 @@ var testCases = map[string][]testCase{
 			annotation: &Widget{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 250, LLy: 250, URx: 450, URy: 290},
-					NM:   "child-widget-001",
+					Name: "child-widget-001",
 				},
 				H:      "T",                       // Toggle highlighting (same as Push)
 				Parent: pdf.NewReference(2100, 0), // Parent field reference
@@ -1195,7 +1196,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 100, LLy: 400, URx: 350, URy: 450},
 					Contents: "Complete widget annotation",
-					C:        []float64{0.9, 0.9, 0.9}, // Light gray background
+					Color:    []float64{0.9, 0.9, 0.9}, // Light gray background
 				},
 				H:      "P",                       // Push highlighting
 				MK:     pdf.NewReference(2200, 0), // Appearance characteristics
@@ -1231,7 +1232,7 @@ var testCases = map[string][]testCase{
 			annotation: &PrinterMark{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 200, LLy: 780, URx: 400, URy: 800},
-					NM:   "colorbar-001",
+					Name: "colorbar-001",
 				},
 				MN: "ColorBar",
 			},
@@ -1242,7 +1243,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 20, URy: 20},
 					Contents: "Corner cut mark",
-					C:        []float64{0.0, 0.0, 0.0}, // Black color
+					Color:    []float64{0.0, 0.0, 0.0}, // Black color
 				},
 				MN: "CutMark",
 			},
@@ -1266,8 +1267,8 @@ var testCases = map[string][]testCase{
 			name: "printer's mark with print and readonly flags",
 			annotation: &PrinterMark{
 				Common: Common{
-					Rect: pdf.Rectangle{LLx: 150, LLy: 150, URx: 200, URy: 200},
-					F:    6, // Print (2) + ReadOnly (4) flags as per spec
+					Rect:  pdf.Rectangle{LLx: 150, LLy: 150, URx: 200, URy: 200},
+					Flags: 6, // Print (2) + ReadOnly (4) flags as per spec
 				},
 				MN: "GrayRamp",
 			},
@@ -1287,8 +1288,8 @@ var testCases = map[string][]testCase{
 			name: "trap network with LastModified",
 			annotation: &TrapNet{
 				Common: Common{
-					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
-					F:    6,                                                 // Print (2) + ReadOnly (4) flags as per spec
+					Rect:  pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
+					Flags: 6,                                                 // Print (2) + ReadOnly (4) flags as per spec
 				},
 				LastModified: "D:20231215103000Z",
 			},
@@ -1297,9 +1298,9 @@ var testCases = map[string][]testCase{
 			name: "trap network with Version and AnnotStates",
 			annotation: &TrapNet{
 				Common: Common{
-					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
-					F:    6,                                                 // Print (2) + ReadOnly (4) flags as per spec
-					NM:   "trapnet-001",
+					Rect:  pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
+					Flags: 6,                                                 // Print (2) + ReadOnly (4) flags as per spec
+					Name:  "trapnet-001",
 				},
 				Version: []pdf.Reference{
 					pdf.NewReference(100, 0), // Content stream
@@ -1314,7 +1315,7 @@ var testCases = map[string][]testCase{
 			annotation: &TrapNet{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
-					F:        6,                                                 // Print (2) + ReadOnly (4) flags
+					Flags:    6,                                                 // Print (2) + ReadOnly (4) flags
 					Contents: "Trap network with font substitutions",
 				},
 				LastModified: "D:20231201120000Z",
@@ -1328,9 +1329,9 @@ var testCases = map[string][]testCase{
 			name: "complex trap network",
 			annotation: &TrapNet{
 				Common: Common{
-					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
-					F:    6,                                                 // Print (2) + ReadOnly (4) flags
-					NM:   "complex-trapnet",
+					Rect:  pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
+					Flags: 6,                                                 // Print (2) + ReadOnly (4) flags
+					Name:  "complex-trapnet",
 				},
 				Version: []pdf.Reference{
 					pdf.NewReference(300, 0), // Page content stream
@@ -1348,8 +1349,8 @@ var testCases = map[string][]testCase{
 			name: "minimal trap network",
 			annotation: &TrapNet{
 				Common: Common{
-					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
-					F:    6,                                                 // Required Print + ReadOnly flags
+					Rect:  pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
+					Flags: 6,                                                 // Required Print + ReadOnly flags
 				},
 				LastModified: "D:20231201000000Z", // Minimal required field
 			},
@@ -1370,7 +1371,7 @@ var testCases = map[string][]testCase{
 			annotation: &Watermark{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 100, LLy: 100, URx: 300, URy: 150},
-					NM:   "watermark-001",
+					Name: "watermark-001",
 				},
 				FixedPrint: &FixedPrint{
 					Matrix: []float64{1, 0, 0, 1, 72, -72}, // Translate 1 inch right and down
@@ -1461,7 +1462,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 350, URy: 250},
 					Contents: "Interactive 3D Model",
-					NM:       "3d-model-001",
+					Name:     "3d-model-001",
 				},
 				D: pdf.NewReference(200, 0), // 3D stream reference
 				V: pdf.Integer(0),           // View index
@@ -1501,7 +1502,7 @@ var testCases = map[string][]testCase{
 			annotation: &Annot3D{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 100, LLy: 100, URx: 500, URy: 400},
-					NM:   "advanced-3d-model",
+					Name: "advanced-3d-model",
 				},
 				D: pdf.NewReference(500, 0), // 3D stream reference
 				A: &ThreeDActivation{
@@ -1543,8 +1544,8 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 450, URy: 350},
 					Contents: "Complex 3D Scene with Multiple Features",
-					NM:       "complex-3d-scene",
-					F:        1, // Invisible flag
+					Name:     "complex-3d-scene",
+					Flags:    1, // Invisible flag
 				},
 				D: pdf.NewReference(800, 0), // 3D stream reference
 				V: pdf.Integer(2),           // Third view (index 2)
@@ -1597,7 +1598,7 @@ var testCases = map[string][]testCase{
 			annotation: &Redact{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 50},
-					NM:   "redact-001",
+					Name: "redact-001",
 				},
 				IC: []float64{0.0, 0.0, 0.0}, // Black interior color
 			},
@@ -1631,7 +1632,7 @@ var testCases = map[string][]testCase{
 			annotation: &Redact{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 200, LLy: 500, URx: 400, URy: 550},
-					NM:   "redact-with-xobject",
+					Name: "redact-with-xobject",
 				},
 				RO: pdf.NewReference(100, 0), // Form XObject reference
 			},
@@ -1642,13 +1643,13 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 50, LLy: 600, URx: 450, URy: 700},
 					Contents: "Sensitive information requiring redaction",
-					NM:       "comprehensive-redact",
-					F:        4, // Print flag
+					Name:     "comprehensive-redact",
+					Flags:    4, // Print flag
 				},
 				Markup: Markup{
-					T:   "Redaction Tool",
-					RC:  pdf.String("This content contains sensitive information"),
-					IRT: pdf.NewReference(200, 0), // In reply to reference
+					User:      "Redaction Tool",
+					RC:        pdf.String("This content contains sensitive information"),
+					InReplyTo: pdf.NewReference(200, 0), // In reply to reference
 				},
 				QuadPoints: []float64{
 					75, 620, 175, 620, 175, 640, 75, 640, // First quad
@@ -1666,12 +1667,12 @@ var testCases = map[string][]testCase{
 			name: "redaction with markup properties",
 			annotation: &Redact{
 				Common: Common{
-					Rect: pdf.Rectangle{LLx: 100, LLy: 750, URx: 300, URy: 780},
-					F:    1, // Invisible flag
+					Rect:  pdf.Rectangle{LLx: 100, LLy: 750, URx: 300, URy: 780},
+					Flags: 1, // Invisible flag
 				},
 				Markup: Markup{
-					T:    "Security Officer",
-					Subj: "Personal Information Redaction",
+					User:    "Security Officer",
+					Subject: "Personal Information Redaction",
 				},
 				IC: []float64{1.0, 1.0, 0.0}, // Yellow background
 			},
@@ -1695,8 +1696,8 @@ var testCases = map[string][]testCase{
 					Contents: "3D measurement comment",
 				},
 				Markup: Markup{
-					T:    "3D Analyst",
-					Subj: "Measurement annotation",
+					User:    "3D Analyst",
+					Subject: "Measurement annotation",
 				},
 			},
 		},
@@ -1705,12 +1706,12 @@ var testCases = map[string][]testCase{
 			annotation: &Projection{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 50, LLy: 200, URx: 300, URy: 250},
-					NM:   "proj-001",
+					Name: "proj-001",
 				},
 				Markup: Markup{
-					T:            "Measurement Tool",
+					User:         "Measurement Tool",
 					CreationDate: time.Date(2023, 5, 10, 9, 15, 0, 0, time.UTC),
-					Subj:         "3D measurement association",
+					Subject:      "3D measurement association",
 				},
 				ExData: pdf.NewReference(500, 0), // Reference to external data dictionary
 			},
@@ -1723,8 +1724,8 @@ var testCases = map[string][]testCase{
 					Contents: "Measurement with zero width rect",
 				},
 				Markup: Markup{
-					T:    "Specialist",
-					Subj: "Zero-dimension measurement",
+					User:    "Specialist",
+					Subject: "Zero-dimension measurement",
 				},
 				ExData: pdf.NewReference(600, 0),
 			},
@@ -1735,19 +1736,19 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:               pdf.Rectangle{LLx: 200, LLy: 400, URx: 500, URy: 500},
 					Contents:           "Comprehensive 3D measurement annotation",
-					NM:                 "comprehensive-projection",
-					F:                  2,                        // Print flag
-					C:                  []float64{0.0, 1.0, 0.0}, // Green color
+					Name:               "comprehensive-projection",
+					Flags:              2,                        // Print flag
+					Color:              []float64{0.0, 1.0, 0.0}, // Green color
 					StrokingOpacity:    0.9,
 					NonStrokingOpacity: 0.7,
 				},
 				Markup: Markup{
-					T:            "3D Measurement System",
-					Subj:         "Complex geospatial measurement",
+					User:         "3D Measurement System",
+					Subject:      "Complex geospatial measurement",
 					RC:           pdf.String("Associated with 3D measurement data"),
 					CreationDate: time.Date(2023, 8, 20, 14, 30, 0, 0, time.UTC),
-					IRT:          pdf.NewReference(300, 0), // In reply to reference
-					IT:           "Group",
+					InReplyTo:    pdf.NewReference(300, 0), // In reply to reference
+					Intent:       "Group",
 				},
 				ExData: pdf.NewReference(700, 0), // External data dictionary with 3DM subtype
 			},
@@ -1759,7 +1760,7 @@ var testCases = map[string][]testCase{
 					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 50, URy: 25},
 				},
 				Markup: Markup{
-					T: "User",
+					User: "User",
 				},
 				// No ExData - optional for projection annotations
 			},
@@ -1780,9 +1781,9 @@ var testCases = map[string][]testCase{
 			name: "rich media with settings",
 			annotation: &RichMedia{
 				Common: Common{
-					Rect: pdf.Rectangle{LLx: 50, LLy: 200, URx: 350, URy: 400},
-					NM:   "richmedia-001",
-					F:    2, // Print flag
+					Rect:  pdf.Rectangle{LLx: 50, LLy: 200, URx: 350, URy: 400},
+					Name:  "richmedia-001",
+					Flags: 2, // Print flag
 				},
 				RichMediaContent:  pdf.NewReference(600, 0), // Required content dictionary
 				RichMediaSettings: pdf.NewReference(700, 0), // Optional settings dictionary
@@ -1794,9 +1795,9 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:               pdf.Rectangle{LLx: 200, LLy: 500, URx: 600, URy: 700},
 					Contents:           "Interactive 3D content with video and sound",
-					NM:                 "comprehensive-richmedia",
-					F:                  0,                        // No flags
-					C:                  []float64{0.5, 0.5, 0.5}, // Gray border
+					Name:               "comprehensive-richmedia",
+					Flags:              0,                        // No flags
+					Color:              []float64{0.5, 0.5, 0.5}, // Gray border
 					StrokingOpacity:    1.0,
 					NonStrokingOpacity: 0.8,
 					Border: &Border{
@@ -1825,7 +1826,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:               pdf.Rectangle{LLx: 300, LLy: 800, URx: 500, URy: 900},
 					Contents:           "Rich media with additional fields",
-					NM:                 "richmedia-advanced",
+					Name:               "richmedia-advanced",
 					StrokingOpacity:    0.9,
 					NonStrokingOpacity: 0.7,
 				},
@@ -1986,9 +1987,19 @@ func TestBorderDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dict, ok := embedded.(pdf.Dict)
+	ref, ok := embedded.(pdf.Reference)
 	if !ok {
-		t.Fatal("embedded annotation is not a dictionary")
+		t.Fatal("embedded annotation is not a reference")
+	}
+
+	obj, err := buf.Get(ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dict, ok := obj.(pdf.Dict)
+	if !ok {
+		t.Fatal("annotation object is not a dictionary")
 	}
 
 	// Border should not be present since it's the default value
@@ -2046,9 +2057,19 @@ func TestOpacityHandling(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			dict, ok := embedded.(pdf.Dict)
+			ref, ok := embedded.(pdf.Reference)
 			if !ok {
-				t.Fatal("embedded annotation is not a dictionary")
+				t.Fatal("embedded annotation is not a reference")
+			}
+
+			obj, err := buf.Get(ref, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			dict, ok := obj.(pdf.Dict)
+			if !ok {
+				t.Fatal("annotation object is not a dictionary")
 			}
 
 			_, hasCA := dict["CA"]

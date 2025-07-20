@@ -18,9 +18,8 @@ package annotation
 
 import "seehuhn.de/go/pdf"
 
-// Screen represents a screen annotation that specifies a region of a page
-// upon which media clips may be played. It also serves as an object from
-// which actions can be triggered.
+// Screen specifies a region of a page upon which media clips may be played. It
+// also serves as an object from which actions can be triggered.
 type Screen struct {
 	Common
 
@@ -82,10 +81,14 @@ func extractScreen(r pdf.Getter, dict pdf.Dict) (*Screen, error) {
 }
 
 func (s *Screen) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	err := s.EmbedAt(rm, ref)
+	return ref, pdf.Unused{}, err
+}
 
+func (s *Screen) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	if err := pdf.CheckVersion(rm.Out, "screen annotation", pdf.V1_5); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	dict := pdf.Dict{
@@ -95,7 +98,7 @@ func (s *Screen) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 
 	// Add common annotation fields
 	if err := s.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	// Add screen-specific fields
@@ -119,5 +122,5 @@ func (s *Screen) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 		dict["AA"] = s.AA
 	}
 
-	return dict, zero, nil
+	return rm.Out.Put(ref, dict)
 }

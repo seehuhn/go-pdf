@@ -62,12 +62,15 @@ func extractRichMedia(r pdf.Getter, dict pdf.Dict) (*RichMedia, error) {
 	return richMedia, nil
 }
 
-// Embed writes the rich media annotation to a PDF file.
 func (r *RichMedia) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	err := r.EmbedAt(rm, ref)
+	return ref, pdf.Unused{}, err
+}
 
+func (r *RichMedia) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	if err := pdf.CheckVersion(rm.Out, "rich media annotation", pdf.V2_0); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	dict := pdf.Dict{
@@ -77,7 +80,7 @@ func (r *RichMedia) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 
 	// Add common annotation fields
 	if err := r.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	// RichMediaContent (required)
@@ -90,5 +93,5 @@ func (r *RichMedia) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 		dict["RichMediaSettings"] = r.RichMediaSettings
 	}
 
-	return dict, zero, nil
+	return rm.Out.Put(ref, dict)
 }

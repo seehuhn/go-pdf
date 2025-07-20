@@ -79,10 +79,14 @@ func extractSound(r pdf.Getter, dict pdf.Dict) (*Sound, error) {
 }
 
 func (s *Sound) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	err := s.EmbedAt(rm, ref)
+	return ref, pdf.Unused{}, err
+}
 
+func (s *Sound) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	if err := pdf.CheckVersion(rm.Out, "sound annotation", pdf.V1_2); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	dict := pdf.Dict{
@@ -92,12 +96,12 @@ func (s *Sound) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	// Add common annotation fields
 	if err := s.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	// Add markup annotation fields
 	if err := s.Markup.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	// Add sound-specific fields
@@ -111,5 +115,5 @@ func (s *Sound) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["Name"] = s.Name
 	}
 
-	return dict, zero, nil
+	return rm.Out.Put(ref, dict)
 }

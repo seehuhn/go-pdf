@@ -71,7 +71,7 @@ func extractStamp(r pdf.Getter, dict pdf.Dict) (*Stamp, error) {
 	// Extract stamp-specific fields
 	// Per spec: "If the IT key is present and its value is not Stamp, this Name key is not present"
 	// If IT is present and not "Stamp", ignore any Name field in the PDF (it's invalid)
-	if stamp.IT != "" && stamp.IT != "Stamp" {
+	if stamp.Intent != "" && stamp.Intent != "Stamp" {
 		// IT is present and not "Stamp" - ignore Name field, use default
 		stamp.Name = "Draft"
 	} else {
@@ -90,10 +90,14 @@ func extractStamp(r pdf.Getter, dict pdf.Dict) (*Stamp, error) {
 }
 
 func (s *Stamp) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	err := s.EmbedAt(rm, ref)
+	return ref, pdf.Unused{}, err
+}
 
+func (s *Stamp) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	if err := pdf.CheckVersion(rm.Out, "stamp annotation", pdf.V1_3); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	dict := pdf.Dict{
@@ -103,20 +107,20 @@ func (s *Stamp) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	// Add common annotation fields
 	if err := s.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	// Add markup annotation fields
 	if err := s.Markup.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	// Add stamp-specific fields
 	// Per spec: "If the IT key is present and its value is not Stamp, this Name key is not present"
-	if s.IT != "" && s.IT != "Stamp" {
+	if s.Intent != "" && s.Intent != "Stamp" {
 		// IT is present and not "Stamp" - Name is not present
 		if s.Name != "" && s.Name != "Draft" {
-			return nil, zero, fmt.Errorf("stamp annotation: Name field is not present when IT is %q", s.IT)
+			return fmt.Errorf("stamp annotation: Name field is not present when IT is %q", s.Intent)
 		}
 		// Don't write Name field
 	} else {
@@ -129,5 +133,5 @@ func (s *Stamp) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	// Note: IT field is already handled by fillDict in the Markup struct
 
-	return dict, zero, nil
+	return rm.Out.Put(ref, dict)
 }

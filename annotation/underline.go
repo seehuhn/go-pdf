@@ -71,9 +71,18 @@ func extractUnderline(r pdf.Getter, dict pdf.Dict) (*Underline, error) {
 
 func (u *Underline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	if _, err := u.EmbedAt(rm, ref); err != nil {
+		return nil, zero, err
+	}
+	return ref, zero, nil
+}
+
+func (u *Underline) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
+	var zero pdf.Unused
 
 	if err := pdf.CheckVersion(rm.Out, "underline annotation", pdf.V1_3); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	dict := pdf.Dict{
@@ -83,12 +92,12 @@ func (u *Underline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 
 	// Add common annotation fields
 	if err := u.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add markup annotation fields
 	if err := u.Markup.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add underline-specific fields
@@ -101,5 +110,10 @@ func (u *Underline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 		dict["QuadPoints"] = quadArray
 	}
 
-	return dict, zero, nil
+	err := rm.Out.Put(ref, dict)
+	if err != nil {
+		return zero, err
+	}
+
+	return zero, nil
 }

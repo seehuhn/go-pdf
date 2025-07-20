@@ -122,9 +122,17 @@ func extractInk(r pdf.Getter, dict pdf.Dict) (*Ink, error) {
 
 func (i *Ink) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-
-	if err := pdf.CheckVersion(rm.Out, "ink annotation", pdf.V1_3); err != nil {
+	ref := rm.Out.Alloc()
+	if _, err := i.EmbedAt(rm, ref); err != nil {
 		return nil, zero, err
+	}
+	return ref, zero, nil
+}
+
+func (i *Ink) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
+	var zero pdf.Unused
+	if err := pdf.CheckVersion(rm.Out, "ink annotation", pdf.V1_3); err != nil {
+		return zero, err
 	}
 
 	dict := pdf.Dict{
@@ -134,12 +142,12 @@ func (i *Ink) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	// Add common annotation fields
 	if err := i.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add markup annotation fields
 	if err := i.Markup.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add ink-specific fields
@@ -168,7 +176,7 @@ func (i *Ink) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	// Path (optional; PDF 2.0)
 	if len(i.Path) > 0 {
 		if err := pdf.CheckVersion(rm.Out, "ink annotation Path entry", pdf.V2_0); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		pathArray := make(pdf.Array, len(i.Path))
 		for i, pathEntry := range i.Path {
@@ -185,5 +193,10 @@ func (i *Ink) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["Path"] = pathArray
 	}
 
-	return dict, zero, nil
+	err := rm.Out.Put(ref, dict)
+	if err != nil {
+		return zero, err
+	}
+
+	return zero, nil
 }

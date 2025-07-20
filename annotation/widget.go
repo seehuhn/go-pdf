@@ -113,9 +113,17 @@ func extractWidget(r pdf.Getter, dict pdf.Dict) (*Widget, error) {
 
 func (w *Widget) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-
-	if err := pdf.CheckVersion(rm.Out, "widget annotation", pdf.V1_2); err != nil {
+	ref := rm.Out.Alloc()
+	if _, err := w.EmbedAt(rm, ref); err != nil {
 		return nil, zero, err
+	}
+	return ref, zero, nil
+}
+
+func (w *Widget) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
+	var zero pdf.Unused
+	if err := pdf.CheckVersion(rm.Out, "widget annotation", pdf.V1_2); err != nil {
+		return zero, err
 	}
 
 	dict := pdf.Dict{
@@ -125,7 +133,7 @@ func (w *Widget) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 
 	// Add common annotation fields
 	if err := w.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add widget-specific fields
@@ -159,5 +167,10 @@ func (w *Widget) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 		dict["Parent"] = w.Parent
 	}
 
-	return dict, zero, nil
+	err := rm.Out.Put(ref, dict)
+	if err != nil {
+		return zero, err
+	}
+
+	return zero, nil
 }

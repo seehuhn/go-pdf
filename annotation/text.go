@@ -16,7 +16,11 @@
 
 package annotation
 
-import "seehuhn.de/go/pdf"
+import (
+	"errors"
+
+	"seehuhn.de/go/pdf"
+)
 
 // Text represents a "sticky note" text annotation.
 type Text struct {
@@ -26,19 +30,19 @@ type Text struct {
 	// Open specifies whether the annotation is initially displayed open.
 	Open bool
 
-	// Name (optional) is the name of an icon that is used in displaying
+	// IconName (optional) is the name of an icon that is used in displaying
 	// the annotation. Standard names include: Comment, Key, Note, Help,
 	// NewParagraph, Paragraph, Insert. Default value: Note.
-	Name pdf.Name
+	//
+	// This corresponds to the /Name entry in the PDF annotation dictionary.
+	IconName Icon
 
-	// State (optional; PDF 1.5) is the state to which the original annotation
-	// is set. Default: "Unmarked" if StateModel is "Marked"; "None" if
-	// StateModel is "Review".
-	State string
-
-	// StateModel (required if State is present, otherwise optional; PDF 1.5)
-	// is the state model corresponding to State.
-	StateModel string
+	// State specifies the current state of the annotation denoted by the
+	// [Markup.InReplyTo] field.
+	//
+	// This corresponds to the /State and /StateModel entries in the PDF
+	// annotation dictionary.
+	State State
 }
 
 var _ pdf.Annotation = (*Text)(nil)
@@ -72,16 +76,44 @@ func extractText(r pdf.Getter, obj pdf.Object) (*Text, error) {
 		text.Open = bool(open)
 	}
 
-	if name, err := pdf.GetName(r, dict["Name"]); err == nil {
-		text.Name = name
+	if name, err := pdf.GetName(r, dict["Name"]); err == nil && name != "" {
+		text.IconName = Icon(name)
+	} else {
+		text.IconName = IconNote
 	}
 
-	if state, err := pdf.GetTextString(r, dict["State"]); err == nil {
-		text.State = string(state)
+	stateModel, _ := pdf.GetTextString(r, dict["StateModel"])
+	switch stateModel { // set default values
+	case "Marked":
+		text.State = StateUnmarked
+	case "Review":
+		text.State = StateNone
+	}
+	state, _ := pdf.GetTextString(r, dict["State"])
+	switch state {
+	case "Marked":
+		text.State = StateMarked
+	case "Unmarked":
+		text.State = StateUnmarked
+	case "Accepted":
+		text.State = StateAccepted
+	case "Rejected":
+		text.State = StateRejected
+	case "Cancelled":
+		text.State = StateCancelled
+	case "Completed":
+		text.State = StateCompleted
+	case "None":
+		text.State = StateNone
 	}
 
-	if stateModel, err := pdf.GetTextString(r, dict["StateModel"]); err == nil {
-		text.StateModel = string(stateModel)
+	// graceful fallback for invalid state annotations when reading from PDF
+	if text.State != StateUnknown {
+		if text.Markup.InReplyTo == 0 {
+			text.State = StateUnknown // can't fix missing reply relationship
+		} else if text.Markup.User == "" {
+			text.Markup.User = "unknown" // preserve state with placeholder user
+		}
 	}
 
 	return text, nil
@@ -89,44 +121,77 @@ func extractText(r pdf.Getter, obj pdf.Object) (*Text, error) {
 
 func (t *Text) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	if _, err := t.EmbedAt(rm, ref); err != nil {
+		return nil, zero, err
+	}
+	return ref, zero, nil
+}
+
+func (t *Text) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
+	var zero pdf.Unused
 
 	dict := pdf.Dict{
 		"Type":    pdf.Name("Annot"),
 		"Subtype": pdf.Name("Text"),
 	}
 
-	// Add common annotation fields
 	if err := t.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
-
-	// Add markup annotation fields
 	if err := t.Markup.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
-	// Add text-specific fields
+	// text-specific fields
 	if t.Open {
 		dict["Open"] = pdf.Boolean(t.Open)
 	}
 
-	if t.Name != "" {
-		dict["Name"] = t.Name
+	if t.IconName != "" && t.IconName != IconNote {
+		dict["Name"] = pdf.Name(t.IconName)
 	}
-
-	if t.State != "" {
+	if t.State != StateUnknown {
 		if err := pdf.CheckVersion(rm.Out, "text annotation State entry", pdf.V1_5); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
-		dict["State"] = pdf.TextString(t.State)
+		if t.Markup.User == "" {
+			return zero, errors.New("missing User")
+		}
+		if t.Markup.InReplyTo == 0 {
+			return zero, errors.New("missing InReplyTo")
+		}
+
+		switch t.State {
+		case StateUnmarked:
+			dict["StateModel"] = pdf.TextString("Marked")
+			// dict["State"] = pdf.TextString("Unmarked")
+		case StateMarked:
+			dict["StateModel"] = pdf.TextString("Marked")
+			dict["State"] = pdf.TextString("Marked")
+
+		case StateAccepted:
+			dict["StateModel"] = pdf.TextString("Review")
+			dict["State"] = pdf.TextString("Accepted")
+		case StateRejected:
+			dict["StateModel"] = pdf.TextString("Review")
+			dict["State"] = pdf.TextString("Rejected")
+		case StateCancelled:
+			dict["StateModel"] = pdf.TextString("Review")
+			dict["State"] = pdf.TextString("Cancelled")
+		case StateCompleted:
+			dict["StateModel"] = pdf.TextString("Review")
+			dict["State"] = pdf.TextString("Completed")
+		case StateNone:
+			dict["StateModel"] = pdf.TextString("Review")
+			// dict["State"] = pdf.TextString("None")
+		}
 	}
 
-	if t.StateModel != "" {
-		if err := pdf.CheckVersion(rm.Out, "text annotation StateModel entry", pdf.V1_5); err != nil {
-			return nil, zero, err
-		}
-		dict["StateModel"] = pdf.TextString(t.StateModel)
+	err := rm.Out.Put(ref, dict)
+	if err != nil {
+		return zero, err
 	}
 
-	return dict, zero, nil
+	return zero, nil
 }

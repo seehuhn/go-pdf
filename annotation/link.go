@@ -44,9 +44,9 @@ type Link struct {
 	// activated. Array of 8×n numbers (x1 y1 x2 y2 x3 y3 x4 y4 for each quad).
 	QuadPoints []float64
 
-	// BS (optional; PDF 1.6) is a border style dictionary specifying
-	// the line width and dash pattern for drawing the annotation's border.
-	BS pdf.Reference
+	// BS is a border style dictionary specifying the line width and dash
+	// pattern for drawing the annotation's border.
+	BS *Border
 }
 
 var _ pdf.Annotation = (*Link)(nil)
@@ -97,8 +97,32 @@ func extractLink(r pdf.Getter, obj pdf.Object) (*Link, error) {
 		link.QuadPoints = coords
 	}
 
-	if bs, ok := dict["BS"].(pdf.Reference); ok {
-		link.BS = bs
+	// BS (optional)
+	if border, err := pdf.GetArray(r, dict["BS"]); err == nil && border != nil {
+		if len(border) >= 3 {
+			b := &Border{}
+			if h, err := pdf.GetNumber(r, border[0]); err == nil {
+				b.HCornerRadius = float64(h)
+			}
+			if v, err := pdf.GetNumber(r, border[1]); err == nil {
+				b.VCornerRadius = float64(v)
+			}
+			if w, err := pdf.GetNumber(r, border[2]); err == nil {
+				b.Width = float64(w)
+			}
+			if len(border) > 3 {
+				if dashArray, err := pdf.GetArray(r, border[3]); err == nil {
+					dashes := make([]float64, len(dashArray))
+					for i, dash := range dashArray {
+						if num, err := pdf.GetNumber(r, dash); err == nil {
+							dashes[i] = float64(num)
+						}
+					}
+					b.DashArray = dashes
+				}
+			}
+			link.BS = b
+		}
 	}
 
 	return link, nil
@@ -106,7 +130,15 @@ func extractLink(r pdf.Getter, obj pdf.Object) (*Link, error) {
 
 func (l *Link) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	if _, err := l.EmbedAt(rm, ref); err != nil {
+		return nil, zero, err
+	}
+	return ref, zero, nil
+}
 
+func (l *Link) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
+	var zero pdf.Unused
 	dict := pdf.Dict{
 		"Type":    pdf.Name("Annot"),
 		"Subtype": pdf.Name("Link"),
@@ -114,13 +146,13 @@ func (l *Link) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	// Add common annotation fields
 	if err := l.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add link-specific fields
 	if l.A != 0 {
 		if err := pdf.CheckVersion(rm.Out, "link annotation A entry", pdf.V1_1); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		dict["A"] = l.A
 	} else if l.Dest != nil {
@@ -129,21 +161,21 @@ func (l *Link) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	if l.H != "" {
 		if err := pdf.CheckVersion(rm.Out, "link annotation H entry", pdf.V1_2); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		dict["H"] = l.H
 	}
 
 	if l.PA != 0 {
 		if err := pdf.CheckVersion(rm.Out, "link annotation PA entry", pdf.V1_3); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		dict["PA"] = l.PA
 	}
 
 	if l.QuadPoints != nil {
 		if err := pdf.CheckVersion(rm.Out, "link annotation QuadPoints entry", pdf.V1_6); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		quadArray := make(pdf.Array, len(l.QuadPoints))
 		for i, v := range l.QuadPoints {
@@ -152,12 +184,32 @@ func (l *Link) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["QuadPoints"] = quadArray
 	}
 
-	if l.BS != 0 {
+	if l.BS != nil && !l.BS.isDefault() {
 		if err := pdf.CheckVersion(rm.Out, "link annotation BS entry", pdf.V1_6); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
-		dict["BS"] = l.BS
+		borderArray := pdf.Array{
+			pdf.Number(l.BS.HCornerRadius),
+			pdf.Number(l.BS.VCornerRadius),
+			pdf.Number(l.BS.Width),
+		}
+		if l.BS.DashArray != nil {
+			if err := pdf.CheckVersion(rm.Out, "annotation Border dash array", pdf.V1_1); err != nil {
+				return zero, err
+			}
+			dashArray := make(pdf.Array, len(l.BS.DashArray))
+			for i, v := range l.BS.DashArray {
+				dashArray[i] = pdf.Number(v)
+			}
+			borderArray = append(borderArray, dashArray)
+		}
+		dict["BS"] = borderArray
 	}
 
-	return dict, zero, nil
+	err := rm.Out.Put(ref, dict)
+	if err != nil {
+		return zero, err
+	}
+
+	return zero, nil
 }

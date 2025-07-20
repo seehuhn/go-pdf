@@ -109,6 +109,15 @@ func extractCircle(r pdf.Getter, dict pdf.Dict) (*Circle, error) {
 
 func (c *Circle) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	if _, err := c.EmbedAt(rm, ref); err != nil {
+		return nil, zero, err
+	}
+	return ref, zero, nil
+}
+
+func (c *Circle) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
+	var zero pdf.Unused
 
 	dict := pdf.Dict{
 		"Type":    pdf.Name("Annot"),
@@ -117,12 +126,12 @@ func (c *Circle) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 
 	// Add common annotation fields
 	if err := c.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add markup annotation fields
 	if err := c.Markup.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add circle-specific fields
@@ -134,7 +143,7 @@ func (c *Circle) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 	// IC (optional)
 	if c.IC != nil {
 		if err := pdf.CheckVersion(rm.Out, "circle annotation IC entry", pdf.V1_4); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		icArray := make(pdf.Array, len(c.IC))
 		for i, color := range c.IC {
@@ -146,7 +155,7 @@ func (c *Circle) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 	// BE (optional)
 	if c.BE != 0 {
 		if err := pdf.CheckVersion(rm.Out, "circle annotation BE entry", pdf.V1_5); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		dict["BE"] = c.BE
 	}
@@ -154,7 +163,7 @@ func (c *Circle) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 	// RD (optional)
 	if len(c.RD) == 4 {
 		if err := pdf.CheckVersion(rm.Out, "circle annotation RD entry", pdf.V1_5); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		rdArray := make(pdf.Array, 4)
 		for i, diff := range c.RD {
@@ -163,5 +172,10 @@ func (c *Circle) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 		dict["RD"] = rdArray
 	}
 
-	return dict, zero, nil
+	err := rm.Out.Put(ref, dict)
+	if err != nil {
+		return zero, err
+	}
+
+	return zero, nil
 }

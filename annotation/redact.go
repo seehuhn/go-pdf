@@ -143,12 +143,15 @@ func extractRedact(r pdf.Getter, dict pdf.Dict) (*Redact, error) {
 	return redact, nil
 }
 
-// Embed writes the redaction annotation to a PDF file.
 func (r *Redact) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	err := r.EmbedAt(rm, ref)
+	return ref, pdf.Unused{}, err
+}
 
+func (r *Redact) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	if err := pdf.CheckVersion(rm.Out, "redaction annotation", pdf.V1_7); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	dict := pdf.Dict{
@@ -158,12 +161,12 @@ func (r *Redact) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 
 	// Add common annotation fields
 	if err := r.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	// Add markup annotation fields
 	if err := r.Markup.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	// QuadPoints (optional)
@@ -205,7 +208,7 @@ func (r *Redact) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 
 		// DA (required if OverlayText present)
 		if r.DA == "" {
-			return nil, zero, fmt.Errorf("DA field is required when OverlayText is present")
+			return fmt.Errorf("DA field is required when OverlayText is present")
 		}
 	}
 
@@ -222,10 +225,10 @@ func (r *Redact) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 	// Q (optional) - default 0 (left-justified)
 	if r.Q != 0 {
 		if r.Q < 0 || r.Q > 2 {
-			return nil, zero, fmt.Errorf("Q field must be 0, 1, or 2")
+			return fmt.Errorf("the Q field must be 0, 1 or 2")
 		}
 		dict["Q"] = pdf.Integer(r.Q)
 	}
 
-	return dict, zero, nil
+	return rm.Out.Put(ref, dict)
 }

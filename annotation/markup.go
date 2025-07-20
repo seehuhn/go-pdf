@@ -24,13 +24,15 @@ import (
 
 // Markup contains fields common to all markup annotations.
 type Markup struct {
-	// T (optional; PDF 1.1) is the text label that is displayed in the
+	// User (optional; PDF 1.1) is the text label that is displayed in the
 	// title bar of the annotation's popup window when open and active. This
 	// entry identifies the user who added the annotation.
-	T string
+	//
+	// This corresponds to the /T entry in the PDF annotation dictionary.
+	User string
 
-	// Popup (optional; PDF 1.3) is an indirect reference to a popup annotation
-	// for displaying the annotation's contents in a popup window.
+	// Popup (optional) is used for displaying the annotation's contents in a
+	// popup window when the annotation is open.
 	Popup pdf.Reference
 
 	// RC (optional; PDF 1.5) is a rich contents stream or string, providing a
@@ -42,23 +44,29 @@ type Markup struct {
 	// annotation was created.
 	CreationDate time.Time
 
-	// IRT (required if RT is present; PDF 1.5) is a reference to the
+	// InReplyTo (required if RT is present; PDF 1.5) is a reference to the
 	// annotation that this annotation is "in reply to". Both annotations
 	// are on the same page.
-	IRT pdf.Reference
+	//
+	// This corresponds to the /IRT entry in the PDF annotation dictionary.
+	InReplyTo pdf.Reference
 
-	// Subj (optional; PDF 1.5) is the subject of the annotation, typically
-	// displayed in the title bar of the annotation's popup window.
-	Subj string
+	// Subject (optional) is the subject of the annotation, typically displayed
+	// in the title bar of the annotation's popup window.
+	//
+	// This corresponds to the /Subj entry in the PDF annotation dictionary.
+	Subject string
 
 	// RT (optional; PDF 1.6) specifies the relationship between this
 	// annotation and the annotation specified by IRT. Valid values are
 	// "R" (Reply) and "Group". Default value: "R".
 	RT pdf.Name
 
-	// IT (optional; PDF 1.6) describes the intent of the markup annotation.
+	// Intent (optional; PDF 1.6) describes the intent of the markup annotation.
 	// Valid values vary by annotation type.
-	IT pdf.Name
+	//
+	// This corresponds to the /IT entry in the PDF annotation dictionary.
+	Intent pdf.Name
 }
 
 // fillDict adds the fields corresponding to the Markup struct
@@ -67,11 +75,11 @@ type Markup struct {
 func (m *Markup) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 	w := rm.Out
 
-	if m.T != "" {
+	if m.User != "" {
 		if err := pdf.CheckVersion(w, "markup annotation T entry", pdf.V1_1); err != nil {
 			return err
 		}
-		d["T"] = pdf.TextString(m.T)
+		d["T"] = pdf.TextString(m.User)
 	}
 
 	if m.Popup != 0 {
@@ -95,18 +103,18 @@ func (m *Markup) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 		d["CreationDate"] = pdf.Date(m.CreationDate)
 	}
 
-	if m.IRT != 0 {
+	if m.InReplyTo != 0 {
 		if err := pdf.CheckVersion(w, "markup annotation IRT entry", pdf.V1_5); err != nil {
 			return err
 		}
-		d["IRT"] = m.IRT
+		d["IRT"] = m.InReplyTo
 	}
 
-	if m.Subj != "" {
+	if m.Subject != "" {
 		if err := pdf.CheckVersion(w, "markup annotation Subj entry", pdf.V1_5); err != nil {
 			return err
 		}
-		d["Subj"] = pdf.TextString(m.Subj)
+		d["Subj"] = pdf.TextString(m.Subject)
 	}
 
 	if m.RT != "" {
@@ -116,11 +124,11 @@ func (m *Markup) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 		d["RT"] = m.RT
 	}
 
-	if m.IT != "" {
+	if m.Intent != "" {
 		if err := pdf.CheckVersion(w, "markup annotation IT entry", pdf.V1_6); err != nil {
 			return err
 		}
-		d["IT"] = m.IT
+		d["IT"] = m.Intent
 	}
 
 	return nil
@@ -130,7 +138,7 @@ func (m *Markup) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 func extractMarkup(r pdf.Getter, dict pdf.Dict, markup *Markup) error {
 	// T (optional)
 	if t, err := pdf.GetTextString(r, dict["T"]); err == nil {
-		markup.T = string(t)
+		markup.User = string(t)
 	}
 
 	// Popup (optional)
@@ -150,12 +158,12 @@ func extractMarkup(r pdf.Getter, dict pdf.Dict, markup *Markup) error {
 
 	// IRT (optional)
 	if irt, ok := dict["IRT"].(pdf.Reference); ok {
-		markup.IRT = irt
+		markup.InReplyTo = irt
 	}
 
 	// Subj (optional)
 	if subj, err := pdf.GetTextString(r, dict["Subj"]); err == nil {
-		markup.Subj = string(subj)
+		markup.Subject = string(subj)
 	}
 
 	// RT (optional)
@@ -165,7 +173,7 @@ func extractMarkup(r pdf.Getter, dict pdf.Dict, markup *Markup) error {
 
 	// IT (optional)
 	if it, err := pdf.GetName(r, dict["IT"]); err == nil {
-		markup.IT = it
+		markup.Intent = it
 	}
 
 	return nil

@@ -82,9 +82,18 @@ func extractCaret(r pdf.Getter, dict pdf.Dict) (*Caret, error) {
 
 func (c *Caret) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	if _, err := c.EmbedAt(rm, ref); err != nil {
+		return nil, zero, err
+	}
+	return ref, zero, nil
+}
+
+func (c *Caret) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
+	var zero pdf.Unused
 
 	if err := pdf.CheckVersion(rm.Out, "caret annotation", pdf.V1_5); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	dict := pdf.Dict{
@@ -94,12 +103,12 @@ func (c *Caret) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	// Add common annotation fields
 	if err := c.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add markup annotation fields
 	if err := c.Markup.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add caret-specific fields
@@ -117,5 +126,10 @@ func (c *Caret) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["Sy"] = c.Sy
 	}
 
-	return dict, zero, nil
+	err := rm.Out.Put(ref, dict)
+	if err != nil {
+		return zero, err
+	}
+
+	return zero, nil
 }

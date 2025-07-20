@@ -71,9 +71,18 @@ func extractHighlight(r pdf.Getter, dict pdf.Dict) (*Highlight, error) {
 
 func (h *Highlight) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	if _, err := h.EmbedAt(rm, ref); err != nil {
+		return nil, zero, err
+	}
+	return ref, zero, nil
+}
+
+func (h *Highlight) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
+	var zero pdf.Unused
 
 	if err := pdf.CheckVersion(rm.Out, "highlight annotation", pdf.V1_3); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	dict := pdf.Dict{
@@ -83,12 +92,12 @@ func (h *Highlight) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 
 	// Add common annotation fields
 	if err := h.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add markup annotation fields
 	if err := h.Markup.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add highlight-specific fields
@@ -101,5 +110,10 @@ func (h *Highlight) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 		dict["QuadPoints"] = quadArray
 	}
 
-	return dict, zero, nil
+	err := rm.Out.Put(ref, dict)
+	if err != nil {
+		return zero, err
+	}
+
+	return zero, nil
 }

@@ -148,7 +148,15 @@ func extractPolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
 
 func (p *Polyline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	if _, err := p.EmbedAt(rm, ref); err != nil {
+		return nil, zero, err
+	}
+	return ref, zero, nil
+}
 
+func (p *Polyline) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
+	var zero pdf.Unused
 	dict := pdf.Dict{
 		"Type":    pdf.Name("Annot"),
 		"Subtype": pdf.Name("PolyLine"),
@@ -156,19 +164,19 @@ func (p *Polyline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 
 	// Add common annotation fields
 	if err := p.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add markup annotation fields
 	if err := p.Markup.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add polyline-specific fields
 	// Vertices (required unless Path is present)
 	if p.Path == nil && p.Vertices != nil && len(p.Vertices) > 0 {
 		if err := pdf.CheckVersion(rm.Out, "polyline annotation", pdf.V1_5); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		verticesArray := make(pdf.Array, len(p.Vertices))
 		for i, vertex := range p.Vertices {
@@ -200,7 +208,7 @@ func (p *Polyline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 	// Measure (optional)
 	if p.Measure != 0 {
 		if err := pdf.CheckVersion(rm.Out, "polyline annotation Measure entry", pdf.V1_7); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		dict["Measure"] = p.Measure
 	}
@@ -208,7 +216,7 @@ func (p *Polyline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 	// Path (optional; PDF 2.0)
 	if len(p.Path) > 0 {
 		if err := pdf.CheckVersion(rm.Out, "polyline annotation Path entry", pdf.V2_0); err != nil {
-			return nil, zero, err
+			return zero, err
 		}
 		pathArray := make(pdf.Array, 0, len(p.Path))
 		for _, pathEntry := range p.Path {
@@ -225,5 +233,10 @@ func (p *Polyline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 		}
 	}
 
-	return dict, zero, nil
+	err := rm.Out.Put(ref, dict)
+	if err != nil {
+		return zero, err
+	}
+
+	return zero, nil
 }

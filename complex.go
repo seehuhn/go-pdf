@@ -144,6 +144,11 @@ type asTextStringer interface {
 
 type Date time.Time
 
+// Now returns the current date and time as a Date object.
+func Now() Date {
+	return Date(time.Now())
+}
+
 func (d Date) String() string {
 	return time.Time(d).Format(time.RFC3339)
 }
@@ -174,6 +179,7 @@ func (d Date) AsPDF(opt OutputOptions) Native {
 	return String(s)
 }
 
+// TODO(voss): remove
 func (d Date) AsDate() (Date, error) {
 	return d, nil
 }
@@ -216,12 +222,15 @@ func (x String) AsDate() (Date, error) {
 	for _, format := range formats {
 		t, err := time.Parse(format, s)
 		if err == nil {
+			// truncate fractional seconds for consistency with PDF format
+			t = t.Truncate(time.Second)
 			return Date(t), nil
 		}
 	}
 	return zero, errNoDate
 }
 
+// TODO(voss): remove
 type asDater interface {
 	AsDate() (Date, error)
 }

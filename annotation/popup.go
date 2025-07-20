@@ -21,7 +21,7 @@ import "seehuhn.de/go/pdf"
 // Popup represents a popup annotation that displays text in a popup window
 // for entry and editing. It does not appear alone but is associated with a
 // markup annotation (its parent annotation) and is used for editing the
-// parent's text. It has no appearance stream or associated actions of its own.
+// parent's text.
 type Popup struct {
 	Common
 
@@ -68,9 +68,18 @@ func extractPopup(r pdf.Getter, dict pdf.Dict) (*Popup, error) {
 
 func (p *Popup) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	if _, err := p.EmbedAt(rm, ref); err != nil {
+		return nil, zero, err
+	}
+	return ref, zero, nil
+}
+
+func (p *Popup) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
+	var zero pdf.Unused
 
 	if err := pdf.CheckVersion(rm.Out, "popup annotation", pdf.V1_3); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	dict := pdf.Dict{
@@ -80,7 +89,7 @@ func (p *Popup) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	// Add common annotation fields
 	if err := p.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return zero, err
 	}
 
 	// Add popup-specific fields
@@ -94,5 +103,10 @@ func (p *Popup) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["Open"] = pdf.Boolean(p.Open)
 	}
 
-	return dict, zero, nil
+	err := rm.Out.Put(ref, dict)
+	if err != nil {
+		return zero, err
+	}
+
+	return zero, nil
 }

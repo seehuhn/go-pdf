@@ -121,10 +121,14 @@ func extractTrapNet(r pdf.Getter, dict pdf.Dict) (*TrapNet, error) {
 }
 
 func (t *TrapNet) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+	ref := rm.Out.Alloc()
+	err := t.EmbedAt(rm, ref)
+	return ref, pdf.Unused{}, err
+}
 
+func (t *TrapNet) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	if err := pdf.CheckVersion(rm.Out, "trap network annotation", pdf.V1_3); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	dict := pdf.Dict{
@@ -134,14 +138,14 @@ func (t *TrapNet) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 
 	// Add common annotation fields
 	if err := t.Common.fillDict(rm, dict); err != nil {
-		return nil, zero, err
+		return err
 	}
 
 	// Add trap network-specific fields
 	// LastModified (conditional)
 	if t.LastModified != "" {
 		if err := pdf.CheckVersion(rm.Out, "trap network annotation LastModified entry", pdf.V1_4); err != nil {
-			return nil, zero, err
+			return err
 		}
 		dict["LastModified"] = pdf.TextString(t.LastModified)
 	}
@@ -177,5 +181,5 @@ func (t *TrapNet) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 		dict["FontFauxing"] = fauxingArray
 	}
 
-	return dict, zero, nil
+	return rm.Out.Put(ref, dict)
 }
