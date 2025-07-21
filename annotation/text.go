@@ -53,7 +53,7 @@ func (t *Text) AnnotationType() pdf.Name {
 	return "Text"
 }
 
-func extractText(r pdf.Getter, obj pdf.Object) (*Text, error) {
+func extractText(r pdf.Getter, obj pdf.Object, singleUse bool) (*Text, error) {
 	dict, err := pdf.GetDict(r, obj)
 	if err != nil {
 		return nil, err
@@ -62,7 +62,7 @@ func extractText(r pdf.Getter, obj pdf.Object) (*Text, error) {
 	text := &Text{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &text.Common); err != nil {
+	if err := extractCommon(r, &text.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -120,27 +120,31 @@ func extractText(r pdf.Getter, obj pdf.Object) (*Text, error) {
 }
 
 func (t *Text) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	ref := rm.Out.Alloc()
-	if _, err := t.EmbedAt(rm, ref); err != nil {
-		return nil, zero, err
+	dict, err := t.AsDict(rm)
+	if err != nil {
+		return nil, pdf.Unused{}, err
 	}
-	return ref, zero, nil
+
+	if t.SingleUse {
+		return dict, pdf.Unused{}, nil
+	}
+
+	ref := rm.Out.Alloc()
+	err = rm.Out.Put(ref, dict)
+	return ref, pdf.Unused{}, err
 }
 
-func (t *Text) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
-	var zero pdf.Unused
-
+func (t *Text) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Type":    pdf.Name("Annot"),
 		"Subtype": pdf.Name("Text"),
 	}
 
 	if err := t.Common.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 	if err := t.Markup.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// text-specific fields
@@ -153,13 +157,13 @@ func (t *Text) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, 
 	}
 	if t.State != StateUnknown {
 		if err := pdf.CheckVersion(rm.Out, "text annotation State entry", pdf.V1_5); err != nil {
-			return zero, err
+			return nil, err
 		}
 		if t.Markup.User == "" {
-			return zero, errors.New("missing User")
+			return nil, errors.New("missing User")
 		}
 		if t.Markup.InReplyTo == 0 {
-			return zero, errors.New("missing InReplyTo")
+			return nil, errors.New("missing InReplyTo")
 		}
 
 		switch t.State {
@@ -188,10 +192,5 @@ func (t *Text) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, 
 		}
 	}
 
-	err := rm.Out.Put(ref, dict)
-	if err != nil {
-		return zero, err
-	}
-
-	return zero, nil
+	return dict, nil
 }

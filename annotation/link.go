@@ -57,16 +57,11 @@ func (l *Link) AnnotationType() pdf.Name {
 	return "Link"
 }
 
-func extractLink(r pdf.Getter, obj pdf.Object) (*Link, error) {
-	dict, err := pdf.GetDict(r, obj)
-	if err != nil {
-		return nil, err
-	}
-
+func extractLink(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Link, error) {
 	link := &Link{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &link.Common); err != nil {
+	if err := extractCommon(r, &link.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -129,16 +124,21 @@ func extractLink(r pdf.Getter, obj pdf.Object) (*Link, error) {
 }
 
 func (l *Link) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	ref := rm.Out.Alloc()
-	if _, err := l.EmbedAt(rm, ref); err != nil {
-		return nil, zero, err
+	dict, err := l.AsDict(rm)
+	if err != nil {
+		return nil, pdf.Unused{}, err
 	}
-	return ref, zero, nil
+
+	if l.SingleUse {
+		return dict, pdf.Unused{}, nil
+	}
+
+	ref := rm.Out.Alloc()
+	err = rm.Out.Put(ref, dict)
+	return ref, pdf.Unused{}, err
 }
 
-func (l *Link) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
-	var zero pdf.Unused
+func (l *Link) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Type":    pdf.Name("Annot"),
 		"Subtype": pdf.Name("Link"),
@@ -146,13 +146,13 @@ func (l *Link) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, 
 
 	// Add common annotation fields
 	if err := l.Common.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add link-specific fields
 	if l.A != 0 {
 		if err := pdf.CheckVersion(rm.Out, "link annotation A entry", pdf.V1_1); err != nil {
-			return zero, err
+			return nil, err
 		}
 		dict["A"] = l.A
 	} else if l.Dest != nil {
@@ -161,21 +161,21 @@ func (l *Link) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, 
 
 	if l.H != "" {
 		if err := pdf.CheckVersion(rm.Out, "link annotation H entry", pdf.V1_2); err != nil {
-			return zero, err
+			return nil, err
 		}
 		dict["H"] = l.H
 	}
 
 	if l.PA != 0 {
 		if err := pdf.CheckVersion(rm.Out, "link annotation PA entry", pdf.V1_3); err != nil {
-			return zero, err
+			return nil, err
 		}
 		dict["PA"] = l.PA
 	}
 
 	if l.QuadPoints != nil {
 		if err := pdf.CheckVersion(rm.Out, "link annotation QuadPoints entry", pdf.V1_6); err != nil {
-			return zero, err
+			return nil, err
 		}
 		quadArray := make(pdf.Array, len(l.QuadPoints))
 		for i, v := range l.QuadPoints {
@@ -186,7 +186,7 @@ func (l *Link) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, 
 
 	if l.BS != nil && !l.BS.isDefault() {
 		if err := pdf.CheckVersion(rm.Out, "link annotation BS entry", pdf.V1_6); err != nil {
-			return zero, err
+			return nil, err
 		}
 		borderArray := pdf.Array{
 			pdf.Number(l.BS.HCornerRadius),
@@ -195,7 +195,7 @@ func (l *Link) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, 
 		}
 		if l.BS.DashArray != nil {
 			if err := pdf.CheckVersion(rm.Out, "annotation Border dash array", pdf.V1_1); err != nil {
-				return zero, err
+				return nil, err
 			}
 			dashArray := make(pdf.Array, len(l.BS.DashArray))
 			for i, v := range l.BS.DashArray {
@@ -206,10 +206,5 @@ func (l *Link) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, 
 		dict["BS"] = borderArray
 	}
 
-	err := rm.Out.Put(ref, dict)
-	if err != nil {
-		return zero, err
-	}
-
-	return zero, nil
+	return dict, nil
 }

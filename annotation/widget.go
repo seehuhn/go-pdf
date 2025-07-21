@@ -67,11 +67,11 @@ func (w *Widget) AnnotationType() pdf.Name {
 	return "Widget"
 }
 
-func extractWidget(r pdf.Getter, dict pdf.Dict) (*Widget, error) {
+func extractWidget(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Widget, error) {
 	widget := &Widget{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &widget.Common); err != nil {
+	if err := extractCommon(r, &widget.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -112,18 +112,23 @@ func extractWidget(r pdf.Getter, dict pdf.Dict) (*Widget, error) {
 }
 
 func (w *Widget) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	ref := rm.Out.Alloc()
-	if _, err := w.EmbedAt(rm, ref); err != nil {
-		return nil, zero, err
+	dict, err := w.AsDict(rm)
+	if err != nil {
+		return nil, pdf.Unused{}, err
 	}
-	return ref, zero, nil
+
+	if w.SingleUse {
+		return dict, pdf.Unused{}, nil
+	}
+
+	ref := rm.Out.Alloc()
+	err = rm.Out.Put(ref, dict)
+	return ref, pdf.Unused{}, err
 }
 
-func (w *Widget) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
-	var zero pdf.Unused
+func (w *Widget) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "widget annotation", pdf.V1_2); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -133,7 +138,7 @@ func (w *Widget) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused
 
 	// Add common annotation fields
 	if err := w.Common.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add widget-specific fields
@@ -167,10 +172,5 @@ func (w *Widget) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused
 		dict["Parent"] = w.Parent
 	}
 
-	err := rm.Out.Put(ref, dict)
-	if err != nil {
-		return zero, err
-	}
-
-	return zero, nil
+	return dict, nil
 }

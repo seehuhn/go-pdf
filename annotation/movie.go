@@ -52,11 +52,11 @@ func (m *Movie) AnnotationType() pdf.Name {
 	return "Movie"
 }
 
-func extractMovie(r pdf.Getter, dict pdf.Dict) (*Movie, error) {
+func extractMovie(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Movie, error) {
 	movie := &Movie{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &movie.Common); err != nil {
+	if err := extractCommon(r, &movie.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -82,18 +82,23 @@ func extractMovie(r pdf.Getter, dict pdf.Dict) (*Movie, error) {
 }
 
 func (m *Movie) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	ref := rm.Out.Alloc()
-	if _, err := m.EmbedAt(rm, ref); err != nil {
-		return nil, zero, err
+	dict, err := m.AsDict(rm)
+	if err != nil {
+		return nil, pdf.Unused{}, err
 	}
-	return ref, zero, nil
+
+	if m.SingleUse {
+		return dict, pdf.Unused{}, nil
+	}
+
+	ref := rm.Out.Alloc()
+	err = rm.Out.Put(ref, dict)
+	return ref, pdf.Unused{}, err
 }
 
-func (m *Movie) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
-	var zero pdf.Unused
+func (m *Movie) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "movie annotation", pdf.V1_2); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -103,7 +108,7 @@ func (m *Movie) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused,
 
 	// Add common annotation fields
 	if err := m.Common.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add movie-specific fields
@@ -124,10 +129,5 @@ func (m *Movie) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused,
 		}
 	}
 
-	err := rm.Out.Put(ref, dict)
-	if err != nil {
-		return zero, err
-	}
-
-	return zero, nil
+	return dict, nil
 }

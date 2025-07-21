@@ -87,14 +87,23 @@ func (a *Annot3D) AnnotationType() pdf.Name {
 }
 
 func (a *Annot3D) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	dict, err := a.AsDict(rm)
+	if err != nil {
+		return nil, pdf.Unused{}, err
+	}
+
+	if a.SingleUse {
+		return dict, pdf.Unused{}, nil
+	}
+
 	ref := rm.Out.Alloc()
-	err := a.EmbedAt(rm, ref)
+	err = rm.Out.Put(ref, dict)
 	return ref, pdf.Unused{}, err
 }
 
-func (a *Annot3D) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
+func (a *Annot3D) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "3D annotation", pdf.V1_6); err != nil {
-		return err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -104,12 +113,12 @@ func (a *Annot3D) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 
 	// Add common annotation fields
 	if err := a.Common.fillDict(rm, dict); err != nil {
-		return err
+		return nil, err
 	}
 
 	// 3DD (required)
 	if a.D == nil {
-		return fmt.Errorf("3DD field is required")
+		return nil, fmt.Errorf("3DD field is required")
 	}
 	dict["3DD"] = a.D
 
@@ -145,7 +154,7 @@ func (a *Annot3D) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 		// TB (optional, PDF 1.7) - default true
 		if !a.A.TB {
 			if err := pdf.CheckVersion(rm.Out, "3D annotation TB entry", pdf.V1_7); err != nil {
-				return err
+				return nil, err
 			}
 			activationDict["TB"] = pdf.Boolean(false)
 		}
@@ -153,7 +162,7 @@ func (a *Annot3D) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 		// NP (optional, PDF 1.7) - default false
 		if a.A.NP {
 			if err := pdf.CheckVersion(rm.Out, "3D annotation NP entry", pdf.V1_7); err != nil {
-				return err
+				return nil, err
 			}
 			activationDict["NP"] = pdf.Boolean(true)
 		}
@@ -161,7 +170,7 @@ func (a *Annot3D) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 		// Style (optional, PDF 2.0) - default Embedded
 		if a.A.Style != "" && a.A.Style != "Embedded" {
 			if err := pdf.CheckVersion(rm.Out, "3D annotation Style entry", pdf.V2_0); err != nil {
-				return err
+				return nil, err
 			}
 			activationDict["Style"] = a.A.Style
 		}
@@ -169,7 +178,7 @@ func (a *Annot3D) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 		// Window (optional, PDF 2.0)
 		if a.A.Window != 0 {
 			if err := pdf.CheckVersion(rm.Out, "3D annotation Window entry", pdf.V2_0); err != nil {
-				return err
+				return nil, err
 			}
 			activationDict["Window"] = a.A.Window
 		}
@@ -177,7 +186,7 @@ func (a *Annot3D) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 		// Transparent (optional, PDF 2.0) - default false
 		if a.A.Transparent {
 			if err := pdf.CheckVersion(rm.Out, "3D annotation Transparent entry", pdf.V2_0); err != nil {
-				return err
+				return nil, err
 			}
 			activationDict["Transparent"] = pdf.Boolean(true)
 		}
@@ -205,7 +214,7 @@ func (a *Annot3D) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	// 3DU (optional, PDF 2.0)
 	if a.U != 0 {
 		if err := pdf.CheckVersion(rm.Out, "3D annotation 3DU entry", pdf.V2_0); err != nil {
-			return err
+			return nil, err
 		}
 		dict["3DU"] = a.U
 	}
@@ -213,19 +222,19 @@ func (a *Annot3D) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	// GEO (optional, PDF 2.0)
 	if a.GEO != 0 {
 		if err := pdf.CheckVersion(rm.Out, "3D annotation GEO entry", pdf.V2_0); err != nil {
-			return err
+			return nil, err
 		}
 		dict["GEO"] = a.GEO
 	}
 
-	return rm.Out.Put(ref, dict)
+	return dict, nil
 }
 
-func extractAnnot3D(r pdf.Getter, dict pdf.Dict) (*Annot3D, error) {
+func extractAnnot3D(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Annot3D, error) {
 	annot3D := &Annot3D{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &annot3D.Common); err != nil {
+	if err := extractCommon(r, &annot3D.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 

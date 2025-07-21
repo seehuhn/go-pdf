@@ -59,7 +59,7 @@ func (u *Unknown) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 	return dict, zero, nil
 }
 
-func extractUnknown(r pdf.Getter, dict pdf.Dict) (*Unknown, error) {
+func extractUnknown(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Unknown, error) {
 	subtype, err := pdf.GetName(r, dict["Subtype"])
 	if err != nil {
 		return nil, err
@@ -73,7 +73,7 @@ func extractUnknown(r pdf.Getter, dict pdf.Dict) (*Unknown, error) {
 	}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &unknown.Common); err != nil {
+	if err := extractCommon(r, &unknown.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 

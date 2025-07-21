@@ -55,11 +55,11 @@ func (s *Stamp) AnnotationType() pdf.Name {
 	return "Stamp"
 }
 
-func extractStamp(r pdf.Getter, dict pdf.Dict) (*Stamp, error) {
+func extractStamp(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Stamp, error) {
 	stamp := &Stamp{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &stamp.Common); err != nil {
+	if err := extractCommon(r, &stamp.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -90,14 +90,24 @@ func extractStamp(r pdf.Getter, dict pdf.Dict) (*Stamp, error) {
 }
 
 func (s *Stamp) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
+	dict, err := s.AsDict(rm)
+	if err != nil {
+		return nil, zero, err
+	}
+
+	if s.SingleUse {
+		return dict, zero, nil
+	}
+
 	ref := rm.Out.Alloc()
-	err := s.EmbedAt(rm, ref)
-	return ref, pdf.Unused{}, err
+	err = rm.Out.Put(ref, dict)
+	return ref, zero, err
 }
 
-func (s *Stamp) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
+func (s *Stamp) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "stamp annotation", pdf.V1_3); err != nil {
-		return err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -107,12 +117,12 @@ func (s *Stamp) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 
 	// Add common annotation fields
 	if err := s.Common.fillDict(rm, dict); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Add markup annotation fields
 	if err := s.Markup.fillDict(rm, dict); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Add stamp-specific fields
@@ -120,7 +130,7 @@ func (s *Stamp) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	if s.Intent != "" && s.Intent != "Stamp" {
 		// IT is present and not "Stamp" - Name is not present
 		if s.Name != "" && s.Name != "Draft" {
-			return fmt.Errorf("stamp annotation: Name field is not present when IT is %q", s.Intent)
+			return nil, fmt.Errorf("stamp annotation: Name field is not present when IT is %q", s.Intent)
 		}
 		// Don't write Name field
 	} else {
@@ -133,5 +143,5 @@ func (s *Stamp) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 
 	// Note: IT field is already handled by fillDict in the Markup struct
 
-	return rm.Out.Put(ref, dict)
+	return dict, nil
 }

@@ -358,3 +358,50 @@ func TestType0CatmullRomSpline(t *testing.T) {
 		})
 	}
 }
+
+// TestType0Empty tests that a Type0 function with no inputs and no outputs
+// is handled correctly.
+func TestType0Empty(t *testing.T) {
+	f := &Type0{
+		Domain:        []float64{},
+		Range:         []float64{},
+		Size:          []int{},
+		BitsPerSample: 8,
+		Samples:       []byte{},
+	}
+
+	m, n := f.Shape()
+	if m != 0 || n != 0 {
+		t.Errorf("expected shape (0, 0), got (%d, %d)", m, n)
+	}
+	result := f.Apply()
+	if len(result) != 0 {
+		t.Errorf("expected no output, got %d", len(result))
+	}
+}
+
+// TestType0Constant tests that functions with no inputs and one output
+// are handled correctly.
+func TestType0Constant(t *testing.T) {
+	f := &Type0{
+		Domain:        []float64{},
+		Range:         []float64{0, 1},
+		Size:          []int{},
+		BitsPerSample: 8,
+		Encode:        []float64{},
+		Decode:        []float64{0, 1},
+		Samples:       []byte{},
+	}
+
+	m, n := f.Shape()
+	if m != 0 || n != 1 {
+		t.Errorf("expected shape (0, 1), got (%d, %d)", m, n)
+	}
+	result := f.Apply()
+	if len(result) != 1 {
+		t.Errorf("expected 1 output, got %d", len(result))
+	}
+	if result[0] != 0 {
+		t.Errorf("expected output 0, got %f", result[0])
+	}
+}

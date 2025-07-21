@@ -68,11 +68,11 @@ func (f *FreeText) AnnotationType() pdf.Name {
 	return "FreeText"
 }
 
-func extractFreeText(r pdf.Getter, dict pdf.Dict) (*FreeText, error) {
+func extractFreeText(r pdf.Getter, dict pdf.Dict, singleUse bool) (*FreeText, error) {
 	freeText := &FreeText{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &freeText.Common); err != nil {
+	if err := extractCommon(r, &freeText.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -131,15 +131,21 @@ func extractFreeText(r pdf.Getter, dict pdf.Dict) (*FreeText, error) {
 
 func (f *FreeText) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	ref := rm.Out.Alloc()
-	if _, err := f.EmbedAt(rm, ref); err != nil {
+	dict, err := f.AsDict(rm)
+	if err != nil {
 		return nil, zero, err
 	}
-	return ref, zero, nil
+
+	if f.SingleUse {
+		return dict, zero, nil
+	}
+
+	ref := rm.Out.Alloc()
+	err = rm.Out.Put(ref, dict)
+	return ref, zero, err
 }
 
-func (f *FreeText) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
-	var zero pdf.Unused
+func (f *FreeText) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 
 	dict := pdf.Dict{
 		"Type":    pdf.Name("Annot"),
@@ -148,12 +154,12 @@ func (f *FreeText) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unus
 
 	// Add common annotation fields
 	if err := f.Common.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add markup annotation fields
 	if err := f.Markup.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add free text-specific fields
@@ -163,21 +169,21 @@ func (f *FreeText) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unus
 
 	if f.Q != 0 {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation Q entry", pdf.V1_4); err != nil {
-			return zero, err
+			return nil, err
 		}
 		dict["Q"] = f.Q
 	}
 
 	if f.DS != "" {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation DS entry", pdf.V1_5); err != nil {
-			return zero, err
+			return nil, err
 		}
 		dict["DS"] = pdf.TextString(f.DS)
 	}
 
 	if f.CL != nil {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation CL entry", pdf.V1_6); err != nil {
-			return zero, err
+			return nil, err
 		}
 		clArray := make(pdf.Array, len(f.CL))
 		for i, coord := range f.CL {
@@ -188,14 +194,14 @@ func (f *FreeText) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unus
 
 	if f.BE != 0 {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation BE entry", pdf.V1_6); err != nil {
-			return zero, err
+			return nil, err
 		}
 		dict["BE"] = f.BE
 	}
 
 	if f.RD != nil {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation RD entry", pdf.V1_6); err != nil {
-			return zero, err
+			return nil, err
 		}
 		rdArray := make(pdf.Array, len(f.RD))
 		for i, diff := range f.RD {
@@ -206,22 +212,17 @@ func (f *FreeText) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unus
 
 	if f.BS != 0 {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation BS entry", pdf.V1_6); err != nil {
-			return zero, err
+			return nil, err
 		}
 		dict["BS"] = f.BS
 	}
 
 	if f.LE != "" {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation LE entry", pdf.V1_6); err != nil {
-			return zero, err
+			return nil, err
 		}
 		dict["LE"] = f.LE
 	}
 
-	err := rm.Out.Put(ref, dict)
-	if err != nil {
-		return zero, err
-	}
-
-	return zero, nil
+	return dict, nil
 }

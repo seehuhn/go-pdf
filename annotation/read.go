@@ -22,6 +22,8 @@ import (
 
 // Extract extracts an annotation from a PDF file.
 func Extract(r pdf.Getter, obj pdf.Object) (pdf.Annotation, error) {
+	_, singleUse := obj.(pdf.Dict)
+
 	dict, err := pdf.GetDictTyped(r, obj, "Annot")
 	if err != nil {
 		return nil, err
@@ -34,62 +36,62 @@ func Extract(r pdf.Getter, obj pdf.Object) (pdf.Annotation, error) {
 
 	switch subtype {
 	case "Text":
-		return extractText(r, dict)
+		return extractText(r, dict, singleUse)
 	case "Link":
-		return extractLink(r, dict)
+		return extractLink(r, dict, singleUse)
 	case "FreeText":
-		return extractFreeText(r, dict)
+		return extractFreeText(r, dict, singleUse)
 	case "Line":
-		return extractLine(r, dict)
+		return extractLine(r, dict, singleUse)
 	case "Square":
-		return extractSquare(r, dict)
+		return extractSquare(r, dict, singleUse)
 	case "Circle":
-		return extractCircle(r, dict)
+		return extractCircle(r, dict, singleUse)
 	case "Polygon":
-		return extractPolygon(r, dict)
+		return extractPolygon(r, dict, singleUse)
 	case "PolyLine":
-		return extractPolyline(r, dict)
+		return extractPolyline(r, dict, singleUse)
 	case "Highlight":
-		return extractHighlight(r, dict)
+		return extractHighlight(r, dict, singleUse)
 	case "Underline":
-		return extractUnderline(r, dict)
+		return extractUnderline(r, dict, singleUse)
 	case "Squiggly":
-		return extractSquiggly(r, dict)
+		return extractSquiggly(r, dict, singleUse)
 	case "StrikeOut":
-		return extractStrikeOut(r, dict)
+		return extractStrikeOut(r, dict, singleUse)
 	case "Caret":
-		return extractCaret(r, dict)
+		return extractCaret(r, dict, singleUse)
 	case "Stamp":
-		return extractStamp(r, dict)
+		return extractStamp(r, dict, singleUse)
 	case "Ink":
-		return extractInk(r, dict)
+		return extractInk(r, dict, singleUse)
 	case "Popup":
-		return extractPopup(r, dict)
+		return extractPopup(r, dict, singleUse)
 	case "FileAttachment":
-		return extractFileAttachment(r, dict)
+		return extractFileAttachment(r, dict, singleUse)
 	case "Sound":
-		return extractSound(r, dict)
+		return extractSound(r, dict, singleUse)
 	case "Movie":
-		return extractMovie(r, dict)
+		return extractMovie(r, dict, singleUse)
 	case "Screen":
-		return extractScreen(r, dict)
+		return extractScreen(r, dict, singleUse)
 	case "Widget":
-		return extractWidget(r, dict)
+		return extractWidget(r, dict, singleUse)
 	case "PrinterMark":
-		return extractPrinterMark(r, dict)
+		return extractPrinterMark(r, dict, singleUse)
 	case "TrapNet":
-		return extractTrapNet(r, dict)
+		return extractTrapNet(r, dict, singleUse)
 	case "Watermark":
-		return extractWatermark(r, dict)
+		return extractWatermark(r, dict, singleUse)
 	case "3D":
-		return extractAnnot3D(r, dict)
+		return extractAnnot3D(r, dict, singleUse)
 	case "Redact":
-		return extractRedact(r, dict)
+		return extractRedact(r, dict, singleUse)
 	case "Projection":
-		return extractProjection(r, dict)
+		return extractProjection(r, dict, singleUse)
 	case "RichMedia":
-		return extractRichMedia(r, dict)
+		return extractRichMedia(r, dict, singleUse)
 	default:
-		return extractUnknown(r, dict)
+		return extractUnknown(r, dict, singleUse)
 	}
 }

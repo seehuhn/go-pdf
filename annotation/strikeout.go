@@ -41,11 +41,11 @@ func (s *StrikeOut) AnnotationType() pdf.Name {
 	return "StrikeOut"
 }
 
-func extractStrikeOut(r pdf.Getter, dict pdf.Dict) (*StrikeOut, error) {
+func extractStrikeOut(r pdf.Getter, dict pdf.Dict, singleUse bool) (*StrikeOut, error) {
 	strikeOut := &StrikeOut{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &strikeOut.Common); err != nil {
+	if err := extractCommon(r, &strikeOut.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -70,19 +70,23 @@ func extractStrikeOut(r pdf.Getter, dict pdf.Dict) (*StrikeOut, error) {
 }
 
 func (s *StrikeOut) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	ref := rm.Out.Alloc()
-	if _, err := s.EmbedAt(rm, ref); err != nil {
-		return nil, zero, err
+	dict, err := s.AsDict(rm)
+	if err != nil {
+		return nil, pdf.Unused{}, err
 	}
-	return ref, zero, nil
+
+	if s.SingleUse {
+		return dict, pdf.Unused{}, nil
+	}
+
+	ref := rm.Out.Alloc()
+	err = rm.Out.Put(ref, dict)
+	return ref, pdf.Unused{}, err
 }
 
-func (s *StrikeOut) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
-	var zero pdf.Unused
-
+func (s *StrikeOut) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "strikeout annotation", pdf.V1_3); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -92,12 +96,12 @@ func (s *StrikeOut) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unu
 
 	// Add common annotation fields
 	if err := s.Common.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add markup annotation fields
 	if err := s.Markup.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add strikeout-specific fields
@@ -110,10 +114,5 @@ func (s *StrikeOut) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unu
 		dict["QuadPoints"] = quadArray
 	}
 
-	err := rm.Out.Put(ref, dict)
-	if err != nil {
-		return zero, err
-	}
-
-	return zero, nil
+	return dict, nil
 }

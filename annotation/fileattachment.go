@@ -45,11 +45,11 @@ func (f *FileAttachment) AnnotationType() pdf.Name {
 	return "FileAttachment"
 }
 
-func extractFileAttachment(r pdf.Getter, dict pdf.Dict) (*FileAttachment, error) {
+func extractFileAttachment(r pdf.Getter, dict pdf.Dict, singleUse bool) (*FileAttachment, error) {
 	fileAttachment := &FileAttachment{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &fileAttachment.Common); err != nil {
+	if err := extractCommon(r, &fileAttachment.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -73,14 +73,23 @@ func extractFileAttachment(r pdf.Getter, dict pdf.Dict) (*FileAttachment, error)
 }
 
 func (f *FileAttachment) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	dict, err := f.AsDict(rm)
+	if err != nil {
+		return nil, pdf.Unused{}, err
+	}
+
+	if f.SingleUse {
+		return dict, pdf.Unused{}, nil
+	}
+
 	ref := rm.Out.Alloc()
-	err := f.EmbedAt(rm, ref)
+	err = rm.Out.Put(ref, dict)
 	return ref, pdf.Unused{}, err
 }
 
-func (f *FileAttachment) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
+func (f *FileAttachment) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "file attachment annotation", pdf.V1_3); err != nil {
-		return err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -90,12 +99,12 @@ func (f *FileAttachment) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) err
 
 	// Add common annotation fields
 	if err := f.Common.fillDict(rm, dict); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Add markup annotation fields
 	if err := f.Markup.fillDict(rm, dict); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Add file attachment-specific fields
@@ -109,5 +118,5 @@ func (f *FileAttachment) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) err
 		dict["Name"] = f.Name
 	}
 
-	return rm.Out.Put(ref, dict)
+	return dict, nil
 }

@@ -67,11 +67,11 @@ func (p *Polyline) AnnotationType() pdf.Name {
 	return "PolyLine"
 }
 
-func extractPolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
+func extractPolyline(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Polyline, error) {
 	polyline := &Polyline{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &polyline.Common); err != nil {
+	if err := extractCommon(r, &polyline.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -147,16 +147,21 @@ func extractPolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
 }
 
 func (p *Polyline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	ref := rm.Out.Alloc()
-	if _, err := p.EmbedAt(rm, ref); err != nil {
-		return nil, zero, err
+	dict, err := p.AsDict(rm)
+	if err != nil {
+		return nil, pdf.Unused{}, err
 	}
-	return ref, zero, nil
+
+	if p.SingleUse {
+		return dict, pdf.Unused{}, nil
+	}
+
+	ref := rm.Out.Alloc()
+	err = rm.Out.Put(ref, dict)
+	return ref, pdf.Unused{}, err
 }
 
-func (p *Polyline) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
-	var zero pdf.Unused
+func (p *Polyline) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Type":    pdf.Name("Annot"),
 		"Subtype": pdf.Name("PolyLine"),
@@ -164,19 +169,19 @@ func (p *Polyline) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unus
 
 	// Add common annotation fields
 	if err := p.Common.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add markup annotation fields
 	if err := p.Markup.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add polyline-specific fields
 	// Vertices (required unless Path is present)
 	if p.Path == nil && p.Vertices != nil && len(p.Vertices) > 0 {
 		if err := pdf.CheckVersion(rm.Out, "polyline annotation", pdf.V1_5); err != nil {
-			return zero, err
+			return nil, err
 		}
 		verticesArray := make(pdf.Array, len(p.Vertices))
 		for i, vertex := range p.Vertices {
@@ -208,7 +213,7 @@ func (p *Polyline) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unus
 	// Measure (optional)
 	if p.Measure != 0 {
 		if err := pdf.CheckVersion(rm.Out, "polyline annotation Measure entry", pdf.V1_7); err != nil {
-			return zero, err
+			return nil, err
 		}
 		dict["Measure"] = p.Measure
 	}
@@ -216,7 +221,7 @@ func (p *Polyline) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unus
 	// Path (optional; PDF 2.0)
 	if len(p.Path) > 0 {
 		if err := pdf.CheckVersion(rm.Out, "polyline annotation Path entry", pdf.V2_0); err != nil {
-			return zero, err
+			return nil, err
 		}
 		pathArray := make(pdf.Array, 0, len(p.Path))
 		for _, pathEntry := range p.Path {
@@ -233,10 +238,5 @@ func (p *Polyline) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unus
 		}
 	}
 
-	err := rm.Out.Put(ref, dict)
-	if err != nil {
-		return zero, err
-	}
-
-	return zero, nil
+	return dict, nil
 }

@@ -64,11 +64,11 @@ func (t *TrapNet) AnnotationType() pdf.Name {
 	return "TrapNet"
 }
 
-func extractTrapNet(r pdf.Getter, dict pdf.Dict) (*TrapNet, error) {
+func extractTrapNet(r pdf.Getter, dict pdf.Dict, singleUse bool) (*TrapNet, error) {
 	trapNet := &TrapNet{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &trapNet.Common); err != nil {
+	if err := extractCommon(r, &trapNet.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -121,14 +121,24 @@ func extractTrapNet(r pdf.Getter, dict pdf.Dict) (*TrapNet, error) {
 }
 
 func (t *TrapNet) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
+	dict, err := t.AsDict(rm)
+	if err != nil {
+		return nil, zero, err
+	}
+
+	if t.SingleUse {
+		return dict, zero, nil
+	}
+
 	ref := rm.Out.Alloc()
-	err := t.EmbedAt(rm, ref)
-	return ref, pdf.Unused{}, err
+	err = rm.Out.Put(ref, dict)
+	return ref, zero, err
 }
 
-func (t *TrapNet) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
+func (t *TrapNet) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "trap network annotation", pdf.V1_3); err != nil {
-		return err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -138,14 +148,14 @@ func (t *TrapNet) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 
 	// Add common annotation fields
 	if err := t.Common.fillDict(rm, dict); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Add trap network-specific fields
 	// LastModified (conditional)
 	if t.LastModified != "" {
 		if err := pdf.CheckVersion(rm.Out, "trap network annotation LastModified entry", pdf.V1_4); err != nil {
-			return err
+			return nil, err
 		}
 		dict["LastModified"] = pdf.TextString(t.LastModified)
 	}
@@ -181,5 +191,5 @@ func (t *TrapNet) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 		dict["FontFauxing"] = fauxingArray
 	}
 
-	return rm.Out.Put(ref, dict)
+	return dict, nil
 }

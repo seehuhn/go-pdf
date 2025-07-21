@@ -62,8 +62,8 @@ type Type3 struct {
 	// AntiAlias controls whether to filter the shading function to prevent aliasing.
 	AntiAlias bool
 
-	// SingleUse determines if shading is returned as dictionary (true) or
-	// reference (false).
+	// SingleUse determines if Embed returns as dictionary (true) or
+	// a reference (false).
 	SingleUse bool
 }
 
@@ -137,7 +137,7 @@ func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	var data pdf.Native
 	if s.SingleUse {
-		data = dict.AsPDF(rm.Out.GetOptions())
+		data = dict
 	} else {
 		ref := rm.Out.Alloc()
 		err := rm.Out.Put(ref, dict)

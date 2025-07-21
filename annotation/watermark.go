@@ -66,11 +66,11 @@ func (w *Watermark) AnnotationType() pdf.Name {
 	return "Watermark"
 }
 
-func extractWatermark(r pdf.Getter, dict pdf.Dict) (*Watermark, error) {
+func extractWatermark(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Watermark, error) {
 	watermark := &Watermark{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &watermark.Common); err != nil {
+	if err := extractCommon(r, &watermark.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -115,14 +115,24 @@ func extractWatermark(r pdf.Getter, dict pdf.Dict) (*Watermark, error) {
 }
 
 func (w *Watermark) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
+	dict, err := w.AsDict(rm)
+	if err != nil {
+		return nil, zero, err
+	}
+
+	if w.SingleUse {
+		return dict, zero, nil
+	}
+
 	ref := rm.Out.Alloc()
-	err := w.EmbedAt(rm, ref)
-	return ref, pdf.Unused{}, err
+	err = rm.Out.Put(ref, dict)
+	return ref, zero, err
 }
 
-func (w *Watermark) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
+func (w *Watermark) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "watermark annotation", pdf.V1_6); err != nil {
-		return err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -132,7 +142,7 @@ func (w *Watermark) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 
 	// Add common annotation fields
 	if err := w.Common.fillDict(rm, dict); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Add watermark-specific fields
@@ -172,5 +182,5 @@ func (w *Watermark) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 		dict["FixedPrint"] = fixedPrintRef
 	}
 
-	return rm.Out.Put(ref, dict)
+	return dict, nil
 }

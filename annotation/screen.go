@@ -48,11 +48,11 @@ func (s *Screen) AnnotationType() pdf.Name {
 	return "Screen"
 }
 
-func extractScreen(r pdf.Getter, dict pdf.Dict) (*Screen, error) {
+func extractScreen(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Screen, error) {
 	screen := &Screen{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &screen.Common); err != nil {
+	if err := extractCommon(r, &screen.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -81,14 +81,24 @@ func extractScreen(r pdf.Getter, dict pdf.Dict) (*Screen, error) {
 }
 
 func (s *Screen) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
+	dict, err := s.AsDict(rm)
+	if err != nil {
+		return nil, zero, err
+	}
+
+	if s.SingleUse {
+		return dict, zero, nil
+	}
+
 	ref := rm.Out.Alloc()
-	err := s.EmbedAt(rm, ref)
-	return ref, pdf.Unused{}, err
+	err = rm.Out.Put(ref, dict)
+	return ref, zero, err
 }
 
-func (s *Screen) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
+func (s *Screen) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "screen annotation", pdf.V1_5); err != nil {
-		return err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -98,7 +108,7 @@ func (s *Screen) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 
 	// Add common annotation fields
 	if err := s.Common.fillDict(rm, dict); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Add screen-specific fields
@@ -122,5 +132,5 @@ func (s *Screen) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 		dict["AA"] = s.AA
 	}
 
-	return rm.Out.Put(ref, dict)
+	return dict, nil
 }

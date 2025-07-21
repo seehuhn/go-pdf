@@ -65,11 +65,11 @@ func (p *Polygon) AnnotationType() pdf.Name {
 	return "Polygon"
 }
 
-func extractPolygon(r pdf.Getter, dict pdf.Dict) (*Polygon, error) {
+func extractPolygon(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Polygon, error) {
 	polygon := &Polygon{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &polygon.Common); err != nil {
+	if err := extractCommon(r, &polygon.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -143,17 +143,21 @@ func extractPolygon(r pdf.Getter, dict pdf.Dict) (*Polygon, error) {
 }
 
 func (p *Polygon) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	ref := rm.Out.Alloc()
-	if _, err := p.EmbedAt(rm, ref); err != nil {
-		return nil, zero, err
+	dict, err := p.AsDict(rm)
+	if err != nil {
+		return nil, pdf.Unused{}, err
 	}
-	return ref, zero, nil
+
+	if p.SingleUse {
+		return dict, pdf.Unused{}, nil
+	}
+
+	ref := rm.Out.Alloc()
+	err = rm.Out.Put(ref, dict)
+	return ref, pdf.Unused{}, err
 }
 
-func (p *Polygon) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
-	var zero pdf.Unused
-
+func (p *Polygon) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Type":    pdf.Name("Annot"),
 		"Subtype": pdf.Name("Polygon"),
@@ -161,19 +165,19 @@ func (p *Polygon) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unuse
 
 	// Add common annotation fields
 	if err := p.Common.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add markup annotation fields
 	if err := p.Markup.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add polygon-specific fields
 	// Vertices (required unless Path is present)
 	if p.Path == nil && p.Vertices != nil && len(p.Vertices) > 0 {
 		if err := pdf.CheckVersion(rm.Out, "polygon annotation", pdf.V1_5); err != nil {
-			return zero, err
+			return nil, err
 		}
 		verticesArray := make(pdf.Array, len(p.Vertices))
 		for i, vertex := range p.Vertices {
@@ -204,7 +208,7 @@ func (p *Polygon) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unuse
 	// Measure (optional)
 	if p.Measure != 0 {
 		if err := pdf.CheckVersion(rm.Out, "polygon annotation Measure entry", pdf.V1_7); err != nil {
-			return zero, err
+			return nil, err
 		}
 		dict["Measure"] = p.Measure
 	}
@@ -212,7 +216,7 @@ func (p *Polygon) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unuse
 	// Path (optional; PDF 2.0)
 	if len(p.Path) > 0 {
 		if err := pdf.CheckVersion(rm.Out, "polygon annotation Path entry", pdf.V2_0); err != nil {
-			return zero, err
+			return nil, err
 		}
 		pathArray := make(pdf.Array, len(p.Path))
 		for i, pathEntry := range p.Path {
@@ -229,10 +233,5 @@ func (p *Polygon) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unuse
 		dict["Path"] = pathArray
 	}
 
-	err := rm.Out.Put(ref, dict)
-	if err != nil {
-		return zero, err
-	}
-
-	return zero, nil
+	return dict, nil
 }

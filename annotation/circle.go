@@ -58,11 +58,11 @@ func (c *Circle) AnnotationType() pdf.Name {
 	return "Circle"
 }
 
-func extractCircle(r pdf.Getter, dict pdf.Dict) (*Circle, error) {
+func extractCircle(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Circle, error) {
 	circle := &Circle{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &circle.Common); err != nil {
+	if err := extractCommon(r, &circle.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -109,15 +109,21 @@ func extractCircle(r pdf.Getter, dict pdf.Dict) (*Circle, error) {
 
 func (c *Circle) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	ref := rm.Out.Alloc()
-	if _, err := c.EmbedAt(rm, ref); err != nil {
+	dict, err := c.AsDict(rm)
+	if err != nil {
 		return nil, zero, err
 	}
-	return ref, zero, nil
+
+	if c.SingleUse {
+		return dict, zero, nil
+	}
+
+	ref := rm.Out.Alloc()
+	err = rm.Out.Put(ref, dict)
+	return ref, zero, err
 }
 
-func (c *Circle) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
-	var zero pdf.Unused
+func (c *Circle) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 
 	dict := pdf.Dict{
 		"Type":    pdf.Name("Annot"),
@@ -126,12 +132,12 @@ func (c *Circle) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused
 
 	// Add common annotation fields
 	if err := c.Common.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add markup annotation fields
 	if err := c.Markup.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add circle-specific fields
@@ -143,7 +149,7 @@ func (c *Circle) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused
 	// IC (optional)
 	if c.IC != nil {
 		if err := pdf.CheckVersion(rm.Out, "circle annotation IC entry", pdf.V1_4); err != nil {
-			return zero, err
+			return nil, err
 		}
 		icArray := make(pdf.Array, len(c.IC))
 		for i, color := range c.IC {
@@ -155,7 +161,7 @@ func (c *Circle) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused
 	// BE (optional)
 	if c.BE != 0 {
 		if err := pdf.CheckVersion(rm.Out, "circle annotation BE entry", pdf.V1_5); err != nil {
-			return zero, err
+			return nil, err
 		}
 		dict["BE"] = c.BE
 	}
@@ -163,7 +169,7 @@ func (c *Circle) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused
 	// RD (optional)
 	if len(c.RD) == 4 {
 		if err := pdf.CheckVersion(rm.Out, "circle annotation RD entry", pdf.V1_5); err != nil {
-			return zero, err
+			return nil, err
 		}
 		rdArray := make(pdf.Array, 4)
 		for i, diff := range c.RD {
@@ -172,10 +178,5 @@ func (c *Circle) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused
 		dict["RD"] = rdArray
 	}
 
-	err := rm.Out.Put(ref, dict)
-	if err != nil {
-		return zero, err
-	}
-
-	return zero, nil
+	return dict, nil
 }

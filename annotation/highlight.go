@@ -41,11 +41,11 @@ func (h *Highlight) AnnotationType() pdf.Name {
 	return "Highlight"
 }
 
-func extractHighlight(r pdf.Getter, dict pdf.Dict) (*Highlight, error) {
+func extractHighlight(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Highlight, error) {
 	highlight := &Highlight{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &highlight.Common); err != nil {
+	if err := extractCommon(r, &highlight.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -71,18 +71,23 @@ func extractHighlight(r pdf.Getter, dict pdf.Dict) (*Highlight, error) {
 
 func (h *Highlight) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	ref := rm.Out.Alloc()
-	if _, err := h.EmbedAt(rm, ref); err != nil {
+	dict, err := h.AsDict(rm)
+	if err != nil {
 		return nil, zero, err
 	}
-	return ref, zero, nil
+
+	if h.SingleUse {
+		return dict, zero, nil
+	}
+
+	ref := rm.Out.Alloc()
+	err = rm.Out.Put(ref, dict)
+	return ref, zero, err
 }
 
-func (h *Highlight) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
-	var zero pdf.Unused
-
+func (h *Highlight) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "highlight annotation", pdf.V1_3); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -92,12 +97,12 @@ func (h *Highlight) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unu
 
 	// Add common annotation fields
 	if err := h.Common.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add markup annotation fields
 	if err := h.Markup.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add highlight-specific fields
@@ -110,10 +115,5 @@ func (h *Highlight) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unu
 		dict["QuadPoints"] = quadArray
 	}
 
-	err := rm.Out.Put(ref, dict)
-	if err != nil {
-		return zero, err
-	}
-
-	return zero, nil
+	return dict, nil
 }

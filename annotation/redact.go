@@ -59,11 +59,11 @@ func (r *Redact) AnnotationType() pdf.Name {
 	return "Redact"
 }
 
-func extractRedact(r pdf.Getter, dict pdf.Dict) (*Redact, error) {
+func extractRedact(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Redact, error) {
 	redact := &Redact{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &redact.Common); err != nil {
+	if err := extractCommon(r, &redact.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -144,14 +144,24 @@ func extractRedact(r pdf.Getter, dict pdf.Dict) (*Redact, error) {
 }
 
 func (r *Redact) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
+	dict, err := r.AsDict(rm)
+	if err != nil {
+		return nil, zero, err
+	}
+
+	if r.SingleUse {
+		return dict, zero, nil
+	}
+
 	ref := rm.Out.Alloc()
-	err := r.EmbedAt(rm, ref)
-	return ref, pdf.Unused{}, err
+	err = rm.Out.Put(ref, dict)
+	return ref, zero, err
 }
 
-func (r *Redact) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
+func (r *Redact) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "redaction annotation", pdf.V1_7); err != nil {
-		return err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -161,12 +171,12 @@ func (r *Redact) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 
 	// Add common annotation fields
 	if err := r.Common.fillDict(rm, dict); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Add markup annotation fields
 	if err := r.Markup.fillDict(rm, dict); err != nil {
-		return err
+		return nil, err
 	}
 
 	// QuadPoints (optional)
@@ -208,7 +218,7 @@ func (r *Redact) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 
 		// DA (required if OverlayText present)
 		if r.DA == "" {
-			return fmt.Errorf("DA field is required when OverlayText is present")
+			return nil, fmt.Errorf("DA field is required when OverlayText is present")
 		}
 	}
 
@@ -225,10 +235,10 @@ func (r *Redact) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	// Q (optional) - default 0 (left-justified)
 	if r.Q != 0 {
 		if r.Q < 0 || r.Q > 2 {
-			return fmt.Errorf("the Q field must be 0, 1 or 2")
+			return nil, fmt.Errorf("the Q field must be 0, 1 or 2")
 		}
 		dict["Q"] = pdf.Integer(r.Q)
 	}
 
-	return rm.Out.Put(ref, dict)
+	return dict, nil
 }

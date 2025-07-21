@@ -26,6 +26,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
@@ -76,7 +77,7 @@ var testCases = map[string][]testCase{
 					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
 					Contents: "Complete text annotation",
 					Flags:    4,                        // ReadOnly flag
-					Color:    []float64{1.0, 0.0, 0.0}, // Red color
+					Color:    color.DeviceRGB(1, 0, 0), // red
 					Border: &Border{
 						HCornerRadius: 2.0,
 						VCornerRadius: 2.0,
@@ -169,7 +170,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 50, LLy: 300, URx: 250, URy: 380},
 					Contents: "Styled free text",
-					Color:    []float64{0.9, 0.9, 0.9}, // Light gray background
+					Color:    color.DeviceGray(0.9), // Light gray background
 				},
 				Markup: Markup{
 					User:         "Designer",
@@ -236,8 +237,8 @@ var testCases = map[string][]testCase{
 			annotation: &Line{
 				Common: Common{
 					Rect:  pdf.Rectangle{LLx: 100, LLy: 300, URx: 400, URy: 350},
-					Flags: 2,                        // Print flag
-					Color: []float64{0.0, 0.0, 1.0}, // Blue border color
+					Flags: 2,                            // Print flag
+					Color: color.DeviceCMYK(1, 1, 0, 0), // blue
 				},
 				Markup: Markup{
 					User:    "Reviewer",
@@ -290,7 +291,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 200, LLy: 200, URx: 350, URy: 300},
 					Contents: "Complex square",
-					Color:    []float64{0.0, 0.0, 1.0}, // Blue border
+					Color:    Transparent, // transparent
 				},
 				Markup: Markup{
 					User:    "Reviewer",
@@ -336,7 +337,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 300, LLy: 300, URx: 450, URy: 450},
 					Contents: "Complex circle",
-					Color:    []float64{1.0, 0.0, 0.0}, // Red border
+					Color:    color.DeviceGray(0.5), // gray
 				},
 				Markup: Markup{
 					User:    "Reviewer",
@@ -474,7 +475,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:  pdf.Rectangle{LLx: 50, LLy: 300, URx: 250, URy: 340},
 					Name:  "highlight-001",
-					Color: []float64{1.0, 1.0, 0.0}, // Yellow highlight
+					Color: color.DeviceRGB(1.0, 1.0, 0.0), // yellow
 				},
 				Markup: Markup{
 					User:    "Student",
@@ -509,7 +510,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:  pdf.Rectangle{LLx: 75, LLy: 500, URx: 225, URy: 520},
 					Name:  "underline-001",
-					Color: []float64{0.0, 0.0, 1.0}, // Blue underline
+					Color: color.DeviceRGB(0, 0, 1), // blue
 				},
 				Markup: Markup{
 					User:         "Proofreader",
@@ -541,7 +542,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:  pdf.Rectangle{LLx: 100, LLy: 700, URx: 180, URy: 720},
 					Name:  "squiggly-001",
-					Color: []float64{1.0, 0.0, 0.0}, // Red squiggly
+					Color: color.DeviceRGB(1, 0.5, 0), // orange
 				},
 				Markup: Markup{
 					User:    "Grammar checker",
@@ -725,7 +726,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:  pdf.Rectangle{LLx: 100, LLy: 200, URx: 300, URy: 350},
 					Name:  "ink-001",
-					Color: []float64{0.0, 0.0, 1.0}, // Blue ink
+					Color: color.DeviceRGB(0.0, 0.0, 1.0), // blue
 				},
 				Markup: Markup{
 					User:         "Artist",
@@ -896,7 +897,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 100, LLy: 350, URx: 130, URy: 380},
 					Contents: "Tagged reference file",
-					Color:    []float64{0.9, 0.9, 0.9}, // Light gray background
+					Color:    color.DeviceGray(0.8), // light gray
 				},
 				Markup: Markup{
 					User:    "Librarian",
@@ -973,7 +974,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 150, LLy: 400, URx: 180, URy: 430},
 					Contents: "Interview recording",
-					Color:    []float64{1.0, 0.9, 0.8}, // Light orange background
+					Color:    color.DeviceRGB(0.5, 0.5, 0.5), // gray
 				},
 				Markup: Markup{
 					User:    "Journalist",
@@ -1028,7 +1029,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 250, URy: 150},
 					Contents: "Interactive presentation",
-					Color:    []float64{0.2, 0.4, 0.8}, // Blue background
+					Color:    color.DeviceRGB(0.7, 0.6, 0.5), // brown
 				},
 				T:     "Interactive Demo",
 				Movie: pdf.NewReference(700, 0), // Movie dictionary reference
@@ -1084,7 +1085,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 350, URy: 250},
 					Contents: "Click to play video",
-					Color:    []float64{0.1, 0.1, 0.1}, // Dark background
+					Color:    Transparent,
 				},
 				T: "Action Trigger",
 				A: pdf.NewReference(1200, 0), // Action dictionary
@@ -1106,7 +1107,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 150, LLy: 150, URx: 450, URy: 350},
 					Contents: "Full-featured media player",
-					Color:    []float64{0.9, 0.9, 0.9}, // Light gray background
+					Color:    color.DeviceRGB(0.9, 0.9, 0.9),
 				},
 				T:  "Complete Media Player",
 				MK: pdf.NewReference(1400, 0), // Appearance characteristics
@@ -1161,7 +1162,7 @@ var testCases = map[string][]testCase{
 			annotation: &Widget{
 				Common: Common{
 					Rect:  pdf.Rectangle{LLx: 300, LLy: 300, URx: 500, URy: 340},
-					Color: []float64{0.8, 0.8, 1.0}, // Light blue background
+					Color: color.DeviceCMYK(0.1, 0.2, 0.3, 0.4),
 				},
 				H:  "I",                       // Default highlighting
 				A:  pdf.NewReference(1800, 0), // Action dictionary
@@ -1196,7 +1197,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 100, LLy: 400, URx: 350, URy: 450},
 					Contents: "Complete widget annotation",
-					Color:    []float64{0.9, 0.9, 0.9}, // Light gray background
+					Color:    color.DeviceRGB(0.8, 0.9, 1.0),
 				},
 				H:      "P",                       // Push highlighting
 				MK:     pdf.NewReference(2200, 0), // Appearance characteristics
@@ -1243,7 +1244,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 20, URy: 20},
 					Contents: "Corner cut mark",
-					Color:    []float64{0.0, 0.0, 0.0}, // Black color
+					Color:    color.DeviceRGB(0, 0, 0),
 				},
 				MN: "CutMark",
 			},
@@ -1737,8 +1738,8 @@ var testCases = map[string][]testCase{
 					Rect:               pdf.Rectangle{LLx: 200, LLy: 400, URx: 500, URy: 500},
 					Contents:           "Comprehensive 3D measurement annotation",
 					Name:               "comprehensive-projection",
-					Flags:              2,                        // Print flag
-					Color:              []float64{0.0, 1.0, 0.0}, // Green color
+					Flags:              2, // Print flag
+					Color:              color.DeviceGray(0.8),
 					StrokingOpacity:    0.9,
 					NonStrokingOpacity: 0.7,
 				},
@@ -1796,8 +1797,8 @@ var testCases = map[string][]testCase{
 					Rect:               pdf.Rectangle{LLx: 200, LLy: 500, URx: 600, URy: 700},
 					Contents:           "Interactive 3D content with video and sound",
 					Name:               "comprehensive-richmedia",
-					Flags:              0,                        // No flags
-					Color:              []float64{0.5, 0.5, 0.5}, // Gray border
+					Flags:              0, // No flags
+					Color:              color.DeviceGray(0.5),
 					StrokingOpacity:    1.0,
 					NonStrokingOpacity: 0.8,
 					Border: &Border{
@@ -1840,10 +1841,144 @@ var testCases = map[string][]testCase{
 func TestRoundTrip(t *testing.T) {
 	for annotationType, cases := range testCases {
 		for _, tc := range cases {
-			t.Run(fmt.Sprintf("%s-%s", annotationType, tc.name), func(t *testing.T) {
-				roundTripTest(t, tc.annotation)
-			})
+			for _, singleUse := range []bool{true, false} {
+				singleUseStr := "reference"
+				if singleUse {
+					singleUseStr = "singleuse"
+				}
+				t.Run(fmt.Sprintf("%s-%s-%s", annotationType, tc.name, singleUseStr), func(t *testing.T) {
+					// Create a copy of the annotation with the desired SingleUse setting
+					annotation := cloneAnnotationWithSingleUse(tc.annotation, singleUse)
+					roundTripTest(t, annotation)
+				})
+			}
 		}
+	}
+}
+
+// cloneAnnotationWithSingleUse creates a copy of an annotation with the SingleUse field set
+func cloneAnnotationWithSingleUse(original pdf.Annotation, singleUse bool) pdf.Annotation {
+	// Use type switching to handle each annotation type
+	switch a := original.(type) {
+	case *Text:
+		clone := *a // shallow copy
+		clone.SingleUse = singleUse
+		return &clone
+	case *Link:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *FreeText:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Line:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Square:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Circle:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Polygon:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Polyline:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Highlight:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Underline:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Squiggly:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *StrikeOut:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Stamp:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Caret:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Ink:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Popup:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *FileAttachment:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Sound:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Movie:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Widget:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *PrinterMark:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *TrapNet:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Watermark:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Annot3D:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *RichMedia:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Screen:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Projection:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Redact:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	case *Unknown:
+		clone := *a
+		clone.SingleUse = singleUse
+		return &clone
+	default:
+		// Fallback: return original annotation (this shouldn't happen in tests)
+		return original
 	}
 }
 

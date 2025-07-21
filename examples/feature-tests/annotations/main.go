@@ -73,43 +73,38 @@ func createDocument(fname string) error {
 	now := pdf.Now().AsPDF(0).(pdf.String)
 	text := &annotation.Text{
 		Common: annotation.Common{
-			Rect:         rect,
-			Contents:     "This is an example text annotation.  It contains some text.",
-			LastModified: string(now),
-			// Appearance:         &annotation.AppearanceDict{},
-			// AppearanceState:    "",
-			Border: &annotation.Border{
-				HCornerRadius: 0,
-				VCornerRadius: 0,
-				Width:         2,
-				DashArray:     []float64{10, 10},
-			},
-			Color: []float64{0.0, 1.0, 1.0},
-			// OptionalContent:    0,
-			// Files:              []pdf.Reference{},
+			Rect:               rect,
+			Contents:           "This is an example text annotation.  It contains some text.",
+			LastModified:       string(now),
+			Color:              color.DeviceGray(0.3),
 			NonStrokingOpacity: 1.0,
 			StrokingOpacity:    1.0,
-			// BlendMode:          "",
 		},
 		Markup: annotation.Markup{
 			User:  "Jochen Voss",
 			Popup: popupRef,
-			// RC:           nil,
-			// CreationDate: time.Time{},
-			// InReplyTo: 0,
-			// Subject:   "",
-			// RT:        "",
-			// Intent:    "",
 		},
 		Open:     true,
 		IconName: annotation.IconNote,
-		// State:    annotation.StateUnknown,
 	}
-	_, err = text.EmbedAt(doc.RM, textRef)
+	// Embed text annotation as reference (SingleUse = false)
+	text.SingleUse = false
+	textNative, _, err := text.Embed(doc.RM)
 	if err != nil {
 		return err
 	}
-	_, err = popup.EmbedAt(doc.RM, popupRef)
+	err = doc.RM.Out.Put(textRef, textNative)
+	if err != nil {
+		return err
+	}
+
+	// Embed popup annotation as reference (SingleUse = false)
+	popup.SingleUse = false
+	popupNative, _, err := popup.Embed(doc.RM)
+	if err != nil {
+		return err
+	}
+	err = doc.RM.Out.Put(popupRef, popupNative)
 	if err != nil {
 		return err
 	}
@@ -122,7 +117,7 @@ func createDocument(fname string) error {
 	writer.printf("Link Annotation")
 
 	linkRef := doc.RM.Out.Alloc()
-	rect = writer.makeRect(12, 100)
+	rect = writer.makeRect(100, 12)
 	link := &annotation.Link{
 		Common: annotation.Common{
 			Rect: rect,
@@ -134,7 +129,14 @@ func createDocument(fname string) error {
 		QuadPoints: []float64{},
 		// BS:         0,
 	}
-	_, err = link.EmbedAt(doc.RM, linkRef)
+	// Embed link annotation directly as dict (SingleUse = true)
+	link.SingleUse = true
+	linkNative, _, err := link.Embed(doc.RM)
+	if err != nil {
+		return err
+	}
+	// For SingleUse=true, linkNative is already a Dict, so we can put it directly
+	err = doc.RM.Out.Put(linkRef, linkNative)
 	if err != nil {
 		return err
 	}

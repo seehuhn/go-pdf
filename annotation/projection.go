@@ -38,11 +38,11 @@ func (p *Projection) AnnotationType() pdf.Name {
 	return "Projection"
 }
 
-func extractProjection(r pdf.Getter, dict pdf.Dict) (*Projection, error) {
+func extractProjection(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Projection, error) {
 	projection := &Projection{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &projection.Common); err != nil {
+	if err := extractCommon(r, &projection.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -60,14 +60,24 @@ func extractProjection(r pdf.Getter, dict pdf.Dict) (*Projection, error) {
 }
 
 func (p *Projection) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
+	dict, err := p.AsDict(rm)
+	if err != nil {
+		return nil, zero, err
+	}
+
+	if p.SingleUse {
+		return dict, zero, nil
+	}
+
 	ref := rm.Out.Alloc()
-	err := p.EmbedAt(rm, ref)
-	return ref, pdf.Unused{}, err
+	err = rm.Out.Put(ref, dict)
+	return ref, zero, err
 }
 
-func (p *Projection) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
+func (p *Projection) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "projection annotation", pdf.V2_0); err != nil {
-		return err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -77,12 +87,12 @@ func (p *Projection) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 
 	// Add common annotation fields
 	if err := p.Common.fillDict(rm, dict); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Add markup annotation fields
 	if err := p.Markup.fillDict(rm, dict); err != nil {
-		return err
+		return nil, err
 	}
 
 	// ExData (optional)
@@ -90,5 +100,5 @@ func (p *Projection) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) error {
 		dict["ExData"] = p.ExData
 	}
 
-	return rm.Out.Put(ref, dict)
+	return dict, nil
 }

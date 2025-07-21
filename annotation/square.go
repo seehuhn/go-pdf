@@ -58,11 +58,11 @@ func (s *Square) AnnotationType() pdf.Name {
 	return "Square"
 }
 
-func extractSquare(r pdf.Getter, dict pdf.Dict) (*Square, error) {
+func extractSquare(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Square, error) {
 	square := &Square{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &square.Common); err != nil {
+	if err := extractCommon(r, &square.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -108,17 +108,21 @@ func extractSquare(r pdf.Getter, dict pdf.Dict) (*Square, error) {
 }
 
 func (s *Square) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	ref := rm.Out.Alloc()
-	if _, err := s.EmbedAt(rm, ref); err != nil {
-		return nil, zero, err
+	dict, err := s.AsDict(rm)
+	if err != nil {
+		return nil, pdf.Unused{}, err
 	}
-	return ref, zero, nil
+
+	if s.SingleUse {
+		return dict, pdf.Unused{}, nil
+	}
+
+	ref := rm.Out.Alloc()
+	err = rm.Out.Put(ref, dict)
+	return ref, pdf.Unused{}, err
 }
 
-func (s *Square) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
-	var zero pdf.Unused
-
+func (s *Square) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Type":    pdf.Name("Annot"),
 		"Subtype": pdf.Name("Square"),
@@ -126,12 +130,12 @@ func (s *Square) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused
 
 	// Add common annotation fields
 	if err := s.Common.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add markup annotation fields
 	if err := s.Markup.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add square-specific fields
@@ -143,7 +147,7 @@ func (s *Square) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused
 	// IC (optional)
 	if s.IC != nil {
 		if err := pdf.CheckVersion(rm.Out, "square annotation IC entry", pdf.V1_4); err != nil {
-			return zero, err
+			return nil, err
 		}
 		icArray := make(pdf.Array, len(s.IC))
 		for i, color := range s.IC {
@@ -155,7 +159,7 @@ func (s *Square) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused
 	// BE (optional)
 	if s.BE != 0 {
 		if err := pdf.CheckVersion(rm.Out, "square annotation BE entry", pdf.V1_5); err != nil {
-			return zero, err
+			return nil, err
 		}
 		dict["BE"] = s.BE
 	}
@@ -163,7 +167,7 @@ func (s *Square) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused
 	// RD (optional)
 	if len(s.RD) == 4 {
 		if err := pdf.CheckVersion(rm.Out, "square annotation RD entry", pdf.V1_5); err != nil {
-			return zero, err
+			return nil, err
 		}
 		rdArray := make(pdf.Array, 4)
 		for i, diff := range s.RD {
@@ -172,10 +176,5 @@ func (s *Square) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused
 		dict["RD"] = rdArray
 	}
 
-	err := rm.Out.Put(ref, dict)
-	if err != nil {
-		return zero, err
-	}
-
-	return zero, nil
+	return dict, nil
 }

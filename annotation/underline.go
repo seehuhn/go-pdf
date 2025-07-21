@@ -41,11 +41,11 @@ func (u *Underline) AnnotationType() pdf.Name {
 	return "Underline"
 }
 
-func extractUnderline(r pdf.Getter, dict pdf.Dict) (*Underline, error) {
+func extractUnderline(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Underline, error) {
 	underline := &Underline{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &underline.Common); err != nil {
+	if err := extractCommon(r, &underline.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -70,19 +70,23 @@ func extractUnderline(r pdf.Getter, dict pdf.Dict) (*Underline, error) {
 }
 
 func (u *Underline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	ref := rm.Out.Alloc()
-	if _, err := u.EmbedAt(rm, ref); err != nil {
-		return nil, zero, err
+	dict, err := u.AsDict(rm)
+	if err != nil {
+		return nil, pdf.Unused{}, err
 	}
-	return ref, zero, nil
+
+	if u.SingleUse {
+		return dict, pdf.Unused{}, nil
+	}
+
+	ref := rm.Out.Alloc()
+	err = rm.Out.Put(ref, dict)
+	return ref, pdf.Unused{}, err
 }
 
-func (u *Underline) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
-	var zero pdf.Unused
-
+func (u *Underline) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "underline annotation", pdf.V1_3); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -92,12 +96,12 @@ func (u *Underline) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unu
 
 	// Add common annotation fields
 	if err := u.Common.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add markup annotation fields
 	if err := u.Markup.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add underline-specific fields
@@ -110,10 +114,5 @@ func (u *Underline) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unu
 		dict["QuadPoints"] = quadArray
 	}
 
-	err := rm.Out.Put(ref, dict)
-	if err != nil {
-		return zero, err
-	}
-
-	return zero, nil
+	return dict, nil
 }

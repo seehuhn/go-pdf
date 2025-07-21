@@ -18,9 +18,12 @@ package annotation
 
 import (
 	"errors"
+	"fmt"
 
 	"golang.org/x/text/language"
+
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/color"
 )
 
 // Common contains fields common to all annotation dictionaries.
@@ -76,11 +79,15 @@ type Common struct {
 	// border.
 	Border *Border
 
-	// Color (optional) is an array of numbers representing a color used for
-	// the annotation's background, title bar or border.
+	// Color (optional) is the color used for the annotation's background,
+	// title bar and border.  Only certain colors are allowed:
+	// - colors in the [color.DeviceGray] color space
+	// - colors in the [color.DeviceRGB] color space
+	// - colors in the [color.DeviceCMYK] color space
+	// - the [Transparent] color
 	//
 	// This corresponds to the /C entry in the PDF annotation dictionary.
-	Color []float64
+	Color color.Color
 
 	// StructParent (required if the annotation is a structural content item)
 	// is the integer key of the annotation's entry in the structural parent
@@ -122,6 +129,10 @@ type Common struct {
 	// Lang (optional) is a language identifier specifying the natural language
 	// for all text in the annotation.
 	Lang language.Tag
+
+	// SingleUse determines if Embed returns as dictionary (true) or
+	// a reference (false).
+	SingleUse bool
 }
 
 // fillDict adds the fields corresponding to the Common struct
@@ -207,8 +218,19 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 		if err := pdf.CheckVersion(w, "annotation C entry", pdf.V1_1); err != nil {
 			return err
 		}
-		colorArray := make(pdf.Array, len(c.Color))
-		for i, v := range c.Color {
+		s := c.Color.ColorSpace()
+		var x []float64
+		if s != nil {
+			fam := s.Family()
+			switch fam {
+			case color.FamilyDeviceGray, color.FamilyDeviceRGB, color.FamilyDeviceCMYK:
+				x, _, _ = color.Operator(c.Color)
+			default:
+				return fmt.Errorf("unexpected color space %s", fam)
+			}
+		}
+		colorArray := make(pdf.Array, len(x))
+		for i, v := range x {
 			colorArray[i] = pdf.Number(v)
 		}
 		d["C"] = colorArray
@@ -273,7 +295,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 }
 
 // extractCommon extracts fields common to all annotations from a PDF dictionary.
-func extractCommon(r pdf.Getter, dict pdf.Dict, common *Common) error {
+func extractCommon(r pdf.Getter, common *Common, dict pdf.Dict, singleUse bool) error {
 	// Rect (required)
 	if rect, err := pdf.GetRectangle(r, dict["Rect"]); err == nil && rect != nil {
 		common.Rect = *rect
@@ -343,14 +365,23 @@ func extractCommon(r pdf.Getter, dict pdf.Dict, common *Common) error {
 	}
 
 	// C (optional)
-	if c, err := pdf.GetArray(r, dict["C"]); err == nil && len(c) > 0 {
+	if c, _ := pdf.GetArray(r, dict["C"]); c != nil {
 		colors := make([]float64, len(c))
 		for i, color := range c {
 			if num, err := pdf.GetNumber(r, color); err == nil {
 				colors[i] = float64(num)
 			}
 		}
-		common.Color = colors
+		switch len(colors) {
+		case 0:
+			common.Color = Transparent
+		case 1:
+			common.Color = color.DeviceGray(colors[0])
+		case 3:
+			common.Color = color.DeviceRGB(colors[0], colors[1], colors[2])
+		case 4:
+			common.Color = color.DeviceCMYK(colors[0], colors[1], colors[2], colors[3])
+		}
 	}
 
 	// StructParent (optional)
@@ -404,5 +435,19 @@ func extractCommon(r pdf.Getter, dict pdf.Dict, common *Common) error {
 		}
 	}
 
+	// Set SingleUse based on whether the annotation was embedded as a dictionary or reference
+	common.SingleUse = singleUse
+
+	return nil
+}
+
+// Transparent is a special color that indicates that an annotation should not
+// be painted at all.  This can only be used for the Color field in the
+// [Common] struct.
+var Transparent color.Color = &transparent{}
+
+type transparent struct{}
+
+func (t *transparent) ColorSpace() color.Space {
 	return nil
 }

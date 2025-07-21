@@ -242,6 +242,10 @@ type SpaceDeviceN struct {
 }
 
 // DeviceN returns a new DeviceN color space.
+
+// DeviceN returns a new DeviceN color space with the given component names,
+// alternate color space, tint transformation function, and attributes
+// dictionary (optional).
 func DeviceN(names []pdf.Name, alternate Space, trfm pdf.Function, attr pdf.Dict) (*SpaceDeviceN, error) {
 	namesArray := make(pdf.Array, len(names))
 	seen := make(map[pdf.Name]bool)

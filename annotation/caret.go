@@ -47,11 +47,11 @@ func (c *Caret) AnnotationType() pdf.Name {
 	return "Caret"
 }
 
-func extractCaret(r pdf.Getter, dict pdf.Dict) (*Caret, error) {
+func extractCaret(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Caret, error) {
 	caret := &Caret{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, dict, &caret.Common); err != nil {
+	if err := extractCommon(r, &caret.Common, dict, singleUse); err != nil {
 		return nil, err
 	}
 
@@ -82,18 +82,23 @@ func extractCaret(r pdf.Getter, dict pdf.Dict) (*Caret, error) {
 
 func (c *Caret) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	ref := rm.Out.Alloc()
-	if _, err := c.EmbedAt(rm, ref); err != nil {
+	dict, err := c.AsDict(rm)
+	if err != nil {
 		return nil, zero, err
 	}
-	return ref, zero, nil
+
+	if c.SingleUse {
+		return dict, zero, nil
+	}
+
+	ref := rm.Out.Alloc()
+	err = rm.Out.Put(ref, dict)
+	return ref, zero, err
 }
 
-func (c *Caret) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused, error) {
-	var zero pdf.Unused
-
+func (c *Caret) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "caret annotation", pdf.V1_5); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -103,12 +108,12 @@ func (c *Caret) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused,
 
 	// Add common annotation fields
 	if err := c.Common.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add markup annotation fields
 	if err := c.Markup.fillDict(rm, dict); err != nil {
-		return zero, err
+		return nil, err
 	}
 
 	// Add caret-specific fields
@@ -126,10 +131,5 @@ func (c *Caret) EmbedAt(rm *pdf.ResourceManager, ref pdf.Reference) (pdf.Unused,
 		dict["Sy"] = c.Sy
 	}
 
-	err := rm.Out.Put(ref, dict)
-	if err != nil {
-		return zero, err
-	}
-
-	return zero, nil
+	return dict, nil
 }
