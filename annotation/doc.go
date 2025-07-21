@@ -14,17 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package annotation provides types and functions for reading and writing PDF
-// annotations following the PDF specification.
+// Package annotation provides support for reading and writing PDF annotations.
 //
 // This package supports various annotation types including text annotations,
 // links, markup annotations (highlighting, underlining, strikeouts, etc.),
 // geometric shapes (squares, circles, polygons), and form widgets.
 //
-// The most common annotation type is [Link], which represents clickable
-// areas in the PDF that can navigate to other pages or external URLs.
-// Other commonly used annotation types include [Widget] for form fields,
-// [Popup] for pop-up notes, and [Text] for simple text notes.
+// The most common annotation type is [Link], which represents clickable areas
+// in the PDF that can navigate to other pages or external URLs. Other commonly
+// used annotation types include [Widget] for form fields and [Text] for simple
+// text notes.
 //
 // All annotation types implement the [pdf.Annotation] interface. The function
 // [Extract] can be used to extract annotations from a PDF document.
