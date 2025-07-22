@@ -25,10 +25,10 @@ import "seehuhn.de/go/pdf"
 type Popup struct {
 	Common
 
-	// Parent (optional; indirect reference) is the parent annotation
-	// with which this popup annotation is associated. If this entry is
-	// present, the parent annotation's Contents, M, C, and T entries override
-	// those of the popup annotation itself.
+	// Parent (optional; indirect reference) is the parent annotation with
+	// which this popup annotation is associated. If this entry is present, the
+	// parent's Common.Contents, Common.LastModified, Common.Color and
+	// Markup.User entries override those of the popup annotation itself.
 	Parent pdf.Reference
 
 	// Open (optional) is a flag specifying whether the popup annotation is

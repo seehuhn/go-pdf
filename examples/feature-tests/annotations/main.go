@@ -61,7 +61,7 @@ func createDocument(fname string) error {
 	popupRef := doc.RM.Out.Alloc()
 	textRef := doc.RM.Out.Alloc()
 
-	rect := writer.makeRect(21, 21)
+	rect := writer.makeRect(32, 32)
 	popup := &annotation.Popup{
 		Common: annotation.Common{
 			Rect:               rect,
@@ -70,13 +70,13 @@ func createDocument(fname string) error {
 		},
 		Parent: textRef,
 	}
-	now := pdf.Now().AsPDF(0).(pdf.String)
+	now := pdf.Now().AsPDF(doc.RM.Out.GetOptions()).(pdf.String)
 	text := &annotation.Text{
 		Common: annotation.Common{
 			Rect:               rect,
 			Contents:           "This is an example text annotation.  It contains some text.",
 			LastModified:       string(now),
-			Color:              color.DeviceGray(0.3),
+			Color:              color.DeviceRGB(0, 0, 1),
 			NonStrokingOpacity: 1.0,
 			StrokingOpacity:    1.0,
 		},
@@ -84,7 +84,6 @@ func createDocument(fname string) error {
 			User:  "Jochen Voss",
 			Popup: popupRef,
 		},
-		Open:     true,
 		IconName: annotation.IconNote,
 	}
 	// Embed text annotation as reference (SingleUse = false)
@@ -111,39 +110,39 @@ func createDocument(fname string) error {
 
 	p := writer.page
 	annots, _ := p.PageDict["Annots"].(pdf.Array)
-	annots = append(annots, textRef, popupRef)
+	annots = append(annots, textRef)
 	p.PageDict["Annots"] = annots
 
-	writer.printf("Link Annotation")
+	// writer.printf("Link Annotation")
 
-	linkRef := doc.RM.Out.Alloc()
-	rect = writer.makeRect(100, 12)
-	link := &annotation.Link{
-		Common: annotation.Common{
-			Rect: rect,
-		},
-		A:          0,
-		Dest:       nil,
-		H:          "",
-		PA:         0,
-		QuadPoints: []float64{},
-		// BS:         0,
-	}
-	// Embed link annotation directly as dict (SingleUse = true)
-	link.SingleUse = true
-	linkNative, _, err := link.Embed(doc.RM)
-	if err != nil {
-		return err
-	}
-	// For SingleUse=true, linkNative is already a Dict, so we can put it directly
-	err = doc.RM.Out.Put(linkRef, linkNative)
-	if err != nil {
-		return err
-	}
+	// linkRef := doc.RM.Out.Alloc()
+	// rect = writer.makeRect(100, 12)
+	// link := &annotation.Link{
+	// 	Common: annotation.Common{
+	// 		Rect: rect,
+	// 	},
+	// 	A:          0,
+	// 	Dest:       nil,
+	// 	H:          "",
+	// 	PA:         0,
+	// 	QuadPoints: []float64{},
+	// 	// BS:         0,
+	// }
+	// // Embed link annotation directly as dict (SingleUse = true)
+	// link.SingleUse = true
+	// linkNative, _, err := link.Embed(doc.RM)
+	// if err != nil {
+	// 	return err
+	// }
+	// // For SingleUse=true, linkNative is already a Dict, so we can put it directly
+	// err = doc.RM.Out.Put(linkRef, linkNative)
+	// if err != nil {
+	// 	return err
+	// }
 
-	annots, _ = p.PageDict["Annots"].(pdf.Array)
-	annots = append(annots, linkRef)
-	p.PageDict["Annots"] = annots
+	// annots, _ = p.PageDict["Annots"].(pdf.Array)
+	// annots = append(annots, linkRef)
+	// p.PageDict["Annots"] = annots
 
 	err = writer.Close()
 	if err != nil {

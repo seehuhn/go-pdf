@@ -81,10 +81,10 @@ type Common struct {
 
 	// Color (optional) is the color used for the annotation's background,
 	// title bar and border.  Only certain colors are allowed:
-	// - colors in the [color.DeviceGray] color space
-	// - colors in the [color.DeviceRGB] color space
-	// - colors in the [color.DeviceCMYK] color space
-	// - the [Transparent] color
+	//  - colors in the [color.DeviceGray] color space
+	//  - colors in the [color.DeviceRGB] color space
+	//  - colors in the [color.DeviceCMYK] color space
+	//  - the [Transparent] color
 	//
 	// This corresponds to the /C entry in the PDF annotation dictionary.
 	Color color.Color
