@@ -34,7 +34,7 @@ type RichMedia struct {
 	RichMediaSettings pdf.Reference
 }
 
-var _ pdf.Annotation = (*RichMedia)(nil)
+var _ Annotation = (*RichMedia)(nil)
 
 // AnnotationType returns "RichMedia".
 func (r *RichMedia) AnnotationType() pdf.Name {

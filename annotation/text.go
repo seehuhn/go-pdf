@@ -52,10 +52,10 @@ type Text struct {
 	State TextState
 }
 
-var _ pdf.Annotation = (*Text)(nil)
+var _ Annotation = (*Text)(nil)
 
 // AnnotationType returns "Text".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (t *Text) AnnotationType() pdf.Name {
 	return "Text"
 }

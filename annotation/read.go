@@ -21,7 +21,7 @@ import (
 )
 
 // Extract extracts an annotation from a PDF file.
-func Extract(r pdf.Getter, obj pdf.Object) (pdf.Annotation, error) {
+func Extract(r pdf.Getter, obj pdf.Object) (Annotation, error) {
 	_, singleUse := obj.(pdf.Dict)
 
 	dict, err := pdf.GetDictTyped(r, obj, "Annot")

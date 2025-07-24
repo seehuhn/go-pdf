@@ -59,10 +59,10 @@ type Widget struct {
 	Parent pdf.Reference
 }
 
-var _ pdf.Annotation = (*Widget)(nil)
+var _ Annotation = (*Widget)(nil)
 
 // AnnotationType returns "Widget".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (w *Widget) AnnotationType() pdf.Name {
 	return "Widget"
 }

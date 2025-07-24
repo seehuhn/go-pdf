@@ -16,7 +16,11 @@
 
 package annotation
 
-import "seehuhn.de/go/pdf"
+import (
+	"errors"
+
+	"seehuhn.de/go/pdf"
+)
 
 // Link represents a hypertext link annotation.
 type Link struct {
@@ -49,13 +53,13 @@ type Link struct {
 	// All points must be contained within the annotation rectangle.
 	QuadPoints []float64
 
-	// Border (optional) is a border style dictionary specifying the line width
+	// BorderStyle (optional) is a border style dictionary specifying the line width
 	// and dash pattern for drawing the annotation's border.
 	//
 	// If this field is set, the Common.Border field is ignored.
 	//
 	// This corresponds to the /BS entry in the PDF annotation dictionary.
-	Border *BorderStyle
+	BorderStyle *BorderStyle
 
 	// Backup (optional) is an URI action formerly associated with this
 	// annotation, used for reverting go-to actions back to URI actions.
@@ -64,10 +68,10 @@ type Link struct {
 	Backup pdf.Reference
 }
 
-var _ pdf.Annotation = (*Link)(nil)
+var _ Annotation = (*Link)(nil)
 
 // AnnotationType returns "Link".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (l *Link) AnnotationType() pdf.Name {
 	return "Link"
 }
@@ -81,12 +85,14 @@ func extractLink(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Link, error) {
 	}
 
 	// Extract link-specific fields
-	if a, ok := dict["A"].(pdf.Reference); ok {
+	if a := dict["A"]; a != nil {
 		link.Action = a
 	}
-
 	if dest := dict["Dest"]; dest != nil {
 		link.Destination = dest
+	}
+	if link.Action != nil {
+		link.Destination = nil // mutually exclusive fields
 	}
 
 	if h, _ := pdf.GetName(r, dict["H"]); h != "" {
@@ -110,7 +116,7 @@ func extractLink(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Link, error) {
 	}
 
 	// BS (optional)
-	link.Border, _ = ExtractBorderStyle(r, dict["BS"])
+	link.BorderStyle, _ = ExtractBorderStyle(r, dict["BS"])
 
 	return link, nil
 }
@@ -131,6 +137,13 @@ func (l *Link) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 }
 
 func (l *Link) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+	if l.Action != nil && l.Destination != nil {
+		return nil, errors.New("conflicting Action and Destination fields in Link annotation")
+	}
+	if len(l.QuadPoints)%8 != 0 {
+		return nil, errors.New("length of QuadPoints is not a multiple of 8")
+	}
+
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Link"),
 	}
@@ -177,8 +190,11 @@ func (l *Link) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		dict["QuadPoints"] = quadArray
 	}
 
-	if l.Border != nil {
-		ref, _, err := pdf.ResourceManagerEmbed(rm, l.Border)
+	if l.BorderStyle != nil {
+		if err := pdf.CheckVersion(rm.Out, "link annotation BS entry", pdf.V1_6); err != nil {
+			return nil, err
+		}
+		ref, _, err := pdf.ResourceManagerEmbed(rm, l.BorderStyle)
 		if err != nil {
 			return nil, err
 		}

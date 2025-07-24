@@ -26,6 +26,19 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
+// Annotation represents a PDF annotation.
+// The different implementations of this interface can be found in this package.
+type Annotation interface {
+	// AnnotationType returns the type of the annotation, e.g. "Text", "Link",
+	// "Widget", etc.
+	AnnotationType() pdf.Name
+
+	// GetCommon returns the common annotation fields.
+	GetCommon() *Common
+
+	pdf.Embedder[pdf.Unused]
+}
+
 // Common contains fields common to all annotation dictionaries.
 type Common struct {
 	// Rect is the rectangle that defines the position and sometimes the extent
@@ -106,15 +119,15 @@ type Common struct {
 	// This corresponds to the /AF entry in the PDF annotation dictionary.
 	Files []pdf.Reference
 
-	// NonStrokingTranparency is the transparency value for nonstroking
+	// NonStrokingTransparency is the transparency value for nonstroking
 	// operations on the annotation in its closed state. The value 1 means
 	// fully transparent, 0 means fully opaque. Ignored if the annotation has
 	// an appearance stream.  For PDF versions prior to 2.0, this field must
 	// equal StrokingTransparency.
 	//
 	// This represents the /ca entry in the PDF annotation dictionary (ca = 1 -
-	// NonStrokingTranparency).
-	NonStrokingTranparency float64
+	// NonStrokingTransparency).
+	NonStrokingTransparency float64
 
 	// StrokingTransparency is the transparency value for stroking operations
 	// on annotation in its closed state. The value 1 means fully transparent,
@@ -139,6 +152,10 @@ type Common struct {
 	// SingleUse determines if Embed returns as dictionary (true) or
 	// a reference (false).
 	SingleUse bool
+}
+
+func (c *Common) GetCommon() *Common {
+	return c
 }
 
 // fillDict adds the fields corresponding to the Common struct
@@ -194,6 +211,14 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 			return err
 		}
 		d["AP"] = ref
+	} else {
+		// check for missing appearance dictionary per PDF spec requirements
+		subtype := d["Subtype"].(pdf.Name)
+		hasZeroArea := c.Rect.LLx == c.Rect.URx && c.Rect.LLy == c.Rect.URy
+		isExemptSubtype := subtype == "Popup" || subtype == "Projection" || subtype == "Link"
+		if pdf.GetVersion(w) >= pdf.V2_0 && !hasZeroArea && !isExemptSubtype {
+			return errors.New("missing appearance dictionary")
+		}
 	}
 
 	if c.AppearanceState != "" {
@@ -201,7 +226,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 			return err
 		}
 		d["AS"] = c.AppearanceState
-	} else if c.Appearance.hasDicts() {
+	} else if c.Appearance != nil && c.Appearance.hasDicts() {
 		return errors.New("missing AS entry")
 	}
 
@@ -280,11 +305,11 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 	}
 
 	// NonStrokingOpacity (ca entry)
-	if c.NonStrokingTranparency != c.StrokingTransparency {
+	if c.NonStrokingTransparency != c.StrokingTransparency {
 		if err := pdf.CheckVersion(w, "annotation ca entry", pdf.V2_0); err != nil {
 			return err
 		}
-		d["ca"] = pdf.Number(1 - c.NonStrokingTranparency)
+		d["ca"] = pdf.Number(1 - c.NonStrokingTransparency)
 	}
 
 	if c.BlendMode != "" {
@@ -425,10 +450,10 @@ func extractCommon(r pdf.Getter, common *Common, dict pdf.Dict, singleUse bool) 
 	// ca (optional) - if not present, defaults to the same value as CA
 	if dict["ca"] != nil {
 		if ca, err := pdf.GetNumber(r, dict["ca"]); err == nil {
-			common.NonStrokingTranparency = 1 - float64(ca)
+			common.NonStrokingTransparency = 1 - float64(ca)
 		}
 	} else {
-		common.NonStrokingTranparency = common.StrokingTransparency
+		common.NonStrokingTransparency = common.StrokingTransparency
 	}
 
 	// BM (optional)

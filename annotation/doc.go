@@ -25,7 +25,7 @@
 // [Link], which represents clickable areas in the PDF that can navigate to
 // other pages or external URLs. Other commonly used annotation types include
 // [Widget] for form fields and [Text] for simple text notes.
-// All annotation types implement the [pdf.Annotation] interface.
+// All annotation types implement the [Annotation] interface.
 // The full list is:
 //   - [Annot3D]: (PDF 1.6) include 3D artwork in PDF documents
 //   - [Caret]: (PDF 1.5) indicate the presence of text edits

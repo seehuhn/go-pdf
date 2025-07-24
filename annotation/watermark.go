@@ -58,10 +58,10 @@ type Watermark struct {
 	FixedPrint *FixedPrint
 }
 
-var _ pdf.Annotation = (*Watermark)(nil)
+var _ Annotation = (*Watermark)(nil)
 
 // AnnotationType returns "Watermark".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (w *Watermark) AnnotationType() pdf.Name {
 	return "Watermark"
 }

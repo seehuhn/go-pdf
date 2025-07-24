@@ -19,6 +19,7 @@ package annotation
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -26,14 +27,16 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/debug/mock"
 )
 
 type testCase struct {
 	name       string
-	annotation pdf.Annotation
+	annotation Annotation
 }
 
 // testCases holds test cases for all annotation types
@@ -54,11 +57,11 @@ var testCases = map[string][]testCase{
 			name: "text annotation with markup fields",
 			annotation: &Text{
 				Common: Common{
-					Rect:                   pdf.Rectangle{LLx: 50, LLy: 50, URx: 150, URy: 100},
-					Contents:               "Text with markup",
-					Name:                   "annotation-1",
-					StrokingTransparency:   0.8,
-					NonStrokingTranparency: 0.6,
+					Rect:                    pdf.Rectangle{LLx: 50, LLy: 50, URx: 150, URy: 100},
+					Contents:                "Text with markup",
+					Name:                    "annotation-1",
+					StrokingTransparency:    0.8,
+					NonStrokingTransparency: 0.6,
 				},
 				Markup: Markup{
 					User:         "Author Name",
@@ -1736,13 +1739,13 @@ var testCases = map[string][]testCase{
 			name: "comprehensive projection annotation",
 			annotation: &Projection{
 				Common: Common{
-					Rect:                   pdf.Rectangle{LLx: 200, LLy: 400, URx: 500, URy: 500},
-					Contents:               "Comprehensive 3D measurement annotation",
-					Name:                   "comprehensive-projection",
-					Flags:                  2, // Print flag
-					Color:                  color.DeviceGray(0.8),
-					StrokingTransparency:   0.9,
-					NonStrokingTranparency: 0.7,
+					Rect:                    pdf.Rectangle{LLx: 200, LLy: 400, URx: 500, URy: 500},
+					Contents:                "Comprehensive 3D measurement annotation",
+					Name:                    "comprehensive-projection",
+					Flags:                   2, // Print flag
+					Color:                   color.DeviceGray(0.8),
+					StrokingTransparency:    0.9,
+					NonStrokingTransparency: 0.7,
 				},
 				Markup: Markup{
 					User:         "3D Measurement System",
@@ -1795,13 +1798,13 @@ var testCases = map[string][]testCase{
 			name: "comprehensive rich media annotation",
 			annotation: &RichMedia{
 				Common: Common{
-					Rect:                   pdf.Rectangle{LLx: 200, LLy: 500, URx: 600, URy: 700},
-					Contents:               "Interactive 3D content with video and sound",
-					Name:                   "comprehensive-richmedia",
-					Flags:                  0, // No flags
-					Color:                  color.DeviceGray(0.5),
-					StrokingTransparency:   1.0,
-					NonStrokingTranparency: 0.8,
+					Rect:                    pdf.Rectangle{LLx: 200, LLy: 500, URx: 600, URy: 700},
+					Contents:                "Interactive 3D content with video and sound",
+					Name:                    "comprehensive-richmedia",
+					Flags:                   0, // No flags
+					Color:                   color.DeviceGray(0.5),
+					StrokingTransparency:    1.0,
+					NonStrokingTransparency: 0.8,
 					Border: &Border{
 						HCornerRadius: 5.0,
 						VCornerRadius: 5.0,
@@ -1826,11 +1829,11 @@ var testCases = map[string][]testCase{
 			name: "rich media with other fields",
 			annotation: &RichMedia{
 				Common: Common{
-					Rect:                   pdf.Rectangle{LLx: 300, LLy: 800, URx: 500, URy: 900},
-					Contents:               "Rich media with additional fields",
-					Name:                   "richmedia-advanced",
-					StrokingTransparency:   0.9,
-					NonStrokingTranparency: 0.7,
+					Rect:                    pdf.Rectangle{LLx: 300, LLy: 800, URx: 500, URy: 900},
+					Contents:                "Rich media with additional fields",
+					Name:                    "richmedia-advanced",
+					StrokingTransparency:    0.9,
+					NonStrokingTransparency: 0.7,
 				},
 				RichMediaContent:  pdf.NewReference(1100, 0),
 				RichMediaSettings: pdf.NewReference(1200, 0),
@@ -1874,13 +1877,28 @@ func TestRoundTrip(t *testing.T) {
 					singleUseStr = "singleuse"
 				}
 				t.Run(fmt.Sprintf("%s-%s-%s", annotationType, tc.name, singleUseStr), func(t *testing.T) {
-					// Create a copy of the a with the desired SingleUse setting
-					a := cloneAnnotationWithSingleUse(tc.annotation, singleUse)
+					a := shallowCopy(tc.annotation)
+					common := a.GetCommon()
+					common.SingleUse = singleUse
 					roundTripTest(t, a)
 				})
 			}
 		}
 	}
+}
+
+func shallowCopy(iface Annotation) Annotation {
+	origVal := reflect.ValueOf(iface)
+
+	if origVal.Kind() != reflect.Ptr {
+		return iface
+	}
+
+	elemType := origVal.Elem().Type()
+	newPtr := reflect.New(elemType)
+	newPtr.Elem().Set(origVal.Elem())
+
+	return newPtr.Interface().(Annotation)
 }
 
 func TestRoundTripDict(t *testing.T) {
@@ -1899,136 +1917,42 @@ func TestRoundTripDict(t *testing.T) {
 	}
 }
 
-// cloneAnnotationWithSingleUse creates a copy of an annotation with the SingleUse field set
-func cloneAnnotationWithSingleUse(original pdf.Annotation, singleUse bool) pdf.Annotation {
-	// Use type switching to handle each annotation type
-	switch a := original.(type) {
-	case *Text:
-		clone := *a // shallow copy
-		clone.SingleUse = singleUse
-		return &clone
-	case *Link:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *FreeText:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Line:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Square:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Circle:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Polygon:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Polyline:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Highlight:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Underline:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Squiggly:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *StrikeOut:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Stamp:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Caret:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Ink:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Popup:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *FileAttachment:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Sound:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Movie:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Widget:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *PrinterMark:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *TrapNet:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Watermark:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Annot3D:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *RichMedia:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Screen:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Projection:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Redact:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	case *Unknown:
-		clone := *a
-		clone.SingleUse = singleUse
-		return &clone
-	default:
-		// Fallback: return original annotation (this shouldn't happen in tests)
-		return original
+// makeAppearance creates a simple appearance dictionary for testing
+func makeAppearance(rm *pdf.ResourceManager, rect pdf.Rectangle) *AppearanceDict {
+	// Create a simple form XObject with a transparent rectangle
+	formObj := &form.Form{
+		BBox: rect,
+		Draw: func(gw *graphics.Writer) error {
+			// Draw nothing - just a transparent appearance
+			return nil
+		},
+	}
+
+	// Embed the form and get its reference
+	ref, _, err := pdf.ResourceManagerEmbed(rm, formObj)
+	if err != nil {
+		// Fallback to a simple appearance if embedding fails
+		return &AppearanceDict{
+			Normal:    nil,
+			SingleUse: false,
+		}
+	}
+
+	return &AppearanceDict{
+		Normal:    ref,
+		SingleUse: false,
 	}
 }
 
 // roundTripTest performs a round-trip test for any annotation type
-func roundTripTest(t *testing.T, a1 pdf.Annotation) {
+func roundTripTest(t *testing.T, a1 Annotation) {
 	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(buf)
+
+	// Ensure appearance dictionary compliance for PDF 2.0
+	common := a1.GetCommon()
+	common.Appearance = makeAppearance(rm, a1.GetCommon().Rect)
+	common.AppearanceState = pdf.Name("Normal")
 
 	// Embed the annotation
 	embedded, _, err := a1.Embed(rm)
@@ -2051,6 +1975,8 @@ func roundTripTest(t *testing.T, a1 pdf.Annotation) {
 	opts := []cmp.Option{
 		cmp.AllowUnexported(language.Tag{}),
 		cmpopts.EquateComparable(language.Tag{}),
+		// Ignore appearance dictionary in comparison since we add it artificially for testing
+		cmpopts.IgnoreFields(Common{}, "Appearance"),
 	}
 
 	// For Unknown annotations, we don't expect perfect round-trip
@@ -2114,6 +2040,7 @@ func TestUnknownAnnotation(t *testing.T) {
 	// Just verify it doesn't crash and basic fields are preserved
 	buf2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm2 := pdf.NewResourceManager(buf2)
+
 	_, _, err = unknown.Embed(rm2)
 	if err != nil {
 		t.Errorf("failed to embed unknown annotation: %v", err)
@@ -2122,7 +2049,7 @@ func TestUnknownAnnotation(t *testing.T) {
 
 func TestAnnotationTypes(t *testing.T) {
 	tests := []struct {
-		annotation   pdf.Annotation
+		annotation   Annotation
 		expectedType pdf.Name
 	}{
 		{&Text{}, "Text"},
@@ -2158,6 +2085,9 @@ func TestBorderDefaults(t *testing.T) {
 
 	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(buf)
+
+	// Add appearance dictionary for PDF 2.0 compliance
+	annotation.Common.Appearance = makeAppearance(rm, annotation.Common.Rect)
 
 	embedded, _, err := annotation.Embed(rm)
 	if err != nil {
@@ -2220,14 +2150,17 @@ func TestOpacityHandling(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			annotation := &Text{
 				Common: Common{
-					Rect:                   pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
-					StrokingTransparency:   tt.strokeTransparency,
-					NonStrokingTranparency: tt.nonStrokeTransparency,
+					Rect:                    pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
+					StrokingTransparency:    tt.strokeTransparency,
+					NonStrokingTransparency: tt.nonStrokeTransparency,
 				},
 			}
 
 			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(buf)
+
+			// Add appearance dictionary for PDF 2.0 compliance
+			annotation.Common.Appearance = makeAppearance(rm, annotation.Common.Rect)
 
 			embedded, _, err := annotation.Embed(rm)
 			if err != nil {
@@ -2272,7 +2205,12 @@ func FuzzRead(f *testing.F) {
 			w, out := memfile.NewPDFWriter(pdf.V2_0, opt)
 			rm := pdf.NewResourceManager(w)
 
-			embedded, _, err := tc.annotation.Embed(rm)
+			a := shallowCopy(tc.annotation)
+			common := a.GetCommon()
+			common.Appearance = makeAppearance(rm, a.GetCommon().Rect)
+			common.AppearanceState = pdf.Name("Normal")
+
+			embedded, _, err := a.Embed(rm)
 			if err != nil {
 				continue
 			}
@@ -2345,6 +2283,7 @@ func FuzzRead(f *testing.F) {
 		// Test embedding doesn't panic
 		buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 		rm := pdf.NewResourceManager(buf)
+
 		_, _, err = annotation.Embed(rm)
 		if err != nil {
 			t.Errorf("failed to embed annotation: %v", err)

@@ -33,10 +33,10 @@ type Squiggly struct {
 	QuadPoints []float64
 }
 
-var _ pdf.Annotation = (*Squiggly)(nil)
+var _ Annotation = (*Squiggly)(nil)
 
 // AnnotationType returns "Squiggly".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (s *Squiggly) AnnotationType() pdf.Name {
 	return "Squiggly"
 }

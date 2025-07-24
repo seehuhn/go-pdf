@@ -49,7 +49,7 @@ type Annot3D struct {
 	GEO pdf.Reference
 }
 
-var _ pdf.Annotation = (*Annot3D)(nil)
+var _ Annotation = (*Annot3D)(nil)
 
 // ThreeDActivation represents a 3D activation dictionary.
 type ThreeDActivation struct {

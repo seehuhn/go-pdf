@@ -37,10 +37,10 @@ type FileAttachment struct {
 	Name pdf.Name
 }
 
-var _ pdf.Annotation = (*FileAttachment)(nil)
+var _ Annotation = (*FileAttachment)(nil)
 
 // AnnotationType returns "FileAttachment".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (f *FileAttachment) AnnotationType() pdf.Name {
 	return "FileAttachment"
 }

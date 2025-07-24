@@ -60,10 +60,10 @@ type FreeText struct {
 	LE pdf.Name
 }
 
-var _ pdf.Annotation = (*FreeText)(nil)
+var _ Annotation = (*FreeText)(nil)
 
 // AnnotationType returns "FreeText".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (f *FreeText) AnnotationType() pdf.Name {
 	return "FreeText"
 }

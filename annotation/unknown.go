@@ -28,10 +28,10 @@ type Unknown struct {
 	Data pdf.Dict
 }
 
-var _ pdf.Annotation = (*Unknown)(nil)
+var _ Annotation = (*Unknown)(nil)
 
 // AnnotationType returns the subtype of the unknown annotation.
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (u *Unknown) AnnotationType() pdf.Name {
 	return u.Type
 }

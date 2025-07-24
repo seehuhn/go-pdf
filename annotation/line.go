@@ -78,10 +78,10 @@ type Line struct {
 	CO []float64
 }
 
-var _ pdf.Annotation = (*Line)(nil)
+var _ Annotation = (*Line)(nil)
 
 // AnnotationType returns "Line".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (l *Line) AnnotationType() pdf.Name {
 	return "Line"
 }

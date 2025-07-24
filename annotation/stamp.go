@@ -47,10 +47,10 @@ type Stamp struct {
 	// Note: This field is inherited from Markup but has specific meaning for stamps.
 }
 
-var _ pdf.Annotation = (*Stamp)(nil)
+var _ Annotation = (*Stamp)(nil)
 
 // AnnotationType returns "Stamp".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (s *Stamp) AnnotationType() pdf.Name {
 	return "Stamp"
 }

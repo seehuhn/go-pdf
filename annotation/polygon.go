@@ -57,10 +57,10 @@ type Polygon struct {
 	Path [][]float64
 }
 
-var _ pdf.Annotation = (*Polygon)(nil)
+var _ Annotation = (*Polygon)(nil)
 
 // AnnotationType returns "Polygon".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (p *Polygon) AnnotationType() pdf.Name {
 	return "Polygon"
 }

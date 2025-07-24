@@ -50,10 +50,10 @@ type Square struct {
 	RD []float64
 }
 
-var _ pdf.Annotation = (*Square)(nil)
+var _ Annotation = (*Square)(nil)
 
 // AnnotationType returns "Square".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (s *Square) AnnotationType() pdf.Name {
 	return "Square"
 }

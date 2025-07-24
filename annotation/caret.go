@@ -39,10 +39,10 @@ type Caret struct {
 	Sy pdf.Name
 }
 
-var _ pdf.Annotation = (*Caret)(nil)
+var _ Annotation = (*Caret)(nil)
 
 // AnnotationType returns "Caret".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (c *Caret) AnnotationType() pdf.Name {
 	return "Caret"
 }

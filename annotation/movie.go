@@ -44,10 +44,10 @@ type Movie struct {
 	A pdf.Object
 }
 
-var _ pdf.Annotation = (*Movie)(nil)
+var _ Annotation = (*Movie)(nil)
 
 // AnnotationType returns "Movie".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (m *Movie) AnnotationType() pdf.Name {
 	return "Movie"
 }

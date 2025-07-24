@@ -20,35 +20,57 @@ import "seehuhn.de/go/pdf"
 
 // AppearanceDict represents an annotation appearance dictionary.
 type AppearanceDict struct {
-	// Normal is the annotation's normal appearance.
-	Normal Appearance
+	// Normal  is the annotation's normal appearance.
+	Normal pdf.Object
 
-	// RollOver (optional) is the annotation's rollover appearance.
-	// Default: the value of Normal.
-	RollOver Appearance
+	// RollOver is the annotation's rollover appearance.
+	//
+	// When writing appearance dictionaries, a zero value can be used as a
+	// shorthand for the same value as Normal.
+	RollOver pdf.Object
 
-	// Down (optional) is the annotation's down appearance.
-	// Default: the value of Normal.
-	Down Appearance
+	// Down is the annotation's down appearance.
+	//
+	// When writing appearance dictionaries, a zero value can be used as a
+	// shorthand for the same value as Normal.
+	Down pdf.Object
+
+	// SingleUse determines if Embed returns as dictionary (true) or
+	// a reference (false).
+	SingleUse bool
 }
 
 var _ pdf.Embedder[pdf.Unused] = (*AppearanceDict)(nil)
 
-func (d *AppearanceDict) hasDicts() bool {
-	if d == nil {
-		return false
+func ExtractAppearanceDict(r pdf.Getter, obj pdf.Object) (*AppearanceDict, error) {
+	_, singleUse := obj.(pdf.Reference)
+
+	dict, err := pdf.GetDict(r, obj)
+	if err != nil {
+		return nil, err
 	}
 
-	if _, ok := d.Normal.(AppearanceStates); ok {
-		return true
+	N, err := pdf.Resolve(r, dict["N"])
+	if err != nil {
+		return nil, err
 	}
-	if _, ok := d.RollOver.(AppearanceStates); ok {
-		return true
+
+	R, _ := pdf.Resolve(r, dict["R"])
+	if R == nil {
+		R = N
 	}
-	if _, ok := d.Down.(AppearanceStates); ok {
-		return true
+
+	D, _ := pdf.Resolve(r, dict["D"])
+	if D == nil {
+		D = N
 	}
-	return false
+
+	return &AppearanceDict{
+		Normal:    N,
+		RollOver:  R,
+		Down:      D,
+		SingleUse: singleUse,
+	}, nil
 }
 
 func (d *AppearanceDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
@@ -71,107 +93,19 @@ func (d *AppearanceDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused,
 	return dict, zero, nil
 }
 
-// Appearance represents either a single appearance stream
-// or a subdictionary of appearance states.
-//
-// This must be one of [AppearanceStream] or [AppearanceStates].
-type Appearance interface {
-	isAppearanceValue()
-
-	pdf.Object
-
-	// Get returns the appearance stream reference for the given state.
-	// For SingleStream, returns the stream reference regardless of state.
-	// For StatesDictionary, looks up the state and returns the reference,
-	// or zero value if not found.
-	Get(state pdf.Name) pdf.Reference
-}
-
-// AppearanceStream represents a single appearance stream reference.
-type AppearanceStream pdf.Reference
-
-func (s AppearanceStream) isAppearanceValue() {}
-
-func (s AppearanceStream) AsPDF(pdf.OutputOptions) pdf.Native {
-	return pdf.Reference(s)
-}
-
-func (s AppearanceStream) Get(state pdf.Name) pdf.Reference {
-	return pdf.Reference(s)
-}
-
-// AppearanceStates represents a mapping of state names to stream references.
-type AppearanceStates map[pdf.Name]pdf.Reference
-
-func (s AppearanceStates) isAppearanceValue() {}
-
-func (s AppearanceStates) AsPDF(pdf.OutputOptions) pdf.Native {
-	statesDict := pdf.Dict{}
-	for state, ref := range s {
-		statesDict[state] = ref
-	}
-	return statesDict
-}
-
-func (s AppearanceStates) Get(state pdf.Name) pdf.Reference {
-	return s[state]
-}
-
-// ExtractAppearanceDict extracts an appearance dictionary from a PDF object.
-func ExtractAppearanceDict(r pdf.Getter, obj pdf.Object) (*AppearanceDict, error) {
-	dict, err := pdf.GetDict(r, obj)
-	if dict == nil {
-		return nil, err
+func (d *AppearanceDict) hasDicts() bool {
+	if d == nil {
+		return false
 	}
 
-	res := &AppearanceDict{}
-
-	res.Normal, err = extractAppearance(r, dict["N"])
-	if err != nil {
-		return nil, err
+	if _, ok := d.Normal.(pdf.Dict); ok {
+		return true
 	}
-
-	res.RollOver, err = extractAppearance(r, dict["R"])
-	if err != nil {
-		return nil, err
+	if _, ok := d.RollOver.(pdf.Dict); ok {
+		return true
 	}
-
-	res.Down, err = extractAppearance(r, dict["D"])
-	if err != nil {
-		return nil, err
+	if _, ok := d.Down.(pdf.Dict); ok {
+		return true
 	}
-
-	if res.Normal == nil && res.RollOver == nil && res.Down == nil {
-		return nil, nil
-	}
-
-	return res, nil
-}
-
-// extractAppearance extracts an appearance from a PDF object.
-func extractAppearance(r pdf.Getter, obj pdf.Object) (Appearance, error) {
-	if obj == nil {
-		return nil, nil
-	}
-
-	// First, try to interpret as a dictionary of appearance states.
-	if d, err := pdf.GetDict(r, obj); err == nil && d != nil {
-		states := make(AppearanceStates)
-		for name, val := range d {
-			if ref, ok := val.(pdf.Reference); ok {
-				states[name] = ref
-			}
-		}
-		if len(states) > 0 {
-			return states, nil
-		}
-	}
-
-	// If it's not a dictionary of states, it should be a single appearance stream.
-	// A stream is always given by reference.
-	if ref, ok := obj.(pdf.Reference); ok {
-		return AppearanceStream(ref), nil
-	}
-
-	return nil, nil
+	return false
 }

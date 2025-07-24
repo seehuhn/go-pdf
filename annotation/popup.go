@@ -36,10 +36,10 @@ type Popup struct {
 	Open bool
 }
 
-var _ pdf.Annotation = (*Popup)(nil)
+var _ Annotation = (*Popup)(nil)
 
 // AnnotationType returns "Popup".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (p *Popup) AnnotationType() pdf.Name {
 	return "Popup"
 }

@@ -33,10 +33,10 @@ type Underline struct {
 	QuadPoints []float64
 }
 
-var _ pdf.Annotation = (*Underline)(nil)
+var _ Annotation = (*Underline)(nil)
 
 // AnnotationType returns "Underline".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (u *Underline) AnnotationType() pdf.Name {
 	return "Underline"
 }

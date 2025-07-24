@@ -33,10 +33,10 @@ type Highlight struct {
 	QuadPoints []float64
 }
 
-var _ pdf.Annotation = (*Highlight)(nil)
+var _ Annotation = (*Highlight)(nil)
 
 // AnnotationType returns "Highlight".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (h *Highlight) AnnotationType() pdf.Name {
 	return "Highlight"
 }

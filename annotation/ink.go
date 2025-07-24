@@ -44,10 +44,10 @@ type Ink struct {
 	Path [][]float64
 }
 
-var _ pdf.Annotation = (*Ink)(nil)
+var _ Annotation = (*Ink)(nil)
 
 // AnnotationType returns "Ink".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (i *Ink) AnnotationType() pdf.Name {
 	return "Ink"
 }

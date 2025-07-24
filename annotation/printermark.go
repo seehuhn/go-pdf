@@ -34,10 +34,10 @@ type PrinterMark struct {
 	MN pdf.Name
 }
 
-var _ pdf.Annotation = (*PrinterMark)(nil)
+var _ Annotation = (*PrinterMark)(nil)
 
 // AnnotationType returns "PrinterMark".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (p *PrinterMark) AnnotationType() pdf.Name {
 	return "PrinterMark"
 }

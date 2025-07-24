@@ -152,7 +152,7 @@ func createDocument(fname string) error {
 			"S":    pdf.Name("Named"),
 			"N":    pdf.Name("FirstPage"),
 		},
-		Border: &annotation.BorderStyle{
+		BorderStyle: &annotation.BorderStyle{
 			Width:     0.5,
 			Style:     "S",
 			SingleUse: true,

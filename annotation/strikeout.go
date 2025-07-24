@@ -33,10 +33,10 @@ type StrikeOut struct {
 	QuadPoints []float64
 }
 
-var _ pdf.Annotation = (*StrikeOut)(nil)
+var _ Annotation = (*StrikeOut)(nil)
 
 // AnnotationType returns "StrikeOut".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (s *StrikeOut) AnnotationType() pdf.Name {
 	return "StrikeOut"
 }

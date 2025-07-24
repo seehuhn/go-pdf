@@ -52,7 +52,7 @@ type Redact struct {
 	Q int
 }
 
-var _ pdf.Annotation = (*Redact)(nil)
+var _ Annotation = (*Redact)(nil)
 
 // AnnotationType returns "Redact".
 func (r *Redact) AnnotationType() pdf.Name {

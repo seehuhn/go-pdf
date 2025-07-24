@@ -31,7 +31,7 @@ type Projection struct {
 	ExData pdf.Reference
 }
 
-var _ pdf.Annotation = (*Projection)(nil)
+var _ Annotation = (*Projection)(nil)
 
 // AnnotationType returns "Projection".
 func (p *Projection) AnnotationType() pdf.Name {

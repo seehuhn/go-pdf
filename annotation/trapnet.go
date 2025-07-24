@@ -56,10 +56,10 @@ type TrapNet struct {
 	FontFauxing []pdf.Reference
 }
 
-var _ pdf.Annotation = (*TrapNet)(nil)
+var _ Annotation = (*TrapNet)(nil)
 
 // AnnotationType returns "TrapNet".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (t *TrapNet) AnnotationType() pdf.Name {
 	return "TrapNet"
 }

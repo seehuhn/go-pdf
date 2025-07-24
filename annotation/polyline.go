@@ -59,10 +59,10 @@ type Polyline struct {
 	Path [][]float64
 }
 
-var _ pdf.Annotation = (*Polyline)(nil)
+var _ Annotation = (*Polyline)(nil)
 
 // AnnotationType returns "PolyLine".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (p *Polyline) AnnotationType() pdf.Name {
 	return "PolyLine"
 }

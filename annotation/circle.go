@@ -50,10 +50,10 @@ type Circle struct {
 	RD []float64
 }
 
-var _ pdf.Annotation = (*Circle)(nil)
+var _ Annotation = (*Circle)(nil)
 
 // AnnotationType returns "Circle".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (c *Circle) AnnotationType() pdf.Name {
 	return "Circle"
 }

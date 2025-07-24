@@ -41,10 +41,10 @@ type Sound struct {
 	Name pdf.Name
 }
 
-var _ pdf.Annotation = (*Sound)(nil)
+var _ Annotation = (*Sound)(nil)
 
 // AnnotationType returns "Sound".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (s *Sound) AnnotationType() pdf.Name {
 	return "Sound"
 }

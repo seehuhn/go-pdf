@@ -40,10 +40,10 @@ type Screen struct {
 	AA pdf.Reference
 }
 
-var _ pdf.Annotation = (*Screen)(nil)
+var _ Annotation = (*Screen)(nil)
 
 // AnnotationType returns "Screen".
-// This implements the [pdf.Annotation] interface.
+// This implements the [Annotation] interface.
 func (s *Screen) AnnotationType() pdf.Name {
 	return "Screen"
 }
