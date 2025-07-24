@@ -38,8 +38,8 @@ golang.org/x/tools v0.1.12/go.mod h1:hNGJHUnrk76NpqgfD5Aqm5Crs+Hm0VOH/i9J2+nxYbc
 golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5 h1:X3EdZgozH+/MKCx+N/1ZkEfNgQQ0ohd2U8f9tBj4Oc8=
 seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5/go.mod h1:se0NAaAL9aI9pRBRK0EvlY3572GJTsF0J7RwMXEiKz4=
-seehuhn.de/go/geom v0.6.0 h1:YXXWXZRFB1bB2lDA/SLIxTI29RYJcTEv5WCR5aCDr1I=
-seehuhn.de/go/geom v0.6.0/go.mod h1:YSriOfxNICtKWqxX1Ykdl9pMEwGmG9rwlYOOhobxXQA=
+seehuhn.de/go/geom v0.6.1-0.20250724052641-8bb0fcca46ad h1:uCmZM6HpTM752mF0/O7l9L/tDXph/lGbJItxAQMcLYM=
+seehuhn.de/go/geom v0.6.1-0.20250724052641-8bb0fcca46ad/go.mod h1:YSriOfxNICtKWqxX1Ykdl9pMEwGmG9rwlYOOhobxXQA=
 seehuhn.de/go/icc v0.0.0-20240801195843-cfc244e2c55a h1:AonqL6dUBDUJu06ueS8G44KVwtiZvONQSXdlYn/jzy8=
 seehuhn.de/go/icc v0.0.0-20240801195843-cfc244e2c55a/go.mod h1:wOBOA24OpXamCfQt//QaJnvlLdQFSTAq4525fJRcem8=
 seehuhn.de/go/postscript v0.6.0 h1:crpVBPVOCZEe0mptK7ojpLV2Tam5wyTlU5aA2+aWSGc=
