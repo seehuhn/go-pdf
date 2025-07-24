@@ -29,6 +29,9 @@ func ExtractCIDSystemInfo(r pdf.Getter, obj pdf.Object) (*cid.SystemInfo, error)
 	if err != nil {
 		return nil, err
 	}
+	if dict == nil {
+		return nil, nil
+	}
 
 	var registry, ordering string
 	s, e1 := pdf.GetString(r, dict["Registry"])

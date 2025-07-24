@@ -402,3 +402,86 @@ func TestType4Constant(t *testing.T) {
 		t.Errorf("expected output 42, got %f", result[0])
 	}
 }
+
+func TestType4Repair(t *testing.T) {
+	tests := []struct {
+		name           string
+		inputDomain    []float64
+		inputRange     []float64
+		expectedDomain []float64
+		expectedRange  []float64
+	}{
+		{
+			name:           "empty domain and range",
+			inputDomain:    []float64{},
+			inputRange:     []float64{},
+			expectedDomain: []float64{0.0, 1.0}, // default domain
+			expectedRange:  []float64{0, 1},     // default range (required)
+		},
+		{
+			name:           "odd length domain",
+			inputDomain:    []float64{0.0, 1.0, 2.0}, // length 3, should truncate to 2
+			inputRange:     []float64{0.0, 1.0},
+			expectedDomain: []float64{0.0, 1.0}, // truncated to even length
+			expectedRange:  []float64{0.0, 1.0},
+		},
+		{
+			name:           "odd length range",
+			inputDomain:    []float64{0.0, 1.0},
+			inputRange:     []float64{0.0, 1.0, 2.0}, // length 3, should truncate to 2
+			expectedDomain: []float64{0.0, 1.0},
+			expectedRange:  []float64{0.0, 1.0}, // truncated to even length
+		},
+		{
+			name:           "both odd lengths",
+			inputDomain:    []float64{0.0, 1.0, 2.0},   // length 3
+			inputRange:     []float64{5.0, 10.0, 15.0}, // length 3
+			expectedDomain: []float64{0.0, 1.0},        // truncated
+			expectedRange:  []float64{5.0, 10.0},       // truncated
+		},
+		{
+			name:           "single element arrays",
+			inputDomain:    []float64{0.5},      // length 1, should truncate to 0, then default
+			inputRange:     []float64{10.0},     // length 1, should truncate to 0, then default
+			expectedDomain: []float64{0.0, 1.0}, // becomes default after truncation
+			expectedRange:  []float64{0, 1},     // becomes default after truncation
+		},
+		{
+			name:           "even lengths remain unchanged",
+			inputDomain:    []float64{0.0, 1.0, 2.0, 3.0}, // length 4, should remain
+			inputRange:     []float64{5.0, 10.0},          // length 2, should remain
+			expectedDomain: []float64{0.0, 1.0, 2.0, 3.0},
+			expectedRange:  []float64{5.0, 10.0},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fn := &Type4{
+				Domain:  tt.inputDomain,
+				Range:   tt.inputRange,
+				Program: "0", // simple program
+			}
+
+			fn.repair()
+
+			if len(fn.Domain) != len(tt.expectedDomain) {
+				t.Errorf("Domain length mismatch: expected %d, got %d", len(tt.expectedDomain), len(fn.Domain))
+			}
+			for i, expected := range tt.expectedDomain {
+				if i >= len(fn.Domain) || fn.Domain[i] != expected {
+					t.Errorf("Domain[%d]: expected %f, got %f", i, expected, fn.Domain[i])
+				}
+			}
+
+			if len(fn.Range) != len(tt.expectedRange) {
+				t.Errorf("Range length mismatch: expected %d, got %d", len(tt.expectedRange), len(fn.Range))
+			}
+			for i, expected := range tt.expectedRange {
+				if i >= len(fn.Range) || fn.Range[i] != expected {
+					t.Errorf("Range[%d]: expected %f, got %f", i, expected, fn.Range[i])
+				}
+			}
+		})
+	}
+}

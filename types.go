@@ -502,6 +502,7 @@ func formatDict(w io.Writer, opt OutputOptions, dict Dict) error {
 			}
 		}
 	} else {
+		var lastOperator Operator
 		for _, name := range keys {
 			val := dict[name]
 			if val == nil {
@@ -513,6 +514,13 @@ func formatDict(w io.Writer, opt OutputOptions, dict Dict) error {
 				return err
 			}
 			_, err = doFormat(w, val, opt, true)
+			if err != nil {
+				return err
+			}
+			lastOperator, _ = val.(Operator)
+		}
+		if lastOperator == ">" {
+			_, err = w.Write([]byte{' '})
 			if err != nil {
 				return err
 			}

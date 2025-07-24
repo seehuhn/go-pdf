@@ -21,6 +21,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/postscript/type1/names"
 )
 
 // Simple represents the encoding of a simple font.
@@ -118,7 +119,10 @@ func ExtractType1(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Simple, er
 
 			case pdf.Name:
 				if currentCode >= 0 && currentCode < 256 {
-					differences[byte(currentCode)] = string(item)
+					name := string(item)
+					if names.IsValid(name) {
+						differences[byte(currentCode)] = name
+					}
 					currentCode++
 				}
 			}

@@ -97,7 +97,28 @@ func extractType4(r pdf.Getter, stream *pdf.Stream) (*Type4, error) {
 	}
 	f.Program = program
 
+	f.repair()
+	if err := f.validate(); err != nil {
+		return nil, err
+	}
+
 	return f, nil
+}
+
+// repair sets default values and tries to fix mal-formed function dicts.
+func (f *Type4) repair() {
+	if len(f.Domain)%2 == 1 {
+		f.Domain = f.Domain[:len(f.Domain)-1]
+	}
+	if len(f.Domain) == 0 {
+		f.Domain = []float64{0.0, 1.0}
+	}
+	if len(f.Range)%2 == 1 {
+		f.Range = f.Range[:len(f.Range)-1]
+	}
+	if len(f.Range) == 0 {
+		f.Range = []float64{0, 1}
+	}
 }
 
 // validate checks if the Type4 function is properly configured.
@@ -109,6 +130,9 @@ func (f *Type4) validate() error {
 	}
 	if len(f.Range) != 2*n {
 		return newInvalidFunctionError(4, "range", "length must be 2*n (%d), got %d", 2*n, len(f.Range))
+	}
+	if len(f.Range) == 0 {
+		return newInvalidFunctionError(4, "range", "must not be empty")
 	}
 
 	if f.Program == "" {

@@ -161,7 +161,7 @@ func FuzzScanner(f *testing.F) {
 		out2 := buf.String()
 
 		if out1 != out2 {
-			t.Fatalf("output differs: %q != %q", out1, out2)
+			t.Fatalf("output differs: %q -> %q -> %q", in, out1, out2)
 		}
 	})
 }

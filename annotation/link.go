@@ -22,8 +22,8 @@ import "seehuhn.de/go/pdf"
 type Link struct {
 	Common
 
-	// Action (optional; PDF 1.1) is an action that is performed when the
-	// link annotation is activated. Mutually exclusive with Destination.
+	// Action (optional) is an action that is performed when the link
+	// annotation is activated. Mutually exclusive with Destination.
 	//
 	// This corresponds to the /A entry in the PDF annotation dictionary.
 	Action pdf.Object
@@ -34,18 +34,19 @@ type Link struct {
 	// This corresponds to the /Dest entry in the PDF annotation dictionary.
 	Destination pdf.Object
 
-	// H (optional; PDF 1.2) is the annotation's highlighting mode.
-	// Valid values: "N" (None), "I" (Invert), "O" (Outline), "P" (Push).
-	// Default value: "I".
-	H pdf.Name
+	// Highlight is the annotation's highlighting mode.
+	//
+	// When writing annotations, a zero value can be used as a shorthand
+	// [LinkHighlightInvert].
+	//
+	// This corresponds to the /H entry in the PDF annotation dictionary.
+	Highlight LinkHighlight
 
-	// PA (optional; PDF 1.3) is a URI action formerly associated with this
-	// annotation, used for reverting go-to actions back to URI actions.
-	PA pdf.Reference
-
-	// QuadPoints (optional; PDF 1.6) specifies the coordinates of
+	// QuadPoints (optional) specifies the coordinates of
 	// quadrilaterals that comprise the region where the link should be
 	// activated. Array of 8×n numbers (x1 y1 x2 y2 x3 y3 x4 y4 for each quad).
+	//
+	// All points must be contained within the annotation rectangle.
 	QuadPoints []float64
 
 	// Border (optional) is a border style dictionary specifying the line width
@@ -55,6 +56,12 @@ type Link struct {
 	//
 	// This corresponds to the /BS entry in the PDF annotation dictionary.
 	Border *BorderStyle
+
+	// Backup (optional) is an URI action formerly associated with this
+	// annotation, used for reverting go-to actions back to URI actions.
+	//
+	// This corresponds to the /PA entry in the PDF annotation dictionary.
+	Backup pdf.Reference
 }
 
 var _ pdf.Annotation = (*Link)(nil)
@@ -82,12 +89,14 @@ func extractLink(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Link, error) {
 		link.Destination = dest
 	}
 
-	if h, err := pdf.GetName(r, dict["H"]); err == nil {
-		link.H = h
+	if h, _ := pdf.GetName(r, dict["H"]); h != "" {
+		link.Highlight = LinkHighlight(h)
+	} else {
+		link.Highlight = LinkHighlightInvert // default value
 	}
 
 	if pa, ok := dict["PA"].(pdf.Reference); ok {
-		link.PA = pa
+		link.Backup = pa
 	}
 
 	if quadPoints, err := pdf.GetArray(r, dict["QuadPoints"]); err == nil && len(quadPoints) > 0 {
@@ -141,18 +150,20 @@ func (l *Link) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		dict["Dest"] = l.Destination
 	}
 
-	if l.H != "" {
+	if l.Highlight != "" {
 		if err := pdf.CheckVersion(rm.Out, "link annotation H entry", pdf.V1_2); err != nil {
 			return nil, err
 		}
-		dict["H"] = l.H
+		if l.Highlight != LinkHighlightInvert {
+			dict["H"] = pdf.Name(l.Highlight)
+		}
 	}
 
-	if l.PA != 0 {
+	if l.Backup != 0 {
 		if err := pdf.CheckVersion(rm.Out, "link annotation PA entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		dict["PA"] = l.PA
+		dict["PA"] = l.Backup
 	}
 
 	if l.QuadPoints != nil {
@@ -176,3 +187,15 @@ func (l *Link) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 
 	return dict, nil
 }
+
+// LinkHighlight represents a highlighting mode for a link annotation.
+// The valid names are provided as constants.
+type LinkHighlight pdf.Name
+
+// Valid values for the [LinkHighlight] type.
+const (
+	LinkHighlightNone    LinkHighlight = "N" // no highlighting
+	LinkHighlightInvert  LinkHighlight = "I" // invert the annotation rectangle
+	LinkHighlightOutline LinkHighlight = "O" // invert the border
+	LinkHighlightPush    LinkHighlight = "P" // push-down effect
+)

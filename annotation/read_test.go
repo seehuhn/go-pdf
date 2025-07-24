@@ -107,7 +107,7 @@ var testCases = map[string][]testCase{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 10, LLy: 10, URx: 100, URy: 30},
 				},
-				H: "I", // Invert highlighting
+				Highlight: LinkHighlightInvert,
 			},
 		},
 		{
@@ -117,7 +117,7 @@ var testCases = map[string][]testCase{
 					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 40},
 					Contents: "Link description",
 				},
-				H:          "O",                                         // Outline highlighting
+				Highlight:  LinkHighlightOutline,
 				QuadPoints: []float64{10, 10, 190, 10, 190, 30, 10, 30}, // Rectangle quad
 			},
 		},
@@ -131,7 +131,7 @@ var testCases = map[string][]testCase{
 						DashArray: []float64{5.0, 3.0},
 					},
 				},
-				H: "P", // Push highlighting
+				Highlight: LinkHighlightPush,
 			},
 		},
 	},
