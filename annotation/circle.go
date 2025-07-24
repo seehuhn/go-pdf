@@ -126,7 +126,6 @@ func (c *Circle) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 func (c *Circle) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 
 	dict := pdf.Dict{
-		"Type":    pdf.Name("Annot"),
 		"Subtype": pdf.Name("Circle"),
 	}
 

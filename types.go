@@ -74,11 +74,8 @@ func (o OutputOptions) HasAny(opt OutputOptions) bool {
 // These constants give the supported output options.
 // The values are bit masks which can be combined using bitwise OR.
 const (
-	// OptContentStream is set if we are inside a content stream.
-	OptContentStream OutputOptions = 1 << iota
-
 	// OptDictTypes adds optional dictionary /Type arguments.
-	OptDictTypes
+	OptDictTypes OutputOptions = 1 << iota
 
 	// OptTrimStandardFonts omits the font descriptor and glyph width
 	// information from font dictionaries for the 14 standard PDF fonts, where
@@ -86,14 +83,17 @@ const (
 	// some PDF readers.
 	OptTrimStandardFonts
 
-	// optObjStm allows the use of object streams.
-	optObjStm
-
 	// OptPretty makes the output more human-readable.
 	OptPretty
 
 	// OptTextStringUtf8 enables UTF-8 encoding for text strings.
 	OptTextStringUtf8
+
+	// OptContentStream is set if we are inside a content stream.
+	OptContentStream
+
+	// optObjStm allows the use of object streams.
+	optObjStm
 
 	// optXRefStream allows to use an xref stream instead of an xref table.
 	optXRefStream

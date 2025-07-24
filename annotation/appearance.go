@@ -119,24 +119,24 @@ func (s AppearanceStates) Get(state pdf.Name) pdf.Reference {
 
 // ExtractAppearanceDict extracts an appearance dictionary from a PDF object.
 func ExtractAppearanceDict(r pdf.Getter, obj pdf.Object) (*AppearanceDict, error) {
-	d, err := pdf.GetDict(r, obj)
-	if err != nil || d == nil {
+	dict, err := pdf.GetDict(r, obj)
+	if dict == nil {
 		return nil, err
 	}
 
 	res := &AppearanceDict{}
 
-	res.Normal, err = extractAppearance(r, d["N"])
+	res.Normal, err = extractAppearance(r, dict["N"])
 	if err != nil {
 		return nil, err
 	}
 
-	res.RollOver, err = extractAppearance(r, d["R"])
+	res.RollOver, err = extractAppearance(r, dict["R"])
 	if err != nil {
 		return nil, err
 	}
 
-	res.Down, err = extractAppearance(r, d["D"])
+	res.Down, err = extractAppearance(r, dict["D"])
 	if err != nil {
 		return nil, err
 	}

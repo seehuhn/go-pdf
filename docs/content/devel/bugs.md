@@ -12,6 +12,7 @@ PDF specification, and that their process is open to the public.
 I have filed the following bug reports against the PDF specification,
 when I found the existing text to be unclear or ambiguous:
 
+- https://github.com/pdf-association/pdf-issues/issues/585
 - https://github.com/pdf-association/pdf-issues/issues/577
 - https://github.com/pdf-association/pdf-issues/issues/573
 - https://github.com/pdf-association/pdf-issues/issues/518 [fixed]

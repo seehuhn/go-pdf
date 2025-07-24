@@ -123,7 +123,7 @@ func (r *gsRenderer) Close() (image.Image, error) {
 
 	cmd := exec.Command(
 		"gs", "-q",
-		"-sDEVICE=png16m", fmt.Sprintf("-r%d", gsResolution),
+		"-sDEVICE=png16m", fmt.Sprintf("-r%d", Resolution),
 		"-dTextAlphaBits=4", "-dGraphicsAlphaBits=4",
 		"-o", pngName,
 		r.PDFName)
@@ -185,4 +185,5 @@ var (
 	gsIndex       = make(chan int, 1)
 )
 
-const gsResolution = 4 * 72
+// Resolution is the image resolution in pixels per inch used for rendering.
+const Resolution = 4 * 72

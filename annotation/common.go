@@ -106,19 +106,25 @@ type Common struct {
 	// This corresponds to the /AF entry in the PDF annotation dictionary.
 	Files []pdf.Reference
 
-	// NonStrokingOpacity is the opacity value for all nonstroking operations
-	// on all visible elements of the annotation in its closed state.
-	// The value 0.0 means fully transparent, 1.0 means fully opaque.
-	// Ignored if the annotation has an appearance stream.
-	// For PDF versions prior to 2.0, this field must equal StrokingOpacity.
-	NonStrokingOpacity float64
+	// NonStrokingTranparency is the transparency value for nonstroking
+	// operations on the annotation in its closed state. The value 1 means
+	// fully transparent, 0 means fully opaque. Ignored if the annotation has
+	// an appearance stream.  For PDF versions prior to 2.0, this field must
+	// equal StrokingTransparency.
+	//
+	// This represents the /ca entry in the PDF annotation dictionary (ca = 1 -
+	// NonStrokingTranparency).
+	NonStrokingTranparency float64
 
-	// StrokingOpacity is the opacity value for stroking all visible elements
-	// of the annotation in its closed state. The value 0.0 means fully
-	// transparent, 1.0 means fully opaque. Ignored if the annotation has an
-	// appearance stream. For non-markup annotations prior to PDF 2.0, this
-	// field must be 1.0.
-	StrokingOpacity float64
+	// StrokingTransparency is the transparency value for stroking operations
+	// on annotation in its closed state. The value 1 means fully transparent,
+	// 0 means fully opaque. Ignored if the annotation has an appearance
+	// stream.  For non-markup annotations prior to PDF 2.0, this field must be
+	// 0.
+	//
+	// This represents the /CA entry in the PDF annotation dictionary. (CA = 1
+	// - StrokingTransparency).
+	StrokingTransparency float64
 
 	// BlendMode (optional) is the blend mode that is used when painting the
 	// annotation onto the page.
@@ -140,6 +146,10 @@ type Common struct {
 // corresponding to the ResourceManager, an error is returned.
 func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 	w := rm.Out
+
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		d["Type"] = pdf.Name("Annot")
+	}
 
 	d["Rect"] = &c.Rect
 
@@ -262,19 +272,19 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 	}
 
 	// StrokingOpacity (CA entry)
-	if c.StrokingOpacity != 1.0 {
+	if c.StrokingTransparency != 0.0 {
 		if err := pdf.CheckVersion(w, "annotation CA entry", pdf.V1_4); err != nil {
 			return err
 		}
-		d["CA"] = pdf.Number(c.StrokingOpacity)
+		d["CA"] = pdf.Number(1 - c.StrokingTransparency)
 	}
 
 	// NonStrokingOpacity (ca entry)
-	if c.NonStrokingOpacity != c.StrokingOpacity {
+	if c.NonStrokingTranparency != c.StrokingTransparency {
 		if err := pdf.CheckVersion(w, "annotation ca entry", pdf.V2_0); err != nil {
 			return err
 		}
-		d["ca"] = pdf.Number(c.NonStrokingOpacity)
+		d["ca"] = pdf.Number(1 - c.NonStrokingTranparency)
 	}
 
 	if c.BlendMode != "" {
@@ -408,19 +418,17 @@ func extractCommon(r pdf.Getter, common *Common, dict pdf.Dict, singleUse bool) 
 	// CA (optional) - default value is 1.0
 	if dict["CA"] != nil {
 		if ca, err := pdf.GetNumber(r, dict["CA"]); err == nil {
-			common.StrokingOpacity = float64(ca)
+			common.StrokingTransparency = 1 - float64(ca)
 		}
-	} else {
-		common.StrokingOpacity = 1.0
 	}
 
 	// ca (optional) - if not present, defaults to the same value as CA
 	if dict["ca"] != nil {
 		if ca, err := pdf.GetNumber(r, dict["ca"]); err == nil {
-			common.NonStrokingOpacity = float64(ca)
+			common.NonStrokingTranparency = 1 - float64(ca)
 		}
 	} else {
-		common.NonStrokingOpacity = common.StrokingOpacity
+		common.NonStrokingTranparency = common.StrokingTransparency
 	}
 
 	// BM (optional)

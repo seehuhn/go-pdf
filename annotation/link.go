@@ -22,13 +22,17 @@ import "seehuhn.de/go/pdf"
 type Link struct {
 	Common
 
-	// A (optional; PDF 1.1) is an action that is performed when the
-	// link annotation is activated. Mutually exclusive with Dest.
-	A pdf.Reference
+	// Action (optional; PDF 1.1) is an action that is performed when the
+	// link annotation is activated. Mutually exclusive with Destination.
+	//
+	// This corresponds to the /A entry in the PDF annotation dictionary.
+	Action pdf.Object
 
-	// Dest (optional) is a destination that is displayed when the
-	// annotation is activated. Not permitted if A is present.
-	Dest pdf.Object
+	// Destination (optional) is a destination that is displayed when the
+	// annotation is activated. Mutually exclusive with Action.
+	//
+	// This corresponds to the /Dest entry in the PDF annotation dictionary.
+	Destination pdf.Object
 
 	// H (optional; PDF 1.2) is the annotation's highlighting mode.
 	// Valid values: "N" (None), "I" (Invert), "O" (Outline), "P" (Push).
@@ -44,9 +48,13 @@ type Link struct {
 	// activated. Array of 8×n numbers (x1 y1 x2 y2 x3 y3 x4 y4 for each quad).
 	QuadPoints []float64
 
-	// BS is a border style dictionary specifying the line width and dash
-	// pattern for drawing the annotation's border.
-	BS *Border
+	// Border (optional) is a border style dictionary specifying the line width
+	// and dash pattern for drawing the annotation's border.
+	//
+	// If this field is set, the Common.Border field is ignored.
+	//
+	// This corresponds to the /BS entry in the PDF annotation dictionary.
+	Border *BorderStyle
 }
 
 var _ pdf.Annotation = (*Link)(nil)
@@ -67,11 +75,11 @@ func extractLink(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Link, error) {
 
 	// Extract link-specific fields
 	if a, ok := dict["A"].(pdf.Reference); ok {
-		link.A = a
+		link.Action = a
 	}
 
 	if dest := dict["Dest"]; dest != nil {
-		link.Dest = dest
+		link.Destination = dest
 	}
 
 	if h, err := pdf.GetName(r, dict["H"]); err == nil {
@@ -93,32 +101,7 @@ func extractLink(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Link, error) {
 	}
 
 	// BS (optional)
-	if border, err := pdf.GetArray(r, dict["BS"]); err == nil && border != nil {
-		if len(border) >= 3 {
-			b := &Border{}
-			if h, err := pdf.GetNumber(r, border[0]); err == nil {
-				b.HCornerRadius = float64(h)
-			}
-			if v, err := pdf.GetNumber(r, border[1]); err == nil {
-				b.VCornerRadius = float64(v)
-			}
-			if w, err := pdf.GetNumber(r, border[2]); err == nil {
-				b.Width = float64(w)
-			}
-			if len(border) > 3 {
-				if dashArray, err := pdf.GetArray(r, border[3]); err == nil {
-					dashes := make([]float64, len(dashArray))
-					for i, dash := range dashArray {
-						if num, err := pdf.GetNumber(r, dash); err == nil {
-							dashes[i] = float64(num)
-						}
-					}
-					b.DashArray = dashes
-				}
-			}
-			link.BS = b
-		}
-	}
+	link.Border, _ = ExtractBorderStyle(r, dict["BS"])
 
 	return link, nil
 }
@@ -140,7 +123,6 @@ func (l *Link) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 func (l *Link) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
-		"Type":    pdf.Name("Annot"),
 		"Subtype": pdf.Name("Link"),
 	}
 
@@ -150,13 +132,13 @@ func (l *Link) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// Add link-specific fields
-	if l.A != 0 {
+	if l.Action != nil {
 		if err := pdf.CheckVersion(rm.Out, "link annotation A entry", pdf.V1_1); err != nil {
 			return nil, err
 		}
-		dict["A"] = l.A
-	} else if l.Dest != nil {
-		dict["Dest"] = l.Dest
+		dict["A"] = l.Action
+	} else if l.Destination != nil {
+		dict["Dest"] = l.Destination
 	}
 
 	if l.H != "" {
@@ -184,26 +166,12 @@ func (l *Link) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		dict["QuadPoints"] = quadArray
 	}
 
-	if l.BS != nil && !l.BS.isDefault() {
-		if err := pdf.CheckVersion(rm.Out, "link annotation BS entry", pdf.V1_6); err != nil {
+	if l.Border != nil {
+		ref, _, err := pdf.ResourceManagerEmbed(rm, l.Border)
+		if err != nil {
 			return nil, err
 		}
-		borderArray := pdf.Array{
-			pdf.Number(l.BS.HCornerRadius),
-			pdf.Number(l.BS.VCornerRadius),
-			pdf.Number(l.BS.Width),
-		}
-		if l.BS.DashArray != nil {
-			if err := pdf.CheckVersion(rm.Out, "annotation Border dash array", pdf.V1_1); err != nil {
-				return nil, err
-			}
-			dashArray := make(pdf.Array, len(l.BS.DashArray))
-			for i, v := range l.BS.DashArray {
-				dashArray[i] = pdf.Number(v)
-			}
-			borderArray = append(borderArray, dashArray)
-		}
-		dict["BS"] = borderArray
+		dict["BS"] = ref
 	}
 
 	return dict, nil

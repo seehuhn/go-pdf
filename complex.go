@@ -611,7 +611,7 @@ type Action interface {
 
 // Annotation represents a PDF annotation.
 // The different implementations of this interface can be found in the
-// seehuhn.de/go/pdf/annotation package.
+// [seehuhn.de/go/pdf/annotation] package.
 type Annotation interface {
 	// AnnotationType returns the type of the annotation, e.g. "Text", "Link",
 	// "Widget", etc.

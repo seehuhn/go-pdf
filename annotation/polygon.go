@@ -159,7 +159,6 @@ func (p *Polygon) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 
 func (p *Polygon) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
-		"Type":    pdf.Name("Annot"),
 		"Subtype": pdf.Name("Polygon"),
 	}
 

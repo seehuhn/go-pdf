@@ -30,19 +30,26 @@ type Text struct {
 	// Open specifies whether the annotation is initially displayed open.
 	Open bool
 
-	// IconName (optional) is the name of an icon that is used in displaying
+	// Icon is the name of an icon that is used in displaying
 	// the annotation. Standard names include: Comment, Key, Note, Help,
-	// NewParagraph, Paragraph, Insert. Default value: Note.
+	// NewParagraph, Paragraph, Insert.
+	//
+	// When writing annotations, an empty Icon name can be used as a shorthand
+	// [TextIconNote].
 	//
 	// This corresponds to the /Name entry in the PDF annotation dictionary.
-	IconName Icon
+	Icon TextIcon
 
-	// State specifies the current state of the annotation denoted by the
-	// [Markup.InReplyTo] field.
+	// State specifies the current state of the "parent" annotation denoted by
+	// the [Markup.InReplyTo] field.  Text annotations which have non-zero
+	// State must have the following fields set:
+	//   - [Markup.InReplyTo] must indicate the annotation that this
+	//     state applies to.
+	//   - [Markup.User] must be set to the user who assigned the state.
 	//
 	// This corresponds to the /State and /StateModel entries in the PDF
 	// annotation dictionary.
-	State State
+	State TextState
 }
 
 var _ pdf.Annotation = (*Text)(nil)
@@ -77,40 +84,40 @@ func extractText(r pdf.Getter, obj pdf.Object, singleUse bool) (*Text, error) {
 	}
 
 	if name, err := pdf.GetName(r, dict["Name"]); err == nil && name != "" {
-		text.IconName = Icon(name)
+		text.Icon = TextIcon(name)
 	} else {
-		text.IconName = IconNote
+		text.Icon = TextIconNote
 	}
 
 	stateModel, _ := pdf.GetTextString(r, dict["StateModel"])
 	switch stateModel { // set default values
 	case "Marked":
-		text.State = StateUnmarked
+		text.State = TextStateUnmarked
 	case "Review":
-		text.State = StateNone
+		text.State = TextStateNone
 	}
 	state, _ := pdf.GetTextString(r, dict["State"])
 	switch state {
 	case "Marked":
-		text.State = StateMarked
+		text.State = TextStateMarked
 	case "Unmarked":
-		text.State = StateUnmarked
+		text.State = TextStateUnmarked
 	case "Accepted":
-		text.State = StateAccepted
+		text.State = TextStateAccepted
 	case "Rejected":
-		text.State = StateRejected
+		text.State = TextStateRejected
 	case "Cancelled":
-		text.State = StateCancelled
+		text.State = TextStateCancelled
 	case "Completed":
-		text.State = StateCompleted
+		text.State = TextStateCompleted
 	case "None":
-		text.State = StateNone
+		text.State = TextStateNone
 	}
 
 	// graceful fallback for invalid state annotations when reading from PDF
-	if text.State != StateUnknown {
+	if text.State != TextStateUnknown {
 		if text.Markup.InReplyTo == 0 {
-			text.State = StateUnknown // can't fix missing reply relationship
+			text.State = TextStateUnknown // can't fix missing reply relationship
 		} else if text.Markup.User == "" {
 			text.Markup.User = "unknown" // preserve state with placeholder user
 		}
@@ -120,23 +127,24 @@ func extractText(r pdf.Getter, obj pdf.Object, singleUse bool) (*Text, error) {
 }
 
 func (t *Text) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
+
 	dict, err := t.AsDict(rm)
 	if err != nil {
-		return nil, pdf.Unused{}, err
+		return nil, zero, err
 	}
 
 	if t.SingleUse {
-		return dict, pdf.Unused{}, nil
+		return dict, zero, nil
 	}
 
 	ref := rm.Out.Alloc()
 	err = rm.Out.Put(ref, dict)
-	return ref, pdf.Unused{}, err
+	return ref, zero, err
 }
 
 func (t *Text) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
-		"Type":    pdf.Name("Annot"),
 		"Subtype": pdf.Name("Text"),
 	}
 
@@ -152,10 +160,10 @@ func (t *Text) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		dict["Open"] = pdf.Boolean(t.Open)
 	}
 
-	if t.IconName != "" && t.IconName != IconNote {
-		dict["Name"] = pdf.Name(t.IconName)
+	if t.Icon != "" && t.Icon != TextIconNote {
+		dict["Name"] = pdf.Name(t.Icon)
 	}
-	if t.State != StateUnknown {
+	if t.State != TextStateUnknown {
 		if err := pdf.CheckVersion(rm.Out, "text annotation State entry", pdf.V1_5); err != nil {
 			return nil, err
 		}
@@ -167,26 +175,26 @@ func (t *Text) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		}
 
 		switch t.State {
-		case StateUnmarked:
+		case TextStateUnmarked:
 			dict["StateModel"] = pdf.TextString("Marked")
 			// dict["State"] = pdf.TextString("Unmarked")
-		case StateMarked:
+		case TextStateMarked:
 			dict["StateModel"] = pdf.TextString("Marked")
 			dict["State"] = pdf.TextString("Marked")
 
-		case StateAccepted:
+		case TextStateAccepted:
 			dict["StateModel"] = pdf.TextString("Review")
 			dict["State"] = pdf.TextString("Accepted")
-		case StateRejected:
+		case TextStateRejected:
 			dict["StateModel"] = pdf.TextString("Review")
 			dict["State"] = pdf.TextString("Rejected")
-		case StateCancelled:
+		case TextStateCancelled:
 			dict["StateModel"] = pdf.TextString("Review")
 			dict["State"] = pdf.TextString("Cancelled")
-		case StateCompleted:
+		case TextStateCompleted:
 			dict["StateModel"] = pdf.TextString("Review")
 			dict["State"] = pdf.TextString("Completed")
-		case StateNone:
+		case TextStateNone:
 			dict["StateModel"] = pdf.TextString("Review")
 			// dict["State"] = pdf.TextString("None")
 		}
@@ -194,3 +202,39 @@ func (t *Text) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 
 	return dict, nil
 }
+
+// TextIcon represents the name of an icon used to represent a text annotation.
+// The standard names defined by the PDF specification are provided as constants.
+// Other names may be used, but support is viewer dependent.
+type TextIcon pdf.Name
+
+// Standard PDF icon names for text annotations.
+const (
+	TextIconComment      TextIcon = "Comment"
+	TextIconKey          TextIcon = "Key"
+	TextIconNote         TextIcon = "Note"
+	TextIconHelp         TextIcon = "Help"
+	TextIconNewParagraph TextIcon = "NewParagraph"
+	TextIconParagraph    TextIcon = "Paragraph"
+	TextIconInsert       TextIcon = "Insert"
+)
+
+// TextState represents a PDF annotation state.
+type TextState int
+
+// State represents the valid values of a [TextState] variable.
+const (
+	// TextStateUnknown indicates that no /State or /StateModel field are present.
+	TextStateUnknown TextState = iota
+
+	// Values following the "Marked" state model.
+	TextStateUnmarked
+	TextStateMarked
+
+	// Values following the "Review" state model.
+	TextStateAccepted
+	TextStateRejected
+	TextStateCancelled
+	TextStateCompleted
+	TextStateNone
+)

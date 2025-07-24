@@ -46,7 +46,6 @@ func (u *Unknown) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 	}
 
 	// Ensure Type and Subtype are set
-	dict["Type"] = pdf.Name("Annot")
 	if dict["Subtype"] == nil {
 		dict["Subtype"] = pdf.Name("Unknown")
 	}

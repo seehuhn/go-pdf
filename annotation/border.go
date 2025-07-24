@@ -16,6 +16,8 @@
 
 package annotation
 
+import "seehuhn.de/go/pdf"
+
 // Border represents the characteristics of an annotation's border.
 type Border struct {
 	// HCornerRadius is the horizontal corner radius.
@@ -38,4 +40,98 @@ func (b *Border) isDefault() bool {
 		b.VCornerRadius == 0 &&
 		b.Width == 1 &&
 		b.DashArray == nil
+}
+
+type BorderStyle struct {
+	// Width is the border width in points.
+	// If 0, no border is drawn.
+	Width float64
+
+	// Style is the border style.
+	//  - "S" (Solid) is the default.
+	//  - "D" (Dashed) specifies a dashed line.
+	//  - "B" (Beveled) specifies a beveled line.
+	//  - "I" (Inset) specifies an inset line.
+	//  - "U" (Underline) specifies an underline.
+	Style pdf.Name
+
+	// DashArray (optional) defines a pattern of dashes and gaps for drawing
+	// the border when Style is "D".
+	DashArray []float64
+
+	// SingleUse determines if Embed returns as dictionary (true) or
+	// a reference (false).
+	SingleUse bool
+}
+
+var _ pdf.Embedder[pdf.Unused] = (*BorderStyle)(nil)
+
+func ExtractBorderStyle(r pdf.Getter, obj pdf.Object) (*BorderStyle, error) {
+	dict, err := pdf.GetDictTyped(r, obj, "Border")
+	if dict == nil {
+		return nil, err
+	}
+
+	style := &BorderStyle{}
+
+	if w, ok := dict["W"]; ok {
+		x, _ := pdf.GetNumber(r, w)
+		style.Width = float64(x)
+	} else {
+		style.Width = 1 // default width
+	}
+
+	style.Style, _ = pdf.GetName(r, dict["S"])
+	if style.Style == "" {
+		style.Style = "S" // default to solid line
+	}
+
+	a, _ := pdf.GetArray(r, dict["D"])
+	if len(a) > 0 {
+		style.DashArray = make([]float64, len(a))
+		for i, d := range a {
+			if num, err := pdf.GetNumber(r, d); err == nil {
+				style.DashArray[i] = float64(num)
+			}
+		}
+	} else {
+		style.DashArray = []float64{3} // default dash pattern
+	}
+
+	return style, nil
+}
+
+func (b *BorderStyle) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
+
+	d := pdf.Dict{}
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		d["Type"] = pdf.Name("Border")
+	}
+
+	if b.Width != 1 {
+		d["W"] = pdf.Number(b.Width)
+	}
+	if b.Style != "S" && b.Style != "" {
+		d["S"] = b.Style
+	}
+
+	defaultDash := len(b.DashArray) == 1 && b.DashArray[0] == 3
+	if b.DashArray != nil && !defaultDash {
+		a := make(pdf.Array, len(b.DashArray))
+		for i, d := range b.DashArray {
+			a[i] = pdf.Number(d)
+		}
+		d["D"] = a
+	}
+
+	if b.SingleUse {
+		return d, zero, nil
+	}
+	ref := rm.Out.Alloc()
+	err := rm.Out.Put(ref, d)
+	if err != nil {
+		return nil, zero, err
+	}
+	return ref, zero, nil
 }

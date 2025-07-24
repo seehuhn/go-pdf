@@ -21,6 +21,7 @@ import (
 	"os"
 	"strings"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/document"
@@ -45,49 +46,51 @@ func main() {
 }
 
 func createDocument(fname string) error {
-	doc, err := document.CreateMultiPage(fname, paper, pdf.V2_0, nil)
+	opt := &pdf.WriterOptions{
+		HumanReadable: true,
+	}
+	doc, err := document.CreateMultiPage(fname, paper, pdf.V2_0, opt)
 	if err != nil {
 		return err
 	}
 
-	writer := newWriter(doc)
+	w := newWriter(doc)
 
 	// Add introduction page
-	writer.writeIntroduction()
-	writer.newPage()
+	w.writeIntroduction()
+	w.newPage()
 
-	writer.printf("Text Annotation")
+	annotCol := color.DeviceRGB(0.4, 0.4, 1.0)
 
-	popupRef := doc.RM.Out.Alloc()
+	w.printf("Text Annotation")
+
 	textRef := doc.RM.Out.Alloc()
+	popupRef := doc.RM.Out.Alloc()
 
-	rect := writer.makeRect(32, 32)
+	rect := w.makeRect(32, 32)
 	popup := &annotation.Popup{
 		Common: annotation.Common{
-			Rect:               rect,
-			NonStrokingOpacity: 1.0,
-			StrokingOpacity:    1.0,
+			Rect:      rect,
+			Color:     annotCol,
+			SingleUse: true, // Embed() creates a dict, we embed this manually
 		},
 		Parent: textRef,
 	}
-	now := pdf.Now().AsPDF(doc.RM.Out.GetOptions()).(pdf.String)
+	now := string(pdf.Now().AsPDF(doc.RM.Out.GetOptions()).(pdf.String))
 	text := &annotation.Text{
 		Common: annotation.Common{
-			Rect:               rect,
-			Contents:           "This is an example text annotation.  It contains some text.",
-			LastModified:       string(now),
-			Color:              color.DeviceRGB(0, 0, 1),
-			NonStrokingOpacity: 1.0,
-			StrokingOpacity:    1.0,
+			Rect:         rect,
+			Color:        annotCol,
+			Contents:     "This is an example text annotation.  It contains some text.",
+			LastModified: now,
+			SingleUse:    true, // Embed() creates a dict, we embed this manually
 		},
 		Markup: annotation.Markup{
 			User:  "Jochen Voss",
 			Popup: popupRef,
 		},
-		IconName: annotation.IconNote,
+		Icon: annotation.TextIconNote,
 	}
-	// Embed text annotation as reference (SingleUse = false)
-	text.SingleUse = false
 	textNative, _, err := text.Embed(doc.RM)
 	if err != nil {
 		return err
@@ -97,8 +100,6 @@ func createDocument(fname string) error {
 		return err
 	}
 
-	// Embed popup annotation as reference (SingleUse = false)
-	popup.SingleUse = false
 	popupNative, _, err := popup.Embed(doc.RM)
 	if err != nil {
 		return err
@@ -108,43 +109,66 @@ func createDocument(fname string) error {
 		return err
 	}
 
-	p := writer.page
+	p := w.page
 	annots, _ := p.PageDict["Annots"].(pdf.Array)
-	annots = append(annots, textRef)
+	annots = append(annots, textRef, popupRef)
 	p.PageDict["Annots"] = annots
 
-	// writer.printf("Link Annotation")
+	w.printf("Link Annotation")
 
-	// linkRef := doc.RM.Out.Alloc()
-	// rect = writer.makeRect(100, 12)
-	// link := &annotation.Link{
-	// 	Common: annotation.Common{
-	// 		Rect: rect,
-	// 	},
-	// 	A:          0,
-	// 	Dest:       nil,
-	// 	H:          "",
-	// 	PA:         0,
-	// 	QuadPoints: []float64{},
-	// 	// BS:         0,
-	// }
-	// // Embed link annotation directly as dict (SingleUse = true)
-	// link.SingleUse = true
-	// linkNative, _, err := link.Embed(doc.RM)
-	// if err != nil {
-	// 	return err
-	// }
-	// // For SingleUse=true, linkNative is already a Dict, so we can put it directly
-	// err = doc.RM.Out.Put(linkRef, linkNative)
-	// if err != nil {
-	// 	return err
-	// }
+	w.vSpace(10)
+	w.ensureSpace(20)
+	w.page.PushGraphicsState()
+	w.page.TextBegin()
+	w.page.TextSetFont(w.body, 18)
+	w.yPos -= 15
+	w.page.TextSetMatrix(matrix.Rotate(0.1).Translate(margin+10, w.yPos))
+	w.page.SetFillColor(color.DeviceGray(0.3))
+	w.page.TextShow("This is a ")
+	w.page.SetFillColor(annotCol)
+	gg := w.page.TextLayout(nil, "link to the first page")
+	quadPoints := w.page.TextGetQuadPoints(gg)
+	w.page.TextShowGlyphs(gg)
+	w.page.SetFillColor(color.DeviceGray(0.3))
+	w.page.TextShow(".")
+	w.yPos -= 5
+	w.page.TextEnd()
+	w.page.PopGraphicsState()
 
-	// annots, _ = p.PageDict["Annots"].(pdf.Array)
-	// annots = append(annots, linkRef)
-	// p.PageDict["Annots"] = annots
+	rect = pdf.Rectangle{
+		LLx: min(quadPoints[0], quadPoints[2], quadPoints[4], quadPoints[6]),
+		LLy: min(quadPoints[1], quadPoints[3], quadPoints[5], quadPoints[7]),
+		URx: max(quadPoints[0], quadPoints[2], quadPoints[4], quadPoints[6]),
+		URy: max(quadPoints[1], quadPoints[3], quadPoints[5], quadPoints[7]),
+	}
+	link := &annotation.Link{
+		Common: annotation.Common{
+			Rect:     rect,
+			Contents: "Link to the first page",
+			Color:    annotCol,
+		},
+		Action: pdf.Dict{
+			"Type": pdf.Name("Action"),
+			"S":    pdf.Name("Named"),
+			"N":    pdf.Name("FirstPage"),
+		},
+		Border: &annotation.BorderStyle{
+			Width:     0.5,
+			Style:     "S",
+			SingleUse: true,
+		},
+		QuadPoints: quadPoints,
+	}
+	linkRef, _, err := link.Embed(doc.RM)
+	if err != nil {
+		return err
+	}
 
-	err = writer.Close()
+	annots, _ = p.PageDict["Annots"].(pdf.Array)
+	annots = append(annots, linkRef)
+	p.PageDict["Annots"] = annots
+
+	err = w.Close()
 	if err != nil {
 		return err
 	}
@@ -157,19 +181,19 @@ type writer struct {
 	page *document.Page
 	yPos float64
 
-	label font.Layouter
-	body  font.Layouter
+	heading font.Layouter
+	body    font.Layouter
 
 	grey color.Color
 }
 
 func newWriter(doc *document.MultiPage) *writer {
 	w := &writer{
-		doc:   doc,
-		yPos:  paper.URy - margin,
-		label: standard.Helvetica.New(),
-		body:  standard.TimesRoman.New(),
-		grey:  color.DeviceGray(0.5),
+		doc:     doc,
+		yPos:    paper.URy - margin,
+		heading: standard.Helvetica.New(),
+		body:    standard.TimesRoman.New(),
+		grey:    color.DeviceGray(0.9),
 	}
 
 	return w
@@ -182,14 +206,14 @@ func (w *writer) Close() error {
 	return nil
 }
 
-func (w *writer) printf(format string, args ...interface{}) {
+func (w *writer) printf(format string, args ...any) {
 	text := fmt.Sprintf(format, args...)
 	lines := strings.Split(text, "\n")
 
 	w.ensureSpace(15)
 	w.page.PushGraphicsState()
 	w.page.TextBegin()
-	w.page.TextSetFont(w.label, 12)
+	w.page.TextSetFont(w.heading, 12)
 	for i, line := range lines {
 		w.yPos -= 10
 		switch i {
@@ -241,7 +265,7 @@ func (w *writer) writeIntroduction() {
 	// Title
 	w.page.PushGraphicsState()
 	w.page.TextBegin()
-	w.page.TextSetFont(w.label, 16)
+	w.page.TextSetFont(w.heading, 16)
 	w.page.TextFirstLine(margin, w.yPos)
 	w.page.TextShow("PDF Annotation Types Visual Test")
 	w.page.TextEnd()
@@ -324,10 +348,9 @@ func (w *writer) makeRect(width, height float64) pdf.Rectangle {
 	w.yPos -= 10
 
 	w.page.PushGraphicsState()
-	w.page.SetLineWidth(1.0)
-	w.page.SetStrokeColor(w.grey)
-	w.page.Rectangle(res.LLx-5, res.LLy-5, width+10, height+10)
-	w.page.Stroke()
+	w.page.SetFillColor(w.grey)
+	w.page.Rectangle(res.LLx, res.LLy, width, height)
+	w.page.Fill()
 	w.page.PopGraphicsState()
 
 	return res

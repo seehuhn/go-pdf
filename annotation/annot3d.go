@@ -107,7 +107,6 @@ func (a *Annot3D) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	dict := pdf.Dict{
-		"Type":    pdf.Name("Annot"),
 		"Subtype": pdf.Name("3D"),
 	}
 

@@ -163,7 +163,6 @@ func (p *Polyline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 
 func (p *Polyline) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
-		"Type":    pdf.Name("Annot"),
 		"Subtype": pdf.Name("PolyLine"),
 	}
 

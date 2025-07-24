@@ -180,3 +180,91 @@ func (w *Writer) TextLayout(seq *font.GlyphSeq, text string) *font.GlyphSeq {
 
 	return T.Layout(seq, text)
 }
+
+// TextGetQuadPoints returns QuadPoints for a glyph sequence in default user
+// space coordinates. Returns an array of 8 numbers representing one
+// quadrilateral (x1 y1 x2 y2 x3 y3 x4 y4), where (x1,y1)--(x2,y2) is the
+// bottom edge of the (possibly rotated) bounding box.
+func (w *Writer) TextGetQuadPoints(seq *font.GlyphSeq) []float64 {
+	if seq == nil || len(seq.Seq) == 0 {
+		return nil
+	}
+	if err := w.mustBeSet(StateTextFont | StateTextMatrix); err != nil {
+		return nil
+	}
+
+	// get bounding rectangle in PDF text space units
+	f := w.CurrentFont
+	geom := f.GetGeometry()
+	size := w.TextFontSize
+
+	var width, height, depth float64
+	first := true
+	for _, glyph := range seq.Seq {
+		width += glyph.Advance
+
+		bbox := &geom.GlyphExtents[glyph.GID]
+		if bbox.IsZero() {
+			continue
+		}
+		thisDepth := -(bbox.LLy*size/1000 + glyph.Rise)
+		thisHeight := (bbox.URy*size/1000 + glyph.Rise)
+
+		if thisDepth > depth || first {
+			depth = thisDepth
+		}
+		if thisHeight > height || first {
+			height = thisHeight
+		}
+		first = false
+	}
+	if first {
+		return nil
+	}
+	// Build glyph rectangle in text space
+	// Calculate the actual glyph bounds including left bearing
+	skip := seq.Skip
+
+	// Find the left-most and right-most glyph bounds
+	var leftBearing, rightBearing float64
+	first = true
+	currentPos := skip
+	for _, glyph := range seq.Seq {
+		bbox := &geom.GlyphExtents[glyph.GID]
+		if !bbox.IsZero() {
+			glyphLeft := currentPos + bbox.LLx*size/1000
+			glyphRight := currentPos + bbox.URx*size/1000
+			if first {
+				leftBearing = glyphLeft
+				rightBearing = glyphRight
+				first = false
+			} else {
+				if glyphLeft < leftBearing {
+					leftBearing = glyphLeft
+				}
+				if glyphRight > rightBearing {
+					rightBearing = glyphRight
+				}
+			}
+		}
+		currentPos += glyph.Advance
+	}
+
+	rectText := []float64{
+		leftBearing, -depth, // bottom-left
+		rightBearing, -depth, // bottom-right
+		rightBearing, height, // top-right
+		leftBearing, height, // top-left
+	}
+
+	// transform the bounding rectangle from text space to default user space
+	M := w.TextMatrix.Mul(w.CTM)
+	rectUser := make([]float64, 8)
+	for i := range 4 {
+		x, y := M.Apply(rectText[2*i], rectText[2*i+1])
+		rectUser[2*i] = x
+		rectUser[2*i+1] = y
+	}
+
+	return rectUser
+}

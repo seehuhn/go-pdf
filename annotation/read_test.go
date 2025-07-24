@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/debug/mock"
 )
 
 type testCase struct {
@@ -45,19 +46,19 @@ var testCases = map[string][]testCase{
 					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 150},
 					Contents: "This is a text annotation",
 				},
-				Open:     false,
-				IconName: "Comment",
+				Open: false,
+				Icon: "Comment",
 			},
 		},
 		{
 			name: "text annotation with markup fields",
 			annotation: &Text{
 				Common: Common{
-					Rect:               pdf.Rectangle{LLx: 50, LLy: 50, URx: 150, URy: 100},
-					Contents:           "Text with markup",
-					Name:               "annotation-1",
-					StrokingOpacity:    0.8,
-					NonStrokingOpacity: 0.6,
+					Rect:                   pdf.Rectangle{LLx: 50, LLy: 50, URx: 150, URy: 100},
+					Contents:               "Text with markup",
+					Name:                   "annotation-1",
+					StrokingTransparency:   0.8,
+					NonStrokingTranparency: 0.6,
 				},
 				Markup: Markup{
 					User:         "Author Name",
@@ -65,9 +66,9 @@ var testCases = map[string][]testCase{
 					Subject:      "Test Subject",
 					InReplyTo:    pdf.NewReference(1, 0),
 				},
-				Open:     true,
-				IconName: "Note",
-				State:    StateMarked,
+				Open:  true,
+				Icon:  "Note",
+				State: TextStateMarked,
 			},
 		},
 		{
@@ -93,9 +94,9 @@ var testCases = map[string][]testCase{
 					Intent:    "Note",
 					InReplyTo: pdf.NewReference(2, 0),
 				},
-				Open:     true,
-				IconName: "Insert",
-				State:    StateAccepted,
+				Open:  true,
+				Icon:  "Insert",
+				State: TextStateAccepted,
 			},
 		},
 	},
@@ -1735,13 +1736,13 @@ var testCases = map[string][]testCase{
 			name: "comprehensive projection annotation",
 			annotation: &Projection{
 				Common: Common{
-					Rect:               pdf.Rectangle{LLx: 200, LLy: 400, URx: 500, URy: 500},
-					Contents:           "Comprehensive 3D measurement annotation",
-					Name:               "comprehensive-projection",
-					Flags:              2, // Print flag
-					Color:              color.DeviceGray(0.8),
-					StrokingOpacity:    0.9,
-					NonStrokingOpacity: 0.7,
+					Rect:                   pdf.Rectangle{LLx: 200, LLy: 400, URx: 500, URy: 500},
+					Contents:               "Comprehensive 3D measurement annotation",
+					Name:                   "comprehensive-projection",
+					Flags:                  2, // Print flag
+					Color:                  color.DeviceGray(0.8),
+					StrokingTransparency:   0.9,
+					NonStrokingTranparency: 0.7,
 				},
 				Markup: Markup{
 					User:         "3D Measurement System",
@@ -1794,13 +1795,13 @@ var testCases = map[string][]testCase{
 			name: "comprehensive rich media annotation",
 			annotation: &RichMedia{
 				Common: Common{
-					Rect:               pdf.Rectangle{LLx: 200, LLy: 500, URx: 600, URy: 700},
-					Contents:           "Interactive 3D content with video and sound",
-					Name:               "comprehensive-richmedia",
-					Flags:              0, // No flags
-					Color:              color.DeviceGray(0.5),
-					StrokingOpacity:    1.0,
-					NonStrokingOpacity: 0.8,
+					Rect:                   pdf.Rectangle{LLx: 200, LLy: 500, URx: 600, URy: 700},
+					Contents:               "Interactive 3D content with video and sound",
+					Name:                   "comprehensive-richmedia",
+					Flags:                  0, // No flags
+					Color:                  color.DeviceGray(0.5),
+					StrokingTransparency:   1.0,
+					NonStrokingTranparency: 0.8,
 					Border: &Border{
 						HCornerRadius: 5.0,
 						VCornerRadius: 5.0,
@@ -1825,16 +1826,42 @@ var testCases = map[string][]testCase{
 			name: "rich media with other fields",
 			annotation: &RichMedia{
 				Common: Common{
-					Rect:               pdf.Rectangle{LLx: 300, LLy: 800, URx: 500, URy: 900},
-					Contents:           "Rich media with additional fields",
-					Name:               "richmedia-advanced",
-					StrokingOpacity:    0.9,
-					NonStrokingOpacity: 0.7,
+					Rect:                   pdf.Rectangle{LLx: 300, LLy: 800, URx: 500, URy: 900},
+					Contents:               "Rich media with additional fields",
+					Name:                   "richmedia-advanced",
+					StrokingTransparency:   0.9,
+					NonStrokingTranparency: 0.7,
 				},
 				RichMediaContent:  pdf.NewReference(1100, 0),
 				RichMediaSettings: pdf.NewReference(1200, 0),
 			},
 		},
+	},
+}
+
+// testDicts contains annotation dictionaries for round-trip tests. Some of the
+// dictionaries are mal-formed. These are used to make sure that:
+//  1. The reader does not crash on malformed dictionaries.
+//  2. Every dict which can be read can then be written back
+//     (possibly leading to a different representation).
+var testDicts = []pdf.Dict{
+	{
+		"Type":       pdf.Name("Annot"),
+		"Subtype":    pdf.Name("Text"),
+		"Rect":       &pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 150},
+		"T":          pdf.String("Grumpy Boss"),
+		"State":      pdf.Name("Rejected"),
+		"StateModel": pdf.Name("Review"),
+		"IRT":        pdf.NewReference(1, 0),
+	},
+	{
+		"Type":       pdf.Name("Annot"),
+		"Subtype":    pdf.Name("Text"),
+		"Rect":       &pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 150},
+		"T":          pdf.String("Grumpy Boss"),
+		"State":      pdf.Name("Rejected"),
+		"StateModel": pdf.Name("Review"),
+		// invalid due to missing "IRT" field
 	},
 }
 
@@ -1847,12 +1874,28 @@ func TestRoundTrip(t *testing.T) {
 					singleUseStr = "singleuse"
 				}
 				t.Run(fmt.Sprintf("%s-%s-%s", annotationType, tc.name, singleUseStr), func(t *testing.T) {
-					// Create a copy of the annotation with the desired SingleUse setting
-					annotation := cloneAnnotationWithSingleUse(tc.annotation, singleUse)
-					roundTripTest(t, annotation)
+					// Create a copy of the a with the desired SingleUse setting
+					a := cloneAnnotationWithSingleUse(tc.annotation, singleUse)
+					roundTripTest(t, a)
 				})
 			}
 		}
+	}
+}
+
+func TestRoundTripDict(t *testing.T) {
+	for i, dict := range testDicts {
+		t.Run(fmt.Sprintf("dict-%d", i), func(t *testing.T) {
+			// step 1: make sure Extract does not crash or hang
+			a, err := Extract(mock.Getter, dict)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+
+			// step 2: if we managed to extract an annotation, do a round-trip test
+			roundTripTest(t, a)
+		})
 	}
 }
 
@@ -2029,7 +2072,6 @@ func roundTripTest(t *testing.T, a1 pdf.Annotation) {
 func TestUnknownAnnotation(t *testing.T) {
 	// Create an unknown annotation type
 	unknownDict := pdf.Dict{
-		"Type":        pdf.Name("Annot"),
 		"Subtype":     pdf.Name("CustomType"),
 		"Rect":        pdf.Array{pdf.Number(0), pdf.Number(0), pdf.Number(100), pdf.Number(50)},
 		"CustomField": pdf.TextString("custom value"),
@@ -2145,32 +2187,32 @@ func TestBorderDefaults(t *testing.T) {
 
 func TestOpacityHandling(t *testing.T) {
 	tests := []struct {
-		name             string
-		strokeOpacity    float64
-		nonStrokeOpacity float64
-		expectCA         bool
-		expectCa         bool
+		name                  string
+		strokeTransparency    float64
+		nonStrokeTransparency float64
+		expectCA              bool
+		expectCa              bool
 	}{
 		{
-			name:             "default opacities",
-			strokeOpacity:    1.0,
-			nonStrokeOpacity: 1.0,
-			expectCA:         false,
-			expectCa:         false,
+			name:                  "default transparencies",
+			strokeTransparency:    0.0,
+			nonStrokeTransparency: 0.0,
+			expectCA:              false,
+			expectCa:              false,
 		},
 		{
-			name:             "custom stroke opacity",
-			strokeOpacity:    0.5,
-			nonStrokeOpacity: 0.5,
-			expectCA:         true,
-			expectCa:         false,
+			name:                  "custom stroke transparency",
+			strokeTransparency:    0.5,
+			nonStrokeTransparency: 0.5,
+			expectCA:              true,
+			expectCa:              false,
 		},
 		{
-			name:             "different opacities",
-			strokeOpacity:    0.8,
-			nonStrokeOpacity: 0.6,
-			expectCA:         true,
-			expectCa:         true,
+			name:                  "different transparencies",
+			strokeTransparency:    0.2,
+			nonStrokeTransparency: 0.4,
+			expectCA:              true,
+			expectCa:              true,
 		},
 	}
 
@@ -2178,9 +2220,9 @@ func TestOpacityHandling(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			annotation := &Text{
 				Common: Common{
-					Rect:               pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
-					StrokingOpacity:    tt.strokeOpacity,
-					NonStrokingOpacity: tt.nonStrokeOpacity,
+					Rect:                   pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
+					StrokingTransparency:   tt.strokeTransparency,
+					NonStrokingTranparency: tt.nonStrokeTransparency,
 				},
 			}
 
@@ -2235,12 +2277,12 @@ func FuzzRead(f *testing.F) {
 				continue
 			}
 
+			w.GetMeta().Trailer["Quir:X"] = embedded
+
 			err = rm.Close()
 			if err != nil {
 				continue
 			}
-
-			w.GetMeta().Trailer["Quir:X"] = embedded
 
 			err = w.Close()
 			if err != nil {
@@ -2249,6 +2291,27 @@ func FuzzRead(f *testing.F) {
 
 			f.Add(out.Data)
 		}
+	}
+	for _, dict := range testDicts {
+		opt := &pdf.WriterOptions{
+			HumanReadable: true,
+		}
+		w, out := memfile.NewPDFWriter(pdf.V2_0, opt)
+		rm := pdf.NewResourceManager(w)
+		ref := w.Alloc()
+		w.Put(ref, dict)
+		err := rm.Close()
+		if err != nil {
+			continue
+		}
+
+		w.GetMeta().Trailer["Quir:X"] = ref
+		err = w.Close()
+		if err != nil {
+			continue
+		}
+
+		f.Add(out.Data)
 	}
 
 	f.Fuzz(func(t *testing.T, fileData []byte) {

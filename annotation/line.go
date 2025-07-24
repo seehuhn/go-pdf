@@ -199,7 +199,6 @@ func (l *Line) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 func (l *Line) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
-		"Type":    pdf.Name("Annot"),
 		"Subtype": pdf.Name("Line"),
 	}
 
