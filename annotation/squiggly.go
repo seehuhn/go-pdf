@@ -41,11 +41,11 @@ func (s *Squiggly) AnnotationType() pdf.Name {
 	return "Squiggly"
 }
 
-func extractSquiggly(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Squiggly, error) {
+func extractSquiggly(r pdf.Getter, dict pdf.Dict) (*Squiggly, error) {
 	squiggly := &Squiggly{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &squiggly.Common, dict, singleUse); err != nil {
+	if err := extractCommon(r, &squiggly.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -69,22 +69,7 @@ func extractSquiggly(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Squiggly, er
 	return squiggly, nil
 }
 
-func (s *Squiggly) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := s.asDict(rm)
-	if err != nil {
-		return nil, pdf.Unused{}, err
-	}
-
-	if s.SingleUse {
-		return dict, pdf.Unused{}, nil
-	}
-
-	ref := rm.Out.Alloc()
-	err = rm.Out.Put(ref, dict)
-	return ref, pdf.Unused{}, err
-}
-
-func (s *Squiggly) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (s *Squiggly) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "squiggly annotation", pdf.V1_4); err != nil {
 		return nil, err
 	}

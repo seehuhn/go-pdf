@@ -24,9 +24,8 @@
 // PDF 2.0 defines 28 different annotation types. The most common type is
 // [Link], which represents clickable areas in the PDF that can navigate to
 // other pages or external URLs. Other commonly used annotation types include
-// [Widget] for form fields and [Text] for simple text notes.
-// All annotation types implement the [Annotation] interface.
-// The full list is:
+// [Widget] for form fields and [Text] for simple text notes. All annotation
+// types implement the [Annotation] interface. The full list is:
 //   - [Annot3D]: (PDF 1.6) include 3D artwork in PDF documents
 //   - [Caret]: (PDF 1.5) indicate the presence of text edits
 //   - [Circle]: draw an ellipse onto the page
@@ -55,4 +54,10 @@
 //   - [Underline]: (PDF 1.3)
 //   - [Watermark]: (PDF 1.6)
 //   - [Widget]: (PDF 1.2)
+//
+// The list of annotations is extensible; PDF viewers may support additional
+// annotation types, and possibly a plugin system for custom annotations. The
+// following type is used by the go-pdf library to represent custom
+// annotations:
+//   - [Custom]: any annotation not shown in the list above
 package annotation

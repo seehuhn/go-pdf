@@ -58,19 +58,17 @@ func createDocument(filename string) error {
 		textRef := doc.RM.Out.Alloc()
 		popupRef := doc.RM.Out.Alloc()
 
-		rect := pdf.Rectangle{LLx: 36 + float64(i)*50, LLy: 200, URx: 36 + float64(i+1)*50, URy: 250}
+		rect := pdf.Rectangle{LLx: 36 + float64(i)*50, LLy: 300, URx: 36 + float64(i+1)*50, URy: 350}
 		popup := &annotation.Popup{
 			Common: annotation.Common{
-				Rect:      rect,
-				SingleUse: true, // Embed() creates a dict, we embed this manually
+				Rect: rect,
 			},
 			Parent: textRef,
 		}
 		text := &annotation.Text{
 			Common: annotation.Common{
-				Rect:      rect,
-				Contents:  fmt.Sprintf("Icon name %q", icon),
-				SingleUse: true, // Embed() creates a dict, we embed this manually
+				Rect:     rect,
+				Contents: fmt.Sprintf("Icon name %q", icon),
 			},
 			Markup: annotation.Markup{
 				User:  "Jochen Voss",
@@ -78,7 +76,7 @@ func createDocument(filename string) error {
 			},
 			Icon: icon,
 		}
-		textNative, _, err := text.Embed(doc.RM)
+		textNative, err := text.AsDict(doc.RM)
 		if err != nil {
 			return err
 		}
@@ -87,7 +85,7 @@ func createDocument(filename string) error {
 			return err
 		}
 
-		popupNative, _, err := popup.Embed(doc.RM)
+		popupNative, err := popup.AsDict(doc.RM)
 		if err != nil {
 			return err
 		}

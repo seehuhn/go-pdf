@@ -67,11 +67,11 @@ func (w *Widget) AnnotationType() pdf.Name {
 	return "Widget"
 }
 
-func extractWidget(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Widget, error) {
+func extractWidget(r pdf.Getter, dict pdf.Dict) (*Widget, error) {
 	widget := &Widget{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &widget.Common, dict, singleUse); err != nil {
+	if err := extractCommon(r, &widget.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -111,22 +111,7 @@ func extractWidget(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Widget, error)
 	return widget, nil
 }
 
-func (w *Widget) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := w.asDict(rm)
-	if err != nil {
-		return nil, pdf.Unused{}, err
-	}
-
-	if w.SingleUse {
-		return dict, pdf.Unused{}, nil
-	}
-
-	ref := rm.Out.Alloc()
-	err = rm.Out.Put(ref, dict)
-	return ref, pdf.Unused{}, err
-}
-
-func (w *Widget) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (w *Widget) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "widget annotation", pdf.V1_2); err != nil {
 		return nil, err
 	}

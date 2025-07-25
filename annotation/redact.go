@@ -59,11 +59,11 @@ func (r *Redact) AnnotationType() pdf.Name {
 	return "Redact"
 }
 
-func extractRedact(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Redact, error) {
+func extractRedact(r pdf.Getter, dict pdf.Dict) (*Redact, error) {
 	redact := &Redact{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &redact.Common, dict, singleUse); err != nil {
+	if err := extractCommon(r, &redact.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -143,23 +143,7 @@ func extractRedact(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Redact, error)
 	return redact, nil
 }
 
-func (r *Redact) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	dict, err := r.asDict(rm)
-	if err != nil {
-		return nil, zero, err
-	}
-
-	if r.SingleUse {
-		return dict, zero, nil
-	}
-
-	ref := rm.Out.Alloc()
-	err = rm.Out.Put(ref, dict)
-	return ref, zero, err
-}
-
-func (r *Redact) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (r *Redact) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "redaction annotation", pdf.V1_7); err != nil {
 		return nil, err
 	}

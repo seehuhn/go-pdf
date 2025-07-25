@@ -1871,18 +1871,10 @@ var testDicts = []pdf.Dict{
 func TestRoundTrip(t *testing.T) {
 	for annotationType, cases := range testCases {
 		for _, tc := range cases {
-			for _, singleUse := range []bool{true, false} {
-				singleUseStr := "reference"
-				if singleUse {
-					singleUseStr = "singleuse"
-				}
-				t.Run(fmt.Sprintf("%s-%s-%s", annotationType, tc.name, singleUseStr), func(t *testing.T) {
-					a := shallowCopy(tc.annotation)
-					common := a.GetCommon()
-					common.SingleUse = singleUse
-					roundTripTest(t, a)
-				})
-			}
+			t.Run(fmt.Sprintf("%s-%s", annotationType, tc.name), func(t *testing.T) {
+				a := shallowCopy(tc.annotation)
+				roundTripTest(t, a)
+			})
 		}
 	}
 }
@@ -1955,7 +1947,7 @@ func roundTripTest(t *testing.T, a1 Annotation) {
 	common.AppearanceState = pdf.Name("Normal")
 
 	// Embed the annotation
-	embedded, _, err := a1.Embed(rm)
+	embedded, err := a1.AsDict(rm)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1981,7 +1973,7 @@ func roundTripTest(t *testing.T, a1 Annotation) {
 
 	// For Unknown annotations, we don't expect perfect round-trip
 	// because the embedding process may add common annotation fields
-	if _, isUnknown := a1.(*Unknown); isUnknown {
+	if _, isUnknown := a1.(*Custom); isUnknown {
 		// Just verify basic properties are preserved
 		if a1.AnnotationType() != a2.AnnotationType() {
 			t.Errorf("annotation type mismatch: want %s, got %s",
@@ -2020,7 +2012,7 @@ func TestUnknownAnnotation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	unknown, ok := annotation.(*Unknown)
+	unknown, ok := annotation.(*Custom)
 	if !ok {
 		t.Fatalf("expected *Unknown, got %T", annotation)
 	}
@@ -2041,7 +2033,7 @@ func TestUnknownAnnotation(t *testing.T) {
 	buf2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm2 := pdf.NewResourceManager(buf2)
 
-	_, _, err = unknown.Embed(rm2)
+	_, err = unknown.AsDict(rm2)
 	if err != nil {
 		t.Errorf("failed to embed unknown annotation: %v", err)
 	}
@@ -2056,8 +2048,8 @@ func TestAnnotationTypes(t *testing.T) {
 		{&Link{}, "Link"},
 		{&FreeText{}, "FreeText"},
 		{&Line{}, "Line"},
-		{&Unknown{Type: "Custom", Data: pdf.Dict{"Subtype": pdf.Name("Custom")}}, "Custom"},
-		{&Unknown{Type: "Unknown", Data: pdf.Dict{}}, "Unknown"},
+		{&Custom{Type: "Custom", Data: pdf.Dict{"Subtype": pdf.Name("Custom")}}, "Custom"},
+		{&Custom{Type: "Unknown", Data: pdf.Dict{}}, "Unknown"},
 	}
 
 	for _, tt := range tests {
@@ -2089,24 +2081,19 @@ func TestBorderDefaults(t *testing.T) {
 	// Add appearance dictionary for PDF 2.0 compliance
 	annotation.Common.Appearance = makeAppearance(rm, annotation.Common.Rect)
 
-	embedded, _, err := annotation.Embed(rm)
+	embedded, err := annotation.AsDict(rm)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ref, ok := embedded.(pdf.Reference)
-	if !ok {
-		t.Fatal("embedded annotation is not a reference")
-	}
-
-	obj, err := buf.Get(ref, false)
+	err = rm.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dict, ok := obj.(pdf.Dict)
-	if !ok {
-		t.Fatal("annotation object is not a dictionary")
+	dict, err := pdf.GetDict(buf, embedded)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Border should not be present since it's the default value
@@ -2162,24 +2149,19 @@ func TestOpacityHandling(t *testing.T) {
 			// Add appearance dictionary for PDF 2.0 compliance
 			annotation.Common.Appearance = makeAppearance(rm, annotation.Common.Rect)
 
-			embedded, _, err := annotation.Embed(rm)
+			embedded, err := annotation.AsDict(rm)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			ref, ok := embedded.(pdf.Reference)
-			if !ok {
-				t.Fatal("embedded annotation is not a reference")
-			}
-
-			obj, err := buf.Get(ref, false)
+			err = rm.Close()
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			dict, ok := obj.(pdf.Dict)
-			if !ok {
-				t.Fatal("annotation object is not a dictionary")
+			dict, err := pdf.GetDict(rm.Out, embedded)
+			if err != nil {
+				t.Fatal(err)
 			}
 
 			_, hasCA := dict["CA"]
@@ -2210,7 +2192,7 @@ func FuzzRead(f *testing.F) {
 			common.Appearance = makeAppearance(rm, a.GetCommon().Rect)
 			common.AppearanceState = pdf.Name("Normal")
 
-			embedded, _, err := a.Embed(rm)
+			embedded, err := a.AsDict(rm)
 			if err != nil {
 				continue
 			}
@@ -2276,7 +2258,7 @@ func FuzzRead(f *testing.F) {
 		// Test that basic operations don't panic
 		annotationType := annotation.AnnotationType()
 		// For Unknown annotations, empty type is acceptable if no subtype is present
-		if _, isUnknown := annotation.(*Unknown); !isUnknown && annotationType == "" {
+		if _, isUnknown := annotation.(*Custom); !isUnknown && annotationType == "" {
 			t.Error("annotation type should not be empty for known types")
 		}
 
@@ -2284,7 +2266,7 @@ func FuzzRead(f *testing.F) {
 		buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		_, _, err = annotation.Embed(rm)
+		_, err = annotation.AsDict(rm)
 		if err != nil {
 			t.Errorf("failed to embed annotation: %v", err)
 		}

@@ -67,11 +67,11 @@ func (p *Polyline) AnnotationType() pdf.Name {
 	return "PolyLine"
 }
 
-func extractPolyline(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Polyline, error) {
+func extractPolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
 	polyline := &Polyline{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &polyline.Common, dict, singleUse); err != nil {
+	if err := extractCommon(r, &polyline.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -146,22 +146,7 @@ func extractPolyline(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Polyline, er
 	return polyline, nil
 }
 
-func (p *Polyline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := p.asDict(rm)
-	if err != nil {
-		return nil, pdf.Unused{}, err
-	}
-
-	if p.SingleUse {
-		return dict, pdf.Unused{}, nil
-	}
-
-	ref := rm.Out.Alloc()
-	err = rm.Out.Put(ref, dict)
-	return ref, pdf.Unused{}, err
-}
-
-func (p *Polyline) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (p *Polyline) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("PolyLine"),
 	}

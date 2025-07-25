@@ -55,11 +55,11 @@ func (s *Stamp) AnnotationType() pdf.Name {
 	return "Stamp"
 }
 
-func extractStamp(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Stamp, error) {
+func extractStamp(r pdf.Getter, dict pdf.Dict) (*Stamp, error) {
 	stamp := &Stamp{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &stamp.Common, dict, singleUse); err != nil {
+	if err := extractCommon(r, &stamp.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -89,23 +89,7 @@ func extractStamp(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Stamp, error) {
 	return stamp, nil
 }
 
-func (s *Stamp) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	dict, err := s.asDict(rm)
-	if err != nil {
-		return nil, zero, err
-	}
-
-	if s.SingleUse {
-		return dict, zero, nil
-	}
-
-	ref := rm.Out.Alloc()
-	err = rm.Out.Put(ref, dict)
-	return ref, zero, err
-}
-
-func (s *Stamp) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (s *Stamp) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "stamp annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

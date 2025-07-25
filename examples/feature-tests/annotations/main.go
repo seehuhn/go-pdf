@@ -70,9 +70,8 @@ func createDocument(fname string) error {
 	rect := w.makeRect(32, 32)
 	popup := &annotation.Popup{
 		Common: annotation.Common{
-			Rect:      rect,
-			Color:     annotCol,
-			SingleUse: true, // Embed() creates a dict, we embed this manually
+			Rect:  rect,
+			Color: annotCol,
 		},
 		Parent: textRef,
 	}
@@ -83,7 +82,6 @@ func createDocument(fname string) error {
 			Color:        annotCol,
 			Contents:     "This is an example text annotation.  It contains some text.",
 			LastModified: now,
-			SingleUse:    true, // Embed() creates a dict, we embed this manually
 		},
 		Markup: annotation.Markup{
 			User:  "Jochen Voss",
@@ -91,7 +89,7 @@ func createDocument(fname string) error {
 		},
 		Icon: annotation.TextIconNote,
 	}
-	textNative, _, err := text.Embed(doc.RM)
+	textNative, err := text.AsDict(doc.RM)
 	if err != nil {
 		return err
 	}
@@ -100,7 +98,7 @@ func createDocument(fname string) error {
 		return err
 	}
 
-	popupNative, _, err := popup.Embed(doc.RM)
+	popupNative, err := popup.AsDict(doc.RM)
 	if err != nil {
 		return err
 	}
@@ -159,7 +157,12 @@ func createDocument(fname string) error {
 		},
 		QuadPoints: quadPoints,
 	}
-	linkRef, _, err := link.Embed(doc.RM)
+	linkRef := doc.RM.Out.Alloc()
+	linkNative, err := link.AsDict(doc.RM)
+	if err != nil {
+		return err
+	}
+	err = doc.RM.Out.Put(linkRef, linkNative)
 	if err != nil {
 		return err
 	}

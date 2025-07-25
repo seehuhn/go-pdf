@@ -86,22 +86,7 @@ func (a *Annot3D) AnnotationType() pdf.Name {
 	return "3D"
 }
 
-func (a *Annot3D) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := a.asDict(rm)
-	if err != nil {
-		return nil, pdf.Unused{}, err
-	}
-
-	if a.SingleUse {
-		return dict, pdf.Unused{}, nil
-	}
-
-	ref := rm.Out.Alloc()
-	err = rm.Out.Put(ref, dict)
-	return ref, pdf.Unused{}, err
-}
-
-func (a *Annot3D) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (a *Annot3D) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "3D annotation", pdf.V1_6); err != nil {
 		return nil, err
 	}
@@ -229,11 +214,11 @@ func (a *Annot3D) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	return dict, nil
 }
 
-func extractAnnot3D(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Annot3D, error) {
+func extractAnnot3D(r pdf.Getter, dict pdf.Dict) (*Annot3D, error) {
 	annot3D := &Annot3D{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &annot3D.Common, dict, singleUse); err != nil {
+	if err := extractCommon(r, &annot3D.Common, dict); err != nil {
 		return nil, err
 	}
 

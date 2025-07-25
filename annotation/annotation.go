@@ -36,7 +36,7 @@ type Annotation interface {
 	// GetCommon returns the common annotation fields.
 	GetCommon() *Common
 
-	pdf.Embedder[pdf.Unused]
+	AsDict(rm *pdf.ResourceManager) (pdf.Dict, error)
 }
 
 // Common contains fields common to all annotation dictionaries.
@@ -148,10 +148,6 @@ type Common struct {
 	// Lang (optional) is a language identifier specifying the natural language
 	// for all text in the annotation.
 	Lang language.Tag
-
-	// SingleUse determines if Embed returns as dictionary (true) or
-	// a reference (false).
-	SingleUse bool
 }
 
 func (c *Common) GetCommon() *Common {
@@ -336,7 +332,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict, isMarkup bool) er
 }
 
 // extractCommon extracts fields common to all annotations from a PDF dictionary.
-func extractCommon(r pdf.Getter, common *Common, dict pdf.Dict, singleUse bool) error {
+func extractCommon(r pdf.Getter, common *Common, dict pdf.Dict) error {
 	// Rect (required)
 	if rect, err := pdf.GetRectangle(r, dict["Rect"]); err == nil && rect != nil {
 		common.Rect = *rect
@@ -473,9 +469,6 @@ func extractCommon(r pdf.Getter, common *Common, dict pdf.Dict, singleUse bool) 
 			common.Lang = tag
 		}
 	}
-
-	// Set SingleUse based on whether the annotation was embedded as a dictionary or reference
-	common.SingleUse = singleUse
 
 	return nil
 }

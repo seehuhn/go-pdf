@@ -60,7 +60,7 @@ func (t *Text) AnnotationType() pdf.Name {
 	return "Text"
 }
 
-func extractText(r pdf.Getter, obj pdf.Object, singleUse bool) (*Text, error) {
+func extractText(r pdf.Getter, obj pdf.Object) (*Text, error) {
 	dict, err := pdf.GetDict(r, obj)
 	if err != nil {
 		return nil, err
@@ -69,7 +69,7 @@ func extractText(r pdf.Getter, obj pdf.Object, singleUse bool) (*Text, error) {
 	text := &Text{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &text.Common, dict, singleUse); err != nil {
+	if err := extractCommon(r, &text.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -126,24 +126,7 @@ func extractText(r pdf.Getter, obj pdf.Object, singleUse bool) (*Text, error) {
 	return text, nil
 }
 
-func (t *Text) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-
-	dict, err := t.asDict(rm)
-	if err != nil {
-		return nil, zero, err
-	}
-
-	if t.SingleUse {
-		return dict, zero, nil
-	}
-
-	ref := rm.Out.Alloc()
-	err = rm.Out.Put(ref, dict)
-	return ref, zero, err
-}
-
-func (t *Text) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (t *Text) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Text"),
 	}

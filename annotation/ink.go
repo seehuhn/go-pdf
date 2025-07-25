@@ -52,11 +52,11 @@ func (i *Ink) AnnotationType() pdf.Name {
 	return "Ink"
 }
 
-func extractInk(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Ink, error) {
+func extractInk(r pdf.Getter, dict pdf.Dict) (*Ink, error) {
 	ink := &Ink{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &ink.Common, dict, singleUse); err != nil {
+	if err := extractCommon(r, &ink.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -120,22 +120,7 @@ func extractInk(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Ink, error) {
 	return ink, nil
 }
 
-func (i *Ink) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := i.asDict(rm)
-	if err != nil {
-		return nil, pdf.Unused{}, err
-	}
-
-	if i.SingleUse {
-		return dict, pdf.Unused{}, nil
-	}
-
-	ref := rm.Out.Alloc()
-	err = rm.Out.Put(ref, dict)
-	return ref, pdf.Unused{}, err
-}
-
-func (i *Ink) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (i *Ink) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "ink annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

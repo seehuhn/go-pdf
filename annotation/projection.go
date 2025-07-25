@@ -38,11 +38,11 @@ func (p *Projection) AnnotationType() pdf.Name {
 	return "Projection"
 }
 
-func extractProjection(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Projection, error) {
+func extractProjection(r pdf.Getter, dict pdf.Dict) (*Projection, error) {
 	projection := &Projection{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &projection.Common, dict, singleUse); err != nil {
+	if err := extractCommon(r, &projection.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -59,23 +59,7 @@ func extractProjection(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Projection
 	return projection, nil
 }
 
-func (p *Projection) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	dict, err := p.asDict(rm)
-	if err != nil {
-		return nil, zero, err
-	}
-
-	if p.SingleUse {
-		return dict, zero, nil
-	}
-
-	ref := rm.Out.Alloc()
-	err = rm.Out.Put(ref, dict)
-	return ref, zero, err
-}
-
-func (p *Projection) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (p *Projection) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "projection annotation", pdf.V2_0); err != nil {
 		return nil, err
 	}

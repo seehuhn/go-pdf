@@ -41,11 +41,11 @@ func (u *Underline) AnnotationType() pdf.Name {
 	return "Underline"
 }
 
-func extractUnderline(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Underline, error) {
+func extractUnderline(r pdf.Getter, dict pdf.Dict) (*Underline, error) {
 	underline := &Underline{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &underline.Common, dict, singleUse); err != nil {
+	if err := extractCommon(r, &underline.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -69,22 +69,7 @@ func extractUnderline(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Underline, 
 	return underline, nil
 }
 
-func (u *Underline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := u.asDict(rm)
-	if err != nil {
-		return nil, pdf.Unused{}, err
-	}
-
-	if u.SingleUse {
-		return dict, pdf.Unused{}, nil
-	}
-
-	ref := rm.Out.Alloc()
-	err = rm.Out.Put(ref, dict)
-	return ref, pdf.Unused{}, err
-}
-
-func (u *Underline) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (u *Underline) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "underline annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

@@ -86,11 +86,11 @@ func (l *Line) AnnotationType() pdf.Name {
 	return "Line"
 }
 
-func extractLine(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Line, error) {
+func extractLine(r pdf.Getter, dict pdf.Dict) (*Line, error) {
 	line := &Line{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &line.Common, dict, singleUse); err != nil {
+	if err := extractCommon(r, &line.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -182,22 +182,7 @@ func extractLine(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Line, error) {
 	return line, nil
 }
 
-func (l *Line) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := l.asDict(rm)
-	if err != nil {
-		return nil, pdf.Unused{}, err
-	}
-
-	if l.SingleUse {
-		return dict, pdf.Unused{}, nil
-	}
-
-	ref := rm.Out.Alloc()
-	err = rm.Out.Put(ref, dict)
-	return ref, pdf.Unused{}, err
-}
-
-func (l *Line) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (l *Line) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Line"),
 	}

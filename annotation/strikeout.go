@@ -41,11 +41,11 @@ func (s *StrikeOut) AnnotationType() pdf.Name {
 	return "StrikeOut"
 }
 
-func extractStrikeOut(r pdf.Getter, dict pdf.Dict, singleUse bool) (*StrikeOut, error) {
+func extractStrikeOut(r pdf.Getter, dict pdf.Dict) (*StrikeOut, error) {
 	strikeOut := &StrikeOut{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &strikeOut.Common, dict, singleUse); err != nil {
+	if err := extractCommon(r, &strikeOut.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -69,22 +69,7 @@ func extractStrikeOut(r pdf.Getter, dict pdf.Dict, singleUse bool) (*StrikeOut, 
 	return strikeOut, nil
 }
 
-func (s *StrikeOut) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := s.asDict(rm)
-	if err != nil {
-		return nil, pdf.Unused{}, err
-	}
-
-	if s.SingleUse {
-		return dict, pdf.Unused{}, nil
-	}
-
-	ref := rm.Out.Alloc()
-	err = rm.Out.Put(ref, dict)
-	return ref, pdf.Unused{}, err
-}
-
-func (s *StrikeOut) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (s *StrikeOut) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "strikeout annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

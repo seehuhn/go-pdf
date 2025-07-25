@@ -42,11 +42,11 @@ func (p *PrinterMark) AnnotationType() pdf.Name {
 	return "PrinterMark"
 }
 
-func extractPrinterMark(r pdf.Getter, dict pdf.Dict, singleUse bool) (*PrinterMark, error) {
+func extractPrinterMark(r pdf.Getter, dict pdf.Dict) (*PrinterMark, error) {
 	printerMark := &PrinterMark{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &printerMark.Common, dict, singleUse); err != nil {
+	if err := extractCommon(r, &printerMark.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -59,23 +59,7 @@ func extractPrinterMark(r pdf.Getter, dict pdf.Dict, singleUse bool) (*PrinterMa
 	return printerMark, nil
 }
 
-func (p *PrinterMark) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	dict, err := p.asDict(rm)
-	if err != nil {
-		return nil, zero, err
-	}
-
-	if p.SingleUse {
-		return dict, zero, nil
-	}
-
-	ref := rm.Out.Alloc()
-	err = rm.Out.Put(ref, dict)
-	return ref, zero, err
-}
-
-func (p *PrinterMark) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (p *PrinterMark) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "printer's mark annotation", pdf.V1_4); err != nil {
 		return nil, err
 	}

@@ -58,11 +58,11 @@ func (s *Square) AnnotationType() pdf.Name {
 	return "Square"
 }
 
-func extractSquare(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Square, error) {
+func extractSquare(r pdf.Getter, dict pdf.Dict) (*Square, error) {
 	square := &Square{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &square.Common, dict, singleUse); err != nil {
+	if err := extractCommon(r, &square.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -107,22 +107,7 @@ func extractSquare(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Square, error)
 	return square, nil
 }
 
-func (s *Square) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := s.asDict(rm)
-	if err != nil {
-		return nil, pdf.Unused{}, err
-	}
-
-	if s.SingleUse {
-		return dict, pdf.Unused{}, nil
-	}
-
-	ref := rm.Out.Alloc()
-	err = rm.Out.Put(ref, dict)
-	return ref, pdf.Unused{}, err
-}
-
-func (s *Square) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (s *Square) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Square"),
 	}

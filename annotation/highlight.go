@@ -41,11 +41,11 @@ func (h *Highlight) AnnotationType() pdf.Name {
 	return "Highlight"
 }
 
-func extractHighlight(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Highlight, error) {
+func extractHighlight(r pdf.Getter, dict pdf.Dict) (*Highlight, error) {
 	highlight := &Highlight{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &highlight.Common, dict, singleUse); err != nil {
+	if err := extractCommon(r, &highlight.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -69,23 +69,7 @@ func extractHighlight(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Highlight, 
 	return highlight, nil
 }
 
-func (h *Highlight) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	dict, err := h.asDict(rm)
-	if err != nil {
-		return nil, zero, err
-	}
-
-	if h.SingleUse {
-		return dict, zero, nil
-	}
-
-	ref := rm.Out.Alloc()
-	err = rm.Out.Put(ref, dict)
-	return ref, zero, err
-}
-
-func (h *Highlight) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (h *Highlight) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "highlight annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

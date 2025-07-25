@@ -45,11 +45,11 @@ func (f *FileAttachment) AnnotationType() pdf.Name {
 	return "FileAttachment"
 }
 
-func extractFileAttachment(r pdf.Getter, dict pdf.Dict, singleUse bool) (*FileAttachment, error) {
+func extractFileAttachment(r pdf.Getter, dict pdf.Dict) (*FileAttachment, error) {
 	fileAttachment := &FileAttachment{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &fileAttachment.Common, dict, singleUse); err != nil {
+	if err := extractCommon(r, &fileAttachment.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -72,22 +72,7 @@ func extractFileAttachment(r pdf.Getter, dict pdf.Dict, singleUse bool) (*FileAt
 	return fileAttachment, nil
 }
 
-func (f *FileAttachment) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := f.asDict(rm)
-	if err != nil {
-		return nil, pdf.Unused{}, err
-	}
-
-	if f.SingleUse {
-		return dict, pdf.Unused{}, nil
-	}
-
-	ref := rm.Out.Alloc()
-	err = rm.Out.Put(ref, dict)
-	return ref, pdf.Unused{}, err
-}
-
-func (f *FileAttachment) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (f *FileAttachment) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "file attachment annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

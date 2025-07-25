@@ -68,11 +68,11 @@ func (f *FreeText) AnnotationType() pdf.Name {
 	return "FreeText"
 }
 
-func extractFreeText(r pdf.Getter, dict pdf.Dict, singleUse bool) (*FreeText, error) {
+func extractFreeText(r pdf.Getter, dict pdf.Dict) (*FreeText, error) {
 	freeText := &FreeText{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &freeText.Common, dict, singleUse); err != nil {
+	if err := extractCommon(r, &freeText.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -129,23 +129,7 @@ func extractFreeText(r pdf.Getter, dict pdf.Dict, singleUse bool) (*FreeText, er
 	return freeText, nil
 }
 
-func (f *FreeText) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	dict, err := f.asDict(rm)
-	if err != nil {
-		return nil, zero, err
-	}
-
-	if f.SingleUse {
-		return dict, zero, nil
-	}
-
-	ref := rm.Out.Alloc()
-	err = rm.Out.Put(ref, dict)
-	return ref, zero, err
-}
-
-func (f *FreeText) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (f *FreeText) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("FreeText"),
 	}

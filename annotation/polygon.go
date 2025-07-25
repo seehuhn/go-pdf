@@ -65,11 +65,11 @@ func (p *Polygon) AnnotationType() pdf.Name {
 	return "Polygon"
 }
 
-func extractPolygon(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Polygon, error) {
+func extractPolygon(r pdf.Getter, dict pdf.Dict) (*Polygon, error) {
 	polygon := &Polygon{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &polygon.Common, dict, singleUse); err != nil {
+	if err := extractCommon(r, &polygon.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -142,22 +142,7 @@ func extractPolygon(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Polygon, erro
 	return polygon, nil
 }
 
-func (p *Polygon) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := p.asDict(rm)
-	if err != nil {
-		return nil, pdf.Unused{}, err
-	}
-
-	if p.SingleUse {
-		return dict, pdf.Unused{}, nil
-	}
-
-	ref := rm.Out.Alloc()
-	err = rm.Out.Put(ref, dict)
-	return ref, pdf.Unused{}, err
-}
-
-func (p *Polygon) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (p *Polygon) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Polygon"),
 	}
