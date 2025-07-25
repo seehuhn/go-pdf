@@ -122,7 +122,7 @@ func extractTrapNet(r pdf.Getter, dict pdf.Dict, singleUse bool) (*TrapNet, erro
 
 func (t *TrapNet) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	dict, err := t.AsDict(rm)
+	dict, err := t.asDict(rm)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -136,7 +136,7 @@ func (t *TrapNet) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 	return ref, zero, err
 }
 
-func (t *TrapNet) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (t *TrapNet) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "trap network annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func (t *TrapNet) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// Add common annotation fields
-	if err := t.Common.fillDict(rm, dict); err != nil {
+	if err := t.Common.fillDict(rm, dict, isMarkup(t)); err != nil {
 		return nil, err
 	}
 

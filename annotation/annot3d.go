@@ -34,7 +34,7 @@ type Annot3D struct {
 	V pdf.Object
 
 	// A (optional) is an activation dictionary.
-	A *ThreeDActivation
+	A *Annot3DActivation
 
 	// I (optional) is the interactive flag.
 	I bool
@@ -51,8 +51,8 @@ type Annot3D struct {
 
 var _ Annotation = (*Annot3D)(nil)
 
-// ThreeDActivation represents a 3D activation dictionary.
-type ThreeDActivation struct {
+// Annot3DActivation represents a 3D activation dictionary.
+type Annot3DActivation struct {
 	// A (optional) - activation circumstances
 	A pdf.Name
 
@@ -87,7 +87,7 @@ func (a *Annot3D) AnnotationType() pdf.Name {
 }
 
 func (a *Annot3D) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := a.AsDict(rm)
+	dict, err := a.asDict(rm)
 	if err != nil {
 		return nil, pdf.Unused{}, err
 	}
@@ -101,7 +101,7 @@ func (a *Annot3D) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 	return ref, pdf.Unused{}, err
 }
 
-func (a *Annot3D) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (a *Annot3D) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "3D annotation", pdf.V1_6); err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (a *Annot3D) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// Add common annotation fields
-	if err := a.Common.fillDict(rm, dict); err != nil {
+	if err := a.Common.fillDict(rm, dict, isMarkup(a)); err != nil {
 		return nil, err
 	}
 
@@ -252,7 +252,7 @@ func extractAnnot3D(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Annot3D, erro
 	// 3DA (optional)
 	if dict["3DA"] != nil {
 		if threeDa, err := pdf.GetDict(r, dict["3DA"]); err == nil {
-			activation := &ThreeDActivation{
+			activation := &Annot3DActivation{
 				TB: true, // default value
 			}
 

@@ -109,7 +109,7 @@ func extractCircle(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Circle, error)
 
 func (c *Circle) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	dict, err := c.AsDict(rm)
+	dict, err := c.asDict(rm)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -123,14 +123,13 @@ func (c *Circle) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 	return ref, zero, err
 }
 
-func (c *Circle) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
-
+func (c *Circle) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Circle"),
 	}
 
 	// Add common annotation fields
-	if err := c.Common.fillDict(rm, dict); err != nil {
+	if err := c.Common.fillDict(rm, dict, isMarkup(c)); err != nil {
 		return nil, err
 	}
 

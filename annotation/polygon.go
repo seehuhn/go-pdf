@@ -143,7 +143,7 @@ func extractPolygon(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Polygon, erro
 }
 
 func (p *Polygon) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := p.AsDict(rm)
+	dict, err := p.asDict(rm)
 	if err != nil {
 		return nil, pdf.Unused{}, err
 	}
@@ -157,13 +157,13 @@ func (p *Polygon) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 	return ref, pdf.Unused{}, err
 }
 
-func (p *Polygon) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (p *Polygon) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Polygon"),
 	}
 
 	// Add common annotation fields
-	if err := p.Common.fillDict(rm, dict); err != nil {
+	if err := p.Common.fillDict(rm, dict, isMarkup(p)); err != nil {
 		return nil, err
 	}
 

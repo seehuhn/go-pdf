@@ -1481,7 +1481,7 @@ var testCases = map[string][]testCase{
 					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 300, URy: 200},
 				},
 				D: pdf.NewReference(300, 0), // 3D stream reference
-				A: &ThreeDActivation{
+				A: &Annot3DActivation{
 					A:   "PO",  // Activate on page open
 					AIS: "L",   // Live state
 					D:   "PC",  // Deactivate on page close
@@ -1510,7 +1510,7 @@ var testCases = map[string][]testCase{
 					Name: "advanced-3d-model",
 				},
 				D: pdf.NewReference(500, 0), // 3D stream reference
-				A: &ThreeDActivation{
+				A: &Annot3DActivation{
 					A:           "XA",                     // Explicit activation
 					AIS:         "I",                      // Instantiated state
 					Style:       "Windowed",               // Windowed display
@@ -1554,7 +1554,7 @@ var testCases = map[string][]testCase{
 				},
 				D: pdf.NewReference(800, 0), // 3D stream reference
 				V: pdf.Integer(2),           // Third view (index 2)
-				A: &ThreeDActivation{
+				A: &Annot3DActivation{
 					A:   "PV", // Activate on page visible
 					AIS: "L",  // Live state
 					D:   "PI", // Deactivate on page invisible

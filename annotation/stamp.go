@@ -91,7 +91,7 @@ func extractStamp(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Stamp, error) {
 
 func (s *Stamp) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	dict, err := s.AsDict(rm)
+	dict, err := s.asDict(rm)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -105,7 +105,7 @@ func (s *Stamp) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	return ref, zero, err
 }
 
-func (s *Stamp) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (s *Stamp) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "stamp annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func (s *Stamp) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// Add common annotation fields
-	if err := s.Common.fillDict(rm, dict); err != nil {
+	if err := s.Common.fillDict(rm, dict, isMarkup(s)); err != nil {
 		return nil, err
 	}
 

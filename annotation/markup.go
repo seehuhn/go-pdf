@@ -67,6 +67,10 @@ type Markup struct {
 	//
 	// This corresponds to the /IT entry in the PDF annotation dictionary.
 	Intent pdf.Name
+
+	// ExData (optional) can be used to specify an "external data dictionary"
+	// for the annotation.
+	ExData pdf.Object
 }
 
 // fillDict adds the fields corresponding to the Markup struct
@@ -177,4 +181,12 @@ func extractMarkup(r pdf.Getter, dict pdf.Dict, markup *Markup) error {
 	}
 
 	return nil
+}
+
+func (m *Markup) isMarkup() {}
+
+// isMarkup returns true if a is a markup annotation.
+func isMarkup(a Annotation) bool {
+	_, ok := a.(interface{ isMarkup() })
+	return ok
 }

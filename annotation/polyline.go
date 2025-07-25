@@ -147,7 +147,7 @@ func extractPolyline(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Polyline, er
 }
 
 func (p *Polyline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := p.AsDict(rm)
+	dict, err := p.asDict(rm)
 	if err != nil {
 		return nil, pdf.Unused{}, err
 	}
@@ -161,13 +161,13 @@ func (p *Polyline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 	return ref, pdf.Unused{}, err
 }
 
-func (p *Polyline) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (p *Polyline) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("PolyLine"),
 	}
 
 	// Add common annotation fields
-	if err := p.Common.fillDict(rm, dict); err != nil {
+	if err := p.Common.fillDict(rm, dict, isMarkup(p)); err != nil {
 		return nil, err
 	}
 

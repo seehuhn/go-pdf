@@ -122,7 +122,7 @@ func extractLink(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Link, error) {
 }
 
 func (l *Link) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := l.AsDict(rm)
+	dict, err := l.asDict(rm)
 	if err != nil {
 		return nil, pdf.Unused{}, err
 	}
@@ -136,7 +136,7 @@ func (l *Link) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	return ref, pdf.Unused{}, err
 }
 
-func (l *Link) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (l *Link) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if l.Action != nil && l.Destination != nil {
 		return nil, errors.New("conflicting Action and Destination fields in Link annotation")
 	}
@@ -149,7 +149,7 @@ func (l *Link) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// Add common annotation fields
-	if err := l.Common.fillDict(rm, dict); err != nil {
+	if err := l.Common.fillDict(rm, dict, isMarkup(l)); err != nil {
 		return nil, err
 	}
 

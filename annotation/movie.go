@@ -82,7 +82,7 @@ func extractMovie(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Movie, error) {
 }
 
 func (m *Movie) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := m.AsDict(rm)
+	dict, err := m.asDict(rm)
 	if err != nil {
 		return nil, pdf.Unused{}, err
 	}
@@ -96,7 +96,7 @@ func (m *Movie) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	return ref, pdf.Unused{}, err
 }
 
-func (m *Movie) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (m *Movie) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "movie annotation", pdf.V1_2); err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (m *Movie) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// Add common annotation fields
-	if err := m.Common.fillDict(rm, dict); err != nil {
+	if err := m.Common.fillDict(rm, dict, isMarkup(m)); err != nil {
 		return nil, err
 	}
 

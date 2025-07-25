@@ -67,7 +67,7 @@ func extractPopup(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Popup, error) {
 }
 
 func (p *Popup) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := p.AsDict(rm)
+	dict, err := p.asDict(rm)
 	if err != nil {
 		return nil, pdf.Unused{}, err
 	}
@@ -81,7 +81,7 @@ func (p *Popup) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	return ref, pdf.Unused{}, err
 }
 
-func (p *Popup) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (p *Popup) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "popup annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func (p *Popup) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// Add common annotation fields
-	if err := p.Common.fillDict(rm, dict); err != nil {
+	if err := p.Common.fillDict(rm, dict, isMarkup(p)); err != nil {
 		return nil, err
 	}
 

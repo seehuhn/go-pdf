@@ -108,7 +108,7 @@ func extractSquare(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Square, error)
 }
 
 func (s *Square) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := s.AsDict(rm)
+	dict, err := s.asDict(rm)
 	if err != nil {
 		return nil, pdf.Unused{}, err
 	}
@@ -122,13 +122,13 @@ func (s *Square) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 	return ref, pdf.Unused{}, err
 }
 
-func (s *Square) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (s *Square) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Square"),
 	}
 
 	// Add common annotation fields
-	if err := s.Common.fillDict(rm, dict); err != nil {
+	if err := s.Common.fillDict(rm, dict, isMarkup(s)); err != nil {
 		return nil, err
 	}
 

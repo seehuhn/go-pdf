@@ -64,7 +64,7 @@ func extractRichMedia(r pdf.Getter, dict pdf.Dict, singleUse bool) (*RichMedia, 
 
 func (r *RichMedia) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	dict, err := r.AsDict(rm)
+	dict, err := r.asDict(rm)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -78,7 +78,7 @@ func (r *RichMedia) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 	return ref, zero, err
 }
 
-func (r *RichMedia) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (r *RichMedia) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "rich media annotation", pdf.V2_0); err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func (r *RichMedia) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// Add common annotation fields
-	if err := r.Common.fillDict(rm, dict); err != nil {
+	if err := r.Common.fillDict(rm, dict, isMarkup(r)); err != nil {
 		return nil, err
 	}
 

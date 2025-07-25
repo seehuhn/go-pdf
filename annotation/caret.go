@@ -82,7 +82,7 @@ func extractCaret(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Caret, error) {
 
 func (c *Caret) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	dict, err := c.AsDict(rm)
+	dict, err := c.asDict(rm)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -96,7 +96,7 @@ func (c *Caret) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	return ref, zero, err
 }
 
-func (c *Caret) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (c *Caret) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "caret annotation", pdf.V1_5); err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (c *Caret) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// Add common annotation fields
-	if err := c.Common.fillDict(rm, dict); err != nil {
+	if err := c.Common.fillDict(rm, dict, isMarkup(c)); err != nil {
 		return nil, err
 	}
 

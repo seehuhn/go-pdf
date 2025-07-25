@@ -51,7 +51,7 @@ func (u *Unknown) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 	}
 
 	// Add/override common annotation fields
-	if err := u.Common.fillDict(rm, dict); err != nil {
+	if err := u.Common.fillDict(rm, dict, isMarkup(u)); err != nil {
 		return nil, zero, err
 	}
 

@@ -183,7 +183,7 @@ func extractLine(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Line, error) {
 }
 
 func (l *Line) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := l.AsDict(rm)
+	dict, err := l.asDict(rm)
 	if err != nil {
 		return nil, pdf.Unused{}, err
 	}
@@ -197,13 +197,13 @@ func (l *Line) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	return ref, pdf.Unused{}, err
 }
 
-func (l *Line) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (l *Line) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Line"),
 	}
 
 	// Add common annotation fields
-	if err := l.Common.fillDict(rm, dict); err != nil {
+	if err := l.Common.fillDict(rm, dict, isMarkup(l)); err != nil {
 		return nil, err
 	}
 

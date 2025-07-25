@@ -145,7 +145,7 @@ func extractRedact(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Redact, error)
 
 func (r *Redact) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	dict, err := r.AsDict(rm)
+	dict, err := r.asDict(rm)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -159,7 +159,7 @@ func (r *Redact) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 	return ref, zero, err
 }
 
-func (r *Redact) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (r *Redact) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "redaction annotation", pdf.V1_7); err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func (r *Redact) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// Add common annotation fields
-	if err := r.Common.fillDict(rm, dict); err != nil {
+	if err := r.Common.fillDict(rm, dict, isMarkup(r)); err != nil {
 		return nil, err
 	}
 

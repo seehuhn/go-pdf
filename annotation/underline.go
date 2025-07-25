@@ -70,7 +70,7 @@ func extractUnderline(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Underline, 
 }
 
 func (u *Underline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := u.AsDict(rm)
+	dict, err := u.asDict(rm)
 	if err != nil {
 		return nil, pdf.Unused{}, err
 	}
@@ -84,7 +84,7 @@ func (u *Underline) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 	return ref, pdf.Unused{}, err
 }
 
-func (u *Underline) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (u *Underline) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "underline annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (u *Underline) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// Add common annotation fields
-	if err := u.Common.fillDict(rm, dict); err != nil {
+	if err := u.Common.fillDict(rm, dict, isMarkup(u)); err != nil {
 		return nil, err
 	}
 

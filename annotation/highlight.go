@@ -71,7 +71,7 @@ func extractHighlight(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Highlight, 
 
 func (h *Highlight) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	dict, err := h.AsDict(rm)
+	dict, err := h.asDict(rm)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -85,7 +85,7 @@ func (h *Highlight) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 	return ref, zero, err
 }
 
-func (h *Highlight) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (h *Highlight) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "highlight annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (h *Highlight) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// Add common annotation fields
-	if err := h.Common.fillDict(rm, dict); err != nil {
+	if err := h.Common.fillDict(rm, dict, isMarkup(h)); err != nil {
 		return nil, err
 	}
 

@@ -129,7 +129,7 @@ func extractText(r pdf.Getter, obj pdf.Object, singleUse bool) (*Text, error) {
 func (t *Text) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	dict, err := t.AsDict(rm)
+	dict, err := t.asDict(rm)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -143,12 +143,12 @@ func (t *Text) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	return ref, zero, err
 }
 
-func (t *Text) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (t *Text) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Text"),
 	}
 
-	if err := t.Common.fillDict(rm, dict); err != nil {
+	if err := t.Common.fillDict(rm, dict, isMarkup(t)); err != nil {
 		return nil, err
 	}
 	if err := t.Markup.fillDict(rm, dict); err != nil {

@@ -116,7 +116,7 @@ func extractWatermark(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Watermark, 
 
 func (w *Watermark) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	dict, err := w.AsDict(rm)
+	dict, err := w.asDict(rm)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -130,7 +130,7 @@ func (w *Watermark) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 	return ref, zero, err
 }
 
-func (w *Watermark) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (w *Watermark) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "watermark annotation", pdf.V1_6); err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func (w *Watermark) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// Add common annotation fields
-	if err := w.Common.fillDict(rm, dict); err != nil {
+	if err := w.Common.fillDict(rm, dict, isMarkup(w)); err != nil {
 		return nil, err
 	}
 

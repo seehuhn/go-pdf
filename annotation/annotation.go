@@ -161,7 +161,7 @@ func (c *Common) GetCommon() *Common {
 // fillDict adds the fields corresponding to the Common struct
 // to the given PDF dictionary.  If fields are not valid for the PDF version
 // corresponding to the ResourceManager, an error is returned.
-func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
+func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict, isMarkup bool) error {
 	w := rm.Out
 
 	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
@@ -214,9 +214,9 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 	} else {
 		// check for missing appearance dictionary per PDF spec requirements
 		subtype := d["Subtype"].(pdf.Name)
-		hasZeroArea := c.Rect.LLx == c.Rect.URx && c.Rect.LLy == c.Rect.URy
+		isSinglePoint := c.Rect.LLx == c.Rect.URx && c.Rect.LLy == c.Rect.URy
 		isExemptSubtype := subtype == "Popup" || subtype == "Projection" || subtype == "Link"
-		if pdf.GetVersion(w) >= pdf.V2_0 && !hasZeroArea && !isExemptSubtype {
+		if pdf.GetVersion(w) >= pdf.V2_0 && !isSinglePoint && !isExemptSubtype {
 			return errors.New("missing appearance dictionary")
 		}
 	}
@@ -298,8 +298,14 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 
 	// StrokingOpacity (CA entry)
 	if c.StrokingTransparency != 0.0 {
-		if err := pdf.CheckVersion(w, "annotation CA entry", pdf.V1_4); err != nil {
-			return err
+		if isMarkup {
+			if err := pdf.CheckVersion(w, "markup annotation CA entry", pdf.V1_4); err != nil {
+				return err
+			}
+		} else {
+			if err := pdf.CheckVersion(w, "non-markup annotation CA entry", pdf.V2_0); err != nil {
+				return err
+			}
 		}
 		d["CA"] = pdf.Number(1 - c.StrokingTransparency)
 	}

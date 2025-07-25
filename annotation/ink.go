@@ -121,7 +121,7 @@ func extractInk(r pdf.Getter, dict pdf.Dict, singleUse bool) (*Ink, error) {
 }
 
 func (i *Ink) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	dict, err := i.AsDict(rm)
+	dict, err := i.asDict(rm)
 	if err != nil {
 		return nil, pdf.Unused{}, err
 	}
@@ -135,7 +135,7 @@ func (i *Ink) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	return ref, pdf.Unused{}, err
 }
 
-func (i *Ink) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (i *Ink) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "ink annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func (i *Ink) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// Add common annotation fields
-	if err := i.Common.fillDict(rm, dict); err != nil {
+	if err := i.Common.fillDict(rm, dict, isMarkup(i)); err != nil {
 		return nil, err
 	}
 

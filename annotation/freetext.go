@@ -131,7 +131,7 @@ func extractFreeText(r pdf.Getter, dict pdf.Dict, singleUse bool) (*FreeText, er
 
 func (f *FreeText) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	dict, err := f.AsDict(rm)
+	dict, err := f.asDict(rm)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -145,14 +145,13 @@ func (f *FreeText) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 	return ref, zero, err
 }
 
-func (f *FreeText) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
-
+func (f *FreeText) asDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("FreeText"),
 	}
 
 	// Add common annotation fields
-	if err := f.Common.fillDict(rm, dict); err != nil {
+	if err := f.Common.fillDict(rm, dict, isMarkup(f)); err != nil {
 		return nil, err
 	}
 
