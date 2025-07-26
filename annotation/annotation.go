@@ -23,6 +23,7 @@ import (
 	"golang.org/x/text/language"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -79,7 +80,7 @@ type Common struct {
 	// annotation is presented visually on the page.
 	//
 	// This corresponds to the /AP entry in the PDF annotation dictionary.
-	Appearance *AppearanceDict
+	Appearance *appearance.Dict
 
 	// AppearanceState (required if AP contains subdictionaries) is the
 	// annotation's appearance state, which selects the applicable appearance
@@ -222,7 +223,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict, isMarkup bool) er
 			return err
 		}
 		d["AS"] = c.AppearanceState
-	} else if c.Appearance != nil && c.Appearance.hasDicts() {
+	} else if c.Appearance != nil && c.Appearance.HasDicts() {
 		return errors.New("missing AS entry")
 	}
 
@@ -364,7 +365,7 @@ func extractCommon(r pdf.Getter, common *Common, dict pdf.Dict) error {
 	}
 
 	// AP (optional)
-	if ap, err := ExtractAppearanceDict(r, dict["AP"]); err == nil && ap != nil {
+	if ap, err := appearance.Extract(r, dict["AP"]); err == nil && ap != nil {
 		common.Appearance = ap
 	}
 

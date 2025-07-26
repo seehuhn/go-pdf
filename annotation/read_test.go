@@ -27,6 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/form"
@@ -1910,7 +1911,7 @@ func TestRoundTripDict(t *testing.T) {
 }
 
 // makeAppearance creates a simple appearance dictionary for testing
-func makeAppearance(rm *pdf.ResourceManager, rect pdf.Rectangle) *AppearanceDict {
+func makeAppearance(rm *pdf.ResourceManager, rect pdf.Rectangle) *appearance.Dict {
 	// Create a simple form XObject with a transparent rectangle
 	formObj := &form.Form{
 		BBox: rect,
@@ -1924,13 +1925,13 @@ func makeAppearance(rm *pdf.ResourceManager, rect pdf.Rectangle) *AppearanceDict
 	ref, _, err := pdf.ResourceManagerEmbed(rm, formObj)
 	if err != nil {
 		// Fallback to a simple appearance if embedding fails
-		return &AppearanceDict{
+		return &appearance.Dict{
 			Normal:    nil,
 			SingleUse: false,
 		}
 	}
 
-	return &AppearanceDict{
+	return &appearance.Dict{
 		Normal:    ref,
 		SingleUse: false,
 	}
