@@ -16,26 +16,38 @@
 
 package appearance
 
-import "seehuhn.de/go/pdf"
+import (
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/form"
+)
 
 // Dict represents an annotation appearance dictionary.
 type Dict struct {
 	// Normal is the annotation's normal appearance.
-	Normal pdf.Object
+	// This is mutually exclusive with NormalMap.
+	Normal *form.Form
+
+	// NormalMap give the annotation's normal appearance for each state.
+	// This is mutually exclusive with Normal.
+	NormalMap map[pdf.Name]*form.Form
 
 	// RollOver is the annotation's rollover appearance.
-	//
-	// When writing appearance dictionaries, a zero value can be used as a
-	// shorthand for the same value as Normal.
-	RollOver pdf.Object
+	// This is mutually exclusive with RollOverMap.
+	RollOver *form.Form
+
+	// RollOverMap gives the annotation's rollover appearance for each state.
+	// This is mutually exclusive with RollOver.
+	RollOverMap map[pdf.Name]*form.Form
 
 	// Down is the annotation's down appearance.
-	//
-	// When writing appearance dictionaries, a zero value can be used as a
-	// shorthand for the same value as Normal.
-	Down pdf.Object
+	// This is mutually exclusive with DownMap.
+	Down *form.Form
 
-	// SingleUse determines if Embed returns as dictionary (true) or
+	// DownMap gives the annotation's down appearance for each state.
+	// This is mutually exclusive with Down.
+	DownMap map[pdf.Name]*form.Form
+
+	// SingleUse determines if Embed returns a dictionary (true) or
 	// a reference (false).
 	SingleUse bool
 }
@@ -43,7 +55,11 @@ type Dict struct {
 var _ pdf.Embedder[pdf.Unused] = (*Dict)(nil)
 
 func Extract(r pdf.Getter, obj pdf.Object) (*Dict, error) {
-	_, singleUse := obj.(pdf.Reference)
+	_, isIndirect := obj.(pdf.Reference)
+
+	res := &Dict{
+		SingleUse: !isIndirect,
+	}
 
 	dict, err := pdf.GetDict(r, obj)
 	if err != nil {
@@ -54,23 +70,74 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Dict, error) {
 	if err != nil {
 		return nil, err
 	}
+	switch N := N.(type) {
+	case pdf.Dict:
+		res.NormalMap = make(map[pdf.Name]*form.Form)
+		for key, obj := range N {
+			state := pdf.Name(key)
+			formObj, err := form.Extract(r, obj)
+			if err != nil {
+				return nil, err
+			}
+			res.NormalMap[state] = formObj
+		}
+	case *pdf.Stream:
+		formObj, err := form.Extract(r, N)
+		if err != nil {
+			return nil, err
+		}
+		res.Normal = formObj
+	default:
+		return nil, pdf.Errorf("invalid appearance dict entry: N %T", N)
+	}
 
 	R, _ := pdf.Resolve(r, dict["R"])
 	if R == nil {
 		R = N
+	}
+	switch R := R.(type) {
+	case pdf.Dict:
+		res.RollOverMap = make(map[pdf.Name]*form.Form)
+		for key, obj := range R {
+			state := pdf.Name(key)
+			formObj, err := form.Extract(r, obj)
+			if err != nil {
+				return nil, err
+			}
+			res.RollOverMap[state] = formObj
+		}
+	case *pdf.Stream:
+		formObj, err := form.Extract(r, R)
+		if err != nil {
+			return nil, err
+		}
+		res.RollOver = formObj
 	}
 
 	D, _ := pdf.Resolve(r, dict["D"])
 	if D == nil {
 		D = N
 	}
+	switch D := D.(type) {
+	case pdf.Dict:
+		res.DownMap = make(map[pdf.Name]*form.Form)
+		for key, obj := range D {
+			state := pdf.Name(key)
+			formObj, err := form.Extract(r, obj)
+			if err != nil {
+				return nil, err
+			}
+			res.DownMap[state] = formObj
+		}
+	case *pdf.Stream:
+		formObj, err := form.Extract(r, D)
+		if err != nil {
+			return nil, err
+		}
+		res.Down = formObj
+	}
 
-	return &Dict{
-		Normal:    N,
-		RollOver:  R,
-		Down:      D,
-		SingleUse: singleUse,
-	}, nil
+	return res, nil
 }
 
 func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
@@ -82,15 +149,74 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	dict := pdf.Dict{}
 
-	dict["N"] = d.Normal
-	if d.RollOver != nil {
-		dict["R"] = d.RollOver
-	}
-	if d.Down != nil {
-		dict["D"] = d.Down
+	// Embed Normal appearance
+	if d.Normal != nil {
+		nRef, _, err := pdf.ResourceManagerEmbed(rm, d.Normal)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["N"] = nRef
+	} else if d.NormalMap != nil {
+		nDict := pdf.Dict{}
+		for state, form := range d.NormalMap {
+			formRef, _, err := pdf.ResourceManagerEmbed(rm, form)
+			if err != nil {
+				return nil, zero, err
+			}
+			nDict[state] = formRef
+		}
+		dict["N"] = nDict
 	}
 
-	return dict, zero, nil
+	// Embed RollOver appearance
+	if d.RollOver != nil {
+		rRef, _, err := pdf.ResourceManagerEmbed(rm, d.RollOver)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["R"] = rRef
+	} else if d.RollOverMap != nil {
+		rDict := pdf.Dict{}
+		for state, form := range d.RollOverMap {
+			formRef, _, err := pdf.ResourceManagerEmbed(rm, form)
+			if err != nil {
+				return nil, zero, err
+			}
+			rDict[state] = formRef
+		}
+		dict["R"] = rDict
+	}
+
+	// Embed Down appearance
+	if d.Down != nil {
+		dRef, _, err := pdf.ResourceManagerEmbed(rm, d.Down)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["D"] = dRef
+	} else if d.DownMap != nil {
+		dDict := pdf.Dict{}
+		for state, form := range d.DownMap {
+			formRef, _, err := pdf.ResourceManagerEmbed(rm, form)
+			if err != nil {
+				return nil, zero, err
+			}
+			dDict[state] = formRef
+		}
+		dict["D"] = dDict
+	}
+
+	if d.SingleUse {
+		return dict, zero, nil
+	}
+
+	ref := rm.Out.Alloc()
+	err := rm.Out.Put(ref, dict)
+	if err != nil {
+		return nil, zero, err
+	}
+
+	return ref, zero, nil
 }
 
 func (d *Dict) HasDicts() bool {
@@ -98,14 +224,7 @@ func (d *Dict) HasDicts() bool {
 		return false
 	}
 
-	if _, ok := d.Normal.(pdf.Dict); ok {
-		return true
-	}
-	if _, ok := d.RollOver.(pdf.Dict); ok {
-		return true
-	}
-	if _, ok := d.Down.(pdf.Dict); ok {
-		return true
-	}
-	return false
+	return d.NormalMap != nil ||
+		d.RollOverMap != nil ||
+		d.DownMap != nil
 }

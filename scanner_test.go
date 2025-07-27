@@ -359,3 +359,71 @@ func TestStreamReader(t *testing.T) {
 		t.Errorf("expected 2, got %d", x2)
 	}
 }
+
+func TestStreamReaderSeek(t *testing.T) {
+	in := "<< /Length 6 >>\nstream\nABCDEF\nendstream"
+	s := newScanner(strings.NewReader(in), func(x Object) (Integer, error) { return x.(Integer), nil }, nil)
+	stmObj, err := s.ReadObject()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stm, ok := stmObj.(*Stream)
+	if !ok {
+		t.Fatalf("expected stream, got %T", stmObj)
+	}
+
+	firstRead, err := io.ReadAll(stm.R)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(firstRead) != "ABCDEF" {
+		t.Errorf("first read: expected ABCDEF, got %q", firstRead)
+	}
+
+	if seeker, ok := stm.R.(io.Seeker); ok {
+		_, err := seeker.Seek(0, io.SeekStart)
+		if err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		t.Fatal("stream reader does not implement io.Seeker")
+	}
+
+	secondRead, err := io.ReadAll(stm.R)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(secondRead) != "ABCDEF" {
+		t.Errorf("second read after seek: expected ABCDEF, got %q", secondRead)
+	}
+
+	seeker, _ := stm.R.(io.Seeker)
+	seeker.Seek(0, io.SeekStart)
+
+	buf := make([]byte, 3)
+	n, err := stm.R.Read(buf)
+	if err != nil || n != 3 || string(buf) != "ABC" {
+		t.Errorf("partial read after seek: expected ABC, got %q (n=%d, err=%v)", buf[:n], n, err)
+	}
+
+	seeker.Seek(0, io.SeekStart)
+
+	thirdRead, err := io.ReadAll(stm.R)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(thirdRead) != "ABCDEF" {
+		t.Errorf("third read after partial consumption: expected ABCDEF, got %q", thirdRead)
+	}
+
+	pos, err := seeker.Seek(3, io.SeekStart)
+	if err != nil || pos != 3 {
+		t.Errorf("seek to position 3: expected pos=3, got pos=%d, err=%v", pos, err)
+	}
+
+	buf4 := make([]byte, 3)
+	n, err = stm.R.Read(buf4)
+	if err != nil || n != 3 || string(buf4) != "DEF" {
+		t.Errorf("read from position 3: expected DEF, got %q (n=%d, err=%v)", buf4[:n], n, err)
+	}
+}

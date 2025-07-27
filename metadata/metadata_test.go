@@ -55,7 +55,7 @@ func TestRoundTrip(t *testing.T) {
 	}
 
 	// Extract and compare
-	extracted, err := ExtractStream(pdfData, ref)
+	extracted, err := Extract(pdfData, ref)
 	if err != nil {
 		t.Fatalf("failed to extract metadata: %v", err)
 	}

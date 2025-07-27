@@ -213,16 +213,24 @@ func GetStreamReader(r Getter, ref Object) (io.ReadCloser, error) {
 	return DecodeStream(r, stm, 0)
 }
 
-// DecodeStream returns a reader for the decoded stream data.
-// If numFilters is non-zero, only the first numFilters filters are decoded.
+// DecodeStream returns a reader for the decoded stream data. If numFilters is
+// non-zero, only the first numFilters filters are decoded.
+//
+// If the x.R implements io.ReadSeeker, the stream will be reset to the
+// beginning before decoding.  In particular, this is the case for streams read
+// from a file.  If x.R does not have a Seek method, the stream can only be
+// decoded once.
 func DecodeStream(r Getter, x *Stream, numFilters int) (io.ReadCloser, error) {
+	if seeker, ok := x.R.(io.Seeker); ok {
+		seeker.Seek(0, io.SeekStart)
+	}
 	filters, err := getFilters(r, x)
 	if err != nil {
 		return nil, err
 	}
 
 	v := V1_2
-	if r != nil {
+	if r != nil { // TODO(voss): is r == nil still possible?
 		v = r.GetMeta().Version
 	}
 

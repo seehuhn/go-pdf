@@ -23,6 +23,12 @@ import (
 
 // Embedder represents a PDF resource (a font, image, pattern, etc.) which has
 // not yet been associated with a specific PDF file.
+//
+// There are two additional constraints a type must satisfy to be used as an
+// Embedder, in addition to implementing the Embedder interface:
+//  1. The type must be comparable, so that it can be used as a key in a map.
+//  2. The type must be independent of any PDF file.  For example, it must
+//     not contain pdf.Reference values, neither directly nor indirectly.
 type Embedder[T any] interface {
 	// Embed converts the Go representation of the object into a PDF object,
 	// corresponding to the PDF version of the output file.

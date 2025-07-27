@@ -663,9 +663,10 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 	start := s.currentPos()
 	l := int64(length)
 	var streamData io.Reader = &streamReader{
-		r:   origReader,
-		pos: start,
-		end: start + l,
+		r:     origReader,
+		start: start,
+		pos:   start,
+		end:   start + l,
 	}
 	err = s.Discard(l)
 	if err != nil {
@@ -922,9 +923,10 @@ func (s *scanner) find(pat *regexp.Regexp) (int64, []string, error) {
 }
 
 type streamReader struct {
-	r   io.ReadSeeker
-	pos int64
-	end int64
+	r     io.ReadSeeker
+	start int64
+	pos   int64
+	end   int64
 }
 
 func (r *streamReader) Read(buf []byte) (int, error) {
@@ -956,6 +958,29 @@ func (r *streamReader) Read(buf []byte) (int, error) {
 	}
 
 	return n, nil
+}
+
+func (r *streamReader) Seek(offset int64, whence int) (int64, error) {
+	var abs int64
+	switch whence {
+	case io.SeekStart:
+		abs = r.start + offset
+	case io.SeekCurrent:
+		abs = r.pos + offset
+	case io.SeekEnd:
+		abs = r.end + offset
+	default:
+		return 0, errors.New("invalid whence")
+	}
+	
+	if abs < r.start {
+		abs = r.start
+	} else if abs > r.end {
+		abs = r.end
+	}
+	
+	r.pos = abs
+	return abs - r.start, nil
 }
 
 var (

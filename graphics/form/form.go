@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/metadata"
 )
 
@@ -35,6 +36,9 @@ type Form struct {
 	BBox pdf.Rectangle
 
 	// Matrix transforms form coordinates to user space coordinates.
+	//
+	// When writing forms to a PDF file, the zero matrix can be used as an
+	// alternative to the identity matrix for convenience.
 	Matrix matrix.Matrix
 
 	// Metadata is an optional reference to metadata for this form.
@@ -124,6 +128,30 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	return ref, zero, nil
+}
+
+// Equal compares two forms by comparing their content streams.
+// It ignores resource dictionaries and other metadata.
+func (f *Form) Equal(other *Form) bool {
+	if f == nil || other == nil || f == other {
+		return f == other
+	}
+
+	buf1 := &bytes.Buffer{}
+	w1, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	c1 := graphics.NewWriter(buf1, pdf.NewResourceManager(w1))
+	err1 := f.Draw(c1)
+
+	buf2 := &bytes.Buffer{}
+	w2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	c2 := graphics.NewWriter(buf2, pdf.NewResourceManager(w2))
+	err2 := other.Draw(c2)
+
+	if err1 != nil || err2 != nil {
+		return false
+	}
+
+	return buf1.String() == buf2.String()
 }
 
 func toPDF(x []float64) pdf.Array {

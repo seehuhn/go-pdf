@@ -59,7 +59,7 @@ type BorderStyle struct {
 	// the border when Style is "D".
 	DashArray []float64
 
-	// SingleUse determines if Embed returns as dictionary (true) or
+	// SingleUse determines if Embed returns a dictionary (true) or
 	// a reference (false).
 	SingleUse bool
 }

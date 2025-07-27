@@ -140,7 +140,7 @@ func ExtractSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 	case FamilyICCBased:
 		var meta *metadata.Stream
 		if ref, ok := d.dict["Metadata"]; ok {
-			meta, err = metadata.ExtractStream(r, ref)
+			meta, err = metadata.Extract(r, ref)
 			if err != nil {
 				d.SetError(err)
 			}

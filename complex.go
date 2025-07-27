@@ -608,4 +608,3 @@ type Action interface {
 
 	Object
 }
-

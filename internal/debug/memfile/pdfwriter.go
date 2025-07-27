@@ -19,6 +19,7 @@ package memfile
 import "seehuhn.de/go/pdf"
 
 // NewPDFWriter creates a new PDF writer which writes to a MemFile.
+// The returned writer can still be used as a reader after it has been closed.
 func NewPDFWriter(v pdf.Version, opt *pdf.WriterOptions) (*pdf.Writer, *MemFile) {
 	tmpFile := New()
 	w, err := pdf.NewWriter(tmpFile, v, opt)
