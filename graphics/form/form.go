@@ -18,6 +18,7 @@ package form
 
 import (
 	"bytes"
+	"errors"
 	"time"
 
 	"seehuhn.de/go/geom/matrix"
@@ -25,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/metadata"
+	"seehuhn.de/go/pdf/pieceinfo"
 )
 
 // Form represents a PDF form XObject that can contain reusable graphics content.
@@ -45,9 +47,10 @@ type Form struct {
 	Metadata *metadata.Stream
 
 	// PieceInfo contains private application data.
-	PieceInfo pdf.Object
+	PieceInfo *pieceinfo.PieceInfo
 
-	// LastModified is the date the form was last modified.
+	// LastModified (Required if PieceInfo is present; optional otherwise; PDF
+	// 1.3) is the date the form was last modified.
 	LastModified time.Time
 
 	// TODO(voss): StructParent, StructParents
@@ -64,7 +67,7 @@ func (f *Form) Subtype() pdf.Name {
 
 func (f *Form) validate() error {
 	if f.BBox.IsZero() {
-		return pdf.Error("missing BBox")
+		return errors.New("missing BBox")
 	}
 	return nil
 }
@@ -108,7 +111,16 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["Metadata"] = rmEmbedded
 	}
 	if f.PieceInfo != nil {
-		dict["PieceInfo"] = f.PieceInfo
+		if f.LastModified.IsZero() {
+			return nil, zero, errors.New("missing LastModified")
+		}
+		pieceInfoObj, _, err := f.PieceInfo.Embed(rm)
+		if err != nil {
+			return nil, zero, err
+		}
+		if pieceInfoObj != nil {
+			dict["PieceInfo"] = pieceInfoObj
+		}
 	}
 	if !f.LastModified.IsZero() {
 		dict["LastModified"] = pdf.Date(f.LastModified)

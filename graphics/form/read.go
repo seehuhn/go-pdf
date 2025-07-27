@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/pdfcopy"
+	"seehuhn.de/go/pdf/pieceinfo"
 )
 
 // Extract extracts a form XObject from a PDF file.
@@ -69,7 +70,11 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Form, error) {
 
 	// Read optional PieceInfo
 	if pieceInfoObj, ok := dict["PieceInfo"]; ok {
-		form.PieceInfo = pieceInfoObj
+		var err error
+		form.PieceInfo, err = pieceinfo.Extract(r, pieceInfoObj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract PieceInfo: %w", err)
+		}
 	}
 
 	// Read optional LastModified
