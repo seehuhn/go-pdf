@@ -193,13 +193,33 @@ type TextIcon pdf.Name
 
 // Standard PDF icon names for text annotations.
 const (
-	TextIconComment      TextIcon = "Comment"
-	TextIconKey          TextIcon = "Key"
-	TextIconNote         TextIcon = "Note"
-	TextIconHelp         TextIcon = "Help"
+	// TextIconComment represents general feedback or discussion points.
+	// Typically appears as a speech bubble icon in PDF viewers.
+	TextIconComment TextIcon = "Comment"
+
+	// TextIconKey marks important or critical information requiring special attention.
+	// Typically appears as a key symbol or star icon in PDF viewers.
+	TextIconKey TextIcon = "Key"
+
+	// TextIconNote provides explanatory text, clarifications, or additional information.
+	// Typically appears as a sticky note (post-it) icon in PDF viewers.
+	TextIconNote TextIcon = "Note"
+
+	// TextIconHelp indicates questions, requests for clarification, or help-related content.
+	// Typically appears as a question mark or help "i" icon in PDF viewers.
+	TextIconHelp TextIcon = "Help"
+
+	// TextIconNewParagraph indicates where a paragraph break should be inserted.
+	// Typically appears as a pilcrow (¶) symbol in PDF viewers.
 	TextIconNewParagraph TextIcon = "NewParagraph"
-	TextIconParagraph    TextIcon = "Paragraph"
-	TextIconInsert       TextIcon = "Insert"
+
+	// TextIconParagraph provides comments about existing paragraph structure or content.
+	// Typically appears as a pilcrow (¶) symbol or text block icon in PDF viewers.
+	TextIconParagraph TextIcon = "Paragraph"
+
+	// TextIconInsert indicates where content should be added or inserted.
+	// Typically appears as a caret (^) or insertion cursor icon in PDF viewers.
+	TextIconInsert TextIcon = "Insert"
 )
 
 // TextState represents a PDF annotation state.

@@ -32,9 +32,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 )
 
-type Options struct {
-}
-
 // Instance is a Type 1 font instance which can be embedded into a PDF file.
 //
 // Use [New] to create new font instances.
@@ -62,6 +59,8 @@ type Instance struct {
 	kern map[glyph.Pair]funit.Int16
 	cmap map[rune]glyph.ID
 }
+
+var _ font.Layouter = (*Instance)(nil)
 
 // New creates a new Type 1 PDF font from a Type 1 PostScript font.
 // The argument psFont must be present, metrics is optional.
