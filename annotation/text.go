@@ -22,7 +22,9 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Text represents a "sticky note" text annotation.
+// Text represents a text annotation.
+// This type of annotation is used to provide editorial notes, comments, or other
+// textual feedback on a PDF document.
 type Text struct {
 	Common
 	Markup
@@ -30,9 +32,10 @@ type Text struct {
 	// Open specifies whether the annotation is initially displayed open.
 	Open bool
 
-	// Icon is the name of an icon that is used in displaying
-	// the annotation. Standard names include: Comment, Key, Note, Help,
-	// NewParagraph, Paragraph, Insert.
+	// Icon is the name of an icon that is used in displaying the annotation.
+	// The standard icon names are Comment, Key, Note, Help, NewParagraph,
+	// Paragraph, Insert.  Viewers may support additional, application-specific
+	// names.
 	//
 	// When writing annotations, an empty Icon name can be used as a shorthand
 	// [TextIconNote].
