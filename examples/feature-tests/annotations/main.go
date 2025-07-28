@@ -49,7 +49,7 @@ func createDocument(fname string) error {
 	opt := &pdf.WriterOptions{
 		HumanReadable: true,
 	}
-	doc, err := document.CreateMultiPage(fname, paper, pdf.V2_0, opt)
+	doc, err := document.CreateMultiPage(fname, paper, pdf.V1_7, opt)
 	if err != nil {
 		return err
 	}

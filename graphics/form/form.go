@@ -87,6 +87,9 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	if err != nil {
 		return nil, zero, err
 	}
+	if contents.Err != nil {
+		return nil, zero, contents.Err
+	}
 
 	ref := rm.Out.Alloc()
 

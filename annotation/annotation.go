@@ -28,7 +28,6 @@ import (
 )
 
 // Annotation represents a PDF annotation.
-// The different implementations of this interface can be found in this package.
 type Annotation interface {
 	// AnnotationType returns the type of the annotation, e.g. "Text", "Link",
 	// "Widget", etc.
@@ -37,6 +36,7 @@ type Annotation interface {
 	// GetCommon returns the common annotation fields.
 	GetCommon() *Common
 
+	// AsDict returns the PDF representation of the annotation.
 	AsDict(rm *pdf.ResourceManager) (pdf.Dict, error)
 }
 
