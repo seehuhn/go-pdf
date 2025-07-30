@@ -45,7 +45,7 @@ func extractRichMedia(r pdf.Getter, dict pdf.Dict) (*RichMedia, error) {
 	richMedia := &RichMedia{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &richMedia.Common, dict); err != nil {
+	if err := decodeCommon(r, &richMedia.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -62,7 +62,7 @@ func extractRichMedia(r pdf.Getter, dict pdf.Dict) (*RichMedia, error) {
 	return richMedia, nil
 }
 
-func (r *RichMedia) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (r *RichMedia) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "rich media annotation", pdf.V2_0); err != nil {
 		return nil, err
 	}

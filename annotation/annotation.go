@@ -36,8 +36,8 @@ type Annotation interface {
 	// GetCommon returns the common annotation fields.
 	GetCommon() *Common
 
-	// AsDict returns the PDF representation of the annotation.
-	AsDict(rm *pdf.ResourceManager) (pdf.Dict, error)
+	// Encode returns the PDF representation of the annotation.
+	Encode(rm *pdf.ResourceManager) (pdf.Dict, error)
 }
 
 // Common contains fields common to all annotation dictionaries.
@@ -332,8 +332,8 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict, isMarkup bool) er
 	return nil
 }
 
-// extractCommon extracts fields common to all annotations from a PDF dictionary.
-func extractCommon(r pdf.Getter, common *Common, dict pdf.Dict) error {
+// decodeCommon extracts fields common to all annotations from a PDF dictionary.
+func decodeCommon(r pdf.Getter, common *Common, dict pdf.Dict) error {
 	// Rect (required)
 	if rect, err := pdf.GetRectangle(r, dict["Rect"]); err == nil && rect != nil {
 		common.Rect = *rect

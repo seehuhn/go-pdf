@@ -43,7 +43,7 @@ func TestCustomAnnotation(t *testing.T) {
 	}
 
 	// Extract should return an Unknown annotation
-	annotation, err := Extract(buf, ref)
+	annotation, err := Decode(buf, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestCustomAnnotation(t *testing.T) {
 	buf2, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm2 := pdf.NewResourceManager(buf2)
 
-	_, err = custom.AsDict(rm2)
+	_, err = custom.Encode(rm2)
 	if err != nil {
 		t.Errorf("failed to embed unknown annotation: %v", err)
 	}

@@ -45,12 +45,12 @@ func extractHighlight(r pdf.Getter, dict pdf.Dict) (*Highlight, error) {
 	highlight := &Highlight{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &highlight.Common, dict); err != nil {
+	if err := decodeCommon(r, &highlight.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := extractMarkup(r, dict, &highlight.Markup); err != nil {
+	if err := decodeMarkup(r, dict, &highlight.Markup); err != nil {
 		return nil, err
 	}
 
@@ -69,7 +69,7 @@ func extractHighlight(r pdf.Getter, dict pdf.Dict) (*Highlight, error) {
 	return highlight, nil
 }
 
-func (h *Highlight) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (h *Highlight) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "highlight annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

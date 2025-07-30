@@ -78,7 +78,7 @@ func TestRoundTripDict(t *testing.T) {
 		for i, dict := range testDicts {
 			t.Run(fmt.Sprintf("dict-%d", i), func(t *testing.T) {
 				// make sure Extract does not crash or hang
-				a, err := Extract(mock.Getter, dict)
+				a, err := Decode(mock.Getter, dict)
 				if err != nil {
 					t.Error(err)
 					return
@@ -104,7 +104,7 @@ func roundTripTest(t *testing.T, v pdf.Version, a1 Annotation) {
 	rm := pdf.NewResourceManager(buf)
 
 	// embed the annotation
-	dict, err := a1.AsDict(rm)
+	dict, err := a1.Encode(rm)
 	if _, isVersionError := err.(*pdf.VersionError); isVersionError {
 		t.Skip()
 	} else if err != nil {
@@ -120,7 +120,7 @@ func roundTripTest(t *testing.T, v pdf.Version, a1 Annotation) {
 	}
 
 	// read back
-	a2, err := Extract(buf, dict)
+	a2, err := Decode(buf, dict)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +205,7 @@ func TestOpacity(t *testing.T) {
 			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(buf)
 
-			embedded, err := annotation.AsDict(rm)
+			embedded, err := annotation.Encode(rm)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -248,7 +248,7 @@ func FuzzRead(f *testing.F) {
 			common.Appearance = defaultAppearanceDict
 			common.AppearanceState = pdf.Name("Normal")
 
-			embedded, err := a.AsDict(rm)
+			embedded, err := a.Encode(rm)
 			if err != nil {
 				continue
 			}
@@ -289,7 +289,7 @@ func FuzzRead(f *testing.F) {
 		if obj == nil {
 			t.Skip("missing annotation")
 		}
-		annotation, err := Extract(r, obj)
+		annotation, err := Decode(r, obj)
 		if err != nil {
 			t.Skip("broken annotation")
 		}

@@ -69,12 +69,12 @@ func extractPolygon(r pdf.Getter, dict pdf.Dict) (*Polygon, error) {
 	polygon := &Polygon{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &polygon.Common, dict); err != nil {
+	if err := decodeCommon(r, &polygon.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := extractMarkup(r, dict, &polygon.Markup); err != nil {
+	if err := decodeMarkup(r, dict, &polygon.Markup); err != nil {
 		return nil, err
 	}
 
@@ -142,7 +142,7 @@ func extractPolygon(r pdf.Getter, dict pdf.Dict) (*Polygon, error) {
 	return polygon, nil
 }
 
-func (p *Polygon) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Polygon"),
 	}

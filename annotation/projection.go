@@ -24,11 +24,6 @@ import "seehuhn.de/go/pdf"
 type Projection struct {
 	Common
 	Markup
-
-	// ExData (optional) is an external data dictionary. When used in conjunction
-	// with a 3D measurement, it has a Subtype of "3DM" and contains an M3DREF
-	// entry that references a 3D measurement dictionary.
-	ExData pdf.Reference
 }
 
 var _ Annotation = (*Projection)(nil)
@@ -42,24 +37,19 @@ func extractProjection(r pdf.Getter, dict pdf.Dict) (*Projection, error) {
 	projection := &Projection{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &projection.Common, dict); err != nil {
+	if err := decodeCommon(r, &projection.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := extractMarkup(r, dict, &projection.Markup); err != nil {
+	if err := decodeMarkup(r, dict, &projection.Markup); err != nil {
 		return nil, err
-	}
-
-	// ExData (optional)
-	if exData, ok := dict["ExData"].(pdf.Reference); ok {
-		projection.ExData = exData
 	}
 
 	return projection, nil
 }
 
-func (p *Projection) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (p *Projection) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "projection annotation", pdf.V2_0); err != nil {
 		return nil, err
 	}
@@ -79,9 +69,6 @@ func (p *Projection) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// ExData (optional)
-	if p.ExData != 0 {
-		dict["ExData"] = p.ExData
-	}
 
 	return dict, nil
 }

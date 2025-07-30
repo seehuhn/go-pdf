@@ -63,12 +63,12 @@ func extractRedact(r pdf.Getter, dict pdf.Dict) (*Redact, error) {
 	redact := &Redact{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &redact.Common, dict); err != nil {
+	if err := decodeCommon(r, &redact.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := extractMarkup(r, dict, &redact.Markup); err != nil {
+	if err := decodeMarkup(r, dict, &redact.Markup); err != nil {
 		return nil, err
 	}
 
@@ -143,7 +143,7 @@ func extractRedact(r pdf.Getter, dict pdf.Dict) (*Redact, error) {
 	return redact, nil
 }
 
-func (r *Redact) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (r *Redact) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "redaction annotation", pdf.V1_7); err != nil {
 		return nil, err
 	}

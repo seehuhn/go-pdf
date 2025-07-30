@@ -89,7 +89,7 @@ func createDocument(fname string) error {
 		},
 		Icon: annotation.TextIconNote,
 	}
-	textNative, err := text.AsDict(doc.RM)
+	textNative, err := text.Encode(doc.RM)
 	if err != nil {
 		return err
 	}
@@ -98,7 +98,7 @@ func createDocument(fname string) error {
 		return err
 	}
 
-	popupNative, err := popup.AsDict(doc.RM)
+	popupNative, err := popup.Encode(doc.RM)
 	if err != nil {
 		return err
 	}
@@ -158,7 +158,7 @@ func createDocument(fname string) error {
 		QuadPoints: quadPoints,
 	}
 	linkRef := doc.RM.Out.Alloc()
-	linkNative, err := link.AsDict(doc.RM)
+	linkNative, err := link.Encode(doc.RM)
 	if err != nil {
 		return err
 	}

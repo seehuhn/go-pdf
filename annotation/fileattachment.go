@@ -49,12 +49,12 @@ func extractFileAttachment(r pdf.Getter, dict pdf.Dict) (*FileAttachment, error)
 	fileAttachment := &FileAttachment{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &fileAttachment.Common, dict); err != nil {
+	if err := decodeCommon(r, &fileAttachment.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := extractMarkup(r, dict, &fileAttachment.Markup); err != nil {
+	if err := decodeMarkup(r, dict, &fileAttachment.Markup); err != nil {
 		return nil, err
 	}
 
@@ -72,7 +72,7 @@ func extractFileAttachment(r pdf.Getter, dict pdf.Dict) (*FileAttachment, error)
 	return fileAttachment, nil
 }
 
-func (f *FileAttachment) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (f *FileAttachment) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "file attachment annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

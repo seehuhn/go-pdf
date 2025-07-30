@@ -80,6 +80,17 @@ func (err *MalformedFileError) Unwrap() error {
 	return err.Err
 }
 
+// Optional zeros out any [MalformedFileError] but returns all other errors.
+func Optional[T any](value T, err error) (T, error) {
+	var zero T
+	if _, isMalformed := err.(*MalformedFileError); isMalformed {
+		return zero, nil
+	} else if err != nil {
+		return zero, err
+	}
+	return value, nil
+}
+
 // Wrap wraps an error with a location.
 // If the error is a [MalformedFileError], the location is appended to the list
 // of locations.  Otherwise, the error is wrapped using [fmt.Errorf].

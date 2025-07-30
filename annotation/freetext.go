@@ -18,6 +18,8 @@ package annotation
 
 import "seehuhn.de/go/pdf"
 
+// PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.6
+
 // FreeText represents a free text annotation that displays text directly on the page.
 type FreeText struct {
 	Common
@@ -27,13 +29,15 @@ type FreeText struct {
 	// formatting the text.
 	DA string
 
-	// Q (optional; PDF 1.4) is a code specifying the form of quadding
-	// (justification) used in displaying the annotation's text:
-	// 0 = Left-justified, 1 = Centred, 2 = Right-justified
-	// Default value: 0 (left-justified).
-	Q pdf.Integer
+	// Align specifies the text alignment used for the annotation's text.
+	// The zero value if [FreeTextAlignLeft].
+	// The other allowed values are [FreeTextAlignCenter] and
+	// [FreeTextAlignRight].
+	//
+	// This corresponds to the Q entry in the PDF annotation dictionary.
+	Align FreeTextAlign
 
-	// DS (optional; PDF 1.5) is a default style string.
+	// DS (optional) is a default style string.
 	DS string
 
 	// CL (optional; meaningful only if IT is FreeTextCallout; PDF 1.6)
@@ -72,12 +76,12 @@ func extractFreeText(r pdf.Getter, dict pdf.Dict) (*FreeText, error) {
 	freeText := &FreeText{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &freeText.Common, dict); err != nil {
+	if err := decodeCommon(r, &freeText.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := extractMarkup(r, dict, &freeText.Markup); err != nil {
+	if err := decodeMarkup(r, dict, &freeText.Markup); err != nil {
 		return nil, err
 	}
 
@@ -86,8 +90,11 @@ func extractFreeText(r pdf.Getter, dict pdf.Dict) (*FreeText, error) {
 		freeText.DA = string(da)
 	}
 
-	if q, err := pdf.GetInteger(r, dict["Q"]); err == nil {
-		freeText.Q = q
+	q, err := pdf.Optional(pdf.GetInteger(r, dict["Q"]))
+	if err != nil {
+		return nil, err
+	} else if q >= 0 && q <= 2 {
+		freeText.Align = FreeTextAlign(q)
 	}
 
 	if ds, err := pdf.GetTextString(r, dict["DS"]); err == nil {
@@ -129,7 +136,7 @@ func extractFreeText(r pdf.Getter, dict pdf.Dict) (*FreeText, error) {
 	return freeText, nil
 }
 
-func (f *FreeText) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("FreeText"),
 	}
@@ -149,11 +156,11 @@ func (f *FreeText) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		dict["DA"] = pdf.TextString(f.DA)
 	}
 
-	if f.Q != 0 {
+	if f.Align != 0 {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation Q entry", pdf.V1_4); err != nil {
 			return nil, err
 		}
-		dict["Q"] = f.Q
+		dict["Q"] = pdf.Integer(f.Align)
 	}
 
 	if f.DS != "" {
@@ -208,3 +215,13 @@ func (f *FreeText) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
 
 	return dict, nil
 }
+
+// FreeTextAlign represents the text justification options for free text
+// annotations.
+type FreeTextAlign int
+
+const (
+	FreeTextAlignLeft   FreeTextAlign = 0
+	FreeTextAlignCenter FreeTextAlign = 1
+	FreeTextAlignRight  FreeTextAlign = 2
+)

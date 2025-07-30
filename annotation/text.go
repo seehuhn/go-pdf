@@ -22,6 +22,8 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.4
+
 // Text represents a text annotation.
 // This type of annotation is used to provide editorial notes, comments, or other
 // textual feedback on a PDF document.
@@ -72,12 +74,12 @@ func extractText(r pdf.Getter, obj pdf.Object) (*Text, error) {
 	text := &Text{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &text.Common, dict); err != nil {
+	if err := decodeCommon(r, &text.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := extractMarkup(r, dict, &text.Markup); err != nil {
+	if err := decodeMarkup(r, dict, &text.Markup); err != nil {
 		return nil, err
 	}
 
@@ -117,7 +119,7 @@ func extractText(r pdf.Getter, obj pdf.Object) (*Text, error) {
 		text.State = TextStateNone
 	}
 
-	// graceful fallback for invalid state annotations when reading from PDF
+	// State annotations require both InReplyTo and User fields.
 	if text.State != TextStateUnknown {
 		if text.Markup.InReplyTo == 0 {
 			text.State = TextStateUnknown // can't fix missing reply relationship
@@ -129,7 +131,7 @@ func extractText(r pdf.Getter, obj pdf.Object) (*Text, error) {
 	return text, nil
 }
 
-func (t *Text) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (t *Text) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Text"),
 	}

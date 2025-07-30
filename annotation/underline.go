@@ -45,12 +45,12 @@ func extractUnderline(r pdf.Getter, dict pdf.Dict) (*Underline, error) {
 	underline := &Underline{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &underline.Common, dict); err != nil {
+	if err := decodeCommon(r, &underline.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := extractMarkup(r, dict, &underline.Markup); err != nil {
+	if err := decodeMarkup(r, dict, &underline.Markup); err != nil {
 		return nil, err
 	}
 
@@ -69,7 +69,7 @@ func extractUnderline(r pdf.Getter, dict pdf.Dict) (*Underline, error) {
 	return underline, nil
 }
 
-func (u *Underline) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (u *Underline) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "underline annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

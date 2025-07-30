@@ -86,7 +86,7 @@ func (a *Annot3D) AnnotationType() pdf.Name {
 	return "3D"
 }
 
-func (a *Annot3D) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (a *Annot3D) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "3D annotation", pdf.V1_6); err != nil {
 		return nil, err
 	}
@@ -218,7 +218,7 @@ func extractAnnot3D(r pdf.Getter, dict pdf.Dict) (*Annot3D, error) {
 	annot3D := &Annot3D{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &annot3D.Common, dict); err != nil {
+	if err := decodeCommon(r, &annot3D.Common, dict); err != nil {
 		return nil, err
 	}
 

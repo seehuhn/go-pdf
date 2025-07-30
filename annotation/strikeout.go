@@ -45,12 +45,12 @@ func extractStrikeOut(r pdf.Getter, dict pdf.Dict) (*StrikeOut, error) {
 	strikeOut := &StrikeOut{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &strikeOut.Common, dict); err != nil {
+	if err := decodeCommon(r, &strikeOut.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := extractMarkup(r, dict, &strikeOut.Markup); err != nil {
+	if err := decodeMarkup(r, dict, &strikeOut.Markup); err != nil {
 		return nil, err
 	}
 
@@ -69,7 +69,7 @@ func extractStrikeOut(r pdf.Getter, dict pdf.Dict) (*StrikeOut, error) {
 	return strikeOut, nil
 }
 
-func (s *StrikeOut) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (s *StrikeOut) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "strikeout annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

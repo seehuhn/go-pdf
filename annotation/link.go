@@ -80,7 +80,7 @@ func extractLink(r pdf.Getter, dict pdf.Dict) (*Link, error) {
 	link := &Link{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &link.Common, dict); err != nil {
+	if err := decodeCommon(r, &link.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -121,7 +121,7 @@ func extractLink(r pdf.Getter, dict pdf.Dict) (*Link, error) {
 	return link, nil
 }
 
-func (l *Link) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (l *Link) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if l.Action != nil && l.Destination != nil {
 		return nil, errors.New("conflicting Action and Destination fields in Link annotation")
 	}

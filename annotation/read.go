@@ -20,8 +20,8 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Extract extracts an annotation from a PDF file.
-func Extract(r pdf.Getter, obj pdf.Object) (Annotation, error) {
+// Decode reads an annotation from a PDF file.
+func Decode(r pdf.Getter, obj pdf.Object) (Annotation, error) {
 	dict, err := pdf.GetDictTyped(r, obj, "Annot")
 	if err != nil {
 		return nil, err

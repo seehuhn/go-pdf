@@ -46,7 +46,7 @@ func extractPrinterMark(r pdf.Getter, dict pdf.Dict) (*PrinterMark, error) {
 	printerMark := &PrinterMark{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &printerMark.Common, dict); err != nil {
+	if err := decodeCommon(r, &printerMark.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -59,7 +59,7 @@ func extractPrinterMark(r pdf.Getter, dict pdf.Dict) (*PrinterMark, error) {
 	return printerMark, nil
 }
 
-func (p *PrinterMark) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (p *PrinterMark) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "printer's mark annotation", pdf.V1_4); err != nil {
 		return nil, err
 	}

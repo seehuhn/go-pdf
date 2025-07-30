@@ -71,7 +71,7 @@ func extractWidget(r pdf.Getter, dict pdf.Dict) (*Widget, error) {
 	widget := &Widget{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &widget.Common, dict); err != nil {
+	if err := decodeCommon(r, &widget.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -111,7 +111,7 @@ func extractWidget(r pdf.Getter, dict pdf.Dict) (*Widget, error) {
 	return widget, nil
 }
 
-func (w *Widget) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "widget annotation", pdf.V1_2); err != nil {
 		return nil, err
 	}

@@ -51,12 +51,12 @@ func extractCaret(r pdf.Getter, dict pdf.Dict) (*Caret, error) {
 	caret := &Caret{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &caret.Common, dict); err != nil {
+	if err := decodeCommon(r, &caret.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := extractMarkup(r, dict, &caret.Markup); err != nil {
+	if err := decodeMarkup(r, dict, &caret.Markup); err != nil {
 		return nil, err
 	}
 
@@ -80,7 +80,7 @@ func extractCaret(r pdf.Getter, dict pdf.Dict) (*Caret, error) {
 	return caret, nil
 }
 
-func (c *Caret) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (c *Caret) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "caret annotation", pdf.V1_5); err != nil {
 		return nil, err
 	}

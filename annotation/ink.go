@@ -56,12 +56,12 @@ func extractInk(r pdf.Getter, dict pdf.Dict) (*Ink, error) {
 	ink := &Ink{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &ink.Common, dict); err != nil {
+	if err := decodeCommon(r, &ink.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := extractMarkup(r, dict, &ink.Markup); err != nil {
+	if err := decodeMarkup(r, dict, &ink.Markup); err != nil {
 		return nil, err
 	}
 
@@ -120,7 +120,7 @@ func extractInk(r pdf.Getter, dict pdf.Dict) (*Ink, error) {
 	return ink, nil
 }
 
-func (i *Ink) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (i *Ink) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "ink annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

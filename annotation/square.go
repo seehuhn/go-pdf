@@ -62,12 +62,12 @@ func extractSquare(r pdf.Getter, dict pdf.Dict) (*Square, error) {
 	square := &Square{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &square.Common, dict); err != nil {
+	if err := decodeCommon(r, &square.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := extractMarkup(r, dict, &square.Markup); err != nil {
+	if err := decodeMarkup(r, dict, &square.Markup); err != nil {
 		return nil, err
 	}
 
@@ -107,7 +107,7 @@ func extractSquare(r pdf.Getter, dict pdf.Dict) (*Square, error) {
 	return square, nil
 }
 
-func (s *Square) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Square"),
 	}

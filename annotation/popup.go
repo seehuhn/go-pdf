@@ -48,7 +48,7 @@ func extractPopup(r pdf.Getter, dict pdf.Dict) (*Popup, error) {
 	popup := &Popup{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &popup.Common, dict); err != nil {
+	if err := decodeCommon(r, &popup.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -66,7 +66,7 @@ func extractPopup(r pdf.Getter, dict pdf.Dict) (*Popup, error) {
 	return popup, nil
 }
 
-func (p *Popup) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (p *Popup) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "popup annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

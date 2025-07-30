@@ -45,12 +45,12 @@ func extractSquiggly(r pdf.Getter, dict pdf.Dict) (*Squiggly, error) {
 	squiggly := &Squiggly{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &squiggly.Common, dict); err != nil {
+	if err := decodeCommon(r, &squiggly.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := extractMarkup(r, dict, &squiggly.Markup); err != nil {
+	if err := decodeMarkup(r, dict, &squiggly.Markup); err != nil {
 		return nil, err
 	}
 
@@ -69,7 +69,7 @@ func extractSquiggly(r pdf.Getter, dict pdf.Dict) (*Squiggly, error) {
 	return squiggly, nil
 }
 
-func (s *Squiggly) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (s *Squiggly) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "squiggly annotation", pdf.V1_4); err != nil {
 		return nil, err
 	}

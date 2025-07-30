@@ -93,7 +93,7 @@ func createDocument(filename string) error {
 			},
 			Icon: icon,
 		}
-		textNative, err := text.AsDict(doc.RM)
+		textNative, err := text.Encode(doc.RM)
 		if err != nil {
 			return err
 		}
@@ -102,7 +102,7 @@ func createDocument(filename string) error {
 			return err
 		}
 
-		popupNative, err := popup.AsDict(doc.RM)
+		popupNative, err := popup.Encode(doc.RM)
 		if err != nil {
 			return err
 		}
@@ -137,7 +137,7 @@ func createDocument(filename string) error {
 			Icon: icon,
 		}
 		style.AddAppearance(text)
-		textNative, err = text.AsDict(doc.RM)
+		textNative, err = text.Encode(doc.RM)
 		if err != nil {
 			return err
 		}
@@ -146,7 +146,7 @@ func createDocument(filename string) error {
 			return err
 		}
 
-		popupNative, err = popup.AsDict(doc.RM)
+		popupNative, err = popup.Encode(doc.RM)
 		if err != nil {
 			return err
 		}

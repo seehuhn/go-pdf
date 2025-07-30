@@ -62,12 +62,12 @@ func extractCircle(r pdf.Getter, dict pdf.Dict) (*Circle, error) {
 	circle := &Circle{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &circle.Common, dict); err != nil {
+	if err := decodeCommon(r, &circle.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := extractMarkup(r, dict, &circle.Markup); err != nil {
+	if err := decodeMarkup(r, dict, &circle.Markup); err != nil {
 		return nil, err
 	}
 
@@ -107,7 +107,7 @@ func extractCircle(r pdf.Getter, dict pdf.Dict) (*Circle, error) {
 	return circle, nil
 }
 
-func (c *Circle) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (c *Circle) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Circle"),
 	}

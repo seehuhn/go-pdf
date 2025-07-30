@@ -57,7 +57,7 @@ func extractCustom(r pdf.Getter, dict pdf.Dict) (*Custom, error) {
 	}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &c.Common, dict); err != nil {
+	if err := decodeCommon(r, &c.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -90,7 +90,7 @@ func extractCustom(r pdf.Getter, dict pdf.Dict) (*Custom, error) {
 	return c, nil
 }
 
-func (c *Custom) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (c *Custom) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if c.Type == "" {
 		return nil, errors.New("missing annotation subtype")
 	}

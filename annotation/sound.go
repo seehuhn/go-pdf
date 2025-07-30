@@ -53,12 +53,12 @@ func extractSound(r pdf.Getter, dict pdf.Dict) (*Sound, error) {
 	sound := &Sound{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &sound.Common, dict); err != nil {
+	if err := decodeCommon(r, &sound.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := extractMarkup(r, dict, &sound.Markup); err != nil {
+	if err := decodeMarkup(r, dict, &sound.Markup); err != nil {
 		return nil, err
 	}
 
@@ -78,7 +78,7 @@ func extractSound(r pdf.Getter, dict pdf.Dict) (*Sound, error) {
 	return sound, nil
 }
 
-func (s *Sound) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (s *Sound) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "sound annotation", pdf.V1_2); err != nil {
 		return nil, err
 	}

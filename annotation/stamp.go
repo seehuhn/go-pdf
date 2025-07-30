@@ -59,12 +59,12 @@ func extractStamp(r pdf.Getter, dict pdf.Dict) (*Stamp, error) {
 	stamp := &Stamp{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &stamp.Common, dict); err != nil {
+	if err := decodeCommon(r, &stamp.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := extractMarkup(r, dict, &stamp.Markup); err != nil {
+	if err := decodeMarkup(r, dict, &stamp.Markup); err != nil {
 		return nil, err
 	}
 
@@ -89,7 +89,7 @@ func extractStamp(r pdf.Getter, dict pdf.Dict) (*Stamp, error) {
 	return stamp, nil
 }
 
-func (s *Stamp) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (s *Stamp) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "stamp annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

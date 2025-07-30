@@ -68,7 +68,7 @@ func extractTrapNet(r pdf.Getter, dict pdf.Dict) (*TrapNet, error) {
 	trapNet := &TrapNet{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &trapNet.Common, dict); err != nil {
+	if err := decodeCommon(r, &trapNet.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -120,7 +120,7 @@ func extractTrapNet(r pdf.Getter, dict pdf.Dict) (*TrapNet, error) {
 	return trapNet, nil
 }
 
-func (t *TrapNet) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (t *TrapNet) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "trap network annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

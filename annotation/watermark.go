@@ -70,7 +70,7 @@ func extractWatermark(r pdf.Getter, dict pdf.Dict) (*Watermark, error) {
 	watermark := &Watermark{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &watermark.Common, dict); err != nil {
+	if err := decodeCommon(r, &watermark.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -114,7 +114,7 @@ func extractWatermark(r pdf.Getter, dict pdf.Dict) (*Watermark, error) {
 	return watermark, nil
 }
 
-func (w *Watermark) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (w *Watermark) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "watermark annotation", pdf.V1_6); err != nil {
 		return nil, err
 	}

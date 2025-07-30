@@ -90,12 +90,12 @@ func extractLine(r pdf.Getter, dict pdf.Dict) (*Line, error) {
 	line := &Line{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &line.Common, dict); err != nil {
+	if err := decodeCommon(r, &line.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := extractMarkup(r, dict, &line.Markup); err != nil {
+	if err := decodeMarkup(r, dict, &line.Markup); err != nil {
 		return nil, err
 	}
 
@@ -182,7 +182,7 @@ func extractLine(r pdf.Getter, dict pdf.Dict) (*Line, error) {
 	return line, nil
 }
 
-func (l *Line) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Line"),
 	}

@@ -71,12 +71,12 @@ func extractPolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
 	polyline := &Polyline{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &polyline.Common, dict); err != nil {
+	if err := decodeCommon(r, &polyline.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := extractMarkup(r, dict, &polyline.Markup); err != nil {
+	if err := decodeMarkup(r, dict, &polyline.Markup); err != nil {
 		return nil, err
 	}
 
@@ -146,7 +146,7 @@ func extractPolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
 	return polyline, nil
 }
 
-func (p *Polyline) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (p *Polyline) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("PolyLine"),
 	}

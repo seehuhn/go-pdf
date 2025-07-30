@@ -52,7 +52,7 @@ func extractScreen(r pdf.Getter, dict pdf.Dict) (*Screen, error) {
 	screen := &Screen{}
 
 	// Extract common annotation fields
-	if err := extractCommon(r, &screen.Common, dict); err != nil {
+	if err := decodeCommon(r, &screen.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -80,7 +80,7 @@ func extractScreen(r pdf.Getter, dict pdf.Dict) (*Screen, error) {
 	return screen, nil
 }
 
-func (s *Screen) AsDict(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (s *Screen) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "screen annotation", pdf.V1_5); err != nil {
 		return nil, err
 	}

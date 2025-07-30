@@ -136,8 +136,8 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 300, URy: 150},
 					Contents: "Free text content",
 				},
-				DA: "/Helvetica 12 Tf 0 g",
-				Q:  0, // Left justified
+				DA:    "/Helvetica 12 Tf 0 g",
+				Align: 0, // Left justified
 			},
 		},
 		{
@@ -152,10 +152,10 @@ var testCases = map[pdf.Name][]testCase{
 					Subject: "Callout comment",
 					Intent:  "FreeTextCallout",
 				},
-				DA: "/Arial 10 Tf 0 0 1 rg",
-				Q:  1,                                       // Centered
-				CL: []float64{100, 150, 125, 175, 150, 200}, // 6-point callout line
-				LE: "OpenArrow",
+				DA:    "/Arial 10 Tf 0 0 1 rg",
+				Align: 1,                                       // Centered
+				CL:    []float64{100, 150, 125, 175, 150, 200}, // 6-point callout line
+				LE:    "OpenArrow",
 			},
 		},
 		{
@@ -171,10 +171,10 @@ var testCases = map[pdf.Name][]testCase{
 					CreationDate: time.Date(2023, 6, 1, 14, 0, 0, 0, time.UTC),
 					Intent:       "FreeText",
 				},
-				DA: "/Times-Roman 14 Tf 0.2 0.2 0.8 rg",
-				Q:  2, // Right justified
-				DS: "font-size:14pt;color:#3333CC;",
-				RD: []float64{5.0, 3.0, 5.0, 3.0}, // Inner rectangle margins
+				DA:    "/Times-Roman 14 Tf 0.2 0.2 0.8 rg",
+				Align: 2, // Right justified
+				DS:    "font-size:14pt;color:#3333CC;",
+				RD:    []float64{5.0, 3.0, 5.0, 3.0}, // Inner rectangle margins
 			},
 		},
 	},
@@ -235,9 +235,10 @@ var testCases = map[pdf.Name][]testCase{
 					Color: color.DeviceCMYK(1, 1, 0, 0), // blue
 				},
 				Markup: Markup{
-					User:    "Reviewer",
-					Subject: "Complete line annotation",
-					RT:      "R",
+					User:      "Reviewer",
+					Subject:   "Complete line annotation",
+					RT:        "R",
+					InReplyTo: pdf.NewReference(1, 0),
 				},
 				L:   []float64{120, 325, 380, 325},
 				LE:  []pdf.Name{"Diamond", "Square"},
@@ -1707,8 +1708,8 @@ var testCases = map[pdf.Name][]testCase{
 					User:         "Measurement Tool",
 					CreationDate: time.Date(2023, 5, 10, 9, 15, 0, 0, time.UTC),
 					Subject:      "3D measurement association",
+					ExData:       pdf.NewReference(500, 0), // Reference to external data dictionary
 				},
-				ExData: pdf.NewReference(500, 0), // Reference to external data dictionary
 			},
 		},
 		{
@@ -1721,8 +1722,8 @@ var testCases = map[pdf.Name][]testCase{
 				Markup: Markup{
 					User:    "Specialist",
 					Subject: "Zero-dimension measurement",
+					ExData:  pdf.NewReference(600, 0),
 				},
-				ExData: pdf.NewReference(600, 0),
 			},
 		},
 		{
@@ -1744,8 +1745,8 @@ var testCases = map[pdf.Name][]testCase{
 					CreationDate: time.Date(2023, 8, 20, 14, 30, 0, 0, time.UTC),
 					InReplyTo:    pdf.NewReference(300, 0), // In reply to reference
 					Intent:       "Group",
+					ExData:       pdf.NewReference(700, 0), // External data dictionary with 3DM subtype
 				},
-				ExData: pdf.NewReference(700, 0), // External data dictionary with 3DM subtype
 			},
 		},
 		{
