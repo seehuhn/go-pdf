@@ -16,7 +16,11 @@
 
 package annotation
 
-import "seehuhn.de/go/pdf"
+import (
+	"fmt"
+
+	"seehuhn.de/go/pdf"
+)
 
 // Border represents the characteristics of an annotation's border.
 type Border struct {
@@ -33,6 +37,106 @@ type Border struct {
 	// DashArray (optional; PDF 1.1) defines a pattern of dashes and gaps
 	// for drawing the border. If nil, a solid border is drawn.
 	DashArray []float64
+
+	// SingleUse determines if Embed returns a dictionary (true) or
+	// a reference (false).
+	SingleUse bool
+}
+
+var _ pdf.Embedder[pdf.Unused] = (*Border)(nil)
+
+var defaultBorder = &Border{Width: 1}
+
+// ExtractBorder extracts a Border from a PDF array.
+// If no valid border data can be decoded, returns the default border.
+func ExtractBorder(r pdf.Getter, obj pdf.Object) (*Border, error) {
+	border, err := pdf.Optional(pdf.GetArray(r, obj))
+	if err != nil {
+		return nil, err
+	}
+
+	if len(border) < 3 {
+		return defaultBorder, nil
+	}
+
+	b := &Border{}
+
+	if h, err := pdf.Optional(pdf.GetNumber(r, border[0])); err != nil {
+		return nil, err
+	} else {
+		b.HCornerRadius = float64(h)
+	}
+
+	if v, err := pdf.Optional(pdf.GetNumber(r, border[1])); err != nil {
+		return nil, err
+	} else {
+		b.VCornerRadius = float64(v)
+	}
+
+	if w, err := pdf.Optional(pdf.GetNumber(r, border[2])); err != nil {
+		return nil, err
+	} else {
+		b.Width = float64(w)
+	}
+
+	if len(border) > 3 {
+		if dashArray, err := pdf.Optional(pdf.GetArray(r, border[3])); err != nil {
+			return nil, err
+		} else {
+			var dashes []float64
+			for _, dash := range dashArray {
+				if num, err := pdf.Optional(pdf.GetNumber(r, dash)); err != nil {
+					return nil, err
+				} else if num >= 0 {
+					dashes = append(dashes, float64(num))
+				}
+			}
+			if len(dashes) > 0 {
+				b.DashArray = dashes
+			}
+		}
+	}
+
+	return b, nil
+}
+
+func (b *Border) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
+
+	// return nil for default values to omit field from PDF
+	if b.isDefault() {
+		return nil, zero, nil
+	}
+
+	borderArray := pdf.Array{
+		pdf.Number(b.HCornerRadius),
+		pdf.Number(b.VCornerRadius),
+		pdf.Number(b.Width),
+	}
+
+	if b.DashArray != nil {
+		if err := pdf.CheckVersion(rm.Out, "border dash array", pdf.V1_1); err != nil {
+			return nil, zero, err
+		}
+		dashArray := make(pdf.Array, len(b.DashArray))
+		for i, v := range b.DashArray {
+			if v < 0 {
+				return nil, zero, fmt.Errorf("invalid dash value %f in border dash array", v)
+			}
+			dashArray[i] = pdf.Number(v)
+		}
+		borderArray = append(borderArray, dashArray)
+	}
+
+	if b.SingleUse {
+		return borderArray, zero, nil
+	}
+	ref := rm.Out.Alloc()
+	err := rm.Out.Put(ref, borderArray)
+	if err != nil {
+		return nil, zero, err
+	}
+	return ref, zero, nil
 }
 
 func (b *Border) isDefault() bool {
@@ -163,8 +267,7 @@ func ExtractBorderEffect(r pdf.Getter, obj pdf.Object) (*BorderEffect, error) {
 	dict, err := pdf.GetDict(r, obj)
 	if err != nil {
 		return nil, err
-	}
-	if dict == nil {
+	} else if dict == nil {
 		return nil, pdf.Error("missing border effect dictionary")
 	}
 
@@ -178,10 +281,12 @@ func ExtractBorderEffect(r pdf.Getter, obj pdf.Object) (*BorderEffect, error) {
 		effect.Style = "S"
 	}
 
-	if intensity, err := pdf.Optional(pdf.GetNumber(r, dict["I"])); err != nil {
-		return nil, err
-	} else if effect.Style == "C" {
-		effect.Intensity = float64(intensity)
+	if effect.Style == "C" {
+		if intensity, err := pdf.Optional(pdf.GetNumber(r, dict["I"])); err != nil {
+			return nil, err
+		} else {
+			effect.Intensity = float64(intensity)
+		}
 	}
 
 	_, isIndirect := obj.(pdf.Reference)

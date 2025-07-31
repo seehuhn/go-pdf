@@ -16,7 +16,12 @@
 
 package annotation
 
-import "seehuhn.de/go/pdf"
+import (
+	"errors"
+	"fmt"
+
+	"seehuhn.de/go/pdf"
+)
 
 // PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.6
 
@@ -31,6 +36,19 @@ type FreeText struct {
 	// This corresponds to the /DA entry in the PDF annotation dictionary.
 	DefaultAppearance string
 
+	// DefaultStyle (optional) is a default style string.
+	//
+	// This corresponds to the /DS entry in the PDF annotation dictionary.
+	DefaultStyle string
+
+	// Padding (optional) describes the numerical differences between
+	// the Rect entry and an inner rectangle where the text should be displayed.
+	//
+	// Slice of four numbers: [left, top, right, bottom]
+	//
+	// This corresponds to the /RD entry in the PDF annotation dictionary.
+	Padding []float64
+
 	// Align specifies the text alignment used for the annotation's text.
 	// The zero value if [FreeTextAlignLeft].
 	// The other allowed values are [FreeTextAlignCenter] and
@@ -39,33 +57,34 @@ type FreeText struct {
 	// This corresponds to the /Q entry in the PDF annotation dictionary.
 	Align FreeTextAlign
 
-	// DefaultStyle (optional) is a default style string.
-	//
-	// This corresponds to the /DS entry in the PDF annotation dictionary.
-	DefaultStyle string
-
-	// CL (optional; meaningful only if IT is FreeTextCallout; PDF 1.6)
+	// CalloutLine (used only if Markup.Intent is [FreeTextIntentCallout]; PDF 1.6)
 	// specifies a callout line attached to the free text annotation.
 	// Four numbers [x1 y1 x2 y2] represent start and end coordinates.
 	// Six numbers [x1 y1 x2 y2 x3 y3] represent start, knee, and end coordinates.
-	CL []float64
+	//
+	// This corresponds to the /CL entry in the PDF annotation dictionary.
+	CalloutLine []float64
 
-	// BE (optional; PDF 1.6) is a border effect dictionary used in
-	// conjunction with the border style dictionary specified by BS.
-	BE *BorderEffect
+	// LineEndingStyle (optional; meaningful only if CalloutLine is present)
+	// specifies the line ending style for the callout line endpoint (x1, y1).
+	//
+	// When writing annotations an empty string may be used as a shorthand
+	// for [LineEndingStyleNone]
+	//
+	// This corresponds to the /LE entry in the PDF annotation dictionary.
+	LineEndingStyle LineEndingStyle
 
-	// RD (optional; PDF 1.6) describes the numerical differences between
-	// the Rect entry and an inner rectangle where the text should be displayed.
-	// Array of four numbers: [left, top, right, bottom] differences.
-	RD []float64
+	// BorderEffect (optional) is a border effect dictionary used in
+	// conjunction with the border style dictionary specified by BorderStyle.
+	BorderEffect *BorderEffect
 
-	// BS (optional; PDF 1.3) is a border style dictionary specifying
-	// the line width and dash pattern for drawing the annotation's border.
-	BS *BorderStyle
-
-	// LE (optional; meaningful only if CL is present; PDF 1.6) specifies
-	// the line ending style for the callout line endpoint (x1, y1).
-	LE pdf.Name
+	// BorderStyle (optional) is a border style dictionary specifying the line
+	// width and dash pattern for drawing the annotation's border.
+	//
+	// If the BorderStyle field is set, the Common.Border field is ignored.
+	//
+	// This corresponds to the /BS entry in the PDF annotation dictionary.
+	BorderStyle *BorderStyle
 }
 
 var _ Annotation = (*FreeText)(nil)
@@ -77,134 +96,113 @@ func (f *FreeText) AnnotationType() pdf.Name {
 }
 
 func extractFreeText(r pdf.Getter, dict pdf.Dict) (*FreeText, error) {
-	freeText := &FreeText{}
+	f := &FreeText{}
 
-	// Extract common annotation fields
-	if err := decodeCommon(r, &freeText.Common, dict); err != nil {
+	if err := decodeCommon(r, &f.Common, dict); err != nil {
+		return nil, err
+	}
+	if err := decodeMarkup(r, dict, &f.Markup); err != nil {
 		return nil, err
 	}
 
-	// Extract markup annotation fields
-	if err := decodeMarkup(r, dict, &freeText.Markup); err != nil {
+	if da, err := pdf.Optional(pdf.GetTextString(r, dict["DA"])); err != nil {
 		return nil, err
+	} else {
+		f.DefaultAppearance = string(da)
 	}
 
-	// Extract free text-specific fields
-	// DA is required for free text annotations
-	if dict["DA"] == nil {
-		return nil, pdf.Error("missing required DA field in free text annotation")
-	}
-	da, err := pdf.GetTextString(r, dict["DA"])
-	if err != nil {
-		return nil, err
-	}
-	freeText.DefaultAppearance = string(da)
-
-	q, err := pdf.Optional(pdf.GetInteger(r, dict["Q"]))
-	if err != nil {
+	if q, err := pdf.Optional(pdf.GetInteger(r, dict["Q"])); err != nil {
 		return nil, err
 	} else if q >= 0 && q <= 2 {
-		freeText.Align = FreeTextAlign(q)
+		f.Align = FreeTextAlign(q)
 	}
 
-	if dict["DS"] != nil {
-		if ds, err := pdf.Optional(pdf.GetTextString(r, dict["DS"])); err != nil {
-			return nil, err
-		} else {
-			freeText.DefaultStyle = string(ds)
-		}
+	if ds, err := pdf.Optional(pdf.GetTextString(r, dict["DS"])); err != nil {
+		return nil, err
+	} else {
+		f.DefaultStyle = string(ds)
 	}
 
 	if cl, err := pdf.Optional(pdf.GetArray(r, dict["CL"])); err != nil {
 		return nil, err
-	} else if cl != nil {
-		// CL must have exactly 4 or 6 numbers
-		if len(cl) != 4 && len(cl) != 6 {
-			// Ignore invalid CL arrays per permissive reading guidelines
-		} else {
-			coords := make([]float64, len(cl))
-			valid := true
-			for i, coord := range cl {
-				if num, err := pdf.GetNumber(r, coord); err == nil {
-					coords[i] = float64(num)
-				} else {
-					valid = false
-					break
-				}
-			}
-			if valid {
-				freeText.CL = coords
+	} else if f.Intent == FreeTextIntentCallout && (len(cl) == 4 || len(cl) == 6) {
+		coords := make([]float64, len(cl))
+		for i, coord := range cl {
+			if num, err := pdf.GetNumber(r, coord); err == nil {
+				coords[i] = float64(num)
 			}
 		}
+		f.CalloutLine = coords
 	}
 
-	if beObj := dict["BE"]; beObj != nil {
-		if be, err := ExtractBorderEffect(r, beObj); err == nil {
-			freeText.BE = be
-		}
-	}
-
-	if rd, err := pdf.GetArray(r, dict["RD"]); err == nil && len(rd) == 4 {
-		diffs := make([]float64, 4)
-		for i, diff := range rd {
-			if num, err := pdf.GetNumber(r, diff); err == nil {
-				diffs[i] = float64(num)
-			}
-		}
-		freeText.RD = diffs
-	}
-
-	if bsObj := dict["BS"]; bsObj != nil {
-		if bs, err := ExtractBorderStyle(r, bsObj); err == nil {
-			freeText.BS = bs
-		}
-	}
-
-	if le, err := pdf.Optional(pdf.GetName(r, dict["LE"])); err != nil {
+	if be, err := pdf.Optional(ExtractBorderEffect(r, dict["BE"])); err != nil {
 		return nil, err
-	} else if le != "" {
-		freeText.LE = le
+	} else {
+		f.BorderEffect = be
 	}
 
-	return freeText, nil
+	if rd, err := pdf.Optional(pdf.GetArray(r, dict["RD"])); err != nil {
+		return nil, err
+	} else if len(rd) == 4 {
+		a := make([]float64, 4)
+		for i, diff := range rd {
+			num, _ := pdf.GetNumber(r, diff)
+			a[i] = max(float64(num), 0)
+		}
+		f.Padding = a
+	}
+
+	if bs, err := pdf.Optional(ExtractBorderStyle(r, dict["BS"])); err != nil {
+		return nil, err
+	} else {
+		f.BorderStyle = bs
+	}
+
+	if f.Intent == FreeTextIntentCallout {
+		if le, err := pdf.Optional(pdf.GetName(r, dict["LE"])); err != nil {
+			return nil, err
+		} else if le != "" {
+			f.LineEndingStyle = LineEndingStyle(le)
+		} else {
+			f.LineEndingStyle = LineEndingStyleNone
+		}
+	}
+
+	return f, nil
 }
 
 func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+	if err := pdf.CheckVersion(rm.Out, "free text annotation", pdf.V1_3); err != nil {
+		return nil, err
+	}
+
+	switch f.Markup.Intent {
+	case "":
+		// intent is optional
+	case FreeTextIntentPlain, FreeTextIntentCallout, FreeTextIntentTypeWriter:
+		// valid intent values
+	default:
+		return nil, fmt.Errorf("invalid Intent %q for free text annotation", f.Intent)
+	}
+
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("FreeText"),
 	}
-
-	// Add Type field if required by options
 	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Annot")
 	}
 
-	// Add common annotation fields
 	if err := f.Common.fillDict(rm, dict, isMarkup(f)); err != nil {
 		return nil, err
 	}
-
-	// Add markup annotation fields
 	if err := f.Markup.fillDict(rm, dict); err != nil {
 		return nil, err
 	}
 
-	// Validate Intent field for free text annotations
-	if f.Markup.Intent != "" {
-		switch f.Markup.Intent {
-		case "FreeText", "FreeTextCallout", "FreeTextTypeWriter":
-			// Valid intent values
-		default:
-			return nil, pdf.Error("invalid Intent value for free text annotation: " + string(f.Markup.Intent))
-		}
-	}
-
 	// Add free text-specific fields
-	if f.DefaultAppearance != "" {
-		dict["DA"] = pdf.TextString(f.DefaultAppearance)
-	}
+	dict["DA"] = pdf.TextString(f.DefaultAppearance)
 
-	if f.Align != 0 {
+	if f.Align != FreeTextAlignLeft {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation Q entry", pdf.V1_4); err != nil {
 			return nil, err
 		}
@@ -218,59 +216,67 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		dict["DS"] = pdf.TextString(f.DefaultStyle)
 	}
 
-	if f.CL != nil {
+	if f.CalloutLine != nil {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation CL entry", pdf.V1_6); err != nil {
 			return nil, err
 		}
-		// CL must have exactly 4 or 6 numbers
-		if len(f.CL) != 4 && len(f.CL) != 6 {
-			return nil, pdf.Error("CL array must have exactly 4 or 6 numbers")
+		if f.Intent != FreeTextIntentCallout {
+			return nil, errors.New("CL entry present but Intent is not FreeTextIntentCallout")
 		}
-		clArray := make(pdf.Array, len(f.CL))
-		for i, coord := range f.CL {
+		if len(f.CalloutLine) != 4 && len(f.CalloutLine) != 6 {
+			return nil, errors.New("invalid length for CL array")
+		}
+		clArray := make(pdf.Array, len(f.CalloutLine))
+		for i, coord := range f.CalloutLine {
 			clArray[i] = pdf.Number(coord)
 		}
 		dict["CL"] = clArray
 	}
 
-	if f.BE != nil {
+	if f.BorderEffect != nil {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation BE entry", pdf.V1_6); err != nil {
 			return nil, err
 		}
-		beObj, _, err := f.BE.Embed(rm)
+		be, _, err := f.BorderEffect.Embed(rm)
 		if err != nil {
 			return nil, err
 		}
-		dict["BE"] = beObj
+		dict["BE"] = be
 	}
 
-	if f.RD != nil {
+	if f.Padding != nil {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation RD entry", pdf.V1_6); err != nil {
 			return nil, err
 		}
-		rdArray := make(pdf.Array, len(f.RD))
-		for i, diff := range f.RD {
-			rdArray[i] = pdf.Number(diff)
+		if len(f.Padding) != 4 {
+			return nil, errors.New("invalid length for RD array")
 		}
-		dict["RD"] = rdArray
+		rd := make(pdf.Array, len(f.Padding))
+		for i, xi := range f.Padding {
+			if xi < 0 {
+				return nil, fmt.Errorf("invalid entry %f in RD array", xi)
+			}
+			rd[i] = pdf.Number(xi)
+		}
+		dict["RD"] = rd
 	}
 
-	if f.BS != nil {
+	if f.BorderStyle != nil {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation BS entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		bsObj, _, err := f.BS.Embed(rm)
+		bs, _, err := f.BorderStyle.Embed(rm)
 		if err != nil {
 			return nil, err
 		}
-		dict["BS"] = bsObj
+		dict["BS"] = bs
 	}
 
-	if f.LE != "" {
+	if f.CalloutLine != nil && f.LineEndingStyle != "" && f.LineEndingStyle != LineEndingStyleNone {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation LE entry", pdf.V1_6); err != nil {
 			return nil, err
 		}
-		dict["LE"] = f.LE
+		dict["LE"] = pdf.Name(f.LineEndingStyle)
 	}
 
 	return dict, nil
@@ -284,4 +290,22 @@ const (
 	FreeTextAlignLeft   FreeTextAlign = 0
 	FreeTextAlignCenter FreeTextAlign = 1
 	FreeTextAlignRight  FreeTextAlign = 2
+)
+
+// These constants represent the allowed values for the Markup.Intent
+// field in free text annotations.
+const (
+	// FreeTextIntentPlain creates a standard text box annotation with visible
+	// borders and background. Use this for general text comments and notes.
+	FreeTextIntentPlain pdf.Name = "FreeText"
+
+	// FreeTextIntentCallout creates a callout annotation that points to a
+	// specific area on the page using an arrow or line.  Use this to annotate
+	// or reference particular elements in the document.
+	FreeTextIntentCallout pdf.Name = "FreeTextCallout"
+
+	// FreeTextIntentTypeWriter creates a typewriter-style annotation with
+	// transparent background and opaque text. This is similar to how one might
+	// fill in a paper form using a typewriter.
+	FreeTextIntentTypeWriter pdf.Name = "FreeTextTypeWriter"
 )

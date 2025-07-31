@@ -154,8 +154,8 @@ var testCases = map[pdf.Name][]testCase{
 				},
 				DefaultAppearance: "/Arial 10 Tf 0 0 1 rg",
 				Align:             1,                                       // Centered
-				CL:                []float64{100, 150, 125, 175, 150, 200}, // 6-point callout line
-				LE:                "OpenArrow",
+				CalloutLine:       []float64{100, 150, 125, 175, 150, 200}, // 6-point callout line
+				LineEndingStyle:   "OpenArrow",
 			},
 		},
 		{
@@ -174,7 +174,7 @@ var testCases = map[pdf.Name][]testCase{
 				DefaultAppearance: "/Times-Roman 14 Tf 0.2 0.2 0.8 rg",
 				Align:             2, // Right justified
 				DefaultStyle:      "font-size:14pt;color:#3333CC;",
-				RD:                []float64{5.0, 3.0, 5.0, 3.0}, // Inner rectangle margins
+				Padding:           []float64{5.0, 3.0, 5.0, 3.0}, // Inner rectangle margins
 			},
 		},
 	},
@@ -1171,8 +1171,12 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:     pdf.Rectangle{LLx: 150, LLy: 150, URx: 400, URy: 190},
 					Contents: "Field with custom border",
 				},
-				H:  "N",                       // No highlighting
-				BS: pdf.NewReference(2000, 0), // Border style dictionary
+				H: "N", // No highlighting
+				BorderStyle: &BorderStyle{
+					Width:     2,
+					Style:     "S",
+					DashArray: []float64{3},
+				},
 			},
 		},
 		{
@@ -1194,12 +1198,16 @@ var testCases = map[pdf.Name][]testCase{
 					Contents: "Complete widget annotation",
 					Color:    color.DeviceRGB(0.8, 0.9, 1.0),
 				},
-				H:      "P",                       // Push highlighting
-				MK:     pdf.NewReference(2200, 0), // Appearance characteristics
-				A:      pdf.NewReference(2300, 0), // Action dictionary
-				AA:     pdf.NewReference(2400, 0), // Additional-actions dictionary
-				BS:     pdf.NewReference(2500, 0), // Border style dictionary
-				Parent: pdf.NewReference(2600, 0), // Parent field reference
+				H:           "P",                       // Push highlighting
+				MK:          pdf.NewReference(2200, 0), // Appearance characteristics
+				A:           pdf.NewReference(2300, 0), // Action dictionary
+				AA:          pdf.NewReference(2400, 0), // Additional-actions dictionary
+				BorderStyle: &BorderStyle{
+					Width: 1.5,
+					Style: "D",
+					DashArray: []float64{5, 2},
+				},
+				Parent:      pdf.NewReference(2600, 0), // Parent field reference
 			},
 		},
 		{

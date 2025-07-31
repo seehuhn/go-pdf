@@ -19,233 +19,56 @@ package fallback
 import (
 	"fmt"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/extended"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/graphics/form"
 )
+
+// The following fields are ignored when an annotation has an appearance
+// stream.
+//  - C: `Common.Color`
+//  - Border: `Common.Border`
+//  - IC: fill color for Circle, Line, Polygon, Polyline, Redact, Square
+//  - BS: border style for Circle, FreeText, Ink, Line, Link, Polygon, Polyline, Square, Widget
+//  - BE: border effects for Circle, FreeText, Polygon, Square
+//  - H: horizontal shift for Watermark
+//  - DA: default appearance for FreeText, Redact
+//  - Q: alignment for FreeText, Redact
+//  - DS: default style for FreeText
+//  - LE: line ending style for FreeText, Line, Polyline
+//  - LL: "leader lines" for Line
+//  - LLE: "leader line extension" for Line
+//  - MK: "appearance characteristics dictionary" for Screen, Widget
+//  - Sy: "symbol" for Caret
 
 type Style struct {
 	iconFont font.Layouter
-	cache    map[string]*appearance.Dict
+	cache    map[key]*appearance.Dict
+}
+
+type key struct {
+	name string
+	bg   color.Color
 }
 
 func NewStyle() *Style {
 	iconFont := extended.NimbusRomanBold.New()
 	return &Style{
 		iconFont: iconFont,
-		cache:    make(map[string]*appearance.Dict),
+		cache:    make(map[key]*appearance.Dict),
 	}
 }
 
-func (s *Style) AddAppearance(a annotation.Annotation) error {
+func (s *Style) AddAppearance(a annotation.Annotation, backgroundColor color.Color) error {
 	switch a := a.(type) {
 	case *annotation.Text:
-		s.addTextAppearance(a)
-		return nil
+		s.addTextAppearance(a, backgroundColor)
+	case *annotation.FreeText:
+		s.addFreeTextAppearance(a, backgroundColor)
 	default:
 		return fmt.Errorf("unsupported annotation type: %T", a)
 	}
-}
-
-func (s *Style) addTextAppearance(a *annotation.Text) {
-	a.Color = nil
-	a.Border = nil
-	a.AppearanceState = ""
-
-	key := string(a.AnnotationType()) + "-" + string(a.Icon)
-	res, ok := s.cache[key]
-	if ok {
-		a.Appearance = res
-		return
-	}
-
-	var draw func(*graphics.Writer) error
-	switch a.Icon {
-	case annotation.TextIconComment:
-		draw = func(w *graphics.Writer) error {
-			w.SetLineWidth(0.5)
-			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetFillColor(color.DeviceRGB(0.98, 0.96, 0.75))
-			w.Rectangle(0.25, 0.25, 23.5, 23.5)
-			w.CloseFillAndStroke()
-
-			w.TextBegin()
-			w.TextSetFont(s.iconFont, 23)
-			w.SetFillColor(color.DeviceGray(0.0))
-			w.TextFirstLine(6, 2)
-			w.TextSetHorizontalScaling(0.9)
-			w.TextShow("“")
-			w.TextEnd()
-
-			return nil
-		}
-
-	case annotation.TextIconKey:
-		draw = func(w *graphics.Writer) error {
-			w.SetLineWidth(0.5)
-			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetFillColor(color.DeviceRGB(0.98, 0.96, 0.75))
-			w.Rectangle(0.25, 0.25, 23.5, 23.5)
-			w.CloseFillAndStroke()
-
-			w.TextBegin()
-			w.TextSetFont(s.iconFont, 25)
-			w.SetFillColor(color.DeviceGray(0.0))
-			w.TextFirstLine(5, 2)
-			w.TextShow("*")
-			w.TextEnd()
-
-			return nil
-		}
-
-	case annotation.TextIconNote, "":
-		draw = func(w *graphics.Writer) error {
-			delta := 7.0
-
-			w.SetLineWidth(0.5)
-			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetFillColor(color.DeviceRGB(0.98, 0.96, 0.75))
-			w.MoveTo(23.5-delta, 0.25)
-			w.LineTo(0.25, 0.25)
-			w.LineTo(0.25, 23.5)
-			w.LineTo(23.5, 23.5)
-			w.LineTo(23.5, 0.25+delta)
-			w.LineTo(23.5-delta, 0.25)
-			w.LineTo(23.5-delta, 0.25+delta)
-			w.LineTo(23.5, 0.25+delta)
-			w.CloseFillAndStroke()
-
-			w.SetLineWidth(1.5)
-			w.SetStrokeColor(color.DeviceGray(0.5))
-			for y := 19.; y > 6; y -= 3.5 {
-				w.MoveTo(4, y)
-				if y > 10 {
-					w.LineTo(17, y)
-				} else {
-					w.LineTo(12, y)
-				}
-			}
-			w.Stroke()
-
-			return nil
-		}
-
-	case annotation.TextIconHelp:
-		draw = func(w *graphics.Writer) error {
-			w.SetLineWidth(0.5)
-			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetFillColor(color.DeviceRGB(0.98, 0.96, 0.75))
-			w.Rectangle(0.25, 0.25, 23.5, 23.5)
-			w.CloseFillAndStroke()
-
-			w.TextBegin()
-			w.TextSetFont(s.iconFont, 23)
-			w.SetFillColor(color.DeviceGray(0.0))
-			w.TextFirstLine(6, 4)
-			w.TextShow("?")
-			w.TextEnd()
-
-			return nil
-		}
-
-	case annotation.TextIconNewParagraph:
-		draw = func(w *graphics.Writer) error {
-			w.SetLineWidth(0.5)
-			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetFillColor(color.DeviceRGB(0.98, 0.96, 0.75))
-			w.Rectangle(0.25, 0.25, 23.5, 23.5)
-			w.CloseFillAndStroke()
-
-			w.SetStrokeColor(color.DeviceGray(0.7))
-			w.SetLineWidth(1.5)
-			w.MoveTo(4, 19)
-			w.LineTo(17, 19)
-			w.MoveTo(4, 15.5)
-			w.LineTo(12, 15.5)
-			w.MoveTo(4, 5)
-			w.LineTo(17, 5)
-			w.Stroke()
-
-			m := (15.5 + 5) / 2
-
-			w.SetStrokeColor(color.DeviceGray(0))
-			w.SetFillColor(color.DeviceGray(0))
-			w.SetLineWidth(2)
-			w.MoveTo(17.5-0.75, 15.5)
-			w.LineTo(17.5-0.75, m)
-			w.LineTo(5, m)
-			w.Stroke()
-			w.MoveTo(3, m)
-			w.LineTo(7, m+3)
-			w.LineTo(7, m-3)
-			w.Fill()
-
-			return nil
-		}
-
-	case annotation.TextIconParagraph:
-		draw = func(w *graphics.Writer) error {
-			w.SetLineWidth(0.5)
-			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetFillColor(color.DeviceRGB(0.98, 0.96, 0.75))
-			w.Rectangle(0.25, 0.25, 23.5, 23.5)
-			w.CloseFillAndStroke()
-
-			w.TextBegin()
-			w.TextSetFont(s.iconFont, 16)
-			w.SetFillColor(color.DeviceGray(0.0))
-			w.TextFirstLine(6, 8)
-			w.TextSetHorizontalScaling(1.4)
-			w.TextShow("¶")
-			w.TextEnd()
-
-			return nil
-		}
-
-	case annotation.TextIconInsert:
-		draw = func(w *graphics.Writer) error {
-			w.SetLineWidth(0.5)
-			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetFillColor(color.DeviceRGB(0.98, 0.96, 0.75))
-			w.Rectangle(0.25, 0.25, 23.5, 23.5)
-			w.CloseFillAndStroke()
-
-			w.TextBegin()
-			w.TextSetFont(s.iconFont, 16)
-			w.SetFillColor(color.DeviceGray(0.0))
-			w.TextFirstLine(5.5, 4)
-			w.TextSetHorizontalScaling(1.4)
-			w.TextShow("^")
-			w.TextEnd()
-
-			return nil
-		}
-
-	default:
-		draw = func(w *graphics.Writer) error {
-			w.SetLineWidth(0.5)
-			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetFillColor(color.DeviceRGB(0.98, 0.96, 0.75))
-			w.Rectangle(0.25, 0.25, 23.5, 23.5)
-			w.CloseFillAndStroke()
-
-			return nil
-		}
-	}
-
-	xObj := &form.Form{
-		Draw: draw,
-		BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 24, URy: 24},
-	}
-	res = &appearance.Dict{
-		Normal: xObj,
-	}
-	s.cache[key] = res
-
-	a.Appearance = res
+	return nil
 }

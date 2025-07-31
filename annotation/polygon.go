@@ -30,9 +30,13 @@ type Polygon struct {
 	// user space.
 	Vertices []float64
 
-	// BS (optional) is a border style dictionary specifying the width and dash
-	// pattern used in drawing the polygon.
-	BS pdf.Reference
+	// BorderStyle (optional) is a border style dictionary specifying the width
+	// and dash pattern used in drawing the polygon.
+	//
+	// If this field is set, the Common.Border field is ignored.
+	//
+	// This corresponds to the /BS entry in the PDF annotation dictionary.
+	BorderStyle *BorderStyle
 
 	// IC (optional) is an array of numbers in the range 0.0 to 1.0 specifying
 	// the interior color with which to fill the entire polygon shape.
@@ -91,8 +95,10 @@ func extractPolygon(r pdf.Getter, dict pdf.Dict) (*Polygon, error) {
 	}
 
 	// BS (optional)
-	if bs, ok := dict["BS"].(pdf.Reference); ok {
-		polygon.BS = bs
+	if bs, err := pdf.Optional(ExtractBorderStyle(r, dict["BS"])); err != nil {
+		return nil, err
+	} else {
+		polygon.BorderStyle = bs
 	}
 
 	// IC (optional)
@@ -171,8 +177,12 @@ func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// BS (optional)
-	if p.BS != 0 {
-		dict["BS"] = p.BS
+	if p.BorderStyle != nil {
+		bs, _, err := p.BorderStyle.Embed(rm)
+		if err != nil {
+			return nil, err
+		}
+		dict["BS"] = bs
 	}
 
 	// IC (optional)

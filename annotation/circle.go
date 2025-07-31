@@ -25,9 +25,13 @@ type Circle struct {
 	Common
 	Markup
 
-	// BS (optional) is a border style dictionary specifying the line width
-	// and dash pattern that is used in drawing the ellipse.
-	BS pdf.Reference
+	// BorderStyle (optional) is a border style dictionary specifying the line
+	// width and dash pattern that is used in drawing the ellipse.
+	//
+	// If the BorderStyle field is set, the Common.Border field is ignored.
+	//
+	// This corresponds to the /BS entry in the PDF annotation dictionary.
+	BorderStyle *BorderStyle
 
 	// IC (optional; PDF 1.4) is an array of numbers in the range 0.0 to 1.0
 	// specifying the interior colour with which to fill the annotation's ellipse.
@@ -73,8 +77,10 @@ func extractCircle(r pdf.Getter, dict pdf.Dict) (*Circle, error) {
 
 	// Extract circle-specific fields
 	// BS (optional)
-	if bs, ok := dict["BS"].(pdf.Reference); ok {
-		circle.BS = bs
+	if bs, err := pdf.Optional(ExtractBorderStyle(r, dict["BS"])); err != nil {
+		return nil, err
+	} else {
+		circle.BorderStyle = bs
 	}
 
 	// IC (optional)
@@ -124,8 +130,12 @@ func (c *Circle) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 
 	// Add circle-specific fields
 	// BS (optional)
-	if c.BS != 0 {
-		dict["BS"] = c.BS
+	if c.BorderStyle != nil {
+		bs, _, err := c.BorderStyle.Embed(rm)
+		if err != nil {
+			return nil, err
+		}
+		dict["BS"] = bs
 	}
 
 	// IC (optional)

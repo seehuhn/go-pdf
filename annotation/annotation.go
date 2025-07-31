@@ -91,10 +91,13 @@ type Common struct {
 
 	// Border (optional) specifies the characteristics of the annotation's
 	// border.
+	//
+	// When writing annotations, a nil value can be used as a shorthand for
+	// the default border style (width 1, solid line, no dash or rounded corners).
 	Border *Border
 
 	// Color (optional) is the color used for the annotation's background,
-	// title bar and border.  Only certain colors are allowed:
+	// title bar or border.  Only certain color types are allowed:
 	//  - colors in the [color.DeviceGray] color space
 	//  - colors in the [color.DeviceRGB] color space
 	//  - colors in the [color.DeviceCMYK] color space
@@ -227,23 +230,14 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict, isMarkup bool) er
 		return errors.New("missing AS entry")
 	}
 
-	if c.Border != nil && !c.Border.isDefault() {
-		borderArray := pdf.Array{
-			pdf.Number(c.Border.HCornerRadius),
-			pdf.Number(c.Border.VCornerRadius),
-			pdf.Number(c.Border.Width),
+	if c.Border != nil {
+		borderValue, _, err := c.Border.Embed(rm)
+		if err != nil {
+			return err
 		}
-		if c.Border.DashArray != nil {
-			if err := pdf.CheckVersion(w, "annotation Border dash array", pdf.V1_1); err != nil {
-				return err
-			}
-			dashArray := make(pdf.Array, len(c.Border.DashArray))
-			for i, v := range c.Border.DashArray {
-				dashArray[i] = pdf.Number(v)
-			}
-			borderArray = append(borderArray, dashArray)
+		if borderValue != nil {
+			d["Border"] = borderValue
 		}
-		d["Border"] = borderArray
 	}
 
 	if c.Color != nil {
@@ -375,30 +369,9 @@ func decodeCommon(r pdf.Getter, common *Common, dict pdf.Dict) error {
 	}
 
 	// Border (optional)
-	if border, err := pdf.GetArray(r, dict["Border"]); err == nil && border != nil {
-		if len(border) >= 3 {
-			b := &Border{}
-			if h, err := pdf.GetNumber(r, border[0]); err == nil {
-				b.HCornerRadius = float64(h)
-			}
-			if v, err := pdf.GetNumber(r, border[1]); err == nil {
-				b.VCornerRadius = float64(v)
-			}
-			if w, err := pdf.GetNumber(r, border[2]); err == nil {
-				b.Width = float64(w)
-			}
-			if len(border) > 3 {
-				if dashArray, err := pdf.GetArray(r, border[3]); err == nil {
-					dashes := make([]float64, len(dashArray))
-					for i, dash := range dashArray {
-						if num, err := pdf.GetNumber(r, dash); err == nil {
-							dashes[i] = float64(num)
-						}
-					}
-					b.DashArray = dashes
-				}
-			}
-			common.Border = b
+	if dict["Border"] != nil {
+		if border, err := ExtractBorder(r, dict["Border"]); err == nil {
+			common.Border = border
 		}
 	}
 

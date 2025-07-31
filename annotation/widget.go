@@ -49,9 +49,14 @@ type Widget struct {
 	// the annotation's behaviour in response to various trigger events.
 	AA pdf.Reference
 
-	// BS (optional; PDF 1.2) is a border style dictionary specifying the
-	// width and dash pattern that is used in drawing the annotation's border.
-	BS pdf.Reference
+	// BorderStyle (optional; PDF 1.2) is a border style dictionary specifying
+	// the width and dash pattern that is used in drawing the annotation's
+	// border.
+	//
+	// If this field is set, the Common.Border field is ignored.
+	//
+	// This corresponds to the /BS entry in the PDF annotation dictionary.
+	BorderStyle *BorderStyle
 
 	// Parent (required if this widget annotation is one of multiple children
 	// in a field; optional otherwise) is an indirect reference to the widget
@@ -99,8 +104,10 @@ func extractWidget(r pdf.Getter, dict pdf.Dict) (*Widget, error) {
 	}
 
 	// BS (optional)
-	if bs, ok := dict["BS"].(pdf.Reference); ok {
-		widget.BS = bs
+	if bs, err := pdf.Optional(ExtractBorderStyle(r, dict["BS"])); err != nil {
+		return nil, err
+	} else {
+		widget.BorderStyle = bs
 	}
 
 	// Parent (optional)
@@ -147,8 +154,12 @@ func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// BS (optional)
-	if w.BS != 0 {
-		dict["BS"] = w.BS
+	if w.BorderStyle != nil {
+		bs, _, err := w.BorderStyle.Embed(rm)
+		if err != nil {
+			return nil, err
+		}
+		dict["BS"] = bs
 	}
 
 	// Parent (optional)

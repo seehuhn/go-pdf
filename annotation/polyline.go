@@ -36,9 +36,13 @@ type Polyline struct {
 	// Default value: [/None /None]
 	LE []pdf.Name
 
-	// BS (optional) is a border style dictionary specifying the width and dash
-	// pattern used in drawing the polyline.
-	BS pdf.Reference
+	// BorderStyle (optional) is a border style dictionary specifying the width
+	// and dash pattern used in drawing the polyline.
+	//
+	// If this field is set, the Common.Border field is ignored.
+	//
+	// This corresponds to the /BS entry in the PDF annotation dictionary.
+	BorderStyle *BorderStyle
 
 	// IC (optional) is an array of numbers in the range 0.0 to 1.0 specifying
 	// the interior color with which to fill the annotation's line endings.
@@ -104,8 +108,10 @@ func extractPolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
 	}
 
 	// BS (optional)
-	if bs, ok := dict["BS"].(pdf.Reference); ok {
-		polyline.BS = bs
+	if bs, err := pdf.Optional(ExtractBorderStyle(r, dict["BS"])); err != nil {
+		return nil, err
+	} else {
+		polyline.BorderStyle = bs
 	}
 
 	// IC (optional)
@@ -181,8 +187,12 @@ func (p *Polyline) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// BS (optional)
-	if p.BS != 0 {
-		dict["BS"] = p.BS
+	if p.BorderStyle != nil {
+		bs, _, err := p.BorderStyle.Embed(rm)
+		if err != nil {
+			return nil, err
+		}
+		dict["BS"] = bs
 	}
 
 	// IC (optional)

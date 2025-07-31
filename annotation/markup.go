@@ -38,9 +38,9 @@ type Markup struct {
 	// popup window when the annotation is open.
 	Popup pdf.Reference
 
-	// RC (optional) is a rich text string or stream providing a
-	// formatted representation of the annotation's contents. When both Contents
-	// and RC are present, their textual content should be equivalent.
+	// RC (optional) is a rich text string or stream providing a formatted
+	// representation of the annotation's contents. When both Contents and RC
+	// are present, their textual content should be equivalent.
 	RC pdf.Object
 
 	// CreationDate (optional) is the date and time when the

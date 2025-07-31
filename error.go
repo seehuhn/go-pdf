@@ -57,6 +57,7 @@ type MalformedFileError struct {
 }
 
 // Error creates a new [MalformedFileError] with the given message.
+// This is only for read errors, but not for write errors.
 func Error(msg string) error {
 	return &MalformedFileError{Err: errors.New(msg)}
 }

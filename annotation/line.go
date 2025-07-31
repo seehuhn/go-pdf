@@ -27,9 +27,13 @@ type Line struct {
 	// starting and ending coordinates of the line in default user space.
 	L []float64
 
-	// BS (optional) is a border style dictionary specifying the width and
-	// dash pattern that is used in drawing the line.
-	BS pdf.Reference
+	// BorderStyle (optional) is a border style dictionary specifying the width
+	// and dash pattern that is used in drawing the line.
+	//
+	// If the BorderStyle field is set, the Common.Border field is ignored.
+	//
+	// This corresponds to the /BS entry in the PDF annotation dictionary.
+	BorderStyle pdf.Reference
 
 	// LE (optional; PDF 1.4) is an array of two names specifying the line
 	// ending styles for the start and end points respectively.
@@ -113,7 +117,7 @@ func extractLine(r pdf.Getter, dict pdf.Dict) (*Line, error) {
 
 	// BS (optional)
 	if bs, ok := dict["BS"].(pdf.Reference); ok {
-		line.BS = bs
+		line.BorderStyle = bs
 	}
 
 	// LE (optional)
@@ -208,8 +212,8 @@ func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// BS (optional)
-	if l.BS != 0 {
-		dict["BS"] = l.BS
+	if l.BorderStyle != 0 {
+		dict["BS"] = l.BorderStyle
 	}
 
 	// LE (optional)
@@ -298,3 +302,18 @@ func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 
 	return dict, nil
 }
+
+type LineEndingStyle pdf.Name
+
+const (
+	LineEndingStyleSquare       LineEndingStyle = "Square"
+	LineEndingStyleCircle       LineEndingStyle = "Circle"
+	LineEndingStyleDiamond      LineEndingStyle = "Diamond"
+	LineEndingStyleOpenArrow    LineEndingStyle = "OpenArrow"
+	LineEndingStyleClosedArrow  LineEndingStyle = "ClosedArrow"
+	LineEndingStyleNone         LineEndingStyle = "None"
+	LineEndingStyleButt         LineEndingStyle = "Butt"
+	LineEndingStyleROpenArrow   LineEndingStyle = "ROpenArrow"
+	LineEndingStyleRClosedArrow LineEndingStyle = "RClosedArrow"
+	LineEndingStyleSlash        LineEndingStyle = "Slash"
+)
