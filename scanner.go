@@ -972,13 +972,13 @@ func (r *streamReader) Seek(offset int64, whence int) (int64, error) {
 	default:
 		return 0, errors.New("invalid whence")
 	}
-	
+
 	if abs < r.start {
 		abs = r.start
 	} else if abs > r.end {
 		abs = r.end
 	}
-	
+
 	r.pos = abs
 	return abs - r.start, nil
 }

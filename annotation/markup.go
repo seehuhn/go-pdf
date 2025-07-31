@@ -61,14 +61,14 @@ type Markup struct {
 	Subject string
 
 	// RT specifies the relationship between this annotation and the annotation
-	// specified by IRT. Valid values are "R" (Reply) and "Group".
+	// specified by InReplyTo. Valid values are "R" (Reply) and "Group".
 	//
 	// When writing annotations, an empty RT value can be used as a shorthand
 	// for "R".
 	RT pdf.Name
 
-	// Intent (optional) describes the intent of the markup annotation.
-	// Valid values vary by annotation type and allow processors to distinguish
+	// Intent (optional) describes the intent of the markup annotation. Valid
+	// values vary by annotation type and allow processors to distinguish
 	// between different uses of the same annotation type.
 	//
 	// This corresponds to the /IT entry in the PDF annotation dictionary.

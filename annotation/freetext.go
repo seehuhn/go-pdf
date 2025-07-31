@@ -25,20 +25,24 @@ type FreeText struct {
 	Common
 	Markup
 
-	// DA (required) is the default appearance string that is used in
+	// DefaultAppearance is the default appearance string that is used in
 	// formatting the text.
-	DA string
+	//
+	// This corresponds to the /DA entry in the PDF annotation dictionary.
+	DefaultAppearance string
 
 	// Align specifies the text alignment used for the annotation's text.
 	// The zero value if [FreeTextAlignLeft].
 	// The other allowed values are [FreeTextAlignCenter] and
 	// [FreeTextAlignRight].
 	//
-	// This corresponds to the Q entry in the PDF annotation dictionary.
+	// This corresponds to the /Q entry in the PDF annotation dictionary.
 	Align FreeTextAlign
 
-	// DS (optional) is a default style string.
-	DS string
+	// DefaultStyle (optional) is a default style string.
+	//
+	// This corresponds to the /DS entry in the PDF annotation dictionary.
+	DefaultStyle string
 
 	// CL (optional; meaningful only if IT is FreeTextCallout; PDF 1.6)
 	// specifies a callout line attached to the free text annotation.
@@ -48,16 +52,16 @@ type FreeText struct {
 
 	// BE (optional; PDF 1.6) is a border effect dictionary used in
 	// conjunction with the border style dictionary specified by BS.
-	BE pdf.Reference
+	BE *BorderEffect
 
 	// RD (optional; PDF 1.6) describes the numerical differences between
 	// the Rect entry and an inner rectangle where the text should be displayed.
 	// Array of four numbers: [left, top, right, bottom] differences.
 	RD []float64
 
-	// BS (optional; PDF 1.6) is a border style dictionary specifying
+	// BS (optional; PDF 1.3) is a border style dictionary specifying
 	// the line width and dash pattern for drawing the annotation's border.
-	BS pdf.Reference
+	BS *BorderStyle
 
 	// LE (optional; meaningful only if CL is present; PDF 1.6) specifies
 	// the line ending style for the callout line endpoint (x1, y1).
@@ -86,9 +90,15 @@ func extractFreeText(r pdf.Getter, dict pdf.Dict) (*FreeText, error) {
 	}
 
 	// Extract free text-specific fields
-	if da, err := pdf.GetTextString(r, dict["DA"]); err == nil {
-		freeText.DA = string(da)
+	// DA is required for free text annotations
+	if dict["DA"] == nil {
+		return nil, pdf.Error("missing required DA field in free text annotation")
 	}
+	da, err := pdf.GetTextString(r, dict["DA"])
+	if err != nil {
+		return nil, err
+	}
+	freeText.DefaultAppearance = string(da)
 
 	q, err := pdf.Optional(pdf.GetInteger(r, dict["Q"]))
 	if err != nil {
@@ -97,22 +107,41 @@ func extractFreeText(r pdf.Getter, dict pdf.Dict) (*FreeText, error) {
 		freeText.Align = FreeTextAlign(q)
 	}
 
-	if ds, err := pdf.GetTextString(r, dict["DS"]); err == nil {
-		freeText.DS = string(ds)
+	if dict["DS"] != nil {
+		if ds, err := pdf.Optional(pdf.GetTextString(r, dict["DS"])); err != nil {
+			return nil, err
+		} else {
+			freeText.DefaultStyle = string(ds)
+		}
 	}
 
-	if cl, err := pdf.GetArray(r, dict["CL"]); err == nil && len(cl) > 0 {
-		coords := make([]float64, len(cl))
-		for i, coord := range cl {
-			if num, err := pdf.GetNumber(r, coord); err == nil {
-				coords[i] = float64(num)
+	if cl, err := pdf.Optional(pdf.GetArray(r, dict["CL"])); err != nil {
+		return nil, err
+	} else if cl != nil {
+		// CL must have exactly 4 or 6 numbers
+		if len(cl) != 4 && len(cl) != 6 {
+			// Ignore invalid CL arrays per permissive reading guidelines
+		} else {
+			coords := make([]float64, len(cl))
+			valid := true
+			for i, coord := range cl {
+				if num, err := pdf.GetNumber(r, coord); err == nil {
+					coords[i] = float64(num)
+				} else {
+					valid = false
+					break
+				}
+			}
+			if valid {
+				freeText.CL = coords
 			}
 		}
-		freeText.CL = coords
 	}
 
-	if be, ok := dict["BE"].(pdf.Reference); ok {
-		freeText.BE = be
+	if beObj := dict["BE"]; beObj != nil {
+		if be, err := ExtractBorderEffect(r, beObj); err == nil {
+			freeText.BE = be
+		}
 	}
 
 	if rd, err := pdf.GetArray(r, dict["RD"]); err == nil && len(rd) == 4 {
@@ -125,11 +154,15 @@ func extractFreeText(r pdf.Getter, dict pdf.Dict) (*FreeText, error) {
 		freeText.RD = diffs
 	}
 
-	if bs, ok := dict["BS"].(pdf.Reference); ok {
-		freeText.BS = bs
+	if bsObj := dict["BS"]; bsObj != nil {
+		if bs, err := ExtractBorderStyle(r, bsObj); err == nil {
+			freeText.BS = bs
+		}
 	}
 
-	if le, err := pdf.GetName(r, dict["LE"]); err == nil {
+	if le, err := pdf.Optional(pdf.GetName(r, dict["LE"])); err != nil {
+		return nil, err
+	} else if le != "" {
 		freeText.LE = le
 	}
 
@@ -139,6 +172,11 @@ func extractFreeText(r pdf.Getter, dict pdf.Dict) (*FreeText, error) {
 func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("FreeText"),
+	}
+
+	// Add Type field if required by options
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Annot")
 	}
 
 	// Add common annotation fields
@@ -151,9 +189,19 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		return nil, err
 	}
 
+	// Validate Intent field for free text annotations
+	if f.Markup.Intent != "" {
+		switch f.Markup.Intent {
+		case "FreeText", "FreeTextCallout", "FreeTextTypeWriter":
+			// Valid intent values
+		default:
+			return nil, pdf.Error("invalid Intent value for free text annotation: " + string(f.Markup.Intent))
+		}
+	}
+
 	// Add free text-specific fields
-	if f.DA != "" {
-		dict["DA"] = pdf.TextString(f.DA)
+	if f.DefaultAppearance != "" {
+		dict["DA"] = pdf.TextString(f.DefaultAppearance)
 	}
 
 	if f.Align != 0 {
@@ -163,16 +211,20 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		dict["Q"] = pdf.Integer(f.Align)
 	}
 
-	if f.DS != "" {
+	if f.DefaultStyle != "" {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation DS entry", pdf.V1_5); err != nil {
 			return nil, err
 		}
-		dict["DS"] = pdf.TextString(f.DS)
+		dict["DS"] = pdf.TextString(f.DefaultStyle)
 	}
 
 	if f.CL != nil {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation CL entry", pdf.V1_6); err != nil {
 			return nil, err
+		}
+		// CL must have exactly 4 or 6 numbers
+		if len(f.CL) != 4 && len(f.CL) != 6 {
+			return nil, pdf.Error("CL array must have exactly 4 or 6 numbers")
 		}
 		clArray := make(pdf.Array, len(f.CL))
 		for i, coord := range f.CL {
@@ -181,11 +233,15 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		dict["CL"] = clArray
 	}
 
-	if f.BE != 0 {
+	if f.BE != nil {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation BE entry", pdf.V1_6); err != nil {
 			return nil, err
 		}
-		dict["BE"] = f.BE
+		beObj, _, err := f.BE.Embed(rm)
+		if err != nil {
+			return nil, err
+		}
+		dict["BE"] = beObj
 	}
 
 	if f.RD != nil {
@@ -199,11 +255,15 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		dict["RD"] = rdArray
 	}
 
-	if f.BS != 0 {
-		if err := pdf.CheckVersion(rm.Out, "free text annotation BS entry", pdf.V1_6); err != nil {
+	if f.BS != nil {
+		if err := pdf.CheckVersion(rm.Out, "free text annotation BS entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		dict["BS"] = f.BS
+		bsObj, _, err := f.BS.Embed(rm)
+		if err != nil {
+			return nil, err
+		}
+		dict["BS"] = bsObj
 	}
 
 	if f.LE != "" {

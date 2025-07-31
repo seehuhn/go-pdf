@@ -136,8 +136,8 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 300, URy: 150},
 					Contents: "Free text content",
 				},
-				DA:    "/Helvetica 12 Tf 0 g",
-				Align: 0, // Left justified
+				DefaultAppearance: "/Helvetica 12 Tf 0 g",
+				Align:             0, // Left justified
 			},
 		},
 		{
@@ -152,10 +152,10 @@ var testCases = map[pdf.Name][]testCase{
 					Subject: "Callout comment",
 					Intent:  "FreeTextCallout",
 				},
-				DA:    "/Arial 10 Tf 0 0 1 rg",
-				Align: 1,                                       // Centered
-				CL:    []float64{100, 150, 125, 175, 150, 200}, // 6-point callout line
-				LE:    "OpenArrow",
+				DefaultAppearance: "/Arial 10 Tf 0 0 1 rg",
+				Align:             1,                                       // Centered
+				CL:                []float64{100, 150, 125, 175, 150, 200}, // 6-point callout line
+				LE:                "OpenArrow",
 			},
 		},
 		{
@@ -171,10 +171,10 @@ var testCases = map[pdf.Name][]testCase{
 					CreationDate: time.Date(2023, 6, 1, 14, 0, 0, 0, time.UTC),
 					Intent:       "FreeText",
 				},
-				DA:    "/Times-Roman 14 Tf 0.2 0.2 0.8 rg",
-				Align: 2, // Right justified
-				DS:    "font-size:14pt;color:#3333CC;",
-				RD:    []float64{5.0, 3.0, 5.0, 3.0}, // Inner rectangle margins
+				DefaultAppearance: "/Times-Roman 14 Tf 0.2 0.2 0.8 rg",
+				Align:             2, // Right justified
+				DefaultStyle:      "font-size:14pt;color:#3333CC;",
+				RD:                []float64{5.0, 3.0, 5.0, 3.0}, // Inner rectangle margins
 			},
 		},
 	},
