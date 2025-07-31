@@ -196,7 +196,9 @@ func ReadType1(r pdf.Getter, obj pdf.Object) (*Type1, error) {
 // After repair() has been called, validate() will return nil.
 func (d *Type1) repair(r pdf.Getter) {
 	if d.Descriptor == nil {
-		d.Descriptor = &font.Descriptor{}
+		d.Descriptor = &font.Descriptor{
+			IsSymbolic: true, // default to symbolic to match built-in encoding assumption
+		}
 	}
 
 	if v := pdf.GetVersion(r); v == pdf.V1_0 {

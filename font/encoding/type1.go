@@ -122,6 +122,8 @@ func ExtractType1(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Simple, er
 					name := string(item)
 					if names.IsValid(name) {
 						differences[byte(currentCode)] = name
+					} else {
+						differences[byte(currentCode)] = ".notdef"
 					}
 					currentCode++
 				}
