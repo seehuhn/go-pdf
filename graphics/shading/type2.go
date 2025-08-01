@@ -71,7 +71,7 @@ type Type2 struct {
 	// aliasing.
 	AntiAlias bool
 
-	// SingleUse determines if Embed returns as dictionary (true) or
+	// SingleUse determines if Embed returns a dictionary (true) or
 	// a reference (false).
 	SingleUse bool
 }
@@ -88,7 +88,7 @@ func (s *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	if s.ColorSpace == nil {
 		return nil, zero, errors.New("missing ColorSpace")
-	} else if s.ColorSpace.Family() == color.FamilyPattern {
+	} else if s.ColorSpace.Family() == color.FamilyPattern || s.ColorSpace.Family() == color.FamilyIndexed {
 		return nil, zero, errors.New("invalid ColorSpace")
 	}
 	if have := len(s.Background); have > 0 {
