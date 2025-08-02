@@ -62,7 +62,7 @@ type Type3 struct {
 	// AntiAlias controls whether to filter the shading function to prevent aliasing.
 	AntiAlias bool
 
-	// SingleUse determines if Embed returns as dictionary (true) or
+	// SingleUse determines if Embed returns a dictionary (true) or
 	// a reference (false).
 	SingleUse bool
 }

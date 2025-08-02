@@ -57,7 +57,7 @@ type Type1 struct {
 	// aliasing. Default: false.
 	AntiAlias bool
 
-	// SingleUse determines if Embed returns as dictionary (true) or
+	// SingleUse determines if Embed returns a dictionary (true) or
 	// a reference (false).
 	SingleUse bool
 }
