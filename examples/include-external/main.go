@@ -19,6 +19,7 @@ package main
 import (
 	"io"
 	"log"
+	"math"
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
@@ -57,7 +58,7 @@ func run() error {
 	base := paper.URy - 72 - height
 	left := paper.LLx + 0.5*(paper.Dx()-width)
 	page.PushGraphicsState()
-	page.Transform(matrix.Translate(left-bbox.LLx, base-bbox.LLy))
+	page.Transform(matrix.Translate(math.Round(left-bbox.LLx), math.Round(base-bbox.LLy)))
 	page.DrawXObject(figure)
 	page.PopGraphicsState()
 
@@ -116,43 +117,16 @@ func LoadFigure(fname string, rm *pdf.ResourceManager) (graphics.XObject, *pdf.R
 				return err
 			}
 
-			contents, err := pdf.Resolve(r, pageDict["Contents"])
+			contents, err := pagetree.ContentStream(r, pageDict)
 			if err != nil {
 				return err
 			}
-			switch x := contents.(type) {
-			case *pdf.Stream:
-				stm, err := pdf.DecodeStream(r, x, 0)
-				if err != nil {
-					return err
-				}
-				_, err = io.Copy(w.Content, stm)
-				if err != nil {
-					return err
-				}
-			case pdf.Array:
-				for _, ref := range x {
-					obj, err := pdf.GetStream(r, ref)
-					if err != nil {
-						return err
-					}
-					stm, err := pdf.DecodeStream(r, obj, 0)
-					if err != nil {
-						return err
-					}
-					_, err = io.Copy(w.Content, stm)
-					if err != nil {
-						return err
-					}
-				}
-			}
-
-			err = r.Close()
+			_, err = io.Copy(w.Content, contents)
 			if err != nil {
 				return err
 			}
 
-			return nil
+			return r.Close()
 		},
 		BBox: *bbox,
 	}

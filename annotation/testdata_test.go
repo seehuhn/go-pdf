@@ -174,7 +174,7 @@ var testCases = map[pdf.Name][]testCase{
 				DefaultAppearance: "/Times-Roman 14 Tf 0.2 0.2 0.8 rg",
 				Align:             2, // Right justified
 				DefaultStyle:      "font-size:14pt;color:#3333CC;",
-				Padding:           []float64{5.0, 3.0, 5.0, 3.0}, // Inner rectangle margins
+				Margin:            []float64{5.0, 3.0, 5.0, 3.0}, // Inner rectangle margins
 			},
 		},
 	},
@@ -1198,16 +1198,16 @@ var testCases = map[pdf.Name][]testCase{
 					Contents: "Complete widget annotation",
 					Color:    color.DeviceRGB(0.8, 0.9, 1.0),
 				},
-				H:           "P",                       // Push highlighting
-				MK:          pdf.NewReference(2200, 0), // Appearance characteristics
-				A:           pdf.NewReference(2300, 0), // Action dictionary
-				AA:          pdf.NewReference(2400, 0), // Additional-actions dictionary
+				H:  "P",                       // Push highlighting
+				MK: pdf.NewReference(2200, 0), // Appearance characteristics
+				A:  pdf.NewReference(2300, 0), // Action dictionary
+				AA: pdf.NewReference(2400, 0), // Additional-actions dictionary
 				BorderStyle: &BorderStyle{
-					Width: 1.5,
-					Style: "D",
+					Width:     1.5,
+					Style:     "D",
 					DashArray: []float64{5, 2},
 				},
-				Parent:      pdf.NewReference(2600, 0), // Parent field reference
+				Parent: pdf.NewReference(2600, 0), // Parent field reference
 			},
 		},
 		{

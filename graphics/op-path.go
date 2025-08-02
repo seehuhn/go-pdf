@@ -88,6 +88,9 @@ func (w *Writer) ClosePath() {
 
 // Rectangle appends a rectangle to the current path as a closed subpath.
 //
+// Note that the final two arguments are the width and height of the rectangle,
+// not the coordinates of the upper right corner.
+//
 // This implements the PDF graphics operator "re".
 func (w *Writer) Rectangle(x, y, width, height float64) {
 	if !w.isValid("Rectangle", objPage|objPath) {

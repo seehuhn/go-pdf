@@ -41,14 +41,6 @@ type FreeText struct {
 	// This corresponds to the /DS entry in the PDF annotation dictionary.
 	DefaultStyle string
 
-	// Padding (optional) describes the numerical differences between
-	// the Rect entry and an inner rectangle where the text should be displayed.
-	//
-	// Slice of four numbers: [left, top, right, bottom]
-	//
-	// This corresponds to the /RD entry in the PDF annotation dictionary.
-	Padding []float64
-
 	// Align specifies the text alignment used for the annotation's text.
 	// The zero value if [FreeTextAlignLeft].
 	// The other allowed values are [FreeTextAlignCenter] and
@@ -56,6 +48,17 @@ type FreeText struct {
 	//
 	// This corresponds to the /Q entry in the PDF annotation dictionary.
 	Align FreeTextAlign
+
+	// Margin (optional) describes the numerical differences between the
+	// Common.Rect entry and an inner rectangle where the text should be
+	// displayed.  The border, if any, applies to the inner rectangle. If
+	// Markup.Intent is [FreeTextIntentCallout], the callout line is usually
+	// located in the margin between the inner rectangle and Common.Rect.
+	//
+	// Slice of four numbers: [left, top, right, bottom]
+	//
+	// This corresponds to the /RD entry in the PDF annotation dictionary.
+	Margin []float64
 
 	// CalloutLine (used only if Markup.Intent is [FreeTextIntentCallout]; PDF 1.6)
 	// specifies a callout line attached to the free text annotation.
@@ -149,7 +152,7 @@ func extractFreeText(r pdf.Getter, dict pdf.Dict) (*FreeText, error) {
 			num, _ := pdf.GetNumber(r, diff)
 			a[i] = max(float64(num), 0)
 		}
-		f.Padding = a
+		f.Margin = a
 	}
 
 	if bs, err := pdf.Optional(ExtractBorderStyle(r, dict["BS"])); err != nil {
@@ -244,15 +247,15 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		dict["BE"] = be
 	}
 
-	if f.Padding != nil {
+	if f.Margin != nil {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation RD entry", pdf.V1_6); err != nil {
 			return nil, err
 		}
-		if len(f.Padding) != 4 {
+		if len(f.Margin) != 4 {
 			return nil, errors.New("invalid length for RD array")
 		}
-		rd := make(pdf.Array, len(f.Padding))
-		for i, xi := range f.Padding {
+		rd := make(pdf.Array, len(f.Margin))
+		for i, xi := range f.Margin {
 			if xi < 0 {
 				return nil, fmt.Errorf("invalid entry %f in RD array", xi)
 			}

@@ -361,6 +361,16 @@ func (r *Rectangle) Extend(other *Rectangle) {
 	}
 }
 
+// Round rounds the corner coordinates of the rectangle to the given number of
+// decimal places.
+func (r *Rectangle) Round(digits int) {
+	factor := math.Pow(10, float64(digits))
+	r.LLx = math.Round(r.LLx*factor) / factor
+	r.LLy = math.Round(r.LLy*factor) / factor
+	r.URx = math.Round(r.URx*factor) / factor
+	r.URy = math.Round(r.URy*factor) / factor
+}
+
 func GetMatrix(r Getter, obj Object) (m matrix.Matrix, err error) {
 	defer func() {
 		if err != nil {

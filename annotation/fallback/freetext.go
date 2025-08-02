@@ -25,13 +25,13 @@ import (
 )
 
 func (s *Style) addFreeTextAppearance(a *annotation.FreeText, bgCol color.Color) {
-	// a.Color = nil
-	// a.Border = nil
-	// a.BorderStyle = nil
-	// a.BorderEffect = nil
-	// a.DefaultAppearance = ""
-	// a.Align = annotation.FreeTextAlignLeft
-	// a.DefaultStyle = ""
+	a.Color = nil
+	a.Border = nil
+	a.BorderStyle = nil
+	a.BorderEffect = nil
+	a.DefaultAppearance = ""
+	a.Align = annotation.FreeTextAlignLeft
+	a.DefaultStyle = ""
 
 	// TODO(voss): is the next one correct?
 	// a.LineEndingStyle = annotation.LineEndingStyleNone
@@ -39,18 +39,12 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText, bgCol color.Color)
 	// We don't generate dicts with different states.
 	a.AppearanceState = ""
 
-	bg := bgCol
-	if bg == nil {
-		bg = stickyYellow
-	}
-
 	draw := func(w *graphics.Writer) error {
-		lw := 0.5
+		lw := 1.0
 		w.SetLineWidth(lw)
-		w.SetStrokeColor(color.DeviceGray(0.2))
-		w.SetFillColor(bg)
+		w.SetStrokeColor(color.DeviceGray(0))
 		w.Rectangle(a.Rect.LLx+lw/2, a.Rect.LLy+lw/2, a.Rect.Dx()-lw, a.Rect.Dy()-lw)
-		w.CloseFillAndStroke()
+		w.Stroke()
 
 		return nil
 	}
