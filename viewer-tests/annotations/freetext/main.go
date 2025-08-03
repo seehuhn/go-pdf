@@ -44,13 +44,12 @@ const (
 	styledRowY        = 500.0
 	pinkRowY          = 400.0
 	styledPinkRowY    = 300.0
+	borderLineWidth   = 2.0
 )
 
 // annotationConfig defines the parameters for creating a free text annotation
 type annotationConfig struct {
-	intent          pdf.Name
 	yPos            float64
-	text            string
 	backgroundColor color.Color
 	useStyle        bool
 }
@@ -95,10 +94,10 @@ func createDocument(filename string) error {
 
 	// configuration for the four annotation rows
 	configs := []annotationConfig{
-		{yPos: defaultRowY, backgroundColor: nil, useStyle: false},    // viewer default style
-		{yPos: styledRowY, backgroundColor: nil, useStyle: true},      // with appearance dictionary
-		{yPos: pinkRowY, backgroundColor: pink, useStyle: false},      // pink background
-		{yPos: styledPinkRowY, backgroundColor: pink, useStyle: true}, // styled with pink background
+		{yPos: defaultRowY, backgroundColor: nil, useStyle: false},
+		{yPos: styledRowY, backgroundColor: nil, useStyle: true},
+		{yPos: pinkRowY, backgroundColor: pink, useStyle: false},
+		{yPos: styledPinkRowY, backgroundColor: pink, useStyle: true},
 	}
 
 	// create intent labels at the top
@@ -151,23 +150,24 @@ func createFreeTextAnnotation(doc *document.Page, intent pdf.Name, index int, co
 			Rect:     rect,
 			Contents: gibberish.Generate(12, uint64(index+1)),
 			Color:    config.backgroundColor,
+			Flags:    annotation.FlagPrint,
+			Border:   &annotation.Border{Width: borderLineWidth, SingleUse: true},
 		},
 		Markup: annotation.Markup{
 			User:   "Test User",
 			Intent: intent,
 		},
-		DefaultAppearance: "0 0 0 rg /Helvetica 12 Tf",
-		Align:             annotation.FreeTextAlignLeft,
+		Align: annotation.FreeTextAlignLeft,
 	}
 
 	// Add callout line for FreeTextIntentCallout
 	if intent == annotation.FreeTextIntentCallout {
 		freeText.CalloutLine = []float64{
 			x + 72, config.yPos - 18,
-			x, config.yPos - 18,
-			x, config.yPos,
+			x + 0.5*borderLineWidth, config.yPos - 18,
+			x + 0.5*borderLineWidth, config.yPos,
 		}
-		freeText.LineEndingStyle = annotation.LineEndingStyleOpenArrow
+		freeText.LineEndingStyle = annotation.LineEndingStyleRClosedArrow
 	}
 
 	if config.useStyle {

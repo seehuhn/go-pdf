@@ -285,6 +285,16 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	return dict, nil
 }
 
+func (f *FreeText) BorderWidth() float64 {
+	if f.BorderStyle != nil {
+		return f.BorderStyle.Width
+	}
+	if f.Common.Border != nil {
+		return f.Common.Border.Width
+	}
+	return 1.0 // default border width
+}
+
 // FreeTextAlign represents the text justification options for free text
 // annotations.
 type FreeTextAlign int
