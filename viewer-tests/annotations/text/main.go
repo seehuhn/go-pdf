@@ -156,7 +156,7 @@ func createTextAnnotationPair(doc *document.Page, icon annotation.TextIcon, inde
 	}
 
 	if config.useStyle {
-		style.AddAppearance(text, config.backgroundColor)
+		style.AddAppearance(text)
 	}
 
 	textNative, err := text.Encode(doc.RM)

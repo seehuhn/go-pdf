@@ -25,8 +25,8 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addTextAppearance(a *annotation.Text, bgCol color.Color) {
-	a.Color = nil
+func (s *Style) addTextAppearance(a *annotation.Text) {
+	bgCol := a.Color
 	a.Border = nil
 
 	// We don't generate dicts with different states.

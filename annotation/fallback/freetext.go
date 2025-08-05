@@ -25,9 +25,10 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addFreeTextAppearance(a *annotation.FreeText, bgCol color.Color) {
+func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 	// extract information from the pre-set fields
 	lw := a.BorderWidth()
+	bgCol := a.Color
 
 	calloutLine := a.CalloutLine
 	if k := len(calloutLine); k%2 != 0 {
@@ -69,7 +70,6 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText, bgCol color.Color)
 	// Set some relevant ignored fields: even if they are not used
 	// for rendering, these may be useful in case the appearance stream
 	// needs to be re-generated after edits.
-	a.Color = bgCol
 	a.Border = &annotation.Border{Width: lw}
 	a.BorderStyle = nil
 	a.BorderEffect = nil

@@ -25,34 +25,30 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/fallback"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/font/standard"
-	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/shading"
-	"seehuhn.de/go/pdf/internal/gibberish"
 )
 
 const (
-	leftMargin        = 72.0
-	annotationWidth   = 150.0
-	annotationSpacing = 170.0
-	annotationHeight  = 60.0
-	titleY            = 670.0
-	defaultRowY       = 600.0
-	styledRowY        = 500.0
-	pinkRowY          = 400.0
-	styledPinkRowY    = 300.0
-	borderLineWidth   = 2.0
-)
+	annotHeight = 40.0
+	annotWidth  = 100.0
 
-// annotationConfig defines the parameters for creating a free text annotation
-type annotationConfig struct {
-	yPos            float64
-	backgroundColor color.Color
-	useStyle        bool
-}
+	mid1     = 260.0
+	mid2     = 320.0
+	yMidTop  = 620.0
+	yMidStep = 35.0
+
+	leftX0     = mid1 - 100 - annotWidth
+	leftX1     = mid1 - 100
+	rightX0    = mid2 + 100
+	rightX1    = mid2 + 100 + annotWidth
+	yOuterTop  = yMidTop + 140
+	yOuterStep = 50.0
+
+	lw = 1.0
+)
 
 func main() {
 	err := createDocument("test.pdf")
@@ -80,114 +76,121 @@ func createDocument(filename string) error {
 
 	var annots pdf.Array
 
-	titleFont := standard.Helvetica.New()
-
-	style := fallback.NewStyle()
-	pink := color.DeviceRGB(0.96, 0.87, 0.90)
-
-	// configuration for the different annotation styling scenarios
-	allIntents := []pdf.Name{
-		annotation.FreeTextIntentPlain,
-		annotation.FreeTextIntentCallout,
-		annotation.FreeTextIntentTypeWriter,
+	leStyles := []annotation.LineEndingStyle{
+		annotation.LineEndingStyleSquare,
+		annotation.LineEndingStyleCircle,
+		annotation.LineEndingStyleDiamond,
+		annotation.LineEndingStyleOpenArrow,
+		annotation.LineEndingStyleClosedArrow,
+		annotation.LineEndingStyleNone,
+		annotation.LineEndingStyleButt,
+		annotation.LineEndingStyleROpenArrow,
+		annotation.LineEndingStyleRClosedArrow,
+		annotation.LineEndingStyleSlash,
 	}
+	numCallout := len(leStyles)
 
-	// configuration for the four annotation rows
-	configs := []annotationConfig{
-		{yPos: defaultRowY, backgroundColor: nil, useStyle: false},
-		{yPos: styledRowY, backgroundColor: nil, useStyle: true},
-		{yPos: pinkRowY, backgroundColor: pink, useStyle: false},
-		{yPos: styledPinkRowY, backgroundColor: pink, useStyle: true},
+	doc.SetLineWidth(0.5)
+	doc.SetStrokeColor(color.Blue)
+	doc.MoveTo(mid1, yMidTop+20)
+	doc.LineTo(mid1, yMidTop-float64(numCallout-1)*yMidStep-20)
+	doc.MoveTo(mid2, yMidTop+20)
+	doc.LineTo(mid2, yMidTop-float64(numCallout-1)*yMidStep-20)
+	for i := range leStyles {
+		doc.MoveTo(mid1-20, yMidTop-float64(i)*yMidStep)
+		doc.LineTo(mid2+20, yMidTop-float64(i)*yMidStep)
 	}
+	doc.Stroke()
 
-	// create intent labels at the top
-	for i, intent := range allIntents {
-		err := createTitle(doc, titleFont, intent, i)
+	embed := func(a *annotation.FreeText) error {
+		dict, err := a.Encode(doc.RM)
 		if err != nil {
 			return err
 		}
+		ref := doc.RM.Out.Alloc()
+		err = doc.RM.Out.Put(ref, dict)
+		if err != nil {
+			return err
+		}
+		annots = append(annots, ref)
+		return nil
 	}
 
-	// create annotations for each intent and configuration
-	for i, intent := range allIntents {
-		for _, config := range configs {
-			annotRef, err := createFreeTextAnnotation(doc, intent, i, config, style)
-			if err != nil {
-				return err
-			}
-			annots = append(annots, annotRef)
+	styler := fallback.NewStyle()
+
+	for i, style := range leStyles {
+		yMid := yMidTop - float64(i)*yMidStep
+		yTopOuter := yOuterTop - float64(i)*yOuterStep
+
+		var col color.Color
+		if i%2 == 0 {
+			col = color.DeviceRGB(0.98, 0.96, 0.75)
+		}
+
+		aLeft := &annotation.FreeText{
+			Common: annotation.Common{
+				Rect: pdf.Rectangle{
+					LLx: leftX0,
+					LLy: yTopOuter - annotHeight,
+					URx: leftX1,
+					URy: yTopOuter,
+				},
+				Contents: string(annotation.FreeTextIntentCallout) + "\n" + string(style),
+				Flags:    annotation.FlagPrint,
+				Border:   &annotation.Border{Width: lw, SingleUse: true},
+				Color:    col,
+			},
+			Markup: annotation.Markup{
+				Intent: annotation.FreeTextIntentCallout,
+			},
+			// Margin:          []float64{},
+			CalloutLine: []float64{
+				mid1, yMid,
+				mid1 - 50, yTopOuter - annotHeight/2,
+				leftX1, yTopOuter - annotHeight/2,
+			},
+			LineEndingStyle: style,
+		}
+		err := embed(aLeft)
+		if err != nil {
+			return err
+		}
+
+		aRight := &annotation.FreeText{
+			Common: annotation.Common{
+				Rect: pdf.Rectangle{
+					LLx: rightX0,
+					LLy: yTopOuter - annotHeight,
+					URx: rightX1,
+					URy: yTopOuter,
+				},
+				Contents: string(annotation.FreeTextIntentCallout) + "\n" + string(style),
+				Flags:    annotation.FlagPrint,
+				Border:   &annotation.Border{Width: lw, SingleUse: true},
+				Color:    col,
+			},
+			Markup: annotation.Markup{
+				Intent: annotation.FreeTextIntentCallout,
+			},
+			// Margin:          []float64{},
+			CalloutLine: []float64{
+				mid2, yMid,
+				mid2 + 50, yTopOuter - annotHeight/2,
+				rightX0, yTopOuter - annotHeight/2,
+			},
+			LineEndingStyle: style,
+		}
+		styler.AddAppearance(aRight)
+
+		err = embed(aRight)
+		if err != nil {
+			return err
 		}
 	}
 
 	doc.PageDict["Annots"] = annots
 
 	return doc.Close()
-}
-
-// createTitle creates the title text for an annotation type
-func createTitle(doc *document.Page, titleFont *type1.Instance, intent pdf.Name, index int) error {
-	doc.TextBegin()
-	doc.TextSetFont(titleFont, 8)
-	x := leftMargin + float64(index)*annotationSpacing
-	doc.TextFirstLine(x, titleY)
-	doc.TextShow(string(intent))
-	doc.TextEnd()
-	return nil
-}
-
-// createFreeTextAnnotation creates a free text annotation
-func createFreeTextAnnotation(doc *document.Page, intent pdf.Name, index int, config annotationConfig, style *fallback.Style) (pdf.Reference, error) {
-	x := leftMargin + float64(index)*annotationSpacing
-	rect := pdf.Rectangle{
-		LLx: x,
-		LLy: config.yPos,
-		URx: x + annotationWidth,
-		URy: config.yPos + annotationHeight,
-	}
-
-	freeText := &annotation.FreeText{
-		Common: annotation.Common{
-			Rect:     rect,
-			Contents: gibberish.Generate(12, uint64(index+1)),
-			Color:    config.backgroundColor,
-			Flags:    annotation.FlagPrint,
-			Border:   &annotation.Border{Width: borderLineWidth, SingleUse: true},
-		},
-		Markup: annotation.Markup{
-			User:   "Test User",
-			Intent: intent,
-		},
-		Align: annotation.FreeTextAlignLeft,
-	}
-
-	// Add callout line for FreeTextIntentCallout
-	if intent == annotation.FreeTextIntentCallout {
-		freeText.CalloutLine = []float64{
-			x + 72, config.yPos - 18,
-			x + 0.5*borderLineWidth, config.yPos - 18,
-			x + 0.5*borderLineWidth, config.yPos,
-		}
-		freeText.LineEndingStyle = annotation.LineEndingStyleRClosedArrow
-	}
-
-	if config.useStyle {
-		err := style.AddAppearance(freeText, config.backgroundColor)
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	annotRef := doc.RM.Out.Alloc()
-	annotNative, err := freeText.Encode(doc.RM)
-	if err != nil {
-		return 0, err
-	}
-	err = doc.RM.Out.Put(annotRef, annotNative)
-	if err != nil {
-		return 0, err
-	}
-
-	return annotRef, nil
 }
 
 func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {

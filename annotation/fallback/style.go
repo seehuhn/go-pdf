@@ -61,12 +61,12 @@ func NewStyle() *Style {
 	}
 }
 
-func (s *Style) AddAppearance(a annotation.Annotation, backgroundColor color.Color) error {
+func (s *Style) AddAppearance(a annotation.Annotation) error {
 	switch a := a.(type) {
 	case *annotation.Text:
-		s.addTextAppearance(a, backgroundColor)
+		s.addTextAppearance(a)
 	case *annotation.FreeText:
-		s.addFreeTextAppearance(a, backgroundColor)
+		s.addFreeTextAppearance(a)
 	default:
 		return fmt.Errorf("unsupported annotation type: %T", a)
 	}

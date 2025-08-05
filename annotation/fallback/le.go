@@ -17,9 +17,10 @@
 package fallback
 
 import (
-	"fmt"
 	"math"
 
+	"seehuhn.de/go/geom/linalg"
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/graphics"
@@ -71,19 +72,32 @@ func NewLineEnding(atX, atY, fromX, fromY float64, lw float64, style annotation.
 			lw:  lw,
 		}
 	case annotation.LineEndingStyleOpenArrow:
+		return &arrow{
+			atX: atX,
+			atY: atY,
+			dX:  dX,
+			dY:  dY,
+			lw:  lw,
+		}
 	case annotation.LineEndingStyleClosedArrow:
-		return &closedArrow{
-			atX:     atX,
-			atY:     atY,
-			dX:      dX,
-			dY:      dY,
-			lw:      lw,
-			reverse: false,
+		return &arrow{
+			atX:    atX,
+			atY:    atY,
+			dX:     dX,
+			dY:     dY,
+			lw:     lw,
+			closed: true,
 		}
 	case annotation.LineEndingStyleButt:
+		return &butt{
+			atX: atX,
+			atY: atY,
+			dX:  dX,
+			dY:  dY,
+			lw:  lw,
+		}
 	case annotation.LineEndingStyleROpenArrow:
-	case annotation.LineEndingStyleRClosedArrow:
-		return &closedArrow{
+		return &arrow{
 			atX:     atX,
 			atY:     atY,
 			dX:      dX,
@@ -91,14 +105,157 @@ func NewLineEnding(atX, atY, fromX, fromY float64, lw float64, style annotation.
 			lw:      lw,
 			reverse: true,
 		}
+	case annotation.LineEndingStyleRClosedArrow:
+		return &arrow{
+			atX:     atX,
+			atY:     atY,
+			dX:      dX,
+			dY:      dY,
+			lw:      lw,
+			closed:  true,
+			reverse: true,
+		}
 	case annotation.LineEndingStyleSlash:
+		return &slash{
+			atX: atX,
+			atY: atY,
+			dX:  dX,
+			dY:  dY,
+			lw:  lw,
+		}
 	default: // annotation.LineEndingStyleNone
 		return &none{
 			atX: atX,
 			atY: atY,
 		}
 	}
-	panic(fmt.Sprintf("not implemented: %s", style))
+}
+
+// ---------------------------------------------------------------------------
+
+type none struct {
+	atX, atY float64
+}
+
+func (le *none) Enlarge(b *pdf.Rectangle) {
+	// do nothing, no line ending to expand the bounding box
+}
+
+func (le *none) Draw(w *graphics.Writer, col color.Color) {
+	w.LineTo(le.atX, le.atY)
+	w.Stroke()
+}
+
+// ---------------------------------------------------------------------------
+
+type butt struct {
+	atX, atY float64
+	dX, dY   float64
+	lw       float64
+}
+
+func (le *butt) Enlarge(bbox *pdf.Rectangle) {
+	n := vec.Vec2{X: le.dX, Y: le.dY}.Normal()
+	n.IMul(le.size() / 2)
+	corners := []float64{
+		le.atX + n.X + le.dX, le.atY + n.Y + le.dY,
+		le.atX - n.X + le.dX, le.atY - n.Y + le.dY,
+		le.atX + n.X - le.dX, le.atY + n.Y - le.dY,
+		le.atX - n.X - le.dX, le.atY - n.Y - le.dY,
+	}
+
+	first := bbox.IsZero()
+	for i := 0; i < len(corners); i += 2 {
+		x := corners[i]
+		y := corners[i+1]
+		if first || x < bbox.LLx {
+			bbox.LLx = x
+		}
+		if first || y < bbox.LLy {
+			bbox.LLy = y
+		}
+		if first || x > bbox.URx {
+			bbox.URx = x
+		}
+		if first || y > bbox.URy {
+			bbox.URy = y
+		}
+		first = false
+	}
+}
+
+func (le *butt) Draw(w *graphics.Writer, col color.Color) {
+	w.LineTo(le.atX, le.atY)
+	w.Stroke()
+
+	n := vec.Vec2{X: le.dX, Y: le.dY}.Normal()
+	n.IMul(le.size() / 2)
+
+	w.MoveTo(le.atX+n.X, le.atY+n.Y)
+	w.LineTo(le.atX-n.X, le.atY-n.Y)
+	w.Stroke()
+}
+
+func (le *butt) size() float64 {
+	return max(3, 6*le.lw)
+}
+
+// ---------------------------------------------------------------------------
+
+type slash struct {
+	atX, atY float64
+	dX, dY   float64
+	lw       float64
+}
+
+func (le *slash) Enlarge(bbox *pdf.Rectangle) {
+	a := 0.5              // cos(60°)
+	b := math.Sqrt(3) / 2 // sin(60°)
+	n := vec.Vec2{X: a*le.dX - b*le.dY, Y: a*le.dY + b*le.dX}
+	n.IMul(le.size() / 2)
+	corners := []float64{
+		le.atX + n.X + le.dX, le.atY + n.Y + le.dY,
+		le.atX - n.X + le.dX, le.atY - n.Y + le.dY,
+		le.atX + n.X - le.dX, le.atY + n.Y - le.dY,
+		le.atX - n.X - le.dX, le.atY - n.Y - le.dY,
+	}
+
+	first := bbox.IsZero()
+	for i := 0; i < len(corners); i += 2 {
+		x := corners[i]
+		y := corners[i+1]
+		if first || x < bbox.LLx {
+			bbox.LLx = x
+		}
+		if first || y < bbox.LLy {
+			bbox.LLy = y
+		}
+		if first || x > bbox.URx {
+			bbox.URx = x
+		}
+		if first || y > bbox.URy {
+			bbox.URy = y
+		}
+		first = false
+	}
+}
+
+func (le *slash) Draw(w *graphics.Writer, col color.Color) {
+	w.LineTo(le.atX, le.atY)
+	w.Stroke()
+
+	a := 0.5              // cos(60°)
+	b := math.Sqrt(3) / 2 // sin(60°)
+	n := vec.Vec2{X: a*le.dX - b*le.dY, Y: a*le.dY + b*le.dX}
+	n.IMul(le.size() / 2)
+
+	w.MoveTo(le.atX+n.X, le.atY+n.Y)
+	w.LineTo(le.atX-n.X, le.atY-n.Y)
+	w.Stroke()
+}
+
+func (le *slash) size() float64 {
+	return max(5, 10*le.lw)
 }
 
 // ---------------------------------------------------------------------------
@@ -109,53 +266,53 @@ type square struct {
 	lw       float64
 }
 
-func (s *square) Enlarge(b *pdf.Rectangle) {
-	size := max(3, 6*s.lw)
-	L := size + s.lw
+func (le *square) Enlarge(bbox *pdf.Rectangle) {
+	size := max(3, 6*le.lw)
+	L := size + le.lw
 	corners := []float64{
-		s.atX + 0.5*L*s.dX - 0.5*L*s.dY, s.atY + 0.5*L*s.dY + 0.5*L*s.dX,
-		s.atX - 0.5*L*s.dX - 0.5*L*s.dY, s.atY - 0.5*L*s.dY + 0.5*L*s.dX,
-		s.atX - 0.5*L*s.dX + 0.5*L*s.dY, s.atY - 0.5*L*s.dY - 0.5*L*s.dX,
-		s.atX + 0.5*L*s.dX + 0.5*L*s.dY, s.atY + 0.5*L*s.dY - 0.5*L*s.dX,
+		le.atX + 0.5*L*le.dX - 0.5*L*le.dY, le.atY + 0.5*L*le.dY + 0.5*L*le.dX,
+		le.atX - 0.5*L*le.dX - 0.5*L*le.dY, le.atY - 0.5*L*le.dY + 0.5*L*le.dX,
+		le.atX - 0.5*L*le.dX + 0.5*L*le.dY, le.atY - 0.5*L*le.dY - 0.5*L*le.dX,
+		le.atX + 0.5*L*le.dX + 0.5*L*le.dY, le.atY + 0.5*L*le.dY - 0.5*L*le.dX,
 	}
 
-	first := b.IsZero()
+	first := bbox.IsZero()
 	for i := 0; i < len(corners); i += 2 {
 		x := corners[i]
 		y := corners[i+1]
-		if first || x < b.LLx {
-			b.LLx = x
+		if first || x < bbox.LLx {
+			bbox.LLx = x
 		}
-		if first || y < b.LLy {
-			b.LLy = y
+		if first || y < bbox.LLy {
+			bbox.LLy = y
 		}
-		if first || x > b.URx {
-			b.URx = x
+		if first || x > bbox.URx {
+			bbox.URx = x
 		}
-		if first || y > b.URy {
-			b.URy = y
+		if first || y > bbox.URy {
+			bbox.URy = y
 		}
 		first = false
 	}
 }
 
-func (s *square) Draw(w *graphics.Writer, col color.Color) {
-	size := max(3, 6*s.lw)
-	w.LineTo(s.atX-0.5*size*s.dX, s.atY-0.5*size*s.dY)
+func (le *square) Draw(w *graphics.Writer, col color.Color) {
+	size := max(3, 6*le.lw)
+	w.LineTo(le.atX-0.5*size*le.dX, le.atY-0.5*size*le.dY)
 	w.Stroke()
 	L := size
 	if col != nil {
 		w.SetFillColor(col)
-		w.MoveTo(s.atX+0.5*L*s.dX-0.5*L*s.dY, s.atY+0.5*L*s.dY+0.5*L*s.dX)
-		w.LineTo(s.atX-0.5*L*s.dX-0.5*L*s.dY, s.atY-0.5*L*s.dY+0.5*L*s.dX)
-		w.LineTo(s.atX-0.5*L*s.dX+0.5*L*s.dY, s.atY-0.5*L*s.dY-0.5*L*s.dX)
-		w.LineTo(s.atX+0.5*L*s.dX+0.5*L*s.dY, s.atY+0.5*L*s.dY-0.5*L*s.dX)
+		w.MoveTo(le.atX+0.5*L*le.dX-0.5*L*le.dY, le.atY+0.5*L*le.dY+0.5*L*le.dX)
+		w.LineTo(le.atX-0.5*L*le.dX-0.5*L*le.dY, le.atY-0.5*L*le.dY+0.5*L*le.dX)
+		w.LineTo(le.atX-0.5*L*le.dX+0.5*L*le.dY, le.atY-0.5*L*le.dY-0.5*L*le.dX)
+		w.LineTo(le.atX+0.5*L*le.dX+0.5*L*le.dY, le.atY+0.5*L*le.dY-0.5*L*le.dX)
 		w.CloseFillAndStroke()
 	} else {
-		w.MoveTo(s.atX+0.5*L*s.dX-0.5*L*s.dY, s.atY+0.5*L*s.dY+0.5*L*s.dX)
-		w.LineTo(s.atX-0.5*L*s.dX-0.5*L*s.dY, s.atY-0.5*L*s.dY+0.5*L*s.dX)
-		w.LineTo(s.atX-0.5*L*s.dX+0.5*L*s.dY, s.atY-0.5*L*s.dY-0.5*L*s.dX)
-		w.LineTo(s.atX+0.5*L*s.dX+0.5*L*s.dY, s.atY+0.5*L*s.dY-0.5*L*s.dX)
+		w.MoveTo(le.atX+0.5*L*le.dX-0.5*L*le.dY, le.atY+0.5*L*le.dY+0.5*L*le.dX)
+		w.LineTo(le.atX-0.5*L*le.dX-0.5*L*le.dY, le.atY-0.5*L*le.dY+0.5*L*le.dX)
+		w.LineTo(le.atX-0.5*L*le.dX+0.5*L*le.dY, le.atY-0.5*L*le.dY-0.5*L*le.dX)
+		w.LineTo(le.atX+0.5*L*le.dX+0.5*L*le.dY, le.atY+0.5*L*le.dY-0.5*L*le.dX)
 		w.CloseAndStroke()
 	}
 }
@@ -214,8 +371,7 @@ type diamond struct {
 }
 
 func (d *diamond) Enlarge(b *pdf.Rectangle) {
-	size := max(3, 6*d.lw)
-	L := size + d.lw
+	L := d.size() + d.lw
 	corners := []float64{
 		d.atX + 0.5*L*d.dX, d.atY + 0.5*L*d.dY,
 		d.atX - 0.5*L*d.dY, d.atY + 0.5*L*d.dX,
@@ -244,7 +400,7 @@ func (d *diamond) Enlarge(b *pdf.Rectangle) {
 }
 
 func (d *diamond) Draw(w *graphics.Writer, col color.Color) {
-	size := max(3, 6*d.lw)
+	size := d.size()
 	w.LineTo(d.atX-0.5*size*d.dX, d.atY-0.5*size*d.dY)
 	w.Stroke()
 	L := size
@@ -264,36 +420,29 @@ func (d *diamond) Draw(w *graphics.Writer, col color.Color) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-
-type none struct {
-	atX, atY float64
-}
-
-func (n *none) Enlarge(b *pdf.Rectangle) {
-	// do nothing, no line ending to expand the bounding box
-}
-
-func (n *none) Draw(w *graphics.Writer, col color.Color) {
-	w.LineTo(n.atX, n.atY)
-	w.Stroke()
+func (d *diamond) size() float64 {
+	return max(4, 8*d.lw)
 }
 
 // ---------------------------------------------------------------------------
 
-type closedArrow struct {
+type arrow struct {
 	atX, atY float64
 	dX, dY   float64
 	lw       float64
+	closed   bool
 	reverse  bool
 }
 
-func (a *closedArrow) Enlarge(b *pdf.Rectangle) {
-	xy := a.corners()
+func (a *arrow) Size() float64 {
+	return max(4, 8*a.lw)
+}
 
-	// Update bounding box with visual corners (same loop as square.Enlarge)
+func (a *arrow) Enlarge(b *pdf.Rectangle) {
+	xy := a.outerCorners()
+
 	first := b.IsZero()
-	for i := 0; i < len(xy); i += 2 {
+	for i := 0; i+1 < len(xy); i += 2 {
 		x := xy[i]
 		y := xy[i+1]
 		if first || x < b.LLx {
@@ -312,123 +461,76 @@ func (a *closedArrow) Enlarge(b *pdf.Rectangle) {
 	}
 }
 
-func (a *closedArrow) Draw(w *graphics.Writer, col color.Color) {
-	size := max(3, 6*a.lw)
-
-	var tipX, tipY float64
-	var dirX, dirY float64
+func (a *arrow) Draw(w *graphics.Writer, col color.Color) {
+	tip, base1, base2 := a.corners()
 
 	if a.reverse {
-		// For reverse arrow: line goes to atX,atY, triangle points backward
-		dirX, dirY = -a.dX, -a.dY
-		tipX, tipY = a.atX, a.atY
-
-		// Draw line all the way to the endpoint
 		w.LineTo(a.atX, a.atY)
-		w.Stroke()
+	} else if a.closed {
+		m := vec.Middle(base1, base2)
+		w.LineTo(m.X, m.Y)
 	} else {
-		// For normal arrow: calculate shift and draw line to triangle base
-		dirX, dirY = a.dX, a.dY
+		v, _ := linalg.Miter(base1, tip, base2, a.lw, false)
+		w.LineTo(v.X, v.Y)
+	}
+	w.Stroke()
 
-		// Calculate shift to account for stroke width at triangle tip
-		// Edge vectors from tip to base corners
-		edge1X, edge1Y := -size*dirX-0.5*size*dirY, -size*dirY+0.5*size*dirX
-		edge2X, edge2Y := -size*dirX+0.5*size*dirY, -size*dirY-0.5*size*dirX
-		// Angle between edges: cos(θ) = (edge1 · edge2) / (|edge1| * |edge2|)
-		dot := edge1X*edge2X + edge1Y*edge2Y
-		mag1 := math.Sqrt(edge1X*edge1X + edge1Y*edge1Y)
-		mag2 := math.Sqrt(edge2X*edge2X + edge2Y*edge2Y)
-		cosTheta := dot / (mag1 * mag2)
-		// Stroke miter extension = strokeWidth / (2 * sin(θ/2))
-		// Using identity: sin(θ/2) = sqrt((1 - cos(θ)) / 2)
-		sinHalfTheta := math.Sqrt((1 - cosTheta) / 2)
-		shift := a.lw / (2 * sinHalfTheta)
-
-		tipX = a.atX - shift*dirX
-		tipY = a.atY - shift*dirY
-
-		// Draw line to triangle base (where line naturally connects to arrow)
-		w.LineTo(tipX-size*dirX, tipY-size*dirY)
+	if a.closed {
+		if col != nil {
+			w.SetFillColor(col)
+			w.MoveTo(base1.X, base1.Y)
+			w.LineTo(tip.X, tip.Y)
+			w.LineTo(base2.X, base2.Y)
+			w.CloseFillAndStroke()
+		} else {
+			w.MoveTo(base1.X, base1.Y)
+			w.LineTo(tip.X, tip.Y)
+			w.LineTo(base2.X, base2.Y)
+			w.CloseAndStroke()
+		}
+	} else {
+		w.MoveTo(base1.X, base1.Y)
+		w.LineTo(tip.X, tip.Y)
+		w.LineTo(base2.X, base2.Y)
 		w.Stroke()
 	}
-
-	// Draw triangle arrowhead using direction vectors
-	if col != nil {
-		w.SetFillColor(col)
-		w.MoveTo(tipX, tipY)                                                 // tip
-		w.LineTo(tipX-size*dirX-0.5*size*dirY, tipY-size*dirY+0.5*size*dirX) // base corner 1
-		w.LineTo(tipX-size*dirX+0.5*size*dirY, tipY-size*dirY-0.5*size*dirX) // base corner 2
-		w.CloseFillAndStroke()
-	} else {
-		w.MoveTo(tipX, tipY)                                                 // tip
-		w.LineTo(tipX-size*dirX-0.5*size*dirY, tipY-size*dirY+0.5*size*dirX) // base corner 1
-		w.LineTo(tipX-size*dirX+0.5*size*dirY, tipY-size*dirY-0.5*size*dirX) // base corner 2
-		w.CloseAndStroke()
-	}
-
-	xx := a.corners()
-	w.SetLineWidth(0.2)
-	w.SetStrokeColor(color.Red)
-	w.MoveTo(xx[0], xx[1])
-	for i := 2; i < len(xx); i += 2 {
-		w.LineTo(xx[i], xx[i+1])
-	}
-	w.CloseAndStroke()
 }
 
-func (a *closedArrow) corners() []float64 {
-	// Calculate arrowhead size
-	size := max(3, 6*a.lw)
+func (a *arrow) corners() (vec.Vec2, vec.Vec2, vec.Vec2) {
+	size := a.Size()
+	width := 0.9 * size
 
-	var tipX, tipY float64
-	var dirX, dirY float64
-
-	if a.reverse {
-		// For reverse arrow: tip at atX,atY, triangle points backward
-		dirX, dirY = -a.dX, -a.dY
-		tipX, tipY = a.atX, a.atY
+	var dir vec.Vec2
+	if !a.reverse {
+		dir = vec.Vec2{X: a.dX, Y: a.dY}
 	} else {
-		// For normal arrow: calculate shift for tip positioning
-		dirX, dirY = a.dX, a.dY
-
-		// Calculate shift for tip (same as original code)
-		edge1X, edge1Y := -size*dirX-0.5*size*dirY, -size*dirY+0.5*size*dirX
-		edge2X, edge2Y := -size*dirX+0.5*size*dirY, -size*dirY-0.5*size*dirX
-		dot := edge1X*edge2X + edge1Y*edge2Y
-		mag1 := math.Sqrt(edge1X*edge1X + edge1Y*edge1Y)
-		mag2 := math.Sqrt(edge2X*edge2X + edge2Y*edge2Y)
-		cosTheta := dot / (mag1 * mag2)
-		sinHalfTheta := math.Sqrt((1 - cosTheta) / 2)
-		shift := a.lw / (2 * sinHalfTheta)
-
-		tipX = a.atX - shift*dirX
-		tipY = a.atY - shift*dirY
+		dir = vec.Vec2{X: -a.dX, Y: -a.dY}
 	}
+	n := dir.Normal()
 
-	// Drawn base corner positions using direction vectors
-	base1X := tipX - size*dirX - 0.5*size*dirY
-	base1Y := tipY - size*dirY + 0.5*size*dirX
-	base2X := tipX - size*dirX + 0.5*size*dirY
-	base2Y := tipY - size*dirY - 0.5*size*dirX
+	// slope: -width/2/size
+	// we need shift*width/2/size=a.lw/2
+	shift := size * a.lw / width
 
-	// Calculate miter extension for base corner 1
-	v1X, v1Y := tipX-base1X, tipY-base1Y     // to tip
-	v2X, v2Y := base2X-base1X, base2Y-base1Y // to base2
-	extend1, bisect1X, bisect1Y := miterExtension(v1X, v1Y, v2X, v2Y, a.lw)
-	visualBase1X := base1X - extend1*bisect1X
-	visualBase1Y := base1Y - extend1*bisect1Y
+	at := vec.Vec2{X: a.atX, Y: a.atY}
 
-	// Calculate miter extension for base corner 2
-	v3X, v3Y := base1X-base2X, base1Y-base2Y // to base1
-	v4X, v4Y := tipX-base2X, tipY-base2Y     // to tip
-	extend2, bisect2X, bisect2Y := miterExtension(v3X, v3Y, v4X, v4Y, a.lw)
-	visualBase2X := base2X - extend2*bisect2X
-	visualBase2Y := base2Y - extend2*bisect2Y
+	tip := at.Sub(dir.Mul(shift))
+	base := tip.Sub(dir.Mul(size))
+	base1 := base.Add(n.Mul(0.5 * width))
+	base2 := base.Sub(n.Mul(0.5 * width))
 
+	return tip, base1, base2
+}
+
+func (a *arrow) outerCorners() []float64 {
+	tip, base1, base2 := a.corners()
+	oTip, _ := linalg.Miter(base2, tip, base1, a.lw, true)
+	oBase1, _ := linalg.Miter(tip, base1, base2, a.lw, true)
+	oBase2, _ := linalg.Miter(base1, base2, tip, a.lw, true)
 	return []float64{
-		tipX, tipY, // tip (visual position)
-		visualBase1X, visualBase1Y, // base corner 1
-		visualBase2X, visualBase2Y, // base corner 2
+		oTip.X, oTip.Y,
+		oBase1.X, oBase1.Y,
+		oBase2.X, oBase2.Y,
 	}
 }
 
@@ -442,63 +544,4 @@ func (m *tooShort) Enlarge(*pdf.Rectangle) {
 
 func (m *tooShort) Draw(w *graphics.Writer, col color.Color) {
 	w.Stroke()
-}
-
-// miterExtension calculates miter extension for stroke width compensation
-// at a corner where two edges meet. The corner is treated as origin (0,0).
-//
-// Parameters:
-//
-//	v1X, v1Y: vector from corner to first adjacent point
-//	v2X, v2Y: vector from corner to second adjacent point
-//	strokeWidth: line width for miter calculation
-//
-// Returns:
-//
-//	extension: distance to extend along bisector direction
-//	bisectX, bisectY: normalized bisector direction (pointing outward from corner)
-func miterExtension(v1X, v1Y, v2X, v2Y, strokeWidth float64) (extension, bisectX, bisectY float64) {
-	length1 := math.Sqrt(v1X*v1X + v1Y*v1Y)
-	length2 := math.Sqrt(v2X*v2X + v2Y*v2Y)
-
-	if length1 < 1e-10 || length2 < 1e-10 {
-		return 0, 1, 0 // no extension, default bisector
-	}
-
-	// angle between edges: cos(θ) = (v1 · v2) / (|v1| * |v2|)
-	dot := v1X*v2X + v1Y*v2Y
-	cosTheta := dot / (length1 * length2)
-
-	// clamp cosTheta to [-1,1] to handle numerical errors
-	if cosTheta > 1 {
-		cosTheta = 1
-	} else if cosTheta < -1 {
-		cosTheta = -1
-	}
-
-	// Calculate sin(θ/2) using identity: sin(θ/2) = sqrt((1 - cos(θ)) / 2)
-	sinHalfTheta := math.Sqrt((1 - cosTheta) / 2)
-
-	// Handle parallel vectors (very small angle)
-	if sinHalfTheta < 1e-10 {
-		return 0, 1, 0 // no extension needed for parallel edges
-	}
-
-	// Miter extension = strokeWidth / (2 * sin(θ/2))
-	extension = strokeWidth / (2 * sinHalfTheta)
-
-	// Calculate normalized bisector direction (sum of unit vectors)
-	bisectX = v1X/length1 + v2X/length2
-	bisectY = v1Y/length1 + v2Y/length2
-	bisectMag := math.Sqrt(bisectX*bisectX + bisectY*bisectY)
-
-	// Normalize bisector (should never be zero for non-parallel edges)
-	if bisectMag > 1e-10 {
-		bisectX /= bisectMag
-		bisectY /= bisectMag
-	} else {
-		bisectX, bisectY = 1, 0 // fallback direction
-	}
-
-	return extension, bisectX, bisectY
 }
