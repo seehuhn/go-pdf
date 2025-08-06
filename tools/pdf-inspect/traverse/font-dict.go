@@ -109,7 +109,7 @@ func (c *fontDictCtx) Next() []Step {
 				})
 			}
 		case *dict.CIDFontType2:
-			if fontDict.FontType == glyphdata.TrueType {
+			if fontDict.FontType == glyphdata.TrueType || fontDict.FontType == glyphdata.OpenTypeGlyf {
 				steps = append(steps, Step{
 					Match: regexp.MustCompile(`^load$`),
 					Desc:  "`load`",

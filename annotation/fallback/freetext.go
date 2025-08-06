@@ -32,7 +32,7 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 
 	calloutLine := a.CalloutLine
 	if k := len(calloutLine); k%2 != 0 {
-		calloutLine = calloutLine[:k-1] // ignore last point if odd
+		calloutLine = calloutLine[:k-1] // ignore last value if odd
 	}
 	hasCallout := a.Intent == annotation.FreeTextIntentCallout && len(calloutLine) >= 4
 	var le LineEnding
@@ -47,9 +47,9 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 	inner := a.Rect
 	if len(a.Margin) >= 4 {
 		inner.LLx += a.Margin[0]
-		inner.URy -= a.Margin[1]
+		inner.LLy += a.Margin[1]
 		inner.URx -= a.Margin[2]
-		inner.LLy += a.Margin[3]
+		inner.URy -= a.Margin[3]
 	}
 
 	outer := inner
@@ -79,7 +79,6 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 	a.DefaultAppearance = ""
 	a.Align = annotation.FreeTextAlignLeft
 	a.DefaultStyle = ""
-	a.LineEndingStyle = annotation.LineEndingStyleNone
 	// We don't generate dicts with different states.
 	a.AppearanceState = ""
 
@@ -89,9 +88,9 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 	} else {
 		a.Margin = []float64{
 			inner.LLx - outer.LLx,
-			outer.URy - inner.URy,
-			outer.URx - inner.URx,
 			inner.LLy - outer.LLy,
+			inner.URx - outer.URx,
+			inner.URy - outer.URy,
 		}
 	}
 

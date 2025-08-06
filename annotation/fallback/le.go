@@ -197,7 +197,7 @@ func (le *butt) Draw(w *graphics.Writer, col color.Color) {
 }
 
 func (le *butt) size() float64 {
-	return max(3, 6*le.lw)
+	return max(3.5, 7*le.lw)
 }
 
 // ---------------------------------------------------------------------------
@@ -267,13 +267,10 @@ type square struct {
 }
 
 func (le *square) Enlarge(bbox *pdf.Rectangle) {
-	size := max(3, 6*le.lw)
-	L := size + le.lw
+	L := le.size() + le.lw
 	corners := []float64{
-		le.atX + 0.5*L*le.dX - 0.5*L*le.dY, le.atY + 0.5*L*le.dY + 0.5*L*le.dX,
-		le.atX - 0.5*L*le.dX - 0.5*L*le.dY, le.atY - 0.5*L*le.dY + 0.5*L*le.dX,
-		le.atX - 0.5*L*le.dX + 0.5*L*le.dY, le.atY - 0.5*L*le.dY - 0.5*L*le.dX,
-		le.atX + 0.5*L*le.dX + 0.5*L*le.dY, le.atY + 0.5*L*le.dY - 0.5*L*le.dX,
+		le.atX + L/2, le.atY + L/2,
+		le.atX - L/2, le.atY - L/2,
 	}
 
 	first := bbox.IsZero()
@@ -297,24 +294,28 @@ func (le *square) Enlarge(bbox *pdf.Rectangle) {
 }
 
 func (le *square) Draw(w *graphics.Writer, col color.Color) {
-	size := max(3, 6*le.lw)
-	w.LineTo(le.atX-0.5*size*le.dX, le.atY-0.5*size*le.dY)
+	size := le.size()
+	a := size / max(le.dX, le.dY)
+	w.LineTo(le.atX-a*le.dX, le.atY-a*le.dY)
 	w.Stroke()
-	L := size
 	if col != nil {
 		w.SetFillColor(col)
-		w.MoveTo(le.atX+0.5*L*le.dX-0.5*L*le.dY, le.atY+0.5*L*le.dY+0.5*L*le.dX)
-		w.LineTo(le.atX-0.5*L*le.dX-0.5*L*le.dY, le.atY-0.5*L*le.dY+0.5*L*le.dX)
-		w.LineTo(le.atX-0.5*L*le.dX+0.5*L*le.dY, le.atY-0.5*L*le.dY-0.5*L*le.dX)
-		w.LineTo(le.atX+0.5*L*le.dX+0.5*L*le.dY, le.atY+0.5*L*le.dY-0.5*L*le.dX)
+		w.MoveTo(le.atX+size/2, le.atY+size/2)
+		w.LineTo(le.atX-size/2, le.atY+size/2)
+		w.LineTo(le.atX-size/2, le.atY-size/2)
+		w.LineTo(le.atX+size/2, le.atY-size/2)
 		w.CloseFillAndStroke()
 	} else {
-		w.MoveTo(le.atX+0.5*L*le.dX-0.5*L*le.dY, le.atY+0.5*L*le.dY+0.5*L*le.dX)
-		w.LineTo(le.atX-0.5*L*le.dX-0.5*L*le.dY, le.atY-0.5*L*le.dY+0.5*L*le.dX)
-		w.LineTo(le.atX-0.5*L*le.dX+0.5*L*le.dY, le.atY-0.5*L*le.dY-0.5*L*le.dX)
-		w.LineTo(le.atX+0.5*L*le.dX+0.5*L*le.dY, le.atY+0.5*L*le.dY-0.5*L*le.dX)
+		w.MoveTo(le.atX+size/2, le.atY+size/2)
+		w.LineTo(le.atX-size/2, le.atY+size/2)
+		w.LineTo(le.atX-size/2, le.atY-size/2)
+		w.LineTo(le.atX+size/2, le.atY-size/2)
 		w.CloseAndStroke()
 	}
+}
+
+func (le *square) size() float64 {
+	return max(3, 6*le.lw)
 }
 
 // ---------------------------------------------------------------------------
@@ -325,14 +326,13 @@ type circle struct {
 	lw       float64
 }
 
-func (c *circle) Enlarge(b *pdf.Rectangle) {
-	size := max(3, 6*c.lw)
-	L := size + c.lw
+func (le *circle) Enlarge(b *pdf.Rectangle) {
+	L := le.size() + le.lw
 	first := b.IsZero()
-	xMin := c.atX - 0.5*L
-	xMax := c.atX + 0.5*L
-	yMin := c.atY - 0.5*L
-	yMax := c.atY + 0.5*L
+	xMin := le.atX - 0.5*L
+	xMax := le.atX + 0.5*L
+	yMin := le.atY - 0.5*L
+	yMax := le.atY + 0.5*L
 
 	if first || xMin < b.LLx {
 		b.LLx = xMin
@@ -348,18 +348,22 @@ func (c *circle) Enlarge(b *pdf.Rectangle) {
 	}
 }
 
-func (c *circle) Draw(w *graphics.Writer, col color.Color) {
-	size := max(3, 6*c.lw)
-	w.LineTo(c.atX-0.5*size*c.dX, c.atY-0.5*size*c.dY)
+func (le *circle) Draw(w *graphics.Writer, col color.Color) {
+	size := le.size()
+	w.LineTo(le.atX-0.5*size*le.dX, le.atY-0.5*size*le.dY)
 	w.Stroke()
 	if col != nil {
 		w.SetFillColor(col)
-		w.Circle(c.atX, c.atY, 0.5*size)
+		w.Circle(le.atX, le.atY, 0.5*size)
 		w.FillAndStroke()
 	} else {
-		w.Circle(c.atX, c.atY, 0.5*size)
+		w.Circle(le.atX, le.atY, 0.5*size)
 		w.Stroke()
 	}
+}
+
+func (le *circle) size() float64 {
+	return max(3.5, 7*le.lw)
 }
 
 // ---------------------------------------------------------------------------
@@ -370,13 +374,11 @@ type diamond struct {
 	lw       float64
 }
 
-func (d *diamond) Enlarge(b *pdf.Rectangle) {
-	L := d.size() + d.lw
+func (le *diamond) Enlarge(b *pdf.Rectangle) {
+	L := le.size() + le.lw
 	corners := []float64{
-		d.atX + 0.5*L*d.dX, d.atY + 0.5*L*d.dY,
-		d.atX - 0.5*L*d.dY, d.atY + 0.5*L*d.dX,
-		d.atX - 0.5*L*d.dX, d.atY - 0.5*L*d.dY,
-		d.atX + 0.5*L*d.dY, d.atY - 0.5*L*d.dX,
+		le.atX - L/2, le.atY - L/2,
+		le.atX + L/2, le.atY + L/2,
 	}
 
 	first := b.IsZero()
@@ -399,29 +401,30 @@ func (d *diamond) Enlarge(b *pdf.Rectangle) {
 	}
 }
 
-func (d *diamond) Draw(w *graphics.Writer, col color.Color) {
-	size := d.size()
-	w.LineTo(d.atX-0.5*size*d.dX, d.atY-0.5*size*d.dY)
+func (le *diamond) Draw(w *graphics.Writer, col color.Color) {
+	size := le.size()
+	a := size / (math.Abs(le.dX) + math.Abs(le.dY)) / 2
+	w.LineTo(le.atX-a*le.dX, le.atY-a*le.dY)
 	w.Stroke()
 	L := size
 	if col != nil {
 		w.SetFillColor(col)
-		w.MoveTo(d.atX+0.5*L*d.dX, d.atY+0.5*L*d.dY)
-		w.LineTo(d.atX-0.5*L*d.dY, d.atY+0.5*L*d.dX)
-		w.LineTo(d.atX-0.5*L*d.dX, d.atY-0.5*L*d.dY)
-		w.LineTo(d.atX+0.5*L*d.dY, d.atY-0.5*L*d.dX)
+		w.MoveTo(le.atX+L/2, le.atY)
+		w.LineTo(le.atX, le.atY+L/2)
+		w.LineTo(le.atX-L/2, le.atY)
+		w.LineTo(le.atX, le.atY-L/2)
 		w.CloseFillAndStroke()
 	} else {
-		w.MoveTo(d.atX+0.5*L*d.dX, d.atY+0.5*L*d.dY)
-		w.LineTo(d.atX-0.5*L*d.dY, d.atY+0.5*L*d.dX)
-		w.LineTo(d.atX-0.5*L*d.dX, d.atY-0.5*L*d.dY)
-		w.LineTo(d.atX+0.5*L*d.dY, d.atY-0.5*L*d.dX)
+		w.MoveTo(le.atX+L/2, le.atY)
+		w.LineTo(le.atX, le.atY+L/2)
+		w.LineTo(le.atX-L/2, le.atY)
+		w.LineTo(le.atX, le.atY-L/2)
 		w.CloseAndStroke()
 	}
 }
 
-func (d *diamond) size() float64 {
-	return max(4, 8*d.lw)
+func (le *diamond) size() float64 {
+	return max(4, 8*le.lw)
 }
 
 // ---------------------------------------------------------------------------
