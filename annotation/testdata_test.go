@@ -185,7 +185,7 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 10, LLy: 10, URx: 200, URy: 50},
 				},
-				L: []float64{20, 20, 180, 40}, // Start and end coordinates
+				Coords: [4]float64{20, 20, 180, 40}, // Start and end coordinates
 			},
 		},
 		{
@@ -199,9 +199,9 @@ var testCases = map[pdf.Name][]testCase{
 					User:   "Designer",
 					Intent: "LineArrow",
 				},
-				L:  []float64{60, 110, 240, 110},
-				LE: []pdf.Name{"OpenArrow", "ClosedArrow"},
-				IC: []float64{1.0, 0.0, 0.0}, // Red interior color
+				Coords:          [4]float64{60, 110, 240, 110},
+				LineEndingStyle: [2]LineEndingStyle{LineEndingStyleOpenArrow, LineEndingStyleClosedArrow},
+				FillColor:       color.DeviceRGB(1.0, 0.0, 0.0), // Red interior color
 			},
 		},
 		{
@@ -216,14 +216,14 @@ var testCases = map[pdf.Name][]testCase{
 					CreationDate: time.Date(2023, 3, 15, 9, 0, 0, 0, time.UTC),
 					Intent:       "LineDimension",
 				},
-				L:   []float64{50, 225, 250, 225},
-				LE:  []pdf.Name{"Butt", "Butt"},
-				LL:  10.0,            // Leader line length
-				LLE: 5.0,             // Leader line extensions
-				Cap: true,            // Show caption
-				CP:  "Top",           // Caption on top
-				CO:  []float64{0, 5}, // Caption offset
-				LLO: 2.0,             // Leader line offset
+				Coords:          [4]float64{50, 225, 250, 225},
+				LineEndingStyle: [2]LineEndingStyle{LineEndingStyleButt, LineEndingStyleButt},
+				LL:              10.0,            // Leader line length
+				LLE:             5.0,             // Leader line extensions
+				Caption:         true,            // Show caption
+				CP:              "Top",           // Caption on top
+				CO:              []float64{0, 5}, // Caption offset
+				LLO:             2.0,             // Leader line offset
 			},
 		},
 		{
@@ -240,15 +240,15 @@ var testCases = map[pdf.Name][]testCase{
 					RT:        "R",
 					InReplyTo: pdf.NewReference(1, 0),
 				},
-				L:   []float64{120, 325, 380, 325},
-				LE:  []pdf.Name{"Diamond", "Square"},
-				IC:  []float64{0.0, 1.0, 0.0}, // Green interior
-				LL:  15.0,
-				LLE: 8.0,
-				Cap: true,
-				CP:  "Inline",
-				CO:  []float64{10, -5},
-				LLO: 3.0,
+				Coords:          [4]float64{120, 325, 380, 325},
+				LineEndingStyle: [2]LineEndingStyle{LineEndingStyleDiamond, LineEndingStyleSquare},
+				FillColor:       color.DeviceRGB(0.0, 1.0, 0.0), // Green interior
+				LL:              15.0,
+				LLE:             8.0,
+				Caption:         true,
+				CP:              "Inline",
+				CO:              []float64{10, -5},
+				LLO:             3.0,
 			},
 		},
 	},

@@ -29,6 +29,7 @@ import (
 	"unicode/utf16"
 
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/vec"
 )
 
 // A Number is either an Integer or a Real.
@@ -368,6 +369,13 @@ func (r *Rectangle) Round(digits int) {
 	r.LLy = Round(r.LLy, digits)
 	r.URx = Round(r.URx, digits)
 	r.URy = Round(r.URy, digits)
+}
+
+// Contains checks if a point is within the rectangle.
+// The rectangle coordinates are in normalized form (lower-left, upper-right).
+func (r *Rectangle) Contains(point vec.Vec2) bool {
+	return point.X >= r.LLx && point.X <= r.URx &&
+		point.Y >= r.LLy && point.Y <= r.URy
 }
 
 func GetMatrix(r Getter, obj Object) (m matrix.Matrix, err error) {

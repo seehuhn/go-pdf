@@ -32,6 +32,8 @@ const (
 )
 
 func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
+	// TODO(voss): implement border effects
+
 	// extract information from the pre-set fields
 	lw := a.BorderWidth()
 	bgCol := a.Color

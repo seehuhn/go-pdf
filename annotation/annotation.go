@@ -97,7 +97,9 @@ type Common struct {
 	Border *Border
 
 	// Color (optional) is the color used for the annotation's background,
-	// title bar or border.  Only certain color types are allowed:
+	// title bar or border.
+	//
+	// Only certain color types are allowed:
 	//  - colors in the [color.DeviceGray] color space
 	//  - colors in the [color.DeviceRGB] color space
 	//  - colors in the [color.DeviceCMYK] color space

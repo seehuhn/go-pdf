@@ -16,7 +16,10 @@
 
 package annotation
 
-import "seehuhn.de/go/pdf"
+import (
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/measure"
+)
 
 // Polygon represents a polygon annotation that displays closed polygons on the page.
 // Polygons may have many vertices connected by straight lines, with the first and
@@ -53,7 +56,7 @@ type Polygon struct {
 
 	// Measure (optional; PDF 1.7) is a measure dictionary that specifies the
 	// scale and units that apply to the annotation.
-	Measure pdf.Reference
+	Measure measure.Measure
 
 	// Path (optional; PDF 2.0) is an array of n arrays, each supplying operands
 	// for path building operators (m, l, or c). If present, Vertices is not present.
@@ -118,8 +121,12 @@ func extractPolygon(r pdf.Getter, dict pdf.Dict) (*Polygon, error) {
 	}
 
 	// Measure (optional)
-	if measure, ok := dict["Measure"].(pdf.Reference); ok {
-		polygon.Measure = measure
+	if dict["Measure"] != nil {
+		if m, err := pdf.Optional(measure.Extract(r, dict["Measure"])); err != nil {
+			return nil, err
+		} else {
+			polygon.Measure = m
+		}
 	}
 
 	// Path (optional; PDF 2.0)
@@ -200,11 +207,15 @@ func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// Measure (optional)
-	if p.Measure != 0 {
+	if p.Measure != nil {
 		if err := pdf.CheckVersion(rm.Out, "polygon annotation Measure entry", pdf.V1_7); err != nil {
 			return nil, err
 		}
-		dict["Measure"] = p.Measure
+		embedded, _, err := p.Measure.Embed(rm)
+		if err != nil {
+			return nil, err
+		}
+		dict["Measure"] = embedded
 	}
 
 	// Path (optional; PDF 2.0)

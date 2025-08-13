@@ -16,7 +16,10 @@
 
 package annotation
 
-import "seehuhn.de/go/pdf"
+import (
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/measure"
+)
 
 // Polyline represents a polyline annotation that displays open polygons on the page.
 // Polylines are similar to polygons, except that the first and last vertex are not
@@ -55,7 +58,7 @@ type Polyline struct {
 
 	// Measure (optional; PDF 1.7) is a measure dictionary that specifies the
 	// scale and units that apply to the annotation.
-	Measure pdf.Reference
+	Measure measure.Measure
 
 	// Path (optional; PDF 2.0) is an array of n arrays, each supplying operands
 	// for path building operators (m, l, or c). If present, Vertices is not present.
@@ -126,8 +129,12 @@ func extractPolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
 	}
 
 	// Measure (optional)
-	if measure, ok := dict["Measure"].(pdf.Reference); ok {
-		polyline.Measure = measure
+	if dict["Measure"] != nil {
+		if m, err := pdf.Optional(measure.Extract(r, dict["Measure"])); err != nil {
+			return nil, err
+		} else {
+			polyline.Measure = m
+		}
 	}
 
 	// Path (optional; PDF 2.0)
@@ -205,11 +212,15 @@ func (p *Polyline) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// Measure (optional)
-	if p.Measure != 0 {
+	if p.Measure != nil {
 		if err := pdf.CheckVersion(rm.Out, "polyline annotation Measure entry", pdf.V1_7); err != nil {
 			return nil, err
 		}
-		dict["Measure"] = p.Measure
+		embedded, _, err := p.Measure.Embed(rm)
+		if err != nil {
+			return nil, err
+		}
+		dict["Measure"] = embedded
 	}
 
 	// Path (optional; PDF 2.0)

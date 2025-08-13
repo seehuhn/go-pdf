@@ -71,8 +71,8 @@ type FreeText struct {
 	// LineEndingStyle (optional; meaningful only if CalloutLine is present)
 	// specifies the line ending style for the callout line endpoint (x1, y1).
 	//
-	// When writing annotations an empty string may be used as a shorthand
-	// for [LineEndingStyleNone]
+	// When writing annotations an empty name may be used as a shorthand for
+	// [LineEndingStyleNone].
 	//
 	// This corresponds to the /LE entry in the PDF annotation dictionary.
 	LineEndingStyle LineEndingStyle
