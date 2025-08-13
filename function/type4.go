@@ -183,7 +183,11 @@ func (f *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	// Create stream with PostScript program
 	ref := rm.Out.Alloc()
-	stm, err := rm.Out.OpenStream(ref, dict, pdf.FilterCompress{})
+	var filters []pdf.Filter
+	if !rm.Out.GetOptions().HasAny(pdf.OptPretty) {
+		filters = append(filters, &pdf.FilterCompress{})
+	}
+	stm, err := rm.Out.OpenStream(ref, dict, filters...)
 	if err != nil {
 		return nil, zero, err
 	}

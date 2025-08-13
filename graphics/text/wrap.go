@@ -19,21 +19,48 @@ package text
 import (
 	"iter"
 	"strings"
+	"unicode"
 
 	"seehuhn.de/go/pdf/font"
 )
 
 type wrap struct {
 	width float64
-	text  string
+	words [][]string
 }
 
+// Wrap creates a text wrapper that breaks text at the specified width.
+// Whitespace at the beginning of the first text and the end of the last text is ignored.
+// Newline characters in the input strings start a new line.
 func Wrap(width float64, text ...string) *wrap {
-	var words []string
-	for _, t := range text {
-		words = append(words, strings.Fields(t)...)
+	var allWords [][]string
+	var currentParagraph []string
+
+	for i, t := range text {
+		if i == 0 {
+			t = strings.TrimLeftFunc(t, unicode.IsSpace)
+		}
+		if i == len(text)-1 {
+			t = strings.TrimRightFunc(t, unicode.IsSpace)
+		}
+
+		first := true
+		for part := range strings.SplitSeq(t, "\n") {
+			words := strings.Fields(part)
+			if first {
+				currentParagraph = append(currentParagraph, words...)
+				first = false
+			} else {
+				allWords = append(allWords, currentParagraph)
+				currentParagraph = words
+			}
+		}
 	}
-	return &wrap{width, strings.Join(words, " ")}
+	if currentParagraph != nil {
+		allWords = append(allWords, currentParagraph)
+	}
+
+	return &wrap{width, allWords}
 }
 
 // Lines arranges the text into lines.
@@ -41,27 +68,49 @@ func Wrap(width float64, text ...string) *wrap {
 // Lines are at most w.width wide, except when a single word is wider than w.width.
 func (w *wrap) Lines(F font.Layouter, ptSize float64) iter.Seq[*font.GlyphSeq] {
 	return func(yield func(*font.GlyphSeq) bool) {
-		glyphs := F.Layout(nil, ptSize, w.text)
-
-		startPos := 0
-		breakPos := 0
-		currentWidth := 0.0
-		for i, g := range glyphs.Seq {
-			if g.Text == " " {
-				breakPos = i
-			}
-			if currentWidth+g.Advance > w.width && breakPos > startPos {
-				// emit a line
-				if !yield(&font.GlyphSeq{Seq: glyphs.Seq[startPos:breakPos]}) {
+		for paragraphIdx, paragraph := range w.words {
+			if len(paragraph) == 0 {
+				// empty paragraph, yield empty line
+				if !yield(&font.GlyphSeq{}) {
 					return
 				}
-				startPos = breakPos + 1
-				currentWidth = 0
+				continue
 			}
-			currentWidth += g.Advance
-		}
-		if startPos < len(glyphs.Seq) {
-			yield(&font.GlyphSeq{Seq: glyphs.Seq[startPos:]})
+
+			// join words with spaces for this paragraph
+			paragraphText := strings.Join(paragraph, " ")
+			glyphs := F.Layout(nil, ptSize, paragraphText)
+
+			startPos := 0
+			breakPos := 0
+			currentWidth := 0.0
+			for i, g := range glyphs.Seq {
+				if g.Text == " " {
+					breakPos = i
+				}
+				if currentWidth+g.Advance > w.width && breakPos > startPos {
+					// emit a line
+					if !yield(&font.GlyphSeq{Seq: glyphs.Seq[startPos:breakPos]}) {
+						return
+					}
+					startPos = breakPos + 1
+					currentWidth = 0
+				}
+				currentWidth += g.Advance
+			}
+			// emit remaining text in this paragraph
+			if startPos < len(glyphs.Seq) {
+				if !yield(&font.GlyphSeq{Seq: glyphs.Seq[startPos:]}) {
+					return
+				}
+			}
+
+			// force line break between paragraphs (except after last paragraph)
+			if paragraphIdx < len(w.words)-1 {
+				if !yield(&font.GlyphSeq{}) {
+					return
+				}
+			}
 		}
 	}
 }
