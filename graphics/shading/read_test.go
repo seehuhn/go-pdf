@@ -413,8 +413,8 @@ func TestReadErrors(t *testing.T) {
 func TestType2InvalidColorSpace(t *testing.T) {
 	// Test that Type2 shading rejects Indexed color spaces
 	indexedColorSpace, err := color.Indexed([]color.Color{
-		color.DeviceGray(0),
-		color.DeviceGray(1),
+		color.Black,
+		color.White,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -422,7 +422,7 @@ func TestType2InvalidColorSpace(t *testing.T) {
 
 	shading := &Type2{
 		ColorSpace: indexedColorSpace,
-		X0: 0, Y0: 0, X1: 100, Y1: 100,
+		X0:         0, Y0: 0, X1: 100, Y1: 100,
 		F: &function.Type2{
 			XMin: 0, XMax: 1,
 			C0: []float64{0},

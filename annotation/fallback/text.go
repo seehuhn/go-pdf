@@ -153,8 +153,8 @@ func (s *Style) addTextAppearance(a *annotation.Text) {
 
 			m := (15.5 + 5) / 2
 
-			w.SetStrokeColor(color.DeviceGray(0))
-			w.SetFillColor(color.DeviceGray(0))
+			w.SetStrokeColor(color.Black)
+			w.SetFillColor(color.Black)
 			w.SetLineWidth(2)
 			w.MoveTo(17.5-0.75, 15.5)
 			w.LineTo(17.5-0.75, m)

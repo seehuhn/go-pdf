@@ -83,7 +83,8 @@ const (
 	// some PDF readers.
 	OptTrimStandardFonts
 
-	// OptPretty makes the output more human-readable.
+	// OptPretty makes the generated PDF more human-readable, at the expense of
+	// larger file size.
 	OptPretty
 
 	// OptTextStringUtf8 enables UTF-8 encoding for text strings.

@@ -164,7 +164,7 @@ func writeDummyDocument(w io.Writer, makeFont func() font.Layouter) error {
 	setStyle := func(page *document.Page) {
 		page.TextSetFont(F, 10)
 		page.TextSetLeading(12)
-		page.SetFillColor(color.DeviceGray(0))
+		page.SetFillColor(color.Black)
 	}
 
 	page := doc.AddPage()

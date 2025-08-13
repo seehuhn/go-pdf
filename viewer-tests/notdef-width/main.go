@@ -143,7 +143,7 @@ func createDocument(filename string) error {
 			"Crosses on the left indicate which glyph this PDF viewer shows,",
 			"crosses on the right show which width is used."),
 	)
-	page.SetStrokeColor(color.DeviceGray(0))
+	page.SetStrokeColor(color.Black)
 	page.MoveTo(325, y-50)
 	page.LineTo(240, y-50)
 	page.MoveTo(245, y-47)

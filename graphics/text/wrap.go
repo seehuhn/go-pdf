@@ -36,7 +36,7 @@ func Wrap(width float64, text ...string) *wrap {
 	return &wrap{width, strings.Join(words, " ")}
 }
 
-// Lines breaks the text into lines.
+// Lines arranges the text into lines.
 // Breaks occur only at spaces (which are then removed).
 // Lines are at most w.width wide, except when a single word is wider than w.width.
 func (w *wrap) Lines(F font.Layouter, ptSize float64) iter.Seq[*font.GlyphSeq] {

@@ -129,7 +129,11 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["LastModified"] = pdf.Date(f.LastModified)
 	}
 
-	stm, err := rm.Out.OpenStream(ref, dict, &pdf.FilterCompress{})
+	var filters []pdf.Filter
+	if !rm.Out.GetOptions().HasAny(pdf.OptPretty) {
+		filters = append(filters, &pdf.FilterCompress{})
+	}
+	stm, err := rm.Out.OpenStream(ref, dict, filters...)
 	if err != nil {
 		return nil, zero, err
 	}

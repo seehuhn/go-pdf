@@ -54,7 +54,7 @@ func createDocument(filename string) error {
 	note := text.F{
 		Font:  F,
 		Size:  10,
-		Color: color.DeviceGray(0),
+		Color: color.Black,
 	}
 
 	blue := color.DeviceRGB(0, 0, 0.9)

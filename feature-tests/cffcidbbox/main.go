@@ -60,7 +60,7 @@ func createDocument(fname string) error {
 		return err
 	}
 
-	black := color.DeviceGray(0)
+	black := color.Black
 	blue := color.DeviceRGB(0, 0, 0.9)
 	red := color.DeviceRGB(0.9, 0, 0)
 

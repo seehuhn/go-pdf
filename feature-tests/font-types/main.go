@@ -156,7 +156,7 @@ func doit() error {
 		}
 		page.TextShow(title)
 		page.TextEnd()
-		page.SetFillColor(color.DeviceGray(0))
+		page.SetFillColor(color.Black)
 
 		page.TextBegin()
 		if gen != nil && *writeIndividual {

@@ -23,6 +23,12 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/graphics/text"
+)
+
+const (
+	freeTextFontSize = 12
+	freeTextPadding  = 2
 )
 
 func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
@@ -98,7 +104,7 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 	draw := func(w *graphics.Writer) error {
 		if a.Intent != annotation.FreeTextIntentTypeWriter {
 			w.SetLineWidth(lw)
-			w.SetStrokeColor(color.DeviceGray(0))
+			w.SetStrokeColor(color.Black)
 			if bgCol != nil {
 				w.SetFillColor(bgCol)
 				w.Rectangle(inner.LLx+lw/2, inner.LLy+lw/2, inner.Dx()-lw, inner.Dy()-lw)
@@ -111,13 +117,63 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 
 		if hasCallout {
 			w.SetLineWidth(lw)
-			w.SetStrokeColor(color.DeviceGray(0))
+			w.SetStrokeColor(color.Black)
 			k := len(calloutLine)
 			w.MoveTo(calloutLine[k-2], calloutLine[k-1])
 			for i := k - 4; i >= 2; i -= 2 {
 				w.LineTo(calloutLine[i], calloutLine[i+1])
 			}
 			le.Draw(w, bgCol)
+		}
+
+		// render text content if present
+		if a.Contents != "" {
+			F := s.contentFont
+
+			clipLeft := inner.LLx + lw + freeTextPadding
+			clipBottom := inner.LLy + lw + freeTextPadding
+			clipWidth := inner.Dx() - 2*lw - 2*freeTextPadding
+			clipHeight := inner.Dy() - 2*lw - 2*freeTextPadding
+
+			lineHeight := F.GetGeometry().Leading * freeTextFontSize
+
+			w.PushGraphicsState()
+			w.Rectangle(clipLeft, clipBottom, clipWidth, clipHeight)
+			w.ClipNonZero()
+			w.EndPath()
+
+			w.TextBegin()
+			w.TextSetFont(F, freeTextFontSize)
+			w.SetFillColor(color.Black)
+			wrapper := text.Wrap(clipWidth, a.Contents)
+			yPos := inner.URy - lw - freeTextPadding - freeTextFontSize
+			lineNo := 0
+			for line := range wrapper.Lines(F, freeTextFontSize) {
+				switch lineNo {
+				case 0:
+					w.TextFirstLine(clipLeft, yPos)
+				case 1:
+					w.TextSecondLine(0, -lineHeight)
+				default:
+					w.TextNextLine()
+				}
+
+				switch a.Align {
+				case annotation.FreeTextAlignCenter:
+					line.Align(clipWidth, 0.5)
+				case annotation.FreeTextAlignRight:
+					line.Align(clipWidth, 1.0)
+				default:
+					// no adjustment needed for left alignment
+				}
+				w.TextShowGlyphs(line)
+
+				yPos -= lineHeight
+				lineNo++
+			}
+			w.TextEnd()
+
+			w.PopGraphicsState()
 		}
 
 		return nil

@@ -76,7 +76,7 @@ func doit() error {
 		page.LineTo(600, z)
 	}
 	page.Stroke()
-	page.SetFillColor(color.DeviceGray(1))
+	page.SetFillColor(color.White)
 	page.TextSetFont(F, 9)
 	for _, x := range []float64{82, 532} {
 		for i := 0; i <= 600; i += 50 {
@@ -155,7 +155,7 @@ func doit() error {
 	page.TextShow("the TrimBox may be shown in ")
 	page.SetFillColor(color.DeviceRGB(0.8, 0.4, 0))
 	page.TextShow("orange.")
-	page.SetFillColor(color.DeviceGray(0))
+	page.SetFillColor(color.Black)
 	page.TextEnd()
 
 	page.TextBegin()
@@ -167,7 +167,7 @@ func doit() error {
 	page.TextShow("the BleedBox may be shown in ")
 	page.SetFillColor(color.DeviceRGB(0, 0, 0.8))
 	page.TextShow("blue.")
-	page.SetFillColor(color.DeviceGray(0))
+	page.SetFillColor(color.Black)
 	page.TextEnd()
 
 	page.TextBegin()

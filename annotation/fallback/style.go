@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/extended"
+	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -44,20 +45,31 @@ import (
 //  - Sy: "symbol" for Caret
 
 type Style struct {
+	// iconFont is the font used to render symbols inside some of the icons for
+	// text annotations.  If this is changed to be something different from
+	// extended.NimbusRomanBold, the layout of the icons needs to be adjusted.
 	iconFont font.Layouter
-	cache    map[key]*appearance.Dict
+
+	// contentFont is the font used to render the text content of annotations,
+	// for example for FreeText annotations.
+	contentFont font.Layouter
+
+	cache map[key]*appearance.Dict
 }
 
+// TODO(voss): review this once more annotation types are implemented.
 type key struct {
 	name string
 	bg   color.Color
 }
 
 func NewStyle() *Style {
-	iconFont := extended.NimbusRomanBold.New()
+	// We allocate a single instance of each font here, to make sure
+	// that at most one instance of each font embedded in each output file.
 	return &Style{
-		iconFont: iconFont,
-		cache:    make(map[key]*appearance.Dict),
+		iconFont:    extended.NimbusRomanBold.New(),
+		contentFont: standard.Helvetica.New(),
+		cache:       make(map[key]*appearance.Dict),
 	}
 }
 
