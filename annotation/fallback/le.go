@@ -142,7 +142,7 @@ func (le *none) Enlarge(b *pdf.Rectangle) {
 }
 
 func (le *none) Draw(w *graphics.Writer, col color.Color) {
-	w.LineTo(le.atX, le.atY)
+	w.LineTo(pdf.Round(le.atX, 2), pdf.Round(le.atY, 2))
 	w.Stroke()
 }
 
@@ -185,14 +185,14 @@ func (le *butt) Enlarge(bbox *pdf.Rectangle) {
 }
 
 func (le *butt) Draw(w *graphics.Writer, col color.Color) {
-	w.LineTo(le.atX, le.atY)
+	w.LineTo(pdf.Round(le.atX, 2), pdf.Round(le.atY, 2))
 	w.Stroke()
 
 	n := vec.Vec2{X: le.dX, Y: le.dY}.Normal()
 	n.IMul(le.size() / 2)
 
-	w.MoveTo(le.atX+n.X, le.atY+n.Y)
-	w.LineTo(le.atX-n.X, le.atY-n.Y)
+	w.MoveTo(pdf.Round(le.atX+n.X, 2), pdf.Round(le.atY+n.Y, 2))
+	w.LineTo(pdf.Round(le.atX-n.X, 2), pdf.Round(le.atY-n.Y, 2))
 	w.Stroke()
 }
 
@@ -241,7 +241,7 @@ func (le *slash) Enlarge(bbox *pdf.Rectangle) {
 }
 
 func (le *slash) Draw(w *graphics.Writer, col color.Color) {
-	w.LineTo(le.atX, le.atY)
+	w.LineTo(pdf.Round(le.atX, 2), pdf.Round(le.atY, 2))
 	w.Stroke()
 
 	a := 0.5              // cos(60°)
@@ -249,8 +249,8 @@ func (le *slash) Draw(w *graphics.Writer, col color.Color) {
 	n := vec.Vec2{X: a*le.dX - b*le.dY, Y: a*le.dY + b*le.dX}
 	n.IMul(le.size() / 2)
 
-	w.MoveTo(le.atX+n.X, le.atY+n.Y)
-	w.LineTo(le.atX-n.X, le.atY-n.Y)
+	w.MoveTo(pdf.Round(le.atX+n.X, 2), pdf.Round(le.atY+n.Y, 2))
+	w.LineTo(pdf.Round(le.atX-n.X, 2), pdf.Round(le.atY-n.Y, 2))
 	w.Stroke()
 }
 
@@ -296,20 +296,20 @@ func (le *square) Enlarge(bbox *pdf.Rectangle) {
 func (le *square) Draw(w *graphics.Writer, col color.Color) {
 	size := le.size()
 	a := size / max(le.dX, le.dY)
-	w.LineTo(le.atX-a*le.dX, le.atY-a*le.dY)
+	w.LineTo(pdf.Round(le.atX-a*le.dX, 2), pdf.Round(le.atY-a*le.dY, 2))
 	w.Stroke()
 	if col != nil {
 		w.SetFillColor(col)
-		w.MoveTo(le.atX+size/2, le.atY+size/2)
-		w.LineTo(le.atX-size/2, le.atY+size/2)
-		w.LineTo(le.atX-size/2, le.atY-size/2)
-		w.LineTo(le.atX+size/2, le.atY-size/2)
+		w.MoveTo(pdf.Round(le.atX+size/2, 2), pdf.Round(le.atY+size/2, 2))
+		w.LineTo(pdf.Round(le.atX-size/2, 2), pdf.Round(le.atY+size/2, 2))
+		w.LineTo(pdf.Round(le.atX-size/2, 2), pdf.Round(le.atY-size/2, 2))
+		w.LineTo(pdf.Round(le.atX+size/2, 2), pdf.Round(le.atY-size/2, 2))
 		w.CloseFillAndStroke()
 	} else {
-		w.MoveTo(le.atX+size/2, le.atY+size/2)
-		w.LineTo(le.atX-size/2, le.atY+size/2)
-		w.LineTo(le.atX-size/2, le.atY-size/2)
-		w.LineTo(le.atX+size/2, le.atY-size/2)
+		w.MoveTo(pdf.Round(le.atX+size/2, 2), pdf.Round(le.atY+size/2, 2))
+		w.LineTo(pdf.Round(le.atX-size/2, 2), pdf.Round(le.atY+size/2, 2))
+		w.LineTo(pdf.Round(le.atX-size/2, 2), pdf.Round(le.atY-size/2, 2))
+		w.LineTo(pdf.Round(le.atX+size/2, 2), pdf.Round(le.atY-size/2, 2))
 		w.CloseAndStroke()
 	}
 }
@@ -350,14 +350,14 @@ func (le *circle) Enlarge(b *pdf.Rectangle) {
 
 func (le *circle) Draw(w *graphics.Writer, col color.Color) {
 	size := le.size()
-	w.LineTo(le.atX-0.5*size*le.dX, le.atY-0.5*size*le.dY)
+	w.LineTo(pdf.Round(le.atX-0.5*size*le.dX, 2), pdf.Round(le.atY-0.5*size*le.dY, 2))
 	w.Stroke()
 	if col != nil {
 		w.SetFillColor(col)
-		w.Circle(le.atX, le.atY, 0.5*size)
+		w.Circle(pdf.Round(le.atX, 2), pdf.Round(le.atY, 2), pdf.Round(0.5*size, 2))
 		w.FillAndStroke()
 	} else {
-		w.Circle(le.atX, le.atY, 0.5*size)
+		w.Circle(pdf.Round(le.atX, 2), pdf.Round(le.atY, 2), pdf.Round(0.5*size, 2))
 		w.Stroke()
 	}
 }
@@ -404,21 +404,21 @@ func (le *diamond) Enlarge(b *pdf.Rectangle) {
 func (le *diamond) Draw(w *graphics.Writer, col color.Color) {
 	size := le.size()
 	a := size / (math.Abs(le.dX) + math.Abs(le.dY)) / 2
-	w.LineTo(le.atX-a*le.dX, le.atY-a*le.dY)
+	w.LineTo(pdf.Round(le.atX-a*le.dX, 2), pdf.Round(le.atY-a*le.dY, 2))
 	w.Stroke()
 	L := size
 	if col != nil {
 		w.SetFillColor(col)
-		w.MoveTo(le.atX+L/2, le.atY)
-		w.LineTo(le.atX, le.atY+L/2)
-		w.LineTo(le.atX-L/2, le.atY)
-		w.LineTo(le.atX, le.atY-L/2)
+		w.MoveTo(pdf.Round(le.atX+L/2, 2), pdf.Round(le.atY, 2))
+		w.LineTo(pdf.Round(le.atX, 2), pdf.Round(le.atY+L/2, 2))
+		w.LineTo(pdf.Round(le.atX-L/2, 2), pdf.Round(le.atY, 2))
+		w.LineTo(pdf.Round(le.atX, 2), pdf.Round(le.atY-L/2, 2))
 		w.CloseFillAndStroke()
 	} else {
-		w.MoveTo(le.atX+L/2, le.atY)
-		w.LineTo(le.atX, le.atY+L/2)
-		w.LineTo(le.atX-L/2, le.atY)
-		w.LineTo(le.atX, le.atY-L/2)
+		w.MoveTo(pdf.Round(le.atX+L/2, 2), pdf.Round(le.atY, 2))
+		w.LineTo(pdf.Round(le.atX, 2), pdf.Round(le.atY+L/2, 2))
+		w.LineTo(pdf.Round(le.atX-L/2, 2), pdf.Round(le.atY, 2))
+		w.LineTo(pdf.Round(le.atX, 2), pdf.Round(le.atY-L/2, 2))
 		w.CloseAndStroke()
 	}
 }
@@ -468,33 +468,33 @@ func (a *arrow) Draw(w *graphics.Writer, col color.Color) {
 	tip, base1, base2 := a.corners()
 
 	if a.reverse {
-		w.LineTo(a.atX, a.atY)
+		w.LineTo(pdf.Round(a.atX, 2), pdf.Round(a.atY, 2))
 	} else if a.closed {
 		m := vec.Middle(base1, base2)
-		w.LineTo(m.X, m.Y)
+		w.LineTo(pdf.Round(m.X, 2), pdf.Round(m.Y, 2))
 	} else {
 		v, _ := linalg.Miter(base1, tip, base2, a.lw, false)
-		w.LineTo(v.X, v.Y)
+		w.LineTo(pdf.Round(v.X, 2), pdf.Round(v.Y, 2))
 	}
 	w.Stroke()
 
 	if a.closed {
 		if col != nil {
 			w.SetFillColor(col)
-			w.MoveTo(base1.X, base1.Y)
-			w.LineTo(tip.X, tip.Y)
-			w.LineTo(base2.X, base2.Y)
+			w.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
+			w.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
+			w.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
 			w.CloseFillAndStroke()
 		} else {
-			w.MoveTo(base1.X, base1.Y)
-			w.LineTo(tip.X, tip.Y)
-			w.LineTo(base2.X, base2.Y)
+			w.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
+			w.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
+			w.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
 			w.CloseAndStroke()
 		}
 	} else {
-		w.MoveTo(base1.X, base1.Y)
-		w.LineTo(tip.X, tip.Y)
-		w.LineTo(base2.X, base2.Y)
+		w.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
+		w.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
+		w.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
 		w.Stroke()
 	}
 }

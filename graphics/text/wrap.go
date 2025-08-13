@@ -68,7 +68,7 @@ func Wrap(width float64, text ...string) *wrap {
 // Lines are at most w.width wide, except when a single word is wider than w.width.
 func (w *wrap) Lines(F font.Layouter, ptSize float64) iter.Seq[*font.GlyphSeq] {
 	return func(yield func(*font.GlyphSeq) bool) {
-		for paragraphIdx, paragraph := range w.words {
+		for _, paragraph := range w.words {
 			if len(paragraph) == 0 {
 				// empty paragraph, yield empty line
 				if !yield(&font.GlyphSeq{}) {
@@ -101,13 +101,6 @@ func (w *wrap) Lines(F font.Layouter, ptSize float64) iter.Seq[*font.GlyphSeq] {
 			// emit remaining text in this paragraph
 			if startPos < len(glyphs.Seq) {
 				if !yield(&font.GlyphSeq{Seq: glyphs.Seq[startPos:]}) {
-					return
-				}
-			}
-
-			// force line break between paragraphs (except after last paragraph)
-			if paragraphIdx < len(w.words)-1 {
-				if !yield(&font.GlyphSeq{}) {
 					return
 				}
 			}

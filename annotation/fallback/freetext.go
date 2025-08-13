@@ -88,15 +88,16 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 	// We don't generate dicts with different states.
 	a.AppearanceState = ""
 
+	outer.Round(1)
 	a.Rect = outer
 	if inner.NearlyEqual(&outer, 0.01) {
 		a.Margin = nil
 	} else {
 		a.Margin = []float64{
-			inner.LLx - outer.LLx,
-			inner.LLy - outer.LLy,
-			inner.URx - outer.URx,
-			inner.URy - outer.URy,
+			pdf.Round(inner.LLx-outer.LLx, 4),
+			pdf.Round(inner.LLy-outer.LLy, 4),
+			pdf.Round(inner.URx-outer.URx, 4),
+			pdf.Round(inner.URy-outer.URy, 4),
 		}
 	}
 
@@ -135,7 +136,7 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 			clipWidth := inner.Dx() - 2*lw - 2*freeTextPadding
 			clipHeight := inner.Dy() - 2*lw - 2*freeTextPadding
 
-			lineHeight := F.GetGeometry().Leading * freeTextFontSize
+			lineHeight := pdf.Round(F.GetGeometry().Leading*freeTextFontSize, 2)
 
 			w.PushGraphicsState()
 			w.Rectangle(clipLeft, clipBottom, clipWidth, clipHeight)

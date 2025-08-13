@@ -19,6 +19,8 @@ package graphics
 import (
 	"fmt"
 	"math"
+
+	"seehuhn.de/go/pdf"
 )
 
 // This file implements the "Path construction operators" and "Path-painting
@@ -330,6 +332,9 @@ func (w *Writer) LineToArc(x, y, radius, startAngle, endAngle float64) {
 func (w *Writer) arc(x, y, radius, startAngle, endAngle float64, move bool) {
 	w.currentObject = objPath
 
+	// rounding precision based on radius
+	digits := max(1, 2-int(math.Round(math.Log10(radius))))
+
 	// also see https://www.tinaja.com/glib/bezcirc2.pdf
 	// from https://pomax.github.io/bezierinfo/ , section 42
 
@@ -341,12 +346,12 @@ func (w *Writer) arc(x, y, radius, startAngle, endAngle float64, move bool) {
 	x0 := x + radius*math.Cos(phi)
 	y0 := y + radius*math.Sin(phi)
 	if move {
-		w.MoveTo(x0, y0)
+		w.MoveTo(pdf.Round(x0, digits), pdf.Round(y0, digits))
 	} else {
-		w.LineTo(x0, y0)
+		w.LineTo(pdf.Round(x0, digits), pdf.Round(y0, digits))
 	}
 
-	for i := 0; i < nSegment; i++ {
+	for range nSegment {
 		x1 := x0 - k*math.Sin(phi)
 		y1 := y0 + k*math.Cos(phi)
 		phi += dPhi
@@ -354,7 +359,7 @@ func (w *Writer) arc(x, y, radius, startAngle, endAngle float64, move bool) {
 		y3 := y + radius*math.Sin(phi)
 		x2 := x3 + k*math.Sin(phi)
 		y2 := y3 - k*math.Cos(phi)
-		w.CurveTo(x1, y1, x2, y2, x3, y3)
+		w.CurveTo(pdf.Round(x1, int(digits)), pdf.Round(y1, int(digits)), pdf.Round(x2, int(digits)), pdf.Round(y2, int(digits)), pdf.Round(x3, int(digits)), pdf.Round(y3, int(digits)))
 		x0 = x3
 		y0 = y3
 	}

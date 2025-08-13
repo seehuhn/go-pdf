@@ -17,9 +17,11 @@
 package text
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/pdf/font/standard"
 )
 
 func TestWrap(t *testing.T) {
@@ -77,5 +79,20 @@ func TestWrap(t *testing.T) {
 				t.Errorf("Wrap() mismatch (-want +got):\n%s", d)
 			}
 		})
+	}
+}
+
+func TestWrapOverfull(t *testing.T) {
+	w := Wrap(0, "a\nb")
+	F := standard.Helvetica.New()
+	res := slices.Collect(w.Lines(F, 10))
+	if len(res) != 2 {
+		t.Fatal("expected two lines, got", len(res))
+	}
+
+	for i := range 2 {
+		if len(res[i].Seq) != 1 {
+			t.Errorf("expected one glyphs in line %d, got %d", i, len(res[i].Seq))
+		}
 	}
 }

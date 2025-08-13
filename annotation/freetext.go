@@ -231,7 +231,7 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		}
 		clArray := make(pdf.Array, len(f.CalloutLine))
 		for i, coord := range f.CalloutLine {
-			clArray[i] = pdf.Number(coord)
+			clArray[i] = pdf.Number(pdf.Round(coord, 2))
 		}
 		dict["CL"] = clArray
 	}
@@ -259,7 +259,7 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 			if xi < 0 {
 				return nil, fmt.Errorf("invalid entry %f in RD array", xi)
 			}
-			rd[i] = pdf.Number(xi)
+			rd[i] = pdf.Number(pdf.Round(xi, 4))
 		}
 		dict["RD"] = rd
 	}

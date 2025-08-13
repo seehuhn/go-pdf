@@ -92,13 +92,13 @@ func createDocument(filename string) error {
 
 	doc.SetLineWidth(0.5)
 	doc.SetStrokeColor(color.Blue)
-	doc.MoveTo(mid1, yMidTop+20)
-	doc.LineTo(mid1, yMidTop-float64(numCallout-1)*yMidStep-20)
-	doc.MoveTo(mid2, yMidTop+20)
-	doc.LineTo(mid2, yMidTop-float64(numCallout-1)*yMidStep-20)
+	doc.MoveTo(pdf.Round(mid1, 2), pdf.Round(yMidTop+20, 2))
+	doc.LineTo(pdf.Round(mid1, 2), pdf.Round(yMidTop-float64(numCallout-1)*yMidStep-20, 2))
+	doc.MoveTo(pdf.Round(mid2, 2), pdf.Round(yMidTop+20, 2))
+	doc.LineTo(pdf.Round(mid2, 2), pdf.Round(yMidTop-float64(numCallout-1)*yMidStep-20, 2))
 	for i := range leStyles {
-		doc.MoveTo(mid1-20, yMidTop-float64(i)*yMidStep)
-		doc.LineTo(mid2+20, yMidTop-float64(i)*yMidStep)
+		doc.MoveTo(pdf.Round(mid1-20, 2), pdf.Round(yMidTop-float64(i)*yMidStep, 2))
+		doc.LineTo(pdf.Round(mid2+20, 2), pdf.Round(yMidTop-float64(i)*yMidStep, 2))
 	}
 	doc.Stroke()
 
@@ -130,10 +130,10 @@ func createDocument(filename string) error {
 		aLeft := &annotation.FreeText{
 			Common: annotation.Common{
 				Rect: pdf.Rectangle{
-					LLx: leftX0,
-					LLy: yTopOuter - annotHeight,
-					URx: leftX1,
-					URy: yTopOuter,
+					LLx: pdf.Round(leftX0, 2),
+					LLy: pdf.Round(yTopOuter-annotHeight, 2),
+					URx: pdf.Round(leftX1, 2),
+					URy: pdf.Round(yTopOuter, 2),
 				},
 				Contents: string(annotation.FreeTextIntentCallout) + "\n" + string(style),
 				Flags:    annotation.FlagPrint,
@@ -145,9 +145,9 @@ func createDocument(filename string) error {
 			},
 			// Margin:          []float64{},
 			CalloutLine: []float64{
-				mid1, yMid,
-				mid1 - 50, yTopOuter - annotHeight/2,
-				leftX1, yTopOuter - annotHeight/2,
+				pdf.Round(mid1, 2), pdf.Round(yMid, 2),
+				pdf.Round(mid1-50, 2), pdf.Round(yTopOuter-annotHeight/2, 2),
+				pdf.Round(leftX1, 2), pdf.Round(yTopOuter-annotHeight/2, 2),
 			},
 			LineEndingStyle: style,
 		}
@@ -159,10 +159,10 @@ func createDocument(filename string) error {
 		aRight := &annotation.FreeText{
 			Common: annotation.Common{
 				Rect: pdf.Rectangle{
-					LLx: rightX0,
-					LLy: yTopOuter - annotHeight,
-					URx: rightX1,
-					URy: yTopOuter,
+					LLx: pdf.Round(rightX0, 2),
+					LLy: pdf.Round(yTopOuter-annotHeight, 2),
+					URx: pdf.Round(rightX1, 2),
+					URy: pdf.Round(yTopOuter, 2),
 				},
 				Contents: string(annotation.FreeTextIntentCallout) + "\n" + string(style),
 				Flags:    annotation.FlagPrint,
@@ -174,9 +174,9 @@ func createDocument(filename string) error {
 			},
 			// Margin:          []float64{},
 			CalloutLine: []float64{
-				mid2, yMid,
-				mid2 + 50, yTopOuter - annotHeight/2,
-				rightX0, yTopOuter - annotHeight/2,
+				pdf.Round(mid2, 2), pdf.Round(yMid, 2),
+				pdf.Round(mid2+50, 2), pdf.Round(yTopOuter-annotHeight/2, 2),
+				pdf.Round(rightX0, 2), pdf.Round(yTopOuter-annotHeight/2, 2),
 			},
 			LineEndingStyle: style,
 		}
@@ -199,8 +199,8 @@ func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {
 	nx := math.Cos(alpha)
 	ny := math.Sin(alpha)
 
-	t0 := math.Round((paper.LLx*nx+paper.LLy*ny)*10) / 10
-	t1 := math.Round((paper.URx*nx+paper.URy*ny)*10) / 10
+	t0 := pdf.Round(paper.LLx*nx+paper.LLy*ny, 1)
+	t1 := pdf.Round(paper.URx*nx+paper.URy*ny, 1)
 
 	F := &function.Type4{
 		Domain:  []float64{t0, t1},
@@ -210,10 +210,10 @@ func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {
 
 	background := &shading.Type2{
 		ColorSpace: color.DeviceRGBSpace,
-		X0:         math.Round(t0*nx*10) / 10,
-		Y0:         math.Round(t0*ny*10) / 10,
-		X1:         math.Round(t1*nx*10) / 10,
-		Y1:         math.Round(t1*ny*10) / 10,
+		X0:         pdf.Round(t0*nx, 1),
+		Y0:         pdf.Round(t0*ny, 1),
+		X1:         pdf.Round(t1*nx, 1),
+		Y1:         pdf.Round(t1*ny, 1),
 		F:          F,
 		TMin:       t0,
 		TMax:       t1,
