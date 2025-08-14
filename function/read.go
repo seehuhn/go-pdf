@@ -96,24 +96,6 @@ func safeExtract(r pdf.Getter, obj pdf.Object, cycleChecker *pdf.CycleChecker) (
 	}
 }
 
-// readFloats extracts a slice of float64 from a PDF Array.
-func readFloats(r pdf.Getter, obj pdf.Object) ([]float64, error) {
-	a, err := pdf.GetArray(r, obj)
-	if a == nil {
-		return nil, err
-	}
-
-	res := make([]float64, len(a))
-	for i, obj := range a {
-		num, err := pdf.GetNumber(r, obj)
-		if err != nil {
-			return nil, err
-		}
-		res[i] = float64(num)
-	}
-	return res, nil
-}
-
 // readInts extracts a slice of int from a PDF Array.
 func readInts(r pdf.Getter, obj pdf.Object) ([]int, error) {
 	a, err := pdf.GetArray(r, obj)

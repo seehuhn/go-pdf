@@ -84,14 +84,8 @@ func extractCircle(r pdf.Getter, dict pdf.Dict) (*Circle, error) {
 	}
 
 	// IC (optional)
-	if ic, err := pdf.GetArray(r, dict["IC"]); err == nil && len(ic) > 0 {
-		colors := make([]float64, len(ic))
-		for i, color := range ic {
-			if num, err := pdf.GetNumber(r, color); err == nil {
-				colors[i] = float64(num)
-			}
-		}
-		circle.IC = colors
+	if ic, err := pdf.GetFloatArray(r, dict["IC"]); err == nil && len(ic) > 0 {
+		circle.IC = ic
 	}
 
 	// BE (optional)
@@ -100,14 +94,8 @@ func extractCircle(r pdf.Getter, dict pdf.Dict) (*Circle, error) {
 	}
 
 	// RD (optional)
-	if rd, err := pdf.GetArray(r, dict["RD"]); err == nil && len(rd) == 4 {
-		diffs := make([]float64, 4)
-		for i, diff := range rd {
-			if num, err := pdf.GetNumber(r, diff); err == nil {
-				diffs[i] = float64(num)
-			}
-		}
-		circle.RD = diffs
+	if rd, err := pdf.GetFloatArray(r, dict["RD"]); err == nil && len(rd) == 4 {
+		circle.RD = rd
 	}
 
 	return circle, nil

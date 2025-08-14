@@ -33,7 +33,7 @@
 //	if err != nil {
 //		// handle error
 //	}
-//	
+//
 //	// Check the type
 //	switch m := measure.(type) {
 //	case *measure.RectilinearMeasure:
@@ -74,10 +74,10 @@
 // Use [ViewPortArray] for managing multiple viewports:
 //
 //	viewports := measure.ViewPortArray{viewport1, viewport2}
-//	
+//
 //	// Find viewport containing a point
 //	selected := viewports.Select(vec.Vec2{X: 100, Y: 200})
-//	
+//
 //	// Embed array in PDF
 //	embedded, _, err := viewports.Embed(resourceManager)
 //
@@ -107,14 +107,14 @@
 //		ConversionFactor: 1.0,
 //		Precision:        100,
 //	}
-//	
+//
 //	inchFormat := &measure.NumberFormat{
 //		Unit:             "in",
 //		ConversionFactor: 12,
 //		Precision:        8,
 //		FractionFormat:   measure.FractionFraction,
 //	}
-//	
+//
 //	// Create rectilinear measure
 //	rm := &measure.RectilinearMeasure{
 //		ScaleRatio: "1 in = 10 ft",
@@ -123,14 +123,14 @@
 //		Distance:   []*measure.NumberFormat{feetFormat, inchFormat},
 //		Area:       []*measure.NumberFormat{feetFormat},
 //	}
-//	
+//
 //	// Create viewport
 //	viewport := &measure.Viewport{
 //		BBox:    pdf.Rectangle{LLx: 72, LLy: 72, URx: 540, URy: 720},
 //		Name:    "Floor Plan",
 //		Measure: rm,
 //	}
-//	
+//
 //	// Embed in PDF
 //	embedded, _, err := viewport.Embed(resourceManager)
 package measure

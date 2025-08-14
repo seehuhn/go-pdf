@@ -36,17 +36,17 @@ func TestRectangleContains(t *testing.T) {
 		point    vec.Vec2
 		expected bool
 	}{
-		{"point inside", vec.Vec2{50, 100}, true},
-		{"point on left edge", vec.Vec2{10, 100}, true},
-		{"point on right edge", vec.Vec2{100, 100}, true},
-		{"point on bottom edge", vec.Vec2{50, 20}, true},
-		{"point on top edge", vec.Vec2{50, 200}, true},
-		{"point at lower-left corner", vec.Vec2{10, 20}, true},
-		{"point at upper-right corner", vec.Vec2{100, 200}, true},
-		{"point left of rectangle", vec.Vec2{5, 100}, false},
-		{"point right of rectangle", vec.Vec2{105, 100}, false},
-		{"point below rectangle", vec.Vec2{50, 15}, false},
-		{"point above rectangle", vec.Vec2{50, 205}, false},
+		{"point inside", vec.Vec2{X: 50, Y: 100}, true},
+		{"point on left edge", vec.Vec2{X: 10, Y: 100}, true},
+		{"point on right edge", vec.Vec2{X: 100, Y: 100}, true},
+		{"point on bottom edge", vec.Vec2{X: 50, Y: 20}, true},
+		{"point on top edge", vec.Vec2{X: 50, Y: 200}, true},
+		{"point at lower-left corner", vec.Vec2{X: 10, Y: 20}, true},
+		{"point at upper-right corner", vec.Vec2{X: 100, Y: 200}, true},
+		{"point left of rectangle", vec.Vec2{X: 5, Y: 100}, false},
+		{"point right of rectangle", vec.Vec2{X: 105, Y: 100}, false},
+		{"point below rectangle", vec.Vec2{X: 50, Y: 15}, false},
+		{"point above rectangle", vec.Vec2{X: 50, Y: 205}, false},
 	}
 
 	for _, tt := range tests {
@@ -284,13 +284,13 @@ func TestSelectViewportEmptyArray(t *testing.T) {
 func TestExtractViewportArray(t *testing.T) {
 	// Create test viewports
 	vp1 := &Viewport{
-		BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-		Name: "First",
+		BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+		Name:      "First",
 		SingleUse: true,
 	}
 	vp2 := &Viewport{
-		BBox: pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 200},
-		Name: "Second",
+		BBox:      pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 200},
+		Name:      "Second",
 		SingleUse: true,
 	}
 
@@ -336,13 +336,13 @@ func TestExtractViewportArray(t *testing.T) {
 func TestEmbedViewportArray(t *testing.T) {
 	viewports := ViewPortArray{
 		{
-			BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-			Name: "First",
+			BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+			Name:      "First",
 			SingleUse: true,
 		},
 		{
-			BBox: pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 200},
-			Name: "Second",
+			BBox:      pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 200},
+			Name:      "Second",
 			SingleUse: false,
 		},
 	}
@@ -356,7 +356,7 @@ func TestEmbedViewportArray(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Embed failed: %v", err)
 	}
-	
+
 	arr, ok := embedded.(pdf.Array)
 	if !ok {
 		t.Fatalf("Expected pdf.Array, got %T", embedded)
@@ -385,8 +385,8 @@ func TestViewPortArrayType(t *testing.T) {
 	// Test that ViewPortArray implements the expected methods
 	viewports := ViewPortArray{
 		{
-			BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-			Name: "Test",
+			BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+			Name:      "Test",
 			SingleUse: true,
 		},
 	}
@@ -400,23 +400,23 @@ func TestViewPortArrayType(t *testing.T) {
 	// Test Embed method
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	res := pdf.NewResourceManager(w)
-	
+
 	embedded, _, err := viewports.Embed(res)
 	if err != nil {
 		t.Fatalf("Embed failed: %v", err)
 	}
-	
+
 	if _, ok := embedded.(pdf.Array); !ok {
 		t.Errorf("Expected pdf.Array, got %T", embedded)
 	}
-	
+
 	// Test round-trip
 	arr := embedded.(pdf.Array)
 	extracted, err := ExtractViewportArray(w, arr)
 	if err != nil {
 		t.Fatalf("ExtractViewportArray failed: %v", err)
 	}
-	
+
 	if len(extracted) != 1 {
 		t.Errorf("Expected 1 viewport, got %d", len(extracted))
 	}
@@ -426,8 +426,8 @@ func TestBackwardsCompatibility(t *testing.T) {
 	// Test that the deprecated functions still work
 	viewports := []*Viewport{
 		{
-			BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-			Name: "Test",
+			BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+			Name:      "Test",
 			SingleUse: true,
 		},
 	}
@@ -441,12 +441,12 @@ func TestBackwardsCompatibility(t *testing.T) {
 	// Test deprecated EmbedViewportArray function
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	res := pdf.NewResourceManager(w)
-	
+
 	arr, err := EmbedViewportArray(res, viewports)
 	if err != nil {
 		t.Fatalf("EmbedViewportArray failed: %v", err)
 	}
-	
+
 	if len(arr) != 1 {
 		t.Errorf("Expected 1 element in array, got %d", len(arr))
 	}
@@ -454,7 +454,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 func TestViewportVersionCheck(t *testing.T) {
 	vp := &Viewport{
-		BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+		BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
 		SingleUse: true,
 	}
 
@@ -515,7 +515,7 @@ func TestExtractViewportErrors(t *testing.T) {
 
 func TestViewportSingleUse(t *testing.T) {
 	vp := &Viewport{
-		BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+		BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
 		SingleUse: true,
 	}
 

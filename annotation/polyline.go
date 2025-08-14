@@ -89,14 +89,8 @@ func extractPolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
 
 	// Extract polyline-specific fields
 	// Vertices (required unless Path is present)
-	if vertices, err := pdf.GetArray(r, dict["Vertices"]); err == nil && len(vertices) > 0 {
-		coords := make([]float64, len(vertices))
-		for i, vertex := range vertices {
-			if num, err := pdf.GetNumber(r, vertex); err == nil {
-				coords[i] = float64(num)
-			}
-		}
-		polyline.Vertices = coords
+	if vertices, err := pdf.GetFloatArray(r, dict["Vertices"]); err == nil && len(vertices) > 0 {
+		polyline.Vertices = vertices
 	}
 
 	// LE (optional)
@@ -118,14 +112,8 @@ func extractPolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
 	}
 
 	// IC (optional)
-	if ic, err := pdf.GetArray(r, dict["IC"]); err == nil && len(ic) > 0 {
-		colors := make([]float64, len(ic))
-		for i, color := range ic {
-			if num, err := pdf.GetNumber(r, color); err == nil {
-				colors[i] = float64(num)
-			}
-		}
-		polyline.IC = colors
+	if ic, err := pdf.GetFloatArray(r, dict["IC"]); err == nil && len(ic) > 0 {
+		polyline.IC = ic
 	}
 
 	// Measure (optional)
@@ -141,13 +129,7 @@ func extractPolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
 	if path, err := pdf.GetArray(r, dict["Path"]); err == nil && len(path) > 0 {
 		pathArrays := make([][]float64, 0, len(path))
 		for _, pathEntry := range path {
-			if pathArray, err := pdf.GetArray(r, pathEntry); err == nil {
-				coords := make([]float64, len(pathArray))
-				for j, coord := range pathArray {
-					if num, err := pdf.GetNumber(r, coord); err == nil {
-						coords[j] = float64(num)
-					}
-				}
+			if coords, err := pdf.GetFloatArray(r, pathEntry); err == nil {
 				pathArrays = append(pathArrays, coords)
 			}
 		}

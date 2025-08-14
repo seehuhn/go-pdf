@@ -80,15 +80,14 @@ func ExtractBorder(r pdf.Getter, obj pdf.Object) (*Border, error) {
 	}
 
 	if len(border) > 3 {
-		if dashArray, err := pdf.Optional(pdf.GetArray(r, border[3])); err != nil {
+		if dashArray, err := pdf.Optional(pdf.GetFloatArray(r, border[3])); err != nil {
 			return nil, err
 		} else {
+			// filter out negative values
 			var dashes []float64
-			for _, dash := range dashArray {
-				if num, err := pdf.Optional(pdf.GetNumber(r, dash)); err != nil {
-					return nil, err
-				} else if num >= 0 {
-					dashes = append(dashes, float64(num))
+			for _, num := range dashArray {
+				if num >= 0 {
+					dashes = append(dashes, num)
 				}
 			}
 			if len(dashes) > 0 {
@@ -190,14 +189,8 @@ func ExtractBorderStyle(r pdf.Getter, obj pdf.Object) (*BorderStyle, error) {
 		style.Style = "S" // default to solid line
 	}
 
-	a, _ := pdf.GetArray(r, dict["D"])
-	if len(a) > 0 {
-		style.DashArray = make([]float64, len(a))
-		for i, d := range a {
-			if num, err := pdf.GetNumber(r, d); err == nil {
-				style.DashArray[i] = float64(num)
-			}
-		}
+	if a, err := pdf.GetFloatArray(r, dict["D"]); err == nil && len(a) > 0 {
+		style.DashArray = a
 	} else {
 		style.DashArray = []float64{3} // default dash pattern
 	}

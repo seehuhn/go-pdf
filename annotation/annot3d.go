@@ -299,18 +299,12 @@ func extractAnnot3D(r pdf.Getter, dict pdf.Dict) (*Annot3D, error) {
 	}
 
 	// 3DB (optional)
-	if threeDB, err := pdf.GetArray(r, dict["3DB"]); err == nil && len(threeDB) == 4 {
-		llx, err1 := pdf.GetReal(r, threeDB[0])
-		lly, err2 := pdf.GetReal(r, threeDB[1])
-		urx, err3 := pdf.GetReal(r, threeDB[2])
-		ury, err4 := pdf.GetReal(r, threeDB[3])
-		if err1 == nil && err2 == nil && err3 == nil && err4 == nil {
-			annot3D.B = &pdf.Rectangle{
-				LLx: float64(llx),
-				LLy: float64(lly),
-				URx: float64(urx),
-				URy: float64(ury),
-			}
+	if threeDB, err := pdf.GetFloatArray(r, dict["3DB"]); err == nil && len(threeDB) == 4 {
+		annot3D.B = &pdf.Rectangle{
+			LLx: threeDB[0],
+			LLy: threeDB[1],
+			URx: threeDB[2],
+			URy: threeDB[3],
 		}
 	}
 

@@ -136,7 +136,7 @@ func extractRectilinearMeasure(r pdf.Getter, dict pdf.Dict) (*RectilinearMeasure
 		oArray, err := pdf.Optional(pdf.GetArray(r, dict["O"]))
 		if err != nil {
 			return nil, err
-		} else if oArray != nil && len(oArray) >= 2 {
+		} else if len(oArray) >= 2 {
 			origin0, err := pdf.GetNumber(r, oArray[0])
 			if err != nil {
 				return nil, err

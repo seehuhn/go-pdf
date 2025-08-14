@@ -87,14 +87,8 @@ func extractPolygon(r pdf.Getter, dict pdf.Dict) (*Polygon, error) {
 
 	// Extract polygon-specific fields
 	// Vertices (required unless Path is present)
-	if vertices, err := pdf.GetArray(r, dict["Vertices"]); err == nil && len(vertices) > 0 {
-		coords := make([]float64, len(vertices))
-		for i, vertex := range vertices {
-			if num, err := pdf.GetNumber(r, vertex); err == nil {
-				coords[i] = float64(num)
-			}
-		}
-		polygon.Vertices = coords
+	if vertices, err := pdf.GetFloatArray(r, dict["Vertices"]); err == nil && len(vertices) > 0 {
+		polygon.Vertices = vertices
 	}
 
 	// BS (optional)
@@ -105,14 +99,8 @@ func extractPolygon(r pdf.Getter, dict pdf.Dict) (*Polygon, error) {
 	}
 
 	// IC (optional)
-	if ic, err := pdf.GetArray(r, dict["IC"]); err == nil && len(ic) > 0 {
-		colors := make([]float64, len(ic))
-		for i, color := range ic {
-			if num, err := pdf.GetNumber(r, color); err == nil {
-				colors[i] = float64(num)
-			}
-		}
-		polygon.IC = colors
+	if ic, err := pdf.GetFloatArray(r, dict["IC"]); err == nil && len(ic) > 0 {
+		polygon.IC = ic
 	}
 
 	// BE (optional)

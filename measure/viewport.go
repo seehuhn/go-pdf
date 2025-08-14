@@ -17,8 +17,8 @@
 package measure
 
 import (
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/geom/vec"
+	"seehuhn.de/go/pdf"
 )
 
 // Viewport represents a rectangular region of a page with measurement information.
@@ -173,7 +173,7 @@ func ExtractViewportArray(r pdf.Getter, arr pdf.Array) (ViewPortArray, error) {
 // Embed converts the ViewPortArray into a PDF array.
 func (va ViewPortArray) Embed(res *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	
+
 	arr := make(pdf.Array, len(va))
 	for i, viewport := range va {
 		embedded, _, err := viewport.Embed(res)

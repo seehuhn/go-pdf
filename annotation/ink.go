@@ -74,18 +74,8 @@ func extractInk(r pdf.Getter, dict pdf.Dict) (*Ink, error) {
 	if inkList, err := pdf.GetArray(r, dict["InkList"]); err == nil && len(inkList) > 0 {
 		paths := make([][]float64, len(inkList))
 		for i, pathEntry := range inkList {
-			if pathArray, err := pdf.GetArray(r, pathEntry); err == nil {
-				if len(pathArray) > 0 {
-					coords := make([]float64, len(pathArray))
-					for j, coord := range pathArray {
-						if num, err := pdf.GetNumber(r, coord); err == nil {
-							coords[j] = float64(num)
-						}
-					}
-					paths[i] = coords
-				} else {
-					paths[i] = []float64{} // Ensure empty slice instead of nil
-				}
+			if coords, err := pdf.GetFloatArray(r, pathEntry); err == nil && len(coords) > 0 {
+				paths[i] = coords
 			} else {
 				paths[i] = []float64{} // Default to empty slice if extraction fails
 			}

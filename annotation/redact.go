@@ -73,34 +73,24 @@ func extractRedact(r pdf.Getter, dict pdf.Dict) (*Redact, error) {
 	}
 
 	// QuadPoints (optional)
-	if quadPoints, err := pdf.GetArray(r, dict["QuadPoints"]); err == nil && len(quadPoints) > 0 {
-		points := make([]float64, len(quadPoints))
-		for i, obj := range quadPoints {
-			if num, err := pdf.GetNumber(r, obj); err == nil {
-				points[i] = float64(num)
-			}
-		}
+	if quadPoints, err := pdf.GetFloatArray(r, dict["QuadPoints"]); err == nil && len(quadPoints) > 0 {
 		// Validate that we have a multiple of 8 points (each quadrilateral needs 8 coordinates)
-		if len(points)%8 == 0 {
-			redact.QuadPoints = points
+		if len(quadPoints)%8 == 0 {
+			redact.QuadPoints = quadPoints
 		}
 	}
 
 	// IC (optional) - RGB color components
-	if ic, err := pdf.GetArray(r, dict["IC"]); err == nil && len(ic) == 3 {
+	if ic, err := pdf.GetFloatArray(r, dict["IC"]); err == nil && len(ic) == 3 {
+		// Clamp invalid color values to valid range [0, 1]
 		colors := make([]float64, 3)
-		for i, obj := range ic {
-			if num, err := pdf.GetNumber(r, obj); err == nil {
-				// Clamp invalid color values to valid range [0, 1]
-				val := float64(num)
-				if val < 0.0 {
-					val = 0.0
-				} else if val > 1.0 {
-					val = 1.0
-				}
-				colors[i] = val
+		for i, val := range ic {
+			if val < 0.0 {
+				val = 0.0
+			} else if val > 1.0 {
+				val = 1.0
 			}
-			// Invalid numbers default to 0.0
+			colors[i] = val
 		}
 		redact.IC = colors
 	}

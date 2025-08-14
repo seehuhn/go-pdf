@@ -62,14 +62,8 @@ func extractCaret(r pdf.Getter, dict pdf.Dict) (*Caret, error) {
 
 	// Extract caret-specific fields
 	// RD (optional)
-	if rd, err := pdf.GetArray(r, dict["RD"]); err == nil && len(rd) == 4 {
-		diffs := make([]float64, 4)
-		for i, diff := range rd {
-			if num, err := pdf.GetNumber(r, diff); err == nil {
-				diffs[i] = float64(num)
-			}
-		}
-		caret.RD = diffs
+	if rd, err := pdf.GetFloatArray(r, dict["RD"]); err == nil && len(rd) == 4 {
+		caret.RD = rd
 	}
 
 	// Sy (optional)

@@ -105,14 +105,8 @@ func extractLink(r pdf.Getter, dict pdf.Dict) (*Link, error) {
 		link.Backup = pa
 	}
 
-	if quadPoints, err := pdf.GetArray(r, dict["QuadPoints"]); err == nil && len(quadPoints) > 0 {
-		coords := make([]float64, len(quadPoints))
-		for i, coord := range quadPoints {
-			if num, err := pdf.GetNumber(r, coord); err == nil {
-				coords[i] = float64(num)
-			}
-		}
-		link.QuadPoints = coords
+	if quadPoints, err := pdf.GetFloatArray(r, dict["QuadPoints"]); err == nil && len(quadPoints) > 0 {
+		link.QuadPoints = quadPoints
 	}
 
 	// BS (optional)

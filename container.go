@@ -164,6 +164,32 @@ func getIntegerNoObjStm(r Getter, obj Object) (Integer, error) {
 	}
 }
 
+// GetFloatArray resolves any indirect reference and returns the object as a
+// slice of float64 values. Each array element is converted to float64 using
+// GetNumber.
+//
+// If the object is `null`, the function returns `nil, nil`.
+func GetFloatArray(r Getter, obj Object) ([]float64, error) {
+	array, err := GetArray(r, obj)
+	if err != nil {
+		return nil, err
+	}
+	if array == nil {
+		return nil, nil
+	}
+
+	result := make([]float64, len(array))
+	for i, item := range array {
+		num, err := GetNumber(r, item)
+		if err != nil {
+			return nil, fmt.Errorf("array element %d: %w", i, err)
+		}
+		result[i] = float64(num)
+	}
+
+	return result, nil
+}
+
 // GetDictTyped resolves any indirect reference and checks that the resulting
 // object is a dictionary.  The function also checks that the "Type" entry of
 // the dictionary, if set, is equal to the given type.

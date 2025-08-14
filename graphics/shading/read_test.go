@@ -70,11 +70,11 @@ var testCases = map[int][]testCase{
 			shading: &Type1{
 				ColorSpace: color.DeviceRGBSpace,
 				F: &function.Type0{
-					Domain:        []float64{0, 1, 0, 1},
+					Domain:        []float64{-1, 1, -1, 1},
 					Range:         []float64{0, 1, 0, 1, 0, 1},
 					Size:          []int{2, 2},
 					BitsPerSample: 8,
-					Encode:        []float64{0, 1, 0, 1},
+					Encode:        []float64{-1, 1, -1, 1},
 					Decode:        []float64{0, 1, 0, 1, 0, 1},
 					Samples:       []byte{255, 255, 255, 0, 0, 0, 128, 128, 128, 64, 64, 64},
 				},
@@ -250,7 +250,7 @@ func roundTripTest(t *testing.T, originalShading graphics.Shading) {
 	}
 
 	// Read the shading back
-	readShading, err := Read(buf, ref)
+	readShading, err := Extract(buf, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -402,7 +402,7 @@ func TestReadErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 
-			_, err := Read(buf, tt.dict)
+			_, err := Extract(buf, tt.dict)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Read() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -499,7 +499,7 @@ func FuzzRead(f *testing.F) {
 		if obj == nil {
 			t.Skip("broken reference")
 		}
-		shading, err := Read(r, obj)
+		shading, err := Extract(r, obj)
 		if err != nil {
 			t.Skip("broken shading")
 		}

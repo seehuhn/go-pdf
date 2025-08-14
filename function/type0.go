@@ -75,16 +75,21 @@ func (f *Type0) Shape() (int, int) {
 	return len(f.Domain) / 2, len(f.Range) / 2
 }
 
+// GetDomain returns the function's input domain.
+func (f *Type0) GetDomain() []float64 {
+	return f.Domain
+}
+
 // extractType0 reads a Type 0 sampled function from a PDF stream object.
 func extractType0(r pdf.Getter, stream *pdf.Stream) (*Type0, error) {
 	d := stream.Dict
 
-	domain, err := readFloats(r, d["Domain"])
+	domain, err := pdf.GetFloatArray(r, d["Domain"])
 	if err != nil {
 		return nil, err
 	}
 
-	rangeArray, err := readFloats(r, d["Range"])
+	rangeArray, err := pdf.GetFloatArray(r, d["Range"])
 	if err != nil {
 		return nil, err
 	}
@@ -104,12 +109,12 @@ func extractType0(r pdf.Getter, stream *pdf.Stream) (*Type0, error) {
 		return nil, err
 	}
 
-	encode, err := readFloats(r, d["Encode"])
+	encode, err := pdf.GetFloatArray(r, d["Encode"])
 	if err != nil {
 		return nil, err
 	}
 
-	decode, err := readFloats(r, d["Decode"])
+	decode, err := pdf.GetFloatArray(r, d["Decode"])
 	if err != nil {
 		return nil, err
 	}

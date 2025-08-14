@@ -56,14 +56,8 @@ func extractHighlight(r pdf.Getter, dict pdf.Dict) (*Highlight, error) {
 
 	// Extract highlight-specific fields
 	// QuadPoints (required)
-	if quadPoints, err := pdf.GetArray(r, dict["QuadPoints"]); err == nil && len(quadPoints) > 0 {
-		coords := make([]float64, len(quadPoints))
-		for i, point := range quadPoints {
-			if num, err := pdf.GetNumber(r, point); err == nil {
-				coords[i] = float64(num)
-			}
-		}
-		highlight.QuadPoints = coords
+	if quadPoints, err := pdf.GetFloatArray(r, dict["QuadPoints"]); err == nil && len(quadPoints) > 0 {
+		highlight.QuadPoints = quadPoints
 	}
 
 	return highlight, nil

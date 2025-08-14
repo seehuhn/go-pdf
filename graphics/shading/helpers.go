@@ -33,3 +33,29 @@ func toPDF(x []float64) pdf.Array {
 func isValues(x []float64, y ...float64) bool {
 	return slices.Equal(x, y)
 }
+
+// domainContains checks if functionDomain contains shadingDomain.
+// Both domains are in format [min0, max0, min1, max1, ...] where each pair
+// represents the valid range for one input variable.
+func domainContains(functionDomain, shadingDomain []float64) bool {
+	if len(shadingDomain)%2 != 0 || len(functionDomain)%2 != 0 {
+		return false
+	}
+	// Function and shading must have same number of input dimensions
+	if len(functionDomain) != len(shadingDomain) {
+		return false
+	}
+
+	// Check each dimension pair
+	for i := 0; i < len(shadingDomain); i += 2 {
+		shadingMin := shadingDomain[i]
+		shadingMax := shadingDomain[i+1]
+		functionMin := functionDomain[i]
+		functionMax := functionDomain[i+1]
+
+		if functionMin > shadingMin || functionMax < shadingMax {
+			return false
+		}
+	}
+	return true
+}

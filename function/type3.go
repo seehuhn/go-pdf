@@ -67,9 +67,14 @@ func (f *Type3) Shape() (int, int) {
 	return 1, n
 }
 
+// GetDomain returns the function's input domain.
+func (f *Type3) GetDomain() []float64 {
+	return []float64{f.XMin, f.XMax}
+}
+
 // extractType3 reads a Type 3 piecewise defined function from a PDF dictionary.
 func extractType3(r pdf.Getter, d pdf.Dict, cycleChecker *pdf.CycleChecker) (*Type3, error) {
-	domain, err := readFloats(r, d["Domain"])
+	domain, err := pdf.GetFloatArray(r, d["Domain"])
 	if err != nil {
 		return nil, err
 	}
@@ -77,12 +82,12 @@ func extractType3(r pdf.Getter, d pdf.Dict, cycleChecker *pdf.CycleChecker) (*Ty
 		domain = []float64{0, 1}
 	}
 
-	bounds, err := readFloats(r, d["Bounds"])
+	bounds, err := pdf.GetFloatArray(r, d["Bounds"])
 	if err != nil {
 		return nil, err
 	}
 
-	encode, err := readFloats(r, d["Encode"])
+	encode, err := pdf.GetFloatArray(r, d["Encode"])
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +109,7 @@ func extractType3(r pdf.Getter, d pdf.Dict, cycleChecker *pdf.CycleChecker) (*Ty
 		return nil, errors.New("missing child functions")
 	}
 
-	rnge, err := readFloats(r, d["Range"])
+	rnge, err := pdf.GetFloatArray(r, d["Range"])
 	if err != nil {
 		return nil, err
 	}

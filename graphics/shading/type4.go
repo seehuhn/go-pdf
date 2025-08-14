@@ -19,9 +19,11 @@ package shading
 import (
 	"errors"
 	"fmt"
+	"io"
 	"math"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
@@ -82,6 +84,232 @@ type Type4Vertex struct {
 // ShadingType implements the [Shading] interface.
 func (s *Type4) ShadingType() int {
 	return 4
+}
+
+// extractType4 reads a Type 4 (free-form Gouraud-shaded triangle mesh) shading from a PDF stream.
+func extractType4(r pdf.Getter, stream *pdf.Stream, wasReference bool) (*Type4, error) {
+	d := stream.Dict
+	s := &Type4{}
+
+	// Read required ColorSpace
+	csObj, ok := d["ColorSpace"]
+	if !ok {
+		return nil, &pdf.MalformedFileError{
+			Err: fmt.Errorf("missing /ColorSpace entry"),
+		}
+	}
+	cs, err := color.ExtractSpace(r, csObj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read ColorSpace: %w", err)
+	}
+	s.ColorSpace = cs
+
+	// Read required BitsPerCoordinate
+	bpcObj, ok := d["BitsPerCoordinate"]
+	if !ok {
+		return nil, &pdf.MalformedFileError{
+			Err: fmt.Errorf("missing /BitsPerCoordinate entry"),
+		}
+	}
+	bpc, err := pdf.GetInteger(r, bpcObj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read BitsPerCoordinate: %w", err)
+	}
+	s.BitsPerCoordinate = int(bpc)
+
+	// Read required BitsPerComponent
+	bpcompObj, ok := d["BitsPerComponent"]
+	if !ok {
+		return nil, &pdf.MalformedFileError{
+			Err: fmt.Errorf("missing /BitsPerComponent entry"),
+		}
+	}
+	bpcomp, err := pdf.GetInteger(r, bpcompObj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read BitsPerComponent: %w", err)
+	}
+	s.BitsPerComponent = int(bpcomp)
+
+	// Read required BitsPerFlag
+	bpfObj, ok := d["BitsPerFlag"]
+	if !ok {
+		return nil, &pdf.MalformedFileError{
+			Err: fmt.Errorf("missing /BitsPerFlag entry"),
+		}
+	}
+	bpf, err := pdf.GetInteger(r, bpfObj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read BitsPerFlag: %w", err)
+	}
+	s.BitsPerFlag = int(bpf)
+
+	// Read required Decode
+	decodeObj, ok := d["Decode"]
+	if !ok {
+		return nil, &pdf.MalformedFileError{
+			Err: fmt.Errorf("missing /Decode entry"),
+		}
+	}
+	decode, err := pdf.GetFloatArray(r, decodeObj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read Decode: %w", err)
+	}
+	s.Decode = decode
+
+	// We'll validate the Decode array length after reading the optional Function
+	// since the number of color components depends on whether a Function is present
+
+	// Read optional Function
+	if fnObj, ok := d["Function"]; ok {
+		fn, err := function.Extract(r, fnObj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read Function: %w", err)
+		}
+		s.F = fn
+	}
+
+	// Validate Decode array length
+	// Type4 shading Decode array must have 4 + 2*n elements:
+	// - 4 elements for X,Y coordinates (xmin, xmax, ymin, ymax)
+	// - 2*n elements for color components (cmin1, cmax1, cmin2, cmax2, ...)
+	// where n is the number of color components in the vertex data
+	var numColorComponents int
+	if s.F != nil {
+		// If function is present, color components are function inputs
+		m, _ := s.F.Shape()
+		numColorComponents = m
+	} else {
+		// If no function, color components are direct color space values
+		numColorComponents = s.ColorSpace.Channels()
+	}
+	expectedDecodeLength := 4 + 2*numColorComponents // 4 for X,Y + 2 per color component
+	if len(s.Decode) != expectedDecodeLength {
+		return nil, &pdf.MalformedFileError{
+			Err: fmt.Errorf("invalid Decode array length: expected %d, got %d", expectedDecodeLength, len(s.Decode)),
+		}
+	}
+
+	// Read optional Background
+	if bgObj, ok := d["Background"]; ok {
+		bg, err := pdf.GetFloatArray(r, bgObj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read Background: %w", err)
+		}
+		s.Background = bg
+	}
+
+	// Read optional BBox
+	if bboxObj, ok := d["BBox"]; ok {
+		bbox, err := pdf.GetRectangle(r, bboxObj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read BBox: %w", err)
+		}
+		s.BBox = bbox
+	}
+
+	// Read optional AntiAlias
+	if aaObj, ok := d["AntiAlias"]; ok {
+		aa, err := pdf.GetBoolean(r, aaObj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read AntiAlias: %w", err)
+		}
+		s.AntiAlias = bool(aa)
+	}
+
+	// Read stream data to extract vertices
+	stmReader, err := pdf.DecodeStream(r, stream, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode stream: %w", err)
+	}
+	defer stmReader.Close()
+
+	data, err := io.ReadAll(stmReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read stream data: %w", err)
+	}
+
+	// Parse vertices from binary data
+	vertices, err := parseType4Vertices(data, s)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse vertices: %w", err)
+	}
+	s.Vertices = vertices
+
+	return s, nil
+}
+
+// parseType4Vertices parses vertex data from binary stream data.
+func parseType4Vertices(data []byte, s *Type4) ([]Type4Vertex, error) {
+	numComponents := s.ColorSpace.Channels()
+	numValues := numComponents
+	if s.F != nil {
+		numValues = 1
+	}
+
+	vertexBits := s.BitsPerFlag + 2*s.BitsPerCoordinate + numValues*s.BitsPerComponent
+	if vertexBits <= 0 {
+		return nil, pdf.Errorf("invalid vertex bit configuration: total bits per vertex is %d", vertexBits)
+	}
+	vertexBytes := (vertexBits + 7) / 8
+
+	if len(data)%vertexBytes != 0 {
+		return nil, fmt.Errorf("invalid stream data length: %d bytes is not a multiple of %d", len(data), vertexBytes)
+	}
+
+	numVertices := len(data) / vertexBytes
+	vertices := make([]Type4Vertex, numVertices)
+
+	// bit extraction helper
+	extractBits := func(data []byte, bitOffset, numBits int) uint32 {
+		var result uint32
+		for i := 0; i < numBits; i++ {
+			byteIndex := (bitOffset + i) / 8
+			bitIndex := 7 - ((bitOffset + i) % 8)
+			if byteIndex < len(data) && (data[byteIndex]&(1<<bitIndex)) != 0 {
+				result |= 1 << (numBits - 1 - i)
+			}
+		}
+		return result
+	}
+
+	// coordinate decoding helper
+	decodeCoord := func(encoded uint32, bits int, decodeMin, decodeMax float64) float64 {
+		maxVal := (1 << bits) - 1
+		t := float64(encoded) / float64(maxVal)
+		return decodeMin + t*(decodeMax-decodeMin)
+	}
+
+	for i := 0; i < numVertices; i++ {
+		vertexData := data[i*vertexBytes : (i+1)*vertexBytes]
+		bitOffset := 0
+
+		// Extract flag
+		flag := extractBits(vertexData, bitOffset, s.BitsPerFlag)
+		vertices[i].Flag = uint8(flag)
+		bitOffset += s.BitsPerFlag
+
+		// Extract X coordinate
+		xEncoded := extractBits(vertexData, bitOffset, s.BitsPerCoordinate)
+		vertices[i].X = decodeCoord(xEncoded, s.BitsPerCoordinate, s.Decode[0], s.Decode[1])
+		bitOffset += s.BitsPerCoordinate
+
+		// Extract Y coordinate
+		yEncoded := extractBits(vertexData, bitOffset, s.BitsPerCoordinate)
+		vertices[i].Y = decodeCoord(yEncoded, s.BitsPerCoordinate, s.Decode[2], s.Decode[3])
+		bitOffset += s.BitsPerCoordinate
+
+		// Extract color components
+		vertices[i].Color = make([]float64, numValues)
+		for j := 0; j < numValues; j++ {
+			colorEncoded := extractBits(vertexData, bitOffset, s.BitsPerComponent)
+			decodeMin := s.Decode[4+2*j]
+			decodeMax := s.Decode[4+2*j+1]
+			vertices[i].Color[j] = decodeCoord(colorEncoded, s.BitsPerComponent, decodeMin, decodeMax)
+			bitOffset += s.BitsPerComponent
+		}
+	}
+
+	return vertices, nil
 }
 
 // Embed implements the [Shading] interface.

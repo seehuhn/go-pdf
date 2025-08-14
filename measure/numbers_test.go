@@ -116,29 +116,29 @@ func TestNumberFormatExtractEmbed(t *testing.T) {
 func TestNumberFormatExtractDefaults(t *testing.T) {
 	// Test extraction with minimal PDF dictionary (only required fields)
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	
+
 	dict := pdf.Dict{
 		"U": pdf.String("mi"),
 		"C": pdf.Number(1.0),
 		"D": pdf.Integer(100),
 	}
-	
+
 	extracted, err := ExtractNumberFormat(w, dict)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
 
 	expected := NumberFormat{
-		Unit:                   "mi",
-		ConversionFactor:       1.0,
-		Precision:              100,
-		FractionFormat:         FractionDecimal,
-		ForceExactFraction:     false,
-		ThousandsSeparator:     "",
-		DecimalSeparator:       "",
-		PrefixSpacing:          "",
-		SuffixSpacing:          "",
-		PrefixLabel:            false,
+		Unit:               "mi",
+		ConversionFactor:   1.0,
+		Precision:          100,
+		FractionFormat:     FractionDecimal,
+		ForceExactFraction: false,
+		ThousandsSeparator: "",
+		DecimalSeparator:   "",
+		PrefixSpacing:      "",
+		SuffixSpacing:      "",
+		PrefixLabel:        false,
 	}
 
 	if diff := cmp.Diff(*extracted, expected); diff != "" {

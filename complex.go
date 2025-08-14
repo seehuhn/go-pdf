@@ -282,13 +282,12 @@ func asRectangle(r Getter, a Array) (*Rectangle, error) {
 	if len(a) != 4 {
 		return nil, errNoRectangle
 	}
-	values := [4]float64{}
-	for i, obj := range a {
-		xi, err := GetNumber(r, obj)
-		if err != nil {
-			return nil, err
-		}
-		values[i] = float64(xi)
+	values, err := GetFloatArray(r, a)
+	if err != nil {
+		return nil, err
+	}
+	if len(values) != 4 {
+		return nil, errNoRectangle
 	}
 	rect := &Rectangle{
 		LLx: math.Min(values[0], values[2]),
@@ -385,7 +384,7 @@ func GetMatrix(r Getter, obj Object) (m matrix.Matrix, err error) {
 		}
 	}()
 
-	a, err := GetArray(r, obj)
+	a, err := GetFloatArray(r, obj)
 	if err != nil {
 		return matrix.Matrix{}, err
 	}
@@ -396,13 +395,7 @@ func GetMatrix(r Getter, obj Object) (m matrix.Matrix, err error) {
 		}
 	}
 
-	for i, x := range a {
-		xi, err := GetNumber(r, x)
-		if err != nil {
-			return m, err
-		}
-		m[i] = float64(xi)
-	}
+	copy(m[:], a)
 
 	return m, nil
 }
@@ -578,6 +571,11 @@ type Function interface {
 
 	// Shape returns the number of input and output values of the function.
 	Shape() (m int, n int)
+
+	// GetDomain returns the function's input domain in array format
+	// [min0, max0, min1, max1, ...] where each pair represents the valid
+	// range for one input variable.
+	GetDomain() []float64
 
 	Embedder[Unused]
 

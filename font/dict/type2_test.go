@@ -19,7 +19,6 @@ package dict
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -109,7 +108,6 @@ func FuzzType2Dict(f *testing.F) {
 		}
 		obj := r.GetMeta().Trailer["Quir:X"]
 		if obj == nil {
-			pdf.Format(os.Stdout, pdf.OptPretty, r.GetMeta().Trailer)
 			t.Skip("broken reference")
 		}
 		d, err := ReadCIDFontType2(r, obj)

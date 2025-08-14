@@ -51,6 +51,11 @@ func (f *Type4) Shape() (int, int) {
 	return m, n
 }
 
+// GetDomain returns the function's input domain.
+func (f *Type4) GetDomain() []float64 {
+	return f.Domain
+}
+
 // extractType4 reads a Type 4 function from a PDF stream object.
 func extractType4(r pdf.Getter, stream *pdf.Stream) (*Type4, error) {
 	d := stream.Dict
@@ -58,7 +63,7 @@ func extractType4(r pdf.Getter, stream *pdf.Stream) (*Type4, error) {
 	var domain []float64
 	if domainObj, ok := d["Domain"]; ok {
 		var err error
-		domain, err = readFloats(r, domainObj)
+		domain, err = pdf.GetFloatArray(r, domainObj)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read Domain: %w", err)
 		}
@@ -67,7 +72,7 @@ func extractType4(r pdf.Getter, stream *pdf.Stream) (*Type4, error) {
 	var rangeArray []float64
 	if rangeObj, ok := d["Range"]; ok {
 		var err error
-		rangeArray, err = readFloats(r, rangeObj)
+		rangeArray, err = pdf.GetFloatArray(r, rangeObj)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read Range: %w", err)
 		}

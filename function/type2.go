@@ -65,9 +65,14 @@ func (f *Type2) Shape() (int, int) {
 	return 1, len(f.C0)
 }
 
+// GetDomain returns the function's input domain.
+func (f *Type2) GetDomain() []float64 {
+	return []float64{f.XMin, f.XMax}
+}
+
 // extractType2 reads a Type 2 exponential interpolation function from a PDF dictionary.
 func extractType2(r pdf.Getter, d pdf.Dict) (*Type2, error) {
-	domain, err := readFloats(r, d["Domain"])
+	domain, err := pdf.GetFloatArray(r, d["Domain"])
 	if err != nil {
 		return nil, err
 	}
@@ -75,17 +80,17 @@ func extractType2(r pdf.Getter, d pdf.Dict) (*Type2, error) {
 		domain = []float64{0, 1}
 	}
 
-	rnge, err := readFloats(r, d["Range"])
+	rnge, err := pdf.GetFloatArray(r, d["Range"])
 	if err != nil {
 		return nil, err
 	}
 
-	C0, err := readFloats(r, d["C0"])
+	C0, err := pdf.GetFloatArray(r, d["C0"])
 	if err != nil {
 		return nil, err
 	}
 
-	C1, err := readFloats(r, d["C1"])
+	C1, err := pdf.GetFloatArray(r, d["C1"])
 	if err != nil {
 		return nil, err
 	}

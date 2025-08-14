@@ -56,14 +56,8 @@ func extractSquiggly(r pdf.Getter, dict pdf.Dict) (*Squiggly, error) {
 
 	// Extract squiggly-specific fields
 	// QuadPoints (required)
-	if quadPoints, err := pdf.GetArray(r, dict["QuadPoints"]); err == nil && len(quadPoints) > 0 {
-		coords := make([]float64, len(quadPoints))
-		for i, point := range quadPoints {
-			if num, err := pdf.GetNumber(r, point); err == nil {
-				coords[i] = float64(num)
-			}
-		}
-		squiggly.QuadPoints = coords
+	if quadPoints, err := pdf.GetFloatArray(r, dict["QuadPoints"]); err == nil && len(quadPoints) > 0 {
+		squiggly.QuadPoints = quadPoints
 	}
 
 	return squiggly, nil
