@@ -26,6 +26,8 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
+// PDF 2.0 sections: 8.7.4.3 8.7.4.5.2
+
 // Type1 represents a type 1 (function-based) shading.
 //
 // This type implements the [seehuhn.de/go/pdf/graphics.Shading] interface.
@@ -83,7 +85,7 @@ func extractType1(r pdf.Getter, d pdf.Dict, wasReference bool) (*Type1, error) {
 	}
 	cs, err := color.ExtractSpace(r, csObj)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read ColorSpace: %w", err)
+		return nil, err
 	}
 	s.ColorSpace = cs
 
@@ -96,7 +98,7 @@ func extractType1(r pdf.Getter, d pdf.Dict, wasReference bool) (*Type1, error) {
 	}
 	fn, err := function.Extract(r, fnObj)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read Function: %w", err)
+		return nil, err
 	}
 	s.F = fn
 

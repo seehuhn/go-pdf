@@ -231,27 +231,27 @@ func TestSelectViewport(t *testing.T) {
 	}{
 		{
 			name:     "point in first viewport only",
-			point:    vec.Vec2{10, 10},
+			point:    vec.Vec2{X: 10, Y: 10},
 			expected: viewports[0],
 		},
 		{
 			name:     "point in overlapping area - should return last",
-			point:    vec.Vec2{60, 60},
+			point:    vec.Vec2{X: 60, Y: 60},
 			expected: viewports[2], // Third is last in reverse order
 		},
 		{
 			name:     "point in second and third - should return third",
-			point:    vec.Vec2{70, 70},
+			point:    vec.Vec2{X: 70, Y: 70},
 			expected: viewports[2],
 		},
 		{
 			name:     "point not in any viewport",
-			point:    vec.Vec2{200, 200},
+			point:    vec.Vec2{X: 200, Y: 200},
 			expected: nil,
 		},
 		{
 			name:     "point on boundary",
-			point:    vec.Vec2{75, 75},
+			point:    vec.Vec2{X: 75, Y: 75},
 			expected: viewports[2],
 		},
 	}
@@ -275,7 +275,7 @@ func TestSelectViewport(t *testing.T) {
 
 func TestSelectViewportEmptyArray(t *testing.T) {
 	viewports := ViewPortArray{}
-	result := viewports.Select(vec.Vec2{50, 50})
+	result := viewports.Select(vec.Vec2{X: 50, Y: 50})
 	if result != nil {
 		t.Error("Select with empty array should return nil")
 	}
@@ -392,7 +392,7 @@ func TestViewPortArrayType(t *testing.T) {
 	}
 
 	// Test Select method
-	result := viewports.Select(vec.Vec2{50, 50})
+	result := viewports.Select(vec.Vec2{X: 50, Y: 50})
 	if result == nil || result.Name != "Test" {
 		t.Errorf("Select failed: got %v, want viewport named 'Test'", result)
 	}
@@ -419,36 +419,6 @@ func TestViewPortArrayType(t *testing.T) {
 
 	if len(extracted) != 1 {
 		t.Errorf("Expected 1 viewport, got %d", len(extracted))
-	}
-}
-
-func TestBackwardsCompatibility(t *testing.T) {
-	// Test that the deprecated functions still work
-	viewports := []*Viewport{
-		{
-			BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-			Name:      "Test",
-			SingleUse: true,
-		},
-	}
-
-	// Test deprecated SelectViewport function
-	result := SelectViewport(vec.Vec2{50, 50}, viewports)
-	if result == nil || result.Name != "Test" {
-		t.Errorf("SelectViewport failed: got %v, want viewport named 'Test'", result)
-	}
-
-	// Test deprecated EmbedViewportArray function
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	res := pdf.NewResourceManager(w)
-
-	arr, err := EmbedViewportArray(res, viewports)
-	if err != nil {
-		t.Fatalf("EmbedViewportArray failed: %v", err)
-	}
-
-	if len(arr) != 1 {
-		t.Errorf("Expected 1 element in array, got %d", len(arr))
 	}
 }
 

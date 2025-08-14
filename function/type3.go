@@ -207,7 +207,7 @@ func (f *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	functionRefs := make(pdf.Array, len(f.Functions))
 	for i, fn := range f.Functions {
-		ref, _, err := fn.Embed(rm)
+		ref, _, err := pdf.ResourceManagerEmbed(rm, fn)
 		if err != nil {
 			return nil, zero, err
 		}

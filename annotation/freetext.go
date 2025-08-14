@@ -55,7 +55,10 @@ type FreeText struct {
 	// Markup.Intent is [FreeTextIntentCallout], the callout line is usually
 	// located in the margin between the inner rectangle and Common.Rect.
 	//
-	// Slice of four numbers: [left, top, right, bottom]
+	// Slice of four numbers: [left, bottom, right, top]
+	//
+	// TODO(voss): review this once
+	// https://github.com/pdf-association/pdf-issues/issues/592 is resolved.
 	//
 	// This corresponds to the /RD entry in the PDF annotation dictionary.
 	Margin []float64
@@ -240,7 +243,7 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation BE entry", pdf.V1_6); err != nil {
 			return nil, err
 		}
-		be, _, err := f.BorderEffect.Embed(rm)
+		be, _, err := pdf.ResourceManagerEmbed(rm, f.BorderEffect)
 		if err != nil {
 			return nil, err
 		}
@@ -261,6 +264,13 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 			}
 			rd[i] = pdf.Number(pdf.Round(xi, 4))
 		}
+
+		if f.Margin[0]+f.Margin[2] >= f.Rect.Dx() {
+			return nil, errors.New("left and right margins exceed rectangle width")
+		}
+		if f.Margin[1]+f.Margin[3] >= f.Rect.Dy() {
+			return nil, errors.New("top and bottom margins exceed rectangle height")
+		}
 		dict["RD"] = rd
 	}
 
@@ -268,7 +278,7 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation BS entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		bs, _, err := f.BorderStyle.Embed(rm)
+		bs, _, err := pdf.ResourceManagerEmbed(rm, f.BorderStyle)
 		if err != nil {
 			return nil, err
 		}

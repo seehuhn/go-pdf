@@ -119,7 +119,7 @@ func (c *Circle) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	// Add circle-specific fields
 	// BS (optional)
 	if c.BorderStyle != nil {
-		bs, _, err := c.BorderStyle.Embed(rm)
+		bs, _, err := pdf.ResourceManagerEmbed(rm, c.BorderStyle)
 		if err != nil {
 			return nil, err
 		}

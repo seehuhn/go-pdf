@@ -119,7 +119,7 @@ func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	// Add square-specific fields
 	// BS (optional)
 	if s.BorderStyle != nil {
-		bs, _, err := s.BorderStyle.Embed(rm)
+		bs, _, err := pdf.ResourceManagerEmbed(rm, s.BorderStyle)
 		if err != nil {
 			return nil, err
 		}

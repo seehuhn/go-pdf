@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -28,14 +28,12 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
-// PDF 2.0 sections: 8.7.4.3 8.7.4.5.5
+// PDF 2.0 sections: 8.7.4.3 8.7.4.5.6
 
-// Type4 represents a type 4 (free-form Gouraud-shaded triangle mesh) shading.
-//
-// https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf#page=189
+// Type5 represents a type 5 (lattice-form Gouraud-shaded triangle mesh) shading.
 //
 // This type implements the [seehuhn.de/go/pdf/graphics.Shading] interface.
-type Type4 struct {
+type Type5 struct {
 	// ColorSpace defines the color space for shading color values.
 	ColorSpace color.Space
 
@@ -45,15 +43,16 @@ type Type4 struct {
 	// BitsPerComponent specifies the number of bits used to represent each color component.
 	BitsPerComponent int
 
-	// BitsPerFlag specifies the number of bits used to represent the edge flag for each vertex.
-	BitsPerFlag int
+	// VerticesPerRow specifies the number of vertices in each row of the lattice.
+	// The value must be greater than or equal to 2.
+	VerticesPerRow int
 
 	// Decode specifies how to map vertex coordinates and color components into
 	// the appropriate ranges of values.
 	Decode []float64
 
-	// Vertices contains the vertex data for the triangle mesh.
-	Vertices []Type4Vertex
+	// Vertices contains the vertex data for the triangle mesh, organized in rows.
+	Vertices []Type5Vertex
 
 	// F (optional) is a 1->n function for mapping parametric values to colors.
 	F pdf.Function
@@ -69,29 +68,26 @@ type Type4 struct {
 	AntiAlias bool
 }
 
-var _ graphics.Shading = (*Type4)(nil)
+var _ graphics.Shading = (*Type5)(nil)
 
-// Type4Vertex represents a single vertex in a type 4 shading.
-type Type4Vertex struct {
+// Type5Vertex represents a single vertex in a type 5 shading.
+type Type5Vertex struct {
 	// X, Y are the vertex coordinates.
 	X, Y float64
-
-	// Flag determines how the vertex connects to other vertices (0, 1, or 2).
-	Flag uint8
 
 	// Color contains the color components for this vertex.
 	Color []float64
 }
 
 // ShadingType implements the [Shading] interface.
-func (s *Type4) ShadingType() int {
-	return 4
+func (s *Type5) ShadingType() int {
+	return 5
 }
 
-// extractType4 reads a Type 4 (free-form Gouraud-shaded triangle mesh) shading from a PDF stream.
-func extractType4(r pdf.Getter, stream *pdf.Stream, wasReference bool) (*Type4, error) {
+// extractType5 reads a Type 5 (lattice-form Gouraud-shaded triangle mesh) shading from a PDF stream.
+func extractType5(r pdf.Getter, stream *pdf.Stream, wasReference bool) (*Type5, error) {
 	d := stream.Dict
-	s := &Type4{}
+	s := &Type5{}
 
 	// Read required ColorSpace
 	csObj, ok := d["ColorSpace"]
@@ -132,18 +128,18 @@ func extractType4(r pdf.Getter, stream *pdf.Stream, wasReference bool) (*Type4, 
 	}
 	s.BitsPerComponent = int(bpcomp)
 
-	// Read required BitsPerFlag
-	bpfObj, ok := d["BitsPerFlag"]
+	// Read required VerticesPerRow
+	vprObj, ok := d["VerticesPerRow"]
 	if !ok {
 		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("missing /BitsPerFlag entry"),
+			Err: fmt.Errorf("missing /VerticesPerRow entry"),
 		}
 	}
-	bpf, err := pdf.GetInteger(r, bpfObj)
+	vpr, err := pdf.GetInteger(r, vprObj)
 	if err != nil {
 		return nil, err
 	}
-	s.BitsPerFlag = int(bpf)
+	s.VerticesPerRow = int(vpr)
 
 	// Read required Decode
 	decodeObj, ok := d["Decode"]
@@ -158,9 +154,6 @@ func extractType4(r pdf.Getter, stream *pdf.Stream, wasReference bool) (*Type4, 
 	}
 	s.Decode = decode
 
-	// We'll validate the Decode array length after reading the optional Function
-	// since the number of color components depends on whether a Function is present
-
 	// Read optional Function
 	if fnObj, ok := d["Function"]; ok {
 		if fn, err := pdf.Optional(function.Extract(r, fnObj)); err != nil {
@@ -171,7 +164,7 @@ func extractType4(r pdf.Getter, stream *pdf.Stream, wasReference bool) (*Type4, 
 	}
 
 	// Validate Decode array length
-	// Type4 shading Decode array must have 4 + 2*n elements:
+	// Type5 shading Decode array must have 4 + 2*n elements:
 	// - 4 elements for X,Y coordinates (xmin, xmax, ymin, ymax)
 	// - 2*n elements for color components (cmin1, cmax1, cmin2, cmax2, ...)
 	// where n is the number of color components in the vertex data
@@ -221,47 +214,60 @@ func extractType4(r pdf.Getter, stream *pdf.Stream, wasReference bool) (*Type4, 
 	// Read stream data to extract vertices
 	stmReader, err := pdf.DecodeStream(r, stream, 0)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode stream: %w", err)
+		return nil, err
 	}
 	defer stmReader.Close()
 
 	data, err := io.ReadAll(stmReader)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read stream data: %w", err)
+		return nil, err
 	}
 
 	// Parse vertices from binary data
-	vertices, err := parseType4Vertices(data, s)
+	vertices, err := parseType5Vertices(data, s)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse vertices: %w", err)
+		return nil, err
 	}
 	s.Vertices = vertices
 
 	return s, nil
 }
 
-// parseType4Vertices parses vertex data from binary stream data.
-func parseType4Vertices(data []byte, s *Type4) ([]Type4Vertex, error) {
+// parseType5Vertices parses vertex data from binary stream data.
+func parseType5Vertices(data []byte, s *Type5) ([]Type5Vertex, error) {
 	numComponents := s.ColorSpace.Channels()
 	numValues := numComponents
 	if s.F != nil {
 		numValues = 1
 	}
 
-	vertexBits := s.BitsPerFlag + 2*s.BitsPerCoordinate + numValues*s.BitsPerComponent
+	// Type5 has no edge flags, so vertex bits calculation is simpler
+	vertexBits := 2*s.BitsPerCoordinate + numValues*s.BitsPerComponent
 	if vertexBits <= 0 {
 		return nil, pdf.Errorf("invalid vertex bit configuration: total bits per vertex is %d", vertexBits)
 	}
-	vertexBytes := (vertexBits + 7) / 8
 
-	if len(data)%vertexBytes != 0 {
-		return nil, fmt.Errorf("invalid stream data length: %d bytes is not a multiple of %d", len(data), vertexBytes)
+	// Calculate how many complete vertices we can extract from the data
+	totalBits := len(data) * 8
+	numVertices := totalBits / vertexBits
+
+	if numVertices == 0 {
+		return nil, fmt.Errorf("insufficient data: need at least %d bits per vertex, got %d total bits", vertexBits, totalBits)
 	}
 
-	numVertices := len(data) / vertexBytes
-	vertices := make([]Type4Vertex, numVertices)
+	// Validate lattice completeness
+	if numVertices%s.VerticesPerRow != 0 {
+		return nil, fmt.Errorf("invalid lattice: %d vertices is not a multiple of %d vertices per row", numVertices, s.VerticesPerRow)
+	}
 
-	// bit extraction helper
+	numRows := numVertices / s.VerticesPerRow
+	if numRows < 2 {
+		return nil, fmt.Errorf("invalid lattice: need at least 2 rows for triangulation, got %d", numRows)
+	}
+
+	vertices := make([]Type5Vertex, numVertices)
+
+	// bit extraction helper (same as Type4/6/7)
 	extractBits := func(data []byte, bitOffset, numBits int) uint32 {
 		var result uint32
 		for i := 0; i < numBits; i++ {
@@ -274,36 +280,32 @@ func parseType4Vertices(data []byte, s *Type4) ([]Type4Vertex, error) {
 		return result
 	}
 
-	// coordinate decoding helper
+	// coordinate decoding helper (same as Type4/6/7)
 	decodeCoord := func(encoded uint32, bits int, decodeMin, decodeMax float64) float64 {
 		maxVal := (1 << bits) - 1
 		t := float64(encoded) / float64(maxVal)
 		return decodeMin + t*(decodeMax-decodeMin)
 	}
 
+	// Process vertices using continuous bit stream (not byte-aligned chunks)
+	bitOffset := 0
 	for i := 0; i < numVertices; i++ {
-		vertexData := data[i*vertexBytes : (i+1)*vertexBytes]
-		bitOffset := 0
-
-		// Extract flag
-		flag := extractBits(vertexData, bitOffset, s.BitsPerFlag)
-		vertices[i].Flag = uint8(flag)
-		bitOffset += s.BitsPerFlag
+		// No flag extraction for Type5 - vertices are positioned by lattice structure
 
 		// Extract X coordinate
-		xEncoded := extractBits(vertexData, bitOffset, s.BitsPerCoordinate)
+		xEncoded := extractBits(data, bitOffset, s.BitsPerCoordinate)
 		vertices[i].X = decodeCoord(xEncoded, s.BitsPerCoordinate, s.Decode[0], s.Decode[1])
 		bitOffset += s.BitsPerCoordinate
 
 		// Extract Y coordinate
-		yEncoded := extractBits(vertexData, bitOffset, s.BitsPerCoordinate)
+		yEncoded := extractBits(data, bitOffset, s.BitsPerCoordinate)
 		vertices[i].Y = decodeCoord(yEncoded, s.BitsPerCoordinate, s.Decode[2], s.Decode[3])
 		bitOffset += s.BitsPerCoordinate
 
 		// Extract color components
 		vertices[i].Color = make([]float64, numValues)
 		for j := 0; j < numValues; j++ {
-			colorEncoded := extractBits(vertexData, bitOffset, s.BitsPerComponent)
+			colorEncoded := extractBits(data, bitOffset, s.BitsPerComponent)
 			decodeMin := s.Decode[4+2*j]
 			decodeMax := s.Decode[4+2*j+1]
 			vertices[i].Color[j] = decodeCoord(colorEncoded, s.BitsPerComponent, decodeMin, decodeMax)
@@ -315,11 +317,11 @@ func parseType4Vertices(data []byte, s *Type4) ([]Type4Vertex, error) {
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (s *Type5) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	// Version check
-	if err := pdf.CheckVersion(rm.Out, "Type 4 shadings", pdf.V1_3); err != nil {
+	if err := pdf.CheckVersion(rm.Out, "Type 5 shadings", pdf.V1_3); err != nil {
 		return nil, zero, err
 	}
 
@@ -348,11 +350,8 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	default:
 		return nil, zero, fmt.Errorf("invalid BitsPerComponent: %d", s.BitsPerComponent)
 	}
-	switch s.BitsPerFlag {
-	case 2, 4, 8:
-		// pass
-	default:
-		return nil, zero, fmt.Errorf("invalid BitsPerFlag: %d", s.BitsPerFlag)
+	if s.VerticesPerRow < 2 {
+		return nil, zero, fmt.Errorf("invalid VerticesPerRow: %d (must be >= 2)", s.VerticesPerRow)
 	}
 	numValues := numComponents
 	if s.F != nil {
@@ -368,10 +367,18 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 			return nil, zero, fmt.Errorf("invalid decode values: %v", s.Decode)
 		}
 	}
+
+	// Validate lattice structure
+	numVertices := len(s.Vertices)
+	if numVertices%s.VerticesPerRow != 0 {
+		return nil, zero, fmt.Errorf("invalid lattice: %d vertices is not a multiple of %d vertices per row", numVertices, s.VerticesPerRow)
+	}
+	numRows := numVertices / s.VerticesPerRow
+	if numRows < 2 {
+		return nil, zero, fmt.Errorf("invalid lattice: need at least 2 rows for triangulation, got %d", numRows)
+	}
+
 	for i, v := range s.Vertices {
-		if v.Flag > 2 {
-			return nil, zero, fmt.Errorf("vertex %d: invalid flag: %d", i, v.Flag)
-		}
 		if have := len(v.Color); have != numValues {
 			return nil, zero, fmt.Errorf("vertex %d: wrong number of color values: expected %d, got %d",
 				i, numValues, have)
@@ -387,11 +394,11 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	dict := pdf.Dict{
-		"ShadingType":       pdf.Integer(4),
+		"ShadingType":       pdf.Integer(5),
 		"ColorSpace":        csE,
 		"BitsPerCoordinate": pdf.Integer(s.BitsPerCoordinate),
 		"BitsPerComponent":  pdf.Integer(s.BitsPerComponent),
-		"BitsPerFlag":       pdf.Integer(s.BitsPerFlag),
+		"VerticesPerRow":    pdf.Integer(s.VerticesPerRow),
 		"Decode":            toPDF(s.Decode),
 	}
 	if len(s.Background) > 0 {
@@ -411,23 +418,14 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["Function"] = fn
 	}
 
-	vertexBits := s.BitsPerFlag + 2*s.BitsPerCoordinate + numValues*s.BitsPerComponent
-	vertexBytes := (vertexBits + 7) / 8
+	// Calculate total bits needed for all vertices
+	vertexBits := 2*s.BitsPerCoordinate + numValues*s.BitsPerComponent
+	totalBits := len(s.Vertices) * vertexBits
 
-	ref := rm.Out.Alloc()
-	stm, err := rm.Out.OpenStream(ref, dict)
-	if err != nil {
-		return nil, zero, err
-	}
+	// Create one buffer for all vertices
+	buf := make([]byte, (totalBits+7)/8)
+	var bufBytePos, bufBitsFree int = 0, 8
 
-	// write packed bit data for each vertex:
-	//   - s.BitsPerFlag bits for the flag
-	//   - s.BitsPerCoordinate bits for the x coordinate
-	//   - s.BitsPerCoordinate bits for the y coordinate
-	//   - numValues * s.BitsPerComponent bits for the color
-	// most-significant bits are used first.
-	buf := make([]byte, vertexBytes)
-	var bufBytePos, bufBitsFree int
 	addBits := func(bits uint32, n int) {
 		for n > 0 {
 			if n < bufBitsFree {
@@ -441,6 +439,7 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 			bufBytePos++
 		}
 	}
+
 	coord := func(x, xMin, xMax float64, bits int) uint32 {
 		limit := int64(1) << bits
 		z := int64(math.Floor((x - xMin) / (xMax - xMin) * float64(limit)))
@@ -452,23 +451,27 @@ func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		return uint32(z)
 	}
 
+	// Write all vertices to one continuous buffer
 	for _, v := range s.Vertices {
-		for i := range buf {
-			buf[i] = 0
-		}
-		bufBytePos = 0
-		bufBitsFree = 8
-		addBits(uint32(v.Flag), s.BitsPerFlag)
+		// No flag bits for Type5 - vertices are positioned by lattice structure
 		addBits(coord(v.X, s.Decode[0], s.Decode[1], s.BitsPerCoordinate), s.BitsPerCoordinate)
 		addBits(coord(v.Y, s.Decode[2], s.Decode[3], s.BitsPerCoordinate), s.BitsPerCoordinate)
 		for i, c := range v.Color {
 			addBits(coord(c, s.Decode[4+2*i], s.Decode[4+2*i+1], s.BitsPerComponent), s.BitsPerComponent)
 		}
-		_, err := stm.Write(buf)
-		if err != nil {
-			return nil, zero, err
-		}
 	}
+
+	ref := rm.Out.Alloc()
+	stm, err := rm.Out.OpenStream(ref, dict)
+	if err != nil {
+		return nil, zero, err
+	}
+
+	_, err = stm.Write(buf)
+	if err != nil {
+		return nil, zero, err
+	}
+
 	err = stm.Close()
 	if err != nil {
 		return nil, zero, err

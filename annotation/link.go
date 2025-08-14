@@ -22,6 +22,8 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// PDF 2.0 sections: 12.5.2 12.5.6.5
+
 // Link represents a hypertext link annotation.
 type Link struct {
 	Common

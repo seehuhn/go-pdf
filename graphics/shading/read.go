@@ -75,6 +75,27 @@ func Extract(r pdf.Getter, obj pdf.Object) (graphics.Shading, error) {
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("type 4 shading must be a stream"),
 		}
+	case 5:
+		if stream, ok := obj.(*pdf.Stream); ok {
+			return extractType5(r, stream, isIndirect)
+		}
+		return nil, &pdf.MalformedFileError{
+			Err: fmt.Errorf("type 5 shading must be a stream"),
+		}
+	case 6:
+		if stream, ok := obj.(*pdf.Stream); ok {
+			return extractType6(r, stream, isIndirect)
+		}
+		return nil, &pdf.MalformedFileError{
+			Err: fmt.Errorf("type 6 shading must be a stream"),
+		}
+	case 7:
+		if stream, ok := obj.(*pdf.Stream); ok {
+			return extractType7(r, stream, isIndirect)
+		}
+		return nil, &pdf.MalformedFileError{
+			Err: fmt.Errorf("type 7 shading must be a stream"),
+		}
 	default:
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("unsupported shading type %d", stNum),

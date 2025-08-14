@@ -63,7 +63,7 @@ func (p *PieceInfo) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 		dataDict := pdf.Dict{
 			"LastModified": pdf.Date(data.LastModified()),
 		}
-		privateVal, _, err := data.Embed(rm)
+		privateVal, _, err := pdf.ResourceManagerEmbed(rm, data)
 		if err != nil {
 			return nil, pdf.Unused{}, err
 		}

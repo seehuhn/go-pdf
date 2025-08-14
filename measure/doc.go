@@ -79,7 +79,7 @@
 //	selected := viewports.Select(vec.Vec2{X: 100, Y: 200})
 //
 //	// Embed array in PDF
-//	embedded, _, err := viewports.Embed(resourceManager)
+//	embedded, _, err := pdf.ResourceManagerEmbed(resourceManager, viewports)
 //
 // # PDF Integration
 //
@@ -132,5 +132,5 @@
 //	}
 //
 //	// Embed in PDF
-//	embedded, _, err := viewport.Embed(resourceManager)
+//	embedded, _, err := pdf.ResourceManagerEmbed(resourceManager, viewport)
 package measure

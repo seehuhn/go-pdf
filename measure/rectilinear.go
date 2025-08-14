@@ -158,7 +158,7 @@ func (rm *RectilinearMeasure) Embed(res *pdf.ResourceManager) (pdf.Native, pdf.U
 func embedNumberFormatArray(res *pdf.ResourceManager, formats []*NumberFormat) (pdf.Array, error) {
 	arr := make(pdf.Array, len(formats))
 	for i, format := range formats {
-		embedded, _, err := format.Embed(res)
+		embedded, _, err := pdf.ResourceManagerEmbed(res, format)
 		if err != nil {
 			return nil, err
 		}

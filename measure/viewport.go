@@ -114,7 +114,7 @@ func (v *Viewport) Embed(res *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 
 	// Optional Measure field
 	if v.Measure != nil {
-		embedded, _, err := v.Measure.Embed(res)
+		embedded, _, err := pdf.ResourceManagerEmbed(res, v.Measure)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -150,13 +150,6 @@ func (va ViewPortArray) Select(point vec.Vec2) *Viewport {
 	return nil
 }
 
-// SelectViewport finds the appropriate viewport for a given point.
-// Deprecated: Use ViewPortArray.Select method instead.
-func SelectViewport(point vec.Vec2, viewports []*Viewport) *Viewport {
-	va := ViewPortArray(viewports)
-	return va.Select(point)
-}
-
 // ExtractViewportArray extracts an array of viewports from a PDF array.
 func ExtractViewportArray(r pdf.Getter, arr pdf.Array) (ViewPortArray, error) {
 	viewports := make(ViewPortArray, len(arr))
@@ -176,22 +169,11 @@ func (va ViewPortArray) Embed(res *pdf.ResourceManager) (pdf.Native, pdf.Unused,
 
 	arr := make(pdf.Array, len(va))
 	for i, viewport := range va {
-		embedded, _, err := viewport.Embed(res)
+		embedded, _, err := pdf.ResourceManagerEmbed(res, viewport)
 		if err != nil {
 			return nil, zero, err
 		}
 		arr[i] = embedded
 	}
 	return arr, zero, nil
-}
-
-// EmbedViewportArray embeds an array of viewports into a PDF array.
-// Deprecated: Use ViewPortArray.Embed method instead.
-func EmbedViewportArray(res *pdf.ResourceManager, viewports []*Viewport) (pdf.Array, error) {
-	va := ViewPortArray(viewports)
-	embedded, _, err := va.Embed(res)
-	if err != nil {
-		return nil, err
-	}
-	return embedded.(pdf.Array), nil
 }

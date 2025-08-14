@@ -185,7 +185,8 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 10, LLy: 10, URx: 200, URy: 50},
 				},
-				Coords: [4]float64{20, 20, 180, 40}, // Start and end coordinates
+				Coords:          [4]float64{20, 20, 180, 40}, // Start and end coordinates
+				LineEndingStyle: [2]LineEndingStyle{LineEndingStyleNone, LineEndingStyleNone},
 			},
 		},
 		{
@@ -221,8 +222,8 @@ var testCases = map[pdf.Name][]testCase{
 				LL:              10.0,            // Leader line length
 				LLE:             5.0,             // Leader line extensions
 				Caption:         true,            // Show caption
-				CP:              "Top",           // Caption on top
-				CO:              []float64{0, 5}, // Caption offset
+				CaptionAbove:    true,            // Caption on top
+				CaptionOffset:   []float64{0, 5}, // Caption offset
 				LLO:             2.0,             // Leader line offset
 			},
 		},
@@ -246,8 +247,8 @@ var testCases = map[pdf.Name][]testCase{
 				LL:              15.0,
 				LLE:             8.0,
 				Caption:         true,
-				CP:              "Inline",
-				CO:              []float64{10, -5},
+				CaptionAbove:    false,
+				CaptionOffset:   []float64{10, -5},
 				LLO:             3.0,
 			},
 		},
@@ -1173,9 +1174,8 @@ var testCases = map[pdf.Name][]testCase{
 				},
 				H: "N", // No highlighting
 				BorderStyle: &BorderStyle{
-					Width:     2,
-					Style:     "S",
-					DashArray: []float64{3},
+					Width: 2,
+					Style: "S",
 				},
 			},
 		},

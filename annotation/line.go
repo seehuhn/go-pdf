@@ -22,7 +22,15 @@ import (
 	"seehuhn.de/go/pdf/measure"
 )
 
-// Line represents a line annotation that displays a single straight line on the page.
+// PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.7
+
+// Line represents a line annotation that displays a single straight line on
+// the page.
+//
+// The line style and dash pattern is determined as follows:
+//   - If the BorderStyle field is set, this is used.
+//   - Otherwise, if the Common.Border field is set, this is used.
+//   - Otherwise, a solid line with a width of 1 point is used.
 type Line struct {
 	Common
 	Markup
@@ -62,41 +70,50 @@ type Line struct {
 	// This corresponds to the /IC entry in the PDF annotation dictionary.
 	FillColor color.Color
 
-	// LL (required if LLE is present; PDF 1.6) is the length of leader lines
-	// that extend from each endpoint perpendicular to the line itself.
-	// Positive values appear clockwise, negative values counterclockwise.
-	// Default value: 0 (no leader lines).
+	// LL (Leader Line Length) shifts the line perpendicular to its direction
+	// and connects the original endpoints to the shifted line with
+	// perpendicular segments.
+	//
+	//  - Positive values: shift the line to the left (when viewed from start to end)
+	//  - Negative values: shift the line to the right
+	//
+	// This creates a bracket-like shape: two perpendicular segments connecting
+	// the original endpoints to a parallel shifted line. Commonly used for
+	// dimension lines in technical drawings.
 	LL float64
 
-	// LLE (optional; PDF 1.6) is the length of leader line extensions that
-	// extend from the line proper 180 degrees from the leader lines.
-	// Default value: 0 (no leader line extensions).
+	// LLE (Leader Line Extensions) extends the perpendicular connecting
+	// segments beyond the shifted line (when LL is non-zero). This makes the
+	// "bracket arms" longer, creating more prominent dimension-line tick
+	// marks.
 	LLE float64
 
-	// LLO (optional; PDF 1.7) is the length of the leader line offset,
-	// which is the amount of empty space between the endpoints of the
-	// annotation and the beginning of the leader lines.
+	// LLO (Leader Line Offset) creates empty space at the original endpoints
+	// before the perpendicular connecting segments begin (when LL is
+	// non-zero). This adds a gap between what you're measuring and the
+	// dimension line.
 	LLO float64
 
-	// Caption (PDF 1.6) indicates whether the text specified by
-	// Contents or RC entries are replicated as a caption in the line's
-	// appearance.
+	// Caption indicates whether the text specified by Common.Contents or
+	// Markup.RC entries are replicated as part of the line's appearance.
+	//
+	// This corresponds to the /Cap entry in the PDF annotation dictionary.
 	Caption bool
 
-	// CP (optional; meaningful only if Cap is true; PDF 1.7) describes the
-	// annotation's caption positioning. Valid values are "Inline" (centered
-	// inside the line) and "Top" (on top of the line).
-	// Default value: "Inline".
-	CP pdf.Name
+	// CaptionAbove specifies whether the caption appears above the line. When
+	// true, the caption appears on top of the line instead of inside it.
+	//
+	// This corresponds to the /CP entry in the PDF annotation dictionary.
+	CaptionAbove bool
 
-	// CO (optional; meaningful only if Cap is true; PDF 1.7) is an array of
-	// two numbers that specify the offset of the caption text from its normal
-	// position. [horizontal_offset, vertical_offset]
-	// Default value: [0, 0] (no offset).
-	CO []float64
+	// CaptionOffset is an array of two numbers that specify the offset of the
+	// caption text from its normal position: [hoffset, voffset].
+	//
+	// This corresponds to the /CO entry in the PDF annotation dictionary.
+	CaptionOffset []float64
 
-	// Measure (optional; PDF 1.7) is a measure dictionary that specifies
-	// the scale and units that apply to the line annotation.
+	// Measure (optional) is a measure dictionary that specifies the scale and
+	// units that apply to the line annotation.
 	Measure measure.Measure
 }
 
@@ -163,49 +180,53 @@ func extractLine(r pdf.Getter, dict pdf.Dict) (*Line, error) {
 		line.FillColor = ic
 	}
 
-	// LL (optional)
-	if ll, err := pdf.GetNumber(r, dict["LL"]); err == nil {
-		line.LL = float64(ll)
-	}
-
-	// LLE (optional)
-	if lle, err := pdf.GetNumber(r, dict["LLE"]); err == nil {
-		line.LLE = float64(lle)
-	}
-
 	// Cap (optional)
 	if cap, err := pdf.GetBoolean(r, dict["Cap"]); err == nil {
 		line.Caption = bool(cap)
 	}
 
-	// LLO (optional)
-	if llo, err := pdf.GetNumber(r, dict["LLO"]); err == nil {
-		line.LLO = float64(llo)
+	if line.Caption {
+		// CP (optional)
+		if cp, err := pdf.GetName(r, dict["CP"]); err == nil && cp == "Top" {
+			line.CaptionAbove = true
+		} else {
+			// default to false for "Inline" or any other value
+		}
+
+		// CO (optional)
+		if co, err := pdf.Optional(pdf.GetFloatArray(r, dict["CO"])); err != nil {
+			return nil, err
+		} else if len(co) == 2 {
+			line.CaptionOffset = co
+		}
 	}
 
-	// CP (optional)
-	if cp, err := pdf.GetName(r, dict["CP"]); err == nil {
-		line.CP = cp
+	// LL (optional)
+	if ll, err := pdf.Optional(pdf.GetNumber(r, dict["LL"])); err != nil {
+		return nil, err
+	} else {
+		line.LL = float64(ll)
+	}
+
+	// LLE (optional)
+	if lle, err := pdf.Optional(pdf.GetNumber(r, dict["LLE"])); err != nil {
+		return nil, err
+	} else {
+		line.LLE = max(float64(lle), 0)
+	}
+
+	// LLO (optional)
+	if llo, err := pdf.Optional(pdf.GetNumber(r, dict["LLO"])); err != nil {
+		return nil, err
+	} else {
+		line.LLO = max(float64(llo), 0)
 	}
 
 	// Measure (optional)
-	if dict["Measure"] != nil {
-		if m, err := pdf.Optional(measure.Extract(r, dict["Measure"])); err != nil {
-			return nil, err
-		} else {
-			line.Measure = m
-		}
-	}
-
-	// CO (optional)
-	if co, err := pdf.GetArray(r, dict["CO"]); err == nil && len(co) == 2 {
-		offsets := make([]float64, 2)
-		for i, offset := range co {
-			if num, err := pdf.GetNumber(r, offset); err == nil {
-				offsets[i] = float64(num)
-			}
-		}
-		line.CO = offsets
+	if m, err := pdf.Optional(measure.Extract(r, dict["Measure"])); err != nil {
+		return nil, err
+	} else {
+		line.Measure = m
 	}
 
 	return line, nil
@@ -236,7 +257,7 @@ func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 
 	// BS (optional)
 	if l.BorderStyle != nil {
-		bs, _, err := l.BorderStyle.Embed(rm)
+		bs, _, err := pdf.ResourceManagerEmbed(rm, l.BorderStyle)
 		if err != nil {
 			return nil, err
 		}
@@ -244,13 +265,22 @@ func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	// LE (optional; PDF 1.4) - only write if not default [None, None]
-	if l.LineEndingStyle != [2]LineEndingStyle{LineEndingStyleNone, LineEndingStyleNone} {
+	// normalize empty strings to None as documented
+	normalized := l.LineEndingStyle
+	if normalized[0] == "" {
+		normalized[0] = LineEndingStyleNone
+	}
+	if normalized[1] == "" {
+		normalized[1] = LineEndingStyleNone
+	}
+
+	if normalized != [2]LineEndingStyle{LineEndingStyleNone, LineEndingStyleNone} {
 		if err := pdf.CheckVersion(rm.Out, "line annotation LE entry", pdf.V1_4); err != nil {
 			return nil, err
 		}
 		leArray := make(pdf.Array, 2)
-		leArray[0] = pdf.Name(l.LineEndingStyle[0])
-		leArray[1] = pdf.Name(l.LineEndingStyle[1])
+		leArray[0] = pdf.Name(normalized[0])
+		leArray[1] = pdf.Name(normalized[1])
 		dict["LE"] = leArray
 	}
 
@@ -266,8 +296,44 @@ func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		}
 	}
 
+	// Cap (optional)
+	if l.Caption {
+		if err := pdf.CheckVersion(rm.Out, "line annotation Cap entry", pdf.V1_6); err != nil {
+			return nil, err
+		}
+		dict["Cap"] = pdf.Boolean(l.Caption)
+
+		if l.CaptionAbove {
+			if err := pdf.CheckVersion(rm.Out, "line annotation CP entry", pdf.V1_7); err != nil {
+				return nil, err
+			}
+			dict["CP"] = pdf.Name("Top")
+		}
+
+		if l.CaptionOffset != nil {
+			if err := pdf.CheckVersion(rm.Out, "line annotation CO entry", pdf.V1_7); err != nil {
+				return nil, err
+			}
+			if len(l.CaptionOffset) != 2 {
+				return nil, pdf.Error("invalid CaptionOffset")
+			}
+			coArray := make(pdf.Array, 2)
+			for i, offset := range l.CaptionOffset {
+				coArray[i] = pdf.Number(offset)
+			}
+			dict["CO"] = coArray
+		}
+	} else {
+		if l.CaptionAbove {
+			return nil, pdf.Error("unexpected CaptionAbove")
+		}
+		if l.CaptionOffset != nil {
+			return nil, pdf.Error("unexpected CaptionOffset")
+		}
+	}
+
 	// LL (optional)
-	if l.LL != 0 {
+	if l.LL != 0 || l.LLE != 0 {
 		if err := pdf.CheckVersion(rm.Out, "line annotation LL entry", pdf.V1_6); err != nil {
 			return nil, err
 		}
@@ -279,15 +345,10 @@ func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		if err := pdf.CheckVersion(rm.Out, "line annotation LLE entry", pdf.V1_6); err != nil {
 			return nil, err
 		}
-		dict["LLE"] = pdf.Number(l.LLE)
-	}
-
-	// Cap (optional)
-	if l.Caption {
-		if err := pdf.CheckVersion(rm.Out, "line annotation Cap entry", pdf.V1_6); err != nil {
-			return nil, err
+		if l.LLE < 0 {
+			return nil, pdf.Error("negative LLE value")
 		}
-		dict["Cap"] = pdf.Boolean(l.Caption)
+		dict["LLE"] = pdf.Number(l.LLE)
 	}
 
 	// LLO (optional)
@@ -295,15 +356,10 @@ func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		if err := pdf.CheckVersion(rm.Out, "line annotation LLO entry", pdf.V1_7); err != nil {
 			return nil, err
 		}
-		dict["LLO"] = pdf.Number(l.LLO)
-	}
-
-	// CP (optional)
-	if l.CP != "" {
-		if err := pdf.CheckVersion(rm.Out, "line annotation CP entry", pdf.V1_7); err != nil {
-			return nil, err
+		if l.LLO < 0 {
+			return nil, pdf.Error("negative LLO value")
 		}
-		dict["CP"] = l.CP
+		dict["LLO"] = pdf.Number(l.LLO)
 	}
 
 	// Measure (optional)
@@ -311,23 +367,11 @@ func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		if err := pdf.CheckVersion(rm.Out, "line annotation Measure entry", pdf.V1_7); err != nil {
 			return nil, err
 		}
-		embedded, _, err := l.Measure.Embed(rm)
+		embedded, _, err := pdf.ResourceManagerEmbed(rm, l.Measure)
 		if err != nil {
 			return nil, err
 		}
 		dict["Measure"] = embedded
-	}
-
-	// CO (optional)
-	if len(l.CO) == 2 {
-		if err := pdf.CheckVersion(rm.Out, "line annotation CO entry", pdf.V1_7); err != nil {
-			return nil, err
-		}
-		coArray := make(pdf.Array, 2)
-		for i, offset := range l.CO {
-			coArray[i] = pdf.Number(offset)
-		}
-		dict["CO"] = coArray
 	}
 
 	return dict, nil

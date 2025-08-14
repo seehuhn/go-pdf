@@ -233,7 +233,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict, isMarkup bool) er
 	}
 
 	if c.Border != nil {
-		borderValue, _, err := c.Border.Embed(rm)
+		borderValue, _, err := pdf.ResourceManagerEmbed(rm, c.Border)
 		if err != nil {
 			return err
 		}

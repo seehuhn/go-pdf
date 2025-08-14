@@ -26,6 +26,8 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
+// PDF 2.0 sections: 8.7.4.3 8.7.4.5.3
+
 // Type2 represents a type 2 (axial) shading.
 //
 // This type implements the [seehuhn.de/go/pdf/graphics.Shading] interface.
@@ -97,7 +99,7 @@ func extractType2(r pdf.Getter, d pdf.Dict, isIndirect bool) (*Type2, error) {
 	}
 	cs, err := color.ExtractSpace(r, csObj)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read ColorSpace: %w", err)
+		return nil, err
 	}
 	s.ColorSpace = cs
 
@@ -110,7 +112,7 @@ func extractType2(r pdf.Getter, d pdf.Dict, isIndirect bool) (*Type2, error) {
 	}
 	coords, err := pdf.GetFloatArray(r, coordsObj)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read Coords: %w", err)
+		return nil, err
 	}
 	if len(coords) != 4 {
 		return nil, &pdf.MalformedFileError{
@@ -128,18 +130,18 @@ func extractType2(r pdf.Getter, d pdf.Dict, isIndirect bool) (*Type2, error) {
 	}
 	fn, err := function.Extract(r, fnObj)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read Function: %w", err)
+		return nil, err
 	}
 	s.F = fn
 
 	// Read optional Domain (renamed to TMin/TMax for Type2)
 	if domainObj, ok := d["Domain"]; ok {
-		domain, err := pdf.GetFloatArray(r, domainObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read Domain: %w", err)
-		}
-		if len(domain) >= 2 {
+		if domain, err := pdf.Optional(pdf.GetFloatArray(r, domainObj)); err != nil {
+			return nil, err
+		} else if len(domain) >= 2 {
 			s.TMin, s.TMax = domain[0], domain[1]
+		} else {
+			s.TMin, s.TMax = 0.0, 1.0
 		}
 	} else {
 		s.TMin, s.TMax = 0.0, 1.0
@@ -147,51 +149,51 @@ func extractType2(r pdf.Getter, d pdf.Dict, isIndirect bool) (*Type2, error) {
 
 	// Read optional Extend
 	if extendObj, ok := d["Extend"]; ok {
-		extendArray, err := pdf.GetArray(r, extendObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read Extend: %w", err)
-		}
-		if len(extendArray) >= 1 {
-			extendStart, err := pdf.GetBoolean(r, extendArray[0])
-			if err != nil {
-				return nil, fmt.Errorf("failed to read Extend[0]: %w", err)
+		if extendArray, err := pdf.Optional(pdf.GetArray(r, extendObj)); err != nil {
+			return nil, err
+		} else {
+			if len(extendArray) >= 1 {
+				if extendStart, err := pdf.Optional(pdf.GetBoolean(r, extendArray[0])); err != nil {
+					return nil, err
+				} else {
+					s.ExtendStart = bool(extendStart)
+				}
 			}
-			s.ExtendStart = bool(extendStart)
-		}
-		if len(extendArray) >= 2 {
-			extendEnd, err := pdf.GetBoolean(r, extendArray[1])
-			if err != nil {
-				return nil, fmt.Errorf("failed to read Extend[1]: %w", err)
+			if len(extendArray) >= 2 {
+				if extendEnd, err := pdf.Optional(pdf.GetBoolean(r, extendArray[1])); err != nil {
+					return nil, err
+				} else {
+					s.ExtendEnd = bool(extendEnd)
+				}
 			}
-			s.ExtendEnd = bool(extendEnd)
 		}
 	}
 
 	// Read optional Background
 	if bgObj, ok := d["Background"]; ok {
-		bg, err := pdf.GetFloatArray(r, bgObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read Background: %w", err)
+		if bg, err := pdf.Optional(pdf.GetFloatArray(r, bgObj)); err != nil {
+			return nil, err
+		} else {
+			s.Background = bg
 		}
-		s.Background = bg
 	}
 
 	// Read optional BBox
 	if bboxObj, ok := d["BBox"]; ok {
-		bbox, err := pdf.GetRectangle(r, bboxObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read BBox: %w", err)
+		if bbox, err := pdf.Optional(pdf.GetRectangle(r, bboxObj)); err != nil {
+			return nil, err
+		} else {
+			s.BBox = bbox
 		}
-		s.BBox = bbox
 	}
 
 	// Read optional AntiAlias
 	if aaObj, ok := d["AntiAlias"]; ok {
-		aa, err := pdf.GetBoolean(r, aaObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read AntiAlias: %w", err)
+		if aa, err := pdf.Optional(pdf.GetBoolean(r, aaObj)); err != nil {
+			return nil, err
+		} else {
+			s.AntiAlias = bool(aa)
 		}
-		s.AntiAlias = bool(aa)
 	}
 
 	// Set SingleUse based on whether the original object was a reference,

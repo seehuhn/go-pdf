@@ -117,7 +117,7 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		if f.LastModified.IsZero() {
 			return nil, zero, errors.New("missing LastModified")
 		}
-		pieceInfoObj, _, err := f.PieceInfo.Embed(rm)
+		pieceInfoObj, _, err := pdf.ResourceManagerEmbed(rm, f.PieceInfo)
 		if err != nil {
 			return nil, zero, err
 		}

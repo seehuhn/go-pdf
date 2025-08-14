@@ -26,6 +26,8 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
+// PDF 2.0 sections: 8.7.4.3 8.7.4.5.4
+
 // Type3 represents a type 3 (radial) shading.
 //
 // This type implements the [seehuhn.de/go/pdf/graphics.Shading] interface.
@@ -88,7 +90,7 @@ func extractType3(r pdf.Getter, d pdf.Dict, wasReference bool) (*Type3, error) {
 	}
 	cs, err := color.ExtractSpace(r, csObj)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read ColorSpace: %w", err)
+		return nil, err
 	}
 	s.ColorSpace = cs
 
@@ -101,7 +103,7 @@ func extractType3(r pdf.Getter, d pdf.Dict, wasReference bool) (*Type3, error) {
 	}
 	coords, err := pdf.GetFloatArray(r, coordsObj)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read Coords: %w", err)
+		return nil, err
 	}
 	if len(coords) != 6 {
 		return nil, &pdf.MalformedFileError{
@@ -119,18 +121,18 @@ func extractType3(r pdf.Getter, d pdf.Dict, wasReference bool) (*Type3, error) {
 	}
 	fn, err := function.Extract(r, fnObj)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read Function: %w", err)
+		return nil, err
 	}
 	s.F = fn
 
 	// Read optional Domain (renamed to TMin/TMax for Type3)
 	if domainObj, ok := d["Domain"]; ok {
-		domain, err := pdf.GetFloatArray(r, domainObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read Domain: %w", err)
-		}
-		if len(domain) >= 2 {
+		if domain, err := pdf.Optional(pdf.GetFloatArray(r, domainObj)); err != nil {
+			return nil, err
+		} else if len(domain) == 2 {
 			s.TMin, s.TMax = domain[0], domain[1]
+		} else {
+			s.TMin, s.TMax = 0.0, 1.0
 		}
 	} else {
 		s.TMin, s.TMax = 0.0, 1.0
@@ -138,51 +140,52 @@ func extractType3(r pdf.Getter, d pdf.Dict, wasReference bool) (*Type3, error) {
 
 	// Read optional Extend
 	if extendObj, ok := d["Extend"]; ok {
-		extendArray, err := pdf.GetArray(r, extendObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read Extend: %w", err)
-		}
-		if len(extendArray) >= 1 {
-			extendStart, err := pdf.GetBoolean(r, extendArray[0])
-			if err != nil {
-				return nil, fmt.Errorf("failed to read Extend[0]: %w", err)
+		if extendArray, err := pdf.Optional(pdf.GetArray(r, extendObj)); err != nil {
+			return nil, err
+		} else {
+			if len(extendArray) >= 1 {
+				if extendStart, err := pdf.Optional(pdf.GetBoolean(r, extendArray[0])); err != nil {
+					return nil, err
+				} else {
+					s.ExtendStart = bool(extendStart)
+				}
 			}
-			s.ExtendStart = bool(extendStart)
-		}
-		if len(extendArray) >= 2 {
-			extendEnd, err := pdf.GetBoolean(r, extendArray[1])
-			if err != nil {
-				return nil, fmt.Errorf("failed to read Extend[1]: %w", err)
+			if len(extendArray) >= 2 {
+				if extendEnd, err := pdf.Optional(pdf.GetBoolean(r, extendArray[1])); err != nil {
+					return nil, err
+				} else {
+					s.ExtendEnd = bool(extendEnd)
+				}
 			}
-			s.ExtendEnd = bool(extendEnd)
 		}
 	}
 
 	// Read optional Background
 	if bgObj, ok := d["Background"]; ok {
-		bg, err := pdf.GetFloatArray(r, bgObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read Background: %w", err)
+		if bg, err := pdf.Optional(pdf.GetFloatArray(r, bgObj)); err != nil {
+			return nil, err
+		} else if len(bg) == s.ColorSpace.Channels() {
+			s.Background = bg // Only store if valid length
 		}
-		s.Background = bg
+		// Invalid lengths silently ignored for permissive reading
 	}
 
 	// Read optional BBox
 	if bboxObj, ok := d["BBox"]; ok {
-		bbox, err := pdf.GetRectangle(r, bboxObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read BBox: %w", err)
+		if bbox, err := pdf.Optional(pdf.GetRectangle(r, bboxObj)); err != nil {
+			return nil, err
+		} else {
+			s.BBox = bbox
 		}
-		s.BBox = bbox
 	}
 
 	// Read optional AntiAlias
 	if aaObj, ok := d["AntiAlias"]; ok {
-		aa, err := pdf.GetBoolean(r, aaObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read AntiAlias: %w", err)
+		if aa, err := pdf.Optional(pdf.GetBoolean(r, aaObj)); err != nil {
+			return nil, err
+		} else {
+			s.AntiAlias = bool(aa)
 		}
-		s.AntiAlias = bool(aa)
 	}
 
 	// Set SingleUse based on whether the original object was a reference
@@ -195,10 +198,15 @@ func extractType3(r pdf.Getter, d pdf.Dict, wasReference bool) (*Type3, error) {
 // Embed implements the [Shading] interface.
 func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
+	if err := pdf.CheckVersion(rm.Out, "Type 3 shadings", pdf.V1_3); err != nil {
+		return nil, zero, err
+	}
 	if s.ColorSpace == nil {
 		return nil, zero, errors.New("missing ColorSpace")
 	} else if s.ColorSpace.Family() == color.FamilyPattern {
-		return nil, zero, errors.New("invalid ColorSpace")
+		return nil, zero, errors.New("Pattern color space not allowed")
+	} else if s.ColorSpace.Family() == color.FamilyIndexed {
+		return nil, zero, errors.New("Indexed color space not allowed")
 	}
 	if have := len(s.Background); have > 0 {
 		want := s.ColorSpace.Channels()
@@ -218,6 +226,14 @@ func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	if s.F == nil {
 		return nil, zero, errors.New("missing function")
 	}
+
+	// Validate function domain contains shading domain
+	shadingDomain := []float64{s.TMin, s.TMax}
+	functionDomain := s.F.GetDomain()
+	if !domainContains(functionDomain, shadingDomain) {
+		return nil, zero, fmt.Errorf("function domain %v must contain shading domain %v", functionDomain, shadingDomain)
+	}
+
 	fn, _, err := pdf.ResourceManagerEmbed(rm, s.F)
 	if err != nil {
 		return nil, zero, err

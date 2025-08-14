@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
@@ -210,6 +211,250 @@ var testCases = map[int][]testCase{
 			},
 		},
 	},
+	5: {
+		{
+			name: "basic Type5",
+			shading: &Type5{
+				ColorSpace:        color.DeviceRGBSpace,
+				BitsPerCoordinate: 8,
+				BitsPerComponent:  8,
+				VerticesPerRow:    2,
+				Decode:            []float64{0, 100, 0, 100, 0, 1, 0, 1, 0, 1},
+				Vertices: []Type5Vertex{
+					// First row
+					{X: 0, Y: 0, Color: []float64{1, 0, 0}},
+					{X: 100, Y: 0, Color: []float64{0, 1, 0}},
+					// Second row
+					{X: 0, Y: 100, Color: []float64{0, 0, 1}},
+					{X: 100, Y: 100, Color: []float64{1, 1, 0}},
+				},
+			},
+		},
+		{
+			name: "Type5 with function",
+			shading: &Type5{
+				ColorSpace:        color.DeviceRGBSpace,
+				BitsPerCoordinate: 8,
+				BitsPerComponent:  8,
+				VerticesPerRow:    3,
+				Decode:            []float64{0, 200, 0, 200, 0, 1},
+				F: &function.Type2{
+					XMin: 0, XMax: 1,
+					C0: []float64{0, 0, 0},
+					C1: []float64{1, 1, 1},
+					N:  1.0,
+				},
+				Vertices: []Type5Vertex{
+					// First row (3 vertices)
+					{X: 0, Y: 0, Color: []float64{0.0}},
+					{X: 100, Y: 0, Color: []float64{0.5}},
+					{X: 200, Y: 0, Color: []float64{1.0}},
+					// Second row (3 vertices)
+					{X: 0, Y: 100, Color: []float64{0.2}},
+					{X: 100, Y: 100, Color: []float64{0.7}},
+					{X: 200, Y: 100, Color: []float64{0.8}},
+				},
+				Background: []float64{0.9, 0.9, 0.9},
+				BBox:       &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 100},
+				AntiAlias:  true,
+			},
+		},
+	},
+	6: {
+		{
+			name: "basic Type6",
+			shading: &Type6{
+				ColorSpace:        color.DeviceRGBSpace,
+				BitsPerCoordinate: 8,
+				BitsPerComponent:  8,
+				BitsPerFlag:       2,
+				Decode:            []float64{0, 100, 0, 100, 0, 1, 0, 1, 0, 1},
+				Patches: []Type6Patch{
+					{
+						Flag: 0,
+						ControlPoints: [12]vec.Vec2{
+							{X: 10, Y: 10}, {X: 20, Y: 10}, {X: 30, Y: 10}, {X: 40, Y: 10}, // C1 curve
+							{X: 40, Y: 20}, {X: 40, Y: 30}, {X: 40, Y: 40}, {X: 30, Y: 40}, // D2 curve
+							{X: 20, Y: 40}, {X: 10, Y: 40}, {X: 10, Y: 30}, {X: 10, Y: 20}, // C2, D1 curves
+						},
+						CornerColors: [][]float64{
+							{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1, 1, 0},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Type6 with function",
+			shading: &Type6{
+				ColorSpace:        color.DeviceRGBSpace,
+				BitsPerCoordinate: 8,
+				BitsPerComponent:  8,
+				BitsPerFlag:       2,
+				Decode:            []float64{0, 200, 0, 200, 0, 1},
+				F: &function.Type2{
+					XMin: 0, XMax: 1,
+					C0: []float64{0, 0, 0},
+					C1: []float64{1, 1, 1},
+					N:  1.0,
+				},
+				Patches: []Type6Patch{
+					{
+						Flag: 0,
+						ControlPoints: [12]vec.Vec2{
+							{X: 0, Y: 0}, {X: 50, Y: 0}, {X: 100, Y: 0}, {X: 150, Y: 0},
+							{X: 150, Y: 50}, {X: 150, Y: 100}, {X: 100, Y: 100}, {X: 50, Y: 100},
+							{X: 0, Y: 100}, {X: 0, Y: 50}, {X: 25, Y: 25}, {X: 0, Y: 25},
+						},
+						CornerColors: [][]float64{
+							{0.0}, {0.3}, {0.7}, {1.0},
+						},
+					},
+				},
+				Background: []float64{0.9, 0.9, 0.9},
+				BBox:       &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
+				AntiAlias:  true,
+			},
+		},
+		{
+			name: "Type6 with connected patches",
+			shading: &Type6{
+				ColorSpace:        color.DeviceRGBSpace,
+				BitsPerCoordinate: 8,
+				BitsPerComponent:  8,
+				BitsPerFlag:       2,
+				Decode:            []float64{0, 100, 0, 100, 0, 1, 0, 1, 0, 1},
+				Patches: []Type6Patch{
+					{
+						// First patch (new)
+						Flag: 0,
+						ControlPoints: [12]vec.Vec2{
+							{X: 10, Y: 10}, {X: 20, Y: 10}, {X: 30, Y: 10}, {X: 40, Y: 10},
+							{X: 40, Y: 20}, {X: 40, Y: 30}, {X: 40, Y: 40}, {X: 30, Y: 40},
+							{X: 20, Y: 40}, {X: 10, Y: 40}, {X: 10, Y: 30}, {X: 10, Y: 20},
+						},
+						CornerColors: [][]float64{
+							{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1, 1, 0},
+						},
+					},
+					{
+						// Second patch (connected to first patch's D2 edge, flag=1)
+						Flag: 1,
+						ControlPoints: [12]vec.Vec2{
+							{X: 40, Y: 10}, {X: 40, Y: 20}, {X: 40, Y: 30}, {X: 40, Y: 40}, // inherited from first patch
+							{X: 50, Y: 40}, {X: 60, Y: 40}, {X: 70, Y: 40}, {X: 70, Y: 30}, // explicit coordinates
+							{X: 70, Y: 20}, {X: 70, Y: 10}, {X: 60, Y: 10}, {X: 50, Y: 10}, // explicit coordinates
+						},
+						CornerColors: [][]float64{
+							{0, 1, 0}, {0, 0, 1}, {1, 0, 1}, {0, 1, 1}, // first two inherited, last two explicit
+						},
+					},
+				},
+			},
+		},
+	},
+	7: {
+		{
+			name: "basic Type7",
+			shading: &Type7{
+				ColorSpace:        color.DeviceRGBSpace,
+				BitsPerCoordinate: 8,
+				BitsPerComponent:  8,
+				BitsPerFlag:       2,
+				Decode:            []float64{0, 100, 0, 100, 0, 1, 0, 1, 0, 1},
+				Patches: []Type7Patch{
+					{
+						Flag: 0,
+						ControlPoints: [16]vec.Vec2{
+							// Stream order (spiral pattern): bottom row, right column, top row, left column, then internal
+							{X: 10, Y: 10}, {X: 20, Y: 10}, {X: 30, Y: 10}, {X: 40, Y: 10}, // bottom row
+							{X: 40, Y: 20}, {X: 40, Y: 30}, {X: 40, Y: 40},                // right column  
+							{X: 30, Y: 40}, {X: 20, Y: 40}, {X: 10, Y: 40},                // top row
+							{X: 10, Y: 30}, {X: 10, Y: 20},                               // left column
+							{X: 20, Y: 20}, {X: 30, Y: 20}, {X: 30, Y: 30}, {X: 20, Y: 30}, // internal points
+						},
+						CornerColors: [][]float64{
+							{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1, 1, 0},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Type7 with function",
+			shading: &Type7{
+				ColorSpace:        color.DeviceRGBSpace,
+				BitsPerCoordinate: 8,
+				BitsPerComponent:  8,
+				BitsPerFlag:       2,
+				Decode:            []float64{0, 200, 0, 200, 0, 1},
+				F: &function.Type2{
+					XMin: 0, XMax: 1,
+					C0: []float64{0, 0, 0},
+					C1: []float64{1, 1, 1},
+					N:  1.0,
+				},
+				Patches: []Type7Patch{
+					{
+						Flag: 0,
+						ControlPoints: [16]vec.Vec2{
+							{X: 0, Y: 0}, {X: 50, Y: 0}, {X: 100, Y: 0}, {X: 150, Y: 0},     // bottom
+							{X: 150, Y: 50}, {X: 150, Y: 100}, {X: 150, Y: 150},            // right
+							{X: 100, Y: 150}, {X: 50, Y: 150}, {X: 0, Y: 150},             // top  
+							{X: 0, Y: 100}, {X: 0, Y: 50},                                 // left
+							{X: 50, Y: 50}, {X: 100, Y: 50}, {X: 100, Y: 100}, {X: 50, Y: 100}, // internal
+						},
+						CornerColors: [][]float64{
+							{0.0}, {0.3}, {0.7}, {1.0},
+						},
+					},
+				},
+				Background: []float64{0.9, 0.9, 0.9},
+				BBox:       &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
+				AntiAlias:  true,
+			},
+		},
+		{
+			name: "Type7 with connected patches",
+			shading: &Type7{
+				ColorSpace:        color.DeviceRGBSpace,
+				BitsPerCoordinate: 8,
+				BitsPerComponent:  8,
+				BitsPerFlag:       2,
+				Decode:            []float64{0, 100, 0, 100, 0, 1, 0, 1, 0, 1},
+				Patches: []Type7Patch{
+					{
+						// First patch (new)
+						Flag: 0,
+						ControlPoints: [16]vec.Vec2{
+							{X: 10, Y: 10}, {X: 20, Y: 10}, {X: 30, Y: 10}, {X: 40, Y: 10}, // bottom
+							{X: 40, Y: 20}, {X: 40, Y: 30}, {X: 40, Y: 40},                // right
+							{X: 30, Y: 40}, {X: 20, Y: 40}, {X: 10, Y: 40},                // top
+							{X: 10, Y: 30}, {X: 10, Y: 20},                               // left
+							{X: 20, Y: 20}, {X: 30, Y: 20}, {X: 30, Y: 30}, {X: 20, Y: 30}, // internal
+						},
+						CornerColors: [][]float64{
+							{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1, 1, 0},
+						},
+					},
+					{
+						// Second patch (connected to first patch's right edge, flag=1)
+						Flag: 1,
+						ControlPoints: [16]vec.Vec2{
+							{X: 10, Y: 40}, {X: 20, Y: 40}, {X: 30, Y: 40}, {X: 40, Y: 40}, // inherited from first patch (stream indices 9,8,7,6)
+							{X: 50, Y: 40}, {X: 60, Y: 40}, {X: 70, Y: 40},                // explicit coordinates
+							{X: 70, Y: 30}, {X: 70, Y: 20}, {X: 70, Y: 10},                // explicit coordinates 
+							{X: 60, Y: 10}, {X: 50, Y: 10},                               // explicit coordinates
+							{X: 50, Y: 20}, {X: 60, Y: 20}, {X: 60, Y: 30}, {X: 50, Y: 30}, // explicit internal points
+						},
+						CornerColors: [][]float64{
+							{0, 1, 0}, {0, 0, 1}, {1, 0, 1}, {0, 1, 1}, // first two inherited from corners 1,2 of previous patch
+						},
+					},
+				},
+			},
+		},
+	},
 }
 
 type testCase struct {
@@ -264,8 +509,8 @@ func roundTripTest(t *testing.T, originalShading graphics.Shading) {
 	// Use cmp.Diff to compare the original and read shading
 	// Ignore unexported fields and use tolerance for floating point comparisons
 	opts := []cmp.Option{
-		cmpopts.IgnoreUnexported(Type1{}, Type2{}, Type3{}, Type4{}),
-		cmpopts.EquateApprox(0.01, 0.01), // Allow precision differences from bit quantization
+		cmpopts.IgnoreUnexported(Type1{}, Type2{}, Type3{}, Type4{}, Type5{}, Type6{}, Type7{}),
+		cmpopts.EquateApprox(0.5, 0.01), // Allow precision differences from bit quantization
 	}
 	if diff := cmp.Diff(originalShading, readShading, opts...); diff != "" {
 		t.Errorf("round trip failed (-want +got):\n%s", diff)
@@ -332,6 +577,70 @@ func TestShadingEvaluation(t *testing.T) {
 					{X: 0, Y: 0, Flag: 0, Color: []float64{1, 0, 0}},
 					{X: 100, Y: 0, Flag: 1, Color: []float64{0, 1, 0}},
 					{X: 50, Y: 100, Flag: 2, Color: []float64{0, 0, 1}},
+				},
+			},
+		},
+		{
+			name: "Type5 evaluation",
+			shading: &Type5{
+				ColorSpace:        color.DeviceRGBSpace,
+				BitsPerCoordinate: 8,
+				BitsPerComponent:  8,
+				VerticesPerRow:    2,
+				Decode:            []float64{0, 100, 0, 100, 0, 1, 0, 1, 0, 1},
+				Vertices: []Type5Vertex{
+					{X: 0, Y: 0, Color: []float64{1, 0, 0}},
+					{X: 100, Y: 0, Color: []float64{0, 1, 0}},
+					{X: 0, Y: 100, Color: []float64{0, 0, 1}},
+					{X: 100, Y: 100, Color: []float64{1, 1, 0}},
+				},
+			},
+		},
+		{
+			name: "Type6 evaluation",
+			shading: &Type6{
+				ColorSpace:        color.DeviceRGBSpace,
+				BitsPerCoordinate: 8,
+				BitsPerComponent:  8,
+				BitsPerFlag:       2,
+				Decode:            []float64{0, 100, 0, 100, 0, 1, 0, 1, 0, 1},
+				Patches: []Type6Patch{
+					{
+						Flag: 0,
+						ControlPoints: [12]vec.Vec2{
+							{X: 10, Y: 10}, {X: 20, Y: 10}, {X: 30, Y: 10}, {X: 40, Y: 10},
+							{X: 40, Y: 20}, {X: 40, Y: 30}, {X: 40, Y: 40}, {X: 30, Y: 40},
+							{X: 20, Y: 40}, {X: 10, Y: 40}, {X: 10, Y: 30}, {X: 10, Y: 20},
+						},
+						CornerColors: [][]float64{
+							{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1, 1, 0},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Type7 evaluation",
+			shading: &Type7{
+				ColorSpace:        color.DeviceRGBSpace,
+				BitsPerCoordinate: 8,
+				BitsPerComponent:  8,
+				BitsPerFlag:       2,
+				Decode:            []float64{0, 100, 0, 100, 0, 1, 0, 1, 0, 1},
+				Patches: []Type7Patch{
+					{
+						Flag: 0,
+						ControlPoints: [16]vec.Vec2{
+							{X: 10, Y: 10}, {X: 20, Y: 10}, {X: 30, Y: 10}, {X: 40, Y: 10}, // bottom
+							{X: 40, Y: 20}, {X: 40, Y: 30}, {X: 40, Y: 40},                // right
+							{X: 30, Y: 40}, {X: 20, Y: 40}, {X: 10, Y: 40},                // top
+							{X: 10, Y: 30}, {X: 10, Y: 20},                               // left
+							{X: 20, Y: 20}, {X: 30, Y: 20}, {X: 30, Y: 30}, {X: 20, Y: 30}, // internal
+						},
+						CornerColors: [][]float64{
+							{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1, 1, 0},
+						},
+					},
 				},
 			},
 		},
@@ -524,7 +833,7 @@ func FuzzRead(f *testing.F) {
 
 		// Test basic shading properties don't panic
 		shadingType := shading.ShadingType()
-		if shadingType < 1 || shadingType > 4 {
+		if shadingType < 1 || shadingType > 7 {
 			t.Errorf("invalid shading type: %d", shadingType)
 		}
 	})

@@ -191,7 +191,7 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["Intent"] = pdf.Name(d.Intent)
 	}
 	if d.MaskImage != nil {
-		ref, _, err := d.MaskImage.Embed(rm)
+		ref, _, err := pdf.ResourceManagerEmbed(rm, d.MaskImage)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -216,7 +216,7 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	if len(d.Alternates) > 0 {
 		var alts pdf.Array
 		for _, alt := range d.Alternates {
-			ref, _, err := alt.Embed(rm)
+			ref, _, err := pdf.ResourceManagerEmbed(rm, alt)
 			if err != nil {
 				return nil, zero, err
 			}
@@ -228,7 +228,7 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["Name"] = d.Name
 	}
 	if d.Metadata != nil {
-		ref, _, err := d.Metadata.Embed(rm)
+		ref, _, err := pdf.ResourceManagerEmbed(rm, d.Metadata)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -521,7 +521,7 @@ func (m *ImageMask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 	if len(m.Alternates) > 0 {
 		var alts pdf.Array
 		for _, alt := range m.Alternates {
-			ref, _, err := alt.Embed(rm)
+			ref, _, err := pdf.ResourceManagerEmbed(rm, alt)
 			if err != nil {
 				return nil, zero, err
 			}
@@ -533,7 +533,7 @@ func (m *ImageMask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 		dict["Name"] = m.Name
 	}
 	if m.Metadata != nil {
-		ref, _, err := m.Metadata.Embed(rm)
+		ref, _, err := pdf.ResourceManagerEmbed(rm, m.Metadata)
 		if err != nil {
 			return nil, zero, err
 		}

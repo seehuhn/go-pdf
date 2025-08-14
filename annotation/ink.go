@@ -155,7 +155,7 @@ func (i *Ink) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 
 	// BS (optional)
 	if i.BorderStyle != nil {
-		bs, _, err := i.BorderStyle.Embed(rm)
+		bs, _, err := pdf.ResourceManagerEmbed(rm, i.BorderStyle)
 		if err != nil {
 			return nil, err
 		}

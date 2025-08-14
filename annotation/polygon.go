@@ -173,7 +173,7 @@ func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 
 	// BS (optional)
 	if p.BorderStyle != nil {
-		bs, _, err := p.BorderStyle.Embed(rm)
+		bs, _, err := pdf.ResourceManagerEmbed(rm, p.BorderStyle)
 		if err != nil {
 			return nil, err
 		}
@@ -199,7 +199,7 @@ func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 		if err := pdf.CheckVersion(rm.Out, "polygon annotation Measure entry", pdf.V1_7); err != nil {
 			return nil, err
 		}
-		embedded, _, err := p.Measure.Embed(rm)
+		embedded, _, err := pdf.ResourceManagerEmbed(rm, p.Measure)
 		if err != nil {
 			return nil, err
 		}
