@@ -55,7 +55,7 @@ func (s *Stamp) AnnotationType() pdf.Name {
 	return "Stamp"
 }
 
-func extractStamp(r pdf.Getter, dict pdf.Dict) (*Stamp, error) {
+func decodeStamp(r pdf.Getter, dict pdf.Dict) (*Stamp, error) {
 	stamp := &Stamp{}
 
 	// Extract common annotation fields

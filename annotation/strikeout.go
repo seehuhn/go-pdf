@@ -41,7 +41,7 @@ func (s *StrikeOut) AnnotationType() pdf.Name {
 	return "StrikeOut"
 }
 
-func extractStrikeOut(r pdf.Getter, dict pdf.Dict) (*StrikeOut, error) {
+func decodeStrikeOut(r pdf.Getter, dict pdf.Dict) (*StrikeOut, error) {
 	strikeOut := &StrikeOut{}
 
 	// Extract common annotation fields

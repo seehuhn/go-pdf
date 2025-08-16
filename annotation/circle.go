@@ -62,7 +62,7 @@ func (c *Circle) AnnotationType() pdf.Name {
 	return "Circle"
 }
 
-func extractCircle(r pdf.Getter, dict pdf.Dict) (*Circle, error) {
+func decodeCircle(r pdf.Getter, dict pdf.Dict) (*Circle, error) {
 	circle := &Circle{}
 
 	// Extract common annotation fields

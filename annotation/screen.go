@@ -48,7 +48,7 @@ func (s *Screen) AnnotationType() pdf.Name {
 	return "Screen"
 }
 
-func extractScreen(r pdf.Getter, dict pdf.Dict) (*Screen, error) {
+func decodeScreen(r pdf.Getter, dict pdf.Dict) (*Screen, error) {
 	screen := &Screen{}
 
 	// Extract common annotation fields

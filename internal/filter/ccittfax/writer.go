@@ -18,6 +18,7 @@ package ccittfax
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 )
@@ -40,10 +41,14 @@ type Writer struct {
 }
 
 // NewWriter creates a new CCITT Fax encoder with the given parameters.
-func NewWriter(w io.Writer, p *Params) *Writer {
+func NewWriter(w io.Writer, p *Params) (*Writer, error) {
 	pCopy := *p
 	if pCopy.Columns == 0 {
 		pCopy.Columns = 1728
+	}
+
+	if pCopy.Columns < 0 || pCopy.Columns > maxColumns {
+		return nil, errors.New("invalid Columns value")
 	}
 
 	lineBytes := (pCopy.Columns + 7) / 8
@@ -71,7 +76,7 @@ func NewWriter(w io.Writer, p *Params) *Writer {
 		refLine:   referenceLine,
 		count2D:   0, // start with 1D line
 	}
-	return out
+	return out, nil
 }
 
 // Close finalizes the CCITT Fax stream.

@@ -44,7 +44,7 @@ func (p *Popup) AnnotationType() pdf.Name {
 	return "Popup"
 }
 
-func extractPopup(r pdf.Getter, dict pdf.Dict) (*Popup, error) {
+func decodePopup(r pdf.Getter, dict pdf.Dict) (*Popup, error) {
 	popup := &Popup{}
 
 	// Extract common annotation fields

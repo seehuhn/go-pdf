@@ -52,7 +52,7 @@ func (m *Movie) AnnotationType() pdf.Name {
 	return "Movie"
 }
 
-func extractMovie(r pdf.Getter, dict pdf.Dict) (*Movie, error) {
+func decodeMovie(r pdf.Getter, dict pdf.Dict) (*Movie, error) {
 	movie := &Movie{}
 
 	// Extract common annotation fields

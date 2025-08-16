@@ -56,7 +56,7 @@ func (i *Ink) AnnotationType() pdf.Name {
 	return "Ink"
 }
 
-func extractInk(r pdf.Getter, dict pdf.Dict) (*Ink, error) {
+func decodeInk(r pdf.Getter, dict pdf.Dict) (*Ink, error) {
 	ink := &Ink{}
 
 	// Extract common annotation fields

@@ -65,7 +65,7 @@ func (t *Text) AnnotationType() pdf.Name {
 	return "Text"
 }
 
-func extractText(r pdf.Getter, obj pdf.Object) (*Text, error) {
+func decodeText(r pdf.Getter, obj pdf.Object) (*Text, error) {
 	dict, err := pdf.GetDict(r, obj)
 	if err != nil {
 		return nil, err

@@ -189,6 +189,36 @@ func TestParamsValidate(t *testing.T) {
 			expectError: true,
 		},
 		{
+			name: "invalid Columns - excessive value to prevent memory exhaustion",
+			params: Params{
+				Colors:           1,
+				BitsPerComponent: 8,
+				Columns:          9000000000002,
+				Predictor:        2,
+			},
+			expectError: true,
+		},
+		{
+			name: "valid Columns - at maximum",
+			params: Params{
+				Colors:           1,
+				BitsPerComponent: 8,
+				Columns:          maxColumns,
+				Predictor:        2,
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid Columns - just above maximum",
+			params: Params{
+				Colors:           1,
+				BitsPerComponent: 8,
+				Columns:          maxColumns + 1,
+				Predictor:        2,
+			},
+			expectError: true,
+		},
+		{
 			name: "invalid Predictor - zero",
 			params: Params{
 				Colors:           3,

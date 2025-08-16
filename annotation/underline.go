@@ -41,7 +41,7 @@ func (u *Underline) AnnotationType() pdf.Name {
 	return "Underline"
 }
 
-func extractUnderline(r pdf.Getter, dict pdf.Dict) (*Underline, error) {
+func decodeUnderline(r pdf.Getter, dict pdf.Dict) (*Underline, error) {
 	underline := &Underline{}
 
 	// Extract common annotation fields

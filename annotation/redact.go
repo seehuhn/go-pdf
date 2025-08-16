@@ -59,7 +59,7 @@ func (r *Redact) AnnotationType() pdf.Name {
 	return "Redact"
 }
 
-func extractRedact(r pdf.Getter, dict pdf.Dict) (*Redact, error) {
+func decodeRedact(r pdf.Getter, dict pdf.Dict) (*Redact, error) {
 	redact := &Redact{}
 
 	// Extract common annotation fields

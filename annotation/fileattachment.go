@@ -45,7 +45,7 @@ func (f *FileAttachment) AnnotationType() pdf.Name {
 	return "FileAttachment"
 }
 
-func extractFileAttachment(r pdf.Getter, dict pdf.Dict) (*FileAttachment, error) {
+func decodeFileAttachment(r pdf.Getter, dict pdf.Dict) (*FileAttachment, error) {
 	fileAttachment := &FileAttachment{}
 
 	// Extract common annotation fields

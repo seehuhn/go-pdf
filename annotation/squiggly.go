@@ -41,7 +41,7 @@ func (s *Squiggly) AnnotationType() pdf.Name {
 	return "Squiggly"
 }
 
-func extractSquiggly(r pdf.Getter, dict pdf.Dict) (*Squiggly, error) {
+func decodeSquiggly(r pdf.Getter, dict pdf.Dict) (*Squiggly, error) {
 	squiggly := &Squiggly{}
 
 	// Extract common annotation fields

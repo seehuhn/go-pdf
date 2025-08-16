@@ -545,7 +545,10 @@ func (f FilterCCITTFax) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, err
 		IgnoreEndOfBlock:       !ff.eob,
 		DamagedRowsBeforeError: ff.damagedRows,
 	}
-	ww := ccittfax.NewWriter(w, params)
+	ww, err := ccittfax.NewWriter(w, params)
+	if err != nil {
+		return nil, err
+	}
 	return &withClose{
 		Writer: ww,
 		close: func() error {
@@ -575,7 +578,11 @@ func (f FilterCCITTFax) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 		IgnoreEndOfBlock:       !ff.eob,
 		DamagedRowsBeforeError: ff.damagedRows,
 	}
-	return io.NopCloser(ccittfax.NewReader(r, params)), nil
+	reader, err := ccittfax.NewReader(r, params)
+	if err != nil {
+		return nil, err
+	}
+	return io.NopCloser(reader), nil
 }
 
 func (f FilterCCITTFax) parseParameters() (*ccittFilter, error) {

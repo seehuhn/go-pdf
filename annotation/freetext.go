@@ -101,7 +101,7 @@ func (f *FreeText) AnnotationType() pdf.Name {
 	return "FreeText"
 }
 
-func extractFreeText(r pdf.Getter, dict pdf.Dict) (*FreeText, error) {
+func decodeFreeText(r pdf.Getter, dict pdf.Dict) (*FreeText, error) {
 	f := &FreeText{}
 
 	if err := decodeCommon(r, &f.Common, dict); err != nil {

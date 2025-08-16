@@ -18,6 +18,7 @@ package ccittfax
 
 import (
 	"bufio"
+	"errors"
 	"io"
 )
 
@@ -38,10 +39,14 @@ type Reader struct {
 }
 
 // NewReader creates a new CCITT Fax decoder.
-func NewReader(r io.Reader, p *Params) *Reader {
+func NewReader(r io.Reader, p *Params) (*Reader, error) {
 	pCopy := *p
 	if pCopy.Columns == 0 {
 		pCopy.Columns = 1728 // Default as per PDF spec / common fax width
+	}
+
+	if pCopy.Columns < 0 || pCopy.Columns > maxColumns {
+		return nil, errors.New("invalid Columns value")
 	}
 
 	lineBufSize := (pCopy.Columns + 7) / 8
@@ -65,7 +70,7 @@ func NewReader(r io.Reader, p *Params) *Reader {
 		line:    make([]byte, 0, lineBufSize),
 		refLine: refLine,
 		numRows: 0,
-	}
+	}, nil
 }
 
 // Read decodes the next scan line into the provided buffer.

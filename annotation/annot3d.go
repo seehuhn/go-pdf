@@ -214,7 +214,7 @@ func (a *Annot3D) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	return dict, nil
 }
 
-func extractAnnot3D(r pdf.Getter, dict pdf.Dict) (*Annot3D, error) {
+func decodeAnnot3D(r pdf.Getter, dict pdf.Dict) (*Annot3D, error) {
 	annot3D := &Annot3D{}
 
 	// Extract common annotation fields

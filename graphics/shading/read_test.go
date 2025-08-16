@@ -368,9 +368,9 @@ var testCases = map[int][]testCase{
 						ControlPoints: [16]vec.Vec2{
 							// Stream order (spiral pattern): bottom row, right column, top row, left column, then internal
 							{X: 10, Y: 10}, {X: 20, Y: 10}, {X: 30, Y: 10}, {X: 40, Y: 10}, // bottom row
-							{X: 40, Y: 20}, {X: 40, Y: 30}, {X: 40, Y: 40},                // right column  
-							{X: 30, Y: 40}, {X: 20, Y: 40}, {X: 10, Y: 40},                // top row
-							{X: 10, Y: 30}, {X: 10, Y: 20},                               // left column
+							{X: 40, Y: 20}, {X: 40, Y: 30}, {X: 40, Y: 40}, // right column
+							{X: 30, Y: 40}, {X: 20, Y: 40}, {X: 10, Y: 40}, // top row
+							{X: 10, Y: 30}, {X: 10, Y: 20}, // left column
 							{X: 20, Y: 20}, {X: 30, Y: 20}, {X: 30, Y: 30}, {X: 20, Y: 30}, // internal points
 						},
 						CornerColors: [][]float64{
@@ -398,10 +398,10 @@ var testCases = map[int][]testCase{
 					{
 						Flag: 0,
 						ControlPoints: [16]vec.Vec2{
-							{X: 0, Y: 0}, {X: 50, Y: 0}, {X: 100, Y: 0}, {X: 150, Y: 0},     // bottom
-							{X: 150, Y: 50}, {X: 150, Y: 100}, {X: 150, Y: 150},            // right
-							{X: 100, Y: 150}, {X: 50, Y: 150}, {X: 0, Y: 150},             // top  
-							{X: 0, Y: 100}, {X: 0, Y: 50},                                 // left
+							{X: 0, Y: 0}, {X: 50, Y: 0}, {X: 100, Y: 0}, {X: 150, Y: 0}, // bottom
+							{X: 150, Y: 50}, {X: 150, Y: 100}, {X: 150, Y: 150}, // right
+							{X: 100, Y: 150}, {X: 50, Y: 150}, {X: 0, Y: 150}, // top
+							{X: 0, Y: 100}, {X: 0, Y: 50}, // left
 							{X: 50, Y: 50}, {X: 100, Y: 50}, {X: 100, Y: 100}, {X: 50, Y: 100}, // internal
 						},
 						CornerColors: [][]float64{
@@ -428,9 +428,9 @@ var testCases = map[int][]testCase{
 						Flag: 0,
 						ControlPoints: [16]vec.Vec2{
 							{X: 10, Y: 10}, {X: 20, Y: 10}, {X: 30, Y: 10}, {X: 40, Y: 10}, // bottom
-							{X: 40, Y: 20}, {X: 40, Y: 30}, {X: 40, Y: 40},                // right
-							{X: 30, Y: 40}, {X: 20, Y: 40}, {X: 10, Y: 40},                // top
-							{X: 10, Y: 30}, {X: 10, Y: 20},                               // left
+							{X: 40, Y: 20}, {X: 40, Y: 30}, {X: 40, Y: 40}, // right
+							{X: 30, Y: 40}, {X: 20, Y: 40}, {X: 10, Y: 40}, // top
+							{X: 10, Y: 30}, {X: 10, Y: 20}, // left
 							{X: 20, Y: 20}, {X: 30, Y: 20}, {X: 30, Y: 30}, {X: 20, Y: 30}, // internal
 						},
 						CornerColors: [][]float64{
@@ -442,9 +442,9 @@ var testCases = map[int][]testCase{
 						Flag: 1,
 						ControlPoints: [16]vec.Vec2{
 							{X: 10, Y: 40}, {X: 20, Y: 40}, {X: 30, Y: 40}, {X: 40, Y: 40}, // inherited from first patch (stream indices 9,8,7,6)
-							{X: 50, Y: 40}, {X: 60, Y: 40}, {X: 70, Y: 40},                // explicit coordinates
-							{X: 70, Y: 30}, {X: 70, Y: 20}, {X: 70, Y: 10},                // explicit coordinates 
-							{X: 60, Y: 10}, {X: 50, Y: 10},                               // explicit coordinates
+							{X: 50, Y: 40}, {X: 60, Y: 40}, {X: 70, Y: 40}, // explicit coordinates
+							{X: 70, Y: 30}, {X: 70, Y: 20}, {X: 70, Y: 10}, // explicit coordinates
+							{X: 60, Y: 10}, {X: 50, Y: 10}, // explicit coordinates
 							{X: 50, Y: 20}, {X: 60, Y: 20}, {X: 60, Y: 30}, {X: 50, Y: 30}, // explicit internal points
 						},
 						CornerColors: [][]float64{
@@ -632,9 +632,9 @@ func TestShadingEvaluation(t *testing.T) {
 						Flag: 0,
 						ControlPoints: [16]vec.Vec2{
 							{X: 10, Y: 10}, {X: 20, Y: 10}, {X: 30, Y: 10}, {X: 40, Y: 10}, // bottom
-							{X: 40, Y: 20}, {X: 40, Y: 30}, {X: 40, Y: 40},                // right
-							{X: 30, Y: 40}, {X: 20, Y: 40}, {X: 10, Y: 40},                // top
-							{X: 10, Y: 30}, {X: 10, Y: 20},                               // left
+							{X: 40, Y: 20}, {X: 40, Y: 30}, {X: 40, Y: 40}, // right
+							{X: 30, Y: 40}, {X: 20, Y: 40}, {X: 10, Y: 40}, // top
+							{X: 10, Y: 30}, {X: 10, Y: 20}, // left
 							{X: 20, Y: 20}, {X: 30, Y: 20}, {X: 30, Y: 30}, {X: 20, Y: 30}, // internal
 						},
 						CornerColors: [][]float64{

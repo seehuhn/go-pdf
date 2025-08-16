@@ -101,7 +101,8 @@ type Line struct {
 	Caption bool
 
 	// CaptionAbove specifies whether the caption appears above the line. When
-	// true, the caption appears on top of the line instead of inside it.
+	// true, the caption is written parallel the line instead of embedded into
+	// it.
 	//
 	// This corresponds to the /CP entry in the PDF annotation dictionary.
 	CaptionAbove bool
@@ -125,7 +126,7 @@ func (l *Line) AnnotationType() pdf.Name {
 	return "Line"
 }
 
-func extractLine(r pdf.Getter, dict pdf.Dict) (*Line, error) {
+func decodeLine(r pdf.Getter, dict pdf.Dict) (*Line, error) {
 	line := &Line{}
 
 	// Extract common annotation fields

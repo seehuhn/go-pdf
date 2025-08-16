@@ -21,6 +21,8 @@ import (
 	"fmt"
 )
 
+const maxColumns = 1 << 20
+
 type Params struct {
 	// Colors is the number of color components per pixel.
 	// Valid range: at least 1, with predictor-specific limits:
@@ -84,9 +86,11 @@ func (p *Params) Validate() error {
 		return fmt.Errorf("BitsPerComponent must be 1, 2, 4, 8, or 16, got %d", p.BitsPerComponent)
 	}
 
-	// Validate Columns
-	if p.Columns < 1 {
-		return errors.New("Columns must be at least 1")
+	// validate Columns
+	bitsPerPixel := p.Colors * p.BitsPerComponent
+	maxCols := min(maxColumns, (1<<31-1)/bitsPerPixel)
+	if p.Columns < 1 || p.Columns > maxCols {
+		return errors.New("invalid Columns value")
 	}
 
 	// Validate Predictor

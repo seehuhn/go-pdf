@@ -43,7 +43,7 @@ func (c *Custom) AnnotationType() pdf.Name {
 	return c.Type
 }
 
-func extractCustom(r pdf.Getter, dict pdf.Dict) (*Custom, error) {
+func decodeCustom(r pdf.Getter, dict pdf.Dict) (*Custom, error) {
 	subtype, err := pdf.GetName(r, dict["Subtype"])
 	if err != nil {
 		return nil, err

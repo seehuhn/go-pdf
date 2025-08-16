@@ -18,6 +18,8 @@ package ccittfax
 
 //go:generate go run ./generate/
 
+const maxColumns = 1 << 20
+
 // Params holds the parameters that control CCITT Fax encoding and decoding behavior.
 type Params struct {
 	// Columns specifies image width in pixels.

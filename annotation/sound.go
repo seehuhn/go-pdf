@@ -49,7 +49,7 @@ func (s *Sound) AnnotationType() pdf.Name {
 	return "Sound"
 }
 
-func extractSound(r pdf.Getter, dict pdf.Dict) (*Sound, error) {
+func decodeSound(r pdf.Getter, dict pdf.Dict) (*Sound, error) {
 	sound := &Sound{}
 
 	// Extract common annotation fields

@@ -41,7 +41,7 @@ func (h *Highlight) AnnotationType() pdf.Name {
 	return "Highlight"
 }
 
-func extractHighlight(r pdf.Getter, dict pdf.Dict) (*Highlight, error) {
+func decodeHighlight(r pdf.Getter, dict pdf.Dict) (*Highlight, error) {
 	highlight := &Highlight{}
 
 	// Extract common annotation fields

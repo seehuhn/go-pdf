@@ -42,7 +42,7 @@ func (p *PrinterMark) AnnotationType() pdf.Name {
 	return "PrinterMark"
 }
 
-func extractPrinterMark(r pdf.Getter, dict pdf.Dict) (*PrinterMark, error) {
+func decodePrinterMark(r pdf.Getter, dict pdf.Dict) (*PrinterMark, error) {
 	printerMark := &PrinterMark{}
 
 	// Extract common annotation fields

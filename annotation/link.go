@@ -25,6 +25,8 @@ import (
 // PDF 2.0 sections: 12.5.2 12.5.6.5
 
 // Link represents a hypertext link annotation.
+// This is a clickable region on a PDF page that can perform an action
+// or navigate to a destination when activated.
 type Link struct {
 	Common
 
@@ -42,7 +44,7 @@ type Link struct {
 
 	// Highlight is the annotation's highlighting mode.
 	//
-	// When writing annotations, a zero value can be used as a shorthand
+	// When writing annotations, an empty name can be used as a shorthand
 	// [LinkHighlightInvert].
 	//
 	// This corresponds to the /H entry in the PDF annotation dictionary.
@@ -52,7 +54,7 @@ type Link struct {
 	// quadrilaterals that comprise the region where the link should be
 	// activated. Array of 8×n numbers (x1 y1 x2 y2 x3 y3 x4 y4 for each quad).
 	//
-	// All points must be contained within the annotation rectangle.
+	// All points must be contained within Common.Rect.
 	QuadPoints []float64
 
 	// BorderStyle (optional) is a border style dictionary specifying the line width
@@ -78,7 +80,7 @@ func (l *Link) AnnotationType() pdf.Name {
 	return "Link"
 }
 
-func extractLink(r pdf.Getter, dict pdf.Dict) (*Link, error) {
+func decodeLink(r pdf.Getter, dict pdf.Dict) (*Link, error) {
 	link := &Link{}
 
 	// Extract common annotation fields

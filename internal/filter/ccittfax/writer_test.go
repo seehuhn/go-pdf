@@ -32,7 +32,10 @@ func TestSimpleWriteWithoutEOL(t *testing.T) {
 	}
 
 	buf := &bytes.Buffer{}
-	w := NewWriter(buf, p)
+	w, err := NewWriter(buf, p)
+	if err != nil {
+		t.Fatal(err)
+	}
 	n, err := w.Write([]byte{0xFF}) // one row, eight columns, all white
 	if err != nil {
 		t.Fatal(err)
@@ -59,7 +62,10 @@ func TestSimepleWriteWithEOL(t *testing.T) {
 	}
 
 	buf := &bytes.Buffer{}
-	w := NewWriter(buf, p)
+	w, err := NewWriter(buf, p)
+	if err != nil {
+		t.Fatal(err)
+	}
 	n, err := w.Write([]byte{0xFF}) // one row, eight columns, all white
 	if err != nil {
 		t.Fatal(err)

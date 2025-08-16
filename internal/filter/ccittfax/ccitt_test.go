@@ -53,7 +53,10 @@ func TestRoundTripTriangle(t *testing.T) {
 			}
 
 			buf := &bytes.Buffer{}
-			writer := NewWriter(buf, param)
+			writer, err := NewWriter(buf, param)
+			if err != nil {
+				t.Fatal(err)
+			}
 			n, err := writer.Write(originalData)
 			if err != nil {
 				t.Fatal(err)
@@ -65,7 +68,10 @@ func TestRoundTripTriangle(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			reader := NewReader(bytes.NewReader(buf.Bytes()), param)
+			reader, err := NewReader(bytes.NewReader(buf.Bytes()), param)
+			if err != nil {
+				t.Fatal(err)
+			}
 			decodedData, err := io.ReadAll(reader)
 			if err != nil {
 				t.Fatal(err)
@@ -90,8 +96,11 @@ func TestCompatibilitySimple(t *testing.T) {
 
 	// Encode with our encoder
 	buf := &bytes.Buffer{}
-	writer := NewWriter(buf, param)
-	_, err := writer.Write(image)
+	writer, err := NewWriter(buf, param)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = writer.Write(image)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,8 +158,11 @@ func TestCompatibility(t *testing.T) {
 
 	// Encode with our encoder
 	buf := &bytes.Buffer{}
-	writer := NewWriter(buf, param)
-	_, err := writer.Write(image)
+	writer, err := NewWriter(buf, param)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = writer.Write(image)
 	if err != nil {
 		t.Fatal(err)
 	}

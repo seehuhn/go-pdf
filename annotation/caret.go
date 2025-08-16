@@ -47,7 +47,7 @@ func (c *Caret) AnnotationType() pdf.Name {
 	return "Caret"
 }
 
-func extractCaret(r pdf.Getter, dict pdf.Dict) (*Caret, error) {
+func decodeCaret(r pdf.Getter, dict pdf.Dict) (*Caret, error) {
 	caret := &Caret{}
 
 	// Extract common annotation fields

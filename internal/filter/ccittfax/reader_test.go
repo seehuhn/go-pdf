@@ -50,8 +50,11 @@ func TestSimpleRead(t *testing.T) {
 							BlackIs1:  blackIs1,
 						}
 
-						r := NewReader(bytes.NewReader(data), p)
-						data, err := io.ReadAll(r)
+						r, err := NewReader(bytes.NewReader(data), p)
+						if err != nil {
+							t.Fatalf("failed to create reader: %v", err)
+						}
+						data, err = io.ReadAll(r)
 						if err != nil {
 							t.Fatalf("unexpected error: %v", err)
 						}

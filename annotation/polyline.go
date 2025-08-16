@@ -74,7 +74,7 @@ func (p *Polyline) AnnotationType() pdf.Name {
 	return "PolyLine"
 }
 
-func extractPolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
+func decodePolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
 	polyline := &Polyline{}
 
 	// Extract common annotation fields

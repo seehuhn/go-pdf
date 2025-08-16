@@ -34,62 +34,62 @@ func Decode(r pdf.Getter, obj pdf.Object) (Annotation, error) {
 
 	switch subtype {
 	case "Text":
-		return extractText(r, dict)
+		return decodeText(r, dict)
 	case "Link":
-		return extractLink(r, dict)
+		return decodeLink(r, dict)
 	case "FreeText":
-		return extractFreeText(r, dict)
+		return decodeFreeText(r, dict)
 	case "Line":
-		return extractLine(r, dict)
+		return decodeLine(r, dict)
 	case "Square":
-		return extractSquare(r, dict)
+		return decodeSquare(r, dict)
 	case "Circle":
-		return extractCircle(r, dict)
+		return decodeCircle(r, dict)
 	case "Polygon":
-		return extractPolygon(r, dict)
+		return decodePolygon(r, dict)
 	case "PolyLine":
-		return extractPolyline(r, dict)
+		return decodePolyline(r, dict)
 	case "Highlight":
-		return extractHighlight(r, dict)
+		return decodeHighlight(r, dict)
 	case "Underline":
-		return extractUnderline(r, dict)
+		return decodeUnderline(r, dict)
 	case "Squiggly":
-		return extractSquiggly(r, dict)
+		return decodeSquiggly(r, dict)
 	case "StrikeOut":
-		return extractStrikeOut(r, dict)
+		return decodeStrikeOut(r, dict)
 	case "Caret":
-		return extractCaret(r, dict)
+		return decodeCaret(r, dict)
 	case "Stamp":
-		return extractStamp(r, dict)
+		return decodeStamp(r, dict)
 	case "Ink":
-		return extractInk(r, dict)
+		return decodeInk(r, dict)
 	case "Popup":
-		return extractPopup(r, dict)
+		return decodePopup(r, dict)
 	case "FileAttachment":
-		return extractFileAttachment(r, dict)
+		return decodeFileAttachment(r, dict)
 	case "Sound":
-		return extractSound(r, dict)
+		return decodeSound(r, dict)
 	case "Movie":
-		return extractMovie(r, dict)
+		return decodeMovie(r, dict)
 	case "Screen":
-		return extractScreen(r, dict)
+		return decodeScreen(r, dict)
 	case "Widget":
-		return extractWidget(r, dict)
+		return decodeWidget(r, dict)
 	case "PrinterMark":
-		return extractPrinterMark(r, dict)
+		return decodePrinterMark(r, dict)
 	case "TrapNet":
-		return extractTrapNet(r, dict)
+		return decodeTrapNet(r, dict)
 	case "Watermark":
-		return extractWatermark(r, dict)
+		return decodeWatermark(r, dict)
 	case "3D":
-		return extractAnnot3D(r, dict)
+		return decodeAnnot3D(r, dict)
 	case "Redact":
-		return extractRedact(r, dict)
+		return decodeRedact(r, dict)
 	case "Projection":
-		return extractProjection(r, dict)
+		return decodeProjection(r, dict)
 	case "RichMedia":
-		return extractRichMedia(r, dict)
+		return decodeRichMedia(r, dict)
 	default:
-		return extractCustom(r, dict)
+		return decodeCustom(r, dict)
 	}
 }

@@ -72,7 +72,7 @@ func (w *Widget) AnnotationType() pdf.Name {
 	return "Widget"
 }
 
-func extractWidget(r pdf.Getter, dict pdf.Dict) (*Widget, error) {
+func decodeWidget(r pdf.Getter, dict pdf.Dict) (*Widget, error) {
 	widget := &Widget{}
 
 	// Extract common annotation fields

@@ -72,7 +72,7 @@ func (p *Polygon) AnnotationType() pdf.Name {
 	return "Polygon"
 }
 
-func extractPolygon(r pdf.Getter, dict pdf.Dict) (*Polygon, error) {
+func decodePolygon(r pdf.Getter, dict pdf.Dict) (*Polygon, error) {
 	polygon := &Polygon{}
 
 	// Extract common annotation fields

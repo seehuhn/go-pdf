@@ -62,7 +62,7 @@ func (s *Square) AnnotationType() pdf.Name {
 	return "Square"
 }
 
-func extractSquare(r pdf.Getter, dict pdf.Dict) (*Square, error) {
+func decodeSquare(r pdf.Getter, dict pdf.Dict) (*Square, error) {
 	square := &Square{}
 
 	// Extract common annotation fields

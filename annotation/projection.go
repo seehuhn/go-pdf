@@ -33,7 +33,7 @@ func (p *Projection) AnnotationType() pdf.Name {
 	return "Projection"
 }
 
-func extractProjection(r pdf.Getter, dict pdf.Dict) (*Projection, error) {
+func decodeProjection(r pdf.Getter, dict pdf.Dict) (*Projection, error) {
 	projection := &Projection{}
 
 	// Extract common annotation fields
