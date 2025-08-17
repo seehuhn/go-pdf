@@ -78,7 +78,7 @@ func decodeSound(r pdf.Getter, dict pdf.Dict) (*Sound, error) {
 	return sound, nil
 }
 
-func (s *Sound) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (s *Sound) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "sound annotation", pdf.V1_2); err != nil {
 		return nil, err
 	}

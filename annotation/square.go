@@ -101,7 +101,7 @@ func decodeSquare(r pdf.Getter, dict pdf.Dict) (*Square, error) {
 	return square, nil
 }
 
-func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Square"),
 	}

@@ -81,7 +81,7 @@ func decodeMovie(r pdf.Getter, dict pdf.Dict) (*Movie, error) {
 	return movie, nil
 }
 
-func (m *Movie) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (m *Movie) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "movie annotation", pdf.V1_2); err != nil {
 		return nil, err
 	}

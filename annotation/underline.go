@@ -63,7 +63,7 @@ func decodeUnderline(r pdf.Getter, dict pdf.Dict) (*Underline, error) {
 	return underline, nil
 }
 
-func (u *Underline) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (u *Underline) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "underline annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

@@ -114,7 +114,7 @@ func decodeWatermark(r pdf.Getter, dict pdf.Dict) (*Watermark, error) {
 	return watermark, nil
 }
 
-func (w *Watermark) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (w *Watermark) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "watermark annotation", pdf.V1_6); err != nil {
 		return nil, err
 	}

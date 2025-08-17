@@ -143,7 +143,7 @@ func decodePolygon(r pdf.Getter, dict pdf.Dict) (*Polygon, error) {
 	return polygon, nil
 }
 
-func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Polygon"),
 	}

@@ -118,7 +118,7 @@ func decodeWidget(r pdf.Getter, dict pdf.Dict) (*Widget, error) {
 	return widget, nil
 }
 
-func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "widget annotation", pdf.V1_2); err != nil {
 		return nil, err
 	}

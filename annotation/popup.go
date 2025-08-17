@@ -66,7 +66,7 @@ func decodePopup(r pdf.Getter, dict pdf.Dict) (*Popup, error) {
 	return popup, nil
 }
 
-func (p *Popup) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (p *Popup) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "popup annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

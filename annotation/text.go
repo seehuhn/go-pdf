@@ -131,7 +131,7 @@ func decodeText(r pdf.Getter, obj pdf.Object) (*Text, error) {
 	return text, nil
 }
 
-func (t *Text) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (t *Text) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Text"),
 	}

@@ -59,7 +59,7 @@ func decodePrinterMark(r pdf.Getter, dict pdf.Dict) (*PrinterMark, error) {
 	return printerMark, nil
 }
 
-func (p *PrinterMark) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (p *PrinterMark) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "printer's mark annotation", pdf.V1_4); err != nil {
 		return nil, err
 	}

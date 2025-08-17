@@ -80,7 +80,7 @@ func decodeScreen(r pdf.Getter, dict pdf.Dict) (*Screen, error) {
 	return screen, nil
 }
 
-func (s *Screen) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (s *Screen) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "screen annotation", pdf.V1_5); err != nil {
 		return nil, err
 	}

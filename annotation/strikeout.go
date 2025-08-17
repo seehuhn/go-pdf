@@ -63,7 +63,7 @@ func decodeStrikeOut(r pdf.Getter, dict pdf.Dict) (*StrikeOut, error) {
 	return strikeOut, nil
 }
 
-func (s *StrikeOut) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (s *StrikeOut) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "strikeout annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

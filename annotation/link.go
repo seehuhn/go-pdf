@@ -119,7 +119,7 @@ func decodeLink(r pdf.Getter, dict pdf.Dict) (*Link, error) {
 	return link, nil
 }
 
-func (l *Link) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (l *Link) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if l.Action != nil && l.Destination != nil {
 		return nil, errors.New("conflicting Action and Destination fields in Link annotation")
 	}

@@ -133,7 +133,7 @@ func decodeRedact(r pdf.Getter, dict pdf.Dict) (*Redact, error) {
 	return redact, nil
 }
 
-func (r *Redact) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (r *Redact) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "redaction annotation", pdf.V1_7); err != nil {
 		return nil, err
 	}

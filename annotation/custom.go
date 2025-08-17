@@ -90,7 +90,7 @@ func decodeCustom(r pdf.Getter, dict pdf.Dict) (*Custom, error) {
 	return c, nil
 }
 
-func (c *Custom) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (c *Custom) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if c.Type == "" {
 		return nil, errors.New("missing annotation subtype")
 	}

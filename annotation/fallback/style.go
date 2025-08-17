@@ -47,7 +47,8 @@ import (
 type Style struct {
 	// iconFont is the font used to render symbols inside some of the icons for
 	// text annotations.  If this is changed to be something different from
-	// extended.NimbusRomanBold, the layout of the icons needs to be adjusted.
+	// extended.NimbusRomanBold, the layout of some text icons needs to be
+	// adjusted.
 	iconFont font.Layouter
 
 	// contentFont is the font used to render the text content of annotations,

@@ -21,6 +21,13 @@ import (
 	"fmt"
 )
 
+// Encoder represents a PDF object which is tied to a specific PDF file.
+type Encoder interface {
+	// Encode converts the Go representation of the object into the PDF
+	// representation.
+	Encode(rm *ResourceManager) (Native, error)
+}
+
 // Embedder represents a PDF resource (a font, image, pattern, etc.) which has
 // not yet been associated with a specific PDF file.
 //

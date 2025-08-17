@@ -18,15 +18,19 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/fallback"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
-	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/function"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/shading"
 )
 
 func main() {
@@ -38,47 +42,43 @@ func main() {
 }
 
 const (
-	leftMargin     = 72.0
-	iconSpacing    = 50.0
-	iconSize       = 24.0
-	titleY         = 340.0
-	defaultRowY    = 300.0
-	styledRowY     = 250.0
-	pinkRowY       = 150.0
-	styledPinkRowY = 100.0
+	rowSpacing = 32.0
+	iconSize   = 24.0
+
+	topRowY = 500.0
+
+	labelX         = 70.0
+	defaultColX    = 160.0
+	styledColX     = 200.0
+	pinkColX       = 270.0
+	styledPinkColX = 310.0
 )
 
-// annotationConfig defines the parameters for creating an annotation pair
-type annotationConfig struct {
-	yPos            float64
-	backgroundColor color.Color
-	useStyle        bool
-}
-
 func createDocument(filename string) error {
-	paper := document.A5r
+	paper := document.A5
 	opt := &pdf.WriterOptions{
 		HumanReadable: true,
 	}
-	doc, err := document.CreateSinglePage(filename, paper, pdf.V1_7, opt)
+	page, err := document.CreateSinglePage(filename, paper, pdf.V1_7, opt)
 	if err != nil {
 		return err
 	}
 
-	var annots pdf.Array
-
-	titleFont := standard.Helvetica.New()
-
-	style := fallback.NewStyle()
-	pink := color.DeviceRGB(0.96, 0.87, 0.90)
-
-	// configuration for the four annotation rows
-	configs := []annotationConfig{
-		{yPos: defaultRowY, backgroundColor: nil, useStyle: false},    // viewer default style
-		{yPos: styledRowY, backgroundColor: nil, useStyle: true},      // with appearance dictionary
-		{yPos: pinkRowY, backgroundColor: pink, useStyle: false},      // pink background
-		{yPos: styledPinkRowY, backgroundColor: pink, useStyle: true}, // styled with pink background
+	background, err := pageBackground(paper)
+	if err != nil {
+		return err
 	}
+	page.DrawShading(background)
+
+	w := &writer{
+		annots:    pdf.Array{},
+		page:      page,
+		style:     fallback.NewStyle(),
+		yPos:      topRowY,
+		labelFont: standard.Helvetica.New(),
+	}
+
+	pink := color.DeviceRGB(0.96, 0.87, 0.90)
 
 	allIcons := []annotation.TextIcon{
 		annotation.TextIconComment,
@@ -89,55 +89,83 @@ func createDocument(filename string) error {
 		annotation.TextIconParagraph,
 		annotation.TextIconInsert,
 	}
-	// create icon labels at the top
-	for i, icon := range allIcons {
-		err := createIconLabel(doc, titleFont, icon, i)
+	for _, icon := range allIcons {
+		w.label(icon)
+
+		// viewer default style
+		err := w.annotationPair(icon, defaultColX, nil, false)
 		if err != nil {
 			return err
 		}
-	}
 
-	// create annotations for each icon and configuration
-	for i, icon := range allIcons {
-		for _, config := range configs {
-			textRef, popupRef, err := createTextAnnotationPair(doc, icon, i, config, style)
-			if err != nil {
-				return err
-			}
-			annots = append(annots, textRef, popupRef)
+		// with appearance dictionary
+		err = w.annotationPair(icon, styledColX, nil, true)
+		if err != nil {
+			return err
 		}
+
+		// pink background
+		err = w.annotationPair(icon, pinkColX, pink, false)
+		if err != nil {
+			return err
+		}
+
+		// styled with pink background
+		err = w.annotationPair(icon, styledPinkColX, pink, true)
+		if err != nil {
+			return err
+		}
+
+		w.yPos -= rowSpacing
 	}
 
-	doc.PageDict["Annots"] = annots
+	page.PageDict["Annots"] = w.annots
 
-	return doc.Close()
+	return page.Close()
 }
 
-// createIconLabel creates the title text for an icon
-func createIconLabel(doc *document.Page, titleFont *type1.Instance, icon annotation.TextIcon, index int) error {
-	doc.TextBegin()
-	doc.TextSetFont(titleFont, 8)
-	if len(icon) > 8 {
-		doc.TextSetHorizontalScaling(0.8)
+type writer struct {
+	annots    pdf.Array
+	page      *document.Page
+	style     *fallback.Style
+	yPos      float64
+	labelFont font.Layouter
+}
+
+func (w *writer) embed(a annotation.Annotation, ref pdf.Reference) error {
+	obj, err := a.Encode(w.page.RM)
+	if err != nil {
+		return err
 	}
-	doc.TextFirstLine(leftMargin+float64(index)*iconSpacing, titleY)
-	doc.TextShow(string(icon))
-	doc.TextEnd()
+	err = w.page.RM.Out.Put(ref, obj)
+	if err != nil {
+		return err
+	}
+	w.annots = append(w.annots, ref)
 	return nil
 }
 
-// createTextAnnotationPair creates a text annotation and its popup
-func createTextAnnotationPair(doc *document.Page, icon annotation.TextIcon, index int, config annotationConfig, style *fallback.Style) (pdf.Reference, pdf.Reference, error) {
-	textRef := doc.RM.Out.Alloc()
-	popupRef := doc.RM.Out.Alloc()
+// createIconLabel creates the title text for an icon
+func (w *writer) label(iconName annotation.TextIcon) {
+	w.page.TextBegin()
+	w.page.TextSetFont(w.labelFont, 8)
+	w.page.TextFirstLine(labelX, w.yPos+10)
+	w.page.TextShow(string(iconName))
+	w.page.TextEnd()
+}
 
-	x := leftMargin + float64(index)*iconSpacing
-	rect := pdf.Rectangle{LLx: x, LLy: config.yPos, URx: x + iconSize, URy: config.yPos + iconSize}
+// annotationPair creates a text annotation and its popup
+func (w *writer) annotationPair(icon annotation.TextIcon, xPos float64, backgroundColor color.Color, useStyle bool) error {
+	textRef := w.page.RM.Out.Alloc()
+	popupRef := w.page.RM.Out.Alloc()
+
+	y := w.yPos + 24
+	rect := pdf.Rectangle{LLx: xPos, LLy: y - iconSize, URx: xPos + iconSize, URy: y}
 
 	popup := &annotation.Popup{
 		Common: annotation.Common{
 			Rect:  rect,
-			Color: config.backgroundColor,
+			Color: backgroundColor,
 		},
 		Parent: textRef,
 	}
@@ -146,7 +174,7 @@ func createTextAnnotationPair(doc *document.Page, icon annotation.TextIcon, inde
 		Common: annotation.Common{
 			Rect:     rect,
 			Contents: fmt.Sprintf("Icon name %q", icon),
-			Color:    config.backgroundColor,
+			Color:    backgroundColor,
 		},
 		Markup: annotation.Markup{
 			User:  "Jochen Voss",
@@ -155,27 +183,42 @@ func createTextAnnotationPair(doc *document.Page, icon annotation.TextIcon, inde
 		Icon: icon,
 	}
 
-	if config.useStyle {
-		style.AddAppearance(text)
+	if useStyle {
+		w.style.AddAppearance(text)
 	}
 
-	textNative, err := text.Encode(doc.RM)
+	err := w.embed(text, textRef)
 	if err != nil {
-		return 0, 0, err
-	}
-	err = doc.RM.Out.Put(textRef, textNative)
-	if err != nil {
-		return 0, 0, err
+		return err
 	}
 
-	popupNative, err := popup.Encode(doc.RM)
-	if err != nil {
-		return 0, 0, err
-	}
-	err = doc.RM.Out.Put(popupRef, popupNative)
-	if err != nil {
-		return 0, 0, err
+	return w.embed(popup, popupRef)
+}
+
+func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {
+	alpha := 30.0 / 360 * 2 * math.Pi
+
+	nx := math.Cos(alpha)
+	ny := math.Sin(alpha)
+
+	t0 := pdf.Round(paper.LLx*nx+paper.LLy*ny, 1)
+	t1 := pdf.Round(paper.URx*nx+paper.URy*ny, 1)
+
+	F := &function.Type4{
+		Domain:  []float64{t0, t1},
+		Range:   []float64{0, 1, 0, 1, 0, 1},
+		Program: "dup 16 div floor 16 mul sub 8 ge {0.99 0.98 0.95}{0.96 0.94 0.89}ifelse",
 	}
 
-	return textRef, popupRef, nil
+	background := &shading.Type2{
+		ColorSpace: color.DeviceRGBSpace,
+		X0:         pdf.Round(t0*nx, 1),
+		Y0:         pdf.Round(t0*ny, 1),
+		X1:         pdf.Round(t1*nx, 1),
+		Y1:         pdf.Round(t1*ny, 1),
+		F:          F,
+		TMin:       t0,
+		TMax:       t1,
+	}
+	return background, nil
 }

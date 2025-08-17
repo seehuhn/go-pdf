@@ -86,7 +86,7 @@ func (a *Annot3D) AnnotationType() pdf.Name {
 	return "3D"
 }
 
-func (a *Annot3D) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (a *Annot3D) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "3D annotation", pdf.V1_6); err != nil {
 		return nil, err
 	}

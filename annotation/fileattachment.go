@@ -72,7 +72,7 @@ func decodeFileAttachment(r pdf.Getter, dict pdf.Dict) (*FileAttachment, error) 
 	return fileAttachment, nil
 }
 
-func (f *FileAttachment) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (f *FileAttachment) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "file attachment annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

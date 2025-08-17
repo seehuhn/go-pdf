@@ -62,7 +62,7 @@ func decodeRichMedia(r pdf.Getter, dict pdf.Dict) (*RichMedia, error) {
 	return richMedia, nil
 }
 
-func (r *RichMedia) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (r *RichMedia) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "rich media annotation", pdf.V2_0); err != nil {
 		return nil, err
 	}

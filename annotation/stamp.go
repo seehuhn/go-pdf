@@ -89,7 +89,7 @@ func decodeStamp(r pdf.Getter, dict pdf.Dict) (*Stamp, error) {
 	return stamp, nil
 }
 
-func (s *Stamp) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (s *Stamp) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "stamp annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

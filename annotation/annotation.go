@@ -29,15 +29,14 @@ import (
 
 // Annotation represents a PDF annotation.
 type Annotation interface {
+	pdf.Encoder
+
 	// AnnotationType returns the type of the annotation, e.g. "Text", "Link",
 	// "Widget", etc.
 	AnnotationType() pdf.Name
 
 	// GetCommon returns the common annotation fields.
 	GetCommon() *Common
-
-	// Encode returns the PDF representation of the annotation.
-	Encode(rm *pdf.ResourceManager) (pdf.Dict, error)
 }
 
 // Common contains fields common to all annotation dictionaries.

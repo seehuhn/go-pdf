@@ -63,7 +63,7 @@ func decodeSquiggly(r pdf.Getter, dict pdf.Dict) (*Squiggly, error) {
 	return squiggly, nil
 }
 
-func (s *Squiggly) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (s *Squiggly) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "squiggly annotation", pdf.V1_4); err != nil {
 		return nil, err
 	}

@@ -120,7 +120,7 @@ func decodeTrapNet(r pdf.Getter, dict pdf.Dict) (*TrapNet, error) {
 	return trapNet, nil
 }
 
-func (t *TrapNet) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (t *TrapNet) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "trap network annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

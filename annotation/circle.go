@@ -101,7 +101,7 @@ func decodeCircle(r pdf.Getter, dict pdf.Dict) (*Circle, error) {
 	return circle, nil
 }
 
-func (c *Circle) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (c *Circle) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Circle"),
 	}

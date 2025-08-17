@@ -9,7 +9,8 @@ weight = 100
 ## API
 
 - Finalise the font API.
-- centralise all 2D geometry in seehuhn.de/go/geom
+- Is the distinction between `pdf.Native` and `pdf.Object` really useful?
+  Maybe we should just use `pdf.Object` everywhere?
 
 ## General
 
@@ -19,8 +20,6 @@ weight = 100
 - By more systematic about the use of pdf.MalformedFileError, and in
   particular the `Loc` field there.
 - avoid PDF output like `[-722 (1) -722] TJ` for centered text
-- double-check that I am correctly using the "Adobe Glyph List" and "Adobe
-  Glyph List for New Fonts"
 - make a central list of all external assets/resources I include
 - should the library support FDF files?
 
@@ -29,6 +28,8 @@ weight = 100
 - reconsider PostScriptName for *sfnt.Font.
 - test that the widths of the `.notdef` character is correct for the
   standard 14 fonts
+- double-check that I am correctly using the "Adobe Glyph List" and "Adobe
+  Glyph List for New Fonts"
 
 ## Testing
 

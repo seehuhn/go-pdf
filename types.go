@@ -26,7 +26,7 @@ import (
 	"strings"
 )
 
-// Native represents an object in a PDF file. Thus must be one of the
+// Native represents an object in a PDF file. This must be one of the
 // following:
 //
 //   - [Array]

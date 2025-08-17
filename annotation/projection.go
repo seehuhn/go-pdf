@@ -49,7 +49,7 @@ func decodeProjection(r pdf.Getter, dict pdf.Dict) (*Projection, error) {
 	return projection, nil
 }
 
-func (p *Projection) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (p *Projection) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "projection annotation", pdf.V2_0); err != nil {
 		return nil, err
 	}

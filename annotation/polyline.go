@@ -141,7 +141,7 @@ func decodePolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
 	return polyline, nil
 }
 
-func (p *Polyline) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (p *Polyline) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("PolyLine"),
 	}

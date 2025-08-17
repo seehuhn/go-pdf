@@ -74,7 +74,7 @@ func decodeCaret(r pdf.Getter, dict pdf.Dict) (*Caret, error) {
 	return caret, nil
 }
 
-func (c *Caret) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (c *Caret) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "caret annotation", pdf.V1_5); err != nil {
 		return nil, err
 	}

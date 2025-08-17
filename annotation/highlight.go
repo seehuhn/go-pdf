@@ -63,7 +63,7 @@ func decodeHighlight(r pdf.Getter, dict pdf.Dict) (*Highlight, error) {
 	return highlight, nil
 }
 
-func (h *Highlight) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (h *Highlight) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "highlight annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

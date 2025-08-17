@@ -116,7 +116,7 @@ func decodeInk(r pdf.Getter, dict pdf.Dict) (*Ink, error) {
 	return ink, nil
 }
 
-func (i *Ink) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (i *Ink) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "ink annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

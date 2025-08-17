@@ -177,7 +177,7 @@ func decodeFreeText(r pdf.Getter, dict pdf.Dict) (*FreeText, error) {
 	return f, nil
 }
 
-func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "free text annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}

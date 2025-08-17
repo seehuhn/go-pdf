@@ -233,7 +233,7 @@ func decodeLine(r pdf.Getter, dict pdf.Dict) (*Line, error) {
 	return line, nil
 }
 
-func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Dict, error) {
+func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Line"),
 	}

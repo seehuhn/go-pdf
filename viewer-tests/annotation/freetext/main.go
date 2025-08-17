@@ -43,7 +43,6 @@ const (
 	leftX0     = mid1 - 100 - annotWidth
 	leftX1     = mid1 - 100
 	rightX0    = mid2 + 100
-	rightX1    = mid2 + 100 + annotWidth
 	yOuterTop  = yMidTop + 140
 	yOuterStep = 50.0
 
@@ -63,7 +62,7 @@ func createDocument(filename string) error {
 	opt := &pdf.WriterOptions{
 		HumanReadable: true,
 	}
-	doc, err := document.CreateSinglePage(filename, paper, pdf.V1_7, opt)
+	page, err := document.CreateSinglePage(filename, paper, pdf.V1_7, opt)
 	if err != nil {
 		return err
 	}
@@ -72,9 +71,13 @@ func createDocument(filename string) error {
 	if err != nil {
 		return err
 	}
-	doc.DrawShading(background)
+	page.DrawShading(background)
 
-	var annots pdf.Array
+	w := &writer{
+		annots: pdf.Array{},
+		page:   page,
+		style:  fallback.NewStyle(),
+	}
 
 	leStyles := []annotation.LineEndingStyle{
 		annotation.LineEndingStyleSquare,
@@ -90,33 +93,17 @@ func createDocument(filename string) error {
 	}
 	numCallout := len(leStyles)
 
-	doc.SetLineWidth(0.5)
-	doc.SetStrokeColor(color.Blue)
-	doc.MoveTo(pdf.Round(mid1, 2), pdf.Round(yMidTop+20, 2))
-	doc.LineTo(pdf.Round(mid1, 2), pdf.Round(yMidTop-float64(numCallout-1)*yMidStep-20, 2))
-	doc.MoveTo(pdf.Round(mid2, 2), pdf.Round(yMidTop+20, 2))
-	doc.LineTo(pdf.Round(mid2, 2), pdf.Round(yMidTop-float64(numCallout-1)*yMidStep-20, 2))
+	page.SetLineWidth(0.5)
+	page.SetStrokeColor(color.Blue)
+	page.MoveTo(pdf.Round(mid1, 2), pdf.Round(yMidTop+20, 2))
+	page.LineTo(pdf.Round(mid1, 2), pdf.Round(yMidTop-float64(numCallout-1)*yMidStep-20, 2))
+	page.MoveTo(pdf.Round(mid2, 2), pdf.Round(yMidTop+20, 2))
+	page.LineTo(pdf.Round(mid2, 2), pdf.Round(yMidTop-float64(numCallout-1)*yMidStep-20, 2))
 	for i := range leStyles {
-		doc.MoveTo(pdf.Round(mid1-20, 2), pdf.Round(yMidTop-float64(i)*yMidStep, 2))
-		doc.LineTo(pdf.Round(mid2+20, 2), pdf.Round(yMidTop-float64(i)*yMidStep, 2))
+		page.MoveTo(pdf.Round(mid1-20, 2), pdf.Round(yMidTop-float64(i)*yMidStep, 2))
+		page.LineTo(pdf.Round(mid2+20, 2), pdf.Round(yMidTop-float64(i)*yMidStep, 2))
 	}
-	doc.Stroke()
-
-	embed := func(a *annotation.FreeText) error {
-		dict, err := a.Encode(doc.RM)
-		if err != nil {
-			return err
-		}
-		ref := doc.RM.Out.Alloc()
-		err = doc.RM.Out.Put(ref, dict)
-		if err != nil {
-			return err
-		}
-		annots = append(annots, ref)
-		return nil
-	}
-
-	styler := fallback.NewStyle()
+	page.Stroke()
 
 	for i, style := range leStyles {
 		yMid := yMidTop - float64(i)*yMidStep
@@ -127,7 +114,7 @@ func createDocument(filename string) error {
 			col = color.DeviceRGB(0.98, 0.96, 0.75)
 		}
 
-		aLeft := &annotation.FreeText{
+		template := &annotation.FreeText{
 			Common: annotation.Common{
 				Rect: pdf.Rectangle{
 					LLx: pdf.Round(leftX0, 2),
@@ -143,7 +130,6 @@ func createDocument(filename string) error {
 			Markup: annotation.Markup{
 				Intent: annotation.FreeTextIntentCallout,
 			},
-			// Margin:          []float64{},
 			CalloutLine: []float64{
 				pdf.Round(mid1, 2), pdf.Round(yMid, 2),
 				pdf.Round(mid1-50, 2), pdf.Round(yTopOuter-annotHeight/2, 2),
@@ -151,46 +137,67 @@ func createDocument(filename string) error {
 			},
 			LineEndingStyle: style,
 		}
-		err := embed(aLeft)
-		if err != nil {
-			return err
-		}
-
-		aRight := &annotation.FreeText{
-			Common: annotation.Common{
-				Rect: pdf.Rectangle{
-					LLx: pdf.Round(rightX0, 2),
-					LLy: pdf.Round(yTopOuter-annotHeight, 2),
-					URx: pdf.Round(rightX1, 2),
-					URy: pdf.Round(yTopOuter, 2),
-				},
-				Contents: string(annotation.FreeTextIntentCallout) + "\n" + string(style),
-				Flags:    annotation.FlagPrint,
-				Border:   &annotation.Border{Width: lw, SingleUse: true},
-				Color:    col,
-			},
-			Markup: annotation.Markup{
-				Intent: annotation.FreeTextIntentCallout,
-			},
-			// Margin:          []float64{},
-			CalloutLine: []float64{
-				pdf.Round(mid2, 2), pdf.Round(yMid, 2),
-				pdf.Round(mid2+50, 2), pdf.Round(yTopOuter-annotHeight/2, 2),
-				pdf.Round(rightX0, 2), pdf.Round(yTopOuter-annotHeight/2, 2),
-			},
-			LineEndingStyle: style,
-		}
-		styler.AddAppearance(aRight)
-
-		err = embed(aRight)
+		err := w.addAnnotationPair(template)
 		if err != nil {
 			return err
 		}
 	}
 
-	doc.PageDict["Annots"] = annots
+	page.PageDict["Annots"] = w.annots
 
-	return doc.Close()
+	return page.Close()
+}
+
+type writer struct {
+	annots pdf.Array
+	page   *document.Page
+	style  *fallback.Style
+}
+
+func (w *writer) embed(a annotation.Annotation) error {
+	obj, err := a.Encode(w.page.RM)
+	if err != nil {
+		return err
+	}
+	ref := w.page.RM.Out.Alloc()
+	err = w.page.RM.Out.Put(ref, obj)
+	if err != nil {
+		return err
+	}
+	w.annots = append(w.annots, ref)
+	return nil
+}
+
+func (w *writer) addAnnotationPair(template *annotation.FreeText) error {
+	// embed left annotation as-is
+	err := w.embed(template)
+	if err != nil {
+		return err
+	}
+
+	// create shallow copy for right column
+	rightAnnot := clone(template)
+
+	// adjust coordinates for right column
+	deltaX := rightX0 - leftX0
+	rightAnnot.Rect.LLx += deltaX
+	rightAnnot.Rect.URx += deltaX
+	rightAnnot.CalloutLine[0] = pdf.Round(mid2, 2)    // mid2 instead of mid1
+	rightAnnot.CalloutLine[2] = pdf.Round(mid2+50, 2) // mid2+50 instead of mid1-50
+	rightAnnot.CalloutLine[4] = pdf.Round(rightX0, 2) // rightX0 instead of leftX1
+
+	w.style.AddAppearance(rightAnnot)
+
+	// embed right annotation
+	return w.embed(rightAnnot)
+}
+
+func clone[T any](v *T) *T {
+	if v == nil {
+		return nil
+	}
+	clone := *v
+	return &clone
 }
 
 func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {
@@ -205,7 +212,7 @@ func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {
 	F := &function.Type4{
 		Domain:  []float64{t0, t1},
 		Range:   []float64{0, 1, 0, 1, 0, 1},
-		Program: "dup 16 div floor 16 mul sub 8 ge {0.9216 0.9216 1}{0.8510 0.9216 1}ifelse",
+		Program: "dup 16 div floor 16 mul sub 8 ge {0.99 0.98 0.95}{0.96 0.94 0.89}ifelse",
 	}
 
 	background := &shading.Type2{
