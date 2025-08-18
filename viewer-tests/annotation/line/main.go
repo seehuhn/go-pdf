@@ -82,8 +82,6 @@ func createDocument(filename string) error {
 		Width: defaultLineWidth,
 	}
 
-	// styler := fallback.NewStyle()
-
 	// Group 1: Line ending styles
 	lineEndingStyles := []annotation.LineEndingStyle{
 		annotation.LineEndingStyleSquare,
@@ -467,7 +465,7 @@ func (w *writer) addAnnotationPair(line *annotation.Line) error {
 	rightLine.Coords[0] += deltaX
 	rightLine.Coords[2] += deltaX
 
-	// styler.AddAppearance(rightLine)
+	w.style.AddAppearance(rightLine)
 
 	// embed right annotation
 	return w.embed(rightLine)

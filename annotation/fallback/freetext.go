@@ -43,14 +43,6 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 		calloutLine = calloutLine[:k-1] // ignore last value if odd
 	}
 	hasCallout := a.Intent == annotation.FreeTextIntentCallout && len(calloutLine) >= 4
-	var le LineEnding
-	if hasCallout {
-		le = NewLineEnding(
-			calloutLine[0], calloutLine[1],
-			calloutLine[2], calloutLine[3],
-			lw, a.LineEndingStyle,
-		)
-	}
 
 	inner := a.Rect
 	if len(a.Margin) >= 4 {
@@ -72,7 +64,13 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 			}
 			outer.Extend(&joint)
 		}
-		le.Enlarge(&outer)
+		leInfo := LineEndingInfo{
+			AtX:  calloutLine[0],
+			AtY:  calloutLine[1],
+			DirX: calloutLine[0] - calloutLine[2],
+			DirY: calloutLine[1] - calloutLine[3],
+		}
+		LineEndingBBox(&outer, a.LineEndingStyle, leInfo, lw)
 	}
 
 	// Set some relevant ignored fields: even if they are not used
@@ -126,7 +124,14 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 			for i := k - 4; i >= 2; i -= 2 {
 				w.LineTo(calloutLine[i], calloutLine[i+1])
 			}
-			le.Draw(w, bgCol)
+			leInfo := LineEndingInfo{
+				FillColor: bgCol,
+				AtX:       calloutLine[0],
+				AtY:       calloutLine[1],
+				DirX:      calloutLine[0] - calloutLine[2],
+				DirY:      calloutLine[1] - calloutLine[3],
+			}
+			DrawLineEnding(w, a.LineEndingStyle, leInfo)
 		}
 
 		// render text content if present
