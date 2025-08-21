@@ -19,6 +19,8 @@ package annotation
 import (
 	"time"
 
+	"seehuhn.de/go/geom/vec"
+
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -154,7 +156,7 @@ var testCases = map[pdf.Name][]testCase{
 				},
 				DefaultAppearance: "/Arial 10 Tf 0 0 1 rg",
 				Align:             1,                                       // Centered
-				CalloutLine:       []float64{100, 150, 125, 175, 150, 200}, // 6-point callout line
+				CalloutLine:       []vec.Vec2{{X: 100, Y: 150}, {X: 125, Y: 175}, {X: 150, Y: 200}}, // 3-point callout line
 				LineEndingStyle:   "OpenArrow",
 			},
 		},

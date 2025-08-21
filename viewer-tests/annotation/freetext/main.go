@@ -21,6 +21,8 @@ import (
 	"math"
 	"os"
 
+	"seehuhn.de/go/geom/vec"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/fallback"
@@ -130,10 +132,10 @@ func createDocument(filename string) error {
 			Markup: annotation.Markup{
 				Intent: annotation.FreeTextIntentCallout,
 			},
-			CalloutLine: []float64{
-				pdf.Round(mid1, 2), pdf.Round(yMid, 2),
-				pdf.Round(mid1-50, 2), pdf.Round(yTopOuter-annotHeight/2, 2),
-				pdf.Round(leftX1, 2), pdf.Round(yTopOuter-annotHeight/2, 2),
+			CalloutLine: []vec.Vec2{
+				{X: pdf.Round(mid1, 2), Y: pdf.Round(yMid, 2)},
+				{X: pdf.Round(mid1-50, 2), Y: pdf.Round(yTopOuter-annotHeight/2, 2)},
+				{X: pdf.Round(leftX1, 2), Y: pdf.Round(yTopOuter-annotHeight/2, 2)},
 			},
 			LineEndingStyle: style,
 		}
@@ -182,9 +184,9 @@ func (w *writer) addAnnotationPair(template *annotation.FreeText) error {
 	deltaX := rightX0 - leftX0
 	rightAnnot.Rect.LLx += deltaX
 	rightAnnot.Rect.URx += deltaX
-	rightAnnot.CalloutLine[0] = pdf.Round(mid2, 2)    // mid2 instead of mid1
-	rightAnnot.CalloutLine[2] = pdf.Round(mid2+50, 2) // mid2+50 instead of mid1-50
-	rightAnnot.CalloutLine[4] = pdf.Round(rightX0, 2) // rightX0 instead of leftX1
+	rightAnnot.CalloutLine[0] = vec.Vec2{X: pdf.Round(mid2, 2), Y: rightAnnot.CalloutLine[0].Y}       // mid2 instead of mid1, keep same Y
+	rightAnnot.CalloutLine[1] = vec.Vec2{X: pdf.Round(mid2+50, 2), Y: rightAnnot.CalloutLine[1].Y} // mid2+50 instead of mid1-50, keep same Y
+	rightAnnot.CalloutLine[2] = vec.Vec2{X: pdf.Round(rightX0, 2), Y: rightAnnot.CalloutLine[2].Y} // rightX0 instead of leftX1, keep same Y
 
 	w.style.AddAppearance(rightAnnot)
 

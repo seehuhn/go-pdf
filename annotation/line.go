@@ -190,8 +190,6 @@ func decodeLine(r pdf.Getter, dict pdf.Dict) (*Line, error) {
 		// CP (optional)
 		if cp, err := pdf.GetName(r, dict["CP"]); err == nil && cp == "Top" {
 			line.CaptionAbove = true
-		} else {
-			// default to false for "Inline" or any other value
 		}
 
 		// CO (optional)

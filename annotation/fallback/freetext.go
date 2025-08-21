@@ -39,10 +39,7 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 	bgCol := a.Color
 
 	calloutLine := a.CalloutLine
-	if k := len(calloutLine); k%2 != 0 {
-		calloutLine = calloutLine[:k-1] // ignore last value if odd
-	}
-	hasCallout := a.Intent == annotation.FreeTextIntentCallout && len(calloutLine) >= 4
+	hasCallout := a.Intent == annotation.FreeTextIntentCallout && len(calloutLine) >= 2
 
 	inner := a.Rect
 	if len(a.Margin) >= 4 {
@@ -54,23 +51,20 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 
 	outer := inner
 	if hasCallout {
-		for i := 0; i+1 < len(calloutLine); i += 2 {
-			x, y := calloutLine[i], calloutLine[i+1]
+		for _, point := range calloutLine {
 			joint := pdf.Rectangle{
-				LLx: x - lw/2,
-				LLy: y - lw/2,
-				URx: x + lw/2,
-				URy: y + lw/2,
+				LLx: point.X - lw/2,
+				LLy: point.Y - lw/2,
+				URx: point.X + lw/2,
+				URy: point.Y + lw/2,
 			}
 			outer.Extend(&joint)
 		}
-		leInfo := LineEndingInfo{
-			AtX:  calloutLine[0],
-			AtY:  calloutLine[1],
-			DirX: calloutLine[0] - calloutLine[2],
-			DirY: calloutLine[1] - calloutLine[3],
+		leInfo := lineEndingInfo{
+			At:  calloutLine[0],
+			Dir: calloutLine[0].Sub(calloutLine[1]),
 		}
-		LineEndingBBox(&outer, a.LineEndingStyle, leInfo, lw)
+		lineEndingBBox(&outer, a.LineEndingStyle, leInfo, lw)
 	}
 
 	// Set some relevant ignored fields: even if they are not used
@@ -120,18 +114,17 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 			w.SetLineWidth(lw)
 			w.SetStrokeColor(color.Black)
 			k := len(calloutLine)
-			w.MoveTo(calloutLine[k-2], calloutLine[k-1])
-			for i := k - 4; i >= 2; i -= 2 {
-				w.LineTo(calloutLine[i], calloutLine[i+1])
+			lastPoint := calloutLine[k-1]
+			w.MoveTo(lastPoint.X, lastPoint.Y)
+			for i := k - 2; i >= 1; i-- {
+				w.LineTo(calloutLine[i].X, calloutLine[i].Y)
 			}
-			leInfo := LineEndingInfo{
+			leInfo := lineEndingInfo{
 				FillColor: bgCol,
-				AtX:       calloutLine[0],
-				AtY:       calloutLine[1],
-				DirX:      calloutLine[0] - calloutLine[2],
-				DirY:      calloutLine[1] - calloutLine[3],
+				At:        calloutLine[0],
+				Dir:       calloutLine[0].Sub(calloutLine[1]),
 			}
-			DrawLineEnding(w, a.LineEndingStyle, leInfo)
+			drawLineEnding(w, a.LineEndingStyle, leInfo)
 		}
 
 		// render text content if present

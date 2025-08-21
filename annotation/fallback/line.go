@@ -19,6 +19,8 @@ package fallback
 import (
 	"math"
 
+	"seehuhn.de/go/geom/vec"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/appearance"
@@ -116,23 +118,19 @@ func calculateLineBBox(a *annotation.Line, lw float64) pdf.Rectangle {
 
 	// expand for line endings
 	if a.LineEndingStyle[0] != "" && a.LineEndingStyle[0] != annotation.LineEndingStyleNone {
-		info := LineEndingInfo{
-			AtX:  x1,
-			AtY:  y1,
-			DirX: -dx,
-			DirY: -dy,
+		info := lineEndingInfo{
+			At:  vec.Vec2{X: x1, Y: y1},
+			Dir: vec.Vec2{X: -dx, Y: -dy},
 		}
-		LineEndingBBox(&bbox, a.LineEndingStyle[0], info, lw)
+		lineEndingBBox(&bbox, a.LineEndingStyle[0], info, lw)
 	}
 
 	if a.LineEndingStyle[1] != "" && a.LineEndingStyle[1] != annotation.LineEndingStyleNone {
-		info := LineEndingInfo{
-			AtX:  x2,
-			AtY:  y2,
-			DirX: dx,
-			DirY: dy,
+		info := lineEndingInfo{
+			At:  vec.Vec2{X: x2, Y: y2},
+			Dir: vec.Vec2{X: dx, Y: dy},
 		}
-		LineEndingBBox(&bbox, a.LineEndingStyle[1], info, lw)
+		lineEndingBBox(&bbox, a.LineEndingStyle[1], info, lw)
 	}
 
 	// expand for leader lines if present
@@ -208,30 +206,26 @@ func drawSimpleLine(w *graphics.Writer, a *annotation.Line, lw float64) {
 
 	// draw start ending if present
 	if a.LineEndingStyle[0] != "" && a.LineEndingStyle[0] != annotation.LineEndingStyleNone {
-		info := LineEndingInfo{
-			AtX:       x1,
-			AtY:       y1,
-			DirX:      x1 - x2,
-			DirY:      y1 - y2,
+		info := lineEndingInfo{
+			At:        vec.Vec2{X: x1, Y: y1},
+			Dir:       vec.Vec2{X: x1 - x2, Y: y1 - y2},
 			FillColor: a.FillColor,
 			IsStart:   true,
 		}
-		DrawLineEnding(w, a.LineEndingStyle[0], info)
+		drawLineEnding(w, a.LineEndingStyle[0], info)
 	} else {
 		w.MoveTo(pdf.Round(x1, 2), pdf.Round(y1, 2))
 	}
 
 	// draw end ending if present
 	if a.LineEndingStyle[1] != "" && a.LineEndingStyle[1] != annotation.LineEndingStyleNone {
-		info := LineEndingInfo{
-			AtX:       x2,
-			AtY:       y2,
-			DirX:      x2 - x1,
-			DirY:      y2 - y1,
+		info := lineEndingInfo{
+			At:        vec.Vec2{X: x2, Y: y2},
+			Dir:       vec.Vec2{X: x2 - x1, Y: y2 - y1},
 			FillColor: a.FillColor,
 			IsStart:   false,
 		}
-		DrawLineEnding(w, a.LineEndingStyle[1], info)
+		drawLineEnding(w, a.LineEndingStyle[1], info)
 	} else {
 		w.LineTo(pdf.Round(x2, 2), pdf.Round(y2, 2))
 		w.Stroke()
@@ -296,30 +290,26 @@ func drawLineWithLeaderLines(w *graphics.Writer, a *annotation.Line, lw float64)
 	// draw the main line with endings
 	// start ending
 	if a.LineEndingStyle[0] != "" && a.LineEndingStyle[0] != annotation.LineEndingStyleNone {
-		info := LineEndingInfo{
-			AtX:       shiftedStartX,
-			AtY:       shiftedStartY,
-			DirX:      shiftedStartX - shiftedEndX,
-			DirY:      shiftedStartY - shiftedEndY,
+		info := lineEndingInfo{
+			At:        vec.Vec2{X: shiftedStartX, Y: shiftedStartY},
+			Dir:       vec.Vec2{X: shiftedStartX - shiftedEndX, Y: shiftedStartY - shiftedEndY},
 			FillColor: a.FillColor,
 			IsStart:   true,
 		}
-		DrawLineEnding(w, a.LineEndingStyle[0], info)
+		drawLineEnding(w, a.LineEndingStyle[0], info)
 	} else {
 		w.MoveTo(pdf.Round(shiftedStartX, 2), pdf.Round(shiftedStartY, 2))
 	}
 
 	// end ending
 	if a.LineEndingStyle[1] != "" && a.LineEndingStyle[1] != annotation.LineEndingStyleNone {
-		info := LineEndingInfo{
-			AtX:       shiftedEndX,
-			AtY:       shiftedEndY,
-			DirX:      shiftedEndX - shiftedStartX,
-			DirY:      shiftedEndY - shiftedStartY,
+		info := lineEndingInfo{
+			At:        vec.Vec2{X: shiftedEndX, Y: shiftedEndY},
+			Dir:       vec.Vec2{X: shiftedEndX - shiftedStartX, Y: shiftedEndY - shiftedStartY},
 			FillColor: a.FillColor,
 			IsStart:   false,
 		}
-		DrawLineEnding(w, a.LineEndingStyle[1], info)
+		drawLineEnding(w, a.LineEndingStyle[1], info)
 	} else {
 		w.LineTo(pdf.Round(shiftedEndX, 2), pdf.Round(shiftedEndY, 2))
 		w.Stroke()

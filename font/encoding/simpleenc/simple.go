@@ -228,10 +228,7 @@ func (t *Simple) makeGlyphName(gid glyph.ID, defaultGlyphName, text string) stri
 	alt := 0
 	base := glyphName
 nameLoop:
-	for {
-		if names.IsValid(glyphName) && !t.glyphNameUsed[glyphName] {
-			break
-		}
+	for !names.IsValid(glyphName) || t.glyphNameUsed[glyphName] {
 		if len(base) == 0 || len(glyphName) > 31 {
 			// Try one more name than gd.glyphNameUsed has elements.
 			// This guarantees that we find a free name.

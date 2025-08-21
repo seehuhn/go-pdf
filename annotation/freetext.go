@@ -20,6 +20,8 @@ import (
 	"errors"
 	"fmt"
 
+	"seehuhn.de/go/geom/vec"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -65,11 +67,10 @@ type FreeText struct {
 
 	// CalloutLine (used only if Markup.Intent is [FreeTextIntentCallout]; PDF 1.6)
 	// specifies a callout line attached to the free text annotation.
-	// Four numbers [x1 y1 x2 y2] represent start and end coordinates.
-	// Six numbers [x1 y1 x2 y2 x3 y3] represent start, knee, and end coordinates.
+	// Must contain either 2 points (start and end) or 3 points (start, knee, and end).
 	//
 	// This corresponds to the /CL entry in the PDF annotation dictionary.
-	CalloutLine []float64
+	CalloutLine []vec.Vec2
 
 	// LineEndingStyle (optional; meaningful only if CalloutLine is present)
 	// specifies the line ending style for the callout line endpoint (x1, y1).
@@ -132,13 +133,15 @@ func decodeFreeText(r pdf.Getter, dict pdf.Dict) (*FreeText, error) {
 	if cl, err := pdf.Optional(pdf.GetArray(r, dict["CL"])); err != nil {
 		return nil, err
 	} else if f.Intent == FreeTextIntentCallout && (len(cl) == 4 || len(cl) == 6) {
-		coords := make([]float64, len(cl))
-		for i, coord := range cl {
-			if num, err := pdf.GetNumber(r, coord); err == nil {
-				coords[i] = float64(num)
+		points := make([]vec.Vec2, len(cl)/2)
+		for i := 0; i < len(points); i++ {
+			if x, err := pdf.GetNumber(r, cl[i*2]); err == nil {
+				if y, err := pdf.GetNumber(r, cl[i*2+1]); err == nil {
+					points[i] = vec.Vec2{X: float64(x), Y: float64(y)}
+				}
 			}
 		}
-		f.CalloutLine = coords
+		f.CalloutLine = points
 	}
 
 	if be, err := pdf.Optional(ExtractBorderEffect(r, dict["BE"])); err != nil {
@@ -229,12 +232,13 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if f.Intent != FreeTextIntentCallout {
 			return nil, errors.New("CL entry present but Intent is not FreeTextIntentCallout")
 		}
-		if len(f.CalloutLine) != 4 && len(f.CalloutLine) != 6 {
-			return nil, errors.New("invalid length for CL array")
+		if len(f.CalloutLine) != 2 && len(f.CalloutLine) != 3 {
+			return nil, errors.New("invalid CalloutLine length: must contain 2 or 3 points")
 		}
-		clArray := make(pdf.Array, len(f.CalloutLine))
-		for i, coord := range f.CalloutLine {
-			clArray[i] = pdf.Number(pdf.Round(coord, 2))
+		clArray := make(pdf.Array, len(f.CalloutLine)*2)
+		for i, point := range f.CalloutLine {
+			clArray[i*2] = pdf.Number(pdf.Round(point.X, 2))
+			clArray[i*2+1] = pdf.Number(pdf.Round(point.Y, 2))
 		}
 		dict["CL"] = clArray
 	}
