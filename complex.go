@@ -361,6 +361,23 @@ func (r *Rectangle) Extend(other *Rectangle) {
 	}
 }
 
+// ExtendVec enlarges the rectangle to also cover v.
+func (r *Rectangle) ExtendVec(v vec.Vec2) {
+	isZero := r.IsZero()
+	if v.X < r.LLx || isZero {
+		r.LLx = v.X
+	}
+	if v.Y < r.LLy || isZero {
+		r.LLy = v.Y
+	}
+	if v.X > r.URx || isZero {
+		r.URx = v.X
+	}
+	if v.Y > r.URy || isZero {
+		r.URy = v.Y
+	}
+}
+
 // Round rounds the corner coordinates of the rectangle to the given number of
 // decimal places.
 func (r *Rectangle) Round(digits int) {

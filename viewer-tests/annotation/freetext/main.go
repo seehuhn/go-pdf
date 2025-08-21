@@ -184,7 +184,7 @@ func (w *writer) addAnnotationPair(template *annotation.FreeText) error {
 	deltaX := rightX0 - leftX0
 	rightAnnot.Rect.LLx += deltaX
 	rightAnnot.Rect.URx += deltaX
-	rightAnnot.CalloutLine[0] = vec.Vec2{X: pdf.Round(mid2, 2), Y: rightAnnot.CalloutLine[0].Y}       // mid2 instead of mid1, keep same Y
+	rightAnnot.CalloutLine[0] = vec.Vec2{X: pdf.Round(mid2, 2), Y: rightAnnot.CalloutLine[0].Y}    // mid2 instead of mid1, keep same Y
 	rightAnnot.CalloutLine[1] = vec.Vec2{X: pdf.Round(mid2+50, 2), Y: rightAnnot.CalloutLine[1].Y} // mid2+50 instead of mid1-50, keep same Y
 	rightAnnot.CalloutLine[2] = vec.Vec2{X: pdf.Round(rightX0, 2), Y: rightAnnot.CalloutLine[2].Y} // rightX0 instead of leftX1, keep same Y
 

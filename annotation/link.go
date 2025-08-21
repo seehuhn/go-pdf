@@ -19,6 +19,7 @@ package annotation
 import (
 	"errors"
 
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 )
 
@@ -52,10 +53,10 @@ type Link struct {
 
 	// QuadPoints (optional) specifies the coordinates of
 	// quadrilaterals that comprise the region where the link should be
-	// activated. Array of 8×n numbers (x1 y1 x2 y2 x3 y3 x4 y4 for each quad).
+	// activated. Each quadrilateral is represented by 4 Vec2 points.
 	//
 	// All points must be contained within Common.Rect.
-	QuadPoints []float64
+	QuadPoints []vec.Vec2
 
 	// BorderStyle (optional) is a border style dictionary specifying the line width
 	// and dash pattern for drawing the annotation's border.
@@ -110,7 +111,14 @@ func decodeLink(r pdf.Getter, dict pdf.Dict) (*Link, error) {
 	}
 
 	if quadPoints, err := pdf.GetFloatArray(r, dict["QuadPoints"]); err == nil && len(quadPoints) > 0 {
-		link.QuadPoints = quadPoints
+		// convert float array to Vec2 slice
+		if len(quadPoints)%2 == 0 {
+			points := make([]vec.Vec2, len(quadPoints)/2)
+			for i := 0; i < len(quadPoints); i += 2 {
+				points[i/2] = vec.Vec2{X: quadPoints[i], Y: quadPoints[i+1]}
+			}
+			link.QuadPoints = points
+		}
 	}
 
 	// BS (optional)
@@ -123,8 +131,8 @@ func (l *Link) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if l.Action != nil && l.Destination != nil {
 		return nil, errors.New("conflicting Action and Destination fields in Link annotation")
 	}
-	if len(l.QuadPoints)%8 != 0 {
-		return nil, errors.New("length of QuadPoints is not a multiple of 8")
+	if len(l.QuadPoints)%4 != 0 {
+		return nil, errors.New("length of QuadPoints is not a multiple of 4")
 	}
 
 	dict := pdf.Dict{
@@ -166,9 +174,11 @@ func (l *Link) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out, "link annotation QuadPoints entry", pdf.V1_6); err != nil {
 			return nil, err
 		}
-		quadArray := make(pdf.Array, len(l.QuadPoints))
+		// convert Vec2 slice to float array for PDF
+		quadArray := make(pdf.Array, len(l.QuadPoints)*2)
 		for i, v := range l.QuadPoints {
-			quadArray[i] = pdf.Number(v)
+			quadArray[i*2] = pdf.Number(v.X)
+			quadArray[i*2+1] = pdf.Number(v.Y)
 		}
 		dict["QuadPoints"] = quadArray
 	}

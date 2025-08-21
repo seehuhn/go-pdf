@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/document"
@@ -125,7 +126,7 @@ func createDocument(fname string) error {
 	w.page.TextShow("This is a ")
 	w.page.SetFillColor(annotCol)
 	gg := w.page.TextLayout(nil, "link to the first page")
-	quadPoints := w.page.TextGetQuadPoints(gg)
+	quadFloats := w.page.TextGetQuadPoints(gg)
 	w.page.TextShowGlyphs(gg)
 	w.page.SetFillColor(color.DeviceGray(0.3))
 	w.page.TextShow(".")
@@ -133,11 +134,20 @@ func createDocument(fname string) error {
 	w.page.TextEnd()
 	w.page.PopGraphicsState()
 
+	// convert float array to Vec2 slice
+	var quadPoints []vec.Vec2
+	if len(quadFloats) >= 8 {
+		quadPoints = make([]vec.Vec2, len(quadFloats)/2)
+		for i := 0; i < len(quadFloats); i += 2 {
+			quadPoints[i/2] = vec.Vec2{X: quadFloats[i], Y: quadFloats[i+1]}
+		}
+	}
+
 	rect = pdf.Rectangle{
-		LLx: min(quadPoints[0], quadPoints[2], quadPoints[4], quadPoints[6]),
-		LLy: min(quadPoints[1], quadPoints[3], quadPoints[5], quadPoints[7]),
-		URx: max(quadPoints[0], quadPoints[2], quadPoints[4], quadPoints[6]),
-		URy: max(quadPoints[1], quadPoints[3], quadPoints[5], quadPoints[7]),
+		LLx: min(quadPoints[0].X, quadPoints[1].X, quadPoints[2].X, quadPoints[3].X),
+		LLy: min(quadPoints[0].Y, quadPoints[1].Y, quadPoints[2].Y, quadPoints[3].Y),
+		URx: max(quadPoints[0].X, quadPoints[1].X, quadPoints[2].X, quadPoints[3].X),
+		URy: max(quadPoints[0].Y, quadPoints[1].Y, quadPoints[2].Y, quadPoints[3].Y),
 	}
 	link := &annotation.Link{
 		Common: annotation.Common{

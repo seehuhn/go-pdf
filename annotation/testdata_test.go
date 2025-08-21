@@ -113,7 +113,7 @@ var testCases = map[pdf.Name][]testCase{
 					Contents: "Link description",
 				},
 				Highlight:  LinkHighlightOutline,
-				QuadPoints: []float64{10, 10, 190, 10, 190, 30, 10, 30}, // Rectangle quad
+				QuadPoints: []vec.Vec2{{X: 10, Y: 10}, {X: 190, Y: 10}, {X: 190, Y: 30}, {X: 10, Y: 30}}, // Rectangle quad
 			},
 		},
 		{
@@ -155,7 +155,7 @@ var testCases = map[pdf.Name][]testCase{
 					Intent:  "FreeTextCallout",
 				},
 				DefaultAppearance: "/Arial 10 Tf 0 0 1 rg",
-				Align:             1,                                       // Centered
+				Align:             1,                                                                // Centered
 				CalloutLine:       []vec.Vec2{{X: 100, Y: 150}, {X: 125, Y: 175}, {X: 150, Y: 200}}, // 3-point callout line
 				LineEndingStyle:   "OpenArrow",
 			},
