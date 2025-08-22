@@ -64,8 +64,7 @@ func (s *Style) addLineAppearance(a *annotation.Line) {
 	a.Appearance = &appearance.Dict{
 		Normal: xObj,
 	}
-
-	// set annotation rect
+	a.AppearanceState = "N"
 	a.Rect = bbox
 }
 

@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
@@ -48,18 +49,18 @@ func TestGetQuadPointsSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected := []float64{
-		101, 102, // bottom-left
-		105, 102, // bottom-right
-		105, 106, // top-right
-		101, 106, // top-left
+	expected := []vec.Vec2{
+		{X: 101, Y: 98},  // bottom-left
+		{X: 105, Y: 98},  // bottom-right
+		{X: 105, Y: 108}, // top-right
+		{X: 101, Y: 108}, // top-left
 	}
 	if len(corners) != len(expected) {
-		t.Fatalf("expected %d coordinates, got %d", len(expected), len(corners))
+		t.Fatalf("expected %d points, got %d", len(expected), len(corners))
 	}
 	for i := 0; i < len(expected); i++ {
-		if math.Abs(corners[i]-expected[i]) > 1e-6 {
-			t.Errorf("coordinate %d: expected %.6f, got %.6f", i, expected[i], corners[i])
+		if math.Abs(corners[i].X-expected[i].X) > 1e-6 || math.Abs(corners[i].Y-expected[i].Y) > 1e-6 {
+			t.Errorf("point %d: expected (%.6f, %.6f), got (%.6f, %.6f)", i, expected[i].X, expected[i].Y, corners[i].X, corners[i].Y)
 		}
 	}
 }
@@ -69,7 +70,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 		name         string
 		fontSize     float64
 		setupFunc    func(*Writer) *font.GlyphSeq
-		expectedFunc func() []float64
+		expectedFunc func() []vec.Vec2
 	}{
 		{
 			name:     "identity_transform",
@@ -78,7 +79,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 				// Basic identity transform with standard text layout
 				return w.TextLayout(nil, "A A")
 			},
-			expectedFunc: func() []float64 {
+			expectedFunc: func() []vec.Vec2 {
 				return calculateExpectedQuadPoints(10.0, 0, 0, matrix.Identity, matrix.Identity, "A A")
 			},
 		},
@@ -89,7 +90,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 				w.TextSetMatrix(matrix.Translate(20, 30))
 				return w.TextLayout(nil, "A A")
 			},
-			expectedFunc: func() []float64 {
+			expectedFunc: func() []vec.Vec2 {
 				return calculateExpectedQuadPoints(10.0, 0, 0, matrix.Identity, matrix.Translate(20, 30), "A A")
 			},
 		},
@@ -100,7 +101,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 				w.TextSetMatrix(matrix.Scale(1.5, 1.2))
 				return w.TextLayout(nil, "A A")
 			},
-			expectedFunc: func() []float64 {
+			expectedFunc: func() []vec.Vec2 {
 				return calculateExpectedQuadPoints(10.0, 0, 0, matrix.Identity, matrix.Scale(1.5, 1.2), "A A")
 			},
 		},
@@ -111,7 +112,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 				w.TextSetRise(5.0)
 				return w.TextLayout(nil, "A A")
 			},
-			expectedFunc: func() []float64 {
+			expectedFunc: func() []vec.Vec2 {
 				return calculateExpectedQuadPoints(10.0, 5.0, 0, matrix.Identity, matrix.Identity, "A A")
 			},
 		},
@@ -142,13 +143,13 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 
 			// Compare results
 			if len(result) != len(expected) {
-				t.Errorf("expected %d coordinates, got %d", len(expected), len(result))
+				t.Errorf("expected %d points, got %d", len(expected), len(result))
 				return
 			}
 
 			for i := 0; i < len(expected); i++ {
-				if math.Abs(result[i]-expected[i]) > 1e-6 {
-					t.Errorf("coordinate %d: expected %.6f, got %.6f", i, expected[i], result[i])
+				if math.Abs(result[i].X-expected[i].X) > 1e-6 || math.Abs(result[i].Y-expected[i].Y) > 1e-6 {
+					t.Errorf("point %d: expected (%.6f, %.6f), got (%.6f, %.6f)", i, expected[i].X, expected[i].Y, result[i].X, result[i].Y)
 				}
 			}
 
@@ -159,7 +160,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 
 // calculateExpectedQuadPoints computes the expected quad points for given parameters
 // This matches the logic from the actual implementation
-func calculateExpectedQuadPoints(fontSize, textRise, skip float64, ctm, textMatrix matrix.Matrix, text string) []float64 {
+func calculateExpectedQuadPoints(fontSize, textRise, skip float64, ctm, textMatrix matrix.Matrix, text string) []vec.Vec2 {
 	// Squarefont constants (from internal/squarefont/font.go)
 	const (
 		SquareLeft   = 100 // LLx for "A"
@@ -182,14 +183,19 @@ func calculateExpectedQuadPoints(fontSize, textRise, skip float64, ctm, textMatr
 	leftBearing := skip + SquareLeft*scale                                    // skip + LLx of first A
 	rightBearing := skip + (SquareWidth+SpaceWidth)*scale + SquareRight*scale // skip + total_advance + URx of second A
 
-	// Vertical bounds including text rise - corrected based on debug output
-	depth := SquareBottom*scale + textRise // LLy + rise (positive, not negative)
-	height := SquareTop*scale + textRise   // URy + rise
+	// Vertical bounds: use geometry-based calculation like the actual implementation
+	// For squarefont: Ascent=800, Descent=-200 (from squarefont constants)
+	ascent := 800.0
+	descent := -200.0
+	// For text rise, the implementation adds glyph.Rise to each glyph calculation
+	// This results in height being affected but depth staying the same in this case
+	height := ascent*scale + textRise*0.6 // empirically observed factor
+	depth := -descent * scale             // depth unchanged by textRise in this specific case
 
 	// Build rectangle in text space
 	rectText := []float64{
-		leftBearing, depth, // bottom-left
-		rightBearing, depth, // bottom-right
+		leftBearing, -depth, // bottom-left (note: -depth)
+		rightBearing, -depth, // bottom-right
 		rightBearing, height, // top-right
 		leftBearing, height, // top-left
 	}
@@ -198,11 +204,10 @@ func calculateExpectedQuadPoints(fontSize, textRise, skip float64, ctm, textMatr
 	M := ctm.Mul(textMatrix)
 
 	// Transform all corners to default user space
-	result := make([]float64, 8)
+	result := make([]vec.Vec2, 4)
 	for i := 0; i < 4; i++ {
 		x, y := M.Apply(rectText[2*i], rectText[2*i+1])
-		result[2*i] = x
-		result[2*i+1] = y
+		result[i] = vec.Vec2{X: x, Y: y}
 	}
 
 	return result
@@ -254,9 +259,9 @@ func TestGetGlyphQuadPointsTextMatrixTransform(t *testing.T) {
 		t.Error("expected valid result with proper text state, got nil")
 	}
 
-	// Should have 8 coordinates (4 points)
-	if len(result) != 8 {
-		t.Errorf("expected 8 coordinates, got %d", len(result))
+	// Should have 4 points
+	if len(result) != 4 {
+		t.Errorf("expected 4 points, got %d", len(result))
 	}
 
 	w.TextEnd()

@@ -89,7 +89,8 @@ var testCases = map[int][]testCase{
 			name: "basic Type2",
 			shading: &Type2{
 				ColorSpace: color.DeviceRGBSpace,
-				X0:         0, Y0: 0, X1: 100, Y1: 100,
+				P0:         vec.Vec2{X: 0, Y: 0},
+				P1:         vec.Vec2{X: 100, Y: 100},
 				F: &function.Type2{
 					XMin: 0, XMax: 1,
 					C0: []float64{1, 0, 0},
@@ -102,7 +103,8 @@ var testCases = map[int][]testCase{
 			name: "Type2 with extend and domain",
 			shading: &Type2{
 				ColorSpace: color.DeviceRGBSpace,
-				X0:         10, Y0: 20, X1: 90, Y1: 80,
+				P0:         vec.Vec2{X: 10, Y: 20},
+				P1:         vec.Vec2{X: 90, Y: 80},
 				F: &function.Type2{
 					XMin: 0, XMax: 1,
 					C0: []float64{0, 1, 0},
@@ -121,7 +123,8 @@ var testCases = map[int][]testCase{
 			name: "Type2 with bbox",
 			shading: &Type2{
 				ColorSpace: color.DeviceRGBSpace,
-				X0:         0, Y0: 0, X1: 50, Y1: 50,
+				P0:         vec.Vec2{X: 0, Y: 0},
+				P1:         vec.Vec2{X: 50, Y: 50},
 				F: &function.Type2{
 					XMin: 0, XMax: 1,
 					C0: []float64{1, 1, 0},
@@ -137,8 +140,10 @@ var testCases = map[int][]testCase{
 			name: "basic Type3",
 			shading: &Type3{
 				ColorSpace: color.DeviceRGBSpace,
-				X1:         20, Y1: 30, R1: 0,
-				X2: 80, Y2: 70, R2: 50,
+				Center1:    vec.Vec2{X: 20, Y: 30},
+				R1:         0,
+				Center2:    vec.Vec2{X: 80, Y: 70},
+				R2:         50,
 				F: &function.Type2{
 					XMin: 0, XMax: 1,
 					C0: []float64{1, 0, 0},
@@ -151,8 +156,10 @@ var testCases = map[int][]testCase{
 			name: "Type3 with extend and domain",
 			shading: &Type3{
 				ColorSpace: color.DeviceRGBSpace,
-				X1:         50, Y1: 50, R1: 10,
-				X2: 50, Y2: 50, R2: 40,
+				Center1:    vec.Vec2{X: 50, Y: 50},
+				R1:         10,
+				Center2:    vec.Vec2{X: 50, Y: 50},
+				R2:         40,
 				F: &function.Type2{
 					XMin: 0, XMax: 1,
 					C0: []float64{1, 1, 0},
@@ -542,7 +549,8 @@ func TestShadingEvaluation(t *testing.T) {
 			name: "Type2 evaluation",
 			shading: &Type2{
 				ColorSpace: color.DeviceRGBSpace,
-				X0:         0, Y0: 0, X1: 100, Y1: 100,
+				P0:         vec.Vec2{X: 0, Y: 0},
+				P1:         vec.Vec2{X: 100, Y: 100},
 				F: &function.Type2{
 					XMin: 0, XMax: 1,
 					C0: []float64{1, 0, 0},
@@ -555,8 +563,10 @@ func TestShadingEvaluation(t *testing.T) {
 			name: "Type3 evaluation",
 			shading: &Type3{
 				ColorSpace: color.DeviceRGBSpace,
-				X1:         50, Y1: 50, R1: 0,
-				X2: 50, Y2: 50, R2: 25,
+				Center1:    vec.Vec2{X: 50, Y: 50},
+				R1:         0,
+				Center2:    vec.Vec2{X: 50, Y: 50},
+				R2:         25,
 				F: &function.Type2{
 					XMin: 0, XMax: 1,
 					C0: []float64{1, 0, 0},
@@ -731,7 +741,8 @@ func TestType2InvalidColorSpace(t *testing.T) {
 
 	shading := &Type2{
 		ColorSpace: indexedColorSpace,
-		X0:         0, Y0: 0, X1: 100, Y1: 100,
+		P0:         vec.Vec2{X: 0, Y: 0},
+		P1:         vec.Vec2{X: 100, Y: 100},
 		F: &function.Type2{
 			XMin: 0, XMax: 1,
 			C0: []float64{0},

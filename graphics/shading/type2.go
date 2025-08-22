@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
@@ -35,9 +36,9 @@ type Type2 struct {
 	// ColorSpace defines the color space for shading color values.
 	ColorSpace color.Space
 
-	// X0, Y0, X1, Y1 specify the starting and ending coordinates of the axis,
+	// P0, P1 specify the starting and ending coordinates of the axis,
 	// expressed in the shading's target coordinate space.
-	X0, Y0, X1, Y1 float64
+	P0, P1 vec.Vec2
 
 	// F is a 1->n function where n is the number of color components of the
 	// ColorSpace. The function is called with values of the parametric
@@ -119,7 +120,8 @@ func extractType2(r pdf.Getter, d pdf.Dict, isIndirect bool) (*Type2, error) {
 			Err: fmt.Errorf("Coords must have 4 elements, got %d", len(coords)),
 		}
 	}
-	s.X0, s.Y0, s.X1, s.Y1 = coords[0], coords[1], coords[2], coords[3]
+	s.P0 = vec.Vec2{X: coords[0], Y: coords[1]}
+	s.P1 = vec.Vec2{X: coords[2], Y: coords[3]}
 
 	// Read required Function
 	fnObj, ok := d["Function"]
@@ -227,7 +229,7 @@ func (s *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	// validate that starting and ending coordinates are not coincident
-	if s.X0 == s.X1 && s.Y0 == s.Y1 {
+	if s.P0 == s.P1 {
 		return nil, zero, errors.New("starting and ending coordinates must not be coincident")
 	}
 
@@ -266,8 +268,8 @@ func (s *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		"ShadingType": pdf.Integer(2),
 		"ColorSpace":  csE,
 		"Coords": pdf.Array{
-			pdf.Number(s.X0), pdf.Number(s.Y0),
-			pdf.Number(s.X1), pdf.Number(s.Y1),
+			pdf.Number(s.P0.X), pdf.Number(s.P0.Y),
+			pdf.Number(s.P1.X), pdf.Number(s.P1.Y),
 		},
 		"Function": fn,
 	}

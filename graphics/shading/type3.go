@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
@@ -35,11 +36,13 @@ type Type3 struct {
 	// ColorSpace defines the color space for shading color values.
 	ColorSpace color.Space
 
-	// X1, Y1, R1 specify the center and radius of the starting circle.
-	X1, Y1, R1 float64
+	// Center1, R1 specify the center and radius of the starting circle.
+	Center1 vec.Vec2
+	R1      float64
 
-	// X2, Y2, R2 specify the center and radius of the ending circle.
-	X2, Y2, R2 float64
+	// Center2, R2 specify the center and radius of the ending circle.
+	Center2 vec.Vec2
+	R2      float64
 
 	// F is either 1->n function or an array of n 1->1 functions, where n is
 	// the number of color components of the ColorSpace.
@@ -110,7 +113,10 @@ func extractType3(r pdf.Getter, d pdf.Dict, wasReference bool) (*Type3, error) {
 			Err: fmt.Errorf("Coords must have 6 elements, got %d", len(coords)),
 		}
 	}
-	s.X1, s.Y1, s.R1, s.X2, s.Y2, s.R2 = coords[0], coords[1], coords[2], coords[3], coords[4], coords[5]
+	s.Center1 = vec.Vec2{X: coords[0], Y: coords[1]}
+	s.R1 = coords[2]
+	s.Center2 = vec.Vec2{X: coords[3], Y: coords[4]}
+	s.R2 = coords[5]
 
 	// Read required Function
 	fnObj, ok := d["Function"]
@@ -248,8 +254,8 @@ func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		"ShadingType": pdf.Integer(3),
 		"ColorSpace":  csE,
 		"Coords": pdf.Array{
-			pdf.Number(s.X1), pdf.Number(s.Y1), pdf.Number(s.R1),
-			pdf.Number(s.X2), pdf.Number(s.Y2), pdf.Number(s.R2),
+			pdf.Number(s.Center1.X), pdf.Number(s.Center1.Y), pdf.Number(s.R1),
+			pdf.Number(s.Center2.X), pdf.Number(s.Center2.Y), pdf.Number(s.R2),
 		},
 		"Function": fn,
 	}

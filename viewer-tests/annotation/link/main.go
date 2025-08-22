@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/annotation/fallback"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
@@ -56,7 +57,8 @@ func createDocument(filename string) error {
 		TextCol: color.DeviceGray(0.1),
 		LinkCol: color.DeviceRGB(0, 0, 0.9),
 
-		RM: page.RM,
+		style: fallback.NewStyle(),
+		RM:    page.RM,
 		BS: &annotation.BorderStyle{
 			Width: 1,
 			Style: "U",
@@ -68,11 +70,11 @@ func createDocument(filename string) error {
 	x2 := math.Round(xMid + 12.0)
 	yTop := paper.URy - 72.0
 
-	err = w.AddParagraph(x0, yTop)
+	err = w.AddParagraph(x0, yTop, false)
 	if err != nil {
 		return err
 	}
-	err = w.AddParagraph(x2, yTop)
+	err = w.AddParagraph(x2, yTop, true)
 	if err != nil {
 		return err
 	}
@@ -89,6 +91,7 @@ type writer struct {
 	TextCol color.Color
 	LinkCol color.Color
 
+	style  *fallback.Style
 	RM     *pdf.ResourceManager
 	BS     *annotation.BorderStyle
 	Annots pdf.Array
@@ -96,7 +99,7 @@ type writer struct {
 
 // AddParagraph adds a paragraph to the PDF document at the specified position.
 // The text width is 244 units.
-func (w *writer) AddParagraph(x, y float64) error {
+func (w *writer) AddParagraph(x, y float64, withAppearance bool) error {
 	geom := w.Roman.GetGeometry()
 
 	page := w.Page
@@ -110,7 +113,7 @@ func (w *writer) AddParagraph(x, y float64) error {
 	page.SetFillColor(w.LinkCol)
 	qq := w.MakeLink("gathering")
 	err := w.MakeAnnotation("https://en.wikipedia.org/wiki/Gathering_(bookbinding)",
-		"Gathering (bookbinding)", qq)
+		"Wikipedia: Gathering (bookbinding)", withAppearance, qq)
 	if err != nil {
 		return err
 	}
@@ -123,7 +126,7 @@ func (w *writer) AddParagraph(x, y float64) error {
 	page.SetFillColor(w.LinkCol)
 	qq = w.MakeLink("vellum")
 	err = w.MakeAnnotation("https://en.wikipedia.org/wiki/Vellum",
-		"Vellum", qq)
+		"Wikipedia: Vellum", withAppearance, qq)
 	if err != nil {
 		return err
 	}
@@ -132,25 +135,29 @@ func (w *writer) AddParagraph(x, y float64) error {
 	page.SetFillColor(w.LinkCol)
 	qq = w.MakeLink("parch-")
 	err = w.MakeAnnotation("https://en.wikipedia.org/wiki/Parchment",
-		"Parchment", qq)
+		"Wikipedia: Parchment", withAppearance, qq)
 	if err != nil {
 		return err
 	}
 
 	page.TextNextLine()
-	page.TextSetWordSpacing(-0.328)
+	page.TextSetWordSpacing(-0.333)
 	qq = w.MakeLink("ment")
 	err = w.MakeAnnotation("https://en.wikipedia.org/wiki/Parchment",
-		"Parchment", qq)
+		"Wikipedia: Parchment", withAppearance, qq)
 	if err != nil {
 		return err
 	}
 	page.SetFillColor(w.TextCol)
-	page.TextShow(", i.e. eight leaves or ")
+	page.TextShow(", ")
+	page.TextSetFont(w.Italic, 10)
+	page.TextShow("i.e.")
+	page.TextSetFont(w.Roman, 10)
+	page.TextShow(" eight leaves or ")
 	page.SetFillColor(w.LinkCol)
 	qq = w.MakeLink("folios")
 	err = w.MakeAnnotation("https://en.wikipedia.org/wiki/Folio",
-		"Folio", qq)
+		"Wikipedia: Folio", withAppearance, qq)
 	if err != nil {
 		return err
 	}
@@ -164,25 +171,25 @@ func (w *writer) AddParagraph(x, y float64) error {
 	return nil
 }
 
-func (w *writer) MakeLink(text string) []float64 {
+func (w *writer) MakeLink(text string) []vec.Vec2 {
 	page := w.Page
 
-	gg := page.TextLayout(nil, text)
-	outline := page.TextGetQuadPoints(gg)
-	page.TextShowGlyphs(gg)
+	glyphs := page.TextLayout(nil, text)
+	corners := page.TextGetQuadPoints(glyphs)
+	page.TextShowGlyphs(glyphs)
 
-	return outline
+	return corners
 }
 
-func (w *writer) MakeAnnotation(url string, title string, quadPoints ...[]float64) error {
+func (w *writer) MakeAnnotation(url string, title string, app bool, quadPoints ...[]vec.Vec2) error {
 	var qq []vec.Vec2
 	for _, q := range quadPoints {
-		// convert float array to Vec2 slice
-		for i := 0; i < len(q); i += 2 {
-			if i+1 < len(q) {
-				qq = append(qq, vec.Vec2{X: q[i], Y: q[i+1]})
-			}
-		}
+		// quadPoints are already Vec2 slices
+		qq = append(qq, q...)
+	}
+	for i := range qq {
+		qq[i].X = pdf.Round(qq[i].X, 2)
+		qq[i].Y = pdf.Round(qq[i].Y, 2)
 	}
 
 	a := pdf.Dict{
@@ -198,14 +205,22 @@ func (w *writer) MakeAnnotation(url string, title string, quadPoints ...[]float6
 		},
 		Action:      a,
 		Highlight:   annotation.LinkHighlightInvert,
-		QuadPoints:  qq,
 		BorderStyle: w.BS,
 	}
 
+	if len(quadPoints) > 1 {
+		link.QuadPoints = qq
+	}
+
 	// compute the bounding box from the quad points
-	for _, q := range quadPoints {
-		for i := 0; i < len(q); i += 2 {
-			link.Common.Rect.ExtendVec(vec.Vec2{X: q[i], Y: q[i+1]})
+	for _, point := range qq {
+		link.Common.Rect.ExtendVec(point)
+	}
+
+	if app {
+		err := w.style.AddAppearance(link)
+		if err != nil {
+			return err
 		}
 	}
 

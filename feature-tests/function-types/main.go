@@ -24,6 +24,7 @@ import (
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/rect"
+	"seehuhn.de/go/geom/vec"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
@@ -481,10 +482,8 @@ func (w *writer) test1DStrip(f pdf.Function) error {
 	s := &shading.Type2{
 		ColorSpace: cs,
 		F:          f,
-		X0:         area1.LLx,
-		Y0:         area1.LLy + area1.Dy()/2,
-		X1:         area1.URx,
-		Y1:         area1.LLy + area1.Dy()/2,
+		P0:         vec.Vec2{X: area1.LLx, Y: area1.LLy + area1.Dy()/2},
+		P1:         vec.Vec2{X: area1.URx, Y: area1.LLy + area1.Dy()/2},
 		TMin:       0,
 		TMax:       1,
 		BBox:       &pdf.Rectangle{LLx: area1.LLx, LLy: area1.LLy, URx: area1.URx, URy: area1.URy},

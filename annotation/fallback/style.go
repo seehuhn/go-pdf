@@ -78,6 +78,8 @@ func (s *Style) AddAppearance(a annotation.Annotation) error {
 	switch a := a.(type) {
 	case *annotation.Text:
 		s.addTextAppearance(a)
+	case *annotation.Link:
+		s.addLinkAppearance(a)
 	case *annotation.FreeText:
 		s.addFreeTextAppearance(a)
 	case *annotation.Line:

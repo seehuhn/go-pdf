@@ -21,6 +21,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 )
@@ -182,10 +183,11 @@ func (w *Writer) TextLayout(seq *font.GlyphSeq, text string) *font.GlyphSeq {
 }
 
 // TextGetQuadPoints returns QuadPoints for a glyph sequence in default user
-// space coordinates. Returns an array of 8 numbers representing one
-// quadrilateral (x1 y1 x2 y2 x3 y3 x4 y4), where (x1,y1)--(x2,y2) is the
-// bottom edge of the (possibly rotated) bounding box.
-func (w *Writer) TextGetQuadPoints(seq *font.GlyphSeq) []float64 {
+// space coordinates. Returns 4 Vec2 points representing one quadrilateral,
+// where the first two points form the bottom edge of the (possibly rotated) bounding box.
+func (w *Writer) TextGetQuadPoints(seq *font.GlyphSeq) []vec.Vec2 {
+	// TODO(voss): Make sure this is correct for vertical writing mode.
+
 	if seq == nil || len(seq.Seq) == 0 {
 		return nil
 	}
@@ -198,56 +200,39 @@ func (w *Writer) TextGetQuadPoints(seq *font.GlyphSeq) []float64 {
 	geom := f.GetGeometry()
 	size := w.TextFontSize
 
-	var width, height, depth float64
-	first := true
-	for _, glyph := range seq.Seq {
-		width += glyph.Advance
-
-		bbox := &geom.GlyphExtents[glyph.GID]
-		if bbox.IsZero() {
-			continue
-		}
-		thisDepth := -(bbox.LLy*size/1000 + glyph.Rise)
-		thisHeight := (bbox.URy*size/1000 + glyph.Rise)
-
-		if thisDepth > depth || first {
-			depth = thisDepth
-		}
-		if thisHeight > height || first {
-			height = thisHeight
-		}
-		first = false
-	}
-	if first {
-		return nil
-	}
-	// Build glyph rectangle in text space
-	// Calculate the actual glyph bounds including left bearing
-	skip := seq.Skip
-
-	// Find the left-most and right-most glyph bounds
+	height := geom.Ascent * size
+	depth := -geom.Descent * size
 	var leftBearing, rightBearing float64
-	first = true
-	currentPos := skip
+
+	first := true
+	currentPos := seq.Skip
 	for _, glyph := range seq.Seq {
 		bbox := &geom.GlyphExtents[glyph.GID]
 		if !bbox.IsZero() {
+			glyphDepth := -(bbox.LLy*size/1000 + glyph.Rise)
+			glyphHeight := (bbox.URy*size/1000 + glyph.Rise)
 			glyphLeft := currentPos + bbox.LLx*size/1000
 			glyphRight := currentPos + bbox.URx*size/1000
-			if first {
-				leftBearing = glyphLeft
-				rightBearing = glyphRight
-				first = false
-			} else {
-				if glyphLeft < leftBearing {
-					leftBearing = glyphLeft
-				}
-				if glyphRight > rightBearing {
-					rightBearing = glyphRight
-				}
+
+			if glyphDepth > depth {
+				depth = glyphDepth
 			}
+			if glyphHeight > height {
+				height = glyphHeight
+			}
+			if glyphLeft < leftBearing || first {
+				leftBearing = glyphLeft
+			}
+			if glyphRight > rightBearing || first {
+				rightBearing = glyphRight
+			}
+
+			first = false
 		}
 		currentPos += glyph.Advance
+	}
+	if first {
+		return nil
 	}
 
 	rectText := []float64{
@@ -259,11 +244,10 @@ func (w *Writer) TextGetQuadPoints(seq *font.GlyphSeq) []float64 {
 
 	// transform the bounding rectangle from text space to default user space
 	M := w.TextMatrix.Mul(w.CTM)
-	rectUser := make([]float64, 8)
+	rectUser := make([]vec.Vec2, 4)
 	for i := range 4 {
 		x, y := M.Apply(rectText[2*i], rectText[2*i+1])
-		rectUser[2*i] = x
-		rectUser[2*i+1] = y
+		rectUser[i] = vec.Vec2{X: x, Y: y}
 	}
 
 	return rectUser

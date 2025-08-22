@@ -22,6 +22,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
@@ -370,11 +371,9 @@ func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
 
 	shadingData := &shading.Type3{
 		ColorSpace:  color.DeviceRGBSpace,
-		X1:          100,
-		Y1:          350,
+		Center1:     vec.Vec2{X: 100, Y: 350},
 		R1:          10,
-		X2:          500,
-		Y2:          750,
+		Center2:     vec.Vec2{X: 500, Y: 750},
 		R2:          200,
 		F:           fn,
 		ExtendStart: true,

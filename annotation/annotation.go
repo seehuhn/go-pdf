@@ -65,7 +65,7 @@ type Common struct {
 
 	// LastModified (optional) is the date and time when the annotation was
 	// most recently modified.  This can either be a PDF date string or a
-	// freeform string.
+	// human-readable freeform string.
 	//
 	// This corresponds to the /M entry in the PDF annotation dictionary.
 	LastModified string
@@ -96,7 +96,7 @@ type Common struct {
 	Border *Border
 
 	// Color (optional) is the color used for the annotation's background,
-	// title bar or border.
+	// title bar or border (depending on the annotation type).
 	//
 	// Only certain color types are allowed:
 	//  - colors in the [color.DeviceGray] color space

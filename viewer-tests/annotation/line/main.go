@@ -21,6 +21,7 @@ import (
 	"math"
 	"os"
 
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/fallback"
@@ -496,10 +497,8 @@ func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {
 
 	background := &shading.Type2{
 		ColorSpace: color.DeviceRGBSpace,
-		X0:         pdf.Round(t0*nx, 1),
-		Y0:         pdf.Round(t0*ny, 1),
-		X1:         pdf.Round(t1*nx, 1),
-		Y1:         pdf.Round(t1*ny, 1),
+		P0:         vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
+		P1:         vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
 		F:          F,
 		TMin:       t0,
 		TMax:       t1,

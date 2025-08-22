@@ -25,9 +25,15 @@ import (
 
 // PDF 2.0 sections: 12.5.2 12.5.6.5
 
-// Link represents a hypertext link annotation.
-// This is a clickable region on a PDF page that can perform an action
-// or navigate to a destination when activated.
+// Link represents a hypertext link annotation. This is a clickable region on a
+// PDF page that can perform an action or navigate to a destination when
+// activated.
+//
+// The only graphical indication of a link is an optional border. The border
+// color is specified in the Common.Color field, and the line width and style
+// are specified in the BorderStyle or Common.Border fields.
+// Many PDF viewers will display the contents of the Common.Contents field
+// as a tooltip when the pointer hovers over the link.
 type Link struct {
 	Common
 
@@ -51,9 +57,14 @@ type Link struct {
 	// This corresponds to the /H entry in the PDF annotation dictionary.
 	Highlight LinkHighlight
 
-	// QuadPoints (optional) specifies the coordinates of
-	// quadrilaterals that comprise the region where the link should be
-	// activated. Each quadrilateral is represented by 4 Vec2 points.
+	// QuadPoints (optional) specifies the coordinates of quadrilaterals that
+	// comprise the region where the link should be activated. Each
+	// quadrilateral is represented by 4 Vec2 points, giving the corners in
+	// counter-clockwise order, starting at the bottom-left.  If QuadPoints is
+	// absent, Common.Rect is used instead.
+	//
+	// If QuadPoints is present for link annotations with a border, PDF viewers
+	// disagree on where and how any borders should be drawn.
 	//
 	// All points must be contained within Common.Rect.
 	QuadPoints []vec.Vec2
