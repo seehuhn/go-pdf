@@ -18,8 +18,11 @@ package annotation
 
 import (
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/measure"
 )
+
+// PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.9
 
 // Polyline represents a polyline annotation that displays open polygons on the page.
 // Polylines are similar to polygons, except that the first and last vertex are not
@@ -33,11 +36,19 @@ type Polyline struct {
 	// user space.
 	Vertices []float64
 
-	// LE (optional; meaningful only for polyline annotations) is an array of two
-	// names that specify the line ending styles for the endpoints defined by the
-	// first and last pairs of coordinates in the Vertices array.
-	// Default value: [/None /None]
-	LE []pdf.Name
+	// Path (optional; PDF 2.0) is an array of n arrays, each supplying operands
+	// for path building operators (m, l, or c). If present, Vertices is not present.
+	// Each array contains pairs of values specifying points for path drawing operations.
+	Path [][]float64
+
+	// LineEndingStyle (optional) is an array of two names specifying the line
+	// ending styles for the start and end points respectively.
+	//
+	// When writing annotations empty names may be used as a shorthand for
+	// [LineEndingStyleNone].
+	//
+	// This corresponds to the /LE entry in the PDF annotation dictionary.
+	LineEndingStyle [2]LineEndingStyle
 
 	// BorderStyle (optional) is a border style dictionary specifying the width
 	// and dash pattern used in drawing the polyline.
@@ -47,23 +58,21 @@ type Polyline struct {
 	// This corresponds to the /BS entry in the PDF annotation dictionary.
 	BorderStyle *BorderStyle
 
-	// IC (optional) is an array of numbers in the range 0.0 to 1.0 specifying
-	// the interior color with which to fill the annotation's line endings.
-	// The number of array elements determines the colour space:
-	// 0 - No colour; transparent
-	// 1 - DeviceGray
-	// 3 - DeviceRGB
-	// 4 - DeviceCMYK
-	IC []float64
+	// FillColor (optional; PDF 1.4) is the colour used to fill the
+	// polyline's line endings, if applicable.
+	//
+	// Only certain color types are allowed:
+	//  - colors in the [color.DeviceGray] color space
+	//  - colors in the [color.DeviceRGB] color space
+	//  - colors in the [color.DeviceCMYK] color space
+	//  - the [Transparent] color
+	//
+	// This corresponds to the /IC entry in the PDF annotation dictionary.
+	FillColor color.Color
 
 	// Measure (optional; PDF 1.7) is a measure dictionary that specifies the
 	// scale and units that apply to the annotation.
 	Measure measure.Measure
-
-	// Path (optional; PDF 2.0) is an array of n arrays, each supplying operands
-	// for path building operators (m, l, or c). If present, Vertices is not present.
-	// Each array contains pairs of values specifying points for path drawing operations.
-	Path [][]float64
 }
 
 var _ Annotation = (*Polyline)(nil)
@@ -93,15 +102,22 @@ func decodePolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
 		polyline.Vertices = vertices
 	}
 
-	// LE (optional)
-	if le, err := pdf.GetArray(r, dict["LE"]); err == nil && len(le) == 2 {
-		endings := make([]pdf.Name, 2)
-		for i, ending := range le {
-			if name, err := pdf.GetName(r, ending); err == nil {
-				endings[i] = name
-			}
+	// LE (optional; PDF 1.4) - default is [None, None]
+	polyline.LineEndingStyle = [2]LineEndingStyle{LineEndingStyleNone, LineEndingStyleNone}
+	if le, err := pdf.Optional(pdf.GetArray(r, dict["LE"])); err != nil {
+		return nil, err
+	} else if len(le) >= 1 {
+		if name, err := pdf.GetName(r, le[0]); err == nil {
+			polyline.LineEndingStyle[0] = LineEndingStyle(name)
 		}
-		polyline.LE = endings
+		if len(le) >= 2 {
+			if name, err := pdf.GetName(r, le[1]); err == nil {
+				polyline.LineEndingStyle[1] = LineEndingStyle(name)
+			}
+		} else {
+			// if only one element, copy first element to second
+			polyline.LineEndingStyle[1] = polyline.LineEndingStyle[0]
+		}
 	}
 
 	// BS (optional)
@@ -111,9 +127,11 @@ func decodePolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
 		polyline.BorderStyle = bs
 	}
 
-	// IC (optional)
-	if ic, err := pdf.GetFloatArray(r, dict["IC"]); err == nil && len(ic) > 0 {
-		polyline.IC = ic
+	// IC (optional; PDF 1.4)
+	if ic, err := pdf.Optional(extractColor(r, dict["IC"])); err != nil {
+		return nil, err
+	} else {
+		polyline.FillColor = ic
 	}
 
 	// Measure (optional)
@@ -169,9 +187,23 @@ func (p *Polyline) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["Vertices"] = verticesArray
 	}
 
-	// LE (optional)
-	if len(p.LE) == 2 {
-		leArray := pdf.Array{p.LE[0], p.LE[1]}
+	// LE (optional; PDF 1.4) - only write if not default [None, None]
+	// normalize empty strings to None as documented
+	normalized := p.LineEndingStyle
+	if normalized[0] == "" {
+		normalized[0] = LineEndingStyleNone
+	}
+	if normalized[1] == "" {
+		normalized[1] = LineEndingStyleNone
+	}
+
+	if normalized != [2]LineEndingStyle{LineEndingStyleNone, LineEndingStyleNone} {
+		if err := pdf.CheckVersion(rm.Out, "polyline annotation LE entry", pdf.V1_4); err != nil {
+			return nil, err
+		}
+		leArray := make(pdf.Array, 2)
+		leArray[0] = pdf.Name(normalized[0])
+		leArray[1] = pdf.Name(normalized[1])
 		dict["LE"] = leArray
 	}
 
@@ -184,13 +216,16 @@ func (p *Polyline) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["BS"] = bs
 	}
 
-	// IC (optional)
-	if p.IC != nil {
-		icArray := make(pdf.Array, len(p.IC))
-		for i, color := range p.IC {
-			icArray[i] = pdf.Number(color)
+	// IC (optional; PDF 1.4)
+	if p.FillColor != nil {
+		if err := pdf.CheckVersion(rm.Out, "polyline annotation IC entry", pdf.V1_4); err != nil {
+			return nil, err
 		}
-		dict["IC"] = icArray
+		if icArray, err := encodeColor(p.FillColor); err != nil {
+			return nil, err
+		} else if icArray != nil {
+			dict["IC"] = icArray
+		}
 	}
 
 	// Measure (optional)

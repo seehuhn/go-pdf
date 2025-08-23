@@ -65,6 +65,20 @@ type FreeText struct {
 	// This corresponds to the /RD entry in the PDF annotation dictionary.
 	Margin []float64
 
+	// BorderStyle (optional) is a border style dictionary specifying the line
+	// width and dash pattern for drawing the annotation's border.
+	//
+	// If the BorderStyle field is set, the Common.Border field is ignored.
+	//
+	// This corresponds to the /BS entry in the PDF annotation dictionary.
+	BorderStyle *BorderStyle
+
+	// BorderEffect (optional) is a border effect dictionary used in
+	// conjunction with the border style dictionary specified by BorderStyle.
+	//
+	// This corresponds to the /BE entry in the PDF annotation dictionary.
+	BorderEffect *BorderEffect
+
 	// CalloutLine (used only if Markup.Intent is [FreeTextIntentCallout]; PDF 1.6)
 	// specifies a callout line attached to the free text annotation.
 	// Must contain either 2 points (start and end) or 3 points (start, knee, and end).
@@ -80,18 +94,6 @@ type FreeText struct {
 	//
 	// This corresponds to the /LE entry in the PDF annotation dictionary.
 	LineEndingStyle LineEndingStyle
-
-	// BorderEffect (optional) is a border effect dictionary used in
-	// conjunction with the border style dictionary specified by BorderStyle.
-	BorderEffect *BorderEffect
-
-	// BorderStyle (optional) is a border style dictionary specifying the line
-	// width and dash pattern for drawing the annotation's border.
-	//
-	// If the BorderStyle field is set, the Common.Border field is ignored.
-	//
-	// This corresponds to the /BS entry in the PDF annotation dictionary.
-	BorderStyle *BorderStyle
 }
 
 var _ Annotation = (*FreeText)(nil)

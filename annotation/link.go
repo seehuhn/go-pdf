@@ -121,15 +121,17 @@ func decodeLink(r pdf.Getter, dict pdf.Dict) (*Link, error) {
 		link.Backup = pa
 	}
 
-	if quadPoints, err := pdf.GetFloatArray(r, dict["QuadPoints"]); err == nil && len(quadPoints) > 0 {
-		// convert float array to Vec2 slice
-		if len(quadPoints)%2 == 0 {
-			points := make([]vec.Vec2, len(quadPoints)/2)
-			for i := 0; i < len(quadPoints); i += 2 {
-				points[i/2] = vec.Vec2{X: quadPoints[i], Y: quadPoints[i+1]}
+	if quadPoints, err := pdf.GetFloatArray(r, dict["QuadPoints"]); err == nil && len(quadPoints) >= 8 {
+		// process floats in groups of 8, each group becomes 4 Vec2 points
+		numCompleteQuads := len(quadPoints) / 8
+		points := make([]vec.Vec2, numCompleteQuads*4)
+		for quad := 0; quad < numCompleteQuads; quad++ {
+			for corner := 0; corner < 4; corner++ {
+				idx := quad*8 + corner*2
+				points[quad*4+corner] = vec.Vec2{X: quadPoints[idx], Y: quadPoints[idx+1]}
 			}
-			link.QuadPoints = points
 		}
+		link.QuadPoints = points
 	}
 
 	// BS (optional)

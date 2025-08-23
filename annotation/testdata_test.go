@@ -280,7 +280,7 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Designer",
 					Subject: "Color square",
 				},
-				IC: []float64{1.0, 0.5, 0.0}, // RGB orange interior
+				FillColor: color.DeviceRGB(1.0, 0.5, 0.0), // RGB orange interior
 			},
 		},
 		{
@@ -296,8 +296,8 @@ var testCases = map[pdf.Name][]testCase{
 					Subject: "Complex annotation",
 					Intent:  "SquareCloud",
 				},
-				IC: []float64{0.9, 0.9, 0.9},      // Light gray interior
-				RD: []float64{5.0, 5.0, 5.0, 5.0}, // Rectangle differences
+				FillColor: color.DeviceRGB(0.9, 0.9, 0.9), // Light gray interior
+				Margin:    []float64{5.0, 5.0, 5.0, 5.0},  // Rectangle differences
 			},
 		},
 	},
@@ -326,7 +326,7 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Designer",
 					Subject: "Color circle",
 				},
-				IC: []float64{0.0, 1.0, 0.0}, // Green interior
+				FillColor: color.DeviceRGB(0.0, 1.0, 0.0), // Green interior
 			},
 		},
 		{
@@ -342,8 +342,8 @@ var testCases = map[pdf.Name][]testCase{
 					Subject: "Complex circle annotation",
 					Intent:  "CircleCloud",
 				},
-				IC: []float64{1.0, 1.0, 0.0},          // Yellow interior
-				RD: []float64{10.0, 10.0, 10.0, 10.0}, // Rectangle differences
+				FillColor: color.DeviceRGB(1.0, 1.0, 0.0),    // Yellow interior
+				Margin:    []float64{10.0, 10.0, 10.0, 10.0}, // Rectangle differences
 			},
 		},
 	},
@@ -374,8 +374,8 @@ var testCases = map[pdf.Name][]testCase{
 					Subject: "Colored polygon",
 					Intent:  "PolygonCloud",
 				},
-				Vertices: []float64{150, 100, 300, 150, 250, 250, 100, 200}, // Quadrilateral
-				IC:       []float64{0.0, 1.0, 0.5},                          // Green-cyan interior
+				Vertices:  []float64{150, 100, 300, 150, 250, 250, 100, 200}, // Quadrilateral
+				FillColor: color.DeviceRGB(0.0, 1.0, 0.5),                    // Green-cyan interior
 			},
 		},
 		{
@@ -411,8 +411,8 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Author",
 					Subject: "Line path",
 				},
-				Vertices: []float64{75, 100, 150, 175, 225, 125, 275, 150}, // Zigzag line
-				LE:       []pdf.Name{"None", "OpenArrow"},                  // Arrow at end
+				Vertices:        []float64{75, 100, 150, 175, 225, 125, 275, 150},                  // Zigzag line
+				LineEndingStyle: [2]LineEndingStyle{LineEndingStyleNone, LineEndingStyleOpenArrow}, // Arrow at end
 			},
 		},
 		{
@@ -427,9 +427,9 @@ var testCases = map[pdf.Name][]testCase{
 					Subject: "Colored polyline",
 					Intent:  "PolyLineDimension",
 				},
-				Vertices: []float64{150, 200, 200, 150, 300, 250, 350, 180},
-				LE:       []pdf.Name{"Circle", "Square"}, // Different endings
-				IC:       []float64{1.0, 0.0, 0.0},       // Red line endings
+				Vertices:        []float64{150, 200, 200, 150, 300, 250, 350, 180},
+				LineEndingStyle: [2]LineEndingStyle{LineEndingStyleCircle, LineEndingStyleSquare}, // Different endings
+				FillColor:       color.DeviceRGB(1.0, 0.0, 0.0),                                   // Red line endings
 			},
 		},
 		{
@@ -448,14 +448,15 @@ var testCases = map[pdf.Name][]testCase{
 					{300, 250, 350, 350, 400, 300}, // curveto (6 coordinates)
 					{450, 320},                     // lineto
 				},
-				LE: []pdf.Name{"Butt", "Diamond"},
+				LineEndingStyle: [2]LineEndingStyle{LineEndingStyleButt, LineEndingStyleDiamond},
 			},
 		},
 	},
 	"Highlight": {
 		{
 			name: "basic highlight annotation",
-			annotation: &Highlight{
+			annotation: &TextMarkup{
+				Type: TextMarkupTypeHighlight,
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 100, LLy: 200, URx: 200, URy: 220},
 					Contents: "Highlighted text",
@@ -464,12 +465,13 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Reviewer",
 					Subject: "Important passage",
 				},
-				QuadPoints: []float64{100, 200, 200, 200, 200, 220, 100, 220}, // Single word quad
+				QuadPoints: []vec.Vec2{{X: 100, Y: 200}, {X: 200, Y: 200}, {X: 200, Y: 220}, {X: 100, Y: 220}}, // Single word quad
 			},
 		},
 		{
 			name: "highlight with multiple quads",
-			annotation: &Highlight{
+			annotation: &TextMarkup{
+				Type: TextMarkupTypeHighlight,
 				Common: Common{
 					Rect:  pdf.Rectangle{LLx: 50, LLy: 300, URx: 250, URy: 340},
 					Name:  "highlight-001",
@@ -479,10 +481,10 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Student",
 					Subject: "Study notes",
 				},
-				QuadPoints: []float64{
-					50, 300, 100, 300, 100, 320, 50, 320, // First word
-					110, 300, 160, 300, 160, 320, 110, 320, // Second word
-					170, 320, 250, 320, 250, 340, 170, 340, // Third word (different line)
+				QuadPoints: []vec.Vec2{
+					{X: 50, Y: 300}, {X: 100, Y: 300}, {X: 100, Y: 320}, {X: 50, Y: 320}, // First word
+					{X: 110, Y: 300}, {X: 160, Y: 300}, {X: 160, Y: 320}, {X: 110, Y: 320}, // Second word
+					{X: 170, Y: 320}, {X: 250, Y: 320}, {X: 250, Y: 340}, {X: 170, Y: 340}, // Third word (different line)
 				},
 			},
 		},
@@ -490,7 +492,8 @@ var testCases = map[pdf.Name][]testCase{
 	"Underline": {
 		{
 			name: "basic underline annotation",
-			annotation: &Underline{
+			annotation: &TextMarkup{
+				Type: TextMarkupTypeUnderline,
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 150, LLy: 400, URx: 300, URy: 420},
 					Contents: "Underlined text",
@@ -499,12 +502,13 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Editor",
 					Subject: "Emphasis added",
 				},
-				QuadPoints: []float64{150, 400, 300, 400, 300, 420, 150, 420}, // Single phrase
+				QuadPoints: []vec.Vec2{{X: 150, Y: 400}, {X: 300, Y: 400}, {X: 300, Y: 420}, {X: 150, Y: 420}}, // Single phrase
 			},
 		},
 		{
 			name: "underline with markup fields",
-			annotation: &Underline{
+			annotation: &TextMarkup{
+				Type: TextMarkupTypeUnderline,
 				Common: Common{
 					Rect:  pdf.Rectangle{LLx: 75, LLy: 500, URx: 225, URy: 520},
 					Name:  "underline-001",
@@ -515,14 +519,15 @@ var testCases = map[pdf.Name][]testCase{
 					Subject:      "Grammar correction",
 					CreationDate: time.Date(2023, 6, 15, 14, 30, 0, 0, time.UTC),
 				},
-				QuadPoints: []float64{75, 500, 225, 500, 225, 520, 75, 520},
+				QuadPoints: []vec.Vec2{{X: 75, Y: 500}, {X: 225, Y: 500}, {X: 225, Y: 520}, {X: 75, Y: 520}},
 			},
 		},
 	},
 	"Squiggly": {
 		{
 			name: "basic squiggly annotation",
-			annotation: &Squiggly{
+			annotation: &TextMarkup{
+				Type: TextMarkupTypeSquiggly,
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 200, LLy: 600, URx: 350, URy: 620},
 					Contents: "Spelling error",
@@ -531,12 +536,13 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Spellchecker",
 					Subject: "Possible misspelling",
 				},
-				QuadPoints: []float64{200, 600, 350, 600, 350, 620, 200, 620}, // Misspelled word
+				QuadPoints: []vec.Vec2{{X: 200, Y: 600}, {X: 350, Y: 600}, {X: 350, Y: 620}, {X: 200, Y: 620}}, // Misspelled word
 			},
 		},
 		{
 			name: "squiggly with color",
-			annotation: &Squiggly{
+			annotation: &TextMarkup{
+				Type: TextMarkupTypeSquiggly,
 				Common: Common{
 					Rect:  pdf.Rectangle{LLx: 100, LLy: 700, URx: 180, URy: 720},
 					Name:  "squiggly-001",
@@ -546,14 +552,15 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Grammar checker",
 					Subject: "Grammar issue",
 				},
-				QuadPoints: []float64{100, 700, 180, 700, 180, 720, 100, 720},
+				QuadPoints: []vec.Vec2{{X: 100, Y: 700}, {X: 180, Y: 700}, {X: 180, Y: 720}, {X: 100, Y: 720}},
 			},
 		},
 	},
 	"StrikeOut": {
 		{
 			name: "basic strikeout annotation",
-			annotation: &StrikeOut{
+			annotation: &TextMarkup{
+				Type: TextMarkupTypeStrikeOut,
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 250, LLy: 800, URx: 400, URy: 820},
 					Contents: "Deleted text",
@@ -562,12 +569,13 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Editor",
 					Subject: "Text to be removed",
 				},
-				QuadPoints: []float64{250, 800, 400, 800, 400, 820, 250, 820}, // Struck-out phrase
+				QuadPoints: []vec.Vec2{{X: 250, Y: 800}, {X: 400, Y: 800}, {X: 400, Y: 820}, {X: 250, Y: 820}}, // Struck-out phrase
 			},
 		},
 		{
 			name: "strikeout with multiple sections",
-			annotation: &StrikeOut{
+			annotation: &TextMarkup{
+				Type: TextMarkupTypeStrikeOut,
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 50, LLy: 900, URx: 300, URy: 940},
 					Name: "strikeout-001",
@@ -576,10 +584,10 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Reviewer",
 					Subject: "Major revision",
 				},
-				QuadPoints: []float64{
-					50, 900, 150, 900, 150, 920, 50, 920, // First section
-					160, 900, 250, 900, 250, 920, 160, 920, // Second section
-					50, 920, 300, 920, 300, 940, 50, 940, // Third section (different line)
+				QuadPoints: []vec.Vec2{
+					{X: 50, Y: 900}, {X: 150, Y: 900}, {X: 150, Y: 920}, {X: 50, Y: 920}, // First section
+					{X: 160, Y: 900}, {X: 250, Y: 900}, {X: 250, Y: 920}, {X: 160, Y: 920}, // Second section
+					{X: 50, Y: 920}, {X: 300, Y: 920}, {X: 300, Y: 940}, {X: 50, Y: 940}, // Third section (different line)
 				},
 			},
 		},

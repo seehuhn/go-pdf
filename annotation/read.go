@@ -49,14 +49,8 @@ func Decode(r pdf.Getter, obj pdf.Object) (Annotation, error) {
 		return decodePolygon(r, dict)
 	case "PolyLine":
 		return decodePolyline(r, dict)
-	case "Highlight":
-		return decodeHighlight(r, dict)
-	case "Underline":
-		return decodeUnderline(r, dict)
-	case "Squiggly":
-		return decodeSquiggly(r, dict)
-	case "StrikeOut":
-		return decodeStrikeOut(r, dict)
+	case "Highlight", "Underline", "Squiggly", "StrikeOut":
+		return decodeTextMarkup(r, dict, subtype)
 	case "Caret":
 		return decodeCaret(r, dict)
 	case "Stamp":

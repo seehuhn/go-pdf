@@ -18,8 +18,11 @@ package annotation
 
 import (
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/measure"
 )
+
+// PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.9
 
 // Polygon represents a polygon annotation that displays closed polygons on the page.
 // Polygons may have many vertices connected by straight lines, with the first and
@@ -33,6 +36,11 @@ type Polygon struct {
 	// user space.
 	Vertices []float64
 
+	// Path (optional; PDF 2.0) is an array of n arrays, each supplying operands
+	// for path building operators (m, l, or c). If present, Vertices is ignored.
+	// Each array contains pairs of values specifying points for path drawing operations.
+	Path [][]float64
+
 	// BorderStyle (optional) is a border style dictionary specifying the width
 	// and dash pattern used in drawing the polygon.
 	//
@@ -41,27 +49,26 @@ type Polygon struct {
 	// This corresponds to the /BS entry in the PDF annotation dictionary.
 	BorderStyle *BorderStyle
 
-	// IC (optional) is an array of numbers in the range 0.0 to 1.0 specifying
-	// the interior color with which to fill the entire polygon shape.
-	// The number of array elements determines the colour space:
-	// 0 - No colour; transparent
-	// 1 - DeviceGray
-	// 3 - DeviceRGB
-	// 4 - DeviceCMYK
-	IC []float64
+	// BorderEffect (optional) is a border effect dictionary describing an
+	// effect applied to the border described by the BS entry.
+	//
+	// This corresponds to the /BE entry in the PDF annotation dictionary.
+	BorderEffect *BorderEffect
 
-	// BE (optional) is a border effect dictionary describing an effect applied
-	// to the border described by the BS entry.
-	BE pdf.Reference
+	// FillColor (optional; PDF 1.4) is the colour used to fill the polygon.
+	//
+	// Only certain color types are allowed:
+	//  - colors in the [color.DeviceGray] color space
+	//  - colors in the [color.DeviceRGB] color space
+	//  - colors in the [color.DeviceCMYK] color space
+	//  - the [Transparent] color
+	//
+	// This corresponds to the /IC entry in the PDF annotation dictionary.
+	FillColor color.Color
 
 	// Measure (optional; PDF 1.7) is a measure dictionary that specifies the
 	// scale and units that apply to the annotation.
 	Measure measure.Measure
-
-	// Path (optional; PDF 2.0) is an array of n arrays, each supplying operands
-	// for path building operators (m, l, or c). If present, Vertices is not present.
-	// Each array contains pairs of values specifying points for path drawing operations.
-	Path [][]float64
 }
 
 var _ Annotation = (*Polygon)(nil)
@@ -99,13 +106,17 @@ func decodePolygon(r pdf.Getter, dict pdf.Dict) (*Polygon, error) {
 	}
 
 	// IC (optional)
-	if ic, err := pdf.GetFloatArray(r, dict["IC"]); err == nil && len(ic) > 0 {
-		polygon.IC = ic
+	if ic, err := pdf.Optional(extractColor(r, dict["IC"])); err != nil {
+		return nil, err
+	} else {
+		polygon.FillColor = ic
 	}
 
 	// BE (optional)
-	if be, ok := dict["BE"].(pdf.Reference); ok {
-		polygon.BE = be
+	if be, err := pdf.Optional(ExtractBorderEffect(r, dict["BE"])); err != nil {
+		return nil, err
+	} else {
+		polygon.BorderEffect = be
 	}
 
 	// Measure (optional)
@@ -181,17 +192,27 @@ func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// IC (optional)
-	if p.IC != nil {
-		icArray := make(pdf.Array, len(p.IC))
-		for i, color := range p.IC {
-			icArray[i] = pdf.Number(color)
+	if p.FillColor != nil {
+		if err := pdf.CheckVersion(rm.Out, "polygon annotation IC entry", pdf.V1_4); err != nil {
+			return nil, err
 		}
-		dict["IC"] = icArray
+		if icArray, err := encodeColor(p.FillColor); err != nil {
+			return nil, err
+		} else if icArray != nil {
+			dict["IC"] = icArray
+		}
 	}
 
 	// BE (optional)
-	if p.BE != 0 {
-		dict["BE"] = p.BE
+	if p.BorderEffect != nil {
+		if err := pdf.CheckVersion(rm.Out, "polygon annotation BE entry", pdf.V1_5); err != nil {
+			return nil, err
+		}
+		be, _, err := pdf.ResourceManagerEmbed(rm, p.BorderEffect)
+		if err != nil {
+			return nil, err
+		}
+		dict["BE"] = be
 	}
 
 	// Measure (optional)
