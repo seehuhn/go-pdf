@@ -90,9 +90,6 @@ type Common struct {
 
 	// Border (optional) specifies the characteristics of the annotation's
 	// border.
-	//
-	// When writing annotations, a nil value can be used as a shorthand for
-	// the default border style (width 1, solid line, no dash or rounded corners).
 	Border *Border
 
 	// Color (optional) is the color used for the annotation's background,
@@ -127,21 +124,23 @@ type Common struct {
 	// NonStrokingTransparency is the transparency value for nonstroking
 	// operations on the annotation in its closed state. The value 1 means
 	// fully transparent, 0 means fully opaque. Ignored if the annotation has
-	// an appearance stream.  For PDF versions prior to 2.0, this field must
-	// equal StrokingTransparency.
+	// an appearance stream.
 	//
-	// This represents the /ca entry in the PDF annotation dictionary (ca = 1 -
-	// NonStrokingTransparency).
+	// For PDF versions prior to 2.0, this field must equal StrokingTransparency.
+	//
+	// This represents the /ca entry in the PDF annotation dictionary
+	// (ca = 1 - NonStrokingTransparency).
 	NonStrokingTransparency float64
 
 	// StrokingTransparency is the transparency value for stroking operations
 	// on annotation in its closed state. The value 1 means fully transparent,
 	// 0 means fully opaque. Ignored if the annotation has an appearance
-	// stream.  For non-markup annotations prior to PDF 2.0, this field must be
-	// 0.
+	// stream.
 	//
-	// This represents the /CA entry in the PDF annotation dictionary. (CA = 1
-	// - StrokingTransparency).
+	// For non-markup annotations prior to PDF 2.0, this field must be 0.
+	//
+	// This represents the /CA entry in the PDF annotation dictionary
+	// (CA = 1 - StrokingTransparency).
 	StrokingTransparency float64
 
 	// BlendMode (optional) is the blend mode that is used when painting the
@@ -231,14 +230,12 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict, isMarkup bool) er
 		return errors.New("missing AS entry")
 	}
 
-	if c.Border != nil {
-		borderValue, _, err := pdf.ResourceManagerEmbed(rm, c.Border)
-		if err != nil {
-			return err
-		}
-		if borderValue != nil {
-			d["Border"] = borderValue
-		}
+	borderValue, _, err := pdf.ResourceManagerEmbed(rm, c.Border)
+	if err != nil {
+		return err
+	}
+	if borderValue != nil {
+		d["Border"] = borderValue
 	}
 
 	if c.Color != nil {
@@ -370,10 +367,10 @@ func decodeCommon(r pdf.Getter, common *Common, dict pdf.Dict) error {
 	}
 
 	// Border (optional)
-	if dict["Border"] != nil {
-		if border, err := ExtractBorder(r, dict["Border"]); err == nil {
-			common.Border = border
-		}
+	if border, err := pdf.Optional(ExtractBorder(r, dict["Border"])); err != nil {
+		return err
+	} else {
+		common.Border = border
 	}
 
 	// C (optional)

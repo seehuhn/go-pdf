@@ -125,7 +125,7 @@ func createDocument(fname string) error {
 	w.page.TextShow("This is a ")
 	w.page.SetFillColor(annotCol)
 	gg := w.page.TextLayout(nil, "link to the first page")
-	quadPoints := w.page.TextGetQuadPoints(gg)
+	quadPoints := w.page.TextGetQuadPoints(gg, 0)
 	w.page.TextShowGlyphs(gg)
 	w.page.SetFillColor(color.DeviceGray(0.3))
 	w.page.TextShow(".")

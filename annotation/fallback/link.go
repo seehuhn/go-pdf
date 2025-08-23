@@ -23,10 +23,11 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/internal/colconv"
 )
 
 func (s *Style) addLinkAppearance(a *annotation.Link) {
-	borderWidth := 1.0
+	borderWidth := 0.0
 	var dashPattern []float64
 	style := pdf.Name("S")
 	if a.Common.Border != nil {
@@ -83,8 +84,50 @@ func (s *Style) addLinkAppearance(a *annotation.Link) {
 			w.Stroke()
 			return nil
 		}
-	// case "B": // beveled // TODO(voss): implement
-	// case "I": // inset // TODO(voss): implement
+	case "B":
+		dark, light := getDarkLightCol(col)
+		draw = func(w *graphics.Writer) error {
+			w.SetFillColor(dark)
+			w.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy, 2))
+			w.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.LLy, 2))
+			w.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.URy, 2))
+			w.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
+			w.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
+			w.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
+			w.Fill()
+
+			w.SetFillColor(light)
+			w.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy, 2))
+			w.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
+			w.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
+			w.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
+			w.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.URy, 2))
+			w.LineTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.URy, 2))
+			w.Fill()
+			return nil
+		}
+	case "I":
+		dark, light := getDarkLightCol(col)
+		draw = func(w *graphics.Writer) error {
+			w.SetFillColor(light)
+			w.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy, 2))
+			w.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.LLy, 2))
+			w.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.URy, 2))
+			w.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
+			w.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
+			w.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
+			w.Fill()
+
+			w.SetFillColor(dark)
+			w.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy, 2))
+			w.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
+			w.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
+			w.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
+			w.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.URy, 2))
+			w.LineTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.URy, 2))
+			w.Fill()
+			return nil
+		}
 	default: // solid or unknown
 		draw = func(w *graphics.Writer) error {
 			w.SetStrokeColor(col)
@@ -107,8 +150,56 @@ func (s *Style) addLinkAppearance(a *annotation.Link) {
 	a.Appearance = &appearance.Dict{
 		Normal: xObj,
 	}
-	a.AppearanceState = "N"
+	a.AppearanceState = ""
 
 	// set style fields to what we have used
 	a.Color = col
 }
+
+func getDarkLightCol(col color.Color) (dark, light color.Color) {
+	if col == annotation.Transparent {
+		return col, col
+	}
+
+	components, _, _ := color.Operator(col)
+	s := col.ColorSpace()
+	switch s.Family() {
+	case color.FamilyDeviceGray:
+		L := colconv.DeviceGrayToL(components[0])
+		darkL, lightL := getDarkLightL(L)
+		dark = color.DeviceGray(pdf.Round(colconv.LToDeviceGray(darkL), 2))
+		light = color.DeviceGray(pdf.Round(colconv.LToDeviceGray(lightL), 2))
+	case color.FamilyDeviceRGB:
+		L, a, b := colconv.DeviceRGBToLAB(components[0], components[1], components[2])
+		darkL, lightL := getDarkLightL(L)
+		r1, g1, b1 := colconv.LABToDeviceRGB(darkL, a, b)
+		r2, g2, b2 := colconv.LABToDeviceRGB(lightL, a, b)
+		dark = color.DeviceRGB(pdf.Round(r1, 2), pdf.Round(g1, 2), pdf.Round(b1, 2))
+		light = color.DeviceRGB(pdf.Round(r2, 2), pdf.Round(g2, 2), pdf.Round(b2, 2))
+	case color.FamilyDeviceCMYK:
+		L, a, b := colconv.DeviceCMYKToLAB(components[0], components[1], components[2], components[3])
+		darkL, lightL := getDarkLightL(L)
+		c1, m1, y1, k1 := colconv.LABToDeviceCMYK(darkL, a, b)
+		c2, m2, y2, k2 := colconv.LABToDeviceCMYK(lightL, a, b)
+		dark = color.DeviceCMYK(pdf.Round(c1, 2), pdf.Round(m1, 2), pdf.Round(y1, 2), pdf.Round(k1, 2))
+		light = color.DeviceCMYK(pdf.Round(c2, 2), pdf.Round(m2, 2), pdf.Round(y2, 2), pdf.Round(k2, 2))
+	default:
+		return col, col
+	}
+	return dark, light
+}
+
+func getDarkLightL(L float64) (dark, light float64) {
+	if L < deltaMin {
+		L = deltaMin
+	} else if L > 100-deltaMin {
+		L = 100 - deltaMin
+	}
+	delta := min(deltaMax, L, 100-L)
+	return L - delta, L + delta
+}
+
+const (
+	deltaMin = 10
+	deltaMax = 20
+)

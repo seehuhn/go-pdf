@@ -48,9 +48,9 @@ func (s *Style) addLineAppearance(a *annotation.Line) {
 
 		// draw the line based on whether we have leader lines
 		if a.LL != 0 {
-			drawLineWithLeaderLines(w, a, lw)
+			drawLineWithLeaderLines(w, a)
 		} else {
-			drawSimpleLine(w, a, lw)
+			drawSimpleLine(w, a)
 		}
 
 		return nil
@@ -64,7 +64,7 @@ func (s *Style) addLineAppearance(a *annotation.Line) {
 	a.Appearance = &appearance.Dict{
 		Normal: xObj,
 	}
-	a.AppearanceState = "N"
+	a.AppearanceState = ""
 	a.Rect = bbox
 }
 
@@ -76,7 +76,7 @@ func getLineWidth(a *annotation.Line) float64 {
 	if a.Common.Border != nil {
 		return a.Common.Border.Width
 	}
-	return 1 // default
+	return 0 // Go default
 }
 
 // getDashPattern returns the dash pattern if any
@@ -137,7 +137,7 @@ func calculateLineBBox(a *annotation.Line, lw float64) pdf.Rectangle {
 		expandBBoxForLeaderLines(&bbox, a, lw)
 	}
 
-	bbox.Round(1)
+	bbox.IRound(1)
 	return bbox
 }
 
@@ -199,7 +199,7 @@ func expandBBoxForLeaderLines(bbox *pdf.Rectangle, a *annotation.Line, lw float6
 }
 
 // drawSimpleLine draws a line without leader lines
-func drawSimpleLine(w *graphics.Writer, a *annotation.Line, lw float64) {
+func drawSimpleLine(w *graphics.Writer, a *annotation.Line) {
 	x1, y1 := a.Coords[0], a.Coords[1]
 	x2, y2 := a.Coords[2], a.Coords[3]
 
@@ -232,7 +232,7 @@ func drawSimpleLine(w *graphics.Writer, a *annotation.Line, lw float64) {
 }
 
 // drawLineWithLeaderLines draws a line with leader lines (dimension line style)
-func drawLineWithLeaderLines(w *graphics.Writer, a *annotation.Line, lw float64) {
+func drawLineWithLeaderLines(w *graphics.Writer, a *annotation.Line) {
 	x1, y1 := a.Coords[0], a.Coords[1]
 	x2, y2 := a.Coords[2], a.Coords[3]
 
@@ -242,7 +242,7 @@ func drawLineWithLeaderLines(w *graphics.Writer, a *annotation.Line, lw float64)
 	length := math.Sqrt(dx*dx + dy*dy)
 	if length < 0.1 {
 		// line too short, fall back to simple line
-		drawSimpleLine(w, a, lw)
+		drawSimpleLine(w, a)
 		return
 	}
 

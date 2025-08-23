@@ -134,6 +134,9 @@ func decodeLink(r pdf.Getter, dict pdf.Dict) (*Link, error) {
 
 	// BS (optional)
 	link.BorderStyle, _ = ExtractBorderStyle(r, dict["BS"])
+	if link.BorderStyle != nil {
+		link.Common.Border = nil
+	}
 
 	return link, nil
 }
@@ -144,6 +147,9 @@ func (l *Link) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 	if len(l.QuadPoints)%4 != 0 {
 		return nil, errors.New("length of QuadPoints is not a multiple of 4")
+	}
+	if l.BorderStyle != nil && l.Common.Border != nil {
+		return nil, errors.New("conflicting BorderStyle and Common.Border fields in Link annotation")
 	}
 
 	dict := pdf.Dict{
@@ -203,6 +209,7 @@ func (l *Link) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 			return nil, err
 		}
 		dict["BS"] = ref
+		dict["Border"] = nil // overwrite the [0 0 0] from nil Common.Border
 	}
 
 	return dict, nil

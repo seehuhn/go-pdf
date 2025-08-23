@@ -378,9 +378,9 @@ func (r *Rectangle) ExtendVec(v vec.Vec2) {
 	}
 }
 
-// Round rounds the corner coordinates of the rectangle to the given number of
-// decimal places.
-func (r *Rectangle) Round(digits int) {
+// IRound rounds the corner coordinates of the rectangle to the given number of
+// decimal places. This modifies the rectangle in place.
+func (r *Rectangle) IRound(digits int) {
 	r.LLx = Round(r.LLx, digits)
 	r.LLy = Round(r.LLy, digits)
 	r.URx = Round(r.URx, digits)

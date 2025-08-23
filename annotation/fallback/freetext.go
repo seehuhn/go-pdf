@@ -82,7 +82,7 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 	// We don't generate dicts with different states.
 	a.AppearanceState = ""
 
-	outer.Round(1)
+	outer.IRound(1)
 	a.Rect = outer
 	if inner.NearlyEqual(&outer, 0.01) {
 		a.Margin = nil

@@ -40,7 +40,7 @@ func TestGetQuadPointsSimple(t *testing.T) {
 	w.TextSetFont(F, 10)
 	w.TextFirstLine(100, 100)
 	gg := w.TextLayout(nil, "A")
-	corners := w.TextGetQuadPoints(gg)
+	corners := w.TextGetQuadPoints(gg, 0)
 	w.TextShowGlyphs(gg)
 	w.TextEnd()
 
@@ -136,7 +136,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 			glyphSeq := tc.setupFunc(w)
 
 			// Call the method under test
-			result := w.TextGetQuadPoints(glyphSeq)
+			result := w.TextGetQuadPoints(glyphSeq, 0)
 
 			// Calculate expected values
 			expected := tc.expectedFunc()
@@ -225,7 +225,7 @@ func TestGetGlyphQuadPointsStateValidation(t *testing.T) {
 	glyphSeq := font.Layout(nil, 12.0, "A")
 
 	// Should return nil because text state is not properly set
-	result := w.TextGetQuadPoints(glyphSeq)
+	result := w.TextGetQuadPoints(glyphSeq, 0)
 	if result != nil {
 		t.Errorf("expected nil result when text state not set, got %v", result)
 	}
@@ -252,7 +252,7 @@ func TestGetGlyphQuadPointsTextMatrixTransform(t *testing.T) {
 	glyphSeq := w.TextLayout(nil, "A")
 
 	// The function should account for both text matrix and CTM
-	result := w.TextGetQuadPoints(glyphSeq)
+	result := w.TextGetQuadPoints(glyphSeq, 0)
 
 	// Should get a valid result (not nil)
 	if result == nil {

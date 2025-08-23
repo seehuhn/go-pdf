@@ -306,7 +306,7 @@ func (f *FreeText) BorderWidth() float64 {
 	if f.Common.Border != nil {
 		return f.Common.Border.Width
 	}
-	return 1.0 // default border width
+	return 0 // Go default = no border
 }
 
 // FreeTextAlign represents the text justification options for free text

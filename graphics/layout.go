@@ -185,7 +185,7 @@ func (w *Writer) TextLayout(seq *font.GlyphSeq, text string) *font.GlyphSeq {
 // TextGetQuadPoints returns QuadPoints for a glyph sequence in default user
 // space coordinates. Returns 4 Vec2 points representing one quadrilateral,
 // where the first two points form the bottom edge of the (possibly rotated) bounding box.
-func (w *Writer) TextGetQuadPoints(seq *font.GlyphSeq) []vec.Vec2 {
+func (w *Writer) TextGetQuadPoints(seq *font.GlyphSeq, padding float64) []vec.Vec2 {
 	// TODO(voss): Make sure this is correct for vertical writing mode.
 
 	if seq == nil || len(seq.Seq) == 0 {
@@ -234,6 +234,11 @@ func (w *Writer) TextGetQuadPoints(seq *font.GlyphSeq) []vec.Vec2 {
 	if first {
 		return nil
 	}
+
+	leftBearing -= padding
+	rightBearing += padding
+	height += padding
+	depth += padding
 
 	rectText := []float64{
 		leftBearing, -depth, // bottom-left

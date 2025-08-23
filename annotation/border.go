@@ -48,7 +48,8 @@ var _ pdf.Embedder[pdf.Unused] = (*Border)(nil)
 var defaultBorder = &Border{Width: 1}
 
 // ExtractBorder extracts a Border from a PDF array.
-// If no valid border data can be decoded, returns the default border.
+// If no border entry exists, returns the PDF default (solid border with width 1).
+// If no border is to be drawn, returns nil.
 func ExtractBorder(r pdf.Getter, obj pdf.Object) (*Border, error) {
 	border, err := pdf.Optional(pdf.GetArray(r, obj))
 	if err != nil {
@@ -79,6 +80,10 @@ func ExtractBorder(r pdf.Getter, obj pdf.Object) (*Border, error) {
 		b.Width = float64(w)
 	}
 
+	if b.Width <= 0 {
+		return nil, nil // no border
+	}
+
 	if len(border) > 3 {
 		if dashArray, err := pdf.Optional(pdf.GetFloatArray(r, border[3])); err != nil {
 			return nil, err
@@ -86,7 +91,7 @@ func ExtractBorder(r pdf.Getter, obj pdf.Object) (*Border, error) {
 			// filter out negative values
 			var dashes []float64
 			for _, num := range dashArray {
-				if num >= 0 {
+				if num > 0 {
 					dashes = append(dashes, num)
 				}
 			}
@@ -102,9 +107,23 @@ func ExtractBorder(r pdf.Getter, obj pdf.Object) (*Border, error) {
 func (b *Border) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	// return nil for default values to omit field from PDF
-	if b.isDefault() {
+	// the Go default value is "no border"
+	if b == nil {
+		return pdf.Array{pdf.Number(0), pdf.Number(0), pdf.Number(0)}, zero, nil
+	}
+
+	// if we have the PDF default value, we don't need to store anything
+	if b.isPDFDefault() {
 		return nil, zero, nil
+	}
+
+	if b.Width <= 0 {
+		return nil, zero, fmt.Errorf("invalid border width %f", b.Width)
+	}
+	for _, v := range b.DashArray {
+		if v <= 0 {
+			return nil, zero, fmt.Errorf("invalid dash value %f", v)
+		}
 	}
 
 	borderArray := pdf.Array{
@@ -138,8 +157,9 @@ func (b *Border) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 	return ref, zero, nil
 }
 
-func (b *Border) isDefault() bool {
-	return b.HCornerRadius == 0 &&
+func (b *Border) isPDFDefault() bool {
+	return b != nil &&
+		b.HCornerRadius == 0 &&
 		b.VCornerRadius == 0 &&
 		b.Width == 1 &&
 		b.DashArray == nil

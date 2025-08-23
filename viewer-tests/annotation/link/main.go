@@ -21,7 +21,9 @@ import (
 	"math"
 	"os"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/vec"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/fallback"
@@ -59,22 +61,97 @@ func createDocument(filename string) error {
 
 		style: fallback.NewStyle(),
 		RM:    page.RM,
-		BS: &annotation.BorderStyle{
-			Width: 1,
-			Style: "U",
-		},
 	}
 
 	xMid := paper.LLx + 0.5*paper.Dx()
 	x0 := math.Round(xMid - 244 - 12.0)
 	x2 := math.Round(xMid + 12.0)
-	yTop := paper.URy - 72.0
+	yPos := paper.URy - 72.0
 
-	err = w.AddParagraph(x0, yTop, false)
+	// title
+
+	B := standard.TimesBold.New()
+	page.TextBegin()
+	page.TextSetMatrix(matrix.Translate(x0, yPos))
+	page.TextSetFont(B, 12)
+	glyphs := page.TextLayout(nil, "Your PDF viewer")
+	glyphs.Align(244, 0.5)
+	page.TextShowGlyphs(glyphs)
+	page.TextSetMatrix(matrix.Translate(x2, yPos))
+	glyphs = page.TextLayout(nil, "Quire appearance stream")
+	glyphs.Align(244, 0.5)
+	page.TextShowGlyphs(glyphs)
+	page.TextEnd()
+
+	yPos -= 36.0
+
+	// paragraphs of text with links
+
+	err = w.AddParagraph(x0, yPos, false)
 	if err != nil {
 		return err
 	}
-	err = w.AddParagraph(x2, yTop, true)
+	err = w.AddParagraph(x2, yPos, true)
+	if err != nil {
+		return err
+	}
+	yPos -= 100.0
+
+	// framed links with different border styles
+
+	for _, style := range []pdf.Name{"S", "D", "B", "I", "U"} {
+		err = w.DrawFramedLink(x0+22, yPos, style, false)
+		if err != nil {
+			return err
+		}
+		err = w.DrawFramedLink(x2+22, yPos, style, true)
+		if err != nil {
+			return err
+		}
+		yPos -= 42.0
+	}
+
+	// hexagon shaped link area
+
+	hex := make([]vec.Vec2, 6)
+	for i := range hex {
+		angle := float64(i)*math.Pi/3 + 0.1
+		hex[i] = vec.Vec2{
+			X: pdf.Round(xMid+100*math.Cos(angle), 2),
+			Y: pdf.Round(yPos+100*math.Sin(angle)-120, 2),
+		}
+	}
+	page.SetFillColor(color.DeviceCMYK(0, 0.9, 0.9, 0))
+	page.MoveTo(hex[0].X, hex[0].Y)
+	for i := 1; i < len(hex); i++ {
+		page.LineTo(hex[i].X, hex[i].Y)
+	}
+	page.Fill()
+	page.SetStrokeColor(color.Green)
+	page.SetLineWidth(1)
+	page.MoveTo(hex[0].X, hex[0].Y)
+	page.LineTo(hex[1].X, hex[1].Y)
+	page.LineTo(hex[2].X, hex[2].Y)
+	page.LineTo(hex[3].X, hex[3].Y)
+	page.ClosePath()
+	page.MoveTo(hex[0].X, hex[0].Y)
+	page.LineTo(hex[3].X, hex[3].Y)
+	page.LineTo(hex[4].X, hex[4].Y)
+	page.LineTo(hex[5].X, hex[5].Y)
+	page.ClosePath()
+	page.Stroke()
+	w.MakeAnnotation("https://en.wikipedia.org/wiki/Hexagon", "Hexagon", nil, false,
+		[]vec.Vec2{hex[0], hex[1], hex[2], hex[3]},
+		[]vec.Vec2{hex[3], hex[4], hex[5], hex[0]})
+	yPos -= 300
+
+	// multiple quad points with border
+
+	err = w.DrawQuads(x0+122, yPos, false)
+	if err != nil {
+		return err
+	}
+	err = w.DrawQuads(x2+122, yPos, true)
 	if err != nil {
 		return err
 	}
@@ -93,7 +170,6 @@ type writer struct {
 
 	style  *fallback.Style
 	RM     *pdf.ResourceManager
-	BS     *annotation.BorderStyle
 	Annots pdf.Array
 }
 
@@ -113,7 +189,7 @@ func (w *writer) AddParagraph(x, y float64, withAppearance bool) error {
 	page.SetFillColor(w.LinkCol)
 	qq := w.MakeLink("gathering")
 	err := w.MakeAnnotation("https://en.wikipedia.org/wiki/Gathering_(bookbinding)",
-		"Wikipedia: Gathering (bookbinding)", withAppearance, qq)
+		"Wikipedia: Gathering (bookbinding)", nil, withAppearance, qq)
 	if err != nil {
 		return err
 	}
@@ -126,7 +202,7 @@ func (w *writer) AddParagraph(x, y float64, withAppearance bool) error {
 	page.SetFillColor(w.LinkCol)
 	qq = w.MakeLink("vellum")
 	err = w.MakeAnnotation("https://en.wikipedia.org/wiki/Vellum",
-		"Wikipedia: Vellum", withAppearance, qq)
+		"Wikipedia: Vellum", nil, withAppearance, qq)
 	if err != nil {
 		return err
 	}
@@ -135,7 +211,7 @@ func (w *writer) AddParagraph(x, y float64, withAppearance bool) error {
 	page.SetFillColor(w.LinkCol)
 	qq = w.MakeLink("parch-")
 	err = w.MakeAnnotation("https://en.wikipedia.org/wiki/Parchment",
-		"Wikipedia: Parchment", withAppearance, qq)
+		"Wikipedia: Parchment", nil, withAppearance, qq)
 	if err != nil {
 		return err
 	}
@@ -144,7 +220,7 @@ func (w *writer) AddParagraph(x, y float64, withAppearance bool) error {
 	page.TextSetWordSpacing(-0.333)
 	qq = w.MakeLink("ment")
 	err = w.MakeAnnotation("https://en.wikipedia.org/wiki/Parchment",
-		"Wikipedia: Parchment", withAppearance, qq)
+		"Wikipedia: Parchment", nil, withAppearance, qq)
 	if err != nil {
 		return err
 	}
@@ -157,7 +233,7 @@ func (w *writer) AddParagraph(x, y float64, withAppearance bool) error {
 	page.SetFillColor(w.LinkCol)
 	qq = w.MakeLink("folios")
 	err = w.MakeAnnotation("https://en.wikipedia.org/wiki/Folio",
-		"Wikipedia: Folio", withAppearance, qq)
+		"Wikipedia: Folio", nil, withAppearance, qq)
 	if err != nil {
 		return err
 	}
@@ -171,20 +247,104 @@ func (w *writer) AddParagraph(x, y float64, withAppearance bool) error {
 	return nil
 }
 
+func (w *writer) DrawFramedLink(x, y float64, style pdf.Name, withAppearance bool) error {
+	page := w.Page
+
+	bs := &annotation.BorderStyle{
+		Width:     2,
+		Style:     style,
+		SingleUse: true,
+	}
+	if style == "D" {
+		bs.DashArray = []float64{5, 2}
+	}
+
+	page.TextBegin()
+	page.TextSetFont(w.Roman, 18)
+	page.SetFillColor(w.LinkCol)
+
+	text := "link with frame style " + string(style)
+	glyphs := page.TextLayout(nil, text)
+	width := glyphs.TotalWidth()
+	page.TextFirstLine(pdf.Round(x+(200-width)/2, 2), y)
+	page.TextShowGlyphs(glyphs)
+	page.TextEnd()
+
+	qq := []vec.Vec2{
+		{X: pdf.Round(x, 2), Y: pdf.Round(y-8, 2)},
+		{X: pdf.Round(x+200, 2), Y: pdf.Round(y-8, 2)},
+		{X: pdf.Round(x+200, 2), Y: pdf.Round(y+20, 2)},
+		{X: pdf.Round(x, 2), Y: pdf.Round(y+20, 2)},
+	}
+	err := w.MakeAnnotation("https://www.example.com/",
+		"www.example.com", bs, withAppearance, qq)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (w *writer) DrawQuads(x, y float64, withAppearance bool) error {
+	page := w.Page
+
+	const alpha = 0.1
+	dx := math.Cos(alpha)
+	dy := math.Sin(alpha)
+	q1 := []vec.Vec2{
+		{X: pdf.Round(x-80*dx, 2), Y: pdf.Round(y-80*dy-20, 2)},
+		{X: pdf.Round(x+90*dx, 2), Y: pdf.Round(y+90*dy-20, 2)},
+		{X: pdf.Round(x+100*dx-10*dy, 2), Y: pdf.Round(y+100*dy+10*dx-20, 2)},
+		{X: pdf.Round(x-80*dx-10*dy, 2), Y: pdf.Round(y-80*dy+10*dx-20, 2)},
+	}
+	q2 := []vec.Vec2{
+		{X: pdf.Round(x-100*dx+10*dy, 2), Y: pdf.Round(y-100*dy-10*dx-20, 2)},
+		{X: pdf.Round(x+80*dx+10*dy, 2), Y: pdf.Round(y+80*dy-10*dx-20, 2)},
+		{X: pdf.Round(x+80*dx, 2), Y: pdf.Round(y+80*dy-20, 2)},
+		{X: pdf.Round(x-100*dx, 2), Y: pdf.Round(y-100*dy-20, 2)},
+	}
+	page.SetFillColor(color.DeviceRGB(0.9, 0.9, 0))
+	page.MoveTo(q1[0].X, q1[0].Y)
+	for i := 1; i < len(q1); i++ {
+		page.LineTo(q1[i].X, q1[i].Y)
+	}
+	page.ClosePath()
+	page.Fill()
+	page.SetFillColor(color.DeviceRGB(0, 0.9, 0.9))
+	page.MoveTo(q2[0].X, q2[0].Y)
+	for i := 1; i < len(q2); i++ {
+		page.LineTo(q2[i].X, q2[i].Y)
+	}
+	page.ClosePath()
+	page.Fill()
+
+	bs := &annotation.BorderStyle{
+		Width:     2,
+		Style:     "U",
+		SingleUse: true,
+	}
+	err := w.MakeAnnotation("https://www.example.com/",
+		"www.example.com", bs, withAppearance, q1, q2)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (w *writer) MakeLink(text string) []vec.Vec2 {
 	page := w.Page
 
 	glyphs := page.TextLayout(nil, text)
-	corners := page.TextGetQuadPoints(glyphs)
+	corners := page.TextGetQuadPoints(glyphs, 0)
 	page.TextShowGlyphs(glyphs)
 
 	return corners
 }
 
-func (w *writer) MakeAnnotation(url string, title string, app bool, quadPoints ...[]vec.Vec2) error {
+func (w *writer) MakeAnnotation(url string, title string, bs *annotation.BorderStyle, app bool, quadPoints ...[]vec.Vec2) error {
 	var qq []vec.Vec2
 	for _, q := range quadPoints {
-		// quadPoints are already Vec2 slices
 		qq = append(qq, q...)
 	}
 	for i := range qq {
@@ -205,17 +365,25 @@ func (w *writer) MakeAnnotation(url string, title string, app bool, quadPoints .
 		},
 		Action:      a,
 		Highlight:   annotation.LinkHighlightInvert,
-		BorderStyle: w.BS,
-	}
-
-	if len(quadPoints) > 1 {
-		link.QuadPoints = qq
+		BorderStyle: bs,
 	}
 
 	// compute the bounding box from the quad points
 	for _, point := range qq {
 		link.Common.Rect.ExtendVec(point)
 	}
+
+	if len(quadPoints) > 1 {
+		link.QuadPoints = qq
+
+		// Avoid rounding issues when viewers check whether the quad points
+		// are inside the rectangle.
+		link.Common.Rect.LLx -= 0.01
+		link.Common.Rect.LLy -= 0.01
+		link.Common.Rect.URx += 0.01
+		link.Common.Rect.URy += 0.01
+	}
+	link.Common.Rect.IRound(2)
 
 	if app {
 		err := w.style.AddAppearance(link)
