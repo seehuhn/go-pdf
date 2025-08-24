@@ -26,19 +26,24 @@ type Caret struct {
 	Common
 	Markup
 
-	// RD (optional; PDF 1.5) describes the numerical differences between
+	// Margin (optional; PDF 1.5) describes the numerical differences between
 	// the Rect entry of the annotation and the actual boundaries of the
-	// underlying caret. This can occur when a paragraph symbol specified
-	// by Sy is displayed along with the caret. The four numbers correspond
-	// to the differences in default user space between the left, top, right,
-	// and bottom coordinates of Rect and those of the caret, respectively.
-	RD []float64
+	// underlying caret. This can occur when a paragraph symbol specified by Sy
+	// is displayed along with the caret.
+	//
+	// Slice of four numbers: [left, bottom, right, top]
+	//
+	// TODO(voss): review this once
+	// https://github.com/pdf-association/pdf-issues/issues/592 is resolved.
+	//
+	// This corresponds to the /Margin entry in the PDF annotation dictionary.
+	Margin []float64
 
-	// Sy (optional) specifies a symbol that is associated with the caret:
-	// "P" - A new paragraph symbol (¶) is associated with the caret
-	// "None" - No symbol is associated with the caret
-	// Default value: "None"
-	Sy pdf.Name
+	// Symbol (optional) specifies a symbol that is associated with the caret:
+	//  - "P": A new paragraph symbol (¶) is associated with the caret
+	//
+	// This corresponds to the /SY entry in the PDF annotation dictionary.
+	Symbol pdf.Name
 }
 
 var _ Annotation = (*Caret)(nil)
@@ -65,12 +70,12 @@ func decodeCaret(r pdf.Getter, dict pdf.Dict) (*Caret, error) {
 	// Extract caret-specific fields
 	// RD (optional)
 	if rd, err := pdf.GetFloatArray(r, dict["RD"]); err == nil && len(rd) == 4 {
-		caret.RD = rd
+		caret.Margin = rd
 	}
 
 	// Sy (optional)
 	if sy, err := pdf.GetName(r, dict["Sy"]); err == nil && sy != "" {
-		caret.Sy = sy
+		caret.Symbol = sy
 	}
 
 	return caret, nil
@@ -97,17 +102,17 @@ func (c *Caret) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// Add caret-specific fields
 	// RD (optional)
-	if len(c.RD) == 4 {
+	if len(c.Margin) == 4 {
 		rdArray := make(pdf.Array, 4)
-		for i, diff := range c.RD {
+		for i, diff := range c.Margin {
 			rdArray[i] = pdf.Number(diff)
 		}
 		dict["RD"] = rdArray
 	}
 
 	// Sy (optional) - only write if not the default value "None"
-	if c.Sy != "" && c.Sy != "None" {
-		dict["Sy"] = c.Sy
+	if c.Symbol != "" && c.Symbol != "None" {
+		dict["Sy"] = c.Symbol
 	}
 
 	return dict, nil

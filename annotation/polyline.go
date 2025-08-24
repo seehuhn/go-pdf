@@ -31,15 +31,25 @@ type Polyline struct {
 	Common
 	Markup
 
-	// Vertices (required unless Path is present) is an array of numbers specifying
-	// the alternating horizontal and vertical coordinates of each vertex in default
-	// user space.
+	// Vertices (required unless Path is present) is an array of numbers
+	// specifying the alternating horizontal and vertical coordinates of each
+	// vertex in default user space.
 	Vertices []float64
 
-	// Path (optional; PDF 2.0) is an array of n arrays, each supplying operands
-	// for path building operators (m, l, or c). If present, Vertices is not present.
-	// Each array contains pairs of values specifying points for path drawing operations.
+	// Path (optional; PDF 2.0) is an array of arrays, each supplying operands
+	// for path building operators (m, l, or c).  Each array inner contains
+	// pairs of values specifying points for path drawing operations. The first
+	// array is of length 2 (moveto), subsequent arrays of length 2 specify
+	// lineto operators, and arrays of length 6 specify curveto operators.
 	Path [][]float64
+
+	// BorderStyle (optional) is a border style dictionary specifying the width
+	// and dash pattern used in drawing the polyline.
+	//
+	// If this field is set, the Common.Border field is ignored.
+	//
+	// This corresponds to the /BS entry in the PDF annotation dictionary.
+	BorderStyle *BorderStyle
 
 	// LineEndingStyle (optional) is an array of two names specifying the line
 	// ending styles for the start and end points respectively.
@@ -49,14 +59,6 @@ type Polyline struct {
 	//
 	// This corresponds to the /LE entry in the PDF annotation dictionary.
 	LineEndingStyle [2]LineEndingStyle
-
-	// BorderStyle (optional) is a border style dictionary specifying the width
-	// and dash pattern used in drawing the polyline.
-	//
-	// If this field is set, the Common.Border field is ignored.
-	//
-	// This corresponds to the /BS entry in the PDF annotation dictionary.
-	BorderStyle *BorderStyle
 
 	// FillColor (optional; PDF 1.4) is the colour used to fill the
 	// polyline's line endings, if applicable.

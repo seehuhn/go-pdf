@@ -18,6 +18,8 @@ package annotation
 
 import "seehuhn.de/go/pdf"
 
+// PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.13
+
 // Ink represents an ink annotation that represents a freehand "scribble"
 // composed of one or more disjoint paths. When opened, it displays a popup
 // window containing the text of the associated note.
@@ -25,27 +27,27 @@ type Ink struct {
 	Common
 	Markup
 
-	// InkList (required) is an array of n arrays, each representing a stroked path.
-	// Each array is a series of alternating horizontal and vertical coordinates
-	// in default user space, specifying points along the path. When drawn, the
-	// points are connected by straight lines or curves in an implementation-dependent way.
+	// InkList (required) is an array of n arrays, each representing a stroked
+	// path. Each array is a series of alternating horizontal and vertical
+	// coordinates in default user space, specifying points along the path.
+	// When drawn, the points are connected by straight lines or curves in an
+	// implementation-dependent way.
 	InkList [][]float64
 
-	// BorderStyle (optional) is a border style dictionary specifying the line width
-	// and dash pattern that is used in drawing the paths.
+	// Path (optional; PDF 2.0) is an array of arrays, each supplying operands
+	// for path building operators (m, l, or c).  Each array inner contains
+	// pairs of values specifying points for path drawing operations. The first
+	// array is of length 2 (moveto), subsequent arrays of length 2 specify
+	// lineto operators, and arrays of length 6 specify curveto operators.
+	Path [][]float64
+
+	// BorderStyle (optional) is a border style dictionary specifying the line
+	// width and dash pattern that is used in drawing the ink annotation.
 	//
 	// If the BorderStyle field is set, the Common.Border field is ignored.
 	//
 	// This corresponds to the /BS entry in the PDF annotation dictionary.
 	BorderStyle *BorderStyle
-
-	// Path (optional; PDF 2.0) is an array of n arrays, each supplying operands
-	// for path building operators (m, l, or c). Each array contains pairs of
-	// values specifying points for path drawing operations.
-	// The first array is of length 2 (moveto), subsequent arrays of
-	// length 2 specify lineto operators, and arrays of length 6 specify
-	// curveto operators.
-	Path [][]float64
 }
 
 var _ Annotation = (*Ink)(nil)
@@ -92,25 +94,15 @@ func decodeInk(r pdf.Getter, dict pdf.Dict) (*Ink, error) {
 
 	// Path (optional; PDF 2.0)
 	if path, err := pdf.GetArray(r, dict["Path"]); err == nil && len(path) > 0 {
-		pathArrays := make([][]float64, len(path))
-		for i, pathEntry := range path {
-			if pathArray, err := pdf.GetArray(r, pathEntry); err == nil {
-				if len(pathArray) > 0 {
-					coords := make([]float64, len(pathArray))
-					for j, coord := range pathArray {
-						if num, err := pdf.GetNumber(r, coord); err == nil {
-							coords[j] = float64(num)
-						}
-					}
-					pathArrays[i] = coords
-				} else {
-					pathArrays[i] = []float64{} // Ensure empty slice instead of nil
-				}
-			} else {
-				pathArrays[i] = []float64{} // Default to empty slice if extraction fails
+		pathArrays := make([][]float64, 0, len(path))
+		for _, pathEntry := range path {
+			if coords, err := pdf.GetFloatArray(r, pathEntry); err == nil {
+				pathArrays = append(pathArrays, coords)
 			}
 		}
-		ink.Path = pathArrays
+		if len(pathArrays) > 0 {
+			ink.Path = pathArrays
+		}
 	}
 
 	return ink, nil
@@ -167,19 +159,19 @@ func (i *Ink) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out, "ink annotation Path entry", pdf.V2_0); err != nil {
 			return nil, err
 		}
-		pathArray := make(pdf.Array, len(i.Path))
-		for i, pathEntry := range i.Path {
-			if len(pathEntry) > 0 {
+		pathArray := make(pdf.Array, 0, len(i.Path))
+		for _, pathEntry := range i.Path {
+			if pathEntry != nil {
 				entryArray := make(pdf.Array, len(pathEntry))
 				for j, coord := range pathEntry {
 					entryArray[j] = pdf.Number(coord)
 				}
-				pathArray[i] = entryArray
-			} else {
-				pathArray[i] = pdf.Array{} // Empty array for empty path entries
+				pathArray = append(pathArray, entryArray)
 			}
 		}
-		dict["Path"] = pathArray
+		if len(pathArray) > 0 {
+			dict["Path"] = pathArray
+		}
 	}
 
 	return dict, nil

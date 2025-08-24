@@ -40,7 +40,7 @@ type Text struct {
 	// names.
 	//
 	// When writing annotations, an empty Icon name can be used as a shorthand
-	// [TextIconNote].
+	// for [TextIconNote].
 	//
 	// This corresponds to the /Name entry in the PDF annotation dictionary.
 	Icon TextIcon

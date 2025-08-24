@@ -18,6 +18,8 @@ package annotation
 
 import "seehuhn.de/go/pdf"
 
+// PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.15
+
 // FileAttachment represents a file attachment annotation that contains a
 // reference to a file, which typically is embedded in the PDF file.
 // Activating the annotation extracts the embedded file and gives the user
@@ -26,15 +28,18 @@ type FileAttachment struct {
 	Common
 	Markup
 
+	// Icon is the name of an icon that is used in displaying the annotation.
+	// The standard icon names are Graph, PushPin, Paperclip, and Tag.
+	//
+	// When writing annotations, an empty Icon name can be used as a shorthand
+	// for [FileAttachmentIconPushPin].
+	//
+	// This corresponds to the /Name entry in the PDF annotation dictionary.
+	Icon FileAttachmentIcon
+
 	// FS (required) is the file specification associated with this annotation.
 	// This typically references an embedded file stream.
 	FS pdf.Reference
-
-	// Name (optional) is the name of an icon that is used in displaying
-	// the annotation. Standard names include:
-	// Graph, PushPin, Paperclip, Tag
-	// Default value: "PushPin"
-	Name pdf.Name
 }
 
 var _ Annotation = (*FileAttachment)(nil)
@@ -64,9 +69,12 @@ func decodeFileAttachment(r pdf.Getter, dict pdf.Dict) (*FileAttachment, error) 
 		fileAttachment.FS = fs
 	}
 
-	// Name (optional)
-	if name, err := pdf.GetName(r, dict["Name"]); err == nil && name != "" {
-		fileAttachment.Name = name
+	if icon, err := pdf.Optional(pdf.GetName(r, dict["Name"])); err != nil {
+		return nil, err
+	} else if icon != "" {
+		fileAttachment.Icon = FileAttachmentIcon(icon)
+	} else {
+		fileAttachment.Icon = FileAttachmentIconPushPin
 	}
 
 	return fileAttachment, nil
@@ -97,10 +105,21 @@ func (f *FileAttachment) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["FS"] = f.FS
 	}
 
-	// Name (optional) - only write if not the default value "PushPin"
-	if f.Name != "" && f.Name != "PushPin" {
-		dict["Name"] = f.Name
+	if f.Icon != "" && f.Icon != FileAttachmentIconPushPin {
+		dict["Name"] = pdf.Name(f.Icon)
 	}
 
 	return dict, nil
 }
+
+// FileAttachmentIcon represents the name of an icon used in displaying a file attachment annotation.
+// The standard names defined by the PDF specification are provided as constants.
+// Other names may be used, but support is viewer dependent.
+type FileAttachmentIcon pdf.Name
+
+const (
+	FileAttachmentIconPushPin   FileAttachmentIcon = "PushPin"
+	FileAttachmentIconGraph     FileAttachmentIcon = "Graph"
+	FileAttachmentIconPaperclip FileAttachmentIcon = "Paperclip"
+	FileAttachmentIconTag       FileAttachmentIcon = "Tag"
+)

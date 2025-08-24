@@ -88,7 +88,7 @@ func FuzzType0Dict(f *testing.F) {
 				f.Fatal(err)
 			}
 
-			w.GetMeta().Trailer["Quir:X"] = fontDictRef
+			w.GetMeta().Trailer["Quir:E"] = fontDictRef
 
 			err = w.Close()
 			if err != nil {
@@ -110,7 +110,7 @@ func FuzzType0Dict(f *testing.F) {
 		if err != nil {
 			t.Skip("broken PDF: " + err.Error())
 		}
-		obj := r.GetMeta().Trailer["Quir:X"]
+		obj := r.GetMeta().Trailer["Quir:E"]
 		if obj == nil {
 			pdf.Format(os.Stdout, pdf.OptPretty, r.GetMeta().Trailer)
 			t.Skip("broken reference")

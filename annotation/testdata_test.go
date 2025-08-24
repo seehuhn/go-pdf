@@ -618,7 +618,7 @@ var testCases = map[pdf.Name][]testCase{
 					Subject:      "New paragraph needed",
 					CreationDate: time.Date(2023, 8, 20, 10, 15, 0, 0, time.UTC),
 				},
-				Sy: "P", // Paragraph symbol
+				Symbol: "P", // Paragraph symbol
 			},
 		},
 		{
@@ -632,7 +632,7 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Reviewer",
 					Subject: "Spacing adjustment",
 				},
-				RD: []float64{2.0, 3.0, 2.0, 5.0}, // Rectangle differences
+				Margin: []float64{2.0, 3.0, 2.0, 5.0}, // Rectangle differences
 			},
 		},
 	},
@@ -647,8 +647,9 @@ var testCases = map[pdf.Name][]testCase{
 				Markup: Markup{
 					User:    "Manager",
 					Subject: "Document approval",
+					Intent:  "Stamp",
 				},
-				Name: "Approved",
+				Icon: "Approved",
 			},
 		},
 		{
@@ -662,8 +663,9 @@ var testCases = map[pdf.Name][]testCase{
 					User:         "Editor",
 					Subject:      "Draft version",
 					CreationDate: time.Date(2023, 9, 10, 16, 30, 0, 0, time.UTC),
+					Intent:       "Stamp",
 				},
-				Name: "Draft", // Default value
+				Icon: "Draft", // Default value
 			},
 		},
 		{
@@ -676,8 +678,9 @@ var testCases = map[pdf.Name][]testCase{
 				Markup: Markup{
 					User:    "Security Officer",
 					Subject: "Classification stamp",
+					Intent:  "Stamp",
 				},
-				Name: "Confidential",
+				Icon: "Confidential",
 			},
 		},
 		{
@@ -691,7 +694,7 @@ var testCases = map[pdf.Name][]testCase{
 					User:   "Designer",
 					Intent: "StampImage", // Intent: image stamp
 				},
-				Name: "Draft", // Default value (Name not written to PDF when IT != "Stamp")
+				// Icon omitted when Intent != "Stamp" per PDF specification
 			},
 		},
 		{
@@ -705,7 +708,7 @@ var testCases = map[pdf.Name][]testCase{
 					User:   "Publisher",
 					Intent: "Stamp", // Explicit rubber stamp intent
 				},
-				Name: "Final",
+				Icon: "Final",
 			},
 		},
 	},
@@ -863,7 +866,7 @@ var testCases = map[pdf.Name][]testCase{
 					Subject: "Supporting data",
 				},
 				FS:   pdf.NewReference(100, 0), // File specification reference
-				Name: "Graph",                  // Icon for data files
+				Icon: FileAttachmentIconGraph,  // Icon for data files
 			},
 		},
 		{
@@ -878,8 +881,8 @@ var testCases = map[pdf.Name][]testCase{
 					Subject:      "Supporting document",
 					CreationDate: time.Date(2023, 11, 15, 9, 30, 0, 0, time.UTC),
 				},
-				FS: pdf.NewReference(200, 0), // File specification reference
-				// Name not set, should default to "PushPin"
+				FS:   pdf.NewReference(200, 0),  // File specification reference
+				Icon: FileAttachmentIconPushPin, // Default value
 			},
 		},
 		{
@@ -893,8 +896,8 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Secretary",
 					Subject: "Office document",
 				},
-				FS:   pdf.NewReference(300, 0), // File specification reference
-				Name: "Paperclip",              // Paperclip icon
+				FS:   pdf.NewReference(300, 0),    // File specification reference
+				Icon: FileAttachmentIconPaperclip, // Paperclip icon
 			},
 		},
 		{
@@ -910,7 +913,7 @@ var testCases = map[pdf.Name][]testCase{
 					Subject: "Reference material",
 				},
 				FS:   pdf.NewReference(400, 0), // File specification reference
-				Name: "Tag",                    // Tag icon
+				Icon: FileAttachmentIconTag,    // Tag icon
 			},
 		},
 		{
@@ -922,8 +925,8 @@ var testCases = map[pdf.Name][]testCase{
 				Markup: Markup{
 					User: "User",
 				},
-				FS: pdf.NewReference(500, 0), // Required file specification
-				// Name will default to "PushPin"
+				FS:   pdf.NewReference(500, 0),  // Required file specification
+				Icon: FileAttachmentIconPushPin, // Default value
 			},
 		},
 	},

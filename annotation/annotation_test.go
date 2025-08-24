@@ -233,7 +233,7 @@ func TestOpacity(t *testing.T) {
 	}
 }
 
-func FuzzRead(f *testing.F) {
+func FuzzRoundtrip(f *testing.F) {
 	// Seed the fuzzer with valid test cases from all annotation types
 	opt := &pdf.WriterOptions{
 		HumanReadable: true,
@@ -257,7 +257,7 @@ func FuzzRead(f *testing.F) {
 			if err != nil {
 				continue
 			}
-			w.GetMeta().Trailer["Quir:X"] = embedded
+			w.GetMeta().Trailer["Quir:E"] = embedded
 			err = w.Close()
 			if err != nil {
 				continue
@@ -269,7 +269,7 @@ func FuzzRead(f *testing.F) {
 	for _, dict := range testDicts {
 		w, out := memfile.NewPDFWriter(pdf.V2_0, opt)
 
-		w.GetMeta().Trailer["Quir:X"] = dict
+		w.GetMeta().Trailer["Quir:E"] = dict
 
 		err := w.Close()
 		if err != nil {
@@ -285,7 +285,7 @@ func FuzzRead(f *testing.F) {
 		if err != nil {
 			t.Skip("invalid PDF")
 		}
-		obj := r.GetMeta().Trailer["Quir:X"]
+		obj := r.GetMeta().Trailer["Quir:E"]
 		if obj == nil {
 			t.Skip("missing annotation")
 		}

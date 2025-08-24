@@ -793,7 +793,7 @@ func FuzzRead(f *testing.F) {
 				continue
 			}
 
-			w.GetMeta().Trailer["Quir:X"] = ref
+			w.GetMeta().Trailer["Quir:E"] = ref
 
 			err = w.Close()
 			if err != nil {
@@ -815,7 +815,7 @@ func FuzzRead(f *testing.F) {
 		if err != nil {
 			t.Skip("broken PDF: " + err.Error())
 		}
-		obj := r.GetMeta().Trailer["Quir:X"]
+		obj := r.GetMeta().Trailer["Quir:E"]
 		if obj == nil {
 			t.Skip("broken reference")
 		}
