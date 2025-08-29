@@ -23,17 +23,17 @@ import "seehuhn.de/go/pdf"
 type Screen struct {
 	Common
 
-	// T (optional) is the title of the screen annotation.
-	T pdf.TextString
+	// Title (optional) is the title of the screen annotation.
+	Title string
 
 	// MK (optional) is an appearance characteristics dictionary. The I entry
 	// of this dictionary provides the icon used in generating the appearance
 	// referred to by the screen annotation's AP entry.
 	MK pdf.Reference
 
-	// A (optional; PDF 1.1) is an action that is performed when the
+	// Action (optional; PDF 1.1) is an action that is performed when the
 	// annotation is activated.
-	A pdf.Reference
+	Action pdf.Reference
 
 	// AA (optional; PDF 1.2) is an additional-actions dictionary defining
 	// the screen annotation's behaviour in response to various trigger events.
@@ -59,7 +59,7 @@ func decodeScreen(r pdf.Getter, dict pdf.Dict) (*Screen, error) {
 	// Extract screen-specific fields
 	// T (optional)
 	if t, err := pdf.GetTextString(r, dict["T"]); err == nil && t != "" {
-		screen.T = t
+		screen.Title = string(t)
 	}
 
 	// MK (optional)
@@ -69,7 +69,7 @@ func decodeScreen(r pdf.Getter, dict pdf.Dict) (*Screen, error) {
 
 	// A (optional)
 	if a, ok := dict["A"].(pdf.Reference); ok {
-		screen.A = a
+		screen.Action = a
 	}
 
 	// AA (optional)
@@ -96,8 +96,8 @@ func (s *Screen) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// Add screen-specific fields
 	// T (optional)
-	if s.T != "" {
-		dict["T"] = s.T
+	if s.Title != "" {
+		dict["T"] = pdf.TextString(s.Title)
 	}
 
 	// MK (optional)
@@ -106,8 +106,8 @@ func (s *Screen) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// A (optional)
-	if s.A != 0 {
-		dict["A"] = s.A
+	if s.Action != 0 {
+		dict["A"] = s.Action
 	}
 
 	// AA (optional)

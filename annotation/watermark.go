@@ -18,6 +18,24 @@ package annotation
 
 import "seehuhn.de/go/pdf"
 
+// Watermark represents a watermark annotation used to represent graphics that
+// are to be printed at a fixed size relative to the target media, and fixed
+// relative position on the target media, regardless of the dimensions of that media.
+//
+// Watermark annotations have no popup window nor other interactive elements.
+// When displaying on-screen, interactive PDF processors use the dimensions
+// of the media box as the media dimensions so that scroll and zoom behavior is
+// the same as for other annotations.
+type Watermark struct {
+	Common
+
+	// FixedPrint (optional) is a fixed print dictionary that specifies how this
+	// annotation is drawn relative to the dimensions of the target media.
+	// If this entry is not present, the annotation is drawn without any
+	// special consideration for the dimensions of the target media.
+	FixedPrint *FixedPrint
+}
+
 // FixedPrint represents a fixed print dictionary that specifies how a watermark
 // annotation is drawn relative to the dimensions of the target media.
 type FixedPrint struct {
@@ -38,24 +56,6 @@ type FixedPrint struct {
 	// of the page's MediaBox). 1.0 represents 100% and 0.0 represents 0%.
 	// Negative values should not be used. Default value: 0.
 	V float64
-}
-
-// Watermark represents a watermark annotation used to represent graphics that
-// are to be printed at a fixed size relative to the target media, and fixed
-// relative position on the target media, regardless of the dimensions of that media.
-//
-// Watermark annotations have no popup window nor other interactive elements.
-// When displaying on-screen, interactive PDF processors use the dimensions
-// of the media box as the media dimensions so that scroll and zoom behavior is
-// the same as for other annotations.
-type Watermark struct {
-	Common
-
-	// FixedPrint (optional) is a fixed print dictionary that specifies how this
-	// annotation is drawn relative to the dimensions of the target media.
-	// If this entry is not present, the annotation is drawn without any
-	// special consideration for the dimensions of the target media.
-	FixedPrint *FixedPrint
 }
 
 var _ Annotation = (*Watermark)(nil)

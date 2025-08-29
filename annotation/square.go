@@ -34,8 +34,7 @@ type Square struct {
 	Markup
 
 	// Margin (optional; PDF 1.5) describes the numerical differences between
-	// the Rect entry of the annotation and the actual boundaries of the
-	// underlying rectangle.
+	// the Rect entry of the annotation and the boundaries of the rectangle.
 	//
 	// Slice of four numbers: [left, bottom, right, top]
 	//
@@ -99,6 +98,14 @@ func decodeSquare(r pdf.Getter, dict pdf.Dict) (*Square, error) {
 		return nil, err
 	} else {
 		square.BorderStyle = bs
+		square.Border = nil
+
+		// BE (optional)
+		if be, err := pdf.Optional(ExtractBorderEffect(r, dict["BE"])); err != nil {
+			return nil, err
+		} else {
+			square.BorderEffect = be
+		}
 	}
 
 	// IC (optional)
@@ -106,13 +113,6 @@ func decodeSquare(r pdf.Getter, dict pdf.Dict) (*Square, error) {
 		return nil, err
 	} else {
 		square.FillColor = ic
-	}
-
-	// BE (optional)
-	if be, err := pdf.Optional(ExtractBorderEffect(r, dict["BE"])); err != nil {
-		return nil, err
-	} else {
-		square.BorderEffect = be
 	}
 
 	// RD (optional)
@@ -126,6 +126,21 @@ func decodeSquare(r pdf.Getter, dict pdf.Dict) (*Square, error) {
 func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Square"),
+	}
+
+	if s.BorderStyle != nil {
+		if s.Common.Border != nil {
+			return nil, errors.New("conflicting border settings")
+		}
+		if s.BorderStyle.Style == "D" {
+			if len(s.BorderStyle.DashArray) == 0 {
+				return nil, errors.New("missing dash array")
+			}
+		} else if len(s.BorderStyle.DashArray) > 0 {
+			return nil, errors.New("unexpected dash array")
+		}
+	} else if s.BorderEffect != nil {
+		return nil, errors.New("border effect without border style")
 	}
 
 	// Add common annotation fields
@@ -146,6 +161,7 @@ func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 			return nil, err
 		}
 		dict["BS"] = bs
+		delete(dict, "Border")
 	}
 
 	// IC (optional)

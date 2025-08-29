@@ -84,6 +84,8 @@ func (s *Style) AddAppearance(a annotation.Annotation) error {
 		s.addFreeTextAppearance(a)
 	case *annotation.Line:
 		s.addLineAppearance(a)
+	case *annotation.Square:
+		s.addSquareAppearance(a)
 	default:
 		return fmt.Errorf("unsupported annotation type: %T", a)
 	}

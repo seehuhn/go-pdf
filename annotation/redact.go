@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/color"
 )
 
 // Redact represents a redaction annotation (PDF 1.7+).
@@ -33,8 +34,11 @@ type Redact struct {
 	// for content regions to remove. If absent, Rect defines the redaction region.
 	QuadPoints []float64
 
-	// IC (optional) - RGB color components for interior fill after redaction
-	IC []float64
+	// FillColor (optional) is the color used to fill the redacted area after
+	// the content has been removed.   This must be a DeviceRGB color.
+	//
+	// This corresponds to the /IC entry in the PDF annotation dictionary.
+	FillColor color.Color
 
 	// RO (optional) - form XObject for overlay appearance
 	RO pdf.Reference
@@ -48,8 +52,12 @@ type Redact struct {
 	// DA (required if OverlayText present) - appearance string for formatting overlay text
 	DA string
 
-	// Q (optional) - quadding/justification code (0=left, 1=center, 2=right)
-	Q int
+	// Align specifies the text alignment used for the annotation's text.
+	// The zero value if [TextAlignLeft].
+	// The other allowed values are [TextAlignCenter] and [TextAlignRight].
+	//
+	// This corresponds to the /Q entry in the PDF annotation dictionary.
+	Align TextAlign
 }
 
 var _ Annotation = (*Redact)(nil)
@@ -81,18 +89,10 @@ func decodeRedact(r pdf.Getter, dict pdf.Dict) (*Redact, error) {
 	}
 
 	// IC (optional) - RGB color components
-	if ic, err := pdf.GetFloatArray(r, dict["IC"]); err == nil && len(ic) == 3 {
-		// Clamp invalid color values to valid range [0, 1]
-		colors := make([]float64, 3)
-		for i, val := range ic {
-			if val < 0.0 {
-				val = 0.0
-			} else if val > 1.0 {
-				val = 1.0
-			}
-			colors[i] = val
-		}
-		redact.IC = colors
+	if ic, err := pdf.Optional(extractColorRGB(r, dict["IC"])); err != nil {
+		return nil, err
+	} else {
+		redact.FillColor = ic
 	}
 
 	// RO (optional) - form XObject reference
@@ -122,12 +122,10 @@ func decodeRedact(r pdf.Getter, dict pdf.Dict) (*Redact, error) {
 	}
 
 	// Q (optional) - default 0 (left-justified)
-	if q, err := pdf.GetInteger(r, dict["Q"]); err == nil {
-		qVal := int(q)
-		// Only accept valid Q values (0, 1, 2)
-		if qVal >= 0 && qVal <= 2 {
-			redact.Q = qVal
-		}
+	if q, err := pdf.Optional(pdf.GetInteger(r, dict["Q"])); err != nil {
+		return nil, err
+	} else if q >= 0 && q <= 2 {
+		redact.Align = TextAlign(q)
 	}
 
 	return redact, nil
@@ -162,21 +160,11 @@ func (r *Redact) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// IC (optional) - RGB color components
-	if len(r.IC) == 3 {
-		// Validate color components are in range [0, 1]
-		validColors := true
-		for _, c := range r.IC {
-			if c < 0.0 || c > 1.0 {
-				validColors = false
-				break
-			}
-		}
-		if validColors {
-			dict["IC"] = pdf.Array{
-				pdf.Number(r.IC[0]),
-				pdf.Number(r.IC[1]),
-				pdf.Number(r.IC[2]),
-			}
+	if r.FillColor != nil {
+		if icArray, err := encodeColorRGB(r.FillColor); err != nil {
+			return nil, err
+		} else if icArray != nil {
+			dict["IC"] = icArray
 		}
 	}
 
@@ -206,11 +194,8 @@ func (r *Redact) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Q (optional) - default 0 (left-justified)
-	if r.Q != 0 {
-		if r.Q < 0 || r.Q > 2 {
-			return nil, fmt.Errorf("the Q field must be 0, 1 or 2")
-		}
-		dict["Q"] = pdf.Integer(r.Q)
+	if r.Align != TextAlignLeft {
+		dict["Q"] = pdf.Integer(r.Align)
 	}
 
 	return dict, nil

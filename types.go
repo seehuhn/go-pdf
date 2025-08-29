@@ -734,6 +734,8 @@ func (d Dict) SortedKeys() []Name {
 	return keys
 }
 
+// TODO(voss): handle the F field for streams (data stored in an external file).
+
 // Stream represent a stream object in a PDF file.
 // Use the [DecodeStream] function to access the contents of the stream.
 type Stream struct {

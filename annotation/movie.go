@@ -27,9 +27,9 @@ import "seehuhn.de/go/pdf"
 type Movie struct {
 	Common
 
-	// T (optional) is the title of the movie annotation. Movie actions may
+	// Title (optional) is the title of the movie annotation. Movie actions may
 	// use this title to reference the movie annotation.
-	T pdf.TextString
+	Title string
 
 	// Movie (required) is a movie dictionary that describes the movie's
 	// static characteristics.
@@ -63,7 +63,7 @@ func decodeMovie(r pdf.Getter, dict pdf.Dict) (*Movie, error) {
 	// Extract movie-specific fields
 	// T (optional)
 	if t, err := pdf.GetTextString(r, dict["T"]); err == nil && t != "" {
-		movie.T = t
+		movie.Title = string(t)
 	}
 
 	// Movie (required)
@@ -97,8 +97,8 @@ func (m *Movie) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// Add movie-specific fields
 	// T (optional)
-	if m.T != "" {
-		dict["T"] = m.T
+	if m.Title != "" {
+		dict["T"] = pdf.TextString(m.Title)
 	}
 
 	// Movie (required)

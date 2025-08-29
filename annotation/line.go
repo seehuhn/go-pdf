@@ -58,7 +58,7 @@ type Line struct {
 	// This corresponds to the /LE entry in the PDF annotation dictionary.
 	LineEndingStyle [2]LineEndingStyle
 
-	// FillColor (optional; PDF 1.4) is the colour used to fill the
+	// FillColor (optional; PDF 1.4) is the color used to fill the
 	// annotation's line endings, if applicable.
 	//
 	// Only certain color types are allowed:

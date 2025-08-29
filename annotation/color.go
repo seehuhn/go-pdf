@@ -77,3 +77,58 @@ func encodeColor(c color.Color) (pdf.Array, error) {
 	}
 	return colorArray, nil
 }
+
+// extractColorRGB extracts a DeviceRGB color from a PDF array.
+// Only accepts 3-element arrays (RGB colors) or nil/empty arrays.
+func extractColorRGB(r pdf.Getter, obj pdf.Object) (color.Color, error) {
+	c, _ := pdf.GetArray(r, obj)
+	if c == nil {
+		return nil, nil
+	}
+
+	if len(c) == 0 {
+		return nil, nil
+	}
+
+	if len(c) != 3 {
+		return nil, fmt.Errorf("color array must have 3 components for RGB, got %d", len(c))
+	}
+
+	colors := make([]float64, 3)
+	for i, colorVal := range c {
+		if num, err := pdf.GetNumber(r, colorVal); err == nil {
+			colors[i] = float64(num)
+		}
+	}
+
+	return color.DeviceRGB(colors[0], colors[1], colors[2]), nil
+}
+
+// encodeColorRGB encodes a DeviceRGB color to a PDF array.
+// Only accepts DeviceRGB colors or nil.
+func encodeColorRGB(c color.Color) (pdf.Array, error) {
+	if c == nil {
+		return nil, nil
+	}
+
+	s := c.ColorSpace()
+	if s == nil {
+		return nil, fmt.Errorf("color must be DeviceRGB")
+	}
+
+	fam := s.Family()
+	if fam != color.FamilyDeviceRGB {
+		return nil, fmt.Errorf("color must be DeviceRGB, got %s", fam)
+	}
+
+	x, _, _ := color.Operator(c)
+	if len(x) != 3 {
+		return nil, fmt.Errorf("unexpected number of color components: %d", len(x))
+	}
+
+	colorArray := make(pdf.Array, 3)
+	for i, v := range x {
+		colorArray[i] = pdf.Number(v)
+	}
+	return colorArray, nil
+}

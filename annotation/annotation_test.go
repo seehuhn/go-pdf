@@ -119,6 +119,15 @@ func roundTripTest(t *testing.T, v pdf.Version, a1 Annotation) {
 		t.Fatal(err)
 	}
 
+	// some special case checks on the encoded dict
+	if dict, ok := dict.(pdf.Dict); ok {
+		_, hasBorder := dict["Border"]
+		_, hasBS := dict["BS"]
+		if hasBorder && hasBS {
+			t.Errorf("%T annotation has both Border and BS entries", a1)
+		}
+	}
+
 	// read back
 	a2, err := Decode(buf, dict)
 	if err != nil {
@@ -139,7 +148,7 @@ func roundTripTest(t *testing.T, v pdf.Version, a1 Annotation) {
 func shallowCopy(iface Annotation) Annotation {
 	origVal := reflect.ValueOf(iface)
 
-	if origVal.Kind() != reflect.Ptr {
+	if origVal.Kind() != reflect.Pointer {
 		return iface
 	}
 

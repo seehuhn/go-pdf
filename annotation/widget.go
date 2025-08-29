@@ -16,7 +16,11 @@
 
 package annotation
 
-import "seehuhn.de/go/pdf"
+import (
+	"errors"
+
+	"seehuhn.de/go/pdf"
+)
 
 // Widget represents a widget annotation used by interactive forms to represent
 // the appearance of fields and to manage user interactions. When a field has
@@ -25,7 +29,7 @@ import "seehuhn.de/go/pdf"
 type Widget struct {
 	Common
 
-	// H (optional) is the annotation's highlighting mode, the visual effect
+	// Highlight (optional) is the annotation's highlighting mode, the visual effect
 	// that is used when the mouse button is pressed or held down inside
 	// its active area. Valid values:
 	// - "N" (None): No highlighting
@@ -34,7 +38,7 @@ type Widget struct {
 	// - "P" (Push): Display the annotation's down appearance
 	// - "T" (Toggle): Same as P (which is preferred)
 	// Default value: "I"
-	H pdf.Name
+	Highlight pdf.Name
 
 	// MK (optional) is an appearance characteristics dictionary that is
 	// used in constructing a dynamic appearance stream specifying the
@@ -83,9 +87,9 @@ func decodeWidget(r pdf.Getter, dict pdf.Dict) (*Widget, error) {
 	// Extract widget-specific fields
 	// H (optional) - default to "I" if not specified
 	if h, err := pdf.GetName(r, dict["H"]); err == nil && h != "" {
-		widget.H = h
+		widget.Highlight = h
 	} else {
-		widget.H = "I" // PDF default value
+		widget.Highlight = "I" // PDF default value
 	}
 
 	// MK (optional)
@@ -108,6 +112,7 @@ func decodeWidget(r pdf.Getter, dict pdf.Dict) (*Widget, error) {
 		return nil, err
 	} else {
 		widget.BorderStyle = bs
+		widget.Common.Border = nil
 	}
 
 	// Parent (optional)
@@ -123,6 +128,10 @@ func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 
+	if w.Common.Border != nil && w.BorderStyle != nil {
+		return nil, errors.New("conflicting border settings")
+	}
+
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Widget"),
 	}
@@ -134,8 +143,8 @@ func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// Add widget-specific fields
 	// H (optional) - only write if not the default value "I"
-	if w.H != "" && w.H != "I" {
-		dict["H"] = w.H
+	if w.Highlight != "" && w.Highlight != "I" {
+		dict["H"] = w.Highlight
 	}
 
 	// MK (optional)
@@ -160,6 +169,7 @@ func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 			return nil, err
 		}
 		dict["BS"] = bs
+		delete(dict, "Border")
 	}
 
 	// Parent (optional)

@@ -77,7 +77,7 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 	// zero out the remaining ignored fields
 	// TODO(voss): is this the right thing to do?
 	a.DefaultAppearance = ""
-	a.Align = annotation.FreeTextAlignLeft
+	a.Align = annotation.TextAlignLeft
 	a.DefaultStyle = ""
 	// We don't generate dicts with different states.
 	a.AppearanceState = ""
@@ -160,9 +160,9 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 				}
 
 				switch a.Align {
-				case annotation.FreeTextAlignCenter:
+				case annotation.TextAlignCenter:
 					line.Align(clipWidth, 0.5)
-				case annotation.FreeTextAlignRight:
+				case annotation.TextAlignRight:
 					line.Align(clipWidth, 1.0)
 				default:
 					// no adjustment needed for left alignment

@@ -139,7 +139,7 @@ var testCases = map[pdf.Name][]testCase{
 					Contents: "Free text content",
 				},
 				DefaultAppearance: "/Helvetica 12 Tf 0 g",
-				Align:             0, // Left justified
+				Align:             TextAlignLeft, // Left justified
 			},
 		},
 		{
@@ -155,7 +155,7 @@ var testCases = map[pdf.Name][]testCase{
 					Intent:  "FreeTextCallout",
 				},
 				DefaultAppearance: "/Arial 10 Tf 0 0 1 rg",
-				Align:             1,                                                                // Centered
+				Align:             TextAlignCenter,                                                  // Centered
 				CalloutLine:       []vec.Vec2{{X: 100, Y: 150}, {X: 125, Y: 175}, {X: 150, Y: 200}}, // 3-point callout line
 				LineEndingStyle:   "OpenArrow",
 			},
@@ -174,7 +174,7 @@ var testCases = map[pdf.Name][]testCase{
 					Intent:       "FreeText",
 				},
 				DefaultAppearance: "/Times-Roman 14 Tf 0.2 0.2 0.8 rg",
-				Align:             2, // Right justified
+				Align:             TextAlignRight, // Right justified
 				DefaultStyle:      "font-size:14pt;color:#3333CC;",
 				Margin:            []float64{5.0, 3.0, 5.0, 3.0}, // Inner rectangle margins
 			},
@@ -1015,7 +1015,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 300, URy: 200},
 					Contents: "Educational video",
 				},
-				T:     "Introduction Video",
+				Title: "Introduction Video",
 				Movie: pdf.NewReference(500, 0), // Movie dictionary reference
 				A:     pdf.Boolean(true),        // Default activation
 			},
@@ -1027,7 +1027,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect: pdf.Rectangle{LLx: 200, LLy: 200, URx: 400, URy: 300},
 					Name: "movie-001",
 				},
-				T:     "Training Module 1",
+				Title: "Training Module 1",
 				Movie: pdf.NewReference(600, 0), // Movie dictionary reference
 				A:     pdf.Boolean(false),       // Do not play automatically
 			},
@@ -1040,7 +1040,7 @@ var testCases = map[pdf.Name][]testCase{
 					Contents: "Interactive presentation",
 					Color:    color.DeviceRGB(0.7, 0.6, 0.5), // brown
 				},
-				T:     "Interactive Demo",
+				Title: "Interactive Demo",
 				Movie: pdf.NewReference(700, 0), // Movie dictionary reference
 				A:     pdf.NewReference(800, 0), // Movie activation dictionary
 			},
@@ -1074,7 +1074,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 400, URy: 300},
 					Contents: "Media playback region",
 				},
-				T: "Video Player",
+				Title: "Video Player",
 			},
 		},
 		{
@@ -1084,8 +1084,8 @@ var testCases = map[pdf.Name][]testCase{
 					Rect: pdf.Rectangle{LLx: 200, LLy: 200, URx: 500, URy: 400},
 					Name: "screen-001",
 				},
-				T:  "Interactive Media",
-				MK: pdf.NewReference(1100, 0), // Appearance characteristics dictionary
+				Title: "Interactive Media",
+				MK:    pdf.NewReference(1100, 0), // Appearance characteristics dictionary
 			},
 		},
 		{
@@ -1096,8 +1096,8 @@ var testCases = map[pdf.Name][]testCase{
 					Contents: "Click to play video",
 					Color:    Transparent,
 				},
-				T: "Action Trigger",
-				A: pdf.NewReference(1200, 0), // Action dictionary
+				Title:  "Action Trigger",
+				Action: pdf.NewReference(1200, 0), // Action dictionary
 			},
 		},
 		{
@@ -1106,8 +1106,8 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 300, LLy: 300, URx: 600, URy: 500},
 				},
-				T:  "Advanced Media Control",
-				AA: pdf.NewReference(1300, 0), // Additional-actions dictionary
+				Title: "Advanced Media Control",
+				AA:    pdf.NewReference(1300, 0), // Additional-actions dictionary
 			},
 		},
 		{
@@ -1118,10 +1118,10 @@ var testCases = map[pdf.Name][]testCase{
 					Contents: "Full-featured media player",
 					Color:    color.DeviceRGB(0.9, 0.9, 0.9),
 				},
-				T:  "Complete Media Player",
-				MK: pdf.NewReference(1400, 0), // Appearance characteristics
-				A:  pdf.NewReference(1500, 0), // Action dictionary
-				AA: pdf.NewReference(1600, 0), // Additional-actions dictionary
+				Title:  "Complete Media Player",
+				MK:     pdf.NewReference(1400, 0), // Appearance characteristics
+				Action: pdf.NewReference(1500, 0), // Action dictionary
+				AA:     pdf.NewReference(1600, 0), // Additional-actions dictionary
 			},
 		},
 		{
@@ -1142,7 +1142,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 300, URy: 130},
 					Contents: "Text input field",
 				},
-				H: "I", // Default highlighting mode
+				Highlight: "I", // Default highlighting mode
 			},
 		},
 		{
@@ -1152,7 +1152,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect: pdf.Rectangle{LLx: 200, LLy: 200, URx: 350, URy: 240},
 					Name: "button-001",
 				},
-				H: "P", // Push highlighting
+				Highlight: "P", // Push highlighting
 			},
 		},
 		{
@@ -1162,8 +1162,8 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 250, URy: 80},
 					Contents: "Button with custom appearance",
 				},
-				H:  "O",                       // Outline highlighting
-				MK: pdf.NewReference(1700, 0), // Appearance characteristics dictionary
+				Highlight: "O",                       // Outline highlighting
+				MK:        pdf.NewReference(1700, 0), // Appearance characteristics dictionary
 			},
 		},
 		{
@@ -1173,9 +1173,9 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:  pdf.Rectangle{LLx: 300, LLy: 300, URx: 500, URy: 340},
 					Color: color.DeviceCMYK(0.1, 0.2, 0.3, 0.4),
 				},
-				H:  "I",                       // Default highlighting
-				A:  pdf.NewReference(1800, 0), // Action dictionary
-				AA: pdf.NewReference(1900, 0), // Additional-actions dictionary
+				Highlight: "I",                       // Default highlighting
+				A:         pdf.NewReference(1800, 0), // Action dictionary
+				AA:        pdf.NewReference(1900, 0), // Additional-actions dictionary
 			},
 		},
 		{
@@ -1185,7 +1185,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:     pdf.Rectangle{LLx: 150, LLy: 150, URx: 400, URy: 190},
 					Contents: "Field with custom border",
 				},
-				H: "N", // No highlighting
+				Highlight: "N", // No highlighting
 				BorderStyle: &BorderStyle{
 					Width: 2,
 					Style: "S",
@@ -1199,8 +1199,8 @@ var testCases = map[pdf.Name][]testCase{
 					Rect: pdf.Rectangle{LLx: 250, LLy: 250, URx: 450, URy: 290},
 					Name: "child-widget-001",
 				},
-				H:      "T",                       // Toggle highlighting (same as Push)
-				Parent: pdf.NewReference(2100, 0), // Parent field reference
+				Highlight: "T",                       // Toggle highlighting (same as Push)
+				Parent:    pdf.NewReference(2100, 0), // Parent field reference
 			},
 		},
 		{
@@ -1211,10 +1211,10 @@ var testCases = map[pdf.Name][]testCase{
 					Contents: "Complete widget annotation",
 					Color:    color.DeviceRGB(0.8, 0.9, 1.0),
 				},
-				H:  "P",                       // Push highlighting
-				MK: pdf.NewReference(2200, 0), // Appearance characteristics
-				A:  pdf.NewReference(2300, 0), // Action dictionary
-				AA: pdf.NewReference(2400, 0), // Additional-actions dictionary
+				Highlight: "P",                       // Push highlighting
+				MK:        pdf.NewReference(2200, 0), // Appearance characteristics
+				A:         pdf.NewReference(2300, 0), // Action dictionary
+				AA:        pdf.NewReference(2400, 0), // Additional-actions dictionary
 				BorderStyle: &BorderStyle{
 					Width:     1.5,
 					Style:     "D",
@@ -1229,7 +1229,7 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 30},
 				},
-				H: "I", // Default value
+				Highlight: "I", // Default value
 			},
 		},
 	},
@@ -1617,7 +1617,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 50},
 					Name: "redact-001",
 				},
-				IC: []float64{0.0, 0.0, 0.0}, // Black interior color
+				FillColor: color.DeviceRGB(0.0, 0.0, 0.0), // Black interior color
 			},
 		},
 		{
@@ -1628,7 +1628,7 @@ var testCases = map[pdf.Name][]testCase{
 				},
 				OverlayText: "CONFIDENTIAL",
 				DA:          "/Helvetica 12 Tf 1 0 0 rg", // Red text appearance
-				Q:           1,                           // Centered
+				Align:       TextAlignCenter,             // Centered
 			},
 		},
 		{
@@ -1641,7 +1641,7 @@ var testCases = map[pdf.Name][]testCase{
 				OverlayText: "REDACTED",
 				DA:          "/Arial 10 Tf 0.5 0.5 0.5 rg", // Gray text
 				Repeat:      true,
-				Q:           2, // Right-justified
+				Align:       TextAlignRight, // Right-justified
 			},
 		},
 		{
@@ -1673,11 +1673,11 @@ var testCases = map[pdf.Name][]testCase{
 					200, 620, 300, 620, 300, 640, 200, 640, // Second quad
 					325, 620, 425, 620, 425, 640, 325, 640, // Third quad
 				},
-				IC:          []float64{0.8, 0.8, 0.8}, // Light gray background
+				FillColor:   color.DeviceRGB(0.8, 0.8, 0.8), // Light gray background
 				OverlayText: "CLASSIFIED",
 				DA:          "/Times-Bold 14 Tf 1 0 0 rg", // Bold red text
 				Repeat:      false,
-				Q:           1, // Centered
+				Align:       TextAlignCenter, // Centered
 			},
 		},
 		{
@@ -1691,7 +1691,7 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Security Officer",
 					Subject: "Personal Information Redaction",
 				},
-				IC: []float64{1.0, 1.0, 0.0}, // Yellow background
+				FillColor: color.DeviceRGB(1.0, 1.0, 0.0), // Yellow background
 			},
 		},
 		{
