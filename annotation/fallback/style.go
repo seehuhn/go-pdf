@@ -24,7 +24,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/extended"
 	"seehuhn.de/go/pdf/font/standard"
-	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/form"
 )
 
 // The following fields are ignored when an annotation has an appearance
@@ -46,22 +46,14 @@ import (
 
 type Style struct {
 	// iconFont is the font used to render symbols inside some of the icons for
-	// text annotations.  If this is changed to be something different from
-	// extended.NimbusRomanBold, the layout of some text icons needs to be
+	// text annotations.  If this is changed to be different from
+	// extended.NimbusRomanBold, the layout of some text icons may need to be
 	// adjusted.
 	iconFont font.Layouter
 
 	// contentFont is the font used to render the text content of annotations,
 	// for example for FreeText annotations.
 	contentFont font.Layouter
-
-	cache map[key]*appearance.Dict
-}
-
-// TODO(voss): review this once more annotation types are implemented.
-type key struct {
-	name string
-	bg   color.Color
 }
 
 func NewStyle() *Style {
@@ -70,24 +62,38 @@ func NewStyle() *Style {
 	return &Style{
 		iconFont:    extended.NimbusRomanBold.New(),
 		contentFont: standard.Helvetica.New(),
-		cache:       make(map[key]*appearance.Dict),
 	}
 }
 
 func (s *Style) AddAppearance(a annotation.Annotation) error {
+	// TODO(voss): cache appearances where possible?
+
+	var normal *form.Form
 	switch a := a.(type) {
 	case *annotation.Text:
-		s.addTextAppearance(a)
+		normal = s.addTextAppearance(a)
 	case *annotation.Link:
-		s.addLinkAppearance(a)
+		normal = s.addLinkAppearance(a)
 	case *annotation.FreeText:
-		s.addFreeTextAppearance(a)
+		normal = s.addFreeTextAppearance(a)
 	case *annotation.Line:
-		s.addLineAppearance(a)
+		normal = s.addLineAppearance(a)
 	case *annotation.Square:
-		s.addSquareAppearance(a)
+		normal = s.addSquareAppearance(a)
 	default:
 		return fmt.Errorf("unsupported annotation type: %T", a)
 	}
+
+	c := a.GetCommon()
+	if normal != nil {
+		c.Appearance = &appearance.Dict{
+			Normal:    normal,
+			SingleUse: true,
+		}
+	} else {
+		c.Appearance = nil
+	}
+	c.AppearanceState = ""
+
 	return nil
 }

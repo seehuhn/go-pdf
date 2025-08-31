@@ -19,13 +19,12 @@ package fallback
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addTextAppearance(a *annotation.Text) {
+func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 	bgCol := a.Color
 	a.Border = nil
 
@@ -35,13 +34,6 @@ func (s *Style) addTextAppearance(a *annotation.Text) {
 	bg := bgCol
 	if bg == nil {
 		bg = stickyYellow
-	}
-
-	key := key{string(a.AnnotationType()) + "-" + string(a.Icon), bg}
-	res, ok := s.cache[key]
-	if ok {
-		a.Appearance = res
-		return
 	}
 
 	var draw func(*graphics.Writer) error
@@ -218,16 +210,10 @@ func (s *Style) addTextAppearance(a *annotation.Text) {
 		}
 	}
 
-	xObj := &form.Form{
+	return &form.Form{
 		Draw: draw,
 		BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 24, URy: 24},
 	}
-	res = &appearance.Dict{
-		Normal: xObj,
-	}
-	s.cache[key] = res
-
-	a.Appearance = res
 }
 
 var (

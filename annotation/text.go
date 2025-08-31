@@ -24,9 +24,13 @@ import (
 
 // PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.4
 
-// Text represents a text annotation.
-// This type of annotation is used to provide editorial notes, comments, or other
-// textual feedback on a PDF document.
+// Text represents a text annotation, used to provide editorial notes,
+// comments, or other textual feedback on a PDF document. Text annotations are
+// displayed as icons on the page, which can be clicked to reveal the
+// associated text content in a pop-up window.
+//
+// The background color of the icon can be specified using the [Common.Color]
+// field.
 type Text struct {
 	Common
 	Markup

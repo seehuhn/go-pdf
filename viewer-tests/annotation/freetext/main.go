@@ -170,28 +170,28 @@ func (w *writer) embed(a annotation.Annotation) error {
 	return nil
 }
 
-func (w *writer) addAnnotationPair(template *annotation.FreeText) error {
+func (w *writer) addAnnotationPair(left *annotation.FreeText) error {
 	// embed left annotation as-is
-	err := w.embed(template)
+	err := w.embed(left)
 	if err != nil {
 		return err
 	}
 
 	// create shallow copy for right column
-	rightAnnot := clone(template)
+	right := clone(left)
 
 	// adjust coordinates for right column
 	deltaX := rightX0 - leftX0
-	rightAnnot.Rect.LLx += deltaX
-	rightAnnot.Rect.URx += deltaX
-	rightAnnot.CalloutLine[0] = vec.Vec2{X: pdf.Round(mid2, 2), Y: rightAnnot.CalloutLine[0].Y}    // mid2 instead of mid1, keep same Y
-	rightAnnot.CalloutLine[1] = vec.Vec2{X: pdf.Round(mid2+50, 2), Y: rightAnnot.CalloutLine[1].Y} // mid2+50 instead of mid1-50, keep same Y
-	rightAnnot.CalloutLine[2] = vec.Vec2{X: pdf.Round(rightX0, 2), Y: rightAnnot.CalloutLine[2].Y} // rightX0 instead of leftX1, keep same Y
+	right.Rect.LLx += deltaX
+	right.Rect.URx += deltaX
+	right.CalloutLine[0] = vec.Vec2{X: pdf.Round(mid2, 2), Y: right.CalloutLine[0].Y}    // mid2 instead of mid1, keep same Y
+	right.CalloutLine[1] = vec.Vec2{X: pdf.Round(mid2+50, 2), Y: right.CalloutLine[1].Y} // mid2+50 instead of mid1-50, keep same Y
+	right.CalloutLine[2] = vec.Vec2{X: pdf.Round(rightX0, 2), Y: right.CalloutLine[2].Y} // rightX0 instead of leftX1, keep same Y
 
-	w.style.AddAppearance(rightAnnot)
+	w.style.AddAppearance(right)
 
 	// embed right annotation
-	return w.embed(rightAnnot)
+	return w.embed(right)
 }
 
 func clone[T any](v *T) *T {

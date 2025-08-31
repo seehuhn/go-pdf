@@ -26,38 +26,51 @@ import (
 
 // PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.8
 
-// Square represents an annotation that displays a rectangle on the page.
-// When opened, it displays a popup window containing the text of the associated note.
-// The rectangle is inscribed within the annotation rectangle defined by the Rect entry.
+// Square represents an annotation that displays a rectangle on the page. When
+// opened, it displays a popup window containing the text of the associated
+// note:
+//
+//   - The location of the rectangle is given by the Common.Rect field and
+//     optionally modified by the Margin field.
+//   - The border line color is specified by the Common.Color field.
+//     If this is nil, no border is drawn.
+//   - The border line style is specified by the BorderStyle field.
+//     If this is nil, the Common.Border field is used instead.
+//     If both are nil, a solid border with width 1 is used.
+//     If the border width is 0, no border is drawn.
 type Square struct {
 	Common
 	Markup
 
-	// Margin (optional; PDF 1.5) describes the numerical differences between
-	// the Rect entry of the annotation and the boundaries of the rectangle.
+	// Margin (optional) describes the numerical differences between the
+	// Common.Rect entry of the annotation and the boundaries of the rectangle.
 	//
 	// Slice of four numbers: [left, bottom, right, top]
 	//
-	// This is useful in case the BorderEffect causes the graphical
+	// If this is unset, the rectangle coincides with Common.Rect.
+	//
+	// This can be used in case the BorderEffect causes the graphical
 	// representation of the rectangle to extend beyond the boundaries of the
-	// original rectangle.
+	// annotation rectangle.
 	//
 	// This corresponds to the /RD entry in the PDF annotation dictionary.
 	Margin []float64
 
-	// FillColor (optional; PDF 1.4) is the colour used to fill the rectangle.
+	// FillColor (optional) is the colour used to fill the rectangle.
 	//
 	// Only certain color types are allowed:
 	//  - colors in the [color.DeviceGray] color space
 	//  - colors in the [color.DeviceRGB] color space
 	//  - colors in the [color.DeviceCMYK] color space
-	//  - the [Transparent] color
+	//
+	// If this is nil, the rectangle is not filled.
 	//
 	// This corresponds to the /IC entry in the PDF annotation dictionary.
 	FillColor color.Color
 
 	// BorderStyle (optional) is a border style dictionary specifying the line
 	// width and dash pattern that is used in drawing the rectangle.
+	// The only supported styles are "S" (solid) and "D" (dashed).
 	//
 	// If this field is set, the Common.Border field is ignored.
 	//

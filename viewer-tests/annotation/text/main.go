@@ -94,25 +94,25 @@ func createDocument(filename string) error {
 		w.label(icon)
 
 		// viewer default style
-		err := w.annotationPair(icon, defaultColX, nil, false)
+		err := w.addAnnotation(icon, defaultColX, nil, false)
 		if err != nil {
 			return err
 		}
 
 		// with appearance dictionary
-		err = w.annotationPair(icon, styledColX, nil, true)
+		err = w.addAnnotation(icon, styledColX, nil, true)
 		if err != nil {
 			return err
 		}
 
 		// pink background
-		err = w.annotationPair(icon, pinkColX, pink, false)
+		err = w.addAnnotation(icon, pinkColX, pink, false)
 		if err != nil {
 			return err
 		}
 
 		// styled with pink background
-		err = w.annotationPair(icon, styledPinkColX, pink, true)
+		err = w.addAnnotation(icon, styledPinkColX, pink, true)
 		if err != nil {
 			return err
 		}
@@ -155,21 +155,12 @@ func (w *writer) label(iconName annotation.TextIcon) {
 	w.page.TextEnd()
 }
 
-// annotationPair creates a text annotation and its popup
-func (w *writer) annotationPair(icon annotation.TextIcon, xPos float64, backgroundColor color.Color, useStyle bool) error {
+// addAnnotation creates a text annotation
+func (w *writer) addAnnotation(icon annotation.TextIcon, xPos float64, backgroundColor color.Color, useStyle bool) error {
 	textRef := w.page.RM.Out.Alloc()
-	popupRef := w.page.RM.Out.Alloc()
 
 	y := w.yPos + 24
 	rect := pdf.Rectangle{LLx: xPos, LLy: y - iconSize, URx: xPos + iconSize, URy: y}
-
-	popup := &annotation.Popup{
-		Common: annotation.Common{
-			Rect:  rect,
-			Color: backgroundColor,
-		},
-		Parent: textRef,
-	}
 
 	text := &annotation.Text{
 		Common: annotation.Common{
@@ -178,8 +169,7 @@ func (w *writer) annotationPair(icon annotation.TextIcon, xPos float64, backgrou
 			Color:    backgroundColor,
 		},
 		Markup: annotation.Markup{
-			User:  "Jochen Voss",
-			Popup: popupRef,
+			User: "Jochen Voss",
 		},
 		Icon: icon,
 	}
@@ -192,8 +182,7 @@ func (w *writer) annotationPair(icon annotation.TextIcon, xPos float64, backgrou
 	if err != nil {
 		return err
 	}
-
-	return w.embed(popup, popupRef)
+	return nil
 }
 
 func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {

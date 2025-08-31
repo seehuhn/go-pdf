@@ -31,7 +31,7 @@ type BorderEffect struct {
 	//  - "S" (Solid): no effect.
 	//  - "C" (Cloudy): border effect.
 	//
-	// When writing annotations, and empty Style value can be used
+	// When writing annotations, an empty Style value can be used
 	// as a shorthand for "S".
 	Style pdf.Name
 

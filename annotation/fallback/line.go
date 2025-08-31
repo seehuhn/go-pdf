@@ -23,19 +23,18 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addLineAppearance(a *annotation.Line) {
-	// extract line properties
+func (s *Style) addLineAppearance(a *annotation.Line) *form.Form {
 	lw := getLineWidth(a)
 	dashPattern := getDashPattern(a)
 
 	// calculate bounding box
 	bbox := calculateLineBBox(a, lw)
+	a.Rect = bbox
 
 	// create drawing function
 	draw := func(w *graphics.Writer) error {
@@ -57,15 +56,10 @@ func (s *Style) addLineAppearance(a *annotation.Line) {
 	}
 
 	// create appearance stream
-	xObj := &form.Form{
+	return &form.Form{
 		Draw: draw,
 		BBox: bbox,
 	}
-	a.Appearance = &appearance.Dict{
-		Normal: xObj,
-	}
-	a.AppearanceState = ""
-	a.Rect = bbox
 }
 
 // getLineWidth returns the line width from BorderStyle, Border, or default
@@ -76,7 +70,7 @@ func getLineWidth(a *annotation.Line) float64 {
 	if a.Common.Border != nil {
 		return a.Common.Border.Width
 	}
-	return 0 // Go default
+	return 0
 }
 
 // getDashPattern returns the dash pattern if any

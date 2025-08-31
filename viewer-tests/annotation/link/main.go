@@ -34,6 +34,16 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
+const (
+	// horizontal spacing
+	leftColStart  = 36.0
+	rightColStart = 304.0
+	colWidth      = 244.0
+
+	// vertical spacing
+	startY = 780.0
+)
+
 func main() {
 	err := createDocument("test.pdf")
 	if err != nil {
@@ -61,64 +71,177 @@ func createDocument(filename string) error {
 
 		style: fallback.NewStyle(),
 		RM:    page.RM,
+		yPos:  startY,
 	}
-
-	xMid := paper.LLx + 0.5*paper.Dx()
-	x0 := math.Round(xMid - 244 - 12.0)
-	x2 := math.Round(xMid + 12.0)
-	yPos := paper.URy - 72.0
 
 	// title
 
 	B := standard.TimesBold.New()
 	page.TextBegin()
-	page.TextSetMatrix(matrix.Translate(x0, yPos))
+	page.TextSetMatrix(matrix.Translate(leftColStart, w.yPos))
 	page.TextSetFont(B, 12)
 	glyphs := page.TextLayout(nil, "Your PDF viewer")
-	glyphs.Align(244, 0.5)
+	glyphs.Align(colWidth, 0.5)
 	page.TextShowGlyphs(glyphs)
-	page.TextSetMatrix(matrix.Translate(x2, yPos))
+	page.TextSetMatrix(matrix.Translate(rightColStart, w.yPos))
 	glyphs = page.TextLayout(nil, "Quire appearance stream")
-	glyphs.Align(244, 0.5)
+	glyphs.Align(colWidth, 0.5)
 	page.TextShowGlyphs(glyphs)
 	page.TextEnd()
 
-	yPos -= 36.0
+	w.yPos -= 36.0
 
 	// paragraphs of text with links
 
-	err = w.AddParagraph(x0, yPos, false)
+	err = w.addParagraph(leftColStart, w.yPos, false)
 	if err != nil {
 		return err
 	}
-	err = w.AddParagraph(x2, yPos, true)
+	err = w.addParagraph(rightColStart, w.yPos, true)
 	if err != nil {
 		return err
 	}
-	yPos -= 100.0
+	w.yPos -= 64.0
+
+	// different ways of setting the border width
+
+	a := &annotation.Link{
+		Common: annotation.Common{
+			Contents: "default border width",
+			Flags:    annotation.FlagPrint,
+			Color:    w.LinkCol,
+			Border:   &annotation.Border{Width: 1, SingleUse: true},
+		},
+		Action: pdf.Dict{
+			"S":   pdf.Name("URI"),
+			"URI": pdf.String("https://www.example.com/"),
+		},
+		Highlight: annotation.LinkHighlightInvert,
+	}
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
+
+	a = &annotation.Link{
+		Common: annotation.Common{
+			Contents: "Common.Border.Width=2",
+			Flags:    annotation.FlagPrint,
+			Color:    w.LinkCol,
+			Border:   &annotation.Border{Width: 2, SingleUse: true},
+		},
+		Action: pdf.Dict{
+			"S":   pdf.Name("URI"),
+			"URI": pdf.String("https://www.example.com/"),
+		},
+	}
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
+
+	a = &annotation.Link{
+		Common: annotation.Common{
+			Contents: "BorderStyle.Width=2",
+			Flags:    annotation.FlagPrint,
+			Border:   &annotation.Border{Width: 2, SingleUse: true},
+			Color:    w.LinkCol,
+		},
+		Action: pdf.Dict{
+			"S":   pdf.Name("URI"),
+			"URI": pdf.String("https://www.example.com/"),
+		},
+	}
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
+
+	a = &annotation.Link{
+		Common: annotation.Common{
+			Contents: "default border color",
+			Flags:    annotation.FlagPrint,
+		},
+		Action: pdf.Dict{
+			"S":   pdf.Name("URI"),
+			"URI": pdf.String("https://www.example.com/"),
+		},
+		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
+	}
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
+
+	a = &annotation.Link{
+		Common: annotation.Common{
+			Contents: "transparent border",
+			Flags:    annotation.FlagPrint,
+			Color:    annotation.Transparent,
+		},
+		Action: pdf.Dict{
+			"S":   pdf.Name("URI"),
+			"URI": pdf.String("https://www.example.com/"),
+		},
+		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
+	}
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
 
 	// framed links with different border styles
 
 	for _, style := range []pdf.Name{"S", "D", "B", "I", "U"} {
-		err = w.DrawFramedLink(x0+22, yPos, style, false)
+		bs := &annotation.BorderStyle{
+			Width:     2,
+			Style:     style,
+			SingleUse: true,
+		}
+		if style == "D" {
+			bs.DashArray = []float64{5, 2}
+		}
+
+		a := &annotation.Link{
+			Common: annotation.Common{
+				Contents: "frame style " + string(style),
+				Flags:    annotation.FlagPrint,
+				Color:    w.LinkCol,
+			},
+			Action: pdf.Dict{
+				"S":   pdf.Name("URI"),
+				"URI": pdf.String("https://www.example.com/"),
+			},
+			Highlight:   annotation.LinkHighlightInvert,
+			BorderStyle: bs,
+		}
+		err = w.addAnnotationPair(a)
 		if err != nil {
 			return err
 		}
-		err = w.DrawFramedLink(x2+22, yPos, style, true)
-		if err != nil {
-			return err
-		}
-		yPos -= 42.0
 	}
+
+	// multiple quad points with border
+
+	err = w.DrawQuads(leftColStart+122, w.yPos, false)
+	if err != nil {
+		return err
+	}
+	err = w.DrawQuads(rightColStart+122, w.yPos, true)
+	if err != nil {
+		return err
+	}
+	w.yPos -= 64.0
 
 	// hexagon shaped link area
 
+	xMid := leftColStart + 0.5*(rightColStart-leftColStart+colWidth)
 	hex := make([]vec.Vec2, 6)
 	for i := range hex {
 		angle := float64(i)*math.Pi/3 + 0.1
 		hex[i] = vec.Vec2{
 			X: pdf.Round(xMid+100*math.Cos(angle), 2),
-			Y: pdf.Round(yPos+100*math.Sin(angle)-120, 2),
+			Y: pdf.Round(w.yPos+100*math.Sin(angle)-120, 2),
 		}
 	}
 	page.SetFillColor(color.DeviceCMYK(0, 0.9, 0.9, 0))
@@ -143,20 +266,9 @@ func createDocument(filename string) error {
 	w.MakeAnnotation("https://en.wikipedia.org/wiki/Hexagon", "Hexagon", nil, false,
 		[]vec.Vec2{hex[0], hex[1], hex[2], hex[3]},
 		[]vec.Vec2{hex[3], hex[4], hex[5], hex[0]})
-	yPos -= 300
+	w.yPos -= 280
 
-	// multiple quad points with border
-
-	err = w.DrawQuads(x0+122, yPos, false)
-	if err != nil {
-		return err
-	}
-	err = w.DrawQuads(x2+122, yPos, true)
-	if err != nil {
-		return err
-	}
-
-	page.PageDict["Annots"] = w.Annots
+	page.PageDict["Annots"] = w.annots
 
 	return page.Close()
 }
@@ -170,12 +282,26 @@ type writer struct {
 
 	style  *fallback.Style
 	RM     *pdf.ResourceManager
-	Annots pdf.Array
+	annots pdf.Array
+	yPos   float64
 }
 
-// AddParagraph adds a paragraph to the PDF document at the specified position.
+func (w *writer) embed(a annotation.Annotation, ref pdf.Reference) error {
+	obj, err := a.Encode(w.RM)
+	if err != nil {
+		return err
+	}
+	err = w.RM.Out.Put(ref, obj)
+	if err != nil {
+		return err
+	}
+	w.annots = append(w.annots, ref)
+	return nil
+}
+
+// addParagraph adds a paragraph to the PDF document at the specified position.
 // The text width is 244 units.
-func (w *writer) AddParagraph(x, y float64, withAppearance bool) error {
+func (w *writer) addParagraph(x, y float64, withAppearance bool) error {
 	geom := w.Roman.GetGeometry()
 
 	page := w.Page
@@ -187,7 +313,7 @@ func (w *writer) AddParagraph(x, y float64, withAppearance bool) error {
 	page.SetFillColor(w.TextCol)
 	page.TextShow("In the Middle Ages, a quire (also called a “")
 	page.SetFillColor(w.LinkCol)
-	qq := w.MakeLink("gathering")
+	qq := w.makeLink("gathering")
 	err := w.MakeAnnotation("https://en.wikipedia.org/wiki/Gathering_(bookbinding)",
 		"Wikipedia: Gathering (bookbinding)", nil, withAppearance, qq)
 	if err != nil {
@@ -200,7 +326,7 @@ func (w *writer) AddParagraph(x, y float64, withAppearance bool) error {
 	page.TextSetWordSpacing(0.750)
 	page.TextShow("most often formed of four folded sheets of ")
 	page.SetFillColor(w.LinkCol)
-	qq = w.MakeLink("vellum")
+	qq = w.makeLink("vellum")
 	err = w.MakeAnnotation("https://en.wikipedia.org/wiki/Vellum",
 		"Wikipedia: Vellum", nil, withAppearance, qq)
 	if err != nil {
@@ -209,7 +335,7 @@ func (w *writer) AddParagraph(x, y float64, withAppearance bool) error {
 	page.SetFillColor(w.TextCol)
 	page.TextShow(" or ")
 	page.SetFillColor(w.LinkCol)
-	qq = w.MakeLink("parch-")
+	qq = w.makeLink("parch-")
 	err = w.MakeAnnotation("https://en.wikipedia.org/wiki/Parchment",
 		"Wikipedia: Parchment", nil, withAppearance, qq)
 	if err != nil {
@@ -218,7 +344,7 @@ func (w *writer) AddParagraph(x, y float64, withAppearance bool) error {
 
 	page.TextNextLine()
 	page.TextSetWordSpacing(-0.333)
-	qq = w.MakeLink("ment")
+	qq = w.makeLink("ment")
 	err = w.MakeAnnotation("https://en.wikipedia.org/wiki/Parchment",
 		"Wikipedia: Parchment", nil, withAppearance, qq)
 	if err != nil {
@@ -231,7 +357,7 @@ func (w *writer) AddParagraph(x, y float64, withAppearance bool) error {
 	page.TextSetFont(w.Roman, 10)
 	page.TextShow(" eight leaves or ")
 	page.SetFillColor(w.LinkCol)
-	qq = w.MakeLink("folios")
+	qq = w.makeLink("folios")
 	err = w.MakeAnnotation("https://en.wikipedia.org/wiki/Folio",
 		"Wikipedia: Folio", nil, withAppearance, qq)
 	if err != nil {
@@ -247,40 +373,87 @@ func (w *writer) AddParagraph(x, y float64, withAppearance bool) error {
 	return nil
 }
 
-func (w *writer) DrawFramedLink(x, y float64, style pdf.Name, withAppearance bool) error {
+func (w *writer) makeLink(text string) []vec.Vec2 {
 	page := w.Page
 
-	bs := &annotation.BorderStyle{
-		Width:     2,
-		Style:     style,
-		SingleUse: true,
-	}
-	if style == "D" {
-		bs.DashArray = []float64{5, 2}
-	}
-
-	page.TextBegin()
-	page.TextSetFont(w.Roman, 18)
-	page.SetFillColor(w.LinkCol)
-
-	text := "link with frame style " + string(style)
 	glyphs := page.TextLayout(nil, text)
-	width := glyphs.TotalWidth()
-	page.TextFirstLine(pdf.Round(x+(200-width)/2, 2), y)
+	corners := page.TextGetQuadPoints(glyphs, 0)
+	page.TextShowGlyphs(glyphs)
+
+	return corners
+}
+
+func (w *writer) addAnnotationPair(left *annotation.Link) error {
+	leftRef := w.RM.Out.Alloc()
+	rightRef := w.RM.Out.Alloc()
+
+	page := w.Page
+
+	text := left.Common.Contents
+
+	const (
+		margin = 30.0
+		boxW   = 244.0 - 2*margin
+	)
+
+	// draw the text for both columns
+	page.TextBegin()
+	page.TextSetFont(w.Roman, 12)
+	glyphs := page.TextLayout(nil, text)
+	textW := glyphs.TotalWidth()
+	page.SetFillColor(w.LinkCol)
+	leftX := leftColStart + margin
+	page.TextSetMatrix(matrix.Translate(pdf.Round(leftX+(boxW-textW)/2, 2), w.yPos))
+	page.TextShowGlyphs(glyphs)
+	rightX := rightColStart + margin
+	page.TextSetMatrix(matrix.Translate(pdf.Round(rightX+(boxW-textW)/2, 2), w.yPos))
 	page.TextShowGlyphs(glyphs)
 	page.TextEnd()
 
-	qq := []vec.Vec2{
-		{X: pdf.Round(x, 2), Y: pdf.Round(y-8, 2)},
-		{X: pdf.Round(x+200, 2), Y: pdf.Round(y-8, 2)},
-		{X: pdf.Round(x+200, 2), Y: pdf.Round(y+20, 2)},
-		{X: pdf.Round(x, 2), Y: pdf.Round(y+20, 2)},
+	// display reference markers for both annotations
+	page.TextBegin()
+	page.TextSetFont(w.Roman, 6)
+	page.TextSetHorizontalScaling(0.9)
+	page.TextSetWordSpacing(1)
+	page.SetFillColor(w.TextCol)
+	page.TextSetMatrix(matrix.Translate(leftX+boxW+3, w.yPos-6))
+	page.TextShow(fmt.Sprintf("%d %d R", leftRef.Number(), leftRef.Generation()))
+	page.TextSetMatrix(matrix.Translate(rightX+boxW+3, w.yPos-6))
+	page.TextShow(fmt.Sprintf("%d %d R", rightRef.Number(), rightRef.Generation()))
+	page.TextEnd()
+
+	// create a pair of annotations
+	right := clone(left)
+
+	left.Common.Rect = pdf.Rectangle{
+		LLx: pdf.Round(leftX, 2),
+		LLy: pdf.Round(w.yPos-6, 2),
+		URx: pdf.Round(leftX+boxW, 2),
+		URy: pdf.Round(w.yPos+14, 2),
 	}
-	err := w.MakeAnnotation("https://www.example.com/",
-		"www.example.com", bs, withAppearance, qq)
+	left.Common.Contents = "www.example.com (viewer)"
+	err := w.embed(left, leftRef)
 	if err != nil {
 		return err
 	}
+
+	right.Common.Rect = pdf.Rectangle{
+		LLx: pdf.Round(rightX, 2),
+		LLy: pdf.Round(w.yPos-6, 2),
+		URx: pdf.Round(rightX+boxW, 2),
+		URy: pdf.Round(w.yPos+14, 2),
+	}
+	right.Common.Contents = "www.example.com (quire)"
+	err = w.style.AddAppearance(right)
+	if err != nil {
+		return err
+	}
+	err = w.embed(right, rightRef)
+	if err != nil {
+		return err
+	}
+
+	w.yPos -= 36.0
 
 	return nil
 }
@@ -332,16 +505,6 @@ func (w *writer) DrawQuads(x, y float64, withAppearance bool) error {
 	return nil
 }
 
-func (w *writer) MakeLink(text string) []vec.Vec2 {
-	page := w.Page
-
-	glyphs := page.TextLayout(nil, text)
-	corners := page.TextGetQuadPoints(glyphs, 0)
-	page.TextShowGlyphs(glyphs)
-
-	return corners
-}
-
 func (w *writer) MakeAnnotation(url string, title string, bs *annotation.BorderStyle, app bool, quadPoints ...[]vec.Vec2) error {
 	var qq []vec.Vec2
 	for _, q := range quadPoints {
@@ -361,7 +524,6 @@ func (w *writer) MakeAnnotation(url string, title string, bs *annotation.BorderS
 		Common: annotation.Common{
 			Contents: title,
 			Flags:    annotation.FlagPrint,
-			Color:    w.LinkCol,
 		},
 		Action:      a,
 		Highlight:   annotation.LinkHighlightInvert,
@@ -392,16 +554,19 @@ func (w *writer) MakeAnnotation(url string, title string, bs *annotation.BorderS
 		}
 	}
 
-	dict, err := link.Encode(w.RM)
-	if err != nil {
-		return err
-	}
 	ref := w.RM.Out.Alloc()
-	err = w.RM.Out.Put(ref, dict)
+	err := w.embed(link, ref)
 	if err != nil {
 		return err
 	}
-	w.Annots = append(w.Annots, ref)
 
 	return nil
+}
+
+func clone[T any](v *T) *T {
+	if v == nil {
+		return nil
+	}
+	clone := *v
+	return &clone
 }

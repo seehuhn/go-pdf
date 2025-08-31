@@ -21,11 +21,14 @@ import (
 	"math"
 	"os"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/fallback"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -33,22 +36,16 @@ import (
 )
 
 const (
-	// column positions
-	leftColStart  = 100.0
+	// horizontal spacing
+	leftColStart  = 60.0
 	leftColEnd    = 160.0
 	rightColStart = 220.0
-	rightColEnd   = 280.0
-
-	// annotation size
-	squareSize = 24.0
+	rightColEnd   = 320.0
+	commentStart  = 380.0
 
 	// vertical spacing
-	startY   = 750.0
-	rowStep  = 60.0
-	groupGap = 80.0
-
-	// default properties
-	defaultLineWidth = 1.5
+	startY     = 780.0
+	squareSize = 24.0
 )
 
 func main() {
@@ -75,201 +72,210 @@ func createDocument(filename string) error {
 	}
 	page.DrawShading(background)
 
+	B := standard.TimesBold.New()
+	H := standard.Helvetica.New()
+
 	w := &writer{
-		annots:   pdf.Array{},
-		page:     page,
-		style:    fallback.NewStyle(),
-		currentY: startY,
+		annots: pdf.Array{},
+		page:   page,
+		style:  fallback.NewStyle(),
+		yPos:   startY,
+		font:   H,
 	}
 
-	// Group 1: Basic fill colors
-	colors := []struct {
-		name  string
-		color color.Color
-	}{
-		{"No fill", nil},
-		{"Red fill", color.Red},
-		{"Gray fill", color.DeviceGray(0.7)},
-		{"CMYK fill", color.DeviceCMYK(0.3, 0.7, 0.0, 0.1)},
-	}
+	page.TextBegin()
+	page.TextSetMatrix(matrix.Translate(leftColStart-5, w.yPos))
+	page.TextSetFont(B, 12)
+	page.TextShow("Your PDF viewer")
+	page.TextSetMatrix(matrix.Translate(rightColStart-5, w.yPos))
+	page.TextShow("Quire appearance stream")
+	page.TextEnd()
+	w.yPos -= 24.0
 
-	for _, c := range colors {
-		square := &annotation.Square{
-			Common: annotation.Common{
-				Rect: pdf.Rectangle{
-					LLx: leftColStart,
-					LLy: w.currentY - squareSize,
-					URx: leftColEnd,
-					URy: w.currentY,
-				},
-				Contents: c.name,
-				Color:    color.Black,
-				Flags:    annotation.FlagPrint,
-			},
-			FillColor: c.color,
-			BorderStyle: &annotation.BorderStyle{
-				Width:     defaultLineWidth,
-				SingleUse: true,
-			},
-		}
-		err = w.addAnnotationPair(square)
-		if err != nil {
-			return err
-		}
-
-		w.currentY -= rowStep
-	}
-
-	// Group 2: Border style comparison
-	w.currentY -= groupGap
-
-	// Common.Border with dash
-	borderSquare1 := &annotation.Square{
+	a := &annotation.Square{
 		Common: annotation.Common{
-			Rect: pdf.Rectangle{
-				LLx: leftColStart,
-				LLy: w.currentY - squareSize,
-				URx: leftColEnd,
-				URy: w.currentY,
-			},
-			Contents: "Common.Border with dash",
-			Color:    color.Black,
+			Contents: "default border width",
 			Flags:    annotation.FlagPrint,
-			Border:   &annotation.Border{Width: 2, DashArray: []float64{8, 3}, SingleUse: true},
+			Border:   &annotation.Border{Width: 1, SingleUse: true},
+			Color:    color.Blue,
 		},
-		FillColor: color.DeviceRGB(0.9, 0.9, 0.9),
 	}
-	err = w.addAnnotationPair(borderSquare1)
+	err = w.addAnnotationPair(a)
 	if err != nil {
 		return err
 	}
 
-	w.currentY -= rowStep
-
-	// BorderStyle with dash
-	borderSquare2 := &annotation.Square{
+	a = &annotation.Square{
 		Common: annotation.Common{
-			Rect: pdf.Rectangle{
-				LLx: leftColStart,
-				LLy: w.currentY - squareSize,
-				URx: leftColEnd,
-				URy: w.currentY,
-			},
-			Contents: "BorderStyle with dash",
-			Color:    color.Black,
+			Contents: "Border.Width=2",
 			Flags:    annotation.FlagPrint,
+			Border:   &annotation.Border{Width: 2, SingleUse: true},
+			Color:    color.Blue,
 		},
-		FillColor: color.DeviceRGB(0.9, 0.9, 0.9),
+	}
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
+
+	a = &annotation.Square{
+		Common: annotation.Common{
+			Contents: "BorderStyle.Width=2",
+			Flags:    annotation.FlagPrint,
+			Color:    color.Blue,
+		},
+		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
+	}
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
+
+	a = &annotation.Square{
+		Common: annotation.Common{
+			Contents: "dashed border",
+			Flags:    annotation.FlagPrint,
+			Color:    color.Blue,
+		},
 		BorderStyle: &annotation.BorderStyle{
 			Width:     2,
 			Style:     "D",
-			DashArray: []float64{8, 3},
+			DashArray: []float64{20, 2, 5, 2},
 			SingleUse: true,
 		},
 	}
-	err = w.addAnnotationPair(borderSquare2)
+	err = w.addAnnotationPair(a)
 	if err != nil {
 		return err
 	}
 
-	w.currentY -= rowStep
-
-	// No border style specified
-	borderSquare3 := &annotation.Square{
+	a = &annotation.Square{
 		Common: annotation.Common{
-			Rect: pdf.Rectangle{
-				LLx: leftColStart,
-				LLy: w.currentY - squareSize,
-				URx: leftColEnd,
-				URy: w.currentY,
-			},
-			Contents: "No border style",
-			Color:    color.Black,
+			Contents: "border style B",
 			Flags:    annotation.FlagPrint,
+			Color:    color.Blue,
 		},
-		FillColor: color.DeviceRGB(0.9, 0.9, 0.9),
+		BorderStyle: &annotation.BorderStyle{
+			Width:     2,
+			Style:     "B",
+			SingleUse: true,
+		},
 	}
-	err = w.addAnnotationPair(borderSquare3)
+	err = w.addAnnotationPair(a)
 	if err != nil {
 		return err
 	}
 
-	// Group 3: Border effects (if supported)
-	w.currentY -= groupGap
-
-	// Cloud border effect with different intensities
-	intensities := []float64{0.0, 0.5, 1.0, 1.5, 2.0}
-	for _, intensity := range intensities {
-		cloudSquare := &annotation.Square{
-			Common: annotation.Common{
-				Rect: pdf.Rectangle{
-					LLx: leftColStart,
-					LLy: w.currentY - squareSize,
-					URx: leftColEnd,
-					URy: w.currentY,
-				},
-				Contents: fmt.Sprintf("Cloud effect I=%.1f", intensity),
-				Color:    color.Black,
-				Flags:    annotation.FlagPrint,
-			},
-			FillColor: color.DeviceRGB(0.95, 0.95, 1.0),
-			BorderStyle: &annotation.BorderStyle{
-				Width:     1.5,
-				SingleUse: true,
-			},
-			BorderEffect: &annotation.BorderEffect{
-				Style:     "C",
-				Intensity: intensity,
-				SingleUse: true,
-			},
-		}
-		err = w.addAnnotationPair(cloudSquare)
-		if err != nil {
-			return err
-		}
-
-		w.currentY -= rowStep
+	a = &annotation.Square{
+		Common: annotation.Common{
+			Contents: "border style U",
+			Flags:    annotation.FlagPrint,
+			Color:    color.Blue,
+		},
+		BorderStyle: &annotation.BorderStyle{
+			Width:     2,
+			Style:     "U",
+			SingleUse: true,
+		},
+	}
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
 	}
 
-	// Group 4: Margin adjustments (RD array)
-	w.currentY -= groupGap
-
-	margins := []struct {
-		name   string
-		margin []float64
-	}{
-		// {"No margins", nil},
-		// {"Small margins", []float64{3, 3, 3, 3}},
-		// {"Large margins", []float64{8, 8, 8, 8}},
-		// {"Asymmetric", []float64{2, 5, 10, 3}},
+	a = &annotation.Square{
+		Common: annotation.Common{
+			Contents: "default border color",
+			Flags:    annotation.FlagPrint,
+			Border:   &annotation.Border{Width: 2, SingleUse: true},
+		},
+	}
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
 	}
 
-	for _, m := range margins {
-		marginSquare := &annotation.Square{
-			Common: annotation.Common{
-				Rect: pdf.Rectangle{
-					LLx: leftColStart,
-					LLy: w.currentY - squareSize,
-					URx: leftColEnd,
-					URy: w.currentY,
-				},
-				Contents: m.name,
-				Color:    color.Black,
-				Flags:    annotation.FlagPrint,
-			},
-			FillColor: color.DeviceRGB(1.0, 0.95, 0.8),
-			BorderStyle: &annotation.BorderStyle{
-				Width:     2,
-				SingleUse: true,
-			},
-			Margin: m.margin,
-		}
-		err = w.addAnnotationPair(marginSquare)
-		if err != nil {
-			return err
-		}
+	a = &annotation.Square{
+		Common: annotation.Common{
+			Contents: "filled",
+			Flags:    annotation.FlagPrint,
+			Border:   &annotation.Border{Width: 1, SingleUse: true},
+			Color:    color.Black,
+		},
+		FillColor: color.White,
+	}
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
 
-		w.currentY -= rowStep
+	a = &annotation.Square{
+		Common: annotation.Common{
+			Contents: "cloudy border, intensity=0",
+			Flags:    annotation.FlagPrint,
+			Color:    color.Black,
+		},
+		FillColor: color.White,
+		BorderStyle: &annotation.BorderStyle{
+			Width:     1,
+			Style:     "S",
+			SingleUse: true,
+		},
+		BorderEffect: &annotation.BorderEffect{
+			Style:     "C",
+			Intensity: 0,
+			SingleUse: true,
+		},
+	}
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
+
+	a = &annotation.Square{
+		Common: annotation.Common{
+			Contents: "cloudy border, intensity=1",
+			Flags:    annotation.FlagPrint,
+			Color:    color.Black,
+		},
+		FillColor: color.White,
+		BorderStyle: &annotation.BorderStyle{
+			Width:     1,
+			Style:     "S",
+			SingleUse: true,
+		},
+		BorderEffect: &annotation.BorderEffect{
+			Style:     "C",
+			Intensity: 1,
+			SingleUse: true,
+		},
+	}
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
+
+	a = &annotation.Square{
+		Common: annotation.Common{
+			Contents: "cloudy border, intensity=2",
+			Flags:    annotation.FlagPrint,
+			Color:    color.Black,
+		},
+		FillColor: color.White,
+		BorderStyle: &annotation.BorderStyle{
+			Width:     1,
+			Style:     "S",
+			SingleUse: true,
+		},
+		BorderEffect: &annotation.BorderEffect{
+			Style:     "C",
+			Intensity: 2,
+			SingleUse: true,
+		},
+	}
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
 	}
 
 	page.PageDict["Annots"] = w.annots
@@ -278,18 +284,18 @@ func createDocument(filename string) error {
 }
 
 type writer struct {
-	annots   pdf.Array
-	page     *document.Page
-	style    *fallback.Style
-	currentY float64
+	annots pdf.Array
+	page   *document.Page
+	style  *fallback.Style
+	yPos   float64
+	font   font.Layouter
 }
 
-func (w *writer) embed(a annotation.Annotation) error {
+func (w *writer) embed(a annotation.Annotation, ref pdf.Reference) error {
 	obj, err := a.Encode(w.page.RM)
 	if err != nil {
 		return err
 	}
-	ref := w.page.RM.Out.Alloc()
 	err = w.page.RM.Out.Put(ref, obj)
 	if err != nil {
 		return err
@@ -298,25 +304,62 @@ func (w *writer) embed(a annotation.Annotation) error {
 	return nil
 }
 
-func (w *writer) addAnnotationPair(square *annotation.Square) error {
-	// embed left annotation as-is
-	err := w.embed(square)
+func (w *writer) addAnnotationPair(left *annotation.Square) error {
+	if left.BorderEffect != nil {
+		w.yPos -= 5 * left.BorderEffect.Intensity
+	}
+
+	leftRef := w.page.RM.Out.Alloc()
+	rightRef := w.page.RM.Out.Alloc()
+
+	w.page.TextBegin()
+	w.page.TextSetFont(w.font, 10)
+	w.page.TextSetMatrix(matrix.Translate(commentStart, w.yPos-squareSize/2-3))
+	w.page.TextShow(left.Contents)
+	w.page.TextSetFont(w.font, 6)
+	w.page.TextSetHorizontalScaling(0.9)
+	w.page.TextSetMatrix(matrix.Translate(leftColEnd+3, w.yPos-squareSize))
+	w.page.TextShow(fmt.Sprintf("%d %d R", leftRef.Number(), leftRef.Generation()))
+	w.page.TextSetMatrix(matrix.Translate(rightColEnd+3, w.yPos-squareSize))
+	w.page.TextShow(fmt.Sprintf("%d %d R", rightRef.Number(), rightRef.Generation()))
+	w.page.TextEnd()
+
+	right := clone(left)
+
+	left.Rect = pdf.Rectangle{
+		LLx: leftColStart,
+		LLy: w.yPos - squareSize,
+		URx: leftColEnd,
+		URy: w.yPos,
+	}
+	left.Contents += " (viewer)"
+
+	right.Rect = pdf.Rectangle{
+		LLx: rightColStart,
+		LLy: w.yPos - squareSize,
+		URx: rightColEnd,
+		URy: w.yPos,
+	}
+	right.Contents += " (quire)"
+
+	w.style.AddAppearance(right)
+
+	err := w.embed(left, leftRef)
 	if err != nil {
 		return err
 	}
 
-	// create shallow copy for right column
-	rightSquare := clone(square)
+	err = w.embed(right, rightRef)
+	if err != nil {
+		return err
+	}
 
-	// adjust coordinates for right column
-	deltaX := rightColStart - leftColStart
-	rightSquare.Rect.LLx += deltaX
-	rightSquare.Rect.URx += deltaX
+	w.yPos -= squareSize + 12.0
+	if left.BorderEffect != nil {
+		w.yPos -= 5 * left.BorderEffect.Intensity
+	}
 
-	w.style.AddAppearance(rightSquare)
-
-	// embed right annotation
-	return w.embed(rightSquare)
+	return nil
 }
 
 func clone[T any](v *T) *T {

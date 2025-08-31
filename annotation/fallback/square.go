@@ -19,69 +19,63 @@ package fallback
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addSquareAppearance(a *annotation.Square) {
-	// extract square properties
+func (s *Style) addSquareAppearance(a *annotation.Square) *form.Form {
 	lw := getSquareLineWidth(a)
 	dashPattern := getSquareDashPattern(a)
+	col := a.Color
 
-	// calculate effective rectangle considering margins
 	rect := calculateSquareRect(a)
+	bbox := rect // TODO(voss): implement boundary effects
 
-	// calculate bounding box (including border width)
-	bbox := calculateSquareBBox(rect, lw)
+	if m := min(rect.Dx(), rect.Dy()); lw > m/2 {
+		lw = m / 2
+	}
 
-	// create drawing function
+	a.Rect = rect
+
+	hasOutline := col != nil && col != annotation.Transparent && lw > 0
+	hasFill := a.FillColor != nil
+	if !(hasOutline || hasFill) {
+		return &form.Form{
+			Draw: func(w *graphics.Writer) error { return nil },
+			BBox: bbox,
+		}
+	}
+
 	draw := func(w *graphics.Writer) error {
-		// set stroke properties
-		if lw > 0 {
+		if hasOutline {
 			w.SetLineWidth(lw)
-			w.SetStrokeColor(color.Black)
+			w.SetStrokeColor(col)
 			if len(dashPattern) > 0 {
 				w.SetLineDash(dashPattern, 0)
 			}
 		}
-
-		// set fill color if specified
-		var hasFill bool
-		if a.FillColor != nil {
+		if hasFill {
 			w.SetFillColor(a.FillColor)
-			hasFill = true
 		}
 
-		// draw the rectangle
-		w.Rectangle(rect.LLx, rect.LLy, rect.Dx(), rect.Dy())
+		w.Rectangle(rect.LLx+lw/2, rect.LLy+lw/2, rect.Dx()-lw, rect.Dy()-lw)
 
-		// fill and/or stroke based on properties
-		if hasFill && lw > 0 {
+		switch {
+		case hasOutline && hasFill:
 			w.FillAndStroke()
-		} else if hasFill {
+		case hasFill:
 			w.Fill()
-		} else if lw > 0 {
+		default: // hasOutline
 			w.Stroke()
-		} else {
-			// neither fill nor stroke - just define the path
-			w.EndPath()
 		}
 
 		return nil
 	}
 
-	// create appearance stream
-	xObj := &form.Form{
+	return &form.Form{
 		Draw: draw,
 		BBox: bbox,
 	}
-	a.Appearance = &appearance.Dict{
-		Normal: xObj,
-	}
-	a.AppearanceState = ""
-	a.Rect = bbox
 }
 
 // getSquareLineWidth returns the line width from BorderStyle, Border, or default

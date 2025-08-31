@@ -19,7 +19,6 @@ package fallback
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/form"
@@ -31,7 +30,7 @@ const (
 	freeTextPadding  = 2
 )
 
-func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
+func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 	// TODO(voss): implement border effects
 
 	// extract information from the pre-set fields
@@ -180,12 +179,8 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) {
 		return nil
 	}
 
-	xObj := &form.Form{
+	return &form.Form{
 		Draw: draw,
 		BBox: outer,
 	}
-	res := &appearance.Dict{
-		Normal: xObj,
-	}
-	a.Appearance = res
 }

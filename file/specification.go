@@ -42,9 +42,11 @@ type Specification struct {
 	// FileName specifies the file path in platform-independent format.
 	// Components are separated by forward slashes.
 	//
-	// The characters in this string must be in the PDFDocEncoding.
+	// The characters in this string must be in the PDFDocEncoding character
+	// set.
 	//
-	// This corresponds to the /F entry in the PDF file specification dictionary.
+	// This corresponds to the /F entry in the PDF file specification
+	// dictionary.
 	FileName string
 
 	// FileNameDOS (optional, deprecated in PDF 2.0) specifies a DOS file name.

@@ -19,14 +19,13 @@ package fallback
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/internal/colconv"
 )
 
-func (s *Style) addLinkAppearance(a *annotation.Link) {
+func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 	borderWidth := 0.0
 	var dashPattern []float64
 	style := pdf.Name("S")
@@ -48,17 +47,19 @@ func (s *Style) addLinkAppearance(a *annotation.Link) {
 		}
 	}
 
-	if borderWidth <= 0 {
-		a.Appearance = nil
-		a.AppearanceState = ""
-		return
-	}
-
 	col := a.Color
 	if col == nil {
 		col = color.Black
 	}
+
 	bbox := a.Rect
+
+	if borderWidth <= 0 || col == annotation.Transparent {
+		return &form.Form{
+			Draw: func(w *graphics.Writer) error { return nil },
+			BBox: bbox,
+		}
+	}
 
 	var draw func(w *graphics.Writer) error
 	switch style {
@@ -143,17 +144,10 @@ func (s *Style) addLinkAppearance(a *annotation.Link) {
 	}
 
 	// create appearance stream
-	xObj := &form.Form{
+	return &form.Form{
 		Draw: draw,
 		BBox: bbox,
 	}
-	a.Appearance = &appearance.Dict{
-		Normal: xObj,
-	}
-	a.AppearanceState = ""
-
-	// set style fields to what we have used
-	a.Color = col
 }
 
 func getDarkLightCol(col color.Color) (dark, light color.Color) {
