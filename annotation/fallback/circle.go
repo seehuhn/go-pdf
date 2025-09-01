@@ -17,12 +17,14 @@
 package fallback
 
 import (
+	"math"
+
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addSquareAppearance(a *annotation.Square) *form.Form {
+func (s *Style) addCircleAppearance(a *annotation.Circle) *form.Form {
 	lw := getBorderLineWidth(a.Common.Border, a.BorderStyle)
 	dashPattern := getBorderDashPattern(a.Common.Border, a.BorderStyle)
 	col := a.Color
@@ -69,7 +71,19 @@ func (s *Style) addSquareAppearance(a *annotation.Square) *form.Form {
 			w.SetFillColor(a.FillColor)
 		}
 
-		w.Rectangle(rect.LLx+lw/2, rect.LLy+lw/2, rect.Dx()-lw, rect.Dy()-lw)
+		xMid := (rect.LLx + rect.URx) / 2
+		yMid := (rect.LLy + rect.URy) / 2
+		rx := (rect.Dx() - lw) / 2
+		ry := (rect.Dy() - lw) / 2
+
+		k := (math.Sqrt2 - 1.0) * 4 / 3 // control point offset for cubic Bezier approximation of a circle
+
+		w.MoveTo(xMid+rx, yMid)
+		w.CurveTo(xMid+rx, yMid+ry*k, xMid+rx*k, rect.URy-lw, xMid, rect.URy-lw)
+		w.CurveTo(xMid-rx*k, rect.URy-lw, rect.LLx+lw, yMid+ry*k, rect.LLx+lw, yMid)
+		w.CurveTo(rect.LLx+lw, yMid-ry*k, xMid-rx*k, rect.LLy+lw, xMid, rect.LLy+lw)
+		w.CurveTo(xMid+rx*k, rect.LLy+lw, xMid+rx, yMid-ry*k, xMid+rx, yMid)
+		w.ClosePath()
 
 		switch {
 		case hasOutline && hasFill:

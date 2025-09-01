@@ -684,42 +684,6 @@ func parseType7Patches(data []byte, s *Type7) ([]Type7Patch, error) {
 	return patches, nil
 }
 
-// Coordinate transformation helpers for Type7 patches.
-
-// getControlPointAtGrid returns the control point at the specified grid position (row, col).
-func (p *Type7Patch) getControlPointAtGrid(row, col int) vec.Vec2 {
-	if row < 0 || row >= 4 || col < 0 || col >= 4 {
-		panic(fmt.Sprintf("grid position (%d,%d) is out of bounds", row, col))
-	}
-	streamIdx := gridToStreamOrder[row][col]
-	return p.ControlPoints[streamIdx]
-}
-
-// setControlPointAtGrid sets the control point at the specified grid position (row, col).
-func (p *Type7Patch) setControlPointAtGrid(row, col int, point vec.Vec2) {
-	if row < 0 || row >= 4 || col < 0 || col >= 4 {
-		panic(fmt.Sprintf("grid position (%d,%d) is out of bounds", row, col))
-	}
-	streamIdx := gridToStreamOrder[row][col]
-	p.ControlPoints[streamIdx] = point
-}
-
-// getCornerColorIndex returns the corner color array index for the specified corner.
-// Corners are numbered: 0=bottom-left, 1=bottom-right, 2=top-right, 3=top-left
-// corresponding to grid positions (0,0), (0,3), (3,3), (3,0).
-func getCornerColorIndex(row, col int) int {
-	if row == 0 && col == 0 {
-		return 0 // bottom-left: c₀₀
-	} else if row == 0 && col == 3 {
-		return 1 // bottom-right: c₃₀
-	} else if row == 3 && col == 3 {
-		return 2 // top-right: c₃₃
-	} else if row == 3 && col == 0 {
-		return 3 // top-left: c₀₃
-	}
-	panic(fmt.Sprintf("(%d,%d) is not a corner position", row, col))
-}
-
 // init validates the control point mappings at package initialization.
 func init() {
 	if err := validateControlPointMappings(); err != nil {

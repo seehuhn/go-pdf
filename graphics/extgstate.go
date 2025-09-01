@@ -225,7 +225,7 @@ func (s *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Native, State, error) {
 		res.SmoothnessTolerance = s.SmoothnessTolerance
 	}
 
-	res.Set = set & ExtGStateBits
+	res.Set = set & extGStateBits
 
 	if s.SingleUse {
 		return dict, res, nil

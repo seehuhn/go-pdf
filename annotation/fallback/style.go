@@ -19,6 +19,7 @@ package fallback
 import (
 	"fmt"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/font"
@@ -66,7 +67,7 @@ func NewStyle() *Style {
 }
 
 func (s *Style) AddAppearance(a annotation.Annotation) error {
-	// TODO(voss): cache appearances where possible?
+	// TODO(voss): cache appearances where possible
 
 	var normal *form.Form
 	switch a := a.(type) {
@@ -80,6 +81,8 @@ func (s *Style) AddAppearance(a annotation.Annotation) error {
 		normal = s.addLineAppearance(a)
 	case *annotation.Square:
 		normal = s.addSquareAppearance(a)
+	case *annotation.Circle:
+		normal = s.addCircleAppearance(a)
 	default:
 		return fmt.Errorf("unsupported annotation type: %T", a)
 	}
@@ -96,4 +99,39 @@ func (s *Style) AddAppearance(a annotation.Annotation) error {
 	c.AppearanceState = ""
 
 	return nil
+}
+
+// getBorderLineWidth returns the line width from BorderStyle, Border, or default
+func getBorderLineWidth(border *annotation.Border, borderStyle *annotation.BorderStyle) float64 {
+	if borderStyle != nil {
+		return borderStyle.Width
+	}
+	if border != nil {
+		return border.Width
+	}
+	return 1.0 // default line width
+}
+
+// getBorderDashPattern returns the dash pattern from BorderStyle or Border
+func getBorderDashPattern(border *annotation.Border, borderStyle *annotation.BorderStyle) []float64 {
+	if borderStyle != nil && len(borderStyle.DashArray) > 0 {
+		return borderStyle.DashArray
+	}
+	if border != nil && len(border.DashArray) > 0 {
+		return border.DashArray
+	}
+	return nil
+}
+
+// applyMargins adjusts a rectangle by applying margins (RD array)
+func applyMargins(rect pdf.Rectangle, margin []float64) pdf.Rectangle {
+	// apply margins (RD array) if specified
+	if len(margin) == 4 {
+		// RD format: [left, bottom, right, top]
+		rect.LLx += margin[0] // left margin
+		rect.LLy += margin[1] // bottom margin
+		rect.URx -= margin[2] // right margin
+		rect.URy -= margin[3] // top margin
+	}
+	return rect
 }

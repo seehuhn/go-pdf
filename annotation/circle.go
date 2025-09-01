@@ -26,27 +26,37 @@ import (
 
 // PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.8
 
-// Circle represents an annotation that displays an ellipse on the page.
-// When opened, it displays a popup window containing the text of the associated note.
-// The ellipse is inscribed within the annotation rectangle defined by the Rect entry.
+// Circle represents an annotation that displays an ellipse on the page. When
+// opened, the annotation displays a popup window containing the text of the
+// associated note:
+//
+//   - The location of the ellipse is given by the Common.Rect field and
+//     optionally modified by the Margin field.
+//   - The border line color is specified by the Common.Color field.
+//     If this is nil, no border is drawn.
+//   - The border line style is specified by the BorderStyle field.
+//     If this is nil, the Common.Border field is used instead.
+//     If both are nil, a solid border with width 1 is used.
+//     If the border width is 0, no border is drawn.
 type Circle struct {
 	Common
 	Markup
 
-	// Margin (optional; PDF 1.5) describes the numerical differences between
-	// the Rect entry of the annotation and the actual boundaries of the
-	// underlying ellipse.
+	// Margin (optional) describes the numerical differences between the
+	// Common.Rect entry of the annotation and the boundaries of the ellipse.
 	//
 	// Slice of four numbers: [left, bottom, right, top]
 	//
-	// This is useful in case the BorderEffect causes the graphical
-	// representation of the circle to extend beyond the boundaries of the
-	// original circle.
+	// If this is unset, the ellipse coincides with Common.Rect.
+	//
+	// This can be used in case the BorderEffect causes the graphical
+	// representation of the ellipse to extend beyond the boundaries of the
+	// annotation rectangle.
 	//
 	// This corresponds to the /RD entry in the PDF annotation dictionary.
 	Margin []float64
 
-	// FillColor (optional; PDF 1.4) is the colour used to fill the ellipse.
+	// FillColor (optional) is the colour used to fill the ellipse.
 	//
 	// Only certain color types are allowed:
 	//  - colors in the [color.DeviceGray] color space
@@ -54,13 +64,16 @@ type Circle struct {
 	//  - colors in the [color.DeviceCMYK] color space
 	//  - the [Transparent] color
 	//
+	// If this is nil, the ellipse is not filled.
+	//
 	// This corresponds to the /IC entry in the PDF annotation dictionary.
 	FillColor color.Color
 
 	// BorderStyle (optional) is a border style dictionary specifying the line
 	// width and dash pattern that is used in drawing the ellipse.
+	// The only supported styles are "S" (solid) and "D" (dashed).
 	//
-	// If the BorderStyle field is set, the Common.Border field is ignored.
+	// If this field is set, the Common.Border field is ignored.
 	//
 	// This corresponds to the /BS entry in the PDF annotation dictionary.
 	BorderStyle *BorderStyle
@@ -99,6 +112,14 @@ func decodeCircle(r pdf.Getter, dict pdf.Dict) (*Circle, error) {
 		return nil, err
 	} else {
 		circle.BorderStyle = bs
+		circle.Border = nil
+
+		// BE (optional)
+		if be, err := pdf.Optional(ExtractBorderEffect(r, dict["BE"])); err != nil {
+			return nil, err
+		} else {
+			circle.BorderEffect = be
+		}
 	}
 
 	// IC (optional)
@@ -106,13 +127,6 @@ func decodeCircle(r pdf.Getter, dict pdf.Dict) (*Circle, error) {
 		return nil, err
 	} else {
 		circle.FillColor = ic
-	}
-
-	// BE (optional)
-	if be, err := pdf.Optional(ExtractBorderEffect(r, dict["BE"])); err != nil {
-		return nil, err
-	} else {
-		circle.BorderEffect = be
 	}
 
 	// RD (optional)
@@ -126,6 +140,21 @@ func decodeCircle(r pdf.Getter, dict pdf.Dict) (*Circle, error) {
 func (c *Circle) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Circle"),
+	}
+
+	if c.BorderStyle != nil {
+		if c.Common.Border != nil {
+			return nil, errors.New("conflicting border settings")
+		}
+		if c.BorderStyle.Style == "D" {
+			if len(c.BorderStyle.DashArray) == 0 {
+				return nil, errors.New("missing dash array")
+			}
+		} else if len(c.BorderStyle.DashArray) > 0 {
+			return nil, errors.New("unexpected dash array")
+		}
+	} else if c.BorderEffect != nil {
+		return nil, errors.New("border effect without border style")
 	}
 
 	// Add common annotation fields
@@ -146,18 +175,7 @@ func (c *Circle) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 			return nil, err
 		}
 		dict["BS"] = bs
-	}
-
-	// IC (optional)
-	if c.FillColor != nil {
-		if err := pdf.CheckVersion(rm.Out, "circle annotation IC entry", pdf.V1_4); err != nil {
-			return nil, err
-		}
-		if icArray, err := encodeColor(c.FillColor); err != nil {
-			return nil, err
-		} else if icArray != nil {
-			dict["IC"] = icArray
-		}
+		delete(dict, "Border")
 	}
 
 	// BE (optional)
@@ -170,6 +188,18 @@ func (c *Circle) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 			return nil, err
 		}
 		dict["BE"] = be
+	}
+
+	// IC (optional)
+	if c.FillColor != nil {
+		if err := pdf.CheckVersion(rm.Out, "circle annotation IC entry", pdf.V1_4); err != nil {
+			return nil, err
+		}
+		if icArray, err := encodeColor(c.FillColor); err != nil {
+			return nil, err
+		} else if icArray != nil {
+			dict["IC"] = icArray
+		}
 	}
 
 	// RD (optional)

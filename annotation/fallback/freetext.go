@@ -40,13 +40,7 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 	calloutLine := a.CalloutLine
 	hasCallout := a.Intent == annotation.FreeTextIntentCallout && len(calloutLine) >= 2
 
-	inner := a.Rect
-	if len(a.Margin) >= 4 {
-		inner.LLx += a.Margin[0]
-		inner.LLy += a.Margin[1]
-		inner.URx -= a.Margin[2]
-		inner.URy -= a.Margin[3]
-	}
+	inner := applyMargins(a.Rect, a.Margin)
 
 	outer := inner
 	if hasCallout {

@@ -62,6 +62,7 @@ type Square struct {
 	//  - colors in the [color.DeviceGray] color space
 	//  - colors in the [color.DeviceRGB] color space
 	//  - colors in the [color.DeviceCMYK] color space
+	//  - the [Transparent] color
 	//
 	// If this is nil, the rectangle is not filled.
 	//
@@ -177,18 +178,6 @@ func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		delete(dict, "Border")
 	}
 
-	// IC (optional)
-	if s.FillColor != nil {
-		if err := pdf.CheckVersion(rm.Out, "square annotation IC entry", pdf.V1_4); err != nil {
-			return nil, err
-		}
-		if icArray, err := encodeColor(s.FillColor); err != nil {
-			return nil, err
-		} else if icArray != nil {
-			dict["IC"] = icArray
-		}
-	}
-
 	// BE (optional)
 	if s.BorderEffect != nil {
 		if err := pdf.CheckVersion(rm.Out, "square annotation BE entry", pdf.V1_5); err != nil {
@@ -199,6 +188,18 @@ func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 			return nil, err
 		}
 		dict["BE"] = be
+	}
+
+	// IC (optional)
+	if s.FillColor != nil {
+		if err := pdf.CheckVersion(rm.Out, "square annotation IC entry", pdf.V1_4); err != nil {
+			return nil, err
+		}
+		if icArray, err := encodeColor(s.FillColor); err != nil {
+			return nil, err
+		} else if icArray != nil {
+			dict["IC"] = icArray
+		}
 	}
 
 	// RD (optional)

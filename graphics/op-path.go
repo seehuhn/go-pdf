@@ -38,6 +38,7 @@ func (w *Writer) MoveTo(x, y float64) {
 
 	w.StartX, w.StartY = x, y
 	w.CurrentX, w.CurrentY = x, y
+	w.IsClosed = false
 
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(x), w.coord(y), "m")
 }
@@ -51,6 +52,7 @@ func (w *Writer) LineTo(x, y float64) {
 	}
 
 	w.CurrentX, w.CurrentY = x, y
+	w.IsClosed = false
 
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(x), w.coord(y), "l")
 }
@@ -65,6 +67,7 @@ func (w *Writer) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
 
 	x0, y0 := w.CurrentX, w.CurrentY
 	w.CurrentX, w.CurrentY = x3, y3
+	w.IsClosed = false
 
 	if nearlyEqual(x0, x1) && nearlyEqual(y0, y1) {
 		_, w.Err = fmt.Fprintln(w.Content, w.coord(x2), w.coord(y2), w.coord(x3), w.coord(y3), "v")
@@ -84,6 +87,7 @@ func (w *Writer) ClosePath() {
 	}
 
 	w.CurrentX, w.CurrentY = w.StartX, w.StartY
+	w.IsClosed = true
 
 	_, w.Err = fmt.Fprintln(w.Content, "h")
 }
@@ -102,6 +106,7 @@ func (w *Writer) Rectangle(x, y, width, height float64) {
 
 	w.StartX, w.StartY = x, y
 	w.CurrentX, w.CurrentY = x, y
+	w.IsClosed = true
 
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(x), w.coord(y), w.coord(width), w.coord(height), "re")
 }
@@ -115,7 +120,12 @@ func (w *Writer) Stroke() {
 	}
 	w.currentObject = objPage
 
-	if err := w.mustBeSet(strokeStateBits); err != nil {
+	required := StateLineWidth | StateLineJoin | StateLineDash | StateStrokeColor
+	if !w.IsClosed || len(w.DashPattern) > 0 {
+		required |= StateLineCap
+	}
+
+	if err := w.mustBeSet(required); err != nil {
 		w.Err = err
 		return
 	}
@@ -133,7 +143,14 @@ func (w *Writer) CloseAndStroke() {
 	}
 	w.currentObject = objPage
 
-	if err := w.mustBeSet(strokeStateBits); err != nil {
+	w.IsClosed = true
+
+	required := StateLineWidth | StateLineJoin | StateLineDash | StateStrokeColor
+	if len(w.DashPattern) > 0 {
+		required |= StateLineCap
+	}
+
+	if err := w.mustBeSet(required); err != nil {
 		w.Err = err
 		return
 	}
@@ -151,7 +168,7 @@ func (w *Writer) Fill() {
 	}
 	w.currentObject = objPage
 
-	if err := w.mustBeSet(fillStateBits); err != nil {
+	if err := w.mustBeSet(StateFillColor); err != nil {
 		w.Err = err
 		return
 	}
@@ -169,7 +186,7 @@ func (w *Writer) FillEvenOdd() {
 	}
 	w.currentObject = objPage
 
-	if err := w.mustBeSet(fillStateBits); err != nil {
+	if err := w.mustBeSet(StateFillColor); err != nil {
 		w.Err = err
 		return
 	}
@@ -187,7 +204,12 @@ func (w *Writer) FillAndStroke() {
 	}
 	w.currentObject = objPage
 
-	if err := w.mustBeSet(strokeStateBits | fillStateBits); err != nil {
+	required := StateLineWidth | StateLineJoin | StateLineDash | StateStrokeColor
+	if !w.IsClosed || len(w.DashPattern) > 0 {
+		required |= StateLineCap
+	}
+
+	if err := w.mustBeSet(required | StateFillColor); err != nil {
 		w.Err = err
 		return
 	}
@@ -206,7 +228,12 @@ func (w *Writer) FillAndStrokeEvenOdd() {
 	}
 	w.currentObject = objPage
 
-	if err := w.mustBeSet(strokeStateBits | fillStateBits); err != nil {
+	required := StateLineWidth | StateLineJoin | StateLineDash | StateStrokeColor
+	if !w.IsClosed || len(w.DashPattern) > 0 {
+		required |= StateLineCap
+	}
+
+	if err := w.mustBeSet(required | StateFillColor); err != nil {
 		w.Err = err
 		return
 	}
@@ -224,7 +251,14 @@ func (w *Writer) CloseFillAndStroke() {
 	}
 	w.currentObject = objPage
 
-	if err := w.mustBeSet(strokeStateBits | fillStateBits); err != nil {
+	w.IsClosed = true
+
+	required := StateLineWidth | StateLineJoin | StateLineDash | StateStrokeColor
+	if len(w.DashPattern) > 0 {
+		required |= StateLineCap
+	}
+
+	if err := w.mustBeSet(required | StateFillColor); err != nil {
 		w.Err = err
 		return
 	}
@@ -243,7 +277,14 @@ func (w *Writer) CloseFillAndStrokeEvenOdd() {
 	}
 	w.currentObject = objPage
 
-	if err := w.mustBeSet(strokeStateBits | fillStateBits); err != nil {
+	w.IsClosed = true
+
+	required := StateLineWidth | StateLineJoin | StateLineDash | StateStrokeColor
+	if !w.IsClosed || len(w.DashPattern) > 0 {
+		required |= StateLineCap
+	}
+
+	if err := w.mustBeSet(required | StateFillColor); err != nil {
 		w.Err = err
 		return
 	}

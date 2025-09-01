@@ -39,6 +39,7 @@ type Parameters struct {
 
 	StartX, StartY     float64 // the starting point of the current path
 	CurrentX, CurrentY float64 // the "current point"
+	IsClosed           bool    // whether the current path is closed
 
 	StrokeColor color.Color
 	FillColor   color.Color
@@ -408,17 +409,9 @@ const (
 		StateBlackPointCompensation | StateOverprint | StateOverprintMode |
 		StateFlatnessTolerance
 
-	// OpStateBits lists the graphical parameters which can be set using
-	// graphics operators.
-	OpStateBits = StateStrokeColor | StateFillColor | StateTextCharacterSpacing |
-		StateTextWordSpacing | StateTextHorizontalScaling | StateTextLeading |
-		StateTextFont | StateTextRenderingMode | StateTextRise |
-		StateLineWidth | StateLineCap | StateLineJoin | StateMiterLimit |
-		StateLineDash | StateRenderingIntent | StateFlatnessTolerance
-
-	// ExtGStateBits lists the graphical parameters which can be encoded in an
+	// extGStateBits lists the graphical parameters which can be encoded in an
 	// ExtGState resource.
-	ExtGStateBits = StateTextFont | StateTextKnockout | StateLineWidth |
+	extGStateBits = StateTextFont | StateTextKnockout | StateLineWidth |
 		StateLineCap | StateLineJoin | StateMiterLimit | StateLineDash |
 		StateRenderingIntent | StateStrokeAdjustment | StateBlendMode |
 		StateSoftMask | StateStrokeAlpha | StateFillAlpha |
@@ -426,12 +419,6 @@ const (
 		StateOverprintMode | StateBlackGeneration | StateUndercolorRemoval |
 		StateTransferFunction | StateHalftone | StateHalftoneOrigin |
 		StateFlatnessTolerance | StateSmoothnessTolerance
-
-	// TODO(voss): update this once
-	// https://github.com/pdf-association/pdf-issues/issues/380
-	// is resolved
-	strokeStateBits = StateLineWidth | StateLineCap | StateLineJoin | StateLineDash | StateStrokeColor
-	fillStateBits   = StateFillColor
 )
 
 type errMissingState StateBits

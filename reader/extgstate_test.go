@@ -100,11 +100,6 @@ func TestExtGState(t *testing.T) {
 	ext1.SmoothnessTolerance = 0.6
 	ext1.Set |= graphics.StateSmoothnessTolerance
 
-	// check that we have set all possible parameters
-	if ext1.Set != graphics.ExtGStateBits {
-		t.Error("test is broken: some parameters are not set")
-	}
-
 	// step 1: embed this graphics state into a PDF file
 	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(data)

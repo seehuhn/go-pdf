@@ -80,7 +80,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 				return w.TextLayout(nil, "A A")
 			},
 			expectedFunc: func() []vec.Vec2 {
-				return calculateExpectedQuadPoints(10.0, 0, 0, matrix.Identity, matrix.Identity, "A A")
+				return calculateExpectedQuadPoints(10.0, 0, 0, matrix.Identity, matrix.Identity)
 			},
 		},
 		{
@@ -91,7 +91,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 				return w.TextLayout(nil, "A A")
 			},
 			expectedFunc: func() []vec.Vec2 {
-				return calculateExpectedQuadPoints(10.0, 0, 0, matrix.Identity, matrix.Translate(20, 30), "A A")
+				return calculateExpectedQuadPoints(10.0, 0, 0, matrix.Identity, matrix.Translate(20, 30))
 			},
 		},
 		{
@@ -102,7 +102,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 				return w.TextLayout(nil, "A A")
 			},
 			expectedFunc: func() []vec.Vec2 {
-				return calculateExpectedQuadPoints(10.0, 0, 0, matrix.Identity, matrix.Scale(1.5, 1.2), "A A")
+				return calculateExpectedQuadPoints(10.0, 0, 0, matrix.Identity, matrix.Scale(1.5, 1.2))
 			},
 		},
 		{
@@ -113,7 +113,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 				return w.TextLayout(nil, "A A")
 			},
 			expectedFunc: func() []vec.Vec2 {
-				return calculateExpectedQuadPoints(10.0, 5.0, 0, matrix.Identity, matrix.Identity, "A A")
+				return calculateExpectedQuadPoints(10.0, 5.0, 0, matrix.Identity, matrix.Identity)
 			},
 		},
 	}
@@ -160,7 +160,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 
 // calculateExpectedQuadPoints computes the expected quad points for given parameters
 // This matches the logic from the actual implementation
-func calculateExpectedQuadPoints(fontSize, textRise, skip float64, ctm, textMatrix matrix.Matrix, text string) []vec.Vec2 {
+func calculateExpectedQuadPoints(fontSize, textRise, skip float64, ctm, textMatrix matrix.Matrix) []vec.Vec2 {
 	// Squarefont constants (from internal/squarefont/font.go)
 	const (
 		SquareLeft   = 100 // LLx for "A"

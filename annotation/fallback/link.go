@@ -67,6 +67,9 @@ func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 		draw = func(w *graphics.Writer) error {
 			w.SetStrokeColor(col)
 			w.SetLineWidth(borderWidth)
+			w.SetLineJoin(graphics.LineJoinMiter) // TODO(voss): remove
+			w.SetLineDash(nil, 0)
+			w.SetLineCap(graphics.LineCapButt)
 			w.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy+borderWidth/2, 2))
 			w.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.LLy+borderWidth/2, 2))
 			w.Stroke()
@@ -75,8 +78,10 @@ func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 	case "D": // dashed
 		draw = func(w *graphics.Writer) error {
 			w.SetStrokeColor(col)
-			w.SetLineDash(dashPattern, 0)
 			w.SetLineWidth(borderWidth)
+			w.SetLineJoin(graphics.LineJoinMiter)
+			w.SetLineDash(dashPattern, 0)
+			w.SetLineCap(graphics.LineCapButt)
 			w.Rectangle(
 				pdf.Round(bbox.LLx+borderWidth/2, 2),
 				pdf.Round(bbox.LLy+borderWidth/2, 2),
@@ -133,6 +138,8 @@ func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 		draw = func(w *graphics.Writer) error {
 			w.SetStrokeColor(col)
 			w.SetLineWidth(borderWidth)
+			w.SetLineJoin(graphics.LineJoinMiter)
+			w.SetLineDash(nil, 0)
 			w.Rectangle(
 				pdf.Round(bbox.LLx+borderWidth/2, 2),
 				pdf.Round(bbox.LLy+borderWidth/2, 2),
