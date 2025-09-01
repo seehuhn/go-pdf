@@ -55,9 +55,9 @@
 //		FractionFormat:   measure.FractionFraction,
 //	}
 //
-// Use [FormatMeasurement] to format numeric values according to PDF spec 12.9.2:
+// Use [Format] to format numeric values according to PDF spec 12.9.2:
 //
-//	formatted, err := measure.FormatMeasurement(1.75, []*measure.NumberFormat{format})
+//	formatted, err := measure.Format(1.75, []*measure.NumberFormat{format})
 //	// Result: "1 ft 9 in" (depending on format configuration)
 //
 // # Viewport Dictionaries
@@ -80,22 +80,6 @@
 //
 //	// Embed array in PDF
 //	embedded, _, err := pdf.ResourceManagerEmbed(resourceManager, viewports)
-//
-// # PDF Integration
-//
-// All types implement the standard PDF embedding patterns:
-//
-//   - Extract functions for reading from PDF objects
-//   - Embed methods for writing to PDF objects
-//   - Support for SingleUse pattern (direct vs indirect objects)
-//   - Proper error handling for malformed input
-//
-// The package follows PDF specification requirements:
-//
-//   - Version checking (PDF 1.6+ required for measure dictionaries)
-//   - Permissive reading with fallbacks for unknown subtypes
-//   - Strict validation during PDF generation
-//   - Optimization for common cases (e.g., omitting Y-axis when equal to X-axis)
 //
 // # Examples
 //

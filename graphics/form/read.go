@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/pdfcopy"
 	"seehuhn.de/go/pdf/pieceinfo"
@@ -81,6 +82,13 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Form, error) {
 	lastModDate, _ := pdf.GetDate(r, dict["LastModified"])
 	if !lastModDate.IsZero() {
 		form.LastModified = time.Time(lastModDate)
+	}
+
+	// Measure (optional)
+	if m, err := pdf.Optional(measure.Extract(r, dict["Measure"])); err != nil {
+		return nil, err
+	} else {
+		form.Measure = m
 	}
 
 	// Create Draw function as closure

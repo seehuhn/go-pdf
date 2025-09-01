@@ -16,48 +16,53 @@
 
 // Package annotation provides support for reading and writing PDF annotations.
 //
-// PDF annotations are additions to a PDF page which are stored outside the
-// page content stream (in the Annots entry of the page dictionary), in a
-// structured format.  This makes it relatively easy to add/edit/remove
-// annotations without having to rewrite the entire page.
-//
-// PDF 2.0 defines 28 different annotation types. The most common type is
-// [Link], which represents clickable areas in the PDF that can navigate to
-// other pages or external URLs. Other commonly used annotation types include
-// [Widget] for form fields and [Text] for simple text notes. All annotation
-// types implement the [Annotation] interface. The full list is:
-//   - [Annot3D]: (PDF 1.6) include 3D artwork in PDF documents
-//   - [Caret]: (PDF 1.5) indicate the presence of text edits
+// There are two classes of annotations, markup annotations and interactive
+// annotations. Markup annotations correspond to comments and other markings a
+// reviewer or editor might add to a manuscript. These annotations allow for
+// tracking of relies and approvals. The most common type of markup annotation
+// are [Text] annotations, which represent simple text notes which can be
+// opened by clicking on an icon on the PDF page. The full list of markup
+// annotations for PDF 2.0 is:
+//   - [Caret]: indicate the presence of text edits
 //   - [Circle]: draw an ellipse onto the page
-//   - [FileAttachment]: (PDF 1.3)
-//   - [FreeText]: (PDF 1.3)
-//   - [Highlight]: (PDF 1.3)
-//   - [Ink]: (PDF 1.3)
-//   - [Line]: (PDF 1.3)
-//   - [Link]: a clickable area which navigates to another page or an external URL
-//   - [Movie]: (PDF 1.2; deprecated in PDF 2.0)
-//   - [Polygon]: (PDF 1.5)
-//   - [Polyline]: (PDF 1.5)
-//   - [Popup]: (PDF 1.3)
-//   - [PrinterMark]: (PDF 1.4)
+//   - [FileAttachment]:
+//   - [FreeText]:
+//   - [Ink]:
+//   - [Line]:
+//   - [Polygon]:
+//   - [Polyline]:
 //   - [Projection]: (PDF 2.0)
-//   - [Redact]: (PDF 1.7)
-//   - [RichMedia]: (PDF 2.0)
-//   - [Screen]: (PDF 1.5)
-//   - [Sound]: (PDF 1.2; deprecated in PDF 2.0)
-//   - [Square]: (PDF 1.3) draw a rectangle onto the page
-//   - [Squiggly]: (PDF 1.4)
-//   - [Stamp]: (PDF 1.3)
-//   - [StrikeOut]: (PDF 1.3)
+//   - [Redact]:
+//   - [Sound]: (deprecated in PDF 2.0)
+//   - [Square]: draw a rectangle onto the page
+//   - [Stamp]:
 //   - [Text]: a clickable icon which opens a popup with text
-//   - [TrapNet]: (PDF 1.3; deprecated in PDF 2.0)
-//   - [Underline]: (PDF 1.3)
-//   - [Watermark]: (PDF 1.6)
-//   - [Widget]: (PDF 1.2)
+//   - [TextMarkup]:
+//
+// Interactive annotations provide a way to interact with on-screen versions of
+// the document.  The most common type of interactive annotation are [Link]
+// annotations, which represent clickable areas in the PDF that can navigate to
+// other pages or external URLs.  The full list of interactive annotations for
+// PDF 2.0 is:
+//   - [Annot3D]: includes 3D artwork in PDF documents
+//   - [Link]: a clickable area which navigates to another page or an external URL
+//   - [Movie]: (deprecated in PDF 2.0)
+//   - [Popup]:
+//   - [PrinterMark]:
+//   - [RichMedia]: (PDF 2.0)
+//   - [Screen]:
+//   - [TrapNet]: (deprecated in PDF 2.0)
+//   - [Watermark]:
+//   - [Widget]:
 //
 // The list of annotations is extensible; PDF viewers may support additional
 // annotation types, and possibly a plugin system for custom annotations. The
 // following type is used by the go-pdf library to represent custom
 // annotations:
 //   - [Custom]: any annotation not shown in the list above
+//
+// PDF annotations are stored outside the page content stream (in the Annots
+// entry of the page dictionary), in a structured format.  This makes it
+// relatively easy to add/edit/remove annotations without having to rewrite the
+// entire page.
 package annotation

@@ -25,9 +25,12 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/pieceinfo"
 )
+
+// PDF 2.0 sections: 8.10
 
 // Form represents a PDF form XObject that can contain reusable graphics content.
 type Form struct {
@@ -53,10 +56,13 @@ type Form struct {
 	// 1.3) is the date the form was last modified.
 	LastModified time.Time
 
+	// Measure (optional) is a measure dictionary that specifies the scale and
+	// units which shall apply to the form.
+	Measure measure.Measure
+
 	// TODO(voss): StructParent, StructParents
 	// TODO(voss): OC
 	// TODO(voss): AF
-	// TODO(voss): Measure
 	// TODO(voss): PtData
 }
 
@@ -83,6 +89,7 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	buf := &bytes.Buffer{}
 	contents := graphics.NewWriter(buf, rm)
+	contents.State.Set = 0 // make sure the XObject is independent of the current graphics state
 	err = f.Draw(contents)
 	if err != nil {
 		return nil, zero, err
@@ -127,6 +134,18 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 	if !f.LastModified.IsZero() {
 		dict["LastModified"] = pdf.Date(f.LastModified)
+	}
+
+	// Measure (optional; PDF 2.0)
+	if f.Measure != nil {
+		if err := pdf.CheckVersion(rm.Out, "form XObject Measure entry", pdf.V2_0); err != nil {
+			return nil, zero, err
+		}
+		embedded, _, err := pdf.ResourceManagerEmbed(rm, f.Measure)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["Measure"] = embedded
 	}
 
 	var filters []pdf.Filter

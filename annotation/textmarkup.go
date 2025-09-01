@@ -31,9 +31,9 @@ type TextMarkupType pdf.Name
 
 const (
 	TextMarkupTypeHighlight TextMarkupType = "Highlight"
-	TextMarkupTypeUnderline TextMarkupType = "Underline"
 	TextMarkupTypeSquiggly  TextMarkupType = "Squiggly"
 	TextMarkupTypeStrikeOut TextMarkupType = "StrikeOut"
+	TextMarkupTypeUnderline TextMarkupType = "Underline"
 )
 
 // TextMarkup represents a text markup annotation that appears as highlights,

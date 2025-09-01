@@ -37,6 +37,7 @@ type SpaceCalGray struct {
 //
 // WhitePoint is the diffuse white point in CIE 1931 XYZ coordinates.  This
 // must be a slice of length 3, with positive entries, and Y=1.
+// This is typically one of [WhitePointD65] or [WhitePointD50].
 //
 // BlackPoint (optional) is the diffuse black point in the CIE 1931 XYZ
 // coordinates.  If non-nil, this must be a slice of three non-negative
@@ -134,6 +135,7 @@ type SpaceCalRGB struct {
 //
 // WhitePoint is the diffuse white point in CIE 1931 XYZ coordinates.  This
 // must be a slice of length 3, with positive entries, and Y=1.
+// This is typically one of [WhitePointD65] or [WhitePointD50].
 //
 // BlackPoint (optional) is the diffuse black point in the CIE 1931 XYZ
 // coordinates.  If non-nil, this must be a slice of three non-negative
@@ -245,6 +247,7 @@ type SpaceLab struct {
 //
 // WhitePoint is the diffuse white point in CIE 1931 XYZ coordinates.  This
 // must be a slice of length 3, with positive entries, and Y=1.
+// This is typically one of [WhitePointD65] or [WhitePointD50].
 //
 // BlackPoint (optional) is the diffuse black point in the CIE 1931 XYZ
 // coordinates.  If non-nil, this must be a slice of three non-negative

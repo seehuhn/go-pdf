@@ -378,6 +378,17 @@ func (r *Rectangle) ExtendVec(v vec.Vec2) {
 	}
 }
 
+// Round rounds the corner coordinates of the rectangle to the given number of
+// decimal places and returns the result.
+func (r Rectangle) Round(digits int) Rectangle {
+	return Rectangle{
+		LLx: Round(r.LLx, digits),
+		LLy: Round(r.LLy, digits),
+		URx: Round(r.URx, digits),
+		URy: Round(r.URy, digits),
+	}
+}
+
 // IRound rounds the corner coordinates of the rectangle to the given number of
 // decimal places. This modifies the rectangle in place.
 func (r *Rectangle) IRound(digits int) {

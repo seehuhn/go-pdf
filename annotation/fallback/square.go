@@ -47,6 +47,16 @@ func (s *Style) addSquareAppearance(a *annotation.Square) *form.Form {
 	}
 
 	draw := func(w *graphics.Writer) error {
+		if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
+			gs := &graphics.ExtGState{
+				Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
+				StrokeAlpha: 1 - a.StrokingTransparency,
+				FillAlpha:   1 - a.NonStrokingTransparency,
+				SingleUse:   true,
+			}
+			w.SetExtGState(gs)
+		}
+
 		if hasOutline {
 			w.SetLineWidth(lw)
 			w.SetStrokeColor(col)

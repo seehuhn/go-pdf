@@ -70,54 +70,12 @@ type Common struct {
 	// The position is given by the upper-left corner of the rectangle.
 	Rect pdf.Rectangle
 
-	// Contents (optional) is the textual content of the annotation.
-	// The exact meaning of this field depends on the type of the annotation.
-	Contents string
-
-	// Page (optional) points to the page dictionary that contains this
-	// annotation. Required for [Screen] annotations associated with rendition
-	// actions.
-	//
-	// This corresponds to the /P entry in the PDF annotation dictionary.
-	Page pdf.Reference
-
-	// Name (optional) is the name of the annotation. Is set, this must be unique
-	// among all annotations on the page.
-	//
-	// This corresponds to the /NM entry in the PDF annotation dictionary.
-	Name string
-
-	// LastModified (optional) is the date and time when the annotation was
-	// most recently modified.  This can either be a PDF date string or a
-	// human-readable freeform string.
-	//
-	// This corresponds to the /M entry in the PDF annotation dictionary.
-	LastModified string
-
-	// Flags specifies various characteristics of the annotation.
-	//
-	// This corresponds to the /F entry in the PDF annotation dictionary.
-	Flags Flags
-
-	// Appearance (optional) is an appearance dictionary specifying how the
-	// annotation is presented visually on the page.
-	//
-	// This corresponds to the /AP entry in the PDF annotation dictionary.
-	Appearance *appearance.Dict
-
-	// AppearanceState (required if AP contains subdictionaries) is the
-	// annotation's appearance state, which selects the applicable appearance
-	// stream from an appearance subdictionary.
-	//
-	// This corresponds to the /AS entry in the PDF annotation dictionary.
-	AppearanceState pdf.Name
-
 	// Border (optional) specifies the characteristics of the annotation's
 	// border.
 	Border *Border
 
 	// Color (optional) is the color used for the annotation's background,
-	// title bar or border (depending on the annotation type).
+	// border or title bar (depending on the annotation type).
 	//
 	// Only certain color types are allowed:
 	//  - colors in the [color.DeviceGray] color space
@@ -125,25 +83,17 @@ type Common struct {
 	//  - colors in the [color.DeviceCMYK] color space
 	//  - the [Transparent] color
 	//
+	// The effect of a nil Color value depends on the annotation type.
+	//
 	// This corresponds to the /C entry in the PDF annotation dictionary.
 	Color color.Color
 
-	// StructParent (required if the annotation is a structural content item)
-	// is the integer key of the annotation's entry in the structural parent
-	// tree.
-	StructParent pdf.Integer
-
-	// OptionalContent (optional) specifies the optional content properties for
-	// the annotation.
+	// Appearance (optional for PDF1.7, required for PDF 2.0) is an appearance
+	// dictionary specifying how the annotation is presented visually on the
+	// page.
 	//
-	// This corresponds to the /OC entry in the PDF annotation dictionary.
-	OptionalContent pdf.Reference
-
-	// Files (optional) is an array of file specification dictionaries which
-	// denote the associated files for this annotation.
-	//
-	// This corresponds to the /AF entry in the PDF annotation dictionary.
-	Files []pdf.Reference
+	// This corresponds to the /AP entry in the PDF annotation dictionary.
+	Appearance *appearance.Dict
 
 	// NonStrokingTransparency is the transparency value for nonstroking
 	// operations on the annotation in its closed state. The value 1 means
@@ -173,9 +123,62 @@ type Common struct {
 	// This corresponds to the /BM entry in the PDF annotation dictionary.
 	BlendMode pdf.Name
 
+	// AppearanceState (required if AP contains subdictionaries) is the
+	// annotation's appearance state, which selects the applicable appearance
+	// stream from an appearance subdictionary.
+	//
+	// This corresponds to the /AS entry in the PDF annotation dictionary.
+	AppearanceState pdf.Name
+
+	// Contents (optional) is the textual content of the annotation.
+	// The exact meaning of this field depends on the type of the annotation.
+	Contents string
+
 	// Lang (optional) is a language identifier specifying the natural language
 	// for all text in the annotation.
 	Lang language.Tag
+
+	// LastModified (optional) is the date and time when the annotation was
+	// most recently modified.  This can either be a PDF date string or a
+	// human-readable freeform string.
+	//
+	// This corresponds to the /M entry in the PDF annotation dictionary.
+	LastModified string
+
+	// Flags specifies various characteristics of the annotation.
+	//
+	// This corresponds to the /F entry in the PDF annotation dictionary.
+	Flags Flags
+
+	// Name (optional) is the name of the annotation. Is set, this must be unique
+	// among all annotations on the page.
+	//
+	// This corresponds to the /NM entry in the PDF annotation dictionary.
+	Name string
+
+	// Files (optional) is an array of file specification dictionaries which
+	// denote the associated files for this annotation.
+	//
+	// This corresponds to the /AF entry in the PDF annotation dictionary.
+	Files []pdf.Reference
+
+	// StructParent (required if the annotation is a structural content item)
+	// is the integer key of the annotation's entry in the structural parent
+	// tree.
+	StructParent pdf.Integer
+
+	// OptionalContent (optional) specifies the optional content properties for
+	// the annotation.
+	//
+	// This corresponds to the /OC entry in the PDF annotation dictionary.
+	OptionalContent pdf.Reference
+
+	// Page (optional) points to the page dictionary that contains this
+	// annotation. Required for [Screen] annotations associated with rendition
+	// actions.
+	//
+	// This corresponds to the /P entry in the PDF annotation dictionary.
+	Page pdf.Reference
 }
 
 func (c *Common) GetCommon() *Common {
@@ -469,9 +472,9 @@ func decodeCommon(r pdf.Getter, common *Common, dict pdf.Dict) error {
 	return nil
 }
 
-// Transparent is a special color that indicates that an annotation should not
-// be painted at all.  This can only be used for the Color field in the
-// [Common] struct.
+// Transparent is a special color that indicates that part of an annotation
+// (for example the border) should not be painted at all.  This can only be
+// used for the Color field in the [Common] struct.
 var Transparent color.Color = &transparent{}
 
 type transparent struct{}
