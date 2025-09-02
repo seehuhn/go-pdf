@@ -24,18 +24,18 @@ import (
 
 // PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.4
 
-// Text represents a text annotation, used to provide editorial notes,
-// comments, or other textual feedback on a PDF document. Text annotations are
-// displayed as icons on the page, which can be clicked to reveal the
-// associated text content in a pop-up window.
+// Text is used to provide editorial notes, comments, or other textual feedback
+// on a PDF document. Text annotations are displayed as icons on the page,
+// which can be clicked to reveal the associated text content in a pop-up
+// window.
 //
 // The background color of the icon can be specified using the [Common.Color]
-// field.
+// field.  The default color is implementation dependent.
 type Text struct {
 	Common
 	Markup
 
-	// Open specifies whether the annotation is initially displayed open.
+	// Open specifies whether the pop-up window should be initially open.
 	Open bool
 
 	// Icon is the name of an icon that is used in displaying the annotation.
@@ -49,9 +49,10 @@ type Text struct {
 	// This corresponds to the /Name entry in the PDF annotation dictionary.
 	Icon TextIcon
 
-	// State specifies the current state of the "parent" annotation denoted by
-	// the [Markup.InReplyTo] field.  Text annotations which have non-zero
-	// State must have the following fields set:
+	// State (optional) specifies the current state of the "parent" annotation
+	// denoted by the [Markup.InReplyTo] field.  Text annotations with
+	// non-zero State must have the following fields set:
+	//
 	//   - [Markup.InReplyTo] must indicate the annotation that this
 	//     state applies to.
 	//   - [Markup.User] must be set to the user who assigned the state.
@@ -77,35 +78,43 @@ func decodeText(r pdf.Getter, obj pdf.Object) (*Text, error) {
 
 	text := &Text{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(r, &text.Common, dict); err != nil {
 		return nil, err
 	}
 
-	// Extract markup annotation fields
 	if err := decodeMarkup(r, dict, &text.Markup); err != nil {
 		return nil, err
 	}
 
-	// Extract text-specific fields
-	if open, err := pdf.GetBoolean(r, dict["Open"]); err == nil {
+	if open, err := pdf.Optional(pdf.GetBoolean(r, dict["Open"])); err != nil {
+		return nil, err
+	} else {
 		text.Open = bool(open)
 	}
 
-	if name, err := pdf.GetName(r, dict["Name"]); err == nil && name != "" {
+	if name, err := pdf.Optional(pdf.GetName(r, dict["Name"])); err != nil {
+		return nil, err
+	} else if name != "" {
 		text.Icon = TextIcon(name)
 	} else {
 		text.Icon = TextIconNote
 	}
 
-	stateModel, _ := pdf.GetTextString(r, dict["StateModel"])
-	switch stateModel { // set default values
+	stateModel, err := pdf.Optional(pdf.GetTextString(r, dict["StateModel"]))
+	if err != nil {
+		return nil, err
+	}
+	switch stateModel {
 	case "Marked":
 		text.State = TextStateUnmarked
 	case "Review":
 		text.State = TextStateNone
 	}
-	state, _ := pdf.GetTextString(r, dict["State"])
+
+	state, err := pdf.Optional(pdf.GetTextString(r, dict["State"]))
+	if err != nil {
+		return nil, err
+	}
 	switch state {
 	case "Marked":
 		text.State = TextStateMarked
@@ -128,7 +137,7 @@ func decodeText(r pdf.Getter, obj pdf.Object) (*Text, error) {
 		if text.Markup.InReplyTo == 0 {
 			text.State = TextStateUnknown // can't fix missing reply relationship
 		} else if text.Markup.User == "" {
-			text.Markup.User = "unknown" // preserve state with placeholder user
+			text.Markup.User = "unknown"
 		}
 	}
 
@@ -147,7 +156,6 @@ func (t *Text) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 
-	// text-specific fields
 	if t.Open {
 		dict["Open"] = pdf.Boolean(t.Open)
 	}

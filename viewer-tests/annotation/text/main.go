@@ -21,6 +21,7 @@ import (
 	"math"
 	"os"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
@@ -34,6 +35,19 @@ import (
 	"seehuhn.de/go/pdf/graphics/shading"
 )
 
+const (
+	// horizontal spacing
+	leftColStart  = 60.0
+	leftColEnd    = 160.0
+	rightColStart = 220.0
+	rightColEnd   = 320.0
+	commentStart  = 380.0
+
+	// vertical spacing
+	startY   = 780.0
+	iconSize = 24.0
+)
+
 func main() {
 	err := createDocument("test.pdf")
 	if err != nil {
@@ -42,21 +56,8 @@ func main() {
 	}
 }
 
-const (
-	rowSpacing = 32.0
-	iconSize   = 24.0
-
-	topRowY = 500.0
-
-	labelX         = 70.0
-	defaultColX    = 160.0
-	styledColX     = 200.0
-	pinkColX       = 270.0
-	styledPinkColX = 310.0
-)
-
 func createDocument(filename string) error {
-	paper := document.A5
+	paper := document.A4
 	opt := &pdf.WriterOptions{
 		HumanReadable: true,
 	}
@@ -71,16 +72,28 @@ func createDocument(filename string) error {
 	}
 	page.DrawShading(background)
 
+	B := standard.TimesBold.New()
+	H := standard.Helvetica.New()
+
 	w := &writer{
-		annots:    pdf.Array{},
-		page:      page,
-		style:     fallback.NewStyle(),
-		yPos:      topRowY,
-		labelFont: standard.Helvetica.New(),
+		annots: pdf.Array{},
+		page:   page,
+		style:  fallback.NewStyle(),
+		yPos:   startY,
+		font:   H,
 	}
 
-	pink := color.DeviceRGB(0.96, 0.87, 0.90)
+	// add headers
+	page.TextBegin()
+	page.TextSetMatrix(matrix.Translate(leftColStart-5, w.yPos))
+	page.TextSetFont(B, 12)
+	page.TextShow("Your PDF viewer")
+	page.TextSetMatrix(matrix.Translate(rightColStart-5, w.yPos))
+	page.TextShow("Quire appearance stream")
+	page.TextEnd()
+	w.yPos -= 24.0
 
+	// test all 7 icon types with default colors
 	allIcons := []annotation.TextIcon{
 		annotation.TextIconComment,
 		annotation.TextIconKey,
@@ -90,34 +103,77 @@ func createDocument(filename string) error {
 		annotation.TextIconParagraph,
 		annotation.TextIconInsert,
 	}
+
 	for _, icon := range allIcons {
-		w.label(icon)
-
-		// viewer default style
-		err := w.addAnnotation(icon, defaultColX, nil, false)
+		text := &annotation.Text{
+			Common: annotation.Common{
+				Contents: fmt.Sprintf("Icon: %s", icon),
+				Border:   annotation.PDFDefaultBorder,
+				Flags:    annotation.FlagPrint,
+			},
+			Markup: annotation.Markup{
+				User: "Test User",
+			},
+			Icon: icon,
+		}
+		err = w.addAnnotationPair(text, string(icon))
 		if err != nil {
 			return err
 		}
+	}
 
-		// with appearance dictionary
-		err = w.addAnnotation(icon, styledColX, nil, true)
-		if err != nil {
-			return err
-		}
+	// test with pink color
+	pink := color.DeviceRGB(0.96, 0.87, 0.90)
+	text := &annotation.Text{
+		Common: annotation.Common{
+			Contents: "Pink background",
+			Color:    pink,
+			Border:   annotation.PDFDefaultBorder,
+			Flags:    annotation.FlagPrint,
+		},
+		Markup: annotation.Markup{
+			User: "Test User",
+		},
+		Icon: annotation.TextIconNote,
+	}
+	err = w.addAnnotationPair(text, "Common.Color = pink")
+	if err != nil {
+		return err
+	}
 
-		// pink background
-		err = w.addAnnotation(icon, pinkColX, pink, false)
-		if err != nil {
-			return err
-		}
+	// test with transparent color (no appearance stream)
+	text = &annotation.Text{
+		Common: annotation.Common{
+			Contents: "Transparent background",
+			Color:    annotation.Transparent,
+			Border:   annotation.PDFDefaultBorder,
+			Flags:    annotation.FlagPrint,
+		},
+		Markup: annotation.Markup{
+			User: "Test User",
+		},
+		Icon: annotation.TextIconNote,
+	}
+	err = w.addAnnotationPair(text, "Common.Color = transparent")
+	if err != nil {
+		return err
+	}
 
-		// styled with pink background
-		err = w.addAnnotation(icon, styledPinkColX, pink, true)
-		if err != nil {
-			return err
-		}
-
-		w.yPos -= rowSpacing
+	// test with border width
+	text = &annotation.Text{
+		Common: annotation.Common{
+			Contents: "Border width 2",
+			Border:   &annotation.Border{Width: 2, SingleUse: true},
+			Flags:    annotation.FlagPrint,
+		},
+		Markup: annotation.Markup{
+			User: "Test User",
+		},
+		Icon: annotation.TextIconNote,
+	}
+	err = w.addAnnotationPair(text, "Common.Border.Width = 2")
+	if err != nil {
+		return err
 	}
 
 	page.PageDict["Annots"] = w.annots
@@ -126,11 +182,11 @@ func createDocument(filename string) error {
 }
 
 type writer struct {
-	annots    pdf.Array
-	page      *document.Page
-	style     *fallback.Style
-	yPos      float64
-	labelFont font.Layouter
+	annots pdf.Array
+	page   *document.Page
+	style  *fallback.Style
+	yPos   float64
+	font   font.Layouter
 }
 
 func (w *writer) embed(a annotation.Annotation, ref pdf.Reference) error {
@@ -146,43 +202,68 @@ func (w *writer) embed(a annotation.Annotation, ref pdf.Reference) error {
 	return nil
 }
 
-// createIconLabel creates the title text for an icon
-func (w *writer) label(iconName annotation.TextIcon) {
+func (w *writer) addAnnotationPair(left *annotation.Text, label string) error {
+	leftRef := w.page.RM.Out.Alloc()
+	rightRef := w.page.RM.Out.Alloc()
+
+	// center icons horizontally in columns
+	leftCenter := (leftColStart + leftColEnd) / 2
+	rightCenter := (rightColStart + rightColEnd) / 2
+
+	// add label on the right side
 	w.page.TextBegin()
-	w.page.TextSetFont(w.labelFont, 8)
-	w.page.TextFirstLine(labelX, w.yPos+10)
-	w.page.TextShow(string(iconName))
+	w.page.TextSetFont(w.font, 10)
+	w.page.TextSetMatrix(matrix.Translate(commentStart, w.yPos-iconSize/2-3))
+	w.page.TextShow(label)
+	w.page.TextSetFont(w.font, 6)
+	w.page.TextSetHorizontalScaling(0.9)
+	w.page.TextSetMatrix(matrix.Translate(leftCenter+iconSize/2+3, w.yPos-iconSize))
+	w.page.TextShow(fmt.Sprintf("%d %d R", leftRef.Number(), leftRef.Generation()))
+	w.page.TextSetMatrix(matrix.Translate(rightCenter+iconSize/2+3, w.yPos-iconSize))
+	w.page.TextShow(fmt.Sprintf("%d %d R", rightRef.Number(), rightRef.Generation()))
 	w.page.TextEnd()
-}
 
-// addAnnotation creates a text annotation
-func (w *writer) addAnnotation(icon annotation.TextIcon, xPos float64, backgroundColor color.Color, useStyle bool) error {
-	textRef := w.page.RM.Out.Alloc()
+	right := clone(left)
 
-	y := w.yPos + 24
-	rect := pdf.Rectangle{LLx: xPos, LLy: y - iconSize, URx: xPos + iconSize, URy: y}
-
-	text := &annotation.Text{
-		Common: annotation.Common{
-			Rect:     rect,
-			Contents: fmt.Sprintf("Icon name %q", icon),
-			Color:    backgroundColor,
-		},
-		Markup: annotation.Markup{
-			User: "Jochen Voss",
-		},
-		Icon: icon,
+	left.Rect = pdf.Rectangle{
+		LLx: leftCenter - iconSize/2,
+		LLy: w.yPos - iconSize,
+		URx: leftCenter + iconSize/2,
+		URy: w.yPos,
 	}
+	left.Contents += " (viewer)"
 
-	if useStyle {
-		w.style.AddAppearance(text)
+	right.Rect = pdf.Rectangle{
+		LLx: rightCenter - iconSize/2,
+		LLy: w.yPos - iconSize,
+		URx: rightCenter + iconSize/2,
+		URy: w.yPos,
 	}
+	right.Contents += " (quire)"
 
-	err := w.embed(text, textRef)
+	w.style.AddAppearance(right)
+
+	err := w.embed(left, leftRef)
 	if err != nil {
 		return err
 	}
+
+	err = w.embed(right, rightRef)
+	if err != nil {
+		return err
+	}
+
+	w.yPos -= iconSize + 12.0
+
 	return nil
+}
+
+func clone[T any](v *T) *T {
+	if v == nil {
+		return nil
+	}
+	clone := *v
+	return &clone
 }
 
 func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {

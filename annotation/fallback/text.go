@@ -26,14 +26,8 @@ import (
 
 func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 	bgCol := a.Color
-	a.Border = nil
-
-	// We don't generate dicts with different states.
-	a.AppearanceState = ""
-
-	bg := bgCol
-	if bg == nil {
-		bg = stickyYellow
+	if bgCol == nil {
+		bgCol = stickyYellow
 	}
 
 	var draw func(*graphics.Writer) error
@@ -43,9 +37,14 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 			w.SetExtGState(s.reset)
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetFillColor(bg)
-			w.Rectangle(0.25, 0.25, 23.5, 23.5)
-			w.CloseFillAndStroke()
+			if bgCol != annotation.Transparent {
+				w.SetFillColor(bgCol)
+				w.Rectangle(0.25, 0.25, 23.5, 23.5)
+				w.CloseFillAndStroke()
+			} else {
+				w.Rectangle(0.25, 0.25, 23.5, 23.5)
+				w.CloseAndStroke()
+			}
 
 			w.TextBegin()
 			w.TextSetFont(s.iconFont, 23)
@@ -65,9 +64,14 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 			w.SetExtGState(s.reset)
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetFillColor(bg)
-			w.Rectangle(0.25, 0.25, 23.5, 23.5)
-			w.CloseFillAndStroke()
+			if bgCol != annotation.Transparent {
+				w.SetFillColor(bgCol)
+				w.Rectangle(0.25, 0.25, 23.5, 23.5)
+				w.CloseFillAndStroke()
+			} else {
+				w.Rectangle(0.25, 0.25, 23.5, 23.5)
+				w.CloseAndStroke()
+			}
 
 			w.TextBegin()
 			w.TextSetFont(s.iconFont, 25)
@@ -88,7 +92,9 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 			w.SetExtGState(s.reset)
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetFillColor(bg)
+			if bgCol != annotation.Transparent {
+				w.SetFillColor(bgCol)
+			}
 			w.MoveTo(23.5-delta, 0.25)
 			w.LineTo(0.25, 0.25)
 			w.LineTo(0.25, 23.5)
@@ -97,7 +103,11 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 			w.LineTo(23.5-delta, 0.25)
 			w.LineTo(23.5-delta, 0.25+delta)
 			w.LineTo(23.5, 0.25+delta)
-			w.CloseFillAndStroke()
+			if bgCol != annotation.Transparent {
+				w.CloseFillAndStroke()
+			} else {
+				w.CloseAndStroke()
+			}
 
 			w.SetLineWidth(1.5)
 			w.SetStrokeColor(color.DeviceGray(0.5))
@@ -120,9 +130,14 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetFillColor(bg)
-			w.Rectangle(0.25, 0.25, 23.5, 23.5)
-			w.CloseFillAndStroke()
+			if bgCol != annotation.Transparent {
+				w.SetFillColor(bgCol)
+				w.Rectangle(0.25, 0.25, 23.5, 23.5)
+				w.CloseFillAndStroke()
+			} else {
+				w.Rectangle(0.25, 0.25, 23.5, 23.5)
+				w.CloseAndStroke()
+			}
 
 			w.TextBegin()
 			w.TextSetFont(s.iconFont, 23)
@@ -142,9 +157,14 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetFillColor(bg)
-			w.Rectangle(0.25, 0.25, 23.5, 23.5)
-			w.CloseFillAndStroke()
+			if bgCol != annotation.Transparent {
+				w.SetFillColor(bgCol)
+				w.Rectangle(0.25, 0.25, 23.5, 23.5)
+				w.CloseFillAndStroke()
+			} else {
+				w.Rectangle(0.25, 0.25, 23.5, 23.5)
+				w.CloseAndStroke()
+			}
 
 			w.SetStrokeColor(color.DeviceGray(0.7))
 			w.SetLineWidth(1.5)
@@ -160,14 +180,14 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 
 			w.SetStrokeColor(color.Black)
 			w.SetFillColor(color.Black)
-			w.SetLineWidth(2)
+			w.SetLineWidth(1.8)
 			w.MoveTo(17.5-0.75, 15.5)
 			w.LineTo(17.5-0.75, m)
 			w.LineTo(5, m)
 			w.Stroke()
 			w.MoveTo(3, m)
-			w.LineTo(7, m+3)
-			w.LineTo(7, m-3)
+			w.LineTo(7, m+2.8)
+			w.LineTo(7, m-2.8)
 			w.Fill()
 
 			return nil
@@ -179,9 +199,14 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetFillColor(bg)
-			w.Rectangle(0.25, 0.25, 23.5, 23.5)
-			w.CloseFillAndStroke()
+			if bgCol != annotation.Transparent {
+				w.SetFillColor(bgCol)
+				w.Rectangle(0.25, 0.25, 23.5, 23.5)
+				w.CloseFillAndStroke()
+			} else {
+				w.Rectangle(0.25, 0.25, 23.5, 23.5)
+				w.CloseAndStroke()
+			}
 
 			w.TextBegin()
 			w.TextSetFont(s.iconFont, 16)
@@ -202,9 +227,14 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetFillColor(bg)
-			w.Rectangle(0.25, 0.25, 23.5, 23.5)
-			w.CloseFillAndStroke()
+			if bgCol != annotation.Transparent {
+				w.SetFillColor(bgCol)
+				w.Rectangle(0.25, 0.25, 23.5, 23.5)
+				w.CloseFillAndStroke()
+			} else {
+				w.Rectangle(0.25, 0.25, 23.5, 23.5)
+				w.CloseAndStroke()
+			}
 
 			w.TextBegin()
 			w.TextSetFont(s.iconFont, 16)
@@ -225,9 +255,14 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetFillColor(bg)
-			w.Rectangle(0.25, 0.25, 23.5, 23.5)
-			w.CloseFillAndStroke()
+			if bgCol != annotation.Transparent {
+				w.SetFillColor(bgCol)
+				w.Rectangle(0.25, 0.25, 23.5, 23.5)
+				w.CloseFillAndStroke()
+			} else {
+				w.Rectangle(0.25, 0.25, 23.5, 23.5)
+				w.CloseAndStroke()
+			}
 
 			return nil
 		}

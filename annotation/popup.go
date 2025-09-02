@@ -18,7 +18,7 @@ package annotation
 
 import "seehuhn.de/go/pdf"
 
-// Popup represents a popup annotation that displays text in a popup window
+// Popup represents a popup annotation that displays text in a pop-up window
 // for entry and editing. It does not appear alone but is associated with a
 // markup annotation (its parent annotation) and is used for editing the
 // parent's text.

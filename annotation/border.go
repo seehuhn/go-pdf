@@ -45,7 +45,9 @@ type Border struct {
 
 var _ pdf.Embedder[pdf.Unused] = (*Border)(nil)
 
-var defaultBorder = &Border{Width: 1}
+// PDFDefaultBorder is the default border values within PDF files.
+// Using this for [Common.Border] slightly reduces file size.
+var PDFDefaultBorder = &Border{Width: 1}
 
 // ExtractBorder extracts a Border from a PDF array.
 // If no border entry exists, returns the PDF default (solid border with width 1).
@@ -57,7 +59,7 @@ func ExtractBorder(r pdf.Getter, obj pdf.Object) (*Border, error) {
 	}
 
 	if len(border) < 3 {
-		return defaultBorder, nil
+		return PDFDefaultBorder, nil
 	}
 
 	b := &Border{}

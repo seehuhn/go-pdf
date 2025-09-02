@@ -132,3 +132,14 @@ func encodeColorRGB(c color.Color) (pdf.Array, error) {
 	}
 	return colorArray, nil
 }
+
+// Transparent is a special color that indicates that part of an annotation
+// (for example the border) should not be painted at all.  This can only be
+// used for the Color field in the [Common] struct.
+var Transparent color.Color = &transparent{}
+
+type transparent struct{}
+
+func (t *transparent) ColorSpace() color.Space {
+	return nil
+}

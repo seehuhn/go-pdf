@@ -26,7 +26,7 @@ import (
 
 // Stamp represents a rubber stamp annotation that displays text or graphics
 // intended to look as if they were stamped on the page with a rubber stamp.
-// When opened, it displays a popup window containing the text of the associated note.
+// When opened, it displays a pop-up window containing the text of the associated note.
 type Stamp struct {
 	Common
 	Markup

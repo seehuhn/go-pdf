@@ -22,7 +22,7 @@ import "seehuhn.de/go/pdf"
 // are to be printed at a fixed size relative to the target media, and fixed
 // relative position on the target media, regardless of the dimensions of that media.
 //
-// Watermark annotations have no popup window nor other interactive elements.
+// Watermark annotations have no pop-up window nor other interactive elements.
 // When displaying on-screen, interactive PDF processors use the dimensions
 // of the media box as the media dimensions so that scroll and zoom behavior is
 // the same as for other annotations.

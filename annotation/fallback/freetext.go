@@ -72,8 +72,6 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 	a.DefaultAppearance = ""
 	a.Align = annotation.TextAlignLeft
 	a.DefaultStyle = ""
-	// We don't generate dicts with different states.
-	a.AppearanceState = ""
 
 	outer.IRound(1)
 	a.Rect = outer

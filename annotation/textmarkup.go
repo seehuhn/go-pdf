@@ -38,7 +38,7 @@ const (
 
 // TextMarkup represents a text markup annotation that appears as highlights,
 // underlines, strikeouts, or jagged ("squiggly") underlines in the text.
-// When opened, it displays a popup window containing the text of the associated note.
+// When opened, it displays a pop-up window containing the text of the associated note.
 type TextMarkup struct {
 	Common
 	Markup

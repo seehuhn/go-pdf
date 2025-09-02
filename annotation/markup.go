@@ -28,14 +28,14 @@ import (
 // Markup contains fields common to all markup annotations.
 type Markup struct {
 	// User (optional) is the text label that is displayed in the
-	// title bar of the annotation's popup window when open and active. This
+	// title bar of the annotation's pop-up window when open and active. This
 	// entry identifies the user who added the annotation.
 	//
 	// This corresponds to the /T entry in the PDF annotation dictionary.
 	User string
 
 	// Popup (optional) is used for displaying the annotation's contents in a
-	// popup window when the annotation is open.
+	// pop-up window when the annotation is open.
 	Popup pdf.Reference
 
 	// RC (optional) is a rich text string or stream providing a formatted
@@ -55,7 +55,7 @@ type Markup struct {
 	InReplyTo pdf.Reference
 
 	// Subject (optional) is the subject of the annotation, typically displayed
-	// in the title bar of the annotation's popup window.
+	// in the title bar of the annotation's pop-up window.
 	//
 	// This corresponds to the /Subj entry in the PDF annotation dictionary.
 	Subject string

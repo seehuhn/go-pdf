@@ -402,7 +402,7 @@ var testCases = map[pdf.Name][]testCase{
 	"PolyLine": {
 		{
 			name: "basic polyline annotation",
-			annotation: &Polyline{
+			annotation: &PolyLine{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 75, LLy: 75, URx: 275, URy: 175},
 					Contents: "Simple polyline",
@@ -417,7 +417,7 @@ var testCases = map[pdf.Name][]testCase{
 		},
 		{
 			name: "polyline with line endings and colors",
-			annotation: &Polyline{
+			annotation: &PolyLine{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 150, LLy: 150, URx: 350, URy: 250},
 					Name: "polyline-001",
@@ -434,7 +434,7 @@ var testCases = map[pdf.Name][]testCase{
 		},
 		{
 			name: "polyline with curved path",
-			annotation: &Polyline{
+			annotation: &PolyLine{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 250, LLy: 250, URx: 450, URy: 350},
 					Contents: "Curved polyline",

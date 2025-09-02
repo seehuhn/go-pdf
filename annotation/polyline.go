@@ -24,10 +24,10 @@ import (
 
 // PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.9
 
-// Polyline represents a polyline annotation that displays open polygons on the page.
+// PolyLine represents a polyline annotation that displays open polygons on the page.
 // Polylines are similar to polygons, except that the first and last vertex are not
 // implicitly connected.
-type Polyline struct {
+type PolyLine struct {
 	Common
 	Markup
 
@@ -77,16 +77,16 @@ type Polyline struct {
 	Measure measure.Measure
 }
 
-var _ Annotation = (*Polyline)(nil)
+var _ Annotation = (*PolyLine)(nil)
 
 // AnnotationType returns "PolyLine".
 // This implements the [Annotation] interface.
-func (p *Polyline) AnnotationType() pdf.Name {
+func (p *PolyLine) AnnotationType() pdf.Name {
 	return "PolyLine"
 }
 
-func decodePolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
-	polyline := &Polyline{}
+func decodePolyline(r pdf.Getter, dict pdf.Dict) (*PolyLine, error) {
+	polyline := &PolyLine{}
 
 	// Extract common annotation fields
 	if err := decodeCommon(r, &polyline.Common, dict); err != nil {
@@ -161,7 +161,7 @@ func decodePolyline(r pdf.Getter, dict pdf.Dict) (*Polyline, error) {
 	return polyline, nil
 }
 
-func (p *Polyline) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
+func (p *PolyLine) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("PolyLine"),
 	}

@@ -110,15 +110,31 @@ func (s *Style) AddAppearance(a annotation.Annotation) error {
 	}
 
 	c := a.GetCommon()
-	if normal != nil {
+	if c.Appearance == nil {
 		c.Appearance = &appearance.Dict{
-			Normal:    normal,
 			SingleUse: true,
 		}
-	} else {
-		c.Appearance = nil
 	}
-	c.AppearanceState = ""
+	if c.AppearanceState == "" {
+		c.Appearance.Normal = normal
+		c.Appearance.NormalMap = nil
+		c.Appearance.RollOver = nil
+		c.Appearance.RollOverMap = nil
+		c.Appearance.Down = nil
+		c.Appearance.DownMap = nil
+	} else {
+		c.Appearance.Normal = nil
+		if c.Appearance.NormalMap == nil {
+			c.Appearance.NormalMap = make(map[pdf.Name]*form.Form)
+		}
+		c.Appearance.NormalMap[c.AppearanceState] = normal
+		if c.Appearance.RollOver != nil {
+			delete(c.Appearance.RollOverMap, c.AppearanceState)
+		}
+		if c.Appearance.Down != nil {
+			delete(c.Appearance.DownMap, c.AppearanceState)
+		}
+	}
 
 	return nil
 }
