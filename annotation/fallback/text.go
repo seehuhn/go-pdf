@@ -43,11 +43,15 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
 			w.SetFillColor(bg)
+			w.SetLineJoin(graphics.LineJoinMiter)
+			w.SetLineDash(nil, 0)
 			w.Rectangle(0.25, 0.25, 23.5, 23.5)
 			w.CloseFillAndStroke()
 
 			w.TextBegin()
 			w.TextSetFont(s.iconFont, 23)
+			w.TextSetRise(0)
+			w.TextSetHorizontalScaling(1)
 			w.SetFillColor(color.DeviceGray(0.0))
 			w.TextFirstLine(6, 2)
 			w.TextSetHorizontalScaling(0.9)
@@ -61,12 +65,16 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		draw = func(w *graphics.Writer) error {
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
+			w.SetLineJoin(graphics.LineJoinMiter)
+			w.SetLineDash(nil, 0)
 			w.SetFillColor(bg)
 			w.Rectangle(0.25, 0.25, 23.5, 23.5)
 			w.CloseFillAndStroke()
 
 			w.TextBegin()
 			w.TextSetFont(s.iconFont, 25)
+			w.TextSetRise(0)
+			w.TextSetHorizontalScaling(1)
 			w.SetFillColor(color.DeviceGray(0.0))
 			w.TextFirstLine(5, 2)
 			w.TextShow("*")
@@ -81,6 +89,8 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
+			w.SetLineJoin(graphics.LineJoinMiter)
+			w.SetLineDash(nil, 0)
 			w.SetFillColor(bg)
 			w.MoveTo(23.5-delta, 0.25)
 			w.LineTo(0.25, 0.25)
@@ -94,6 +104,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 
 			w.SetLineWidth(1.5)
 			w.SetStrokeColor(color.DeviceGray(0.5))
+			w.SetLineCap(graphics.LineCapButt)
 			for y := 19.; y > 6; y -= 3.5 {
 				w.MoveTo(4, y)
 				if y > 10 {
@@ -111,12 +122,16 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		draw = func(w *graphics.Writer) error {
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
+			w.SetLineJoin(graphics.LineJoinMiter)
+			w.SetLineDash(nil, 0)
 			w.SetFillColor(bg)
 			w.Rectangle(0.25, 0.25, 23.5, 23.5)
 			w.CloseFillAndStroke()
 
 			w.TextBegin()
 			w.TextSetFont(s.iconFont, 23)
+			w.TextSetRise(0)
+			w.TextSetHorizontalScaling(1)
 			w.SetFillColor(color.DeviceGray(0.0))
 			w.TextFirstLine(6, 4)
 			w.TextShow("?")
@@ -129,12 +144,15 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		draw = func(w *graphics.Writer) error {
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
+			w.SetLineJoin(graphics.LineJoinMiter)
+			w.SetLineDash(nil, 0)
 			w.SetFillColor(bg)
 			w.Rectangle(0.25, 0.25, 23.5, 23.5)
 			w.CloseFillAndStroke()
 
 			w.SetStrokeColor(color.DeviceGray(0.7))
 			w.SetLineWidth(1.5)
+			w.SetLineCap(graphics.LineCapButt)
 			w.MoveTo(4, 19)
 			w.LineTo(17, 19)
 			w.MoveTo(4, 15.5)
@@ -164,12 +182,16 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		draw = func(w *graphics.Writer) error {
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
+			w.SetLineJoin(graphics.LineJoinMiter)
+			w.SetLineDash(nil, 0)
 			w.SetFillColor(bg)
 			w.Rectangle(0.25, 0.25, 23.5, 23.5)
 			w.CloseFillAndStroke()
 
 			w.TextBegin()
 			w.TextSetFont(s.iconFont, 16)
+			w.TextSetRise(0)
+			w.TextSetHorizontalScaling(1)
 			w.SetFillColor(color.DeviceGray(0.0))
 			w.TextFirstLine(6, 8)
 			w.TextSetHorizontalScaling(1.4)
@@ -183,12 +205,16 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		draw = func(w *graphics.Writer) error {
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
+			w.SetLineJoin(graphics.LineJoinMiter)
+			w.SetLineDash(nil, 0)
 			w.SetFillColor(bg)
 			w.Rectangle(0.25, 0.25, 23.5, 23.5)
 			w.CloseFillAndStroke()
 
 			w.TextBegin()
 			w.TextSetFont(s.iconFont, 16)
+			w.TextSetRise(0)
+			w.TextSetHorizontalScaling(1)
 			w.SetFillColor(color.DeviceGray(0.0))
 			w.TextFirstLine(5.5, 4)
 			w.TextSetHorizontalScaling(1.4)
@@ -202,6 +228,8 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		draw = func(w *graphics.Writer) error {
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
+			w.SetLineJoin(graphics.LineJoinMiter)
+			w.SetLineDash(nil, 0)
 			w.SetFillColor(bg)
 			w.Rectangle(0.25, 0.25, 23.5, 23.5)
 			w.CloseFillAndStroke()

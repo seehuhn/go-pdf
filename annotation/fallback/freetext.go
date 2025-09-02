@@ -93,6 +93,8 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 		if a.Intent != annotation.FreeTextIntentTypeWriter {
 			w.SetLineWidth(lw)
 			w.SetStrokeColor(color.Black)
+			w.SetLineJoin(graphics.LineJoinMiter)
+			w.SetLineDash(nil, 0)
 			if bgCol != nil {
 				w.SetFillColor(bgCol)
 				w.Rectangle(inner.LLx+lw/2, inner.LLy+lw/2, inner.Dx()-lw, inner.Dy()-lw)
@@ -106,6 +108,9 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 		if hasCallout {
 			w.SetLineWidth(lw)
 			w.SetStrokeColor(color.Black)
+			w.SetLineJoin(graphics.LineJoinMiter)
+			w.SetLineDash(nil, 0)
+			w.SetLineCap(graphics.LineCapButt)
 			k := len(calloutLine)
 			lastPoint := calloutLine[k-1]
 			w.MoveTo(lastPoint.X, lastPoint.Y)
@@ -139,6 +144,8 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 			w.TextBegin()
 			w.TextSetFont(F, freeTextFontSize)
 			w.SetFillColor(color.Black)
+			w.TextSetHorizontalScaling(1)
+			w.TextSetRise(0)
 			wrapper := text.Wrap(clipWidth, a.Contents)
 			yPos := inner.URy - lw - freeTextPadding - freeTextFontSize
 			lineNo := 0

@@ -41,9 +41,9 @@ func (s *Style) addLineAppearance(a *annotation.Line) *form.Form {
 		// set line properties
 		w.SetLineWidth(lw)
 		w.SetStrokeColor(color.Black)
-		if len(dashPattern) > 0 {
-			w.SetLineDash(dashPattern, 0)
-		}
+		w.SetLineDash(dashPattern, 0)
+		w.SetLineJoin(graphics.LineJoinBevel)
+		w.SetLineCap(graphics.LineCapButt)
 
 		// draw the line based on whether we have leader lines
 		if a.LL != 0 {
