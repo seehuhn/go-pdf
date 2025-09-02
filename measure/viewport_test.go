@@ -515,3 +515,107 @@ func TestViewportSingleUse(t *testing.T) {
 		t.Error("SingleUse=false should return Reference, not Dict")
 	}
 }
+
+// TestViewportWithPtData verifies that PtData is properly handled during
+// viewport read/write cycles.
+func TestViewportWithPtData(t *testing.T) {
+	writer1, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm1 := pdf.NewResourceManager(writer1)
+
+	// create test PtData with some geospatial point data
+	testPtData := &PtData{
+		Subtype: PtDataSubtypeCloud,
+		Names:   []string{PtDataNameLat, PtDataNameLon, PtDataNameAlt},
+		XPTS: [][]pdf.Object{
+			{pdf.Number(40.7128), pdf.Number(-74.0060), pdf.Number(10.5)}, // NYC coordinates
+			{pdf.Number(40.7589), pdf.Number(-73.9851), pdf.Number(15.2)}, // Central Park
+		},
+		SingleUse: false, // use as indirect object
+	}
+
+	vp0 := &Viewport{
+		BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+		Name:      "Geospatial Viewport",
+		PtData:    testPtData,
+		SingleUse: true,
+	}
+
+	embedded, _, err := vp0.Embed(rm1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = rm1.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = writer1.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vp1, err := ExtractViewport(writer1, embedded)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// verify PtData was preserved
+	if vp1.PtData == nil {
+		t.Error("PtData was not preserved during extraction")
+		return
+	}
+
+	// check PtData content
+	if vp1.PtData.Subtype != PtDataSubtypeCloud {
+		t.Errorf("PtData subtype mismatch: got %s, want %s", vp1.PtData.Subtype, PtDataSubtypeCloud)
+	}
+	if len(vp1.PtData.Names) != 3 {
+		t.Errorf("PtData names length mismatch: got %d, want 3", len(vp1.PtData.Names))
+	}
+	if len(vp1.PtData.XPTS) != 2 {
+		t.Errorf("PtData XPTS length mismatch: got %d, want 2", len(vp1.PtData.XPTS))
+	}
+
+	// test round-trip
+	writer2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm2 := pdf.NewResourceManager(writer2)
+	embedded2, _, err := vp1.Embed(rm2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = rm2.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = writer2.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vp2, err := ExtractViewport(writer2, embedded2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// check that PtData round-tripped correctly
+	if vp2.PtData == nil {
+		t.Error("PtData was lost during round-trip")
+		return
+	}
+
+	// Fix SingleUse for comparison (not stored in PDF)
+	vp2.SingleUse = vp1.SingleUse
+	vp2.PtData.SingleUse = vp1.PtData.SingleUse
+
+	// use cmp to compare the PtData structures
+	if diff := cmp.Diff(vp1.PtData, vp2.PtData, cmp.AllowUnexported(PtData{})); diff != "" {
+		t.Errorf("PtData round trip failed (-got +want):\n%s", diff)
+	}
+
+	// verify basic viewport properties were preserved
+	if vp1.BBox != vp2.BBox {
+		t.Errorf("BBox changed: %v -> %v", vp1.BBox, vp2.BBox)
+	}
+	if vp1.Name != vp2.Name {
+		t.Errorf("Name changed: %s -> %s", vp1.Name, vp2.Name)
+	}
+}

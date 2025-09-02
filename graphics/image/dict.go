@@ -26,8 +26,11 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
 )
+
+// PDF 2.0 sections: 8.9.5
 
 type Dict struct {
 	// Width is the width of the image in pixels.
@@ -51,7 +54,7 @@ type Dict struct {
 	// painted.
 	//
 	// Only one of MaskImage or MaskColors may be specified.
-	MaskImage *ImageMask
+	MaskImage *Mask
 
 	// MaskColors (optional) is an array of colors used for color key masking.
 	// When specified, image samples with colors falling within the defined ranges
@@ -100,8 +103,11 @@ type Dict struct {
 
 	// TODO(voss): OC
 	// TODO(voss): AF
-	// TODO(voss): Measure
-	// TODO(voss): PtData
+
+	Measure measure.Measure
+
+	// PtData (optional; PDF 2.0) contains extended geospatial point data.
+	PtData *measure.PtData
 
 	// WriteData is a function that writes the image data to the provided writer.
 	// The data should be written row by row, with each row containing
@@ -109,22 +115,224 @@ type Dict struct {
 	WriteData func(io.Writer) error
 }
 
-var _ Image = (*Dict)(nil)
-
-// Bounds returns the dimensions of the image.
-func (d *Dict) Bounds() Rectangle {
-	return Rectangle{
-		XMin: 0,
-		YMin: 0,
-		XMax: d.Width,
-		YMax: d.Height,
+// ExtractDict extracts an image dictionary from a PDF stream.
+func ExtractDict(r pdf.Getter, obj pdf.Object) (*Dict, error) {
+	stream, err := pdf.GetStream(r, obj)
+	if err != nil {
+		return nil, err
+	} else if stream == nil {
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("missing image stream"),
+		}
 	}
+	dict := stream.Dict
+
+	// Check Type and Subtype
+	typeName, _ := pdf.GetDictTyped(r, obj, "XObject")
+	if typeName == nil {
+		// Type is optional, but if present must be XObject
+		if t, err := pdf.Optional(pdf.GetName(r, dict["Type"])); err != nil {
+			return nil, err
+		} else if t != "" && t != "XObject" {
+			return nil, &pdf.MalformedFileError{
+				Err: fmt.Errorf("invalid Type %q for image XObject", t),
+			}
+		}
+	}
+
+	subtypeName, err := pdf.Optional(pdf.GetName(r, dict["Subtype"]))
+	if err != nil {
+		return nil, err
+	}
+	if subtypeName != "Image" {
+		return nil, &pdf.MalformedFileError{
+			Err: fmt.Errorf("invalid Subtype %q for image XObject", subtypeName),
+		}
+	}
+
+	// Check if this is an image mask (should use ExtractImageMask instead)
+	if isImageMask, err := pdf.GetBoolean(r, dict["ImageMask"]); err == nil && bool(isImageMask) {
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("use ExtractImageMask for image masks"),
+		}
+	}
+
+	// Extract required fields
+	width, err := pdf.GetInteger(r, dict["Width"])
+	if err != nil {
+		return nil, fmt.Errorf("missing or invalid Width: %w", err)
+	}
+	if width <= 0 {
+		return nil, &pdf.MalformedFileError{
+			Err: fmt.Errorf("invalid image width %d", width),
+		}
+	}
+
+	height, err := pdf.GetInteger(r, dict["Height"])
+	if err != nil {
+		return nil, fmt.Errorf("missing or invalid Height: %w", err)
+	}
+	if height <= 0 {
+		return nil, &pdf.MalformedFileError{
+			Err: fmt.Errorf("invalid image height %d", height),
+		}
+	}
+
+	img := &Dict{
+		Width:  int(width),
+		Height: int(height),
+	}
+
+	// Extract ColorSpace (required for images)
+	if csObj, ok := dict["ColorSpace"]; ok {
+		cs, err := color.ExtractSpace(r, csObj)
+		if err != nil {
+			return nil, fmt.Errorf("invalid ColorSpace: %w", err)
+		}
+		img.ColorSpace = cs
+	} else {
+		// ColorSpace is optional only for JPXDecode filter
+		filters, _ := pdf.GetArray(r, dict["Filter"])
+		hasJPX := false
+		for _, f := range filters {
+			if name, _ := pdf.GetName(r, f); name == "JPXDecode" {
+				hasJPX = true
+				break
+			}
+		}
+		if !hasJPX {
+			return nil, &pdf.MalformedFileError{
+				Err: errors.New("missing ColorSpace for non-JPXDecode image"),
+			}
+		}
+	}
+
+	// Extract BitsPerComponent (required except for JPXDecode)
+	if bpc, err := pdf.Optional(pdf.GetInteger(r, dict["BitsPerComponent"])); err != nil {
+		return nil, err
+	} else if bpc > 0 {
+		img.BitsPerComponent = int(bpc)
+	} else if img.ColorSpace != nil {
+		// BitsPerComponent is required when ColorSpace is present
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("missing BitsPerComponent"),
+		}
+	}
+
+	// Extract optional fields
+	if intent, err := pdf.Optional(pdf.GetName(r, dict["Intent"])); err != nil {
+		return nil, err
+	} else if intent != "" {
+		img.Intent = graphics.RenderingIntent(intent)
+	}
+
+	// Extract Mask (can be either image mask reference or color key mask array)
+	if maskObj, ok := dict["Mask"]; ok {
+		if maskRef, isRef := maskObj.(pdf.Reference); isRef {
+			// Image mask reference
+			maskImg, err := ExtractMask(r, maskRef)
+			if err != nil {
+				return nil, fmt.Errorf("invalid image mask: %w", err)
+			}
+			img.MaskImage = maskImg
+		} else if maskArray, err := pdf.GetArray(r, maskObj); err == nil {
+			// Color key mask array
+			img.MaskColors = make([]uint16, len(maskArray))
+			for i, val := range maskArray {
+				if num, err := pdf.GetInteger(r, val); err != nil {
+					return nil, fmt.Errorf("invalid MaskColors[%d]: %w", i, err)
+				} else {
+					img.MaskColors[i] = uint16(num)
+				}
+			}
+		} else {
+			return nil, fmt.Errorf("invalid Mask entry: %w", err)
+		}
+	}
+
+	// Extract Decode array
+	if decodeArray, err := pdf.Optional(pdf.GetArray(r, dict["Decode"])); err != nil {
+		return nil, err
+	} else if decodeArray != nil {
+		img.Decode = make([]float64, len(decodeArray))
+		for i, val := range decodeArray {
+			if num, err := pdf.GetNumber(r, val); err != nil {
+				return nil, fmt.Errorf("invalid Decode[%d]: %w", i, err)
+			} else {
+				img.Decode[i] = float64(num)
+			}
+		}
+	}
+
+	// Extract Interpolate
+	if interp, err := pdf.GetBoolean(r, dict["Interpolate"]); err == nil {
+		img.Interpolate = bool(interp)
+	}
+
+	// Extract Alternates
+	if alts, err := pdf.Optional(pdf.GetArray(r, dict["Alternates"])); err != nil {
+		return nil, err
+	} else if alts != nil {
+		img.Alternates = make([]*Dict, len(alts))
+		for i, altObj := range alts {
+			altDict, err := ExtractDict(r, altObj)
+			if err != nil {
+				return nil, fmt.Errorf("invalid Alternates[%d]: %w", i, err)
+			}
+			img.Alternates[i] = altDict
+		}
+	}
+
+	// Extract Name (deprecated in PDF 2.0)
+	if name, err := pdf.Optional(pdf.GetName(r, dict["Name"])); err != nil {
+		return nil, err
+	} else {
+		img.Name = name
+	}
+
+	// Extract Metadata
+	if metaObj, ok := dict["Metadata"]; ok {
+		meta, err := metadata.Extract(r, metaObj)
+		if err != nil {
+			return nil, fmt.Errorf("invalid Metadata: %w", err)
+		}
+		img.Metadata = meta
+	}
+
+	// Extract Measure
+	if measureObj, ok := dict["Measure"]; ok {
+		m, err := measure.Extract(r, measureObj)
+		if err != nil {
+			return nil, fmt.Errorf("invalid Measure: %w", err)
+		}
+		img.Measure = m
+	}
+
+	// Extract PtData
+	if ptData, err := pdf.Optional(measure.ExtractPtData(r, dict["PtData"])); err != nil {
+		return nil, err
+	} else {
+		img.PtData = ptData
+	}
+
+	// Create WriteData function as a closure
+	img.WriteData = func(w io.Writer) error {
+		stm, err := pdf.DecodeStream(r, stream, 0)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(w, stm)
+		if err != nil {
+			stm.Close()
+			return err
+		}
+		return stm.Close()
+	}
+
+	return img, nil
 }
 
-// Subtype returns the PDF XObject subtype for images.
-func (d *Dict) Subtype() pdf.Name {
-	return pdf.Name("Image")
-}
+var _ Image = (*Dict)(nil)
 
 // FromImage creates a Dict from an image.Image.
 // The ColorSpace and BitsPerComponent must be set appropriately for the image.
@@ -144,20 +352,75 @@ func FromImage(img image.Image, colorSpace color.Space, bitsPerComponent int) *D
 	}
 }
 
-// FromImageMask creates an ImageMask from an image.Image.
-// Only the alpha channel is used, with alpha values rounded to full opacity or full transparency.
-func FromImageMask(img image.Image) *ImageMask {
+// writeImageData writes image data from an image.Image to the provided writer.
+func writeImageData(w io.Writer, img image.Image, colorSpace color.Space, bitsPerComponent int) error {
 	bounds := img.Bounds()
 	width := bounds.Dx()
 	height := bounds.Dy()
+	numChannels := colorSpace.Channels()
 
-	return &ImageMask{
-		Width:  width,
-		Height: height,
-		WriteData: func(w io.Writer) error {
-			return writeImageMaskData(w, img)
-		},
+	buf := NewPixelRow(width*numChannels, bitsPerComponent)
+	for y := range height {
+		buf.Reset()
+
+		for x := range width {
+			pixCol := img.At(bounds.Min.X+x, bounds.Min.Y+y)
+			shift := 16 - bitsPerComponent
+			switch colorSpace.Family() {
+			case color.FamilyDeviceGray, color.FamilyCalGray:
+				g16 := gocol.Gray16Model.Convert(pixCol).(gocol.Gray16).Y
+				buf.AppendBits(g16 >> shift)
+
+			case color.FamilyDeviceRGB, color.FamilyCalRGB:
+				c16 := gocol.NRGBA64Model.Convert(pixCol).(gocol.NRGBA64)
+				buf.AppendBits(c16.R >> shift)
+				buf.AppendBits(c16.G >> shift)
+				buf.AppendBits(c16.B >> shift)
+
+			case color.FamilyDeviceCMYK:
+				c16 := gocol.NRGBA64Model.Convert(pixCol).(gocol.NRGBA64)
+				c, m, y, k := rgbToCMYK(c16.R, c16.G, c16.B)
+				buf.AppendBits(c >> shift)
+				buf.AppendBits(m >> shift)
+				buf.AppendBits(y >> shift)
+				buf.AppendBits(k >> shift)
+
+			// TODO(voss): implement the remaining color spaces
+			case color.FamilyLab:
+				return errors.New("Lab color space not implemented")
+			case color.FamilyICCBased:
+				return errors.New("ICCBased color space not implemented")
+			case color.FamilyIndexed:
+				return errors.New("Indexed color space not implemented")
+			case color.FamilySeparation:
+				return errors.New("Separation color space not implemented")
+			case color.FamilyDeviceN:
+				return errors.New("DeviceN color space not implemented")
+			}
+		}
+
+		_, err := w.Write(buf.Bytes())
+		if err != nil {
+			return err
+		}
 	}
+	return nil
+}
+
+func rgbToCMYK(r, g, b uint16) (c, m, y, k uint16) {
+	maxVal := max(r, g, b)
+
+	if maxVal == 0 {
+		return 0, 0, 0, 0xffff
+	}
+
+	k = 0xffff - maxVal
+
+	c = uint16((uint32(maxVal-r) * 0xffff) / uint32(maxVal))
+	m = uint16((uint32(maxVal-g) * 0xffff) / uint32(maxVal))
+	y = uint16((uint32(maxVal-b) * 0xffff) / uint32(maxVal))
+
+	return c, m, y, k
 }
 
 // FromImageWithMask creates a Dict with an associated ImageMask from two image.Image objects.
@@ -233,6 +496,27 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 			return nil, zero, err
 		}
 		dict["Metadata"] = ref
+	}
+
+	// Measure (optional)
+	if d.Measure != nil {
+		embedded, _, err := pdf.ResourceManagerEmbed(rm, d.Measure)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["Measure"] = embedded
+	}
+
+	// PtData (optional; PDF 2.0)
+	if d.PtData != nil {
+		if err := pdf.CheckVersion(rm.Out, "image dictionary PtData entry", pdf.V2_0); err != nil {
+			return nil, zero, err
+		}
+		embedded, _, err := pdf.ResourceManagerEmbed(rm, d.PtData)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["PtData"] = embedded
 	}
 
 	ref := rm.Out.Alloc()
@@ -341,262 +625,26 @@ func (d *Dict) check(out *pdf.Writer) error {
 		}
 	}
 
-	return nil
-}
-
-func rgbToCMYK(r, g, b uint16) (c, m, y, k uint16) {
-	maxVal := max(r, g, b)
-
-	if maxVal == 0 {
-		return 0, 0, 0, 0xffff
-	}
-
-	k = 0xffff - maxVal
-
-	c = uint16((uint32(maxVal-r) * 0xffff) / uint32(maxVal))
-	m = uint16((uint32(maxVal-g) * 0xffff) / uint32(maxVal))
-	y = uint16((uint32(maxVal-b) * 0xffff) / uint32(maxVal))
-
-	return c, m, y, k
-}
-
-// writeImageData writes image data from an image.Image to the provided writer.
-func writeImageData(w io.Writer, img image.Image, colorSpace color.Space, bitsPerComponent int) error {
-	bounds := img.Bounds()
-	width := bounds.Dx()
-	height := bounds.Dy()
-	numChannels := colorSpace.Channels()
-
-	buf := NewPixelRow(width*numChannels, bitsPerComponent)
-	for y := range height {
-		buf.Reset()
-
-		for x := range width {
-			pixCol := img.At(bounds.Min.X+x, bounds.Min.Y+y)
-			shift := 16 - bitsPerComponent
-			switch colorSpace.Family() {
-			case color.FamilyDeviceGray, color.FamilyCalGray:
-				g16 := gocol.Gray16Model.Convert(pixCol).(gocol.Gray16).Y
-				buf.AppendBits(g16 >> shift)
-
-			case color.FamilyDeviceRGB, color.FamilyCalRGB:
-				c16 := gocol.NRGBA64Model.Convert(pixCol).(gocol.NRGBA64)
-				buf.AppendBits(c16.R >> shift)
-				buf.AppendBits(c16.G >> shift)
-				buf.AppendBits(c16.B >> shift)
-
-			case color.FamilyDeviceCMYK:
-				c16 := gocol.NRGBA64Model.Convert(pixCol).(gocol.NRGBA64)
-				c, m, y, k := rgbToCMYK(c16.R, c16.G, c16.B)
-				buf.AppendBits(c >> shift)
-				buf.AppendBits(m >> shift)
-				buf.AppendBits(y >> shift)
-				buf.AppendBits(k >> shift)
-
-			// TODO(voss): implement the remaining color spaces
-			case color.FamilyLab:
-				return errors.New("Lab color space not implemented")
-			case color.FamilyICCBased:
-				return errors.New("ICCBased color space not implemented")
-			case color.FamilyIndexed:
-				return errors.New("Indexed color space not implemented")
-			case color.FamilySeparation:
-				return errors.New("Separation color space not implemented")
-			case color.FamilyDeviceN:
-				return errors.New("DeviceN color space not implemented")
-			}
-		}
-
-		_, err := w.Write(buf.Bytes())
-		if err != nil {
+	if d.Measure != nil {
+		if err := pdf.CheckVersion(out, "image dictionary Measure entry", pdf.V2_0); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
-// writeImageMaskData writes mask data from an image.Image to the provided writer.
-func writeImageMaskData(w io.Writer, img image.Image) error {
-	bounds := img.Bounds()
-	width := bounds.Dx()
-	height := bounds.Dy()
-
-	// Mask data is encoded as a continuous bit stream, with the high-order bit
-	// of each byte first. Each row starts at a new byte boundary.
-	// 0 = opaque, 1 = transparent
-	rowBytes := (width + 7) / 8
-	buf := make([]byte, rowBytes)
-	for y := range height {
-		for i := range buf {
-			buf[i] = 0
-		}
-
-		for x := range width {
-			_, _, _, a := img.At(bounds.Min.X+x, bounds.Min.Y+y).RGBA()
-			if a < 0x8000 {
-				buf[x/8] |= 1 << (7 - x%8)
-			}
-		}
-
-		_, err := w.Write(buf)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-type ImageMask struct {
-	// Width is the width of the image mask in pixels.
-	Width int
-
-	// Height is the height of the image mask in pixels.
-	Height int
-
-	// WriteData is a function that writes the mask data to the provided writer.
-	// The data should be written as a continuous bit stream, with each row
-	// starting at a new byte boundary. 0 = opaque, 1 = transparent.
-	WriteData func(io.Writer) error
-
-	// Interpolate enables edge smoothing for the mask to reduce jagged
-	// appearance in low-resolution stencil masks.
-	Interpolate bool
-
-	// Alternates (optional) is an array of alternate image dictionaries for this image.
-	Alternates []*ImageMask
-
-	// TODO(voss): SMask
-	// TODO(voss): SMaskInData
-
-	// Name is deprecated and should be left empty.
-	// Only used in PDF 1.0 where it was the name used to reference the image
-	// from within content streams.
-	Name pdf.Name
-
-	// TODO(voss): StructParent
-	// TODO(voss): ID
-	// TODO(voss): OPI
-
-	// Metadata (optional) is a metadata stream containing metadata for the image.
-	Metadata *metadata.Stream
-
-	// TODO(voss): OC
-	// TODO(voss): AF
-	// TODO(voss): Measure
-	// TODO(voss): PtData
-}
-
-var _ Image = (*ImageMask)(nil)
-
-func (m *ImageMask) Bounds() Rectangle {
+// Bounds returns the dimensions of the image.
+func (d *Dict) Bounds() Rectangle {
 	return Rectangle{
 		XMin: 0,
 		YMin: 0,
-		XMax: m.Width,
-		YMax: m.Height,
+		XMax: d.Width,
+		YMax: d.Height,
 	}
 }
 
-func (m *ImageMask) Subtype() pdf.Name {
+// Subtype returns the PDF XObject subtype for images.
+func (d *Dict) Subtype() pdf.Name {
 	return pdf.Name("Image")
-}
-
-func (m *ImageMask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-
-	if err := m.check(rm.Out); err != nil {
-		return nil, zero, err
-	}
-
-	dict := pdf.Dict{
-		"Type":      pdf.Name("XObject"),
-		"Subtype":   pdf.Name("Image"),
-		"Width":     pdf.Integer(m.Width),
-		"Height":    pdf.Integer(m.Height),
-		"ImageMask": pdf.Boolean(true),
-	}
-	if m.Interpolate {
-		dict["Interpolate"] = pdf.Boolean(true)
-	}
-	if len(m.Alternates) > 0 {
-		var alts pdf.Array
-		for _, alt := range m.Alternates {
-			ref, _, err := pdf.ResourceManagerEmbed(rm, alt)
-			if err != nil {
-				return nil, zero, err
-			}
-			alts = append(alts, ref)
-		}
-		dict["Alternates"] = alts
-	}
-	if m.Name != "" {
-		dict["Name"] = m.Name
-	}
-	if m.Metadata != nil {
-		ref, _, err := pdf.ResourceManagerEmbed(rm, m.Metadata)
-		if err != nil {
-			return nil, zero, err
-		}
-		dict["Metadata"] = ref
-	}
-
-	ref := rm.Out.Alloc()
-	filters := []pdf.Filter{
-		pdf.FilterCCITTFax{
-			"Columns": pdf.Integer(m.Width),
-			"K":       pdf.Integer(-1),
-		},
-	}
-	w, err := rm.Out.OpenStream(ref, dict, filters...)
-	if err != nil {
-		return nil, zero, fmt.Errorf("cannot open image mask stream: %w", err)
-	}
-
-	err = m.WriteData(w)
-	if err != nil {
-		return nil, zero, err
-	}
-
-	err = w.Close()
-	if err != nil {
-		return nil, zero, err
-	}
-	return ref, zero, nil
-}
-
-func (m *ImageMask) check(out *pdf.Writer) error {
-	if m.Width <= 0 {
-		return fmt.Errorf("invalid image mask width %d", m.Width)
-	}
-	if m.Height <= 0 {
-		return fmt.Errorf("invalid image mask height %d", m.Height)
-	}
-	if m.WriteData == nil {
-		return errors.New("WriteData function cannot be nil")
-	}
-
-	if m.Alternates != nil {
-		if err := pdf.CheckVersion(out, "image alternates", pdf.V1_3); err != nil {
-			return err
-		}
-
-		for _, alt := range m.Alternates {
-			if len(alt.Alternates) > 0 {
-				return errors.New("alternates of alternates not allowed")
-			}
-		}
-	}
-	if m.Name != "" {
-		v := pdf.GetVersion(out)
-		if v >= pdf.V2_0 {
-			return errors.New("unexpected /Name field")
-		}
-	}
-	if m.Metadata != nil {
-		if err := pdf.CheckVersion(out, "image metadata", pdf.V1_4); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }

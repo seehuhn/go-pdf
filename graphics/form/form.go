@@ -63,7 +63,9 @@ type Form struct {
 	// TODO(voss): StructParent, StructParents
 	// TODO(voss): OC
 	// TODO(voss): AF
-	// TODO(voss): PtData
+
+	// PtData (optional; PDF 2.0) contains extended geospatial point data.
+	PtData *measure.PtData
 }
 
 // Subtype returns the XObject subtype for forms.
@@ -146,6 +148,18 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 			return nil, zero, err
 		}
 		dict["Measure"] = embedded
+	}
+
+	// PtData (optional; PDF 2.0)
+	if f.PtData != nil {
+		if err := pdf.CheckVersion(rm.Out, "form XObject PtData entry", pdf.V2_0); err != nil {
+			return nil, zero, err
+		}
+		embedded, _, err := pdf.ResourceManagerEmbed(rm, f.PtData)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["PtData"] = embedded
 	}
 
 	var filters []pdf.Filter

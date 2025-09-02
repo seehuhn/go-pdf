@@ -32,8 +32,8 @@ type Viewport struct {
 	// Measure specifies the scale and units for measurements within the viewport (optional).
 	Measure Measure
 
-	// TODO(voss): Add PtData field when point data dictionaries are implemented.
-	// PtData specifies extended geospatial data (optional, PDF 2.0).
+	// PtData (optional; PDF 2.0) contains extended geospatial point data.
+	PtData *PtData
 
 	// SingleUse determines if Embed returns a dictionary (true) or
 	// a reference (false).
@@ -85,6 +85,13 @@ func ExtractViewport(r pdf.Getter, obj pdf.Object) (*Viewport, error) {
 		}
 	}
 
+	// Extract optional PtData field
+	if ptData, err := pdf.Optional(ExtractPtData(r, dict["PtData"])); err != nil {
+		return nil, err
+	} else {
+		vp.PtData = ptData
+	}
+
 	return vp, nil
 }
 
@@ -119,6 +126,18 @@ func (v *Viewport) Embed(res *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 			return nil, zero, err
 		}
 		dict["Measure"] = embedded
+	}
+
+	// Optional PtData field (PDF 2.0)
+	if v.PtData != nil {
+		if err := pdf.CheckVersion(res.Out, "viewport PtData entry", pdf.V2_0); err != nil {
+			return nil, zero, err
+		}
+		embedded, _, err := pdf.ResourceManagerEmbed(res, v.PtData)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["PtData"] = embedded
 	}
 
 	if v.SingleUse {

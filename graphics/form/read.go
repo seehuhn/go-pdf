@@ -91,6 +91,13 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Form, error) {
 		form.Measure = m
 	}
 
+	// PtData (optional)
+	if ptData, err := pdf.Optional(measure.ExtractPtData(r, dict["PtData"])); err != nil {
+		return nil, err
+	} else {
+		form.PtData = ptData
+	}
+
 	// Create Draw function as closure
 	form.Draw = func(w *graphics.Writer) error {
 		copier := pdfcopy.NewCopier(w.RM.Out, r)

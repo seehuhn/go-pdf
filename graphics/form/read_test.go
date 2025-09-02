@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/pieceinfo"
 )
 
@@ -202,5 +203,101 @@ func TestPieceInfoRequiresLastModified(t *testing.T) {
 	_, _, err := pdf.ResourceManagerEmbed(rm, form)
 	if err == nil {
 		t.Error("Expected error when PieceInfo is present but LastModified is not set")
+	}
+}
+
+// TestFormWithPtData verifies that PtData is properly handled during
+// form XObject read/write cycles.
+func TestFormWithPtData(t *testing.T) {
+	writer1, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm1 := pdf.NewResourceManager(writer1)
+
+	// create test PtData with some geospatial point data
+	testPtData := &measure.PtData{
+		Subtype: measure.PtDataSubtypeCloud,
+		Names:   []string{measure.PtDataNameLat, measure.PtDataNameLon, measure.PtDataNameAlt},
+		XPTS: [][]pdf.Object{
+			{pdf.Number(40.7128), pdf.Number(-74.0060), pdf.Number(10.5)}, // NYC coordinates
+			{pdf.Number(40.7589), pdf.Number(-73.9851), pdf.Number(15.2)}, // Central Park
+		},
+		SingleUse: false, // use as indirect object
+	}
+
+	form0 := &Form{
+		Draw: func(w *graphics.Writer) error {
+			w.SetFillColor(color.DeviceGray(0.5))
+			w.Rectangle(0, 0, 100, 100)
+			w.Fill()
+			return nil
+		},
+		BBox:   pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+		PtData: testPtData,
+	}
+
+	ref, _, err := pdf.ResourceManagerEmbed(rm1, form0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = rm1.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = writer1.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	form1, err := Extract(writer1, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// verify PtData was preserved
+	if form1.PtData == nil {
+		t.Error("PtData was not preserved during extraction")
+		return
+	}
+
+	// check PtData content
+	if form1.PtData.Subtype != measure.PtDataSubtypeCloud {
+		t.Errorf("PtData subtype mismatch: got %s, want %s", form1.PtData.Subtype, measure.PtDataSubtypeCloud)
+	}
+	if len(form1.PtData.Names) != 3 {
+		t.Errorf("PtData names length mismatch: got %d, want 3", len(form1.PtData.Names))
+	}
+	if len(form1.PtData.XPTS) != 2 {
+		t.Errorf("PtData XPTS length mismatch: got %d, want 2", len(form1.PtData.XPTS))
+	}
+
+	// test round-trip
+	writer2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm2 := pdf.NewResourceManager(writer2)
+	ref2, _, err := pdf.ResourceManagerEmbed(rm2, form1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = rm2.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = writer2.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	form2, err := Extract(writer2, ref2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// check that PtData round-tripped correctly
+	if form2.PtData == nil {
+		t.Error("PtData was lost during round-trip")
+		return
+	}
+
+	// use cmp to compare the PtData structures
+	if diff := cmp.Diff(form1.PtData, form2.PtData, cmp.AllowUnexported(measure.PtData{})); diff != "" {
+		t.Errorf("PtData round trip failed (-got +want):\n%s", diff)
 	}
 }

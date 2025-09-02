@@ -25,7 +25,7 @@ import (
 
 // MarkedContent represents a marked-content point or sequence.
 type MarkedContent struct {
-	// Tag specifies the role or significance of the sequence.
+	// Tag specifies the role or significance of the point/sequence.
 	Tag pdf.Name
 
 	// Properties is a property list.
