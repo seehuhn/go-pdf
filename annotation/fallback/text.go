@@ -40,11 +40,10 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 	switch a.Icon {
 	case annotation.TextIconComment:
 		draw = func(w *graphics.Writer) error {
+			w.SetExtGState(s.reset)
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
 			w.SetFillColor(bg)
-			w.SetLineJoin(graphics.LineJoinMiter)
-			w.SetLineDash(nil, 0)
 			w.Rectangle(0.25, 0.25, 23.5, 23.5)
 			w.CloseFillAndStroke()
 
@@ -63,10 +62,9 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 
 	case annotation.TextIconKey:
 		draw = func(w *graphics.Writer) error {
+			w.SetExtGState(s.reset)
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetLineJoin(graphics.LineJoinMiter)
-			w.SetLineDash(nil, 0)
 			w.SetFillColor(bg)
 			w.Rectangle(0.25, 0.25, 23.5, 23.5)
 			w.CloseFillAndStroke()
@@ -87,10 +85,9 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		draw = func(w *graphics.Writer) error {
 			delta := 7.0
 
+			w.SetExtGState(s.reset)
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetLineJoin(graphics.LineJoinMiter)
-			w.SetLineDash(nil, 0)
 			w.SetFillColor(bg)
 			w.MoveTo(23.5-delta, 0.25)
 			w.LineTo(0.25, 0.25)
@@ -104,7 +101,6 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 
 			w.SetLineWidth(1.5)
 			w.SetStrokeColor(color.DeviceGray(0.5))
-			w.SetLineCap(graphics.LineCapButt)
 			for y := 19.; y > 6; y -= 3.5 {
 				w.MoveTo(4, y)
 				if y > 10 {
@@ -120,10 +116,10 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 
 	case annotation.TextIconHelp:
 		draw = func(w *graphics.Writer) error {
+			w.SetExtGState(s.reset)
+
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetLineJoin(graphics.LineJoinMiter)
-			w.SetLineDash(nil, 0)
 			w.SetFillColor(bg)
 			w.Rectangle(0.25, 0.25, 23.5, 23.5)
 			w.CloseFillAndStroke()
@@ -142,17 +138,16 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 
 	case annotation.TextIconNewParagraph:
 		draw = func(w *graphics.Writer) error {
+			w.SetExtGState(s.reset)
+
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetLineJoin(graphics.LineJoinMiter)
-			w.SetLineDash(nil, 0)
 			w.SetFillColor(bg)
 			w.Rectangle(0.25, 0.25, 23.5, 23.5)
 			w.CloseFillAndStroke()
 
 			w.SetStrokeColor(color.DeviceGray(0.7))
 			w.SetLineWidth(1.5)
-			w.SetLineCap(graphics.LineCapButt)
 			w.MoveTo(4, 19)
 			w.LineTo(17, 19)
 			w.MoveTo(4, 15.5)
@@ -180,10 +175,10 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 
 	case annotation.TextIconParagraph:
 		draw = func(w *graphics.Writer) error {
+			w.SetExtGState(s.reset)
+
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetLineJoin(graphics.LineJoinMiter)
-			w.SetLineDash(nil, 0)
 			w.SetFillColor(bg)
 			w.Rectangle(0.25, 0.25, 23.5, 23.5)
 			w.CloseFillAndStroke()
@@ -203,10 +198,10 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 
 	case annotation.TextIconInsert:
 		draw = func(w *graphics.Writer) error {
+			w.SetExtGState(s.reset)
+
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetLineJoin(graphics.LineJoinMiter)
-			w.SetLineDash(nil, 0)
 			w.SetFillColor(bg)
 			w.Rectangle(0.25, 0.25, 23.5, 23.5)
 			w.CloseFillAndStroke()
@@ -226,10 +221,10 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 
 	default:
 		draw = func(w *graphics.Writer) error {
+			w.SetExtGState(s.reset)
+
 			w.SetLineWidth(0.5)
 			w.SetStrokeColor(color.DeviceGray(0.2))
-			w.SetLineJoin(graphics.LineJoinMiter)
-			w.SetLineDash(nil, 0)
 			w.SetFillColor(bg)
 			w.Rectangle(0.25, 0.25, 23.5, 23.5)
 			w.CloseFillAndStroke()

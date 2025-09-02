@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/extended"
 	"seehuhn.de/go/pdf/font/standard"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
@@ -55,14 +56,35 @@ type Style struct {
 	// contentFont is the font used to render the text content of annotations,
 	// for example for FreeText annotations.
 	contentFont font.Layouter
+
+	// reset is used to set a default graphics state at the beginning of each
+	// appearance stream.
+	reset *graphics.ExtGState
 }
 
 func NewStyle() *Style {
-	// We allocate a single instance of each font here, to make sure
-	// that at most one instance of each font embedded in each output file.
+	reset := &graphics.ExtGState{
+		Set: graphics.StateTextKnockout |
+			graphics.StateLineCap |
+			graphics.StateLineJoin |
+			graphics.StateMiterLimit |
+			graphics.StateLineDash |
+			graphics.StateStrokeAdjustment,
+		TextKnockout:     false,
+		LineCap:          graphics.LineCapButt,
+		LineJoin:         graphics.LineJoinMiter,
+		MiterLimit:       10,
+		DashPattern:      nil,
+		DashPhase:        0,
+		StrokeAdjustment: false,
+	}
+
+	// Allocate fonts once here, to make sure that at most one instance of each
+	// font is embedded in an output file.
 	return &Style{
 		iconFont:    extended.NimbusRomanBold.New(),
 		contentFont: standard.Helvetica.New(),
+		reset:       reset,
 	}
 }
 

@@ -65,11 +65,9 @@ func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 	switch style {
 	case "U": // underline
 		draw = func(w *graphics.Writer) error {
+			w.SetExtGState(s.reset)
 			w.SetStrokeColor(col)
 			w.SetLineWidth(borderWidth)
-			w.SetLineJoin(graphics.LineJoinMiter) // TODO(voss): remove
-			w.SetLineDash(nil, 0)
-			w.SetLineCap(graphics.LineCapButt)
 			w.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy+borderWidth/2, 2))
 			w.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.LLy+borderWidth/2, 2))
 			w.Stroke()
@@ -77,11 +75,10 @@ func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 		}
 	case "D": // dashed
 		draw = func(w *graphics.Writer) error {
+			w.SetExtGState(s.reset)
 			w.SetStrokeColor(col)
 			w.SetLineWidth(borderWidth)
-			w.SetLineJoin(graphics.LineJoinMiter)
 			w.SetLineDash(dashPattern, 0)
-			w.SetLineCap(graphics.LineCapButt)
 			w.Rectangle(
 				pdf.Round(bbox.LLx+borderWidth/2, 2),
 				pdf.Round(bbox.LLy+borderWidth/2, 2),
@@ -93,6 +90,7 @@ func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 	case "B":
 		dark, light := getDarkLightCol(col)
 		draw = func(w *graphics.Writer) error {
+			w.SetExtGState(s.reset)
 			w.SetFillColor(dark)
 			w.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy, 2))
 			w.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.LLy, 2))
@@ -115,6 +113,7 @@ func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 	case "I":
 		dark, light := getDarkLightCol(col)
 		draw = func(w *graphics.Writer) error {
+			w.SetExtGState(s.reset)
 			w.SetFillColor(light)
 			w.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy, 2))
 			w.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.LLy, 2))
@@ -136,10 +135,9 @@ func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 		}
 	default: // solid or unknown
 		draw = func(w *graphics.Writer) error {
+			w.SetExtGState(s.reset)
 			w.SetStrokeColor(col)
 			w.SetLineWidth(borderWidth)
-			w.SetLineJoin(graphics.LineJoinMiter)
-			w.SetLineDash(nil, 0)
 			w.Rectangle(
 				pdf.Round(bbox.LLx+borderWidth/2, 2),
 				pdf.Round(bbox.LLy+borderWidth/2, 2),

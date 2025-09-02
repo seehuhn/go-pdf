@@ -32,20 +32,15 @@ func (s *Style) addLineAppearance(a *annotation.Line) *form.Form {
 	lw := getLineWidth(a)
 	dashPattern := getDashPattern(a)
 
-	// calculate bounding box
 	bbox := calculateLineBBox(a, lw)
 	a.Rect = bbox
 
-	// create drawing function
 	draw := func(w *graphics.Writer) error {
-		// set line properties
+		w.SetExtGState(s.reset)
 		w.SetLineWidth(lw)
 		w.SetStrokeColor(color.Black)
 		w.SetLineDash(dashPattern, 0)
-		w.SetLineJoin(graphics.LineJoinBevel)
-		w.SetLineCap(graphics.LineCapButt)
 
-		// draw the line based on whether we have leader lines
 		if a.LL != 0 {
 			drawLineWithLeaderLines(w, a)
 		} else {
@@ -55,7 +50,6 @@ func (s *Style) addLineAppearance(a *annotation.Line) *form.Form {
 		return nil
 	}
 
-	// create appearance stream
 	return &form.Form{
 		Draw: draw,
 		BBox: bbox,

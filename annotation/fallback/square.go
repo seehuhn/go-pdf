@@ -46,6 +46,7 @@ func (s *Style) addSquareAppearance(a *annotation.Square) *form.Form {
 	}
 
 	draw := func(w *graphics.Writer) error {
+		w.SetExtGState(s.reset)
 		if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
 			gs := &graphics.ExtGState{
 				Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
@@ -59,11 +60,7 @@ func (s *Style) addSquareAppearance(a *annotation.Square) *form.Form {
 		if hasOutline {
 			w.SetLineWidth(lw)
 			w.SetStrokeColor(col)
-			w.SetLineJoin(graphics.LineJoinMiter)
 			w.SetLineDash(dashPattern, 0)
-			if len(dashPattern) > 0 {
-				w.SetLineCap(graphics.LineCapButt)
-			}
 		}
 		if hasFill {
 			w.SetFillColor(a.FillColor)

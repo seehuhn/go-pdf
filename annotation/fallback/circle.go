@@ -48,6 +48,7 @@ func (s *Style) addCircleAppearance(a *annotation.Circle) *form.Form {
 	}
 
 	draw := func(w *graphics.Writer) error {
+		w.SetExtGState(s.reset)
 		if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
 			gs := &graphics.ExtGState{
 				Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
@@ -61,8 +62,6 @@ func (s *Style) addCircleAppearance(a *annotation.Circle) *form.Form {
 		if hasOutline {
 			w.SetLineWidth(lw)
 			w.SetStrokeColor(col)
-			w.SetLineJoin(graphics.LineJoinRound)
-			w.SetLineDash(dashPattern, 0)
 			if len(dashPattern) > 0 {
 				w.SetLineCap(graphics.LineCapButt)
 			}
