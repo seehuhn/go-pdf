@@ -93,22 +93,23 @@ func (c *Circle) AnnotationType() pdf.Name {
 	return "Circle"
 }
 
-func decodeCircle(r pdf.Getter, dict pdf.Dict) (*Circle, error) {
+func decodeCircle(x *pdf.Extractor, dict pdf.Dict) (*Circle, error) {
+	r := x.R
 	circle := &Circle{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(r, &circle.Common, dict); err != nil {
+	if err := decodeCommon(x, &circle.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(r, dict, &circle.Markup); err != nil {
+	if err := decodeMarkup(x, dict, &circle.Markup); err != nil {
 		return nil, err
 	}
 
 	// Extract circle-specific fields
 	// BS (optional)
-	if bs, err := pdf.Optional(ExtractBorderStyle(r, dict["BS"])); err != nil {
+	if bs, err := pdf.Optional(pdf.ExtractorGet(x, dict["BS"], ExtractBorderStyle)); err != nil {
 		return nil, err
 	} else {
 		circle.BorderStyle = bs

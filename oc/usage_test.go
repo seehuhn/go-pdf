@@ -37,7 +37,7 @@ func TestUsageRoundTrip(t *testing.T) {
 		{
 			name: "creator_info",
 			usage: &Usage{
-				CreatorInfo: &CreatorInfo{
+				Creator: &UsageCreator{
 					Creator: "Test Application",
 					Subtype: "Artwork",
 					AdditionalInfo: pdf.Dict{
@@ -49,7 +49,7 @@ func TestUsageRoundTrip(t *testing.T) {
 		{
 			name: "language",
 			usage: &Usage{
-				Language: &LanguageInfo{
+				Language: &UsageLanguage{
 					Lang:      language.MustParse("es-MX"),
 					Preferred: true,
 				},
@@ -58,7 +58,7 @@ func TestUsageRoundTrip(t *testing.T) {
 		{
 			name: "export",
 			usage: &Usage{
-				Export: &ExportInfo{
+				Export: &UsageExport{
 					ExportState: true,
 				},
 			},
@@ -66,7 +66,7 @@ func TestUsageRoundTrip(t *testing.T) {
 		{
 			name: "zoom",
 			usage: &Usage{
-				Zoom: &ZoomInfo{
+				Zoom: &UsageZoom{
 					Min: 1.0,
 					Max: 10.0,
 				},
@@ -75,7 +75,7 @@ func TestUsageRoundTrip(t *testing.T) {
 		{
 			name: "zoom_infinity",
 			usage: &Usage{
-				Zoom: &ZoomInfo{
+				Zoom: &UsageZoom{
 					Min: 2.0,
 					Max: 1e308,
 				},
@@ -84,7 +84,7 @@ func TestUsageRoundTrip(t *testing.T) {
 		{
 			name: "print",
 			usage: &Usage{
-				Print: &PrintInfo{
+				Print: &UsagePrint{
 					Subtype:    PrintSubtypeWatermark,
 					PrintState: true,
 				},
@@ -93,7 +93,7 @@ func TestUsageRoundTrip(t *testing.T) {
 		{
 			name: "view",
 			usage: &Usage{
-				View: &ViewInfo{
+				View: &UsageView{
 					ViewState: false,
 				},
 			},
@@ -101,7 +101,7 @@ func TestUsageRoundTrip(t *testing.T) {
 		{
 			name: "user_single",
 			usage: &Usage{
-				User: &UserInfo{
+				User: &UsageUser{
 					Type: UserTypeIndividual,
 					Name: []string{"John Doe"},
 				},
@@ -110,7 +110,7 @@ func TestUsageRoundTrip(t *testing.T) {
 		{
 			name: "user_multiple",
 			usage: &Usage{
-				User: &UserInfo{
+				User: &UsageUser{
 					Type: UserTypeOrganisation,
 					Name: []string{"Company A", "Company B"},
 				},
@@ -119,7 +119,7 @@ func TestUsageRoundTrip(t *testing.T) {
 		{
 			name: "page_element",
 			usage: &Usage{
-				PageElement: &PageElementInfo{
+				PageElement: &UsagePageElement{
 					Subtype: PageElementHeaderFooter,
 				},
 			},
@@ -127,33 +127,33 @@ func TestUsageRoundTrip(t *testing.T) {
 		{
 			name: "complex",
 			usage: &Usage{
-				CreatorInfo: &CreatorInfo{
+				Creator: &UsageCreator{
 					Creator: "PDF Editor Pro",
 					Subtype: "Technical",
 				},
-				Language: &LanguageInfo{
+				Language: &UsageLanguage{
 					Lang:      language.English,
 					Preferred: false,
 				},
-				Export: &ExportInfo{
+				Export: &UsageExport{
 					ExportState: false,
 				},
-				Zoom: &ZoomInfo{
+				Zoom: &UsageZoom{
 					Min: 0.5,
 					Max: 20.0,
 				},
-				Print: &PrintInfo{
+				Print: &UsagePrint{
 					Subtype:    PrintSubtypePrintersMarks,
 					PrintState: true,
 				},
-				View: &ViewInfo{
+				View: &UsageView{
 					ViewState: true,
 				},
-				User: &UserInfo{
+				User: &UsageUser{
 					Type: UserTypeTitle,
 					Name: []string{"Manager", "Director"},
 				},
-				PageElement: &PageElementInfo{
+				PageElement: &UsagePageElement{
 					Subtype: PageElementBackground,
 				},
 			},
@@ -196,7 +196,8 @@ func testUsageRoundTrip(t *testing.T, original *Usage, mode string) {
 	}
 
 	// extract the usage dictionary
-	extracted, err3 := ExtractUsage(buf, obj)
+	extractor := pdf.NewExtractor(buf)
+	extracted, err3 := ExtractUsage(extractor, obj)
 	if err3 != nil {
 		t.Fatalf("%s: extract: %v", mode, err3)
 	}
@@ -233,15 +234,15 @@ func normalizeUsage(u *Usage) {
 	}
 
 	// clear AdditionalInfo if empty
-	if u.CreatorInfo != nil && len(u.CreatorInfo.AdditionalInfo) == 0 {
-		u.CreatorInfo.AdditionalInfo = nil
+	if u.Creator != nil && len(u.Creator.AdditionalInfo) == 0 {
+		u.Creator.AdditionalInfo = nil
 	}
 
 	// normalize AdditionalInfo types (TextString -> String during PDF processing)
-	if u.CreatorInfo != nil && u.CreatorInfo.AdditionalInfo != nil {
-		for key, val := range u.CreatorInfo.AdditionalInfo {
+	if u.Creator != nil && u.Creator.AdditionalInfo != nil {
+		for key, val := range u.Creator.AdditionalInfo {
 			if ts, ok := val.(pdf.TextString); ok {
-				u.CreatorInfo.AdditionalInfo[key] = pdf.String(ts)
+				u.Creator.AdditionalInfo[key] = pdf.String(ts)
 			}
 		}
 	}
@@ -253,7 +254,7 @@ func TestUsageValidation(t *testing.T) {
 
 	// Test invalid Zoom constraint: Min > Max
 	usage := &Usage{
-		Zoom: &ZoomInfo{
+		Zoom: &UsageZoom{
 			Min: 10.0,
 			Max: 5.0, // Max < Min should fail
 		},

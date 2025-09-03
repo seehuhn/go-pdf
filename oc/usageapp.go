@@ -18,5 +18,7 @@ package oc
 
 // PDF 2.0 sections: 8.11.4
 
-// Table 101
+// UsageApplication specifies rules for automatically managing
+// optional content group states based on external factors.
+// This corresponds to Table 101 in the PDF specification.
 type UsageApplication struct{}

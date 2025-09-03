@@ -53,6 +53,8 @@ func Resolve(r Getter, obj Object) (Native, error) {
 	return resolve(r, obj, true)
 }
 
+const maxRefDepth = 16
+
 func resolve(r Getter, obj Object, canObjStm bool) (Native, error) {
 	if obj == nil {
 		return nil, nil
@@ -69,7 +71,7 @@ func resolve(r Getter, obj Object, canObjStm bool) (Native, error) {
 	count := 0
 	for {
 		count++
-		if count > 16 {
+		if count > maxRefDepth {
 			return nil, &MalformedFileError{
 				Err: errors.New("too many levels of indirection"),
 				Loc: []string{"object " + origRef.String()},

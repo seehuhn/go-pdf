@@ -44,8 +44,8 @@ type Group struct {
 var _ pdf.Embedder[pdf.Unused] = (*Group)(nil)
 
 // ExtractGroup extracts an optional content group from a PDF object.
-func ExtractGroup(r pdf.Getter, obj pdf.Object) (*Group, error) {
-	dict, err := pdf.GetDictTyped(r, obj, "OCG")
+func ExtractGroup(x *pdf.Extractor, obj pdf.Object) (*Group, error) {
+	dict, err := pdf.GetDictTyped(x.R, obj, "OCG")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -55,51 +55,46 @@ func ExtractGroup(r pdf.Getter, obj pdf.Object) (*Group, error) {
 	group := &Group{}
 
 	// extract Name (required)
-	if name, err := pdf.Optional(pdf.GetTextString(r, dict["Name"])); err != nil {
+	if name, err := pdf.Optional(pdf.GetTextString(x.R, dict["Name"])); err != nil {
 		return nil, err
 	} else if name != "" {
 		group.Name = string(name)
 	}
 
-	// extract Intent (optional)
-	intentObj := dict["Intent"]
-	if intentObj != nil {
-		// Intent can be either a single name or an array of names
-		if arr, err := pdf.GetArray(r, intentObj); err == nil && arr != nil {
-			// array of names
-			for _, item := range arr {
-				if name, err := pdf.Optional(pdf.GetName(r, item)); err != nil {
-					return nil, err
-				} else if name != "" {
-					group.Intent = append(group.Intent, name)
-				}
+	// Intent (optional) can be either a single name or an array of names.
+	intent, err := pdf.Resolve(x.R, dict["Intent"])
+	if err != nil {
+		return nil, err
+	}
+	switch intent := intent.(type) {
+	case pdf.Array:
+		for _, o := range intent {
+			if name, err := pdf.Optional(pdf.GetName(x.R, o)); err != nil {
+				return nil, err
+			} else if name != "" {
+				group.Intent = append(group.Intent, name)
 			}
-		} else if name, err := pdf.Optional(pdf.GetName(r, intentObj)); err != nil {
-			return nil, err
-		} else if name != "" {
-			// single name
-			group.Intent = []pdf.Name{name}
+		}
+	case pdf.Name:
+		if intent != "" {
+			group.Intent = []pdf.Name{intent}
 		}
 	}
-
-	// apply default Intent if none specified
 	if len(group.Intent) == 0 {
 		group.Intent = []pdf.Name{"View"}
 	}
 
-	// extract Usage dictionary (optional)
-	if usageObj := dict["Usage"]; usageObj != nil {
-		if usage, err := ExtractUsage(r, usageObj); err != nil {
-			return nil, err
-		} else {
-			group.Usage = usage
-		}
+	// Usage dictionary (optional)
+	if usage, err := pdf.Optional(ExtractUsage(x, dict["Usage"])); err != nil {
+		return nil, err
+	} else {
+		group.Usage = usage
 	}
 
 	return group, nil
 }
 
-// Embed converts the Group to a PDF object, always as an indirect reference.
+// Embed adds the optional content group to a PDF file.
 func (g *Group) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
@@ -131,7 +126,7 @@ func (g *Group) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	// embed Usage dictionary if present
 	if g.Usage != nil {
-		usageObj, _, err := g.Usage.Embed(rm)
+		usageObj, _, err := pdf.ResourceManagerEmbed(rm, g.Usage)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -146,4 +141,9 @@ func (g *Group) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	return ref, zero, nil
+}
+
+// IsVisible returns whether the group is visible given a state map.
+func (g *Group) IsVisible(states map[*Group]bool) bool {
+	return states[g]
 }

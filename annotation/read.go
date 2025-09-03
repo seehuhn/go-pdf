@@ -21,69 +21,69 @@ import (
 )
 
 // Decode reads an annotation from a PDF file.
-func Decode(r pdf.Getter, obj pdf.Object) (Annotation, error) {
-	dict, err := pdf.GetDictTyped(r, obj, "Annot")
+func Decode(x *pdf.Extractor, obj pdf.Object) (Annotation, error) {
+	dict, err := pdf.GetDictTyped(x.R, obj, "Annot")
 	if err != nil {
 		return nil, err
 	}
 
-	subtype, err := pdf.GetName(r, dict["Subtype"])
+	subtype, err := pdf.GetName(x.R, dict["Subtype"])
 	if err != nil {
 		return nil, err
 	}
 
 	switch subtype {
 	case "Text":
-		return decodeText(r, dict)
+		return decodeText(x, dict)
 	case "Link":
-		return decodeLink(r, dict)
+		return decodeLink(x, dict)
 	case "FreeText":
-		return decodeFreeText(r, dict)
+		return decodeFreeText(x, dict)
 	case "Line":
-		return decodeLine(r, dict)
+		return decodeLine(x, dict)
 	case "Square":
-		return decodeSquare(r, dict)
+		return decodeSquare(x, dict)
 	case "Circle":
-		return decodeCircle(r, dict)
+		return decodeCircle(x, dict)
 	case "Polygon":
-		return decodePolygon(r, dict)
+		return decodePolygon(x, dict)
 	case "PolyLine":
-		return decodePolyline(r, dict)
+		return decodePolyline(x, dict)
 	case "Highlight", "Underline", "Squiggly", "StrikeOut":
-		return decodeTextMarkup(r, dict, subtype)
+		return decodeTextMarkup(x, dict, subtype)
 	case "Caret":
-		return decodeCaret(r, dict)
+		return decodeCaret(x, dict)
 	case "Stamp":
-		return decodeStamp(r, dict)
+		return decodeStamp(x, dict)
 	case "Ink":
-		return decodeInk(r, dict)
+		return decodeInk(x, dict)
 	case "Popup":
-		return decodePopup(r, dict)
+		return decodePopup(x, dict)
 	case "FileAttachment":
-		return decodeFileAttachment(r, dict)
+		return decodeFileAttachment(x, dict)
 	case "Sound":
-		return decodeSound(r, dict)
+		return decodeSound(x, dict)
 	case "Movie":
-		return decodeMovie(r, dict)
+		return decodeMovie(x, dict)
 	case "Screen":
-		return decodeScreen(r, dict)
+		return decodeScreen(x, dict)
 	case "Widget":
-		return decodeWidget(r, dict)
+		return decodeWidget(x, dict)
 	case "PrinterMark":
-		return decodePrinterMark(r, dict)
+		return decodePrinterMark(x, dict)
 	case "TrapNet":
-		return decodeTrapNet(r, dict)
+		return decodeTrapNet(x, dict)
 	case "Watermark":
-		return decodeWatermark(r, dict)
+		return decodeWatermark(x, dict)
 	case "3D":
-		return decodeAnnot3D(r, dict)
+		return decodeAnnot3D(x, dict)
 	case "Redact":
-		return decodeRedact(r, dict)
+		return decodeRedact(x, dict)
 	case "Projection":
-		return decodeProjection(r, dict)
+		return decodeProjection(x, dict)
 	case "RichMedia":
-		return decodeRichMedia(r, dict)
+		return decodeRichMedia(x, dict)
 	default:
-		return decodeCustom(r, dict)
+		return decodeCustom(x, dict)
 	}
 }

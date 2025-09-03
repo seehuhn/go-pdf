@@ -41,11 +41,11 @@ func (r *RichMedia) AnnotationType() pdf.Name {
 	return "RichMedia"
 }
 
-func decodeRichMedia(r pdf.Getter, dict pdf.Dict) (*RichMedia, error) {
+func decodeRichMedia(x *pdf.Extractor, dict pdf.Dict) (*RichMedia, error) {
 	richMedia := &RichMedia{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(r, &richMedia.Common, dict); err != nil {
+	if err := decodeCommon(x, &richMedia.Common, dict); err != nil {
 		return nil, err
 	}
 

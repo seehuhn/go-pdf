@@ -355,7 +355,7 @@ func (spec *Specification) Encode(rm *pdf.ResourceManager) (pdf.Object, error) {
 
 	// EncryptedPayload (EP)
 	if spec.EncryptedPayload != nil {
-		ep, _, err := spec.EncryptedPayload.Embed(rm)
+		ep, _, err := pdf.ResourceManagerEmbed(rm, spec.EncryptedPayload)
 		if err != nil {
 			return nil, err
 		}

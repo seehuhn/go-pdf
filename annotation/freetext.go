@@ -103,13 +103,14 @@ func (f *FreeText) AnnotationType() pdf.Name {
 	return "FreeText"
 }
 
-func decodeFreeText(r pdf.Getter, dict pdf.Dict) (*FreeText, error) {
+func decodeFreeText(x *pdf.Extractor, dict pdf.Dict) (*FreeText, error) {
+	r := x.R
 	f := &FreeText{}
 
-	if err := decodeCommon(r, &f.Common, dict); err != nil {
+	if err := decodeCommon(x, &f.Common, dict); err != nil {
 		return nil, err
 	}
-	if err := decodeMarkup(r, dict, &f.Markup); err != nil {
+	if err := decodeMarkup(x, dict, &f.Markup); err != nil {
 		return nil, err
 	}
 
@@ -162,7 +163,7 @@ func decodeFreeText(r pdf.Getter, dict pdf.Dict) (*FreeText, error) {
 		f.Margin = a
 	}
 
-	if bs, err := pdf.Optional(ExtractBorderStyle(r, dict["BS"])); err != nil {
+	if bs, err := pdf.Optional(pdf.ExtractorGet(x, dict["BS"], ExtractBorderStyle)); err != nil {
 		return nil, err
 	} else {
 		f.BorderStyle = bs

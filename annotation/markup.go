@@ -158,9 +158,9 @@ func (m *Markup) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 }
 
 // decodeMarkup extracts fields common to all markup annotations from a PDF dictionary.
-func decodeMarkup(r pdf.Getter, dict pdf.Dict, markup *Markup) error {
+func decodeMarkup(x *pdf.Extractor, dict pdf.Dict, markup *Markup) error {
 	// T (optional)
-	if t, err := pdf.Optional(pdf.GetTextString(r, dict["T"])); err != nil {
+	if t, err := pdf.Optional(pdf.GetTextString(x.R, dict["T"])); err != nil {
 		return err
 	} else {
 		markup.User = string(t)
@@ -177,7 +177,7 @@ func decodeMarkup(r pdf.Getter, dict pdf.Dict, markup *Markup) error {
 	}
 
 	// CreationDate (optional)
-	if creationDate, err := pdf.Optional(pdf.GetDate(r, dict["CreationDate"])); err != nil {
+	if creationDate, err := pdf.Optional(pdf.GetDate(x.R, dict["CreationDate"])); err != nil {
 		return err
 	} else if !creationDate.IsZero() {
 		markup.CreationDate = time.Time(creationDate)
@@ -189,21 +189,21 @@ func decodeMarkup(r pdf.Getter, dict pdf.Dict, markup *Markup) error {
 	}
 
 	// Subj (optional)
-	if subj, err := pdf.Optional(pdf.GetTextString(r, dict["Subj"])); err != nil {
+	if subj, err := pdf.Optional(pdf.GetTextString(x.R, dict["Subj"])); err != nil {
 		return err
 	} else {
 		markup.Subject = string(subj)
 	}
 
 	// RT (optional)
-	if rt, err := pdf.Optional(pdf.GetName(r, dict["RT"])); err != nil {
+	if rt, err := pdf.Optional(pdf.GetName(x.R, dict["RT"])); err != nil {
 		return err
 	} else {
 		markup.RT = rt
 	}
 
 	// IT (optional)
-	if it, err := pdf.Optional(pdf.GetName(r, dict["IT"])); err != nil {
+	if it, err := pdf.Optional(pdf.GetName(x.R, dict["IT"])); err != nil {
 		return err
 	} else {
 		markup.Intent = it

@@ -126,31 +126,31 @@ func (l *Line) AnnotationType() pdf.Name {
 	return "Line"
 }
 
-func decodeLine(r pdf.Getter, dict pdf.Dict) (*Line, error) {
+func decodeLine(x *pdf.Extractor, dict pdf.Dict) (*Line, error) {
 	line := &Line{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(r, &line.Common, dict); err != nil {
+	if err := decodeCommon(x, &line.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(r, dict, &line.Markup); err != nil {
+	if err := decodeMarkup(x, dict, &line.Markup); err != nil {
 		return nil, err
 	}
 
 	// Extract line-specific fields
 	// L (required)
-	if l, err := pdf.GetArray(r, dict["L"]); err == nil && len(l) == 4 {
+	if l, err := pdf.GetArray(x.R, dict["L"]); err == nil && len(l) == 4 {
 		for i, coord := range l {
-			if num, err := pdf.GetNumber(r, coord); err == nil {
+			if num, err := pdf.GetNumber(x.R, coord); err == nil {
 				line.Coords[i] = float64(num)
 			}
 		}
 	}
 
 	// BS (optional)
-	if bs, err := pdf.Optional(ExtractBorderStyle(r, dict["BS"])); err != nil {
+	if bs, err := pdf.Optional(pdf.ExtractorGet(x, dict["BS"], ExtractBorderStyle)); err != nil {
 		return nil, err
 	} else {
 		line.BorderStyle = bs
@@ -158,14 +158,14 @@ func decodeLine(r pdf.Getter, dict pdf.Dict) (*Line, error) {
 
 	// LE (optional; PDF 1.4) - default is [None, None]
 	line.LineEndingStyle = [2]LineEndingStyle{LineEndingStyleNone, LineEndingStyleNone}
-	if le, err := pdf.Optional(pdf.GetArray(r, dict["LE"])); err != nil {
+	if le, err := pdf.Optional(pdf.GetArray(x.R, dict["LE"])); err != nil {
 		return nil, err
 	} else if len(le) >= 1 {
-		if name, err := pdf.GetName(r, le[0]); err == nil {
+		if name, err := pdf.GetName(x.R, le[0]); err == nil {
 			line.LineEndingStyle[0] = LineEndingStyle(name)
 		}
 		if len(le) >= 2 {
-			if name, err := pdf.GetName(r, le[1]); err == nil {
+			if name, err := pdf.GetName(x.R, le[1]); err == nil {
 				line.LineEndingStyle[1] = LineEndingStyle(name)
 			}
 		} else {
@@ -175,25 +175,25 @@ func decodeLine(r pdf.Getter, dict pdf.Dict) (*Line, error) {
 	}
 
 	// IC (optional; PDF 1.4)
-	if ic, err := pdf.Optional(extractColor(r, dict["IC"])); err != nil {
+	if ic, err := pdf.Optional(extractColor(x.R, dict["IC"])); err != nil {
 		return nil, err
 	} else {
 		line.FillColor = ic
 	}
 
 	// Cap (optional)
-	if cap, err := pdf.GetBoolean(r, dict["Cap"]); err == nil {
+	if cap, err := pdf.GetBoolean(x.R, dict["Cap"]); err == nil {
 		line.Caption = bool(cap)
 	}
 
 	if line.Caption {
 		// CP (optional)
-		if cp, err := pdf.GetName(r, dict["CP"]); err == nil && cp == "Top" {
+		if cp, err := pdf.GetName(x.R, dict["CP"]); err == nil && cp == "Top" {
 			line.CaptionAbove = true
 		}
 
 		// CO (optional)
-		if co, err := pdf.Optional(pdf.GetFloatArray(r, dict["CO"])); err != nil {
+		if co, err := pdf.Optional(pdf.GetFloatArray(x.R, dict["CO"])); err != nil {
 			return nil, err
 		} else if len(co) == 2 {
 			line.CaptionOffset = co
@@ -201,28 +201,28 @@ func decodeLine(r pdf.Getter, dict pdf.Dict) (*Line, error) {
 	}
 
 	// LL (optional)
-	if ll, err := pdf.Optional(pdf.GetNumber(r, dict["LL"])); err != nil {
+	if ll, err := pdf.Optional(pdf.GetNumber(x.R, dict["LL"])); err != nil {
 		return nil, err
 	} else {
 		line.LL = float64(ll)
 	}
 
 	// LLE (optional)
-	if lle, err := pdf.Optional(pdf.GetNumber(r, dict["LLE"])); err != nil {
+	if lle, err := pdf.Optional(pdf.GetNumber(x.R, dict["LLE"])); err != nil {
 		return nil, err
 	} else {
 		line.LLE = max(float64(lle), 0)
 	}
 
 	// LLO (optional)
-	if llo, err := pdf.Optional(pdf.GetNumber(r, dict["LLO"])); err != nil {
+	if llo, err := pdf.Optional(pdf.GetNumber(x.R, dict["LLO"])); err != nil {
 		return nil, err
 	} else {
 		line.LLO = max(float64(llo), 0)
 	}
 
 	// Measure (optional)
-	if m, err := pdf.Optional(measure.Extract(r, dict["Measure"])); err != nil {
+	if m, err := pdf.Optional(measure.Extract(x.R, dict["Measure"])); err != nil {
 		return nil, err
 	} else {
 		line.Measure = m

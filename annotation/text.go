@@ -70,19 +70,15 @@ func (t *Text) AnnotationType() pdf.Name {
 	return "Text"
 }
 
-func decodeText(r pdf.Getter, obj pdf.Object) (*Text, error) {
-	dict, err := pdf.GetDict(r, obj)
-	if err != nil {
-		return nil, err
-	}
-
+func decodeText(x *pdf.Extractor, dict pdf.Dict) (*Text, error) {
+	r := x.R
 	text := &Text{}
 
-	if err := decodeCommon(r, &text.Common, dict); err != nil {
+	if err := decodeCommon(x, &text.Common, dict); err != nil {
 		return nil, err
 	}
 
-	if err := decodeMarkup(r, dict, &text.Markup); err != nil {
+	if err := decodeMarkup(x, dict, &text.Markup); err != nil {
 		return nil, err
 	}
 

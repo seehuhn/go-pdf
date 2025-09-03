@@ -44,8 +44,8 @@ type BorderStyle struct {
 
 var _ pdf.Embedder[pdf.Unused] = (*BorderStyle)(nil)
 
-func ExtractBorderStyle(r pdf.Getter, obj pdf.Object) (*BorderStyle, error) {
-	dict, err := pdf.GetDictTyped(r, obj, "Border")
+func ExtractBorderStyle(x *pdf.Extractor, obj pdf.Object) (*BorderStyle, error) {
+	dict, err := pdf.GetDictTyped(x.R, obj, "Border")
 	if dict == nil {
 		return nil, err
 	}
@@ -54,14 +54,14 @@ func ExtractBorderStyle(r pdf.Getter, obj pdf.Object) (*BorderStyle, error) {
 
 	style.Width = 1 // default width
 	if w, ok := dict["W"]; ok {
-		if w, err := pdf.Optional(pdf.GetNumber(r, w)); err != nil {
+		if w, err := pdf.Optional(pdf.GetNumber(x.R, w)); err != nil {
 			return nil, err
 		} else if w >= 0 {
 			style.Width = float64(w)
 		}
 	}
 
-	if s, err := pdf.Optional(pdf.GetName(r, dict["S"])); err != nil {
+	if s, err := pdf.Optional(pdf.GetName(x.R, dict["S"])); err != nil {
 		return nil, err
 	} else if s != "" {
 		style.Style = s
@@ -70,7 +70,7 @@ func ExtractBorderStyle(r pdf.Getter, obj pdf.Object) (*BorderStyle, error) {
 	}
 
 	if style.Style == "D" {
-		a, err := pdf.Optional(pdf.GetFloatArray(r, dict["D"]))
+		a, err := pdf.Optional(pdf.GetFloatArray(x.R, dict["D"]))
 		if err != nil {
 			return nil, err
 		}

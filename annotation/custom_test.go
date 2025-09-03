@@ -43,7 +43,8 @@ func TestCustomAnnotation(t *testing.T) {
 	}
 
 	// Extract should return an Unknown annotation
-	annotation, err := Decode(buf, ref)
+	x := pdf.NewExtractor(buf)
+	annotation, err := Decode(x, ref)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -55,7 +55,7 @@ func TestGroupRoundTrip(t *testing.T) {
 			group: &Group{
 				Name: "Language Layer",
 				Usage: &Usage{
-					Language: &LanguageInfo{
+					Language: &UsageLanguage{
 						Lang:      language.English,
 						Preferred: true,
 					},
@@ -68,19 +68,19 @@ func TestGroupRoundTrip(t *testing.T) {
 				Name:   "Complex Layer",
 				Intent: []pdf.Name{"View", "Print"},
 				Usage: &Usage{
-					CreatorInfo: &CreatorInfo{
+					Creator: &UsageCreator{
 						Creator: "Test App",
 						Subtype: "Artwork",
 					},
-					Language: &LanguageInfo{
+					Language: &UsageLanguage{
 						Lang:      language.MustParse("es-MX"),
 						Preferred: false,
 					},
-					Zoom: &ZoomInfo{
+					Zoom: &UsageZoom{
 						Min: 1.0,
 						Max: 10.0,
 					},
-					Print: &PrintInfo{
+					Print: &UsagePrint{
 						Subtype:    PrintSubtypeWatermark,
 						PrintState: true,
 					},
@@ -118,7 +118,8 @@ func testGroupRoundTrip(t *testing.T, original *Group) {
 	}
 
 	// extract the group
-	extracted, err := ExtractGroup(buf, ref)
+	extractor := pdf.NewExtractor(buf)
+	extracted, err := ExtractGroup(extractor, ref)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}

@@ -54,27 +54,27 @@ func (c *Caret) AnnotationType() pdf.Name {
 	return "Caret"
 }
 
-func decodeCaret(r pdf.Getter, dict pdf.Dict) (*Caret, error) {
+func decodeCaret(x *pdf.Extractor, dict pdf.Dict) (*Caret, error) {
 	caret := &Caret{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(r, &caret.Common, dict); err != nil {
+	if err := decodeCommon(x, &caret.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(r, dict, &caret.Markup); err != nil {
+	if err := decodeMarkup(x, dict, &caret.Markup); err != nil {
 		return nil, err
 	}
 
 	// Extract caret-specific fields
 	// RD (optional)
-	if rd, err := pdf.GetFloatArray(r, dict["RD"]); err == nil && len(rd) == 4 {
+	if rd, err := pdf.GetFloatArray(x.R, dict["RD"]); err == nil && len(rd) == 4 {
 		caret.Margin = rd
 	}
 
 	// Sy (optional)
-	if sy, err := pdf.GetName(r, dict["Sy"]); err == nil && sy != "" {
+	if sy, err := pdf.GetName(x.R, dict["Sy"]); err == nil && sy != "" {
 		caret.Symbol = sy
 	}
 

@@ -58,16 +58,17 @@ func (i *Ink) AnnotationType() pdf.Name {
 	return "Ink"
 }
 
-func decodeInk(r pdf.Getter, dict pdf.Dict) (*Ink, error) {
+func decodeInk(x *pdf.Extractor, dict pdf.Dict) (*Ink, error) {
+	r := x.R
 	ink := &Ink{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(r, &ink.Common, dict); err != nil {
+	if err := decodeCommon(x, &ink.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(r, dict, &ink.Markup); err != nil {
+	if err := decodeMarkup(x, dict, &ink.Markup); err != nil {
 		return nil, err
 	}
 
@@ -86,7 +87,7 @@ func decodeInk(r pdf.Getter, dict pdf.Dict) (*Ink, error) {
 	}
 
 	// BS (optional)
-	if bs, err := pdf.Optional(ExtractBorderStyle(r, dict["BS"])); err != nil {
+	if bs, err := pdf.Optional(pdf.ExtractorGet(x, dict["BS"], ExtractBorderStyle)); err != nil {
 		return nil, err
 	} else {
 		ink.BorderStyle = bs

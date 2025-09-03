@@ -43,7 +43,8 @@ func (c *Custom) AnnotationType() pdf.Name {
 	return c.Type
 }
 
-func decodeCustom(r pdf.Getter, dict pdf.Dict) (*Custom, error) {
+func decodeCustom(x *pdf.Extractor, dict pdf.Dict) (*Custom, error) {
+	r := x.R
 	subtype, err := pdf.GetName(r, dict["Subtype"])
 	if err != nil {
 		return nil, err
@@ -57,7 +58,7 @@ func decodeCustom(r pdf.Getter, dict pdf.Dict) (*Custom, error) {
 	}
 
 	// Extract common annotation fields
-	if err := decodeCommon(r, &c.Common, dict); err != nil {
+	if err := decodeCommon(x, &c.Common, dict); err != nil {
 		return nil, err
 	}
 

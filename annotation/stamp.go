@@ -54,16 +54,17 @@ func (s *Stamp) AnnotationType() pdf.Name {
 	return "Stamp"
 }
 
-func decodeStamp(r pdf.Getter, dict pdf.Dict) (*Stamp, error) {
+func decodeStamp(x *pdf.Extractor, dict pdf.Dict) (*Stamp, error) {
+	r := x.R
 	stamp := &Stamp{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(r, &stamp.Common, dict); err != nil {
+	if err := decodeCommon(x, &stamp.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(r, dict, &stamp.Markup); err != nil {
+	if err := decodeMarkup(x, dict, &stamp.Markup); err != nil {
 		return nil, err
 	}
 

@@ -67,16 +67,17 @@ func (r *Redact) AnnotationType() pdf.Name {
 	return "Redact"
 }
 
-func decodeRedact(r pdf.Getter, dict pdf.Dict) (*Redact, error) {
+func decodeRedact(x *pdf.Extractor, dict pdf.Dict) (*Redact, error) {
+	r := x.R
 	redact := &Redact{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(r, &redact.Common, dict); err != nil {
+	if err := decodeCommon(x, &redact.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(r, dict, &redact.Markup); err != nil {
+	if err := decodeMarkup(x, dict, &redact.Markup); err != nil {
 		return nil, err
 	}
 

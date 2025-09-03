@@ -78,7 +78,8 @@ func TestRoundTripDict(t *testing.T) {
 		for i, dict := range testDicts {
 			t.Run(fmt.Sprintf("dict-%d", i), func(t *testing.T) {
 				// make sure Extract does not crash or hang
-				a, err := Decode(mock.Getter, dict)
+				x := pdf.NewExtractor(mock.Getter)
+				a, err := Decode(x, dict)
 				if err != nil {
 					t.Error(err)
 					return
@@ -129,7 +130,8 @@ func roundTripTest(t *testing.T, v pdf.Version, a1 Annotation) {
 	}
 
 	// read back
-	a2, err := Decode(buf, dict)
+	x := pdf.NewExtractor(buf)
+	a2, err := Decode(x, dict)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,7 +300,8 @@ func FuzzRoundtrip(f *testing.F) {
 		if obj == nil {
 			t.Skip("missing annotation")
 		}
-		annotation, err := Decode(r, obj)
+		x := pdf.NewExtractor(r)
+		annotation, err := Decode(x, obj)
 		if err != nil {
 			t.Skip("broken annotation")
 		}

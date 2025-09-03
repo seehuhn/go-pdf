@@ -14,11 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Package oc implements optional content for PDF documents.
+// Optional content allows parts of a document to be selectively
+// viewed or hidden by PDF processors.
 package oc
-
-// PDF 2.0 sections: 8.11.4
-
-// Properties represents the optional content properties dictionary
-// that contains all optional content groups and their configurations.
-// This corresponds to Table 98 in the PDF specification.
-type Properties struct{}

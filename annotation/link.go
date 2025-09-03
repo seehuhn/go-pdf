@@ -92,11 +92,12 @@ func (l *Link) AnnotationType() pdf.Name {
 	return "Link"
 }
 
-func decodeLink(r pdf.Getter, dict pdf.Dict) (*Link, error) {
+func decodeLink(x *pdf.Extractor, dict pdf.Dict) (*Link, error) {
+	r := x.R
 	link := &Link{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(r, &link.Common, dict); err != nil {
+	if err := decodeCommon(x, &link.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -135,7 +136,7 @@ func decodeLink(r pdf.Getter, dict pdf.Dict) (*Link, error) {
 	}
 
 	// BS (optional)
-	link.BorderStyle, _ = ExtractBorderStyle(r, dict["BS"])
+	link.BorderStyle, _ = ExtractBorderStyle(x, dict["BS"])
 	if link.BorderStyle != nil {
 		link.Common.Border = nil
 	}

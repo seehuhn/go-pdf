@@ -79,41 +79,41 @@ func (p *Polygon) AnnotationType() pdf.Name {
 	return "Polygon"
 }
 
-func decodePolygon(r pdf.Getter, dict pdf.Dict) (*Polygon, error) {
+func decodePolygon(x *pdf.Extractor, dict pdf.Dict) (*Polygon, error) {
 	polygon := &Polygon{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(r, &polygon.Common, dict); err != nil {
+	if err := decodeCommon(x, &polygon.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(r, dict, &polygon.Markup); err != nil {
+	if err := decodeMarkup(x, dict, &polygon.Markup); err != nil {
 		return nil, err
 	}
 
 	// Extract polygon-specific fields
 	// Vertices (required unless Path is present)
-	if vertices, err := pdf.GetFloatArray(r, dict["Vertices"]); err == nil && len(vertices) > 0 {
+	if vertices, err := pdf.GetFloatArray(x.R, dict["Vertices"]); err == nil && len(vertices) > 0 {
 		polygon.Vertices = vertices
 	}
 
 	// BS (optional)
-	if bs, err := pdf.Optional(ExtractBorderStyle(r, dict["BS"])); err != nil {
+	if bs, err := pdf.Optional(pdf.ExtractorGet(x, dict["BS"], ExtractBorderStyle)); err != nil {
 		return nil, err
 	} else {
 		polygon.BorderStyle = bs
 	}
 
 	// IC (optional)
-	if ic, err := pdf.Optional(extractColor(r, dict["IC"])); err != nil {
+	if ic, err := pdf.Optional(extractColor(x.R, dict["IC"])); err != nil {
 		return nil, err
 	} else {
 		polygon.FillColor = ic
 	}
 
 	// BE (optional)
-	if be, err := pdf.Optional(ExtractBorderEffect(r, dict["BE"])); err != nil {
+	if be, err := pdf.Optional(ExtractBorderEffect(x.R, dict["BE"])); err != nil {
 		return nil, err
 	} else {
 		polygon.BorderEffect = be
@@ -121,7 +121,7 @@ func decodePolygon(r pdf.Getter, dict pdf.Dict) (*Polygon, error) {
 
 	// Measure (optional)
 	if dict["Measure"] != nil {
-		if m, err := pdf.Optional(measure.Extract(r, dict["Measure"])); err != nil {
+		if m, err := pdf.Optional(measure.Extract(x.R, dict["Measure"])); err != nil {
 			return nil, err
 		} else {
 			polygon.Measure = m
@@ -129,14 +129,14 @@ func decodePolygon(r pdf.Getter, dict pdf.Dict) (*Polygon, error) {
 	}
 
 	// Path (optional; PDF 2.0)
-	if path, err := pdf.GetArray(r, dict["Path"]); err == nil && len(path) > 0 {
+	if path, err := pdf.GetArray(x.R, dict["Path"]); err == nil && len(path) > 0 {
 		pathArrays := make([][]float64, len(path))
 		for i, pathEntry := range path {
-			if pathArray, err := pdf.GetArray(r, pathEntry); err == nil {
+			if pathArray, err := pdf.GetArray(x.R, pathEntry); err == nil {
 				if len(pathArray) > 0 {
 					coords := make([]float64, len(pathArray))
 					for j, coord := range pathArray {
-						if num, err := pdf.GetNumber(r, coord); err == nil {
+						if num, err := pdf.GetNumber(x.R, coord); err == nil {
 							coords[j] = float64(num)
 						}
 					}

@@ -50,16 +50,17 @@ func (f *FileAttachment) AnnotationType() pdf.Name {
 	return "FileAttachment"
 }
 
-func decodeFileAttachment(r pdf.Getter, dict pdf.Dict) (*FileAttachment, error) {
+func decodeFileAttachment(x *pdf.Extractor, dict pdf.Dict) (*FileAttachment, error) {
+	r := x.R
 	fileAttachment := &FileAttachment{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(r, &fileAttachment.Common, dict); err != nil {
+	if err := decodeCommon(x, &fileAttachment.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(r, dict, &fileAttachment.Markup); err != nil {
+	if err := decodeMarkup(x, dict, &fileAttachment.Markup); err != nil {
 		return nil, err
 	}
 

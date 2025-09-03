@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/oc"
 )
 
 // Common contains fields common to all annotation dictionaries.
@@ -135,7 +136,7 @@ type Common struct {
 	// the annotation.
 	//
 	// This corresponds to the /OC entry in the PDF annotation dictionary.
-	OptionalContent pdf.Reference
+	OptionalContent oc.Conditional
 
 	// Page (optional) points to the page dictionary that contains this
 	// annotation. Required for [Screen] annotations associated with rendition
@@ -258,11 +259,15 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict, isMarkup bool) er
 		d["StructParent"] = c.StructParent
 	}
 
-	if c.OptionalContent != 0 {
+	if c.OptionalContent != nil {
 		if err := pdf.CheckVersion(w, "annotation OC entry", pdf.V1_5); err != nil {
 			return err
 		}
-		d["OC"] = c.OptionalContent
+		ocObj, _, err := pdf.ResourceManagerEmbed(rm, c.OptionalContent)
+		if err != nil {
+			return err
+		}
+		d["OC"] = ocObj
 	}
 
 	if c.Files != nil {
@@ -316,7 +321,8 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict, isMarkup bool) er
 }
 
 // decodeCommon extracts fields common to all annotations from a PDF dictionary.
-func decodeCommon(r pdf.Getter, common *Common, dict pdf.Dict) error {
+func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
+	r := x.R
 	// Rect (required)
 	if rect, err := pdf.GetRectangle(r, dict["Rect"]); err == nil && rect != nil {
 		common.Rect = *rect
@@ -390,7 +396,9 @@ func decodeCommon(r pdf.Getter, common *Common, dict pdf.Dict) error {
 	}
 
 	// OC (optional)
-	if oc, ok := dict["OC"].(pdf.Reference); ok {
+	if oc, err := pdf.Optional(oc.ExtractConditional(x, dict["OC"])); err != nil {
+		return err
+	} else {
 		common.OptionalContent = oc
 	}
 

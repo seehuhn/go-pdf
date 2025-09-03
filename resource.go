@@ -19,6 +19,7 @@ package pdf
 import (
 	"errors"
 	"fmt"
+	"reflect"
 )
 
 // Encoder represents a PDF object which is tied to a specific PDF file.
@@ -211,4 +212,67 @@ func (s *CycleChecker) Check(obj Object) error {
 
 var ErrCycle = &MalformedFileError{
 	Err: errors.New("cycle in recursive structure"),
+}
+
+type Extractor struct {
+	R     Getter
+	cache map[extractorKey]any
+}
+
+type extractorKey struct {
+	ref Reference
+	tp  reflect.Type
+}
+
+func NewExtractor(r Getter) *Extractor {
+	return &Extractor{
+		R:     r,
+		cache: make(map[extractorKey]any),
+	}
+}
+
+func ExtractorGet[X any, T Embedder[X]](x *Extractor, obj Object, extract func(*Extractor, Object) (T, error)) (T, error) {
+	var zero T
+	tp := reflect.TypeFor[T]()
+
+	var refs []Reference
+	count := 0
+	for {
+		ref, ok := obj.(Reference)
+		if !ok {
+			break
+		}
+		key := extractorKey{ref: ref, tp: tp}
+
+		if v, ok := x.cache[key]; ok {
+			return v.(T), nil
+		}
+
+		refs = append(refs, ref)
+		count++
+		if count > maxRefDepth {
+			return zero, &MalformedFileError{
+				Err: errors.New("too many levels of indirection"),
+				Loc: []string{"object " + ref.String()},
+			}
+		}
+
+		var err error
+		obj, err = x.R.Get(ref, true)
+		if err != nil {
+			return zero, err
+		}
+	}
+
+	res, err := extract(x, obj)
+	if err != nil {
+		return zero, err
+	}
+
+	for _, ref := range refs {
+		key := extractorKey{ref: ref, tp: tp}
+		x.cache[key] = res
+	}
+
+	return res, nil
 }

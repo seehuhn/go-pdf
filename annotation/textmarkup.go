@@ -63,18 +63,19 @@ func (t *TextMarkup) AnnotationType() pdf.Name {
 	return pdf.Name(t.Type)
 }
 
-func decodeTextMarkup(r pdf.Getter, dict pdf.Dict, subtype pdf.Name) (*TextMarkup, error) {
+func decodeTextMarkup(x *pdf.Extractor, dict pdf.Dict, subtype pdf.Name) (*TextMarkup, error) {
+	r := x.R
 	textMarkup := &TextMarkup{}
 
 	textMarkup.Type = TextMarkupType(subtype)
 
 	// Extract common annotation fields
-	if err := decodeCommon(r, &textMarkup.Common, dict); err != nil {
+	if err := decodeCommon(x, &textMarkup.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(r, dict, &textMarkup.Markup); err != nil {
+	if err := decodeMarkup(x, dict, &textMarkup.Markup); err != nil {
 		return nil, err
 	}
 

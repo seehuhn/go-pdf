@@ -64,11 +64,12 @@ func (t *TrapNet) AnnotationType() pdf.Name {
 	return "TrapNet"
 }
 
-func decodeTrapNet(r pdf.Getter, dict pdf.Dict) (*TrapNet, error) {
+func decodeTrapNet(x *pdf.Extractor, dict pdf.Dict) (*TrapNet, error) {
+	r := x.R
 	trapNet := &TrapNet{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(r, &trapNet.Common, dict); err != nil {
+	if err := decodeCommon(x, &trapNet.Common, dict); err != nil {
 		return nil, err
 	}
 

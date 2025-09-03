@@ -25,141 +25,33 @@ import (
 
 // PDF 2.0 sections: 8.11.4.4
 
-// UserType represents the type of user in a usage dictionary.
-type UserType string
-
-const (
-	// UserTypeIndividual represents an individual user.
-	UserTypeIndividual UserType = "Ind"
-	// UserTypeTitle represents a title or position.
-	UserTypeTitle UserType = "Ttl"
-	// UserTypeOrganisation represents an organisation.
-	UserTypeOrganisation UserType = "Org"
-)
-
-// PageElementSubtype represents the subtype of a page element.
-type PageElementSubtype string
-
-const (
-	// PageElementHeaderFooter represents header/footer content.
-	PageElementHeaderFooter PageElementSubtype = "HF"
-	// PageElementForeground represents foreground image or graphics.
-	PageElementForeground PageElementSubtype = "FG"
-	// PageElementBackground represents background image or graphics.
-	PageElementBackground PageElementSubtype = "BG"
-	// PageElementLogo represents a logo.
-	PageElementLogo PageElementSubtype = "L"
-)
-
-// PrintSubtype represents the kind of content controlled by a print usage dictionary.
-type PrintSubtype string
-
-const (
-	// PrintSubtypeTrapping represents trapping content.
-	PrintSubtypeTrapping PrintSubtype = "Trapping"
-	// PrintSubtypePrintersMarks represents printer's marks.
-	PrintSubtypePrintersMarks PrintSubtype = "PrintersMarks"
-	// PrintSubtypeWatermark represents watermark content.
-	PrintSubtypeWatermark PrintSubtype = "Watermark"
-)
-
-// CreatorInfo contains information about the application that created an optional content group.
-type CreatorInfo struct {
-	// Creator specifies the application that created the group.
-	Creator string
-
-	// Subtype defines the type of content controlled by the group.
-	// Suggested values include "Artwork" for graphic-design or publishing applications,
-	// and "Technical" for technical designs such as building plans or schematics.
-	Subtype pdf.Name
-
-	// AdditionalInfo may contain additional entries relevant to the creating application.
-	AdditionalInfo pdf.Dict
-}
-
-// LanguageInfo specifies the language of the content controlled by an optional content group.
-type LanguageInfo struct {
-	// Lang specifies a language and possibly a locale.
-	Lang language.Tag
-
-	// Preferred indicates whether this language should be used when there is a partial
-	// match but no exact match between the system language and available languages.
-	Preferred bool
-}
-
-// ExportInfo contains export state information.
-type ExportInfo struct {
-	// ExportState indicates the recommended state for content when the document
-	// is saved to a format that does not support optional content.
-	ExportState bool
-}
-
-// ZoomInfo specifies a range of magnifications at which content is best viewed.
-type ZoomInfo struct {
-	// Min is the minimum recommended magnification factor at which the group shall be ON.
-	Min float64
-
-	// Max is the magnification factor below which the group shall be ON.
-	Max float64
-}
-
-// PrintInfo specifies content to be used when printing.
-type PrintInfo struct {
-	// Subtype specifies the kind of content controlled by the group.
-	Subtype PrintSubtype
-
-	// PrintState indicates whether the group shall be ON or OFF when printing.
-	PrintState bool
-}
-
-// ViewInfo contains view state information.
-type ViewInfo struct {
-	// ViewState indicates the state of the group when the document is first opened.
-	ViewState bool
-}
-
-// UserInfo specifies users for whom an optional content group is primarily intended.
-type UserInfo struct {
-	// Type specifies whether Name refers to an individual, title/position, or organisation.
-	Type UserType
-
-	// Name represents the name(s) of the individual, position or organisation.
-	Name []string
-}
-
-// PageElementInfo declares that a group contains a pagination artifact.
-type PageElementInfo struct {
-	// Subtype specifies the type of pagination artifact.
-	Subtype PageElementSubtype
-}
-
 // Usage represents an optional content usage dictionary that contains information
 // describing the nature of the content controlled by an optional content group.
 // This corresponds to Table 100 in the PDF specification.
 type Usage struct {
-	// CreatorInfo (optional) contains application-specific data associated with this group.
-	CreatorInfo *CreatorInfo
+	// Creator (optional) contains application-specific data associated with this group.
+	Creator *UsageCreator
 
 	// Language (optional) specifies the language of the content controlled by this group.
-	Language *LanguageInfo
+	Language *UsageLanguage
 
 	// Export (optional) contains export state configuration.
-	Export *ExportInfo
+	Export *UsageExport
 
 	// Zoom (optional) specifies a range of magnifications at which content is best viewed.
-	Zoom *ZoomInfo
+	Zoom *UsageZoom
 
 	// Print (optional) specifies content to be used when printing.
-	Print *PrintInfo
+	Print *UsagePrint
 
 	// View (optional) contains view state information.
-	View *ViewInfo
+	View *UsageView
 
 	// User (optional) specifies users for whom this group is primarily intended.
-	User *UserInfo
+	User *UsageUser
 
 	// PageElement (optional) declares that the group contains a pagination artifact.
-	PageElement *PageElementInfo
+	PageElement *UsagePageElement
 
 	// SingleUse determines if Embed returns a dictionary (true) or
 	// a reference (false).
@@ -169,7 +61,8 @@ type Usage struct {
 var _ pdf.Embedder[pdf.Unused] = (*Usage)(nil)
 
 // ExtractUsage extracts a usage dictionary from a PDF object.
-func ExtractUsage(r pdf.Getter, obj pdf.Object) (*Usage, error) {
+func ExtractUsage(x *pdf.Extractor, obj pdf.Object) (*Usage, error) {
+	r := x.R
 	dict, err := pdf.GetDict(r, obj)
 	if err != nil {
 		return nil, err
@@ -183,7 +76,7 @@ func ExtractUsage(r pdf.Getter, obj pdf.Object) (*Usage, error) {
 	if creatorDict, err := pdf.Optional(pdf.GetDict(r, dict["CreatorInfo"])); err != nil {
 		return nil, err
 	} else if creatorDict != nil {
-		info := &CreatorInfo{}
+		info := &UsageCreator{}
 
 		if creator, err := pdf.Optional(pdf.GetTextString(r, creatorDict["Creator"])); err != nil {
 			return nil, err
@@ -207,14 +100,14 @@ func ExtractUsage(r pdf.Getter, obj pdf.Object) (*Usage, error) {
 			}
 		}
 
-		usage.CreatorInfo = info
+		usage.Creator = info
 	}
 
 	// extract Language dictionary
 	if langDict, err := pdf.Optional(pdf.GetDict(r, dict["Language"])); err != nil {
 		return nil, err
 	} else if langDict != nil {
-		info := &LanguageInfo{}
+		info := &UsageLanguage{}
 
 		if langStr, err := pdf.Optional(pdf.GetTextString(r, langDict["Lang"])); err != nil {
 			return nil, err
@@ -241,7 +134,7 @@ func ExtractUsage(r pdf.Getter, obj pdf.Object) (*Usage, error) {
 	if exportDict, err := pdf.Optional(pdf.GetDict(r, dict["Export"])); err != nil {
 		return nil, err
 	} else if exportDict != nil {
-		info := &ExportInfo{}
+		info := &UsageExport{}
 
 		if state, err := pdf.Optional(pdf.GetName(r, exportDict["ExportState"])); err != nil {
 			return nil, err
@@ -256,7 +149,7 @@ func ExtractUsage(r pdf.Getter, obj pdf.Object) (*Usage, error) {
 	if zoomDict, err := pdf.Optional(pdf.GetDict(r, dict["Zoom"])); err != nil {
 		return nil, err
 	} else if zoomDict != nil {
-		info := &ZoomInfo{}
+		info := &UsageZoom{}
 
 		if min, err := pdf.Optional(pdf.GetNumber(r, zoomDict["min"])); err != nil {
 			return nil, err
@@ -280,7 +173,7 @@ func ExtractUsage(r pdf.Getter, obj pdf.Object) (*Usage, error) {
 	if printDict, err := pdf.Optional(pdf.GetDict(r, dict["Print"])); err != nil {
 		return nil, err
 	} else if printDict != nil {
-		info := &PrintInfo{}
+		info := &UsagePrint{}
 
 		if subtype, err := pdf.Optional(pdf.GetName(r, printDict["Subtype"])); err != nil {
 			return nil, err
@@ -301,7 +194,7 @@ func ExtractUsage(r pdf.Getter, obj pdf.Object) (*Usage, error) {
 	if viewDict, err := pdf.Optional(pdf.GetDict(r, dict["View"])); err != nil {
 		return nil, err
 	} else if viewDict != nil {
-		info := &ViewInfo{}
+		info := &UsageView{}
 
 		if state, err := pdf.Optional(pdf.GetName(r, viewDict["ViewState"])); err != nil {
 			return nil, err
@@ -316,7 +209,7 @@ func ExtractUsage(r pdf.Getter, obj pdf.Object) (*Usage, error) {
 	if userDict, err := pdf.Optional(pdf.GetDict(r, dict["User"])); err != nil {
 		return nil, err
 	} else if userDict != nil {
-		info := &UserInfo{}
+		info := &UsageUser{}
 
 		if userType, err := pdf.Optional(pdf.GetName(r, userDict["Type"])); err != nil {
 			return nil, err
@@ -348,12 +241,12 @@ func ExtractUsage(r pdf.Getter, obj pdf.Object) (*Usage, error) {
 	if pageDict, err := pdf.Optional(pdf.GetDict(r, dict["PageElement"])); err != nil {
 		return nil, err
 	} else if pageDict != nil {
-		info := &PageElementInfo{}
+		info := &UsagePageElement{}
 
 		if subtype, err := pdf.Optional(pdf.GetName(r, pageDict["Subtype"])); err != nil {
 			return nil, err
 		} else if subtype != "" {
-			info.Subtype = PageElementSubtype(subtype)
+			info.Subtype = PageElement(subtype)
 		}
 
 		usage.PageElement = info
@@ -366,28 +259,28 @@ func ExtractUsage(r pdf.Getter, obj pdf.Object) (*Usage, error) {
 	return usage, nil
 }
 
-// Embed converts the Usage dictionary to a PDF object.
+// Embed adds the usage dictionary to a PDF file.
 func (u *Usage) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	dict := pdf.Dict{}
 
 	// embed CreatorInfo dictionary
-	if u.CreatorInfo != nil {
+	if u.Creator != nil {
 		creatorDict := pdf.Dict{}
 
-		if u.CreatorInfo.Creator == "" {
+		if u.Creator.Creator == "" {
 			return nil, zero, errors.New("CreatorInfo.Creator is required")
 		}
-		creatorDict["Creator"] = pdf.TextString(u.CreatorInfo.Creator)
+		creatorDict["Creator"] = pdf.TextString(u.Creator.Creator)
 
-		if u.CreatorInfo.Subtype == "" {
+		if u.Creator.Subtype == "" {
 			return nil, zero, errors.New("CreatorInfo.Subtype is required")
 		}
-		creatorDict["Subtype"] = u.CreatorInfo.Subtype
+		creatorDict["Subtype"] = u.Creator.Subtype
 
 		// add any additional entries
-		for key, val := range u.CreatorInfo.AdditionalInfo {
+		for key, val := range u.Creator.AdditionalInfo {
 			if key != "Creator" && key != "Subtype" {
 				creatorDict[key] = val
 			}
@@ -548,3 +441,111 @@ func (u *Usage) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 	return ref, zero, nil
 }
+
+// UserType represents the type of user in a usage dictionary.
+type UserType string
+
+const (
+	// UserTypeIndividual represents an individual user.
+	UserTypeIndividual UserType = "Ind"
+	// UserTypeTitle represents a title or position.
+	UserTypeTitle UserType = "Ttl"
+	// UserTypeOrganisation represents an organisation.
+	UserTypeOrganisation UserType = "Org"
+)
+
+// PrintSubtype represents the kind of content controlled by a print usage dictionary.
+type PrintSubtype string
+
+const (
+	// PrintSubtypeTrapping represents trapping content.
+	PrintSubtypeTrapping PrintSubtype = "Trapping"
+	// PrintSubtypePrintersMarks represents printer's marks.
+	PrintSubtypePrintersMarks PrintSubtype = "PrintersMarks"
+	// PrintSubtypeWatermark represents watermark content.
+	PrintSubtypeWatermark PrintSubtype = "Watermark"
+)
+
+// UsageCreator contains information about the application that created an optional content group.
+type UsageCreator struct {
+	// Creator specifies the application that created the group.
+	Creator string
+
+	// Subtype defines the type of content controlled by the group.
+	// Suggested values include "Artwork" for graphic-design or publishing applications,
+	// and "Technical" for technical designs such as building plans or schematics.
+	Subtype pdf.Name
+
+	// AdditionalInfo may contain additional entries relevant to the creating application.
+	AdditionalInfo pdf.Dict
+}
+
+// UsageLanguage specifies the language of the content controlled by an optional content group.
+type UsageLanguage struct {
+	// Lang specifies a language and possibly a locale.
+	Lang language.Tag
+
+	// Preferred indicates whether this language should be used when there is a partial
+	// match but no exact match between the system language and available languages.
+	Preferred bool
+}
+
+// UsageExport contains export state information.
+type UsageExport struct {
+	// ExportState indicates the recommended state for content when the document
+	// is saved to a format that does not support optional content.
+	ExportState bool
+}
+
+// UsageZoom specifies a range of magnifications at which content is best viewed.
+type UsageZoom struct {
+	// Min is the minimum recommended magnification factor at which the group shall be ON.
+	Min float64
+
+	// Max is the magnification factor below which the group shall be ON.
+	Max float64
+}
+
+// UsagePrint specifies content to be used when printing.
+type UsagePrint struct {
+	// Subtype specifies the kind of content controlled by the group.
+	Subtype PrintSubtype
+
+	// PrintState indicates whether the group shall be ON or OFF when printing.
+	PrintState bool
+}
+
+// UsageView contains view state information.
+type UsageView struct {
+	// ViewState indicates the state of the group when the document is first opened.
+	ViewState bool
+}
+
+// UsageUser specifies users for whom an optional content group is primarily intended.
+type UsageUser struct {
+	// Type specifies whether Name refers to an individual, title/position, or organisation.
+	Type UserType
+
+	// Name represents the name(s) of the individual, position or organisation.
+	Name []string
+}
+
+// UsagePageElement declares that a group contains a pagination artifact.
+type UsagePageElement struct {
+	// Subtype specifies the type of pagination artifact.
+	Subtype PageElement
+}
+
+// PageElement represents the subtype of a page element.
+type PageElement string
+
+const (
+	// PageElementHeaderFooter represents header/footer content.
+	PageElementHeaderFooter PageElement = "HF"
+	// PageElementForeground represents foreground image or graphics.
+	PageElementForeground PageElement = "FG"
+	// PageElementBackground represents background image or graphics.
+	PageElementBackground PageElement = "BG"
+	// PageElementLogo represents a logo.
+	PageElementLogo PageElement = "L"
+)
