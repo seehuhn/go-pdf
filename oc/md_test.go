@@ -130,7 +130,12 @@ func TestMembershipRoundTrip(t *testing.T) {
 }
 
 func testMembershipRoundTrip(t *testing.T, original *Membership, mode string) {
-	buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
+	// Use PDF 2.0 for visibility expressions, 1.7 for basic features
+	version := pdf.V1_7
+	if original.VE != nil {
+		version = pdf.V2_0
+	}
+	buf, _ := memfile.NewPDFWriter(version, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	// embed the membership dictionary
@@ -201,7 +206,7 @@ func normalizeVisibilityExpression(ve VisibilityExpression) {
 }
 
 func TestMembershipValidation(t *testing.T) {
-	buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
+	buf, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	// test empty membership (should fail)

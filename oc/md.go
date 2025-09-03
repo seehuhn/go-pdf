@@ -121,7 +121,9 @@ func (m *Membership) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 
 	switch len(m.OCGs) {
 	case 0:
-		// pass
+		if m.VE == nil {
+			return nil, zero, errors.New("membership dictionary must have either OCGs or VE")
+		}
 	case 1:
 		ocgObj, _, err := pdf.ResourceManagerEmbed(rm, m.OCGs[0])
 		if err != nil {
