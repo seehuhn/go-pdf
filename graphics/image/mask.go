@@ -59,12 +59,14 @@ type Mask struct {
 	Name pdf.Name
 
 	// TODO(voss): StructParent
+
 	// TODO(voss): ID
 
 	// Metadata (optional) is a metadata stream containing metadata for the image.
 	Metadata *metadata.Stream
 
 	// TODO(voss): OC
+
 	// TODO(voss): AF
 
 	// Measure (optional, PDF 2.0) specifies the scale and units which apply to the image.

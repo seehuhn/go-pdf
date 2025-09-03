@@ -77,7 +77,7 @@ func NewResourceManager(w *Writer) *ResourceManager {
 }
 
 type embRes struct {
-	Val Object
+	Val Native
 	Emb any
 }
 
@@ -99,7 +99,7 @@ type Finisher interface {
 //
 // Once Go supports methods with type parameters, this function can be turned
 // into a method on [ResourceManager].
-func ResourceManagerEmbed[T any](rm *ResourceManager, r Embedder[T]) (Object, T, error) {
+func ResourceManagerEmbed[T any](rm *ResourceManager, r Embedder[T]) (Native, T, error) {
 	var zero T
 
 	if existing, ok := rm.embedded[r]; ok {
@@ -133,7 +133,7 @@ func ResourceManagerEmbed[T any](rm *ResourceManager, r Embedder[T]) (Object, T,
 // returned without calling the embed function again.
 //
 // The function f must return the PDF representation of the embedded object.
-func ResourceManagerEmbedFunc[T any](rm *ResourceManager, f func(*ResourceManager, T) (Object, error), obj T) (Object, error) {
+func ResourceManagerEmbedFunc[T any](rm *ResourceManager, f func(*ResourceManager, T) (Native, error), obj T) (Native, error) {
 	if existing, ok := rm.embedded[obj]; ok {
 		return existing.Val, nil
 	}

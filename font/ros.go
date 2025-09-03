@@ -64,7 +64,7 @@ func ExtractCIDSystemInfo(r pdf.Getter, obj pdf.Object) (*cid.SystemInfo, error)
 	}, nil
 }
 
-func WriteCIDSystemInfo(rm *pdf.ResourceManager, ROS *cid.SystemInfo) (pdf.Object, error) {
+func WriteCIDSystemInfo(rm *pdf.ResourceManager, ROS *cid.SystemInfo) (pdf.Native, error) {
 	if ROS == nil {
 		return nil, nil
 	}
