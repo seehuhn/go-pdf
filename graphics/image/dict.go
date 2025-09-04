@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
+	"seehuhn.de/go/pdf/oc"
 )
 
 // PDF 2.0 sections: 8.9.5
@@ -86,8 +87,16 @@ type Dict struct {
 	// Alternates (optional) is an array of alternate image dictionaries for this image.
 	Alternates []*Dict
 
-	// TODO(voss): SMask
-	// TODO(voss): SMaskInData
+	// SMask (optional; PDF 1.4) is a subsidiary image XObject defining a
+	// soft-mask image for transparency effects.
+	SMask *SoftMask
+
+	// SMaskInData (optional for JPXDecode; PDF 1.5) specifies how soft-mask
+	// information encoded with image samples should be used:
+	// 0 = ignore encoded soft-mask info (default)
+	// 1 = image data includes encoded soft-mask values
+	// 2 = image data includes premultiplied opacity channel
+	SMaskInData int
 
 	// Name is deprecated and should be left empty.
 	// Only used in PDF 1.0 where it was the name used to reference the image
@@ -101,7 +110,9 @@ type Dict struct {
 	// Metadata (optional) is a metadata stream containing metadata for the image.
 	Metadata *metadata.Stream
 
-	// TODO(voss): OC
+	// OptionalContent (optional) allows to control the visibility of the form.
+	OptionalContent oc.Conditional
+
 	// TODO(voss): AF
 
 	Measure measure.Measure
@@ -116,8 +127,8 @@ type Dict struct {
 }
 
 // ExtractDict extracts an image dictionary from a PDF stream.
-func ExtractDict(r pdf.Getter, obj pdf.Object) (*Dict, error) {
-	stream, err := pdf.GetStream(r, obj)
+func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
+	stream, err := pdf.GetStream(x.R, obj)
 	if err != nil {
 		return nil, err
 	} else if stream == nil {
@@ -128,10 +139,10 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*Dict, error) {
 	dict := stream.Dict
 
 	// Check Type and Subtype
-	typeName, _ := pdf.GetDictTyped(r, obj, "XObject")
+	typeName, _ := pdf.GetDictTyped(x.R, obj, "XObject")
 	if typeName == nil {
 		// Type is optional, but if present must be XObject
-		if t, err := pdf.Optional(pdf.GetName(r, dict["Type"])); err != nil {
+		if t, err := pdf.Optional(pdf.GetName(x.R, dict["Type"])); err != nil {
 			return nil, err
 		} else if t != "" && t != "XObject" {
 			return nil, &pdf.MalformedFileError{
@@ -140,7 +151,7 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*Dict, error) {
 		}
 	}
 
-	subtypeName, err := pdf.Optional(pdf.GetName(r, dict["Subtype"]))
+	subtypeName, err := pdf.Optional(pdf.GetName(x.R, dict["Subtype"]))
 	if err != nil {
 		return nil, err
 	}
@@ -151,14 +162,14 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*Dict, error) {
 	}
 
 	// Check if this is an image mask (should use ExtractImageMask instead)
-	if isImageMask, err := pdf.GetBoolean(r, dict["ImageMask"]); err == nil && bool(isImageMask) {
+	if isImageMask, err := pdf.GetBoolean(x.R, dict["ImageMask"]); err == nil && bool(isImageMask) {
 		return nil, &pdf.MalformedFileError{
 			Err: errors.New("use ExtractImageMask for image masks"),
 		}
 	}
 
 	// Extract required fields
-	width, err := pdf.GetInteger(r, dict["Width"])
+	width, err := pdf.GetInteger(x.R, dict["Width"])
 	if err != nil {
 		return nil, fmt.Errorf("missing or invalid Width: %w", err)
 	}
@@ -168,7 +179,7 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*Dict, error) {
 		}
 	}
 
-	height, err := pdf.GetInteger(r, dict["Height"])
+	height, err := pdf.GetInteger(x.R, dict["Height"])
 	if err != nil {
 		return nil, fmt.Errorf("missing or invalid Height: %w", err)
 	}
@@ -185,17 +196,17 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*Dict, error) {
 
 	// Extract ColorSpace (required for images)
 	if csObj, ok := dict["ColorSpace"]; ok {
-		cs, err := color.ExtractSpace(r, csObj)
+		cs, err := color.ExtractSpace(x.R, csObj)
 		if err != nil {
 			return nil, fmt.Errorf("invalid ColorSpace: %w", err)
 		}
 		img.ColorSpace = cs
 	} else {
 		// ColorSpace is optional only for JPXDecode filter
-		filters, _ := pdf.GetArray(r, dict["Filter"])
+		filters, _ := pdf.GetArray(x.R, dict["Filter"])
 		hasJPX := false
 		for _, f := range filters {
-			if name, _ := pdf.GetName(r, f); name == "JPXDecode" {
+			if name, _ := pdf.GetName(x.R, f); name == "JPXDecode" {
 				hasJPX = true
 				break
 			}
@@ -208,7 +219,7 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*Dict, error) {
 	}
 
 	// Extract BitsPerComponent (required except for JPXDecode)
-	if bpc, err := pdf.Optional(pdf.GetInteger(r, dict["BitsPerComponent"])); err != nil {
+	if bpc, err := pdf.Optional(pdf.GetInteger(x.R, dict["BitsPerComponent"])); err != nil {
 		return nil, err
 	} else if bpc > 0 {
 		img.BitsPerComponent = int(bpc)
@@ -220,43 +231,42 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*Dict, error) {
 	}
 
 	// Extract optional fields
-	if intent, err := pdf.Optional(pdf.GetName(r, dict["Intent"])); err != nil {
+	if intent, err := pdf.Optional(pdf.GetName(x.R, dict["Intent"])); err != nil {
 		return nil, err
 	} else if intent != "" {
 		img.Intent = graphics.RenderingIntent(intent)
 	}
 
-	// Extract Mask (can be either image mask reference or color key mask array)
-	if maskObj, ok := dict["Mask"]; ok {
-		if maskRef, isRef := maskObj.(pdf.Reference); isRef {
-			// Image mask reference
-			maskImg, err := ExtractMask(r, maskRef)
-			if err != nil {
-				return nil, fmt.Errorf("invalid image mask: %w", err)
-			}
-			img.MaskImage = maskImg
-		} else if maskArray, err := pdf.GetArray(r, maskObj); err == nil {
-			// Color key mask array
-			img.MaskColors = make([]uint16, len(maskArray))
-			for i, val := range maskArray {
-				if num, err := pdf.GetInteger(r, val); err != nil {
-					return nil, fmt.Errorf("invalid MaskColors[%d]: %w", i, err)
-				} else {
-					img.MaskColors[i] = uint16(num)
-				}
-			}
+	// Mask can either be an image mask or a color key mask array.
+	maskObj, err := pdf.Resolve(x.R, dict["Mask"])
+	if err != nil {
+		return nil, err
+	}
+	switch maskObj := maskObj.(type) {
+	case *pdf.Stream: // image mask stream
+		if maskImg, err := pdf.ExtractorGetOptional(x, maskObj, ExtractMask); err != nil {
+			return nil, err
 		} else {
-			return nil, fmt.Errorf("invalid Mask entry: %w", err)
+			img.MaskImage = maskImg
+		}
+	case pdf.Array: // color key mask array
+		img.MaskColors = make([]uint16, len(maskObj))
+		for i, val := range maskObj {
+			if num, err := pdf.GetInteger(x.R, val); err != nil {
+				return nil, fmt.Errorf("invalid MaskColors[%d]: %w", i, err)
+			} else {
+				img.MaskColors[i] = uint16(num)
+			}
 		}
 	}
 
 	// Extract Decode array
-	if decodeArray, err := pdf.Optional(pdf.GetArray(r, dict["Decode"])); err != nil {
+	if decodeArray, err := pdf.Optional(pdf.GetArray(x.R, dict["Decode"])); err != nil {
 		return nil, err
 	} else if decodeArray != nil {
 		img.Decode = make([]float64, len(decodeArray))
 		for i, val := range decodeArray {
-			if num, err := pdf.GetNumber(r, val); err != nil {
+			if num, err := pdf.GetNumber(x.R, val); err != nil {
 				return nil, fmt.Errorf("invalid Decode[%d]: %w", i, err)
 			} else {
 				img.Decode[i] = float64(num)
@@ -265,17 +275,17 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*Dict, error) {
 	}
 
 	// Extract Interpolate
-	if interp, err := pdf.GetBoolean(r, dict["Interpolate"]); err == nil {
+	if interp, err := pdf.GetBoolean(x.R, dict["Interpolate"]); err == nil {
 		img.Interpolate = bool(interp)
 	}
 
 	// Extract Alternates
-	if alts, err := pdf.Optional(pdf.GetArray(r, dict["Alternates"])); err != nil {
+	if alts, err := pdf.Optional(pdf.GetArray(x.R, dict["Alternates"])); err != nil {
 		return nil, err
 	} else if alts != nil {
 		img.Alternates = make([]*Dict, len(alts))
 		for i, altObj := range alts {
-			altDict, err := ExtractDict(r, altObj)
+			altDict, err := pdf.ExtractorGetOptional(x, altObj, ExtractDict)
 			if err != nil {
 				return nil, fmt.Errorf("invalid Alternates[%d]: %w", i, err)
 			}
@@ -283,8 +293,30 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*Dict, error) {
 		}
 	}
 
+	// Extract SMask (soft-mask image)
+	if smaskObj, ok := dict["SMask"]; ok {
+		smask, err := pdf.ExtractorGetOptional(x, smaskObj, func(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
+			return ExtractSoftMask(x.R, obj)
+		})
+		if err != nil {
+			return nil, fmt.Errorf("invalid SMask: %w", err)
+		}
+		img.SMask = smask
+	}
+
+	// Extract SMaskInData
+	if smd, err := pdf.Optional(pdf.GetInteger(x.R, dict["SMaskInData"])); err != nil {
+		return nil, err
+	} else if smd > 0 {
+		img.SMaskInData = int(smd)
+		// Per spec: if SMaskInData is non-zero, SMask should be ignored
+		if img.SMask != nil {
+			img.SMask = nil
+		}
+	}
+
 	// Extract Name (deprecated in PDF 2.0)
-	if name, err := pdf.Optional(pdf.GetName(r, dict["Name"])); err != nil {
+	if name, err := pdf.Optional(pdf.GetName(x.R, dict["Name"])); err != nil {
 		return nil, err
 	} else {
 		img.Name = name
@@ -292,16 +324,23 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*Dict, error) {
 
 	// Extract Metadata
 	if metaObj, ok := dict["Metadata"]; ok {
-		meta, err := metadata.Extract(r, metaObj)
+		meta, err := metadata.Extract(x.R, metaObj)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Metadata: %w", err)
 		}
 		img.Metadata = meta
 	}
 
+	// OC (optional)
+	if oc, err := pdf.ExtractorGetOptional(x, dict["OC"], oc.ExtractConditional); err != nil {
+		return nil, err
+	} else {
+		img.OptionalContent = oc
+	}
+
 	// Extract Measure
 	if measureObj, ok := dict["Measure"]; ok {
-		m, err := measure.Extract(r, measureObj)
+		m, err := measure.Extract(x.R, measureObj)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Measure: %w", err)
 		}
@@ -309,7 +348,7 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*Dict, error) {
 	}
 
 	// Extract PtData
-	if ptData, err := pdf.Optional(measure.ExtractPtData(r, dict["PtData"])); err != nil {
+	if ptData, err := pdf.Optional(measure.ExtractPtData(x.R, dict["PtData"])); err != nil {
 		return nil, err
 	} else {
 		img.PtData = ptData
@@ -317,7 +356,7 @@ func ExtractDict(r pdf.Getter, obj pdf.Object) (*Dict, error) {
 
 	// Create WriteData function as a closure
 	img.WriteData = func(w io.Writer) error {
-		stm, err := pdf.DecodeStream(r, stream, 0)
+		stm, err := pdf.DecodeStream(x.R, stream, 0)
 		if err != nil {
 			return err
 		}
@@ -487,6 +526,24 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		}
 		dict["Alternates"] = alts
 	}
+
+	// Handle SMask/SMaskInData (mutually exclusive)
+	if d.SMask != nil && d.SMaskInData == 0 {
+		if err := pdf.CheckVersion(rm.Out, "soft mask images", pdf.V1_4); err != nil {
+			return nil, zero, err
+		}
+		ref, _, err := pdf.ResourceManagerEmbed(rm, d.SMask)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["SMask"] = ref
+	} else if d.SMaskInData > 0 {
+		if err := pdf.CheckVersion(rm.Out, "SMaskInData", pdf.V1_5); err != nil {
+			return nil, zero, err
+		}
+		dict["SMaskInData"] = pdf.Integer(d.SMaskInData)
+	}
+
 	if d.Name != "" {
 		dict["Name"] = d.Name
 	}
@@ -498,7 +555,17 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["Metadata"] = ref
 	}
 
-	// Measure (optional)
+	if d.OptionalContent != nil {
+		if err := pdf.CheckVersion(rm.Out, "Image dict OC entry", pdf.V1_5); err != nil {
+			return nil, zero, err
+		}
+		embedded, _, err := pdf.ResourceManagerEmbed(rm, d.OptionalContent)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["OC"] = embedded
+	}
+
 	if d.Measure != nil {
 		embedded, _, err := pdf.ResourceManagerEmbed(rm, d.Measure)
 		if err != nil {
@@ -507,7 +574,6 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["Measure"] = embedded
 	}
 
-	// PtData (optional; PDF 2.0)
 	if d.PtData != nil {
 		if err := pdf.CheckVersion(rm.Out, "image dictionary PtData entry", pdf.V2_0); err != nil {
 			return nil, zero, err
@@ -628,6 +694,40 @@ func (d *Dict) check(out *pdf.Writer) error {
 	if d.Measure != nil {
 		if err := pdf.CheckVersion(out, "image dictionary Measure entry", pdf.V2_0); err != nil {
 			return err
+		}
+	}
+
+	// Validate SMask/SMaskInData
+	if d.SMask != nil && d.SMaskInData != 0 {
+		return errors.New("SMask and SMaskInData are mutually exclusive")
+	}
+
+	if d.SMaskInData != 0 {
+		if d.SMaskInData < 0 || d.SMaskInData > 2 {
+			return fmt.Errorf("invalid SMaskInData value %d (must be 0, 1, or 2)", d.SMaskInData)
+		}
+		if err := pdf.CheckVersion(out, "SMaskInData", pdf.V1_5); err != nil {
+			return err
+		}
+		// Note: SMaskInData is only meaningful for JPXDecode filter
+		// Full validation would require filter information
+	}
+
+	if d.SMask != nil {
+		if err := pdf.CheckVersion(out, "soft mask images", pdf.V1_4); err != nil {
+			return err
+		}
+
+		// Validate soft mask dimensions match if Matte is present
+		if d.SMask.Matte != nil {
+			if d.SMask.Width != d.Width || d.SMask.Height != d.Height {
+				return errors.New("soft mask dimensions must match parent image when Matte is present")
+			}
+			// Validate Matte length matches color space channels
+			if len(d.SMask.Matte) != d.ColorSpace.Channels() {
+				return fmt.Errorf("Matte array length %d doesn't match color space channels %d",
+					len(d.SMask.Matte), d.ColorSpace.Channels())
+			}
 		}
 	}
 

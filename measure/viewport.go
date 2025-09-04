@@ -21,6 +21,8 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// PDF 2.0 sections: 12.9
+
 // Viewport represents a rectangular region of a page with measurement information.
 type Viewport struct {
 	// BBox specifies the location of the viewport on the page.

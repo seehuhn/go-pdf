@@ -34,19 +34,20 @@ var (
 // ExtractConditional extracts an optional content element from a PDF object.
 // The object can be either a Group (OCG) or a Membership (OCMD) dictionary.
 func ExtractConditional(x *pdf.Extractor, obj pdf.Object) (Conditional, error) {
-	// Try to extract as Group first (OCG type)
-	if group, err := pdf.Optional(ExtractGroup(x, obj)); err != nil {
+	dict, err := pdf.GetDict(x.R, obj)
+	if err != nil {
 		return nil, err
-	} else if group != nil {
-		return group, nil
 	}
-
-	// Try to extract as Membership (OCMD type)
-	if membership, err := pdf.Optional(ExtractMembership(x, obj)); err != nil {
+	tp, err := pdf.GetName(x.R, dict["Type"])
+	if err != nil {
 		return nil, err
-	} else if membership != nil {
-		return membership, nil
 	}
-
-	return nil, pdf.Error("not a valid optional content object")
+	switch tp {
+	case "OCG":
+		return pdf.ExtractorGet(x, obj, ExtractGroup)
+	case "OCMD":
+		return pdf.ExtractorGet(x, obj, ExtractMembership)
+	default:
+		return nil, pdf.Error("invalid optional content object")
+	}
 }

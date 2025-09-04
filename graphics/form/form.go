@@ -19,6 +19,8 @@ package form
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"io"
 	"time"
 
 	"seehuhn.de/go/geom/matrix"
@@ -27,6 +29,8 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
+	"seehuhn.de/go/pdf/oc"
+	"seehuhn.de/go/pdf/pdfcopy"
 	"seehuhn.de/go/pdf/pieceinfo"
 )
 
@@ -52,32 +56,29 @@ type Form struct {
 	// PieceInfo contains private application data.
 	PieceInfo *pieceinfo.PieceInfo
 
-	// LastModified (Required if PieceInfo is present; optional otherwise; PDF
-	// 1.3) is the date the form was last modified.
+	// LastModified (Required if PieceInfo is present; optional otherwise) is
+	// the date the form was last modified.
 	LastModified time.Time
+
+	// OptionalContent (optional) allows to control the visibility of the form.
+	OptionalContent oc.Conditional
 
 	// Measure (optional) is a measure dictionary that specifies the scale and
 	// units which shall apply to the form.
 	Measure measure.Measure
 
-	// TODO(voss): StructParent, StructParents
-	// TODO(voss): OC
-	// TODO(voss): AF
-
 	// PtData (optional; PDF 2.0) contains extended geospatial point data.
 	PtData *measure.PtData
+
+	// TODO(voss): StructParent, StructParents
+
+	// TODO(voss): AF
 }
 
-// Subtype returns the XObject subtype for forms.
+// Subtype returns "Form".
+// This implements the [graphics.XObject] interface.
 func (f *Form) Subtype() pdf.Name {
 	return "Form"
-}
-
-func (f *Form) validate() error {
-	if f.BBox.IsZero() {
-		return errors.New("missing BBox")
-	}
-	return nil
 }
 
 // Embed implements the pdf.Embedder interface for form XObjects.
@@ -138,7 +139,17 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["LastModified"] = pdf.Date(f.LastModified)
 	}
 
-	// Measure (optional; PDF 2.0)
+	if f.OptionalContent != nil {
+		if err := pdf.CheckVersion(rm.Out, "form XObject OC entry", pdf.V1_5); err != nil {
+			return nil, zero, err
+		}
+		embedded, _, err := pdf.ResourceManagerEmbed(rm, f.OptionalContent)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["OC"] = embedded
+	}
+
 	if f.Measure != nil {
 		if err := pdf.CheckVersion(rm.Out, "form XObject Measure entry", pdf.V2_0); err != nil {
 			return nil, zero, err
@@ -180,6 +191,124 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	return ref, zero, nil
+}
+
+func (f *Form) validate() error {
+	if f.BBox.IsZero() {
+		return errors.New("missing BBox")
+	}
+	return nil
+}
+
+// Extract extracts a form XObject from a PDF file.
+func Extract(x *pdf.Extractor, obj pdf.Object) (*Form, error) {
+	stream, err := pdf.GetStream(x.R, obj)
+	if err != nil {
+		return nil, err
+	} else if stream == nil {
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("missing form XObject"),
+		}
+	}
+	dict := stream.Dict
+
+	subtypeName, _ := pdf.GetName(x.R, dict["Subtype"])
+	if subtypeName != "Form" {
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("invalid Subtype for form XObject"),
+		}
+	}
+
+	// Read required BBox
+	bbox, err := pdf.GetRectangle(x.R, dict["BBox"])
+	if err != nil {
+		return nil, fmt.Errorf("failed to read BBox: %w", err)
+	} else if bbox == nil || bbox.IsZero() {
+		return nil, pdf.Error("missing BBox")
+	}
+
+	form := &Form{
+		BBox: *bbox,
+	}
+
+	form.Matrix, err = pdf.GetMatrix(x.R, dict["Matrix"])
+	if err != nil {
+		form.Matrix = matrix.Identity
+	}
+
+	form.Metadata, _ = metadata.Extract(x.R, dict["Metadata"])
+
+	// Read optional PieceInfo
+	if pieceInfoObj, ok := dict["PieceInfo"]; ok {
+		var err error
+		form.PieceInfo, err = pieceinfo.Extract(x.R, pieceInfoObj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract PieceInfo: %w", err)
+		}
+	}
+
+	// LastModified (optional)
+	if lastModDate, err := pdf.Optional(pdf.GetDate(x.R, dict["LastModified"])); err != nil {
+		return nil, err
+	} else {
+		form.LastModified = time.Time(lastModDate)
+	}
+
+	// OC (optional)
+	if oc, err := pdf.ExtractorGetOptional(x, dict["OC"], oc.ExtractConditional); err != nil {
+		return nil, err
+	} else {
+		form.OptionalContent = oc
+	}
+
+	// Measure (optional)
+	if m, err := pdf.Optional(measure.Extract(x.R, dict["Measure"])); err != nil {
+		return nil, err
+	} else {
+		form.Measure = m
+	}
+
+	// PtData (optional)
+	if ptData, err := pdf.Optional(measure.ExtractPtData(x.R, dict["PtData"])); err != nil {
+		return nil, err
+	} else {
+		form.PtData = ptData
+	}
+
+	// Create Draw function as closure
+	form.Draw = func(w *graphics.Writer) error {
+		copier := pdfcopy.NewCopier(w.RM.Out, x.R)
+
+		// Handle resources
+		origResources, err := pdf.GetDict(x.R, dict["Resources"])
+		if err != nil {
+			return err
+		}
+		if origResources != nil {
+			resourceObj, err := copier.Copy(origResources)
+			if err != nil {
+				return err
+			}
+			w.Resources, err = pdf.ExtractResources(nil, resourceObj)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Handle stream content
+		stm, err := pdf.DecodeStream(x.R, stream, 0)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(w.Content, stm)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	return form, nil
 }
 
 // Equal compares two forms by comparing their content streams.

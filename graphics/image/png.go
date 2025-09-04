@@ -17,7 +17,6 @@
 package image
 
 import (
-	"fmt"
 	"image"
 	gocolor "image/color"
 
@@ -50,109 +49,24 @@ func (im *PNG) Bounds() Rectangle {
 // Embed ensures that the image is embedded in the PDF file.
 // This implements the [Image] interface.
 func (im *PNG) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	ref := rm.Out.Alloc()
 	src := im.Data
 
-	width := src.Bounds().Dx()
-	height := src.Bounds().Dy()
-
-	var maskRef pdf.Reference
-	if needsAlphaChannel(src) {
-		maskRef = rm.Out.Alloc()
-	}
-
+	// Determine color space
 	cs := im.ColorSpace
 	if cs == nil {
 		cs = color.DeviceRGBSpace
 	}
-	if cs.Channels() != 3 {
-		return nil, zero, fmt.Errorf("unsupported color space: %v", cs.Family())
-	}
-	csEmbedded, _, err := pdf.ResourceManagerEmbed(rm, cs)
-	if err != nil {
-		return nil, zero, err
+
+	// Create main image dict using existing Dict functionality
+	dict := FromImage(src, cs, 8)
+
+	// Add soft mask if alpha channel is needed
+	if needsAlphaChannel(src) {
+		dict.SMask = FromImageAlpha(src, 8)
 	}
 
-	// see Table 87 of ISO 32000-2:2020
-	imDict := pdf.Dict{
-		"Type":             pdf.Name("XObject"),
-		"Subtype":          pdf.Name("Image"),
-		"Width":            pdf.Integer(width),
-		"Height":           pdf.Integer(height),
-		"ColorSpace":       csEmbedded,
-		"BitsPerComponent": pdf.Integer(8),
-	}
-	var alpha []byte
-	if maskRef != 0 {
-		imDict["SMask"] = maskRef
-		alpha = make([]byte, 0, width*height)
-	}
-
-	// write the image data
-	// (and gather the alpha values at the same time)
-	filter := pdf.FilterCompress{
-		"Columns":   pdf.Integer(width),
-		"Colors":    pdf.Integer(3),
-		"Predictor": pdf.Integer(15),
-	}
-	stream, err := rm.Out.OpenStream(ref, imDict, filter)
-	if err != nil {
-		return nil, zero, err
-	}
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			r, g, b, a := src.At(x, y).RGBA()
-			_, err = stream.Write([]byte{byte(r >> 8), byte(g >> 8), byte(b >> 8)})
-			if err != nil {
-				return nil, zero, err
-			}
-			if alpha != nil {
-				alpha = append(alpha, byte(a>>8))
-			}
-		}
-	}
-	err = stream.Close()
-	if err != nil {
-		return nil, zero, err
-	}
-
-	if maskRef != 0 {
-		maskCS := color.DeviceGraySpace
-		maskCSEmbedded, _, err := pdf.ResourceManagerEmbed(rm, maskCS)
-		if err != nil {
-			return nil, zero, err
-		}
-
-		maskDict := pdf.Dict{
-			"Type":             pdf.Name("XObject"),
-			"Subtype":          pdf.Name("Image"),
-			"Width":            pdf.Integer(width),
-			"Height":           pdf.Integer(height),
-			"ColorSpace":       maskCSEmbedded,
-			"BitsPerComponent": pdf.Integer(8),
-		}
-
-		// TODO(voss): is there a more appropriate compression type for the mask?
-		filter = pdf.FilterCompress{
-			"Columns":   pdf.Integer(width),
-			"Predictor": pdf.Integer(15),
-		}
-		stream, err = rm.Out.OpenStream(maskRef, maskDict, filter)
-		if err != nil {
-			return nil, zero, err
-		}
-		_, err = stream.Write(alpha)
-		if err != nil {
-			return nil, zero, err
-		}
-		err = stream.Close()
-		if err != nil {
-			return nil, zero, err
-		}
-	}
-
-	return ref, zero, nil
+	// Let Dict handle all the PDF generation, validation, and embedding
+	return pdf.ResourceManagerEmbed(rm, dict)
 }
 
 func needsAlphaChannel(img image.Image) bool {

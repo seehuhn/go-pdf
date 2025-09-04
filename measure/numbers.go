@@ -39,32 +39,34 @@ type NumberFormat struct {
 	// or initial measurement value to this unit.
 	ConversionFactor float64
 
-	// Precision specifies the precision for decimal display or denominator for fractions.
+	// Precision specifies the precision for decimal display or denominator for
+	// fractions.
 	Precision int
 
 	// FractionFormat specifies how to display fractional values.
 	FractionFormat FractionalFormat
 
-	// ForceExactFraction prevents reduction of fractions and truncation of zeros.
+	// ForceExactFraction prevents reduction of fractions and truncation of
+	// zeros.
 	ForceExactFraction bool
 
-	// ThousandsSeparator specifies text used between thousands in numerical display.
+	// ThousandsSeparator (optional) specifies text used between thousands in
+	// numerical display.
 	ThousandsSeparator string
 
-	// DecimalSeparator specifies text used as the decimal position.
-	// An empty string uses the standard period separator.
+	// DecimalSeparator (optional) specifies text used as the decimal position.
+	//
+	// When writing, an empty string can be used as a shorthand for a period.
 	DecimalSeparator string
 
 	// PrefixSpacing specifies text concatenated before the unit label.
-	// An empty string uses a single space.
 	PrefixSpacing string
 
 	// SuffixSpacing specifies text concatenated after the unit label.
-	// An empty string uses a single space.
 	SuffixSpacing string
 
-	// PrefixLabel determines unit label position.
-	// false positions the label after the value, true positions it before.
+	// PrefixLabel determines unit label position. False positions the label
+	// after the value, true positions it before.
 	PrefixLabel bool
 
 	// SingleUse determines if Embed returns a dictionary (true) or
@@ -96,12 +98,6 @@ func ExtractNumberFormat(r pdf.Getter, obj pdf.Object) (*NumberFormat, error) {
 	}
 	nf.ConversionFactor = float64(conversion)
 
-	precision, err := pdf.GetInteger(r, dict["D"])
-	if err != nil {
-		return nil, err
-	}
-	nf.Precision = int(precision)
-
 	// Extract optional fields with defaults
 	if f, err := pdf.Optional(pdf.GetName(r, dict["F"])); err != nil {
 		return nil, err
@@ -120,6 +116,25 @@ func ExtractNumberFormat(r pdf.Getter, obj pdf.Object) (*NumberFormat, error) {
 		}
 	}
 
+	// Extract Precision - conditional based on FractionFormat
+	precisionMeaningful := nf.FractionFormat == FractionDecimal || nf.FractionFormat == FractionFraction
+	if precisionMeaningful {
+		if precision, err := pdf.Optional(pdf.GetInteger(r, dict["D"])); err != nil {
+			return nil, err
+		} else if precision != 0 {
+			nf.Precision = int(precision)
+		} else {
+			// Use default values when not present
+			if nf.FractionFormat == FractionDecimal {
+				nf.Precision = 100 // default for decimal
+			} else {
+				nf.Precision = 16 // default for fraction
+			}
+		}
+	} else {
+		nf.Precision = 0 // not meaningful for round/truncate
+	}
+
 	if fd, err := pdf.Optional(pdf.GetBoolean(r, dict["FD"])); err != nil {
 		return nil, err
 	} else {
@@ -129,24 +144,31 @@ func ExtractNumberFormat(r pdf.Getter, obj pdf.Object) (*NumberFormat, error) {
 	if rt, err := pdf.Optional(pdf.GetString(r, dict["RT"])); err != nil {
 		return nil, err
 	} else {
+		// RT present: use the value (even if empty string)
 		nf.ThousandsSeparator = string(rt)
-	}
+	} // If RT not present, PDF uses comma default, but we leave empty in Go
 
 	if rd, err := pdf.Optional(pdf.GetString(r, dict["RD"])); err != nil {
 		return nil, err
-	} else {
+	} else if rd != nil && string(rd) != "" {
+		// RD present and non-empty: use the value
 		nf.DecimalSeparator = string(rd)
+	} else {
+		// RD not present or empty: use period
+		nf.DecimalSeparator = "."
 	}
 
 	if ps, err := pdf.Optional(pdf.GetString(r, dict["PS"])); err != nil {
 		return nil, err
 	} else {
+		// PS: store the value (empty if not present)
 		nf.PrefixSpacing = string(ps)
 	}
 
 	if ss, err := pdf.Optional(pdf.GetString(r, dict["SS"])); err != nil {
 		return nil, err
 	} else {
+		// SS: store the value (empty if not present)
 		nf.SuffixSpacing = string(ss)
 	}
 
@@ -163,15 +185,48 @@ func ExtractNumberFormat(r pdf.Getter, obj pdf.Object) (*NumberFormat, error) {
 func (nf *NumberFormat) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
+	// Validate required fields
+	if nf.Unit == "" {
+		return nil, zero, pdf.Errorf("missing required Unit")
+	}
+	if nf.ConversionFactor == 0 {
+		return nil, zero, pdf.Errorf("ConversionFactor cannot be zero")
+	}
+
+	// Validate Precision based on FractionFormat
+	precisionMeaningful := nf.FractionFormat == FractionDecimal || nf.FractionFormat == FractionFraction
+	if precisionMeaningful {
+		if nf.Precision <= 0 {
+			return nil, zero, pdf.Errorf("Precision must be positive when FractionFormat is decimal or fraction")
+		}
+		if nf.FractionFormat == FractionDecimal && nf.Precision%10 != 0 && nf.Precision != 1 {
+			return nil, zero, pdf.Errorf("Precision must be 1 or a multiple of 10 for decimal format")
+		}
+	} else {
+		if nf.Precision != 0 {
+			return nil, zero, pdf.Errorf("Precision must be 0 when FractionFormat is round or truncate")
+		}
+	}
+
 	dict := pdf.Dict{
 		"U": pdf.String(nf.Unit),
 		"C": pdf.Number(nf.ConversionFactor),
-		"D": pdf.Integer(nf.Precision),
 	}
 
 	// Optional Type field
 	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("NumberFormat")
+	}
+
+	// Precision - only include when meaningful and different from defaults
+	if precisionMeaningful {
+		defaultPrecision := 100 // default for decimal
+		if nf.FractionFormat == FractionFraction {
+			defaultPrecision = 16 // default for fraction
+		}
+		if nf.Precision != defaultPrecision {
+			dict["D"] = pdf.Integer(nf.Precision)
+		}
 	}
 
 	// Fraction format
@@ -193,18 +248,26 @@ func (nf *NumberFormat) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, 
 		dict["FD"] = pdf.Boolean(true)
 	}
 
-	// Separators and spacing - only encode if different from Go zero values
+	// Separators and spacing - optimize by using PDF defaults
+	// RT: default is comma, so always write it (even if empty string)
 	dict["RT"] = pdf.String(nf.ThousandsSeparator)
 
-	if nf.DecimalSeparator != "" {
-		dict["RD"] = pdf.String(nf.DecimalSeparator)
+	// RD: empty string is shorthand for period, only write if different from period
+	decimalSep := nf.DecimalSeparator
+	if decimalSep == "" {
+		decimalSep = "."
+	}
+	if decimalSep != "." {
+		dict["RD"] = pdf.String(decimalSep)
 	}
 
-	if nf.PrefixSpacing != "" {
+	// PS: default is single space, only write if different from default
+	if nf.PrefixSpacing != " " {
 		dict["PS"] = pdf.String(nf.PrefixSpacing)
 	}
 
-	if nf.SuffixSpacing != "" {
+	// SS: default is single space, only write if different from default
+	if nf.SuffixSpacing != " " {
 		dict["SS"] = pdf.String(nf.SuffixSpacing)
 	}
 
@@ -226,27 +289,4 @@ func (nf *NumberFormat) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, 
 	}
 
 	return ref, zero, nil
-}
-
-// Helper methods for getting separator/spacing values with defaults
-
-func (nf *NumberFormat) getDecimalSeparator() string {
-	if nf.DecimalSeparator == "" {
-		return "."
-	}
-	return nf.DecimalSeparator
-}
-
-func (nf *NumberFormat) getPrefixSpacing() string {
-	if nf.PrefixSpacing == "" {
-		return " "
-	}
-	return nf.PrefixSpacing
-}
-
-func (nf *NumberFormat) getSuffixSpacing() string {
-	if nf.SuffixSpacing == "" {
-		return " "
-	}
-	return nf.SuffixSpacing
 }

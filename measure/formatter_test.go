@@ -31,9 +31,9 @@ func TestFormatMeasurement(t *testing.T) {
 			name:  "spec example - 1.4505 miles",
 			value: 1.4505,
 			formats: []*NumberFormat{
-				{Unit: "mi", ConversionFactor: 1.0, Precision: 100000, FractionFormat: FractionDecimal, ThousandsSeparator: ","},
-				{Unit: "ft", ConversionFactor: 5280, Precision: 1, FractionFormat: FractionDecimal, ThousandsSeparator: ","},
-				{Unit: "in", ConversionFactor: 12, Precision: 8, FractionFormat: FractionFraction, ThousandsSeparator: ","},
+				{Unit: "mi", ConversionFactor: 1.0, Precision: 100000, FractionFormat: FractionDecimal, ThousandsSeparator: ",", SuffixSpacing: " "},
+				{Unit: "ft", ConversionFactor: 5280, Precision: 1, FractionFormat: FractionDecimal, ThousandsSeparator: ",", SuffixSpacing: " "},
+				{Unit: "in", ConversionFactor: 12, Precision: 8, FractionFormat: FractionFraction, ThousandsSeparator: ",", SuffixSpacing: " "},
 			},
 			expected: "1 mi 2,378 ft 7 5/8 in",
 		},
@@ -41,7 +41,7 @@ func TestFormatMeasurement(t *testing.T) {
 			name:  "simple single format",
 			value: 5.25,
 			formats: []*NumberFormat{
-				{Unit: "ft", ConversionFactor: 1.0, Precision: 100, FractionFormat: FractionDecimal},
+				{Unit: "ft", ConversionFactor: 1.0, Precision: 100, FractionFormat: FractionDecimal, SuffixSpacing: " "},
 			},
 			expected: "5.25 ft",
 		},
@@ -49,7 +49,7 @@ func TestFormatMeasurement(t *testing.T) {
 			name:  "whole number only",
 			value: 3.0,
 			formats: []*NumberFormat{
-				{Unit: "m", ConversionFactor: 1.0, Precision: 100, FractionFormat: FractionDecimal},
+				{Unit: "m", ConversionFactor: 1.0, Precision: 100, FractionFormat: FractionDecimal, SuffixSpacing: " "},
 			},
 			expected: "3 m",
 		},
@@ -57,7 +57,7 @@ func TestFormatMeasurement(t *testing.T) {
 			name:  "zero value",
 			value: 0.0,
 			formats: []*NumberFormat{
-				{Unit: "cm", ConversionFactor: 1.0, Precision: 10, FractionFormat: FractionDecimal},
+				{Unit: "cm", ConversionFactor: 1.0, Precision: 10, FractionFormat: FractionDecimal, SuffixSpacing: " "},
 			},
 			expected: "0 cm",
 		},
@@ -65,7 +65,7 @@ func TestFormatMeasurement(t *testing.T) {
 			name:  "fraction rounding",
 			value: 2.6,
 			formats: []*NumberFormat{
-				{Unit: "units", ConversionFactor: 1.0, Precision: 1, FractionFormat: FractionRound},
+				{Unit: "units", ConversionFactor: 1.0, Precision: 0, FractionFormat: FractionRound, SuffixSpacing: " "},
 			},
 			expected: "3 units",
 		},
@@ -73,7 +73,7 @@ func TestFormatMeasurement(t *testing.T) {
 			name:  "fraction truncation",
 			value: 2.9,
 			formats: []*NumberFormat{
-				{Unit: "units", ConversionFactor: 1.0, Precision: 1, FractionFormat: FractionTruncate},
+				{Unit: "units", ConversionFactor: 1.0, Precision: 0, FractionFormat: FractionTruncate, SuffixSpacing: " "},
 			},
 			expected: "2 units",
 		},
@@ -81,7 +81,7 @@ func TestFormatMeasurement(t *testing.T) {
 			name:  "prefix label",
 			value: 1.5,
 			formats: []*NumberFormat{
-				{Unit: "kg", ConversionFactor: 1.0, Precision: 10, FractionFormat: FractionDecimal, PrefixLabel: true},
+				{Unit: "kg", ConversionFactor: 1.0, Precision: 10, FractionFormat: FractionDecimal, PrefixLabel: true, PrefixSpacing: " ", SuffixSpacing: " "},
 			},
 			expected: " kg 1.5",
 		},
@@ -89,7 +89,7 @@ func TestFormatMeasurement(t *testing.T) {
 			name:  "no thousands separator",
 			value: 12345.0,
 			formats: []*NumberFormat{
-				{Unit: "units", ConversionFactor: 1.0, Precision: 1, FractionFormat: FractionDecimal, ThousandsSeparator: ""},
+				{Unit: "units", ConversionFactor: 1.0, Precision: 1, FractionFormat: FractionDecimal, ThousandsSeparator: "", SuffixSpacing: " "},
 			},
 			expected: "12345 units",
 		},

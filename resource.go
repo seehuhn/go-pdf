@@ -214,6 +214,8 @@ var ErrCycle = &MalformedFileError{
 	Err: errors.New("cycle in recursive structure"),
 }
 
+// Extractor caches extracted PDF objects to ensure that extracting the same
+// reference multiple times returns the same Go object.
 type Extractor struct {
 	R     Getter
 	cache map[extractorKey]any
@@ -224,6 +226,8 @@ type extractorKey struct {
 	tp  reflect.Type
 }
 
+// NewExtractor creates a new Extractor using the given Getter to read PDF
+// objects.
 func NewExtractor(r Getter) *Extractor {
 	return &Extractor{
 		R:     r,
@@ -234,6 +238,10 @@ func NewExtractor(r Getter) *Extractor {
 func ExtractorGet[X any, T Embedder[X]](x *Extractor, obj Object, extract func(*Extractor, Object) (T, error)) (T, error) {
 	var zero T
 	tp := reflect.TypeFor[T]()
+
+	// We need to keep the information whether the original object was a
+	// reference, in order to correctly set any SingleUse fields.
+	origObj := obj
 
 	var refs []Reference
 	count := 0
@@ -264,7 +272,7 @@ func ExtractorGet[X any, T Embedder[X]](x *Extractor, obj Object, extract func(*
 		}
 	}
 
-	res, err := extract(x, obj)
+	res, err := extract(x, origObj)
 	if err != nil {
 		return zero, err
 	}
@@ -275,4 +283,8 @@ func ExtractorGet[X any, T Embedder[X]](x *Extractor, obj Object, extract func(*
 	}
 
 	return res, nil
+}
+
+func ExtractorGetOptional[X any, T Embedder[X]](x *Extractor, obj Object, extract func(*Extractor, Object) (T, error)) (T, error) {
+	return Optional(ExtractorGet(x, obj, extract))
 }

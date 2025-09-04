@@ -124,7 +124,8 @@ func TestRoundTrip(t *testing.T) {
 			}
 
 			// extract the Dict from the PDF
-			extracted1, err := Extract(w1, ref)
+			x1 := pdf.NewExtractor(w1)
+			extracted1, err := Extract(x1, ref)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -146,7 +147,8 @@ func TestRoundTrip(t *testing.T) {
 			}
 
 			// extract the Dict again
-			extracted2, err := Extract(w2, ref2)
+			x2 := pdf.NewExtractor(w2)
+			extracted2, err := Extract(x2, ref2)
 			if err != nil {
 				t.Fatal(err)
 			}

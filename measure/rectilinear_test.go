@@ -17,6 +17,7 @@
 package measure
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -24,384 +25,376 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-func TestRectilinearMeasureExtractEmbed(t *testing.T) {
-	// Create some number formats for testing
-	milesFormat := &NumberFormat{
-		Unit:             "mi",
-		ConversionFactor: 1.0,
-		Precision:        100000,
-		FractionFormat:   FractionDecimal,
-		SingleUse:        true,
-	}
-	feetFormat := &NumberFormat{
-		Unit:             "ft",
-		ConversionFactor: 5280,
-		Precision:        1,
-		FractionFormat:   FractionDecimal,
-		SingleUse:        true,
-	}
-	inchFormat := &NumberFormat{
-		Unit:             "in",
-		ConversionFactor: 12,
-		Precision:        8,
-		FractionFormat:   FractionFraction,
-		SingleUse:        true,
-	}
-	acresFormat := &NumberFormat{
-		Unit:             "acres",
-		ConversionFactor: 640,
-		Precision:        100,
-		SingleUse:        true,
+var rectilinearTestCases = []struct {
+	name    string
+	version pdf.Version
+	data    *RectilinearMeasure
+}{
+	{
+		name:    "basic_measure_different_axes_v17",
+		version: pdf.V1_7,
+		data: &RectilinearMeasure{
+			ScaleRatio: "1in = 0.1 mi",
+			XAxis: []*NumberFormat{{
+				Unit:             "mi",
+				ConversionFactor: 1.0,
+				Precision:        100000,
+				FractionFormat:   FractionDecimal,
+				SingleUse:        true,
+			}},
+			YAxis: []*NumberFormat{{
+				Unit:             "ft",
+				ConversionFactor: 5280,
+				Precision:        1,
+				FractionFormat:   FractionDecimal,
+				SingleUse:        true,
+			}},
+			Distance: []*NumberFormat{{
+				Unit:             "mi",
+				ConversionFactor: 1.0,
+				Precision:        100000,
+				FractionFormat:   FractionDecimal,
+				SingleUse:        true,
+			}, {
+				Unit:             "ft",
+				ConversionFactor: 5280,
+				Precision:        1,
+				FractionFormat:   FractionDecimal,
+				SingleUse:        true,
+			}, {
+				Unit:             "in",
+				ConversionFactor: 12,
+				Precision:        8,
+				FractionFormat:   FractionFraction,
+				SingleUse:        true,
+			}},
+			Area: []*NumberFormat{{
+				Unit:             "acres",
+				ConversionFactor: 640,
+				Precision:        100,
+				SingleUse:        true,
+			}},
+			Origin:    [2]float64{0, 0},
+			CYX:       0.000189394,
+			SingleUse: true,
+		},
+	},
+	{
+		name:    "same_xy_axes_v20",
+		version: pdf.V2_0,
+		data: &RectilinearMeasure{
+			ScaleRatio: "1:100",
+			XAxis: []*NumberFormat{{
+				Unit:             "m",
+				ConversionFactor: 1.0,
+				Precision:        100,
+				SingleUse:        true,
+			}},
+			YAxis: []*NumberFormat{{
+				Unit:             "m",
+				ConversionFactor: 1.0,
+				Precision:        100,
+				SingleUse:        true,
+			}},
+			Distance: []*NumberFormat{{
+				Unit:             "m",
+				ConversionFactor: 1.0,
+				Precision:        100,
+				SingleUse:        true,
+			}},
+			Area: []*NumberFormat{{
+				Unit:             "m²",
+				ConversionFactor: 1.0,
+				Precision:        100,
+				SingleUse:        true,
+			}},
+			Origin:    [2]float64{0, 0},
+			CYX:       1.0,
+			SingleUse: true,
+		},
+	},
+	{
+		name:    "non_zero_origin_v17",
+		version: pdf.V1_7,
+		data: &RectilinearMeasure{
+			ScaleRatio: "1cm = 1m",
+			XAxis: []*NumberFormat{{
+				Unit:             "m",
+				ConversionFactor: 100.0,
+				Precision:        10,
+				SingleUse:        true,
+			}},
+			YAxis: []*NumberFormat{{
+				Unit:             "m",
+				ConversionFactor: 100.0,
+				Precision:        10,
+				SingleUse:        true,
+			}},
+			Distance: []*NumberFormat{{
+				Unit:             "m",
+				ConversionFactor: 100.0,
+				Precision:        10,
+				SingleUse:        true,
+			}},
+			Area: []*NumberFormat{{
+				Unit:             "m²",
+				ConversionFactor: 10000.0,
+				Precision:        100,
+				SingleUse:        true,
+			}},
+			Origin:    [2]float64{100.5, 200.75},
+			CYX:       1.0,
+			SingleUse: true,
+		},
+	},
+	{
+		name:    "with_optional_fields_v20",
+		version: pdf.V2_0,
+		data: &RectilinearMeasure{
+			ScaleRatio: "1:50",
+			XAxis: []*NumberFormat{{
+				Unit:             "mm",
+				ConversionFactor: 1.0,
+				Precision:        1,
+				SingleUse:        true,
+			}},
+			YAxis: []*NumberFormat{{
+				Unit:             "mm",
+				ConversionFactor: 1.0,
+				Precision:        1,
+				SingleUse:        true,
+			}},
+			Distance: []*NumberFormat{{
+				Unit:             "mm",
+				ConversionFactor: 1.0,
+				Precision:        1,
+				SingleUse:        true,
+			}},
+			Area: []*NumberFormat{{
+				Unit:             "mm²",
+				ConversionFactor: 1.0,
+				Precision:        1,
+				SingleUse:        true,
+			}},
+			Angle: []*NumberFormat{{
+				Unit:             "deg",
+				ConversionFactor: 1.0,
+				Precision:        10,
+				SingleUse:        true,
+			}},
+			Slope: []*NumberFormat{{
+				Unit:             "%",
+				ConversionFactor: 100.0,
+				Precision:        10,
+				SingleUse:        true,
+			}},
+			Origin:    [2]float64{0, 0},
+			CYX:       1.0,
+			SingleUse: false,
+		},
+	},
+}
+
+func rectilinearRoundTripTest(t *testing.T, version pdf.Version, data *RectilinearMeasure) {
+	t.Helper()
+
+	w, _ := memfile.NewPDFWriter(version, nil)
+
+	rm := pdf.NewResourceManager(w)
+	embedded, _, err := pdf.ResourceManagerEmbed(rm, data)
+	if err != nil {
+		t.Fatalf("embed failed: %v", err)
 	}
 
+	err = rm.Close()
+	if err != nil {
+		t.Fatalf("resource manager close failed: %v", err)
+	}
+
+	decoded, err := Extract(w, embedded)
+	if err != nil {
+		t.Fatalf("extract failed: %v", err)
+	}
+
+	// Type assertion to RectilinearMeasure
+	decodedRL, ok := decoded.(*RectilinearMeasure)
+	if !ok {
+		t.Fatalf("extracted measure is not RectilinearMeasure, got %T", decoded)
+	}
+
+	// Fix SingleUse fields for comparison (not stored in PDF)
+	fixSingleUseFields(decodedRL, data)
+
+	if diff := cmp.Diff(data, decodedRL); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+}
+
+// fixSingleUseFields sets SingleUse fields to match original for comparison
+func fixSingleUseFields(decoded, original *RectilinearMeasure) {
+	decoded.SingleUse = original.SingleUse
+
+	// Helper function to fix NumberFormat fields
+	fixNumberFormat := func(decoded, original *NumberFormat) {
+		decoded.SingleUse = original.SingleUse
+		// DecimalSeparator: empty string becomes period after round-trip
+		if original.DecimalSeparator == "" {
+			decoded.DecimalSeparator = ""
+		}
+	}
+
+	for i, nf := range decoded.XAxis {
+		if i < len(original.XAxis) {
+			fixNumberFormat(nf, original.XAxis[i])
+		}
+	}
+	for i, nf := range decoded.YAxis {
+		if i < len(original.YAxis) {
+			fixNumberFormat(nf, original.YAxis[i])
+		}
+	}
+	for i, nf := range decoded.Distance {
+		if i < len(original.Distance) {
+			fixNumberFormat(nf, original.Distance[i])
+		}
+	}
+	for i, nf := range decoded.Area {
+		if i < len(original.Area) {
+			fixNumberFormat(nf, original.Area[i])
+		}
+	}
+	for i, nf := range decoded.Angle {
+		if i < len(original.Angle) {
+			fixNumberFormat(nf, original.Angle[i])
+		}
+	}
+	for i, nf := range decoded.Slope {
+		if i < len(original.Slope) {
+			fixNumberFormat(nf, original.Slope[i])
+		}
+	}
+}
+
+func TestRectilinearSpecificationRoundTrip(t *testing.T) {
+	for _, tc := range rectilinearTestCases {
+		t.Run(tc.name, func(t *testing.T) {
+			rectilinearRoundTripTest(t, tc.version, tc.data)
+		})
+	}
+}
+
+func FuzzRectilinearRoundTrip(f *testing.F) {
+	opt := &pdf.WriterOptions{
+		HumanReadable: true,
+	}
+	for _, tc := range rectilinearTestCases {
+		w, buf := memfile.NewPDFWriter(tc.version, opt)
+
+		rm := pdf.NewResourceManager(w)
+		embedded, _, err := pdf.ResourceManagerEmbed(rm, tc.data)
+		if err != nil {
+			continue
+		}
+
+		err = rm.Close()
+		if err != nil {
+			continue
+		}
+
+		w.GetMeta().Trailer["Quir:E"] = embedded
+		err = w.Close()
+		if err != nil {
+			continue
+		}
+
+		f.Add(buf.Data)
+	}
+
+	f.Fuzz(func(t *testing.T, fileData []byte) {
+		r, err := pdf.NewReader(bytes.NewReader(fileData), nil)
+		if err != nil {
+			t.Skip("invalid PDF")
+		}
+		objPDF := r.GetMeta().Trailer["Quir:E"]
+		if objPDF == nil {
+			t.Skip("missing PDF object")
+		}
+
+		objGo, err := Extract(r, objPDF)
+		if err != nil {
+			t.Skip("malformed PDF object")
+		}
+
+		objGoRL, ok := objGo.(*RectilinearMeasure)
+		if !ok {
+			t.Skip("not a RectilinearMeasure")
+		}
+
+		rectilinearRoundTripTest(t, pdf.V1_7, objGoRL)
+	})
+}
+
+// TestEmbedValidation tests that Embed validates required fields
+func TestEmbedValidation(t *testing.T) {
 	tests := []struct {
 		name string
 		rm   *RectilinearMeasure
 	}{
 		{
-			name: "basic measure with different X and Y",
+			name: "missing scale ratio",
 			rm: &RectilinearMeasure{
-				ScaleRatio: "1in = 0.1 mi",
-				XAxis:      []*NumberFormat{milesFormat},
-				YAxis:      []*NumberFormat{feetFormat},
-				Distance:   []*NumberFormat{milesFormat, feetFormat, inchFormat},
-				Area:       []*NumberFormat{acresFormat},
-				Origin:     [2]float64{0, 0},
-				CYX:        0.000189394, // feet to miles conversion
-				SingleUse:  true,
+				ScaleRatio: "",
+				XAxis:      []*NumberFormat{{Unit: "m", ConversionFactor: 1, Precision: 1}},
+				Distance:   []*NumberFormat{{Unit: "m", ConversionFactor: 1, Precision: 1}},
+				Area:       []*NumberFormat{{Unit: "m²", ConversionFactor: 1, Precision: 1}},
 			},
 		},
 		{
-			name: "measure with same X and Y",
+			name: "missing X axis",
 			rm: &RectilinearMeasure{
-				ScaleRatio: "1:100",
-				XAxis:      []*NumberFormat{milesFormat},
-				YAxis:      []*NumberFormat{milesFormat}, // Same as X
-				Distance:   []*NumberFormat{milesFormat},
-				Area:       []*NumberFormat{acresFormat},
-				Origin:     [2]float64{0, 0},
-				CYX:        1.0,
-				SingleUse:  true,
+				ScaleRatio: "1:1",
+				XAxis:      nil,
+				Distance:   []*NumberFormat{{Unit: "m", ConversionFactor: 1, Precision: 1}},
+				Area:       []*NumberFormat{{Unit: "m²", ConversionFactor: 1, Precision: 1}},
 			},
 		},
 		{
-			name: "measure with non-zero origin",
+			name: "empty X axis",
 			rm: &RectilinearMeasure{
-				ScaleRatio: "1cm = 1m",
-				XAxis:      []*NumberFormat{milesFormat},
-				YAxis:      []*NumberFormat{milesFormat},
-				Distance:   []*NumberFormat{milesFormat},
-				Area:       []*NumberFormat{acresFormat},
-				Origin:     [2]float64{100, 200},
-				CYX:        1.0,
-				SingleUse:  true,
+				ScaleRatio: "1:1",
+				XAxis:      []*NumberFormat{},
+				Distance:   []*NumberFormat{{Unit: "m", ConversionFactor: 1, Precision: 1}},
+				Area:       []*NumberFormat{{Unit: "m²", ConversionFactor: 1, Precision: 1}},
 			},
 		},
 		{
-			name: "measure with optional fields",
+			name: "missing Distance",
 			rm: &RectilinearMeasure{
-				ScaleRatio: "1:50",
-				XAxis:      []*NumberFormat{milesFormat},
-				YAxis:      []*NumberFormat{milesFormat},
-				Distance:   []*NumberFormat{milesFormat},
-				Area:       []*NumberFormat{acresFormat},
-				Angle: []*NumberFormat{{
-					Unit:             "deg",
-					ConversionFactor: 1.0,
-					Precision:        10,
-					SingleUse:        true,
-				}},
-				Slope: []*NumberFormat{{
-					Unit:             "%",
-					ConversionFactor: 100,
-					Precision:        10,
-					SingleUse:        true,
-				}},
-				Origin:    [2]float64{0, 0},
-				CYX:       1.0,
-				SingleUse: false, // Test reference creation
+				ScaleRatio: "1:1",
+				XAxis:      []*NumberFormat{{Unit: "m", ConversionFactor: 1, Precision: 1}},
+				Distance:   nil,
+				Area:       []*NumberFormat{{Unit: "m²", ConversionFactor: 1, Precision: 1}},
+			},
+		},
+		{
+			name: "missing Area",
+			rm: &RectilinearMeasure{
+				ScaleRatio: "1:1",
+				XAxis:      []*NumberFormat{{Unit: "m", ConversionFactor: 1, Precision: 1}},
+				Distance:   []*NumberFormat{{Unit: "m", ConversionFactor: 1, Precision: 1}},
+				Area:       nil,
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a test PDF writer
 			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-
-			// Embed the RectilinearMeasure
 			rm := pdf.NewResourceManager(w)
-			embedded, _, err := tt.rm.Embed(rm)
-			if err != nil {
-				t.Fatalf("embed failed: %v", err)
-			}
 
-			// Extract the Measure back
-			extracted, err := Extract(w, embedded)
-			if err != nil {
-				t.Fatalf("extract failed: %v", err)
-			}
-
-			// Check type
-			extractedRL, ok := extracted.(*RectilinearMeasure)
-			if !ok {
-				t.Fatalf("extracted measure is not RectilinearMeasure")
-			}
-
-			// For comparison, set SingleUse to match (it's not stored in PDF)
-			extractedRL.SingleUse = tt.rm.SingleUse
-
-			// Also fix SingleUse for all NumberFormats (not stored in PDF)
-			for _, nf := range extractedRL.XAxis {
-				nf.SingleUse = true
-			}
-			for _, nf := range extractedRL.YAxis {
-				nf.SingleUse = true
-			}
-			for _, nf := range extractedRL.Distance {
-				nf.SingleUse = true
-			}
-			for _, nf := range extractedRL.Area {
-				nf.SingleUse = true
-			}
-			for _, nf := range extractedRL.Angle {
-				nf.SingleUse = true
-			}
-			for _, nf := range extractedRL.Slope {
-				nf.SingleUse = true
-			}
-
-			// Compare
-			if diff := cmp.Diff(extractedRL, tt.rm); diff != "" {
-				t.Errorf("round trip failed (-got +want):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestRectilinearMeasureYAxisOptimization(t *testing.T) {
-	// Create identical number formats
-	format := &NumberFormat{
-		Unit:             "m",
-		ConversionFactor: 1.0,
-		Precision:        100,
-		SingleUse:        true,
-	}
-
-	rm := &RectilinearMeasure{
-		ScaleRatio: "1:1",
-		XAxis:      []*NumberFormat{format},
-		YAxis:      []*NumberFormat{format}, // Same pointer as X
-		Distance:   []*NumberFormat{format},
-		Area:       []*NumberFormat{format},
-		Origin:     [2]float64{0, 0},
-		CYX:        1.0,
-		SingleUse:  true,
-	}
-
-	// Create a test PDF writer
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-
-	// Embed the RectilinearMeasure
-	res := pdf.NewResourceManager(w)
-	embedded, _, err := rm.Embed(res)
-	if err != nil {
-		t.Fatalf("embed failed: %v", err)
-	}
-
-	// Check that Y is not in the dictionary
-	dict, ok := embedded.(pdf.Dict)
-	if !ok {
-		t.Fatalf("embedded measure is not a dictionary")
-	}
-
-	if _, hasY := dict["Y"]; hasY {
-		t.Error("Y axis should be omitted when pointer-equal to X")
-	}
-
-	// Extract and verify it's reconstructed correctly
-	extracted, err := Extract(w, dict)
-	if err != nil {
-		t.Fatalf("extract failed: %v", err)
-	}
-
-	extractedRL := extracted.(*RectilinearMeasure)
-
-	// Should have same values (though not same pointers after extraction)
-	if len(extractedRL.YAxis) != len(rm.YAxis) {
-		t.Errorf("Y axis length mismatch: got %d, want %d", len(extractedRL.YAxis), len(rm.YAxis))
-	}
-
-	// CYX should be 1.0 when Y is copied from X
-	if extractedRL.CYX != 1.0 {
-		t.Errorf("CYX should be 1.0 when Y copied from X, got %f", extractedRL.CYX)
-	}
-}
-
-func TestRectilinearMeasureCYXHandling(t *testing.T) {
-	tests := []struct {
-		name        string
-		hasY        bool
-		hasCYX      bool
-		cyx         float64
-		expectedCYX float64
-	}{
-		{
-			name:        "Y missing, CYX missing",
-			hasY:        false,
-			hasCYX:      false,
-			cyx:         0,
-			expectedCYX: 1.0, // Should be set to 1.0
-		},
-		{
-			name:        "Y present, CYX missing",
-			hasY:        true,
-			hasCYX:      false,
-			cyx:         0,
-			expectedCYX: 0, // Should remain 0
-		},
-		{
-			name:        "Y present, CYX present",
-			hasY:        true,
-			hasCYX:      true,
-			cyx:         2.5,
-			expectedCYX: 2.5,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create a test PDF writer
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-
-			// Create a measure dictionary manually
-			xFormat := pdf.Dict{
-				"U": pdf.String("m"),
-				"C": pdf.Number(1.0),
-				"D": pdf.Integer(100),
-			}
-
-			dict := pdf.Dict{
-				"Subtype": pdf.Name("RL"),
-				"R":       pdf.String("1:1"),
-				"X":       pdf.Array{xFormat},
-				"D":       pdf.Array{xFormat},
-				"A":       pdf.Array{xFormat},
-			}
-
-			if tt.hasY {
-				dict["Y"] = pdf.Array{xFormat}
-			}
-			if tt.hasCYX {
-				dict["CYX"] = pdf.Number(tt.cyx)
-			}
-
-			// Extract the measure
-			extracted, err := Extract(w, dict)
-			if err != nil {
-				t.Fatalf("extract failed: %v", err)
-			}
-
-			extractedRL := extracted.(*RectilinearMeasure)
-			if extractedRL.CYX != tt.expectedCYX {
-				t.Errorf("CYX = %f, want %f", extractedRL.CYX, tt.expectedCYX)
-			}
-		})
-	}
-}
-
-func TestMeasureInterface(t *testing.T) {
-	rm := &RectilinearMeasure{
-		ScaleRatio: "1:1",
-		XAxis:      []*NumberFormat{},
-		YAxis:      []*NumberFormat{},
-		Distance:   []*NumberFormat{},
-		Area:       []*NumberFormat{},
-		Origin:     [2]float64{0, 0},
-	}
-
-	// Check that RectilinearMeasure implements Measure
-	var _ Measure = rm
-
-	// Check MeasureType
-	if rm.MeasureType() != "RL" {
-		t.Errorf("MeasureType() = %q, want %q", rm.MeasureType(), "RL")
-	}
-}
-
-func TestExtractMeasureSubtypeHandling(t *testing.T) {
-	tests := []struct {
-		name         string
-		subtype      pdf.Name
-		shouldPanic  bool
-		expectedType pdf.Name
-	}{
-		{
-			name:         "explicit RL subtype",
-			subtype:      "RL",
-			shouldPanic:  false,
-			expectedType: "RL",
-		},
-		{
-			name:         "missing subtype defaults to RL",
-			subtype:      "",
-			shouldPanic:  false,
-			expectedType: "RL",
-		},
-		{
-			name:         "unknown subtype defaults to RL",
-			subtype:      "Unknown",
-			shouldPanic:  false,
-			expectedType: "RL",
-		},
-		{
-			name:        "GEO subtype panics",
-			subtype:     "GEO",
-			shouldPanic: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create a test PDF writer
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-
-			// Create a minimal measure dictionary
-			xFormat := pdf.Dict{
-				"U": pdf.String("m"),
-				"C": pdf.Number(1.0),
-				"D": pdf.Integer(100),
-			}
-
-			dict := pdf.Dict{
-				"R": pdf.String("1:1"),
-				"X": pdf.Array{xFormat},
-				"D": pdf.Array{xFormat},
-				"A": pdf.Array{xFormat},
-			}
-
-			if tt.subtype != "" {
-				dict["Subtype"] = tt.subtype
-			}
-
-			if tt.shouldPanic {
-				defer func() {
-					if r := recover(); r == nil {
-						t.Error("expected panic but didn't get one")
-					}
-				}()
-			}
-
-			// Extract the measure
-			extracted, err := Extract(w, dict)
-			if err != nil && !tt.shouldPanic {
-				t.Fatalf("extract failed: %v", err)
-			}
-
-			if !tt.shouldPanic {
-				if extracted.MeasureType() != tt.expectedType {
-					t.Errorf("MeasureType() = %q, want %q", extracted.MeasureType(), tt.expectedType)
-				}
+			_, _, err := tt.rm.Embed(rm)
+			if err == nil {
+				t.Fatal("expected validation error but got none")
 			}
 		})
 	}

@@ -171,9 +171,8 @@ var testCases = []struct {
 func TestSpecificationRoundTrip(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Round trip test
-			buf, _ := memfile.NewPDFWriter(tc.version, nil)
-			rm := pdf.NewResourceManager(buf)
+			w, _ := memfile.NewPDFWriter(tc.version, nil)
+			rm := pdf.NewResourceManager(w)
 
 			// Encode the specification
 			obj, err := tc.spec.Encode(rm)
@@ -185,13 +184,13 @@ func TestSpecificationRoundTrip(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = buf.Close()
+			err = w.Close()
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			// Decode it back
-			decoded, err := DecodeSpecification(buf, obj)
+			decoded, err := DecodeSpecification(w, obj)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -482,7 +481,6 @@ func FuzzRoundTrip(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, fileData []byte) {
-		// Make sure we don't panic on random input.
 		r, err := pdf.NewReader(bytes.NewReader(fileData), nil)
 		if err != nil {
 			t.Skip("invalid PDF")

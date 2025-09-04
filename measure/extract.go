@@ -67,7 +67,7 @@ func extractRectilinearMeasure(r pdf.Getter, dict pdf.Dict) (*RectilinearMeasure
 		return nil, err
 	}
 
-	// Extract Y axis - if missing, copy from X
+	// Extract Y axis - if missing, leave as nil
 	if dict["Y"] != nil {
 		yArray, err := pdf.GetArray(r, dict["Y"])
 		if err != nil {
@@ -77,14 +77,8 @@ func extractRectilinearMeasure(r pdf.Getter, dict pdf.Dict) (*RectilinearMeasure
 		if err != nil {
 			return nil, err
 		}
-	} else {
-		// Y missing - copy from X
-		rm.YAxis = rm.XAxis
-		// When Y is copied from X, set CYX = 1.0 if CYX not present
-		if dict["CYX"] == nil {
-			rm.CYX = 1.0
-		}
 	}
+	// Note: YAxis remains nil if not present in PDF
 
 	// Extract Distance
 	dArray, err := pdf.GetArray(r, dict["D"])

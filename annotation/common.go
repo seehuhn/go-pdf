@@ -153,45 +153,45 @@ func (c *Common) GetCommon() *Common {
 // fillDict adds the fields corresponding to the Common struct
 // to the given PDF dictionary.  If fields are not valid for the PDF version
 // corresponding to the ResourceManager, an error is returned.
-func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict, isMarkup bool) error {
+func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool) error {
 	w := rm.Out
 
 	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
-		d["Type"] = pdf.Name("Annot")
+		dict["Type"] = pdf.Name("Annot")
 	}
 
-	d["Rect"] = &c.Rect
+	dict["Rect"] = &c.Rect
 
 	if c.Contents != "" {
-		d["Contents"] = pdf.TextString(c.Contents)
+		dict["Contents"] = pdf.TextString(c.Contents)
 	}
 
 	if c.Page != 0 {
 		if err := pdf.CheckVersion(w, "annotation P entry", pdf.V1_3); err != nil {
 			return err
 		}
-		d["P"] = c.Page
+		dict["P"] = c.Page
 	}
 
 	if c.Name != "" {
 		if err := pdf.CheckVersion(w, "annotation NM entry", pdf.V1_4); err != nil {
 			return err
 		}
-		d["NM"] = pdf.TextString(c.Name)
+		dict["NM"] = pdf.TextString(c.Name)
 	}
 
 	if c.LastModified != "" {
 		if err := pdf.CheckVersion(w, "annotation M entry", pdf.V1_1); err != nil {
 			return err
 		}
-		d["M"] = pdf.TextString(c.LastModified)
+		dict["M"] = pdf.TextString(c.LastModified)
 	}
 
 	if c.Flags != 0 {
 		if err := pdf.CheckVersion(w, "annotation F entry", pdf.V1_1); err != nil {
 			return err
 		}
-		d["F"] = pdf.Integer(c.Flags)
+		dict["F"] = pdf.Integer(c.Flags)
 	}
 
 	if c.Appearance != nil {
@@ -202,10 +202,10 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict, isMarkup bool) er
 		if err != nil {
 			return err
 		}
-		d["AP"] = ref
+		dict["AP"] = ref
 	} else {
 		// check for missing appearance dictionary per PDF spec requirements
-		subtype := d["Subtype"].(pdf.Name)
+		subtype := dict["Subtype"].(pdf.Name)
 		isSinglePoint := c.Rect.LLx == c.Rect.URx && c.Rect.LLy == c.Rect.URy
 		isExemptSubtype := subtype == "Popup" || subtype == "Projection" || subtype == "Link"
 		if pdf.GetVersion(w) >= pdf.V2_0 && !isSinglePoint && !isExemptSubtype {
@@ -217,7 +217,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict, isMarkup bool) er
 		if err := pdf.CheckVersion(w, "annotation AS entry", pdf.V1_2); err != nil {
 			return err
 		}
-		d["AS"] = c.AppearanceState
+		dict["AS"] = c.AppearanceState
 	} else if c.Appearance != nil && c.Appearance.HasDicts() {
 		return errors.New("missing AS entry")
 	}
@@ -227,7 +227,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict, isMarkup bool) er
 		return err
 	}
 	if borderValue != nil {
-		d["Border"] = borderValue
+		dict["Border"] = borderValue
 	}
 
 	if c.Color != nil {
@@ -249,14 +249,14 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict, isMarkup bool) er
 		for i, v := range x {
 			colorArray[i] = pdf.Number(v)
 		}
-		d["C"] = colorArray
+		dict["C"] = colorArray
 	}
 
 	if c.StructParent != 0 {
 		if err := pdf.CheckVersion(w, "annotation StructParent entry", pdf.V1_3); err != nil {
 			return err
 		}
-		d["StructParent"] = c.StructParent
+		dict["StructParent"] = c.StructParent
 	}
 
 	if c.OptionalContent != nil {
@@ -267,7 +267,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict, isMarkup bool) er
 		if err != nil {
 			return err
 		}
-		d["OC"] = ocObj
+		dict["OC"] = ocObj
 	}
 
 	if c.Files != nil {
@@ -278,7 +278,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict, isMarkup bool) er
 		for i, ref := range c.Files {
 			afArray[i] = ref
 		}
-		d["AF"] = afArray
+		dict["AF"] = afArray
 	}
 
 	// StrokingOpacity (CA entry)
@@ -292,7 +292,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict, isMarkup bool) er
 				return err
 			}
 		}
-		d["CA"] = pdf.Number(1 - c.StrokingTransparency)
+		dict["CA"] = pdf.Number(1 - c.StrokingTransparency)
 	}
 
 	// NonStrokingOpacity (ca entry)
@@ -300,21 +300,21 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, d pdf.Dict, isMarkup bool) er
 		if err := pdf.CheckVersion(w, "annotation ca entry", pdf.V2_0); err != nil {
 			return err
 		}
-		d["ca"] = pdf.Number(1 - c.NonStrokingTransparency)
+		dict["ca"] = pdf.Number(1 - c.NonStrokingTransparency)
 	}
 
 	if c.BlendMode != "" {
 		if err := pdf.CheckVersion(w, "annotation BM entry", pdf.V2_0); err != nil {
 			return err
 		}
-		d["BM"] = c.BlendMode
+		dict["BM"] = c.BlendMode
 	}
 
 	if !c.Lang.IsRoot() {
 		if err := pdf.CheckVersion(w, "annotation Lang entry", pdf.V2_0); err != nil {
 			return err
 		}
-		d["Lang"] = pdf.TextString(c.Lang.String())
+		dict["Lang"] = pdf.TextString(c.Lang.String())
 	}
 
 	return nil
@@ -354,7 +354,7 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 	}
 
 	// AP (optional)
-	if ap, err := appearance.Extract(r, dict["AP"]); err == nil && ap != nil {
+	if ap, err := appearance.Extract(x, dict["AP"]); err == nil && ap != nil {
 		common.Appearance = ap
 	}
 
@@ -396,7 +396,7 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 	}
 
 	// OC (optional)
-	if oc, err := pdf.Optional(oc.ExtractConditional(x, dict["OC"])); err != nil {
+	if oc, err := pdf.ExtractorGetOptional(x, dict["OC"], oc.ExtractConditional); err != nil {
 		return err
 	} else {
 		common.OptionalContent = oc

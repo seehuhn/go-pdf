@@ -20,6 +20,8 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// PDF 2.0 sections: 12.9
+
 // RectilinearMeasure represents a rectilinear coordinate system.
 type RectilinearMeasure struct {
 	// ScaleRatio expresses the scale ratio of the drawing.
@@ -70,6 +72,20 @@ func (rm *RectilinearMeasure) Embed(res *pdf.ResourceManager) (pdf.Native, pdf.U
 		return nil, zero, err
 	}
 
+	// Validate required fields
+	if rm.ScaleRatio == "" {
+		return nil, zero, pdf.Errorf("missing required ScaleRatio")
+	}
+	if len(rm.XAxis) == 0 {
+		return nil, zero, pdf.Errorf("missing required XAxis")
+	}
+	if len(rm.Distance) == 0 {
+		return nil, zero, pdf.Errorf("missing required Distance")
+	}
+	if len(rm.Area) == 0 {
+		return nil, zero, pdf.Errorf("missing required Area")
+	}
+
 	dict := pdf.Dict{}
 
 	// Optional Type field
@@ -90,8 +106,8 @@ func (rm *RectilinearMeasure) Embed(res *pdf.ResourceManager) (pdf.Native, pdf.U
 	}
 	dict["X"] = xArray
 
-	// Y axis - optimize by omitting if pointer-equal to X
-	yAxisOmitted := areNumberFormatArraysEqual(rm.YAxis, rm.XAxis)
+	// Y axis - omit if nil or pointer-equal to X
+	yAxisOmitted := rm.YAxis == nil || areNumberFormatArraysEqual(rm.YAxis, rm.XAxis)
 	if !yAxisOmitted {
 		yArray, err := embedNumberFormatArray(res, rm.YAxis)
 		if err != nil {

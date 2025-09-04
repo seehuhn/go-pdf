@@ -46,7 +46,7 @@ func Format(value float64, formats []*NumberFormat) (string, error) {
 			if integerPart != 0 || (i == len(formats)-1 && value == 0) {
 				if integerPart == 0 && value == 0 {
 					// Special case for zero - always format with unit
-					formatted := "0" + format.getSuffixSpacing() + format.Unit
+					formatted := "0" + format.SuffixSpacing + format.Unit
 					if result.Len() > 0 {
 						result.WriteString(" ")
 					}
@@ -79,7 +79,7 @@ func Format(value float64, formats []*NumberFormat) (string, error) {
 				} else {
 					rounded = int64(valueInUnits)
 				}
-				formatted := strconv.FormatInt(rounded, 10) + format.getSuffixSpacing() + format.Unit
+				formatted := strconv.FormatInt(rounded, 10) + format.SuffixSpacing + format.Unit
 				if result.Len() > 0 {
 					result.WriteString(" ")
 				}
@@ -96,7 +96,7 @@ func Format(value float64, formats []*NumberFormat) (string, error) {
 				if result.Len() > 0 {
 					result.WriteString(" ")
 				}
-				result.WriteString(intFormatted + " " + fracFormatted + format.getSuffixSpacing() + format.Unit)
+				result.WriteString(intFormatted + " " + fracFormatted + format.SuffixSpacing + format.Unit)
 
 			} else if integerPart != 0 {
 				// Only integer part
@@ -156,9 +156,9 @@ func (nf *NumberFormat) formatInteger(value int64) string {
 	}
 
 	// Add unit label with appropriate spacing
-	spacing := nf.getSuffixSpacing()
+	spacing := nf.SuffixSpacing
 	if nf.PrefixLabel {
-		spacing = nf.getPrefixSpacing()
+		spacing = nf.PrefixSpacing
 		return spacing + nf.Unit + spacing + numStr
 	} else {
 		return numStr + spacing + nf.Unit
@@ -212,15 +212,18 @@ func (nf *NumberFormat) formatDecimal(fractional float64) (string, error) {
 	}
 
 	// Replace decimal separator if needed
-	decimalSep := nf.getDecimalSeparator()
+	decimalSep := nf.DecimalSeparator
+	if decimalSep == "" {
+		decimalSep = "."
+	}
 	if decimalSep != "." {
 		formatted = strings.Replace(formatted, ".", decimalSep, 1)
 	}
 
 	// Add unit label with appropriate spacing
-	spacing := nf.getSuffixSpacing()
+	spacing := nf.SuffixSpacing
 	if nf.PrefixLabel {
-		spacing = nf.getPrefixSpacing()
+		spacing = nf.PrefixSpacing
 		return spacing + nf.Unit + spacing + formatted, nil
 	} else {
 		return formatted + spacing + nf.Unit, nil
@@ -247,9 +250,9 @@ func (nf *NumberFormat) formatFractionValue(fractional float64) (string, error) 
 	fractionStr := fmt.Sprintf("%d/%d", numerator, denominator)
 
 	// Add unit label with appropriate spacing
-	spacing := nf.getSuffixSpacing()
+	spacing := nf.SuffixSpacing
 	if nf.PrefixLabel {
-		spacing = nf.getPrefixSpacing()
+		spacing = nf.PrefixSpacing
 		return spacing + nf.Unit + spacing + fractionStr, nil
 	} else {
 		return fractionStr + spacing + nf.Unit, nil
@@ -325,7 +328,10 @@ func (nf *NumberFormat) formatDecimalOnly(fractional float64) (string, error) {
 	}
 
 	// Replace decimal separator if needed
-	decimalSep := nf.getDecimalSeparator()
+	decimalSep := nf.DecimalSeparator
+	if decimalSep == "" {
+		decimalSep = "."
+	}
 	if decimalSep != "." {
 		formatted = strings.Replace(formatted, ".", decimalSep, 1)
 	}
@@ -375,15 +381,18 @@ func (nf *NumberFormat) formatDecimalComplete(value float64) string {
 	}
 
 	// Replace decimal separator if needed
-	decimalSep := nf.getDecimalSeparator()
+	decimalSep := nf.DecimalSeparator
+	if decimalSep == "" {
+		decimalSep = "."
+	}
 	if decimalSep != "." {
 		formatted = strings.Replace(formatted, ".", decimalSep, 1)
 	}
 
 	// Add unit label with appropriate spacing
-	spacing := nf.getSuffixSpacing()
+	spacing := nf.SuffixSpacing
 	if nf.PrefixLabel {
-		spacing = nf.getPrefixSpacing()
+		spacing = nf.PrefixSpacing
 		return spacing + nf.Unit + spacing + formatted
 	} else {
 		return formatted + spacing + nf.Unit

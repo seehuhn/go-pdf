@@ -84,8 +84,7 @@ func ExtractGroup(x *pdf.Extractor, obj pdf.Object) (*Group, error) {
 		group.Intent = []pdf.Name{"View"}
 	}
 
-	// Usage dictionary (optional)
-	if usage, err := pdf.Optional(ExtractUsage(x, dict["Usage"])); err != nil {
+	if usage, err := pdf.ExtractorGetOptional(x, dict["Usage"], ExtractUsage); err != nil {
 		return nil, err
 	} else {
 		group.Usage = usage

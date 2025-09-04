@@ -54,19 +54,19 @@ type Dict struct {
 
 var _ pdf.Embedder[pdf.Unused] = (*Dict)(nil)
 
-func Extract(r pdf.Getter, obj pdf.Object) (*Dict, error) {
+func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	_, isIndirect := obj.(pdf.Reference)
 
 	res := &Dict{
 		SingleUse: !isIndirect,
 	}
 
-	dict, err := pdf.GetDict(r, obj)
+	dict, err := pdf.GetDict(x.R, obj)
 	if err != nil {
 		return nil, err
 	}
 
-	N, err := pdf.Resolve(r, dict["N"])
+	N, err := pdf.Resolve(x.R, dict["N"])
 	if err != nil {
 		return nil, err
 	}
@@ -75,14 +75,14 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Dict, error) {
 		res.NormalMap = make(map[pdf.Name]*form.Form)
 		for key, obj := range N {
 			state := pdf.Name(key)
-			formObj, err := form.Extract(r, obj)
+			formObj, err := form.Extract(x, obj)
 			if err != nil {
 				return nil, err
 			}
 			res.NormalMap[state] = formObj
 		}
 	case *pdf.Stream:
-		formObj, err := form.Extract(r, N)
+		formObj, err := form.Extract(x, N)
 		if err != nil {
 			return nil, err
 		}
@@ -91,7 +91,7 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Dict, error) {
 		return nil, pdf.Errorf("invalid appearance dict entry: N %T", N)
 	}
 
-	R, _ := pdf.Resolve(r, dict["R"])
+	R, _ := pdf.Resolve(x.R, dict["R"])
 	if R == nil {
 		R = N
 	}
@@ -100,21 +100,21 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Dict, error) {
 		res.RollOverMap = make(map[pdf.Name]*form.Form)
 		for key, obj := range R {
 			state := pdf.Name(key)
-			formObj, err := form.Extract(r, obj)
+			formObj, err := form.Extract(x, obj)
 			if err != nil {
 				return nil, err
 			}
 			res.RollOverMap[state] = formObj
 		}
 	case *pdf.Stream:
-		formObj, err := form.Extract(r, R)
+		formObj, err := form.Extract(x, R)
 		if err != nil {
 			return nil, err
 		}
 		res.RollOver = formObj
 	}
 
-	D, _ := pdf.Resolve(r, dict["D"])
+	D, _ := pdf.Resolve(x.R, dict["D"])
 	if D == nil {
 		D = N
 	}
@@ -123,14 +123,14 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Dict, error) {
 		res.DownMap = make(map[pdf.Name]*form.Form)
 		for key, obj := range D {
 			state := pdf.Name(key)
-			formObj, err := form.Extract(r, obj)
+			formObj, err := form.Extract(x, obj)
 			if err != nil {
 				return nil, err
 			}
 			res.DownMap[state] = formObj
 		}
 	case *pdf.Stream:
-		formObj, err := form.Extract(r, D)
+		formObj, err := form.Extract(x, D)
 		if err != nil {
 			return nil, err
 		}

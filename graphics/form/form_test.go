@@ -70,7 +70,8 @@ func TestRead(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	form1, err := Extract(writer1, ref)
+	x1 := pdf.NewExtractor(writer1)
+	form1, err := Extract(x1, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +91,8 @@ func TestRead(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	form2, err := Extract(writer2, ref2)
+	x2 := pdf.NewExtractor(writer2)
+	form2, err := Extract(x2, ref2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +141,8 @@ func TestReadWithPieceInfo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	form1, err := Extract(writer1, ref)
+	x1 := pdf.NewExtractor(writer1)
+	form1, err := Extract(x1, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +168,8 @@ func TestReadWithPieceInfo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	form2, err := Extract(writer2, ref2)
+	x2 := pdf.NewExtractor(writer2)
+	form2, err := Extract(x2, ref2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +251,8 @@ func TestFormWithPtData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	form1, err := Extract(writer1, ref)
+	x1 := pdf.NewExtractor(writer1)
+	form1, err := Extract(x1, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,7 +290,8 @@ func TestFormWithPtData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	form2, err := Extract(writer2, ref2)
+	x2 := pdf.NewExtractor(writer2)
+	form2, err := Extract(x2, ref2)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -135,8 +135,11 @@ func decodeLink(x *pdf.Extractor, dict pdf.Dict) (*Link, error) {
 		link.QuadPoints = points
 	}
 
-	// BS (optional)
-	link.BorderStyle, _ = ExtractBorderStyle(x, dict["BS"])
+	if bs, err := pdf.ExtractorGetOptional(x, dict["BS"], ExtractBorderStyle); err != nil {
+		return nil, err
+	} else {
+		link.BorderStyle = bs
+	}
 	if link.BorderStyle != nil {
 		link.Common.Border = nil
 	}

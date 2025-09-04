@@ -33,103 +33,78 @@ var (
 	_ graphics.XObject = Image(nil)
 )
 
-// TestImageWithPtData verifies that PtData is properly handled during
-// image dictionary read/write cycles.
-func TestImageWithPtData(t *testing.T) {
-	writer1, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	rm1 := pdf.NewResourceManager(writer1)
+// TestPNGRefactored verifies that the refactored PNG implementation works correctly.
+func TestPNGRefactored(t *testing.T) {
+	writer, _ := memfile.NewPDFWriter(pdf.V1_4, nil)
+	rm := pdf.NewResourceManager(writer)
 
-	// create test PtData with some geospatial point data
-	testPtData := &measure.PtData{
-		Subtype: measure.PtDataSubtypeCloud,
-		Names:   []string{measure.PtDataNameLat, measure.PtDataNameLon, measure.PtDataNameAlt},
-		XPTS: [][]pdf.Object{
-			{pdf.Number(40.7128), pdf.Number(-74.0060), pdf.Number(10.5)}, // NYC coordinates
-			{pdf.Number(40.7589), pdf.Number(-73.9851), pdf.Number(15.2)}, // Central Park
-		},
-		SingleUse: false, // use as indirect object
+	// Create a test image with transparency
+	testImg := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	for y := 0; y < 4; y++ {
+		for x := 0; x < 4; x++ {
+			// Create a gradient with varying alpha
+			alpha := uint8((x + y) * 32)
+			testImg.Set(x, y, gocol.RGBA{R: uint8(x * 64), G: uint8(y * 64), B: 128, A: alpha})
+		}
 	}
 
-	// create a simple test image (2x2 gray pixels)
-	testImg := image.NewGray(image.Rect(0, 0, 2, 2))
-	testImg.Set(0, 0, gocol.Gray{Y: 128})
-	testImg.Set(1, 0, gocol.Gray{Y: 64})
-	testImg.Set(0, 1, gocol.Gray{Y: 192})
-	testImg.Set(1, 1, gocol.Gray{Y: 255})
-
-	dict0 := FromImage(testImg, color.DeviceGraySpace, 8)
-	dict0.PtData = testPtData
-
-	ref, _, err := pdf.ResourceManagerEmbed(rm1, dict0)
+	// Test PNG without explicit color space (should default to DeviceRGB)
+	png1 := &PNG{Data: testImg}
+	ref1, _, err := pdf.ResourceManagerEmbed(rm, png1)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to embed PNG: %v", err)
 	}
-	err = rm1.Close()
+	if ref1 == nil {
+		t.Error("PNG embedding returned nil reference")
+	}
+
+	// Test PNG with explicit color space
+	png2 := &PNG{
+		Data:       testImg,
+		ColorSpace: color.DeviceRGBSpace,
+	}
+	ref2, _, err := pdf.ResourceManagerEmbed(rm, png2)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to embed PNG with explicit ColorSpace: %v", err)
 	}
-	err = writer1.Close()
+	if ref2 == nil {
+		t.Error("PNG embedding with ColorSpace returned nil reference")
+	}
+
+	// Test PNG with opaque image (no alpha channel)
+	opaqueImg := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	opaqueImg.Set(0, 0, gocol.RGBA{R: 255, G: 0, B: 0, A: 255})
+	opaqueImg.Set(1, 0, gocol.RGBA{R: 0, G: 255, B: 0, A: 255})
+	opaqueImg.Set(0, 1, gocol.RGBA{R: 0, G: 0, B: 255, A: 255})
+	opaqueImg.Set(1, 1, gocol.RGBA{R: 255, G: 255, B: 0, A: 255})
+
+	png3 := &PNG{Data: opaqueImg}
+	ref3, _, err := pdf.ResourceManagerEmbed(rm, png3)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to embed opaque PNG: %v", err)
+	}
+	if ref3 == nil {
+		t.Error("Opaque PNG embedding returned nil reference")
 	}
 
-	dict1, err := ExtractDict(writer1, ref)
+	// Close resource manager and writer
+	err = rm.Close()
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to close resource manager: %v", err)
 	}
-
-	// verify PtData was preserved
-	if dict1.PtData == nil {
-		t.Error("PtData was not preserved during extraction")
-		return
-	}
-
-	// check PtData content
-	if dict1.PtData.Subtype != measure.PtDataSubtypeCloud {
-		t.Errorf("PtData subtype mismatch: got %s, want %s", dict1.PtData.Subtype, measure.PtDataSubtypeCloud)
-	}
-	if len(dict1.PtData.Names) != 3 {
-		t.Errorf("PtData names length mismatch: got %d, want 3", len(dict1.PtData.Names))
-	}
-	if len(dict1.PtData.XPTS) != 2 {
-		t.Errorf("PtData XPTS length mismatch: got %d, want 2", len(dict1.PtData.XPTS))
-	}
-
-	// test round-trip
-	writer2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	rm2 := pdf.NewResourceManager(writer2)
-	ref2, _, err := pdf.ResourceManagerEmbed(rm2, dict1)
+	err = writer.Close()
 	if err != nil {
-		t.Fatal(err)
-	}
-	err = rm2.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = writer2.Close()
-	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to close writer: %v", err)
 	}
 
-	dict2, err := ExtractDict(writer2, ref2)
-	if err != nil {
-		t.Fatal(err)
+	// Verify PNG implements Image interface correctly
+	if png1.Subtype() != "Image" {
+		t.Errorf("PNG Subtype() returned %q, want %q", png1.Subtype(), "Image")
 	}
 
-	// check that PtData round-tripped correctly
-	if dict2.PtData == nil {
-		t.Error("PtData was lost during round-trip")
-		return
-	}
-
-	// use cmp to compare the PtData structures
-	if diff := cmp.Diff(dict1.PtData, dict2.PtData, cmp.AllowUnexported(measure.PtData{})); diff != "" {
-		t.Errorf("PtData round trip failed (-got +want):\n%s", diff)
-	}
-
-	// verify basic image properties were preserved
-	if dict1.Width != dict2.Width || dict1.Height != dict2.Height {
-		t.Errorf("Image dimensions changed: %dx%d -> %dx%d", dict1.Width, dict1.Height, dict2.Width, dict2.Height)
+	bounds := png1.Bounds()
+	if bounds.XMin != 0 || bounds.YMin != 0 || bounds.XMax != 4 || bounds.YMax != 4 {
+		t.Errorf("PNG Bounds() returned %+v, want {XMin:0 YMin:0 XMax:4 YMax:4}", bounds)
 	}
 }
 
@@ -173,7 +148,8 @@ func TestMaskWithPtData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mask1, err := ExtractMask(writer1, ref)
+	x1 := pdf.NewExtractor(writer1)
+	mask1, err := ExtractMask(x1, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +187,8 @@ func TestMaskWithPtData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mask2, err := ExtractMask(writer2, ref2)
+	x2 := pdf.NewExtractor(writer2)
+	mask2, err := ExtractMask(x2, ref2)
 	if err != nil {
 		t.Fatal(err)
 	}

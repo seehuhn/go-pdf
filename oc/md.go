@@ -75,14 +75,14 @@ func ExtractMembership(x *pdf.Extractor, obj pdf.Object) (*Membership, error) {
 	case pdf.Array:
 		m.OCGs = make([]*Group, 0, len(arr))
 		for _, item := range arr {
-			if group, err := pdf.Optional(ExtractGroup(x, item)); err != nil {
+			if group, err := pdf.ExtractorGetOptional(x, item, ExtractGroup); err != nil {
 				return nil, err
 			} else if group != nil {
 				m.OCGs = append(m.OCGs, group)
 			}
 		}
 	default:
-		if group, err := pdf.Optional(ExtractGroup(x, ocgsObj)); err != nil {
+		if group, err := pdf.ExtractorGetOptional(x, ocgsObj, ExtractGroup); err != nil {
 			return nil, err
 		} else if group != nil {
 			m.OCGs = []*Group{group}
@@ -100,7 +100,7 @@ func ExtractMembership(x *pdf.Extractor, obj pdf.Object) (*Membership, error) {
 		}
 	}
 
-	if ve, err := pdf.Optional(ExtractVisibilityExpression(x, dict["VE"])); err != nil {
+	if ve, err := pdf.ExtractorGetOptional(x, dict["VE"], ExtractVisibilityExpression); err != nil {
 		return nil, err
 	} else {
 		m.VE = ve
