@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/pieceinfo"
+	"seehuhn.de/go/pdf/structure"
 )
 
 // testData implements pieceinfo.Data for testing
@@ -305,5 +306,83 @@ func TestFormWithPtData(t *testing.T) {
 	// use cmp to compare the PtData structures
 	if diff := cmp.Diff(form1.PtData, form2.PtData, cmp.AllowUnexported(measure.PtData{})); diff != "" {
 		t.Errorf("PtData round trip failed (-got +want):\n%s", diff)
+	}
+}
+
+// TestFormWithStructParent verifies that StructParent fields are properly handled.
+func TestFormWithStructParent(t *testing.T) {
+	writer1, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm1 := pdf.NewResourceManager(writer1)
+
+	form0 := &Form{
+		Draw: func(w *graphics.Writer) error {
+			w.SetFillColor(color.DeviceGray(0.5))
+			w.Rectangle(0, 0, 100, 100)
+			w.Fill()
+			return nil
+		},
+		BBox:         pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+		StructParent: structure.NewKey(42),
+	}
+	ref, _, err := pdf.ResourceManagerEmbed(rm1, form0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = rm1.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = writer1.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x1 := pdf.NewExtractor(writer1)
+	form1, err := Extract(x1, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify StructParent was preserved
+	if key, ok := form1.StructParent.Get(); !ok || key != 42 {
+		t.Errorf("StructParent not preserved: got %v (present=%v), want 42", key, ok)
+	}
+
+	// Test with StructParent value 0 (edge case)
+	writer2, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm2 := pdf.NewResourceManager(writer2)
+	
+	form0Zero := &Form{
+		Draw: func(w *graphics.Writer) error {
+			w.SetFillColor(color.DeviceGray(0.5))
+			w.Rectangle(0, 0, 100, 100)
+			w.Fill()
+			return nil
+		},
+		BBox:         pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+		StructParent: structure.NewKey(0),
+	}
+	ref2, _, err := pdf.ResourceManagerEmbed(rm2, form0Zero)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = rm2.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = writer2.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x2 := pdf.NewExtractor(writer2)
+	form2, err := Extract(x2, ref2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify StructParent value 0 was preserved
+	if key, ok := form2.StructParent.Get(); !ok || key != 0 {
+		t.Errorf("StructParent value 0 not preserved: got %v (present=%v), want 0", key, ok)
 	}
 }

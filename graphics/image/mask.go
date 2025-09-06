@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/oc"
+	"seehuhn.de/go/pdf/structure"
 )
 
 // PDF 2.0 sections: 8.9.5 8.9.6
@@ -59,7 +60,9 @@ type Mask struct {
 	// from within content streams.
 	Name pdf.Name
 
-	// TODO(voss): StructParent
+	// StructParent (required if the image mask is a structural content item)
+	// is the integer key of the image mask's entry in the structural parent tree.
+	StructParent structure.Key
 
 	// TODO(voss): ID
 
@@ -284,6 +287,15 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 		mask.PtData = ptData
 	}
 
+	// Extract StructParent
+	if keyObj := dict["StructParent"]; keyObj != nil {
+		if key, err := pdf.Optional(pdf.GetInteger(x.R, dict["StructParent"])); err != nil {
+			return nil, err
+		} else {
+			mask.StructParent.Set(key)
+		}
+	}
+
 	// Create WriteData function as a closure
 	mask.WriteData = func(w io.Writer) error {
 		stm, err := pdf.DecodeStream(x.R, stream, 0)
@@ -378,6 +390,13 @@ func (m *Mask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 			return nil, zero, err
 		}
 		dict["PtData"] = embedded
+	}
+
+	if key, ok := m.StructParent.Get(); ok {
+		if err := pdf.CheckVersion(rm.Out, "image mask StructParent entry", pdf.V1_3); err != nil {
+			return nil, zero, err
+		}
+		dict["StructParent"] = pdf.Integer(key)
 	}
 
 	ref := rm.Out.Alloc()

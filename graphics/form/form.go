@@ -32,6 +32,7 @@ import (
 	"seehuhn.de/go/pdf/oc"
 	"seehuhn.de/go/pdf/pdfcopy"
 	"seehuhn.de/go/pdf/pieceinfo"
+	"seehuhn.de/go/pdf/structure"
 )
 
 // PDF 2.0 sections: 8.10
@@ -70,7 +71,11 @@ type Form struct {
 	// PtData (optional; PDF 2.0) contains extended geospatial point data.
 	PtData *measure.PtData
 
-	// TODO(voss): StructParent, StructParents
+	// StructParent (required if the form is a structural content item)
+	// is the integer key of the form's entry in the structural parent tree.
+	StructParent structure.Key
+
+	// TODO(voss): StructParents
 
 	// TODO(voss): AF
 }
@@ -173,6 +178,13 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["PtData"] = embedded
 	}
 
+	if key, ok := f.StructParent.Get(); ok {
+		if err := pdf.CheckVersion(rm.Out, "form XObject StructParent entry", pdf.V1_3); err != nil {
+			return nil, zero, err
+		}
+		dict["StructParent"] = pdf.Integer(key)
+	}
+
 	var filters []pdf.Filter
 	if !rm.Out.GetOptions().HasAny(pdf.OptPretty) {
 		filters = append(filters, &pdf.FilterCompress{})
@@ -273,6 +285,15 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Form, error) {
 		return nil, err
 	} else {
 		form.PtData = ptData
+	}
+
+	// Extract StructParent
+	if keyObj := dict["StructParent"]; keyObj != nil {
+		if key, err := pdf.Optional(pdf.GetInteger(x.R, dict["StructParent"])); err != nil {
+			return nil, err
+		} else {
+			form.StructParent.Set(key)
+		}
 	}
 
 	// Create Draw function as closure

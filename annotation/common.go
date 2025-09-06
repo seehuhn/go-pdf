@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/oc"
+	"seehuhn.de/go/pdf/structure"
 )
 
 // Common contains fields common to all annotation dictionaries.
@@ -130,7 +131,7 @@ type Common struct {
 	// StructParent (required if the annotation is a structural content item)
 	// is the integer key of the annotation's entry in the structural parent
 	// tree.
-	StructParent pdf.Integer
+	StructParent structure.Key
 
 	// OptionalContent (optional) specifies the optional content properties for
 	// the annotation.
@@ -252,11 +253,11 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool)
 		dict["C"] = colorArray
 	}
 
-	if c.StructParent != 0 {
+	if key, ok := c.StructParent.Get(); ok {
 		if err := pdf.CheckVersion(w, "annotation StructParent entry", pdf.V1_3); err != nil {
 			return err
 		}
-		dict["StructParent"] = c.StructParent
+		dict["StructParent"] = pdf.Integer(key)
 	}
 
 	if c.OptionalContent != nil {
@@ -390,9 +391,12 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 		}
 	}
 
-	// StructParent (optional)
-	if sp, err := pdf.GetInteger(r, dict["StructParent"]); err == nil && sp != 0 {
-		common.StructParent = sp
+	if keyObj := dict["StructParent"]; keyObj != nil {
+		if key, err := pdf.Optional(pdf.GetInteger(r, dict["StructParent"])); err != nil {
+			return err
+		} else {
+			common.StructParent.Set(key)
+		}
 	}
 
 	// OC (optional)

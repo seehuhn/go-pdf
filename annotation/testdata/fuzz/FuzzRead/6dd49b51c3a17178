@@ -1,2 +1,0 @@
-go test fuzz v1
-[]byte("%PDF-1.0A00000000000000000000000000000000000000000000xreftrailer<</Quir:X<</Subtype/Text/Lang(AAA)>>>>startxref53")
