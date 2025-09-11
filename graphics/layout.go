@@ -168,6 +168,10 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 // [font.Layouter], the function returns nil.  If seq is not nil (and there is
 // no error), the return value is guaranteed to be equal to seq.
 func (w *Writer) TextLayout(seq *font.GlyphSeq, text string) *font.GlyphSeq {
+	if w.Err != nil {
+		return seq
+	}
+
 	F := w.CurrentFont
 	if F == nil {
 		return nil

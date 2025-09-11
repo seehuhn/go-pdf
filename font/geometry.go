@@ -55,6 +55,9 @@ func (g *Geometry) GetGeometry() *Geometry {
 // assuming that it is typeset at point (0, 0) using the given font size.
 func (g *Geometry) BoundingBox(fontSize float64, gg *GlyphSeq) *pdf.Rectangle {
 	res := &pdf.Rectangle{}
+	if gg == nil || len(gg.Seq) == 0 {
+		return res
+	}
 
 	xPos := gg.Skip
 	for _, glyph := range gg.Seq {

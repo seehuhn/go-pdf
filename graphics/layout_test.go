@@ -242,12 +242,12 @@ func TestGetGlyphQuadPointsTextMatrixTransform(t *testing.T) {
 	// Set up text state
 	w.TextSetFont(font, 10.0)
 
+	// Apply CTM transformation before starting text object
+	w.Transform(matrix.Scale(2, 2))
+
 	// Start text object and set text matrix
 	w.TextBegin()
 	w.TextSetMatrix(matrix.Translate(5, 10))
-
-	// Also apply CTM transformation
-	w.Transform(matrix.Scale(2, 2))
 
 	glyphSeq := w.TextLayout(nil, "A")
 
