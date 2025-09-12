@@ -69,44 +69,46 @@ func TestRoundTrip(t *testing.T) {
 }
 
 func FuzzFontDescriptor(f *testing.F) {
-	fd := &Descriptor{}
-	data, err := embedFD(fd)
-	if err != nil {
-		f.Fatal(err)
-	}
-	f.Add(data)
+	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
+		fd := &Descriptor{}
+		data, err := embedFD(fd, v)
+		if err != nil {
+			f.Fatal(err)
+		}
+		f.Add(data)
 
-	fd = &Descriptor{
-		FontName:     "Test Name",
-		FontFamily:   "Test Family",
-		FontStretch:  os2.WidthCondensed,
-		FontWeight:   os2.WeightExtraBold,
-		IsFixedPitch: true,
-		IsSerif:      true,
-		IsSymbolic:   true,
-		IsScript:     true,
-		IsItalic:     true,
-		IsAllCap:     true,
-		IsSmallCap:   true,
-		ForceBold:    true,
-		FontBBox:     rect.Rect{LLx: 100, LLy: 200, URx: 300, URy: 400},
-		ItalicAngle:  -10,
-		Ascent:       800,
-		Descent:      -200,
-		Leading:      1200,
-		CapHeight:    600,
-		XHeight:      400,
-		StemV:        50,
-		StemH:        30,
-		MaxWidth:     1000,
-		AvgWidth:     800,
-		MissingWidth: 700,
+		fd = &Descriptor{
+			FontName:     "Test Name",
+			FontFamily:   "Test Family",
+			FontStretch:  os2.WidthCondensed,
+			FontWeight:   os2.WeightExtraBold,
+			IsFixedPitch: true,
+			IsSerif:      true,
+			IsSymbolic:   true,
+			IsScript:     true,
+			IsItalic:     true,
+			IsAllCap:     true,
+			IsSmallCap:   true,
+			ForceBold:    true,
+			FontBBox:     rect.Rect{LLx: 100, LLy: 200, URx: 300, URy: 400},
+			ItalicAngle:  -10,
+			Ascent:       800,
+			Descent:      -200,
+			Leading:      1200,
+			CapHeight:    600,
+			XHeight:      400,
+			StemV:        50,
+			StemH:        30,
+			MaxWidth:     1000,
+			AvgWidth:     800,
+			MissingWidth: 700,
+		}
+		data, err = embedFD(fd, v)
+		if err != nil {
+			f.Fatal(err)
+		}
+		f.Add(data)
 	}
-	data, err = embedFD(fd)
-	if err != nil {
-		f.Fatal(err)
-	}
-	f.Add(data)
 
 	f.Fuzz(func(t *testing.T, data1 []byte) {
 		opt := &pdf.ReaderOptions{
@@ -139,9 +141,10 @@ func FuzzFontDescriptor(f *testing.F) {
 	})
 }
 
-func embedFD(fd *Descriptor) ([]byte, error) {
+func embedFD(fd *Descriptor, v pdf.Version) ([]byte, error) {
 	buf := &bytes.Buffer{}
-	w, err := pdf.NewWriter(buf, pdf.V1_7, nil)
+	opt := &pdf.WriterOptions{HumanReadable: true}
+	w, err := pdf.NewWriter(buf, v, opt)
 	if err != nil {
 		return nil, err
 	}

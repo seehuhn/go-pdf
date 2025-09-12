@@ -16,28 +16,35 @@
 
 // Package annotation provides support for reading and writing PDF annotations.
 //
-// There are two classes of annotations, markup annotations and interactive
-// annotations. Markup annotations correspond to comments and other markings a
-// reviewer or editor might add to a manuscript. These annotations allow for
-// tracking of relies and approvals. The most common type of markup annotation
-// are [Text] annotations, which represent simple text notes which can be
-// opened by clicking on an icon on the PDF page. The full list of markup
-// annotations for PDF 2.0 is:
+// To add annotations to a PDF page, create an annotation object (e.g., [Link]
+// or [Text]), configure its fields including the Common.Rect to position it on
+// the page, then encode it using the Encode method. Write the encoded
+// annotation as an indirect object to the PDF, and add its reference to the
+// page dictionary's "Annots" array. When reading, annotations for a page can
+// be found in the "Annots" entry of the page dictionary and can be decoded
+// using the [Decode] function.
+//
+// There are several classes of annotations. Markup annotations correspond to
+// comments and other markings a reviewer or editor might add to a manuscript.
+// These annotations allow for tracking of replies and approvals. The most
+// common type of markup annotation are [Text] annotations, which represent
+// simple text notes which can be opened by clicking on an icon on the PDF
+// page. The full list of markup annotations for PDF 2.0 is:
 //   - [Caret]: indicate the presence of text edits
-//   - [Circle]: draw an ellipse onto the page
-//   - [FileAttachment]:
-//   - [FreeText]:
-//   - [Ink]:
-//   - [Line]:
-//   - [Polygon]:
-//   - [Polyline]:
-//   - [Projection]: (PDF 2.0)
-//   - [Redact]:
-//   - [Sound]: (deprecated in PDF 2.0)
-//   - [Square]: draw a rectangle onto the page
-//   - [Stamp]:
+//   - [Circle]: an ellipse
+//   - [FileAttachment]: embed a file as an icon that can be opened or saved
+//   - [FreeText]: display text directly on the page without a popup
+//   - [Ink]: freehand drawing or handwritten paths
+//   - [Line]: straight line with optional start and end decorations
+//   - [Polygon]: closed polygonal path
+//   - [Polyline]: open polygonal path with optional start and end decorations
+//   - [Projection]: (PDF 2.0) dimensional measurements and callouts from 3D models
+//   - [Redact]: mark content for removal and specify replacement text
+//   - [Sound]: (deprecated in PDF 2.0) a voice note
+//   - [Square]: a rectangle
+//   - [Stamp]: apply a rubber stamp appearance to the page
 //   - [Text]: a clickable icon which opens a popup with text
-//   - [TextMarkup]:
+//   - [TextMarkup]: highlight, underline, strikeout, or squiggly underline text
 //
 // Interactive annotations provide a way to interact with on-screen versions of
 // the document.  The most common type of interactive annotation are [Link]
@@ -46,14 +53,17 @@
 // PDF 2.0 is:
 //   - [Annot3D]: includes 3D artwork in PDF documents
 //   - [Link]: a clickable area which navigates to another page or an external URL
-//   - [Movie]: (deprecated in PDF 2.0)
-//   - [Popup]:
-//   - [PrinterMark]:
-//   - [RichMedia]: (PDF 2.0)
-//   - [Screen]:
-//   - [TrapNet]: (deprecated in PDF 2.0)
-//   - [Watermark]:
-//   - [Widget]:
+//   - [Movie]: (deprecated in PDF 2.0) embed video content
+//   - [Popup]: the pop-up window for text associated with markup annotations
+//   - [RichMedia]: (PDF 2.0) embed rich media content including Flash and video
+//   - [Screen]: define a page region for playing media clips
+//   - [Widget]: an interactive form field
+//
+// Finally, the PDF specification defines a few annotations to support
+// document preparation and production workflows:
+//   - [PrinterMark]: registration marks, color bars, cutting guides, ...
+//   - [TrapNet]: (deprecated in PDF 2.0) compensate for potential misregistration during printing
+//   - [Watermark]: watermark overlaid over the page content
 //
 // The list of annotations is extensible; PDF viewers may support additional
 // annotation types, and possibly a plugin system for custom annotations. The

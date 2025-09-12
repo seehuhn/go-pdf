@@ -446,11 +446,12 @@ func TestReaderGoFuzz(t *testing.T) {
 func FuzzReader(f *testing.F) {
 	vv := []Version{V1_0, V1_1, V1_2, V1_3, V1_4, V1_5, V1_6, V1_7, V2_0}
 	buf := &bytes.Buffer{}
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		for _, v := range vv {
 			buf.Reset()
 
-			w, err := NewWriter(buf, v, nil)
+			opts := &WriterOptions{HumanReadable: true}
+			w, err := NewWriter(buf, v, opts)
 			if err != nil {
 				f.Fatal(err)
 			}

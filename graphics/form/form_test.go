@@ -351,7 +351,7 @@ func TestFormWithStructParent(t *testing.T) {
 	// Test with StructParent value 0 (edge case)
 	writer2, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm2 := pdf.NewResourceManager(writer2)
-	
+
 	form0Zero := &Form{
 		Draw: func(w *graphics.Writer) error {
 			w.SetFillColor(color.DeviceGray(0.5))
