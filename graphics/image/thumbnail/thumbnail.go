@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package image
+package thumbnail
 
 import (
 	"bytes"
@@ -23,6 +23,7 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -59,7 +60,7 @@ type Thumbnail struct {
 	WriteData func(io.Writer) error
 }
 
-var _ Image = (*Thumbnail)(nil)
+var _ graphics.Image = (*Thumbnail)(nil)
 
 // ExtractThumbnail reads a thumbnail image from a PDF object.
 func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
@@ -217,8 +218,8 @@ func (t *Thumbnail) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 }
 
 // Bounds returns the dimensions of the thumbnail.
-func (t *Thumbnail) Bounds() Rectangle {
-	return Rectangle{
+func (t *Thumbnail) Bounds() graphics.Rectangle {
+	return graphics.Rectangle{
 		XMin: 0,
 		YMin: 0,
 		XMax: t.Width,

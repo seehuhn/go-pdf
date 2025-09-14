@@ -23,10 +23,13 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/file"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/oc"
 	"seehuhn.de/go/pdf/structure"
+	"seehuhn.de/go/pdf/webcapture"
 )
 
 // PDF 2.0 sections: 8.9.5 8.9.6
@@ -38,6 +41,11 @@ type Mask struct {
 	// Height is the height of the image mask in pixels.
 	Height int
 
+	// Inverted indicates the meaning of individual bits in the image data:
+	//   - false: 0=opaque and 1=transparent
+	//   - true: 1=opaque and 0=transparent
+	Inverted bool
+
 	// WriteData is a function that writes the mask data to the provided writer.
 	// The data should be written as a continuous bit stream, with each row
 	// starting at a new byte boundary. 0 = opaque, 1 = transparent.
@@ -47,41 +55,46 @@ type Mask struct {
 	// appearance in low-resolution stencil masks.
 	Interpolate bool
 
-	// Inverted indicates the meaning of individual bits in the image data:
-	//   - false: 0=opaque and 1=transparent
-	//   - true: 1=opaque and 0=transparent
-	Inverted bool
-
-	// Alternates (optional) is an array of alternate image dictionaries for this image.
+	// Alternates (optional) is an array of alternate image dictionaries for this mask.
 	Alternates []*Mask
 
-	// Name is deprecated and should be left empty.
-	// Only used in PDF 1.0 where it was the name used to reference the image
-	// from within content streams.
-	Name pdf.Name
+	// OptionalContent (optional) allows to control the visibility of the mask.
+	OptionalContent oc.Conditional
 
 	// StructParent (required if the image mask is a structural content item)
 	// is the integer key of the image mask's entry in the structural parent tree.
 	StructParent structure.Key
 
-	// TODO(voss): ID
-
 	// Metadata (optional) is a metadata stream containing metadata for the image.
 	Metadata *metadata.Stream
 
-	// OptionalContent (optional) allows to control the visibility of the form.
-	OptionalContent oc.Conditional
+	// AssociatedFiles (optional; PDF 2.0) is an array of files associated with
+	// the mask. The relationship that the associated files have to the
+	// XObject is supplied by the Specification.AFRelationship field.
+	//
+	// This corresponds to the AF entry in the image mask dictionary.
+	AssociatedFiles []*file.Specification
 
-	// TODO(voss): AF
-
-	// Measure (optional, PDF 2.0) specifies the scale and units which apply to the image.
+	// Measure (optional; PDF 2.0) specifies the scale and units which apply to
+	// the mask.
 	Measure measure.Measure
 
 	// PtData (optional; PDF 2.0) contains extended geospatial point data.
 	PtData *measure.PtData
+
+	// WebCaptureID (optional) is the digital identifier of the image's parent
+	// Web Capture content set.
+	//
+	// This corresponds to the /ID entry in the image mask dictionary.
+	WebCaptureID *webcapture.Identifier
+
+	// Name is deprecated and should be left empty.
+	// Only used in PDF 1.0 where it was the name used to reference the image
+	// from within content streams.
+	Name pdf.Name
 }
 
-var _ Image = (*Mask)(nil)
+var _ graphics.Image = (*Mask)(nil)
 
 // FromImageMask creates an ImageMask from an image.Image.
 // Only the alpha channel is used, with alpha values rounded to full opacity or full transparency.
@@ -287,6 +300,27 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 		mask.PtData = ptData
 	}
 
+	// Extract AssociatedFiles (AF)
+	if afArray, err := pdf.Optional(pdf.GetArray(x.R, dict["AF"])); err != nil {
+		return nil, err
+	} else if afArray != nil {
+		mask.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
+		for _, afObj := range afArray {
+			if spec, err := pdf.ExtractorGetOptional(x, afObj, file.ExtractSpecification); err != nil {
+				return nil, err
+			} else if spec != nil {
+				mask.AssociatedFiles = append(mask.AssociatedFiles, spec)
+			}
+		}
+	}
+
+	// Extract WebCaptureID (ID)
+	if webID, err := pdf.ExtractorGetOptional(x, dict["ID"], webcapture.ExtractIdentifier); err != nil {
+		return nil, err
+	} else if webID != nil {
+		mask.WebCaptureID = webID
+	}
+
 	// Extract StructParent
 	if keyObj := dict["StructParent"]; keyObj != nil {
 		if key, err := pdf.Optional(pdf.GetInteger(x.R, dict["StructParent"])); err != nil {
@@ -313,6 +347,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 	return mask, nil
 }
 
+// Embed adds the mask to the PDF file and returns the embedded object.
 func (m *Mask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
@@ -392,6 +427,47 @@ func (m *Mask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["PtData"] = embedded
 	}
 
+	if len(m.AssociatedFiles) > 0 {
+		if err := pdf.CheckVersion(rm.Out, "image mask AF entry", pdf.V2_0); err != nil {
+			return nil, zero, err
+		}
+
+		// Validate each file specification can be used as associated file
+		version := pdf.GetVersion(rm.Out)
+		for i, spec := range m.AssociatedFiles {
+			if spec == nil {
+				continue
+			}
+			if err := spec.CanBeAF(version); err != nil {
+				return nil, zero, fmt.Errorf("AssociatedFiles[%d]: %w", i, err)
+			}
+		}
+
+		// Embed the file specifications
+		var afArray pdf.Array
+		for _, spec := range m.AssociatedFiles {
+			if spec != nil {
+				embedded, _, err := pdf.ResourceManagerEmbed(rm, spec)
+				if err != nil {
+					return nil, zero, err
+				}
+				afArray = append(afArray, embedded)
+			}
+		}
+		dict["AF"] = afArray
+	}
+
+	if m.WebCaptureID != nil {
+		if err := pdf.CheckVersion(rm.Out, "image mask ID entry", pdf.V1_3); err != nil {
+			return nil, zero, err
+		}
+		embedded, _, err := pdf.ResourceManagerEmbed(rm, m.WebCaptureID)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["ID"] = embedded
+	}
+
 	if key, ok := m.StructParent.Get(); ok {
 		if err := pdf.CheckVersion(rm.Out, "image mask StructParent entry", pdf.V1_3); err != nil {
 			return nil, zero, err
@@ -463,11 +539,29 @@ func (m *Mask) check(out *pdf.Writer) error {
 		}
 	}
 
+	// Validate AssociatedFiles
+	if len(m.AssociatedFiles) > 0 {
+		if err := pdf.CheckVersion(out, "image mask AssociatedFiles entry", pdf.V2_0); err != nil {
+			return err
+		}
+
+		version := pdf.GetVersion(out)
+		for i, spec := range m.AssociatedFiles {
+			if spec == nil {
+				continue
+			}
+			if err := spec.CanBeAF(version); err != nil {
+				return fmt.Errorf("AssociatedFiles[%d]: %w", i, err)
+			}
+		}
+	}
+
 	return nil
 }
 
-func (m *Mask) Bounds() Rectangle {
-	return Rectangle{
+// Bounds returns the dimensions of the mask.
+func (m *Mask) Bounds() graphics.Rectangle {
+	return graphics.Rectangle{
 		XMin: 0,
 		YMin: 0,
 		XMax: m.Width,
@@ -475,6 +569,7 @@ func (m *Mask) Bounds() Rectangle {
 	}
 }
 
+// Subtype returns the PDF XObject subtype for image masks.
 func (m *Mask) Subtype() pdf.Name {
 	return pdf.Name("Image")
 }

@@ -23,6 +23,7 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -44,17 +45,16 @@ type SoftMask struct {
 	// component. The value must be 1, 2, 4, 8, or 16.
 	BitsPerComponent int
 
+	// Decode (optional) is an array of numbers describing how to map mask
+	// samples into the range 0.0 to 1.0. If present, the array must contain
+	// exactly 2 values [Dmin, Dmax]. Default: [0.0, 1.0] which maps 0 to
+	// transparent, max to opaque.
+	Decode []float64
+
 	// WriteData is a function that writes the grayscale mask data to the
 	// provided writer. The data should be written row by row, with each row
-	// containing Width samples, each sample using BitsPerComponent bits. 0 =
-	// fully transparent, max = fully opaque.
+	// containing Width samples, each sample using BitsPerComponent bits.
 	WriteData func(io.Writer) error
-
-	// Decode (optional) is an array of numbers describing how to map mask
-	// samples into the range 0.0 to 1.0. The array must contain exactly 2
-	// values [Dmin, Dmax]. Default: [0.0, 1.0] which maps 0→transparent,
-	// max→opaque.
-	Decode []float64
 
 	// Interpolate indicates whether mask interpolation should be performed by
 	// a PDF processor to reduce pixelation in low-resolution masks.
@@ -68,11 +68,11 @@ type SoftMask struct {
 	Matte []float64
 }
 
-var _ Image = (*SoftMask)(nil)
+var _ graphics.Image = (*SoftMask)(nil)
 
 // Bounds returns the dimensions of the soft mask.
-func (sm *SoftMask) Bounds() Rectangle {
-	return Rectangle{
+func (sm *SoftMask) Bounds() graphics.Rectangle {
+	return graphics.Rectangle{
 		XMin: 0,
 		YMin: 0,
 		XMax: sm.Width,
@@ -81,7 +81,7 @@ func (sm *SoftMask) Bounds() Rectangle {
 }
 
 // Subtype returns "Image".
-// This implements the [Image] interface.
+// This implements the [graphics.Image] interface.
 func (sm *SoftMask) Subtype() pdf.Name {
 	return pdf.Name("Image")
 }

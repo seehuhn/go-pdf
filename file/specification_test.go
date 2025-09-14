@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/collection"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/graphics/image"
+	"seehuhn.de/go/pdf/graphics/image/thumbnail"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
@@ -165,7 +165,7 @@ var testCases = []struct {
 		version: pdf.V2_0,
 		spec: &Specification{
 			FileName: "image.jpg",
-			Thumbnail: &image.Thumbnail{
+			Thumbnail: &thumbnail.Thumbnail{
 				Width:            2,
 				Height:           2,
 				ColorSpace:       color.SpaceDeviceGray,
@@ -239,7 +239,7 @@ var testCases = []struct {
 					"Rating":   {Val: float64(4.8)},
 				},
 			},
-			Thumbnail: &image.Thumbnail{
+			Thumbnail: &thumbnail.Thumbnail{
 				Width:            1,
 				Height:           1,
 				ColorSpace:       color.SpaceDeviceRGB,
@@ -356,7 +356,7 @@ func TestSpecificationValidation(t *testing.T) {
 	t.Run("version requirement - PDF 2.0", func(t *testing.T) {
 		spec := &Specification{
 			FileName: "test.txt",
-			Thumbnail: &image.Thumbnail{
+			Thumbnail: &thumbnail.Thumbnail{
 				Width:            1,
 				Height:           1,
 				ColorSpace:       color.SpaceDeviceGray,

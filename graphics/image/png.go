@@ -24,49 +24,32 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
-// PNG represents an image which is stored losslessly in the PDF file.
-// The encoding is similar to the PNG format.
-type PNG struct {
-	Data image.Image
-
-	// ColorSpace is the color space of the image.
-	// If this is not set, the image will be embedded as a DeviceRGB image.
-	ColorSpace color.Space
-}
-
-// Subtype returns /Image.
-// This implements the [Image] interface.
-func (im *PNG) Subtype() pdf.Name {
-	return pdf.Name("Image")
-}
-
-// Bounds implements the [Image] interface.
-func (im *PNG) Bounds() Rectangle {
-	b := im.Data.Bounds()
-	return Rectangle{XMin: b.Min.X, YMin: b.Min.Y, XMax: b.Max.X, YMax: b.Max.Y}
-}
-
-// Embed ensures that the image is embedded in the PDF file.
-// This implements the [Image] interface.
-func (im *PNG) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	src := im.Data
+// PNG creates an image dictionary for lossless storage similar to PNG format.
+// The image is stored with 8 bits per component and uses PNG-style predictors
+// for compression. If the image has an alpha channel, a soft mask is automatically
+// created.
+//
+// If colorSpace is nil, DeviceRGB will be used as the default color space.
+func PNG(img image.Image, colorSpace color.Space) (*Dict, error) {
+	if img == nil {
+		return nil, pdf.Errorf("image cannot be nil")
+	}
 
 	// Determine color space
-	cs := im.ColorSpace
+	cs := colorSpace
 	if cs == nil {
 		cs = color.SpaceDeviceRGB
 	}
 
 	// Create main image dict using existing Dict functionality
-	dict := FromImage(src, cs, 8)
+	dict := FromImage(img, cs, 8)
 
 	// Add soft mask if alpha channel is needed
-	if needsAlphaChannel(src) {
-		dict.SMask = FromImageAlpha(src, 8)
+	if needsAlphaChannel(img) {
+		dict.SMask = FromImageAlpha(img, 8)
 	}
 
-	// Let Dict handle all the PDF generation, validation, and embedding
-	return pdf.ResourceManagerEmbed(rm, dict)
+	return dict, nil
 }
 
 func needsAlphaChannel(img image.Image) bool {

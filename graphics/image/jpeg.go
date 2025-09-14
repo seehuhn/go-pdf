@@ -22,12 +22,13 @@ import (
 	"image/jpeg"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
 // JPEG creates a new PDF image from a JPEG image.
 // The file is stored in the DCTDecode format in the PDF file.
-func JPEG(src image.Image, opts *jpeg.Options) (Image, error) {
+func JPEG(src image.Image, opts *jpeg.Options) (graphics.Image, error) {
 	// convert to NRGBA format
 	b := src.Bounds()
 	img := image.NewNRGBA(b)
@@ -51,14 +52,14 @@ func (im *jpegImage) Subtype() pdf.Name {
 	return pdf.Name("Image")
 }
 
-// Bounds implements the [Image] interface.
-func (im *jpegImage) Bounds() Rectangle {
+// Bounds implements the [graphics.Image] interface.
+func (im *jpegImage) Bounds() graphics.Rectangle {
 	b := im.im.Bounds()
-	return Rectangle{XMin: b.Min.X, YMin: b.Min.Y, XMax: b.Max.X, YMax: b.Max.Y}
+	return graphics.Rectangle{XMin: b.Min.X, YMin: b.Min.Y, XMax: b.Max.X, YMax: b.Max.Y}
 }
 
 // Embed ensures that the image is embedded in the PDF file.
-// This implements the [Image] interface.
+// This implements the [graphics.Image] interface.
 func (im *jpegImage) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	ref := rm.Out.Alloc()

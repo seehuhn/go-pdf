@@ -24,12 +24,14 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/oc"
 	"seehuhn.de/go/pdf/structure"
+	"seehuhn.de/go/pdf/webcapture"
 )
 
 // PDF 2.0 sections: 8.9.5
@@ -49,8 +51,17 @@ type Dict struct {
 	// The value must be 1, 2, 4, 8, or (from PDF 1.5) 16.
 	BitsPerComponent int
 
-	// Intent (optional) is the name of a color rendering intent to be used in rendering the image.
-	Intent graphics.RenderingIntent
+	// Decode (optional) is an array of numbers describing how to map image
+	// samples into the range of values appropriate for the image's color
+	// space. The slice must have twice the number of color components in the
+	// ColorSpace.
+	Decode []float64
+
+	// WriteData is a function that writes the image data to the provided
+	// writer. The data should be written row by row, with each row containing
+	// Width * ColorSpace.Channels() samples, each sample using
+	// BitsPerComponent bits.
+	WriteData func(io.Writer) error
 
 	// MaskImage (optional) determines which parts of the image are to be
 	// painted.
@@ -58,35 +69,14 @@ type Dict struct {
 	// Only one of MaskImage or MaskColors may be specified.
 	MaskImage *Mask
 
-	// MaskColors (optional) is an array of colors used for color key masking.
-	// When specified, image samples with colors falling within the defined ranges
-	// will not be painted, allowing the background to show through (similar to
-	// chroma-key/green screen effects).
-	//
-	// The array contains pairs of min/max values for each color component:
-	// [min1, max1, min2, max2, ..., minN, maxN] where N is the number of color
-	// components in the image's color space. Each value must be in the range
-	// 0 to (2^BitsPerComponent - 1) and represents raw color values before
-	// any Decode array processing.
-	//
-	// A pixel is masked if ALL of its color components fall within their
-	// respective min/max ranges.
+	// MaskColors (optional) defines color ranges for transparency masking.
+	// Contains pairs [min1, max1, min2, max2, ...] for each color component.
+	// Each value must be in the range 0 to (2^BitsPerComponent - 1) and
+	// represents raw color values before any Decode array processing. Pixels
+	// with all components in their respective ranges become transparent.
 	//
 	// Only one of MaskImage or MaskColors may be specified.
 	MaskColors []uint16
-
-	// Decode (optional) is an array of numbers describing how to map image
-	// samples into the range of values appropriate for the image's color
-	// space. The slice must have twice the number of color components
-	// required by ColorSpace.
-	Decode []float64
-
-	// Interpolate indicates whether image interpolation should be performed by
-	// a PDF processor.
-	Interpolate bool
-
-	// Alternates (optional) is an array of alternate image dictionaries for this image.
-	Alternates []*Dict
 
 	// SMask (optional; PDF 1.4) is a subsidiary image XObject defining a
 	// soft-mask image for transparency effects.
@@ -99,35 +89,53 @@ type Dict struct {
 	// 2 = image data includes premultiplied opacity channel
 	SMaskInData int
 
-	// Name is deprecated and should be left empty.
-	// Only used in PDF 1.0 where it was the name used to reference the image
-	// mask from within content streams.
-	Name pdf.Name
+	// Interpolate indicates whether image interpolation should be performed by
+	// a PDF processor.
+	Interpolate bool
+
+	// Alternates (optional) is an array of alternate image dictionaries for this image.
+	Alternates []*Dict
+
+	// OptionalContent (optional) allows to control the visibility of the image.
+	OptionalContent oc.Conditional
+
+	// Intent (optional) is the name of a color rendering intent to be used in
+	// rendering the image.
+	Intent graphics.RenderingIntent
 
 	// StructParent (required if the image is a structural content item)
 	// is the integer key of the image's entry in the structural parent tree.
 	StructParent structure.Key
 
-	// TODO(voss): ID
-	// TODO(voss): OPI
-
 	// Metadata (optional) is a metadata stream containing metadata for the image.
 	Metadata *metadata.Stream
 
-	// OptionalContent (optional) allows to control the visibility of the form.
-	OptionalContent oc.Conditional
+	// AssociatedFiles (optional; PDF 2.0) is an array of files associated with
+	// the image. The relationship that the associated files have to the
+	// XObject is supplied by the Specification.AFRelationship field.
+	//
+	// This corresponds to the AF entry in the image dictionary.
+	AssociatedFiles []*file.Specification
 
-	// TODO(voss): AF
-
+	// Measure (optional; PDF 2.0) specifies the scale and units that apply to
+	// the image.
 	Measure measure.Measure
 
 	// PtData (optional; PDF 2.0) contains extended geospatial point data.
 	PtData *measure.PtData
 
-	// WriteData is a function that writes the image data to the provided writer.
-	// The data should be written row by row, with each row containing
-	// Width * ColorSpace.Channels() samples, each sample using BitsPerComponent bits.
-	WriteData func(io.Writer) error
+	// WebCaptureID (optional) is the digital identifier of the image's parent
+	// Web Capture content set.
+	//
+	// This corresponds to the /ID entry in the image mask dictionary.
+	WebCaptureID *webcapture.Identifier
+
+	// TODO(voss): OPI
+
+	// Name is deprecated and should be left empty.
+	// Only used in PDF 1.0 where it was the name used to reference the image
+	// mask from within content streams.
+	Name pdf.Name
 }
 
 // ExtractDict extracts an image dictionary from a PDF stream.
@@ -367,6 +375,27 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		}
 	}
 
+	// Extract AssociatedFiles (AF)
+	if afArray, err := pdf.Optional(pdf.GetArray(x.R, dict["AF"])); err != nil {
+		return nil, err
+	} else if afArray != nil {
+		img.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
+		for _, afObj := range afArray {
+			if spec, err := pdf.ExtractorGetOptional(x, afObj, file.ExtractSpecification); err != nil {
+				return nil, err
+			} else if spec != nil {
+				img.AssociatedFiles = append(img.AssociatedFiles, spec)
+			}
+		}
+	}
+
+	// Extract WebCaptureID (ID)
+	if webID, err := pdf.ExtractorGetOptional(x, dict["ID"], webcapture.ExtractIdentifier); err != nil {
+		return nil, err
+	} else if webID != nil {
+		img.WebCaptureID = webID
+	}
+
 	// Create WriteData function as a closure
 	img.WriteData = func(w io.Writer) error {
 		stm, err := pdf.DecodeStream(x.R, stream, 0)
@@ -384,7 +413,7 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	return img, nil
 }
 
-var _ Image = (*Dict)(nil)
+var _ graphics.Image = (*Dict)(nil)
 
 // FromImage creates a Dict from an image.Image.
 // The ColorSpace and BitsPerComponent must be set appropriately for the image.
@@ -439,15 +468,15 @@ func writeImageData(w io.Writer, img image.Image, colorSpace color.Space, bitsPe
 
 			// TODO(voss): implement the remaining color spaces
 			case color.FamilyLab:
-				return errors.New("Lab color space not implemented")
+				return errors.New("color space Lab not implemented")
 			case color.FamilyICCBased:
-				return errors.New("ICCBased color space not implemented")
+				return errors.New("color space ICCBased not implemented")
 			case color.FamilyIndexed:
-				return errors.New("Indexed color space not implemented")
+				return errors.New("color space Indexed not implemented")
 			case color.FamilySeparation:
-				return errors.New("Separation color space not implemented")
+				return errors.New("color space Separation not implemented")
 			case color.FamilyDeviceN:
-				return errors.New("DeviceN color space not implemented")
+				return errors.New("color space DeviceN not implemented")
 			}
 		}
 
@@ -482,6 +511,7 @@ func FromImageWithMask(img image.Image, mask image.Image, colorSpace color.Space
 	return dict
 }
 
+// Embed adds the image to the PDF file and returns the embedded object.
 func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
@@ -603,6 +633,47 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 			return nil, zero, err
 		}
 		dict["StructParent"] = pdf.Integer(key)
+	}
+
+	if len(d.AssociatedFiles) > 0 {
+		if err := pdf.CheckVersion(rm.Out, "image dictionary AF entry", pdf.V2_0); err != nil {
+			return nil, zero, err
+		}
+
+		// Validate each file specification can be used as associated file
+		version := pdf.GetVersion(rm.Out)
+		for i, spec := range d.AssociatedFiles {
+			if spec == nil {
+				continue
+			}
+			if err := spec.CanBeAF(version); err != nil {
+				return nil, zero, fmt.Errorf("AssociatedFiles[%d]: %w", i, err)
+			}
+		}
+
+		// Embed the file specifications
+		var afArray pdf.Array
+		for _, spec := range d.AssociatedFiles {
+			if spec != nil {
+				embedded, _, err := pdf.ResourceManagerEmbed(rm, spec)
+				if err != nil {
+					return nil, zero, err
+				}
+				afArray = append(afArray, embedded)
+			}
+		}
+		dict["AF"] = afArray
+	}
+
+	if d.WebCaptureID != nil {
+		if err := pdf.CheckVersion(rm.Out, "image dictionary ID entry", pdf.V1_3); err != nil {
+			return nil, zero, err
+		}
+		embedded, _, err := pdf.ResourceManagerEmbed(rm, d.WebCaptureID)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["ID"] = embedded
 	}
 
 	ref := rm.Out.Alloc()
@@ -741,7 +812,7 @@ func (d *Dict) check(out *pdf.Writer) error {
 		// Validate soft mask dimensions match if Matte is present
 		if d.SMask.Matte != nil {
 			if d.SMask.Width != d.Width || d.SMask.Height != d.Height {
-				return errors.New("soft mask dimensions must match parent image when Matte is present")
+				return errors.New("soft mask dimensions mismatch")
 			}
 			// Validate Matte length matches color space channels
 			if len(d.SMask.Matte) != d.ColorSpace.Channels() {
@@ -751,12 +822,29 @@ func (d *Dict) check(out *pdf.Writer) error {
 		}
 	}
 
+	// Validate AssociatedFiles
+	if len(d.AssociatedFiles) > 0 {
+		if err := pdf.CheckVersion(out, "image dictionary AssociatedFiles entry", pdf.V2_0); err != nil {
+			return err
+		}
+
+		version := pdf.GetVersion(out)
+		for i, spec := range d.AssociatedFiles {
+			if spec == nil {
+				continue
+			}
+			if err := spec.CanBeAF(version); err != nil {
+				return fmt.Errorf("AssociatedFiles[%d]: %w", i, err)
+			}
+		}
+	}
+
 	return nil
 }
 
 // Bounds returns the dimensions of the image.
-func (d *Dict) Bounds() Rectangle {
-	return Rectangle{
+func (d *Dict) Bounds() graphics.Rectangle {
+	return graphics.Rectangle{
 		XMin: 0,
 		YMin: 0,
 		XMax: d.Width,

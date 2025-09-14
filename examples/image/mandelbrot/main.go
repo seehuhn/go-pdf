@@ -44,7 +44,10 @@ func run(fname string) error {
 	}
 
 	imageData := mandelbrot()
-	img := &pdfimage.PNG{Data: imageData}
+	img, err := pdfimage.PNG(imageData, nil)
+	if err != nil {
+		return err
+	}
 
 	b := imageData.Bounds()
 	q := float64(b.Dx()) / float64(b.Dy())

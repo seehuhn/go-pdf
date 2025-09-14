@@ -50,7 +50,7 @@ func (r *PixelRow) Bytes() []byte {
 }
 
 // AppendBits appends the specified number of bits to the row.
-// Only the low-order numBits bits of the value are used.
+// Only the low-order bitsPerElem bits of the value are used.
 func (r *PixelRow) AppendBits(bits uint16) {
 	bitsToDo := r.numBits
 

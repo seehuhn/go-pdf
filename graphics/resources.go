@@ -41,3 +41,24 @@ type Halftone interface {
 
 	pdf.Embedder[pdf.Unused]
 }
+
+// Image represents a raster image which can be embedded in a PDF file.
+type Image interface {
+	XObject
+	Bounds() Rectangle
+}
+
+// Rectangle gives the dimensions of an image.
+type Rectangle struct {
+	XMin, YMin, XMax, YMax int
+}
+
+// Dx returns the width of the rectangle.
+func (r Rectangle) Dx() int {
+	return r.XMax - r.XMin
+}
+
+// Dy returns the height of the rectangle.
+func (r Rectangle) Dy() int {
+	return r.YMax - r.YMin
+}

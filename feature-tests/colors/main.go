@@ -111,9 +111,9 @@ func showCalRGBColors(doc *document.MultiPage, F font.Layouter) error {
 			imgData.Pix[idx+3] = 255
 		}
 	}
-	img := &image.PNG{
-		Data:       imgData,
-		ColorSpace: CalRGB,
+	img, err := image.PNG(imgData, CalRGB)
+	if err != nil {
+		return err
 	}
 
 	page.PushGraphicsState()
@@ -160,9 +160,9 @@ func showLabColors(doc *document.MultiPage, F font.Layouter) error {
 			imgData.Pix[idx+3] = 255
 		}
 	}
-	img := &image.PNG{
-		Data:       imgData,
-		ColorSpace: Lab,
+	img, err := image.PNG(imgData, Lab)
+	if err != nil {
+		return err
 	}
 
 	page := doc.AddPage()

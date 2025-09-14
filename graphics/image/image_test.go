@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
@@ -30,10 +31,10 @@ import (
 )
 
 var (
-	_ graphics.XObject = Image(nil)
+	_ graphics.XObject = graphics.Image(nil)
 )
 
-// TestPNGRefactored verifies that the refactored PNG implementation works correctly.
+// TestPNGRefactored verifies that the PNG function creates proper Dict objects.
 func TestPNGRefactored(t *testing.T) {
 	writer, _ := memfile.NewPDFWriter(pdf.V1_4, nil)
 	rm := pdf.NewResourceManager(writer)
@@ -48,27 +49,45 @@ func TestPNGRefactored(t *testing.T) {
 		}
 	}
 
-	// Test PNG without explicit color space (should default to DeviceRGB)
-	png1 := &PNG{Data: testImg}
-	ref1, _, err := pdf.ResourceManagerEmbed(rm, png1)
+	// Test PNG function without explicit color space (should default to DeviceRGB)
+	dict1, err := PNG(testImg, nil)
 	if err != nil {
-		t.Fatalf("Failed to embed PNG: %v", err)
+		t.Fatalf("PNG function failed: %v", err)
+	}
+	if dict1 == nil {
+		t.Fatal("PNG function returned nil dict")
+	}
+	if dict1.ColorSpace != color.SpaceDeviceRGB {
+		t.Errorf("PNG function didn't default to DeviceRGB, got %v", dict1.ColorSpace)
+	}
+	if dict1.SMask == nil {
+		t.Error("PNG function should have created soft mask for image with alpha")
+	}
+
+	// Test embedding the dict
+	ref1, _, err := pdf.ResourceManagerEmbed(rm, dict1)
+	if err != nil {
+		t.Fatalf("Failed to embed PNG dict: %v", err)
 	}
 	if ref1 == nil {
-		t.Error("PNG embedding returned nil reference")
+		t.Error("PNG dict embedding returned nil reference")
 	}
 
 	// Test PNG with explicit color space
-	png2 := &PNG{
-		Data:       testImg,
-		ColorSpace: color.SpaceDeviceRGB,
-	}
-	ref2, _, err := pdf.ResourceManagerEmbed(rm, png2)
+	dict2, err := PNG(testImg, color.SpaceDeviceRGB)
 	if err != nil {
-		t.Fatalf("Failed to embed PNG with explicit ColorSpace: %v", err)
+		t.Fatalf("PNG function with ColorSpace failed: %v", err)
+	}
+	if dict2.ColorSpace != color.SpaceDeviceRGB {
+		t.Errorf("PNG function didn't use explicit ColorSpace, got %v", dict2.ColorSpace)
+	}
+
+	ref2, _, err := pdf.ResourceManagerEmbed(rm, dict2)
+	if err != nil {
+		t.Fatalf("Failed to embed PNG dict with explicit ColorSpace: %v", err)
 	}
 	if ref2 == nil {
-		t.Error("PNG embedding with ColorSpace returned nil reference")
+		t.Error("PNG dict embedding with ColorSpace returned nil reference")
 	}
 
 	// Test PNG with opaque image (no alpha channel)
@@ -78,13 +97,26 @@ func TestPNGRefactored(t *testing.T) {
 	opaqueImg.Set(0, 1, gocol.RGBA{R: 0, G: 0, B: 255, A: 255})
 	opaqueImg.Set(1, 1, gocol.RGBA{R: 255, G: 255, B: 0, A: 255})
 
-	png3 := &PNG{Data: opaqueImg}
-	ref3, _, err := pdf.ResourceManagerEmbed(rm, png3)
+	dict3, err := PNG(opaqueImg, nil)
 	if err != nil {
-		t.Fatalf("Failed to embed opaque PNG: %v", err)
+		t.Fatalf("PNG function with opaque image failed: %v", err)
+	}
+	if dict3.SMask != nil {
+		t.Error("PNG function should not create soft mask for opaque image")
+	}
+
+	ref3, _, err := pdf.ResourceManagerEmbed(rm, dict3)
+	if err != nil {
+		t.Fatalf("Failed to embed opaque PNG dict: %v", err)
 	}
 	if ref3 == nil {
-		t.Error("Opaque PNG embedding returned nil reference")
+		t.Error("Opaque PNG dict embedding returned nil reference")
+	}
+
+	// Test error handling
+	_, err = PNG(nil, nil)
+	if err == nil {
+		t.Error("PNG function should return error for nil image")
 	}
 
 	// Close resource manager and writer
@@ -97,14 +129,20 @@ func TestPNGRefactored(t *testing.T) {
 		t.Fatalf("Failed to close writer: %v", err)
 	}
 
-	// Verify PNG implements Image interface correctly
-	if png1.Subtype() != "Image" {
-		t.Errorf("PNG Subtype() returned %q, want %q", png1.Subtype(), "Image")
+	// Verify Dict implements Image interface correctly
+	if dict1.Subtype() != "Image" {
+		t.Errorf("Dict Subtype() returned %q, want %q", dict1.Subtype(), "Image")
 	}
 
-	bounds := png1.Bounds()
+	bounds := dict1.Bounds()
 	if bounds.XMin != 0 || bounds.YMin != 0 || bounds.XMax != 4 || bounds.YMax != 4 {
-		t.Errorf("PNG Bounds() returned %+v, want {XMin:0 YMin:0 XMax:4 YMax:4}", bounds)
+		t.Errorf("Dict Bounds() returned %+v, want {XMin:0 YMin:0 XMax:4 YMax:4}", bounds)
+	}
+
+	// Test that PNG Dict can now use AssociatedFiles (new functionality!)
+	if dict1.AssociatedFiles == nil {
+		// This is expected - just verify the field exists
+		dict1.AssociatedFiles = []*file.Specification{} // Should compile without error
 	}
 }
 

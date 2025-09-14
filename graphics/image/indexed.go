@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -42,19 +43,19 @@ func NewIndexed(width, height int, cs color.Space) *Indexed {
 }
 
 // Bounds returns the image bounds.
-// This implements the [Image] interface.
-func (im *Indexed) Bounds() Rectangle {
-	return Rectangle{XMax: im.Width, YMax: im.Height}
+// This implements the [graphics.Image] interface.
+func (im *Indexed) Bounds() graphics.Rectangle {
+	return graphics.Rectangle{XMax: im.Width, YMax: im.Height}
 }
 
 // Subtype returns /Image.
-// This implements the [Image] interface.
+// This implements the [graphics.Image] interface.
 func (im *Indexed) Subtype() pdf.Name {
 	return "Image"
 }
 
 // Embed adds the image to the PDF file.
-// This implements the [Image] interface.
+// This implements the [graphics.Image] interface.
 func (im *Indexed) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	cs, ok := im.ColorSpace.(*color.SpaceIndexed)

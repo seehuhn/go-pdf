@@ -19,7 +19,7 @@ package file
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/collection"
-	"seehuhn.de/go/pdf/graphics/image"
+	"seehuhn.de/go/pdf/graphics/image/thumbnail"
 )
 
 // PDF 2.0 sections: 7.11.3 7.11.4
@@ -82,7 +82,7 @@ type Specification struct {
 	Description string
 
 	// Thumbnail (PDF 2.0) references a thumbnail image stream for the file.
-	Thumbnail *image.Thumbnail
+	Thumbnail *thumbnail.Thumbnail
 
 	// ID contains an identifier for the described file, as two byte strings.
 	ID []string
@@ -239,7 +239,7 @@ func ExtractSpecification(x *pdf.Extractor, obj pdf.Object) (*Specification, err
 	}
 
 	// Thumbnail
-	if thumb, err := pdf.ExtractorGetOptional(x, dict["Thumb"], image.ExtractThumbnail); err != nil {
+	if thumb, err := pdf.ExtractorGetOptional(x, dict["Thumb"], thumbnail.ExtractThumbnail); err != nil {
 		return nil, err
 	} else {
 		spec.Thumbnail = thumb
@@ -490,3 +490,37 @@ const (
 	RelationshipSchema           Relationship = "Schema"
 	RelationshipUnspecified      Relationship = "Unspecified"
 )
+
+// CanBeAF checks if this file specification can be used as an associated file
+// for the given PDF version. Returns an error if requirements are not met.
+func (spec *Specification) CanBeAF(v pdf.Version) error {
+	// Associated files require PDF 2.0
+	if v < pdf.V2_0 {
+		return pdf.Errorf("associated files require PDF 2.0 or later")
+	}
+
+	// Must have at least one file name
+	if spec.FileName == "" && spec.FileNameUnicode == "" &&
+		spec.FileNameDOS == "" && spec.FileNameMac == "" && spec.FileNameUnix == "" {
+		return pdf.Errorf("file specification must have at least one file name")
+	}
+
+	// Check embedded file requirements (per spec 14.13.2)
+	for key, stream := range spec.EmbeddedFiles {
+		if stream == nil {
+			continue
+		}
+
+		// Subtype (MIME type) is required for associated files
+		if stream.MimeType == "" {
+			return pdf.Errorf("embedded file %q must have Subtype (MIME type) for associated files", key)
+		}
+
+		// ModDate is required in Params for associated files
+		if stream.ModDate.IsZero() {
+			return pdf.Errorf("embedded file %q must have ModDate in Params for associated files", key)
+		}
+	}
+
+	return nil
+}
