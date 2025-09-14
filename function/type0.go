@@ -17,6 +17,7 @@
 package function
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -684,4 +685,42 @@ func interpolateCatmullRom(t, p0, p1, p2, p3 float64) float64 {
 // The parameter t is in [0, 1], interpolating between p1 and p2.
 func interpolateQuadratic(t, p1, p2, p3 float64) float64 {
 	return interpolateCatmullRom(t, p1, p1, p2, p3)
+}
+
+// Equal reports whether f and other represent the same Type0 function.
+func (f *Type0) Equal(other *Type0) bool {
+	if f == nil || other == nil {
+		return f == other
+	}
+
+	if !floatSlicesEqual(f.Domain, other.Domain, floatEpsilon) {
+		return false
+	}
+	if !floatSlicesEqual(f.Range, other.Range, floatEpsilon) {
+		return false
+	}
+
+	if !intSlicesEqual(f.Size, other.Size) {
+		return false
+	}
+
+	if f.BitsPerSample != other.BitsPerSample {
+		return false
+	}
+	if f.UseCubic != other.UseCubic {
+		return false
+	}
+
+	if !floatSlicesEqual(f.Encode, other.Encode, floatEpsilon) {
+		return false
+	}
+	if !floatSlicesEqual(f.Decode, other.Decode, floatEpsilon) {
+		return false
+	}
+
+	if !bytes.Equal(f.Samples, other.Samples) {
+		return false
+	}
+
+	return true
 }

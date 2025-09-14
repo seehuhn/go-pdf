@@ -54,7 +54,7 @@ func (im *PNG) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	// Determine color space
 	cs := im.ColorSpace
 	if cs == nil {
-		cs = color.DeviceRGBSpace
+		cs = color.SpaceDeviceRGB
 	}
 
 	// Create main image dict using existing Dict functionality

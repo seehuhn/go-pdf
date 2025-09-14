@@ -75,7 +75,7 @@ var testColorSpaces = []Space{
 
 	must(Indexed([]Color{DeviceRGB(0, 0, 0), DeviceRGB(1, 1, 1)})),
 
-	must(Separation("foo", DeviceRGBSpace, &function.Type2{
+	must(Separation("foo", SpaceDeviceRGB, &function.Type2{
 		XMin: 0,
 		XMax: 1,
 		C0:   []float64{1, 0, 0},
@@ -83,7 +83,7 @@ var testColorSpaces = []Space{
 		N:    1,
 	})),
 
-	must(DeviceN([]pdf.Name{"bar"}, DeviceRGBSpace, &function.Type2{
+	must(DeviceN([]pdf.Name{"bar"}, SpaceDeviceRGB, &function.Type2{
 		XMin: 0,
 		XMax: 1,
 		C0:   []float64{1, 0, 0},

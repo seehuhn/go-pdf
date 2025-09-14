@@ -370,7 +370,7 @@ func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
 	}
 
 	shadingData := &shading.Type3{
-		ColorSpace:  color.DeviceRGBSpace,
+		ColorSpace:  color.SpaceDeviceRGB,
 		Center1:     vec.Vec2{X: 100, Y: 350},
 		R1:          10,
 		Center2:     vec.Vec2{X: 500, Y: 750},

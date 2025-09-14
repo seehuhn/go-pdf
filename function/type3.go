@@ -19,6 +19,7 @@ package function
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"seehuhn.de/go/pdf"
 )
@@ -291,4 +292,42 @@ func (f *Type3) findSubdomain(x float64) (int, float64, float64) {
 	}
 
 	return len(f.Functions) - 1, left, domain1
+}
+
+// Equal reports whether f and other represent the same Type3 function.
+func (f *Type3) Equal(other *Type3) bool {
+	if f == nil || other == nil {
+		return f == other
+	}
+
+	if math.Abs(f.XMin-other.XMin) > floatEpsilon {
+		return false
+	}
+	if math.Abs(f.XMax-other.XMax) > floatEpsilon {
+		return false
+	}
+
+	if !floatSlicesEqual(f.Range, other.Range, floatEpsilon) {
+		return false
+	}
+
+	// compare child functions recursively
+	if len(f.Functions) != len(other.Functions) {
+		return false
+	}
+	for i := range f.Functions {
+		if !Equal(f.Functions[i], other.Functions[i]) {
+			return false
+		}
+	}
+
+	if !floatSlicesEqual(f.Bounds, other.Bounds, floatEpsilon) {
+		return false
+	}
+
+	if !floatSlicesEqual(f.Encode, other.Encode, floatEpsilon) {
+		return false
+	}
+
+	return true
 }

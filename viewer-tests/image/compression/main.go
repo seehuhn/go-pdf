@@ -71,14 +71,14 @@ func createDocument(filename string) error {
 		Range:   []float64{0, 1, 0, 1, 0, 1, 0, 1},
 		Program: "pop",
 	}
-	funny, err := color.DeviceN([]pdf.Name{"Cyan", "Magenta", "Yellow", "Black", "Gold"}, color.DeviceCMYKSpace, F5To4, nil)
+	funny, err := color.DeviceN([]pdf.Name{"Cyan", "Magenta", "Yellow", "Black", "Gold"}, color.SpaceDeviceCMYK, F5To4, nil)
 	if err != nil {
 		return err
 	}
 	csMap := map[int]color.Space{
-		1: color.DeviceGraySpace,
-		3: color.DeviceRGBSpace,
-		4: color.DeviceCMYKSpace,
+		1: color.SpaceDeviceGray,
+		3: color.SpaceDeviceRGB,
+		4: color.SpaceDeviceCMYK,
 		5: funny,
 	}
 

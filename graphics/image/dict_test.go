@@ -50,7 +50,7 @@ var testCases = []struct {
 		data: &Dict{
 			Width:            100,
 			Height:           50,
-			ColorSpace:       color.DeviceRGBSpace,
+			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 8,
 			WriteData: func(w io.Writer) error {
 				// Simple test pattern: alternating red and blue pixels
@@ -79,7 +79,7 @@ var testCases = []struct {
 		data: &Dict{
 			Width:            25,
 			Height:           25,
-			ColorSpace:       color.DeviceGraySpace,
+			ColorSpace:       color.SpaceDeviceGray,
 			BitsPerComponent: 8,
 			Interpolate:      true,
 			WriteData: func(w io.Writer) error {
@@ -102,7 +102,7 @@ var testCases = []struct {
 		data: &Dict{
 			Width:            10,
 			Height:           10,
-			ColorSpace:       color.DeviceCMYKSpace,
+			ColorSpace:       color.SpaceDeviceCMYK,
 			BitsPerComponent: 8,
 			Decode:           []float64{0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0},
 			WriteData: func(w io.Writer) error {
@@ -128,7 +128,7 @@ var testCases = []struct {
 		data: &Dict{
 			Width:            20,
 			Height:           20,
-			ColorSpace:       color.DeviceRGBSpace,
+			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 8,
 			Intent:           graphics.RenderingIntent("Perceptual"),
 			WriteData: func(w io.Writer) error {
@@ -148,7 +148,7 @@ var testCases = []struct {
 		data: &Dict{
 			Width:            15,
 			Height:           15,
-			ColorSpace:       color.DeviceRGBSpace,
+			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 8,
 			MaskColors:       []uint16{0, 10, 0, 10, 0, 10}, // mask near-black pixels
 			WriteData: func(w io.Writer) error {
@@ -178,7 +178,7 @@ var testCases = []struct {
 		data: &Dict{
 			Width:            8,
 			Height:           8,
-			ColorSpace:       color.DeviceRGBSpace,
+			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 8,
 			SMask: &SoftMask{
 				Width:            8,
@@ -219,7 +219,7 @@ var testCases = []struct {
 		data: &Dict{
 			Width:            4,
 			Height:           4,
-			ColorSpace:       color.DeviceRGBSpace,
+			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 8,
 			SMask: &SoftMask{
 				Width:            4,
@@ -257,7 +257,7 @@ var testCases = []struct {
 		data: &Dict{
 			Width:            6,
 			Height:           6,
-			ColorSpace:       color.DeviceRGBSpace,
+			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 8,
 			SMaskInData:      1, // image data includes encoded soft-mask values
 			WriteData: func(w io.Writer) error {
@@ -280,7 +280,7 @@ var testCases = []struct {
 		data: &Dict{
 			Width:            16,
 			Height:           16,
-			ColorSpace:       color.DeviceGraySpace,
+			ColorSpace:       color.SpaceDeviceGray,
 			BitsPerComponent: 1,
 			WriteData: func(w io.Writer) error {
 				// Checkerboard pattern in 1-bit
@@ -305,7 +305,7 @@ var testCases = []struct {
 		data: &Dict{
 			Width:            5,
 			Height:           5,
-			ColorSpace:       color.DeviceRGBSpace,
+			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 16,
 			WriteData: func(w io.Writer) error {
 				// High precision RGB data
@@ -334,13 +334,13 @@ var testCases = []struct {
 		data: &Dict{
 			Width:            12,
 			Height:           12,
-			ColorSpace:       color.DeviceGraySpace,
+			ColorSpace:       color.SpaceDeviceGray,
 			BitsPerComponent: 8,
 			Alternates: []*Dict{
 				{
 					Width:            12,
 					Height:           12,
-					ColorSpace:       color.DeviceRGBSpace,
+					ColorSpace:       color.SpaceDeviceRGB,
 					BitsPerComponent: 8,
 					WriteData: func(w io.Writer) error {
 						// RGB version
@@ -372,7 +372,7 @@ var testCases = []struct {
 		data: &Dict{
 			Width:            8,
 			Height:           8,
-			ColorSpace:       color.DeviceGraySpace,
+			ColorSpace:       color.SpaceDeviceGray,
 			BitsPerComponent: 8,
 			// Skip metadata for now - requires properly initialized XMP packet
 			WriteData: func(w io.Writer) error {
@@ -393,7 +393,7 @@ var testCases = []struct {
 		data: &Dict{
 			Width:            6,
 			Height:           6,
-			ColorSpace:       color.DeviceRGBSpace,
+			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 8,
 			Measure: &measure.RectilinearMeasure{
 				ScaleRatio: "1:1000", // 1:1000 scale
@@ -433,7 +433,7 @@ var testCases = []struct {
 		data: &Dict{
 			Width:            10,
 			Height:           10,
-			ColorSpace:       color.DeviceRGBSpace,
+			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 8,
 			OptionalContent: &oc.Group{
 				Name:   "TestLayer",
@@ -459,7 +459,7 @@ var testCases = []struct {
 		data: &Dict{
 			Width:            1,
 			Height:           1,
-			ColorSpace:       color.DeviceRGBSpace,
+			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 16,
 			StructParent:     structure.NewKey(0),
 			WriteData: func(w io.Writer) error {
@@ -474,7 +474,7 @@ var testCases = []struct {
 		data: &Dict{
 			Width:            1,
 			Height:           1,
-			ColorSpace:       color.DeviceRGBSpace,
+			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 16,
 			StructParent:     structure.NewKey(42),
 			WriteData: func(w io.Writer) error {

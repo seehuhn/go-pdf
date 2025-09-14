@@ -245,3 +245,34 @@ func (f *Type2) Apply(inputs ...float64) []float64 {
 
 	return outputs
 }
+
+// Equal reports whether f and other represent the same Type2 function.
+func (f *Type2) Equal(other *Type2) bool {
+	if f == nil || other == nil {
+		return f == other
+	}
+
+	if math.Abs(f.XMin-other.XMin) > floatEpsilon {
+		return false
+	}
+	if math.Abs(f.XMax-other.XMax) > floatEpsilon {
+		return false
+	}
+
+	if !floatSlicesEqual(f.Range, other.Range, floatEpsilon) {
+		return false
+	}
+
+	if !floatSlicesEqual(f.C0, other.C0, floatEpsilon) {
+		return false
+	}
+	if !floatSlicesEqual(f.C1, other.C1, floatEpsilon) {
+		return false
+	}
+
+	if math.Abs(f.N-other.N) > floatEpsilon {
+		return false
+	}
+
+	return true
+}

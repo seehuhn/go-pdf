@@ -76,3 +76,12 @@ func (s *Stream) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 
 	return ref, zero, nil
 }
+
+// Equal reports whether s and other represent the same XMP metadata.
+func (s *Stream) Equal(other *Stream) bool {
+	if s == nil || other == nil {
+		return s == other
+	}
+
+	return s.Data.Equal(other.Data)
+}

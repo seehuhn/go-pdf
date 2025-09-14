@@ -331,3 +331,25 @@ var allowedOps = []string{
 	// Stack operators
 	"copy", "dup", "exch", "index", "pop", "roll",
 }
+
+// Equal reports whether f and other represent the same Type4 function.
+func (f *Type4) Equal(other *Type4) bool {
+	if f == nil || other == nil {
+		return f == other
+	}
+
+	if !floatSlicesEqual(f.Domain, other.Domain, floatEpsilon) {
+		return false
+	}
+
+	if !floatSlicesEqual(f.Range, other.Range, floatEpsilon) {
+		return false
+	}
+
+	// compare program (exact string comparison)
+	if f.Program != other.Program {
+		return false
+	}
+
+	return true
+}

@@ -36,7 +36,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "basic Type1",
 			shading: &Type1{
-				ColorSpace: color.DeviceRGBSpace,
+				ColorSpace: color.SpaceDeviceRGB,
 				F: &function.Type0{
 					Domain:        []float64{0, 1, 0, 1},
 					Range:         []float64{0, 1, 0, 1, 0, 1},
@@ -51,7 +51,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type1 with background and bbox",
 			shading: &Type1{
-				ColorSpace: color.DeviceRGBSpace,
+				ColorSpace: color.SpaceDeviceRGB,
 				F: &function.Type0{
 					Domain:        []float64{0, 1, 0, 1},
 					Range:         []float64{0, 1, 0, 1, 0, 1},
@@ -69,7 +69,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type1 with custom domain and matrix",
 			shading: &Type1{
-				ColorSpace: color.DeviceRGBSpace,
+				ColorSpace: color.SpaceDeviceRGB,
 				F: &function.Type0{
 					Domain:        []float64{-1, 1, -1, 1},
 					Range:         []float64{0, 1, 0, 1, 0, 1},
@@ -88,7 +88,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "basic Type2",
 			shading: &Type2{
-				ColorSpace: color.DeviceRGBSpace,
+				ColorSpace: color.SpaceDeviceRGB,
 				P0:         vec.Vec2{X: 0, Y: 0},
 				P1:         vec.Vec2{X: 100, Y: 100},
 				F: &function.Type2{
@@ -102,7 +102,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type2 with extend and domain",
 			shading: &Type2{
-				ColorSpace: color.DeviceRGBSpace,
+				ColorSpace: color.SpaceDeviceRGB,
 				P0:         vec.Vec2{X: 10, Y: 20},
 				P1:         vec.Vec2{X: 90, Y: 80},
 				F: &function.Type2{
@@ -122,7 +122,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type2 with bbox",
 			shading: &Type2{
-				ColorSpace: color.DeviceRGBSpace,
+				ColorSpace: color.SpaceDeviceRGB,
 				P0:         vec.Vec2{X: 0, Y: 0},
 				P1:         vec.Vec2{X: 50, Y: 50},
 				F: &function.Type2{
@@ -139,7 +139,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "basic Type3",
 			shading: &Type3{
-				ColorSpace: color.DeviceRGBSpace,
+				ColorSpace: color.SpaceDeviceRGB,
 				Center1:    vec.Vec2{X: 20, Y: 30},
 				R1:         0,
 				Center2:    vec.Vec2{X: 80, Y: 70},
@@ -155,7 +155,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type3 with extend and domain",
 			shading: &Type3{
-				ColorSpace: color.DeviceRGBSpace,
+				ColorSpace: color.SpaceDeviceRGB,
 				Center1:    vec.Vec2{X: 50, Y: 50},
 				R1:         10,
 				Center2:    vec.Vec2{X: 50, Y: 50},
@@ -180,7 +180,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "basic Type4",
 			shading: &Type4{
-				ColorSpace:        color.DeviceRGBSpace,
+				ColorSpace:        color.SpaceDeviceRGB,
 				BitsPerCoordinate: 16,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -195,7 +195,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type4 with function",
 			shading: &Type4{
-				ColorSpace:        color.DeviceRGBSpace,
+				ColorSpace:        color.SpaceDeviceRGB,
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -222,7 +222,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "basic Type5",
 			shading: &Type5{
-				ColorSpace:        color.DeviceRGBSpace,
+				ColorSpace:        color.SpaceDeviceRGB,
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				VerticesPerRow:    2,
@@ -240,7 +240,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type5 with function",
 			shading: &Type5{
-				ColorSpace:        color.DeviceRGBSpace,
+				ColorSpace:        color.SpaceDeviceRGB,
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				VerticesPerRow:    3,
@@ -271,7 +271,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "basic Type6",
 			shading: &Type6{
-				ColorSpace:        color.DeviceRGBSpace,
+				ColorSpace:        color.SpaceDeviceRGB,
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -294,7 +294,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type6 with function",
 			shading: &Type6{
-				ColorSpace:        color.DeviceRGBSpace,
+				ColorSpace:        color.SpaceDeviceRGB,
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -326,7 +326,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type6 with connected patches",
 			shading: &Type6{
-				ColorSpace:        color.DeviceRGBSpace,
+				ColorSpace:        color.SpaceDeviceRGB,
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -364,7 +364,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "basic Type7",
 			shading: &Type7{
-				ColorSpace:        color.DeviceRGBSpace,
+				ColorSpace:        color.SpaceDeviceRGB,
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -390,7 +390,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type7 with function",
 			shading: &Type7{
-				ColorSpace:        color.DeviceRGBSpace,
+				ColorSpace:        color.SpaceDeviceRGB,
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -424,7 +424,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type7 with connected patches",
 			shading: &Type7{
-				ColorSpace:        color.DeviceRGBSpace,
+				ColorSpace:        color.SpaceDeviceRGB,
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -533,7 +533,7 @@ func TestShadingEvaluation(t *testing.T) {
 		{
 			name: "Type1 evaluation",
 			shading: &Type1{
-				ColorSpace: color.DeviceRGBSpace,
+				ColorSpace: color.SpaceDeviceRGB,
 				F: &function.Type0{
 					Domain:        []float64{0, 1, 0, 1},
 					Range:         []float64{0, 1, 0, 1, 0, 1},
@@ -548,7 +548,7 @@ func TestShadingEvaluation(t *testing.T) {
 		{
 			name: "Type2 evaluation",
 			shading: &Type2{
-				ColorSpace: color.DeviceRGBSpace,
+				ColorSpace: color.SpaceDeviceRGB,
 				P0:         vec.Vec2{X: 0, Y: 0},
 				P1:         vec.Vec2{X: 100, Y: 100},
 				F: &function.Type2{
@@ -562,7 +562,7 @@ func TestShadingEvaluation(t *testing.T) {
 		{
 			name: "Type3 evaluation",
 			shading: &Type3{
-				ColorSpace: color.DeviceRGBSpace,
+				ColorSpace: color.SpaceDeviceRGB,
 				Center1:    vec.Vec2{X: 50, Y: 50},
 				R1:         0,
 				Center2:    vec.Vec2{X: 50, Y: 50},
@@ -578,7 +578,7 @@ func TestShadingEvaluation(t *testing.T) {
 		{
 			name: "Type4 evaluation",
 			shading: &Type4{
-				ColorSpace:        color.DeviceRGBSpace,
+				ColorSpace:        color.SpaceDeviceRGB,
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -593,7 +593,7 @@ func TestShadingEvaluation(t *testing.T) {
 		{
 			name: "Type5 evaluation",
 			shading: &Type5{
-				ColorSpace:        color.DeviceRGBSpace,
+				ColorSpace:        color.SpaceDeviceRGB,
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				VerticesPerRow:    2,
@@ -609,7 +609,7 @@ func TestShadingEvaluation(t *testing.T) {
 		{
 			name: "Type6 evaluation",
 			shading: &Type6{
-				ColorSpace:        color.DeviceRGBSpace,
+				ColorSpace:        color.SpaceDeviceRGB,
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -632,7 +632,7 @@ func TestShadingEvaluation(t *testing.T) {
 		{
 			name: "Type7 evaluation",
 			shading: &Type7{
-				ColorSpace:        color.DeviceRGBSpace,
+				ColorSpace:        color.SpaceDeviceRGB,
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,

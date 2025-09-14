@@ -384,11 +384,11 @@ func (w *writer) test2DStrip(f pdf.Function) error {
 	var cs color.Space
 	switch n {
 	case 1:
-		cs = color.DeviceGraySpace
+		cs = color.SpaceDeviceGray
 	case 3:
-		cs = color.DeviceRGBSpace
+		cs = color.SpaceDeviceRGB
 	case 4:
-		cs = color.DeviceCMYKSpace
+		cs = color.SpaceDeviceCMYK
 	default:
 		return fmt.Errorf("unsupported function shape: %d->%d", m, n)
 	}
@@ -463,11 +463,11 @@ func (w *writer) test1DStrip(f pdf.Function) error {
 	var cs color.Space
 	switch n {
 	case 1:
-		cs = color.DeviceGraySpace
+		cs = color.SpaceDeviceGray
 	case 3:
-		cs = color.DeviceRGBSpace
+		cs = color.SpaceDeviceRGB
 	case 4:
-		cs = color.DeviceCMYKSpace
+		cs = color.SpaceDeviceCMYK
 	default:
 		return fmt.Errorf("unsupported function shape: 1->%d", n)
 	}

@@ -46,5 +46,5 @@ seehuhn.de/go/postscript v0.6.1-0.20250805053126-20e516ce5746 h1:8TMAKT0lb7O9462
 seehuhn.de/go/postscript v0.6.1-0.20250805053126-20e516ce5746/go.mod h1:4I4yRcH36bqiGfKOV2x2jDmXhgONtrMUlbytC5jojDE=
 seehuhn.de/go/sfnt v0.6.1-0.20250805053320-86c13f5239b6 h1:k2mP4g7jVpOgmV3lu1fTTPBOT8QgLjSFtPnLxmsPDcA=
 seehuhn.de/go/sfnt v0.6.1-0.20250805053320-86c13f5239b6/go.mod h1:9SmEkGvowA9ZO/IUGI/Z1PHIIsvukG/sIubOhqYDiGI=
-seehuhn.de/go/xmp v0.3.0 h1:663c5gVv5fJfpKFpWKE0d/LlnPaPXJpD6WHRSEnESzo=
-seehuhn.de/go/xmp v0.3.0/go.mod h1:SrC9BllbJBp04/oRT6saWHvy0Eg9rxnRam/1BRIHp8E=
+seehuhn.de/go/xmp v0.3.1-0.20250914024658-99b3372159f4 h1:dnsdOXaqtmsRlKsdP8+0pLWyFOomikQH4+KbJsfLN7k=
+seehuhn.de/go/xmp v0.3.1-0.20250914024658-99b3372159f4/go.mod h1:jGgG+sBWq1z1L4NdE/QPTiiy4MH5c7YSWFFUfDJM6MI=

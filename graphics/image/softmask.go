@@ -100,7 +100,7 @@ func (sm *SoftMask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 	}
 
 	// Soft-mask images must always use DeviceGray color space
-	csEmbedded, _, err := pdf.ResourceManagerEmbed(rm, color.DeviceGraySpace)
+	csEmbedded, _, err := pdf.ResourceManagerEmbed(rm, color.SpaceDeviceGray)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -149,7 +149,7 @@ func (sm *SoftMask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 
 	w, err := rm.Out.OpenStream(ref, dict, compress)
 	if err != nil {
-		return nil, zero, fmt.Errorf("cannot open soft mask stream: %w", err)
+		return nil, zero, err
 	}
 
 	err = sm.WriteData(w)
@@ -202,34 +202,21 @@ func (sm *SoftMask) check(out *pdf.Writer) error {
 
 // ExtractSoftMask extracts a soft-mask image from a PDF stream.
 func ExtractSoftMask(r pdf.Getter, obj pdf.Object) (*SoftMask, error) {
-	stream, err := pdf.GetStream(r, obj)
+	stm, err := pdf.GetStream(r, obj)
 	if err != nil {
 		return nil, err
-	} else if stream == nil {
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("missing soft mask stream"),
-		}
+	} else if stm == nil {
+		return nil, pdf.Error("missing soft mask stream")
 	}
-	dict := stream.Dict
+	dict := stm.Dict
 
 	// Check Type and Subtype
-	typeName, _ := pdf.GetDictTyped(r, obj, "XObject")
-	if typeName == nil {
-		// Type is optional, but if present must be XObject
-		if t, err := pdf.Optional(pdf.GetName(r, dict["Type"])); err != nil {
-			return nil, err
-		} else if t != "" && t != "XObject" {
-			return nil, &pdf.MalformedFileError{
-				Err: fmt.Errorf("invalid Type %q for soft mask XObject", t),
-			}
-		}
-	}
-
-	subtypeName, err := pdf.Optional(pdf.GetName(r, dict["Subtype"]))
-	if err != nil {
+	if err := pdf.CheckDictType(r, dict, "XObject"); err != nil {
 		return nil, err
 	}
-	if subtypeName != "Image" {
+	if subtypeName, err := pdf.Optional(pdf.GetName(r, dict["Subtype"])); err != nil {
+		return nil, err
+	} else if subtypeName != "Image" && subtypeName != "" {
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("invalid Subtype %q for soft mask XObject", subtypeName),
 		}
@@ -239,7 +226,7 @@ func ExtractSoftMask(r pdf.Getter, obj pdf.Object) (*SoftMask, error) {
 	if csObj, ok := dict["ColorSpace"]; ok {
 		cs, err := color.ExtractSpace(r, csObj)
 		if err != nil {
-			return nil, fmt.Errorf("invalid ColorSpace: %w", err)
+			return nil, err
 		}
 		if cs.Family() != color.FamilyDeviceGray {
 			return nil, &pdf.MalformedFileError{
@@ -274,7 +261,7 @@ func ExtractSoftMask(r pdf.Getter, obj pdf.Object) (*SoftMask, error) {
 	// Extract required fields
 	width, err := pdf.GetInteger(r, dict["Width"])
 	if err != nil {
-		return nil, fmt.Errorf("missing or invalid Width: %w", err)
+		return nil, err
 	}
 	if width <= 0 {
 		return nil, &pdf.MalformedFileError{
@@ -284,7 +271,7 @@ func ExtractSoftMask(r pdf.Getter, obj pdf.Object) (*SoftMask, error) {
 
 	height, err := pdf.GetInteger(r, dict["Height"])
 	if err != nil {
-		return nil, fmt.Errorf("missing or invalid Height: %w", err)
+		return nil, err
 	}
 	if height <= 0 {
 		return nil, &pdf.MalformedFileError{
@@ -294,7 +281,7 @@ func ExtractSoftMask(r pdf.Getter, obj pdf.Object) (*SoftMask, error) {
 
 	bpc, err := pdf.GetInteger(r, dict["BitsPerComponent"])
 	if err != nil {
-		return nil, fmt.Errorf("missing or invalid BitsPerComponent: %w", err)
+		return nil, err
 	}
 
 	softMask := &SoftMask{
@@ -342,16 +329,14 @@ func ExtractSoftMask(r pdf.Getter, obj pdf.Object) (*SoftMask, error) {
 	}
 
 	softMask.WriteData = func(w io.Writer) error {
-		stm, err := pdf.DecodeStream(r, stream, 0)
+		r, err := pdf.GetStreamReader(r, stm)
 		if err != nil {
 			return err
 		}
-		_, err = io.Copy(w, stm)
-		if err != nil {
-			stm.Close()
-			return err
-		}
-		return stm.Close()
+		defer r.Close()
+
+		_, err = io.Copy(w, r)
+		return err
 	}
 
 	return softMask, nil

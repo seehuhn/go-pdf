@@ -78,3 +78,56 @@ func arrayFromInts(x []int) pdf.Array {
 	}
 	return res
 }
+
+// floatEpsilon is the tolerance for comparing floating point values.
+const floatEpsilon = 1e-9
+
+// floatSlicesEqual compares two float64 slices for equality with a given epsilon tolerance.
+func floatSlicesEqual(a, b []float64, eps float64) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if math.Abs(a[i]-b[i]) > eps {
+			return false
+		}
+	}
+	return true
+}
+
+// intSlicesEqual compares two int slices for equality.
+func intSlicesEqual(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// Equal compares two PDF functions for equality.
+func Equal(a, b pdf.Function) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+
+	if a.FunctionType() != b.FunctionType() {
+		return false
+	}
+
+	switch fa := a.(type) {
+	case *Type0:
+		return fa.Equal(b.(*Type0))
+	case *Type2:
+		return fa.Equal(b.(*Type2))
+	case *Type3:
+		return fa.Equal(b.(*Type3))
+	case *Type4:
+		return fa.Equal(b.(*Type4))
+	default:
+		return false
+	}
+}

@@ -386,7 +386,7 @@ func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {
 	}
 
 	background := &shading.Type2{
-		ColorSpace: color.DeviceRGBSpace,
+		ColorSpace: color.SpaceDeviceRGB,
 		P0:         vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
 		P1:         vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
 		F:          F,

@@ -61,7 +61,7 @@ func TestPNGRefactored(t *testing.T) {
 	// Test PNG with explicit color space
 	png2 := &PNG{
 		Data:       testImg,
-		ColorSpace: color.DeviceRGBSpace,
+		ColorSpace: color.SpaceDeviceRGB,
 	}
 	ref2, _, err := pdf.ResourceManagerEmbed(rm, png2)
 	if err != nil {

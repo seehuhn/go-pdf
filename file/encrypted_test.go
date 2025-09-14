@@ -92,7 +92,8 @@ func TestEncryptedPayloadRoundTrip(t *testing.T) {
 					}
 
 					// Extract it back
-					extracted, err := ExtractEncryptedPayload(buf, obj)
+					x := pdf.NewExtractor(buf)
+					extracted, err := ExtractEncryptedPayload(x, obj)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -142,6 +143,7 @@ func TestEncryptedPayloadErrors(t *testing.T) {
 
 	t.Run("malformed dict", func(t *testing.T) {
 		buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+		x := pdf.NewExtractor(buf)
 
 		// Create malformed dictionary (missing required Subtype)
 		dict := pdf.Dict{
@@ -150,7 +152,7 @@ func TestEncryptedPayloadErrors(t *testing.T) {
 			// Missing Subtype
 		}
 
-		_, err := ExtractEncryptedPayload(buf, dict)
+		_, err := ExtractEncryptedPayload(x, dict)
 		if err == nil {
 			t.Error("expected error for missing Subtype")
 		}

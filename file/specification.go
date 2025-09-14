@@ -18,6 +18,8 @@ package file
 
 import (
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/collection"
+	"seehuhn.de/go/pdf/graphics/image"
 )
 
 // PDF 2.0 sections: 7.11.3 7.11.4
@@ -27,7 +29,7 @@ import (
 // within the PDF document.
 type Specification struct {
 	// NameSpace (optional) specifies the file system to interpret this file
-	// specification in. Set to "URL" if FileName contains a URL.
+	// specification in. Set to "URL" if FileName is an URL.
 	NameSpace pdf.Name
 
 	// FileNameUnicode (optional, PDF 1.7) provides a Unicode version of the
@@ -80,7 +82,7 @@ type Specification struct {
 	Description string
 
 	// Thumbnail (PDF 2.0) references a thumbnail image stream for the file.
-	Thumbnail pdf.Reference
+	Thumbnail *image.Thumbnail
 
 	// ID contains an identifier for the described file, as two byte strings.
 	ID []string
@@ -92,11 +94,11 @@ type Specification struct {
 	Volatile bool
 
 	// EmbeddedFiles maps file specification keys (FileName and/or
-	// FileNameUnicode) to embedded file streams. When present, the referenced
-	// files are embedded in the PDF document.
+	// FileNameUnicode) to embedded file streams. When present, the files
+	// are embedded in the PDF document.
 	//
 	// This corresponds to the /EF entry in the PDF dictionary.
-	EmbeddedFiles map[string]pdf.Reference
+	EmbeddedFiles map[string]*Stream
 
 	// RelatedFiles (optional) maps file specification keys to related files
 	// arrays. Each array identifies files related to those in EF. Keys must
@@ -111,16 +113,20 @@ type Specification struct {
 	// This corresponds to the /EP entry in the PDF dictionary.
 	EncryptedPayload *EncryptedPayload
 
-	// CollectionItem (optional) references a collection item dictionary for
+	// CollectionItem (optional) specifies a collection item dictionary for
 	// portable collections.
 	//
 	// This corresponds to the /CI entry in the PDF dictionary.
-	CollectionItem pdf.Reference
+	CollectionItem *collection.ItemDict
+
+	// SingleUse determines if Embed returns a dictionary (true) or
+	// a reference (false).
+	SingleUse bool
 }
 
-// DecodeSpecification extracts a file specification dictionary from a PDF object.
-func DecodeSpecification(r pdf.Getter, obj pdf.Object) (*Specification, error) {
-	dict, err := pdf.GetDictTyped(r, obj, "Filespec")
+// ExtractSpecification extracts a file specification dictionary from a PDF object.
+func ExtractSpecification(x *pdf.Extractor, obj pdf.Object) (*Specification, error) {
+	dict, err := pdf.GetDictTyped(x.R, obj, "Filespec")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -130,92 +136,94 @@ func DecodeSpecification(r pdf.Getter, obj pdf.Object) (*Specification, error) {
 	spec := &Specification{}
 
 	// NameSpace (FS)
-	if nameSpace, err := pdf.Optional(pdf.GetName(r, dict["FS"])); err != nil {
+	if nameSpace, err := pdf.Optional(pdf.GetName(x.R, dict["FS"])); err != nil {
 		return nil, err
 	} else {
 		spec.NameSpace = nameSpace
 	}
 
 	// File names
-	if fileName, err := pdf.Optional(pdf.GetTextString(r, dict["F"])); err != nil {
+	if fileName, err := pdf.Optional(pdf.GetTextString(x.R, dict["F"])); err != nil {
 		return nil, err
 	} else {
 		spec.FileName = string(fileName)
 	}
 
-	if fileNameUnicode, err := pdf.Optional(pdf.GetTextString(r, dict["UF"])); err != nil {
+	if fileNameUnicode, err := pdf.Optional(pdf.GetTextString(x.R, dict["UF"])); err != nil {
 		return nil, err
 	} else {
 		spec.FileNameUnicode = string(fileNameUnicode)
 	}
 
-	if fileNameDOS, err := pdf.Optional(pdf.GetString(r, dict["DOS"])); err != nil {
+	if fileNameDOS, err := pdf.Optional(pdf.GetString(x.R, dict["DOS"])); err != nil {
 		return nil, err
 	} else {
 		spec.FileNameDOS = string(fileNameDOS)
 	}
 
-	if fileNameMac, err := pdf.Optional(pdf.GetString(r, dict["Mac"])); err != nil {
+	if fileNameMac, err := pdf.Optional(pdf.GetString(x.R, dict["Mac"])); err != nil {
 		return nil, err
 	} else {
 		spec.FileNameMac = string(fileNameMac)
 	}
 
-	if fileNameUnix, err := pdf.Optional(pdf.GetString(r, dict["Unix"])); err != nil {
+	if fileNameUnix, err := pdf.Optional(pdf.GetString(x.R, dict["Unix"])); err != nil {
 		return nil, err
 	} else {
 		spec.FileNameUnix = string(fileNameUnix)
 	}
 
 	// Description
-	if description, err := pdf.Optional(pdf.GetTextString(r, dict["Desc"])); err != nil {
+	if description, err := pdf.Optional(pdf.GetTextString(x.R, dict["Desc"])); err != nil {
 		return nil, err
 	} else {
 		spec.Description = string(description)
 	}
 
 	// ID array
-	if idArray, err := pdf.Optional(pdf.GetArray(r, dict["ID"])); err != nil {
+	if idArray, err := pdf.Optional(pdf.GetArray(x.R, dict["ID"])); err != nil {
 		return nil, err
 	} else if len(idArray) >= 2 {
-		id1, err1 := pdf.Optional(pdf.GetString(r, idArray[0]))
-		id2, err2 := pdf.Optional(pdf.GetString(r, idArray[1]))
+		id1, err1 := pdf.Optional(pdf.GetString(x.R, idArray[0]))
+		id2, err2 := pdf.Optional(pdf.GetString(x.R, idArray[1]))
 		if err1 == nil && err2 == nil {
 			spec.ID = []string{string(id1), string(id2)}
 		}
 	}
 
 	// Volatile
-	if volatile, err := pdf.Optional(pdf.GetBoolean(r, dict["V"])); err != nil {
+	if volatile, err := pdf.Optional(pdf.GetBoolean(x.R, dict["V"])); err != nil {
 		return nil, err
 	} else {
 		spec.Volatile = bool(volatile)
 	}
 
 	// EmbeddedFiles (EF)
-	if efDict, err := pdf.Optional(pdf.GetDict(r, dict["EF"])); err != nil {
+	if efDict, err := pdf.Optional(pdf.GetDict(x.R, dict["EF"])); err != nil {
 		return nil, err
 	} else if efDict != nil {
-		spec.EmbeddedFiles = make(map[string]pdf.Reference)
+		spec.EmbeddedFiles = make(map[string]*Stream)
 		for key, value := range efDict {
-			if ref, ok := value.(pdf.Reference); ok {
-				spec.EmbeddedFiles[string(key)] = ref
+			if stream, err := pdf.ExtractorGetOptional(x, value, ExtractStream); err != nil {
+				return nil, err
+			} else if stream != nil {
+				spec.EmbeddedFiles[string(key)] = stream
 			}
 		}
 	}
 
 	// RelatedFiles (RF)
-	if rfDict, err := pdf.Optional(pdf.GetDict(r, dict["RF"])); err != nil {
+	if rfDict, err := pdf.Optional(pdf.GetDict(x.R, dict["RF"])); err != nil {
 		return nil, err
 	} else if rfDict != nil {
-		spec.RelatedFiles, err = decodeRelatedFiles(r, rfDict)
+		spec.RelatedFiles, err = extractRelatedFiles(x, rfDict)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	// AFRelationship
-	if afRelationship, err := pdf.Optional(pdf.GetName(r, dict["AFRelationship"])); err != nil {
+	if afRelationship, err := pdf.Optional(pdf.GetName(x.R, dict["AFRelationship"])); err != nil {
 		return nil, err
 	} else if afRelationship != "" {
 		spec.AFRelationship = Relationship(afRelationship)
@@ -224,18 +232,22 @@ func DecodeSpecification(r pdf.Getter, obj pdf.Object) (*Specification, error) {
 	}
 
 	// CollectionItem (CI)
-	if ci, ok := dict["CI"].(pdf.Reference); ok {
+	if ci, err := pdf.ExtractorGetOptional(x, dict["CI"], collection.ExtractItemDict); err != nil {
+		return nil, err
+	} else {
 		spec.CollectionItem = ci
 	}
 
 	// Thumbnail
-	if thumb, ok := dict["Thumb"].(pdf.Reference); ok {
+	if thumb, err := pdf.ExtractorGetOptional(x, dict["Thumb"], image.ExtractThumbnail); err != nil {
+		return nil, err
+	} else {
 		spec.Thumbnail = thumb
 	}
 
 	// EncryptedPayload (EP)
 	if epObj := dict["EP"]; epObj != nil {
-		ep, err := ExtractEncryptedPayload(r, epObj)
+		ep, err := ExtractEncryptedPayload(x, epObj)
 		if err != nil {
 			return nil, err
 		}
@@ -245,30 +257,31 @@ func DecodeSpecification(r pdf.Getter, obj pdf.Object) (*Specification, error) {
 	return spec, nil
 }
 
-// Encode converts the file specification to a PDF dictionary.
-func (spec *Specification) Encode(rm *pdf.ResourceManager) (pdf.Object, error) {
+// Embed converts the file specification to a PDF dictionary.
+func (spec *Specification) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
 	// Check version requirements for various fields
-	if spec.FileNameUnicode != "" || spec.CollectionItem != 0 {
+	if spec.FileNameUnicode != "" || spec.CollectionItem != nil {
 		if err := pdf.CheckVersion(rm.Out, "file specification UF/CI entries", pdf.V1_7); err != nil {
-			return nil, err
+			return nil, zero, err
 		}
 	}
 
 	if spec.EmbeddedFiles != nil || spec.RelatedFiles != nil {
 		if err := pdf.CheckVersion(rm.Out, "file specification EF/RF entries", pdf.V1_3); err != nil {
-			return nil, err
+			return nil, zero, err
 		}
 	}
 
-	if spec.Thumbnail != 0 || spec.EncryptedPayload != nil || (spec.AFRelationship != "" && spec.AFRelationship != RelationshipUnspecified) {
+	if spec.Thumbnail != nil || spec.EncryptedPayload != nil || (spec.AFRelationship != "" && spec.AFRelationship != RelationshipUnspecified) {
 		if err := pdf.CheckVersion(rm.Out, "file specification PDF 2.0 entries", pdf.V2_0); err != nil {
-			return nil, err
+			return nil, zero, err
 		}
 	}
 
 	// Validate that F is present if DOS/Mac/Unix are all absent
 	if spec.FileName == "" && spec.FileNameDOS == "" && spec.FileNameMac == "" && spec.FileNameUnix == "" {
-		return nil, pdf.Errorf("file specification must have F entry if DOS, Mac, and Unix entries are all absent")
+		return nil, zero, pdf.Errorf("file specification must have F entry if DOS, Mac, and Unix entries are all absent")
 	}
 
 	dict := pdf.Dict{}
@@ -323,17 +336,23 @@ func (spec *Specification) Encode(rm *pdf.ResourceManager) (pdf.Object, error) {
 	// EmbeddedFiles (EF)
 	if len(spec.EmbeddedFiles) > 0 {
 		efDict := pdf.Dict{}
-		for key, ref := range spec.EmbeddedFiles {
-			efDict[pdf.Name(key)] = ref
+		for key, stream := range spec.EmbeddedFiles {
+			if stream != nil {
+				ref, _, err := pdf.ResourceManagerEmbed(rm, stream)
+				if err != nil {
+					return nil, zero, err
+				}
+				efDict[pdf.Name(key)] = ref
+			}
 		}
 		dict["EF"] = efDict
 	}
 
 	// RelatedFiles (RF)
 	if len(spec.RelatedFiles) > 0 {
-		rfDict, err := encodeRelatedFiles(spec.RelatedFiles)
+		rfDict, err := encodeRelatedFiles(rm, spec.RelatedFiles)
 		if err != nil {
-			return nil, err
+			return nil, zero, err
 		}
 		dict["RF"] = rfDict
 	}
@@ -344,51 +363,63 @@ func (spec *Specification) Encode(rm *pdf.ResourceManager) (pdf.Object, error) {
 	}
 
 	// CollectionItem (CI)
-	if spec.CollectionItem != 0 {
-		dict["CI"] = spec.CollectionItem
+	if spec.CollectionItem != nil {
+		ci, _, err := pdf.ResourceManagerEmbed(rm, spec.CollectionItem)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["CI"] = ci
 	}
 
 	// Thumbnail
-	if spec.Thumbnail != 0 {
-		dict["Thumb"] = spec.Thumbnail
+	if spec.Thumbnail != nil {
+		thumb, _, err := pdf.ResourceManagerEmbed(rm, spec.Thumbnail)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["Thumb"] = thumb
 	}
 
 	// EncryptedPayload (EP)
 	if spec.EncryptedPayload != nil {
 		ep, _, err := pdf.ResourceManagerEmbed(rm, spec.EncryptedPayload)
 		if err != nil {
-			return nil, err
+			return nil, zero, err
 		}
 		dict["EP"] = ep
 	}
 
-	// If EF or RF is present, the file specification dictionary shall be indirectly referenced
+	// If EF or RF is present, the file specification dictionary must be indirectly referenced
 	mustBeIndirect := spec.EmbeddedFiles != nil || spec.RelatedFiles != nil
 
-	if mustBeIndirect {
-		ref := rm.Out.Alloc()
-		err := rm.Out.Put(ref, dict)
-		if err != nil {
-			return nil, err
-		}
-		return ref, nil
+	if mustBeIndirect && spec.SingleUse {
+		return nil, zero, pdf.Errorf("file specification with EF or RF entries must be indirect (SingleUse must be false)")
 	}
 
-	return dict, nil
+	if spec.SingleUse {
+		return dict, zero, nil
+	}
+
+	ref := rm.Out.Alloc()
+	err := rm.Out.Put(ref, dict)
+	if err != nil {
+		return nil, zero, err
+	}
+	return ref, zero, nil
 }
 
 // RelatedFile represents an entry in a related files array.
 type RelatedFile struct {
 	Name   string
-	Stream pdf.Reference
+	Stream *Stream
 }
 
-// decodeRelatedFiles extracts related files from an RF dictionary.
-func decodeRelatedFiles(r pdf.Getter, rfDict pdf.Dict) (map[string][]RelatedFile, error) {
+// extractRelatedFiles extracts related files from an RF dictionary.
+func extractRelatedFiles(x *pdf.Extractor, rfDict pdf.Dict) (map[string][]RelatedFile, error) {
 	result := make(map[string][]RelatedFile)
 
 	for key, value := range rfDict {
-		array, err := pdf.GetArray(r, value)
+		array, err := pdf.GetArray(x.R, value)
 		if err != nil {
 			continue // skip malformed entries
 		}
@@ -399,15 +430,17 @@ func decodeRelatedFiles(r pdf.Getter, rfDict pdf.Dict) (map[string][]RelatedFile
 				break
 			}
 
-			name, err := pdf.Optional(pdf.GetTextString(r, array[i]))
+			name, err := pdf.Optional(pdf.GetTextString(x.R, array[i]))
 			if err != nil {
 				continue
 			}
 
-			if ref, ok := array[i+1].(pdf.Reference); ok {
+			if stream, err := pdf.ExtractorGetOptional(x, array[i+1], ExtractStream); err != nil {
+				continue // skip malformed stream
+			} else if stream != nil {
 				relatedFiles = append(relatedFiles, RelatedFile{
 					Name:   string(name),
-					Stream: ref,
+					Stream: stream,
 				})
 			}
 		}
@@ -421,14 +454,20 @@ func decodeRelatedFiles(r pdf.Getter, rfDict pdf.Dict) (map[string][]RelatedFile
 }
 
 // encodeRelatedFiles creates an RF dictionary from related files map.
-func encodeRelatedFiles(relatedFiles map[string][]RelatedFile) (pdf.Dict, error) {
+func encodeRelatedFiles(rm *pdf.ResourceManager, relatedFiles map[string][]RelatedFile) (pdf.Dict, error) {
 	rfDict := pdf.Dict{}
 
 	for key, files := range relatedFiles {
 		var array pdf.Array
 		for _, file := range files {
 			array = append(array, pdf.TextString(file.Name))
-			array = append(array, file.Stream)
+			if file.Stream != nil {
+				ref, _, err := pdf.ResourceManagerEmbed(rm, file.Stream)
+				if err != nil {
+					return nil, err
+				}
+				array = append(array, ref)
+			}
 		}
 		rfDict[pdf.Name(key)] = array
 	}

@@ -18,10 +18,15 @@ package file
 
 import (
 	"bytes"
+	"io"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/collection"
+	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/image"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
@@ -75,9 +80,21 @@ var testCases = []struct {
 		version: pdf.V1_3,
 		spec: &Specification{
 			FileName: "document.pdf",
-			EmbeddedFiles: map[string]pdf.Reference{
-				"F":  pdf.NewReference(100, 0),
-				"UF": pdf.NewReference(101, 0),
+			EmbeddedFiles: map[string]*Stream{
+				"F": {
+					WriteData: func(w io.Writer) error {
+						_, err := w.Write([]byte("Document F content"))
+						return err
+					},
+					SingleUse: false,
+				},
+				"UF": {
+					WriteData: func(w io.Writer) error {
+						_, err := w.Write([]byte("Document UF content"))
+						return err
+					},
+					SingleUse: false,
+				},
 			},
 			AFRelationship: RelationshipUnspecified,
 		},
@@ -87,13 +104,31 @@ var testCases = []struct {
 		version: pdf.V1_3,
 		spec: &Specification{
 			FileName: "main.txt",
-			EmbeddedFiles: map[string]pdf.Reference{
-				"F": pdf.NewReference(200, 0),
+			EmbeddedFiles: map[string]*Stream{
+				"F": {
+					WriteData: func(w io.Writer) error {
+						_, err := w.Write([]byte("Main file content"))
+						return err
+					},
+					SingleUse: false,
+				},
 			},
 			RelatedFiles: map[string][]RelatedFile{
 				"F": {
-					{Name: "related1.txt", Stream: pdf.NewReference(201, 0)},
-					{Name: "related2.txt", Stream: pdf.NewReference(202, 0)},
+					{Name: "related1.txt", Stream: &Stream{
+						WriteData: func(w io.Writer) error {
+							_, err := w.Write([]byte("Related file 1 content"))
+							return err
+						},
+						SingleUse: false,
+					}},
+					{Name: "related2.txt", Stream: &Stream{
+						WriteData: func(w io.Writer) error {
+							_, err := w.Write([]byte("Related file 2 content"))
+							return err
+						},
+						SingleUse: false,
+					}},
 				},
 			},
 			AFRelationship: RelationshipUnspecified,
@@ -115,8 +150,13 @@ var testCases = []struct {
 		name:    "file specification with collection item",
 		version: pdf.V1_7,
 		spec: &Specification{
-			FileName:       "collection_item.pdf",
-			CollectionItem: pdf.NewReference(300, 0),
+			FileName: "collection_item.pdf",
+			CollectionItem: &collection.ItemDict{
+				Data: map[pdf.Name]collection.ItemValue{
+					"Title":   {Val: "Test Collection Item"},
+					"Created": {Val: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)},
+				},
+			},
 			AFRelationship: RelationshipUnspecified,
 		},
 	},
@@ -124,8 +164,17 @@ var testCases = []struct {
 		name:    "file specification with thumbnail",
 		version: pdf.V2_0,
 		spec: &Specification{
-			FileName:       "image.jpg",
-			Thumbnail:      pdf.NewReference(400, 0),
+			FileName: "image.jpg",
+			Thumbnail: &image.Thumbnail{
+				Width:            2,
+				Height:           2,
+				ColorSpace:       color.SpaceDeviceGray,
+				BitsPerComponent: 8,
+				WriteData: func(w io.Writer) error {
+					_, err := w.Write([]byte{0x00, 0x80, 0x80, 0xff})
+					return err
+				},
+			},
 			AFRelationship: RelationshipUnspecified,
 		},
 	},
@@ -148,18 +197,58 @@ var testCases = []struct {
 			Description:     "Comprehensive test document",
 			ID:              []string{"comp1", "comp2"},
 			Volatile:        true,
-			EmbeddedFiles: map[string]pdf.Reference{
-				"F":  pdf.NewReference(500, 0),
-				"UF": pdf.NewReference(501, 0),
+			EmbeddedFiles: map[string]*Stream{
+				"F": {
+					MimeType:     "application/pdf",
+					Size:         2048,
+					CreationDate: time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
+					ModDate:      time.Date(2023, 6, 15, 14, 30, 0, 0, time.UTC),
+					CheckSum:     []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+					WriteData: func(w io.Writer) error {
+						_, err := w.Write([]byte("Comprehensive F content with full metadata"))
+						return err
+					},
+					SingleUse: false,
+				},
+				"UF": {
+					MimeType: "text/plain",
+					WriteData: func(w io.Writer) error {
+						_, err := w.Write([]byte("Unicode filename content"))
+						return err
+					},
+					SingleUse: false,
+				},
 			},
 			RelatedFiles: map[string][]RelatedFile{
 				"F": {
-					{Name: "metadata.xml", Stream: pdf.NewReference(502, 0)},
+					{Name: "metadata.xml", Stream: &Stream{
+						MimeType: "text/xml",
+						WriteData: func(w io.Writer) error {
+							_, err := w.Write([]byte("<?xml version=\"1.0\"?><metadata></metadata>"))
+							return err
+						},
+						SingleUse: false,
+					}},
 				},
 			},
 			AFRelationship: RelationshipSource,
-			CollectionItem: pdf.NewReference(503, 0),
-			Thumbnail:      pdf.NewReference(504, 0),
+			CollectionItem: &collection.ItemDict{
+				Data: map[pdf.Name]collection.ItemValue{
+					"Document": {Val: "Comprehensive Test Document"},
+					"Size":     {Val: int64(1024), Prefix: "Size: "},
+					"Rating":   {Val: float64(4.8)},
+				},
+			},
+			Thumbnail: &image.Thumbnail{
+				Width:            1,
+				Height:           1,
+				ColorSpace:       color.SpaceDeviceRGB,
+				BitsPerComponent: 16,
+				WriteData: func(w io.Writer) error {
+					_, err := w.Write([]byte{0x00, 0x00, 0xff, 0xff, 0x00, 0x00})
+					return err
+				},
+			},
 			EncryptedPayload: &EncryptedPayload{
 				FilterName: "AdvancedCrypto",
 				Version:    "2.1",
@@ -174,8 +263,8 @@ func TestSpecificationRoundTrip(t *testing.T) {
 			w, _ := memfile.NewPDFWriter(tc.version, nil)
 			rm := pdf.NewResourceManager(w)
 
-			// Encode the specification
-			obj, err := tc.spec.Encode(rm)
+			// Embed the specification
+			obj, _, err := tc.spec.Embed(rm)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -189,13 +278,22 @@ func TestSpecificationRoundTrip(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// Decode it back
-			decoded, err := DecodeSpecification(w, obj)
+			// Extract it back
+			x := pdf.NewExtractor(w)
+			decoded, err := ExtractSpecification(x, obj)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			if diff := cmp.Diff(tc.spec, decoded); diff != "" {
+			if diff := cmp.Diff(tc.spec, decoded, cmp.Comparer(func(a, b *Stream) bool {
+				if a == nil && b == nil {
+					return true
+				}
+				if a == nil || b == nil {
+					return false
+				}
+				return a.Equal(b)
+			})); diff != "" {
 				t.Errorf("round trip failed (-want +got):\n%s", diff)
 			}
 		})
@@ -211,7 +309,7 @@ func TestSpecificationValidation(t *testing.T) {
 		buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		_, err := spec.Encode(rm)
+		_, _, err := spec.Embed(rm)
 		if err == nil {
 			t.Error("expected error for missing file names")
 		}
@@ -226,7 +324,7 @@ func TestSpecificationValidation(t *testing.T) {
 		buf, _ := memfile.NewPDFWriter(pdf.V1_6, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		_, err := spec.Encode(rm)
+		_, _, err := spec.Embed(rm)
 		if err == nil {
 			t.Error("expected version error for UF in PDF 1.6")
 		}
@@ -235,15 +333,21 @@ func TestSpecificationValidation(t *testing.T) {
 	t.Run("version requirement - EF", func(t *testing.T) {
 		spec := &Specification{
 			FileName: "test.txt",
-			EmbeddedFiles: map[string]pdf.Reference{
-				"F": pdf.NewReference(100, 0),
+			EmbeddedFiles: map[string]*Stream{
+				"F": {
+					WriteData: func(w io.Writer) error {
+						_, err := w.Write([]byte("test content"))
+						return err
+					},
+					SingleUse: false,
+				},
 			},
 		}
 
 		buf, _ := memfile.NewPDFWriter(pdf.V1_2, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		_, err := spec.Encode(rm)
+		_, _, err := spec.Embed(rm)
 		if err == nil {
 			t.Error("expected version error for EF in PDF 1.2")
 		}
@@ -251,14 +355,23 @@ func TestSpecificationValidation(t *testing.T) {
 
 	t.Run("version requirement - PDF 2.0", func(t *testing.T) {
 		spec := &Specification{
-			FileName:  "test.txt",
-			Thumbnail: pdf.NewReference(100, 0),
+			FileName: "test.txt",
+			Thumbnail: &image.Thumbnail{
+				Width:            1,
+				Height:           1,
+				ColorSpace:       color.SpaceDeviceGray,
+				BitsPerComponent: 8,
+				WriteData: func(w io.Writer) error {
+					_, err := w.Write([]byte{0x00})
+					return err
+				},
+			},
 		}
 
 		buf, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		_, err := spec.Encode(rm)
+		_, _, err := spec.Embed(rm)
 		if err == nil {
 			t.Error("expected version error for Thumbnail in PDF 1.7")
 		}
@@ -269,15 +382,21 @@ func TestSpecificationIndirectReference(t *testing.T) {
 	t.Run("EF requires indirect reference", func(t *testing.T) {
 		spec := &Specification{
 			FileName: "test.txt",
-			EmbeddedFiles: map[string]pdf.Reference{
-				"F": pdf.NewReference(100, 0),
+			EmbeddedFiles: map[string]*Stream{
+				"F": {
+					WriteData: func(w io.Writer) error {
+						_, err := w.Write([]byte("test content"))
+						return err
+					},
+					SingleUse: false,
+				},
 			},
 		}
 
 		buf, _ := memfile.NewPDFWriter(pdf.V1_3, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		obj, err := spec.Encode(rm)
+		obj, _, err := spec.Embed(rm)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -292,14 +411,20 @@ func TestSpecificationIndirectReference(t *testing.T) {
 		spec := &Specification{
 			FileName: "test.txt",
 			RelatedFiles: map[string][]RelatedFile{
-				"F": {{Name: "related.txt", Stream: pdf.NewReference(101, 0)}},
+				"F": {{Name: "related.txt", Stream: &Stream{
+					WriteData: func(w io.Writer) error {
+						_, err := w.Write([]byte("Related file content"))
+						return err
+					},
+					SingleUse: false,
+				}}},
 			},
 		}
 
 		buf, _ := memfile.NewPDFWriter(pdf.V1_3, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		obj, err := spec.Encode(rm)
+		obj, _, err := spec.Embed(rm)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -312,13 +437,14 @@ func TestSpecificationIndirectReference(t *testing.T) {
 
 	t.Run("simple spec can be direct", func(t *testing.T) {
 		spec := &Specification{
-			FileName: "test.txt",
+			FileName:  "test.txt",
+			SingleUse: true,
 		}
 
 		buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		obj, err := spec.Encode(rm)
+		obj, _, err := spec.Embed(rm)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -335,12 +461,13 @@ func TestSpecificationAFRelationship(t *testing.T) {
 		spec := &Specification{
 			FileName:       "test.txt",
 			AFRelationship: RelationshipUnspecified,
+			SingleUse:      true,
 		}
 
 		buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		obj, err := spec.Encode(rm)
+		obj, _, err := spec.Embed(rm)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -360,12 +487,13 @@ func TestSpecificationAFRelationship(t *testing.T) {
 		spec := &Specification{
 			FileName:       "test.txt",
 			AFRelationship: RelationshipSource,
+			SingleUse:      true,
 		}
 
 		buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		obj, err := spec.Encode(rm)
+		obj, _, err := spec.Embed(rm)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -384,6 +512,7 @@ func TestSpecificationAFRelationship(t *testing.T) {
 func TestSpecificationMalformedInput(t *testing.T) {
 	t.Run("malformed RF dictionary", func(t *testing.T) {
 		buf, _ := memfile.NewPDFWriter(pdf.V1_3, nil)
+		x := pdf.NewExtractor(buf)
 
 		// Create malformed dictionary with invalid RF structure
 		dict := pdf.Dict{
@@ -395,7 +524,7 @@ func TestSpecificationMalformedInput(t *testing.T) {
 		}
 
 		// Should handle malformed RF gracefully
-		_, err := DecodeSpecification(buf, dict)
+		_, err := ExtractSpecification(x, dict)
 		if err != nil {
 			t.Errorf("should handle malformed RF gracefully: %v", err)
 		}
@@ -403,6 +532,7 @@ func TestSpecificationMalformedInput(t *testing.T) {
 
 	t.Run("malformed ID array", func(t *testing.T) {
 		buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
+		x := pdf.NewExtractor(buf)
 
 		// Create dictionary with malformed ID (only one element)
 		dict := pdf.Dict{
@@ -410,7 +540,7 @@ func TestSpecificationMalformedInput(t *testing.T) {
 			"ID": pdf.Array{pdf.String("only_one")},
 		}
 
-		spec, err := DecodeSpecification(buf, dict)
+		spec, err := ExtractSpecification(x, dict)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -427,7 +557,7 @@ func roundTripTest(t *testing.T, v pdf.Version, spec1 *Specification) {
 	rm := pdf.NewResourceManager(buf)
 
 	// encode the specification
-	obj, err := spec1.Encode(rm)
+	obj, _, err := spec1.Embed(rm)
 	if _, isVersionError := err.(*pdf.VersionError); isVersionError {
 		t.Skip()
 	} else if err != nil {
@@ -443,7 +573,8 @@ func roundTripTest(t *testing.T, v pdf.Version, spec1 *Specification) {
 	}
 
 	// read back
-	spec2, err := DecodeSpecification(buf, obj)
+	x := pdf.NewExtractor(buf)
+	spec2, err := ExtractSpecification(x, obj)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -453,7 +584,7 @@ func roundTripTest(t *testing.T, v pdf.Version, spec1 *Specification) {
 	}
 }
 
-func FuzzRoundTrip(f *testing.F) {
+func FuzzSpecificationRoundTrip(f *testing.F) {
 	// Seed the fuzzer with valid test cases from all specification types
 	opt := &pdf.WriterOptions{
 		HumanReadable: true,
@@ -462,7 +593,7 @@ func FuzzRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(tc.version, opt)
 		rm := pdf.NewResourceManager(w)
 
-		embedded, err := tc.spec.Encode(rm)
+		embedded, _, err := tc.spec.Embed(rm)
 		if err != nil {
 			continue
 		}
@@ -489,7 +620,8 @@ func FuzzRoundTrip(f *testing.F) {
 		if obj == nil {
 			t.Skip("missing specification")
 		}
-		specification, err := DecodeSpecification(r, obj)
+		x := pdf.NewExtractor(r)
+		specification, err := ExtractSpecification(x, obj)
 		if err != nil {
 			t.Skip("broken specification")
 		}

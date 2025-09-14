@@ -30,8 +30,9 @@ import (
 // SpaceIndexed represents an indexed color space.
 type SpaceIndexed struct {
 	NumCol int
+	Base   Space
 
-	base   Space
+	// lookup contains the color palette data as encoded bytes.
 	lookup pdf.String
 }
 
@@ -81,7 +82,7 @@ func Indexed(colors []Color) (*SpaceIndexed, error) {
 	}
 
 	return &SpaceIndexed{
-		base:   space,
+		Base:   space,
 		NumCol: len(colors),
 		lookup: lookup,
 	}, nil
@@ -108,7 +109,7 @@ func (s *SpaceIndexed) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, e
 		return nil, zero, err
 	}
 
-	base, _, err := pdf.ResourceManagerEmbed(rm, s.base)
+	base, _, err := pdf.ResourceManagerEmbed(rm, s.Base)
 	if err != nil {
 		return nil, zero, err
 	}
