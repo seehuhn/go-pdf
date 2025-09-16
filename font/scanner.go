@@ -53,7 +53,7 @@ type Dict interface {
 	// can be defined via the returned font object.
 	MakeFont() FromFile
 
-	// FontInfo returns information about the embedded font program.
+	// FontInfo returns information about the embedded font file.
 	// The information can be used to load the font file and to extract
 	// the the glyph corresponding to a character identifier.
 	// The result is a pointer to one of the FontInfo* types

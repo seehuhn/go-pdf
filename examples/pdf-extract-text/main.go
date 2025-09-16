@@ -29,12 +29,12 @@ import (
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/type1/names"
 
-	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/glyf"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/glyphdata/sfntglyphs"
 	"seehuhn.de/go/pdf/internal/pagerange"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/reader"
@@ -135,7 +135,7 @@ func (e *extractor) extractText(fname string) error {
 			F := contents.TextFont
 			m, ok := extraTextCache[F]
 			if !ok {
-				m = getExtraMapping(r, contents.TextFont)
+				m = getExtraMapping(contents.TextFont)
 				extraTextCache[F] = m
 			}
 			text = m[cid]
@@ -187,7 +187,7 @@ func getSpaceWidth(F font.Embedded) float64 {
 	return spaceWidthHeuristic(d)
 }
 
-func getExtraMapping(r pdf.Getter, F font.Embedded) map[cid.CID]string {
+func getExtraMapping(F font.Embedded) map[cid.CID]string {
 	Fe, ok := F.(font.FromFile)
 	if !ok {
 		return nil
@@ -198,11 +198,11 @@ func getExtraMapping(r pdf.Getter, F font.Embedded) map[cid.CID]string {
 
 	switch fontInfo := fontInfo.(type) {
 	case *dict.FontInfoGlyfEmbedded:
-		body, err := pdf.GetStreamReader(r, fontInfo.Ref)
-		if err != nil {
-			return nil
+		if fontInfo.FontFile == nil {
+			return nil // font not embedded
 		}
-		info, err := sfnt.Read(body)
+
+		info, err := sfntglyphs.FromStream(fontInfo.FontFile)
 		if err != nil {
 			return nil
 		}

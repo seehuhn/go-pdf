@@ -33,7 +33,6 @@ import (
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/extended"
-	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/text"
@@ -244,7 +243,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	dict := &dict.Type1{
 		PostScriptName: TestFontName,
 		Descriptor:     fd,
-		FontType:       glyphdata.None,
+		FontFile:       nil, // external font
 	}
 	if f.useEncodingDict {
 		// The standard encoding is represented by an encoding dictionary

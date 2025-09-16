@@ -19,7 +19,12 @@ package glyphdata
 import "errors"
 
 var (
-	ErrNotFound    = errors.New("glyph data not found")
-	ErrWrongType   = errors.New("unexpected font type")
+	// ErrNotFound is returned when requested glyph data cannot be found.
+	ErrNotFound = errors.New("glyph data not found")
+
+	// ErrWrongType is returned when a font stream has an unexpected type.
+	ErrWrongType = errors.New("unexpected font type")
+
+	// ErrInvalidFont is returned when font data is malformed or invalid.
 	ErrInvalidFont = errors.New("invalid font data")
 )

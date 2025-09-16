@@ -214,16 +214,10 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 				{First: []byte{0x00}, Last: []byte{0x7f}, Values: []string{"\000"}},
 			},
 		},
-		FontType: glyphdata.CFF,
-		FontRef:  rm.Out.Alloc(),
+		FontFile: cffglyphs.ToStream(f.Font, glyphdata.CFF),
 	}
 
 	err := dict.WriteToPDF(rm, fontDictRef)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	err = cffglyphs.Embed(rm.Out, dict.FontType, dict.FontRef, f.Font)
 	if err != nil {
 		return nil, nil, err
 	}

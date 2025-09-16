@@ -14,11 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package glyphdata provides support for embedding and extracting font glyph data in PDF files.
+// Package glyphdata encodes and decodes font data streams in PDF files.
 //
-// This package handles different font formats including Type 1, TrueType, CFF, and OpenType fonts.
-// Each format has its own subpackage that implements format-specific embedding and extraction logic.
+// This package handles different font formats including Type1, TrueType, CFF,
+// and OpenType fonts. Each format has its own subpackage that implements
+// format-specific embedding and extraction logic.
 //
-// The main Type enumeration defines the supported font types, and each subpackage provides
-// Embed and Extract functions for handling font data streams in PDF files.
+// The main Type enumeration defines the supported font types, and each
+// subpackage provides Embed and Extract functions for handling font data
+// streams in PDF files.
 package glyphdata

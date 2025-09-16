@@ -96,7 +96,15 @@ func TestType1Embedding(t *testing.T) {
 		t.Fatal("expected FontInfoSimple type")
 	}
 
-	t1Font, err := type1glyphs.Extract(r, glyphdata.Type1, fontInfo.Ref)
+	if fontInfo.FontFile == nil {
+		t.Fatal("expected embedded font file")
+	}
+	if fontInfo.FontFile.Type != glyphdata.Type1 {
+		t.Fatal("expected Type1 font")
+	}
+
+	// Extract font data using FromStream helper
+	t1Font, err := type1glyphs.FromStream(fontInfo.FontFile)
 	if err != nil {
 		t.Fatal(err)
 	}

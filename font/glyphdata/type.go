@@ -16,34 +16,22 @@
 
 package glyphdata
 
-import "fmt"
+import (
+	"fmt"
 
+	"seehuhn.de/go/pdf"
+)
+
+// Type specifies the format of font data in a PDF font file stream.
 type Type int
 
 const (
-	// None indicates that no glyph outlines are embedded.
-	None Type = iota
-
 	// Type1 indicates that glyph outlines are provided in Type 1 format.
-	//
-	// This can be used for [seehuhn.de/go/pdf/font/dict.Type1] font dictionaries.
-	//
-	// Font data can be embedded using [seehuhn.de/go/pdf/font/glyphdata/type1glyphs.Embed],
-	// and extracted using [seehuhn.de/go/pdf/font/glyphdata/type1glyphs.Extract].
-	Type1
+	Type1 Type = iota + 1
 
 	// TrueType indicates that glyph outlines are provided in TrueType "glyf"
 	// format.
-	//
-	// This can be used for [seehuhn.de/go/pdf/font/dict.TrueType] and
-	// [seehuhn.de/go/pdf/font/dict.CIDFontType2] font dictionaries.
-	//
-	// Font data can be embedded using [seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs.Embed],
-	// and extracted using [seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs.Extract].
 	TrueType
-
-	// Type3 indicates that glyph outlines are provided as PDF content streams.
-	Type3
 
 	// CFF indicates that glyph outlines are provided in CFF format,
 	// using CIDFont operators.
@@ -61,29 +49,16 @@ const (
 	// OpenTypeCFFSimple indicates that glyph outlines are provided in OpenType
 	// format, with font data given within a "CFF" table.  The CFF font data
 	// does not use CIDFont operators.
-	//
-	// This can be used for [seehuhn.de/go/pdf/font/dict.Type1] and
-	// [seehuhn.de/go/pdf/font/dict.CIDFontType0] font dictionaries.
-	//
-	// Font data can be embedded using [seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs.Embed],
-	// and extracted using [seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs.Extract].
 	OpenTypeCFFSimple
 
-	// OpenTypeGlyf indicates that glyph outlines are provided as an OpenType font with a
-	// "glyf" table.
-	//
-	// This can be used for [seehuhn.de/go/pdf/font/dict.TrueType] and
-	// [seehuhn.de/go/pdf/font/dict.CIDFontType2] font dictionaries.
-	//
-	// Font data can be embedded using [seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs.Embed],
-	// and extracted using [seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs.Extract].
+	// OpenTypeGlyf indicates that glyph outlines are provided as an OpenType
+	// font with a "glyf" table.
 	OpenTypeGlyf
 )
 
+// String returns a human-readable representation of the font type.
 func (t Type) String() string {
 	switch t {
-	case None:
-		return "None"
 	case CFF:
 		return "CFF"
 	case CFFSimple:
@@ -98,9 +73,21 @@ func (t Type) String() string {
 		return "TrueType"
 	case Type1:
 		return "Type1"
-	case Type3:
-		return "Type3"
 	default:
 		return fmt.Sprintf("Type(%d)", t)
+	}
+}
+
+// subtype returns the PDF subtype value for FontFile3 streams, or empty string for others.
+func (t Type) subtype() pdf.Name {
+	switch t {
+	case CFFSimple:
+		return "Type1C"
+	case CFF:
+		return "CIDFontType0C"
+	case OpenTypeCFFSimple, OpenTypeCFF, OpenTypeGlyf:
+		return "OpenType"
+	default:
+		return ""
 	}
 }

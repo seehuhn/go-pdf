@@ -14,70 +14,61 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Package type1glyphs provides support for encoding and decoding Type 1 fonts
+// in PDF.
 package type1glyphs
 
 import (
-	"errors"
 	"fmt"
-	"os"
+	"io"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/postscript/type1"
 )
 
-// Embed embeds Type 1 font data into a PDF file.
+// FromStream extracts a Type 1 font from a font file stream.
 //
-// Only [glyphdata.Type1] font type is supported.
-func Embed(w *pdf.Writer, tp glyphdata.Type, ref pdf.Reference, data *type1.Font) error {
-	if tp != glyphdata.Type1 {
-		return glyphdata.ErrWrongType
+// The stream must have type [glyphdata.Type1].
+// Returns an error if the stream is nil, has the wrong type, or contains
+// invalid Type 1 data.
+func FromStream(stream *glyphdata.Stream) (*type1.Font, error) {
+	if stream == nil || stream.Type != glyphdata.Type1 {
+		return nil, fmt.Errorf("expected Type1 stream")
 	}
 
-	length1 := pdf.NewPlaceholder(w, 10)
-	length2 := pdf.NewPlaceholder(w, 10)
-	fontStmDict := pdf.Dict{
-		"Length1": length1,
-		"Length2": length2,
-		"Length3": pdf.Integer(0),
-	}
-	fontStm, err := w.OpenStream(ref, fontStmDict, pdf.FilterCompress{})
-	if err != nil {
-		return fmt.Errorf("open Type1 stream: %w", err)
-	}
-	l1, l2, err := data.WritePDF(fontStm)
-	if err != nil {
-		return fmt.Errorf("write Type1 stream: %w", err)
-	}
-	err = length1.Set(pdf.Integer(l1))
-	if err != nil {
-		return fmt.Errorf("Type1 stream: length1: %w", err)
-	}
-	err = length2.Set(pdf.Integer(l2))
-	if err != nil {
-		return fmt.Errorf("Type1 stream: length2: %w", err)
-	}
-	err = fontStm.Close()
-	if err != nil {
-		return fmt.Errorf("close Type1 stream: %w", err)
+	r, w := io.Pipe()
+	var t1Font *type1.Font
+	var parseErr error
+
+	go func() {
+		defer w.Close()
+		err := stream.WriteTo(w, nil)
+		if err != nil {
+			w.CloseWithError(fmt.Errorf("extracting font data: %w", err))
+		}
+	}()
+
+	t1Font, parseErr = type1.Read(r)
+	if parseErr != nil {
+		return nil, fmt.Errorf("parsing Type1 font: %w", parseErr)
 	}
 
-	return nil
+	return t1Font, nil
 }
 
-// Extract extracts Type 1 font data from a PDF file.
-//
-// Only [glyphdata.Type1] font type is supported.
-func Extract(r pdf.Getter, tp glyphdata.Type, ref pdf.Object) (*type1.Font, error) {
-	if tp != glyphdata.Type1 {
-		return nil, glyphdata.ErrWrongType
+// ToStream creates a font file stream from Type 1 font data.
+func ToStream(font *type1.Font) *glyphdata.Stream {
+	return &glyphdata.Stream{
+		Type: glyphdata.Type1,
+		WriteTo: func(w io.Writer, length *glyphdata.Lengths) error {
+			l1, l2, err := font.WritePDF(w)
+			if length != nil {
+				length.Length1 = pdf.Integer(l1)
+				length.Length2 = pdf.Integer(l2)
+				length.Length3 = pdf.Integer(0)
+			}
+			return err
+		},
 	}
-
-	body, err := pdf.GetStreamReader(r, ref)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, glyphdata.ErrNotFound
-	}
-	defer body.Close()
-
-	return type1.Read(body)
 }

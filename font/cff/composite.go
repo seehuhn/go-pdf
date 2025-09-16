@@ -277,16 +277,10 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 		DefaultWidth:    dw,
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
 		ToUnicode:       e.CIDEncoder.ToUnicode(),
-		FontType:        glyphdata.CFF,
-		FontRef:         rm.Out.Alloc(),
+		FontFile:        cffglyphs.ToStream(subsetFont, glyphdata.CFF),
 	}
 
 	err := dict.WriteToPDF(rm, e.Ref)
-	if err != nil {
-		return err
-	}
-
-	err = cffglyphs.Embed(rm.Out, dict.FontType, dict.FontRef, subsetFont)
 	if err != nil {
 		return err
 	}

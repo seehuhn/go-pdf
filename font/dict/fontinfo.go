@@ -32,18 +32,9 @@ type FontInfoSimple struct {
 	// PostScriptName is the PostScript name of the font.
 	PostScriptName string
 
-	// Ref is the PDF reference to the font object.
-	Ref pdf.Reference
-
-	// FontType indicates the underlying font program type. This is one of the
-	// following:
-	//   - [glyphdata.Type1]
-	//   - [glyphdata.CFFSimple]
-	//   - [glyphdata.OpentTypeCFFSimple]
-	//   - [glyphdata.TrueType]
-	//   - [glyphdata.OpenTypeGlyf]
-	//   - [glyphdata.None]
-	FontType glyphdata.Type
+	// FontFile contains the embedded font file stream.
+	// If the font is not embedded, this is nil.
+	FontFile *glyphdata.Stream
 
 	// Encoding is the font's character encoding.
 	Encoding encoding.Simple
@@ -56,11 +47,9 @@ type FontInfoCID struct {
 	// PostScriptName is the PostScript name of the font.
 	PostScriptName string
 
-	// Ref is the PDF reference to the font object.
-	Ref pdf.Reference
-
-	// FontType indicates the underlying font program type (e.g., CIDFontType0, CIDFontType2).
-	FontType glyphdata.Type
+	// FontFile contains the embedded font file stream.
+	// If the font is not embedded, this is nil.
+	FontFile *glyphdata.Stream
 
 	// CIDIsUsed maps CIDs to a boolean indicating if the CID is used in the font.
 	CIDIsUsed map[cid.CID]bool
@@ -72,8 +61,8 @@ type FontInfoGlyfEmbedded struct {
 	// PostScriptName is the PostScript name of the font.
 	PostScriptName string
 
-	// Ref is the PDF reference to the font object.
-	Ref pdf.Reference
+	// FontFile contains the embedded font file stream.
+	FontFile *glyphdata.Stream
 
 	// CIDToGID maps CIDs to Glyph IDs (GIDs) for the embedded TrueType font.
 	CIDToGID []glyph.ID

@@ -53,7 +53,8 @@ func TestType3Roundtrip(t *testing.T) {
 
 				// == Read ==
 
-				d2, err := ReadType3(w, fontDictRef)
+				x := pdf.NewExtractor(w)
+				d2, err := DecodeType3(x, fontDictRef)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -142,7 +143,8 @@ func FuzzType3Dict(f *testing.F) {
 			pdf.Format(os.Stdout, pdf.OptPretty, r.GetMeta().Trailer)
 			t.Skip("broken reference")
 		}
-		d1, err := ReadType3(r, obj)
+		x := pdf.NewExtractor(r)
+		d1, err := DecodeType3(x, obj)
 		if err != nil {
 			t.Skip("broken Type3Dict")
 		}
@@ -164,7 +166,8 @@ func FuzzType3Dict(f *testing.F) {
 
 		// Read back the data.
 		// Make sure we get the same Type3Dict back.
-		d2, err := ReadType3(w, fontDictRef)
+		x2 := pdf.NewExtractor(w)
+		d2, err := DecodeType3(x2, fontDictRef)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -346,13 +346,6 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		ww[cmap.CID(cid)] = w
 	}
 
-	fontType := glyphdata.CFF
-	fontRef := rm.Out.Alloc()
-	err := cffglyphs.Embed(rm.Out, fontType, fontRef, f.cff)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	dicts := &dict.CIDFontType0{
 		PostScriptName:  f.cff.FontName,
 		Descriptor:      fd,
@@ -361,10 +354,9 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		Width:           ww,
 		DefaultWidth:    f.cff.GlyphWidthPDF(0),
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
-		FontType:        fontType,
-		FontRef:         fontRef,
+		FontFile:        cffglyphs.ToStream(f.cff, glyphdata.CFF),
 	}
-	err = dicts.WriteToPDF(rm, fontDictRef)
+	err := dicts.WriteToPDF(rm, fontDictRef)
 	if err != nil {
 		return nil, nil, err
 	}

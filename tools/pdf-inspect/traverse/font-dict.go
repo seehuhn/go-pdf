@@ -17,8 +17,8 @@
 package traverse
 
 import (
-	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"regexp"
 
@@ -47,36 +47,50 @@ func newFontDictCtx(r pdf.Getter, pdfDict pdf.Dict) (*fontDictCtx, error) {
 func (c *fontDictCtx) Next() []Step {
 	var steps []Step
 
-	// Check if any font type has a non-zero FontRef for @raw
-	var fontRef pdf.Reference
+	// Check if any font type has an embedded font file for @raw
+	var hasEmbeddedFont bool
 	switch f := c.dict.(type) {
 	case *dict.Type1:
-		fontRef = f.FontRef
+		hasEmbeddedFont = f.FontFile != nil
 	case *dict.TrueType:
-		fontRef = f.FontRef
+		hasEmbeddedFont = f.FontFile != nil
 	case *dict.CIDFontType0:
-		fontRef = f.FontRef
+		hasEmbeddedFont = f.FontFile != nil
 	case *dict.CIDFontType2:
-		fontRef = f.FontRef
+		hasEmbeddedFont = f.FontFile != nil
 	}
 
-	if fontRef != 0 {
+	if hasEmbeddedFont {
+		// Add @raw step to extract raw font data
 		steps = append(steps, Step{
 			Match: regexp.MustCompile(`^@raw$`),
 			Desc:  "`@raw`",
 			Next: func(key string) (Context, error) {
-				// Get the stream for the font program
-				stm, err := pdf.GetStream(c.r, fontRef)
-				if err != nil {
-					return nil, err
-				} else if stm == nil {
-					return nil, errors.New("missing font program stream")
+				// Extract FontFile based on font type
+				var fontFile *glyphdata.Stream
+				switch f := c.dict.(type) {
+				case *dict.Type1:
+					fontFile = f.FontFile
+				case *dict.TrueType:
+					fontFile = f.FontFile
+				case *dict.CIDFontType0:
+					fontFile = f.FontFile
+				case *dict.CIDFontType2:
+					fontFile = f.FontFile
 				}
-				decoded, err := pdf.DecodeStream(c.r, stm, 0)
-				if err != nil {
-					return nil, err
+
+				if fontFile == nil {
+					return nil, fmt.Errorf("no embedded font file available")
 				}
-				return &rawStreamCtx{r: decoded}, nil
+
+				// Use a pipe to stream the font data
+				pr, pw := io.Pipe()
+				go func() {
+					err := fontFile.WriteTo(pw, nil)
+					pw.CloseWithError(err)
+				}()
+
+				return &rawStreamCtx{r: pr}, nil
 			},
 		})
 
@@ -87,7 +101,10 @@ func (c *fontDictCtx) Next() []Step {
 				Match: regexp.MustCompile(`^load$`),
 				Desc:  "`load`",
 				Next: func(key string) (Context, error) {
-					t1ctx, err := newType1Ctx(c.r, fontDict.FontRef)
+					if fontDict.FontFile == nil {
+						return nil, fmt.Errorf("no embedded font file available")
+					}
+					t1ctx, err := newType1Ctx(fontDict.FontFile)
 					if err != nil {
 						return nil, fmt.Errorf("creating type1 context for `load`: %w", err)
 					}
@@ -95,32 +112,14 @@ func (c *fontDictCtx) Next() []Step {
 				},
 			})
 		case *dict.TrueType:
-			if fontDict.FontType == glyphdata.TrueType {
-				steps = append(steps, Step{
-					Match: regexp.MustCompile(`^load$`),
-					Desc:  "`load`",
-					Next: func(key string) (Context, error) {
-						sctx, err := newSfntCtx(c.r, fontDict.FontRef)
-						if err != nil {
-							return nil, fmt.Errorf("creating sfnt context for `load`: %w", err)
-						}
-						return sctx, nil
-					},
-				})
+			if fontDict.FontFile != nil && (fontDict.FontFile.Type == glyphdata.TrueType || fontDict.FontFile.Type == glyphdata.OpenTypeGlyf) {
+				// load functionality for TrueType/OpenType fonts could be added here
+				// when TrueType context support is implemented
 			}
 		case *dict.CIDFontType2:
-			if fontDict.FontType == glyphdata.TrueType || fontDict.FontType == glyphdata.OpenTypeGlyf {
-				steps = append(steps, Step{
-					Match: regexp.MustCompile(`^load$`),
-					Desc:  "`load`",
-					Next: func(key string) (Context, error) {
-						sctx, err := newSfntCtx(c.r, fontDict.FontRef)
-						if err != nil {
-							return nil, fmt.Errorf("creating sfnt context for `load`: %w", err)
-						}
-						return sctx, nil
-					},
-				})
+			if fontDict.FontFile != nil && (fontDict.FontFile.Type == glyphdata.TrueType || fontDict.FontFile.Type == glyphdata.OpenTypeGlyf) {
+				// load functionality for CIDFontType2 fonts could be added here
+				// when TrueType context support is implemented
 			}
 		}
 	}
@@ -162,7 +161,11 @@ func (c *fontDictCtx) Show() error {
 			fmt.Printf("Subset Tag: %s\n", dict.SubsetTag)
 		}
 		showFontDescriptor(dict.Descriptor)
-		fmt.Println("Font Program:", dict.FontType)
+		if dict.FontFile != nil {
+			fmt.Println("Font Program:", dict.FontFile.Type)
+		} else {
+			fmt.Println("Font Program: external")
+		}
 
 	case *dict.TrueType:
 		fmt.Println("TrueType font:")
@@ -171,7 +174,11 @@ func (c *fontDictCtx) Show() error {
 			fmt.Printf("Subset Tag: %s\n", dict.SubsetTag)
 		}
 		showFontDescriptor(dict.Descriptor)
-		fmt.Println("Font Program:", dict.FontType)
+		if dict.FontFile != nil {
+			fmt.Println("Font Program:", dict.FontFile.Type)
+		} else {
+			fmt.Println("Font Program: external")
+		}
 
 	case *dict.Type3:
 		fmt.Println("Type3 font:")

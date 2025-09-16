@@ -208,8 +208,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
 		Encoding:       e.Simple.Encoding(),
-		FontType:       glyphdata.CFFSimple,
-		FontRef:        rm.Out.Alloc(),
+		FontFile:       cffglyphs.ToStream(subsetCFF, glyphdata.CFFSimple),
 		ToUnicode:      e.Simple.ToUnicode(e.Font.FontName),
 	}
 	for c, info := range e.Simple.MappedCodes() {
@@ -217,11 +216,6 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	}
 
 	err := dict.WriteToPDF(rm, e.Ref)
-	if err != nil {
-		return err
-	}
-
-	err = cffglyphs.Embed(rm.Out, dict.FontType, dict.FontRef, subsetCFF)
 	if err != nil {
 		return err
 	}

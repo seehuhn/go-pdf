@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Package cffglyphs provides support for encoding and decoding CFF font data
+// in PDF.
 package cffglyphs
 
 import (
@@ -21,97 +23,47 @@ import (
 	"fmt"
 	"io"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/sfnt/cff"
 )
 
-// Embed embeds CFF font data into a PDF file.
+// FromStream extracts a CFF font from a font file stream.
 //
-// The following font types are supported: [glyphdata.CFFSimple] and [glyphdata.CFF].
-func Embed(w *pdf.Writer, tp glyphdata.Type, ref pdf.Reference, data *cff.Font) error {
-	switch tp {
-	case glyphdata.CFFSimple:
-		if data.IsCIDKeyed() {
-			return glyphdata.ErrInvalidFont
-		}
-
-		fontStmDict := pdf.Dict{
-			"Subtype": pdf.Name("Type1C"),
-		}
-		fontStm, err := w.OpenStream(ref, fontStmDict, pdf.FilterCompress{})
-		if err != nil {
-			return fmt.Errorf("open CFF stream: %w", err)
-		}
-		err = data.Write(fontStm)
-		if err != nil {
-			return fmt.Errorf("write CFF stream: %w", err)
-		}
-		err = fontStm.Close()
-		if err != nil {
-			return fmt.Errorf("close CFF stream: %w", err)
-		}
-
-	case glyphdata.CFF:
-		fontStmDict := pdf.Dict{
-			"Subtype": pdf.Name("CIDFontType0C"),
-		}
-		fontFileStream, err := w.OpenStream(ref, fontStmDict, pdf.FilterCompress{})
-		if err != nil {
-			return fmt.Errorf("open CFF stream: %w", err)
-		}
-		err = data.Write(fontFileStream)
-		if err != nil {
-			return fmt.Errorf("write CFF stream: %w", err)
-		}
-		err = fontFileStream.Close()
-		if err != nil {
-			return fmt.Errorf("close CFF stream: %w", err)
-		}
-
-	default:
-		return glyphdata.ErrWrongType
+// The stream must have type [glyphdata.CFF] or [glyphdata.CFFSimple].
+// Returns an error if the stream is nil, has the wrong type, or contains
+// invalid CFF data.
+func FromStream(stream *glyphdata.Stream) (*cff.Font, error) {
+	if stream == nil || (stream.Type != glyphdata.CFF && stream.Type != glyphdata.CFFSimple) {
+		return nil, fmt.Errorf("expected CFF stream")
 	}
 
-	return nil
+	var buf bytes.Buffer
+	err := stream.WriteTo(&buf, nil)
+	if err != nil {
+		return nil, fmt.Errorf("extracting font data: %w", err)
+	}
+
+	font, err := cff.Read(bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		return nil, fmt.Errorf("parsing CFF font: %w", err)
+	}
+
+	return font, nil
 }
 
-// Extract extracts CFF font data from a PDF file.
+// ToStream creates a font file stream from CFF font data.
 //
-// The following font types are supported: [glyphdata.CFFSimple] and [glyphdata.CFF].
-func Extract(r pdf.Getter, tp glyphdata.Type, ref pdf.Object) (*cff.Font, error) {
-	stm, err := pdf.GetStream(r, ref)
-	if err != nil {
-		return nil, err
-	} else if stm == nil {
-		return nil, glyphdata.ErrNotFound
+// The tp parameter must be either [glyphdata.CFFSimple] or [glyphdata.CFF].
+// The function panics if an invalid type is provided.
+func ToStream(font *cff.Font, tp glyphdata.Type) *glyphdata.Stream {
+	if tp != glyphdata.CFFSimple && tp != glyphdata.CFF {
+		panic(fmt.Sprintf("invalid CFF stream type: %v", tp))
 	}
 
-	body, err := pdf.DecodeStream(r, stm, 0)
-	if err != nil {
-		return nil, err
+	return &glyphdata.Stream{
+		Type: tp,
+		WriteTo: func(w io.Writer, length *glyphdata.Lengths) error {
+			return font.Write(w)
+		},
 	}
-	defer body.Close()
-
-	bodyBytes, err := io.ReadAll(body)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := cff.Read(bytes.NewReader(bodyBytes))
-	if err != nil {
-		return nil, err
-	}
-
-	switch tp {
-	case glyphdata.CFFSimple:
-		if data.IsCIDKeyed() {
-			return nil, glyphdata.ErrInvalidFont
-		}
-	case glyphdata.CFF:
-		// pass
-	default:
-		return nil, glyphdata.ErrWrongType
-	}
-	return data, nil
 }

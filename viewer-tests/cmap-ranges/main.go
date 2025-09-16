@@ -36,7 +36,7 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/glyphdata"
-	"seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs"
+	"seehuhn.de/go/pdf/font/glyphdata/sfntglyphs"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/text"
@@ -107,7 +107,6 @@ func (testFont) PostScriptName() string {
 func (testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
 	fontDictRef := rm.Out.Alloc()
 	fontType := glyphdata.TrueType
-	fontFileRef := rm.Out.Alloc()
 
 	numCID := 34 + 3
 	cidToGID := make([]glyph.ID, numCID)
@@ -140,10 +139,6 @@ func (testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error
 	origFont.Gsub = nil
 	origFont.Gpos = nil
 	subsetFont := origFont.Subset(subsetGlyphs)
-	err = opentypeglyphs.Embed(rm.Out, fontType, fontFileRef, subsetFont)
-	if err != nil {
-		return nil, nil, err
-	}
 
 	// Create a PDF font dictionary for the font.
 	qv := subsetFont.FontMatrix[3] * 1000
@@ -198,8 +193,7 @@ func (testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error
 		DefaultWidth:    width[0],
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
 		CIDToGID:        cidToGID,
-		FontType:        fontType,
-		FontRef:         fontFileRef,
+		FontFile:        sfntglyphs.ToStream(subsetFont, fontType),
 	}
 
 	err = dict.WriteToPDF(rm, fontDictRef)

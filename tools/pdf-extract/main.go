@@ -32,12 +32,12 @@ import (
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/type1/names"
 
-	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/glyf"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/glyphdata/sfntglyphs"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/pdfcopy"
 	"seehuhn.de/go/pdf/reader"
@@ -393,11 +393,12 @@ func getExtraMapping(r pdf.Getter, F font.Embedded) map[cid.CID]string {
 
 	switch fontInfo := fontInfo.(type) {
 	case *dict.FontInfoGlyfEmbedded:
-		body, err := pdf.GetStreamReader(r, fontInfo.Ref)
-		if err != nil {
-			return nil
+		if fontInfo.FontFile == nil {
+			return nil // external font - no embedded data to extract
 		}
-		info, err := sfnt.Read(body)
+
+		// Use FromStream to get the font
+		info, err := sfntglyphs.FromStream(fontInfo.FontFile)
 		if err != nil {
 			return nil
 		}

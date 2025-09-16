@@ -463,15 +463,9 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		Width:           f.widths,
 		DefaultWidth:    f.dw,
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
-		FontType:        glyphdata.CFF,
-		FontRef:         rm.Out.Alloc(),
+		FontFile:        cffglyphs.ToStream(f.data, glyphdata.CFF),
 	}
 	err := dict.WriteToPDF(rm, fontDictRef)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	err = cffglyphs.Embed(rm.Out, dict.FontType, dict.FontRef, f.data)
 	if err != nil {
 		return nil, nil, err
 	}

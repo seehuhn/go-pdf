@@ -52,10 +52,6 @@ type Stream struct {
 
 	// WriteData writes the embedded file data to the provided writer.
 	WriteData func(io.Writer) error
-
-	// SingleUse determines if Embed returns a stream dictionary (true) or
-	// a reference (false).
-	SingleUse bool
 }
 
 // ExtractStream extracts an embedded file stream from a PDF stream object.
@@ -210,12 +206,6 @@ func (s *Stream) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 		return nil, zero, err
 	}
 
-	if s.SingleUse {
-		// For SingleUse, we still need to return the reference since
-		// embedded file streams are always indirect objects
-		return ref, zero, nil
-	}
-
 	return ref, zero, nil
 }
 
@@ -233,8 +223,7 @@ func (s *Stream) Equal(other *Stream) bool {
 	if s.MimeType != other.MimeType ||
 		s.Size != other.Size ||
 		!s.CreationDate.Equal(other.CreationDate) ||
-		!s.ModDate.Equal(other.ModDate) ||
-		s.SingleUse != other.SingleUse {
+		!s.ModDate.Equal(other.ModDate) {
 		return false
 	}
 

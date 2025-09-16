@@ -76,9 +76,9 @@ type Type3 struct {
 	Resources *pdf.Resources
 }
 
-// ReadType3 reads a Type 3 font dictionary from a PDF file.
-func ReadType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
-	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
+// DecodeType3 reads a Type 3 font dictionary from a PDF file.
+func DecodeType3(x *pdf.Extractor, obj pdf.Object) (*Type3, error) {
+	fontDict, err := pdf.GetDictTyped(x.R, obj, "Font")
 	if err != nil {
 		return nil, err
 	} else if fontDict == nil {
@@ -86,7 +86,7 @@ func ReadType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
 			Err: errors.New("missing font dictionary"),
 		}
 	}
-	subtype, err := pdf.GetName(r, fontDict["Subtype"])
+	subtype, err := pdf.GetName(x.R, fontDict["Subtype"])
 	if err != nil {
 		return nil, err
 	}
@@ -96,16 +96,16 @@ func ReadType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
 
 	d := &Type3{}
 
-	d.Name, _ = pdf.GetName(r, fontDict["Name"])
+	d.Name, _ = pdf.GetName(x.R, fontDict["Name"])
 
-	fdDict, err := pdf.GetDictTyped(r, fontDict["FontDescriptor"], "FontDescriptor")
+	fdDict, err := pdf.GetDictTyped(x.R, fontDict["FontDescriptor"], "FontDescriptor")
 	if pdf.IsReadError(err) {
 		return nil, err
 	}
-	fd, _ := font.ExtractDescriptor(r, fdDict)
+	fd, _ := font.ExtractDescriptor(x.R, fdDict)
 	d.Descriptor = fd
 
-	enc, err := encoding.ExtractType3(r, fontDict["Encoding"])
+	enc, err := encoding.ExtractType3(x.R, fontDict["Encoding"])
 	if err != nil {
 		return nil, err
 	}
@@ -115,11 +115,11 @@ func ReadType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
 	if fd != nil {
 		defaultWidth = fd.MissingWidth
 	}
-	getSimpleWidths(d.Width[:], r, fontDict, defaultWidth)
+	getSimpleWidths(d.Width[:], x.R, fontDict, defaultWidth)
 
-	d.ToUnicode, _ = cmap.ExtractToUnicode(r, fontDict["ToUnicode"])
+	d.ToUnicode, _ = cmap.ExtractToUnicode(x.R, fontDict["ToUnicode"])
 
-	charProcs, err := pdf.GetDict(r, fontDict["CharProcs"])
+	charProcs, err := pdf.GetDict(x.R, fontDict["CharProcs"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "CharProcs")
 	}
@@ -131,19 +131,19 @@ func ReadType3(r pdf.Getter, obj pdf.Object) (*Type3, error) {
 	}
 	d.CharProcs = glyphs
 
-	fontBBox, _ := pdf.GetRectangle(r, fontDict["FontBBox"])
+	fontBBox, _ := pdf.GetRectangle(x.R, fontDict["FontBBox"])
 	if fontBBox != nil && !fontBBox.IsZero() {
 		d.FontBBox = fontBBox
 	}
 
-	d.FontMatrix, _ = pdf.GetMatrix(r, fontDict["FontMatrix"])
+	d.FontMatrix, _ = pdf.GetMatrix(x.R, fontDict["FontMatrix"])
 
-	d.Resources, err = pdf.ExtractResources(r, fontDict["Resources"])
+	d.Resources, err = pdf.ExtractResources(x.R, fontDict["Resources"])
 	if pdf.IsReadError(err) {
 		return nil, err
 	}
 
-	d.repair(r)
+	d.repair(x.R)
 
 	return d, nil
 }
@@ -303,7 +303,7 @@ func (d *Type3) Characters() iter.Seq2[charcode.Code, font.Code] {
 	}
 }
 
-// FontInfo returns information about the embedded font program.
+// FontInfo returns information about the embedded font file.
 // The returned value is of type [*FontInfoType3].
 func (d *Type3) FontInfo() any {
 	return &FontInfoType3{
@@ -361,7 +361,7 @@ func (f *t3Font) Codes(s pdf.String) iter.Seq[*font.Code] {
 }
 
 func init() {
-	registerReader("Type3", func(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
-		return ReadType3(r, obj)
+	registerReader("Type3", func(x *pdf.Extractor, obj pdf.Object) (font.Dict, error) {
+		return DecodeType3(x, obj)
 	})
 }

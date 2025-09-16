@@ -41,7 +41,6 @@ var streamTestCases = []struct {
 				_, err := w.Write([]byte("Hello, World!"))
 				return err
 			},
-			SingleUse: true,
 		},
 	},
 	{
@@ -53,7 +52,6 @@ var streamTestCases = []struct {
 				_, err := w.Write([]byte("Hello, World!"))
 				return err
 			},
-			SingleUse: false,
 		},
 	},
 	{
@@ -65,7 +63,6 @@ var streamTestCases = []struct {
 				_, err := w.Write(bytes.Repeat([]byte("A"), 42))
 				return err
 			},
-			SingleUse: true,
 		},
 	},
 	{
@@ -78,7 +75,6 @@ var streamTestCases = []struct {
 				_, err := w.Write([]byte("Document content"))
 				return err
 			},
-			SingleUse: false,
 		},
 	},
 	{
@@ -91,7 +87,6 @@ var streamTestCases = []struct {
 				_, err := w.Write([]byte("Content with checksum"))
 				return err
 			},
-			SingleUse: true,
 		},
 	},
 	{
@@ -110,7 +105,6 @@ var streamTestCases = []struct {
 				_, err := w.Write([]byte("comprehensive test data"))
 				return err
 			},
-			SingleUse: false,
 		},
 	},
 }

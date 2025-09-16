@@ -90,19 +90,14 @@ type CIDFontType2 struct {
 	// identity mapping.
 	CIDToGID []glyph.ID
 
-	// FontType gives the type of glyph outline data. Possible values are
-	// [glyphdata.TrueType] and [glyphdata.OpenTypeGlyf], or [glyphdata.None]
-	// if the font is not embedded.
-	FontType glyphdata.Type
-
-	// FontRef is the reference to the glyph outline data in the PDF file.
-	// If the font is not embedded, this is 0.
-	FontRef pdf.Reference
+	// FontFile contains the embedded font file stream.
+	// If the font is not embedded, this is nil.
+	FontFile *glyphdata.Stream
 }
 
-// ReadCIDFontType2 reads a Type 2 CIDFont dictionary from the PDF file.
-func ReadCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
-	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
+// DecodeCIDFontType2 reads a Type 2 CIDFont dictionary from the PDF file.
+func DecodeCIDFontType2(x *pdf.Extractor, obj pdf.Object) (*CIDFontType2, error) {
+	fontDict, err := pdf.GetDictTyped(x.R, obj, "Font")
 	if err != nil {
 		return nil, err
 	} else if fontDict == nil {
@@ -110,7 +105,7 @@ func ReadCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 			Err: errors.New("missing font dictionary"),
 		}
 	}
-	subtype, err := pdf.GetName(r, fontDict["Subtype"])
+	subtype, err := pdf.GetName(x.R, fontDict["Subtype"])
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +115,7 @@ func ReadCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 		}
 	}
 
-	a, err := pdf.GetArray(r, fontDict["DescendantFonts"])
+	a, err := pdf.GetArray(x.R, fontDict["DescendantFonts"])
 	if err != nil {
 		return nil, err
 	} else if len(a) != 1 {
@@ -128,7 +123,7 @@ func ReadCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 			Err: errors.New("invalid DescendantFonts array"),
 		}
 	}
-	cidFontDict, err := pdf.GetDictTyped(r, a[0], "Font")
+	cidFontDict, err := pdf.GetDictTyped(x.R, a[0], "Font")
 	if err != nil {
 		return nil, err
 	} else if cidFontDict == nil {
@@ -136,7 +131,7 @@ func ReadCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 			Err: errors.New("missing CIDFont dictionary"),
 		}
 	}
-	subtype, err = pdf.GetName(r, cidFontDict["Subtype"])
+	subtype, err = pdf.GetName(x.R, cidFontDict["Subtype"])
 	if err != nil {
 		return nil, err
 	} else if subtype != "CIDFontType2" {
@@ -149,16 +144,16 @@ func ReadCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 
 	// fields in the font dictionary
 
-	d.CMap, err = cmap.Extract(r, fontDict["Encoding"])
+	d.CMap, err = cmap.Extract(x.R, fontDict["Encoding"])
 	if err != nil {
 		return nil, err
 	}
 
-	d.ToUnicode, _ = cmap.ExtractToUnicode(r, fontDict["ToUnicode"])
+	d.ToUnicode, _ = cmap.ExtractToUnicode(x.R, fontDict["ToUnicode"])
 
 	// fields in the CIDFont dictionary
 
-	baseFont, err := pdf.GetName(r, cidFontDict["BaseFont"])
+	baseFont, err := pdf.GetName(x.R, cidFontDict["BaseFont"])
 	if err != nil {
 		return nil, err
 	}
@@ -169,20 +164,20 @@ func ReadCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 		d.PostScriptName = string(baseFont)
 	}
 
-	fdDict, err := pdf.GetDictTyped(r, cidFontDict["FontDescriptor"], "FontDescriptor")
+	fdDict, err := pdf.GetDictTyped(x.R, cidFontDict["FontDescriptor"], "FontDescriptor")
 	if pdf.IsReadError(err) {
 		return nil, err
 	}
-	d.Descriptor, _ = font.ExtractDescriptor(r, fdDict)
+	d.Descriptor, _ = font.ExtractDescriptor(x.R, fdDict)
 
-	d.ROS, _ = font.ExtractCIDSystemInfo(r, cidFontDict["CIDSystemInfo"])
+	d.ROS, _ = font.ExtractCIDSystemInfo(x.R, cidFontDict["CIDSystemInfo"])
 
-	d.Width, err = decodeCompositeWidths(r, cidFontDict["W"])
+	d.Width, err = decodeCompositeWidths(x.R, cidFontDict["W"])
 	if err != nil {
 		return nil, err
 	}
 	if obj, ok := cidFontDict["DW"]; ok {
-		dw, err := pdf.GetNumber(r, obj)
+		dw, err := pdf.GetNumber(x.R, obj)
 		if pdf.IsReadError(err) {
 			return nil, err
 		}
@@ -191,18 +186,18 @@ func ReadCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 		d.DefaultWidth = DefaultWidthDefault
 	}
 
-	dw2, err := decodeVDefault(r, cidFontDict["DW2"])
+	dw2, err := decodeVDefault(x.R, cidFontDict["DW2"])
 	if err != nil {
 		return nil, err
 	}
 	d.DefaultVMetrics = dw2
-	w2, err := decodeVMetrics(r, cidFontDict["W2"])
+	w2, err := decodeVMetrics(x.R, cidFontDict["W2"])
 	if err != nil {
 		return nil, err
 	}
 	d.VMetrics = w2
 
-	c2g, err := pdf.Resolve(r, cidFontDict["CIDToGIDMap"])
+	c2g, err := pdf.Resolve(x.R, cidFontDict["CIDToGIDMap"])
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +213,7 @@ func ReadCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 		}
 
 	case *pdf.Stream:
-		in, err := pdf.DecodeStream(r, c2g, 0)
+		in, err := pdf.DecodeStream(x.R, c2g, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -242,24 +237,21 @@ func ReadCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 		}
 	}
 
-	d.FontType = glyphdata.None
-	if ref, _ := fdDict["FontFile2"].(pdf.Reference); ref != 0 {
-		d.FontType = glyphdata.TrueType
-		d.FontRef = ref
-	} else if ref, _ := fdDict["FontFile3"].(pdf.Reference); ref != 0 {
-		if stm, _ := pdf.GetStream(r, ref); stm != nil {
-			subType, _ := pdf.GetName(r, stm.Dict["Subtype"])
-			switch subType {
-			case "OpenType":
-				d.FontType = glyphdata.OpenTypeGlyf
-				d.FontRef = ref
-			}
+	for _, key := range []pdf.Name{"FontFile2", "FontFile3"} {
+		if fontFile, err := pdf.ExtractorGetOptional(x, fdDict[key],
+			func(x *pdf.Extractor, obj pdf.Object) (*glyphdata.Stream, error) {
+				return glyphdata.ExtractStream(x, obj, "TrueType", key)
+			}); err != nil {
+			return nil, err
+		} else if fontFile != nil {
+			d.FontFile = fontFile
+			break
 		}
 	}
 
 	d.repair()
 
-	if d.FontType == glyphdata.None && !d.CMap.IsPredefined() {
+	if d.FontFile == nil && !d.CMap.IsPredefined() {
 		return nil, errors.New("custom encoding not allowed for external font")
 	}
 
@@ -271,12 +263,6 @@ func ReadCIDFontType2(r pdf.Getter, obj pdf.Object) (*CIDFontType2, error) {
 func (d *CIDFontType2) repair() {
 	if d.Descriptor == nil {
 		d.Descriptor = &font.Descriptor{}
-	}
-
-	if d.FontRef == 0 {
-		d.FontType = glyphdata.None
-	} else if d.FontType == glyphdata.None {
-		d.FontRef = 0
 	}
 
 	m := subset.TagRegexp.FindStringSubmatch(d.Descriptor.FontName)
@@ -296,12 +282,12 @@ func (d *CIDFontType2) repair() {
 	if !subset.IsValidTag(d.SubsetTag) {
 		d.SubsetTag = ""
 	}
-	if d.FontType == glyphdata.None {
+	if d.FontFile == nil {
 		d.SubsetTag = ""
 	}
 	d.Descriptor.FontName = subset.Join(d.SubsetTag, d.PostScriptName)
 
-	if d.FontType == glyphdata.None {
+	if d.FontFile == nil {
 		d.CIDToGID = nil
 	}
 
@@ -336,15 +322,11 @@ func (d *CIDFontType2) validate() error {
 			baseFont, d.Descriptor.FontName)
 	}
 
-	if d.SubsetTag != "" && d.FontType == glyphdata.None {
+	if d.SubsetTag != "" && d.FontFile == nil {
 		return errors.New("external font data cannot be subsetted")
 	}
 
-	if (d.FontType == glyphdata.None) != (d.FontRef == 0) {
-		return errors.New("missing font reference or type")
-	}
-
-	if d.FontType == glyphdata.None && d.CIDToGID != nil {
+	if d.FontFile == nil && d.CIDToGID != nil {
 		return errors.New("CIDToGIDMap not allowed for external font")
 	}
 
@@ -370,19 +352,19 @@ func (d *CIDFontType2) validate() error {
 func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	w := rm.Out
 
-	switch d.FontType {
-	case glyphdata.None:
-		// pass
-	case glyphdata.TrueType:
-		if err := pdf.CheckVersion(w, "embedded composite TrueType font", pdf.V1_3); err != nil {
-			return err
+	if d.FontFile != nil {
+		switch d.FontFile.Type {
+		case glyphdata.TrueType:
+			if err := pdf.CheckVersion(w, "embedded composite TrueType font", pdf.V1_3); err != nil {
+				return err
+			}
+		case glyphdata.OpenTypeGlyf:
+			if err := pdf.CheckVersion(w, "embedded composite OpenType/glyf font", pdf.V1_6); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("invalid font type %s", d.FontFile.Type)
 		}
-	case glyphdata.OpenTypeGlyf:
-		if err := pdf.CheckVersion(w, "embedded composite OpenType/glyf font", pdf.V1_6); err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("invalid font type %s", d.FontType)
 	}
 
 	err := d.validate()
@@ -390,7 +372,7 @@ func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) er
 		return err
 	}
 
-	if d.FontType == glyphdata.None && !d.CMap.IsPredefined() {
+	if d.FontFile == nil && !d.CMap.IsPredefined() {
 		return errors.New("custom encoding not allowed for external font")
 	}
 
@@ -442,11 +424,17 @@ func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) er
 	}
 
 	fdDict := d.Descriptor.AsDict()
-	switch d.FontType {
-	case glyphdata.TrueType:
-		fdDict["FontFile2"] = d.FontRef
-	case glyphdata.OpenTypeGlyf:
-		fdDict["FontFile3"] = d.FontRef
+	if d.FontFile != nil {
+		fontFileRef, _, err := pdf.ResourceManagerEmbed(rm, d.FontFile)
+		if err != nil {
+			return err
+		}
+		switch d.FontFile.Type {
+		case glyphdata.TrueType:
+			fdDict["FontFile2"] = fontFileRef
+		case glyphdata.OpenTypeGlyf:
+			fdDict["FontFile3"] = fontFileRef
+		}
 	}
 
 	compressedObjects := []pdf.Object{fontDict, cidFontDict, fdDict}
@@ -477,7 +465,7 @@ func (d *CIDFontType2) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) er
 	if d.CIDToGID != nil {
 		c2gRef = w.Alloc()
 		cidFontDict["CIDToGIDMap"] = c2gRef
-	} else if d.FontType != glyphdata.None {
+	} else if d.FontFile != nil {
 		cidFontDict["CIDToGIDMap"] = pdf.Name("Identity")
 	}
 
@@ -542,13 +530,13 @@ func (d *CIDFontType2) Characters() iter.Seq2[charcode.Code, font.Code] {
 	}
 }
 
-// FontInfo returns information about the embedded font program.
+// FontInfo returns information about the embedded font file.
 // The returned value is of type [*FontInfoGlyfEmbedded] or [*FontInfoGlyfExternal].
 func (d *CIDFontType2) FontInfo() any {
-	if d.FontRef != 0 {
+	if d.FontFile != nil {
 		return &FontInfoGlyfEmbedded{
 			PostScriptName: d.PostScriptName,
-			Ref:            d.FontRef,
+			FontFile:       d.FontFile,
 			CIDToGID:       d.CIDToGID,
 		}
 	}
@@ -647,7 +635,7 @@ func (s *t2Font) Codes(str pdf.String) iter.Seq[*font.Code] {
 }
 
 func init() {
-	registerReader("CIDFontType2", func(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
-		return ReadCIDFontType2(r, obj)
+	registerReader("CIDFontType2", func(x *pdf.Extractor, obj pdf.Object) (font.Dict, error) {
+		return DecodeCIDFontType2(x, obj)
 	})
 }

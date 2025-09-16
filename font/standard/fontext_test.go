@@ -23,13 +23,12 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/dict"
-	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
 // TestEmbedStandard tests that the 14 standard PDF fonts can be
-// used and that the font program is not embedded.
+// used and that the font file is not embedded.
 func TestEmbedStandard(t *testing.T) {
 	for _, standardFont := range standard.All {
 		for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
@@ -80,8 +79,8 @@ func TestEmbedStandard(t *testing.T) {
 				if t1Dict.PostScriptName != standardFont.PostScriptName() {
 					t.Errorf("unexpected PostScriptName %q", t1Dict.PostScriptName)
 				}
-				if t1Dict.FontType != glyphdata.None {
-					t.Errorf("unexpected FontType %d", t1Dict.FontType)
+				if t1Dict.FontFile != nil {
+					t.Errorf("unexpected embedded font file, expected external font")
 				}
 			})
 		}

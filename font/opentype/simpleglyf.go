@@ -32,7 +32,7 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
-	"seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs"
+	"seehuhn.de/go/pdf/font/glyphdata/sfntglyphs"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 )
@@ -240,8 +240,7 @@ func (e *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
 		Encoding:       dictEnc,
-		FontType:       glyphdata.OpenTypeGlyf,
-		FontRef:        rm.Out.Alloc(),
+		FontFile:       sfntglyphs.ToStream(subsetFont, glyphdata.OpenTypeGlyf),
 		ToUnicode:      e.Simple.ToUnicode(postScriptName),
 	}
 	for c, info := range e.Simple.MappedCodes() {
@@ -249,11 +248,6 @@ func (e *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
 	}
 
 	err := dict.WriteToPDF(rm, e.Ref)
-	if err != nil {
-		return err
-	}
-
-	err = opentypeglyphs.Embed(rm.Out, dict.FontType, dict.FontRef, subsetFont)
 	if err != nil {
 		return err
 	}

@@ -33,7 +33,7 @@ type sfntCtx struct {
 	font *sfnt.Font
 }
 
-// newSfntCtx creates a new font context by reading and parsing the font program.
+// newSfntCtx creates a new font context by reading and parsing the font file.
 func newSfntCtx(getter pdf.Getter, fontRef pdf.Reference) (*sfntCtx, error) {
 	if fontRef == 0 {
 		return nil, errors.New("invalid font reference for `load`")
@@ -41,15 +41,15 @@ func newSfntCtx(getter pdf.Getter, fontRef pdf.Reference) (*sfntCtx, error) {
 
 	stm, err := pdf.GetStream(getter, fontRef)
 	if err != nil {
-		return nil, fmt.Errorf("getting font program stream for `load`: %w", err)
+		return nil, fmt.Errorf("getting font file stream for `load`: %w", err)
 	}
 	if stm == nil {
-		return nil, errors.New("missing font program stream for `load`")
+		return nil, errors.New("missing font file stream for `load`")
 	}
 
 	decoded, err := pdf.DecodeStream(getter, stm, 0)
 	if err != nil {
-		return nil, fmt.Errorf("decoding font program stream for `load`: %w", err)
+		return nil, fmt.Errorf("decoding font file stream for `load`: %w", err)
 	}
 	defer decoded.Close()
 

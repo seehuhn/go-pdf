@@ -32,7 +32,6 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
-	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/type1glyphs"
 	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/font/standard"
@@ -218,8 +217,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		SubsetTag:      "AAAAAA",
 		Descriptor:     fd,
 		Encoding:       enc,
-		FontType:       glyphdata.Type1,
-		FontRef:        w.Alloc(),
+		FontFile:       type1glyphs.ToStream(F),
 	}
 	for code := range 256 {
 		dict.Width[code] = 500
@@ -238,11 +236,6 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	dict.ToUnicode = tu
 
 	err = dict.WriteToPDF(rm, fontDictRef)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	err = type1glyphs.Embed(w, dict.FontType, dict.FontRef, F)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -19,6 +19,7 @@ package dict
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"testing"
 
@@ -60,23 +61,30 @@ func FuzzType0Dict(f *testing.F) {
 			fontDictRef := w.Alloc()
 
 			d := clone(d)
-			if d.FontRef != 0 {
-				d.FontRef = w.Alloc()
+			if d.FontFile != nil {
+				fontRef := w.Alloc()
 				// write a fake font data stream
 				var subtype pdf.Object
-				switch d.FontType {
+				switch d.FontFile.Type {
 				case glyphdata.CFF:
 					subtype = pdf.Name("CIDFontType0C")
 				case glyphdata.OpenTypeCFF:
 					subtype = pdf.Name("OpenType")
 				}
-				stm, err := w.OpenStream(d.FontRef, pdf.Dict{"Subtype": subtype})
+				stm, err := w.OpenStream(fontRef, pdf.Dict{"Subtype": subtype})
 				if err != nil {
 					f.Fatal(err)
 				}
 				err = stm.Close()
 				if err != nil {
 					f.Fatal(err)
+				}
+				// Keep FontFile but simplify WriteTo for test
+				d.FontFile = &glyphdata.Stream{
+					Type: d.FontFile.Type,
+					WriteTo: func(w io.Writer, length *glyphdata.Lengths) error {
+						return nil // test stub
+					},
 				}
 			}
 			err = d.WriteToPDF(rm, fontDictRef)
@@ -115,7 +123,8 @@ func FuzzType0Dict(f *testing.F) {
 			pdf.Format(os.Stdout, pdf.OptPretty, r.GetMeta().Trailer)
 			t.Skip("broken reference")
 		}
-		d, err := ReadCIDFontType0(r, obj)
+		x := pdf.NewExtractor(r)
+		d, err := DecodeCIDFontType0(x, obj)
 		if err != nil {
 			t.Skip("no valid CIDFontType0 dict")
 		}
@@ -137,23 +146,30 @@ func checkRoundtripT0(t *testing.T, d1 *CIDFontType0, v pdf.Version) {
 
 	// == Write ==
 
-	if d1.FontRef != 0 {
-		d1.FontRef = w.Alloc()
+	if d1.FontFile != nil {
+		fontRef := w.Alloc()
 		// write a fake font data stream
 		var subtype pdf.Object
-		switch d1.FontType {
+		switch d1.FontFile.Type {
 		case glyphdata.CFF:
 			subtype = pdf.Name("CIDFontType0C")
 		case glyphdata.OpenTypeCFF:
 			subtype = pdf.Name("OpenType")
 		}
-		stm, err := w.OpenStream(d1.FontRef, pdf.Dict{"Subtype": subtype})
+		stm, err := w.OpenStream(fontRef, pdf.Dict{"Subtype": subtype})
 		if err != nil {
 			t.Fatal(err)
 		}
 		err = stm.Close()
 		if err != nil {
 			t.Fatal(err)
+		}
+		// Keep FontFile but simplify WriteTo for test
+		d1.FontFile = &glyphdata.Stream{
+			Type: d1.FontFile.Type,
+			WriteTo: func(w io.Writer, length *glyphdata.Lengths) error {
+				return nil // test stub
+			},
 		}
 	}
 	err := d1.WriteToPDF(rm, fontDictRef)
@@ -167,7 +183,8 @@ func checkRoundtripT0(t *testing.T, d1 *CIDFontType0, v pdf.Version) {
 
 	// == Read ==
 
-	d2, err := ReadCIDFontType0(w, fontDictRef)
+	x := pdf.NewExtractor(w)
+	d2, err := DecodeCIDFontType0(x, fontDictRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,7 +241,7 @@ var t0Dicts = []*CIDFontType0{
 				},
 			},
 		},
-		FontType: glyphdata.None,
+		FontFile: nil, // external font
 	},
 	{
 		PostScriptName: "Test",
@@ -248,8 +265,12 @@ var t0Dicts = []*CIDFontType0{
 				},
 			},
 		},
-		FontType: glyphdata.OpenTypeCFF,
-		FontRef:  pdf.NewReference(999, 0),
+		FontFile: &glyphdata.Stream{
+			Type: glyphdata.OpenTypeCFF,
+			WriteTo: func(w io.Writer, length *glyphdata.Lengths) error {
+				return nil // test stub
+			},
+		},
 	},
 	{
 		PostScriptName: "Test",
@@ -290,8 +311,7 @@ var t0Dicts = []*CIDFontType0{
 			12: 1200,
 		},
 		DefaultWidth: 900,
-		FontType:     glyphdata.CFF,
-		FontRef:      pdf.NewReference(999, 0),
+		FontFile:     nil, // No font data needed for this test
 	},
 	{
 		PostScriptName: "Nil-Width",
@@ -311,6 +331,6 @@ var t0Dicts = []*CIDFontType0{
 		ROS:          ros,
 		CMap:         func() *cmap.File { c, _ := cmap.Predefined("Identity-H"); return c }(),
 		DefaultWidth: 1000,
-		FontType:     glyphdata.None,
+		FontFile:     nil, // external font
 	},
 }

@@ -72,10 +72,11 @@ func Read(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
 		return nil, pdf.Errorf("unsupported font type: %s", fontType)
 	}
 
-	return read(r, fontDict)
+	x := pdf.NewExtractor(r)
+	return read(x, fontDict)
 }
 
-type readerFunc func(r pdf.Getter, obj pdf.Object) (font.Dict, error)
+type readerFunc func(x *pdf.Extractor, obj pdf.Object) (font.Dict, error)
 
 var (
 	readerMutex sync.Mutex

@@ -34,7 +34,7 @@ import (
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding/cidenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
-	"seehuhn.de/go/pdf/font/glyphdata/opentypeglyphs"
+	"seehuhn.de/go/pdf/font/glyphdata/sfntglyphs"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 )
@@ -218,19 +218,13 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 		DefaultWidth:    dw,
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
 		ToUnicode:       e.CIDEncoder.ToUnicode(),
-		FontType:        glyphdata.TrueType,
-		FontRef:         rm.Out.Alloc(),
+		FontFile:        sfntglyphs.ToStream(subsetFont, glyphdata.TrueType),
 	}
 	if !isIdentity {
 		dict.CIDToGID = cidToGID
 	}
 
 	err := dict.WriteToPDF(rm, e.Ref)
-	if err != nil {
-		return err
-	}
-
-	err = opentypeglyphs.Embed(rm.Out, dict.FontType, dict.FontRef, subsetFont)
 	if err != nil {
 		return err
 	}

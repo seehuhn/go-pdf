@@ -29,7 +29,7 @@
 //
 // This package deals exclusively with font dictionary structures and does not
 // handle the embedding of font programs (glyph outlines). When embedding
-// fonts, the caller must separately embed the font program data and provide
+// fonts, the caller must separately embed the font file data and provide
 // its reference via the FontRef field.
 //
 // Simple fonts select glyphs either by name or via the built-in encoding of a

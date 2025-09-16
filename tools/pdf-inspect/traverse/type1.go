@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"regexp"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/type1glyphs"
 	"seehuhn.de/go/postscript/type1"
@@ -31,9 +30,9 @@ type type1Ctx struct {
 	font *type1.Font
 }
 
-// newType1Ctx creates a new Type1 font context by reading and parsing the font program.
-func newType1Ctx(r pdf.Getter, fontRef pdf.Reference) (*type1Ctx, error) {
-	t1Font, err := type1glyphs.Extract(r, glyphdata.Type1, fontRef)
+// newType1Ctx creates a new Type1 font context by reading and parsing the font file.
+func newType1Ctx(fontFile *glyphdata.Stream) (*type1Ctx, error) {
+	t1Font, err := type1glyphs.FromStream(fontFile)
 	if err != nil {
 		return nil, err
 	}

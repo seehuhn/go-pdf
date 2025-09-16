@@ -86,14 +86,12 @@ var testCases = []struct {
 						_, err := w.Write([]byte("Document F content"))
 						return err
 					},
-					SingleUse: false,
 				},
 				"UF": {
 					WriteData: func(w io.Writer) error {
 						_, err := w.Write([]byte("Document UF content"))
 						return err
 					},
-					SingleUse: false,
 				},
 			},
 			AFRelationship: RelationshipUnspecified,
@@ -110,7 +108,6 @@ var testCases = []struct {
 						_, err := w.Write([]byte("Main file content"))
 						return err
 					},
-					SingleUse: false,
 				},
 			},
 			RelatedFiles: map[string][]RelatedFile{
@@ -120,14 +117,12 @@ var testCases = []struct {
 							_, err := w.Write([]byte("Related file 1 content"))
 							return err
 						},
-						SingleUse: false,
 					}},
 					{Name: "related2.txt", Stream: &Stream{
 						WriteData: func(w io.Writer) error {
 							_, err := w.Write([]byte("Related file 2 content"))
 							return err
 						},
-						SingleUse: false,
 					}},
 				},
 			},
@@ -208,7 +203,6 @@ var testCases = []struct {
 						_, err := w.Write([]byte("Comprehensive F content with full metadata"))
 						return err
 					},
-					SingleUse: false,
 				},
 				"UF": {
 					MimeType: "text/plain",
@@ -216,7 +210,6 @@ var testCases = []struct {
 						_, err := w.Write([]byte("Unicode filename content"))
 						return err
 					},
-					SingleUse: false,
 				},
 			},
 			RelatedFiles: map[string][]RelatedFile{
@@ -227,7 +220,6 @@ var testCases = []struct {
 							_, err := w.Write([]byte("<?xml version=\"1.0\"?><metadata></metadata>"))
 							return err
 						},
-						SingleUse: false,
 					}},
 				},
 			},
@@ -339,7 +331,6 @@ func TestSpecificationValidation(t *testing.T) {
 						_, err := w.Write([]byte("test content"))
 						return err
 					},
-					SingleUse: false,
 				},
 			},
 		}
@@ -388,7 +379,6 @@ func TestSpecificationIndirectReference(t *testing.T) {
 						_, err := w.Write([]byte("test content"))
 						return err
 					},
-					SingleUse: false,
 				},
 			},
 		}
@@ -416,29 +406,25 @@ func TestSpecificationIndirectReference(t *testing.T) {
 						_, err := w.Write([]byte("Related file content"))
 						return err
 					},
-					SingleUse: false,
 				}}},
 			},
+			SingleUse: true, // Try to get a direct dictionary
 		}
 
 		buf, _ := memfile.NewPDFWriter(pdf.V1_3, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		obj, _, err := spec.Embed(rm)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// Should return a reference, not a direct dictionary
-		if _, isRef := obj.(pdf.Reference); !isRef {
-			t.Error("expected indirect reference when RF is present")
+		// Should return an error because RF requires indirect reference
+		_, _, err := spec.Embed(rm)
+		if err == nil {
+			t.Error("expected error when RF is present with SingleUse=true")
 		}
 	})
 
 	t.Run("simple spec can be direct", func(t *testing.T) {
 		spec := &Specification{
 			FileName:  "test.txt",
-			SingleUse: true,
+			SingleUse: true, // Request a direct dictionary
 		}
 
 		buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
@@ -461,7 +447,6 @@ func TestSpecificationAFRelationship(t *testing.T) {
 		spec := &Specification{
 			FileName:       "test.txt",
 			AFRelationship: RelationshipUnspecified,
-			SingleUse:      true,
 		}
 
 		buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
@@ -472,9 +457,9 @@ func TestSpecificationAFRelationship(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		dict, ok := obj.(pdf.Dict)
-		if !ok {
-			t.Fatal("expected dictionary")
+		dict, err := pdf.GetDict(buf, obj)
+		if err != nil {
+			t.Fatal(err)
 		}
 
 		// Unspecified should not be written (it's the default)
@@ -487,7 +472,6 @@ func TestSpecificationAFRelationship(t *testing.T) {
 		spec := &Specification{
 			FileName:       "test.txt",
 			AFRelationship: RelationshipSource,
-			SingleUse:      true,
 		}
 
 		buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
@@ -498,9 +482,9 @@ func TestSpecificationAFRelationship(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		dict, ok := obj.(pdf.Dict)
-		if !ok {
-			t.Fatal("expected dictionary")
+		dict, err := pdf.GetDict(buf, obj)
+		if err != nil {
+			t.Fatal(err)
 		}
 
 		if dict["AFRelationship"] != pdf.Name("Source") {

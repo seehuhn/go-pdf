@@ -19,6 +19,7 @@ package dict
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"testing"
 
@@ -105,7 +106,8 @@ func FuzzTrueTypeDict(f *testing.F) {
 			pdf.Format(os.Stdout, pdf.OptPretty, r.GetMeta().Trailer)
 			t.Skip("broken reference")
 		}
-		d, err := ReadTrueType(r, obj)
+		x := pdf.NewExtractor(r)
+		d, err := DecodeTrueType(x, obj)
 		if err != nil {
 			t.Skip("broken TrueTypeDict")
 		}
@@ -124,21 +126,28 @@ func checkRoundtripTT(t *testing.T, d1 *TrueType, v pdf.Version) {
 	// == Write ==
 
 	ref := w.Alloc()
-	if d1.FontRef != 0 {
-		d1.FontRef = w.Alloc()
+	if d1.FontFile != nil {
+		fontRef := w.Alloc()
 		// write a fake font data stream
 		var subtype pdf.Object
-		switch d1.FontType {
+		switch d1.FontFile.Type {
 		case glyphdata.OpenTypeGlyf:
 			subtype = pdf.Name("OpenType")
 		}
-		stm, err := w.OpenStream(d1.FontRef, pdf.Dict{"Subtype": subtype})
+		stm, err := w.OpenStream(fontRef, pdf.Dict{"Subtype": subtype})
 		if err != nil {
 			t.Fatal(err)
 		}
 		err = stm.Close()
 		if err != nil {
 			t.Fatal(err)
+		}
+		// Keep FontFile but simplify WriteTo for test
+		d1.FontFile = &glyphdata.Stream{
+			Type: d1.FontFile.Type,
+			WriteTo: func(w io.Writer, length *glyphdata.Lengths) error {
+				return nil // test stub
+			},
 		}
 	}
 	err := d1.WriteToPDF(rm, ref)
@@ -152,7 +161,8 @@ func checkRoundtripTT(t *testing.T, d1 *TrueType, v pdf.Version) {
 
 	// == Read ==
 
-	d2, err := ReadTrueType(w, ref)
+	x := pdf.NewExtractor(w)
+	d2, err := DecodeTrueType(x, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +252,11 @@ var ttDicts = []*TrueType{
 		},
 		Encoding: func(c byte) string { return pdfenc.Standard.Encoding[c] },
 		Width:    makeConstWidth(666),
-		FontType: glyphdata.OpenTypeGlyf,
-		FontRef:  pdf.NewReference(999, 0),
+		FontFile: &glyphdata.Stream{
+			Type: glyphdata.OpenTypeGlyf,
+			WriteTo: func(w io.Writer, length *glyphdata.Lengths) error {
+				return nil // test stub
+			},
+		},
 	},
 }

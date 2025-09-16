@@ -30,7 +30,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
-	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/type1glyphs"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
@@ -206,23 +205,13 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	for c, info := range e.Simple.MappedCodes() {
 		dict.Width[c] = info.Width
 	}
-	if omitFontData {
-		dict.FontType = glyphdata.None
-	} else {
-		dict.FontType = glyphdata.Type1
-		dict.FontRef = rm.Out.Alloc()
+	if !omitFontData {
+		dict.FontFile = type1glyphs.ToStream(fontSubset)
 	}
 
 	err := dict.WriteToPDF(rm, e.Ref)
 	if err != nil {
 		return err
-	}
-
-	if dict.FontType == glyphdata.Type1 {
-		err := type1glyphs.Embed(rm.Out, dict.FontType, dict.FontRef, fontSubset)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
