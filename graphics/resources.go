@@ -39,6 +39,10 @@ type Halftone interface {
 	// This is one of 1, 5, 6, 10 or 16.
 	HalftoneType() int
 
+	// GetTransferFunction returns the transfer function given in the halftone.
+	// If no transfer function is specified, nil is returned.
+	GetTransferFunction() pdf.Function
+
 	pdf.Embedder[pdf.Unused]
 }
 

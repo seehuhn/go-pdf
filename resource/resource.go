@@ -23,7 +23,7 @@ import (
 )
 
 // TODO(voss):
-// 1. Implement ExtractExtGState for graphics.ExtGState
+// 1. Implement ExtractExtGState for [graphics.ExtGState]
 // 2. Implement a general ExtractXObject that can dispatch to specific XObject types (Image, Form, PS)
 // 3. Implement ExtractPattern for color.Pattern interface
 // 4. Review/verify shading.Extract compatibility with the extractor pattern

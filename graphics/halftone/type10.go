@@ -17,11 +17,14 @@
 package halftone
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/transfer"
 )
 
 // PDF 2.0 sections: 10.6.4 10.6.5.1 10.6.5.4
@@ -29,33 +32,82 @@ import (
 // Type10 represents a Type 10 halftone that uses angled threshold arrays
 // supporting non-zero screen angles through two-square decomposition.
 type Type10 struct {
-	// HalftoneName (optional) is the name of the halftone dictionary.
-	HalftoneName string
+	// Size1 is the side of square X in device pixels.
+	Size1 int
 
-	// Xsquare is the side of square X in device pixels.
-	// Horizontal displacement between corresponding points in adjacent halftone cells.
-	Xsquare int
-
-	// Ysquare is the side of square Y in device pixels.
-	// Vertical displacement between corresponding points in adjacent halftone cells.
-	Ysquare int
+	// Size2 is the side of square Y in device pixels.
+	Size2 int
 
 	// ThresholdData contains the threshold values for both squares.
-	// The first Xsquare² bytes represent the first square, followed by
-	// Ysquare² bytes for the second square, both in row-major order.
+	// The first Size1*Size1 bytes represent the first square, followed by
+	// Size2*Size2 bytes for the second square, both in row-major order.
 	ThresholdData []uint8
 
-	// TransferFunction (optional) overrides the current transfer function.
-	// Use pdf.Name("Identity") for the identity function.
-	TransferFunction pdf.Object
+	// TransferFunction (optional) overrides the current transfer function for
+	// this component. Use [transfer.Identity] for the identity function.
+	TransferFunction pdf.Function
 }
 
 var _ graphics.Halftone = (*Type10)(nil)
 
-// HalftoneType returns 10.
-// This implements the [graphics.Halftone] interface.
-func (h *Type10) HalftoneType() int {
-	return 10
+// extractType10 reads a Type 10 halftone from a PDF stream.
+func extractType10(x *pdf.Extractor, stream *pdf.Stream) (*Type10, error) {
+	h := &Type10{}
+
+	if xsquare, ok := stream.Dict["Xsquare"]; ok {
+		xsquareVal, err := pdf.GetInteger(x.R, xsquare)
+		if err != nil {
+			return nil, err
+		}
+		h.Size1 = int(xsquareVal)
+	}
+
+	if ysquare, ok := stream.Dict["Ysquare"]; ok {
+		ysquareVal, err := pdf.GetInteger(x.R, ysquare)
+		if err != nil {
+			return nil, err
+		}
+		h.Size2 = int(ysquareVal)
+	}
+
+	if tf, err := pdf.Resolve(x.R, stream.Dict["TransferFunction"]); err != nil {
+		return nil, err
+	} else if tf == pdf.Name("Identity") {
+		h.TransferFunction = transfer.Identity
+	} else {
+		if F, err := pdf.Optional(function.Extract(x, tf)); err != nil {
+			return nil, err
+		} else if isValidTransferFunction(F) {
+			h.TransferFunction = F
+		}
+	}
+
+	// Validate dimensions
+	if h.Size1 <= 0 || h.Size2 <= 0 {
+		return nil, fmt.Errorf("invalid square dimensions %dx%d", h.Size1, h.Size2)
+	}
+
+	// Read threshold data if dimensions are provided
+	if h.Size1 > 0 && h.Size2 > 0 {
+		expectedSize := h.Size1*h.Size1 + h.Size2*h.Size2
+		stmReader, err := pdf.DecodeStream(x.R, stream, 0)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode stream: %w", err)
+		}
+		defer stmReader.Close()
+
+		data := make([]byte, expectedSize)
+		n, err := io.ReadFull(stmReader, data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read threshold data: %w", err)
+		}
+		if n != expectedSize {
+			return nil, fmt.Errorf("incomplete threshold data: expected %d bytes, got %d", expectedSize, n)
+		}
+		h.ThresholdData = data
+	}
+
+	return h, nil
 }
 
 func (h *Type10) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
@@ -65,36 +117,23 @@ func (h *Type10) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 		return nil, zero, err
 	}
 
-	if h.HalftoneName == "" {
-		if h.Xsquare <= 0 || h.Ysquare <= 0 {
-			return nil, zero, fmt.Errorf("invalid square dimensions %d×%d", h.Xsquare, h.Ysquare)
-		}
-		expectedSize := h.Xsquare*h.Xsquare + h.Ysquare*h.Ysquare
-		if len(h.ThresholdData) != expectedSize {
-			return nil, zero, fmt.Errorf("threshold data size mismatch: expected %d bytes, got %d", expectedSize, len(h.ThresholdData))
-		}
-	} else {
-		// If HalftoneName is provided, all other fields become optional.
-		if h.Xsquare < 0 || h.Ysquare < 0 {
-			return nil, zero, fmt.Errorf("invalid square dimensions %d×%d", h.Xsquare, h.Ysquare)
-		}
-		if h.Xsquare > 0 && h.Ysquare > 0 {
-			expectedSize := h.Xsquare*h.Xsquare + h.Ysquare*h.Ysquare
-			if len(h.ThresholdData) != 0 && len(h.ThresholdData) != expectedSize {
-				return nil, zero, fmt.Errorf("threshold data size mismatch: expected %d bytes, got %d", expectedSize, len(h.ThresholdData))
-			}
-		}
+	if h.Size1 <= 0 || h.Size2 <= 0 {
+		return nil, zero, fmt.Errorf("invalid square dimensions %dx%d", h.Size1, h.Size2)
+	}
+	expectedSize := h.Size1*h.Size1 + h.Size2*h.Size2
+	if len(h.ThresholdData) != expectedSize {
+		return nil, zero, fmt.Errorf("threshold data size mismatch: expected %d bytes, got %d", expectedSize, len(h.ThresholdData))
 	}
 
 	dict := pdf.Dict{
 		"HalftoneType": pdf.Integer(10),
 	}
 
-	if h.Xsquare > 0 {
-		dict["Xsquare"] = pdf.Integer(h.Xsquare)
+	if h.Size1 > 0 {
+		dict["Xsquare"] = pdf.Integer(h.Size1)
 	}
-	if h.Ysquare > 0 {
-		dict["Ysquare"] = pdf.Integer(h.Ysquare)
+	if h.Size2 > 0 {
+		dict["Ysquare"] = pdf.Integer(h.Size2)
 	}
 
 	// Add optional fields
@@ -103,12 +142,17 @@ func (h *Type10) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 		dict["Type"] = pdf.Name("Halftone")
 	}
 
-	if h.HalftoneName != "" {
-		dict["HalftoneName"] = pdf.String(h.HalftoneName)
-	}
-
-	if h.TransferFunction != nil {
-		dict["TransferFunction"] = h.TransferFunction
+	if h.TransferFunction == transfer.Identity {
+		dict["TransferFunction"] = pdf.Name("Identity")
+	} else if h.TransferFunction != nil {
+		if !isValidTransferFunction(h.TransferFunction) {
+			return nil, zero, errors.New("invalid transfer function shape")
+		}
+		ref, _, err := pdf.ResourceManagerEmbed(rm, h.TransferFunction)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["TransferFunction"] = ref
 	}
 
 	// Create the stream with threshold data
@@ -133,68 +177,14 @@ func (h *Type10) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 	return ref, zero, nil
 }
 
-// readType10 reads a Type 10 halftone from a PDF stream.
-func readType10(x *pdf.Extractor, stream *pdf.Stream) (*Type10, error) {
-	h := &Type10{}
+// HalftoneType returns 10.
+// This implements the [graphics.Halftone] interface.
+func (h *Type10) HalftoneType() int {
+	return 10
+}
 
-	if name, ok := stream.Dict["HalftoneName"]; ok {
-		halftoneName, err := pdf.GetString(x.R, name)
-		if err != nil {
-			return nil, err
-		}
-		h.HalftoneName = string(halftoneName)
-	}
-
-	if xsquare, ok := stream.Dict["Xsquare"]; ok {
-		xsquareVal, err := pdf.GetInteger(x.R, xsquare)
-		if err != nil {
-			return nil, err
-		}
-		h.Xsquare = int(xsquareVal)
-	}
-
-	if ysquare, ok := stream.Dict["Ysquare"]; ok {
-		ysquareVal, err := pdf.GetInteger(x.R, ysquare)
-		if err != nil {
-			return nil, err
-		}
-		h.Ysquare = int(ysquareVal)
-	}
-
-	if transferFunc, ok := stream.Dict["TransferFunction"]; ok {
-		h.TransferFunction = transferFunc
-	}
-
-	// Validate dimensions
-	if h.HalftoneName == "" {
-		if h.Xsquare <= 0 || h.Ysquare <= 0 {
-			return nil, fmt.Errorf("invalid square dimensions %d×%d", h.Xsquare, h.Ysquare)
-		}
-	} else {
-		if h.Xsquare < 0 || h.Ysquare < 0 {
-			return nil, fmt.Errorf("invalid square dimensions %d×%d", h.Xsquare, h.Ysquare)
-		}
-	}
-
-	// Read threshold data if dimensions are provided
-	if h.Xsquare > 0 && h.Ysquare > 0 {
-		expectedSize := h.Xsquare*h.Xsquare + h.Ysquare*h.Ysquare
-		stmReader, err := pdf.DecodeStream(x.R, stream, 0)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode stream: %w", err)
-		}
-		defer stmReader.Close()
-
-		data := make([]byte, expectedSize)
-		n, err := io.ReadFull(stmReader, data)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read threshold data: %w", err)
-		}
-		if n != expectedSize {
-			return nil, fmt.Errorf("incomplete threshold data: expected %d bytes, got %d", expectedSize, n)
-		}
-		h.ThresholdData = data
-	}
-
-	return h, nil
+// GetTransferFunction returns the transfer function given in the halftone.
+// This implements the [graphics.Halftone] interface.
+func (h *Type10) GetTransferFunction() pdf.Function {
+	return h.TransferFunction
 }

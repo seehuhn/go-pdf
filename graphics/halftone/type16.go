@@ -23,17 +23,16 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/transfer"
 )
 
 // PDF 2.0 sections: 10.6.4 10.6.5.1 10.6.5.5
 
-// Type16 represents a Type 16 halftone that uses high-precision threshold arrays
-// with 16-bit threshold values.
+// Type16 represents a Type 16 halftone that uses high-precision threshold
+// arrays with 16-bit threshold values.
 type Type16 struct {
-	// HalftoneName (optional) is the name of the halftone dictionary.
-	HalftoneName string
-
 	// Width is the width of the first (or only) rectangle in device pixels.
 	Width int
 
@@ -49,143 +48,20 @@ type Type16 struct {
 	Height2 int
 
 	// ThresholdData contains the 16-bit threshold values.
-	// For one rectangle: Width × Height values.
-	// For two rectangles: (Width × Height + Width2 × Height2) values.
+	// For one rectangle: Width*Height values.
+	// For two rectangles: (Width*Height + Width2*Height2) values.
 	ThresholdData []uint16
 
-	// TransferFunction (optional) overrides the current transfer function.
-	// Use pdf.Name("Identity") for the identity function.
-	TransferFunction pdf.Object
+	// TransferFunction (optional) overrides the current transfer function for
+	// this component. Use [transfer.Identity] for the identity function.
+	TransferFunction pdf.Function
 }
 
 var _ graphics.Halftone = (*Type16)(nil)
 
-// HalftoneType returns 16.
-// This implements the [graphics.Halftone] interface.
-func (h *Type16) HalftoneType() int {
-	return 16
-}
-
-func (h *Type16) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-
-	if err := pdf.CheckVersion(rm.Out, "Type 16 halftone screening", pdf.V1_3); err != nil {
-		return nil, zero, err
-	}
-
-	if h.HalftoneName == "" {
-		if h.Width <= 0 || h.Height <= 0 {
-			return nil, zero, fmt.Errorf("invalid threshold array dimensions %d×%d", h.Width, h.Height)
-		}
-
-		hasSecondRect := h.Width2 > 0 || h.Height2 > 0
-		if hasSecondRect && (h.Width2 <= 0 || h.Height2 <= 0) {
-			return nil, zero, fmt.Errorf("if Width2 or Height2 is specified, both must be positive, got %d×%d", h.Width2, h.Height2)
-		}
-
-		// Calculate expected data size (uint16 values)
-		expectedValues := h.Width * h.Height
-		if hasSecondRect {
-			expectedValues += h.Width2 * h.Height2
-		}
-
-		if len(h.ThresholdData) != expectedValues {
-			return nil, zero, fmt.Errorf("threshold data size mismatch: expected %d values, got %d", expectedValues, len(h.ThresholdData))
-		}
-	} else {
-		// If HalftoneName is provided, all other fields become optional.
-		if h.Width < 0 || h.Height < 0 {
-			return nil, zero, fmt.Errorf("invalid threshold array dimensions %d×%d", h.Width, h.Height)
-		}
-
-		hasSecondRect := h.Width2 > 0 || h.Height2 > 0
-		if hasSecondRect && (h.Width2 < 0 || h.Height2 < 0) {
-			return nil, zero, fmt.Errorf("invalid second rectangle dimensions %d×%d", h.Width2, h.Height2)
-		}
-		if hasSecondRect && (h.Width2 == 0 || h.Height2 == 0) {
-			return nil, zero, errors.New("if Width2 or Height2 is specified, both must be positive")
-		}
-
-		if h.Width > 0 && h.Height > 0 {
-			expectedValues := h.Width * h.Height
-			if hasSecondRect {
-				expectedValues += h.Width2 * h.Height2
-			}
-			if len(h.ThresholdData) != 0 && len(h.ThresholdData) != expectedValues {
-				return nil, zero, fmt.Errorf("threshold data size mismatch: expected %d values, got %d", expectedValues, len(h.ThresholdData))
-			}
-		}
-	}
-
-	dict := pdf.Dict{
-		"HalftoneType": pdf.Integer(16),
-	}
-
-	if h.Width > 0 {
-		dict["Width"] = pdf.Integer(h.Width)
-	}
-	if h.Height > 0 {
-		dict["Height"] = pdf.Integer(h.Height)
-	}
-
-	// Add optional fields
-	opt := rm.Out.GetOptions()
-	if opt.HasAny(pdf.OptDictTypes) {
-		dict["Type"] = pdf.Name("Halftone")
-	}
-
-	if h.HalftoneName != "" {
-		dict["HalftoneName"] = pdf.String(h.HalftoneName)
-	}
-
-	hasSecondRect := h.Width2 > 0 && h.Height2 > 0
-	if hasSecondRect {
-		dict["Width2"] = pdf.Integer(h.Width2)
-		dict["Height2"] = pdf.Integer(h.Height2)
-	}
-
-	if h.TransferFunction != nil {
-		dict["TransferFunction"] = h.TransferFunction
-	}
-
-	// Create the stream with threshold data
-	ref := rm.Out.Alloc()
-	stm, err := rm.Out.OpenStream(ref, dict, pdf.FilterCompress{})
-	if err != nil {
-		return nil, zero, err
-	}
-
-	if len(h.ThresholdData) > 0 {
-		// Convert uint16 values to big-endian bytes
-		data := make([]byte, len(h.ThresholdData)*2)
-		for i, val := range h.ThresholdData {
-			binary.BigEndian.PutUint16(data[i*2:], val)
-		}
-		_, err = stm.Write(data)
-		if err != nil {
-			return nil, zero, err
-		}
-	}
-
-	err = stm.Close()
-	if err != nil {
-		return nil, zero, err
-	}
-
-	return ref, zero, nil
-}
-
-// readType16 reads a Type 16 halftone from a PDF stream.
-func readType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
+// extractType16 reads a Type 16 halftone from a PDF stream.
+func extractType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
 	h := &Type16{}
-
-	if name, ok := stream.Dict["HalftoneName"]; ok {
-		halftoneName, err := pdf.GetString(x.R, name)
-		if err != nil {
-			return nil, err
-		}
-		h.HalftoneName = string(halftoneName)
-	}
 
 	if width, ok := stream.Dict["Width"]; ok {
 		widthVal, err := pdf.GetInteger(x.R, width)
@@ -219,32 +95,26 @@ func readType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
 		h.Height2 = int(height2Val)
 	}
 
-	if transferFunc, ok := stream.Dict["TransferFunction"]; ok {
-		h.TransferFunction = transferFunc
+	if tf, err := pdf.Resolve(x.R, stream.Dict["TransferFunction"]); err != nil {
+		return nil, err
+	} else if tf == pdf.Name("Identity") {
+		h.TransferFunction = transfer.Identity
+	} else {
+		if F, err := pdf.Optional(function.Extract(x, tf)); err != nil {
+			return nil, err
+		} else if isValidTransferFunction(F) {
+			h.TransferFunction = F
+		}
 	}
 
 	// Validate dimensions
-	if h.HalftoneName == "" {
-		if h.Width <= 0 || h.Height <= 0 {
-			return nil, fmt.Errorf("invalid threshold array dimensions %d×%d", h.Width, h.Height)
-		}
+	if h.Width <= 0 || h.Height <= 0 {
+		return nil, fmt.Errorf("invalid threshold array dimensions %dx%d", h.Width, h.Height)
+	}
 
-		hasSecondRect := h.Width2 > 0 || h.Height2 > 0
-		if hasSecondRect && (h.Width2 <= 0 || h.Height2 <= 0) {
-			return nil, fmt.Errorf("if Width2 or Height2 is specified, both must be positive, got %d×%d", h.Width2, h.Height2)
-		}
-	} else {
-		if h.Width < 0 || h.Height < 0 {
-			return nil, fmt.Errorf("invalid threshold array dimensions %d×%d", h.Width, h.Height)
-		}
-
-		hasSecondRect := h.Width2 > 0 || h.Height2 > 0
-		if hasSecondRect && (h.Width2 < 0 || h.Height2 < 0) {
-			return nil, fmt.Errorf("invalid second rectangle dimensions %d×%d", h.Width2, h.Height2)
-		}
-		if hasSecondRect && (h.Width2 == 0 || h.Height2 == 0) {
-			return nil, errors.New("if Width2 or Height2 is specified, both must be positive")
-		}
+	hasSecondRect := h.Width2 > 0 || h.Height2 > 0
+	if hasSecondRect && (h.Width2 <= 0 || h.Height2 <= 0) {
+		return nil, fmt.Errorf("if Width2 or Height2 is specified, both must be positive, got %dx%d", h.Width2, h.Height2)
 	}
 
 	// Read threshold data if dimensions are provided
@@ -279,4 +149,104 @@ func readType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
 	}
 
 	return h, nil
+}
+
+func (h *Type16) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
+
+	if err := pdf.CheckVersion(rm.Out, "Type 16 halftone screening", pdf.V1_3); err != nil {
+		return nil, zero, err
+	}
+
+	if h.Width <= 0 || h.Height <= 0 {
+		return nil, zero, fmt.Errorf("invalid threshold array dimensions %dx%d", h.Width, h.Height)
+	}
+
+	hasSecondRect := h.Width2 > 0 || h.Height2 > 0
+	if hasSecondRect && (h.Width2 <= 0 || h.Height2 <= 0) {
+		return nil, zero, fmt.Errorf("if Width2 or Height2 is specified, both must be positive, got %dx%d", h.Width2, h.Height2)
+	}
+
+	// Calculate expected data size (uint16 values)
+	expectedValues := h.Width * h.Height
+	if hasSecondRect {
+		expectedValues += h.Width2 * h.Height2
+	}
+
+	if len(h.ThresholdData) != expectedValues {
+		return nil, zero, fmt.Errorf("threshold data size mismatch: expected %d values, got %d", expectedValues, len(h.ThresholdData))
+	}
+
+	dict := pdf.Dict{
+		"HalftoneType": pdf.Integer(16),
+	}
+
+	if h.Width > 0 {
+		dict["Width"] = pdf.Integer(h.Width)
+	}
+	if h.Height > 0 {
+		dict["Height"] = pdf.Integer(h.Height)
+	}
+
+	// Add optional fields
+	opt := rm.Out.GetOptions()
+	if opt.HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Halftone")
+	}
+
+	if hasSecondRect {
+		dict["Width2"] = pdf.Integer(h.Width2)
+		dict["Height2"] = pdf.Integer(h.Height2)
+	}
+
+	if h.TransferFunction == transfer.Identity {
+		dict["TransferFunction"] = pdf.Name("Identity")
+	} else if h.TransferFunction != nil {
+		if !isValidTransferFunction(h.TransferFunction) {
+			return nil, zero, errors.New("invalid transfer function shape")
+		}
+		ref, _, err := pdf.ResourceManagerEmbed(rm, h.TransferFunction)
+		if err != nil {
+			return nil, zero, err
+		}
+		dict["TransferFunction"] = ref
+	}
+
+	// Create the stream with threshold data
+	ref := rm.Out.Alloc()
+	stm, err := rm.Out.OpenStream(ref, dict, pdf.FilterCompress{})
+	if err != nil {
+		return nil, zero, err
+	}
+
+	if len(h.ThresholdData) > 0 {
+		// Convert uint16 values to big-endian bytes
+		data := make([]byte, len(h.ThresholdData)*2)
+		for i, val := range h.ThresholdData {
+			binary.BigEndian.PutUint16(data[i*2:], val)
+		}
+		_, err = stm.Write(data)
+		if err != nil {
+			return nil, zero, err
+		}
+	}
+
+	err = stm.Close()
+	if err != nil {
+		return nil, zero, err
+	}
+
+	return ref, zero, nil
+}
+
+// HalftoneType returns 16.
+// This implements the [graphics.Halftone] interface.
+func (h *Type16) HalftoneType() int {
+	return 16
+}
+
+// GetTransferFunction returns the transfer function given in the halftone.
+// This implements the [graphics.Halftone] interface.
+func (h *Type16) GetTransferFunction() pdf.Function {
+	return h.TransferFunction
 }

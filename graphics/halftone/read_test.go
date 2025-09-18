@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/transfer"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
@@ -41,19 +42,11 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type1 with all fields",
 			halftone: &Type1{
-				HalftoneName:     "MyHalftone",
 				Frequency:        72.0,
 				Angle:            30.0,
 				SpotFunction:     Round,
 				AccurateScreens:  true,
-				TransferFunction: pdf.Name("Identity"),
-			},
-		},
-		{
-			name: "Type1 with named halftone only",
-			halftone: &Type1{
-				HalftoneName: "NamedHalftone",
-				SpotFunction: SimpleDot,
+				TransferFunction: transfer.Identity,
 			},
 		},
 	},
@@ -62,14 +55,12 @@ var testCases = map[int][]testCase{
 			name: "basic Type5",
 			halftone: &Type5{
 				Default: &Type1{
-					Frequency:    60.0,
-					Angle:        45.0,
-					SpotFunction: SimpleDot,
+					Frequency:        60.0,
+					Angle:            45.0,
+					SpotFunction:     SimpleDot,
+					TransferFunction: transfer.Identity,
 				},
-				Colorants: map[string]interface {
-					pdf.Embedder[pdf.Unused]
-					graphics.Halftone
-				}{
+				Colorants: map[pdf.Name]graphics.Halftone{
 					"Cyan": &Type1{
 						Frequency:    72.0,
 						Angle:        15.0,
@@ -81,12 +72,6 @@ var testCases = map[int][]testCase{
 						SpotFunction: Ellipse,
 					},
 				},
-			},
-		},
-		{
-			name: "Type5 with named halftone only",
-			halftone: &Type5{
-				HalftoneName: "NamedType5",
 			},
 		},
 	},
@@ -102,17 +87,10 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type6 with all fields",
 			halftone: &Type6{
-				HalftoneName:     "MyType6",
 				Width:            2,
 				Height:           2,
 				ThresholdData:    []byte{0, 255, 127, 128},
-				TransferFunction: pdf.Name("Identity"),
-			},
-		},
-		{
-			name: "Type6 with named halftone only",
-			halftone: &Type6{
-				HalftoneName: "NamedType6",
+				TransferFunction: transfer.Identity,
 			},
 		},
 	},
@@ -120,25 +98,18 @@ var testCases = map[int][]testCase{
 		{
 			name: "basic Type10",
 			halftone: &Type10{
-				Xsquare:       3,
-				Ysquare:       2,
+				Size1:         3,
+				Size2:         2,
 				ThresholdData: []byte{0, 128, 64, 192, 255, 127, 191, 63, 32, 160, 96, 224, 31},
 			},
 		},
 		{
 			name: "Type10 with all fields",
 			halftone: &Type10{
-				HalftoneName:     "MyType10",
-				Xsquare:          2,
-				Ysquare:          1,
+				Size1:            2,
+				Size2:            1,
 				ThresholdData:    []byte{0, 255, 127, 128, 64},
-				TransferFunction: pdf.Name("Identity"),
-			},
-		},
-		{
-			name: "Type10 with named halftone only",
-			halftone: &Type10{
-				HalftoneName: "NamedType10",
+				TransferFunction: transfer.Identity,
 			},
 		},
 	},
@@ -164,17 +135,10 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type16 with all fields",
 			halftone: &Type16{
-				HalftoneName:     "MyType16",
 				Width:            1,
 				Height:           1,
 				ThresholdData:    []uint16{32767},
-				TransferFunction: pdf.Name("Identity"),
-			},
-		},
-		{
-			name: "Type16 with named halftone only",
-			halftone: &Type16{
-				HalftoneName: "NamedType16",
+				TransferFunction: transfer.Identity,
 			},
 		},
 	},
@@ -219,7 +183,7 @@ func roundTripTest(t *testing.T, originalHalftone graphics.Halftone) {
 
 	// Read the halftone back
 	x := pdf.NewExtractor(buf)
-	readHalftone, err := Read(x, ref)
+	readHalftone, err := Extract(x, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,7 +258,7 @@ func FuzzRead(f *testing.F) {
 			t.Skip("broken reference")
 		}
 		x := pdf.NewExtractor(r)
-		halftone, err := Read(x, obj)
+		halftone, err := Extract(x, obj)
 		if err != nil {
 			t.Skip("broken halftone")
 		}

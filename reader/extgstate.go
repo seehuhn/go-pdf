@@ -237,7 +237,7 @@ func (r *Reader) readExtGState(ref pdf.Object) (graphics.State, error) {
 		case "TR2":
 			tr2 = v
 		case "HT":
-			x, err := halftone.Read(r.x, v)
+			x, err := halftone.Extract(r.x, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {

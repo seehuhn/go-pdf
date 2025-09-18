@@ -23,8 +23,8 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 )
 
-// Read extracts a halftone from a PDF file.
-func Read(x *pdf.Extractor, obj pdf.Object) (graphics.Halftone, error) {
+// Extract extracts a halftone from a PDF file.
+func Extract(x *pdf.Extractor, obj pdf.Object) (graphics.Halftone, error) {
 	resolved, err := pdf.Resolve(x.R, obj)
 	if err != nil {
 		return nil, err
@@ -45,9 +45,9 @@ func Read(x *pdf.Extractor, obj pdf.Object) (graphics.Halftone, error) {
 
 		switch halftoneType {
 		case 1:
-			return readType1(x, resolved)
+			return extractType1(x, resolved)
 		case 5:
-			return readType5(x, resolved)
+			return extractType5(x, resolved)
 		default:
 			return nil, &pdf.MalformedFileError{
 				Err: fmt.Errorf("unsupported halftone type %d for dictionary", halftoneType),
@@ -62,11 +62,11 @@ func Read(x *pdf.Extractor, obj pdf.Object) (graphics.Halftone, error) {
 
 		switch halftoneType {
 		case 6:
-			return readType6(x, resolved)
+			return extractType6(x, resolved)
 		case 10:
-			return readType10(x, resolved)
+			return extractType10(x, resolved)
 		case 16:
-			return readType16(x, resolved)
+			return extractType16(x, resolved)
 		default:
 			return nil, &pdf.MalformedFileError{
 				Err: fmt.Errorf("unsupported halftone type %d for stream", halftoneType),
