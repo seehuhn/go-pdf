@@ -87,7 +87,8 @@ func TestType1Embedding(t *testing.T) {
 	}
 
 	// step 3: extract the font file and check
-	parsedDict, err := dict.Read(r, fontDict)
+	x := pdf.NewExtractor(r)
+	parsedDict, err := dict.Read(x, fontDict)
 	if err != nil {
 		t.Fatal(err)
 	}

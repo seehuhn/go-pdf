@@ -85,7 +85,7 @@ func (s *Type5) ShadingType() int {
 }
 
 // extractType5 reads a Type 5 (lattice-form Gouraud-shaded triangle mesh) shading from a PDF stream.
-func extractType5(r pdf.Getter, stream *pdf.Stream, wasReference bool) (*Type5, error) {
+func extractType5(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Type5, error) {
 	d := stream.Dict
 	s := &Type5{}
 
@@ -96,7 +96,7 @@ func extractType5(r pdf.Getter, stream *pdf.Stream, wasReference bool) (*Type5, 
 			Err: fmt.Errorf("missing /ColorSpace entry"),
 		}
 	}
-	cs, err := color.ExtractSpace(r, csObj)
+	cs, err := color.ExtractSpace(x, csObj)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func extractType5(r pdf.Getter, stream *pdf.Stream, wasReference bool) (*Type5, 
 			Err: fmt.Errorf("missing /BitsPerCoordinate entry"),
 		}
 	}
-	bpc, err := pdf.GetInteger(r, bpcObj)
+	bpc, err := pdf.GetInteger(x.R, bpcObj)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func extractType5(r pdf.Getter, stream *pdf.Stream, wasReference bool) (*Type5, 
 			Err: fmt.Errorf("missing /BitsPerComponent entry"),
 		}
 	}
-	bpcomp, err := pdf.GetInteger(r, bpcompObj)
+	bpcomp, err := pdf.GetInteger(x.R, bpcompObj)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func extractType5(r pdf.Getter, stream *pdf.Stream, wasReference bool) (*Type5, 
 			Err: fmt.Errorf("missing /VerticesPerRow entry"),
 		}
 	}
-	vpr, err := pdf.GetInteger(r, vprObj)
+	vpr, err := pdf.GetInteger(x.R, vprObj)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func extractType5(r pdf.Getter, stream *pdf.Stream, wasReference bool) (*Type5, 
 			Err: fmt.Errorf("missing /Decode entry"),
 		}
 	}
-	decode, err := pdf.GetFloatArray(r, decodeObj)
+	decode, err := pdf.GetFloatArray(x.R, decodeObj)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +156,7 @@ func extractType5(r pdf.Getter, stream *pdf.Stream, wasReference bool) (*Type5, 
 
 	// Read optional Function
 	if fnObj, ok := d["Function"]; ok {
-		if fn, err := pdf.Optional(function.Extract(r, fnObj)); err != nil {
+		if fn, err := pdf.Optional(pdf.ExtractorGet(x, fnObj, function.Extract)); err != nil {
 			return nil, err
 		} else if fn != nil {
 			s.F = fn
@@ -186,7 +186,7 @@ func extractType5(r pdf.Getter, stream *pdf.Stream, wasReference bool) (*Type5, 
 
 	// Read optional Background
 	if bgObj, ok := d["Background"]; ok {
-		if bg, err := pdf.Optional(pdf.GetFloatArray(r, bgObj)); err != nil {
+		if bg, err := pdf.Optional(pdf.GetFloatArray(x.R, bgObj)); err != nil {
 			return nil, err
 		} else {
 			s.Background = bg
@@ -195,7 +195,7 @@ func extractType5(r pdf.Getter, stream *pdf.Stream, wasReference bool) (*Type5, 
 
 	// Read optional BBox
 	if bboxObj, ok := d["BBox"]; ok {
-		if bbox, err := pdf.Optional(pdf.GetRectangle(r, bboxObj)); err != nil {
+		if bbox, err := pdf.Optional(pdf.GetRectangle(x.R, bboxObj)); err != nil {
 			return nil, err
 		} else {
 			s.BBox = bbox
@@ -204,7 +204,7 @@ func extractType5(r pdf.Getter, stream *pdf.Stream, wasReference bool) (*Type5, 
 
 	// Read optional AntiAlias
 	if aaObj, ok := d["AntiAlias"]; ok {
-		if aa, err := pdf.Optional(pdf.GetBoolean(r, aaObj)); err != nil {
+		if aa, err := pdf.Optional(pdf.GetBoolean(x.R, aaObj)); err != nil {
 			return nil, err
 		} else {
 			s.AntiAlias = bool(aa)
@@ -212,7 +212,7 @@ func extractType5(r pdf.Getter, stream *pdf.Stream, wasReference bool) (*Type5, 
 	}
 
 	// Read stream data to extract vertices
-	stmReader, err := pdf.DecodeStream(r, stream, 0)
+	stmReader, err := pdf.DecodeStream(x.R, stream, 0)
 	if err != nil {
 		return nil, err
 	}

@@ -26,22 +26,22 @@ import (
 )
 
 // Read reads a font dictionary from a PDF file.
-func Read(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
-	fontDict, err := pdf.GetDictTyped(r, obj, "Font")
+func Read(x *pdf.Extractor, obj pdf.Object) (font.Dict, error) {
+	fontDict, err := pdf.GetDictTyped(x.R, obj, "Font")
 	if err != nil {
 		return nil, err
 	} else if fontDict == nil {
 		return nil, pdf.Error("missing font dictionary")
 	}
 
-	fontType, err := pdf.GetName(r, fontDict["Subtype"])
+	fontType, err := pdf.GetName(x.R, fontDict["Subtype"])
 	if err != nil {
 		return nil, err
 	}
 	fontDict["Subtype"] = fontType
 
 	if fontType == "Type0" {
-		a, err := pdf.GetArray(r, fontDict["DescendantFonts"])
+		a, err := pdf.GetArray(x.R, fontDict["DescendantFonts"])
 		if err != nil {
 			return nil, err
 		} else if len(a) < 1 {
@@ -51,13 +51,13 @@ func Read(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
 		}
 		fontDict["DescendantFonts"] = a
 
-		cidFontDict, err := pdf.GetDictTyped(r, a[0], "Font")
+		cidFontDict, err := pdf.GetDictTyped(x.R, a[0], "Font")
 		if err != nil {
 			return nil, err
 		}
 		a[0] = cidFontDict
 
-		fontType, err = pdf.GetName(r, cidFontDict["Subtype"])
+		fontType, err = pdf.GetName(x.R, cidFontDict["Subtype"])
 		if err != nil {
 			return nil, err
 		}
@@ -72,7 +72,6 @@ func Read(r pdf.Getter, obj pdf.Object) (font.Dict, error) {
 		return nil, pdf.Errorf("unsupported font type: %s", fontType)
 	}
 
-	x := pdf.NewExtractor(r)
 	return read(x, fontDict)
 }
 

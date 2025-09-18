@@ -81,7 +81,8 @@ func TestToUnicodeSimple1(t *testing.T) {
 			}
 
 			ref := page.Resources.Font[fontName]
-			d, err := dict.Read(buf, ref)
+			x := pdf.NewExtractor(buf)
+			d, err := dict.Read(x, ref)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -129,7 +130,8 @@ func TestToUnicodeSimple2(t *testing.T) {
 			}
 
 			ref := page.Resources.Font[fontName]
-			d, err := dict.Read(buf, ref)
+			x := pdf.NewExtractor(buf)
+			d, err := dict.Read(x, ref)
 			if err != nil {
 				t.Fatal(err)
 			}

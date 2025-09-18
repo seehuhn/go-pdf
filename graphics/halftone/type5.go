@@ -24,6 +24,8 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 )
 
+// PDF 2.0 sections: 10.6.5.1 10.6.5.6
+
 // Type5 represents a Type 5 halftone dictionary that defines separate screens
 // for multiple colorants.
 type Type5 struct {
@@ -116,11 +118,11 @@ func (h *Type5) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 }
 
 // readType5 reads a Type 5 halftone from a PDF dictionary.
-func readType5(r pdf.Getter, dict pdf.Dict) (*Type5, error) {
+func readType5(x *pdf.Extractor, dict pdf.Dict) (*Type5, error) {
 	h := &Type5{}
 
 	if name, ok := dict["HalftoneName"]; ok {
-		halftoneName, err := pdf.GetString(r, name)
+		halftoneName, err := pdf.GetString(x.R, name)
 		if err != nil {
 			return nil, err
 		}
@@ -129,7 +131,7 @@ func readType5(r pdf.Getter, dict pdf.Dict) (*Type5, error) {
 
 	// Read the Default halftone
 	if defaultObj, ok := dict["Default"]; ok {
-		defaultHalftone, err := Read(r, defaultObj)
+		defaultHalftone, err := Read(x, defaultObj)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read default halftone: %w", err)
 		}
@@ -158,7 +160,7 @@ func readType5(r pdf.Getter, dict pdf.Dict) (*Type5, error) {
 	// Check for standard colorants
 	for _, colorant := range standardColorants {
 		if colorantObj, ok := dict[pdf.Name(colorant)]; ok {
-			colorantHalftone, err := Read(r, colorantObj)
+			colorantHalftone, err := Read(x, colorantObj)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read halftone for colorant %q: %w", colorant, err)
 			}
@@ -207,7 +209,7 @@ func readType5(r pdf.Getter, dict pdf.Dict) (*Type5, error) {
 		}
 
 		// Try to read as a halftone
-		colorantHalftone, err := Read(r, value)
+		colorantHalftone, err := Read(x, value)
 		if err != nil {
 			// If it fails to read as a halftone, skip it (might be some other entry)
 			continue

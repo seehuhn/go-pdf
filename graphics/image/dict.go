@@ -208,7 +208,7 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 
 	// Extract ColorSpace (required for images)
 	if csObj, ok := dict["ColorSpace"]; ok {
-		cs, err := color.ExtractSpace(x.R, csObj)
+		cs, err := color.ExtractSpace(x, csObj)
 		if err != nil {
 			return nil, fmt.Errorf("invalid ColorSpace: %w", err)
 		}
@@ -308,7 +308,7 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	// Extract SMask (soft-mask image)
 	if smaskObj, ok := dict["SMask"]; ok {
 		smask, err := pdf.ExtractorGetOptional(x, smaskObj, func(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
-			return ExtractSoftMask(x.R, obj)
+			return ExtractSoftMask(x, obj)
 		})
 		if err != nil {
 			return nil, fmt.Errorf("invalid SMask: %w", err)

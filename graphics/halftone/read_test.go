@@ -35,7 +35,7 @@ var testCases = map[int][]testCase{
 			halftone: &Type1{
 				Frequency:    60.0,
 				Angle:        45.0,
-				SpotFunction: pdf.Name("SimpleDot"),
+				SpotFunction: SimpleDot,
 			},
 		},
 		{
@@ -44,7 +44,7 @@ var testCases = map[int][]testCase{
 				HalftoneName:     "MyHalftone",
 				Frequency:        72.0,
 				Angle:            30.0,
-				SpotFunction:     pdf.Name("Round"),
+				SpotFunction:     Round,
 				AccurateScreens:  true,
 				TransferFunction: pdf.Name("Identity"),
 			},
@@ -53,6 +53,7 @@ var testCases = map[int][]testCase{
 			name: "Type1 with named halftone only",
 			halftone: &Type1{
 				HalftoneName: "NamedHalftone",
+				SpotFunction: SimpleDot,
 			},
 		},
 	},
@@ -63,7 +64,7 @@ var testCases = map[int][]testCase{
 				Default: &Type1{
 					Frequency:    60.0,
 					Angle:        45.0,
-					SpotFunction: pdf.Name("SimpleDot"),
+					SpotFunction: SimpleDot,
 				},
 				Colorants: map[string]interface {
 					pdf.Embedder[pdf.Unused]
@@ -72,12 +73,12 @@ var testCases = map[int][]testCase{
 					"Cyan": &Type1{
 						Frequency:    72.0,
 						Angle:        15.0,
-						SpotFunction: pdf.Name("Round"),
+						SpotFunction: Round,
 					},
 					"Magenta": &Type1{
 						Frequency:    72.0,
 						Angle:        75.0,
-						SpotFunction: pdf.Name("Ellipse"),
+						SpotFunction: Ellipse,
 					},
 				},
 			},
@@ -217,7 +218,8 @@ func roundTripTest(t *testing.T, originalHalftone graphics.Halftone) {
 	}
 
 	// Read the halftone back
-	readHalftone, err := Read(buf, ref)
+	x := pdf.NewExtractor(buf)
+	readHalftone, err := Read(x, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,7 +293,8 @@ func FuzzRead(f *testing.F) {
 		if obj == nil {
 			t.Skip("broken reference")
 		}
-		halftone, err := Read(r, obj)
+		x := pdf.NewExtractor(r)
+		halftone, err := Read(x, obj)
 		if err != nil {
 			t.Skip("broken halftone")
 		}

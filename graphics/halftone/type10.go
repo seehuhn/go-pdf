@@ -24,6 +24,8 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 )
 
+// PDF 2.0 sections: 10.6.4 10.6.5.1 10.6.5.4
+
 // Type10 represents a Type 10 halftone that uses angled threshold arrays
 // supporting non-zero screen angles through two-square decomposition.
 type Type10 struct {
@@ -132,11 +134,11 @@ func (h *Type10) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 }
 
 // readType10 reads a Type 10 halftone from a PDF stream.
-func readType10(r pdf.Getter, stream *pdf.Stream) (*Type10, error) {
+func readType10(x *pdf.Extractor, stream *pdf.Stream) (*Type10, error) {
 	h := &Type10{}
 
 	if name, ok := stream.Dict["HalftoneName"]; ok {
-		halftoneName, err := pdf.GetString(r, name)
+		halftoneName, err := pdf.GetString(x.R, name)
 		if err != nil {
 			return nil, err
 		}
@@ -144,7 +146,7 @@ func readType10(r pdf.Getter, stream *pdf.Stream) (*Type10, error) {
 	}
 
 	if xsquare, ok := stream.Dict["Xsquare"]; ok {
-		xsquareVal, err := pdf.GetInteger(r, xsquare)
+		xsquareVal, err := pdf.GetInteger(x.R, xsquare)
 		if err != nil {
 			return nil, err
 		}
@@ -152,7 +154,7 @@ func readType10(r pdf.Getter, stream *pdf.Stream) (*Type10, error) {
 	}
 
 	if ysquare, ok := stream.Dict["Ysquare"]; ok {
-		ysquareVal, err := pdf.GetInteger(r, ysquare)
+		ysquareVal, err := pdf.GetInteger(x.R, ysquare)
 		if err != nil {
 			return nil, err
 		}
@@ -177,7 +179,7 @@ func readType10(r pdf.Getter, stream *pdf.Stream) (*Type10, error) {
 	// Read threshold data if dimensions are provided
 	if h.Xsquare > 0 && h.Ysquare > 0 {
 		expectedSize := h.Xsquare*h.Xsquare + h.Ysquare*h.Ysquare
-		stmReader, err := pdf.DecodeStream(r, stream, 0)
+		stmReader, err := pdf.DecodeStream(x.R, stream, 0)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode stream: %w", err)
 		}

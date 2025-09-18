@@ -66,7 +66,8 @@ func TestEmbedStandard(t *testing.T) {
 				// Read back the font dictionary and check that everything is
 				// as expected:
 
-				dictObj, err := dict.Read(data, ref)
+				x := pdf.NewExtractor(data)
+				dictObj, err := dict.Read(x, ref)
 				if err != nil {
 					t.Fatal(err)
 				}

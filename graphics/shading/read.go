@@ -24,11 +24,11 @@ import (
 )
 
 // Extract extracts a shading from a PDF file and returns a graphics.Shading.
-func Extract(r pdf.Getter, obj pdf.Object) (graphics.Shading, error) {
+func Extract(x *pdf.Extractor, obj pdf.Object) (graphics.Shading, error) {
 	// Check if original object was a reference before resolving
 	_, isIndirect := obj.(pdf.Reference)
 
-	obj, err := pdf.Resolve(r, obj)
+	obj, err := pdf.Resolve(x.R, obj)
 	if err != nil {
 		return nil, err
 	} else if obj == nil {
@@ -56,42 +56,42 @@ func Extract(r pdf.Getter, obj pdf.Object) (graphics.Shading, error) {
 		}
 	}
 
-	stNum, err := pdf.GetInteger(r, st)
+	stNum, err := pdf.GetInteger(x.R, st)
 	if err != nil {
 		return nil, err
 	}
 
 	switch stNum {
 	case 1:
-		return extractType1(r, dict, isIndirect)
+		return extractType1(x, dict, isIndirect)
 	case 2:
-		return extractType2(r, dict, isIndirect)
+		return extractType2(x, dict, isIndirect)
 	case 3:
-		return extractType3(r, dict, isIndirect)
+		return extractType3(x, dict, isIndirect)
 	case 4:
 		if stream, ok := obj.(*pdf.Stream); ok {
-			return extractType4(r, stream, isIndirect)
+			return extractType4(x, stream, isIndirect)
 		}
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("type 4 shading must be a stream"),
 		}
 	case 5:
 		if stream, ok := obj.(*pdf.Stream); ok {
-			return extractType5(r, stream, isIndirect)
+			return extractType5(x, stream, isIndirect)
 		}
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("type 5 shading must be a stream"),
 		}
 	case 6:
 		if stream, ok := obj.(*pdf.Stream); ok {
-			return extractType6(r, stream, isIndirect)
+			return extractType6(x, stream, isIndirect)
 		}
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("type 6 shading must be a stream"),
 		}
 	case 7:
 		if stream, ok := obj.(*pdf.Stream); ok {
-			return extractType7(r, stream, isIndirect)
+			return extractType7(x, stream, isIndirect)
 		}
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("type 7 shading must be a stream"),

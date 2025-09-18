@@ -104,7 +104,8 @@ func TestDecodeSpace(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			space2, err := ExtractSpace(r, obj)
+			x := pdf.NewExtractor(r)
+			space2, err := ExtractSpace(x, obj)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -201,8 +201,8 @@ func (sm *SoftMask) check(out *pdf.Writer) error {
 }
 
 // ExtractSoftMask extracts a soft-mask image from a PDF stream.
-func ExtractSoftMask(r pdf.Getter, obj pdf.Object) (*SoftMask, error) {
-	stm, err := pdf.GetStream(r, obj)
+func ExtractSoftMask(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
+	stm, err := pdf.GetStream(x.R, obj)
 	if err != nil {
 		return nil, err
 	} else if stm == nil {
@@ -211,10 +211,10 @@ func ExtractSoftMask(r pdf.Getter, obj pdf.Object) (*SoftMask, error) {
 	dict := stm.Dict
 
 	// Check Type and Subtype
-	if err := pdf.CheckDictType(r, dict, "XObject"); err != nil {
+	if err := pdf.CheckDictType(x.R, dict, "XObject"); err != nil {
 		return nil, err
 	}
-	if subtypeName, err := pdf.Optional(pdf.GetName(r, dict["Subtype"])); err != nil {
+	if subtypeName, err := pdf.Optional(pdf.GetName(x.R, dict["Subtype"])); err != nil {
 		return nil, err
 	} else if subtypeName != "Image" && subtypeName != "" {
 		return nil, &pdf.MalformedFileError{
@@ -224,7 +224,7 @@ func ExtractSoftMask(r pdf.Getter, obj pdf.Object) (*SoftMask, error) {
 
 	// Validate ColorSpace is DeviceGray (required for soft masks)
 	if csObj, ok := dict["ColorSpace"]; ok {
-		cs, err := color.ExtractSpace(r, csObj)
+		cs, err := color.ExtractSpace(x, csObj)
 		if err != nil {
 			return nil, err
 		}
@@ -240,7 +240,7 @@ func ExtractSoftMask(r pdf.Getter, obj pdf.Object) (*SoftMask, error) {
 	}
 
 	// Validate forbidden fields (Table 143 restrictions)
-	if isImageMask, err := pdf.GetBoolean(r, dict["ImageMask"]); err == nil && bool(isImageMask) {
+	if isImageMask, err := pdf.GetBoolean(x.R, dict["ImageMask"]); err == nil && bool(isImageMask) {
 		return nil, &pdf.MalformedFileError{
 			Err: errors.New("ImageMask must be false or absent for soft masks"),
 		}
@@ -259,7 +259,7 @@ func ExtractSoftMask(r pdf.Getter, obj pdf.Object) (*SoftMask, error) {
 	}
 
 	// Extract required fields
-	width, err := pdf.GetInteger(r, dict["Width"])
+	width, err := pdf.GetInteger(x.R, dict["Width"])
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +269,7 @@ func ExtractSoftMask(r pdf.Getter, obj pdf.Object) (*SoftMask, error) {
 		}
 	}
 
-	height, err := pdf.GetInteger(r, dict["Height"])
+	height, err := pdf.GetInteger(x.R, dict["Height"])
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +279,7 @@ func ExtractSoftMask(r pdf.Getter, obj pdf.Object) (*SoftMask, error) {
 		}
 	}
 
-	bpc, err := pdf.GetInteger(r, dict["BitsPerComponent"])
+	bpc, err := pdf.GetInteger(x.R, dict["BitsPerComponent"])
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +291,7 @@ func ExtractSoftMask(r pdf.Getter, obj pdf.Object) (*SoftMask, error) {
 	}
 
 	// Extract Decode array
-	if decodeArray, err := pdf.Optional(pdf.GetArray(r, dict["Decode"])); err != nil {
+	if decodeArray, err := pdf.Optional(pdf.GetArray(x.R, dict["Decode"])); err != nil {
 		return nil, err
 	} else if decodeArray != nil {
 		if len(decodeArray) != 2 {
@@ -301,7 +301,7 @@ func ExtractSoftMask(r pdf.Getter, obj pdf.Object) (*SoftMask, error) {
 		}
 		softMask.Decode = make([]float64, 2)
 		for i, val := range decodeArray {
-			if num, err := pdf.GetNumber(r, val); err != nil {
+			if num, err := pdf.GetNumber(x.R, val); err != nil {
 				return nil, fmt.Errorf("invalid Decode[%d]: %w", i, err)
 			} else {
 				softMask.Decode[i] = float64(num)
@@ -310,17 +310,17 @@ func ExtractSoftMask(r pdf.Getter, obj pdf.Object) (*SoftMask, error) {
 	}
 
 	// Extract Interpolate
-	if interp, err := pdf.GetBoolean(r, dict["Interpolate"]); err == nil {
+	if interp, err := pdf.GetBoolean(x.R, dict["Interpolate"]); err == nil {
 		softMask.Interpolate = bool(interp)
 	}
 
 	// Extract Matte array (specific to soft masks)
-	if matteArray, err := pdf.Optional(pdf.GetArray(r, dict["Matte"])); err != nil {
+	if matteArray, err := pdf.Optional(pdf.GetArray(x.R, dict["Matte"])); err != nil {
 		return nil, err
 	} else if matteArray != nil {
 		softMask.Matte = make([]float64, len(matteArray))
 		for i, val := range matteArray {
-			if num, err := pdf.GetNumber(r, val); err != nil {
+			if num, err := pdf.GetNumber(x.R, val); err != nil {
 				return nil, fmt.Errorf("invalid Matte[%d]: %w", i, err)
 			} else {
 				softMask.Matte[i] = float64(num)
@@ -329,7 +329,7 @@ func ExtractSoftMask(r pdf.Getter, obj pdf.Object) (*SoftMask, error) {
 	}
 
 	softMask.WriteData = func(w io.Writer) error {
-		r, err := pdf.GetStreamReader(r, stm)
+		r, err := pdf.GetStreamReader(x.R, stm)
 		if err != nil {
 			return err
 		}

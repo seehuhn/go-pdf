@@ -201,7 +201,8 @@ func TestSoftMaskRoundTrip(t *testing.T) {
 					t.Fatalf("embed failed: %v", err)
 				}
 
-				extracted, err := ExtractSoftMask(w, ref)
+				x := pdf.NewExtractor(w)
+				extracted, err := ExtractSoftMask(x, ref)
 				if err != nil {
 					t.Fatalf("extract failed: %v", err)
 				}
@@ -288,7 +289,8 @@ func FuzzSoftMaskRoundTrip(f *testing.F) {
 		}
 
 		// attempt to extract the soft mask - main goal is no panic
-		_, err = ExtractSoftMask(r, ref)
+		x := pdf.NewExtractor(r)
+		_, err = ExtractSoftMask(x, ref)
 		// errors are acceptable for malformed input, panics are not
 		_ = err
 	})

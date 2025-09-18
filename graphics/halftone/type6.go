@@ -24,6 +24,8 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 )
 
+// PDF 2.0 sections: 10.6.4 10.6.5.1 10.6.5.3
+
 // Type6 represents a Type 6 halftone that uses threshold arrays with zero screen angle.
 type Type6 struct {
 	// HalftoneName (optional) is the name of the halftone dictionary.
@@ -129,11 +131,11 @@ func (h *Type6) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 }
 
 // readType6 reads a Type 6 halftone from a PDF stream.
-func readType6(r pdf.Getter, stream *pdf.Stream) (*Type6, error) {
+func readType6(x *pdf.Extractor, stream *pdf.Stream) (*Type6, error) {
 	h := &Type6{}
 
 	if name, ok := stream.Dict["HalftoneName"]; ok {
-		halftoneName, err := pdf.GetString(r, name)
+		halftoneName, err := pdf.GetString(x.R, name)
 		if err != nil {
 			return nil, err
 		}
@@ -141,7 +143,7 @@ func readType6(r pdf.Getter, stream *pdf.Stream) (*Type6, error) {
 	}
 
 	if width, ok := stream.Dict["Width"]; ok {
-		widthVal, err := pdf.GetInteger(r, width)
+		widthVal, err := pdf.GetInteger(x.R, width)
 		if err != nil {
 			return nil, err
 		}
@@ -149,7 +151,7 @@ func readType6(r pdf.Getter, stream *pdf.Stream) (*Type6, error) {
 	}
 
 	if height, ok := stream.Dict["Height"]; ok {
-		heightVal, err := pdf.GetInteger(r, height)
+		heightVal, err := pdf.GetInteger(x.R, height)
 		if err != nil {
 			return nil, err
 		}
@@ -174,7 +176,7 @@ func readType6(r pdf.Getter, stream *pdf.Stream) (*Type6, error) {
 	// Read threshold data if dimensions are provided
 	if h.Width > 0 && h.Height > 0 {
 		expectedSize := h.Width * h.Height
-		stmReader, err := pdf.DecodeStream(r, stream, 0)
+		stmReader, err := pdf.DecodeStream(x.R, stream, 0)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode stream: %w", err)
 		}

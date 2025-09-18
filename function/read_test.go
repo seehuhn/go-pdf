@@ -287,7 +287,8 @@ func roundTripTest(t *testing.T, f1 pdf.Function) {
 	}
 
 	// Read the function back
-	f2, err := Extract(buf, embedded)
+	x := pdf.NewExtractor(buf)
+	f2, err := Extract(x, embedded)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -650,7 +651,8 @@ func FuzzRead(f *testing.F) {
 		if obj == nil {
 			t.Skip("broken reference")
 		}
-		function, err := Extract(r, obj)
+		x := pdf.NewExtractor(r)
+		function, err := Extract(x, obj)
 		if err != nil {
 			t.Skip("broken function")
 		}

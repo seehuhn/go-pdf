@@ -36,6 +36,7 @@ import (
 type Reader struct {
 	R      pdf.Getter
 	loader *loader.FontLoader
+	x      *pdf.Extractor
 
 	scanner *scanner.Scanner
 
@@ -69,6 +70,7 @@ func New(r pdf.Getter, loader *loader.FontLoader) *Reader {
 	return &Reader{
 		R:      r,
 		loader: loader,
+		x:      pdf.NewExtractor(r),
 
 		scanner: scanner.NewScanner(),
 
@@ -485,7 +487,7 @@ func (r *Reader) do() error {
 				}
 				csDesc = r.Resources.ColorSpace[name]
 			}
-			cs, err := color.ExtractSpace(r.R, csDesc)
+			cs, err := color.ExtractSpace(r.x, csDesc)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {

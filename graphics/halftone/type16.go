@@ -26,6 +26,8 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 )
 
+// PDF 2.0 sections: 10.6.4 10.6.5.1 10.6.5.5
+
 // Type16 represents a Type 16 halftone that uses high-precision threshold arrays
 // with 16-bit threshold values.
 type Type16 struct {
@@ -174,11 +176,11 @@ func (h *Type16) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 }
 
 // readType16 reads a Type 16 halftone from a PDF stream.
-func readType16(r pdf.Getter, stream *pdf.Stream) (*Type16, error) {
+func readType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
 	h := &Type16{}
 
 	if name, ok := stream.Dict["HalftoneName"]; ok {
-		halftoneName, err := pdf.GetString(r, name)
+		halftoneName, err := pdf.GetString(x.R, name)
 		if err != nil {
 			return nil, err
 		}
@@ -186,7 +188,7 @@ func readType16(r pdf.Getter, stream *pdf.Stream) (*Type16, error) {
 	}
 
 	if width, ok := stream.Dict["Width"]; ok {
-		widthVal, err := pdf.GetInteger(r, width)
+		widthVal, err := pdf.GetInteger(x.R, width)
 		if err != nil {
 			return nil, err
 		}
@@ -194,7 +196,7 @@ func readType16(r pdf.Getter, stream *pdf.Stream) (*Type16, error) {
 	}
 
 	if height, ok := stream.Dict["Height"]; ok {
-		heightVal, err := pdf.GetInteger(r, height)
+		heightVal, err := pdf.GetInteger(x.R, height)
 		if err != nil {
 			return nil, err
 		}
@@ -202,7 +204,7 @@ func readType16(r pdf.Getter, stream *pdf.Stream) (*Type16, error) {
 	}
 
 	if width2, ok := stream.Dict["Width2"]; ok {
-		width2Val, err := pdf.GetInteger(r, width2)
+		width2Val, err := pdf.GetInteger(x.R, width2)
 		if err != nil {
 			return nil, err
 		}
@@ -210,7 +212,7 @@ func readType16(r pdf.Getter, stream *pdf.Stream) (*Type16, error) {
 	}
 
 	if height2, ok := stream.Dict["Height2"]; ok {
-		height2Val, err := pdf.GetInteger(r, height2)
+		height2Val, err := pdf.GetInteger(x.R, height2)
 		if err != nil {
 			return nil, err
 		}
@@ -254,7 +256,7 @@ func readType16(r pdf.Getter, stream *pdf.Stream) (*Type16, error) {
 		}
 		expectedBytes := expectedValues * 2
 
-		stmReader, err := pdf.DecodeStream(r, stream, 0)
+		stmReader, err := pdf.DecodeStream(x.R, stream, 0)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode stream: %w", err)
 		}

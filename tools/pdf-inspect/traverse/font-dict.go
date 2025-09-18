@@ -36,7 +36,8 @@ type fontDictCtx struct {
 
 // newFontDictCtx creates a new font dictionary context.
 func newFontDictCtx(r pdf.Getter, pdfDict pdf.Dict) (*fontDictCtx, error) {
-	dict, err := dict.Read(r, pdfDict)
+	x := pdf.NewExtractor(r)
+	dict, err := dict.Read(x, pdfDict)
 	if err != nil {
 		return nil, err
 	}

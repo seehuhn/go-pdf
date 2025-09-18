@@ -89,7 +89,7 @@ func TestExtGState(t *testing.T) {
 	ext1.Halftone = &halftone.Type1{
 		Frequency:    120,
 		Angle:        30,
-		SpotFunction: pdf.Name("Round"),
+		SpotFunction: halftone.Round,
 	}
 	ext1.Set |= graphics.StateHalftone
 	ext1.HalftoneOriginX = 12

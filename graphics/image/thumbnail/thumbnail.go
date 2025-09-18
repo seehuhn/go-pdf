@@ -106,7 +106,7 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
 	thumb.Height = int(height)
 
 	// color space (required)
-	cs, err := color.ExtractSpace(x.R, dict["ColorSpace"])
+	cs, err := color.ExtractSpace(x, dict["ColorSpace"])
 	if err != nil {
 		return nil, err
 	} else if cs == nil {

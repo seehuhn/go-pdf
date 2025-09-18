@@ -24,8 +24,8 @@ import (
 )
 
 // Read extracts a halftone from a PDF file.
-func Read(r pdf.Getter, obj pdf.Object) (graphics.Halftone, error) {
-	resolved, err := pdf.Resolve(r, obj)
+func Read(x *pdf.Extractor, obj pdf.Object) (graphics.Halftone, error) {
+	resolved, err := pdf.Resolve(x.R, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -38,16 +38,16 @@ func Read(r pdf.Getter, obj pdf.Object) (graphics.Halftone, error) {
 
 	switch resolved := resolved.(type) {
 	case pdf.Dict:
-		halftoneType, err := pdf.GetInteger(r, resolved["HalftoneType"])
+		halftoneType, err := pdf.GetInteger(x.R, resolved["HalftoneType"])
 		if err != nil {
 			return nil, err
 		}
 
 		switch halftoneType {
 		case 1:
-			return readType1(r, resolved)
+			return readType1(x, resolved)
 		case 5:
-			return readType5(r, resolved)
+			return readType5(x, resolved)
 		default:
 			return nil, &pdf.MalformedFileError{
 				Err: fmt.Errorf("unsupported halftone type %d for dictionary", halftoneType),
@@ -55,18 +55,18 @@ func Read(r pdf.Getter, obj pdf.Object) (graphics.Halftone, error) {
 		}
 
 	case *pdf.Stream:
-		halftoneType, err := pdf.GetInteger(r, resolved.Dict["HalftoneType"])
+		halftoneType, err := pdf.GetInteger(x.R, resolved.Dict["HalftoneType"])
 		if err != nil {
 			return nil, err
 		}
 
 		switch halftoneType {
 		case 6:
-			return readType6(r, resolved)
+			return readType6(x, resolved)
 		case 10:
-			return readType10(r, resolved)
+			return readType10(x, resolved)
 		case 16:
-			return readType16(r, resolved)
+			return readType16(x, resolved)
 		default:
 			return nil, &pdf.MalformedFileError{
 				Err: fmt.Errorf("unsupported halftone type %d for stream", halftoneType),

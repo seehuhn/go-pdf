@@ -502,7 +502,8 @@ func roundTripTest(t *testing.T, originalShading graphics.Shading) {
 	}
 
 	// Read the shading back
-	readShading, err := Extract(buf, ref)
+	x := pdf.NewExtractor(buf)
+	readShading, err := Extract(x, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -721,7 +722,8 @@ func TestReadErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 
-			_, err := Extract(buf, tt.dict)
+			x := pdf.NewExtractor(buf)
+			_, err := Extract(x, tt.dict)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Read() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -819,7 +821,8 @@ func FuzzRead(f *testing.F) {
 		if obj == nil {
 			t.Skip("broken reference")
 		}
-		shading, err := Extract(r, obj)
+		x := pdf.NewExtractor(r)
+		shading, err := Extract(x, obj)
 		if err != nil {
 			t.Skip("broken shading")
 		}

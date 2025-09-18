@@ -79,8 +79,8 @@ var (
 //
 // The argument desc is typically a value in the ColorSpace sub-dictionary of
 // a Resources dictionary.
-func ExtractSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
-	d := newDecoder(r, desc)
+func ExtractSpace(x *pdf.Extractor, desc pdf.Object) (Space, error) {
+	d := newDecoder(x.R, desc)
 
 	var res Space
 	var err error
@@ -98,7 +98,7 @@ func ExtractSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 		if len(d.args) == 0 {
 			res = spacePatternColored{}
 		} else {
-			base, err := ExtractSpace(r, d.args[0])
+			base, err := pdf.ExtractorGet(x, d.args[0], ExtractSpace)
 			if err != nil {
 				d.SetError(pdf.Wrap(err, "base color space"))
 			} else {
@@ -142,7 +142,7 @@ func ExtractSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 	case FamilyICCBased:
 		var meta *metadata.Stream
 		if ref, ok := d.dict["Metadata"]; ok {
-			meta, err = metadata.Extract(r, ref)
+			meta, err = metadata.Extract(x.R, ref)
 			if err != nil {
 				d.SetError(err)
 			}
@@ -157,12 +157,12 @@ func ExtractSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 			d.MarkAsInvalid()
 			break
 		}
-		base, err := ExtractSpace(r, d.args[0])
+		base, err := pdf.ExtractorGet(x, d.args[0], ExtractSpace)
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "base color space"))
 			break
 		}
-		hiVal, err := pdf.GetInteger(r, d.args[1])
+		hiVal, err := pdf.GetInteger(x.R, d.args[1])
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "high value"))
 			break
@@ -172,7 +172,7 @@ func ExtractSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 		}
 
 		var lookup pdf.String
-		lookupData, err := pdf.Resolve(r, d.args[2])
+		lookupData, err := pdf.Resolve(x.R, d.args[2])
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "lookup table"))
 			break
@@ -181,7 +181,7 @@ func ExtractSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 		case pdf.String:
 			lookup = obj
 		case *pdf.Stream:
-			data, err := pdf.ReadAll(r, obj)
+			data, err := pdf.ReadAll(x.R, obj)
 			if err != nil {
 				d.SetError(pdf.Wrap(err, "lookup table"))
 				break
@@ -202,19 +202,19 @@ func ExtractSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 			break
 		}
 
-		colorant, err := pdf.GetName(r, d.args[0])
+		colorant, err := pdf.GetName(x.R, d.args[0])
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "colorant name"))
 			break
 		}
 
-		alternate, err := ExtractSpace(r, d.args[1])
+		alternate, err := pdf.ExtractorGet(x, d.args[1], ExtractSpace)
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "alternate color space"))
 			break
 		}
 
-		trfm, err := function.Extract(r, d.args[2])
+		trfm, err := pdf.ExtractorGet(x, d.args[2], function.Extract)
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "tint transform"))
 			break
@@ -232,19 +232,19 @@ func ExtractSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 			break
 		}
 
-		colorants, err := getNames(r, d.args[0])
+		colorants, err := getNames(x.R, d.args[0])
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "colorant names"))
 			break
 		}
 
-		alternate, err := ExtractSpace(r, d.args[1])
+		alternate, err := pdf.ExtractorGet(x, d.args[1], ExtractSpace)
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "alternate color space"))
 			break
 		}
 
-		trfm, err := function.Extract(r, d.args[2])
+		trfm, err := pdf.ExtractorGet(x, d.args[2], function.Extract)
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "tint transform"))
 			break
@@ -252,7 +252,7 @@ func ExtractSpace(r pdf.Getter, desc pdf.Object) (Space, error) {
 
 		var attr pdf.Dict
 		if len(d.args) >= 4 {
-			attr, err = pdf.GetDict(r, d.args[3])
+			attr, err = pdf.GetDict(x.R, d.args[3])
 			if err != nil {
 				d.SetError(pdf.Wrap(err, "attributes"))
 				break
