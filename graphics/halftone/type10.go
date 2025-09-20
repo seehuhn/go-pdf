@@ -23,7 +23,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/transfer"
 )
 
@@ -48,7 +47,7 @@ type Type10 struct {
 	TransferFunction pdf.Function
 }
 
-var _ graphics.Halftone = (*Type10)(nil)
+var _ Halftone = (*Type10)(nil)
 
 // extractType10 reads a Type 10 halftone from a PDF stream.
 func extractType10(x *pdf.Extractor, stream *pdf.Stream) (*Type10, error) {
@@ -178,13 +177,13 @@ func (h *Type10) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 }
 
 // HalftoneType returns 10.
-// This implements the [graphics.Halftone] interface.
+// This implements the [Halftone] interface.
 func (h *Type10) HalftoneType() int {
 	return 10
 }
 
 // GetTransferFunction returns the transfer function given in the halftone.
-// This implements the [graphics.Halftone] interface.
+// This implements the [Halftone] interface.
 func (h *Type10) GetTransferFunction() pdf.Function {
 	return h.TransferFunction
 }

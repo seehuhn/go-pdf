@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
 )
 
 // PDF 2.0 sections: 10.6.5.1 10.6.5.6
@@ -31,16 +30,16 @@ import (
 type Type5 struct {
 	// Default is the halftone for colorants without specific entries.
 	// Must not be Type 5. Required to have transfer function if nonprimary colorants exist.
-	Default graphics.Halftone
+	Default Halftone
 
 	// Colorants maps colorant names to their specific halftone dictionaries.
 	// Standard names include: "Cyan", "Magenta", "Yellow", "Black" (CMYK);
 	// "Red", "Green", "Blue" (RGB); "Gray" (DeviceGray).
 	// Spot colors use specific colorant names.
-	Colorants map[pdf.Name]graphics.Halftone
+	Colorants map[pdf.Name]Halftone
 }
 
-var _ graphics.Halftone = (*Type5)(nil)
+var _ Halftone = (*Type5)(nil)
 
 // extractType5 reads a Type 5 halftone from a PDF dictionary.
 func extractType5(x *pdf.Extractor, dict pdf.Dict) (*Type5, error) {
@@ -58,7 +57,7 @@ func extractType5(x *pdf.Extractor, dict pdf.Dict) (*Type5, error) {
 		return nil, pdf.Error("missing Default halftone")
 	}
 
-	h.Colorants = make(map[pdf.Name]graphics.Halftone)
+	h.Colorants = make(map[pdf.Name]Halftone)
 	for colorant, val := range dict {
 		switch colorant {
 		case "Type", "HalftoneType", "HalftoneName", "Default":
@@ -147,13 +146,13 @@ func (h *Type5) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 }
 
 // HalftoneType returns 5.
-// This implements the [graphics.Halftone] interface.
+// This implements the [Halftone] interface.
 func (h *Type5) HalftoneType() int {
 	return 5
 }
 
 // GetTransferFunction returns nil.
-// This implements the [graphics.Halftone] interface.
+// This implements the [Halftone] interface.
 func (h *Type5) GetTransferFunction() pdf.Function {
 	return nil
 }

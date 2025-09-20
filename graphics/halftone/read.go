@@ -20,11 +20,10 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
 )
 
 // Extract extracts a halftone from a PDF file.
-func Extract(x *pdf.Extractor, obj pdf.Object) (graphics.Halftone, error) {
+func Extract(x *pdf.Extractor, obj pdf.Object) (Halftone, error) {
 	resolved, err := pdf.Resolve(x.R, obj)
 	if err != nil {
 		return nil, err

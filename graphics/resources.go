@@ -30,22 +30,6 @@ type Shading interface {
 	pdf.Embedder[pdf.Unused]
 }
 
-// Halftone represents a PDF halftone dictionary or stream.
-//
-// Concrete implementations of this interface can be found in
-// the seehuhn.de/go/pdf/graphics/halftone package.
-type Halftone interface {
-	// HalftoneType returns the type of the PDF halftone.
-	// This is one of 1, 5, 6, 10 or 16.
-	HalftoneType() int
-
-	// GetTransferFunction returns the transfer function given in the halftone.
-	// If no transfer function is specified, nil is returned.
-	GetTransferFunction() pdf.Function
-
-	pdf.Embedder[pdf.Unused]
-}
-
 // Image represents a raster image which can be embedded in a PDF file.
 type Image interface {
 	XObject

@@ -23,7 +23,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/transfer"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -60,7 +59,7 @@ var testCases = map[int][]testCase{
 					SpotFunction:     SimpleDot,
 					TransferFunction: transfer.Identity,
 				},
-				Colorants: map[pdf.Name]graphics.Halftone{
+				Colorants: map[pdf.Name]Halftone{
 					"Cyan": &Type1{
 						Frequency:    72.0,
 						Angle:        15.0,
@@ -146,7 +145,7 @@ var testCases = map[int][]testCase{
 
 type testCase struct {
 	name     string
-	halftone graphics.Halftone
+	halftone Halftone
 }
 
 func TestRoundTrip(t *testing.T) {
@@ -160,7 +159,7 @@ func TestRoundTrip(t *testing.T) {
 }
 
 // roundTripTest performs a round-trip test for any halftone type
-func roundTripTest(t *testing.T, originalHalftone graphics.Halftone) {
+func roundTripTest(t *testing.T, originalHalftone Halftone) {
 	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(buf)
 

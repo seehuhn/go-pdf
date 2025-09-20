@@ -25,6 +25,7 @@ import (
 
 // FromFile represents an immutable font read from a PDF file.
 type FromFile interface {
+	Font
 	Embedded
 
 	// GetDict returns the font dictionary of this font.

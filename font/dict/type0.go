@@ -488,38 +488,51 @@ type t0Font struct {
 	cache map[charcode.Code]*font.Code
 }
 
-func (s *t0Font) GetDict() font.Dict {
-	return s.CIDFontType0
+func (f *t0Font) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
+	ref := rm.Out.Alloc()
+	err := f.CIDFontType0.WriteToPDF(rm, ref)
+	if err != nil {
+		return nil, nil, err
+	}
+	return ref, f, nil
 }
 
-func (s *t0Font) WritingMode() font.WritingMode {
-	return s.CMap.WMode
+func (f *t0Font) PostScriptName() string {
+	return f.CIDFontType0.PostScriptName
 }
 
-func (s *t0Font) Codes(str pdf.String) iter.Seq[*font.Code] {
+func (f *t0Font) GetDict() font.Dict {
+	return f.CIDFontType0
+}
+
+func (f *t0Font) WritingMode() font.WritingMode {
+	return f.CMap.WMode
+}
+
+func (f *t0Font) Codes(str pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		for len(str) > 0 {
-			code, k, isValid := s.codec.Decode(str)
+			code, k, isValid := f.codec.Decode(str)
 
-			res, seen := s.cache[code]
+			res, seen := f.cache[code]
 			if !seen {
 				res = &font.Code{}
 				codeBytes := str[:k]
 				if isValid {
-					res.CID = s.CMap.LookupCID(codeBytes)
-					res.Notdef = s.CMap.LookupNotdefCID(codeBytes)
+					res.CID = f.CMap.LookupCID(codeBytes)
+					res.Notdef = f.CMap.LookupNotdefCID(codeBytes)
 				} else {
-					res.CID = s.CMap.LookupNotdefCID(codeBytes)
+					res.CID = f.CMap.LookupNotdefCID(codeBytes)
 				}
-				w, ok := s.Width[res.CID]
+				w, ok := f.Width[res.CID]
 				if ok {
 					res.Width = w
 				} else {
-					res.Width = s.DefaultWidth
+					res.Width = f.DefaultWidth
 				}
 				res.UseWordSpacing = k == 1 && code == 0x20
-				res.Text = s.text[code]
-				s.cache[code] = res
+				res.Text = f.text[code]
+				f.cache[code] = res
 			}
 
 			str = str[k:]

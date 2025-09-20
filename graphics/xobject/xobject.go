@@ -14,40 +14,41 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package resource
+package xobject
 
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/graphics/image"
 )
 
-// TODO(voss):
-// * Implement ExtractExtGState for [graphics.ExtGState]
-// * Implement ExtractPattern for color.Pattern interface
-// * Review/verify shading.Extract compatibility with the extractor pattern
-// * Sort out fonts
-// * Sort out Properties
+func Extract(x *pdf.Extractor, obj pdf.Object) (graphics.XObject, error) {
+	stm, err := pdf.GetStream(x.R, obj)
+	if err != nil {
+		return nil, err
+	}
+	err = pdf.CheckDictType(x.R, stm.Dict, "XObject")
+	if err != nil {
+		return nil, err
+	}
 
-// PDF 2.0 sections: 14.2 14.6 7.8
+	subtype, err := pdf.GetName(x.R, stm.Dict["Subtype"])
+	if err != nil {
+		return nil, err
+	}
 
-type Resource struct {
-	ExtGState  map[pdf.Name]graphics.ExtGState
-	ColorSpace map[pdf.Name]color.Space
-	Pattern    map[pdf.Name]color.Pattern
-	Shading    map[pdf.Name]graphics.Shading
-	XObject    map[pdf.Name]graphics.XObject
-	// Font       map[pdf.Name]font.Font
-	// Properties map[pdf.Name]Properties
-	ProcSet ProcSet
-}
-
-// var _ pdf.Embedder[pdf.Unused] = (*Resource)(nil)
-
-type ProcSet struct {
-	PDF    bool
-	Text   bool
-	ImageB bool
-	ImageC bool
-	ImageI bool
+	switch subtype {
+	case "Image":
+		img, err := image.ExtractDict(x, stm)
+		return img, err
+	case "Form":
+		form, err := form.Extract(x, stm)
+		return form, err
+	case "PS":
+		ps, err := extractPostScript(x, stm)
+		return ps, err
+	default:
+		return nil, pdf.Errorf("unsupported XObject Subtype %q", subtype)
+	}
 }

@@ -22,7 +22,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/transfer"
 )
 
@@ -56,7 +55,7 @@ type Type1 struct {
 	TransferFunction pdf.Function
 }
 
-var _ graphics.Halftone = (*Type1)(nil)
+var _ Halftone = (*Type1)(nil)
 
 // extractType1 reads a Type 1 halftone from a PDF dictionary.
 func extractType1(x *pdf.Extractor, dict pdf.Dict) (*Type1, error) {

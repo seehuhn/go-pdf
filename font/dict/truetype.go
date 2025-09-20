@@ -402,6 +402,19 @@ type ttFont struct {
 	Text map[byte]string
 }
 
+func (f *ttFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
+	ref := rm.Out.Alloc()
+	err := f.Dict.WriteToPDF(rm, ref)
+	if err != nil {
+		return nil, nil, err
+	}
+	return ref, f, nil
+}
+
+func (f *ttFont) PostScriptName() string {
+	return f.Dict.PostScriptName
+}
+
 func (f *ttFont) GetDict() font.Dict {
 	return f.Dict
 }

@@ -187,7 +187,7 @@ type writer struct {
 	heading font.Layouter
 	body    font.Layouter
 
-	grey color.Color
+	gray color.Color
 }
 
 func newWriter(doc *document.MultiPage) *writer {
@@ -196,7 +196,7 @@ func newWriter(doc *document.MultiPage) *writer {
 		yPos:    paper.URy - margin,
 		heading: standard.Helvetica.New(),
 		body:    standard.TimesRoman.New(),
-		grey:    color.DeviceGray(0.9),
+		gray:    color.DeviceGray(0.9),
 	}
 
 	return w
@@ -351,7 +351,7 @@ func (w *writer) makeRect(width, height float64) pdf.Rectangle {
 	w.yPos -= 10
 
 	w.page.PushGraphicsState()
-	w.page.SetFillColor(w.grey)
+	w.page.SetFillColor(w.gray)
 	w.page.Rectangle(res.LLx, res.LLy, width, height)
 	w.page.Fill()
 	w.page.PopGraphicsState()

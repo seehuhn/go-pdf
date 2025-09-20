@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/halftone"
+	"seehuhn.de/go/pdf/graphics/transfer"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
@@ -76,15 +77,16 @@ func TestExtGState(t *testing.T) {
 	ext1.Set |= graphics.StateOverprint
 	ext1.OverprintMode = 1
 	ext1.Set |= graphics.StateOverprintMode
-	ext1.BlackGeneration = pdf.Name("Default")
+	ext1.BlackGeneration = nil
 	ext1.Set |= graphics.StateBlackGeneration
-	ext1.UndercolorRemoval = pdf.Dict{
-		"FunctionType": pdf.Integer(0),
-		"Domain":       pdf.Array{pdf.Integer(0), pdf.Integer(1)},
-		"Range":        pdf.Array{pdf.Integer(0), pdf.Integer(1)},
-	}
+	ext1.UndercolorRemoval = nil
 	ext1.Set |= graphics.StateUndercolorRemoval
-	ext1.TransferFunction = pdf.Name("Default")
+	ext1.TransferFunction = transfer.Functions{
+		Red:   nil,
+		Green: nil,
+		Blue:  nil,
+		Gray:  nil,
+	}
 	ext1.Set |= graphics.StateTransferFunction
 	ext1.Halftone = &halftone.Type1{
 		Frequency:    120,

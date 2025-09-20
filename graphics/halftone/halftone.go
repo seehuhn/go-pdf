@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,34 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics
+package halftone
 
-import (
-	"seehuhn.de/go/pdf"
-)
+import "seehuhn.de/go/pdf"
 
-// This file implements the "XObject operator".
-// The operator is defined in table 86 of ISO 32000-2:2020.
+// Halftone represents a PDF halftone dictionary or stream.
+type Halftone interface {
+	// HalftoneType returns the type of the PDF halftone.
+	// This is one of 1, 5, 6, 10 or 16.
+	HalftoneType() int
 
-// XObject represents a PDF XObject.
-type XObject interface {
-	Subtype() pdf.Name
+	// GetTransferFunction returns the transfer function given in the halftone.
+	// If no transfer function is specified, nil is returned.
+	GetTransferFunction() pdf.Function
+
 	pdf.Embedder[pdf.Unused]
-}
-
-// DrawXObject draws a PDF XObject on the page.
-//
-// This implements the PDF graphics operator "Do".
-func (w *Writer) DrawXObject(obj XObject) {
-	if !w.isValid("DrawXObject", objPage) {
-		return
-	}
-
-	name, _, err := writerGetResourceName(w, catXObject, obj)
-	if err != nil {
-		w.Err = err
-		return
-	}
-
-	w.writeObjects(name, pdf.Operator("Do"))
 }

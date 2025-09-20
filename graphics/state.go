@@ -26,6 +26,8 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/halftone"
+	"seehuhn.de/go/pdf/graphics/transfer"
 )
 
 // Parameters collects all graphical parameters of the PDF processor.
@@ -86,15 +88,29 @@ type Parameters struct {
 	OverprintFill   bool // for PDF<1.3 this must equal OverprintStroke
 	OverprintMode   int  // for PDF<1.3 this must be 0
 
-	BlackGeneration   pdf.Object
-	UndercolorRemoval pdf.Object
-	TransferFunction  pdf.Object
-	Halftone          Halftone
-	HalftoneOriginX   float64 //  https://github.com/pdf-association/pdf-issues/issues/260
-	HalftoneOriginY   float64
+	// BlackGeneration specifies the black generation function to be used for
+	// color conversion from DeviceRGB to DeviceCMYK.  The value nil represents
+	// the device-specific default function.
+	BlackGeneration pdf.Function
 
-	// FlatnessTolerance is a positive number specifying the precision with which
-	// curves are be rendered on the output device.  Smaller numbers give
+	// UndercolorRemoval specifies the undercolor removal function to be used
+	// for color conversion from DeviceRGB to DeviceCMYK.  The value nil
+	// represents the device-specific default function.
+	UndercolorRemoval pdf.Function
+
+	// TransferFunction represents the transfer functions for the individual
+	// color components.
+	TransferFunction transfer.Functions
+
+	// Halftone specifies the halftone screen to be used.
+	// The value nil represents the device-dependent default halftone.
+	Halftone halftone.Halftone
+
+	HalftoneOriginX float64 //  https://github.com/pdf-association/pdf-issues/issues/260
+	HalftoneOriginY float64
+
+	// FlatnessTolerance is a positive number specifying the precision with
+	// which curves are be rendered on the output device.  Smaller numbers give
 	// smoother curves, but also increase the amount of computation needed
 	// (default: 1).
 	FlatnessTolerance float64
@@ -158,10 +174,16 @@ func NewState() State {
 	param.OverprintFill = false
 	param.OverprintMode = 0
 
-	// param.BlackGeneration = nil   // defaul: device dependent
-	// param.UndercolorRemoval = nil // defaul: device dependent
-	// param.TransferFunction = nil  // defaul: device dependent
-	// param.Halftone = nil          // defaul: device dependent
+	param.BlackGeneration = nil   // defaul: device dependent
+	param.UndercolorRemoval = nil // defaul: device dependent
+	param.TransferFunction = transfer.Functions{
+		Red:   nil, // defaul: device dependent
+		Green: nil, // defaul: device dependent
+		Blue:  nil, // defaul: device dependent
+		Gray:  nil, // defaul: device dependent
+	}
+
+	param.Halftone = nil // defaul: device dependent
 	// param.HalftoneOriginX = 0     // defaul: device dependent
 	// param.HalftoneOriginY = 0     // defaul: device dependent
 

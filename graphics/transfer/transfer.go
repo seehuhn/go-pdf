@@ -16,12 +16,32 @@
 
 package transfer
 
-import "seehuhn.de/go/pdf/function"
+import (
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/function"
+)
 
-var Identity = &function.Type2{
-	XMin: 0,
-	XMax: 1,
-	C0:   []float64{0},
-	C1:   []float64{1},
-	N:    1,
+// Functions holds the transfer functions for the color components.  Each
+// function must have one input and one output.
+//
+// The special value nil for a component represents the device-specific default
+// transfer function.
+type Functions struct {
+	Red   pdf.Function
+	Green pdf.Function
+	Blue  pdf.Function
+	Gray  pdf.Function
 }
+
+var (
+	// Identity is the identity transfer function. This specific function
+	// object corresponds to the name /Default in PDF graphics state parameter
+	// dictionaries.
+	Identity = &function.Type2{
+		XMin: 0,
+		XMax: 1,
+		C0:   []float64{0},
+		C1:   []float64{1},
+		N:    1,
+	}
+)

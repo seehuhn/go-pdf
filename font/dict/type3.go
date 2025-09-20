@@ -333,6 +333,19 @@ type t3Font struct {
 	Text map[byte]string
 }
 
+func (f *t3Font) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
+	ref := rm.Out.Alloc()
+	err := f.Dict.WriteToPDF(rm, ref)
+	if err != nil {
+		return nil, nil, err
+	}
+	return ref, f, nil
+}
+
+func (f *t3Font) PostScriptName() string {
+	return ""
+}
+
 func (f *t3Font) GetDict() font.Dict {
 	return f.Dict
 }
