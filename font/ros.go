@@ -64,7 +64,7 @@ func ExtractCIDSystemInfo(r pdf.Getter, obj pdf.Object) (*cid.SystemInfo, error)
 	}, nil
 }
 
-func WriteCIDSystemInfo(rm *pdf.ResourceManager, ROS *cid.SystemInfo) (pdf.Native, error) {
+func WriteCIDSystemInfo(rm *pdf.EmbedHelper, ROS *cid.SystemInfo) (pdf.Native, error) {
 	if ROS == nil {
 		return nil, nil
 	}
@@ -74,8 +74,8 @@ func WriteCIDSystemInfo(rm *pdf.ResourceManager, ROS *cid.SystemInfo) (pdf.Nativ
 		"Supplement": pdf.Integer(ROS.Supplement),
 	}
 
-	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, obj)
+	ref := rm.Alloc()
+	err := rm.Out().Put(ref, obj)
 	if err != nil {
 		return nil, err
 	}

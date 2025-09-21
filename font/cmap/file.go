@@ -444,7 +444,7 @@ rangesLoop:
 	return 0
 }
 
-func (f *File) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (f *File) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	// TODO(voss): decide this based on the CMap content?
@@ -452,7 +452,7 @@ func (f *File) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		return pdf.Name(f.Name), zero, nil
 	}
 
-	ros, err := pdf.ResourceManagerEmbedFunc(rm, font.WriteCIDSystemInfo, f.ROS)
+	ros, err := pdf.EmbedHelperEmbedFunc(rm, font.WriteCIDSystemInfo, f.ROS)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -466,7 +466,7 @@ func (f *File) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["WMode"] = pdf.Integer(f.WMode)
 	}
 	if f.Parent != nil {
-		parent, _, err := pdf.ResourceManagerEmbed(rm, f.Parent)
+		parent, _, err := pdf.EmbedHelperEmbed(rm, f.Parent)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -474,13 +474,13 @@ func (f *File) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	var filters []pdf.Filter
-	opt := rm.Out.GetOptions()
+	opt := rm.Out().GetOptions()
 	if !opt.HasAny(pdf.OptPretty) {
 		filters = append(filters, pdf.FilterCompress{})
 	}
 
-	ref := rm.Out.Alloc()
-	stm, err := rm.Out.OpenStream(ref, dict, filters...)
+	ref := rm.Alloc()
+	stm, err := rm.Out().OpenStream(ref, dict, filters...)
 	if err != nil {
 		return nil, zero, err
 	}

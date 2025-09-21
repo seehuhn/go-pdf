@@ -109,7 +109,7 @@ func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) 
 
 // Finish is called when the resource manager is closed.
 // At this point the subset of glyphs to be embedded is known.
-func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
+func (e *embeddedSimple) Finish(rm *pdf.EmbedHelper) error {
 	if e.finished {
 		return nil
 	}
@@ -209,7 +209,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		dict.FontFile = type1glyphs.ToStream(fontSubset)
 	}
 
-	err := dict.WriteToPDF(rm, e.Ref)
+	err := dict.WriteToPDF(rm.GetRM(), e.Ref)
 	if err != nil {
 		return err
 	}

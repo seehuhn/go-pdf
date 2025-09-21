@@ -48,10 +48,10 @@ func (p *Type2) PaintType() int {
 
 // Embed returns the pattern dictionary for the shading pattern.
 // This implements the [seehuhn.de/go/pdf/graphics/color.Pattern] interface.
-func (p *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (p *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	sh, _, err := pdf.ResourceManagerEmbed(rm, p.Shading)
+	sh, _, err := pdf.EmbedHelperEmbed(rm, p.Shading)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -65,7 +65,7 @@ func (p *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["Matrix"] = toPDF(p.Matrix[:])
 	}
 	if p.ExtGState != nil {
-		gs, _, err := pdf.ResourceManagerEmbed(rm, p.ExtGState)
+		gs, _, err := pdf.EmbedHelperEmbed(rm, p.ExtGState)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -74,14 +74,14 @@ func (p *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	var data pdf.Native
 	if p.SingleUse {
-		ref := rm.Out.Alloc()
-		err := rm.Out.Put(ref, dict)
+		ref := rm.Alloc()
+		err := rm.Out().Put(ref, dict)
 		if err != nil {
 			return nil, zero, err
 		}
 		data = ref
 	} else {
-		data = dict.AsPDF(rm.Out.GetOptions())
+		data = dict.AsPDF(rm.Out().GetOptions())
 	}
 
 	return data, zero, nil

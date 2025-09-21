@@ -44,7 +44,7 @@ func TestRoundTrip(t *testing.T) {
 	pdfData, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(pdfData)
 
-	ref, _, err := original.Embed(rm)
+	ref, _, err := pdf.ResourceManagerEmbed[pdf.Unused](rm, original)
 	if err != nil {
 		t.Fatalf("failed to embed metadata: %v", err)
 	}

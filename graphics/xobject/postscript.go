@@ -60,15 +60,15 @@ func extractPostScript(x *pdf.Extractor, stm *pdf.Stream) (*postScript, error) {
 	return &postScript{WriteTo: draw}, nil
 }
 
-func (ps *postScript) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (ps *postScript) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	dict := pdf.Dict{
 		"Type":    pdf.Name("XObject"),
 		"Subtype": pdf.Name("PS"),
 	}
-	ref := rm.Out.Alloc()
-	stm, err := rm.Out.OpenStream(ref, dict, pdf.FilterCompress{})
+	ref := rm.Alloc()
+	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
 		return nil, zero, err
 	}

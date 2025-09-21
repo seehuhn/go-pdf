@@ -167,10 +167,10 @@ func (f *Type4) validate() error {
 }
 
 // Embed embeds the function into a PDF file.
-func (f *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (f *Type4) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := pdf.CheckVersion(rm.Out, "Type 4 functions", pdf.V1_3); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "Type 4 functions", pdf.V1_3); err != nil {
 		return nil, zero, err
 	} else if err := f.validate(); err != nil {
 		return nil, zero, err
@@ -187,12 +187,12 @@ func (f *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	program := "{" + f.Program + "}"
 
 	// Create stream with PostScript program
-	ref := rm.Out.Alloc()
+	ref := rm.Alloc()
 	var filters []pdf.Filter
-	if !rm.Out.GetOptions().HasAny(pdf.OptPretty) {
+	if !rm.Out().GetOptions().HasAny(pdf.OptPretty) {
 		filters = append(filters, &pdf.FilterCompress{})
 	}
-	stm, err := rm.Out.OpenStream(ref, dict, filters...)
+	stm, err := rm.Out().OpenStream(ref, dict, filters...)
 	if err != nil {
 		return nil, zero, err
 	}

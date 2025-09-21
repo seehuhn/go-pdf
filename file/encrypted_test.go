@@ -77,7 +77,7 @@ func TestEncryptedPayloadRoundTrip(t *testing.T) {
 					rm := pdf.NewResourceManager(buf)
 
 					// Embed the encrypted payload
-					obj, _, err := original.Embed(rm)
+					obj, _, err := pdf.ResourceManagerEmbed[pdf.Unused](rm, &original)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -121,7 +121,7 @@ func TestEncryptedPayloadErrors(t *testing.T) {
 		buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		_, _, err := ep.Embed(rm)
+		_, _, err := pdf.ResourceManagerEmbed(rm, ep)
 		if err == nil {
 			t.Error("expected error for missing Subtype")
 		}
@@ -135,7 +135,7 @@ func TestEncryptedPayloadErrors(t *testing.T) {
 		buf, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		_, _, err := ep.Embed(rm)
+		_, _, err := pdf.ResourceManagerEmbed(rm, ep)
 		if err == nil {
 			t.Error("expected version error for PDF 1.7")
 		}
@@ -169,7 +169,7 @@ func TestEncryptedPayloadOptionalType(t *testing.T) {
 		buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		obj, _, err := ep.Embed(rm)
+		obj, _, err := pdf.ResourceManagerEmbed(rm, ep)
 		if err != nil {
 			t.Fatal(err)
 		}

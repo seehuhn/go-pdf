@@ -87,20 +87,20 @@ func (sm *SoftMask) Subtype() pdf.Name {
 }
 
 // Embed embeds the soft mask as a PDF image XObject stream.
-func (sm *SoftMask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (sm *SoftMask) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := sm.check(rm.Out); err != nil {
+	if err := sm.check(rm.Out()); err != nil {
 		return nil, zero, err
 	}
 
 	// Soft masks require PDF 1.4+
-	if err := pdf.CheckVersion(rm.Out, "soft mask images", pdf.V1_4); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "soft mask images", pdf.V1_4); err != nil {
 		return nil, zero, err
 	}
 
 	// Soft-mask images must always use DeviceGray color space
-	csEmbedded, _, err := pdf.ResourceManagerEmbed(rm, color.SpaceDeviceGray)
+	csEmbedded, _, err := pdf.EmbedHelperEmbed(rm, color.SpaceDeviceGray)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -137,7 +137,7 @@ func (sm *SoftMask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 		dict["Matte"] = matte
 	}
 
-	ref := rm.Out.Alloc()
+	ref := rm.Alloc()
 
 	// Use compression appropriate for grayscale data
 	compress := pdf.FilterCompress{
@@ -147,7 +147,7 @@ func (sm *SoftMask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 		"Columns":          pdf.Integer(sm.Width),
 	}
 
-	w, err := rm.Out.OpenStream(ref, dict, compress)
+	w, err := rm.Out().OpenStream(ref, dict, compress)
 	if err != nil {
 		return nil, zero, err
 	}

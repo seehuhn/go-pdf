@@ -327,10 +327,10 @@ func (f *testFont) PostScriptName() string {
 	return f.ttf.FamilyName
 }
 
-func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
-	fontDictRef := rm.Out.Alloc()
-	fontDescriptorRef := rm.Out.Alloc()
-	fontFileRef := rm.Out.Alloc()
+func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
+	fontDictRef := rm.Alloc()
+	fontDescriptorRef := rm.Alloc()
+	fontFileRef := rm.Alloc()
 
 	fontDict := pdf.Dict{
 		"Type":           pdf.Name("Font"),
@@ -342,7 +342,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		"FontDescriptor": fontDescriptorRef,
 		"Encoding":       f.encoding,
 	}
-	err := rm.Out.Put(fontDictRef, fontDict)
+	err := rm.Out().Put(fontDictRef, fontDict)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -366,16 +366,16 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		"MissingWidth": pdf.Number(f.width),
 		"FontFile2":    fontFileRef,
 	}
-	err = rm.Out.Put(fontDescriptorRef, fontDescriptor)
+	err = rm.Out().Put(fontDescriptorRef, fontDescriptor)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	length1 := pdf.NewPlaceholder(rm.Out, 10)
+	length1 := pdf.NewPlaceholder(rm.Out(), 10)
 	fontFileDict := pdf.Dict{
 		"Length1": length1,
 	}
-	fontFileStream, err := rm.Out.OpenStream(fontFileRef, fontFileDict, pdf.FilterCompress{})
+	fontFileStream, err := rm.Out().OpenStream(fontFileRef, fontFileDict, pdf.FilterCompress{})
 	if err != nil {
 		return nil, nil, err
 	}

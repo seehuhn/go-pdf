@@ -140,10 +140,10 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	return res, nil
 }
 
-func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := pdf.CheckVersion(rm.Out, "appearance streams", pdf.V1_2); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "appearance streams", pdf.V1_2); err != nil {
 		return nil, zero, err
 	}
 
@@ -151,7 +151,7 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	// Embed Normal appearance
 	if d.Normal != nil {
-		nRef, _, err := pdf.ResourceManagerEmbed(rm, d.Normal)
+		nRef, _, err := pdf.EmbedHelperEmbed(rm, d.Normal)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -159,7 +159,7 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	} else if d.NormalMap != nil {
 		nDict := pdf.Dict{}
 		for state, form := range d.NormalMap {
-			formRef, _, err := pdf.ResourceManagerEmbed(rm, form)
+			formRef, _, err := pdf.EmbedHelperEmbed(rm, form)
 			if err != nil {
 				return nil, zero, err
 			}
@@ -170,7 +170,7 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	// Embed RollOver appearance
 	if d.RollOver != nil {
-		rRef, _, err := pdf.ResourceManagerEmbed(rm, d.RollOver)
+		rRef, _, err := pdf.EmbedHelperEmbed(rm, d.RollOver)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -178,7 +178,7 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	} else if d.RollOverMap != nil {
 		rDict := pdf.Dict{}
 		for state, form := range d.RollOverMap {
-			formRef, _, err := pdf.ResourceManagerEmbed(rm, form)
+			formRef, _, err := pdf.EmbedHelperEmbed(rm, form)
 			if err != nil {
 				return nil, zero, err
 			}
@@ -189,7 +189,7 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	// Embed Down appearance
 	if d.Down != nil {
-		dRef, _, err := pdf.ResourceManagerEmbed(rm, d.Down)
+		dRef, _, err := pdf.EmbedHelperEmbed(rm, d.Down)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -197,7 +197,7 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	} else if d.DownMap != nil {
 		dDict := pdf.Dict{}
 		for state, form := range d.DownMap {
-			formRef, _, err := pdf.ResourceManagerEmbed(rm, form)
+			formRef, _, err := pdf.EmbedHelperEmbed(rm, form)
 			if err != nil {
 				return nil, zero, err
 			}
@@ -210,8 +210,8 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		return dict, zero, nil
 	}
 
-	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, dict)
+	ref := rm.Alloc()
+	err := rm.Out().Put(ref, dict)
 	if err != nil {
 		return nil, zero, err
 	}

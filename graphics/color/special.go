@@ -102,14 +102,14 @@ func (s *SpaceIndexed) Channels() int {
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s *SpaceIndexed) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (s *SpaceIndexed) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := pdf.CheckVersion(rm.Out, "Indexed color space", pdf.V1_1); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "Indexed color space", pdf.V1_1); err != nil {
 		return nil, zero, err
 	}
 
-	base, _, err := pdf.ResourceManagerEmbed(rm, s.Base)
+	base, _, err := pdf.EmbedHelperEmbed(rm, s.Base)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -188,18 +188,18 @@ func (s *SpaceSeparation) Channels() int {
 
 // Embed adds the color space to a PDF file.
 // This implements the pdf.Embedder interface.
-func (s *SpaceSeparation) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (s *SpaceSeparation) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := pdf.CheckVersion(rm.Out, "Separation color space", pdf.V1_2); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "Separation color space", pdf.V1_2); err != nil {
 		return nil, zero, err
 	}
 
-	alt, _, err := pdf.ResourceManagerEmbed(rm, s.alternate)
+	alt, _, err := pdf.EmbedHelperEmbed(rm, s.alternate)
 	if err != nil {
 		return nil, zero, err
 	}
-	trfm, _, err := pdf.ResourceManagerEmbed(rm, s.trfm)
+	trfm, _, err := pdf.EmbedHelperEmbed(rm, s.trfm)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -309,19 +309,19 @@ func (s *SpaceDeviceN) Channels() int {
 
 // Embed adds the color space to a PDF file.
 // This implements the pdf.Embedder interface.
-func (s *SpaceDeviceN) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (s *SpaceDeviceN) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := pdf.CheckVersion(rm.Out, "DeviceN color space", pdf.V1_3); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "DeviceN color space", pdf.V1_3); err != nil {
 		return nil, zero, err
 	}
 
-	alt, _, err := pdf.ResourceManagerEmbed(rm, s.alternate)
+	alt, _, err := pdf.EmbedHelperEmbed(rm, s.alternate)
 	if err != nil {
 		return nil, zero, err
 	}
 
-	trfm, _, err := pdf.ResourceManagerEmbed(rm, s.trfm)
+	trfm, _, err := pdf.EmbedHelperEmbed(rm, s.trfm)
 	if err != nil {
 		return nil, zero, err
 	}

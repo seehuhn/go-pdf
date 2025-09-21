@@ -182,7 +182,7 @@ func ExtractNumberFormat(r pdf.Getter, obj pdf.Object) (*NumberFormat, error) {
 }
 
 // Embed converts the NumberFormat into a PDF dictionary.
-func (nf *NumberFormat) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (nf *NumberFormat) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	// Validate required fields
@@ -214,7 +214,7 @@ func (nf *NumberFormat) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, 
 	}
 
 	// Optional Type field
-	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("NumberFormat")
 	}
 
@@ -282,8 +282,8 @@ func (nf *NumberFormat) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, 
 		return dict, zero, nil
 	}
 
-	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, dict)
+	ref := rm.Alloc()
+	err := rm.Out().Put(ref, dict)
 	if err != nil {
 		return nil, zero, err
 	}

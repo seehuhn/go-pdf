@@ -343,10 +343,10 @@ rangesLoop:
 	return "", false
 }
 
-func (tu *ToUnicodeFile) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (tu *ToUnicodeFile) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	opt := rm.Out.GetOptions()
+	opt := rm.Out().GetOptions()
 
 	// TODO(voss): review this once
 	// https://github.com/pdf-association/pdf-issues/issues/462 is resolved.
@@ -355,7 +355,7 @@ func (tu *ToUnicodeFile) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused,
 		dict["Type"] = pdf.Name("CMap")
 	}
 	if tu.Parent != nil {
-		parent, _, err := pdf.ResourceManagerEmbed(rm, tu.Parent)
+		parent, _, err := pdf.EmbedHelperEmbed(rm, tu.Parent)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -367,8 +367,8 @@ func (tu *ToUnicodeFile) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused,
 		filters = append(filters, pdf.FilterCompress{})
 	}
 
-	ref := rm.Out.Alloc()
-	stm, err := rm.Out.OpenStream(ref, dict, filters...)
+	ref := rm.Alloc()
+	stm, err := rm.Out().OpenStream(ref, dict, filters...)
 	if err != nil {
 		return nil, zero, err
 	}

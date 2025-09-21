@@ -220,10 +220,13 @@ func doit() error {
 			page.TextEnd()
 			l.yPos -= 30
 
-			err = Y.(pdf.Finisher).Finish(page.RM)
-			if err != nil {
-				return err
-			}
+			_ = Y
+			panic("TODO(voss): fix this")
+
+			// err = Y.(pdf.Finisher).Finish(page.RM)
+			// if err != nil {
+			// 	return err
+			// }
 
 			fontDict, err := pdf.GetDict(doc.Out, refY)
 			if err != nil {

@@ -592,9 +592,9 @@ type t2Font struct {
 	cache map[charcode.Code]*font.Code
 }
 
-func (f *t2Font) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
-	ref := rm.Out.Alloc()
-	err := f.CIDFontType2.WriteToPDF(rm, ref)
+func (f *t2Font) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
+	ref := rm.Alloc()
+	err := f.CIDFontType2.WriteToPDF(rm.GetRM(), ref)
 	if err != nil {
 		return nil, nil, err
 	}

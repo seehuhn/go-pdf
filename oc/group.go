@@ -94,7 +94,7 @@ func ExtractGroup(x *pdf.Extractor, obj pdf.Object) (*Group, error) {
 }
 
 // Embed adds the optional content group to a PDF file.
-func (g *Group) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (g *Group) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	// validate required fields
@@ -125,7 +125,7 @@ func (g *Group) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	// embed Usage dictionary if present
 	if g.Usage != nil {
-		usageObj, _, err := pdf.ResourceManagerEmbed(rm, g.Usage)
+		usageObj, _, err := pdf.EmbedHelperEmbed(rm, g.Usage)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -133,8 +133,8 @@ func (g *Group) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	// always create indirect reference
-	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, dict)
+	ref := rm.Alloc()
+	err := rm.Out().Put(ref, dict)
 	if err != nil {
 		return nil, zero, err
 	}

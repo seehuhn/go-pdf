@@ -134,7 +134,7 @@ func (e *embeddedComposite) AppendEncoded(s pdf.String, gid glyph.ID, text strin
 	return e.CIDEncoder.Codec().AppendCode(s, c), w / 1000
 }
 
-func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
+func (e *embeddedComposite) Finish(rm *pdf.EmbedHelper) error {
 	if e.finished {
 		return nil
 	}
@@ -280,7 +280,7 @@ func (e *embeddedComposite) Finish(rm *pdf.ResourceManager) error {
 		FontFile:        cffglyphs.ToStream(subsetFont, glyphdata.CFF),
 	}
 
-	err := dict.WriteToPDF(rm, e.Ref)
+	err := dict.WriteToPDF(rm.GetRM(), e.Ref)
 	if err != nil {
 		return err
 	}

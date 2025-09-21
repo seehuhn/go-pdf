@@ -104,7 +104,7 @@ func (e *embeddedGlyfComposite) AppendEncoded(s pdf.String, gid glyph.ID, text s
 	return e.CIDEncoder.Codec().AppendCode(s, c), w / 1000
 }
 
-func (e *embeddedGlyfComposite) Finish(rm *pdf.ResourceManager) error {
+func (e *embeddedGlyfComposite) Finish(rm *pdf.EmbedHelper) error {
 	if e.finished {
 		return nil
 	}
@@ -216,7 +216,7 @@ func (e *embeddedGlyfComposite) Finish(rm *pdf.ResourceManager) error {
 		dict.CIDToGID = cidToGID
 	}
 
-	err := dict.WriteToPDF(rm, e.Ref)
+	err := dict.WriteToPDF(rm.GetRM(), e.Ref)
 	if err != nil {
 		return err
 	}

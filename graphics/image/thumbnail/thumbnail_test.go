@@ -381,7 +381,7 @@ func TestInvalidThumbnails(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := tc.thumbnail.Embed(rm)
+			_, _, err := pdf.ResourceManagerEmbed(rm, tc.thumbnail)
 			if tc.wantErr && err == nil {
 				t.Error("expected error but got nil")
 			} else if !tc.wantErr && err != nil {

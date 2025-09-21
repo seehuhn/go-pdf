@@ -114,13 +114,31 @@ func (c *fontDictCtx) Next() []Step {
 			})
 		case *dict.TrueType:
 			if fontDict.FontFile != nil && (fontDict.FontFile.Type == glyphdata.TrueType || fontDict.FontFile.Type == glyphdata.OpenTypeGlyf) {
-				// load functionality for TrueType/OpenType fonts could be added here
-				// when TrueType context support is implemented
+				steps = append(steps, Step{
+					Match: regexp.MustCompile(`^load$`),
+					Desc:  "`load`",
+					Next: func(key string) (Context, error) {
+						sfntCtx, err := newSfntCtx(fontDict.FontFile)
+						if err != nil {
+							return nil, fmt.Errorf("creating sfnt context for `load`: %w", err)
+						}
+						return sfntCtx, nil
+					},
+				})
 			}
 		case *dict.CIDFontType2:
 			if fontDict.FontFile != nil && (fontDict.FontFile.Type == glyphdata.TrueType || fontDict.FontFile.Type == glyphdata.OpenTypeGlyf) {
-				// load functionality for CIDFontType2 fonts could be added here
-				// when TrueType context support is implemented
+				steps = append(steps, Step{
+					Match: regexp.MustCompile(`^load$`),
+					Desc:  "`load`",
+					Next: func(key string) (Context, error) {
+						sfntCtx, err := newSfntCtx(fontDict.FontFile)
+						if err != nil {
+							return nil, fmt.Errorf("creating sfnt context for `load`: %w", err)
+						}
+						return sfntCtx, nil
+					},
+				})
 			}
 		}
 	}

@@ -86,7 +86,7 @@ func (e *embeddedGlyfSimple) AppendEncoded(s pdf.String, gid glyph.ID, text stri
 	return append(s, c), w / 1000
 }
 
-func (e *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
+func (e *embeddedGlyfSimple) Finish(rm *pdf.EmbedHelper) error {
 	if e.finished {
 		return nil
 	}
@@ -247,7 +247,7 @@ func (e *embeddedGlyfSimple) Finish(rm *pdf.ResourceManager) error {
 		dict.Width[c] = info.Width
 	}
 
-	err := dict.WriteToPDF(rm, e.Ref)
+	err := dict.WriteToPDF(rm.GetRM(), e.Ref)
 	if err != nil {
 		return err
 	}

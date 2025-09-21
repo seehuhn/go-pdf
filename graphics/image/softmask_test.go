@@ -196,7 +196,7 @@ func TestSoftMaskRoundTrip(t *testing.T) {
 
 				rm := pdf.NewResourceManager(w)
 
-				ref, _, err := tt.softMask.Embed(rm)
+				ref, _, err := pdf.ResourceManagerEmbed(rm, tt.softMask)
 				if err != nil {
 					t.Fatalf("embed failed: %v", err)
 				}
@@ -254,7 +254,7 @@ func FuzzSoftMaskRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(pdf.V2_0, opt)
 		rm := pdf.NewResourceManager(w)
 
-		ref, _, err := tt.softMask.Embed(rm)
+		ref, _, err := pdf.ResourceManagerEmbed(rm, tt.softMask)
 		if err != nil {
 			continue
 		}

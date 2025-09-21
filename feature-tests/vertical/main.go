@@ -163,7 +163,7 @@ func (f *testFont) PostScriptName() string {
 	return f.Font.FontName
 }
 
-func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
+func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
 	subsetFont := f.Font
 	subsetTag := "ABCDEF"
 
@@ -197,7 +197,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		Descent:      math.Round(f.Descent),
 		CapHeight:    math.Round(f.CapHeight),
 	}
-	fontDictRef := rm.Out.Alloc()
+	fontDictRef := rm.Alloc()
 	dict := &dict.CIDFontType0{
 		PostScriptName:  f.Font.FontName,
 		SubsetTag:       subsetTag,
@@ -217,7 +217,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		FontFile: cffglyphs.ToStream(f.Font, glyphdata.CFF),
 	}
 
-	err := dict.WriteToPDF(rm, fontDictRef)
+	err := dict.WriteToPDF(rm.GetRM(), fontDictRef)
 	if err != nil {
 		return nil, nil, err
 	}

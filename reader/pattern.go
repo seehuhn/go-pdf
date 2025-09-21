@@ -92,8 +92,8 @@ func (p *patternFromFile) PaintType() int {
 	return p.paintType
 }
 
-func (p *patternFromFile) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	copier := pdfcopy.NewCopier(rm.Out, p.r)
+func (p *patternFromFile) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+	copier := pdfcopy.NewCopier(rm.Out(), p.r)
 	obj, err := copier.Copy(p.obj)
 	if err != nil {
 		return nil, pdf.Unused{}, err

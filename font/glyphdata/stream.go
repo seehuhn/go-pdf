@@ -110,40 +110,40 @@ func ExtractStream(x *pdf.Extractor, obj pdf.Object, dictType, fdKey pdf.Name) (
 //
 // This method implements the pdf.Embedder interface and handles all necessary
 // PDF version checks and stream formatting based on the font type.
-func (s *Stream) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	switch s.Type {
 	case Type1:
 		// pass
 	case TrueType:
-		if err := pdf.CheckVersion(rm.Out, "TrueType font file", pdf.V1_1); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "TrueType font file", pdf.V1_1); err != nil {
 			return nil, zero, err
 		}
 	case CFFSimple:
-		if err := pdf.CheckVersion(rm.Out, "CFF font file", pdf.V1_2); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "CFF font file", pdf.V1_2); err != nil {
 			return nil, zero, err
 		}
 	case CFF:
-		if err := pdf.CheckVersion(rm.Out, "CID-keyed CFF font file", pdf.V1_3); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "CID-keyed CFF font file", pdf.V1_3); err != nil {
 			return nil, zero, err
 		}
 	case OpenTypeCFFSimple, OpenTypeCFF, OpenTypeGlyf:
-		if err := pdf.CheckVersion(rm.Out, "OpenType font file", pdf.V1_6); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "OpenType font file", pdf.V1_6); err != nil {
 			return nil, zero, err
 		}
 	default:
 		return nil, zero, pdf.Errorf("unexpected font type %s", s.Type)
 	}
 
-	ref := rm.Out.Alloc()
+	ref := rm.Alloc()
 	dict := pdf.Dict{}
 
 	if subtype := s.Type.subtype(); subtype != "" {
 		dict["Subtype"] = subtype
 	}
 
-	stm, err := rm.Out.OpenStream(ref, dict, pdf.FilterCompress{})
+	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
 		return nil, zero, err
 	}
@@ -153,12 +153,12 @@ func (s *Stream) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 		var lengths Lengths
 		var l1, l2, l3 *pdf.Placeholder
 
-		l1 = pdf.NewPlaceholder(rm.Out, 10)
+		l1 = pdf.NewPlaceholder(rm.Out(), 10)
 		dict["Length1"] = l1
 		if s.Type == Type1 {
-			l2 = pdf.NewPlaceholder(rm.Out, 10)
+			l2 = pdf.NewPlaceholder(rm.Out(), 10)
 			dict["Length2"] = l2
-			l3 = pdf.NewPlaceholder(rm.Out, 10)
+			l3 = pdf.NewPlaceholder(rm.Out(), 10)
 			dict["Length3"] = l3
 		}
 

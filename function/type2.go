@@ -184,10 +184,10 @@ func (f *Type2) validate() error {
 }
 
 // Embed embeds the function into a PDF file.
-func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (f *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := pdf.CheckVersion(rm.Out, "Type 2 functions", pdf.V1_3); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "Type 2 functions", pdf.V1_3); err != nil {
 		return nil, zero, err
 	}
 	if err := f.validate(); err != nil {
@@ -211,8 +211,8 @@ func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["C1"] = arrayFromFloats(f.C1)
 	}
 
-	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, dict)
+	ref := rm.Alloc()
+	err := rm.Out().Put(ref, dict)
 	if err != nil {
 		return nil, zero, err
 	}

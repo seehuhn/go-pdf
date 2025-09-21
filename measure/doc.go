@@ -73,7 +73,9 @@
 //
 // Use [ViewPortArray] for managing multiple viewports:
 //
-//	viewports := measure.ViewPortArray{viewport1, viewport2}
+//	viewports := &measure.ViewPortArray{
+//		Viewports: []*measure.Viewport{viewport1, viewport2},
+//	}
 //
 //	// Find viewport containing a point
 //	selected := viewports.Select(vec.Vec2{X: 100, Y: 200})

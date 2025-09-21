@@ -164,7 +164,7 @@ func roundTripTest(t *testing.T, originalHalftone Halftone) {
 	rm := pdf.NewResourceManager(buf)
 
 	// Embed the halftone
-	embedded, _, err := originalHalftone.Embed(rm)
+	embedded, _, err := pdf.ResourceManagerEmbed(rm, originalHalftone)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func FuzzRead(f *testing.F) {
 
 			ref := w.Alloc()
 
-			embedded, _, err := tc.halftone.Embed(rm)
+			embedded, _, err := pdf.ResourceManagerEmbed(rm, tc.halftone)
 			if err != nil {
 				continue
 			}

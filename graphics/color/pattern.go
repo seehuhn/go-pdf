@@ -54,9 +54,9 @@ func (s spacePatternColored) Channels() int {
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s spacePatternColored) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (s spacePatternColored) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	if err := pdf.CheckVersion(rm.Out, "Pattern color space", pdf.V1_2); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "Pattern color space", pdf.V1_2); err != nil {
 		return nil, zero, err
 	}
 	return pdf.Name("Pattern"), zero, nil
@@ -107,13 +107,13 @@ func (s spacePatternUncolored) Channels() int {
 
 // Embed adds the pattern color space to the PDF file.
 // This implements the [Space] interface.
-func (s spacePatternUncolored) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (s spacePatternUncolored) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := pdf.CheckVersion(rm.Out, "Pattern color space", pdf.V1_2); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "Pattern color space", pdf.V1_2); err != nil {
 		return nil, zero, err
 	}
-	base, _, err := pdf.ResourceManagerEmbed(rm, s.base)
+	base, _, err := pdf.EmbedHelperEmbed(rm, s.base)
 	if err != nil {
 		return nil, zero, err
 	}

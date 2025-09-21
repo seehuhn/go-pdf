@@ -512,14 +512,14 @@ func FromImageWithMask(img image.Image, mask image.Image, colorSpace color.Space
 }
 
 // Embed adds the image to the PDF file and returns the embedded object.
-func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := d.check(rm.Out); err != nil {
+	if err := d.check(rm.Out()); err != nil {
 		return nil, zero, err
 	}
 
-	csEmbedded, _, err := pdf.ResourceManagerEmbed(rm, d.ColorSpace)
+	csEmbedded, _, err := pdf.EmbedHelperEmbed(rm, d.ColorSpace)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -536,7 +536,7 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["Intent"] = pdf.Name(d.Intent)
 	}
 	if d.MaskImage != nil {
-		ref, _, err := pdf.ResourceManagerEmbed(rm, d.MaskImage)
+		ref, _, err := pdf.EmbedHelperEmbed(rm, d.MaskImage)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -561,7 +561,7 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	if len(d.Alternates) > 0 {
 		var alts pdf.Array
 		for _, alt := range d.Alternates {
-			ref, _, err := pdf.ResourceManagerEmbed(rm, alt)
+			ref, _, err := pdf.EmbedHelperEmbed(rm, alt)
 			if err != nil {
 				return nil, zero, err
 			}
@@ -572,16 +572,16 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	// Handle SMask/SMaskInData (mutually exclusive)
 	if d.SMask != nil && d.SMaskInData == 0 {
-		if err := pdf.CheckVersion(rm.Out, "soft mask images", pdf.V1_4); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "soft mask images", pdf.V1_4); err != nil {
 			return nil, zero, err
 		}
-		ref, _, err := pdf.ResourceManagerEmbed(rm, d.SMask)
+		ref, _, err := pdf.EmbedHelperEmbed(rm, d.SMask)
 		if err != nil {
 			return nil, zero, err
 		}
 		dict["SMask"] = ref
 	} else if d.SMaskInData > 0 {
-		if err := pdf.CheckVersion(rm.Out, "SMaskInData", pdf.V1_5); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "SMaskInData", pdf.V1_5); err != nil {
 			return nil, zero, err
 		}
 		dict["SMaskInData"] = pdf.Integer(d.SMaskInData)
@@ -591,7 +591,7 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["Name"] = d.Name
 	}
 	if d.Metadata != nil {
-		ref, _, err := pdf.ResourceManagerEmbed(rm, d.Metadata)
+		ref, _, err := pdf.EmbedHelperEmbed(rm, d.Metadata)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -599,10 +599,10 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if d.OptionalContent != nil {
-		if err := pdf.CheckVersion(rm.Out, "Image dict OC entry", pdf.V1_5); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "Image dict OC entry", pdf.V1_5); err != nil {
 			return nil, zero, err
 		}
-		embedded, _, err := pdf.ResourceManagerEmbed(rm, d.OptionalContent)
+		embedded, _, err := pdf.EmbedHelperEmbed(rm, d.OptionalContent)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -610,7 +610,7 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if d.Measure != nil {
-		embedded, _, err := pdf.ResourceManagerEmbed(rm, d.Measure)
+		embedded, _, err := pdf.EmbedHelperEmbed(rm, d.Measure)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -618,10 +618,10 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if d.PtData != nil {
-		if err := pdf.CheckVersion(rm.Out, "image dictionary PtData entry", pdf.V2_0); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "image dictionary PtData entry", pdf.V2_0); err != nil {
 			return nil, zero, err
 		}
-		embedded, _, err := pdf.ResourceManagerEmbed(rm, d.PtData)
+		embedded, _, err := pdf.EmbedHelperEmbed(rm, d.PtData)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -629,19 +629,19 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if key, ok := d.StructParent.Get(); ok {
-		if err := pdf.CheckVersion(rm.Out, "image dictionary StructParent entry", pdf.V1_3); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "image dictionary StructParent entry", pdf.V1_3); err != nil {
 			return nil, zero, err
 		}
 		dict["StructParent"] = pdf.Integer(key)
 	}
 
 	if len(d.AssociatedFiles) > 0 {
-		if err := pdf.CheckVersion(rm.Out, "image dictionary AF entry", pdf.V2_0); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "image dictionary AF entry", pdf.V2_0); err != nil {
 			return nil, zero, err
 		}
 
 		// Validate each file specification can be used as associated file
-		version := pdf.GetVersion(rm.Out)
+		version := pdf.GetVersion(rm.Out())
 		for i, spec := range d.AssociatedFiles {
 			if spec == nil {
 				continue
@@ -655,7 +655,7 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		var afArray pdf.Array
 		for _, spec := range d.AssociatedFiles {
 			if spec != nil {
-				embedded, _, err := pdf.ResourceManagerEmbed(rm, spec)
+				embedded, _, err := pdf.EmbedHelperEmbed(rm, spec)
 				if err != nil {
 					return nil, zero, err
 				}
@@ -666,24 +666,24 @@ func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if d.WebCaptureID != nil {
-		if err := pdf.CheckVersion(rm.Out, "image dictionary ID entry", pdf.V1_3); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "image dictionary ID entry", pdf.V1_3); err != nil {
 			return nil, zero, err
 		}
-		embedded, _, err := pdf.ResourceManagerEmbed(rm, d.WebCaptureID)
+		embedded, _, err := pdf.EmbedHelperEmbed(rm, d.WebCaptureID)
 		if err != nil {
 			return nil, zero, err
 		}
 		dict["ID"] = embedded
 	}
 
-	ref := rm.Out.Alloc()
+	ref := rm.Alloc()
 	compress := pdf.FilterCompress{
 		"Predictor":        pdf.Integer(15), // TODO(voss): check that this is a good choice
 		"Colors":           pdf.Integer(d.ColorSpace.Channels()),
 		"BitsPerComponent": pdf.Integer(d.BitsPerComponent),
 		"Columns":          pdf.Integer(d.Width),
 	}
-	w, err := rm.Out.OpenStream(ref, dict, compress)
+	w, err := rm.Out().OpenStream(ref, dict, compress)
 	if err != nil {
 		return nil, zero, fmt.Errorf("cannot open image stream: %w", err)
 	}

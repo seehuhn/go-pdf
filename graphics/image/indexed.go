@@ -56,7 +56,7 @@ func (im *Indexed) Subtype() pdf.Name {
 
 // Embed adds the image to the PDF file.
 // This implements the [graphics.Image] interface.
-func (im *Indexed) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (im *Indexed) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	cs, ok := im.ColorSpace.(*color.SpaceIndexed)
 	if !ok {
@@ -70,7 +70,7 @@ func (im *Indexed) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 		}
 	}
 
-	csRef, _, err := pdf.ResourceManagerEmbed(rm, im.ColorSpace)
+	csRef, _, err := pdf.EmbedHelperEmbed(rm, im.ColorSpace)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -87,8 +87,8 @@ func (im *Indexed) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error
 		"Columns":   pdf.Integer(im.Width),
 		"Predictor": pdf.Integer(15),
 	}
-	ref := rm.Out.Alloc()
-	stream, err := rm.Out.OpenStream(ref, imDict, filter)
+	ref := rm.Alloc()
+	stream, err := rm.Out().OpenStream(ref, imDict, filter)
 	if err != nil {
 		return nil, zero, err
 	}

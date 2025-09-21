@@ -53,7 +53,7 @@ type Data interface {
 // Embed converts the PieceInfo to a PDF dictionary for embedding.
 //
 // This implements the [pdf.Embedder] interface.
-func (p *PieceInfo) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (p *PieceInfo) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	if p == nil || len(p.Entries) == 0 {
 		return nil, pdf.Unused{}, nil
 	}
@@ -63,7 +63,7 @@ func (p *PieceInfo) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 		dataDict := pdf.Dict{
 			"LastModified": pdf.Date(data.LastModified()),
 		}
-		privateVal, _, err := pdf.ResourceManagerEmbed(rm, data)
+		privateVal, _, err := pdf.EmbedHelperEmbed(rm, data)
 		if err != nil {
 			return nil, pdf.Unused{}, err
 		}
@@ -77,8 +77,8 @@ func (p *PieceInfo) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 	if p.SingleUse {
 		return result, pdf.Unused{}, nil
 	}
-	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, result)
+	ref := rm.Alloc()
+	err := rm.Out().Put(ref, result)
 	if err != nil {
 		return nil, pdf.Unused{}, err
 	}
@@ -156,7 +156,7 @@ func (u *unknown) LastModified() time.Time {
 	return u.lastModified
 }
 
-func (u *unknown) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (u *unknown) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	if u.Private == nil {
@@ -164,8 +164,8 @@ func (u *unknown) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 	}
 
 	// copy the private object using pdfcopy
-	copier := pdfcopy.NewCopier(rm.Out, u.sourceReader)
-	copied, err := copier.Copy(u.Private.AsPDF(rm.Out.GetOptions()))
+	copier := pdfcopy.NewCopier(rm.Out(), u.sourceReader)
+	copied, err := copier.Copy(u.Private.AsPDF(rm.Out().GetOptions()))
 	if err != nil {
 		return nil, zero, err
 	}

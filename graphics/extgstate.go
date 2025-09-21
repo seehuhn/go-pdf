@@ -552,12 +552,12 @@ func parseSingleTransfer(x *pdf.Extractor, obj pdf.Object) (pdf.Function, error)
 // This implements the [pdf.Embedder] interface.
 //
 // TODO(voss): remove the State return value
-func (e *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Native, State, error) {
+func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, State, error) {
 	res := State{
 		Parameters: &Parameters{},
 	}
 
-	if err := pdf.CheckVersion(rm.Out, "ExtGState", pdf.V1_2); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "ExtGState", pdf.V1_2); err != nil {
 		return nil, res, err
 	}
 
@@ -569,7 +569,7 @@ func (e *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Native, State, error) {
 	// See table 57 in ISO 32000-2:2020.
 	dict := pdf.Dict{}
 	if set&StateTextFont != 0 {
-		E, embedded, err := pdf.ResourceManagerEmbed(rm, e.TextFont)
+		E, embedded, err := pdf.EmbedHelperEmbed(rm, e.TextFont)
 		if err != nil {
 			return nil, res, err
 		}
@@ -661,12 +661,12 @@ func (e *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Native, State, error) {
 	}
 	if set&StateBlackGeneration != 0 {
 		if e.BlackGeneration == nil {
-			if err := pdf.CheckVersion(rm.Out, "BG2 in ExtGState", pdf.V1_3); err != nil {
+			if err := pdf.CheckVersion(rm.Out(), "BG2 in ExtGState", pdf.V1_3); err != nil {
 				return nil, res, err
 			}
 			dict["BG2"] = pdf.Name("Default")
 		} else {
-			obj, _, err := pdf.ResourceManagerEmbed(rm, e.BlackGeneration)
+			obj, _, err := pdf.EmbedHelperEmbed(rm, e.BlackGeneration)
 			if err != nil {
 				return nil, res, err
 			}
@@ -676,12 +676,12 @@ func (e *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Native, State, error) {
 	}
 	if set&StateUndercolorRemoval != 0 {
 		if e.UndercolorRemoval == nil {
-			if err := pdf.CheckVersion(rm.Out, "UCR2 in ExtGState", pdf.V1_3); err != nil {
+			if err := pdf.CheckVersion(rm.Out(), "UCR2 in ExtGState", pdf.V1_3); err != nil {
 				return nil, res, err
 			}
 			dict["UCR2"] = pdf.Name("Default")
 		} else {
-			obj, _, err := pdf.ResourceManagerEmbed(rm, e.UndercolorRemoval)
+			obj, _, err := pdf.EmbedHelperEmbed(rm, e.UndercolorRemoval)
 			if err != nil {
 				return nil, res, err
 			}
@@ -690,7 +690,7 @@ func (e *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Native, State, error) {
 		res.UndercolorRemoval = e.UndercolorRemoval
 	}
 	if set&StateTransferFunction != 0 {
-		if v := pdf.GetVersion(rm.Out); v >= pdf.V2_0 {
+		if v := pdf.GetVersion(rm.Out()); v >= pdf.V2_0 {
 			return nil, res, errors.New("TransferFunction is deprecated in PDF 2.0")
 		}
 		all := []pdf.Function{
@@ -706,7 +706,7 @@ func (e *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Native, State, error) {
 				needsArray = true
 			}
 			if fn == nil {
-				if err := pdf.CheckVersion(rm.Out, "TR2 in ExtGState", pdf.V1_3); err != nil {
+				if err := pdf.CheckVersion(rm.Out(), "TR2 in ExtGState", pdf.V1_3); err != nil {
 					return nil, res, err
 				}
 				key = "TR2"
@@ -724,7 +724,7 @@ func (e *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Native, State, error) {
 				obj = pdf.Name("Identity")
 			default:
 				var err error
-				obj, _, err = pdf.ResourceManagerEmbed(rm, fn)
+				obj, _, err = pdf.EmbedHelperEmbed(rm, fn)
 				if err != nil {
 					return nil, res, err
 				}
@@ -739,7 +739,7 @@ func (e *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Native, State, error) {
 		res.TransferFunction = e.TransferFunction
 	}
 	if set&StateHalftone != 0 {
-		htEmbedded, _, err := pdf.ResourceManagerEmbed(rm, e.Halftone)
+		htEmbedded, _, err := pdf.EmbedHelperEmbed(rm, e.Halftone)
 		if err != nil {
 			return nil, res, err
 		}
@@ -768,8 +768,8 @@ func (e *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Native, State, error) {
 	if e.SingleUse {
 		return dict, res, nil
 	}
-	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, dict)
+	ref := rm.Alloc()
+	err := rm.Out().Put(ref, dict)
 	if err != nil {
 		return nil, res, err
 	}

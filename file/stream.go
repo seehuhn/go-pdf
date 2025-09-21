@@ -128,11 +128,11 @@ func ExtractStream(x *pdf.Extractor, obj pdf.Object) (*Stream, error) {
 }
 
 // Embed converts the Stream to a PDF stream object.
-func (s *Stream) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	// Check PDF version requirement for embedded file streams (PDF 1.3)
-	if err := pdf.CheckVersion(rm.Out, "embedded file streams", pdf.V1_3); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "embedded file streams", pdf.V1_3); err != nil {
 		return nil, zero, err
 	}
 
@@ -148,7 +148,7 @@ func (s *Stream) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 
 	// Create stream dictionary
 	dict := pdf.Dict{}
-	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("EmbeddedFile")
 	}
 
@@ -186,10 +186,10 @@ func (s *Stream) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 	}
 
 	// Create the stream object
-	ref := rm.Out.Alloc()
+	ref := rm.Alloc()
 
 	// Open stream for writing
-	w, err := rm.Out.OpenStream(ref, dict)
+	w, err := rm.Out().OpenStream(ref, dict)
 	if err != nil {
 		return nil, zero, err
 	}

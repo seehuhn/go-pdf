@@ -78,10 +78,10 @@ func ExtractEncryptedPayload(x *pdf.Extractor, obj pdf.Object) (*EncryptedPayloa
 
 // Embed converts the encrypted payload to a PDF object.
 // This implements the pdf.Embedder interface.
-func (ep *EncryptedPayload) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (ep *EncryptedPayload) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := pdf.CheckVersion(rm.Out, "encrypted payload dictionary", pdf.V2_0); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "encrypted payload dictionary", pdf.V2_0); err != nil {
 		return nil, zero, err
 	}
 
@@ -94,7 +94,7 @@ func (ep *EncryptedPayload) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unus
 	}
 
 	// Optional Type field
-	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("EncryptedPayload")
 	}
 
@@ -107,8 +107,8 @@ func (ep *EncryptedPayload) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unus
 		return dict, zero, nil
 	}
 
-	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, dict)
+	ref := rm.Alloc()
+	err := rm.Out().Put(ref, dict)
 	if err != nil {
 		return nil, zero, err
 	}

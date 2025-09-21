@@ -159,10 +159,10 @@ func extractItemValue(x *pdf.Extractor, obj pdf.Object) (*ItemValue, error) {
 }
 
 // Embed converts the collection item dictionary to a PDF object.
-func (item *ItemDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (item *ItemDict) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := pdf.CheckVersion(rm.Out, "collection item dictionary", pdf.V1_7); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "collection item dictionary", pdf.V1_7); err != nil {
 		return nil, zero, err
 	}
 
@@ -174,7 +174,7 @@ func (item *ItemDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, er
 	dict := pdf.Dict{}
 
 	// Add Type field if requested
-	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("CollectionItem")
 	}
 
@@ -193,8 +193,8 @@ func (item *ItemDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, er
 		return dict, zero, nil
 	}
 
-	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, dict)
+	ref := rm.Alloc()
+	err := rm.Out().Put(ref, dict)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -203,7 +203,7 @@ func (item *ItemDict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, er
 }
 
 // embedItemValue converts an ItemValue to a PDF object.
-func embedItemValue(rm *pdf.ResourceManager, value ItemValue) (pdf.Object, error) {
+func embedItemValue(rm *pdf.EmbedHelper, value ItemValue) (pdf.Object, error) {
 	var pdfVal pdf.Object
 
 	// Convert the Go value to PDF object
@@ -212,7 +212,7 @@ func embedItemValue(rm *pdf.ResourceManager, value ItemValue) (pdf.Object, error
 		pdfVal = pdf.TextString(v)
 
 	case time.Time:
-		pdfVal = pdf.Date(v).AsPDF(rm.Out.GetOptions())
+		pdfVal = pdf.Date(v).AsPDF(rm.Out().GetOptions())
 
 	case int64:
 		pdfVal = pdf.Integer(v)
@@ -235,7 +235,7 @@ func embedItemValue(rm *pdf.ResourceManager, value ItemValue) (pdf.Object, error
 		"P": pdf.TextString(value.Prefix),
 	}
 
-	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		subitemDict["Type"] = pdf.Name("CollectionSubitem")
 	}
 

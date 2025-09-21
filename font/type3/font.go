@@ -173,12 +173,12 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 }
 
 // Embed implements the pdf.Embedder interface for Type 3 fonts.
-func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
+func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
 	if len(f.Font.Glyphs) == 0 || f.Font.Glyphs[0].Name != "" {
 		return nil, nil, errors.New("invalid glyph 0")
 	}
 
-	ref := rm.Out.Alloc()
+	ref := rm.Alloc()
 	res := newEmbeddedSimple(ref, f.Font)
 	return ref, res, nil
 }

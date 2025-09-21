@@ -87,7 +87,7 @@ func (f *Form) Subtype() pdf.Name {
 }
 
 // Embed implements the pdf.Embedder interface for form XObjects.
-func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	err := f.validate()
@@ -96,7 +96,7 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	buf := &bytes.Buffer{}
-	contents := graphics.NewWriter(buf, rm)
+	contents := graphics.NewWriter(buf, rm.GetRM())
 	contents.State.Set = 0 // make sure the XObject is independent of the current graphics state
 	err = f.Draw(contents)
 	if err != nil {
@@ -106,13 +106,13 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		return nil, zero, contents.Err
 	}
 
-	ref := rm.Out.Alloc()
+	ref := rm.Alloc()
 
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Form"),
 		"BBox":    &f.BBox,
 	}
-	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("XObject")
 	}
 	if f.Matrix != matrix.Identity && f.Matrix != matrix.Zero {
@@ -122,7 +122,7 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["Resources"] = pdf.AsDict(contents.Resources)
 	}
 	if f.Metadata != nil {
-		rmEmbedded, _, err := pdf.ResourceManagerEmbed(rm, f.Metadata)
+		rmEmbedded, _, err := pdf.EmbedHelperEmbed(rm, f.Metadata)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -132,7 +132,7 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		if f.LastModified.IsZero() {
 			return nil, zero, errors.New("missing LastModified")
 		}
-		pieceInfoObj, _, err := pdf.ResourceManagerEmbed(rm, f.PieceInfo)
+		pieceInfoObj, _, err := pdf.EmbedHelperEmbed(rm, f.PieceInfo)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -145,10 +145,10 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if f.OptionalContent != nil {
-		if err := pdf.CheckVersion(rm.Out, "form XObject OC entry", pdf.V1_5); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "form XObject OC entry", pdf.V1_5); err != nil {
 			return nil, zero, err
 		}
-		embedded, _, err := pdf.ResourceManagerEmbed(rm, f.OptionalContent)
+		embedded, _, err := pdf.EmbedHelperEmbed(rm, f.OptionalContent)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -156,10 +156,10 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if f.Measure != nil {
-		if err := pdf.CheckVersion(rm.Out, "form XObject Measure entry", pdf.V2_0); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "form XObject Measure entry", pdf.V2_0); err != nil {
 			return nil, zero, err
 		}
-		embedded, _, err := pdf.ResourceManagerEmbed(rm, f.Measure)
+		embedded, _, err := pdf.EmbedHelperEmbed(rm, f.Measure)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -168,10 +168,10 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	// PtData (optional; PDF 2.0)
 	if f.PtData != nil {
-		if err := pdf.CheckVersion(rm.Out, "form XObject PtData entry", pdf.V2_0); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "form XObject PtData entry", pdf.V2_0); err != nil {
 			return nil, zero, err
 		}
-		embedded, _, err := pdf.ResourceManagerEmbed(rm, f.PtData)
+		embedded, _, err := pdf.EmbedHelperEmbed(rm, f.PtData)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -179,17 +179,17 @@ func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if key, ok := f.StructParent.Get(); ok {
-		if err := pdf.CheckVersion(rm.Out, "form XObject StructParent entry", pdf.V1_3); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "form XObject StructParent entry", pdf.V1_3); err != nil {
 			return nil, zero, err
 		}
 		dict["StructParent"] = pdf.Integer(key)
 	}
 
 	var filters []pdf.Filter
-	if !rm.Out.GetOptions().HasAny(pdf.OptPretty) {
+	if !rm.Out().GetOptions().HasAny(pdf.OptPretty) {
 		filters = append(filters, &pdf.FilterCompress{})
 	}
-	stm, err := rm.Out.OpenStream(ref, dict, filters...)
+	stm, err := rm.Out().OpenStream(ref, dict, filters...)
 	if err != nil {
 		return nil, zero, err
 	}

@@ -402,11 +402,11 @@ func extractType6(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Typ
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type6) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (s *Type6) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	// Version check
-	if err := pdf.CheckVersion(rm.Out, "Type 6 shadings", pdf.V1_3); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "Type 6 shadings", pdf.V1_3); err != nil {
 		return nil, zero, err
 	}
 
@@ -473,7 +473,7 @@ func (s *Type6) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		return nil, zero, errors.New("Function not allowed for indexed color space")
 	}
 
-	csE, _, err := pdf.ResourceManagerEmbed(rm, s.ColorSpace)
+	csE, _, err := pdf.EmbedHelperEmbed(rm, s.ColorSpace)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -496,7 +496,7 @@ func (s *Type6) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["AntiAlias"] = pdf.Boolean(true)
 	}
 	if s.F != nil {
-		fn, _, err := pdf.ResourceManagerEmbed(rm, s.F)
+		fn, _, err := pdf.EmbedHelperEmbed(rm, s.F)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -577,8 +577,8 @@ func (s *Type6) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		}
 	}
 
-	ref := rm.Out.Alloc()
-	stm, err := rm.Out.OpenStream(ref, dict)
+	ref := rm.Alloc()
+	stm, err := rm.Out().OpenStream(ref, dict)
 	if err != nil {
 		return nil, zero, err
 	}

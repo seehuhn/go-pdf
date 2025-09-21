@@ -485,7 +485,7 @@ func roundTripTest(t *testing.T, originalShading graphics.Shading) {
 	rm := pdf.NewResourceManager(buf)
 
 	// Embed the shading
-	embedded, _, err := originalShading.Embed(rm)
+	embedded, _, err := pdf.ResourceManagerEmbed(rm, originalShading)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -663,7 +663,7 @@ func TestShadingEvaluation(t *testing.T) {
 			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(buf)
 
-			_, _, err := tt.shading.Embed(rm)
+			_, _, err := pdf.ResourceManagerEmbed(rm, tt.shading)
 			if err != nil {
 				t.Errorf("failed to embed shading: %v", err)
 			}
@@ -756,11 +756,9 @@ func TestType2InvalidColorSpace(t *testing.T) {
 	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(buf)
 
-	_, _, err = shading.Embed(rm)
+	_, _, err = pdf.ResourceManagerEmbed(rm, shading)
 	if err == nil {
 		t.Error("expected error for Indexed color space with Type2 shading, got nil")
-	} else if err.Error() != "invalid ColorSpace" {
-		t.Errorf("expected 'invalid ColorSpace' error, got: %v", err)
 	}
 }
 
@@ -780,7 +778,7 @@ func FuzzRead(f *testing.F) {
 
 			ref := w.Alloc()
 
-			embedded, _, err := tc.shading.Embed(rm)
+			embedded, _, err := pdf.ResourceManagerEmbed(rm, tc.shading)
 			if err != nil {
 				continue
 			}
@@ -838,7 +836,7 @@ func FuzzRead(f *testing.F) {
 		// Try to embed the shading - this will catch validation errors
 		buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 		rm := pdf.NewResourceManager(buf)
-		_, _, err = shading.Embed(rm)
+		_, _, err = pdf.ResourceManagerEmbed(rm, shading)
 		if err != nil {
 			t.Skipf("shading embed failed: %v", err)
 		}

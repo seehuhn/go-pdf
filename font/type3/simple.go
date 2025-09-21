@@ -78,7 +78,7 @@ func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) 
 	return append(s, c), w * e.Font.FontMatrix[0]
 }
 
-func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
+func (e *embeddedSimple) Finish(rm *pdf.EmbedHelper) error {
 	if e.finished {
 		return nil
 	}
@@ -99,18 +99,18 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 	//     https://pdf-issues.pdfa.org/32000-2-2020/clause07.html#H7.8.3
 	//   - check where different PDF versions put the Resources dictionary
 	//   - make it configurable whether to use per-glyph resource dictionaries?
-	page := graphics.NewWriter(nil, rm)
+	page := graphics.NewWriter(nil, rm.GetRM())
 	charProcs := make(map[pdf.Name]pdf.Reference)
 	for _, gid := range glyphs {
 		g := e.Font.Glyphs[gid]
 		if g.Name == "" {
 			continue
 		}
-		gRef := rm.Out.Alloc()
+		gRef := rm.Alloc()
 
 		charProcs[pdf.Name(g.Name)] = gRef
 
-		stm, err := rm.Out.OpenStream(gRef, nil, pdf.FilterCompress{})
+		stm, err := rm.Out().OpenStream(gRef, nil, pdf.FilterCompress{})
 		if err != nil {
 			return err
 		}
@@ -181,7 +181,7 @@ func (e *embeddedSimple) Finish(rm *pdf.ResourceManager) error {
 		dict.Width[c] = info.Width
 	}
 
-	err := dict.WriteToPDF(rm, e.Ref)
+	err := dict.WriteToPDF(rm.GetRM(), e.Ref)
 	if err != nil {
 		return err
 	}

@@ -106,7 +106,7 @@ func ExtractBorder(r pdf.Getter, obj pdf.Object) (*Border, error) {
 	return b, nil
 }
 
-func (b *Border) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (b *Border) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	// the Go default value is "no border"
@@ -135,7 +135,7 @@ func (b *Border) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 	}
 
 	if b.DashArray != nil {
-		if err := pdf.CheckVersion(rm.Out, "border dash array", pdf.V1_1); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "border dash array", pdf.V1_1); err != nil {
 			return nil, zero, err
 		}
 		dashArray := make(pdf.Array, len(b.DashArray))
@@ -151,8 +151,8 @@ func (b *Border) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 	if b.SingleUse {
 		return borderArray, zero, nil
 	}
-	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, borderArray)
+	ref := rm.Alloc()
+	err := rm.Out().Put(ref, borderArray)
 	if err != nil {
 		return nil, zero, err
 	}

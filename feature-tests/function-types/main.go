@@ -531,10 +531,10 @@ func (img *imageStrip) Subtype() pdf.Name {
 	return "Image"
 }
 
-func (img *imageStrip) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (img *imageStrip) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	csEmbedded, _, err := pdf.ResourceManagerEmbed(rm, img.cs)
+	csEmbedded, _, err := pdf.EmbedHelperEmbed(rm, img.cs)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -568,8 +568,8 @@ func (img *imageStrip) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, e
 		}
 	}
 
-	ref := rm.Out.Alloc()
-	stm, err := rm.Out.OpenStream(ref, dict, pdf.FilterCompress{})
+	ref := rm.Alloc()
+	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
 		return nil, zero, err
 	}
@@ -598,10 +598,10 @@ func (img *axialImageStrip) Subtype() pdf.Name {
 	return "Image"
 }
 
-func (img *axialImageStrip) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (img *axialImageStrip) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	csEmbedded, _, err := pdf.ResourceManagerEmbed(rm, img.cs)
+	csEmbedded, _, err := pdf.EmbedHelperEmbed(rm, img.cs)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -628,8 +628,8 @@ func (img *axialImageStrip) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unus
 		}
 	}
 
-	ref := rm.Out.Alloc()
-	stm, err := rm.Out.OpenStream(ref, dict, pdf.FilterCompress{})
+	ref := rm.Alloc()
+	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
 		return nil, zero, err
 	}

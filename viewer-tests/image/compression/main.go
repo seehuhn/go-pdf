@@ -191,9 +191,9 @@ func (img *testImage) Subtype() pdf.Name {
 	return "Image"
 }
 
-func (img *testImage) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (img *testImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	csEmbedded, _, err := pdf.ResourceManagerEmbed(rm, img.cs)
+	csEmbedded, _, err := pdf.EmbedHelperEmbed(rm, img.cs)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -208,7 +208,7 @@ func (img *testImage) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, er
 		"ColorSpace":       csEmbedded,
 		"BitsPerComponent": pdf.Integer(img.bpc),
 	}
-	ref := rm.Out.Alloc()
+	ref := rm.Alloc()
 	compress := pdf.FilterFlate{
 		"Predictor": pdf.Integer(img.predictor),
 	}
@@ -217,7 +217,7 @@ func (img *testImage) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, er
 		compress["BitsPerComponent"] = pdf.Integer(img.bpc)
 		compress["Columns"] = pdf.Integer(size)
 	}
-	stm, err := rm.Out.OpenStream(ref, dict, compress)
+	stm, err := rm.Out().OpenStream(ref, dict, compress)
 	if err != nil {
 		return nil, zero, err
 	}

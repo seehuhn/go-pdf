@@ -60,14 +60,14 @@ func (im *jpegImage) Bounds() graphics.Rectangle {
 
 // Embed ensures that the image is embedded in the PDF file.
 // This implements the [graphics.Image] interface.
-func (im *jpegImage) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (im *jpegImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	ref := rm.Out.Alloc()
+	ref := rm.Alloc()
 
 	// TODO(voss): write a mask if there is an alpha channel
 
 	img := im.im
-	stream, err := rm.Out.OpenStream(ref, pdf.Dict{
+	stream, err := rm.Out().OpenStream(ref, pdf.Dict{
 		"Type":             pdf.Name("XObject"),
 		"Subtype":          pdf.Name("Image"),
 		"Width":            pdf.Integer(img.Bounds().Dx()),

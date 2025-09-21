@@ -93,9 +93,9 @@ func (s *SpaceCalGray) New(gray float64) Color {
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s *SpaceCalGray) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (s *SpaceCalGray) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	if err := pdf.CheckVersion(rm.Out, "CalGray color space", pdf.V1_1); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "CalGray color space", pdf.V1_1); err != nil {
 		return nil, zero, err
 	}
 
@@ -179,9 +179,9 @@ func CalRGB(whitePoint, blackPoint, gamma, matrix []float64) (*SpaceCalRGB, erro
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s *SpaceCalRGB) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (s *SpaceCalRGB) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	if err := pdf.CheckVersion(rm.Out, "CalRGB color space", pdf.V1_1); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "CalRGB color space", pdf.V1_1); err != nil {
 		return nil, zero, err
 	}
 
@@ -331,9 +331,9 @@ func (s *SpaceLab) Default() Color {
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s *SpaceLab) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (s *SpaceLab) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	if err := pdf.CheckVersion(rm.Out, "Lab color space", pdf.V1_1); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "Lab color space", pdf.V1_1); err != nil {
 		return nil, zero, err
 	}
 

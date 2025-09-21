@@ -101,14 +101,14 @@ func (g *VisibilityExpressionGroup) isVisible(states map[*Group]bool) bool {
 }
 
 // Embed converts the group reference to a PDF object reference.
-func (g *VisibilityExpressionGroup) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (g *VisibilityExpressionGroup) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	if g.Group == nil {
 		return nil, zero, pdf.Error("VisibilityExpressionGroup.Group is nil")
 	}
 
 	// embed the group using ResourceManager
-	groupRef, _, err := pdf.ResourceManagerEmbed(rm, g.Group)
+	groupRef, _, err := pdf.EmbedHelperEmbed(rm, g.Group)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -131,7 +131,7 @@ func (a *VisibilityExpressionAnd) isVisible(groupStates map[*Group]bool) bool {
 }
 
 // Embed converts the AND expression to a PDF array.
-func (a *VisibilityExpressionAnd) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (a *VisibilityExpressionAnd) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	if len(a.Args) == 0 {
 		return nil, zero, pdf.Error("VisibilityExpressionAnd requires at least one operand")
@@ -143,7 +143,7 @@ func (a *VisibilityExpressionAnd) Embed(rm *pdf.ResourceManager) (pdf.Native, pd
 
 	// embed each operand
 	for i, operand := range a.Args {
-		obj, _, err := pdf.ResourceManagerEmbed(rm, operand)
+		obj, _, err := pdf.EmbedHelperEmbed(rm, operand)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -169,7 +169,7 @@ func (o *VisibilityExpressionOr) isVisible(groupStates map[*Group]bool) bool {
 }
 
 // Embed converts the OR expression to a PDF array.
-func (o *VisibilityExpressionOr) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (o *VisibilityExpressionOr) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	if len(o.Args) == 0 {
 		return nil, zero, pdf.Error("VisibilityExpressionOr requires at least one operand")
@@ -181,7 +181,7 @@ func (o *VisibilityExpressionOr) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf
 
 	// embed each operand
 	for i, operand := range o.Args {
-		obj, _, err := pdf.ResourceManagerEmbed(rm, operand)
+		obj, _, err := pdf.EmbedHelperEmbed(rm, operand)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -202,14 +202,14 @@ func (n *VisibilityExpressionNot) isVisible(groupStates map[*Group]bool) bool {
 }
 
 // Embed converts the NOT expression to a PDF array.
-func (n *VisibilityExpressionNot) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (n *VisibilityExpressionNot) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	if n.Args == nil {
 		return nil, zero, pdf.Error("VisibilityExpressionNot requires exactly one operand")
 	}
 
 	// embed the operand
-	obj, _, err := pdf.ResourceManagerEmbed(rm, n.Args)
+	obj, _, err := pdf.EmbedHelperEmbed(rm, n.Args)
 	if err != nil {
 		return nil, zero, err
 	}

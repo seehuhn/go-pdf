@@ -197,10 +197,10 @@ func (f *Type3) validate() error {
 }
 
 // Embed embeds the function into a PDF file.
-func (f *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (f *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := pdf.CheckVersion(rm.Out, "Type 3 functions", pdf.V1_3); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "Type 3 functions", pdf.V1_3); err != nil {
 		return nil, zero, err
 	} else if err := f.validate(); err != nil {
 		return nil, zero, err
@@ -208,7 +208,7 @@ func (f *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	functionRefs := make(pdf.Array, len(f.Functions))
 	for i, fn := range f.Functions {
-		ref, _, err := pdf.ResourceManagerEmbed(rm, fn)
+		ref, _, err := pdf.EmbedHelperEmbed(rm, fn)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -227,8 +227,8 @@ func (f *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["Range"] = arrayFromFloats(f.Range)
 	}
 
-	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, dict)
+	ref := rm.Alloc()
+	err := rm.Out().Put(ref, dict)
 	if err != nil {
 		return nil, zero, err
 	}

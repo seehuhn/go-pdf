@@ -104,8 +104,8 @@ func (testFont) PostScriptName() string {
 	return "Test"
 }
 
-func (testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
-	fontDictRef := rm.Out.Alloc()
+func (testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
+	fontDictRef := rm.Alloc()
 	fontType := glyphdata.TrueType
 
 	numCID := 34 + 3
@@ -196,7 +196,7 @@ func (testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error
 		FontFile:        sfntglyphs.ToStream(subsetFont, fontType),
 	}
 
-	err = dict.WriteToPDF(rm, fontDictRef)
+	err = dict.WriteToPDF(rm.GetRM(), fontDictRef)
 	if err != nil {
 		return nil, nil, err
 	}

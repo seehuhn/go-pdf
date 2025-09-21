@@ -260,7 +260,7 @@ func ExtractUsage(x *pdf.Extractor, obj pdf.Object) (*Usage, error) {
 }
 
 // Embed adds the usage dictionary to a PDF file.
-func (u *Usage) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	dict := pdf.Dict{}
@@ -434,8 +434,8 @@ func (u *Usage) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		return dict, zero, nil
 	}
 
-	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, dict)
+	ref := rm.Alloc()
+	err := rm.Out().Put(ref, dict)
 	if err != nil {
 		return nil, zero, err
 	}

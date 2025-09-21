@@ -348,10 +348,10 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 }
 
 // Embed adds the mask to the PDF file and returns the embedded object.
-func (m *Mask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (m *Mask) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := m.check(rm.Out); err != nil {
+	if err := m.check(rm.Out()); err != nil {
 		return nil, zero, err
 	}
 
@@ -372,7 +372,7 @@ func (m *Mask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	if len(m.Alternates) > 0 {
 		var alts pdf.Array
 		for _, alt := range m.Alternates {
-			ref, _, err := pdf.ResourceManagerEmbed(rm, alt)
+			ref, _, err := pdf.EmbedHelperEmbed(rm, alt)
 			if err != nil {
 				return nil, zero, err
 			}
@@ -386,7 +386,7 @@ func (m *Mask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if m.Metadata != nil {
-		ref, _, err := pdf.ResourceManagerEmbed(rm, m.Metadata)
+		ref, _, err := pdf.EmbedHelperEmbed(rm, m.Metadata)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -394,10 +394,10 @@ func (m *Mask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if m.OptionalContent != nil {
-		if err := pdf.CheckVersion(rm.Out, "ImageMask OC entry", pdf.V1_5); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "ImageMask OC entry", pdf.V1_5); err != nil {
 			return nil, zero, err
 		}
-		embedded, _, err := pdf.ResourceManagerEmbed(rm, m.OptionalContent)
+		embedded, _, err := pdf.EmbedHelperEmbed(rm, m.OptionalContent)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -405,10 +405,10 @@ func (m *Mask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if m.Measure != nil {
-		if err := pdf.CheckVersion(rm.Out, "image mask Measure entry", pdf.V2_0); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "image mask Measure entry", pdf.V2_0); err != nil {
 			return nil, zero, err
 		}
-		embedded, _, err := pdf.ResourceManagerEmbed(rm, m.Measure)
+		embedded, _, err := pdf.EmbedHelperEmbed(rm, m.Measure)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -417,10 +417,10 @@ func (m *Mask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 
 	// PtData (optional; PDF 2.0)
 	if m.PtData != nil {
-		if err := pdf.CheckVersion(rm.Out, "image mask PtData entry", pdf.V2_0); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "image mask PtData entry", pdf.V2_0); err != nil {
 			return nil, zero, err
 		}
-		embedded, _, err := pdf.ResourceManagerEmbed(rm, m.PtData)
+		embedded, _, err := pdf.EmbedHelperEmbed(rm, m.PtData)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -428,12 +428,12 @@ func (m *Mask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if len(m.AssociatedFiles) > 0 {
-		if err := pdf.CheckVersion(rm.Out, "image mask AF entry", pdf.V2_0); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "image mask AF entry", pdf.V2_0); err != nil {
 			return nil, zero, err
 		}
 
 		// Validate each file specification can be used as associated file
-		version := pdf.GetVersion(rm.Out)
+		version := pdf.GetVersion(rm.Out())
 		for i, spec := range m.AssociatedFiles {
 			if spec == nil {
 				continue
@@ -447,7 +447,7 @@ func (m *Mask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		var afArray pdf.Array
 		for _, spec := range m.AssociatedFiles {
 			if spec != nil {
-				embedded, _, err := pdf.ResourceManagerEmbed(rm, spec)
+				embedded, _, err := pdf.EmbedHelperEmbed(rm, spec)
 				if err != nil {
 					return nil, zero, err
 				}
@@ -458,10 +458,10 @@ func (m *Mask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if m.WebCaptureID != nil {
-		if err := pdf.CheckVersion(rm.Out, "image mask ID entry", pdf.V1_3); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "image mask ID entry", pdf.V1_3); err != nil {
 			return nil, zero, err
 		}
-		embedded, _, err := pdf.ResourceManagerEmbed(rm, m.WebCaptureID)
+		embedded, _, err := pdf.EmbedHelperEmbed(rm, m.WebCaptureID)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -469,20 +469,20 @@ func (m *Mask) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if key, ok := m.StructParent.Get(); ok {
-		if err := pdf.CheckVersion(rm.Out, "image mask StructParent entry", pdf.V1_3); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "image mask StructParent entry", pdf.V1_3); err != nil {
 			return nil, zero, err
 		}
 		dict["StructParent"] = pdf.Integer(key)
 	}
 
-	ref := rm.Out.Alloc()
+	ref := rm.Alloc()
 	filters := []pdf.Filter{
 		pdf.FilterCCITTFax{
 			"Columns": pdf.Integer(m.Width),
 			"K":       pdf.Integer(-1),
 		},
 	}
-	w, err := rm.Out.OpenStream(ref, dict, filters...)
+	w, err := rm.Out().OpenStream(ref, dict, filters...)
 	if err != nil {
 		return nil, zero, fmt.Errorf("cannot open image mask stream: %w", err)
 	}

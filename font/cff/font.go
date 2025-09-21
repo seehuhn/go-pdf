@@ -171,20 +171,20 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 // instead of being called directly.
 //
 // This implements the [font.Font] interface.
-func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
-	ref := rm.Out.Alloc()
+func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
+	ref := rm.Alloc()
 
 	opt := f.Opt
 
 	var res font.Embedded
 	if opt.Composite {
-		err := pdf.CheckVersion(rm.Out, "composite CFF fonts", pdf.V1_3)
+		err := pdf.CheckVersion(rm.Out(), "composite CFF fonts", pdf.V1_3)
 		if err != nil {
 			return nil, nil, err
 		}
 		res = newEmbeddedComposite(ref, f)
 	} else {
-		err := pdf.CheckVersion(rm.Out, "simple CFF fonts", pdf.V1_2)
+		err := pdf.CheckVersion(rm.Out(), "simple CFF fonts", pdf.V1_2)
 		if err != nil {
 			return nil, nil, err
 		}

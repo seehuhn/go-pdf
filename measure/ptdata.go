@@ -118,11 +118,11 @@ func ExtractPtData(r pdf.Getter, obj pdf.Object) (*PtData, error) {
 }
 
 // Embed converts the PtData into a PDF object.
-func (pd *PtData) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (pd *PtData) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	// Check PDF 2.0 requirement
-	if err := pdf.CheckVersion(rm.Out, "point data dictionaries", pdf.V2_0); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "point data dictionaries", pdf.V2_0); err != nil {
 		return nil, zero, err
 	}
 
@@ -173,8 +173,8 @@ func (pd *PtData) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 		return dict, zero, nil
 	}
 
-	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, dict)
+	ref := rm.Alloc()
+	err := rm.Out().Put(ref, dict)
 	if err != nil {
 		return nil, zero, err
 	}

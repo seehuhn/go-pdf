@@ -202,9 +202,9 @@ func extractType3(x *pdf.Extractor, d pdf.Dict, wasReference bool) (*Type3, erro
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (s *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
-	if err := pdf.CheckVersion(rm.Out, "Type 3 shadings", pdf.V1_3); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "Type 3 shadings", pdf.V1_3); err != nil {
 		return nil, zero, err
 	}
 	if s.ColorSpace == nil {
@@ -240,12 +240,12 @@ func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		return nil, zero, fmt.Errorf("function domain %v must contain shading domain %v", functionDomain, shadingDomain)
 	}
 
-	fn, _, err := pdf.ResourceManagerEmbed(rm, s.F)
+	fn, _, err := pdf.EmbedHelperEmbed(rm, s.F)
 	if err != nil {
 		return nil, zero, err
 	}
 
-	csE, _, err := pdf.ResourceManagerEmbed(rm, s.ColorSpace)
+	csE, _, err := pdf.EmbedHelperEmbed(rm, s.ColorSpace)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -279,8 +279,8 @@ func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	if s.SingleUse {
 		data = dict
 	} else {
-		ref := rm.Out.Alloc()
-		err := rm.Out.Put(ref, dict)
+		ref := rm.Alloc()
+		err := rm.Out().Put(ref, dict)
 		if err != nil {
 			return nil, zero, err
 		}

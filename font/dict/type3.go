@@ -333,9 +333,9 @@ type t3Font struct {
 	Text map[byte]string
 }
 
-func (f *t3Font) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
-	ref := rm.Out.Alloc()
-	err := f.Dict.WriteToPDF(rm, ref)
+func (f *t3Font) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
+	ref := rm.Alloc()
+	err := f.Dict.WriteToPDF(rm.GetRM(), ref)
 	if err != nil {
 		return nil, nil, err
 	}

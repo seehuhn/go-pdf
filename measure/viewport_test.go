@@ -204,7 +204,7 @@ func viewportRoundTripTest(t *testing.T, version pdf.Version, vp *Viewport) {
 	rm := pdf.NewResourceManager(w)
 
 	// Write the viewport
-	embedded, _, err := vp.Embed(rm)
+	embedded, _, err := pdf.ResourceManagerEmbed(rm, vp)
 	if err != nil {
 		t.Fatalf("embed failed: %v", err)
 	}
@@ -287,7 +287,7 @@ func FuzzViewportRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(tc.version, opt)
 		rm := pdf.NewResourceManager(w)
 
-		embedded, _, err := tc.data.Embed(rm)
+		embedded, _, err := pdf.ResourceManagerEmbed(rm, tc.data)
 		if err != nil {
 			continue
 		}
@@ -371,7 +371,7 @@ func TestViewportVersionRequirements(t *testing.T) {
 	// Test with PDF 1.5 (should fail - viewports require 1.6+)
 	w15, _ := memfile.NewPDFWriter(pdf.V1_5, nil)
 	rm15 := pdf.NewResourceManager(w15)
-	_, _, err := vp.Embed(rm15)
+	_, _, err := pdf.ResourceManagerEmbed(rm15, vp)
 	if err == nil {
 		t.Error("expected version check error for PDF 1.5")
 	}
@@ -379,7 +379,7 @@ func TestViewportVersionRequirements(t *testing.T) {
 	// Test with PDF 1.6 (should succeed)
 	w16, _ := memfile.NewPDFWriter(pdf.V1_6, nil)
 	rm16 := pdf.NewResourceManager(w16)
-	_, _, err = vp.Embed(rm16)
+	_, _, err = pdf.ResourceManagerEmbed(rm16, vp)
 	if err != nil {
 		t.Errorf("unexpected error for PDF 1.6: %v", err)
 	}
@@ -399,7 +399,7 @@ func TestViewportVersionRequirements(t *testing.T) {
 	// Should fail with PDF 1.7
 	w17, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm17 := pdf.NewResourceManager(w17)
-	_, _, err = vpWithPtData.Embed(rm17)
+	_, _, err = pdf.ResourceManagerEmbed(rm17, vpWithPtData)
 	if err == nil {
 		t.Error("expected version check error for PtData with PDF 1.7")
 	}
@@ -407,7 +407,7 @@ func TestViewportVersionRequirements(t *testing.T) {
 	// Should succeed with PDF 2.0
 	w20, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm20 := pdf.NewResourceManager(w20)
-	_, _, err = vpWithPtData.Embed(rm20)
+	_, _, err = pdf.ResourceManagerEmbed(rm20, vpWithPtData)
 	if err != nil {
 		t.Errorf("unexpected error for PtData with PDF 2.0: %v", err)
 	}
@@ -424,7 +424,7 @@ func TestViewportSingleUse(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	// Embed with SingleUse = true
-	embedded, _, err := vp.Embed(rm)
+	embedded, _, err := pdf.ResourceManagerEmbed(rm, vp)
 	if err != nil {
 		t.Fatalf("embed failed: %v", err)
 	}
@@ -434,9 +434,12 @@ func TestViewportSingleUse(t *testing.T) {
 		t.Errorf("SingleUse=true should return Dict, got %T", embedded)
 	}
 
-	// Test with SingleUse = false
-	vp.SingleUse = false
-	embedded2, _, err := vp.Embed(rm)
+	// Test with SingleUse = false (create new viewport to avoid caching)
+	vp2 := &Viewport{
+		BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+		SingleUse: false,
+	}
+	embedded2, _, err := pdf.ResourceManagerEmbed(rm, vp2)
 	if err != nil {
 		t.Fatalf("embed failed: %v", err)
 	}
@@ -518,18 +521,20 @@ func TestExtractViewportMalformed(t *testing.T) {
 
 // TestViewPortArraySelect tests the Select method for finding viewports
 func TestViewPortArraySelect(t *testing.T) {
-	viewports := ViewPortArray{
-		{
-			BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-			Name: "First",
-		},
-		{
-			BBox: pdf.Rectangle{LLx: 50, LLy: 50, URx: 150, URy: 150},
-			Name: "Second",
-		},
-		{
-			BBox: pdf.Rectangle{LLx: 25, LLy: 25, URx: 75, URy: 75},
-			Name: "Third",
+	viewports := &ViewPortArray{
+		Viewports: []*Viewport{
+			{
+				BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+				Name: "First",
+			},
+			{
+				BBox: pdf.Rectangle{LLx: 50, LLy: 50, URx: 150, URy: 150},
+				Name: "Second",
+			},
+			{
+				BBox: pdf.Rectangle{LLx: 25, LLy: 25, URx: 75, URy: 75},
+				Name: "Third",
+			},
 		},
 	}
 
@@ -541,17 +546,17 @@ func TestViewPortArraySelect(t *testing.T) {
 		{
 			name:     "point in first viewport only",
 			point:    vec.Vec2{X: 10, Y: 10},
-			expected: viewports[0],
+			expected: viewports.Viewports[0],
 		},
 		{
 			name:     "point in overlapping area - should return last",
 			point:    vec.Vec2{X: 60, Y: 60},
-			expected: viewports[2], // Third is last in reverse order
+			expected: viewports.Viewports[2], // Third is last in reverse order
 		},
 		{
 			name:     "point in second and third - should return third",
 			point:    vec.Vec2{X: 70, Y: 70},
-			expected: viewports[2],
+			expected: viewports.Viewports[2],
 		},
 		{
 			name:     "point not in any viewport",
@@ -561,7 +566,7 @@ func TestViewPortArraySelect(t *testing.T) {
 		{
 			name:     "point on boundary",
 			point:    vec.Vec2{X: 75, Y: 75},
-			expected: viewports[2],
+			expected: viewports.Viewports[2],
 		},
 	}
 
@@ -584,24 +589,27 @@ func TestViewPortArraySelect(t *testing.T) {
 
 // TestViewPortArrayEmbed tests embedding of viewport arrays
 func TestViewPortArrayEmbed(t *testing.T) {
-	viewports := ViewPortArray{
-		{
-			BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-			Name:      "First",
-			SingleUse: true,
+	viewports := &ViewPortArray{
+		Viewports: []*Viewport{
+			{
+				BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+				Name:      "First",
+				SingleUse: true,
+			},
+			{
+				BBox:      pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 200},
+				Name:      "Second",
+				SingleUse: false,
+			},
 		},
-		{
-			BBox:      pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 200},
-			Name:      "Second",
-			SingleUse: false,
-		},
+		SingleUse: true,
 	}
 
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	// Embed array
-	embedded, _, err := viewports.Embed(rm)
+	embedded, _, err := pdf.ResourceManagerEmbed(rm, viewports)
 	if err != nil {
 		t.Fatalf("Embed failed: %v", err)
 	}
@@ -621,9 +629,10 @@ func TestViewPortArrayEmbed(t *testing.T) {
 		t.Fatalf("ExtractViewportArray failed: %v", err)
 	}
 
-	// Fix SingleUse for comparison
-	extracted[0].SingleUse = true
-	extracted[1].SingleUse = false
+	// Fix SingleUse for comparison (SingleUse is write-only, not stored in PDF)
+	extracted.Viewports[0].SingleUse = true
+	extracted.Viewports[1].SingleUse = false
+	extracted.SingleUse = true
 
 	if diff := cmp.Diff(viewports, extracted); diff != "" {
 		t.Errorf("array round trip failed (-want +got):\n%s", diff)
@@ -649,11 +658,11 @@ func TestViewPortArrayExtract(t *testing.T) {
 	res := pdf.NewResourceManager(w)
 
 	// Embed viewports
-	embedded1, _, err := vp1.Embed(res)
+	embedded1, _, err := pdf.ResourceManagerEmbed(res, vp1)
 	if err != nil {
 		t.Fatalf("embed vp1 failed: %v", err)
 	}
-	embedded2, _, err := vp2.Embed(res)
+	embedded2, _, err := pdf.ResourceManagerEmbed(res, vp2)
 	if err != nil {
 		t.Fatalf("embed vp2 failed: %v", err)
 	}
@@ -667,19 +676,19 @@ func TestViewPortArrayExtract(t *testing.T) {
 		t.Fatalf("ExtractViewportArray failed: %v", err)
 	}
 
-	if len(extracted) != 2 {
-		t.Fatalf("expected 2 viewports, got %d", len(extracted))
+	if len(extracted.Viewports) != 2 {
+		t.Fatalf("expected 2 viewports, got %d", len(extracted.Viewports))
 	}
 
 	// Fix SingleUse for comparison
-	extracted[0].SingleUse = true
-	extracted[1].SingleUse = true
+	extracted.Viewports[0].SingleUse = true
+	extracted.Viewports[1].SingleUse = true
 
-	if extracted[0].Name != "First" {
-		t.Errorf("first viewport name = %q, want %q", extracted[0].Name, "First")
+	if extracted.Viewports[0].Name != "First" {
+		t.Errorf("first viewport name = %q, want %q", extracted.Viewports[0].Name, "First")
 	}
-	if extracted[1].Name != "Second" {
-		t.Errorf("second viewport name = %q, want %q", extracted[1].Name, "Second")
+	if extracted.Viewports[1].Name != "Second" {
+		t.Errorf("second viewport name = %q, want %q", extracted.Viewports[1].Name, "Second")
 	}
 }
 
@@ -688,42 +697,46 @@ func TestViewPortArrayRoundTrip(t *testing.T) {
 	testArrays := []struct {
 		name    string
 		version pdf.Version
-		data    ViewPortArray
+		data    *ViewPortArray
 	}{
 		{
 			name:    "empty array",
 			version: pdf.V1_6,
-			data:    ViewPortArray{},
+			data:    &ViewPortArray{Viewports: []*Viewport{}},
 		},
 		{
 			name:    "single viewport",
 			version: pdf.V1_7,
-			data: ViewPortArray{
-				{
-					BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-					Name:      "Single",
-					SingleUse: true,
+			data: &ViewPortArray{
+				Viewports: []*Viewport{
+					{
+						BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+						Name:      "Single",
+						SingleUse: true,
+					},
 				},
 			},
 		},
 		{
 			name:    "multiple viewports",
 			version: pdf.V2_0,
-			data: ViewPortArray{
-				{
-					BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 50, URy: 50},
-					Name:      "First",
-					SingleUse: true,
-				},
-				{
-					BBox:      pdf.Rectangle{LLx: 50, LLy: 50, URx: 100, URy: 100},
-					Name:      "Second",
-					SingleUse: false,
-				},
-				{
-					BBox:      pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 200},
-					Name:      "Third",
-					SingleUse: true,
+			data: &ViewPortArray{
+				Viewports: []*Viewport{
+					{
+						BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 50, URy: 50},
+						Name:      "First",
+						SingleUse: true,
+					},
+					{
+						BBox:      pdf.Rectangle{LLx: 50, LLy: 50, URx: 100, URy: 100},
+						Name:      "Second",
+						SingleUse: false,
+					},
+					{
+						BBox:      pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 200},
+						Name:      "Third",
+						SingleUse: true,
+					},
 				},
 			},
 		},
@@ -735,7 +748,7 @@ func TestViewPortArrayRoundTrip(t *testing.T) {
 			rm := pdf.NewResourceManager(w)
 
 			// Embed the array
-			embedded, _, err := tc.data.Embed(rm)
+			embedded, _, err := pdf.ResourceManagerEmbed(rm, tc.data)
 			if err != nil {
 				t.Fatalf("embed failed: %v", err)
 			}
@@ -745,21 +758,15 @@ func TestViewPortArrayRoundTrip(t *testing.T) {
 				t.Fatalf("resource manager close failed: %v", err)
 			}
 
-			// Extract it back
-			arr, ok := embedded.(pdf.Array)
-			if !ok {
-				t.Fatalf("expected pdf.Array, got %T", embedded)
-			}
-
-			extracted, err := ExtractViewportArray(w, arr)
+			extracted, err := ExtractViewportArray(w, embedded)
 			if err != nil {
 				t.Fatalf("extract failed: %v", err)
 			}
 
 			// Fix SingleUse for comparison
-			for i := range extracted {
-				if i < len(tc.data) {
-					extracted[i].SingleUse = tc.data[i].SingleUse
+			for i := range extracted.Viewports {
+				if i < len(tc.data.Viewports) {
+					extracted.Viewports[i].SingleUse = tc.data.Viewports[i].SingleUse
 				}
 			}
 
@@ -772,7 +779,7 @@ func TestViewPortArrayRoundTrip(t *testing.T) {
 
 // TestViewPortArraySelectEmptyArray tests Select with empty array
 func TestViewPortArraySelectEmptyArray(t *testing.T) {
-	viewports := ViewPortArray{}
+	viewports := &ViewPortArray{}
 	result := viewports.Select(vec.Vec2{X: 50, Y: 50})
 	if result != nil {
 		t.Error("Select with empty array should return nil")

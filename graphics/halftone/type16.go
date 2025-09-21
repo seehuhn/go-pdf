@@ -150,10 +150,10 @@ func extractType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
 	return h, nil
 }
 
-func (h *Type16) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (h *Type16) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := pdf.CheckVersion(rm.Out, "Type 16 halftone screening", pdf.V1_3); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "Type 16 halftone screening", pdf.V1_3); err != nil {
 		return nil, zero, err
 	}
 
@@ -188,7 +188,7 @@ func (h *Type16) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 	}
 
 	// Add optional fields
-	opt := rm.Out.GetOptions()
+	opt := rm.Out().GetOptions()
 	if opt.HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Halftone")
 	}
@@ -204,7 +204,7 @@ func (h *Type16) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 		if !isValidTransferFunction(h.TransferFunction) {
 			return nil, zero, errors.New("invalid transfer function shape")
 		}
-		ref, _, err := pdf.ResourceManagerEmbed(rm, h.TransferFunction)
+		ref, _, err := pdf.EmbedHelperEmbed(rm, h.TransferFunction)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -212,8 +212,8 @@ func (h *Type16) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) 
 	}
 
 	// Create the stream with threshold data
-	ref := rm.Out.Alloc()
-	stm, err := rm.Out.OpenStream(ref, dict, pdf.FilterCompress{})
+	ref := rm.Alloc()
+	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
 		return nil, zero, err
 	}

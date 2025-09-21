@@ -81,10 +81,10 @@ func ExtractBorderEffect(r pdf.Getter, obj pdf.Object) (*BorderEffect, error) {
 	return effect, nil
 }
 
-func (be *BorderEffect) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (be *BorderEffect) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := pdf.CheckVersion(rm.Out, "border effect dictionary", pdf.V1_5); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "border effect dictionary", pdf.V1_5); err != nil {
 		return nil, zero, err
 	}
 
@@ -109,8 +109,8 @@ func (be *BorderEffect) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, 
 	if be.SingleUse {
 		return d, zero, nil
 	}
-	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, d)
+	ref := rm.Alloc()
+	err := rm.Out().Put(ref, d)
 	if err != nil {
 		return nil, zero, err
 	}

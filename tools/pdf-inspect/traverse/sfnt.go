@@ -17,7 +17,6 @@
 package traverse
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -25,7 +24,8 @@ import (
 
 	"seehuhn.de/go/sfnt"
 
-	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/pdf/font/glyphdata/sfntglyphs"
 )
 
 // sfntCtx represents a parsed font for traversal.
@@ -34,28 +34,10 @@ type sfntCtx struct {
 }
 
 // newSfntCtx creates a new font context by reading and parsing the font file.
-func newSfntCtx(getter pdf.Getter, fontRef pdf.Reference) (*sfntCtx, error) {
-	if fontRef == 0 {
-		return nil, errors.New("invalid font reference for `load`")
-	}
-
-	stm, err := pdf.GetStream(getter, fontRef)
+func newSfntCtx(fontFile *glyphdata.Stream) (*sfntCtx, error) {
+	sfont, err := sfntglyphs.FromStream(fontFile)
 	if err != nil {
-		return nil, fmt.Errorf("getting font file stream for `load`: %w", err)
-	}
-	if stm == nil {
-		return nil, errors.New("missing font file stream for `load`")
-	}
-
-	decoded, err := pdf.DecodeStream(getter, stm, 0)
-	if err != nil {
-		return nil, fmt.Errorf("decoding font file stream for `load`: %w", err)
-	}
-	defer decoded.Close()
-
-	sfont, err := sfnt.Read(decoded)
-	if err != nil {
-		return nil, fmt.Errorf("parsing sfnt font for `load`: %w", err)
+		return nil, err
 	}
 
 	return &sfntCtx{font: sfont}, nil

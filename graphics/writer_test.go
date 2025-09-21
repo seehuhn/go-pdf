@@ -26,7 +26,7 @@ import (
 
 type dummyResource pdf.Reference
 
-func (r dummyResource) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (r dummyResource) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	return pdf.Reference(r), zero, nil
 }

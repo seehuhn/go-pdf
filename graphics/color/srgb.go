@@ -40,10 +40,10 @@ func (s spaceSRGB) Channels() int {
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s spaceSRGB) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (s spaceSRGB) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	w := rm.Out
+	w := rm.Out()
 	if err := pdf.CheckVersion(w, "sRGB color space", pdf.V1_3); err != nil {
 		return nil, zero, err
 	}

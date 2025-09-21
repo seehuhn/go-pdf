@@ -133,7 +133,7 @@ func (t *InMemory) All() iter.Seq2[pdf.Name, pdf.Object] {
 }
 
 // Embed adds the name tree to a PDF file.
-func (t *InMemory) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-	ref, err := Write(rm.Out, t.All())
+func (t *InMemory) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+	ref, err := Write(rm.Out(), t.All())
 	return ref, pdf.Unused{}, err
 }

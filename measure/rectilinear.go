@@ -64,11 +64,11 @@ func (rm *RectilinearMeasure) MeasureType() pdf.Name {
 }
 
 // Embed converts the RectilinearMeasure into a PDF object.
-func (rm *RectilinearMeasure) Embed(res *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (rm *RectilinearMeasure) Embed(res *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	// Version check for PDF 1.6+
-	if err := pdf.CheckVersion(res.Out, "measure dictionaries", pdf.V1_6); err != nil {
+	if err := pdf.CheckVersion(res.Out(), "measure dictionaries", pdf.V1_6); err != nil {
 		return nil, zero, err
 	}
 
@@ -89,7 +89,7 @@ func (rm *RectilinearMeasure) Embed(res *pdf.ResourceManager) (pdf.Native, pdf.U
 	dict := pdf.Dict{}
 
 	// Optional Type field
-	if res.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+	if res.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Measure")
 	}
 
@@ -161,8 +161,8 @@ func (rm *RectilinearMeasure) Embed(res *pdf.ResourceManager) (pdf.Native, pdf.U
 		return dict, zero, nil
 	}
 
-	ref := res.Out.Alloc()
-	err = res.Out.Put(ref, dict)
+	ref := res.Alloc()
+	err = res.Out().Put(ref, dict)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -171,10 +171,10 @@ func (rm *RectilinearMeasure) Embed(res *pdf.ResourceManager) (pdf.Native, pdf.U
 }
 
 // embedNumberFormatArray embeds an array of NumberFormat objects.
-func embedNumberFormatArray(res *pdf.ResourceManager, formats []*NumberFormat) (pdf.Array, error) {
+func embedNumberFormatArray(res *pdf.EmbedHelper, formats []*NumberFormat) (pdf.Array, error) {
 	arr := make(pdf.Array, len(formats))
 	for i, format := range formats {
-		embedded, _, err := pdf.ResourceManagerEmbed(res, format)
+		embedded, _, err := pdf.EmbedHelperEmbed(res, format)
 		if err != nil {
 			return nil, err
 		}

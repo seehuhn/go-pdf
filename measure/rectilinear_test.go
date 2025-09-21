@@ -392,7 +392,7 @@ func TestEmbedValidation(t *testing.T) {
 			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(w)
 
-			_, _, err := tt.rm.Embed(rm)
+			_, _, err := pdf.ResourceManagerEmbed(rm, tt.rm)
 			if err == nil {
 				t.Fatal("expected validation error but got none")
 			}

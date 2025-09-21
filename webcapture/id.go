@@ -49,7 +49,7 @@ func ExtractIdentifier(x *pdf.Extractor, obj pdf.Object) (*Identifier, error) {
 }
 
 // Embed converts the identifier to a PDF byte string as an indirect object.
-func (id *Identifier) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (id *Identifier) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	// Validate the ID
@@ -61,8 +61,8 @@ func (id *Identifier) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, er
 	pdfStr := pdf.String(id.ID)
 
 	// Always create as indirect object
-	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, pdfStr)
+	ref := rm.Alloc()
+	err := rm.Out().Put(ref, pdfStr)
 	if err != nil {
 		return nil, zero, err
 	}

@@ -112,7 +112,7 @@ func ExtractMembership(x *pdf.Extractor, obj pdf.Object) (*Membership, error) {
 }
 
 // Embed converts the Membership to a PDF object.
-func (m *Membership) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (m *Membership) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	dict := pdf.Dict{
@@ -125,7 +125,7 @@ func (m *Membership) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 			return nil, zero, errors.New("membership dictionary must have either OCGs or VE")
 		}
 	case 1:
-		ocgObj, _, err := pdf.ResourceManagerEmbed(rm, m.OCGs[0])
+		ocgObj, _, err := pdf.EmbedHelperEmbed(rm, m.OCGs[0])
 		if err != nil {
 			return nil, zero, err
 		}
@@ -133,7 +133,7 @@ func (m *Membership) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 	default:
 		ocgArray := make(pdf.Array, len(m.OCGs))
 		for i, group := range m.OCGs {
-			ocgObj, _, err := pdf.ResourceManagerEmbed(rm, group)
+			ocgObj, _, err := pdf.EmbedHelperEmbed(rm, group)
 			if err != nil {
 				return nil, zero, err
 			}
@@ -152,10 +152,10 @@ func (m *Membership) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 	}
 
 	if m.VE != nil {
-		if err := pdf.CheckVersion(rm.Out, "visibility expressions", pdf.V1_6); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "visibility expressions", pdf.V1_6); err != nil {
 			return nil, zero, err
 		}
-		veObj, _, err := pdf.ResourceManagerEmbed(rm, m.VE)
+		veObj, _, err := pdf.EmbedHelperEmbed(rm, m.VE)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -166,8 +166,8 @@ func (m *Membership) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, err
 		return dict, zero, nil
 	}
 
-	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, dict)
+	ref := rm.Alloc()
+	err := rm.Out().Put(ref, dict)
 	if err != nil {
 		return nil, zero, err
 	}

@@ -224,8 +224,8 @@ func (f *testFont) PostScriptName() string {
 	return TestFontName
 }
 
-func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
-	fontDictRef := rm.Out.Alloc()
+func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
+	fontDictRef := rm.Alloc()
 
 	fd := &font.Descriptor{
 		FontName:     TestFontName,
@@ -257,7 +257,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		dict.Width[i] = glyphWidths
 	}
 
-	err := dict.WriteToPDF(rm, fontDictRef)
+	err := dict.WriteToPDF(rm.GetRM(), fontDictRef)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -137,10 +137,10 @@ func extractType1(x *pdf.Extractor, dict pdf.Dict) (*Type1, error) {
 	return h, nil
 }
 
-func (h *Type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (h *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := pdf.CheckVersion(rm.Out, "halftone screening", pdf.V1_2); err != nil {
+	if err := pdf.CheckVersion(rm.Out(), "halftone screening", pdf.V1_2); err != nil {
 		return nil, zero, err
 	}
 
@@ -161,7 +161,7 @@ func (h *Type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		if obj, ok := spotToName[spot]; ok {
 			spotObj = obj
 		} else {
-			obj, _, err := pdf.ResourceManagerEmbed(rm, spot)
+			obj, _, err := pdf.EmbedHelperEmbed(rm, spot)
 			if err != nil {
 				return nil, zero, err
 			}
@@ -179,7 +179,7 @@ func (h *Type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	// Add optional fields
-	opt := rm.Out.GetOptions()
+	opt := rm.Out().GetOptions()
 	if opt.HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Halftone")
 	}
@@ -194,7 +194,7 @@ func (h *Type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		if !isValidTransferFunction(h.TransferFunction) {
 			return nil, zero, errors.New("invalid transfer function shape")
 		}
-		ref, _, err := pdf.ResourceManagerEmbed(rm, h.TransferFunction)
+		ref, _, err := pdf.EmbedHelperEmbed(rm, h.TransferFunction)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -202,8 +202,8 @@ func (h *Type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	// We always embed halftone dictionaries as indirect objects.
-	ref := rm.Out.Alloc()
-	if err := rm.Out.Put(ref, dict); err != nil {
+	ref := rm.Alloc()
+	if err := rm.Out().Put(ref, dict); err != nil {
 		return nil, zero, err
 	}
 	return ref, zero, nil

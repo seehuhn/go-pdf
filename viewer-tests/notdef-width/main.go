@@ -443,8 +443,8 @@ func (f *testFont) PostScriptName() string {
 	return f.data.FontName
 }
 
-func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
-	fontDictRef := rm.Out.Alloc()
+func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
+	fontDictRef := rm.Alloc()
 
 	fd := &font.Descriptor{
 		FontName:   f.data.FontName,
@@ -465,7 +465,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
 		FontFile:        cffglyphs.ToStream(f.data, glyphdata.CFF),
 	}
-	err := dict.WriteToPDF(rm, fontDictRef)
+	err := dict.WriteToPDF(rm.GetRM(), fontDictRef)
 	if err != nil {
 		return nil, nil, err
 	}

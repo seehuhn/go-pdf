@@ -39,7 +39,7 @@ func (t *testData) LastModified() time.Time {
 	return time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
 }
 
-func (t *testData) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (t *testData) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	return pdf.String(t.data), pdf.Unused{}, nil
 }
 

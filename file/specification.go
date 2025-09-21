@@ -258,23 +258,23 @@ func ExtractSpecification(x *pdf.Extractor, obj pdf.Object) (*Specification, err
 }
 
 // Embed converts the file specification to a PDF dictionary.
-func (spec *Specification) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 	// Check version requirements for various fields
 	if spec.FileNameUnicode != "" || spec.CollectionItem != nil {
-		if err := pdf.CheckVersion(rm.Out, "file specification UF/CI entries", pdf.V1_7); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "file specification UF/CI entries", pdf.V1_7); err != nil {
 			return nil, zero, err
 		}
 	}
 
 	if spec.EmbeddedFiles != nil || spec.RelatedFiles != nil {
-		if err := pdf.CheckVersion(rm.Out, "file specification EF/RF entries", pdf.V1_3); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "file specification EF/RF entries", pdf.V1_3); err != nil {
 			return nil, zero, err
 		}
 	}
 
 	if spec.Thumbnail != nil || spec.EncryptedPayload != nil || (spec.AFRelationship != "" && spec.AFRelationship != RelationshipUnspecified) {
-		if err := pdf.CheckVersion(rm.Out, "file specification PDF 2.0 entries", pdf.V2_0); err != nil {
+		if err := pdf.CheckVersion(rm.Out(), "file specification PDF 2.0 entries", pdf.V2_0); err != nil {
 			return nil, zero, err
 		}
 	}
@@ -288,7 +288,7 @@ func (spec *Specification) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unuse
 
 	// Type field is required if EF, EP, or RF is present
 	requiresType := spec.EmbeddedFiles != nil || spec.EncryptedPayload != nil || spec.RelatedFiles != nil
-	if requiresType || rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+	if requiresType || rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Filespec")
 	}
 
@@ -338,7 +338,7 @@ func (spec *Specification) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unuse
 		efDict := pdf.Dict{}
 		for key, stream := range spec.EmbeddedFiles {
 			if stream != nil {
-				ref, _, err := pdf.ResourceManagerEmbed(rm, stream)
+				ref, _, err := pdf.EmbedHelperEmbed(rm, stream)
 				if err != nil {
 					return nil, zero, err
 				}
@@ -364,7 +364,7 @@ func (spec *Specification) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unuse
 
 	// CollectionItem (CI)
 	if spec.CollectionItem != nil {
-		ci, _, err := pdf.ResourceManagerEmbed(rm, spec.CollectionItem)
+		ci, _, err := pdf.EmbedHelperEmbed(rm, spec.CollectionItem)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -373,7 +373,7 @@ func (spec *Specification) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unuse
 
 	// Thumbnail
 	if spec.Thumbnail != nil {
-		thumb, _, err := pdf.ResourceManagerEmbed(rm, spec.Thumbnail)
+		thumb, _, err := pdf.EmbedHelperEmbed(rm, spec.Thumbnail)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -382,7 +382,7 @@ func (spec *Specification) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unuse
 
 	// EncryptedPayload (EP)
 	if spec.EncryptedPayload != nil {
-		ep, _, err := pdf.ResourceManagerEmbed(rm, spec.EncryptedPayload)
+		ep, _, err := pdf.EmbedHelperEmbed(rm, spec.EncryptedPayload)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -400,8 +400,8 @@ func (spec *Specification) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unuse
 		return dict, zero, nil
 	}
 
-	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, dict)
+	ref := rm.Alloc()
+	err := rm.Out().Put(ref, dict)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -454,7 +454,7 @@ func extractRelatedFiles(x *pdf.Extractor, rfDict pdf.Dict) (map[string][]Relate
 }
 
 // encodeRelatedFiles creates an RF dictionary from related files map.
-func encodeRelatedFiles(rm *pdf.ResourceManager, relatedFiles map[string][]RelatedFile) (pdf.Dict, error) {
+func encodeRelatedFiles(rm *pdf.EmbedHelper, relatedFiles map[string][]RelatedFile) (pdf.Dict, error) {
 	rfDict := pdf.Dict{}
 
 	for key, files := range relatedFiles {
@@ -462,7 +462,7 @@ func encodeRelatedFiles(rm *pdf.ResourceManager, relatedFiles map[string][]Relat
 		for _, file := range files {
 			array = append(array, pdf.TextString(file.Name))
 			if file.Stream != nil {
-				ref, _, err := pdf.ResourceManagerEmbed(rm, file.Stream)
+				ref, _, err := pdf.EmbedHelperEmbed(rm, file.Stream)
 				if err != nil {
 					return nil, err
 				}

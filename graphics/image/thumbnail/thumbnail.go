@@ -167,10 +167,10 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
 }
 
 // Embed converts the thumbnail to a PDF object.
-func (t *Thumbnail) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (t *Thumbnail) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	if err := t.check(rm.Out); err != nil {
+	if err := t.check(rm.Out()); err != nil {
 		return nil, zero, err
 	}
 
@@ -181,7 +181,7 @@ func (t *Thumbnail) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 	}
 
 	// embed color space
-	csObj, _, err := pdf.ResourceManagerEmbed(rm, t.ColorSpace)
+	csObj, _, err := pdf.EmbedHelperEmbed(rm, t.ColorSpace)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -197,8 +197,8 @@ func (t *Thumbnail) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 	}
 
 	// create the stream
-	ref := rm.Out.Alloc()
-	stm, err := rm.Out.OpenStream(ref, dict, pdf.FilterCompress{})
+	ref := rm.Alloc()
+	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
 		return nil, zero, err
 	}

@@ -146,8 +146,8 @@ func (f *testFont) GetGeometry() *font.Geometry {
 	panic("not implemented") // TODO: Implement
 }
 
-func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
-	w := rm.Out
+func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
+	w := rm.Out()
 	fontDictRef := w.Alloc()
 
 	// load the original font
@@ -235,7 +235,7 @@ func (f *testFont) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, er
 	}
 	dict.ToUnicode = tu
 
-	err = dict.WriteToPDF(rm, fontDictRef)
+	err = dict.WriteToPDF(rm.GetRM(), fontDictRef)
 	if err != nil {
 		return nil, nil, err
 	}

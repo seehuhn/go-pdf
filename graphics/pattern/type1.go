@@ -69,7 +69,7 @@ func (p *Type1) PaintType() int {
 	return 2
 }
 
-func (p *Type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (p *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	if p.TilingType < 1 || p.TilingType > 3 {
@@ -80,7 +80,7 @@ func (p *Type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 	}
 
 	buf := &bytes.Buffer{}
-	w := graphics.NewWriter(buf, rm)
+	w := graphics.NewWriter(buf, rm.GetRM())
 	err := p.Draw(w)
 	if err != nil {
 		return nil, zero, err
@@ -98,7 +98,7 @@ func (p *Type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		"YStep":       pdf.Number(p.YStep),
 		"Resources":   pdf.AsDict(w.Resources),
 	}
-	opt := rm.Out.GetOptions()
+	opt := rm.Out().GetOptions()
 	if opt.HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Pattern")
 	}
@@ -106,8 +106,8 @@ func (p *Type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
 		dict["Matrix"] = toPDF(p.Matrix[:])
 	}
 
-	ref := rm.Out.Alloc()
-	stm, err := rm.Out.OpenStream(ref, dict, pdf.FilterCompress{})
+	ref := rm.Alloc()
+	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
 		return nil, zero, err
 	}

@@ -124,9 +124,12 @@ func TestExtractWithValidData(t *testing.T) {
 }
 
 func TestPieceInfoEmbed(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+
 	// test with nil PieceInfo
 	var nilInfo *PieceInfo
-	result, _, err := nilInfo.Embed(nil)
+	result, _, err := pdf.ResourceManagerEmbed(rm, nilInfo)
 	if err != nil {
 		t.Errorf("Embed(nil) returned error: %v", err)
 	}
@@ -136,7 +139,7 @@ func TestPieceInfoEmbed(t *testing.T) {
 
 	// test with empty PieceInfo
 	emptyInfo := &PieceInfo{Entries: make(map[pdf.Name]Data)}
-	result, _, err = emptyInfo.Embed(nil)
+	result, _, err = pdf.ResourceManagerEmbed(rm, emptyInfo)
 	if err != nil {
 		t.Errorf("Embed(empty) returned error: %v", err)
 	}
@@ -223,7 +226,7 @@ func TestSingleUse(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	info.SingleUse = true
-	result, _, err := info.Embed(rm)
+	result, _, err := pdf.ResourceManagerEmbed(rm, info)
 	if err != nil {
 		t.Fatalf("Embed with SingleUse=true returned error: %v", err)
 	}
@@ -231,9 +234,11 @@ func TestSingleUse(t *testing.T) {
 		t.Errorf("Embed with SingleUse=true should return pdf.Dict, got %T", result)
 	}
 
-	// test Embed with SingleUse = false (returns reference)
-	info.SingleUse = false
-	result2, _, err := info.Embed(rm)
+	infoCopy := &PieceInfo{
+		Entries:   info.Entries,
+		SingleUse: false,
+	}
+	result2, _, err := pdf.ResourceManagerEmbed(rm, infoCopy)
 	if err != nil {
 		t.Fatalf("Embed with SingleUse=false returned error: %v", err)
 	}

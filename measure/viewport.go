@@ -98,18 +98,18 @@ func ExtractViewport(r pdf.Getter, obj pdf.Object) (*Viewport, error) {
 }
 
 // Embed converts the Viewport into a PDF object.
-func (v *Viewport) Embed(res *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (v *Viewport) Embed(res *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
 	// Version check for PDF 1.6+
-	if err := pdf.CheckVersion(res.Out, "viewport dictionaries", pdf.V1_6); err != nil {
+	if err := pdf.CheckVersion(res.Out(), "viewport dictionaries", pdf.V1_6); err != nil {
 		return nil, zero, err
 	}
 
 	dict := pdf.Dict{}
 
 	// Optional Type field
-	if res.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+	if res.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Viewport")
 	}
 
@@ -123,7 +123,7 @@ func (v *Viewport) Embed(res *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 
 	// Optional Measure field
 	if v.Measure != nil {
-		embedded, _, err := pdf.ResourceManagerEmbed(res, v.Measure)
+		embedded, _, err := pdf.EmbedHelperEmbed(res, v.Measure)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -132,10 +132,10 @@ func (v *Viewport) Embed(res *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 
 	// Optional PtData field (PDF 2.0)
 	if v.PtData != nil {
-		if err := pdf.CheckVersion(res.Out, "viewport PtData entry", pdf.V2_0); err != nil {
+		if err := pdf.CheckVersion(res.Out(), "viewport PtData entry", pdf.V2_0); err != nil {
 			return nil, zero, err
 		}
-		embedded, _, err := pdf.ResourceManagerEmbed(res, v.PtData)
+		embedded, _, err := pdf.EmbedHelperEmbed(res, v.PtData)
 		if err != nil {
 			return nil, zero, err
 		}
@@ -146,8 +146,8 @@ func (v *Viewport) Embed(res *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 		return dict, zero, nil
 	}
 
-	ref := res.Out.Alloc()
-	err := res.Out.Put(ref, dict)
+	ref := res.Alloc()
+	err := res.Out().Put(ref, dict)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -156,45 +156,70 @@ func (v *Viewport) Embed(res *pdf.ResourceManager) (pdf.Native, pdf.Unused, erro
 }
 
 // ViewPortArray represents an array of viewport dictionaries.
-type ViewPortArray []*Viewport
+type ViewPortArray struct {
+	// Viewports contains the array of viewport dictionaries.
+	Viewports []*Viewport
+
+	// SingleUse determines if Embed returns a dictionary (true) or
+	// a reference (false).
+	SingleUse bool
+}
 
 // Select finds the appropriate viewport for a given point.
 // Implements the algorithm from PDF spec: examine in reverse order,
 // return first viewport whose BBox contains the point.
-func (va ViewPortArray) Select(point vec.Vec2) *Viewport {
+func (va *ViewPortArray) Select(point vec.Vec2) *Viewport {
 	// Iterate backwards through viewports array
-	for i := len(va) - 1; i >= 0; i-- {
-		if va[i].BBox.Contains(point) {
-			return va[i]
+	for i := len(va.Viewports) - 1; i >= 0; i-- {
+		if va.Viewports[i].BBox.Contains(point) {
+			return va.Viewports[i]
 		}
 	}
 	return nil
 }
 
 // ExtractViewportArray extracts an array of viewports from a PDF array.
-func ExtractViewportArray(r pdf.Getter, arr pdf.Array) (ViewPortArray, error) {
-	viewports := make(ViewPortArray, len(arr))
-	for i, obj := range arr {
+func ExtractViewportArray(r pdf.Getter, obj pdf.Object) (*ViewPortArray, error) {
+	_, isIndirect := obj.(pdf.Reference)
+
+	a, err := pdf.GetArray(r, obj)
+	if err != nil {
+		return nil, err
+	}
+
+	viewports := make([]*Viewport, len(a))
+	for i, obj := range a {
 		vp, err := ExtractViewport(r, obj)
 		if err != nil {
 			return nil, err
 		}
 		viewports[i] = vp
 	}
-	return viewports, nil
+	return &ViewPortArray{Viewports: viewports, SingleUse: !isIndirect}, nil
 }
 
 // Embed converts the ViewPortArray into a PDF array.
-func (va ViewPortArray) Embed(res *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (va *ViewPortArray) Embed(res *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	var zero pdf.Unused
 
-	arr := make(pdf.Array, len(va))
-	for i, viewport := range va {
-		embedded, _, err := pdf.ResourceManagerEmbed(res, viewport)
+	arr := make(pdf.Array, len(va.Viewports))
+	for i, viewport := range va.Viewports {
+		embedded, _, err := pdf.EmbedHelperEmbed(res, viewport)
 		if err != nil {
 			return nil, zero, err
 		}
 		arr[i] = embedded
 	}
-	return arr, zero, nil
+
+	if va.SingleUse {
+		return arr, zero, nil
+	}
+
+	ref := res.Alloc()
+	err := res.Out().Put(ref, arr)
+	if err != nil {
+		return nil, zero, err
+	}
+
+	return ref, zero, nil
 }
