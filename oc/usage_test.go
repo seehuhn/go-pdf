@@ -179,7 +179,7 @@ func testUsageRoundTrip(t *testing.T, original *Usage, mode string) {
 	rm := pdf.NewResourceManager(buf)
 
 	// embed the usage dictionary
-	obj, _, err2 := pdf.ResourceManagerEmbed[pdf.Unused](rm, original)
+	obj, _, err2 := pdf.ResourceManagerEmbed(rm, original)
 	if err2 != nil {
 		t.Fatalf("%s: embed: %v", mode, err2)
 	}
@@ -260,7 +260,7 @@ func TestUsageValidation(t *testing.T) {
 		},
 	}
 
-	_, _, err := pdf.ResourceManagerEmbed[pdf.Unused](rm, usage)
+	_, _, err := pdf.ResourceManagerEmbed(rm, usage)
 	if err == nil {
 		t.Error("expected error for Zoom.Min > Zoom.Max, but got none")
 	}

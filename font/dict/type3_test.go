@@ -36,13 +36,12 @@ func TestType3Roundtrip(t *testing.T) {
 			t.Run(fmt.Sprintf("D%dv%s-%s", i, v, d.Name), func(t *testing.T) {
 				w, _ := memfile.NewPDFWriter(v, nil)
 				rm := pdf.NewResourceManager(w)
-				fontDictRef := w.Alloc()
 
 				// == Write ==
 
 				d1 := clone(d)
 
-				err := d1.WriteToPDF(rm, fontDictRef)
+				fontDictRef, _, err := pdf.ResourceManagerEmbed(rm, d1)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -54,7 +53,7 @@ func TestType3Roundtrip(t *testing.T) {
 				// == Read ==
 
 				x := pdf.NewExtractor(w)
-				d2, err := DecodeType3(x, fontDictRef)
+				d2, err := ExtractType3(x, fontDictRef)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -104,11 +103,9 @@ func FuzzType3Dict(f *testing.F) {
 				f.Fatal(err)
 			}
 
-			fontDictRef := w.Alloc()
 			d := clone(d)
-
 			rm := pdf.NewResourceManager(w)
-			err = d.WriteToPDF(rm, fontDictRef)
+			fontDictRef, _, err := pdf.ResourceManagerEmbed(rm, d)
 			if err != nil {
 				f.Fatal(err)
 			}
@@ -144,7 +141,7 @@ func FuzzType3Dict(f *testing.F) {
 			t.Skip("broken reference")
 		}
 		x := pdf.NewExtractor(r)
-		d1, err := DecodeType3(x, obj)
+		d1, err := ExtractType3(x, obj)
 		if err != nil {
 			t.Skip("broken Type3Dict")
 		}
@@ -153,9 +150,8 @@ func FuzzType3Dict(f *testing.F) {
 		// Make sure we can write arbitrary Type3Dicts.
 		w, _ := memfile.NewPDFWriter(r.GetMeta().Version, nil)
 		rm := pdf.NewResourceManager(w)
-		fontDictRef := w.Alloc()
 
-		err = d1.WriteToPDF(rm, fontDictRef)
+		fontDictRef, _, err := pdf.ResourceManagerEmbed(rm, d1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -167,7 +163,7 @@ func FuzzType3Dict(f *testing.F) {
 		// Read back the data.
 		// Make sure we get the same Type3Dict back.
 		x2 := pdf.NewExtractor(w)
-		d2, err := DecodeType3(x2, fontDictRef)
+		d2, err := ExtractType3(x2, fontDictRef)
 		if err != nil {
 			t.Fatal(err)
 		}

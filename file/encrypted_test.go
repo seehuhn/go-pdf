@@ -77,7 +77,7 @@ func TestEncryptedPayloadRoundTrip(t *testing.T) {
 					rm := pdf.NewResourceManager(buf)
 
 					// Embed the encrypted payload
-					obj, _, err := pdf.ResourceManagerEmbed[pdf.Unused](rm, &original)
+					obj, _, err := pdf.ResourceManagerEmbed(rm, &original)
 					if err != nil {
 						t.Fatal(err)
 					}

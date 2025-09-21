@@ -101,7 +101,7 @@ func testGroupRoundTrip(t *testing.T, original *Group) {
 	rm := pdf.NewResourceManager(buf)
 
 	// embed the group
-	obj, _, err := pdf.ResourceManagerEmbed[pdf.Unused](rm, original)
+	obj, _, err := pdf.ResourceManagerEmbed(rm, original)
 	if err != nil {
 		t.Fatalf("embed: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestGroupValidation(t *testing.T) {
 		Name: "",
 	}
 
-	_, _, err := pdf.ResourceManagerEmbed[pdf.Unused](rm, group)
+	_, _, err := pdf.ResourceManagerEmbed(rm, group)
 	if err == nil {
 		t.Error("expected error for empty Group.Name, but got none")
 	}

@@ -75,8 +75,8 @@ type Type1 struct {
 	FontFile *glyphdata.Stream
 }
 
-// DecodeType1 reads a Type 1 font dictionary from a PDF file.
-func DecodeType1(x *pdf.Extractor, obj pdf.Object) (*Type1, error) {
+// ExtractType1 reads a Type 1 font dictionary from a PDF file.
+func ExtractType1(x *pdf.Extractor, obj pdf.Object) (*Type1, error) {
 	fontDict, err := pdf.GetDictTyped(x.R, obj, "Font")
 	if err != nil {
 		return nil, err
@@ -261,10 +261,12 @@ func (d *Type1) validate(w *pdf.Writer) error {
 	return nil
 }
 
-// WriteToPDF adds the font dictionary to a PDF file using the given reference.
+// Embed adds the font dictionary to a PDF file.
 // This implements the [font.Dict] interface.
-func (d *Type1) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
-	w := rm.Out
+func (d *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
+	ref := rm.AllocSelf()
+	w := rm.Out()
 
 	if d.FontFile != nil {
 		switch d.FontFile.Type {
@@ -272,20 +274,20 @@ func (d *Type1) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 			// always ok
 		case glyphdata.CFFSimple:
 			if err := pdf.CheckVersion(w, "embedded CFF font", pdf.V1_2); err != nil {
-				return err
+				return nil, zero, err
 			}
 		case glyphdata.OpenTypeCFFSimple:
 			if err := pdf.CheckVersion(w, "embedded OpenType/CFF font", pdf.V1_6); err != nil {
-				return err
+				return nil, zero, err
 			}
 		default:
-			return fmt.Errorf("invalid font type %s", d.FontFile.Type)
+			return nil, zero, fmt.Errorf("invalid font type %s", d.FontFile.Type)
 		}
 	}
 
 	err := d.validate(w)
 	if err != nil {
-		return err
+		return nil, zero, err
 	}
 
 	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)
@@ -315,7 +317,7 @@ func (d *Type1) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	}
 	encodingObj, err := d.Encoding.AsPDFType1(baseIsStd, w.GetOptions())
 	if err != nil {
-		return err
+		return nil, zero, err
 	}
 	if encodingObj != nil {
 		fontDict["Encoding"] = encodingObj
@@ -328,9 +330,9 @@ func (d *Type1) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 		fdRef := w.Alloc()
 		fdDict := d.Descriptor.AsDict()
 		if d.FontFile != nil {
-			fontFileRef, _, err := pdf.ResourceManagerEmbed(rm, d.FontFile)
+			fontFileRef, _, err := pdf.EmbedHelperEmbed(rm, d.FontFile)
 			if err != nil {
-				return err
+				return nil, zero, err
 			}
 			switch d.FontFile.Type {
 			case glyphdata.Type1:
@@ -350,19 +352,19 @@ func (d *Type1) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	}
 
 	if d.ToUnicode != nil {
-		ref, _, err := pdf.ResourceManagerEmbed(rm, d.ToUnicode)
+		ref, _, err := pdf.EmbedHelperEmbed(rm, d.ToUnicode)
 		if err != nil {
-			return err
+			return nil, zero, err
 		}
 		fontDict["ToUnicode"] = ref
 	}
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return fmt.Errorf("Type 1 font dict: %w", err)
+		return nil, zero, fmt.Errorf("Type 1 font dict: %w", err)
 	}
 
-	return nil
+	return ref, zero, nil
 }
 
 func (d *Type1) Codec() *charcode.Codec {
@@ -426,7 +428,7 @@ type t1Font struct {
 
 func (f *t1Font) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
 	ref := rm.Alloc()
-	err := f.Dict.WriteToPDF(rm.GetRM(), ref)
+	_, _, err := pdf.EmbedHelperEmbedAt(rm, ref, f.Dict)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -466,6 +468,6 @@ func (f *t1Font) Codes(s pdf.String) iter.Seq[*font.Code] {
 
 func init() {
 	registerReader("Type1", func(x *pdf.Extractor, obj pdf.Object) (font.Dict, error) {
-		return DecodeType1(x, obj)
+		return ExtractType1(x, obj)
 	})
 }

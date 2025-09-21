@@ -76,8 +76,8 @@ type Type3 struct {
 	Resources *pdf.Resources
 }
 
-// DecodeType3 reads a Type 3 font dictionary from a PDF file.
-func DecodeType3(x *pdf.Extractor, obj pdf.Object) (*Type3, error) {
+// ExtractType3 reads a Type 3 font dictionary from a PDF file.
+func ExtractType3(x *pdf.Extractor, obj pdf.Object) (*Type3, error) {
 	fontDict, err := pdf.GetDictTyped(x.R, obj, "Font")
 	if err != nil {
 		return nil, err
@@ -178,14 +178,16 @@ func (d *Type3) validate(w *pdf.Writer) error {
 	return nil
 }
 
-// WriteToPDF adds the font dictionary to a PDF file using the given reference.
+// Embed adds the font dictionary to a PDF file.
 // This implements the [font.Dict] interface.
-func (d *Type3) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
-	w := rm.Out
+func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
+	ref := rm.AllocSelf()
+	w := rm.Out()
 
 	err := d.validate(w)
 	if err != nil {
-		return err
+		return nil, zero, err
 	}
 
 	fontBBox := d.FontBBox
@@ -228,7 +230,7 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 
 	encodingObj, err := d.Encoding.AsPDFType3(w.GetOptions())
 	if err != nil {
-		return fmt.Errorf("/Encoding: %w", err)
+		return nil, zero, fmt.Errorf("/Encoding: %w", err)
 	}
 	encodingRef := w.Alloc()
 	fontDict["Encoding"] = encodingRef
@@ -252,9 +254,9 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 	}
 
 	if d.ToUnicode != nil {
-		ref, _, err := pdf.ResourceManagerEmbed(rm, d.ToUnicode)
+		ref, _, err := pdf.EmbedHelperEmbed(rm, d.ToUnicode)
 		if err != nil {
-			return err
+			return nil, zero, err
 		}
 		fontDict["ToUnicode"] = ref
 	}
@@ -269,10 +271,10 @@ func (d *Type3) WriteToPDF(rm *pdf.ResourceManager, ref pdf.Reference) error {
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return fmt.Errorf("Type 3 font dict: %w", err)
+		return nil, zero, fmt.Errorf("Type 3 font dict: %w", err)
 	}
 
-	return nil
+	return ref, zero, nil
 }
 
 func (d *Type3) Codec() *charcode.Codec {
@@ -335,7 +337,7 @@ type t3Font struct {
 
 func (f *t3Font) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
 	ref := rm.Alloc()
-	err := f.Dict.WriteToPDF(rm.GetRM(), ref)
+	_, _, err := pdf.EmbedHelperEmbedAt(rm, ref, f.Dict)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -375,6 +377,6 @@ func (f *t3Font) Codes(s pdf.String) iter.Seq[*font.Code] {
 
 func init() {
 	registerReader("Type3", func(x *pdf.Extractor, obj pdf.Object) (font.Dict, error) {
-		return DecodeType3(x, obj)
+		return ExtractType3(x, obj)
 	})
 }

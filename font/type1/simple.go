@@ -209,7 +209,7 @@ func (e *embeddedSimple) Finish(rm *pdf.EmbedHelper) error {
 		dict.FontFile = type1glyphs.ToStream(fontSubset)
 	}
 
-	err := dict.WriteToPDF(rm.GetRM(), e.Ref)
+	_, _, err := pdf.EmbedHelperEmbedAt(rm, e.Ref, dict)
 	if err != nil {
 		return err
 	}

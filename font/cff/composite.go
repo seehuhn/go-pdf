@@ -280,7 +280,7 @@ func (e *embeddedComposite) Finish(rm *pdf.EmbedHelper) error {
 		FontFile:        cffglyphs.ToStream(subsetFont, glyphdata.CFF),
 	}
 
-	err := dict.WriteToPDF(rm.GetRM(), e.Ref)
+	_, _, err := pdf.EmbedHelperEmbedAt(rm, e.Ref, dict)
 	if err != nil {
 		return err
 	}

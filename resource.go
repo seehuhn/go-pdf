@@ -50,11 +50,20 @@ type Embedder[T any] interface {
 }
 
 type EmbedHelper struct {
-	rm *ResourceManager
+	rm   *ResourceManager
+	refs []Reference
 }
 
 func (e *EmbedHelper) Alloc() Reference {
 	return e.rm.Out.Alloc()
+}
+
+func (e *EmbedHelper) AllocSelf() Reference {
+	k := len(e.refs)
+	if e.refs[k-1] == 0 {
+		e.refs[k-1] = e.rm.Out.Alloc()
+	}
+	return e.refs[k-1]
 }
 
 func (e *EmbedHelper) Out() *Writer {
@@ -67,7 +76,39 @@ func (e *EmbedHelper) GetRM() *ResourceManager {
 }
 
 func EmbedHelperEmbed[T any](e *EmbedHelper, r Embedder[T]) (Native, T, error) {
-	return ResourceManagerEmbed(e.rm, r)
+	return EmbedHelperEmbedAt(e, 0, r)
+}
+
+func EmbedHelperEmbedAt[T any](e *EmbedHelper, ref Reference, r Embedder[T]) (Native, T, error) {
+	var zero T
+
+	if existing, ok := e.rm.embedded[r]; ok {
+		return existing.Val, existing.Emb.(T), nil
+	}
+	if e.rm.isClosed {
+		return nil, zero, errors.New("resource manager is already closed")
+	}
+
+	k := len(e.refs)
+	e.refs = append(e.refs, ref)
+	val, emb, err := r.Embed(e)
+	ref = e.refs[k]
+	e.refs = e.refs[:k]
+	if err != nil {
+		return nil, zero, fmt.Errorf("failed to embed resource: %w", err)
+	}
+
+	if ref != 0 && val != ref {
+		panic("wrong reference")
+	}
+
+	e.rm.embedded[r] = embRes{Val: val, Emb: emb}
+
+	if finisher, ok := any(emb).(Finisher); ok {
+		e.rm.finishers = append(e.rm.finishers, finisher)
+	}
+
+	return val, emb, nil
 }
 
 func EmbedHelperEmbedFunc[T any](e *EmbedHelper, f func(*EmbedHelper, T) (Native, error), obj T) (Native, error) {
@@ -140,28 +181,8 @@ type Finisher interface {
 // Once Go supports methods with type parameters, this function can be turned
 // into a method on [ResourceManager].
 func ResourceManagerEmbed[T any](rm *ResourceManager, r Embedder[T]) (Native, T, error) {
-	var zero T
-
-	if existing, ok := rm.embedded[r]; ok {
-		return existing.Val, existing.Emb.(T), nil
-	}
-	if rm.isClosed {
-		return nil, zero, errors.New("resource manager is already closed")
-	}
-
 	e := &EmbedHelper{rm: rm}
-	val, emb, err := r.Embed(e)
-	if err != nil {
-		return nil, zero, fmt.Errorf("failed to embed resource: %w", err)
-	}
-
-	rm.embedded[r] = embRes{Val: val, Emb: emb}
-
-	if finisher, ok := any(emb).(Finisher); ok {
-		rm.finishers = append(rm.finishers, finisher)
-	}
-
-	return val, emb, nil
+	return EmbedHelperEmbed(e, r)
 }
 
 // ResourceManagerEmbedFunc embeds a resource using a function-driven approach.
@@ -175,22 +196,8 @@ func ResourceManagerEmbed[T any](rm *ResourceManager, r Embedder[T]) (Native, T,
 //
 // The function f must return the PDF representation of the embedded object.
 func ResourceManagerEmbedFunc[T any](rm *ResourceManager, f func(*EmbedHelper, T) (Native, error), obj T) (Native, error) {
-	if existing, ok := rm.embedded[obj]; ok {
-		return existing.Val, nil
-	}
-	if rm.isClosed {
-		return nil, errors.New("resource manager is already closed")
-	}
-
 	e := &EmbedHelper{rm: rm}
-	val, err := f(e, obj)
-	if err != nil {
-		return nil, fmt.Errorf("failed to embed resource: %w", err)
-	}
-
-	e.rm.embedded[obj] = embRes{Val: val}
-
-	return val, nil
+	return EmbedHelperEmbedFunc(e, f, obj)
 }
 
 // Close runs the Finish methods of all embedded resources where the Go

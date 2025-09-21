@@ -94,7 +94,7 @@ func TestNumberFormatExtractEmbed(t *testing.T) {
 
 			// Embed the NumberFormat
 			rm := pdf.NewResourceManager(w)
-			embedded, _, err := pdf.ResourceManagerEmbed[pdf.Unused](rm, &tt.nf)
+			embedded, _, err := pdf.ResourceManagerEmbed(rm, &tt.nf)
 			if err != nil {
 				t.Fatalf("embed failed: %v", err)
 			}

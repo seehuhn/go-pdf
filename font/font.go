@@ -170,12 +170,7 @@ type FromFile interface {
 //   - [seehuhn.de/go/pdf/font/dict.CIDFontType0]
 //   - [seehuhn.de/go/pdf/font/dict.CIDFontType2]
 type Dict interface {
-	// WriteToPDF adds this font dictionary to the PDF file using the given
-	// reference.
-	//
-	// The resource manager is used to deduplicate child objects
-	// like encoding dictionaries, CMap streams, etc.
-	WriteToPDF(*pdf.ResourceManager, pdf.Reference) error
+	pdf.Embedder[pdf.Unused]
 
 	// MakeFont returns a new font object that can be used to typeset text.
 	// The font is immutable, i.e. no new glyphs can be added and no new codes

@@ -356,7 +356,7 @@ func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error)
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
 		FontFile:        cffglyphs.ToStream(f.cff, glyphdata.CFF),
 	}
-	err := dicts.WriteToPDF(rm.GetRM(), fontDictRef)
+	_, _, err := pdf.EmbedHelperEmbedAt(rm, fontDictRef, dicts)
 	if err != nil {
 		return nil, nil, err
 	}

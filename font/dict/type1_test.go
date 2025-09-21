@@ -67,7 +67,6 @@ func FuzzType1Dict(f *testing.F) {
 				f.Fatal(err)
 			}
 			rm := pdf.NewResourceManager(w)
-			fontDictRef := w.Alloc()
 
 			d := clone(d)
 			if d.FontFile != nil {
@@ -97,7 +96,7 @@ func FuzzType1Dict(f *testing.F) {
 					},
 				}
 			}
-			err = d.WriteToPDF(rm, fontDictRef)
+			fontDictRef, _, err := pdf.ResourceManagerEmbed(rm, d)
 			if err != nil {
 				f.Fatal(err)
 			}
@@ -134,7 +133,7 @@ func FuzzType1Dict(f *testing.F) {
 			t.Skip("broken reference")
 		}
 		x := pdf.NewExtractor(r)
-		d, err := DecodeType1(x, obj)
+		d, err := ExtractType1(x, obj)
 		if err != nil {
 			t.Skip("no valid Type1Dict")
 		}
@@ -149,7 +148,6 @@ func checkRoundtripT1(t *testing.T, d1 *Type1, v pdf.Version) {
 
 	w, _ := memfile.NewPDFWriter(v, nil)
 	rm := pdf.NewResourceManager(w)
-	fontDictRef := w.Alloc()
 
 	// == Write ==
 
@@ -180,7 +178,7 @@ func checkRoundtripT1(t *testing.T, d1 *Type1, v pdf.Version) {
 			},
 		}
 	}
-	err := d1.WriteToPDF(rm, fontDictRef)
+	fontDictRef, _, err := pdf.ResourceManagerEmbed(rm, d1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +190,7 @@ func checkRoundtripT1(t *testing.T, d1 *Type1, v pdf.Version) {
 	// == Read ==
 
 	x := pdf.NewExtractor(w)
-	d2, err := DecodeType1(x, fontDictRef)
+	d2, err := ExtractType1(x, fontDictRef)
 	if err != nil {
 		t.Fatal(err)
 	}

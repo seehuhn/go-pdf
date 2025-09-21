@@ -189,7 +189,7 @@ func (e *embeddedCFFSimple) Finish(rm *pdf.EmbedHelper) error {
 		dict.Width[c] = info.Width
 	}
 
-	err := dict.WriteToPDF(rm.GetRM(), e.Ref)
+	_, _, err := pdf.EmbedHelperEmbedAt(rm, e.Ref, dict)
 	if err != nil {
 		return err
 	}

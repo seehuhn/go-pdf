@@ -202,7 +202,7 @@ func (testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
 		FontFile:        sfntglyphs.ToStream(subsetFont, fontType),
 	}
 
-	err = dict.WriteToPDF(rm.GetRM(), fontDictRef)
+	_, _, err = pdf.EmbedHelperEmbedAt(rm, fontDictRef, dict)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -67,10 +67,8 @@ func FuzzTrueTypeDict(f *testing.F) {
 			}
 			rm := pdf.NewResourceManager(w)
 
-			ref := w.Alloc()
 			d := clone(d)
-
-			err = d.WriteToPDF(rm, ref)
+			ref, _, err := pdf.ResourceManagerEmbed(rm, d)
 			if err != nil {
 				f.Fatal(err)
 			}
@@ -107,7 +105,7 @@ func FuzzTrueTypeDict(f *testing.F) {
 			t.Skip("broken reference")
 		}
 		x := pdf.NewExtractor(r)
-		d, err := DecodeTrueType(x, obj)
+		d, err := ExtractTrueType(x, obj)
 		if err != nil {
 			t.Skip("broken TrueTypeDict")
 		}
@@ -125,7 +123,6 @@ func checkRoundtripTT(t *testing.T, d1 *TrueType, v pdf.Version) {
 
 	// == Write ==
 
-	ref := w.Alloc()
 	if d1.FontFile != nil {
 		fontRef := w.Alloc()
 		// write a fake font data stream
@@ -150,7 +147,7 @@ func checkRoundtripTT(t *testing.T, d1 *TrueType, v pdf.Version) {
 			},
 		}
 	}
-	err := d1.WriteToPDF(rm, ref)
+	ref, _, err := pdf.ResourceManagerEmbed(rm, d1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +159,7 @@ func checkRoundtripTT(t *testing.T, d1 *TrueType, v pdf.Version) {
 	// == Read ==
 
 	x := pdf.NewExtractor(w)
-	d2, err := DecodeTrueType(x, ref)
+	d2, err := ExtractTrueType(x, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
