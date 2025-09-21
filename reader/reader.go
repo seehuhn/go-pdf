@@ -622,7 +622,7 @@ func (r *Reader) processText(s pdf.String) error {
 		// Type 3 fonts use the font matrix, ...
 		toTextSpace = f.ToTextSpace
 	} else {
-		// ... everybode else divides by 1000.
+		// ... everybody else divides by 1000.
 		toTextSpace = divideBy1000
 	}
 

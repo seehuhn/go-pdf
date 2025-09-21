@@ -177,7 +177,7 @@ func (t *Typesetter) Layout(seq *GlyphSeq, text string) *GlyphSeq {
 
 	if t.characterSpacing == 0 {
 		t.font.Layout(seq, t.fontSize, text)
-	} else { // disable ligatures
+	} else { // disable ligatures/kerning
 		for _, r := range text {
 			t.font.Layout(seq, t.fontSize, string(r))
 		}

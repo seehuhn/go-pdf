@@ -22,10 +22,12 @@
 // in the PDF file. All structs implement the [font.Dict] interface.
 //
 // Each type of font dictionary is represented by a Go structure which holds
-// all the information from the dictionary. Functions with names starting with
-// "Extract" can read a font dictionary from a PDF file. Methods named
-// "WriteToPDF" can write a font dictionary to a PDF file. Writing followed by
-// reading will yield the same font dictionary.
+// all the information from the dictionary:
+//   - [Type1]
+//   - [TrueType]
+//   - [Type3]
+//   - [CIDFontType0]
+//   - [CIDFontType2]
 //
 // This package deals exclusively with font dictionary structures and does not
 // handle the embedding of font programs (glyph outlines). When embedding

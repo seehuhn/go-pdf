@@ -168,13 +168,8 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 // [font.Layouter], the function returns nil.  If seq is not nil (and there is
 // no error), the return value is guaranteed to be equal to seq.
 func (w *Writer) TextLayout(seq *font.GlyphSeq, text string) *font.GlyphSeq {
-	if w.Err != nil {
+	if w.Err != nil || w.CurrentFont == nil {
 		return seq
-	}
-
-	F := w.CurrentFont
-	if F == nil {
-		return nil
 	}
 
 	T := font.NewTypesetter(w.CurrentFont, w.TextFontSize)

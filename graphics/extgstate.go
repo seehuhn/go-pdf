@@ -551,7 +551,7 @@ func parseSingleTransfer(x *pdf.Extractor, obj pdf.Object) (pdf.Function, error)
 //
 // This implements the [pdf.Embedder] interface.
 //
-// TODO(voss): remove the State return value?
+// TODO(voss): remove the State return value
 func (e *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Native, State, error) {
 	res := State{
 		Parameters: &Parameters{},
@@ -560,6 +560,8 @@ func (e *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Native, State, error) {
 	if err := pdf.CheckVersion(rm.Out, "ExtGState", pdf.V1_2); err != nil {
 		return nil, res, err
 	}
+
+	// TODO(voss): check that unset fields have the zero value
 
 	set := e.Set
 
