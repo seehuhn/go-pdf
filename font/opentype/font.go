@@ -159,15 +159,23 @@ func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error)
 	var embedded font.Embedded
 	if f.Font.IsCFF() {
 		if !opt.Composite {
-			embedded = newEmbeddedCFFSimple(ref, f.Font)
+			e := newEmbeddedCFFSimple(ref, f.Font)
+			rm.Defer(e.finish)
+			embedded = e
 		} else {
-			embedded = newEmbeddedCFFComposite(ref, f)
+			e := newEmbeddedCFFComposite(ref, f)
+			rm.Defer(e.finish)
+			embedded = e
 		}
 	} else {
 		if !opt.Composite {
-			embedded = newEmbeddedGlyfSimple(ref, f.Font)
+			e := newEmbeddedGlyfSimple(ref, f.Font)
+			rm.Defer(e.finish)
+			embedded = e
 		} else {
-			embedded = newEmbeddedGlyfComposite(ref, f)
+			e := newEmbeddedGlyfComposite(ref, f)
+			rm.Defer(e.finish)
+			embedded = e
 		}
 	}
 

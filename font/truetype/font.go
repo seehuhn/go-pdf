@@ -138,14 +138,18 @@ func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error)
 			return nil, nil, err
 		}
 
-		embedded = newEmbeddedComposite(ref, f)
+		e := newEmbeddedComposite(ref, f)
+		rm.Defer(e.finish)
+		embedded = e
 	} else {
 		err := pdf.CheckVersion(w, "simple TrueType fonts", pdf.V1_1)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		embedded = newEmbeddedSimple(ref, f.Font)
+		e := newEmbeddedSimple(ref, f.Font)
+		rm.Defer(e.finish)
+		embedded = e
 	}
 
 	return ref, embedded, nil

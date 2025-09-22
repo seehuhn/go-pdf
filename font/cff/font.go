@@ -182,13 +182,17 @@ func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error)
 		if err != nil {
 			return nil, nil, err
 		}
-		res = newEmbeddedComposite(ref, f)
+		e := newEmbeddedComposite(ref, f)
+		rm.Defer(e.finish)
+		res = e
 	} else {
 		err := pdf.CheckVersion(rm.Out(), "simple CFF fonts", pdf.V1_2)
 		if err != nil {
 			return nil, nil, err
 		}
-		res = newEmbeddedSimple(ref, f)
+		e := newEmbeddedSimple(ref, f)
+		rm.Defer(e.finish)
+		res = e
 	}
 
 	return ref, res, nil

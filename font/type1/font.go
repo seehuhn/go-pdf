@@ -217,6 +217,7 @@ func (f *Instance) GlyphWidthPDF(glyphName string) float64 {
 func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
 	ref := rm.Alloc()
 	res := newEmbeddedSimple(ref, f)
+	rm.Defer(res.finish)
 	return ref, res, nil
 }
 

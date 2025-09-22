@@ -71,8 +71,14 @@ func (e *EmbedHelper) Out() *Writer {
 }
 
 // TODO(voss): remove this once it is no longer needed.
+//
+// Deprecated: this will go away.
 func (e *EmbedHelper) GetRM() *ResourceManager {
 	return e.rm
+}
+
+func (e *EmbedHelper) Defer(fn func(*EmbedHelper) error) {
+	e.rm.deferred = append(e.rm.deferred, fn)
 }
 
 func EmbedHelperEmbed[T any](e *EmbedHelper, r Embedder[T]) (Native, T, error) {
@@ -103,10 +109,6 @@ func EmbedHelperEmbedAt[T any](e *EmbedHelper, ref Reference, r Embedder[T]) (Na
 	}
 
 	e.rm.embedded[r] = embRes{Val: val, Emb: emb}
-
-	if finisher, ok := any(emb).(Finisher); ok {
-		e.rm.finishers = append(e.rm.finishers, finisher)
-	}
 
 	return val, emb, nil
 }
@@ -143,10 +145,10 @@ type Unused struct{}
 // The ResourceManager must be closed with the [Close] method before the PDF
 // file is closed.
 type ResourceManager struct {
-	Out       *Writer
-	embedded  map[any]embRes
-	finishers []Finisher
-	isClosed  bool
+	Out      *Writer
+	embedded map[any]embRes
+	deferred []func(*EmbedHelper) error
+	isClosed bool
 }
 
 // NewResourceManager creates a new ResourceManager.
@@ -160,14 +162,6 @@ func NewResourceManager(w *Writer) *ResourceManager {
 type embRes struct {
 	Val Native
 	Emb any
-}
-
-// Finisher is implemented by embedded objects that need to perform
-// finalization work when the ResourceManager is closed.
-// The Finish method is called automatically for any embedded object
-// whose type implements this interface.
-type Finisher interface {
-	Finish(*EmbedHelper) error
 }
 
 // ResourceManagerEmbed embeds a resource in the PDF file.
@@ -209,13 +203,13 @@ func (rm *ResourceManager) Close() error {
 		return nil
 	}
 
-	for len(rm.finishers) > 0 {
-		r := rm.finishers[0]
-		k := copy(rm.finishers, rm.finishers[1:])
-		rm.finishers = rm.finishers[:k]
+	for len(rm.deferred) > 0 {
+		fn := rm.deferred[0]
+		k := copy(rm.deferred, rm.deferred[1:])
+		rm.deferred = rm.deferred[:k]
 
 		e := &EmbedHelper{rm: rm}
-		if err := r.Finish(e); err != nil {
+		if err := fn(e); err != nil {
 			return err
 		}
 	}

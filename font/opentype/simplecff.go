@@ -39,7 +39,6 @@ import (
 var _ interface {
 	font.EmbeddedLayouter
 	font.Embedded
-	pdf.Finisher
 } = (*embeddedCFFSimple)(nil)
 
 type embeddedCFFSimple struct {
@@ -85,7 +84,7 @@ func (e *embeddedCFFSimple) AppendEncoded(s pdf.String, gid glyph.ID, text strin
 	return append(s, c), w / 1000
 }
 
-func (e *embeddedCFFSimple) Finish(rm *pdf.EmbedHelper) error {
+func (e *embeddedCFFSimple) finish(rm *pdf.EmbedHelper) error {
 	if e.finished {
 		return nil
 	}

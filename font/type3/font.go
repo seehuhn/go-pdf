@@ -180,5 +180,6 @@ func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error)
 
 	ref := rm.Alloc()
 	res := newEmbeddedSimple(ref, f.Font)
+	rm.Defer(res.finish)
 	return ref, res, nil
 }

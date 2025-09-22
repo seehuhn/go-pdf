@@ -42,7 +42,6 @@ import (
 var _ interface {
 	font.EmbeddedLayouter
 	font.Embedded
-	pdf.Finisher
 } = (*embeddedGlyfComposite)(nil)
 
 type embeddedGlyfComposite struct {
@@ -104,7 +103,7 @@ func (e *embeddedGlyfComposite) AppendEncoded(s pdf.String, gid glyph.ID, text s
 	return e.CIDEncoder.Codec().AppendCode(s, c), w / 1000
 }
 
-func (e *embeddedGlyfComposite) Finish(rm *pdf.EmbedHelper) error {
+func (e *embeddedGlyfComposite) finish(rm *pdf.EmbedHelper) error {
 	if e.finished {
 		return nil
 	}
