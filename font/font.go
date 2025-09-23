@@ -30,22 +30,27 @@ import (
 // == NEW API=================================================================
 
 type InstanceNew interface {
-	WritingMode() WritingMode
-
-	// GetCodec returns the character code codec for the encoding used by this
-	// font.
-	GetCodec() *charcode.Codec
-
-	Codes(s pdf.String) iter.Seq[*Code]
-
 	// GetName returns a human-readable name for the font.
 	// For most font types, this is the PostScript name of the font.
 	GetName() string
 
+	WritingMode() WritingMode
+
+	// GetCodec returns the codec for the encoding used by this font.
+	GetCodec() *charcode.Codec
+
+	Codes(s pdf.String) iter.Seq[*Code]
+
+	// FontInfo returns information required to load the font file and to
+	// extract the the glyph corresponding to a character identifier. The
+	// result is a pointer to one of the FontInfo* types defined in the
+	// font/dict package.
+	FontInfo() any
+
 	pdf.Embedder[pdf.Unused]
 }
 
-type EncoderNew interface {
+type LayouterNew interface {
 	InstanceNew
 
 	// Encode converts a glyph ID to a character code (for use with the
@@ -53,23 +58,16 @@ type EncoderNew interface {
 	// an appropriate advance width and text representation for the character
 	// code, in case a new code is allocated.
 	//
-	// The function returns the character code, the PDF advance width and a
-	// boolean indicating whether the encoding was successful.  If the function
-	// returns false, the glyph ID cannot be encoded with this font instance.
+	// The function returns the character code, and a boolean indicating
+	// whether the encoding was successful.  If the function returns false, the
+	// glyph ID cannot be encoded with this font instance.
 	//
-	// Use the Codec to append the character code to PDF strings. The returned
-	// width is the advance width from the PDF font dictionary, and if a
-	// pre-existing code is re-used this may be different from the width
-	// argument.
-	Encode(gid glyph.ID, width float64, text string) (charcode.Code, float64, bool)
+	// Use the Codec to append the character code to PDF strings.
+	Encode(gid glyph.ID, width float64, text string) (charcode.Code, bool)
 
 	// Capacity returns the number of character codes that can still be
 	// allocated in this font instance.
 	Capacity() int
-}
-
-type LayouterNew interface {
-	EncoderNew
 
 	// Layout appends a string to a glyph sequence.  The string is typeset at
 	// the given point size and the resulting GlyphSeq is returned.
