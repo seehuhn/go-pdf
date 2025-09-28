@@ -161,13 +161,21 @@ func createDocument(filename string) error {
 		Size:  12,
 		Color: color.Black,
 	}
+	F1, err := makeTestFont(false)
+	if err != nil {
+		return err
+	}
 	test1 := text.F{
-		Font:  &testFont{false},
+		Font:  F1,
 		Size:  12,
 		Color: color.Blue,
 	}
+	F2, err := makeTestFont(true)
+	if err != nil {
+		return err
+	}
 	test2 := text.F{
-		Font:  &testFont{true},
+		Font:  F2,
 		Size:  12,
 		Color: color.Blue,
 	}
@@ -216,17 +224,7 @@ func createDocument(filename string) error {
 	return nil
 }
 
-type testFont struct {
-	useEncodingDict bool
-}
-
-func (f *testFont) PostScriptName() string {
-	return TestFontName
-}
-
-func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
-	fontDictRef := rm.Alloc()
-
+func makeTestFont(useEncodingDict bool) (font.Instance, error) {
 	fd := &font.Descriptor{
 		FontName:     TestFontName,
 		IsFixedPitch: true,
@@ -245,7 +243,7 @@ func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error)
 		Descriptor:     fd,
 		FontFile:       nil, // external font
 	}
-	if f.useEncodingDict {
+	if useEncodingDict {
 		// The standard encoding is represented by an encoding dictionary
 		// without a /BaseEncoding field.
 		dict.Encoding = encoding.Standard
@@ -257,12 +255,5 @@ func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error)
 		dict.Width[i] = glyphWidths
 	}
 
-	_, _, err := pdf.EmbedHelperEmbedAt(rm, fontDictRef, dict)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	E := dict.MakeFont()
-
-	return fontDictRef, E, nil
+	return dict.MakeFont(), nil
 }

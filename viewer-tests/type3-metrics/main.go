@@ -62,34 +62,40 @@ func createDocument(filename string) error {
 	var testString [4]pdf.String
 
 	for i, unitsPerEm := range []float64{1000, 2000} {
-		T := makeTestFont(unitsPerEm, false)
-		_, E, err := pdf.ResourceManagerEmbed(w.RM, T)
-		if err != nil {
-			return err
-		}
+		F := makeTestFont(unitsPerEm, false)
 		testFont[i] = text.F{
-			Font:  T,
+			Font:  F,
 			Size:  12,
 			Color: blue,
 		}
-		testString[i], _ = E.(font.EmbeddedLayouter).AppendEncoded(testString[i], 1, "A")
-		testString[i], _ = E.(font.EmbeddedLayouter).AppendEncoded(testString[i], 1, "A")
-		testString[i], _ = E.(font.EmbeddedLayouter).AppendEncoded(testString[i], 1, "A")
+
+		gg := F.Layout(nil, 1, "AAA")
+		for _, g := range gg.Seq {
+			code, ok := F.Encode(g.GID, 0, g.Text)
+			if !ok {
+				return fmt.Errorf("cannot encode glyph %v", g)
+			}
+			codec := F.Codec()
+			testString[i] = codec.AppendCode(testString[i], code)
+		}
 	}
 	for i, unitsPerEm := range []float64{1000, 2000} {
-		T := makeTestFont(unitsPerEm, true)
-		_, E, err := pdf.ResourceManagerEmbed(w.RM, T)
-		if err != nil {
-			return err
-		}
+		F := makeTestFont(unitsPerEm, true)
 		testFont[i+2] = text.F{
-			Font:  T,
+			Font:  F,
 			Size:  12,
 			Color: blue,
 		}
-		testString[i+2], _ = E.(font.EmbeddedLayouter).AppendEncoded(testString[i+2], 1, "A")
-		testString[i+2], _ = E.(font.EmbeddedLayouter).AppendEncoded(testString[i+2], 1, "A")
-		testString[i+2], _ = E.(font.EmbeddedLayouter).AppendEncoded(testString[i+2], 1, "A")
+
+		gg := F.Layout(nil, 1, "AAA")
+		for _, g := range gg.Seq {
+			code, ok := F.Encode(g.GID, 0, g.Text)
+			if !ok {
+				return fmt.Errorf("cannot encode glyph %v", g)
+			}
+			codec := F.Codec()
+			testString[i+2] = codec.AppendCode(testString[i+2], code)
+		}
 	}
 
 	text.Show(w.Writer,
@@ -126,7 +132,7 @@ func createDocument(filename string) error {
 	return nil
 }
 
-func makeTestFont(unitsPerEm float64, rotate bool) font.Font {
+func makeTestFont(unitsPerEm float64, rotate bool) font.Layouter {
 	q := 1 / unitsPerEm
 
 	fontMatrix := matrix.Matrix{q, 0, 0, q, 0, 0}
@@ -148,13 +154,13 @@ func makeTestFont(unitsPerEm float64, rotate bool) font.Font {
 		BBox:  rect.Rect{URx: unitsPerEm, URy: unitsPerEm},
 		Draw: func(w *graphics.Writer) error {
 			a := 0.05 * unitsPerEm
-			b := 0.95 * unitsPerEm
+			b := 0.90 * unitsPerEm
 			w.Rectangle(a, a, b, b)
 			w.Fill()
 			return nil
 		},
 	})
-	res, err := type3.New(F)
+	res, err := F.New()
 	if err != nil {
 		panic(err)
 	}

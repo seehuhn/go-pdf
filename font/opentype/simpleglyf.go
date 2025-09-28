@@ -17,9 +17,12 @@
 package opentype
 
 import (
-	"fmt"
+	"errors"
 	"math"
+	"slices"
 
+	"seehuhn.de/go/geom/rect"
+	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt"
@@ -28,6 +31,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
@@ -37,72 +41,169 @@ import (
 	"seehuhn.de/go/pdf/font/subset"
 )
 
-var _ interface {
-	font.EmbeddedLayouter
-	font.Embedded
-} = (*embeddedGlyfSimple)(nil)
+// SimpleGlyf represents a simple OpenType font with glyf outlines.
+// This implements the font.Layouter interface.
+type SimpleGlyf struct {
+	*sfnt.Font
 
-type embeddedGlyfSimple struct {
-	Ref  pdf.Reference
-	Font *sfnt.Font
+	*font.Geometry
+	layouter *sfnt.Layouter
 
 	*simpleenc.Simple
-
-	finished bool
 }
 
-func newEmbeddedGlyfSimple(ref pdf.Reference, font *sfnt.Font) *embeddedGlyfSimple {
-	e := &embeddedGlyfSimple{
-		Ref:  ref,
-		Font: font,
-		Simple: simpleenc.NewSimple(
-			math.Round(font.GlyphWidthPDF(0)),
-			font.PostScriptName(),
-			&pdfenc.WinAnsi,
-		),
+var _ font.Layouter = (*SimpleGlyf)(nil)
+
+// newSimpleGlyf creates a simple OpenType font with glyf outlines.
+func newSimpleGlyf(info *sfnt.Font, opt *OptionsSimple) (*SimpleGlyf, error) {
+	if !info.IsGlyf() {
+		return nil, errors.New("no glyf outlines in font")
 	}
 
-	return e
+	geometry := &font.Geometry{
+		GlyphExtents: scaleBoxesGlyf(info.GlyphBBoxes(), info.UnitsPerEm),
+		Widths:       info.WidthsPDF(),
+
+		Ascent:             float64(info.Ascent) / float64(info.UnitsPerEm),
+		Descent:            float64(info.Descent) / float64(info.UnitsPerEm),
+		Leading:            float64(info.Ascent-info.Descent+info.LineGap) / float64(info.UnitsPerEm),
+		UnderlinePosition:  float64(info.UnderlinePosition) / float64(info.UnitsPerEm),
+		UnderlineThickness: float64(info.UnderlineThickness) / float64(info.UnitsPerEm),
+	}
+
+	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
+	if err != nil {
+		return nil, err
+	}
+
+	f := &SimpleGlyf{
+		Font:     info,
+		Geometry: geometry,
+		layouter: layouter,
+	}
+
+	notdefWidth := math.Round(info.GlyphWidthPDF(0))
+	f.Simple = simpleenc.NewSimple(
+		notdefWidth,
+		info.PostScriptName(),
+		&pdfenc.WinAnsi,
+	)
+
+	return f, nil
 }
 
-func (e *embeddedGlyfSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
-	c, ok := e.Simple.GetCode(gid, text)
-	if !ok {
-		if e.finished {
-			return s, 0
-		}
+// FontInfo returns information required to load the font file and to
+// extract the the glyph corresponding to a character identifier.
+func (f *SimpleGlyf) FontInfo() any {
+	return &dict.FontInfoSimple{
+		PostScriptName: f.Font.PostScriptName(),
+		FontFile:       &glyphdata.Stream{},
+		Encoding:       f.Simple.Encoding(),
+		IsSymbolic:     f.isSymbolic(),
+	}
+}
 
-		glyphName := e.Font.GlyphName(gid)
-		width := math.Round(e.Font.GlyphWidthPDF(gid))
-		var err error
-		c, err = e.Simple.Encode(gid, glyphName, text, width)
+// Embed adds the font to a PDF file.
+func (f *SimpleGlyf) Embed(e *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+	if err := pdf.CheckVersion(e.Out(), "OpenType fonts", pdf.V1_6); err != nil {
+		return nil, pdf.Unused{}, err
+	}
+
+	ref := e.Alloc()
+	e.Defer(func(eh *pdf.EmbedHelper) error {
+		dict, err := f.makeDict()
 		if err != nil {
-			return s, 0
+			return err
 		}
-	}
+		_, _, err = pdf.EmbedHelperEmbedAt(eh, ref, dict)
+		return err
+	})
 
-	w := e.Simple.Width(c)
-	return append(s, c), w / 1000
+	return ref, pdf.Unused{}, nil
 }
 
-func (e *embeddedGlyfSimple) finish(rm *pdf.EmbedHelper) error {
-	if e.finished {
-		return nil
+// Encode converts a glyph ID to a character code.
+func (f *SimpleGlyf) Encode(gid glyph.ID, width float64, text string) (charcode.Code, bool) {
+	if c, ok := f.Simple.GetCode(gid, text); ok {
+		return charcode.Code(c), true
 	}
-	e.finished = true
 
-	if err := e.Simple.Error(); err != nil {
-		return pdf.Wrap(err, fmt.Sprintf("font %q", e.Font.PostScriptName()))
+	if width <= 0 {
+		width = math.Round(f.Font.GlyphWidthPDF(gid))
+	}
+	c, err := f.Simple.Encode(gid, f.Font.GlyphName(gid), text, width)
+	return charcode.Code(c), err == nil
+}
+
+// Layout appends a string to a glyph sequence.
+func (f *SimpleGlyf) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
+	if seq == nil {
+		seq = &font.GlyphSeq{}
+	}
+
+	buf := f.layouter.Layout(s)
+	seq.Seq = slices.Grow(seq.Seq, len(buf))
+	for _, g := range buf {
+		xOffset := float64(g.XOffset) * ptSize * f.Font.FontMatrix[0]
+		if len(seq.Seq) == 0 {
+			seq.Skip += xOffset
+		} else {
+			seq.Seq[len(seq.Seq)-1].Advance += xOffset
+		}
+		seq.Seq = append(seq.Seq, font.Glyph{
+			GID:     g.GID,
+			Advance: float64(g.Advance) * ptSize * f.Font.FontMatrix[0],
+			Rise:    float64(g.YOffset) * ptSize * f.Font.FontMatrix[3],
+			Text:    string(g.Text),
+		})
+	}
+	return seq
+}
+
+// IsBlank reports whether the glyph is blank.
+func (f *SimpleGlyf) IsBlank(gid glyph.ID) bool {
+	if int(gid) >= len(f.Geometry.GlyphExtents) {
+		gid = 0
+	}
+	return f.Geometry.GlyphExtents[gid].IsZero()
+}
+
+func (f *SimpleGlyf) isSymbolic() bool {
+	// Follow the advice of section 9.6.5.4 of ISO 32000-2:2020, we
+	// only make the font as non-symbolic, if it can be encoded either
+	// using "MacRomanEncoding" or "WinAnsiEncoding".
+	canMacRoman := true
+	canWinAnsi := true
+	for code := range 256 {
+		gid := f.Simple.GID(byte(code))
+		if gid == 0 {
+			continue
+		}
+		glyphName := f.Simple.GlyphName(gid)
+		if !pdfenc.MacRoman.Has[glyphName] {
+			canMacRoman = false
+		}
+		if !pdfenc.WinAnsi.Has[glyphName] {
+			canWinAnsi = false
+		}
+	}
+	return !canMacRoman && !canWinAnsi
+}
+
+// makeDict creates the PDF font dictionary for this font.
+func (f *SimpleGlyf) makeDict() (*dict.TrueType, error) {
+	if err := f.Simple.Error(); err != nil {
+		return nil, pdf.Errorf("font %q: %w", f.Font.PostScriptName(), err)
 	}
 
 	// subset the font
-	origFont := e.Font.Clone()
+	origFont := f.Font.Clone()
 	origFont.CMapTable = nil
 	origFont.Gdef = nil
 	origFont.Gsub = nil
 	origFont.Gpos = nil
 
-	glyphs := e.Simple.Glyphs()
+	glyphs := f.Simple.Glyphs()
 	subsetTag := subset.Tag(glyphs, origFont.NumGlyphs())
 	var subsetFont *sfnt.Font
 	if subsetTag != "" {
@@ -111,32 +212,14 @@ func (e *embeddedGlyfSimple) finish(rm *pdf.EmbedHelper) error {
 		subsetFont = origFont
 	}
 
-	// Follow the advice of section 9.6.5.4 of ISO 32000-2:2020:
-	// Only make the font as non-symbolic, if it can be encoded either
-	// using "MacRomanEncoding" or "WinAnsiEncoding".
-	var dictEnc encoding.Simple
-	canMacRoman := true
-	canWinAnsi := true
-	for code := range 256 {
-		gid := e.Simple.GID(byte(code))
-		if gid == 0 {
-			continue
-		}
-
-		glyphName := e.Simple.GlyphName(gid)
-		if pdfenc.MacRoman.Encoding[code] != glyphName {
-			canMacRoman = false
-		}
-		if pdfenc.WinAnsi.Encoding[code] != glyphName {
-			canWinAnsi = false
-		}
-		if !(canMacRoman || canWinAnsi) {
-			break
-		}
+	toSubset := make(map[glyph.ID]glyph.ID, len(glyphs))
+	for subsetGID, origGID := range glyphs {
+		toSubset[origGID] = glyph.ID(subsetGID)
 	}
 
-	isSymbolic := !(canMacRoman || canWinAnsi)
+	isSymbolic := f.isSymbolic()
 
+	var dictEnc encoding.Simple
 	if isSymbolic {
 		// Use the built-in encoding, defined by a (1,0) "cmap" subtable which
 		// maps codes to a GIDs.
@@ -145,11 +228,11 @@ func (e *embeddedGlyfSimple) finish(rm *pdf.EmbedHelper) error {
 
 		subtable := sfntcmap.Format4{}
 		for code := range 256 {
-			gid := e.Simple.GID(byte(code))
+			gid := f.Simple.GID(byte(code))
 			if gid == 0 {
 				continue
 			}
-			subtable[uint16(code)] = gid
+			subtable[uint16(code)] = toSubset[gid]
 		}
 		subsetFont.CMapTable = sfntcmap.Table{
 			{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
@@ -159,11 +242,11 @@ func (e *embeddedGlyfSimple) finish(rm *pdf.EmbedHelper) error {
 		// map the names to unicode, and use a (3,1) "cmap" subtable to map
 		// unicode to GIDs.
 
-		dictEnc = e.Simple.Encoding()
+		dictEnc = f.Simple.Encoding()
 
 		var needsFormat12 bool
 		for _, origGid := range glyphs {
-			glyphName := e.Simple.GlyphName(origGid)
+			glyphName := f.Simple.GlyphName(origGid)
 			rr := []rune(names.ToUnicode(glyphName, subsetFont.PostScriptName()))
 			if len(rr) != 1 {
 				continue
@@ -177,7 +260,7 @@ func (e *embeddedGlyfSimple) finish(rm *pdf.EmbedHelper) error {
 		if !needsFormat12 {
 			subtable := sfntcmap.Format4{}
 			for gid, origGid := range glyphs {
-				glyphName := e.Simple.GlyphName(origGid)
+				glyphName := f.Simple.GlyphName(origGid)
 				rr := []rune(names.ToUnicode(glyphName, subsetFont.PostScriptName()))
 				if len(rr) != 1 {
 					continue
@@ -190,7 +273,7 @@ func (e *embeddedGlyfSimple) finish(rm *pdf.EmbedHelper) error {
 		} else {
 			subtable := sfntcmap.Format12{}
 			for gid, origGid := range glyphs {
-				glyphName := e.Simple.GlyphName(origGid)
+				glyphName := f.Simple.GlyphName(origGid)
 				rr := []rune(names.ToUnicode(glyphName, subsetFont.PostScriptName()))
 				if len(rr) != 1 {
 					continue
@@ -198,24 +281,19 @@ func (e *embeddedGlyfSimple) finish(rm *pdf.EmbedHelper) error {
 				subtable[uint32(rr[0])] = glyph.ID(gid)
 			}
 			subsetFont.CMapTable = sfntcmap.Table{
-				{PlatformID: 3, EncodingID: 1}: subtable.Encode(0),
+				{PlatformID: 3, EncodingID: 1}: subtable.Encode(1),
 			}
 		}
 	}
 
-	qv := subsetFont.FontMatrix[3] * 1000
-	ascent := math.Round(float64(subsetFont.Ascent) * qv)
-	descent := math.Round(float64(subsetFont.Descent) * qv)
-	leading := math.Round(float64(subsetFont.Ascent-subsetFont.Descent+subsetFont.LineGap) * qv)
-	capHeight := math.Round(float64(subsetFont.CapHeight) * qv)
-	xHeight := math.Round(float64(subsetFont.XHeight) * qv)
-
-	italicAngle := math.Round(subsetFont.ItalicAngle*10) / 10
-
-	postScriptName := subsetFont.PostScriptName()
+	// construct the font dictionary and font descriptor
+	var widths [256]float64
+	for code, info := range f.Simple.MappedCodes() {
+		widths[code] = info.Width
+	}
 
 	fd := &font.Descriptor{
-		FontName:     subset.Join(subsetTag, postScriptName),
+		FontName:     subset.Join(subsetTag, subsetFont.PostScriptName()),
 		FontFamily:   subsetFont.FamilyName,
 		FontStretch:  subsetFont.Width,
 		FontWeight:   subsetFont.Weight,
@@ -225,31 +303,41 @@ func (e *embeddedGlyfSimple) finish(rm *pdf.EmbedHelper) error {
 		IsScript:     subsetFont.IsScript,
 		IsItalic:     subsetFont.IsItalic,
 		FontBBox:     subsetFont.FontBBoxPDF().Rounded(),
-		ItalicAngle:  italicAngle,
-		Ascent:       ascent,
-		Descent:      descent,
-		Leading:      leading,
-		CapHeight:    capHeight,
-		XHeight:      xHeight,
-		MissingWidth: e.Simple.DefaultWidth(),
+		ItalicAngle:  subsetFont.ItalicAngle,
+		Ascent:       float64(subsetFont.Ascent) / float64(subsetFont.UnitsPerEm) * 1000,
+		Descent:      float64(subsetFont.Descent) / float64(subsetFont.UnitsPerEm) * 1000,
+		Leading:      float64(subsetFont.LineGap) / float64(subsetFont.UnitsPerEm) * 1000,
+		CapHeight:    float64(subsetFont.CapHeight) / float64(subsetFont.UnitsPerEm) * 1000,
+		XHeight:      float64(subsetFont.XHeight) / float64(subsetFont.UnitsPerEm) * 1000,
+		StemV:        0, // not specified
+		StemH:        0, // not specified
+		AvgWidth:     0, // not specified
+		MaxWidth:     0, // not specified
+		MissingWidth: f.Simple.DefaultWidth(),
 	}
 
-	dict := &dict.TrueType{
-		PostScriptName: postScriptName,
+	fontDict := &dict.TrueType{
+		PostScriptName: subsetFont.PostScriptName(),
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
 		Encoding:       dictEnc,
-		FontFile:       sfntglyphs.ToStream(subsetFont, glyphdata.OpenTypeGlyf),
-		ToUnicode:      e.Simple.ToUnicode(postScriptName),
-	}
-	for c, info := range e.Simple.MappedCodes() {
-		dict.Width[c] = info.Width
+		Width:          widths,
+		ToUnicode:      f.Simple.ToUnicode(subsetFont.PostScriptName()),
+		FontFile:       sfntglyphs.ToStream(subsetFont, glyphdata.TrueType),
 	}
 
-	_, _, err := pdf.EmbedHelperEmbedAt(rm, e.Ref, dict)
-	if err != nil {
-		return err
-	}
+	return fontDict, nil
+}
 
-	return nil
+func scaleBoxesGlyf(bboxes []funit.Rect16, unitsPerEm uint16) []rect.Rect {
+	res := make([]rect.Rect, len(bboxes))
+	for i, b := range bboxes {
+		res[i] = rect.Rect{
+			LLx: float64(b.LLx) / float64(unitsPerEm),
+			LLy: float64(b.LLy) / float64(unitsPerEm),
+			URx: float64(b.URx) / float64(unitsPerEm),
+			URy: float64(b.URy) / float64(unitsPerEm),
+		}
+	}
+	return res
 }

@@ -62,9 +62,8 @@ func TestPredefined(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fontOpt := &truetype.Options{
+	fontOpt := &truetype.OptionsComposite{
 		Language:    language.English,
-		Composite:   true,
 		WritingMode: font.Horizontal,
 		MakeGIDToCID: func() cmap.GIDToCID {
 			return cmap.NewGIDToCIDFromROS(cmapInfo.ROS, lookup)
@@ -81,7 +80,7 @@ func TestPredefined(t *testing.T) {
 		},
 	}
 
-	F, err := truetype.New(fontInfo, fontOpt)
+	F, err := truetype.NewComposite(fontInfo, fontOpt)
 	if err != nil {
 		t.Fatal(err)
 	}

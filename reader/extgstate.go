@@ -18,7 +18,6 @@ package reader
 
 import (
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
 )
 
@@ -33,6 +32,7 @@ func (r *Reader) readExtGState(ref pdf.Object) (graphics.State, error) {
 
 	// Convert ExtGState to graphics.State by copying all fields to Parameters
 	param := &graphics.Parameters{
+		TextFont:               extGState.TextFont,
 		TextFontSize:           extGState.TextFontSize,
 		TextKnockout:           extGState.TextKnockout,
 		LineWidth:              extGState.LineWidth,
@@ -60,17 +60,6 @@ func (r *Reader) readExtGState(ref pdf.Object) (graphics.State, error) {
 		HalftoneOriginY:        extGState.HalftoneOriginY,
 		FlatnessTolerance:      extGState.FlatnessTolerance,
 		SmoothnessTolerance:    extGState.SmoothnessTolerance,
-	}
-
-	// Handle TextFont conversion - ExtGState.TextFont is font.Font, but
-	// Parameters.TextFont expects font.Embedded Since the font came from a PDF
-	// file, it should be font.FromFile which implements font.Embedded.
-	//
-	// TODO(voss): this should be modelled on Writer.TextSetFont instead.
-	if extGState.TextFont != nil {
-		if embeddedFont, ok := extGState.TextFont.(font.Embedded); ok {
-			param.TextFont = embeddedFont
-		}
 	}
 
 	res := graphics.State{

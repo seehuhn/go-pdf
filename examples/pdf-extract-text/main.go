@@ -108,8 +108,8 @@ func (e *extractor) extractText(fname string) error {
 
 	// -----------------------------------------------------------------------
 
-	extraTextCache := make(map[font.Embedded]map[cid.CID]string)
-	spaceWidth := make(map[font.Embedded]float64)
+	extraTextCache := make(map[font.Instance]map[cid.CID]string)
+	spaceWidth := make(map[font.Instance]float64)
 
 	contents := reader.New(r, nil)
 	contents.TextEvent = func(op reader.TextEvent, arg float64) {
@@ -173,8 +173,13 @@ func (e *extractor) extractText(fname string) error {
 	return nil
 }
 
-func getSpaceWidth(F font.Embedded) float64 {
-	Fe, ok := F.(font.FromFile)
+type fontFromFile interface {
+	font.Instance
+	GetDict() font.Dict
+}
+
+func getSpaceWidth(F font.Instance) float64 {
+	Fe, ok := F.(fontFromFile)
 	if !ok {
 		return 280
 	}
@@ -187,14 +192,8 @@ func getSpaceWidth(F font.Embedded) float64 {
 	return spaceWidthHeuristic(d)
 }
 
-func getExtraMapping(F font.Embedded) map[cid.CID]string {
-	Fe, ok := F.(font.FromFile)
-	if !ok {
-		return nil
-	}
-
-	d := Fe.GetDict()
-	fontInfo := d.FontInfo()
+func getExtraMapping(F font.Instance) map[cid.CID]string {
+	fontInfo := F.FontInfo()
 
 	switch fontInfo := fontInfo.(type) {
 	case *dict.FontInfoGlyfEmbedded:

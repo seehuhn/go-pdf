@@ -29,11 +29,11 @@
 // [seehuhn.de/go/pdf/font/embed].
 // If more control is needed, the following functions can be used for the
 // different ways of embedding fonts into PDF files as simple fonts:
-//   - [seehuhn.de/go/pdf/font/cff.New]
+//   - [seehuhn.de/go/pdf/font/fontcff.New]
 //   - [seehuhn.de/go/pdf/font/truetype.New]
 //   - [seehuhn.de/go/pdf/font/opentype.New]
 //   - [seehuhn.de/go/pdf/font/type1.New]
-//   - [seehuhn.de/go/pdf/font/type3.New]
+//   - [seehuhn.de/go/pdf/font/type3.Font.New]
 //
 // # Fonts included in the library
 //
@@ -43,7 +43,7 @@
 //
 // # Data Types for Representing Fonts
 //
-//   - A [Font] represents a font before it is embedded into a PDF file.
-//   - A [Layouter] is a font which includes enough information to typeset new text.
-//   - The type [Embedded] represents a font within a PDF file.
+//   - A [FontOld] represents a font before it is embedded into a PDF file.
+//   - A [LayouterOld] is a font which includes enough information to typeset new text.
+//   - The type [EmbeddedOld] represents a font within a PDF file.
 package font

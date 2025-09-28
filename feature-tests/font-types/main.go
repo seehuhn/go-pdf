@@ -130,7 +130,7 @@ func doit() error {
 		default:
 			panic("unexpected section " + title)
 		}
-		var X font.Font
+		var X font.Instance
 		if gen != nil {
 			X = gen()
 		}
@@ -207,7 +207,9 @@ func doit() error {
 		}
 
 		if gen != nil {
-			refY, Y, err := pdf.ResourceManagerEmbed(page.RM, X)
+			fontRM := pdf.NewResourceManager(doc.Out)
+
+			refY, _, err := pdf.ResourceManagerEmbed(fontRM, X)
 			if err != nil {
 				return err
 			}
@@ -220,13 +222,10 @@ func doit() error {
 			page.TextEnd()
 			l.yPos -= 30
 
-			_ = Y
-			panic("TODO(voss): fix this")
-
-			// err = Y.(pdf.Finisher).Finish(page.RM)
-			// if err != nil {
-			// 	return err
-			// }
+			err = fontRM.Close()
+			if err != nil {
+				return err
+			}
 
 			fontDict, err := pdf.GetDict(doc.Out, refY)
 			if err != nil {

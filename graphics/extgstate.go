@@ -39,7 +39,7 @@ import (
 type ExtGState struct {
 	Set StateBits
 
-	TextFont               font.Font
+	TextFont               font.Instance
 	TextFontSize           float64
 	TextKnockout           bool
 	LineWidth              float64
@@ -569,7 +569,7 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, State, error) {
 	// See table 57 in ISO 32000-2:2020.
 	dict := pdf.Dict{}
 	if set&StateTextFont != 0 {
-		E, embedded, err := pdf.EmbedHelperEmbed(rm, e.TextFont)
+		E, _, err := pdf.EmbedHelperEmbed(rm, e.TextFont)
 		if err != nil {
 			return nil, res, err
 		}
@@ -579,7 +579,7 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, State, error) {
 			return nil, res, err
 		}
 		dict["Font"] = pdf.Array{E, pdf.Number(e.TextFontSize)}
-		res.TextFont = embedded
+		res.TextFont = e.TextFont
 		res.TextFontSize = e.TextFontSize
 	}
 	if set&StateTextKnockout != 0 {

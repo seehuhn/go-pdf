@@ -33,8 +33,6 @@ type Writer struct {
 
 	currentObject objectType
 
-	CurrentFont font.Layouter
-
 	State
 	stack []State
 
@@ -217,7 +215,7 @@ func writerSetResourceName[T any](w *Writer, resource pdf.Embedder[T], category 
 // SetFontNameInternal controls how the font is refered to in the content
 // stream.  Normally names are allocated automatically, and use of this
 // function is not required.
-func (w *Writer) SetFontNameInternal(f font.Font, name pdf.Name) error {
+func (w *Writer) SetFontNameInternal(f font.Instance, name pdf.Name) error {
 	return writerSetResourceName(w, f, catFont, name)
 }
 

@@ -304,8 +304,8 @@ func (te TextExtractor) Process(doc pdf.Getter, pages *PageSet, outputFile strin
 	defer outFile.Close()
 
 	// set up text extraction
-	extraTextCache := make(map[font.Embedded]map[cid.CID]string)
-	spaceWidth := make(map[font.Embedded]float64)
+	extraTextCache := make(map[font.Instance]map[cid.CID]string)
+	spaceWidth := make(map[font.Instance]float64)
 
 	contents := reader.New(doc, nil)
 	contents.TextEvent = func(op reader.TextEvent, arg float64) {
@@ -331,7 +331,7 @@ func (te TextExtractor) Process(doc pdf.Getter, pages *PageSet, outputFile strin
 			F := contents.TextFont
 			m, ok := extraTextCache[F]
 			if !ok {
-				m = getExtraMapping(doc, contents.TextFont)
+				m = getExtraMapping(contents.TextFont)
 				extraTextCache[F] = m
 			}
 			text = m[cid]
@@ -366,10 +366,15 @@ func (te TextExtractor) Process(doc pdf.Getter, pages *PageSet, outputFile strin
 	return nil
 }
 
+type fontFromFile interface {
+	font.Instance
+	GetDict() font.Dict
+}
+
 // Helper functions for text extraction (adapted from examples/pdf-extract-text)
 
-func getSpaceWidth(F font.Embedded) float64 {
-	Fe, ok := F.(font.FromFile)
+func getSpaceWidth(F font.Instance) float64 {
+	Fe, ok := F.(fontFromFile)
 	if !ok {
 		return 280
 	}
@@ -382,22 +387,15 @@ func getSpaceWidth(F font.Embedded) float64 {
 	return spaceWidthHeuristic(d)
 }
 
-func getExtraMapping(r pdf.Getter, F font.Embedded) map[cid.CID]string {
-	Fe, ok := F.(font.FromFile)
-	if !ok {
-		return nil
-	}
-
-	d := Fe.GetDict()
-	fontInfo := d.FontInfo()
+func getExtraMapping(F font.Instance) map[cid.CID]string {
+	fontInfo := F.FontInfo()
 
 	switch fontInfo := fontInfo.(type) {
 	case *dict.FontInfoGlyfEmbedded:
 		if fontInfo.FontFile == nil {
-			return nil // external font - no embedded data to extract
+			return nil // font not embedded
 		}
 
-		// Use FromStream to get the font
 		info, err := sfntglyphs.FromStream(fontInfo.FontFile)
 		if err != nil {
 			return nil
@@ -438,6 +436,7 @@ type affine struct {
 
 var commonCharacters = map[string]affine{
 	" ": {0, 1},
+	" ": {0, 1},
 	")": {-43.01937, 1.0268},
 	"/": {-10.99708, 0.9623335},
 	"•": {-24.2725, 0.9956384},
@@ -450,7 +449,7 @@ var commonCharacters = map[string]affine{
 	"E": {-28.76257, 0.6957778},
 	"i": {51.62929, 0.8973944},
 	"ε": {-56.25771, 0.9947787},
-	"Ω": {-132.9966, 1.002173},
+	"Ω": {-132.9966, 1.002173},
 	"中": {-356.8609, 1.215483},
 }
 

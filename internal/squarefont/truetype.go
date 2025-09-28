@@ -101,7 +101,7 @@ func makeTrueTypeFont(unitsPerEm uint16) font.Layouter {
 	}
 
 	// Convert to PDF TrueType font
-	instance, err := truetype.New(font, nil)
+	instance, err := truetype.NewSimple(font, nil)
 	if err != nil {
 		panic(err)
 	}

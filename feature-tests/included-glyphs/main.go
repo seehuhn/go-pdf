@@ -27,7 +27,6 @@ import (
 	"seehuhn.de/go/pdf/font/extended"
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/standard"
-	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/outline"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -84,7 +83,7 @@ func createDocument(fname string) error {
 	}
 
 	for _, f := range gofont.All {
-		fontInstance, err := f.New(nil)
+		fontInstance, err := f.NewSimple(nil)
 		if err != nil {
 			return fmt.Errorf("failed to create Go font %v: %w", f, err)
 		}
@@ -342,9 +341,7 @@ func createFreshFontInstance(entry fontEntry) (font.Layouter, error) {
 		// Find the matching gofont and create new instance
 		for _, f := range gofont.All {
 			if getGoFontDisplayName(f) == fontName {
-				return f.New(&truetype.Options{
-					Composite: true,
-				})
+				return f.NewComposite(nil)
 			}
 		}
 	}

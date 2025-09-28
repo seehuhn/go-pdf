@@ -572,7 +572,7 @@ func (d *CIDFontType2) makeTextMap(codec *charcode.Codec) map[charcode.Code]stri
 // MakeFont returns a new font object that can be used to typeset text.
 // The font is immutable, i.e. no new glyphs can be added and no new codes
 // can be defined via the returned font object.
-func (d *CIDFontType2) MakeFont() font.FromFile {
+func (d *CIDFontType2) MakeFont() font.Instance {
 	codec := d.Codec()
 	textMap := d.makeTextMap(codec)
 	return &t2Font{
@@ -583,10 +583,6 @@ func (d *CIDFontType2) MakeFont() font.FromFile {
 	}
 }
 
-var (
-	_ font.FromFile = (*t2Font)(nil)
-)
-
 type t2Font struct {
 	*CIDFontType2
 	codec *charcode.Codec
@@ -594,21 +590,28 @@ type t2Font struct {
 	cache map[charcode.Code]*font.Code
 }
 
-func (f *t2Font) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
-	ref := rm.Alloc()
-	_, _, err := pdf.EmbedHelperEmbedAt(rm, ref, f.CIDFontType2)
+var _ font.Instance = (*t2Font)(nil)
+
+func (f *t2Font) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+	ref, _, err := pdf.EmbedHelperEmbed(rm, f.CIDFontType2)
 	if err != nil {
-		return nil, nil, err
+		return nil, pdf.Unused{}, err
 	}
-	return ref, f, nil
+	return ref, pdf.Unused{}, nil
 }
 
+// GetName returns a human-readable name for the font.
 func (f *t2Font) PostScriptName() string {
 	return f.CIDFontType2.PostScriptName
 }
 
 func (f *t2Font) GetDict() font.Dict {
 	return f.CIDFontType2
+}
+
+// GetCodec returns the codec for the encoding used by this font.
+func (f *t2Font) GetCodec() *charcode.Codec {
+	return f.CIDFontType2.Codec()
 }
 
 func (f *t2Font) WritingMode() font.WritingMode {

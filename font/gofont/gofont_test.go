@@ -27,7 +27,7 @@ func TestLigatures(t *testing.T) {
 		Medium, MediumItalic, Regular, Smallcaps, SmallcapsItalic,
 		Mono, MonoBold, MonoBoldItalic, MonoItalic} {
 
-		F, err := Fx.New(nil)
+		F, err := Fx.NewComposite(nil)
 		if err != nil {
 			t.Fatal(err)
 		}

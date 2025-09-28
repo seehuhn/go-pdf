@@ -38,7 +38,7 @@ func TestResourceManager(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	F, err := gofont.Regular.New(nil)
+	F, err := gofont.Regular.NewSimple(nil)
 	if err != nil {
 		t.Fatal(err)
 	}

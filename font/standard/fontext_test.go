@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
@@ -39,7 +38,7 @@ func TestEmbedStandard(t *testing.T) {
 				// Embed the font into a PDF file:
 
 				F := standardFont.New()
-				ref, E, err := pdf.ResourceManagerEmbed(rm, F)
+				ref, _, err := pdf.ResourceManagerEmbed(rm, F)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -55,7 +54,10 @@ func TestEmbedStandard(t *testing.T) {
 				}
 				gg := F.Layout(nil, 10, testText)
 				for _, g := range gg.Seq { // allocate codes
-					E.(font.EmbeddedLayouter).AppendEncoded(nil, g.GID, string(g.Text))
+					// Use the actual glyph width, not the kerned advance
+					glyphName := F.GlyphNames[g.GID]
+					glyphWidth := F.GlyphWidthPDF(glyphName)
+					_, _ = F.Encode(g.GID, glyphWidth, g.Text)
 				}
 
 				err = rm.Close()

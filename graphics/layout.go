@@ -77,6 +77,10 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 	}
 
 	E := w.TextFont
+	layouter, ok := E.(font.Layouter)
+	if !ok {
+		panic("font does not implement Layouter")
+	}
 
 	left := seq.Skip
 	gg := seq.Seq
@@ -113,6 +117,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 	if E.WritingMode() != 0 {
 		panic("vertical writing mode not implemented")
 	}
+	codec := layouter.Codec()
 	for _, g := range gg {
 		if w.State.Set&StateTextRise == 0 || math.Abs(g.Rise-w.State.TextRise) > 1e-6 {
 			flush()
@@ -124,7 +129,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 		}
 
 		xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) / param.TextFontSize / param.TextHorizontalScaling * 1000))
-		if xOffsetInt != 0 { // TODO(voss): only do this if the glyph is not blank
+		if xOffsetInt != 0 && !layouter.IsBlank(g.GID) {
 			if len(run) > 0 {
 				out = append(out, run)
 				run = nil
@@ -133,17 +138,21 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 			xActual += float64(xOffsetInt) / 1000 * param.TextFontSize * param.TextHorizontalScaling
 		}
 
-		var glyphWidth float64
-		prevLen := len(run)
-		run, glyphWidth = E.(font.EmbeddedLayouter).AppendEncoded(run, g.GID, g.Text)
-		isSpace := len(run) == prevLen+1 && run[prevLen] == ' '
-		glyphWidth = glyphWidth*param.TextFontSize + param.TextCharacterSpacing
-		if isSpace {
-			glyphWidth += param.TextWordSpacing
-		}
-
-		xActual += glyphWidth * param.TextHorizontalScaling
 		xWanted += g.Advance
+
+		prevLen := len(run)
+		charCode, ok := layouter.Encode(g.GID, pdf.Round(1000*g.Advance/param.TextFontSize, 1), g.Text)
+		if !ok {
+			continue // Skip glyphs that can't be encoded
+		}
+		run = codec.AppendCode(run, charCode)
+		for info := range layouter.Codes(run[prevLen:]) {
+			glyphWidth := info.Width/1000*param.TextFontSize + param.TextCharacterSpacing
+			if info.UseWordSpacing {
+				glyphWidth += param.TextWordSpacing
+			}
+			xActual += glyphWidth * param.TextHorizontalScaling
+		}
 	}
 	xOffsetInt := pdf.Integer(math.Round((xWanted - xActual) / param.TextFontSize / param.TextHorizontalScaling * 1000))
 	if xOffsetInt != 0 {
@@ -168,11 +177,13 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 // [font.Layouter], the function returns nil.  If seq is not nil (and there is
 // no error), the return value is guaranteed to be equal to seq.
 func (w *Writer) TextLayout(seq *font.GlyphSeq, text string) *font.GlyphSeq {
-	if w.Err != nil || w.CurrentFont == nil {
+	layouter, ok := w.TextFont.(font.Layouter)
+
+	if w.Err != nil || !ok {
 		return seq
 	}
 
-	T := font.NewTypesetter(w.CurrentFont, w.TextFontSize)
+	T := font.NewTypesetter(layouter, w.TextFontSize)
 	T.SetCharacterSpacing(w.TextCharacterSpacing)
 	T.SetWordSpacing(w.TextWordSpacing)
 	T.SetHorizontalScaling(w.TextHorizontalScaling)
@@ -195,7 +206,10 @@ func (w *Writer) TextGetQuadPoints(seq *font.GlyphSeq, padding float64) []vec.Ve
 	}
 
 	// get bounding rectangle in PDF text space units
-	f := w.CurrentFont
+	f, ok := w.TextFont.(font.Layouter)
+	if !ok {
+		return nil
+	}
 	geom := f.GetGeometry()
 	size := w.TextFontSize
 

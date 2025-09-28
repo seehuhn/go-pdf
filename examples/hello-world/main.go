@@ -37,7 +37,7 @@ func run() error {
 		return err
 	}
 
-	font, err := gofont.Regular.New(nil)
+	font, err := gofont.Regular.NewSimple(nil)
 	if err != nil {
 		return err
 	}

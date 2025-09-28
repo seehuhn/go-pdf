@@ -121,7 +121,7 @@ func (o *output) Println(args ...any) {
 			o.page.TextShow(arg)
 		case pdf.String:
 			o.page.TextShowRaw(arg)
-		case font.Font:
+		case font.Instance:
 			o.page.TextSetFont(arg, fontSize)
 		case color.Color:
 			o.page.SetFillColor(arg)

@@ -354,6 +354,15 @@ func (f *File) writeBinary(h hash.Hash, maxGen int) {
 	}
 }
 
+func (f *File) Codec() (*charcode.Codec, error) {
+	var cs charcode.CodeSpaceRange
+	for f != nil {
+		cs = append(cs, f.CodeSpaceRange...)
+		f = f.Parent
+	}
+	return charcode.NewCodec(cs)
+}
+
 func (f *File) All(codec *charcode.Codec) iter.Seq2[charcode.Code, cid.CID] {
 	return func(yield func(charcode.Code, cid.CID) bool) {
 		if f.Parent != nil {

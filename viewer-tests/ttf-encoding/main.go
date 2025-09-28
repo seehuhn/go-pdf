@@ -55,11 +55,11 @@ func createDocument(fname string) error {
 		return err
 	}
 
-	labelFont, err := gofont.Mono.New(nil)
+	labelFont, err := gofont.Mono.NewSimple(nil)
 	if err != nil {
 		return err
 	}
-	textFont, err := gofont.Regular.New(nil)
+	textFont, err := gofont.Regular.NewSimple(nil)
 	if err != nil {
 		return err
 	}

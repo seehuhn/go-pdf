@@ -61,7 +61,7 @@ func createDocument(fname string) error {
 
 	F := standard.Helvetica.New()
 
-	X := &testFont{}
+	X, err := makeTestFont()
 
 	M := makeMarkerFont()
 
@@ -107,7 +107,7 @@ func createDocument(fname string) error {
 
 // makeMarkerFont creates a simple type3 font where "I" shows a gray, vertical
 // line.
-func makeMarkerFont() font.Font {
+func makeMarkerFont() font.Instance {
 	markerFont := &type3.Font{
 		FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},
 		Glyphs: []*type3.Glyph{
@@ -126,39 +126,23 @@ func makeMarkerFont() font.Font {
 			},
 		},
 	}
-	F, err := type3.New(markerFont)
+	F, err := markerFont.New()
 	if err != nil {
 		panic(err)
 	}
 	return F
 }
 
-// This is a modified version of the Times-Roman font,
-// which only contains the following glyphs: .notdef, space, Yacute, AEacute.
-type testFont struct{}
-
-func (f *testFont) PostScriptName() string {
-	return "Test"
-}
-
-// GetGeometry returns font metrics required for typesetting.
-func (f *testFont) GetGeometry() *font.Geometry {
-	panic("not implemented") // TODO: Implement
-}
-
-func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
-	w := rm.Out()
-	fontDictRef := w.Alloc()
-
+func makeTestFont() (font.Instance, error) {
 	// load the original font
 	ll := loader.NewFontLoader()
 	r, err := ll.Open("Times-Roman", loader.FontTypeType1)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	F, err := type1.Read(r)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// copy the glyphs we want to keep
@@ -231,16 +215,9 @@ func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error)
 	}
 	tu, err := cmap.NewToUnicodeFile(charcode.Simple, m)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	dict.ToUnicode = tu
 
-	_, _, err = pdf.EmbedHelperEmbedAt(rm, fontDictRef, &dict)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	E := dict.MakeFont()
-
-	return fontDictRef, E, nil
+	return dict.MakeFont(), nil
 }

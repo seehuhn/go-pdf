@@ -18,6 +18,9 @@ package type3
 
 import (
 	"errors"
+	"fmt"
+	"math"
+	"strconv"
 
 	"seehuhn.de/go/postscript/type1/names"
 
@@ -28,6 +31,11 @@ import (
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/encoding/simpleenc"
+	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/graphics"
 )
 
@@ -90,12 +98,10 @@ type Glyph struct {
 	Draw func(*graphics.Writer) error
 }
 
-var _ interface {
-	font.Layouter
-} = (*Instance)(nil)
+var _ font.Layouter = (*instance)(nil)
 
-// Instance represents a Type 3 font instance ready for embedding.
-type Instance struct {
+// instance represents a Type 3 font instance ready for embedding.
+type instance struct {
 	// Font is the underlying Type 3 font definition.
 	Font *Font
 
@@ -103,10 +109,12 @@ type Instance struct {
 	CMap map[rune]glyph.ID
 
 	*font.Geometry
+
+	*simpleenc.Simple
 }
 
 // New creates a new Type 3 font instance from a font definition.
-func New(f *Font) (*Instance, error) {
+func (f *Font) New() (font.Layouter, error) {
 	if len(f.Glyphs) == 0 || f.Glyphs[0].Name != "" {
 		return nil, errors.New("invalid glyph 0")
 	}
@@ -137,21 +145,35 @@ func New(f *Font) (*Instance, error) {
 		Widths:             ww,
 	}
 
-	res := &Instance{
+	// Initialize encoding state - Type3 fonts are always simple fonts
+	notdefWidth := math.Round(ww[0] * 1000)
+	simple := simpleenc.NewSimple(
+		notdefWidth,
+		f.PostScriptName,
+		&pdfenc.WinAnsi,
+	)
+
+	res := &instance{
 		Font:     f,
 		CMap:     cmap,
 		Geometry: geom,
+		Simple:   simple,
 	}
 	return res, nil
 }
 
+// ToTextSpace converts a value from glyph space to text space.
+func (f *instance) ToTextSpace(x float64) float64 {
+	return x * f.Font.FontMatrix[0]
+}
+
 // PostScriptName returns the PostScript name of the font.
-func (f *Instance) PostScriptName() string {
+func (f *instance) PostScriptName() string {
 	return f.Font.PostScriptName
 }
 
 // Layout converts a string to a sequence of positioned glyphs.
-func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
+func (f *instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
 	if seq == nil {
 		seq = &font.GlyphSeq{}
 	}
@@ -172,14 +194,152 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 	return seq
 }
 
+// FontInfo returns information about the font file.
+func (f *instance) FontInfo() any {
+	return &dict.FontInfoSimple{
+		PostScriptName: f.Font.PostScriptName,
+		FontFile:       &glyphdata.Stream{},
+		Encoding:       f.Simple.Encoding(),
+		IsSymbolic:     f.Simple.IsSymbolic(),
+	}
+}
+
+// Encode converts a glyph ID to a character code.
+func (f *instance) Encode(gid glyph.ID, width float64, text string) (charcode.Code, bool) {
+	if c, ok := f.Simple.GetCode(gid, text); ok {
+		return charcode.Code(c), true
+	}
+
+	// Allocate new code
+	glyphName := f.Font.Glyphs[gid].Name
+	if width <= 0 {
+		width = math.Round(f.Font.Glyphs[gid].Width)
+	}
+
+	c, err := f.Simple.Encode(gid, glyphName, text, width)
+	return charcode.Code(c), err == nil
+}
+
 // Embed implements the pdf.Embedder interface for Type 3 fonts.
-func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
+func (f *instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	if len(f.Font.Glyphs) == 0 || f.Font.Glyphs[0].Name != "" {
-		return nil, nil, errors.New("invalid glyph 0")
+		return nil, pdf.Unused{}, errors.New("invalid glyph 0")
 	}
 
 	ref := rm.Alloc()
-	res := newEmbeddedSimple(ref, f.Font)
-	rm.Defer(res.finish)
-	return ref, res, nil
+	rm.Defer(func(eh *pdf.EmbedHelper) error {
+		dict, err := f.makeFontDict(eh)
+		if err != nil {
+			return err
+		}
+		_, _, err = pdf.EmbedHelperEmbedAt(eh, ref, dict)
+		return err
+	})
+	return ref, pdf.Unused{}, nil
+}
+
+// makeFontDict creates the Type 3 font dictionary for embedding.
+func (f *instance) makeFontDict(rm *pdf.EmbedHelper) (*dict.Type3, error) {
+	if err := f.Simple.Error(); err != nil {
+		return nil, fmt.Errorf("Type3 font: %w", err)
+	}
+
+	glyphs := f.Simple.Glyphs()
+
+	// Write the glyphs first, so that we can construct the resources
+	// dictionary. Here we use a common builder for all glyphs, so that a
+	// common resources dictionary for the whole font can be accumulated.
+	//
+	// TODO(voss):
+	//   - consider the discussion at
+	//     https://pdf-issues.pdfa.org/32000-2-2020/clause07.html#H7.8.3
+	//   - check where different PDF versions put the Resources dictionary
+	//   - make it configurable whether to use per-glyph resource dictionaries?
+	page := graphics.NewWriter(nil, rm.GetRM())
+	charProcs := make(map[pdf.Name]pdf.Reference)
+	for _, gid := range glyphs {
+		g := f.Font.Glyphs[gid]
+		if g.Name == "" {
+			continue
+		}
+		gRef := rm.Alloc()
+
+		charProcs[pdf.Name(g.Name)] = gRef
+
+		stm, err := rm.Out().OpenStream(gRef, nil, pdf.FilterCompress{})
+		if err != nil {
+			return nil, err
+		}
+		page.NewStream(stm)
+
+		// TODO(voss): move "d0" and "d1" to the graphics package, and restrict
+		// the list of allowed operators depending on the choice.
+		if g.Color {
+			fmt.Fprintf(stm, "%s 0 d0\n", format(g.Width))
+		} else {
+			fmt.Fprintf(stm,
+				"%s 0 %s %s %s %s d1\n",
+				format(g.Width),
+				format(g.BBox.LLx),
+				format(g.BBox.LLy),
+				format(g.BBox.URx),
+				format(g.BBox.URy))
+		}
+		if g.Draw != nil {
+			err = g.Draw(page)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if page.Err != nil {
+			return nil, page.Err
+		}
+		err = stm.Close()
+		if err != nil {
+			return nil, err
+		}
+	}
+	resources := page.Resources
+
+	italicAngle := math.Round(f.Font.ItalicAngle*10) / 10
+
+	fd := &font.Descriptor{
+		FontName:     f.Font.PostScriptName,
+		FontFamily:   f.Font.FontFamily,
+		FontStretch:  f.Font.FontStretch,
+		FontWeight:   f.Font.FontWeight,
+		IsFixedPitch: f.Font.IsFixedPitch,
+		IsSerif:      f.Font.IsSerif,
+		IsSymbolic:   f.Simple.IsSymbolic(),
+		IsScript:     f.Font.IsScript,
+		IsItalic:     italicAngle != 0,
+		IsAllCap:     f.Font.IsAllCap,
+		IsSmallCap:   f.Font.IsSmallCap,
+		ItalicAngle:  italicAngle,
+		Ascent:       f.Font.Ascent,
+		Descent:      f.Font.Descent,
+		Leading:      f.Font.Leading,
+		CapHeight:    f.Font.CapHeight,
+		XHeight:      f.Font.XHeight,
+		StemV:        -1,
+		MissingWidth: f.Simple.DefaultWidth(),
+	}
+	dict := &dict.Type3{
+		Descriptor: fd,
+		Encoding:   f.Simple.Encoding(),
+		CharProcs:  charProcs,
+		// FontBBox:   &pdf.Rectangle{},
+		FontMatrix: f.Font.FontMatrix,
+		Resources:  resources,
+		ToUnicode:  f.Simple.ToUnicode(f.Font.PostScriptName),
+	}
+	for c, info := range f.Simple.MappedCodes() {
+		dict.Width[c] = info.Width
+	}
+
+	return dict, nil
+}
+
+func format(x float64) string {
+	return strconv.FormatFloat(x, 'f', -1, 64)
 }

@@ -23,13 +23,21 @@ import (
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/funit"
+	"seehuhn.de/go/postscript/psenc"
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/os2"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/encoding/simpleenc"
+	"seehuhn.de/go/pdf/font/glyphdata/type1glyphs"
+	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/pdf/font/subset"
 )
 
 // Instance is a Type 1 font instance which can be embedded into a PDF file.
@@ -58,6 +66,8 @@ type Instance struct {
 	lig  map[glyph.Pair]glyph.ID
 	kern map[glyph.Pair]funit.Int16
 	cmap map[rune]glyph.ID
+
+	*simpleenc.Simple
 }
 
 var _ font.Layouter = (*Instance)(nil)
@@ -75,7 +85,12 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 	widths := make([]float64, len(glyphNames))
 	extents := make([]rect.Rect, len(glyphNames))
 	for i, name := range glyphNames {
-		widths[i] = psFont.GlyphWidthPDF(name) / 1000
+		// Use metrics for width if available, to match GlyphWidthPDF behavior
+		if metrics != nil {
+			widths[i] = metrics.GlyphWidthPDF(name) / 1000
+		} else {
+			widths[i] = psFont.GlyphWidthPDF(name) / 1000
+		}
 		extents[i] = psFont.GlyphBBoxPDF(name)
 	}
 	geometry.UnderlinePosition = float64(psFont.FontInfo.UnderlinePosition) * psFont.FontMatrix[3]
@@ -125,6 +140,14 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 		cmap[r] = glyph.ID(gid)
 	}
 
+	// Initialize encoding state - Type1 fonts are always simple fonts
+	notdefWidth := math.Round(widths[0] * 1000)
+	simple := simpleenc.NewSimple(
+		notdefWidth,
+		psFont.FontName,
+		&pdfenc.WinAnsi,
+	)
+
 	return &Instance{
 		Font:       psFont,
 		Metrics:    metrics,
@@ -133,6 +156,7 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 		lig:        lig,
 		kern:       kern,
 		cmap:       cmap,
+		Simple:     simple,
 	}, nil
 }
 
@@ -155,12 +179,38 @@ func isConsistent(F *type1.Font, M *afm.Metrics) bool {
 	return true
 }
 
-// PostScriptName returns the PostScript name of the font.
+// GetName returns the PostScript name of the font.
 func (f *Instance) PostScriptName() string {
 	if f.Metrics != nil {
 		return f.Metrics.FontName
 	}
 	return f.Font.FontInfo.FontName
+}
+
+// FontInfo returns information about the font file.
+func (f *Instance) FontInfo() any {
+	dict, err := f.makeFontDict()
+	if err != nil {
+		return nil
+	}
+	return dict.FontInfo()
+}
+
+// Encode converts a glyph ID to a character code.
+func (f *Instance) Encode(gid glyph.ID, width float64, text string) (charcode.Code, bool) {
+	if c, ok := f.Simple.GetCode(gid, text); ok {
+		return charcode.Code(c), true
+	}
+
+	// Allocate new code
+	glyphName := f.GlyphNames[gid]
+	glyphWidth := math.Round(f.GlyphWidthPDF(glyphName))
+	if width > 0 {
+		glyphWidth = width
+	}
+
+	c, err := f.Simple.Encode(gid, glyphName, text, glyphWidth)
+	return charcode.Code(c), err == nil
 }
 
 // Layout implements the [font.Layouter] interface.
@@ -203,6 +253,7 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 	return seq
 }
 
+// GlyphWidthPDF returns the width of the given glyph in PDF glyph space units.
 func (f *Instance) GlyphWidthPDF(glyphName string) float64 {
 	if f.Metrics != nil {
 		return f.Metrics.GlyphWidthPDF(glyphName)
@@ -213,12 +264,115 @@ func (f *Instance) GlyphWidthPDF(glyphName string) float64 {
 
 // Embed adds the font to a PDF file.
 //
-// This implements the [font.Font] interface.
-func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
+// This implements the [font.Instance] interface.
+func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	ref := rm.Alloc()
-	res := newEmbeddedSimple(ref, f)
-	rm.Defer(res.finish)
-	return ref, res, nil
+	rm.Defer(func(eh *pdf.EmbedHelper) error {
+		dict, err := f.makeFontDict()
+		if err != nil {
+			return err
+		}
+		_, _, err = pdf.EmbedHelperEmbedAt(eh, ref, dict)
+		return err
+	})
+	return ref, pdf.Unused{}, nil
+}
+
+func (f *Instance) makeFontDict() (*dict.Type1, error) {
+	if err := f.Simple.Error(); err != nil {
+		return nil, pdf.Errorf("font %q: %w", f.Font.FontName, err)
+	}
+
+	fontData := f.Font
+	metricsData := f.Metrics
+
+	var numGlyphs int
+	var postScriptName string
+	if metricsData != nil {
+		numGlyphs = metricsData.NumGlyphs()
+		postScriptName = metricsData.FontName
+	} else {
+		numGlyphs = fontData.NumGlyphs()
+		postScriptName = fontData.FontName
+	}
+
+	omitFontData := isStandard(postScriptName, f.Simple)
+
+	glyphs := f.Simple.Glyphs()
+	subsetTag := subset.Tag(glyphs, numGlyphs)
+
+	fontSubset := fontData
+	metricsSubset := metricsData
+	if omitFontData {
+		// only subset the font, if the font is embedded
+		subsetTag = ""
+	} else if subsetTag != "" {
+		if fontData != nil {
+			fontSubset = clone(fontData)
+			fontSubset.Outlines = clone(fontData.Outlines)
+			fontSubset.Glyphs = make(map[string]*type1.Glyph)
+			for _, gid := range glyphs {
+				glyphName := f.GlyphNames[gid]
+				if g, ok := fontData.Glyphs[glyphName]; ok {
+					fontSubset.Glyphs[glyphName] = g
+				}
+			}
+			fontSubset.Encoding = psenc.StandardEncoding[:]
+		}
+
+		if metricsData != nil {
+			metricsSubset := clone(metricsData)
+			metricsSubset.Glyphs = make(map[string]*afm.GlyphInfo)
+			for _, gid := range glyphs {
+				glyphName := f.GlyphNames[gid]
+				if g, ok := metricsData.Glyphs[glyphName]; ok {
+					metricsSubset.Glyphs[glyphName] = g
+				}
+			}
+			metricsSubset.Encoding = psenc.StandardEncoding[:]
+		}
+	}
+
+	fd := &font.Descriptor{
+		FontName:   subset.Join(subsetTag, postScriptName),
+		IsSerif:    f.IsSerif,
+		IsSymbolic: f.Simple.IsSymbolic(),
+	}
+	if fontSubset != nil {
+		fd.FontFamily = fontSubset.FamilyName
+		fd.FontWeight = os2.WeightFromString(fontSubset.Weight)
+		fd.FontBBox = fontSubset.FontBBoxPDF().Rounded()
+		fd.IsItalic = fontSubset.ItalicAngle != 0
+		fd.ItalicAngle = fontSubset.ItalicAngle
+		fd.IsFixedPitch = fontSubset.IsFixedPitch
+		fd.ForceBold = fontSubset.Private.ForceBold
+		fd.StemV = fontSubset.Private.StdVW
+		fd.StemH = fontSubset.Private.StdHW
+	}
+	if metricsSubset != nil {
+		fd.FontBBox = metricsSubset.FontBBoxPDF().Rounded()
+		fd.CapHeight = math.Round(metricsSubset.CapHeight)
+		fd.XHeight = math.Round(metricsSubset.XHeight)
+		fd.Ascent = math.Round(metricsSubset.Ascent)
+		fd.Descent = math.Round(metricsSubset.Descent)
+		fd.IsItalic = metricsSubset.ItalicAngle != 0
+		fd.ItalicAngle = metricsSubset.ItalicAngle
+		fd.IsFixedPitch = metricsSubset.IsFixedPitch
+	}
+	dict := &dict.Type1{
+		PostScriptName: postScriptName,
+		SubsetTag:      subsetTag,
+		Descriptor:     fd,
+		Encoding:       f.Simple.Encoding(),
+		ToUnicode:      f.Simple.ToUnicode(postScriptName),
+	}
+	for c, info := range f.Simple.MappedCodes() {
+		dict.Width[c] = info.Width
+	}
+	if !omitFontData {
+		dict.FontFile = type1glyphs.ToStream(fontSubset)
+	}
+	return dict, nil
 }
 
 func clone[T any](x *T) *T {

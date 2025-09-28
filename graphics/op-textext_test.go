@@ -26,7 +26,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics/testcases"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 	"seehuhn.de/go/pdf/internal/ghostscript"
@@ -162,6 +161,7 @@ func TestTextShowRaw2(t *testing.T) {
 			var s pdf.String
 
 			F := sample.MakeFont()
+			codec := F.Codec()
 
 			// First print glyphs one-by-one and record the x positions.
 			var xx []float64
@@ -170,15 +170,13 @@ func TestTextShowRaw2(t *testing.T) {
 				r.TextBegin()
 				r.TextFirstLine(10, 10)
 
-				_, E, err := pdf.ResourceManagerEmbed(r.RM, F)
-				if err != nil {
-					return err
-				}
-
 				for _, g := range r.TextLayout(nil, testString).Seq {
 					xx = append(xx, r.TextMatrix[4])
-					s, _ = E.(font.EmbeddedLayouter).AppendEncoded(s[:0], g.GID, string(g.Text))
-
+					code, ok := F.Encode(g.GID, g.Advance, string(g.Text))
+					if !ok {
+						t.Fatalf("cannot encode glyph ID %d (%q)", g.GID, g.Text)
+					}
+					s = codec.AppendCode(s[:0], code)
 					r.TextShowRaw(s)
 				}
 				r.TextEnd()
@@ -189,15 +187,14 @@ func TestTextShowRaw2(t *testing.T) {
 			img2 := ghostscript.Render(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
 				r.TextSetFont(F, fontSize)
 
-				_, E, err := pdf.ResourceManagerEmbed(r.RM, F)
-				if err != nil {
-					return err
-				}
-
 				for i, g := range r.TextLayout(nil, testString).Seq {
 					r.TextBegin()
 					r.TextFirstLine(xx[i], 10)
-					s, _ = E.(font.EmbeddedLayouter).AppendEncoded(s[:0], g.GID, string(g.Text))
+					code, ok := F.Encode(g.GID, g.Advance, string(g.Text))
+					if !ok {
+						t.Fatalf("cannot encode glyph ID %d (%q)", g.GID, g.Text)
+					}
+					s = codec.AppendCode(s[:0], code)
 					r.TextShowRaw(s)
 					r.TextEnd()
 				}

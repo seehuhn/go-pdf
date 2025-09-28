@@ -218,3 +218,9 @@ func (e *compositeUTF8) ToUnicode() *cmap.ToUnicodeFile {
 
 	return toUnicode
 }
+
+func (e *compositeUTF8) CodesRemaining() int {
+	const num_surrogates = 0xDFFF - 0xD800 + 1
+	const num_range = 0x10_FFFF - 0x00_0000 + 1
+	return num_range - num_surrogates - len(e.info)
+}

@@ -60,8 +60,9 @@ const (
 	MonoItalic                  // Go Mono Italic
 )
 
-// New returns a new font instance for the given Go font and options.
-func (f Font) New(opt *truetype.Options) (*truetype.Instance, error) {
+// NewSimple returns a new simple font instance for the given Go font and options.
+// Simple fonts can encode up to 256 glyphs and are suitable for basic text.
+func (f Font) NewSimple(opt *truetype.OptionsSimple) (*truetype.Simple, error) {
 	data, ok := ttf[f]
 	if !ok {
 		return nil, fmt.Errorf("gofont: unknown font %d", f)
@@ -72,7 +73,28 @@ func (f Font) New(opt *truetype.Options) (*truetype.Instance, error) {
 		return nil, fmt.Errorf("gofont: %w", err)
 	}
 
-	F, err := truetype.New(info, opt)
+	F, err := truetype.NewSimple(info, opt)
+	if err != nil {
+		return nil, fmt.Errorf("gofont: %w", err)
+	}
+
+	return F, nil
+}
+
+// NewComposite returns a new composite font instance for the given Go font and options.
+// Composite fonts can encode the full Unicode range and are suitable for complex text.
+func (f Font) NewComposite(opt *truetype.OptionsComposite) (*truetype.Composite, error) {
+	data, ok := ttf[f]
+	if !ok {
+		return nil, fmt.Errorf("gofont: unknown font %d", f)
+	}
+
+	info, err := sfnt.Read(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("gofont: %w", err)
+	}
+
+	F, err := truetype.NewComposite(info, opt)
 	if err != nil {
 		return nil, fmt.Errorf("gofont: %w", err)
 	}

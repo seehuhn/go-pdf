@@ -42,7 +42,8 @@ type FontInfoSimple struct {
 	IsSymbolic bool
 }
 
-// FontInfoCID holds information about a CID-keyed font.
+// FontInfoCID holds information about a CID-keyed font,
+// used for Type 0 CIDFonts.
 type FontInfoCID struct {
 	// PostScriptName is the PostScript name of the font.
 	PostScriptName string

@@ -45,16 +45,15 @@ func createDocument(fname string) error {
 	}
 
 	cffFont := makefont.OpenType()
-	fontOpt := &cff.Options{
+	fontOpt := &cff.OptionsComposite{
 		Language:    language.German,
-		Composite:   true,
 		MakeEncoder: cidenc.NewCompositeUtf8,
 	}
-	F1, err := cff.New(cffFont, fontOpt)
+	F1, err := cff.NewComposite(cffFont, fontOpt)
 	if err != nil {
 		return err
 	}
-	F2, err := cff.New(cffFont, nil)
+	F2, err := cff.NewSimple(cffFont, nil)
 	if err != nil {
 		return err
 	}

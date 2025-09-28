@@ -318,7 +318,7 @@ func (d *Type3) FontInfo() any {
 // MakeFont returns a new font object that can be used to typeset text.
 // The font is immutable, i.e. no new glyphs can be added and no new codes
 // can be defined via the returned font object.
-func (d *Type3) MakeFont() font.FromFile {
+func (d *Type3) MakeFont() font.Instance {
 	textMap := simpleTextMap("", d.Encoding, d.ToUnicode)
 	return &t3Font{
 		Dict: d,
@@ -327,7 +327,7 @@ func (d *Type3) MakeFont() font.FromFile {
 }
 
 var (
-	_ font.FromFile = &t3Font{}
+	_ font.Instance = &t3Font{}
 )
 
 type t3Font struct {
@@ -335,13 +335,13 @@ type t3Font struct {
 	Text map[byte]string
 }
 
-func (f *t3Font) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
+func (f *t3Font) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	ref := rm.Alloc()
 	_, _, err := pdf.EmbedHelperEmbedAt(rm, ref, f.Dict)
 	if err != nil {
-		return nil, nil, err
+		return nil, pdf.Unused{}, err
 	}
-	return ref, f, nil
+	return ref, pdf.Unused{}, nil
 }
 
 func (f *t3Font) PostScriptName() string {
@@ -350,6 +350,16 @@ func (f *t3Font) PostScriptName() string {
 
 func (f *t3Font) GetDict() font.Dict {
 	return f.Dict
+}
+
+// Codec returns the codec for the encoding used by this font.
+func (f *t3Font) Codec() *charcode.Codec {
+	return f.Dict.Codec()
+}
+
+// FontInfo returns information required to load the font file.
+func (f *t3Font) FontInfo() any {
+	return f.Dict.FontInfo()
 }
 
 func (*t3Font) WritingMode() font.WritingMode {

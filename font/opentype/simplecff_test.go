@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
@@ -35,7 +34,7 @@ func TestEmbedSimple(t *testing.T) {
 			rm := pdf.NewResourceManager(w)
 
 			fontData := makefont.OpenType()
-			fontInstance, err := opentype.New(fontData, nil)
+			fontInstance, err := opentype.NewSimple(fontData, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -44,15 +43,12 @@ func TestEmbedSimple(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			e2, ok := e.(font.EmbeddedLayouter)
-			if !ok {
-				t.Fatal("does not implement font.EmbeddedLayouter")
-			}
+			_ = e // e should be pdf.Unused{}
 
 			// make sure a few glyphs are included and encoded
 			gg := fontInstance.Layout(nil, 12, "Hello")
 			for _, g := range gg.Seq {
-				e2.AppendEncoded(nil, g.GID, string(g.Text))
+				_, _ = fontInstance.Encode(g.GID, 0, string(g.Text))
 			}
 
 			err = rm.Close()

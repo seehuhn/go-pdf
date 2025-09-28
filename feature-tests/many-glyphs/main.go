@@ -67,7 +67,7 @@ func createDocument(fname string) error {
 	return doc.Close()
 }
 
-func drawPage(H font.Font, nRow int, page *document.Page, F font.Layouter, desc string) {
+func drawPage(H font.Instance, nRow int, page *document.Page, F font.Layouter, desc string) {
 	paper := &pdf.Rectangle{URx: 10 + 16*20, URy: 5 + float64(nRow)*20 + 15}
 	page.SetPageSize(paper)
 

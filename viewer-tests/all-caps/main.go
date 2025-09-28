@@ -72,8 +72,13 @@ func createDocument(filename string) error {
 		Color: color.DeviceGray(0.1),
 	}
 
+	testFont, err := makeTestFont()
+	if err != nil {
+		return err
+	}
+
 	test := text.F{
-		Font:  testFont{},
+		Font:  testFont,
 		Size:  24,
 		Color: color.DeviceRGB(0, 0, 0.7),
 	}
@@ -95,14 +100,7 @@ func createDocument(filename string) error {
 	return nil
 }
 
-type testFont struct{}
-
-func (testFont) PostScriptName() string {
-	return "Test"
-}
-
-func (testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
-	fontDictRef := rm.Alloc()
+func makeTestFont() (font.Instance, error) {
 	fontType := glyphdata.TrueType
 
 	numCID := 34 + 26
@@ -112,11 +110,11 @@ func (testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
 	// Create a TrueType font with the required subset of glyphs.
 	origFont, err := sfnt.Read(bytes.NewReader(goregular.TTF))
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	cmapTable, err := origFont.CMapTable.GetBest()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	var subsetGlyphs []glyph.ID
 	// CID 0 = .notdef
@@ -202,12 +200,5 @@ func (testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
 		FontFile:        sfntglyphs.ToStream(subsetFont, fontType),
 	}
 
-	_, _, err = pdf.EmbedHelperEmbedAt(rm, fontDictRef, dict)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	E := dict.MakeFont()
-
-	return fontDictRef, E, nil
+	return dict.MakeFont(), nil
 }

@@ -86,11 +86,9 @@ func createDocument(filename string) error {
 		},
 		FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},
 	}
-	M := &type3.Instance{
-		Font: markerFont,
-		CMap: map[rune]glyph.ID{
-			'I': 1,
-		},
+	M, err := markerFont.New()
+	if err != nil {
+		return err
 	}
 
 	gid := glyph.ID(0)

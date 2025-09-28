@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"iter"
 	"math"
 	"os"
 
@@ -69,7 +70,7 @@ func createDocument(fname string) error {
 	noteFont := standard.TimesRoman.New()
 	note := text.F{Font: noteFont, Size: fontSize, Color: black}
 
-	origFont, err := cff.New(data.origFont, nil)
+	origFont, err := cff.NewSimple(data.origFont, nil)
 	if err != nil {
 		return err
 	}
@@ -313,8 +314,6 @@ func rescaleGlyph(g *sfntcff.Glyph, xScale, yScale float64) *sfntcff.Glyph {
 	return new
 }
 
-var _ font.Font = (*testFont)(nil)
-
 type testFont struct {
 	cff       *sfntcff.Font
 	ascent    float64 // PDF glyph space units
@@ -323,12 +322,31 @@ type testFont struct {
 	cmap      *cmap.File
 }
 
+var _ font.Instance = (*testFont)(nil)
+
 func (f *testFont) PostScriptName() string {
 	return f.cff.FontName
 }
 
-func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
-	fontDictRef := rm.Alloc()
+func (f *testFont) WritingMode() font.WritingMode {
+	return font.Horizontal
+}
+
+// Codec returns the codec for the encoding used by this font.
+func (f *testFont) Codec() *charcode.Codec {
+	return charcode.SimpleCodec
+}
+
+func (f *testFont) Codes(s pdf.String) iter.Seq[*font.Code] {
+	panic("not implemented")
+}
+
+func (f *testFont) FontInfo() any {
+	panic("not implemented")
+}
+
+func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
 
 	fd := &font.Descriptor{
 		FontName:   f.cff.FontName,
@@ -356,14 +374,12 @@ func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error)
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
 		FontFile:        cffglyphs.ToStream(f.cff, glyphdata.CFF),
 	}
-	_, _, err := pdf.EmbedHelperEmbedAt(rm, fontDictRef, dicts)
+	fontDictRef, _, err := pdf.EmbedHelperEmbed(rm, dicts)
 	if err != nil {
-		return nil, nil, err
+		return nil, zero, err
 	}
 
-	E := dicts.MakeFont()
-
-	return fontDictRef, E, nil
+	return fontDictRef, zero, nil
 }
 
 func clone[T any](x *T) *T {

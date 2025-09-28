@@ -75,8 +75,13 @@ func createDocument(fname string) error {
 		Color: color.DeviceGray(0.1),
 	}
 
+	F, err := makeTestFont()
+	if err != nil {
+		return err
+	}
+
 	test := text.F{
-		Font:  testFont{},
+		Font:  F,
 		Size:  24,
 		Color: color.DeviceRGB(0, 0, 0.7),
 	}
@@ -98,16 +103,7 @@ func createDocument(fname string) error {
 	return nil
 }
 
-type testFont struct{}
-
-func (testFont) PostScriptName() string {
-	return "Test"
-}
-
-func (testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
-	fontDictRef := rm.Alloc()
-	fontType := glyphdata.TrueType
-
+func makeTestFont() (font.Instance, error) {
 	numCID := 34 + 3
 	cidToGID := make([]glyph.ID, numCID)
 	width := map[cmap.CID]float64{}
@@ -115,11 +111,11 @@ func (testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
 	// Create a TrueType font with the required subset of glyphs.
 	origFont, err := sfnt.Read(bytes.NewReader(goregular.TTF))
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	cmapTable, err := origFont.CMapTable.GetBest()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	var subsetGlyphs []glyph.ID
 	// CID 0 = .notdef
@@ -193,14 +189,8 @@ func (testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
 		DefaultWidth:    width[0],
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
 		CIDToGID:        cidToGID,
-		FontFile:        sfntglyphs.ToStream(subsetFont, fontType),
+		FontFile:        sfntglyphs.ToStream(subsetFont, glyphdata.TrueType),
 	}
 
-	_, _, err = pdf.EmbedHelperEmbedAt(rm, fontDictRef, dict)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	E := dict.MakeFont()
-	return fontDictRef, E, nil
+	return dict.MakeFont(), nil
 }

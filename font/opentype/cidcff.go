@@ -17,6 +17,7 @@
 package opentype
 
 import (
+	"errors"
 	"math"
 	"slices"
 
@@ -33,119 +34,199 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding/cidenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
-	"seehuhn.de/go/pdf/font/glyphdata/sfntglyphs"
+	"seehuhn.de/go/pdf/font/glyphdata/cffglyphs"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 )
 
-var _ interface {
-	font.EmbeddedLayouter
-	font.Embedded
-} = (*embeddedCFFComposite)(nil)
+// CompositeCFF represents a composite OpenType font with CFF outlines.
+// This implements the font.Layouter interface.
+type CompositeCFF struct {
+	*sfnt.Font
 
-type embeddedCFFComposite struct {
-	Ref  pdf.Reference
-	Font *sfnt.Font
+	*font.Geometry
+	layouter *sfnt.Layouter
 
-	cmap.GIDToCID
+	gidToCID cmap.GIDToCID
 	cidenc.CIDEncoder
-
-	finished bool
+	usedCIDs map[cid.CID]struct{}
 }
 
-func newEmbeddedCFFComposite(ref pdf.Reference, f *Instance) *embeddedCFFComposite {
-	opt := f.Opt
-	if opt == nil {
-		opt = &Options{}
+var _ font.Layouter = (*CompositeCFF)(nil)
+
+// newCompositeCFF creates a composite OpenType font with CFF outlines.
+func newCompositeCFF(info *sfnt.Font, opt *OptionsComposite) (*CompositeCFF, error) {
+	if !info.IsCFF() {
+		return nil, errors.New("no CFF outlines in font")
+	}
+
+	geom := &font.Geometry{
+		Ascent:             float64(info.Ascent) * info.FontMatrix[3],
+		Descent:            float64(info.Descent) * info.FontMatrix[3],
+		Leading:            float64(info.Ascent-info.Descent+info.LineGap) * info.FontMatrix[3],
+		UnderlinePosition:  float64(info.UnderlinePosition) * info.FontMatrix[3],
+		UnderlineThickness: float64(info.UnderlineThickness) * info.FontMatrix[3],
+
+		GlyphExtents: scaleBoxesCFF(info.GlyphBBoxes(), info.FontMatrix[:]),
+		Widths:       info.WidthsPDF(),
+	}
+
+	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
+	if err != nil {
+		return nil, err
 	}
 
 	makeGIDToCID := cmap.NewGIDToCIDSequential
 	if opt.MakeGIDToCID != nil {
 		makeGIDToCID = opt.MakeGIDToCID
 	}
-	gidToCID := makeGIDToCID()
-
 	makeEncoder := cidenc.NewCompositeIdentity
 	if opt.MakeEncoder != nil {
 		makeEncoder = opt.MakeEncoder
 	}
-	notdefWidth := math.Round(f.Font.GlyphWidthPDF(0))
-	encoder := makeEncoder(notdefWidth, opt.WritingMode)
+	notdefWidth := math.Round(info.GlyphWidthPDF(0))
 
-	e := &embeddedCFFComposite{
-		Ref:  ref,
-		Font: f.Font,
+	f := &CompositeCFF{
+		Font: info,
 
-		GIDToCID:   gidToCID,
-		CIDEncoder: encoder,
-	}
-	return e
-}
+		Geometry: geom,
+		layouter: layouter,
 
-func (e *embeddedCFFComposite) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
-	cid := e.GIDToCID.CID(gid, []rune(text))
-	c, ok := e.CIDEncoder.GetCode(cid, text)
-	if !ok {
-		if e.finished {
-			return s, 0
-		}
-
-		width := math.Round(e.Font.GlyphWidthPDF(gid))
-		var err error
-		c, err = e.CIDEncoder.Encode(cid, text, width)
-		if err != nil {
-			return s, 0
-		}
+		gidToCID:   makeGIDToCID(),
+		CIDEncoder: makeEncoder(notdefWidth, opt.WritingMode),
+		usedCIDs:   make(map[cid.CID]struct{}),
 	}
 
-	w := e.CIDEncoder.Width(c)
-	return e.CIDEncoder.Codec().AppendCode(s, c), w / 1000
+	return f, nil
 }
 
-func (e *embeddedCFFComposite) finish(rm *pdf.EmbedHelper) error {
-	if e.finished {
+// FontInfo returns information required to load the font file and to
+// extract the the glyph corresponding to a character identifier. The
+// result is a pointer to one of the FontInfo* types defined in the
+// font/dict package.
+func (f *CompositeCFF) FontInfo() any {
+	dict, _ := f.makeDict()
+	if dict == nil {
 		return nil
 	}
-	e.finished = true
+	return dict.FontInfo()
+}
 
-	origFont := e.Font
-	postScriptName := origFont.PostScriptName()
+// Embed adds the font to a PDF file.
+func (f *CompositeCFF) Embed(e *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+	if err := pdf.CheckVersion(e.Out(), "OpenType fonts", pdf.V1_6); err != nil {
+		return nil, pdf.Unused{}, err
+	}
 
-	origFont = origFont.Clone()
-	origFont.CMapTable = nil
-	origFont.Gdef = nil
-	origFont.Gsub = nil
-	origFont.Gpos = nil
+	ref := e.Alloc()
+	e.Defer(func(rm *pdf.EmbedHelper) error {
+		dict, err := f.makeDict()
+		if err != nil {
+			return err
+		}
+		_, _, err = pdf.EmbedHelperEmbedAt(rm, ref, dict)
+		return err
+	})
+
+	return ref, pdf.Unused{}, nil
+}
+
+// Encode converts a glyph ID to a character code (for use with the
+// instance's codec).  The arguments width and text are hints for choosing
+// an appropriate advance width and text representation for the character
+// code, in case a new code is allocated.
+//
+// The function returns the character code, and a boolean indicating
+// whether the encoding was successful.  If the function returns false, the
+// glyph ID cannot be encoded with this font instance.
+//
+// Use the Codec to append the character code to PDF strings.
+//
+// The given width must be in PDF glyph space units.
+func (f *CompositeCFF) Encode(gid glyph.ID, width float64, text string) (charcode.Code, bool) {
+	cid := f.gidToCID.CID(gid, []rune(text))
+	f.usedCIDs[cid] = struct{}{}
+
+	if c, ok := f.CIDEncoder.GetCode(cid, text); ok {
+		return c, true
+	}
+
+	if width <= 0 {
+		width = math.Round(f.Font.GlyphWidthPDF(gid))
+	}
+	c, err := f.CIDEncoder.Encode(cid, text, width)
+	return c, err == nil
+}
+
+// Layout appends a string to a glyph sequence.
+func (f *CompositeCFF) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
+	if seq == nil {
+		seq = &font.GlyphSeq{}
+	}
+
+	qh := ptSize * f.Font.FontMatrix[0]
+	qv := ptSize * f.Font.FontMatrix[3]
+
+	buf := f.layouter.Layout(s)
+	seq.Seq = slices.Grow(seq.Seq, len(buf))
+	for _, g := range buf {
+		xOffset := float64(g.XOffset) * qh
+		if len(seq.Seq) == 0 {
+			seq.Skip += xOffset
+		} else {
+			seq.Seq[len(seq.Seq)-1].Advance += xOffset
+		}
+		seq.Seq = append(seq.Seq, font.Glyph{
+			GID:     g.GID,
+			Advance: float64(g.Advance) * qh,
+			Rise:    float64(g.YOffset) * qv,
+			Text:    string(g.Text),
+		})
+	}
+	return seq
+}
+
+// makeDict creates the PDF font dictionary for this font.
+func (f *CompositeCFF) makeDict() (*dict.CIDFontType0, error) {
+	// get the CFF font data
+	cffFont := f.Font.AsCFF()
+	if cffFont == nil {
+		return nil, errors.New("no CFF outlines in font")
+	}
+
+	fontInfo := cffFont.FontInfo
+	origOutlines := cffFont.Outlines
+	postScriptName := f.Font.PostScriptName()
 
 	// Subset the font, if needed.
 	// To minimise file size, we arrange the glyphs in order of increasing CID.
 	cidSet := make(map[cid.CID]struct{})
 	cidSet[0] = struct{}{}
-	for _, info := range e.CIDEncoder.MappedCodes() {
-		cidSet[info.CID] = struct{}{}
+	for cidVal := range f.usedCIDs {
+		cidSet[cidVal] = struct{}{}
 	}
 	cidList := maps.Keys(cidSet)
 	slices.Sort(cidList)
 
 	glyphs := make([]glyph.ID, len(cidList))
 	for i, cidVal := range cidList {
-		glyphs[i] = e.GIDToCID.GID(cidVal)
+		glyphs[i] = f.gidToCID.GID(cidVal)
 	}
-	subsetTag := subset.Tag(glyphs, origFont.NumGlyphs())
+	subsetTag := subset.Tag(glyphs, origOutlines.NumGlyphs())
 
-	var subsetFont *sfnt.Font
+	var subsetOutlines *cff.Outlines
 	if subsetTag != "" {
-		subsetFont = origFont.Subset(glyphs)
+		subsetOutlines = origOutlines.Subset(glyphs)
 	} else {
-		subsetFont = origFont
+		subsetOutlines = clone(origOutlines)
 	}
-	subsetOutlines := subsetFont.Outlines.(*cff.Outlines)
 
-	ros := e.ROS()
+	ros := f.gidToCID.ROS()
 
 	// Simple CFF fonts can only have one private dict, and ...
 	canUseSimple := len(subsetOutlines.Private) == 1
@@ -159,7 +240,8 @@ func (e *embeddedCFFComposite) finish(rm *pdf.EmbedHelper) error {
 
 	if canUseSimple { // convert to simple font
 		if len(subsetOutlines.FontMatrices) > 0 && subsetOutlines.FontMatrices[0] != matrix.Identity {
-			subsetFont.FontMatrix = subsetOutlines.FontMatrices[0].Mul(subsetFont.FontMatrix)
+			fontInfo = clone(fontInfo)
+			fontInfo.FontMatrix = subsetOutlines.FontMatrices[0].Mul(fontInfo.FontMatrix)
 		}
 
 		cidToSubsetGID := make(map[cid.CID]glyph.ID)
@@ -167,7 +249,11 @@ func (e *embeddedCFFComposite) finish(rm *pdf.EmbedHelper) error {
 			cidToSubsetGID[CID] = glyph.ID(subsetGID)
 		}
 		glyphText := make(map[glyph.ID]string)
-		for _, info := range e.CIDEncoder.MappedCodes() {
+		for _, info := range f.CIDEncoder.MappedCodes() {
+			// Only include information for CIDs that were actually used
+			if _, used := f.usedCIDs[info.CID]; !used && info.CID != 0 {
+				continue
+			}
 			subsetGID, ok := cidToSubsetGID[info.CID]
 			if !ok {
 				continue
@@ -188,15 +274,23 @@ func (e *embeddedCFFComposite) finish(rm *pdf.EmbedHelper) error {
 		subsetOutlines.MakeCIDKeyed(ros, cidList)
 	}
 
+	subsetFont := &cff.Font{
+		FontInfo: fontInfo,
+		Outlines: subsetOutlines,
+	}
+
 	// construct the font dictionary and font descriptor
-	dw := math.Round(subsetFont.GlyphWidthPDF(0))
-	ww := make(map[cmap.CID]float64)
-	for _, info := range e.CIDEncoder.MappedCodes() {
-		ww[info.CID] = info.Width
+	dw := math.Round(f.Font.GlyphWidthPDF(0))
+	ww := make(map[cid.CID]float64)
+	for _, info := range f.CIDEncoder.MappedCodes() {
+		// Only include information for CIDs that were actually used
+		if _, used := f.usedCIDs[info.CID]; used || info.CID == 0 {
+			ww[info.CID] = info.Width
+		}
 	}
 
 	isSymbolic := false
-	for _, info := range e.CIDEncoder.MappedCodes() {
+	for _, info := range f.CIDEncoder.MappedCodes() {
 		// TODO(voss): if the font is simple, use the existing glyph names?
 		glyphName := names.FromUnicode(info.Text)
 		if !pdfenc.StandardLatin.Has[glyphName] {
@@ -207,24 +301,24 @@ func (e *embeddedCFFComposite) finish(rm *pdf.EmbedHelper) error {
 
 	qh := subsetFont.FontMatrix[0] * 1000 // TODO(voss): is this correct for CID-keyed fonts?
 	qv := subsetFont.FontMatrix[3] * 1000
-	ascent := math.Round(float64(subsetFont.Ascent) * qv)
-	descent := math.Round(float64(subsetFont.Descent) * qv)
-	leading := math.Round(float64(subsetFont.Ascent-subsetFont.Descent+subsetFont.LineGap) * qv)
-	capHeight := math.Round(float64(subsetFont.CapHeight) * qv)
-	xHeight := math.Round(float64(subsetFont.XHeight) * qv)
+	ascent := math.Round(float64(f.Font.Ascent) * qv)
+	descent := math.Round(float64(f.Font.Descent) * qv)
+	leading := math.Round(float64(f.Font.Ascent-f.Font.Descent+f.Font.LineGap) * qv)
+	capHeight := math.Round(float64(f.Font.CapHeight) * qv)
+	xHeight := math.Round(float64(f.Font.XHeight) * qv)
 
-	italicAngle := math.Round(subsetFont.ItalicAngle*10) / 10
+	italicAngle := pdf.Round(subsetFont.ItalicAngle, 1)
 
 	fd := &font.Descriptor{
 		FontName:     subset.Join(subsetTag, postScriptName),
 		FontFamily:   subsetFont.FamilyName,
-		FontStretch:  subsetFont.Width,
-		FontWeight:   subsetFont.Weight,
-		IsFixedPitch: subsetFont.IsFixedPitch(),
-		IsSerif:      subsetFont.IsSerif,
+		FontStretch:  f.Font.Width,
+		FontWeight:   f.Font.Weight,
+		IsFixedPitch: f.Font.IsFixedPitch(),
+		IsSerif:      f.Font.IsSerif,
 		IsSymbolic:   isSymbolic,
-		IsScript:     subsetFont.IsScript,
-		IsItalic:     subsetFont.IsItalic,
+		IsScript:     f.Font.IsScript,
+		IsItalic:     f.Font.IsItalic,
 		ForceBold:    subsetOutlines.Private[0].ForceBold,
 		FontBBox:     subsetFont.FontBBoxPDF().Rounded(),
 		ItalicAngle:  italicAngle,
@@ -237,23 +331,18 @@ func (e *embeddedCFFComposite) finish(rm *pdf.EmbedHelper) error {
 		StemH:        math.Round(subsetOutlines.Private[0].StdHW * qv),
 	}
 
-	dict := &dict.CIDFontType0{
+	fontDict := &dict.CIDFontType0{
 		PostScriptName:  postScriptName,
 		SubsetTag:       subsetTag,
 		Descriptor:      fd,
 		ROS:             ros,
-		CMap:            e.CIDEncoder.CMap(ros),
+		CMap:            f.CIDEncoder.CMap(ros),
 		Width:           ww,
 		DefaultWidth:    dw,
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
-		ToUnicode:       e.CIDEncoder.ToUnicode(),
-		FontFile:        sfntglyphs.ToStream(subsetFont, glyphdata.OpenTypeCFF),
+		ToUnicode:       f.CIDEncoder.ToUnicode(),
+		FontFile:        cffglyphs.ToStream(subsetFont, glyphdata.CFF),
 	}
 
-	_, _, err := pdf.EmbedHelperEmbedAt(rm, e.Ref, dict)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return fontDict, nil
 }

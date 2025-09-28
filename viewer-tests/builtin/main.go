@@ -89,8 +89,8 @@ type fontTables struct {
 
 	used float64 // vertical amount of page space currently used
 
-	titleFont font.Font
-	bodyFont  font.Font
+	titleFont font.Instance
+	bodyFont  font.Instance
 
 	page *document.Page
 

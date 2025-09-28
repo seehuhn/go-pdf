@@ -124,7 +124,7 @@ func TestExtGState(t *testing.T) {
 	}
 
 	// step 3: check that the embedded and read back graphics states are equal
-	cmpFont := cmp.Comparer(func(a, b font.Embedded) bool {
+	cmpFont := cmp.Comparer(func(a, b font.Instance) bool {
 		if a == nil || b == nil {
 			return a == b
 		}

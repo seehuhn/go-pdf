@@ -46,7 +46,7 @@ var _ CIDEncoder = (*fixed)(nil)
 // NewFromCMap creates a CIDEncoder from an existing CMap.
 // This returns an error, if the CMap has an invalid code space range.
 func NewFromCMap(cmap *cmap.File, cid0Width float64) (CIDEncoder, error) {
-	codec, err := charcode.NewCodec(cmap.CodeSpaceRange)
+	codec, err := cmap.Codec()
 	if err != nil {
 		return nil, err
 	}
@@ -218,4 +218,8 @@ func (f *fixed) ToUnicode() *cmap.ToUnicodeFile {
 	// in NewFromCMap, so we will never get an error here.
 	toUnicode, _ := cmap.NewToUnicodeFile(f.cmap.CodeSpaceRange, m)
 	return toUnicode
+}
+
+func (f *fixed) CodesRemaining() int {
+	return 0
 }

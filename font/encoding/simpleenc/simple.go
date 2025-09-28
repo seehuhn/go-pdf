@@ -33,6 +33,7 @@ import (
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
 )
@@ -91,7 +92,7 @@ func NewSimple(notdefWidth float64, fontName string, base *pdfenc.Encoding) *Sim
 	return gd
 }
 
-// WritingMode implements the [font.Embedded] interface.
+// WritingMode implements the [font.EmbeddedOld] interface.
 func (*Simple) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
@@ -342,6 +343,14 @@ func (t *Simple) IsSymbolic() bool {
 		}
 	}
 	return false
+}
+
+func (t *Simple) CodesRemaining() int {
+	return max(256-len(t.info), 0)
+}
+
+func (t *Simple) Codec() *charcode.Codec {
+	return charcode.SimpleCodec
 }
 
 var (

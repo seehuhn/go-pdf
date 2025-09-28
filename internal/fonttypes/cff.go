@@ -58,12 +58,13 @@ func (f cffEmbedder) font() font.Layouter {
 		info = makefont.OpenTypeCID2()
 	}
 
-	var opt *cff.Options
+	var F font.Layouter
+	var err error
 	if f.composite {
-		opt = &cff.Options{Composite: true}
+		F, err = cff.NewComposite(info, nil)
+	} else {
+		F, err = cff.NewSimple(info, nil)
 	}
-
-	F, err := cff.New(info, opt)
 	if err != nil {
 		panic(err)
 	}

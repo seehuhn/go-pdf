@@ -70,7 +70,7 @@ func Show(w *graphics.Writer, args ...any) {
 				w.TextNextLine()
 			}
 		case *wrap:
-			for line := range v.Lines(w.CurrentFont, w.TextFontSize) {
+			for line := range v.Lines(w.TextFont.(font.Layouter), w.TextFontSize) {
 				w.TextShowGlyphs(line)
 				if !leadingSet {
 					w.TextSecondLine(0, -leading)
@@ -103,7 +103,7 @@ type M struct {
 }
 
 type F struct {
-	Font  font.Font
+	Font  font.Instance
 	Size  float64
 	Color color.Color
 }

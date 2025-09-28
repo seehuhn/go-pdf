@@ -20,8 +20,6 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/rect"
 
-	"seehuhn.de/go/sfnt/glyph"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/type3"
@@ -68,7 +66,7 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 	markerFont.Glyphs = append(markerFont.Glyphs, &type3.Glyph{
 		Name:  "x",
 		Width: 0,
-		BBox:  rect.Rect{LLx: -100, LLy: 100, URx: 100, URy: 100},
+		BBox:  rect.Rect{LLx: -100, LLy: -100, URx: 100, URy: 100},
 		Color: true,
 		Draw: func(w *graphics.Writer) error {
 			w.SetFillColor(color.DeviceRGB(1.0, 0, 0))
@@ -85,9 +83,9 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 			return nil
 		},
 	})
-	X := &type3.Instance{
-		Font: markerFont,
-		CMap: map[rune]glyph.ID{'x': 1},
+	X, err := markerFont.New()
+	if err != nil {
+		return 0, 0, err
 	}
 
 	r.Page.TextSetFont(X, 10)

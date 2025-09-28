@@ -54,6 +54,9 @@ type CIDEncoder interface {
 	// Encode assigns a new code to a CID and stores the text and width.
 	Encode(cidVal cid.CID, text string, width float64) (charcode.Code, error)
 
+	// CodesRemaining returns the number of unallocated codes.
+	CodesRemaining() int
+
 	// CMap returns a CMap object which describes the mapping
 	// from character codes to CIDs.
 	CMap(ros *cid.SystemInfo) *cmap.File

@@ -43,27 +43,44 @@ func OpenTypeFile(fname string, opt *Options) (font.Layouter, error) {
 
 // OpenTypeFont embeds an OpenType/TrueType font.
 func OpenTypeFont(info *sfnt.Font, opt *Options) (font.Layouter, error) {
+	if opt == nil {
+		opt = &Options{}
+	}
+
 	var F font.Layouter
 	var err error
 	if info.IsCFF() {
-		var o *cff.Options
-		if opt != nil {
-			o = &cff.Options{
+		if opt.Composite {
+			o := &cff.OptionsComposite{
 				Language:     opt.Language,
 				GsubFeatures: opt.GsubFeatures,
 				GposFeatures: opt.GposFeatures,
-				Composite:    opt.Composite,
 			}
+			F, err = cff.NewComposite(info, o)
+		} else {
+			o := &cff.OptionsSimple{
+				Language:     opt.Language,
+				GsubFeatures: opt.GsubFeatures,
+				GposFeatures: opt.GposFeatures,
+			}
+			F, err = cff.NewSimple(info, o)
 		}
-		F, err = cff.New(info, o)
 	} else {
-		o := &truetype.Options{
-			Language:     opt.Language,
-			GsubFeatures: opt.GsubFeatures,
-			GposFeatures: opt.GposFeatures,
-			Composite:    opt.Composite,
+		if opt.Composite {
+			o := &truetype.OptionsComposite{
+				Language:     opt.Language,
+				GsubFeatures: opt.GsubFeatures,
+				GposFeatures: opt.GposFeatures,
+			}
+			F, err = truetype.NewComposite(info, o)
+		} else {
+			o := &truetype.OptionsSimple{
+				Language:     opt.Language,
+				GsubFeatures: opt.GsubFeatures,
+				GposFeatures: opt.GposFeatures,
+			}
+			F, err = truetype.NewSimple(info, o)
 		}
-		F, err = truetype.New(info, o)
 	}
 	if err != nil {
 		return nil, err

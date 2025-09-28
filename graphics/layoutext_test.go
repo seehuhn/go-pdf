@@ -107,7 +107,7 @@ func TestSpaceAdvance(t *testing.T) {
 	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
 
-	F, err := gofont.Regular.New(nil)
+	F, err := gofont.Regular.NewSimple(nil)
 	if err != nil {
 		t.Fatal(err)
 	}

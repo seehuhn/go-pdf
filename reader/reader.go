@@ -40,7 +40,7 @@ type Reader struct {
 
 	scanner *scanner.Scanner
 
-	fontCache map[pdf.Reference]font.FromFile
+	fontCache map[pdf.Reference]font.Instance
 
 	Resources *pdf.Resources
 	graphics.State
@@ -74,7 +74,7 @@ func New(r pdf.Getter, loader *loader.FontLoader) *Reader {
 
 		scanner: scanner.NewScanner(),
 
-		fontCache: make(map[pdf.Reference]font.FromFile),
+		fontCache: make(map[pdf.Reference]font.Instance),
 	}
 }
 

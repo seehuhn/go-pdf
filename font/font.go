@@ -27,18 +27,23 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// == NEW API=================================================================
-
-type InstanceNew interface {
-	// GetName returns a human-readable name for the font.
+type Instance interface {
+	// PostScriptName returns a human-readable name for the font.
 	// For most font types, this is the PostScript name of the font.
-	GetName() string
+	PostScriptName() string
 
+	// WritingMode returns whether the font is used for horizontal or vertical
+	// writing.
 	WritingMode() WritingMode
 
-	// GetCodec returns the codec for the encoding used by this font.
-	GetCodec() *charcode.Codec
+	// Codec returns the codec for the encoding used by this font.
+	Codec() *charcode.Codec
 
+	// Codes iterates over the character codes in a PDF string, yielding
+	// information about each character code.
+	//
+	// The returned pointer points to memory that is reused across iterations.
+	// The caller must not modify the pointed-to structure.
 	Codes(s pdf.String) iter.Seq[*Code]
 
 	// FontInfo returns information required to load the font file and to
@@ -50,8 +55,8 @@ type InstanceNew interface {
 	pdf.Embedder[pdf.Unused]
 }
 
-type LayouterNew interface {
-	InstanceNew
+type Layouter interface {
+	Instance
 
 	// Encode converts a glyph ID to a character code (for use with the
 	// instance's codec).  The arguments width and text are hints for choosing
@@ -63,11 +68,13 @@ type LayouterNew interface {
 	// glyph ID cannot be encoded with this font instance.
 	//
 	// Use the Codec to append the character code to PDF strings.
+	//
+	// The given width must be in PDF glyph space units.
 	Encode(gid glyph.ID, width float64, text string) (charcode.Code, bool)
 
-	// Capacity returns the number of character codes that can still be
+	// CodesRemaining returns the number of character codes that can still be
 	// allocated in this font instance.
-	Capacity() int
+	CodesRemaining() int
 
 	// Layout appends a string to a glyph sequence.  The string is typeset at
 	// the given point size and the resulting GlyphSeq is returned.
@@ -81,81 +88,6 @@ type LayouterNew interface {
 
 	// IsBlank reports whether the glyph with the given ID is a blank glyph.
 	IsBlank(gid glyph.ID) bool
-}
-
-// == OLD API=================================================================
-
-// Font represents a font instance which can be embedded in a PDF file.
-//
-// This interface implements [pdf.Embedder] and font objects are normally
-// embedded using [pdf.ResourceManagerEmbed].  As a consequence, each font
-// instance is embedded into a PDF file only once.  If more than one embedded
-// copy is required, separate Font instances must be used.
-type Font interface {
-	// PostScriptName returns the PostScript name of the font.
-	PostScriptName() string
-
-	pdf.Embedder[Embedded]
-}
-
-// A Layouter is a font which can typeset new text.
-//
-// Fonts which implement this interface need to contain the following
-// information:
-//   - How to convert characters to Glyph IDs
-//   - Kerning and Ligature information, if applicable
-//   - Global font metrics, e.g. ascent, descent, line height
-//   - Glyph metrics: advance width, bounding box
-type Layouter interface {
-	Font
-
-	// GetGeometry returns font metrics required for typesetting.
-	GetGeometry() *Geometry
-
-	// Layout appends a string to a glyph sequence.  The string is typeset at
-	// the given point size and the resulting GlyphSeq is returned.
-	//
-	// If seq is nil, a new glyph sequence is allocated.  If seq is not
-	// nil, the return value is guaranteed to be equal to seq.
-	Layout(seq *GlyphSeq, ptSize float64, s string) *GlyphSeq
-}
-
-// Embedded represents a font which is already embedded in a PDF file.
-//
-// The functions of this interface provide the information required to
-// keep track of the current text position in a PDF content stream.
-type Embedded interface {
-	WritingMode() WritingMode
-
-	// Codes iterates over the character codes in a PDF string, yielding
-	// information about each character code.
-	//
-	// The returned pointer points to memory that is reused across iterations.
-	// The caller must not modify the pointed-to structure.
-	Codes(s pdf.String) iter.Seq[*Code]
-}
-
-// EmbeddedLayouter is an embedded font which can typeset new text.
-type EmbeddedLayouter interface {
-	Embedded
-
-	// AppendEncoded converts a glyph ID (corresponding to the given text) into
-	// a PDF character code.  The character code is appended to s. The function
-	// returns the new string s and the width of the glyph in PDF text space units
-	// (still to be multiplied by the font size).
-	//
-	// As a side effect, this function may allocate codes for the given
-	// glyph/text combination in the font's encoding.
-	AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64)
-}
-
-// FromFile represents an immutable font read from a PDF file.
-type FromFile interface {
-	Font
-	Embedded
-
-	// GetDict returns the font dictionary of this font.
-	GetDict() Dict
 }
 
 // Dict represents a font dictionary in a PDF file.
@@ -173,7 +105,7 @@ type Dict interface {
 	// MakeFont returns a new font object that can be used to typeset text.
 	// The font is immutable, i.e. no new glyphs can be added and no new codes
 	// can be defined via the returned font object.
-	MakeFont() FromFile
+	MakeFont() Instance
 
 	// FontInfo returns information about the embedded font file.
 	// The information can be used to load the font file and to extract

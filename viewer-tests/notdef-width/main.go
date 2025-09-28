@@ -82,9 +82,12 @@ func createDocument(filename string) error {
 		Color: color.DeviceGray(0.5),
 	}
 
-	testFont := makeTestFont()
+	F, err := makeTestFont()
+	if err != nil {
+		return err
+	}
 	test := text.F{
-		Font:  testFont,
+		Font:  F,
 		Size:  30,
 		Color: color.DeviceRGB(0, 0, 0.8),
 	}
@@ -336,7 +339,7 @@ func circle(page *document.Page, y0 float64, idx int) {
 	page.Circle(x, y, 130*q)
 }
 
-func makeTestFont() *testFont {
+func makeTestFont() (font.Instance, error) {
 	var glyphs []*cff.Glyph
 
 	g := &cff.Glyph{ // CID 0
@@ -414,40 +417,18 @@ func makeTestFont() *testFont {
 		},
 	}
 
-	res := &testFont{
-		data: fontCFF,
-		cmap: cmap,
-		widths: map[cid.CID]float64{
-			0: 500,
-			1: 1000,
-			2: 1500, // glyph present in the font
-			3: 500,
-			4: 1500, // missing glyph
-			5: 1000,
-		},
-		dw: 2000,
+	widths := map[cid.CID]float64{
+		0: 500,
+		1: 1000,
+		2: 1500, // glyph present in the font
+		3: 500,
+		4: 1500, // missing glyph
+		5: 1000,
 	}
-	return res
-}
-
-var _ font.Font = (*testFont)(nil)
-
-type testFont struct {
-	data   *cff.Font
-	cmap   *cmap.File
-	widths map[cid.CID]float64
-	dw     float64
-}
-
-func (f *testFont) PostScriptName() string {
-	return f.data.FontName
-}
-
-func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
-	fontDictRef := rm.Alloc()
+	dw := 2000.0
 
 	fd := &font.Descriptor{
-		FontName:   f.data.FontName,
+		FontName:   fontCFF.FontName,
 		IsSymbolic: true,
 		FontBBox:   rect.Rect{LLx: 0, LLy: 0, URx: 1500, URy: 300},
 		Ascent:     300,
@@ -456,23 +437,17 @@ func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error)
 		StemV:      0,
 	}
 	dict := &dict.CIDFontType0{
-		PostScriptName:  f.data.FontName,
+		PostScriptName:  fontCFF.FontName,
 		Descriptor:      fd,
-		ROS:             f.cmap.ROS,
-		CMap:            f.cmap,
-		Width:           f.widths,
-		DefaultWidth:    f.dw,
+		ROS:             cmap.ROS,
+		CMap:            cmap,
+		Width:           widths,
+		DefaultWidth:    dw,
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
-		FontFile:        cffglyphs.ToStream(f.data, glyphdata.CFF),
-	}
-	_, _, err := pdf.EmbedHelperEmbedAt(rm, fontDictRef, dict)
-	if err != nil {
-		return nil, nil, err
+		FontFile:        cffglyphs.ToStream(fontCFF, glyphdata.CFF),
 	}
 
-	E := dict.MakeFont()
-
-	return fontDictRef, E, nil
+	return dict.MakeFont(), nil
 }
 
 func drawCross(g *cff.Glyph, x, y, r, lw float64) {

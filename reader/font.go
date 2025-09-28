@@ -23,7 +23,7 @@ import (
 )
 
 // readFont extracts a font from a PDF file.
-func (r *Reader) readFont(ref pdf.Object) (F font.FromFile, err error) {
+func (r *Reader) readFont(ref pdf.Object) (F font.Instance, err error) {
 	if ref, ok := ref.(pdf.Reference); ok {
 		if res, ok := r.fontCache[ref]; ok {
 			return res, nil

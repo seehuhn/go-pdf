@@ -17,17 +17,24 @@
 package cff
 
 import (
+	"errors"
 	"fmt"
 	"math"
+	"slices"
+
+	"golang.org/x/text/language"
 
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/rect"
 
+	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/os2"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
@@ -36,17 +43,16 @@ import (
 	"seehuhn.de/go/pdf/font/subset"
 )
 
-var _ interface {
-	font.EmbeddedLayouter
-	font.Embedded
-} = (*embeddedSimple)(nil)
+type OptionsSimple struct {
+	Language     language.Tag
+	GsubFeatures map[string]bool
+	GposFeatures map[string]bool
+}
 
-// embeddedSimple represents an [Instance] which has been embedded in a PDF
-// file if the Composite option is not set.  There should be at most one
-// embeddedSimple for each [Instance] in a PDF file.
-type embeddedSimple struct {
-	Ref  pdf.Reference
-	Font *cff.Font
+// Simple represents a CFF font which can be embedded in a PDF file
+// as a simple font.
+type Simple struct {
+	*cff.Font
 
 	Stretch  os2.Width
 	Weight   os2.Weight
@@ -59,71 +65,186 @@ type embeddedSimple struct {
 	CapHeight float64 // PDF glyph space units
 	XHeight   float64 // PDF glyph space units
 
+	*font.Geometry
+	layouter *sfnt.Layouter
+
 	*simpleenc.Simple
-
-	finished bool
 }
 
-func newEmbeddedSimple(ref pdf.Reference, f *Instance) *embeddedSimple {
-	e := &embeddedSimple{
-		Ref:  ref,
-		Font: f.Font,
+var _ font.Layouter = (*Simple)(nil)
 
-		Stretch:  f.Stretch,
-		Weight:   f.Weight,
-		IsSerif:  f.IsSerif,
-		IsScript: f.IsScript,
-
-		Ascent:    f.Ascent,
-		Descent:   f.Descent,
-		Leading:   f.Leading,
-		CapHeight: f.CapHeight,
-		XHeight:   f.XHeight,
-
-		Simple: simpleenc.NewSimple(
-			math.Round(f.Font.GlyphWidthPDF(0)),
-			f.Font.FontName,
-			&pdfenc.WinAnsi,
-		),
-	}
-	return e
-}
-
-func (e *embeddedSimple) AppendEncoded(s pdf.String, gid glyph.ID, text string) (pdf.String, float64) {
-	c, ok := e.Simple.GetCode(gid, text)
-	if !ok {
-		if e.finished {
-			return s, 0
-		}
-
-		glyphName := e.Font.Outlines.Glyphs[gid].Name
-		width := math.Round(e.Font.GlyphWidthPDF(gid))
-		var err error
-		c, err = e.Simple.Encode(gid, glyphName, text, width)
-		if err != nil {
-			return s, 0
-		}
+// NewSimple turns a sfnt.Font into a PDF CFF font.
+//
+// The font can be embedded as a simple font or as a composite font,
+// depending on the options used.
+//
+// The sfnt.Font info must be an OpenType font with CFF outlines.
+func NewSimple(info *sfnt.Font, opt *OptionsSimple) (*Simple, error) {
+	if opt == nil {
+		opt = &OptionsSimple{}
 	}
 
-	w := e.Simple.Width(c)
-	return append(s, c), w / 1000
+	cffFont := info.AsCFF()
+	if cffFont == nil {
+		return nil, errors.New("no CFF outlines in font")
+	}
+
+	qv := info.FontMatrix[3] * 1000
+	ascent := math.Round(float64(info.Ascent) * qv)
+	descent := math.Round(float64(info.Descent) * qv)
+	leading := math.Round(float64(info.Ascent-info.Descent+info.LineGap) * qv)
+	capHeight := math.Round(float64(info.CapHeight) * qv)
+	xHeight := math.Round(float64(info.XHeight) * qv)
+	glyphExtents := make([]rect.Rect, len(cffFont.Glyphs))
+	for gid := range cffFont.Glyphs {
+		glyphExtents[gid] = cffFont.GlyphBBoxPDF(cffFont.FontMatrix, glyph.ID(gid))
+	}
+	geom := &font.Geometry{
+		Ascent:             ascent / 1000,
+		Descent:            descent / 1000,
+		Leading:            leading / 1000,
+		UnderlinePosition:  float64(info.UnderlinePosition) * qv / 1000,
+		UnderlineThickness: float64(info.UnderlineThickness) * qv / 1000,
+
+		GlyphExtents: glyphExtents,
+		Widths:       info.WidthsPDF(),
+	}
+
+	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
+	if err != nil {
+		return nil, err
+	}
+
+	notdefWidth := math.Round(info.GlyphWidthPDF(0))
+
+	f := &Simple{
+		Font: cffFont,
+
+		Stretch:  info.Width,
+		Weight:   info.Weight,
+		IsSerif:  info.IsSerif,
+		IsScript: info.IsScript,
+
+		Ascent:    ascent,
+		Descent:   descent,
+		Leading:   leading,
+		CapHeight: capHeight,
+		XHeight:   xHeight,
+
+		Geometry: geom,
+		layouter: layouter,
+
+		Simple: simpleenc.NewSimple(notdefWidth, cffFont.FontName, &pdfenc.WinAnsi),
+	}
+
+	return f, nil
 }
 
-func (e *embeddedSimple) finish(rm *pdf.EmbedHelper) error {
-	if e.finished {
+// FontInfo returns information required to load the font file and to
+// extract the the glyph corresponding to a character identifier. The
+// result is a pointer to one of the FontInfo* types defined in the
+// font/dict package.
+func (f *Simple) FontInfo() any {
+	dict, err := f.makeFontDict()
+	if err != nil {
 		return nil
 	}
-	e.finished = true
+	return dict.FontInfo()
+}
 
-	if err := e.Simple.Error(); err != nil {
-		return pdf.Errorf("font %q: %w", e.Font.FontName, err)
+// Encode converts a glyph ID to a character code (for use with the
+// instance's codec).  The arguments width and text are hints for choosing
+// an appropriate advance width and text representation for the character
+// code, in case a new code is allocated.
+//
+// The function returns the character code, and a boolean indicating
+// whether the encoding was successful.  If the function returns false, the
+// glyph ID cannot be encoded with this font instance.
+//
+// Use the Codec to append the character code to PDF strings.
+//
+// The given width must be in PDF glyph space units.
+func (f *Simple) Encode(gid glyph.ID, width float64, text string) (charcode.Code, bool) {
+	if c, ok := f.Simple.GetCode(gid, text); ok {
+		return charcode.Code(c), true
 	}
 
-	fontInfo := e.Font.FontInfo
-	outlines := e.Font.Outlines
+	// Allocate new code
+	if width <= 0 {
+		width = math.Round(f.GlyphWidthPDF(gid))
+	}
+	c, err := f.Simple.Encode(gid, f.Font.Glyphs[gid].Name, text, width)
+	return charcode.Code(c), err == nil
+}
+
+// Layout appends a string to a glyph sequence.  The string is typeset at
+// the given point size and the resulting GlyphSeq is returned.
+//
+// If seq is nil, a new glyph sequence is allocated.  If seq is not
+// nil, the return value is guaranteed to be equal to seq.
+func (f *Simple) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.GlyphSeq {
+	if seq == nil {
+		seq = &font.GlyphSeq{}
+	}
+
+	qh := ptSize * f.Font.FontMatrix[0]
+	qv := ptSize * f.Font.FontMatrix[3]
+
+	buf := f.layouter.Layout(s)
+	seq.Seq = slices.Grow(seq.Seq, len(buf))
+	for _, g := range buf {
+		xOffset := float64(g.XOffset) * qh
+		if len(seq.Seq) == 0 {
+			seq.Skip += xOffset
+		} else {
+			seq.Seq[len(seq.Seq)-1].Advance += xOffset
+		}
+		seq.Seq = append(seq.Seq, font.Glyph{
+			GID:     g.GID,
+			Advance: float64(g.Advance) * qh,
+			Rise:    float64(g.YOffset) * qv,
+			Text:    string(g.Text),
+		})
+	}
+	return seq
+}
+
+// Embed converts the Go representation of the object into a PDF object,
+// corresponding to the PDF version of the output file.
+//
+// The first return value is the PDF representation of the object.
+// If the object is embedded in the PDF file, this may be a reference.
+//
+// The second return value is a Go representation of the embedded object.
+// In most cases, this value is not used and T can be set to [Unused].
+func (f *Simple) Embed(e *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+	if err := pdf.CheckVersion(e.Out(), "simple CFF fonts", pdf.V1_2); err != nil {
+		return nil, pdf.Unused{}, err
+	}
+
+	ref := e.Alloc()
+	e.Defer(func(eh *pdf.EmbedHelper) error {
+		dict, err := f.makeFontDict()
+		if err != nil {
+			return err
+		}
+		_, _, err = pdf.EmbedHelperEmbedAt(eh, ref, dict)
+		return err
+	})
+
+	return ref, pdf.Unused{}, nil
+}
+
+func (f *Simple) makeFontDict() (*dict.Type1, error) {
+	if err := f.Simple.Error(); err != nil {
+		return nil, pdf.Errorf("font %q: %w", f.Font.FontName, err)
+	}
+
+	fontInfo := f.Font.FontInfo
+	outlines := f.Font.Outlines
 
 	// subset the font, if needed
-	glyphs := e.Simple.Glyphs()
+	glyphs := f.Simple.Glyphs()
 	subsetTag := subset.Tag(glyphs, outlines.NumGlyphs())
 
 	var subsetOutlines *cff.Outlines
@@ -135,7 +256,7 @@ func (e *embeddedSimple) finish(rm *pdf.EmbedHelper) error {
 
 	// convert to a simple font, if needed:
 	if len(subsetOutlines.Private) != 1 {
-		return fmt.Errorf("need exactly one private dict for a simple font")
+		return nil, fmt.Errorf("need exactly one private dict for a simple font")
 	}
 	subsetOutlines.ROS = nil
 	subsetOutlines.GIDToCID = nil
@@ -146,7 +267,7 @@ func (e *embeddedSimple) finish(rm *pdf.EmbedHelper) error {
 	subsetOutlines.FontMatrices = nil
 	for gid, origGID := range glyphs { // fill in the glyph names
 		g := subsetOutlines.Glyphs[gid]
-		glyphName := e.Simple.GlyphName(origGID)
+		glyphName := f.Simple.GlyphName(origGID)
 		if g.Name == glyphName {
 			continue
 		}
@@ -171,7 +292,7 @@ func (e *embeddedSimple) finish(rm *pdf.EmbedHelper) error {
 		if gid == 0 {
 			continue
 		}
-		if !pdfenc.StandardLatin.Has[e.Simple.GlyphName(gid)] {
+		if !pdfenc.StandardLatin.Has[f.Simple.GlyphName(gid)] {
 			isSymbolic = true
 			break
 		}
@@ -181,43 +302,38 @@ func (e *embeddedSimple) finish(rm *pdf.EmbedHelper) error {
 	qv := subsetCFF.FontMatrix[3] * 1000
 
 	fd := &font.Descriptor{
-		FontName:     subset.Join(subsetTag, e.Font.FontName),
+		FontName:     subset.Join(subsetTag, f.Font.FontName),
 		FontFamily:   subsetCFF.FamilyName,
-		FontStretch:  e.Stretch,
-		FontWeight:   e.Weight,
+		FontStretch:  f.Stretch,
+		FontWeight:   f.Weight,
 		IsFixedPitch: subsetCFF.IsFixedPitch,
-		IsSerif:      e.IsSerif,
+		IsSerif:      f.IsSerif,
 		IsSymbolic:   isSymbolic,
-		IsScript:     e.IsScript,
+		IsScript:     f.IsScript,
 		IsItalic:     subsetCFF.ItalicAngle != 0,
 		ForceBold:    subsetCFF.Private[0].ForceBold,
 		FontBBox:     subsetCFF.FontBBoxPDF().Rounded(),
 		ItalicAngle:  subsetCFF.ItalicAngle,
-		Ascent:       e.Ascent,
-		Descent:      e.Descent,
-		Leading:      e.Leading,
-		CapHeight:    e.CapHeight,
-		XHeight:      e.XHeight,
+		Ascent:       f.Ascent,
+		Descent:      f.Descent,
+		Leading:      f.Leading,
+		CapHeight:    f.CapHeight,
+		XHeight:      f.XHeight,
 		StemV:        math.Round(subsetCFF.Private[0].StdVW * qh),
 		StemH:        math.Round(subsetCFF.Private[0].StdHW * qv),
-		MissingWidth: e.Simple.DefaultWidth(),
+		MissingWidth: f.Simple.DefaultWidth(),
 	}
-	dict := dict.Type1{
-		PostScriptName: e.Font.FontName,
+	dict := &dict.Type1{
+		PostScriptName: f.Font.FontName,
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
-		Encoding:       e.Simple.Encoding(),
+		Encoding:       f.Simple.Encoding(),
 		FontFile:       cffglyphs.ToStream(subsetCFF, glyphdata.CFFSimple),
-		ToUnicode:      e.Simple.ToUnicode(e.Font.FontName),
+		ToUnicode:      f.Simple.ToUnicode(f.Font.FontName),
 	}
-	for c, info := range e.Simple.MappedCodes() {
+	for c, info := range f.Simple.MappedCodes() {
 		dict.Width[c] = info.Width
 	}
 
-	_, _, err := pdf.EmbedHelperEmbedAt(rm, e.Ref, &dict)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return dict, nil
 }

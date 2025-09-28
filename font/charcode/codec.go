@@ -510,4 +510,13 @@ func (l *linearizer) AppendNodes(t tree) uint16 {
 	return uint16(base)
 }
 
+var SimpleCodec = must(NewCodec(Simple))
+
+func must(codec *Codec, err error) *Codec {
+	if err != nil {
+		panic(err)
+	}
+	return codec
+}
+
 var errInvalidCodeSpaceRange = errors.New("invalid code space range")

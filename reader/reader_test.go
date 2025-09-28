@@ -78,15 +78,6 @@ func TestParameters(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fontsEqual := func(a, b font.Embedded) bool {
-		if a == nil || b == nil {
-			return a == b
-		}
-		// TODO(voss): update this once we have a way of comparing a loaded
-		// font to an original font.  Maybe we can use the font name?
-		return true
-	}
-
 	// First check: the individual parameters are as we set them.
 	if r.State.LineWidth != 12.3 {
 		t.Errorf("LineWidth: got %v, want 12.3", r.State.LineWidth)
@@ -151,6 +142,16 @@ func TestParameters(t *testing.T) {
 	// Second check: the final graphics states are the same.
 	// This checks that no parameters different from the ones we explicitly used
 	// were changed.
+
+	fontsEqual := func(a, b font.Instance) bool {
+		if a == nil || b == nil {
+			return a == b
+		}
+		// TODO(voss): update this once we have a way of comparing a loaded
+		// font to an original font.  Maybe we can use the font name?
+		return true
+	}
+
 	cmpFont := cmp.Comparer(fontsEqual)
 	if d := cmp.Diff(w.State, r.State, cmpFont); d != "" {
 		t.Errorf("State: %s", d)

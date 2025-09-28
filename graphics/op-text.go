@@ -145,28 +145,22 @@ func (w *Writer) TextSetLeading(leading float64) {
 // TextSetFont sets the font and font size.
 //
 // This implements the PDF graphics operator "Tf".
-func (w *Writer) TextSetFont(F font.Font, size float64) {
+func (w *Writer) TextSetFont(F font.Instance, size float64) {
 	if !w.isValid("TextSetFont", objText|objPage) {
 		return
 	}
 
-	name, embedded, err := writerGetResourceName(w, catFont, F)
+	name, _, err := writerGetResourceName(w, catFont, F)
 	if err != nil {
 		w.Err = err
 		return
 	}
 
-	if w.isSet(StateTextFont) && w.State.TextFont == embedded && nearlyEqual(w.State.TextFontSize, size) {
+	if w.isSet(StateTextFont) && w.State.TextFont == F && nearlyEqual(w.State.TextFontSize, size) {
 		return
 	}
 
-	if L, ok := F.(font.Layouter); ok {
-		w.CurrentFont = L
-	} else {
-		w.CurrentFont = nil
-	}
-
-	w.State.TextFont = embedded
+	w.State.TextFont = F
 	w.State.TextFontSize = size
 	w.State.Set |= StateTextFont
 

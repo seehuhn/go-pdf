@@ -23,12 +23,13 @@ import (
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/pdf/graphics"
 )
 
 // Type3 returns a Type3 font.
-func Type3() (*type3.Instance, error) {
+func Type3() (font.Layouter, error) {
 	info := clone(TrueType())
 	info.EnsureGlyphNames()
 
@@ -83,7 +84,7 @@ func Type3() (*type3.Instance, error) {
 		font.Glyphs = append(font.Glyphs, g)
 	}
 
-	return type3.New(font)
+	return font.New()
 }
 
 type drawer struct {

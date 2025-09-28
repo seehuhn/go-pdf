@@ -18,25 +18,14 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"os"
 
-	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/font/dict"
-	"seehuhn.de/go/pdf/font/glyphdata"
-	"seehuhn.de/go/pdf/font/glyphdata/cffglyphs"
-	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
-	"seehuhn.de/go/postscript/cid"
-	"seehuhn.de/go/postscript/type1"
-	"seehuhn.de/go/sfnt/cff"
-	"seehuhn.de/go/sfnt/glyph"
 )
 
 func main() {
@@ -53,15 +42,30 @@ func createDocument(fname string) error {
 		return err
 	}
 
-	F, err := makeFont()
+	raw := makefont.OpenType()
+	opt := &opentype.OptionsComposite{
+		WritingMode: font.Vertical,
+	}
+	F, err := opentype.NewComposite(raw, opt)
 	if err != nil {
 		return err
+	}
+
+	var s pdf.String
+	codec := F.Codec()
+	gg := F.Layout(nil, 10, "HELLO")
+	for _, g := range gg.Seq {
+		code, ok := F.Encode(g.GID, raw.GlyphWidthPDF(g.GID), g.Text)
+		if !ok {
+			return fmt.Errorf("cannot encode glyph %d %q", g.GID, g.Text)
+		}
+		s = codec.AppendCode(s, code)
 	}
 
 	page.TextBegin()
 	page.TextSetFont(F, 64)
 	page.TextFirstLine(72, 520)
-	page.TextShowRaw(pdf.String("HELLO"))
+	page.TextShowRaw(s)
 	page.TextEnd()
 
 	page.SetFillColor(color.Red)
@@ -69,160 +73,4 @@ func createDocument(fname string) error {
 	page.Fill()
 
 	return page.Close()
-}
-
-func makeFont() (font.Font, error) {
-	info := makefont.OpenType()
-
-	var glyphs []glyph.ID
-	var gidToCID []cid.CID
-	cmap, err := info.CMapTable.GetBest()
-	if err != nil {
-		return nil, err
-	}
-	for code := 0; code < 128; code++ {
-		var gid glyph.ID
-		if code > 0 {
-			gid = cmap.Lookup(rune(code))
-			if gid == 0 {
-				continue
-			}
-		}
-		glyphs = append(glyphs, gid)
-		gidToCID = append(gidToCID, cid.CID(code))
-	}
-	info = info.Subset(glyphs)
-
-	fontInfo := &type1.FontInfo{
-		FontName:           info.PostScriptName(),
-		Version:            info.Version.String(),
-		Notice:             info.Trademark,
-		Copyright:          info.Copyright,
-		FullName:           info.FullName(),
-		FamilyName:         info.FamilyName,
-		Weight:             info.Weight.String(),
-		ItalicAngle:        info.ItalicAngle,
-		IsFixedPitch:       info.IsFixedPitch(),
-		UnderlinePosition:  info.UnderlinePosition,
-		UnderlineThickness: info.UnderlineThickness,
-		FontMatrix:         info.FontMatrix,
-	}
-	outlines := info.Outlines.(*cff.Outlines)
-	ros := &cid.SystemInfo{
-		Registry:   "Quire",
-		Ordering:   "ASCII",
-		Supplement: 0,
-	}
-	outlines.MakeCIDKeyed(ros, gidToCID)
-	cffFont := &cff.Font{
-		FontInfo: fontInfo,
-		Outlines: outlines,
-	}
-
-	qv := info.FontMatrix[3] * 1000
-	ascent := math.Round(float64(info.Ascent) * qv)
-	descent := math.Round(float64(info.Descent) * qv)
-	leading := math.Round(float64(info.Ascent-info.Descent+info.LineGap) * qv)
-	capHeight := math.Round(float64(info.CapHeight) * qv)
-	glyphExtents := make([]rect.Rect, len(cffFont.Glyphs))
-	for gid := range cffFont.Glyphs {
-		glyphExtents[gid] = cffFont.GlyphBBoxPDF(cffFont.FontMatrix, glyph.ID(gid))
-	}
-	geom := &font.Geometry{
-		Ascent:             ascent / 1000,
-		Descent:            descent / 1000,
-		Leading:            leading / 1000,
-		UnderlinePosition:  float64(info.UnderlinePosition) * qv / 1000,
-		UnderlineThickness: float64(info.UnderlineThickness) * qv / 1000,
-
-		GlyphExtents: glyphExtents,
-		Widths:       info.WidthsPDF(),
-	}
-
-	f := &testFont{
-		Font:      cffFont,
-		Geometry:  geom,
-		ROS:       ros,
-		Ascent:    ascent,
-		Descent:   descent,
-		CapHeight: capHeight,
-	}
-	return f, nil
-}
-
-type testFont struct {
-	Font *cff.Font
-	*font.Geometry
-	ROS       *cid.SystemInfo
-	Ascent    float64
-	Descent   float64
-	CapHeight float64
-}
-
-func (f *testFont) PostScriptName() string {
-	return f.Font.FontName
-}
-
-func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
-	subsetFont := f.Font
-	subsetTag := "ABCDEF"
-
-	defaultWidth := math.Round(subsetFont.GlyphWidthPDF(0))
-	widths := make(map[cid.CID]float64)
-	for gid, cid := range subsetFont.Outlines.GIDToCID {
-		w := math.Round(subsetFont.GlyphWidthPDF(glyph.ID(gid)))
-		if w == defaultWidth {
-			continue
-		}
-		widths[cid] = w
-	}
-
-	csASCII := charcode.CodeSpaceRange{
-		{Low: []byte{0x00}, High: []byte{0x7F}},
-	}
-	encoding := &cmap.File{
-		Name:           "Quire-ASCII-V",
-		ROS:            f.ROS,
-		WMode:          font.Vertical,
-		CodeSpaceRange: csASCII,
-		CIDRanges: []cmap.Range{
-			{First: []byte{0x00}, Last: []byte{0x7F}, Value: 0},
-		},
-	}
-	fd := &font.Descriptor{
-		FontName:     subset.Join(subsetTag, subsetFont.FontName),
-		IsFixedPitch: f.Font.IsFixedPitch,
-		FontBBox:     subsetFont.FontBBoxPDF().Rounded(),
-		Ascent:       math.Round(f.Ascent),
-		Descent:      math.Round(f.Descent),
-		CapHeight:    math.Round(f.CapHeight),
-	}
-	fontDictRef := rm.Alloc()
-	dict := &dict.CIDFontType0{
-		PostScriptName:  f.Font.FontName,
-		SubsetTag:       subsetTag,
-		Descriptor:      fd,
-		ROS:             f.ROS,
-		CMap:            encoding,
-		Width:           widths,
-		DefaultWidth:    defaultWidth,
-		VMetrics:        nil,
-		DefaultVMetrics: dict.DefaultVMetricsDefault,
-		ToUnicode: &cmap.ToUnicodeFile{
-			CodeSpaceRange: csASCII,
-			Ranges: []cmap.ToUnicodeRange{
-				{First: []byte{0x00}, Last: []byte{0x7f}, Values: []string{"\000"}},
-			},
-		},
-		FontFile: cffglyphs.ToStream(f.Font, glyphdata.CFF),
-	}
-
-	_, _, err := pdf.EmbedHelperEmbedAt(rm, fontDictRef, dict)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	E := dict.MakeFont()
-
-	return fontDictRef, E, nil
 }

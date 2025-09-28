@@ -143,11 +143,6 @@ func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		dict["Subtype"] = subtype
 	}
 
-	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
-	if err != nil {
-		return nil, zero, err
-	}
-
 	needsLengths := s.Type == Type1 || s.Type == TrueType
 	if needsLengths {
 		var lengths Lengths
@@ -160,6 +155,11 @@ func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 			dict["Length2"] = l2
 			l3 = pdf.NewPlaceholder(rm.Out(), 10)
 			dict["Length3"] = l3
+		}
+
+		stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
+		if err != nil {
+			return nil, zero, err
 		}
 
 		err = s.WriteTo(stm, &lengths)
@@ -185,17 +185,27 @@ func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 				return nil, zero, err
 			}
 		}
+
+		err = stm.Close()
+		if err != nil {
+			return nil, zero, err
+		}
 	} else {
+		stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
+		if err != nil {
+			return nil, zero, err
+		}
+
 		err = s.WriteTo(stm, nil)
 		if err != nil {
 			stm.Close()
 			return nil, zero, err
 		}
-	}
 
-	err = stm.Close()
-	if err != nil {
-		return nil, zero, err
+		err = stm.Close()
+		if err != nil {
+			return nil, zero, err
+		}
 	}
 
 	return ref, zero, nil

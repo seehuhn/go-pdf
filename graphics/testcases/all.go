@@ -27,7 +27,6 @@ import (
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/sfnt/glyph"
 )
 
 //go:generate go run generate.go
@@ -46,7 +45,7 @@ var All = []TestCase{
 		// Test that the text position is (0, 0) after starting a new page.
 		// We still need to set a font so that there is a font size available
 		// for the text position calculation.
-		E, err := gofont.Regular.New(nil)
+		E, err := gofont.Regular.NewSimple(nil)
 		if err != nil {
 			return err
 		}
@@ -56,7 +55,7 @@ var All = []TestCase{
 
 	func(p *document.Page) error {
 		// Test the normal case: we use TextSetFont and print simple string.
-		E, err := gofont.Regular.New(nil)
+		E, err := gofont.Regular.NewSimple(nil)
 		if err != nil {
 			return err
 		}
@@ -89,9 +88,9 @@ var All = []TestCase{
 				return nil
 			},
 		})
-		E := &type3.Instance{
-			Font: F,
-			CMap: map[rune]glyph.ID{'A': 1},
+		E, err := F.New()
+		if err != nil {
+			return err
 		}
 
 		p.TextSetFont(E, 10)
@@ -102,7 +101,7 @@ var All = []TestCase{
 
 	func(p *document.Page) error {
 		// Test a two-line text, using TextSecondLine.
-		E, err := gofont.Regular.New(nil)
+		E, err := gofont.Regular.NewSimple(nil)
 		if err != nil {
 			return err
 		}
@@ -116,7 +115,7 @@ var All = []TestCase{
 
 	func(p *document.Page) error {
 		// Test a three-line text, using TextSecondLine and TextNextLine.
-		E, err := gofont.Regular.New(nil)
+		E, err := gofont.Regular.NewSimple(nil)
 		if err != nil {
 			return err
 		}
@@ -132,7 +131,7 @@ var All = []TestCase{
 
 	func(p *document.Page) error {
 		// Test TextSetCharacterSpacing.
-		E, err := gofont.Regular.New(nil)
+		E, err := gofont.Regular.NewSimple(nil)
 		if err != nil {
 			return err
 		}
@@ -144,7 +143,7 @@ var All = []TestCase{
 
 	func(p *document.Page) error {
 		// Test TextSetCharacterSpacing with negative spacing.
-		E, err := gofont.Regular.New(nil)
+		E, err := gofont.Regular.NewSimple(nil)
 		if err != nil {
 			return err
 		}
@@ -156,7 +155,7 @@ var All = []TestCase{
 
 	func(p *document.Page) error {
 		// Test positive word spacing.
-		E, err := gofont.Regular.New(nil)
+		E, err := gofont.Regular.NewSimple(nil)
 		if err != nil {
 			return err
 		}
@@ -168,7 +167,7 @@ var All = []TestCase{
 
 	func(p *document.Page) error {
 		// Test negative word spacing.
-		E, err := gofont.Regular.New(nil)
+		E, err := gofont.Regular.NewSimple(nil)
 		if err != nil {
 			return err
 		}
@@ -180,7 +179,7 @@ var All = []TestCase{
 
 	func(p *document.Page) error {
 		// Test horizontally stretched text.
-		E, err := gofont.Regular.New(nil)
+		E, err := gofont.Regular.NewSimple(nil)
 		if err != nil {
 			return err
 		}
@@ -193,7 +192,7 @@ var All = []TestCase{
 
 	func(p *document.Page) error {
 		// Test horizontally compressed text.
-		E, err := gofont.Regular.New(nil)
+		E, err := gofont.Regular.NewSimple(nil)
 		if err != nil {
 			return err
 		}
@@ -205,7 +204,7 @@ var All = []TestCase{
 
 	func(p *document.Page) error {
 		// Test horizontally mirrored text.
-		E, err := gofont.Regular.New(nil)
+		E, err := gofont.Regular.NewSimple(nil)
 		if err != nil {
 			return err
 		}
@@ -218,7 +217,7 @@ var All = []TestCase{
 
 	func(p *document.Page) error {
 		// Test TextSetLeading.
-		E, err := gofont.Regular.New(nil)
+		E, err := gofont.Regular.NewSimple(nil)
 		if err != nil {
 			return err
 		}
@@ -237,7 +236,7 @@ var All = []TestCase{
 
 	func(p *document.Page) error {
 		// Test the text rise.
-		E, err := gofont.Regular.New(nil)
+		E, err := gofont.Regular.NewSimple(nil)
 		if err != nil {
 			return err
 		}
@@ -250,7 +249,7 @@ var All = []TestCase{
 
 	func(p *document.Page) error {
 		// Test text rotated by 45 degrees.
-		E, err := gofont.Regular.New(nil)
+		E, err := gofont.Regular.NewSimple(nil)
 		if err != nil {
 			return err
 		}
@@ -262,7 +261,7 @@ var All = []TestCase{
 
 	func(p *document.Page) error {
 		// Test an arbitrary text matrix.
-		E, err := gofont.Regular.New(nil)
+		E, err := gofont.Regular.NewSimple(nil)
 		if err != nil {
 			return err
 		}
@@ -274,7 +273,7 @@ var All = []TestCase{
 
 	func(p *document.Page) error {
 		// Test TextShowRaw.
-		E, err := gofont.Regular.New(nil)
+		E, err := gofont.Regular.NewSimple(nil)
 		if err != nil {
 			return err
 		}
@@ -286,7 +285,7 @@ var All = []TestCase{
 
 	func(p *document.Page) error {
 		// Test TextShowNextLineRaw.
-		E, err := gofont.Regular.New(nil)
+		E, err := gofont.Regular.NewSimple(nil)
 		if err != nil {
 			return err
 		}
@@ -301,7 +300,7 @@ var All = []TestCase{
 
 	func(p *document.Page) error {
 		// Test TextShowSpacedRaw.
-		E, err := gofont.Regular.New(nil)
+		E, err := gofont.Regular.NewSimple(nil)
 		if err != nil {
 			return err
 		}
@@ -317,16 +316,17 @@ type Answer struct {
 	X, Y float64
 }
 
-func encodeText(rm *pdf.ResourceManager, F font.Layouter, s string) pdf.String {
-	_, E, err := pdf.ResourceManagerEmbed(rm, F)
-	if err != nil {
-		panic(err)
-	}
+func encodeText(_ *pdf.ResourceManager, F font.Layouter, s string) pdf.String {
+	codec := F.Codec()
 
 	gg := F.Layout(nil, 10, s)
 	var res pdf.String
 	for _, g := range gg.Seq {
-		res, _ = E.(font.EmbeddedLayouter).AppendEncoded(res, g.GID, g.Text)
+		code, ok := F.Encode(g.GID, 0, g.Text)
+		if !ok {
+			panic("cannot encode glyph")
+		}
+		res = codec.AppendCode(res, code)
 	}
 	return res
 }

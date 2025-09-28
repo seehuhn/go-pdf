@@ -51,7 +51,7 @@ type Parameters struct {
 	TextWordSpacing       float64 // word spacing (T_w)
 	TextHorizontalScaling float64 // horizonal scaling (T_h, normal spacing = 1)
 	TextLeading           float64 // leading (T_l)
-	TextFont              font.Embedded
+	TextFont              font.Instance
 	TextFontSize          float64
 	TextRenderingMode     TextRenderingMode
 	TextRise              float64

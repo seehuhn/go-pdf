@@ -103,7 +103,7 @@ func makeCFFFont(fontMatrix matrix.Matrix) font.Layouter {
 		CMapTable:          cmapTable,
 	}
 
-	instance, err := pdfcff.New(font, nil)
+	instance, err := pdfcff.NewSimple(font, nil)
 	if err != nil {
 		panic(err)
 	}

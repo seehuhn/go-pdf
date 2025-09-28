@@ -19,6 +19,7 @@ package font
 import (
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
 // Geometry collects the various dimensions connected to a font and to
@@ -98,4 +99,12 @@ func (g *Geometry) IsFixedPitch() bool {
 	}
 
 	return true
+}
+
+// IsBlank reports whether the glyph is blank.
+func (g *Geometry) IsBlank(gid glyph.ID) bool {
+	if int(gid) >= len(g.GlyphExtents) {
+		gid = 0
+	}
+	return g.GlyphExtents[gid].IsZero()
 }

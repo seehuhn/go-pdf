@@ -35,6 +35,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1/names"
@@ -106,7 +107,7 @@ type encInfo struct {
 // to map codes to glyphs.  To make it possible to tell apart which method
 // a viewer uses, different mappings map the same codes to different
 // glyphs.  The glyphs are chosen to spell the strings given in enc.
-func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Font, error) {
+func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Instance, error) {
 	// provisionally construct the subset of glyphs that are used
 	runeUsed := make(map[rune]struct{})
 	yes := struct{}{}
@@ -323,11 +324,9 @@ type testFont struct {
 	symbolic bool
 }
 
-func (f *testFont) PostScriptName() string {
-	return f.ttf.FamilyName
-}
+func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
 
-func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error) {
 	fontDictRef := rm.Alloc()
 	fontDescriptorRef := rm.Alloc()
 	fontFileRef := rm.Alloc()
@@ -344,7 +343,7 @@ func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error)
 	}
 	err := rm.Out().Put(fontDictRef, fontDict)
 	if err != nil {
-		return nil, nil, err
+		return nil, zero, err
 	}
 
 	var flags pdf.Integer
@@ -368,7 +367,7 @@ func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error)
 	}
 	err = rm.Out().Put(fontDescriptorRef, fontDescriptor)
 	if err != nil {
-		return nil, nil, err
+		return nil, zero, err
 	}
 
 	length1 := pdf.NewPlaceholder(rm.Out(), 10)
@@ -377,7 +376,7 @@ func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error)
 	}
 	fontFileStream, err := rm.Out().OpenStream(fontFileRef, fontFileDict, pdf.FilterCompress{})
 	if err != nil {
-		return nil, nil, err
+		return nil, zero, err
 	}
 	var extra []any
 	if f.post != nil {
@@ -385,18 +384,18 @@ func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, font.Embedded, error)
 	}
 	n, err := f.ttf.WriteTrueTypePDF(fontFileStream, extra...)
 	if err != nil {
-		return nil, nil, err
+		return nil, zero, err
 	}
 	err = length1.Set(pdf.Integer(n))
 	if err != nil {
-		return nil, nil, err
+		return nil, zero, err
 	}
 	err = fontFileStream.Close()
 	if err != nil {
-		return nil, nil, err
+		return nil, zero, err
 	}
 
-	return fontDictRef, f, nil
+	return fontDictRef, zero, nil
 }
 
 func (f *testFont) WritingMode() font.WritingMode {
@@ -407,6 +406,31 @@ func (f *testFont) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
 		// TODO(voss): implement
 	}
+}
+
+// GetName returns a human-readable name for the font.
+// For most font types, this is the PostScript name of the font.
+func (f *testFont) PostScriptName() string {
+	return f.ttf.FamilyName
+}
+
+// Codec returns the codec for the encoding used by this font.
+func (f *testFont) Codec() *charcode.Codec {
+	return charcode.SimpleCodec
+}
+
+// CodesRemaining returns the number of character codes that can still be
+// allocated in this font instance.
+func (f *testFont) CodesRemaining() int {
+	return 0
+}
+
+// FontInfo returns information required to load the font file and to
+// extract the the glyph corresponding to a character identifier. The
+// result is a pointer to one of the FontInfo* types defined in the
+// font/dict package.
+func (f *testFont) FontInfo() any {
+	panic("not implemented") // TODO: Implement
 }
 
 var (
