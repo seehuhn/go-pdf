@@ -19,6 +19,7 @@ package graphics
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -92,6 +93,8 @@ type ExtGState struct {
 }
 
 func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
+	_, isIndirect := obj.(pdf.Reference)
+
 	dict, err := pdf.GetDictTyped(x.R, obj, "ExtGState")
 	if err != nil {
 		return nil, err
@@ -436,6 +439,8 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 		}
 	}
 
+	res.SingleUse = !isIndirect
+
 	res.Set = set
 	return res, nil
 }
@@ -550,18 +555,12 @@ func parseSingleTransfer(x *pdf.Extractor, obj pdf.Object) (pdf.Function, error)
 // Embed adds the graphics state dictionary to a PDF file.
 //
 // This implements the [pdf.Embedder] interface.
-//
-// TODO(voss): remove the State return value
-func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, State, error) {
-	res := State{
-		Parameters: &Parameters{},
-	}
+func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+	var zero pdf.Unused
 
 	if err := pdf.CheckVersion(rm.Out(), "ExtGState", pdf.V1_2); err != nil {
-		return nil, res, err
+		return nil, zero, err
 	}
-
-	// TODO(voss): check that unset fields have the zero value
 
 	set := e.Set
 
@@ -571,36 +570,56 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, State, error) {
 	if set&StateTextFont != 0 {
 		E, _, err := pdf.EmbedHelperEmbed(rm, e.TextFont)
 		if err != nil {
-			return nil, res, err
+			return nil, zero, err
 		}
 		if _, ok := E.(pdf.Reference); !ok {
 			err := fmt.Errorf("font %q cannot be used in ExtGState",
 				e.TextFont.PostScriptName())
-			return nil, res, err
+			return nil, zero, err
 		}
 		dict["Font"] = pdf.Array{E, pdf.Number(e.TextFontSize)}
-		res.TextFont = e.TextFont
-		res.TextFontSize = e.TextFontSize
+	} else {
+		if e.TextFont != nil {
+			return nil, zero, errors.New("unexpected TextFont value")
+		}
+		if e.TextFontSize != 0 {
+			return nil, zero, errors.New("unexpected TextFontSize value")
+		}
 	}
 	if set&StateTextKnockout != 0 {
 		dict["TK"] = pdf.Boolean(e.TextKnockout)
-		res.TextKnockout = e.TextKnockout
+	} else {
+		if e.TextKnockout {
+			return nil, zero, errors.New("unexpected TextKnockout value")
+		}
 	}
 	if set&StateLineWidth != 0 {
 		dict["LW"] = pdf.Number(e.LineWidth)
-		res.LineWidth = e.LineWidth
+	} else {
+		if e.LineWidth != 0 {
+			return nil, zero, errors.New("unexpected LineWidth value")
+		}
 	}
 	if set&StateLineCap != 0 {
 		dict["LC"] = pdf.Integer(e.LineCap)
-		res.LineCap = e.LineCap
+	} else {
+		if e.LineCap != 0 {
+			return nil, zero, errors.New("unexpected LineCap value")
+		}
 	}
 	if set&StateLineJoin != 0 {
 		dict["LJ"] = pdf.Integer(e.LineJoin)
-		res.LineJoin = e.LineJoin
+	} else {
+		if e.LineJoin != 0 {
+			return nil, zero, errors.New("unexpected LineJoin value")
+		}
 	}
 	if set&StateMiterLimit != 0 {
 		dict["ML"] = pdf.Number(e.MiterLimit)
-		res.MiterLimit = e.MiterLimit
+	} else {
+		if e.MiterLimit != 0 {
+			return nil, zero, errors.New("unexpected MiterLimit value")
+		}
 	}
 	if set&StateLineDash != 0 {
 		pat := make(pdf.Array, len(e.DashPattern))
@@ -611,40 +630,69 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, State, error) {
 			pat,
 			pdf.Number(e.DashPhase),
 		}
-		res.DashPattern = e.DashPattern
-		res.DashPhase = e.DashPhase
+	} else {
+		if e.DashPattern != nil {
+			return nil, zero, errors.New("unexpected DashPattern value")
+		}
+		if e.DashPhase != 0 {
+			return nil, zero, errors.New("unexpected DashPhase value")
+		}
 	}
 	if set&StateRenderingIntent != 0 {
 		dict["RI"] = pdf.Name(e.RenderingIntent)
-		res.RenderingIntent = e.RenderingIntent
+	} else {
+		if e.RenderingIntent != "" {
+			return nil, zero, errors.New("unexpected RenderingIntent value")
+		}
 	}
 	if set&StateStrokeAdjustment != 0 {
 		dict["SA"] = pdf.Boolean(e.StrokeAdjustment)
-		res.StrokeAdjustment = e.StrokeAdjustment
+	} else {
+		if e.StrokeAdjustment {
+			return nil, zero, errors.New("unexpected StrokeAdjustment value")
+		}
 	}
 	if set&StateBlendMode != 0 {
 		dict["BM"] = e.BlendMode
-		res.BlendMode = e.BlendMode
+	} else {
+		if e.BlendMode != nil {
+			return nil, zero, errors.New("unexpected BlendMode value")
+		}
 	}
 	if set&StateSoftMask != 0 {
 		dict["SMask"] = e.SoftMask
-		res.SoftMask = e.SoftMask
+	} else {
+		if e.SoftMask != nil {
+			return nil, zero, errors.New("unexpected SoftMask value")
+		}
 	}
 	if set&StateStrokeAlpha != 0 {
 		dict["CA"] = pdf.Number(e.StrokeAlpha)
-		res.StrokeAlpha = e.StrokeAlpha
+	} else {
+		if e.StrokeAlpha != 0 {
+			return nil, zero, errors.New("unexpected StrokeAlpha value")
+		}
 	}
 	if set&StateFillAlpha != 0 {
 		dict["ca"] = pdf.Number(e.FillAlpha)
-		res.FillAlpha = e.FillAlpha
+	} else {
+		if e.FillAlpha != 0 {
+			return nil, zero, errors.New("unexpected FillAlpha value")
+		}
 	}
 	if set&StateAlphaSourceFlag != 0 {
 		dict["AIS"] = pdf.Boolean(e.AlphaSourceFlag)
-		res.AlphaSourceFlag = e.AlphaSourceFlag
+	} else {
+		if e.AlphaSourceFlag {
+			return nil, zero, errors.New("unexpected AlphaSourceFlag value")
+		}
 	}
 	if set&StateBlackPointCompensation != 0 {
 		dict["UseBlackPtComp"] = e.BlackPointCompensation
-		res.BlackPointCompensation = e.BlackPointCompensation
+	} else {
+		if e.BlackPointCompensation != "" {
+			return nil, zero, errors.New("unexpected BlackPointCompensation value")
+		}
 	}
 
 	if set&StateOverprint != 0 {
@@ -652,46 +700,60 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, State, error) {
 		if e.OverprintFill != e.OverprintStroke {
 			dict["op"] = pdf.Boolean(e.OverprintFill)
 		}
-		res.OverprintStroke = e.OverprintStroke
-		res.OverprintFill = e.OverprintFill
+	} else {
+		if e.OverprintStroke {
+			return nil, zero, errors.New("unexpected OverprintStroke value")
+		}
+		if e.OverprintFill {
+			return nil, zero, errors.New("unexpected OverprintFill value")
+		}
 	}
 	if set&StateOverprintMode != 0 {
 		dict["OPM"] = pdf.Integer(e.OverprintMode)
-		res.OverprintMode = e.OverprintMode
+	} else {
+		if e.OverprintMode != 0 {
+			return nil, zero, errors.New("unexpected OverprintMode value")
+		}
 	}
 	if set&StateBlackGeneration != 0 {
 		if e.BlackGeneration == nil {
 			if err := pdf.CheckVersion(rm.Out(), "BG2 in ExtGState", pdf.V1_3); err != nil {
-				return nil, res, err
+				return nil, zero, err
 			}
 			dict["BG2"] = pdf.Name("Default")
 		} else {
 			obj, _, err := pdf.EmbedHelperEmbed(rm, e.BlackGeneration)
 			if err != nil {
-				return nil, res, err
+				return nil, zero, err
 			}
 			dict["BG"] = obj
 		}
-		res.BlackGeneration = e.BlackGeneration
+	} else {
+		if e.BlackGeneration != nil {
+			return nil, zero, errors.New("unexpected BlackGeneration value")
+		}
 	}
 	if set&StateUndercolorRemoval != 0 {
 		if e.UndercolorRemoval == nil {
 			if err := pdf.CheckVersion(rm.Out(), "UCR2 in ExtGState", pdf.V1_3); err != nil {
-				return nil, res, err
+				return nil, zero, err
 			}
 			dict["UCR2"] = pdf.Name("Default")
 		} else {
 			obj, _, err := pdf.EmbedHelperEmbed(rm, e.UndercolorRemoval)
 			if err != nil {
-				return nil, res, err
+				return nil, zero, err
 			}
 			dict["UCR"] = obj
 		}
-		res.UndercolorRemoval = e.UndercolorRemoval
+	} else {
+		if e.UndercolorRemoval != nil {
+			return nil, zero, errors.New("unexpected UndercolorRemoval value")
+		}
 	}
 	if set&StateTransferFunction != 0 {
 		if v := pdf.GetVersion(rm.Out()); v >= pdf.V2_0 {
-			return nil, res, errors.New("TransferFunction is deprecated in PDF 2.0")
+			return nil, zero, errors.New("TransferFunction is deprecated in PDF 2.0")
 		}
 		all := []pdf.Function{
 			e.TransferFunction.Red,
@@ -707,11 +769,11 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, State, error) {
 			}
 			if fn == nil {
 				if err := pdf.CheckVersion(rm.Out(), "TR2 in ExtGState", pdf.V1_3); err != nil {
-					return nil, res, err
+					return nil, zero, err
 				}
 				key = "TR2"
 			} else if nIn, nOut := fn.Shape(); nIn != 1 || nOut != 1 {
-				return nil, res, fmt.Errorf("wrong transfer function shape (%d,%d) != (1,1)", nIn, nOut)
+				return nil, zero, fmt.Errorf("wrong transfer function shape (%d,%d) != (1,1)", nIn, nOut)
 			}
 		}
 		a := make(pdf.Array, len(all))
@@ -726,7 +788,7 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, State, error) {
 				var err error
 				obj, _, err = pdf.EmbedHelperEmbed(rm, fn)
 				if err != nil {
-					return nil, res, err
+					return nil, zero, err
 				}
 			}
 			a[i] = obj
@@ -736,42 +798,143 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, State, error) {
 		} else {
 			dict[key] = a[0]
 		}
-		res.TransferFunction = e.TransferFunction
+	} else {
+		if e.TransferFunction.Red != nil || e.TransferFunction.Green != nil ||
+			e.TransferFunction.Blue != nil || e.TransferFunction.Gray != nil {
+			return nil, zero, errors.New("unexpected TransferFunction value")
+		}
 	}
 	if set&StateHalftone != 0 {
 		htEmbedded, _, err := pdf.EmbedHelperEmbed(rm, e.Halftone)
 		if err != nil {
-			return nil, res, err
+			return nil, zero, err
 		}
 		dict["HT"] = htEmbedded
-		res.Halftone = e.Halftone
+	} else {
+		if e.Halftone != nil {
+			return nil, zero, errors.New("unexpected Halftone value")
+		}
 	}
 	if set&StateHalftoneOrigin != 0 {
 		dict["HTO"] = pdf.Array{
 			pdf.Number(e.HalftoneOriginX),
 			pdf.Number(e.HalftoneOriginY),
 		}
-		res.HalftoneOriginX = e.HalftoneOriginX
-		res.HalftoneOriginY = e.HalftoneOriginY
+	} else {
+		if e.HalftoneOriginX != 0 {
+			return nil, zero, errors.New("unexpected HalftoneOriginX value")
+		}
+		if e.HalftoneOriginY != 0 {
+			return nil, zero, errors.New("unexpected HalftoneOriginY value")
+		}
 	}
 	if set&StateFlatnessTolerance != 0 {
 		dict["FL"] = pdf.Number(e.FlatnessTolerance)
-		res.FlatnessTolerance = e.FlatnessTolerance
+	} else {
+		if e.FlatnessTolerance != 0 {
+			return nil, zero, errors.New("unexpected FlatnessTolerance value")
+		}
 	}
 	if set&StateSmoothnessTolerance != 0 {
 		dict["SM"] = pdf.Number(e.SmoothnessTolerance)
-		res.SmoothnessTolerance = e.SmoothnessTolerance
+	} else {
+		if e.SmoothnessTolerance != 0 {
+			return nil, zero, errors.New("unexpected SmoothnessTolerance value")
+		}
 	}
 
-	res.Set = set & extGStateBits
-
 	if e.SingleUse {
-		return dict, res, nil
+		return dict, zero, nil
 	}
 	ref := rm.Alloc()
 	err := rm.Out().Put(ref, dict)
 	if err != nil {
-		return nil, res, err
+		return nil, zero, err
 	}
-	return ref, res, nil
+	return ref, zero, nil
+}
+
+// ApplyTo modifies the given graphics state according to the parameters in
+// the extended graphics state.
+func (e *ExtGState) ApplyTo(s *State) {
+	set := e.Set
+	s.Set |= set
+
+	param := s.Parameters
+	if set&StateTextFont != 0 {
+		param.TextFont = e.TextFont
+		param.TextFontSize = e.TextFontSize
+	}
+	if set&StateTextKnockout != 0 {
+		param.TextKnockout = e.TextKnockout
+	}
+	if set&StateLineWidth != 0 {
+		param.LineWidth = e.LineWidth
+	}
+	if set&StateLineCap != 0 {
+		param.LineCap = e.LineCap
+	}
+	if set&StateLineJoin != 0 {
+		param.LineJoin = e.LineJoin
+	}
+	if set&StateMiterLimit != 0 {
+		param.MiterLimit = e.MiterLimit
+	}
+	if set&StateLineDash != 0 {
+		param.DashPattern = slices.Clone(e.DashPattern)
+		param.DashPhase = e.DashPhase
+	}
+	if set&StateRenderingIntent != 0 {
+		param.RenderingIntent = e.RenderingIntent
+	}
+	if set&StateStrokeAdjustment != 0 {
+		param.StrokeAdjustment = e.StrokeAdjustment
+	}
+	if set&StateBlendMode != 0 {
+		param.BlendMode = e.BlendMode
+	}
+	if set&StateSoftMask != 0 {
+		param.SoftMask = e.SoftMask
+	}
+	if set&StateStrokeAlpha != 0 {
+		param.StrokeAlpha = e.StrokeAlpha
+	}
+	if set&StateFillAlpha != 0 {
+		param.FillAlpha = e.FillAlpha
+	}
+	if set&StateAlphaSourceFlag != 0 {
+		param.AlphaSourceFlag = e.AlphaSourceFlag
+	}
+	if set&StateBlackPointCompensation != 0 {
+		param.BlackPointCompensation = e.BlackPointCompensation
+	}
+	if set&StateOverprint != 0 {
+		param.OverprintStroke = e.OverprintStroke
+		param.OverprintFill = e.OverprintFill
+	}
+	if set&StateOverprintMode != 0 {
+		param.OverprintMode = e.OverprintMode
+	}
+	if set&StateBlackGeneration != 0 {
+		param.BlackGeneration = e.BlackGeneration
+	}
+	if set&StateUndercolorRemoval != 0 {
+		param.UndercolorRemoval = e.UndercolorRemoval
+	}
+	if set&StateTransferFunction != 0 {
+		param.TransferFunction = e.TransferFunction
+	}
+	if set&StateHalftone != 0 {
+		param.Halftone = e.Halftone
+	}
+	if set&StateHalftoneOrigin != 0 {
+		param.HalftoneOriginX = e.HalftoneOriginX
+		param.HalftoneOriginY = e.HalftoneOriginY
+	}
+	if set&StateFlatnessTolerance != 0 {
+		param.FlatnessTolerance = e.FlatnessTolerance
+	}
+	if set&StateSmoothnessTolerance != 0 {
+		param.SmoothnessTolerance = e.SmoothnessTolerance
+	}
 }

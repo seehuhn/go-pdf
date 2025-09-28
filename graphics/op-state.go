@@ -256,13 +256,13 @@ func (w *Writer) SetExtGState(s *ExtGState) {
 		return
 	}
 
-	name, newState, err := writerGetResourceName(w, catExtGState, s)
+	name, _, err := writerGetResourceName(w, catExtGState, s)
 	if err != nil {
 		w.Err = err
 		return
 	}
 
-	newState.CopyTo(&w.State)
+	s.ApplyTo(&w.State)
 
 	w.writeObjects(name, pdf.Operator("gs"))
 }

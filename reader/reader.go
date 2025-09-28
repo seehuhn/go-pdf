@@ -233,9 +233,9 @@ func (r *Reader) do() error {
 			dictName := op.GetName()
 			if op.OK() {
 				// TODO(voss): use caching
-				newState, err := r.readExtGState(r.Resources.ExtGState[dictName])
+				extGState, err := graphics.ExtractExtGState(r.x, r.Resources.ExtGState[dictName])
 				if err == nil {
-					newState.CopyTo(&r.State)
+					extGState.ApplyTo(&r.State)
 				} else if !pdf.IsMalformed(err) {
 					return err
 				}
