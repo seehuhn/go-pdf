@@ -60,8 +60,7 @@ func extractPostScript(x *pdf.Extractor, stm *pdf.Stream) (*postScript, error) {
 	return &postScript{WriteTo: draw}, nil
 }
 
-func (ps *postScript) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (ps *postScript) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	dict := pdf.Dict{
 		"Type":    pdf.Name("XObject"),
@@ -70,19 +69,19 @@ func (ps *postScript) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error)
 	ref := rm.Alloc()
 	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	err = ps.WriteTo(stm)
 	if err != nil {
 		stm.Close()
-		return nil, zero, err
+		return nil, err
 	}
 	err = stm.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 func (ps *postScript) Subtype() pdf.Name {

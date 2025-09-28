@@ -349,8 +349,7 @@ func (d *CIDFontType2) validate() error {
 
 // Embed adds the font dictionary to a PDF file.
 // This implements the [font.Dict] interface.
-func (d *CIDFontType2) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (d *CIDFontType2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	ref := rm.AllocSelf()
 	w := rm.Out()
 
@@ -358,48 +357,48 @@ func (d *CIDFontType2) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error
 		switch d.FontFile.Type {
 		case glyphdata.TrueType:
 			if err := pdf.CheckVersion(w, "embedded composite TrueType font", pdf.V1_3); err != nil {
-				return nil, zero, err
+				return nil, err
 			}
 		case glyphdata.OpenTypeGlyf:
 			if err := pdf.CheckVersion(w, "embedded composite OpenType/glyf font", pdf.V1_6); err != nil {
-				return nil, zero, err
+				return nil, err
 			}
 		default:
-			return nil, zero, fmt.Errorf("invalid font type %s", d.FontFile.Type)
+			return nil, fmt.Errorf("invalid font type %s", d.FontFile.Type)
 		}
 	}
 
 	err := d.validate()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	if d.FontFile == nil && !d.CMap.IsPredefined() {
-		return nil, zero, errors.New("custom encoding not allowed for external font")
+		return nil, errors.New("custom encoding not allowed for external font")
 	}
 
 	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)
 
 	cidSystemInfo, err := pdf.EmbedHelperEmbedFunc(rm, font.WriteCIDSystemInfo, d.ROS)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	var encoding pdf.Object
 	if d.CMap.IsPredefined() {
 		encoding = pdf.Name(d.CMap.Name)
 	} else {
-		encoding, _, err = pdf.EmbedHelperEmbed(rm, d.CMap)
+		encoding, err = rm.Embed(d.CMap)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 	}
 
 	var toUni pdf.Object
 	if d.ToUnicode != nil {
-		toUni, _, err = pdf.EmbedHelperEmbed(rm, d.ToUnicode)
+		toUni, err = rm.Embed(d.ToUnicode)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 	}
 
@@ -427,9 +426,9 @@ func (d *CIDFontType2) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error
 
 	fdDict := d.Descriptor.AsDict()
 	if d.FontFile != nil {
-		fontFileRef, _, err := pdf.EmbedHelperEmbed(rm, d.FontFile)
+		fontFileRef, err := rm.Embed(d.FontFile)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		switch d.FontFile.Type {
 		case glyphdata.TrueType:
@@ -473,7 +472,7 @@ func (d *CIDFontType2) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return nil, zero, fmt.Errorf("CIDFontType2 dicts: %w", err)
+		return nil, fmt.Errorf("CIDFontType2 dicts: %w", err)
 	}
 
 	if c2gRef != 0 {
@@ -483,7 +482,7 @@ func (d *CIDFontType2) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error
 				"Columns":   pdf.Integer(2),
 			})
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		cid2gid := make([]byte, 2*len(d.CIDToGID))
 		for cid, gid := range d.CIDToGID {
@@ -492,15 +491,15 @@ func (d *CIDFontType2) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error
 		}
 		_, err = c2gStm.Write(cid2gid)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		err = c2gStm.Close()
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 func (d *CIDFontType2) Codec() *charcode.Codec {
@@ -592,12 +591,12 @@ type t2Font struct {
 
 var _ font.Instance = (*t2Font)(nil)
 
-func (f *t2Font) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	ref, _, err := pdf.EmbedHelperEmbed(rm, f.CIDFontType2)
+func (f *t2Font) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+	ref, err := rm.Embed(f.CIDFontType2)
 	if err != nil {
-		return nil, pdf.Unused{}, err
+		return nil, err
 	}
-	return ref, pdf.Unused{}, nil
+	return ref, nil
 }
 
 // GetName returns a human-readable name for the font.

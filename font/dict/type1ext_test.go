@@ -49,7 +49,7 @@ func TestType1Embedding(t *testing.T) {
 
 	F := fonttypes.Type1WithMetrics()
 
-	fontRefObj, _, err := pdf.ResourceManagerEmbed(doc.RM, F)
+	fontRefObj, err := doc.RM.Embed(F)
 	if err != nil {
 		t.Fatal(err)
 	}

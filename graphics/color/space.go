@@ -37,7 +37,7 @@ type Space interface {
 	// Default returns the default color of the color space.
 	Default() Color
 
-	pdf.Embedder[pdf.Unused]
+	pdf.Embedder
 }
 
 // IsSpecial reports whether the color space is a special color space.

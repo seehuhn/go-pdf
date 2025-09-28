@@ -343,8 +343,7 @@ rangesLoop:
 	return "", false
 }
 
-func (tu *ToUnicodeFile) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (tu *ToUnicodeFile) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	opt := rm.Out().GetOptions()
 
@@ -355,9 +354,9 @@ func (tu *ToUnicodeFile) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, err
 		dict["Type"] = pdf.Name("CMap")
 	}
 	if tu.Parent != nil {
-		parent, _, err := pdf.EmbedHelperEmbed(rm, tu.Parent)
+		parent, err := rm.Embed(tu.Parent)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["UseCMap"] = parent
 	}
@@ -370,18 +369,18 @@ func (tu *ToUnicodeFile) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, err
 	ref := rm.Alloc()
 	stm, err := rm.Out().OpenStream(ref, dict, filters...)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	err = toUnicodeTmplNew.Execute(stm, tu)
 	if err != nil {
-		return nil, zero, fmt.Errorf("embedding cmap: %w", err)
+		return nil, fmt.Errorf("embedding cmap: %w", err)
 	}
 	err = stm.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 func toString(obj postscript.Object) (string, error) {

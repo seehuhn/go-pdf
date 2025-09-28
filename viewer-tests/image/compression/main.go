@@ -154,7 +154,7 @@ func (g *generator) GenerateImage(predictor, colors, bpc int) error {
 	page.DrawXObject(img)
 	page.PopGraphicsState()
 
-	ref, _, err := pdf.ResourceManagerEmbed(page.RM, img)
+	ref, err := page.RM.Embed(img)
 	if err != nil {
 		return err
 	}
@@ -191,11 +191,10 @@ func (img *testImage) Subtype() pdf.Name {
 	return "Image"
 }
 
-func (img *testImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	csEmbedded, _, err := pdf.EmbedHelperEmbed(rm, img.cs)
+func (img *testImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+	csEmbedded, err := rm.Embed(img.cs)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	nChannels := img.cs.Channels()
@@ -219,7 +218,7 @@ func (img *testImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error)
 	}
 	stm, err := rm.Out().OpenStream(ref, dict, compress)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	q := float64(uint(1)<<img.bpc - 1)
@@ -237,16 +236,16 @@ func (img *testImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error)
 		}
 		_, err = stm.Write(row.Bytes())
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 	}
 
 	err = stm.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 const damping float64 = 4

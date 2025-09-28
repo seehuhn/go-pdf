@@ -124,7 +124,7 @@ func roundTripTest(t *testing.T, version pdf.Version, item1 *ItemDict) {
 	rm := pdf.NewResourceManager(w)
 
 	// Embed the item
-	obj, _, err := pdf.ResourceManagerEmbed(rm, item1)
+	obj, err := rm.Embed(item1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +175,7 @@ func TestItemDictValidation(t *testing.T) {
 		w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 		rm := pdf.NewResourceManager(w)
 
-		_, _, err := pdf.ResourceManagerEmbed(rm, item)
+		_, err := rm.Embed(item)
 		if err == nil {
 			t.Error("expected error for Type key, got nil")
 		}
@@ -191,7 +191,7 @@ func TestItemDictValidation(t *testing.T) {
 		w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 		rm := pdf.NewResourceManager(w)
 
-		_, _, err := pdf.ResourceManagerEmbed(rm, item)
+		_, err := rm.Embed(item)
 		if err == nil {
 			t.Error("expected error for invalid value type, got nil")
 		}
@@ -207,7 +207,7 @@ func TestItemDictValidation(t *testing.T) {
 		w, _ := memfile.NewPDFWriter(pdf.V1_6, nil)
 		rm := pdf.NewResourceManager(w)
 
-		_, _, err := pdf.ResourceManagerEmbed(rm, item)
+		_, err := rm.Embed(item)
 		if err == nil {
 			t.Error("expected version error, got nil")
 		}
@@ -249,7 +249,7 @@ func FuzzItemDictRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(tc.version, opt)
 		rm := pdf.NewResourceManager(w)
 
-		obj, _, err := pdf.ResourceManagerEmbed(rm, tc.item)
+		obj, err := rm.Embed(tc.item)
 		if err != nil {
 			continue
 		}

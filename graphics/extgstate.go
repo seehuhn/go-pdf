@@ -555,11 +555,10 @@ func parseSingleTransfer(x *pdf.Extractor, obj pdf.Object) (pdf.Function, error)
 // Embed adds the graphics state dictionary to a PDF file.
 //
 // This implements the [pdf.Embedder] interface.
-func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if err := pdf.CheckVersion(rm.Out(), "ExtGState", pdf.V1_2); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	set := e.Set
@@ -568,57 +567,57 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	// See table 57 in ISO 32000-2:2020.
 	dict := pdf.Dict{}
 	if set&StateTextFont != 0 {
-		E, _, err := pdf.EmbedHelperEmbed(rm, e.TextFont)
+		E, err := rm.Embed(e.TextFont)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		if _, ok := E.(pdf.Reference); !ok {
 			err := fmt.Errorf("font %q cannot be used in ExtGState",
 				e.TextFont.PostScriptName())
-			return nil, zero, err
+			return nil, err
 		}
 		dict["Font"] = pdf.Array{E, pdf.Number(e.TextFontSize)}
 	} else {
 		if e.TextFont != nil {
-			return nil, zero, errors.New("unexpected TextFont value")
+			return nil, errors.New("unexpected TextFont value")
 		}
 		if e.TextFontSize != 0 {
-			return nil, zero, errors.New("unexpected TextFontSize value")
+			return nil, errors.New("unexpected TextFontSize value")
 		}
 	}
 	if set&StateTextKnockout != 0 {
 		dict["TK"] = pdf.Boolean(e.TextKnockout)
 	} else {
 		if e.TextKnockout {
-			return nil, zero, errors.New("unexpected TextKnockout value")
+			return nil, errors.New("unexpected TextKnockout value")
 		}
 	}
 	if set&StateLineWidth != 0 {
 		dict["LW"] = pdf.Number(e.LineWidth)
 	} else {
 		if e.LineWidth != 0 {
-			return nil, zero, errors.New("unexpected LineWidth value")
+			return nil, errors.New("unexpected LineWidth value")
 		}
 	}
 	if set&StateLineCap != 0 {
 		dict["LC"] = pdf.Integer(e.LineCap)
 	} else {
 		if e.LineCap != 0 {
-			return nil, zero, errors.New("unexpected LineCap value")
+			return nil, errors.New("unexpected LineCap value")
 		}
 	}
 	if set&StateLineJoin != 0 {
 		dict["LJ"] = pdf.Integer(e.LineJoin)
 	} else {
 		if e.LineJoin != 0 {
-			return nil, zero, errors.New("unexpected LineJoin value")
+			return nil, errors.New("unexpected LineJoin value")
 		}
 	}
 	if set&StateMiterLimit != 0 {
 		dict["ML"] = pdf.Number(e.MiterLimit)
 	} else {
 		if e.MiterLimit != 0 {
-			return nil, zero, errors.New("unexpected MiterLimit value")
+			return nil, errors.New("unexpected MiterLimit value")
 		}
 	}
 	if set&StateLineDash != 0 {
@@ -632,66 +631,66 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		}
 	} else {
 		if e.DashPattern != nil {
-			return nil, zero, errors.New("unexpected DashPattern value")
+			return nil, errors.New("unexpected DashPattern value")
 		}
 		if e.DashPhase != 0 {
-			return nil, zero, errors.New("unexpected DashPhase value")
+			return nil, errors.New("unexpected DashPhase value")
 		}
 	}
 	if set&StateRenderingIntent != 0 {
 		dict["RI"] = pdf.Name(e.RenderingIntent)
 	} else {
 		if e.RenderingIntent != "" {
-			return nil, zero, errors.New("unexpected RenderingIntent value")
+			return nil, errors.New("unexpected RenderingIntent value")
 		}
 	}
 	if set&StateStrokeAdjustment != 0 {
 		dict["SA"] = pdf.Boolean(e.StrokeAdjustment)
 	} else {
 		if e.StrokeAdjustment {
-			return nil, zero, errors.New("unexpected StrokeAdjustment value")
+			return nil, errors.New("unexpected StrokeAdjustment value")
 		}
 	}
 	if set&StateBlendMode != 0 {
 		dict["BM"] = e.BlendMode
 	} else {
 		if e.BlendMode != nil {
-			return nil, zero, errors.New("unexpected BlendMode value")
+			return nil, errors.New("unexpected BlendMode value")
 		}
 	}
 	if set&StateSoftMask != 0 {
 		dict["SMask"] = e.SoftMask
 	} else {
 		if e.SoftMask != nil {
-			return nil, zero, errors.New("unexpected SoftMask value")
+			return nil, errors.New("unexpected SoftMask value")
 		}
 	}
 	if set&StateStrokeAlpha != 0 {
 		dict["CA"] = pdf.Number(e.StrokeAlpha)
 	} else {
 		if e.StrokeAlpha != 0 {
-			return nil, zero, errors.New("unexpected StrokeAlpha value")
+			return nil, errors.New("unexpected StrokeAlpha value")
 		}
 	}
 	if set&StateFillAlpha != 0 {
 		dict["ca"] = pdf.Number(e.FillAlpha)
 	} else {
 		if e.FillAlpha != 0 {
-			return nil, zero, errors.New("unexpected FillAlpha value")
+			return nil, errors.New("unexpected FillAlpha value")
 		}
 	}
 	if set&StateAlphaSourceFlag != 0 {
 		dict["AIS"] = pdf.Boolean(e.AlphaSourceFlag)
 	} else {
 		if e.AlphaSourceFlag {
-			return nil, zero, errors.New("unexpected AlphaSourceFlag value")
+			return nil, errors.New("unexpected AlphaSourceFlag value")
 		}
 	}
 	if set&StateBlackPointCompensation != 0 {
 		dict["UseBlackPtComp"] = e.BlackPointCompensation
 	} else {
 		if e.BlackPointCompensation != "" {
-			return nil, zero, errors.New("unexpected BlackPointCompensation value")
+			return nil, errors.New("unexpected BlackPointCompensation value")
 		}
 	}
 
@@ -702,58 +701,58 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		}
 	} else {
 		if e.OverprintStroke {
-			return nil, zero, errors.New("unexpected OverprintStroke value")
+			return nil, errors.New("unexpected OverprintStroke value")
 		}
 		if e.OverprintFill {
-			return nil, zero, errors.New("unexpected OverprintFill value")
+			return nil, errors.New("unexpected OverprintFill value")
 		}
 	}
 	if set&StateOverprintMode != 0 {
 		dict["OPM"] = pdf.Integer(e.OverprintMode)
 	} else {
 		if e.OverprintMode != 0 {
-			return nil, zero, errors.New("unexpected OverprintMode value")
+			return nil, errors.New("unexpected OverprintMode value")
 		}
 	}
 	if set&StateBlackGeneration != 0 {
 		if e.BlackGeneration == nil {
 			if err := pdf.CheckVersion(rm.Out(), "BG2 in ExtGState", pdf.V1_3); err != nil {
-				return nil, zero, err
+				return nil, err
 			}
 			dict["BG2"] = pdf.Name("Default")
 		} else {
-			obj, _, err := pdf.EmbedHelperEmbed(rm, e.BlackGeneration)
+			obj, err := rm.Embed(e.BlackGeneration)
 			if err != nil {
-				return nil, zero, err
+				return nil, err
 			}
 			dict["BG"] = obj
 		}
 	} else {
 		if e.BlackGeneration != nil {
-			return nil, zero, errors.New("unexpected BlackGeneration value")
+			return nil, errors.New("unexpected BlackGeneration value")
 		}
 	}
 	if set&StateUndercolorRemoval != 0 {
 		if e.UndercolorRemoval == nil {
 			if err := pdf.CheckVersion(rm.Out(), "UCR2 in ExtGState", pdf.V1_3); err != nil {
-				return nil, zero, err
+				return nil, err
 			}
 			dict["UCR2"] = pdf.Name("Default")
 		} else {
-			obj, _, err := pdf.EmbedHelperEmbed(rm, e.UndercolorRemoval)
+			obj, err := rm.Embed(e.UndercolorRemoval)
 			if err != nil {
-				return nil, zero, err
+				return nil, err
 			}
 			dict["UCR"] = obj
 		}
 	} else {
 		if e.UndercolorRemoval != nil {
-			return nil, zero, errors.New("unexpected UndercolorRemoval value")
+			return nil, errors.New("unexpected UndercolorRemoval value")
 		}
 	}
 	if set&StateTransferFunction != 0 {
 		if v := pdf.GetVersion(rm.Out()); v >= pdf.V2_0 {
-			return nil, zero, errors.New("TransferFunction is deprecated in PDF 2.0")
+			return nil, errors.New("TransferFunction is deprecated in PDF 2.0")
 		}
 		all := []pdf.Function{
 			e.TransferFunction.Red,
@@ -769,11 +768,11 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 			}
 			if fn == nil {
 				if err := pdf.CheckVersion(rm.Out(), "TR2 in ExtGState", pdf.V1_3); err != nil {
-					return nil, zero, err
+					return nil, err
 				}
 				key = "TR2"
 			} else if nIn, nOut := fn.Shape(); nIn != 1 || nOut != 1 {
-				return nil, zero, fmt.Errorf("wrong transfer function shape (%d,%d) != (1,1)", nIn, nOut)
+				return nil, fmt.Errorf("wrong transfer function shape (%d,%d) != (1,1)", nIn, nOut)
 			}
 		}
 		a := make(pdf.Array, len(all))
@@ -786,9 +785,9 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 				obj = pdf.Name("Identity")
 			default:
 				var err error
-				obj, _, err = pdf.EmbedHelperEmbed(rm, fn)
+				obj, err = rm.Embed(fn)
 				if err != nil {
-					return nil, zero, err
+					return nil, err
 				}
 			}
 			a[i] = obj
@@ -801,18 +800,18 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	} else {
 		if e.TransferFunction.Red != nil || e.TransferFunction.Green != nil ||
 			e.TransferFunction.Blue != nil || e.TransferFunction.Gray != nil {
-			return nil, zero, errors.New("unexpected TransferFunction value")
+			return nil, errors.New("unexpected TransferFunction value")
 		}
 	}
 	if set&StateHalftone != 0 {
-		htEmbedded, _, err := pdf.EmbedHelperEmbed(rm, e.Halftone)
+		htEmbedded, err := rm.Embed(e.Halftone)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["HT"] = htEmbedded
 	} else {
 		if e.Halftone != nil {
-			return nil, zero, errors.New("unexpected Halftone value")
+			return nil, errors.New("unexpected Halftone value")
 		}
 	}
 	if set&StateHalftoneOrigin != 0 {
@@ -822,36 +821,36 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		}
 	} else {
 		if e.HalftoneOriginX != 0 {
-			return nil, zero, errors.New("unexpected HalftoneOriginX value")
+			return nil, errors.New("unexpected HalftoneOriginX value")
 		}
 		if e.HalftoneOriginY != 0 {
-			return nil, zero, errors.New("unexpected HalftoneOriginY value")
+			return nil, errors.New("unexpected HalftoneOriginY value")
 		}
 	}
 	if set&StateFlatnessTolerance != 0 {
 		dict["FL"] = pdf.Number(e.FlatnessTolerance)
 	} else {
 		if e.FlatnessTolerance != 0 {
-			return nil, zero, errors.New("unexpected FlatnessTolerance value")
+			return nil, errors.New("unexpected FlatnessTolerance value")
 		}
 	}
 	if set&StateSmoothnessTolerance != 0 {
 		dict["SM"] = pdf.Number(e.SmoothnessTolerance)
 	} else {
 		if e.SmoothnessTolerance != 0 {
-			return nil, zero, errors.New("unexpected SmoothnessTolerance value")
+			return nil, errors.New("unexpected SmoothnessTolerance value")
 		}
 	}
 
 	if e.SingleUse {
-		return dict, zero, nil
+		return dict, nil
 	}
 	ref := rm.Alloc()
 	err := rm.Out().Put(ref, dict)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
-	return ref, zero, nil
+	return ref, nil
 }
 
 // ApplyTo modifies the given graphics state according to the parameters in

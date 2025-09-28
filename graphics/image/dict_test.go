@@ -492,7 +492,7 @@ func roundTripTest(t *testing.T, version pdf.Version, data *Dict) {
 	rm := pdf.NewResourceManager(w)
 
 	// Embed the original data
-	ref, _, err := pdf.ResourceManagerEmbed(rm, data)
+	ref, err := rm.Embed(data)
 	if err != nil {
 		t.Fatalf("failed to embed Dict: %v", err)
 	}
@@ -578,7 +578,7 @@ func FuzzDictRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(tc.version, opt)
 		rm := pdf.NewResourceManager(w)
 
-		ref, _, err := pdf.ResourceManagerEmbed(rm, tc.data)
+		ref, err := rm.Embed(tc.data)
 		if err != nil {
 			continue
 		}

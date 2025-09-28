@@ -130,9 +130,9 @@ func (f *Composite) FontInfo() any {
 }
 
 // Embed adds the font to a PDF file.
-func (f *Composite) Embed(e *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+func (f *Composite) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	if err := pdf.CheckVersion(e.Out(), "composite CFF fonts", pdf.V1_3); err != nil {
-		return nil, pdf.Unused{}, err
+		return nil, err
 	}
 
 	ref := e.Alloc()
@@ -141,11 +141,11 @@ func (f *Composite) Embed(e *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		if err != nil {
 			return err
 		}
-		_, _, err = pdf.EmbedHelperEmbedAt(rm, ref, dict)
+		_, err = rm.EmbedAt(ref, dict)
 		return err
 	})
 
-	return ref, pdf.Unused{}, nil
+	return ref, nil
 }
 
 // Encode converts a glyph ID to a character code.

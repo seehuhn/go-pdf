@@ -32,7 +32,7 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-var _ pdf.Embedder[pdf.Unused] = (*ToUnicodeFile)(nil)
+var _ pdf.Embedder = (*ToUnicodeFile)(nil)
 
 func TestToUnicodeRangeIter(t *testing.T) {
 	type testCase struct {
@@ -486,7 +486,7 @@ func TestEmbedToUnicode(t *testing.T) {
 	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
 
-	ref, _, err := pdf.ResourceManagerEmbed(rm, testToUniInfoChild)
+	ref, err := rm.Embed(testToUniInfoChild)
 	if err != nil {
 		t.Fatal(err)
 	}

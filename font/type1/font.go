@@ -265,17 +265,17 @@ func (f *Instance) GlyphWidthPDF(glyphName string) float64 {
 // Embed adds the font to a PDF file.
 //
 // This implements the [font.Instance] interface.
-func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	ref := rm.Alloc()
 	rm.Defer(func(eh *pdf.EmbedHelper) error {
 		dict, err := f.makeFontDict()
 		if err != nil {
 			return err
 		}
-		_, _, err = pdf.EmbedHelperEmbedAt(eh, ref, dict)
+		_, err = eh.EmbedAt(ref, dict)
 		return err
 	})
-	return ref, pdf.Unused{}, nil
+	return ref, nil
 }
 
 func (f *Instance) makeFontDict() (*dict.Type1, error) {

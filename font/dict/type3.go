@@ -180,14 +180,13 @@ func (d *Type3) validate(w *pdf.Writer) error {
 
 // Embed adds the font dictionary to a PDF file.
 // This implements the [font.Dict] interface.
-func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	ref := rm.AllocSelf()
 	w := rm.Out()
 
 	err := d.validate(w)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	fontBBox := d.FontBBox
@@ -230,7 +229,7 @@ func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 
 	encodingObj, err := d.Encoding.AsPDFType3(w.GetOptions())
 	if err != nil {
-		return nil, zero, fmt.Errorf("/Encoding: %w", err)
+		return nil, fmt.Errorf("/Encoding: %w", err)
 	}
 	encodingRef := w.Alloc()
 	fontDict["Encoding"] = encodingRef
@@ -254,9 +253,9 @@ func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if d.ToUnicode != nil {
-		ref, _, err := pdf.EmbedHelperEmbed(rm, d.ToUnicode)
+		ref, err := rm.Embed(d.ToUnicode)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		fontDict["ToUnicode"] = ref
 	}
@@ -271,10 +270,10 @@ func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return nil, zero, fmt.Errorf("Type 3 font dict: %w", err)
+		return nil, fmt.Errorf("Type 3 font dict: %w", err)
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 func (d *Type3) Codec() *charcode.Codec {
@@ -335,13 +334,13 @@ type t3Font struct {
 	Text map[byte]string
 }
 
-func (f *t3Font) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+func (f *t3Font) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	ref := rm.Alloc()
-	_, _, err := pdf.EmbedHelperEmbedAt(rm, ref, f.Dict)
+	_, err := rm.EmbedAt(ref, f.Dict)
 	if err != nil {
-		return nil, pdf.Unused{}, err
+		return nil, err
 	}
-	return ref, pdf.Unused{}, nil
+	return ref, nil
 }
 
 func (f *t3Font) PostScriptName() string {

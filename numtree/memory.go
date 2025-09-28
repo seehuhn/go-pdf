@@ -133,7 +133,7 @@ func (t *InMemory) All() iter.Seq2[pdf.Integer, pdf.Object] {
 }
 
 // Embed adds the number tree to a PDF file.
-func (t *InMemory) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+func (t *InMemory) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	ref, err := Write(rm.Out(), t.All())
-	return ref, pdf.Unused{}, err
+	return ref, err
 }

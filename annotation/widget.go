@@ -165,7 +165,7 @@ func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// BS (optional)
 	if w.BorderStyle != nil {
-		bs, _, err := pdf.ResourceManagerEmbed(rm, w.BorderStyle)
+		bs, err := rm.Embed(w.BorderStyle)
 		if err != nil {
 			return nil, err
 		}

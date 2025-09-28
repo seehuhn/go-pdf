@@ -28,7 +28,7 @@ import (
 
 // color.Space implements pdf.Embedder
 var (
-	_ pdf.Embedder[pdf.Unused] = Space(nil)
+	_ pdf.Embedder = Space(nil)
 )
 
 // The following types implement the ColorSpace interface:
@@ -99,7 +99,7 @@ func TestDecodeSpace(t *testing.T) {
 			r, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(r)
 
-			obj, _, err := pdf.ResourceManagerEmbed(rm, space)
+			obj, err := rm.Embed(space)
 			if err != nil {
 				t.Fatal(err)
 			}

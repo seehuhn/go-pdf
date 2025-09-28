@@ -139,7 +139,7 @@ func testMembershipRoundTrip(t *testing.T, original *Membership, mode string) {
 	rm := pdf.NewResourceManager(buf)
 
 	// embed the membership dictionary
-	obj, _, err := pdf.ResourceManagerEmbed(rm, original)
+	obj, err := rm.Embed(original)
 	if err != nil {
 		t.Fatalf("%s: embed: %v", mode, err)
 	}
@@ -211,7 +211,7 @@ func TestMembershipValidation(t *testing.T) {
 
 	// test empty membership (should fail)
 	empty := &Membership{}
-	_, _, err := pdf.ResourceManagerEmbed(rm, empty)
+	_, err := rm.Embed(empty)
 	if err == nil {
 		t.Error("expected error for empty membership, got nil")
 	}
@@ -223,7 +223,7 @@ func TestMembershipValidation(t *testing.T) {
 		},
 		Policy: Policy("Invalid"),
 	}
-	_, _, err = pdf.ResourceManagerEmbed(rm, invalidPolicy)
+	_, err = rm.Embed(invalidPolicy)
 	if err == nil {
 		t.Error("expected error for invalid policy, got nil")
 	}
@@ -289,7 +289,7 @@ func TestMembershipSingleOCG(t *testing.T) {
 		SingleUse: false,
 	}
 
-	obj, _, err := pdf.ResourceManagerEmbed(rm, membership)
+	obj, err := rm.Embed(membership)
 	if err != nil {
 		t.Fatalf("embed: %v", err)
 	}
@@ -318,7 +318,7 @@ func TestMembershipWithNullOCGs(t *testing.T) {
 
 	// create a valid group first
 	group := &Group{Name: "ValidGroup"}
-	groupRef, _, err := pdf.ResourceManagerEmbed(rm, group)
+	groupRef, err := rm.Embed(group)
 	if err != nil {
 		t.Fatalf("embed group: %v", err)
 	}

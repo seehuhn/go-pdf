@@ -87,22 +87,21 @@ func (sm *SoftMask) Subtype() pdf.Name {
 }
 
 // Embed embeds the soft mask as a PDF image XObject stream.
-func (sm *SoftMask) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (sm *SoftMask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if err := sm.check(rm.Out()); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	// Soft masks require PDF 1.4+
 	if err := pdf.CheckVersion(rm.Out(), "soft mask images", pdf.V1_4); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	// Soft-mask images must always use DeviceGray color space
-	csEmbedded, _, err := pdf.EmbedHelperEmbed(rm, color.SpaceDeviceGray)
+	csEmbedded, err := rm.Embed(color.SpaceDeviceGray)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -149,20 +148,20 @@ func (sm *SoftMask) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 
 	w, err := rm.Out().OpenStream(ref, dict, compress)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	err = sm.WriteData(w)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	err = w.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 // check validates the soft mask according to PDF specification requirements.

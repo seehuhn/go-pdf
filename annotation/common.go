@@ -199,7 +199,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool)
 		if err := pdf.CheckVersion(w, "annotation AP entry", pdf.V1_2); err != nil {
 			return err
 		}
-		ref, _, err := pdf.ResourceManagerEmbed(rm, c.Appearance)
+		ref, err := rm.Embed(c.Appearance)
 		if err != nil {
 			return err
 		}
@@ -223,7 +223,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool)
 		return errors.New("missing AS entry")
 	}
 
-	borderValue, _, err := pdf.ResourceManagerEmbed(rm, c.Border)
+	borderValue, err := rm.Embed(c.Border)
 	if err != nil {
 		return err
 	}
@@ -264,7 +264,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool)
 		if err := pdf.CheckVersion(w, "annotation OC entry", pdf.V1_5); err != nil {
 			return err
 		}
-		ocObj, _, err := pdf.ResourceManagerEmbed(rm, c.OptionalContent)
+		ocObj, err := rm.Embed(c.OptionalContent)
 		if err != nil {
 			return err
 		}

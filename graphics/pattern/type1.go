@@ -69,24 +69,23 @@ func (p *Type1) PaintType() int {
 	return 2
 }
 
-func (p *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (p *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if p.TilingType < 1 || p.TilingType > 3 {
-		return nil, zero, fmt.Errorf("invalid tiling type: %d", p.TilingType)
+		return nil, fmt.Errorf("invalid tiling type: %d", p.TilingType)
 	}
 	if p.XStep == 0 || p.YStep == 0 {
-		return nil, zero, fmt.Errorf("invalid step size: (%f, %f)", p.XStep, p.YStep)
+		return nil, fmt.Errorf("invalid step size: (%f, %f)", p.XStep, p.YStep)
 	}
 
 	buf := &bytes.Buffer{}
 	w := graphics.NewWriter(buf, rm.GetRM())
 	err := p.Draw(w)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	if w.Err != nil {
-		return nil, zero, w.Err
+		return nil, w.Err
 	}
 
 	dict := pdf.Dict{
@@ -109,16 +108,16 @@ func (p *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	ref := rm.Alloc()
 	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	_, err = io.Copy(stm, buf)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	err = stm.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }

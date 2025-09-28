@@ -76,7 +76,7 @@ func TestBorderEffectRoundTrip(t *testing.T) {
 			rm := pdf.NewResourceManager(buf)
 
 			// embed the border effect
-			embedded, _, err := pdf.ResourceManagerEmbed(rm, tt.effect)
+			embedded, err := rm.Embed(tt.effect)
 			if err != nil {
 				t.Fatal(err)
 			}

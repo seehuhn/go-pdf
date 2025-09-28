@@ -217,9 +217,9 @@ func (f *Simple) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Glyp
 //
 // The second return value is a Go representation of the embedded object.
 // In most cases, this value is not used and T can be set to [Unused].
-func (f *Simple) Embed(e *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+func (f *Simple) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	if err := pdf.CheckVersion(e.Out(), "simple CFF fonts", pdf.V1_2); err != nil {
-		return nil, pdf.Unused{}, err
+		return nil, err
 	}
 
 	ref := e.Alloc()
@@ -228,11 +228,11 @@ func (f *Simple) Embed(e *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		if err != nil {
 			return err
 		}
-		_, _, err = pdf.EmbedHelperEmbedAt(eh, ref, dict)
+		_, err = eh.EmbedAt(ref, dict)
 		return err
 	})
 
-	return ref, pdf.Unused{}, nil
+	return ref, nil
 }
 
 func (f *Simple) makeFontDict() (*dict.Type1, error) {

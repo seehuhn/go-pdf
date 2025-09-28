@@ -221,9 +221,9 @@ func (f *instance) Encode(gid glyph.ID, width float64, text string) (charcode.Co
 }
 
 // Embed implements the pdf.Embedder interface for Type 3 fonts.
-func (f *instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+func (f *instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if len(f.Font.Glyphs) == 0 || f.Font.Glyphs[0].Name != "" {
-		return nil, pdf.Unused{}, errors.New("invalid glyph 0")
+		return nil, errors.New("invalid glyph 0")
 	}
 
 	ref := rm.Alloc()
@@ -232,10 +232,10 @@ func (f *instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		if err != nil {
 			return err
 		}
-		_, _, err = pdf.EmbedHelperEmbedAt(eh, ref, dict)
+		_, err = eh.EmbedAt(ref, dict)
 		return err
 	})
-	return ref, pdf.Unused{}, nil
+	return ref, nil
 }
 
 // makeFontDict creates the Type 3 font dictionary for embedding.

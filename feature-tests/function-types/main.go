@@ -531,12 +531,11 @@ func (img *imageStrip) Subtype() pdf.Name {
 	return "Image"
 }
 
-func (img *imageStrip) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (img *imageStrip) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
-	csEmbedded, _, err := pdf.EmbedHelperEmbed(rm, img.cs)
+	csEmbedded, err := rm.Embed(img.cs)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -571,18 +570,18 @@ func (img *imageStrip) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error
 	ref := rm.Alloc()
 	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	_, err = stm.Write(buf)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	err = stm.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 type axialImageStrip struct {
@@ -598,12 +597,11 @@ func (img *axialImageStrip) Subtype() pdf.Name {
 	return "Image"
 }
 
-func (img *axialImageStrip) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (img *axialImageStrip) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
-	csEmbedded, _, err := pdf.EmbedHelperEmbed(rm, img.cs)
+	csEmbedded, err := rm.Embed(img.cs)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -631,18 +629,18 @@ func (img *axialImageStrip) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, 
 	ref := rm.Alloc()
 	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	_, err = stm.Write(buf)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	err = stm.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 func encodeSamples(bitDepth int, samples [][]float64) []byte {

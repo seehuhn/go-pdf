@@ -209,7 +209,7 @@ func doit() error {
 		if gen != nil {
 			fontRM := pdf.NewResourceManager(doc.Out)
 
-			refY, _, err := pdf.ResourceManagerEmbed(fontRM, X)
+			refY, err := fontRM.Embed(X)
 			if err != nil {
 				return err
 			}

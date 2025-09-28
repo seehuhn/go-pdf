@@ -56,23 +56,22 @@ func (im *Indexed) Subtype() pdf.Name {
 
 // Embed adds the image to the PDF file.
 // This implements the [graphics.Image] interface.
-func (im *Indexed) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (im *Indexed) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	cs, ok := im.ColorSpace.(*color.SpaceIndexed)
 	if !ok {
-		return nil, zero, fmt.Errorf("Indexed: invalid color space %q", im.ColorSpace.Family())
+		return nil, fmt.Errorf("Indexed: invalid color space %q", im.ColorSpace.Family())
 	}
 
 	maxCol := uint8(cs.NumCol - 1)
 	for _, pix := range im.Pix {
 		if pix > maxCol {
-			return nil, zero, fmt.Errorf("Indexed: invalid color index %d", pix)
+			return nil, fmt.Errorf("Indexed: invalid color index %d", pix)
 		}
 	}
 
-	csRef, _, err := pdf.EmbedHelperEmbed(rm, im.ColorSpace)
+	csRef, err := rm.Embed(im.ColorSpace)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	imDict := pdf.Dict{
@@ -90,16 +89,16 @@ func (im *Indexed) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	ref := rm.Alloc()
 	stream, err := rm.Out().OpenStream(ref, imDict, filter)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	_, err = stream.Write(im.Pix)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	err = stream.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }

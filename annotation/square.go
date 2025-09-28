@@ -171,7 +171,7 @@ func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	// Add square-specific fields
 	// BS (optional)
 	if s.BorderStyle != nil {
-		bs, _, err := pdf.ResourceManagerEmbed(rm, s.BorderStyle)
+		bs, err := rm.Embed(s.BorderStyle)
 		if err != nil {
 			return nil, err
 		}
@@ -184,7 +184,7 @@ func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out, "square annotation BE entry", pdf.V1_5); err != nil {
 			return nil, err
 		}
-		be, _, err := pdf.ResourceManagerEmbed(rm, s.BorderEffect)
+		be, err := rm.Embed(s.BorderEffect)
 		if err != nil {
 			return nil, err
 		}

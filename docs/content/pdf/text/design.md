@@ -110,10 +110,9 @@ The Go API needs to cater for the following use cases:
     generate multiple PDF files.
 
   - In order for the `pdf.ResourceManager` mechanism to work,
-    fonts used for typesetting new text must embed the generic
-    `pdf.Embedder[T]` interface, for some type `T`.
-    The type `T` represents a font tied to a specific PDF file,
-    and must be able to allocate character codes to glyphs and to keep
+    fonts used for typesetting new text must implement the
+    `pdf.Embedder` interface. When embedded, fonts become tied to a
+    specific PDF file and are able to allocate character codes to glyphs and to keep
     track of which glyphs of the font are used in the PDF file.
 
   - The field `TextFont` in a PDF graphics state needs to be able to refer to
@@ -132,7 +131,7 @@ The following table lists different operations on different types of fonts:
 
 | A | B | C | Operation
 |---|---|---|-----------
-| x |   |   | implement pdf.Embedder[T]
+| x |   |   | implement pdf.Embedder
 |   | x |   | implement pdf.Resource
 | x | x | . | GID -> width
 |   | . | x | character code -> width

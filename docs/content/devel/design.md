@@ -38,12 +38,10 @@ Deduplication
 
 - To be used with a `ResourceManager`, objects must implement the [`Embedder`
   interface](https://pkg.go.dev/seehuhn.de/go/pdf@v0.5.1-0.20250106103048-1692b734110c#Embedder),
-  by providing a method `Embed(*pdf.ResourceManager) (pdf.Native, T, error)`
-  for some type `T`.  The object can either use the `Embed` method to embed the
-  object straight away, or it can defer embedding the object by returning a
-  type `T` with a `Finish(*pdf.ResourceManager) error` method.  In the latter
-  case, the resource manager will call `Finish` when the resource manager is
-  closed.
+  by providing a method `Embed(*pdf.EmbedHelper) (pdf.Native, error)`.
+  The object can either embed the object immediately, or it can defer
+  embedding by using the `EmbedHelper.Defer()` method to register a
+  function that will be called when the resource manager is closed.
 
 
 Naming
@@ -72,50 +70,51 @@ Naming
 - Methods with signature `WriteToPDF(*pdf.ResourceManager) error`
   are used to write objects to a PDF file as one or more indirect objects.
 
-- Methods with signature `Embed(*pdf.ResourceManager) (pdf.Native, T, error)`
-  and optionally `Finish(*pdf.ResourceManager) error` are used to write objects
-  to the PDF file, in cases when deduplication is required.
+- Methods with signature `Embed(*pdf.EmbedHelper) (pdf.Native, error)`
+  are used to write objects to the PDF file, in cases when deduplication
+  is required. Objects can use `EmbedHelper.Defer()` to register functions
+  for delayed execution when the resource manager is closed.
 
 
 Composite Objects
 -----------------
 
 No reader:
-./go-pdf/function/function.go:func (f *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-./go-pdf/font/cff/font.go:func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
-./go-pdf/font/opentype/font.go:func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
-./go-pdf/font/truetype/font.go:func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
-./go-pdf/font/type1/font.go:func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
-./go-pdf/font/type3/font.go:func (f *Instance) Embed(rm *pdf.ResourceManager) (pdf.Native, font.Embedded, error) {
-./go-pdf/graphics/extgstate.go:func (s *ExtGState) Embed(rm *pdf.ResourceManager) (pdf.Native, State, error) {
-./go-pdf/graphics/form/form.go:func (f *Form) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-./go-pdf/graphics/op-marks.go:func (mc *MarkedContent) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-./go-pdf/graphics/pattern/type1.go:func (p *type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-./go-pdf/graphics/pattern/type2.go:func (p *Type2) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-./go-pdf/graphics/shading/type1.go:func (s *Type1) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-./go-pdf/graphics/shading/type3.go:func (s *Type3) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-./go-pdf/graphics/shading/type4.go:func (s *Type4) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+./go-pdf/function/function.go:func (f *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+./go-pdf/font/cff/font.go:func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+./go-pdf/font/opentype/font.go:func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+./go-pdf/font/truetype/font.go:func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+./go-pdf/font/type1/font.go:func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+./go-pdf/font/type3/font.go:func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+./go-pdf/graphics/extgstate.go:func (s *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+./go-pdf/graphics/form/form.go:func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+./go-pdf/graphics/op-marks.go:func (mc *MarkedContent) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+./go-pdf/graphics/pattern/type1.go:func (p *type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+./go-pdf/graphics/pattern/type2.go:func (p *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+./go-pdf/graphics/shading/type1.go:func (s *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+./go-pdf/graphics/shading/type3.go:func (s *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+./go-pdf/graphics/shading/type4.go:func (s *Type4) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 With reader:
-cmap.Extract -> *cmap.File -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
-cmap.ExtractToUnicode -> *cmap.ToUnicodeFile -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
+cmap.Extract -> *cmap.File -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
+cmap.ExtractToUnicode -> *cmap.ToUnicodeFile -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
 color.ExtractSpace -> ...
-  ... -> *color.SpaceCalGray -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
-  ... -> *color.SpaceCalRGB -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
-  ... -> *color.SpaceLab -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
-  ... -> color.SpaceDeviceCMYK -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
-  ... -> color.SpaceDeviceGray -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
-  ... -> color.SpaceDeviceRGB -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
-  ... -> *color.SpaceICCBased -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
-  ... -> *color.spacePatternColored -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
-  ... -> *color.spacePatternUncolored -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
-  ... -> *color.SpaceDeviceN -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
-  ... -> *color.SpaceIndexed -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
-  ... -> *color.SpaceSeparation -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
-metadata.ExtractStream -> *metadata.Stream -> Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
+  ... -> *color.SpaceCalGray -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
+  ... -> *color.SpaceCalRGB -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
+  ... -> *color.SpaceLab -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
+  ... -> color.SpaceDeviceCMYK -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
+  ... -> color.SpaceDeviceGray -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
+  ... -> color.SpaceDeviceRGB -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
+  ... -> *color.SpaceICCBased -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
+  ... -> *color.spacePatternColored -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
+  ... -> *color.spacePatternUncolored -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
+  ... -> *color.SpaceDeviceN -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
+  ... -> *color.SpaceIndexed -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
+  ... -> *color.SpaceSeparation -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
+metadata.ExtractStream -> *metadata.Stream -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
 
 TODO:
-./go-pdf/graphics/image/dict.go:func (d *Dict) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-./go-pdf/graphics/image/indexed.go:func (im *Indexed) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-./go-pdf/graphics/image/jpeg.go:func (im *jpegImage) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
-./go-pdf/graphics/image/png.go:func (im *PNG) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+./go-pdf/graphics/image/dict.go:func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+./go-pdf/graphics/image/indexed.go:func (im *Indexed) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+./go-pdf/graphics/image/jpeg.go:func (im *jpegImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+./go-pdf/graphics/image/png.go:func (im *PNG) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {

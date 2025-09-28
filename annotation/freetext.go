@@ -249,7 +249,7 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation BE entry", pdf.V1_6); err != nil {
 			return nil, err
 		}
-		be, _, err := pdf.ResourceManagerEmbed(rm, f.BorderEffect)
+		be, err := rm.Embed(f.BorderEffect)
 		if err != nil {
 			return nil, err
 		}
@@ -284,7 +284,7 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation BS entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		bs, _, err := pdf.ResourceManagerEmbed(rm, f.BorderStyle)
+		bs, err := rm.Embed(f.BorderStyle)
 		if err != nil {
 			return nil, err
 		}

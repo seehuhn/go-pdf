@@ -58,7 +58,7 @@ type Usage struct {
 	SingleUse bool
 }
 
-var _ pdf.Embedder[pdf.Unused] = (*Usage)(nil)
+var _ pdf.Embedder = (*Usage)(nil)
 
 // ExtractUsage extracts a usage dictionary from a PDF object.
 func ExtractUsage(x *pdf.Extractor, obj pdf.Object) (*Usage, error) {
@@ -260,8 +260,7 @@ func ExtractUsage(x *pdf.Extractor, obj pdf.Object) (*Usage, error) {
 }
 
 // Embed adds the usage dictionary to a PDF file.
-func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	dict := pdf.Dict{}
 
@@ -270,12 +269,12 @@ func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		creatorDict := pdf.Dict{}
 
 		if u.Creator.Creator == "" {
-			return nil, zero, errors.New("CreatorInfo.Creator is required")
+			return nil, errors.New("CreatorInfo.Creator is required")
 		}
 		creatorDict["Creator"] = pdf.TextString(u.Creator.Creator)
 
 		if u.Creator.Subtype == "" {
-			return nil, zero, errors.New("CreatorInfo.Subtype is required")
+			return nil, errors.New("CreatorInfo.Subtype is required")
 		}
 		creatorDict["Subtype"] = u.Creator.Subtype
 
@@ -294,7 +293,7 @@ func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		langDict := pdf.Dict{}
 
 		if u.Language.Lang.IsRoot() {
-			return nil, zero, errors.New("Language.Lang is required")
+			return nil, errors.New("Language.Lang is required")
 		}
 		langDict["Lang"] = pdf.TextString(u.Language.Lang.String())
 
@@ -323,13 +322,13 @@ func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		zoomDict := pdf.Dict{}
 
 		if u.Zoom.Min < 0 {
-			return nil, zero, errors.New("Zoom.Min must be non-negative")
+			return nil, errors.New("Zoom.Min must be non-negative")
 		}
 		if u.Zoom.Max <= 0 {
-			return nil, zero, errors.New("Zoom.Max must be positive")
+			return nil, errors.New("Zoom.Max must be positive")
 		}
 		if u.Zoom.Min > u.Zoom.Max {
-			return nil, zero, errors.New("Zoom.Min must be less than or equal to Zoom.Max")
+			return nil, errors.New("Zoom.Min must be less than or equal to Zoom.Max")
 		}
 		if u.Zoom.Min != 0 {
 			zoomDict["min"] = pdf.Number(u.Zoom.Min)
@@ -355,7 +354,7 @@ func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 			case PrintSubtypeTrapping, PrintSubtypePrintersMarks, PrintSubtypeWatermark:
 				printDict["Subtype"] = pdf.Name(u.Print.Subtype)
 			default:
-				return nil, zero, errors.New("invalid Print.Subtype")
+				return nil, errors.New("invalid Print.Subtype")
 			}
 		}
 
@@ -387,18 +386,18 @@ func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		userDict := pdf.Dict{}
 
 		if u.User.Type == "" {
-			return nil, zero, errors.New("User.Type is required")
+			return nil, errors.New("User.Type is required")
 		}
 		// validate type
 		switch u.User.Type {
 		case UserTypeIndividual, UserTypeTitle, UserTypeOrganisation:
 			userDict["Type"] = pdf.Name(u.User.Type)
 		default:
-			return nil, zero, errors.New("invalid User.Type")
+			return nil, errors.New("invalid User.Type")
 		}
 
 		if len(u.User.Name) == 0 {
-			return nil, zero, errors.New("User.Name is required")
+			return nil, errors.New("User.Name is required")
 		} else if len(u.User.Name) == 1 {
 			userDict["Name"] = pdf.TextString(u.User.Name[0])
 		} else {
@@ -417,29 +416,29 @@ func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		pageDict := pdf.Dict{}
 
 		if u.PageElement.Subtype == "" {
-			return nil, zero, errors.New("PageElement.Subtype is required")
+			return nil, errors.New("PageElement.Subtype is required")
 		}
 		// validate subtype
 		switch u.PageElement.Subtype {
 		case PageElementHeaderFooter, PageElementForeground, PageElementBackground, PageElementLogo:
 			pageDict["Subtype"] = pdf.Name(u.PageElement.Subtype)
 		default:
-			return nil, zero, errors.New("invalid PageElement.Subtype")
+			return nil, errors.New("invalid PageElement.Subtype")
 		}
 
 		dict["PageElement"] = pageDict
 	}
 
 	if u.SingleUse {
-		return dict, zero, nil
+		return dict, nil
 	}
 
 	ref := rm.Alloc()
 	err := rm.Out().Put(ref, dict)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
-	return ref, zero, nil
+	return ref, nil
 }
 
 // UserType represents the type of user in a usage dictionary.

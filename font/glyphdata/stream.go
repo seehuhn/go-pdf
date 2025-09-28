@@ -53,7 +53,7 @@ type Lengths struct {
 	Length3 pdf.Integer
 }
 
-var _ pdf.Embedder[pdf.Unused] = (*Stream)(nil)
+var _ pdf.Embedder = (*Stream)(nil)
 
 // ExtractStream extracts a font file stream from a PDF file.
 //
@@ -110,30 +110,29 @@ func ExtractStream(x *pdf.Extractor, obj pdf.Object, dictType, fdKey pdf.Name) (
 //
 // This method implements the pdf.Embedder interface and handles all necessary
 // PDF version checks and stream formatting based on the font type.
-func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	switch s.Type {
 	case Type1:
 		// pass
 	case TrueType:
 		if err := pdf.CheckVersion(rm.Out(), "TrueType font file", pdf.V1_1); err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 	case CFFSimple:
 		if err := pdf.CheckVersion(rm.Out(), "CFF font file", pdf.V1_2); err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 	case CFF:
 		if err := pdf.CheckVersion(rm.Out(), "CID-keyed CFF font file", pdf.V1_3); err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 	case OpenTypeCFFSimple, OpenTypeCFF, OpenTypeGlyf:
 		if err := pdf.CheckVersion(rm.Out(), "OpenType font file", pdf.V1_6); err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 	default:
-		return nil, zero, pdf.Errorf("unexpected font type %s", s.Type)
+		return nil, pdf.Errorf("unexpected font type %s", s.Type)
 	}
 
 	ref := rm.Alloc()
@@ -159,56 +158,56 @@ func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 
 		stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 
 		err = s.WriteTo(stm, &lengths)
 		if err != nil {
 			stm.Close()
-			return nil, zero, err
+			return nil, err
 		}
 
 		err = l1.Set(pdf.Integer(lengths.Length1))
 		if err != nil {
 			stm.Close()
-			return nil, zero, err
+			return nil, err
 		}
 		if s.Type == Type1 {
 			err = l2.Set(pdf.Integer(lengths.Length2))
 			if err != nil {
 				stm.Close()
-				return nil, zero, err
+				return nil, err
 			}
 			err = l3.Set(pdf.Integer(lengths.Length3))
 			if err != nil {
 				stm.Close()
-				return nil, zero, err
+				return nil, err
 			}
 		}
 
 		err = stm.Close()
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 	} else {
 		stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 
 		err = s.WriteTo(stm, nil)
 		if err != nil {
 			stm.Close()
-			return nil, zero, err
+			return nil, err
 		}
 
 		err = stm.Close()
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 // determineType determines the glyphdata.Type from the font dictionary type,

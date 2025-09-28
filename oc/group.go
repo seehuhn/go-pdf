@@ -41,7 +41,7 @@ type Group struct {
 	Usage *Usage
 }
 
-var _ pdf.Embedder[pdf.Unused] = (*Group)(nil)
+var _ pdf.Embedder = (*Group)(nil)
 
 // ExtractGroup extracts an optional content group from a PDF object.
 func ExtractGroup(x *pdf.Extractor, obj pdf.Object) (*Group, error) {
@@ -94,12 +94,11 @@ func ExtractGroup(x *pdf.Extractor, obj pdf.Object) (*Group, error) {
 }
 
 // Embed adds the optional content group to a PDF file.
-func (g *Group) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (g *Group) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// validate required fields
 	if g.Name == "" {
-		return nil, zero, errors.New("Group.Name is required")
+		return nil, errors.New("Group.Name is required")
 	}
 
 	dict := pdf.Dict{
@@ -125,9 +124,9 @@ func (g *Group) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 
 	// embed Usage dictionary if present
 	if g.Usage != nil {
-		usageObj, _, err := pdf.EmbedHelperEmbed(rm, g.Usage)
+		usageObj, err := rm.Embed(g.Usage)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["Usage"] = usageObj
 	}
@@ -136,10 +135,10 @@ func (g *Group) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	ref := rm.Alloc()
 	err := rm.Out().Put(ref, dict)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 // IsVisible returns whether the group is visible given a state map.

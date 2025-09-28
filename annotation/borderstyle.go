@@ -42,7 +42,7 @@ type BorderStyle struct {
 	SingleUse bool
 }
 
-var _ pdf.Embedder[pdf.Unused] = (*BorderStyle)(nil)
+var _ pdf.Embedder = (*BorderStyle)(nil)
 
 func ExtractBorderStyle(x *pdf.Extractor, obj pdf.Object) (*BorderStyle, error) {
 	dict, err := pdf.GetDictTyped(x.R, obj, "Border")
@@ -92,8 +92,7 @@ func ExtractBorderStyle(x *pdf.Extractor, obj pdf.Object) (*BorderStyle, error) 
 
 var borderStyleDefaultDash = []float64{3}
 
-func (b *BorderStyle) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (b *BorderStyle) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	d := pdf.Dict{}
 	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
@@ -101,7 +100,7 @@ func (b *BorderStyle) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error)
 	}
 
 	if b.Width < 0 {
-		return nil, zero, pdf.Error("negative border width")
+		return nil, pdf.Error("negative border width")
 	}
 	if b.Width != 1 {
 		d["W"] = pdf.Number(b.Width)
@@ -113,30 +112,30 @@ func (b *BorderStyle) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error)
 
 	if b.Style == "D" {
 		if len(b.DashArray) == 0 {
-			return nil, zero, pdf.Error("missing dash array")
+			return nil, pdf.Error("missing dash array")
 		}
 		defaultDash := len(b.DashArray) == 1 && b.DashArray[0] == 3
 		if b.DashArray != nil && !defaultDash {
 			a := make(pdf.Array, len(b.DashArray))
 			for i, d := range b.DashArray {
 				if d < 0 {
-					return nil, zero, pdf.Error("negative dash value")
+					return nil, pdf.Error("negative dash value")
 				}
 				a[i] = pdf.Number(d)
 			}
 			d["D"] = a
 		}
 	} else if b.DashArray != nil {
-		return nil, zero, pdf.Error("unexpected dash array")
+		return nil, pdf.Error("unexpected dash array")
 	}
 
 	if b.SingleUse {
-		return d, zero, nil
+		return d, nil
 	}
 	ref := rm.Alloc()
 	err := rm.Out().Put(ref, d)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
-	return ref, zero, nil
+	return ref, nil
 }

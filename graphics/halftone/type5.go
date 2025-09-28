@@ -78,18 +78,17 @@ func extractType5(x *pdf.Extractor, dict pdf.Dict) (*Type5, error) {
 	return h, nil
 }
 
-func (h *Type5) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (h *Type5) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if err := pdf.CheckVersion(rm.Out(), "halftone screening", pdf.V1_2); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	if h.Default == nil {
-		return nil, zero, errors.New("missing default halftone")
+		return nil, errors.New("missing default halftone")
 	}
 	if h.Default.HalftoneType() == 5 {
-		return nil, zero, errors.New("default halftone cannot be Type 5")
+		return nil, errors.New("default halftone cannot be Type 5")
 	}
 
 	dict := pdf.Dict{
@@ -104,11 +103,11 @@ func (h *Type5) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 
 	if h.Default != nil {
 		if h.Default.GetTransferFunction() == nil {
-			return nil, zero, errors.New("missing transfer function")
+			return nil, errors.New("missing transfer function")
 		}
-		defaultEmbedded, _, err := pdf.EmbedHelperEmbed(rm, h.Default)
+		defaultEmbedded, err := rm.Embed(h.Default)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["Default"] = defaultEmbedded
 	}
@@ -117,22 +116,22 @@ func (h *Type5) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		var isPrimary bool
 		switch colorant {
 		case "Type", "HalftoneType", "HalftoneName", "Default":
-			return nil, zero, fmt.Errorf("invalid colorant name %q", colorant)
+			return nil, fmt.Errorf("invalid colorant name %q", colorant)
 		case "Cyan", "Magenta", "Yellow", "Black", "Red", "Green", "Blue", "Gray":
 			isPrimary = true
 		}
 
 		if ht.HalftoneType() == 5 {
-			return nil, zero, fmt.Errorf("colorant halftone for %q cannot be Type 5", colorant)
+			return nil, fmt.Errorf("colorant halftone for %q cannot be Type 5", colorant)
 		}
 
 		if !isPrimary && ht.GetTransferFunction() == nil {
-			return nil, zero, errors.New("missing transfer function")
+			return nil, errors.New("missing transfer function")
 		}
 
-		colorantEmbedded, _, err := pdf.EmbedHelperEmbed(rm, ht)
+		colorantEmbedded, err := rm.Embed(ht)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict[colorant] = colorantEmbedded
 	}
@@ -140,9 +139,9 @@ func (h *Type5) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	// We always embed halftone dictionaries as indirect objects.
 	ref := rm.Alloc()
 	if err := rm.Out().Put(ref, dict); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
-	return ref, zero, nil
+	return ref, nil
 }
 
 // HalftoneType returns 5.

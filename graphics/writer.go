@@ -155,25 +155,24 @@ func (w *Writer) coord(x float64) string {
 //
 // Once Go supports methods with type parameters, this function can be turned
 // into a method on [Writer].
-func writerGetResourceName[T any](w *Writer, cat resourceCategory, resource pdf.Embedder[T]) (pdf.Name, T, error) {
+func writerGetResourceName(w *Writer, cat resourceCategory, resource pdf.Embedder) (pdf.Name, error) {
 	key := catRes{cat, resource}
 	v, ok := w.resName[key]
 	if ok {
-		return v.name, v.obj.(T), nil
+		return v.name, nil
 	}
 
-	obj, embedded, err := pdf.ResourceManagerEmbed(w.RM, resource)
+	obj, err := w.RM.Embed(resource)
 	if err != nil {
-		var zero T
-		return "", zero, err
+		return "", err
 	}
 
 	dict := w.getCategoryDict(cat)
 	name := w.generateName(cat, dict)
 	(*dict)[name] = obj
 
-	w.resName[key] = objName{embedded, name}
-	return name, embedded, nil
+	w.resName[key] = objName{obj, name}
+	return name, nil
 }
 
 // GetResourceName returns a name which can be used to refer to a resource from
@@ -182,7 +181,7 @@ func writerGetResourceName[T any](w *Writer, cat resourceCategory, resource pdf.
 //
 // Once Go supports methods with type parameters, this function can be turned
 // into a method on [Writer].
-func writerSetResourceName[T any](w *Writer, resource pdf.Embedder[T], category resourceCategory, name pdf.Name) error {
+func writerSetResourceName(w *Writer, resource pdf.Embedder, category resourceCategory, name pdf.Name) error {
 	for k, v := range w.resName {
 		if k.cat == category && v.name == name {
 			return fmt.Errorf("name %q is already used for category %d", name, category)
@@ -199,7 +198,7 @@ func writerSetResourceName[T any](w *Writer, resource pdf.Embedder[T], category 
 		return fmt.Errorf("name %q is reserved for color spaces", name)
 	}
 
-	dictData, embedded, err := pdf.ResourceManagerEmbed(w.RM, resource)
+	dictData, err := w.RM.Embed(resource)
 	if err != nil {
 		return err
 	}
@@ -208,7 +207,7 @@ func writerSetResourceName[T any](w *Writer, resource pdf.Embedder[T], category 
 	(*dict)[name] = dictData
 
 	key := catRes{category, resource}
-	w.resName[key] = objName{embedded, name}
+	w.resName[key] = objName{dictData, name}
 	return nil
 }
 

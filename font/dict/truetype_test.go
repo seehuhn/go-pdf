@@ -68,7 +68,7 @@ func FuzzTrueTypeDict(f *testing.F) {
 			rm := pdf.NewResourceManager(w)
 
 			d := clone(d)
-			ref, _, err := pdf.ResourceManagerEmbed(rm, d)
+			ref, err := rm.Embed(d)
 			if err != nil {
 				f.Fatal(err)
 			}
@@ -147,7 +147,7 @@ func checkRoundtripTT(t *testing.T, d1 *TrueType, v pdf.Version) {
 			},
 		}
 	}
-	ref, _, err := pdf.ResourceManagerEmbed(rm, d1)
+	ref, err := rm.Embed(d1)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -52,7 +52,7 @@ type Instance interface {
 	// font/dict package.
 	FontInfo() any
 
-	pdf.Embedder[pdf.Unused]
+	pdf.Embedder
 }
 
 type Layouter interface {
@@ -100,7 +100,7 @@ type Layouter interface {
 //   - [seehuhn.de/go/pdf/font/dict.CIDFontType0]
 //   - [seehuhn.de/go/pdf/font/dict.CIDFontType2]
 type Dict interface {
-	pdf.Embedder[pdf.Unused]
+	pdf.Embedder
 
 	// MakeFont returns a new font object that can be used to typeset text.
 	// The font is immutable, i.e. no new glyphs can be added and no new codes

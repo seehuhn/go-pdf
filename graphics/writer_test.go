@@ -26,9 +26,8 @@ import (
 
 type dummyResource pdf.Reference
 
-func (r dummyResource) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
-	return pdf.Reference(r), zero, nil
+func (r dummyResource) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+	return pdf.Reference(r), nil
 }
 
 // TestGetResourceName1 tests that resources of all categories can be
@@ -53,13 +52,13 @@ func TestGetResourceName1(t *testing.T) {
 	var allNames []pdf.Name
 	for _, cat := range allCats {
 		// test name generation
-		name1, _, err := writerGetResourceName(w, cat, r)
+		name1, err := writerGetResourceName(w, cat, r)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 
 		// test caching
-		name2, _, err := writerGetResourceName(w, cat, r)
+		name2, err := writerGetResourceName(w, cat, r)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		} else if name1 != name2 {

@@ -93,10 +93,9 @@ func (s *SpaceCalGray) New(gray float64) Color {
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s *SpaceCalGray) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (s *SpaceCalGray) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out(), "CalGray color space", pdf.V1_1); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{}
@@ -108,7 +107,7 @@ func (s *SpaceCalGray) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error
 		dict["Gamma"] = pdf.Number(s.gamma)
 	}
 
-	return pdf.Array{pdf.Name("CalGray"), dict}, zero, nil
+	return pdf.Array{pdf.Name("CalGray"), dict}, nil
 }
 
 type colorCalGray struct {
@@ -179,10 +178,9 @@ func CalRGB(whitePoint, blackPoint, gamma, matrix []float64) (*SpaceCalRGB, erro
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s *SpaceCalRGB) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (s *SpaceCalRGB) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out(), "CalRGB color space", pdf.V1_1); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{}
@@ -197,7 +195,7 @@ func (s *SpaceCalRGB) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error)
 		dict["Matrix"] = toPDF(s.matrix)
 	}
 
-	return pdf.Array{pdf.Name("CalRGB"), dict}, zero, nil
+	return pdf.Array{pdf.Name("CalRGB"), dict}, nil
 }
 
 // New returns a new CalRGB color.
@@ -331,10 +329,9 @@ func (s *SpaceLab) Default() Color {
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s *SpaceLab) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (s *SpaceLab) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out(), "Lab color space", pdf.V1_1); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{}
@@ -346,7 +343,7 @@ func (s *SpaceLab) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		dict["Range"] = toPDF(s.ranges)
 	}
 
-	return pdf.Array{FamilyLab, dict}, zero, nil
+	return pdf.Array{FamilyLab, dict}, nil
 }
 
 type colorLab struct {

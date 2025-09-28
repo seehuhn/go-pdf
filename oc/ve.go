@@ -28,7 +28,7 @@ import "seehuhn.de/go/pdf"
 //   - [VisibilityExpressionNot]
 type VisibilityExpression interface {
 	isVisible(map[*Group]bool) bool
-	pdf.Embedder[pdf.Unused]
+	pdf.Embedder
 }
 
 var (
@@ -101,18 +101,17 @@ func (g *VisibilityExpressionGroup) isVisible(states map[*Group]bool) bool {
 }
 
 // Embed converts the group reference to a PDF object reference.
-func (g *VisibilityExpressionGroup) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (g *VisibilityExpressionGroup) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if g.Group == nil {
-		return nil, zero, pdf.Error("VisibilityExpressionGroup.Group is nil")
+		return nil, pdf.Error("VisibilityExpressionGroup.Group is nil")
 	}
 
 	// embed the group using ResourceManager
-	groupRef, _, err := pdf.EmbedHelperEmbed(rm, g.Group)
+	groupRef, err := rm.Embed(g.Group)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
-	return groupRef, zero, nil
+	return groupRef, nil
 }
 
 // VisibilityExpressionAnd represents a logical AND of multiple visibility expressions.
@@ -131,10 +130,9 @@ func (a *VisibilityExpressionAnd) isVisible(groupStates map[*Group]bool) bool {
 }
 
 // Embed converts the AND expression to a PDF array.
-func (a *VisibilityExpressionAnd) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (a *VisibilityExpressionAnd) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if len(a.Args) == 0 {
-		return nil, zero, pdf.Error("VisibilityExpressionAnd requires at least one operand")
+		return nil, pdf.Error("VisibilityExpressionAnd requires at least one operand")
 	}
 
 	// create array starting with operator
@@ -143,14 +141,14 @@ func (a *VisibilityExpressionAnd) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Un
 
 	// embed each operand
 	for i, operand := range a.Args {
-		obj, _, err := pdf.EmbedHelperEmbed(rm, operand)
+		obj, err := rm.Embed(operand)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		arr[i+1] = obj
 	}
 
-	return arr, zero, nil
+	return arr, nil
 }
 
 // VisibilityExpressionOr represents a logical OR of multiple visibility expressions.
@@ -169,10 +167,9 @@ func (o *VisibilityExpressionOr) isVisible(groupStates map[*Group]bool) bool {
 }
 
 // Embed converts the OR expression to a PDF array.
-func (o *VisibilityExpressionOr) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (o *VisibilityExpressionOr) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if len(o.Args) == 0 {
-		return nil, zero, pdf.Error("VisibilityExpressionOr requires at least one operand")
+		return nil, pdf.Error("VisibilityExpressionOr requires at least one operand")
 	}
 
 	// create array starting with operator
@@ -181,14 +178,14 @@ func (o *VisibilityExpressionOr) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unu
 
 	// embed each operand
 	for i, operand := range o.Args {
-		obj, _, err := pdf.EmbedHelperEmbed(rm, operand)
+		obj, err := rm.Embed(operand)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		arr[i+1] = obj
 	}
 
-	return arr, zero, nil
+	return arr, nil
 }
 
 // VisibilityExpressionNot represents a logical NOT of a single visibility expression.
@@ -202,19 +199,18 @@ func (n *VisibilityExpressionNot) isVisible(groupStates map[*Group]bool) bool {
 }
 
 // Embed converts the NOT expression to a PDF array.
-func (n *VisibilityExpressionNot) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (n *VisibilityExpressionNot) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if n.Args == nil {
-		return nil, zero, pdf.Error("VisibilityExpressionNot requires exactly one operand")
+		return nil, pdf.Error("VisibilityExpressionNot requires exactly one operand")
 	}
 
 	// embed the operand
-	obj, _, err := pdf.EmbedHelperEmbed(rm, n.Args)
+	obj, err := rm.Embed(n.Args)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	// create array with operator and operand
 	arr := pdf.Array{pdf.Name("Not"), obj}
-	return arr, zero, nil
+	return arr, nil
 }

@@ -210,7 +210,7 @@ func (l *Link) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out, "link annotation BS entry", pdf.V1_6); err != nil {
 			return nil, err
 		}
-		ref, _, err := pdf.ResourceManagerEmbed(rm, l.BorderStyle)
+		ref, err := rm.Embed(l.BorderStyle)
 		if err != nil {
 			return nil, err
 		}

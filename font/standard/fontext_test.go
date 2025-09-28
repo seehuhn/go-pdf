@@ -38,7 +38,7 @@ func TestEmbedStandard(t *testing.T) {
 				// Embed the font into a PDF file:
 
 				F := standardFont.New()
-				ref, _, err := pdf.ResourceManagerEmbed(rm, F)
+				ref, err := rm.Embed(F)
 				if err != nil {
 					t.Fatal(err)
 				}

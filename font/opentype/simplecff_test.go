@@ -39,11 +39,10 @@ func TestEmbedSimple(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			ref, e, err := pdf.ResourceManagerEmbed(rm, fontInstance)
+			ref, err := rm.Embed(fontInstance)
 			if err != nil {
 				t.Fatal(err)
 			}
-			_ = e // e should be pdf.Unused{}
 
 			// make sure a few glyphs are included and encoded
 			gg := fontInstance.Layout(nil, 12, "Hello")

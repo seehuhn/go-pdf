@@ -13,16 +13,13 @@ objects should implement the [Embedder] interface, which allows them to be
 embedded into a PDF file, transforming them into file-specific representations:
 
 ```go
-type Embedder[T any] interface {
+type Embedder interface {
 	// Embed converts the Go representation of the object into a PDF object,
 	// corresponding to the PDF version of the output file.
 	//
-	// The first return value is the PDF representation of the object.
+	// The return value is the PDF representation of the object.
 	// If the object is embedded in the PDF file, this may be a reference.
-	//
-	// The second return value is a Go representation of the embedded object.
-	// In most cases, this value is not used and T can be set to [pdf.Unused].
-	Embed(rm *ResourceManager) (Native, T, error)
+	Embed(e *EmbedHelper) (Native, error)
 }
 ```
 
@@ -51,7 +48,7 @@ manager must be closed before the PDF file is closed.  New objects are added
 to the PDF file using the `pdf.ResourceManagerEmbed` function:
 
 ```go
-func ResourceManagerEmbed[T any](rm *ResourceManager, obj Embedder[T]) (pdf.Native, T, error)
+func ResourceManagerEmbed(rm *ResourceManager, obj Embedder) (pdf.Native, error)
 ```
 
 The return values are:
@@ -59,8 +56,6 @@ The return values are:
   for example be used in a resource dictionary to represent the object. The
   value is typically a `pdf.Reference`, but can also be a `pdf.Name` or other
   PDF primitive.
-- The Go representation of the embedded, file-specific object. If this is not
-  needed, the type parameter `T` can be set to [pdf.Unused].
 - An error if the embedding failed.
 
 Depending on the type of the embedded object, the actual embedding may
@@ -129,7 +124,7 @@ where they then write the PDF representation of the object. For example,
 a method to write JPEG images might look like this:
 
 ```go
-func (img *Image) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error) {
+func (img *Image) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	ref := rm.Out.Alloc()
 	stream, err := rm.Out.OpenStream(ref, pdf.Dict{
 		"Type":             pdf.Name("XObject"),
@@ -143,7 +138,7 @@ func (img *Image) Embed(rm *pdf.ResourceManager) (pdf.Native, pdf.Unused, error)
 
 	// handle errors and write the JPEG image data to the stream
 
-	return ref, zero, nil
+	return ref, nil
 }
 ```
 
@@ -153,10 +148,10 @@ embedding the main object. For example, when a PNG image embeds its color space
 dependency:
 
 ```go
-func (img *Image) Embed(rm *ResourceManager) (Native, Unused, error) {
-    csEmbedded, _, err := pdf.ResourceManagerEmbed(rm, img.cs)
+func (img *Image) Embed(rm *EmbedHelper) (Native, error) {
+    csEmbedded, err := pdf.EmbedHelperEmbed(rm, img.cs)
     if err != nil {
-        return nil, zero, err
+        return nil, err
     }
 
     imDict := pdf.Dict{
@@ -195,12 +190,12 @@ type Font interface {
 	// PostScriptName returns the PostScript name of the font.
 	PostScriptName() string
 
-	pdf.Embedder[font.Embedded]
+	pdf.Embedder
 }
 ```
 
 When using the `pdf.ResourceManagerEmbed` function to embed a font, the
-call returns a `font.Embedded` object which can be used typeset text.
+embedded font becomes available in the PDF file and can be referenced from content streams.
 
 For objects with delayed embedding, normally the `Embed` method
 is very simple.  It just allocates a new PDF reference and returns

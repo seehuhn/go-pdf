@@ -37,19 +37,18 @@ type MarkedContent struct {
 
 // Embed adds the MarkedContent properties dict to a PDF file.
 // This implements the [pdf.Embedder] interface.
-func (mc *MarkedContent) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (mc *MarkedContent) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if mc.SingleUse {
-		return mc.Properties, zero, nil
+		return mc.Properties, nil
 	}
 
 	ref := rm.Alloc()
 	err := rm.Out().Put(ref, mc.Properties)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
-	return ref, zero, nil
+	return ref, nil
 }
 
 // MarkedContentPoint adds a marked-content point to the content stream.
@@ -117,7 +116,7 @@ func (w *Writer) getProperties(mc *MarkedContent) pdf.Object {
 		return mc.Properties
 	}
 
-	name, _, err := writerGetResourceName(w, catProperties, mc)
+	name, err := writerGetResourceName(w, catProperties, mc)
 	if err != nil {
 		w.Err = err
 		return nil

@@ -286,8 +286,7 @@ func (d *CIDFontType0) validate() error {
 
 // Embed adds the font dictionary to a PDF file.
 // This implements the [font.Dict] interface.
-func (d *CIDFontType0) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (d *CIDFontType0) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	ref := rm.AllocSelf()
 	w := rm.Out()
 
@@ -295,44 +294,44 @@ func (d *CIDFontType0) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error
 		switch d.FontFile.Type {
 		case glyphdata.CFF:
 			if err := pdf.CheckVersion(w, "embedded composite CFF fonts", pdf.V1_3); err != nil {
-				return nil, zero, err
+				return nil, err
 			}
 		case glyphdata.OpenTypeCFF:
 			if err := pdf.CheckVersion(w, "embedded composite OpenType/CFF fonts", pdf.V1_6); err != nil {
-				return nil, zero, err
+				return nil, err
 			}
 		default:
-			return nil, zero, fmt.Errorf("invalid font type %s", d.FontFile.Type)
+			return nil, fmt.Errorf("invalid font type %s", d.FontFile.Type)
 		}
 	}
 
 	err := d.validate()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)
 
 	cidSystemInfo, err := pdf.EmbedHelperEmbedFunc(rm, font.WriteCIDSystemInfo, d.ROS)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	var encoding pdf.Object
 	if d.CMap.IsPredefined() {
 		encoding = pdf.Name(d.CMap.Name)
 	} else {
-		encoding, _, err = pdf.EmbedHelperEmbed(rm, d.CMap)
+		encoding, err = rm.Embed(d.CMap)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 	}
 
 	var toUni pdf.Object
 	if d.ToUnicode != nil {
-		toUni, _, err = pdf.EmbedHelperEmbed(rm, d.ToUnicode)
+		toUni, err = rm.Embed(d.ToUnicode)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 	}
 
@@ -359,9 +358,9 @@ func (d *CIDFontType0) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error
 
 	fdDict := d.Descriptor.AsDict()
 	if d.FontFile != nil {
-		fontFileRef, _, err := pdf.EmbedHelperEmbed(rm, d.FontFile)
+		fontFileRef, err := rm.Embed(d.FontFile)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		fdDict["FontFile3"] = fontFileRef
 	}
@@ -392,10 +391,10 @@ func (d *CIDFontType0) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return nil, zero, fmt.Errorf("CIDFontType0 dicts: %w", err)
+		return nil, fmt.Errorf("CIDFontType0 dicts: %w", err)
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 func (d *CIDFontType0) Codec() *charcode.Codec {
@@ -490,13 +489,13 @@ type t0Font struct {
 	cache map[charcode.Code]*font.Code
 }
 
-func (f *t0Font) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+func (f *t0Font) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	ref := rm.Alloc()
-	_, _, err := pdf.EmbedHelperEmbedAt(rm, ref, f.CIDFontType0)
+	_, err := rm.EmbedAt(ref, f.CIDFontType0)
 	if err != nil {
-		return nil, pdf.Unused{}, err
+		return nil, err
 	}
-	return ref, pdf.Unused{}, nil
+	return ref, nil
 }
 
 func (f *t0Font) PostScriptName() string {

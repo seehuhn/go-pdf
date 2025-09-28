@@ -206,62 +206,61 @@ func extractType2(x *pdf.Extractor, d pdf.Dict, isIndirect bool) (*Type2, error)
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (s *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// Version check
 	if err := pdf.CheckVersion(rm.Out(), "Type 2 shading", pdf.V1_3); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	if s.ColorSpace == nil {
-		return nil, zero, errors.New("missing ColorSpace")
+		return nil, errors.New("missing ColorSpace")
 	} else if s.ColorSpace.Family() == color.FamilyPattern || s.ColorSpace.Family() == color.FamilyIndexed {
-		return nil, zero, errors.New("invalid ColorSpace")
+		return nil, errors.New("invalid ColorSpace")
 	}
 	if have := len(s.Background); have > 0 {
 		want := s.ColorSpace.Channels()
 		if have != want {
 			err := fmt.Errorf("wrong number of background values: expected %d, got %d",
 				want, have)
-			return nil, zero, err
+			return nil, err
 		}
 	}
 
 	// validate that starting and ending coordinates are not coincident
 	if s.P0 == s.P1 {
-		return nil, zero, errors.New("starting and ending coordinates must not be coincident")
+		return nil, errors.New("starting and ending coordinates must not be coincident")
 	}
 
 	// validate domain relationship
 	if s.TMin > s.TMax {
-		return nil, zero, fmt.Errorf("TMin (%g) must be less than or equal to TMax (%g)", s.TMin, s.TMax)
+		return nil, fmt.Errorf("TMin (%g) must be less than or equal to TMax (%g)", s.TMin, s.TMax)
 	}
 
 	if s.F == nil {
-		return nil, zero, errors.New("missing function")
+		return nil, errors.New("missing function")
 	}
 	if m, n := s.F.Shape(); m != 1 {
-		return nil, zero, fmt.Errorf("function must have 1 input, not %d", m)
+		return nil, fmt.Errorf("function must have 1 input, not %d", m)
 	} else if n != s.ColorSpace.Channels() {
-		return nil, zero, fmt.Errorf("function outputs (%d) must match color space channels (%d)", n, s.ColorSpace.Channels())
+		return nil, fmt.Errorf("function outputs (%d) must match color space channels (%d)", n, s.ColorSpace.Channels())
 	}
 
 	// Validate function domain contains shading domain
 	shadingDomain := []float64{s.TMin, s.TMax}
 	functionDomain := s.F.GetDomain()
 	if !domainContains(functionDomain, shadingDomain) {
-		return nil, zero, fmt.Errorf("function domain %v must contain shading domain %v", functionDomain, shadingDomain)
+		return nil, fmt.Errorf("function domain %v must contain shading domain %v", functionDomain, shadingDomain)
 	}
 
-	fn, _, err := pdf.EmbedHelperEmbed(rm, s.F)
+	fn, err := rm.Embed(s.F)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	csE, _, err := pdf.EmbedHelperEmbed(rm, s.ColorSpace)
+	csE, err := rm.Embed(s.ColorSpace)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -296,10 +295,10 @@ func (s *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		ref := rm.Alloc()
 		err := rm.Out().Put(ref, dict)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		data = ref
 	}
 
-	return data, zero, nil
+	return data, nil
 }

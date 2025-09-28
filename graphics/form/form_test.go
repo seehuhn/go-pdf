@@ -39,8 +39,8 @@ func (t *testData) LastModified() time.Time {
 	return time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
 }
 
-func (t *testData) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	return pdf.String(t.data), pdf.Unused{}, nil
+func (t *testData) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+	return pdf.String(t.data), nil
 }
 
 // TestRead verifies that a form XObject read from one PDF file can be written
@@ -58,7 +58,7 @@ func TestRead(t *testing.T) {
 		},
 		BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
 	}
-	ref, _, err := pdf.ResourceManagerEmbed(rm1, form0)
+	ref, err := rm1.Embed(form0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestRead(t *testing.T) {
 
 	writer2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm2 := pdf.NewResourceManager(writer2)
-	ref2, _, err := pdf.ResourceManagerEmbed(rm2, form1)
+	ref2, err := rm2.Embed(form1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestReadWithPieceInfo(t *testing.T) {
 		LastModified: time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
 	}
 
-	ref, _, err := pdf.ResourceManagerEmbed(rm1, form0)
+	ref, err := rm1.Embed(form0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestReadWithPieceInfo(t *testing.T) {
 	// test round-trip
 	writer2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm2 := pdf.NewResourceManager(writer2)
-	ref2, _, err := pdf.ResourceManagerEmbed(rm2, form1)
+	ref2, err := rm2.Embed(form1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +205,7 @@ func TestPieceInfoRequiresLastModified(t *testing.T) {
 		// LastModified is intentionally not set to trigger validation error
 	}
 
-	_, _, err := pdf.ResourceManagerEmbed(rm, form)
+	_, err := rm.Embed(form)
 	if err == nil {
 		t.Error("Expected error when PieceInfo is present but LastModified is not set")
 	}
@@ -239,7 +239,7 @@ func TestFormWithPtData(t *testing.T) {
 		PtData: testPtData,
 	}
 
-	ref, _, err := pdf.ResourceManagerEmbed(rm1, form0)
+	ref, err := rm1.Embed(form0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,7 +278,7 @@ func TestFormWithPtData(t *testing.T) {
 	// test round-trip
 	writer2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm2 := pdf.NewResourceManager(writer2)
-	ref2, _, err := pdf.ResourceManagerEmbed(rm2, form1)
+	ref2, err := rm2.Embed(form1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,7 +324,7 @@ func TestFormWithStructParent(t *testing.T) {
 		BBox:         pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
 		StructParent: structure.NewKey(42),
 	}
-	ref, _, err := pdf.ResourceManagerEmbed(rm1, form0)
+	ref, err := rm1.Embed(form0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,7 +362,7 @@ func TestFormWithStructParent(t *testing.T) {
 		BBox:         pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
 		StructParent: structure.NewKey(0),
 	}
-	ref2, _, err := pdf.ResourceManagerEmbed(rm2, form0Zero)
+	ref2, err := rm2.Embed(form0Zero)
 	if err != nil {
 		t.Fatal(err)
 	}

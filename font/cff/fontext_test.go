@@ -37,7 +37,7 @@ func TestEmbedSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ref, _, err := pdf.ResourceManagerEmbed(rm, fontInstance)
+	ref, err := rm.Embed(fontInstance)
 	if err != nil {
 		t.Fatal(err)
 	}

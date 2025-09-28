@@ -45,7 +45,7 @@ type BorderEffect struct {
 	SingleUse bool
 }
 
-var _ pdf.Embedder[pdf.Unused] = (*BorderEffect)(nil)
+var _ pdf.Embedder = (*BorderEffect)(nil)
 
 func ExtractBorderEffect(r pdf.Getter, obj pdf.Object) (*BorderEffect, error) {
 	dict, err := pdf.GetDict(r, obj)
@@ -81,11 +81,10 @@ func ExtractBorderEffect(r pdf.Getter, obj pdf.Object) (*BorderEffect, error) {
 	return effect, nil
 }
 
-func (be *BorderEffect) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (be *BorderEffect) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if err := pdf.CheckVersion(rm.Out(), "border effect dictionary", pdf.V1_5); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	d := pdf.Dict{}
@@ -96,23 +95,23 @@ func (be *BorderEffect) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, erro
 
 	if be.Style == "C" {
 		if be.Intensity < 0.0 || be.Intensity > 2.0 {
-			return nil, zero, errors.New("invalid Intensity value")
+			return nil, errors.New("invalid Intensity value")
 		} else if be.Intensity != 0 {
 			d["I"] = pdf.Number(be.Intensity)
 		}
 	} else {
 		if be.Intensity != 0 {
-			return nil, zero, errors.New("unexpected Intensity value")
+			return nil, errors.New("unexpected Intensity value")
 		}
 	}
 
 	if be.SingleUse {
-		return d, zero, nil
+		return d, nil
 	}
 	ref := rm.Alloc()
 	err := rm.Out().Put(ref, d)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
-	return ref, zero, nil
+	return ref, nil
 }

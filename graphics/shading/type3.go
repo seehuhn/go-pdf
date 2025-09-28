@@ -202,52 +202,51 @@ func extractType3(x *pdf.Extractor, d pdf.Dict, wasReference bool) (*Type3, erro
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (s *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out(), "Type 3 shadings", pdf.V1_3); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	if s.ColorSpace == nil {
-		return nil, zero, errors.New("missing ColorSpace")
+		return nil, errors.New("missing ColorSpace")
 	} else if s.ColorSpace.Family() == color.FamilyPattern {
-		return nil, zero, errors.New("Pattern color space not allowed")
+		return nil, errors.New("Pattern color space not allowed")
 	} else if s.ColorSpace.Family() == color.FamilyIndexed {
-		return nil, zero, errors.New("Indexed color space not allowed")
+		return nil, errors.New("Indexed color space not allowed")
 	}
 	if have := len(s.Background); have > 0 {
 		want := s.ColorSpace.Channels()
 		if have != want {
 			err := fmt.Errorf("wrong number of background values: expected %d, got %d",
 				want, have)
-			return nil, zero, err
+			return nil, err
 		}
 	}
 
 	if s.R1 < 0 {
-		return nil, zero, fmt.Errorf("invalid radius: %f", s.R1)
+		return nil, fmt.Errorf("invalid radius: %f", s.R1)
 	}
 	if s.R2 < 0 {
-		return nil, zero, fmt.Errorf("invalid radius: %f", s.R2)
+		return nil, fmt.Errorf("invalid radius: %f", s.R2)
 	}
 	if s.F == nil {
-		return nil, zero, errors.New("missing function")
+		return nil, errors.New("missing function")
 	}
 
 	// Validate function domain contains shading domain
 	shadingDomain := []float64{s.TMin, s.TMax}
 	functionDomain := s.F.GetDomain()
 	if !domainContains(functionDomain, shadingDomain) {
-		return nil, zero, fmt.Errorf("function domain %v must contain shading domain %v", functionDomain, shadingDomain)
+		return nil, fmt.Errorf("function domain %v must contain shading domain %v", functionDomain, shadingDomain)
 	}
 
-	fn, _, err := pdf.EmbedHelperEmbed(rm, s.F)
+	fn, err := rm.Embed(s.F)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	csE, _, err := pdf.EmbedHelperEmbed(rm, s.ColorSpace)
+	csE, err := rm.Embed(s.ColorSpace)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -282,10 +281,10 @@ func (s *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		ref := rm.Alloc()
 		err := rm.Out().Put(ref, dict)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		data = ref
 	}
 
-	return data, zero, nil
+	return data, nil
 }

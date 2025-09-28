@@ -243,7 +243,7 @@ func roundTripThumbnail(t *testing.T, version pdf.Version, thumb *Thumbnail) {
 	rm := pdf.NewResourceManager(w)
 
 	// embed the thumbnail
-	ref, _, err := pdf.ResourceManagerEmbed(rm, thumb)
+	ref, err := rm.Embed(thumb)
 	if err != nil {
 		t.Fatalf("failed to embed thumbnail: %v", err)
 	}
@@ -381,7 +381,7 @@ func TestInvalidThumbnails(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := pdf.ResourceManagerEmbed(rm, tc.thumbnail)
+			_, err := rm.Embed(tc.thumbnail)
 			if tc.wantErr && err == nil {
 				t.Error("expected error but got nil")
 			} else if !tc.wantErr && err != nil {
@@ -399,7 +399,7 @@ func FuzzThumbnailRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(tc.version, opt)
 
 		rm := pdf.NewResourceManager(w)
-		ref, _, err := pdf.ResourceManagerEmbed(rm, tc.thumbnail)
+		ref, err := rm.Embed(tc.thumbnail)
 		if err != nil {
 			continue
 		}

@@ -37,16 +37,13 @@ type Encoder interface {
 //  1. The type must be comparable, so that it can be used as a key in a map.
 //  2. The type must be independent of any PDF file.  For example, it must
 //     not contain pdf.Reference values, neither directly nor indirectly.
-type Embedder[T any] interface {
+type Embedder interface {
 	// Embed converts the Go representation of the object into a PDF object,
 	// corresponding to the PDF version of the output file.
 	//
 	// The first return value is the PDF representation of the object.
 	// If the object is embedded in the PDF file, this may be a reference.
-	//
-	// The second return value is a Go representation of the embedded object.
-	// In most cases, this value is not used and T can be set to [Unused].
-	Embed(e *EmbedHelper) (Native, T, error)
+	Embed(e *EmbedHelper) (Native, error)
 }
 
 type EmbedHelper struct {
@@ -81,41 +78,39 @@ func (e *EmbedHelper) Defer(fn func(*EmbedHelper) error) {
 	e.rm.deferred = append(e.rm.deferred, fn)
 }
 
-func EmbedHelperEmbed[T any](e *EmbedHelper, r Embedder[T]) (Native, T, error) {
-	return EmbedHelperEmbedAt(e, 0, r)
+func (e *EmbedHelper) Embed(r Embedder) (Native, error) {
+	return e.EmbedAt(0, r)
 }
 
-func EmbedHelperEmbedAt[T any](e *EmbedHelper, ref Reference, r Embedder[T]) (Native, T, error) {
-	var zero T
-
+func (e *EmbedHelper) EmbedAt(ref Reference, r Embedder) (Native, error) {
 	if existing, ok := e.rm.embedded[r]; ok {
-		return existing.Val, existing.Emb.(T), nil
+		return existing, nil
 	}
 	if e.rm.isClosed {
-		return nil, zero, errors.New("resource manager is already closed")
+		return nil, errors.New("resource manager is already closed")
 	}
 
 	k := len(e.refs)
 	e.refs = append(e.refs, ref)
-	val, emb, err := r.Embed(e)
+	val, err := r.Embed(e)
 	ref = e.refs[k]
 	e.refs = e.refs[:k]
 	if err != nil {
-		return nil, zero, fmt.Errorf("failed to embed resource: %w", err)
+		return nil, fmt.Errorf("failed to embed resource: %w", err)
 	}
 
 	if ref != 0 && val != ref {
 		panic("wrong reference")
 	}
 
-	e.rm.embedded[r] = embRes{Val: val, Emb: emb}
+	e.rm.embedded[r] = val
 
-	return val, emb, nil
+	return val, nil
 }
 
 func EmbedHelperEmbedFunc[T any](e *EmbedHelper, f func(*EmbedHelper, T) (Native, error), obj T) (Native, error) {
 	if existing, ok := e.rm.embedded[obj]; ok {
-		return existing.Val, nil
+		return existing, nil
 	}
 	if e.rm.isClosed {
 		return nil, errors.New("resource manager is already closed")
@@ -126,15 +121,10 @@ func EmbedHelperEmbedFunc[T any](e *EmbedHelper, f func(*EmbedHelper, T) (Native
 		return nil, fmt.Errorf("failed to embed resource: %w", err)
 	}
 
-	e.rm.embedded[obj] = embRes{Val: val}
+	e.rm.embedded[obj] = val
 
 	return val, nil
 }
-
-// Unused is a placeholder type for the second return value of the
-// Embedder.Embed method, for when no Go representation of the
-// embedded object is required.
-type Unused struct{}
 
 // ResourceManager helps to avoid duplicate resources in a PDF file.
 // It is used to embed object implementing the [Embedder] interface.
@@ -146,7 +136,7 @@ type Unused struct{}
 // file is closed.
 type ResourceManager struct {
 	Out      *Writer
-	embedded map[any]embRes
+	embedded map[any]Native
 	deferred []func(*EmbedHelper) error
 	isClosed bool
 }
@@ -155,28 +145,17 @@ type ResourceManager struct {
 func NewResourceManager(w *Writer) *ResourceManager {
 	return &ResourceManager{
 		Out:      w,
-		embedded: make(map[any]embRes),
+		embedded: make(map[any]Native),
 	}
 }
 
-type embRes struct {
-	Val Native
-	Emb any
-}
-
-// ResourceManagerEmbed embeds a resource in the PDF file.
+// Embed embeds a resource in the PDF file.
 //
 // If the resource is already present in the file, the existing resource is
 // returned.
-//
-// The embedded type, T, must be comparable.  If T implements [Finisher], the
-// Finish() method will be called when the ResourceManager is closed.
-//
-// Once Go supports methods with type parameters, this function can be turned
-// into a method on [ResourceManager].
-func ResourceManagerEmbed[T any](rm *ResourceManager, r Embedder[T]) (Native, T, error) {
+func (rm *ResourceManager) Embed(r Embedder) (Native, error) {
 	e := &EmbedHelper{rm: rm}
-	return EmbedHelperEmbed(e, r)
+	return e.Embed(r)
 }
 
 // ResourceManagerEmbedFunc embeds a resource using a function-driven approach.
@@ -194,8 +173,7 @@ func ResourceManagerEmbedFunc[T any](rm *ResourceManager, f func(*EmbedHelper, T
 	return EmbedHelperEmbedFunc(e, f, obj)
 }
 
-// Close runs the Finish methods of all embedded resources where the Go
-// representation implemented the [Finisher] interface.
+// Close runs all defered calls registered with [EmbedHelper.Defer].
 //
 // After Close has been called, the resource manager can no longer be used.
 func (rm *ResourceManager) Close() error {
@@ -278,7 +256,7 @@ func NewExtractor(r Getter) *Extractor {
 	}
 }
 
-func ExtractorGet[X any, T Embedder[X]](x *Extractor, obj Object, extract func(*Extractor, Object) (T, error)) (T, error) {
+func ExtractorGet[T Embedder](x *Extractor, obj Object, extract func(*Extractor, Object) (T, error)) (T, error) {
 	var zero T
 	tp := reflect.TypeFor[T]()
 
@@ -328,6 +306,6 @@ func ExtractorGet[X any, T Embedder[X]](x *Extractor, obj Object, extract func(*
 	return res, nil
 }
 
-func ExtractorGetOptional[X any, T Embedder[X]](x *Extractor, obj Object, extract func(*Extractor, Object) (T, error)) (T, error) {
+func ExtractorGetOptional[T Embedder](x *Extractor, obj Object, extract func(*Extractor, Object) (T, error)) (T, error) {
 	return Optional(ExtractorGet(x, obj, extract))
 }

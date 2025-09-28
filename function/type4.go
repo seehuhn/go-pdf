@@ -167,13 +167,12 @@ func (f *Type4) validate() error {
 }
 
 // Embed embeds the function into a PDF file.
-func (f *Type4) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (f *Type4) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if err := pdf.CheckVersion(rm.Out(), "Type 4 functions", pdf.V1_3); err != nil {
-		return nil, zero, err
+		return nil, err
 	} else if err := f.validate(); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	// Build the function dictionary
@@ -194,20 +193,20 @@ func (f *Type4) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	}
 	stm, err := rm.Out().OpenStream(ref, dict, filters...)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	_, err = stm.Write([]byte(program))
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	err = stm.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 // Apply applies the function to the given input values and returns the output values.

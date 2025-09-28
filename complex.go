@@ -605,7 +605,7 @@ type Function interface {
 	// range for one input variable.
 	GetDomain() []float64
 
-	Embedder[Unused]
+	Embedder
 
 	// Apply applies the function to the given m input values
 	// and returns the n output values.
@@ -623,7 +623,7 @@ type NumberTree interface {
 
 	All() iter.Seq2[Integer, Object]
 
-	Embedder[Unused]
+	Embedder
 }
 
 // NameTree represents a PDF name tree.
@@ -637,7 +637,7 @@ type NameTree interface {
 
 	All() iter.Seq2[Name, Object]
 
-	Embedder[Unused]
+	Embedder
 }
 
 // Action represents a PDF action.

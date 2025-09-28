@@ -93,44 +93,43 @@ func (s *Type7) ShadingType() int {
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type7) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (s *Type7) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// Version check
 	if err := pdf.CheckVersion(rm.Out(), "Type 7 shadings", pdf.V1_3); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	if s.ColorSpace == nil {
-		return nil, zero, errors.New("missing ColorSpace")
+		return nil, errors.New("missing ColorSpace")
 	} else if s.ColorSpace.Family() == color.FamilyPattern {
-		return nil, zero, errors.New("invalid ColorSpace")
+		return nil, errors.New("invalid ColorSpace")
 	}
 	numComponents := s.ColorSpace.Channels()
 	if have := len(s.Background); have > 0 {
 		if have != numComponents {
 			err := fmt.Errorf("wrong number of background values: expected %d, got %d",
 				numComponents, have)
-			return nil, zero, err
+			return nil, err
 		}
 	}
 	switch s.BitsPerCoordinate {
 	case 1, 2, 4, 8, 12, 16, 24, 32:
 		// pass
 	default:
-		return nil, zero, fmt.Errorf("invalid BitsPerCoordinate: %d", s.BitsPerCoordinate)
+		return nil, fmt.Errorf("invalid BitsPerCoordinate: %d", s.BitsPerCoordinate)
 	}
 	switch s.BitsPerComponent {
 	case 1, 2, 4, 8, 12, 16:
 		// pass
 	default:
-		return nil, zero, fmt.Errorf("invalid BitsPerComponent: %d", s.BitsPerComponent)
+		return nil, fmt.Errorf("invalid BitsPerComponent: %d", s.BitsPerComponent)
 	}
 	switch s.BitsPerFlag {
 	case 2, 4, 8:
 		// pass
 	default:
-		return nil, zero, fmt.Errorf("invalid BitsPerFlag: %d", s.BitsPerFlag)
+		return nil, fmt.Errorf("invalid BitsPerFlag: %d", s.BitsPerFlag)
 	}
 	numValues := numComponents
 	if s.F != nil {
@@ -138,35 +137,35 @@ func (s *Type7) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	}
 	decodeLen := 4 + 2*numValues
 	if have := len(s.Decode); have != decodeLen {
-		return nil, zero, fmt.Errorf("wrong number of decode values: expected %d, got %d",
+		return nil, fmt.Errorf("wrong number of decode values: expected %d, got %d",
 			decodeLen, have)
 	}
 	for i := 0; i < decodeLen; i += 2 {
 		if s.Decode[i] > s.Decode[i+1] {
-			return nil, zero, fmt.Errorf("invalid decode values: %v", s.Decode)
+			return nil, fmt.Errorf("invalid decode values: %v", s.Decode)
 		}
 	}
 	for i, patch := range s.Patches {
 		if patch.Flag > 3 {
-			return nil, zero, fmt.Errorf("patch %d: invalid flag: %d", i, patch.Flag)
+			return nil, fmt.Errorf("patch %d: invalid flag: %d", i, patch.Flag)
 		}
 		if have := len(patch.CornerColors); have != 4 {
-			return nil, zero, fmt.Errorf("patch %d: expected 4 corner colors, got %d", i, have)
+			return nil, fmt.Errorf("patch %d: expected 4 corner colors, got %d", i, have)
 		}
 		for j, corner := range patch.CornerColors {
 			if have := len(corner); have != numValues {
-				return nil, zero, fmt.Errorf("patch %d corner %d: wrong number of color values: expected %d, got %d",
+				return nil, fmt.Errorf("patch %d corner %d: wrong number of color values: expected %d, got %d",
 					i, j, numValues, have)
 			}
 		}
 	}
 	if s.F != nil && s.ColorSpace.Family() == color.FamilyIndexed {
-		return nil, zero, errors.New("Function not allowed for indexed color space")
+		return nil, errors.New("Function not allowed for indexed color space")
 	}
 
-	csE, _, err := pdf.EmbedHelperEmbed(rm, s.ColorSpace)
+	csE, err := rm.Embed(s.ColorSpace)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -187,9 +186,9 @@ func (s *Type7) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		dict["AntiAlias"] = pdf.Boolean(true)
 	}
 	if s.F != nil {
-		fn, _, err := pdf.EmbedHelperEmbed(rm, s.F)
+		fn, err := rm.Embed(s.F)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["Function"] = fn
 	}
@@ -271,20 +270,20 @@ func (s *Type7) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	ref := rm.Alloc()
 	stm, err := rm.Out().OpenStream(ref, dict)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	_, err = stm.Write(buf)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	err = stm.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 // Control point mapping tables for Type7 tensor-product patches.

@@ -211,7 +211,7 @@ func (p *PolyLine) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// BS (optional)
 	if p.BorderStyle != nil {
-		bs, _, err := pdf.ResourceManagerEmbed(rm, p.BorderStyle)
+		bs, err := rm.Embed(p.BorderStyle)
 		if err != nil {
 			return nil, err
 		}
@@ -235,7 +235,7 @@ func (p *PolyLine) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out, "polyline annotation Measure entry", pdf.V1_7); err != nil {
 			return nil, err
 		}
-		embedded, _, err := pdf.ResourceManagerEmbed(rm, p.Measure)
+		embedded, err := rm.Embed(p.Measure)
 		if err != nil {
 			return nil, err
 		}

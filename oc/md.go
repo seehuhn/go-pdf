@@ -52,7 +52,7 @@ type Membership struct {
 	SingleUse bool
 }
 
-var _ pdf.Embedder[pdf.Unused] = (*Membership)(nil)
+var _ pdf.Embedder = (*Membership)(nil)
 
 // ExtractMembership extracts an optional content membership dictionary from a PDF object.
 func ExtractMembership(x *pdf.Extractor, obj pdf.Object) (*Membership, error) {
@@ -112,8 +112,7 @@ func ExtractMembership(x *pdf.Extractor, obj pdf.Object) (*Membership, error) {
 }
 
 // Embed converts the Membership to a PDF object.
-func (m *Membership) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (m *Membership) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	dict := pdf.Dict{
 		"Type": pdf.Name("OCMD"),
@@ -122,20 +121,20 @@ func (m *Membership) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) 
 	switch len(m.OCGs) {
 	case 0:
 		if m.VE == nil {
-			return nil, zero, errors.New("membership dictionary must have either OCGs or VE")
+			return nil, errors.New("membership dictionary must have either OCGs or VE")
 		}
 	case 1:
-		ocgObj, _, err := pdf.EmbedHelperEmbed(rm, m.OCGs[0])
+		ocgObj, err := rm.Embed(m.OCGs[0])
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["OCGs"] = ocgObj
 	default:
 		ocgArray := make(pdf.Array, len(m.OCGs))
 		for i, group := range m.OCGs {
-			ocgObj, _, err := pdf.EmbedHelperEmbed(rm, group)
+			ocgObj, err := rm.Embed(group)
 			if err != nil {
-				return nil, zero, err
+				return nil, err
 			}
 			ocgArray[i] = ocgObj
 		}
@@ -147,31 +146,31 @@ func (m *Membership) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) 
 		case PolicyAllOn, PolicyAnyOn, PolicyAnyOff, PolicyAllOff:
 			dict["P"] = pdf.Name(m.Policy)
 		default:
-			return nil, zero, errors.New("invalid Policy value")
+			return nil, errors.New("invalid Policy value")
 		}
 	}
 
 	if m.VE != nil {
 		if err := pdf.CheckVersion(rm.Out(), "visibility expressions", pdf.V1_6); err != nil {
-			return nil, zero, err
+			return nil, err
 		}
-		veObj, _, err := pdf.EmbedHelperEmbed(rm, m.VE)
+		veObj, err := rm.Embed(m.VE)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["VE"] = veObj
 	}
 
 	if m.SingleUse {
-		return dict, zero, nil
+		return dict, nil
 	}
 
 	ref := rm.Alloc()
 	err := rm.Out().Put(ref, dict)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
-	return ref, zero, nil
+	return ref, nil
 }
 
 // IsVisible evaluates the visibility of content controlled by this membership

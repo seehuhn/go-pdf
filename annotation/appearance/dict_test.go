@@ -110,7 +110,7 @@ func TestRoundTrip(t *testing.T) {
 			// embed the Dict into a PDF
 			w1, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm1 := pdf.NewResourceManager(w1)
-			ref, _, err := pdf.ResourceManagerEmbed(rm1, tc.data)
+			ref, err := rm1.Embed(tc.data)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -133,7 +133,7 @@ func TestRoundTrip(t *testing.T) {
 			// embed the extracted Dict into a new PDF
 			w2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm2 := pdf.NewResourceManager(w2)
-			ref2, _, err := pdf.ResourceManagerEmbed(rm2, extracted1)
+			ref2, err := rm2.Embed(extracted1)
 			if err != nil {
 				t.Fatal(err)
 			}

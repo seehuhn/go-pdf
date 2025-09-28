@@ -43,7 +43,7 @@ type Border struct {
 	SingleUse bool
 }
 
-var _ pdf.Embedder[pdf.Unused] = (*Border)(nil)
+var _ pdf.Embedder = (*Border)(nil)
 
 // PDFDefaultBorder is the default border values within PDF files.
 // Using this for [Common.Border] slightly reduces file size.
@@ -106,25 +106,24 @@ func ExtractBorder(r pdf.Getter, obj pdf.Object) (*Border, error) {
 	return b, nil
 }
 
-func (b *Border) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (b *Border) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// the Go default value is "no border"
 	if b == nil {
-		return pdf.Array{pdf.Number(0), pdf.Number(0), pdf.Number(0)}, zero, nil
+		return pdf.Array{pdf.Number(0), pdf.Number(0), pdf.Number(0)}, nil
 	}
 
 	// if we have the PDF default value, we don't need to store anything
 	if b.isPDFDefault() {
-		return nil, zero, nil
+		return nil, nil
 	}
 
 	if b.Width <= 0 {
-		return nil, zero, fmt.Errorf("invalid border width %f", b.Width)
+		return nil, fmt.Errorf("invalid border width %f", b.Width)
 	}
 	for _, v := range b.DashArray {
 		if v <= 0 {
-			return nil, zero, fmt.Errorf("invalid dash value %f", v)
+			return nil, fmt.Errorf("invalid dash value %f", v)
 		}
 	}
 
@@ -136,12 +135,12 @@ func (b *Border) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 
 	if b.DashArray != nil {
 		if err := pdf.CheckVersion(rm.Out(), "border dash array", pdf.V1_1); err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dashArray := make(pdf.Array, len(b.DashArray))
 		for i, v := range b.DashArray {
 			if v < 0 {
-				return nil, zero, fmt.Errorf("invalid dash value %f in border dash array", v)
+				return nil, fmt.Errorf("invalid dash value %f in border dash array", v)
 			}
 			dashArray[i] = pdf.Number(v)
 		}
@@ -149,14 +148,14 @@ func (b *Border) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if b.SingleUse {
-		return borderArray, zero, nil
+		return borderArray, nil
 	}
 	ref := rm.Alloc()
 	err := rm.Out().Put(ref, borderArray)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
-	return ref, zero, nil
+	return ref, nil
 }
 
 func (b *Border) isPDFDefault() bool {

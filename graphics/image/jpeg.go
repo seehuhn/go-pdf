@@ -60,8 +60,7 @@ func (im *jpegImage) Bounds() graphics.Rectangle {
 
 // Embed ensures that the image is embedded in the PDF file.
 // This implements the [graphics.Image] interface.
-func (im *jpegImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (im *jpegImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	ref := rm.Alloc()
 
 	// TODO(voss): write a mask if there is an alpha channel
@@ -77,18 +76,18 @@ func (im *jpegImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) 
 		"Filter":           pdf.Name("DCTDecode"),
 	})
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	err = jpeg.Encode(stream, img, im.opts)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	err = stream.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }

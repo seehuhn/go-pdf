@@ -22,7 +22,7 @@ import "seehuhn.de/go/pdf"
 // based on conditions. This must be be either a [Group] or a [Membership]
 // object.
 type Conditional interface {
-	pdf.Embedder[pdf.Unused]
+	pdf.Embedder
 	IsVisible(map[*Group]bool) bool
 }
 

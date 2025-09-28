@@ -64,26 +64,25 @@ func (rm *RectilinearMeasure) MeasureType() pdf.Name {
 }
 
 // Embed converts the RectilinearMeasure into a PDF object.
-func (rm *RectilinearMeasure) Embed(res *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (rm *RectilinearMeasure) Embed(res *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// Version check for PDF 1.6+
 	if err := pdf.CheckVersion(res.Out(), "measure dictionaries", pdf.V1_6); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	// Validate required fields
 	if rm.ScaleRatio == "" {
-		return nil, zero, pdf.Errorf("missing required ScaleRatio")
+		return nil, pdf.Errorf("missing required ScaleRatio")
 	}
 	if len(rm.XAxis) == 0 {
-		return nil, zero, pdf.Errorf("missing required XAxis")
+		return nil, pdf.Errorf("missing required XAxis")
 	}
 	if len(rm.Distance) == 0 {
-		return nil, zero, pdf.Errorf("missing required Distance")
+		return nil, pdf.Errorf("missing required Distance")
 	}
 	if len(rm.Area) == 0 {
-		return nil, zero, pdf.Errorf("missing required Area")
+		return nil, pdf.Errorf("missing required Area")
 	}
 
 	dict := pdf.Dict{}
@@ -102,7 +101,7 @@ func (rm *RectilinearMeasure) Embed(res *pdf.EmbedHelper) (pdf.Native, pdf.Unuse
 	// X axis
 	xArray, err := embedNumberFormatArray(res, rm.XAxis)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	dict["X"] = xArray
 
@@ -111,7 +110,7 @@ func (rm *RectilinearMeasure) Embed(res *pdf.EmbedHelper) (pdf.Native, pdf.Unuse
 	if !yAxisOmitted {
 		yArray, err := embedNumberFormatArray(res, rm.YAxis)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["Y"] = yArray
 	}
@@ -119,14 +118,14 @@ func (rm *RectilinearMeasure) Embed(res *pdf.EmbedHelper) (pdf.Native, pdf.Unuse
 	// Distance
 	dArray, err := embedNumberFormatArray(res, rm.Distance)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	dict["D"] = dArray
 
 	// Area
 	aArray, err := embedNumberFormatArray(res, rm.Area)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	dict["A"] = aArray
 
@@ -134,7 +133,7 @@ func (rm *RectilinearMeasure) Embed(res *pdf.EmbedHelper) (pdf.Native, pdf.Unuse
 	if len(rm.Angle) > 0 {
 		tArray, err := embedNumberFormatArray(res, rm.Angle)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["T"] = tArray
 	}
@@ -142,7 +141,7 @@ func (rm *RectilinearMeasure) Embed(res *pdf.EmbedHelper) (pdf.Native, pdf.Unuse
 	if len(rm.Slope) > 0 {
 		sArray, err := embedNumberFormatArray(res, rm.Slope)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["S"] = sArray
 	}
@@ -158,23 +157,23 @@ func (rm *RectilinearMeasure) Embed(res *pdf.EmbedHelper) (pdf.Native, pdf.Unuse
 	}
 
 	if rm.SingleUse {
-		return dict, zero, nil
+		return dict, nil
 	}
 
 	ref := res.Alloc()
 	err = res.Out().Put(ref, dict)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 // embedNumberFormatArray embeds an array of NumberFormat objects.
 func embedNumberFormatArray(res *pdf.EmbedHelper, formats []*NumberFormat) (pdf.Array, error) {
 	arr := make(pdf.Array, len(formats))
 	for i, format := range formats {
-		embedded, _, err := pdf.EmbedHelperEmbed(res, format)
+		embedded, err := res.Embed(format)
 		if err != nil {
 			return nil, err
 		}

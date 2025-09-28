@@ -201,7 +201,7 @@ func rectilinearRoundTripTest(t *testing.T, version pdf.Version, data *Rectiline
 	w, _ := memfile.NewPDFWriter(version, nil)
 
 	rm := pdf.NewResourceManager(w)
-	embedded, _, err := pdf.ResourceManagerEmbed(rm, data)
+	embedded, err := rm.Embed(data)
 	if err != nil {
 		t.Fatalf("embed failed: %v", err)
 	}
@@ -291,7 +291,7 @@ func FuzzRectilinearRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(tc.version, opt)
 
 		rm := pdf.NewResourceManager(w)
-		embedded, _, err := pdf.ResourceManagerEmbed(rm, tc.data)
+		embedded, err := rm.Embed(tc.data)
 		if err != nil {
 			continue
 		}
@@ -392,7 +392,7 @@ func TestEmbedValidation(t *testing.T) {
 			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(w)
 
-			_, _, err := pdf.ResourceManagerEmbed(rm, tt.rm)
+			_, err := rm.Embed(tt.rm)
 			if err == nil {
 				t.Fatal("expected validation error but got none")
 			}

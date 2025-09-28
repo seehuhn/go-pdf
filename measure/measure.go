@@ -23,6 +23,6 @@ import (
 // Measure represents a measurement coordinate system.
 // This is implemented by [RectilinearMeasure] and [GeospatialMeasure].
 type Measure interface {
-	pdf.Embedder[pdf.Unused]
+	pdf.Embedder
 	MeasureType() pdf.Name // Returns "RL" or "GEO"
 }

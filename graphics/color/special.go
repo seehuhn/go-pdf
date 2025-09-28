@@ -102,16 +102,15 @@ func (s *SpaceIndexed) Channels() int {
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s *SpaceIndexed) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (s *SpaceIndexed) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if err := pdf.CheckVersion(rm.Out(), "Indexed color space", pdf.V1_1); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	base, _, err := pdf.EmbedHelperEmbed(rm, s.Base)
+	base, err := rm.Embed(s.Base)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	data := pdf.Array{
@@ -121,7 +120,7 @@ func (s *SpaceIndexed) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error
 		s.lookup,
 	}
 
-	return data, zero, nil
+	return data, nil
 }
 
 // Default returns color 0 in the indexed color space.
@@ -188,23 +187,22 @@ func (s *SpaceSeparation) Channels() int {
 
 // Embed adds the color space to a PDF file.
 // This implements the pdf.Embedder interface.
-func (s *SpaceSeparation) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (s *SpaceSeparation) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if err := pdf.CheckVersion(rm.Out(), "Separation color space", pdf.V1_2); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	alt, _, err := pdf.EmbedHelperEmbed(rm, s.alternate)
+	alt, err := rm.Embed(s.alternate)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
-	trfm, _, err := pdf.EmbedHelperEmbed(rm, s.trfm)
+	trfm, err := rm.Embed(s.trfm)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return pdf.Array{FamilySeparation, s.colorant, alt, trfm}, zero, nil
+	return pdf.Array{FamilySeparation, s.colorant, alt, trfm}, nil
 }
 
 // New returns a new color in the separation color space.
@@ -309,21 +307,20 @@ func (s *SpaceDeviceN) Channels() int {
 
 // Embed adds the color space to a PDF file.
 // This implements the pdf.Embedder interface.
-func (s *SpaceDeviceN) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (s *SpaceDeviceN) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if err := pdf.CheckVersion(rm.Out(), "DeviceN color space", pdf.V1_3); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	alt, _, err := pdf.EmbedHelperEmbed(rm, s.alternate)
+	alt, err := rm.Embed(s.alternate)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	trfm, _, err := pdf.EmbedHelperEmbed(rm, s.trfm)
+	trfm, err := rm.Embed(s.trfm)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	var res pdf.Array
@@ -343,7 +340,7 @@ func (s *SpaceDeviceN) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error
 			s.attr,
 		}
 	}
-	return res, zero, nil
+	return res, nil
 }
 
 // Default returns the default color of the color space.

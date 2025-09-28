@@ -68,7 +68,7 @@ func (w *Writer) setColor(c color.Color, fill bool) {
 	}
 
 	if needsColorSpace {
-		name, _, err := writerGetResourceName(w, catColorSpace, cs)
+		name, err := writerGetResourceName(w, catColorSpace, cs)
 		if err != nil {
 			w.Err = err
 			return
@@ -93,7 +93,7 @@ func (w *Writer) setColor(c color.Color, fill bool) {
 			out = append(out, pdf.Number(val))
 		}
 		if pattern != nil {
-			name, _, err := writerGetResourceName(w, catPattern, pattern)
+			name, err := writerGetResourceName(w, catPattern, pattern)
 			if err != nil {
 				w.Err = err
 				return
@@ -128,7 +128,7 @@ func (w *Writer) DrawShading(shading Shading) {
 		return
 	}
 
-	name, _, err := writerGetResourceName(w, catShading, shading)
+	name, err := writerGetResourceName(w, catShading, shading)
 	if err != nil {
 		w.Err = err
 		return

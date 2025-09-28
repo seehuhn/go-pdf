@@ -345,8 +345,7 @@ func (f *testFont) FontInfo() any {
 	panic("not implemented")
 }
 
-func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	fd := &font.Descriptor{
 		FontName:   f.cff.FontName,
@@ -374,12 +373,12 @@ func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
 		FontFile:        cffglyphs.ToStream(f.cff, glyphdata.CFF),
 	}
-	fontDictRef, _, err := pdf.EmbedHelperEmbed(rm, dicts)
+	fontDictRef, err := rm.Embed(dicts)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return fontDictRef, zero, nil
+	return fontDictRef, nil
 }
 
 func clone[T any](x *T) *T {

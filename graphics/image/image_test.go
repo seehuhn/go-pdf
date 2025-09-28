@@ -65,7 +65,7 @@ func TestPNGRefactored(t *testing.T) {
 	}
 
 	// Test embedding the dict
-	ref1, _, err := pdf.ResourceManagerEmbed(rm, dict1)
+	ref1, err := rm.Embed(dict1)
 	if err != nil {
 		t.Fatalf("Failed to embed PNG dict: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestPNGRefactored(t *testing.T) {
 		t.Errorf("PNG function didn't use explicit ColorSpace, got %v", dict2.ColorSpace)
 	}
 
-	ref2, _, err := pdf.ResourceManagerEmbed(rm, dict2)
+	ref2, err := rm.Embed(dict2)
 	if err != nil {
 		t.Fatalf("Failed to embed PNG dict with explicit ColorSpace: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestPNGRefactored(t *testing.T) {
 		t.Error("PNG function should not create soft mask for opaque image")
 	}
 
-	ref3, _, err := pdf.ResourceManagerEmbed(rm, dict3)
+	ref3, err := rm.Embed(dict3)
 	if err != nil {
 		t.Fatalf("Failed to embed opaque PNG dict: %v", err)
 	}
@@ -173,7 +173,7 @@ func TestMaskWithPtData(t *testing.T) {
 	mask0 := FromImageMask(testImg)
 	mask0.PtData = testPtData
 
-	ref, _, err := pdf.ResourceManagerEmbed(rm1, mask0)
+	ref, err := rm1.Embed(mask0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +212,7 @@ func TestMaskWithPtData(t *testing.T) {
 	// test round-trip
 	writer2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm2 := pdf.NewResourceManager(writer2)
-	ref2, _, err := pdf.ResourceManagerEmbed(rm2, mask1)
+	ref2, err := rm2.Embed(mask1)
 	if err != nil {
 		t.Fatal(err)
 	}

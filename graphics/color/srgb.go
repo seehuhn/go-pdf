@@ -40,12 +40,11 @@ func (s spaceSRGB) Channels() int {
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s spaceSRGB) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (s spaceSRGB) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	w := rm.Out()
 	if err := pdf.CheckVersion(w, "sRGB color space", pdf.V1_3); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -55,7 +54,7 @@ func (s spaceSRGB) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	sRef := w.Alloc()
 	body, err := w.OpenStream(sRef, dict, pdf.FilterFlate{})
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	var iccData []byte
 	if pdf.GetVersion(w) >= pdf.V1_7 {
@@ -67,14 +66,14 @@ func (s spaceSRGB) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	}
 	_, err = body.Write(iccData)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	err = body.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return pdf.Array{FamilyICCBased, sRef}, zero, nil
+	return pdf.Array{FamilyICCBased, sRef}, nil
 }
 
 // Default returns black in the sRGB color space.

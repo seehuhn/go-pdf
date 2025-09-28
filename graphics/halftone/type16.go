@@ -150,20 +150,19 @@ func extractType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
 	return h, nil
 }
 
-func (h *Type16) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (h *Type16) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if err := pdf.CheckVersion(rm.Out(), "Type 16 halftone screening", pdf.V1_3); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	if h.Width <= 0 || h.Height <= 0 {
-		return nil, zero, fmt.Errorf("invalid threshold array dimensions %dx%d", h.Width, h.Height)
+		return nil, fmt.Errorf("invalid threshold array dimensions %dx%d", h.Width, h.Height)
 	}
 
 	hasSecondRect := h.Width2 > 0 || h.Height2 > 0
 	if hasSecondRect && (h.Width2 <= 0 || h.Height2 <= 0) {
-		return nil, zero, fmt.Errorf("if Width2 or Height2 is specified, both must be positive, got %dx%d", h.Width2, h.Height2)
+		return nil, fmt.Errorf("if Width2 or Height2 is specified, both must be positive, got %dx%d", h.Width2, h.Height2)
 	}
 
 	// Calculate expected data size (uint16 values)
@@ -173,7 +172,7 @@ func (h *Type16) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if len(h.ThresholdData) != expectedValues {
-		return nil, zero, fmt.Errorf("threshold data size mismatch: expected %d values, got %d", expectedValues, len(h.ThresholdData))
+		return nil, fmt.Errorf("threshold data size mismatch: expected %d values, got %d", expectedValues, len(h.ThresholdData))
 	}
 
 	dict := pdf.Dict{
@@ -202,11 +201,11 @@ func (h *Type16) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		dict["TransferFunction"] = pdf.Name("Identity")
 	} else if h.TransferFunction != nil {
 		if !isValidTransferFunction(h.TransferFunction) {
-			return nil, zero, errors.New("invalid transfer function shape")
+			return nil, errors.New("invalid transfer function shape")
 		}
-		ref, _, err := pdf.EmbedHelperEmbed(rm, h.TransferFunction)
+		ref, err := rm.Embed(h.TransferFunction)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["TransferFunction"] = ref
 	}
@@ -215,7 +214,7 @@ func (h *Type16) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	ref := rm.Alloc()
 	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	if len(h.ThresholdData) > 0 {
@@ -226,16 +225,16 @@ func (h *Type16) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		}
 		_, err = stm.Write(data)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 	}
 
 	err = stm.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 // HalftoneType returns 16.

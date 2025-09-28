@@ -28,5 +28,5 @@ type Halftone interface {
 	// If no transfer function is specified, nil is returned.
 	GetTransferFunction() pdf.Function
 
-	pdf.Embedder[pdf.Unused]
+	pdf.Embedder
 }

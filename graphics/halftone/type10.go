@@ -109,19 +109,18 @@ func extractType10(x *pdf.Extractor, stream *pdf.Stream) (*Type10, error) {
 	return h, nil
 }
 
-func (h *Type10) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (h *Type10) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if err := pdf.CheckVersion(rm.Out(), "halftone screening", pdf.V1_2); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	if h.Size1 <= 0 || h.Size2 <= 0 {
-		return nil, zero, fmt.Errorf("invalid square dimensions %dx%d", h.Size1, h.Size2)
+		return nil, fmt.Errorf("invalid square dimensions %dx%d", h.Size1, h.Size2)
 	}
 	expectedSize := h.Size1*h.Size1 + h.Size2*h.Size2
 	if len(h.ThresholdData) != expectedSize {
-		return nil, zero, fmt.Errorf("threshold data size mismatch: expected %d bytes, got %d", expectedSize, len(h.ThresholdData))
+		return nil, fmt.Errorf("threshold data size mismatch: expected %d bytes, got %d", expectedSize, len(h.ThresholdData))
 	}
 
 	dict := pdf.Dict{
@@ -145,11 +144,11 @@ func (h *Type10) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		dict["TransferFunction"] = pdf.Name("Identity")
 	} else if h.TransferFunction != nil {
 		if !isValidTransferFunction(h.TransferFunction) {
-			return nil, zero, errors.New("invalid transfer function shape")
+			return nil, errors.New("invalid transfer function shape")
 		}
-		ref, _, err := pdf.EmbedHelperEmbed(rm, h.TransferFunction)
+		ref, err := rm.Embed(h.TransferFunction)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["TransferFunction"] = ref
 	}
@@ -158,22 +157,22 @@ func (h *Type10) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	ref := rm.Alloc()
 	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	if len(h.ThresholdData) > 0 {
 		_, err = stm.Write(h.ThresholdData)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 	}
 
 	err = stm.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 // HalftoneType returns 10.

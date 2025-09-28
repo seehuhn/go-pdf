@@ -34,7 +34,7 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-var _ pdf.Embedder[pdf.Unused] = (*File)(nil)
+var _ pdf.Embedder = (*File)(nil)
 
 // The following variabes contain test CMap data used in the tests below.
 var (
@@ -619,7 +619,7 @@ func TestExtractLoop(t *testing.T) {
 func TestEmbedCMap(t *testing.T) {
 	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
-	ref, _, err := pdf.ResourceManagerEmbed(rm, testToUniInfoChild)
+	ref, err := rm.Embed(testToUniInfoChild)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -258,30 +258,29 @@ func ExtractSpecification(x *pdf.Extractor, obj pdf.Object) (*Specification, err
 }
 
 // Embed converts the file specification to a PDF dictionary.
-func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// Check version requirements for various fields
 	if spec.FileNameUnicode != "" || spec.CollectionItem != nil {
 		if err := pdf.CheckVersion(rm.Out(), "file specification UF/CI entries", pdf.V1_7); err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 	}
 
 	if spec.EmbeddedFiles != nil || spec.RelatedFiles != nil {
 		if err := pdf.CheckVersion(rm.Out(), "file specification EF/RF entries", pdf.V1_3); err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 	}
 
 	if spec.Thumbnail != nil || spec.EncryptedPayload != nil || (spec.AFRelationship != "" && spec.AFRelationship != RelationshipUnspecified) {
 		if err := pdf.CheckVersion(rm.Out(), "file specification PDF 2.0 entries", pdf.V2_0); err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 	}
 
 	// Validate that F is present if DOS/Mac/Unix are all absent
 	if spec.FileName == "" && spec.FileNameDOS == "" && spec.FileNameMac == "" && spec.FileNameUnix == "" {
-		return nil, zero, pdf.Errorf("file specification must have F entry if DOS, Mac, and Unix entries are all absent")
+		return nil, pdf.Errorf("file specification must have F entry if DOS, Mac, and Unix entries are all absent")
 	}
 
 	dict := pdf.Dict{}
@@ -338,9 +337,9 @@ func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, e
 		efDict := pdf.Dict{}
 		for key, stream := range spec.EmbeddedFiles {
 			if stream != nil {
-				ref, _, err := pdf.EmbedHelperEmbed(rm, stream)
+				ref, err := rm.Embed(stream)
 				if err != nil {
-					return nil, zero, err
+					return nil, err
 				}
 				efDict[pdf.Name(key)] = ref
 			}
@@ -352,7 +351,7 @@ func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, e
 	if len(spec.RelatedFiles) > 0 {
 		rfDict, err := encodeRelatedFiles(rm, spec.RelatedFiles)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["RF"] = rfDict
 	}
@@ -364,27 +363,27 @@ func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, e
 
 	// CollectionItem (CI)
 	if spec.CollectionItem != nil {
-		ci, _, err := pdf.EmbedHelperEmbed(rm, spec.CollectionItem)
+		ci, err := rm.Embed(spec.CollectionItem)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["CI"] = ci
 	}
 
 	// Thumbnail
 	if spec.Thumbnail != nil {
-		thumb, _, err := pdf.EmbedHelperEmbed(rm, spec.Thumbnail)
+		thumb, err := rm.Embed(spec.Thumbnail)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["Thumb"] = thumb
 	}
 
 	// EncryptedPayload (EP)
 	if spec.EncryptedPayload != nil {
-		ep, _, err := pdf.EmbedHelperEmbed(rm, spec.EncryptedPayload)
+		ep, err := rm.Embed(spec.EncryptedPayload)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["EP"] = ep
 	}
@@ -393,19 +392,19 @@ func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, e
 	mustBeIndirect := spec.EmbeddedFiles != nil || spec.RelatedFiles != nil
 
 	if mustBeIndirect && spec.SingleUse {
-		return nil, zero, pdf.Errorf("file specification with EF or RF entries must be indirect (SingleUse must be false)")
+		return nil, pdf.Errorf("file specification with EF or RF entries must be indirect (SingleUse must be false)")
 	}
 
 	if spec.SingleUse {
-		return dict, zero, nil
+		return dict, nil
 	}
 
 	ref := rm.Alloc()
 	err := rm.Out().Put(ref, dict)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
-	return ref, zero, nil
+	return ref, nil
 }
 
 // RelatedFile represents an entry in a related files array.
@@ -462,7 +461,7 @@ func encodeRelatedFiles(rm *pdf.EmbedHelper, relatedFiles map[string][]RelatedFi
 		for _, file := range files {
 			array = append(array, pdf.TextString(file.Name))
 			if file.Stream != nil {
-				ref, _, err := pdf.EmbedHelperEmbed(rm, file.Stream)
+				ref, err := rm.Embed(file.Stream)
 				if err != nil {
 					return nil, err
 				}

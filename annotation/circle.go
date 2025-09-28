@@ -171,7 +171,7 @@ func (c *Circle) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	// Add circle-specific fields
 	// BS (optional)
 	if c.BorderStyle != nil {
-		bs, _, err := pdf.ResourceManagerEmbed(rm, c.BorderStyle)
+		bs, err := rm.Embed(c.BorderStyle)
 		if err != nil {
 			return nil, err
 		}
@@ -184,7 +184,7 @@ func (c *Circle) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out, "circle annotation BE entry", pdf.V1_5); err != nil {
 			return nil, err
 		}
-		be, _, err := pdf.ResourceManagerEmbed(rm, c.BorderEffect)
+		be, err := rm.Embed(c.BorderEffect)
 		if err != nil {
 			return nil, err
 		}

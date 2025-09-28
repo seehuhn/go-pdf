@@ -167,11 +167,10 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
 }
 
 // Embed converts the thumbnail to a PDF object.
-func (t *Thumbnail) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (t *Thumbnail) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if err := t.check(rm.Out()); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -181,9 +180,9 @@ func (t *Thumbnail) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	}
 
 	// embed color space
-	csObj, _, err := pdf.EmbedHelperEmbed(rm, t.ColorSpace)
+	csObj, err := rm.Embed(t.ColorSpace)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	dict["ColorSpace"] = csObj
 
@@ -200,21 +199,21 @@ func (t *Thumbnail) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	ref := rm.Alloc()
 	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	err = t.WriteData(stm)
 	if err != nil {
 		stm.Close()
-		return nil, zero, err
+		return nil, err
 	}
 
 	err = stm.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 // Bounds returns the dimensions of the thumbnail.

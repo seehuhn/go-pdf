@@ -324,8 +324,7 @@ type testFont struct {
 	symbolic bool
 }
 
-func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	fontDictRef := rm.Alloc()
 	fontDescriptorRef := rm.Alloc()
@@ -343,7 +342,7 @@ func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	}
 	err := rm.Out().Put(fontDictRef, fontDict)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	var flags pdf.Integer
@@ -367,7 +366,7 @@ func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	}
 	err = rm.Out().Put(fontDescriptorRef, fontDescriptor)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	length1 := pdf.NewPlaceholder(rm.Out(), 10)
@@ -376,7 +375,7 @@ func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	}
 	fontFileStream, err := rm.Out().OpenStream(fontFileRef, fontFileDict, pdf.FilterCompress{})
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	var extra []any
 	if f.post != nil {
@@ -384,18 +383,18 @@ func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	}
 	n, err := f.ttf.WriteTrueTypePDF(fontFileStream, extra...)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	err = length1.Set(pdf.Integer(n))
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	err = fontFileStream.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return fontDictRef, zero, nil
+	return fontDictRef, nil
 }
 
 func (f *testFont) WritingMode() font.WritingMode {

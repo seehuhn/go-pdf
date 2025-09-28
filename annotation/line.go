@@ -256,7 +256,7 @@ func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// BS (optional)
 	if l.BorderStyle != nil {
-		bs, _, err := pdf.ResourceManagerEmbed(rm, l.BorderStyle)
+		bs, err := rm.Embed(l.BorderStyle)
 		if err != nil {
 			return nil, err
 		}
@@ -366,7 +366,7 @@ func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out, "line annotation Measure entry", pdf.V1_7); err != nil {
 			return nil, err
 		}
-		embedded, _, err := pdf.ResourceManagerEmbed(rm, l.Measure)
+		embedded, err := rm.Embed(l.Measure)
 		if err != nil {
 			return nil, err
 		}

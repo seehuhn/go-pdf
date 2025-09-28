@@ -128,22 +128,21 @@ func ExtractStream(x *pdf.Extractor, obj pdf.Object) (*Stream, error) {
 }
 
 // Embed converts the Stream to a PDF stream object.
-func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// Check PDF version requirement for embedded file streams (PDF 1.3)
 	if err := pdf.CheckVersion(rm.Out(), "embedded file streams", pdf.V1_3); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	// Validate WriteData is provided
 	if s.WriteData == nil {
-		return nil, zero, pdf.Errorf("WriteData function is required for embedded file streams")
+		return nil, pdf.Errorf("WriteData function is required for embedded file streams")
 	}
 
 	// Validate CheckSum length if present
 	if len(s.CheckSum) != 0 && len(s.CheckSum) != 16 {
-		return nil, zero, pdf.Errorf("CheckSum must be exactly 16 bytes when present")
+		return nil, pdf.Errorf("CheckSum must be exactly 16 bytes when present")
 	}
 
 	// Create stream dictionary
@@ -191,22 +190,22 @@ func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	// Open stream for writing
 	w, err := rm.Out().OpenStream(ref, dict)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	// Write data using the WriteData function
 	err = s.WriteData(w)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	// Close the stream
 	err = w.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 // Equal compares two Stream objects for equality.

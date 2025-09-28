@@ -197,20 +197,19 @@ func (f *Type3) validate() error {
 }
 
 // Embed embeds the function into a PDF file.
-func (f *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (f *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if err := pdf.CheckVersion(rm.Out(), "Type 3 functions", pdf.V1_3); err != nil {
-		return nil, zero, err
+		return nil, err
 	} else if err := f.validate(); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	functionRefs := make(pdf.Array, len(f.Functions))
 	for i, fn := range f.Functions {
-		ref, _, err := pdf.EmbedHelperEmbed(rm, fn)
+		ref, err := rm.Embed(fn)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		functionRefs[i] = ref
 	}
@@ -230,10 +229,10 @@ func (f *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	ref := rm.Alloc()
 	err := rm.Out().Put(ref, dict)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 // Apply applies the function to the given input value and returns the output values.

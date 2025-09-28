@@ -44,7 +44,7 @@ func TestEmbed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ref, _, err := pdf.ResourceManagerEmbed(rm, fontInstance)
+	ref, err := rm.Embed(fontInstance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestTextContent(t *testing.T) {
 	page.TextEnd()
 
 	// keep a reference to the font
-	ref, _, _ := pdf.ResourceManagerEmbed(page.RM, F)
+	ref, _ := page.RM.Embed(F)
 
 	err = page.Close()
 	if err != nil {

@@ -116,7 +116,7 @@ func streamRoundTripTest(t *testing.T, version pdf.Version, stream *Stream) {
 
 	// Embed the stream
 	rm := pdf.NewResourceManager(w)
-	obj, _, err := pdf.ResourceManagerEmbed(rm, stream)
+	obj, err := rm.Embed(stream)
 	if err != nil {
 		t.Fatalf("Embed failed: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestStreamValidation(t *testing.T) {
 		stream := &Stream{
 			MimeType: "text/plain",
 		}
-		_, _, err := pdf.ResourceManagerEmbed(rm, stream)
+		_, err := rm.Embed(stream)
 		if err == nil {
 			t.Error("Expected error for missing WriteData")
 		}
@@ -218,7 +218,7 @@ func TestStreamValidation(t *testing.T) {
 				return nil
 			},
 		}
-		_, _, err := pdf.ResourceManagerEmbed(rm, stream)
+		_, err := rm.Embed(stream)
 		if err == nil {
 			t.Error("Expected error for invalid CheckSum length")
 		}
@@ -240,7 +240,7 @@ func TestStreamVersionRequirement(t *testing.T) {
 		},
 	}
 
-	_, _, err := pdf.ResourceManagerEmbed(rm, stream)
+	_, err := rm.Embed(stream)
 	if err == nil {
 		t.Error("Expected version error for PDF 1.2")
 	}
@@ -258,7 +258,7 @@ func FuzzStreamRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(tc.version, opt)
 		rm := pdf.NewResourceManager(w)
 
-		obj, _, err := pdf.ResourceManagerEmbed(rm, tc.stream)
+		obj, err := rm.Embed(tc.stream)
 		if err != nil {
 			continue
 		}

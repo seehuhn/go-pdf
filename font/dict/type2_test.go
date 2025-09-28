@@ -82,7 +82,7 @@ func FuzzType2Dict(f *testing.F) {
 					},
 				}
 			}
-			fontDictRef, _, err := pdf.ResourceManagerEmbed(rm, d)
+			fontDictRef, err := rm.Embed(d)
 			if err != nil {
 				f.Fatal(err)
 			}
@@ -165,7 +165,7 @@ func checkRoundtripT2(t *testing.T, d1 *CIDFontType2, v pdf.Version) {
 			},
 		}
 	}
-	fontDictRef, _, err := pdf.ResourceManagerEmbed(rm, d1)
+	fontDictRef, err := rm.Embed(d1)
 	if err != nil {
 		t.Fatal(err)
 	}

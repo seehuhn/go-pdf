@@ -137,33 +137,32 @@ func extractType1(x *pdf.Extractor, dict pdf.Dict) (*Type1, error) {
 	return h, nil
 }
 
-func (h *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (h *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if err := pdf.CheckVersion(rm.Out(), "halftone screening", pdf.V1_2); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	if h.Frequency <= 0 {
-		return nil, zero, fmt.Errorf("invalid halftone frequency %g", h.Frequency)
+		return nil, fmt.Errorf("invalid halftone frequency %g", h.Frequency)
 	}
 	if h.SpotFunction == nil {
-		return nil, zero, errors.New("missing spot function")
+		return nil, errors.New("missing spot function")
 	}
 
 	var spotObj pdf.Object
 	if spot := h.SpotFunction; spot != nil {
 		nIn, nOut := spot.Shape()
 		if nIn != 2 || nOut != 1 {
-			return nil, zero, fmt.Errorf("wrong spot function shape %dx%d != 2x1", nIn, nOut)
+			return nil, fmt.Errorf("wrong spot function shape %dx%d != 2x1", nIn, nOut)
 		}
 
 		if obj, ok := spotToName[spot]; ok {
 			spotObj = obj
 		} else {
-			obj, _, err := pdf.EmbedHelperEmbed(rm, spot)
+			obj, err := rm.Embed(spot)
 			if err != nil {
-				return nil, zero, err
+				return nil, err
 			}
 			spotObj = obj
 		}
@@ -192,11 +191,11 @@ func (h *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		dict["TransferFunction"] = pdf.Name("Identity")
 	} else if h.TransferFunction != nil {
 		if !isValidTransferFunction(h.TransferFunction) {
-			return nil, zero, errors.New("invalid transfer function shape")
+			return nil, errors.New("invalid transfer function shape")
 		}
-		ref, _, err := pdf.EmbedHelperEmbed(rm, h.TransferFunction)
+		ref, err := rm.Embed(h.TransferFunction)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["TransferFunction"] = ref
 	}
@@ -204,9 +203,9 @@ func (h *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	// We always embed halftone dictionaries as indirect objects.
 	ref := rm.Alloc()
 	if err := rm.Out().Put(ref, dict); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
-	return ref, zero, nil
+	return ref, nil
 }
 
 // HalftoneType returns 1.

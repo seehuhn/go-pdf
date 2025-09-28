@@ -46,12 +46,11 @@ func Extract(r pdf.Getter, ref pdf.Object) (*Stream, error) {
 
 // Embed adds the XMP metadata stream to the PDF file.
 // This implements the pdf.Embedder interface.
-func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	w := rm.Out()
 	if err := pdf.CheckVersion(w, "XMP metadata stream", pdf.V1_4); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	ref := w.Alloc()
 
@@ -61,20 +60,20 @@ func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	}
 	body, err := w.OpenStream(ref, dict, pdf.FilterFlate{})
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	err = s.Data.Write(body, nil)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	err = body.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 // Equal reports whether s and other represent the same XMP metadata.

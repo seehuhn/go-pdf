@@ -160,33 +160,32 @@ func extractType1(x *pdf.Extractor, d pdf.Dict, wasReference bool) (*Type1, erro
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (s *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// Version check
 	if err := pdf.CheckVersion(rm.Out(), "Type 1 shading", pdf.V1_3); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	if s.ColorSpace == nil {
-		return nil, zero, errors.New("missing ColorSpace")
+		return nil, errors.New("missing ColorSpace")
 	} else if s.ColorSpace.Family() == color.FamilyPattern {
-		return nil, zero, errors.New("invalid ColorSpace")
+		return nil, errors.New("invalid ColorSpace")
 	} else if s.ColorSpace.Family() == color.FamilyIndexed {
-		return nil, zero, errors.New("Type 1 shading cannot use Indexed color space")
+		return nil, errors.New("Type 1 shading cannot use Indexed color space")
 	}
 	if have := len(s.Background); have > 0 {
 		want := s.ColorSpace.Channels()
 		if have != want {
 			err := fmt.Errorf("wrong number of background values: expected %d, got %d",
 				want, have)
-			return nil, zero, err
+			return nil, err
 		}
 	}
 	if m, n := s.F.Shape(); m != 2 {
-		return nil, zero, fmt.Errorf("function must have 2 inputs, not %d", m)
+		return nil, fmt.Errorf("function must have 2 inputs, not %d", m)
 	} else if n != s.ColorSpace.Channels() {
-		return nil, zero, fmt.Errorf("function outputs (%d) must match color space channels (%d)", n, s.ColorSpace.Channels())
+		return nil, fmt.Errorf("function outputs (%d) must match color space channels (%d)", n, s.ColorSpace.Channels())
 	}
 
 	// Validate function domain contains shading domain
@@ -196,24 +195,24 @@ func (s *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	}
 	functionDomain := s.F.GetDomain()
 	if !domainContains(functionDomain, shadingDomain) {
-		return nil, zero, fmt.Errorf("function domain %v must contain shading domain %v", functionDomain, shadingDomain)
+		return nil, fmt.Errorf("function domain %v must contain shading domain %v", functionDomain, shadingDomain)
 	}
 
-	fn, _, err := pdf.EmbedHelperEmbed(rm, s.F)
+	fn, err := rm.Embed(s.F)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	if len(s.Domain) > 0 && (len(s.Domain) != 4 || s.Domain[0] > s.Domain[1] || s.Domain[2] > s.Domain[3]) {
-		return nil, zero, fmt.Errorf("invalid Domain: %v", s.Domain)
+		return nil, fmt.Errorf("invalid Domain: %v", s.Domain)
 	}
 	if len(s.Matrix) > 0 && len(s.Matrix) != 6 {
-		return nil, zero, errors.New("invalid Matrix")
+		return nil, errors.New("invalid Matrix")
 	}
 
-	csE, _, err := pdf.EmbedHelperEmbed(rm, s.ColorSpace)
+	csE, err := rm.Embed(s.ColorSpace)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -244,10 +243,10 @@ func (s *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		ref := rm.Alloc()
 		err := rm.Out().Put(ref, dict)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		data = ref
 	}
 
-	return data, zero, nil
+	return data, nil
 }

@@ -47,15 +47,15 @@ type Data interface {
 	// Embed generates the value for the /Private entry in the data dictionary.
 	//
 	// This implements the [pdf.Embedder] interface.
-	pdf.Embedder[pdf.Unused]
+	pdf.Embedder
 }
 
 // Embed converts the PieceInfo to a PDF dictionary for embedding.
 //
 // This implements the [pdf.Embedder] interface.
-func (p *PieceInfo) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+func (p *PieceInfo) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if p == nil || len(p.Entries) == 0 {
-		return nil, pdf.Unused{}, nil
+		return nil, nil
 	}
 
 	result := pdf.Dict{}
@@ -63,9 +63,9 @@ func (p *PieceInfo) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		dataDict := pdf.Dict{
 			"LastModified": pdf.Date(data.LastModified()),
 		}
-		privateVal, _, err := pdf.EmbedHelperEmbed(rm, data)
+		privateVal, err := rm.Embed(data)
 		if err != nil {
-			return nil, pdf.Unused{}, err
+			return nil, err
 		}
 		if privateVal != nil {
 			dataDict["Private"] = privateVal
@@ -75,14 +75,14 @@ func (p *PieceInfo) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if p.SingleUse {
-		return result, pdf.Unused{}, nil
+		return result, nil
 	}
 	ref := rm.Alloc()
 	err := rm.Out().Put(ref, result)
 	if err != nil {
-		return nil, pdf.Unused{}, err
+		return nil, err
 	}
-	return ref, pdf.Unused{}, nil
+	return ref, nil
 }
 
 // Extract reads a page-piece dictionary from a PDF object.
@@ -156,20 +156,19 @@ func (u *unknown) LastModified() time.Time {
 	return u.lastModified
 }
 
-func (u *unknown) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (u *unknown) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if u.Private == nil {
-		return nil, zero, nil
+		return nil, nil
 	}
 
 	// copy the private object using pdfcopy
 	copier := pdfcopy.NewCopier(rm.Out(), u.sourceReader)
 	copied, err := copier.Copy(u.Private.AsPDF(rm.Out().GetOptions()))
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
-	return copied, zero, nil
+	return copied, nil
 }
 
 // Register installs a handler for page-piece dictionary entries with the given

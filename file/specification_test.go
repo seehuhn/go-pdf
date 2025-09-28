@@ -256,7 +256,7 @@ func TestSpecificationRoundTrip(t *testing.T) {
 			rm := pdf.NewResourceManager(w)
 
 			// Embed the specification
-			obj, _, err := pdf.ResourceManagerEmbed(rm, tc.spec)
+			obj, err := rm.Embed(tc.spec)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -301,7 +301,7 @@ func TestSpecificationValidation(t *testing.T) {
 		buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		_, _, err := pdf.ResourceManagerEmbed(rm, spec)
+		_, err := rm.Embed(spec)
 		if err == nil {
 			t.Error("expected error for missing file names")
 		}
@@ -316,7 +316,7 @@ func TestSpecificationValidation(t *testing.T) {
 		buf, _ := memfile.NewPDFWriter(pdf.V1_6, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		_, _, err := pdf.ResourceManagerEmbed(rm, spec)
+		_, err := rm.Embed(spec)
 		if err == nil {
 			t.Error("expected version error for UF in PDF 1.6")
 		}
@@ -338,7 +338,7 @@ func TestSpecificationValidation(t *testing.T) {
 		buf, _ := memfile.NewPDFWriter(pdf.V1_2, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		_, _, err := pdf.ResourceManagerEmbed(rm, spec)
+		_, err := rm.Embed(spec)
 		if err == nil {
 			t.Error("expected version error for EF in PDF 1.2")
 		}
@@ -362,7 +362,7 @@ func TestSpecificationValidation(t *testing.T) {
 		buf, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		_, _, err := pdf.ResourceManagerEmbed(rm, spec)
+		_, err := rm.Embed(spec)
 		if err == nil {
 			t.Error("expected version error for Thumbnail in PDF 1.7")
 		}
@@ -386,7 +386,7 @@ func TestSpecificationIndirectReference(t *testing.T) {
 		buf, _ := memfile.NewPDFWriter(pdf.V1_3, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		obj, _, err := pdf.ResourceManagerEmbed(rm, spec)
+		obj, err := rm.Embed(spec)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -415,7 +415,7 @@ func TestSpecificationIndirectReference(t *testing.T) {
 		rm := pdf.NewResourceManager(buf)
 
 		// Should return an error because RF requires indirect reference
-		_, _, err := pdf.ResourceManagerEmbed(rm, spec)
+		_, err := rm.Embed(spec)
 		if err == nil {
 			t.Error("expected error when RF is present with SingleUse=true")
 		}
@@ -430,7 +430,7 @@ func TestSpecificationIndirectReference(t *testing.T) {
 		buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		obj, _, err := pdf.ResourceManagerEmbed(rm, spec)
+		obj, err := rm.Embed(spec)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -452,7 +452,7 @@ func TestSpecificationAFRelationship(t *testing.T) {
 		buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		obj, _, err := pdf.ResourceManagerEmbed(rm, spec)
+		obj, err := rm.Embed(spec)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -477,7 +477,7 @@ func TestSpecificationAFRelationship(t *testing.T) {
 		buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 		rm := pdf.NewResourceManager(buf)
 
-		obj, _, err := pdf.ResourceManagerEmbed(rm, spec)
+		obj, err := rm.Embed(spec)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -541,7 +541,7 @@ func roundTripTest(t *testing.T, v pdf.Version, spec1 *Specification) {
 	rm := pdf.NewResourceManager(buf)
 
 	// encode the specification
-	obj, _, err := pdf.ResourceManagerEmbed(rm, spec1)
+	obj, err := rm.Embed(spec1)
 	if _, isVersionError := err.(*pdf.VersionError); isVersionError {
 		t.Skip()
 	} else if err != nil {
@@ -577,7 +577,7 @@ func FuzzSpecificationRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(tc.version, opt)
 		rm := pdf.NewResourceManager(w)
 
-		embedded, _, err := pdf.ResourceManagerEmbed(rm, tc.spec)
+		embedded, err := rm.Embed(tc.spec)
 		if err != nil {
 			continue
 		}

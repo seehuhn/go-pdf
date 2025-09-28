@@ -52,7 +52,7 @@ type Dict struct {
 	SingleUse bool
 }
 
-var _ pdf.Embedder[pdf.Unused] = (*Dict)(nil)
+var _ pdf.Embedder = (*Dict)(nil)
 
 func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	_, isIndirect := obj.(pdf.Reference)
@@ -140,28 +140,27 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	return res, nil
 }
 
-func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if err := pdf.CheckVersion(rm.Out(), "appearance streams", pdf.V1_2); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{}
 
 	// Embed Normal appearance
 	if d.Normal != nil {
-		nRef, _, err := pdf.EmbedHelperEmbed(rm, d.Normal)
+		nRef, err := rm.Embed(d.Normal)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["N"] = nRef
 	} else if d.NormalMap != nil {
 		nDict := pdf.Dict{}
 		for state, form := range d.NormalMap {
-			formRef, _, err := pdf.EmbedHelperEmbed(rm, form)
+			formRef, err := rm.Embed(form)
 			if err != nil {
-				return nil, zero, err
+				return nil, err
 			}
 			nDict[state] = formRef
 		}
@@ -170,17 +169,17 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 
 	// Embed RollOver appearance
 	if d.RollOver != nil {
-		rRef, _, err := pdf.EmbedHelperEmbed(rm, d.RollOver)
+		rRef, err := rm.Embed(d.RollOver)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["R"] = rRef
 	} else if d.RollOverMap != nil {
 		rDict := pdf.Dict{}
 		for state, form := range d.RollOverMap {
-			formRef, _, err := pdf.EmbedHelperEmbed(rm, form)
+			formRef, err := rm.Embed(form)
 			if err != nil {
-				return nil, zero, err
+				return nil, err
 			}
 			rDict[state] = formRef
 		}
@@ -189,17 +188,17 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 
 	// Embed Down appearance
 	if d.Down != nil {
-		dRef, _, err := pdf.EmbedHelperEmbed(rm, d.Down)
+		dRef, err := rm.Embed(d.Down)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["D"] = dRef
 	} else if d.DownMap != nil {
 		dDict := pdf.Dict{}
 		for state, form := range d.DownMap {
-			formRef, _, err := pdf.EmbedHelperEmbed(rm, form)
+			formRef, err := rm.Embed(form)
 			if err != nil {
-				return nil, zero, err
+				return nil, err
 			}
 			dDict[state] = formRef
 		}
@@ -207,16 +206,16 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if d.SingleUse {
-		return dict, zero, nil
+		return dict, nil
 	}
 
 	ref := rm.Alloc()
 	err := rm.Out().Put(ref, dict)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 func (d *Dict) HasDicts() bool {

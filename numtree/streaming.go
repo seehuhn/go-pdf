@@ -176,7 +176,7 @@ func (t *FromFile) yieldFromNode(node pdf.Dict, yield func(pdf.Integer, pdf.Obje
 	return true
 }
 
-func (t *FromFile) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
+func (t *FromFile) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	ref, err := Write(rm.Out(), t.All())
-	return ref, pdf.Unused{}, err
+	return ref, err
 }

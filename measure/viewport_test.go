@@ -204,7 +204,7 @@ func viewportRoundTripTest(t *testing.T, version pdf.Version, vp *Viewport) {
 	rm := pdf.NewResourceManager(w)
 
 	// Write the viewport
-	embedded, _, err := pdf.ResourceManagerEmbed(rm, vp)
+	embedded, err := rm.Embed(vp)
 	if err != nil {
 		t.Fatalf("embed failed: %v", err)
 	}
@@ -287,7 +287,7 @@ func FuzzViewportRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(tc.version, opt)
 		rm := pdf.NewResourceManager(w)
 
-		embedded, _, err := pdf.ResourceManagerEmbed(rm, tc.data)
+		embedded, err := rm.Embed(tc.data)
 		if err != nil {
 			continue
 		}
@@ -371,7 +371,7 @@ func TestViewportVersionRequirements(t *testing.T) {
 	// Test with PDF 1.5 (should fail - viewports require 1.6+)
 	w15, _ := memfile.NewPDFWriter(pdf.V1_5, nil)
 	rm15 := pdf.NewResourceManager(w15)
-	_, _, err := pdf.ResourceManagerEmbed(rm15, vp)
+	_, err := rm15.Embed(vp)
 	if err == nil {
 		t.Error("expected version check error for PDF 1.5")
 	}
@@ -379,7 +379,7 @@ func TestViewportVersionRequirements(t *testing.T) {
 	// Test with PDF 1.6 (should succeed)
 	w16, _ := memfile.NewPDFWriter(pdf.V1_6, nil)
 	rm16 := pdf.NewResourceManager(w16)
-	_, _, err = pdf.ResourceManagerEmbed(rm16, vp)
+	_, err = rm16.Embed(vp)
 	if err != nil {
 		t.Errorf("unexpected error for PDF 1.6: %v", err)
 	}
@@ -399,7 +399,7 @@ func TestViewportVersionRequirements(t *testing.T) {
 	// Should fail with PDF 1.7
 	w17, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm17 := pdf.NewResourceManager(w17)
-	_, _, err = pdf.ResourceManagerEmbed(rm17, vpWithPtData)
+	_, err = rm17.Embed(vpWithPtData)
 	if err == nil {
 		t.Error("expected version check error for PtData with PDF 1.7")
 	}
@@ -407,7 +407,7 @@ func TestViewportVersionRequirements(t *testing.T) {
 	// Should succeed with PDF 2.0
 	w20, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm20 := pdf.NewResourceManager(w20)
-	_, _, err = pdf.ResourceManagerEmbed(rm20, vpWithPtData)
+	_, err = rm20.Embed(vpWithPtData)
 	if err != nil {
 		t.Errorf("unexpected error for PtData with PDF 2.0: %v", err)
 	}
@@ -424,7 +424,7 @@ func TestViewportSingleUse(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	// Embed with SingleUse = true
-	embedded, _, err := pdf.ResourceManagerEmbed(rm, vp)
+	embedded, err := rm.Embed(vp)
 	if err != nil {
 		t.Fatalf("embed failed: %v", err)
 	}
@@ -439,7 +439,7 @@ func TestViewportSingleUse(t *testing.T) {
 		BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
 		SingleUse: false,
 	}
-	embedded2, _, err := pdf.ResourceManagerEmbed(rm, vp2)
+	embedded2, err := rm.Embed(vp2)
 	if err != nil {
 		t.Fatalf("embed failed: %v", err)
 	}
@@ -609,7 +609,7 @@ func TestViewPortArrayEmbed(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	// Embed array
-	embedded, _, err := pdf.ResourceManagerEmbed(rm, viewports)
+	embedded, err := rm.Embed(viewports)
 	if err != nil {
 		t.Fatalf("Embed failed: %v", err)
 	}
@@ -658,11 +658,11 @@ func TestViewPortArrayExtract(t *testing.T) {
 	res := pdf.NewResourceManager(w)
 
 	// Embed viewports
-	embedded1, _, err := pdf.ResourceManagerEmbed(res, vp1)
+	embedded1, err := res.Embed(vp1)
 	if err != nil {
 		t.Fatalf("embed vp1 failed: %v", err)
 	}
-	embedded2, _, err := pdf.ResourceManagerEmbed(res, vp2)
+	embedded2, err := res.Embed(vp2)
 	if err != nil {
 		t.Fatalf("embed vp2 failed: %v", err)
 	}
@@ -748,7 +748,7 @@ func TestViewPortArrayRoundTrip(t *testing.T) {
 			rm := pdf.NewResourceManager(w)
 
 			// Embed the array
-			embedded, _, err := pdf.ResourceManagerEmbed(rm, tc.data)
+			embedded, err := rm.Embed(tc.data)
 			if err != nil {
 				t.Fatalf("embed failed: %v", err)
 			}

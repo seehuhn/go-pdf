@@ -159,16 +159,15 @@ func extractItemValue(x *pdf.Extractor, obj pdf.Object) (*ItemValue, error) {
 }
 
 // Embed converts the collection item dictionary to a PDF object.
-func (item *ItemDict) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (item *ItemDict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if err := pdf.CheckVersion(rm.Out(), "collection item dictionary", pdf.V1_7); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	// Check for reserved Type key
 	if _, hasType := item.Data["Type"]; hasType {
-		return nil, zero, fmt.Errorf("collection item data cannot contain 'Type' key")
+		return nil, fmt.Errorf("collection item data cannot contain 'Type' key")
 	}
 
 	dict := pdf.Dict{}
@@ -182,7 +181,7 @@ func (item *ItemDict) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error)
 	for key, value := range item.Data {
 		pdfObj, err := embedItemValue(rm, value)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		if pdfObj != nil {
 			dict[key] = pdfObj
@@ -190,16 +189,16 @@ func (item *ItemDict) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error)
 	}
 
 	if item.SingleUse {
-		return dict, zero, nil
+		return dict, nil
 	}
 
 	ref := rm.Alloc()
 	err := rm.Out().Put(ref, dict)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 // embedItemValue converts an ItemValue to a PDF object.

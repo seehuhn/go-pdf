@@ -101,12 +101,11 @@ func (s *SpaceICCBased) Default() Color {
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s *SpaceICCBased) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (s *SpaceICCBased) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	w := rm.Out()
 	if err := pdf.CheckVersion(w, "ICCBased color space", pdf.V1_3); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -125,9 +124,9 @@ func (s *SpaceICCBased) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, erro
 	}
 
 	if s.metadata != nil {
-		mRef, _, err := pdf.EmbedHelperEmbed(rm, s.metadata)
+		mRef, err := rm.Embed(s.metadata)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["Metadata"] = mRef
 	}
@@ -135,18 +134,18 @@ func (s *SpaceICCBased) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, erro
 	sRef := w.Alloc()
 	body, err := w.OpenStream(sRef, dict, pdf.FilterFlate{})
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	_, err = body.Write(s.profile)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	err = body.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return pdf.Array{FamilyICCBased, sRef}, zero, nil
+	return pdf.Array{FamilyICCBased, sRef}, nil
 }
 
 // New returns a new color in the ICC-based color space.

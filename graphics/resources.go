@@ -27,7 +27,7 @@ import (
 type Shading interface {
 	ShadingType() int
 
-	pdf.Embedder[pdf.Unused]
+	pdf.Embedder
 }
 
 // Image represents a raster image which can be embedded in a PDF file.

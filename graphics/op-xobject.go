@@ -26,7 +26,7 @@ import (
 // XObject represents a PDF XObject.
 type XObject interface {
 	Subtype() pdf.Name
-	pdf.Embedder[pdf.Unused]
+	pdf.Embedder
 }
 
 // DrawXObject draws a PDF XObject on the page.
@@ -37,7 +37,7 @@ func (w *Writer) DrawXObject(obj XObject) {
 		return
 	}
 
-	name, _, err := writerGetResourceName(w, catXObject, obj)
+	name, err := writerGetResourceName(w, catXObject, obj)
 	if err != nil {
 		w.Err = err
 		return

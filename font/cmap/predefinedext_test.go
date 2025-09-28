@@ -85,7 +85,7 @@ func TestPredefined(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fontRefObj, _, err := pdf.ResourceManagerEmbed(doc.RM, F)
+	fontRefObj, err := doc.RM.Embed(F)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -129,7 +129,7 @@ func TestPieceInfoEmbed(t *testing.T) {
 
 	// test with nil PieceInfo
 	var nilInfo *PieceInfo
-	result, _, err := pdf.ResourceManagerEmbed(rm, nilInfo)
+	result, err := rm.Embed(nilInfo)
 	if err != nil {
 		t.Errorf("Embed(nil) returned error: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestPieceInfoEmbed(t *testing.T) {
 
 	// test with empty PieceInfo
 	emptyInfo := &PieceInfo{Entries: make(map[pdf.Name]Data)}
-	result, _, err = pdf.ResourceManagerEmbed(rm, emptyInfo)
+	result, err = rm.Embed(emptyInfo)
 	if err != nil {
 		t.Errorf("Embed(empty) returned error: %v", err)
 	}
@@ -226,7 +226,7 @@ func TestSingleUse(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	info.SingleUse = true
-	result, _, err := pdf.ResourceManagerEmbed(rm, info)
+	result, err := rm.Embed(info)
 	if err != nil {
 		t.Fatalf("Embed with SingleUse=true returned error: %v", err)
 	}
@@ -238,7 +238,7 @@ func TestSingleUse(t *testing.T) {
 		Entries:   info.Entries,
 		SingleUse: false,
 	}
-	result2, _, err := pdf.ResourceManagerEmbed(rm, infoCopy)
+	result2, err := rm.Embed(infoCopy)
 	if err != nil {
 		t.Fatalf("Embed with SingleUse=false returned error: %v", err)
 	}

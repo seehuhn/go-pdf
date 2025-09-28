@@ -87,12 +87,11 @@ func (f *Form) Subtype() pdf.Name {
 }
 
 // Embed implements the pdf.Embedder interface for form XObjects.
-func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	err := f.validate()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	buf := &bytes.Buffer{}
@@ -100,10 +99,10 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	contents.State.Set = 0 // make sure the XObject is independent of the current graphics state
 	err = f.Draw(contents)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	if contents.Err != nil {
-		return nil, zero, contents.Err
+		return nil, contents.Err
 	}
 
 	ref := rm.Alloc()
@@ -122,19 +121,19 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		dict["Resources"] = pdf.AsDict(contents.Resources)
 	}
 	if f.Metadata != nil {
-		rmEmbedded, _, err := pdf.EmbedHelperEmbed(rm, f.Metadata)
+		rmEmbedded, err := rm.Embed(f.Metadata)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["Metadata"] = rmEmbedded
 	}
 	if f.PieceInfo != nil {
 		if f.LastModified.IsZero() {
-			return nil, zero, errors.New("missing LastModified")
+			return nil, errors.New("missing LastModified")
 		}
-		pieceInfoObj, _, err := pdf.EmbedHelperEmbed(rm, f.PieceInfo)
+		pieceInfoObj, err := rm.Embed(f.PieceInfo)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		if pieceInfoObj != nil {
 			dict["PieceInfo"] = pieceInfoObj
@@ -146,22 +145,22 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 
 	if f.OptionalContent != nil {
 		if err := pdf.CheckVersion(rm.Out(), "form XObject OC entry", pdf.V1_5); err != nil {
-			return nil, zero, err
+			return nil, err
 		}
-		embedded, _, err := pdf.EmbedHelperEmbed(rm, f.OptionalContent)
+		embedded, err := rm.Embed(f.OptionalContent)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["OC"] = embedded
 	}
 
 	if f.Measure != nil {
 		if err := pdf.CheckVersion(rm.Out(), "form XObject Measure entry", pdf.V2_0); err != nil {
-			return nil, zero, err
+			return nil, err
 		}
-		embedded, _, err := pdf.EmbedHelperEmbed(rm, f.Measure)
+		embedded, err := rm.Embed(f.Measure)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["Measure"] = embedded
 	}
@@ -169,18 +168,18 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	// PtData (optional; PDF 2.0)
 	if f.PtData != nil {
 		if err := pdf.CheckVersion(rm.Out(), "form XObject PtData entry", pdf.V2_0); err != nil {
-			return nil, zero, err
+			return nil, err
 		}
-		embedded, _, err := pdf.EmbedHelperEmbed(rm, f.PtData)
+		embedded, err := rm.Embed(f.PtData)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["PtData"] = embedded
 	}
 
 	if key, ok := f.StructParent.Get(); ok {
 		if err := pdf.CheckVersion(rm.Out(), "form XObject StructParent entry", pdf.V1_3); err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["StructParent"] = pdf.Integer(key)
 	}
@@ -191,18 +190,18 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	}
 	stm, err := rm.Out().OpenStream(ref, dict, filters...)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	_, err = stm.Write(buf.Bytes())
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	err = stm.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 func (f *Form) validate() error {

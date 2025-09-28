@@ -101,7 +101,7 @@ func roundTripTest(t *testing.T, version pdf.Version, data *PtData) {
 	rm := pdf.NewResourceManager(w)
 
 	// Embed the object
-	embedded, _, err := pdf.ResourceManagerEmbed(rm, data)
+	embedded, err := rm.Embed(data)
 	if err != nil {
 		t.Fatalf("embed failed: %v", err)
 	}
@@ -136,7 +136,7 @@ func FuzzRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(tc.version, opt)
 
 		rm := pdf.NewResourceManager(w)
-		embedded, _, err := pdf.ResourceManagerEmbed(rm, tc.data)
+		embedded, err := rm.Embed(tc.data)
 		if err != nil {
 			continue
 		}

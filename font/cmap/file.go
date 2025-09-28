@@ -453,17 +453,16 @@ rangesLoop:
 	return 0
 }
 
-func (f *File) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (f *File) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// TODO(voss): decide this based on the CMap content?
 	if f.IsPredefined() {
-		return pdf.Name(f.Name), zero, nil
+		return pdf.Name(f.Name), nil
 	}
 
 	ros, err := pdf.EmbedHelperEmbedFunc(rm, font.WriteCIDSystemInfo, f.ROS)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -475,9 +474,9 @@ func (f *File) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 		dict["WMode"] = pdf.Integer(f.WMode)
 	}
 	if f.Parent != nil {
-		parent, _, err := pdf.EmbedHelperEmbed(rm, f.Parent)
+		parent, err := rm.Embed(f.Parent)
 		if err != nil {
-			return nil, zero, err
+			return nil, err
 		}
 		dict["UseCMap"] = parent
 	}
@@ -491,20 +490,20 @@ func (f *File) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	ref := rm.Alloc()
 	stm, err := rm.Out().OpenStream(ref, dict, filters...)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	err = f.WriteTo(stm, opt.HasAny(pdf.OptPretty))
 	if err != nil {
-		return nil, zero, fmt.Errorf("embedding cmap: %w", err)
+		return nil, fmt.Errorf("embedding cmap: %w", err)
 	}
 
 	err = stm.Close()
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 func (f *File) WriteTo(w io.Writer, pretty bool) error {

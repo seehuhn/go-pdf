@@ -44,7 +44,7 @@ type EncryptedPayload struct {
 	SingleUse bool
 }
 
-var _ pdf.Embedder[pdf.Unused] = (*EncryptedPayload)(nil)
+var _ pdf.Embedder = (*EncryptedPayload)(nil)
 
 // ExtractEncryptedPayload extracts an encrypted payload dictionary from a PDF object.
 func ExtractEncryptedPayload(x *pdf.Extractor, obj pdf.Object) (*EncryptedPayload, error) {
@@ -78,15 +78,14 @@ func ExtractEncryptedPayload(x *pdf.Extractor, obj pdf.Object) (*EncryptedPayloa
 
 // Embed converts the encrypted payload to a PDF object.
 // This implements the pdf.Embedder interface.
-func (ep *EncryptedPayload) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (ep *EncryptedPayload) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if err := pdf.CheckVersion(rm.Out(), "encrypted payload dictionary", pdf.V2_0); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	if ep.FilterName == "" {
-		return nil, zero, pdf.Errorf("missing required Subtype in encrypted payload dictionary")
+		return nil, pdf.Errorf("missing required Subtype in encrypted payload dictionary")
 	}
 
 	dict := pdf.Dict{
@@ -104,14 +103,14 @@ func (ep *EncryptedPayload) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, 
 	}
 
 	if ep.SingleUse {
-		return dict, zero, nil
+		return dict, nil
 	}
 
 	ref := rm.Alloc()
 	err := rm.Out().Put(ref, dict)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }

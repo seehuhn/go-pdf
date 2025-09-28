@@ -118,22 +118,21 @@ func ExtractPtData(r pdf.Getter, obj pdf.Object) (*PtData, error) {
 }
 
 // Embed converts the PtData into a PDF object.
-func (pd *PtData) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (pd *PtData) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// Check PDF 2.0 requirement
 	if err := pdf.CheckVersion(rm.Out(), "point data dictionaries", pdf.V2_0); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	// Validate Subtype
 	if pd.Subtype != PtDataSubtypeCloud {
-		return nil, zero, pdf.Error("point data subtype must be \"Cloud\"")
+		return nil, pdf.Error("point data subtype must be \"Cloud\"")
 	}
 
 	// Validate Names not empty
 	if len(pd.Names) == 0 {
-		return nil, zero, pdf.Error("Names array cannot be empty")
+		return nil, pdf.Error("Names array cannot be empty")
 	}
 
 	// Build dictionary
@@ -156,7 +155,7 @@ func (pd *PtData) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 
 		for i, point := range pd.XPTS {
 			if len(point) != expectedLen {
-				return nil, zero, pdf.Errorf("XPTS point %d has %d elements, expected %d", i, len(point), expectedLen)
+				return nil, pdf.Errorf("XPTS point %d has %d elements, expected %d", i, len(point), expectedLen)
 			}
 
 			pointArray := make(pdf.Array, len(point))
@@ -170,14 +169,14 @@ func (pd *PtData) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	}
 
 	if pd.SingleUse {
-		return dict, zero, nil
+		return dict, nil
 	}
 
 	ref := rm.Alloc()
 	err := rm.Out().Put(ref, dict)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }

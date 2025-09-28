@@ -182,29 +182,28 @@ func ExtractNumberFormat(r pdf.Getter, obj pdf.Object) (*NumberFormat, error) {
 }
 
 // Embed converts the NumberFormat into a PDF dictionary.
-func (nf *NumberFormat) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (nf *NumberFormat) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// Validate required fields
 	if nf.Unit == "" {
-		return nil, zero, pdf.Errorf("missing required Unit")
+		return nil, pdf.Errorf("missing required Unit")
 	}
 	if nf.ConversionFactor == 0 {
-		return nil, zero, pdf.Errorf("ConversionFactor cannot be zero")
+		return nil, pdf.Errorf("ConversionFactor cannot be zero")
 	}
 
 	// Validate Precision based on FractionFormat
 	precisionMeaningful := nf.FractionFormat == FractionDecimal || nf.FractionFormat == FractionFraction
 	if precisionMeaningful {
 		if nf.Precision <= 0 {
-			return nil, zero, pdf.Errorf("Precision must be positive when FractionFormat is decimal or fraction")
+			return nil, pdf.Errorf("Precision must be positive when FractionFormat is decimal or fraction")
 		}
 		if nf.FractionFormat == FractionDecimal && nf.Precision%10 != 0 && nf.Precision != 1 {
-			return nil, zero, pdf.Errorf("Precision must be 1 or a multiple of 10 for decimal format")
+			return nil, pdf.Errorf("Precision must be 1 or a multiple of 10 for decimal format")
 		}
 	} else {
 		if nf.Precision != 0 {
-			return nil, zero, pdf.Errorf("Precision must be 0 when FractionFormat is round or truncate")
+			return nil, pdf.Errorf("Precision must be 0 when FractionFormat is round or truncate")
 		}
 	}
 
@@ -279,14 +278,14 @@ func (nf *NumberFormat) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, erro
 	}
 
 	if nf.SingleUse {
-		return dict, zero, nil
+		return dict, nil
 	}
 
 	ref := rm.Alloc()
 	err := rm.Out().Put(ref, dict)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }

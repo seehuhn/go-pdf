@@ -42,7 +42,7 @@ type Resource struct {
 	ProcSet ProcSet
 }
 
-// var _ pdf.Embedder[pdf.Unused] = (*Resource)(nil)
+// var _ pdf.Embedder = (*Resource)(nil)
 
 type ProcSet struct {
 	PDF    bool

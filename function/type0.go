@@ -284,14 +284,13 @@ func (f *Type0) validate() error {
 }
 
 // Embed embeds the function into a PDF file.
-func (f *Type0) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (f *Type0) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if err := pdf.CheckVersion(rm.Out(), "Type 0 functions", pdf.V1_2); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	if err := f.validate(); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -314,16 +313,16 @@ func (f *Type0) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
 	ref := rm.Alloc()
 	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	if _, err := stm.Write(f.Samples); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 	if err := stm.Close(); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }
 
 // isDefaultEncode checks if the Encode array equals the default value.

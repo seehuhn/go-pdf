@@ -49,12 +49,11 @@ func ExtractIdentifier(x *pdf.Extractor, obj pdf.Object) (*Identifier, error) {
 }
 
 // Embed converts the identifier to a PDF byte string as an indirect object.
-func (id *Identifier) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (id *Identifier) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// Validate the ID
 	if len(id.ID) != 16 {
-		return nil, zero, fmt.Errorf("invalid identifier length: %d != 16", len(id.ID))
+		return nil, fmt.Errorf("invalid identifier length: %d != 16", len(id.ID))
 	}
 
 	// Create PDF byte string
@@ -64,8 +63,8 @@ func (id *Identifier) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error)
 	ref := rm.Alloc()
 	err := rm.Out().Put(ref, pdfStr)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return ref, zero, nil
+	return ref, nil
 }

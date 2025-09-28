@@ -31,7 +31,7 @@ type Pattern interface {
 	// PaintType returns 1 for colored patterns and 2 for uncolored patterns.
 	PaintType() int
 
-	pdf.Embedder[pdf.Unused]
+	pdf.Embedder
 }
 
 // == colored patterns and shadings ==========================================
@@ -54,12 +54,11 @@ func (s spacePatternColored) Channels() int {
 
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
-func (s spacePatternColored) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (s spacePatternColored) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out(), "Pattern color space", pdf.V1_2); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
-	return pdf.Name("Pattern"), zero, nil
+	return pdf.Name("Pattern"), nil
 }
 
 // Default returns a pattern which causes nothing to be drawn.
@@ -107,18 +106,17 @@ func (s spacePatternUncolored) Channels() int {
 
 // Embed adds the pattern color space to the PDF file.
 // This implements the [Space] interface.
-func (s spacePatternUncolored) Embed(rm *pdf.EmbedHelper) (pdf.Native, pdf.Unused, error) {
-	var zero pdf.Unused
+func (s spacePatternUncolored) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if err := pdf.CheckVersion(rm.Out(), "Pattern color space", pdf.V1_2); err != nil {
-		return nil, zero, err
+		return nil, err
 	}
-	base, _, err := pdf.EmbedHelperEmbed(rm, s.base)
+	base, err := rm.Embed(s.base)
 	if err != nil {
-		return nil, zero, err
+		return nil, err
 	}
 
-	return pdf.Array{pdf.Name("Pattern"), base}, zero, nil
+	return pdf.Array{pdf.Name("Pattern"), base}, nil
 }
 
 // Default returns a pattern which causes nothing to be drawn.
