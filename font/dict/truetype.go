@@ -35,10 +35,6 @@ import (
 	"seehuhn.de/go/pdf/internal/stdmtx"
 )
 
-var (
-	_ font.Dict = (*TrueType)(nil)
-)
-
 // TrueType holds the information from a TrueType font dictionary.
 type TrueType struct {
 	// PostScriptName is the PostScript name of the font
@@ -73,8 +69,10 @@ type TrueType struct {
 	FontFile *glyphdata.Stream
 }
 
-// ExtractTrueType reads a TrueType font dictionary from a PDF file.
-func ExtractTrueType(x *pdf.Extractor, obj pdf.Object) (*TrueType, error) {
+var _ Dict = (*TrueType)(nil)
+
+// extractTrueType reads a TrueType font dictionary from a PDF file.
+func extractTrueType(x *pdf.Extractor, obj pdf.Object) (*TrueType, error) {
 	fontDict, err := pdf.GetDictTyped(x.R, obj, "Font")
 	if err != nil {
 		return nil, err
@@ -256,7 +254,7 @@ func (d *TrueType) validate(w *pdf.Writer) error {
 }
 
 // Embed adds the font dictionary to a PDF file.
-// This implements the [font.Dict] interface.
+// This implements the [Dict] interface.
 func (d *TrueType) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	ref := rm.AllocSelf()
 	w := rm.Out()
@@ -358,7 +356,7 @@ func (d *TrueType) Characters() iter.Seq2[charcode.Code, font.Code] {
 			if d.Encoding(code) != "" {
 				info = font.Code{
 					CID:            cid.CID(code) + 1,
-					Width:          d.Width[code],
+					Width:          d.Width[code] / 1000,
 					Text:           textMap[code],
 					UseWordSpacing: code == 0x20,
 				}
@@ -416,7 +414,7 @@ func (f *ttFont) PostScriptName() string {
 	return f.Dict.PostScriptName
 }
 
-func (f *ttFont) GetDict() font.Dict {
+func (f *ttFont) GetDict() Dict {
 	return f.Dict
 }
 
@@ -443,7 +441,7 @@ func (f *ttFont) Codes(s pdf.String) iter.Seq[*font.Code] {
 			} else {
 				res.CID = cid.CID(code) + 1
 			}
-			res.Width = f.Dict.Width[code]
+			res.Width = f.Dict.Width[code] / 1000
 			res.UseWordSpacing = (code == 0x20)
 			res.Text = f.Text[code]
 			if !yield(&res) {
@@ -451,10 +449,4 @@ func (f *ttFont) Codes(s pdf.String) iter.Seq[*font.Code] {
 			}
 		}
 	}
-}
-
-func init() {
-	registerReader("TrueType", func(x *pdf.Extractor, obj pdf.Object) (font.Dict, error) {
-		return ExtractTrueType(x, obj)
-	})
 }

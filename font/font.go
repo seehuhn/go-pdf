@@ -90,36 +90,6 @@ type Layouter interface {
 	IsBlank(gid glyph.ID) bool
 }
 
-// Dict represents a font dictionary in a PDF file.
-//
-// This interface is implemented by the following types, corresponding to the
-// different font dictionary types supported by PDF:
-//   - [seehuhn.de/go/pdf/font/dict.Type1]
-//   - [seehuhn.de/go/pdf/font/dict.TrueType]
-//   - [seehuhn.de/go/pdf/font/dict.Type3]
-//   - [seehuhn.de/go/pdf/font/dict.CIDFontType0]
-//   - [seehuhn.de/go/pdf/font/dict.CIDFontType2]
-type Dict interface {
-	pdf.Embedder
-
-	// MakeFont returns a new font object that can be used to typeset text.
-	// The font is immutable, i.e. no new glyphs can be added and no new codes
-	// can be defined via the returned font object.
-	MakeFont() Instance
-
-	// FontInfo returns information about the embedded font file.
-	// The information can be used to load the font file and to extract
-	// the the glyph corresponding to a character identifier.
-	// The result is a pointer to one of the FontInfo* types
-	// defined in the font/dict package.
-	FontInfo() any
-
-	// Codec allows to interpret character codes for the font.
-	Codec() *charcode.Codec
-
-	Characters() iter.Seq2[charcode.Code, Code]
-}
-
 // WritingMode is the "writing mode" of a PDF font (horizontal or vertical).
 type WritingMode int
 
@@ -150,7 +120,8 @@ type Code struct {
 	// present in the font.
 	Notdef cid.CID
 
-	// Width is the glyph width in PDF glyph space units.
+	// Width is the glyph width in PDF text space units.
+	// This still needs to be scaled by the font size.
 	Width float64
 
 	// Text is the textual representation of the character.

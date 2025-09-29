@@ -141,13 +141,13 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 		xWanted += g.Advance
 
 		prevLen := len(run)
-		charCode, ok := layouter.Encode(g.GID, pdf.Round(1000*g.Advance/param.TextFontSize, 1), g.Text)
+		charCode, ok := layouter.Encode(g.GID, 0, g.Text)
 		if !ok {
 			continue // Skip glyphs that can't be encoded
 		}
 		run = codec.AppendCode(run, charCode)
 		for info := range layouter.Codes(run[prevLen:]) {
-			glyphWidth := info.Width/1000*param.TextFontSize + param.TextCharacterSpacing
+			glyphWidth := info.Width*param.TextFontSize + param.TextCharacterSpacing
 			if info.UseWordSpacing {
 				glyphWidth += param.TextWordSpacing
 			}

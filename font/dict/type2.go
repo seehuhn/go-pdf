@@ -35,10 +35,6 @@ import (
 	"seehuhn.de/go/pdf/font/subset"
 )
 
-var (
-	_ font.Dict = (*CIDFontType2)(nil)
-)
-
 // CIDFontType2 holds the information from a Type 2 CIDFont dictionary.
 type CIDFontType2 struct {
 	// PostScriptName is the PostScript name of the font
@@ -95,8 +91,10 @@ type CIDFontType2 struct {
 	FontFile *glyphdata.Stream
 }
 
-// ExtractCIDFontType2 reads a Type 2 CIDFont dictionary from the PDF file.
-func ExtractCIDFontType2(x *pdf.Extractor, obj pdf.Object) (*CIDFontType2, error) {
+var _ Dict = (*CIDFontType2)(nil)
+
+// extractCIDFontType2 reads a Type 2 CIDFont dictionary from the PDF file.
+func extractCIDFontType2(x *pdf.Extractor, obj pdf.Object) (*CIDFontType2, error) {
 	fontDict, err := pdf.GetDictTyped(x.R, obj, "Font")
 	if err != nil {
 		return nil, err
@@ -348,7 +346,7 @@ func (d *CIDFontType2) validate() error {
 }
 
 // Embed adds the font dictionary to a PDF file.
-// This implements the [font.Dict] interface.
+// This implements the [Dict] interface.
 func (d *CIDFontType2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	ref := rm.AllocSelf()
 	w := rm.Out()
@@ -520,7 +518,7 @@ func (d *CIDFontType2) Characters() iter.Seq2[charcode.Code, font.Code] {
 			info := font.Code{
 				CID:            cid,
 				Notdef:         d.CMap.LookupNotdefCID(buf),
-				Width:          width,
+				Width:          width / 1000,
 				Text:           textMap[code],
 				UseWordSpacing: len(buf) == 1 && buf[0] == 0x20,
 			}
@@ -604,7 +602,7 @@ func (f *t2Font) PostScriptName() string {
 	return f.CIDFontType2.PostScriptName
 }
 
-func (f *t2Font) GetDict() font.Dict {
+func (f *t2Font) GetDict() Dict {
 	return f.CIDFontType2
 }
 
@@ -634,9 +632,9 @@ func (f *t2Font) Codes(str pdf.String) iter.Seq[*font.Code] {
 				}
 				w, ok := f.Width[res.CID]
 				if ok {
-					res.Width = w
+					res.Width = w / 1000
 				} else {
-					res.Width = f.DefaultWidth
+					res.Width = f.DefaultWidth / 1000
 				}
 				res.UseWordSpacing = k == 1 && code == 0x20
 				res.Text = f.text[code]
@@ -649,10 +647,4 @@ func (f *t2Font) Codes(str pdf.String) iter.Seq[*font.Code] {
 			}
 		}
 	}
-}
-
-func init() {
-	registerReader("CIDFontType2", func(x *pdf.Extractor, obj pdf.Object) (font.Dict, error) {
-		return ExtractCIDFontType2(x, obj)
-	})
 }

@@ -562,6 +562,9 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	set := e.Set
+	if excess := set &^ extGStateBits; excess != 0 {
+		return nil, fmt.Errorf("unsupported graphics state bits: 0b%b", excess)
+	}
 
 	// Build a graphics state parameter dictionary for the given state.
 	// See table 57 in ISO 32000-2:2020.

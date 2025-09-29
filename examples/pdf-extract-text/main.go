@@ -175,7 +175,7 @@ func (e *extractor) extractText(fname string) error {
 
 type fontFromFile interface {
 	font.Instance
-	GetDict() font.Dict
+	GetDict() dict.Dict
 }
 
 func getSpaceWidth(F font.Instance) float64 {
@@ -258,11 +258,11 @@ var commonCharacters = map[string]affine{
 	"中": {-356.8609, 1.215483},
 }
 
-func spaceWidthHeuristic(dict font.Dict) float64 {
+func spaceWidthHeuristic(dict dict.Dict) float64 {
 	guesses := []float64{280}
 	for _, info := range dict.Characters() {
 		if coef, ok := commonCharacters[info.Text]; ok && info.Width > 0 {
-			guesses = append(guesses, coef.intercept+coef.slope*info.Width)
+			guesses = append(guesses, coef.intercept+coef.slope*info.Width*1000)
 		}
 	}
 	slices.Sort(guesses)

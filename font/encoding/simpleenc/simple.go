@@ -110,7 +110,7 @@ func (t *Simple) Codes(s pdf.String) iter.Seq[*font.Code] {
 			} else {
 				code.CID = cid.CID(c) + 1 // CID 0 is reserved for .notdef
 			}
-			code.Width = info.Width
+			code.Width = info.Width / 1000
 			code.UseWordSpacing = (c == 0x20)
 			code.Text = info.Text
 			if !yield(&code) {

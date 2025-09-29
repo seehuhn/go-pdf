@@ -94,7 +94,7 @@ func (f *fixed) Codes(s pdf.String) iter.Seq[*font.Code] {
 				code = font.Code{
 					CID: cid,
 					// Notdef:         ...
-					Width:          f.width[cid],
+					Width:          f.width[cid] / 1000,
 					Text:           f.text[c],
 					UseWordSpacing: k == 1 && c == 0x20,
 				}
@@ -102,7 +102,7 @@ func (f *fixed) Codes(s pdf.String) iter.Seq[*font.Code] {
 				code = font.Code{
 					CID: 0,
 					// Notdef:         ...,
-					Width:          f.width[0],
+					Width:          f.width[0] / 1000,
 					Text:           f.text[c],
 					UseWordSpacing: k == 1 && c == 0x20,
 				}

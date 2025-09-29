@@ -606,30 +606,12 @@ func (r *Reader) do() error {
 	return r.scanner.Error()
 }
 
-type toTextSpacer interface {
-	ToTextSpace(float64) float64
-}
-
-func divideBy1000(x float64) float64 {
-	return x / 1000
-}
-
 func (r *Reader) processText(s pdf.String) error {
 	// TODO(voss): can this be merged with the corresponding code in op-text.go?
 
-	var toTextSpace func(float64) float64
-	if f, ok := r.TextFont.(toTextSpacer); ok {
-		// Type 3 fonts use the font matrix, ...
-		toTextSpace = f.ToTextSpace
-	} else {
-		// ... everybody else divides by 1000.
-		toTextSpace = divideBy1000
-	}
-
 	wmode := r.TextFont.WritingMode()
 	for info := range r.TextFont.Codes(s) {
-		width := toTextSpace(info.Width)
-		width = width*r.TextFontSize + r.TextCharacterSpacing
+		width := info.Width*r.TextFontSize + r.TextCharacterSpacing
 		if info.UseWordSpacing {
 			width += r.TextWordSpacing
 		}

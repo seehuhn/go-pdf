@@ -29,11 +29,19 @@
 // [seehuhn.de/go/pdf/font/embed].
 // If more control is needed, the following functions can be used for the
 // different ways of embedding fonts into PDF files as simple fonts:
-//   - [seehuhn.de/go/pdf/font/fontcff.New]
-//   - [seehuhn.de/go/pdf/font/truetype.New]
-//   - [seehuhn.de/go/pdf/font/opentype.New]
+//   - [seehuhn.de/go/pdf/font/cff.NewSimple]
+//   - [seehuhn.de/go/pdf/font/truetype.NewSimple]
+//   - [seehuhn.de/go/pdf/font/opentype.NewSimple]
 //   - [seehuhn.de/go/pdf/font/type1.New]
 //   - [seehuhn.de/go/pdf/font/type3.Font.New]
+//
+// The following functions can be used to embed fonts as composite fonts:
+//   - [seehuhn.de/go/pdf/font/cff.NewComposite]
+//   - [seehuhn.de/go/pdf/font/truetype.NewComposite]
+//   - [seehuhn.de/go/pdf/font/opentype.NewComposite]
+//
+// Fonts can be extracted from existing PDF files using
+// the [seehuhn.de/go/pdf/font/dict/ExtractFont] function.
 //
 // # Fonts included in the library
 //
@@ -43,7 +51,6 @@
 //
 // # Data Types for Representing Fonts
 //
-//   - A [FontOld] represents a font before it is embedded into a PDF file.
-//   - A [LayouterOld] is a font which includes enough information to typeset new text.
-//   - The type [EmbeddedOld] represents a font within a PDF file.
+//   - An [Instance] represents a font which can be embedded in a PDF file.
+//   - A [Layouter] is a font which includes enough information to typeset new text.
 package font

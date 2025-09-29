@@ -379,31 +379,13 @@ func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {
 	w.writeObjects(a, pdf.Operator("TJ"))
 }
 
-type toTextSpacer interface {
-	ToTextSpace(float64) float64
-}
-
-func divideBy1000(x float64) float64 {
-	return x / 1000
-}
-
 func (w *Writer) updateTextPosition(s pdf.String) {
 	// TODO(voss): can this be merged with the corresponding code in
-	// reader/reader.go?
-
-	var toTextSpace func(float64) float64
-	if f, ok := w.TextFont.(toTextSpacer); ok {
-		// Type 3 fonts use the font matrix, ...
-		toTextSpace = f.ToTextSpace
-	} else {
-		// ... everybody else divides by 1000.
-		toTextSpace = divideBy1000
-	}
+	// reader/reader.go and layout.go?
 
 	wmode := w.TextFont.WritingMode()
 	for info := range w.TextFont.Codes(s) {
-		width := toTextSpace(info.Width)
-		width = width*w.TextFontSize + w.TextCharacterSpacing
+		width := info.Width*w.TextFontSize + w.TextCharacterSpacing
 		if info.UseWordSpacing {
 			width += w.TextWordSpacing
 		}

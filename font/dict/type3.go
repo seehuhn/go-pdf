@@ -32,10 +32,6 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 )
 
-var (
-	_ font.Dict = (*Type3)(nil)
-)
-
 // Type3 holds the information from a Type 3 font dictionary.
 type Type3 struct {
 	// Name is deprecated and should be left empty.
@@ -70,14 +66,13 @@ type Type3 struct {
 	// Resources (optional) holds named resources directly used by content
 	// streams referenced by CharProcs, when the content stream does not itself
 	// have a resource dictionary.
-	//
-	// TODO(voss): Should this be a pdf.Object instead, so that an
-	// indirect reference can be used on writing?
 	Resources *pdf.Resources
 }
 
-// ExtractType3 reads a Type 3 font dictionary from a PDF file.
-func ExtractType3(x *pdf.Extractor, obj pdf.Object) (*Type3, error) {
+var _ Dict = (*Type3)(nil)
+
+// extractType3 reads a Type 3 font dictionary from a PDF file.
+func extractType3(x *pdf.Extractor, obj pdf.Object) (*Type3, error) {
 	fontDict, err := pdf.GetDictTyped(x.R, obj, "Font")
 	if err != nil {
 		return nil, err
@@ -179,7 +174,7 @@ func (d *Type3) validate(w *pdf.Writer) error {
 }
 
 // Embed adds the font dictionary to a PDF file.
-// This implements the [font.Dict] interface.
+// This implements the [Dict] interface.
 func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	ref := rm.AllocSelf()
 	w := rm.Out()
@@ -290,7 +285,7 @@ func (d *Type3) Characters() iter.Seq2[charcode.Code, font.Code] {
 			if d.Encoding(code) != "" {
 				info = font.Code{
 					CID:            cid.CID(code) + 1,
-					Width:          d.Width[code],
+					Width:          d.Width[code] * d.FontMatrix[0],
 					Text:           textMap[code],
 					UseWordSpacing: code == 0x20,
 				}
@@ -347,7 +342,7 @@ func (f *t3Font) PostScriptName() string {
 	return ""
 }
 
-func (f *t3Font) GetDict() font.Dict {
+func (f *t3Font) GetDict() Dict {
 	return f.Dict
 }
 
@@ -374,7 +369,7 @@ func (f *t3Font) Codes(s pdf.String) iter.Seq[*font.Code] {
 			} else {
 				res.CID = cid.CID(code) + 1
 			}
-			res.Width = f.Dict.Width[code]
+			res.Width = f.Dict.Width[code] * f.Dict.FontMatrix[0]
 			res.UseWordSpacing = (code == 0x20)
 			res.Text = f.Text[code]
 			if !yield(&res) {
@@ -382,10 +377,4 @@ func (f *t3Font) Codes(s pdf.String) iter.Seq[*font.Code] {
 			}
 		}
 	}
-}
-
-func init() {
-	registerReader("Type3", func(x *pdf.Extractor, obj pdf.Object) (font.Dict, error) {
-		return ExtractType3(x, obj)
-	})
 }

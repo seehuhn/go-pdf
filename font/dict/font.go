@@ -24,7 +24,7 @@ import (
 // ExtractFont extracts a font from a PDF file as an immutable font object.
 // This combines dict.Read with MakeFont() for convenience.
 func ExtractFont(x *pdf.Extractor, obj pdf.Object) (font.Instance, error) {
-	dict, err := Read(x, obj)
+	dict, err := ExtractDict(x, obj)
 	if err != nil {
 		return nil, err
 	}

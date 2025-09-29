@@ -118,7 +118,7 @@ func FuzzType2Dict(f *testing.F) {
 			t.Skip("broken reference")
 		}
 		x := pdf.NewExtractor(r)
-		d, err := ExtractCIDFontType2(x, obj)
+		d, err := extractCIDFontType2(x, obj)
 		if err != nil {
 			t.Skip("no valid CIDFontType2 dict")
 		}
@@ -177,7 +177,7 @@ func checkRoundtripT2(t *testing.T, d1 *CIDFontType2, v pdf.Version) {
 	// == Read ==
 
 	x := pdf.NewExtractor(w)
-	d2, err := ExtractCIDFontType2(x, fontDictRef)
+	d2, err := extractCIDFontType2(x, fontDictRef)
 	if err != nil {
 		t.Fatal(err)
 	}

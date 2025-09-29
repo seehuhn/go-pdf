@@ -52,9 +52,13 @@ func TestEmbedSimple(t *testing.T) {
 
 	// step 2: read back the font and verify that everything is as expected
 	x := pdf.NewExtractor(w)
-	dict, err := dict.ExtractType1(x, ref)
+	dictObj, err := dict.ExtractDict(x, ref)
 	if err != nil {
 		t.Fatal(err)
+	}
+	dict, ok := dictObj.(*dict.Type1)
+	if !ok {
+		t.Fatalf("wrong font dictionary type: %T", dictObj)
 	}
 
 	if dict.PostScriptName != fontData.PostScriptName() {

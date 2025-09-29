@@ -22,8 +22,8 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/postscript/cid"
 )
 
 // SetMapping updates a cmap File with a new mapping.
@@ -31,7 +31,7 @@ import (
 //
 // Codes which are already correctly set in a parent cmap are not included in
 // the new mapping.
-func (f *File) SetMapping(codec *charcode.Codec, data map[charcode.Code]font.Code) {
+func (f *File) SetMapping(codec *charcode.Codec, data map[charcode.Code]cid.CID) {
 	f.CodeSpaceRange = codec.CodeSpaceRange()
 	f.CIDSingles = nil
 	f.CIDRanges = nil
@@ -43,11 +43,11 @@ func (f *File) SetMapping(codec *charcode.Codec, data map[charcode.Code]font.Cod
 	}
 	ranges := make(map[string][]entry)
 	var buf []byte
-	for code, info := range data {
+	for code, cid := range data {
 		buf = codec.AppendCode(buf[:0], code)
 		if f.Parent != nil {
 			parentCID := f.Parent.LookupCID(buf)
-			if parentCID == info.CID {
+			if parentCID == cid {
 				continue
 			}
 		}
@@ -73,7 +73,7 @@ func (f *File) SetMapping(codec *charcode.Codec, data map[charcode.Code]font.Cod
 		for i := 1; i <= len(info); i++ {
 			if i == len(info) ||
 				info[i].x != info[i-1].x+1 ||
-				data[info[i].code].CID != data[info[i-1].code].CID+1 {
+				data[info[i].code] != data[info[i-1].code]+1 {
 				first := make([]byte, len(key)+1)
 				copy(first, key)
 				first[len(key)] = info[start].x
@@ -84,12 +84,12 @@ func (f *File) SetMapping(codec *charcode.Codec, data map[charcode.Code]font.Cod
 					f.CIDRanges = append(f.CIDRanges, Range{
 						First: first,
 						Last:  last,
-						Value: data[info[start].code].CID,
+						Value: data[info[start].code],
 					})
 				} else {
 					f.CIDSingles = append(f.CIDSingles, Single{
 						Code:  first,
-						Value: data[info[start].code].CID,
+						Value: data[info[start].code],
 					})
 				}
 				start = i

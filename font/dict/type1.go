@@ -35,10 +35,6 @@ import (
 	"seehuhn.de/go/pdf/internal/stdmtx"
 )
 
-var (
-	_ font.Dict = (*Type1)(nil)
-)
-
 // PDF 2.0 sections: 9.6.2
 
 // Type1 holds the information from a Type 1 font dictionary.
@@ -75,8 +71,10 @@ type Type1 struct {
 	FontFile *glyphdata.Stream
 }
 
-// ExtractType1 reads a Type 1 font dictionary from a PDF file.
-func ExtractType1(x *pdf.Extractor, obj pdf.Object) (*Type1, error) {
+var _ Dict = (*Type1)(nil)
+
+// extractType1 reads a Type 1 font dictionary from a PDF file.
+func extractType1(x *pdf.Extractor, obj pdf.Object) (*Type1, error) {
 	fontDict, err := pdf.GetDictTyped(x.R, obj, "Font")
 	if err != nil {
 		return nil, err
@@ -262,7 +260,7 @@ func (d *Type1) validate(w *pdf.Writer) error {
 }
 
 // Embed adds the font dictionary to a PDF file.
-// This implements the [font.Dict] interface.
+// This implements the [Dict] interface.
 func (d *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	ref := rm.AllocSelf()
 	w := rm.Out()
@@ -380,7 +378,7 @@ func (d *Type1) Characters() iter.Seq2[charcode.Code, font.Code] {
 			if d.Encoding(code) != "" {
 				info = font.Code{
 					CID:            cid.CID(code) + 1,
-					Width:          d.Width[code],
+					Width:          d.Width[code] / 1000,
 					Text:           textMap[code],
 					UseWordSpacing: code == 0x20,
 				}
@@ -438,7 +436,7 @@ func (f *t1Font) PostScriptName() string {
 	return f.Dict.PostScriptName
 }
 
-func (f *t1Font) GetDict() font.Dict {
+func (f *t1Font) GetDict() Dict {
 	return f.Dict
 }
 
@@ -465,7 +463,7 @@ func (f *t1Font) Codes(s pdf.String) iter.Seq[*font.Code] {
 			} else {
 				res.CID = cid.CID(code) + 1
 			}
-			res.Width = f.Dict.Width[code]
+			res.Width = f.Dict.Width[code] / 1000
 			res.Text = f.Text[code]
 			res.UseWordSpacing = code == 0x20
 			if !yield(&res) {
@@ -473,10 +471,4 @@ func (f *t1Font) Codes(s pdf.String) iter.Seq[*font.Code] {
 			}
 		}
 	}
-}
-
-func init() {
-	registerReader("Type1", func(x *pdf.Extractor, obj pdf.Object) (font.Dict, error) {
-		return ExtractType1(x, obj)
-	})
 }

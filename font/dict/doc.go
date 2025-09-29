@@ -18,21 +18,14 @@
 //
 // The package supports all PDF font dictionary types defined in the PDF
 // specification. Each struct provides a one-to-one representation of its
-// corresponding dictionary type, preserving all information exactly as stored
-// in the PDF file. All structs implement the [font.Dict] interface.
-//
-// Each type of font dictionary is represented by a Go structure which holds
-// all the information from the dictionary:
+// corresponding dictionary type:
 //   - [Type1]
 //   - [TrueType]
 //   - [Type3]
 //   - [CIDFontType0]
 //   - [CIDFontType2]
 //
-// This package deals exclusively with font dictionary structures and does not
-// handle the embedding of font programs (glyph outlines). When embedding
-// fonts, the caller must separately embed the font file data and provide
-// its reference via the FontRef field.
+// All of these structs implement the [Dict] interface.
 //
 // Simple fonts select glyphs either by name or via the built-in encoding of a
 // font. By contrast, composite fonts select glyphs via a character identifier

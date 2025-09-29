@@ -73,16 +73,16 @@ func (e *compositeUTF8) Codes(s pdf.String) iter.Seq[*font.Code] {
 				info := e.info[c]
 				if info != nil { // code is mapped to a CID
 					code.CID = info.CID
-					code.Width = info.Width
+					code.Width = info.Width / 1000
 					code.Text = info.Text
 				} else { // unmapped code
 					code.CID = 0
-					code.Width = e.cid0Width
+					code.Width = e.cid0Width / 1000
 					code.Text = ""
 				}
 			} else { // invalid code
 				code.CID = 0
-				code.Width = e.cid0Width
+				code.Width = e.cid0Width / 1000
 				code.Text = ""
 			}
 
@@ -170,12 +170,9 @@ func (e *compositeUTF8) get(c charcode.Code) *codeInfo {
 }
 
 func (e *compositeUTF8) CMap(ros *cid.SystemInfo) *cmap.File {
-	m := make(map[charcode.Code]font.Code)
+	m := make(map[charcode.Code]cid.CID)
 	for c, info := range e.info {
-		m[c] = font.Code{
-			CID:   info.CID,
-			Width: info.Width,
-		}
+		m[c] = info.CID
 	}
 	cmapInfo := &cmap.File{
 		Name:  "",

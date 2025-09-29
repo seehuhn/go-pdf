@@ -31,13 +31,13 @@ import (
 // fontDictCtx represents a PDF font dictionary.
 type fontDictCtx struct {
 	r    pdf.Getter
-	dict font.Dict
+	dict dict.Dict
 }
 
 // newFontDictCtx creates a new font dictionary context.
 func newFontDictCtx(r pdf.Getter, pdfDict pdf.Dict) (*fontDictCtx, error) {
 	x := pdf.NewExtractor(r)
-	dict, err := dict.Read(x, pdfDict)
+	dict, err := dict.ExtractDict(x, pdfDict)
 	if err != nil {
 		return nil, err
 	}
