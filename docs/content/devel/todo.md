@@ -47,7 +47,6 @@ weight = 100
 ## Missing Features
 
 - implement high-quality text extraction
-- implement RunLengthDecode filters
 - implement JBIG2Decode filters
 - implement JPXDecode filters
 - implement Crypt filters

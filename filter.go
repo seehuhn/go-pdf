@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/internal/filter/ccittfax"
 	"seehuhn.de/go/pdf/internal/filter/lzw"
 	"seehuhn.de/go/pdf/internal/filter/predict"
+	"seehuhn.de/go/pdf/internal/filter/runlength"
 )
 
 // Frequencies of filter types used in the PDF files on my system:
@@ -43,10 +44,10 @@ import (
 // Filter represents a PDF stream filter.
 //
 // Currently, the following filter types are implemented by this library:
-// [FilterASCII85], [FilterASCIIHex], [FilterFlate], [FilterLZW].  In addition,
-// [FilterCompress] can be used to select the best available compression filter
-// when writing PDF streams.  This is FilterFlate for PDF versions 1.2 and
-// above, and FilterLZW for older versions.
+// [FilterASCII85], [FilterASCIIHex], [FilterFlate], [FilterLZW],
+// [FilterRunLength].  In addition, [FilterCompress] can be used to select the
+// best available compression filter when writing PDF streams.  This is
+// FilterFlate for PDF versions 1.2 and above, and FilterLZW for older versions.
 type Filter interface {
 	// Info returns the name and parameters of the filter,
 	// as they should be written to the PDF file.
@@ -72,6 +73,8 @@ func makeFilter(filter Name, param Dict) Filter {
 		return FilterLZW(param)
 	case "CCITTFaxDecode":
 		return FilterCCITTFax(param)
+	case "RunLengthDecode":
+		return FilterRunLength{}
 	default:
 		return &filterNotImplemented{Name: filter, Param: param}
 	}
@@ -130,6 +133,25 @@ func (f FilterASCIIHex) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, err
 // Decode implements the [Filter] interface.
 func (f FilterASCIIHex) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 	return asciihex.Decode(r), nil
+}
+
+// FilterRunLength is the RunLengthDecode filter.
+// This filter has no parameters.
+type FilterRunLength struct{}
+
+// Info implements the [Filter] interface.
+func (f FilterRunLength) Info(_ Version) (Name, Dict, error) {
+	return "RunLengthDecode", nil, nil
+}
+
+// Encode implements the [Filter] interface.
+func (f FilterRunLength) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, error) {
+	return runlength.Encode(w), nil
+}
+
+// Decode implements the [Filter] interface.
+func (f FilterRunLength) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
+	return runlength.Decode(r), nil
 }
 
 // FilterCompress is a special filter name, which is used to select the
