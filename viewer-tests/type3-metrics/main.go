@@ -71,7 +71,7 @@ func createDocument(filename string) error {
 
 		gg := F.Layout(nil, 1, "AAA")
 		for _, g := range gg.Seq {
-			code, ok := F.Encode(g.GID, 0, g.Text)
+			code, ok := F.Encode(g.GID, g.Text)
 			if !ok {
 				return fmt.Errorf("cannot encode glyph %v", g)
 			}
@@ -89,7 +89,7 @@ func createDocument(filename string) error {
 
 		gg := F.Layout(nil, 1, "AAA")
 		for _, g := range gg.Seq {
-			code, ok := F.Encode(g.GID, 0, g.Text)
+			code, ok := F.Encode(g.GID, g.Text)
 			if !ok {
 				return fmt.Errorf("cannot encode glyph %v", g)
 			}

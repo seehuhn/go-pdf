@@ -6,6 +6,16 @@ weight = 100
 
 # TODO List
 
+## Next Steps
+
+- Implement property lists.
+- Make Resource dictionaries file-independent.
+- make dict.Type3 file-independent
+- Try to merge `updateTextPosition` in "op-text.go" with the
+  corresponding code from `processText` in "reader/reader.go".
+- Get rid of `ResourceManagerEmbedFunc` and `EmbedHelperEmbedFunc`.
+- Should graphics.NewWriter really take a ResourceManager argument?
+
 ## API
 
 - Finalise the font API.
@@ -15,7 +25,7 @@ weight = 100
 ## General
 
 - Make sure that readers cannot get into infinite loops when resources
-  depend on each other in a cycle.
+  depend on each other in a cycle; Extend pdf.Extractor with better loop detection.
 - test that we don't write numbers like `0.6000000000000001` in content streams
 - By more systematic about the use of pdf.MalformedFileError, and in
   particular the `Loc` field there.

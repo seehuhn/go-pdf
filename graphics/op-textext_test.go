@@ -172,7 +172,7 @@ func TestTextShowRaw2(t *testing.T) {
 
 				for _, g := range r.TextLayout(nil, testString).Seq {
 					xx = append(xx, r.TextMatrix[4])
-					code, ok := F.Encode(g.GID, g.Advance, string(g.Text))
+					code, ok := F.Encode(g.GID, string(g.Text))
 					if !ok {
 						t.Fatalf("cannot encode glyph ID %d (%q)", g.GID, g.Text)
 					}
@@ -190,7 +190,7 @@ func TestTextShowRaw2(t *testing.T) {
 				for i, g := range r.TextLayout(nil, testString).Seq {
 					r.TextBegin()
 					r.TextFirstLine(xx[i], 10)
-					code, ok := F.Encode(g.GID, g.Advance, string(g.Text))
+					code, ok := F.Encode(g.GID, string(g.Text))
 					if !ok {
 						t.Fatalf("cannot encode glyph ID %d (%q)", g.GID, g.Text)
 					}

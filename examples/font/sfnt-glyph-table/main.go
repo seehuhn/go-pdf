@@ -295,7 +295,7 @@ func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 				// TODO(voss): fix this
 				// Try to establish a mapping from glyph ID to rune in the embedded
 				// font (called for side effects only).
-				_, _ = theFont.Encode(gid, g.Advance, g.Text)
+				_, _ = theFont.Encode(gid, g.Text)
 			}
 			if unicode.IsPrint(r) && r < 128 {
 				label = fmt.Sprintf("%q", r)

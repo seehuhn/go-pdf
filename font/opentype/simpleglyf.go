@@ -123,14 +123,12 @@ func (f *SimpleGlyf) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 }
 
 // Encode converts a glyph ID to a character code.
-func (f *SimpleGlyf) Encode(gid glyph.ID, width float64, text string) (charcode.Code, bool) {
+func (f *SimpleGlyf) Encode(gid glyph.ID, text string) (charcode.Code, bool) {
 	if c, ok := f.Simple.GetCode(gid, text); ok {
 		return charcode.Code(c), true
 	}
 
-	if width <= 0 {
-		width = math.Round(f.Font.GlyphWidthPDF(gid))
-	}
+	width := math.Round(f.Font.GlyphWidthPDF(gid))
 	c, err := f.Simple.Encode(gid, f.Font.GlyphName(gid), text, width)
 	return charcode.Code(c), err == nil
 }

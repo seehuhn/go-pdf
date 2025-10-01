@@ -147,8 +147,8 @@ func (f *CompositeCFF) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 //
 // Use the Codec to append the character code to PDF strings.
 //
-// The given width must be in PDF glyph space units.
-func (f *CompositeCFF) Encode(gid glyph.ID, width float64, text string) (charcode.Code, bool) {
+// Encode converts a glyph ID to a character code.
+func (f *CompositeCFF) Encode(gid glyph.ID, text string) (charcode.Code, bool) {
 	cid := f.gidToCID.CID(gid, []rune(text))
 	f.usedCIDs[cid] = struct{}{}
 
@@ -156,9 +156,7 @@ func (f *CompositeCFF) Encode(gid glyph.ID, width float64, text string) (charcod
 		return c, true
 	}
 
-	if width <= 0 {
-		width = math.Round(f.Font.GlyphWidthPDF(gid))
-	}
+	width := math.Round(f.Font.GlyphWidthPDF(gid))
 	c, err := f.CIDEncoder.Encode(cid, text, width)
 	return c, err == nil
 }

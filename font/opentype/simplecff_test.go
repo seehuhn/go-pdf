@@ -47,7 +47,7 @@ func TestEmbedSimple(t *testing.T) {
 			// make sure a few glyphs are included and encoded
 			gg := fontInstance.Layout(nil, 12, "Hello")
 			for _, g := range gg.Seq {
-				_, _ = fontInstance.Encode(g.GID, 0, string(g.Text))
+				_, _ = fontInstance.Encode(g.GID, string(g.Text))
 			}
 
 			err = rm.Close()

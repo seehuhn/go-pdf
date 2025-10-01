@@ -55,9 +55,7 @@ func TestEmbedStandard(t *testing.T) {
 				gg := F.Layout(nil, 10, testText)
 				for _, g := range gg.Seq { // allocate codes
 					// Use the actual glyph width, not the kerned advance
-					glyphName := F.GlyphNames[g.GID]
-					glyphWidth := F.GlyphWidthPDF(glyphName)
-					_, _ = F.Encode(g.GID, glyphWidth, g.Text)
+					_, _ = F.Encode(g.GID, g.Text)
 				}
 
 				err = rm.Close()

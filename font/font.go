@@ -59,18 +59,16 @@ type Layouter interface {
 	Instance
 
 	// Encode converts a glyph ID to a character code (for use with the
-	// instance's codec).  The arguments width and text are hints for choosing
-	// an appropriate advance width and text representation for the character
-	// code, in case a new code is allocated.
+	// instance's codec).  The text argument is a hint for choosing
+	// an appropriate text representation for the character code, in case
+	// a new code is allocated.  The glyph's width is taken from the font.
 	//
 	// The function returns the character code, and a boolean indicating
 	// whether the encoding was successful.  If the function returns false, the
 	// glyph ID cannot be encoded with this font instance.
 	//
 	// Use the Codec to append the character code to PDF strings.
-	//
-	// The given width must be in PDF glyph space units.
-	Encode(gid glyph.ID, width float64, text string) (charcode.Code, bool)
+	Encode(gid glyph.ID, text string) (charcode.Code, bool)
 
 	// CodesRemaining returns the number of character codes that can still be
 	// allocated in this font instance.

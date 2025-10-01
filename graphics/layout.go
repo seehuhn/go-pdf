@@ -141,7 +141,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 		xWanted += g.Advance
 
 		prevLen := len(run)
-		charCode, ok := layouter.Encode(g.GID, 0, g.Text)
+		charCode, ok := layouter.Encode(g.GID, g.Text)
 		if !ok {
 			continue // Skip glyphs that can't be encoded
 		}

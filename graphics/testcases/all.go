@@ -322,7 +322,7 @@ func encodeText(_ *pdf.ResourceManager, F font.Layouter, s string) pdf.String {
 	gg := F.Layout(nil, 10, s)
 	var res pdf.String
 	for _, g := range gg.Seq {
-		code, ok := F.Encode(g.GID, 0, g.Text)
+		code, ok := F.Encode(g.GID, g.Text)
 		if !ok {
 			panic("cannot encode glyph")
 		}

@@ -213,16 +213,14 @@ func (f *instance) FontInfo() any {
 }
 
 // Encode converts a glyph ID to a character code.
-func (f *instance) Encode(gid glyph.ID, width float64, text string) (charcode.Code, bool) {
+func (f *instance) Encode(gid glyph.ID, text string) (charcode.Code, bool) {
 	if c, ok := f.Simple.GetCode(gid, text); ok {
 		return charcode.Code(c), true
 	}
 
 	// Allocate new code
 	glyphName := f.Font.Glyphs[gid].Name
-	if width <= 0 {
-		width = math.Round(f.Font.Glyphs[gid].Width)
-	}
+	width := math.Round(f.Font.Glyphs[gid].Width)
 
 	c, err := f.Simple.Encode(gid, glyphName, text, width)
 	return charcode.Code(c), err == nil

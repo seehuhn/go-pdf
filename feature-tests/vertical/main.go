@@ -55,7 +55,7 @@ func createDocument(fname string) error {
 	codec := F.Codec()
 	gg := F.Layout(nil, 10, "HELLO")
 	for _, g := range gg.Seq {
-		code, ok := F.Encode(g.GID, raw.GlyphWidthPDF(g.GID), g.Text)
+		code, ok := F.Encode(g.GID, g.Text)
 		if !ok {
 			return fmt.Errorf("cannot encode glyph %d %q", g.GID, g.Text)
 		}

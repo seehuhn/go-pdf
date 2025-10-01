@@ -202,8 +202,8 @@ func (f *Composite) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 //
 // Use the Codec to append the character code to PDF strings.
 //
-// The given width must be in PDF glyph space units.
-func (f *Composite) Encode(gid glyph.ID, width float64, text string) (charcode.Code, bool) {
+// Encode converts a glyph ID to a character code.
+func (f *Composite) Encode(gid glyph.ID, text string) (charcode.Code, bool) {
 	cid := f.gidToCID.CID(gid, []rune(text))
 	f.usedCIDs[cid] = struct{}{}
 
@@ -211,9 +211,7 @@ func (f *Composite) Encode(gid glyph.ID, width float64, text string) (charcode.C
 		return c, true
 	}
 
-	if width <= 0 {
-		width = math.Round(f.Font.GlyphBBoxPDF(f.Font.FontMatrix, gid).URx - f.Font.GlyphBBoxPDF(f.Font.FontMatrix, gid).LLx)
-	}
+	width := math.Round(f.Font.GlyphBBoxPDF(f.Font.FontMatrix, gid).URx - f.Font.GlyphBBoxPDF(f.Font.FontMatrix, gid).LLx)
 	c, err := f.CIDEncoder.Encode(cid, text, width)
 	return c, err == nil
 }

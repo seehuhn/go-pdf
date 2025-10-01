@@ -18,8 +18,10 @@ package resource
 
 import (
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/property"
 )
 
 // TODO(voss):
@@ -37,9 +39,9 @@ type Resource struct {
 	Pattern    map[pdf.Name]color.Pattern
 	Shading    map[pdf.Name]graphics.Shading
 	XObject    map[pdf.Name]graphics.XObject
-	// Font       map[pdf.Name]font.Font
-	// Properties map[pdf.Name]Properties
-	ProcSet ProcSet
+	Font       map[pdf.Name]font.Instance
+	Properties map[pdf.Name]property.List
+	ProcSet    ProcSet
 }
 
 // var _ pdf.Embedder = (*Resource)(nil)

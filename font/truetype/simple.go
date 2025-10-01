@@ -128,15 +128,13 @@ func (f *Simple) FontInfo() any {
 //
 // Use the Codec to append the character code to PDF strings.
 //
-// The given width must be in PDF glyph space units.
-func (f *Simple) Encode(gid glyph.ID, width float64, text string) (charcode.Code, bool) {
+// Encode converts a glyph ID to a character code.
+func (f *Simple) Encode(gid glyph.ID, text string) (charcode.Code, bool) {
 	if c, ok := f.Simple.GetCode(gid, text); ok {
 		return charcode.Code(c), true
 	}
 
-	if width <= 0 {
-		width = math.Round(f.Font.GlyphWidthPDF(gid))
-	}
+	width := math.Round(f.Font.GlyphWidthPDF(gid))
 	c, err := f.Simple.Encode(gid, f.Font.GlyphName(gid), text, width)
 	return charcode.Code(c), err == nil
 }

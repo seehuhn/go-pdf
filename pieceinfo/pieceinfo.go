@@ -157,7 +157,6 @@ func (u *unknown) LastModified() time.Time {
 }
 
 func (u *unknown) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if u.Private == nil {
 		return nil, nil
 	}

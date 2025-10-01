@@ -149,7 +149,7 @@ func (f *Composite) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 }
 
 // Encode converts a glyph ID to a character code.
-func (f *Composite) Encode(gid glyph.ID, width float64, text string) (charcode.Code, bool) {
+func (f *Composite) Encode(gid glyph.ID, text string) (charcode.Code, bool) {
 	cid := f.gidToCID.CID(gid, []rune(text))
 	if c, ok := f.CIDEncoder.GetCode(cid, text); ok {
 		return c, true
@@ -157,9 +157,7 @@ func (f *Composite) Encode(gid glyph.ID, width float64, text string) (charcode.C
 
 	f.usedCIDs[cid] = struct{}{}
 
-	if width <= 0 {
-		width = math.Round(f.Font.GlyphWidthPDF(gid))
-	}
+	width := math.Round(f.Font.GlyphWidthPDF(gid))
 	c, err := f.CIDEncoder.Encode(cid, text, width)
 	return c, err == nil
 }
