@@ -337,3 +337,36 @@ func TestFitBV(t *testing.T) {
 		t.Errorf("type: got %v, want FitBV", arr[1])
 	}
 }
+
+func TestNamed(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+
+	dest := &Named{Name: "Chapter6"}
+
+	obj, err := dest.Encode(rm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	str, ok := obj.(pdf.String)
+	if !ok {
+		t.Fatalf("expected String, got %T", obj)
+	}
+
+	if string(str) != "Chapter6" {
+		t.Errorf("got %q, want %q", str, "Chapter6")
+	}
+}
+
+func TestNamedEmptyName(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+
+	dest := &Named{Name: ""}
+
+	_, err := dest.Encode(rm)
+	if err == nil {
+		t.Error("expected error for empty name, got nil")
+	}
+}

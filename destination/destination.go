@@ -286,3 +286,19 @@ func (d *FitBV) Encode(rm *pdf.ResourceManager) (pdf.Object, error) {
 		encodeOptionalNumber(d.Left),
 	}, nil
 }
+
+// Named represents a named destination that must be looked up in the document catalog's
+// Dests dictionary or Names/Dests name tree. The Name field contains the lookup key.
+type Named struct {
+	Name string
+}
+
+func (d *Named) DestinationType() Type { return TypeNamed }
+
+func (d *Named) Encode(rm *pdf.ResourceManager) (pdf.Object, error) {
+	if d.Name == "" {
+		return nil, pdf.Error("named destination must have a non-empty name")
+	}
+	// Always use pdf.String (modern PDF 1.2+ format)
+	return pdf.String(d.Name), nil
+}
