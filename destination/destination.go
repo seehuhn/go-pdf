@@ -169,3 +169,45 @@ func (d *FitV) Encode(rm *pdf.ResourceManager) (pdf.Object, error) {
 		encodeOptionalNumber(d.Left),
 	}, nil
 }
+
+// FitR displays the page with contents magnified to fit the rectangle
+// specified by the coordinates entirely within the window. If the required
+// horizontal and vertical magnification factors are different, uses the
+// smaller of the two, centering the rectangle within the window in the other dimension.
+type FitR struct {
+	Page                     Target
+	Left, Bottom, Right, Top float64
+}
+
+func (d *FitR) DestinationType() Type { return TypeFitR }
+
+func (d *FitR) Encode(rm *pdf.ResourceManager) (pdf.Object, error) {
+	if math.IsNaN(d.Left) || math.IsInf(d.Left, 0) {
+		return nil, pdf.Error("Left must be a finite number")
+	}
+	if math.IsNaN(d.Bottom) || math.IsInf(d.Bottom, 0) {
+		return nil, pdf.Error("Bottom must be a finite number")
+	}
+	if math.IsNaN(d.Right) || math.IsInf(d.Right, 0) {
+		return nil, pdf.Error("Right must be a finite number")
+	}
+	if math.IsNaN(d.Top) || math.IsInf(d.Top, 0) {
+		return nil, pdf.Error("Top must be a finite number")
+	}
+
+	if d.Left >= d.Right {
+		return nil, pdf.Error("Left must be less than Right")
+	}
+	if d.Bottom >= d.Top {
+		return nil, pdf.Error("Bottom must be less than Top")
+	}
+
+	return pdf.Array{
+		d.Page,
+		pdf.Name(TypeFitR),
+		pdf.Number(d.Left),
+		pdf.Number(d.Bottom),
+		pdf.Number(d.Right),
+		pdf.Number(d.Top),
+	}, nil
+}

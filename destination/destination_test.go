@@ -209,3 +209,64 @@ func TestFitV(t *testing.T) {
 		t.Errorf("left: got %v, want 100", arr[2])
 	}
 }
+
+func TestFitR(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+	pageRef := w.Alloc()
+
+	dest := &FitR{
+		Page:   Target(pageRef),
+		Left:   100,
+		Bottom: 200,
+		Right:  400,
+		Top:    500,
+	}
+
+	obj, err := dest.Encode(rm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	arr := obj.(pdf.Array)
+	if len(arr) != 6 {
+		t.Fatalf("expected 6 elements, got %d", len(arr))
+	}
+
+	if arr[1] != pdf.Name("FitR") {
+		t.Errorf("type: got %v, want FitR", arr[1])
+	}
+}
+
+func TestFitRInvalidRectangle(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+	pageRef := w.Alloc()
+
+	tests := []struct {
+		name string
+		dest *FitR
+	}{
+		{
+			name: "left >= right",
+			dest: &FitR{Page: Target(pageRef), Left: 400, Bottom: 200, Right: 100, Top: 500},
+		},
+		{
+			name: "bottom >= top",
+			dest: &FitR{Page: Target(pageRef), Left: 100, Bottom: 500, Right: 400, Top: 200},
+		},
+		{
+			name: "infinite coordinate",
+			dest: &FitR{Page: Target(pageRef), Left: math.Inf(1), Bottom: 200, Right: 400, Top: 500},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := tt.dest.Encode(rm)
+			if err == nil {
+				t.Error("expected error, got nil")
+			}
+		})
+	}
+}
