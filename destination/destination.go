@@ -211,3 +211,78 @@ func (d *FitR) Encode(rm *pdf.ResourceManager) (pdf.Object, error) {
 		pdf.Number(d.Top),
 	}, nil
 }
+
+// FitB displays the page with contents magnified to fit the page's bounding
+// box entirely within the window. If the required horizontal and vertical
+// magnification factors are different, uses the smaller of the two,
+// centering the bounding box within the window in the other dimension.
+// Requires PDF 1.1.
+type FitB struct {
+	Page Target
+}
+
+func (d *FitB) DestinationType() Type { return TypeFitB }
+
+func (d *FitB) Encode(rm *pdf.ResourceManager) (pdf.Object, error) {
+	if err := pdf.CheckVersion(rm.Out, "FitB destination", pdf.V1_1); err != nil {
+		return nil, err
+	}
+	return pdf.Array{
+		d.Page,
+		pdf.Name(TypeFitB),
+	}, nil
+}
+
+// FitBH displays the page with the vertical coordinate Top positioned at the
+// top edge of the window and contents magnified to fit the entire width of
+// the page's bounding box within the window.
+// Use Unset (or any NaN value) for Top to retain the current value.
+// Requires PDF 1.1.
+type FitBH struct {
+	Page Target
+	Top  float64
+}
+
+func (d *FitBH) DestinationType() Type { return TypeFitBH }
+
+func (d *FitBH) Encode(rm *pdf.ResourceManager) (pdf.Object, error) {
+	if err := pdf.CheckVersion(rm.Out, "FitBH destination", pdf.V1_1); err != nil {
+		return nil, err
+	}
+	if err := validateFinite("Top", d.Top); err != nil {
+		return nil, err
+	}
+
+	return pdf.Array{
+		d.Page,
+		pdf.Name(TypeFitBH),
+		encodeOptionalNumber(d.Top),
+	}, nil
+}
+
+// FitBV displays the page with the horizontal coordinate Left positioned at
+// the left edge of the window and contents magnified to fit the entire height
+// of the page's bounding box within the window.
+// Use Unset (or any NaN value) for Left to retain the current value.
+// Requires PDF 1.1.
+type FitBV struct {
+	Page Target
+	Left float64
+}
+
+func (d *FitBV) DestinationType() Type { return TypeFitBV }
+
+func (d *FitBV) Encode(rm *pdf.ResourceManager) (pdf.Object, error) {
+	if err := pdf.CheckVersion(rm.Out, "FitBV destination", pdf.V1_1); err != nil {
+		return nil, err
+	}
+	if err := validateFinite("Left", d.Left); err != nil {
+		return nil, err
+	}
+
+	return pdf.Array{
+		d.Page,
+		pdf.Name(TypeFitBV),
+		encodeOptionalNumber(d.Left),
+	}, nil
+}

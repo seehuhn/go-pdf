@@ -270,3 +270,70 @@ func TestFitRInvalidRectangle(t *testing.T) {
 		})
 	}
 }
+
+func TestFitB(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+	pageRef := w.Alloc()
+
+	dest := &FitB{Page: Target(pageRef)}
+
+	obj, err := dest.Encode(rm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	arr := obj.(pdf.Array)
+	if arr[1] != pdf.Name("FitB") {
+		t.Errorf("type: got %v, want FitB", arr[1])
+	}
+}
+
+func TestFitBVersionCheck(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
+	rm := pdf.NewResourceManager(w)
+	pageRef := w.Alloc()
+
+	dest := &FitB{Page: Target(pageRef)}
+
+	_, err := dest.Encode(rm)
+	if err == nil {
+		t.Error("expected version error for PDF 1.0, got nil")
+	}
+}
+
+func TestFitBH(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+	pageRef := w.Alloc()
+
+	dest := &FitBH{Page: Target(pageRef), Top: 600}
+
+	obj, err := dest.Encode(rm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	arr := obj.(pdf.Array)
+	if arr[1] != pdf.Name("FitBH") {
+		t.Errorf("type: got %v, want FitBH", arr[1])
+	}
+}
+
+func TestFitBV(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+	pageRef := w.Alloc()
+
+	dest := &FitBV{Page: Target(pageRef), Left: 50}
+
+	obj, err := dest.Encode(rm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	arr := obj.(pdf.Array)
+	if arr[1] != pdf.Name("FitBV") {
+		t.Errorf("type: got %v, want FitBV", arr[1])
+	}
+}
