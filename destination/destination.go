@@ -56,3 +56,53 @@ type Target pdf.Object
 // Unset is a sentinel value for coordinates that should retain their current value.
 // Use math.IsNaN() to test for this value.
 var Unset = math.NaN()
+
+// XYZ displays the page with coordinates (Left, Top) positioned at the upper-left
+// corner of the window and contents magnified by Zoom factor.
+// Use Unset (or any NaN value) for parameters that should retain their current value.
+// A Zoom of 0 has the same meaning as Unset.
+type XYZ struct {
+	Page            Target
+	Left, Top, Zoom float64
+}
+
+func (d *XYZ) DestinationType() Type { return TypeXYZ }
+
+func (d *XYZ) Encode(rm *pdf.ResourceManager) (pdf.Object, error) {
+	if err := validateFinite("Left", d.Left); err != nil {
+		return nil, err
+	}
+	if err := validateFinite("Top", d.Top); err != nil {
+		return nil, err
+	}
+	if err := validateFinite("Zoom", d.Zoom); err != nil {
+		return nil, err
+	}
+
+	return pdf.Array{
+		d.Page,
+		pdf.Name(TypeXYZ),
+		encodeOptionalNumber(d.Left),
+		encodeOptionalNumber(d.Top),
+		encodeOptionalNumber(d.Zoom),
+	}, nil
+}
+
+// validateFinite checks that a value is either Unset (NaN) or a finite number
+func validateFinite(field string, v float64) error {
+	if math.IsNaN(v) {
+		return nil // Unset is valid
+	}
+	if math.IsInf(v, 0) {
+		return pdf.Error(field + " must be either Unset or a finite number")
+	}
+	return nil
+}
+
+// encodeOptionalNumber converts a float64 to a PDF object, using null for Unset/NaN
+func encodeOptionalNumber(v float64) pdf.Object {
+	if math.IsNaN(v) {
+		return nil // PDF null
+	}
+	return pdf.Number(v)
+}
