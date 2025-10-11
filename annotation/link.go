@@ -63,14 +63,14 @@ type Link struct {
 	// counter-clockwise order, starting at the bottom-left.  If QuadPoints is
 	// absent, Common.Rect is used instead.
 	//
+	// All points must be contained within Common.Rect.
+	//
 	// If QuadPoints is present for link annotations with a border, PDF viewers
 	// disagree on where and how any borders should be drawn.
-	//
-	// All points must be contained within Common.Rect.
 	QuadPoints []vec.Vec2
 
-	// BorderStyle (optional) is a border style dictionary specifying the line width
-	// and dash pattern for drawing the annotation's border.
+	// BorderStyle (optional) is a border style dictionary specifying the line
+	// width and dash pattern for drawing the annotation's border.
 	//
 	// If this field is set, the Common.Border field is ignored.
 	//

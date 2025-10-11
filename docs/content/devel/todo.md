@@ -26,6 +26,7 @@ weight = 100
 
 - Make sure that readers cannot get into infinite loops when resources
   depend on each other in a cycle; Extend pdf.Extractor with better loop detection.
+- fix infinite recursion risk in halftone Type 5 extraction
 - test that we don't write numbers like `0.6000000000000001` in content streams
 - By more systematic about the use of pdf.MalformedFileError, and in
   particular the `Loc` field there.
@@ -35,14 +36,21 @@ weight = 100
 ## Fonts
 
 - reconsider PostScriptName for *sfnt.Font.
+- complete font subsetting implementation for all GSUB/GPOS subtable types
+- implement missing cmap subtable formats (2, 8, 10, 13, 14)
+- implement CFF font matrix handling
+- re-introduce CFF subroutines optimization for better compression
+- complete name table encoding implementations
 - test that the widths of the `.notdef` character is correct for the
   standard 14 fonts
 - double-check that I am correctly using the "Adobe Glyph List" and "Adobe
   Glyph List for New Fonts"
+- improve font comparison for testing once better font equality is available
 
 ## Testing
 
 - make sure that unit tests don't leave stray files behind
+- re-enable and fix TextShowGlyphs test for space advance handling
 
 ## Missing Features
 
