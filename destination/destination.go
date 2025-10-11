@@ -302,3 +302,117 @@ func (d *Named) Encode(rm *pdf.ResourceManager) (pdf.Object, error) {
 	// Always use pdf.String (modern PDF 1.2+ format)
 	return pdf.String(d.Name), nil
 }
+
+// Decode reads a destination from a PDF object.
+// The object can be an array (explicit destination), a name/string (named destination),
+// or a dictionary with a D entry.
+func Decode(x *pdf.Extractor, obj pdf.Object) (Destination, error) {
+	obj, err := pdf.Resolve(x.R, obj)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle named destinations (name or string)
+	if name, ok := obj.(pdf.Name); ok {
+		return &Named{Name: string(name)}, nil
+	}
+	if str, ok := obj.(pdf.String); ok {
+		return &Named{Name: string(str)}, nil
+	}
+
+	// Handle dictionary wrapper with D entry
+	if dict, _ := pdf.GetDict(x.R, obj); dict != nil {
+		if dObj := dict["D"]; dObj != nil {
+			obj = dObj
+		}
+	}
+
+	// Must be an array for explicit destination
+	arr, err := pdf.GetArray(x.R, obj)
+	if err != nil {
+		return nil, err
+	}
+	if len(arr) < 2 {
+		return nil, pdf.Error("destination array too short")
+	}
+
+	// First element is the page/target
+	page := Target(arr[0])
+
+	// Second element is the type name
+	typeName, err := pdf.Optional(pdf.GetName(x.R, arr[1]))
+	if err != nil {
+		return nil, err
+	}
+
+	switch Type(typeName) {
+	case TypeXYZ:
+		if len(arr) < 5 {
+			return nil, pdf.Error("XYZ destination requires 5 elements")
+		}
+		left := getOptionalNumber(x.R, arr[2])
+		top := getOptionalNumber(x.R, arr[3])
+		zoom := getOptionalNumber(x.R, arr[4])
+		return &XYZ{Page: page, Left: left, Top: top, Zoom: zoom}, nil
+
+	case TypeFit:
+		return &Fit{Page: page}, nil
+
+	case TypeFitH:
+		if len(arr) < 3 {
+			return nil, pdf.Error("FitH destination requires 3 elements")
+		}
+		top := getOptionalNumber(x.R, arr[2])
+		return &FitH{Page: page, Top: top}, nil
+
+	case TypeFitV:
+		if len(arr) < 3 {
+			return nil, pdf.Error("FitV destination requires 3 elements")
+		}
+		left := getOptionalNumber(x.R, arr[2])
+		return &FitV{Page: page, Left: left}, nil
+
+	case TypeFitR:
+		if len(arr) < 6 {
+			return nil, pdf.Error("FitR destination requires 6 elements")
+		}
+		left, _ := pdf.Optional(pdf.GetNumber(x.R, arr[2]))
+		bottom, _ := pdf.Optional(pdf.GetNumber(x.R, arr[3]))
+		right, _ := pdf.Optional(pdf.GetNumber(x.R, arr[4]))
+		top, _ := pdf.Optional(pdf.GetNumber(x.R, arr[5]))
+		return &FitR{Page: page, Left: float64(left), Bottom: float64(bottom),
+			Right: float64(right), Top: float64(top)}, nil
+
+	case TypeFitB:
+		return &FitB{Page: page}, nil
+
+	case TypeFitBH:
+		if len(arr) < 3 {
+			return nil, pdf.Error("FitBH destination requires 3 elements")
+		}
+		top := getOptionalNumber(x.R, arr[2])
+		return &FitBH{Page: page, Top: top}, nil
+
+	case TypeFitBV:
+		if len(arr) < 3 {
+			return nil, pdf.Error("FitBV destination requires 3 elements")
+		}
+		left := getOptionalNumber(x.R, arr[2])
+		return &FitBV{Page: page, Left: left}, nil
+
+	default:
+		return nil, pdf.Error("unknown destination type: " + string(typeName))
+	}
+}
+
+// getOptionalNumber reads a number from a PDF object, treating null as Unset
+func getOptionalNumber(r pdf.Getter, obj pdf.Object) float64 {
+	if obj == nil {
+		return Unset
+	}
+	num, err := pdf.Optional(pdf.GetNumber(r, obj))
+	if err != nil {
+		return Unset
+	}
+	return float64(num)
+}

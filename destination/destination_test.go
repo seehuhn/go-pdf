@@ -370,3 +370,139 @@ func TestNamedEmptyName(t *testing.T) {
 		t.Error("expected error for empty name, got nil")
 	}
 }
+
+func TestRoundTrip(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+	pageRef := w.Alloc()
+
+	tests := []struct {
+		name string
+		dest Destination
+	}{
+		{"XYZ", &XYZ{Page: Target(pageRef), Left: 100, Top: 200, Zoom: 1.5}},
+		{"XYZ with Unset", &XYZ{Page: Target(pageRef), Left: Unset, Top: Unset, Zoom: Unset}},
+		{"Fit", &Fit{Page: Target(pageRef)}},
+		{"FitH", &FitH{Page: Target(pageRef), Top: 500}},
+		{"FitV", &FitV{Page: Target(pageRef), Left: 100}},
+		{"FitR", &FitR{Page: Target(pageRef), Left: 100, Bottom: 200, Right: 400, Top: 500}},
+		{"FitB", &FitB{Page: Target(pageRef)}},
+		{"FitBH", &FitBH{Page: Target(pageRef), Top: 600}},
+		{"FitBV", &FitBV{Page: Target(pageRef), Left: 50}},
+		{"Named", &Named{Name: "Chapter6"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Encode
+			obj, err := tt.dest.Encode(rm)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Decode
+			x := pdf.NewExtractor(w)
+			decoded, err := Decode(x, obj)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Compare types
+			if decoded.DestinationType() != tt.dest.DestinationType() {
+				t.Errorf("type mismatch: got %v, want %v", decoded.DestinationType(), tt.dest.DestinationType())
+			}
+
+			// Compare encoded forms
+			obj2, err := decoded.Encode(rm)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !equalObjects(obj, obj2) {
+				t.Errorf("round trip mismatch:\noriginal: %v\ndecoded:  %v", obj, obj2)
+			}
+		})
+	}
+}
+
+func equalObjects(a, b pdf.Object) bool {
+	// Handle nil
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+
+	// Compare arrays
+	arrA, okA := a.(pdf.Array)
+	arrB, okB := b.(pdf.Array)
+	if okA && okB {
+		if len(arrA) != len(arrB) {
+			return false
+		}
+		for i := range arrA {
+			if !equalObjects(arrA[i], arrB[i]) {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Compare strings
+	strA, okA := a.(pdf.String)
+	strB, okB := b.(pdf.String)
+	if okA && okB {
+		return string(strA) == string(strB)
+	}
+
+	// Direct comparison for other types
+	return a == b
+}
+
+func TestDecodeNamedFromName(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	x := pdf.NewExtractor(w)
+
+	// Old-style PDF 1.1 named destination using pdf.Name
+	obj := pdf.Name("Chapter6")
+
+	dest, err := Decode(x, obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	named, ok := dest.(*Named)
+	if !ok {
+		t.Fatalf("expected *Named, got %T", dest)
+	}
+
+	if named.Name != "Chapter6" {
+		t.Errorf("got %q, want %q", named.Name, "Chapter6")
+	}
+}
+
+func TestDecodeDictionaryWrapper(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	pageRef := w.Alloc()
+
+	// Dictionary wrapper with D entry
+	dict := pdf.Dict{
+		"D": pdf.Array{pageRef, pdf.Name("Fit")},
+	}
+
+	x := pdf.NewExtractor(w)
+	dest, err := Decode(x, dict)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fit, ok := dest.(*Fit)
+	if !ok {
+		t.Fatalf("expected *Fit, got %T", dest)
+	}
+
+	if fit.Page != Target(pageRef) {
+		t.Errorf("page mismatch")
+	}
+}
