@@ -119,3 +119,35 @@ func TestXYZInvalidValues(t *testing.T) {
 		})
 	}
 }
+
+func TestFit(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+	pageRef := w.Alloc()
+
+	dest := &Fit{
+		Page: Target(pageRef),
+	}
+
+	obj, err := dest.Encode(rm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	arr, ok := obj.(pdf.Array)
+	if !ok {
+		t.Fatalf("expected Array, got %T", obj)
+	}
+
+	if len(arr) != 2 {
+		t.Fatalf("expected 2 elements, got %d", len(arr))
+	}
+
+	if arr[0] != pageRef {
+		t.Errorf("page: got %v, want %v", arr[0], pageRef)
+	}
+
+	if arr[1] != pdf.Name("Fit") {
+		t.Errorf("type: got %v, want Fit", arr[1])
+	}
+}

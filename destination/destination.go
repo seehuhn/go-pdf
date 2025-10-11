@@ -106,3 +106,20 @@ func encodeOptionalNumber(v float64) pdf.Object {
 	}
 	return pdf.Number(v)
 }
+
+// Fit displays the page magnified to fit entirely within the window
+// both horizontally and vertically. If the required horizontal and vertical
+// magnification factors are different, uses the smaller of the two,
+// centering the page within the window in the other dimension.
+type Fit struct {
+	Page Target
+}
+
+func (d *Fit) DestinationType() Type { return TypeFit }
+
+func (d *Fit) Encode(rm *pdf.ResourceManager) (pdf.Object, error) {
+	return pdf.Array{
+		d.Page,
+		pdf.Name(TypeFit),
+	}, nil
+}
