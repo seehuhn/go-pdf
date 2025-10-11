@@ -151,3 +151,61 @@ func TestFit(t *testing.T) {
 		t.Errorf("type: got %v, want Fit", arr[1])
 	}
 }
+
+func TestFitH(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+	pageRef := w.Alloc()
+
+	dest := &FitH{
+		Page: Target(pageRef),
+		Top:  500,
+	}
+
+	obj, err := dest.Encode(rm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	arr := obj.(pdf.Array)
+	if len(arr) != 3 {
+		t.Fatalf("expected 3 elements, got %d", len(arr))
+	}
+
+	if arr[1] != pdf.Name("FitH") {
+		t.Errorf("type: got %v, want FitH", arr[1])
+	}
+
+	if arr[2] != pdf.Number(500) {
+		t.Errorf("top: got %v, want 500", arr[2])
+	}
+}
+
+func TestFitV(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+	pageRef := w.Alloc()
+
+	dest := &FitV{
+		Page: Target(pageRef),
+		Left: 100,
+	}
+
+	obj, err := dest.Encode(rm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	arr := obj.(pdf.Array)
+	if len(arr) != 3 {
+		t.Fatalf("expected 3 elements, got %d", len(arr))
+	}
+
+	if arr[1] != pdf.Name("FitV") {
+		t.Errorf("type: got %v, want FitV", arr[1])
+	}
+
+	if arr[2] != pdf.Number(100) {
+		t.Errorf("left: got %v, want 100", arr[2])
+	}
+}

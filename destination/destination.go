@@ -123,3 +123,49 @@ func (d *Fit) Encode(rm *pdf.ResourceManager) (pdf.Object, error) {
 		pdf.Name(TypeFit),
 	}, nil
 }
+
+// FitH displays the page with the vertical coordinate Top positioned at the
+// top edge of the window and contents magnified to fit the entire width of
+// the page within the window.
+// Use Unset (or any NaN value) for Top to retain the current value.
+type FitH struct {
+	Page Target
+	Top  float64
+}
+
+func (d *FitH) DestinationType() Type { return TypeFitH }
+
+func (d *FitH) Encode(rm *pdf.ResourceManager) (pdf.Object, error) {
+	if err := validateFinite("Top", d.Top); err != nil {
+		return nil, err
+	}
+
+	return pdf.Array{
+		d.Page,
+		pdf.Name(TypeFitH),
+		encodeOptionalNumber(d.Top),
+	}, nil
+}
+
+// FitV displays the page with the horizontal coordinate Left positioned at
+// the left edge of the window and contents magnified to fit the entire height
+// of the page within the window.
+// Use Unset (or any NaN value) for Left to retain the current value.
+type FitV struct {
+	Page Target
+	Left float64
+}
+
+func (d *FitV) DestinationType() Type { return TypeFitV }
+
+func (d *FitV) Encode(rm *pdf.ResourceManager) (pdf.Object, error) {
+	if err := validateFinite("Left", d.Left); err != nil {
+		return nil, err
+	}
+
+	return pdf.Array{
+		d.Page,
+		pdf.Name(TypeFitV),
+		encodeOptionalNumber(d.Left),
+	}, nil
+}
