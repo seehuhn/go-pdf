@@ -56,6 +56,18 @@ const (
 	TypeRichMediaExecute Type = "RichMediaExecute"
 )
 
+// NewWindowMode specifies how a target document should be displayed.
+type NewWindowMode uint8
+
+const (
+	// NewWindowDefault indicates the viewer should use its preference.
+	NewWindowDefault NewWindowMode = 0
+	// NewWindowReplace indicates the target should replace the current window.
+	NewWindowReplace NewWindowMode = 1
+	// NewWindowNew indicates the target should open in a new window.
+	NewWindowNew NewWindowMode = 2
+)
+
 // Decode reads an action from a PDF object.
 func Decode(x *pdf.Extractor, obj pdf.Object) (Action, error) {
 	dict, err := pdf.GetDict(x.R, obj)

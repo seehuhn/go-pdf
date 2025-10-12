@@ -38,8 +38,8 @@ type Launch struct {
 	// Unix (deprecated in PDF 2.0) is UNIX launch parameters.
 	Unix pdf.Object
 
-	// NewWindow indicates whether to open in a new window.
-	NewWindow *bool
+	// NewWindow specifies how the target document should be displayed.
+	NewWindow NewWindowMode
 
 	// Next is the sequence of actions to perform after this action.
 	Next ActionList
@@ -76,11 +76,11 @@ func (a *Launch) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["Unix"] = a.Unix
 	}
 
-	if a.NewWindow != nil {
+	if a.NewWindow != NewWindowDefault {
 		if err := pdf.CheckVersion(rm.Out, "Launch action NewWindow entry", pdf.V1_2); err != nil {
 			return nil, err
 		}
-		dict["NewWindow"] = pdf.Boolean(*a.NewWindow)
+		dict["NewWindow"] = pdf.Boolean(a.NewWindow == NewWindowNew)
 	}
 
 	if next, err := a.Next.Encode(rm); err != nil {
@@ -103,11 +103,14 @@ func decodeLaunch(x *pdf.Extractor, dict pdf.Dict) (*Launch, error) {
 
 	win, _ := pdf.GetDict(x.R, dict["Win"])
 
-	var newWindow *bool
+	newWindow := NewWindowDefault
 	if dict["NewWindow"] != nil {
 		nw, _ := pdf.Optional(pdf.GetBoolean(x.R, dict["NewWindow"]))
-		b := bool(nw)
-		newWindow = &b
+		if nw {
+			newWindow = NewWindowNew
+		} else {
+			newWindow = NewWindowReplace
+		}
 	}
 
 	next, err := DecodeActionList(x, dict["Next"])

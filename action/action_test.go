@@ -358,3 +358,123 @@ func TestActionRoundTrip(t *testing.T) {
 		})
 	}
 }
+
+func TestNewWindowMode(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	defer w.Close()
+	rm := pdf.NewResourceManager(w)
+	x := pdf.NewExtractor(w)
+
+	tests := []struct {
+		name   string
+		action Action
+		mode   NewWindowMode
+	}{
+		{
+			name: "GoToR default",
+			action: &GoToR{
+				F:         &file.Specification{FileName: "other.pdf"},
+				D:         pdf.Array{pdf.Integer(0), pdf.Name("Fit")},
+				NewWindow: NewWindowDefault,
+			},
+			mode: NewWindowDefault,
+		},
+		{
+			name: "GoToR replace",
+			action: &GoToR{
+				F:         &file.Specification{FileName: "other.pdf"},
+				D:         pdf.Array{pdf.Integer(0), pdf.Name("Fit")},
+				NewWindow: NewWindowReplace,
+			},
+			mode: NewWindowReplace,
+		},
+		{
+			name: "GoToR new",
+			action: &GoToR{
+				F:         &file.Specification{FileName: "other.pdf"},
+				D:         pdf.Array{pdf.Integer(0), pdf.Name("Fit")},
+				NewWindow: NewWindowNew,
+			},
+			mode: NewWindowNew,
+		},
+		{
+			name: "GoToE default",
+			action: &GoToE{
+				F:         &file.Specification{FileName: "embedded.pdf"},
+				D:         pdf.Array{pdf.Integer(0), pdf.Name("Fit")},
+				NewWindow: NewWindowDefault,
+			},
+			mode: NewWindowDefault,
+		},
+		{
+			name: "GoToE new",
+			action: &GoToE{
+				F:         &file.Specification{FileName: "embedded.pdf"},
+				D:         pdf.Array{pdf.Integer(0), pdf.Name("Fit")},
+				NewWindow: NewWindowNew,
+			},
+			mode: NewWindowNew,
+		},
+		{
+			name: "Launch default",
+			action: &Launch{
+				F:         &file.Specification{FileName: "app.exe"},
+				NewWindow: NewWindowDefault,
+			},
+			mode: NewWindowDefault,
+		},
+		{
+			name: "Launch replace",
+			action: &Launch{
+				F:         &file.Specification{FileName: "app.exe"},
+				NewWindow: NewWindowReplace,
+			},
+			mode: NewWindowReplace,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj, err := tt.action.Encode(rm)
+			if err != nil {
+				t.Fatalf("encode error: %v", err)
+			}
+
+			dict := obj.(pdf.Dict)
+
+			// verify encoding
+			if tt.mode == NewWindowDefault {
+				if dict["NewWindow"] != nil {
+					t.Errorf("expected NewWindow to be omitted for default, got %v", dict["NewWindow"])
+				}
+			} else {
+				expected := pdf.Boolean(tt.mode == NewWindowNew)
+				if dict["NewWindow"] != expected {
+					t.Errorf("NewWindow = %v, want %v", dict["NewWindow"], expected)
+				}
+			}
+
+			// decode and verify
+			decoded, err := Decode(x, obj)
+			if err != nil {
+				t.Fatalf("decode error: %v", err)
+			}
+
+			var decodedMode NewWindowMode
+			switch a := decoded.(type) {
+			case *GoToR:
+				decodedMode = a.NewWindow
+			case *GoToE:
+				decodedMode = a.NewWindow
+			case *Launch:
+				decodedMode = a.NewWindow
+			default:
+				t.Fatalf("unexpected action type: %T", decoded)
+			}
+
+			if decodedMode != tt.mode {
+				t.Errorf("decoded NewWindow = %v, want %v", decodedMode, tt.mode)
+			}
+		})
+	}
+}

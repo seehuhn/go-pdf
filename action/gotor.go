@@ -37,8 +37,8 @@ type GoToR struct {
 	// If present, should take precedence over D.
 	SD pdf.Array
 
-	// NewWindow indicates whether to open in a new window.
-	NewWindow *bool
+	// NewWindow specifies how the target document should be displayed.
+	NewWindow NewWindowMode
 
 	// Next is the sequence of actions to perform after this action.
 	Next ActionList
@@ -75,11 +75,11 @@ func (a *GoToR) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["SD"] = a.SD
 	}
 
-	if a.NewWindow != nil {
+	if a.NewWindow != NewWindowDefault {
 		if err := pdf.CheckVersion(rm.Out, "GoToR action NewWindow entry", pdf.V1_2); err != nil {
 			return nil, err
 		}
-		dict["NewWindow"] = pdf.Boolean(*a.NewWindow)
+		dict["NewWindow"] = pdf.Boolean(a.NewWindow == NewWindowNew)
 	}
 
 	if next, err := a.Next.Encode(rm); err != nil {
@@ -110,11 +110,14 @@ func decodeGoToR(x *pdf.Extractor, dict pdf.Dict) (*GoToR, error) {
 
 	sd, _ := pdf.GetArray(x.R, dict["SD"])
 
-	var newWindow *bool
+	newWindow := NewWindowDefault
 	if dict["NewWindow"] != nil {
 		nw, _ := pdf.Optional(pdf.GetBoolean(x.R, dict["NewWindow"]))
-		b := bool(nw)
-		newWindow = &b
+		if nw {
+			newWindow = NewWindowNew
+		} else {
+			newWindow = NewWindowReplace
+		}
 	}
 
 	next, err := DecodeActionList(x, dict["Next"])

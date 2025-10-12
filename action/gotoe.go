@@ -32,8 +32,8 @@ type GoToE struct {
 	// D is the destination to jump to.
 	D pdf.Object
 
-	// NewWindow indicates whether to open in a new window.
-	NewWindow *bool
+	// NewWindow specifies how the target document should be displayed.
+	NewWindow NewWindowMode
 
 	// T specifies the target for the embedded file.
 	T pdf.Object
@@ -65,8 +65,8 @@ func (a *GoToE) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["F"] = fn
 	}
 
-	if a.NewWindow != nil {
-		dict["NewWindow"] = pdf.Boolean(*a.NewWindow)
+	if a.NewWindow != NewWindowDefault {
+		dict["NewWindow"] = pdf.Boolean(a.NewWindow == NewWindowNew)
 	}
 
 	if a.T != nil {
@@ -93,11 +93,14 @@ func decodeGoToE(x *pdf.Extractor, dict pdf.Dict) (*GoToE, error) {
 		return nil, err
 	}
 
-	var newWindow *bool
+	newWindow := NewWindowDefault
 	if dict["NewWindow"] != nil {
 		nw, _ := pdf.Optional(pdf.GetBoolean(x.R, dict["NewWindow"]))
-		b := bool(nw)
-		newWindow = &b
+		if nw {
+			newWindow = NewWindowNew
+		} else {
+			newWindow = NewWindowReplace
+		}
 	}
 
 	next, err := DecodeActionList(x, dict["Next"])
