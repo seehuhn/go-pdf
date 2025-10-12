@@ -20,13 +20,14 @@ package action
 
 import (
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/file"
 )
 
 // GoToR represents a remote go-to action that navigates to a destination
 // in another PDF file.
 type GoToR struct {
 	// F is the file specification for the target document.
-	F pdf.Object
+	F *file.Specification
 
 	// D is the destination to jump to (name, string, or array).
 	// For arrays, the first element is a page number, not a page reference.
@@ -56,9 +57,14 @@ func (a *GoToR) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, pdf.Error("GoToR action must have D entry")
 	}
 
+	fn, err := rm.Embed(a.F)
+	if err != nil {
+		return nil, err
+	}
+
 	dict := pdf.Dict{
 		"S": pdf.Name(TypeGoToR),
-		"F": a.F,
+		"F": fn,
 		"D": a.D,
 	}
 
@@ -89,7 +95,10 @@ func (a *GoToR) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeGoToR(x *pdf.Extractor, dict pdf.Dict) (*GoToR, error) {
-	f := dict["F"]
+	f, err := file.ExtractSpecification(x, dict["F"])
+	if err != nil {
+		return nil, err
+	}
 	if f == nil {
 		return nil, pdf.Error("GoToR action missing F entry")
 	}

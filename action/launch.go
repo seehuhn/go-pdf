@@ -20,13 +20,14 @@ package action
 
 import (
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/file"
 )
 
 // Launch represents a launch action that launches an application or opens
 // or prints a document.
 type Launch struct {
 	// F is the file specification for the file to launch or open.
-	F pdf.Object
+	F *file.Specification
 
 	// Win (deprecated in PDF 2.0) is Microsoft Windows launch parameters.
 	Win pdf.Dict
@@ -56,7 +57,11 @@ func (a *Launch) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	if a.F != nil {
-		dict["F"] = a.F
+		fn, err := rm.Embed(a.F)
+		if err != nil {
+			return nil, err
+		}
+		dict["F"] = fn
 	}
 
 	if a.Win != nil {
@@ -91,6 +96,11 @@ func (a *Launch) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeLaunch(x *pdf.Extractor, dict pdf.Dict) (*Launch, error) {
+	f, err := file.ExtractSpecification(x, dict["F"])
+	if err != nil {
+		return nil, err
+	}
+
 	win, _ := pdf.GetDict(x.R, dict["Win"])
 
 	var newWindow *bool
@@ -106,7 +116,7 @@ func decodeLaunch(x *pdf.Extractor, dict pdf.Dict) (*Launch, error) {
 	}
 
 	return &Launch{
-		F:         dict["F"],
+		F:         f,
 		Win:       win,
 		Mac:       dict["Mac"],
 		Unix:      dict["Unix"],

@@ -20,13 +20,14 @@ package action
 
 import (
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/file"
 )
 
 // ImportData represents an import-data action that imports form field values
 // from a file.
 type ImportData struct {
 	// F is the FDF file from which to import data.
-	F pdf.Object
+	F *file.Specification
 
 	// Next is the sequence of actions to perform after this action.
 	Next ActionList
@@ -42,9 +43,14 @@ func (a *ImportData) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, pdf.Error("ImportData action must have F entry")
 	}
 
+	fn, err := rm.Embed(a.F)
+	if err != nil {
+		return nil, err
+	}
+
 	dict := pdf.Dict{
 		"S": pdf.Name(TypeImportData),
-		"F": a.F,
+		"F": fn,
 	}
 
 	if next, err := a.Next.Encode(rm); err != nil {
@@ -57,7 +63,10 @@ func (a *ImportData) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeImportData(x *pdf.Extractor, dict pdf.Dict) (*ImportData, error) {
-	f := dict["F"]
+	f, err := file.ExtractSpecification(x, dict["F"])
+	if err != nil {
+		return nil, err
+	}
 	if f == nil {
 		return nil, pdf.Error("ImportData action missing F entry")
 	}

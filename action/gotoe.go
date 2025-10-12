@@ -20,13 +20,14 @@ package action
 
 import (
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/file"
 )
 
 // GoToE represents a go-to embedded action that navigates to a destination
 // in an embedded file.
 type GoToE struct {
 	// F is the file specification for the embedded file.
-	F pdf.Object
+	F *file.Specification
 
 	// D is the destination to jump to.
 	D pdf.Object
@@ -57,7 +58,11 @@ func (a *GoToE) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	if a.F != nil {
-		dict["F"] = a.F
+		fn, err := rm.Embed(a.F)
+		if err != nil {
+			return nil, err
+		}
+		dict["F"] = fn
 	}
 
 	if a.NewWindow != nil {
@@ -83,6 +88,11 @@ func decodeGoToE(x *pdf.Extractor, dict pdf.Dict) (*GoToE, error) {
 		return nil, pdf.Error("GoToE action missing D entry")
 	}
 
+	f, err := file.ExtractSpecification(x, dict["F"])
+	if err != nil {
+		return nil, err
+	}
+
 	var newWindow *bool
 	if dict["NewWindow"] != nil {
 		nw, _ := pdf.Optional(pdf.GetBoolean(x.R, dict["NewWindow"]))
@@ -96,7 +106,7 @@ func decodeGoToE(x *pdf.Extractor, dict pdf.Dict) (*GoToE, error) {
 	}
 
 	return &GoToE{
-		F:         dict["F"],
+		F:         f,
 		D:         d,
 		NewWindow: newWindow,
 		T:         dict["T"],

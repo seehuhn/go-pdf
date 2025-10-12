@@ -5,6 +5,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/destination"
+	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
@@ -162,7 +163,7 @@ func TestGoToRAction(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	action := &GoToR{
-		F: pdf.String("other.pdf"),
+		F: &file.Specification{FileName: "other.pdf"},
 		D: pdf.Array{pdf.Integer(0), pdf.Name("Fit")},
 	}
 
@@ -329,7 +330,7 @@ func TestActionRoundTrip(t *testing.T) {
 		{
 			name: "ImportData",
 			action: &ImportData{
-				F: pdf.String("data.fdf"),
+				F: &file.Specification{FileName: "data.fdf"},
 			},
 		},
 	}
