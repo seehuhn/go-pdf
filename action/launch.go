@@ -1,0 +1,116 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+// PDF 2.0 sections: 12.6.2 12.6.4.6
+
+package action
+
+import (
+	"seehuhn.de/go/pdf"
+)
+
+// Launch represents a launch action that launches an application or opens
+// or prints a document.
+type Launch struct {
+	// F is the file specification for the file to launch or open.
+	F pdf.Object
+
+	// Win (deprecated in PDF 2.0) is Microsoft Windows launch parameters.
+	Win pdf.Dict
+
+	// Mac (deprecated in PDF 2.0) is Mac OS launch parameters.
+	Mac pdf.Object
+
+	// Unix (deprecated in PDF 2.0) is UNIX launch parameters.
+	Unix pdf.Object
+
+	// NewWindow indicates whether to open in a new window.
+	NewWindow *bool
+
+	// Next is the sequence of actions to perform after this action.
+	Next ActionList
+}
+
+func (a *Launch) ActionType() Type { return TypeLaunch }
+
+func (a *Launch) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
+	if err := pdf.CheckVersion(rm.Out, "Launch action", pdf.V1_1); err != nil {
+		return nil, err
+	}
+
+	dict := pdf.Dict{
+		"S": pdf.Name(TypeLaunch),
+	}
+
+	if a.F != nil {
+		dict["F"] = a.F
+	}
+
+	if a.Win != nil {
+		dict["Win"] = a.Win
+	}
+
+	if a.Mac != nil {
+		dict["Mac"] = a.Mac
+	}
+
+	if a.Unix != nil {
+		dict["Unix"] = a.Unix
+	}
+
+	if a.NewWindow != nil {
+		if err := pdf.CheckVersion(rm.Out, "Launch action NewWindow entry", pdf.V1_2); err != nil {
+			return nil, err
+		}
+		dict["NewWindow"] = pdf.Boolean(*a.NewWindow)
+	}
+
+	if next, err := a.Next.Encode(rm); err != nil {
+		return nil, err
+	} else if next != nil {
+		if err := pdf.CheckVersion(rm.Out, "action Next entry", pdf.V1_2); err != nil {
+			return nil, err
+		}
+		dict["Next"] = next
+	}
+
+	return dict, nil
+}
+
+func decodeLaunch(x *pdf.Extractor, dict pdf.Dict) (*Launch, error) {
+	win, _ := pdf.GetDict(x.R, dict["Win"])
+
+	var newWindow *bool
+	if dict["NewWindow"] != nil {
+		nw, _ := pdf.Optional(pdf.GetBoolean(x.R, dict["NewWindow"]))
+		b := bool(nw)
+		newWindow = &b
+	}
+
+	next, err := DecodeActionList(x, dict["Next"])
+	if err != nil {
+		return nil, err
+	}
+
+	return &Launch{
+		F:         dict["F"],
+		Win:       win,
+		Mac:       dict["Mac"],
+		Unix:      dict["Unix"],
+		NewWindow: newWindow,
+		Next:      next,
+	}, nil
+}
