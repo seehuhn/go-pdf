@@ -191,3 +191,169 @@ func TestGoToRAction(t *testing.T) {
 		t.Error("F is nil")
 	}
 }
+
+func TestActionListChaining(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	defer w.Close()
+	rm := pdf.NewResourceManager(w)
+
+	// create a chain: GoTo -> URI -> Named
+	action1 := &GoTo{
+		Dest: &destination.Fit{Page: pdf.Reference(1)},
+	}
+	action2 := &URI{
+		URI: "https://example.com",
+	}
+	action3 := &Named{
+		N: "NextPage",
+	}
+
+	// chain them
+	action1.Next = ActionList{action2}
+	action2.Next = ActionList{action3}
+
+	// encode
+	obj, err := action1.Encode(rm)
+	if err != nil {
+		t.Fatalf("encode error: %v", err)
+	}
+
+	// decode
+	x := pdf.NewExtractor(w)
+	decoded, err := Decode(x, obj)
+	if err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+
+	// verify chain
+	goTo := decoded.(*GoTo)
+	if len(goTo.Next) != 1 {
+		t.Fatalf("expected 1 next action, got %d", len(goTo.Next))
+	}
+
+	uri := goTo.Next[0].(*URI)
+	if uri.URI != "https://example.com" {
+		t.Errorf("URI = %v, want https://example.com", uri.URI)
+	}
+
+	if len(uri.Next) != 1 {
+		t.Fatalf("expected 1 next action in chain, got %d", len(uri.Next))
+	}
+
+	named := uri.Next[0].(*Named)
+	if named.N != "NextPage" {
+		t.Errorf("N = %v, want NextPage", named.N)
+	}
+}
+
+func TestActionListMultipleActions(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	defer w.Close()
+	rm := pdf.NewResourceManager(w)
+
+	// create multiple parallel actions
+	action := &GoTo{
+		Dest: &destination.Fit{Page: pdf.Reference(1)},
+		Next: ActionList{
+			&URI{URI: "https://example.com"},
+			&Named{N: "NextPage"},
+		},
+	}
+
+	// encode
+	obj, err := action.Encode(rm)
+	if err != nil {
+		t.Fatalf("encode error: %v", err)
+	}
+
+	dict := obj.(pdf.Dict)
+	nextArr, ok := dict["Next"].(pdf.Array)
+	if !ok {
+		t.Fatalf("expected Next to be array, got %T", dict["Next"])
+	}
+
+	if len(nextArr) != 2 {
+		t.Errorf("expected 2 actions in Next array, got %d", len(nextArr))
+	}
+
+	// decode and verify
+	x := pdf.NewExtractor(w)
+	decoded, err := Decode(x, obj)
+	if err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+
+	goTo := decoded.(*GoTo)
+	if len(goTo.Next) != 2 {
+		t.Fatalf("expected 2 next actions, got %d", len(goTo.Next))
+	}
+}
+
+func TestActionRoundTrip(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	defer w.Close()
+	rm := pdf.NewResourceManager(w)
+
+	tests := []struct {
+		name   string
+		action Action
+	}{
+		{
+			name: "JavaScript",
+			action: &JavaScript{
+				JS: pdf.String("app.alert('Hello');"),
+			},
+		},
+		{
+			name: "Hide",
+			action: &Hide{
+				T: pdf.String("MyAnnotation"),
+				H: true,
+			},
+		},
+		{
+			name: "SubmitForm",
+			action: &SubmitForm{
+				F:      pdf.String("http://example.com/submit"),
+				Fields: pdf.Array{pdf.String("field1"), pdf.String("field2")},
+				Flags:  1,
+			},
+		},
+		{
+			name: "ResetForm",
+			action: &ResetForm{
+				Fields: pdf.Array{pdf.String("field1")},
+				Flags:  0,
+			},
+		},
+		{
+			name: "ImportData",
+			action: &ImportData{
+				F: pdf.String("data.fdf"),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// encode
+			obj, err := tt.action.Encode(rm)
+			if err != nil {
+				t.Fatalf("encode error: %v", err)
+			}
+
+			// decode
+			x := pdf.NewExtractor(w)
+			decoded, err := Decode(x, obj)
+			if err != nil {
+				t.Fatalf("decode error: %v", err)
+			}
+
+			// verify type
+			if decoded.ActionType() != tt.action.ActionType() {
+				t.Errorf("action type mismatch: got %v, want %v",
+					decoded.ActionType(), tt.action.ActionType())
+			}
+		})
+	}
+}
