@@ -205,10 +205,6 @@ func decodeHide(x *pdf.Extractor, dict pdf.Dict) (Action, error) {
 	return nil, pdf.Error("Hide action not yet implemented")
 }
 
-func decodeNamed(x *pdf.Extractor, dict pdf.Dict) (Action, error) {
-	return nil, pdf.Error("Named action not yet implemented")
-}
-
 func decodeSubmitForm(x *pdf.Extractor, dict pdf.Dict) (Action, error) {
 	return nil, pdf.Error("SubmitForm action not yet implemented")
 }

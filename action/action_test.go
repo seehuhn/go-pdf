@@ -120,3 +120,38 @@ func TestURIAction(t *testing.T) {
 		t.Errorf("IsMap = false, want true")
 	}
 }
+
+func TestNamedAction(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	defer w.Close()
+	rm := pdf.NewResourceManager(w)
+
+	action := &Named{
+		N: "NextPage",
+	}
+
+	obj, err := action.Encode(rm)
+	if err != nil {
+		t.Fatalf("encode error: %v", err)
+	}
+
+	dict, ok := obj.(pdf.Dict)
+	if !ok {
+		t.Fatalf("expected Dict, got %T", obj)
+	}
+
+	if dict["N"] != pdf.Name("NextPage") {
+		t.Errorf("N = %v, want NextPage", dict["N"])
+	}
+
+	x := pdf.NewExtractor(w)
+	decoded, err := Decode(x, dict)
+	if err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+
+	namedAction := decoded.(*Named)
+	if namedAction.N != "NextPage" {
+		t.Errorf("N = %v, want NextPage", namedAction.N)
+	}
+}
