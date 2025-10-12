@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
@@ -19,5 +20,55 @@ func TestActionListEncode_Empty(t *testing.T) {
 	}
 	if obj != nil {
 		t.Errorf("expected nil for empty ActionList, got %v", obj)
+	}
+}
+
+func TestGoToAction(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	defer w.Close()
+	rm := pdf.NewResourceManager(w)
+
+	// create a simple XYZ destination
+	dest := &destination.XYZ{
+		Page: pdf.Reference(5),
+		Left: 100,
+		Top:  200,
+		Zoom: 1.5,
+	}
+
+	action := &GoTo{
+		Dest: dest,
+	}
+
+	// encode
+	obj, err := action.Encode(rm)
+	if err != nil {
+		t.Fatalf("encode error: %v", err)
+	}
+
+	dict, ok := obj.(pdf.Dict)
+	if !ok {
+		t.Fatalf("expected Dict, got %T", obj)
+	}
+
+	// verify S field
+	if dict["S"] != pdf.Name("GoTo") {
+		t.Errorf("S = %v, want GoTo", dict["S"])
+	}
+
+	// decode
+	x := pdf.NewExtractor(w)
+	decoded, err := Decode(x, dict)
+	if err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+
+	goToAction, ok := decoded.(*GoTo)
+	if !ok {
+		t.Fatalf("expected *GoTo, got %T", decoded)
+	}
+
+	if goToAction.ActionType() != TypeGoTo {
+		t.Errorf("ActionType = %v, want %v", goToAction.ActionType(), TypeGoTo)
 	}
 }

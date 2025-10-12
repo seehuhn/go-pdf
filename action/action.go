@@ -172,9 +172,6 @@ func DecodeActionList(x *pdf.Extractor, obj pdf.Object) (ActionList, error) {
 }
 
 // stub decode functions to be implemented in subsequent tasks
-func decodeGoTo(x *pdf.Extractor, dict pdf.Dict) (Action, error) {
-	return nil, pdf.Error("GoTo action not yet implemented")
-}
 
 func decodeGoToR(x *pdf.Extractor, dict pdf.Dict) (Action, error) {
 	return nil, pdf.Error("GoToR action not yet implemented")
