@@ -193,10 +193,6 @@ func decodeThread(x *pdf.Extractor, dict pdf.Dict) (Action, error) {
 	return nil, pdf.Error("Thread action not yet implemented")
 }
 
-func decodeURI(x *pdf.Extractor, dict pdf.Dict) (Action, error) {
-	return nil, pdf.Error("URI action not yet implemented")
-}
-
 func decodeSound(x *pdf.Extractor, dict pdf.Dict) (Action, error) {
 	return nil, pdf.Error("Sound action not yet implemented")
 }

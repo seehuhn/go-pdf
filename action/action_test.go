@@ -72,3 +72,51 @@ func TestGoToAction(t *testing.T) {
 		t.Errorf("ActionType = %v, want %v", goToAction.ActionType(), TypeGoTo)
 	}
 }
+
+func TestURIAction(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	defer w.Close()
+	rm := pdf.NewResourceManager(w)
+
+	action := &URI{
+		URI:   "https://example.com",
+		IsMap: true,
+	}
+
+	// encode
+	obj, err := action.Encode(rm)
+	if err != nil {
+		t.Fatalf("encode error: %v", err)
+	}
+
+	dict, ok := obj.(pdf.Dict)
+	if !ok {
+		t.Fatalf("expected Dict, got %T", obj)
+	}
+
+	if dict["S"] != pdf.Name("URI") {
+		t.Errorf("S = %v, want URI", dict["S"])
+	}
+	if string(dict["URI"].(pdf.String)) != "https://example.com" {
+		t.Errorf("URI = %v, want https://example.com", dict["URI"])
+	}
+
+	// decode
+	x := pdf.NewExtractor(w)
+	decoded, err := Decode(x, dict)
+	if err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+
+	uriAction, ok := decoded.(*URI)
+	if !ok {
+		t.Fatalf("expected *URI, got %T", decoded)
+	}
+
+	if uriAction.URI != "https://example.com" {
+		t.Errorf("URI = %v, want https://example.com", uriAction.URI)
+	}
+	if !uriAction.IsMap {
+		t.Errorf("IsMap = false, want true")
+	}
+}
