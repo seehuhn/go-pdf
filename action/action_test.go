@@ -155,3 +155,39 @@ func TestNamedAction(t *testing.T) {
 		t.Errorf("N = %v, want NextPage", namedAction.N)
 	}
 }
+
+func TestGoToRAction(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	defer w.Close()
+	rm := pdf.NewResourceManager(w)
+
+	action := &GoToR{
+		F: pdf.String("other.pdf"),
+		D: pdf.Array{pdf.Integer(0), pdf.Name("Fit")},
+	}
+
+	obj, err := action.Encode(rm)
+	if err != nil {
+		t.Fatalf("encode error: %v", err)
+	}
+
+	dict, ok := obj.(pdf.Dict)
+	if !ok {
+		t.Fatalf("expected Dict, got %T", obj)
+	}
+
+	if dict["S"] != pdf.Name("GoToR") {
+		t.Errorf("S = %v, want GoToR", dict["S"])
+	}
+
+	x := pdf.NewExtractor(w)
+	decoded, err := Decode(x, dict)
+	if err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+
+	goToRAction := decoded.(*GoToR)
+	if goToRAction.F == nil {
+		t.Error("F is nil")
+	}
+}
