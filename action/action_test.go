@@ -164,7 +164,7 @@ func TestGoToRAction(t *testing.T) {
 
 	action := &GoToR{
 		F: &file.Specification{FileName: "other.pdf"},
-		D: pdf.Array{pdf.Integer(0), pdf.Name("Fit")},
+		D: &destination.Fit{Page: pdf.Integer(0)},
 	}
 
 	obj, err := action.Encode(rm)
@@ -359,6 +359,55 @@ func TestActionRoundTrip(t *testing.T) {
 	}
 }
 
+func TestGoToEWithTarget(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	defer w.Close()
+	rm := pdf.NewResourceManager(w)
+
+	action := &GoToE{
+		F: &file.Specification{FileName: "embedded.pdf"},
+		D: &destination.Fit{Page: pdf.Integer(0)},
+		T: &TargetNamedChild{
+			Name: pdf.String("child.pdf"),
+			Next: &TargetParent{},
+		},
+	}
+
+	obj, err := action.Encode(rm)
+	if err != nil {
+		t.Fatalf("encode error: %v", err)
+	}
+
+	dict, ok := obj.(pdf.Dict)
+	if !ok {
+		t.Fatalf("expected Dict, got %T", obj)
+	}
+
+	if dict["S"] != pdf.Name("GoToE") {
+		t.Errorf("S = %v, want GoToE", dict["S"])
+	}
+
+	x := pdf.NewExtractor(w)
+	decoded, err := Decode(x, dict)
+	if err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+
+	goToEAction := decoded.(*GoToE)
+	if goToEAction.T == nil {
+		t.Error("T is nil")
+	}
+
+	namedChild, ok := goToEAction.T.(*TargetNamedChild)
+	if !ok {
+		t.Fatalf("expected *TargetNamedChild, got %T", goToEAction.T)
+	}
+
+	if string(namedChild.Name) != "child.pdf" {
+		t.Errorf("Name = %v, want child.pdf", namedChild.Name)
+	}
+}
+
 func TestNewWindowMode(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	defer w.Close()
@@ -374,7 +423,7 @@ func TestNewWindowMode(t *testing.T) {
 			name: "GoToR default",
 			action: &GoToR{
 				F:         &file.Specification{FileName: "other.pdf"},
-				D:         pdf.Array{pdf.Integer(0), pdf.Name("Fit")},
+				D:         &destination.Fit{Page: pdf.Integer(0)},
 				NewWindow: NewWindowDefault,
 			},
 			mode: NewWindowDefault,
@@ -383,7 +432,7 @@ func TestNewWindowMode(t *testing.T) {
 			name: "GoToR replace",
 			action: &GoToR{
 				F:         &file.Specification{FileName: "other.pdf"},
-				D:         pdf.Array{pdf.Integer(0), pdf.Name("Fit")},
+				D:         &destination.Fit{Page: pdf.Integer(0)},
 				NewWindow: NewWindowReplace,
 			},
 			mode: NewWindowReplace,
@@ -392,7 +441,7 @@ func TestNewWindowMode(t *testing.T) {
 			name: "GoToR new",
 			action: &GoToR{
 				F:         &file.Specification{FileName: "other.pdf"},
-				D:         pdf.Array{pdf.Integer(0), pdf.Name("Fit")},
+				D:         &destination.Fit{Page: pdf.Integer(0)},
 				NewWindow: NewWindowNew,
 			},
 			mode: NewWindowNew,
@@ -401,7 +450,7 @@ func TestNewWindowMode(t *testing.T) {
 			name: "GoToE default",
 			action: &GoToE{
 				F:         &file.Specification{FileName: "embedded.pdf"},
-				D:         pdf.Array{pdf.Integer(0), pdf.Name("Fit")},
+				D:         &destination.Fit{Page: pdf.Integer(0)},
 				NewWindow: NewWindowDefault,
 			},
 			mode: NewWindowDefault,
@@ -410,7 +459,7 @@ func TestNewWindowMode(t *testing.T) {
 			name: "GoToE new",
 			action: &GoToE{
 				F:         &file.Specification{FileName: "embedded.pdf"},
-				D:         pdf.Array{pdf.Integer(0), pdf.Name("Fit")},
+				D:         &destination.Fit{Page: pdf.Integer(0)},
 				NewWindow: NewWindowNew,
 			},
 			mode: NewWindowNew,

@@ -20,6 +20,7 @@ package action
 
 import (
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/file"
 )
 
@@ -30,18 +31,23 @@ type GoToE struct {
 	F *file.Specification
 
 	// D is the destination to jump to.
-	D pdf.Object
+	// For explicit destinations, the page target is a page number (integer),
+	// not a page reference.
+	D destination.Destination
 
 	// NewWindow specifies how the target document should be displayed.
 	NewWindow NewWindowMode
 
 	// T specifies the target for the embedded file.
-	T pdf.Object
+	// Optional if F is present; otherwise required.
+	T Target
 
 	// Next is the sequence of actions to perform after this action.
 	Next ActionList
 }
 
+// ActionType returns "GoToE".
+// This implements the [Action] interface.
 func (a *GoToE) ActionType() Type { return TypeGoToE }
 
 func (a *GoToE) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
@@ -52,9 +58,14 @@ func (a *GoToE) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, pdf.Error("GoToE action must have D entry")
 	}
 
+	destObj, err := a.D.Encode(rm)
+	if err != nil {
+		return nil, err
+	}
+
 	dict := pdf.Dict{
 		"S": pdf.Name(TypeGoToE),
-		"D": a.D,
+		"D": destObj,
 	}
 
 	if a.F != nil {
@@ -70,7 +81,11 @@ func (a *GoToE) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	if a.T != nil {
-		dict["T"] = a.T
+		tObj, err := a.T.Encode(rm)
+		if err != nil {
+			return nil, err
+		}
+		dict["T"] = tObj
 	}
 
 	if next, err := a.Next.Encode(rm); err != nil {
@@ -83,8 +98,11 @@ func (a *GoToE) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeGoToE(x *pdf.Extractor, dict pdf.Dict) (*GoToE, error) {
-	d := dict["D"]
-	if d == nil {
+	dest, err := destination.Decode(x, dict["D"])
+	if err != nil {
+		return nil, err
+	}
+	if dest == nil {
 		return nil, pdf.Error("GoToE action missing D entry")
 	}
 
@@ -103,6 +121,14 @@ func decodeGoToE(x *pdf.Extractor, dict pdf.Dict) (*GoToE, error) {
 		}
 	}
 
+	var target Target
+	if dict["T"] != nil {
+		target, err = DecodeTarget(x, dict["T"])
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	next, err := DecodeActionList(x, dict["Next"])
 	if err != nil {
 		return nil, err
@@ -110,9 +136,9 @@ func decodeGoToE(x *pdf.Extractor, dict pdf.Dict) (*GoToE, error) {
 
 	return &GoToE{
 		F:         f,
-		D:         d,
+		D:         dest,
 		NewWindow: newWindow,
-		T:         dict["T"],
+		T:         target,
 		Next:      next,
 	}, nil
 }
