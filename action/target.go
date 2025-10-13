@@ -104,3 +104,52 @@ func (t *TargetNamedChild) encodeTargetSafe(rm *pdf.ResourceManager, visited map
 
 	return dict, nil
 }
+
+// TargetAnnotationChild navigates down to a child document via a file attachment annotation.
+type TargetAnnotationChild struct {
+	// Page specifies the page containing the annotation.
+	// Can be pdf.Integer (zero-based page number) or pdf.String (named destination).
+	Page pdf.Object
+
+	// Annotation specifies which annotation on the page.
+	// Can be pdf.Integer (zero-based index in Annots array) or pdf.String (NM field).
+	Annotation pdf.Object
+
+	// Next is the next step in the target path, or nil if this child is the final target.
+	Next Target
+}
+
+func (t *TargetAnnotationChild) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
+	visited := make(map[Target]bool)
+	return t.encodeTargetSafe(rm, visited)
+}
+
+func (t *TargetAnnotationChild) encodeTargetSafe(rm *pdf.ResourceManager, visited map[Target]bool) (pdf.Native, error) {
+	if visited[t] {
+		return nil, errTargetCycle
+	}
+	visited[t] = true
+
+	if t.Page == nil {
+		return nil, pdf.Error("TargetAnnotationChild must have a Page")
+	}
+	if t.Annotation == nil {
+		return nil, pdf.Error("TargetAnnotationChild must have an Annotation")
+	}
+
+	dict := pdf.Dict{
+		"R": pdf.Name("C"),
+		"P": t.Page,
+		"A": t.Annotation,
+	}
+
+	if t.Next != nil {
+		nextDict, err := t.Next.encodeTargetSafe(rm, visited)
+		if err != nil {
+			return nil, err
+		}
+		dict["T"] = nextDict
+	}
+
+	return dict, nil
+}
