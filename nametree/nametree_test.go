@@ -380,3 +380,106 @@ func TestStreamingVeryLargeTree(t *testing.T) {
 		}
 	}
 }
+
+func TestWriteMapSingle(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	// single entry
+	data := map[pdf.Name]pdf.Object{
+		"alpha": pdf.Integer(1),
+	}
+
+	ref, err := WriteMap(w, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// read back
+	extracted, err := ExtractInMemory(w, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := cmp.Diff(data, extracted.Data); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+}
+
+func TestWriteMapMultiple(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	// multiple entries in random order
+	data := map[pdf.Name]pdf.Object{
+		"zebra":  pdf.Integer(26),
+		"apple":  pdf.Integer(1),
+		"mango":  pdf.Integer(13),
+		"banana": pdf.Integer(2),
+	}
+
+	ref, err := WriteMap(w, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// read back
+	extracted, err := ExtractInMemory(w, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := cmp.Diff(data, extracted.Data); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+}
+
+func TestWriteMapEmpty(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	// empty map
+	data := map[pdf.Name]pdf.Object{}
+
+	ref, err := WriteMap(w, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// should return zero reference for empty tree
+	if ref != 0 {
+		t.Errorf("WriteMap(empty) = %v, want 0", ref)
+	}
+}
+
+func TestWriteMapLarge(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	// large map to test sorting and tree structure
+	data := make(map[pdf.Name]pdf.Object)
+	for i := 0; i < 200; i++ {
+		key := pdf.Name(fmt.Sprintf("key%03d", i))
+		data[key] = pdf.Integer(i)
+	}
+
+	ref, err := WriteMap(w, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// verify size
+	size, err := Size(w, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if size != 200 {
+		t.Errorf("Size() = %d, want 200", size)
+	}
+
+	// read back and verify
+	extracted, err := ExtractInMemory(w, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := cmp.Diff(data, extracted.Data); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+}

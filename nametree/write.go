@@ -19,6 +19,8 @@ package nametree
 import (
 	"errors"
 	"iter"
+	"slices"
+	"strings"
 
 	"seehuhn.de/go/pdf"
 )
@@ -289,4 +291,29 @@ func (w *nameTreeWriter) collapse() error {
 		}
 	}
 	return nil
+}
+
+// WriteMap creates a name tree from a map of key-value pairs.
+// The keys are sorted lexicographically before writing.
+// The return value is the reference to the name tree root.
+func WriteMap(w *pdf.Writer, data map[pdf.Name]pdf.Object) (pdf.Reference, error) {
+	// collect and sort keys
+	keys := make([]pdf.Name, 0, len(data))
+	for k := range data {
+		keys = append(keys, k)
+	}
+	slices.SortFunc(keys, func(a, b pdf.Name) int {
+		return strings.Compare(string(a), string(b))
+	})
+
+	// create iterator over sorted entries
+	iter := func(yield func(pdf.Name, pdf.Object) bool) {
+		for _, k := range keys {
+			if !yield(k, data[k]) {
+				return
+			}
+		}
+	}
+
+	return Write(w, iter)
 }
