@@ -153,3 +153,61 @@ func (t *TargetAnnotationChild) encodeTargetSafe(rm *pdf.ResourceManager, visite
 
 	return dict, nil
 }
+
+// DecodeTarget reads a target dictionary from a PDF object.
+func DecodeTarget(x *pdf.Extractor, obj pdf.Object) (Target, error) {
+	if obj == nil {
+		return nil, nil
+	}
+
+	dict, err := pdf.GetDict(x.R, obj)
+	if err != nil {
+		return nil, err
+	}
+
+	relationship, err := pdf.GetName(x.R, dict["R"])
+	if err != nil {
+		return nil, err
+	}
+
+	// recursively decode nested target
+	var next Target
+	if dict["T"] != nil {
+		next, err = DecodeTarget(x, dict["T"])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	switch relationship {
+	case "P":
+		return &TargetParent{
+			Next: next,
+		}, nil
+
+	case "C":
+		// check if it's named or annotation-based
+		if name, _ := pdf.GetString(x.R, dict["N"]); name != nil {
+			return &TargetNamedChild{
+				Name: name,
+				Next: next,
+			}, nil
+		}
+
+		// must be annotation-based
+		page := dict["P"]
+		annotation := dict["A"]
+		if page == nil || annotation == nil {
+			return nil, pdf.Error("child target must have either N or both P and A")
+		}
+
+		return &TargetAnnotationChild{
+			Page:       page,
+			Annotation: annotation,
+			Next:       next,
+		}, nil
+
+	default:
+		return nil, pdf.Error("invalid target relationship: " + string(relationship))
+	}
+}

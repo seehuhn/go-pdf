@@ -152,3 +152,86 @@ func TestTargetCycle(t *testing.T) {
 		t.Errorf("expected cycle error, got %v", err)
 	}
 }
+
+func TestDecodeTargetParent(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	defer w.Close()
+
+	dict := pdf.Dict{
+		"R": pdf.Name("P"),
+	}
+
+	x := pdf.NewExtractor(w)
+	target, err := DecodeTarget(x, dict)
+	if err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+
+	parent, ok := target.(*TargetParent)
+	if !ok {
+		t.Fatalf("expected *TargetParent, got %T", target)
+	}
+
+	if parent.Next != nil {
+		t.Error("expected Next to be nil")
+	}
+}
+
+func TestDecodeTargetNamedChild(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	defer w.Close()
+
+	dict := pdf.Dict{
+		"R": pdf.Name("C"),
+		"N": pdf.String("embedded.pdf"),
+	}
+
+	x := pdf.NewExtractor(w)
+	target, err := DecodeTarget(x, dict)
+	if err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+
+	child, ok := target.(*TargetNamedChild)
+	if !ok {
+		t.Fatalf("expected *TargetNamedChild, got %T", target)
+	}
+
+	if string(child.Name) != "embedded.pdf" {
+		t.Errorf("Name = %v, want embedded.pdf", child.Name)
+	}
+}
+
+func TestDecodeTargetAnnotationChild(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	defer w.Close()
+
+	dict := pdf.Dict{
+		"R": pdf.Name("C"),
+		"P": pdf.Integer(5),
+		"A": pdf.String("attach"),
+	}
+
+	x := pdf.NewExtractor(w)
+	target, err := DecodeTarget(x, dict)
+	if err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+
+	child, ok := target.(*TargetAnnotationChild)
+	if !ok {
+		t.Fatalf("expected *TargetAnnotationChild, got %T", target)
+	}
+
+	if child.Page != pdf.Integer(5) {
+		t.Errorf("Page = %v, want 5", child.Page)
+	}
+
+	annotStr, ok := child.Annotation.(pdf.String)
+	if !ok {
+		t.Fatalf("Annotation is not a pdf.String, got %T", child.Annotation)
+	}
+	if string(annotStr) != "attach" {
+		t.Errorf("Annotation = %v, want attach", annotStr)
+	}
+}
