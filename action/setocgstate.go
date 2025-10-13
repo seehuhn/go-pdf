@@ -38,6 +38,8 @@ type SetOCGState struct {
 	Next ActionList
 }
 
+// ActionType returns "SetOCGState".
+// This implements the [Action] interface.
 func (a *SetOCGState) ActionType() Type { return TypeSetOCGState }
 
 func (a *SetOCGState) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

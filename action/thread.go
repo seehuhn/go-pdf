@@ -34,6 +34,8 @@ type Thread struct {
 	Next ActionList
 }
 
+// ActionType returns "Thread".
+// This implements the [Action] interface.
 func (a *Thread) ActionType() Type { return TypeThread }
 
 func (a *Thread) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

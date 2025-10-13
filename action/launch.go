@@ -45,6 +45,8 @@ type Launch struct {
 	Next ActionList
 }
 
+// ActionType returns "Launch".
+// This implements the [Action] interface.
 func (a *Launch) ActionType() Type { return TypeLaunch }
 
 func (a *Launch) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

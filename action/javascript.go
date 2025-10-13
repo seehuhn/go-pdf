@@ -32,6 +32,8 @@ type JavaScript struct {
 	Next ActionList
 }
 
+// ActionType returns "JavaScript".
+// This implements the [Action] interface.
 func (a *JavaScript) ActionType() Type { return TypeJavaScript }
 
 func (a *JavaScript) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

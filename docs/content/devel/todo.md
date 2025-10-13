@@ -8,6 +8,8 @@ weight = 100
 
 ## Next Steps
 
+- Make sure that readers cannot get into infinite loops when resources
+  depend on each other in a cycle; Extend pdf.Extractor with better loop detection.
 - Implement property lists.
 - Make Resource dictionaries file-independent.
 - make dict.Type3 file-independent
@@ -24,8 +26,6 @@ weight = 100
 
 ## General
 
-- Make sure that readers cannot get into infinite loops when resources
-  depend on each other in a cycle; Extend pdf.Extractor with better loop detection.
 - fix infinite recursion risk in halftone Type 5 extraction
 - test that we don't write numbers like `0.6000000000000001` in content streams
 - By more systematic about the use of pdf.MalformedFileError, and in

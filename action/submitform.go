@@ -37,6 +37,8 @@ type SubmitForm struct {
 	Next ActionList
 }
 
+// ActionType returns "SubmitForm".
+// This implements the [Action] interface.
 func (a *SubmitForm) ActionType() Type { return TypeSubmitForm }
 
 func (a *SubmitForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

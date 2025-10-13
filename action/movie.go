@@ -39,6 +39,8 @@ type Movie struct {
 	Next ActionList
 }
 
+// ActionType returns "Movie".
+// This implements the [Action] interface.
 func (a *Movie) ActionType() Type { return TypeMovie }
 
 func (a *Movie) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

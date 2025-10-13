@@ -35,6 +35,8 @@ type GoTo3DView struct {
 	Next ActionList
 }
 
+// ActionType returns "GoTo3DView".
+// This implements the [Action] interface.
 func (a *GoTo3DView) ActionType() Type { return TypeGoTo3DView }
 
 func (a *GoTo3DView) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

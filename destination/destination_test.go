@@ -20,9 +20,60 @@ import (
 	"math"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
+
+type testCase struct {
+	Name string
+	Dest Destination
+}
+
+var testCases = []testCase{
+	{"XYZ", &XYZ{Page: Target(pdf.Reference(10)), Left: 100, Top: 200, Zoom: 1.5}},
+	{"XYZ with Unset", &XYZ{Page: Target(pdf.Reference(10)), Left: Unset, Top: Unset, Zoom: Unset}},
+	{"Fit", &Fit{Page: Target(pdf.Reference(10))}},
+	{"FitH", &FitH{Page: Target(pdf.Reference(10)), Top: 500}},
+	{"FitV", &FitV{Page: Target(pdf.Reference(10)), Left: 100}},
+	{"FitR", &FitR{Page: Target(pdf.Reference(10)), Left: 100, Bottom: 200, Right: 400, Top: 500}},
+	{"FitB", &FitB{Page: Target(pdf.Reference(10))}},
+	{"FitBH", &FitBH{Page: Target(pdf.Reference(10)), Top: 600}},
+	{"FitBV", &FitBV{Page: Target(pdf.Reference(10)), Left: 50}},
+	{"Named", &Named{Name: pdf.String("Chapter6")}},
+}
+
+// testRoundTrip encodes a destination, decodes it back, and verifies the result
+// matches the original using cmp.Diff.
+func testRoundTrip(t *testing.T, d Destination) {
+	t.Helper()
+
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+
+	// encode
+	obj, err := d.Encode(rm)
+	if err != nil {
+		t.Fatalf("encode failed: %v", err)
+	}
+
+	// decode
+	x := pdf.NewExtractor(w)
+	decoded, err := Decode(x, obj)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+
+	// compare with custom NaN comparer
+	opts := cmp.Options{
+		cmp.Comparer(func(a, b float64) bool {
+			return a == b || (math.IsNaN(a) && math.IsNaN(b))
+		}),
+	}
+	if diff := cmp.Diff(d, decoded, opts); diff != "" {
+		t.Errorf("round-trip mismatch (-want +got):\n%s", diff)
+	}
+}
 
 func TestXYZ(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
@@ -358,7 +409,7 @@ func TestNamed(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
-	dest := &Named{Name: "Chapter6"}
+	dest := &Named{Name: pdf.String("Chapter6")}
 
 	obj, err := dest.Encode(rm)
 	if err != nil {
@@ -379,7 +430,7 @@ func TestNamedEmptyName(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
-	dest := &Named{Name: ""}
+	dest := &Named{Name: pdf.String("")}
 
 	_, err := dest.Encode(rm)
 	if err == nil {
@@ -388,92 +439,11 @@ func TestNamedEmptyName(t *testing.T) {
 }
 
 func TestRoundTrip(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	rm := pdf.NewResourceManager(w)
-	pageRef := w.Alloc()
-
-	tests := []struct {
-		name string
-		dest Destination
-	}{
-		{"XYZ", &XYZ{Page: Target(pageRef), Left: 100, Top: 200, Zoom: 1.5}},
-		{"XYZ with Unset", &XYZ{Page: Target(pageRef), Left: Unset, Top: Unset, Zoom: Unset}},
-		{"Fit", &Fit{Page: Target(pageRef)}},
-		{"FitH", &FitH{Page: Target(pageRef), Top: 500}},
-		{"FitV", &FitV{Page: Target(pageRef), Left: 100}},
-		{"FitR", &FitR{Page: Target(pageRef), Left: 100, Bottom: 200, Right: 400, Top: 500}},
-		{"FitB", &FitB{Page: Target(pageRef)}},
-		{"FitBH", &FitBH{Page: Target(pageRef), Top: 600}},
-		{"FitBV", &FitBV{Page: Target(pageRef), Left: 50}},
-		{"Named", &Named{Name: "Chapter6"}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Encode
-			obj, err := tt.dest.Encode(rm)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			// Decode
-			x := pdf.NewExtractor(w)
-			decoded, err := Decode(x, obj)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			// Compare types
-			if decoded.DestinationType() != tt.dest.DestinationType() {
-				t.Errorf("type mismatch: got %v, want %v", decoded.DestinationType(), tt.dest.DestinationType())
-			}
-
-			// Compare encoded forms
-			obj2, err := decoded.Encode(rm)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if !equalObjects(obj, obj2) {
-				t.Errorf("round trip mismatch:\noriginal: %v\ndecoded:  %v", obj, obj2)
-			}
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			testRoundTrip(t, tc.Dest)
 		})
 	}
-}
-
-func equalObjects(a, b pdf.Object) bool {
-	// Handle nil
-	if a == nil && b == nil {
-		return true
-	}
-	if a == nil || b == nil {
-		return false
-	}
-
-	// Compare arrays
-	arrA, okA := a.(pdf.Array)
-	arrB, okB := b.(pdf.Array)
-	if okA && okB {
-		if len(arrA) != len(arrB) {
-			return false
-		}
-		for i := range arrA {
-			if !equalObjects(arrA[i], arrB[i]) {
-				return false
-			}
-		}
-		return true
-	}
-
-	// Compare strings
-	strA, okA := a.(pdf.String)
-	strB, okB := b.(pdf.String)
-	if okA && okB {
-		return string(strA) == string(strB)
-	}
-
-	// Direct comparison for other types
-	return a == b
 }
 
 func TestDecodeNamedFromName(t *testing.T) {
@@ -493,7 +463,7 @@ func TestDecodeNamedFromName(t *testing.T) {
 		t.Fatalf("expected *Named, got %T", dest)
 	}
 
-	if named.Name != "Chapter6" {
+	if string(named.Name) != "Chapter6" {
 		t.Errorf("got %q, want %q", named.Name, "Chapter6")
 	}
 }

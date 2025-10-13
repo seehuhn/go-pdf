@@ -32,6 +32,8 @@ type Trans struct {
 	Next ActionList
 }
 
+// ActionType returns "Trans".
+// This implements the [Action] interface.
 func (a *Trans) ActionType() Type { return TypeTrans }
 
 func (a *Trans) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

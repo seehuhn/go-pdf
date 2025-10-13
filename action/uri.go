@@ -34,6 +34,8 @@ type URI struct {
 	Next ActionList
 }
 
+// ActionType returns "URI".
+// This implements the [Action] interface.
 func (a *URI) ActionType() Type { return TypeURI }
 
 func (a *URI) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

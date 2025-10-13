@@ -40,6 +40,8 @@ type Rendition struct {
 	Next ActionList
 }
 
+// ActionType returns "Rendition".
+// This implements the [Action] interface.
 func (a *Rendition) ActionType() Type { return TypeRendition }
 
 func (a *Rendition) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

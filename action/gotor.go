@@ -20,6 +20,7 @@ package action
 
 import (
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/file"
 )
 
@@ -29,9 +30,10 @@ type GoToR struct {
 	// F is the file specification for the target document.
 	F *file.Specification
 
-	// D is the destination to jump to (name, string, or array).
-	// For arrays, the first element is a page number, not a page reference.
-	D pdf.Object
+	// D is the destination to jump to.
+	// For explicit destinations, the page target is a page number (integer),
+	// not a page reference.
+	D destination.Destination
 
 	// SD (PDF 2.0) is the structure destination to jump to.
 	// If present, should take precedence over D.
@@ -44,6 +46,8 @@ type GoToR struct {
 	Next ActionList
 }
 
+// ActionType returns "GoToR".
+// This implements the [Action] interface.
 func (a *GoToR) ActionType() Type { return TypeGoToR }
 
 func (a *GoToR) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
@@ -62,10 +66,15 @@ func (a *GoToR) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 
+	destObj, err := a.D.Encode(rm)
+	if err != nil {
+		return nil, err
+	}
+
 	dict := pdf.Dict{
 		"S": pdf.Name(TypeGoToR),
 		"F": fn,
-		"D": a.D,
+		"D": destObj,
 	}
 
 	if a.SD != nil {
@@ -103,8 +112,11 @@ func decodeGoToR(x *pdf.Extractor, dict pdf.Dict) (*GoToR, error) {
 		return nil, pdf.Error("GoToR action missing F entry")
 	}
 
-	d := dict["D"]
-	if d == nil {
+	dest, err := destination.Decode(x, dict["D"])
+	if err != nil {
+		return nil, err
+	}
+	if dest == nil {
 		return nil, pdf.Error("GoToR action missing D entry")
 	}
 
@@ -127,7 +139,7 @@ func decodeGoToR(x *pdf.Extractor, dict pdf.Dict) (*GoToR, error) {
 
 	return &GoToR{
 		F:         f,
-		D:         d,
+		D:         dest,
 		SD:        sd,
 		NewWindow: newWindow,
 		Next:      next,

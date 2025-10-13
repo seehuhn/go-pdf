@@ -32,6 +32,8 @@ type GoToDp struct {
 	Next ActionList
 }
 
+// ActionType returns "GoToDp".
+// This implements the [Action] interface.
 func (a *GoToDp) ActionType() Type { return TypeGoToDp }
 
 func (a *GoToDp) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

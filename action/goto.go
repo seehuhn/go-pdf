@@ -33,6 +33,8 @@ type GoTo struct {
 	Next ActionList
 }
 
+// ActionType returns "GoTo".
+// This implements the [Action] interface.
 func (a *GoTo) ActionType() Type { return TypeGoTo }
 
 func (a *GoTo) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

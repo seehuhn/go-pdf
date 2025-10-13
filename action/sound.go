@@ -46,6 +46,8 @@ type Sound struct {
 	Next ActionList
 }
 
+// ActionType returns "Sound".
+// This implements the [Action] interface.
 func (a *Sound) ActionType() Type { return TypeSound }
 
 func (a *Sound) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
