@@ -64,3 +64,43 @@ func (t *TargetParent) encodeTargetSafe(rm *pdf.ResourceManager, visited map[Tar
 
 	return dict, nil
 }
+
+// TargetNamedChild navigates down to a child document by name in the EmbeddedFiles tree.
+type TargetNamedChild struct {
+	// Name is the name of the file in the EmbeddedFiles name tree.
+	Name pdf.String
+
+	// Next is the next step in the target path, or nil if this child is the final target.
+	Next Target
+}
+
+func (t *TargetNamedChild) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
+	visited := make(map[Target]bool)
+	return t.encodeTargetSafe(rm, visited)
+}
+
+func (t *TargetNamedChild) encodeTargetSafe(rm *pdf.ResourceManager, visited map[Target]bool) (pdf.Native, error) {
+	if visited[t] {
+		return nil, errTargetCycle
+	}
+	visited[t] = true
+
+	if len(t.Name) == 0 {
+		return nil, pdf.Error("TargetNamedChild must have a non-empty Name")
+	}
+
+	dict := pdf.Dict{
+		"R": pdf.Name("C"),
+		"N": t.Name,
+	}
+
+	if t.Next != nil {
+		nextDict, err := t.Next.encodeTargetSafe(rm, visited)
+		if err != nil {
+			return nil, err
+		}
+		dict["T"] = nextDict
+	}
+
+	return dict, nil
+}
