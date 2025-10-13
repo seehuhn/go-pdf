@@ -55,7 +55,7 @@ func extractType6(x *pdf.Extractor, stream *pdf.Stream) (*Type6, error) {
 
 	h := &Type6{}
 
-	if width, err := pdf.GetInteger(x.R, dict["Width"]); err != nil {
+	if width, err := x.GetInteger(dict["Width"]); err != nil {
 		return nil, err
 	} else if width > 0 && width <= 1024 {
 		h.Width = int(width)
@@ -63,7 +63,7 @@ func extractType6(x *pdf.Extractor, stream *pdf.Stream) (*Type6, error) {
 		return nil, pdf.Error("invalid Type 6 halftone Width")
 	}
 
-	if height, err := pdf.GetInteger(x.R, dict["Height"]); err != nil {
+	if height, err := x.GetInteger(dict["Height"]); err != nil {
 		return nil, err
 	} else if height > 0 && height <= 1024 {
 		h.Height = int(height)

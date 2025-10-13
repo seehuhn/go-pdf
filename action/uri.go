@@ -71,12 +71,12 @@ func (a *URI) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeURI(x *pdf.Extractor, dict pdf.Dict) (*URI, error) {
-	uri, err := pdf.GetString(x.R, dict["URI"])
+	uri, err := x.GetString(dict["URI"])
 	if err != nil {
 		return nil, err
 	}
 
-	isMap, _ := pdf.Optional(pdf.GetBoolean(x.R, dict["IsMap"]))
+	isMap, _ := pdf.Optional(x.GetBoolean(dict["IsMap"]))
 
 	next, err := DecodeActionList(x, dict["Next"])
 	if err != nil {

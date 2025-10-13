@@ -28,7 +28,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (graphics.Shading, error) {
 	// Check if original object was a reference before resolving
 	_, isIndirect := obj.(pdf.Reference)
 
-	obj, err := pdf.Resolve(x.R, obj)
+	obj, err := x.Resolve(obj)
 	if err != nil {
 		return nil, err
 	} else if obj == nil {
@@ -56,7 +56,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (graphics.Shading, error) {
 		}
 	}
 
-	stNum, err := pdf.GetInteger(x.R, st)
+	stNum, err := x.GetInteger(st)
 	if err != nil {
 		return nil, err
 	}

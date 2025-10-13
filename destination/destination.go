@@ -60,7 +60,7 @@ var Unset = math.NaN()
 // The object can be an array (explicit destination), a name/string (named destination),
 // or a dictionary with a D entry.
 func Decode(x *pdf.Extractor, obj pdf.Object) (Destination, error) {
-	obj, err := pdf.Resolve(x.R, obj)
+	obj, err := x.Resolve(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -74,14 +74,14 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (Destination, error) {
 	}
 
 	// Handle dictionary wrapper with D entry
-	if dict, _ := pdf.GetDict(x.R, obj); dict != nil {
+	if dict, _ := x.GetDict(obj); dict != nil {
 		if dObj := dict["D"]; dObj != nil {
 			obj = dObj
 		}
 	}
 
 	// Must be an array for explicit destination
-	arr, err := pdf.GetArray(x.R, obj)
+	arr, err := x.GetArray(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (Destination, error) {
 	page := Target(arr[0])
 
 	// Second element is the type name
-	typeName, err := pdf.Optional(pdf.GetName(x.R, arr[1]))
+	typeName, err := pdf.Optional(x.GetName(arr[1]))
 	if err != nil {
 		return nil, err
 	}
@@ -129,10 +129,10 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (Destination, error) {
 		if len(arr) < 6 {
 			return nil, pdf.Error("FitR destination requires 6 elements")
 		}
-		left, _ := pdf.Optional(pdf.GetNumber(x.R, arr[2]))
-		bottom, _ := pdf.Optional(pdf.GetNumber(x.R, arr[3]))
-		right, _ := pdf.Optional(pdf.GetNumber(x.R, arr[4]))
-		top, _ := pdf.Optional(pdf.GetNumber(x.R, arr[5]))
+		left, _ := pdf.Optional(x.GetNumber(arr[2]))
+		bottom, _ := pdf.Optional(x.GetNumber(arr[3]))
+		right, _ := pdf.Optional(x.GetNumber(arr[4]))
+		top, _ := pdf.Optional(x.GetNumber(arr[5]))
 		return &FitR{Page: page, Left: float64(left), Bottom: float64(bottom),
 			Right: float64(right), Top: float64(top)}, nil
 

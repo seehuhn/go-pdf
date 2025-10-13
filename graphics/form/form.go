@@ -213,7 +213,7 @@ func (f *Form) validate() error {
 
 // Extract extracts a form XObject from a PDF file.
 func Extract(x *pdf.Extractor, obj pdf.Object) (*Form, error) {
-	stream, err := pdf.GetStream(x.R, obj)
+	stream, err := x.GetStream(obj)
 	if err != nil {
 		return nil, err
 	} else if stream == nil {
@@ -223,7 +223,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Form, error) {
 	}
 	dict := stream.Dict
 
-	subtypeName, _ := pdf.GetName(x.R, dict["Subtype"])
+	subtypeName, _ := x.GetName(dict["Subtype"])
 	if subtypeName != "Form" {
 		return nil, &pdf.MalformedFileError{
 			Err: errors.New("invalid Subtype for form XObject"),
@@ -288,7 +288,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Form, error) {
 
 	// Extract StructParent
 	if keyObj := dict["StructParent"]; keyObj != nil {
-		if key, err := pdf.Optional(pdf.GetInteger(x.R, dict["StructParent"])); err != nil {
+		if key, err := pdf.Optional(x.GetInteger(dict["StructParent"])); err != nil {
 			return nil, err
 		} else {
 			form.StructParent.Set(key)
@@ -300,7 +300,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Form, error) {
 		copier := pdfcopy.NewCopier(w.RM.Out, x.R)
 
 		// Handle resources
-		origResources, err := pdf.GetDict(x.R, dict["Resources"])
+		origResources, err := x.GetDict(dict["Resources"])
 		if err != nil {
 			return err
 		}

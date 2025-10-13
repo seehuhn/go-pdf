@@ -82,7 +82,7 @@ func decodeRendition(x *pdf.Extractor, dict pdf.Dict) (*Rendition, error) {
 	an, _ := dict["AN"].(pdf.Reference)
 
 	var op *int
-	if opVal, err := pdf.Optional(pdf.GetInteger(x.R, dict["OP"])); err == nil {
+	if opVal, err := pdf.Optional(x.GetInteger(dict["OP"])); err == nil {
 		i := int(opVal)
 		op = &i
 	}

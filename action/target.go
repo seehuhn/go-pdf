@@ -160,12 +160,12 @@ func DecodeTarget(x *pdf.Extractor, obj pdf.Object) (Target, error) {
 		return nil, nil
 	}
 
-	dict, err := pdf.GetDict(x.R, obj)
+	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err
 	}
 
-	relationship, err := pdf.GetName(x.R, dict["R"])
+	relationship, err := x.GetName(dict["R"])
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +187,7 @@ func DecodeTarget(x *pdf.Extractor, obj pdf.Object) (Target, error) {
 
 	case "C":
 		// check if it's named or annotation-based
-		if name, _ := pdf.GetString(x.R, dict["N"]); name != nil {
+		if name, _ := x.GetString(dict["N"]); name != nil {
 			return &TargetNamedChild{
 				Name: name,
 				Next: next,

@@ -129,14 +129,14 @@ func decodePolygon(x *pdf.Extractor, dict pdf.Dict) (*Polygon, error) {
 	}
 
 	// Path (optional; PDF 2.0)
-	if path, err := pdf.GetArray(x.R, dict["Path"]); err == nil && len(path) > 0 {
+	if path, err := x.GetArray(dict["Path"]); err == nil && len(path) > 0 {
 		pathArrays := make([][]float64, len(path))
 		for i, pathEntry := range path {
-			if pathArray, err := pdf.GetArray(x.R, pathEntry); err == nil {
+			if pathArray, err := x.GetArray(pathEntry); err == nil {
 				if len(pathArray) > 0 {
 					coords := make([]float64, len(pathArray))
 					for j, coord := range pathArray {
-						if num, err := pdf.GetNumber(x.R, coord); err == nil {
+						if num, err := x.GetNumber(coord); err == nil {
 							coords[j] = float64(num)
 						}
 					}

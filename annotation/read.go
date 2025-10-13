@@ -22,12 +22,12 @@ import (
 
 // Decode reads an annotation from a PDF file.
 func Decode(x *pdf.Extractor, obj pdf.Object) (Annotation, error) {
-	dict, err := pdf.GetDictTyped(x.R, obj, "Annot")
+	dict, err := x.GetDictTyped(obj, "Annot")
 	if err != nil {
 		return nil, err
 	}
 
-	subtype, err := pdf.GetName(x.R, dict["Subtype"])
+	subtype, err := x.GetName(dict["Subtype"])
 	if err != nil {
 		return nil, err
 	}

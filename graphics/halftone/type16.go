@@ -63,7 +63,7 @@ func extractType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
 	h := &Type16{}
 
 	if width, ok := stream.Dict["Width"]; ok {
-		widthVal, err := pdf.GetInteger(x.R, width)
+		widthVal, err := x.GetInteger(width)
 		if err != nil {
 			return nil, err
 		}
@@ -71,7 +71,7 @@ func extractType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
 	}
 
 	if height, ok := stream.Dict["Height"]; ok {
-		heightVal, err := pdf.GetInteger(x.R, height)
+		heightVal, err := x.GetInteger(height)
 		if err != nil {
 			return nil, err
 		}
@@ -79,7 +79,7 @@ func extractType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
 	}
 
 	if width2, ok := stream.Dict["Width2"]; ok {
-		width2Val, err := pdf.GetInteger(x.R, width2)
+		width2Val, err := x.GetInteger(width2)
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +87,7 @@ func extractType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
 	}
 
 	if height2, ok := stream.Dict["Height2"]; ok {
-		height2Val, err := pdf.GetInteger(x.R, height2)
+		height2Val, err := x.GetInteger(height2)
 		if err != nil {
 			return nil, err
 		}

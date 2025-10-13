@@ -19,6 +19,7 @@ package pdf
 import (
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 )
 
@@ -214,7 +215,7 @@ func NewCycleChecker() *CycleChecker {
 // Check examines the given PDF object for circular references. If the object
 // is not a reference (i.e., it's a direct value), Check returns nil immediately.
 // If the object is a reference that has already been seen by this CycleChecker,
-// Check returns ErrCycle. Otherwise, Check marks the reference as seen and
+// Check returns ErrCycle0. Otherwise, Check marks the reference as seen and
 // returns nil.
 //
 // This method should be called before recursively processing any PDF object
@@ -231,15 +232,16 @@ func (s *CycleChecker) Check(obj Object) error {
 	return nil
 }
 
-var ErrCycle = &MalformedFileError{
-	Err: errors.New("cycle in recursive structure"),
-}
+var ErrCycle = errors.New("cycle in recursive structure")
 
 // Extractor caches extracted PDF objects to ensure that extracting the same
-// reference multiple times returns the same Go object.
+// reference multiple times returns the same Go object. It also detects cycles
+// in PDF object structures to prevent infinite recursion.
 type Extractor struct {
-	R     Getter
-	cache map[extractorKey]any
+	R          Getter
+	IsIndirect bool
+	cache      map[extractorKey]any
+	path       map[Reference]bool
 }
 
 type extractorKey struct {
@@ -253,19 +255,15 @@ func NewExtractor(r Getter) *Extractor {
 	return &Extractor{
 		R:     r,
 		cache: make(map[extractorKey]any),
+		path:  make(map[Reference]bool),
 	}
 }
 
-func ExtractorGet[T Embedder](x *Extractor, obj Object, extract func(*Extractor, Object) (T, error)) (T, error) {
+func ExtractorGet[T any](x *Extractor, obj Object, extract func(*Extractor, Object) (T, error)) (T, error) {
 	var zero T
 	tp := reflect.TypeFor[T]()
 
-	// We need to keep the information whether the original object was a
-	// reference, in order to correctly set any SingleUse fields.
-	origObj := obj
-
 	var refs []Reference
-	count := 0
 	for {
 		ref, ok := obj.(Reference)
 		if !ok {
@@ -277,14 +275,16 @@ func ExtractorGet[T Embedder](x *Extractor, obj Object, extract func(*Extractor,
 			return v.(T), nil
 		}
 
-		refs = append(refs, ref)
-		count++
-		if count > maxRefDepth {
+		// check for cycle
+		if x.path[ref] {
 			return zero, &MalformedFileError{
-				Err: errors.New("too many levels of indirection"),
+				Err: ErrCycle,
 				Loc: []string{"object " + ref.String()},
 			}
 		}
+
+		refs = append(refs, ref)
+		x.path[ref] = true
 
 		var err error
 		obj, err = x.R.Get(ref, true)
@@ -293,11 +293,19 @@ func ExtractorGet[T Embedder](x *Extractor, obj Object, extract func(*Extractor,
 		}
 	}
 
-	res, err := extract(x, origObj)
+	x.IsIndirect = len(refs) > 0
+	res, err := extract(x, obj)
+
+	// cleanup path
+	for _, ref := range refs {
+		delete(x.path, ref)
+	}
+
 	if err != nil {
 		return zero, err
 	}
 
+	// cache under all refs
 	for _, ref := range refs {
 		key := extractorKey{ref: ref, tp: tp}
 		x.cache[key] = res
@@ -308,4 +316,191 @@ func ExtractorGet[T Embedder](x *Extractor, obj Object, extract func(*Extractor,
 
 func ExtractorGetOptional[T Embedder](x *Extractor, obj Object, extract func(*Extractor, Object) (T, error)) (T, error) {
 	return Optional(ExtractorGet(x, obj, extract))
+}
+
+// Resolve resolves references to indirect objects with cycle detection.
+//
+// If obj is a [Reference], the function reads the corresponding object from
+// the file and returns the result. If obj is not a [Reference], it is
+// returned unchanged. The function recursively follows chains of references
+// until it resolves to a non-reference object.
+//
+// If a reference loop is encountered, the function returns an error of type
+// [MalformedFileError].
+func (x *Extractor) Resolve(obj Object) (Native, error) {
+	if obj == nil {
+		return nil, nil
+	}
+
+	ref, isReference := obj.(Reference)
+	if !isReference {
+		return obj.AsPDF(0), nil
+	}
+
+	var refs []Reference
+	var result Native
+	var err error
+
+	for {
+		if x.path[ref] {
+			err = &MalformedFileError{
+				Err: ErrCycle,
+				Loc: []string{"object " + ref.String()},
+			}
+			break
+		}
+
+		refs = append(refs, ref)
+		x.path[ref] = true
+
+		next, getErr := x.R.Get(ref, true)
+		if getErr != nil {
+			err = getErr
+			break
+		}
+
+		if ref, isReference = next.(Reference); !isReference {
+			result = next
+			break
+		}
+	}
+
+	// cleanup
+	for _, r := range refs {
+		delete(x.path, r)
+	}
+
+	return result, err
+}
+
+func extractorResolveAndCast[T Native](x *Extractor, obj Object) (T, error) {
+	var zero T
+	resolved, err := x.Resolve(obj)
+	if err != nil {
+		return zero, err
+	}
+
+	if resolved == nil {
+		return zero, nil
+	}
+
+	result, ok := resolved.(T)
+	if !ok {
+		return zero, &MalformedFileError{
+			Err: fmt.Errorf("expected %T but got %T", zero, resolved),
+		}
+	}
+
+	return result, nil
+}
+
+// GetArray resolves any indirect reference and returns the object as an Array.
+// If obj is nil, the function returns nil, nil.
+func (x *Extractor) GetArray(obj Object) (Array, error) {
+	return extractorResolveAndCast[Array](x, obj)
+}
+
+// GetBoolean resolves any indirect reference and returns the object as a Boolean.
+// If obj is nil, the function returns false, nil.
+func (x *Extractor) GetBoolean(obj Object) (Boolean, error) {
+	return extractorResolveAndCast[Boolean](x, obj)
+}
+
+// GetDict resolves any indirect reference and returns the object as a Dict.
+// If obj is nil, the function returns nil, nil.
+func (x *Extractor) GetDict(obj Object) (Dict, error) {
+	return extractorResolveAndCast[Dict](x, obj)
+}
+
+// GetDictTyped resolves any indirect reference and checks that the resulting
+// object is a dictionary. The function also checks that the "Type" entry of
+// the dictionary, if set, is equal to the given type.
+//
+// If the object is nil, the function returns nil, nil.
+func (x *Extractor) GetDictTyped(obj Object, tp Name) (Dict, error) {
+	dict, err := x.GetDict(obj)
+	if dict == nil || err != nil {
+		return nil, err
+	}
+
+	haveType, err := x.GetName(dict["Type"])
+	if err != nil {
+		return nil, err
+	}
+	if haveType != tp && haveType != "" {
+		return nil, &MalformedFileError{
+			Err: fmt.Errorf("expected dict type %q, got %q", tp, haveType),
+		}
+	}
+
+	return dict, nil
+}
+
+// GetName resolves any indirect reference and returns the object as a Name.
+// If obj is nil, the function returns "", nil.
+func (x *Extractor) GetName(obj Object) (Name, error) {
+	return extractorResolveAndCast[Name](x, obj)
+}
+
+// GetReal resolves any indirect reference and returns the object as a Real.
+// If obj is nil, the function returns 0, nil.
+func (x *Extractor) GetReal(obj Object) (Real, error) {
+	return extractorResolveAndCast[Real](x, obj)
+}
+
+// GetStream resolves any indirect reference and returns the object as a Stream.
+// If obj is nil, the function returns nil, nil.
+func (x *Extractor) GetStream(obj Object) (*Stream, error) {
+	return extractorResolveAndCast[*Stream](x, obj)
+}
+
+// GetString resolves any indirect reference and returns the object as a String.
+// If obj is nil, the function returns "", nil.
+func (x *Extractor) GetString(obj Object) (String, error) {
+	return extractorResolveAndCast[String](x, obj)
+}
+
+// GetInteger resolves any indirect reference and returns the object as an Integer.
+// If obj is nil, the function returns 0, nil.
+// Integers are returned as is.
+// Floating point values are silently rounded to the nearest integer.
+// All other object types result in an error.
+func (x *Extractor) GetInteger(obj Object) (Integer, error) {
+	resolved, err := x.Resolve(obj)
+	if resolved == nil {
+		return 0, err
+	}
+
+	switch val := resolved.(type) {
+	case Integer:
+		return val, nil
+	case Real:
+		return Integer(math.Round(float64(val))), nil
+	default:
+		return 0, &MalformedFileError{
+			Err: fmt.Errorf("expected Integer but got %T", resolved),
+		}
+	}
+}
+
+// GetNumber resolves any indirect reference and returns the object as a float64.
+// If obj is nil, the function returns 0, nil.
+// Both Integer and Real values are converted to float64.
+// All other object types result in an error.
+func (x *Extractor) GetNumber(obj Object) (float64, error) {
+	resolved, err := x.Resolve(obj)
+	if resolved == nil {
+		return 0, err
+	}
+
+	switch val := resolved.(type) {
+	case Integer:
+		return float64(val), nil
+	case Real:
+		return float64(val), nil
+	default:
+		return 0, &MalformedFileError{
+			Err: fmt.Errorf("expected Number but got %T", resolved),
+		}
+	}
 }

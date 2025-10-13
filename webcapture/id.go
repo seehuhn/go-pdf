@@ -31,7 +31,7 @@ type Identifier struct {
 
 // ExtractIdentifier extracts an identifier from a PDF byte string object.
 func ExtractIdentifier(x *pdf.Extractor, obj pdf.Object) (*Identifier, error) {
-	str, err := pdf.Optional(pdf.GetString(x.R, obj))
+	str, err := pdf.Optional(x.GetString(obj))
 	if err != nil {
 		return nil, err
 	}

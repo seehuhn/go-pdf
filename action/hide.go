@@ -76,7 +76,7 @@ func decodeHide(x *pdf.Extractor, dict pdf.Dict) (*Hide, error) {
 
 	h := true // default value
 	if dict["H"] != nil {
-		hVal, _ := pdf.Optional(pdf.GetBoolean(x.R, dict["H"]))
+		hVal, _ := pdf.Optional(x.GetBoolean(dict["H"]))
 		h = bool(hVal)
 	}
 

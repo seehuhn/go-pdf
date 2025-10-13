@@ -92,13 +92,13 @@ func decodeSound(x *pdf.Extractor, dict pdf.Dict) (*Sound, error) {
 	}
 
 	volume := 1.0
-	if v, err := pdf.Optional(pdf.GetNumber(x.R, dict["Volume"])); err == nil {
+	if v, err := pdf.Optional(x.GetNumber(dict["Volume"])); err == nil {
 		volume = float64(v)
 	}
 
-	synchronous, _ := pdf.Optional(pdf.GetBoolean(x.R, dict["Synchronous"]))
-	repeat, _ := pdf.Optional(pdf.GetBoolean(x.R, dict["Repeat"]))
-	mix, _ := pdf.Optional(pdf.GetBoolean(x.R, dict["Mix"]))
+	synchronous, _ := pdf.Optional(x.GetBoolean(dict["Synchronous"]))
+	repeat, _ := pdf.Optional(x.GetBoolean(dict["Repeat"]))
+	mix, _ := pdf.Optional(x.GetBoolean(dict["Mix"]))
 
 	next, err := DecodeActionList(x, dict["Next"])
 	if err != nil {

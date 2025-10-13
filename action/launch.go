@@ -103,11 +103,11 @@ func decodeLaunch(x *pdf.Extractor, dict pdf.Dict) (*Launch, error) {
 		return nil, err
 	}
 
-	win, _ := pdf.GetDict(x.R, dict["Win"])
+	win, _ := x.GetDict(dict["Win"])
 
 	newWindow := NewWindowDefault
 	if dict["NewWindow"] != nil {
-		nw, _ := pdf.Optional(pdf.GetBoolean(x.R, dict["NewWindow"]))
+		nw, _ := pdf.Optional(x.GetBoolean(dict["NewWindow"]))
 		if nw {
 			newWindow = NewWindowNew
 		} else {

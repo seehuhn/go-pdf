@@ -106,14 +106,14 @@ func decodePolyline(x *pdf.Extractor, dict pdf.Dict) (*PolyLine, error) {
 
 	// LE (optional; PDF 1.4) - default is [None, None]
 	polyline.LineEndingStyle = [2]LineEndingStyle{LineEndingStyleNone, LineEndingStyleNone}
-	if le, err := pdf.Optional(pdf.GetArray(x.R, dict["LE"])); err != nil {
+	if le, err := pdf.Optional(x.GetArray(dict["LE"])); err != nil {
 		return nil, err
 	} else if len(le) >= 1 {
-		if name, err := pdf.GetName(x.R, le[0]); err == nil {
+		if name, err := x.GetName(le[0]); err == nil {
 			polyline.LineEndingStyle[0] = LineEndingStyle(name)
 		}
 		if len(le) >= 2 {
-			if name, err := pdf.GetName(x.R, le[1]); err == nil {
+			if name, err := x.GetName(le[1]); err == nil {
 				polyline.LineEndingStyle[1] = LineEndingStyle(name)
 			}
 		} else {
@@ -146,7 +146,7 @@ func decodePolyline(x *pdf.Extractor, dict pdf.Dict) (*PolyLine, error) {
 	}
 
 	// Path (optional; PDF 2.0)
-	if path, err := pdf.GetArray(x.R, dict["Path"]); err == nil && len(path) > 0 {
+	if path, err := x.GetArray(dict["Path"]); err == nil && len(path) > 0 {
 		pathArrays := make([][]float64, 0, len(path))
 		for _, pathEntry := range path {
 			if coords, err := pdf.GetFloatArray(x.R, pathEntry); err == nil {

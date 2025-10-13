@@ -64,7 +64,7 @@ var _ graphics.Image = (*Thumbnail)(nil)
 
 // ExtractThumbnail reads a thumbnail image from a PDF object.
 func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
-	stm, err := pdf.GetStream(x.R, obj)
+	stm, err := x.GetStream(obj)
 	if err != nil {
 		return nil, err
 	} else if stm == nil {
@@ -77,7 +77,7 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
 	if err := pdf.CheckDictType(x.R, dict, "XObject"); err != nil {
 		return nil, err
 	}
-	if subtypeName, err := pdf.Optional(pdf.GetName(x.R, dict["Subtype"])); err != nil {
+	if subtypeName, err := pdf.Optional(x.GetName(dict["Subtype"])); err != nil {
 		return nil, err
 	} else if subtypeName != "Image" && subtypeName != "" {
 		return nil, &pdf.MalformedFileError{
@@ -88,7 +88,7 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
 	thumb := &Thumbnail{}
 
 	// width (required)
-	width, err := pdf.GetInteger(x.R, dict["Width"])
+	width, err := x.GetInteger(dict["Width"])
 	if err != nil {
 		return nil, err
 	} else if width <= 0 {
@@ -97,7 +97,7 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
 	thumb.Width = int(width)
 
 	// height (required)
-	height, err := pdf.GetInteger(x.R, dict["Height"])
+	height, err := x.GetInteger(dict["Height"])
 	if err != nil {
 		return nil, err
 	} else if height <= 0 {
@@ -120,7 +120,7 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
 	thumb.ColorSpace = cs
 
 	// bits per component (required)
-	bpc, err := pdf.GetInteger(x.R, dict["BitsPerComponent"])
+	bpc, err := x.GetInteger(dict["BitsPerComponent"])
 	if err != nil {
 		return nil, err
 	} else if !isValidBitsPerComponent(int(bpc)) {
@@ -129,7 +129,7 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
 	thumb.BitsPerComponent = int(bpc)
 
 	// decode array (optional)
-	if decodeArray, err := pdf.Optional(pdf.GetArray(x.R, dict["Decode"])); err != nil {
+	if decodeArray, err := pdf.Optional(x.GetArray(dict["Decode"])); err != nil {
 		return nil, err
 	} else if decodeArray != nil {
 		expectedLen := 2 * cs.Channels()
@@ -139,13 +139,13 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
 		} else {
 			decode := make([]float64, len(decodeArray))
 			for i, val := range decodeArray {
-				num, err := pdf.GetNumber(x.R, val)
+				num, err := x.GetNumber(val)
 				if err != nil {
 					// ignore malformed decode array
 					decode = nil
 					break
 				}
-				decode[i] = float64(num)
+				decode[i] = num
 			}
 			thumb.Decode = decode
 		}

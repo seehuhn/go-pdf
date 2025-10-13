@@ -54,7 +54,7 @@ type ItemValue struct {
 
 // ExtractItemDict extracts a collection item dictionary from a PDF object.
 func ExtractItemDict(x *pdf.Extractor, obj pdf.Object) (*ItemDict, error) {
-	dict, err := pdf.GetDictTyped(x.R, obj, "CollectionItem")
+	dict, err := x.GetDictTyped(obj, "CollectionItem")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -84,7 +84,7 @@ func ExtractItemDict(x *pdf.Extractor, obj pdf.Object) (*ItemDict, error) {
 
 // extractItemValue extracts a single item value from a PDF object.
 func extractItemValue(x *pdf.Extractor, obj pdf.Object) (*ItemValue, error) {
-	resolved, err := pdf.Resolve(x.R, obj)
+	resolved, err := x.Resolve(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func extractItemValue(x *pdf.Extractor, obj pdf.Object) (*ItemValue, error) {
 		}
 
 		// Resolve the D entry
-		if resolved, err := pdf.Resolve(x.R, data); err != nil {
+		if resolved, err := x.Resolve(data); err != nil {
 			return nil, err
 		} else {
 			data = resolved

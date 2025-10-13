@@ -59,7 +59,7 @@ func (a *Named) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeNamed(x *pdf.Extractor, dict pdf.Dict) (*Named, error) {
-	n, err := pdf.GetName(x.R, dict["N"])
+	n, err := x.GetName(dict["N"])
 	if err != nil {
 		return nil, err
 	}

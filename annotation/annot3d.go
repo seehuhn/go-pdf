@@ -236,43 +236,43 @@ func decodeAnnot3D(x *pdf.Extractor, dict pdf.Dict) (*Annot3D, error) {
 
 	// 3DA (optional)
 	if dict["3DA"] != nil {
-		if threeDa, err := pdf.GetDict(x.R, dict["3DA"]); err == nil {
+		if threeDa, err := x.GetDict(dict["3DA"]); err == nil {
 			activation := &Annot3DActivation{
 				TB: true, // default value
 			}
 
 			// A (optional) - default XA
-			if a, err := pdf.GetName(x.R, threeDa["A"]); err == nil {
+			if a, err := x.GetName(threeDa["A"]); err == nil {
 				activation.A = a
 			}
 
 			// AIS (optional) - default L
-			if ais, err := pdf.GetName(x.R, threeDa["AIS"]); err == nil {
+			if ais, err := x.GetName(threeDa["AIS"]); err == nil {
 				activation.AIS = ais
 			}
 
 			// D (optional) - default PI
-			if d, err := pdf.GetName(x.R, threeDa["D"]); err == nil {
+			if d, err := x.GetName(threeDa["D"]); err == nil {
 				activation.D = d
 			}
 
 			// DIS (optional) - default U
-			if dis, err := pdf.GetName(x.R, threeDa["DIS"]); err == nil {
+			if dis, err := x.GetName(threeDa["DIS"]); err == nil {
 				activation.DIS = dis
 			}
 
 			// TB (optional, PDF 1.7) - default true
-			if tb, err := pdf.GetBoolean(x.R, threeDa["TB"]); err == nil {
+			if tb, err := x.GetBoolean(threeDa["TB"]); err == nil {
 				activation.TB = bool(tb)
 			}
 
 			// NP (optional, PDF 1.7) - default false
-			if np, err := pdf.GetBoolean(x.R, threeDa["NP"]); err == nil {
+			if np, err := x.GetBoolean(threeDa["NP"]); err == nil {
 				activation.NP = bool(np)
 			}
 
 			// Style (optional, PDF 2.0) - default Embedded
-			if style, err := pdf.GetName(x.R, threeDa["Style"]); err == nil {
+			if style, err := x.GetName(threeDa["Style"]); err == nil {
 				activation.Style = style
 			}
 
@@ -282,7 +282,7 @@ func decodeAnnot3D(x *pdf.Extractor, dict pdf.Dict) (*Annot3D, error) {
 			}
 
 			// Transparent (optional, PDF 2.0) - default false
-			if transparent, err := pdf.GetBoolean(x.R, threeDa["Transparent"]); err == nil {
+			if transparent, err := x.GetBoolean(threeDa["Transparent"]); err == nil {
 				activation.Transparent = bool(transparent)
 			}
 
@@ -293,7 +293,7 @@ func decodeAnnot3D(x *pdf.Extractor, dict pdf.Dict) (*Annot3D, error) {
 	// 3DI (optional) - default true
 	annot3D.I = true // default value
 	if dict["3DI"] != nil {
-		if threeDI, err := pdf.GetBoolean(x.R, dict["3DI"]); err == nil {
+		if threeDI, err := x.GetBoolean(dict["3DI"]); err == nil {
 			annot3D.I = bool(threeDI)
 		}
 	}

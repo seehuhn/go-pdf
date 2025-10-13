@@ -73,7 +73,7 @@ var _ Dict = (*Type3)(nil)
 
 // extractType3 reads a Type 3 font dictionary from a PDF file.
 func extractType3(x *pdf.Extractor, obj pdf.Object) (*Type3, error) {
-	fontDict, err := pdf.GetDictTyped(x.R, obj, "Font")
+	fontDict, err := x.GetDictTyped(obj, "Font")
 	if err != nil {
 		return nil, err
 	} else if fontDict == nil {
@@ -81,7 +81,7 @@ func extractType3(x *pdf.Extractor, obj pdf.Object) (*Type3, error) {
 			Err: errors.New("missing font dictionary"),
 		}
 	}
-	subtype, err := pdf.GetName(x.R, fontDict["Subtype"])
+	subtype, err := x.GetName(fontDict["Subtype"])
 	if err != nil {
 		return nil, err
 	}
@@ -91,9 +91,9 @@ func extractType3(x *pdf.Extractor, obj pdf.Object) (*Type3, error) {
 
 	d := &Type3{}
 
-	d.Name, _ = pdf.GetName(x.R, fontDict["Name"])
+	d.Name, _ = x.GetName(fontDict["Name"])
 
-	fdDict, err := pdf.GetDictTyped(x.R, fontDict["FontDescriptor"], "FontDescriptor")
+	fdDict, err := x.GetDictTyped(fontDict["FontDescriptor"], "FontDescriptor")
 	if pdf.IsReadError(err) {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func extractType3(x *pdf.Extractor, obj pdf.Object) (*Type3, error) {
 
 	d.ToUnicode, _ = cmap.ExtractToUnicode(x.R, fontDict["ToUnicode"])
 
-	charProcs, err := pdf.GetDict(x.R, fontDict["CharProcs"])
+	charProcs, err := x.GetDict(fontDict["CharProcs"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "CharProcs")
 	}

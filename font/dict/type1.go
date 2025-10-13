@@ -75,7 +75,7 @@ var _ Dict = (*Type1)(nil)
 
 // extractType1 reads a Type 1 font dictionary from a PDF file.
 func extractType1(x *pdf.Extractor, obj pdf.Object) (*Type1, error) {
-	fontDict, err := pdf.GetDictTyped(x.R, obj, "Font")
+	fontDict, err := x.GetDictTyped(obj, "Font")
 	if err != nil {
 		return nil, err
 	} else if fontDict == nil {
@@ -83,7 +83,7 @@ func extractType1(x *pdf.Extractor, obj pdf.Object) (*Type1, error) {
 			Err: errors.New("missing font dictionary"),
 		}
 	}
-	subtype, err := pdf.GetName(x.R, fontDict["Subtype"])
+	subtype, err := x.GetName(fontDict["Subtype"])
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func extractType1(x *pdf.Extractor, obj pdf.Object) (*Type1, error) {
 
 	d := &Type1{}
 
-	baseFont, err := pdf.GetName(x.R, fontDict["BaseFont"])
+	baseFont, err := x.GetName(fontDict["BaseFont"])
 	if err != nil {
 		return nil, err
 	}
@@ -104,14 +104,14 @@ func extractType1(x *pdf.Extractor, obj pdf.Object) (*Type1, error) {
 		d.PostScriptName = string(baseFont)
 	}
 
-	d.Name, _ = pdf.GetName(x.R, fontDict["Name"])
+	d.Name, _ = x.GetName(fontDict["Name"])
 
 	// StdInfo will be non-nil, if the PostScript name indicates one of the
 	// standard 14 fonts. In this case, we use the corresponding metrics as
 	// default values, in case they are missing from the font dictionary.
 	stdInfo := stdmtx.Metrics[d.PostScriptName]
 
-	fdDict, err := pdf.GetDictTyped(x.R, fontDict["FontDescriptor"], "FontDescriptor")
+	fdDict, err := x.GetDictTyped(fontDict["FontDescriptor"], "FontDescriptor")
 	if pdf.IsReadError(err) {
 		return nil, err
 	}

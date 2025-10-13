@@ -56,9 +56,10 @@ var _ pdf.Embedder = (*Membership)(nil)
 
 // ExtractMembership extracts an optional content membership dictionary from a PDF object.
 func ExtractMembership(x *pdf.Extractor, obj pdf.Object) (*Membership, error) {
+	// check if obj is indirect before resolving
 	_, isIndirect := obj.(pdf.Reference)
 
-	dict, err := pdf.GetDictTyped(x.R, obj, "OCMD")
+	dict, err := x.GetDictTyped(obj, "OCMD")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -67,7 +68,7 @@ func ExtractMembership(x *pdf.Extractor, obj pdf.Object) (*Membership, error) {
 
 	m := &Membership{}
 
-	ocgsObj, err := pdf.Resolve(x.R, dict["OCGs"])
+	ocgsObj, err := x.Resolve(dict["OCGs"])
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +90,7 @@ func ExtractMembership(x *pdf.Extractor, obj pdf.Object) (*Membership, error) {
 		}
 	}
 
-	if pName, err := pdf.Optional(pdf.GetName(x.R, dict["P"])); err != nil {
+	if pName, err := pdf.Optional(x.GetName(dict["P"])); err != nil {
 		return nil, err
 	} else {
 		switch Policy(pName) {
@@ -106,7 +107,8 @@ func ExtractMembership(x *pdf.Extractor, obj pdf.Object) (*Membership, error) {
 		m.VE = ve
 	}
 
-	m.SingleUse = !isIndirect
+	// obj is indirect if passed as a reference or accessed through one
+	m.SingleUse = !isIndirect && !x.IsIndirect
 
 	return m, nil
 }

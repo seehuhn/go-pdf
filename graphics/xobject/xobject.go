@@ -24,7 +24,7 @@ import (
 )
 
 func Extract(x *pdf.Extractor, obj pdf.Object) (graphics.XObject, error) {
-	stm, err := pdf.GetStream(x.R, obj)
+	stm, err := x.GetStream(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +33,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (graphics.XObject, error) {
 		return nil, err
 	}
 
-	subtype, err := pdf.GetName(x.R, stm.Dict["Subtype"])
+	subtype, err := x.GetName(stm.Dict["Subtype"])
 	if err != nil {
 		return nil, err
 	}

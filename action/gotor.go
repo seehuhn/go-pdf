@@ -120,11 +120,11 @@ func decodeGoToR(x *pdf.Extractor, dict pdf.Dict) (*GoToR, error) {
 		return nil, pdf.Error("GoToR action missing D entry")
 	}
 
-	sd, _ := pdf.GetArray(x.R, dict["SD"])
+	sd, _ := x.GetArray(dict["SD"])
 
 	newWindow := NewWindowDefault
 	if dict["NewWindow"] != nil {
-		nw, _ := pdf.Optional(pdf.GetBoolean(x.R, dict["NewWindow"]))
+		nw, _ := pdf.Optional(x.GetBoolean(dict["NewWindow"]))
 		if nw {
 			newWindow = NewWindowNew
 		} else {

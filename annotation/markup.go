@@ -196,14 +196,14 @@ func decodeMarkup(x *pdf.Extractor, dict pdf.Dict, markup *Markup) error {
 	}
 
 	// RT (optional)
-	if rt, err := pdf.Optional(pdf.GetName(x.R, dict["RT"])); err != nil {
+	if rt, err := pdf.Optional(x.GetName(dict["RT"])); err != nil {
 		return err
 	} else {
 		markup.RT = rt
 	}
 
 	// IT (optional)
-	if it, err := pdf.Optional(pdf.GetName(x.R, dict["IT"])); err != nil {
+	if it, err := pdf.Optional(x.GetName(dict["IT"])); err != nil {
 		return err
 	} else {
 		markup.Intent = it

@@ -17,6 +17,7 @@
 package pdf_test
 
 import (
+	"errors"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -107,5 +108,78 @@ func TestResourceManager(t *testing.T) {
 
 	if font1["X"] != font2["X"] {
 		t.Errorf("%s != %s", pdf.AsString(font1), pdf.AsString(font2))
+	}
+}
+
+// TestExtractorResolveCycle tests that Extractor.Resolve detects reference cycles.
+func TestExtractorResolveCycle(t *testing.T) {
+	// create a PDF with a cycle: A -> B -> A
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+	refA := w.Alloc()
+	refB := w.Alloc()
+
+	err := w.Put(refA, refB)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = w.Put(refB, refA)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// use the writer as a getter and try to resolve the cycle
+	x := pdf.NewExtractor(w)
+	_, err = x.Resolve(refA)
+	if err == nil {
+		t.Fatal("expected cycle error, got nil")
+	}
+	if !errors.Is(err, pdf.ErrCycle) {
+		t.Errorf("expected cycle error, got %v", err)
+	}
+}
+
+// TestExtractorGetArrayCycle tests that Extractor.GetArray detects cycles.
+func TestExtractorGetArrayCycle(t *testing.T) {
+	// create a PDF with a cycle in an array
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+	refA := w.Alloc()
+	err := w.Put(refA, pdf.Array{pdf.Integer(1), refA})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// use the writer as a getter and try to resolve
+	x := pdf.NewExtractor(w)
+
+	extract := func(x *pdf.Extractor, obj pdf.Object) (pdf.Array, error) {
+		arr, err := x.GetArray(obj.AsPDF(0))
+		if err != nil {
+			return nil, err
+		}
+		for i := range arr {
+			arr[i], err = x.Resolve(arr[i])
+			if err != nil {
+				return nil, err
+			}
+		}
+		return arr, nil
+	}
+
+	_, err = pdf.ExtractorGet(x, refA, extract)
+	if !errors.Is(err, pdf.ErrCycle) {
+		t.Errorf("expected cycle error, got %v", err)
 	}
 }

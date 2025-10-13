@@ -60,7 +60,7 @@ var _ pdf.Embedder = (*Stream)(nil)
 // The dictType parameter specifies the font dictionary type (e.g., "Type1", "TrueType", "Type0").
 // The fdKey parameter specifies the font descriptor key ("FontFile", "FontFile2" or "FontFile3").
 func ExtractStream(x *pdf.Extractor, obj pdf.Object, dictType, fdKey pdf.Name) (*Stream, error) {
-	stm, err := pdf.Optional(pdf.GetStream(x.R, obj))
+	stm, err := pdf.Optional(x.GetStream(obj))
 	if err != nil {
 		return nil, err
 	} else if stm == nil {

@@ -144,7 +144,7 @@ func extractType1(x *pdf.Extractor, d pdf.Dict, wasReference bool) (*Type1, erro
 
 	// Read optional AntiAlias
 	if aaObj, ok := d["AntiAlias"]; ok {
-		if aa, err := pdf.Optional(pdf.GetBoolean(x.R, aaObj)); err != nil {
+		if aa, err := pdf.Optional(x.GetBoolean(aaObj)); err != nil {
 			return nil, err
 		} else {
 			s.AntiAlias = bool(aa)
@@ -152,9 +152,8 @@ func extractType1(x *pdf.Extractor, d pdf.Dict, wasReference bool) (*Type1, erro
 		// Invalid antiAlias values are ignored, using zero value (false)
 	}
 
-	// Set SingleUse based on whether the original object was a reference
-	// True for direct dictionaries, false for references
-	s.SingleUse = !wasReference
+	// obj is indirect if passed as a reference or accessed through one
+	s.SingleUse = !wasReference && !x.IsIndirect
 
 	return s, nil
 }

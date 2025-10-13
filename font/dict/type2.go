@@ -95,7 +95,7 @@ var _ Dict = (*CIDFontType2)(nil)
 
 // extractCIDFontType2 reads a Type 2 CIDFont dictionary from the PDF file.
 func extractCIDFontType2(x *pdf.Extractor, obj pdf.Object) (*CIDFontType2, error) {
-	fontDict, err := pdf.GetDictTyped(x.R, obj, "Font")
+	fontDict, err := x.GetDictTyped(obj, "Font")
 	if err != nil {
 		return nil, err
 	} else if fontDict == nil {
@@ -103,7 +103,7 @@ func extractCIDFontType2(x *pdf.Extractor, obj pdf.Object) (*CIDFontType2, error
 			Err: errors.New("missing font dictionary"),
 		}
 	}
-	subtype, err := pdf.GetName(x.R, fontDict["Subtype"])
+	subtype, err := x.GetName(fontDict["Subtype"])
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func extractCIDFontType2(x *pdf.Extractor, obj pdf.Object) (*CIDFontType2, error
 		}
 	}
 
-	a, err := pdf.GetArray(x.R, fontDict["DescendantFonts"])
+	a, err := x.GetArray(fontDict["DescendantFonts"])
 	if err != nil {
 		return nil, err
 	} else if len(a) != 1 {
@@ -121,7 +121,7 @@ func extractCIDFontType2(x *pdf.Extractor, obj pdf.Object) (*CIDFontType2, error
 			Err: errors.New("invalid DescendantFonts array"),
 		}
 	}
-	cidFontDict, err := pdf.GetDictTyped(x.R, a[0], "Font")
+	cidFontDict, err := x.GetDictTyped(a[0], "Font")
 	if err != nil {
 		return nil, err
 	} else if cidFontDict == nil {
@@ -129,7 +129,7 @@ func extractCIDFontType2(x *pdf.Extractor, obj pdf.Object) (*CIDFontType2, error
 			Err: errors.New("missing CIDFont dictionary"),
 		}
 	}
-	subtype, err = pdf.GetName(x.R, cidFontDict["Subtype"])
+	subtype, err = x.GetName(cidFontDict["Subtype"])
 	if err != nil {
 		return nil, err
 	} else if subtype != "CIDFontType2" {
@@ -151,7 +151,7 @@ func extractCIDFontType2(x *pdf.Extractor, obj pdf.Object) (*CIDFontType2, error
 
 	// fields in the CIDFont dictionary
 
-	baseFont, err := pdf.GetName(x.R, cidFontDict["BaseFont"])
+	baseFont, err := x.GetName(cidFontDict["BaseFont"])
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +162,7 @@ func extractCIDFontType2(x *pdf.Extractor, obj pdf.Object) (*CIDFontType2, error
 		d.PostScriptName = string(baseFont)
 	}
 
-	fdDict, err := pdf.GetDictTyped(x.R, cidFontDict["FontDescriptor"], "FontDescriptor")
+	fdDict, err := x.GetDictTyped(cidFontDict["FontDescriptor"], "FontDescriptor")
 	if pdf.IsReadError(err) {
 		return nil, err
 	}
@@ -175,7 +175,7 @@ func extractCIDFontType2(x *pdf.Extractor, obj pdf.Object) (*CIDFontType2, error
 		return nil, err
 	}
 	if obj, ok := cidFontDict["DW"]; ok {
-		dw, err := pdf.GetNumber(x.R, obj)
+		dw, err := x.GetNumber(obj)
 		if pdf.IsReadError(err) {
 			return nil, err
 		}
@@ -195,7 +195,7 @@ func extractCIDFontType2(x *pdf.Extractor, obj pdf.Object) (*CIDFontType2, error
 	}
 	d.VMetrics = w2
 
-	c2g, err := pdf.Resolve(x.R, cidFontDict["CIDToGIDMap"])
+	c2g, err := x.Resolve(cidFontDict["CIDToGIDMap"])
 	if err != nil {
 		return nil, err
 	}

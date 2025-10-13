@@ -145,7 +145,7 @@ func writeImageMaskData(w io.Writer, img image.Image) error {
 
 // ExtractMask extracts an image mask from a PDF stream.
 func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
-	stream, err := pdf.GetStream(x.R, obj)
+	stream, err := x.GetStream(obj)
 	if err != nil {
 		return nil, err
 	} else if stream == nil {
@@ -156,10 +156,10 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 	dict := stream.Dict
 
 	// Check Type and Subtype
-	typeName, _ := pdf.GetDictTyped(x.R, obj, "XObject")
+	typeName, _ := x.GetDictTyped(obj, "XObject")
 	if typeName == nil {
 		// Type is optional, but if present must be XObject
-		if t, err := pdf.Optional(pdf.GetName(x.R, dict["Type"])); err != nil {
+		if t, err := pdf.Optional(x.GetName(dict["Type"])); err != nil {
 			return nil, err
 		} else if t != "" && t != "XObject" {
 			return nil, &pdf.MalformedFileError{
@@ -168,7 +168,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 		}
 	}
 
-	subtypeName, err := pdf.Optional(pdf.GetName(x.R, dict["Subtype"]))
+	subtypeName, err := pdf.Optional(x.GetName(dict["Subtype"]))
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 	}
 
 	// Check ImageMask flag
-	isImageMask, err := pdf.GetBoolean(x.R, dict["ImageMask"])
+	isImageMask, err := x.GetBoolean(dict["ImageMask"])
 	if err != nil || !bool(isImageMask) {
 		return nil, &pdf.MalformedFileError{
 			Err: errors.New("ImageMask flag not set for image mask"),
@@ -187,7 +187,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 	}
 
 	// Extract required fields
-	width, err := pdf.GetInteger(x.R, dict["Width"])
+	width, err := x.GetInteger(dict["Width"])
 	if err != nil {
 		return nil, fmt.Errorf("missing or invalid Width: %w", err)
 	}
@@ -197,7 +197,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 		}
 	}
 
-	height, err := pdf.GetInteger(x.R, dict["Height"])
+	height, err := x.GetInteger(dict["Height"])
 	if err != nil {
 		return nil, fmt.Errorf("missing or invalid Height: %w", err)
 	}
@@ -213,7 +213,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 	}
 
 	// BitsPerComponent is optional for image masks, but if present must be 1
-	if bpc, err := pdf.Optional(pdf.GetInteger(x.R, dict["BitsPerComponent"])); err != nil {
+	if bpc, err := pdf.Optional(x.GetInteger(dict["BitsPerComponent"])); err != nil {
 		return nil, err
 	} else if bpc > 0 && bpc != 1 {
 		return nil, &pdf.MalformedFileError{
@@ -236,21 +236,21 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 	}
 
 	// Extract Decode array (for image masks, must be [0 1] or [1 0])
-	if decodeArray, err := pdf.Optional(pdf.GetArray(x.R, dict["Decode"])); err != nil {
+	if decodeArray, err := pdf.Optional(x.GetArray(dict["Decode"])); err != nil {
 		return nil, err
 	} else if len(decodeArray) == 2 {
-		d0, _ := pdf.GetNumber(x.R, decodeArray[0])
-		d1, _ := pdf.GetNumber(x.R, decodeArray[1])
+		d0, _ := x.GetNumber(decodeArray[0])
+		d1, _ := x.GetNumber(decodeArray[1])
 		if d0 == 1 && d1 == 0 {
 			mask.Inverted = true
 		}
 	}
 
-	if interp, err := pdf.GetBoolean(x.R, dict["Interpolate"]); err == nil {
+	if interp, err := x.GetBoolean(dict["Interpolate"]); err == nil {
 		mask.Interpolate = bool(interp)
 	}
 
-	if alts, err := pdf.Optional(pdf.GetArray(x.R, dict["Alternates"])); err != nil {
+	if alts, err := pdf.Optional(x.GetArray(dict["Alternates"])); err != nil {
 		return nil, err
 	} else if alts != nil {
 		mask.Alternates = make([]*Mask, len(alts))
@@ -263,7 +263,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 		}
 	}
 
-	if name, err := pdf.Optional(pdf.GetName(x.R, dict["Name"])); err != nil {
+	if name, err := pdf.Optional(x.GetName(dict["Name"])); err != nil {
 		return nil, err
 	} else if pdf.GetVersion(x.R) < pdf.V2_0 { // Name is deprecated in PDF 2.0
 		mask.Name = name
@@ -301,7 +301,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 	}
 
 	// Extract AssociatedFiles (AF)
-	if afArray, err := pdf.Optional(pdf.GetArray(x.R, dict["AF"])); err != nil {
+	if afArray, err := pdf.Optional(x.GetArray(dict["AF"])); err != nil {
 		return nil, err
 	} else if afArray != nil {
 		mask.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
@@ -323,7 +323,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 
 	// Extract StructParent
 	if keyObj := dict["StructParent"]; keyObj != nil {
-		if key, err := pdf.Optional(pdf.GetInteger(x.R, dict["StructParent"])); err != nil {
+		if key, err := pdf.Optional(x.GetInteger(dict["StructParent"])); err != nil {
 			return nil, err
 		} else {
 			mask.StructParent.Set(key)

@@ -416,7 +416,7 @@ func extractType7(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Typ
 			Err: fmt.Errorf("missing /BitsPerCoordinate entry"),
 		}
 	}
-	bpc, err := pdf.GetInteger(x.R, bpcObj)
+	bpc, err := x.GetInteger(bpcObj)
 	if err != nil {
 		return nil, err
 	}
@@ -429,7 +429,7 @@ func extractType7(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Typ
 			Err: fmt.Errorf("missing /BitsPerComponent entry"),
 		}
 	}
-	bpcomp, err := pdf.GetInteger(x.R, bpcompObj)
+	bpcomp, err := x.GetInteger(bpcompObj)
 	if err != nil {
 		return nil, err
 	}
@@ -442,7 +442,7 @@ func extractType7(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Typ
 			Err: fmt.Errorf("missing /BitsPerFlag entry"),
 		}
 	}
-	bpf, err := pdf.GetInteger(x.R, bpfObj)
+	bpf, err := x.GetInteger(bpfObj)
 	if err != nil {
 		return nil, err
 	}
@@ -514,7 +514,7 @@ func extractType7(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Typ
 
 	// Read optional AntiAlias
 	if aaObj, ok := d["AntiAlias"]; ok {
-		if aa, err := pdf.Optional(pdf.GetBoolean(x.R, aaObj)); err != nil {
+		if aa, err := pdf.Optional(x.GetBoolean(aaObj)); err != nil {
 			return nil, err
 		} else {
 			s.AntiAlias = bool(aa)

@@ -151,18 +151,18 @@ func extractType2(x *pdf.Extractor, d pdf.Dict, isIndirect bool) (*Type2, error)
 
 	// Read optional Extend
 	if extendObj, ok := d["Extend"]; ok {
-		if extendArray, err := pdf.Optional(pdf.GetArray(x.R, extendObj)); err != nil {
+		if extendArray, err := pdf.Optional(x.GetArray(extendObj)); err != nil {
 			return nil, err
 		} else {
 			if len(extendArray) >= 1 {
-				if extendStart, err := pdf.Optional(pdf.GetBoolean(x.R, extendArray[0])); err != nil {
+				if extendStart, err := pdf.Optional(x.GetBoolean(extendArray[0])); err != nil {
 					return nil, err
 				} else {
 					s.ExtendStart = bool(extendStart)
 				}
 			}
 			if len(extendArray) >= 2 {
-				if extendEnd, err := pdf.Optional(pdf.GetBoolean(x.R, extendArray[1])); err != nil {
+				if extendEnd, err := pdf.Optional(x.GetBoolean(extendArray[1])); err != nil {
 					return nil, err
 				} else {
 					s.ExtendEnd = bool(extendEnd)
@@ -191,16 +191,15 @@ func extractType2(x *pdf.Extractor, d pdf.Dict, isIndirect bool) (*Type2, error)
 
 	// Read optional AntiAlias
 	if aaObj, ok := d["AntiAlias"]; ok {
-		if aa, err := pdf.Optional(pdf.GetBoolean(x.R, aaObj)); err != nil {
+		if aa, err := pdf.Optional(x.GetBoolean(aaObj)); err != nil {
 			return nil, err
 		} else {
 			s.AntiAlias = bool(aa)
 		}
 	}
 
-	// Set SingleUse based on whether the original object was a reference,
-	// true for direct dictionaries, false for references.
-	s.SingleUse = !isIndirect
+	// obj is indirect if passed as a reference or accessed through one
+	s.SingleUse = !isIndirect && !x.IsIndirect
 
 	return s, nil
 }

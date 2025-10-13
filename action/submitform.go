@@ -77,8 +77,8 @@ func decodeSubmitForm(x *pdf.Extractor, dict pdf.Dict) (*SubmitForm, error) {
 		return nil, pdf.Error("SubmitForm action missing F entry")
 	}
 
-	fields, _ := pdf.GetArray(x.R, dict["Fields"])
-	flags, _ := pdf.Optional(pdf.GetInteger(x.R, dict["Flags"]))
+	fields, _ := x.GetArray(dict["Fields"])
+	flags, _ := pdf.Optional(x.GetInteger(dict["Flags"]))
 
 	next, err := DecodeActionList(x, dict["Next"])
 	if err != nil {

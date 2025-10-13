@@ -61,19 +61,19 @@ var _ Halftone = (*Type1)(nil)
 func extractType1(x *pdf.Extractor, dict pdf.Dict) (*Type1, error) {
 	h := &Type1{}
 
-	if freq, err := pdf.GetNumber(x.R, dict["Frequency"]); err != nil {
+	if freq, err := x.GetNumber( dict["Frequency"]); err != nil {
 		return nil, err
 	} else if freq > 0 {
-		h.Frequency = float64(freq)
+		h.Frequency = freq
 	} else {
 		return nil, pdf.Error("invalid halftone frequency")
 	}
 
 	// Angle is not technically required, but we can default to 0.
-	if angle, err := pdf.Optional(pdf.GetNumber(x.R, dict["Angle"])); err != nil {
+	if angle, err := pdf.Optional(x.GetNumber( dict["Angle"])); err != nil {
 		return nil, err
 	} else {
-		h.Angle = float64(angle)
+		h.Angle = angle
 	}
 
 	// SpotFunction is not technically optional, but we can default to SimpleDot.
@@ -87,7 +87,7 @@ func extractType1(x *pdf.Extractor, dict pdf.Dict) (*Type1, error) {
 			}
 		case pdf.Array:
 			for _, elem := range spot {
-				if x, err := pdf.Optional(pdf.GetName(x.R, elem)); err == nil {
+				if x, err := pdf.Optional(x.GetName(elem)); err == nil {
 					if fn, ok := nameToSpot[x]; ok {
 						h.SpotFunction = fn
 						break
@@ -115,7 +115,7 @@ func extractType1(x *pdf.Extractor, dict pdf.Dict) (*Type1, error) {
 	}
 
 	if accurateScreens, ok := dict["AccurateScreens"]; ok {
-		accurate, err := pdf.GetBoolean(x.R, accurateScreens)
+		accurate, err := x.GetBoolean(accurateScreens)
 		if err != nil {
 			return nil, err
 		}

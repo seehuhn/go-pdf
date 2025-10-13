@@ -61,12 +61,12 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		SingleUse: !isIndirect,
 	}
 
-	dict, err := pdf.GetDict(x.R, obj)
+	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err
 	}
 
-	N, err := pdf.Resolve(x.R, dict["N"])
+	N, err := x.Resolve(dict["N"])
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		return nil, pdf.Errorf("invalid appearance dict entry: N %T", N)
 	}
 
-	R, _ := pdf.Resolve(x.R, dict["R"])
+	R, _ := x.Resolve(dict["R"])
 	if R == nil {
 		R = N
 	}
@@ -114,7 +114,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		res.RollOver = formObj
 	}
 
-	D, _ := pdf.Resolve(x.R, dict["D"])
+	D, _ := x.Resolve(dict["D"])
 	if D == nil {
 		D = N
 	}

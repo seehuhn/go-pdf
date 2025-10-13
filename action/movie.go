@@ -74,8 +74,8 @@ func (a *Movie) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeMovie(x *pdf.Extractor, dict pdf.Dict) (*Movie, error) {
-	t, _ := pdf.GetString(x.R, dict["T"])
-	operation, _ := pdf.GetName(x.R, dict["Operation"])
+	t, _ := x.GetString(dict["T"])
+	operation, _ := x.GetName(dict["Operation"])
 
 	next, err := DecodeActionList(x, dict["Next"])
 	if err != nil {

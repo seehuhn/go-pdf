@@ -70,12 +70,12 @@ const (
 
 // Decode reads an action from a PDF object.
 func Decode(x *pdf.Extractor, obj pdf.Object) (Action, error) {
-	dict, err := pdf.GetDict(x.R, obj)
+	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err
 	}
 
-	actionType, err := pdf.GetName(x.R, dict["S"])
+	actionType, err := x.GetName(dict["S"])
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func DecodeActionList(x *pdf.Extractor, obj pdf.Object) (ActionList, error) {
 	}
 
 	// try single action dictionary first
-	dict, err := pdf.GetDict(x.R, obj)
+	dict, err := x.GetDict(obj)
 	if err == nil && dict != nil {
 		action, err := Decode(x, dict)
 		if err != nil {
@@ -167,7 +167,7 @@ func DecodeActionList(x *pdf.Extractor, obj pdf.Object) (ActionList, error) {
 	}
 
 	// array of actions
-	arr, err := pdf.GetArray(x.R, obj)
+	arr, err := x.GetArray(obj)
 	if err != nil {
 		return nil, err
 	}

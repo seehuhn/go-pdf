@@ -74,7 +74,7 @@ func decodeCaret(x *pdf.Extractor, dict pdf.Dict) (*Caret, error) {
 	}
 
 	// Sy (optional)
-	if sy, err := pdf.GetName(x.R, dict["Sy"]); err == nil && sy != "" {
+	if sy, err := x.GetName(dict["Sy"]); err == nil && sy != "" {
 		caret.Symbol = sy
 	}
 

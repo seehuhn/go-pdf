@@ -162,7 +162,7 @@ func ExtractSpace(x *pdf.Extractor, desc pdf.Object) (Space, error) {
 			d.SetError(pdf.Wrap(err, "base color space"))
 			break
 		}
-		hiVal, err := pdf.GetInteger(x.R, d.args[1])
+		hiVal, err := x.GetInteger(d.args[1])
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "high value"))
 			break
@@ -172,7 +172,7 @@ func ExtractSpace(x *pdf.Extractor, desc pdf.Object) (Space, error) {
 		}
 
 		var lookup pdf.String
-		lookupData, err := pdf.Resolve(x.R, d.args[2])
+		lookupData, err := x.Resolve(d.args[2])
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "lookup table"))
 			break
@@ -202,7 +202,7 @@ func ExtractSpace(x *pdf.Extractor, desc pdf.Object) (Space, error) {
 			break
 		}
 
-		colorant, err := pdf.GetName(x.R, d.args[0])
+		colorant, err := x.GetName(d.args[0])
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "colorant name"))
 			break
@@ -252,7 +252,7 @@ func ExtractSpace(x *pdf.Extractor, desc pdf.Object) (Space, error) {
 
 		var attr pdf.Dict
 		if len(d.args) >= 4 {
-			attr, err = pdf.GetDict(x.R, d.args[3])
+			attr, err = x.GetDict(d.args[3])
 			if err != nil {
 				d.SetError(pdf.Wrap(err, "attributes"))
 				break

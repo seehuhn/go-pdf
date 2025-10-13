@@ -39,7 +39,7 @@ var (
 )
 
 func ExtractVisibilityExpression(x *pdf.Extractor, obj pdf.Object) (VisibilityExpression, error) {
-	obj, err := pdf.Resolve(x.R, obj)
+	obj, err := x.Resolve(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func ExtractVisibilityExpression(x *pdf.Extractor, obj pdf.Object) (VisibilityEx
 			args = append(args, arg)
 		}
 
-		op, _ := pdf.GetName(x.R, v[0])
+		op, _ := x.GetName(v[0])
 		switch op {
 		case "And":
 			if len(args) == 0 {

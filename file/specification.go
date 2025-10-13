@@ -126,7 +126,7 @@ type Specification struct {
 
 // ExtractSpecification extracts a file specification dictionary from a PDF object.
 func ExtractSpecification(x *pdf.Extractor, obj pdf.Object) (*Specification, error) {
-	dict, err := pdf.GetDictTyped(x.R, obj, "Filespec")
+	dict, err := x.GetDictTyped(obj, "Filespec")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -136,7 +136,7 @@ func ExtractSpecification(x *pdf.Extractor, obj pdf.Object) (*Specification, err
 	spec := &Specification{}
 
 	// NameSpace (FS)
-	if nameSpace, err := pdf.Optional(pdf.GetName(x.R, dict["FS"])); err != nil {
+	if nameSpace, err := pdf.Optional(x.GetName(dict["FS"])); err != nil {
 		return nil, err
 	} else {
 		spec.NameSpace = nameSpace
@@ -155,19 +155,19 @@ func ExtractSpecification(x *pdf.Extractor, obj pdf.Object) (*Specification, err
 		spec.FileNameUnicode = string(fileNameUnicode)
 	}
 
-	if fileNameDOS, err := pdf.Optional(pdf.GetString(x.R, dict["DOS"])); err != nil {
+	if fileNameDOS, err := pdf.Optional(x.GetString(dict["DOS"])); err != nil {
 		return nil, err
 	} else {
 		spec.FileNameDOS = string(fileNameDOS)
 	}
 
-	if fileNameMac, err := pdf.Optional(pdf.GetString(x.R, dict["Mac"])); err != nil {
+	if fileNameMac, err := pdf.Optional(x.GetString(dict["Mac"])); err != nil {
 		return nil, err
 	} else {
 		spec.FileNameMac = string(fileNameMac)
 	}
 
-	if fileNameUnix, err := pdf.Optional(pdf.GetString(x.R, dict["Unix"])); err != nil {
+	if fileNameUnix, err := pdf.Optional(x.GetString(dict["Unix"])); err != nil {
 		return nil, err
 	} else {
 		spec.FileNameUnix = string(fileNameUnix)
@@ -181,25 +181,25 @@ func ExtractSpecification(x *pdf.Extractor, obj pdf.Object) (*Specification, err
 	}
 
 	// ID array
-	if idArray, err := pdf.Optional(pdf.GetArray(x.R, dict["ID"])); err != nil {
+	if idArray, err := pdf.Optional(x.GetArray(dict["ID"])); err != nil {
 		return nil, err
 	} else if len(idArray) >= 2 {
-		id1, err1 := pdf.Optional(pdf.GetString(x.R, idArray[0]))
-		id2, err2 := pdf.Optional(pdf.GetString(x.R, idArray[1]))
+		id1, err1 := pdf.Optional(x.GetString(idArray[0]))
+		id2, err2 := pdf.Optional(x.GetString(idArray[1]))
 		if err1 == nil && err2 == nil {
 			spec.ID = []string{string(id1), string(id2)}
 		}
 	}
 
 	// Volatile
-	if volatile, err := pdf.Optional(pdf.GetBoolean(x.R, dict["V"])); err != nil {
+	if volatile, err := pdf.Optional(x.GetBoolean(dict["V"])); err != nil {
 		return nil, err
 	} else {
 		spec.Volatile = bool(volatile)
 	}
 
 	// EmbeddedFiles (EF)
-	if efDict, err := pdf.Optional(pdf.GetDict(x.R, dict["EF"])); err != nil {
+	if efDict, err := pdf.Optional(x.GetDict(dict["EF"])); err != nil {
 		return nil, err
 	} else if efDict != nil {
 		spec.EmbeddedFiles = make(map[string]*Stream)
@@ -213,7 +213,7 @@ func ExtractSpecification(x *pdf.Extractor, obj pdf.Object) (*Specification, err
 	}
 
 	// RelatedFiles (RF)
-	if rfDict, err := pdf.Optional(pdf.GetDict(x.R, dict["RF"])); err != nil {
+	if rfDict, err := pdf.Optional(x.GetDict(dict["RF"])); err != nil {
 		return nil, err
 	} else if rfDict != nil {
 		spec.RelatedFiles, err = extractRelatedFiles(x, rfDict)
@@ -223,7 +223,7 @@ func ExtractSpecification(x *pdf.Extractor, obj pdf.Object) (*Specification, err
 	}
 
 	// AFRelationship
-	if afRelationship, err := pdf.Optional(pdf.GetName(x.R, dict["AFRelationship"])); err != nil {
+	if afRelationship, err := pdf.Optional(x.GetName(dict["AFRelationship"])); err != nil {
 		return nil, err
 	} else if afRelationship != "" {
 		spec.AFRelationship = Relationship(afRelationship)
@@ -418,7 +418,7 @@ func extractRelatedFiles(x *pdf.Extractor, rfDict pdf.Dict) (map[string][]Relate
 	result := make(map[string][]RelatedFile)
 
 	for key, value := range rfDict {
-		array, err := pdf.GetArray(x.R, value)
+		array, err := x.GetArray(value)
 		if err != nil {
 			continue // skip malformed entries
 		}

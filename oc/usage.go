@@ -62,6 +62,9 @@ var _ pdf.Embedder = (*Usage)(nil)
 
 // ExtractUsage extracts a usage dictionary from a PDF object.
 func ExtractUsage(x *pdf.Extractor, obj pdf.Object) (*Usage, error) {
+	// check if obj is indirect before resolving
+	_, isIndirect := obj.(pdf.Reference)
+
 	r := x.R
 	dict, err := pdf.GetDict(r, obj)
 	if err != nil {
@@ -252,9 +255,8 @@ func ExtractUsage(x *pdf.Extractor, obj pdf.Object) (*Usage, error) {
 		usage.PageElement = info
 	}
 
-	// determine SingleUse based on whether object is indirect
-	_, isIndirect := obj.(pdf.Reference)
-	usage.SingleUse = !isIndirect
+	// obj is indirect if passed as a reference or accessed through one
+	usage.SingleUse = !isIndirect && !x.IsIndirect
 
 	return usage, nil
 }

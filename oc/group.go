@@ -45,7 +45,7 @@ var _ pdf.Embedder = (*Group)(nil)
 
 // ExtractGroup extracts an optional content group from a PDF object.
 func ExtractGroup(x *pdf.Extractor, obj pdf.Object) (*Group, error) {
-	dict, err := pdf.GetDictTyped(x.R, obj, "OCG")
+	dict, err := x.GetDictTyped(obj, "OCG")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -62,14 +62,14 @@ func ExtractGroup(x *pdf.Extractor, obj pdf.Object) (*Group, error) {
 	}
 
 	// Intent (optional) can be either a single name or an array of names.
-	intent, err := pdf.Resolve(x.R, dict["Intent"])
+	intent, err := x.Resolve(dict["Intent"])
 	if err != nil {
 		return nil, err
 	}
 	switch intent := intent.(type) {
 	case pdf.Array:
 		for _, o := range intent {
-			if name, err := pdf.Optional(pdf.GetName(x.R, o)); err != nil {
+			if name, err := pdf.Optional(x.GetName(o)); err != nil {
 				return nil, err
 			} else if name != "" {
 				group.Intent = append(group.Intent, name)

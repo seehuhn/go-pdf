@@ -141,9 +141,9 @@ func decodeLine(x *pdf.Extractor, dict pdf.Dict) (*Line, error) {
 
 	// Extract line-specific fields
 	// L (required)
-	if l, err := pdf.GetArray(x.R, dict["L"]); err == nil && len(l) == 4 {
+	if l, err := x.GetArray(dict["L"]); err == nil && len(l) == 4 {
 		for i, coord := range l {
-			if num, err := pdf.GetNumber(x.R, coord); err == nil {
+			if num, err := x.GetNumber(coord); err == nil {
 				line.Coords[i] = float64(num)
 			}
 		}
@@ -158,14 +158,14 @@ func decodeLine(x *pdf.Extractor, dict pdf.Dict) (*Line, error) {
 
 	// LE (optional; PDF 1.4) - default is [None, None]
 	line.LineEndingStyle = [2]LineEndingStyle{LineEndingStyleNone, LineEndingStyleNone}
-	if le, err := pdf.Optional(pdf.GetArray(x.R, dict["LE"])); err != nil {
+	if le, err := pdf.Optional(x.GetArray(dict["LE"])); err != nil {
 		return nil, err
 	} else if len(le) >= 1 {
-		if name, err := pdf.GetName(x.R, le[0]); err == nil {
+		if name, err := x.GetName(le[0]); err == nil {
 			line.LineEndingStyle[0] = LineEndingStyle(name)
 		}
 		if len(le) >= 2 {
-			if name, err := pdf.GetName(x.R, le[1]); err == nil {
+			if name, err := x.GetName(le[1]); err == nil {
 				line.LineEndingStyle[1] = LineEndingStyle(name)
 			}
 		} else {
@@ -182,13 +182,13 @@ func decodeLine(x *pdf.Extractor, dict pdf.Dict) (*Line, error) {
 	}
 
 	// Cap (optional)
-	if cap, err := pdf.GetBoolean(x.R, dict["Cap"]); err == nil {
+	if cap, err := x.GetBoolean(dict["Cap"]); err == nil {
 		line.Caption = bool(cap)
 	}
 
 	if line.Caption {
 		// CP (optional)
-		if cp, err := pdf.GetName(x.R, dict["CP"]); err == nil && cp == "Top" {
+		if cp, err := x.GetName(dict["CP"]); err == nil && cp == "Top" {
 			line.CaptionAbove = true
 		}
 
@@ -201,21 +201,21 @@ func decodeLine(x *pdf.Extractor, dict pdf.Dict) (*Line, error) {
 	}
 
 	// LL (optional)
-	if ll, err := pdf.Optional(pdf.GetNumber(x.R, dict["LL"])); err != nil {
+	if ll, err := pdf.Optional(x.GetNumber(dict["LL"])); err != nil {
 		return nil, err
 	} else {
 		line.LL = float64(ll)
 	}
 
 	// LLE (optional)
-	if lle, err := pdf.Optional(pdf.GetNumber(x.R, dict["LLE"])); err != nil {
+	if lle, err := pdf.Optional(x.GetNumber(dict["LLE"])); err != nil {
 		return nil, err
 	} else {
 		line.LLE = max(float64(lle), 0)
 	}
 
 	// LLO (optional)
-	if llo, err := pdf.Optional(pdf.GetNumber(x.R, dict["LLO"])); err != nil {
+	if llo, err := pdf.Optional(x.GetNumber(dict["LLO"])); err != nil {
 		return nil, err
 	} else {
 		line.LLO = max(float64(llo), 0)

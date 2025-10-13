@@ -201,7 +201,7 @@ func (sm *SoftMask) check(out *pdf.Writer) error {
 
 // ExtractSoftMask extracts a soft-mask image from a PDF stream.
 func ExtractSoftMask(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
-	stm, err := pdf.GetStream(x.R, obj)
+	stm, err := x.GetStream(obj)
 	if err != nil {
 		return nil, err
 	} else if stm == nil {
@@ -213,7 +213,7 @@ func ExtractSoftMask(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
 	if err := pdf.CheckDictType(x.R, dict, "XObject"); err != nil {
 		return nil, err
 	}
-	if subtypeName, err := pdf.Optional(pdf.GetName(x.R, dict["Subtype"])); err != nil {
+	if subtypeName, err := pdf.Optional(x.GetName(dict["Subtype"])); err != nil {
 		return nil, err
 	} else if subtypeName != "Image" && subtypeName != "" {
 		return nil, &pdf.MalformedFileError{
@@ -239,7 +239,7 @@ func ExtractSoftMask(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
 	}
 
 	// Validate forbidden fields (Table 143 restrictions)
-	if isImageMask, err := pdf.GetBoolean(x.R, dict["ImageMask"]); err == nil && bool(isImageMask) {
+	if isImageMask, err := x.GetBoolean(dict["ImageMask"]); err == nil && bool(isImageMask) {
 		return nil, &pdf.MalformedFileError{
 			Err: errors.New("ImageMask must be false or absent for soft masks"),
 		}
@@ -258,7 +258,7 @@ func ExtractSoftMask(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
 	}
 
 	// Extract required fields
-	width, err := pdf.GetInteger(x.R, dict["Width"])
+	width, err := x.GetInteger(dict["Width"])
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +268,7 @@ func ExtractSoftMask(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
 		}
 	}
 
-	height, err := pdf.GetInteger(x.R, dict["Height"])
+	height, err := x.GetInteger(dict["Height"])
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +278,7 @@ func ExtractSoftMask(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
 		}
 	}
 
-	bpc, err := pdf.GetInteger(x.R, dict["BitsPerComponent"])
+	bpc, err := x.GetInteger(dict["BitsPerComponent"])
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +290,7 @@ func ExtractSoftMask(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
 	}
 
 	// Extract Decode array
-	if decodeArray, err := pdf.Optional(pdf.GetArray(x.R, dict["Decode"])); err != nil {
+	if decodeArray, err := pdf.Optional(x.GetArray(dict["Decode"])); err != nil {
 		return nil, err
 	} else if decodeArray != nil {
 		if len(decodeArray) != 2 {
@@ -300,29 +300,29 @@ func ExtractSoftMask(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
 		}
 		softMask.Decode = make([]float64, 2)
 		for i, val := range decodeArray {
-			if num, err := pdf.GetNumber(x.R, val); err != nil {
+			if num, err := x.GetNumber(val); err != nil {
 				return nil, fmt.Errorf("invalid Decode[%d]: %w", i, err)
 			} else {
-				softMask.Decode[i] = float64(num)
+				softMask.Decode[i] = num
 			}
 		}
 	}
 
 	// Extract Interpolate
-	if interp, err := pdf.GetBoolean(x.R, dict["Interpolate"]); err == nil {
+	if interp, err := x.GetBoolean(dict["Interpolate"]); err == nil {
 		softMask.Interpolate = bool(interp)
 	}
 
 	// Extract Matte array (specific to soft masks)
-	if matteArray, err := pdf.Optional(pdf.GetArray(x.R, dict["Matte"])); err != nil {
+	if matteArray, err := pdf.Optional(x.GetArray(dict["Matte"])); err != nil {
 		return nil, err
 	} else if matteArray != nil {
 		softMask.Matte = make([]float64, len(matteArray))
 		for i, val := range matteArray {
-			if num, err := pdf.GetNumber(x.R, val); err != nil {
+			if num, err := x.GetNumber(val); err != nil {
 				return nil, fmt.Errorf("invalid Matte[%d]: %w", i, err)
 			} else {
-				softMask.Matte[i] = float64(num)
+				softMask.Matte[i] = num
 			}
 		}
 	}

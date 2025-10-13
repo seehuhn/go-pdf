@@ -54,7 +54,7 @@ func extractType10(x *pdf.Extractor, stream *pdf.Stream) (*Type10, error) {
 	h := &Type10{}
 
 	if xsquare, ok := stream.Dict["Xsquare"]; ok {
-		xsquareVal, err := pdf.GetInteger(x.R, xsquare)
+		xsquareVal, err := x.GetInteger(xsquare)
 		if err != nil {
 			return nil, err
 		}
@@ -62,7 +62,7 @@ func extractType10(x *pdf.Extractor, stream *pdf.Stream) (*Type10, error) {
 	}
 
 	if ysquare, ok := stream.Dict["Ysquare"]; ok {
-		ysquareVal, err := pdf.GetInteger(x.R, ysquare)
+		ysquareVal, err := x.GetInteger(ysquare)
 		if err != nil {
 			return nil, err
 		}

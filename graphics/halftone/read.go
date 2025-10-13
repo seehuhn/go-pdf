@@ -37,7 +37,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (Halftone, error) {
 
 	switch resolved := resolved.(type) {
 	case pdf.Dict:
-		halftoneType, err := pdf.GetInteger(x.R, resolved["HalftoneType"])
+		halftoneType, err := x.GetInteger(resolved["HalftoneType"])
 		if err != nil {
 			return nil, err
 		}
@@ -54,7 +54,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (Halftone, error) {
 		}
 
 	case *pdf.Stream:
-		halftoneType, err := pdf.GetInteger(x.R, resolved.Dict["HalftoneType"])
+		halftoneType, err := x.GetInteger(resolved.Dict["HalftoneType"])
 		if err != nil {
 			return nil, err
 		}
