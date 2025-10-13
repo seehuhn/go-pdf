@@ -1,11 +1,72 @@
 package action
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
+
+var targetTestCases = []Target{
+	// Simple cases
+	&TargetParent{},
+	&TargetNamedChild{Name: pdf.String("embedded.pdf")},
+	&TargetAnnotationChild{
+		Page:       pdf.Integer(0),
+		Annotation: pdf.Integer(1),
+	},
+	&TargetAnnotationChild{
+		Page:       pdf.String("chapter1"),
+		Annotation: pdf.String("attachment1"),
+	},
+
+	// Chained cases
+	&TargetParent{
+		Next: &TargetNamedChild{Name: pdf.String("child.pdf")},
+	},
+	&TargetNamedChild{
+		Name: pdf.String("level1.pdf"),
+		Next: &TargetNamedChild{Name: pdf.String("level2.pdf")},
+	},
+	&TargetNamedChild{
+		Name: pdf.String("embedded.pdf"),
+		Next: &TargetAnnotationChild{
+			Page:       pdf.Integer(5),
+			Annotation: pdf.String("attach"),
+		},
+	},
+}
+
+func testTargetRoundTrip(t *testing.T, target Target) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	defer w.Close()
+	rm := pdf.NewResourceManager(w)
+
+	encoded, err := target.Encode(rm)
+	if err != nil {
+		t.Fatalf("encode error: %v", err)
+	}
+
+	x := pdf.NewExtractor(w)
+	decoded, err := DecodeTarget(x, encoded)
+	if err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+
+	if diff := cmp.Diff(decoded, target); diff != "" {
+		t.Errorf("round trip failed (-got +want):\n%s", diff)
+	}
+}
+
+func TestTargetRoundTrip(t *testing.T) {
+	for i, target := range targetTestCases {
+		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			testTargetRoundTrip(t, target)
+		})
+	}
+}
 
 func TestTargetParentEncode(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
