@@ -135,3 +135,20 @@ func TestTargetAnnotationChildMissingFields(t *testing.T) {
 		})
 	}
 }
+
+func TestTargetCycle(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	defer w.Close()
+	rm := pdf.NewResourceManager(w)
+
+	// Create a cycle: t1 -> t2 -> t1
+	t1 := &TargetParent{}
+	t2 := &TargetNamedChild{Name: pdf.String("embedded")}
+	t1.Next = t2
+	t2.Next = t1
+
+	_, err := t1.Encode(rm)
+	if err != errTargetCycle {
+		t.Errorf("expected cycle error, got %v", err)
+	}
+}
