@@ -291,9 +291,24 @@ func (d *CIDFontType2) repair() {
 
 	d.Descriptor.MissingWidth = 0
 
+	if d.ROS == nil {
+		if d.CMap.ROS != nil {
+			d.ROS = d.CMap.ROS
+		} else {
+			d.ROS = &cid.SystemInfo{
+				Registry:   "Adobe",
+				Ordering:   "Identity",
+				Supplement: 0,
+			}
+		}
+	}
+
 	if d.CMap.Name != "Identity-H" && d.CMap.Name != "Identity-V" ||
 		!d.CMap.IsPredefined() {
-		if d.ROS.Registry != d.CMap.ROS.Registry ||
+		if d.CMap.ROS == nil {
+			d.CMap = d.CMap.Clone()
+			d.CMap.ROS = d.ROS
+		} else if d.ROS.Registry != d.CMap.ROS.Registry ||
 			d.ROS.Ordering != d.CMap.ROS.Ordering {
 			d.CMap = d.CMap.Clone()
 			d.CMap.ROS = d.ROS

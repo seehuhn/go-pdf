@@ -61,7 +61,7 @@ var _ Halftone = (*Type1)(nil)
 func extractType1(x *pdf.Extractor, dict pdf.Dict) (*Type1, error) {
 	h := &Type1{}
 
-	if freq, err := x.GetNumber( dict["Frequency"]); err != nil {
+	if freq, err := x.GetNumber(dict["Frequency"]); err != nil {
 		return nil, err
 	} else if freq > 0 {
 		h.Frequency = freq
@@ -70,7 +70,7 @@ func extractType1(x *pdf.Extractor, dict pdf.Dict) (*Type1, error) {
 	}
 
 	// Angle is not technically required, but we can default to 0.
-	if angle, err := pdf.Optional(x.GetNumber( dict["Angle"])); err != nil {
+	if angle, err := pdf.Optional(x.GetNumber(dict["Angle"])); err != nil {
 		return nil, err
 	} else {
 		h.Angle = angle

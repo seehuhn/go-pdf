@@ -249,6 +249,11 @@ func FuzzItemDictRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(tc.version, opt)
 		rm := pdf.NewResourceManager(w)
 
+		err := memfile.AddBlankPage(w)
+		if err != nil {
+			continue
+		}
+
 		obj, err := rm.Embed(tc.item)
 		if err != nil {
 			continue

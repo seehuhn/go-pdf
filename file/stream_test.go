@@ -258,6 +258,11 @@ func FuzzStreamRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(tc.version, opt)
 		rm := pdf.NewResourceManager(w)
 
+		err := memfile.AddBlankPage(w)
+		if err != nil {
+			continue
+		}
+
 		obj, err := rm.Embed(tc.stream)
 		if err != nil {
 			continue

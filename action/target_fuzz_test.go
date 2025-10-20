@@ -34,6 +34,11 @@ func FuzzTarget(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
 		rm := pdf.NewResourceManager(w)
 
+		err := memfile.AddBlankPage(w)
+		if err != nil {
+			continue
+		}
+
 		obj, err := target.Encode(rm)
 		if err != nil {
 			continue

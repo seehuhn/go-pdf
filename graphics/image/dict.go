@@ -144,9 +144,7 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	if err != nil {
 		return nil, err
 	} else if stream == nil {
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("missing image stream"),
-		}
+		return nil, pdf.Error("missing image stream")
 	}
 	dict := stream.Dict
 
@@ -157,9 +155,7 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		if t, err := pdf.Optional(x.GetName(dict["Type"])); err != nil {
 			return nil, err
 		} else if t != "" && t != "XObject" {
-			return nil, &pdf.MalformedFileError{
-				Err: fmt.Errorf("invalid Type %q for image XObject", t),
-			}
+			return nil, pdf.Errorf("invalid Type %q for image XObject", t)
 		}
 	}
 
@@ -168,15 +164,26 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		return nil, err
 	}
 	if subtypeName != "Image" {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("invalid Subtype %q for image XObject", subtypeName),
-		}
+		return nil, pdf.Errorf("invalid Subtype %q for image XObject", subtypeName)
 	}
 
-	// Check if this is an image mask (should use ExtractImageMask instead)
-	if isImageMask, err := x.GetBoolean(dict["ImageMask"]); err == nil && bool(isImageMask) {
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("use ExtractImageMask for image masks"),
+	if isImageMask, err := x.GetBoolean(dict["ImageMask"]); err == nil && isImageMask {
+		return nil, pdf.Error("use ExtractImageMask for image masks")
+	}
+
+	hasJPX := false
+	if filters, err := pdf.Optional(pdf.GetFilters(x.R, dict)); err != nil {
+		return nil, err
+	} else {
+		for _, f := range filters {
+			name, _, err := f.Info(pdf.GetVersion(x.R))
+			if err != nil {
+				return nil, err
+			}
+			if name == "JPXDecode" {
+				hasJPX = true
+				break
+			}
 		}
 	}
 
@@ -186,9 +193,7 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		return nil, fmt.Errorf("missing or invalid Width: %w", err)
 	}
 	if width <= 0 {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("invalid image width %d", width),
-		}
+		return nil, pdf.Errorf("invalid image width %d", width)
 	}
 
 	height, err := x.GetInteger(dict["Height"])
@@ -196,9 +201,7 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		return nil, fmt.Errorf("missing or invalid Height: %w", err)
 	}
 	if height <= 0 {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("invalid image height %d", height),
-		}
+		return nil, pdf.Errorf("invalid image height %d", height)
 	}
 
 	img := &Dict{
@@ -213,33 +216,23 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 			return nil, fmt.Errorf("invalid ColorSpace: %w", err)
 		}
 		img.ColorSpace = cs
-	} else {
-		// ColorSpace is optional only for JPXDecode filter
-		filters, _ := x.GetArray(dict["Filter"])
-		hasJPX := false
-		for _, f := range filters {
-			if name, _ := x.GetName(f); name == "JPXDecode" {
-				hasJPX = true
-				break
-			}
-		}
-		if !hasJPX {
-			return nil, &pdf.MalformedFileError{
-				Err: errors.New("missing ColorSpace for non-JPXDecode image"),
-			}
-		}
+	} else if !hasJPX {
+		return nil, pdf.Error("missing ColorSpace for non-JPXDecode image")
 	}
 
 	// Extract BitsPerComponent (required except for JPXDecode)
 	if bpc, err := pdf.Optional(x.GetInteger(dict["BitsPerComponent"])); err != nil {
 		return nil, err
-	} else if bpc > 0 {
-		img.BitsPerComponent = int(bpc)
-	} else if img.ColorSpace != nil {
-		// BitsPerComponent is required when ColorSpace is present
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("missing BitsPerComponent"),
+	} else if bpc != 0 {
+		// Validate it's a valid value
+		switch bpc {
+		case 1, 2, 4, 8, 16:
+			img.BitsPerComponent = int(bpc)
+		default:
+			return nil, pdf.Errorf("invalid BitsPerComponent %d", bpc)
 		}
+	} else if !hasJPX {
+		return nil, pdf.Error("missing BitsPerComponent")
 	}
 
 	// Extract optional fields

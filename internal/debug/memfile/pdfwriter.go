@@ -28,3 +28,35 @@ func NewPDFWriter(v pdf.Version, opt *pdf.WriterOptions) (*pdf.Writer, *MemFile)
 	}
 	return w, tmpFile
 }
+
+// AddBlankPage adds a minimal page tree with a single blank page to the writer.
+// This creates the minimum structure required for a valid PDF document that can
+// be read by pdf.NewReader.
+func AddBlankPage(w *pdf.Writer) error {
+	pageRef := w.Alloc()
+	pagesRef := w.Alloc()
+
+	pageDict := pdf.Dict{
+		"Type":      pdf.Name("Page"),
+		"Parent":    pagesRef,
+		"Resources": pdf.Dict{},
+		"MediaBox":  &pdf.Rectangle{URx: 100, URy: 100},
+	}
+	err := w.Put(pageRef, pageDict)
+	if err != nil {
+		return err
+	}
+
+	pagesDict := pdf.Dict{
+		"Type":  pdf.Name("Pages"),
+		"Kids":  pdf.Array{pageRef},
+		"Count": pdf.Integer(1),
+	}
+	err = w.Put(pagesRef, pagesDict)
+	if err != nil {
+		return err
+	}
+
+	w.GetMeta().Catalog.Pages = pagesRef
+	return nil
+}

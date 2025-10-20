@@ -52,8 +52,6 @@ import "seehuhn.de/go/pdf"
 //     VE for OCMD).
 
 // List represents a marked-property list.
-//
-// TODO(voss): add methods to inspect the object.
 type List interface {
 	// Keys returns the dictionary keys present in the property list.
 	Keys() []pdf.Name
@@ -65,6 +63,9 @@ type List interface {
 	pdf.Embedder
 }
 
+// ResolvedObject wraps a PDF object with its extractor context, allowing
+// references to be resolved during conversion to PDF format.
+// This makes the object independent of the source file it may have come from.
 type ResolvedObject struct {
 	obj pdf.Object
 	x   *pdf.Extractor

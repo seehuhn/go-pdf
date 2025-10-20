@@ -578,6 +578,11 @@ func FuzzDictRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(tc.version, opt)
 		rm := pdf.NewResourceManager(w)
 
+		err := memfile.AddBlankPage(w)
+		if err != nil {
+			continue
+		}
+
 		ref, err := rm.Embed(tc.data)
 		if err != nil {
 			continue
@@ -613,6 +618,8 @@ func FuzzDictRoundTrip(f *testing.F) {
 			t.Skip("malformed PDF object")
 		}
 
-		roundTripTest(t, pdf.GetVersion(r), objGo)
+		// Use at least PDF 1.3 to ensure all standard features are supported
+		version := max(pdf.GetVersion(r), pdf.V1_3)
+		roundTripTest(t, version, objGo)
 	})
 }

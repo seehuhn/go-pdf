@@ -238,6 +238,11 @@ func FuzzExtGStateRoundTrip(f *testing.F) {
 	for _, tc := range testCases {
 		w, buf := memfile.NewPDFWriter(tc.version, opt)
 
+		err := memfile.AddBlankPage(w)
+		if err != nil {
+			continue
+		}
+
 		rm := pdf.NewResourceManager(w)
 		embedded, err := rm.Embed(tc.data)
 		if err != nil {

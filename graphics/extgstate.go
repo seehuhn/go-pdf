@@ -126,7 +126,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				break
 			}
 
-			size, err := x.GetNumber( a[1])
+			size, err := x.GetNumber(a[1])
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -153,7 +153,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 			res.TextKnockout = bool(val)
 			set |= StateTextKnockout
 		case "LW":
-			lw, err := x.GetNumber( v)
+			lw, err := x.GetNumber(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -190,7 +190,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 			res.LineJoin = LineJoinStyle(lineJoin)
 			set |= StateLineJoin
 		case "ML":
-			miterLimit, err := x.GetNumber( v)
+			miterLimit, err := x.GetNumber(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -235,7 +235,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 			res.SoftMask = v
 			set |= StateSoftMask
 		case "CA":
-			ca, err := x.GetNumber( v)
+			ca, err := x.GetNumber(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -244,7 +244,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 			res.StrokeAlpha = ca
 			set |= StateStrokeAlpha
 		case "ca":
-			ca, err := x.GetNumber( v)
+			ca, err := x.GetNumber(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -331,13 +331,13 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 			if len(a) != 2 {
 				break
 			}
-			xCoord, err := x.GetNumber( a[0])
+			xCoord, err := x.GetNumber(a[0])
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
 				return nil, err
 			}
-			yCoord, err := x.GetNumber( a[1])
+			yCoord, err := x.GetNumber(a[1])
 			if pdf.IsMalformed(err) {
 				break
 			}
@@ -345,7 +345,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 			res.HalftoneOriginY = yCoord
 			set |= StateHalftoneOrigin
 		case "FL":
-			fl, err := x.GetNumber( v)
+			fl, err := x.GetNumber(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -354,7 +354,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 			res.FlatnessTolerance = fl
 			set |= StateFlatnessTolerance
 		case "SM":
-			sm, err := x.GetNumber( v)
+			sm, err := x.GetNumber(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {

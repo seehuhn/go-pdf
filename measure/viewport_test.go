@@ -287,6 +287,11 @@ func FuzzViewportRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(tc.version, opt)
 		rm := pdf.NewResourceManager(w)
 
+		err := memfile.AddBlankPage(w)
+		if err != nil {
+			continue
+		}
+
 		embedded, err := rm.Embed(tc.data)
 		if err != nil {
 			continue

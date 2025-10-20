@@ -252,7 +252,7 @@ func DecodeStream(r Getter, x *Stream, numFilters int) (io.ReadCloser, error) {
 	if seeker, ok := x.R.(io.Seeker); ok {
 		seeker.Seek(0, io.SeekStart)
 	}
-	filters, err := getFilters(r, x)
+	filters, err := GetFilters(r, x.Dict)
 	if err != nil {
 		return nil, err
 	}
@@ -275,14 +275,14 @@ func DecodeStream(r Getter, x *Stream, numFilters int) (io.ReadCloser, error) {
 	return out, nil
 }
 
-// Filters extracts the information contained in the /Filter and /DecodeParms
-// entries of the stream dictionary.
-func getFilters(r Getter, x *Stream) ([]Filter, error) {
-	decodeParams, err := resolve(r, x.Dict["DecodeParms"], false)
+// GetFilters extracts the information contained in the /Filter and
+// /DecodeParms entries of a stream dictionary.
+func GetFilters(r Getter, dict Dict) ([]Filter, error) {
+	decodeParams, err := resolve(r, dict["DecodeParms"], false)
 	if err != nil {
 		return nil, err
 	}
-	filter, err := resolve(r, x.Dict["Filter"], false)
+	filter, err := resolve(r, dict["Filter"], false)
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +332,7 @@ func getFilters(r Getter, x *Stream) ([]Filter, error) {
 			res = append(res, makeFilter(name, pDict))
 		}
 	default:
-		return nil, errors.New("invalid /Filter field")
+		return nil, Error("invalid /Filter field")
 	}
 	return res, nil
 }

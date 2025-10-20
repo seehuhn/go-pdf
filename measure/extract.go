@@ -17,6 +17,8 @@
 package measure
 
 import (
+	"fmt"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -50,14 +52,7 @@ func Extract(r pdf.Getter, obj pdf.Object) (Measure, error) {
 func extractRectilinearMeasure(r pdf.Getter, dict pdf.Dict) (*RectilinearMeasure, error) {
 	rm := &RectilinearMeasure{}
 
-	// Extract required fields
-	scaleRatio, err := pdf.GetString(r, dict["R"])
-	if err != nil {
-		return nil, err
-	}
-	rm.ScaleRatio = string(scaleRatio)
-
-	// Extract X axis
+	// Extract X axis first (needed for autogenerating ScaleRatio if missing)
 	xArray, err := pdf.GetArray(r, dict["X"])
 	if err != nil {
 		return nil, err
@@ -79,6 +74,32 @@ func extractRectilinearMeasure(r pdf.Getter, dict pdf.Dict) (*RectilinearMeasure
 		}
 	}
 	// Note: YAxis remains nil if not present in PDF
+
+	// Extract ScaleRatio - if missing or empty, autogenerate from X/Y arrays
+	scaleRatio, _ := pdf.Optional(pdf.GetString(r, dict["R"]))
+	if string(scaleRatio) == "" {
+		// autogenerate scale ratio from X (and Y if different)
+		if len(rm.XAxis) > 0 {
+			xFactor := rm.XAxis[0].ConversionFactor
+			xUnit := rm.XAxis[0].Unit
+
+			if rm.YAxis != nil && len(rm.YAxis) > 0 &&
+				(rm.YAxis[0].ConversionFactor != xFactor || rm.YAxis[0].Unit != xUnit) {
+				// X and Y differ
+				yFactor := rm.YAxis[0].ConversionFactor
+				yUnit := rm.YAxis[0].Unit
+				scaleRatio = pdf.String(fmt.Sprintf("in X 1 pt = %g %s, in Y 1 pt = %g %s",
+					xFactor, xUnit, yFactor, yUnit))
+			} else {
+				// X and Y same (or Y not present)
+				scaleRatio = pdf.String(fmt.Sprintf("1 pt = %g %s", xFactor, xUnit))
+			}
+		} else {
+			// fallback if XAxis is empty or malformed
+			scaleRatio = pdf.String("1:1")
+		}
+	}
+	rm.ScaleRatio = string(scaleRatio)
 
 	// Extract Distance
 	dArray, err := pdf.GetArray(r, dict["D"])
