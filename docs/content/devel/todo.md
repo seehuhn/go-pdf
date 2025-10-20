@@ -8,8 +8,6 @@ weight = 100
 
 ## Next Steps
 
-- Make sure that readers cannot get into infinite loops when resources
-  depend on each other in a cycle; Extend pdf.Extractor with better loop detection.
 - Implement property lists.
 - Make Resource dictionaries file-independent.
 - make dict.Type3 file-independent

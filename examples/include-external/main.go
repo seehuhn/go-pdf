@@ -28,7 +28,6 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/pagetree"
-	"seehuhn.de/go/pdf/pdfcopy"
 )
 
 func main() {
@@ -102,7 +101,7 @@ func LoadFigure(fname string, rm *pdf.ResourceManager) (graphics.XObject, *pdf.R
 
 	obj := &form.Form{
 		Draw: func(w *graphics.Writer) error {
-			copier := pdfcopy.NewCopier(rm.Out, r)
+			copier := pdf.NewCopier(rm.Out, r)
 
 			origResources, err := pdf.GetDict(r, pageDict["Resources"])
 			if err != nil {

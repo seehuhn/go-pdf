@@ -22,7 +22,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/outline"
 	"seehuhn.de/go/pdf/pagetree"
-	"seehuhn.de/go/pdf/pdfcopy"
 )
 
 // Concat represents a PDF file made by concatenating other PDF files.
@@ -102,7 +101,7 @@ func (c *Concat) Append(fname string) error {
 	}
 	defer r.Close()
 
-	copy := pdfcopy.NewCopier(c.w, r)
+	copy := pdf.NewCopier(c.w, r)
 
 	meta := r.GetMeta()
 	outlineTree, _ := outline.Read(r)
@@ -164,7 +163,7 @@ func (c *Concat) Append(fname string) error {
 }
 
 // CopyOutline copies an outline tree from the source file to the target file.
-func (c *Concat) CopyOutline(copy *pdfcopy.Copier, in []*outline.Tree) ([]*outline.Tree, error) {
+func (c *Concat) CopyOutline(copy *pdf.Copier, in []*outline.Tree) ([]*outline.Tree, error) {
 	out := make([]*outline.Tree, len(in))
 	for i, child := range in {
 		cc, err := c.CopyOutline(copy, child.Children)

@@ -48,8 +48,9 @@ type Embedder interface {
 }
 
 type EmbedHelper struct {
-	rm   *ResourceManager
-	refs []Reference
+	rm      *ResourceManager
+	copiers map[*Extractor]*Copier
+	refs    []Reference
 }
 
 func (e *EmbedHelper) Alloc() Reference {
@@ -109,6 +110,15 @@ func (e *EmbedHelper) EmbedAt(ref Reference, r Embedder) (Native, error) {
 	return val, nil
 }
 
+func (e *EmbedHelper) CopierFrom(x *Extractor) *Copier {
+	if c, ok := e.copiers[x]; ok {
+		return c
+	}
+	c := NewCopier(e.rm.Out, x.R)
+	e.copiers[x] = c
+	return c
+}
+
 func EmbedHelperEmbedFunc[T any](e *EmbedHelper, f func(*EmbedHelper, T) (Native, error), obj T) (Native, error) {
 	if existing, ok := e.rm.embedded[obj]; ok {
 		return existing, nil
@@ -155,7 +165,8 @@ func NewResourceManager(w *Writer) *ResourceManager {
 // If the resource is already present in the file, the existing resource is
 // returned.
 func (rm *ResourceManager) Embed(r Embedder) (Native, error) {
-	e := &EmbedHelper{rm: rm}
+	cc := make(map[*Extractor]*Copier)
+	e := &EmbedHelper{rm: rm, copiers: cc}
 	return e.Embed(r)
 }
 
@@ -365,7 +376,6 @@ func (x *Extractor) Resolve(obj Object) (Native, error) {
 		}
 	}
 
-	// cleanup
 	for _, r := range refs {
 		delete(x.path, r)
 	}

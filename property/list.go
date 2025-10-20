@@ -55,9 +55,59 @@ import "seehuhn.de/go/pdf"
 //
 // TODO(voss): add methods to inspect the object.
 type List interface {
+	// Keys returns the dictionary keys present in the property list.
+	Keys() []pdf.Name
+
+	// Get retrieves the value associated with the given key.
+	// If the key is not present, the error [ErrNoKey] is returned.
+	Get(key pdf.Name) (*ResolvedObject, error)
+
 	pdf.Embedder
 }
 
-func ExtractList(x *pdf.Extractor, obj pdf.Object) (List, error) {
-	panic("not implemented")
+type ResolvedObject struct {
+	obj pdf.Object
+	x   *pdf.Extractor
 }
+
+var _ pdf.Object = (*ResolvedObject)(nil)
+
+func (r *ResolvedObject) AsPDF(opt pdf.OutputOptions) pdf.Native {
+	obj := r.obj.AsPDF(opt)
+
+	if ref, ok := obj.(pdf.Reference); ok {
+		resolved, err := r.x.Resolve(ref)
+		if err != nil {
+			resolved = nil // TODO(voss): what to do on error?
+		}
+		obj = resolved
+	}
+
+	switch obj := obj.(type) {
+	case pdf.Dict:
+		res := make(pdf.Dict, len(obj))
+		for k, v := range obj {
+			res[k] = &ResolvedObject{v, r.x}
+		}
+		return res
+	case pdf.Array:
+		res := make(pdf.Array, len(obj))
+		for i, v := range obj {
+			res[i] = &ResolvedObject{v, r.x}
+		}
+		return res
+	case *pdf.Stream:
+		res := *obj
+		res.Dict = make(pdf.Dict, len(obj.Dict))
+		for k, v := range obj.Dict {
+			res.Dict[k] = &ResolvedObject{v, r.x}
+		}
+		return &res
+	default:
+		return obj
+	}
+}
+
+// ErrNoKey is returned by List.Get if the requested key is not present
+// in the property list.
+var ErrNoKey = pdf.Error("no such key in property list")

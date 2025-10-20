@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/pdfcopy"
 )
 
 type patternFromFile struct {
@@ -93,7 +92,7 @@ func (p *patternFromFile) PaintType() int {
 }
 
 func (p *patternFromFile) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-	copier := pdfcopy.NewCopier(rm.Out(), p.r)
+	copier := pdf.NewCopier(rm.Out(), p.r)
 	obj, err := copier.Copy(p.obj)
 	if err != nil {
 		return nil, err

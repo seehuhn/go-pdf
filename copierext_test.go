@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package pdfcopy
+package pdf_test
 
 import (
 	"testing"
@@ -44,7 +44,7 @@ func TestCopyReference(t *testing.T) {
 
 	// copy the chain
 	dest, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	copier := NewCopier(dest, orig)
+	copier := pdf.NewCopier(dest, orig)
 	copiedC, err := copier.CopyReference(c)
 	if err != nil {
 		t.Fatal(err)

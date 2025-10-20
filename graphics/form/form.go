@@ -30,7 +30,6 @@ import (
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/oc"
-	"seehuhn.de/go/pdf/pdfcopy"
 	"seehuhn.de/go/pdf/pieceinfo"
 	"seehuhn.de/go/pdf/structure"
 )
@@ -297,7 +296,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Form, error) {
 
 	// Create Draw function as closure
 	form.Draw = func(w *graphics.Writer) error {
-		copier := pdfcopy.NewCopier(w.RM.Out, x.R)
+		copier := pdf.NewCopier(w.RM.Out, x.R)
 
 		// Handle resources
 		origResources, err := x.GetDict(dict["Resources"])

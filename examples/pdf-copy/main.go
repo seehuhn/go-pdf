@@ -23,7 +23,6 @@ import (
 	"runtime/pprof"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/pdfcopy"
 )
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
@@ -54,15 +53,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	trans := pdfcopy.NewCopier(w, r)
+	trans := pdf.NewCopier(w, r)
 
-	newCatalog, err := pdfcopy.CopyStruct(trans, r.GetMeta().Catalog)
+	newCatalog, err := pdf.CopierCopyStruct(trans, r.GetMeta().Catalog)
 	if err != nil {
 		log.Fatal(err)
 	}
 	w.GetMeta().Catalog = newCatalog
 
-	newInfo, err := pdfcopy.CopyStruct(trans, r.GetMeta().Info)
+	newInfo, err := pdf.CopierCopyStruct(trans, r.GetMeta().Info)
 	if err != nil {
 		log.Fatal(err)
 	}

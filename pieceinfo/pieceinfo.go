@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/pdfcopy"
 )
 
 // PieceInfo represents a page-piece dictionary containing private data from
@@ -162,7 +161,7 @@ func (u *unknown) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	// copy the private object using pdfcopy
-	copier := pdfcopy.NewCopier(rm.Out(), u.sourceReader)
+	copier := pdf.NewCopier(rm.Out(), u.sourceReader)
 	copied, err := copier.Copy(u.Private.AsPDF(rm.Out().GetOptions()))
 	if err != nil {
 		return nil, err

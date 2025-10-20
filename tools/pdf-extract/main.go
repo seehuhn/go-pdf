@@ -39,7 +39,6 @@ import (
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/glyphdata/sfntglyphs"
 	"seehuhn.de/go/pdf/pagetree"
-	"seehuhn.de/go/pdf/pdfcopy"
 	"seehuhn.de/go/pdf/reader"
 
 	"seehuhn.de/go/pdf/tools/pdf-extract/sections"
@@ -219,7 +218,7 @@ func (pe PDFExtractor) Process(doc pdf.Getter, pages *PageSet, outputFile string
 
 	// create page tree writer and copier
 	pageTreeOut := pagetree.NewWriter(out)
-	copier := pdfcopy.NewCopier(out, doc)
+	copier := pdf.NewCopier(out, doc)
 
 	// extract each selected page
 	for _, pageNo := range pageNums {

@@ -25,7 +25,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/pagerange"
 	"seehuhn.de/go/pdf/pagetree"
-	"seehuhn.de/go/pdf/pdfcopy"
 )
 
 func main() {
@@ -116,7 +115,7 @@ func extractPages(w io.Writer, inputFile string, pages *pagerange.PageRange) err
 	}
 	pageTreeOut := pagetree.NewWriter(out)
 
-	copy := pdfcopy.NewCopier(out, in)
+	copy := pdf.NewCopier(out, in)
 
 	for pageNo := startPage; pageNo <= endPage; pageNo++ {
 		refIn, pageIn, err := pagetree.GetPage(in, pageNo-1)
