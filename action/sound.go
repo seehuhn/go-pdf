@@ -93,7 +93,7 @@ func decodeSound(x *pdf.Extractor, dict pdf.Dict) (*Sound, error) {
 
 	volume := 1.0
 	if v, err := pdf.Optional(x.GetNumber(dict["Volume"])); err == nil {
-		volume = float64(v)
+		volume = v
 	}
 
 	synchronous, _ := pdf.Optional(x.GetBoolean(dict["Synchronous"]))

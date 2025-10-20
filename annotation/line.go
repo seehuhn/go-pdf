@@ -144,7 +144,7 @@ func decodeLine(x *pdf.Extractor, dict pdf.Dict) (*Line, error) {
 	if l, err := x.GetArray(dict["L"]); err == nil && len(l) == 4 {
 		for i, coord := range l {
 			if num, err := x.GetNumber(coord); err == nil {
-				line.Coords[i] = float64(num)
+				line.Coords[i] = num
 			}
 		}
 	}
@@ -204,21 +204,21 @@ func decodeLine(x *pdf.Extractor, dict pdf.Dict) (*Line, error) {
 	if ll, err := pdf.Optional(x.GetNumber(dict["LL"])); err != nil {
 		return nil, err
 	} else {
-		line.LL = float64(ll)
+		line.LL = ll
 	}
 
 	// LLE (optional)
 	if lle, err := pdf.Optional(x.GetNumber(dict["LLE"])); err != nil {
 		return nil, err
 	} else {
-		line.LLE = max(float64(lle), 0)
+		line.LLE = max(lle, 0)
 	}
 
 	// LLO (optional)
 	if llo, err := pdf.Optional(x.GetNumber(dict["LLO"])); err != nil {
 		return nil, err
 	} else {
-		line.LLO = max(float64(llo), 0)
+		line.LLO = max(llo, 0)
 	}
 
 	// Measure (optional)

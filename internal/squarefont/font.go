@@ -68,10 +68,10 @@ func drawSquare(path interface {
 	MoveTo(x, y float64)
 	LineTo(x, y float64)
 }, fm matrix.Matrix) {
-	left := float64(SquareLeft / (1000 * fm[0]))
-	right := float64(SquareRight / (1000 * fm[0]))
-	bottom := float64(SquareBottom / (1000 * fm[3]))
-	top := float64(SquareTop / (1000 * fm[3]))
+	left := SquareLeft / (1000 * fm[0])
+	right := SquareRight / (1000 * fm[0])
+	bottom := SquareBottom / (1000 * fm[3])
+	top := SquareTop / (1000 * fm[3])
 
 	path.MoveTo(left, bottom)
 	path.LineTo(right, bottom)

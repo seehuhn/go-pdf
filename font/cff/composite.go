@@ -311,7 +311,7 @@ func (f *Composite) makeDict() (*dict.CIDFontType0, error) {
 	} else { // convert to CID-keyed font
 		var sup int32
 		if ros.Supplement > 0 && ros.Supplement < 0x1000_0000 {
-			sup = int32(ros.Supplement)
+			sup = ros.Supplement
 		}
 		ros := &cid.SystemInfo{
 			Registry:   ros.Registry,

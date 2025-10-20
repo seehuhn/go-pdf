@@ -137,7 +137,7 @@ func decodePolygon(x *pdf.Extractor, dict pdf.Dict) (*Polygon, error) {
 					coords := make([]float64, len(pathArray))
 					for j, coord := range pathArray {
 						if num, err := x.GetNumber(coord); err == nil {
-							coords[j] = float64(num)
+							coords[j] = num
 						}
 					}
 					pathArrays[i] = coords

@@ -167,18 +167,18 @@ func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 			return nil, err
 		}
 
-		err = l1.Set(pdf.Integer(lengths.Length1))
+		err = l1.Set(lengths.Length1)
 		if err != nil {
 			stm.Close()
 			return nil, err
 		}
 		if s.Type == Type1 {
-			err = l2.Set(pdf.Integer(lengths.Length2))
+			err = l2.Set(lengths.Length2)
 			if err != nil {
 				stm.Close()
 				return nil, err
 			}
-			err = l3.Set(pdf.Integer(lengths.Length3))
+			err = l3.Set(lengths.Length3)
 			if err != nil {
 				stm.Close()
 				return nil, err

@@ -179,7 +179,7 @@ func extractCIDFontType2(x *pdf.Extractor, obj pdf.Object) (*CIDFontType2, error
 		if pdf.IsReadError(err) {
 			return nil, err
 		}
-		d.DefaultWidth = float64(dw)
+		d.DefaultWidth = dw
 	} else {
 		d.DefaultWidth = DefaultWidthDefault
 	}

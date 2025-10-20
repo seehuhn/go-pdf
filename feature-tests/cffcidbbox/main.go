@@ -212,13 +212,13 @@ func makeTestFonts() (*testFonts, error) {
 
 	newCID := cid.CID(len(newGlyphs))
 	GIDToCID = append(GIDToCID, newCID)
-	cmapData.CIDSingles = append(cmapData.CIDSingles, cmap.Single{Code: []byte{' '}, Value: cmap.CID(newCID)})
+	cmapData.CIDSingles = append(cmapData.CIDSingles, cmap.Single{Code: []byte{' '}, Value: newCID})
 	gid := lookup.Lookup(' ')
 	newGlyphs = append(newGlyphs, rescaleGlyph(origOutlines.Glyphs[gid], qx, qy))
 
 	for c := 'A'; c <= 'Z'; c++ {
 		newCID := cid.CID(len(newGlyphs))
-		cmapData.CIDSingles = append(cmapData.CIDSingles, cmap.Single{Code: []byte{byte(c)}, Value: cmap.CID(newCID)})
+		cmapData.CIDSingles = append(cmapData.CIDSingles, cmap.Single{Code: []byte{byte(c)}, Value: newCID})
 		GIDToCID = append(GIDToCID, newCID)
 		gid := lookup.Lookup(c)
 		newGlyphs = append(newGlyphs, rescaleGlyph(origOutlines.Glyphs[gid], qx, qy))
@@ -239,7 +239,7 @@ func makeTestFonts() (*testFonts, error) {
 
 	for c := 'a'; c <= 'z'; c++ {
 		newCID := cid.CID(len(newGlyphs))
-		cmapData.CIDSingles = append(cmapData.CIDSingles, cmap.Single{Code: []byte{byte(c)}, Value: cmap.CID(newCID)})
+		cmapData.CIDSingles = append(cmapData.CIDSingles, cmap.Single{Code: []byte{byte(c)}, Value: newCID})
 		GIDToCID = append(GIDToCID, newCID)
 		gid := lookup.Lookup(c)
 		newGlyphs = append(newGlyphs, rescaleGlyph(origOutlines.Glyphs[gid], qx, qy))
@@ -360,7 +360,7 @@ func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	ww := make(map[cmap.CID]float64)
 	for gid, cid := range f.cff.GIDToCID {
 		w := f.cff.GlyphWidthPDF(glyph.ID(gid))
-		ww[cmap.CID(cid)] = w
+		ww[cid] = w
 	}
 
 	dicts := &dict.CIDFontType0{

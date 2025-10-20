@@ -471,7 +471,7 @@ func (m *Mask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out(), "image mask StructParent entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		dict["StructParent"] = pdf.Integer(key)
+		dict["StructParent"] = key
 	}
 
 	ref := rm.Alloc()

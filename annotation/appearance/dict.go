@@ -74,7 +74,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	case pdf.Dict:
 		res.NormalMap = make(map[pdf.Name]*form.Form)
 		for key, obj := range N {
-			state := pdf.Name(key)
+			state := key
 			formObj, err := form.Extract(x, obj)
 			if err != nil {
 				return nil, err
@@ -99,7 +99,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	case pdf.Dict:
 		res.RollOverMap = make(map[pdf.Name]*form.Form)
 		for key, obj := range R {
-			state := pdf.Name(key)
+			state := key
 			formObj, err := form.Extract(x, obj)
 			if err != nil {
 				return nil, err
@@ -122,7 +122,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	case pdf.Dict:
 		res.DownMap = make(map[pdf.Name]*form.Form)
 		for key, obj := range D {
-			state := pdf.Name(key)
+			state := key
 			formObj, err := form.Extract(x, obj)
 			if err != nil {
 				return nil, err

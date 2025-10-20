@@ -163,7 +163,7 @@ func NewGIDToCIDFromROS(ros *cid.SystemInfo, cmap interface{ Lookup(rune) glyph.
 			continue // skip .notdef glyphs
 		}
 
-		cidVal := cid.CID(cidValInt)
+		cidVal := cidValInt
 		if otherCid, ok := g2c[gid]; ok && otherCid < cidVal {
 			// in case several CIDs map to the same GID, we keep the smallest
 			// CID value

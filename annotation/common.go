@@ -257,7 +257,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool)
 		if err := pdf.CheckVersion(w, "annotation StructParent entry", pdf.V1_3); err != nil {
 			return err
 		}
-		dict["StructParent"] = pdf.Integer(key)
+		dict["StructParent"] = key
 	}
 
 	if c.OptionalContent != nil {

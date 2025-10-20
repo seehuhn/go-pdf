@@ -400,7 +400,7 @@ func (w *Writer) arc(x, y, radius, startAngle, endAngle float64, move bool) {
 		y3 := y + radius*math.Sin(phi)
 		x2 := x3 + k*math.Sin(phi)
 		y2 := y3 - k*math.Cos(phi)
-		w.CurveTo(pdf.Round(x1, int(digits)), pdf.Round(y1, int(digits)), pdf.Round(x2, int(digits)), pdf.Round(y2, int(digits)), pdf.Round(x3, int(digits)), pdf.Round(y3, int(digits)))
+		w.CurveTo(pdf.Round(x1, digits), pdf.Round(y1, digits), pdf.Round(x2, digits), pdf.Round(y2, digits), pdf.Round(x3, digits), pdf.Round(y3, digits))
 		x0 = x3
 		y0 = y3
 	}

@@ -624,7 +624,7 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out(), "image dictionary StructParent entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		dict["StructParent"] = pdf.Integer(key)
+		dict["StructParent"] = key
 	}
 
 	if len(d.AssociatedFiles) > 0 {

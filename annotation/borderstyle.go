@@ -57,7 +57,7 @@ func ExtractBorderStyle(x *pdf.Extractor, obj pdf.Object) (*BorderStyle, error) 
 		if w, err := pdf.Optional(x.GetNumber(w)); err != nil {
 			return nil, err
 		} else if w >= 0 {
-			style.Width = float64(w)
+			style.Width = w
 		}
 	}
 

@@ -133,8 +133,8 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (Destination, error) {
 		bottom, _ := pdf.Optional(x.GetNumber(arr[3]))
 		right, _ := pdf.Optional(x.GetNumber(arr[4]))
 		top, _ := pdf.Optional(x.GetNumber(arr[5]))
-		return &FitR{Page: page, Left: float64(left), Bottom: float64(bottom),
-			Right: float64(right), Top: float64(top)}, nil
+		return &FitR{Page: page, Left: left, Bottom: bottom,
+			Right: right, Top: top}, nil
 
 	case TypeFitB:
 		return &FitB{Page: page}, nil
