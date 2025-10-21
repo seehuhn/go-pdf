@@ -24,9 +24,9 @@ import (
 	"math"
 
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -92,8 +92,8 @@ func (img *runlengthImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return ref, nil
 }
 
-func (img *runlengthImage) Bounds() graphics.Rectangle {
-	return graphics.Rectangle{
+func (img *runlengthImage) Bounds() rect.IntRect {
+	return rect.IntRect{
 		XMin: 0,
 		YMin: 0,
 		XMax: size,

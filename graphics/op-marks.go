@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/property"
 )
 
 // MarkedContent represents a marked-content point or sequence.
@@ -28,36 +29,21 @@ type MarkedContent struct {
 	// Tag specifies the role or significance of the point/sequence.
 	Tag pdf.Name
 
-	// Properties is a property list.
-	Properties pdf.Dict
+	// Properties is an optional property list providing additional data.
+	// Set to nil for marked content without properties (MP/BMC operators).
+	Properties property.List
 
-	Inline    bool
-	SingleUse bool
-}
-
-// Embed adds the MarkedContent properties dict to a PDF file.
-// This implements the [pdf.Embedder] interface.
-func (mc *MarkedContent) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
-	if mc.SingleUse {
-		return mc.Properties, nil
-	}
-
-	ref := rm.Alloc()
-	err := rm.Out().Put(ref, mc.Properties)
-	if err != nil {
-		return nil, err
-	}
-	return ref, nil
+	// Inline controls whether the property list is embedded inline in the
+	// content stream (true) or referenced via the Properties resource
+	// dictionary (false). Only relevant if Properties is not nil.
+	// Property lists can only be inlined if IsDirect() returns true.
+	Inline bool
 }
 
 // MarkedContentPoint adds a marked-content point to the content stream.
 //
-// The tag parameter specifies the role or significance of the point.
-// The properties parameter is a property list.  Properties can either be
-// nil, or a [pdf.Dict], or a [pdf.Reference] representing a [pdf.Dict].
-//
-// This implements the PDF graphics operators "MP" and "DP".
+// This implements the PDF graphics operators "MP" (without properties)
+// and "DP" (with properties).
 func (w *Writer) MarkedContentPoint(mc *MarkedContent) {
 	if !w.isValid("MarkedContentPoint", objPage|objText) {
 		return
@@ -109,14 +95,20 @@ func (w *Writer) MarkedContentStart(mc *MarkedContent) {
 
 func (w *Writer) getProperties(mc *MarkedContent) pdf.Object {
 	if mc.Inline {
-		if !pdf.IsDirect(mc.Properties) {
+		if !mc.Properties.IsDirect() {
 			w.Err = ErrNotDirect
 			return nil
 		}
-		return mc.Properties
+		// Embed inline - will return the direct dict
+		embedded, err := w.RM.Embed(mc.Properties)
+		if err != nil {
+			w.Err = err
+			return nil
+		}
+		return embedded
 	}
 
-	name, err := writerGetResourceName(w, catProperties, mc)
+	name, err := writerGetResourceName(w, catProperties, mc.Properties)
 	if err != nil {
 		w.Err = err
 		return nil
@@ -138,6 +130,6 @@ func (w *Writer) MarkedContentEnd() {
 	_, w.Err = fmt.Fprintln(w.Content, "EMC")
 }
 
-// ErrNotDirect is returned by [Writer.MarkedContentStart] if the properties
-// object is not a direct object, and the Inline property is set.
-var ErrNotDirect = errors.New("MarkedContent: indirect object in inline property list")
+// ErrNotDirect is returned when attempting to inline a property list
+// that cannot be embedded inline in the content stream.
+var ErrNotDirect = errors.New("property list cannot be inlined in content stream")

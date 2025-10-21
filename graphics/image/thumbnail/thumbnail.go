@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"io"
 
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -32,6 +32,8 @@ import (
 // Thumbnail represents a thumbnail image for a PDF page.
 // Thumbnail images are miniature representations of page contents that can be
 // displayed for navigation purposes.
+//
+// Thumbnail implements the graphics.Image interface.
 type Thumbnail struct {
 	// Width is the width of the thumbnail image in pixels.
 	Width int
@@ -59,8 +61,6 @@ type Thumbnail struct {
 	// Width * ColorSpace.Channels() samples, each sample using BitsPerComponent bits.
 	WriteData func(io.Writer) error
 }
-
-var _ graphics.Image = (*Thumbnail)(nil)
 
 // ExtractThumbnail reads a thumbnail image from a PDF object.
 func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
@@ -217,8 +217,8 @@ func (t *Thumbnail) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 }
 
 // Bounds returns the dimensions of the thumbnail.
-func (t *Thumbnail) Bounds() graphics.Rectangle {
-	return graphics.Rectangle{
+func (t *Thumbnail) Bounds() rect.IntRect {
+	return rect.IntRect{
 		XMin: 0,
 		YMin: 0,
 		XMax: t.Width,

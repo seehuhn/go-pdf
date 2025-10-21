@@ -28,7 +28,7 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/oc"
-	"seehuhn.de/go/pdf/structure"
+	"seehuhn.de/go/pdf/optional"
 )
 
 var px = &measure.NumberFormat{
@@ -461,7 +461,7 @@ var testCases = []struct {
 			Height:           1,
 			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 16,
-			StructParent:     structure.NewKey(0),
+			StructParent:     optional.NewInt(0),
 			WriteData: func(w io.Writer) error {
 				_, err := w.Write([]byte{0, 1, 2, 3, 4, 5})
 				return err
@@ -476,7 +476,7 @@ var testCases = []struct {
 			Height:           1,
 			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 16,
-			StructParent:     structure.NewKey(42),
+			StructParent:     optional.NewInt(42),
 			WriteData: func(w io.Writer) error {
 				_, err := w.Write([]byte{0, 1, 2, 3, 4, 5})
 				return err

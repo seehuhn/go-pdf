@@ -19,8 +19,8 @@ package image
 import (
 	"fmt"
 
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -44,8 +44,8 @@ func NewIndexed(width, height int, cs color.Space) *Indexed {
 
 // Bounds returns the image bounds.
 // This implements the [graphics.Image] interface.
-func (im *Indexed) Bounds() graphics.Rectangle {
-	return graphics.Rectangle{XMax: im.Width, YMax: im.Height}
+func (im *Indexed) Bounds() rect.IntRect {
+	return rect.IntRect{XMax: im.Width, YMax: im.Height}
 }
 
 // Subtype returns /Image.

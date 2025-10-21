@@ -23,6 +23,7 @@ import (
 	gocol "image/color"
 	"io"
 
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics"
@@ -30,7 +31,7 @@ import (
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/oc"
-	"seehuhn.de/go/pdf/structure"
+	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/webcapture"
 )
 
@@ -105,7 +106,7 @@ type Dict struct {
 
 	// StructParent (required if the image is a structural content item)
 	// is the integer key of the image's entry in the structural parent tree.
-	StructParent structure.Key
+	StructParent optional.Int
 
 	// Metadata (optional) is a metadata stream containing metadata for the image.
 	Metadata *metadata.Stream
@@ -835,8 +836,8 @@ func (d *Dict) check(out *pdf.Writer) error {
 }
 
 // Bounds returns the dimensions of the image.
-func (d *Dict) Bounds() graphics.Rectangle {
-	return graphics.Rectangle{
+func (d *Dict) Bounds() rect.IntRect {
+	return rect.IntRect{
 		XMin: 0,
 		YMin: 0,
 		XMax: d.Width,

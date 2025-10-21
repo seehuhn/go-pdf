@@ -21,6 +21,7 @@ import (
 	"image/draw"
 	"image/jpeg"
 
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -53,9 +54,9 @@ func (im *jpegImage) Subtype() pdf.Name {
 }
 
 // Bounds implements the [graphics.Image] interface.
-func (im *jpegImage) Bounds() graphics.Rectangle {
+func (im *jpegImage) Bounds() rect.IntRect {
 	b := im.im.Bounds()
-	return graphics.Rectangle{XMin: b.Min.X, YMin: b.Min.Y, XMax: b.Max.X, YMax: b.Max.Y}
+	return rect.IntRect{XMin: b.Min.X, YMin: b.Min.Y, XMax: b.Max.X, YMax: b.Max.Y}
 }
 
 // Embed ensures that the image is embedded in the PDF file.

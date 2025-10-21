@@ -26,8 +26,8 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/measure"
+	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/pieceinfo"
-	"seehuhn.de/go/pdf/structure"
 )
 
 // testData implements pieceinfo.Data for testing
@@ -322,7 +322,7 @@ func TestFormWithStructParent(t *testing.T) {
 			return nil
 		},
 		BBox:         pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-		StructParent: structure.NewKey(42),
+		StructParent: optional.NewInt(42),
 	}
 	ref, err := rm1.Embed(form0)
 	if err != nil {
@@ -360,7 +360,7 @@ func TestFormWithStructParent(t *testing.T) {
 			return nil
 		},
 		BBox:         pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-		StructParent: structure.NewKey(0),
+		StructParent: optional.NewInt(0),
 	}
 	ref2, err := rm2.Embed(form0Zero)
 	if err != nil {

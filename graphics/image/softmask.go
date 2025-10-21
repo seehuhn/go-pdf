@@ -22,6 +22,7 @@ import (
 	"image"
 	"io"
 
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -71,8 +72,8 @@ type SoftMask struct {
 var _ graphics.Image = (*SoftMask)(nil)
 
 // Bounds returns the dimensions of the soft mask.
-func (sm *SoftMask) Bounds() graphics.Rectangle {
-	return graphics.Rectangle{
+func (sm *SoftMask) Bounds() rect.IntRect {
+	return rect.IntRect{
 		XMin: 0,
 		YMin: 0,
 		XMax: sm.Width,

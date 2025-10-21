@@ -60,6 +60,12 @@ type List interface {
 	// If the key is not present, the error [ErrNoKey] is returned.
 	Get(key pdf.Name) (*ResolvedObject, error)
 
+	// IsDirect returns true if the property list can be embedded inline
+	// in a content stream (i.e., contains only direct objects).
+	// If false, the property list must be referenced via the Properties
+	// resource dictionary.
+	IsDirect() bool
+
 	pdf.Embedder
 }
 

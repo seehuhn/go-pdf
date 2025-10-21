@@ -25,20 +25,29 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/property"
 )
 
 func TestMarkedContentInline(t *testing.T) {
 	type TestCase struct {
-		Prop pdf.Dict
+		Prop property.List
 		out  string
 		err  error
 	}
+
+	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	x := pdf.NewExtractor(data)
+
+	// create property lists for test cases
+	propDirect, _ := property.ExtractList(x, pdf.Dict{"X": pdf.Integer(1)})
+	propIndirect, _ := property.ExtractList(x, pdf.Dict{"X": pdf.NewReference(1, 0)})
+
 	var testCases = []TestCase{
 		{nil, "/test MP\n", nil},
-		{pdf.Dict{"X": pdf.Integer(1)}, "/test<</X 1>>DP\n", nil},
-		{pdf.Dict{"X": pdf.NewReference(1, 0)}, "", graphics.ErrNotDirect},
+		{propDirect, "/test<</X 1>>DP\n", nil},
+		{propIndirect, "", graphics.ErrNotDirect},
 	}
-	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
 	rm := pdf.NewResourceManager(data)
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("test%02d", i), func(t *testing.T) {

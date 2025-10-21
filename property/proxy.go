@@ -63,6 +63,10 @@ func (p *proxyList) Get(key pdf.Name) (*ResolvedObject, error) {
 	return &ResolvedObject{obj, p.x}, nil
 }
 
+func (p *proxyList) IsDirect() bool {
+	return isDirect(p.dict)
+}
+
 // Embed converts the Go representation of the object into a PDF object,
 // corresponding to the PDF version of the output file.
 //
@@ -85,4 +89,32 @@ func (p *proxyList) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 	return ref, nil
+}
+
+// isDirect recursively checks if an object contains only direct objects.
+// Returns false if the object contains any references or streams.
+func isDirect(obj pdf.Object) bool {
+	switch obj := obj.(type) {
+	case pdf.Reference:
+		return false
+	case *pdf.Stream:
+		return false
+	case pdf.Dict:
+		for _, v := range obj {
+			if !isDirect(v) {
+				return false
+			}
+		}
+		return true
+	case pdf.Array:
+		for _, v := range obj {
+			if !isDirect(v) {
+				return false
+			}
+		}
+		return true
+	default:
+		// pdf.Name, pdf.Integer, pdf.Real, pdf.Boolean, pdf.String, etc.
+		return true
+	}
 }

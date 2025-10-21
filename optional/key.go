@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2022  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,25 +14,40 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics
+package optional
 
-import (
-	"seehuhn.de/go/geom/rect"
-	"seehuhn.de/go/pdf"
-)
+import "seehuhn.de/go/pdf"
 
-// Shading represents a PDF shading dictionary.
-//
-// Shadings can either be drawn to the page using the [Writer.DrawShading]
-// method, or can be used as the basis of a shading pattern.
-type Shading interface {
-	ShadingType() int
-
-	pdf.Embedder
+// Int represents an optional integer.
+type Int struct {
+	val uint64
 }
 
-// Image represents a raster image which can be embedded in a PDF file.
-type Image interface {
-	XObject
-	Bounds() rect.IntRect
+func NewInt(v pdf.Integer) Int {
+	var k Int
+	k.Set(v)
+	return k
+}
+
+func (k Int) Get() (pdf.Integer, bool) {
+	if k.val == 0 {
+		return 0, false
+	}
+	return pdf.Integer(k.val - 1), true
+}
+
+func (k *Int) Set(v pdf.Integer) {
+	if v < 0 || uint64(v) >= 1<<64-1 {
+		panic("key value out of range")
+	}
+	k.val = uint64(v) + 1
+}
+
+func (k *Int) Clear() {
+	k.val = 0
+}
+
+// Equal compares two Keys for equality.
+func (k Int) Equal(other Int) bool {
+	return k.val == other.val
 }

@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/oc"
-	"seehuhn.de/go/pdf/structure"
+	"seehuhn.de/go/pdf/optional"
 )
 
 // Common contains fields common to all annotation dictionaries.
@@ -131,7 +131,7 @@ type Common struct {
 	// StructParent (required if the annotation is a structural content item)
 	// is the integer key of the annotation's entry in the structural parent
 	// tree.
-	StructParent structure.Key
+	StructParent optional.Int
 
 	// OptionalContent (optional) specifies the optional content properties for
 	// the annotation.

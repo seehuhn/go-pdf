@@ -29,6 +29,7 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/pagetree"
+	"seehuhn.de/go/pdf/property"
 	"seehuhn.de/go/pdf/reader/scanner"
 )
 
@@ -54,6 +55,9 @@ type Reader struct {
 	Text      func(text string) error
 	UnknownOp func(op string, args []pdf.Object) error
 	EveryOp   func(op string, args []pdf.Object) error
+
+	MarkedContent      func(event MarkedContentEvent, mc *graphics.MarkedContent) error
+	MarkedContentStack []*graphics.MarkedContent
 }
 
 type TextEvent uint8
@@ -65,6 +69,14 @@ const (
 	TextEventMove
 )
 
+type MarkedContentEvent uint8
+
+const (
+	MarkedContentPoint MarkedContentEvent = iota
+	MarkedContentBegin
+	MarkedContentEnd
+)
+
 // New creates a new Reader.
 func New(r pdf.Getter, loader *loader.FontLoader) *Reader {
 	return &Reader{
@@ -74,7 +86,8 @@ func New(r pdf.Getter, loader *loader.FontLoader) *Reader {
 
 		scanner: scanner.NewScanner(),
 
-		fontCache: make(map[pdf.Reference]font.Instance),
+		fontCache:          make(map[pdf.Reference]font.Instance),
+		MarkedContentStack: make([]*graphics.MarkedContent, 0, 8),
 	}
 }
 
@@ -85,6 +98,7 @@ func (r *Reader) Reset() {
 	r.Resources = &pdf.Resources{}
 	r.State = graphics.NewState()
 	r.stack = r.stack[:0]
+	r.MarkedContentStack = r.MarkedContentStack[:0]
 }
 
 // ParsePage parses a page, and calls the appropriate callback functions.
@@ -587,6 +601,142 @@ func (r *Reader) do() error {
 				// TODO(voss): implement this
 			}
 
+		// Table 319 - Marked-content operators
+
+		case "MP":
+			tag := op.GetName()
+			if op.OK() && r.MarkedContent != nil {
+				mc := &graphics.MarkedContent{
+					Tag:        tag,
+					Properties: nil,
+					Inline:     false,
+				}
+				err := r.MarkedContent(MarkedContentPoint, mc)
+				if err != nil {
+					return err
+				}
+			}
+
+		case "BMC":
+			tag := op.GetName()
+			if op.OK() && len(r.MarkedContentStack) < maxMarkedContentDepth {
+				mc := &graphics.MarkedContent{
+					Tag:        tag,
+					Properties: nil,
+					Inline:     false,
+				}
+				r.MarkedContentStack = append(r.MarkedContentStack, mc)
+				if r.MarkedContent != nil {
+					err := r.MarkedContent(MarkedContentBegin, mc)
+					if err != nil {
+						return err
+					}
+				}
+			}
+
+		case "DP":
+			if len(op.Args) != 2 {
+				break
+			}
+			tag, ok1 := op.Args[0].(pdf.Name)
+			propArg := op.Args[1]
+			if !ok1 {
+				break
+			}
+
+			var propObj pdf.Object
+			var inline bool
+			if name, ok := propArg.(pdf.Name); ok {
+				if r.Resources != nil && r.Resources.Properties != nil {
+					propObj = r.Resources.Properties[name]
+				}
+				inline = false
+			} else {
+				propObj = propArg
+				inline = true
+			}
+
+			var list property.List
+			if propObj != nil {
+				var err error
+				list, err = property.ExtractList(r.x, propObj)
+				if pdf.IsMalformed(err) {
+					break
+				} else if err != nil {
+					return err
+				}
+			}
+
+			if r.MarkedContent != nil {
+				mc := &graphics.MarkedContent{
+					Tag:        tag,
+					Properties: list,
+					Inline:     inline,
+				}
+				err := r.MarkedContent(MarkedContentPoint, mc)
+				if err != nil {
+					return err
+				}
+			}
+
+		case "BDC":
+			if len(op.Args) != 2 {
+				break
+			}
+			tag, ok1 := op.Args[0].(pdf.Name)
+			propArg := op.Args[1]
+			if !ok1 || len(r.MarkedContentStack) >= maxMarkedContentDepth {
+				break
+			}
+
+			var propObj pdf.Object
+			var inline bool
+			if name, ok := propArg.(pdf.Name); ok {
+				if r.Resources != nil && r.Resources.Properties != nil {
+					propObj = r.Resources.Properties[name]
+				}
+				inline = false
+			} else {
+				propObj = propArg
+				inline = true
+			}
+
+			var list property.List
+			if propObj != nil {
+				var err error
+				list, err = property.ExtractList(r.x, propObj)
+				if pdf.IsMalformed(err) {
+					break
+				} else if err != nil {
+					return err
+				}
+			}
+
+			mc := &graphics.MarkedContent{
+				Tag:        tag,
+				Properties: list,
+				Inline:     inline,
+			}
+			r.MarkedContentStack = append(r.MarkedContentStack, mc)
+			if r.MarkedContent != nil {
+				err := r.MarkedContent(MarkedContentBegin, mc)
+				if err != nil {
+					return err
+				}
+			}
+
+		case "EMC":
+			if op.OK() && len(r.MarkedContentStack) > 0 {
+				mc := r.MarkedContentStack[len(r.MarkedContentStack)-1]
+				r.MarkedContentStack = r.MarkedContentStack[:len(r.MarkedContentStack)-1]
+				if r.MarkedContent != nil {
+					err := r.MarkedContent(MarkedContentEnd, mc)
+					if err != nil {
+						return err
+					}
+				}
+			}
+
 		default:
 			if r.UnknownOp != nil {
 				err := r.UnknownOp(op.Name, op.Args)
@@ -672,4 +822,5 @@ func convertDashPattern(dashPattern pdf.Array) (pat []float64, ok bool) {
 
 const (
 	maxGraphicsStackDepth = 64
+	maxMarkedContentDepth = 64
 )

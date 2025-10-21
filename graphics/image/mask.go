@@ -22,13 +22,14 @@ import (
 	"image"
 	"io"
 
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/oc"
-	"seehuhn.de/go/pdf/structure"
+	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/webcapture"
 )
 
@@ -63,7 +64,7 @@ type Mask struct {
 
 	// StructParent (required if the image mask is a structural content item)
 	// is the integer key of the image mask's entry in the structural parent tree.
-	StructParent structure.Key
+	StructParent optional.Int
 
 	// Metadata (optional) is a metadata stream containing metadata for the image.
 	Metadata *metadata.Stream
@@ -559,8 +560,8 @@ func (m *Mask) check(out *pdf.Writer) error {
 }
 
 // Bounds returns the dimensions of the mask.
-func (m *Mask) Bounds() graphics.Rectangle {
-	return graphics.Rectangle{
+func (m *Mask) Bounds() rect.IntRect {
+	return rect.IntRect{
 		XMin: 0,
 		YMin: 0,
 		XMax: m.Width,

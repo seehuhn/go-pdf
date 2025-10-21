@@ -30,8 +30,8 @@ import (
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/oc"
+	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/pieceinfo"
-	"seehuhn.de/go/pdf/structure"
 )
 
 // PDF 2.0 sections: 8.10
@@ -72,7 +72,7 @@ type Form struct {
 
 	// StructParent (required if the form is a structural content item)
 	// is the integer key of the form's entry in the structural parent tree.
-	StructParent structure.Key
+	StructParent optional.Int
 
 	// TODO(voss): StructParents
 
