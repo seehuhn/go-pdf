@@ -762,28 +762,24 @@ func TestType2InvalidColorSpace(t *testing.T) {
 	}
 }
 
-func FuzzRead(f *testing.F) {
-	// Seed the fuzzer with valid test cases from all shading types
+func FuzzRoundTrip(f *testing.F) {
+	// seed corpus with test cases
+	opt := &pdf.WriterOptions{
+		HumanReadable: true,
+	}
+
 	for _, cases := range testCases {
 		for _, tc := range cases {
-			out := memfile.New()
-			opt := &pdf.WriterOptions{
-				HumanReadable: true,
-			}
-			w, err := pdf.NewWriter(out, pdf.V2_0, opt)
-			if err != nil {
-				f.Fatal(err)
-			}
-			rm := pdf.NewResourceManager(w)
+			w, buf := memfile.NewPDFWriter(pdf.V2_0, opt)
 
-			ref := w.Alloc()
-
-			embedded, err := rm.Embed(tc.shading)
+			err := memfile.AddBlankPage(w)
 			if err != nil {
 				continue
 			}
 
-			err = w.Put(ref, embedded)
+			rm := pdf.NewResourceManager(w)
+
+			embedded, err := rm.Embed(tc.shading)
 			if err != nil {
 				continue
 			}
@@ -793,60 +789,33 @@ func FuzzRead(f *testing.F) {
 				continue
 			}
 
-			w.GetMeta().Trailer["Quir:E"] = ref
-
+			w.GetMeta().Trailer["Quir:E"] = embedded
 			err = w.Close()
 			if err != nil {
 				continue
 			}
 
-			f.Add(out.Data)
+			f.Add(buf.Data)
 		}
 	}
 
 	f.Fuzz(func(t *testing.T, fileData []byte) {
-		// Get a "random" shading from the PDF file.
-
-		// Make sure we don't panic on random input.
-		opt := &pdf.ReaderOptions{
-			ErrorHandling: pdf.ErrorHandlingReport,
-		}
-		r, err := pdf.NewReader(bytes.NewReader(fileData), opt)
+		r, err := pdf.NewReader(bytes.NewReader(fileData), nil)
 		if err != nil {
-			t.Skip("broken PDF: " + err.Error())
+			t.Skip("invalid PDF")
 		}
+
 		obj := r.GetMeta().Trailer["Quir:E"]
 		if obj == nil {
-			t.Skip("broken reference")
+			t.Skip("missing shading object")
 		}
+
 		x := pdf.NewExtractor(r)
 		shading, err := Extract(x, obj)
 		if err != nil {
-			t.Skip("broken shading")
-		}
-
-		// Make sure we can write the shading, and read it back.
-		// Skip if the shading has validation errors (e.g., wrong function input count)
-		defer func() {
-			if r := recover(); r != nil {
-				t.Skipf("shading validation failed: %v", r)
-			}
-		}()
-
-		// Try to embed the shading - this will catch validation errors
-		buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-		rm := pdf.NewResourceManager(buf)
-		_, err = rm.Embed(shading)
-		if err != nil {
-			t.Skipf("shading embed failed: %v", err)
+			t.Skip("malformed shading")
 		}
 
 		roundTripTest(t, shading)
-
-		// Test basic shading properties don't panic
-		shadingType := shading.ShadingType()
-		if shadingType < 1 || shadingType > 7 {
-			t.Errorf("invalid shading type: %d", shadingType)
-		}
 	})
 }

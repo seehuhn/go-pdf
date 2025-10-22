@@ -119,6 +119,14 @@ func extractType4(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Typ
 	}
 	s.BitsPerCoordinate = int(bpc)
 
+	// validate BitsPerCoordinate
+	switch s.BitsPerCoordinate {
+	case 1, 2, 4, 8, 12, 16, 24, 32:
+		// valid
+	default:
+		return nil, pdf.Errorf("invalid /BitsPerCoordinate: %d", s.BitsPerCoordinate)
+	}
+
 	// Read required BitsPerComponent
 	bpcompObj, ok := d["BitsPerComponent"]
 	if !ok {
@@ -132,6 +140,14 @@ func extractType4(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Typ
 	}
 	s.BitsPerComponent = int(bpcomp)
 
+	// validate BitsPerComponent
+	switch s.BitsPerComponent {
+	case 1, 2, 4, 8, 12, 16:
+		// valid
+	default:
+		return nil, pdf.Errorf("invalid /BitsPerComponent: %d", s.BitsPerComponent)
+	}
+
 	// Read required BitsPerFlag
 	bpfObj, ok := d["BitsPerFlag"]
 	if !ok {
@@ -144,6 +160,14 @@ func extractType4(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Typ
 		return nil, err
 	}
 	s.BitsPerFlag = int(bpf)
+
+	// validate BitsPerFlag
+	switch s.BitsPerFlag {
+	case 2, 4, 8:
+		// valid
+	default:
+		return nil, pdf.Errorf("invalid /BitsPerFlag: %d", s.BitsPerFlag)
+	}
 
 	// Read required Decode
 	decodeObj, ok := d["Decode"]
@@ -195,7 +219,10 @@ func extractType4(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Typ
 	if bgObj, ok := d["Background"]; ok {
 		if bg, err := pdf.Optional(pdf.GetFloatArray(x.R, bgObj)); err != nil {
 			return nil, err
-		} else {
+		} else if len(bg) > 0 {
+			if len(bg) != cs.Channels() {
+				return nil, pdf.Errorf("wrong number of background values: expected %d, got %d", cs.Channels(), len(bg))
+			}
 			s.Background = bg
 		}
 	}
@@ -361,11 +388,6 @@ func (s *Type4) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if have := len(s.Decode); have != decodeLen {
 		return nil, fmt.Errorf("wrong number of decode values: expected %d, got %d",
 			decodeLen, have)
-	}
-	for i := 0; i < decodeLen; i += 2 {
-		if s.Decode[i] > s.Decode[i+1] {
-			return nil, fmt.Errorf("invalid decode values: %v", s.Decode)
-		}
 	}
 	for i, v := range s.Vertices {
 		if v.Flag > 2 {

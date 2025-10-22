@@ -17,6 +17,7 @@
 package destination
 
 import (
+	"bytes"
 	"math"
 	"testing"
 
@@ -491,4 +492,55 @@ func TestDecodeDictionaryWrapper(t *testing.T) {
 	if fit.Page != Target(pageRef) {
 		t.Errorf("page mismatch")
 	}
+}
+
+func FuzzRoundTrip(f *testing.F) {
+	// seed corpus with test cases
+	opt := &pdf.WriterOptions{
+		HumanReadable: true,
+	}
+
+	for _, tc := range testCases {
+		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+		rm := pdf.NewResourceManager(w)
+
+		obj, err := tc.Dest.Encode(rm)
+		if err != nil {
+			continue
+		}
+
+		err = rm.Close()
+		if err != nil {
+			continue
+		}
+
+		w.GetMeta().Trailer["Quir:Dest"] = obj
+		err = w.Close()
+		if err != nil {
+			continue
+		}
+
+		f.Add(buf.Data)
+	}
+
+	f.Fuzz(func(t *testing.T, fileData []byte) {
+		r, err := pdf.NewReader(bytes.NewReader(fileData), nil)
+		if err != nil {
+			t.Skip("invalid PDF")
+		}
+
+		obj := r.GetMeta().Trailer["Quir:Dest"]
+		if obj == nil {
+			t.Skip("missing destination object")
+		}
+
+		x := pdf.NewExtractor(r)
+		dest, err := Decode(x, obj)
+		if err != nil {
+			t.Skip("malformed destination")
+		}
+
+		// round-trip test
+		testRoundTrip(t, dest)
+	})
 }

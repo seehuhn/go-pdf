@@ -129,6 +129,27 @@ func extractType3(x *pdf.Extractor, d pdf.Dict, wasReference bool) (*Type3, erro
 	if err != nil {
 		return nil, err
 	}
+
+	// validate function has correct number of inputs
+	m, n := fn.Shape()
+	if m != 1 {
+		return nil, pdf.Errorf("function must have 1 input, not %d", m)
+	}
+
+	// validate function outputs match color space channels
+	if n != cs.Channels() {
+		return nil, pdf.Errorf("function outputs (%d) must match color space channels (%d)", n, cs.Channels())
+	}
+
+	// validate function domain is well-formed
+	functionDomain := fn.GetDomain()
+	if len(functionDomain) != 2 {
+		return nil, pdf.Errorf("function domain must have 2 values, not %d", len(functionDomain))
+	}
+	if functionDomain[0] > functionDomain[1] {
+		return nil, pdf.Errorf("function domain %v has invalid range", functionDomain)
+	}
+
 	s.F = fn
 
 	// Read optional Domain (renamed to TMin/TMax for Type3)
@@ -136,12 +157,18 @@ func extractType3(x *pdf.Extractor, d pdf.Dict, wasReference bool) (*Type3, erro
 		if domain, err := pdf.Optional(pdf.GetFloatArray(x.R, domainObj)); err != nil {
 			return nil, err
 		} else if len(domain) == 2 {
-			s.TMin, s.TMax = domain[0], domain[1]
+			s.TMin, s.TMax = min(domain[0], domain[1]), max(domain[0], domain[1])
 		} else {
 			s.TMin, s.TMax = 0.0, 1.0
 		}
 	} else {
 		s.TMin, s.TMax = 0.0, 1.0
+	}
+
+	// validate function domain contains shading domain
+	shadingDomain := []float64{s.TMin, s.TMax}
+	if !domainContains(functionDomain, shadingDomain) {
+		return nil, pdf.Errorf("function domain %v must contain shading domain %v", functionDomain, shadingDomain)
 	}
 
 	// Read optional Extend
@@ -170,10 +197,12 @@ func extractType3(x *pdf.Extractor, d pdf.Dict, wasReference bool) (*Type3, erro
 	if bgObj, ok := d["Background"]; ok {
 		if bg, err := pdf.Optional(pdf.GetFloatArray(x.R, bgObj)); err != nil {
 			return nil, err
-		} else if len(bg) == s.ColorSpace.Channels() {
-			s.Background = bg // Only store if valid length
+		} else if len(bg) > 0 {
+			if len(bg) != cs.Channels() {
+				return nil, pdf.Errorf("wrong number of background values: expected %d, got %d", cs.Channels(), len(bg))
+			}
+			s.Background = bg
 		}
-		// Invalid lengths silently ignored for permissive reading
 	}
 
 	// Read optional BBox

@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/color"
 )
 
 // Type1 represents a tiling pattern which repeats periodically in the plane.
@@ -53,6 +54,8 @@ type Type1 struct {
 	// Draw draws a single pattern cell.
 	Draw func(*graphics.Writer) error
 }
+
+var _ color.Pattern = (*Type1)(nil)
 
 // PatternType returns 1 for tiling patterns.
 // This implements the [color.Pattern] interface.

@@ -20,6 +20,7 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/color"
 )
 
 // Type2 represents the pattern dictionary for a shading pattern
@@ -33,6 +34,8 @@ type Type2 struct {
 
 	SingleUse bool
 }
+
+var _ color.Pattern = (*Type2)(nil)
 
 // PatternType returns 2 for shading patterns.
 // This implements the [color.Pattern] interface.

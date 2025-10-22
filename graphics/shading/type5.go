@@ -115,6 +115,14 @@ func extractType5(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Typ
 	}
 	s.BitsPerCoordinate = int(bpc)
 
+	// validate BitsPerCoordinate
+	switch s.BitsPerCoordinate {
+	case 1, 2, 4, 8, 12, 16, 24, 32:
+		// valid
+	default:
+		return nil, pdf.Errorf("invalid /BitsPerCoordinate: %d", s.BitsPerCoordinate)
+	}
+
 	// Read required BitsPerComponent
 	bpcompObj, ok := d["BitsPerComponent"]
 	if !ok {
@@ -128,6 +136,14 @@ func extractType5(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Typ
 	}
 	s.BitsPerComponent = int(bpcomp)
 
+	// validate BitsPerComponent
+	switch s.BitsPerComponent {
+	case 1, 2, 4, 8, 12, 16:
+		// valid
+	default:
+		return nil, pdf.Errorf("invalid /BitsPerComponent: %d", s.BitsPerComponent)
+	}
+
 	// Read required VerticesPerRow
 	vprObj, ok := d["VerticesPerRow"]
 	if !ok {
@@ -138,6 +154,9 @@ func extractType5(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Typ
 	vpr, err := x.GetInteger(vprObj)
 	if err != nil {
 		return nil, err
+	}
+	if vpr < 2 {
+		return nil, pdf.Errorf("VerticesPerRow must be at least 2, got %d", vpr)
 	}
 	s.VerticesPerRow = int(vpr)
 
@@ -188,7 +207,10 @@ func extractType5(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Typ
 	if bgObj, ok := d["Background"]; ok {
 		if bg, err := pdf.Optional(pdf.GetFloatArray(x.R, bgObj)); err != nil {
 			return nil, err
-		} else {
+		} else if len(bg) > 0 {
+			if len(bg) != cs.Channels() {
+				return nil, pdf.Errorf("wrong number of background values: expected %d, got %d", cs.Channels(), len(bg))
+			}
 			s.Background = bg
 		}
 	}
@@ -360,11 +382,6 @@ func (s *Type5) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if have := len(s.Decode); have != decodeLen {
 		return nil, fmt.Errorf("wrong number of decode values: expected %d, got %d",
 			decodeLen, have)
-	}
-	for i := 0; i < decodeLen; i += 2 {
-		if s.Decode[i] > s.Decode[i+1] {
-			return nil, fmt.Errorf("invalid decode values: %v", s.Decode)
-		}
 	}
 
 	// Validate lattice structure

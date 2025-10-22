@@ -100,6 +100,27 @@ func extractType1(x *pdf.Extractor, d pdf.Dict, wasReference bool) (*Type1, erro
 	if err != nil {
 		return nil, err
 	}
+
+	// validate function has correct number of inputs
+	m, n := fn.Shape()
+	if m != 2 {
+		return nil, pdf.Errorf("function must have 2 inputs, not %d", m)
+	}
+
+	// validate function outputs match color space channels
+	if n != cs.Channels() {
+		return nil, pdf.Errorf("function outputs (%d) must match color space channels (%d)", n, cs.Channels())
+	}
+
+	// validate function domain is well-formed
+	functionDomain := fn.GetDomain()
+	if len(functionDomain) != 4 {
+		return nil, pdf.Errorf("function domain must have 4 values, not %d", len(functionDomain))
+	}
+	if functionDomain[0] > functionDomain[1] || functionDomain[2] > functionDomain[3] {
+		return nil, pdf.Errorf("function domain %v has invalid ranges", functionDomain)
+	}
+
 	s.F = fn
 
 	// Read optional Domain
@@ -110,6 +131,15 @@ func extractType1(x *pdf.Extractor, d pdf.Dict, wasReference bool) (*Type1, erro
 			s.Domain = domain
 		}
 		// Invalid domain values are ignored, using zero value
+	}
+
+	// validate function domain contains shading domain
+	shadingDomain := []float64{0, 1, 0, 1} // default
+	if len(s.Domain) == 4 {
+		shadingDomain = s.Domain
+	}
+	if !domainContains(functionDomain, shadingDomain) {
+		return nil, pdf.Errorf("function domain %v must contain shading domain %v", functionDomain, shadingDomain)
 	}
 
 	// Read optional Matrix
@@ -127,6 +157,9 @@ func extractType1(x *pdf.Extractor, d pdf.Dict, wasReference bool) (*Type1, erro
 		if bg, err := pdf.Optional(pdf.GetFloatArray(x.R, bgObj)); err != nil {
 			return nil, err
 		} else if len(bg) > 0 {
+			if len(bg) != cs.Channels() {
+				return nil, pdf.Errorf("wrong number of background values: expected %d, got %d", cs.Channels(), len(bg))
+			}
 			s.Background = bg
 		}
 		// Invalid background values are ignored, using zero value
