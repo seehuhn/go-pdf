@@ -163,7 +163,7 @@ func (r *Reader) do() error {
 
 		case "cm":
 			m := matrix.Matrix{}
-			for i := 0; i < 6; i++ {
+			for i := range 6 {
 				m[i] = op.GetNumber()
 			}
 			if op.OK() {
@@ -363,7 +363,7 @@ func (r *Reader) do() error {
 
 		case "Tm":
 			m := matrix.Matrix{}
-			for i := 0; i < 6; i++ {
+			for i := range 6 {
 				m[i] = op.GetNumber()
 			}
 			if op.OK() {
@@ -546,8 +546,10 @@ func (r *Reader) do() error {
 			}
 			if op.Name == "SC" || op.Name == "SCN" {
 				r.StrokeColor = color.SCN(r.StrokeColor, values, pat)
+				r.Set |= graphics.StateStrokeColor
 			} else {
 				r.FillColor = color.SCN(r.FillColor, values, pat)
+				r.Set |= graphics.StateFillColor
 			}
 
 		case "G":
@@ -609,7 +611,6 @@ func (r *Reader) do() error {
 				mc := &graphics.MarkedContent{
 					Tag:        tag,
 					Properties: nil,
-					Inline:     false,
 				}
 				err := r.MarkedContent(MarkedContentPoint, mc)
 				if err != nil {
@@ -623,7 +624,6 @@ func (r *Reader) do() error {
 				mc := &graphics.MarkedContent{
 					Tag:        tag,
 					Properties: nil,
-					Inline:     false,
 				}
 				r.MarkedContentStack = append(r.MarkedContentStack, mc)
 				if r.MarkedContent != nil {
@@ -639,40 +639,18 @@ func (r *Reader) do() error {
 				break
 			}
 			tag, ok1 := op.Args[0].(pdf.Name)
-			propArg := op.Args[1]
 			if !ok1 {
 				break
 			}
 
-			var propObj pdf.Object
-			var inline bool
-			if name, ok := propArg.(pdf.Name); ok {
-				if r.Resources != nil && r.Resources.Properties != nil {
-					propObj = r.Resources.Properties[name]
-				}
-				inline = false
-			} else {
-				propObj = propArg
-				inline = true
-			}
-
-			var list property.List
-			if propObj != nil {
-				var err error
-				list, err = property.ExtractList(r.x, propObj)
-				if pdf.IsMalformed(err) {
-					break
-				} else if err != nil {
-					return err
-				}
+			mc, err := r.extractMarkedContent(tag, op.Args[1])
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return err
 			}
 
 			if r.MarkedContent != nil {
-				mc := &graphics.MarkedContent{
-					Tag:        tag,
-					Properties: list,
-					Inline:     inline,
-				}
 				err := r.MarkedContent(MarkedContentPoint, mc)
 				if err != nil {
 					return err
@@ -683,40 +661,19 @@ func (r *Reader) do() error {
 			if len(op.Args) != 2 {
 				break
 			}
+
 			tag, ok1 := op.Args[0].(pdf.Name)
-			propArg := op.Args[1]
 			if !ok1 || len(r.MarkedContentStack) >= maxMarkedContentDepth {
 				break
 			}
 
-			var propObj pdf.Object
-			var inline bool
-			if name, ok := propArg.(pdf.Name); ok {
-				if r.Resources != nil && r.Resources.Properties != nil {
-					propObj = r.Resources.Properties[name]
-				}
-				inline = false
-			} else {
-				propObj = propArg
-				inline = true
+			mc, err := r.extractMarkedContent(tag, op.Args[1])
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return err
 			}
 
-			var list property.List
-			if propObj != nil {
-				var err error
-				list, err = property.ExtractList(r.x, propObj)
-				if pdf.IsMalformed(err) {
-					break
-				} else if err != nil {
-					return err
-				}
-			}
-
-			mc := &graphics.MarkedContent{
-				Tag:        tag,
-				Properties: list,
-				Inline:     inline,
-			}
 			r.MarkedContentStack = append(r.MarkedContentStack, mc)
 			if r.MarkedContent != nil {
 				err := r.MarkedContent(MarkedContentBegin, mc)
@@ -754,6 +711,37 @@ func (r *Reader) do() error {
 		}
 	}
 	return r.scanner.Error()
+}
+
+// extractMarkedContent extracts marked content properties from operator arguments.
+// It returns the MarkedContent struct or an error if extraction fails.
+func (r *Reader) extractMarkedContent(tag pdf.Name, propArg pdf.Object) (*graphics.MarkedContent, error) {
+	var propObj pdf.Object
+	var inline bool
+	if name, ok := propArg.(pdf.Name); ok {
+		if r.Resources != nil && r.Resources.Properties != nil {
+			propObj = r.Resources.Properties[name]
+		}
+		inline = false
+	} else {
+		propObj = propArg
+		inline = true
+	}
+
+	var list property.List
+	if propObj != nil {
+		var err error
+		list, err = property.ExtractList(r.x, propObj)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &graphics.MarkedContent{
+		Tag:        tag,
+		Properties: list,
+		Inline:     inline,
+	}, nil
 }
 
 func (r *Reader) processText(s pdf.String) error {

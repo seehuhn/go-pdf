@@ -22,22 +22,11 @@ import (
 	"log"
 	"math"
 	"os"
-	"slices"
-
-	"seehuhn.de/go/geom/matrix"
-
-	"seehuhn.de/go/postscript/cid"
-	"seehuhn.de/go/postscript/type1/names"
-
-	"seehuhn.de/go/sfnt/glyf"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/dict"
-	"seehuhn.de/go/pdf/font/glyphdata/sfntglyphs"
 	"seehuhn.de/go/pdf/internal/pagerange"
 	"seehuhn.de/go/pdf/pagetree"
-	"seehuhn.de/go/pdf/reader"
+	"seehuhn.de/go/pdf/tools/pdf-extract/text"
 )
 
 func main() {
@@ -45,6 +34,7 @@ func main() {
 	flag.Var(pages, "p", "range of pages to extract")
 	xRange := flag.String("x", "", "Only include text at x coordinates `A-B`")
 	showPageNumbers := flag.Bool("P", false, "show page numbers")
+	useActualText := flag.Bool("use-actualtext", false, "use ActualText from marked content")
 	flag.Parse()
 
 	if pages.Start < 1 {
@@ -61,29 +51,15 @@ func main() {
 		}
 	}
 
-	e := &extractor{
-		pageMin:         pages.Start,
-		pageMax:         pages.End,
-		xRangeMin:       xRangeMin,
-		xRangeMax:       xRangeMax,
-		showPageNumbers: *showPageNumbers,
-	}
-
 	for _, fname := range flag.Args() {
-		err := e.extractText(fname)
+		err := extractText(fname, pages.Start, pages.End, xRangeMin, xRangeMax, *showPageNumbers, *useActualText)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 }
 
-type extractor struct {
-	pageMin, pageMax     int
-	xRangeMin, xRangeMax float64
-	showPageNumbers      bool
-}
-
-func (e *extractor) extractText(fname string) error {
+func extractText(fname string, pageMin, pageMax int, xRangeMin, xRangeMax float64, showPageNumbers, useActualText bool) error {
 	fd, err := os.Open(fname)
 	if err != nil {
 		return err
@@ -100,57 +76,16 @@ func (e *extractor) extractText(fname string) error {
 		return err
 	}
 
-	startPage := e.pageMin
-	endPage := e.pageMax
+	startPage := pageMin
+	endPage := pageMax
 	if endPage > numPages {
 		endPage = numPages
 	}
 
-	// -----------------------------------------------------------------------
-
-	extraTextCache := make(map[font.Instance]map[cid.CID]string)
-	spaceWidth := make(map[font.Instance]float64)
-
-	contents := reader.New(r, nil)
-	contents.TextEvent = func(op reader.TextEvent, arg float64) {
-		switch op {
-		case reader.TextEventSpace:
-			w0, ok := spaceWidth[contents.TextFont]
-			if !ok {
-				w0 = getSpaceWidth(contents.TextFont)
-				spaceWidth[contents.TextFont] = w0
-			}
-
-			if arg > 0.3*w0 {
-				fmt.Print(" ")
-			}
-		case reader.TextEventNL:
-			fmt.Println()
-		case reader.TextEventMove:
-			fmt.Println()
-		}
-	}
-	contents.Character = func(cid cid.CID, text string) error {
-		if text == "" {
-			F := contents.TextFont
-			m, ok := extraTextCache[F]
-			if !ok {
-				m = getExtraMapping(contents.TextFont)
-				extraTextCache[F] = m
-			}
-			text = m[cid]
-		}
-
-		// xUser, yUser := contents.GetTextPositionUser()
-
-		xDev, _ := contents.GetTextPositionDevice()
-		if xDev >= e.xRangeMin && xDev < e.xRangeMax {
-			fmt.Print(text)
-		}
-		return nil
-	}
-
-	// -----------------------------------------------------------------------
+	extractor := text.New(r, os.Stdout)
+	extractor.UseActualText = useActualText
+	extractor.XRangeMin = xRangeMin
+	extractor.XRangeMax = xRangeMax
 
 	for pageNo := startPage; pageNo <= endPage; pageNo++ {
 		_, pageDict, err := pagetree.GetPage(r, pageNo-1)
@@ -158,133 +93,17 @@ func (e *extractor) extractText(fname string) error {
 			return err
 		}
 
-		if e.showPageNumbers {
+		if showPageNumbers {
 			fmt.Println("Page", pageNo)
 			fmt.Println()
 		}
 
-		err = contents.ParsePage(pageDict, matrix.Identity)
+		err = extractor.ExtractPage(pageDict)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 
 		fmt.Println()
 	}
 	return nil
-}
-
-type fontFromFile interface {
-	font.Instance
-	GetDict() dict.Dict
-}
-
-func getSpaceWidth(F font.Instance) float64 {
-	Fe, ok := F.(fontFromFile)
-	if !ok {
-		return 280
-	}
-
-	d := Fe.GetDict()
-	if d == nil {
-		return 0
-	}
-
-	return spaceWidthHeuristic(d)
-}
-
-func getExtraMapping(F font.Instance) map[cid.CID]string {
-	fontInfo := F.FontInfo()
-
-	switch fontInfo := fontInfo.(type) {
-	case *dict.FontInfoGlyfEmbedded:
-		if fontInfo.FontFile == nil {
-			return nil // font not embedded
-		}
-
-		info, err := sfntglyphs.FromStream(fontInfo.FontFile)
-		if err != nil {
-			return nil
-		}
-		outlines, ok := info.Outlines.(*glyf.Outlines)
-		if !ok {
-			return nil
-		}
-
-		m := make(map[cid.CID]string)
-
-		// method 1: use glyph names, if present
-		if outlines.Names != nil {
-			if fontInfo.CIDToGID != nil {
-				for cidVal, gid := range fontInfo.CIDToGID {
-					if int(gid) > len(outlines.Names) {
-						continue
-					}
-					name := outlines.Names[gid]
-					if name == "" {
-						continue
-					}
-
-					text := names.ToUnicode(name, fontInfo.PostScriptName)
-					m[cid.CID(cidVal)] = text
-				}
-			}
-		}
-		return m
-	default:
-		return nil
-	}
-}
-
-type affine struct {
-	intercept, slope float64
-}
-
-var commonCharacters = map[string]affine{
-	" ": {0, 1},
-	" ": {0, 1},
-	")": {-43.01937, 1.0268},
-	"/": {-10.99708, 0.9623335},
-	"•": {-24.2725, 0.9956384},
-	"−": {-439.6255, 1.238626},
-	"∗": {91.30598, 0.7265824},
-	"1": {-130.7855, 0.9746186},
-	"a": {-131.2164, 0.9740258},
-	"A": {72.40703, 0.4928694},
-	"e": {-136.5258, 0.9895894},
-	"E": {-28.76257, 0.6957778},
-	"i": {51.62929, 0.8973944},
-	"ε": {-56.25771, 0.9947787},
-	"Ω": {-132.9966, 1.002173},
-	"中": {-356.8609, 1.215483},
-}
-
-func spaceWidthHeuristic(dict dict.Dict) float64 {
-	guesses := []float64{280}
-	for _, info := range dict.Characters() {
-		if coef, ok := commonCharacters[info.Text]; ok && info.Width > 0 {
-			guesses = append(guesses, coef.intercept+coef.slope*info.Width*1000)
-		}
-	}
-	slices.Sort(guesses)
-
-	// calculate the median
-	var guess float64
-	n := len(guesses)
-	if n%2 == 0 {
-		guess = (guesses[n/2-1] + guesses[n/2]) / 2
-	} else {
-		guess = guesses[n/2]
-	}
-
-	// adjustment to remove empirical bias
-	guess = 1.366239*guess - 139.183703
-
-	// clamp to approximate [0.01, 0.99] quantile range
-	if guess < 200 {
-		guess = 200
-	} else if guess > 1000 {
-		guess = 1000
-	}
-
-	return guess
 }
