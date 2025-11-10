@@ -8,7 +8,6 @@ weight = 100
 
 ## Next Steps
 
-- Implement property lists.
 - Make Resource dictionaries file-independent.
 - make dict.Type3 file-independent
 - Try to merge `updateTextPosition` in "op-text.go" with the
