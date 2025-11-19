@@ -1,6 +1,6 @@
 # PDF Content Stream Operators
 
-This document lists all operators that can appear in PDF content streams.
+This document lists all 73 operators that can appear in PDF content streams.
 
 ## General Graphics State
 

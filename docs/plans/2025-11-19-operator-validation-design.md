@@ -45,7 +45,7 @@ type Operator struct {
 
 ### Operator Metadata
 
-A static map stores metadata for all 81 content stream operators, organized by category:
+A static map stores metadata for all 73 content stream operators, organized by category:
 
 ```go
 var operators = map[pdf.Name]*opInfo{
