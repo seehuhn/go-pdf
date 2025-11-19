@@ -8,10 +8,37 @@ import (
 
 // Sentinel errors for validation failures
 var (
-	ErrUnknown     = errors.New("unknown operator")
-	ErrVersion     = errors.New("operator not available in PDF version")
-	ErrDeprecated  = errors.New("deprecated operator")
+	ErrUnknown    = errors.New("unknown operator")
+	ErrVersion    = errors.New("operator not available in PDF version")
+	ErrDeprecated = errors.New("deprecated operator")
 )
+
+// Operator represents a content stream operator with its arguments
+type Operator struct {
+	Name pdf.Name
+	Args []pdf.Native
+}
+
+// IsValidName checks whether the operator name is valid for the given PDF version.
+// It returns ErrUnknown if the operator is not recognized, ErrDeprecated if
+// the operator is deprecated in the given version, or ErrVersion if the
+// operator was not yet available in the given version.
+func (o Operator) IsValidName(v pdf.Version) error {
+	info, ok := operators[o.Name]
+	if !ok {
+		return ErrUnknown
+	}
+
+	if info.Deprecated != 0 && v >= info.Deprecated {
+		return ErrDeprecated
+	}
+
+	if v < info.Since {
+		return ErrVersion
+	}
+
+	return nil
+}
 
 // opInfo contains metadata about a content stream operator
 type opInfo struct {
@@ -123,31 +150,4 @@ var operators = map[pdf.Name]*opInfo{
 	// Compatibility
 	"BX": {Since: pdf.V1_1},
 	"EX": {Since: pdf.V1_1},
-}
-
-// Operator represents a content stream operator with its arguments
-type Operator struct {
-	Name pdf.Name
-	Args []pdf.Native
-}
-
-// IsValidName checks whether the operator name is valid for the given PDF version.
-// It returns ErrUnknown if the operator is not recognized, ErrDeprecated if the
-// operator is deprecated in the given version, or ErrVersion if the operator was
-// not yet available in the given version.
-func (o Operator) IsValidName(v pdf.Version) error {
-	info, ok := operators[o.Name]
-	if !ok {
-		return ErrUnknown
-	}
-
-	if info.Deprecated != 0 && v >= info.Deprecated {
-		return ErrDeprecated
-	}
-
-	if v < info.Since {
-		return ErrVersion
-	}
-
-	return nil
 }

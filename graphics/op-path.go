@@ -34,11 +34,16 @@ func (w *Writer) MoveTo(x, y float64) {
 	if !w.isValid("MoveTo", objPage|objPath) {
 		return
 	}
-	w.currentObject = objPath
 
+	// if starting a new subpath while an open subpath exists, finalize it
+	if w.currentObject == objPath && !w.ThisSubpathClosed {
+		w.AllSubpathsClosed = false
+	}
+
+	w.currentObject = objPath
 	w.StartX, w.StartY = x, y
 	w.CurrentX, w.CurrentY = x, y
-	w.IsClosed = false
+	w.ThisSubpathClosed = true // positioned, but no open segments yet
 
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(x), w.coord(y), "m")
 }
@@ -52,7 +57,7 @@ func (w *Writer) LineTo(x, y float64) {
 	}
 
 	w.CurrentX, w.CurrentY = x, y
-	w.IsClosed = false
+	w.ThisSubpathClosed = false
 
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(x), w.coord(y), "l")
 }
@@ -67,7 +72,7 @@ func (w *Writer) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
 
 	x0, y0 := w.CurrentX, w.CurrentY
 	w.CurrentX, w.CurrentY = x3, y3
-	w.IsClosed = false
+	w.ThisSubpathClosed = false
 
 	if nearlyEqual(x0, x1) && nearlyEqual(y0, y1) {
 		_, w.Err = fmt.Fprintln(w.Content, w.coord(x2), w.coord(y2), w.coord(x3), w.coord(y3), "v")
@@ -87,7 +92,7 @@ func (w *Writer) ClosePath() {
 	}
 
 	w.CurrentX, w.CurrentY = w.StartX, w.StartY
-	w.IsClosed = true
+	w.ThisSubpathClosed = true
 
 	_, w.Err = fmt.Fprintln(w.Content, "h")
 }
@@ -102,11 +107,16 @@ func (w *Writer) Rectangle(x, y, width, height float64) {
 	if !w.isValid("Rectangle", objPage|objPath) {
 		return
 	}
-	w.currentObject = objPath
 
+	// if starting a new subpath while an open subpath exists, finalize it
+	if w.currentObject == objPath && !w.ThisSubpathClosed {
+		w.AllSubpathsClosed = false
+	}
+
+	w.currentObject = objPath
 	w.StartX, w.StartY = x, y
 	w.CurrentX, w.CurrentY = x, y
-	w.IsClosed = true
+	w.ThisSubpathClosed = true // rectangle is a closed subpath
 
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(x), w.coord(y), w.coord(width), w.coord(height), "re")
 }
@@ -118,10 +128,16 @@ func (w *Writer) Stroke() {
 	if !w.isValid("Stroke", objPath|objClippingPath) {
 		return
 	}
+
+	// finalize current subpath if open
+	if !w.ThisSubpathClosed {
+		w.AllSubpathsClosed = false
+	}
+
 	w.currentObject = objPage
 
 	required := StateLineWidth | StateLineJoin | StateLineDash | StateStrokeColor
-	if !w.IsClosed || len(w.DashPattern) > 0 {
+	if !w.AllSubpathsClosed || len(w.DashPattern) > 0 {
 		required |= StateLineCap
 	}
 
@@ -131,6 +147,9 @@ func (w *Writer) Stroke() {
 	}
 
 	_, w.Err = fmt.Fprintln(w.Content, "S")
+
+	// reset for next path
+	w.AllSubpathsClosed = true
 }
 
 // CloseAndStroke closes and strokes the current path.
@@ -141,12 +160,14 @@ func (w *Writer) CloseAndStroke() {
 	if !w.isValid("CloseAndStroke", objPath|objClippingPath) {
 		return
 	}
+
+	// the "s" operator closes the current subpath
+	w.ThisSubpathClosed = true
+
 	w.currentObject = objPage
 
-	w.IsClosed = true
-
 	required := StateLineWidth | StateLineJoin | StateLineDash | StateStrokeColor
-	if len(w.DashPattern) > 0 {
+	if !w.AllSubpathsClosed || len(w.DashPattern) > 0 {
 		required |= StateLineCap
 	}
 
@@ -156,6 +177,9 @@ func (w *Writer) CloseAndStroke() {
 	}
 
 	_, w.Err = fmt.Fprintln(w.Content, "s")
+
+	// reset for next path
+	w.AllSubpathsClosed = true
 }
 
 // Fill fills the current path, using the nonzero winding number rule.  Any
@@ -174,6 +198,9 @@ func (w *Writer) Fill() {
 	}
 
 	_, w.Err = fmt.Fprintln(w.Content, "f")
+
+	// reset for next path
+	w.AllSubpathsClosed = true
 }
 
 // FillEvenOdd fills the current path, using the even-odd rule.  Any
@@ -192,6 +219,9 @@ func (w *Writer) FillEvenOdd() {
 	}
 
 	_, w.Err = fmt.Fprintln(w.Content, "f*")
+
+	// reset for next path
+	w.AllSubpathsClosed = true
 }
 
 // FillAndStroke fills and strokes the current path.  Any subpaths that are
@@ -202,10 +232,16 @@ func (w *Writer) FillAndStroke() {
 	if !w.isValid("FillAndStroke", objPath|objClippingPath) {
 		return
 	}
+
+	// finalize current subpath if open
+	if !w.ThisSubpathClosed {
+		w.AllSubpathsClosed = false
+	}
+
 	w.currentObject = objPage
 
 	required := StateLineWidth | StateLineJoin | StateLineDash | StateStrokeColor
-	if !w.IsClosed || len(w.DashPattern) > 0 {
+	if !w.AllSubpathsClosed || len(w.DashPattern) > 0 {
 		required |= StateLineCap
 	}
 
@@ -215,6 +251,9 @@ func (w *Writer) FillAndStroke() {
 	}
 
 	_, w.Err = fmt.Fprintln(w.Content, "B")
+
+	// reset for next path
+	w.AllSubpathsClosed = true
 }
 
 // FillAndStrokeEvenOdd fills and strokes the current path, using the even-odd
@@ -226,10 +265,16 @@ func (w *Writer) FillAndStrokeEvenOdd() {
 	if !w.isValid("FillAndStroke", objPath|objClippingPath) {
 		return
 	}
+
+	// finalize current subpath if open
+	if !w.ThisSubpathClosed {
+		w.AllSubpathsClosed = false
+	}
+
 	w.currentObject = objPage
 
 	required := StateLineWidth | StateLineJoin | StateLineDash | StateStrokeColor
-	if !w.IsClosed || len(w.DashPattern) > 0 {
+	if !w.AllSubpathsClosed || len(w.DashPattern) > 0 {
 		required |= StateLineCap
 	}
 
@@ -239,6 +284,9 @@ func (w *Writer) FillAndStrokeEvenOdd() {
 	}
 
 	_, w.Err = fmt.Fprintln(w.Content, "B*")
+
+	// reset for next path
+	w.AllSubpathsClosed = true
 }
 
 // CloseFillAndStroke closes, fills and strokes the current path. This has the
@@ -249,12 +297,14 @@ func (w *Writer) CloseFillAndStroke() {
 	if !w.isValid("FillAndStroke", objPath|objClippingPath) {
 		return
 	}
+
+	// the "b" operator closes the current subpath
+	w.ThisSubpathClosed = true
+
 	w.currentObject = objPage
 
-	w.IsClosed = true
-
 	required := StateLineWidth | StateLineJoin | StateLineDash | StateStrokeColor
-	if len(w.DashPattern) > 0 {
+	if !w.AllSubpathsClosed || len(w.DashPattern) > 0 {
 		required |= StateLineCap
 	}
 
@@ -264,6 +314,9 @@ func (w *Writer) CloseFillAndStroke() {
 	}
 
 	_, w.Err = fmt.Fprintln(w.Content, "b")
+
+	// reset for next path
+	w.AllSubpathsClosed = true
 }
 
 // CloseFillAndStrokeEvenOdd closes, fills and strokes the current path, using
@@ -275,12 +328,14 @@ func (w *Writer) CloseFillAndStrokeEvenOdd() {
 	if !w.isValid("FillAndStroke", objPath|objClippingPath) {
 		return
 	}
+
+	// the "b*" operator closes the current subpath
+	w.ThisSubpathClosed = true
+
 	w.currentObject = objPage
 
-	w.IsClosed = true
-
 	required := StateLineWidth | StateLineJoin | StateLineDash | StateStrokeColor
-	if !w.IsClosed || len(w.DashPattern) > 0 {
+	if !w.AllSubpathsClosed || len(w.DashPattern) > 0 {
 		required |= StateLineCap
 	}
 
@@ -290,6 +345,9 @@ func (w *Writer) CloseFillAndStrokeEvenOdd() {
 	}
 
 	_, w.Err = fmt.Fprintln(w.Content, "b*")
+
+	// reset for next path
+	w.AllSubpathsClosed = true
 }
 
 // EndPath ends the path without filling and stroking it.
@@ -303,6 +361,9 @@ func (w *Writer) EndPath() {
 	w.currentObject = objPage
 
 	_, w.Err = fmt.Fprintln(w.Content, "n")
+
+	// reset for next path
+	w.AllSubpathsClosed = true
 }
 
 // ClipNonZero sets the current clipping path using the nonzero winding number

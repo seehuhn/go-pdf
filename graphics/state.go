@@ -41,7 +41,8 @@ type Parameters struct {
 
 	StartX, StartY     float64 // the starting point of the current path
 	CurrentX, CurrentY float64 // the "current point"
-	IsClosed           bool    // whether the current path is closed
+	AllSubpathsClosed  bool    // all subpaths of the current path are closed
+	ThisSubpathClosed  bool    // the current subpath is closed
 
 	StrokeColor color.Color
 	FillColor   color.Color
@@ -138,6 +139,9 @@ func NewState() State {
 	param := &Parameters{}
 
 	param.CTM = matrix.Identity
+
+	param.AllSubpathsClosed = true
+	param.ThisSubpathClosed = true
 
 	param.StrokeColor = color.Black
 	param.FillColor = color.Black
