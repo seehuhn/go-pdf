@@ -92,3 +92,33 @@ func TestStateOperators_LineDash(t *testing.T) {
 		t.Error("StateLineDash not marked in Out")
 	}
 }
+
+func TestStateOperators_ConcatMatrix(t *testing.T) {
+	gState := graphics.NewState()
+	state := &State{
+		Param: *gState.Parameters,
+	}
+	res := &resource.Resource{}
+
+	// apply cm operator: 2 0 0 2 10 20 cm (scale by 2 and translate by (10,20))
+	op := Operator{
+		Name: "cm",
+		Args: []pdf.Native{
+			pdf.Real(2), pdf.Real(0),
+			pdf.Real(0), pdf.Real(2),
+			pdf.Real(10), pdf.Real(20),
+		},
+	}
+
+	if err := ApplyOperator(state, op, res); err != nil {
+		t.Fatalf("cm operator failed: %v", err)
+	}
+
+	// verify CTM was modified
+	if state.Param.CTM[0] != 2.0 || state.Param.CTM[3] != 2.0 {
+		t.Errorf("CTM scaling = [%v, %v], want [2, 2]", state.Param.CTM[0], state.Param.CTM[3])
+	}
+	if state.Param.CTM[4] != 10.0 || state.Param.CTM[5] != 20.0 {
+		t.Errorf("CTM translation = [%v, %v], want [10, 20]", state.Param.CTM[4], state.Param.CTM[5])
+	}
+}
