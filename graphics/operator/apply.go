@@ -183,8 +183,18 @@ type opHandler func(*State, []pdf.Native, *resource.Resource) error
 
 // handlers maps operator names to their handler functions
 var handlers = map[pdf.Name]opHandler{
-	"q": handlePushState,
-	// more handlers will be added in subsequent tasks
+	// Graphics state
+	"q":  handlePushState,
+	"Q":  handlePopState,
+	"cm": handleConcatMatrix,
+	"w":  handleSetLineWidth,
+	"J":  handleSetLineCap,
+	"j":  handleSetLineJoin,
+	"M":  handleSetMiterLimit,
+	"d":  handleSetLineDash,
+	"ri": handleSetRenderingIntent,
+	"i":  handleSetFlatness,
+	"gs": handleSetExtGState,
 }
 
 // handlePushState implements the q operator (save graphics state)
