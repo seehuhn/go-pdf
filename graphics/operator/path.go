@@ -162,3 +162,220 @@ func handleRectangle(s *State, args []pdf.Native, res *resource.Resource) error 
 
 	return nil
 }
+
+// handleStroke implements the S operator (stroke path)
+func handleStroke(s *State, args []pdf.Native, res *resource.Resource) error {
+	p := argParser{args: args}
+	if err := p.Check(); err != nil {
+		return err
+	}
+
+	if s.CurrentObject != objPath && s.CurrentObject != objClippingPath {
+		return errors.New("not in path context")
+	}
+
+	// Finalize current subpath
+	if !s.Param.ThisSubpathClosed {
+		s.Param.AllSubpathsClosed = false
+	}
+
+	// Mark dependencies
+	s.markIn(graphics.StateLineWidth | graphics.StateLineJoin |
+		graphics.StateLineDash | graphics.StateStrokeColor)
+
+	// Conditional dependency on LineCap
+	if !s.Param.AllSubpathsClosed || len(s.Param.DashPattern) > 0 {
+		s.markIn(graphics.StateLineCap)
+	}
+
+	// Reset path
+	s.CurrentObject = objPage
+	s.Param.AllSubpathsClosed = true
+
+	return nil
+}
+
+// handleCloseAndStroke implements the s operator (close and stroke path)
+func handleCloseAndStroke(s *State, args []pdf.Native, res *resource.Resource) error {
+	p := argParser{args: args}
+	if err := p.Check(); err != nil {
+		return err
+	}
+
+	if s.CurrentObject != objPath && s.CurrentObject != objClippingPath {
+		return errors.New("not in path context")
+	}
+
+	// Close current subpath
+	s.Param.CurrentX = s.Param.StartX
+	s.Param.CurrentY = s.Param.StartY
+	s.Param.ThisSubpathClosed = true
+
+	// Mark dependencies (same as S)
+	s.markIn(graphics.StateLineWidth | graphics.StateLineJoin |
+		graphics.StateLineDash | graphics.StateStrokeColor)
+
+	// Conditional dependency on LineCap
+	if !s.Param.AllSubpathsClosed || len(s.Param.DashPattern) > 0 {
+		s.markIn(graphics.StateLineCap)
+	}
+
+	s.CurrentObject = objPage
+	s.Param.AllSubpathsClosed = true
+
+	return nil
+}
+
+// handleFill implements the f operator (fill path using nonzero winding rule)
+func handleFill(s *State, args []pdf.Native, res *resource.Resource) error {
+	p := argParser{args: args}
+	if err := p.Check(); err != nil {
+		return err
+	}
+
+	if s.CurrentObject != objPath && s.CurrentObject != objClippingPath {
+		return errors.New("not in path context")
+	}
+
+	s.markIn(graphics.StateFillColor)
+	s.CurrentObject = objPage
+	s.Param.AllSubpathsClosed = true
+
+	return nil
+}
+
+// handleFillCompat implements the F operator (deprecated alias for f)
+func handleFillCompat(s *State, args []pdf.Native, res *resource.Resource) error {
+	return handleFill(s, args, res)
+}
+
+// handleFillEvenOdd implements the f* operator (fill using even-odd rule)
+func handleFillEvenOdd(s *State, args []pdf.Native, res *resource.Resource) error {
+	p := argParser{args: args}
+	if err := p.Check(); err != nil {
+		return err
+	}
+
+	if s.CurrentObject != objPath && s.CurrentObject != objClippingPath {
+		return errors.New("not in path context")
+	}
+
+	s.markIn(graphics.StateFillColor)
+	s.CurrentObject = objPage
+	s.Param.AllSubpathsClosed = true
+
+	return nil
+}
+
+// handleFillAndStroke implements the B operator (fill and stroke, nonzero)
+func handleFillAndStroke(s *State, args []pdf.Native, res *resource.Resource) error {
+	p := argParser{args: args}
+	if err := p.Check(); err != nil {
+		return err
+	}
+
+	if s.CurrentObject != objPath && s.CurrentObject != objClippingPath {
+		return errors.New("not in path context")
+	}
+
+	if !s.Param.ThisSubpathClosed {
+		s.Param.AllSubpathsClosed = false
+	}
+
+	s.markIn(graphics.StateFillColor | graphics.StateLineWidth |
+		graphics.StateLineJoin | graphics.StateLineDash | graphics.StateStrokeColor)
+
+	if !s.Param.AllSubpathsClosed || len(s.Param.DashPattern) > 0 {
+		s.markIn(graphics.StateLineCap)
+	}
+
+	s.CurrentObject = objPage
+	s.Param.AllSubpathsClosed = true
+
+	return nil
+}
+
+// handleFillAndStrokeEvenOdd implements the B* operator
+func handleFillAndStrokeEvenOdd(s *State, args []pdf.Native, res *resource.Resource) error {
+	return handleFillAndStroke(s, args, res)
+}
+
+// handleCloseFillAndStroke implements the b operator
+func handleCloseFillAndStroke(s *State, args []pdf.Native, res *resource.Resource) error {
+	p := argParser{args: args}
+	if err := p.Check(); err != nil {
+		return err
+	}
+
+	if s.CurrentObject != objPath && s.CurrentObject != objClippingPath {
+		return errors.New("not in path context")
+	}
+
+	s.Param.CurrentX = s.Param.StartX
+	s.Param.CurrentY = s.Param.StartY
+	s.Param.ThisSubpathClosed = true
+
+	s.markIn(graphics.StateFillColor | graphics.StateLineWidth |
+		graphics.StateLineJoin | graphics.StateLineDash | graphics.StateStrokeColor)
+
+	if !s.Param.AllSubpathsClosed || len(s.Param.DashPattern) > 0 {
+		s.markIn(graphics.StateLineCap)
+	}
+
+	s.CurrentObject = objPage
+	s.Param.AllSubpathsClosed = true
+
+	return nil
+}
+
+// handleCloseFillAndStrokeEvenOdd implements the b* operator
+func handleCloseFillAndStrokeEvenOdd(s *State, args []pdf.Native, res *resource.Resource) error {
+	return handleCloseFillAndStroke(s, args, res)
+}
+
+// handleEndPath implements the n operator (end path without painting)
+func handleEndPath(s *State, args []pdf.Native, res *resource.Resource) error {
+	p := argParser{args: args}
+	if err := p.Check(); err != nil {
+		return err
+	}
+
+	if s.CurrentObject != objPath && s.CurrentObject != objClippingPath {
+		return errors.New("not in path context")
+	}
+
+	s.CurrentObject = objPage
+	s.Param.AllSubpathsClosed = true
+
+	return nil
+}
+
+// handleClip implements the W operator (set clipping path, nonzero)
+func handleClip(s *State, args []pdf.Native, res *resource.Resource) error {
+	p := argParser{args: args}
+	if err := p.Check(); err != nil {
+		return err
+	}
+
+	if s.CurrentObject != objPath {
+		return errors.New("not in path context")
+	}
+
+	s.CurrentObject = objClippingPath
+	return nil
+}
+
+// handleClipEvenOdd implements the W* operator (set clipping path, even-odd)
+func handleClipEvenOdd(s *State, args []pdf.Native, res *resource.Resource) error {
+	p := argParser{args: args}
+	if err := p.Check(); err != nil {
+		return err
+	}
+
+	if s.CurrentObject != objPath {
+		return errors.New("not in path context")
+	}
+
+	s.CurrentObject = objClippingPath
+	return nil
+}

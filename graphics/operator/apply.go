@@ -204,6 +204,20 @@ var handlers = map[pdf.Name]opHandler{
 	"y":  handleCurveToY,
 	"h":  handleClosePath,
 	"re": handleRectangle,
+
+	// Path painting
+	"S":  handleStroke,
+	"s":  handleCloseAndStroke,
+	"f":  handleFill,
+	"F":  handleFillCompat,
+	"f*": handleFillEvenOdd,
+	"B":  handleFillAndStroke,
+	"B*": handleFillAndStrokeEvenOdd,
+	"b":  handleCloseFillAndStroke,
+	"b*": handleCloseFillAndStrokeEvenOdd,
+	"n":  handleEndPath,
+	"W":  handleClip,
+	"W*": handleClipEvenOdd,
 }
 
 // handlePushState implements the q operator (save graphics state)

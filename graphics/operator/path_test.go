@@ -54,3 +54,67 @@ func TestPathConstruction_LineTo(t *testing.T) {
 			state.Param.CurrentX, state.Param.CurrentY)
 	}
 }
+
+func TestPathPainting_Stroke(t *testing.T) {
+	state := &State{CurrentObject: objPath}
+	state.Param.AllSubpathsClosed = true
+	state.Param.ThisSubpathClosed = true // last subpath is closed
+	state.Param.DashPattern = nil
+	res := &resource.Resource{}
+
+	op := Operator{Name: "S", Args: nil}
+	if err := ApplyOperator(state, op, res); err != nil {
+		t.Fatalf("S operator failed: %v", err)
+	}
+
+	// Should mark dependencies
+	expected := graphics.StateLineWidth | graphics.StateLineJoin |
+		graphics.StateLineDash | graphics.StateStrokeColor
+	if state.In&expected != expected {
+		t.Errorf("In = %v, want at least %v", state.In, expected)
+	}
+
+	// LineCap should NOT be marked for closed path without dashes
+	if state.In&graphics.StateLineCap != 0 {
+		t.Error("LineCap marked but path is closed and not dashed")
+	}
+
+	// Should reset to page context
+	if state.CurrentObject != objPage {
+		t.Errorf("CurrentObject = %v, want objPage", state.CurrentObject)
+	}
+}
+
+func TestPathPainting_StrokeOpenPath(t *testing.T) {
+	state := &State{CurrentObject: objPath}
+	state.Param.AllSubpathsClosed = false
+	state.Param.DashPattern = nil
+	res := &resource.Resource{}
+
+	op := Operator{Name: "S", Args: nil}
+	if err := ApplyOperator(state, op, res); err != nil {
+		t.Fatalf("S operator failed: %v", err)
+	}
+
+	// LineCap SHOULD be marked for open path
+	if state.In&graphics.StateLineCap == 0 {
+		t.Error("LineCap not marked for open path")
+	}
+}
+
+func TestPathPainting_Fill(t *testing.T) {
+	state := &State{CurrentObject: objPath}
+	res := &resource.Resource{}
+
+	op := Operator{Name: "f", Args: nil}
+	if err := ApplyOperator(state, op, res); err != nil {
+		t.Fatalf("f operator failed: %v", err)
+	}
+
+	if state.In&graphics.StateFillColor == 0 {
+		t.Error("FillColor not marked in In")
+	}
+	if state.CurrentObject != objPage {
+		t.Errorf("CurrentObject = %v, want objPage", state.CurrentObject)
+	}
+}
