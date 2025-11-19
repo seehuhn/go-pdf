@@ -46,6 +46,136 @@ func TestArgParser_GetFloat(t *testing.T) {
 	}
 }
 
+func TestArgParser_GetInt(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []pdf.Native
+		want    int
+		wantErr bool
+	}{
+		{"Integer", []pdf.Native{pdf.Integer(42)}, 42, false},
+		{"WrongType", []pdf.Native{pdf.Real(3.14)}, 0, true},
+		{"NoArgs", []pdf.Native{}, 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := argParser{args: tt.args}
+			got := p.GetInt()
+			if got != tt.want {
+				t.Errorf("GetInt() = %v, want %v", got, tt.want)
+			}
+			if (p.err != nil) != tt.wantErr {
+				t.Errorf("GetInt() error = %v, wantErr %v", p.err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestArgParser_GetName(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []pdf.Native
+		want    pdf.Name
+		wantErr bool
+	}{
+		{"Name", []pdf.Native{pdf.Name("foo")}, pdf.Name("foo"), false},
+		{"WrongType", []pdf.Native{pdf.Integer(42)}, pdf.Name(""), true},
+		{"NoArgs", []pdf.Native{}, pdf.Name(""), true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := argParser{args: tt.args}
+			got := p.GetName()
+			if got != tt.want {
+				t.Errorf("GetName() = %v, want %v", got, tt.want)
+			}
+			if (p.err != nil) != tt.wantErr {
+				t.Errorf("GetName() error = %v, wantErr %v", p.err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestArgParser_GetArray(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []pdf.Native
+		want    pdf.Array
+		wantErr bool
+	}{
+		{"Array", []pdf.Native{pdf.Array{pdf.Integer(1), pdf.Integer(2)}}, pdf.Array{pdf.Integer(1), pdf.Integer(2)}, false},
+		{"WrongType", []pdf.Native{pdf.Integer(42)}, nil, true},
+		{"NoArgs", []pdf.Native{}, nil, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := argParser{args: tt.args}
+			got := p.GetArray()
+			if len(got) != len(tt.want) {
+				t.Errorf("GetArray() = %v, want %v", got, tt.want)
+			}
+			if (p.err != nil) != tt.wantErr {
+				t.Errorf("GetArray() error = %v, wantErr %v", p.err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestArgParser_GetDict(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []pdf.Native
+		want    pdf.Dict
+		wantErr bool
+	}{
+		{"Dict", []pdf.Native{pdf.Dict{"Key": pdf.Integer(1)}}, pdf.Dict{"Key": pdf.Integer(1)}, false},
+		{"WrongType", []pdf.Native{pdf.Integer(42)}, nil, true},
+		{"NoArgs", []pdf.Native{}, nil, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := argParser{args: tt.args}
+			got := p.GetDict()
+			if len(got) != len(tt.want) {
+				t.Errorf("GetDict() = %v, want %v", got, tt.want)
+			}
+			if (p.err != nil) != tt.wantErr {
+				t.Errorf("GetDict() error = %v, wantErr %v", p.err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestArgParser_GetString(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []pdf.Native
+		want    pdf.String
+		wantErr bool
+	}{
+		{"String", []pdf.Native{pdf.String("hello")}, pdf.String("hello"), false},
+		{"WrongType", []pdf.Native{pdf.Integer(42)}, nil, true},
+		{"NoArgs", []pdf.Native{}, nil, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := argParser{args: tt.args}
+			got := p.GetString()
+			if string(got) != string(tt.want) {
+				t.Errorf("GetString() = %v, want %v", got, tt.want)
+			}
+			if (p.err != nil) != tt.wantErr {
+				t.Errorf("GetString() error = %v, wantErr %v", p.err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestArgParser_Check(t *testing.T) {
 	tests := []struct {
 		name    string
