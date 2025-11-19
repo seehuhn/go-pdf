@@ -195,6 +195,15 @@ var handlers = map[pdf.Name]opHandler{
 	"ri": handleSetRenderingIntent,
 	"i":  handleSetFlatness,
 	"gs": handleSetExtGState,
+
+	// Path construction
+	"m":  handleMoveTo,
+	"l":  handleLineTo,
+	"c":  handleCurveTo,
+	"v":  handleCurveToV,
+	"y":  handleCurveToY,
+	"h":  handleClosePath,
+	"re": handleRectangle,
 }
 
 // handlePushState implements the q operator (save graphics state)
