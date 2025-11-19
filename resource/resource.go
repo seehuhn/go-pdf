@@ -30,9 +30,6 @@ import (
 	"seehuhn.de/go/pdf/property"
 )
 
-// TODO(voss):
-// * Implement ExtractPattern for color.Pattern interface
-
 // PDF 2.0 sections: 14.2 7.8
 
 type Resource struct {
@@ -45,8 +42,8 @@ type Resource struct {
 	ProcSet    ProcSet
 	Properties map[pdf.Name]property.List
 
-	// SingleUse determines whether the resource dictionary is embedded directly (true)
-	// or as an indirect object reference (false).
+	// SingleUse determines whether the resource dictionary is embedded
+	// directly (true) or as an indirect object reference (false).
 	SingleUse bool
 }
 
