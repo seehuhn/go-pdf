@@ -8,13 +8,6 @@ import (
 	"seehuhn.de/go/pdf/resource"
 )
 
-const (
-	objPage         = graphics.ObjectType(1 << 0)
-	objPath         = graphics.ObjectType(1 << 1)
-	objText         = graphics.ObjectType(1 << 2)
-	objClippingPath = graphics.ObjectType(1 << 3)
-)
-
 // handleMoveTo implements the m operator (begin new subpath)
 func handleMoveTo(s *State, args []pdf.Native, res *resource.Resource) error {
 	p := argParser{args: args}
@@ -24,21 +17,21 @@ func handleMoveTo(s *State, args []pdf.Native, res *resource.Resource) error {
 		return err
 	}
 
-	if s.CurrentObject != objPage && s.CurrentObject != objPath {
+	if s.CurrentObject != ObjPage && s.CurrentObject != ObjPath {
 		return errors.New("m: invalid context")
 	}
 
 	// Starting a new path from page context
-	if s.CurrentObject == objPage {
+	if s.CurrentObject == ObjPage {
 		s.Param.AllSubpathsClosed = true
 	}
 
 	// Finalize any existing open subpath
-	if s.CurrentObject == objPath && !s.Param.ThisSubpathClosed {
+	if s.CurrentObject == ObjPath && !s.Param.ThisSubpathClosed {
 		s.Param.AllSubpathsClosed = false
 	}
 
-	s.CurrentObject = objPath
+	s.CurrentObject = ObjPath
 	s.Param.StartX, s.Param.StartY = x, y
 	s.Param.CurrentX, s.Param.CurrentY = x, y
 	s.Param.ThisSubpathClosed = false
@@ -55,7 +48,7 @@ func handleLineTo(s *State, args []pdf.Native, res *resource.Resource) error {
 		return err
 	}
 
-	if s.CurrentObject != objPath {
+	if s.CurrentObject != ObjPath {
 		return errors.New("not in path context")
 	}
 
@@ -76,7 +69,7 @@ func handleCurveTo(s *State, args []pdf.Native, res *resource.Resource) error {
 		return err
 	}
 
-	if s.CurrentObject != objPath {
+	if s.CurrentObject != ObjPath {
 		return errors.New("not in path context")
 	}
 
@@ -95,7 +88,7 @@ func handleCurveToV(s *State, args []pdf.Native, res *resource.Resource) error {
 		return err
 	}
 
-	if s.CurrentObject != objPath {
+	if s.CurrentObject != ObjPath {
 		return errors.New("not in path context")
 	}
 
@@ -114,7 +107,7 @@ func handleCurveToY(s *State, args []pdf.Native, res *resource.Resource) error {
 		return err
 	}
 
-	if s.CurrentObject != objPath {
+	if s.CurrentObject != ObjPath {
 		return errors.New("not in path context")
 	}
 
@@ -129,7 +122,7 @@ func handleClosePath(s *State, args []pdf.Native, res *resource.Resource) error 
 		return err
 	}
 
-	if s.CurrentObject != objPath {
+	if s.CurrentObject != ObjPath {
 		return errors.New("not in path context")
 	}
 
@@ -150,21 +143,21 @@ func handleRectangle(s *State, args []pdf.Native, res *resource.Resource) error 
 		return err
 	}
 
-	if s.CurrentObject != objPage && s.CurrentObject != objPath {
+	if s.CurrentObject != ObjPage && s.CurrentObject != ObjPath {
 		return errors.New("re: invalid context")
 	}
 
 	// Starting a new path from page context
-	if s.CurrentObject == objPage {
+	if s.CurrentObject == ObjPage {
 		s.Param.AllSubpathsClosed = true
 	}
 
 	// Finalize any existing open subpath
-	if s.CurrentObject == objPath && !s.Param.ThisSubpathClosed {
+	if s.CurrentObject == ObjPath && !s.Param.ThisSubpathClosed {
 		s.Param.AllSubpathsClosed = false
 	}
 
-	s.CurrentObject = objPath
+	s.CurrentObject = ObjPath
 	// Rectangle creates a closed subpath
 	s.Param.StartX, s.Param.StartY = x, y
 	s.Param.CurrentX, s.Param.CurrentY = x, y
@@ -180,7 +173,7 @@ func handleStroke(s *State, args []pdf.Native, res *resource.Resource) error {
 		return err
 	}
 
-	if s.CurrentObject != objPath && s.CurrentObject != objClippingPath {
+	if s.CurrentObject != ObjPath && s.CurrentObject != ObjClippingPath {
 		return errors.New("not in path context")
 	}
 
@@ -199,7 +192,7 @@ func handleStroke(s *State, args []pdf.Native, res *resource.Resource) error {
 	}
 
 	// Reset path
-	s.CurrentObject = objPage
+	s.CurrentObject = ObjPage
 	s.Param.AllSubpathsClosed = true
 
 	return nil
@@ -212,7 +205,7 @@ func handleCloseAndStroke(s *State, args []pdf.Native, res *resource.Resource) e
 		return err
 	}
 
-	if s.CurrentObject != objPath && s.CurrentObject != objClippingPath {
+	if s.CurrentObject != ObjPath && s.CurrentObject != ObjClippingPath {
 		return errors.New("not in path context")
 	}
 
@@ -230,7 +223,7 @@ func handleCloseAndStroke(s *State, args []pdf.Native, res *resource.Resource) e
 		s.markIn(graphics.StateLineCap)
 	}
 
-	s.CurrentObject = objPage
+	s.CurrentObject = ObjPage
 	s.Param.AllSubpathsClosed = true
 
 	return nil
@@ -243,12 +236,12 @@ func handleFill(s *State, args []pdf.Native, res *resource.Resource) error {
 		return err
 	}
 
-	if s.CurrentObject != objPath && s.CurrentObject != objClippingPath {
+	if s.CurrentObject != ObjPath && s.CurrentObject != ObjClippingPath {
 		return errors.New("not in path context")
 	}
 
 	s.markIn(graphics.StateFillColor)
-	s.CurrentObject = objPage
+	s.CurrentObject = ObjPage
 	s.Param.AllSubpathsClosed = true
 
 	return nil
@@ -266,12 +259,12 @@ func handleFillEvenOdd(s *State, args []pdf.Native, res *resource.Resource) erro
 		return err
 	}
 
-	if s.CurrentObject != objPath && s.CurrentObject != objClippingPath {
+	if s.CurrentObject != ObjPath && s.CurrentObject != ObjClippingPath {
 		return errors.New("not in path context")
 	}
 
 	s.markIn(graphics.StateFillColor)
-	s.CurrentObject = objPage
+	s.CurrentObject = ObjPage
 	s.Param.AllSubpathsClosed = true
 
 	return nil
@@ -284,7 +277,7 @@ func handleFillAndStroke(s *State, args []pdf.Native, res *resource.Resource) er
 		return err
 	}
 
-	if s.CurrentObject != objPath && s.CurrentObject != objClippingPath {
+	if s.CurrentObject != ObjPath && s.CurrentObject != ObjClippingPath {
 		return errors.New("not in path context")
 	}
 
@@ -299,7 +292,7 @@ func handleFillAndStroke(s *State, args []pdf.Native, res *resource.Resource) er
 		s.markIn(graphics.StateLineCap)
 	}
 
-	s.CurrentObject = objPage
+	s.CurrentObject = ObjPage
 	s.Param.AllSubpathsClosed = true
 
 	return nil
@@ -317,7 +310,7 @@ func handleCloseFillAndStroke(s *State, args []pdf.Native, res *resource.Resourc
 		return err
 	}
 
-	if s.CurrentObject != objPath && s.CurrentObject != objClippingPath {
+	if s.CurrentObject != ObjPath && s.CurrentObject != ObjClippingPath {
 		return errors.New("not in path context")
 	}
 
@@ -332,7 +325,7 @@ func handleCloseFillAndStroke(s *State, args []pdf.Native, res *resource.Resourc
 		s.markIn(graphics.StateLineCap)
 	}
 
-	s.CurrentObject = objPage
+	s.CurrentObject = ObjPage
 	s.Param.AllSubpathsClosed = true
 
 	return nil
@@ -350,11 +343,11 @@ func handleEndPath(s *State, args []pdf.Native, res *resource.Resource) error {
 		return err
 	}
 
-	if s.CurrentObject != objPath && s.CurrentObject != objClippingPath {
+	if s.CurrentObject != ObjPath && s.CurrentObject != ObjClippingPath {
 		return errors.New("not in path context")
 	}
 
-	s.CurrentObject = objPage
+	s.CurrentObject = ObjPage
 	s.Param.AllSubpathsClosed = true
 
 	return nil
@@ -367,11 +360,11 @@ func handleClip(s *State, args []pdf.Native, res *resource.Resource) error {
 		return err
 	}
 
-	if s.CurrentObject != objPath {
+	if s.CurrentObject != ObjPath {
 		return errors.New("not in path context")
 	}
 
-	s.CurrentObject = objClippingPath
+	s.CurrentObject = ObjClippingPath
 	return nil
 }
 
@@ -382,10 +375,10 @@ func handleClipEvenOdd(s *State, args []pdf.Native, res *resource.Resource) erro
 		return err
 	}
 
-	if s.CurrentObject != objPath {
+	if s.CurrentObject != ObjPath {
 		return errors.New("not in path context")
 	}
 
-	s.CurrentObject = objClippingPath
+	s.CurrentObject = ObjClippingPath
 	return nil
 }

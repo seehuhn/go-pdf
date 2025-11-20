@@ -10,7 +10,7 @@ import (
 )
 
 func TestIntegration_PathWithStroke(t *testing.T) {
-	state := &State{CurrentObject: objPage}
+	state := &State{CurrentObject: ObjPage}
 	res := &resource.Resource{}
 
 	ops := []Operator{
@@ -23,7 +23,7 @@ func TestIntegration_PathWithStroke(t *testing.T) {
 	}
 
 	for i, op := range ops {
-		if err := ApplyOperator(state, op, res); err != nil {
+		if err := state.Apply(res, op); err != nil {
 			t.Fatalf("operator %d (%s) failed: %v", i, op.Name, err)
 		}
 	}
@@ -47,7 +47,7 @@ func TestIntegration_PathWithStroke(t *testing.T) {
 }
 
 func TestIntegration_TextRenderingDependencies(t *testing.T) {
-	state := &State{CurrentObject: objPage}
+	state := &State{CurrentObject: ObjPage}
 	mockFont := &mockFontInstance{}
 	res := &resource.Resource{
 		Font: map[pdf.Name]font.Instance{
@@ -64,7 +64,7 @@ func TestIntegration_TextRenderingDependencies(t *testing.T) {
 	}
 
 	for i, op := range ops {
-		if err := ApplyOperator(state, op, res); err != nil {
+		if err := state.Apply(res, op); err != nil {
 			t.Fatalf("operator %d (%s) failed: %v", i, op.Name, err)
 		}
 	}
@@ -79,18 +79,18 @@ func TestIntegration_TextRenderingDependencies(t *testing.T) {
 }
 
 func TestIntegration_GraphicsStateStack(t *testing.T) {
-	state := &State{CurrentObject: objPage}
+	state := &State{CurrentObject: ObjPage}
 	res := &resource.Resource{}
 
 	// Set line width
 	op1 := Operator{Name: "w", Args: []pdf.Native{pdf.Real(2.0)}}
-	if err := ApplyOperator(state, op1, res); err != nil {
+	if err := state.Apply(res, op1); err != nil {
 		t.Fatalf("w failed: %v", err)
 	}
 
 	// Push state
 	opQ := Operator{Name: "q", Args: nil}
-	if err := ApplyOperator(state, opQ, res); err != nil {
+	if err := state.Apply(res, opQ); err != nil {
 		t.Fatalf("q failed: %v", err)
 	}
 
@@ -98,13 +98,13 @@ func TestIntegration_GraphicsStateStack(t *testing.T) {
 
 	// Modify state
 	op2 := Operator{Name: "w", Args: []pdf.Native{pdf.Real(5.0)}}
-	if err := ApplyOperator(state, op2, res); err != nil {
+	if err := state.Apply(res, op2); err != nil {
 		t.Fatalf("second w failed: %v", err)
 	}
 
 	// Pop state
 	opPop := Operator{Name: "Q", Args: nil}
-	if err := ApplyOperator(state, opPop, res); err != nil {
+	if err := state.Apply(res, opPop); err != nil {
 		t.Fatalf("Q failed: %v", err)
 	}
 

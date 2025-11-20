@@ -18,7 +18,7 @@ func TestMiscOperators_XObject(t *testing.T) {
 	}
 
 	op := Operator{Name: "Do", Args: []pdf.Native{pdf.Name("Im1")}}
-	if err := ApplyOperator(state, op, res); err != nil {
+	if err := state.Apply(res, op); err != nil {
 		t.Fatalf("Do operator failed: %v", err)
 	}
 }
@@ -29,13 +29,13 @@ func TestMiscOperators_MarkedContent(t *testing.T) {
 
 	// BMC
 	opBMC := Operator{Name: "BMC", Args: []pdf.Native{pdf.Name("Tag1")}}
-	if err := ApplyOperator(state, opBMC, res); err != nil {
+	if err := state.Apply(res, opBMC); err != nil {
 		t.Fatalf("BMC operator failed: %v", err)
 	}
 
 	// EMC
 	opEMC := Operator{Name: "EMC", Args: nil}
-	if err := ApplyOperator(state, opEMC, res); err != nil {
+	if err := state.Apply(res, opEMC); err != nil {
 		t.Fatalf("EMC operator failed: %v", err)
 	}
 }
@@ -46,7 +46,7 @@ func TestMiscOperators_SpecialOperators(t *testing.T) {
 
 	// %raw%
 	opRaw := Operator{Name: "%raw%", Args: []pdf.Native{pdf.String("  % comment\n")}}
-	if err := ApplyOperator(state, opRaw, res); err != nil {
+	if err := state.Apply(res, opRaw); err != nil {
 		t.Fatalf("%%raw%% operator failed: %v", err)
 	}
 
@@ -58,7 +58,7 @@ func TestMiscOperators_SpecialOperators(t *testing.T) {
 			pdf.String("imagedata"),
 		},
 	}
-	if err := ApplyOperator(state, opImage, res); err != nil {
+	if err := state.Apply(res, opImage); err != nil {
 		t.Fatalf("%%image%% operator failed: %v", err)
 	}
 }

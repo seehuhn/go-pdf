@@ -9,7 +9,7 @@ import (
 )
 
 func TestPathConstruction_MoveTo(t *testing.T) {
-	state := &State{CurrentObject: graphics.ObjectType(1)} // objPage
+	state := &State{CurrentObject: ObjectType(1)} // objPage
 	res := &resource.Resource{}
 
 	op := Operator{
@@ -17,7 +17,7 @@ func TestPathConstruction_MoveTo(t *testing.T) {
 		Args: []pdf.Native{pdf.Real(10.0), pdf.Real(20.0)},
 	}
 
-	if err := ApplyOperator(state, op, res); err != nil {
+	if err := state.Apply(res, op); err != nil {
 		t.Fatalf("m operator failed: %v", err)
 	}
 
@@ -29,13 +29,13 @@ func TestPathConstruction_MoveTo(t *testing.T) {
 		t.Errorf("Start point = (%v, %v), want (10, 20)",
 			state.Param.StartX, state.Param.StartY)
 	}
-	if state.CurrentObject != graphics.ObjectType(2) { // objPath
+	if state.CurrentObject != ObjectType(2) { // objPath
 		t.Errorf("CurrentObject = %v, want objPath", state.CurrentObject)
 	}
 }
 
 func TestPathConstruction_LineTo(t *testing.T) {
-	state := &State{CurrentObject: graphics.ObjectType(2)} // objPath
+	state := &State{CurrentObject: ObjectType(2)} // objPath
 	state.Param.CurrentX = 10.0
 	state.Param.CurrentY = 20.0
 	res := &resource.Resource{}
@@ -45,7 +45,7 @@ func TestPathConstruction_LineTo(t *testing.T) {
 		Args: []pdf.Native{pdf.Real(30.0), pdf.Real(40.0)},
 	}
 
-	if err := ApplyOperator(state, op, res); err != nil {
+	if err := state.Apply(res, op); err != nil {
 		t.Fatalf("l operator failed: %v", err)
 	}
 
@@ -56,14 +56,14 @@ func TestPathConstruction_LineTo(t *testing.T) {
 }
 
 func TestPathPainting_Stroke(t *testing.T) {
-	state := &State{CurrentObject: objPath}
+	state := &State{CurrentObject: ObjPath}
 	state.Param.AllSubpathsClosed = true
 	state.Param.ThisSubpathClosed = true // last subpath is closed
 	state.Param.DashPattern = nil
 	res := &resource.Resource{}
 
 	op := Operator{Name: "S", Args: nil}
-	if err := ApplyOperator(state, op, res); err != nil {
+	if err := state.Apply(res, op); err != nil {
 		t.Fatalf("S operator failed: %v", err)
 	}
 
@@ -80,19 +80,19 @@ func TestPathPainting_Stroke(t *testing.T) {
 	}
 
 	// Should reset to page context
-	if state.CurrentObject != objPage {
+	if state.CurrentObject != ObjPage {
 		t.Errorf("CurrentObject = %v, want objPage", state.CurrentObject)
 	}
 }
 
 func TestPathPainting_StrokeOpenPath(t *testing.T) {
-	state := &State{CurrentObject: objPath}
+	state := &State{CurrentObject: ObjPath}
 	state.Param.AllSubpathsClosed = false
 	state.Param.DashPattern = nil
 	res := &resource.Resource{}
 
 	op := Operator{Name: "S", Args: nil}
-	if err := ApplyOperator(state, op, res); err != nil {
+	if err := state.Apply(res, op); err != nil {
 		t.Fatalf("S operator failed: %v", err)
 	}
 
@@ -103,18 +103,18 @@ func TestPathPainting_StrokeOpenPath(t *testing.T) {
 }
 
 func TestPathPainting_Fill(t *testing.T) {
-	state := &State{CurrentObject: objPath}
+	state := &State{CurrentObject: ObjPath}
 	res := &resource.Resource{}
 
 	op := Operator{Name: "f", Args: nil}
-	if err := ApplyOperator(state, op, res); err != nil {
+	if err := state.Apply(res, op); err != nil {
 		t.Fatalf("f operator failed: %v", err)
 	}
 
 	if state.In&graphics.StateFillColor == 0 {
 		t.Error("FillColor not marked in In")
 	}
-	if state.CurrentObject != objPage {
+	if state.CurrentObject != ObjPage {
 		t.Errorf("CurrentObject = %v, want objPage", state.CurrentObject)
 	}
 }

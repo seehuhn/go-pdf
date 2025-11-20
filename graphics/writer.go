@@ -31,7 +31,7 @@ type Writer struct {
 	Resources *pdf.Resources
 	Err       error
 
-	currentObject ObjectType
+	currentObject objectType
 
 	State
 	stack []State
@@ -130,7 +130,7 @@ func (w *Writer) writeObjects(obj ...pdf.Object) {
 
 // IsValid returns true, if the current graphics object is one of the given types
 // and if p.Err is nil.  Otherwise it sets p.Err and returns false.
-func (w *Writer) isValid(cmd string, ss ObjectType) bool {
+func (w *Writer) isValid(cmd string, ss objectType) bool {
 	if w.Err != nil {
 		return false
 	}
@@ -283,19 +283,19 @@ func getCategoryPrefix(category resourceCategory) pdf.Name {
 }
 
 // See Figure 9 (p. 113) of PDF 32000-1:2008.
-type ObjectType int
+type objectType int
 
 const (
-	objPage ObjectType = 1 << iota
+	objPage objectType = 1 << iota
 	objPath
 	objText
 	objClippingPath
-	objInlineImage
+	// objInlineImage
 	// objShading
 	// objExternal
 )
 
-func (s ObjectType) String() string {
+func (s objectType) String() string {
 	switch s {
 	case objPage:
 		return "page"
@@ -305,8 +305,6 @@ func (s ObjectType) String() string {
 		return "text"
 	case objClippingPath:
 		return "clipping path"
-	case objInlineImage:
-		return "inline image"
 	default:
 		return fmt.Sprintf("objectType(%d)", s)
 	}

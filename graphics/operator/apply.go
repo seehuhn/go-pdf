@@ -1,6 +1,6 @@
 // Package operator provides content stream operator handling.
 //
-// The ApplyOperator function analyzes PDF content stream operators and tracks
+// The State.Apply method analyzes PDF content stream operators and tracks
 // how they modify graphics state. This supports both reading existing PDF files
 // and implementing operator-based graphics writing.
 //
@@ -20,6 +20,31 @@ import (
 	"seehuhn.de/go/pdf/resource"
 )
 
+// See Figure 9 (p. 113) of PDF 32000-1:2008.
+type ObjectType byte
+
+func (s ObjectType) String() string {
+	switch s {
+	case ObjPage:
+		return "page"
+	case ObjPath:
+		return "path"
+	case ObjText:
+		return "text"
+	case ObjClippingPath:
+		return "clipping path"
+	default:
+		return fmt.Sprintf("objectType(%d)", s)
+	}
+}
+
+const (
+	ObjPage         ObjectType = 1 << iota // Page-level context (initial state)
+	ObjPath                                // Path construction in progress
+	ObjText                                // Inside text object (BT...ET)
+	ObjClippingPath                        // Clipping path operator executed
+)
+
 type State struct {
 	// Param contains the current values of all graphics parameters.
 	// Only those parameters listed in Out are guaranteed to have valid values.
@@ -34,10 +59,35 @@ type State struct {
 	Out graphics.StateBits
 
 	// CurrentObject lists the current graphics object being constructed.
-	CurrentObject graphics.ObjectType
+	CurrentObject ObjectType
 
 	// stack is the graphics state stack for q/Q
 	stack []savedState
+}
+
+// NewState creates a State initialized to the default PDF graphics state.
+// The initial CurrentObject is ObjPage.
+func NewState() *State {
+	return &State{
+		Param:         *graphics.NewState().Parameters,
+		CurrentObject: ObjPage,
+	}
+}
+
+// Apply applies a single content stream operator to the state.
+//
+// The res parameter must not be nil. It provides access to fonts, XObjects,
+// color spaces, and other PDF resources referenced by operators. Individual
+// resource maps within res may be nil if not needed for the content stream.
+//
+// Returns an error if the operator is unknown, has invalid arguments,
+// or is used in an invalid context (e.g., text operators outside BT...ET).
+func (state *State) Apply(res *resource.Resource, op Operator) error {
+	handler, ok := handlers[op.Name]
+	if !ok {
+		return fmt.Errorf("unknown operator: %s", op.Name)
+	}
+	return handler(state, op.Args, res)
 }
 
 // argParser provides a scanner-style API for parsing operator arguments
@@ -178,15 +228,6 @@ func (s *State) markOut(bits graphics.StateBits) {
 type savedState struct {
 	param *graphics.Parameters
 	out   graphics.StateBits
-}
-
-// ApplyOperator applies a single content stream operator to the state
-func ApplyOperator(state *State, op Operator, res *resource.Resource) error {
-	handler, ok := handlers[op.Name]
-	if !ok {
-		return fmt.Errorf("unknown operator: %s", op.Name)
-	}
-	return handler(state, op.Args, res)
 }
 
 // opHandler is the function signature for operator handlers

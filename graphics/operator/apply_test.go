@@ -13,7 +13,7 @@ func TestApplyOperator_BasicStructure(t *testing.T) {
 	op := Operator{Name: "q", Args: nil}
 	res := &resource.Resource{}
 
-	err := ApplyOperator(state, op, res)
+	err := state.Apply(res, op)
 	if err != nil {
 		t.Errorf("ApplyOperator returned error for valid operator: %v", err)
 	}

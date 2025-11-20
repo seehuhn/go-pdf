@@ -16,11 +16,11 @@ func handleTextBegin(s *State, args []pdf.Native, res *resource.Resource) error 
 		return err
 	}
 
-	if s.CurrentObject != objPage {
+	if s.CurrentObject != ObjPage {
 		return errors.New("BT: not in page context")
 	}
 
-	s.CurrentObject = objText
+	s.CurrentObject = ObjText
 	s.Param.TextMatrix = matrix.Identity
 	s.Param.TextLineMatrix = matrix.Identity
 	s.markOut(graphics.StateTextMatrix)
@@ -35,11 +35,11 @@ func handleTextEnd(s *State, args []pdf.Native, res *resource.Resource) error {
 		return err
 	}
 
-	if s.CurrentObject != objText {
+	if s.CurrentObject != ObjText {
 		return errors.New("not in text object")
 	}
 
-	s.CurrentObject = objPage
+	s.CurrentObject = ObjPage
 	s.Out &= ^graphics.StateTextMatrix
 
 	return nil
@@ -152,7 +152,7 @@ func handleTextMoveOffset(s *State, args []pdf.Native, res *resource.Resource) e
 		return err
 	}
 
-	if s.CurrentObject != objText {
+	if s.CurrentObject != ObjText {
 		return errors.New("not in text object")
 	}
 
@@ -173,7 +173,7 @@ func handleTextMoveOffsetSetLeading(s *State, args []pdf.Native, res *resource.R
 		return err
 	}
 
-	if s.CurrentObject != objText {
+	if s.CurrentObject != ObjText {
 		return errors.New("not in text object")
 	}
 
@@ -202,7 +202,7 @@ func handleTextSetMatrix(s *State, args []pdf.Native, res *resource.Resource) er
 		return err
 	}
 
-	if s.CurrentObject != objText {
+	if s.CurrentObject != ObjText {
 		return errors.New("not in text object")
 	}
 
@@ -221,7 +221,7 @@ func handleTextNextLine(s *State, args []pdf.Native, res *resource.Resource) err
 		return err
 	}
 
-	if s.CurrentObject != objText {
+	if s.CurrentObject != ObjText {
 		return errors.New("not in text object")
 	}
 
@@ -245,7 +245,7 @@ func handleTextShow(s *State, args []pdf.Native, res *resource.Resource) error {
 		return err
 	}
 
-	if s.CurrentObject != objText {
+	if s.CurrentObject != ObjText {
 		return errors.New("not in text object")
 	}
 

@@ -13,16 +13,16 @@ import (
 )
 
 func TestTextOperators_BeginEnd(t *testing.T) {
-	state := &State{CurrentObject: objPage}
+	state := &State{CurrentObject: ObjPage}
 	res := &resource.Resource{}
 
 	// Begin text
 	opBT := Operator{Name: "BT", Args: nil}
-	if err := ApplyOperator(state, opBT, res); err != nil {
+	if err := state.Apply(res, opBT); err != nil {
 		t.Fatalf("BT operator failed: %v", err)
 	}
 
-	if state.CurrentObject != objText {
+	if state.CurrentObject != ObjText {
 		t.Errorf("CurrentObject = %v, want objText", state.CurrentObject)
 	}
 	if state.Param.TextMatrix != matrix.Identity {
@@ -34,11 +34,11 @@ func TestTextOperators_BeginEnd(t *testing.T) {
 
 	// End text
 	opET := Operator{Name: "ET", Args: nil}
-	if err := ApplyOperator(state, opET, res); err != nil {
+	if err := state.Apply(res, opET); err != nil {
 		t.Fatalf("ET operator failed: %v", err)
 	}
 
-	if state.CurrentObject != objPage {
+	if state.CurrentObject != ObjPage {
 		t.Errorf("CurrentObject = %v, want objPage", state.CurrentObject)
 	}
 	if state.Out&graphics.StateTextMatrix != 0 {
@@ -60,7 +60,7 @@ func TestTextOperators_SetFont(t *testing.T) {
 		Args: []pdf.Native{pdf.Name("F1"), pdf.Real(12.0)},
 	}
 
-	if err := ApplyOperator(state, op, res); err != nil {
+	if err := state.Apply(res, op); err != nil {
 		t.Fatalf("Tf operator failed: %v", err)
 	}
 
@@ -155,12 +155,12 @@ func TestTextOperators_RenderingModeDependencies(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			state := &State{CurrentObject: objText}
+			state := &State{CurrentObject: ObjText}
 			state.Param.TextRenderingMode = tt.renderingMode
 			res := &resource.Resource{}
 
 			op := Operator{Name: "Tj", Args: []pdf.Native{pdf.String("test")}}
-			if err := ApplyOperator(state, op, res); err != nil {
+			if err := state.Apply(res, op); err != nil {
 				t.Fatalf("Tj operator failed: %v", err)
 			}
 
@@ -202,13 +202,13 @@ func TestTextOperators_RenderingModeDependencies(t *testing.T) {
 // modify TextMatrix correctly
 func TestTextOperators_TextPositioning(t *testing.T) {
 	t.Run("Td operator", func(t *testing.T) {
-		state := &State{CurrentObject: objText}
+		state := &State{CurrentObject: ObjText}
 		state.Param.TextLineMatrix = matrix.Identity
 		state.Param.TextMatrix = matrix.Identity
 		res := &resource.Resource{}
 
 		op := Operator{Name: "Td", Args: []pdf.Native{pdf.Real(10.0), pdf.Real(20.0)}}
-		if err := ApplyOperator(state, op, res); err != nil {
+		if err := state.Apply(res, op); err != nil {
 			t.Fatalf("Td operator failed: %v", err)
 		}
 
@@ -225,13 +225,13 @@ func TestTextOperators_TextPositioning(t *testing.T) {
 	})
 
 	t.Run("TD operator", func(t *testing.T) {
-		state := &State{CurrentObject: objText}
+		state := &State{CurrentObject: ObjText}
 		state.Param.TextLineMatrix = matrix.Identity
 		state.Param.TextMatrix = matrix.Identity
 		res := &resource.Resource{}
 
 		op := Operator{Name: "TD", Args: []pdf.Native{pdf.Real(10.0), pdf.Real(-5.0)}}
-		if err := ApplyOperator(state, op, res); err != nil {
+		if err := state.Apply(res, op); err != nil {
 			t.Fatalf("TD operator failed: %v", err)
 		}
 
@@ -245,7 +245,7 @@ func TestTextOperators_TextPositioning(t *testing.T) {
 	})
 
 	t.Run("Tm operator", func(t *testing.T) {
-		state := &State{CurrentObject: objText}
+		state := &State{CurrentObject: ObjText}
 		res := &resource.Resource{}
 
 		op := Operator{
@@ -256,7 +256,7 @@ func TestTextOperators_TextPositioning(t *testing.T) {
 				pdf.Real(100.0), pdf.Real(200.0),
 			},
 		}
-		if err := ApplyOperator(state, op, res); err != nil {
+		if err := state.Apply(res, op); err != nil {
 			t.Fatalf("Tm operator failed: %v", err)
 		}
 
@@ -270,14 +270,14 @@ func TestTextOperators_TextPositioning(t *testing.T) {
 	})
 
 	t.Run("T* operator", func(t *testing.T) {
-		state := &State{CurrentObject: objText}
+		state := &State{CurrentObject: ObjText}
 		state.Param.TextLineMatrix = matrix.Identity
 		state.Param.TextMatrix = matrix.Identity
 		state.Param.TextLeading = 12.0
 		res := &resource.Resource{}
 
 		op := Operator{Name: "T*", Args: nil}
-		if err := ApplyOperator(state, op, res); err != nil {
+		if err := state.Apply(res, op); err != nil {
 			t.Fatalf("T* operator failed: %v", err)
 		}
 
@@ -297,14 +297,14 @@ func TestTextOperators_TextPositioning(t *testing.T) {
 // TestTextOperators_CompositeOperators verifies composite text showing operators
 func TestTextOperators_CompositeOperators(t *testing.T) {
 	t.Run("' operator", func(t *testing.T) {
-		state := &State{CurrentObject: objText}
+		state := &State{CurrentObject: ObjText}
 		state.Param.TextLineMatrix = matrix.Identity
 		state.Param.TextMatrix = matrix.Identity
 		state.Param.TextLeading = 10.0
 		res := &resource.Resource{}
 
 		op := Operator{Name: "'", Args: []pdf.Native{pdf.String("test")}}
-		if err := ApplyOperator(state, op, res); err != nil {
+		if err := state.Apply(res, op); err != nil {
 			t.Fatalf("' operator failed: %v", err)
 		}
 
@@ -318,7 +318,7 @@ func TestTextOperators_CompositeOperators(t *testing.T) {
 	})
 
 	t.Run("\" operator", func(t *testing.T) {
-		state := &State{CurrentObject: objText}
+		state := &State{CurrentObject: ObjText}
 		state.Param.TextLineMatrix = matrix.Identity
 		state.Param.TextMatrix = matrix.Identity
 		state.Param.TextLeading = 10.0
@@ -328,7 +328,7 @@ func TestTextOperators_CompositeOperators(t *testing.T) {
 			Name: `"`,
 			Args: []pdf.Native{pdf.Real(1.0), pdf.Real(2.0), pdf.String("test")},
 		}
-		if err := ApplyOperator(state, op, res); err != nil {
+		if err := state.Apply(res, op); err != nil {
 			t.Fatalf("\" operator failed: %v", err)
 		}
 
@@ -360,7 +360,7 @@ func TestTextOperators_FontResolution(t *testing.T) {
 		}
 
 		op := Operator{Name: "Tf", Args: []pdf.Native{pdf.Name("F1"), pdf.Real(12.0)}}
-		if err := ApplyOperator(state, op, res); err != nil {
+		if err := state.Apply(res, op); err != nil {
 			t.Fatalf("Tf operator failed: %v", err)
 		}
 
@@ -382,7 +382,7 @@ func TestTextOperators_FontResolution(t *testing.T) {
 		}
 
 		op := Operator{Name: "Tf", Args: []pdf.Native{pdf.Name("F1"), pdf.Real(12.0)}}
-		err := ApplyOperator(state, op, res)
+		err := state.Apply(res, op)
 		if err == nil {
 			t.Error("expected error for missing font")
 		}
@@ -393,7 +393,7 @@ func TestTextOperators_FontResolution(t *testing.T) {
 		res := &resource.Resource{}
 
 		op := Operator{Name: "Tf", Args: []pdf.Native{pdf.Name("F1"), pdf.Real(12.0)}}
-		err := ApplyOperator(state, op, res)
+		err := state.Apply(res, op)
 		if err == nil {
 			t.Error("expected error when no font resources available")
 		}
@@ -406,17 +406,17 @@ func TestTextOperators_ContextValidation(t *testing.T) {
 		name     string
 		operator string
 		args     []pdf.Native
-		object   graphics.ObjectType
+		object   ObjectType
 		wantErr  bool
 	}{
-		{"BT in page context", "BT", nil, objPage, false},
-		{"BT in text context", "BT", nil, objText, true},
-		{"ET in text context", "ET", nil, objText, false},
-		{"ET in page context", "ET", nil, objPage, true},
-		{"Td in text context", "Td", []pdf.Native{pdf.Real(0), pdf.Real(0)}, objText, false},
-		{"Td in page context", "Td", []pdf.Native{pdf.Real(0), pdf.Real(0)}, objPage, true},
-		{"Tj in text context", "Tj", []pdf.Native{pdf.String("test")}, objText, false},
-		{"Tj in page context", "Tj", []pdf.Native{pdf.String("test")}, objPage, true},
+		{"BT in page context", "BT", nil, ObjPage, false},
+		{"BT in text context", "BT", nil, ObjText, true},
+		{"ET in text context", "ET", nil, ObjText, false},
+		{"ET in page context", "ET", nil, ObjPage, true},
+		{"Td in text context", "Td", []pdf.Native{pdf.Real(0), pdf.Real(0)}, ObjText, false},
+		{"Td in page context", "Td", []pdf.Native{pdf.Real(0), pdf.Real(0)}, ObjPage, true},
+		{"Tj in text context", "Tj", []pdf.Native{pdf.String("test")}, ObjText, false},
+		{"Tj in page context", "Tj", []pdf.Native{pdf.String("test")}, ObjPage, true},
 	}
 
 	for _, tt := range tests {
@@ -425,7 +425,7 @@ func TestTextOperators_ContextValidation(t *testing.T) {
 			res := &resource.Resource{}
 
 			op := Operator{Name: pdf.Name(tt.operator), Args: tt.args}
-			err := ApplyOperator(state, op, res)
+			err := state.Apply(res, op)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ApplyOperator() error = %v, wantErr %v", err, tt.wantErr)
 			}
