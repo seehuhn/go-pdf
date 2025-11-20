@@ -261,6 +261,31 @@ var handlers = map[pdf.Name]opHandler{
 	"rg": handleSetFillRGB,
 	"K":  handleSetStrokeCMYK,
 	"k":  handleSetFillCMYK,
+
+	// Shading
+	"sh": handleShading,
+
+	// XObjects
+	"Do": handleXObject,
+
+	// Marked content
+	"MP":  handleMarkedContentPoint,
+	"DP":  handleMarkedContentPointWithProperties,
+	"BMC": handleBeginMarkedContent,
+	"BDC": handleBeginMarkedContentWithProperties,
+	"EMC": handleEndMarkedContent,
+
+	// Type 3 fonts
+	"d0": handleType3d0,
+	"d1": handleType3d1,
+
+	// Compatibility
+	"BX": handleBeginCompatibility,
+	"EX": handleEndCompatibility,
+
+	// Special operators
+	"%raw%":   handleRawContent,
+	"%image%": handleInlineImage,
 }
 
 // handlePushState implements the q operator (save graphics state)
