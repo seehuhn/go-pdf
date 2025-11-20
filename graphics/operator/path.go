@@ -28,6 +28,11 @@ func handleMoveTo(s *State, args []pdf.Native, res *resource.Resource) error {
 		return errors.New("m: invalid context")
 	}
 
+	// Starting a new path from page context
+	if s.CurrentObject == objPage {
+		s.Param.AllSubpathsClosed = true
+	}
+
 	// Finalize any existing open subpath
 	if s.CurrentObject == objPath && !s.Param.ThisSubpathClosed {
 		s.Param.AllSubpathsClosed = false
@@ -147,6 +152,11 @@ func handleRectangle(s *State, args []pdf.Native, res *resource.Resource) error 
 
 	if s.CurrentObject != objPage && s.CurrentObject != objPath {
 		return errors.New("re: invalid context")
+	}
+
+	// Starting a new path from page context
+	if s.CurrentObject == objPage {
+		s.Param.AllSubpathsClosed = true
 	}
 
 	// Finalize any existing open subpath

@@ -1,3 +1,14 @@
+// Package operator provides content stream operator handling.
+//
+// The ApplyOperator function analyzes PDF content stream operators and tracks
+// how they modify graphics state. This supports both reading existing PDF files
+// and implementing operator-based graphics writing.
+//
+// State tracking uses In/Out bit masks:
+//   - In: External dependencies (accumulates, never restored by Q)
+//   - Out: Modified parameters (saved/restored by q/Q)
+//
+// Once a parameter is in Out, subsequent operators reading it don't add it to In.
 package operator
 
 import (
