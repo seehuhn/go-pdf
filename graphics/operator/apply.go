@@ -243,6 +243,24 @@ var handlers = map[pdf.Name]opHandler{
 	"TJ": handleTextShowArray,
 	"'":  handleTextShowMoveNextLine,
 	`"`:  handleTextShowMoveNextLineSetSpacing,
+
+	// Color spaces
+	"CS": handleSetStrokeColorSpace,
+	"cs": handleSetFillColorSpace,
+
+	// Generic color
+	"SC":  handleSetStrokeColor,
+	"SCN": handleSetStrokeColorN,
+	"sc":  handleSetFillColor,
+	"scn": handleSetFillColorN,
+
+	// Device colors
+	"G":  handleSetStrokeGray,
+	"g":  handleSetFillGray,
+	"RG": handleSetStrokeRGB,
+	"rg": handleSetFillRGB,
+	"K":  handleSetStrokeCMYK,
+	"k":  handleSetFillCMYK,
 }
 
 // handlePushState implements the q operator (save graphics state)
