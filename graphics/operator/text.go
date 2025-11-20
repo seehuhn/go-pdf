@@ -106,10 +106,6 @@ func handleTextSetFont(s *State, args []pdf.Native, res *resource.Resource) erro
 		return err
 	}
 
-	if res.Font == nil {
-		return errors.New("no font resources available")
-	}
-
 	fontInstance, ok := res.Font[name]
 	if !ok {
 		return errors.New("font not found")

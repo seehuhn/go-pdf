@@ -161,10 +161,6 @@ func handleSetExtGState(s *State, args []pdf.Native, res *resource.Resource) err
 		return err
 	}
 
-	if res.ExtGState == nil {
-		return errors.New("no ExtGState resources available")
-	}
-
 	gs, ok := res.ExtGState[name]
 	if !ok {
 		return errors.New("ExtGState not found")

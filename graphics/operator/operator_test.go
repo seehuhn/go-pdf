@@ -77,21 +77,21 @@ func TestAllOperators(t *testing.T) {
 func TestOperatorCategories(t *testing.T) {
 	// spot check operators from each category
 	categories := map[string][]pdf.Name{
-		"graphics state": {"q", "Q", "cm", "w", "gs"},
+		"graphics state":    {"q", "Q", "cm", "w", "gs"},
 		"path construction": {"m", "l", "c", "v", "h", "re"},
-		"path painting": {"S", "f", "B", "n"},
-		"clipping": {"W", "W*"},
-		"text objects": {"BT", "ET"},
-		"text state": {"Tc", "Tw", "Tf"},
-		"text positioning": {"Td", "TD", "Tm", "T*"},
-		"text showing": {"Tj", "TJ", "'", "\""},
-		"type 3 fonts": {"d0", "d1"},
-		"colour": {"CS", "cs", "SC", "G", "g", "RG", "rg", "K", "k"},
-		"shading": {"sh"},
-		"inline images": {"BI", "ID", "EI"},
-		"xobjects": {"Do"},
-		"marked content": {"MP", "DP", "BMC", "BDC", "EMC"},
-		"compatibility": {"BX", "EX"},
+		"path painting":     {"S", "f", "B", "n"},
+		"clipping":          {"W", "W*"},
+		"text objects":      {"BT", "ET"},
+		"text state":        {"Tc", "Tw", "Tf"},
+		"text positioning":  {"Td", "TD", "Tm", "T*"},
+		"text showing":      {"Tj", "TJ", "'", "\""},
+		"type 3 fonts":      {"d0", "d1"},
+		"colour":            {"CS", "cs", "SC", "G", "g", "RG", "rg", "K", "k"},
+		"shading":           {"sh"},
+		"inline images":     {"BI", "ID", "EI"},
+		"xobjects":          {"Do"},
+		"marked content":    {"MP", "DP", "BMC", "BDC", "EMC"},
+		"compatibility":     {"BX", "EX"},
 	}
 
 	for category, ops := range categories {

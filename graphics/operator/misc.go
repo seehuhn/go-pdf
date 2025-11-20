@@ -15,12 +15,7 @@ func handleShading(s *State, args []pdf.Native, res *resource.Resource) error {
 		return err
 	}
 
-	if res.Shading == nil {
-		return errors.New("no shading resources available")
-	}
-
-	_, ok := res.Shading[name]
-	if !ok {
+	if _, ok := res.Shading[name]; !ok {
 		return errors.New("shading not found")
 	}
 
@@ -35,12 +30,7 @@ func handleXObject(s *State, args []pdf.Native, res *resource.Resource) error {
 		return err
 	}
 
-	if res.XObject == nil {
-		return errors.New("no XObject resources available")
-	}
-
-	_, ok := res.XObject[name]
-	if !ok {
+	if _, ok := res.XObject[name]; !ok {
 		return errors.New("XObject not found")
 	}
 

@@ -28,9 +28,6 @@ func handleSetStrokeColorSpace(s *State, args []pdf.Native, res *resource.Resour
 		cs = color.SpaceDeviceCMYK
 	default:
 		// Look up in resources
-		if res.ColorSpace == nil {
-			return errors.New("no color space resources available")
-		}
 		var ok bool
 		cs, ok = res.ColorSpace[name]
 		if !ok {
@@ -60,9 +57,6 @@ func handleSetFillColorSpace(s *State, args []pdf.Native, res *resource.Resource
 	case "DeviceCMYK":
 		cs = color.SpaceDeviceCMYK
 	default:
-		if res.ColorSpace == nil {
-			return errors.New("no color space resources available")
-		}
 		var ok bool
 		cs, ok = res.ColorSpace[name]
 		if !ok {

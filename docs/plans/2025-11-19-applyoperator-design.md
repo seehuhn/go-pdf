@@ -34,6 +34,47 @@ type savedState struct {
 
 **Key asymmetry:** `In` accumulates throughout operator sequence and is never restored. `Out` is saved and restored by q/Q. Once a parameter is in `Out`, it is produced by the sequence, so subsequent operators reading it don't add it to `In`.
 
+### Parameters Struct
+
+The `graphics.Parameters` struct contains all graphics state parameters as defined in section 8.4 of PDF 32000-1:2008. Key fields include:
+
+- **Transformation**: `CTM` (current transformation matrix)
+- **Path state** (not saved by q/Q): `StartX`, `StartY`, `CurrentX`, `CurrentY`, `AllSubpathsClosed`, `ThisSubpathClosed`
+- **Colors**: `StrokeColor`, `FillColor`
+- **Text state**: `TextCharacterSpacing`, `TextWordSpacing`, `TextHorizontalScaling`, `TextLeading`, `TextFont`, `TextFontSize`, `TextRenderingMode`, `TextRise`, `TextKnockout`, `TextMatrix`, `TextLineMatrix`
+- **Line attributes**: `LineWidth`, `LineCap`, `LineJoin`, `MiterLimit`, `DashPattern`, `DashPhase`
+- **Other**: `RenderingIntent`, `StrokeAdjustment`, `BlendMode`, `SoftMask`, `StrokeAlpha`, `FillAlpha`, `AlphaSourceFlag`, `BlackPointCompensation`, `OverprintStroke`, `OverprintFill`, `OverprintMode`, `BlackGeneration`, `UndercolorRemoval`, `TransferFunction`, `Halftone`, `HalftoneOriginX`, `HalftoneOriginY`, `FlatnessTolerance`, `SmoothnessTolerance`
+
+The struct provides a `Clone()` method that performs a deep copy, properly handling slice fields like `DashPattern`.
+
+### CurrentObject State Machine
+
+The `CurrentObject` field tracks the current graphics object context. Valid values (defined as bit flags in `graphics.ObjectType`):
+
+- **objPage** (1 << 0): Page-level context (initial state)
+- **objPath** (1 << 1): Path construction in progress
+- **objText** (1 << 2): Text object (BT...ET)
+- **objClippingPath** (1 << 3): Clipping path operator executed
+- **objInlineImage** (1 << 4): Inline image (not used in operator model)
+
+**State transitions:**
+
+| Operator | Valid States | New State | Notes |
+|----------|--------------|-----------|-------|
+| m, re | objPage \| objPath | objPath | Start or continue path |
+| BT | objPage | objText | Begin text object |
+| ET | objText | objPage | End text object |
+| W, W* | objPath | objClippingPath | Set clipping path |
+| S, s, f, F, f*, B, B*, b, b* | objPath \| objClippingPath | objPage | Paint and end path |
+| n | objPath | objPage | End path without painting |
+
+**Key properties:**
+- Initial state is `objPage`
+- Path state (CurrentX, StartX, etc.) is not saved by q/Q
+- CurrentObject itself is not saved by q/Q
+- Text objects must be properly nested (BT...ET)
+- Clipping paths transition back to objPage after painting
+
 ### Function Signature
 
 ```go
@@ -159,7 +200,7 @@ func handleStroke(s *State, args []pdf.Native, res *resource.Resource) error {
     }
 
     if s.CurrentObject != objPath && s.CurrentObject != objClippingPath {
-        return errors.New("S: not in path context")
+        return errors.New("not in path context")
     }
 
     // Finalize current subpath
@@ -193,7 +234,7 @@ func handleTextShow(s *State, args []pdf.Native, res *resource.Resource) error {
     // ... argument parsing ...
 
     if s.CurrentObject != objText {
-        return errors.New("Tj: not in text object")
+        return errors.New("not in text object")
     }
 
     s.markIn(graphics.StateTextFont | graphics.StateTextMatrix)
@@ -235,6 +276,20 @@ The parser recognizes BI...ID...EI patterns and emits a single `%image%` operato
 
 Inline images are one semantic operation; the three-operator syntax is a parsing artifact.
 
+**EI Detection Algorithm:**
+
+Locating the EI terminator is challenging because the image data between ID and EI is arbitrary binary that might contain the byte sequence "EI". The PDF specification provides two approaches:
+
+1. **PDF 2.0+ with Length key**: If the inline image dictionary contains a Length (or L) key, skip that many bytes after the whitespace following ID to find EI. This is reliable but only available in PDF 2.0+.
+
+2. **Legacy approach** (PDF < 2.0): The parser must scan for "EI" preceded by whitespace and followed by whitespace, while accounting for filters:
+   - ID operator must be followed by a single whitespace character (unless the final filter is ASCIIHexDecode or ASCII85Decode, in which case additional whitespace may follow)
+   - Scan forward looking for whitespace + "EI" + whitespace patterns
+   - Validate that the data before "EI" decodes correctly according to the specified filters and matches the declared image dimensions
+   - If validation fails, continue scanning for the next "EI" candidate
+
+The `ApplyOperator` function receives already-parsed `%image%` operators, so EI detection complexity is handled by the content stream parser, not by the operator handlers.
+
 ## Path State Handling
 
 Path state (`CurrentX`, `CurrentY`, `StartX`, `StartY`, `AllSubpathsClosed`, `ThisSubpathClosed`) is not part of the graphics state in PDF terms and is not saved by q/Q.
@@ -266,7 +321,7 @@ func handlePopState(s *State, args []pdf.Native, res *resource.Resource) error {
     }
 
     if len(s.stack) == 0 {
-        return errors.New("Q: no saved state to restore")
+        return errors.New("no saved state to restore")
     }
 
     saved := s.stack[len(s.stack)-1]
@@ -282,7 +337,12 @@ func handlePopState(s *State, args []pdf.Native, res *resource.Resource) error {
 
 ## Resource Resolution
 
-Operators like `Tf` (set font), `Do` (draw XObject), and `gs` (ExtGState) reference resources by name. The `resource.Resource` parameter provides direct access to resolved instances:
+Operators like `Tf` (set font), `Do` (draw XObject), and `gs` (ExtGState) reference resources by name. The `resource.Resource` parameter provides direct access to resolved instances.
+
+**Resource Contract:**
+- The `res` parameter must never be nil; callers must always provide a valid resource object
+- Individual resource maps (Font, XObject, etc.) may be nil if not needed for the content stream
+- Operators that require resources should return descriptive errors if resources are missing
 
 ```go
 func handleTextSetFont(s *State, args []pdf.Native, res *resource.Resource) error {
@@ -293,13 +353,13 @@ func handleTextSetFont(s *State, args []pdf.Native, res *resource.Resource) erro
         return err
     }
 
-    if res == nil || res.Font == nil {
-        return errors.New("Tf: no font resources available")
+    if res.Font == nil {
+        return errors.New("no font resources available")
     }
 
     fontInstance, ok := res.Font[name]
     if !ok {
-        return fmt.Errorf("Tf: font %q not found", name)
+        return fmt.Errorf("font %q not found", name)
     }
 
     s.Param.TextFont = fontInstance
@@ -313,6 +373,8 @@ func handleTextSetFont(s *State, args []pdf.Native, res *resource.Resource) erro
 
 Strict validation philosophy:
 - Return errors for invalid operator usage (wrong arg count, wrong types, invalid context)
+- Error messages follow Go conventions: lowercase, descriptive, no operator prefix
+- Examples: `"not in path context"`, `"not enough arguments"`, `"font \"F1\" not found"`
 - Caller decides how to handle errors
 - Reader can ignore/log errors for permissive parsing
 - Writer can propagate errors for strict validation
@@ -380,7 +442,16 @@ For reader/writer use:
 
 1. All 73 operators implemented from the start for completeness
 2. Conditional dependencies checked based on actual parameter values for accuracy
-3. Path closure tracking (AllSubpathsClosed/ThisSubpathClosed) used to determine LineCap requirements
+3. Path closure tracking (AllSubpathsClosed/ThisSubpathClosed) used to determine LineCap requirements (verified against PDF spec 8.4.3.3: "The line cap style shall specify the shape that shall be used at both ends of open subpaths (and dashes) when they are stroked")
 4. Text rendering mode checked to determine color and line parameter dependencies
 5. Graphics state stack saves parameters and Out bits, but In accumulates across the entire sequence
 6. Special operators use delimiter-containing names to avoid collision with real operators
+
+## Verification Against PDF Specification
+
+Key design decisions verified against PDF 32000-1:2008:
+
+- **LineCap dependency** (section 8.4.3.3): Required for open subpaths and dashed lines. The condition `!AllSubpathsClosed || len(DashPattern) > 0` correctly identifies when LineCap affects rendering.
+- **Path state not saved** (section 8.4.2): "The current path is not part of the graphics state" - confirmed that CurrentX/Y, StartX/Y, and closure flags are not saved by q/Q.
+- **Text matrix reset** (section 9.4.1): Text matrix and text line matrix are initialized to identity at BT and are not part of the saved graphics state.
+- **Inline image Length key** (section 8.9.7): Length (L) key introduced in PDF 2.0 to enable efficient inline image skipping.
