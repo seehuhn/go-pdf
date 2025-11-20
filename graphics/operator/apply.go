@@ -218,6 +218,31 @@ var handlers = map[pdf.Name]opHandler{
 	"n":  handleEndPath,
 	"W":  handleClip,
 	"W*": handleClipEvenOdd,
+
+	// Text objects
+	"BT": handleTextBegin,
+	"ET": handleTextEnd,
+
+	// Text state
+	"Tc": handleTextSetCharSpacing,
+	"Tw": handleTextSetWordSpacing,
+	"Tz": handleTextSetHorizontalScaling,
+	"TL": handleTextSetLeading,
+	"Tf": handleTextSetFont,
+	"Tr": handleTextSetRenderingMode,
+	"Ts": handleTextSetRise,
+
+	// Text positioning
+	"Td": handleTextMoveOffset,
+	"TD": handleTextMoveOffsetSetLeading,
+	"Tm": handleTextSetMatrix,
+	"T*": handleTextNextLine,
+
+	// Text showing
+	"Tj": handleTextShow,
+	"TJ": handleTextShowArray,
+	"'":  handleTextShowMoveNextLine,
+	`"`:  handleTextShowMoveNextLineSetSpacing,
 }
 
 // handlePushState implements the q operator (save graphics state)
