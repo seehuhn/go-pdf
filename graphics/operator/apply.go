@@ -339,20 +339,3 @@ var handlers = map[pdf.Name]opHandler{
 	"%raw%":   handleRawContent,
 	"%image%": handleInlineImage,
 }
-
-// handlePushState implements the q operator (save graphics state)
-func handlePushState(s *State, args []pdf.Native, res *resource.Resource) error {
-	p := argParser{args: args}
-	if err := p.Check(); err != nil {
-		return err
-	}
-
-	if s.stack == nil {
-		s.stack = make([]savedState, 0, 4)
-	}
-	s.stack = append(s.stack, savedState{
-		param: s.Param.Clone(),
-		out:   s.Out,
-	})
-	return nil
-}

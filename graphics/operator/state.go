@@ -9,6 +9,20 @@ import (
 	"seehuhn.de/go/pdf/resource"
 )
 
+// handlePushState implements the q operator (save graphics state)
+func handlePushState(s *State, args []pdf.Native, res *resource.Resource) error {
+	p := argParser{args: args}
+	if err := p.Check(); err != nil {
+		return err
+	}
+
+	s.stack = append(s.stack, savedState{
+		param: s.Param.Clone(),
+		out:   s.Out,
+	})
+	return nil
+}
+
 // handlePopState implements the Q operator (restore graphics state)
 func handlePopState(s *State, args []pdf.Native, res *resource.Resource) error {
 	p := argParser{args: args}
