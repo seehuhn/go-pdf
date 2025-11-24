@@ -29,7 +29,7 @@ func TestColorOperators_DeviceGray(t *testing.T) {
 	res := &Resources{}
 
 	// Set stroke gray
-	opG := Operator{Name: "G", Args: []pdf.Native{pdf.Real(0.5)}}
+	opG := Operator{Name: OpSetStrokeGray, Args: []pdf.Object{pdf.Real(0.5)}}
 	if err := state.Apply(res, opG); err != nil {
 		t.Fatalf("G operator failed: %v", err)
 	}
@@ -39,7 +39,7 @@ func TestColorOperators_DeviceGray(t *testing.T) {
 	}
 
 	// Set fill gray
-	opg := Operator{Name: "g", Args: []pdf.Native{pdf.Real(0.75)}}
+	opg := Operator{Name: OpSetFillGray, Args: []pdf.Object{pdf.Real(0.75)}}
 	if err := state.Apply(res, opg); err != nil {
 		t.Fatalf("g operator failed: %v", err)
 	}
@@ -55,7 +55,7 @@ func TestColorOperators_DeviceRGB(t *testing.T) {
 
 	op := Operator{
 		Name: "rg",
-		Args: []pdf.Native{pdf.Real(1.0), pdf.Real(0.0), pdf.Real(0.0)},
+		Args: []pdf.Object{pdf.Real(1.0), pdf.Real(0.0), pdf.Real(0.0)},
 	}
 
 	if err := state.Apply(res, op); err != nil {
@@ -76,7 +76,7 @@ func TestColorOperators_SetColorSpace(t *testing.T) {
 	}
 
 	// Set stroke color space
-	opCS := Operator{Name: "CS", Args: []pdf.Native{pdf.Name("CS1")}}
+	opCS := Operator{Name: OpSetStrokeColorSpace, Args: []pdf.Object{pdf.Name("CS1")}}
 	if err := state.Apply(res, opCS); err != nil {
 		t.Fatalf("CS operator failed: %v", err)
 	}

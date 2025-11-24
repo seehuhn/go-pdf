@@ -25,7 +25,7 @@ import (
 
 func TestApplyOperator_BasicStructure(t *testing.T) {
 	state := &GraphicsState{}
-	op := Operator{Name: "q", Args: nil}
+	op := Operator{Name: OpPushGraphicsState, Args: nil}
 	res := &Resources{}
 
 	err := state.Apply(res, op)
@@ -37,14 +37,14 @@ func TestApplyOperator_BasicStructure(t *testing.T) {
 func TestArgParser_GetFloat(t *testing.T) {
 	tests := []struct {
 		name    string
-		args    []pdf.Native
+		args    []pdf.Object
 		want    float64
 		wantErr bool
 	}{
-		{"Real", []pdf.Native{pdf.Real(3.14)}, 3.14, false},
-		{"Integer", []pdf.Native{pdf.Integer(42)}, 42.0, false},
-		{"WrongType", []pdf.Native{pdf.Name("foo")}, 0, true},
-		{"NoArgs", []pdf.Native{}, 0, true},
+		{"Real", []pdf.Object{pdf.Real(3.14)}, 3.14, false},
+		{"Integer", []pdf.Object{pdf.Integer(42)}, 42.0, false},
+		{"WrongType", []pdf.Object{pdf.Name("foo")}, 0, true},
+		{"NoArgs", []pdf.Object{}, 0, true},
 	}
 
 	for _, tt := range tests {
@@ -64,13 +64,13 @@ func TestArgParser_GetFloat(t *testing.T) {
 func TestArgParser_GetInt(t *testing.T) {
 	tests := []struct {
 		name    string
-		args    []pdf.Native
+		args    []pdf.Object
 		want    int
 		wantErr bool
 	}{
-		{"Integer", []pdf.Native{pdf.Integer(42)}, 42, false},
-		{"WrongType", []pdf.Native{pdf.Real(3.14)}, 0, true},
-		{"NoArgs", []pdf.Native{}, 0, true},
+		{"Integer", []pdf.Object{pdf.Integer(42)}, 42, false},
+		{"WrongType", []pdf.Object{pdf.Real(3.14)}, 0, true},
+		{"NoArgs", []pdf.Object{}, 0, true},
 	}
 
 	for _, tt := range tests {
@@ -90,13 +90,13 @@ func TestArgParser_GetInt(t *testing.T) {
 func TestArgParser_GetName(t *testing.T) {
 	tests := []struct {
 		name    string
-		args    []pdf.Native
+		args    []pdf.Object
 		want    pdf.Name
 		wantErr bool
 	}{
-		{"Name", []pdf.Native{pdf.Name("foo")}, pdf.Name("foo"), false},
-		{"WrongType", []pdf.Native{pdf.Integer(42)}, pdf.Name(""), true},
-		{"NoArgs", []pdf.Native{}, pdf.Name(""), true},
+		{"Name", []pdf.Object{pdf.Name("foo")}, pdf.Name("foo"), false},
+		{"WrongType", []pdf.Object{pdf.Integer(42)}, pdf.Name(""), true},
+		{"NoArgs", []pdf.Object{}, pdf.Name(""), true},
 	}
 
 	for _, tt := range tests {
@@ -116,13 +116,13 @@ func TestArgParser_GetName(t *testing.T) {
 func TestArgParser_GetArray(t *testing.T) {
 	tests := []struct {
 		name    string
-		args    []pdf.Native
+		args    []pdf.Object
 		want    pdf.Array
 		wantErr bool
 	}{
-		{"Array", []pdf.Native{pdf.Array{pdf.Integer(1), pdf.Integer(2)}}, pdf.Array{pdf.Integer(1), pdf.Integer(2)}, false},
-		{"WrongType", []pdf.Native{pdf.Integer(42)}, nil, true},
-		{"NoArgs", []pdf.Native{}, nil, true},
+		{"Array", []pdf.Object{pdf.Array{pdf.Integer(1), pdf.Integer(2)}}, pdf.Array{pdf.Integer(1), pdf.Integer(2)}, false},
+		{"WrongType", []pdf.Object{pdf.Integer(42)}, nil, true},
+		{"NoArgs", []pdf.Object{}, nil, true},
 	}
 
 	for _, tt := range tests {
@@ -142,13 +142,13 @@ func TestArgParser_GetArray(t *testing.T) {
 func TestArgParser_GetDict(t *testing.T) {
 	tests := []struct {
 		name    string
-		args    []pdf.Native
+		args    []pdf.Object
 		want    pdf.Dict
 		wantErr bool
 	}{
-		{"Dict", []pdf.Native{pdf.Dict{"Key": pdf.Integer(1)}}, pdf.Dict{"Key": pdf.Integer(1)}, false},
-		{"WrongType", []pdf.Native{pdf.Integer(42)}, nil, true},
-		{"NoArgs", []pdf.Native{}, nil, true},
+		{"Dict", []pdf.Object{pdf.Dict{"Key": pdf.Integer(1)}}, pdf.Dict{"Key": pdf.Integer(1)}, false},
+		{"WrongType", []pdf.Object{pdf.Integer(42)}, nil, true},
+		{"NoArgs", []pdf.Object{}, nil, true},
 	}
 
 	for _, tt := range tests {
@@ -168,13 +168,13 @@ func TestArgParser_GetDict(t *testing.T) {
 func TestArgParser_GetString(t *testing.T) {
 	tests := []struct {
 		name    string
-		args    []pdf.Native
+		args    []pdf.Object
 		want    pdf.String
 		wantErr bool
 	}{
-		{"String", []pdf.Native{pdf.String("hello")}, pdf.String("hello"), false},
-		{"WrongType", []pdf.Native{pdf.Integer(42)}, nil, true},
-		{"NoArgs", []pdf.Native{}, nil, true},
+		{"String", []pdf.Object{pdf.String("hello")}, pdf.String("hello"), false},
+		{"WrongType", []pdf.Object{pdf.Integer(42)}, nil, true},
+		{"NoArgs", []pdf.Object{}, nil, true},
 	}
 
 	for _, tt := range tests {
@@ -198,7 +198,7 @@ func TestArgParser_Check(t *testing.T) {
 		wantErr bool
 	}{
 		{"NoArgs", func(p *argParser) {}, false},
-		{"ExtraArgs", func(p *argParser) { p.args = []pdf.Native{pdf.Integer(1)} }, true},
+		{"ExtraArgs", func(p *argParser) { p.args = []pdf.Object{pdf.Integer(1)} }, true},
 		{"PreviousError", func(p *argParser) { p.err = errors.New("test") }, true},
 	}
 

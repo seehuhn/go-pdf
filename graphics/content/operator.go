@@ -22,35 +22,39 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Sentinel errors for validation failures
 var (
-	ErrUnknown    = errors.New("unknown operator")
-	ErrVersion    = errors.New("operator not available in PDF version")
+	// ErrUnknown is returned when an operator is not recognized.
+	ErrUnknown = errors.New("unknown operator")
+
+	// ErrVersion is returned when an operator is only available in later PDF versions.
+	ErrVersion = errors.New("operator not available in PDF version")
+
+	// ErrDeprecated is returned when an operator has been deprecated in the target PDF version.
 	ErrDeprecated = errors.New("deprecated operator")
 )
 
 // Operator represents a content stream operator with its arguments
 type Operator struct {
-	Name pdf.Name
-	Args []pdf.Native
+	Name OpName
+	Args []pdf.Object
 }
 
-// IsValidName checks whether the operator name is valid for the given PDF version.
+// isValidName checks whether the operator name is valid for the given PDF version.
 // It returns ErrUnknown if the operator is not recognized, ErrDeprecated if
 // the operator is deprecated in the given version, or ErrVersion if the
 // operator was not yet available in the given version.
-func (o Operator) IsValidName(v pdf.Version) error {
+func (o Operator) isValidName(v pdf.Version) error {
 	info, ok := operators[o.Name]
 	if !ok {
 		return ErrUnknown
 	}
 
-	if info.Deprecated != 0 && v >= info.Deprecated {
-		return ErrDeprecated
-	}
-
 	if v < info.Since {
 		return ErrVersion
+	}
+
+	if info.Deprecated != 0 && v >= info.Deprecated {
+		return ErrDeprecated
 	}
 
 	return nil
@@ -63,107 +67,107 @@ type opInfo struct {
 }
 
 // operators maps operator names to their metadata
-var operators = map[pdf.Name]*opInfo{
+var operators = map[OpName]*opInfo{
 	// General Graphics State
-	"q":  {Since: pdf.V1_0},
-	"Q":  {Since: pdf.V1_0},
-	"cm": {Since: pdf.V1_0},
-	"w":  {Since: pdf.V1_0},
-	"J":  {Since: pdf.V1_0},
-	"j":  {Since: pdf.V1_0},
-	"M":  {Since: pdf.V1_0},
-	"d":  {Since: pdf.V1_0},
-	"ri": {Since: pdf.V1_1},
-	"i":  {Since: pdf.V1_0},
-	"gs": {Since: pdf.V1_2},
+	OpPushGraphicsState:    {Since: pdf.V1_0},
+	OpPopGraphicsState:     {Since: pdf.V1_0},
+	OpTransform:            {Since: pdf.V1_0},
+	OpSetLineWidth:         {Since: pdf.V1_0},
+	OpSetLineCap:           {Since: pdf.V1_0},
+	OpSetLineJoin:          {Since: pdf.V1_0},
+	OpSetMiterLimit:        {Since: pdf.V1_0},
+	OpSetLineDash:          {Since: pdf.V1_0},
+	OpSetRenderingIntent:   {Since: pdf.V1_1},
+	OpSetFlatnessTolerance: {Since: pdf.V1_0},
+	OpSetExtGState:         {Since: pdf.V1_2},
 
 	// Path Construction
-	"m":  {Since: pdf.V1_0},
-	"l":  {Since: pdf.V1_0},
-	"c":  {Since: pdf.V1_0},
-	"v":  {Since: pdf.V1_0},
-	"y":  {Since: pdf.V1_0},
-	"h":  {Since: pdf.V1_0},
-	"re": {Since: pdf.V1_0},
+	OpMoveTo:    {Since: pdf.V1_0},
+	OpLineTo:    {Since: pdf.V1_0},
+	OpCurveTo:   {Since: pdf.V1_0},
+	OpCurveToV:  {Since: pdf.V1_0},
+	OpCurveToY:  {Since: pdf.V1_0},
+	OpClosePath: {Since: pdf.V1_0},
+	OpRectangle: {Since: pdf.V1_0},
 
 	// Path Painting
-	"S":  {Since: pdf.V1_0},
-	"s":  {Since: pdf.V1_0},
-	"f":  {Since: pdf.V1_0},
-	"F":  {Since: pdf.V1_0, Deprecated: pdf.V2_0},
-	"f*": {Since: pdf.V1_0},
-	"B":  {Since: pdf.V1_0},
-	"B*": {Since: pdf.V1_0},
-	"b":  {Since: pdf.V1_0},
-	"b*": {Since: pdf.V1_0},
-	"n":  {Since: pdf.V1_0},
+	OpStroke:                    {Since: pdf.V1_0},
+	OpCloseAndStroke:            {Since: pdf.V1_0},
+	OpFill:                      {Since: pdf.V1_0},
+	OpFillCompat:                {Since: pdf.V1_0, Deprecated: pdf.V2_0},
+	OpFillEvenOdd:               {Since: pdf.V1_0},
+	OpFillAndStroke:             {Since: pdf.V1_0},
+	OpFillAndStrokeEvenOdd:      {Since: pdf.V1_0},
+	OpCloseFillAndStroke:        {Since: pdf.V1_0},
+	OpCloseFillAndStrokeEvenOdd: {Since: pdf.V1_0},
+	OpEndPath:                   {Since: pdf.V1_0},
 
 	// Clipping Paths
-	"W":  {Since: pdf.V1_0},
-	"W*": {Since: pdf.V1_0},
+	OpClipNonZero: {Since: pdf.V1_0},
+	OpClipEvenOdd: {Since: pdf.V1_0},
 
 	// Text Objects
-	"BT": {Since: pdf.V1_0},
-	"ET": {Since: pdf.V1_0},
+	OpTextBegin: {Since: pdf.V1_0},
+	OpTextEnd:   {Since: pdf.V1_0},
 
 	// Text State
-	"Tc": {Since: pdf.V1_0},
-	"Tw": {Since: pdf.V1_0},
-	"Tz": {Since: pdf.V1_0},
-	"TL": {Since: pdf.V1_0},
-	"Tf": {Since: pdf.V1_0},
-	"Tr": {Since: pdf.V1_0},
-	"Ts": {Since: pdf.V1_0},
+	OpTextSetCharacterSpacing:  {Since: pdf.V1_0},
+	OpTextSetWordSpacing:       {Since: pdf.V1_0},
+	OpTextSetHorizontalScaling: {Since: pdf.V1_0},
+	OpTextSetLeading:           {Since: pdf.V1_0},
+	OpTextSetFont:              {Since: pdf.V1_0},
+	OpTextSetRenderingMode:     {Since: pdf.V1_0},
+	OpTextSetRise:              {Since: pdf.V1_0},
 
 	// Text Positioning
-	"Td": {Since: pdf.V1_0},
-	"TD": {Since: pdf.V1_0},
-	"Tm": {Since: pdf.V1_0},
-	"T*": {Since: pdf.V1_0},
+	OpTextMoveOffset:           {Since: pdf.V1_0},
+	OpTextMoveOffsetSetLeading: {Since: pdf.V1_0},
+	OpTextSetMatrix:            {Since: pdf.V1_0},
+	OpTextNextLine:             {Since: pdf.V1_0},
 
 	// Text Showing
-	"Tj": {Since: pdf.V1_0},
-	"TJ": {Since: pdf.V1_0},
-	"'":  {Since: pdf.V1_0},
-	"\"": {Since: pdf.V1_0},
+	OpTextShow:                       {Since: pdf.V1_0},
+	OpTextShowArray:                  {Since: pdf.V1_0},
+	OpTextShowMoveNextLine:           {Since: pdf.V1_0},
+	OpTextShowMoveNextLineSetSpacing: {Since: pdf.V1_0},
 
 	// Type 3 Fonts
-	"d0": {Since: pdf.V1_0},
-	"d1": {Since: pdf.V1_0},
+	OpType3SetWidthOnly:           {Since: pdf.V1_0},
+	OpType3SetWidthAndBoundingBox: {Since: pdf.V1_0},
 
 	// Colour
-	"CS":  {Since: pdf.V1_1},
-	"cs":  {Since: pdf.V1_1},
-	"SC":  {Since: pdf.V1_1},
-	"SCN": {Since: pdf.V1_2},
-	"sc":  {Since: pdf.V1_1},
-	"scn": {Since: pdf.V1_2},
-	"G":   {Since: pdf.V1_0},
-	"g":   {Since: pdf.V1_0},
-	"RG":  {Since: pdf.V1_0},
-	"rg":  {Since: pdf.V1_0},
-	"K":   {Since: pdf.V1_0},
-	"k":   {Since: pdf.V1_0},
+	OpSetStrokeColorSpace: {Since: pdf.V1_1},
+	OpSetFillColorSpace:   {Since: pdf.V1_1},
+	OpSetStrokeColor:      {Since: pdf.V1_1},
+	OpSetStrokeColorN:     {Since: pdf.V1_2},
+	OpSetFillColor:        {Since: pdf.V1_1},
+	OpSetFillColorN:       {Since: pdf.V1_2},
+	OpSetStrokeGray:       {Since: pdf.V1_0},
+	OpSetFillGray:         {Since: pdf.V1_0},
+	OpSetStrokeRGB:        {Since: pdf.V1_0},
+	OpSetFillRGB:          {Since: pdf.V1_0},
+	OpSetStrokeCMYK:       {Since: pdf.V1_0},
+	OpSetFillCMYK:         {Since: pdf.V1_0},
 
 	// Shading Patterns
-	"sh": {Since: pdf.V1_3},
+	OpShading: {Since: pdf.V1_3},
 
 	// Inline Images
-	"BI": {Since: pdf.V1_0},
-	"ID": {Since: pdf.V1_0},
-	"EI": {Since: pdf.V1_0},
+	opBeginInlineImage: {Since: pdf.V1_0},
+	opInlineImageData:  {Since: pdf.V1_0},
+	opEndInlineImage:   {Since: pdf.V1_0},
 
 	// XObjects
-	"Do": {Since: pdf.V1_0},
+	OpXObject: {Since: pdf.V1_0},
 
 	// Marked Content
-	"MP":  {Since: pdf.V1_2},
-	"DP":  {Since: pdf.V1_2},
-	"BMC": {Since: pdf.V1_2},
-	"BDC": {Since: pdf.V1_2},
-	"EMC": {Since: pdf.V1_2},
+	OpMarkedContentPoint:               {Since: pdf.V1_2},
+	OpMarkedContentPointWithProperties: {Since: pdf.V1_2},
+	OpBeginMarkedContent:               {Since: pdf.V1_2},
+	OpBeginMarkedContentWithProperties: {Since: pdf.V1_2},
+	OpEndMarkedContent:                 {Since: pdf.V1_2},
 
 	// Compatibility
-	"BX": {Since: pdf.V1_1},
-	"EX": {Since: pdf.V1_1},
+	OpBeginCompatibility: {Since: pdf.V1_1},
+	OpEndCompatibility:   {Since: pdf.V1_1},
 }

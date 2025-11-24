@@ -80,7 +80,7 @@ func (state *GraphicsState) Apply(res *Resources, op Operator) error {
 
 // argParser provides a scanner-style API for parsing operator arguments
 type argParser struct {
-	args []pdf.Native
+	args []pdf.Object
 	err  error
 }
 
@@ -219,111 +219,111 @@ type savedState struct {
 }
 
 // opHandler is the function signature for operator handlers
-type opHandler func(*GraphicsState, []pdf.Native, *Resources) error
+type opHandler func(*GraphicsState, []pdf.Object, *Resources) error
 
 // handlers maps operator names to their handler functions
-var handlers = map[pdf.Name]opHandler{
+var handlers = map[OpName]opHandler{
 	// Graphics state
-	"q":  handlePushState,
-	"Q":  handlePopState,
-	"cm": handleConcatMatrix,
-	"w":  handleSetLineWidth,
-	"J":  handleSetLineCap,
-	"j":  handleSetLineJoin,
-	"M":  handleSetMiterLimit,
-	"d":  handleSetLineDash,
-	"ri": handleSetRenderingIntent,
-	"i":  handleSetFlatness,
-	"gs": handleSetExtGState,
+	OpPushGraphicsState:    handlePushState,
+	OpPopGraphicsState:     handlePopState,
+	OpTransform:            handleConcatMatrix,
+	OpSetLineWidth:         handleSetLineWidth,
+	OpSetLineCap:           handleSetLineCap,
+	OpSetLineJoin:          handleSetLineJoin,
+	OpSetMiterLimit:        handleSetMiterLimit,
+	OpSetLineDash:          handleSetLineDash,
+	OpSetRenderingIntent:   handleSetRenderingIntent,
+	OpSetFlatnessTolerance: handleSetFlatness,
+	OpSetExtGState:         handleSetExtGState,
 
 	// Path construction
-	"m":  handleMoveTo,
-	"l":  handleLineTo,
-	"c":  handleCurveTo,
-	"v":  handleCurveToV,
-	"y":  handleCurveToY,
-	"h":  handleClosePath,
-	"re": handleRectangle,
+	OpMoveTo:    handleMoveTo,
+	OpLineTo:    handleLineTo,
+	OpCurveTo:   handleCurveTo,
+	OpCurveToV:  handleCurveToV,
+	OpCurveToY:  handleCurveToY,
+	OpClosePath: handleClosePath,
+	OpRectangle: handleRectangle,
 
 	// Path painting
-	"S":  handleStroke,
-	"s":  handleCloseAndStroke,
-	"f":  handleFill,
-	"F":  handleFillCompat,
-	"f*": handleFillEvenOdd,
-	"B":  handleFillAndStroke,
-	"B*": handleFillAndStrokeEvenOdd,
-	"b":  handleCloseFillAndStroke,
-	"b*": handleCloseFillAndStrokeEvenOdd,
-	"n":  handleEndPath,
-	"W":  handleClip,
-	"W*": handleClipEvenOdd,
+	OpStroke:                    handleStroke,
+	OpCloseAndStroke:            handleCloseAndStroke,
+	OpFill:                      handleFill,
+	OpFillCompat:                handleFillCompat,
+	OpFillEvenOdd:               handleFillEvenOdd,
+	OpFillAndStroke:             handleFillAndStroke,
+	OpFillAndStrokeEvenOdd:      handleFillAndStrokeEvenOdd,
+	OpCloseFillAndStroke:        handleCloseFillAndStroke,
+	OpCloseFillAndStrokeEvenOdd: handleCloseFillAndStrokeEvenOdd,
+	OpEndPath:                   handleEndPath,
+	OpClipNonZero:               handleClip,
+	OpClipEvenOdd:               handleClipEvenOdd,
 
 	// Text objects
-	"BT": handleTextBegin,
-	"ET": handleTextEnd,
+	OpTextBegin: handleTextBegin,
+	OpTextEnd:   handleTextEnd,
 
 	// Text state
-	"Tc": handleTextSetCharSpacing,
-	"Tw": handleTextSetWordSpacing,
-	"Tz": handleTextSetHorizontalScaling,
-	"TL": handleTextSetLeading,
-	"Tf": handleTextSetFont,
-	"Tr": handleTextSetRenderingMode,
-	"Ts": handleTextSetRise,
+	OpTextSetCharacterSpacing:  handleTextSetCharSpacing,
+	OpTextSetWordSpacing:       handleTextSetWordSpacing,
+	OpTextSetHorizontalScaling: handleTextSetHorizontalScaling,
+	OpTextSetLeading:           handleTextSetLeading,
+	OpTextSetFont:              handleTextSetFont,
+	OpTextSetRenderingMode:     handleTextSetRenderingMode,
+	OpTextSetRise:              handleTextSetRise,
 
 	// Text positioning
-	"Td": handleTextMoveOffset,
-	"TD": handleTextMoveOffsetSetLeading,
-	"Tm": handleTextSetMatrix,
-	"T*": handleTextNextLine,
+	OpTextMoveOffset:           handleTextMoveOffset,
+	OpTextMoveOffsetSetLeading: handleTextMoveOffsetSetLeading,
+	OpTextSetMatrix:            handleTextSetMatrix,
+	OpTextNextLine:             handleTextNextLine,
 
 	// Text showing
-	"Tj": handleTextShow,
-	"TJ": handleTextShowArray,
-	"'":  handleTextShowMoveNextLine,
-	`"`:  handleTextShowMoveNextLineSetSpacing,
+	OpTextShow:                       handleTextShow,
+	OpTextShowArray:                  handleTextShowArray,
+	OpTextShowMoveNextLine:           handleTextShowMoveNextLine,
+	OpTextShowMoveNextLineSetSpacing: handleTextShowMoveNextLineSetSpacing,
 
 	// Color spaces
-	"CS": handleSetStrokeColorSpace,
-	"cs": handleSetFillColorSpace,
+	OpSetStrokeColorSpace: handleSetStrokeColorSpace,
+	OpSetFillColorSpace:   handleSetFillColorSpace,
 
 	// Generic color
-	"SC":  handleSetStrokeColor,
-	"SCN": handleSetStrokeColorN,
-	"sc":  handleSetFillColor,
-	"scn": handleSetFillColorN,
+	OpSetStrokeColor:  handleSetStrokeColor,
+	OpSetStrokeColorN: handleSetStrokeColorN,
+	OpSetFillColor:    handleSetFillColor,
+	OpSetFillColorN:   handleSetFillColorN,
 
 	// Device colors
-	"G":  handleSetStrokeGray,
-	"g":  handleSetFillGray,
-	"RG": handleSetStrokeRGB,
-	"rg": handleSetFillRGB,
-	"K":  handleSetStrokeCMYK,
-	"k":  handleSetFillCMYK,
+	OpSetStrokeGray: handleSetStrokeGray,
+	OpSetFillGray:   handleSetFillGray,
+	OpSetStrokeRGB:  handleSetStrokeRGB,
+	OpSetFillRGB:    handleSetFillRGB,
+	OpSetStrokeCMYK: handleSetStrokeCMYK,
+	OpSetFillCMYK:   handleSetFillCMYK,
 
 	// Shading
-	"sh": handleShading,
+	OpShading: handleShading,
 
 	// XObjects
-	"Do": handleXObject,
+	OpXObject: handleXObject,
 
 	// Marked content
-	"MP":  handleMarkedContentPoint,
-	"DP":  handleMarkedContentPointWithProperties,
-	"BMC": handleBeginMarkedContent,
-	"BDC": handleBeginMarkedContentWithProperties,
-	"EMC": handleEndMarkedContent,
+	OpMarkedContentPoint:               handleMarkedContentPoint,
+	OpMarkedContentPointWithProperties: handleMarkedContentPointWithProperties,
+	OpBeginMarkedContent:               handleBeginMarkedContent,
+	OpBeginMarkedContentWithProperties: handleBeginMarkedContentWithProperties,
+	OpEndMarkedContent:                 handleEndMarkedContent,
 
 	// Type 3 fonts
-	"d0": handleType3d0,
-	"d1": handleType3d1,
+	OpType3SetWidthOnly:           handleType3d0,
+	OpType3SetWidthAndBoundingBox: handleType3d1,
 
 	// Compatibility
-	"BX": handleBeginCompatibility,
-	"EX": handleEndCompatibility,
+	OpBeginCompatibility: handleBeginCompatibility,
+	OpEndCompatibility:   handleEndCompatibility,
 
 	// Special operators
-	"%raw%":   handleRawContent,
-	"%image%": handleInlineImage,
+	OpRawContent:  handleRawContent,
+	OpInlineImage: handleInlineImage,
 }

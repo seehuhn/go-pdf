@@ -18,9 +18,11 @@ package content
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/pdf"
 )
 
 func TestStreamRoundTrip(t *testing.T) {
@@ -81,6 +83,111 @@ func TestStreamRoundTrip(t *testing.T) {
 			// compare
 			if diff := cmp.Diff(stream1, stream2); diff != "" {
 				t.Errorf("round trip failed (-first +second):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestStreamValidate(t *testing.T) {
+	tests := []struct {
+		name    string
+		stream  Stream
+		version pdf.Version
+		wantErr error
+	}{
+		{
+			name: "valid PDF 1.0",
+			stream: Stream{
+				{Name: OpPushGraphicsState},
+				{Name: OpPopGraphicsState},
+			},
+			version: pdf.V1_0,
+			wantErr: nil,
+		},
+		{
+			name: "operator not available in version",
+			stream: Stream{
+				{Name: OpSetExtGState}, // introduced in PDF 1.2
+			},
+			version: pdf.V1_0,
+			wantErr: ErrVersion,
+		},
+		{
+			name: "deprecated operator",
+			stream: Stream{
+				{Name: OpFillCompat}, // deprecated in PDF 2.0
+			},
+			version: pdf.V2_0,
+			wantErr: ErrDeprecated,
+		},
+		{
+			name: "unknown operator outside compatibility",
+			stream: Stream{
+				{Name: "XX"}, // unknown
+			},
+			version: pdf.V1_7,
+			wantErr: ErrUnknown,
+		},
+		{
+			name: "unknown operator inside BX/EX",
+			stream: Stream{
+				{Name: OpBeginCompatibility},
+				{Name: "XX"}, // unknown but allowed
+				{Name: OpEndCompatibility},
+			},
+			version: pdf.V1_7,
+			wantErr: nil,
+		},
+		{
+			name: "nested BX/EX",
+			stream: Stream{
+				{Name: OpBeginCompatibility},
+				{Name: "XX"},
+				{Name: OpBeginCompatibility},
+				{Name: "YY"},
+				{Name: OpEndCompatibility},
+				{Name: "ZZ"},
+				{Name: OpEndCompatibility},
+			},
+			version: pdf.V1_7,
+			wantErr: nil,
+		},
+		{
+			name: "error after EX",
+			stream: Stream{
+				{Name: OpBeginCompatibility},
+				{Name: "XX"}, // ok
+				{Name: OpEndCompatibility},
+				{Name: "YY"}, // not ok
+			},
+			version: pdf.V1_7,
+			wantErr: ErrUnknown,
+		},
+		{
+			name: "version error inside BX/EX still reported",
+			stream: Stream{
+				{Name: OpBeginCompatibility},
+				{Name: OpSetExtGState}, // known but not available in 1.0
+				{Name: OpEndCompatibility},
+			},
+			version: pdf.V1_0,
+			wantErr: ErrVersion,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.stream.Validate(tt.version)
+			if tt.wantErr == nil {
+				if err != nil {
+					t.Errorf("expected no error, got %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Errorf("expected error %v, got nil", tt.wantErr)
+				} else if !errors.Is(err, tt.wantErr) {
+					t.Errorf("expected error %v, got %v", tt.wantErr, err)
+				}
 			}
 		})
 	}

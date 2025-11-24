@@ -29,7 +29,7 @@ func TestPathConstruction_MoveTo(t *testing.T) {
 
 	op := Operator{
 		Name: "m",
-		Args: []pdf.Native{pdf.Real(10.0), pdf.Real(20.0)},
+		Args: []pdf.Object{pdf.Real(10.0), pdf.Real(20.0)},
 	}
 
 	if err := state.Apply(res, op); err != nil {
@@ -57,7 +57,7 @@ func TestPathConstruction_LineTo(t *testing.T) {
 
 	op := Operator{
 		Name: "l",
-		Args: []pdf.Native{pdf.Real(30.0), pdf.Real(40.0)},
+		Args: []pdf.Object{pdf.Real(30.0), pdf.Real(40.0)},
 	}
 
 	if err := state.Apply(res, op); err != nil {
@@ -77,7 +77,7 @@ func TestPathPainting_Stroke(t *testing.T) {
 	state.Param.DashPattern = nil
 	res := &Resources{}
 
-	op := Operator{Name: "S", Args: nil}
+	op := Operator{Name: OpStroke, Args: nil}
 	if err := state.Apply(res, op); err != nil {
 		t.Fatalf("S operator failed: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestPathPainting_StrokeOpenPath(t *testing.T) {
 	state.Param.DashPattern = nil
 	res := &Resources{}
 
-	op := Operator{Name: "S", Args: nil}
+	op := Operator{Name: OpStroke, Args: nil}
 	if err := state.Apply(res, op); err != nil {
 		t.Fatalf("S operator failed: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestPathPainting_Fill(t *testing.T) {
 	state := &GraphicsState{CurrentObject: ObjPath}
 	res := &Resources{}
 
-	op := Operator{Name: "f", Args: nil}
+	op := Operator{Name: OpFill, Args: nil}
 	if err := state.Apply(res, op); err != nil {
 		t.Fatalf("f operator failed: %v", err)
 	}

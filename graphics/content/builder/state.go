@@ -1,0 +1,152 @@
+package builder
+
+import (
+	"fmt"
+
+	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/content"
+)
+
+// PushGraphicsState saves the current graphics state.
+//
+// This implements the PDF graphics operator "q".
+func (b *Builder) PushGraphicsState() {
+	b.emit(content.OpPushGraphicsState)
+}
+
+// PopGraphicsState restores the previous graphics state.
+//
+// This implements the PDF graphics operator "Q".
+func (b *Builder) PopGraphicsState() {
+	b.emit(content.OpPopGraphicsState)
+}
+
+// Transform applies a transformation matrix to the coordinate system.
+//
+// This implements the PDF graphics operator "cm".
+func (b *Builder) Transform(m matrix.Matrix) {
+	b.emit(content.OpTransform,
+		pdf.Number(m[0]), pdf.Number(m[1]),
+		pdf.Number(m[2]), pdf.Number(m[3]),
+		pdf.Number(m[4]), pdf.Number(m[5]))
+}
+
+// SetLineCap sets the line cap style.
+//
+// This implements the PDF graphics operator "J".
+func (b *Builder) SetLineCap(cap graphics.LineCapStyle) {
+	if cap > 2 {
+		b.Err = fmt.Errorf("SetLineCap: invalid line cap style %d", cap)
+		return
+	}
+	if b.State.Out&graphics.StateLineCap != 0 && cap == b.State.Param.LineCap {
+		return
+	}
+	b.emit(content.OpSetLineCap, pdf.Integer(cap))
+}
+
+// SetLineJoin sets the line join style.
+//
+// This implements the PDF graphics operator "j".
+func (b *Builder) SetLineJoin(join graphics.LineJoinStyle) {
+	if join > 2 {
+		b.Err = fmt.Errorf("SetLineJoin: invalid line join style %d", join)
+		return
+	}
+	if b.State.Out&graphics.StateLineJoin != 0 && join == b.State.Param.LineJoin {
+		return
+	}
+	b.emit(content.OpSetLineJoin, pdf.Integer(join))
+}
+
+// SetMiterLimit sets the miter limit.
+//
+// This implements the PDF graphics operator "M".
+func (b *Builder) SetMiterLimit(limit float64) {
+	if limit < 1 {
+		b.Err = fmt.Errorf("SetMiterLimit: invalid miter limit %f", limit)
+		return
+	}
+	if b.State.Out&graphics.StateMiterLimit != 0 && nearlyEqual(limit, b.State.Param.MiterLimit) {
+		return
+	}
+	b.emit(content.OpSetMiterLimit, pdf.Number(limit))
+}
+
+// SetLineDash sets the line dash pattern.
+//
+// This implements the PDF graphics operator "d".
+func (b *Builder) SetLineDash(pattern []float64, phase float64) {
+	if b.State.Out&graphics.StateLineDash != 0 &&
+		sliceNearlyEqual(pattern, b.State.Param.DashPattern) &&
+		nearlyEqual(phase, b.State.Param.DashPhase) {
+		return
+	}
+
+	arr := make(pdf.Array, len(pattern))
+	for i, v := range pattern {
+		arr[i] = pdf.Number(v)
+	}
+	b.emit(content.OpSetLineDash, arr, pdf.Number(phase))
+}
+
+// SetRenderingIntent sets the rendering intent.
+//
+// This implements the PDF graphics operator "ri".
+func (b *Builder) SetRenderingIntent(intent graphics.RenderingIntent) {
+	if b.State.Out&graphics.StateRenderingIntent != 0 && intent == b.State.Param.RenderingIntent {
+		return
+	}
+	b.emit(content.OpSetRenderingIntent, pdf.Name(intent))
+}
+
+// SetFlatnessTolerance sets the flatness tolerance.
+//
+// This implements the PDF graphics operator "i".
+func (b *Builder) SetFlatnessTolerance(flatness float64) {
+	if flatness < 0 || flatness > 100 {
+		b.Err = fmt.Errorf("SetFlatnessTolerance: invalid flatness tolerance %f", flatness)
+		return
+	}
+	if b.State.Out&graphics.StateFlatnessTolerance != 0 && nearlyEqual(flatness, b.State.Param.FlatnessTolerance) {
+		return
+	}
+	b.emit(content.OpSetFlatnessTolerance, pdf.Number(flatness))
+}
+
+// SetExtGState sets selected graphics state parameters.
+//
+// This implements the PDF graphics operator "gs".
+func (b *Builder) SetExtGState(gs *graphics.ExtGState) {
+	if b.Err != nil {
+		return
+	}
+
+	// look up or allocate resource name
+	key := resKey{"E", gs}
+	name, ok := b.resName[key]
+	if !ok {
+		if b.Resources.ExtGState == nil {
+			b.Resources.ExtGState = make(map[pdf.Name]*graphics.ExtGState)
+		}
+		name = allocateName("E", b.Resources.ExtGState)
+		b.Resources.ExtGState[name] = gs
+		b.resName[key] = name
+	}
+
+	b.emit(content.OpSetExtGState, name)
+}
+
+func sliceNearlyEqual(a, b []float64) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !nearlyEqual(a[i], b[i]) {
+			return false
+		}
+	}
+	return true
+}

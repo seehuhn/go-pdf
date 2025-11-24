@@ -32,7 +32,7 @@ func TestStateOperators_PushPop(t *testing.T) {
 	res := &Resources{}
 
 	// Push state
-	opQ := Operator{Name: "q", Args: nil}
+	opQ := Operator{Name: OpPushGraphicsState, Args: nil}
 	if err := state.Apply(res, opQ); err != nil {
 		t.Fatalf("q operator failed: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestStateOperators_PushPop(t *testing.T) {
 	state.Out |= graphics.StateLineWidth
 
 	// Pop state
-	opPop := Operator{Name: "Q", Args: nil}
+	opPop := Operator{Name: OpPopGraphicsState, Args: nil}
 	if err := state.Apply(res, opPop); err != nil {
 		t.Fatalf("Q operator failed: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestStateOperators_LineWidth(t *testing.T) {
 	state := &GraphicsState{}
 	res := &Resources{}
 
-	op := Operator{Name: "w", Args: []pdf.Native{pdf.Real(2.5)}}
+	op := Operator{Name: OpSetLineWidth, Args: []pdf.Object{pdf.Real(2.5)}}
 	if err := state.Apply(res, op); err != nil {
 		t.Fatalf("w operator failed: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestStateOperators_PopWithoutPush(t *testing.T) {
 	state := &GraphicsState{}
 	res := &Resources{}
 
-	op := Operator{Name: "Q", Args: nil}
+	op := Operator{Name: OpPopGraphicsState, Args: nil}
 	err := state.Apply(res, op)
 	if err == nil {
 		t.Error("expected error for Q without matching q")
@@ -87,7 +87,7 @@ func TestStateOperators_LineDash(t *testing.T) {
 
 	op := Operator{
 		Name: "d",
-		Args: []pdf.Native{
+		Args: []pdf.Object{
 			pdf.Array{pdf.Integer(3), pdf.Integer(2)},
 			pdf.Integer(0),
 		},
@@ -118,7 +118,7 @@ func TestStateOperators_ConcatMatrix(t *testing.T) {
 	// apply cm operator: 2 0 0 2 10 20 cm (scale by 2 and translate by (10,20))
 	op := Operator{
 		Name: "cm",
-		Args: []pdf.Native{
+		Args: []pdf.Object{
 			pdf.Real(2), pdf.Real(0),
 			pdf.Real(0), pdf.Real(2),
 			pdf.Real(10), pdf.Real(20),

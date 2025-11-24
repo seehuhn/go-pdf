@@ -61,12 +61,40 @@ func ReadStream(r io.Reader) (Stream, error) {
 	return stream, nil
 }
 
+// Validate checks that all operators in the stream are valid for the given
+// PDF version. Within BX/EX compatibility sections, unknown operators are
+// allowed.
+func (s Stream) Validate(v pdf.Version) error {
+	compatLevel := 0 // nesting depth of BX/EX sections
+	for i, op := range s {
+		switch op.Name {
+		case OpBeginCompatibility:
+			compatLevel++
+		case OpEndCompatibility:
+			if compatLevel > 0 {
+				compatLevel--
+			}
+		}
+
+		err := op.isValidName(v)
+		if err == nil {
+			continue
+		}
+		if (err == ErrUnknown || err == ErrVersion) && compatLevel > 0 {
+			// unknown operators are allowed inside BX/EX
+			continue
+		}
+		return fmt.Errorf("operator %d (%s): %w", i, op.Name, err)
+	}
+	return nil
+}
+
 // Write writes the content stream to w in PDF content stream format.
 func (s Stream) Write(w io.Writer) error {
 	for _, op := range s {
 		// handle pseudo-operators
 		switch op.Name {
-		case "%raw%":
+		case OpRawContent:
 			// write raw content (typically comments)
 			if len(op.Args) > 0 {
 				if str, ok := op.Args[0].(pdf.String); ok {
@@ -79,7 +107,7 @@ func (s Stream) Write(w io.Writer) error {
 				}
 			}
 			continue
-		case "%image%":
+		case OpInlineImage:
 			// write inline image
 			if len(op.Args) >= 2 {
 				dict, _ := op.Args[0].(pdf.Dict)
@@ -142,7 +170,7 @@ func (s Stream) Write(w io.Writer) error {
 }
 
 // writeObject writes a PDF object in content stream format
-func writeObject(w io.Writer, obj pdf.Native) error {
+func writeObject(w io.Writer, obj pdf.Object) error {
 	switch v := obj.(type) {
 	case pdf.Integer:
 		_, err := fmt.Fprintf(w, "%d", v)
@@ -234,7 +262,7 @@ func writeString(w io.Writer, s pdf.String) error {
 	for _, b := range []byte(s) {
 		switch b {
 		case '(', ')', '\\':
-			if _, err := w.Write([]byte{'\\'});  err != nil {
+			if _, err := w.Write([]byte{'\\'}); err != nil {
 				return err
 			}
 			if _, err := w.Write([]byte{b}); err != nil {
@@ -275,7 +303,7 @@ type streamScanner struct {
 	line  int // 0-based
 	col   int // 0-based
 	stack []*scanStackFrame
-	args  []pdf.Native
+	args  []pdf.Object
 
 	srcErr error
 
@@ -299,8 +327,8 @@ func (s *streamScanner) scan() (Operator, error) {
 	if bb := s.peekN(1); len(bb) > 0 && bb[0] == '%' {
 		comment := s.readComment()
 		return Operator{
-			Name: "%raw%",
-			Args: []pdf.Native{pdf.String(comment)},
+			Name: OpRawContent,
+			Args: []pdf.Object{pdf.String(comment)},
 		}, nil
 	}
 
@@ -360,14 +388,14 @@ tokenLoop:
 		if len(s.stack) > 0 { // we are inside a dict or array
 			s.stack[len(s.stack)-1].data = append(s.stack[len(s.stack)-1].data, obj)
 		} else if op, ok := obj.(pdf.Operator); ok {
-			opName := string(op)
+			opName := OpName(op)
 
 			// check for BI (inline image)
-			if opName == "BI" {
+			if opName == opBeginInlineImage {
 				return s.readInlineImage()
 			}
 
-			return Operator{Name: pdf.Name(opName), Args: s.args}, nil
+			return Operator{Name: opName, Args: s.args}, nil
 		} else {
 			s.args = append(s.args, obj)
 		}
@@ -439,8 +467,8 @@ func (s *streamScanner) readInlineImage() (Operator, error) {
 	}
 
 	return Operator{
-		Name: "%image%",
-		Args: []pdf.Native{dict, pdf.String(imageData)},
+		Name: OpInlineImage,
+		Args: []pdf.Object{dict, pdf.String(imageData)},
 	}, nil
 }
 
