@@ -51,8 +51,8 @@ type Type1 struct {
 	// describes a shape.
 	Color bool
 
-	// Draw draws a single pattern cell.
-	Draw func(*graphics.Writer) error
+	// Content is the content stream for a single pattern cell.
+	Content *graphics.ContentStream
 }
 
 var _ color.Pattern = (*Type1)(nil)
@@ -80,15 +80,15 @@ func (p *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if p.XStep == 0 || p.YStep == 0 {
 		return nil, fmt.Errorf("invalid step size: (%f, %f)", p.XStep, p.YStep)
 	}
+	if p.Content == nil {
+		return nil, fmt.Errorf("missing content stream")
+	}
 
+	// Write content stream to buffer
 	buf := &bytes.Buffer{}
-	w := graphics.NewWriter(buf, rm.GetRM())
-	err := p.Draw(w)
+	err := p.Content.WriteTo(buf, rm.Out().GetOptions()|pdf.OptContentStream)
 	if err != nil {
 		return nil, err
-	}
-	if w.Err != nil {
-		return nil, w.Err
 	}
 
 	dict := pdf.Dict{
@@ -98,7 +98,9 @@ func (p *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		"BBox":        p.BBox,
 		"XStep":       pdf.Number(p.XStep),
 		"YStep":       pdf.Number(p.YStep),
-		"Resources":   pdf.AsDict(w.Resources),
+	}
+	if p.Content.Resources != nil {
+		dict["Resources"] = pdf.AsDict(p.Content.Resources)
 	}
 	opt := rm.Out().GetOptions()
 	if opt.HasAny(pdf.OptDictTypes) {

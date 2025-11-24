@@ -77,8 +77,7 @@ func Type3() (font.Layouter, error) {
 				URx: float64(bbox.URx),
 				URy: float64(bbox.URy),
 			}
-			d := &drawer{outlines: origOutlines, gid: gid}
-			g.Draw = d.Draw
+			g.Content = buildGlyphContent(origOutlines, gid)
 		}
 
 		font.Glyphs = append(font.Glyphs, g)
@@ -87,28 +86,26 @@ func Type3() (font.Layouter, error) {
 	return font.New()
 }
 
-type drawer struct {
-	outlines *glyf.Outlines
-	gid      glyph.ID
-}
+func buildGlyphContent(outlines *glyf.Outlines, gid glyph.ID) *graphics.ContentStream {
+	b := graphics.NewContentStreamBuilder()
 
-func (d *drawer) Draw(w *graphics.Writer) error {
-	glyphPath := d.outlines.Path(d.gid)
+	glyphPath := outlines.Path(gid)
 	cubicPath := glyphPath.ToCubic()
 	for cmd, pts := range cubicPath {
 		switch cmd {
 		case path.CmdMoveTo:
-			w.MoveTo(pts[0].X, pts[0].Y)
+			b.MoveTo(pts[0].X, pts[0].Y)
 		case path.CmdLineTo:
-			w.LineTo(pts[0].X, pts[0].Y)
+			b.LineTo(pts[0].X, pts[0].Y)
 		case path.CmdCubeTo:
-			w.CurveTo(pts[0].X, pts[0].Y, pts[1].X, pts[1].Y, pts[2].X, pts[2].Y)
+			b.CurveTo(pts[0].X, pts[0].Y, pts[1].X, pts[1].Y, pts[2].X, pts[2].Y)
 		case path.CmdClose:
-			w.ClosePath()
+			b.ClosePath()
 		}
 	}
-	w.Fill()
-	return nil
+	b.Fill()
+
+	return b.Build()
 }
 
 func clone[T any](x *T) *T {

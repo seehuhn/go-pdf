@@ -57,6 +57,20 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 	M = M.Mul(s.CTM)
 	xc, yc := M.Apply(0, 0)
 
+	// Build the marker glyph content
+	b := graphics.NewContentStreamBuilder()
+	b.SetFillColor(color.DeviceRGB(1.0, 0, 0))
+	A := M.Inv()
+	p, q := A.Apply(xc-1, yc-1)
+	b.MoveTo(p*1000, q*1000)
+	p, q = A.Apply(xc+1, yc-1)
+	b.LineTo(p*1000, q*1000)
+	p, q = A.Apply(xc+1, yc+1)
+	b.LineTo(p*1000, q*1000)
+	p, q = A.Apply(xc-1, yc+1)
+	b.LineTo(p*1000, q*1000)
+	b.Fill()
+
 	markerFont := &type3.Font{
 		Glyphs: []*type3.Glyph{
 			{},
@@ -64,24 +78,11 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 		FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},
 	}
 	markerFont.Glyphs = append(markerFont.Glyphs, &type3.Glyph{
-		Name:  "x",
-		Width: 0,
-		BBox:  rect.Rect{LLx: -100, LLy: -100, URx: 100, URy: 100},
-		Color: true,
-		Draw: func(w *graphics.Writer) error {
-			w.SetFillColor(color.DeviceRGB(1.0, 0, 0))
-			A := M.Inv()
-			p, q := A.Apply(xc-1, yc-1)
-			w.MoveTo(p*1000, q*1000)
-			p, q = A.Apply(xc+1, yc-1)
-			w.LineTo(p*1000, q*1000)
-			p, q = A.Apply(xc+1, yc+1)
-			w.LineTo(p*1000, q*1000)
-			p, q = A.Apply(xc-1, yc+1)
-			w.LineTo(p*1000, q*1000)
-			w.Fill()
-			return nil
-		},
+		Name:    "x",
+		Width:   0,
+		BBox:    rect.Rect{LLx: -100, LLy: -100, URx: 100, URy: 100},
+		Color:   true,
+		Content: b.Build(),
 	})
 	X, err := markerFont.New()
 	if err != nil {
