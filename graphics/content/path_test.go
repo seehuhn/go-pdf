@@ -14,19 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package operator
+package content
 
 import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/resource"
 )
 
 func TestPathConstruction_MoveTo(t *testing.T) {
-	state := &State{CurrentObject: ObjectType(1)} // objPage
-	res := &resource.Resource{}
+	state := &GraphicsState{CurrentObject: Object(1)} // objPage
+	res := &Resources{}
 
 	op := Operator{
 		Name: "m",
@@ -45,16 +44,16 @@ func TestPathConstruction_MoveTo(t *testing.T) {
 		t.Errorf("Start point = (%v, %v), want (10, 20)",
 			state.Param.StartX, state.Param.StartY)
 	}
-	if state.CurrentObject != ObjectType(2) { // objPath
+	if state.CurrentObject != Object(2) { // objPath
 		t.Errorf("CurrentObject = %v, want objPath", state.CurrentObject)
 	}
 }
 
 func TestPathConstruction_LineTo(t *testing.T) {
-	state := &State{CurrentObject: ObjectType(2)} // objPath
+	state := &GraphicsState{CurrentObject: Object(2)} // objPath
 	state.Param.CurrentX = 10.0
 	state.Param.CurrentY = 20.0
-	res := &resource.Resource{}
+	res := &Resources{}
 
 	op := Operator{
 		Name: "l",
@@ -72,11 +71,11 @@ func TestPathConstruction_LineTo(t *testing.T) {
 }
 
 func TestPathPainting_Stroke(t *testing.T) {
-	state := &State{CurrentObject: ObjPath}
+	state := &GraphicsState{CurrentObject: ObjPath}
 	state.Param.AllSubpathsClosed = true
 	state.Param.ThisSubpathClosed = true // last subpath is closed
 	state.Param.DashPattern = nil
-	res := &resource.Resource{}
+	res := &Resources{}
 
 	op := Operator{Name: "S", Args: nil}
 	if err := state.Apply(res, op); err != nil {
@@ -102,10 +101,10 @@ func TestPathPainting_Stroke(t *testing.T) {
 }
 
 func TestPathPainting_StrokeOpenPath(t *testing.T) {
-	state := &State{CurrentObject: ObjPath}
+	state := &GraphicsState{CurrentObject: ObjPath}
 	state.Param.AllSubpathsClosed = false
 	state.Param.DashPattern = nil
-	res := &resource.Resource{}
+	res := &Resources{}
 
 	op := Operator{Name: "S", Args: nil}
 	if err := state.Apply(res, op); err != nil {
@@ -119,8 +118,8 @@ func TestPathPainting_StrokeOpenPath(t *testing.T) {
 }
 
 func TestPathPainting_Fill(t *testing.T) {
-	state := &State{CurrentObject: ObjPath}
-	res := &resource.Resource{}
+	state := &GraphicsState{CurrentObject: ObjPath}
+	res := &Resources{}
 
 	op := Operator{Name: "f", Args: nil}
 	if err := state.Apply(res, op); err != nil {

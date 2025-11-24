@@ -1,15 +1,4 @@
-// Package operator provides content stream operator handling.
-//
-// The State.Apply method analyzes PDF content stream operators and tracks
-// how they modify graphics state. This supports both reading existing PDF files
-// and implementing operator-based graphics writing.
-//
-// State tracking uses In/Out bit masks:
-//   - In: External dependencies (accumulates, never restored by Q)
-//   - Out: Modified parameters (saved/restored by q/Q)
-//
-// Once a parameter is in Out, subsequent operators reading it don't add it to In.
-package operator
+package content
 
 import (
 	"errors"
@@ -17,13 +6,12 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/resource"
 )
 
 // See Figure 9 (p. 113) of PDF 32000-1:2008.
-type ObjectType byte
+type Object byte
 
-func (s ObjectType) String() string {
+func (s Object) String() string {
 	switch s {
 	case ObjPage:
 		return "page"
@@ -39,13 +27,13 @@ func (s ObjectType) String() string {
 }
 
 const (
-	ObjPage         ObjectType = 1 << iota // Page-level context (initial state)
-	ObjPath                                // Path construction in progress
-	ObjText                                // Inside text object (BT...ET)
-	ObjClippingPath                        // Clipping path operator executed
+	ObjPage         Object = 1 << iota // Page-level context (initial state)
+	ObjPath                            // Path construction in progress
+	ObjText                            // Inside text object (BT...ET)
+	ObjClippingPath                    // Clipping path operator executed
 )
 
-type State struct {
+type GraphicsState struct {
 	// Param contains the current values of all graphics parameters.
 	// Only those parameters listed in Out are guaranteed to have valid values.
 	Param graphics.Parameters
@@ -59,7 +47,7 @@ type State struct {
 	Out graphics.StateBits
 
 	// CurrentObject lists the current graphics object being constructed.
-	CurrentObject ObjectType
+	CurrentObject Object
 
 	// stack is the graphics state stack for q/Q
 	stack []savedState
@@ -67,8 +55,8 @@ type State struct {
 
 // NewState creates a State initialized to the default PDF graphics state.
 // The initial CurrentObject is ObjPage.
-func NewState() *State {
-	return &State{
+func NewState() *GraphicsState {
+	return &GraphicsState{
 		Param:         *graphics.NewState().Parameters,
 		CurrentObject: ObjPage,
 	}
@@ -82,7 +70,7 @@ func NewState() *State {
 //
 // Returns an error if the operator is unknown, has invalid arguments,
 // or is used in an invalid context (e.g., text operators outside BT...ET).
-func (state *State) Apply(res *resource.Resource, op Operator) error {
+func (state *GraphicsState) Apply(res *Resources, op Operator) error {
 	handler, ok := handlers[op.Name]
 	if !ok {
 		return fmt.Errorf("unknown operator: %s", op.Name)
@@ -216,11 +204,11 @@ func (p *argParser) Check() error {
 
 // State tracking helpers
 
-func (s *State) markIn(bits graphics.StateBits) {
+func (s *GraphicsState) markIn(bits graphics.StateBits) {
 	s.In |= (bits &^ s.Out)
 }
 
-func (s *State) markOut(bits graphics.StateBits) {
+func (s *GraphicsState) markOut(bits graphics.StateBits) {
 	s.Out |= bits
 }
 
@@ -231,7 +219,7 @@ type savedState struct {
 }
 
 // opHandler is the function signature for operator handlers
-type opHandler func(*State, []pdf.Native, *resource.Resource) error
+type opHandler func(*GraphicsState, []pdf.Native, *Resources) error
 
 // handlers maps operator names to their handler functions
 var handlers = map[pdf.Name]opHandler{

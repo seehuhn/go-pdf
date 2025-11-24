@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package operator
+package content
 
 import (
 	"testing"
@@ -22,12 +22,11 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/resource"
 )
 
 func TestIntegration_PathWithStroke(t *testing.T) {
-	state := &State{CurrentObject: ObjPage}
-	res := &resource.Resource{}
+	state := &GraphicsState{CurrentObject: ObjPage}
+	res := &Resources{}
 
 	ops := []Operator{
 		{Name: "w", Args: []pdf.Native{pdf.Real(2.0)}},
@@ -63,9 +62,9 @@ func TestIntegration_PathWithStroke(t *testing.T) {
 }
 
 func TestIntegration_TextRenderingDependencies(t *testing.T) {
-	state := &State{CurrentObject: ObjPage}
+	state := &GraphicsState{CurrentObject: ObjPage}
 	mockFont := &mockFontInstance{}
-	res := &resource.Resource{
+	res := &Resources{
 		Font: map[pdf.Name]font.Instance{
 			"F1": mockFont,
 		},
@@ -95,8 +94,8 @@ func TestIntegration_TextRenderingDependencies(t *testing.T) {
 }
 
 func TestIntegration_GraphicsStateStack(t *testing.T) {
-	state := &State{CurrentObject: ObjPage}
-	res := &resource.Resource{}
+	state := &GraphicsState{CurrentObject: ObjPage}
+	res := &Resources{}
 
 	// Set line width
 	op1 := Operator{Name: "w", Args: []pdf.Native{pdf.Real(2.0)}}

@@ -473,7 +473,9 @@ type Info struct {
 //
 // See section 7.8.3 of PDF 32000-1:2008 for details.
 //
-// TODO(voss): remove in favor of seehuhn.de/go/pdf/resource.Resource
+// Deprecated: use seehuhn.de/go/pdf/graphics/content.Resources instead.
+//
+// TODO(voss): remove
 type Resources struct {
 	ExtGState  Dict  `pdf:"optional"` // maps resource names to graphics state parameter dictionaries
 	ColorSpace Dict  `pdf:"optional"` // maps resource names to colour spaces

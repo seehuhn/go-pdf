@@ -14,18 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package operator
+package content
 
 import (
 	"errors"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/resource"
 )
 
 // handleMoveTo implements the m operator (begin new subpath)
-func handleMoveTo(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleMoveTo(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	x := p.GetFloat()
 	y := p.GetFloat()
@@ -56,7 +55,7 @@ func handleMoveTo(s *State, args []pdf.Native, res *resource.Resource) error {
 }
 
 // handleLineTo implements the l operator (append straight line)
-func handleLineTo(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleLineTo(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	x := p.GetFloat()
 	y := p.GetFloat()
@@ -73,7 +72,7 @@ func handleLineTo(s *State, args []pdf.Native, res *resource.Resource) error {
 }
 
 // handleCurveTo implements the c operator (append Bezier curve)
-func handleCurveTo(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleCurveTo(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	_ = p.GetFloat() // x1
 	_ = p.GetFloat() // y1
@@ -94,7 +93,7 @@ func handleCurveTo(s *State, args []pdf.Native, res *resource.Resource) error {
 }
 
 // handleCurveToV implements the v operator (Bezier curve, initial point replicated)
-func handleCurveToV(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleCurveToV(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	_ = p.GetFloat() // x2
 	_ = p.GetFloat() // y2
@@ -113,7 +112,7 @@ func handleCurveToV(s *State, args []pdf.Native, res *resource.Resource) error {
 }
 
 // handleCurveToY implements the y operator (Bezier curve, final point replicated)
-func handleCurveToY(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleCurveToY(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	_ = p.GetFloat() // x1
 	_ = p.GetFloat() // y1
@@ -132,7 +131,7 @@ func handleCurveToY(s *State, args []pdf.Native, res *resource.Resource) error {
 }
 
 // handleClosePath implements the h operator (close current subpath)
-func handleClosePath(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleClosePath(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	if err := p.Check(); err != nil {
 		return err
@@ -149,7 +148,7 @@ func handleClosePath(s *State, args []pdf.Native, res *resource.Resource) error 
 }
 
 // handleRectangle implements the re operator (append rectangle)
-func handleRectangle(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleRectangle(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	x := p.GetFloat()
 	y := p.GetFloat()
@@ -183,7 +182,7 @@ func handleRectangle(s *State, args []pdf.Native, res *resource.Resource) error 
 }
 
 // handleStroke implements the S operator (stroke path)
-func handleStroke(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleStroke(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	if err := p.Check(); err != nil {
 		return err
@@ -215,7 +214,7 @@ func handleStroke(s *State, args []pdf.Native, res *resource.Resource) error {
 }
 
 // handleCloseAndStroke implements the s operator (close and stroke path)
-func handleCloseAndStroke(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleCloseAndStroke(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	if err := p.Check(); err != nil {
 		return err
@@ -246,7 +245,7 @@ func handleCloseAndStroke(s *State, args []pdf.Native, res *resource.Resource) e
 }
 
 // handleFill implements the f operator (fill path using nonzero winding rule)
-func handleFill(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleFill(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	if err := p.Check(); err != nil {
 		return err
@@ -264,12 +263,12 @@ func handleFill(s *State, args []pdf.Native, res *resource.Resource) error {
 }
 
 // handleFillCompat implements the F operator (deprecated alias for f)
-func handleFillCompat(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleFillCompat(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	return handleFill(s, args, res)
 }
 
 // handleFillEvenOdd implements the f* operator (fill using even-odd rule)
-func handleFillEvenOdd(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleFillEvenOdd(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	if err := p.Check(); err != nil {
 		return err
@@ -287,7 +286,7 @@ func handleFillEvenOdd(s *State, args []pdf.Native, res *resource.Resource) erro
 }
 
 // handleFillAndStroke implements the B operator (fill and stroke, nonzero)
-func handleFillAndStroke(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleFillAndStroke(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	if err := p.Check(); err != nil {
 		return err
@@ -315,12 +314,12 @@ func handleFillAndStroke(s *State, args []pdf.Native, res *resource.Resource) er
 }
 
 // handleFillAndStrokeEvenOdd implements the B* operator
-func handleFillAndStrokeEvenOdd(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleFillAndStrokeEvenOdd(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	return handleFillAndStroke(s, args, res)
 }
 
 // handleCloseFillAndStroke implements the b operator
-func handleCloseFillAndStroke(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleCloseFillAndStroke(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	if err := p.Check(); err != nil {
 		return err
@@ -348,12 +347,12 @@ func handleCloseFillAndStroke(s *State, args []pdf.Native, res *resource.Resourc
 }
 
 // handleCloseFillAndStrokeEvenOdd implements the b* operator
-func handleCloseFillAndStrokeEvenOdd(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleCloseFillAndStrokeEvenOdd(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	return handleCloseFillAndStroke(s, args, res)
 }
 
 // handleEndPath implements the n operator (end path without painting)
-func handleEndPath(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleEndPath(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	if err := p.Check(); err != nil {
 		return err
@@ -370,7 +369,7 @@ func handleEndPath(s *State, args []pdf.Native, res *resource.Resource) error {
 }
 
 // handleClip implements the W operator (set clipping path, nonzero)
-func handleClip(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleClip(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	if err := p.Check(); err != nil {
 		return err
@@ -385,7 +384,7 @@ func handleClip(s *State, args []pdf.Native, res *resource.Resource) error {
 }
 
 // handleClipEvenOdd implements the W* operator (set clipping path, even-odd)
-func handleClipEvenOdd(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleClipEvenOdd(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	if err := p.Check(); err != nil {
 		return err

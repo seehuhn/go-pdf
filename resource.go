@@ -42,8 +42,8 @@ type Embedder interface {
 	// Embed converts the Go representation of the object into a PDF object,
 	// corresponding to the PDF version of the output file.
 	//
-	// The first return value is the PDF representation of the object.
-	// If the object is embedded in the PDF file, this may be a reference.
+	// The return value is the PDF representation of the object.
+	// If the object is embedded in the PDF file, this may be a [Reference].
 	Embed(e *EmbedHelper) (Native, error)
 }
 

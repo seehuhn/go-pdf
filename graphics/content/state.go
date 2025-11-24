@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package operator
+package content
 
 import (
 	"errors"
@@ -22,11 +22,10 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/resource"
 )
 
 // handlePushState implements the q operator (save graphics state)
-func handlePushState(s *State, args []pdf.Native, res *resource.Resource) error {
+func handlePushState(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	if err := p.Check(); err != nil {
 		return err
@@ -40,7 +39,7 @@ func handlePushState(s *State, args []pdf.Native, res *resource.Resource) error 
 }
 
 // handlePopState implements the Q operator (restore graphics state)
-func handlePopState(s *State, args []pdf.Native, res *resource.Resource) error {
+func handlePopState(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	if err := p.Check(); err != nil {
 		return err
@@ -60,7 +59,7 @@ func handlePopState(s *State, args []pdf.Native, res *resource.Resource) error {
 }
 
 // handleConcatMatrix implements the cm operator (modify CTM)
-func handleConcatMatrix(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleConcatMatrix(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	a := p.GetFloat()
 	b := p.GetFloat()
@@ -78,7 +77,7 @@ func handleConcatMatrix(s *State, args []pdf.Native, res *resource.Resource) err
 }
 
 // handleSetLineWidth implements the w operator
-func handleSetLineWidth(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetLineWidth(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	width := p.GetFloat()
 	if err := p.Check(); err != nil {
@@ -91,7 +90,7 @@ func handleSetLineWidth(s *State, args []pdf.Native, res *resource.Resource) err
 }
 
 // handleSetLineCap implements the J operator
-func handleSetLineCap(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetLineCap(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	cap := p.GetInt()
 	if err := p.Check(); err != nil {
@@ -104,7 +103,7 @@ func handleSetLineCap(s *State, args []pdf.Native, res *resource.Resource) error
 }
 
 // handleSetLineJoin implements the j operator
-func handleSetLineJoin(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetLineJoin(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	join := p.GetInt()
 	if err := p.Check(); err != nil {
@@ -117,7 +116,7 @@ func handleSetLineJoin(s *State, args []pdf.Native, res *resource.Resource) erro
 }
 
 // handleSetMiterLimit implements the M operator
-func handleSetMiterLimit(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetMiterLimit(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	limit := p.GetFloat()
 	if err := p.Check(); err != nil {
@@ -130,7 +129,7 @@ func handleSetMiterLimit(s *State, args []pdf.Native, res *resource.Resource) er
 }
 
 // handleSetLineDash implements the d operator
-func handleSetLineDash(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetLineDash(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	arr := p.GetArray()
 	phase := p.GetFloat()
@@ -158,7 +157,7 @@ func handleSetLineDash(s *State, args []pdf.Native, res *resource.Resource) erro
 }
 
 // handleSetRenderingIntent implements the ri operator
-func handleSetRenderingIntent(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetRenderingIntent(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	intent := p.GetName()
 	if err := p.Check(); err != nil {
@@ -171,7 +170,7 @@ func handleSetRenderingIntent(s *State, args []pdf.Native, res *resource.Resourc
 }
 
 // handleSetFlatness implements the i operator
-func handleSetFlatness(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetFlatness(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	flatness := p.GetFloat()
 	if err := p.Check(); err != nil {
@@ -184,7 +183,7 @@ func handleSetFlatness(s *State, args []pdf.Native, res *resource.Resource) erro
 }
 
 // handleSetExtGState implements the gs operator
-func handleSetExtGState(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetExtGState(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	name := p.GetName()
 	if err := p.Check(); err != nil {

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package operator
+package content
 
 import (
 	"iter"
@@ -25,12 +25,11 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/resource"
 )
 
 func TestTextOperators_BeginEnd(t *testing.T) {
-	state := &State{CurrentObject: ObjPage}
-	res := &resource.Resource{}
+	state := &GraphicsState{CurrentObject: ObjPage}
+	res := &Resources{}
 
 	// Begin text
 	opBT := Operator{Name: "BT", Args: nil}
@@ -63,9 +62,9 @@ func TestTextOperators_BeginEnd(t *testing.T) {
 }
 
 func TestTextOperators_SetFont(t *testing.T) {
-	state := &State{}
+	state := &GraphicsState{}
 	mockFont := &mockFontInstance{}
-	res := &resource.Resource{
+	res := &Resources{
 		Font: map[pdf.Name]font.Instance{
 			"F1": mockFont,
 		},
@@ -171,9 +170,9 @@ func TestTextOperators_RenderingModeDependencies(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			state := &State{CurrentObject: ObjText}
+			state := &GraphicsState{CurrentObject: ObjText}
 			state.Param.TextRenderingMode = tt.renderingMode
-			res := &resource.Resource{}
+			res := &Resources{}
 
 			op := Operator{Name: "Tj", Args: []pdf.Native{pdf.String("test")}}
 			if err := state.Apply(res, op); err != nil {
@@ -218,10 +217,10 @@ func TestTextOperators_RenderingModeDependencies(t *testing.T) {
 // modify TextMatrix correctly
 func TestTextOperators_TextPositioning(t *testing.T) {
 	t.Run("Td operator", func(t *testing.T) {
-		state := &State{CurrentObject: ObjText}
+		state := &GraphicsState{CurrentObject: ObjText}
 		state.Param.TextLineMatrix = matrix.Identity
 		state.Param.TextMatrix = matrix.Identity
-		res := &resource.Resource{}
+		res := &Resources{}
 
 		op := Operator{Name: "Td", Args: []pdf.Native{pdf.Real(10.0), pdf.Real(20.0)}}
 		if err := state.Apply(res, op); err != nil {
@@ -241,10 +240,10 @@ func TestTextOperators_TextPositioning(t *testing.T) {
 	})
 
 	t.Run("TD operator", func(t *testing.T) {
-		state := &State{CurrentObject: ObjText}
+		state := &GraphicsState{CurrentObject: ObjText}
 		state.Param.TextLineMatrix = matrix.Identity
 		state.Param.TextMatrix = matrix.Identity
-		res := &resource.Resource{}
+		res := &Resources{}
 
 		op := Operator{Name: "TD", Args: []pdf.Native{pdf.Real(10.0), pdf.Real(-5.0)}}
 		if err := state.Apply(res, op); err != nil {
@@ -261,8 +260,8 @@ func TestTextOperators_TextPositioning(t *testing.T) {
 	})
 
 	t.Run("Tm operator", func(t *testing.T) {
-		state := &State{CurrentObject: ObjText}
-		res := &resource.Resource{}
+		state := &GraphicsState{CurrentObject: ObjText}
+		res := &Resources{}
 
 		op := Operator{
 			Name: "Tm",
@@ -286,11 +285,11 @@ func TestTextOperators_TextPositioning(t *testing.T) {
 	})
 
 	t.Run("T* operator", func(t *testing.T) {
-		state := &State{CurrentObject: ObjText}
+		state := &GraphicsState{CurrentObject: ObjText}
 		state.Param.TextLineMatrix = matrix.Identity
 		state.Param.TextMatrix = matrix.Identity
 		state.Param.TextLeading = 12.0
-		res := &resource.Resource{}
+		res := &Resources{}
 
 		op := Operator{Name: "T*", Args: nil}
 		if err := state.Apply(res, op); err != nil {
@@ -313,11 +312,11 @@ func TestTextOperators_TextPositioning(t *testing.T) {
 // TestTextOperators_CompositeOperators verifies composite text showing operators
 func TestTextOperators_CompositeOperators(t *testing.T) {
 	t.Run("' operator", func(t *testing.T) {
-		state := &State{CurrentObject: ObjText}
+		state := &GraphicsState{CurrentObject: ObjText}
 		state.Param.TextLineMatrix = matrix.Identity
 		state.Param.TextMatrix = matrix.Identity
 		state.Param.TextLeading = 10.0
-		res := &resource.Resource{}
+		res := &Resources{}
 
 		op := Operator{Name: "'", Args: []pdf.Native{pdf.String("test")}}
 		if err := state.Apply(res, op); err != nil {
@@ -334,11 +333,11 @@ func TestTextOperators_CompositeOperators(t *testing.T) {
 	})
 
 	t.Run("\" operator", func(t *testing.T) {
-		state := &State{CurrentObject: ObjText}
+		state := &GraphicsState{CurrentObject: ObjText}
 		state.Param.TextLineMatrix = matrix.Identity
 		state.Param.TextMatrix = matrix.Identity
 		state.Param.TextLeading = 10.0
-		res := &resource.Resource{}
+		res := &Resources{}
 
 		op := Operator{
 			Name: `"`,
@@ -367,9 +366,9 @@ func TestTextOperators_CompositeOperators(t *testing.T) {
 // TestTextOperators_FontResolution verifies font resource resolution
 func TestTextOperators_FontResolution(t *testing.T) {
 	t.Run("valid font", func(t *testing.T) {
-		state := &State{}
+		state := &GraphicsState{}
 		mockFont := &mockFontInstance{}
-		res := &resource.Resource{
+		res := &Resources{
 			Font: map[pdf.Name]font.Instance{
 				"F1": mockFont,
 			},
@@ -392,8 +391,8 @@ func TestTextOperators_FontResolution(t *testing.T) {
 	})
 
 	t.Run("missing font", func(t *testing.T) {
-		state := &State{}
-		res := &resource.Resource{
+		state := &GraphicsState{}
+		res := &Resources{
 			Font: map[pdf.Name]font.Instance{},
 		}
 
@@ -405,8 +404,8 @@ func TestTextOperators_FontResolution(t *testing.T) {
 	})
 
 	t.Run("no font resources", func(t *testing.T) {
-		state := &State{}
-		res := &resource.Resource{}
+		state := &GraphicsState{}
+		res := &Resources{}
 
 		op := Operator{Name: "Tf", Args: []pdf.Native{pdf.Name("F1"), pdf.Real(12.0)}}
 		err := state.Apply(res, op)
@@ -422,7 +421,7 @@ func TestTextOperators_ContextValidation(t *testing.T) {
 		name     string
 		operator string
 		args     []pdf.Native
-		object   ObjectType
+		object   Object
 		wantErr  bool
 	}{
 		{"BT in page context", "BT", nil, ObjPage, false},
@@ -437,8 +436,8 @@ func TestTextOperators_ContextValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			state := &State{CurrentObject: tt.object}
-			res := &resource.Resource{}
+			state := &GraphicsState{CurrentObject: tt.object}
+			res := &Resources{}
 
 			op := Operator{Name: pdf.Name(tt.operator), Args: tt.args}
 			err := state.Apply(res, op)

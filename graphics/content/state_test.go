@@ -14,23 +14,22 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package operator
+package content
 
 import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/resource"
 )
 
 func TestStateOperators_PushPop(t *testing.T) {
 	gState := graphics.NewState()
-	state := &State{
+	state := &GraphicsState{
 		Param: *gState.Parameters,
 		Out:   graphics.StateLineWidth,
 	}
-	res := &resource.Resource{}
+	res := &Resources{}
 
 	// Push state
 	opQ := Operator{Name: "q", Args: nil}
@@ -55,8 +54,8 @@ func TestStateOperators_PushPop(t *testing.T) {
 }
 
 func TestStateOperators_LineWidth(t *testing.T) {
-	state := &State{}
-	res := &resource.Resource{}
+	state := &GraphicsState{}
+	res := &Resources{}
 
 	op := Operator{Name: "w", Args: []pdf.Native{pdf.Real(2.5)}}
 	if err := state.Apply(res, op); err != nil {
@@ -72,8 +71,8 @@ func TestStateOperators_LineWidth(t *testing.T) {
 }
 
 func TestStateOperators_PopWithoutPush(t *testing.T) {
-	state := &State{}
-	res := &resource.Resource{}
+	state := &GraphicsState{}
+	res := &Resources{}
 
 	op := Operator{Name: "Q", Args: nil}
 	err := state.Apply(res, op)
@@ -83,8 +82,8 @@ func TestStateOperators_PopWithoutPush(t *testing.T) {
 }
 
 func TestStateOperators_LineDash(t *testing.T) {
-	state := &State{}
-	res := &resource.Resource{}
+	state := &GraphicsState{}
+	res := &Resources{}
 
 	op := Operator{
 		Name: "d",
@@ -111,10 +110,10 @@ func TestStateOperators_LineDash(t *testing.T) {
 
 func TestStateOperators_ConcatMatrix(t *testing.T) {
 	gState := graphics.NewState()
-	state := &State{
+	state := &GraphicsState{
 		Param: *gState.Parameters,
 	}
-	res := &resource.Resource{}
+	res := &Resources{}
 
 	// apply cm operator: 2 0 0 2 10 20 cm (scale by 2 and translate by (10,20))
 	op := Operator{

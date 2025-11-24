@@ -14,20 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package operator
+package content
 
 import (
 	"errors"
 	"testing"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/resource"
 )
 
 func TestApplyOperator_BasicStructure(t *testing.T) {
-	state := &State{}
+	state := &GraphicsState{}
 	op := Operator{Name: "q", Args: nil}
-	res := &resource.Resource{}
+	res := &Resources{}
 
 	err := state.Apply(res, op)
 	if err != nil {

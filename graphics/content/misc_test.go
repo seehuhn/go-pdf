@@ -14,20 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package operator
+package content
 
 import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/resource"
 )
 
 func TestMiscOperators_XObject(t *testing.T) {
-	state := &State{}
+	state := &GraphicsState{}
 	mockXObj := &mockXObject{}
-	res := &resource.Resource{
+	res := &Resources{
 		XObject: map[pdf.Name]graphics.XObject{
 			"Im1": mockXObj,
 		},
@@ -40,8 +39,8 @@ func TestMiscOperators_XObject(t *testing.T) {
 }
 
 func TestMiscOperators_MarkedContent(t *testing.T) {
-	state := &State{}
-	res := &resource.Resource{}
+	state := &GraphicsState{}
+	res := &Resources{}
 
 	// BMC
 	opBMC := Operator{Name: "BMC", Args: []pdf.Native{pdf.Name("Tag1")}}
@@ -57,8 +56,8 @@ func TestMiscOperators_MarkedContent(t *testing.T) {
 }
 
 func TestMiscOperators_SpecialOperators(t *testing.T) {
-	state := &State{}
-	res := &resource.Resource{}
+	state := &GraphicsState{}
+	res := &Resources{}
 
 	// %raw%
 	opRaw := Operator{Name: "%raw%", Args: []pdf.Native{pdf.String("  % comment\n")}}

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package operator
+package content
 
 import (
 	"errors"
@@ -22,11 +22,10 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/resource"
 )
 
 // handleSetStrokeColorSpace implements the CS operator
-func handleSetStrokeColorSpace(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetStrokeColorSpace(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	name := p.GetName()
 	if err := p.Check(); err != nil {
@@ -57,7 +56,7 @@ func handleSetStrokeColorSpace(s *State, args []pdf.Native, res *resource.Resour
 }
 
 // handleSetFillColorSpace implements the cs operator
-func handleSetFillColorSpace(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetFillColorSpace(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	name := p.GetName()
 	if err := p.Check(); err != nil {
@@ -86,7 +85,7 @@ func handleSetFillColorSpace(s *State, args []pdf.Native, res *resource.Resource
 }
 
 // handleSetStrokeColor implements the SC operator
-func handleSetStrokeColor(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetStrokeColor(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	// For simplicity, just mark the dependency
 	// Full implementation would parse components based on current color space
 	s.markOut(graphics.StateStrokeColor)
@@ -94,26 +93,26 @@ func handleSetStrokeColor(s *State, args []pdf.Native, res *resource.Resource) e
 }
 
 // handleSetStrokeColorN implements the SCN operator
-func handleSetStrokeColorN(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetStrokeColorN(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	// Similar to SC but supports patterns
 	s.markOut(graphics.StateStrokeColor)
 	return nil
 }
 
 // handleSetFillColor implements the sc operator
-func handleSetFillColor(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetFillColor(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	s.markOut(graphics.StateFillColor)
 	return nil
 }
 
 // handleSetFillColorN implements the scn operator
-func handleSetFillColorN(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetFillColorN(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	s.markOut(graphics.StateFillColor)
 	return nil
 }
 
 // handleSetStrokeGray implements the G operator
-func handleSetStrokeGray(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetStrokeGray(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	gray := p.GetFloat()
 	if err := p.Check(); err != nil {
@@ -126,7 +125,7 @@ func handleSetStrokeGray(s *State, args []pdf.Native, res *resource.Resource) er
 }
 
 // handleSetFillGray implements the g operator
-func handleSetFillGray(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetFillGray(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	gray := p.GetFloat()
 	if err := p.Check(); err != nil {
@@ -139,7 +138,7 @@ func handleSetFillGray(s *State, args []pdf.Native, res *resource.Resource) erro
 }
 
 // handleSetStrokeRGB implements the RG operator
-func handleSetStrokeRGB(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetStrokeRGB(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	r := p.GetFloat()
 	g := p.GetFloat()
@@ -154,7 +153,7 @@ func handleSetStrokeRGB(s *State, args []pdf.Native, res *resource.Resource) err
 }
 
 // handleSetFillRGB implements the rg operator
-func handleSetFillRGB(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetFillRGB(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	r := p.GetFloat()
 	g := p.GetFloat()
@@ -169,7 +168,7 @@ func handleSetFillRGB(s *State, args []pdf.Native, res *resource.Resource) error
 }
 
 // handleSetStrokeCMYK implements the K operator
-func handleSetStrokeCMYK(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetStrokeCMYK(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	c := p.GetFloat()
 	m := p.GetFloat()
@@ -185,7 +184,7 @@ func handleSetStrokeCMYK(s *State, args []pdf.Native, res *resource.Resource) er
 }
 
 // handleSetFillCMYK implements the k operator
-func handleSetFillCMYK(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleSetFillCMYK(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	c := p.GetFloat()
 	m := p.GetFloat()

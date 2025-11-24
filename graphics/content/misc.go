@@ -14,17 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package operator
+package content
 
 import (
 	"errors"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/resource"
 )
 
 // handleShading implements the sh operator (paint shading)
-func handleShading(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleShading(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	name := p.GetName()
 	if err := p.Check(); err != nil {
@@ -39,7 +38,7 @@ func handleShading(s *State, args []pdf.Native, res *resource.Resource) error {
 }
 
 // handleXObject implements the Do operator (paint XObject)
-func handleXObject(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleXObject(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	name := p.GetName()
 	if err := p.Check(); err != nil {
@@ -54,7 +53,7 @@ func handleXObject(s *State, args []pdf.Native, res *resource.Resource) error {
 }
 
 // handleMarkedContentPoint implements the MP operator
-func handleMarkedContentPoint(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleMarkedContentPoint(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	_ = p.GetName() // tag
 	if err := p.Check(); err != nil {
@@ -64,7 +63,7 @@ func handleMarkedContentPoint(s *State, args []pdf.Native, res *resource.Resourc
 }
 
 // handleMarkedContentPointWithProperties implements the DP operator
-func handleMarkedContentPointWithProperties(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleMarkedContentPointWithProperties(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	_ = p.GetName() // tag
 	// Second arg can be name or dict
@@ -78,7 +77,7 @@ func handleMarkedContentPointWithProperties(s *State, args []pdf.Native, res *re
 }
 
 // handleBeginMarkedContent implements the BMC operator
-func handleBeginMarkedContent(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleBeginMarkedContent(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	_ = p.GetName() // tag
 	if err := p.Check(); err != nil {
@@ -88,7 +87,7 @@ func handleBeginMarkedContent(s *State, args []pdf.Native, res *resource.Resourc
 }
 
 // handleBeginMarkedContentWithProperties implements the BDC operator
-func handleBeginMarkedContentWithProperties(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleBeginMarkedContentWithProperties(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	_ = p.GetName() // tag
 	// Second arg can be name or dict
@@ -102,7 +101,7 @@ func handleBeginMarkedContentWithProperties(s *State, args []pdf.Native, res *re
 }
 
 // handleEndMarkedContent implements the EMC operator
-func handleEndMarkedContent(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleEndMarkedContent(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	if err := p.Check(); err != nil {
 		return err
@@ -111,7 +110,7 @@ func handleEndMarkedContent(s *State, args []pdf.Native, res *resource.Resource)
 }
 
 // handleType3d0 implements the d0 operator (Type 3 font glyph width)
-func handleType3d0(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleType3d0(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	_ = p.GetFloat() // wx
 	_ = p.GetFloat() // wy
@@ -122,7 +121,7 @@ func handleType3d0(s *State, args []pdf.Native, res *resource.Resource) error {
 }
 
 // handleType3d1 implements the d1 operator (Type 3 font glyph width and bbox)
-func handleType3d1(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleType3d1(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	_ = p.GetFloat() // wx
 	_ = p.GetFloat() // wy
@@ -137,7 +136,7 @@ func handleType3d1(s *State, args []pdf.Native, res *resource.Resource) error {
 }
 
 // handleBeginCompatibility implements the BX operator
-func handleBeginCompatibility(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleBeginCompatibility(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	if err := p.Check(); err != nil {
 		return err
@@ -146,7 +145,7 @@ func handleBeginCompatibility(s *State, args []pdf.Native, res *resource.Resourc
 }
 
 // handleEndCompatibility implements the EX operator
-func handleEndCompatibility(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleEndCompatibility(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	if err := p.Check(); err != nil {
 		return err
@@ -155,7 +154,7 @@ func handleEndCompatibility(s *State, args []pdf.Native, res *resource.Resource)
 }
 
 // handleRawContent implements the %raw% special operator
-func handleRawContent(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleRawContent(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	_ = p.GetString() // raw content
 	if err := p.Check(); err != nil {
@@ -165,7 +164,7 @@ func handleRawContent(s *State, args []pdf.Native, res *resource.Resource) error
 }
 
 // handleInlineImage implements the %image% special operator
-func handleInlineImage(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleInlineImage(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	_ = p.GetDict()   // image parameters
 	_ = p.GetString() // image data

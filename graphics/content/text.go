@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package operator
+package content
 
 import (
 	"errors"
@@ -22,11 +22,10 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/resource"
 )
 
 // handleTextBegin implements the BT operator (begin text object)
-func handleTextBegin(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleTextBegin(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	if err := p.Check(); err != nil {
 		return err
@@ -45,7 +44,7 @@ func handleTextBegin(s *State, args []pdf.Native, res *resource.Resource) error 
 }
 
 // handleTextEnd implements the ET operator (end text object)
-func handleTextEnd(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleTextEnd(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	if err := p.Check(); err != nil {
 		return err
@@ -62,7 +61,7 @@ func handleTextEnd(s *State, args []pdf.Native, res *resource.Resource) error {
 }
 
 // handleTextSetCharSpacing implements the Tc operator
-func handleTextSetCharSpacing(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleTextSetCharSpacing(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	spacing := p.GetFloat()
 	if err := p.Check(); err != nil {
@@ -75,7 +74,7 @@ func handleTextSetCharSpacing(s *State, args []pdf.Native, res *resource.Resourc
 }
 
 // handleTextSetWordSpacing implements the Tw operator
-func handleTextSetWordSpacing(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleTextSetWordSpacing(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	spacing := p.GetFloat()
 	if err := p.Check(); err != nil {
@@ -88,7 +87,7 @@ func handleTextSetWordSpacing(s *State, args []pdf.Native, res *resource.Resourc
 }
 
 // handleTextSetHorizontalScaling implements the Tz operator
-func handleTextSetHorizontalScaling(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleTextSetHorizontalScaling(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	scale := p.GetFloat()
 	if err := p.Check(); err != nil {
@@ -101,7 +100,7 @@ func handleTextSetHorizontalScaling(s *State, args []pdf.Native, res *resource.R
 }
 
 // handleTextSetLeading implements the TL operator
-func handleTextSetLeading(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleTextSetLeading(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	leading := p.GetFloat()
 	if err := p.Check(); err != nil {
@@ -114,7 +113,7 @@ func handleTextSetLeading(s *State, args []pdf.Native, res *resource.Resource) e
 }
 
 // handleTextSetFont implements the Tf operator
-func handleTextSetFont(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleTextSetFont(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	name := p.GetName()
 	size := p.GetFloat()
@@ -134,7 +133,7 @@ func handleTextSetFont(s *State, args []pdf.Native, res *resource.Resource) erro
 }
 
 // handleTextSetRenderingMode implements the Tr operator
-func handleTextSetRenderingMode(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleTextSetRenderingMode(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	mode := p.GetInt()
 	if err := p.Check(); err != nil {
@@ -147,7 +146,7 @@ func handleTextSetRenderingMode(s *State, args []pdf.Native, res *resource.Resou
 }
 
 // handleTextSetRise implements the Ts operator
-func handleTextSetRise(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleTextSetRise(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	rise := p.GetFloat()
 	if err := p.Check(); err != nil {
@@ -160,7 +159,7 @@ func handleTextSetRise(s *State, args []pdf.Native, res *resource.Resource) erro
 }
 
 // handleTextMoveOffset implements the Td operator
-func handleTextMoveOffset(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleTextMoveOffset(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	tx := p.GetFloat()
 	ty := p.GetFloat()
@@ -181,7 +180,7 @@ func handleTextMoveOffset(s *State, args []pdf.Native, res *resource.Resource) e
 }
 
 // handleTextMoveOffsetSetLeading implements the TD operator
-func handleTextMoveOffsetSetLeading(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleTextMoveOffsetSetLeading(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	tx := p.GetFloat()
 	ty := p.GetFloat()
@@ -206,7 +205,7 @@ func handleTextMoveOffsetSetLeading(s *State, args []pdf.Native, res *resource.R
 }
 
 // handleTextSetMatrix implements the Tm operator
-func handleTextSetMatrix(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleTextSetMatrix(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	a := p.GetFloat()
 	b := p.GetFloat()
@@ -231,7 +230,7 @@ func handleTextSetMatrix(s *State, args []pdf.Native, res *resource.Resource) er
 }
 
 // handleTextNextLine implements the T* operator
-func handleTextNextLine(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleTextNextLine(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	if err := p.Check(); err != nil {
 		return err
@@ -254,7 +253,7 @@ func handleTextNextLine(s *State, args []pdf.Native, res *resource.Resource) err
 }
 
 // handleTextShow implements the Tj operator
-func handleTextShow(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleTextShow(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	_ = p.GetString() // text to show
 	if err := p.Check(); err != nil {
@@ -288,7 +287,7 @@ func handleTextShow(s *State, args []pdf.Native, res *resource.Resource) error {
 }
 
 // handleTextShowArray implements the TJ operator
-func handleTextShowArray(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleTextShowArray(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	_ = p.GetArray() // array of strings and numbers
 	if err := p.Check(); err != nil {
@@ -300,7 +299,7 @@ func handleTextShowArray(s *State, args []pdf.Native, res *resource.Resource) er
 }
 
 // handleTextShowMoveNextLine implements the ' operator
-func handleTextShowMoveNextLine(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleTextShowMoveNextLine(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	text := p.GetString()
 	if err := p.Check(); err != nil {
@@ -315,7 +314,7 @@ func handleTextShowMoveNextLine(s *State, args []pdf.Native, res *resource.Resou
 }
 
 // handleTextShowMoveNextLineSetSpacing implements the " operator
-func handleTextShowMoveNextLineSetSpacing(s *State, args []pdf.Native, res *resource.Resource) error {
+func handleTextShowMoveNextLineSetSpacing(s *GraphicsState, args []pdf.Native, res *Resources) error {
 	p := argParser{args: args}
 	aw := p.GetFloat()
 	ac := p.GetFloat()

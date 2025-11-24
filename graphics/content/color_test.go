@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package operator
+package content
 
 import (
 	"testing"
@@ -22,12 +22,11 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/resource"
 )
 
 func TestColorOperators_DeviceGray(t *testing.T) {
-	state := &State{}
-	res := &resource.Resource{}
+	state := &GraphicsState{}
+	res := &Resources{}
 
 	// Set stroke gray
 	opG := Operator{Name: "G", Args: []pdf.Native{pdf.Real(0.5)}}
@@ -51,8 +50,8 @@ func TestColorOperators_DeviceGray(t *testing.T) {
 }
 
 func TestColorOperators_DeviceRGB(t *testing.T) {
-	state := &State{}
-	res := &resource.Resource{}
+	state := &GraphicsState{}
+	res := &Resources{}
 
 	op := Operator{
 		Name: "rg",
@@ -69,8 +68,8 @@ func TestColorOperators_DeviceRGB(t *testing.T) {
 }
 
 func TestColorOperators_SetColorSpace(t *testing.T) {
-	state := &State{}
-	res := &resource.Resource{
+	state := &GraphicsState{}
+	res := &Resources{
 		ColorSpace: map[pdf.Name]color.Space{
 			"CS1": color.SpaceDeviceGray,
 		},

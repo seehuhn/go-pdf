@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package resource
+package content
 
 import (
 	"fmt"
@@ -32,7 +32,7 @@ import (
 
 // PDF 2.0 sections: 14.2 7.8
 
-type Resource struct {
+type Resources struct {
 	ExtGState  map[pdf.Name]*graphics.ExtGState
 	ColorSpace map[pdf.Name]color.Space
 	Pattern    map[pdf.Name]color.Pattern
@@ -55,9 +55,9 @@ type ProcSet struct {
 	ImageI bool
 }
 
-var _ pdf.Embedder = (*Resource)(nil)
+var _ pdf.Embedder = (*Resources)(nil)
 
-func Extract(x *pdf.Extractor, obj pdf.Object) (*Resource, error) {
+func ExtractResources(x *pdf.Extractor, obj pdf.Object) (*Resources, error) {
 	// check if original object was indirect before resolving
 	_, wasIndirect := obj.(pdf.Reference)
 
@@ -69,7 +69,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Resource, error) {
 
 	// handle nil - return empty resource
 	if obj == nil {
-		return &Resource{SingleUse: true}, nil
+		return &Resources{SingleUse: true}, nil
 	}
 
 	// must be a dictionary
@@ -81,7 +81,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Resource, error) {
 	}
 
 	// create result with SingleUse based on indirectness
-	res := &Resource{
+	res := &Resources{
 		SingleUse: !wasIndirect,
 	}
 
@@ -209,7 +209,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Resource, error) {
 	return res, nil
 }
 
-func (r *Resource) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// validate PDF version constraints
 	if len(r.Shading) > 0 {
 		if err := pdf.CheckVersion(rm.Out(), "Shading resources", pdf.V1_3); err != nil {
