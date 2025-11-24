@@ -21,6 +21,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -181,12 +182,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 	}
 
 	for i, g := range fnt.Glyphs {
-		contentRef := ctx.pageTree.Out.Alloc()
-		stream, err := ctx.pageTree.Out.OpenStream(contentRef, nil, pdf.FilterCompress{})
-		if err != nil {
-			return err
-		}
-		page := graphics.NewWriter(stream, ctx.rm)
+		builder := graphics.NewContentStreamBuilder()
 
 		// show the glyph extent as a shaded rectangle
 		bbox := g.Extent()
@@ -194,11 +190,11 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 		y0 := bbox.LLy.AsFloat(q)
 		x1 := bbox.URx.AsFloat(q)
 		y1 := bbox.URy.AsFloat(q)
-		page.PushGraphicsState()
-		page.SetFillColor(color.DeviceGray(0.9))
-		page.Rectangle(x0, y0, x1-x0, y1-y0)
-		page.Fill()
-		page.PopGraphicsState()
+		builder.PushGraphicsState()
+		builder.SetFillColor(color.DeviceGray(0.9))
+		builder.Rectangle(x0, y0, x1-x0, y1-y0)
+		builder.Fill()
+		builder.PopGraphicsState()
 
 		// show the glyph ID and name
 		var label []string
@@ -217,36 +213,36 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 			label = append(label, fmt.Sprintf("CID=%d", cid))
 		}
 
-		page.TextBegin()
-		page.TextSetFont(ctx.labelFont, 12)
-		page.TextFirstLine(ctx.pageSize.LLx+22, ctx.pageSize.URy-30)
-		page.TextShow(strings.Join(label, ", "))
+		builder.TextBegin()
+		builder.TextSetFont(ctx.labelFont, 12)
+		builder.TextFirstLine(ctx.pageSize.LLx+22, ctx.pageSize.URy-30)
+		builder.TextShow(strings.Join(label, ", "))
 		if g.Name != "" {
 			rr := []rune(names.ToUnicode(g.Name, ""))
 			if len(rr) == 1 {
 				runeName := runenames.Name(rr[0])
-				page.TextSecondLine(0, -15)
-				page.TextShow(runeName)
+				builder.TextSecondLine(0, -15)
+				builder.TextShow(runeName)
 			}
 		}
-		page.TextEnd()
+		builder.TextEnd()
 
-		page.Transform(matrix.Scale(q, q))
+		builder.Transform(matrix.Scale(q, q))
 
 		// illustrate the advance width by drawing an arrow
-		page.PushGraphicsState()
-		page.SetStrokeColor(color.DeviceRGB(0.1, 0.9, 0.1))
-		page.SetLineWidth(3)
-		page.MoveTo(0, -10)
-		page.LineTo(0, 10)
-		page.MoveTo(0, 0)
+		builder.PushGraphicsState()
+		builder.SetStrokeColor(color.DeviceRGB(0.1, 0.9, 0.1))
+		builder.SetLineWidth(3)
+		builder.MoveTo(0, -10)
+		builder.LineTo(0, 10)
+		builder.MoveTo(0, 0)
 		w := g.Width
-		page.LineTo(w, 0)
-		page.MoveTo(w-10, -10)
-		page.LineTo(w, 0)
-		page.LineTo(w-10, 10)
-		page.Stroke()
-		page.PopGraphicsState()
+		builder.LineTo(w, 0)
+		builder.MoveTo(w-10, -10)
+		builder.LineTo(w, 0)
+		builder.LineTo(w-10, 10)
+		builder.Stroke()
+		builder.PopGraphicsState()
 
 		if len(g.Cmds) > 0 {
 			var xx []float64
@@ -254,24 +250,24 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 
 			// draw the glyph outline
 			var ink bool
-			page.PushGraphicsState()
-			page.SetLineWidth(1 / q)
+			builder.PushGraphicsState()
+			builder.SetLineWidth(1 / q)
 			for _, cmd := range g.Cmds {
 				switch cmd.Op {
 				case cff.OpMoveTo:
 					if ink {
-						page.ClosePath()
+						builder.ClosePath()
 					}
-					page.MoveTo(cmd.Args[0], cmd.Args[1])
+					builder.MoveTo(cmd.Args[0], cmd.Args[1])
 					xx = append(xx, cmd.Args[0])
 					yy = append(yy, cmd.Args[1])
 				case cff.OpLineTo:
-					page.LineTo(cmd.Args[0], cmd.Args[1])
+					builder.LineTo(cmd.Args[0], cmd.Args[1])
 					xx = append(xx, cmd.Args[0])
 					yy = append(yy, cmd.Args[1])
 					ink = true
 				case cff.OpCurveTo:
-					page.CurveTo(cmd.Args[0], cmd.Args[1],
+					builder.CurveTo(cmd.Args[0], cmd.Args[1],
 						cmd.Args[2], cmd.Args[3],
 						cmd.Args[4], cmd.Args[5])
 					xx = append(xx, cmd.Args[4])
@@ -280,16 +276,16 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 				}
 			}
 			if ink {
-				page.ClosePath()
+				builder.ClosePath()
 			}
-			page.Stroke()
-			page.PopGraphicsState()
+			builder.Stroke()
+			builder.PopGraphicsState()
 
 			// label the points
-			page.PushGraphicsState()
-			page.SetFillColor(color.DeviceRGB(0, 0, 0.8))
-			page.TextBegin()
-			page.TextSetFont(ctx.labelFont, 8/q)
+			builder.PushGraphicsState()
+			builder.SetFillColor(color.DeviceRGB(0, 0, 0.8))
+			builder.TextBegin()
+			builder.TextSetFont(ctx.labelFont, 8/q)
 			xPrev := 0.0
 			yPrev := 0.0
 			for i := range xx {
@@ -297,15 +293,34 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 				y := yy[i] - 2
 				dx := x - xPrev
 				dy := y - yPrev
-				page.TextFirstLine(dx, dy)
-				page.TextShowAligned(fmt.Sprintf("%d", i), 0, 0.5)
+				builder.TextFirstLine(dx, dy)
+				builder.TextShowAligned(fmt.Sprintf("%d", i), 0, 0.5)
 				xPrev = x
 				yPrev = y
 			}
-			page.TextEnd()
-			page.PopGraphicsState()
+			builder.TextEnd()
+			builder.PopGraphicsState()
 		}
 
+		contentStream := builder.Build()
+
+		// Write content stream to buffer
+		buf := &bytes.Buffer{}
+		err := contentStream.WriteTo(buf, ctx.pageTree.Out.GetOptions()|pdf.OptContentStream)
+		if err != nil {
+			return err
+		}
+
+		// Create stream and write buffer to it
+		contentRef := ctx.pageTree.Out.Alloc()
+		stream, err := ctx.pageTree.Out.OpenStream(contentRef, nil, pdf.FilterCompress{})
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(stream, buf)
+		if err != nil {
+			return err
+		}
 		err = stream.Close()
 		if err != nil {
 			return err
@@ -316,8 +331,8 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 			"Contents": contentRef,
 			"MediaBox": pageSize,
 		}
-		if page.Resources != nil {
-			pageDict["Resources"] = pdf.AsDict(page.Resources)
+		if contentStream.Resources != nil {
+			pageDict["Resources"] = pdf.AsDict(contentStream.Resources)
 		}
 		err = ctx.pageTree.AppendPage(pageDict)
 		if err != nil {

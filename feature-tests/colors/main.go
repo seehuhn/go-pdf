@@ -268,6 +268,14 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 	h := w * math.Sqrt(3)
 	r := 0.3 * w
 
+	builder := graphics.NewContentStreamBuilder()
+	builder.Circle(0, 0, r)
+	builder.Circle(w, 0, r)
+	builder.Circle(w/2, h/2, r)
+	builder.Circle(0, h, r)
+	builder.Circle(w, h, r)
+	builder.Fill()
+
 	pat := &pattern.Type1{
 		TilingType: 1,
 		BBox:       &pdf.Rectangle{URx: w, URy: h},
@@ -275,15 +283,7 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 		YStep:      h,
 		Matrix:     matrix.Identity,
 		Color:      false,
-		Draw: func(builder *graphics.Writer) error {
-			builder.Circle(0, 0, r)
-			builder.Circle(w, 0, r)
-			builder.Circle(w/2, h/2, r)
-			builder.Circle(0, h, r)
-			builder.Circle(w, h, r)
-			builder.Fill()
-			return nil
-		},
+		Content:    builder.Build(),
 	}
 	col := color.PatternUncolored(pat, color.DeviceRGB(1, 0, 0))
 
@@ -316,6 +316,17 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 	height := width * math.Sqrt(3)
 	r := 0.3 * width
 
+	builder := graphics.NewContentStreamBuilder()
+	builder.SetFillColor(color.DeviceGray(0.5))
+	builder.Circle(0, 0, r)
+	builder.Circle(width, 0, r)
+	builder.Circle(0, height, r)
+	builder.Circle(width, height, r)
+	builder.Fill()
+	builder.SetFillColor(color.DeviceRGB(1, 0, 0))
+	builder.Circle(width/2, height/2, r)
+	builder.Fill()
+
 	pat := &pattern.Type1{
 		TilingType: 1,
 		BBox:       &pdf.Rectangle{URx: width, URy: height},
@@ -323,18 +334,7 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 		YStep:      height,
 		Matrix:     matrix.Identity,
 		Color:      true,
-		Draw: func(w *graphics.Writer) error {
-			w.SetFillColor(color.DeviceGray(0.5))
-			w.Circle(0, 0, r)
-			w.Circle(width, 0, r)
-			w.Circle(0, height, r)
-			w.Circle(width, height, r)
-			w.Fill()
-			w.SetFillColor(color.DeviceRGB(1, 0, 0))
-			w.Circle(width/2, height/2, r)
-			w.Fill()
-			return nil
-		},
+		Content:    builder.Build(),
 	}
 	col := color.PatternColored(pat)
 

@@ -98,31 +98,59 @@ func createDocument(filename string) error {
 		}
 	}
 
-	text.Show(w.Writer,
-		text.M{X: 36, Y: 550},
-		note,
-		text.Wrap(340,
-			`PDF Type 3 fonts handle glyph space units differently from other
-			font types. While most fonts define 1000 glyph space units as
-			1 text space unit, Type 3 fonts use their font matrix to convert
-			between glyph and text space. This test verifies that viewers
-			implement this conversion correctly.`),
-		text.NL,
-		text.Wrap(340,
-			"The following two lines should should show three squares each,",
-			"followed by an X, and should look the same:"),
-		text.M{X: 0, Y: -10},
-		testFont[0], testString[0], note, "X", text.NL,
-		text.M{X: 0, Y: -10},
-		testFont[1], testString[1], note, "X", text.NL,
-		text.Wrap(340,
-			"The following two lines should should show three rotated squares,",
-			"followed by an X, and should look the same:"),
-		text.M{X: 0, Y: -10},
-		testFont[2], testString[2], note, "X", text.NL,
-		text.M{X: 0, Y: -10},
-		testFont[3], testString[3], note, "X", text.NL,
-	)
+	// Write text content
+	w.TextBegin()
+	w.TextSetFont(note.Font, note.Size)
+	w.SetFillColor(note.Color)
+	w.TextFirstLine(36, 550)
+
+	w.TextShow("PDF Type 3 fonts handle glyph space units differently from other ")
+	w.TextSecondLine(0, -note.Size*1.2)
+	w.TextShow("font types. While most fonts define 1000 glyph space units as ")
+	w.TextNextLine()
+	w.TextShow("1 text space unit, Type 3 fonts use their font matrix to convert ")
+	w.TextNextLine()
+	w.TextShow("between glyph and text space. This test verifies that viewers ")
+	w.TextNextLine()
+	w.TextShow("implement this conversion correctly.")
+	w.TextNextLine()
+	w.TextNextLine()
+	w.TextShow("The following two lines should should show three squares each, ")
+	w.TextNextLine()
+	w.TextShow("followed by an X, and should look the same:")
+	w.TextSecondLine(0, -10)
+	w.TextSetFont(testFont[0].Font, testFont[0].Size)
+	w.SetFillColor(testFont[0].Color)
+	w.TextShowRaw(testString[0])
+	w.TextSetFont(note.Font, note.Size)
+	w.SetFillColor(note.Color)
+	w.TextShow("X")
+	w.TextSecondLine(0, -10)
+	w.TextSetFont(testFont[1].Font, testFont[1].Size)
+	w.SetFillColor(testFont[1].Color)
+	w.TextShowRaw(testString[1])
+	w.TextSetFont(note.Font, note.Size)
+	w.SetFillColor(note.Color)
+	w.TextShow("X")
+	w.TextSecondLine(0, -10)
+	w.TextShow("The following two lines should should show three rotated squares, ")
+	w.TextNextLine()
+	w.TextShow("followed by an X, and should look the same:")
+	w.TextSecondLine(0, -10)
+	w.TextSetFont(testFont[2].Font, testFont[2].Size)
+	w.SetFillColor(testFont[2].Color)
+	w.TextShowRaw(testString[2])
+	w.TextSetFont(note.Font, note.Size)
+	w.SetFillColor(note.Color)
+	w.TextShow("X")
+	w.TextSecondLine(0, -10)
+	w.TextSetFont(testFont[3].Font, testFont[3].Size)
+	w.SetFillColor(testFont[3].Color)
+	w.TextShowRaw(testString[3])
+	w.TextSetFont(note.Font, note.Size)
+	w.SetFillColor(note.Color)
+	w.TextShow("X")
+	w.TextEnd()
 
 	err = w.Close()
 	if err != nil {
@@ -148,17 +176,17 @@ func makeTestFont(unitsPerEm float64, rotate bool) font.Layouter {
 		Ascent:     unitsPerEm,
 		Leading:    unitsPerEm * 1.2,
 	}
+	builder := graphics.NewContentStreamBuilder()
+	a := 0.05 * unitsPerEm
+	b := 0.90 * unitsPerEm
+	builder.Rectangle(a, a, b, b)
+	builder.Fill()
+
 	F.Glyphs = append(F.Glyphs, &type3.Glyph{
-		Name:  "A",
-		Width: unitsPerEm,
-		BBox:  rect.Rect{URx: unitsPerEm, URy: unitsPerEm},
-		Draw: func(w *graphics.Writer) error {
-			a := 0.05 * unitsPerEm
-			b := 0.90 * unitsPerEm
-			w.Rectangle(a, a, b, b)
-			w.Fill()
-			return nil
-		},
+		Name:    "A",
+		Width:   unitsPerEm,
+		BBox:    rect.Rect{URx: unitsPerEm, URy: unitsPerEm},
+		Content: builder.Build(),
 	})
 	res, err := F.New()
 	if err != nil {

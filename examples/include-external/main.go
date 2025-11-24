@@ -17,7 +17,6 @@
 package main
 
 import (
-	"io"
 	"log"
 	"math"
 
@@ -28,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/pagetree"
+	"seehuhn.de/go/pdf/reader/scanner"
 )
 
 func main() {
@@ -47,7 +47,11 @@ func run() error {
 	B := standard.TimesBold.New()
 	F := standard.TimesRoman.New()
 
-	figure, bbox, err := LoadFigure("fig.pdf", page.RM)
+	// Create a resource manager for embedding external content
+	rm := pdf.NewResourceManager(page.Out)
+	defer rm.Close()
+
+	figure, bbox, err := LoadFigure("fig.pdf", rm)
 	if err != nil {
 		return err
 	}
@@ -99,35 +103,67 @@ func LoadFigure(fname string, rm *pdf.ResourceManager) (graphics.XObject, *pdf.R
 		return nil, nil, err
 	}
 
+	// Copy resources from the original PDF
+	copier := pdf.NewCopier(rm.Out, r)
+
+	origResources, err := pdf.GetDict(r, pageDict["Resources"])
+	if err != nil {
+		return nil, nil, err
+	}
+	resourceObj, err := copier.Copy(origResources)
+	if err != nil {
+		return nil, nil, err
+	}
+	resources, err := pdf.ExtractResources(nil, resourceObj)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Parse content stream operators
+	contents, err := pagetree.ContentStream(r, pageDict)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	s := scanner.NewScanner()
+	s.SetInput(contents)
+
+	var operators []graphics.Operator
+	for s.Scan() {
+		op := s.Operator()
+		// Convert scanner.Operator to graphics.Operator
+		// Note: All operator arguments in content streams should be Native types
+		args := make([]pdf.Native, len(op.Args))
+		for i, arg := range op.Args {
+			// Content stream operators should only have Native arguments
+			native, ok := arg.(pdf.Native)
+			if !ok {
+				return nil, nil, pdf.Errorf("unexpected non-native operator argument: %T", arg)
+			}
+			args[i] = native
+		}
+		operators = append(operators, graphics.Operator{
+			Name: pdf.Name(op.Name),
+			Args: args,
+		})
+	}
+	if s.Error() != nil {
+		return nil, nil, s.Error()
+	}
+
+	err = r.Close()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	contentStream := &graphics.ContentStream{
+		Resources: resources,
+		Operators: operators,
+	}
+
 	obj := &form.Form{
-		Draw: func(w *graphics.Writer) error {
-			copier := pdf.NewCopier(rm.Out, r)
-
-			origResources, err := pdf.GetDict(r, pageDict["Resources"])
-			if err != nil {
-				return err
-			}
-			resourceObj, err := copier.Copy(origResources)
-			if err != nil {
-				return err
-			}
-			w.Resources, err = pdf.ExtractResources(nil, resourceObj)
-			if err != nil {
-				return err
-			}
-
-			contents, err := pagetree.ContentStream(r, pageDict)
-			if err != nil {
-				return err
-			}
-			_, err = io.Copy(w.Content, contents)
-			if err != nil {
-				return err
-			}
-
-			return r.Close()
-		},
-		BBox: *bbox,
+		Content: contentStream,
+		BBox:    *bbox,
 	}
 
 	return obj, bbox, nil

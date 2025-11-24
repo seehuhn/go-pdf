@@ -65,6 +65,10 @@ func createDocument(filename string) error {
 	markerWidth := 1.0 / fontSize * 1000
 	markerAscent := ascent / fontSize * 1000
 	markerDescent := descent / fontSize * 1000
+	markerBuilder := graphics.NewContentStreamBuilder()
+	markerBuilder.Rectangle(0, markerDescent, markerWidth, markerAscent-markerDescent)
+	markerBuilder.Fill()
+
 	markerFont := &type3.Font{
 		Glyphs: []*type3.Glyph{
 			{},
@@ -77,11 +81,7 @@ func createDocument(filename string) error {
 					URx: markerWidth,
 					URy: markerAscent,
 				},
-				Draw: func(w *graphics.Writer) error {
-					w.Rectangle(0, markerDescent, markerWidth, markerAscent-markerDescent)
-					w.Fill()
-					return nil
-				},
+				Content: markerBuilder.Build(),
 			},
 		},
 		FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},

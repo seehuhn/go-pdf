@@ -64,18 +64,27 @@ func writeTestPage(w *pdf.Writer) error {
 	F := standard.Helvetica.New()
 
 	pageTree := pagetree.NewWriter(w)
-	contentBuf := &bytes.Buffer{}
-	content := graphics.NewWriter(contentBuf, rm)
+	builder := graphics.NewContentStreamBuilder()
 
-	writeTestContent(content, F)
+	writeTestContent(builder, F)
 
 	// create content stream
+	contentStream := builder.Build()
+
+	// Write content stream to buffer
+	buf := &bytes.Buffer{}
+	err := contentStream.WriteTo(buf, w.GetOptions()|pdf.OptContentStream)
+	if err != nil {
+		return err
+	}
+
+	// Create stream and write buffer to it
 	contentRef := w.Alloc()
 	stream, err := w.OpenStream(contentRef, nil)
 	if err != nil {
 		return err
 	}
-	_, err = io.Copy(stream, contentBuf)
+	_, err = io.Copy(stream, buf)
 	if err != nil {
 		return err
 	}
@@ -88,7 +97,7 @@ func writeTestPage(w *pdf.Writer) error {
 	page := pdf.Dict{
 		"Type":      pdf.Name("Page"),
 		"Contents":  contentRef,
-		"Resources": pdf.AsDict(content.Resources),
+		"Resources": pdf.AsDict(contentStream.Resources),
 		"MediaBox":  &pdf.Rectangle{0, 0, 595, 842},
 	}
 	err = pageTree.AppendPage(page)
@@ -114,7 +123,7 @@ func writeTestPage(w *pdf.Writer) error {
 //  1. Normal text without ActualText
 //  2. Simple ActualText replacement
 //  3. Nested ActualText (inner should be suppressed)
-func writeTestContent(content *graphics.Writer, F font.Layouter) {
+func writeTestContent(content *graphics.ContentStreamBuilder, F font.Layouter) {
 	y := 800.0
 
 	// 1. normal text

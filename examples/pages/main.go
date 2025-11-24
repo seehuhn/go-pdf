@@ -17,7 +17,9 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"log"
 
 	"seehuhn.de/go/pdf"
@@ -52,34 +54,49 @@ func main() {
 			}
 		}
 
+		builder := graphics.NewContentStreamBuilder()
+
+		builder.TextBegin()
+		builder.TextSetFont(font, 12)
+		builder.TextFirstLine(30, 30)
+		if i < 3 {
+			builder.TextShow(fmt.Sprintf("page %d", i))
+		} else {
+			builder.TextShow(fmt.Sprintf("page %d", i+1))
+		}
+		builder.TextEnd()
+
+		contentStream := builder.Build()
+
+		// Write content stream to buffer
+		buf := &bytes.Buffer{}
+		err := contentStream.WriteTo(buf, out.GetOptions()|pdf.OptContentStream)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Create stream and write buffer to it
 		contentRef := out.Alloc()
 		stream, err := out.OpenStream(contentRef, nil, pdf.FilterCompress{})
 		if err != nil {
 			log.Fatal(err)
 		}
-		g := graphics.NewWriter(stream, rm)
-
-		g.TextBegin()
-		g.TextSetFont(font, 12)
-		g.TextFirstLine(30, 30)
-		if i < 3 {
-			g.TextShow(fmt.Sprintf("page %d", i))
-		} else {
-			g.TextShow(fmt.Sprintf("page %d", i+1))
+		_, err = io.Copy(stream, buf)
+		if err != nil {
+			log.Fatal(err)
 		}
-		g.TextEnd()
-
 		err = stream.Close()
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		dict := pdf.Dict{
 			"Type":     pdf.Name("Page"),
 			"Contents": contentRef,
 			"MediaBox": mediaBox,
 		}
-		if g.Resources != nil {
-			dict["Resources"] = pdf.AsDict(g.Resources)
+		if contentStream.Resources != nil {
+			dict["Resources"] = pdf.AsDict(contentStream.Resources)
 		}
 		err = pageTree.AppendPage(dict)
 		if err != nil {
@@ -88,30 +105,45 @@ func main() {
 	}
 
 	{
+		builder := graphics.NewContentStreamBuilder()
+
+		builder.TextBegin()
+		builder.TextSetFont(font, 12)
+		builder.TextFirstLine(30, 30)
+		builder.TextShow("Title")
+		builder.TextEnd()
+
+		contentStream := builder.Build()
+
+		// Write content stream to buffer
+		buf := &bytes.Buffer{}
+		err = contentStream.WriteTo(buf, out.GetOptions()|pdf.OptContentStream)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Create stream and write buffer to it
 		contentRef := out.Alloc()
 		stream, err := out.OpenStream(contentRef, nil, pdf.FilterCompress{})
 		if err != nil {
 			log.Fatal(err)
 		}
-		g := graphics.NewWriter(stream, rm)
-
-		g.TextBegin()
-		g.TextSetFont(font, 12)
-		g.TextFirstLine(30, 30)
-		g.TextShow("Title")
-		g.TextEnd()
-
+		_, err = io.Copy(stream, buf)
+		if err != nil {
+			log.Fatal(err)
+		}
 		err = stream.Close()
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		dict := pdf.Dict{
 			"Type":     pdf.Name("Page"),
 			"Contents": contentRef,
 			"MediaBox": mediaBox,
 		}
-		if g.Resources != nil {
-			dict["Resources"] = pdf.AsDict(g.Resources)
+		if contentStream.Resources != nil {
+			dict["Resources"] = pdf.AsDict(contentStream.Resources)
 		}
 		err = frontMatter.AppendPage(dict)
 		if err != nil {
@@ -120,33 +152,45 @@ func main() {
 	}
 
 	{
+		builder := graphics.NewContentStreamBuilder()
+
+		builder.TextBegin()
+		builder.TextSetFont(font, 12)
+		builder.TextFirstLine(30, 30)
+		builder.TextShow("three")
+		builder.TextEnd()
+
+		contentStream := builder.Build()
+
+		// Write content stream to buffer
+		buf := &bytes.Buffer{}
+		err = contentStream.WriteTo(buf, out.GetOptions()|pdf.OptContentStream)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Create stream and write buffer to it
 		contentRef := out.Alloc()
 		stream, err := out.OpenStream(contentRef, nil, pdf.FilterCompress{})
 		if err != nil {
 			log.Fatal(err)
 		}
-		g := graphics.NewWriter(stream, rm)
+		_, err = io.Copy(stream, buf)
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		g.TextBegin()
-		g.TextSetFont(font, 12)
-		g.TextFirstLine(30, 30)
-		g.TextShow("three")
-		g.TextEnd()
-
 		err = stream.Close()
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		dict := pdf.Dict{
 			"Type":     pdf.Name("Page"),
 			"Contents": contentRef,
 			"MediaBox": mediaBox,
 		}
-		if g.Resources != nil {
-			dict["Resources"] = pdf.AsDict(g.Resources)
+		if contentStream.Resources != nil {
+			dict["Resources"] = pdf.AsDict(contentStream.Resources)
 		}
 		err = extra.AppendPage(dict)
 		if err != nil {

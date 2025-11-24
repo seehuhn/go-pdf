@@ -199,35 +199,14 @@ func extractType1(x *pdf.Extractor, stream *pdf.Stream) (*Type1, error) {
 		return nil, err
 	}
 
-	// create Draw callback
-	pattern.Draw = func(w *graphics.Writer) error {
-		// TODO(voss): Use EmbedHelper.CopierFrom()
-		copier := pdf.NewCopier(w.RM.Out, x.R)
+	// Extract content stream
+	// For now, we'll return an error since full content stream extraction is not yet implemented
+	// TODO(voss): Implement full content stream extraction using scanner
+	return nil, pdf.Error("pattern extraction from PDF not yet fully implemented for ContentStream API")
 
-		// copy resources
-		origResources, err := x.GetDict(dict["Resources"])
-		if err != nil {
-			return err
-		}
-		if origResources != nil {
-			resourceObj, err := copier.Copy(origResources)
-			if err != nil {
-				return err
-			}
-			w.Resources, err = pdf.ExtractResources(nil, resourceObj)
-			if err != nil {
-				return err
-			}
-		}
-
-		// copy content stream
-		stm, err := pdf.DecodeStream(x.R, stream, 0)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(w.Content, stm)
-		return err
-	}
-
-	return pattern, nil
+	// Future implementation would:
+	// 1. Copy resources using copier
+	// 2. Parse content stream using scanner
+	// 3. Create ContentStream with parsed operators and resources
+	// 4. Set pattern.Content = contentStream
 }

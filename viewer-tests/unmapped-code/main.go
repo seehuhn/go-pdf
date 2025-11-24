@@ -108,21 +108,21 @@ func createDocument(fname string) error {
 // makeMarkerFont creates a simple type3 font where "I" shows a gray, vertical
 // line.
 func makeMarkerFont() font.Instance {
+	builder := graphics.NewContentStreamBuilder()
+	builder.SetFillColor(color.DeviceGray(0.5))
+	builder.Rectangle(0, -500, 50, 2000)
+	builder.Fill()
+
 	markerFont := &type3.Font{
 		FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},
 		Glyphs: []*type3.Glyph{
 			{},
 			{
-				Name:  "I",
-				Width: 50,
-				BBox:  rect.Rect{LLy: -500, URx: 50, URy: 1500},
-				Color: true,
-				Draw: func(w *graphics.Writer) error {
-					w.SetFillColor(color.DeviceGray(0.5))
-					w.Rectangle(0, -500, 50, 2000)
-					w.Fill()
-					return nil
-				},
+				Name:    "I",
+				Width:   50,
+				BBox:    rect.Rect{LLy: -500, URx: 50, URy: 1500},
+				Color:   true,
+				Content: builder.Build(),
 			},
 		},
 	}
