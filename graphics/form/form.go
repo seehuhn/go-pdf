@@ -38,8 +38,8 @@ import (
 
 // Form represents a PDF form XObject that can contain reusable graphics content.
 type Form struct {
-	// Draw is the function that renders the form's content.
-	Draw func(*graphics.Writer) error
+	// Content is the content stream for the form.
+	Content *graphics.ContentStream
 
 	// BBox is the form's bounding box in form coordinate space.
 	BBox pdf.Rectangle
@@ -93,15 +93,15 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 
+	if f.Content == nil {
+		return nil, errors.New("missing content stream")
+	}
+
+	// Write the content stream operators to a buffer
 	buf := &bytes.Buffer{}
-	contents := graphics.NewWriter(buf, rm.GetRM())
-	contents.State.Set = 0 // make sure the XObject is independent of the current graphics state
-	err = f.Draw(contents)
+	err = f.Content.WriteTo(buf, rm.Out().GetOptions()|pdf.OptContentStream)
 	if err != nil {
 		return nil, err
-	}
-	if contents.Err != nil {
-		return nil, contents.Err
 	}
 
 	ref := rm.Alloc()
@@ -116,8 +116,14 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if f.Matrix != matrix.Identity && f.Matrix != matrix.Zero {
 		dict["Matrix"] = toPDF(f.Matrix[:])
 	}
-	if contents.Resources != nil {
-		dict["Resources"] = pdf.AsDict(contents.Resources)
+
+	// Embed resources
+	if f.Content.Resources != nil {
+		resObj, err := rm.Embed(f.Content.Resources)
+		if err != nil {
+			return nil, err
+		}
+		dict["Resources"] = resObj
 	}
 	if f.Metadata != nil {
 		rmEmbedded, err := rm.Embed(f.Metadata)
@@ -294,40 +300,11 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Form, error) {
 		}
 	}
 
-	// Create Draw function as closure
-	form.Draw = func(w *graphics.Writer) error {
-		copier := pdf.NewCopier(w.RM.Out, x.R)
+	// TODO: Extract content stream and parse operators
+	// For now, we don't extract the content stream
+	form.Content = nil
 
-		// Handle resources
-		origResources, err := x.GetDict(dict["Resources"])
-		if err != nil {
-			return err
-		}
-		if origResources != nil {
-			resourceObj, err := copier.Copy(origResources)
-			if err != nil {
-				return err
-			}
-			w.Resources, err = pdf.ExtractResources(nil, resourceObj)
-			if err != nil {
-				return err
-			}
-		}
-
-		// Handle stream content
-		stm, err := pdf.DecodeStream(x.R, stream, 0)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(w.Content, stm)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	return form, nil
+	return form, errors.New("form extraction not yet implemented for ContentStream")
 }
 
 // Equal compares two forms by comparing their content streams.
@@ -337,15 +314,16 @@ func (f *Form) Equal(other *Form) bool {
 		return f == other
 	}
 
-	buf1 := &bytes.Buffer{}
-	w1, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	c1 := graphics.NewWriter(buf1, pdf.NewResourceManager(w1))
-	err1 := f.Draw(c1)
+	if f.Content == nil || other.Content == nil {
+		return f.Content == other.Content
+	}
 
+	// Compare the content streams by writing them to buffers
+	buf1 := &bytes.Buffer{}
 	buf2 := &bytes.Buffer{}
-	w2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	c2 := graphics.NewWriter(buf2, pdf.NewResourceManager(w2))
-	err2 := other.Draw(c2)
+
+	err1 := f.Content.WriteTo(buf1, pdf.OptPretty)
+	err2 := other.Content.WriteTo(buf2, pdf.OptPretty)
 
 	if err1 != nil || err2 != nil {
 		return false

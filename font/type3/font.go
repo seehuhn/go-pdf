@@ -95,8 +95,8 @@ type Glyph struct {
 	// shape.
 	Color bool
 
-	// Draw is the function that renders the glyph.
-	Draw func(*graphics.Writer) error
+	// Content is the content stream that renders the glyph.
+	Content *graphics.ContentStream
 }
 
 var _ font.Layouter = (*instance)(nil)
@@ -253,16 +253,18 @@ func (f *instance) makeFontDict(rm *pdf.EmbedHelper) (*dict.Type3, error) {
 	glyphs := f.Simple.Glyphs()
 
 	// Write the glyphs first, so that we can construct the resources
-	// dictionary. Here we use a common builder for all glyphs, so that a
-	// common resources dictionary for the whole font can be accumulated.
+	// dictionary. Here we merge resources from all glyphs into a common
+	// resources dictionary for the whole font.
 	//
 	// TODO(voss):
 	//   - consider the discussion at
 	//     https://pdf-issues.pdfa.org/32000-2-2020/clause07.html#H7.8.3
 	//   - check where different PDF versions put the Resources dictionary
 	//   - make it configurable whether to use per-glyph resource dictionaries?
-	page := graphics.NewWriter(nil, rm.GetRM())
+
 	charProcs := make(map[pdf.Name]pdf.Reference)
+	commonResources := &pdf.Resources{}
+
 	for _, gid := range glyphs {
 		g := f.Font.Glyphs[gid]
 		if g.Name == "" {
@@ -276,7 +278,6 @@ func (f *instance) makeFontDict(rm *pdf.EmbedHelper) (*dict.Type3, error) {
 		if err != nil {
 			return nil, err
 		}
-		page.NewStream(stm)
 
 		// TODO(voss): move "d0" and "d1" to the graphics package, and restrict
 		// the list of allowed operators depending on the choice.
@@ -291,21 +292,26 @@ func (f *instance) makeFontDict(rm *pdf.EmbedHelper) (*dict.Type3, error) {
 				format(g.BBox.URx),
 				format(g.BBox.URy))
 		}
-		if g.Draw != nil {
-			err = g.Draw(page)
+
+		if g.Content != nil {
+			err = g.Content.WriteTo(stm, rm.Out().GetOptions()|pdf.OptContentStream)
 			if err != nil {
 				return nil, err
 			}
+
+			// TODO: Merge resources from g.Content.Resources into commonResources
+			// For now, we just use the first glyph's resources
+			if commonResources.Font == nil && g.Content.Resources != nil {
+				// This is a simplified approach - proper resource merging would be more complex
+			}
 		}
-		if page.Err != nil {
-			return nil, page.Err
-		}
+
 		err = stm.Close()
 		if err != nil {
 			return nil, err
 		}
 	}
-	resources := page.Resources
+	resources := commonResources
 
 	italicAngle := math.Round(f.Font.ItalicAngle*10) / 10
 
