@@ -27,10 +27,10 @@ import (
 )
 
 // Page represents a page in a PDF document.
-// The contents of the page can be drawn using the [graphics.Writer] methods.
+// The contents of the page can be drawn using the [graphics.ContentStreamBuilder] methods.
 type Page struct {
-	// Writer is used to draw the contents of the page.
-	*graphics.Writer
+	// ContentStreamBuilder is used to draw the contents of the page.
+	*graphics.ContentStreamBuilder
 
 	// PageDict is the PDF dictionary for this page.
 	// This can be modified by the user.  The values at the time
@@ -67,12 +67,15 @@ func (p *Page) GetPageSize() *pdf.Rectangle {
 // Close writes the page to the PDF file.
 // The page contents can no longer be modified after this call.
 func (p *Page) Close() error {
-	if p.Writer.Err != nil {
-		return p.Writer.Err
+	if p.ContentStreamBuilder.Err != nil {
+		return p.ContentStreamBuilder.Err
 	}
 	if p.PageDict["MediaBox"] == nil || p.PageDict["MediaBox"] == (*pdf.Rectangle)(nil) {
 		return errors.New("page size not set")
 	}
+
+	// Build the content stream
+	content := p.ContentStreamBuilder.Build()
 
 	var filters []pdf.Filter
 	opt := p.Out.GetOptions()
@@ -85,7 +88,14 @@ func (p *Page) Close() error {
 	if err != nil {
 		return err
 	}
-	_, err = io.Copy(stream, p.Writer.Content.(*bytes.Buffer))
+
+	// Write the content stream to the PDF
+	buf := &bytes.Buffer{}
+	err = content.WriteTo(buf, p.Out.GetOptions()|pdf.OptContentStream)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(stream, buf)
 	if err != nil {
 		return err
 	}
@@ -94,7 +104,7 @@ func (p *Page) Close() error {
 		return err
 	}
 	p.PageDict["Contents"] = contentRef
-	p.PageDict["Resources"] = pdf.AsDict(p.Writer.Resources)
+	p.PageDict["Resources"] = pdf.AsDict(content.Resources)
 
 	ref := p.Ref
 	if ref == 0 {
@@ -111,7 +121,6 @@ func (p *Page) Close() error {
 	}
 
 	// Disable the page, since it cannot be modified anymore.
-	p.Writer.Content = nil
-	p.Writer = nil
+	p.ContentStreamBuilder = nil
 	return nil
 }

@@ -17,7 +17,6 @@
 package document
 
 import (
-	"bytes"
 	"io"
 
 	"seehuhn.de/go/pdf"
@@ -48,8 +47,7 @@ func WriteSinglePage(w io.Writer, pageSize *pdf.Rectangle, v pdf.Version, opt *p
 func singlePage(w *pdf.Writer, pageSize *pdf.Rectangle) (*Page, error) {
 	tree := pagetree.NewWriter(w)
 
-	rm := pdf.NewResourceManager(w)
-	page := graphics.NewWriter(&bytes.Buffer{}, rm)
+	builder := graphics.NewContentStreamBuilder()
 
 	pageDict := pdf.Dict{
 		"Type": pdf.Name("Page"),
@@ -59,11 +57,11 @@ func singlePage(w *pdf.Writer, pageSize *pdf.Rectangle) (*Page, error) {
 	}
 
 	p := &Page{
-		Writer:   page,
-		PageDict: pageDict,
-		Out:      w,
-		tree:     tree,
-		closeFn:  closePage,
+		ContentStreamBuilder: builder,
+		PageDict:             pageDict,
+		Out:                  w,
+		tree:                 tree,
+		closeFn:              closePage,
 	}
 	return p, nil
 }
@@ -74,11 +72,6 @@ func closePage(p *Page) error {
 		return err
 	}
 	p.Out.GetMeta().Catalog.Pages = ref
-
-	err = p.Writer.RM.Close()
-	if err != nil {
-		return err
-	}
 
 	return p.Out.Close()
 }

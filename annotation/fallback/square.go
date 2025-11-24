@@ -39,49 +39,47 @@ func (s *Style) addSquareAppearance(a *annotation.Square) *form.Form {
 	hasOutline := col != nil && col != annotation.Transparent && lw > 0
 	hasFill := a.FillColor != nil
 	if !(hasOutline || hasFill) {
+		b := graphics.NewContentStreamBuilder()
 		return &form.Form{
-			Draw: func(w *graphics.Writer) error { return nil },
-			BBox: bbox,
+			Content: b.Build(),
+			BBox:    bbox,
 		}
 	}
 
-	draw := func(w *graphics.Writer) error {
-		w.SetExtGState(s.reset)
-		if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
-			gs := &graphics.ExtGState{
-				Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
-				StrokeAlpha: 1 - a.StrokingTransparency,
-				FillAlpha:   1 - a.NonStrokingTransparency,
-				SingleUse:   true,
-			}
-			w.SetExtGState(gs)
+	b := graphics.NewContentStreamBuilder()
+	b.SetExtGState(s.reset)
+	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
+		gs := &graphics.ExtGState{
+			Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
+			StrokeAlpha: 1 - a.StrokingTransparency,
+			FillAlpha:   1 - a.NonStrokingTransparency,
+			SingleUse:   true,
 		}
+		b.SetExtGState(gs)
+	}
 
-		if hasOutline {
-			w.SetLineWidth(lw)
-			w.SetStrokeColor(col)
-			w.SetLineDash(dashPattern, 0)
-		}
-		if hasFill {
-			w.SetFillColor(a.FillColor)
-		}
+	if hasOutline {
+		b.SetLineWidth(lw)
+		b.SetStrokeColor(col)
+		b.SetLineDash(dashPattern, 0)
+	}
+	if hasFill {
+		b.SetFillColor(a.FillColor)
+	}
 
-		w.Rectangle(rect.LLx+lw/2, rect.LLy+lw/2, rect.Dx()-lw, rect.Dy()-lw)
+	b.Rectangle(rect.LLx+lw/2, rect.LLy+lw/2, rect.Dx()-lw, rect.Dy()-lw)
 
-		switch {
-		case hasOutline && hasFill:
-			w.FillAndStroke()
-		case hasFill:
-			w.Fill()
-		default: // hasOutline
-			w.Stroke()
-		}
-
-		return nil
+	switch {
+	case hasOutline && hasFill:
+		b.FillAndStroke()
+	case hasFill:
+		b.Fill()
+	default: // hasOutline
+		b.Stroke()
 	}
 
 	return &form.Form{
-		Draw: draw,
-		BBox: bbox,
+		Content: b.Build(),
+		BBox:    bbox,
 	}
 }

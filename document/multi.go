@@ -17,7 +17,6 @@
 package document
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -29,7 +28,6 @@ import (
 
 type MultiPage struct {
 	Out  *pdf.Writer
-	RM   *pdf.ResourceManager
 	Tree *pagetree.Writer
 
 	mediaBox *pdf.Rectangle
@@ -58,24 +56,20 @@ func WriteMultiPage(w io.Writer, pageSize *pdf.Rectangle, v pdf.Version, opt *pd
 		return nil, err
 	}
 
-	rm := pdf.NewResourceManager(out)
 	tree := pagetree.NewWriter(out)
 
 	return &MultiPage{
 		Out:      out,
-		RM:       rm,
 		Tree:     tree,
 		mediaBox: pageSize,
 	}, nil
 }
 
 func AddMultiPage(out *pdf.Writer, pageSize *pdf.Rectangle) (*MultiPage, error) {
-	rm := pdf.NewResourceManager(out)
 	tree := pagetree.NewWriter(out)
 
 	return &MultiPage{
 		Out:      out,
-		RM:       rm,
 		Tree:     tree,
 		mediaBox: pageSize,
 	}, nil
@@ -91,11 +85,6 @@ func (doc *MultiPage) Close() error {
 		return err
 	}
 	doc.Out.GetMeta().Catalog.Pages = ref
-
-	err = doc.RM.Close()
-	if err != nil {
-		return err
-	}
 
 	err = doc.Out.Close()
 	if err != nil {
@@ -113,9 +102,9 @@ func (doc *MultiPage) Close() error {
 func (doc *MultiPage) AddPage() *Page {
 	doc.numOpen++
 
-	page := graphics.NewWriter(&bytes.Buffer{}, doc.RM)
+	builder := graphics.NewContentStreamBuilder()
 	return &Page{
-		Writer: page,
+		ContentStreamBuilder: builder,
 		PageDict: pdf.Dict{
 			"Type":     pdf.Name("Page"),
 			"MediaBox": doc.mediaBox,

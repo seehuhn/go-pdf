@@ -55,103 +55,86 @@ func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 	bbox := a.Rect
 
 	if borderWidth <= 0 || col == annotation.Transparent {
+		b := graphics.NewContentStreamBuilder()
 		return &form.Form{
-			Draw: func(w *graphics.Writer) error { return nil },
-			BBox: bbox,
+			Content: b.Build(),
+			BBox:    bbox,
 		}
 	}
 
-	var draw func(w *graphics.Writer) error
+	b := graphics.NewContentStreamBuilder()
+	b.SetExtGState(s.reset)
+
 	switch style {
 	case "U": // underline
-		draw = func(w *graphics.Writer) error {
-			w.SetExtGState(s.reset)
-			w.SetStrokeColor(col)
-			w.SetLineWidth(borderWidth)
-			w.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy+borderWidth/2, 2))
-			w.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.LLy+borderWidth/2, 2))
-			w.Stroke()
-			return nil
-		}
+		b.SetStrokeColor(col)
+		b.SetLineWidth(borderWidth)
+		b.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy+borderWidth/2, 2))
+		b.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.LLy+borderWidth/2, 2))
+		b.Stroke()
 	case "D": // dashed
-		draw = func(w *graphics.Writer) error {
-			w.SetExtGState(s.reset)
-			w.SetStrokeColor(col)
-			w.SetLineWidth(borderWidth)
-			w.SetLineDash(dashPattern, 0)
-			w.Rectangle(
-				pdf.Round(bbox.LLx+borderWidth/2, 2),
-				pdf.Round(bbox.LLy+borderWidth/2, 2),
-				pdf.Round(bbox.URx-bbox.LLx-borderWidth, 2),
-				pdf.Round(bbox.URy-bbox.LLy-borderWidth, 2))
-			w.Stroke()
-			return nil
-		}
+		b.SetStrokeColor(col)
+		b.SetLineWidth(borderWidth)
+		b.SetLineDash(dashPattern, 0)
+		b.Rectangle(
+			pdf.Round(bbox.LLx+borderWidth/2, 2),
+			pdf.Round(bbox.LLy+borderWidth/2, 2),
+			pdf.Round(bbox.URx-bbox.LLx-borderWidth, 2),
+			pdf.Round(bbox.URy-bbox.LLy-borderWidth, 2))
+		b.Stroke()
 	case "B":
 		dark, light := getDarkLightCol(col)
-		draw = func(w *graphics.Writer) error {
-			w.SetExtGState(s.reset)
-			w.SetFillColor(dark)
-			w.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy, 2))
-			w.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.LLy, 2))
-			w.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.URy, 2))
-			w.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
-			w.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
-			w.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
-			w.Fill()
+		b.SetFillColor(dark)
+		b.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy, 2))
+		b.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.LLy, 2))
+		b.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.URy, 2))
+		b.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
+		b.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
+		b.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
+		b.Fill()
 
-			w.SetFillColor(light)
-			w.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy, 2))
-			w.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
-			w.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
-			w.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
-			w.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.URy, 2))
-			w.LineTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.URy, 2))
-			w.Fill()
-			return nil
-		}
+		b.SetFillColor(light)
+		b.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy, 2))
+		b.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
+		b.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
+		b.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
+		b.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.URy, 2))
+		b.LineTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.URy, 2))
+		b.Fill()
 	case "I":
 		dark, light := getDarkLightCol(col)
-		draw = func(w *graphics.Writer) error {
-			w.SetExtGState(s.reset)
-			w.SetFillColor(light)
-			w.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy, 2))
-			w.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.LLy, 2))
-			w.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.URy, 2))
-			w.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
-			w.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
-			w.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
-			w.Fill()
+		b.SetFillColor(light)
+		b.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy, 2))
+		b.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.LLy, 2))
+		b.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.URy, 2))
+		b.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
+		b.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
+		b.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
+		b.Fill()
 
-			w.SetFillColor(dark)
-			w.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy, 2))
-			w.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
-			w.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
-			w.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
-			w.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.URy, 2))
-			w.LineTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.URy, 2))
-			w.Fill()
-			return nil
-		}
+		b.SetFillColor(dark)
+		b.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy, 2))
+		b.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
+		b.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
+		b.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
+		b.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.URy, 2))
+		b.LineTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.URy, 2))
+		b.Fill()
 	default: // solid or unknown
-		draw = func(w *graphics.Writer) error {
-			w.SetExtGState(s.reset)
-			w.SetStrokeColor(col)
-			w.SetLineWidth(borderWidth)
-			w.Rectangle(
-				pdf.Round(bbox.LLx+borderWidth/2, 2),
-				pdf.Round(bbox.LLy+borderWidth/2, 2),
-				pdf.Round(bbox.URx-bbox.LLx-borderWidth, 2),
-				pdf.Round(bbox.URy-bbox.LLy-borderWidth, 2))
-			w.Stroke()
-			return nil
-		}
+		b.SetStrokeColor(col)
+		b.SetLineWidth(borderWidth)
+		b.Rectangle(
+			pdf.Round(bbox.LLx+borderWidth/2, 2),
+			pdf.Round(bbox.LLy+borderWidth/2, 2),
+			pdf.Round(bbox.URx-bbox.LLx-borderWidth, 2),
+			pdf.Round(bbox.URy-bbox.LLy-borderWidth, 2))
+		b.Stroke()
 	}
 
 	// create appearance stream
 	return &form.Form{
-		Draw: draw,
-		BBox: bbox,
+		Content: b.Build(),
+		BBox:    bbox,
 	}
 }
 

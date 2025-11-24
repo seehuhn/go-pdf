@@ -87,96 +87,93 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 	}
 
 	// generate the appearance stream
-	draw := func(w *graphics.Writer) error {
-		w.SetExtGState(s.reset)
+	b := graphics.NewContentStreamBuilder()
+	b.SetExtGState(s.reset)
 
-		if a.Intent != annotation.FreeTextIntentTypeWriter {
-			w.SetLineWidth(lw)
-			w.SetStrokeColor(color.Black)
-			if bgCol != nil {
-				w.SetFillColor(bgCol)
-				w.Rectangle(inner.LLx+lw/2, inner.LLy+lw/2, inner.Dx()-lw, inner.Dy()-lw)
-				w.FillAndStroke()
-			} else {
-				w.Rectangle(inner.LLx+lw/2, inner.LLy+lw/2, inner.Dx()-lw, inner.Dy()-lw)
-				w.Stroke()
-			}
+	if a.Intent != annotation.FreeTextIntentTypeWriter {
+		b.SetLineWidth(lw)
+		b.SetStrokeColor(color.Black)
+		if bgCol != nil {
+			b.SetFillColor(bgCol)
+			b.Rectangle(inner.LLx+lw/2, inner.LLy+lw/2, inner.Dx()-lw, inner.Dy()-lw)
+			b.FillAndStroke()
+		} else {
+			b.Rectangle(inner.LLx+lw/2, inner.LLy+lw/2, inner.Dx()-lw, inner.Dy()-lw)
+			b.Stroke()
 		}
+	}
 
-		if hasCallout {
-			w.SetLineWidth(lw)
-			w.SetStrokeColor(color.Black)
-			k := len(calloutLine)
-			lastPoint := calloutLine[k-1]
-			w.MoveTo(lastPoint.X, lastPoint.Y)
-			for i := k - 2; i >= 1; i-- {
-				w.LineTo(calloutLine[i].X, calloutLine[i].Y)
-			}
-			leInfo := lineEndingInfo{
-				FillColor: bgCol,
-				At:        calloutLine[0],
-				Dir:       calloutLine[0].Sub(calloutLine[1]),
-			}
-			drawLineEnding(w, a.LineEndingStyle, leInfo)
+	if hasCallout {
+		b.SetLineWidth(lw)
+		b.SetStrokeColor(color.Black)
+		k := len(calloutLine)
+		lastPoint := calloutLine[k-1]
+		b.MoveTo(lastPoint.X, lastPoint.Y)
+		for i := k - 2; i >= 1; i-- {
+			b.LineTo(calloutLine[i].X, calloutLine[i].Y)
 		}
-
-		// render text content if present
-		if a.Contents != "" {
-			F := s.contentFont
-
-			clipLeft := inner.LLx + lw + freeTextPadding
-			clipBottom := inner.LLy + lw + freeTextPadding
-			clipWidth := inner.Dx() - 2*lw - 2*freeTextPadding
-			clipHeight := inner.Dy() - 2*lw - 2*freeTextPadding
-
-			lineHeight := pdf.Round(F.GetGeometry().Leading*freeTextFontSize, 2)
-
-			w.PushGraphicsState()
-			w.Rectangle(clipLeft, clipBottom, clipWidth, clipHeight)
-			w.ClipNonZero()
-			w.EndPath()
-
-			w.TextBegin()
-			w.TextSetFont(F, freeTextFontSize)
-			w.SetFillColor(color.Black)
-			w.TextSetHorizontalScaling(1)
-			w.TextSetRise(0)
-			wrapper := text.Wrap(clipWidth, a.Contents)
-			yPos := inner.URy - lw - freeTextPadding - freeTextFontSize
-			lineNo := 0
-			for line := range wrapper.Lines(F, freeTextFontSize) {
-				switch lineNo {
-				case 0:
-					w.TextFirstLine(clipLeft, yPos)
-				case 1:
-					w.TextSecondLine(0, -lineHeight)
-				default:
-					w.TextNextLine()
-				}
-
-				switch a.Align {
-				case annotation.TextAlignCenter:
-					line.Align(clipWidth, 0.5)
-				case annotation.TextAlignRight:
-					line.Align(clipWidth, 1.0)
-				default:
-					// no adjustment needed for left alignment
-				}
-				w.TextShowGlyphs(line)
-
-				yPos -= lineHeight
-				lineNo++
-			}
-			w.TextEnd()
-
-			w.PopGraphicsState()
+		leInfo := lineEndingInfo{
+			FillColor: bgCol,
+			At:        calloutLine[0],
+			Dir:       calloutLine[0].Sub(calloutLine[1]),
 		}
+		drawLineEnding(b, a.LineEndingStyle, leInfo)
+	}
 
-		return nil
+	// render text content if present
+	if a.Contents != "" {
+		F := s.contentFont
+
+		clipLeft := inner.LLx + lw + freeTextPadding
+		clipBottom := inner.LLy + lw + freeTextPadding
+		clipWidth := inner.Dx() - 2*lw - 2*freeTextPadding
+		clipHeight := inner.Dy() - 2*lw - 2*freeTextPadding
+
+		lineHeight := pdf.Round(F.GetGeometry().Leading*freeTextFontSize, 2)
+
+		b.PushGraphicsState()
+		b.Rectangle(clipLeft, clipBottom, clipWidth, clipHeight)
+		b.ClipNonZero()
+		b.EndPath()
+
+		b.TextBegin()
+		b.TextSetFont(F, freeTextFontSize)
+		b.SetFillColor(color.Black)
+		b.TextSetHorizontalScaling(1)
+		b.TextSetRise(0)
+		wrapper := text.Wrap(clipWidth, a.Contents)
+		yPos := inner.URy - lw - freeTextPadding - freeTextFontSize
+		lineNo := 0
+		for line := range wrapper.Lines(F, freeTextFontSize) {
+			switch lineNo {
+			case 0:
+				b.TextFirstLine(clipLeft, yPos)
+			case 1:
+				b.TextSecondLine(0, -lineHeight)
+			default:
+				b.TextNextLine()
+			}
+
+			switch a.Align {
+			case annotation.TextAlignCenter:
+				line.Align(clipWidth, 0.5)
+			case annotation.TextAlignRight:
+				line.Align(clipWidth, 1.0)
+			default:
+				// no adjustment needed for left alignment
+			}
+			b.TextShowGlyphs(line)
+
+			yPos -= lineHeight
+			lineNo++
+		}
+		b.TextEnd()
+
+		b.PopGraphicsState()
 	}
 
 	return &form.Form{
-		Draw: draw,
-		BBox: outer,
+		Content: b.Build(),
+		BBox:    outer,
 	}
 }

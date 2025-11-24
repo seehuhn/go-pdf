@@ -41,63 +41,61 @@ func (s *Style) addCircleAppearance(a *annotation.Circle) *form.Form {
 	hasOutline := col != nil && col != annotation.Transparent && lw > 0
 	hasFill := a.FillColor != nil
 	if !(hasOutline || hasFill) {
+		b := graphics.NewContentStreamBuilder()
 		return &form.Form{
-			Draw: func(w *graphics.Writer) error { return nil },
-			BBox: bbox,
+			Content: b.Build(),
+			BBox:    bbox,
 		}
 	}
 
-	draw := func(w *graphics.Writer) error {
-		w.SetExtGState(s.reset)
-		if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
-			gs := &graphics.ExtGState{
-				Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
-				StrokeAlpha: 1 - a.StrokingTransparency,
-				FillAlpha:   1 - a.NonStrokingTransparency,
-				SingleUse:   true,
-			}
-			w.SetExtGState(gs)
+	b := graphics.NewContentStreamBuilder()
+	b.SetExtGState(s.reset)
+	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
+		gs := &graphics.ExtGState{
+			Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
+			StrokeAlpha: 1 - a.StrokingTransparency,
+			FillAlpha:   1 - a.NonStrokingTransparency,
+			SingleUse:   true,
 		}
+		b.SetExtGState(gs)
+	}
 
-		if hasOutline {
-			w.SetLineWidth(lw)
-			w.SetStrokeColor(col)
-			if len(dashPattern) > 0 {
-				w.SetLineCap(graphics.LineCapButt)
-			}
+	if hasOutline {
+		b.SetLineWidth(lw)
+		b.SetStrokeColor(col)
+		if len(dashPattern) > 0 {
+			b.SetLineCap(graphics.LineCapButt)
 		}
-		if hasFill {
-			w.SetFillColor(a.FillColor)
-		}
+	}
+	if hasFill {
+		b.SetFillColor(a.FillColor)
+	}
 
-		xMid := (rect.LLx + rect.URx) / 2
-		yMid := (rect.LLy + rect.URy) / 2
-		rx := (rect.Dx() - lw) / 2
-		ry := (rect.Dy() - lw) / 2
+	xMid := (rect.LLx + rect.URx) / 2
+	yMid := (rect.LLy + rect.URy) / 2
+	rx := (rect.Dx() - lw) / 2
+	ry := (rect.Dy() - lw) / 2
 
-		k := (math.Sqrt2 - 1.0) * 4 / 3 // control point offset for cubic Bezier approximation of a circle
+	k := (math.Sqrt2 - 1.0) * 4 / 3 // control point offset for cubic Bezier approximation of a circle
 
-		w.MoveTo(xMid+rx, yMid)
-		w.CurveTo(xMid+rx, yMid+ry*k, xMid+rx*k, rect.URy-lw, xMid, rect.URy-lw)
-		w.CurveTo(xMid-rx*k, rect.URy-lw, rect.LLx+lw, yMid+ry*k, rect.LLx+lw, yMid)
-		w.CurveTo(rect.LLx+lw, yMid-ry*k, xMid-rx*k, rect.LLy+lw, xMid, rect.LLy+lw)
-		w.CurveTo(xMid+rx*k, rect.LLy+lw, xMid+rx, yMid-ry*k, xMid+rx, yMid)
-		w.ClosePath()
+	b.MoveTo(xMid+rx, yMid)
+	b.CurveTo(xMid+rx, yMid+ry*k, xMid+rx*k, rect.URy-lw, xMid, rect.URy-lw)
+	b.CurveTo(xMid-rx*k, rect.URy-lw, rect.LLx+lw, yMid+ry*k, rect.LLx+lw, yMid)
+	b.CurveTo(rect.LLx+lw, yMid-ry*k, xMid-rx*k, rect.LLy+lw, xMid, rect.LLy+lw)
+	b.CurveTo(xMid+rx*k, rect.LLy+lw, xMid+rx, yMid-ry*k, xMid+rx, yMid)
+	b.ClosePath()
 
-		switch {
-		case hasOutline && hasFill:
-			w.FillAndStroke()
-		case hasFill:
-			w.Fill()
-		default: // hasOutline
-			w.Stroke()
-		}
-
-		return nil
+	switch {
+	case hasOutline && hasFill:
+		b.FillAndStroke()
+	case hasFill:
+		b.Fill()
+	default: // hasOutline
+		b.Stroke()
 	}
 
 	return &form.Form{
-		Draw: draw,
-		BBox: bbox,
+		Content: b.Build(),
+		BBox:    bbox,
 	}
 }
