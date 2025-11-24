@@ -1,12 +1,9 @@
 package builder
 
 import (
-	"fmt"
-	"math"
 	"strconv"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
 )
 
@@ -50,23 +47,20 @@ func (b *Builder) emit(name content.OpName, args ...pdf.Object) {
 	b.Stream = append(b.Stream, op)
 }
 
-// SetLineWidth sets the line width.
-//
-// This implements the PDF graphics operator "w".
-func (b *Builder) SetLineWidth(width float64) {
-	if width < 0 {
-		b.Err = fmt.Errorf("SetLineWidth: negative width %f", width)
-		return
+// getResourceName looks up or allocates a resource name for obj.
+// The dictPtr must point to the appropriate resource map (e.g. &b.Resources.ColorSpace).
+func getResourceName[T pdf.Embedder](b *Builder, prefix pdf.Name, obj T, dictPtr *map[pdf.Name]T) pdf.Name {
+	key := resKey{prefix, obj}
+	if name, ok := b.resName[key]; ok {
+		return name
 	}
-	if b.State.Out&graphics.StateLineWidth != 0 && nearlyEqual(width, b.State.Param.LineWidth) {
-		return
+	if *dictPtr == nil {
+		*dictPtr = make(map[pdf.Name]T)
 	}
-	b.emit(content.OpSetLineWidth, pdf.Number(width))
-}
-
-func nearlyEqual(a, b float64) bool {
-	const ε = 1e-6
-	return math.Abs(a-b) < ε
+	name := allocateName(prefix, *dictPtr)
+	(*dictPtr)[name] = obj
+	b.resName[key] = name
+	return name
 }
 
 // allocateName generates a new unique name with the given prefix in the dict.

@@ -2,6 +2,7 @@ package builder
 
 import (
 	"fmt"
+	"math"
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
@@ -116,6 +117,25 @@ func (b *Builder) SetFlatnessTolerance(flatness float64) {
 	b.emit(content.OpSetFlatnessTolerance, pdf.Number(flatness))
 }
 
+// SetLineWidth sets the line width.
+//
+// This implements the PDF graphics operator "w".
+func (b *Builder) SetLineWidth(width float64) {
+	if width < 0 {
+		b.Err = fmt.Errorf("SetLineWidth: negative width %f", width)
+		return
+	}
+	if b.State.Out&graphics.StateLineWidth != 0 && nearlyEqual(width, b.State.Param.LineWidth) {
+		return
+	}
+	b.emit(content.OpSetLineWidth, pdf.Number(width))
+}
+
+func nearlyEqual(a, b float64) bool {
+	const ε = 1e-6
+	return math.Abs(a-b) < ε
+}
+
 // SetExtGState sets selected graphics state parameters.
 //
 // This implements the PDF graphics operator "gs".
@@ -123,19 +143,7 @@ func (b *Builder) SetExtGState(gs *graphics.ExtGState) {
 	if b.Err != nil {
 		return
 	}
-
-	// look up or allocate resource name
-	key := resKey{"E", gs}
-	name, ok := b.resName[key]
-	if !ok {
-		if b.Resources.ExtGState == nil {
-			b.Resources.ExtGState = make(map[pdf.Name]*graphics.ExtGState)
-		}
-		name = allocateName("E", b.Resources.ExtGState)
-		b.Resources.ExtGState[name] = gs
-		b.resName[key] = name
-	}
-
+	name := getResourceName(b, "E", gs, &b.Resources.ExtGState)
 	b.emit(content.OpSetExtGState, name)
 }
 

@@ -83,31 +83,11 @@ func (b *Builder) setColor(c color.Color, fill bool) {
 }
 
 func (b *Builder) getColorSpaceName(cs color.Space) pdf.Name {
-	key := resKey{"C", cs}
-	if name, ok := b.resName[key]; ok {
-		return name
-	}
-	if b.Resources.ColorSpace == nil {
-		b.Resources.ColorSpace = make(map[pdf.Name]color.Space)
-	}
-	name := allocateName("C", b.Resources.ColorSpace)
-	b.Resources.ColorSpace[name] = cs
-	b.resName[key] = name
-	return name
+	return getResourceName(b, "C", cs, &b.Resources.ColorSpace)
 }
 
 func (b *Builder) getPatternName(pat color.Pattern) pdf.Name {
-	key := resKey{"P", pat}
-	if name, ok := b.resName[key]; ok {
-		return name
-	}
-	if b.Resources.Pattern == nil {
-		b.Resources.Pattern = make(map[pdf.Name]color.Pattern)
-	}
-	name := allocateName("P", b.Resources.Pattern)
-	b.Resources.Pattern[name] = pat
-	b.resName[key] = name
-	return name
+	return getResourceName(b, "P", pat, &b.Resources.Pattern)
 }
 
 // DrawShading paints the given shading, subject to the current clipping path.
@@ -118,17 +98,6 @@ func (b *Builder) DrawShading(shading graphics.Shading) {
 	if b.Err != nil {
 		return
 	}
-
-	key := resKey{"S", shading}
-	name, ok := b.resName[key]
-	if !ok {
-		if b.Resources.Shading == nil {
-			b.Resources.Shading = make(map[pdf.Name]graphics.Shading)
-		}
-		name = allocateName("S", b.Resources.Shading)
-		b.Resources.Shading[name] = shading
-		b.resName[key] = name
-	}
-
+	name := getResourceName(b, "S", shading, &b.Resources.Shading)
 	b.emit(content.OpShading, name)
 }
