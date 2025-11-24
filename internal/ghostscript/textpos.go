@@ -100,9 +100,9 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 
 	var xSum, ySum float64
 	var weight float64
-	b := img.Bounds()
-	for y := b.Min.Y; y < b.Max.Y; y++ {
-		for x := b.Min.X; x < b.Max.X; x++ {
+	bounds := img.Bounds()
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			r, g, b, a := img.At(x, y).RGBA()
 			if r > g && r > b && a > 0 {
 				xSum += float64(x)
@@ -117,10 +117,10 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 	xPix := xSum / weight
 	yPix := ySum / weight
 
-	// xPix = b.Min.X-0.5 correspond to xUser=paper.LLx
-	// xPix = b.Max.X-0.5 correspond to xUser=paper.URx
-	xUser := paper.LLx + (xPix-float64(b.Min.X)+0.5)*(paper.URx-paper.LLx)/float64(b.Max.X-b.Min.X)
-	yUser := paper.LLy + (float64(b.Max.Y)-yPix-0.5)*(paper.URy-paper.LLy)/float64(b.Max.Y-b.Min.Y)
+	// xPix = bounds.Min.X-0.5 correspond to xUser=paper.LLx
+	// xPix = bounds.Max.X-0.5 correspond to xUser=paper.URx
+	xUser := paper.LLx + (xPix-float64(bounds.Min.X)+0.5)*(paper.URx-paper.LLx)/float64(bounds.Max.X-bounds.Min.X)
+	yUser := paper.LLy + (float64(bounds.Max.Y)-yPix-0.5)*(paper.URy-paper.LLy)/float64(bounds.Max.Y-bounds.Min.Y)
 
 	return xUser, yUser, nil
 }
