@@ -60,15 +60,27 @@ func (cs *ContentStream) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 // This is used when the content stream needs to be written to a PDF stream.
 func (cs *ContentStream) WriteTo(w io.Writer, opt pdf.OutputOptions) error {
 	for _, op := range cs.Operators {
-		err := pdf.Format(w, opt, op.Args...)
-		if err != nil {
-			return err
+		// Write arguments
+		for i, arg := range op.Args {
+			if i > 0 {
+				_, err := w.Write([]byte(" "))
+				if err != nil {
+					return err
+				}
+			}
+			err := pdf.Format(w, opt, arg)
+			if err != nil {
+				return err
+			}
 		}
-		_, err = w.Write([]byte(" "))
-		if err != nil {
-			return err
+		// Write operator name
+		if len(op.Args) > 0 {
+			_, err := w.Write([]byte(" "))
+			if err != nil {
+				return err
+			}
 		}
-		_, err = w.Write([]byte(op.Name))
+		_, err := w.Write([]byte(op.Name))
 		if err != nil {
 			return err
 		}

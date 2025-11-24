@@ -101,9 +101,9 @@ func (b *ContentStreamBuilder) isValid(cmd string, ss objectType) bool {
 	return false
 }
 
-func (b *ContentStreamBuilder) coord(x float64) pdf.Number {
+func (b *ContentStreamBuilder) coord(x float64) pdf.Real {
 	// TODO: use the current transformation matrix to determine precision
-	return pdf.Number(x)
+	return pdf.Real(x)
 }
 
 func formatNum(x float64) string {
@@ -128,7 +128,7 @@ func (b *ContentStreamBuilder) MoveTo(x, y float64) {
 	b.CurrentX, b.CurrentY = x, y
 	b.ThisSubpathClosed = true
 
-	b.addOp("m", pdf.Number(x), pdf.Number(y))
+	b.addOp("m", pdf.Real(x), pdf.Real(y))
 }
 
 // LineTo appends a straight line segment to the current path.
@@ -141,7 +141,7 @@ func (b *ContentStreamBuilder) LineTo(x, y float64) {
 	b.CurrentX, b.CurrentY = x, y
 	b.ThisSubpathClosed = false
 
-	b.addOp("l", pdf.Number(x), pdf.Number(y))
+	b.addOp("l", pdf.Real(x), pdf.Real(y))
 }
 
 // CurveTo appends a cubic Bezier curve to the current path.
@@ -156,11 +156,11 @@ func (b *ContentStreamBuilder) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
 	b.ThisSubpathClosed = false
 
 	if nearlyEqual(x0, x1) && nearlyEqual(y0, y1) {
-		b.addOp("v", pdf.Number(x2), pdf.Number(y2), pdf.Number(x3), pdf.Number(y3))
+		b.addOp("v", pdf.Real(x2), pdf.Real(y2), pdf.Real(x3), pdf.Real(y3))
 	} else if nearlyEqual(x2, x3) && nearlyEqual(y2, y3) {
-		b.addOp("y", pdf.Number(x1), pdf.Number(y1), pdf.Number(x3), pdf.Number(y3))
+		b.addOp("y", pdf.Real(x1), pdf.Real(y1), pdf.Real(x3), pdf.Real(y3))
 	} else {
-		b.addOp("c", pdf.Number(x1), pdf.Number(y1), pdf.Number(x2), pdf.Number(y2), pdf.Number(x3), pdf.Number(y3))
+		b.addOp("c", pdf.Real(x1), pdf.Real(y1), pdf.Real(x2), pdf.Real(y2), pdf.Real(x3), pdf.Real(y3))
 	}
 }
 
@@ -193,7 +193,7 @@ func (b *ContentStreamBuilder) Rectangle(x, y, width, height float64) {
 	b.CurrentX, b.CurrentY = x, y
 	b.ThisSubpathClosed = true
 
-	b.addOp("re", pdf.Number(x), pdf.Number(y), pdf.Number(width), pdf.Number(height))
+	b.addOp("re", pdf.Real(x), pdf.Real(y), pdf.Real(width), pdf.Real(height))
 }
 
 // Path painting operators
@@ -388,13 +388,12 @@ func (b *ContentStreamBuilder) Transform(m matrix.Matrix) {
 		return
 	}
 
-	b.CTM = matrix.Multiply(m, b.CTM)
-	b.Set |= StateCTM
+	b.CTM = m.Mul(b.CTM)
 
 	b.addOp("cm",
-		pdf.Number(m[0]), pdf.Number(m[1]),
-		pdf.Number(m[2]), pdf.Number(m[3]),
-		pdf.Number(m[4]), pdf.Number(m[5]))
+		pdf.Real(m[0]), pdf.Real(m[1]),
+		pdf.Real(m[2]), pdf.Real(m[3]),
+		pdf.Real(m[4]), pdf.Real(m[5]))
 }
 
 // SetLineWidth sets the line width.
@@ -407,7 +406,7 @@ func (b *ContentStreamBuilder) SetLineWidth(width float64) {
 	b.LineWidth = width
 	b.Set |= StateLineWidth
 
-	b.addOp("w", pdf.Number(width))
+	b.addOp("w", pdf.Real(width))
 }
 
 // SetLineCap sets the line cap style.
@@ -446,7 +445,7 @@ func (b *ContentStreamBuilder) SetMiterLimit(limit float64) {
 	b.MiterLimit = limit
 	b.Set |= StateMiterLimit
 
-	b.addOp("M", pdf.Number(limit))
+	b.addOp("M", pdf.Real(limit))
 }
 
 // SetLineDash sets the line dash pattern.
@@ -462,10 +461,10 @@ func (b *ContentStreamBuilder) SetLineDash(pattern []float64, phase float64) {
 
 	arr := make(pdf.Array, len(pattern))
 	for i, v := range pattern {
-		arr[i] = pdf.Number(v)
+		arr[i] = pdf.Real(v)
 	}
 
-	b.addOp("d", arr, pdf.Number(phase))
+	b.addOp("d", arr, pdf.Real(phase))
 }
 
 // Helper functions

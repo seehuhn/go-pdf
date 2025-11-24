@@ -20,13 +20,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"time"
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/oc"
@@ -119,11 +117,7 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// Embed resources
 	if f.Content.Resources != nil {
-		resObj, err := rm.Embed(f.Content.Resources)
-		if err != nil {
-			return nil, err
-		}
-		dict["Resources"] = resObj
+		dict["Resources"] = pdf.AsDict(f.Content.Resources)
 	}
 	if f.Metadata != nil {
 		rmEmbedded, err := rm.Embed(f.Metadata)
