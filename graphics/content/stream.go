@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"slices"
 	"strconv"
 
 	"seehuhn.de/go/pdf"
@@ -38,7 +39,7 @@ type Stream []Operator
 
 // ReadStream reads a PDF content stream and returns the sequence of operators.
 // Parse errors are handled permissively: malformed content is skipped and
-// parsing continues.
+// parsing continues. IO errors are returned to the caller.
 func ReadStream(r io.Reader) (Stream, error) {
 	s := &streamScanner{
 		buf: make([]byte, 512),
@@ -48,17 +49,18 @@ func ReadStream(r io.Reader) (Stream, error) {
 	var stream Stream
 	for {
 		op, err := s.scan()
-		if err == io.EOF {
-			break
+		switch err {
+		case nil:
+			stream = append(stream, op)
+		case io.EOF:
+			return stream, nil
+		case errParse:
+			// permissive: skip malformed content
+		default:
+			// IO error
+			return stream, err
 		}
-		if err != nil {
-			// permissive: skip errors and continue
-			continue
-		}
-		stream = append(stream, op)
 	}
-
-	return stream, nil
 }
 
 // Validate checks that all operators in the stream are valid for the given
@@ -81,7 +83,9 @@ func (s Stream) Validate(v pdf.Version) error {
 			continue
 		}
 		if (err == ErrUnknown || err == ErrVersion) && compatLevel > 0 {
-			// unknown operators are allowed inside BX/EX
+			// Unknown operators are allowed inside BX/EX compatibility sections.
+			// Operators introduced in later PDF versions are effectively "unknown"
+			// in earlier versions, so ErrVersion is treated the same as ErrUnknown.
 			continue
 		}
 		return fmt.Errorf("operator %d (%s): %w", i, op.Name, err)
@@ -116,7 +120,14 @@ func (s Stream) Write(w io.Writer) error {
 				if _, err := w.Write([]byte("BI\n")); err != nil {
 					return err
 				}
-				for key, val := range dict {
+				// sort keys for deterministic output
+				keys := make([]pdf.Name, 0, len(dict))
+				for key := range dict {
+					keys = append(keys, key)
+				}
+				slices.Sort(keys)
+				for _, key := range keys {
+					val := dict[key]
 					if _, err := w.Write([]byte("/")); err != nil {
 						return err
 					}
@@ -127,7 +138,7 @@ func (s Stream) Write(w io.Writer) error {
 						return err
 					}
 					if natVal, ok := val.(pdf.Native); ok {
-						if err := writeObject(w, natVal); err != nil {
+						if err := pdf.Format(w, pdf.OptContentStream, natVal); err != nil {
 							return err
 						}
 					}
@@ -141,7 +152,7 @@ func (s Stream) Write(w io.Writer) error {
 				if _, err := w.Write([]byte(data)); err != nil {
 					return err
 				}
-				if _, err := w.Write([]byte("EI\n")); err != nil {
+				if _, err := w.Write([]byte("\nEI\n")); err != nil {
 					return err
 				}
 			}
@@ -150,7 +161,7 @@ func (s Stream) Write(w io.Writer) error {
 
 		// write arguments
 		for _, arg := range op.Args {
-			if err := writeObject(w, arg); err != nil {
+			if err := pdf.Format(w, pdf.OptContentStream, arg); err != nil {
 				return err
 			}
 			if _, err := w.Write([]byte(" ")); err != nil {
@@ -167,135 +178,6 @@ func (s Stream) Write(w io.Writer) error {
 		}
 	}
 	return nil
-}
-
-// writeObject writes a PDF object in content stream format
-func writeObject(w io.Writer, obj pdf.Object) error {
-	switch v := obj.(type) {
-	case pdf.Integer:
-		_, err := fmt.Fprintf(w, "%d", v)
-		return err
-	case pdf.Real:
-		_, err := fmt.Fprintf(w, "%g", v)
-		return err
-	case pdf.Boolean:
-		if v {
-			_, err := w.Write([]byte("true"))
-			return err
-		}
-		_, err := w.Write([]byte("false"))
-		return err
-	case pdf.Name:
-		return writeName(w, v)
-	case pdf.String:
-		return writeString(w, v)
-	case pdf.Array:
-		if _, err := w.Write([]byte("[")); err != nil {
-			return err
-		}
-		for i, elem := range v {
-			if i > 0 {
-				if _, err := w.Write([]byte(" ")); err != nil {
-					return err
-				}
-			}
-			if natElem, ok := elem.(pdf.Native); ok {
-				if err := writeObject(w, natElem); err != nil {
-					return err
-				}
-			}
-		}
-		_, err := w.Write([]byte("]"))
-		return err
-	case pdf.Dict:
-		if _, err := w.Write([]byte("<<")); err != nil {
-			return err
-		}
-		for key, val := range v {
-			if _, err := w.Write([]byte(" ")); err != nil {
-				return err
-			}
-			if err := writeName(w, key); err != nil {
-				return err
-			}
-			if _, err := w.Write([]byte(" ")); err != nil {
-				return err
-			}
-			if natVal, ok := val.(pdf.Native); ok {
-				if err := writeObject(w, natVal); err != nil {
-					return err
-				}
-			}
-		}
-		_, err := w.Write([]byte(" >>"))
-		return err
-	case nil:
-		_, err := w.Write([]byte("null"))
-		return err
-	default:
-		return fmt.Errorf("unsupported type for content stream: %T", obj)
-	}
-}
-
-func writeName(w io.Writer, name pdf.Name) error {
-	if _, err := w.Write([]byte("/")); err != nil {
-		return err
-	}
-	for _, b := range []byte(name) {
-		if b < 33 || b > 126 || b == '#' || b == '/' || b == '%' || b == '(' || b == ')' || b == '<' || b == '>' || b == '[' || b == ']' {
-			if _, err := fmt.Fprintf(w, "#%02X", b); err != nil {
-				return err
-			}
-		} else {
-			if _, err := w.Write([]byte{b}); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func writeString(w io.Writer, s pdf.String) error {
-	if _, err := w.Write([]byte("(")); err != nil {
-		return err
-	}
-	for _, b := range []byte(s) {
-		switch b {
-		case '(', ')', '\\':
-			if _, err := w.Write([]byte{'\\'}); err != nil {
-				return err
-			}
-			if _, err := w.Write([]byte{b}); err != nil {
-				return err
-			}
-		case '\n':
-			if _, err := w.Write([]byte("\\n")); err != nil {
-				return err
-			}
-		case '\r':
-			if _, err := w.Write([]byte("\\r")); err != nil {
-				return err
-			}
-		case '\t':
-			if _, err := w.Write([]byte("\\t")); err != nil {
-				return err
-			}
-		case '\b':
-			if _, err := w.Write([]byte("\\b")); err != nil {
-				return err
-			}
-		case '\f':
-			if _, err := w.Write([]byte("\\f")); err != nil {
-				return err
-			}
-		default:
-			if _, err := w.Write([]byte{b}); err != nil {
-				return err
-			}
-		}
-	}
-	_, err := w.Write([]byte(")"))
-	return err
 }
 
 // streamScanner is an internal scanner for content streams
@@ -388,6 +270,12 @@ tokenLoop:
 		if len(s.stack) > 0 { // we are inside a dict or array
 			s.stack[len(s.stack)-1].data = append(s.stack[len(s.stack)-1].data, obj)
 		} else if op, ok := obj.(pdf.Operator); ok {
+			// skip operators with too many arguments
+			if len(s.args) >= maxOperatorArgs {
+				s.args = s.args[:0]
+				continue tokenLoop
+			}
+
 			opName := OpName(op)
 
 			// check for BI (inline image)
@@ -395,11 +283,71 @@ tokenLoop:
 				return s.readInlineImage()
 			}
 
-			return Operator{Name: opName, Args: s.args}, nil
+			return Operator{Name: opName, Args: slices.Clone(s.args)}, nil
 		} else {
-			s.args = append(s.args, obj)
+			if len(s.args) < maxOperatorArgs {
+				s.args = append(s.args, obj)
+			}
 		}
 	}
+}
+
+// getInlineImageInt extracts an integer value from an inline image dictionary,
+// checking both the abbreviated and full key names.
+// Returns -1 if the key is not found or the value is not a valid integer.
+func getInlineImageInt(dict pdf.Dict, abbrev, full pdf.Name) int {
+	var val pdf.Object
+	if v, ok := dict[abbrev]; ok {
+		val = v // abbreviated key takes precedence per spec
+	} else if v, ok := dict[full]; ok {
+		val = v
+	}
+	if val == nil {
+		return -1
+	}
+	switch v := val.(type) {
+	case pdf.Integer:
+		return int(v)
+	case pdf.Real:
+		return int(v)
+	}
+	return -1
+}
+
+// getInlineImageFilter extracts the filter name(s) from an inline image dictionary.
+// Returns the final filter in the chain (the one applied last during encoding,
+// first during decoding).
+func getInlineImageFilter(dict pdf.Dict) pdf.Name {
+	var val pdf.Object
+	if v, ok := dict["F"]; ok {
+		val = v
+	} else if v, ok := dict["Filter"]; ok {
+		val = v
+	}
+	if val == nil {
+		return ""
+	}
+	switch v := val.(type) {
+	case pdf.Name:
+		return v
+	case pdf.Array:
+		// last filter in array is the final/outermost one
+		if len(v) > 0 {
+			if name, ok := v[len(v)-1].(pdf.Name); ok {
+				return name
+			}
+		}
+	}
+	return ""
+}
+
+// isASCIIFilter returns true if the filter is ASCIIHexDecode or ASCII85Decode.
+func isASCIIFilter(filter pdf.Name) bool {
+	switch filter {
+	case "ASCIIHexDecode", "AHx", "ASCII85Decode", "A85":
+		return true
+	}
+	return false
 }
 
 // readInlineImage reads a BI...ID...EI sequence and returns it as a %image% pseudo-operator
@@ -407,10 +355,9 @@ func (s *streamScanner) readInlineImage() (Operator, error) {
 	// read image dictionary (between BI and ID)
 	dict := pdf.Dict{}
 	for {
-		// skip whitespace
 		s.skipWhiteSpace()
 
-		// peek to check if we hit ID
+		// check if we hit ID
 		if s.peekString("ID") {
 			s.skipN(2)
 			break
@@ -422,7 +369,6 @@ func (s *streamScanner) readInlineImage() (Operator, error) {
 			return Operator{}, io.EOF
 		}
 		if b[0] != '/' {
-			// malformed inline image
 			return Operator{}, errParse
 		}
 		s.skipN(1)
@@ -438,38 +384,108 @@ func (s *streamScanner) readInlineImage() (Operator, error) {
 		}
 	}
 
-	// skip single whitespace after ID
+	// validate image dimensions (defense against resource exhaustion)
+	width := getInlineImageInt(dict, "W", "Width")
+	height := getInlineImageInt(dict, "H", "Height")
+	if width <= 0 || height <= 0 || width > maxInlineImageDim || height > maxInlineImageDim {
+		return Operator{}, errParse
+	}
+	if width*height > maxInlineImagePixels {
+		return Operator{}, errParse
+	}
+
+	// get length (PDF 2.0) and filter
+	length := getInlineImageInt(dict, "L", "Length")
+	filter := getInlineImageFilter(dict)
+
+	// skip whitespace after ID
+	// spec: "the ID operator shall be followed by a single white-space character"
+	// for ASCII filters, we may need to skip additional whitespace
 	b, _ := s.peek()
 	if b <= 32 {
 		s.readByte()
 	}
+	if isASCIIFilter(filter) {
+		s.skipWhiteSpace()
+	}
 
-	// read image data until EI on its own line
 	var imageData []byte
-	for {
-		// check for EI at start of line
-		if s.col == 0 {
-			if s.peekString("EI") {
-				s.skipN(2)
-				// check that EI is followed by whitespace or delimiter
-				nextByte, err := s.peek()
-				if err == io.EOF || nextByte <= 32 || class[nextByte] == delimiter {
-					break
-				}
+
+	if length > 0 {
+		// PDF 2.0: use Length key for efficient reading
+		if length > maxInlineImageBytes {
+			return Operator{}, errParse
+		}
+		imageData = make([]byte, length)
+		for i := 0; i < length; i++ {
+			b, err := s.readByte()
+			if err != nil {
+				return Operator{}, err
 			}
+			imageData[i] = b
+		}
+		// skip optional whitespace before EI
+		s.skipWhiteSpace()
+	} else {
+		// no Length key: read until we find [\r\n]EI pattern
+		var prevByte byte
+		for len(imageData) < maxInlineImageBytes {
+			// check for EI pattern: previous byte is \r or \n, followed by "EI" + delimiter
+			if (prevByte == '\r' || prevByte == '\n') && s.checkEI() {
+				// remove the trailing newline from image data
+				if len(imageData) > 0 {
+					imageData = imageData[:len(imageData)-1]
+				}
+				break
+			}
+
+			b, err := s.readByte()
+			if err != nil {
+				return Operator{}, err
+			}
+			imageData = append(imageData, b)
+			prevByte = b
 		}
 
-		b, err := s.readByte()
-		if err != nil {
-			return Operator{}, err
+		if len(imageData) >= maxInlineImageBytes {
+			// no valid EI found within limit
+			return Operator{}, errParse
 		}
-		imageData = append(imageData, b)
+	}
+
+	// consume the EI operator
+	if !s.peekString("EI") {
+		return Operator{}, errParse
+	}
+	s.skipN(2)
+
+	// verify EI is followed by whitespace, delimiter, or EOF
+	nextByte, err := s.peek()
+	if err != io.EOF && nextByte > 32 && class[nextByte] != delimiter {
+		return Operator{}, errParse
 	}
 
 	return Operator{
 		Name: OpInlineImage,
 		Args: []pdf.Object{dict, pdf.String(imageData)},
 	}, nil
+}
+
+// checkEI checks if we're at a valid EI terminator.
+// Returns true if the next bytes are "EI" followed by whitespace, delimiter, or EOF.
+func (s *streamScanner) checkEI() bool {
+	buf := s.peekN(3)
+	if len(buf) < 2 {
+		return false
+	}
+	if buf[0] != 'E' || buf[1] != 'I' {
+		return false
+	}
+	if len(buf) == 2 {
+		return true // EOF after EI is valid
+	}
+	// EI must be followed by whitespace or delimiter
+	return buf[2] <= 32 || class[buf[2]] == delimiter
 }
 
 // peekString checks if the next n bytes match the given string
@@ -889,6 +905,14 @@ func parseNumber(s []byte) pdf.Native {
 }
 
 var errParse = errors.New("parse error")
+
+// limits for defense against resource exhaustion
+const (
+	maxInlineImageBytes  = 4096       // spec recommendation for inline image data
+	maxInlineImagePixels = 256 * 1024 // ~512×512 max
+	maxInlineImageDim    = 65536      // max width or height
+	maxOperatorArgs      = 64         // PDF spec requires support for 32 DeviceN colorants
+)
 
 type characterClass byte
 
