@@ -211,7 +211,7 @@ func writerSetResourceName(w *Writer, resource pdf.Embedder, category resourceCa
 	return nil
 }
 
-// SetFontNameInternal controls how the font is refered to in the content
+// SetFontNameInternal controls how the font is referred to in the content
 // stream.  Normally names are allocated automatically, and use of this
 // function is not required.
 func (w *Writer) SetFontNameInternal(f font.Instance, name pdf.Name) error {

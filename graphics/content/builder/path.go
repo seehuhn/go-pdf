@@ -1,6 +1,8 @@
 package builder
 
 import (
+	"math"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/content"
 )
@@ -140,4 +142,71 @@ func (b *Builder) ClipNonZero() {
 // This implements the PDF graphics operator "W*".
 func (b *Builder) ClipEvenOdd() {
 	b.emit(content.OpClipEvenOdd)
+}
+
+// Convenience Path Methods
+
+// Circle appends a circle to the current path, as a closed subpath.
+//
+// This is a convenience function, which uses [Builder.MoveTo] and
+// [Builder.CurveTo] to draw the circle.
+func (b *Builder) Circle(x, y, radius float64) {
+	b.arc(x, y, radius, 0, 2*math.Pi, true)
+	b.ClosePath()
+}
+
+// MoveToArc appends a circular arc to the current path,
+// starting a new subpath.
+//
+// This is a convenience function, which uses [Builder.MoveTo] and
+// [Builder.CurveTo] to draw the arc.
+func (b *Builder) MoveToArc(x, y, radius, startAngle, endAngle float64) {
+	b.arc(x, y, radius, startAngle, endAngle, true)
+}
+
+// LineToArc appends a circular arc to the current subpath,
+// connecting the previous point to the arc using a straight line.
+//
+// This is a convenience function, which uses [Builder.LineTo] and
+// [Builder.CurveTo] to draw the arc.
+func (b *Builder) LineToArc(x, y, radius, startAngle, endAngle float64) {
+	b.arc(x, y, radius, startAngle, endAngle, false)
+}
+
+// arc appends a circular arc to the current path.
+func (b *Builder) arc(x, y, radius, startAngle, endAngle float64, move bool) {
+	// rounding precision based on radius
+	digits := max(1, 2-int(math.Round(math.Log10(radius))))
+
+	// also see https://www.tinaja.com/glib/bezcirc2.pdf
+	// from https://pomax.github.io/bezierinfo/ , section 42
+
+	nSegment := int(math.Ceil(math.Abs(endAngle-startAngle) / (0.5 * math.Pi)))
+	dPhi := (endAngle - startAngle) / float64(nSegment)
+	k := 4.0 / 3.0 * radius * math.Tan(dPhi/4)
+
+	phi := startAngle
+	x0 := x + radius*math.Cos(phi)
+	y0 := y + radius*math.Sin(phi)
+	if move {
+		b.MoveTo(pdf.Round(x0, digits), pdf.Round(y0, digits))
+	} else {
+		b.LineTo(pdf.Round(x0, digits), pdf.Round(y0, digits))
+	}
+
+	for range nSegment {
+		x1 := x0 - k*math.Sin(phi)
+		y1 := y0 + k*math.Cos(phi)
+		phi += dPhi
+		x3 := x + radius*math.Cos(phi)
+		y3 := y + radius*math.Sin(phi)
+		x2 := x3 + k*math.Sin(phi)
+		y2 := y3 - k*math.Cos(phi)
+		b.CurveTo(
+			pdf.Round(x1, digits), pdf.Round(y1, digits),
+			pdf.Round(x2, digits), pdf.Round(y2, digits),
+			pdf.Round(x3, digits), pdf.Round(y3, digits))
+		x0 = x3
+		y0 = y3
+	}
 }

@@ -12,6 +12,6 @@ func (b *Builder) DrawXObject(obj graphics.XObject) {
 	if b.Err != nil {
 		return
 	}
-	name := getResourceName(b, "X", obj, &b.Resources.XObject)
+	name := b.getXObjectName(obj)
 	b.emit(content.OpXObject, name)
 }

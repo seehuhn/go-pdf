@@ -32,7 +32,7 @@ func (b *Builder) TextEnd() {
 //
 // This implements the PDF graphics operator "Tc".
 func (b *Builder) TextSetCharacterSpacing(charSpacing float64) {
-	if b.State.Out&graphics.StateTextCharacterSpacing != 0 &&
+	if b.isSet(graphics.StateTextCharacterSpacing) &&
 		nearlyEqual(charSpacing, b.State.Param.TextCharacterSpacing) {
 		return
 	}
@@ -43,7 +43,7 @@ func (b *Builder) TextSetCharacterSpacing(charSpacing float64) {
 //
 // This implements the PDF graphics operator "Tw".
 func (b *Builder) TextSetWordSpacing(wordSpacing float64) {
-	if b.State.Out&graphics.StateTextWordSpacing != 0 &&
+	if b.isSet(graphics.StateTextWordSpacing) &&
 		nearlyEqual(wordSpacing, b.State.Param.TextWordSpacing) {
 		return
 	}
@@ -55,7 +55,7 @@ func (b *Builder) TextSetWordSpacing(wordSpacing float64) {
 //
 // This implements the PDF graphics operator "Tz".
 func (b *Builder) TextSetHorizontalScaling(scaling float64) {
-	if b.State.Out&graphics.StateTextHorizontalScaling != 0 &&
+	if b.isSet(graphics.StateTextHorizontalScaling) &&
 		nearlyEqual(scaling, b.State.Param.TextHorizontalScaling) {
 		return
 	}
@@ -67,7 +67,7 @@ func (b *Builder) TextSetHorizontalScaling(scaling float64) {
 //
 // This implements the PDF graphics operator "TL".
 func (b *Builder) TextSetLeading(leading float64) {
-	if b.State.Out&graphics.StateTextLeading != 0 &&
+	if b.isSet(graphics.StateTextLeading) &&
 		nearlyEqual(leading, b.State.Param.TextLeading) {
 		return
 	}
@@ -82,7 +82,7 @@ func (b *Builder) TextSetRenderingMode(mode graphics.TextRenderingMode) {
 		b.Err = fmt.Errorf("TextSetRenderingMode: invalid mode %d", mode)
 		return
 	}
-	if b.State.Out&graphics.StateTextRenderingMode != 0 &&
+	if b.isSet(graphics.StateTextRenderingMode) &&
 		mode == b.State.Param.TextRenderingMode {
 		return
 	}
@@ -93,7 +93,7 @@ func (b *Builder) TextSetRenderingMode(mode graphics.TextRenderingMode) {
 //
 // This implements the PDF graphics operator "Ts".
 func (b *Builder) TextSetRise(rise float64) {
-	if b.State.Out&graphics.StateTextRise != 0 &&
+	if b.isSet(graphics.StateTextRise) &&
 		nearlyEqual(rise, b.State.Param.TextRise) {
 		return
 	}
@@ -108,24 +108,13 @@ func (b *Builder) TextSetFont(f font.Instance, size float64) {
 		return
 	}
 
-	// look up or allocate resource name
-	key := resKey{"F", f}
-	name, ok := b.resName[key]
-	if !ok {
-		if b.Resources.Font == nil {
-			b.Resources.Font = make(map[pdf.Name]font.Instance)
-		}
-		name = allocateName("F", b.Resources.Font)
-		b.Resources.Font[name] = f
-		b.resName[key] = name
-	}
-
-	if b.State.Out&graphics.StateTextFont != 0 &&
+	if b.isSet(graphics.StateTextFont) &&
 		b.State.Param.TextFont == f &&
 		nearlyEqual(b.State.Param.TextFontSize, size) {
 		return
 	}
 
+	name := b.getFontName(f)
 	b.emit(content.OpTextSetFont, name, pdf.Number(size))
 }
 

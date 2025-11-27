@@ -124,6 +124,7 @@ func (w *Writer) SetLineCap(cap LineCapStyle) {
 	}
 	if cap > 2 {
 		w.Err = fmt.Errorf("SetLineCap: invalid line cap style %d", cap)
+		return
 	}
 	if w.isSet(StateLineCap) && cap == w.LineCap {
 		return
@@ -144,6 +145,7 @@ func (w *Writer) SetLineJoin(join LineJoinStyle) {
 	}
 	if join > 2 {
 		w.Err = fmt.Errorf("SetLineJoin: invalid line join style %d", join)
+		return
 	}
 	if w.isSet(StateLineJoin) && join == w.LineJoin {
 		return

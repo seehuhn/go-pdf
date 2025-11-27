@@ -195,37 +195,10 @@ func handleSetExtGState(s *GraphicsState, args []pdf.Object, res *Resources) err
 		return errors.New("ExtGState not found")
 	}
 
-	// apply ExtGState parameters to current state
-	set := gs.Set
-	if set&graphics.StateLineWidth != 0 {
-		s.Param.LineWidth = gs.LineWidth
-		s.markOut(graphics.StateLineWidth)
-	}
-	if set&graphics.StateLineCap != 0 {
-		s.Param.LineCap = gs.LineCap
-		s.markOut(graphics.StateLineCap)
-	}
-	if set&graphics.StateLineJoin != 0 {
-		s.Param.LineJoin = gs.LineJoin
-		s.markOut(graphics.StateLineJoin)
-	}
-	if set&graphics.StateMiterLimit != 0 {
-		s.Param.MiterLimit = gs.MiterLimit
-		s.markOut(graphics.StateMiterLimit)
-	}
-	if set&graphics.StateLineDash != 0 {
-		s.Param.DashPattern = gs.DashPattern
-		s.Param.DashPhase = gs.DashPhase
-		s.markOut(graphics.StateLineDash)
-	}
-	if set&graphics.StateRenderingIntent != 0 {
-		s.Param.RenderingIntent = gs.RenderingIntent
-		s.markOut(graphics.StateRenderingIntent)
-	}
-	if set&graphics.StateStrokeAdjustment != 0 {
-		s.Param.StrokeAdjustment = gs.StrokeAdjustment
-		s.markOut(graphics.StateStrokeAdjustment)
-	}
+	// use a temporary graphics.State to apply the ExtGState
+	tmp := graphics.State{Parameters: &s.Param, Set: s.Out}
+	gs.ApplyTo(&tmp)
+	s.Out = tmp.Set
 
 	return nil
 }

@@ -35,7 +35,7 @@ func sliceNearlyEqual(a, b []float64) bool {
 		return false
 	}
 	for i, x := range a {
-		if nearlyEqual(x, b[i]) {
+		if !nearlyEqual(x, b[i]) {
 			return false
 		}
 	}

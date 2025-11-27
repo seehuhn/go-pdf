@@ -26,11 +26,11 @@ func (b *Builder) setColor(c color.Color, fill bool) {
 
 	var cur color.Color
 	if fill {
-		if b.State.Out&graphics.StateFillColor != 0 {
+		if b.isSet(graphics.StateFillColor) {
 			cur = b.State.Param.FillColor
 		}
 	} else {
-		if b.State.Out&graphics.StateStrokeColor != 0 {
+		if b.isSet(graphics.StateStrokeColor) {
 			cur = b.State.Param.StrokeColor
 		}
 	}
@@ -82,14 +82,6 @@ func (b *Builder) setColor(c color.Color, fill bool) {
 	}
 }
 
-func (b *Builder) getColorSpaceName(cs color.Space) pdf.Name {
-	return getResourceName(b, "C", cs, &b.Resources.ColorSpace)
-}
-
-func (b *Builder) getPatternName(pat color.Pattern) pdf.Name {
-	return getResourceName(b, "P", pat, &b.Resources.Pattern)
-}
-
 // DrawShading paints the given shading, subject to the current clipping path.
 // The current colour in the graphics state is neither used nor altered.
 //
@@ -98,6 +90,6 @@ func (b *Builder) DrawShading(shading graphics.Shading) {
 	if b.Err != nil {
 		return
 	}
-	name := getResourceName(b, "S", shading, &b.Resources.Shading)
+	name := b.getShadingName(shading)
 	b.emit(content.OpShading, name)
 }
