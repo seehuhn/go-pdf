@@ -54,19 +54,19 @@ type Specification struct {
 	// FileNameDOS (optional, deprecated in PDF 2.0) specifies a DOS file name.
 	//
 	// This corresponds to the /DOS entry in the PDF dictionary.
-	FileNameDOS string
+	FileNameDOS pdf.String
 
 	// FileNameMac (optional, deprecated in PDF 2.0) specifies a MacOS
 	// file name.
 	//
 	// This corresponds to the /Mac entry in the PDF dictionary.
-	FileNameMac string
+	FileNameMac pdf.String
 
 	// FileNameUnix (optional, deprecated in PDF 2.0) specifies a Unix
 	// file name.
 	//
 	// This corresponds to the /Unix entry in the PDF dictionary.
-	FileNameUnix string
+	FileNameUnix pdf.String
 
 	// AFRelationship (PDF 2.0) specifies the relationship between the
 	// referencing component and the associated file.
@@ -158,19 +158,19 @@ func ExtractSpecification(x *pdf.Extractor, obj pdf.Object) (*Specification, err
 	if fileNameDOS, err := pdf.Optional(x.GetString(dict["DOS"])); err != nil {
 		return nil, err
 	} else {
-		spec.FileNameDOS = string(fileNameDOS)
+		spec.FileNameDOS = fileNameDOS
 	}
 
 	if fileNameMac, err := pdf.Optional(x.GetString(dict["Mac"])); err != nil {
 		return nil, err
 	} else {
-		spec.FileNameMac = string(fileNameMac)
+		spec.FileNameMac = fileNameMac
 	}
 
 	if fileNameUnix, err := pdf.Optional(x.GetString(dict["Unix"])); err != nil {
 		return nil, err
 	} else {
-		spec.FileNameUnix = string(fileNameUnix)
+		spec.FileNameUnix = fileNameUnix
 	}
 
 	// Description
@@ -254,6 +254,15 @@ func ExtractSpecification(x *pdf.Extractor, obj pdf.Object) (*Specification, err
 		spec.EncryptedPayload = ep
 	}
 
+	// Ensure at least one filename is set for round-trip compatibility.
+	if spec.FileName == "" && len(spec.FileNameDOS) == 0 && len(spec.FileNameMac) == 0 && len(spec.FileNameUnix) == 0 {
+		if _, ok := pdf.PDFDocEncode(spec.FileNameUnicode); ok && spec.FileNameUnicode != "" {
+			spec.FileName = spec.FileNameUnicode
+		} else {
+			spec.FileName = "file"
+		}
+	}
+
 	return spec, nil
 }
 
@@ -279,7 +288,7 @@ func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	// Validate that F is present if DOS/Mac/Unix are all absent
-	if spec.FileName == "" && spec.FileNameDOS == "" && spec.FileNameMac == "" && spec.FileNameUnix == "" {
+	if spec.FileName == "" && len(spec.FileNameDOS) == 0 && len(spec.FileNameMac) == 0 && len(spec.FileNameUnix) == 0 {
 		return nil, pdf.Errorf("file specification must have F entry if DOS, Mac, and Unix entries are all absent")
 	}
 
@@ -305,16 +314,16 @@ func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["UF"] = pdf.TextString(spec.FileNameUnicode)
 	}
 
-	if spec.FileNameDOS != "" {
-		dict["DOS"] = pdf.String(spec.FileNameDOS)
+	if len(spec.FileNameDOS) > 0 {
+		dict["DOS"] = spec.FileNameDOS
 	}
 
-	if spec.FileNameMac != "" {
-		dict["Mac"] = pdf.String(spec.FileNameMac)
+	if len(spec.FileNameMac) > 0 {
+		dict["Mac"] = spec.FileNameMac
 	}
 
-	if spec.FileNameUnix != "" {
-		dict["Unix"] = pdf.String(spec.FileNameUnix)
+	if len(spec.FileNameUnix) > 0 {
+		dict["Unix"] = spec.FileNameUnix
 	}
 
 	// Description
@@ -500,7 +509,7 @@ func (spec *Specification) CanBeAF(v pdf.Version) error {
 
 	// Must have at least one file name
 	if spec.FileName == "" && spec.FileNameUnicode == "" &&
-		spec.FileNameDOS == "" && spec.FileNameMac == "" && spec.FileNameUnix == "" {
+		len(spec.FileNameDOS) == 0 && len(spec.FileNameMac) == 0 && len(spec.FileNameUnix) == 0 {
 		return pdf.Errorf("file specification must have at least one file name")
 	}
 

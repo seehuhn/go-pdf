@@ -18,6 +18,7 @@ package file
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -69,9 +70,9 @@ var testCases = []struct {
 		version: pdf.V1_0,
 		spec: &Specification{
 			FileName:       "example.txt",
-			FileNameDOS:    "EXAMPLE.TXT",
-			FileNameMac:    "example.txt",
-			FileNameUnix:   "example.txt",
+			FileNameDOS:    pdf.String("EXAMPLE.TXT"),
+			FileNameMac:    pdf.String("example.txt"),
+			FileNameUnix:   pdf.String("example.txt"),
 			AFRelationship: RelationshipUnspecified,
 		},
 	},
@@ -542,7 +543,8 @@ func roundTripTest(t *testing.T, v pdf.Version, spec1 *Specification) {
 
 	// encode the specification
 	obj, err := rm.Embed(spec1)
-	if _, isVersionError := err.(*pdf.VersionError); isVersionError {
+	var versionError *pdf.VersionError
+	if errors.As(err, &versionError) {
 		t.Skip()
 	} else if err != nil {
 		t.Fatal(err)
