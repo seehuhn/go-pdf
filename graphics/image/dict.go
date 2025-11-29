@@ -210,11 +210,14 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		Height: int(height),
 	}
 
-	// Extract ColorSpace (required for images)
+	// Extract ColorSpace (required for images, Pattern not allowed)
 	if csObj, ok := dict["ColorSpace"]; ok {
 		cs, err := color.ExtractSpace(x, csObj)
 		if err != nil {
 			return nil, fmt.Errorf("invalid ColorSpace: %w", err)
+		}
+		if cs.Family() == color.FamilyPattern {
+			return nil, pdf.Error("Pattern colour space not permitted for images")
 		}
 		img.ColorSpace = cs
 	} else if !hasJPX {
@@ -256,27 +259,50 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 			img.MaskImage = maskImg
 		}
 	case pdf.Array: // color key mask array
-		img.MaskColors = make([]uint16, len(maskObj))
-		for i, val := range maskObj {
-			if num, err := x.GetInteger(val); err != nil {
-				return nil, fmt.Errorf("invalid MaskColors[%d]: %w", i, err)
-			} else {
-				img.MaskColors[i] = uint16(num)
+		numChannels := img.ColorSpace.Channels()
+		if len(maskObj) == 2*numChannels {
+			maskColors := make([]uint16, len(maskObj))
+			valid := true
+			for i, val := range maskObj {
+				if num, err := x.GetInteger(val); err != nil {
+					valid = false
+					break
+				} else if img.BitsPerComponent < 16 {
+					maskColors[i] = uint16(num) % (1 << img.BitsPerComponent)
+				} else {
+					maskColors[i] = uint16(num)
+				}
+			}
+			// check min_i <= max_i for each pair
+			for i := 0; valid && i < numChannels; i++ {
+				if maskColors[2*i] > maskColors[2*i+1] {
+					valid = false
+				}
+			}
+			if valid {
+				img.MaskColors = maskColors
 			}
 		}
 	}
 
-	// Extract Decode array
+	// Extract Decode array (must have 2 * numChannels entries, else use default)
 	if decodeArray, err := pdf.Optional(x.GetArray(dict["Decode"])); err != nil {
 		return nil, err
-	} else if decodeArray != nil {
-		img.Decode = make([]float64, len(decodeArray))
+	} else if len(decodeArray) == 2*img.ColorSpace.Channels() {
+		decode := make([]float64, len(decodeArray))
+		valid := true
 		for i, val := range decodeArray {
-			if num, err := x.GetNumber(val); err != nil {
-				return nil, fmt.Errorf("invalid Decode[%d]: %w", i, err)
-			} else {
-				img.Decode[i] = num
+			num, err := x.GetNumber(val)
+			if pdf.IsMalformed(err) {
+				valid = false
+				break
+			} else if err != nil {
+				return nil, err
 			}
+			decode[i] = num
+		}
+		if valid {
+			img.Decode = decode
 		}
 	}
 
@@ -285,7 +311,7 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		img.Interpolate = bool(interp)
 	}
 
-	// Extract Alternates
+	// Extract Alternates (alternates of alternates not allowed per spec)
 	if alts, err := pdf.Optional(x.GetArray(dict["Alternates"])); err != nil {
 		return nil, err
 	} else if alts != nil {
@@ -294,6 +320,9 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 			altDict, err := pdf.ExtractorGetOptional(x, altObj, ExtractDict)
 			if err != nil {
 				return nil, fmt.Errorf("invalid Alternates[%d]: %w", i, err)
+			}
+			if altDict != nil {
+				altDict.Alternates = nil
 			}
 			img.Alternates[i] = altDict
 		}
@@ -310,10 +339,10 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		img.SMask = smask
 	}
 
-	// Extract SMaskInData
+	// Extract SMaskInData (valid values are 0, 1, 2; invalid values default to 0)
 	if smd, err := pdf.Optional(x.GetInteger(dict["SMaskInData"])); err != nil {
 		return nil, err
-	} else if smd > 0 {
+	} else if smd == 1 || smd == 2 {
 		img.SMaskInData = int(smd)
 		// Per spec: if SMaskInData is non-zero, SMask should be ignored
 		if img.SMask != nil {
@@ -390,18 +419,30 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		img.WebCaptureID = webID
 	}
 
-	// Create WriteData function as a closure
+	// Create WriteData function as a closure.
+	// Calculate expected size to normalize malformed image data.
+	bytesPerRow := (img.Width*img.ColorSpace.Channels()*img.BitsPerComponent + 7) / 8
+	expectedSize := bytesPerRow * img.Height
 	img.WriteData = func(w io.Writer) error {
 		stm, err := pdf.DecodeStream(x.R, stream, 0)
 		if err != nil {
 			return err
 		}
-		_, err = io.Copy(w, stm)
+		data, err := io.ReadAll(stm)
+		stm.Close()
 		if err != nil {
-			stm.Close()
 			return err
 		}
-		return stm.Close()
+
+		// normalize to expected size
+		if len(data) < expectedSize {
+			data = append(data, make([]byte, expectedSize-len(data))...)
+		} else if len(data) > expectedSize {
+			data = data[:expectedSize]
+		}
+
+		_, err = w.Write(data)
+		return err
 	}
 
 	return img, nil
@@ -742,6 +783,11 @@ func (d *Dict) check(out *pdf.Writer) error {
 			for i, v := range d.MaskColors {
 				if v > maxVal {
 					return fmt.Errorf("MaskColors[%d] value %d exceeds maximum %d", i, v, maxVal)
+				}
+			}
+			for i := 0; i < numChannels; i++ {
+				if d.MaskColors[2*i] > d.MaskColors[2*i+1] {
+					return fmt.Errorf("MaskColors[%d] > MaskColors[%d]", 2*i, 2*i+1)
 				}
 			}
 		}

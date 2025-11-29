@@ -618,6 +618,11 @@ func FuzzDictRoundTrip(f *testing.F) {
 			t.Skip("malformed PDF object")
 		}
 
+		// skip if image data cannot be read (e.g. unsupported filter)
+		if err := objGo.WriteData(io.Discard); err != nil {
+			t.Skip("image data not readable")
+		}
+
 		// Use at least PDF 1.3 to ensure all standard features are supported
 		version := max(pdf.GetVersion(r), pdf.V1_3)
 		roundTripTest(t, version, objGo)
