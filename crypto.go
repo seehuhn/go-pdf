@@ -1079,7 +1079,7 @@ func utf8Passwd(passwd string) ([]byte, error) {
 
 // returns a slice of length 32
 func padPasswd(passwd string) ([]byte, error) {
-	buf, ok := pdfDocEncode(passwd)
+	buf, ok := PDFDocEncode(passwd)
 	if !ok {
 		return nil, errInvalidPassword
 	}

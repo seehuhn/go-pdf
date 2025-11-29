@@ -239,7 +239,7 @@ func TestDecodeVersion(t *testing.T) {
 }
 
 func pdfDocEncodeMust(s string) String {
-	res, ok := pdfDocEncode(s)
+	res, ok := PDFDocEncode(s)
 	if !ok {
 		panic("encoding failed")
 	}

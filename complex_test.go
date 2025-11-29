@@ -194,11 +194,11 @@ func TestTextString_Roundtrip(t *testing.T) {
 		},
 		{
 			name: "utf8 marker",
-			text: TextString(pdfDocDecode(utf8Marker)),
+			text: TextString(PDFDocDecode(utf8Marker)),
 		},
 		{
 			name: "utf16 marker",
-			text: TextString(pdfDocDecode(utf16Marker)),
+			text: TextString(PDFDocDecode(utf16Marker)),
 		},
 	}
 

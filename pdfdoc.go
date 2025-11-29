@@ -20,11 +20,10 @@ import (
 	"unicode"
 )
 
-// PDFDocEncoding is an encoding used for metadata in PDF files.
-// It is not normally used to show text from fonts in PDF content streams.
-// See PDF 32000-1:2008, Tables D.2 and D.3
-
-func pdfDocEncode(s string) (String, bool) {
+// PDFDocEncode converts a Go string to PDFDocEncoding.
+// It returns the encoded string and true if all characters can be represented,
+// or nil and false if the string contains unsupported characters.
+func PDFDocEncode(s string) (String, bool) {
 	rr := []rune(s)
 	res := make([]byte, len(rr))
 	for i, r := range rr {
@@ -39,7 +38,8 @@ func pdfDocEncode(s string) (String, bool) {
 	return String(res), true
 }
 
-func pdfDocDecode(s []byte) string {
+// PDFDocDecode converts a PDFDocEncoding string to a Go string.
+func PDFDocDecode(s String) string {
 	for i := 0; i < len(s); i++ {
 		if s[i] >= 0x80 || fromPDFDoc[s[i]] != rune(s[i]) {
 			goto Decode

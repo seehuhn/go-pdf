@@ -87,7 +87,7 @@ var utf8Marker = []byte{239, 187, 191}
 
 func (s TextString) AsPDF(opt OutputOptions) Native {
 	// use PDFDocEncoding where possible, because it is smallest
-	if buf, ok := pdfDocEncode(string(s)); ok && !bytes.HasPrefix(buf, utf16Marker) && !bytes.HasPrefix(buf, utf8Marker) {
+	if buf, ok := PDFDocEncode(string(s)); ok && !bytes.HasPrefix(buf, utf16Marker) && !bytes.HasPrefix(buf, utf8Marker) {
 		return buf
 	}
 
@@ -125,7 +125,7 @@ func (x String) AsTextString() TextString {
 	} else if bytes.HasPrefix(b, utf8Marker) {
 		s = string(b[3:])
 	} else {
-		s = pdfDocDecode(b)
+		s = PDFDocDecode(x)
 	}
 
 	return TextString(s)
