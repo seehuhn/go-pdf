@@ -213,9 +213,10 @@ func ExtractSpecification(x *pdf.Extractor, obj pdf.Object) (*Specification, err
 	}
 
 	// RelatedFiles (RF)
+	// Per spec, RF requires EF to be present, so ignore RF if EF is absent.
 	if rfDict, err := pdf.Optional(x.GetDict(dict["RF"])); err != nil {
 		return nil, err
-	} else if rfDict != nil {
+	} else if rfDict != nil && spec.EmbeddedFiles != nil {
 		spec.RelatedFiles, err = extractRelatedFiles(x, rfDict)
 		if err != nil {
 			return nil, err
@@ -342,7 +343,7 @@ func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	// EmbeddedFiles (EF)
-	if len(spec.EmbeddedFiles) > 0 {
+	if spec.EmbeddedFiles != nil {
 		efDict := pdf.Dict{}
 		for key, stream := range spec.EmbeddedFiles {
 			if stream != nil {
@@ -357,7 +358,11 @@ func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	// RelatedFiles (RF)
-	if len(spec.RelatedFiles) > 0 {
+	// Per spec, RF requires EF to be present.
+	if spec.RelatedFiles != nil {
+		if spec.EmbeddedFiles == nil {
+			return nil, pdf.Error("RelatedFiles requires EmbeddedFiles to be present")
+		}
 		rfDict, err := encodeRelatedFiles(rm, spec.RelatedFiles)
 		if err != nil {
 			return nil, err

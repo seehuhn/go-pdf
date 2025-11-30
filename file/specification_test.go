@@ -617,6 +617,29 @@ func FuzzSpecificationRoundTrip(f *testing.F) {
 			t.Skip("broken specification")
 		}
 
+		// Skip if any stream data cannot be read (e.g. unsupported filter)
+		if specification.Thumbnail != nil {
+			if err := specification.Thumbnail.WriteData(io.Discard); err != nil {
+				t.Skip("thumbnail data not readable")
+			}
+		}
+		for _, stream := range specification.EmbeddedFiles {
+			if stream != nil && stream.WriteData != nil {
+				if err := stream.WriteData(io.Discard); err != nil {
+					t.Skip("embedded file data not readable")
+				}
+			}
+		}
+		for _, files := range specification.RelatedFiles {
+			for _, rf := range files {
+				if rf.Stream != nil && rf.Stream.WriteData != nil {
+					if err := rf.Stream.WriteData(io.Discard); err != nil {
+						t.Skip("related file data not readable")
+					}
+				}
+			}
+		}
+
 		// Make sure we can write the specification, and read it back.
 		roundTripTest(t, pdf.GetVersion(r), specification)
 	})

@@ -139,7 +139,7 @@ func extractItemValue(x *pdf.Extractor, obj pdf.Object) (*ItemValue, error) {
 		if dateObj, err := pdf.GetDate(x.R, v); err == nil && !dateObj.IsZero() {
 			val = time.Time(dateObj)
 		} else {
-			val = string(v)
+			val = string(v.AsTextString())
 		}
 
 	case pdf.Integer:
