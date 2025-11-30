@@ -59,15 +59,7 @@ func TestRoundTrip(t *testing.T) {
 		for annotationType, cases := range testCases {
 			for _, tc := range cases {
 				t.Run(fmt.Sprintf("%s-%s-%s", annotationType, tc.name, v), func(t *testing.T) {
-					a := tc.annotation
-
-					if v >= pdf.V2_0 { // add an appearance dictionary, if needed
-						a = shallowCopy(a)
-						c := a.GetCommon()
-						c.Appearance = defaultAppearanceDict
-					}
-
-					roundTripTest(t, v, a)
+					roundTripTest(t, v, tc.annotation)
 				})
 			}
 		}
@@ -78,7 +70,7 @@ func TestRoundTripDict(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		for i, dict := range testDicts {
 			t.Run(fmt.Sprintf("dict-%d", i), func(t *testing.T) {
-				// make sure Extract does not crash or hang
+				// make sure Decode does not crash or hang
 				x := pdf.NewExtractor(mock.Getter)
 				a, err := Decode(x, dict)
 				if err != nil {
@@ -86,22 +78,25 @@ func TestRoundTripDict(t *testing.T) {
 					return
 				}
 
-				// add an appearance dictionary, if needed
-				if v >= pdf.V2_0 {
-					a = shallowCopy(a)
-					c := a.GetCommon()
-					c.Appearance = defaultAppearanceDict
-				}
-
-				// if we managed to extract an annotation, do a round-trip test
+				// if we managed to decode an annotation, do a round-trip test
 				roundTripTest(t, v, a)
 			})
 		}
 	}
 }
 
-// roundTripTest performs a round-trip test for any annotation type
+// roundTripTest performs a round-trip test for any annotation type.
+// For PDF 2.0, it adds an appearance dictionary if needed.
 func roundTripTest(t *testing.T, v pdf.Version, a1 Annotation) {
+	// add appearance dictionary for PDF 2.0 if needed
+	if v >= pdf.V2_0 {
+		a1 = shallowCopy(a1)
+		c := a1.GetCommon()
+		if c.Appearance == nil {
+			c.Appearance = defaultAppearanceDict
+		}
+	}
+
 	buf, _ := memfile.NewPDFWriter(v, nil)
 	rm := pdf.NewResourceManager(buf)
 
