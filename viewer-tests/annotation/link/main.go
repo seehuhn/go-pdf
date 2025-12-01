@@ -68,7 +68,7 @@ func createDocument(filename string) error {
 		Roman:   standard.TimesRoman.New(),
 		Italic:  standard.TimesItalic.New(),
 		TextCol: color.DeviceGray(0.1),
-		LinkCol: color.DeviceRGB(0, 0, 0.9),
+		LinkCol: color.DeviceRGB{0, 0, 0.9},
 
 		style: fallback.NewStyle(),
 		RM:    page.RM,
@@ -227,7 +227,7 @@ func createDocument(filename string) error {
 			Y: pdf.Round(w.yPos+100*math.Sin(angle)-120, 2),
 		}
 	}
-	page.SetFillColor(color.DeviceCMYK(0, 0.9, 0.9, 0))
+	page.SetFillColor(color.DeviceCMYK{0, 0.9, 0.9, 0})
 	page.MoveTo(hex[0].X, hex[0].Y)
 	for i := 1; i < len(hex); i++ {
 		page.LineTo(hex[i].X, hex[i].Y)
@@ -459,14 +459,14 @@ func (w *writer) DrawQuads(x, y float64, withAppearance bool) error {
 		{X: pdf.Round(x+80*dx, 2), Y: pdf.Round(y+80*dy-20, 2)},
 		{X: pdf.Round(x-100*dx, 2), Y: pdf.Round(y-100*dy-20, 2)},
 	}
-	page.SetFillColor(color.DeviceRGB(0.9, 0.9, 0))
+	page.SetFillColor(color.DeviceRGB{0.9, 0.9, 0})
 	page.MoveTo(q1[0].X, q1[0].Y)
 	for i := 1; i < len(q1); i++ {
 		page.LineTo(q1[i].X, q1[i].Y)
 	}
 	page.ClosePath()
 	page.Fill()
-	page.SetFillColor(color.DeviceRGB(0, 0.9, 0.9))
+	page.SetFillColor(color.DeviceRGB{0, 0.9, 0.9})
 	page.MoveTo(q2[0].X, q2[0].Y)
 	for i := 1; i < len(q2); i++ {
 		page.LineTo(q2[i].X, q2[i].Y)

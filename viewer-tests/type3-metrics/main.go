@@ -57,7 +57,7 @@ func createDocument(filename string) error {
 		Color: color.Black,
 	}
 
-	blue := color.DeviceRGB(0, 0, 0.9)
+	blue := color.DeviceRGB{0, 0, 0.9}
 	var testFont [4]text.F
 	var testString [4]pdf.String
 

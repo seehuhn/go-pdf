@@ -117,7 +117,7 @@ func createDocument(filename string) error {
 		page.Stroke()
 
 		page.SetLineWidth(1)
-		page.SetStrokeColor(color.DeviceRGB(1, 0.5, 0.5))
+		page.SetStrokeColor(color.DeviceRGB{1, 0.5, 0.5})
 		x := left + gap1 + 1 + gap2 + 0.5
 		page.MoveTo(x, paper.LLy)
 		page.LineTo(x, paper.URy)

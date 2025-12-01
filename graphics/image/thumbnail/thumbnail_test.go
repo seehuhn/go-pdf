@@ -220,7 +220,7 @@ func makeIndexedRGB() *color.SpaceIndexed {
 	}
 	rgbColors := make([]color.Color, 8)
 	for i, c := range colors {
-		rgbColors[i] = color.DeviceRGB(float64(c[0])/255.0, float64(c[1])/255.0, float64(c[2])/255.0)
+		rgbColors[i] = color.DeviceRGB{float64(c[0]) / 255.0, float64(c[1]) / 255.0, float64(c[2]) / 255.0}
 	}
 	idx, err := color.Indexed(rgbColors)
 	if err != nil {

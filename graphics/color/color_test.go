@@ -22,9 +22,9 @@ import (
 
 // The following types implement the Color interface.
 var (
-	_ Color = colorDeviceGray(0)
-	_ Color = colorDeviceRGB{0, 0, 0}
-	_ Color = colorDeviceCMYK{0, 0, 0, 1}
+	_ Color = DeviceGray(0)
+	_ Color = DeviceRGB{0, 0, 0}
+	_ Color = DeviceCMYK{0, 0, 0, 1}
 	_ Color = colorCalGray{}
 	_ Color = colorCalRGB{}
 	_ Color = colorLab{}

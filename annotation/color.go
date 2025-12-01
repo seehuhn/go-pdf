@@ -42,9 +42,9 @@ func extractColor(r pdf.Getter, obj pdf.Object) (color.Color, error) {
 	case 1:
 		return color.DeviceGray(colors[0]), nil
 	case 3:
-		return color.DeviceRGB(colors[0], colors[1], colors[2]), nil
+		return color.DeviceRGB{colors[0], colors[1], colors[2]}, nil
 	case 4:
-		return color.DeviceCMYK(colors[0], colors[1], colors[2], colors[3]), nil
+		return color.DeviceCMYK{colors[0], colors[1], colors[2], colors[3]}, nil
 	default:
 		return nil, fmt.Errorf("invalid color array length: %d", len(colors))
 	}
@@ -101,7 +101,7 @@ func extractColorRGB(r pdf.Getter, obj pdf.Object) (color.Color, error) {
 		}
 	}
 
-	return color.DeviceRGB(colors[0], colors[1], colors[2]), nil
+	return color.DeviceRGB{colors[0], colors[1], colors[2]}, nil
 }
 
 // encodeColorRGB encodes a DeviceRGB color to a PDF array.

@@ -413,7 +413,7 @@ func createDocument(filename string) error {
 			pdf.Round(w.currentY, 2),
 		},
 		BorderStyle: lineStyle,
-		FillColor:   color.DeviceRGB(1, 1, 0.5),
+		FillColor:   color.DeviceRGB{1, 1, 0.5},
 		LLE:         10,
 		LL:          50,
 		LLO:         10,

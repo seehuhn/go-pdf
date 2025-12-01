@@ -80,7 +80,7 @@ func createDocument(filename string) error {
 	test := text.F{
 		Font:  testFont,
 		Size:  24,
-		Color: color.DeviceRGB(0, 0, 0.7),
+		Color: color.DeviceRGB{0, 0, 0.7},
 	}
 
 	text.Show(page.Writer,

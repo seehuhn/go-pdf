@@ -147,7 +147,7 @@ func handleSetStrokeRGB(s *GraphicsState, args []pdf.Object, res *Resources) err
 		return err
 	}
 
-	s.Param.StrokeColor = color.DeviceRGB(r, g, b)
+	s.Param.StrokeColor = color.DeviceRGB{r, g, b}
 	s.markOut(graphics.StateStrokeColor)
 	return nil
 }
@@ -162,7 +162,7 @@ func handleSetFillRGB(s *GraphicsState, args []pdf.Object, res *Resources) error
 		return err
 	}
 
-	s.Param.FillColor = color.DeviceRGB(r, g, b)
+	s.Param.FillColor = color.DeviceRGB{r, g, b}
 	s.markOut(graphics.StateFillColor)
 	return nil
 }
@@ -178,7 +178,7 @@ func handleSetStrokeCMYK(s *GraphicsState, args []pdf.Object, res *Resources) er
 		return err
 	}
 
-	s.Param.StrokeColor = color.DeviceCMYK(c, m, y, k)
+	s.Param.StrokeColor = color.DeviceCMYK{c, m, y, k}
 	s.markOut(graphics.StateStrokeColor)
 	return nil
 }
@@ -194,7 +194,7 @@ func handleSetFillCMYK(s *GraphicsState, args []pdf.Object, res *Resources) erro
 		return err
 	}
 
-	s.Param.FillColor = color.DeviceCMYK(c, m, y, k)
+	s.Param.FillColor = color.DeviceCMYK{c, m, y, k}
 	s.markOut(graphics.StateFillColor)
 	return nil
 }

@@ -75,7 +75,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
 					Contents: "Complete text annotation",
 					Flags:    4,                        // ReadOnly flag
-					Color:    color.DeviceRGB(1, 0, 0), // red
+					Color:    color.DeviceRGB{1, 0, 0}, // red
 					Border: &Border{
 						HCornerRadius: 2.0,
 						VCornerRadius: 2.0,
@@ -226,7 +226,7 @@ var testCases = map[pdf.Name][]testCase{
 				},
 				Coords:          [4]float64{60, 110, 240, 110},
 				LineEndingStyle: [2]LineEndingStyle{LineEndingStyleOpenArrow, LineEndingStyleClosedArrow},
-				FillColor:       color.DeviceRGB(1.0, 0.0, 0.0), // Red interior color
+				FillColor:       color.DeviceRGB{1.0, 0.0, 0.0}, // Red interior color
 			},
 		},
 		{
@@ -257,7 +257,7 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect:  pdf.Rectangle{LLx: 100, LLy: 300, URx: 400, URy: 350},
 					Flags: 2,                            // Print flag
-					Color: color.DeviceCMYK(1, 1, 0, 0), // blue
+					Color: color.DeviceCMYK{1, 1, 0, 0}, // blue
 				},
 				Markup: Markup{
 					User:      "Reviewer",
@@ -267,7 +267,7 @@ var testCases = map[pdf.Name][]testCase{
 				},
 				Coords:          [4]float64{120, 325, 380, 325},
 				LineEndingStyle: [2]LineEndingStyle{LineEndingStyleDiamond, LineEndingStyleSquare},
-				FillColor:       color.DeviceRGB(0.0, 1.0, 0.0), // Green interior
+				FillColor:       color.DeviceRGB{0.0, 1.0, 0.0}, // Green interior
 				LL:              15.0,
 				LLE:             8.0,
 				Caption:         true,
@@ -302,7 +302,7 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Designer",
 					Subject: "Color square",
 				},
-				FillColor: color.DeviceRGB(1.0, 0.5, 0.0), // RGB orange interior
+				FillColor: color.DeviceRGB{1.0, 0.5, 0.0}, // RGB orange interior
 			},
 		},
 		{
@@ -318,7 +318,7 @@ var testCases = map[pdf.Name][]testCase{
 					Subject: "Complex annotation",
 					Intent:  "SquareCloud",
 				},
-				FillColor: color.DeviceRGB(0.9, 0.9, 0.9), // Light gray interior
+				FillColor: color.DeviceRGB{0.9, 0.9, 0.9}, // Light gray interior
 				Margin:    []float64{5.0, 5.0, 5.0, 5.0},  // Rectangle differences
 			},
 		},
@@ -348,7 +348,7 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Designer",
 					Subject: "Color circle",
 				},
-				FillColor: color.DeviceRGB(0.0, 1.0, 0.0), // Green interior
+				FillColor: color.DeviceRGB{0.0, 1.0, 0.0}, // Green interior
 			},
 		},
 		{
@@ -364,7 +364,7 @@ var testCases = map[pdf.Name][]testCase{
 					Subject: "Complex circle annotation",
 					Intent:  "CircleCloud",
 				},
-				FillColor: color.DeviceRGB(1.0, 1.0, 0.0),    // Yellow interior
+				FillColor: color.DeviceRGB{1.0, 1.0, 0.0},    // Yellow interior
 				Margin:    []float64{10.0, 10.0, 10.0, 10.0}, // Rectangle differences
 			},
 		},
@@ -397,7 +397,7 @@ var testCases = map[pdf.Name][]testCase{
 					Intent:  "PolygonCloud",
 				},
 				Vertices:  []float64{150, 100, 300, 150, 250, 250, 100, 200}, // Quadrilateral
-				FillColor: color.DeviceRGB(0.0, 1.0, 0.5),                    // Green-cyan interior
+				FillColor: color.DeviceRGB{0.0, 1.0, 0.5},                    // Green-cyan interior
 			},
 		},
 		{
@@ -451,7 +451,7 @@ var testCases = map[pdf.Name][]testCase{
 				},
 				Vertices:        []float64{150, 200, 200, 150, 300, 250, 350, 180},
 				LineEndingStyle: [2]LineEndingStyle{LineEndingStyleCircle, LineEndingStyleSquare}, // Different endings
-				FillColor:       color.DeviceRGB(1.0, 0.0, 0.0),                                   // Red line endings
+				FillColor:       color.DeviceRGB{1.0, 0.0, 0.0},                                   // Red line endings
 			},
 		},
 		{
@@ -497,7 +497,7 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect:  pdf.Rectangle{LLx: 50, LLy: 300, URx: 250, URy: 340},
 					Name:  "highlight-001",
-					Color: color.DeviceRGB(1.0, 1.0, 0.0), // yellow
+					Color: color.DeviceRGB{1.0, 1.0, 0.0}, // yellow
 				},
 				Markup: Markup{
 					User:    "Student",
@@ -534,7 +534,7 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect:  pdf.Rectangle{LLx: 75, LLy: 500, URx: 225, URy: 520},
 					Name:  "underline-001",
-					Color: color.DeviceRGB(0, 0, 1), // blue
+					Color: color.DeviceRGB{0, 0, 1}, // blue
 				},
 				Markup: Markup{
 					User:         "Proofreader",
@@ -568,7 +568,7 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect:  pdf.Rectangle{LLx: 100, LLy: 700, URx: 180, URy: 720},
 					Name:  "squiggly-001",
-					Color: color.DeviceRGB(1, 0.5, 0), // orange
+					Color: color.DeviceRGB{1, 0.5, 0}, // orange
 				},
 				Markup: Markup{
 					User:    "Grammar checker",
@@ -757,7 +757,7 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect:  pdf.Rectangle{LLx: 100, LLy: 200, URx: 300, URy: 350},
 					Name:  "ink-001",
-					Color: color.DeviceRGB(0.0, 0.0, 1.0), // blue
+					Color: color.DeviceRGB{0.0, 0.0, 1.0}, // blue
 				},
 				Markup: Markup{
 					User:         "Artist",
@@ -1005,7 +1005,7 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 150, LLy: 400, URx: 180, URy: 430},
 					Contents: "Interview recording",
-					Color:    color.DeviceRGB(0.5, 0.5, 0.5), // gray
+					Color:    color.DeviceRGB{0.5, 0.5, 0.5}, // gray
 				},
 				Markup: Markup{
 					User:    "Journalist",
@@ -1060,7 +1060,7 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 250, URy: 150},
 					Contents: "Interactive presentation",
-					Color:    color.DeviceRGB(0.7, 0.6, 0.5), // brown
+					Color:    color.DeviceRGB{0.7, 0.6, 0.5}, // brown
 				},
 				Title: "Interactive Demo",
 				Movie: pdf.NewReference(700, 0), // Movie dictionary reference
@@ -1138,7 +1138,7 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 150, LLy: 150, URx: 450, URy: 350},
 					Contents: "Full-featured media player",
-					Color:    color.DeviceRGB(0.9, 0.9, 0.9),
+					Color:    color.DeviceRGB{0.9, 0.9, 0.9},
 				},
 				Title:  "Complete Media Player",
 				MK:     pdf.NewReference(1400, 0), // Appearance characteristics
@@ -1193,7 +1193,7 @@ var testCases = map[pdf.Name][]testCase{
 			annotation: &Widget{
 				Common: Common{
 					Rect:  pdf.Rectangle{LLx: 300, LLy: 300, URx: 500, URy: 340},
-					Color: color.DeviceCMYK(0.1, 0.2, 0.3, 0.4),
+					Color: color.DeviceCMYK{0.1, 0.2, 0.3, 0.4},
 				},
 				Highlight: "I",                       // Default highlighting
 				A:         pdf.NewReference(1800, 0), // Action dictionary
@@ -1231,7 +1231,7 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 100, LLy: 400, URx: 350, URy: 450},
 					Contents: "Complete widget annotation",
-					Color:    color.DeviceRGB(0.8, 0.9, 1.0),
+					Color:    color.DeviceRGB{0.8, 0.9, 1.0},
 				},
 				Highlight: "P",                       // Push highlighting
 				MK:        pdf.NewReference(2200, 0), // Appearance characteristics
@@ -1282,7 +1282,7 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 20, URy: 20},
 					Contents: "Corner cut mark",
-					Color:    color.DeviceRGB(0, 0, 0),
+					Color:    color.DeviceRGB{0, 0, 0},
 				},
 				MN: "CutMark",
 			},
@@ -1639,7 +1639,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 50},
 					Name: "redact-001",
 				},
-				FillColor: color.DeviceRGB(0.0, 0.0, 0.0), // Black interior color
+				FillColor: color.DeviceRGB{0.0, 0.0, 0.0}, // Black interior color
 			},
 		},
 		{
@@ -1695,7 +1695,7 @@ var testCases = map[pdf.Name][]testCase{
 					200, 620, 300, 620, 300, 640, 200, 640, // Second quad
 					325, 620, 425, 620, 425, 640, 325, 640, // Third quad
 				},
-				FillColor:   color.DeviceRGB(0.8, 0.8, 0.8), // Light gray background
+				FillColor:   color.DeviceRGB{0.8, 0.8, 0.8}, // Light gray background
 				OverlayText: "CLASSIFIED",
 				DA:          "/Times-Bold 14 Tf 1 0 0 rg", // Bold red text
 				Repeat:      false,
@@ -1713,7 +1713,7 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Security Officer",
 					Subject: "Personal Information Redaction",
 				},
-				FillColor: color.DeviceRGB(1.0, 1.0, 0.0), // Yellow background
+				FillColor: color.DeviceRGB{1.0, 1.0, 0.0}, // Yellow background
 			},
 		},
 		{

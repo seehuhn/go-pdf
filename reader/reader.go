@@ -569,28 +569,28 @@ func (r *Reader) do() error {
 		case "RG":
 			red, green, blue := op.GetNumber(), op.GetNumber(), op.GetNumber()
 			if op.OK() {
-				r.StrokeColor = color.DeviceRGB(red, green, blue)
+				r.StrokeColor = color.DeviceRGB{red, green, blue}
 				r.Set |= graphics.StateStrokeColor
 			}
 
 		case "rg":
 			red, green, blue := op.GetNumber(), op.GetNumber(), op.GetNumber()
 			if op.OK() {
-				r.FillColor = color.DeviceRGB(red, green, blue)
+				r.FillColor = color.DeviceRGB{red, green, blue}
 				r.Set |= graphics.StateFillColor
 			}
 
 		case "K":
 			c, m, y, k := op.GetNumber(), op.GetNumber(), op.GetNumber(), op.GetNumber()
 			if op.OK() {
-				r.StrokeColor = color.DeviceCMYK(c, m, y, k)
+				r.StrokeColor = color.DeviceCMYK{c, m, y, k}
 				r.Set |= graphics.StateStrokeColor
 			}
 
 		case "k":
 			c, m, y, k := op.GetNumber(), op.GetNumber(), op.GetNumber(), op.GetNumber()
 			if op.OK() {
-				r.FillColor = color.DeviceCMYK(c, m, y, k)
+				r.FillColor = color.DeviceCMYK{c, m, y, k}
 				r.Set |= graphics.StateFillColor
 			}
 

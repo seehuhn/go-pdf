@@ -87,13 +87,13 @@ func withoutAP(filename string) error {
 					Width:     8,
 					SingleUse: true,
 				},
-				Color:                   color.DeviceRGB(0.4975, 0.9333, 0.2483),
+				Color:                   color.DeviceRGB{0.4975, 0.9333, 0.2483},
 				NonStrokingTransparency: 1 - CA,
 				StrokingTransparency:    1 - CA,
 				Contents:                text,
 				Flags:                   annotation.FlagPrint,
 			},
-			FillColor: color.DeviceRGB(0.5056, 0.9555, 0.9956),
+			FillColor: color.DeviceRGB{0.5056, 0.9555, 0.9956},
 		}
 
 		dict, err := a.Encode(page.RM)
@@ -157,13 +157,13 @@ func withAP(filename string) error {
 						Width:     8,
 						SingleUse: true,
 					},
-					Color:                   color.DeviceRGB(0.4975, 0.9333, 0.2483),
+					Color:                   color.DeviceRGB{0.4975, 0.9333, 0.2483},
 					NonStrokingTransparency: 1 - ca,
 					StrokingTransparency:    1 - CA,
 					Contents:                text,
 					Flags:                   annotation.FlagPrint,
 				},
-				FillColor: color.DeviceRGB(0.5056, 0.9555, 0.9956),
+				FillColor: color.DeviceRGB{0.5056, 0.9555, 0.9956},
 			}
 			err = style.AddAppearance(a)
 			if err != nil {

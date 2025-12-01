@@ -62,8 +62,8 @@ func createDocument(fname string) error {
 	}
 
 	black := color.Black
-	blue := color.DeviceRGB(0, 0, 0.9)
-	red := color.DeviceRGB(0.9, 0, 0)
+	blue := color.DeviceRGB{0, 0, 0.9}
+	red := color.DeviceRGB{0.9, 0, 0}
 
 	const fontSize = 12
 

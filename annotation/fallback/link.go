@@ -173,15 +173,15 @@ func getDarkLightCol(col color.Color) (dark, light color.Color) {
 		darkL, lightL := getDarkLightL(L)
 		r1, g1, b1 := colconv.LABToDeviceRGB(darkL, a, b)
 		r2, g2, b2 := colconv.LABToDeviceRGB(lightL, a, b)
-		dark = color.DeviceRGB(pdf.Round(r1, 2), pdf.Round(g1, 2), pdf.Round(b1, 2))
-		light = color.DeviceRGB(pdf.Round(r2, 2), pdf.Round(g2, 2), pdf.Round(b2, 2))
+		dark = color.DeviceRGB{pdf.Round(r1, 2), pdf.Round(g1, 2), pdf.Round(b1, 2)}
+		light = color.DeviceRGB{pdf.Round(r2, 2), pdf.Round(g2, 2), pdf.Round(b2, 2)}
 	case color.FamilyDeviceCMYK:
 		L, a, b := colconv.DeviceCMYKToLAB(components[0], components[1], components[2], components[3])
 		darkL, lightL := getDarkLightL(L)
 		c1, m1, y1, k1 := colconv.LABToDeviceCMYK(darkL, a, b)
 		c2, m2, y2, k2 := colconv.LABToDeviceCMYK(lightL, a, b)
-		dark = color.DeviceCMYK(pdf.Round(c1, 2), pdf.Round(m1, 2), pdf.Round(y1, 2), pdf.Round(k1, 2))
-		light = color.DeviceCMYK(pdf.Round(c2, 2), pdf.Round(m2, 2), pdf.Round(y2, 2), pdf.Round(k2, 2))
+		dark = color.DeviceCMYK{pdf.Round(c1, 2), pdf.Round(m1, 2), pdf.Round(y1, 2), pdf.Round(k1, 2)}
+		light = color.DeviceCMYK{pdf.Round(c2, 2), pdf.Round(m2, 2), pdf.Round(y2, 2), pdf.Round(k2, 2)}
 	default:
 		return col, col
 	}

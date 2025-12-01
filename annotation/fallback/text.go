@@ -275,5 +275,5 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 }
 
 var (
-	stickyYellow = color.DeviceRGB(0.98, 0.96, 0.75)
+	stickyYellow = color.DeviceRGB{0.98, 0.96, 0.75}
 )

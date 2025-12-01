@@ -89,7 +89,7 @@ func createDocument(filename string) error {
 	test := text.F{
 		Font:  F,
 		Size:  30,
-		Color: color.DeviceRGB(0, 0, 0.8),
+		Color: color.DeviceRGB{0, 0, 0.8},
 	}
 
 	// -----------------------------------------------------------------------
@@ -327,7 +327,7 @@ func choice(page *document.Page, y0 float64, idx int) {
 }
 
 func good(page *document.Page, y0 float64, idx int) {
-	page.SetFillColor(color.DeviceRGB(0.3, 1, 0.3))
+	page.SetFillColor(color.DeviceRGB{0.3, 1, 0.3})
 	circle(page, y0, idx)
 	page.Fill()
 }

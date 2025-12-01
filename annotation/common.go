@@ -385,9 +385,9 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 		case 1:
 			common.Color = color.DeviceGray(colors[0])
 		case 3:
-			common.Color = color.DeviceRGB(colors[0], colors[1], colors[2])
+			common.Color = color.DeviceRGB{colors[0], colors[1], colors[2]}
 		case 4:
-			common.Color = color.DeviceCMYK(colors[0], colors[1], colors[2], colors[3])
+			common.Color = color.DeviceCMYK{colors[0], colors[1], colors[2], colors[3]}
 		}
 	}
 

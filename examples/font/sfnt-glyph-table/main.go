@@ -238,7 +238,7 @@ func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 
 	// grid of boxes
 	page.PushGraphicsState()
-	page.SetStrokeColor(color.DeviceRGB(.3, .3, 1))
+	page.SetStrokeColor(color.DeviceRGB{.3, .3, 1})
 	page.SetLineWidth(.5)
 	page.MoveTo(left, yBase+v1)
 	page.LineTo(right, yBase+v1)
@@ -253,7 +253,7 @@ func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 	}
 	page.Stroke()
 	xPos := make([]float64, len(gid))
-	page.SetStrokeColor(color.DeviceRGB(1, 0, 0))
+	page.SetStrokeColor(color.DeviceRGB{1, 0, 0})
 	for i, gid := range gid {
 		w := glyphSize * geom.Widths[gid]
 		xPos[i] = left + (float64(i)+0.5)*dx - 0.5*w
@@ -267,7 +267,7 @@ func (f *fontTables) WriteGlyphRow(theFont font.Layouter, start int) error {
 
 	// boxes for glyph extent
 	page.PushGraphicsState()
-	page.SetFillColor(color.DeviceRGB(.4, 1, .4))
+	page.SetFillColor(color.DeviceRGB{.4, 1, .4})
 	for i, gid := range gid {
 		ext := geom.GlyphExtents[gid]
 		page.Rectangle(

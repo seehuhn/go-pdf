@@ -30,15 +30,15 @@ type Color interface {
 // component values and pattern (if c is from a pattern color space).
 func SCN(c Color, values []float64, pat Pattern) Color {
 	switch d := c.(type) {
-	case colorDeviceGray:
+	case DeviceGray:
 		if len(values) >= 1 {
-			return colorDeviceGray(values[0])
+			return DeviceGray(values[0])
 		}
 		return d
-	case colorDeviceRGB:
+	case DeviceRGB:
 		copy(d[:], values)
 		return d
-	case colorDeviceCMYK:
+	case DeviceCMYK:
 		copy(d[:], values)
 		return d
 	case colorCalGray:
@@ -93,11 +93,11 @@ func SCN(c Color, values []float64, pat Pattern) Color {
 func Operator(c Color) ([]float64, Pattern, string) {
 	v := values(c)
 	switch c := c.(type) {
-	case colorDeviceGray:
+	case DeviceGray:
 		return v, nil, "G"
-	case colorDeviceRGB:
+	case DeviceRGB:
 		return v, nil, "RG"
-	case colorDeviceCMYK:
+	case DeviceCMYK:
 		return v, nil, "K"
 	case colorCalGray:
 		return v, nil, "SC"
@@ -126,11 +126,11 @@ func Operator(c Color) ([]float64, Pattern, string) {
 
 func values(c Color) []float64 {
 	switch c := c.(type) {
-	case colorDeviceGray:
+	case DeviceGray:
 		return []float64{float64(c)}
-	case colorDeviceRGB:
+	case DeviceRGB:
 		return c[:]
-	case colorDeviceCMYK:
+	case DeviceCMYK:
 		return c[:]
 	case colorCalGray:
 		return []float64{c.Value}
@@ -163,22 +163,22 @@ var (
 	White = DeviceGray(1)
 
 	// Red represents the red color in the DeviceRGB color space.
-	Red = DeviceRGB(1, 0, 0)
+	Red = DeviceRGB{1, 0, 0}
 
 	// Green represents the green color in the DeviceRGB color space.
-	Green = DeviceRGB(0, 1, 0)
+	Green = DeviceRGB{0, 1, 0}
 
 	// Blue represents the blue color in the DeviceRGB color space.
-	Blue = DeviceRGB(0, 0, 1)
+	Blue = DeviceRGB{0, 0, 1}
 
 	// Cyan represents the cyan color in the DeviceCMYK color space.
-	Cyan = DeviceCMYK(1, 0, 0, 0)
+	Cyan = DeviceCMYK{1, 0, 0, 0}
 
 	// Magenta represents the magenta color in the DeviceCMYK color space.
-	Magenta = DeviceCMYK(0, 1, 0, 0)
+	Magenta = DeviceCMYK{0, 1, 0, 0}
 
 	// Yellow represents the yellow color in the DeviceCMYK color space.
-	Yellow = DeviceCMYK(0, 0, 1, 0)
+	Yellow = DeviceCMYK{0, 0, 1, 0}
 )
 
 // Some commonly used white points.

@@ -113,7 +113,7 @@ func createDocument(filename string) error {
 
 		var col color.Color
 		if i%2 == 0 {
-			col = color.DeviceRGB(0.98, 0.96, 0.75)
+			col = color.DeviceRGB{0.98, 0.96, 0.75}
 		}
 
 		template := &annotation.FreeText{

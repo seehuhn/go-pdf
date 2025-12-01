@@ -235,7 +235,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 
 		// illustrate the advance width by drawing an arrow
 		page.PushGraphicsState()
-		page.SetStrokeColor(color.DeviceRGB(0.1, 0.9, 0.1))
+		page.SetStrokeColor(color.DeviceRGB{0.1, 0.9, 0.1})
 		page.SetLineWidth(3)
 		page.MoveTo(0, -10)
 		page.LineTo(0, 10)
@@ -287,7 +287,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 
 			// label the points
 			page.PushGraphicsState()
-			page.SetFillColor(color.DeviceRGB(0, 0, 0.8))
+			page.SetFillColor(color.DeviceRGB{0, 0, 0.8})
 			page.TextBegin()
 			page.TextSetFont(ctx.labelFont, 8/q)
 			xPrev := 0.0

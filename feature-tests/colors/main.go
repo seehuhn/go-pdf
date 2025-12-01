@@ -285,7 +285,7 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 			return nil
 		},
 	}
-	col := color.PatternUncolored(pat, color.DeviceRGB(1, 0, 0))
+	col := color.PatternUncolored(pat, color.DeviceRGB{1, 0, 0})
 
 	page := doc.AddPage()
 
@@ -330,7 +330,7 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 			w.Circle(0, height, r)
 			w.Circle(width, height, r)
 			w.Fill()
-			w.SetFillColor(color.DeviceRGB(1, 0, 0))
+			w.SetFillColor(color.DeviceRGB{1, 0, 0})
 			w.Circle(width/2, height/2, r)
 			w.Fill()
 			return nil

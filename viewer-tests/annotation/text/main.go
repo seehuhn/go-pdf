@@ -123,7 +123,7 @@ func createDocument(filename string) error {
 	}
 
 	// test with pink color
-	pink := color.DeviceRGB(0.96, 0.87, 0.90)
+	pink := color.DeviceRGB{0.96, 0.87, 0.90}
 	text := &annotation.Text{
 		Common: annotation.Common{
 			Contents: "Pink background",

@@ -61,7 +61,7 @@ func createDocument(fname string) error {
 	w.writeIntroduction()
 	w.newPage()
 
-	annotCol := color.DeviceRGB(0.4, 0.4, 1.0)
+	annotCol := color.DeviceRGB{0.4, 0.4, 1.0}
 
 	w.printf("Text Annotation")
 

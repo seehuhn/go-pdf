@@ -47,19 +47,15 @@ func (s spaceDeviceGray) Channels() int {
 // Default returns the black in the DeviceGray color space.
 // This implements the [Space] interface.
 func (s spaceDeviceGray) Default() Color {
-	return colorDeviceGray(0)
+	return DeviceGray(0)
 }
 
-type colorDeviceGray float64
-
-// DeviceGray returns a color in the DeviceGray color space.
-// The parameter gray must be in the range from 0 (black) to 1 (white).
-func DeviceGray(gray float64) Color {
-	return colorDeviceGray(gray)
-}
+// DeviceGray is a color in the DeviceGray color space.
+// The value must be in the range from 0 (black) to 1 (white).
+type DeviceGray float64
 
 // ColorSpace implements the [Color] interface.
-func (c colorDeviceGray) ColorSpace() Space {
+func (c DeviceGray) ColorSpace() Space {
 	return spaceDeviceGray{}
 }
 
@@ -92,19 +88,15 @@ func (s spaceDeviceRGB) Channels() int {
 // Default returns the black in the DeviceRGB color space.
 // This implements the [Space] interface.
 func (s spaceDeviceRGB) Default() Color {
-	return colorDeviceRGB{0, 0, 0}
+	return DeviceRGB{0, 0, 0}
 }
 
-type colorDeviceRGB [3]float64
-
-// DeviceRGB returns a color in the DeviceRGB color space.
-// The parameters r, g, and b must be in the range from 0 to 1.
-func DeviceRGB(r, g, b float64) Color {
-	return colorDeviceRGB{r, g, b}
-}
+// DeviceRGB is a color in the DeviceRGB color space.
+// The values are r, g, and b, and must be in the range from 0 to 1.
+type DeviceRGB [3]float64
 
 // ColorSpace implements the [Color] interface.
-func (c colorDeviceRGB) ColorSpace() Space {
+func (c DeviceRGB) ColorSpace() Space {
 	return spaceDeviceRGB{}
 }
 
@@ -138,19 +130,15 @@ func (s spaceDeviceCMYK) Channels() int {
 // Default returns the black in the DeviceCMYK color space.
 // This implements the [Space] interface.
 func (s spaceDeviceCMYK) Default() Color {
-	return colorDeviceCMYK{0, 0, 0, 1}
+	return DeviceCMYK{0, 0, 0, 1}
 }
 
-type colorDeviceCMYK [4]float64
-
-// DeviceCMYK returns a color in the DeviceCMYK color space.
-// The parameters c, m, y, and k must be in the range from 0 to 1
-// and control the amount of cyan, magenta, yellow, and black in the color.
-func DeviceCMYK(c, m, y, k float64) Color {
-	return colorDeviceCMYK{c, m, y, k}
-}
+// DeviceCMYK is a color in the DeviceCMYK color space.
+// The value are c, m, y, and k, and must be in the range from 0 to 1.
+// They control the amount of cyan, magenta, yellow, and black in the color.
+type DeviceCMYK [4]float64
 
 // ColorSpace implements the [Color] interface.
-func (c colorDeviceCMYK) ColorSpace() Space {
+func (c DeviceCMYK) ColorSpace() Space {
 	return spaceDeviceCMYK{}
 }

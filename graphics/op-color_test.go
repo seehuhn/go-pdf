@@ -44,8 +44,8 @@ func TestSetColor(t *testing.T) {
 
 	colors := []col{
 		{color.DeviceGray(0.8), "0.8 G\n"},
-		{color.DeviceRGB(0.1, 0.2, 0.3), "0.1 0.2 0.3 RG\n"},
-		{color.DeviceCMYK(0.1, 0.2, 0.3, 0.4), "0.1 0.2 0.3 0.4 K\n"},
+		{color.DeviceRGB{0.1, 0.2, 0.3}, "0.1 0.2 0.3 RG\n"},
+		{color.DeviceCMYK{0.1, 0.2, 0.3, 0.4}, "0.1 0.2 0.3 0.4 K\n"},
 		{calGray.New(0.8), "/CG CS\n0.8 SC\n"},
 		{calRGB.New(0.4, 0.5, 0.6), "/CR CS\n0.4 0.5 0.6 SC\n"},
 	}

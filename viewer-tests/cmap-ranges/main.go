@@ -83,7 +83,7 @@ func createDocument(fname string) error {
 	test := text.F{
 		Font:  F,
 		Size:  24,
-		Color: color.DeviceRGB(0, 0, 0.7),
+		Color: color.DeviceRGB{0, 0, 0.7},
 	}
 
 	text.Show(page.Writer,

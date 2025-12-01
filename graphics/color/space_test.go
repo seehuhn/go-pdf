@@ -73,7 +73,7 @@ var testColorSpaces = []Space{
 	spacePatternUncolored{base: spaceDeviceGray{}},
 	spacePatternUncolored{base: must(CalGray(WhitePointD65, nil, 1.2))},
 
-	must(Indexed([]Color{DeviceRGB(0, 0, 0), DeviceRGB(1, 1, 1)})),
+	must(Indexed([]Color{DeviceRGB{0, 0, 0}, DeviceRGB{1, 1, 1}})),
 
 	must(Separation("foo", SpaceDeviceRGB, &function.Type2{
 		XMin: 0,

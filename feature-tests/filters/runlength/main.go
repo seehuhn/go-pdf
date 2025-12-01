@@ -42,15 +42,15 @@ func (img *runlengthImage) Subtype() pdf.Name {
 
 func (img *runlengthImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	colors := []color.Color{
-		color.DeviceRGB(1, 0, 0),     // red
-		color.DeviceRGB(1, 0.5, 0),   // orange
-		color.DeviceRGB(1, 1, 0),     // yellow
-		color.DeviceRGB(0, 1, 0),     // green
-		color.DeviceRGB(0, 1, 1),     // cyan
-		color.DeviceRGB(0, 0, 1),     // blue
-		color.DeviceRGB(0.3, 0, 0.5), // indigo
-		color.DeviceRGB(0.5, 0, 1),   // violet
-		color.DeviceRGB(0, 0, 0),     // black
+		color.DeviceRGB{1, 0, 0},     // red
+		color.DeviceRGB{1, 0.5, 0},   // orange
+		color.DeviceRGB{1, 1, 0},     // yellow
+		color.DeviceRGB{0, 1, 0},     // green
+		color.DeviceRGB{0, 1, 1},     // cyan
+		color.DeviceRGB{0, 0, 1},     // blue
+		color.DeviceRGB{0.3, 0, 0.5}, // indigo
+		color.DeviceRGB{0.5, 0, 1},   // violet
+		color.DeviceRGB{0, 0, 0},     // black
 	}
 
 	colorSpace, err := color.Indexed(colors)
