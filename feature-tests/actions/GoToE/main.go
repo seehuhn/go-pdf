@@ -413,17 +413,20 @@ func drawTextAt(page *document.Page, font font.Layouter, x, y, size float64, tex
 
 func addPageLink(page *document.Page, fromDoc, toDoc string, toPage int, rect pdf.Rectangle, pageRefs []pdf.Reference, nav *navInfo) error {
 	link := &annotation.Link{Common: annotation.Common{Rect: rect}}
-	linkDict, err := link.Encode(page.RM)
-	if err != nil {
-		return err
-	}
 
 	isInternalLink := fromDoc == toDoc && pageRefs != nil
 	if isInternalLink {
-		err = addInternalDestination(linkDict.(pdf.Dict), page.RM, pageRefs[toPage])
+		link.Destination = &destination.Fit{Page: destination.Target(pageRefs[toPage])}
 	} else {
-		err = addExternalAction(linkDict.(pdf.Dict), page.RM, fromDoc, toDoc, toPage, nav)
+		target := nav.buildTarget(fromDoc, toDoc)
+		link.Action = &action.GoToE{
+			T:         target,
+			D:         &destination.Fit{Page: destination.Target(pdf.Integer(toPage))},
+			NewWindow: action.NewWindowReplace,
+		}
 	}
+
+	linkDict, err := link.Encode(page.RM)
 	if err != nil {
 		return err
 	}
@@ -436,30 +439,5 @@ func addPageLink(page *document.Page, fromDoc, toDoc string, toPage int, rect pd
 	existingAnnots, _ := page.PageDict["Annots"].(pdf.Array)
 	page.PageDict["Annots"] = append(existingAnnots, linkRef)
 
-	return nil
-}
-
-func addInternalDestination(linkDict pdf.Dict, rm *pdf.ResourceManager, pageRef pdf.Reference) error {
-	dest := &destination.Fit{Page: destination.Target(pageRef)}
-	destData, err := dest.Encode(rm)
-	if err != nil {
-		return err
-	}
-	linkDict["Dest"] = destData
-	return nil
-}
-
-func addExternalAction(linkDict pdf.Dict, rm *pdf.ResourceManager, fromDoc, toDoc string, toPage int, nav *navInfo) error {
-	target := nav.buildTarget(fromDoc, toDoc)
-	gotoE := &action.GoToE{
-		T:         target,
-		D:         &destination.Fit{Page: destination.Target(pdf.Integer(toPage))},
-		NewWindow: action.NewWindowReplace,
-	}
-	actionData, err := gotoE.Encode(rm)
-	if err != nil {
-		return err
-	}
-	linkDict["A"] = actionData
 	return nil
 }

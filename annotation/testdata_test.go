@@ -23,6 +23,8 @@ import (
 
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/action"
+	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -127,6 +129,26 @@ var testCases = map[pdf.Name][]testCase{
 					},
 				},
 				Highlight: LinkHighlightPush,
+			},
+		},
+		{
+			name: "link with URI action",
+			annotation: &Link{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 10, LLy: 10, URx: 100, URy: 30},
+				},
+				Action:    &action.URI{URI: "https://example.com"},
+				Highlight: LinkHighlightInvert,
+			},
+		},
+		{
+			name: "link with named destination",
+			annotation: &Link{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 10, LLy: 10, URx: 100, URy: 30},
+				},
+				Destination: &destination.Named{Name: pdf.String("chapter1")},
+				Highlight:   LinkHighlightInvert,
 			},
 		},
 	},

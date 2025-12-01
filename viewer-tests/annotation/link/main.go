@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/geom/vec"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/action"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/fallback"
 	"seehuhn.de/go/pdf/document"
@@ -112,10 +113,7 @@ func createDocument(filename string) error {
 			Color:    w.LinkCol,
 			Border:   &annotation.Border{Width: 1, SingleUse: true},
 		},
-		Action: pdf.Dict{
-			"S":   pdf.Name("URI"),
-			"URI": pdf.String("https://www.example.com/"),
-		},
+		Action:    &action.URI{URI: "https://www.example.com/"},
 		Highlight: annotation.LinkHighlightInvert,
 	}
 	err = w.addAnnotationPair(a)
@@ -130,10 +128,7 @@ func createDocument(filename string) error {
 			Color:    w.LinkCol,
 			Border:   &annotation.Border{Width: 2, SingleUse: true},
 		},
-		Action: pdf.Dict{
-			"S":   pdf.Name("URI"),
-			"URI": pdf.String("https://www.example.com/"),
-		},
+		Action: &action.URI{URI: "https://www.example.com/"},
 	}
 	err = w.addAnnotationPair(a)
 	if err != nil {
@@ -147,10 +142,7 @@ func createDocument(filename string) error {
 			Border:   &annotation.Border{Width: 2, SingleUse: true},
 			Color:    w.LinkCol,
 		},
-		Action: pdf.Dict{
-			"S":   pdf.Name("URI"),
-			"URI": pdf.String("https://www.example.com/"),
-		},
+		Action: &action.URI{URI: "https://www.example.com/"},
 	}
 	err = w.addAnnotationPair(a)
 	if err != nil {
@@ -162,10 +154,7 @@ func createDocument(filename string) error {
 			Contents: "default border color",
 			Flags:    annotation.FlagPrint,
 		},
-		Action: pdf.Dict{
-			"S":   pdf.Name("URI"),
-			"URI": pdf.String("https://www.example.com/"),
-		},
+		Action:      &action.URI{URI: "https://www.example.com/"},
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
 	}
 	err = w.addAnnotationPair(a)
@@ -179,10 +168,7 @@ func createDocument(filename string) error {
 			Flags:    annotation.FlagPrint,
 			Color:    annotation.Transparent,
 		},
-		Action: pdf.Dict{
-			"S":   pdf.Name("URI"),
-			"URI": pdf.String("https://www.example.com/"),
-		},
+		Action:      &action.URI{URI: "https://www.example.com/"},
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
 	}
 	err = w.addAnnotationPair(a)
@@ -208,10 +194,7 @@ func createDocument(filename string) error {
 				Flags:    annotation.FlagPrint,
 				Color:    w.LinkCol,
 			},
-			Action: pdf.Dict{
-				"S":   pdf.Name("URI"),
-				"URI": pdf.String("https://www.example.com/"),
-			},
+			Action:      &action.URI{URI: "https://www.example.com/"},
 			Highlight:   annotation.LinkHighlightInvert,
 			BorderStyle: bs,
 		}
@@ -515,17 +498,12 @@ func (w *writer) MakeAnnotation(url string, title string, bs *annotation.BorderS
 		qq[i].Y = pdf.Round(qq[i].Y, 2)
 	}
 
-	a := pdf.Dict{
-		"S":   pdf.Name("URI"),
-		"URI": pdf.String(url),
-	}
-
 	link := &annotation.Link{
 		Common: annotation.Common{
 			Contents: title,
 			Flags:    annotation.FlagPrint,
 		},
-		Action:      a,
+		Action:      &action.URI{URI: url},
 		Highlight:   annotation.LinkHighlightInvert,
 		BorderStyle: bs,
 	}

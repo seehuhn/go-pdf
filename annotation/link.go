@@ -21,6 +21,8 @@ import (
 
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/action"
+	"seehuhn.de/go/pdf/destination"
 )
 
 // PDF 2.0 sections: 12.5.2 12.5.6.5
@@ -41,13 +43,13 @@ type Link struct {
 	// annotation is activated. Mutually exclusive with Destination.
 	//
 	// This corresponds to the /A entry in the PDF annotation dictionary.
-	Action pdf.Object
+	Action action.Action
 
 	// Destination (optional) is a destination that is displayed when the
 	// annotation is activated. Mutually exclusive with Action.
 	//
 	// This corresponds to the /Dest entry in the PDF annotation dictionary.
-	Destination pdf.Object
+	Destination destination.Destination
 
 	// Highlight is the annotation's highlighting mode.
 	//
@@ -102,14 +104,19 @@ func decodeLink(x *pdf.Extractor, dict pdf.Dict) (*Link, error) {
 	}
 
 	// Extract link-specific fields
-	if a := dict["A"]; a != nil {
-		link.Action = a
+	if dict["A"] != nil {
+		act, err := pdf.Optional(action.Decode(x, dict["A"]))
+		if err != nil {
+			return nil, err
+		}
+		link.Action = act
 	}
-	if dest := dict["Dest"]; dest != nil {
+	if dict["Dest"] != nil && link.Action == nil {
+		dest, err := pdf.Optional(destination.Decode(x, dict["Dest"]))
+		if err != nil {
+			return nil, err
+		}
 		link.Destination = dest
-	}
-	if link.Action != nil {
-		link.Destination = nil // mutually exclusive fields
 	}
 
 	if h, _ := pdf.GetName(r, dict["H"]); h != "" {
@@ -172,9 +179,17 @@ func (l *Link) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out, "link annotation A entry", pdf.V1_1); err != nil {
 			return nil, err
 		}
-		dict["A"] = l.Action
+		encoded, err := l.Action.Encode(rm)
+		if err != nil {
+			return nil, err
+		}
+		dict["A"] = encoded
 	} else if l.Destination != nil {
-		dict["Dest"] = l.Destination
+		encoded, err := l.Destination.Encode(rm)
+		if err != nil {
+			return nil, err
+		}
+		dict["Dest"] = encoded
 	}
 
 	if l.Highlight != "" {

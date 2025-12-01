@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/action"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
@@ -145,11 +146,7 @@ func createDocument(fname string) error {
 			Contents: "Link to the first page",
 			Color:    annotCol,
 		},
-		Action: pdf.Dict{
-			"Type": pdf.Name("Action"),
-			"S":    pdf.Name("Named"),
-			"N":    pdf.Name("FirstPage"),
-		},
+		Action: &action.Named{N: "FirstPage"},
 		BorderStyle: &annotation.BorderStyle{
 			Width:     0.5,
 			Style:     "S",
