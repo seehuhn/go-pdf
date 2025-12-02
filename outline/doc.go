@@ -1,0 +1,24 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+// Package outline reads and writes PDF document outlines.
+//
+// A document outline is a tree-structured hierarchy of outline items
+// (sometimes called bookmarks) that PDF viewers typically display as a
+// navigable table of contents. Each item can have a title, destination or
+// action, and optional styling (color, bold, italic).  A typical use would be
+// to represent the chapter and section structure of a document.
+package outline

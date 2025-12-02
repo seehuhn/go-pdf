@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/extended"
@@ -63,7 +64,7 @@ func createDocument(fname string) error {
 		headerFont:    headerFont,
 		bodyFont:      bodyFont,
 		currentPageNo: 0,
-		outline:       &outline.Tree{},
+		outline:       &outline.Outline{},
 	}
 
 	// Track pages for table of contents
@@ -118,7 +119,7 @@ func createDocument(fname string) error {
 	}
 
 	// Write outline
-	writer.outline.Write(doc.Out)
+	writer.outline.Write(doc.RM)
 
 	return doc.Close()
 }
@@ -135,7 +136,7 @@ type DocumentWriter struct {
 	headerFont    font.Layouter
 	bodyFont      font.Layouter
 	currentPageNo int // 0-based
-	outline       *outline.Tree
+	outline       *outline.Outline
 }
 
 func (w *DocumentWriter) createTitlePage(fontCount int) error {
@@ -226,7 +227,7 @@ func getNonBlankGlyphs(fontInstance font.Layouter) []glyph.ID {
 
 func (w *DocumentWriter) createFontPages(entry fontEntry) error {
 	// Add to outline
-	oFont := w.outline.AddChild(entry.name)
+	oFont := w.outline.AddItem(entry.name)
 
 	// Get all non-blank glyphs from this font
 	nonBlankGlyphs := getNonBlankGlyphs(entry.fontInstance)
@@ -241,16 +242,11 @@ func (w *DocumentWriter) createFontPages(entry fontEntry) error {
 	totalPages := (len(nonBlankGlyphs) + glyphsPerPageCapacity - 1) / glyphsPerPageCapacity
 
 	// Set outline destination to first page of this font (current page number)
-	dest := pdf.Array{
-		pdf.Integer(w.currentPageNo),
-		pdf.Name("XYZ"),
-		pdf.Integer(0),
-		pdf.Number(document.A4.URy),
-		pdf.Integer(0),
-	}
-	oFont.Action = pdf.Dict{
-		"S": pdf.Name("GoTo"),
-		"D": dest,
+	oFont.Destination = &destination.XYZ{
+		Page: pdf.Integer(w.currentPageNo),
+		Left: 0,
+		Top:  document.A4.URy,
+		Zoom: 0,
 	}
 
 	// Create pages for each chunk

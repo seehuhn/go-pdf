@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/outline"
 )
@@ -69,40 +70,28 @@ func TestPages(t *testing.T) {
 	}
 
 	// create outline with test sections
-	tree := &outline.Tree{
-		Children: []*outline.Tree{
+	tree := &outline.Outline{
+		Items: []*outline.Item{
 			{
-				Title: "Introduction",
-				Action: pdf.Dict{
-					"S": pdf.Name("GoTo"),
-					"D": pdf.Array{page0Ref, pdf.Name("XYZ"), pdf.Integer(0), pdf.Number(700), pdf.Integer(0)},
-				},
+				Title:       "Introduction",
+				Destination: &destination.XYZ{Page: page0Ref, Left: 0, Top: 700, Zoom: 0},
 			},
 			{
-				Title: "Chapter 1: Getting Started",
-				Action: pdf.Dict{
-					"S": pdf.Name("GoTo"),
-					"D": pdf.Array{page1Ref, pdf.Name("XYZ"), pdf.Integer(0), pdf.Number(750), pdf.Integer(0)},
-				},
+				Title:       "Chapter 1: Getting Started",
+				Destination: &destination.XYZ{Page: page1Ref, Left: 0, Top: 750, Zoom: 0},
 			},
 			{
-				Title: "Chapter 2: Advanced Topics",
-				Action: pdf.Dict{
-					"S": pdf.Name("GoTo"),
-					"D": pdf.Array{page2Ref, pdf.Name("XYZ"), pdf.Integer(0), pdf.Number(600), pdf.Integer(0)},
-				},
+				Title:       "Chapter 2: Advanced Topics",
+				Destination: &destination.XYZ{Page: page2Ref, Left: 0, Top: 600, Zoom: 0},
 			},
 			{
-				Title: "Conclusion",
-				Action: pdf.Dict{
-					"S": pdf.Name("GoTo"),
-					"D": pdf.Array{page3Ref, pdf.Name("XYZ"), pdf.Integer(0), pdf.Number(500), pdf.Integer(0)},
-				},
+				Title:       "Conclusion",
+				Destination: &destination.XYZ{Page: page3Ref, Left: 0, Top: 500, Zoom: 0},
 			},
 		},
 	}
 
-	err = tree.Write(doc.Out)
+	err = tree.Write(doc.RM)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,33 +205,24 @@ func TestPagesSpanningMultiplePages(t *testing.T) {
 	}
 
 	// create outline where "Long Chapter" spans from page 1 to page 4
-	tree := &outline.Tree{
-		Children: []*outline.Tree{
+	tree := &outline.Outline{
+		Items: []*outline.Item{
 			{
-				Title: "Preface",
-				Action: pdf.Dict{
-					"S": pdf.Name("GoTo"),
-					"D": pdf.Array{pageRefs[0], pdf.Name("XYZ"), pdf.Integer(0), pdf.Number(700), pdf.Integer(0)},
-				},
+				Title:       "Preface",
+				Destination: &destination.XYZ{Page: pageRefs[0], Left: 0, Top: 700, Zoom: 0},
 			},
 			{
-				Title: "Long Chapter",
-				Action: pdf.Dict{
-					"S": pdf.Name("GoTo"),
-					"D": pdf.Array{pageRefs[1], pdf.Name("XYZ"), pdf.Integer(0), pdf.Number(600), pdf.Integer(0)},
-				},
+				Title:       "Long Chapter",
+				Destination: &destination.XYZ{Page: pageRefs[1], Left: 0, Top: 600, Zoom: 0},
 			},
 			{
-				Title: "Epilogue",
-				Action: pdf.Dict{
-					"S": pdf.Name("GoTo"),
-					"D": pdf.Array{pageRefs[5], pdf.Name("XYZ"), pdf.Integer(0), pdf.Number(400), pdf.Integer(0)},
-				},
+				Title:       "Epilogue",
+				Destination: &destination.XYZ{Page: pageRefs[5], Left: 0, Top: 400, Zoom: 0},
 			},
 		},
 	}
 
-	err = tree.Write(doc.Out)
+	err = tree.Write(doc.RM)
 	if err != nil {
 		t.Fatal(err)
 	}

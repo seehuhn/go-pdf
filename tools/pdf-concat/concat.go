@@ -20,6 +20,8 @@ import (
 	"time"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/action"
+	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/outline"
 	"seehuhn.de/go/pdf/pagetree"
 )
@@ -39,7 +41,7 @@ type Concat struct {
 type Child struct {
 	Title     string
 	FirstPage pdf.Reference
-	Outline   []*outline.Tree
+	Outline   []*outline.Item
 }
 
 // NewConcat creates a new Concat object.
@@ -76,16 +78,16 @@ func (c *Concat) Close() error {
 	}
 	meta.Catalog.Pages = pagesRef
 
-	outline := &outline.Tree{}
+	rm := pdf.NewResourceManager(c.w)
+	defer rm.Close()
+
+	outlineTree := &outline.Outline{}
 	for _, child := range c.children {
-		entry := outline.AddChild(child.Title)
-		entry.Action = pdf.Dict{
-			"S": pdf.Name("GoTo"),
-			"D": pdf.Array{child.FirstPage, pdf.Name("Fit")},
-		}
+		entry := outlineTree.AddItem(child.Title)
+		entry.Destination = &destination.Fit{Page: child.FirstPage}
 		entry.Children = child.Outline
 	}
-	err = outline.Write(c.w)
+	err = outlineTree.Write(rm)
 	if err != nil {
 		return err
 	}
@@ -109,8 +111,6 @@ func (c *Concat) Append(fname string) error {
 	var title string
 	if meta.Info != nil && meta.Info.Title != "" {
 		title = string(meta.Info.Title)
-	} else if outlineTree != nil && outlineTree.Title != "" {
-		title = outlineTree.Title
 	} else {
 		title = fname
 	}
@@ -150,11 +150,11 @@ func (c *Concat) Append(fname string) error {
 	}
 
 	if outlineTree != nil {
-		outline, err := c.CopyOutline(copy, outlineTree.Children)
+		items, err := c.CopyOutlineItems(copy, outlineTree.Items)
 		if err != nil {
 			return err
 		}
-		child.Outline = outline
+		child.Outline = items
 	}
 
 	c.children = append(c.children, child)
@@ -162,26 +162,129 @@ func (c *Concat) Append(fname string) error {
 	return nil
 }
 
-// CopyOutline copies an outline tree from the source file to the target file.
-func (c *Concat) CopyOutline(copy *pdf.Copier, in []*outline.Tree) ([]*outline.Tree, error) {
-	out := make([]*outline.Tree, len(in))
+// CopyOutlineItems copies outline items from the source file to the target file.
+func (c *Concat) CopyOutlineItems(cp *pdf.Copier, in []*outline.Item) ([]*outline.Item, error) {
+	out := make([]*outline.Item, len(in))
 	for i, child := range in {
-		cc, err := c.CopyOutline(copy, child.Children)
+		cc, err := c.CopyOutlineItems(cp, child.Children)
 		if err != nil {
 			return nil, err
 		}
 
-		action, err := copy.CopyDict(child.Action)
-		if err != nil {
-			return nil, err
-		}
-
-		out[i] = &outline.Tree{
+		entry := &outline.Item{
 			Title:    child.Title,
 			Children: cc,
 			Open:     child.Open,
-			Action:   action,
+			Color:    child.Color,
+			Bold:     child.Bold,
+			Italic:   child.Italic,
 		}
+
+		// Copy destination with page reference translation
+		if child.Destination != nil {
+			entry.Destination, err = copyDestination(cp, child.Destination)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// Copy action with page reference translation (for GoTo actions)
+		if child.Action != nil {
+			entry.Action, err = copyAction(cp, child.Action)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		out[i] = entry
 	}
 	return out, nil
+}
+
+// copyDestination copies a destination, translating page references.
+func copyDestination(cp *pdf.Copier, dest destination.Destination) (destination.Destination, error) {
+	switch d := dest.(type) {
+	case *destination.XYZ:
+		newPage, err := copyPageTarget(cp, d.Page)
+		if err != nil {
+			return nil, err
+		}
+		return &destination.XYZ{Page: newPage, Left: d.Left, Top: d.Top, Zoom: d.Zoom}, nil
+	case *destination.Fit:
+		newPage, err := copyPageTarget(cp, d.Page)
+		if err != nil {
+			return nil, err
+		}
+		return &destination.Fit{Page: newPage}, nil
+	case *destination.FitH:
+		newPage, err := copyPageTarget(cp, d.Page)
+		if err != nil {
+			return nil, err
+		}
+		return &destination.FitH{Page: newPage, Top: d.Top}, nil
+	case *destination.FitV:
+		newPage, err := copyPageTarget(cp, d.Page)
+		if err != nil {
+			return nil, err
+		}
+		return &destination.FitV{Page: newPage, Left: d.Left}, nil
+	case *destination.FitR:
+		newPage, err := copyPageTarget(cp, d.Page)
+		if err != nil {
+			return nil, err
+		}
+		return &destination.FitR{Page: newPage, Left: d.Left, Bottom: d.Bottom, Right: d.Right, Top: d.Top}, nil
+	case *destination.FitB:
+		newPage, err := copyPageTarget(cp, d.Page)
+		if err != nil {
+			return nil, err
+		}
+		return &destination.FitB{Page: newPage}, nil
+	case *destination.FitBH:
+		newPage, err := copyPageTarget(cp, d.Page)
+		if err != nil {
+			return nil, err
+		}
+		return &destination.FitBH{Page: newPage, Top: d.Top}, nil
+	case *destination.FitBV:
+		newPage, err := copyPageTarget(cp, d.Page)
+		if err != nil {
+			return nil, err
+		}
+		return &destination.FitBV{Page: newPage, Left: d.Left}, nil
+	case *destination.Named:
+		// Named destinations don't need translation
+		return &destination.Named{Name: d.Name}, nil
+	default:
+		return nil, nil
+	}
+}
+
+// copyPageTarget copies a page target (reference or integer).
+func copyPageTarget(cp *pdf.Copier, page destination.Target) (destination.Target, error) {
+	if ref, ok := page.(pdf.Reference); ok {
+		newRef, err := cp.CopyReference(ref)
+		if err != nil {
+			return nil, err
+		}
+		return newRef, nil
+	}
+	// Page numbers don't need translation
+	return page, nil
+}
+
+// copyAction copies an action, translating page references in GoTo actions.
+func copyAction(cp *pdf.Copier, act action.Action) (action.Action, error) {
+	switch a := act.(type) {
+	case *action.GoTo:
+		newDest, err := copyDestination(cp, a.Dest)
+		if err != nil {
+			return nil, err
+		}
+		return &action.GoTo{Dest: newDest}, nil
+	default:
+		// For other action types, just return the same action
+		// (they may contain references that need copying, but that's complex)
+		return act, nil
+	}
 }

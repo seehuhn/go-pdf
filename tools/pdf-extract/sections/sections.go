@@ -23,6 +23,8 @@ import (
 	"regexp"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/action"
+	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/outline"
 	"seehuhn.de/go/pdf/pagetree"
 )
@@ -37,7 +39,7 @@ type PageRange struct {
 
 // sectionMatch holds information about a matched outline entry
 type sectionMatch struct {
-	tree     *outline.Tree
+	item     *outline.Item
 	pageNo   int
 	yCoord   float64
 	hasCoord bool
@@ -69,9 +71,11 @@ func Pages(r pdf.Getter, pattern string) (*PageRange, error) {
 
 	// find all matching sections
 	var matches []sectionMatch
-	err = findMatches(r, pageNumbers, tree, regex, &matches)
-	if err != nil {
-		return nil, err
+	for _, item := range tree.Items {
+		err = findMatches(r, pageNumbers, item, regex, &matches)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if len(matches) == 0 {
@@ -107,21 +111,21 @@ func Pages(r pdf.Getter, pattern string) (*PageRange, error) {
 	return result, nil
 }
 
-// findMatches recursively searches the outline tree for entries matching the regex
-func findMatches(r pdf.Getter, pageNumbers map[pdf.Reference]int, node *outline.Tree, regex *regexp.Regexp, matches *[]sectionMatch) error {
-	if node == nil {
+// findMatches recursively searches the outline items for entries matching the regex
+func findMatches(r pdf.Getter, pageNumbers map[pdf.Reference]int, item *outline.Item, regex *regexp.Regexp, matches *[]sectionMatch) error {
+	if item == nil {
 		return nil
 	}
 
-	// check if current node matches
-	if regex.MatchString(node.Title) {
-		pageNo, yCoord, hasCoord, err := extractDestination(r, pageNumbers, node)
+	// check if current item matches
+	if regex.MatchString(item.Title) {
+		pageNo, yCoord, hasCoord, err := extractDestination(pageNumbers, item)
 		if err != nil {
 			return err
 		}
 
 		*matches = append(*matches, sectionMatch{
-			tree:     node,
+			item:     item,
 			pageNo:   pageNo,
 			yCoord:   yCoord,
 			hasCoord: hasCoord,
@@ -129,7 +133,7 @@ func findMatches(r pdf.Getter, pageNumbers map[pdf.Reference]int, node *outline.
 	}
 
 	// recursively check children
-	for _, child := range node.Children {
+	for _, child := range item.Children {
 		err := findMatches(r, pageNumbers, child, regex, matches)
 		if err != nil {
 			return err
@@ -140,70 +144,127 @@ func findMatches(r pdf.Getter, pageNumbers map[pdf.Reference]int, node *outline.
 }
 
 // extractDestination extracts page number and Y coordinate from an outline entry's destination
-func extractDestination(r pdf.Getter, pageNumbers map[pdf.Reference]int, node *outline.Tree) (pageNo int, yCoord float64, hasCoord bool, err error) {
-	if node.Action == nil {
-		return -1, 0, false, errors.New("outline entry has no action")
+func extractDestination(pageNumbers map[pdf.Reference]int, item *outline.Item) (pageNo int, yCoord float64, hasCoord bool, err error) {
+	// get destination from either Destination field or GoTo action
+	var dest destination.Destination
+	if item.Destination != nil {
+		dest = item.Destination
+	} else if goTo, ok := item.Action.(*action.GoTo); ok {
+		dest = goTo.Dest
+	} else {
+		return -1, 0, false, errors.New("outline entry has no destination")
 	}
 
-	actionType, err := pdf.GetName(r, node.Action["S"])
-	if err != nil {
-		return -1, 0, false, fmt.Errorf("failed to get action type: %w", err)
+	if dest == nil {
+		return -1, 0, false, errors.New("outline entry has nil destination")
 	}
 
-	if actionType != "GoTo" {
-		return -1, 0, false, fmt.Errorf("unsupported action type: %s", actionType)
+	// extract page reference from the destination
+	var pageRef pdf.Reference
+	switch d := dest.(type) {
+	case *destination.XYZ:
+		ref, ok := d.Page.(pdf.Reference)
+		if !ok {
+			return -1, 0, false, errors.New("destination page is not a reference")
+		}
+		pageRef = ref
+		pageNo, ok = pageNumbers[pageRef]
+		if !ok {
+			return -1, 0, false, errors.New("page reference not found in document")
+		}
+		if !math.IsNaN(d.Top) {
+			return pageNo, d.Top, true, nil
+		}
+		return pageNo, 0, false, nil
+
+	case *destination.Fit:
+		ref, ok := d.Page.(pdf.Reference)
+		if !ok {
+			return -1, 0, false, errors.New("destination page is not a reference")
+		}
+		pageRef = ref
+
+	case *destination.FitH:
+		ref, ok := d.Page.(pdf.Reference)
+		if !ok {
+			return -1, 0, false, errors.New("destination page is not a reference")
+		}
+		pageRef = ref
+		pageNo, ok = pageNumbers[pageRef]
+		if !ok {
+			return -1, 0, false, errors.New("page reference not found in document")
+		}
+		if !math.IsNaN(d.Top) {
+			return pageNo, d.Top, true, nil
+		}
+		return pageNo, 0, false, nil
+
+	case *destination.FitV:
+		ref, ok := d.Page.(pdf.Reference)
+		if !ok {
+			return -1, 0, false, errors.New("destination page is not a reference")
+		}
+		pageRef = ref
+
+	case *destination.FitR:
+		ref, ok := d.Page.(pdf.Reference)
+		if !ok {
+			return -1, 0, false, errors.New("destination page is not a reference")
+		}
+		pageRef = ref
+		pageNo, ok = pageNumbers[pageRef]
+		if !ok {
+			return -1, 0, false, errors.New("page reference not found in document")
+		}
+		return pageNo, d.Top, true, nil
+
+	case *destination.FitB:
+		ref, ok := d.Page.(pdf.Reference)
+		if !ok {
+			return -1, 0, false, errors.New("destination page is not a reference")
+		}
+		pageRef = ref
+
+	case *destination.FitBH:
+		ref, ok := d.Page.(pdf.Reference)
+		if !ok {
+			return -1, 0, false, errors.New("destination page is not a reference")
+		}
+		pageRef = ref
+		pageNo, ok = pageNumbers[pageRef]
+		if !ok {
+			return -1, 0, false, errors.New("page reference not found in document")
+		}
+		if !math.IsNaN(d.Top) {
+			return pageNo, d.Top, true, nil
+		}
+		return pageNo, 0, false, nil
+
+	case *destination.FitBV:
+		ref, ok := d.Page.(pdf.Reference)
+		if !ok {
+			return -1, 0, false, errors.New("destination page is not a reference")
+		}
+		pageRef = ref
+
+	default:
+		return -1, 0, false, fmt.Errorf("unsupported destination type: %T", dest)
 	}
 
-	dest, err := pdf.Resolve(r, node.Action["D"])
-	if err != nil {
-		return -1, 0, false, fmt.Errorf("failed to resolve destination: %w", err)
-	}
-
-	destArray, ok := dest.(pdf.Array)
-	if !ok || len(destArray) == 0 {
-		return -1, 0, false, errors.New("invalid destination format")
-	}
-
-	// extract page reference
-	pageRef, ok := destArray[0].(pdf.Reference)
-	if !ok {
-		return -1, 0, false, errors.New("destination does not contain page reference")
-	}
-
-	pageNo, ok = pageNumbers[pageRef]
+	pageNo, ok := pageNumbers[pageRef]
 	if !ok {
 		return -1, 0, false, errors.New("page reference not found in document")
 	}
-
-	// extract Y coordinate if this is an XYZ destination
-	if len(destArray) >= 4 {
-		fitType, ok := destArray[1].(pdf.Name)
-		if ok && fitType == "XYZ" {
-			if yVal := destArray[3]; yVal != nil {
-				switch y := yVal.(type) {
-				case pdf.Number:
-					return pageNo, float64(y), true, nil
-				case pdf.Integer:
-					return pageNo, float64(y), true, nil
-				}
-			}
-		}
-	}
-
 	return pageNo, 0, false, nil
 }
 
 // findSectionEnd determines where the matched section ends by finding the next section
-func findSectionEnd(r pdf.Getter, pageNumbers map[pdf.Reference]int, root *outline.Tree, match sectionMatch) (endPage int, endY float64, err error) {
-	// find the parent and level of the matched section
-	parent, level := findParentAndLevel(root, match.tree, nil, 0)
-	if parent == nil {
-		// this is a top-level section, look for next top-level section
-		parent = root
-	}
+func findSectionEnd(r pdf.Getter, pageNumbers map[pdf.Reference]int, root *outline.Outline, match sectionMatch) (endPage int, endY float64, err error) {
+	// find the level of the matched section
+	level := findLevel(root.Items, match.item, 0)
 
 	// find the next sibling at the same or higher level
-	nextSection := findNextSectionAtLevel(root, match.tree, level)
+	nextSection := findNextSectionAtLevel(root.Items, match.item, level)
 	if nextSection == nil {
 		// this is the last section, it goes to the end of the document
 		totalPages := len(pageNumbers)
@@ -211,7 +272,7 @@ func findSectionEnd(r pdf.Getter, pageNumbers map[pdf.Reference]int, root *outli
 	}
 
 	// get the page and coordinates of the next section
-	nextPageNo, nextY, hasNextCoord, err := extractDestination(r, pageNumbers, nextSection)
+	nextPageNo, nextY, hasNextCoord, err := extractDestination(pageNumbers, nextSection)
 	if err != nil {
 		return -1, 0, err
 	}
@@ -244,43 +305,40 @@ func findSectionEnd(r pdf.Getter, pageNumbers map[pdf.Reference]int, root *outli
 	return endPage, endY, nil
 }
 
-// findParentAndLevel finds the parent node and level of the target node
-func findParentAndLevel(node, target, parent *outline.Tree, level int) (*outline.Tree, int) {
-	if node == target {
-		return parent, level
-	}
-
-	for _, child := range node.Children {
-		if p, l := findParentAndLevel(child, target, node, level+1); p != nil {
-			return p, l
+// findLevel finds the level of the target item in the outline tree
+func findLevel(items []*outline.Item, target *outline.Item, level int) int {
+	for _, item := range items {
+		if item == target {
+			return level
+		}
+		if l := findLevel(item.Children, target, level+1); l >= 0 {
+			return l
 		}
 	}
-
-	return nil, -1
+	return -1
 }
 
 // findNextSectionAtLevel finds the next section at the same or higher level than the target
-func findNextSectionAtLevel(root, target *outline.Tree, targetLevel int) *outline.Tree {
+func findNextSectionAtLevel(items []*outline.Item, target *outline.Item, targetLevel int) *outline.Item {
 	found := false
-	return findNextAtLevel(root, target, targetLevel, 0, &found)
+	return findNextAtLevel(items, target, targetLevel, 0, &found)
 }
 
 // findNextAtLevel recursively searches for the next section at the specified level
-func findNextAtLevel(node, target *outline.Tree, targetLevel, currentLevel int, found *bool) *outline.Tree {
-	if *found && currentLevel <= targetLevel {
-		return node
-	}
+func findNextAtLevel(items []*outline.Item, target *outline.Item, targetLevel, currentLevel int, found *bool) *outline.Item {
+	for _, item := range items {
+		if *found && currentLevel <= targetLevel {
+			return item
+		}
 
-	if node == target {
-		*found = true
-	}
+		if item == target {
+			*found = true
+		}
 
-	for _, child := range node.Children {
-		if result := findNextAtLevel(child, target, targetLevel, currentLevel+1, found); result != nil {
+		if result := findNextAtLevel(item.Children, target, targetLevel, currentLevel+1, found); result != nil {
 			return result
 		}
 	}
-
 	return nil
 }
 
@@ -295,21 +353,23 @@ func ListAll(r pdf.Getter) ([]string, error) {
 	}
 
 	var sections []string
-	collectSections(tree, "", &sections)
+	for _, item := range tree.Items {
+		collectSections(item, "", &sections)
+	}
 	return sections, nil
 }
 
 // collectSections recursively collects all section titles with indentation
-func collectSections(node *outline.Tree, indent string, sections *[]string) {
-	if node == nil {
+func collectSections(item *outline.Item, indent string, sections *[]string) {
+	if item == nil {
 		return
 	}
 
-	if node.Title != "" {
-		*sections = append(*sections, indent+node.Title)
+	if item.Title != "" {
+		*sections = append(*sections, indent+item.Title)
 	}
 
-	for _, child := range node.Children {
+	for _, child := range item.Children {
 		collectSections(child, indent+"  ", sections)
 	}
 }
@@ -340,9 +400,11 @@ func FindNext(r pdf.Getter, pattern string) (string, error) {
 
 	// find all matching sections
 	var matches []sectionMatch
-	err = findMatches(r, pageNumbers, tree, regex, &matches)
-	if err != nil {
-		return "", err
+	for _, item := range tree.Items {
+		err = findMatches(r, pageNumbers, item, regex, &matches)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	if len(matches) == 0 {
@@ -354,11 +416,11 @@ func FindNext(r pdf.Getter, pattern string) (string, error) {
 
 	match := matches[0]
 
-	// find the parent and level of the matched section
-	_, level := findParentAndLevel(tree, match.tree, nil, 0)
+	// find the level of the matched section
+	level := findLevel(tree.Items, match.item, 0)
 
 	// find the next sibling at the same or higher level
-	nextSection := findNextSectionAtLevel(tree, match.tree, level)
+	nextSection := findNextSectionAtLevel(tree.Items, match.item, level)
 	if nextSection == nil {
 		return "", nil // no next section
 	}

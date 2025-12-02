@@ -75,6 +75,9 @@ func decodeURI(x *pdf.Extractor, dict pdf.Dict) (*URI, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(uri) == 0 {
+		return nil, pdf.Error("URI action: missing URI")
+	}
 
 	isMap, _ := pdf.Optional(x.GetBoolean(dict["IsMap"]))
 

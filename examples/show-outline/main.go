@@ -23,6 +23,8 @@ import (
 	"strings"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/action"
+	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/outline"
 	"seehuhn.de/go/pdf/pagetree"
 )
@@ -55,9 +57,11 @@ func main() {
 	}
 
 	// print the tree
-	err = showTree(doc, pageNumbers, tree, "")
-	if err != nil {
-		log.Fatal(err)
+	for _, item := range tree.Items {
+		err = showItem(pageNumbers, item, "")
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	err = doc.Close()
@@ -66,41 +70,75 @@ func main() {
 	}
 }
 
-func showTree(doc pdf.Getter, pageNumbers map[pdf.Reference]int, tree *outline.Tree, indent string) error {
+func showItem(pageNumbers map[pdf.Reference]int, item *outline.Item, indent string) error {
 	var pageLabel string
-	s, err := pdf.GetName(doc, tree.Action["S"])
-	if err != nil {
-		return err
+
+	// get page number from destination or GoTo action
+	var dest destination.Destination
+	if item.Destination != nil {
+		dest = item.Destination
+	} else if goTo, ok := item.Action.(*action.GoTo); ok {
+		dest = goTo.Dest
 	}
-	if s == "GoTo" {
-		dest, err := pdf.Resolve(doc, tree.Action["D"])
-		if err != nil {
-			return err
-		}
-		switch dest := dest.(type) {
-		case pdf.Array:
-			if len(dest) > 0 {
-				ref, ok := dest[0].(pdf.Reference)
-				if ok {
-					if n, ok := pageNumbers[ref]; ok {
-						pageLabel = fmt.Sprintf(" page %d", n+1)
-					}
-				}
+
+	if dest != nil {
+		if ref := getPageRef(dest); ref != 0 {
+			if n, ok := pageNumbers[ref]; ok {
+				pageLabel = fmt.Sprintf(" page %d", n+1)
 			}
 		}
 	}
 
-	line := indent + tree.Title
+	line := indent + item.Title
 	if pageLabel != "" {
 		rep := max(70-len(line), 3)
 		line += "  " + strings.Repeat(".", rep) + pageLabel
 	}
 	fmt.Println(line)
-	for _, child := range tree.Children {
-		err = showTree(doc, pageNumbers, child, indent+"  ")
+	for _, child := range item.Children {
+		err := showItem(pageNumbers, child, indent+"  ")
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// getPageRef extracts the page reference from a destination.
+func getPageRef(dest destination.Destination) pdf.Reference {
+	switch d := dest.(type) {
+	case *destination.XYZ:
+		if ref, ok := d.Page.(pdf.Reference); ok {
+			return ref
+		}
+	case *destination.Fit:
+		if ref, ok := d.Page.(pdf.Reference); ok {
+			return ref
+		}
+	case *destination.FitH:
+		if ref, ok := d.Page.(pdf.Reference); ok {
+			return ref
+		}
+	case *destination.FitV:
+		if ref, ok := d.Page.(pdf.Reference); ok {
+			return ref
+		}
+	case *destination.FitR:
+		if ref, ok := d.Page.(pdf.Reference); ok {
+			return ref
+		}
+	case *destination.FitB:
+		if ref, ok := d.Page.(pdf.Reference); ok {
+			return ref
+		}
+	case *destination.FitBH:
+		if ref, ok := d.Page.(pdf.Reference); ok {
+			return ref
+		}
+	case *destination.FitBV:
+		if ref, ok := d.Page.(pdf.Reference); ok {
+			return ref
+		}
+	}
+	return 0
 }

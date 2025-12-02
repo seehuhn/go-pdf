@@ -92,7 +92,7 @@ func (s spaceDeviceRGB) Default() Color {
 }
 
 // DeviceRGB is a color in the DeviceRGB color space.
-// The values are r, g, and b, and must be in the range from 0 to 1.
+// The values are r, g, and b, and must be in the range from 0 (dark) to 1 (light).
 type DeviceRGB [3]float64
 
 // ColorSpace implements the [Color] interface.
@@ -134,7 +134,7 @@ func (s spaceDeviceCMYK) Default() Color {
 }
 
 // DeviceCMYK is a color in the DeviceCMYK color space.
-// The value are c, m, y, and k, and must be in the range from 0 to 1.
+// The value are c, m, y, and k, and must be in the range from 0 (light) to 1 (dark).
 // They control the amount of cyan, magenta, yellow, and black in the color.
 type DeviceCMYK [4]float64
 
