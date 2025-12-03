@@ -227,32 +227,32 @@ func (c *objectCtx) Show() error {
 		}
 		fmt.Println()
 
-		stmData, err := pdf.DecodeStream(c.r, obj, 0)
-		if err != nil {
-			return err
-		}
-		buf := make([]byte, 128)
-		n, err := stmData.Read(buf)
-		if err != nil && err != io.EOF {
-			return err
-		}
-		if n == 0 {
-			fmt.Println("empty stream")
-			return nil
-		}
-		if mostlyBinary(buf[:n]) {
-			m, err := io.Copy(io.Discard, stmData)
+		if stmData, err := pdf.DecodeStream(c.r, obj, 0); err == nil {
+			buf := make([]byte, 128)
+			n, err := stmData.Read(buf)
+			if err != nil && err != io.EOF {
+				return err
+			}
+			if n == 0 {
+				fmt.Println("empty stream")
+				return nil
+			}
+			if mostlyBinary(buf[:n]) {
+				m, err := io.Copy(io.Discard, stmData)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("... binary stream data (%d bytes) ...\n", int64(n)+m)
+				return nil
+			}
+			fmt.Println("decoded stream contents:")
+			fmt.Print(string(buf[:n]))
+			_, err = io.Copy(os.Stdout, stmData)
 			if err != nil {
 				return err
 			}
-			fmt.Printf("... binary stream data (%d bytes) ...\n", int64(n)+m)
-			return nil
-		}
-		fmt.Println("decoded stream contents:")
-		fmt.Print(string(buf[:n]))
-		_, err = io.Copy(os.Stdout, stmData)
-		if err != nil {
-			return err
+		} else {
+			fmt.Printf("warning: cannote decode stream: %v\n", err)
 		}
 
 	case pdf.Dict:

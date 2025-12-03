@@ -25,30 +25,6 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Helper function to navigate using the new Context interface
-func navigateStreamContext(ctx Context, key string) (Context, error) {
-	steps := ctx.Next()
-	for _, step := range steps {
-		if step.Match.MatchString(key) {
-			return step.Next(key)
-		}
-	}
-	return nil, &KeyError{Key: key, Ctx: "navigation"}
-}
-
-// Helper function to get available step descriptions (replaces Keys())
-func getStreamStepDescriptions(ctx Context) []string {
-	steps := ctx.Next()
-	if len(steps) == 0 {
-		return nil
-	}
-	descs := make([]string, len(steps))
-	for i, step := range steps {
-		descs[i] = step.Desc
-	}
-	return descs
-}
-
 func TestStreamCtxShow(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -98,7 +74,7 @@ func TestStreamCtxNext(t *testing.T) {
 		name: "test stream",
 	}
 
-	result, err := navigateStreamContext(ctx, "any_key")
+	result, err := navigateContext(ctx, "any_key")
 	if result != nil {
 		t.Errorf("expected nil result but got %v", result)
 	}
@@ -116,7 +92,7 @@ func TestStreamCtxKeys(t *testing.T) {
 		name: "test stream",
 	}
 
-	keys := getStreamStepDescriptions(ctx)
+	keys := getStepDescriptions(ctx)
 	if len(keys) != 0 {
 		t.Errorf("expected empty keys but got %v", keys)
 	}
@@ -171,7 +147,7 @@ func TestStreamNavigation(t *testing.T) {
 			}
 
 			ctx := &objectCtx{obj: stream, r: nil} // Note: r is nil for this simple test
-			result, err := navigateStreamContext(ctx, tt.key)
+			result, err := navigateContext(ctx, tt.key)
 
 			if tt.expectError {
 				if err == nil {
@@ -260,7 +236,7 @@ func TestPageContents(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &objectCtx{obj: tt.pageDict, r: nil} // Note: r is nil for this simple test
-			result, err := navigateStreamContext(ctx, "@contents")
+			result, err := navigateContext(ctx, "@contents")
 
 			if tt.expectError {
 				if err == nil {
@@ -356,7 +332,7 @@ func TestObjectCtxKeysWithSpecialActions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &objectCtx{obj: tt.obj}
-			result := getStreamStepDescriptions(ctx)
+			result := getStepDescriptions(ctx)
 
 			if d := cmp.Diff(result, tt.expected); d != "" {
 				t.Errorf("keys mismatch (-got +want):\n%s", d)

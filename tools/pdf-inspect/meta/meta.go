@@ -83,7 +83,7 @@ func showInfo(obj pdf.Object, info *pdf.Info) {
 	if info.Producer != "" {
 		fmt.Println("Producer:", info.Producer)
 	}
-	if info.CreationDate.IsZero() {
+	if !info.CreationDate.IsZero() {
 		fmt.Println("CreationDate:", info.CreationDate)
 	}
 	if !info.ModDate.IsZero() {
