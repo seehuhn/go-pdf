@@ -39,14 +39,18 @@ func (b *Builder) setColor(c color.Color, fill bool) {
 	if b.Err != nil {
 		return
 	}
+	if err := b.checkType3ColorAllowed(); err != nil {
+		b.Err = err
+		return
+	}
 
 	var cur color.Color
 	if fill {
-		if b.isSet(graphics.StateFillColor) {
+		if b.isKnown(graphics.StateFillColor) {
 			cur = b.State.Param.FillColor
 		}
 	} else {
-		if b.isSet(graphics.StateStrokeColor) {
+		if b.isKnown(graphics.StateStrokeColor) {
 			cur = b.State.Param.StrokeColor
 		}
 	}
@@ -93,6 +97,11 @@ func (b *Builder) setColor(c color.Color, fill bool) {
 		}
 		if fill {
 			op = strings.ToLower(op)
+			b.State.Param.FillColor = c
+			b.State.MarkKnown(graphics.StateFillColor)
+		} else {
+			b.State.Param.StrokeColor = c
+			b.State.MarkKnown(graphics.StateStrokeColor)
 		}
 		b.emit(content.OpName(op), args...)
 	}

@@ -73,9 +73,9 @@ func TestIsValidName(t *testing.T) {
 }
 
 func TestAllOperators(t *testing.T) {
-	// verify we have all 73 operators
-	if len(operators) != 73 {
-		t.Errorf("expected 73 operators, got %d", len(operators))
+	// verify we have all 75 operators (73 standard + 2 pseudo-operators)
+	if len(operators) != 75 {
+		t.Errorf("expected 75 operators, got %d", len(operators))
 	}
 
 	// verify all operators are valid in PDF 2.0
@@ -101,7 +101,7 @@ func TestOperatorCategories(t *testing.T) {
 		"text state":        {OpTextSetCharacterSpacing, OpTextSetWordSpacing, OpTextSetFont},
 		"text positioning":  {OpTextMoveOffset, OpTextMoveOffsetSetLeading, OpTextSetMatrix, OpTextNextLine},
 		"text showing":      {OpTextShow, OpTextShowArray, OpTextShowMoveNextLine, OpTextShowMoveNextLineSetSpacing},
-		"type 3 fonts":      {OpType3SetWidthOnly, OpType3SetWidthAndBoundingBox},
+		"type 3 fonts":      {OpType3ColoredGlyph, OpType3UncoloredGlyph},
 		"colour":            {OpSetStrokeColorSpace, OpSetFillColorSpace, OpSetStrokeColor, OpSetStrokeGray, OpSetFillGray, OpSetStrokeRGB, OpSetFillRGB, OpSetStrokeCMYK, OpSetFillCMYK},
 		"shading":           {OpShading},
 		"inline images":     {opBeginInlineImage, opInlineImageData, opEndInlineImage},

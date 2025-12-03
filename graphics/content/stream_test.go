@@ -18,7 +18,6 @@ package content
 
 import (
 	"bytes"
-	"errors"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -43,19 +42,23 @@ func TestStreamRoundTrip(t *testing.T) {
 	for _, tt := range roundTripTestCases {
 		t.Run(tt.name, func(t *testing.T) {
 			// first read
-			stream1, err := ReadStream(bytes.NewReader([]byte(tt.stream)))
+			stream1, err := ReadStream(bytes.NewReader([]byte(tt.stream)), pdf.V2_0, PageContent)
 			if err != nil {
 				t.Fatalf("first read: %v", err)
 			}
 
-			// write
+			// write using Writer (permissive: use latest version)
 			var buf bytes.Buffer
-			if err := stream1.Write(&buf); err != nil {
+			w := NewWriter(PageContent, nil, pdf.V2_0)
+			if err := w.Write(&buf, stream1); err != nil {
 				t.Fatalf("write: %v", err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatalf("writer close: %v", err)
 			}
 
 			// second read
-			stream2, err := ReadStream(bytes.NewReader(buf.Bytes()))
+			stream2, err := ReadStream(bytes.NewReader(buf.Bytes()), pdf.V2_0, PageContent)
 			if err != nil {
 				t.Fatalf("second read: %v", err)
 			}
@@ -75,19 +78,23 @@ func FuzzStreamRoundTrip(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		// first read - permissive, may skip malformed content
-		stream1, err := ReadStream(bytes.NewReader(data))
+		stream1, err := ReadStream(bytes.NewReader(data), pdf.V2_0, PageContent)
 		if err != nil {
 			return
 		}
 
-		// write
+		// write - must succeed if read succeeded
 		var buf bytes.Buffer
-		if err := stream1.Write(&buf); err != nil {
-			t.Fatalf("write failed after successful read: %v", err)
+		w := NewWriter(PageContent, nil, pdf.V2_0)
+		if err := w.Write(&buf, stream1); err != nil {
+			t.Fatalf("write failed: %v", err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("writer close: %v", err)
 		}
 
 		// second read
-		stream2, err := ReadStream(bytes.NewReader(buf.Bytes()))
+		stream2, err := ReadStream(bytes.NewReader(buf.Bytes()), pdf.V2_0, PageContent)
 		if err != nil {
 			t.Fatalf("second read failed: %v", err)
 		}
@@ -97,111 +104,6 @@ func FuzzStreamRoundTrip(f *testing.F) {
 			t.Errorf("round trip failed (-first +second):\n%s", diff)
 		}
 	})
-}
-
-func TestStreamValidate(t *testing.T) {
-	tests := []struct {
-		name    string
-		stream  Stream
-		version pdf.Version
-		wantErr error
-	}{
-		{
-			name: "valid PDF 1.0",
-			stream: Stream{
-				{Name: OpPushGraphicsState},
-				{Name: OpPopGraphicsState},
-			},
-			version: pdf.V1_0,
-			wantErr: nil,
-		},
-		{
-			name: "operator not available in version",
-			stream: Stream{
-				{Name: OpSetExtGState}, // introduced in PDF 1.2
-			},
-			version: pdf.V1_0,
-			wantErr: ErrVersion,
-		},
-		{
-			name: "deprecated operator",
-			stream: Stream{
-				{Name: OpFillCompat}, // deprecated in PDF 2.0
-			},
-			version: pdf.V2_0,
-			wantErr: ErrDeprecated,
-		},
-		{
-			name: "unknown operator outside compatibility",
-			stream: Stream{
-				{Name: "XX"}, // unknown
-			},
-			version: pdf.V1_7,
-			wantErr: ErrUnknown,
-		},
-		{
-			name: "unknown operator inside BX/EX",
-			stream: Stream{
-				{Name: OpBeginCompatibility},
-				{Name: "XX"}, // unknown but allowed
-				{Name: OpEndCompatibility},
-			},
-			version: pdf.V1_7,
-			wantErr: nil,
-		},
-		{
-			name: "nested BX/EX",
-			stream: Stream{
-				{Name: OpBeginCompatibility},
-				{Name: "XX"},
-				{Name: OpBeginCompatibility},
-				{Name: "YY"},
-				{Name: OpEndCompatibility},
-				{Name: "ZZ"},
-				{Name: OpEndCompatibility},
-			},
-			version: pdf.V1_7,
-			wantErr: nil,
-		},
-		{
-			name: "error after EX",
-			stream: Stream{
-				{Name: OpBeginCompatibility},
-				{Name: "XX"}, // ok
-				{Name: OpEndCompatibility},
-				{Name: "YY"}, // not ok
-			},
-			version: pdf.V1_7,
-			wantErr: ErrUnknown,
-		},
-		{
-			name: "version error inside BX/EX still reported",
-			stream: Stream{
-				{Name: OpBeginCompatibility},
-				{Name: OpSetExtGState}, // known but not available in 1.0
-				{Name: OpEndCompatibility},
-			},
-			version: pdf.V1_0,
-			wantErr: ErrVersion,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := tt.stream.Validate(tt.version)
-			if tt.wantErr == nil {
-				if err != nil {
-					t.Errorf("expected no error, got %v", err)
-				}
-			} else {
-				if err == nil {
-					t.Errorf("expected error %v, got nil", tt.wantErr)
-				} else if !errors.Is(err, tt.wantErr) {
-					t.Errorf("expected error %v, got %v", tt.wantErr, err)
-				}
-			}
-		})
-	}
 }
 
 func TestInlineImageLimits(t *testing.T) {
@@ -254,7 +156,7 @@ func TestInlineImageLimits(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stream, err := ReadStream(bytes.NewReader([]byte(tt.stream)))
+			stream, err := ReadStream(bytes.NewReader([]byte(tt.stream)), pdf.V2_0, PageContent)
 			if err != nil {
 				t.Fatalf("ReadStream error: %v", err)
 			}
@@ -282,15 +184,16 @@ func TestOperatorArgLimit(t *testing.T) {
 	}
 	buf.WriteString("m\n") // moveto with 100 args (should be skipped)
 	buf.WriteString("q\n") // save graphics state (should be parsed)
+	buf.WriteString("Q\n") // restore graphics state
 
-	stream, err := ReadStream(bytes.NewReader(buf.Bytes()))
+	stream, err := ReadStream(bytes.NewReader(buf.Bytes()), pdf.V2_0, PageContent)
 	if err != nil {
 		t.Fatalf("ReadStream error: %v", err)
 	}
 
 	// the operator with too many args should be skipped
-	if len(stream) != 1 {
-		t.Errorf("got %d operators, want 1", len(stream))
+	if len(stream) != 2 {
+		t.Errorf("got %d operators, want 2", len(stream))
 	}
 	if len(stream) > 0 && stream[0].Name != OpPushGraphicsState {
 		t.Errorf("got operator %q, want %q", stream[0].Name, OpPushGraphicsState)

@@ -59,7 +59,8 @@ const (
 	V1_6
 	V1_7
 	V2_0
-	tooHighVersion // TODO(voss): remove
+
+	MaxVersion = V2_0
 )
 
 // ParseVersion parses a PDF version string.

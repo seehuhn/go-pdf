@@ -27,13 +27,10 @@ import (
 )
 
 // Builder constructs PDF content streams using a type-safe API.
-//
-// PDF version requirements are not checked during construction; use
-// [content.Stream.Validate] before writing to verify compatibility.
 type Builder struct {
 	Resources *content.Resources
 	Stream    content.Stream
-	State     *content.GraphicsState
+	State     *content.State
 	Err       error
 
 	// resName tracks allocated resource names for deduplication
@@ -50,38 +47,117 @@ type resKey struct {
 	obj    pdf.Embedder
 }
 
-// New creates a new Builder with initialized state.
-func New() *Builder {
-	return &Builder{
-		Resources: &content.Resources{},
-		State:     content.NewState(),
+// New creates a Builder for the given content type.
+// If res is nil, the function allocates a new Resources object.
+func New(ct content.Type, res *content.Resources) *Builder {
+	if res == nil {
+		res = &content.Resources{}
+	}
+	b := &Builder{
+		Resources: res,
+		State:     content.NewStateForContent(ct),
 		resName:   make(map[resKey]pdf.Name),
 	}
+
+	// pre-fill resName from existing resources
+	for name, v := range res.ColorSpace {
+		b.resName[resKey{"C", v}] = name
+	}
+	for name, v := range res.ExtGState {
+		b.resName[resKey{"E", v}] = name
+	}
+	for name, v := range res.Font {
+		b.resName[resKey{"F", v}] = name
+	}
+	for name, v := range res.Pattern {
+		b.resName[resKey{"P", v}] = name
+	}
+	for name, v := range res.Shading {
+		b.resName[resKey{"S", v}] = name
+	}
+	for name, v := range res.XObject {
+		b.resName[resKey{"X", v}] = name
+	}
+
+	return b
+}
+
+// Harvest returns the stream built so far and clears it.
+// State continues for building the next segment.
+// Returns error if Err is set (error is sticky, not cleared).
+func (b *Builder) Harvest() (content.Stream, error) {
+	if b.Err != nil {
+		return nil, b.Err
+	}
+	stream := b.Stream
+	b.Stream = nil
+	return stream, nil
+}
+
+// Close checks final state validity.
+// Calls State.Close() for q/Q, BT/ET, BMC/EMC balance checking.
+func (b *Builder) Close() error {
+	if b.Err != nil {
+		return b.Err
+	}
+	return b.State.CanClose()
 }
 
 // emit appends an operator to the content stream and updates the graphics state.
 //
-// The state update (via State.Apply) validates operator context (e.g., text
-// operators require BT...ET), tracks required input state (via State.In),
-// updates output state (via State.Out), manages the graphics state stack
-// for q/Q, and maintains path state (current point, subpath closedness).
+// State tracking for q/Q, BT/ET, and BMC/EMC is handled via State methods.
+// Individual methods update Known bits and Param values as needed.
 //
-// If an error occurs (including context validation failures), it is stored
-// in b.Err and subsequent calls become no-ops.
+// If an error occurs, it is stored in b.Err and subsequent calls become no-ops.
 func (b *Builder) emit(name content.OpName, args ...pdf.Object) {
 	if b.Err != nil {
 		return
 	}
-	op := content.Operator{Name: name, Args: args}
-	if err := b.State.Apply(b.Resources, op); err != nil {
+
+	if err := b.State.CheckOperatorAllowed(name); err != nil {
 		b.Err = err
 		return
 	}
+
+	// handle state-modifying operators
+	var err error
+	switch name {
+	case content.OpPushGraphicsState:
+		err = b.State.Push()
+	case content.OpPopGraphicsState:
+		err = b.State.Pop()
+	case content.OpTextBegin:
+		err = b.State.TextBegin()
+	case content.OpTextEnd:
+		err = b.State.TextEnd()
+	case content.OpBeginMarkedContent, content.OpBeginMarkedContentWithProperties:
+		b.State.MarkedContentBegin()
+	case content.OpEndMarkedContent:
+		err = b.State.MarkedContentEnd()
+	case content.OpBeginCompatibility:
+		b.State.CompatibilityBegin()
+	case content.OpEndCompatibility:
+		err = b.State.CompatibilityEnd()
+	case content.OpType3ColoredGlyph:
+		err = b.State.Type3ColoredGlyph()
+	case content.OpType3UncoloredGlyph:
+		err = b.State.Type3UncoloredGlyph()
+	}
+	if err != nil {
+		b.Err = err
+		return
+	}
+
+	op := content.Operator{Name: name, Args: args}
 	b.Stream = append(b.Stream, op)
 }
 
+func (b *Builder) isKnown(bits graphics.StateBits) bool {
+	return b.State.IsKnown(bits)
+}
+
 func (b *Builder) isSet(bits graphics.StateBits) bool {
-	return b.State.Out&bits == bits
+	return b.State.IsSet(bits)
 }
 
 func (b *Builder) getColorSpaceName(cs color.Space) pdf.Name {

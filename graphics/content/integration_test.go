@@ -14,122 +14,167 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package content
+package content_test
 
 import (
+	"bytes"
 	"testing"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 )
 
-func TestIntegration_PathWithStroke(t *testing.T) {
-	state := &GraphicsState{CurrentObject: ObjPage}
-	res := &Resources{}
+func TestMultiSegmentPage(t *testing.T) {
+	// Build two segments
+	b := builder.New(content.PageContent, nil)
 
-	ops := []Operator{
-		{Name: "w", Args: []pdf.Object{pdf.Real(2.0)}},
-		{Name: "m", Args: []pdf.Object{pdf.Real(10.0), pdf.Real(10.0)}},
-		{Name: "l", Args: []pdf.Object{pdf.Real(100.0), pdf.Real(10.0)}},
-		{Name: "l", Args: []pdf.Object{pdf.Real(100.0), pdf.Real(100.0)}},
-		{Name: "h", Args: nil},
-		{Name: "S", Args: nil},
+	// First segment
+	b.SetLineWidth(2)
+	b.MoveTo(0, 0)
+	b.LineTo(100, 100)
+	b.Stroke()
+	stream1, err := b.Harvest()
+	if err != nil {
+		t.Fatalf("Harvest stream1: %v", err)
 	}
 
-	for i, op := range ops {
-		if err := state.Apply(res, op); err != nil {
-			t.Fatalf("operator %d (%s) failed: %v", i, op.Name, err)
+	// Second segment (line width Known from first)
+	b.SetLineWidth(2) // should elide
+	b.MoveTo(100, 100)
+	b.LineTo(200, 200)
+	b.Stroke()
+	stream2, err := b.Harvest()
+	if err != nil {
+		t.Fatalf("Harvest stream2: %v", err)
+	}
+
+	// stream2 should not have SetLineWidth (elided)
+	for _, op := range stream2 {
+		if op.Name == content.OpSetLineWidth {
+			t.Error("SetLineWidth should have been elided in stream2")
 		}
 	}
 
-	// Verify dependencies: LineJoin, LineDash, and StrokeColor should be in In.
-	// LineWidth was set before the path, so it's in Out and not added to In.
-	expected := graphics.StateLineJoin | graphics.StateLineDash | graphics.StateStrokeColor
-	if state.In&expected != expected {
-		t.Errorf("missing expected dependencies, In = %v", state.In)
+	// Validate
+	if err := b.Close(); err != nil {
+		t.Fatalf("Validate: %v", err)
 	}
 
-	// LineCap should not be needed (closed path, no dashes)
-	if state.In&graphics.StateLineCap != 0 {
-		t.Error("LineCap marked but not needed")
+	// Write both segments
+	var buf1, buf2 bytes.Buffer
+	w := content.NewWriter(content.PageContent, b.Resources, pdf.V1_7)
+	if err := w.Write(&buf1, stream1); err != nil {
+		t.Fatalf("Write stream1: %v", err)
 	}
-
-	// Verify outputs: LineWidth was explicitly set
-	if state.Out&graphics.StateLineWidth == 0 {
-		t.Error("LineWidth not in Out")
+	if err := w.Write(&buf2, stream2); err != nil {
+		t.Fatalf("Write stream2: %v", err)
 	}
-}
-
-func TestIntegration_TextRenderingDependencies(t *testing.T) {
-	state := &GraphicsState{CurrentObject: ObjPage}
-	mockFont := &mockFontInstance{}
-	res := &Resources{
-		Font: map[pdf.Name]font.Instance{
-			"F1": mockFont,
-		},
-	}
-
-	ops := []Operator{
-		{Name: "BT", Args: nil},
-		{Name: "Tf", Args: []pdf.Object{pdf.Name("F1"), pdf.Real(12.0)}},
-		{Name: "Tr", Args: []pdf.Object{pdf.Integer(1)}}, // Stroke mode
-		{Name: "Tj", Args: []pdf.Object{pdf.String("Hello")}},
-		{Name: "ET", Args: nil},
-	}
-
-	for i, op := range ops {
-		if err := state.Apply(res, op); err != nil {
-			t.Fatalf("operator %d (%s) failed: %v", i, op.Name, err)
-		}
-	}
-
-	// Text stroke mode should require stroke color and line parameters
-	if state.In&graphics.StateStrokeColor == 0 {
-		t.Error("StrokeColor not marked for stroke rendering mode")
-	}
-	if state.In&graphics.StateLineWidth == 0 {
-		t.Error("LineWidth not marked for stroke rendering mode")
+	if err := w.Close(); err != nil {
+		t.Fatalf("Writer.Validate: %v", err)
 	}
 }
 
-func TestIntegration_GraphicsStateStack(t *testing.T) {
-	state := &GraphicsState{CurrentObject: ObjPage}
-	res := &Resources{}
+func TestType3FontGlyphs(t *testing.T) {
+	sharedRes := &content.Resources{}
 
-	// Set line width
-	op1 := Operator{Name: OpSetLineWidth, Args: []pdf.Object{pdf.Real(2.0)}}
-	if err := state.Apply(res, op1); err != nil {
-		t.Fatalf("w failed: %v", err)
+	// Glyph 'A' with d0 (colored)
+	bA := builder.New(content.Type3Content, sharedRes)
+	bA.Type3SetWidthOnly(500, 0)
+	bA.MoveTo(0, 0)
+	bA.LineTo(250, 700)
+	bA.LineTo(500, 0)
+	bA.Stroke()
+	streamA, err := bA.Harvest()
+	if err != nil {
+		t.Fatalf("Harvest glyph A: %v", err)
+	}
+	if err := bA.Close(); err != nil {
+		t.Fatalf("Validate glyph A: %v", err)
 	}
 
-	// Push state
-	opQ := Operator{Name: OpPushGraphicsState, Args: nil}
-	if err := state.Apply(res, opQ); err != nil {
-		t.Fatalf("q failed: %v", err)
+	// Glyph 'B' with d1 (inherits color)
+	bB := builder.New(content.Type3Content, sharedRes)
+	bB.Type3SetWidthAndBoundingBox(600, 0, 0, 0, 600, 700)
+	// No color operators allowed
+	bB.MoveTo(0, 0)
+	bB.LineTo(300, 700)
+	bB.LineTo(600, 0)
+	bB.ClosePath()
+	bB.Fill()
+	streamB, err := bB.Harvest()
+	if err != nil {
+		t.Fatalf("Harvest glyph B: %v", err)
+	}
+	if err := bB.Close(); err != nil {
+		t.Fatalf("Validate glyph B: %v", err)
 	}
 
-	savedOut := state.Out
-
-	// Modify state
-	op2 := Operator{Name: OpSetLineWidth, Args: []pdf.Object{pdf.Real(5.0)}}
-	if err := state.Apply(res, op2); err != nil {
-		t.Fatalf("second w failed: %v", err)
+	// Write both
+	var bufA, bufB bytes.Buffer
+	wA := content.NewWriter(content.Type3Content, sharedRes, pdf.V1_7)
+	if err := wA.Write(&bufA, streamA); err != nil {
+		t.Fatalf("Write glyph A: %v", err)
+	}
+	wB := content.NewWriter(content.Type3Content, sharedRes, pdf.V1_7)
+	if err := wB.Write(&bufB, streamB); err != nil {
+		t.Fatalf("Write glyph B: %v", err)
 	}
 
-	// Pop state
-	opPop := Operator{Name: OpPopGraphicsState, Args: nil}
-	if err := state.Apply(res, opPop); err != nil {
-		t.Fatalf("Q failed: %v", err)
+	if bufA.Len() == 0 || bufB.Len() == 0 {
+		t.Error("Glyph streams should not be empty")
+	}
+}
+
+func TestFormContentInheritedState(t *testing.T) {
+	// FormContent: all params are Set-Unknown, no elision
+	b := builder.New(content.FormContent, nil)
+
+	// First set: should emit (not Known)
+	b.SetLineWidth(5.0)
+	if len(b.Stream) != 1 {
+		t.Errorf("First SetLineWidth should emit, got %d ops", len(b.Stream))
 	}
 
-	// Verify Out was restored
-	if state.Out != savedOut {
-		t.Errorf("Out not restored: got %v, want %v", state.Out, savedOut)
+	// Second set with different value: should emit
+	b.SetLineWidth(10.0)
+	if len(b.Stream) != 2 {
+		t.Errorf("Different value should emit, got %d ops", len(b.Stream))
 	}
 
-	// Verify LineWidth was restored
-	if state.Param.LineWidth != 2.0 {
-		t.Errorf("LineWidth = %v, want 2.0", state.Param.LineWidth)
+	// Third set with same value: should elide (now Known)
+	b.SetLineWidth(10.0)
+	if len(b.Stream) != 2 {
+		t.Errorf("Same value should elide, got %d ops", len(b.Stream))
+	}
+
+	stream, err := b.Harvest()
+	if err != nil {
+		t.Fatalf("Harvest: %v", err)
+	}
+	if len(stream) != 2 {
+		t.Errorf("Expected 2 ops in stream, got %d", len(stream))
+	}
+}
+
+func TestWriterVersionValidation(t *testing.T) {
+	b := builder.New(content.PageContent, nil)
+	b.SetRenderingIntent("Perceptual")
+	stream, _ := b.Harvest()
+
+	// PDF 1.0 doesn't support ri
+	var buf bytes.Buffer
+	w := content.NewWriter(content.PageContent, b.Resources, pdf.V1_0)
+	err := w.Write(&buf, stream)
+	if err == nil {
+		t.Error("ri should fail for PDF 1.0")
+	}
+
+	// PDF 1.1+ supports ri
+	buf.Reset()
+	w2 := content.NewWriter(content.PageContent, b.Resources, pdf.V1_1)
+	err = w2.Write(&buf, stream)
+	if err != nil {
+		t.Errorf("ri should work for PDF 1.1: %v", err)
 	}
 }

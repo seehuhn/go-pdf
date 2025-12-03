@@ -180,7 +180,7 @@ func TestStructVersion(t *testing.T) {
 	res := &testStruct{}
 
 	// test normal operation
-	for v := V1_0; v < tooHighVersion; v++ {
+	for v := V1_0; v <= MaxVersion; v++ {
 		a := &testStruct{V: v}
 		aDict := AsDict(a)
 		err := DecodeDict(nil, res, aDict)
@@ -193,7 +193,7 @@ func TestStructVersion(t *testing.T) {
 	}
 
 	// test that invalid versions are ignored
-	a := &testStruct{V: tooHighVersion}
+	a := &testStruct{V: MaxVersion + 1}
 	aDict := AsDict(a)
 	val, present := aDict["V"]
 	if present {

@@ -22,13 +22,18 @@
 // referenced by operators. Together, a content stream and its resource
 // dictionary form a self-contained entity.
 //
-// The State.Apply method analyzes PDF content stream operators and tracks
-// how they modify graphics state. This supports both reading existing PDF files
-// and implementing operator-based graphics writing.
+// # Building Content Streams
 //
-// State tracking uses In/Out bit masks:
-//   - In: External dependencies (accumulates, never restored by Q)
-//   - Out: Modified parameters (saved/restored by q/Q)
+// Use [State] with [Writer] for constructing new content streams. State tracks
+// graphics parameters using Set/Known bits:
 //
-// Once a parameter is in Out, subsequent operators reading it don't add it to In.
+//   - Set: Parameter has a value (either known or inherited)
+//   - Known: Parameter has a known value (subset of Set)
+//   - UsedUnknown: Set-Unknown parameters that were used (for dependency tracking)
+//
+// The three-state model (Unset, Set-Unknown, Known) enables proper elision of
+// redundant operators and tracking of inherited dependencies in Form XObjects.
+//
+// For a high-level API, use the [builder.Builder] type from the builder
+// sub-package.
 package content

@@ -132,8 +132,8 @@ var operators = map[OpName]*opInfo{
 	OpTextShowMoveNextLineSetSpacing: {Since: pdf.V1_0},
 
 	// Type 3 Fonts
-	OpType3SetWidthOnly:           {Since: pdf.V1_0},
-	OpType3SetWidthAndBoundingBox: {Since: pdf.V1_0},
+	OpType3ColoredGlyph:   {Since: pdf.V1_0},
+	OpType3UncoloredGlyph: {Since: pdf.V1_0},
 
 	// Colour
 	OpSetStrokeColorSpace: {Since: pdf.V1_1},
@@ -170,4 +170,8 @@ var operators = map[OpName]*opInfo{
 	// Compatibility
 	OpBeginCompatibility: {Since: pdf.V1_1},
 	OpEndCompatibility:   {Since: pdf.V1_1},
+
+	// Pseudo-operators (internal use)
+	OpRawContent:  {Since: pdf.V1_0},
+	OpInlineImage: {Since: pdf.V1_0},
 }

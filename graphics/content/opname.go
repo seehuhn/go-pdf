@@ -85,8 +85,8 @@ const (
 	OpTextShowMoveNextLineSetSpacing OpName = "\""
 
 	// Type 3 Fonts
-	OpType3SetWidthOnly           OpName = "d0"
-	OpType3SetWidthAndBoundingBox OpName = "d1"
+	OpType3ColoredGlyph   OpName = "d0"
+	OpType3UncoloredGlyph OpName = "d1"
 
 	// Color Spaces
 	OpSetStrokeColorSpace OpName = "CS"

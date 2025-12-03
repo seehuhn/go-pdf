@@ -18,7 +18,6 @@ package content
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"math"
 	"slices"
@@ -38,21 +37,131 @@ import (
 type Stream []Operator
 
 // ReadStream reads a PDF content stream and returns the sequence of operators.
+// The version parameter specifies the PDF version to use for validation:
+//   - For v <= pdf.MaxVersion, unknown and version-incompatible operators
+//     (outside BX/EX compatibility sections) are silently dropped.
+//   - For v > pdf.MaxVersion, unknown operators are kept (they may be valid
+//     in a newer PDF version).
+//
+// The content type parameter specifies what kind of content stream is being
+// read. This affects which operators are allowed:
+//   - Type 3 operators (d0, d1) are only kept for Type3Content.
+//
 // Parse errors are handled permissively: malformed content is skipped and
 // parsing continues. IO errors are returned to the caller.
-func ReadStream(r io.Reader) (Stream, error) {
+//
+// If the stream has unbalanced state at EOF (unclosed q/Q, BT/ET, BMC/EMC,
+// or BX/EX), the missing closing operators are appended automatically.
+func ReadStream(r io.Reader, v pdf.Version, ct Type) (Stream, error) {
 	s := &streamScanner{
 		buf: make([]byte, 512),
 	}
 	s.src = r
 
 	var stream Stream
+
+	// state tracking for filtering and auto-close at EOF
+	// uses proper nesting stack like the writer to ensure accuracy
+	var nesting []PairType
+	var compatibilityDepth int // fast check for BX/EX
+
 	for {
 		op, err := s.scan()
 		switch err {
 		case nil:
+			// filter based on version validation
+			validErr := op.isValidName(v)
+			if validErr == ErrUnknown || validErr == ErrVersion {
+				if compatibilityDepth > 0 {
+					// inside BX/EX: keep unknown operators
+				} else if v > pdf.MaxVersion {
+					// future PDF version: keep (may be valid)
+				} else {
+					// known PDF version: drop unknown/version-incompatible
+					continue
+				}
+			}
+			// handle deprecated operators by substitution
+			if validErr == ErrDeprecated {
+				switch op.Name {
+				case OpFillCompat:
+					op.Name = OpFill // F -> f
+				default:
+					continue // drop other deprecated operators
+				}
+			}
+
+			// filter Type 3 operators based on content type
+			if ct != Type3Content {
+				if op.Name == OpType3ColoredGlyph || op.Name == OpType3UncoloredGlyph {
+					continue
+				}
+			}
+
+			// update state tracking and filter improperly nested operators
+			switch op.Name {
+			case OpPushGraphicsState:
+				nesting = append(nesting, PairQ)
+			case OpPopGraphicsState:
+				if len(nesting) > 0 && nesting[len(nesting)-1] == PairQ {
+					nesting = nesting[:len(nesting)-1]
+				} else {
+					continue // drop mismatched/unbalanced Q
+				}
+			case OpTextBegin:
+				// BT is only valid when not already in text object
+				inText := false
+				for _, p := range nesting {
+					if p == PairBT {
+						inText = true
+						break
+					}
+				}
+				if inText {
+					continue // drop nested BT
+				}
+				nesting = append(nesting, PairBT)
+			case OpTextEnd:
+				if len(nesting) > 0 && nesting[len(nesting)-1] == PairBT {
+					nesting = nesting[:len(nesting)-1]
+				} else {
+					continue // drop mismatched/unbalanced ET
+				}
+			case OpBeginMarkedContent, OpBeginMarkedContentWithProperties:
+				nesting = append(nesting, PairBMC)
+			case OpEndMarkedContent:
+				if len(nesting) > 0 && nesting[len(nesting)-1] == PairBMC {
+					nesting = nesting[:len(nesting)-1]
+				} else {
+					continue // drop mismatched/unbalanced EMC
+				}
+			case OpBeginCompatibility:
+				nesting = append(nesting, PairBX)
+				compatibilityDepth++
+			case OpEndCompatibility:
+				if len(nesting) > 0 && nesting[len(nesting)-1] == PairBX {
+					nesting = nesting[:len(nesting)-1]
+					compatibilityDepth--
+				} else {
+					continue // drop mismatched/unbalanced EX
+				}
+			}
+
 			stream = append(stream, op)
 		case io.EOF:
+			// auto-close unbalanced state in reverse order
+			for i := len(nesting) - 1; i >= 0; i-- {
+				switch nesting[i] {
+				case PairQ:
+					stream = append(stream, Operator{Name: OpPopGraphicsState})
+				case PairBT:
+					stream = append(stream, Operator{Name: OpTextEnd})
+				case PairBMC:
+					stream = append(stream, Operator{Name: OpEndMarkedContent})
+				case PairBX:
+					stream = append(stream, Operator{Name: OpEndCompatibility})
+				}
+			}
 			return stream, nil
 		case errParse:
 			// permissive: skip malformed content
@@ -61,123 +170,6 @@ func ReadStream(r io.Reader) (Stream, error) {
 			return stream, err
 		}
 	}
-}
-
-// Validate checks that all operators in the stream are valid for the given
-// PDF version. Within BX/EX compatibility sections, unknown operators are
-// allowed.
-func (s Stream) Validate(v pdf.Version) error {
-	compatLevel := 0 // nesting depth of BX/EX sections
-	for i, op := range s {
-		switch op.Name {
-		case OpBeginCompatibility:
-			compatLevel++
-		case OpEndCompatibility:
-			if compatLevel > 0 {
-				compatLevel--
-			}
-		}
-
-		err := op.isValidName(v)
-		if err == nil {
-			continue
-		}
-		if (err == ErrUnknown || err == ErrVersion) && compatLevel > 0 {
-			// Unknown operators are allowed inside BX/EX compatibility sections.
-			// Operators introduced in later PDF versions are effectively "unknown"
-			// in earlier versions, so ErrVersion is treated the same as ErrUnknown.
-			continue
-		}
-		return fmt.Errorf("operator %d (%s): %w", i, op.Name, err)
-	}
-	return nil
-}
-
-// Write writes the content stream to w in PDF content stream format.
-func (s Stream) Write(w io.Writer) error {
-	for _, op := range s {
-		// handle pseudo-operators
-		switch op.Name {
-		case OpRawContent:
-			// write raw content (typically comments)
-			if len(op.Args) > 0 {
-				if str, ok := op.Args[0].(pdf.String); ok {
-					if _, err := w.Write([]byte(str)); err != nil {
-						return err
-					}
-					if _, err := w.Write([]byte("\n")); err != nil {
-						return err
-					}
-				}
-			}
-			continue
-		case OpInlineImage:
-			// write inline image
-			if len(op.Args) >= 2 {
-				dict, _ := op.Args[0].(pdf.Dict)
-				data, _ := op.Args[1].(pdf.String)
-
-				if _, err := w.Write([]byte("BI\n")); err != nil {
-					return err
-				}
-				// sort keys for deterministic output
-				keys := make([]pdf.Name, 0, len(dict))
-				for key := range dict {
-					keys = append(keys, key)
-				}
-				slices.Sort(keys)
-				for _, key := range keys {
-					val := dict[key]
-					if _, err := w.Write([]byte("/")); err != nil {
-						return err
-					}
-					if _, err := w.Write([]byte(key)); err != nil {
-						return err
-					}
-					if _, err := w.Write([]byte(" ")); err != nil {
-						return err
-					}
-					if natVal, ok := val.(pdf.Native); ok {
-						if err := pdf.Format(w, pdf.OptContentStream, natVal); err != nil {
-							return err
-						}
-					}
-					if _, err := w.Write([]byte("\n")); err != nil {
-						return err
-					}
-				}
-				if _, err := w.Write([]byte("ID\n")); err != nil {
-					return err
-				}
-				if _, err := w.Write([]byte(data)); err != nil {
-					return err
-				}
-				if _, err := w.Write([]byte("\nEI\n")); err != nil {
-					return err
-				}
-			}
-			continue
-		}
-
-		// write arguments
-		for _, arg := range op.Args {
-			if err := pdf.Format(w, pdf.OptContentStream, arg); err != nil {
-				return err
-			}
-			if _, err := w.Write([]byte(" ")); err != nil {
-				return err
-			}
-		}
-
-		// write operator
-		if _, err := w.Write([]byte(op.Name)); err != nil {
-			return err
-		}
-		if _, err := w.Write([]byte("\n")); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // streamScanner is an internal scanner for content streams

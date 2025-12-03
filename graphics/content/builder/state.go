@@ -58,9 +58,11 @@ func (b *Builder) SetLineCap(cap graphics.LineCapStyle) {
 		b.Err = fmt.Errorf("SetLineCap: invalid line cap style %d", cap)
 		return
 	}
-	if b.isSet(graphics.StateLineCap) && cap == b.State.Param.LineCap {
+	if b.isKnown(graphics.StateLineCap) && cap == b.State.Param.LineCap {
 		return
 	}
+	b.State.Param.LineCap = cap
+	b.State.MarkKnown(graphics.StateLineCap)
 	b.emit(content.OpSetLineCap, pdf.Integer(cap))
 }
 
@@ -72,9 +74,11 @@ func (b *Builder) SetLineJoin(join graphics.LineJoinStyle) {
 		b.Err = fmt.Errorf("SetLineJoin: invalid line join style %d", join)
 		return
 	}
-	if b.isSet(graphics.StateLineJoin) && join == b.State.Param.LineJoin {
+	if b.isKnown(graphics.StateLineJoin) && join == b.State.Param.LineJoin {
 		return
 	}
+	b.State.Param.LineJoin = join
+	b.State.MarkKnown(graphics.StateLineJoin)
 	b.emit(content.OpSetLineJoin, pdf.Integer(join))
 }
 
@@ -86,9 +90,11 @@ func (b *Builder) SetMiterLimit(limit float64) {
 		b.Err = fmt.Errorf("SetMiterLimit: invalid miter limit %f", limit)
 		return
 	}
-	if b.isSet(graphics.StateMiterLimit) && nearlyEqual(limit, b.State.Param.MiterLimit) {
+	if b.isKnown(graphics.StateMiterLimit) && nearlyEqual(limit, b.State.Param.MiterLimit) {
 		return
 	}
+	b.State.Param.MiterLimit = limit
+	b.State.MarkKnown(graphics.StateMiterLimit)
 	b.emit(content.OpSetMiterLimit, pdf.Number(limit))
 }
 
@@ -96,11 +102,15 @@ func (b *Builder) SetMiterLimit(limit float64) {
 //
 // This implements the PDF graphics operator "d".
 func (b *Builder) SetLineDash(pattern []float64, phase float64) {
-	if b.isSet(graphics.StateLineDash) &&
+	if b.isKnown(graphics.StateLineDash) &&
 		sliceNearlyEqual(pattern, b.State.Param.DashPattern) &&
 		nearlyEqual(phase, b.State.Param.DashPhase) {
 		return
 	}
+
+	b.State.Param.DashPattern = pattern
+	b.State.Param.DashPhase = phase
+	b.State.MarkKnown(graphics.StateLineDash)
 
 	arr := make(pdf.Array, len(pattern))
 	for i, v := range pattern {
@@ -113,9 +123,11 @@ func (b *Builder) SetLineDash(pattern []float64, phase float64) {
 //
 // This implements the PDF graphics operator "ri".
 func (b *Builder) SetRenderingIntent(intent graphics.RenderingIntent) {
-	if b.isSet(graphics.StateRenderingIntent) && intent == b.State.Param.RenderingIntent {
+	if b.isKnown(graphics.StateRenderingIntent) && intent == b.State.Param.RenderingIntent {
 		return
 	}
+	b.State.Param.RenderingIntent = intent
+	b.State.MarkKnown(graphics.StateRenderingIntent)
 	b.emit(content.OpSetRenderingIntent, pdf.Name(intent))
 }
 
@@ -127,9 +139,11 @@ func (b *Builder) SetFlatnessTolerance(flatness float64) {
 		b.Err = fmt.Errorf("SetFlatnessTolerance: invalid flatness tolerance %f", flatness)
 		return
 	}
-	if b.isSet(graphics.StateFlatnessTolerance) && nearlyEqual(flatness, b.State.Param.FlatnessTolerance) {
+	if b.isKnown(graphics.StateFlatnessTolerance) && nearlyEqual(flatness, b.State.Param.FlatnessTolerance) {
 		return
 	}
+	b.State.Param.FlatnessTolerance = flatness
+	b.State.MarkKnown(graphics.StateFlatnessTolerance)
 	b.emit(content.OpSetFlatnessTolerance, pdf.Number(flatness))
 }
 
@@ -141,9 +155,11 @@ func (b *Builder) SetLineWidth(width float64) {
 		b.Err = fmt.Errorf("SetLineWidth: negative width %f", width)
 		return
 	}
-	if b.isSet(graphics.StateLineWidth) && nearlyEqual(width, b.State.Param.LineWidth) {
+	if b.isKnown(graphics.StateLineWidth) && nearlyEqual(width, b.State.Param.LineWidth) {
 		return
 	}
+	b.State.Param.LineWidth = width
+	b.State.MarkKnown(graphics.StateLineWidth)
 	b.emit(content.OpSetLineWidth, pdf.Number(width))
 }
 
@@ -160,6 +176,13 @@ func (b *Builder) SetExtGState(gs *graphics.ExtGState) {
 		return
 	}
 	name := b.getExtGStateName(gs)
+
+	// Apply the ExtGState to our State
+	// Use a temporary graphics.State to leverage ExtGState.ApplyTo
+	tmp := graphics.State{Parameters: &b.State.Param, Set: b.State.Known}
+	gs.ApplyTo(&tmp)
+	b.State.Known = tmp.Set
+
 	b.emit(content.OpSetExtGState, name)
 }
 
