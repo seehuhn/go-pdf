@@ -20,27 +20,18 @@ import (
 	"errors"
 	"fmt"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 )
 
 // State tracks graphics state during content stream building and writing.
 type State struct {
-	// Param contains current parameter values.
-	// Only parameters with Known bit set are valid.
-	Param graphics.Parameters
-
 	// Set indicates which graphics parameters have usable values.
-	// For the corresponding bit in Known is also set, the value can
-	// be found in Param.  Otherwise, the value is inherited from
-	// the surrounding context at the time the content stream is used.
-	//
-	// Commands list SetLineWidth update this field.
+	// If the corresponding Known bit is also set, a concrete value is available.
+	// Otherwise, the value is inherited from the surrounding context.
 	Set graphics.StateBits
 
-	// Known indicates values in Param are valid.
-	// This must be a subset of Set.
-	//
-	// Commands list SetLineWidth update this field.
+	// Known indicates parameters with concrete values (subset of Set).
 	Known graphics.StateBits
 
 	// FromContext tracks which graphics parameters were used from inherited
@@ -56,6 +47,15 @@ type State struct {
 
 	// CurrentObject is the current graphics object context.
 	CurrentObject Object
+
+	// Path closure tracking for conditional LineCap validation.
+	// AllSubpathsClosed is true if all completed subpaths in the current path are closed.
+	// ThisSubpathClosed is true if the current subpath is closed (or has no segments yet).
+	AllSubpathsClosed bool
+	ThisSubpathClosed bool
+
+	// HasNonEmptyDashPattern is true when a dash pattern with at least one element is active.
+	HasNonEmptyDashPattern bool
 
 	// MaxStackDepth tracks the highest nesting depth reached.
 	MaxStackDepth int
@@ -82,16 +82,19 @@ const (
 
 // savedState holds state saved by the q operator.
 type savedState struct {
-	Param *graphics.Parameters
-	Set   graphics.StateBits
-	Known graphics.StateBits
+	Set                    graphics.StateBits
+	Known                  graphics.StateBits
+	AllSubpathsClosed      bool
+	ThisSubpathClosed      bool
+	HasNonEmptyDashPattern bool
 }
 
 // NewState creates a State initialized for the given content type.
 func NewState(ct Type) *State {
 	s := &State{
-		Param:         *graphics.NewState().Parameters,
-		CurrentObject: ObjPage,
+		CurrentObject:     ObjPage,
+		AllSubpathsClosed: true,
+		ThisSubpathClosed: true,
 	}
 
 	switch ct {
@@ -143,9 +146,11 @@ func (s *State) MarkAsUsed(bits graphics.StateBits) {
 // Push saves the current graphics state (for the q operator).
 func (s *State) Push() error {
 	s.stack = append(s.stack, savedState{
-		Param: s.Param.Clone(),
-		Set:   s.Set,
-		Known: s.Known,
+		Set:                    s.Set,
+		Known:                  s.Known,
+		AllSubpathsClosed:      s.AllSubpathsClosed,
+		ThisSubpathClosed:      s.ThisSubpathClosed,
+		HasNonEmptyDashPattern: s.HasNonEmptyDashPattern,
 	})
 	if len(s.stack) > s.MaxStackDepth {
 		s.MaxStackDepth = len(s.stack)
@@ -162,10 +167,12 @@ func (s *State) Pop() error {
 	saved := s.stack[len(s.stack)-1]
 	s.stack = s.stack[:len(s.stack)-1]
 
-	s.Param = *saved.Param
 	s.Set = saved.Set
 	s.Known = saved.Known
-	// Note: UsedUnknown is NOT restored (cumulative across stream)
+	s.AllSubpathsClosed = saved.AllSubpathsClosed
+	s.ThisSubpathClosed = saved.ThisSubpathClosed
+	s.HasNonEmptyDashPattern = saved.HasNonEmptyDashPattern
+	// Note: FromContext is NOT restored (cumulative across stream)
 
 	return nil
 }
@@ -186,6 +193,9 @@ func (s *State) TextEnd() error {
 		return err
 	}
 	s.CurrentObject = ObjPage
+	// The text matrix does not persist between text objects (ISO 32000-2:2020, 9.4.1)
+	s.Set &^= graphics.StateTextMatrix
+	s.Known &^= graphics.StateTextMatrix
 	return nil
 }
 
@@ -219,27 +229,6 @@ func (s *State) InCompatibilitySection() bool {
 	return s.compatibilityDepth > 0
 }
 
-// GlyphColored handles the d0 operator state transition.
-// In colored glyphs, color operators are allowed.
-func (s *State) GlyphColored() error {
-	if s.CurrentObject != ObjType3Start {
-		return errors.New("d0: must be first operator in a Type 3 glyph")
-	}
-	s.CurrentObject = ObjPage
-	return nil
-}
-
-// GlyphUncolored handles the d1 operator state transition.
-// In uncolored glyphs, color operators are forbidden.
-func (s *State) GlyphUncolored() error {
-	if s.CurrentObject != ObjType3Start {
-		return errors.New("d1: must be first operator in a Type 3 glyph")
-	}
-	s.CurrentObject = ObjPage
-	s.ColorOpsForbidden = true
-	return nil
-}
-
 // CheckOperatorAllowed verifies that the given operator can be used in the current state.
 func (s *State) CheckOperatorAllowed(name OpName) error {
 	info, ok := operators[name]
@@ -253,8 +242,124 @@ func (s *State) CheckOperatorAllowed(name OpName) error {
 	return nil
 }
 
-// ApplyTransition updates CurrentObject based on the operator's state transition rule.
-func (s *State) ApplyTransition(name OpName) {
+// ApplyOperator validates and applies all state changes for an operator.
+// It checks if the operator is allowed, validates required state,
+// applies state-modifying changes (q/Q, BT/ET, etc.), and updates state bits.
+func (s *State) ApplyOperator(name OpName, args []pdf.Object) error {
+	if err := s.CheckOperatorAllowed(name); err != nil {
+		return err
+	}
+
+	info := operators[name]
+	if info != nil {
+		requires := info.Requires
+
+		// Conditional LineCap relaxation: not needed for closed paths without dashes
+		if isStrokeOp(name) && s.AllSubpathsClosed && !s.HasNonEmptyDashPattern {
+			requires &^= graphics.StateLineCap
+		}
+
+		// Validate requirements
+		if requires != 0 {
+			missing := requires &^ s.Set
+			if missing != 0 {
+				return fmt.Errorf("%s: required state not set: %v", name, missing)
+			}
+		}
+
+		// Update state bits
+		if info.Sets != 0 {
+			s.Set |= info.Sets
+			s.Known |= info.Sets
+		}
+	}
+
+	return s.ApplyStateChanges(name, args)
+}
+
+// isStrokeOp returns true if the operator is a stroking operation.
+func isStrokeOp(name OpName) bool {
+	switch name {
+	case OpStroke, OpCloseAndStroke, OpFillAndStroke, OpFillAndStrokeEvenOdd,
+		OpCloseFillAndStroke, OpCloseFillAndStrokeEvenOdd:
+		return true
+	}
+	return false
+}
+
+// ApplyStateChanges applies state-modifying changes for an operator.
+// This handles q/Q, BT/ET, BMC/EMC, BX/EX, d1, path state, and dash pattern tracking.
+//
+// Call this after the operator has been validated with CheckOperatorAllowed.
+func (s *State) ApplyStateChanges(name OpName, args []pdf.Object) error {
+	var err error
+	switch name {
+	case OpPushGraphicsState:
+		err = s.Push()
+	case OpPopGraphicsState:
+		err = s.Pop()
+	case OpTextBegin:
+		err = s.TextBegin()
+	case OpTextEnd:
+		err = s.TextEnd()
+	case OpBeginMarkedContent, OpBeginMarkedContentWithProperties:
+		s.MarkedContentBegin()
+	case OpEndMarkedContent:
+		err = s.MarkedContentEnd()
+	case OpBeginCompatibility:
+		s.CompatibilityBegin()
+	case OpEndCompatibility:
+		err = s.CompatibilityEnd()
+	case OpType3UncoloredGlyph:
+		s.ColorOpsForbidden = true
+
+	// Path construction operators
+	case OpMoveTo:
+		// starting new subpath while current is open
+		if !s.ThisSubpathClosed {
+			s.AllSubpathsClosed = false
+		}
+		s.ThisSubpathClosed = true // positioned but no segments yet
+	case OpRectangle:
+		// rectangle is always a closed subpath
+		if !s.ThisSubpathClosed {
+			s.AllSubpathsClosed = false
+		}
+		s.ThisSubpathClosed = true
+	case OpLineTo, OpCurveTo, OpCurveToV, OpCurveToY:
+		s.ThisSubpathClosed = false
+	case OpClosePath:
+		s.ThisSubpathClosed = true
+
+	// Path painting operators reset path state
+	case OpStroke, OpCloseAndStroke, OpFill, OpFillCompat, OpFillEvenOdd,
+		OpFillAndStroke, OpFillAndStrokeEvenOdd, OpCloseFillAndStroke,
+		OpCloseFillAndStrokeEvenOdd, OpEndPath:
+		// finalize current subpath
+		if !s.ThisSubpathClosed {
+			s.AllSubpathsClosed = false
+		}
+		// reset for next path
+		s.AllSubpathsClosed = true
+		s.ThisSubpathClosed = true
+
+	// Dash pattern tracking
+	case OpSetLineDash:
+		if len(args) > 0 {
+			if arr, ok := args[0].(pdf.Array); ok {
+				s.HasNonEmptyDashPattern = len(arr) > 0
+			}
+		}
+	}
+	if err != nil {
+		return err
+	}
+	s.applyTransition(name)
+	return nil
+}
+
+// applyTransition updates CurrentObject based on the operator's state transition rule.
+func (s *State) applyTransition(name OpName) {
 	if info, ok := operators[name]; ok && info.Transition != 0 {
 		s.CurrentObject = info.Transition
 	}

@@ -26,7 +26,7 @@ import (
 func TestBuilder_Type3SetWidthOnly(t *testing.T) {
 	b := New(content.Glyph, nil)
 
-	b.Type3SetWidthOnly(500, 0)
+	b.Type3ColoredGlyph(500, 0)
 	if b.Err != nil {
 		t.Fatalf("Type3SetWidthOnly failed: %v", b.Err)
 	}
@@ -39,7 +39,7 @@ func TestBuilder_Type3SetWidthOnly(t *testing.T) {
 func TestBuilder_Type3SetWidthAndBBox(t *testing.T) {
 	b := New(content.Glyph, nil)
 
-	b.Type3SetWidthAndBoundingBox(600, 0, 0, 0, 500, 700)
+	b.Type3UncoloredGlyph(600, 0, 0, 0, 500, 700)
 	if b.Err != nil {
 		t.Fatalf("Type3SetWidthAndBoundingBox failed: %v", b.Err)
 	}
@@ -53,7 +53,7 @@ func TestBuilder_Type3ColorRestriction(t *testing.T) {
 	b := New(content.Glyph, nil)
 
 	// d1 mode
-	b.Type3SetWidthAndBoundingBox(600, 0, 0, 0, 500, 700)
+	b.Type3UncoloredGlyph(600, 0, 0, 0, 500, 700)
 	if b.Err != nil {
 		t.Fatalf("Type3SetWidthAndBoundingBox failed: %v", b.Err)
 	}
@@ -72,7 +72,7 @@ func TestBuilder_Type3NotFirstOp(t *testing.T) {
 	b.SetLineWidth(1.0)
 
 	// d0/d1 must be first
-	b.Type3SetWidthOnly(500, 0)
+	b.Type3ColoredGlyph(500, 0)
 	if b.Err == nil {
 		t.Error("d0 should fail if not first operator")
 	}
@@ -82,7 +82,7 @@ func TestBuilder_Type3D0AllowsColor(t *testing.T) {
 	b := New(content.Glyph, nil)
 
 	// d0 mode
-	b.Type3SetWidthOnly(500, 0)
+	b.Type3ColoredGlyph(500, 0)
 	if b.Err != nil {
 		t.Fatalf("Type3SetWidthOnly failed: %v", b.Err)
 	}

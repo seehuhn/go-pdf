@@ -80,7 +80,7 @@ func TestType3FontGlyphs(t *testing.T) {
 
 	// Glyph 'A' with d0 (colored)
 	bA := builder.New(content.Glyph, sharedRes)
-	bA.Type3SetWidthOnly(500, 0)
+	bA.Type3ColoredGlyph(500, 0)
 	bA.MoveTo(0, 0)
 	bA.LineTo(250, 700)
 	bA.LineTo(500, 0)
@@ -95,7 +95,7 @@ func TestType3FontGlyphs(t *testing.T) {
 
 	// Glyph 'B' with d1 (inherits color)
 	bB := builder.New(content.Glyph, sharedRes)
-	bB.Type3SetWidthAndBoundingBox(600, 0, 0, 0, 600, 700)
+	bB.Type3UncoloredGlyph(600, 0, 0, 0, 600, 700)
 	// No color operators allowed
 	bB.MoveTo(0, 0)
 	bB.LineTo(300, 700)

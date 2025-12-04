@@ -47,11 +47,11 @@ func (b *Builder) setColor(c color.Color, fill bool) {
 	var cur color.Color
 	if fill {
 		if b.isKnown(graphics.StateFillColor) {
-			cur = b.State.Param.FillColor
+			cur = b.Param.FillColor
 		}
 	} else {
 		if b.isKnown(graphics.StateStrokeColor) {
-			cur = b.State.Param.StrokeColor
+			cur = b.Param.StrokeColor
 		}
 	}
 
@@ -70,7 +70,7 @@ func (b *Builder) setColor(c color.Color, fill bool) {
 			return
 		}
 
-		var op content.OpName = content.OpSetStrokeColorSpace
+		var op = content.OpSetStrokeColorSpace
 		if fill {
 			op = content.OpSetFillColorSpace
 		}
@@ -97,11 +97,9 @@ func (b *Builder) setColor(c color.Color, fill bool) {
 		}
 		if fill {
 			op = strings.ToLower(op)
-			b.State.Param.FillColor = c
-			b.State.MarkAsSet(graphics.StateFillColor)
+			b.Param.FillColor = c
 		} else {
-			b.State.Param.StrokeColor = c
-			b.State.MarkAsSet(graphics.StateStrokeColor)
+			b.Param.StrokeColor = c
 		}
 		b.emit(content.OpName(op), args...)
 	}

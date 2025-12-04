@@ -77,8 +77,8 @@ func TestWriter_StateTracking(t *testing.T) {
 	}
 
 	// MaxStackDepth should be 1
-	if w.MaxStackDepth != 1 {
-		t.Errorf("MaxStackDepth = %d, want 1", w.MaxStackDepth)
+	if w.state.MaxStackDepth != 1 {
+		t.Errorf("MaxStackDepth = %d, want 1", w.state.MaxStackDepth)
 	}
 }
 

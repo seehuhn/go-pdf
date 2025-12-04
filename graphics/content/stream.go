@@ -126,20 +126,27 @@ func ReadStream(r io.Reader, v pdf.Version, ct Type) (Stream, error) {
 
 			// check if operator is allowed in current state and fix up if needed
 			if state.CheckOperatorAllowed(op.Name) != nil {
-				// not allowed - try to fix up
+				// not allowed - try to fix up by inserting prefix operators
 				if fixOps := fixupOperator(state, op); fixOps != nil {
 					for _, fixOp := range fixOps {
-						applyReaderStateChange(state, fixOp.Name)
+						state.ApplyStateChanges(fixOp.Name, fixOp.Args)
 						stream = append(stream, fixOp)
 					}
+					// fall through to process original operator via main path
+				} else {
+					// can't fix up - skip
 					continue
 				}
-				// can't fix up - skip
+			}
+
+			// skip operators whose required state is not set (e.g., text-showing
+			// operators when no font has been set)
+			if info := operators[op.Name]; info != nil && info.Requires&^state.Set != 0 {
 				continue
 			}
 
 			// update state and filter improperly nested operators
-			if !applyReaderStateChange(state, op.Name) {
+			if state.ApplyStateChanges(op.Name, op.Args) != nil {
 				continue // drop mismatched/unbalanced closing operators
 			}
 
@@ -157,10 +164,11 @@ func ReadStream(r io.Reader, v pdf.Version, ct Type) (Stream, error) {
 	}
 }
 
-// fixupOperator returns operators to insert (including op) if the operator
-// can be fixed up, or nil if the operator should be skipped.
-// This function does NOT update state - the caller must apply state changes
-// for all returned operators.
+// fixupOperator returns prefix operators to insert before op to make its
+// context valid, or nil if the operator cannot be fixed up and should be
+// skipped. The returned operators do NOT include op itself - the caller
+// should process op through the main validation path after applying the
+// prefix operators.
 func fixupOperator(state *State, op Operator) []Operator {
 	info := operators[op.Name]
 	if info == nil {
@@ -171,7 +179,7 @@ func fixupOperator(state *State, op Operator) []Operator {
 	if info.Allowed == ObjText && state.CurrentObject != ObjText {
 		// BT is only allowed in page context
 		if state.CurrentObject == ObjPage {
-			return []Operator{{Name: OpTextBegin}, op}
+			return []Operator{{Name: OpTextBegin}}
 		}
 		// can't insert BT in path or other context - skip the operator
 		return nil
@@ -179,45 +187,6 @@ func fixupOperator(state *State, op Operator) []Operator {
 
 	// can't fix up other cases
 	return nil
-}
-
-// applyReaderStateChange updates state for an accepted operator.
-// Returns false if a closing operator is mismatched/unbalanced and should be skipped.
-func applyReaderStateChange(state *State, name OpName) bool {
-	switch name {
-	case OpPushGraphicsState:
-		state.Push()
-	case OpPopGraphicsState:
-		if err := state.Pop(); err != nil {
-			return false // mismatched Q
-		}
-	case OpTextBegin:
-		if err := state.TextBegin(); err != nil {
-			return false // nested BT
-		}
-	case OpTextEnd:
-		if err := state.TextEnd(); err != nil {
-			return false // mismatched ET
-		}
-	case OpBeginMarkedContent, OpBeginMarkedContentWithProperties:
-		state.MarkedContentBegin()
-	case OpEndMarkedContent:
-		if err := state.MarkedContentEnd(); err != nil {
-			return false // mismatched EMC
-		}
-	case OpBeginCompatibility:
-		state.CompatibilityBegin()
-	case OpEndCompatibility:
-		if err := state.CompatibilityEnd(); err != nil {
-			return false // mismatched EX
-		}
-	case OpType3ColoredGlyph:
-		state.GlyphColored()
-	case OpType3UncoloredGlyph:
-		state.GlyphUncolored()
-	}
-	state.ApplyTransition(name)
-	return true
 }
 
 // closeOpenContexts returns operators to close any open contexts at EOF.
@@ -568,9 +537,10 @@ func (s *streamScanner) nextToken() (pdf.Native, error) {
 		s.skipN(2)
 		return pdf.Operator(">>"), nil
 	default:
-		opBytes := []byte{bb[0]}
-		s.readByte() // skip bb[0] (invalidates bb)
-		if class[bb[0]] == regular {
+		firstByte := bb[0]
+		opBytes := []byte{firstByte}
+		s.readByte()
+		if class[firstByte] == regular {
 			for {
 				b, err := s.peek()
 				if err == io.EOF {

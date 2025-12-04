@@ -26,7 +26,7 @@ import (
 
 // Writer outputs content streams with version checking.
 type Writer struct {
-	*State
+	state   *State
 	version pdf.Version
 	res     *Resources
 }
@@ -34,7 +34,7 @@ type Writer struct {
 // NewWriter creates a Writer for the given content type and PDF version.
 func NewWriter(v pdf.Version, ct Type, res *Resources) *Writer {
 	return &Writer{
-		State:   NewState(ct),
+		state:   NewState(ct),
 		version: v,
 		res:     res,
 	}
@@ -46,14 +46,26 @@ func (w *Writer) Write(out io.Writer, s Stream) error {
 		// Check version compatibility.
 		// Unknown operators are allowed inside BX/EX compatibility sections.
 		if err := op.isValidName(w.version); err != nil {
-			if !((err == ErrUnknown || err == ErrVersion) && w.InCompatibilitySection()) {
+			if !((err == ErrUnknown || err == ErrVersion) && w.state.InCompatibilitySection()) {
 				return fmt.Errorf("operator %d (%s): %w", i, op.Name, err)
 			}
 		}
 
+		// q/Q operators are only allowed in text objects for PDF 2.0+
+		if w.version < pdf.V2_0 && w.state.CurrentObject == ObjText {
+			if op.Name == OpPushGraphicsState || op.Name == OpPopGraphicsState {
+				return fmt.Errorf("operator %d (%s): not allowed in text object before PDF 2.0", i, op.Name)
+			}
+		}
+
 		// Update state based on operator
-		if err := w.applyOperator(op); err != nil {
+		if err := w.state.ApplyOperator(op.Name, op.Args); err != nil {
 			return fmt.Errorf("operator %d (%s): %w", i, op.Name, err)
+		}
+		if w.res != nil {
+			if err := w.validateResources(op); err != nil {
+				return fmt.Errorf("operator %d (%s): %w", i, op.Name, err)
+			}
 		}
 
 		// Write the operator
@@ -66,61 +78,14 @@ func (w *Writer) Write(out io.Writer, s Stream) error {
 
 // Close checks for balanced operators and version-specific stack depth limits.
 func (w *Writer) Close() error {
-	if err := w.State.CanClose(); err != nil {
+	if err := w.state.CanClose(); err != nil {
 		return err
 	}
 
 	// PDF 1.7 and earlier: max stack depth is 28
-	if w.version < pdf.V2_0 && w.MaxStackDepth > 28 {
+	if w.version < pdf.V2_0 && w.state.MaxStackDepth > 28 {
 		return fmt.Errorf("stack depth %d exceeds limit of 28 for PDF %s",
-			w.MaxStackDepth, w.version)
-	}
-
-	return nil
-}
-
-// applyOperator updates Writer state for the given operator.
-func (w *Writer) applyOperator(op Operator) error {
-	if err := w.State.CheckOperatorAllowed(op.Name); err != nil {
-		return err
-	}
-
-	// handle state-modifying operators
-	var err error
-	switch op.Name {
-	case OpPushGraphicsState:
-		err = w.Push()
-	case OpPopGraphicsState:
-		err = w.Pop()
-	case OpTextBegin:
-		err = w.TextBegin()
-	case OpTextEnd:
-		err = w.TextEnd()
-	case OpBeginMarkedContent, OpBeginMarkedContentWithProperties:
-		w.MarkedContentBegin()
-	case OpEndMarkedContent:
-		err = w.MarkedContentEnd()
-	case OpBeginCompatibility:
-		w.CompatibilityBegin()
-	case OpEndCompatibility:
-		err = w.CompatibilityEnd()
-	case OpType3ColoredGlyph:
-		err = w.State.GlyphColored()
-	case OpType3UncoloredGlyph:
-		err = w.State.GlyphUncolored()
-	}
-	if err != nil {
-		return err
-	}
-
-	// apply object state transitions for path/clipping operators
-	w.State.ApplyTransition(op.Name)
-
-	// validate resource references
-	if w.res != nil {
-		if err := w.validateResources(op); err != nil {
-			return err
-		}
+			w.state.MaxStackDepth, w.version)
 	}
 
 	return nil
@@ -150,9 +115,13 @@ func (w *Writer) validateResources(op Operator) error {
 	case OpSetExtGState: // gs name
 		if len(op.Args) >= 1 {
 			if name, ok := op.Args[0].(pdf.Name); ok {
-				if _, exists := w.res.ExtGState[name]; !exists {
+				gs, exists := w.res.ExtGState[name]
+				if !exists {
 					return fmt.Errorf("ExtGState %q not in resources", name)
 				}
+				// Update state with what the ExtGState sets
+				w.state.Set |= gs.Set
+				w.state.Known |= gs.Set
 			}
 		}
 
@@ -168,8 +137,8 @@ func (w *Writer) validateResources(op Operator) error {
 	case OpSetStrokeColorSpace, OpSetFillColorSpace: // CS/cs name
 		if len(op.Args) >= 1 {
 			if name, ok := op.Args[0].(pdf.Name); ok {
-				// device color spaces are built-in, not in resources
-				if !isDeviceColorSpace(name) {
+				// reserved color space names are built-in, not in resources
+				if !isReservedColorSpaceName(name) {
 					if _, exists := w.res.ColorSpace[name]; !exists {
 						return fmt.Errorf("color space %q not in resources", name)
 					}
@@ -190,10 +159,12 @@ func (w *Writer) validateResources(op Operator) error {
 	return nil
 }
 
-// isDeviceColorSpace returns true for built-in device color spaces.
-func isDeviceColorSpace(name pdf.Name) bool {
+// isReservedColorSpaceName returns true for color space names that are
+// built-in and don't need to be in the resources dictionary.
+// See table 73 of ISO 32000-2:2020.
+func isReservedColorSpaceName(name pdf.Name) bool {
 	switch name {
-	case "DeviceGray", "DeviceRGB", "DeviceCMYK":
+	case "DeviceGray", "DeviceRGB", "DeviceCMYK", "Pattern":
 		return true
 	}
 	return false

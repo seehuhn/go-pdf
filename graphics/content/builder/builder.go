@@ -31,7 +31,11 @@ type Builder struct {
 	Resources *content.Resources
 	Stream    content.Stream
 	State     *content.State
+	Param     graphics.Parameters
 	Err       error
+
+	// paramStack holds saved Param values for q/Q operators.
+	paramStack []*graphics.Parameters
 
 	// resName tracks allocated resource names for deduplication
 	resName map[resKey]pdf.Name
@@ -56,6 +60,7 @@ func New(ct content.Type, res *content.Resources) *Builder {
 	b := &Builder{
 		Resources: res,
 		State:     content.NewState(ct),
+		Param:     *graphics.NewState().Parameters,
 		resName:   make(map[resKey]pdf.Name),
 	}
 
@@ -106,7 +111,7 @@ func (b *Builder) Close() error {
 // emit appends an operator to the content stream and updates the graphics state.
 //
 // State tracking for q/Q, BT/ET, and BMC/EMC is handled via State methods.
-// Individual methods update Known bits and Param values as needed.
+// Individual methods update Known bits and Builder.Param values as needed.
 //
 // If an error occurs, it is stored in b.Err and subsequent calls become no-ops.
 func (b *Builder) emit(name content.OpName, args ...pdf.Object) {
@@ -114,42 +119,10 @@ func (b *Builder) emit(name content.OpName, args ...pdf.Object) {
 		return
 	}
 
-	if err := b.State.CheckOperatorAllowed(name); err != nil {
+	if err := b.State.ApplyOperator(name, args); err != nil {
 		b.Err = err
 		return
 	}
-
-	// handle state-modifying operators
-	var err error
-	switch name {
-	case content.OpPushGraphicsState:
-		err = b.State.Push()
-	case content.OpPopGraphicsState:
-		err = b.State.Pop()
-	case content.OpTextBegin:
-		err = b.State.TextBegin()
-	case content.OpTextEnd:
-		err = b.State.TextEnd()
-	case content.OpBeginMarkedContent, content.OpBeginMarkedContentWithProperties:
-		b.State.MarkedContentBegin()
-	case content.OpEndMarkedContent:
-		err = b.State.MarkedContentEnd()
-	case content.OpBeginCompatibility:
-		b.State.CompatibilityBegin()
-	case content.OpEndCompatibility:
-		err = b.State.CompatibilityEnd()
-	case content.OpType3ColoredGlyph:
-		err = b.State.GlyphColored()
-	case content.OpType3UncoloredGlyph:
-		err = b.State.GlyphUncolored()
-	}
-	if err != nil {
-		b.Err = err
-		return
-	}
-
-	// apply object state transitions for path/clipping operators
-	b.State.ApplyTransition(name)
 
 	op := content.Operator{Name: name, Args: args}
 	b.Stream = append(b.Stream, op)

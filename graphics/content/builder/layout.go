@@ -80,7 +80,7 @@ func (b *Builder) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 		return 0
 	}
 
-	E := b.State.Param.TextFont
+	E := b.Param.TextFont
 	layouter, ok := E.(font.Layouter)
 	if !ok {
 		panic("font does not implement Layouter")
@@ -117,7 +117,7 @@ func (b *Builder) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 
 	xActual := 0.0
 	xWanted := left
-	param := &b.State.Param
+	param := &b.Param
 	if E.WritingMode() != 0 {
 		panic("vertical writing mode not implemented")
 	}
@@ -167,7 +167,7 @@ func (b *Builder) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 		xActual += float64(xOffsetInt) / 1000 * param.TextFontSize * param.TextHorizontalScaling
 	}
 	flush()
-	b.State.Param.TextMatrix = matrix.Translate(xActual, 0).Mul(b.State.Param.TextMatrix)
+	b.Param.TextMatrix = matrix.Translate(xActual, 0).Mul(b.Param.TextMatrix)
 
 	return xActual
 }
@@ -184,12 +184,12 @@ func (b *Builder) TextLayout(seq *font.GlyphSeq, text string) *font.GlyphSeq {
 		return seq
 	}
 
-	layouter, ok := b.State.Param.TextFont.(font.Layouter)
+	layouter, ok := b.Param.TextFont.(font.Layouter)
 	if !ok {
 		return nil
 	}
 
-	param := &b.State.Param
+	param := &b.Param
 	T := font.NewTypesetter(layouter, param.TextFontSize)
 	T.SetCharacterSpacing(param.TextCharacterSpacing)
 	T.SetWordSpacing(param.TextWordSpacing)
@@ -214,12 +214,12 @@ func (b *Builder) TextGetQuadPoints(seq *font.GlyphSeq, padding float64) []vec.V
 	}
 
 	// get bounding rectangle in PDF text space units
-	f, ok := b.State.Param.TextFont.(font.Layouter)
+	f, ok := b.Param.TextFont.(font.Layouter)
 	if !ok {
 		return nil
 	}
 	geom := f.GetGeometry()
-	size := b.State.Param.TextFontSize
+	size := b.Param.TextFontSize
 
 	height := geom.Ascent * size
 	depth := -geom.Descent * size
@@ -269,7 +269,7 @@ func (b *Builder) TextGetQuadPoints(seq *font.GlyphSeq, padding float64) []vec.V
 	}
 
 	// transform the bounding rectangle from text space to default user space
-	M := b.State.Param.TextMatrix.Mul(b.State.Param.CTM)
+	M := b.Param.TextMatrix.Mul(b.Param.CTM)
 	rectUser := make([]vec.Vec2, 4)
 	for i := range 4 {
 		x, y := M.Apply(rectText[2*i], rectText[2*i+1])

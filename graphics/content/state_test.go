@@ -114,28 +114,30 @@ func TestState_MarkUsedUnknown(t *testing.T) {
 }
 
 func TestState_PushPop(t *testing.T) {
-	s := NewState(Page)
+	s := NewState(Form) // Form has Set=All, Known=0
 
-	// Set line width to custom value
-	s.Param.LineWidth = 5.0
+	// Mark line width as Known
 	s.MarkAsSet(graphics.StateLineWidth)
+	if !s.IsKnown(graphics.StateLineWidth) {
+		t.Fatal("line width should be Known after MarkAsSet")
+	}
 
 	// Push state
 	if err := s.Push(); err != nil {
 		t.Fatalf("Push failed: %v", err)
 	}
 
-	// Modify line width
-	s.Param.LineWidth = 10.0
+	// Modify Known bits
+	s.Known = 0
 
 	// Pop state
 	if err := s.Pop(); err != nil {
 		t.Fatalf("Pop failed: %v", err)
 	}
 
-	// Should be restored
-	if s.Param.LineWidth != 5.0 {
-		t.Errorf("LineWidth = %v, want 5.0", s.Param.LineWidth)
+	// Known should be restored
+	if !s.IsKnown(graphics.StateLineWidth) {
+		t.Error("line width Known bit should be restored after Pop")
 	}
 }
 

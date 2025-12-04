@@ -49,11 +49,11 @@ func TestSetExtGState(t *testing.T) {
 	}
 
 	// verify state was applied
-	if b.State.Param.LineWidth != 5.0 {
-		t.Errorf("LineWidth = %v, want 5.0", b.State.Param.LineWidth)
+	if b.Param.LineWidth != 5.0 {
+		t.Errorf("LineWidth = %v, want 5.0", b.Param.LineWidth)
 	}
-	if b.State.Param.FillAlpha != 0.5 {
-		t.Errorf("FillAlpha = %v, want 0.5", b.State.Param.FillAlpha)
+	if b.Param.FillAlpha != 0.5 {
+		t.Errorf("FillAlpha = %v, want 0.5", b.Param.FillAlpha)
 	}
 	// with new State model, params set by gs are Known
 	if !b.State.IsKnown(graphics.StateLineWidth) {
