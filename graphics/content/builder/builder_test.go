@@ -25,33 +25,33 @@ import (
 )
 
 func TestBuilder_NewForContent(t *testing.T) {
-	b := New(content.PageContent, nil)
+	b := New(content.Page, nil)
 
-	// PageContent: line width is Known (can elide)
+	// Page: line width is Known (can elide)
 	if !b.State.IsKnown(graphics.StateLineWidth) {
-		t.Error("PageContent: line width should be Known")
+		t.Error("Page: line width should be Known")
 	}
 
-	// PageContent: font is NOT Known
+	// Page: font is NOT Known
 	if b.State.IsKnown(graphics.StateTextFont) {
-		t.Error("PageContent: font should not be Known")
+		t.Error("Page: font should not be Known")
 	}
 }
 
-func TestBuilder_FormContentNoElision(t *testing.T) {
-	b := New(content.FormContent, nil)
+func TestBuilder_FormNoElision(t *testing.T) {
+	b := New(content.Form, nil)
 
-	// FormContent: line width is Set but not Known (cannot elide)
+	// Form: line width is Set but not Known (cannot elide)
 	if !b.State.IsSet(graphics.StateLineWidth) {
-		t.Error("FormContent: line width should be Set")
+		t.Error("Form: line width should be Set")
 	}
 	if b.State.IsKnown(graphics.StateLineWidth) {
-		t.Error("FormContent: line width should not be Known")
+		t.Error("Form: line width should not be Known")
 	}
 }
 
 func TestBuilder_Harvest(t *testing.T) {
-	b := New(content.PageContent, nil)
+	b := New(content.Page, nil)
 
 	b.SetLineWidth(5.0)
 	b.MoveTo(0, 0)
@@ -74,7 +74,7 @@ func TestBuilder_Harvest(t *testing.T) {
 }
 
 func TestBuilder_HarvestError(t *testing.T) {
-	b := New(content.PageContent, nil)
+	b := New(content.Page, nil)
 	b.Err = errors.New("test error")
 
 	_, err := b.Harvest()
@@ -89,7 +89,7 @@ func TestBuilder_HarvestError(t *testing.T) {
 }
 
 func TestBuilder_Validate(t *testing.T) {
-	b := New(content.PageContent, nil)
+	b := New(content.Page, nil)
 
 	// Valid state
 	if err := b.Close(); err != nil {

@@ -34,7 +34,7 @@ func TestSliceNearlyEqual(t *testing.T) {
 }
 
 func TestSetExtGState(t *testing.T) {
-	b := New(content.PageContent, nil)
+	b := New(content.Page, nil)
 
 	gs := &graphics.ExtGState{
 		Set:       graphics.StateLineWidth | graphics.StateFillAlpha,
@@ -65,23 +65,23 @@ func TestSetExtGState(t *testing.T) {
 }
 
 func TestBuilder_ElisionWithKnown(t *testing.T) {
-	// PageContent: defaults are Known, elision works
-	b := New(content.PageContent, nil)
+	// Page: defaults are Known, elision works
+	b := New(content.Page, nil)
 	b.SetLineWidth(1.0) // default value
 	if len(b.Stream) != 0 {
-		t.Errorf("PageContent: setting default should elide, got %d ops", len(b.Stream))
+		t.Errorf("Page: setting default should elide, got %d ops", len(b.Stream))
 	}
 
-	// FormContent: defaults are Set-Unknown, no elision
-	b2 := New(content.FormContent, nil)
+	// Form: defaults are Set-Unknown, no elision
+	b2 := New(content.Form, nil)
 	b2.SetLineWidth(1.0) // same value but not Known
 	if len(b2.Stream) != 1 {
-		t.Errorf("FormContent: should not elide Set-Unknown, got %d ops", len(b2.Stream))
+		t.Errorf("Form: should not elide Set-Unknown, got %d ops", len(b2.Stream))
 	}
 }
 
 func TestBuilder_ElisionAfterSet(t *testing.T) {
-	b := New(content.FormContent, nil)
+	b := New(content.Form, nil)
 
 	// First set: should emit (not Known)
 	b.SetLineWidth(5.0)

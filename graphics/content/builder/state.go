@@ -62,7 +62,7 @@ func (b *Builder) SetLineCap(cap graphics.LineCapStyle) {
 		return
 	}
 	b.State.Param.LineCap = cap
-	b.State.MarkKnown(graphics.StateLineCap)
+	b.State.MarkAsSet(graphics.StateLineCap)
 	b.emit(content.OpSetLineCap, pdf.Integer(cap))
 }
 
@@ -78,7 +78,7 @@ func (b *Builder) SetLineJoin(join graphics.LineJoinStyle) {
 		return
 	}
 	b.State.Param.LineJoin = join
-	b.State.MarkKnown(graphics.StateLineJoin)
+	b.State.MarkAsSet(graphics.StateLineJoin)
 	b.emit(content.OpSetLineJoin, pdf.Integer(join))
 }
 
@@ -94,7 +94,7 @@ func (b *Builder) SetMiterLimit(limit float64) {
 		return
 	}
 	b.State.Param.MiterLimit = limit
-	b.State.MarkKnown(graphics.StateMiterLimit)
+	b.State.MarkAsSet(graphics.StateMiterLimit)
 	b.emit(content.OpSetMiterLimit, pdf.Number(limit))
 }
 
@@ -110,7 +110,7 @@ func (b *Builder) SetLineDash(pattern []float64, phase float64) {
 
 	b.State.Param.DashPattern = pattern
 	b.State.Param.DashPhase = phase
-	b.State.MarkKnown(graphics.StateLineDash)
+	b.State.MarkAsSet(graphics.StateLineDash)
 
 	arr := make(pdf.Array, len(pattern))
 	for i, v := range pattern {
@@ -127,7 +127,7 @@ func (b *Builder) SetRenderingIntent(intent graphics.RenderingIntent) {
 		return
 	}
 	b.State.Param.RenderingIntent = intent
-	b.State.MarkKnown(graphics.StateRenderingIntent)
+	b.State.MarkAsSet(graphics.StateRenderingIntent)
 	b.emit(content.OpSetRenderingIntent, pdf.Name(intent))
 }
 
@@ -143,7 +143,7 @@ func (b *Builder) SetFlatnessTolerance(flatness float64) {
 		return
 	}
 	b.State.Param.FlatnessTolerance = flatness
-	b.State.MarkKnown(graphics.StateFlatnessTolerance)
+	b.State.MarkAsSet(graphics.StateFlatnessTolerance)
 	b.emit(content.OpSetFlatnessTolerance, pdf.Number(flatness))
 }
 
@@ -159,7 +159,7 @@ func (b *Builder) SetLineWidth(width float64) {
 		return
 	}
 	b.State.Param.LineWidth = width
-	b.State.MarkKnown(graphics.StateLineWidth)
+	b.State.MarkAsSet(graphics.StateLineWidth)
 	b.emit(content.OpSetLineWidth, pdf.Number(width))
 }
 

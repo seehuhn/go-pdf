@@ -64,114 +64,232 @@ func (o Operator) isValidName(v pdf.Version) error {
 type opInfo struct {
 	Since      pdf.Version // PDF version when introduced
 	Deprecated pdf.Version // PDF version when deprecated (0 if not deprecated)
+	Allowed    Object      // bitmask of allowed object states
+	Transition Object      // new state after operator (0 = no change)
 }
 
 // operators maps operator names to their metadata
 var operators = map[OpName]*opInfo{
-	// General Graphics State
-	OpPushGraphicsState:    {Since: pdf.V1_0},
-	OpPopGraphicsState:     {Since: pdf.V1_0},
-	OpTransform:            {Since: pdf.V1_0},
-	OpSetLineWidth:         {Since: pdf.V1_0},
-	OpSetLineCap:           {Since: pdf.V1_0},
-	OpSetLineJoin:          {Since: pdf.V1_0},
-	OpSetMiterLimit:        {Since: pdf.V1_0},
-	OpSetLineDash:          {Since: pdf.V1_0},
-	OpSetRenderingIntent:   {Since: pdf.V1_1},
-	OpSetFlatnessTolerance: {Since: pdf.V1_0},
-	OpSetExtGState:         {Since: pdf.V1_2},
+	// General Graphics State (allowed in page and text contexts)
+	OpPushGraphicsState:    {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	OpPopGraphicsState:     {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	OpTransform:            {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	OpSetLineWidth:         {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	OpSetLineCap:           {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	OpSetLineJoin:          {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	OpSetMiterLimit:        {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	OpSetLineDash:          {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	OpSetRenderingIntent:   {Since: pdf.V1_1, Allowed: ObjPage | ObjText},
+	OpSetFlatnessTolerance: {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	OpSetExtGState:         {Since: pdf.V1_2, Allowed: ObjPage | ObjText},
 
 	// Path Construction
-	OpMoveTo:    {Since: pdf.V1_0},
-	OpLineTo:    {Since: pdf.V1_0},
-	OpCurveTo:   {Since: pdf.V1_0},
-	OpCurveToV:  {Since: pdf.V1_0},
-	OpCurveToY:  {Since: pdf.V1_0},
-	OpClosePath: {Since: pdf.V1_0},
-	OpRectangle: {Since: pdf.V1_0},
+	OpMoveTo:    {Since: pdf.V1_0, Allowed: ObjPage | ObjPath, Transition: ObjPath},
+	OpLineTo:    {Since: pdf.V1_0, Allowed: ObjPath},
+	OpCurveTo:   {Since: pdf.V1_0, Allowed: ObjPath},
+	OpCurveToV:  {Since: pdf.V1_0, Allowed: ObjPath},
+	OpCurveToY:  {Since: pdf.V1_0, Allowed: ObjPath},
+	OpClosePath: {Since: pdf.V1_0, Allowed: ObjPath},
+	OpRectangle: {Since: pdf.V1_0, Allowed: ObjPage | ObjPath, Transition: ObjPath},
 
-	// Path Painting
-	OpStroke:                    {Since: pdf.V1_0},
-	OpCloseAndStroke:            {Since: pdf.V1_0},
-	OpFill:                      {Since: pdf.V1_0},
-	OpFillCompat:                {Since: pdf.V1_0, Deprecated: pdf.V2_0},
-	OpFillEvenOdd:               {Since: pdf.V1_0},
-	OpFillAndStroke:             {Since: pdf.V1_0},
-	OpFillAndStrokeEvenOdd:      {Since: pdf.V1_0},
-	OpCloseFillAndStroke:        {Since: pdf.V1_0},
-	OpCloseFillAndStrokeEvenOdd: {Since: pdf.V1_0},
-	OpEndPath:                   {Since: pdf.V1_0},
+	// Path Painting (transitions back to page context)
+	OpStroke:                    {Since: pdf.V1_0, Allowed: ObjPath | ObjClippingPath, Transition: ObjPage},
+	OpCloseAndStroke:            {Since: pdf.V1_0, Allowed: ObjPath | ObjClippingPath, Transition: ObjPage},
+	OpFill:                      {Since: pdf.V1_0, Allowed: ObjPath | ObjClippingPath, Transition: ObjPage},
+	OpFillCompat:                {Since: pdf.V1_0, Deprecated: pdf.V2_0, Allowed: ObjPath | ObjClippingPath, Transition: ObjPage},
+	OpFillEvenOdd:               {Since: pdf.V1_0, Allowed: ObjPath | ObjClippingPath, Transition: ObjPage},
+	OpFillAndStroke:             {Since: pdf.V1_0, Allowed: ObjPath | ObjClippingPath, Transition: ObjPage},
+	OpFillAndStrokeEvenOdd:      {Since: pdf.V1_0, Allowed: ObjPath | ObjClippingPath, Transition: ObjPage},
+	OpCloseFillAndStroke:        {Since: pdf.V1_0, Allowed: ObjPath | ObjClippingPath, Transition: ObjPage},
+	OpCloseFillAndStrokeEvenOdd: {Since: pdf.V1_0, Allowed: ObjPath | ObjClippingPath, Transition: ObjPage},
+	OpEndPath:                   {Since: pdf.V1_0, Allowed: ObjPath | ObjClippingPath, Transition: ObjPage},
 
-	// Clipping Paths
-	OpClipNonZero: {Since: pdf.V1_0},
-	OpClipEvenOdd: {Since: pdf.V1_0},
+	// Clipping Paths (transitions to clipping path context)
+	OpClipNonZero: {Since: pdf.V1_0, Allowed: ObjPath, Transition: ObjClippingPath},
+	OpClipEvenOdd: {Since: pdf.V1_0, Allowed: ObjPath, Transition: ObjClippingPath},
 
 	// Text Objects
-	OpTextBegin: {Since: pdf.V1_0},
-	OpTextEnd:   {Since: pdf.V1_0},
+	OpTextBegin: {Since: pdf.V1_0, Allowed: ObjPage, Transition: ObjText},
+	OpTextEnd:   {Since: pdf.V1_0, Allowed: ObjText, Transition: ObjPage},
+
+	// Text State (allowed in any context)
+	OpTextSetCharacterSpacing:  {Since: pdf.V1_0, Allowed: ObjAny},
+	OpTextSetWordSpacing:       {Since: pdf.V1_0, Allowed: ObjAny},
+	OpTextSetHorizontalScaling: {Since: pdf.V1_0, Allowed: ObjAny},
+	OpTextSetLeading:           {Since: pdf.V1_0, Allowed: ObjAny},
+	OpTextSetFont:              {Since: pdf.V1_0, Allowed: ObjAny},
+	OpTextSetRenderingMode:     {Since: pdf.V1_0, Allowed: ObjAny},
+	OpTextSetRise:              {Since: pdf.V1_0, Allowed: ObjAny},
+
+	// Text Positioning (only in text context)
+	OpTextMoveOffset:           {Since: pdf.V1_0, Allowed: ObjText},
+	OpTextMoveOffsetSetLeading: {Since: pdf.V1_0, Allowed: ObjText},
+	OpTextSetMatrix:            {Since: pdf.V1_0, Allowed: ObjText},
+	OpTextNextLine:             {Since: pdf.V1_0, Allowed: ObjText},
+
+	// Text Showing (only in text context)
+	OpTextShow:                       {Since: pdf.V1_0, Allowed: ObjText},
+	OpTextShowArray:                  {Since: pdf.V1_0, Allowed: ObjText},
+	OpTextShowMoveNextLine:           {Since: pdf.V1_0, Allowed: ObjText},
+	OpTextShowMoveNextLineSetSpacing: {Since: pdf.V1_0, Allowed: ObjText},
+
+	// Type 3 Fonts (only at start of Type 3 glyph)
+	OpType3ColoredGlyph:   {Since: pdf.V1_0, Allowed: ObjType3Start, Transition: ObjPage},
+	OpType3UncoloredGlyph: {Since: pdf.V1_0, Allowed: ObjType3Start, Transition: ObjPage},
+
+	// Colour (allowed in page and text contexts)
+	OpSetStrokeColorSpace: {Since: pdf.V1_1, Allowed: ObjPage | ObjText},
+	OpSetFillColorSpace:   {Since: pdf.V1_1, Allowed: ObjPage | ObjText},
+	OpSetStrokeColor:      {Since: pdf.V1_1, Allowed: ObjPage | ObjText},
+	OpSetStrokeColorN:     {Since: pdf.V1_2, Allowed: ObjPage | ObjText},
+	OpSetFillColor:        {Since: pdf.V1_1, Allowed: ObjPage | ObjText},
+	OpSetFillColorN:       {Since: pdf.V1_2, Allowed: ObjPage | ObjText},
+	OpSetStrokeGray:       {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	OpSetFillGray:         {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	OpSetStrokeRGB:        {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	OpSetFillRGB:          {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	OpSetStrokeCMYK:       {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	OpSetFillCMYK:         {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+
+	// Shading Patterns (allowed in page and text contexts)
+	OpShading: {Since: pdf.V1_3, Allowed: ObjPage | ObjText},
+
+	// Inline Images (internal use, allowed in page and text)
+	opBeginInlineImage: {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	opInlineImageData:  {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	opEndInlineImage:   {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+
+	// XObjects (allowed in page and text contexts)
+	OpXObject: {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+
+	// Marked Content (allowed in any context)
+	OpMarkedContentPoint:               {Since: pdf.V1_2, Allowed: ObjAny},
+	OpMarkedContentPointWithProperties: {Since: pdf.V1_2, Allowed: ObjAny},
+	OpBeginMarkedContent:               {Since: pdf.V1_2, Allowed: ObjAny},
+	OpBeginMarkedContentWithProperties: {Since: pdf.V1_2, Allowed: ObjAny},
+	OpEndMarkedContent:                 {Since: pdf.V1_2, Allowed: ObjAny},
+
+	// Compatibility (allowed in any context)
+	OpBeginCompatibility: {Since: pdf.V1_1, Allowed: ObjAny},
+	OpEndCompatibility:   {Since: pdf.V1_1, Allowed: ObjAny},
+
+	// Pseudo-operators (internal use, allowed in any context)
+	OpRawContent:  {Since: pdf.V1_0, Allowed: ObjAny},
+	OpInlineImage: {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+}
+
+type OpName pdf.Name
+
+const (
+	// General Graphics State
+	OpPushGraphicsState    OpName = "q"
+	OpPopGraphicsState     OpName = "Q"
+	OpTransform            OpName = "cm"
+	OpSetLineWidth         OpName = "w"
+	OpSetLineCap           OpName = "J"
+	OpSetLineJoin          OpName = "j"
+	OpSetMiterLimit        OpName = "M"
+	OpSetLineDash          OpName = "d"
+	OpSetRenderingIntent   OpName = "ri"
+	OpSetFlatnessTolerance OpName = "i"
+	OpSetExtGState         OpName = "gs"
+
+	// Path Construction
+	OpMoveTo    OpName = "m"
+	OpLineTo    OpName = "l"
+	OpCurveTo   OpName = "c"
+	OpCurveToV  OpName = "v"
+	OpCurveToY  OpName = "y"
+	OpClosePath OpName = "h"
+	OpRectangle OpName = "re"
+
+	// Path Painting
+	OpStroke                    OpName = "S"
+	OpCloseAndStroke            OpName = "s"
+	OpFill                      OpName = "f"
+	OpFillCompat                OpName = "F"
+	OpFillEvenOdd               OpName = "f*"
+	OpFillAndStroke             OpName = "B"
+	OpFillAndStrokeEvenOdd      OpName = "B*"
+	OpCloseFillAndStroke        OpName = "b"
+	OpCloseFillAndStrokeEvenOdd OpName = "b*"
+	OpEndPath                   OpName = "n"
+
+	// Clipping Paths
+	OpClipNonZero OpName = "W"
+	OpClipEvenOdd OpName = "W*"
+
+	// Text Objects
+	OpTextBegin OpName = "BT"
+	OpTextEnd   OpName = "ET"
 
 	// Text State
-	OpTextSetCharacterSpacing:  {Since: pdf.V1_0},
-	OpTextSetWordSpacing:       {Since: pdf.V1_0},
-	OpTextSetHorizontalScaling: {Since: pdf.V1_0},
-	OpTextSetLeading:           {Since: pdf.V1_0},
-	OpTextSetFont:              {Since: pdf.V1_0},
-	OpTextSetRenderingMode:     {Since: pdf.V1_0},
-	OpTextSetRise:              {Since: pdf.V1_0},
+	OpTextSetCharacterSpacing  OpName = "Tc"
+	OpTextSetWordSpacing       OpName = "Tw"
+	OpTextSetHorizontalScaling OpName = "Tz"
+	OpTextSetLeading           OpName = "TL"
+	OpTextSetFont              OpName = "Tf"
+	OpTextSetRenderingMode     OpName = "Tr"
+	OpTextSetRise              OpName = "Ts"
 
 	// Text Positioning
-	OpTextMoveOffset:           {Since: pdf.V1_0},
-	OpTextMoveOffsetSetLeading: {Since: pdf.V1_0},
-	OpTextSetMatrix:            {Since: pdf.V1_0},
-	OpTextNextLine:             {Since: pdf.V1_0},
+	OpTextMoveOffset           OpName = "Td"
+	OpTextMoveOffsetSetLeading OpName = "TD"
+	OpTextSetMatrix            OpName = "Tm"
+	OpTextNextLine             OpName = "T*"
 
 	// Text Showing
-	OpTextShow:                       {Since: pdf.V1_0},
-	OpTextShowArray:                  {Since: pdf.V1_0},
-	OpTextShowMoveNextLine:           {Since: pdf.V1_0},
-	OpTextShowMoveNextLineSetSpacing: {Since: pdf.V1_0},
+	OpTextShow                       OpName = "Tj"
+	OpTextShowArray                  OpName = "TJ"
+	OpTextShowMoveNextLine           OpName = "'"
+	OpTextShowMoveNextLineSetSpacing OpName = "\""
 
 	// Type 3 Fonts
-	OpType3ColoredGlyph:   {Since: pdf.V1_0},
-	OpType3UncoloredGlyph: {Since: pdf.V1_0},
+	OpType3ColoredGlyph   OpName = "d0"
+	OpType3UncoloredGlyph OpName = "d1"
 
-	// Colour
-	OpSetStrokeColorSpace: {Since: pdf.V1_1},
-	OpSetFillColorSpace:   {Since: pdf.V1_1},
-	OpSetStrokeColor:      {Since: pdf.V1_1},
-	OpSetStrokeColorN:     {Since: pdf.V1_2},
-	OpSetFillColor:        {Since: pdf.V1_1},
-	OpSetFillColorN:       {Since: pdf.V1_2},
-	OpSetStrokeGray:       {Since: pdf.V1_0},
-	OpSetFillGray:         {Since: pdf.V1_0},
-	OpSetStrokeRGB:        {Since: pdf.V1_0},
-	OpSetFillRGB:          {Since: pdf.V1_0},
-	OpSetStrokeCMYK:       {Since: pdf.V1_0},
-	OpSetFillCMYK:         {Since: pdf.V1_0},
+	// Color Spaces
+	OpSetStrokeColorSpace OpName = "CS"
+	OpSetFillColorSpace   OpName = "cs"
+
+	// Generic Color
+	OpSetStrokeColor  OpName = "SC"
+	OpSetStrokeColorN OpName = "SCN"
+	OpSetFillColor    OpName = "sc"
+	OpSetFillColorN   OpName = "scn"
+
+	// Device Colors
+	OpSetStrokeGray OpName = "G"
+	OpSetFillGray   OpName = "g"
+	OpSetStrokeRGB  OpName = "RG"
+	OpSetFillRGB    OpName = "rg"
+	OpSetStrokeCMYK OpName = "K"
+	OpSetFillCMYK   OpName = "k"
 
 	// Shading Patterns
-	OpShading: {Since: pdf.V1_3},
-
-	// Inline Images
-	opBeginInlineImage: {Since: pdf.V1_0},
-	opInlineImageData:  {Since: pdf.V1_0},
-	opEndInlineImage:   {Since: pdf.V1_0},
+	OpShading OpName = "sh"
 
 	// XObjects
-	OpXObject: {Since: pdf.V1_0},
+	OpXObject OpName = "Do"
 
 	// Marked Content
-	OpMarkedContentPoint:               {Since: pdf.V1_2},
-	OpMarkedContentPointWithProperties: {Since: pdf.V1_2},
-	OpBeginMarkedContent:               {Since: pdf.V1_2},
-	OpBeginMarkedContentWithProperties: {Since: pdf.V1_2},
-	OpEndMarkedContent:                 {Since: pdf.V1_2},
+	OpMarkedContentPoint               OpName = "MP"
+	OpMarkedContentPointWithProperties OpName = "DP"
+	OpBeginMarkedContent               OpName = "BMC"
+	OpBeginMarkedContentWithProperties OpName = "BDC"
+	OpEndMarkedContent                 OpName = "EMC"
 
 	// Compatibility
-	OpBeginCompatibility: {Since: pdf.V1_1},
-	OpEndCompatibility:   {Since: pdf.V1_1},
+	OpBeginCompatibility OpName = "BX"
+	OpEndCompatibility   OpName = "EX"
 
-	// Pseudo-operators (internal use)
-	OpRawContent:  {Since: pdf.V1_0},
-	OpInlineImage: {Since: pdf.V1_0},
-}
+	// Pseudo-operators used internally
+	OpRawContent  OpName = "%raw%"   // comments, whitespace and unparsed data
+	OpInlineImage OpName = "%image%" // BI...ID...EI inline image
+
+	// Inline image operators (unexported).
+	// BI, ID, EI are parsed as a unit and converted to OpInlineImage.
+	opBeginInlineImage OpName = "BI"
+	opInlineImageData  OpName = "ID"
+	opEndInlineImage   OpName = "EI"
+)

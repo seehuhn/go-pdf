@@ -53,7 +53,7 @@ func (b *Builder) TextSetCharacterSpacing(charSpacing float64) {
 		return
 	}
 	b.State.Param.TextCharacterSpacing = charSpacing
-	b.State.MarkKnown(graphics.StateTextCharacterSpacing)
+	b.State.MarkAsSet(graphics.StateTextCharacterSpacing)
 	b.emit(content.OpTextSetCharacterSpacing, pdf.Number(charSpacing))
 }
 
@@ -66,7 +66,7 @@ func (b *Builder) TextSetWordSpacing(wordSpacing float64) {
 		return
 	}
 	b.State.Param.TextWordSpacing = wordSpacing
-	b.State.MarkKnown(graphics.StateTextWordSpacing)
+	b.State.MarkAsSet(graphics.StateTextWordSpacing)
 	b.emit(content.OpTextSetWordSpacing, pdf.Number(wordSpacing))
 }
 
@@ -80,7 +80,7 @@ func (b *Builder) TextSetHorizontalScaling(scaling float64) {
 		return
 	}
 	b.State.Param.TextHorizontalScaling = scaling
-	b.State.MarkKnown(graphics.StateTextHorizontalScaling)
+	b.State.MarkAsSet(graphics.StateTextHorizontalScaling)
 	// PDF operator expects percentage (100 = normal)
 	b.emit(content.OpTextSetHorizontalScaling, pdf.Number(scaling*100))
 }
@@ -94,7 +94,7 @@ func (b *Builder) TextSetLeading(leading float64) {
 		return
 	}
 	b.State.Param.TextLeading = leading
-	b.State.MarkKnown(graphics.StateTextLeading)
+	b.State.MarkAsSet(graphics.StateTextLeading)
 	b.emit(content.OpTextSetLeading, pdf.Number(leading))
 }
 
@@ -111,7 +111,7 @@ func (b *Builder) TextSetRenderingMode(mode graphics.TextRenderingMode) {
 		return
 	}
 	b.State.Param.TextRenderingMode = mode
-	b.State.MarkKnown(graphics.StateTextRenderingMode)
+	b.State.MarkAsSet(graphics.StateTextRenderingMode)
 	b.emit(content.OpTextSetRenderingMode, pdf.Integer(mode))
 }
 
@@ -124,7 +124,7 @@ func (b *Builder) TextSetRise(rise float64) {
 		return
 	}
 	b.State.Param.TextRise = rise
-	b.State.MarkKnown(graphics.StateTextRise)
+	b.State.MarkAsSet(graphics.StateTextRise)
 	b.emit(content.OpTextSetRise, pdf.Number(rise))
 }
 
@@ -144,7 +144,7 @@ func (b *Builder) TextSetFont(f font.Instance, size float64) {
 
 	b.State.Param.TextFont = f
 	b.State.Param.TextFontSize = size
-	b.State.MarkKnown(graphics.StateTextFont)
+	b.State.MarkAsSet(graphics.StateTextFont)
 
 	name := b.getFontName(f)
 	b.emit(content.OpTextSetFont, name, pdf.Number(size))

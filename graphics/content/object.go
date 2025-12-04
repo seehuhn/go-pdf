@@ -44,5 +44,8 @@ const (
 	ObjPath                            // Path construction in progress
 	ObjText                            // Inside text object (BT...ET)
 	ObjClippingPath                    // Clipping path operator executed
-	ObjType3Start                      // Awaiting d0 or d1 for Type3 font glyph
+	ObjType3Start                      // Awaiting d0 or d1 for Type 3 font glyph
+
+	// ObjAny is a bitmask matching any object state.
+	ObjAny = ObjPage | ObjPath | ObjText | ObjClippingPath | ObjType3Start
 )

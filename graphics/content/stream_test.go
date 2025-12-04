@@ -35,21 +35,21 @@ var roundTripTestCases = []struct {
 	{name: "arrays and dicts", stream: "[1 2 3] 0 d\n<</Type /XObject>> gs\n"},
 	{name: "comments", stream: "% this is a comment\nq\nQ\n"},
 	{name: "inline image", stream: "BI\n/W 10\n/H 10\nID\nimagedata\nEI\n"},
-	{name: "mixed content", stream: "q\n% save state\n1 0 0 1 0 0 cm\n/F1 12 Tf\n(Text) Tj\nQ\n"},
+	{name: "mixed content", stream: "q\n% save state\n1 0 0 1 0 0 cm\nBT\n/F1 12 Tf\n(Text) Tj\nET\nQ\n"},
 }
 
 func TestStreamRoundTrip(t *testing.T) {
 	for _, tt := range roundTripTestCases {
 		t.Run(tt.name, func(t *testing.T) {
 			// first read
-			stream1, err := ReadStream(bytes.NewReader([]byte(tt.stream)), pdf.V2_0, PageContent)
+			stream1, err := ReadStream(bytes.NewReader([]byte(tt.stream)), pdf.V2_0, Page)
 			if err != nil {
 				t.Fatalf("first read: %v", err)
 			}
 
 			// write using Writer (permissive: use latest version)
 			var buf bytes.Buffer
-			w := NewWriter(PageContent, nil, pdf.V2_0)
+			w := NewWriter(pdf.V2_0, Page, nil)
 			if err := w.Write(&buf, stream1); err != nil {
 				t.Fatalf("write: %v", err)
 			}
@@ -58,7 +58,7 @@ func TestStreamRoundTrip(t *testing.T) {
 			}
 
 			// second read
-			stream2, err := ReadStream(bytes.NewReader(buf.Bytes()), pdf.V2_0, PageContent)
+			stream2, err := ReadStream(bytes.NewReader(buf.Bytes()), pdf.V2_0, Page)
 			if err != nil {
 				t.Fatalf("second read: %v", err)
 			}
@@ -78,14 +78,14 @@ func FuzzStreamRoundTrip(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		// first read - permissive, may skip malformed content
-		stream1, err := ReadStream(bytes.NewReader(data), pdf.V2_0, PageContent)
+		stream1, err := ReadStream(bytes.NewReader(data), pdf.V2_0, Page)
 		if err != nil {
 			return
 		}
 
 		// write - must succeed if read succeeded
 		var buf bytes.Buffer
-		w := NewWriter(PageContent, nil, pdf.V2_0)
+		w := NewWriter(pdf.V2_0, Page, nil)
 		if err := w.Write(&buf, stream1); err != nil {
 			t.Fatalf("write failed: %v", err)
 		}
@@ -94,7 +94,7 @@ func FuzzStreamRoundTrip(f *testing.F) {
 		}
 
 		// second read
-		stream2, err := ReadStream(bytes.NewReader(buf.Bytes()), pdf.V2_0, PageContent)
+		stream2, err := ReadStream(bytes.NewReader(buf.Bytes()), pdf.V2_0, Page)
 		if err != nil {
 			t.Fatalf("second read failed: %v", err)
 		}
@@ -156,7 +156,7 @@ func TestInlineImageLimits(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stream, err := ReadStream(bytes.NewReader([]byte(tt.stream)), pdf.V2_0, PageContent)
+			stream, err := ReadStream(bytes.NewReader([]byte(tt.stream)), pdf.V2_0, Page)
 			if err != nil {
 				t.Fatalf("ReadStream error: %v", err)
 			}
@@ -186,7 +186,7 @@ func TestOperatorArgLimit(t *testing.T) {
 	buf.WriteString("q\n") // save graphics state (should be parsed)
 	buf.WriteString("Q\n") // restore graphics state
 
-	stream, err := ReadStream(bytes.NewReader(buf.Bytes()), pdf.V2_0, PageContent)
+	stream, err := ReadStream(bytes.NewReader(buf.Bytes()), pdf.V2_0, Page)
 	if err != nil {
 		t.Fatalf("ReadStream error: %v", err)
 	}

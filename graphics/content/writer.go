@@ -32,9 +32,9 @@ type Writer struct {
 }
 
 // NewWriter creates a Writer for the given content type and PDF version.
-func NewWriter(ct Type, res *Resources, v pdf.Version) *Writer {
+func NewWriter(v pdf.Version, ct Type, res *Resources) *Writer {
 	return &Writer{
-		State:   NewStateForContent(ct),
+		State:   NewState(ct),
 		version: v,
 		res:     res,
 	}
@@ -64,7 +64,7 @@ func (w *Writer) Write(out io.Writer, s Stream) error {
 	return nil
 }
 
-// Close checks final state validity with version-specific checks.
+// Close checks for balanced operators and version-specific stack depth limits.
 func (w *Writer) Close() error {
 	if err := w.State.CanClose(); err != nil {
 		return err
@@ -105,13 +105,16 @@ func (w *Writer) applyOperator(op Operator) error {
 	case OpEndCompatibility:
 		err = w.CompatibilityEnd()
 	case OpType3ColoredGlyph:
-		err = w.State.Type3ColoredGlyph()
+		err = w.State.GlyphColored()
 	case OpType3UncoloredGlyph:
-		err = w.State.Type3UncoloredGlyph()
+		err = w.State.GlyphUncolored()
 	}
 	if err != nil {
 		return err
 	}
+
+	// apply object state transitions for path/clipping operators
+	w.State.ApplyTransition(op.Name)
 
 	// validate resource references
 	if w.res != nil {

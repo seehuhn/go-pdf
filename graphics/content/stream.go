@@ -18,6 +18,7 @@ package content
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"slices"
@@ -36,6 +37,31 @@ import (
 //   - Annotation appearances
 type Stream []Operator
 
+// Type identifies the type of content stream.
+type Type int
+
+const (
+	Page    Type = iota // page content stream
+	Form                // Form XObject (includes annotation appearances)
+	Pattern             // tiling pattern
+	Glyph               // Type 3 font glyph
+)
+
+func (ct Type) String() string {
+	switch ct {
+	case Page:
+		return "page"
+	case Form:
+		return "form"
+	case Pattern:
+		return "pattern"
+	case Glyph:
+		return "glyph"
+	default:
+		return fmt.Sprintf("Type(%d)", ct)
+	}
+}
+
 // ReadStream reads a PDF content stream and returns the sequence of operators.
 // The version parameter specifies the PDF version to use for validation:
 //   - For v <= pdf.MaxVersion, unknown and version-incompatible operators
@@ -52,6 +78,10 @@ type Stream []Operator
 //
 // If the stream has unbalanced state at EOF (unclosed q/Q, BT/ET, BMC/EMC,
 // or BX/EX), the missing closing operators are appended automatically.
+//
+// Operators that are invalid in the current graphics object context are
+// either fixed up (text operators get BT auto-inserted) or skipped
+// (path operators outside path context).
 func ReadStream(r io.Reader, v pdf.Version, ct Type) (Stream, error) {
 	s := &streamScanner{
 		buf: make([]byte, 512),
@@ -59,11 +89,7 @@ func ReadStream(r io.Reader, v pdf.Version, ct Type) (Stream, error) {
 	s.src = r
 
 	var stream Stream
-
-	// state tracking for filtering and auto-close at EOF
-	// uses proper nesting stack like the writer to ensure accuracy
-	var nesting []PairType
-	var compatibilityDepth int // fast check for BX/EX
+	state := NewState(ct) // tracks nesting, compatibility, and current object
 
 	for {
 		op, err := s.scan()
@@ -72,7 +98,7 @@ func ReadStream(r io.Reader, v pdf.Version, ct Type) (Stream, error) {
 			// filter based on version validation
 			validErr := op.isValidName(v)
 			if validErr == ErrUnknown || validErr == ErrVersion {
-				if compatibilityDepth > 0 {
+				if state.InCompatibilitySection() {
 					// inside BX/EX: keep unknown operators
 				} else if v > pdf.MaxVersion {
 					// future PDF version: keep (may be valid)
@@ -92,76 +118,35 @@ func ReadStream(r io.Reader, v pdf.Version, ct Type) (Stream, error) {
 			}
 
 			// filter Type 3 operators based on content type
-			if ct != Type3Content {
+			if ct != Glyph {
 				if op.Name == OpType3ColoredGlyph || op.Name == OpType3UncoloredGlyph {
 					continue
 				}
 			}
 
-			// update state tracking and filter improperly nested operators
-			switch op.Name {
-			case OpPushGraphicsState:
-				nesting = append(nesting, PairQ)
-			case OpPopGraphicsState:
-				if len(nesting) > 0 && nesting[len(nesting)-1] == PairQ {
-					nesting = nesting[:len(nesting)-1]
-				} else {
-					continue // drop mismatched/unbalanced Q
-				}
-			case OpTextBegin:
-				// BT is only valid when not already in text object
-				inText := false
-				for _, p := range nesting {
-					if p == PairBT {
-						inText = true
-						break
+			// check if operator is allowed in current state and fix up if needed
+			if state.CheckOperatorAllowed(op.Name) != nil {
+				// not allowed - try to fix up
+				if fixOps := fixupOperator(state, op); fixOps != nil {
+					for _, fixOp := range fixOps {
+						applyReaderStateChange(state, fixOp.Name)
+						stream = append(stream, fixOp)
 					}
+					continue
 				}
-				if inText {
-					continue // drop nested BT
-				}
-				nesting = append(nesting, PairBT)
-			case OpTextEnd:
-				if len(nesting) > 0 && nesting[len(nesting)-1] == PairBT {
-					nesting = nesting[:len(nesting)-1]
-				} else {
-					continue // drop mismatched/unbalanced ET
-				}
-			case OpBeginMarkedContent, OpBeginMarkedContentWithProperties:
-				nesting = append(nesting, PairBMC)
-			case OpEndMarkedContent:
-				if len(nesting) > 0 && nesting[len(nesting)-1] == PairBMC {
-					nesting = nesting[:len(nesting)-1]
-				} else {
-					continue // drop mismatched/unbalanced EMC
-				}
-			case OpBeginCompatibility:
-				nesting = append(nesting, PairBX)
-				compatibilityDepth++
-			case OpEndCompatibility:
-				if len(nesting) > 0 && nesting[len(nesting)-1] == PairBX {
-					nesting = nesting[:len(nesting)-1]
-					compatibilityDepth--
-				} else {
-					continue // drop mismatched/unbalanced EX
-				}
+				// can't fix up - skip
+				continue
+			}
+
+			// update state and filter improperly nested operators
+			if !applyReaderStateChange(state, op.Name) {
+				continue // drop mismatched/unbalanced closing operators
 			}
 
 			stream = append(stream, op)
 		case io.EOF:
-			// auto-close unbalanced state in reverse order
-			for i := len(nesting) - 1; i >= 0; i-- {
-				switch nesting[i] {
-				case PairQ:
-					stream = append(stream, Operator{Name: OpPopGraphicsState})
-				case PairBT:
-					stream = append(stream, Operator{Name: OpTextEnd})
-				case PairBMC:
-					stream = append(stream, Operator{Name: OpEndMarkedContent})
-				case PairBX:
-					stream = append(stream, Operator{Name: OpEndCompatibility})
-				}
-			}
+			// auto-close open contexts
+			stream = append(stream, closeOpenContexts(state)...)
 			return stream, nil
 		case errParse:
 			// permissive: skip malformed content
@@ -170,6 +155,79 @@ func ReadStream(r io.Reader, v pdf.Version, ct Type) (Stream, error) {
 			return stream, err
 		}
 	}
+}
+
+// fixupOperator returns operators to insert (including op) if the operator
+// can be fixed up, or nil if the operator should be skipped.
+// This function does NOT update state - the caller must apply state changes
+// for all returned operators.
+func fixupOperator(state *State, op Operator) []Operator {
+	info := operators[op.Name]
+	if info == nil {
+		return nil
+	}
+
+	// text operator outside text context: auto-insert BT if allowed
+	if info.Allowed == ObjText && state.CurrentObject != ObjText {
+		// BT is only allowed in page context
+		if state.CurrentObject == ObjPage {
+			return []Operator{{Name: OpTextBegin}, op}
+		}
+		// can't insert BT in path or other context - skip the operator
+		return nil
+	}
+
+	// can't fix up other cases
+	return nil
+}
+
+// applyReaderStateChange updates state for an accepted operator.
+// Returns false if a closing operator is mismatched/unbalanced and should be skipped.
+func applyReaderStateChange(state *State, name OpName) bool {
+	switch name {
+	case OpPushGraphicsState:
+		state.Push()
+	case OpPopGraphicsState:
+		if err := state.Pop(); err != nil {
+			return false // mismatched Q
+		}
+	case OpTextBegin:
+		if err := state.TextBegin(); err != nil {
+			return false // nested BT
+		}
+	case OpTextEnd:
+		if err := state.TextEnd(); err != nil {
+			return false // mismatched ET
+		}
+	case OpBeginMarkedContent, OpBeginMarkedContentWithProperties:
+		state.MarkedContentBegin()
+	case OpEndMarkedContent:
+		if err := state.MarkedContentEnd(); err != nil {
+			return false // mismatched EMC
+		}
+	case OpBeginCompatibility:
+		state.CompatibilityBegin()
+	case OpEndCompatibility:
+		if err := state.CompatibilityEnd(); err != nil {
+			return false // mismatched EX
+		}
+	case OpType3ColoredGlyph:
+		state.GlyphColored()
+	case OpType3UncoloredGlyph:
+		state.GlyphUncolored()
+	}
+	state.ApplyTransition(name)
+	return true
+}
+
+// closeOpenContexts returns operators to close any open contexts at EOF.
+func closeOpenContexts(state *State) []Operator {
+	names := state.ClosingOperators()
+	ops := make([]Operator, len(names))
+	for i, name := range names {
+		ops[i] = Operator{Name: name}
+	}
+	return ops
 }
 
 // streamScanner is an internal scanner for content streams

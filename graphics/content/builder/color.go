@@ -98,10 +98,10 @@ func (b *Builder) setColor(c color.Color, fill bool) {
 		if fill {
 			op = strings.ToLower(op)
 			b.State.Param.FillColor = c
-			b.State.MarkKnown(graphics.StateFillColor)
+			b.State.MarkAsSet(graphics.StateFillColor)
 		} else {
 			b.State.Param.StrokeColor = c
-			b.State.MarkKnown(graphics.StateStrokeColor)
+			b.State.MarkAsSet(graphics.StateStrokeColor)
 		}
 		b.emit(content.OpName(op), args...)
 	}

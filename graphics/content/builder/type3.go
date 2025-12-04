@@ -43,8 +43,8 @@ func (b *Builder) Type3SetWidthAndBoundingBox(wx, wy, llx, lly, urx, ury float64
 }
 
 func (b *Builder) checkType3ColorAllowed() error {
-	if b.State.Type3Mode == content.Type3ModeD1 {
-		return errors.New("color operators not allowed in d1 glyphs")
+	if b.State.ColorOpsForbidden {
+		return errors.New("color operators not allowed")
 	}
 	return nil
 }

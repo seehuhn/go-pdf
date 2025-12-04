@@ -27,7 +27,7 @@ import (
 
 func TestMultiSegmentPage(t *testing.T) {
 	// Build two segments
-	b := builder.New(content.PageContent, nil)
+	b := builder.New(content.Page, nil)
 
 	// First segment
 	b.SetLineWidth(2)
@@ -63,7 +63,7 @@ func TestMultiSegmentPage(t *testing.T) {
 
 	// Write both segments
 	var buf1, buf2 bytes.Buffer
-	w := content.NewWriter(content.PageContent, b.Resources, pdf.V1_7)
+	w := content.NewWriter(pdf.V1_7, content.Page, b.Resources)
 	if err := w.Write(&buf1, stream1); err != nil {
 		t.Fatalf("Write stream1: %v", err)
 	}
@@ -79,7 +79,7 @@ func TestType3FontGlyphs(t *testing.T) {
 	sharedRes := &content.Resources{}
 
 	// Glyph 'A' with d0 (colored)
-	bA := builder.New(content.Type3Content, sharedRes)
+	bA := builder.New(content.Glyph, sharedRes)
 	bA.Type3SetWidthOnly(500, 0)
 	bA.MoveTo(0, 0)
 	bA.LineTo(250, 700)
@@ -94,7 +94,7 @@ func TestType3FontGlyphs(t *testing.T) {
 	}
 
 	// Glyph 'B' with d1 (inherits color)
-	bB := builder.New(content.Type3Content, sharedRes)
+	bB := builder.New(content.Glyph, sharedRes)
 	bB.Type3SetWidthAndBoundingBox(600, 0, 0, 0, 600, 700)
 	// No color operators allowed
 	bB.MoveTo(0, 0)
@@ -112,11 +112,11 @@ func TestType3FontGlyphs(t *testing.T) {
 
 	// Write both
 	var bufA, bufB bytes.Buffer
-	wA := content.NewWriter(content.Type3Content, sharedRes, pdf.V1_7)
+	wA := content.NewWriter(pdf.V1_7, content.Glyph, sharedRes)
 	if err := wA.Write(&bufA, streamA); err != nil {
 		t.Fatalf("Write glyph A: %v", err)
 	}
-	wB := content.NewWriter(content.Type3Content, sharedRes, pdf.V1_7)
+	wB := content.NewWriter(pdf.V1_7, content.Glyph, sharedRes)
 	if err := wB.Write(&bufB, streamB); err != nil {
 		t.Fatalf("Write glyph B: %v", err)
 	}
@@ -126,9 +126,9 @@ func TestType3FontGlyphs(t *testing.T) {
 	}
 }
 
-func TestFormContentInheritedState(t *testing.T) {
-	// FormContent: all params are Set-Unknown, no elision
-	b := builder.New(content.FormContent, nil)
+func TestFormInheritedState(t *testing.T) {
+	// Form: all params are Set-Unknown, no elision
+	b := builder.New(content.Form, nil)
 
 	// First set: should emit (not Known)
 	b.SetLineWidth(5.0)
@@ -158,13 +158,13 @@ func TestFormContentInheritedState(t *testing.T) {
 }
 
 func TestWriterVersionValidation(t *testing.T) {
-	b := builder.New(content.PageContent, nil)
+	b := builder.New(content.Page, nil)
 	b.SetRenderingIntent("Perceptual")
 	stream, _ := b.Harvest()
 
 	// PDF 1.0 doesn't support ri
 	var buf bytes.Buffer
-	w := content.NewWriter(content.PageContent, b.Resources, pdf.V1_0)
+	w := content.NewWriter(pdf.V1_0, content.Page, b.Resources)
 	err := w.Write(&buf, stream)
 	if err == nil {
 		t.Error("ri should fail for PDF 1.0")
@@ -172,7 +172,7 @@ func TestWriterVersionValidation(t *testing.T) {
 
 	// PDF 1.1+ supports ri
 	buf.Reset()
-	w2 := content.NewWriter(content.PageContent, b.Resources, pdf.V1_1)
+	w2 := content.NewWriter(pdf.V1_1, content.Page, b.Resources)
 	err = w2.Write(&buf, stream)
 	if err != nil {
 		t.Errorf("ri should work for PDF 1.1: %v", err)

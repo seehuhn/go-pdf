@@ -24,33 +24,33 @@ import (
 )
 
 func TestBuilder_Type3SetWidthOnly(t *testing.T) {
-	b := New(content.Type3Content, nil)
+	b := New(content.Glyph, nil)
 
 	b.Type3SetWidthOnly(500, 0)
 	if b.Err != nil {
 		t.Fatalf("Type3SetWidthOnly failed: %v", b.Err)
 	}
 
-	if b.State.Type3Mode != content.Type3ModeD0 {
-		t.Errorf("Type3Mode = %v, want D0", b.State.Type3Mode)
+	if b.State.ColorOpsForbidden {
+		t.Error("ColorOpsForbidden should be false after d0")
 	}
 }
 
 func TestBuilder_Type3SetWidthAndBBox(t *testing.T) {
-	b := New(content.Type3Content, nil)
+	b := New(content.Glyph, nil)
 
 	b.Type3SetWidthAndBoundingBox(600, 0, 0, 0, 500, 700)
 	if b.Err != nil {
 		t.Fatalf("Type3SetWidthAndBoundingBox failed: %v", b.Err)
 	}
 
-	if b.State.Type3Mode != content.Type3ModeD1 {
-		t.Errorf("Type3Mode = %v, want D1", b.State.Type3Mode)
+	if !b.State.ColorOpsForbidden {
+		t.Error("ColorOpsForbidden should be true after d1")
 	}
 }
 
 func TestBuilder_Type3ColorRestriction(t *testing.T) {
-	b := New(content.Type3Content, nil)
+	b := New(content.Glyph, nil)
 
 	// d1 mode
 	b.Type3SetWidthAndBoundingBox(600, 0, 0, 0, 500, 700)
@@ -66,7 +66,7 @@ func TestBuilder_Type3ColorRestriction(t *testing.T) {
 }
 
 func TestBuilder_Type3NotFirstOp(t *testing.T) {
-	b := New(content.Type3Content, nil)
+	b := New(content.Glyph, nil)
 
 	// Some other operator first
 	b.SetLineWidth(1.0)
@@ -79,7 +79,7 @@ func TestBuilder_Type3NotFirstOp(t *testing.T) {
 }
 
 func TestBuilder_Type3D0AllowsColor(t *testing.T) {
-	b := New(content.Type3Content, nil)
+	b := New(content.Glyph, nil)
 
 	// d0 mode
 	b.Type3SetWidthOnly(500, 0)

@@ -22,43 +22,43 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 )
 
-func TestNewState_PageContent(t *testing.T) {
-	s := NewStateForContent(PageContent)
+func TestNewState_Page(t *testing.T) {
+	s := NewState(Page)
 
-	// PageContent: Set=initializedStateBits, Known=initializedStateBits
+	// Page: Set=initializedStateBits, Known=initializedStateBits
 	// Font is NOT in initializedStateBits
 	if s.Set&graphics.StateTextFont != 0 {
-		t.Error("PageContent: font should be Unset")
+		t.Error("Page: font should be Unset")
 	}
 	if s.Known&graphics.StateTextFont != 0 {
-		t.Error("PageContent: font should not be Known")
+		t.Error("Page: font should not be Known")
 	}
 
 	// LineWidth should be Set and Known
 	if s.Set&graphics.StateLineWidth == 0 {
-		t.Error("PageContent: line width should be Set")
+		t.Error("Page: line width should be Set")
 	}
 	if s.Known&graphics.StateLineWidth == 0 {
-		t.Error("PageContent: line width should be Known")
+		t.Error("Page: line width should be Known")
 	}
 }
 
-func TestNewState_FormContent(t *testing.T) {
-	s := NewStateForContent(FormContent)
+func TestNewState_Form(t *testing.T) {
+	s := NewState(Form)
 
-	// FormContent: Set=AllStateBits, Known=0
+	// Form: Set=AllStateBits, Known=0
 	if s.Set != graphics.AllStateBits {
-		t.Errorf("FormContent: Set = %v, want AllStateBits", s.Set)
+		t.Errorf("Form: Set = %v, want AllStateBits", s.Set)
 	}
 	if s.Known != 0 {
-		t.Errorf("FormContent: Known = %v, want 0", s.Known)
+		t.Errorf("Form: Known = %v, want 0", s.Known)
 	}
 }
 
 func TestState_IsKnown(t *testing.T) {
-	s := NewStateForContent(PageContent)
+	s := NewState(Page)
 
-	// LineWidth is Known for PageContent
+	// LineWidth is Known for Page
 	if !s.IsKnown(graphics.StateLineWidth) {
 		t.Error("line width should be Known")
 	}
@@ -70,9 +70,9 @@ func TestState_IsKnown(t *testing.T) {
 }
 
 func TestState_IsSet(t *testing.T) {
-	s := NewStateForContent(FormContent)
+	s := NewState(Form)
 
-	// Everything is Set for FormContent
+	// Everything is Set for Form
 	if !s.IsSet(graphics.StateLineWidth) {
 		t.Error("line width should be Set")
 	}
@@ -81,44 +81,44 @@ func TestState_IsSet(t *testing.T) {
 	}
 }
 
-func TestState_MarkKnown(t *testing.T) {
-	s := NewStateForContent(FormContent)
+func TestState_MarkAsSet(t *testing.T) {
+	s := NewState(Form)
 
 	// Initially not Known
 	if s.IsKnown(graphics.StateLineWidth) {
 		t.Error("line width should not be Known initially")
 	}
 
-	// After marking Known
-	s.MarkKnown(graphics.StateLineWidth)
+	// After MarkAsSet
+	s.MarkAsSet(graphics.StateLineWidth)
 	if !s.IsKnown(graphics.StateLineWidth) {
-		t.Error("line width should be Known after marking")
+		t.Error("line width should be Known after MarkAsSet")
 	}
 }
 
 func TestState_MarkUsedUnknown(t *testing.T) {
-	s := NewStateForContent(FormContent)
+	s := NewState(Form)
 
 	// Use a Set-Unknown parameter
-	s.MarkUsedIfUnknown(graphics.StateLineWidth)
-	if s.UsedUnknown&graphics.StateLineWidth == 0 {
+	s.MarkAsUsed(graphics.StateLineWidth)
+	if s.FromContext&graphics.StateLineWidth == 0 {
 		t.Error("line width should be in UsedUnknown")
 	}
 
 	// Known params should not be marked
-	s.MarkKnown(graphics.StateLineCap)
-	s.MarkUsedIfUnknown(graphics.StateLineCap)
-	if s.UsedUnknown&graphics.StateLineCap != 0 {
+	s.MarkAsSet(graphics.StateLineCap)
+	s.MarkAsUsed(graphics.StateLineCap)
+	if s.FromContext&graphics.StateLineCap != 0 {
 		t.Error("line cap should not be in UsedUnknown (it's Known)")
 	}
 }
 
 func TestState_PushPop(t *testing.T) {
-	s := NewStateForContent(PageContent)
+	s := NewState(Page)
 
 	// Set line width to custom value
 	s.Param.LineWidth = 5.0
-	s.MarkKnown(graphics.StateLineWidth)
+	s.MarkAsSet(graphics.StateLineWidth)
 
 	// Push state
 	if err := s.Push(); err != nil {
@@ -140,7 +140,7 @@ func TestState_PushPop(t *testing.T) {
 }
 
 func TestState_PopEmpty(t *testing.T) {
-	s := NewStateForContent(PageContent)
+	s := NewState(Page)
 
 	// Pop on empty stack should error
 	if err := s.Pop(); err == nil {
@@ -149,7 +149,7 @@ func TestState_PopEmpty(t *testing.T) {
 }
 
 func TestState_MaxStackDepth(t *testing.T) {
-	s := NewStateForContent(PageContent)
+	s := NewState(Page)
 
 	for i := 0; i < 5; i++ {
 		s.Push()
@@ -204,7 +204,7 @@ func TestState_Validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := NewStateForContent(PageContent)
+			s := NewState(Page)
 			tt.setup(s)
 			err := s.CanClose()
 			if (err != nil) != tt.wantErr {

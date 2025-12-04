@@ -21,19 +21,4 @@
 // resource dictionary that provides named resources (fonts, images, etc.)
 // referenced by operators. Together, a content stream and its resource
 // dictionary form a self-contained entity.
-//
-// # Building Content Streams
-//
-// Use [State] with [Writer] for constructing new content streams. State tracks
-// graphics parameters using Set/Known bits:
-//
-//   - Set: Parameter has a value (either known or inherited)
-//   - Known: Parameter has a known value (subset of Set)
-//   - UsedUnknown: Set-Unknown parameters that were used (for dependency tracking)
-//
-// The three-state model (Unset, Set-Unknown, Known) enables proper elision of
-// redundant operators and tracking of inherited dependencies in Form XObjects.
-//
-// For a high-level API, use the [builder.Builder] type from the builder
-// sub-package.
 package content

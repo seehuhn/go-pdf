@@ -55,7 +55,7 @@ func New(ct content.Type, res *content.Resources) *Builder {
 	}
 	b := &Builder{
 		Resources: res,
-		State:     content.NewStateForContent(ct),
+		State:     content.NewState(ct),
 		resName:   make(map[resKey]pdf.Name),
 	}
 
@@ -139,14 +139,17 @@ func (b *Builder) emit(name content.OpName, args ...pdf.Object) {
 	case content.OpEndCompatibility:
 		err = b.State.CompatibilityEnd()
 	case content.OpType3ColoredGlyph:
-		err = b.State.Type3ColoredGlyph()
+		err = b.State.GlyphColored()
 	case content.OpType3UncoloredGlyph:
-		err = b.State.Type3UncoloredGlyph()
+		err = b.State.GlyphUncolored()
 	}
 	if err != nil {
 		b.Err = err
 		return
 	}
+
+	// apply object state transitions for path/clipping operators
+	b.State.ApplyTransition(name)
 
 	op := content.Operator{Name: name, Args: args}
 	b.Stream = append(b.Stream, op)

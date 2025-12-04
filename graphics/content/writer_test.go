@@ -26,7 +26,7 @@ import (
 
 func TestWriter_WriteSimple(t *testing.T) {
 	var buf bytes.Buffer
-	w := NewWriter(PageContent, &Resources{}, pdf.V1_7)
+	w := NewWriter(pdf.V1_7, Page, &Resources{})
 
 	stream := Stream{
 		{Name: OpSetLineWidth, Args: []pdf.Object{pdf.Number(2)}},
@@ -47,7 +47,7 @@ func TestWriter_WriteSimple(t *testing.T) {
 
 func TestWriter_VersionCheck(t *testing.T) {
 	var buf bytes.Buffer
-	w := NewWriter(PageContent, &Resources{}, pdf.V1_0)
+	w := NewWriter(pdf.V1_0, Page, &Resources{})
 
 	// ri operator requires PDF 1.1
 	stream := Stream{
@@ -63,7 +63,7 @@ func TestWriter_VersionCheck(t *testing.T) {
 func TestWriter_StateTracking(t *testing.T) {
 	var buf bytes.Buffer
 	res := &Resources{}
-	w := NewWriter(PageContent, res, pdf.V1_7)
+	w := NewWriter(pdf.V1_7, Page, res)
 
 	// Write q/Q sequence
 	stream := Stream{
@@ -84,7 +84,7 @@ func TestWriter_StateTracking(t *testing.T) {
 
 func TestWriter_UnbalancedQ(t *testing.T) {
 	var buf bytes.Buffer
-	w := NewWriter(PageContent, &Resources{}, pdf.V1_7)
+	w := NewWriter(pdf.V1_7, Page, &Resources{})
 
 	stream := Stream{
 		{Name: OpPushGraphicsState},
@@ -186,7 +186,7 @@ func TestWriter_ResourceValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			w := NewWriter(PageContent, tt.res, pdf.V1_7)
+			w := NewWriter(pdf.V1_7, Page, tt.res)
 			err := w.Write(&buf, tt.stream)
 
 			if tt.errMsg == "" {
