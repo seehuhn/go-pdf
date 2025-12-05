@@ -256,6 +256,9 @@ func (b *Builder) TextShowSpacedRaw(wordSpacing, charSpacing float64, s pdf.Stri
 //
 // This implements the PDF graphics operator "TJ".
 func (b *Builder) TextShowKernedRaw(args ...pdf.Object) {
+	if b.Err != nil {
+		return
+	}
 	wMode := font.Horizontal
 	if b.Param.TextFont != nil {
 		wMode = b.Param.TextFont.WritingMode()
@@ -270,6 +273,9 @@ func (b *Builder) TextShowKernedRaw(args ...pdf.Object) {
 			b.applyTextKern(float64(arg), wMode)
 		case pdf.Number:
 			b.applyTextKern(float64(arg), wMode)
+		default:
+			b.Err = fmt.Errorf("TextShowKernedRaw: invalid argument type %T", arg)
+			return
 		}
 	}
 	b.emit(content.OpTextShowArray, pdf.Array(args))
