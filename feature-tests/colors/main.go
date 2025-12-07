@@ -32,6 +32,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/image"
+	"seehuhn.de/go/pdf/graphics/image/lab"
 	"seehuhn.de/go/pdf/graphics/pattern"
 	"seehuhn.de/go/pdf/graphics/shading"
 )
@@ -146,24 +147,14 @@ func showCalRGBColors(doc *document.MultiPage, F font.Layouter) error {
 }
 
 func showLabColors(doc *document.MultiPage, F font.Layouter) error {
-	Lab, err := color.Lab(color.WhitePointD65, nil, nil)
-	if err != nil {
-		return err
-	}
-
-	imgData := goimage.NewNRGBA(goimage.Rect(0, 0, 256, 256))
+	img := lab.NewLab8(256, 256)
 	for i := range 256 {
 		for j := range 256 {
-			idx := i*imgData.Stride + j*4
-			imgData.Pix[idx+0] = 128
-			imgData.Pix[idx+1] = uint8(j)
-			imgData.Pix[idx+2] = uint8(i)
-			imgData.Pix[idx+3] = 255
+			idx := i*256*3 + j*3
+			img.PixData[idx+0] = 128
+			img.PixData[idx+1] = uint8(j)
+			img.PixData[idx+2] = uint8(i)
 		}
-	}
-	img, err := image.PNG(imgData, Lab)
-	if err != nil {
-		return err
 	}
 
 	page := doc.AddPage()
@@ -188,7 +179,7 @@ func showLabColors(doc *document.MultiPage, F font.Layouter) error {
 	page.TextShow("Colors in the CIE L*a*b* color space, for L*=50 (color space ‘Lab’).")
 	page.TextEnd()
 
-	err = page.Close()
+	err := page.Close()
 	if err != nil {
 		return err
 	}
