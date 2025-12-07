@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"iter"
 	"math"
 	"os"
 
@@ -28,7 +27,6 @@ import (
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
 
-	"seehuhn.de/go/sfnt"
 	sfntcff "seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyph"
 
@@ -70,11 +68,7 @@ func createDocument(fname string) error {
 	noteFont := standard.TimesRoman.New()
 	note := text.F{Font: noteFont, Size: fontSize, Color: black}
 
-	origFont, err := cff.NewSimple(data.origFont, nil)
-	if err != nil {
-		return err
-	}
-	orig := text.F{Font: origFont, Size: fontSize, Color: blue}
+	orig := text.F{Font: data.origFont, Size: fontSize, Color: blue}
 
 	test := text.F{Font: data.testFont, Size: fontSize, Color: red}
 	testL := text.F{Font: data.testFont, Size: 100, Color: red}
@@ -83,7 +77,7 @@ func createDocument(fname string) error {
 	if err != nil {
 		return err
 	}
-	w.SetFontNameInternal(origFont, "Orig")
+	w.SetFontNameInternal(data.origFont, "Orig")
 	w.SetFontNameInternal(data.testFont, "Test")
 
 	// draw the text, including the large test glyphs
@@ -112,41 +106,41 @@ func createDocument(fname string) error {
 	)
 
 	// draw the bounding boxes
-	cff := data.testFont.cff
+	testCFF := data.testCFF
 
 	w.PushGraphicsState()
 	w.SetLineWidth(0.5)
 
 	x0 := x
 
-	bbox := data.testFont.cff.GlyphBBoxPDF(cff.FontMatrix, 2+0)
+	bbox := testCFF.GlyphBBoxPDF(testCFF.FontMatrix, 2+0)
 	bbox.Scale(100.0 / 1000.0) // convert to font size 100, and from glyph space
 	w.Rectangle(x+bbox.LLx, y+bbox.LLy, bbox.Dx(), bbox.Dy())
-	x += 100 * cff.GlyphWidthPDF(2+0) / 1000
+	x += 100 * testCFF.GlyphWidthPDF(2+0) / 1000
 
-	bbox = data.testFont.cff.GlyphBBoxPDF(cff.FontMatrix, 2+1)
+	bbox = testCFF.GlyphBBoxPDF(testCFF.FontMatrix, 2+1)
 	bbox.Scale(100.0 / 1000.0)
 	w.Rectangle(x+bbox.LLx, y+bbox.LLy, bbox.Dx(), bbox.Dy())
-	x += 100 * cff.GlyphWidthPDF(2+1) / 1000
+	x += 100 * testCFF.GlyphWidthPDF(2+1) / 1000
 
-	bbox = data.testFont.cff.GlyphBBoxPDF(cff.FontMatrix, 2+2)
+	bbox = testCFF.GlyphBBoxPDF(testCFF.FontMatrix, 2+2)
 	bbox.Scale(100.0 / 1000.0)
 	w.Rectangle(x+bbox.LLx, y+bbox.LLy, bbox.Dx(), bbox.Dy())
 
 	x = x0 // second line
 	y -= 100
 
-	bbox = data.testFont.cff.GlyphBBoxPDF(cff.FontMatrix, 2+26+0)
+	bbox = testCFF.GlyphBBoxPDF(testCFF.FontMatrix, 2+26+0)
 	bbox.Scale(100.0 / 1000.0) // convert to font size 100, and from glyph space
 	w.Rectangle(x+bbox.LLx, y+bbox.LLy, bbox.Dx(), bbox.Dy())
-	x += 100 * cff.GlyphWidthPDF(2+26+0) / 1000
+	x += 100 * testCFF.GlyphWidthPDF(2+26+0) / 1000
 
-	bbox = data.testFont.cff.GlyphBBoxPDF(cff.FontMatrix, 2+26+1)
+	bbox = testCFF.GlyphBBoxPDF(testCFF.FontMatrix, 2+26+1)
 	bbox.Scale(100.0 / 1000.0)
 	w.Rectangle(x+bbox.LLx, y+bbox.LLy, bbox.Dx(), bbox.Dy())
-	x += 100 * cff.GlyphWidthPDF(2+26+1) / 1000
+	x += 100 * testCFF.GlyphWidthPDF(2+26+1) / 1000
 
-	bbox = data.testFont.cff.GlyphBBoxPDF(cff.FontMatrix, 2+26+2)
+	bbox = testCFF.GlyphBBoxPDF(testCFF.FontMatrix, 2+26+2)
 	bbox.Scale(100.0 / 1000.0)
 	w.Rectangle(x+bbox.LLx, y+bbox.LLy, bbox.Dx(), bbox.Dy())
 
@@ -157,8 +151,9 @@ func createDocument(fname string) error {
 }
 
 type testFonts struct {
-	testFont *testFont
-	origFont *sfnt.Font
+	testFont font.Instance
+	testCFF  *sfntcff.Font
+	origFont font.Instance
 }
 
 func makeTestFonts() (*testFonts, error) {
@@ -250,8 +245,7 @@ func makeTestFonts() (*testFonts, error) {
 		blueValues[i] = funit.Int16(math.Round(float64(v) * qy))
 	}
 
-	// construct the new font
-
+	// construct the new CFF font
 	fontInfo.FontName = "Test"
 	newOutlines := &sfntcff.Outlines{
 		Glyphs: newGlyphs,
@@ -278,18 +272,45 @@ func makeTestFonts() (*testFonts, error) {
 		Outlines: newOutlines,
 	}
 
+	// build the font dictionary
 	q := orig.FontMatrix[3] * 1000
-	res := &testFonts{
-		testFont: &testFont{
-			cff:       testCFF,
-			ascent:    math.Round(orig.Ascent.AsFloat(q)),
-			descent:   math.Round(orig.Descent.AsFloat(q)),
-			capHeight: math.Round(orig.CapHeight.AsFloat(q)),
-			cmap:      cmapData,
-		},
-		origFont: orig,
+	fd := &font.Descriptor{
+		FontName:   testCFF.FontName,
+		IsSymbolic: true,
+		FontBBox:   testCFF.FontBBoxPDF(),
+		Ascent:     math.Round(orig.Ascent.AsFloat(q)),
+		Descent:    math.Round(orig.Descent.AsFloat(q)),
+		CapHeight:  math.Round(orig.CapHeight.AsFloat(q)),
+		StemV:      80,
 	}
-	return res, nil
+
+	ww := make(map[cmap.CID]float64)
+	for gid, cid := range testCFF.GIDToCID {
+		w := testCFF.GlyphWidthPDF(glyph.ID(gid))
+		ww[cid] = w
+	}
+
+	fontDict := &dict.CIDFontType0{
+		PostScriptName:  testCFF.FontName,
+		Descriptor:      fd,
+		ROS:             cmapData.ROS,
+		CMap:            cmapData,
+		Width:           ww,
+		DefaultWidth:    testCFF.GlyphWidthPDF(0),
+		DefaultVMetrics: dict.DefaultVMetricsDefault,
+		FontFile:        cffglyphs.ToStream(testCFF, glyphdata.CFF),
+	}
+
+	origFont, err := cff.NewSimple(orig, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return &testFonts{
+		testFont: fontDict.MakeFont(),
+		testCFF:  testCFF,
+		origFont: origFont,
+	}, nil
 }
 
 func rescaleGlyph(g *sfntcff.Glyph, xScale, yScale float64) *sfntcff.Glyph {
@@ -312,73 +333,6 @@ func rescaleGlyph(g *sfntcff.Glyph, xScale, yScale float64) *sfntcff.Glyph {
 		new.Cmds[i] = newCmd
 	}
 	return new
-}
-
-type testFont struct {
-	cff       *sfntcff.Font
-	ascent    float64 // PDF glyph space units
-	descent   float64 // PDF glyph space units, negative
-	capHeight float64
-	cmap      *cmap.File
-}
-
-var _ font.Instance = (*testFont)(nil)
-
-func (f *testFont) PostScriptName() string {
-	return f.cff.FontName
-}
-
-func (f *testFont) WritingMode() font.WritingMode {
-	return font.Horizontal
-}
-
-// Codec returns the codec for the encoding used by this font.
-func (f *testFont) Codec() *charcode.Codec {
-	return charcode.SimpleCodec
-}
-
-func (f *testFont) Codes(s pdf.String) iter.Seq[*font.Code] {
-	panic("not implemented")
-}
-
-func (f *testFont) FontInfo() any {
-	panic("not implemented")
-}
-
-func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
-	fd := &font.Descriptor{
-		FontName:   f.cff.FontName,
-		IsSymbolic: true,
-		FontBBox:   f.cff.FontBBoxPDF(),
-		Ascent:     f.ascent,
-		Descent:    f.descent,
-		CapHeight:  f.capHeight,
-		StemV:      80,
-	}
-
-	ww := make(map[cmap.CID]float64)
-	for gid, cid := range f.cff.GIDToCID {
-		w := f.cff.GlyphWidthPDF(glyph.ID(gid))
-		ww[cid] = w
-	}
-
-	dicts := &dict.CIDFontType0{
-		PostScriptName:  f.cff.FontName,
-		Descriptor:      fd,
-		ROS:             f.cmap.ROS,
-		CMap:            f.cmap,
-		Width:           ww,
-		DefaultWidth:    f.cff.GlyphWidthPDF(0),
-		DefaultVMetrics: dict.DefaultVMetricsDefault,
-		FontFile:        cffglyphs.ToStream(f.cff, glyphdata.CFF),
-	}
-	fontDictRef, err := rm.Embed(dicts)
-	if err != nil {
-		return nil, err
-	}
-
-	return fontDictRef, nil
 }
 
 func clone[T any](x *T) *T {

@@ -17,14 +17,13 @@
 // Package color implements PDF color spaces and colors.
 //
 // In PDF, every color is represented by a color space and a set of color
-// values.  Color spaces which don't need paramters automatically exist
-// and the package provides functions to generate colors in these color spaces:
-//   - [DeviceGray] makes a DeviceGray color
-//   - [DeviceRGB] makes a DeviceRGB color
-//   - [DeviceCMYK] makes a DeviceCMYK color
-//   - [PatternColored] makes a "color" which draws a colored pattern
-//   - [PatternUncolored] makes a "color" which draws an uncolored pattern in a given color
-//   - [SRGB] makes an sRGB color (a special case of an ICC-based color)
+// values.  Some color spaces don't need parameters and can be used directly:
+//   - [DeviceGray]: grayscale colors, e.g. DeviceGray(0.5)
+//   - [DeviceRGB]: RGB colors, e.g. DeviceRGB{1, 0, 0}
+//   - [DeviceCMYK]: CMYK colors, e.g. DeviceCMYK{1, 0, 0, 0}
+//   - [PatternColored]: draws a colored pattern
+//   - [PatternUncolored]: draws an uncolored pattern in a given color
+//   - [SRGB]: sRGB colors (a special case of an ICC-based color)
 //
 // Other color spaces depend on parameters and need to be created using
 // generator functions:
@@ -36,6 +35,6 @@
 //   - [Separation]: make a new separation color space
 //   - [DeviceN]: make a new DeviceN color space
 //
-// Each color space is represent by an object of class [Space], which
-// has an additional method New() to create new colors in that color space.
+// Each color space is represented by an object of type [Space], which
+// has a method New() to create colors in that color space.
 package color
