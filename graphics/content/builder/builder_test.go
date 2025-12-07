@@ -108,3 +108,55 @@ func TestBuilder_Validate(t *testing.T) {
 		t.Errorf("After closing q should pass: %v", err)
 	}
 }
+
+func TestBuilder_Reset(t *testing.T) {
+	res := &content.Resources{}
+	b := New(content.Page, res)
+
+	// build some content
+	b.SetLineWidth(5.0)
+	b.MoveTo(0, 0)
+	b.LineTo(100, 100)
+	b.Stroke()
+
+	if len(b.Stream) == 0 {
+		t.Fatal("expected non-empty stream")
+	}
+
+	// reset and verify state is cleared
+	b.Reset()
+
+	if len(b.Stream) != 0 {
+		t.Errorf("stream not cleared after Reset, got %d ops", len(b.Stream))
+	}
+	if b.Err != nil {
+		t.Errorf("Err not cleared after Reset: %v", b.Err)
+	}
+	if b.Resources != res {
+		t.Error("resources should be preserved after Reset")
+	}
+
+	// verify we can build new content
+	b.SetLineWidth(10.0)
+	b.MoveTo(50, 50)
+	b.LineTo(150, 150)
+	b.Stroke()
+
+	if len(b.Stream) != 4 {
+		t.Errorf("expected 4 ops after second build, got %d", len(b.Stream))
+	}
+	if err := b.Close(); err != nil {
+		t.Errorf("Close failed after Reset: %v", err)
+	}
+}
+
+func TestBuilder_ResetClearsError(t *testing.T) {
+	b := New(content.Page, nil)
+	b.Err = errors.New("test error")
+
+	b.Reset()
+
+	if b.Err != nil {
+		t.Error("Reset should clear Err")
+	}
+}

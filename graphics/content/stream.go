@@ -41,10 +41,11 @@ type Stream []Operator
 type Type int
 
 const (
-	Page    Type = iota // page content stream
-	Form                // Form XObject (includes annotation appearances)
-	Pattern             // tiling pattern
-	Glyph               // Type 3 font glyph
+	Page             Type = iota // page content stream
+	Form                         // Form XObject (includes annotation appearances)
+	PatternColored               // tiling pattern, PaintType 1 (colored)
+	PatternUncolored             // tiling pattern, PaintType 2 (uncolored)
+	Glyph                        // Type 3 font glyph
 )
 
 func (ct Type) String() string {
@@ -53,8 +54,10 @@ func (ct Type) String() string {
 		return "page"
 	case Form:
 		return "form"
-	case Pattern:
-		return "pattern"
+	case PatternColored:
+		return "pattern (colored)"
+	case PatternUncolored:
+		return "pattern (uncolored)"
 	case Glyph:
 		return "glyph"
 	default:

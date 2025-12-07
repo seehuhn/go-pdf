@@ -106,14 +106,14 @@ func (b *Builder) getProperties(mc *MarkedContent) pdf.Object {
 	}
 
 	// reference via Properties resource
-	key := resKey{"M", mc.Properties}
+	key := resKey{resProperties, mc.Properties}
 	if name, ok := b.resName[key]; ok {
 		return name
 	}
 	if b.Resources.Properties == nil {
 		b.Resources.Properties = make(map[pdf.Name]property.List)
 	}
-	name := allocateName("M", b.Resources.Properties)
+	name := allocateName(resProperties, b.Resources.Properties)
 	b.Resources.Properties[name] = mc.Properties
 	b.resName[key] = name
 	return name

@@ -42,7 +42,7 @@ func (b *Builder) Type3UncoloredGlyph(wx, wy, llx, lly, urx, ury float64) {
 		pdf.Number(urx), pdf.Number(ury))
 }
 
-func (b *Builder) checkType3ColorAllowed() error {
+func (b *Builder) checkColorAllowed() error {
 	if b.State.ColorOpsForbidden {
 		return errors.New("color operators not allowed")
 	}

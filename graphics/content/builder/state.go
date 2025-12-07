@@ -135,6 +135,10 @@ func (b *Builder) SetLineDash(pattern []float64, phase float64) {
 //
 // This implements the PDF graphics operator "ri".
 func (b *Builder) SetRenderingIntent(intent graphics.RenderingIntent) {
+	if err := b.checkColorAllowed(); err != nil {
+		b.Err = err
+		return
+	}
 	if b.isKnown(graphics.StateRenderingIntent) && intent == b.Param.RenderingIntent {
 		return
 	}

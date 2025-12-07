@@ -16,26 +16,34 @@
 
 package builder
 
-import (
-	"errors"
+import "seehuhn.de/go/pdf/graphics/content"
 
-	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/graphics/content"
-)
-
-// DrawXObject draws a PDF XObject on the page.
-//
-// This implements the PDF graphics operator "Do".
-func (b *Builder) DrawXObject(obj graphics.XObject) {
+// Build resets the builder, runs buildFunc to populate the stream,
+// and returns the resulting content stream.
+// On error, it returns nil and the error is stored in b.Err.
+func (b *Builder) Build(buildFunc func(b *Builder) error) content.Stream {
 	if b.Err != nil {
-		return
+		return nil
 	}
-	// In uncolored patterns and Type 3 glyphs with d1, images are forbidden
-	// but image masks are allowed.
-	if b.State.ColorOpsForbidden && obj.Subtype() == "Image" && !graphics.IsImageMask(obj) {
-		b.Err = errors.New("images not allowed (only image masks)")
-		return
+	b.Reset()
+	if err := buildFunc(b); err != nil {
+		b.Err = err
+		return nil
 	}
-	name := b.getXObjectName(obj)
-	b.emit(content.OpXObject, name)
+	if err := b.Close(); err != nil {
+		b.Err = err
+		return nil
+	}
+	res := b.Stream
+	b.Stream = nil
+	return res
+}
+
+// MustBuild is like Build but panics on error.
+func (b *Builder) MustBuild(buildFunc func(b *Builder) error) content.Stream {
+	stream := b.Build(buildFunc)
+	if b.Err != nil {
+		panic(b.Err)
+	}
+	return stream
 }

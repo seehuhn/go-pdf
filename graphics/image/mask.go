@@ -573,3 +573,9 @@ func (m *Mask) Bounds() rect.IntRect {
 func (m *Mask) Subtype() pdf.Name {
 	return pdf.Name("Image")
 }
+
+// IsImageMask returns true, indicating this is a stencil mask.
+// This implements the [graphics.ImageMask] interface.
+func (m *Mask) IsImageMask() bool {
+	return true
+}

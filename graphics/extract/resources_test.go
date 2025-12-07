@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package content
+package extract
 
 import (
 	"bytes"
@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/shading"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/property"
@@ -34,15 +35,15 @@ import (
 func TestRoundTrip(t *testing.T) {
 	tests := []struct {
 		name     string
-		resource *Resources
+		resource *content.Resources
 	}{
 		{
 			name:     "empty",
-			resource: &Resources{SingleUse: true},
+			resource: &content.Resources{SingleUse: true},
 		},
 		{
 			name: "ExtGState only",
-			resource: &Resources{
+			resource: &content.Resources{
 				ExtGState: map[pdf.Name]*graphics.ExtGState{
 					"GS1": {
 						Set:       graphics.StateLineWidth,
@@ -54,7 +55,7 @@ func TestRoundTrip(t *testing.T) {
 		},
 		{
 			name: "ColorSpace only",
-			resource: &Resources{
+			resource: &content.Resources{
 				ColorSpace: map[pdf.Name]color.Space{
 					"CS1": color.SpaceDeviceGray,
 				},
@@ -63,8 +64,8 @@ func TestRoundTrip(t *testing.T) {
 		},
 		{
 			name: "ProcSet only",
-			resource: &Resources{
-				ProcSet: ProcSet{
+			resource: &content.Resources{
+				ProcSet: content.ProcSet{
 					PDF:    true,
 					Text:   true,
 					ImageB: true,
@@ -74,8 +75,8 @@ func TestRoundTrip(t *testing.T) {
 		},
 		{
 			name: "ProcSet all flags",
-			resource: &Resources{
-				ProcSet: ProcSet{
+			resource: &content.Resources{
+				ProcSet: content.ProcSet{
 					PDF:    true,
 					Text:   true,
 					ImageB: true,
@@ -87,7 +88,7 @@ func TestRoundTrip(t *testing.T) {
 		},
 		{
 			name: "multiple types combined",
-			resource: &Resources{
+			resource: &content.Resources{
 				ExtGState: map[pdf.Name]*graphics.ExtGState{
 					"GS1": {
 						Set:       graphics.StateLineWidth,
@@ -98,7 +99,7 @@ func TestRoundTrip(t *testing.T) {
 					"CS1": color.SpaceDeviceRGB,
 					"CS2": color.SpaceDeviceGray,
 				},
-				ProcSet: ProcSet{
+				ProcSet: content.ProcSet{
 					PDF:  true,
 					Text: true,
 				},
@@ -107,8 +108,8 @@ func TestRoundTrip(t *testing.T) {
 		},
 		{
 			name: "SingleUse true (direct dictionary)",
-			resource: &Resources{
-				ProcSet: ProcSet{
+			resource: &content.Resources{
+				ProcSet: content.ProcSet{
 					PDF: true,
 				},
 				SingleUse: true,
@@ -116,8 +117,8 @@ func TestRoundTrip(t *testing.T) {
 		},
 		{
 			name: "SingleUse false (indirect reference)",
-			resource: &Resources{
-				ProcSet: ProcSet{
+			resource: &content.Resources{
+				ProcSet: content.ProcSet{
 					PDF: true,
 				},
 				SingleUse: false,
@@ -125,7 +126,7 @@ func TestRoundTrip(t *testing.T) {
 		},
 		{
 			name: "Properties only",
-			resource: &Resources{
+			resource: &content.Resources{
 				Properties: map[pdf.Name]property.List{
 					"P1": &property.ActualText{
 						Text:      "Test",
@@ -161,7 +162,7 @@ func TestRoundTrip(t *testing.T) {
 
 			// extract it back
 			x := pdf.NewExtractor(w)
-			extracted, err := ExtractResources(x, obj)
+			extracted, err := Resources(x, obj)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -187,7 +188,7 @@ func TestRoundTrip(t *testing.T) {
 			// compare with cmp.Diff (excluding Properties which we compared manually)
 			opts := []cmp.Option{
 				cmpopts.EquateEmpty(),
-				cmpopts.IgnoreFields(Resources{}, "Properties"),
+				cmpopts.IgnoreFields(content.Resources{}, "Properties"),
 			}
 			if diff := cmp.Diff(tt.resource, extracted, opts...); diff != "" {
 				t.Errorf("round trip failed (-got +want):\n%s", diff)
@@ -200,13 +201,13 @@ func TestVersionValidation(t *testing.T) {
 	tests := []struct {
 		name     string
 		version  pdf.Version
-		resource *Resources
+		resource *content.Resources
 		wantErr  bool
 	}{
 		{
 			name:    "Shading with PDF 1.2 fails",
 			version: pdf.V1_2,
-			resource: &Resources{
+			resource: &content.Resources{
 				Shading: map[pdf.Name]graphics.Shading{
 					"Sh1": &shading.Type1{
 						ColorSpace: color.SpaceDeviceGray,
@@ -225,7 +226,7 @@ func TestVersionValidation(t *testing.T) {
 		{
 			name:    "Shading with PDF 1.3 succeeds",
 			version: pdf.V1_3,
-			resource: &Resources{
+			resource: &content.Resources{
 				Shading: map[pdf.Name]graphics.Shading{
 					"Sh1": &shading.Type1{
 						ColorSpace: color.SpaceDeviceGray,
@@ -244,7 +245,7 @@ func TestVersionValidation(t *testing.T) {
 		{
 			name:    "Shading with PDF 2.0 succeeds",
 			version: pdf.V2_0,
-			resource: &Resources{
+			resource: &content.Resources{
 				Shading: map[pdf.Name]graphics.Shading{
 					"Sh1": &shading.Type1{
 						ColorSpace: color.SpaceDeviceGray,
@@ -263,7 +264,7 @@ func TestVersionValidation(t *testing.T) {
 		{
 			name:    "Properties with PDF 1.1 fails",
 			version: pdf.V1_1,
-			resource: &Resources{
+			resource: &content.Resources{
 				Properties: map[pdf.Name]property.List{
 					"P1": &property.ActualText{
 						Text:      "Test",
@@ -277,7 +278,7 @@ func TestVersionValidation(t *testing.T) {
 		{
 			name:    "Properties with PDF 1.2 succeeds",
 			version: pdf.V1_2,
-			resource: &Resources{
+			resource: &content.Resources{
 				Properties: map[pdf.Name]property.List{
 					"P1": &property.ActualText{
 						Text:      "Test",
@@ -291,7 +292,7 @@ func TestVersionValidation(t *testing.T) {
 		{
 			name:    "Properties with PDF 2.0 succeeds",
 			version: pdf.V2_0,
-			resource: &Resources{
+			resource: &content.Resources{
 				Properties: map[pdf.Name]property.List{
 					"P1": &property.ActualText{
 						Text:      "Test",
@@ -305,8 +306,8 @@ func TestVersionValidation(t *testing.T) {
 		{
 			name:    "ProcSet with PDF 2.0 fails",
 			version: pdf.V2_0,
-			resource: &Resources{
-				ProcSet: ProcSet{
+			resource: &content.Resources{
+				ProcSet: content.ProcSet{
 					PDF: true,
 				},
 				SingleUse: true,
@@ -316,8 +317,8 @@ func TestVersionValidation(t *testing.T) {
 		{
 			name:    "ProcSet with PDF 1.7 succeeds",
 			version: pdf.V1_7,
-			resource: &Resources{
-				ProcSet: ProcSet{
+			resource: &content.Resources{
+				ProcSet: content.ProcSet{
 					PDF: true,
 				},
 				SingleUse: true,
@@ -327,8 +328,8 @@ func TestVersionValidation(t *testing.T) {
 		{
 			name:    "ProcSet with PDF 1.0 succeeds",
 			version: pdf.V1_0,
-			resource: &Resources{
-				ProcSet: ProcSet{
+			resource: &content.Resources{
+				ProcSet: content.ProcSet{
 					PDF:    true,
 					Text:   true,
 					ImageB: true,
@@ -340,8 +341,8 @@ func TestVersionValidation(t *testing.T) {
 		{
 			name:    "empty ProcSet with PDF 2.0 succeeds",
 			version: pdf.V2_0,
-			resource: &Resources{
-				ProcSet:   ProcSet{},
+			resource: &content.Resources{
+				ProcSet:   content.ProcSet{},
 				SingleUse: true,
 			},
 			wantErr: false,
@@ -349,7 +350,7 @@ func TestVersionValidation(t *testing.T) {
 		{
 			name:    "multiple features with correct versions succeed",
 			version: pdf.V1_7,
-			resource: &Resources{
+			resource: &content.Resources{
 				Shading: map[pdf.Name]graphics.Shading{
 					"Sh1": &shading.Type1{
 						ColorSpace: color.SpaceDeviceGray,
@@ -367,7 +368,7 @@ func TestVersionValidation(t *testing.T) {
 						SingleUse: true,
 					},
 				},
-				ProcSet: ProcSet{
+				ProcSet: content.ProcSet{
 					PDF: true,
 				},
 				SingleUse: true,
@@ -396,52 +397,52 @@ func TestVersionValidation(t *testing.T) {
 func TestProcSetConversion(t *testing.T) {
 	tests := []struct {
 		name     string
-		procSet  ProcSet
+		procSet  content.ProcSet
 		expected pdf.Array
 	}{
 		{
 			name:     "all false",
-			procSet:  ProcSet{},
+			procSet:  content.ProcSet{},
 			expected: nil,
 		},
 		{
 			name: "PDF only",
-			procSet: ProcSet{
+			procSet: content.ProcSet{
 				PDF: true,
 			},
 			expected: pdf.Array{pdf.Name("PDF")},
 		},
 		{
 			name: "Text only",
-			procSet: ProcSet{
+			procSet: content.ProcSet{
 				Text: true,
 			},
 			expected: pdf.Array{pdf.Name("Text")},
 		},
 		{
 			name: "ImageB only",
-			procSet: ProcSet{
+			procSet: content.ProcSet{
 				ImageB: true,
 			},
 			expected: pdf.Array{pdf.Name("ImageB")},
 		},
 		{
 			name: "ImageC only",
-			procSet: ProcSet{
+			procSet: content.ProcSet{
 				ImageC: true,
 			},
 			expected: pdf.Array{pdf.Name("ImageC")},
 		},
 		{
 			name: "ImageI only",
-			procSet: ProcSet{
+			procSet: content.ProcSet{
 				ImageI: true,
 			},
 			expected: pdf.Array{pdf.Name("ImageI")},
 		},
 		{
 			name: "PDF and Text",
-			procSet: ProcSet{
+			procSet: content.ProcSet{
 				PDF:  true,
 				Text: true,
 			},
@@ -449,7 +450,7 @@ func TestProcSetConversion(t *testing.T) {
 		},
 		{
 			name: "all images",
-			procSet: ProcSet{
+			procSet: content.ProcSet{
 				ImageB: true,
 				ImageC: true,
 				ImageI: true,
@@ -458,7 +459,7 @@ func TestProcSetConversion(t *testing.T) {
 		},
 		{
 			name: "all true",
-			procSet: ProcSet{
+			procSet: content.ProcSet{
 				PDF:    true,
 				Text:   true,
 				ImageB: true,
@@ -469,7 +470,7 @@ func TestProcSetConversion(t *testing.T) {
 		},
 		{
 			name: "mixed selection",
-			procSet: ProcSet{
+			procSet: content.ProcSet{
 				PDF:    true,
 				ImageC: true,
 			},
@@ -477,7 +478,7 @@ func TestProcSetConversion(t *testing.T) {
 		},
 		{
 			name: "Text and ImageB",
-			procSet: ProcSet{
+			procSet: content.ProcSet{
 				Text:   true,
 				ImageB: true,
 			},
@@ -488,7 +489,7 @@ func TestProcSetConversion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// test embed (booleans → array)
-			resource := &Resources{
+			resource := &content.Resources{
 				ProcSet:   tt.procSet,
 				SingleUse: true,
 			}
@@ -537,7 +538,7 @@ func TestProcSetConversion(t *testing.T) {
 			}
 
 			x := pdf.NewExtractor(w)
-			extracted, err := ExtractResources(x, obj)
+			extracted, err := Resources(x, obj)
 			if err != nil {
 				t.Fatalf("extract failed: %v", err)
 			}
@@ -578,12 +579,12 @@ func TestProcSetUnknownNames(t *testing.T) {
 
 	// extract and verify only known names are preserved
 	x := pdf.NewExtractor(w)
-	extracted, err := ExtractResources(x, ref)
+	extracted, err := Resources(x, ref)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
 
-	expected := ProcSet{
+	expected := content.ProcSet{
 		PDF:    true,
 		Text:   true,
 		ImageB: true,
@@ -599,16 +600,16 @@ func TestProcSetUnknownNames(t *testing.T) {
 func FuzzRoundTrip(f *testing.F) {
 	// seed corpus with simple test cases from table tests
 	testCases := []struct {
-		resource *Resources
+		resource *content.Resources
 		version  pdf.Version
 	}{
 		{
-			resource: &Resources{SingleUse: true},
+			resource: &content.Resources{SingleUse: true},
 			version:  pdf.V1_7,
 		},
 		{
-			resource: &Resources{
-				ProcSet: ProcSet{
+			resource: &content.Resources{
+				ProcSet: content.ProcSet{
 					PDF:  true,
 					Text: true,
 				},
@@ -617,7 +618,7 @@ func FuzzRoundTrip(f *testing.F) {
 			version: pdf.V1_7,
 		},
 		{
-			resource: &Resources{
+			resource: &content.Resources{
 				ExtGState: map[pdf.Name]*graphics.ExtGState{
 					"GS1": {
 						Set:       graphics.StateLineWidth,
@@ -629,7 +630,7 @@ func FuzzRoundTrip(f *testing.F) {
 			version: pdf.V1_7,
 		},
 		{
-			resource: &Resources{
+			resource: &content.Resources{
 				ColorSpace: map[pdf.Name]color.Space{
 					"CS1": color.SpaceDeviceRGB,
 				},
@@ -676,7 +677,7 @@ func FuzzRoundTrip(f *testing.F) {
 
 		// first extraction - permissive
 		x1 := pdf.NewExtractor(r)
-		resource1, err := ExtractResources(x1, objPDF)
+		resource1, err := Resources(x1, objPDF)
 		if err != nil {
 			t.Skip("extraction failed (permissive)")
 		}
@@ -702,7 +703,7 @@ func FuzzRoundTrip(f *testing.F) {
 
 		// second extraction
 		x2 := pdf.NewExtractor(w)
-		resource2, err := ExtractResources(x2, embedded)
+		resource2, err := Resources(x2, embedded)
 		if err != nil {
 			t.Fatalf("second extraction failed: %v", err)
 		}
@@ -710,7 +711,7 @@ func FuzzRoundTrip(f *testing.F) {
 		// compare with cmp.Diff (excluding Properties which requires special handling)
 		opts := []cmp.Option{
 			cmpopts.EquateEmpty(),
-			cmpopts.IgnoreFields(Resources{}, "Properties"),
+			cmpopts.IgnoreFields(content.Resources{}, "Properties"),
 		}
 		if diff := cmp.Diff(resource1, resource2, opts...); diff != "" {
 			t.Errorf("round trip failed (-first +second):\n%s", diff)

@@ -14,28 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package builder
-
-import (
-	"errors"
-
-	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/graphics/content"
-)
-
-// DrawXObject draws a PDF XObject on the page.
+// Package extract provides functions for reading PDF graphics resources.
 //
-// This implements the PDF graphics operator "Do".
-func (b *Builder) DrawXObject(obj graphics.XObject) {
-	if b.Err != nil {
-		return
-	}
-	// In uncolored patterns and Type 3 glyphs with d1, images are forbidden
-	// but image masks are allowed.
-	if b.State.ColorOpsForbidden && obj.Subtype() == "Image" && !graphics.IsImageMask(obj) {
-		b.Err = errors.New("images not allowed (only image masks)")
-		return
-	}
-	name := b.getXObjectName(obj)
-	b.emit(content.OpXObject, name)
-}
+// All Extract functions for resource types that may recursively contain other
+// resources are consolidated here to avoid import cycles. This enables the
+// pattern package to import the content package (for content.Stream) without
+// creating a cycle.
+package extract

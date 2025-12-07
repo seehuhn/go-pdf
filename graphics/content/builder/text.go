@@ -149,7 +149,7 @@ func (b *Builder) TextSetFont(f font.Instance, size float64) {
 // stream. Normally names are allocated automatically, and use of this
 // function is not required.
 func (b *Builder) SetFontNameInternal(f font.Instance, name pdf.Name) error {
-	key := resKey{"F", f}
+	key := resKey{resFont, f}
 	if _, exists := b.resName[key]; exists {
 		return fmt.Errorf("font already has a name assigned")
 	}

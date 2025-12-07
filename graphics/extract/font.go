@@ -14,28 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package builder
+package extract
 
 import (
-	"errors"
-
-	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
+	fontdict "seehuhn.de/go/pdf/font/dict"
 )
 
-// DrawXObject draws a PDF XObject on the page.
-//
-// This implements the PDF graphics operator "Do".
-func (b *Builder) DrawXObject(obj graphics.XObject) {
-	if b.Err != nil {
-		return
-	}
-	// In uncolored patterns and Type 3 glyphs with d1, images are forbidden
-	// but image masks are allowed.
-	if b.State.ColorOpsForbidden && obj.Subtype() == "Image" && !graphics.IsImageMask(obj) {
-		b.Err = errors.New("images not allowed (only image masks)")
-		return
-	}
-	name := b.getXObjectName(obj)
-	b.emit(content.OpXObject, name)
+// Font extracts a font from a PDF file.
+func Font(x *pdf.Extractor, obj pdf.Object) (font.Instance, error) {
+	return fontdict.ExtractFont(x, obj)
 }

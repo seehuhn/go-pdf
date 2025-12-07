@@ -28,6 +28,8 @@ import (
 
 // Builder constructs PDF content streams using a type-safe API.
 type Builder struct {
+	contentType content.Type
+
 	Resources *content.Resources
 	Stream    content.Stream
 	State     *content.State
@@ -51,6 +53,17 @@ type resKey struct {
 	obj    pdf.Embedder
 }
 
+// resource type prefixes
+const (
+	resColorSpace pdf.Name = "C"
+	resExtGState  pdf.Name = "E"
+	resFont       pdf.Name = "F"
+	resProperties pdf.Name = "M"
+	resPattern    pdf.Name = "P"
+	resShading    pdf.Name = "S"
+	resXObject    pdf.Name = "X"
+)
+
 // New creates a Builder for the given content type.
 // If res is nil, the function allocates a new Resources object.
 func New(ct content.Type, res *content.Resources) *Builder {
@@ -58,30 +71,31 @@ func New(ct content.Type, res *content.Resources) *Builder {
 		res = &content.Resources{}
 	}
 	b := &Builder{
-		Resources: res,
-		State:     content.NewState(ct),
-		Param:     *graphics.NewState().Parameters,
-		resName:   make(map[resKey]pdf.Name),
+		contentType: ct,
+		Resources:   res,
+		State:       content.NewState(ct),
+		Param:       *graphics.NewState().Parameters,
+		resName:     make(map[resKey]pdf.Name),
 	}
 
 	// pre-fill resName from existing resources
 	for name, v := range res.ColorSpace {
-		b.resName[resKey{"C", v}] = name
+		b.resName[resKey{resColorSpace, v}] = name
 	}
 	for name, v := range res.ExtGState {
-		b.resName[resKey{"E", v}] = name
+		b.resName[resKey{resExtGState, v}] = name
 	}
 	for name, v := range res.Font {
-		b.resName[resKey{"F", v}] = name
+		b.resName[resKey{resFont, v}] = name
 	}
 	for name, v := range res.Pattern {
-		b.resName[resKey{"P", v}] = name
+		b.resName[resKey{resPattern, v}] = name
 	}
 	for name, v := range res.Shading {
-		b.resName[resKey{"S", v}] = name
+		b.resName[resKey{resShading, v}] = name
 	}
 	for name, v := range res.XObject {
-		b.resName[resKey{"X", v}] = name
+		b.resName[resKey{resXObject, v}] = name
 	}
 
 	return b
@@ -99,13 +113,23 @@ func (b *Builder) Harvest() (content.Stream, error) {
 	return stream, nil
 }
 
-// Close checks final state validity.
-// Calls State.Close() for q/Q, BT/ET, BMC/EMC balance checking.
+// Close checks that all q/Q, BT/ET, BMC/EMC groups are correctly closed.
+// The Builder remains usable after Close.
 func (b *Builder) Close() error {
 	if b.Err != nil {
 		return b.Err
 	}
 	return b.State.CanClose()
+}
+
+// Reset clears the stream and state while preserving the resources dictionary.
+// This allows generating multiple separate content streams that share resources.
+func (b *Builder) Reset() {
+	b.Stream = nil
+	b.State = content.NewState(b.contentType)
+	b.Param = *graphics.NewState().Parameters
+	b.Err = nil
+	b.paramStack = nil
 }
 
 // emit appends an operator to the content stream and updates the graphics state.
@@ -137,7 +161,7 @@ func (b *Builder) isSet(bits graphics.StateBits) bool {
 }
 
 func (b *Builder) getColorSpaceName(cs color.Space) pdf.Name {
-	key := resKey{"C", cs}
+	key := resKey{resColorSpace, cs}
 	if name, ok := b.resName[key]; ok {
 		return name
 	}
@@ -151,7 +175,7 @@ func (b *Builder) getColorSpaceName(cs color.Space) pdf.Name {
 }
 
 func (b *Builder) getExtGStateName(gs *graphics.ExtGState) pdf.Name {
-	key := resKey{"E", gs}
+	key := resKey{resExtGState, gs}
 	if name, ok := b.resName[key]; ok {
 		return name
 	}
@@ -165,7 +189,7 @@ func (b *Builder) getExtGStateName(gs *graphics.ExtGState) pdf.Name {
 }
 
 func (b *Builder) getFontName(f font.Instance) pdf.Name {
-	key := resKey{"F", f}
+	key := resKey{resFont, f}
 	if name, ok := b.resName[key]; ok {
 		return name
 	}
@@ -179,7 +203,7 @@ func (b *Builder) getFontName(f font.Instance) pdf.Name {
 }
 
 func (b *Builder) getPatternName(p color.Pattern) pdf.Name {
-	key := resKey{"P", p}
+	key := resKey{resPattern, p}
 	if name, ok := b.resName[key]; ok {
 		return name
 	}
@@ -193,7 +217,7 @@ func (b *Builder) getPatternName(p color.Pattern) pdf.Name {
 }
 
 func (b *Builder) getShadingName(s graphics.Shading) pdf.Name {
-	key := resKey{"S", s}
+	key := resKey{resShading, s}
 	if name, ok := b.resName[key]; ok {
 		return name
 	}
@@ -207,7 +231,7 @@ func (b *Builder) getShadingName(s graphics.Shading) pdf.Name {
 }
 
 func (b *Builder) getXObjectName(x graphics.XObject) pdf.Name {
-	key := resKey{"X", x}
+	key := resKey{resXObject, x}
 	if name, ok := b.resName[key]; ok {
 		return name
 	}

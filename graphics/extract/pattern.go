@@ -14,21 +14,22 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package pattern
+package extract
 
 import (
 	"fmt"
-	"io"
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/pattern"
 	"seehuhn.de/go/pdf/graphics/shading"
 )
 
-// Extract extracts a pattern from a PDF file and returns a color.Pattern.
-func Extract(x *pdf.Extractor, obj pdf.Object) (color.Pattern, error) {
+// Pattern extracts a pattern from a PDF file and returns a color.Pattern.
+func Pattern(x *pdf.Extractor, obj pdf.Object) (color.Pattern, error) {
 	// check if original object was a reference before resolving
 	_, isIndirect := obj.(pdf.Reference)
 
@@ -83,7 +84,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (color.Pattern, error) {
 }
 
 // extractType2 extracts a Type2 (shading) pattern from a PDF dictionary.
-func extractType2(x *pdf.Extractor, dict pdf.Dict, isIndirect bool) (*Type2, error) {
+func extractType2(x *pdf.Extractor, dict pdf.Dict, isIndirect bool) (*pattern.Type2, error) {
 	// extract required Shading
 	shadingObj := dict["Shading"]
 	if shadingObj == nil {
@@ -97,29 +98,29 @@ func extractType2(x *pdf.Extractor, dict pdf.Dict, isIndirect bool) (*Type2, err
 		return nil, err
 	}
 
-	pattern := &Type2{
+	pat := &pattern.Type2{
 		Shading:   sh,
 		SingleUse: isIndirect,
 	}
 
 	// extract optional Matrix
-	pattern.Matrix, err = pdf.GetMatrix(x.R, dict["Matrix"])
+	pat.Matrix, err = pdf.GetMatrix(x.R, dict["Matrix"])
 	if err != nil {
-		pattern.Matrix = matrix.Identity
+		pat.Matrix = matrix.Identity
 	}
 
 	// extract optional ExtGState
 	if extGState, err := pdf.Optional(graphics.ExtractExtGState(x, dict["ExtGState"])); err != nil {
 		return nil, err
 	} else {
-		pattern.ExtGState = extGState
+		pat.ExtGState = extGState
 	}
 
-	return pattern, nil
+	return pat, nil
 }
 
 // extractType1 extracts a Type1 (tiling) pattern from a PDF stream.
-func extractType1(x *pdf.Extractor, stream *pdf.Stream) (*Type1, error) {
+func extractType1(x *pdf.Extractor, stream *pdf.Stream) (*pattern.Type1, error) {
 	dict := stream.Dict
 
 	// extract required PaintType
@@ -174,7 +175,7 @@ func extractType1(x *pdf.Extractor, stream *pdf.Stream) (*Type1, error) {
 		return nil, pdf.Errorf("YStep cannot be zero")
 	}
 
-	pattern := &Type1{
+	pat := &pattern.Type1{
 		TilingType: int(tilingType),
 		BBox:       bbox,
 		XStep:      xStep,
@@ -183,51 +184,38 @@ func extractType1(x *pdf.Extractor, stream *pdf.Stream) (*Type1, error) {
 	}
 
 	// extract optional Matrix
-	pattern.Matrix, err = pdf.GetMatrix(x.R, dict["Matrix"])
+	pat.Matrix, err = pdf.GetMatrix(x.R, dict["Matrix"])
 	if err != nil {
-		pattern.Matrix = matrix.Identity
+		pat.Matrix = matrix.Identity
 	}
 
-	// validate that the stream can be decoded and read
-	testStream, err := pdf.DecodeStream(x.R, stream, 0)
+	// extract resources (required)
+	pat.Res = &content.Resources{}
+	if resObj := dict["Resources"]; resObj != nil {
+		res, err := Resources(x, resObj)
+		if err != nil {
+			return nil, err
+		}
+		if res != nil {
+			pat.Res = res
+		}
+	}
+
+	// read content stream
+	stmType := content.PatternColored
+	if !pat.Color {
+		stmType = content.PatternUncolored
+	}
+	stm, err := pdf.DecodeStream(x.R, stream, 0)
 	if err != nil {
 		return nil, err
 	}
-	_, err = io.Copy(io.Discard, testStream)
-	testStream.Close()
+	defer stm.Close()
+
+	pat.Content, err = content.ReadStream(stm, pdf.GetVersion(x.R), stmType)
 	if err != nil {
 		return nil, err
 	}
 
-	// create Draw callback
-	pattern.Draw = func(w *graphics.Writer) error {
-		// TODO(voss): Use EmbedHelper.CopierFrom()
-		copier := pdf.NewCopier(w.RM.Out, x.R)
-
-		// copy resources
-		origResources, err := x.GetDict(dict["Resources"])
-		if err != nil {
-			return err
-		}
-		if origResources != nil {
-			resourceObj, err := copier.Copy(origResources)
-			if err != nil {
-				return err
-			}
-			w.Resources, err = pdf.ExtractResources(nil, resourceObj)
-			if err != nil {
-				return err
-			}
-		}
-
-		// copy content stream
-		stm, err := pdf.DecodeStream(x.R, stream, 0)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(w.Content, stm)
-		return err
-	}
-
-	return pattern, nil
+	return pat, nil
 }

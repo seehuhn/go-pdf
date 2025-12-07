@@ -102,10 +102,15 @@ func NewState(ct Type) *State {
 		// PDF-defined defaults are Set and Known, except font
 		s.Set = initializedStateBits
 		s.Known = initializedStateBits
-	case Form, Pattern:
+	case Form, PatternColored:
 		// All parameters inherited (Set but not Known)
 		s.Set = graphics.AllStateBits
 		s.Known = 0
+	case PatternUncolored:
+		// All parameters inherited (Set but not Known)
+		s.Set = graphics.AllStateBits
+		s.Known = 0
+		s.ColorOpsForbidden = true
 	case Glyph:
 		// All parameters inherited (Set but not Known)
 		s.Set = graphics.AllStateBits

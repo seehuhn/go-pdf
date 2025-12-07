@@ -14,28 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package builder
+package extract
 
 import (
-	"errors"
-
-	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/image"
 )
 
-// DrawXObject draws a PDF XObject on the page.
-//
-// This implements the PDF graphics operator "Do".
-func (b *Builder) DrawXObject(obj graphics.XObject) {
-	if b.Err != nil {
-		return
-	}
-	// In uncolored patterns and Type 3 glyphs with d1, images are forbidden
-	// but image masks are allowed.
-	if b.State.ColorOpsForbidden && obj.Subtype() == "Image" && !graphics.IsImageMask(obj) {
-		b.Err = errors.New("images not allowed (only image masks)")
-		return
-	}
-	name := b.getXObjectName(obj)
-	b.emit(content.OpXObject, name)
+// Image extracts an image dictionary from a PDF stream.
+func Image(x *pdf.Extractor, obj pdf.Object) (*image.Dict, error) {
+	return image.ExtractDict(x, obj)
+}
+
+// ImageMask extracts an image mask from a PDF stream.
+func ImageMask(x *pdf.Extractor, obj pdf.Object) (*image.Mask, error) {
+	return image.ExtractMask(x, obj)
+}
+
+// SoftMask extracts a soft mask from a PDF stream.
+func SoftMask(x *pdf.Extractor, obj pdf.Object) (*image.SoftMask, error) {
+	return image.ExtractSoftMask(x, obj)
 }

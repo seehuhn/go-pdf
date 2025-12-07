@@ -39,7 +39,7 @@ func (b *Builder) setColor(c color.Color, fill bool) {
 	if b.Err != nil {
 		return
 	}
-	if err := b.checkType3ColorAllowed(); err != nil {
+	if err := b.checkColorAllowed(); err != nil {
 		b.Err = err
 		return
 	}
@@ -111,6 +111,10 @@ func (b *Builder) setColor(c color.Color, fill bool) {
 // This implements the PDF graphics operator "sh".
 func (b *Builder) DrawShading(shading graphics.Shading) {
 	if b.Err != nil {
+		return
+	}
+	if err := b.checkColorAllowed(); err != nil {
+		b.Err = err
 		return
 	}
 	name := b.getShadingName(shading)
