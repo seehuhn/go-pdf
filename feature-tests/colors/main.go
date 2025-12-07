@@ -28,8 +28,9 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/function"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/image"
 	"seehuhn.de/go/pdf/graphics/pattern"
 	"seehuhn.de/go/pdf/graphics/shading"
@@ -263,10 +264,17 @@ func halton(i, base int) float64 {
 
 func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error {
 	// 1/2^2 + (x/2)^2 = 1^2   =>   x = 2*sqrt(3)/2 = sqrt(3)
-
 	w := 12.0
 	h := w * math.Sqrt(3)
 	r := 0.3 * w
+
+	b := builder.New(content.PatternUncolored, nil)
+	b.Circle(0, 0, r)
+	b.Circle(w, 0, r)
+	b.Circle(w/2, h/2, r)
+	b.Circle(0, h, r)
+	b.Circle(w, h, r)
+	b.Fill()
 
 	pat := &pattern.Type1{
 		TilingType: 1,
@@ -275,15 +283,8 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 		YStep:      h,
 		Matrix:     matrix.Identity,
 		Color:      false,
-		Draw: func(builder *graphics.Writer) error {
-			builder.Circle(0, 0, r)
-			builder.Circle(w, 0, r)
-			builder.Circle(w/2, h/2, r)
-			builder.Circle(0, h, r)
-			builder.Circle(w, h, r)
-			builder.Fill()
-			return nil
-		},
+		Content:    b.Stream,
+		Res:        b.Resources,
 	}
 	col := color.PatternUncolored(pat, color.DeviceRGB{1, 0, 0})
 
@@ -311,30 +312,30 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 
 func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 	// 1/2^2 + (x/2)^2 = 1^2   =>   x = 2*sqrt(3)/2 = sqrt(3)
+	w := 12.0
+	h := w * math.Sqrt(3)
+	r := 0.3 * w
 
-	width := 12.0
-	height := width * math.Sqrt(3)
-	r := 0.3 * width
+	b := builder.New(content.PatternColored, nil)
+	b.SetFillColor(color.DeviceGray(0.5))
+	b.Circle(0, 0, r)
+	b.Circle(w, 0, r)
+	b.Circle(0, h, r)
+	b.Circle(w, h, r)
+	b.Fill()
+	b.SetFillColor(color.DeviceRGB{1, 0, 0})
+	b.Circle(w/2, h/2, r)
+	b.Fill()
 
 	pat := &pattern.Type1{
 		TilingType: 1,
-		BBox:       &pdf.Rectangle{URx: width, URy: height},
-		XStep:      width,
-		YStep:      height,
+		BBox:       &pdf.Rectangle{URx: w, URy: h},
+		XStep:      w,
+		YStep:      h,
 		Matrix:     matrix.Identity,
 		Color:      true,
-		Draw: func(w *graphics.Writer) error {
-			w.SetFillColor(color.DeviceGray(0.5))
-			w.Circle(0, 0, r)
-			w.Circle(width, 0, r)
-			w.Circle(0, height, r)
-			w.Circle(width, height, r)
-			w.Fill()
-			w.SetFillColor(color.DeviceRGB{1, 0, 0})
-			w.Circle(width/2, height/2, r)
-			w.Fill()
-			return nil
-		},
+		Content:    b.Stream,
+		Res:        b.Resources,
 	}
 	col := color.PatternColored(pat)
 

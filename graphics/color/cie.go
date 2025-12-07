@@ -233,6 +233,21 @@ func (c colorCalRGB) ColorSpace() Space {
 }
 
 // == Lab ====================================================================
+//
+// PDF Lab is a CIE-based color space defined in ISO 32000-1:2008, section
+// 8.6.5.4. It represents colors using CIE 1976 L*a*b* coordinates: L*
+// (lightness, 0–100) and a*, b* (chromaticity, with configurable ranges).
+//
+// The color space is parameterized by a WhitePoint (required) and BlackPoint
+// (optional). The L*a*b* ↔ XYZ conversion uses only the WhitePoint; BlackPoint
+// does not affect this transformation. BlackPoint is instead used for black
+// point compensation during rendering, as specified in ISO 18619 and
+// controlled by the UseBlackPtComp entry in the graphics state (see ISO
+// 32000-1:2008, section 8.6.5.9).
+//
+// For further details on CIE-based color conversion in PDF, see ISO
+// 32000-1:2008, sections 8.6.5 (CIE-Based Colour Spaces) and 10.3 (CIE-Based
+// Colour to Device Colour).
 
 // SpaceLab represents a CIE 1976 L*a*b* color space.
 type SpaceLab struct {
@@ -354,4 +369,72 @@ type colorLab struct {
 // ColorSpace implements the [Color] interface.
 func (c colorLab) ColorSpace() Space {
 	return c.Space
+}
+
+// ToXYZ converts a Lab color to CIE 1931 XYZ coordinates.
+func (c colorLab) ToXYZ() (X, Y, Z float64) {
+	LStar, aStar, bStar := c.Values[0], c.Values[1], c.Values[2]
+	XW, YW, ZW := c.Space.whitePoint[0], c.Space.whitePoint[1], c.Space.whitePoint[2]
+
+	// Stage 1: L*a*b* to intermediate (L, M, N)
+	common := (LStar + 16) / 116
+	L := common + aStar/500
+	M := common
+	N := common - bStar/200
+
+	// Stage 2: Intermediate to XYZ
+	X = XW * labG(L)
+	Y = YW * labG(M)
+	Z = ZW * labG(N)
+	return X, Y, Z
+}
+
+// FromXYZ converts CIE 1931 XYZ coordinates to a Lab color.
+// Values outside the valid range are clamped.
+func (s *SpaceLab) FromXYZ(X, Y, Z float64) Color {
+	XW, YW, ZW := s.whitePoint[0], s.whitePoint[1], s.whitePoint[2]
+
+	// Inverse of stage 2
+	L := labF(X / XW)
+	M := labF(Y / YW)
+	N := labF(Z / ZW)
+
+	// Inverse of stage 1
+	LStar := 116*M - 16
+	aStar := 500 * (L - M)
+	bStar := 200 * (M - N)
+
+	// Clamp to valid ranges
+	LStar = clamp(LStar, 0, 100)
+	aStar = clamp(aStar, s.ranges[0], s.ranges[1])
+	bStar = clamp(bStar, s.ranges[2], s.ranges[3])
+
+	return colorLab{Space: s, Values: [3]float64{LStar, aStar, bStar}}
+}
+
+// labG is the forward transfer function (used in ToXYZ).
+func labG(x float64) float64 {
+	if x >= 6.0/29.0 {
+		return x * x * x
+	}
+	return (108.0 / 841.0) * (x - 4.0/29.0)
+}
+
+// labF is the inverse transfer function (used in FromXYZ).
+func labF(t float64) float64 {
+	const delta3 = (6.0 / 29.0) * (6.0 / 29.0) * (6.0 / 29.0) // 216/24389
+	if t >= delta3 {
+		return math.Pow(t, 1.0/3.0)
+	}
+	return (841.0/108.0)*t + 4.0/29.0
+}
+
+func clamp(x, min, max float64) float64 {
+	if x < min {
+		return min
+	}
+	if x > max {
+		return max
+	}
+	return x
 }

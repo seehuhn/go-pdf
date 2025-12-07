@@ -217,9 +217,7 @@ func ExtractSoftMask(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
 	if subtypeName, err := pdf.Optional(x.GetName(dict["Subtype"])); err != nil {
 		return nil, err
 	} else if subtypeName != "Image" && subtypeName != "" {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("invalid Subtype %q for soft mask XObject", subtypeName),
-		}
+		return nil, pdf.Errorf("invalid Subtype %q for soft mask XObject", subtypeName)
 	}
 
 	// Validate ColorSpace is DeviceGray (required for soft masks)
@@ -229,33 +227,23 @@ func ExtractSoftMask(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
 			return nil, err
 		}
 		if cs.Family() != color.FamilyDeviceGray {
-			return nil, &pdf.MalformedFileError{
-				Err: fmt.Errorf("soft mask ColorSpace must be DeviceGray, got %s", cs.Family()),
-			}
+			return nil, pdf.Errorf("soft mask ColorSpace must be DeviceGray, got %s", cs.Family())
 		}
 	} else {
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("missing ColorSpace for soft mask"),
-		}
+		return nil, pdf.Error("missing ColorSpace for soft mask")
 	}
 
 	// Validate forbidden fields (Table 143 restrictions)
 	if isImageMask, err := x.GetBoolean(dict["ImageMask"]); err == nil && bool(isImageMask) {
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("ImageMask must be false or absent for soft masks"),
-		}
+		return nil, pdf.Error("ImageMask must be false or absent for soft masks")
 	}
 
 	if _, hasMask := dict["Mask"]; hasMask {
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("Mask entry forbidden in soft masks"),
-		}
+		return nil, pdf.Error("Mask entry forbidden in soft masks")
 	}
 
 	if _, hasSMask := dict["SMask"]; hasSMask {
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("SMask entry forbidden in soft masks"),
-		}
+		return nil, pdf.Error("SMask entry forbidden in soft masks")
 	}
 
 	// Extract required fields
@@ -264,9 +252,7 @@ func ExtractSoftMask(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
 		return nil, err
 	}
 	if width <= 0 {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("invalid soft mask width %d", width),
-		}
+		return nil, pdf.Errorf("invalid soft mask width %d", width)
 	}
 
 	height, err := x.GetInteger(dict["Height"])
@@ -274,9 +260,7 @@ func ExtractSoftMask(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
 		return nil, err
 	}
 	if height <= 0 {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("invalid soft mask height %d", height),
-		}
+		return nil, pdf.Errorf("invalid soft mask height %d", height)
 	}
 
 	bpc, err := x.GetInteger(dict["BitsPerComponent"])
@@ -295,9 +279,7 @@ func ExtractSoftMask(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
 		return nil, err
 	} else if decodeArray != nil {
 		if len(decodeArray) != 2 {
-			return nil, &pdf.MalformedFileError{
-				Err: fmt.Errorf("invalid Decode array length %d for soft mask (must be 2)", len(decodeArray)),
-			}
+			return nil, pdf.Errorf("invalid Decode array length %d for soft mask (must be 2)", len(decodeArray))
 		}
 		softMask.Decode = make([]float64, 2)
 		for i, val := range decodeArray {

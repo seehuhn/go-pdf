@@ -17,14 +17,12 @@
 package pattern
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
 )
 
 // Type1 represents a tiling pattern which repeats periodically in the plane.
@@ -51,8 +49,11 @@ type Type1 struct {
 	// describes a shape.
 	Color bool
 
-	// Draw draws a single pattern cell.
-	Draw func(*graphics.Writer) error
+	// Content is the content stream that draws a single pattern cell.
+	Content content.Stream
+
+	// Res contains the resources used by the content stream (required).
+	Res *content.Resources
 }
 
 var _ color.Pattern = (*Type1)(nil)
@@ -73,22 +74,22 @@ func (p *Type1) PaintType() int {
 }
 
 func (p *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if p.TilingType < 1 || p.TilingType > 3 {
 		return nil, fmt.Errorf("invalid tiling type: %d", p.TilingType)
 	}
 	if p.XStep == 0 || p.YStep == 0 {
 		return nil, fmt.Errorf("invalid step size: (%f, %f)", p.XStep, p.YStep)
 	}
+	if p.Res == nil {
+		return nil, fmt.Errorf("missing resources")
+	}
 
-	buf := &bytes.Buffer{}
-	w := graphics.NewWriter(buf, rm.GetRM())
-	err := p.Draw(w)
+	// embed resources
+	res := *p.Res
+	res.SingleUse = true
+	resObj, err := res.Embed(rm)
 	if err != nil {
 		return nil, err
-	}
-	if w.Err != nil {
-		return nil, w.Err
 	}
 
 	dict := pdf.Dict{
@@ -98,7 +99,7 @@ func (p *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		"BBox":        p.BBox,
 		"XStep":       pdf.Number(p.XStep),
 		"YStep":       pdf.Number(p.YStep),
-		"Resources":   pdf.AsDict(w.Resources),
+		"Resources":   resObj,
 	}
 	opt := rm.Out().GetOptions()
 	if opt.HasAny(pdf.OptDictTypes) {
@@ -113,10 +114,16 @@ func (p *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = io.Copy(stm, buf)
+
+	ct := content.PatternColored
+	if !p.Color {
+		ct = content.PatternUncolored
+	}
+	err = content.Write(stm, p.Content, rm.Out().GetMeta().Version, ct, p.Res)
 	if err != nil {
 		return nil, err
 	}
+
 	err = stm.Close()
 	if err != nil {
 		return nil, err

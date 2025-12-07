@@ -50,6 +50,9 @@ func main() {
 			}
 
 			F := standard.TimesRoman.New()
+			if v == pdf.V1_0 {
+				F.Name = "F1"
+			}
 			geom := F.GetGeometry()
 
 			page.TextBegin()

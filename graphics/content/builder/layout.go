@@ -39,8 +39,7 @@ func (b *Builder) TextShow(s string) float64 {
 	}
 	b.glyphBuf.Reset()
 	gg := b.TextLayout(b.glyphBuf, s)
-	if gg == nil {
-		b.Err = errors.New("font does not support layouting")
+	if b.Err != nil {
 		return 0
 	}
 
@@ -57,8 +56,7 @@ func (b *Builder) TextShowAligned(s string, width, q float64) {
 	}
 
 	gg := b.TextLayout(nil, s)
-	if gg == nil {
-		b.Err = errors.New("font does not support layouting")
+	if b.Err != nil {
 		return
 	}
 	gg.Align(width, q)
@@ -177,16 +175,20 @@ func (b *Builder) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 // The resulting GlyphSeq is returned.
 //
 // If no font is set, or if the current font does not implement
-// [font.Layouter], the function returns nil. If seq is not nil (and there is
-// no error), the return value is guaranteed to be equal to seq.
+// [font.Layouter], an error is set and an empty GlyphSeq is returned.
 func (b *Builder) TextLayout(seq *font.GlyphSeq, text string) *font.GlyphSeq {
+	if seq == nil {
+		seq = &font.GlyphSeq{}
+	}
+
 	if b.Err != nil {
 		return seq
 	}
 
 	layouter, ok := b.Param.TextFont.(font.Layouter)
 	if !ok {
-		return nil
+		b.Err = errors.New("no font set, or font does not support layout")
+		return seq
 	}
 
 	param := &b.Param

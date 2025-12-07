@@ -150,9 +150,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 	if err != nil {
 		return nil, err
 	} else if stream == nil {
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("missing image mask stream"),
-		}
+		return nil, pdf.Error("missing image mask stream")
 	}
 	dict := stream.Dict
 
@@ -163,9 +161,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 		if t, err := pdf.Optional(x.GetName(dict["Type"])); err != nil {
 			return nil, err
 		} else if t != "" && t != "XObject" {
-			return nil, &pdf.MalformedFileError{
-				Err: fmt.Errorf("invalid Type %q for image mask XObject", t),
-			}
+			return nil, pdf.Errorf("invalid Type %q for image mask XObject", t)
 		}
 	}
 
@@ -174,17 +170,13 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 		return nil, err
 	}
 	if subtypeName != "Image" {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("invalid Subtype %q for image mask XObject", subtypeName),
-		}
+		return nil, pdf.Errorf("invalid Subtype %q for image mask XObject", subtypeName)
 	}
 
 	// Check ImageMask flag
 	isImageMask, err := x.GetBoolean(dict["ImageMask"])
 	if err != nil || !bool(isImageMask) {
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("ImageMask flag not set for image mask"),
-		}
+		return nil, pdf.Error("ImageMask flag not set for image mask")
 	}
 
 	// Extract required fields
@@ -193,9 +185,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 		return nil, fmt.Errorf("missing or invalid Width: %w", err)
 	}
 	if width <= 0 {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("invalid image mask width %d", width),
-		}
+		return nil, pdf.Errorf("invalid image mask width %d", width)
 	}
 
 	height, err := x.GetInteger(dict["Height"])
@@ -203,9 +193,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 		return nil, fmt.Errorf("missing or invalid Height: %w", err)
 	}
 	if height <= 0 {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("invalid image mask height %d", height),
-		}
+		return nil, pdf.Errorf("invalid image mask height %d", height)
 	}
 
 	mask := &Mask{
@@ -217,23 +205,17 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 	if bpc, err := pdf.Optional(x.GetInteger(dict["BitsPerComponent"])); err != nil {
 		return nil, err
 	} else if bpc > 0 && bpc != 1 {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("invalid BitsPerComponent %d for image mask (must be 1)", bpc),
-		}
+		return nil, pdf.Errorf("invalid BitsPerComponent %d for image mask (must be 1)", bpc)
 	}
 
 	// ColorSpace must not be present for image masks
 	if _, hasColorSpace := dict["ColorSpace"]; hasColorSpace {
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("ColorSpace not allowed for image masks"),
-		}
+		return nil, pdf.Error("ColorSpace not allowed for image masks")
 	}
 
 	// Mask entry must not be present for image masks
 	if _, hasMask := dict["Mask"]; hasMask {
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("Mask not allowed for image masks"),
-		}
+		return nil, pdf.Error("Mask not allowed for image masks")
 	}
 
 	// Extract Decode array (for image masks, must be [0 1] or [1 0])

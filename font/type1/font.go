@@ -68,6 +68,11 @@ type Instance struct {
 	cmap map[rune]glyph.ID
 
 	*simpleenc.Simple
+
+	// Name is deprecated and should be left empty.
+	// Only used in PDF 1.0 where it was the name used to reference the font
+	// from within content streams.
+	Name pdf.Name
 }
 
 var _ font.Layouter = (*Instance)(nil)
@@ -362,6 +367,7 @@ func (f *Instance) makeFontDict() (*dict.Type1, error) {
 		Descriptor:     fd,
 		Encoding:       f.Simple.Encoding(),
 		ToUnicode:      f.Simple.ToUnicode(postScriptName),
+		Name:           f.Name,
 	}
 	for c, info := range f.Simple.MappedCodes() {
 		dict.Width[c] = info.Width

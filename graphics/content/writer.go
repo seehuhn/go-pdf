@@ -91,6 +91,17 @@ func (w *Writer) Close() error {
 	return nil
 }
 
+// Write serializes a content stream to an io.Writer with validation.
+// This is a convenience function that creates a Writer, writes the stream,
+// and checks for balanced operators.
+func Write(out io.Writer, s Stream, v pdf.Version, ct Type, res *Resources) error {
+	w := NewWriter(v, ct, res)
+	if err := w.Write(out, s); err != nil {
+		return err
+	}
+	return w.Close()
+}
+
 // validateResources checks that resources referenced by the operator exist.
 func (w *Writer) validateResources(op Operator) error {
 	switch op.Name {
