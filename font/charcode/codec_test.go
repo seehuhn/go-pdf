@@ -610,7 +610,7 @@ func TestCodecCodeSpaceRange(t *testing.T) {
 				t.Fatal(err)
 			}
 			csr2 := c.CodeSpaceRange()
-			if !csr1.isEquivalent(csr2) {
+			if !csr1.Equivalent(csr2) {
 				t.Errorf("CodeSpaceRanges differ for % x", csr1.getDifference(csr2))
 				fmt.Println("before:")
 				for _, r := range csr1 {

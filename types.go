@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -61,6 +62,161 @@ type Object interface {
 	//
 	// The output options can be used to control how the object is formatted.
 	AsPDF(OutputOptions) Native
+}
+
+// Equal reports whether two Objects have the same PDF representation.
+// Arrays and Dicts are compared recursively.
+// Stream and Placeholder objects are compared by pointer identity.
+func Equal(a, b Object) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+
+	aN := a.AsPDF(0)
+	bN := b.AsPDF(0)
+
+	switch va := aN.(type) {
+	case nil:
+		return bN == nil
+	case Array:
+		vb, ok := bN.(Array)
+		if !ok || (va == nil) != (vb == nil) || len(va) != len(vb) {
+			return false
+		}
+		for i := range va {
+			if !Equal(va[i], vb[i]) {
+				return false
+			}
+		}
+		return true
+	case Boolean:
+		vb, ok := bN.(Boolean)
+		return ok && va == vb
+	case Dict:
+		vb, ok := bN.(Dict)
+		if !ok || (va == nil) != (vb == nil) || len(va) != len(vb) {
+			return false
+		}
+		for k, valA := range va {
+			valB, exists := vb[k]
+			if !exists || !Equal(valA, valB) {
+				return false
+			}
+		}
+		return true
+	case Integer:
+		vb, ok := bN.(Integer)
+		return ok && va == vb
+	case Name:
+		vb, ok := bN.(Name)
+		return ok && va == vb
+	case Operator:
+		vb, ok := bN.(Operator)
+		return ok && va == vb
+	case Real:
+		vb, ok := bN.(Real)
+		return ok && va == vb
+	case Reference:
+		vb, ok := bN.(Reference)
+		return ok && va == vb
+	case *Stream:
+		vb, ok := bN.(*Stream)
+		return ok && va == vb
+	case String:
+		vb, ok := bN.(String)
+		return ok && (va == nil) == (vb == nil) && bytes.Equal([]byte(va), []byte(vb))
+	case *Placeholder:
+		vb, ok := bN.(*Placeholder)
+		return ok && va == vb
+	default:
+		return false
+	}
+}
+
+// NearlyEqual reports whether two Objects have approximately the same value.
+// Unlike [Equal], nil and empty Arrays/Dicts/Strings are considered equal,
+// and numeric types (Integer and Real) are compared with tolerance eps.
+func NearlyEqual(a, b Object, eps float64) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+
+	aN := a.AsPDF(0)
+	bN := b.AsPDF(0)
+
+	switch va := aN.(type) {
+	case nil:
+		return bN == nil
+	case Array:
+		vb, ok := bN.(Array)
+		if !ok || len(va) != len(vb) {
+			return false
+		}
+		for i := range va {
+			if !NearlyEqual(va[i], vb[i], eps) {
+				return false
+			}
+		}
+		return true
+	case Boolean:
+		vb, ok := bN.(Boolean)
+		return ok && va == vb
+	case Dict:
+		vb, ok := bN.(Dict)
+		if !ok || len(va) != len(vb) {
+			return false
+		}
+		for k, valA := range va {
+			valB, exists := vb[k]
+			if !exists || !NearlyEqual(valA, valB, eps) {
+				return false
+			}
+		}
+		return true
+	case Integer:
+		return nearlyEqualNumeric(float64(va), bN, eps)
+	case Name:
+		vb, ok := bN.(Name)
+		return ok && va == vb
+	case Operator:
+		vb, ok := bN.(Operator)
+		return ok && va == vb
+	case Real:
+		return nearlyEqualNumeric(float64(va), bN, eps)
+	case Reference:
+		vb, ok := bN.(Reference)
+		return ok && va == vb
+	case *Stream:
+		vb, ok := bN.(*Stream)
+		return ok && va == vb
+	case String:
+		vb, ok := bN.(String)
+		return ok && bytes.Equal([]byte(va), []byte(vb))
+	case *Placeholder:
+		vb, ok := bN.(*Placeholder)
+		return ok && va == vb
+	default:
+		return false
+	}
+}
+
+func nearlyEqualNumeric(va float64, bN Native, eps float64) bool {
+	var vb float64
+	switch x := bN.(type) {
+	case Integer:
+		vb = float64(x)
+	case Real:
+		vb = float64(x)
+	default:
+		return false
+	}
+	return math.Abs(va-vb) <= eps
 }
 
 // OutputOptions is a bit-mask which controls how [Object] values are formatted.

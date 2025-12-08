@@ -110,6 +110,33 @@ const (
 	Vertical WritingMode = 1
 )
 
+// InstancesEqual compares two font instances for semantic equality.
+// Two fonts are equal if they have the same PostScript name, writing mode,
+// and code space range.
+func InstancesEqual(a, b Instance) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+
+	if a.PostScriptName() != b.PostScriptName() {
+		return false
+	}
+
+	if a.WritingMode() != b.WritingMode() {
+		return false
+	}
+
+	codecA, codecB := a.Codec(), b.Codec()
+	if (codecA == nil) != (codecB == nil) {
+		return false
+	}
+	if codecA != nil && !codecA.CodeSpaceRange().Equivalent(codecB.CodeSpaceRange()) {
+		return false
+	}
+
+	return true
+}
+
 type Code struct {
 	// CID allows to look up the glyph in the underlying font.
 	CID cid.CID

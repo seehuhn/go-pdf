@@ -323,3 +323,78 @@ func TestPlaceholder(t *testing.T) {
 		t.Errorf("wrong /Length: %d vs %d", lengthOut, testVal)
 	}
 }
+
+func TestEqual(t *testing.T) {
+	objects := []Object{
+		nil,
+		Integer(1),
+		Integer(2),
+		Real(1.5),
+		Real(2.5),
+		Boolean(true),
+		Boolean(false),
+		Name(""),
+		Name("B"),
+		String(nil),
+		String(""),
+		String("world"),
+		Operator(""),
+		Operator("TJ"),
+		NewReference(1, 0),
+		NewReference(2, 0),
+		Array(nil),
+		Array{},
+		Array{Integer(1)},
+		Array{Integer(1), Integer(2)},
+		Dict(nil),
+		Dict{},
+		Dict{"X": Integer(1)},
+		Dict{"X": Integer(2)},
+		&Stream{},
+		&Stream{},
+	}
+
+	for i, a := range objects {
+		for j, b := range objects {
+			got := Equal(a, b)
+			want := i == j
+			if got != want {
+				t.Errorf("Equal(objects[%d], objects[%d]) = %t, want %t", i, j, got, want)
+			}
+		}
+	}
+}
+
+func TestNearlyEqual(t *testing.T) {
+	eps := 1e-6
+
+	// nil vs empty are equal for NearlyEqual
+	if !NearlyEqual(String(nil), String(""), eps) {
+		t.Error("NearlyEqual: String(nil) should equal String(\"\")")
+	}
+	if !NearlyEqual(Array(nil), Array{}, eps) {
+		t.Error("NearlyEqual: Array(nil) should equal Array{}")
+	}
+	if !NearlyEqual(Dict(nil), Dict{}, eps) {
+		t.Error("NearlyEqual: Dict(nil) should equal Dict{}")
+	}
+
+	// numeric tolerance
+	if !NearlyEqual(Real(3.0), Real(3.0+1e-9), eps) {
+		t.Error("NearlyEqual: Real(3.0) should equal Real(3.0+1e-9)")
+	}
+	if !NearlyEqual(Integer(3), Real(3.0), eps) {
+		t.Error("NearlyEqual: Integer(3) should equal Real(3.0)")
+	}
+	if !NearlyEqual(Real(3.0), Integer(3), eps) {
+		t.Error("NearlyEqual: Real(3.0) should equal Integer(3)")
+	}
+	if NearlyEqual(Integer(3), Integer(4), eps) {
+		t.Error("NearlyEqual: Integer(3) should not equal Integer(4)")
+	}
+
+	// different types still differ
+	if NearlyEqual(Integer(1), Name("1"), eps) {
+		t.Error("NearlyEqual: Integer(1) should not equal Name(\"1\")")
+	}
+}

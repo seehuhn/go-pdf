@@ -92,6 +92,122 @@ type ExtGState struct {
 	SingleUse bool
 }
 
+// Equal reports whether two ExtGState values are equal.
+func (e *ExtGState) Equal(other *ExtGState) bool {
+	if e == nil || other == nil {
+		return e == nil && other == nil
+	}
+
+	if e.Set != other.Set || e.SingleUse != other.SingleUse {
+		return false
+	}
+
+	set := e.Set
+
+	if set&StateTextFont != 0 {
+		if !font.InstancesEqual(e.TextFont, other.TextFont) ||
+			e.TextFontSize != other.TextFontSize {
+			return false
+		}
+	}
+	if set&StateTextKnockout != 0 && e.TextKnockout != other.TextKnockout {
+		return false
+	}
+	if set&StateLineWidth != 0 && e.LineWidth != other.LineWidth {
+		return false
+	}
+	if set&StateLineCap != 0 && e.LineCap != other.LineCap {
+		return false
+	}
+	if set&StateLineJoin != 0 && e.LineJoin != other.LineJoin {
+		return false
+	}
+	if set&StateMiterLimit != 0 && e.MiterLimit != other.MiterLimit {
+		return false
+	}
+	if set&StateLineDash != 0 {
+		if !slices.Equal(e.DashPattern, other.DashPattern) ||
+			e.DashPhase != other.DashPhase {
+			return false
+		}
+	}
+	if set&StateRenderingIntent != 0 && e.RenderingIntent != other.RenderingIntent {
+		return false
+	}
+	if set&StateStrokeAdjustment != 0 && e.StrokeAdjustment != other.StrokeAdjustment {
+		return false
+	}
+	if set&StateBlendMode != 0 && !pdf.Equal(e.BlendMode, other.BlendMode) {
+		return false
+	}
+	if set&StateSoftMask != 0 && !pdf.Equal(e.SoftMask, other.SoftMask) {
+		return false
+	}
+	if set&StateStrokeAlpha != 0 && e.StrokeAlpha != other.StrokeAlpha {
+		return false
+	}
+	if set&StateFillAlpha != 0 && e.FillAlpha != other.FillAlpha {
+		return false
+	}
+	if set&StateAlphaSourceFlag != 0 && e.AlphaSourceFlag != other.AlphaSourceFlag {
+		return false
+	}
+	if set&StateBlackPointCompensation != 0 && e.BlackPointCompensation != other.BlackPointCompensation {
+		return false
+	}
+	if set&StateOverprint != 0 {
+		if e.OverprintStroke != other.OverprintStroke ||
+			e.OverprintFill != other.OverprintFill {
+			return false
+		}
+	}
+	if set&StateOverprintMode != 0 && e.OverprintMode != other.OverprintMode {
+		return false
+	}
+	if set&StateBlackGeneration != 0 && !function.Equal(e.BlackGeneration, other.BlackGeneration) {
+		return false
+	}
+	if set&StateUndercolorRemoval != 0 && !function.Equal(e.UndercolorRemoval, other.UndercolorRemoval) {
+		return false
+	}
+	if set&StateTransferFunction != 0 {
+		if !function.Equal(e.TransferFunction.Red, other.TransferFunction.Red) ||
+			!function.Equal(e.TransferFunction.Green, other.TransferFunction.Green) ||
+			!function.Equal(e.TransferFunction.Blue, other.TransferFunction.Blue) ||
+			!function.Equal(e.TransferFunction.Gray, other.TransferFunction.Gray) {
+			return false
+		}
+	}
+	if set&StateHalftone != 0 {
+		// Compare halftones by type and transfer function
+		if (e.Halftone == nil) != (other.Halftone == nil) {
+			return false
+		}
+		if e.Halftone != nil {
+			if e.Halftone.HalftoneType() != other.Halftone.HalftoneType() {
+				return false
+			}
+			if !function.Equal(e.Halftone.GetTransferFunction(), other.Halftone.GetTransferFunction()) {
+				return false
+			}
+		}
+	}
+	if set&StateHalftoneOrigin != 0 {
+		if e.HalftoneOriginX != other.HalftoneOriginX ||
+			e.HalftoneOriginY != other.HalftoneOriginY {
+			return false
+		}
+	}
+	if set&StateFlatnessTolerance != 0 && e.FlatnessTolerance != other.FlatnessTolerance {
+		return false
+	}
+	if set&StateSmoothnessTolerance != 0 && e.SmoothnessTolerance != other.SmoothnessTolerance {
+		return false
+	}
+
+	return true
+}
+
 func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 	_, isIndirect := obj.(pdf.Reference)
 

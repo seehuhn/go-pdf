@@ -524,10 +524,10 @@ func SpacesEqual(a, b Space) bool {
 
 	case *SpaceDeviceN:
 		if vb, ok := b.(*SpaceDeviceN); ok {
-			return pdfArrayEqual(va.colorants, vb.colorants) &&
+			return pdf.NearlyEqual(va.colorants, vb.colorants, floatEpsilon) &&
 				SpacesEqual(va.alternate, vb.alternate) &&
 				function.Equal(va.trfm, vb.trfm) &&
-				pdfDictEqual(va.attr, vb.attr)
+				pdf.NearlyEqual(va.attr, vb.attr, floatEpsilon)
 		}
 
 	case spacePatternUncolored:
@@ -558,73 +558,4 @@ func metadataEqual(a, b *metadata.Stream) bool {
 		return a == b
 	}
 	return a.Equal(b)
-}
-
-// pdfArrayEqual compares two pdf.Array values for equality.
-func pdfArrayEqual(a, b pdf.Array) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if !pdfObjectEqual(a[i], b[i]) {
-			return false
-		}
-	}
-	return true
-}
-
-// pdfDictEqual compares two pdf.Dict values for equality.
-func pdfDictEqual(a, b pdf.Dict) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for name, objA := range a {
-		objB, exists := b[name]
-		if !exists {
-			return false
-		}
-		if !pdfObjectEqual(objA, objB) {
-			return false
-		}
-	}
-	return true
-}
-
-// pdfObjectEqual compares two pdf.Object values for equality.
-func pdfObjectEqual(a, b pdf.Object) bool {
-	switch va := a.(type) {
-	case pdf.Name:
-		if vb, ok := b.(pdf.Name); ok {
-			return va == vb
-		}
-	case pdf.String:
-		if vb, ok := b.(pdf.String); ok {
-			return bytes.Equal([]byte(va), []byte(vb))
-		}
-	case pdf.Integer:
-		if vb, ok := b.(pdf.Integer); ok {
-			return va == vb
-		}
-	case pdf.Number:
-		if vb, ok := b.(pdf.Number); ok {
-			return math.Abs(float64(va)-float64(vb)) <= floatEpsilon
-		}
-	case pdf.Boolean:
-		if vb, ok := b.(pdf.Boolean); ok {
-			return va == vb
-		}
-	case pdf.Array:
-		if vb, ok := b.(pdf.Array); ok {
-			return pdfArrayEqual(va, vb)
-		}
-	case pdf.Dict:
-		if vb, ok := b.(pdf.Dict); ok {
-			return pdfDictEqual(va, vb)
-		}
-	case pdf.Reference:
-		if vb, ok := b.(pdf.Reference); ok {
-			return va == vb
-		}
-	}
-	return false
 }

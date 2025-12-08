@@ -16,7 +16,11 @@
 
 package property
 
-import "seehuhn.de/go/pdf"
+import (
+	"slices"
+
+	"seehuhn.de/go/pdf"
+)
 
 // PDF 2.0 sections: 14.6
 
@@ -118,3 +122,35 @@ func (r *ResolvedObject) AsPDF(opt pdf.OutputOptions) pdf.Native {
 // ErrNoKey is returned by List.Get if the requested key is not present
 // in the property list.
 var ErrNoKey = pdf.Error("no such key in property list")
+
+// ListsEqual compares two property lists for semantic equality.
+// Two lists are equal if they have the same keys with equal PDF values.
+func ListsEqual(a, b List) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+
+	keysA := a.Keys()
+	keysB := b.Keys()
+	slices.Sort(keysA)
+	slices.Sort(keysB)
+	if !slices.Equal(keysA, keysB) {
+		return false
+	}
+
+	for _, key := range keysA {
+		objA, errA := a.Get(key)
+		objB, errB := b.Get(key)
+		if (errA != nil) != (errB != nil) {
+			return false
+		}
+		if errA != nil {
+			continue
+		}
+		if !pdf.Equal(objA, objB) {
+			return false
+		}
+	}
+
+	return true
+}
