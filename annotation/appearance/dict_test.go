@@ -22,43 +22,30 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
+func makeTestAppearance(gray float64) *form.Form {
+	b := builder.New(content.Form, nil)
+	b.SetFillColor(color.DeviceGray(gray))
+	b.Rectangle(0, 0, 24, 24)
+	b.Fill()
+	return &form.Form{
+		Content: b.Stream,
+		Res:     b.Resources,
+		BBox:    pdf.Rectangle{LLx: 0, LLy: 0, URx: 24, URy: 24},
+		Matrix:  matrix.Identity,
+	}
+}
+
 var (
-	appA = &form.Form{
-		Draw: func(page *graphics.Writer) error {
-			page.SetFillColor(color.DeviceGray(0.25))
-			page.Rectangle(0, 0, 24, 24)
-			page.Fill()
-			return nil
-		},
-		BBox:   pdf.Rectangle{LLx: 0, LLy: 0, URx: 24, URy: 24},
-		Matrix: matrix.Identity,
-	}
-	appB = &form.Form{
-		Draw: func(page *graphics.Writer) error {
-			page.SetFillColor(color.DeviceGray(0.5))
-			page.Rectangle(0, 0, 24, 24)
-			page.Fill()
-			return nil
-		},
-		BBox:   pdf.Rectangle{LLx: 0, LLy: 0, URx: 24, URy: 24},
-		Matrix: matrix.Identity,
-	}
-	appC = &form.Form{
-		Draw: func(page *graphics.Writer) error {
-			page.SetFillColor(color.DeviceGray(0.75))
-			page.Rectangle(0, 0, 24, 24)
-			page.Fill()
-			return nil
-		},
-		BBox:   pdf.Rectangle{LLx: 0, LLy: 0, URx: 24, URy: 24},
-		Matrix: matrix.Identity,
-	}
+	appA = makeTestAppearance(0.25)
+	appB = makeTestAppearance(0.5)
+	appC = makeTestAppearance(0.75)
 )
 
 type testCase struct {

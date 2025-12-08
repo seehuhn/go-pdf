@@ -135,7 +135,7 @@ func roundTripTest(t *testing.T, version pdf.Version, item1 *ItemDict) {
 	}
 
 	// Store in trailer for extraction
-	w.GetMeta().Trailer["TestItem"] = obj
+	w.GetMeta().Trailer["Quir:E"] = obj
 	err = w.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -143,9 +143,9 @@ func roundTripTest(t *testing.T, version pdf.Version, item1 *ItemDict) {
 
 	// Extract the item
 	x := pdf.NewExtractor(w)
-	objFromTrailer := w.GetMeta().Trailer["TestItem"]
+	objFromTrailer := w.GetMeta().Trailer["Quir:E"]
 	if objFromTrailer == nil {
-		t.Fatal("missing test item in trailer")
+		t.Fatal("missing test object")
 	}
 
 	item2, err := ExtractItemDict(x, objFromTrailer)
@@ -153,12 +153,8 @@ func roundTripTest(t *testing.T, version pdf.Version, item1 *ItemDict) {
 		t.Fatal(err)
 	}
 
-	// Compare items (SingleUse is write-only, not stored in PDF)
-	expected := &ItemDict{
-		Data:      item1.Data,
-		SingleUse: false, // Always false when extracted from PDF
-	}
-	if diff := cmp.Diff(expected, item2); diff != "" {
+	// SingleUse is inferred from how the object was stored (direct vs indirect)
+	if diff := cmp.Diff(item1, item2); diff != "" {
 		t.Errorf("round trip failed (-want +got):\n%s", diff)
 	}
 }
@@ -264,7 +260,7 @@ func FuzzItemDictRoundTrip(f *testing.F) {
 			continue
 		}
 
-		w.GetMeta().Trailer["TestItem"] = obj
+		w.GetMeta().Trailer["Quir:E"] = obj
 		err = w.Close()
 		if err != nil {
 			continue
@@ -279,9 +275,9 @@ func FuzzItemDictRoundTrip(f *testing.F) {
 			t.Skip("invalid PDF")
 		}
 
-		objPDF := r.GetMeta().Trailer["TestItem"]
+		objPDF := r.GetMeta().Trailer["Quir:E"]
 		if objPDF == nil {
-			t.Skip("missing test item")
+			t.Skip("missing test object")
 		}
 
 		x := pdf.NewExtractor(r)

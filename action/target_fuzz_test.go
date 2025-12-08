@@ -49,7 +49,7 @@ func FuzzTarget(f *testing.F) {
 			continue
 		}
 
-		w.GetMeta().Trailer["Quir:Target"] = obj
+		w.GetMeta().Trailer["Quir:E"] = obj
 		err = w.Close()
 		if err != nil {
 			continue
@@ -64,9 +64,9 @@ func FuzzTarget(f *testing.F) {
 			t.Skip("invalid PDF")
 		}
 
-		obj := r.GetMeta().Trailer["Quir:Target"]
+		obj := r.GetMeta().Trailer["Quir:E"]
 		if obj == nil {
-			t.Skip("missing target object")
+			t.Skip("missing test object")
 		}
 
 		x := pdf.NewExtractor(r)

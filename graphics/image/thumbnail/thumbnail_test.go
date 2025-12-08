@@ -413,7 +413,7 @@ func FuzzThumbnailRoundTrip(f *testing.F) {
 			continue
 		}
 
-		w.GetMeta().Trailer["TestThumb"] = ref
+		w.GetMeta().Trailer["Quir:E"] = ref
 		err = w.Close()
 		if err != nil {
 			continue
@@ -427,9 +427,9 @@ func FuzzThumbnailRoundTrip(f *testing.F) {
 		if err != nil {
 			t.Skip("invalid PDF")
 		}
-		objPDF := r.GetMeta().Trailer["TestThumb"]
+		objPDF := r.GetMeta().Trailer["Quir:E"]
 		if objPDF == nil {
-			t.Skip("missing PDF object")
+			t.Skip("missing test object")
 		}
 
 		x := pdf.NewExtractor(r)

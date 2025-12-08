@@ -18,6 +18,7 @@ package appearance
 
 import (
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
@@ -75,14 +76,14 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		res.NormalMap = make(map[pdf.Name]*form.Form)
 		for key, obj := range N {
 			state := key
-			formObj, err := form.Extract(x, obj)
+			formObj, err := extract.Form(x, obj)
 			if err != nil {
 				return nil, err
 			}
 			res.NormalMap[state] = formObj
 		}
 	case *pdf.Stream:
-		formObj, err := form.Extract(x, N)
+		formObj, err := extract.Form(x, N)
 		if err != nil {
 			return nil, err
 		}
@@ -100,14 +101,14 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		res.RollOverMap = make(map[pdf.Name]*form.Form)
 		for key, obj := range R {
 			state := key
-			formObj, err := form.Extract(x, obj)
+			formObj, err := extract.Form(x, obj)
 			if err != nil {
 				return nil, err
 			}
 			res.RollOverMap[state] = formObj
 		}
 	case *pdf.Stream:
-		formObj, err := form.Extract(x, R)
+		formObj, err := extract.Form(x, R)
 		if err != nil {
 			return nil, err
 		}
@@ -123,14 +124,14 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		res.DownMap = make(map[pdf.Name]*form.Form)
 		for key, obj := range D {
 			state := key
-			formObj, err := form.Extract(x, obj)
+			formObj, err := extract.Form(x, obj)
 			if err != nil {
 				return nil, err
 			}
 			res.DownMap[state] = formObj
 		}
 	case *pdf.Stream:
-		formObj, err := form.Extract(x, D)
+		formObj, err := extract.Form(x, D)
 		if err != nil {
 			return nil, err
 		}

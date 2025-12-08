@@ -54,6 +54,9 @@ type ItemValue struct {
 
 // ExtractItemDict extracts a collection item dictionary from a PDF object.
 func ExtractItemDict(x *pdf.Extractor, obj pdf.Object) (*ItemDict, error) {
+	// check if object is indirect (either directly, or via ExtractorGet)
+	_, isIndirect := obj.(pdf.Reference)
+
 	dict, err := x.GetDictTyped(obj, "CollectionItem")
 	if err != nil {
 		return nil, err
@@ -62,7 +65,8 @@ func ExtractItemDict(x *pdf.Extractor, obj pdf.Object) (*ItemDict, error) {
 	}
 
 	item := &ItemDict{
-		Data: make(map[pdf.Name]ItemValue),
+		Data:      make(map[pdf.Name]ItemValue),
+		SingleUse: !isIndirect && !x.IsIndirect,
 	}
 
 	// Process all entries except Type

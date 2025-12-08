@@ -17,7 +17,6 @@
 package main
 
 import (
-	"io"
 	"log"
 	"math"
 
@@ -26,6 +25,8 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/pagetree"
 )
@@ -47,7 +48,7 @@ func run() error {
 	B := standard.TimesBold.New()
 	F := standard.TimesRoman.New()
 
-	figure, bbox, err := LoadFigure("fig.pdf", page.RM)
+	figure, bbox, err := LoadFigure("fig.pdf")
 	if err != nil {
 		return err
 	}
@@ -80,11 +81,13 @@ func run() error {
 }
 
 // LoadFigure loads the first page of a PDF file as a form XObject.
-func LoadFigure(fname string, rm *pdf.ResourceManager) (graphics.XObject, *pdf.Rectangle, error) {
+func LoadFigure(fname string) (graphics.XObject, *pdf.Rectangle, error) {
 	r, err := pdf.Open(fname, nil)
 	if err != nil {
 		return nil, nil, err
 	}
+	defer r.Close()
+
 	_, pageDict, err := pagetree.GetPage(r, 0)
 	if err != nil {
 		return nil, nil, err
@@ -99,35 +102,34 @@ func LoadFigure(fname string, rm *pdf.ResourceManager) (graphics.XObject, *pdf.R
 		return nil, nil, err
 	}
 
+	// extract resources
+	x := pdf.NewExtractor(r)
+	var res *content.Resources
+	if resObj := pageDict["Resources"]; resObj != nil {
+		res, err = extract.Resources(x, resObj)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	if res == nil {
+		res = &content.Resources{}
+	}
+
+	// read content stream
+	stm, err := pagetree.ContentStream(r, pageDict)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	stream, err := content.ReadStream(stm, pdf.GetVersion(r), content.Form)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	obj := &form.Form{
-		Draw: func(w *graphics.Writer) error {
-			copier := pdf.NewCopier(rm.Out, r)
-
-			origResources, err := pdf.GetDict(r, pageDict["Resources"])
-			if err != nil {
-				return err
-			}
-			resourceObj, err := copier.Copy(origResources)
-			if err != nil {
-				return err
-			}
-			w.Resources, err = pdf.ExtractResources(nil, resourceObj)
-			if err != nil {
-				return err
-			}
-
-			contents, err := pagetree.ContentStream(r, pageDict)
-			if err != nil {
-				return err
-			}
-			_, err = io.Copy(w.Content, contents)
-			if err != nil {
-				return err
-			}
-
-			return r.Close()
-		},
-		BBox: *bbox,
+		Content: stream,
+		Res:     res,
+		BBox:    *bbox,
 	}
 
 	return obj, bbox, nil

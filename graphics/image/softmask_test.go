@@ -268,7 +268,7 @@ func FuzzSoftMaskRoundTrip(f *testing.F) {
 		if err != nil {
 			continue
 		}
-		w.GetMeta().Trailer["Quir:SM"] = ref
+		w.GetMeta().Trailer["Quir:E"] = ref
 		err = w.Close()
 		if err != nil {
 			continue
@@ -283,9 +283,9 @@ func FuzzSoftMaskRoundTrip(f *testing.F) {
 		if err != nil {
 			t.Skip("invalid PDF")
 		}
-		obj := r.GetMeta().Trailer["Quir:SM"]
+		obj := r.GetMeta().Trailer["Quir:E"]
 		if obj == nil {
-			t.Skip("missing soft mask")
+			t.Skip("missing test object")
 		}
 
 		ref, ok := obj.(pdf.Reference)

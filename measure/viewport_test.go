@@ -302,7 +302,7 @@ func FuzzViewportRoundTrip(f *testing.F) {
 			continue
 		}
 
-		w.GetMeta().Trailer["Quire:Viewport"] = embedded
+		w.GetMeta().Trailer["Quir:E"] = embedded
 		err = w.Close()
 		if err != nil {
 			continue
@@ -317,9 +317,9 @@ func FuzzViewportRoundTrip(f *testing.F) {
 			t.Skip("invalid PDF")
 		}
 
-		objPDF := r.GetMeta().Trailer["Quire:Viewport"]
+		objPDF := r.GetMeta().Trailer["Quir:E"]
 		if objPDF == nil {
-			t.Skip("missing viewport object")
+			t.Skip("missing test object")
 		}
 
 		vp, err := ExtractViewport(r, objPDF)

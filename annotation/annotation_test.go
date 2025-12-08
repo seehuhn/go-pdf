@@ -29,24 +29,29 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation/appearance"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/debug/mock"
 )
 
-var (
-	defaultAppearance = &form.Form{
-		Draw: func(page *graphics.Writer) error {
-			page.SetFillColor(color.DeviceGray(0.5))
-			page.Rectangle(0, 0, 24, 24)
-			page.Fill()
-			return nil
-		},
-		BBox:   pdf.Rectangle{LLx: 0, LLy: 0, URx: 24, URy: 24},
-		Matrix: matrix.Identity,
+func makeDefaultAppearance() *form.Form {
+	b := builder.New(content.Form, nil)
+	b.SetFillColor(color.DeviceGray(0.5))
+	b.Rectangle(0, 0, 24, 24)
+	b.Fill()
+	return &form.Form{
+		Content: b.Stream,
+		Res:     b.Resources,
+		BBox:    pdf.Rectangle{LLx: 0, LLy: 0, URx: 24, URy: 24},
+		Matrix:  matrix.Identity,
 	}
+}
+
+var (
+	defaultAppearance     = makeDefaultAppearance()
 	defaultAppearanceDict = &appearance.Dict{
 		Normal:   defaultAppearance,
 		RollOver: defaultAppearance,
@@ -133,10 +138,26 @@ func roundTripTest(t *testing.T, v pdf.Version, a1 Annotation) {
 		t.Fatal(err)
 	}
 
-	// Use EquateComparable to handle language.Tag comparison
+	// Use cmp options to handle semantic equivalence in round-trip comparison
 	opts := []cmp.Option{
 		cmp.AllowUnexported(language.Tag{}),
 		cmpopts.EquateComparable(language.Tag{}),
+		// Use form.Equal for comparing forms, which handles nil vs empty Args
+		// and ignores resource differences (SingleUse, etc.)
+		cmp.Comparer(func(a, b *form.Form) bool {
+			if a == nil && b == nil {
+				return true
+			}
+			if a == nil || b == nil {
+				return false
+			}
+			result := a.Equal(b)
+			if !result {
+				t.Logf("form.Equal=false: a.Content=%+v", a.Content)
+				t.Logf("form.Equal=false: b.Content=%+v", b.Content)
+			}
+			return result
+		}),
 	}
 
 	if diff := cmp.Diff(a1, a2, opts...); diff != "" {

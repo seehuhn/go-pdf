@@ -19,7 +19,6 @@ package pdf
 import (
 	"bytes"
 	"fmt"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -144,7 +143,7 @@ func TestTextString_AsPDF(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.in.AsPDF(tt.opt)
-			if !reflect.DeepEqual(got, tt.want) {
+			if !Equal(got, tt.want) {
 				t.Errorf("AsPDF(%q, %v) = %v, want %v", tt.in, tt.opt, got, tt.want)
 			}
 		})

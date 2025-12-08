@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"reflect"
 	"strings"
 	"testing"
 )
@@ -68,7 +67,7 @@ func TestReadObject(t *testing.T) {
 						body, val)
 					continue
 				}
-				if !reflect.DeepEqual(stm1.Dict, stm2.Dict) {
+				if !Equal(stm1.Dict, stm2.Dict) {
 					t.Errorf("%q: wrong value: expected %#v, got %#v",
 						body, stm2.Dict, stm1.Dict)
 					continue
@@ -90,7 +89,7 @@ func TestReadObject(t *testing.T) {
 					t.Errorf("%q: wrong data in stream, expected %x, got %x",
 						body, data2, data1)
 				}
-			} else if !reflect.DeepEqual(val, test.val) {
+			} else if !Equal(val, test.val) {
 				t.Errorf("%q: wrong value: expected %q, got %q",
 					body, AsString(test.val), AsString(val))
 			}

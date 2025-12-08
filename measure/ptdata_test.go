@@ -150,7 +150,7 @@ func FuzzRoundTrip(f *testing.F) {
 			continue
 		}
 
-		w.GetMeta().Trailer["PtData"] = embedded
+		w.GetMeta().Trailer["Quir:E"] = embedded
 		err = w.Close()
 		if err != nil {
 			continue
@@ -164,9 +164,9 @@ func FuzzRoundTrip(f *testing.F) {
 		if err != nil {
 			t.Skip("invalid PDF")
 		}
-		objPDF := r.GetMeta().Trailer["PtData"]
+		objPDF := r.GetMeta().Trailer["Quir:E"]
 		if objPDF == nil {
-			t.Skip("missing PDF object")
+			t.Skip("missing test object")
 		}
 
 		objGo, err := ExtractPtData(r, objPDF)

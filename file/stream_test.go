@@ -127,7 +127,7 @@ func streamRoundTripTest(t *testing.T, version pdf.Version, stream *Stream) {
 	}
 
 	// Store in trailer for extraction
-	w.GetMeta().Trailer["TestStream"] = obj
+	w.GetMeta().Trailer["Quir:E"] = obj
 	err = w.Close()
 	if err != nil {
 		t.Fatalf("Writer.Close failed: %v", err)
@@ -135,9 +135,9 @@ func streamRoundTripTest(t *testing.T, version pdf.Version, stream *Stream) {
 
 	// Extract the stream back
 	x := pdf.NewExtractor(w)
-	streamObj := w.GetMeta().Trailer["TestStream"]
+	streamObj := w.GetMeta().Trailer["Quir:E"]
 	if streamObj == nil {
-		t.Fatal("TestStream not found in trailer")
+		t.Fatal("missing test object")
 	}
 
 	decoded, err := ExtractStream(x, streamObj)
@@ -273,7 +273,7 @@ func FuzzStreamRoundTrip(f *testing.F) {
 			continue
 		}
 
-		w.GetMeta().Trailer["TestStream"] = obj
+		w.GetMeta().Trailer["Quir:E"] = obj
 		err = w.Close()
 		if err != nil {
 			continue
@@ -288,9 +288,9 @@ func FuzzStreamRoundTrip(f *testing.F) {
 			t.Skip("invalid PDF")
 		}
 
-		objPDF := r.GetMeta().Trailer["TestStream"]
+		objPDF := r.GetMeta().Trailer["Quir:E"]
 		if objPDF == nil {
-			t.Skip("missing TestStream object")
+			t.Skip("missing test object")
 		}
 
 		x := pdf.NewExtractor(r)

@@ -23,8 +23,9 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
@@ -35,24 +36,23 @@ func (s *Style) addLineAppearance(a *annotation.Line) *form.Form {
 	bbox := calculateLineBBox(a, lw)
 	a.Rect = bbox
 
-	draw := func(w *graphics.Writer) error {
-		w.SetExtGState(s.reset)
-		w.SetLineWidth(lw)
-		w.SetStrokeColor(color.Black)
-		w.SetLineDash(dashPattern, 0)
+	b := builder.New(content.Form, nil)
 
-		if a.LL != 0 {
-			drawLineWithLeaderLines(w, a)
-		} else {
-			drawSimpleLine(w, a)
-		}
+	b.SetExtGState(s.reset)
+	b.SetLineWidth(lw)
+	b.SetStrokeColor(color.Black)
+	b.SetLineDash(dashPattern, 0)
 
-		return nil
+	if a.LL != 0 {
+		drawLineWithLeaderLinesBuilder(b, a)
+	} else {
+		drawSimpleLineBuilder(b, a)
 	}
 
 	return &form.Form{
-		Draw: draw,
-		BBox: bbox,
+		Content: b.Stream,
+		Res:     b.Resources,
+		BBox:    bbox,
 	}
 }
 
@@ -186,8 +186,8 @@ func expandBBoxForLeaderLines(bbox *pdf.Rectangle, a *annotation.Line, lw float6
 	}
 }
 
-// drawSimpleLine draws a line without leader lines
-func drawSimpleLine(w *graphics.Writer, a *annotation.Line) {
+// drawSimpleLineBuilder draws a line without leader lines
+func drawSimpleLineBuilder(b *builder.Builder, a *annotation.Line) {
 	x1, y1 := a.Coords[0], a.Coords[1]
 	x2, y2 := a.Coords[2], a.Coords[3]
 
@@ -199,9 +199,9 @@ func drawSimpleLine(w *graphics.Writer, a *annotation.Line) {
 			FillColor: a.FillColor,
 			IsStart:   true,
 		}
-		drawLineEnding(w, a.LineEndingStyle[0], info)
+		drawLineEndingBuilder(b, a.LineEndingStyle[0], info)
 	} else {
-		w.MoveTo(pdf.Round(x1, 2), pdf.Round(y1, 2))
+		b.MoveTo(pdf.Round(x1, 2), pdf.Round(y1, 2))
 	}
 
 	// draw end ending if present
@@ -212,15 +212,15 @@ func drawSimpleLine(w *graphics.Writer, a *annotation.Line) {
 			FillColor: a.FillColor,
 			IsStart:   false,
 		}
-		drawLineEnding(w, a.LineEndingStyle[1], info)
+		drawLineEndingBuilder(b, a.LineEndingStyle[1], info)
 	} else {
-		w.LineTo(pdf.Round(x2, 2), pdf.Round(y2, 2))
-		w.Stroke()
+		b.LineTo(pdf.Round(x2, 2), pdf.Round(y2, 2))
+		b.Stroke()
 	}
 }
 
-// drawLineWithLeaderLines draws a line with leader lines (dimension line style)
-func drawLineWithLeaderLines(w *graphics.Writer, a *annotation.Line) {
+// drawLineWithLeaderLinesBuilder draws a line with leader lines (dimension line style)
+func drawLineWithLeaderLinesBuilder(b *builder.Builder, a *annotation.Line) {
 	x1, y1 := a.Coords[0], a.Coords[1]
 	x2, y2 := a.Coords[2], a.Coords[3]
 
@@ -230,7 +230,7 @@ func drawLineWithLeaderLines(w *graphics.Writer, a *annotation.Line) {
 	length := math.Sqrt(dx*dx + dy*dy)
 	if length < 0.1 {
 		// line too short, fall back to simple line
-		drawSimpleLine(w, a)
+		drawSimpleLineBuilder(b, a)
 		return
 	}
 
@@ -265,14 +265,14 @@ func drawLineWithLeaderLines(w *graphics.Writer, a *annotation.Line) {
 
 	// draw the leader lines (perpendicular segments)
 	// start leader line
-	w.MoveTo(pdf.Round(extStartX, 2), pdf.Round(extStartY, 2))
-	w.LineTo(pdf.Round(startX, 2), pdf.Round(startY, 2))
-	w.Stroke()
+	b.MoveTo(pdf.Round(extStartX, 2), pdf.Round(extStartY, 2))
+	b.LineTo(pdf.Round(startX, 2), pdf.Round(startY, 2))
+	b.Stroke()
 
 	// end leader line
-	w.MoveTo(pdf.Round(extEndX, 2), pdf.Round(extEndY, 2))
-	w.LineTo(pdf.Round(endX, 2), pdf.Round(endY, 2))
-	w.Stroke()
+	b.MoveTo(pdf.Round(extEndX, 2), pdf.Round(extEndY, 2))
+	b.LineTo(pdf.Round(endX, 2), pdf.Round(endY, 2))
+	b.Stroke()
 
 	// draw the main line with endings
 	// start ending
@@ -283,9 +283,9 @@ func drawLineWithLeaderLines(w *graphics.Writer, a *annotation.Line) {
 			FillColor: a.FillColor,
 			IsStart:   true,
 		}
-		drawLineEnding(w, a.LineEndingStyle[0], info)
+		drawLineEndingBuilder(b, a.LineEndingStyle[0], info)
 	} else {
-		w.MoveTo(pdf.Round(shiftedStartX, 2), pdf.Round(shiftedStartY, 2))
+		b.MoveTo(pdf.Round(shiftedStartX, 2), pdf.Round(shiftedStartY, 2))
 	}
 
 	// end ending
@@ -296,9 +296,9 @@ func drawLineWithLeaderLines(w *graphics.Writer, a *annotation.Line) {
 			FillColor: a.FillColor,
 			IsStart:   false,
 		}
-		drawLineEnding(w, a.LineEndingStyle[1], info)
+		drawLineEndingBuilder(b, a.LineEndingStyle[1], info)
 	} else {
-		w.LineTo(pdf.Round(shiftedEndX, 2), pdf.Round(shiftedEndY, 2))
-		w.Stroke()
+		b.LineTo(pdf.Round(shiftedEndX, 2), pdf.Round(shiftedEndY, 2))
+		b.Stroke()
 	}
 }

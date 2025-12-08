@@ -252,7 +252,7 @@ func TestWriterGet(t *testing.T) {
 				if err != nil {
 					t.Fatalf("error reading object %d: %v", i, err)
 				}
-				if !reflect.DeepEqual(obj, testObjects[i]) {
+				if !Equal(obj, testObjects[i]) {
 					t.Errorf("expected %v, got %v", testObjects[i], obj)
 				}
 			}

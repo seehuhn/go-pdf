@@ -19,6 +19,8 @@ package fallback
 import (
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
@@ -40,48 +42,48 @@ func (s *Style) addSquareAppearance(a *annotation.Square) *form.Form {
 	hasFill := a.FillColor != nil
 	if !(hasOutline || hasFill) {
 		return &form.Form{
-			Draw: func(w *graphics.Writer) error { return nil },
-			BBox: bbox,
+			Content: nil,
+			Res:     &content.Resources{},
+			BBox:    bbox,
 		}
 	}
 
-	draw := func(w *graphics.Writer) error {
-		w.SetExtGState(s.reset)
-		if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
-			gs := &graphics.ExtGState{
-				Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
-				StrokeAlpha: 1 - a.StrokingTransparency,
-				FillAlpha:   1 - a.NonStrokingTransparency,
-				SingleUse:   true,
-			}
-			w.SetExtGState(gs)
-		}
+	b := builder.New(content.Form, nil)
 
-		if hasOutline {
-			w.SetLineWidth(lw)
-			w.SetStrokeColor(col)
-			w.SetLineDash(dashPattern, 0)
+	b.SetExtGState(s.reset)
+	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
+		gs := &graphics.ExtGState{
+			Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
+			StrokeAlpha: 1 - a.StrokingTransparency,
+			FillAlpha:   1 - a.NonStrokingTransparency,
+			SingleUse:   true,
 		}
-		if hasFill {
-			w.SetFillColor(a.FillColor)
-		}
+		b.SetExtGState(gs)
+	}
 
-		w.Rectangle(rect.LLx+lw/2, rect.LLy+lw/2, rect.Dx()-lw, rect.Dy()-lw)
+	if hasOutline {
+		b.SetLineWidth(lw)
+		b.SetStrokeColor(col)
+		b.SetLineDash(dashPattern, 0)
+	}
+	if hasFill {
+		b.SetFillColor(a.FillColor)
+	}
 
-		switch {
-		case hasOutline && hasFill:
-			w.FillAndStroke()
-		case hasFill:
-			w.Fill()
-		default: // hasOutline
-			w.Stroke()
-		}
+	b.Rectangle(rect.LLx+lw/2, rect.LLy+lw/2, rect.Dx()-lw, rect.Dy()-lw)
 
-		return nil
+	switch {
+	case hasOutline && hasFill:
+		b.FillAndStroke()
+	case hasFill:
+		b.Fill()
+	default: // hasOutline
+		b.Stroke()
 	}
 
 	return &form.Form{
-		Draw: draw,
-		BBox: bbox,
+		Content: b.Stream,
+		Res:     b.Resources,
+		BBox:    bbox,
 	}
 }

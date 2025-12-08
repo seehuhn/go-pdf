@@ -24,8 +24,8 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 )
 
 // lineEndingInfo contains the parameters needed to draw a line ending.
@@ -47,8 +47,8 @@ type lineEndingInfo struct {
 	IsStart bool
 }
 
-// drawLineEnding draws a line ending with the specified style and parameters.
-func drawLineEnding(w *graphics.Writer, style annotation.LineEndingStyle, info lineEndingInfo) {
+// drawLineEndingBuilder draws a line ending using builder.Builder.
+func drawLineEndingBuilder(b *builder.Builder, style annotation.LineEndingStyle, info lineEndingInfo) {
 	// normalize direction vectors
 	if info.Dir.Length() < 0.1 {
 		style = annotation.LineEndingStyleNone
@@ -58,29 +58,29 @@ func drawLineEnding(w *graphics.Writer, style annotation.LineEndingStyle, info l
 
 	switch style {
 	case annotation.LineEndingStyleSquare:
-		square(info).draw(w)
+		square(info).drawBuilder(b)
 	case annotation.LineEndingStyleCircle:
-		circle(info).draw(w)
+		circle(info).drawBuilder(b)
 	case annotation.LineEndingStyleDiamond:
-		diamond(info).draw(w)
+		diamond(info).drawBuilder(b)
 	case annotation.LineEndingStyleOpenArrow:
 		a := arrow{lineEndingInfo: info}
-		a.draw(w)
+		a.drawBuilder(b)
 	case annotation.LineEndingStyleClosedArrow:
 		a := arrow{lineEndingInfo: info, closed: true}
-		a.draw(w)
+		a.drawBuilder(b)
 	case annotation.LineEndingStyleButt:
-		butt(info).draw(w)
+		butt(info).drawBuilder(b)
 	case annotation.LineEndingStyleROpenArrow:
 		a := arrow{lineEndingInfo: info, reverse: true}
-		a.draw(w)
+		a.drawBuilder(b)
 	case annotation.LineEndingStyleRClosedArrow:
 		a := arrow{lineEndingInfo: info, closed: true, reverse: true}
-		a.draw(w)
+		a.drawBuilder(b)
 	case annotation.LineEndingStyleSlash:
-		slash(info).draw(w)
+		slash(info).drawBuilder(b)
 	default: // annotation.LineEndingStyleNone
-		none(info).draw(w)
+		none(info).drawBuilder(b)
 	}
 }
 
@@ -124,13 +124,13 @@ func lineEndingBBox(bbox *pdf.Rectangle, style annotation.LineEndingStyle, info 
 
 type none lineEndingInfo
 
-func (le none) draw(w *graphics.Writer) {
+func (le none) drawBuilder(b *builder.Builder) {
 	if !le.IsStart {
-		w.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2))
-		w.Stroke()
+		b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2))
+		b.Stroke()
 	}
 	if le.IsStart {
-		w.MoveTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2))
+		b.MoveTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2))
 	}
 }
 
@@ -172,32 +172,28 @@ func (le butt) extend(bbox *pdf.Rectangle, lw float64) {
 	}
 }
 
-func (le butt) draw(w *graphics.Writer) {
-	n := le.Dir.Normal()
-	n.IMul(le.size(w.LineWidth) / 2)
-
-	if le.IsStart {
-		// draw the butt line first
-		p1 := le.At.Add(n)
-		p2 := le.At.Sub(n)
-		w.MoveTo(pdf.Round(p1.X, 2), pdf.Round(p1.Y, 2))
-		w.LineTo(pdf.Round(p2.X, 2), pdf.Round(p2.Y, 2))
-		// position at connection point
-		w.MoveTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2))
-	} else {
-		// connect to the ending point
-		w.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2))
-		// draw the butt line
-		p1 := le.At.Add(n)
-		p2 := le.At.Sub(n)
-		w.MoveTo(pdf.Round(p1.X, 2), pdf.Round(p1.Y, 2))
-		w.LineTo(pdf.Round(p2.X, 2), pdf.Round(p2.Y, 2))
-		w.Stroke()
-	}
-}
-
 func (le butt) size(lw float64) float64 {
 	return max(3.5, 7*lw)
+}
+
+func (le butt) drawBuilder(b *builder.Builder) {
+	n := le.Dir.Normal()
+	n.IMul(le.size(b.Param.LineWidth) / 2)
+
+	if le.IsStart {
+		p1 := le.At.Add(n)
+		p2 := le.At.Sub(n)
+		b.MoveTo(pdf.Round(p1.X, 2), pdf.Round(p1.Y, 2))
+		b.LineTo(pdf.Round(p2.X, 2), pdf.Round(p2.Y, 2))
+		b.MoveTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2))
+	} else {
+		b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2))
+		p1 := le.At.Add(n)
+		p2 := le.At.Sub(n)
+		b.MoveTo(pdf.Round(p1.X, 2), pdf.Round(p1.Y, 2))
+		b.LineTo(pdf.Round(p2.X, 2), pdf.Round(p2.Y, 2))
+		b.Stroke()
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -240,34 +236,30 @@ func (le slash) extend(bbox *pdf.Rectangle, lw float64) {
 	}
 }
 
-func (le slash) draw(w *graphics.Writer) {
-	a := 0.5              // cos(60°)
-	b := math.Sqrt(3) / 2 // sin(60°)
-	n := vec.Vec2{X: a*le.Dir.X - b*le.Dir.Y, Y: a*le.Dir.Y + b*le.Dir.X}
-	n.IMul(le.size(w.LineWidth) / 2)
-
-	if le.IsStart {
-		// draw the slash line first
-		p1 := le.At.Add(n)
-		p2 := le.At.Sub(n)
-		w.MoveTo(pdf.Round(p1.X, 2), pdf.Round(p1.Y, 2))
-		w.LineTo(pdf.Round(p2.X, 2), pdf.Round(p2.Y, 2))
-		// position at connection point
-		w.MoveTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2))
-	} else {
-		// connect to the ending point
-		w.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2))
-		// draw the slash line
-		p1 := le.At.Add(n)
-		p2 := le.At.Sub(n)
-		w.MoveTo(pdf.Round(p1.X, 2), pdf.Round(p1.Y, 2))
-		w.LineTo(pdf.Round(p2.X, 2), pdf.Round(p2.Y, 2))
-		w.Stroke()
-	}
-}
-
 func (le slash) size(lw float64) float64 {
 	return max(5, 10*lw)
+}
+
+func (le slash) drawBuilder(b *builder.Builder) {
+	a := 0.5              // cos(60°)
+	c := math.Sqrt(3) / 2 // sin(60°)
+	n := vec.Vec2{X: a*le.Dir.X - c*le.Dir.Y, Y: a*le.Dir.Y + c*le.Dir.X}
+	n.IMul(le.size(b.Param.LineWidth) / 2)
+
+	if le.IsStart {
+		p1 := le.At.Add(n)
+		p2 := le.At.Sub(n)
+		b.MoveTo(pdf.Round(p1.X, 2), pdf.Round(p1.Y, 2))
+		b.LineTo(pdf.Round(p2.X, 2), pdf.Round(p2.Y, 2))
+		b.MoveTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2))
+	} else {
+		b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2))
+		p1 := le.At.Add(n)
+		p2 := le.At.Sub(n)
+		b.MoveTo(pdf.Round(p1.X, 2), pdf.Round(p1.Y, 2))
+		b.LineTo(pdf.Round(p2.X, 2), pdf.Round(p2.Y, 2))
+		b.Stroke()
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -301,43 +293,38 @@ func (le square) extend(bbox *pdf.Rectangle, lw float64) {
 	}
 }
 
-func (le square) draw(w *graphics.Writer) {
-	size := le.size(w.LineWidth)
-	// offset to edge of square along direction vector
+func (le square) size(lw float64) float64 {
+	return max(3, 6*lw)
+}
+
+func (le square) drawBuilder(b *builder.Builder) {
+	size := le.size(b.Param.LineWidth)
 	a := (size / 2) / max(math.Abs(le.Dir.X), math.Abs(le.Dir.Y))
 
 	if le.IsStart {
-		// draw the square first
 		if le.FillColor != nil {
-			w.SetFillColor(le.FillColor)
-			w.Rectangle(pdf.Round(le.At.X-size/2, 2), pdf.Round(le.At.Y-size/2, 2), pdf.Round(size, 2), pdf.Round(size, 2))
-			w.FillAndStroke()
+			b.SetFillColor(le.FillColor)
+			b.Rectangle(pdf.Round(le.At.X-size/2, 2), pdf.Round(le.At.Y-size/2, 2), pdf.Round(size, 2), pdf.Round(size, 2))
+			b.FillAndStroke()
 		} else {
-			w.Rectangle(pdf.Round(le.At.X-size/2, 2), pdf.Round(le.At.Y-size/2, 2), pdf.Round(size, 2), pdf.Round(size, 2))
-			w.Stroke()
+			b.Rectangle(pdf.Round(le.At.X-size/2, 2), pdf.Round(le.At.Y-size/2, 2), pdf.Round(size, 2), pdf.Round(size, 2))
+			b.Stroke()
 		}
-		// position at connection point
 		pos := le.At.Sub(le.Dir.Mul(a))
-		w.MoveTo(pdf.Round(pos.X, 2), pdf.Round(pos.Y, 2))
+		b.MoveTo(pdf.Round(pos.X, 2), pdf.Round(pos.Y, 2))
 	} else {
-		// connect to the ending point
 		pos := le.At.Sub(le.Dir.Mul(a))
-		w.LineTo(pdf.Round(pos.X, 2), pdf.Round(pos.Y, 2))
-		w.Stroke()
-		// draw the square
+		b.LineTo(pdf.Round(pos.X, 2), pdf.Round(pos.Y, 2))
+		b.Stroke()
 		if le.FillColor != nil {
-			w.SetFillColor(le.FillColor)
-			w.Rectangle(pdf.Round(le.At.X-size/2, 2), pdf.Round(le.At.Y-size/2, 2), pdf.Round(size, 2), pdf.Round(size, 2))
-			w.FillAndStroke()
+			b.SetFillColor(le.FillColor)
+			b.Rectangle(pdf.Round(le.At.X-size/2, 2), pdf.Round(le.At.Y-size/2, 2), pdf.Round(size, 2), pdf.Round(size, 2))
+			b.FillAndStroke()
 		} else {
-			w.Rectangle(pdf.Round(le.At.X-size/2, 2), pdf.Round(le.At.Y-size/2, 2), pdf.Round(size, 2), pdf.Round(size, 2))
-			w.Stroke()
+			b.Rectangle(pdf.Round(le.At.X-size/2, 2), pdf.Round(le.At.Y-size/2, 2), pdf.Round(size, 2), pdf.Round(size, 2))
+			b.Stroke()
 		}
 	}
-}
-
-func (le square) size(lw float64) float64 {
-	return max(3, 6*lw)
 }
 
 // ---------------------------------------------------------------------------
@@ -366,41 +353,37 @@ func (le circle) extend(b *pdf.Rectangle, lw float64) {
 	}
 }
 
-func (le circle) draw(w *graphics.Writer) {
-	size := le.size(w.LineWidth)
-
-	if le.IsStart {
-		// draw the circle first
-		if le.FillColor != nil {
-			w.SetFillColor(le.FillColor)
-			w.Circle(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2), pdf.Round(0.5*size, 2))
-			w.FillAndStroke()
-		} else {
-			w.Circle(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2), pdf.Round(0.5*size, 2))
-			w.Stroke()
-		}
-		// position at connection point
-		pos := le.At.Sub(le.Dir.Mul(0.5 * size))
-		w.MoveTo(pdf.Round(pos.X, 2), pdf.Round(pos.Y, 2))
-	} else {
-		// connect to the ending point
-		pos := le.At.Sub(le.Dir.Mul(0.5 * size))
-		w.LineTo(pdf.Round(pos.X, 2), pdf.Round(pos.Y, 2))
-		w.Stroke()
-		// draw the circle
-		if le.FillColor != nil {
-			w.SetFillColor(le.FillColor)
-			w.Circle(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2), pdf.Round(0.5*size, 2))
-			w.FillAndStroke()
-		} else {
-			w.Circle(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2), pdf.Round(0.5*size, 2))
-			w.Stroke()
-		}
-	}
-}
-
 func (le circle) size(lw float64) float64 {
 	return max(3.5, 7*lw)
+}
+
+func (le circle) drawBuilder(b *builder.Builder) {
+	size := le.size(b.Param.LineWidth)
+
+	if le.IsStart {
+		if le.FillColor != nil {
+			b.SetFillColor(le.FillColor)
+			b.Circle(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2), pdf.Round(0.5*size, 2))
+			b.FillAndStroke()
+		} else {
+			b.Circle(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2), pdf.Round(0.5*size, 2))
+			b.Stroke()
+		}
+		pos := le.At.Sub(le.Dir.Mul(0.5 * size))
+		b.MoveTo(pdf.Round(pos.X, 2), pdf.Round(pos.Y, 2))
+	} else {
+		pos := le.At.Sub(le.Dir.Mul(0.5 * size))
+		b.LineTo(pdf.Round(pos.X, 2), pdf.Round(pos.Y, 2))
+		b.Stroke()
+		if le.FillColor != nil {
+			b.SetFillColor(le.FillColor)
+			b.Circle(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2), pdf.Round(0.5*size, 2))
+			b.FillAndStroke()
+		} else {
+			b.Circle(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2), pdf.Round(0.5*size, 2))
+			b.Stroke()
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -434,55 +417,51 @@ func (le diamond) extend(b *pdf.Rectangle, lw float64) {
 	}
 }
 
-func (le diamond) draw(w *graphics.Writer) {
-	size := le.size(w.LineWidth)
+func (le diamond) size(lw float64) float64 {
+	return max(4, 8*lw)
+}
+
+func (le diamond) drawBuilder(b *builder.Builder) {
+	size := le.size(b.Param.LineWidth)
 	a := size / (math.Abs(le.Dir.X) + math.Abs(le.Dir.Y)) / 2
 	L := size
 
 	if le.IsStart {
-		// draw the diamond first
 		if le.FillColor != nil {
-			w.SetFillColor(le.FillColor)
-			w.MoveTo(pdf.Round(le.At.X+L/2, 2), pdf.Round(le.At.Y, 2))
-			w.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y+L/2, 2))
-			w.LineTo(pdf.Round(le.At.X-L/2, 2), pdf.Round(le.At.Y, 2))
-			w.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y-L/2, 2))
-			w.CloseFillAndStroke()
+			b.SetFillColor(le.FillColor)
+			b.MoveTo(pdf.Round(le.At.X+L/2, 2), pdf.Round(le.At.Y, 2))
+			b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y+L/2, 2))
+			b.LineTo(pdf.Round(le.At.X-L/2, 2), pdf.Round(le.At.Y, 2))
+			b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y-L/2, 2))
+			b.CloseFillAndStroke()
 		} else {
-			w.MoveTo(pdf.Round(le.At.X+L/2, 2), pdf.Round(le.At.Y, 2))
-			w.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y+L/2, 2))
-			w.LineTo(pdf.Round(le.At.X-L/2, 2), pdf.Round(le.At.Y, 2))
-			w.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y-L/2, 2))
-			w.CloseAndStroke()
+			b.MoveTo(pdf.Round(le.At.X+L/2, 2), pdf.Round(le.At.Y, 2))
+			b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y+L/2, 2))
+			b.LineTo(pdf.Round(le.At.X-L/2, 2), pdf.Round(le.At.Y, 2))
+			b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y-L/2, 2))
+			b.CloseAndStroke()
 		}
-		// position at connection point
 		pos := le.At.Sub(le.Dir.Mul(a))
-		w.MoveTo(pdf.Round(pos.X, 2), pdf.Round(pos.Y, 2))
+		b.MoveTo(pdf.Round(pos.X, 2), pdf.Round(pos.Y, 2))
 	} else {
-		// connect to the ending point
 		pos := le.At.Sub(le.Dir.Mul(a))
-		w.LineTo(pdf.Round(pos.X, 2), pdf.Round(pos.Y, 2))
-		w.Stroke()
-		// draw the diamond
+		b.LineTo(pdf.Round(pos.X, 2), pdf.Round(pos.Y, 2))
+		b.Stroke()
 		if le.FillColor != nil {
-			w.SetFillColor(le.FillColor)
-			w.MoveTo(pdf.Round(le.At.X+L/2, 2), pdf.Round(le.At.Y, 2))
-			w.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y+L/2, 2))
-			w.LineTo(pdf.Round(le.At.X-L/2, 2), pdf.Round(le.At.Y, 2))
-			w.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y-L/2, 2))
-			w.CloseFillAndStroke()
+			b.SetFillColor(le.FillColor)
+			b.MoveTo(pdf.Round(le.At.X+L/2, 2), pdf.Round(le.At.Y, 2))
+			b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y+L/2, 2))
+			b.LineTo(pdf.Round(le.At.X-L/2, 2), pdf.Round(le.At.Y, 2))
+			b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y-L/2, 2))
+			b.CloseFillAndStroke()
 		} else {
-			w.MoveTo(pdf.Round(le.At.X+L/2, 2), pdf.Round(le.At.Y, 2))
-			w.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y+L/2, 2))
-			w.LineTo(pdf.Round(le.At.X-L/2, 2), pdf.Round(le.At.Y, 2))
-			w.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y-L/2, 2))
-			w.CloseAndStroke()
+			b.MoveTo(pdf.Round(le.At.X+L/2, 2), pdf.Round(le.At.Y, 2))
+			b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y+L/2, 2))
+			b.LineTo(pdf.Round(le.At.X-L/2, 2), pdf.Round(le.At.Y, 2))
+			b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y-L/2, 2))
+			b.CloseAndStroke()
 		}
 	}
-}
-
-func (le diamond) size(lw float64) float64 {
-	return max(4, 8*lw)
 }
 
 // ---------------------------------------------------------------------------
@@ -520,10 +499,9 @@ func (le arrow) extend(b *pdf.Rectangle, lw float64) {
 	}
 }
 
-func (le arrow) draw(w *graphics.Writer) {
-	tip, base1, base2 := le.corners(w.LineWidth)
+func (le arrow) drawBuilder(b *builder.Builder) {
+	tip, base1, base2 := le.corners(b.Param.LineWidth)
 
-	// determine connection point
 	var connectX, connectY float64
 	if le.reverse {
 		connectX, connectY = le.At.X, le.At.Y
@@ -531,55 +509,51 @@ func (le arrow) draw(w *graphics.Writer) {
 		m := vec.Middle(base1, base2)
 		connectX, connectY = m.X, m.Y
 	} else {
-		v, _ := linalg.Miter(base1, tip, base2, w.LineWidth, false)
+		v, _ := linalg.Miter(base1, tip, base2, b.Param.LineWidth, false)
 		connectX, connectY = v.X, v.Y
 	}
 
 	if le.IsStart {
-		// draw the arrow first
 		if le.closed {
 			if le.FillColor != nil {
-				w.SetFillColor(le.FillColor)
-				w.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
-				w.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
-				w.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
-				w.CloseFillAndStroke()
+				b.SetFillColor(le.FillColor)
+				b.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
+				b.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
+				b.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
+				b.CloseFillAndStroke()
 			} else {
-				w.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
-				w.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
-				w.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
-				w.CloseAndStroke()
+				b.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
+				b.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
+				b.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
+				b.CloseAndStroke()
 			}
 		} else {
-			w.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
-			w.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
-			w.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
+			b.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
+			b.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
+			b.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
 		}
-		// position at connection point
-		w.MoveTo(pdf.Round(connectX, 2), pdf.Round(connectY, 2))
+		b.MoveTo(pdf.Round(connectX, 2), pdf.Round(connectY, 2))
 	} else {
-		// connect to the ending point
-		w.LineTo(pdf.Round(connectX, 2), pdf.Round(connectY, 2))
-		w.Stroke()
-		// draw the arrow
+		b.LineTo(pdf.Round(connectX, 2), pdf.Round(connectY, 2))
+		b.Stroke()
 		if le.closed {
 			if le.FillColor != nil {
-				w.SetFillColor(le.FillColor)
-				w.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
-				w.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
-				w.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
-				w.CloseFillAndStroke()
+				b.SetFillColor(le.FillColor)
+				b.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
+				b.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
+				b.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
+				b.CloseFillAndStroke()
 			} else {
-				w.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
-				w.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
-				w.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
-				w.CloseAndStroke()
+				b.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
+				b.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
+				b.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
+				b.CloseAndStroke()
 			}
 		} else {
-			w.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
-			w.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
-			w.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
-			w.Stroke()
+			b.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
+			b.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
+			b.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
+			b.Stroke()
 		}
 	}
 }
