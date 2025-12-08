@@ -286,6 +286,6 @@ func FuzzItemDictRoundTrip(f *testing.F) {
 			t.Skip("malformed collection item")
 		}
 
-		roundTripTest(t, r.GetMeta().Version, item1)
+		roundTripTest(t, max(r.GetMeta().Version, pdf.V1_7), item1)
 	})
 }

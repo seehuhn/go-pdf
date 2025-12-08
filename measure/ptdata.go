@@ -92,6 +92,11 @@ func ExtractPtData(r pdf.Getter, obj pdf.Object) (*PtData, error) {
 		ptData.Names = names
 	}
 
+	// Validate Names is not empty
+	if len(ptData.Names) == 0 {
+		return nil, pdf.Error("Names array cannot be empty")
+	}
+
 	// Extract XPTS (required)
 	if xptsArray, err := pdf.Optional(pdf.GetArray(r, dict["XPTS"])); err != nil {
 		return nil, err

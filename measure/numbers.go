@@ -90,6 +90,9 @@ func ExtractNumberFormat(r pdf.Getter, obj pdf.Object) (*NumberFormat, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(unit) == 0 {
+		return nil, pdf.Error("missing required Unit")
+	}
 	nf.Unit = string(unit)
 
 	conversion, err := pdf.GetNumber(r, dict["C"])
