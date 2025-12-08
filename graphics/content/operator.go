@@ -40,6 +40,22 @@ type Operator struct {
 	Args []pdf.Object
 }
 
+// Equal determines whether two operators are equal.
+func (o Operator) Equal(other Operator) bool {
+	if o.Name != other.Name {
+		return false
+	}
+	if len(o.Args) != len(other.Args) {
+		return false
+	}
+	for i := range o.Args {
+		if !pdf.Equal(o.Args[i], other.Args[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 // isValidName checks whether the operator name is valid for the given PDF version.
 // It returns ErrUnknown if the operator is not recognized, ErrDeprecated if
 // the operator is deprecated in the given version, or ErrVersion if the

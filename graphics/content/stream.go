@@ -37,6 +37,20 @@ import (
 //   - Annotation appearances
 type Stream []Operator
 
+// Equal determines whether two content streams contain the same sequence of
+// operators.
+func (s Stream) Equal(other Stream) bool {
+	if len(s) != len(other) {
+		return false
+	}
+	for i := range s {
+		if !s[i].Equal(other[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 // Type identifies the type of content stream.
 type Type int
 

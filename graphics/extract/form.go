@@ -17,11 +17,130 @@
 package extract
 
 import (
+	"errors"
+	"fmt"
+	"time"
+
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/measure"
+	"seehuhn.de/go/pdf/metadata"
+	"seehuhn.de/go/pdf/oc"
+	"seehuhn.de/go/pdf/pieceinfo"
 )
 
 // Form extracts a form XObject from a PDF file.
 func Form(x *pdf.Extractor, obj pdf.Object) (*form.Form, error) {
-	return form.Extract(x, obj)
+	stream, err := x.GetStream(obj)
+	if err != nil {
+		return nil, err
+	} else if stream == nil {
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("missing form XObject"),
+		}
+	}
+	dict := stream.Dict
+
+	subtypeName, _ := x.GetName(dict["Subtype"])
+	if subtypeName != "Form" {
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("invalid Subtype for form XObject"),
+		}
+	}
+
+	// read required BBox
+	bbox, err := pdf.GetRectangle(x.R, dict["BBox"])
+	if err != nil {
+		return nil, fmt.Errorf("failed to read BBox: %w", err)
+	} else if bbox == nil || bbox.IsZero() {
+		return nil, pdf.Error("missing BBox")
+	}
+
+	f := &form.Form{
+		BBox: *bbox,
+	}
+
+	f.Matrix, err = pdf.GetMatrix(x.R, dict["Matrix"])
+	if err != nil {
+		f.Matrix = matrix.Identity
+	}
+
+	f.Metadata, _ = metadata.Extract(x.R, dict["Metadata"])
+
+	// read optional PieceInfo
+	if pieceInfoObj, ok := dict["PieceInfo"]; ok {
+		var err error
+		f.PieceInfo, err = pieceinfo.Extract(x.R, pieceInfoObj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract PieceInfo: %w", err)
+		}
+	}
+
+	// LastModified (optional)
+	if lastModDate, err := pdf.Optional(pdf.GetDate(x.R, dict["LastModified"])); err != nil {
+		return nil, err
+	} else {
+		f.LastModified = time.Time(lastModDate)
+	}
+
+	// OC (optional)
+	if ocObj, err := pdf.ExtractorGetOptional(x, dict["OC"], oc.ExtractConditional); err != nil {
+		return nil, err
+	} else {
+		f.OptionalContent = ocObj
+	}
+
+	// Measure (optional)
+	if m, err := pdf.Optional(measure.Extract(x.R, dict["Measure"])); err != nil {
+		return nil, err
+	} else {
+		f.Measure = m
+	}
+
+	// PtData (optional)
+	if ptData, err := pdf.Optional(measure.ExtractPtData(x.R, dict["PtData"])); err != nil {
+		return nil, err
+	} else {
+		f.PtData = ptData
+	}
+
+	// extract StructParent
+	if keyObj := dict["StructParent"]; keyObj != nil {
+		if key, err := pdf.Optional(x.GetInteger(dict["StructParent"])); err != nil {
+			return nil, err
+		} else {
+			f.StructParent.Set(key)
+		}
+	}
+
+	// extract resources
+	f.Res = &content.Resources{}
+	if resObj := dict["Resources"]; resObj != nil {
+		res, err := Resources(x, resObj)
+		if err != nil {
+			return nil, err
+		}
+		if res != nil {
+			f.Res = res
+		}
+	}
+
+	// read content stream
+	stm, err := pdf.DecodeStream(x.R, stream, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	f.Content, err = content.ReadStream(stm, pdf.GetVersion(x.R), content.Form)
+	closeErr := stm.Close()
+	if err != nil {
+		return nil, err
+	}
+	if closeErr != nil {
+		return nil, closeErr
+	}
+
+	return f, nil
 }

@@ -31,7 +31,8 @@ type postScript struct {
 
 var _ graphics.XObject = (*postScript)(nil)
 
-func extractPostScript(x *pdf.Extractor, stm *pdf.Stream) (*postScript, error) {
+// ExtractPostScript extracts a PostScript XObject from a PDF stream.
+func ExtractPostScript(x *pdf.Extractor, stm *pdf.Stream) (*postScript, error) {
 	err := pdf.CheckDictType(x.R, stm.Dict, "XObject")
 	if err != nil {
 		return nil, err

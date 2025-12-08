@@ -18,6 +18,7 @@ package content
 
 import (
 	"fmt"
+	"maps"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -197,4 +198,36 @@ func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 	return ref, nil
+}
+
+// Equal compares two Resources for value equality.
+//
+// TODO(voss): Patterns, Shadings, and XObjects are currently ignored
+// in the comparison, as long as the same keys are present. Implement proper
+// equality checks for these types.
+func (r *Resources) Equal(other *Resources) bool {
+	if r == nil || other == nil || r == other {
+		return r == other
+	}
+	return r.SingleUse == other.SingleUse &&
+		r.ProcSet == other.ProcSet &&
+		maps.EqualFunc(r.ExtGState, other.ExtGState, (*graphics.ExtGState).Equal) &&
+		maps.EqualFunc(r.ColorSpace, other.ColorSpace, color.SpacesEqual) &&
+		haveSameKeys(r.Pattern, other.Pattern) &&
+		haveSameKeys(r.Shading, other.Shading) &&
+		haveSameKeys(r.XObject, other.XObject) &&
+		maps.EqualFunc(r.Font, other.Font, font.InstancesEqual) &&
+		maps.EqualFunc(r.Properties, other.Properties, property.ListsEqual)
+}
+
+func haveSameKeys[Val pdf.Embedder](a, b map[pdf.Name]Val) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k := range a {
+		if _, ok := b[k]; !ok {
+			return false
+		}
+	}
+	return true
 }

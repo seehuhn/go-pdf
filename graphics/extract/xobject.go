@@ -19,10 +19,37 @@ package extract
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/image"
 	"seehuhn.de/go/pdf/graphics/xobject"
 )
 
 // XObject extracts an XObject from a PDF file.
 func XObject(x *pdf.Extractor, obj pdf.Object) (graphics.XObject, error) {
-	return xobject.Extract(x, obj)
+	stm, err := x.GetStream(obj)
+	if err != nil {
+		return nil, err
+	}
+	err = pdf.CheckDictType(x.R, stm.Dict, "XObject")
+	if err != nil {
+		return nil, err
+	}
+
+	subtype, err := x.GetName(stm.Dict["Subtype"])
+	if err != nil {
+		return nil, err
+	}
+
+	switch subtype {
+	case "Image":
+		img, err := image.ExtractDict(x, stm)
+		return img, err
+	case "Form":
+		f, err := Form(x, stm)
+		return f, err
+	case "PS":
+		ps, err := xobject.ExtractPostScript(x, stm)
+		return ps, err
+	default:
+		return nil, pdf.Errorf("unsupported XObject Subtype %q", subtype)
+	}
 }

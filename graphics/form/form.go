@@ -17,16 +17,13 @@
 package form
 
 import (
-	"bytes"
 	"errors"
-	"fmt"
-	"io"
 	"time"
 
 	"seehuhn.de/go/geom/matrix"
+
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/oc"
@@ -38,8 +35,11 @@ import (
 
 // Form represents a PDF form XObject that can contain reusable graphics content.
 type Form struct {
-	// Draw is the function that renders the form's content.
-	Draw func(*graphics.Writer) error
+	// Content is the content stream that draws the form.
+	Content content.Stream
+
+	// Res contains the resources used by the content stream (required).
+	Res *content.Resources
 
 	// BBox is the form's bounding box in form coordinate space.
 	BBox pdf.Rectangle
@@ -87,37 +87,28 @@ func (f *Form) Subtype() pdf.Name {
 
 // Embed implements the pdf.Embedder interface for form XObjects.
 func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
-	err := f.validate()
-	if err != nil {
+	if err := f.validate(); err != nil {
 		return nil, err
 	}
 
-	buf := &bytes.Buffer{}
-	contents := graphics.NewWriter(buf, rm.GetRM())
-	contents.State.Set = 0 // make sure the XObject is independent of the current graphics state
-	err = f.Draw(contents)
+	// embed resources
+	resObj, err := f.Res.Embed(rm)
 	if err != nil {
 		return nil, err
-	}
-	if contents.Err != nil {
-		return nil, contents.Err
 	}
 
 	ref := rm.Alloc()
 
 	dict := pdf.Dict{
-		"Subtype": pdf.Name("Form"),
-		"BBox":    &f.BBox,
+		"Subtype":   pdf.Name("Form"),
+		"BBox":      &f.BBox,
+		"Resources": resObj,
 	}
 	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("XObject")
 	}
 	if f.Matrix != matrix.Identity && f.Matrix != matrix.Zero {
 		dict["Matrix"] = toPDF(f.Matrix[:])
-	}
-	if contents.Resources != nil {
-		dict["Resources"] = pdf.AsDict(contents.Resources)
 	}
 	if f.Metadata != nil {
 		rmEmbedded, err := rm.Embed(f.Metadata)
@@ -183,18 +174,16 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["StructParent"] = key
 	}
 
-	var filters []pdf.Filter
-	if !rm.Out().GetOptions().HasAny(pdf.OptPretty) {
-		filters = append(filters, &pdf.FilterCompress{})
-	}
-	stm, err := rm.Out().OpenStream(ref, dict, filters...)
+	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
 		return nil, err
 	}
-	_, err = stm.Write(buf.Bytes())
+
+	err = content.Write(stm, f.Content, rm.Out().GetMeta().Version, content.Form, f.Res)
 	if err != nil {
 		return nil, err
 	}
+
 	err = stm.Close()
 	if err != nil {
 		return nil, err
@@ -207,151 +196,42 @@ func (f *Form) validate() error {
 	if f.BBox.IsZero() {
 		return errors.New("missing BBox")
 	}
+	if f.Res == nil {
+		return errors.New("missing resources")
+	}
 	return nil
 }
 
-// Extract extracts a form XObject from a PDF file.
-func Extract(x *pdf.Extractor, obj pdf.Object) (*Form, error) {
-	stream, err := x.GetStream(obj)
-	if err != nil {
-		return nil, err
-	} else if stream == nil {
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("missing form XObject"),
-		}
-	}
-	dict := stream.Dict
-
-	subtypeName, _ := x.GetName(dict["Subtype"])
-	if subtypeName != "Form" {
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("invalid Subtype for form XObject"),
-		}
-	}
-
-	// Read required BBox
-	bbox, err := pdf.GetRectangle(x.R, dict["BBox"])
-	if err != nil {
-		return nil, fmt.Errorf("failed to read BBox: %w", err)
-	} else if bbox == nil || bbox.IsZero() {
-		return nil, pdf.Error("missing BBox")
-	}
-
-	form := &Form{
-		BBox: *bbox,
-	}
-
-	form.Matrix, err = pdf.GetMatrix(x.R, dict["Matrix"])
-	if err != nil {
-		form.Matrix = matrix.Identity
-	}
-
-	form.Metadata, _ = metadata.Extract(x.R, dict["Metadata"])
-
-	// Read optional PieceInfo
-	if pieceInfoObj, ok := dict["PieceInfo"]; ok {
-		var err error
-		form.PieceInfo, err = pieceinfo.Extract(x.R, pieceInfoObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to extract PieceInfo: %w", err)
-		}
-	}
-
-	// LastModified (optional)
-	if lastModDate, err := pdf.Optional(pdf.GetDate(x.R, dict["LastModified"])); err != nil {
-		return nil, err
-	} else {
-		form.LastModified = time.Time(lastModDate)
-	}
-
-	// OC (optional)
-	if oc, err := pdf.ExtractorGetOptional(x, dict["OC"], oc.ExtractConditional); err != nil {
-		return nil, err
-	} else {
-		form.OptionalContent = oc
-	}
-
-	// Measure (optional)
-	if m, err := pdf.Optional(measure.Extract(x.R, dict["Measure"])); err != nil {
-		return nil, err
-	} else {
-		form.Measure = m
-	}
-
-	// PtData (optional)
-	if ptData, err := pdf.Optional(measure.ExtractPtData(x.R, dict["PtData"])); err != nil {
-		return nil, err
-	} else {
-		form.PtData = ptData
-	}
-
-	// Extract StructParent
-	if keyObj := dict["StructParent"]; keyObj != nil {
-		if key, err := pdf.Optional(x.GetInteger(dict["StructParent"])); err != nil {
-			return nil, err
-		} else {
-			form.StructParent.Set(key)
-		}
-	}
-
-	// Create Draw function as closure
-	form.Draw = func(w *graphics.Writer) error {
-		copier := pdf.NewCopier(w.RM.Out, x.R)
-
-		// Handle resources
-		origResources, err := x.GetDict(dict["Resources"])
-		if err != nil {
-			return err
-		}
-		if origResources != nil {
-			resourceObj, err := copier.Copy(origResources)
-			if err != nil {
-				return err
-			}
-			w.Resources, err = pdf.ExtractResources(nil, resourceObj)
-			if err != nil {
-				return err
-			}
-		}
-
-		// Handle stream content
-		stm, err := pdf.DecodeStream(x.R, stream, 0)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(w.Content, stm)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	return form, nil
-}
-
-// Equal compares two forms by comparing their content streams.
-// It ignores resource dictionaries and other metadata.
+// Equal compares two forms for value equality.
+//
+// TODO(voss): at the moment, Metadata, PieceInfo, OptionalContent, Measure and
+// PtData sre ignored in the comparison.  Implement and use proper equality
+// checks for these types.
 func (f *Form) Equal(other *Form) bool {
 	if f == nil || other == nil || f == other {
 		return f == other
 	}
-
-	buf1 := &bytes.Buffer{}
-	w1, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	c1 := graphics.NewWriter(buf1, pdf.NewResourceManager(w1))
-	err1 := f.Draw(c1)
-
-	buf2 := &bytes.Buffer{}
-	w2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	c2 := graphics.NewWriter(buf2, pdf.NewResourceManager(w2))
-	err2 := other.Draw(c2)
-
-	if err1 != nil || err2 != nil {
+	if !f.Content.Equal(other.Content) {
+		return false
+	}
+	if !f.Res.Equal(other.Res) {
+		return false
+	}
+	if f.BBox != other.BBox {
+		return false
+	}
+	if f.Matrix != other.Matrix {
 		return false
 	}
 
-	return buf1.String() == buf2.String()
+	if !f.LastModified.Equal(other.LastModified) {
+		return false
+	}
+
+	if !f.StructParent.Equal(other.StructParent) {
+		return false
+	}
+	return true
 }
 
 func toPDF(x []float64) pdf.Array {

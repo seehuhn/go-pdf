@@ -74,17 +74,13 @@ func (p *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["ExtGState"] = gs
 	}
 
-	var data pdf.Native
 	if p.SingleUse {
-		ref := rm.Alloc()
-		err := rm.Out().Put(ref, dict)
-		if err != nil {
-			return nil, err
-		}
-		data = ref
-	} else {
-		data = dict.AsPDF(rm.Out().GetOptions())
+		return dict, nil
 	}
-
-	return data, nil
+	ref := rm.Alloc()
+	err = rm.Out().Put(ref, dict)
+	if err != nil {
+		return nil, err
+	}
+	return ref, nil
 }

@@ -654,7 +654,7 @@ func FuzzRoundTrip(f *testing.F) {
 			continue
 		}
 
-		w.GetMeta().Trailer["TestResource"] = obj
+		w.GetMeta().Trailer["Quir:E"] = obj
 		err = w.Close()
 		if err != nil {
 			continue
@@ -670,9 +670,9 @@ func FuzzRoundTrip(f *testing.F) {
 			t.Skip("invalid PDF")
 		}
 
-		objPDF := r.GetMeta().Trailer["TestResource"]
+		objPDF := r.GetMeta().Trailer["Quir:E"]
 		if objPDF == nil {
-			t.Skip("no TestResource in trailer")
+			t.Skip("missing test object")
 		}
 
 		// first extraction - permissive

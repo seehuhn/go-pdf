@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package form
+package form_test
 
 import (
 	"testing"
@@ -22,8 +22,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
+	"seehuhn.de/go/pdf/graphics/extract"
+	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/optional"
@@ -43,21 +46,26 @@ func (t *testData) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return pdf.String(t.data), nil
 }
 
+// makeTestForm creates a simple test form with a gray rectangle
+func makeTestForm() *form.Form {
+	b := builder.New(content.Form, nil)
+	b.SetFillColor(color.DeviceGray(0.5))
+	b.Rectangle(0, 0, 100, 100)
+	b.Fill()
+	return &form.Form{
+		Content: b.Stream,
+		Res:     b.Resources,
+		BBox:    pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+	}
+}
+
 // TestRead verifies that a form XObject read from one PDF file can be written
 // to another PDF file.
 func TestRead(t *testing.T) {
 	writer1, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm1 := pdf.NewResourceManager(writer1)
 
-	form0 := &Form{
-		Draw: func(w *graphics.Writer) error {
-			w.SetFillColor(color.DeviceGray(0.5))
-			w.Rectangle(0, 0, 100, 100)
-			w.Fill()
-			return nil
-		},
-		BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-	}
+	form0 := makeTestForm()
 	ref, err := rm1.Embed(form0)
 	if err != nil {
 		t.Fatal(err)
@@ -72,7 +80,7 @@ func TestRead(t *testing.T) {
 	}
 
 	x1 := pdf.NewExtractor(writer1)
-	form1, err := Extract(x1, ref)
+	form1, err := extract.Form(x1, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,14 +101,14 @@ func TestRead(t *testing.T) {
 	}
 
 	x2 := pdf.NewExtractor(writer2)
-	form2, err := Extract(x2, ref2)
+	form2, err := extract.Form(x2, ref2)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// check that form1 and form2 are the same (excluding Draw function)
-	if diff := cmp.Diff(form1, form2); diff != "" {
-		t.Errorf("Round trip failed (-got +want):\n%s", diff)
+	// check that form1 and form2 are the same
+	if !form1.Equal(form2) {
+		t.Errorf("round trip failed")
 	}
 }
 
@@ -117,17 +125,9 @@ func TestReadWithPieceInfo(t *testing.T) {
 		},
 	}
 
-	form0 := &Form{
-		Draw: func(w *graphics.Writer) error {
-			w.SetFillColor(color.DeviceGray(0.5))
-			w.Rectangle(0, 0, 100, 100)
-			w.Fill()
-			return nil
-		},
-		BBox:         pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-		PieceInfo:    testPieceInfo,
-		LastModified: time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
-	}
+	form0 := makeTestForm()
+	form0.PieceInfo = testPieceInfo
+	form0.LastModified = time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
 
 	ref, err := rm1.Embed(form0)
 	if err != nil {
@@ -143,7 +143,7 @@ func TestReadWithPieceInfo(t *testing.T) {
 	}
 
 	x1 := pdf.NewExtractor(writer1)
-	form1, err := Extract(x1, ref)
+	form1, err := extract.Form(x1, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestReadWithPieceInfo(t *testing.T) {
 	}
 
 	x2 := pdf.NewExtractor(writer2)
-	form2, err := Extract(x2, ref2)
+	form2, err := extract.Form(x2, ref2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,17 +193,9 @@ func TestPieceInfoRequiresLastModified(t *testing.T) {
 		},
 	}
 
-	form := &Form{
-		Draw: func(w *graphics.Writer) error {
-			w.SetFillColor(color.DeviceGray(0.5))
-			w.Rectangle(0, 0, 100, 100)
-			w.Fill()
-			return nil
-		},
-		BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-		PieceInfo: testPieceInfo,
-		// LastModified is intentionally not set to trigger validation error
-	}
+	form := makeTestForm()
+	form.PieceInfo = testPieceInfo
+	// LastModified is intentionally not set to trigger validation error
 
 	_, err := rm.Embed(form)
 	if err == nil {
@@ -228,16 +220,8 @@ func TestFormWithPtData(t *testing.T) {
 		SingleUse: false, // use as indirect object
 	}
 
-	form0 := &Form{
-		Draw: func(w *graphics.Writer) error {
-			w.SetFillColor(color.DeviceGray(0.5))
-			w.Rectangle(0, 0, 100, 100)
-			w.Fill()
-			return nil
-		},
-		BBox:   pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-		PtData: testPtData,
-	}
+	form0 := makeTestForm()
+	form0.PtData = testPtData
 
 	ref, err := rm1.Embed(form0)
 	if err != nil {
@@ -253,7 +237,7 @@ func TestFormWithPtData(t *testing.T) {
 	}
 
 	x1 := pdf.NewExtractor(writer1)
-	form1, err := Extract(x1, ref)
+	form1, err := extract.Form(x1, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,7 +276,7 @@ func TestFormWithPtData(t *testing.T) {
 	}
 
 	x2 := pdf.NewExtractor(writer2)
-	form2, err := Extract(x2, ref2)
+	form2, err := extract.Form(x2, ref2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,16 +298,8 @@ func TestFormWithStructParent(t *testing.T) {
 	writer1, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm1 := pdf.NewResourceManager(writer1)
 
-	form0 := &Form{
-		Draw: func(w *graphics.Writer) error {
-			w.SetFillColor(color.DeviceGray(0.5))
-			w.Rectangle(0, 0, 100, 100)
-			w.Fill()
-			return nil
-		},
-		BBox:         pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-		StructParent: optional.NewInt(42),
-	}
+	form0 := makeTestForm()
+	form0.StructParent = optional.NewInt(42)
 	ref, err := rm1.Embed(form0)
 	if err != nil {
 		t.Fatal(err)
@@ -338,7 +314,7 @@ func TestFormWithStructParent(t *testing.T) {
 	}
 
 	x1 := pdf.NewExtractor(writer1)
-	form1, err := Extract(x1, ref)
+	form1, err := extract.Form(x1, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -352,16 +328,8 @@ func TestFormWithStructParent(t *testing.T) {
 	writer2, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm2 := pdf.NewResourceManager(writer2)
 
-	form0Zero := &Form{
-		Draw: func(w *graphics.Writer) error {
-			w.SetFillColor(color.DeviceGray(0.5))
-			w.Rectangle(0, 0, 100, 100)
-			w.Fill()
-			return nil
-		},
-		BBox:         pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-		StructParent: optional.NewInt(0),
-	}
+	form0Zero := makeTestForm()
+	form0Zero.StructParent = optional.NewInt(0)
 	ref2, err := rm2.Embed(form0Zero)
 	if err != nil {
 		t.Fatal(err)
@@ -376,7 +344,7 @@ func TestFormWithStructParent(t *testing.T) {
 	}
 
 	x2 := pdf.NewExtractor(writer2)
-	form2, err := Extract(x2, ref2)
+	form2, err := extract.Form(x2, ref2)
 	if err != nil {
 		t.Fatal(err)
 	}
