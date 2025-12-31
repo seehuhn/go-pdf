@@ -49,7 +49,7 @@ type Reader struct {
 
 	// User callbacks.
 	// TODO(voss): clean up this list
-	Character func(cid cid.CID, text string) error
+	Character func(cid cid.CID, text string, width float64) error
 	TextEvent func(event TextEvent, arg float64)
 
 	Text      func(text string) error
@@ -758,7 +758,7 @@ func (r *Reader) processText(s pdf.String) error {
 		}
 
 		if r.Character != nil && r.TextRenderingMode != graphics.TextRenderingModeInvisible {
-			err := r.Character(info.CID, info.Text)
+			err := r.Character(info.CID, info.Text, width)
 			if err != nil {
 				return err
 			}
