@@ -65,7 +65,7 @@ func TestTextExtractorBasic(t *testing.T) {
 		"Type":      pdf.Name("Page"),
 		"Contents":  contentRef,
 		"Resources": pdf.AsDict(content.Resources),
-		"MediaBox":  &pdf.Rectangle{0, 0, 595, 842},
+		"MediaBox":  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 595, URy: 842},
 	}
 	err = pageTree.AppendPage(page)
 	if err != nil {
@@ -169,7 +169,7 @@ func TestTextExtractorActualText(t *testing.T) {
 		"Type":      pdf.Name("Page"),
 		"Contents":  contentRef,
 		"Resources": pdf.AsDict(content.Resources),
-		"MediaBox":  &pdf.Rectangle{0, 0, 595, 842},
+		"MediaBox":  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 595, URy: 842},
 	}
 	err = pageTree.AppendPage(page)
 	if err != nil {
