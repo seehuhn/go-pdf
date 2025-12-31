@@ -49,7 +49,7 @@ type Reader struct {
 
 	// User callbacks.
 	// TODO(voss): clean up this list
-	Character func(cid cid.CID, text string) error
+	Character func(cid cid.CID, text string, width float64) error
 	TextEvent func(event TextEvent, arg float64)
 
 	Text      func(text string) error
@@ -58,6 +58,15 @@ type Reader struct {
 
 	MarkedContent      func(event MarkedContentEvent, mc *graphics.MarkedContent) error
 	MarkedContentStack []*graphics.MarkedContent
+
+	// Rendering callbacks
+	PathMoveTo    func(x, y float64) error
+	PathLineTo    func(x, y float64) error
+	PathCurveTo   func(x1, y1, x2, y2, x3, y3 float64) error
+	PathRectangle func(x, y, w, h float64) error
+	PathClose     func() error
+	PathPaint     func(op string) error
+	DrawXObject   func(name string) error
 }
 
 type TextEvent uint8
@@ -694,6 +703,93 @@ func (r *Reader) do() error {
 				}
 			}
 
+		// Table 58 – Path construction operators
+
+		case "m": // MoveTo
+			x, y := op.GetNumber(), op.GetNumber()
+			if op.OK() && r.PathMoveTo != nil {
+				err := r.PathMoveTo(x, y)
+				if err != nil {
+					return err
+				}
+			}
+
+		case "l": // LineTo
+			x, y := op.GetNumber(), op.GetNumber()
+			if op.OK() && r.PathLineTo != nil {
+				err := r.PathLineTo(x, y)
+				if err != nil {
+					return err
+				}
+			}
+
+		case "c": // CurveTo
+			x1, y1, x2, y2, x3, y3 := op.GetNumber(), op.GetNumber(), op.GetNumber(), op.GetNumber(), op.GetNumber(), op.GetNumber()
+			if op.OK() && r.PathCurveTo != nil {
+				err := r.PathCurveTo(x1, y1, x2, y2, x3, y3)
+				if err != nil {
+					return err
+				}
+			}
+
+		case "v": // CurveTo (v)
+			x2, y2, x3, y3 := op.GetNumber(), op.GetNumber(), op.GetNumber(), op.GetNumber()
+			if op.OK() && r.PathCurveTo != nil {
+				// x1, y1 = current point
+				err := r.PathCurveTo(r.CurrentX, r.CurrentY, x2, y2, x3, y3)
+				if err != nil {
+					return err
+				}
+			}
+
+		case "y": // CurveTo (y)
+			x1, y1, x3, y3 := op.GetNumber(), op.GetNumber(), op.GetNumber(), op.GetNumber()
+			if op.OK() && r.PathCurveTo != nil {
+				// x2, y2 = x3, y3
+				err := r.PathCurveTo(x1, y1, x3, y3, x3, y3)
+				if err != nil {
+					return err
+				}
+			}
+
+		case "h": // ClosePath
+			if op.OK() && r.PathClose != nil {
+				err := r.PathClose()
+				if err != nil {
+					return err
+				}
+			}
+
+		case "re": // Rectangle
+			x, y, w, h := op.GetNumber(), op.GetNumber(), op.GetNumber(), op.GetNumber()
+			if op.OK() && r.PathRectangle != nil {
+				err := r.PathRectangle(x, y, w, h)
+				if err != nil {
+					return err
+				}
+			}
+
+		// Table 59 – Path-painting operators
+
+		case "S", "s", "f", "F", "f*", "B", "B*", "b", "b*", "n":
+			if op.OK() && r.PathPaint != nil {
+				err := r.PathPaint(op.Name)
+				if err != nil {
+					return err
+				}
+			}
+
+		// Table 86 – XObject operator
+
+		case "Do":
+			name := op.GetName()
+			if op.OK() && r.DrawXObject != nil {
+				err := r.DrawXObject(string(name))
+				if err != nil {
+					return err
+				}
+			}
+
 		default:
 			if r.UnknownOp != nil {
 				err := r.UnknownOp(op.Name, op.Args)
@@ -758,7 +854,7 @@ func (r *Reader) processText(s pdf.String) error {
 		}
 
 		if r.Character != nil && r.TextRenderingMode != graphics.TextRenderingModeInvisible {
-			err := r.Character(info.CID, info.Text)
+			err := r.Character(info.CID, info.Text, width)
 			if err != nil {
 				return err
 			}

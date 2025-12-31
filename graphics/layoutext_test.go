@@ -77,7 +77,8 @@ func TestGlyphWidths(t *testing.T) {
 
 	in := reader.New(data, nil)
 	var xxOut []float64
-	in.Character = func(cid cid.CID, text string) error {
+	in.Character = func(cid cid.CID, text string, width float64) error {
+		_ = width
 		x, _ := in.GetTextPositionDevice()
 		xxOut = append(xxOut, x)
 		return nil

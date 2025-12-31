@@ -73,11 +73,34 @@ func makeFilter(filter Name, param Dict) Filter {
 		return FilterLZW(param)
 	case "CCITTFaxDecode":
 		return FilterCCITTFax(param)
+	case "DCTDecode":
+		return FilterDCT(param)
 	case "RunLengthDecode":
 		return FilterRunLength{}
 	default:
 		return &filterNotImplemented{Name: filter, Param: param}
 	}
+}
+
+// FilterDCT is the DCTDecode filter.
+// This filter is used for JPEG-compressed data.
+type FilterDCT Dict
+
+// Info implements the [Filter] interface.
+func (f FilterDCT) Info(_ Version) (Name, Dict, error) {
+	return "DCTDecode", Dict(f), nil
+}
+
+// Encode implements the [Filter] interface.
+func (f FilterDCT) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, error) {
+	return nil, fmt.Errorf("filter DCTDecode: encoding not implemented")
+}
+
+// Decode implements the [Filter] interface.
+// For now, this filter just passes the compressed data through.
+// Decoders for the stream can then decode the JPEG data.
+func (f FilterDCT) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
+	return io.NopCloser(r), nil
 }
 
 type filterNotImplemented struct {

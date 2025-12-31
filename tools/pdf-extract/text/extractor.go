@@ -98,7 +98,8 @@ func (e *TextExtractor) setupCallbacks() {
 		}
 	}
 
-	e.reader.Character = func(cid cid.CID, text string) error {
+	e.reader.Character = func(cid cid.CID, text string, width float64) error {
+		_ = width
 		// suppress character output when inside ActualText region
 		if e.actualTextStartDepth != -1 && len(e.reader.MarkedContentStack) >= e.actualTextStartDepth {
 			return nil
