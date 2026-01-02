@@ -365,10 +365,10 @@ func scaleBoxesGlyf(bboxes []funit.Rect16, unitsPerEm uint16) []rect.Rect {
 	res := make([]rect.Rect, len(bboxes))
 	for i, b := range bboxes {
 		res[i] = rect.Rect{
-			LLx: 1000 * float64(b.LLx) / float64(unitsPerEm),
-			LLy: 1000 * float64(b.LLy) / float64(unitsPerEm),
-			URx: 1000 * float64(b.URx) / float64(unitsPerEm),
-			URy: 1000 * float64(b.URy) / float64(unitsPerEm),
+			LLx: float64(b.LLx) / float64(unitsPerEm),
+			LLy: float64(b.LLy) / float64(unitsPerEm),
+			URx: float64(b.URx) / float64(unitsPerEm),
+			URy: float64(b.URy) / float64(unitsPerEm),
 		}
 	}
 	return res

@@ -107,7 +107,14 @@ func NewComposite(info *sfnt.Font, opt *OptionsComposite) (*Composite, error) {
 	xHeight := math.Round(float64(info.XHeight) * qv)
 	glyphExtents := make([]rect.Rect, len(cffFont.Glyphs))
 	for gid := range cffFont.Glyphs {
-		glyphExtents[gid] = cffFont.GlyphBBoxPDF(cffFont.FontMatrix, glyph.ID(gid))
+		// GlyphBBoxPDF returns 1000-scale glyph space; convert to text space
+		b := cffFont.GlyphBBoxPDF(cffFont.FontMatrix, glyph.ID(gid))
+		glyphExtents[gid] = rect.Rect{
+			LLx: b.LLx / 1000,
+			LLy: b.LLy / 1000,
+			URx: b.URx / 1000,
+			URy: b.URy / 1000,
+		}
 	}
 	geom := &font.Geometry{
 		Ascent:             ascent / 1000,

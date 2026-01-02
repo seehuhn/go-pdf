@@ -23,10 +23,7 @@ import (
 )
 
 // Geometry collects the various dimensions connected to a font and to
-// the individual glyphs.
-//
-// TODO(voss): convert all fields to PDF glyph space units?
-// Add tests to make sure implementations are correct.
+// the individual glyphs. All dimensions are in text space units.
 type Geometry struct {
 	Ascent             float64 // text space units
 	Descent            float64 // negative, text space units
@@ -34,7 +31,7 @@ type Geometry struct {
 	UnderlinePosition  float64 // text space units
 	UnderlineThickness float64 // text space units
 
-	GlyphExtents []rect.Rect // indexed by GID, glyph space units
+	GlyphExtents []rect.Rect // indexed by GID, text space units
 
 	Widths []float64 // indexed by GID, text space units
 }
@@ -68,10 +65,10 @@ func (g *Geometry) BoundingBox(fontSize float64, gg *GlyphSeq) *pdf.Rectangle {
 		}
 
 		b := &pdf.Rectangle{
-			LLx: bbox.LLx*fontSize/1000 + xPos,
-			LLy: bbox.LLy*fontSize/1000 + glyph.Rise,
-			URx: bbox.URx*fontSize/1000 + xPos,
-			URy: bbox.URy*fontSize/1000 + glyph.Rise,
+			LLx: bbox.LLx*fontSize + xPos,
+			LLy: bbox.LLy*fontSize + glyph.Rise,
+			URx: bbox.URx*fontSize + xPos,
+			URy: bbox.URy*fontSize + glyph.Rise,
 		}
 		res.Extend(b)
 		xPos += glyph.Advance

@@ -227,10 +227,10 @@ func (w *Writer) TextGetQuadPoints(seq *font.GlyphSeq, padding float64) []vec.Ve
 	for _, glyph := range seq.Seq {
 		bbox := &geom.GlyphExtents[glyph.GID]
 		if !bbox.IsZero() {
-			glyphDepth := -(bbox.LLy*size/1000 + glyph.Rise)
-			glyphHeight := (bbox.URy*size/1000 + glyph.Rise)
-			glyphLeft := currentPos + bbox.LLx*size/1000
-			glyphRight := currentPos + bbox.URx*size/1000
+			glyphDepth := -(bbox.LLy*size + glyph.Rise)
+			glyphHeight := bbox.URy*size + glyph.Rise
+			glyphLeft := currentPos + bbox.LLx*size
+			glyphRight := currentPos + bbox.URx*size
 
 			if glyphDepth > depth {
 				depth = glyphDepth

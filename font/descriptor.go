@@ -124,7 +124,7 @@ func ExtractDescriptor(r pdf.Getter, fontDescriptor pdf.Dict) (*Descriptor, erro
 	if err != nil {
 		return nil, pdf.Wrap(err, "FontWeight")
 	}
-	if fontWeight > 0 && fontWeight < 1000 {
+	if fontWeight >= 1 && fontWeight <= 1000 {
 		res.FontWeight = os2.Weight(math.Round(float64(fontWeight))).Rounded()
 	}
 

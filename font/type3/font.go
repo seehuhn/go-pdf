@@ -133,7 +133,30 @@ func (f *Font) New() (font.Layouter, error) {
 	ee := make([]rect.Rect, len(f.Glyphs))
 	ww := make([]float64, len(f.Glyphs))
 	for i, g := range f.Glyphs {
-		ee[i] = g.BBox
+		// transform bounding box from glyph space to text space
+		if !g.BBox.IsZero() {
+			corners := []struct{ x, y float64 }{
+				{g.BBox.LLx, g.BBox.LLy},
+				{g.BBox.LLx, g.BBox.URy},
+				{g.BBox.URx, g.BBox.LLy},
+				{g.BBox.URx, g.BBox.URy},
+			}
+			M := f.FontMatrix
+			ee[i] = rect.Rect{
+				LLx: math.Inf(+1),
+				LLy: math.Inf(+1),
+				URx: math.Inf(-1),
+				URy: math.Inf(-1),
+			}
+			for _, c := range corners {
+				x := M[0]*c.x + M[2]*c.y + M[4]
+				y := M[1]*c.x + M[3]*c.y + M[5]
+				ee[i].LLx = min(ee[i].LLx, x)
+				ee[i].LLy = min(ee[i].LLy, y)
+				ee[i].URx = max(ee[i].URx, x)
+				ee[i].URy = max(ee[i].URy, y)
+			}
+		}
 		ww[i] = g.Width * qh
 	}
 	geom := &font.Geometry{

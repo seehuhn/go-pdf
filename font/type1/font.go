@@ -96,7 +96,14 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 		} else {
 			widths[i] = psFont.GlyphWidthPDF(name) / 1000
 		}
-		extents[i] = psFont.GlyphBBoxPDF(name)
+		// GlyphBBoxPDF returns 1000-scale glyph space; convert to text space
+		b := psFont.GlyphBBoxPDF(name)
+		extents[i] = rect.Rect{
+			LLx: b.LLx / 1000,
+			LLy: b.LLy / 1000,
+			URx: b.URx / 1000,
+			URy: b.URy / 1000,
+		}
 	}
 	geometry.UnderlinePosition = float64(psFont.FontInfo.UnderlinePosition) * psFont.FontMatrix[3]
 	geometry.UnderlineThickness = float64(psFont.FontInfo.UnderlineThickness) * psFont.FontMatrix[3]
