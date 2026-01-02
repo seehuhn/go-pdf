@@ -20,7 +20,6 @@ import (
 	"log"
 
 	"seehuhn.de/go/geom/matrix"
-	"seehuhn.de/go/geom/rect"
 
 	"seehuhn.de/go/sfnt/glyph"
 
@@ -29,8 +28,9 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/font/type3"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 )
 
 func main() {
@@ -65,23 +65,23 @@ func createDocument(filename string) error {
 	markerWidth := 1.0 / fontSize * 1000
 	markerAscent := ascent / fontSize * 1000
 	markerDescent := descent / fontSize * 1000
+
+	// Build content stream for marker glyph
+	b := builder.New(content.Glyph, nil)
+	b.Type3UncoloredGlyph(markerWidth, 0, 0, markerDescent, markerWidth, markerAscent)
+	b.Rectangle(0, markerDescent, markerWidth, markerAscent-markerDescent)
+	b.Fill()
+	stream, err := b.Harvest()
+	if err != nil {
+		return err
+	}
+
 	markerFont := &type3.Font{
 		Glyphs: []*type3.Glyph{
 			{},
 			{
-				Name:  "I",
-				Width: markerWidth,
-				BBox: rect.Rect{
-					LLx: 0,
-					LLy: markerDescent,
-					URx: markerWidth,
-					URy: markerAscent,
-				},
-				Draw: func(w *graphics.Writer) error {
-					w.Rectangle(0, markerDescent, markerWidth, markerAscent-markerDescent)
-					w.Fill()
-					return nil
-				},
+				Name:    "I",
+				Content: stream,
 			},
 		},
 		FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},

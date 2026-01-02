@@ -18,14 +18,14 @@ package makefont
 
 import (
 	"seehuhn.de/go/geom/path"
-	"seehuhn.de/go/geom/rect"
 
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type3"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 )
 
 // Type3 returns a Type3 font.
@@ -33,7 +33,7 @@ func Type3() (font.Layouter, error) {
 	info := clone(TrueType())
 	info.EnsureGlyphNames()
 
-	font := &type3.Font{
+	fnt := &type3.Font{
 		Glyphs: []*type3.Glyph{
 			{}, // .notdef
 		},
@@ -55,7 +55,7 @@ func Type3() (font.Layouter, error) {
 		UnderlineThickness: float64(info.UnderlineThickness),
 	}
 
-	// convert glypf outlines to type 3 outlines
+	// convert glyf outlines to type 3 outlines
 	origOutlines := info.Outlines.(*glyf.Outlines)
 	for i, origGlyph := range origOutlines.Glyphs {
 		gid := glyph.ID(i)
@@ -64,51 +64,52 @@ func Type3() (font.Layouter, error) {
 			continue
 		}
 
-		g := &type3.Glyph{
-			Name:  glyphName,
-			Width: info.GlyphWidth(gid),
-		}
+		width := info.GlyphWidth(gid)
+
+		// Build content stream for the glyph
+		b := builder.New(content.Glyph, nil)
 
 		if origGlyph != nil {
 			bbox := origGlyph.Rect16
-			g.BBox = rect.Rect{
-				LLx: float64(bbox.LLx),
-				LLy: float64(bbox.LLy),
-				URx: float64(bbox.URx),
-				URy: float64(bbox.URy),
+			b.Type3UncoloredGlyph(width, 0,
+				float64(bbox.LLx), float64(bbox.LLy),
+				float64(bbox.URx), float64(bbox.URy))
+
+			// Draw the glyph path
+			glyphPath := origOutlines.Path(gid)
+			cubicPath := glyphPath.ToCubic()
+			for cmd, pts := range cubicPath {
+				switch cmd {
+				case path.CmdMoveTo:
+					b.MoveTo(pts[0].X, pts[0].Y)
+				case path.CmdLineTo:
+					b.LineTo(pts[0].X, pts[0].Y)
+				case path.CmdCubeTo:
+					b.CurveTo(pts[0].X, pts[0].Y, pts[1].X, pts[1].Y, pts[2].X, pts[2].Y)
+				case path.CmdClose:
+					b.ClosePath()
+				}
 			}
-			d := &drawer{outlines: origOutlines, gid: gid}
-			g.Draw = d.Draw
+			b.Fill()
+		} else {
+			// Empty glyph - just width, no drawing
+			b.Type3UncoloredGlyph(width, 0, 0, 0, 0, 0)
 		}
 
-		font.Glyphs = append(font.Glyphs, g)
-	}
-
-	return font.New()
-}
-
-type drawer struct {
-	outlines *glyf.Outlines
-	gid      glyph.ID
-}
-
-func (d *drawer) Draw(w *graphics.Writer) error {
-	glyphPath := d.outlines.Path(d.gid)
-	cubicPath := glyphPath.ToCubic()
-	for cmd, pts := range cubicPath {
-		switch cmd {
-		case path.CmdMoveTo:
-			w.MoveTo(pts[0].X, pts[0].Y)
-		case path.CmdLineTo:
-			w.LineTo(pts[0].X, pts[0].Y)
-		case path.CmdCubeTo:
-			w.CurveTo(pts[0].X, pts[0].Y, pts[1].X, pts[1].Y, pts[2].X, pts[2].Y)
-		case path.CmdClose:
-			w.ClosePath()
+		stream, err := b.Harvest()
+		if err != nil {
+			return nil, err
 		}
+
+		g := &type3.Glyph{
+			Name:    glyphName,
+			Content: stream,
+		}
+
+		fnt.Glyphs = append(fnt.Glyphs, g)
 	}
-	w.Fill()
-	return nil
+
+	return fnt.New()
 }
 
 func clone[T any](x *T) *T {

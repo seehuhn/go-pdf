@@ -18,13 +18,13 @@ package ghostscript
 
 import (
 	"seehuhn.de/go/geom/matrix"
-	"seehuhn.de/go/geom/rect"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/type3"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 )
 
 // FindTextPos finds the approximate text position in user coordinates,
@@ -57,32 +57,36 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 	M = M.Mul(s.CTM)
 	xc, yc := M.Apply(0, 0)
 
+	// Build the marker glyph content stream
+	b := builder.New(content.Glyph, nil)
+	b.Type3ColoredGlyph(0, 0) // d0: colored glyph with zero width
+	b.SetFillColor(color.DeviceRGB{1.0, 0, 0})
+	A := M.Inv()
+	p, q := A.Apply(xc-1, yc-1)
+	b.MoveTo(p*1000, q*1000)
+	p, q = A.Apply(xc+1, yc-1)
+	b.LineTo(p*1000, q*1000)
+	p, q = A.Apply(xc+1, yc+1)
+	b.LineTo(p*1000, q*1000)
+	p, q = A.Apply(xc-1, yc+1)
+	b.LineTo(p*1000, q*1000)
+	b.Fill()
+
+	stream, err := b.Harvest()
+	if err != nil {
+		return 0, 0, err
+	}
+
 	markerFont := &type3.Font{
 		Glyphs: []*type3.Glyph{
-			{},
+			{}, // .notdef
+			{
+				Name:    "x",
+				Content: stream,
+			},
 		},
 		FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},
 	}
-	markerFont.Glyphs = append(markerFont.Glyphs, &type3.Glyph{
-		Name:  "x",
-		Width: 0,
-		BBox:  rect.Rect{LLx: -100, LLy: -100, URx: 100, URy: 100},
-		Color: true,
-		Draw: func(w *graphics.Writer) error {
-			w.SetFillColor(color.DeviceRGB{1.0, 0, 0})
-			A := M.Inv()
-			p, q := A.Apply(xc-1, yc-1)
-			w.MoveTo(p*1000, q*1000)
-			p, q = A.Apply(xc+1, yc-1)
-			w.LineTo(p*1000, q*1000)
-			p, q = A.Apply(xc+1, yc+1)
-			w.LineTo(p*1000, q*1000)
-			p, q = A.Apply(xc-1, yc+1)
-			w.LineTo(p*1000, q*1000)
-			w.Fill()
-			return nil
-		},
-	})
 	X, err := markerFont.New()
 	if err != nil {
 		return 0, 0, err
@@ -99,9 +103,9 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 
 	var xSum, ySum float64
 	var weight float64
-	b := img.Bounds()
-	for y := b.Min.Y; y < b.Max.Y; y++ {
-		for x := b.Min.X; x < b.Max.X; x++ {
+	bounds := img.Bounds()
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			r, g, b, a := img.At(x, y).RGBA()
 			if r > g && r > b && a > 0 {
 				xSum += float64(x)
@@ -118,8 +122,8 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 
 	// xPix = b.Min.X-0.5 correspond to xUser=paper.LLx
 	// xPix = b.Max.X-0.5 correspond to xUser=paper.URx
-	xUser := paper.LLx + (xPix-float64(b.Min.X)+0.5)*(paper.URx-paper.LLx)/float64(b.Max.X-b.Min.X)
-	yUser := paper.LLy + (float64(b.Max.Y)-yPix-0.5)*(paper.URy-paper.LLy)/float64(b.Max.Y-b.Min.Y)
+	xUser := paper.LLx + (xPix-float64(bounds.Min.X)+0.5)*(paper.URx-paper.LLx)/float64(bounds.Max.X-bounds.Min.X)
+	yUser := paper.LLy + (float64(bounds.Max.Y)-yPix-0.5)*(paper.URy-paper.LLy)/float64(bounds.Max.Y-bounds.Min.Y)
 
 	return xUser, yUser, nil
 }

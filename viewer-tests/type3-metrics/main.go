@@ -21,15 +21,15 @@ import (
 	"os"
 
 	"seehuhn.de/go/geom/matrix"
-	"seehuhn.de/go/geom/rect"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/font/type3"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/text"
 )
 
@@ -140,26 +140,30 @@ func makeTestFont(unitsPerEm float64, rotate bool) font.Layouter {
 		fontMatrix = fontMatrix.Mul(matrix.RotateDeg(30))
 	}
 
+	// Build content stream for the glyph
+	b := builder.New(content.Glyph, nil)
+	b.Type3UncoloredGlyph(unitsPerEm, 0, 0, 0, unitsPerEm, unitsPerEm)
+	a := 0.05 * unitsPerEm
+	dim := 0.90 * unitsPerEm
+	b.Rectangle(a, a, dim, dim)
+	b.Fill()
+	stream, err := b.Harvest()
+	if err != nil {
+		panic(err)
+	}
+
 	F := &type3.Font{
 		Glyphs: []*type3.Glyph{
-			{},
+			{}, // .notdef
+			{
+				Name:    "A",
+				Content: stream,
+			},
 		},
 		FontMatrix: fontMatrix,
 		Ascent:     unitsPerEm,
 		Leading:    unitsPerEm * 1.2,
 	}
-	F.Glyphs = append(F.Glyphs, &type3.Glyph{
-		Name:  "A",
-		Width: unitsPerEm,
-		BBox:  rect.Rect{URx: unitsPerEm, URy: unitsPerEm},
-		Draw: func(w *graphics.Writer) error {
-			a := 0.05 * unitsPerEm
-			b := 0.90 * unitsPerEm
-			w.Rectangle(a, a, b, b)
-			w.Fill()
-			return nil
-		},
-	})
 	res, err := F.New()
 	if err != nil {
 		panic(err)

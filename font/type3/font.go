@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"iter"
 	"math"
-	"strconv"
 
 	"seehuhn.de/go/postscript/type1/names"
 
@@ -37,7 +36,7 @@ import (
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/pdfenc"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/content"
 )
 
 // Font represents a Type 3 font with user-defined glyph procedures.
@@ -85,18 +84,145 @@ type Glyph struct {
 	// Name is the PostScript name of the glyph.
 	Name string
 
-	// Width is the glyph's advance width in glyph coordinate units.
-	Width float64
+	// Content is the glyph's content stream.
+	// It must start with either the d0 or d1 operator.
+	// Use [content/builder.Builder] to construct content streams.
+	Content content.Stream
+}
 
-	// BBox is the glyph's bounding box.
-	BBox rect.Rect
+// Width returns the glyph's advance width in glyph coordinate units.
+// The width is extracted from the first operator (d0 or d1).
+func (g *Glyph) Width() float64 {
+	if len(g.Content) == 0 || len(g.Content[0].Args) < 1 {
+		return 0
+	}
+	wx, _ := getNumber(g.Content[0].Args[0])
+	return wx
+}
 
-	// Color indicates whether the glyph specifies color, or only describes a
-	// shape.
-	Color bool
+// BBox returns the glyph's bounding box in glyph coordinate units.
+// For d1 glyphs, the bounding box is taken from the operator arguments.
+// For d0 glyphs, the bounding box is computed from path control points.
+func (g *Glyph) BBox() rect.Rect {
+	if len(g.Content) == 0 {
+		return rect.Rect{}
+	}
+	op := g.Content[0]
 
-	// Draw is the function that renders the glyph.
-	Draw func(*graphics.Writer) error
+	if op.Name == content.OpType3UncoloredGlyph { // d1
+		if len(op.Args) >= 6 {
+			llx, _ := getNumber(op.Args[2])
+			lly, _ := getNumber(op.Args[3])
+			urx, _ := getNumber(op.Args[4])
+			ury, _ := getNumber(op.Args[5])
+			return rect.Rect{LLx: llx, LLy: lly, URx: urx, URy: ury}
+		}
+		return rect.Rect{}
+	}
+
+	// d0: compute from path operators
+	return computeBBoxFromPath(g.Content[1:])
+}
+
+// IsColored returns true if the glyph uses the d0 operator (colored glyph).
+func (g *Glyph) IsColored() bool {
+	if len(g.Content) == 0 {
+		return false
+	}
+	return g.Content[0].Name == content.OpType3ColoredGlyph
+}
+
+// validateContent checks that the glyph content stream is valid.
+func (g *Glyph) validateContent() error {
+	if len(g.Content) == 0 {
+		return nil // empty content is allowed (e.g., for .notdef)
+	}
+
+	firstOp := g.Content[0].Name
+	if firstOp != content.OpType3ColoredGlyph && firstOp != content.OpType3UncoloredGlyph {
+		return fmt.Errorf("content must start with d0 or d1, got %s", firstOp)
+	}
+
+	if firstOp == content.OpType3ColoredGlyph {
+		if len(g.Content[0].Args) < 2 {
+			return errors.New("d0 requires 2 arguments (wx, wy)")
+		}
+	} else {
+		if len(g.Content[0].Args) < 6 {
+			return errors.New("d1 requires 6 arguments (wx, wy, llx, lly, urx, ury)")
+		}
+	}
+
+	return nil
+}
+
+// getNumber extracts a float64 from a pdf.Object.
+func getNumber(obj pdf.Object) (float64, bool) {
+	switch v := obj.(type) {
+	case pdf.Integer:
+		return float64(v), true
+	case pdf.Real:
+		return float64(v), true
+	case pdf.Number:
+		return float64(v), true
+	}
+	return 0, false
+}
+
+// computeBBoxFromPath computes a bounding box from path control points.
+func computeBBoxFromPath(stream content.Stream) rect.Rect {
+	bbox := rect.Rect{
+		LLx: math.Inf(+1),
+		LLy: math.Inf(+1),
+		URx: math.Inf(-1),
+		URy: math.Inf(-1),
+	}
+	hasPoints := false
+
+	addPoint := func(x, y float64) {
+		hasPoints = true
+		bbox.LLx = min(bbox.LLx, x)
+		bbox.LLy = min(bbox.LLy, y)
+		bbox.URx = max(bbox.URx, x)
+		bbox.URy = max(bbox.URy, y)
+	}
+
+	for _, op := range stream {
+		switch op.Name {
+		case content.OpMoveTo, content.OpLineTo: // m, l: x y
+			if len(op.Args) >= 2 {
+				x, _ := getNumber(op.Args[0])
+				y, _ := getNumber(op.Args[1])
+				addPoint(x, y)
+			}
+		case content.OpCurveTo: // c: x1 y1 x2 y2 x3 y3
+			for i := 0; i+1 < len(op.Args) && i < 6; i += 2 {
+				x, _ := getNumber(op.Args[i])
+				y, _ := getNumber(op.Args[i+1])
+				addPoint(x, y)
+			}
+		case content.OpCurveToV, content.OpCurveToY: // v, y: 4 args
+			for i := 0; i+1 < len(op.Args) && i < 4; i += 2 {
+				x, _ := getNumber(op.Args[i])
+				y, _ := getNumber(op.Args[i+1])
+				addPoint(x, y)
+			}
+		case content.OpRectangle: // re: x y w h
+			if len(op.Args) >= 4 {
+				x, _ := getNumber(op.Args[0])
+				y, _ := getNumber(op.Args[1])
+				w, _ := getNumber(op.Args[2])
+				h, _ := getNumber(op.Args[3])
+				addPoint(x, y)
+				addPoint(x+w, y+h)
+			}
+		}
+	}
+
+	if !hasPoints {
+		return rect.Rect{}
+	}
+	return bbox
 }
 
 var _ font.Layouter = (*instance)(nil)
@@ -120,6 +246,13 @@ func (f *Font) New() (font.Layouter, error) {
 		return nil, errors.New("invalid glyph 0")
 	}
 
+	// Validate all glyphs have valid content streams
+	for i, g := range f.Glyphs {
+		if err := g.validateContent(); err != nil {
+			return nil, fmt.Errorf("glyph %d (%q): %w", i, g.Name, err)
+		}
+	}
+
 	cmap := make(map[rune]glyph.ID)
 	for i, g := range f.Glyphs {
 		rr := []rune(names.ToUnicode(g.Name, f.PostScriptName))
@@ -134,12 +267,13 @@ func (f *Font) New() (font.Layouter, error) {
 	ww := make([]float64, len(f.Glyphs))
 	for i, g := range f.Glyphs {
 		// transform bounding box from glyph space to text space
-		if !g.BBox.IsZero() {
+		bbox := g.BBox()
+		if !bbox.IsZero() {
 			corners := []struct{ x, y float64 }{
-				{g.BBox.LLx, g.BBox.LLy},
-				{g.BBox.LLx, g.BBox.URy},
-				{g.BBox.URx, g.BBox.LLy},
-				{g.BBox.URx, g.BBox.URy},
+				{bbox.LLx, bbox.LLy},
+				{bbox.LLx, bbox.URy},
+				{bbox.URx, bbox.LLy},
+				{bbox.URx, bbox.URy},
 			}
 			M := f.FontMatrix
 			ee[i] = rect.Rect{
@@ -157,7 +291,7 @@ func (f *Font) New() (font.Layouter, error) {
 				ee[i].URy = max(ee[i].URy, y)
 			}
 		}
-		ww[i] = g.Width * qh
+		ww[i] = g.Width() * qh
 	}
 	geom := &font.Geometry{
 		Ascent:             f.Ascent * qv,
@@ -207,7 +341,7 @@ func (f *instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 		seq.Seq = append(seq.Seq, font.Glyph{
 			GID:     gid,
 			Text:    string(r),
-			Advance: f.Font.Glyphs[gid].Width * q,
+			Advance: f.Font.Glyphs[gid].Width() * q,
 		})
 	}
 	return seq
@@ -243,7 +377,7 @@ func (f *instance) Encode(gid glyph.ID, text string) (charcode.Code, bool) {
 
 	// Allocate new code
 	glyphName := f.Font.Glyphs[gid].Name
-	width := math.Round(f.Font.Glyphs[gid].Width)
+	width := math.Round(f.Font.Glyphs[gid].Width())
 
 	c, err := f.Simple.Encode(gid, glyphName, text, width)
 	return charcode.Code(c), err == nil
@@ -275,16 +409,15 @@ func (f *instance) makeFontDict(rm *pdf.EmbedHelper) (*dict.Type3, error) {
 
 	glyphs := f.Simple.Glyphs()
 
-	// Write the glyphs first, so that we can construct the resources
-	// dictionary. Here we use a common builder for all glyphs, so that a
-	// common resources dictionary for the whole font can be accumulated.
+	// Write the glyphs, accumulating resources across all glyph content streams.
 	//
 	// TODO(voss):
 	//   - consider the discussion at
 	//     https://pdf-issues.pdfa.org/32000-2-2020/clause07.html#H7.8.3
 	//   - check where different PDF versions put the Resources dictionary
 	//   - make it configurable whether to use per-glyph resource dictionaries?
-	page := graphics.NewWriter(nil, rm.GetRM())
+	v := rm.Out().GetMeta().Version
+	contentRes := &content.Resources{}
 	charProcs := make(map[pdf.Name]pdf.Reference)
 	for _, gid := range glyphs {
 		g := f.Font.Glyphs[gid]
@@ -292,43 +425,27 @@ func (f *instance) makeFontDict(rm *pdf.EmbedHelper) (*dict.Type3, error) {
 			continue
 		}
 		gRef := rm.Alloc()
-
 		charProcs[pdf.Name(g.Name)] = gRef
 
 		stm, err := rm.Out().OpenStream(gRef, nil, pdf.FilterCompress{})
 		if err != nil {
 			return nil, err
 		}
-		page.NewStream(stm)
 
-		// TODO(voss): move "d0" and "d1" to the graphics package, and restrict
-		// the list of allowed operators depending on the choice.
-		if g.Color {
-			fmt.Fprintf(stm, "%s 0 d0\n", format(g.Width))
-		} else {
-			fmt.Fprintf(stm,
-				"%s 0 %s %s %s %s d1\n",
-				format(g.Width),
-				format(g.BBox.LLx),
-				format(g.BBox.LLy),
-				format(g.BBox.URx),
-				format(g.BBox.URy))
+		err = content.Write(stm, g.Content, v, content.Glyph, contentRes)
+		if err != nil {
+			stm.Close()
+			return nil, fmt.Errorf("glyph %q: %w", g.Name, err)
 		}
-		if g.Draw != nil {
-			err = g.Draw(page)
-			if err != nil {
-				return nil, err
-			}
-		}
-		if page.Err != nil {
-			return nil, page.Err
-		}
+
 		err = stm.Close()
 		if err != nil {
 			return nil, err
 		}
 	}
-	resources := page.Resources
+
+	// TODO(voss): if contentRes is not empty, embed and convert to pdf.Resources
+	_ = contentRes // resources are not yet used
 
 	italicAngle := math.Round(f.Font.ItalicAngle*10) / 10
 
@@ -359,16 +476,12 @@ func (f *instance) makeFontDict(rm *pdf.EmbedHelper) (*dict.Type3, error) {
 		CharProcs:  charProcs,
 		// FontBBox:   &pdf.Rectangle{},
 		FontMatrix: f.Font.FontMatrix,
-		Resources:  resources,
-		ToUnicode:  f.Simple.ToUnicode(f.Font.PostScriptName),
+		// Resources: TODO(voss): embed contentRes if not empty
+		ToUnicode: f.Simple.ToUnicode(f.Font.PostScriptName),
 	}
 	for c, info := range f.Simple.MappedCodes() {
 		dict.Width[c] = info.Width
 	}
 
 	return dict, nil
-}
-
-func format(x float64) string {
-	return strconv.FormatFloat(x, 'f', -1, 64)
 }

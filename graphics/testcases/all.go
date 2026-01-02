@@ -20,13 +20,13 @@ import (
 	"math"
 
 	"seehuhn.de/go/geom/matrix"
-	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/type3"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 )
 
 //go:generate go run generate.go
@@ -75,18 +75,22 @@ var All = []TestCase{
 			},
 			FontMatrix: matrix.Matrix{q, 0, 0, q, 0, 0},
 		}
+		// Build content stream for the glyph
+		bld := builder.New(content.Glyph, nil)
+		bld.Type3UncoloredGlyph(unitsPerEm, 0, 0, 0, unitsPerEm, unitsPerEm)
+		a := 0.05 * unitsPerEm
+		dim := 0.90 * unitsPerEm
+		bld.SetLineWidth(2)
+		bld.Rectangle(a, a, dim, dim)
+		bld.Stroke()
+		stream, err := bld.Harvest()
+		if err != nil {
+			return err
+		}
+
 		F.Glyphs = append(F.Glyphs, &type3.Glyph{
-			Name:  "A",
-			Width: unitsPerEm,
-			BBox:  rect.Rect{URx: unitsPerEm, URy: unitsPerEm},
-			Draw: func(w *graphics.Writer) error {
-				a := 0.05 * unitsPerEm
-				b := 0.95 * unitsPerEm
-				w.SetLineWidth(2)
-				w.Rectangle(a, a, b, b)
-				w.Stroke()
-				return nil
-			},
+			Name:    "A",
+			Content: stream,
 		})
 		E, err := F.New()
 		if err != nil {

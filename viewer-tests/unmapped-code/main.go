@@ -21,7 +21,6 @@ import (
 	"os"
 
 	"seehuhn.de/go/geom/matrix"
-	"seehuhn.de/go/geom/rect"
 
 	"seehuhn.de/go/postscript/psenc"
 	"seehuhn.de/go/postscript/type1"
@@ -37,8 +36,9 @@ import (
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/type3"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 )
 
 func main() {
@@ -108,21 +108,24 @@ func createDocument(fname string) error {
 // makeMarkerFont creates a simple type3 font where "I" shows a gray, vertical
 // line.
 func makeMarkerFont() font.Instance {
+	// Build content stream for marker glyph
+	b := builder.New(content.Glyph, nil)
+	b.Type3ColoredGlyph(50, 0) // d0: colored glyph
+	b.SetFillColor(color.DeviceGray(0.5))
+	b.Rectangle(0, -500, 50, 2000)
+	b.Fill()
+	stream, err := b.Harvest()
+	if err != nil {
+		panic(err)
+	}
+
 	markerFont := &type3.Font{
 		FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},
 		Glyphs: []*type3.Glyph{
 			{},
 			{
-				Name:  "I",
-				Width: 50,
-				BBox:  rect.Rect{LLy: -500, URx: 50, URy: 1500},
-				Color: true,
-				Draw: func(w *graphics.Writer) error {
-					w.SetFillColor(color.DeviceGray(0.5))
-					w.Rectangle(0, -500, 50, 2000)
-					w.Fill()
-					return nil
-				},
+				Name:    "I",
+				Content: stream,
 			},
 		},
 	}
