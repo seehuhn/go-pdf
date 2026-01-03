@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/pdf/graphics/content"
 )
 
 // FontInfoSimple holds information about a simple font (Type1 or TrueType).
@@ -82,18 +83,13 @@ type FontInfoGlyfExternal struct {
 
 // FontInfoType3 holds information specific to a Type 3 font.
 type FontInfoType3 struct {
-	// CharProcs maps the name of each glyph to the content stream which paints
-	// the glyph for that character.
-	CharProcs map[pdf.Name]pdf.Reference
+	// CharProcs maps glyph names to their content streams.
+	CharProcs map[pdf.Name]*CharProc
 
 	// The FontMatrix maps glyph space to text space.
 	FontMatrix matrix.Matrix
 
-	// Resources (optional) holds named resources directly used by content
-	// streams referenced by CharProcs, when the content stream does not itself
-	// have a resource dictionary.
-	//
-	// TODO(voss): Should this be a pdf.Object instead, so that an
-	// indirect reference can be used on writing?
-	Resources *pdf.Resources
+	// Resources (optional) holds named resources shared by all glyph content
+	// streams that don't have their own resource dictionary.
+	Resources *content.Resources
 }

@@ -30,7 +30,18 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding"
+	"seehuhn.de/go/pdf/graphics/content"
 )
+
+// CharProc represents a Type 3 glyph procedure (content stream).
+type CharProc struct {
+	// Content is the parsed content stream for the glyph.
+	Content content.Stream
+
+	// Resources (optional) holds named resources used by this glyph's content
+	// stream. If nil, resources are looked up from the font's Resources field.
+	Resources *content.Resources
+}
 
 // Type3 holds the information from a Type 3 font dictionary.
 type Type3 struct {
@@ -53,9 +64,8 @@ type Type3 struct {
 	// strings.  This overrides the mapping implied by the glyph names.
 	ToUnicode *cmap.ToUnicodeFile
 
-	// CharProcs maps the name of each glyph to the content stream which paints
-	// the glyph for that character.
-	CharProcs map[pdf.Name]pdf.Reference
+	// CharProcs maps glyph names to their content streams.
+	CharProcs map[pdf.Name]*CharProc
 
 	// FontBBox (optional) is the font bounding box in glyph space units.
 	FontBBox *pdf.Rectangle
@@ -63,10 +73,9 @@ type Type3 struct {
 	// The FontMatrix maps glyph space to text space.
 	FontMatrix matrix.Matrix
 
-	// Resources (optional) holds named resources directly used by content
-	// streams referenced by CharProcs, when the content stream does not itself
-	// have a resource dictionary.
-	Resources *pdf.Resources
+	// Resources (optional) holds named resources shared by all glyph content
+	// streams that don't have their own resource dictionary.
+	Resources *content.Resources
 }
 
 var _ Dict = (*Type3)(nil)
@@ -122,9 +131,46 @@ func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	compressedObjects := []pdf.Object{fontDict}
 	compressedRefs := []pdf.Reference{ref}
 
+	// Write CharProc streams and build the CharProcs dictionary.
+	v := w.GetMeta().Version
 	charProcsDict := make(pdf.Dict, len(d.CharProcs))
-	for name, ref := range d.CharProcs {
-		charProcsDict[name] = ref
+	for name, cp := range d.CharProcs {
+		if cp == nil {
+			continue
+		}
+		cpRef := w.Alloc()
+		charProcsDict[name] = cpRef
+
+		// Build stream dictionary with per-glyph resources if present
+		var streamDict pdf.Dict
+		if cp.Resources != nil {
+			resObj, err := cp.Resources.Embed(rm)
+			if err != nil {
+				return nil, fmt.Errorf("glyph %q resources: %w", name, err)
+			}
+			streamDict = pdf.Dict{"Resources": resObj}
+		}
+
+		stm, err := w.OpenStream(cpRef, streamDict, pdf.FilterCompress{})
+		if err != nil {
+			return nil, err
+		}
+
+		// Use per-glyph resources if present, else fall back to font-level resources
+		res := cp.Resources
+		if res == nil {
+			res = d.Resources
+		}
+		err = content.Write(stm, cp.Content, v, content.Glyph, res)
+		if err != nil {
+			stm.Close()
+			return nil, fmt.Errorf("glyph %q: %w", name, err)
+		}
+
+		err = stm.Close()
+		if err != nil {
+			return nil, err
+		}
 	}
 	if len(charProcsDict) > 5 {
 		charProcsRef := w.Alloc()
@@ -169,11 +215,11 @@ func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	if d.Resources != nil {
-		resRef := w.Alloc()
-		resDict := pdf.AsDict(d.Resources)
-		fontDict["Resources"] = resRef
-		compressedObjects = append(compressedObjects, resDict)
-		compressedRefs = append(compressedRefs, resRef)
+		resObj, err := d.Resources.Embed(rm)
+		if err != nil {
+			return nil, fmt.Errorf("font resources: %w", err)
+		}
+		fontDict["Resources"] = resObj
 	}
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)

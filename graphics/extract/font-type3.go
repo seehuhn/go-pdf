@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding"
+	"seehuhn.de/go/pdf/graphics/content"
 )
 
 // extractFontType3 reads a Type 3 font dictionary from a PDF file.
@@ -71,17 +72,54 @@ func extractFontType3(x *pdf.Extractor, obj pdf.Object) (*dict.Type3, error) {
 
 	d.ToUnicode, _ = cmap.ExtractToUnicode(x.R, fontDict["ToUnicode"])
 
-	charProcs, err := x.GetDict(fontDict["CharProcs"])
+	// Extract CharProcs - parse each content stream
+	charProcsDict, err := x.GetDict(fontDict["CharProcs"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "CharProcs")
 	}
-	glyphs := make(map[pdf.Name]pdf.Reference, len(charProcs))
-	for name, ref := range charProcs {
-		if ref, ok := ref.(pdf.Reference); ok {
-			glyphs[name] = ref
+	v := pdf.GetVersion(x.R)
+	charProcs := make(map[pdf.Name]*dict.CharProc, len(charProcsDict))
+	for name, obj := range charProcsDict {
+		stm, err := x.GetStream(obj)
+		if err != nil {
+			continue // permissive: skip malformed CharProcs
+		}
+		if stm == nil {
+			continue
+		}
+
+		// Extract per-glyph resources if present
+		var res *content.Resources
+		if stm.Dict["Resources"] != nil {
+			res, _ = Resources(x, stm.Dict["Resources"])
+		}
+
+		// Parse the content stream
+		body, err := pdf.DecodeStream(x.R, stm, 0)
+		if err != nil {
+			continue // permissive
+		}
+		stream, err := content.ReadStream(body, v, content.Glyph)
+		body.Close()
+		if err != nil {
+			continue // permissive
+		}
+
+		// Validate the stream is embeddable
+		w := content.NewWriter(v, content.Glyph, res)
+		if err := w.Validate(stream); err != nil {
+			continue // invalid stream, skip this CharProc
+		}
+		if err := w.Close(); err != nil {
+			continue // invalid end state
+		}
+
+		charProcs[name] = &dict.CharProc{
+			Content:   stream,
+			Resources: res,
 		}
 	}
-	d.CharProcs = glyphs
+	d.CharProcs = charProcs
 
 	fontBBox, _ := pdf.GetRectangle(x.R, fontDict["FontBBox"])
 	if fontBBox != nil && !fontBBox.IsZero() {
@@ -90,9 +128,9 @@ func extractFontType3(x *pdf.Extractor, obj pdf.Object) (*dict.Type3, error) {
 
 	d.FontMatrix, _ = pdf.GetMatrix(x.R, fontDict["FontMatrix"])
 
-	d.Resources, err = pdf.ExtractResources(x.R, fontDict["Resources"])
-	if pdf.IsReadError(err) {
-		return nil, err
+	// Extract font-level resources (only if present)
+	if fontDict["Resources"] != nil {
+		d.Resources, _ = Resources(x, fontDict["Resources"])
 	}
 
 	repairType3(d, x.R)

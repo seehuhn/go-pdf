@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -207,9 +208,88 @@ func FuzzType3Dict(f *testing.F) {
 	})
 }
 
+// testCharProcs contains various CharProc content streams for testing.
+var testCharProcs = map[string]*dict.CharProc{
+	// d0 with simple filled rectangle
+	"filledRect": {
+		Content: content.Stream{
+			{Name: content.OpType3ColoredGlyph, Args: []pdf.Object{pdf.Number(500), pdf.Integer(0)}},
+			{Name: content.OpRectangle, Args: []pdf.Object{pdf.Integer(50), pdf.Integer(0), pdf.Integer(400), pdf.Integer(700)}},
+			{Name: content.OpFill},
+		},
+	},
+	// d0 with stroked path and color
+	"strokedPath": {
+		Content: content.Stream{
+			{Name: content.OpType3ColoredGlyph, Args: []pdf.Object{pdf.Number(600), pdf.Integer(0)}},
+			{Name: content.OpSetStrokeGray, Args: []pdf.Object{pdf.Number(0.5)}},
+			{Name: content.OpSetLineWidth, Args: []pdf.Object{pdf.Number(10)}},
+			{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Integer(0), pdf.Integer(0)}},
+			{Name: content.OpLineTo, Args: []pdf.Object{pdf.Integer(500), pdf.Integer(700)}},
+			{Name: content.OpStroke},
+		},
+	},
+	// d1 (uncolored) with bounding box and filled shape
+	"uncolored": {
+		Content: content.Stream{
+			{Name: content.OpType3UncoloredGlyph, Args: []pdf.Object{
+				pdf.Number(500), pdf.Integer(0), // wx, wy
+				pdf.Integer(0), pdf.Integer(0), pdf.Integer(500), pdf.Integer(700), // bbox
+			}},
+			{Name: content.OpRectangle, Args: []pdf.Object{pdf.Integer(0), pdf.Integer(0), pdf.Integer(500), pdf.Integer(700)}},
+			{Name: content.OpFill},
+		},
+	},
+	// d0 with nested q/Q (save/restore graphics state)
+	"nested": {
+		Content: content.Stream{
+			{Name: content.OpType3ColoredGlyph, Args: []pdf.Object{pdf.Number(500), pdf.Integer(0)}},
+			{Name: content.OpPushGraphicsState},
+			{Name: content.OpSetFillGray, Args: []pdf.Object{pdf.Number(0.8)}},
+			{Name: content.OpRectangle, Args: []pdf.Object{pdf.Integer(0), pdf.Integer(0), pdf.Integer(250), pdf.Integer(700)}},
+			{Name: content.OpFill},
+			{Name: content.OpPopGraphicsState},
+			{Name: content.OpRectangle, Args: []pdf.Object{pdf.Integer(250), pdf.Integer(0), pdf.Integer(250), pdf.Integer(700)}},
+			{Name: content.OpFill},
+		},
+	},
+	// d0 with bezier curve
+	"curve": {
+		Content: content.Stream{
+			{Name: content.OpType3ColoredGlyph, Args: []pdf.Object{pdf.Number(500), pdf.Integer(0)}},
+			{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Integer(0), pdf.Integer(0)}},
+			{Name: content.OpCurveTo, Args: []pdf.Object{
+				pdf.Integer(100), pdf.Integer(400), // control point 1
+				pdf.Integer(400), pdf.Integer(400), // control point 2
+				pdf.Integer(500), pdf.Integer(0), // end point
+			}},
+			{Name: content.OpClosePath},
+			{Name: content.OpFill},
+		},
+	},
+	// d0 with fill and stroke
+	"fillAndStroke": {
+		Content: content.Stream{
+			{Name: content.OpType3ColoredGlyph, Args: []pdf.Object{pdf.Number(500), pdf.Integer(0)}},
+			{Name: content.OpSetFillRGB, Args: []pdf.Object{pdf.Number(1), pdf.Number(0), pdf.Number(0)}},
+			{Name: content.OpSetStrokeRGB, Args: []pdf.Object{pdf.Number(0), pdf.Number(0), pdf.Number(1)}},
+			{Name: content.OpSetLineWidth, Args: []pdf.Object{pdf.Number(5)}},
+			{Name: content.OpRectangle, Args: []pdf.Object{pdf.Integer(10), pdf.Integer(10), pdf.Integer(480), pdf.Integer(680)}},
+			{Name: content.OpFillAndStroke},
+		},
+	},
+	// minimal d0 (just width, no drawing)
+	"minimal": {
+		Content: content.Stream{
+			{Name: content.OpType3ColoredGlyph, Args: []pdf.Object{pdf.Number(250), pdf.Integer(0)}},
+		},
+	},
+}
+
 var type3Dicts = []*dict.Type3{
+	// Basic font with minimal glyphs
 	{
-		Name: "Test1",
+		Name: "Minimal",
 		Encoding: func(code byte) string {
 			switch code {
 			case 65:
@@ -220,69 +300,70 @@ var type3Dicts = []*dict.Type3{
 				return ""
 			}
 		},
-		Width: makeTestWidth(65, 100.0, 66, 100.0),
-		CharProcs: map[pdf.Name]pdf.Reference{
-			"A": pdf.NewReference(1, 0),
-			"B": pdf.NewReference(2, 0),
-		},
+		Width:      makeTestWidth(65, 500.0, 66, 250.0),
+		CharProcs:  map[pdf.Name]*dict.CharProc{"A": testCharProcs["filledRect"], "B": testCharProcs["minimal"]},
 		FontMatrix: matrix.Scale(0.001, 0.001),
 	},
-
+	// Font with various drawing operations
 	{
-		Name: "Test2",
-		Descriptor: &font.Descriptor{
-			FontName:     "Test",
-			IsFixedPitch: false,
-			IsSerif:      true,
-			IsSymbolic:   false,
-			IsScript:     true,
-			IsItalic:     false,
-			IsAllCap:     true,
-			IsSmallCap:   false,
-			ForceBold:    true,
-			ItalicAngle:  10,
-			Ascent:       250,
-			Descent:      -50,
-			Leading:      450,
-			CapHeight:    150,
-			XHeight:      50,
-			StemV:        75,
-			StemH:        25,
-		},
+		Name: "Drawing",
 		Encoding: func(code byte) string {
 			switch code {
 			case 65:
 				return "A"
 			case 66:
-				return "funny"
+				return "B"
 			case 67:
 				return "C"
 			case 68:
 				return "D"
-			case 69:
-				return "E"
-			case 70:
-				return "F"
 			default:
 				return ""
 			}
 		},
-		Width: makeTestWidth(65, 100.0, 66, 120.0, 67, 110.0, 68, 90.0, 69, 80.0, 70, 70.0),
-		CharProcs: map[pdf.Name]pdf.Reference{
-			"A":     pdf.NewReference(1, 0),
-			"funny": pdf.NewReference(2, 0),
-			"B":     pdf.NewReference(3, 0),
-			"C":     pdf.NewReference(4, 0),
-			"D":     pdf.NewReference(5, 0),
-			"E":     pdf.NewReference(6, 0),
-			"F":     pdf.NewReference(7, 0),
-		},
-		FontBBox:   &pdf.Rectangle{LLx: 0, LLy: -100, URx: 200, URy: 300},
+		Width:     makeTestWidth(65, 500.0, 66, 600.0, 67, 500.0, 68, 500.0),
+		CharProcs: map[pdf.Name]*dict.CharProc{"A": testCharProcs["filledRect"], "B": testCharProcs["strokedPath"], "C": testCharProcs["curve"], "D": testCharProcs["fillAndStroke"]},
+		FontBBox:  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 600, URy: 700},
 		FontMatrix: matrix.Scale(0.001, 0.001),
-		Resources: &pdf.Resources{
-			Font: map[pdf.Name]pdf.Object{
-				"F0": pdf.Name("Just for testing"),
-			},
+	},
+	// Font with d1 (uncolored) glyphs
+	{
+		Name: "Uncolored",
+		Encoding: func(code byte) string {
+			switch code {
+			case 65:
+				return "A"
+			default:
+				return ""
+			}
 		},
+		Width:      makeTestWidth(65, 500.0),
+		CharProcs:  map[pdf.Name]*dict.CharProc{"A": testCharProcs["uncolored"]},
+		FontBBox:   &pdf.Rectangle{LLx: 0, LLy: 0, URx: 500, URy: 700},
+		FontMatrix: matrix.Scale(0.001, 0.001),
+	},
+	// Font with nested graphics state
+	{
+		Name: "Nested",
+		Descriptor: &font.Descriptor{
+			FontName:    "NestedTest",
+			IsSymbolic:  true,
+			Ascent:      700,
+			Descent:     0,
+			CapHeight:   700,
+			StemV:       80,
+		},
+		Encoding: func(code byte) string {
+			switch code {
+			case 65:
+				return "A"
+			default:
+				return ""
+			}
+		},
+		Width:      makeTestWidth(65, 500.0),
+		CharProcs:  map[pdf.Name]*dict.CharProc{"A": testCharProcs["nested"]},
+		FontBBox:   &pdf.Rectangle{LLx: 0, LLy: 0, URx: 500, URy: 700},
+		FontMatrix: matrix.Scale(0.001, 0.001),
 	},
 }

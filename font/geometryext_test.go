@@ -49,8 +49,8 @@ func TestGeometryConsistency(t *testing.T) {
 		// Expected glyph extents in text space units
 		// Note: empty glyphs (.notdef, space) should have zero extents
 		GlyphExtents: []rect.Rect{
-			{LLx: 0, LLy: 0, URx: 0, URy: 0},             // .notdef (empty)
-			{LLx: 0, LLy: 0, URx: 0, URy: 0},             // space (empty)
+			{LLx: 0, LLy: 0, URx: 0, URy: 0},         // .notdef (empty)
+			{LLx: 0, LLy: 0, URx: 0, URy: 0},         // space (empty)
 			{LLx: 0.1, LLy: 0.2, URx: 0.5, URy: 0.6}, // A (square)
 		},
 	}

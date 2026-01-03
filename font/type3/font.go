@@ -135,14 +135,6 @@ func (g *Glyph) BBox() rect.Rect {
 	return computeBBoxFromPath(g.Content[1:])
 }
 
-// IsColored returns true if the glyph uses the d0 operator (colored glyph).
-func (g *Glyph) IsColored() bool {
-	if len(g.Content) == 0 {
-		return false
-	}
-	return g.Content[0].Name == content.OpType3ColoredGlyph
-}
-
 // validateContent checks that the glyph content stream is valid.
 func (g *Glyph) validateContent() error {
 	if len(g.Content) == 0 {
@@ -161,6 +153,14 @@ func (g *Glyph) validateContent() error {
 	} else {
 		if len(g.Content[0].Args) < 6 {
 			return errors.New("d1 requires 6 arguments (wx, wy, llx, lly, urx, ury)")
+		}
+	}
+
+	// Per PDF spec Table 111: "The number wy shall be 0"
+	if len(g.Content[0].Args) >= 2 {
+		wy, _ := getNumber(g.Content[0].Args[1])
+		if wy != 0 {
+			return errors.New("wy must be 0")
 		}
 	}
 
@@ -413,58 +413,24 @@ func (f *instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 }
 
 // makeFontDict creates the Type 3 font dictionary for embedding.
-func (f *instance) makeFontDict(rm *pdf.EmbedHelper) (*dict.Type3, error) {
+func (f *instance) makeFontDict(_ *pdf.EmbedHelper) (*dict.Type3, error) {
 	if err := f.Simple.Error(); err != nil {
 		return nil, fmt.Errorf("Type3 font: %w", err)
 	}
 
 	glyphs := f.Simple.Glyphs()
 
-	// Write the glyphs, accumulating resources across all glyph content streams.
-	//
-	// TODO(voss):
-	//   - consider the discussion at
-	//     https://pdf-issues.pdfa.org/32000-2-2020/clause07.html#H7.8.3
-	//   - check where different PDF versions put the Resources dictionary
-	//   - make it configurable whether to use per-glyph resource dictionaries?
-	v := rm.Out().GetMeta().Version
-	charProcs := make(map[pdf.Name]pdf.Reference)
+	// Build CharProc entries from the font's glyphs.
+	// The actual stream writing is handled by dict.Type3.Embed().
+	charProcs := make(map[pdf.Name]*dict.CharProc)
 	for _, gid := range glyphs {
 		g := f.Font.Glyphs[gid]
 		if g.Name == "" {
 			continue
 		}
-		gRef := rm.Alloc()
-		charProcs[pdf.Name(g.Name)] = gRef
-
-		// Build stream dictionary with per-glyph resources if present
-		var streamDict pdf.Dict
-		if g.Resources != nil {
-			resObj, err := g.Resources.Embed(rm)
-			if err != nil {
-				return nil, fmt.Errorf("glyph %q resources: %w", g.Name, err)
-			}
-			streamDict = pdf.Dict{"Resources": resObj}
-		}
-
-		stm, err := rm.Out().OpenStream(gRef, streamDict, pdf.FilterCompress{})
-		if err != nil {
-			return nil, err
-		}
-
-		res := g.Resources
-		if res == nil {
-			res = f.Font.Resources
-		}
-		err = content.Write(stm, g.Content, v, content.Glyph, res)
-		if err != nil {
-			stm.Close()
-			return nil, fmt.Errorf("glyph %q: %w", g.Name, err)
-		}
-
-		err = stm.Close()
-		if err != nil {
-			return nil, err
+		charProcs[pdf.Name(g.Name)] = &dict.CharProc{
+			Content:   g.Content,
+			Resources: g.Resources,
 		}
 	}
 
@@ -491,18 +457,18 @@ func (f *instance) makeFontDict(rm *pdf.EmbedHelper) (*dict.Type3, error) {
 		StemV:        -1,
 		MissingWidth: f.Simple.DefaultWidth(),
 	}
-	dict := &dict.Type3{
+	d := &dict.Type3{
 		Descriptor: fd,
 		Encoding:   f.Simple.Encoding(),
 		CharProcs:  charProcs,
 		// FontBBox:   &pdf.Rectangle{},
 		FontMatrix: f.Font.FontMatrix,
-		// Resources: TODO(voss): embed contentRes if not empty
-		ToUnicode: f.Simple.ToUnicode(f.Font.PostScriptName),
+		Resources:  f.Font.Resources,
+		ToUnicode:  f.Simple.ToUnicode(f.Font.PostScriptName),
 	}
 	for c, info := range f.Simple.MappedCodes() {
-		dict.Width[c] = info.Width
+		d.Width[c] = info.Width
 	}
 
-	return dict, nil
+	return d, nil
 }

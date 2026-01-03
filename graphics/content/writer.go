@@ -40,8 +40,9 @@ func NewWriter(v pdf.Version, ct Type, res *Resources) *Writer {
 	}
 }
 
-// Write outputs a stream, validating and checking version compatibility.
-func (w *Writer) Write(out io.Writer, s Stream) error {
+// Validate checks that a content stream is valid without writing it.
+// It performs the same validation as Write but produces no output.
+func (w *Writer) Validate(s Stream) error {
 	for i, op := range s {
 		// Check version compatibility.
 		// Unknown operators are allowed inside BX/EX compatibility sections.
@@ -67,8 +68,16 @@ func (w *Writer) Write(out io.Writer, s Stream) error {
 				return fmt.Errorf("operator %d (%s): %w", i, op.Name, err)
 			}
 		}
+	}
+	return nil
+}
 
-		// Write the operator
+// Write outputs a stream, validating and checking version compatibility.
+func (w *Writer) Write(out io.Writer, s Stream) error {
+	if err := w.Validate(s); err != nil {
+		return err
+	}
+	for _, op := range s {
 		if err := writeOperator(out, op); err != nil {
 			return err
 		}
