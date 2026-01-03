@@ -17,6 +17,8 @@
 package extract
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/image"
@@ -28,6 +30,10 @@ func XObject(x *pdf.Extractor, obj pdf.Object) (graphics.XObject, error) {
 	stm, err := x.GetStream(obj)
 	if err != nil {
 		return nil, err
+	} else if stm == nil {
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("missing XObject"),
+		}
 	}
 	err = pdf.CheckDictType(x.R, stm.Dict, "XObject")
 	if err != nil {
