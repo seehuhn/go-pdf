@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/type1glyphs"
+	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/reader"
@@ -88,7 +89,7 @@ func TestType1Embedding(t *testing.T) {
 
 	// step 3: extract the font file and check
 	x := pdf.NewExtractor(r)
-	parsedDict, err := dict.ExtractDict(x, fontDict)
+	parsedDict, err := extract.Dict(x, fontDict)
 	if err != nil {
 		t.Fatal(err)
 	}

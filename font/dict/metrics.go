@@ -32,34 +32,6 @@ import (
 // field in a composite font dictionary will slightly reduce PDF file size.
 const DefaultWidthDefault = 1000
 
-// getSimpleWidths populates ww with glyph widths from a font dictionary.
-// It sets default widths for all glyphs, then updates specific widths from
-// the Widths array in fontDict.
-//
-// Returns true if widths were successfully read.
-func getSimpleWidths(ww []float64, r pdf.Getter, fontDict pdf.Dict, defaultWidth float64) bool {
-	for c := range ww {
-		ww[c] = defaultWidth
-	}
-
-	firstChar, _ := pdf.GetInteger(r, fontDict["FirstChar"])
-	widths, _ := pdf.GetArray(r, fontDict["Widths"])
-	if widths == nil || len(widths) > 256 || firstChar < 0 || firstChar >= 256 {
-		return false
-	}
-
-	for i, w := range widths {
-		w, err := pdf.GetNumber(r, w)
-		if err != nil {
-			continue
-		}
-		if code := firstChar + pdf.Integer(i); code < 256 {
-			ww[code] = float64(w)
-		}
-	}
-	return true
-}
-
 // setSimpleWidths updates fontDict with a FirstChar, LastChar, and Widths
 // array based on non-default width values in ww. It ignores unused codes.
 //
@@ -94,67 +66,6 @@ func setSimpleWidths(w *pdf.Writer, fontDict pdf.Dict, ww []float64, enc encodin
 	widthRef := w.Alloc()
 	fontDict["Widths"] = widthRef
 	return []pdf.Object{widths}, []pdf.Reference{widthRef}
-}
-
-// decodeCompositeWidths reads glyph width information from a composite font's W array.
-// Returns a map from CID to width value.
-func decodeCompositeWidths(r pdf.Getter, obj pdf.Object) (map[cid.CID]float64, error) {
-	w, err := pdf.GetArray(r, obj)
-	if w == nil {
-		return nil, err
-	}
-
-	res := make(map[cid.CID]float64)
-	for len(w) > 1 {
-		c0, err := pdf.GetInteger(r, w[0])
-		if err != nil {
-			return nil, err
-		}
-		obj1, err := pdf.Resolve(r, w[1])
-		if err != nil {
-			return nil, err
-		}
-		if c1, ok := obj1.(pdf.Integer); ok {
-			if len(w) < 3 || c0 < 0 || c1 < c0 || c1-c0 > 65536 {
-				return nil, pdf.Error("invalid W entry in CIDFont dictionary")
-			}
-			wi, err := pdf.GetNumber(r, w[2])
-			if err != nil {
-				return nil, err
-			}
-			for c := c0; c <= c1; c++ {
-				cid := cid.CID(c)
-				if pdf.Integer(cid) != c {
-					return nil, pdf.Error("invalid W entry in CIDFont dictionary")
-				}
-				res[cid] = float64(wi)
-			}
-			w = w[3:]
-		} else {
-			wi, err := pdf.GetArray(r, w[1])
-			if err != nil {
-				return nil, err
-			}
-			for _, wiObj := range wi {
-				wi, err := pdf.GetNumber(r, wiObj)
-				if err != nil {
-					return nil, err
-				}
-				cid := cid.CID(c0)
-				if pdf.Integer(cid) != c0 {
-					return nil, pdf.Error("invalid W entry in CIDFont dictionary")
-				}
-				res[cid] = float64(wi)
-				c0++
-			}
-			w = w[2:]
-		}
-	}
-	if len(w) != 0 {
-		return nil, pdf.Error("invalid W entry in CIDFont dictionary")
-	}
-
-	return res, nil
 }
 
 // encodeCompositeWidths creates a W array for a composite font from a map of CID to width values.
@@ -247,36 +158,6 @@ type DefaultVMetrics struct {
 	DeltaY float64
 }
 
-// decodeVDefault reads default vertical metrics from a PDF array.
-func decodeVDefault(r pdf.Getter, obj pdf.Object) (DefaultVMetrics, error) {
-	a, err := pdf.GetArray(r, obj)
-	if err != nil {
-		return DefaultVMetrics{}, err
-	}
-
-	res := DefaultVMetrics{
-		OffsY:  880,
-		DeltaY: -1000,
-	}
-
-	if len(a) > 0 {
-		offsY, err := pdf.GetNumber(r, a[0])
-		if err != nil {
-			return DefaultVMetrics{}, err
-		}
-		res.OffsY = float64(offsY)
-	}
-	if len(a) > 1 {
-		deltaY, err := pdf.GetNumber(r, a[1])
-		if err != nil {
-			return DefaultVMetrics{}, err
-		}
-		res.DeltaY = float64(deltaY)
-	}
-
-	return res, nil
-}
-
 // encodeVDefault creates a PDF array representation of default vertical metrics.
 // Returns nil if the metrics match the default values to save space.
 func encodeVDefault(metrics DefaultVMetrics) pdf.Array {
@@ -310,108 +191,6 @@ type VMetrics struct {
 	//
 	// This is normally negative, so that writing goes from top to bottom.
 	DeltaY float64
-}
-
-// decodeVMetrics reads vertical metrics information from a composite font's W2 array.
-// Returns a map from CID to vertical metrics.
-func decodeVMetrics(r pdf.Getter, obj pdf.Object) (map[cid.CID]VMetrics, error) {
-	a, err := pdf.GetArray(r, obj)
-	if a == nil {
-		return nil, err
-	}
-
-	res := make(map[cid.CID]VMetrics)
-	for len(a) > 0 {
-		if len(a) < 2 {
-			return nil, errInvalidVMetrics
-		}
-
-		// The first element is always a CID value
-		x, err := pdf.GetInteger(r, a[0])
-		if err != nil {
-			return nil, err
-		} else if x < 0 || x > 65535 {
-			return nil, errInvalidVMetrics
-		}
-		cidVal := cid.CID(x)
-
-		// The second element could be an array or a CID value
-		elem2, err := pdf.Resolve(r, a[1])
-		if err != nil {
-			return nil, err
-		}
-		switch obj := elem2.(type) {
-		case pdf.Array: // Individual format: cid [dy1 ox1 oy1 ...]
-			if len(obj)%3 != 0 {
-				return nil, errInvalidVMetrics
-			}
-
-			for i := 0; i < len(obj); i += 3 {
-				dy, err := pdf.GetNumber(r, obj[i])
-				if err != nil {
-					return nil, err
-				}
-				offsX, err := pdf.GetNumber(r, obj[i+1])
-				if err != nil {
-					return nil, err
-				}
-				offsY, err := pdf.GetNumber(r, obj[i+2])
-				if err != nil {
-					return nil, err
-				}
-
-				res[cidVal] = VMetrics{
-					DeltaY: float64(dy),
-					OffsX:  float64(offsX),
-					OffsY:  float64(offsY),
-				}
-				cidVal++
-			}
-
-			a = a[2:]
-
-		case pdf.Integer: // Range format: cid1 cid2 dy ox oy
-			if len(a) < 5 {
-				return nil, errInvalidVMetrics
-			}
-
-			x, err := pdf.GetInteger(r, elem2)
-			if err != nil {
-				return nil, err
-			} else if x < 0 || x > 65535 {
-				return nil, errInvalidVMetrics
-			}
-			cidEnd := cid.CID(x)
-
-			dy, err := pdf.GetNumber(r, a[2])
-			if err != nil {
-				return nil, err
-			}
-			offsX, err := pdf.GetNumber(r, a[3])
-			if err != nil {
-				return nil, err
-			}
-			offsY, err := pdf.GetNumber(r, a[4])
-			if err != nil {
-				return nil, err
-			}
-
-			for c := int(cidVal); c <= int(cidEnd); c++ {
-				res[cid.CID(c)] = VMetrics{
-					DeltaY: float64(dy),
-					OffsX:  float64(offsX),
-					OffsY:  float64(offsY),
-				}
-			}
-
-			a = a[5:]
-
-		default:
-			return nil, errInvalidVMetrics
-		}
-	}
-
-	return res, nil
 }
 
 // encodeVMetrics creates a W2 array for a composite font from a map of CID to vertical metrics.
@@ -490,7 +269,3 @@ func encodeVMetrics(metrics map[cid.CID]VMetrics) pdf.Array {
 
 	return res
 }
-
-var (
-	errInvalidVMetrics = pdf.Error("invalid vertical metrics")
-)

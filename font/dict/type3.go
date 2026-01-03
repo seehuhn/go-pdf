@@ -71,94 +71,7 @@ type Type3 struct {
 
 var _ Dict = (*Type3)(nil)
 
-// extractType3 reads a Type 3 font dictionary from a PDF file.
-func extractType3(x *pdf.Extractor, obj pdf.Object) (*Type3, error) {
-	fontDict, err := x.GetDictTyped(obj, "Font")
-	if err != nil {
-		return nil, err
-	} else if fontDict == nil {
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("missing font dictionary"),
-		}
-	}
-	subtype, err := x.GetName(fontDict["Subtype"])
-	if err != nil {
-		return nil, err
-	}
-	if subtype != "" && subtype != "Type3" {
-		return nil, pdf.Errorf("expected font subtype Type3, got %q", subtype)
-	}
-
-	d := &Type3{}
-
-	d.Name, _ = x.GetName(fontDict["Name"])
-
-	fdDict, err := x.GetDictTyped(fontDict["FontDescriptor"], "FontDescriptor")
-	if pdf.IsReadError(err) {
-		return nil, err
-	}
-	fd, _ := font.ExtractDescriptor(x.R, fdDict)
-	d.Descriptor = fd
-
-	enc, err := encoding.ExtractType3(x.R, fontDict["Encoding"])
-	if err != nil {
-		return nil, err
-	}
-	d.Encoding = enc
-
-	var defaultWidth float64
-	if fd != nil {
-		defaultWidth = fd.MissingWidth
-	}
-	getSimpleWidths(d.Width[:], x.R, fontDict, defaultWidth)
-
-	d.ToUnicode, _ = cmap.ExtractToUnicode(x.R, fontDict["ToUnicode"])
-
-	charProcs, err := x.GetDict(fontDict["CharProcs"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "CharProcs")
-	}
-	glyphs := make(map[pdf.Name]pdf.Reference, len(charProcs))
-	for name, ref := range charProcs {
-		if ref, ok := ref.(pdf.Reference); ok {
-			glyphs[name] = ref
-		}
-	}
-	d.CharProcs = glyphs
-
-	fontBBox, _ := pdf.GetRectangle(x.R, fontDict["FontBBox"])
-	if fontBBox != nil && !fontBBox.IsZero() {
-		d.FontBBox = fontBBox
-	}
-
-	d.FontMatrix, _ = pdf.GetMatrix(x.R, fontDict["FontMatrix"])
-
-	d.Resources, err = pdf.ExtractResources(x.R, fontDict["Resources"])
-	if pdf.IsReadError(err) {
-		return nil, err
-	}
-
-	d.repair(x.R)
-
-	return d, nil
-}
-
-// repair fixes invalid data in the font dictionary.
-// After repair() has been called, validate() will return nil.
-func (d *Type3) repair(r pdf.Getter) {
-	if v := pdf.GetVersion(r); v == pdf.V1_0 {
-		if d.Name == "" {
-			d.Name = "Font"
-		}
-	}
-
-	if d.FontMatrix.IsZero() {
-		d.FontMatrix = matrix.Matrix{0.001, 0, 0, 0.001, 0, 0}
-	}
-}
-
 // validate performs some basic checks on the font dictionary.
-// This is guaranteed to pass after repair has been run.
 func (d *Type3) validate(w *pdf.Writer) error {
 	if v := pdf.GetVersion(w); v == pdf.V1_0 {
 		if d.Name == "" {
@@ -278,7 +191,7 @@ func (d *Type3) Codec() *charcode.Codec {
 
 func (d *Type3) Characters() iter.Seq2[charcode.Code, font.Code] {
 	return func(yield func(charcode.Code, font.Code) bool) {
-		textMap := simpleTextMap("", d.Encoding, d.ToUnicode)
+		textMap := SimpleTextMap("", d.Encoding, d.ToUnicode)
 		for c := range 256 {
 			code := byte(c)
 			var info font.Code
@@ -313,7 +226,7 @@ func (d *Type3) FontInfo() any {
 // The font is immutable, i.e. no new glyphs can be added and no new codes
 // can be defined via the returned font object.
 func (d *Type3) MakeFont() font.Instance {
-	textMap := simpleTextMap("", d.Encoding, d.ToUnicode)
+	textMap := SimpleTextMap("", d.Encoding, d.ToUnicode)
 	return &t3Font{
 		Dict: d,
 		Text: textMap,

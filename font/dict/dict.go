@@ -17,7 +17,6 @@
 package dict
 
 import (
-	"errors"
 	"iter"
 
 	"seehuhn.de/go/pdf"
@@ -53,59 +52,4 @@ type Dict interface {
 
 	// TODO(voss): remove? keep?
 	Characters() iter.Seq2[charcode.Code, font.Code]
-}
-
-// ExtractDict reads a font dictionary from a PDF file.
-func ExtractDict(x *pdf.Extractor, obj pdf.Object) (Dict, error) {
-	fontDict, err := x.GetDictTyped(obj, "Font")
-	if err != nil {
-		return nil, err
-	} else if fontDict == nil {
-		return nil, pdf.Error("missing font dictionary")
-	}
-
-	fontType, err := x.GetName(fontDict["Subtype"])
-	if err != nil {
-		return nil, err
-	}
-	fontDict["Subtype"] = fontType
-
-	if fontType == "Type0" {
-		a, err := x.GetArray(fontDict["DescendantFonts"])
-		if err != nil {
-			return nil, err
-		} else if len(a) < 1 {
-			return nil, &pdf.MalformedFileError{
-				Err: errors.New("composite font with no descendant fonts"),
-			}
-		}
-		fontDict["DescendantFonts"] = a
-
-		cidFontDict, err := x.GetDictTyped(a[0], "Font")
-		if err != nil {
-			return nil, err
-		}
-		a[0] = cidFontDict
-
-		fontType, err = x.GetName(cidFontDict["Subtype"])
-		if err != nil {
-			return nil, err
-		}
-		cidFontDict["Subtype"] = fontType
-	}
-
-	switch fontType {
-	case "Type1":
-		return extractType1(x, fontDict)
-	case "TrueType":
-		return extractTrueType(x, fontDict)
-	case "Type3":
-		return extractType3(x, fontDict)
-	case "CIDFontType0":
-		return extractCIDFontType0(x, fontDict)
-	case "CIDFontType2":
-		return extractCIDFontType2(x, fontDict)
-	default:
-		return nil, pdf.Errorf("unsupported font type: %s", fontType)
-	}
 }

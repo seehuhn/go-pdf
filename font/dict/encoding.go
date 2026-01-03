@@ -56,10 +56,10 @@ func makeCodec(cmap *cmap.File, toUnicode *cmap.ToUnicodeFile) *charcode.Codec {
 	return codec
 }
 
-// simpleTextMap creates a mapping from character codes to Unicode text strings
+// SimpleTextMap creates a mapping from character codes to Unicode text strings
 // for simple (non-composite) fonts. It combines information from the font's
 // encoding and optional ToUnicode CMap.
-func simpleTextMap(postScriptName string, encoding encoding.Simple, toUnicode *cmap.ToUnicodeFile) map[byte]string {
+func SimpleTextMap(postScriptName string, encoding encoding.Simple, toUnicode *cmap.ToUnicodeFile) map[byte]string {
 	textMap := make(map[byte]string)
 	for code := range 256 {
 		glyphName := encoding(byte(code))

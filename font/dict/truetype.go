@@ -23,8 +23,6 @@ import (
 
 	"seehuhn.de/go/postscript/cid"
 
-	"seehuhn.de/go/sfnt/os2"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -32,7 +30,6 @@ import (
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/internal/stdmtx"
 )
 
 // TrueType holds the information from a TrueType font dictionary.
@@ -71,154 +68,7 @@ type TrueType struct {
 
 var _ Dict = (*TrueType)(nil)
 
-// extractTrueType reads a TrueType font dictionary from a PDF file.
-func extractTrueType(x *pdf.Extractor, obj pdf.Object) (*TrueType, error) {
-	fontDict, err := x.GetDictTyped(obj, "Font")
-	if err != nil {
-		return nil, err
-	} else if fontDict == nil {
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("missing font dictionary"),
-		}
-	}
-	subtype, err := x.GetName(fontDict["Subtype"])
-	if err != nil {
-		return nil, err
-	}
-	if subtype != "" && subtype != "TrueType" {
-		return nil, pdf.Errorf("expected font subtype TrueType, got %q", subtype)
-	}
-
-	d := &TrueType{}
-
-	baseFont, err := x.GetName(fontDict["BaseFont"])
-	if err != nil {
-		return nil, err
-	}
-	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
-		d.PostScriptName = m[2]
-		d.SubsetTag = m[1]
-	} else {
-		d.PostScriptName = string(baseFont)
-	}
-
-	d.Name, _ = x.GetName(fontDict["Name"])
-
-	// StdInfo will be non-nil, if the PostScript name indicates one of the
-	// standard 14 fonts. In this case, we use the corresponding metrics as
-	// default values, in case they are missing from the font dictionary.
-	stdInfo := stdmtx.Metrics[d.PostScriptName]
-
-	fdDict, err := x.GetDictTyped(fontDict["FontDescriptor"], "FontDescriptor")
-	if pdf.IsReadError(err) {
-		return nil, err
-	}
-	fd, _ := font.ExtractDescriptor(x.R, fdDict)
-	if fd == nil && stdInfo != nil {
-		fd = &font.Descriptor{
-			FontName:     d.PostScriptName,
-			FontFamily:   stdInfo.FontFamily,
-			FontStretch:  os2.WidthNormal,
-			FontWeight:   stdInfo.FontWeight,
-			IsFixedPitch: stdInfo.IsFixedPitch,
-			IsSerif:      stdInfo.IsSerif,
-			IsItalic:     stdInfo.ItalicAngle != 0,
-			IsSymbolic:   stdInfo.IsSymbolic,
-			FontBBox:     stdInfo.FontBBox,
-			ItalicAngle:  stdInfo.ItalicAngle,
-			Ascent:       stdInfo.Ascent,
-			Descent:      stdInfo.Descent,
-			CapHeight:    stdInfo.CapHeight,
-			XHeight:      stdInfo.XHeight,
-			StemV:        stdInfo.StemV,
-			StemH:        stdInfo.StemH,
-			MissingWidth: stdInfo.Width[".notdef"],
-		}
-	}
-	d.Descriptor = fd
-
-	for _, key := range []pdf.Name{"FontFile2", "FontFile3"} {
-		if fontFile, err := pdf.ExtractorGetOptional(x, fdDict[key],
-			func(x *pdf.Extractor, obj pdf.Object) (*glyphdata.Stream, error) {
-				return glyphdata.ExtractStream(x, obj, "TrueType", key)
-			}); err != nil {
-			return nil, err
-		} else if fontFile != nil {
-			d.FontFile = fontFile
-			break
-		}
-	}
-
-	isNonSymbolic := fd != nil && !fd.IsSymbolic
-	isExternal := d.FontFile == nil
-	nonSymbolicExt := isNonSymbolic && isExternal
-	enc, err := encoding.ExtractType1(x.R, fontDict["Encoding"], nonSymbolicExt)
-	if err != nil {
-		return nil, err
-	}
-	d.Encoding = enc
-
-	var defaultWidth float64
-	if fd != nil {
-		defaultWidth = fd.MissingWidth
-	}
-	if !getSimpleWidths(d.Width[:], x.R, fontDict, defaultWidth) && stdInfo != nil {
-		for c := range 256 {
-			w, ok := stdInfo.Width[enc(byte(c))]
-			if !ok {
-				w = stdInfo.Width[".notdef"]
-			}
-			d.Width[c] = w
-		}
-	}
-
-	d.ToUnicode, _ = cmap.ExtractToUnicode(x.R, fontDict["ToUnicode"])
-
-	d.repair(x.R)
-
-	return d, nil
-}
-
-// repair fixes invalid data in the font dictionary.
-// After repair() has been called, validate() will return nil.
-func (d *TrueType) repair(r pdf.Getter) {
-	if d.Descriptor == nil {
-		d.Descriptor = &font.Descriptor{}
-	}
-
-	if v := pdf.GetVersion(r); v == pdf.V1_0 {
-		if d.Name == "" {
-			d.Name = "Font"
-		}
-	} else if v >= pdf.V2_0 {
-		d.Name = ""
-	}
-
-	m := subset.TagRegexp.FindStringSubmatch(d.Descriptor.FontName)
-	if m != nil {
-		if d.SubsetTag == "" {
-			d.SubsetTag = m[1]
-		}
-		if d.PostScriptName == "" {
-			d.PostScriptName = m[2]
-		}
-	} else if d.PostScriptName == "" {
-		d.PostScriptName = d.Descriptor.FontName
-	}
-	if d.PostScriptName == "" {
-		d.PostScriptName = "Font"
-	}
-	if !subset.IsValidTag(d.SubsetTag) {
-		d.SubsetTag = ""
-	}
-	if d.FontFile == nil {
-		d.SubsetTag = ""
-	}
-	d.Descriptor.FontName = subset.Join(d.SubsetTag, d.PostScriptName)
-}
-
 // validate performs some basic checks on the font dictionary.
-// This is guaranteed to pass after repair has been run.
 func (d *TrueType) validate(w *pdf.Writer) error {
 	if d.Descriptor == nil {
 		return errors.New("missing font descriptor")
@@ -349,7 +199,7 @@ func (d *TrueType) Codec() *charcode.Codec {
 
 func (d *TrueType) Characters() iter.Seq2[charcode.Code, font.Code] {
 	return func(yield func(charcode.Code, font.Code) bool) {
-		textMap := simpleTextMap(d.PostScriptName, d.Encoding, d.ToUnicode)
+		textMap := SimpleTextMap(d.PostScriptName, d.Encoding, d.ToUnicode)
 		for c := range 256 {
 			code := byte(c)
 			var info font.Code
@@ -385,7 +235,7 @@ func (d *TrueType) FontInfo() any {
 // The font is immutable, i.e. no new glyphs can be added and no new codes
 // can be defined via the returned font object.
 func (d *TrueType) MakeFont() font.Instance {
-	textMap := simpleTextMap(d.PostScriptName, d.Encoding, d.ToUnicode)
+	textMap := SimpleTextMap(d.PostScriptName, d.Encoding, d.ToUnicode)
 	return &ttFont{
 		Dict: d,
 		Text: textMap,
