@@ -23,11 +23,14 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	fontdict "seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics/halftone"
 	"seehuhn.de/go/pdf/graphics/transfer"
 )
+
+// FontExtractFunc is the function type for extracting fonts.
+// This is set by the extract package to avoid import cycles.
+var FontExtractFunc func(x *pdf.Extractor, obj pdf.Object) (font.Instance, error)
 
 // PDF 2.0 sections: 8.4.5
 
@@ -249,7 +252,10 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				return nil, err
 			}
 
-			F, err := fontdict.ExtractFont(x, fontRef)
+			if FontExtractFunc == nil {
+				break
+			}
+			F, err := FontExtractFunc(x, fontRef)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {

@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/standard"
+	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
@@ -67,7 +68,7 @@ func TestEmbedStandard(t *testing.T) {
 				// as expected:
 
 				x := pdf.NewExtractor(data)
-				dictObj, err := dict.ExtractDict(x, ref)
+				dictObj, err := extract.Dict(x, ref)
 				if err != nil {
 					t.Fatal(err)
 				}

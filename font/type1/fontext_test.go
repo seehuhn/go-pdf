@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/type1"
+	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/fonttypes"
@@ -59,21 +60,21 @@ func TestEmbed(t *testing.T) {
 
 	// step 2: read back the font and verify that everything is as expected
 	x := pdf.NewExtractor(w)
-	dictObj, err := dict.ExtractDict(x, ref)
+	dictObj, err := extract.Dict(x, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dict, ok := dictObj.(*dict.Type1)
+	fontDict, ok := dictObj.(*dict.Type1)
 	if !ok {
 		t.Fatalf("wrong font dictionary type: %T", dictObj)
 	}
 
-	if dict.PostScriptName != fontData.PostScriptName() {
+	if fontDict.PostScriptName != fontData.PostScriptName() {
 		t.Errorf("wrong PostScript name: expected %v, got %v",
-			fontData.PostScriptName(), dict.PostScriptName)
+			fontData.PostScriptName(), fontDict.PostScriptName)
 	}
-	if len(dict.SubsetTag) != 6 {
-		t.Errorf("wrong subset tag: %q", dict.SubsetTag)
+	if len(fontDict.SubsetTag) != 6 {
+		t.Errorf("wrong subset tag: %q", fontDict.SubsetTag)
 	}
 
 	// TODO(voss): more tests
@@ -131,17 +132,17 @@ func TestTextContent(t *testing.T) {
 
 	// step 3: read back the font dictionary to inspect it.
 	x := pdf.NewExtractor(page.Out)
-	dictObj, err := dict.ExtractDict(x, ref)
+	dictObj, err := extract.Dict(x, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dict, ok := dictObj.(*dict.Type1)
+	fontDict, ok := dictObj.(*dict.Type1)
 	if !ok {
 		t.Fatalf("wrong font dictionary type: %T", dictObj)
 	}
 
 	s := &strings.Builder{}
-	E := dict.MakeFont()
+	E := fontDict.MakeFont()
 	for code := range E.Codes(textString) {
 		s.WriteString(code.Text)
 	}

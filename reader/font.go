@@ -19,7 +19,7 @@ package reader
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/graphics/extract"
 )
 
 // readFont extracts a font from a PDF file.
@@ -35,5 +35,5 @@ func (r *Reader) readFont(ref pdf.Object) (F font.Instance, err error) {
 		}()
 	}
 
-	return dict.ExtractFont(r.x, ref)
+	return extract.Font(r.x, ref)
 }

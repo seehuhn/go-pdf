@@ -22,6 +22,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/opentype"
+	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -57,7 +58,7 @@ func TestEmbedSimple(t *testing.T) {
 
 			// step 2: read back the font and verify that everything is as expected
 			x := pdf.NewExtractor(w)
-			dictObj, err := dict.ExtractDict(x, ref)
+			dictObj, err := extract.Dict(x, ref)
 			if err != nil {
 				t.Fatal(err)
 			}

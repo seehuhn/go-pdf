@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/pdf/graphics/extract"
 )
 
 // fontDictCtx represents a PDF font dictionary.
@@ -37,11 +38,11 @@ type fontDictCtx struct {
 // newFontDictCtx creates a new font dictionary context.
 func newFontDictCtx(r pdf.Getter, pdfDict pdf.Dict) (*fontDictCtx, error) {
 	x := pdf.NewExtractor(r)
-	dict, err := dict.ExtractDict(x, pdfDict)
+	d, err := extract.Dict(x, pdfDict)
 	if err != nil {
 		return nil, err
 	}
-	return &fontDictCtx{r: r, dict: dict}, nil
+	return &fontDictCtx{r: r, dict: d}, nil
 }
 
 // Next returns available steps for this context.

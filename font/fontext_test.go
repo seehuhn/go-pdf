@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 )
@@ -81,7 +82,7 @@ func TestToUnicodeSimple1(t *testing.T) {
 
 			ref := page.Resources.Font[fontName]
 			x := pdf.NewExtractor(buf)
-			d, err := dict.ExtractDict(x, ref)
+			d, err := extract.Dict(x, ref)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -130,7 +131,7 @@ func TestToUnicodeSimple2(t *testing.T) {
 
 			ref := page.Resources.Font[fontName]
 			x := pdf.NewExtractor(buf)
-			d, err := dict.ExtractDict(x, ref)
+			d, err := extract.Dict(x, ref)
 			if err != nil {
 				t.Fatal(err)
 			}

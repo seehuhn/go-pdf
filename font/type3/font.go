@@ -46,6 +46,11 @@ type Font struct {
 	// to replace the ".notdef" glyph.
 	Glyphs []*Glyph
 
+	// Resources (optional) holds named resources shared by all glyph content
+	// streams that don't have their own resource dictionary. This is embedded
+	// in the Type 3 font dictionary.
+	Resources *content.Resources
+
 	// FontMatrix transforms glyph space units to text space units.
 	FontMatrix matrix.Matrix
 
@@ -88,6 +93,12 @@ type Glyph struct {
 	// It must start with either the d0 or d1 operator.
 	// Use [content/builder.Builder] to construct content streams.
 	Content content.Stream
+
+	// Resources (optional) holds named resources used by this glyph's content
+	// stream. If set, the resources are embedded in the glyph's stream
+	// dictionary. If nil, resources are looked up from the font's resource
+	// dictionary or inherited from the page.
+	Resources *content.Resources
 }
 
 // Width returns the glyph's advance width in glyph coordinate units.
@@ -417,7 +428,6 @@ func (f *instance) makeFontDict(rm *pdf.EmbedHelper) (*dict.Type3, error) {
 	//   - check where different PDF versions put the Resources dictionary
 	//   - make it configurable whether to use per-glyph resource dictionaries?
 	v := rm.Out().GetMeta().Version
-	contentRes := &content.Resources{}
 	charProcs := make(map[pdf.Name]pdf.Reference)
 	for _, gid := range glyphs {
 		g := f.Font.Glyphs[gid]
@@ -427,12 +437,26 @@ func (f *instance) makeFontDict(rm *pdf.EmbedHelper) (*dict.Type3, error) {
 		gRef := rm.Alloc()
 		charProcs[pdf.Name(g.Name)] = gRef
 
-		stm, err := rm.Out().OpenStream(gRef, nil, pdf.FilterCompress{})
+		// Build stream dictionary with per-glyph resources if present
+		var streamDict pdf.Dict
+		if g.Resources != nil {
+			resObj, err := g.Resources.Embed(rm)
+			if err != nil {
+				return nil, fmt.Errorf("glyph %q resources: %w", g.Name, err)
+			}
+			streamDict = pdf.Dict{"Resources": resObj}
+		}
+
+		stm, err := rm.Out().OpenStream(gRef, streamDict, pdf.FilterCompress{})
 		if err != nil {
 			return nil, err
 		}
 
-		err = content.Write(stm, g.Content, v, content.Glyph, contentRes)
+		res := g.Resources
+		if res == nil {
+			res = f.Font.Resources
+		}
+		err = content.Write(stm, g.Content, v, content.Glyph, res)
 		if err != nil {
 			stm.Close()
 			return nil, fmt.Errorf("glyph %q: %w", g.Name, err)
@@ -443,9 +467,6 @@ func (f *instance) makeFontDict(rm *pdf.EmbedHelper) (*dict.Type3, error) {
 			return nil, err
 		}
 	}
-
-	// TODO(voss): if contentRes is not empty, embed and convert to pdf.Resources
-	_ = contentRes // resources are not yet used
 
 	italicAngle := math.Round(f.Font.ItalicAngle*10) / 10
 
