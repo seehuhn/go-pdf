@@ -327,7 +327,7 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (Simple, error) {
 			currentCode = item
 
 		case pdf.Name:
-			if currentCode >= 0 && currentCode < 256 {
+			if currentCode >= 0 && currentCode < 256 && item != "" {
 				differences[byte(currentCode)] = string(item)
 				currentCode++
 			}
