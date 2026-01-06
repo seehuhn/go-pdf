@@ -30,6 +30,9 @@ type Stream struct {
 }
 
 func Extract(r pdf.Getter, ref pdf.Object) (*Stream, error) {
+	if ref == nil {
+		return nil, nil
+	}
 	body, err := pdf.GetStreamReader(r, ref)
 	if err != nil {
 		return nil, err

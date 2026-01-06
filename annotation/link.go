@@ -95,7 +95,6 @@ func (l *Link) AnnotationType() pdf.Name {
 }
 
 func decodeLink(x *pdf.Extractor, dict pdf.Dict) (*Link, error) {
-	r := x.R
 	link := &Link{}
 
 	// Extract common annotation fields
@@ -119,7 +118,7 @@ func decodeLink(x *pdf.Extractor, dict pdf.Dict) (*Link, error) {
 		link.Destination = dest
 	}
 
-	if h, _ := pdf.GetName(r, dict["H"]); h != "" {
+	if h, _ := x.GetName(dict["H"]); h != "" {
 		link.Highlight = LinkHighlight(h)
 	} else {
 		link.Highlight = LinkHighlightInvert // default value
@@ -129,7 +128,7 @@ func decodeLink(x *pdf.Extractor, dict pdf.Dict) (*Link, error) {
 		link.Backup = pa
 	}
 
-	if quadPoints, err := pdf.GetFloatArray(r, dict["QuadPoints"]); err == nil && len(quadPoints) >= 8 {
+	if quadPoints, err := pdf.GetFloatArray(x.R, dict["QuadPoints"]); err == nil && len(quadPoints) >= 8 {
 		// process floats in groups of 8, each group becomes 4 Vec2 points
 		numCompleteQuads := len(quadPoints) / 8
 		points := make([]vec.Vec2, numCompleteQuads*4)

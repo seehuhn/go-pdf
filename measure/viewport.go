@@ -43,8 +43,8 @@ type Viewport struct {
 }
 
 // ExtractViewport extracts a Viewport from a PDF object.
-func ExtractViewport(r pdf.Getter, obj pdf.Object) (*Viewport, error) {
-	dict, err := pdf.GetDictTyped(r, obj, "Viewport")
+func ExtractViewport(x *pdf.Extractor, obj pdf.Object) (*Viewport, error) {
+	dict, err := pdf.GetDictTyped(x.R, obj, "Viewport")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -54,7 +54,7 @@ func ExtractViewport(r pdf.Getter, obj pdf.Object) (*Viewport, error) {
 	vp := &Viewport{}
 
 	// Extract required BBox field
-	bbox, err := pdf.GetRectangle(r, dict["BBox"])
+	bbox, err := pdf.GetRectangle(x.R, dict["BBox"])
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func ExtractViewport(r pdf.Getter, obj pdf.Object) (*Viewport, error) {
 
 	// Extract optional Name field
 	if dict["Name"] != nil {
-		name, err := pdf.Optional(pdf.GetString(r, dict["Name"]))
+		name, err := pdf.Optional(pdf.GetString(x.R, dict["Name"]))
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +74,7 @@ func ExtractViewport(r pdf.Getter, obj pdf.Object) (*Viewport, error) {
 
 	// Extract optional Measure field
 	if dict["Measure"] != nil {
-		measure, err := Extract(r, dict["Measure"])
+		measure, err := Extract(x, dict["Measure"])
 		if err != nil {
 			// Use Optional for permissive reading
 			if _, isMalformed := err.(*pdf.MalformedFileError); isMalformed {
@@ -88,7 +88,7 @@ func ExtractViewport(r pdf.Getter, obj pdf.Object) (*Viewport, error) {
 	}
 
 	// Extract optional PtData field
-	if ptData, err := pdf.Optional(ExtractPtData(r, dict["PtData"])); err != nil {
+	if ptData, err := pdf.Optional(ExtractPtData(x, dict["PtData"])); err != nil {
 		return nil, err
 	} else {
 		vp.PtData = ptData
@@ -178,17 +178,17 @@ func (va *ViewPortArray) Select(point vec.Vec2) *Viewport {
 }
 
 // ExtractViewportArray extracts an array of viewports from a PDF array.
-func ExtractViewportArray(r pdf.Getter, obj pdf.Object) (*ViewPortArray, error) {
+func ExtractViewportArray(x *pdf.Extractor, obj pdf.Object) (*ViewPortArray, error) {
 	_, isIndirect := obj.(pdf.Reference)
 
-	a, err := pdf.GetArray(r, obj)
+	a, err := pdf.GetArray(x.R, obj)
 	if err != nil {
 		return nil, err
 	}
 
 	viewports := make([]*Viewport, len(a))
 	for i, obj := range a {
-		vp, err := ExtractViewport(r, obj)
+		vp, err := ExtractViewport(x, obj)
 		if err != nil {
 			return nil, err
 		}

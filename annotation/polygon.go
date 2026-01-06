@@ -99,7 +99,7 @@ func decodePolygon(x *pdf.Extractor, dict pdf.Dict) (*Polygon, error) {
 	}
 
 	// BS (optional)
-	if bs, err := pdf.Optional(pdf.ExtractorGet(x, dict["BS"], ExtractBorderStyle)); err != nil {
+	if bs, err := pdf.ExtractorGetOptional(x, dict["BS"], ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		polygon.BorderStyle = bs
@@ -120,12 +120,10 @@ func decodePolygon(x *pdf.Extractor, dict pdf.Dict) (*Polygon, error) {
 	}
 
 	// Measure (optional)
-	if dict["Measure"] != nil {
-		if m, err := pdf.Optional(measure.Extract(x.R, dict["Measure"])); err != nil {
-			return nil, err
-		} else {
-			polygon.Measure = m
-		}
+	if m, err := pdf.Optional(measure.Extract(x, dict["Measure"])); err != nil {
+		return nil, err
+	} else {
+		polygon.Measure = m
 	}
 
 	// Path (optional; PDF 2.0)
@@ -142,10 +140,10 @@ func decodePolygon(x *pdf.Extractor, dict pdf.Dict) (*Polygon, error) {
 					}
 					pathArrays[i] = coords
 				} else {
-					pathArrays[i] = []float64{} // Ensure empty slice instead of nil
+					pathArrays[i] = []float64{} // empty slice instead of nil
 				}
 			} else {
-				pathArrays[i] = []float64{} // Default to empty slice if extraction fails
+				pathArrays[i] = []float64{} // default to empty slice if extraction fails
 			}
 		}
 		polygon.Path = pathArrays

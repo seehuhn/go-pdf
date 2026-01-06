@@ -50,7 +50,7 @@ var testCases = []testCase{
 			Resources: &content.Resources{
 				SingleUse: true,
 			},
-			Contents: []*PageContent{
+			Contents: []*Content{
 				{
 					Operators: content.Stream{
 						{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
@@ -68,13 +68,16 @@ var testCases = []testCase{
 			Resources: &content.Resources{
 				SingleUse: true,
 			},
-			Contents: []*PageContent{
+			Contents: []*Content{
 				{
+					// first stream: self-balanced graphics state
 					Operators: content.Stream{
 						{Name: content.OpPushGraphicsState},
+						{Name: content.OpPopGraphicsState},
 					},
 				},
 				{
+					// second stream: draw operations
 					Operators: content.Stream{
 						{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(50), pdf.Number(50)}},
 						{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
@@ -82,7 +85,9 @@ var testCases = []testCase{
 					},
 				},
 				{
+					// third stream: another self-balanced operation
 					Operators: content.Stream{
+						{Name: content.OpPushGraphicsState},
 						{Name: content.OpPopGraphicsState},
 					},
 				},
@@ -112,7 +117,7 @@ var testCases = []testCase{
 		name: "page with duration",
 		page: &Page{
 			MediaBox:  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792},
-			Dur:       5.0,
+			Duration:  5.0,
 			Resources: &content.Resources{SingleUse: true},
 		},
 	},
@@ -177,6 +182,11 @@ func roundTripTest(t *testing.T, v pdf.Version, p1 *Page) {
 		t.Fatalf("decode failed: %v", err)
 	}
 
+	// Normalize UserUnit: 0 is shorthand for 1.0
+	if p1.UserUnit == 0 {
+		p1.UserUnit = 1.0
+	}
+
 	// Compare using cmp.Diff
 	opts := []cmp.Option{
 		// Ignore Parent since it's set externally
@@ -214,7 +224,7 @@ func TestRoundTrip(t *testing.T) {
 
 func TestPageContent_Embed(t *testing.T) {
 	// Create a simple content stream
-	pc := &PageContent{
+	pc := &Content{
 		Operators: content.Stream{
 			{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
 			{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(200), pdf.Number(200)}},
@@ -253,7 +263,7 @@ func TestPageContent_Embed(t *testing.T) {
 
 func TestPageContent_Deduplication(t *testing.T) {
 	// Create a content stream and use it twice
-	pc := &PageContent{
+	pc := &Content{
 		Operators: content.Stream{
 			{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(0), pdf.Number(0)}},
 			{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
@@ -308,7 +318,7 @@ func TestPage_Encode_ValidationError(t *testing.T) {
 		Resources: &content.Resources{
 			SingleUse: true,
 		},
-		Contents: []*PageContent{
+		Contents: []*Content{
 			{
 				Operators: content.Stream{
 					{Name: content.OpPushGraphicsState},
@@ -403,9 +413,12 @@ func FuzzRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
 		rm := pdf.NewResourceManager(w)
 
-		parentRef := w.Alloc()
+		// allocate page tree references
+		pageRef := w.Alloc()
+		pagesRef := w.Alloc()
+
 		p := *tc.page
-		p.Parent = parentRef
+		p.Parent = pagesRef
 
 		obj, err := p.Encode(rm)
 		if err != nil {
@@ -417,11 +430,25 @@ func FuzzRoundTrip(f *testing.F) {
 			continue
 		}
 
-		if err := w.Put(parentRef, pdf.Dict{"Type": pdf.Name("Pages")}); err != nil {
+		// write the page object
+		if err := w.Put(pageRef, obj); err != nil {
 			continue
 		}
 
+		// write a proper Pages tree
+		pagesDict := pdf.Dict{
+			"Type":  pdf.Name("Pages"),
+			"Kids":  pdf.Array{pageRef},
+			"Count": pdf.Integer(1),
+		}
+		if err := w.Put(pagesRef, pagesDict); err != nil {
+			continue
+		}
+
+		// set up catalog
+		w.GetMeta().Catalog.Pages = pagesRef
 		w.GetMeta().Trailer["Quir:E"] = obj
+
 		err = w.Close()
 		if err != nil {
 			continue

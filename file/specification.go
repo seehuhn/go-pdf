@@ -82,6 +82,8 @@ type Specification struct {
 	Description string
 
 	// Thumbnail (PDF 2.0) references a thumbnail image stream for the file.
+	//
+	// This corresponds to the /Thumb entry in the PDF dictionary.
 	Thumbnail *thumbnail.Thumbnail
 
 	// ID contains an identifier for the described file, as two byte strings.
@@ -126,6 +128,8 @@ type Specification struct {
 
 // ExtractSpecification extracts a file specification dictionary from a PDF object.
 func ExtractSpecification(x *pdf.Extractor, obj pdf.Object) (*Specification, error) {
+	_, isIndirect := obj.(pdf.Reference)
+
 	dict, err := x.GetDictTyped(obj, "Filespec")
 	if err != nil {
 		return nil, err
@@ -263,6 +267,8 @@ func ExtractSpecification(x *pdf.Extractor, obj pdf.Object) (*Specification, err
 			spec.FileName = "file"
 		}
 	}
+
+	spec.SingleUse = !isIndirect
 
 	return spec, nil
 }

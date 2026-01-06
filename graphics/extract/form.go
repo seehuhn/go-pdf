@@ -96,14 +96,14 @@ func Form(x *pdf.Extractor, obj pdf.Object) (*form.Form, error) {
 	}
 
 	// Measure (optional)
-	if m, err := pdf.Optional(measure.Extract(x.R, dict["Measure"])); err != nil {
+	if m, err := pdf.Optional(measure.Extract(x, dict["Measure"])); err != nil {
 		return nil, err
 	} else {
 		f.Measure = m
 	}
 
 	// PtData (optional)
-	if ptData, err := pdf.Optional(measure.ExtractPtData(x.R, dict["PtData"])); err != nil {
+	if ptData, err := pdf.Optional(measure.ExtractPtData(x, dict["PtData"])); err != nil {
 		return nil, err
 	} else {
 		f.PtData = ptData

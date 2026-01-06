@@ -321,9 +321,9 @@ var type3Dicts = []*dict.Type3{
 				return ""
 			}
 		},
-		Width:     makeTestWidth(65, 500.0, 66, 600.0, 67, 500.0, 68, 500.0),
-		CharProcs: map[pdf.Name]*dict.CharProc{"A": testCharProcs["filledRect"], "B": testCharProcs["strokedPath"], "C": testCharProcs["curve"], "D": testCharProcs["fillAndStroke"]},
-		FontBBox:  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 600, URy: 700},
+		Width:      makeTestWidth(65, 500.0, 66, 600.0, 67, 500.0, 68, 500.0),
+		CharProcs:  map[pdf.Name]*dict.CharProc{"A": testCharProcs["filledRect"], "B": testCharProcs["strokedPath"], "C": testCharProcs["curve"], "D": testCharProcs["fillAndStroke"]},
+		FontBBox:   &pdf.Rectangle{LLx: 0, LLy: 0, URx: 600, URy: 700},
 		FontMatrix: matrix.Scale(0.001, 0.001),
 	},
 	// Font with d1 (uncolored) glyphs
@@ -346,12 +346,12 @@ var type3Dicts = []*dict.Type3{
 	{
 		Name: "Nested",
 		Descriptor: &font.Descriptor{
-			FontName:    "NestedTest",
-			IsSymbolic:  true,
-			Ascent:      700,
-			Descent:     0,
-			CapHeight:   700,
-			StemV:       80,
+			FontName:   "NestedTest",
+			IsSymbolic: true,
+			Ascent:     700,
+			Descent:    0,
+			CapHeight:  700,
+			StemV:      80,
 		},
 		Encoding: func(code byte) string {
 			switch code {

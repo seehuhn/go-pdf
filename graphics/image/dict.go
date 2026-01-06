@@ -375,7 +375,7 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 
 	// Extract Measure
 	if measureObj, ok := dict["Measure"]; ok {
-		m, err := measure.Extract(x.R, measureObj)
+		m, err := measure.Extract(x, measureObj)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Measure: %w", err)
 		}
@@ -383,7 +383,7 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	}
 
 	// Extract PtData
-	if ptData, err := pdf.Optional(measure.ExtractPtData(x.R, dict["PtData"])); err != nil {
+	if ptData, err := pdf.Optional(measure.ExtractPtData(x, dict["PtData"])); err != nil {
 		return nil, err
 	} else {
 		img.PtData = ptData
@@ -559,12 +559,14 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	dict := pdf.Dict{
-		"Type":             pdf.Name("XObject"),
 		"Subtype":          pdf.Name("Image"),
 		"Width":            pdf.Integer(d.Width),
 		"Height":           pdf.Integer(d.Height),
 		"ColorSpace":       csEmbedded,
 		"BitsPerComponent": pdf.Integer(d.BitsPerComponent),
+	}
+	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("XObject")
 	}
 	if d.Intent != "" {
 		dict["Intent"] = pdf.Name(d.Intent)

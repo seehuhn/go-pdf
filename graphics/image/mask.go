@@ -269,7 +269,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 
 	// Extract Measure
 	if measureObj, ok := dict["Measure"]; ok {
-		m, err := measure.Extract(x.R, measureObj)
+		m, err := measure.Extract(x, measureObj)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Measure: %w", err)
 		}
@@ -277,7 +277,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 	}
 
 	// Extract PtData
-	if ptData, err := pdf.Optional(measure.ExtractPtData(x.R, dict["PtData"])); err != nil {
+	if ptData, err := pdf.Optional(measure.ExtractPtData(x, dict["PtData"])); err != nil {
 		return nil, err
 	} else {
 		mask.PtData = ptData

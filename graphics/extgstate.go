@@ -678,7 +678,6 @@ func parseSingleTransfer(x *pdf.Extractor, obj pdf.Object) (pdf.Function, error)
 //
 // This implements the [pdf.Embedder] interface.
 func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := pdf.CheckVersion(rm.Out(), "ExtGState", pdf.V1_2); err != nil {
 		return nil, err
 	}
@@ -691,6 +690,9 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// Build a graphics state parameter dictionary for the given state.
 	// See table 57 in ISO 32000-2:2020.
 	dict := pdf.Dict{}
+	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("ExtGState")
+	}
 	if set&StateTextFont != 0 {
 		E, err := rm.Embed(e.TextFont)
 		if err != nil {

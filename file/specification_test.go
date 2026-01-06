@@ -45,6 +45,15 @@ var testCases = []struct {
 		},
 	},
 	{
+		name:    "single use file specification",
+		version: pdf.V1_0,
+		spec: &Specification{
+			FileName:       "inline.txt",
+			AFRelationship: RelationshipUnspecified,
+			SingleUse:      true,
+		},
+	},
+	{
 		name:    "file specification with description",
 		version: pdf.V1_6,
 		spec: &Specification{

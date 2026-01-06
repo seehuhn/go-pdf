@@ -211,7 +211,7 @@ func rectilinearRoundTripTest(t *testing.T, version pdf.Version, data *Rectiline
 		t.Fatalf("resource manager close failed: %v", err)
 	}
 
-	decoded, err := Extract(w, embedded)
+	decoded, err := Extract(pdf.NewExtractor(w), embedded)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -325,7 +325,7 @@ func FuzzRectilinearRoundTrip(f *testing.F) {
 			t.Skip("missing PDF object")
 		}
 
-		objGo, err := Extract(r, objPDF)
+		objGo, err := Extract(pdf.NewExtractor(r), objPDF)
 		if err != nil {
 			t.Skip("malformed PDF object")
 		}

@@ -15,11 +15,11 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // Package page implements PDF page objects.
-//
-// PDF 2.0 sections: 7.7.3
 package page
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
 	"seehuhn.de/go/pdf"
@@ -29,121 +29,131 @@ import (
 	"seehuhn.de/go/pdf/graphics/image/thumbnail"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/optional"
+	"seehuhn.de/go/pdf/page/boxcolor"
 	"seehuhn.de/go/pdf/pieceinfo"
 )
 
-// PageContent represents a single content stream that can be shared
-// across multiple pages. It implements [pdf.Embedder] for deduplication.
-type PageContent struct {
-	Operators content.Stream
-}
+// PDF 2.0 sections: 7.7.3
 
-var _ pdf.Embedder = (*PageContent)(nil)
-
-// Embed writes the content stream to the PDF file.
-// No resource validation is performed; validation is done at the Page level.
-func (pc *PageContent) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-	ref := rm.Alloc()
-	stm, err := rm.Out().OpenStream(ref, nil, pdf.FilterCompress{})
-	if err != nil {
-		return nil, err
-	}
-
-	for _, op := range pc.Operators {
-		if err := content.WriteOperator(stm, op); err != nil {
-			stm.Close()
-			return nil, err
-		}
-	}
-
-	if err := stm.Close(); err != nil {
-		return nil, err
-	}
-
-	return ref, nil
-}
-
-// Page represents a PDF page object.
+// Page represents a PDF page object (Table 31 in the PDF spec).
 // It implements [pdf.Encoder] for file-dependent embedding.
+//
+// This type does not support invisible Template pages (Type=Template).
 type Page struct {
-	// Required fields
-	Parent    pdf.Reference       // parent page tree node
-	MediaBox  *pdf.Rectangle      // inheritable
-	Resources *content.Resources  // inheritable
+	// Parent is the page tree node that is the immediate parent of this page.
+	Parent pdf.Reference
 
-	// Content streams
-	Contents []*PageContent
+	// MediaBox (inheritable) defines the boundaries of the physical medium
+	// on which the page is displayed or printed.
+	MediaBox *pdf.Rectangle
 
-	// Optional boxes (PDF 1.3+)
-	CropBox  *pdf.Rectangle // inheritable
+	// Resources (inheritable) contains resources required by the page contents.
+	Resources *content.Resources
+
+	// Contents (optional) holds content streams describing the page's appearance.
+	Contents []*Content
+
+	// CropBox (optional; inheritable) defines the visible region of the page.
+	// Default: MediaBox.
+	CropBox *pdf.Rectangle
+
+	// BleedBox (optional) defines the clipping region for production output.
+	// Default: CropBox.
 	BleedBox *pdf.Rectangle
-	TrimBox  *pdf.Rectangle
-	ArtBox   *pdf.Rectangle
 
-	// Box display (PDF 1.4)
-	BoxColorInfo pdf.Object // TODO: implement proper type
+	// TrimBox (optional) defines the intended dimensions after trimming.
+	// Default: CropBox.
+	TrimBox *pdf.Rectangle
 
-	// Rotation
-	Rotate int // inheritable, multiple of 90
+	// ArtBox (optional) defines the extent of the page's meaningful content.
+	// Default: CropBox.
+	ArtBox *pdf.Rectangle
 
-	// Transparency (PDF 1.4)
+	// BoxColorInfo (optional) specifies colors for displaying page boundary
+	// guidelines on screen.
+	BoxColorInfo *boxcolor.Info
+
+	// Rotate (optional; inheritable) specifies clockwise rotation in degrees.
+	// Must be a multiple of 90.
+	Rotate int
+
+	// Group (optional) specifies transparency group attributes for the page.
 	Group pdf.Object // TODO: implement transparency group type
 
-	// Thumbnail
-	Thumb *thumbnail.Thumbnail
+	// Thumbnail (optional) is a thumbnail image for the page.
+	//
+	// This corresponds to the /Thumbnail entry in the PDF dictionary.
+	Thumbnail *thumbnail.Thumbnail
 
-	// Article beads (PDF 1.1)
+	// B (optional) lists article beads on the page, in reading order.
 	B []pdf.Reference
 
-	// Presentation (PDF 1.1)
-	Dur   float64    // display duration in seconds
+	// Duration (optional) is the display duration in seconds for presentations.
+	//
+	// This corresponds to the /Duration entry in the PDF dictionary.
+	Duration float64
+
+	// Trans (optional) describes the transition effect for presentations.
 	Trans pdf.Object // TODO: transition dictionary
 
-	// Annotations
+	// Annots (optional) lists annotations associated with the page.
 	Annots []annotation.Annotation
 
-	// Actions (PDF 1.2)
+	// AA (optional) defines actions for page open/close events.
 	AA pdf.Object // TODO: additional-actions dictionary
 
-	// Metadata (PDF 1.4)
+	// Metadata (optional) is a metadata stream for the page.
 	Metadata *metadata.Stream
 
-	// Page-piece (PDF 1.3)
+	// LastModified (optional) is when the page contents were last modified.
+	// Required if PieceInfo is present.
 	LastModified time.Time
-	PieceInfo    *pieceinfo.PieceInfo
 
-	// Structure (PDF 1.3)
+	// PieceInfo (optional) holds application-specific page data.
+	PieceInfo *pieceinfo.PieceInfo
+
+	// StructParents (optional) is this page's key in the structural parent tree.
+	// Required if the page contains structural content items.
 	StructParents optional.Int
 
-	// Web Capture (PDF 1.3, deprecated in 2.0)
+	// ID (optional; deprecated in PDF 2.0) is the digital identifier of the
+	// page's parent Web Capture content set.
 	ID pdf.String
-	PZ float64 // preferred zoom
 
-	// Separation (PDF 1.3)
+	// PZ (optional) is the preferred zoom factor for the page.
+	PZ float64
+
+	// SeparationInfo (optional) contains color separation information.
 	SeparationInfo pdf.Object // TODO: separation dictionary
 
-	// Tab order (PDF 1.5)
-	Tabs pdf.Name // R, C, S, A (2.0), W (2.0)
+	// Tabs (optional) specifies the tab order for annotations.
+	// Values: R (row), C (column), S (structure), A (array order; PDF 2.0),
+	// W (widget order; PDF 2.0).
+	Tabs pdf.Name
 
-	// Template (PDF 1.5)
+	// TemplateInstantiated (optional) is the name of the originating named page
+	// object, if this page was created from one.
 	TemplateInstantiated pdf.Name
 
-	// Navigation (PDF 1.5)
+	// PresSteps (optional) is the first navigation node on the page.
 	PresSteps pdf.Object // TODO: navigation node dictionary
 
-	// User units (PDF 1.6)
-	UserUnit float64 // default 1.0 = 1/72 inch
+	// UserUnit (optional) is the size of user space units in multiples of
+	// 1/72 inch. Default: 1.0. When writing, 0 is treated as 1.0.
+	UserUnit float64
 
-	// Viewports (PDF 1.6)
+	// VP (optional) specifies rectangular viewport regions of the page.
 	VP pdf.Object // TODO: array of viewport dictionaries
 
-	// Associated files (PDF 2.0)
+	// AF (optional; PDF 2.0) lists associated files for this page.
 	AF pdf.Object // TODO: array of file specification dictionaries
 
-	// Output intents (PDF 2.0)
+	// OutputIntents (optional; PDF 2.0) specifies color characteristics
+	// for output devices.
 	OutputIntents pdf.Object // TODO: array of output intent dictionaries
 
-	// Document parts (PDF 2.0)
+	// DPart (optional; PDF 2.0) references the DPart whose range includes
+	// this page. Required if this page is within a DPart range.
 	DPart pdf.Reference
 }
 
@@ -229,14 +239,18 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// BoxColorInfo
 	if p.BoxColorInfo != nil {
-		if err := pdf.CheckVersion(w, "BoxColorInfo", pdf.V1_4); err != nil {
+		obj, err := rm.Embed(p.BoxColorInfo)
+		if err != nil {
 			return nil, err
 		}
-		dict["BoxColorInfo"] = p.BoxColorInfo
+		dict["BoxColorInfo"] = obj
 	}
 
-	// Rotate
+	// Rotate (must be multiple of 90)
 	if p.Rotate != 0 {
+		if p.Rotate%90 != 0 {
+			return nil, fmt.Errorf("Rotate must be a multiple of 90, got %d", p.Rotate)
+		}
 		dict["Rotate"] = pdf.Integer(p.Rotate)
 	}
 
@@ -249,8 +263,8 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Thumb
-	if p.Thumb != nil {
-		thumbRef, err := rm.Embed(p.Thumb)
+	if p.Thumbnail != nil {
+		thumbRef, err := rm.Embed(p.Thumbnail)
 		if err != nil {
 			return nil, err
 		}
@@ -270,11 +284,11 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Dur
-	if p.Dur > 0 {
+	if p.Duration > 0 {
 		if err := pdf.CheckVersion(w, "Dur", pdf.V1_1); err != nil {
 			return nil, err
 		}
-		dict["Dur"] = pdf.Number(p.Dur)
+		dict["Dur"] = pdf.Number(p.Duration)
 	}
 
 	// Trans
@@ -318,24 +332,27 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["Metadata"] = metaRef
 	}
 
-	// LastModified
-	if !p.LastModified.IsZero() {
-		if err := pdf.CheckVersion(w, "LastModified", pdf.V1_3); err != nil {
-			return nil, err
-		}
-		dict["LastModified"] = pdf.Date(p.LastModified)
-	}
-
-	// PieceInfo
+	// PieceInfo (requires LastModified)
 	if p.PieceInfo != nil {
 		if err := pdf.CheckVersion(w, "PieceInfo", pdf.V1_3); err != nil {
 			return nil, err
+		}
+		if p.LastModified.IsZero() {
+			return nil, errors.New("LastModified is required when PieceInfo is present")
 		}
 		pieceRef, err := rm.Embed(p.PieceInfo)
 		if err != nil {
 			return nil, err
 		}
 		dict["PieceInfo"] = pieceRef
+	}
+
+	// LastModified
+	if !p.LastModified.IsZero() {
+		if err := pdf.CheckVersion(w, "LastModified", pdf.V1_3); err != nil {
+			return nil, err
+		}
+		dict["LastModified"] = pdf.Date(p.LastModified)
 	}
 
 	// StructParents
@@ -347,7 +364,10 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// ID (deprecated in 2.0)
-	if len(p.ID) > 0 && v < pdf.V2_0 {
+	if len(p.ID) > 0 {
+		if v >= pdf.V2_0 {
+			return nil, errors.New("ID is deprecated in PDF 2.0")
+		}
 		if err := pdf.CheckVersion(w, "ID", pdf.V1_3); err != nil {
 			return nil, err
 		}
@@ -370,10 +390,20 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["SeparationInfo"] = p.SeparationInfo
 	}
 
-	// Tabs
+	// Tabs (R, C, S for PDF 1.5+; A, W for PDF 2.0+)
 	if p.Tabs != "" {
 		if err := pdf.CheckVersion(w, "Tabs", pdf.V1_5); err != nil {
 			return nil, err
+		}
+		switch p.Tabs {
+		case "R", "C", "S":
+			// valid for PDF 1.5+
+		case "A", "W":
+			if err := pdf.CheckVersion(w, "Tabs value "+string(p.Tabs), pdf.V2_0); err != nil {
+				return nil, err
+			}
+		default:
+			return nil, fmt.Errorf("invalid Tabs value %q", p.Tabs)
 		}
 		dict["Tabs"] = p.Tabs
 	}
@@ -394,7 +424,10 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["PresSteps"] = p.PresSteps
 	}
 
-	// UserUnit
+	// UserUnit (0 is shorthand for 1.0; must be positive)
+	if p.UserUnit < 0 {
+		return nil, fmt.Errorf("UserUnit must be positive, got %g", p.UserUnit)
+	}
 	if p.UserUnit != 0 && p.UserUnit != 1.0 {
 		if err := pdf.CheckVersion(w, "UserUnit", pdf.V1_6); err != nil {
 			return nil, err
@@ -435,32 +468,6 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	return dict, nil
-}
-
-// ExtractContent reads a single content stream from a PDF object.
-func ExtractContent(x *pdf.Extractor, obj pdf.Object) (*PageContent, error) {
-	resolved, err := x.Resolve(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	stream, ok := resolved.(*pdf.Stream)
-	if !ok {
-		return nil, pdf.Errorf("expected stream, got %T", resolved)
-	}
-
-	stm, err := pdf.DecodeStream(x.R, stream, 0)
-	if err != nil {
-		return nil, err
-	}
-	defer stm.Close()
-
-	operators, err := content.ReadStream(stm, pdf.GetVersion(x.R), content.Page)
-	if err != nil {
-		return nil, err
-	}
-
-	return &PageContent{Operators: operators}, nil
 }
 
 // Decode reads a page dictionary from a PDF object.
@@ -509,7 +516,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 			if err != nil {
 				return nil, err
 			}
-			p.Contents = []*PageContent{pc}
+			p.Contents = []*Content{pc}
 		case pdf.Array:
 			// Array of streams
 			for _, item := range c {
@@ -551,7 +558,11 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	// BoxColorInfo (optional)
-	p.BoxColorInfo = dict["BoxColorInfo"]
+	if bci, err := pdf.ExtractorGetOptional(x, dict["BoxColorInfo"], boxcolor.ExtractInfo); err != nil {
+		return nil, err
+	} else {
+		p.BoxColorInfo = bci
+	}
 
 	// Rotate (optional, inheritable)
 	if rotate, err := pdf.Optional(x.GetInteger(dict["Rotate"])); err != nil {
@@ -567,7 +578,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	if thumb, err := pdf.ExtractorGetOptional(x, dict["Thumb"], thumbnail.ExtractThumbnail); err != nil {
 		return nil, err
 	} else {
-		p.Thumb = thumb
+		p.Thumbnail = thumb
 	}
 
 	// B (optional)
@@ -585,7 +596,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	if dur, err := pdf.Optional(x.GetNumber(dict["Dur"])); err != nil {
 		return nil, err
 	} else {
-		p.Dur = dur
+		p.Duration = dur
 	}
 
 	// Trans (optional)
@@ -655,11 +666,16 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	// SeparationInfo (optional)
 	p.SeparationInfo = dict["SeparationInfo"]
 
-	// Tabs (optional)
+	// Tabs (optional; only accept valid values)
 	if tabs, err := pdf.Optional(x.GetName(dict["Tabs"])); err != nil {
 		return nil, err
 	} else {
-		p.Tabs = tabs
+		switch tabs {
+		case "R", "C", "S", "A", "W":
+			p.Tabs = tabs
+		default:
+			// invalid or empty value - leave as empty
+		}
 	}
 
 	// TemplateInstantiated (optional)
@@ -672,11 +688,13 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	// PresSteps (optional)
 	p.PresSteps = dict["PresSteps"]
 
-	// UserUnit (optional)
+	// UserUnit (optional; default 1.0)
 	if userUnit, err := pdf.Optional(x.GetNumber(dict["UserUnit"])); err != nil {
 		return nil, err
-	} else {
+	} else if userUnit > 0 {
 		p.UserUnit = userUnit
+	} else {
+		p.UserUnit = 1.0
 	}
 
 	// VP (optional)

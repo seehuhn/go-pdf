@@ -323,14 +323,13 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool)
 
 // decodeCommon extracts fields common to all annotations from a PDF dictionary.
 func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
-	r := x.R
 	// Rect (required)
-	if rect, err := pdf.GetRectangle(r, dict["Rect"]); err == nil && rect != nil {
+	if rect, err := pdf.GetRectangle(x.R, dict["Rect"]); err == nil && rect != nil {
 		common.Rect = *rect
 	}
 
 	// Contents (optional)
-	if contents, err := pdf.GetTextString(r, dict["Contents"]); err == nil && contents != "" {
+	if contents, err := pdf.GetTextString(x.R, dict["Contents"]); err == nil && contents != "" {
 		common.Contents = string(contents)
 	}
 
@@ -340,17 +339,17 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 	}
 
 	// NM (optional)
-	if nm, err := pdf.GetTextString(r, dict["NM"]); err == nil && nm != "" {
+	if nm, err := pdf.GetTextString(x.R, dict["NM"]); err == nil && nm != "" {
 		common.Name = string(nm)
 	}
 
 	// M (optional)
-	if m, err := pdf.GetTextString(r, dict["M"]); err == nil && m != "" {
+	if m, err := pdf.GetTextString(x.R, dict["M"]); err == nil && m != "" {
 		common.LastModified = string(m)
 	}
 
 	// F (optional)
-	if f, err := pdf.GetInteger(r, dict["F"]); err == nil && f != 0 {
+	if f, err := x.GetInteger(dict["F"]); err == nil && f != 0 {
 		common.Flags = Flags(f)
 	}
 
@@ -360,23 +359,23 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 	}
 
 	// AS (optional)
-	if as, err := pdf.GetName(r, dict["AS"]); err == nil && as != "" {
+	if as, err := x.GetName(dict["AS"]); err == nil && as != "" {
 		common.AppearanceState = as
 	}
 
 	// Border (optional)
-	if border, err := pdf.Optional(ExtractBorder(r, dict["Border"])); err != nil {
+	if border, err := pdf.Optional(ExtractBorder(x.R, dict["Border"])); err != nil {
 		return err
 	} else {
 		common.Border = border
 	}
 
 	// C (optional)
-	if c, _ := pdf.GetArray(r, dict["C"]); c != nil {
+	if c, err := x.GetArray(dict["C"]); err == nil && c != nil {
 		colors := make([]float64, len(c))
-		for i, color := range c {
-			if num, err := pdf.GetNumber(r, color); err == nil {
-				colors[i] = float64(num)
+		for i, col := range c {
+			if num, err := x.GetNumber(col); err == nil {
+				colors[i] = num
 			}
 		}
 		switch len(colors) {
@@ -391,8 +390,9 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 		}
 	}
 
-	if keyObj := dict["StructParent"]; keyObj != nil {
-		if key, err := pdf.Optional(pdf.GetInteger(r, dict["StructParent"])); err != nil {
+	// StructParent (optional)
+	if dict["StructParent"] != nil {
+		if key, err := pdf.Optional(x.GetInteger(dict["StructParent"])); err != nil {
 			return err
 		} else {
 			common.StructParent.Set(key)
@@ -407,7 +407,7 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 	}
 
 	// AF (optional)
-	if af, err := pdf.GetArray(r, dict["AF"]); err == nil && len(af) > 0 {
+	if af, err := x.GetArray(dict["AF"]); err == nil && len(af) > 0 {
 		refs := make([]pdf.Reference, len(af))
 		for i, fileRef := range af {
 			if ref, ok := fileRef.(pdf.Reference); ok {
@@ -419,27 +419,27 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 
 	// CA (optional) - default value is 1.0
 	if dict["CA"] != nil {
-		if ca, err := pdf.GetNumber(r, dict["CA"]); err == nil {
-			common.StrokingTransparency = 1 - float64(ca)
+		if ca, err := x.GetNumber(dict["CA"]); err == nil {
+			common.StrokingTransparency = 1 - ca
 		}
 	}
 
 	// ca (optional) - if not present, defaults to the same value as CA
 	if dict["ca"] != nil {
-		if ca, err := pdf.GetNumber(r, dict["ca"]); err == nil {
-			common.NonStrokingTransparency = 1 - float64(ca)
+		if ca, err := x.GetNumber(dict["ca"]); err == nil {
+			common.NonStrokingTransparency = 1 - ca
 		}
 	} else {
 		common.NonStrokingTransparency = common.StrokingTransparency
 	}
 
 	// BM (optional)
-	if bm, err := pdf.GetName(r, dict["BM"]); err == nil && bm != "" {
+	if bm, err := x.GetName(dict["BM"]); err == nil && bm != "" {
 		common.BlendMode = bm
 	}
 
 	// Lang (optional)
-	if lang, err := pdf.GetTextString(r, dict["Lang"]); err == nil && lang != "" {
+	if lang, err := pdf.GetTextString(x.R, dict["Lang"]); err == nil && lang != "" {
 		if tag, err := language.Parse(string(lang)); err == nil {
 			common.Lang = tag
 		}

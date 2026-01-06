@@ -71,7 +71,6 @@ func (t *Text) AnnotationType() pdf.Name {
 }
 
 func decodeText(x *pdf.Extractor, dict pdf.Dict) (*Text, error) {
-	r := x.R
 	text := &Text{}
 
 	if err := decodeCommon(x, &text.Common, dict); err != nil {
@@ -82,13 +81,13 @@ func decodeText(x *pdf.Extractor, dict pdf.Dict) (*Text, error) {
 		return nil, err
 	}
 
-	if open, err := pdf.Optional(pdf.GetBoolean(r, dict["Open"])); err != nil {
+	if open, err := pdf.Optional(x.GetBoolean(dict["Open"])); err != nil {
 		return nil, err
 	} else {
 		text.Open = bool(open)
 	}
 
-	if name, err := pdf.Optional(pdf.GetName(r, dict["Name"])); err != nil {
+	if name, err := pdf.Optional(x.GetName(dict["Name"])); err != nil {
 		return nil, err
 	} else if name != "" {
 		text.Icon = TextIcon(name)
@@ -96,7 +95,7 @@ func decodeText(x *pdf.Extractor, dict pdf.Dict) (*Text, error) {
 		text.Icon = TextIconNote
 	}
 
-	stateModel, err := pdf.Optional(pdf.GetTextString(r, dict["StateModel"]))
+	stateModel, err := pdf.Optional(pdf.GetTextString(x.R, dict["StateModel"]))
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +106,7 @@ func decodeText(x *pdf.Extractor, dict pdf.Dict) (*Text, error) {
 		text.State = TextStateNone
 	}
 
-	state, err := pdf.Optional(pdf.GetTextString(r, dict["State"]))
+	state, err := pdf.Optional(pdf.GetTextString(x.R, dict["State"]))
 	if err != nil {
 		return nil, err
 	}

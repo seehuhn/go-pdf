@@ -215,7 +215,7 @@ func viewportRoundTripTest(t *testing.T, version pdf.Version, vp *Viewport) {
 	}
 
 	// Read it back
-	extracted, err := ExtractViewport(w, embedded)
+	extracted, err := ExtractViewport(pdf.NewExtractor(w), embedded)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -322,7 +322,7 @@ func FuzzViewportRoundTrip(f *testing.F) {
 			t.Skip("missing test object")
 		}
 
-		vp, err := ExtractViewport(r, objPDF)
+		vp, err := ExtractViewport(pdf.NewExtractor(r), objPDF)
 		if err != nil {
 			t.Skip("malformed viewport")
 		}
@@ -507,7 +507,7 @@ func TestExtractViewportMalformed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			vp, err := ExtractViewport(w, tt.obj)
+			vp, err := ExtractViewport(pdf.NewExtractor(w), tt.obj)
 			if tt.shouldErr {
 				if err == nil {
 					t.Error("expected error but got none")
@@ -629,7 +629,7 @@ func TestViewPortArrayEmbed(t *testing.T) {
 	}
 
 	// Extract back to verify
-	extracted, err := ExtractViewportArray(w, arr)
+	extracted, err := ExtractViewportArray(pdf.NewExtractor(w), arr)
 	if err != nil {
 		t.Fatalf("ExtractViewportArray failed: %v", err)
 	}
@@ -676,7 +676,7 @@ func TestViewPortArrayExtract(t *testing.T) {
 	arr := pdf.Array{embedded1, embedded2}
 
 	// Extract array
-	extracted, err := ExtractViewportArray(w, arr)
+	extracted, err := ExtractViewportArray(pdf.NewExtractor(w), arr)
 	if err != nil {
 		t.Fatalf("ExtractViewportArray failed: %v", err)
 	}
@@ -763,7 +763,7 @@ func TestViewPortArrayRoundTrip(t *testing.T) {
 				t.Fatalf("resource manager close failed: %v", err)
 			}
 
-			extracted, err := ExtractViewportArray(w, embedded)
+			extracted, err := ExtractViewportArray(pdf.NewExtractor(w), embedded)
 			if err != nil {
 				t.Fatalf("extract failed: %v", err)
 			}
