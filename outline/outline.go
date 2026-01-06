@@ -143,7 +143,7 @@ func readItem(r pdf.Getter, seen map[pdf.Reference]bool, ref pdf.Reference) (*It
 	count, _ := dict["Count"].(pdf.Integer)
 	item.Open = count > 0
 
-	v := r.GetMeta().Version
+	v := pdf.GetVersion(r)
 
 	x := pdf.NewExtractor(r)
 	if dict["Dest"] != nil {

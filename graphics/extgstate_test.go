@@ -278,6 +278,6 @@ func FuzzExtGStateRoundTrip(f *testing.F) {
 			t.Skip("malformed PDF object")
 		}
 
-		roundTripTest(t, r.GetMeta().Version, objGo)
+		roundTripTest(t, pdf.GetVersion(r), objGo)
 	})
 }

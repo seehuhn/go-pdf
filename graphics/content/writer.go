@@ -78,7 +78,7 @@ func (w *Writer) Write(out io.Writer, s Stream) error {
 		return err
 	}
 	for _, op := range s {
-		if err := writeOperator(out, op); err != nil {
+		if err := WriteOperator(out, op); err != nil {
 			return err
 		}
 	}
@@ -193,8 +193,8 @@ func isReservedColorSpaceName(name pdf.Name) bool {
 	return false
 }
 
-// writeOperator writes a single operator to the output.
-func writeOperator(out io.Writer, op Operator) error {
+// WriteOperator writes a single operator to the output.
+func WriteOperator(out io.Writer, op Operator) error {
 	// Handle special pseudo-operators
 	switch op.Name {
 	case OpRawContent:

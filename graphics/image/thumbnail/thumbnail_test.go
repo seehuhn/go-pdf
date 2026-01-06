@@ -438,6 +438,6 @@ func FuzzThumbnailRoundTrip(f *testing.F) {
 			t.Skip("malformed thumbnail")
 		}
 
-		roundTripThumbnail(t, r.GetMeta().Version, thumb)
+		roundTripThumbnail(t, pdf.GetVersion(r), thumb)
 	})
 }

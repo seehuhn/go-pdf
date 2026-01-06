@@ -92,5 +92,5 @@ func getVersion(fname string) (pdf.Version, error) {
 	}
 	defer r.Close()
 
-	return r.GetMeta().Version, nil
+	return pdf.GetVersion(r), nil
 }

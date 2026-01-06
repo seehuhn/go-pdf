@@ -67,15 +67,18 @@ func Form(x *pdf.Extractor, obj pdf.Object) (*form.Form, error) {
 		f.Matrix = matrix.Identity
 	}
 
-	f.Metadata, _ = metadata.Extract(x.R, dict["Metadata"])
+	// Metadata (optional)
+	if meta, err := pdf.Optional(metadata.Extract(x.R, dict["Metadata"])); err != nil {
+		return nil, err
+	} else {
+		f.Metadata = meta
+	}
 
-	// read optional PieceInfo
-	if pieceInfoObj, ok := dict["PieceInfo"]; ok {
-		var err error
-		f.PieceInfo, err = pieceinfo.Extract(x.R, pieceInfoObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to extract PieceInfo: %w", err)
-		}
+	// PieceInfo (optional)
+	if piece, err := pdf.Optional(pieceinfo.Extract(x.R, dict["PieceInfo"])); err != nil {
+		return nil, err
+	} else {
+		f.PieceInfo = piece
 	}
 
 	// LastModified (optional)

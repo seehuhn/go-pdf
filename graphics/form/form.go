@@ -179,7 +179,7 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 
-	err = content.Write(stm, f.Content, rm.Out().GetMeta().Version, content.Form, f.Res)
+	err = content.Write(stm, f.Content, pdf.GetVersion(rm.Out()), content.Form, f.Res)
 	if err != nil {
 		return nil, err
 	}

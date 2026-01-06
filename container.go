@@ -259,7 +259,7 @@ func DecodeStream(r Getter, x *Stream, numFilters int) (io.ReadCloser, error) {
 
 	v := V1_2
 	if r != nil { // TODO(voss): is r == nil still possible?
-		v = r.GetMeta().Version
+		v = GetVersion(r)
 	}
 
 	out := io.NopCloser(x.R)

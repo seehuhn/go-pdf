@@ -328,7 +328,7 @@ func FuzzViewportRoundTrip(f *testing.F) {
 		}
 
 		// Use the reader's version for round-trip
-		version := r.GetMeta().Version
+		version := pdf.GetVersion(r)
 		viewportRoundTripTest(t, version, vp)
 	})
 }

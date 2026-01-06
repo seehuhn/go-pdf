@@ -67,7 +67,7 @@ func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 	}
 	if r.ProcSet.PDF || r.ProcSet.Text || r.ProcSet.ImageB || r.ProcSet.ImageC || r.ProcSet.ImageI {
-		v := rm.Out().GetMeta().Version
+		v := pdf.GetVersion(rm.Out())
 		if v >= pdf.V2_0 {
 			return nil, fmt.Errorf("ProcSet is deprecated in PDF 2.0")
 		}

@@ -156,7 +156,7 @@ func FuzzType3Dict(f *testing.F) {
 
 		// Write the Type3Dict back to a new PDF file.
 		// Make sure we can write arbitrary Type3Dicts.
-		w, _ := memfile.NewPDFWriter(r.GetMeta().Version, nil)
+		w, _ := memfile.NewPDFWriter(pdf.GetVersion(r), nil)
 		rm := pdf.NewResourceManager(w)
 
 		fontDictRef, err := rm.Embed(d1)

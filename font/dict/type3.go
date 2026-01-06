@@ -132,7 +132,7 @@ func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	compressedRefs := []pdf.Reference{ref}
 
 	// Write CharProc streams and build the CharProcs dictionary.
-	v := w.GetMeta().Version
+	v := pdf.GetVersion(w)
 	charProcsDict := make(pdf.Dict, len(d.CharProcs))
 	for name, cp := range d.CharProcs {
 		if cp == nil {
