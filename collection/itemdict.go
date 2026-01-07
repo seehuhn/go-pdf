@@ -221,7 +221,7 @@ func embedItemValue(rm *pdf.EmbedHelper, value ItemValue) (pdf.Object, error) {
 		pdfVal = pdf.Integer(v)
 
 	case float64:
-		pdfVal = pdf.Number(v)
+		pdfVal = pdf.Real(v)
 
 	default:
 		return nil, fmt.Errorf("unsupported collection item value type: %T", value.Val)

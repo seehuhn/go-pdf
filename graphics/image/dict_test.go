@@ -485,6 +485,36 @@ var testCases = []struct {
 	},
 }
 
+// checkDictData validates that all image data in a Dict can be read.
+//
+// Image data is loaded lazily via WriteData closures that reference the
+// original PDF stream. Corrupted compressed data (e.g. bad zlib checksum)
+// is only detected when WriteData is actually called. This function forces
+// early detection before round-trip testing.
+func checkDictData(d *Dict) error {
+	if err := d.WriteData(io.Discard); err != nil {
+		return err
+	}
+	if d.SMask != nil {
+		if err := d.SMask.WriteData(io.Discard); err != nil {
+			return err
+		}
+	}
+	if d.MaskImage != nil {
+		if err := d.MaskImage.WriteData(io.Discard); err != nil {
+			return err
+		}
+	}
+	for _, alt := range d.Alternates {
+		if alt != nil {
+			if err := checkDictData(alt); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func roundTripTest(t *testing.T, version pdf.Version, data *Dict) {
 	t.Helper()
 
@@ -619,12 +649,21 @@ func FuzzDictRoundTrip(f *testing.F) {
 		}
 
 		// skip if image data cannot be read (e.g. unsupported filter)
-		if err := objGo.WriteData(io.Discard); err != nil {
+		if err := checkDictData(objGo); err != nil {
 			t.Skip("image data not readable")
 		}
 
-		// Use at least PDF 1.3 to ensure all standard features are supported
+		// Compute minimum version based on extracted object's features
 		version := max(pdf.GetVersion(r), pdf.V1_3)
+		if objGo.SMask != nil || objGo.Metadata != nil {
+			version = max(version, pdf.V1_4)
+		}
+		if objGo.SMaskInData > 0 || objGo.OptionalContent != nil || objGo.BitsPerComponent == 16 {
+			version = max(version, pdf.V1_5)
+		}
+		if objGo.PtData != nil || objGo.Measure != nil || len(objGo.AssociatedFiles) > 0 {
+			version = max(version, pdf.V2_0)
+		}
 		roundTripTest(t, version, objGo)
 	})
 }

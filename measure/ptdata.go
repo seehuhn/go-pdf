@@ -68,13 +68,13 @@ func ExtractPtData(x *pdf.Extractor, obj pdf.Object) (*PtData, error) {
 
 	ptData := &PtData{}
 
-	// Extract Subtype (required, should be "Cloud")
+	// Extract Subtype (required, only "Cloud" is valid)
 	if subtype, err := pdf.Optional(pdf.GetName(x.R, dict["Subtype"])); err != nil {
 		return nil, err
-	} else if subtype != "" {
-		ptData.Subtype = string(subtype)
-	} else {
+	} else if subtype == "" || subtype == PtDataSubtypeCloud {
 		ptData.Subtype = PtDataSubtypeCloud
+	} else {
+		return nil, pdf.Errorf("invalid point data subtype: %q", subtype)
 	}
 
 	// Extract Names (required)
@@ -98,26 +98,25 @@ func ExtractPtData(x *pdf.Extractor, obj pdf.Object) (*PtData, error) {
 	}
 
 	// Extract XPTS (required)
-	if xptsArray, err := pdf.Optional(pdf.GetArray(x.R, dict["XPTS"])); err != nil {
+	xptsArray, err := pdf.Optional(pdf.GetArray(x.R, dict["XPTS"]))
+	if err != nil {
 		return nil, err
-	} else if xptsArray != nil {
-		xpts := make([][]pdf.Object, 0, len(xptsArray))
-		expectedLen := len(ptData.Names)
-
-		for _, pointObj := range xptsArray {
-			if pointArray, err := pdf.Optional(pdf.GetArray(x.R, pointObj)); err != nil {
-				return nil, err
-			} else if pointArray != nil {
-				// Be permissive: truncate or pad to match Names length
-				point := make([]pdf.Object, expectedLen)
-				for i := 0; i < expectedLen && i < len(pointArray); i++ {
-					point[i] = pointArray[i]
-				}
-				xpts = append(xpts, point)
-			}
-		}
-		ptData.XPTS = xpts
 	}
+	xpts := make([][]pdf.Object, 0, len(xptsArray))
+	expectedLen := len(ptData.Names)
+	for _, pointObj := range xptsArray {
+		if pointArray, err := pdf.Optional(pdf.GetArray(x.R, pointObj)); err != nil {
+			return nil, err
+		} else if pointArray != nil {
+			// Be permissive: truncate or pad to match Names length
+			point := make([]pdf.Object, expectedLen)
+			for i := 0; i < expectedLen && i < len(pointArray); i++ {
+				point[i] = pointArray[i]
+			}
+			xpts = append(xpts, point)
+		}
+	}
+	ptData.XPTS = xpts
 
 	return ptData, nil
 }
@@ -153,25 +152,22 @@ func (pd *PtData) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	dict["Names"] = namesArray
 
-	// Validate and encode XPTS
-	if len(pd.XPTS) > 0 {
-		expectedLen := len(pd.Names)
-		xptsArray := make(pdf.Array, len(pd.XPTS))
-
-		for i, point := range pd.XPTS {
-			if len(point) != expectedLen {
-				return nil, pdf.Errorf("XPTS point %d has %d elements, expected %d", i, len(point), expectedLen)
-			}
-
-			pointArray := make(pdf.Array, len(point))
-			copy(pointArray, point)
-			xptsArray[i] = pointArray
-		}
-		dict["XPTS"] = xptsArray
-	} else {
-		// Empty XPTS array is valid
-		dict["XPTS"] = pdf.Array{}
+	// Validate and encode XPTS (required)
+	if pd.XPTS == nil {
+		return nil, pdf.Error("missing XPTS field")
 	}
+	expectedLen := len(pd.Names)
+	xptsArray := make(pdf.Array, len(pd.XPTS))
+	for i, point := range pd.XPTS {
+		if len(point) != expectedLen {
+			return nil, pdf.Errorf("XPTS point %d has %d elements, expected %d", i, len(point), expectedLen)
+		}
+
+		pointArray := make(pdf.Array, len(point))
+		copy(pointArray, point)
+		xptsArray[i] = pointArray
+	}
+	dict["XPTS"] = xptsArray
 
 	if pd.SingleUse {
 		return dict, nil

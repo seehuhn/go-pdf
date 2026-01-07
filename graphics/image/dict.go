@@ -315,7 +315,6 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	if alts, err := pdf.Optional(x.GetArray(dict["Alternates"])); err != nil {
 		return nil, err
 	} else if alts != nil {
-		img.Alternates = make([]*Dict, len(alts))
 		for i, altObj := range alts {
 			altDict, err := pdf.ExtractorGetOptional(x, altObj, ExtractDict)
 			if err != nil {
@@ -323,8 +322,8 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 			}
 			if altDict != nil {
 				altDict.Alternates = nil
+				img.Alternates = append(img.Alternates, altDict)
 			}
-			img.Alternates[i] = altDict
 		}
 	}
 
@@ -597,13 +596,18 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if len(d.Alternates) > 0 {
 		var alts pdf.Array
 		for _, alt := range d.Alternates {
+			if alt == nil {
+				continue
+			}
 			ref, err := rm.Embed(alt)
 			if err != nil {
 				return nil, err
 			}
 			alts = append(alts, ref)
 		}
-		dict["Alternates"] = alts
+		if len(alts) > 0 {
+			dict["Alternates"] = alts
+		}
 	}
 
 	// Handle SMask/SMaskInData (mutually exclusive)
@@ -804,7 +808,7 @@ func (d *Dict) check(out *pdf.Writer) error {
 			return err
 		}
 		for _, alt := range d.Alternates {
-			if len(alt.Alternates) > 0 {
+			if alt != nil && len(alt.Alternates) > 0 {
 				return errors.New("alternates of alternates not allowed")
 			}
 		}
