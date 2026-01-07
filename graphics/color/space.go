@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
@@ -221,9 +222,9 @@ func ExtractSpace(x *pdf.Extractor, desc pdf.Object) (Space, error) {
 		}
 
 		res = &SpaceSeparation{
-			colorant:  colorant,
-			alternate: alternate,
-			trfm:      trfm,
+			Colorant:  colorant,
+			Alternate: alternate,
+			Transform: trfm,
 		}
 
 	case FamilyDeviceN:
@@ -260,10 +261,10 @@ func ExtractSpace(x *pdf.Extractor, desc pdf.Object) (Space, error) {
 		}
 
 		res = &SpaceDeviceN{
-			colorants: colorants,
-			alternate: alternate,
-			trfm:      trfm,
-			attr:      attr,
+			Colorants:  colorants,
+			Alternate:  alternate,
+			Transform:  trfm,
+			Attributes: attr,
 		}
 
 	case "CalCMYK": // deprecated
@@ -517,17 +518,17 @@ func SpacesEqual(a, b Space) bool {
 
 	case *SpaceSeparation:
 		if vb, ok := b.(*SpaceSeparation); ok {
-			return va.colorant == vb.colorant &&
-				SpacesEqual(va.alternate, vb.alternate) &&
-				function.Equal(va.trfm, vb.trfm)
+			return va.Colorant == vb.Colorant &&
+				SpacesEqual(va.Alternate, vb.Alternate) &&
+				function.Equal(va.Transform, vb.Transform)
 		}
 
 	case *SpaceDeviceN:
 		if vb, ok := b.(*SpaceDeviceN); ok {
-			return pdf.NearlyEqual(va.colorants, vb.colorants, floatEpsilon) &&
-				SpacesEqual(va.alternate, vb.alternate) &&
-				function.Equal(va.trfm, vb.trfm) &&
-				pdf.NearlyEqual(va.attr, vb.attr, floatEpsilon)
+			return slices.Equal(va.Colorants, vb.Colorants) &&
+				SpacesEqual(va.Alternate, vb.Alternate) &&
+				function.Equal(va.Transform, vb.Transform) &&
+				pdf.NearlyEqual(va.Attributes, vb.Attributes, floatEpsilon)
 		}
 
 	case spacePatternUncolored:

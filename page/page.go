@@ -23,7 +23,9 @@ import (
 	"time"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/action/triggers"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/graphics/group"
@@ -31,6 +33,8 @@ import (
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/page/boxcolor"
+	"seehuhn.de/go/pdf/page/navnode"
+	"seehuhn.de/go/pdf/page/separation"
 	"seehuhn.de/go/pdf/page/transition"
 	"seehuhn.de/go/pdf/pieceinfo"
 )
@@ -105,8 +109,8 @@ type Page struct {
 	// Annots (optional) lists annotations associated with the page.
 	Annots []annotation.Annotation
 
-	// AA (optional) defines actions for page open/close events.
-	AA pdf.Object // TODO: additional-actions dictionary
+	// AA (optional) defines additional actions for page open/close events.
+	AA *triggers.Page
 
 	// Metadata (optional) is a metadata stream for the page.
 	Metadata *metadata.Stream
@@ -129,8 +133,9 @@ type Page struct {
 	// PZ (optional) is the preferred zoom factor for the page.
 	PZ float64
 
-	// SeparationInfo (optional) contains color separation information.
-	SeparationInfo pdf.Object // TODO: separation dictionary
+	// SeparationInfo (optional) contains color separation information
+	// for preseparated PDF files (deprecated with PDF 2.0).
+	SeparationInfo *separation.Dict
 
 	// Tabs (optional) specifies the tab order for annotations.
 	// Values: R (row), C (column), S (structure), A (array order; PDF 2.0),
@@ -141,18 +146,22 @@ type Page struct {
 	// object, if this page was created from one.
 	TemplateInstantiated pdf.Name
 
-	// PresSteps (optional) is the first navigation node on the page.
-	PresSteps pdf.Object // TODO: navigation node dictionary
+	// PresSteps (optional) is the list of navigation nodes for sub-page navigation.
+	// Navigation nodes allow navigating between different states of the same page
+	// during presentations (PDF 1.5).
+	PresSteps []*navnode.Node
 
 	// UserUnit (optional) is the size of user space units in multiples of
-	// 1/72 inch. Default: 1.0. When writing, 0 is treated as 1.0.
+	// 1/72 inch.
+	//
+	// When writing, 0 is treated as 1.0.
 	UserUnit float64
 
 	// VP (optional) specifies rectangular viewport regions of the page.
 	VP pdf.Object // TODO: array of viewport dictionaries
 
 	// AF (optional; PDF 2.0) lists associated files for this page.
-	AF pdf.Object // TODO: array of file specification dictionaries
+	AF []*file.Specification
 
 	// OutputIntents (optional; PDF 2.0) specifies color characteristics
 	// for output devices.
@@ -322,10 +331,13 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// AA
 	if p.AA != nil {
-		if err := pdf.CheckVersion(w, "AA", pdf.V1_2); err != nil {
+		obj, err := p.AA.Encode(rm)
+		if err != nil {
 			return nil, err
 		}
-		dict["AA"] = p.AA
+		if obj != nil {
+			dict["AA"] = obj
+		}
 	}
 
 	// Metadata
@@ -392,10 +404,11 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// SeparationInfo
 	if p.SeparationInfo != nil {
-		if err := pdf.CheckVersion(w, "SeparationInfo", pdf.V1_3); err != nil {
+		sepObj, err := p.SeparationInfo.Encode(rm)
+		if err != nil {
 			return nil, err
 		}
-		dict["SeparationInfo"] = p.SeparationInfo
+		dict["SeparationInfo"] = sepObj
 	}
 
 	// Tabs (R, C, S for PDF 1.5+; A, W for PDF 2.0+)
@@ -425,11 +438,12 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// PresSteps
-	if p.PresSteps != nil {
-		if err := pdf.CheckVersion(w, "PresSteps", pdf.V1_5); err != nil {
-			return nil, err
+	if len(p.PresSteps) > 0 {
+		presSteps, err := navnode.Encode(rm, p.PresSteps)
+		if err != nil {
+			return nil, pdf.Wrap(err, "PresSteps")
 		}
-		dict["PresSteps"] = p.PresSteps
+		dict["PresSteps"] = presSteps
 	}
 
 	// UserUnit (0 is shorthand for 1.0; must be positive)
@@ -452,11 +466,33 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// AF
-	if p.AF != nil {
-		if err := pdf.CheckVersion(w, "AF", pdf.V2_0); err != nil {
+	if len(p.AF) > 0 {
+		if err := pdf.CheckVersion(w, "page AF entry", pdf.V2_0); err != nil {
 			return nil, err
 		}
-		dict["AF"] = p.AF
+
+		// validate each file specification can be used as associated file
+		for i, spec := range p.AF {
+			if spec == nil {
+				continue
+			}
+			if err := spec.CanBeAF(v); err != nil {
+				return nil, fmt.Errorf("AF[%d]: %w", i, err)
+			}
+		}
+
+		// embed the file specifications
+		var afArray pdf.Array
+		for _, spec := range p.AF {
+			if spec != nil {
+				embedded, err := rm.Embed(spec)
+				if err != nil {
+					return nil, err
+				}
+				afArray = append(afArray, embedded)
+			}
+		}
+		dict["AF"] = afArray
 	}
 
 	// OutputIntents
@@ -637,7 +673,11 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	// AA (optional)
-	p.AA = dict["AA"]
+	if aa, err := triggers.DecodePage(x, dict["AA"]); err != nil {
+		return nil, err
+	} else {
+		p.AA = aa
+	}
 
 	// Metadata (optional)
 	if meta, err := pdf.Optional(metadata.Extract(x.R, dict["Metadata"])); err != nil {
@@ -684,7 +724,13 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	// SeparationInfo (optional)
-	p.SeparationInfo = dict["SeparationInfo"]
+	if dict["SeparationInfo"] != nil {
+		sep, err := separation.Decode(x, dict["SeparationInfo"])
+		if err != nil {
+			return nil, err
+		}
+		p.SeparationInfo = sep
+	}
 
 	// Tabs (optional; only accept valid values)
 	if tabs, err := pdf.Optional(x.GetName(dict["Tabs"])); err != nil {
@@ -706,7 +752,11 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	// PresSteps (optional)
-	p.PresSteps = dict["PresSteps"]
+	if presSteps, err := navnode.Decode(x, dict["PresSteps"]); err != nil {
+		return nil, pdf.Wrap(err, "PresSteps")
+	} else {
+		p.PresSteps = presSteps
+	}
 
 	// UserUnit (optional; default 1.0)
 	if userUnit, err := pdf.Optional(x.GetNumber(dict["UserUnit"])); err != nil {
@@ -721,7 +771,18 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	p.VP = dict["VP"]
 
 	// AF (optional)
-	p.AF = dict["AF"]
+	if afArray, err := pdf.Optional(x.GetArray(dict["AF"])); err != nil {
+		return nil, err
+	} else if afArray != nil {
+		p.AF = make([]*file.Specification, 0, len(afArray))
+		for _, afObj := range afArray {
+			if spec, err := pdf.ExtractorGetOptional(x, afObj, file.ExtractSpecification); err != nil {
+				return nil, err
+			} else if spec != nil {
+				p.AF = append(p.AF, spec)
+			}
+		}
+	}
 
 	// OutputIntents (optional)
 	p.OutputIntents = dict["OutputIntents"]

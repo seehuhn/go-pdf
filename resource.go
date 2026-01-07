@@ -325,7 +325,7 @@ func ExtractorGet[T any](x *Extractor, obj Object, extract func(*Extractor, Obje
 	return res, nil
 }
 
-func ExtractorGetOptional[T Embedder](x *Extractor, obj Object, extract func(*Extractor, Object) (T, error)) (T, error) {
+func ExtractorGetOptional[T any](x *Extractor, obj Object, extract func(*Extractor, Object) (T, error)) (T, error) {
 	return Optional(ExtractorGet(x, obj, extract))
 }
 

@@ -20,13 +20,14 @@ package action
 
 import (
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/page/transition"
 )
 
 // Trans represents a transition action that updates the display using
 // a transition dictionary.
 type Trans struct {
 	// Trans is the transition dictionary.
-	Trans pdf.Dict
+	Trans *transition.Transition
 
 	// Next is the sequence of actions to perform after this action.
 	Next ActionList
@@ -44,9 +45,14 @@ func (a *Trans) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, pdf.Error("Trans action must have Trans entry")
 	}
 
+	transObj, err := rm.Embed(a.Trans)
+	if err != nil {
+		return nil, err
+	}
+
 	dict := pdf.Dict{
 		"S":     pdf.Name(TypeTrans),
-		"Trans": a.Trans,
+		"Trans": transObj,
 	}
 
 	if next, err := a.Next.Encode(rm); err != nil {
@@ -59,7 +65,7 @@ func (a *Trans) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeTrans(x *pdf.Extractor, dict pdf.Dict) (*Trans, error) {
-	trans, err := x.GetDict(dict["Trans"])
+	trans, err := transition.Extract(x, dict["Trans"])
 	if err != nil {
 		return nil, err
 	}

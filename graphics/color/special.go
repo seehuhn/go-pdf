@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 )
@@ -148,11 +149,33 @@ func (c colorIndexed) ColorSpace() Space {
 
 // == Separation =============================================================
 
-// SpaceSeparation represents a separation color space.
+// SpaceSeparation represents a Separation color space.
+//
+// A Separation color space provides a means for specifying the use of
+// additional colorants or for isolating the control of individual color
+// components of a device color space for a subtractive device.
+//
+// Use the [Separation] function to create a new Separation color space.
+//
+// See section 8.6.6.4 of ISO 32000-2:2020.
 type SpaceSeparation struct {
-	colorant  pdf.Name
-	alternate Space
-	trfm      pdf.Function
+	// Colorant specifies the name of the colorant that this Separation
+	// color space represents. This can be any name, including the special
+	// names All (all device colorants) and None (no visible output).
+	// The names Cyan, Magenta, Yellow, and Black are reserved for the
+	// components of a CMYK process color space.
+	Colorant pdf.Name
+
+	// Alternate is the alternate color space used when the device does
+	// not have a colorant corresponding to Colorant. It may be any device
+	// or CIE-based color space but not a special color space (Pattern,
+	// Indexed, Separation, or DeviceN).
+	Alternate Space
+
+	// Transform is a function that maps tint values (0.0 to 1.0) to color
+	// component values in the alternate color space. A tint of 0.0 produces
+	// the lightest color (no colorant); 1.0 produces the darkest (full colorant).
+	Transform pdf.Function
 }
 
 // Separation returns a new separation color space.
@@ -167,9 +190,9 @@ func Separation(colorant pdf.Name, alternate Space, trfm pdf.Function) (*SpaceSe
 	}
 
 	return &SpaceSeparation{
-		colorant:  colorant,
-		alternate: alternate,
-		trfm:      trfm,
+		Colorant:  colorant,
+		Alternate: alternate,
+		Transform: trfm,
 	}, nil
 }
 
@@ -193,16 +216,16 @@ func (s *SpaceSeparation) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 
-	alt, err := rm.Embed(s.alternate)
+	alt, err := rm.Embed(s.Alternate)
 	if err != nil {
 		return nil, err
 	}
-	trfm, err := rm.Embed(s.trfm)
+	trfm, err := rm.Embed(s.Transform)
 	if err != nil {
 		return nil, err
 	}
 
-	return pdf.Array{FamilySeparation, s.colorant, alt, trfm}, nil
+	return pdf.Array{FamilySeparation, s.Colorant, alt, trfm}, nil
 }
 
 // New returns a new color in the separation color space.
@@ -231,13 +254,35 @@ func (c colorSeparation) ColorSpace() Space {
 
 // SpaceDeviceN represents a DeviceN color space.
 //
-// See section 8.6.6.5 (DeviceN Color Spaces) of PDF 32000-1:2008 for details:
-// https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf#page=167
+// DeviceN color spaces may contain an arbitrary number of color components,
+// providing greater flexibility than standard device color spaces or individual
+// Separation color spaces. They are used for high-fidelity color (e.g., PANTONE
+// Hexachrome with six colorants) and multitone color systems (e.g., duotone).
+//
+// Use the [DeviceN] function to create a new DeviceN color space.
+//
+// See section 8.6.6.5 of ISO 32000-2:2020.
 type SpaceDeviceN struct {
-	colorants pdf.Array
-	alternate Space
-	trfm      pdf.Function
-	attr      pdf.Dict
+	// Colorants specifies the names of the individual color components.
+	// Names must be unique except for "None" which may repeat.
+	// The special name "All" is not allowed. The names "Cyan", "Magenta",
+	// "Yellow", and "Black" are reserved for CMYK process colorants.
+	Colorants []pdf.Name
+
+	// Alternate is the alternate color space used when any colorant is not
+	// available on the device. It may be any device or CIE-based color space
+	// but not a special color space (Pattern, Indexed, Separation, or DeviceN).
+	Alternate Space
+
+	// Transform is a function that maps n tint values (one per colorant) to
+	// m color component values in the alternate color space. Tint values range
+	// from 0.0 (minimum/no colorant) to 1.0 (maximum/full colorant).
+	Transform pdf.Function
+
+	// Attributes is an optional dictionary containing additional information
+	// about the color space components (Subtype, Colorants, Process, MixingHints).
+	// If Subtype is "NChannel", additional entries are required.
+	Attributes pdf.Dict
 }
 
 // DeviceN returns a new DeviceN color space.
@@ -246,9 +291,8 @@ type SpaceDeviceN struct {
 // alternate color space, tint transformation function, and attributes
 // dictionary (optional).
 func DeviceN(names []pdf.Name, alternate Space, trfm pdf.Function, attr pdf.Dict) (*SpaceDeviceN, error) {
-	namesArray := make(pdf.Array, len(names))
 	seen := make(map[pdf.Name]bool)
-	for i, name := range names {
+	for _, name := range names {
 		if name == "None" {
 			continue
 		}
@@ -259,7 +303,6 @@ func DeviceN(names []pdf.Name, alternate Space, trfm pdf.Function, attr pdf.Dict
 			return nil, errors.New("DeviceN: duplicate colorant name")
 		}
 		seen[name] = true
-		namesArray[i] = name
 	}
 
 	if alternate == nil || IsSpecial(alternate) {
@@ -287,10 +330,10 @@ func DeviceN(names []pdf.Name, alternate Space, trfm pdf.Function, attr pdf.Dict
 	}
 
 	return &SpaceDeviceN{
-		colorants: namesArray,
-		alternate: alternate,
-		trfm:      trfm,
-		attr:      attr,
+		Colorants:  slices.Clone(names),
+		Alternate:  alternate,
+		Transform:  trfm,
+		Attributes: attr,
 	}, nil
 }
 
@@ -302,7 +345,7 @@ func (s *SpaceDeviceN) Family() pdf.Name {
 
 // Channels returns the dimensionality of the color space.
 func (s *SpaceDeviceN) Channels() int {
-	return len(s.colorants)
+	return len(s.Colorants)
 }
 
 // Embed adds the color space to a PDF file.
@@ -313,31 +356,36 @@ func (s *SpaceDeviceN) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 
-	alt, err := rm.Embed(s.alternate)
+	alt, err := rm.Embed(s.Alternate)
 	if err != nil {
 		return nil, err
 	}
 
-	trfm, err := rm.Embed(s.trfm)
+	trfm, err := rm.Embed(s.Transform)
 	if err != nil {
 		return nil, err
+	}
+
+	names := make(pdf.Array, len(s.Colorants))
+	for i, name := range s.Colorants {
+		names[i] = name
 	}
 
 	var res pdf.Array
-	if s.attr == nil {
+	if s.Attributes == nil {
 		res = pdf.Array{
 			FamilyDeviceN,
-			s.colorants,
+			names,
 			alt,
 			trfm,
 		}
 	} else {
 		res = pdf.Array{
 			FamilyDeviceN,
-			s.colorants,
+			names,
 			alt,
 			trfm,
-			s.attr,
+			s.Attributes,
 		}
 	}
 	return res, nil

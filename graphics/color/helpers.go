@@ -22,12 +22,12 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-func getNames(r pdf.Getter, obj pdf.Object) (pdf.Array, error) {
+func getNames(r pdf.Getter, obj pdf.Object) ([]pdf.Name, error) {
 	a, err := pdf.GetArray(r, obj)
 	if err != nil {
 		return nil, err
 	}
-	res := make(pdf.Array, len(a))
+	res := make([]pdf.Name, len(a))
 	for i, obj := range a {
 		name, err := pdf.GetName(r, obj)
 		if err != nil {
