@@ -26,10 +26,12 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/extract"
+	"seehuhn.de/go/pdf/graphics/group"
 	"seehuhn.de/go/pdf/graphics/image/thumbnail"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/page/boxcolor"
+	"seehuhn.de/go/pdf/page/transition"
 	"seehuhn.de/go/pdf/pieceinfo"
 )
 
@@ -78,23 +80,27 @@ type Page struct {
 	Rotate int
 
 	// Group (optional) specifies transparency group attributes for the page.
-	Group pdf.Object // TODO: implement transparency group type
+	Group *group.TransparencyAttributes
 
 	// Thumbnail (optional) is a thumbnail image for the page.
 	//
-	// This corresponds to the /Thumbnail entry in the PDF dictionary.
+	// This corresponds to the /Thumb entry in the PDF dictionary.
 	Thumbnail *thumbnail.Thumbnail
 
-	// B (optional) lists article beads on the page, in reading order.
-	B []pdf.Reference
+	// ArticleBeads (optional) lists article beads on the page, in reading order.
+	//
+	// This corresponds to the /B entry in the PDF dictionary.
+	ArticleBeads []pdf.Reference
 
 	// Duration (optional) is the display duration in seconds for presentations.
 	//
-	// This corresponds to the /Duration entry in the PDF dictionary.
+	// This corresponds to the /Dur entry in the PDF dictionary.
 	Duration float64
 
-	// Trans (optional) describes the transition effect for presentations.
-	Trans pdf.Object // TODO: transition dictionary
+	// Transition (optional) describes the transition effect for presentations.
+	//
+	// This corresponds to the /Trans entry in the PDF dictionary.
+	Transition *transition.Transition
 
 	// Annots (optional) lists annotations associated with the page.
 	Annots []annotation.Annotation
@@ -256,10 +262,11 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// Group
 	if p.Group != nil {
-		if err := pdf.CheckVersion(w, "Group", pdf.V1_4); err != nil {
+		groupObj, err := rm.Embed(p.Group)
+		if err != nil {
 			return nil, err
 		}
-		dict["Group"] = p.Group
+		dict["Group"] = groupObj
 	}
 
 	// Thumb
@@ -272,12 +279,12 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// B (article beads)
-	if len(p.B) > 0 {
+	if len(p.ArticleBeads) > 0 {
 		if err := pdf.CheckVersion(w, "B", pdf.V1_1); err != nil {
 			return nil, err
 		}
-		arr := make(pdf.Array, len(p.B))
-		for i, ref := range p.B {
+		arr := make(pdf.Array, len(p.ArticleBeads))
+		for i, ref := range p.ArticleBeads {
 			arr[i] = ref
 		}
 		dict["B"] = arr
@@ -292,11 +299,12 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Trans
-	if p.Trans != nil {
-		if err := pdf.CheckVersion(w, "Trans", pdf.V1_1); err != nil {
+	if p.Transition != nil {
+		transObj, err := rm.Embed(p.Transition)
+		if err != nil {
 			return nil, err
 		}
-		dict["Trans"] = p.Trans
+		dict["Trans"] = transObj
 	}
 
 	// Annots
@@ -572,7 +580,13 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	// Group (optional)
-	p.Group = dict["Group"]
+	if dict["Group"] != nil {
+		grp, err := group.ExtractTransparencyAttributes(x, dict["Group"])
+		if err != nil {
+			return nil, err
+		}
+		p.Group = grp
+	}
 
 	// Thumb (optional)
 	if thumb, err := pdf.ExtractorGetOptional(x, dict["Thumb"], thumbnail.ExtractThumbnail); err != nil {
@@ -587,7 +601,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	} else if bArray != nil {
 		for _, item := range bArray {
 			if ref, ok := item.(pdf.Reference); ok {
-				p.B = append(p.B, ref)
+				p.ArticleBeads = append(p.ArticleBeads, ref)
 			}
 		}
 	}
@@ -600,7 +614,13 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	// Trans (optional)
-	p.Trans = dict["Trans"]
+	if dict["Trans"] != nil {
+		trans, err := transition.Extract(x, dict["Trans"])
+		if err != nil {
+			return nil, err
+		}
+		p.Transition = trans
+	}
 
 	// Annots (optional)
 	if annotsArray, err := pdf.Optional(x.GetArray(dict["Annots"])); err != nil {

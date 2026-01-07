@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/page/boxcolor"
 )
 
 func main() {
@@ -44,24 +45,17 @@ func doit() error {
 	page.PageDict["TrimBox"] = &pdf.Rectangle{LLx: 100, LLy: 100, URx: 500, URy: 500}
 	page.PageDict["BleedBox"] = &pdf.Rectangle{LLx: 85, LLy: 85, URx: 515, URy: 515}
 	page.PageDict["ArtBox"] = &pdf.Rectangle{LLx: 150, LLy: 150, URx: 450, URy: 450}
-	page.PageDict["BoxColorInfo"] = pdf.Dict{
-		"CropBox": pdf.Dict{
-			"C": pdf.Array{pdf.Real(0.4), pdf.Real(0), pdf.Real(0.8)}, // purple
-			"W": pdf.Integer(2),
-		},
-		"TrimBox": pdf.Dict{
-			"C": pdf.Array{pdf.Real(0.8), pdf.Real(0.4), pdf.Real(0)}, // orange
-			"W": pdf.Integer(2),
-		},
-		"BleedBox": pdf.Dict{
-			"C": pdf.Array{pdf.Real(0), pdf.Real(0), pdf.Real(0.8)}, // blue
-			"W": pdf.Integer(2),
-		},
-		"ArtBox": pdf.Dict{
-			"C": pdf.Array{pdf.Real(0), pdf.Real(0.8), pdf.Real(0)}, // green
-			"W": pdf.Integer(2),
-		},
+	boxColorInfo := &boxcolor.Info{
+		CropBox:  &boxcolor.Style{Color: color.DeviceRGB{0.4, 0, 0.8}, LineWidth: 2}, // purple
+		TrimBox:  &boxcolor.Style{Color: color.DeviceRGB{0.8, 0.4, 0}, LineWidth: 2}, // orange
+		BleedBox: &boxcolor.Style{Color: color.DeviceRGB{0, 0, 0.8}, LineWidth: 2},   // blue
+		ArtBox:   &boxcolor.Style{Color: color.DeviceRGB{0, 0.8, 0}, LineWidth: 2},   // green
 	}
+	boxColorObj, err := page.RM.Embed(boxColorInfo)
+	if err != nil {
+		return err
+	}
+	page.PageDict["BoxColorInfo"] = boxColorObj
 
 	F := standard.Helvetica.New()
 	geom := F.GetGeometry()
