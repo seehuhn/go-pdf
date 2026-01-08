@@ -22,6 +22,8 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// PDF 2.0 sections: 12.5.2
+
 // Border represents the characteristics of an annotation's border.
 type Border struct {
 	// HCornerRadius is the horizontal corner radius.
@@ -107,7 +109,6 @@ func ExtractBorder(r pdf.Getter, obj pdf.Object) (*Border, error) {
 }
 
 func (b *Border) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	// the Go default value is "no border"
 	if b == nil {
 		return pdf.Array{pdf.Number(0), pdf.Number(0), pdf.Number(0)}, nil

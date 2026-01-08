@@ -24,7 +24,9 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/function"
+	"seehuhn.de/go/pdf/graphics/blend"
 	"seehuhn.de/go/pdf/graphics/halftone"
+	"seehuhn.de/go/pdf/graphics/state"
 	"seehuhn.de/go/pdf/graphics/transfer"
 )
 
@@ -41,7 +43,7 @@ var FontExtractFunc func(x *pdf.Extractor, obj pdf.Object) (font.Instance, error
 // ExtGState struct, for example colors, cannot be controlled using an extended
 // graphics state.
 type ExtGState struct {
-	Set StateBits
+	Set state.Bits
 
 	TextFont               font.Instance
 	TextFontSize           float64
@@ -54,7 +56,7 @@ type ExtGState struct {
 	DashPhase              float64
 	RenderingIntent        RenderingIntent
 	StrokeAdjustment       bool
-	BlendMode              pdf.Object
+	BlendMode              blend.Mode
 	SoftMask               pdf.Object
 	StrokeAlpha            float64
 	FillAlpha              float64
@@ -107,73 +109,73 @@ func (e *ExtGState) Equal(other *ExtGState) bool {
 
 	set := e.Set
 
-	if set&StateTextFont != 0 {
+	if set&state.TextFont != 0 {
 		if !font.InstancesEqual(e.TextFont, other.TextFont) ||
 			e.TextFontSize != other.TextFontSize {
 			return false
 		}
 	}
-	if set&StateTextKnockout != 0 && e.TextKnockout != other.TextKnockout {
+	if set&state.TextKnockout != 0 && e.TextKnockout != other.TextKnockout {
 		return false
 	}
-	if set&StateLineWidth != 0 && e.LineWidth != other.LineWidth {
+	if set&state.LineWidth != 0 && e.LineWidth != other.LineWidth {
 		return false
 	}
-	if set&StateLineCap != 0 && e.LineCap != other.LineCap {
+	if set&state.LineCap != 0 && e.LineCap != other.LineCap {
 		return false
 	}
-	if set&StateLineJoin != 0 && e.LineJoin != other.LineJoin {
+	if set&state.LineJoin != 0 && e.LineJoin != other.LineJoin {
 		return false
 	}
-	if set&StateMiterLimit != 0 && e.MiterLimit != other.MiterLimit {
+	if set&state.MiterLimit != 0 && e.MiterLimit != other.MiterLimit {
 		return false
 	}
-	if set&StateLineDash != 0 {
+	if set&state.LineDash != 0 {
 		if !slices.Equal(e.DashPattern, other.DashPattern) ||
 			e.DashPhase != other.DashPhase {
 			return false
 		}
 	}
-	if set&StateRenderingIntent != 0 && e.RenderingIntent != other.RenderingIntent {
+	if set&state.RenderingIntent != 0 && e.RenderingIntent != other.RenderingIntent {
 		return false
 	}
-	if set&StateStrokeAdjustment != 0 && e.StrokeAdjustment != other.StrokeAdjustment {
+	if set&state.StrokeAdjustment != 0 && e.StrokeAdjustment != other.StrokeAdjustment {
 		return false
 	}
-	if set&StateBlendMode != 0 && !pdf.Equal(e.BlendMode, other.BlendMode) {
+	if set&state.BlendMode != 0 && !e.BlendMode.Equal(other.BlendMode) {
 		return false
 	}
-	if set&StateSoftMask != 0 && !pdf.Equal(e.SoftMask, other.SoftMask) {
+	if set&state.SoftMask != 0 && !pdf.Equal(e.SoftMask, other.SoftMask) {
 		return false
 	}
-	if set&StateStrokeAlpha != 0 && e.StrokeAlpha != other.StrokeAlpha {
+	if set&state.StrokeAlpha != 0 && e.StrokeAlpha != other.StrokeAlpha {
 		return false
 	}
-	if set&StateFillAlpha != 0 && e.FillAlpha != other.FillAlpha {
+	if set&state.FillAlpha != 0 && e.FillAlpha != other.FillAlpha {
 		return false
 	}
-	if set&StateAlphaSourceFlag != 0 && e.AlphaSourceFlag != other.AlphaSourceFlag {
+	if set&state.AlphaSourceFlag != 0 && e.AlphaSourceFlag != other.AlphaSourceFlag {
 		return false
 	}
-	if set&StateBlackPointCompensation != 0 && e.BlackPointCompensation != other.BlackPointCompensation {
+	if set&state.BlackPointCompensation != 0 && e.BlackPointCompensation != other.BlackPointCompensation {
 		return false
 	}
-	if set&StateOverprint != 0 {
+	if set&state.Overprint != 0 {
 		if e.OverprintStroke != other.OverprintStroke ||
 			e.OverprintFill != other.OverprintFill {
 			return false
 		}
 	}
-	if set&StateOverprintMode != 0 && e.OverprintMode != other.OverprintMode {
+	if set&state.OverprintMode != 0 && e.OverprintMode != other.OverprintMode {
 		return false
 	}
-	if set&StateBlackGeneration != 0 && !function.Equal(e.BlackGeneration, other.BlackGeneration) {
+	if set&state.BlackGeneration != 0 && !function.Equal(e.BlackGeneration, other.BlackGeneration) {
 		return false
 	}
-	if set&StateUndercolorRemoval != 0 && !function.Equal(e.UndercolorRemoval, other.UndercolorRemoval) {
+	if set&state.UndercolorRemoval != 0 && !function.Equal(e.UndercolorRemoval, other.UndercolorRemoval) {
 		return false
 	}
-	if set&StateTransferFunction != 0 {
+	if set&state.TransferFunction != 0 {
 		if !function.Equal(e.TransferFunction.Red, other.TransferFunction.Red) ||
 			!function.Equal(e.TransferFunction.Green, other.TransferFunction.Green) ||
 			!function.Equal(e.TransferFunction.Blue, other.TransferFunction.Blue) ||
@@ -181,7 +183,7 @@ func (e *ExtGState) Equal(other *ExtGState) bool {
 			return false
 		}
 	}
-	if set&StateHalftone != 0 {
+	if set&state.Halftone != 0 {
 		// Compare halftones by type and transfer function
 		if (e.Halftone == nil) != (other.Halftone == nil) {
 			return false
@@ -195,16 +197,16 @@ func (e *ExtGState) Equal(other *ExtGState) bool {
 			}
 		}
 	}
-	if set&StateHalftoneOrigin != 0 {
+	if set&state.HalftoneOrigin != 0 {
 		if e.HalftoneOriginX != other.HalftoneOriginX ||
 			e.HalftoneOriginY != other.HalftoneOriginY {
 			return false
 		}
 	}
-	if set&StateFlatnessTolerance != 0 && e.FlatnessTolerance != other.FlatnessTolerance {
+	if set&state.FlatnessTolerance != 0 && e.FlatnessTolerance != other.FlatnessTolerance {
 		return false
 	}
-	if set&StateSmoothnessTolerance != 0 && e.SmoothnessTolerance != other.SmoothnessTolerance {
+	if set&state.SmoothnessTolerance != 0 && e.SmoothnessTolerance != other.SmoothnessTolerance {
 		return false
 	}
 
@@ -220,7 +222,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 	}
 
 	res := &ExtGState{}
-	var set StateBits
+	var set state.Bits
 	var overprintFillSet bool
 	var bg1, bg2 pdf.Object
 	var ucr1, ucr2 pdf.Object
@@ -264,7 +266,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 
 			res.TextFont = F
 			res.TextFontSize = size
-			set |= StateTextFont
+			set |= state.TextFont
 		case "TK":
 			val, err := x.GetBoolean(v)
 			if pdf.IsMalformed(err) {
@@ -273,7 +275,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				return nil, err
 			}
 			res.TextKnockout = bool(val)
-			set |= StateTextKnockout
+			set |= state.TextKnockout
 		case "LW":
 			lw, err := x.GetNumber(v)
 			if pdf.IsMalformed(err) {
@@ -282,7 +284,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				return nil, err
 			}
 			res.LineWidth = lw
-			set |= StateLineWidth
+			set |= state.LineWidth
 		case "LC":
 			lineCap, err := x.GetInteger(v)
 			if pdf.IsMalformed(err) {
@@ -296,7 +298,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				lineCap = 2
 			}
 			res.LineCap = LineCapStyle(lineCap)
-			set |= StateLineCap
+			set |= state.LineCap
 		case "LJ":
 			lineJoin, err := x.GetInteger(v)
 			if pdf.IsMalformed(err) {
@@ -310,7 +312,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				lineJoin = 2
 			}
 			res.LineJoin = LineJoinStyle(lineJoin)
-			set |= StateLineJoin
+			set |= state.LineJoin
 		case "ML":
 			miterLimit, err := x.GetNumber(v)
 			if pdf.IsMalformed(err) {
@@ -322,7 +324,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				miterLimit = 1
 			}
 			res.MiterLimit = miterLimit
-			set |= StateMiterLimit
+			set |= state.MiterLimit
 		case "D":
 			dashPattern, phase, err := readDash(x.R, v)
 			if err != nil {
@@ -330,7 +332,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 			} else if dashPattern != nil {
 				res.DashPattern = dashPattern
 				res.DashPhase = phase
-				set |= StateLineDash
+				set |= state.LineDash
 			}
 		case "RI":
 			ri, err := x.GetName(v)
@@ -340,7 +342,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				return nil, err
 			}
 			res.RenderingIntent = RenderingIntent(ri)
-			set |= StateRenderingIntent
+			set |= state.RenderingIntent
 		case "SA":
 			val, err := x.GetBoolean(v)
 			if pdf.IsMalformed(err) {
@@ -349,13 +351,21 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				return nil, err
 			}
 			res.StrokeAdjustment = bool(val)
-			set |= StateStrokeAdjustment
+			set |= state.StrokeAdjustment
 		case "BM":
-			res.BlendMode = v
-			set |= StateBlendMode
+			bm, err := blend.Extract(x.R, v)
+			if pdf.IsMalformed(err) {
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			if !bm.IsZero() {
+				res.BlendMode = bm
+				set |= state.BlendMode
+			}
 		case "SMask":
 			res.SoftMask = v
-			set |= StateSoftMask
+			set |= state.SoftMask
 		case "CA":
 			ca, err := x.GetNumber(v)
 			if pdf.IsMalformed(err) {
@@ -364,7 +374,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				return nil, err
 			}
 			res.StrokeAlpha = ca
-			set |= StateStrokeAlpha
+			set |= state.StrokeAlpha
 		case "ca":
 			ca, err := x.GetNumber(v)
 			if pdf.IsMalformed(err) {
@@ -373,7 +383,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				return nil, err
 			}
 			res.FillAlpha = ca
-			set |= StateFillAlpha
+			set |= state.FillAlpha
 		case "AIS":
 			ais, err := x.GetBoolean(v)
 			if pdf.IsMalformed(err) {
@@ -382,7 +392,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				return nil, err
 			}
 			res.AlphaSourceFlag = bool(ais)
-			set |= StateAlphaSourceFlag
+			set |= state.AlphaSourceFlag
 		case "UseBlackPtComp":
 			val, err := x.GetName(v)
 			if pdf.IsMalformed(err) {
@@ -391,7 +401,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				return nil, err
 			}
 			res.BlackPointCompensation = val
-			set |= StateBlackPointCompensation
+			set |= state.BlackPointCompensation
 		case "OP":
 			op, err := x.GetBoolean(v)
 			if pdf.IsMalformed(err) {
@@ -400,7 +410,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				return nil, err
 			}
 			res.OverprintStroke = bool(op)
-			set |= StateOverprint
+			set |= state.Overprint
 		case "op":
 			op, err := x.GetBoolean(v)
 			if pdf.IsMalformed(err) {
@@ -409,7 +419,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				return nil, err
 			}
 			res.OverprintFill = bool(op)
-			set |= StateOverprint
+			set |= state.Overprint
 			overprintFillSet = true
 		case "OPM":
 			opm, err := x.GetInteger(v)
@@ -421,7 +431,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 			if opm != 0 {
 				res.OverprintMode = 1
 			}
-			set |= StateOverprintMode
+			set |= state.OverprintMode
 		case "BG":
 			bg1 = v
 		case "BG2":
@@ -442,7 +452,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				return nil, err
 			}
 			res.Halftone = ht
-			set |= StateHalftone
+			set |= state.Halftone
 		case "HTO":
 			a, err := x.GetArray(v)
 			if pdf.IsMalformed(err) {
@@ -465,7 +475,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 			}
 			res.HalftoneOriginX = xCoord
 			res.HalftoneOriginY = yCoord
-			set |= StateHalftoneOrigin
+			set |= state.HalftoneOrigin
 		case "FL":
 			fl, err := x.GetNumber(v)
 			if pdf.IsMalformed(err) {
@@ -474,7 +484,7 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				return nil, err
 			}
 			res.FlatnessTolerance = fl
-			set |= StateFlatnessTolerance
+			set |= state.FlatnessTolerance
 		case "SM":
 			sm, err := x.GetNumber(v)
 			if pdf.IsMalformed(err) {
@@ -483,12 +493,12 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				return nil, err
 			}
 			res.SmoothnessTolerance = sm
-			set |= StateSmoothnessTolerance
+			set |= state.SmoothnessTolerance
 		}
 	}
 
 	// Handle overprint fill fallback (like in reader)
-	if set&StateOverprint != 0 && !overprintFillSet {
+	if set&state.Overprint != 0 && !overprintFillSet {
 		res.OverprintFill = res.OverprintStroke
 	}
 
@@ -496,23 +506,23 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 	if bg2 == pdf.Name("Default") {
 		res.BlackGeneration = nil
 		bg2 = nil
-		set |= StateBlackGeneration
+		set |= state.BlackGeneration
 	}
-	if set&StateBlackGeneration == 0 && bg2 != nil {
+	if set&state.BlackGeneration == 0 && bg2 != nil {
 		fn, err := function.Extract(x, bg2)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.BlackGeneration = fn
-				set |= StateBlackGeneration
+				set |= state.BlackGeneration
 			}
 		}
 	}
-	if set&StateBlackGeneration == 0 && bg1 != nil {
+	if set&state.BlackGeneration == 0 && bg1 != nil {
 		fn, err := function.Extract(x, bg1)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.BlackGeneration = fn
-				set |= StateBlackGeneration
+				set |= state.BlackGeneration
 			}
 		}
 	}
@@ -521,23 +531,23 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 	if ucr2 == pdf.Name("Default") {
 		res.UndercolorRemoval = nil
 		ucr2 = nil
-		set |= StateUndercolorRemoval
+		set |= state.UndercolorRemoval
 	}
-	if set&StateUndercolorRemoval == 0 && ucr2 != nil {
+	if set&state.UndercolorRemoval == 0 && ucr2 != nil {
 		fn, err := function.Extract(x, ucr2)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.UndercolorRemoval = fn
-				set |= StateUndercolorRemoval
+				set |= state.UndercolorRemoval
 			}
 		}
 	}
-	if set&StateUndercolorRemoval == 0 && ucr1 != nil {
+	if set&state.UndercolorRemoval == 0 && ucr1 != nil {
 		fn, err := function.Extract(x, ucr1)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.UndercolorRemoval = fn
-				set |= StateUndercolorRemoval
+				set |= state.UndercolorRemoval
 			}
 		}
 	}
@@ -550,14 +560,14 @@ func ExtractExtGState(x *pdf.Extractor, obj pdf.Object) (*ExtGState, error) {
 				return nil, err
 			}
 			res.TransferFunction = fn
-			set |= StateTransferFunction
+			set |= state.TransferFunction
 		} else if tr1 != nil {
 			fn, err := parseTransferFunction(x.R, tr1)
 			if err != nil {
 				return nil, err
 			}
 			res.TransferFunction = fn
-			set |= StateTransferFunction
+			set |= state.TransferFunction
 		}
 	}
 
@@ -693,7 +703,7 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("ExtGState")
 	}
-	if set&StateTextFont != 0 {
+	if set&state.TextFont != 0 {
 		E, err := rm.Embed(e.TextFont)
 		if err != nil {
 			return nil, err
@@ -712,42 +722,42 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 			return nil, errors.New("unexpected TextFontSize value")
 		}
 	}
-	if set&StateTextKnockout != 0 {
+	if set&state.TextKnockout != 0 {
 		dict["TK"] = pdf.Boolean(e.TextKnockout)
 	} else {
 		if e.TextKnockout {
 			return nil, errors.New("unexpected TextKnockout value")
 		}
 	}
-	if set&StateLineWidth != 0 {
+	if set&state.LineWidth != 0 {
 		dict["LW"] = pdf.Number(e.LineWidth)
 	} else {
 		if e.LineWidth != 0 {
 			return nil, errors.New("unexpected LineWidth value")
 		}
 	}
-	if set&StateLineCap != 0 {
+	if set&state.LineCap != 0 {
 		dict["LC"] = pdf.Integer(e.LineCap)
 	} else {
 		if e.LineCap != 0 {
 			return nil, errors.New("unexpected LineCap value")
 		}
 	}
-	if set&StateLineJoin != 0 {
+	if set&state.LineJoin != 0 {
 		dict["LJ"] = pdf.Integer(e.LineJoin)
 	} else {
 		if e.LineJoin != 0 {
 			return nil, errors.New("unexpected LineJoin value")
 		}
 	}
-	if set&StateMiterLimit != 0 {
+	if set&state.MiterLimit != 0 {
 		dict["ML"] = pdf.Number(e.MiterLimit)
 	} else {
 		if e.MiterLimit != 0 {
 			return nil, errors.New("unexpected MiterLimit value")
 		}
 	}
-	if set&StateLineDash != 0 {
+	if set&state.LineDash != 0 {
 		pat := make(pdf.Array, len(e.DashPattern))
 		for i, x := range e.DashPattern {
 			pat[i] = pdf.Number(x)
@@ -764,56 +774,56 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 			return nil, errors.New("unexpected DashPhase value")
 		}
 	}
-	if set&StateRenderingIntent != 0 {
+	if set&state.RenderingIntent != 0 {
 		dict["RI"] = pdf.Name(e.RenderingIntent)
 	} else {
 		if e.RenderingIntent != "" {
 			return nil, errors.New("unexpected RenderingIntent value")
 		}
 	}
-	if set&StateStrokeAdjustment != 0 {
+	if set&state.StrokeAdjustment != 0 {
 		dict["SA"] = pdf.Boolean(e.StrokeAdjustment)
 	} else {
 		if e.StrokeAdjustment {
 			return nil, errors.New("unexpected StrokeAdjustment value")
 		}
 	}
-	if set&StateBlendMode != 0 {
-		dict["BM"] = e.BlendMode
+	if set&state.BlendMode != 0 {
+		dict["BM"] = e.BlendMode.AsPDF()
 	} else {
-		if e.BlendMode != nil {
+		if !e.BlendMode.IsZero() {
 			return nil, errors.New("unexpected BlendMode value")
 		}
 	}
-	if set&StateSoftMask != 0 {
+	if set&state.SoftMask != 0 {
 		dict["SMask"] = e.SoftMask
 	} else {
 		if e.SoftMask != nil {
 			return nil, errors.New("unexpected SoftMask value")
 		}
 	}
-	if set&StateStrokeAlpha != 0 {
+	if set&state.StrokeAlpha != 0 {
 		dict["CA"] = pdf.Number(e.StrokeAlpha)
 	} else {
 		if e.StrokeAlpha != 0 {
 			return nil, errors.New("unexpected StrokeAlpha value")
 		}
 	}
-	if set&StateFillAlpha != 0 {
+	if set&state.FillAlpha != 0 {
 		dict["ca"] = pdf.Number(e.FillAlpha)
 	} else {
 		if e.FillAlpha != 0 {
 			return nil, errors.New("unexpected FillAlpha value")
 		}
 	}
-	if set&StateAlphaSourceFlag != 0 {
+	if set&state.AlphaSourceFlag != 0 {
 		dict["AIS"] = pdf.Boolean(e.AlphaSourceFlag)
 	} else {
 		if e.AlphaSourceFlag {
 			return nil, errors.New("unexpected AlphaSourceFlag value")
 		}
 	}
-	if set&StateBlackPointCompensation != 0 {
+	if set&state.BlackPointCompensation != 0 {
 		dict["UseBlackPtComp"] = e.BlackPointCompensation
 	} else {
 		if e.BlackPointCompensation != "" {
@@ -821,7 +831,7 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 	}
 
-	if set&StateOverprint != 0 {
+	if set&state.Overprint != 0 {
 		dict["OP"] = pdf.Boolean(e.OverprintStroke)
 		if e.OverprintFill != e.OverprintStroke {
 			dict["op"] = pdf.Boolean(e.OverprintFill)
@@ -834,14 +844,14 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 			return nil, errors.New("unexpected OverprintFill value")
 		}
 	}
-	if set&StateOverprintMode != 0 {
+	if set&state.OverprintMode != 0 {
 		dict["OPM"] = pdf.Integer(e.OverprintMode)
 	} else {
 		if e.OverprintMode != 0 {
 			return nil, errors.New("unexpected OverprintMode value")
 		}
 	}
-	if set&StateBlackGeneration != 0 {
+	if set&state.BlackGeneration != 0 {
 		if e.BlackGeneration == nil {
 			if err := pdf.CheckVersion(rm.Out(), "BG2 in ExtGState", pdf.V1_3); err != nil {
 				return nil, err
@@ -859,7 +869,7 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 			return nil, errors.New("unexpected BlackGeneration value")
 		}
 	}
-	if set&StateUndercolorRemoval != 0 {
+	if set&state.UndercolorRemoval != 0 {
 		if e.UndercolorRemoval == nil {
 			if err := pdf.CheckVersion(rm.Out(), "UCR2 in ExtGState", pdf.V1_3); err != nil {
 				return nil, err
@@ -877,7 +887,7 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 			return nil, errors.New("unexpected UndercolorRemoval value")
 		}
 	}
-	if set&StateTransferFunction != 0 {
+	if set&state.TransferFunction != 0 {
 		if v := pdf.GetVersion(rm.Out()); v >= pdf.V2_0 {
 			return nil, errors.New("TransferFunction is deprecated in PDF 2.0")
 		}
@@ -930,7 +940,7 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 			return nil, errors.New("unexpected TransferFunction value")
 		}
 	}
-	if set&StateHalftone != 0 {
+	if set&state.Halftone != 0 {
 		htEmbedded, err := rm.Embed(e.Halftone)
 		if err != nil {
 			return nil, err
@@ -941,7 +951,7 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 			return nil, errors.New("unexpected Halftone value")
 		}
 	}
-	if set&StateHalftoneOrigin != 0 {
+	if set&state.HalftoneOrigin != 0 {
 		dict["HTO"] = pdf.Array{
 			pdf.Number(e.HalftoneOriginX),
 			pdf.Number(e.HalftoneOriginY),
@@ -954,14 +964,14 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 			return nil, errors.New("unexpected HalftoneOriginY value")
 		}
 	}
-	if set&StateFlatnessTolerance != 0 {
+	if set&state.FlatnessTolerance != 0 {
 		dict["FL"] = pdf.Number(e.FlatnessTolerance)
 	} else {
 		if e.FlatnessTolerance != 0 {
 			return nil, errors.New("unexpected FlatnessTolerance value")
 		}
 	}
-	if set&StateSmoothnessTolerance != 0 {
+	if set&state.SmoothnessTolerance != 0 {
 		dict["SM"] = pdf.Number(e.SmoothnessTolerance)
 	} else {
 		if e.SmoothnessTolerance != 0 {
@@ -987,80 +997,80 @@ func (e *ExtGState) ApplyTo(s *State) {
 	s.Set |= set
 
 	param := s.Parameters
-	if set&StateTextFont != 0 {
+	if set&state.TextFont != 0 {
 		param.TextFont = e.TextFont
 		param.TextFontSize = e.TextFontSize
 	}
-	if set&StateTextKnockout != 0 {
+	if set&state.TextKnockout != 0 {
 		param.TextKnockout = e.TextKnockout
 	}
-	if set&StateLineWidth != 0 {
+	if set&state.LineWidth != 0 {
 		param.LineWidth = e.LineWidth
 	}
-	if set&StateLineCap != 0 {
+	if set&state.LineCap != 0 {
 		param.LineCap = e.LineCap
 	}
-	if set&StateLineJoin != 0 {
+	if set&state.LineJoin != 0 {
 		param.LineJoin = e.LineJoin
 	}
-	if set&StateMiterLimit != 0 {
+	if set&state.MiterLimit != 0 {
 		param.MiterLimit = e.MiterLimit
 	}
-	if set&StateLineDash != 0 {
+	if set&state.LineDash != 0 {
 		param.DashPattern = slices.Clone(e.DashPattern)
 		param.DashPhase = e.DashPhase
 	}
-	if set&StateRenderingIntent != 0 {
+	if set&state.RenderingIntent != 0 {
 		param.RenderingIntent = e.RenderingIntent
 	}
-	if set&StateStrokeAdjustment != 0 {
+	if set&state.StrokeAdjustment != 0 {
 		param.StrokeAdjustment = e.StrokeAdjustment
 	}
-	if set&StateBlendMode != 0 {
+	if set&state.BlendMode != 0 {
 		param.BlendMode = e.BlendMode
 	}
-	if set&StateSoftMask != 0 {
+	if set&state.SoftMask != 0 {
 		param.SoftMask = e.SoftMask
 	}
-	if set&StateStrokeAlpha != 0 {
+	if set&state.StrokeAlpha != 0 {
 		param.StrokeAlpha = e.StrokeAlpha
 	}
-	if set&StateFillAlpha != 0 {
+	if set&state.FillAlpha != 0 {
 		param.FillAlpha = e.FillAlpha
 	}
-	if set&StateAlphaSourceFlag != 0 {
+	if set&state.AlphaSourceFlag != 0 {
 		param.AlphaSourceFlag = e.AlphaSourceFlag
 	}
-	if set&StateBlackPointCompensation != 0 {
+	if set&state.BlackPointCompensation != 0 {
 		param.BlackPointCompensation = e.BlackPointCompensation
 	}
-	if set&StateOverprint != 0 {
+	if set&state.Overprint != 0 {
 		param.OverprintStroke = e.OverprintStroke
 		param.OverprintFill = e.OverprintFill
 	}
-	if set&StateOverprintMode != 0 {
+	if set&state.OverprintMode != 0 {
 		param.OverprintMode = e.OverprintMode
 	}
-	if set&StateBlackGeneration != 0 {
+	if set&state.BlackGeneration != 0 {
 		param.BlackGeneration = e.BlackGeneration
 	}
-	if set&StateUndercolorRemoval != 0 {
+	if set&state.UndercolorRemoval != 0 {
 		param.UndercolorRemoval = e.UndercolorRemoval
 	}
-	if set&StateTransferFunction != 0 {
+	if set&state.TransferFunction != 0 {
 		param.TransferFunction = e.TransferFunction
 	}
-	if set&StateHalftone != 0 {
+	if set&state.Halftone != 0 {
 		param.Halftone = e.Halftone
 	}
-	if set&StateHalftoneOrigin != 0 {
+	if set&state.HalftoneOrigin != 0 {
 		param.HalftoneOriginX = e.HalftoneOriginX
 		param.HalftoneOriginY = e.HalftoneOriginY
 	}
-	if set&StateFlatnessTolerance != 0 {
+	if set&state.FlatnessTolerance != 0 {
 		param.FlatnessTolerance = e.FlatnessTolerance
 	}
-	if set&StateSmoothnessTolerance != 0 {
+	if set&state.SmoothnessTolerance != 0 {
 		param.SmoothnessTolerance = e.SmoothnessTolerance
 	}
 }

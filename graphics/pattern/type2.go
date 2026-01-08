@@ -23,6 +23,8 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
+// PDF 2.0 sections: 8.7.4.1
+
 // Type2 represents the pattern dictionary for a shading pattern
 // (pattern type 2).
 //
@@ -52,7 +54,6 @@ func (p *Type2) PaintType() int {
 // Embed returns the pattern dictionary for the shading pattern.
 // This implements the [seehuhn.de/go/pdf/graphics/color.Pattern] interface.
 func (p *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	sh, err := rm.Embed(p.Shading)
 	if err != nil {
 		return nil, err

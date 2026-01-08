@@ -24,6 +24,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/group"
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/oc"
@@ -49,6 +50,10 @@ type Form struct {
 	// When writing forms to a PDF file, the zero matrix can be used as an
 	// alternative to the identity matrix for convenience.
 	Matrix matrix.Matrix
+
+	// Group specifies transparency group attributes (PDF 1.4).
+	// If non-nil, this form XObject is a transparency group XObject.
+	Group *group.TransparencyAttributes
 
 	// Metadata is an optional reference to metadata for this form.
 	Metadata *metadata.Stream
@@ -85,7 +90,7 @@ func (f *Form) Subtype() pdf.Name {
 	return "Form"
 }
 
-// Embed implements the pdf.Embedder interface for form XObjects.
+// Embed implements the [pdf.Embedder] interface for form XObjects.
 func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if err := f.validate(); err != nil {
 		return nil, err
@@ -109,6 +114,16 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	if f.Matrix != matrix.Identity && f.Matrix != matrix.Zero {
 		dict["Matrix"] = toPDF(f.Matrix[:])
+	}
+	if f.Group != nil {
+		if err := pdf.CheckVersion(rm.Out(), "transparency group XObject", pdf.V1_4); err != nil {
+			return nil, err
+		}
+		groupObj, err := rm.Embed(f.Group)
+		if err != nil {
+			return nil, err
+		}
+		dict["Group"] = groupObj
 	}
 	if f.Metadata != nil {
 		rmEmbedded, err := rm.Embed(f.Metadata)
@@ -221,6 +236,9 @@ func (f *Form) Equal(other *Form) bool {
 		return false
 	}
 	if f.Matrix != other.Matrix {
+		return false
+	}
+	if !f.Group.Equal(other.Group) {
 		return false
 	}
 

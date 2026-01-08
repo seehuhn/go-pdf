@@ -31,7 +31,7 @@ func ImageMask(x *pdf.Extractor, obj pdf.Object) (*image.Mask, error) {
 	return image.ExtractMask(x, obj)
 }
 
-// SoftMask extracts a soft mask from a PDF stream.
-func SoftMask(x *pdf.Extractor, obj pdf.Object) (*image.SoftMask, error) {
+// SoftMaskImage extracts a soft mask from a PDF stream.
+func SoftMaskImage(x *pdf.Extractor, obj pdf.Object) (*image.SoftMask, error) {
 	return image.ExtractSoftMask(x, obj)
 }

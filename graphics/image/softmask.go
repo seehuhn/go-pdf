@@ -89,7 +89,6 @@ func (sm *SoftMask) Subtype() pdf.Name {
 
 // Embed embeds the soft mask as a PDF image XObject stream.
 func (sm *SoftMask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := sm.check(rm.Out()); err != nil {
 		return nil, err
 	}

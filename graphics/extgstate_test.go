@@ -24,7 +24,9 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/graphics/blend"
 	"seehuhn.de/go/pdf/graphics/halftone"
+	"seehuhn.de/go/pdf/graphics/state"
 	"seehuhn.de/go/pdf/graphics/transfer"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -38,7 +40,7 @@ var testCases = []struct {
 		name:    "minimal",
 		version: pdf.V1_7,
 		data: &ExtGState{
-			Set:       StateLineWidth,
+			Set:       state.LineWidth,
 			LineWidth: 2.0,
 		},
 	},
@@ -46,7 +48,7 @@ var testCases = []struct {
 		name:    "text_knockout",
 		version: pdf.V1_7,
 		data: &ExtGState{
-			Set:          StateTextKnockout,
+			Set:          state.TextKnockout,
 			TextKnockout: true,
 		},
 	},
@@ -54,7 +56,7 @@ var testCases = []struct {
 		name:    "line_styles",
 		version: pdf.V1_7,
 		data: &ExtGState{
-			Set:        StateLineWidth | StateLineCap | StateLineJoin | StateMiterLimit,
+			Set:        state.LineWidth | state.LineCap | state.LineJoin | state.MiterLimit,
 			LineWidth:  1.5,
 			LineCap:    LineCapRound,
 			LineJoin:   LineJoinBevel,
@@ -65,7 +67,7 @@ var testCases = []struct {
 		name:    "dash_pattern",
 		version: pdf.V1_7,
 		data: &ExtGState{
-			Set:         StateLineDash,
+			Set:         state.LineDash,
 			DashPattern: []float64{3, 2, 1, 2},
 			DashPhase:   1.5,
 		},
@@ -74,18 +76,18 @@ var testCases = []struct {
 		name:    "alpha_and_blend",
 		version: pdf.V1_7,
 		data: &ExtGState{
-			Set:             StateStrokeAlpha | StateFillAlpha | StateAlphaSourceFlag | StateBlendMode,
+			Set:             state.StrokeAlpha | state.FillAlpha | state.AlphaSourceFlag | state.BlendMode,
 			StrokeAlpha:     0.7,
 			FillAlpha:       0.5,
 			AlphaSourceFlag: true,
-			BlendMode:       pdf.Name("Multiply"),
+			BlendMode:       blend.Mode{blend.ModeMultiply},
 		},
 	},
 	{
 		name:    "overprint",
 		version: pdf.V1_7,
 		data: &ExtGState{
-			Set:             StateOverprint | StateOverprintMode,
+			Set:             state.Overprint | state.OverprintMode,
 			OverprintStroke: true,
 			OverprintFill:   false,
 			OverprintMode:   1,
@@ -95,7 +97,7 @@ var testCases = []struct {
 		name:    "color_functions_nil",
 		version: pdf.V1_7,
 		data: &ExtGState{
-			Set:               StateBlackGeneration | StateUndercolorRemoval,
+			Set:               state.BlackGeneration | state.UndercolorRemoval,
 			BlackGeneration:   nil,
 			UndercolorRemoval: nil,
 		},
@@ -104,7 +106,7 @@ var testCases = []struct {
 		name:    "transfer_function_identity",
 		version: pdf.V1_7,
 		data: &ExtGState{
-			Set: StateTransferFunction,
+			Set: state.TransferFunction,
 			TransferFunction: transfer.Functions{
 				Red:   transfer.Identity,
 				Green: transfer.Identity,
@@ -117,7 +119,7 @@ var testCases = []struct {
 		name:    "halftone_type1",
 		version: pdf.V1_7,
 		data: &ExtGState{
-			Set: StateHalftone,
+			Set: state.Halftone,
 			Halftone: &halftone.Type1{
 				Frequency:    60,
 				Angle:        45,
@@ -129,7 +131,7 @@ var testCases = []struct {
 		name:    "tolerances",
 		version: pdf.V1_7,
 		data: &ExtGState{
-			Set:                 StateFlatnessTolerance | StateSmoothnessTolerance,
+			Set:                 state.FlatnessTolerance | state.SmoothnessTolerance,
 			FlatnessTolerance:   1.0,
 			SmoothnessTolerance: 0.5,
 		},
@@ -138,7 +140,7 @@ var testCases = []struct {
 		name:    "halftone_origin_pdf2",
 		version: pdf.V2_0,
 		data: &ExtGState{
-			Set:             StateHalftoneOrigin,
+			Set:             state.HalftoneOrigin,
 			HalftoneOriginX: 10.0,
 			HalftoneOriginY: 20.0,
 		},
@@ -147,7 +149,7 @@ var testCases = []struct {
 		name:    "black_point_compensation_pdf2",
 		version: pdf.V2_0,
 		data: &ExtGState{
-			Set:                    StateBlackPointCompensation,
+			Set:                    state.BlackPointCompensation,
 			BlackPointCompensation: pdf.Name("ON"),
 		},
 	},
@@ -155,7 +157,7 @@ var testCases = []struct {
 		name:    "singleuse_true",
 		version: pdf.V1_7,
 		data: &ExtGState{
-			Set:              StateStrokeAdjustment,
+			Set:              state.StrokeAdjustment,
 			StrokeAdjustment: true,
 			SingleUse:        true,
 		},
@@ -164,7 +166,7 @@ var testCases = []struct {
 		name:    "singleuse_false",
 		version: pdf.V1_7,
 		data: &ExtGState{
-			Set:              StateStrokeAdjustment,
+			Set:              state.StrokeAdjustment,
 			StrokeAdjustment: true,
 			SingleUse:        false,
 		},
@@ -173,8 +175,8 @@ var testCases = []struct {
 		name:    "complex_state",
 		version: pdf.V1_7,
 		data: &ExtGState{
-			Set: StateLineWidth | StateLineCap | StateRenderingIntent |
-				StateStrokeAlpha | StateFillAlpha | StateOverprint,
+			Set: state.LineWidth | state.LineCap | state.RenderingIntent |
+				state.StrokeAlpha | state.FillAlpha | state.Overprint,
 			LineWidth:       3.0,
 			LineCap:         LineCapSquare,
 			RenderingIntent: RenderingIntent("Perceptual"),

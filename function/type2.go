@@ -23,6 +23,8 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// PDF 2.0 sections: 7.10.3
+
 // Type2 represents a power interpolation function, of the form y = C0 + x^N ×
 // (C1 - C0).  These functions have a single input x and can have one or more
 // outputs. The PDF specification refers to this type of function as
@@ -185,11 +187,9 @@ func (f *Type2) validate() error {
 
 // Embed embeds the function into a PDF file.
 func (f *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := pdf.CheckVersion(rm.Out(), "Type 2 functions", pdf.V1_3); err != nil {
 		return nil, err
-	}
-	if err := f.validate(); err != nil {
+	} else if err := f.validate(); err != nil {
 		return nil, err
 	}
 

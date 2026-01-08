@@ -20,7 +20,7 @@ import (
 	"errors"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/state"
 )
 
 var (
@@ -79,31 +79,31 @@ func (o Operator) isValidName(v pdf.Version) error {
 
 // opInfo contains metadata about a content stream operator
 type opInfo struct {
-	Since      pdf.Version        // PDF version when introduced
-	Deprecated pdf.Version        // PDF version when deprecated (0 if not deprecated)
-	Allowed    Object             // bitmask of allowed object states
-	Transition Object             // new state after operator (0 = no change)
-	Sets       graphics.StateBits // state bits this operator sets
-	Requires   graphics.StateBits // state bits required before this operator
+	Since      pdf.Version // PDF version when introduced
+	Deprecated pdf.Version // PDF version when deprecated (0 if not deprecated)
+	Allowed    Object      // bitmask of allowed object states
+	Transition Object      // new state after operator (0 = no change)
+	Sets       state.Bits  // state bits this operator sets
+	Requires   state.Bits  // state bits required before this operator
 }
 
 // Common requirement sets for operators
 const (
 	// reqStroke is the set of state bits required for stroke operations
-	reqStroke = graphics.StateLineWidth | graphics.StateLineCap | graphics.StateLineJoin |
-		graphics.StateLineDash | graphics.StateStrokeColor
+	reqStroke = state.LineWidth | state.LineCap | state.LineJoin |
+		state.LineDash | state.StrokeColor
 
 	// reqFill is the set of state bits required for fill operations
-	reqFill = graphics.StateFillColor
+	reqFill = state.FillColor
 
 	// reqTextShow is the set of state bits required for text showing operations
-	reqTextShow = graphics.StateTextFont | graphics.StateTextMatrix |
-		graphics.StateTextHorizontalScaling | graphics.StateTextRise |
-		graphics.StateTextWordSpacing | graphics.StateTextCharacterSpacing
+	reqTextShow = state.TextFont | state.TextMatrix |
+		state.TextHorizontalScaling | state.TextRise |
+		state.TextWordSpacing | state.TextCharacterSpacing
 
 	// reqTextShowSetSpacing is for the " operator which sets word/char spacing
-	reqTextShowSetSpacing = graphics.StateTextFont | graphics.StateTextMatrix |
-		graphics.StateTextHorizontalScaling | graphics.StateTextRise
+	reqTextShowSetSpacing = state.TextFont | state.TextMatrix |
+		state.TextHorizontalScaling | state.TextRise
 )
 
 // operators maps operator names to their metadata
@@ -112,13 +112,13 @@ var operators = map[OpName]*opInfo{
 	OpPushGraphicsState:    {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
 	OpPopGraphicsState:     {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
 	OpTransform:            {Since: pdf.V1_0, Allowed: ObjPage}, // special graphics state
-	OpSetLineWidth:         {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateLineWidth},
-	OpSetLineCap:           {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateLineCap},
-	OpSetLineJoin:          {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateLineJoin},
-	OpSetMiterLimit:        {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateMiterLimit},
-	OpSetLineDash:          {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateLineDash},
-	OpSetRenderingIntent:   {Since: pdf.V1_1, Allowed: ObjPage | ObjText, Sets: graphics.StateRenderingIntent},
-	OpSetFlatnessTolerance: {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateFlatnessTolerance},
+	OpSetLineWidth:         {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: state.LineWidth},
+	OpSetLineCap:           {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: state.LineCap},
+	OpSetLineJoin:          {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: state.LineJoin},
+	OpSetMiterLimit:        {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: state.MiterLimit},
+	OpSetLineDash:          {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: state.LineDash},
+	OpSetRenderingIntent:   {Since: pdf.V1_1, Allowed: ObjPage | ObjText, Sets: state.RenderingIntent},
+	OpSetFlatnessTolerance: {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: state.FlatnessTolerance},
 	OpSetExtGState:         {Since: pdf.V1_2, Allowed: ObjPage | ObjText}, // Sets determined from resource
 
 	// Path Construction
@@ -147,47 +147,47 @@ var operators = map[OpName]*opInfo{
 	OpClipEvenOdd: {Since: pdf.V1_0, Allowed: ObjPath, Transition: ObjClippingPath},
 
 	// Text Objects
-	OpTextBegin: {Since: pdf.V1_0, Allowed: ObjPage, Transition: ObjText, Sets: graphics.StateTextMatrix},
+	OpTextBegin: {Since: pdf.V1_0, Allowed: ObjPage, Transition: ObjText, Sets: state.TextMatrix},
 	OpTextEnd:   {Since: pdf.V1_0, Allowed: ObjText, Transition: ObjPage},
 
 	// Text State (allowed in any context)
-	OpTextSetCharacterSpacing:  {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextCharacterSpacing},
-	OpTextSetWordSpacing:       {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextWordSpacing},
-	OpTextSetHorizontalScaling: {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextHorizontalScaling},
-	OpTextSetLeading:           {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextLeading},
-	OpTextSetFont:              {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextFont},
-	OpTextSetRenderingMode:     {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextRenderingMode},
-	OpTextSetRise:              {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextRise},
+	OpTextSetCharacterSpacing:  {Since: pdf.V1_0, Allowed: ObjAny, Sets: state.TextCharacterSpacing},
+	OpTextSetWordSpacing:       {Since: pdf.V1_0, Allowed: ObjAny, Sets: state.TextWordSpacing},
+	OpTextSetHorizontalScaling: {Since: pdf.V1_0, Allowed: ObjAny, Sets: state.TextHorizontalScaling},
+	OpTextSetLeading:           {Since: pdf.V1_0, Allowed: ObjAny, Sets: state.TextLeading},
+	OpTextSetFont:              {Since: pdf.V1_0, Allowed: ObjAny, Sets: state.TextFont},
+	OpTextSetRenderingMode:     {Since: pdf.V1_0, Allowed: ObjAny, Sets: state.TextRenderingMode},
+	OpTextSetRise:              {Since: pdf.V1_0, Allowed: ObjAny, Sets: state.TextRise},
 
 	// Text Positioning (only in text context)
 	OpTextMoveOffset:           {Since: pdf.V1_0, Allowed: ObjText},
-	OpTextMoveOffsetSetLeading: {Since: pdf.V1_0, Allowed: ObjText, Sets: graphics.StateTextLeading},
-	OpTextSetMatrix:            {Since: pdf.V1_0, Allowed: ObjText, Sets: graphics.StateTextMatrix},
-	OpTextNextLine:             {Since: pdf.V1_0, Allowed: ObjText, Requires: graphics.StateTextMatrix | graphics.StateTextLeading},
+	OpTextMoveOffsetSetLeading: {Since: pdf.V1_0, Allowed: ObjText, Sets: state.TextLeading},
+	OpTextSetMatrix:            {Since: pdf.V1_0, Allowed: ObjText, Sets: state.TextMatrix},
+	OpTextNextLine:             {Since: pdf.V1_0, Allowed: ObjText, Requires: state.TextMatrix | state.TextLeading},
 
 	// Text Showing (only in text context)
 	OpTextShow:                       {Since: pdf.V1_0, Allowed: ObjText, Requires: reqTextShow},
 	OpTextShowArray:                  {Since: pdf.V1_0, Allowed: ObjText, Requires: reqTextShow},
-	OpTextShowMoveNextLine:           {Since: pdf.V1_0, Allowed: ObjText, Requires: reqTextShow | graphics.StateTextLeading},
-	OpTextShowMoveNextLineSetSpacing: {Since: pdf.V1_0, Allowed: ObjText, Requires: reqTextShowSetSpacing, Sets: graphics.StateTextWordSpacing | graphics.StateTextCharacterSpacing},
+	OpTextShowMoveNextLine:           {Since: pdf.V1_0, Allowed: ObjText, Requires: reqTextShow | state.TextLeading},
+	OpTextShowMoveNextLineSetSpacing: {Since: pdf.V1_0, Allowed: ObjText, Requires: reqTextShowSetSpacing, Sets: state.TextWordSpacing | state.TextCharacterSpacing},
 
 	// Type 3 Fonts (only at start of Type 3 glyph)
 	OpType3ColoredGlyph:   {Since: pdf.V1_0, Allowed: ObjType3Start, Transition: ObjPage},
 	OpType3UncoloredGlyph: {Since: pdf.V1_0, Allowed: ObjType3Start, Transition: ObjPage},
 
 	// Colour (allowed in page and text contexts)
-	OpSetStrokeColorSpace: {Since: pdf.V1_1, Allowed: ObjPage | ObjText, Sets: graphics.StateStrokeColor},
-	OpSetFillColorSpace:   {Since: pdf.V1_1, Allowed: ObjPage | ObjText, Sets: graphics.StateFillColor},
-	OpSetStrokeColor:      {Since: pdf.V1_1, Allowed: ObjPage | ObjText, Sets: graphics.StateStrokeColor},
-	OpSetStrokeColorN:     {Since: pdf.V1_2, Allowed: ObjPage | ObjText, Sets: graphics.StateStrokeColor},
-	OpSetFillColor:        {Since: pdf.V1_1, Allowed: ObjPage | ObjText, Sets: graphics.StateFillColor},
-	OpSetFillColorN:       {Since: pdf.V1_2, Allowed: ObjPage | ObjText, Sets: graphics.StateFillColor},
-	OpSetStrokeGray:       {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateStrokeColor},
-	OpSetFillGray:         {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateFillColor},
-	OpSetStrokeRGB:        {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateStrokeColor},
-	OpSetFillRGB:          {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateFillColor},
-	OpSetStrokeCMYK:       {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateStrokeColor},
-	OpSetFillCMYK:         {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateFillColor},
+	OpSetStrokeColorSpace: {Since: pdf.V1_1, Allowed: ObjPage | ObjText, Sets: state.StrokeColor},
+	OpSetFillColorSpace:   {Since: pdf.V1_1, Allowed: ObjPage | ObjText, Sets: state.FillColor},
+	OpSetStrokeColor:      {Since: pdf.V1_1, Allowed: ObjPage | ObjText, Sets: state.StrokeColor},
+	OpSetStrokeColorN:     {Since: pdf.V1_2, Allowed: ObjPage | ObjText, Sets: state.StrokeColor},
+	OpSetFillColor:        {Since: pdf.V1_1, Allowed: ObjPage | ObjText, Sets: state.FillColor},
+	OpSetFillColorN:       {Since: pdf.V1_2, Allowed: ObjPage | ObjText, Sets: state.FillColor},
+	OpSetStrokeGray:       {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: state.StrokeColor},
+	OpSetFillGray:         {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: state.FillColor},
+	OpSetStrokeRGB:        {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: state.StrokeColor},
+	OpSetFillRGB:          {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: state.FillColor},
+	OpSetStrokeCMYK:       {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: state.StrokeColor},
+	OpSetFillCMYK:         {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: state.FillColor},
 
 	// Shading Patterns (allowed in page and text contexts)
 	OpShading: {Since: pdf.V1_3, Allowed: ObjPage | ObjText},

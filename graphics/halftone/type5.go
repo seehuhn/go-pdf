@@ -79,7 +79,6 @@ func extractType5(x *pdf.Extractor, dict pdf.Dict) (*Type5, error) {
 }
 
 func (h *Type5) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := pdf.CheckVersion(rm.Out(), "halftone screening", pdf.V1_2); err != nil {
 		return nil, err
 	}

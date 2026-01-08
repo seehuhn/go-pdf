@@ -108,10 +108,9 @@ func ExtractStream(x *pdf.Extractor, obj pdf.Object, dictType, fdKey pdf.Name) (
 
 // Embed adds the font file stream to a PDF file.
 //
-// This method implements the pdf.Embedder interface and handles all necessary
+// This method implements the [pdf.Embedder] interface and handles all necessary
 // PDF version checks and stream formatting based on the font type.
 func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	switch s.Type {
 	case Type1:
 		// pass

@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/graphics/group"
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/oc"
@@ -65,6 +66,13 @@ func Form(x *pdf.Extractor, obj pdf.Object) (*form.Form, error) {
 	f.Matrix, err = pdf.GetMatrix(x.R, dict["Matrix"])
 	if err != nil {
 		f.Matrix = matrix.Identity
+	}
+
+	// Group (optional)
+	if g, err := pdf.ExtractorGetOptional(x, dict["Group"], group.ExtractTransparencyAttributes); err != nil {
+		return nil, err
+	} else {
+		f.Group = g
 	}
 
 	// Metadata (optional)

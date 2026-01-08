@@ -70,28 +70,28 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (graphics.Shading, error) {
 		return extractType3(x, dict, isIndirect)
 	case 4:
 		if stream, ok := obj.(*pdf.Stream); ok {
-			return extractType4(x, stream, isIndirect)
+			return extractType4(x, stream)
 		}
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("type 4 shading must be a stream"),
 		}
 	case 5:
 		if stream, ok := obj.(*pdf.Stream); ok {
-			return extractType5(x, stream, isIndirect)
+			return extractType5(x, stream)
 		}
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("type 5 shading must be a stream"),
 		}
 	case 6:
 		if stream, ok := obj.(*pdf.Stream); ok {
-			return extractType6(x, stream, isIndirect)
+			return extractType6(x, stream)
 		}
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("type 6 shading must be a stream"),
 		}
 	case 7:
 		if stream, ok := obj.(*pdf.Stream); ok {
-			return extractType7(x, stream, isIndirect)
+			return extractType7(x, stream)
 		}
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("type 7 shading must be a stream"),

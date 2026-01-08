@@ -26,6 +26,8 @@ import (
 	"seehuhn.de/go/pdf/metadata"
 )
 
+// PDF 2.0 sections: 8.6.5.5
+
 // SpaceICCBased represents an ICC-based color space.
 type SpaceICCBased struct {
 	N      int
@@ -102,7 +104,6 @@ func (s *SpaceICCBased) Default() Color {
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
 func (s *SpaceICCBased) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	w := rm.Out()
 	if err := pdf.CheckVersion(w, "ICCBased color space", pdf.V1_3); err != nil {
 		return nil, err

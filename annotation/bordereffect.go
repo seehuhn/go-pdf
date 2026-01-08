@@ -82,7 +82,6 @@ func ExtractBorderEffect(r pdf.Getter, obj pdf.Object) (*BorderEffect, error) {
 }
 
 func (be *BorderEffect) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := pdf.CheckVersion(rm.Out(), "border effect dictionary", pdf.V1_5); err != nil {
 		return nil, err
 	}

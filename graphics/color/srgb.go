@@ -22,6 +22,8 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// PDF 2.0 sections: 8.6.5.5
+
 // spaceSRGB represents the sRGB color space.
 // This is a special case of the ICCBased color space.
 type spaceSRGB struct{}
@@ -41,7 +43,6 @@ func (s spaceSRGB) Channels() int {
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
 func (s spaceSRGB) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	w := rm.Out()
 	if err := pdf.CheckVersion(w, "sRGB color space", pdf.V1_3); err != nil {
 		return nil, err

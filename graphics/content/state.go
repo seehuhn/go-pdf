@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/state"
 )
 
 // State tracks graphics state during content stream building and writing.
@@ -29,17 +29,17 @@ type State struct {
 	// Set indicates which graphics parameters have usable values.
 	// If the corresponding Known bit is also set, a concrete value is available.
 	// Otherwise, the value is inherited from the surrounding context.
-	Set graphics.StateBits
+	Set state.Bits
 
 	// Known indicates parameters with concrete values (subset of Set).
-	Known graphics.StateBits
+	Known state.Bits
 
 	// FromContext tracks which graphics parameters were used from inherited
 	// context. This is updated, every time a graphics operator uses a
 	// parameter which is not listed in Known.
 	//
 	// Commands like Stroke and Fill update this field.
-	FromContext graphics.StateBits
+	FromContext state.Bits
 
 	// ColorOpsForbidden is set for uncolored Type 3 glyphs (d1) and
 	// uncolored tiling patterns (PaintType 2).
@@ -82,8 +82,8 @@ const (
 
 // savedState holds state saved by the q operator.
 type savedState struct {
-	Set                    graphics.StateBits
-	Known                  graphics.StateBits
+	Set                    state.Bits
+	Known                  state.Bits
 	AllSubpathsClosed      bool
 	ThisSubpathClosed      bool
 	HasNonEmptyDashPattern bool
@@ -104,16 +104,16 @@ func NewState(ct Type) *State {
 		s.Known = initializedStateBits
 	case Form, PatternColored:
 		// All parameters inherited (Set but not Known)
-		s.Set = graphics.AllStateBits
+		s.Set = state.AllBits
 		s.Known = 0
 	case PatternUncolored:
 		// All parameters inherited (Set but not Known)
-		s.Set = graphics.AllStateBits
+		s.Set = state.AllBits
 		s.Known = 0
 		s.ColorOpsForbidden = true
 	case Glyph:
 		// All parameters inherited (Set but not Known)
-		s.Set = graphics.AllStateBits
+		s.Set = state.AllBits
 		s.Known = 0
 		s.CurrentObject = ObjType3Start
 	}
@@ -124,26 +124,26 @@ func NewState(ct Type) *State {
 // initializedStateBits lists parameters where PDF defines initial values
 // at the start of a page content stream.  This includes all parameters except
 // the text font and font size.
-const initializedStateBits = graphics.AllStateBits & ^graphics.StateTextFont
+const initializedStateBits = state.AllBits & ^state.TextFont
 
 // IsSet returns true if all specified parameters are Set.
-func (s *State) IsSet(bits graphics.StateBits) bool {
+func (s *State) IsSet(bits state.Bits) bool {
 	return s.Set&bits == bits
 }
 
 // IsKnown returns true if all specified parameters are Known.
-func (s *State) IsKnown(bits graphics.StateBits) bool {
+func (s *State) IsKnown(bits state.Bits) bool {
 	return s.Known&bits == bits
 }
 
 // MarkAsSet records that parameters were set by a graphics operator.
-func (s *State) MarkAsSet(bits graphics.StateBits) {
+func (s *State) MarkAsSet(bits state.Bits) {
 	s.Set |= bits
 	s.Known |= bits
 }
 
 // MarkAsUsed records that parameters were used by a graphics operator.
-func (s *State) MarkAsUsed(bits graphics.StateBits) {
+func (s *State) MarkAsUsed(bits state.Bits) {
 	setUnknown := s.Set &^ s.Known
 	s.FromContext |= bits & setUnknown
 }
@@ -199,8 +199,8 @@ func (s *State) TextEnd() error {
 	}
 	s.CurrentObject = ObjPage
 	// The text matrix does not persist between text objects (ISO 32000-2:2020, 9.4.1)
-	s.Set &^= graphics.StateTextMatrix
-	s.Known &^= graphics.StateTextMatrix
+	s.Set &^= state.TextMatrix
+	s.Known &^= state.TextMatrix
 	return nil
 }
 
@@ -261,7 +261,7 @@ func (s *State) ApplyOperator(name OpName, args []pdf.Object) error {
 
 		// Conditional LineCap relaxation: not needed for closed paths without dashes
 		if isStrokeOp(name) && s.AllSubpathsClosed && !s.HasNonEmptyDashPattern {
-			requires &^= graphics.StateLineCap
+			requires &^= state.LineCap
 		}
 
 		// Validate requirements

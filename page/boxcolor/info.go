@@ -19,7 +19,7 @@ package boxcolor
 
 import "seehuhn.de/go/pdf"
 
-// PDF 2.0 sections: 14.11.2.2
+// PDF 2.0 sections: 14.11.2
 
 // Info specifies display styles for page boundary guidelines.
 type Info struct {

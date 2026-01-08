@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/state"
 )
 
 // PushGraphicsState saves the current graphics state.
@@ -74,7 +75,7 @@ func (b *Builder) SetLineCap(cap graphics.LineCapStyle) {
 		b.Err = fmt.Errorf("SetLineCap: invalid line cap style %d", cap)
 		return
 	}
-	if b.isKnown(graphics.StateLineCap) && cap == b.Param.LineCap {
+	if b.isKnown(state.LineCap) && cap == b.Param.LineCap {
 		return
 	}
 	b.Param.LineCap = cap
@@ -89,7 +90,7 @@ func (b *Builder) SetLineJoin(join graphics.LineJoinStyle) {
 		b.Err = fmt.Errorf("SetLineJoin: invalid line join style %d", join)
 		return
 	}
-	if b.isKnown(graphics.StateLineJoin) && join == b.Param.LineJoin {
+	if b.isKnown(state.LineJoin) && join == b.Param.LineJoin {
 		return
 	}
 	b.Param.LineJoin = join
@@ -104,7 +105,7 @@ func (b *Builder) SetMiterLimit(limit float64) {
 		b.Err = fmt.Errorf("SetMiterLimit: invalid miter limit %f", limit)
 		return
 	}
-	if b.isKnown(graphics.StateMiterLimit) && nearlyEqual(limit, b.Param.MiterLimit) {
+	if b.isKnown(state.MiterLimit) && nearlyEqual(limit, b.Param.MiterLimit) {
 		return
 	}
 	b.Param.MiterLimit = limit
@@ -115,7 +116,7 @@ func (b *Builder) SetMiterLimit(limit float64) {
 //
 // This implements the PDF graphics operator "d".
 func (b *Builder) SetLineDash(pattern []float64, phase float64) {
-	if b.isKnown(graphics.StateLineDash) &&
+	if b.isKnown(state.LineDash) &&
 		sliceNearlyEqual(pattern, b.Param.DashPattern) &&
 		nearlyEqual(phase, b.Param.DashPhase) {
 		return
@@ -139,7 +140,7 @@ func (b *Builder) SetRenderingIntent(intent graphics.RenderingIntent) {
 		b.Err = err
 		return
 	}
-	if b.isKnown(graphics.StateRenderingIntent) && intent == b.Param.RenderingIntent {
+	if b.isKnown(state.RenderingIntent) && intent == b.Param.RenderingIntent {
 		return
 	}
 	b.Param.RenderingIntent = intent
@@ -154,7 +155,7 @@ func (b *Builder) SetFlatnessTolerance(flatness float64) {
 		b.Err = fmt.Errorf("SetFlatnessTolerance: invalid flatness tolerance %f", flatness)
 		return
 	}
-	if b.isKnown(graphics.StateFlatnessTolerance) && nearlyEqual(flatness, b.Param.FlatnessTolerance) {
+	if b.isKnown(state.FlatnessTolerance) && nearlyEqual(flatness, b.Param.FlatnessTolerance) {
 		return
 	}
 	b.Param.FlatnessTolerance = flatness
@@ -169,7 +170,7 @@ func (b *Builder) SetLineWidth(width float64) {
 		b.Err = fmt.Errorf("SetLineWidth: negative width %f", width)
 		return
 	}
-	if b.isKnown(graphics.StateLineWidth) && nearlyEqual(width, b.Param.LineWidth) {
+	if b.isKnown(state.LineWidth) && nearlyEqual(width, b.Param.LineWidth) {
 		return
 	}
 	b.Param.LineWidth = width

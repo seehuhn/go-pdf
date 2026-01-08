@@ -24,6 +24,8 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// PDF 2.0 sections: 7.10.4
+
 // Type3 represents a piecewise defined function with a single input.
 // The PDF specification refers to this as a "stitching function".
 type Type3 struct {
@@ -198,7 +200,6 @@ func (f *Type3) validate() error {
 
 // Embed embeds the function into a PDF file.
 func (f *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := pdf.CheckVersion(rm.Out(), "Type 3 functions", pdf.V1_3); err != nil {
 		return nil, err
 	} else if err := f.validate(); err != nil {

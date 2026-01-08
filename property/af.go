@@ -25,13 +25,11 @@ import (
 	"seehuhn.de/go/pdf/optional"
 )
 
-// PDF 2.0 section 14.13.5, Table 409a
+// PDF 2.0 sections: 14.13.5
 
 // AF represents an Associated Files property list.
 // This is used with the AF marked-content tag to link associated files
 // to sections of content in a content stream.
-//
-// PDF 2.0 section 14.13.5
 type AF struct {
 	// MCID (optional) is the marked-content identifier for structure.
 	MCID optional.Int

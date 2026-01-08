@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/graphics/state"
 )
 
 // This function contains convenience methods for drawing text.
@@ -69,7 +70,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 	if !w.isValid("TextShowGlyphs", objText) {
 		return 0
 	}
-	if err := w.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
+	if err := w.mustBeSet(state.TextFont | state.TextMatrix | state.TextHorizontalScaling | state.TextRise); err != nil {
 		w.Err = err
 		return 0
 	}
@@ -117,7 +118,7 @@ func (w *Writer) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 	}
 	codec := layouter.Codec()
 	for _, g := range gg {
-		if w.State.Set&StateTextRise == 0 || math.Abs(g.Rise-w.State.TextRise) > 1e-6 {
+		if w.State.Set&state.TextRise == 0 || math.Abs(g.Rise-w.State.TextRise) > 1e-6 {
 			flush()
 			w.State.TextRise = g.Rise
 			if w.Err != nil {
@@ -206,7 +207,7 @@ func (w *Writer) TextGetQuadPoints(seq *font.GlyphSeq, padding float64) []vec.Ve
 	if seq == nil || len(seq.Seq) == 0 {
 		return nil
 	}
-	if err := w.mustBeSet(StateTextFont | StateTextMatrix); err != nil {
+	if err := w.mustBeSet(state.TextFont | state.TextMatrix); err != nil {
 		return nil
 	}
 

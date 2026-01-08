@@ -18,6 +18,8 @@ package color
 
 import "seehuhn.de/go/pdf"
 
+// PDF 2.0 sections: 8.6.4
+
 // == DeviceGray =============================================================
 
 // spaceDeviceGray represents the DeviceGray color space.
@@ -61,6 +63,8 @@ func (c DeviceGray) ColorSpace() Space {
 
 // == DeviceRGB ==============================================================
 
+// PDF 2.0 sections: 8.6.4
+
 // spaceDeviceRGB represents the DeviceRGB color space.
 type spaceDeviceRGB struct{}
 
@@ -101,6 +105,8 @@ func (c DeviceRGB) ColorSpace() Space {
 }
 
 // == DeviceCMYK =============================================================
+
+// PDF 2.0 sections: 8.6.4
 
 // spaceDeviceCMYK represents the DeviceCMYK color space.
 type spaceDeviceCMYK struct{}

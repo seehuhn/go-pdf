@@ -73,7 +73,7 @@ func (s *Type1) ShadingType() int {
 }
 
 // extractType1 reads a Type 1 (function-based) shading from a PDF dictionary.
-func extractType1(x *pdf.Extractor, d pdf.Dict, wasReference bool) (*Type1, error) {
+func extractType1(x *pdf.Extractor, d pdf.Dict, inIndirect bool) (*Type1, error) {
 	s := &Type1{}
 
 	// Read required ColorSpace
@@ -186,14 +186,13 @@ func extractType1(x *pdf.Extractor, d pdf.Dict, wasReference bool) (*Type1, erro
 	}
 
 	// obj is indirect if passed as a reference or accessed through one
-	s.SingleUse = !wasReference && !x.IsIndirect
+	s.SingleUse = !inIndirect && !x.IsIndirect
 
 	return s, nil
 }
 
 // Embed implements the [Shading] interface.
 func (s *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	// Version check
 	if err := pdf.CheckVersion(rm.Out(), "Type 1 shading", pdf.V1_3); err != nil {
 		return nil, err

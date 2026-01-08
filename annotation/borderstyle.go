@@ -93,6 +93,9 @@ func ExtractBorderStyle(x *pdf.Extractor, obj pdf.Object) (*BorderStyle, error) 
 var borderStyleDefaultDash = []float64{3}
 
 func (b *BorderStyle) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+	if err := pdf.CheckVersion(rm.Out(), "border style dictionary", pdf.V1_2); err != nil {
+		return nil, err
+	}
 
 	d := pdf.Dict{}
 	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {

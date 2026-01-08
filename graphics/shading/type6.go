@@ -250,7 +250,7 @@ func parseType6Patches(data []byte, s *Type6) ([]Type6Patch, error) {
 }
 
 // extractType6 reads a Type 6 (Coons patch mesh) shading from a PDF stream.
-func extractType6(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Type6, error) {
+func extractType6(x *pdf.Extractor, stream *pdf.Stream) (*Type6, error) {
 	d := stream.Dict
 	s := &Type6{}
 
@@ -430,7 +430,6 @@ func extractType6(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Typ
 
 // Embed implements the [Shading] interface.
 func (s *Type6) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	// Version check
 	if err := pdf.CheckVersion(rm.Out(), "Type 6 shadings", pdf.V1_3); err != nil {
 		return nil, err

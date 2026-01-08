@@ -62,7 +62,6 @@ func ExtractPostScript(x *pdf.Extractor, stm *pdf.Stream) (*postScript, error) {
 }
 
 func (ps *postScript) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	dict := pdf.Dict{
 		"Type":    pdf.Name("XObject"),
 		"Subtype": pdf.Name("PS"),

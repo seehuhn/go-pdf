@@ -25,6 +25,8 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 )
 
+// PDF 2.0 sections: 8.7.3.1
+
 // Type1 represents a tiling pattern which repeats periodically in the plane.
 type Type1 struct {
 	// TilingType is a a code that controls adjustments to the spacing of tiles

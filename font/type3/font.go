@@ -394,7 +394,7 @@ func (f *instance) Encode(gid glyph.ID, text string) (charcode.Code, bool) {
 	return charcode.Code(c), err == nil
 }
 
-// Embed implements the pdf.Embedder interface for Type 3 fonts.
+// Embed implements the [pdf.Embedder] interface for Type 3 fonts.
 func (f *instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if len(f.Font.Glyphs) == 0 || f.Font.Glyphs[0].Name != "" {
 		return nil, errors.New("invalid glyph 0")

@@ -454,7 +454,6 @@ rangesLoop:
 }
 
 func (f *File) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	// TODO(voss): decide this based on the CMap content?
 	if f.IsPredefined() {
 		return pdf.Name(f.Name), nil

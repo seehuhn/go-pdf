@@ -94,7 +94,6 @@ func (s *Type7) ShadingType() int {
 
 // Embed implements the [Shading] interface.
 func (s *Type7) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	// Version check
 	if err := pdf.CheckVersion(rm.Out(), "Type 7 shadings", pdf.V1_3); err != nil {
 		return nil, err
@@ -387,7 +386,7 @@ var type7EdgeConnections = map[uint8]Type7EdgeConnection{
 }
 
 // extractType7 reads a Type 7 (tensor-product patch mesh) shading from a PDF stream.
-func extractType7(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Type7, error) {
+func extractType7(x *pdf.Extractor, stream *pdf.Stream) (*Type7, error) {
 	d := stream.Dict
 	s := &Type7{}
 

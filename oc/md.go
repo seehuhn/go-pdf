@@ -115,7 +115,6 @@ func ExtractMembership(x *pdf.Extractor, obj pdf.Object) (*Membership, error) {
 
 // Embed converts the Membership to a PDF object.
 func (m *Membership) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	dict := pdf.Dict{
 		"Type": pdf.Name("OCMD"),
 	}

@@ -129,7 +129,6 @@ func ExtractStream(x *pdf.Extractor, obj pdf.Object) (*Stream, error) {
 
 // Embed converts the Stream to a PDF stream object.
 func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	// Check PDF version requirement for embedded file streams (PDF 1.3)
 	if err := pdf.CheckVersion(rm.Out(), "embedded file streams", pdf.V1_3); err != nil {
 		return nil, err

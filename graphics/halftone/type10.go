@@ -110,7 +110,6 @@ func extractType10(x *pdf.Extractor, stream *pdf.Stream) (*Type10, error) {
 }
 
 func (h *Type10) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := pdf.CheckVersion(rm.Out(), "halftone screening", pdf.V1_2); err != nil {
 		return nil, err
 	}
@@ -163,6 +162,7 @@ func (h *Type10) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if len(h.ThresholdData) > 0 {
 		_, err = stm.Write(h.ThresholdData)
 		if err != nil {
+			stm.Close()
 			return nil, err
 		}
 	}

@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/state"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
@@ -129,7 +130,7 @@ func TestParameters(t *testing.T) {
 		t.Errorf("Tr: got %v, want 15", r.State.TextRise)
 	}
 
-	for b := graphics.StateBits(1); b != 0; b <<= 1 {
+	for b := state.Bits(1); b != 0; b <<= 1 {
 		if w.State.Set&b != r.State.Set&b {
 			if w.State.Set&b != 0 {
 				t.Errorf("State bit %s only set in writer", b.Names())

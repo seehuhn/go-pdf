@@ -22,6 +22,8 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
+// PDF 2.0 sections: 12.5.5
+
 // Dict represents an annotation appearance dictionary.
 type Dict struct {
 	// Normal is the annotation's normal appearance.
@@ -142,7 +144,6 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 }
 
 func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := pdf.CheckVersion(rm.Out(), "appearance streams", pdf.V1_2); err != nil {
 		return nil, err
 	}

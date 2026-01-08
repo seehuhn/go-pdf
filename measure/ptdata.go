@@ -123,8 +123,6 @@ func ExtractPtData(x *pdf.Extractor, obj pdf.Object) (*PtData, error) {
 
 // Embed converts the PtData into a PDF object.
 func (pd *PtData) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
-	// Check PDF 2.0 requirement
 	if err := pdf.CheckVersion(rm.Out(), "point data dictionaries", pdf.V2_0); err != nil {
 		return nil, err
 	}

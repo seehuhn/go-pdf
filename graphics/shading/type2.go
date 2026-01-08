@@ -236,7 +236,6 @@ func extractType2(x *pdf.Extractor, d pdf.Dict, isIndirect bool) (*Type2, error)
 
 // Embed implements the [Shading] interface.
 func (s *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	// Version check
 	if err := pdf.CheckVersion(rm.Out(), "Type 2 shading", pdf.V1_3); err != nil {
 		return nil, err

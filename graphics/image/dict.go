@@ -547,7 +547,6 @@ func FromImageWithMask(img image.Image, mask image.Image, colorSpace color.Space
 
 // Embed adds the image to the PDF file and returns the embedded object.
 func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := d.check(rm.Out()); err != nil {
 		return nil, err
 	}

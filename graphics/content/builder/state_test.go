@@ -21,6 +21,7 @@ import (
 
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/state"
 )
 
 func TestSliceNearlyEqual(t *testing.T) {
@@ -37,7 +38,7 @@ func TestSetExtGState(t *testing.T) {
 	b := New(content.Page, nil)
 
 	gs := &graphics.ExtGState{
-		Set:       graphics.StateLineWidth | graphics.StateFillAlpha,
+		Set:       state.LineWidth | state.FillAlpha,
 		LineWidth: 5.0,
 		FillAlpha: 0.5,
 	}
@@ -56,10 +57,10 @@ func TestSetExtGState(t *testing.T) {
 		t.Errorf("FillAlpha = %v, want 0.5", b.Param.FillAlpha)
 	}
 	// with new State model, params set by gs are Known
-	if !b.State.IsKnown(graphics.StateLineWidth) {
+	if !b.State.IsKnown(state.LineWidth) {
 		t.Error("StateLineWidth not marked as Known")
 	}
-	if !b.State.IsKnown(graphics.StateFillAlpha) {
+	if !b.State.IsKnown(state.FillAlpha) {
 		t.Error("StateFillAlpha not marked as Known")
 	}
 }

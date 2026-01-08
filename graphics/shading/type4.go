@@ -89,7 +89,7 @@ func (s *Type4) ShadingType() int {
 }
 
 // extractType4 reads a Type 4 (free-form Gouraud-shaded triangle mesh) shading from a PDF stream.
-func extractType4(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Type4, error) {
+func extractType4(x *pdf.Extractor, stream *pdf.Stream) (*Type4, error) {
 	d := stream.Dict
 	s := &Type4{}
 
@@ -343,7 +343,6 @@ func parseType4Vertices(data []byte, s *Type4) ([]Type4Vertex, error) {
 
 // Embed implements the [Shading] interface.
 func (s *Type4) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	// Version check
 	if err := pdf.CheckVersion(rm.Out(), "Type 4 shadings", pdf.V1_3); err != nil {
 		return nil, err

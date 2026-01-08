@@ -34,6 +34,8 @@ type Pattern interface {
 	pdf.Embedder
 }
 
+// PDF 2.0 sections: 8.6.6.2
+
 // == colored patterns and shadings ==========================================
 
 // spacePatternColored is used for colored tiling patterns and shading patterns.
@@ -85,6 +87,8 @@ func (colorColoredPattern) ColorSpace() Space {
 }
 
 // == uncolored patterns =====================================================
+
+// PDF 2.0 sections: 8.6.6.2
 
 // spacePatternUncolored represents the color space for uncolored patterns
 // (where the color is specified separately).

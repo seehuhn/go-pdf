@@ -77,9 +77,8 @@ func ExtractEncryptedPayload(x *pdf.Extractor, obj pdf.Object) (*EncryptedPayloa
 }
 
 // Embed converts the encrypted payload to a PDF object.
-// This implements the pdf.Embedder interface.
+// This implements the [pdf.Embedder] interface.
 func (ep *EncryptedPayload) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := pdf.CheckVersion(rm.Out(), "encrypted payload dictionary", pdf.V2_0); err != nil {
 		return nil, err
 	}

@@ -22,6 +22,7 @@ import (
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/state"
 )
 
 // This file implements the operators in the "General Graphics State" and
@@ -105,12 +106,12 @@ func (w *Writer) SetLineWidth(width float64) {
 		w.Err = fmt.Errorf("SetLineWidth: negative width %f", width)
 		return
 	}
-	if w.isSet(StateLineWidth) && nearlyEqual(width, w.LineWidth) {
+	if w.isSet(state.LineWidth) && nearlyEqual(width, w.LineWidth) {
 		return
 	}
 
 	w.LineWidth = width
-	w.Set |= StateLineWidth
+	w.Set |= state.LineWidth
 
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(width), "w")
 }
@@ -126,12 +127,12 @@ func (w *Writer) SetLineCap(cap LineCapStyle) {
 		w.Err = fmt.Errorf("SetLineCap: invalid line cap style %d", cap)
 		return
 	}
-	if w.isSet(StateLineCap) && cap == w.LineCap {
+	if w.isSet(state.LineCap) && cap == w.LineCap {
 		return
 	}
 
 	w.LineCap = cap
-	w.Set |= StateLineCap
+	w.Set |= state.LineCap
 
 	_, w.Err = fmt.Fprintln(w.Content, int(cap), "J")
 }
@@ -147,12 +148,12 @@ func (w *Writer) SetLineJoin(join LineJoinStyle) {
 		w.Err = fmt.Errorf("SetLineJoin: invalid line join style %d", join)
 		return
 	}
-	if w.isSet(StateLineJoin) && join == w.LineJoin {
+	if w.isSet(state.LineJoin) && join == w.LineJoin {
 		return
 	}
 
 	w.LineJoin = join
-	w.Set |= StateLineJoin
+	w.Set |= state.LineJoin
 
 	_, w.Err = fmt.Fprintln(w.Content, int(join), "j")
 }
@@ -168,12 +169,12 @@ func (w *Writer) SetMiterLimit(limit float64) {
 		w.Err = fmt.Errorf("SetMiterLimit: invalid miter limit %f", limit)
 		return
 	}
-	if w.isSet(StateMiterLimit) && nearlyEqual(limit, w.MiterLimit) {
+	if w.isSet(state.MiterLimit) && nearlyEqual(limit, w.MiterLimit) {
 		return
 	}
 
 	w.MiterLimit = limit
-	w.Set |= StateMiterLimit
+	w.Set |= state.MiterLimit
 
 	_, w.Err = fmt.Fprintln(w.Content, format(limit), "M")
 }
@@ -185,7 +186,7 @@ func (w *Writer) SetLineDash(pattern []float64, phase float64) {
 	if !w.isValid("SetLineDash", objPage|objText) {
 		return
 	}
-	if w.isSet(StateLineDash) &&
+	if w.isSet(state.LineDash) &&
 		sliceNearlyEqual(pattern, w.DashPattern) &&
 		nearlyEqual(phase, w.DashPhase) {
 		return
@@ -193,7 +194,7 @@ func (w *Writer) SetLineDash(pattern []float64, phase float64) {
 
 	w.DashPattern = pattern
 	w.DashPhase = phase
-	w.Set |= StateLineDash
+	w.Set |= state.LineDash
 
 	_, w.Err = fmt.Fprint(w.Content, "[")
 	if w.Err != nil {
@@ -220,12 +221,12 @@ func (w *Writer) SetRenderingIntent(intent RenderingIntent) {
 	if pdf.GetVersion(w.RM.Out) < pdf.V1_1 {
 		w.Err = &pdf.VersionError{Operation: "SetRenderingIntent", Earliest: pdf.V1_1}
 	}
-	if w.isSet(StateRenderingIntent) && intent == w.RenderingIntent {
+	if w.isSet(state.RenderingIntent) && intent == w.RenderingIntent {
 		return
 	}
 
 	w.RenderingIntent = intent
-	w.Set |= StateRenderingIntent
+	w.Set |= state.RenderingIntent
 
 	w.writeObjects(pdf.Name(intent), pdf.Operator("ri"))
 }
@@ -240,12 +241,12 @@ func (w *Writer) SetFlatnessTolerance(flatness float64) {
 	if flatness < 0 || flatness > 100 {
 		w.Err = fmt.Errorf("SetFlatnessTolerance: invalid flatness tolerance %f", flatness)
 	}
-	if w.isSet(StateFlatnessTolerance) && nearlyEqual(flatness, w.FlatnessTolerance) {
+	if w.isSet(state.FlatnessTolerance) && nearlyEqual(flatness, w.FlatnessTolerance) {
 		return
 	}
 
 	w.FlatnessTolerance = flatness
-	w.Set |= StateFlatnessTolerance
+	w.Set |= state.FlatnessTolerance
 
 	_, w.Err = fmt.Fprintln(w.Content, format(flatness), "i")
 }

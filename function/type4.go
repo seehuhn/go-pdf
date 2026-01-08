@@ -24,6 +24,8 @@ import (
 	"seehuhn.de/go/postscript"
 )
 
+// PDF 2.0 sections: 7.10.5
+
 // Type4 represents a Type 4 PostScript calculator function that uses a subset
 // of PostScript language to define arbitrary calculations.
 type Type4 struct {
@@ -168,7 +170,6 @@ func (f *Type4) validate() error {
 
 // Embed embeds the function into a PDF file.
 func (f *Type4) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := pdf.CheckVersion(rm.Out(), "Type 4 functions", pdf.V1_3); err != nil {
 		return nil, err
 	} else if err := f.validate(); err != nil {

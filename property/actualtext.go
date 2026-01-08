@@ -21,11 +21,13 @@ import (
 	"seehuhn.de/go/pdf/optional"
 )
 
+// PDF 2.0 sections: 14.9
+
 // ActualText represents an ActualText property list for marked content.
 // This provides replacement text for content that should be used during
 // text extraction, searching, and accessibility.
 //
-// PDF 2.0 section 14.9.4
+// PDF 2.0 section 14.9
 type ActualText struct {
 	// MCID (optional) is the marked-content identifier for structure.
 	MCID optional.Int

@@ -332,7 +332,6 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 
 // Embed adds the mask to the PDF file and returns the embedded object.
 func (m *Mask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := m.check(rm.Out()); err != nil {
 		return nil, err
 	}

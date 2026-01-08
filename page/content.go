@@ -21,6 +21,8 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 )
 
+// PDF 2.0 sections: 7.8
+
 // Content represents a single content stream that can be shared
 // across multiple pages. It implements [pdf.Embedder] for deduplication.
 type Content struct {

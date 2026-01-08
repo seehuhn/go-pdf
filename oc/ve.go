@@ -18,8 +18,6 @@ package oc
 
 import "seehuhn.de/go/pdf"
 
-// PDF 2.0 sections: 8.11.2
-
 // VisibilityExpression represents a PDF visibility expression for optional content.
 // This must be one of:
 //   - [VisibilityExpressionGroup]
@@ -90,6 +88,8 @@ func ExtractVisibilityExpression(x *pdf.Extractor, obj pdf.Object) (VisibilityEx
 	}
 }
 
+// PDF 2.0 sections: 8.11.2
+
 // VisibilityExpressionGroup represents a visibility expression that references a single group.
 type VisibilityExpressionGroup struct {
 	Group *Group
@@ -113,6 +113,8 @@ func (g *VisibilityExpressionGroup) Embed(rm *pdf.EmbedHelper) (pdf.Native, erro
 	}
 	return groupRef, nil
 }
+
+// PDF 2.0 sections: 8.11.2
 
 // VisibilityExpressionAnd represents a logical AND of multiple visibility expressions.
 type VisibilityExpressionAnd struct {
@@ -151,6 +153,8 @@ func (a *VisibilityExpressionAnd) Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
 	return arr, nil
 }
 
+// PDF 2.0 sections: 8.11.2
+
 // VisibilityExpressionOr represents a logical OR of multiple visibility expressions.
 type VisibilityExpressionOr struct {
 	Args []VisibilityExpression
@@ -187,6 +191,8 @@ func (o *VisibilityExpressionOr) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) 
 
 	return arr, nil
 }
+
+// PDF 2.0 sections: 8.11.2
 
 // VisibilityExpressionNot represents a logical NOT of a single visibility expression.
 type VisibilityExpressionNot struct {

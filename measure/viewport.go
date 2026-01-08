@@ -99,7 +99,6 @@ func ExtractViewport(x *pdf.Extractor, obj pdf.Object) (*Viewport, error) {
 
 // Embed converts the Viewport into a PDF object.
 func (v *Viewport) Embed(res *pdf.EmbedHelper) (pdf.Native, error) {
-
 	// Version check for PDF 1.6+
 	if err := pdf.CheckVersion(res.Out(), "viewport dictionaries", pdf.V1_6); err != nil {
 		return nil, err
@@ -154,6 +153,8 @@ func (v *Viewport) Embed(res *pdf.EmbedHelper) (pdf.Native, error) {
 	return ref, nil
 }
 
+// PDF 2.0 sections: 12.9
+
 // ViewPortArray represents an array of viewport dictionaries.
 type ViewPortArray struct {
 	// Viewports contains the array of viewport dictionaries.
@@ -184,6 +185,9 @@ func ExtractViewportArray(x *pdf.Extractor, obj pdf.Object) (*ViewPortArray, err
 	a, err := pdf.GetArray(x.R, obj)
 	if err != nil {
 		return nil, err
+	}
+	if a == nil {
+		return nil, nil
 	}
 
 	viewports := make([]*Viewport, len(a))

@@ -22,6 +22,8 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// PDF 2.0 sections: 7.9.7
+
 // FromFile represents a number tree that allows reading values from a PDF file
 // without holding the entire tree in memory.
 type FromFile struct {

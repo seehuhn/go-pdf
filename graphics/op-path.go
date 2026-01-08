@@ -21,6 +21,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/state"
 )
 
 // This file implements the "Path construction operators" and "Path-painting
@@ -136,9 +137,9 @@ func (w *Writer) Stroke() {
 
 	w.currentObject = objPage
 
-	required := StateLineWidth | StateLineJoin | StateLineDash | StateStrokeColor
+	required := state.LineWidth | state.LineJoin | state.LineDash | state.StrokeColor
 	if !w.AllSubpathsClosed || len(w.DashPattern) > 0 {
-		required |= StateLineCap
+		required |= state.LineCap
 	}
 
 	if err := w.mustBeSet(required); err != nil {
@@ -166,9 +167,9 @@ func (w *Writer) CloseAndStroke() {
 
 	w.currentObject = objPage
 
-	required := StateLineWidth | StateLineJoin | StateLineDash | StateStrokeColor
+	required := state.LineWidth | state.LineJoin | state.LineDash | state.StrokeColor
 	if !w.AllSubpathsClosed || len(w.DashPattern) > 0 {
-		required |= StateLineCap
+		required |= state.LineCap
 	}
 
 	if err := w.mustBeSet(required); err != nil {
@@ -192,7 +193,7 @@ func (w *Writer) Fill() {
 	}
 	w.currentObject = objPage
 
-	if err := w.mustBeSet(StateFillColor); err != nil {
+	if err := w.mustBeSet(state.FillColor); err != nil {
 		w.Err = err
 		return
 	}
@@ -213,7 +214,7 @@ func (w *Writer) FillEvenOdd() {
 	}
 	w.currentObject = objPage
 
-	if err := w.mustBeSet(StateFillColor); err != nil {
+	if err := w.mustBeSet(state.FillColor); err != nil {
 		w.Err = err
 		return
 	}
@@ -240,12 +241,12 @@ func (w *Writer) FillAndStroke() {
 
 	w.currentObject = objPage
 
-	required := StateLineWidth | StateLineJoin | StateLineDash | StateStrokeColor
+	required := state.LineWidth | state.LineJoin | state.LineDash | state.StrokeColor
 	if !w.AllSubpathsClosed || len(w.DashPattern) > 0 {
-		required |= StateLineCap
+		required |= state.LineCap
 	}
 
-	if err := w.mustBeSet(required | StateFillColor); err != nil {
+	if err := w.mustBeSet(required | state.FillColor); err != nil {
 		w.Err = err
 		return
 	}
@@ -273,12 +274,12 @@ func (w *Writer) FillAndStrokeEvenOdd() {
 
 	w.currentObject = objPage
 
-	required := StateLineWidth | StateLineJoin | StateLineDash | StateStrokeColor
+	required := state.LineWidth | state.LineJoin | state.LineDash | state.StrokeColor
 	if !w.AllSubpathsClosed || len(w.DashPattern) > 0 {
-		required |= StateLineCap
+		required |= state.LineCap
 	}
 
-	if err := w.mustBeSet(required | StateFillColor); err != nil {
+	if err := w.mustBeSet(required | state.FillColor); err != nil {
 		w.Err = err
 		return
 	}
@@ -303,12 +304,12 @@ func (w *Writer) CloseFillAndStroke() {
 
 	w.currentObject = objPage
 
-	required := StateLineWidth | StateLineJoin | StateLineDash | StateStrokeColor
+	required := state.LineWidth | state.LineJoin | state.LineDash | state.StrokeColor
 	if !w.AllSubpathsClosed || len(w.DashPattern) > 0 {
-		required |= StateLineCap
+		required |= state.LineCap
 	}
 
-	if err := w.mustBeSet(required | StateFillColor); err != nil {
+	if err := w.mustBeSet(required | state.FillColor); err != nil {
 		w.Err = err
 		return
 	}
@@ -334,12 +335,12 @@ func (w *Writer) CloseFillAndStrokeEvenOdd() {
 
 	w.currentObject = objPage
 
-	required := StateLineWidth | StateLineJoin | StateLineDash | StateStrokeColor
+	required := state.LineWidth | state.LineJoin | state.LineDash | state.StrokeColor
 	if !w.AllSubpathsClosed || len(w.DashPattern) > 0 {
-		required |= StateLineCap
+		required |= state.LineCap
 	}
 
-	if err := w.mustBeSet(required | StateFillColor); err != nil {
+	if err := w.mustBeSet(required | state.FillColor); err != nil {
 		w.Err = err
 		return
 	}

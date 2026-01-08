@@ -85,7 +85,7 @@ func (s *Type5) ShadingType() int {
 }
 
 // extractType5 reads a Type 5 (lattice-form Gouraud-shaded triangle mesh) shading from a PDF stream.
-func extractType5(x *pdf.Extractor, stream *pdf.Stream, wasReference bool) (*Type5, error) {
+func extractType5(x *pdf.Extractor, stream *pdf.Stream) (*Type5, error) {
 	d := stream.Dict
 	s := &Type5{}
 
@@ -340,7 +340,6 @@ func parseType5Vertices(data []byte, s *Type5) ([]Type5Vertex, error) {
 
 // Embed implements the [Shading] interface.
 func (s *Type5) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	// Version check
 	if err := pdf.CheckVersion(rm.Out(), "Type 5 shadings", pdf.V1_3); err != nil {
 		return nil, err

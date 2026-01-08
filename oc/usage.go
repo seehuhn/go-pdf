@@ -23,7 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// PDF 2.0 sections: 8.11.4.4
+// PDF 2.0 sections: 8.11.4
 
 // Usage represents an optional content usage dictionary that contains information
 // describing the nature of the content controlled by an optional content group.
@@ -263,7 +263,6 @@ func ExtractUsage(x *pdf.Extractor, obj pdf.Object) (*Usage, error) {
 
 // Embed adds the usage dictionary to a PDF file.
 func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	dict := pdf.Dict{}
 
 	// embed CreatorInfo dictionary

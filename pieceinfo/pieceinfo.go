@@ -24,6 +24,8 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// PDF 2.0 sections: 14.5
+
 // PieceInfo represents a page-piece dictionary containing private data from
 // PDF processors. This maps application names to the corresponding data.
 type PieceInfo struct {

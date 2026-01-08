@@ -17,13 +17,13 @@
 package boxcolor
 
 import (
-	"errors"
+	"fmt"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
-// PDF 2.0 sections: 14.11.2.2
+// PDF 2.0 sections: 14.11.2
 
 type Style struct {
 	// Color specifies the line color to use.
@@ -63,14 +63,18 @@ func ExtractStyle(x *pdf.Extractor, obj pdf.Object) (*Style, error) {
 
 	style := &Style{}
 
-	// color
+	// color (clamp to valid range [0.0, 1.0])
 	if cArray, err := pdf.Optional(x.GetArray(dict["C"])); err != nil {
 		return nil, err
 	} else if len(cArray) >= 3 {
 		r, _ := pdf.GetNumber(x.R, cArray[0])
 		g, _ := pdf.GetNumber(x.R, cArray[1])
 		b, _ := pdf.GetNumber(x.R, cArray[2])
-		style.Color = color.DeviceRGB{float64(r), float64(g), float64(b)}
+		style.Color = color.DeviceRGB{
+			clamp(float64(r), 0, 1),
+			clamp(float64(g), 0, 1),
+			clamp(float64(b), 0, 1),
+		}
 	}
 
 	// line width
@@ -115,7 +119,12 @@ func (s *Style) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 
 	dict := pdf.Dict{}
 
-	// color
+	// color (must be in range [0.0, 1.0])
+	for i, c := range s.Color {
+		if c < 0 || c > 1 {
+			return nil, fmt.Errorf("color component %d out of range [0, 1]: %g", i, c)
+		}
+	}
 	if s.Color != (color.DeviceRGB{0, 0, 0}) {
 		dict["C"] = pdf.Array{
 			pdf.Number(s.Color[0]),
@@ -126,7 +135,7 @@ func (s *Style) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// line width
 	if s.LineWidth < 0 {
-		return nil, errors.New("line width must be non-negative")
+		return nil, fmt.Errorf("line width must be non-negative: %g", s.LineWidth)
 	}
 	if s.LineWidth != 0 && s.LineWidth != 1 {
 		dict["W"] = pdf.Number(s.LineWidth)
@@ -161,3 +170,13 @@ const (
 	// StyleDashed represents a dashed line style.
 	StyleDashed LineStyle = "D"
 )
+
+func clamp(v, lo, hi float64) float64 {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}

@@ -168,7 +168,6 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
 
 // Embed converts the thumbnail to a PDF object.
 func (t *Thumbnail) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := t.check(rm.Out()); err != nil {
 		return nil, err
 	}

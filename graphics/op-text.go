@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/graphics/state"
 )
 
 // This file implements all text-related PDF operators.  The operators
@@ -43,7 +44,7 @@ func (w *Writer) TextBegin() {
 
 	w.State.TextMatrix = matrix.Identity
 	w.State.TextLineMatrix = matrix.Identity
-	w.Set |= StateTextMatrix
+	w.Set |= state.TextMatrix
 
 	_, w.Err = fmt.Fprintln(w.Content, "BT")
 }
@@ -64,7 +65,7 @@ func (w *Writer) TextEnd() {
 	}
 	w.nesting = w.nesting[:len(w.nesting)-1]
 
-	w.Set &= ^StateTextMatrix
+	w.Set &= ^state.TextMatrix
 
 	_, w.Err = fmt.Fprintln(w.Content, "ET")
 }
@@ -76,12 +77,12 @@ func (w *Writer) TextSetCharacterSpacing(charSpacing float64) {
 	if !w.isValid("TextSetCharSpacing", objText|objPage) {
 		return
 	}
-	if w.isSet(StateTextCharacterSpacing) && nearlyEqual(charSpacing, w.State.TextCharacterSpacing) {
+	if w.isSet(state.TextCharacterSpacing) && nearlyEqual(charSpacing, w.State.TextCharacterSpacing) {
 		return
 	}
 
 	w.State.TextCharacterSpacing = charSpacing
-	w.Set |= StateTextCharacterSpacing
+	w.Set |= state.TextCharacterSpacing
 
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(charSpacing), "Tc")
 }
@@ -93,12 +94,12 @@ func (w *Writer) TextSetWordSpacing(wordSpacing float64) {
 	if !w.isValid("TextSetWordSpacing", objText|objPage) {
 		return
 	}
-	if w.isSet(StateTextWordSpacing) && nearlyEqual(wordSpacing, w.State.TextWordSpacing) {
+	if w.isSet(state.TextWordSpacing) && nearlyEqual(wordSpacing, w.State.TextWordSpacing) {
 		return
 	}
 
 	w.State.TextWordSpacing = wordSpacing
-	w.Set |= StateTextWordSpacing
+	w.Set |= state.TextWordSpacing
 
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(wordSpacing), "Tw")
 }
@@ -113,12 +114,12 @@ func (w *Writer) TextSetHorizontalScaling(scaling float64) {
 	if !w.isValid("TextSetHorizontalScaling", objText|objPage) {
 		return
 	}
-	if w.isSet(StateTextHorizontalScaling) && nearlyEqual(scaling, w.State.TextHorizontalScaling) {
+	if w.isSet(state.TextHorizontalScaling) && nearlyEqual(scaling, w.State.TextHorizontalScaling) {
 		return
 	}
 
 	w.State.TextHorizontalScaling = scaling
-	w.Set |= StateTextHorizontalScaling
+	w.Set |= state.TextHorizontalScaling
 
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(scaling*100), "Tz")
 }
@@ -132,12 +133,12 @@ func (w *Writer) TextSetLeading(leading float64) {
 	if !w.isValid("TextSetLeading", objText|objPage) {
 		return
 	}
-	if w.isSet(StateTextLeading) && nearlyEqual(leading, w.State.TextLeading) {
+	if w.isSet(state.TextLeading) && nearlyEqual(leading, w.State.TextLeading) {
 		return
 	}
 
 	w.State.TextLeading = leading
-	w.Set |= StateTextLeading
+	w.Set |= state.TextLeading
 
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(leading), "TL")
 }
@@ -156,13 +157,13 @@ func (w *Writer) TextSetFont(F font.Instance, size float64) {
 		return
 	}
 
-	if w.isSet(StateTextFont) && w.State.TextFont == F && nearlyEqual(w.State.TextFontSize, size) {
+	if w.isSet(state.TextFont) && w.State.TextFont == F && nearlyEqual(w.State.TextFontSize, size) {
 		return
 	}
 
 	w.State.TextFont = F
 	w.State.TextFontSize = size
-	w.State.Set |= StateTextFont
+	w.State.Set |= state.TextFont
 
 	w.writeObjects(name, pdf.Number(size), pdf.Operator("Tf"))
 }
@@ -174,12 +175,12 @@ func (w *Writer) TextSetRenderingMode(mode TextRenderingMode) {
 	if !w.isValid("TextSetRenderingMode", objText|objPage) {
 		return
 	}
-	if w.isSet(StateTextRenderingMode) && w.State.TextRenderingMode == mode {
+	if w.isSet(state.TextRenderingMode) && w.State.TextRenderingMode == mode {
 		return
 	}
 
 	w.State.TextRenderingMode = mode
-	w.Set |= StateTextRenderingMode
+	w.Set |= state.TextRenderingMode
 
 	_, w.Err = fmt.Fprintln(w.Content, mode, "Tr")
 }
@@ -192,12 +193,12 @@ func (w *Writer) TextSetRise(rise float64) {
 	if !w.isValid("TextSetRise", objText|objPage) {
 		return
 	}
-	if w.isSet(StateTextRise) && nearlyEqual(rise, w.State.TextRise) {
+	if w.isSet(state.TextRise) && nearlyEqual(rise, w.State.TextRise) {
 		return
 	}
 
 	w.State.TextRise = rise
-	w.Set |= StateTextRise
+	w.Set |= state.TextRise
 
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(rise), "Ts")
 }
@@ -231,7 +232,7 @@ func (w *Writer) TextSecondLine(dx, dy float64) {
 	w.TextLineMatrix = matrix.Translate(dx, dy).Mul(w.TextLineMatrix)
 	w.TextMatrix = w.TextLineMatrix
 	w.TextLeading = -dy
-	w.Set |= StateTextLeading
+	w.Set |= state.TextLeading
 
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(dx), w.coord(dy), "TD")
 }
@@ -246,7 +247,7 @@ func (w *Writer) TextSetMatrix(M matrix.Matrix) {
 
 	w.TextMatrix = M
 	w.TextLineMatrix = M
-	w.Set |= StateTextMatrix
+	w.Set |= state.TextMatrix
 
 	_, w.Err = fmt.Fprintln(w.Content, w.coord(M[0]), w.coord(M[1]), w.coord(M[2]), w.coord(M[3]), w.coord(M[4]), w.coord(M[5]), "Tm")
 }
@@ -258,7 +259,7 @@ func (w *Writer) TextNextLine() {
 	if !w.isValid("TextNewLine", objText) {
 		return
 	}
-	if err := w.mustBeSet(StateTextMatrix | StateTextLeading); err != nil {
+	if err := w.mustBeSet(state.TextMatrix | state.TextLeading); err != nil {
 		w.Err = err
 		return
 	}
@@ -276,7 +277,7 @@ func (w *Writer) TextShowRaw(s pdf.String) {
 	if !w.isValid("TextShowRaw", objText) {
 		return
 	}
-	if err := w.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise | StateTextWordSpacing | StateTextCharacterSpacing); err != nil {
+	if err := w.mustBeSet(state.TextFont | state.TextMatrix | state.TextHorizontalScaling | state.TextRise | state.TextWordSpacing | state.TextCharacterSpacing); err != nil {
 		w.Err = err
 		return
 	}
@@ -295,7 +296,7 @@ func (w *Writer) TextShowNextLineRaw(s pdf.String) {
 	if !w.isValid("TextShowNextLineRaw", objText) {
 		return
 	}
-	if err := w.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise | StateTextWordSpacing | StateTextCharacterSpacing | StateTextLeading); err != nil {
+	if err := w.mustBeSet(state.TextFont | state.TextMatrix | state.TextHorizontalScaling | state.TextRise | state.TextWordSpacing | state.TextCharacterSpacing | state.TextLeading); err != nil {
 		w.Err = err
 		return
 	}
@@ -318,14 +319,14 @@ func (w *Writer) TextShowSpacedRaw(wordSpacing, charSpacing float64, s pdf.Strin
 	if !w.isValid("TextShowSpacedRaw", objText) {
 		return
 	}
-	if err := w.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
+	if err := w.mustBeSet(state.TextFont | state.TextMatrix | state.TextHorizontalScaling | state.TextRise); err != nil {
 		w.Err = err
 		return
 	}
 
 	w.State.TextWordSpacing = wordSpacing
 	w.State.TextCharacterSpacing = charSpacing
-	w.Set |= StateTextWordSpacing | StateTextCharacterSpacing
+	w.Set |= state.TextWordSpacing | state.TextCharacterSpacing
 	w.updateTextPosition(s)
 
 	w.writeObjects(pdf.Number(wordSpacing), pdf.Number(charSpacing), s, pdf.Operator(`"`))
@@ -342,7 +343,7 @@ func (w *Writer) TextShowKernedRaw(args ...pdf.Object) {
 	if !w.isValid("TextShowKernedRaw", objText) {
 		return
 	}
-	if err := w.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise | StateTextWordSpacing | StateTextCharacterSpacing); err != nil {
+	if err := w.mustBeSet(state.TextFont | state.TextMatrix | state.TextHorizontalScaling | state.TextRise | state.TextWordSpacing | state.TextCharacterSpacing); err != nil {
 		w.Err = err
 		return
 	}

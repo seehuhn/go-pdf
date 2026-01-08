@@ -22,8 +22,6 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// PDF 2.0 section: 12.4.4
-
 // Style represents a transition style for page transitions.
 type Style pdf.Name
 
@@ -77,6 +75,8 @@ type Direction int
 
 // DirNone represents the PDF name "None", valid only for Fly with Scale ≠ 1.0.
 const DirNone Direction = -1
+
+// PDF 2.0 sections: 12.4.4
 
 // Transition represents a transition dictionary (Table 164 in the PDF spec).
 //

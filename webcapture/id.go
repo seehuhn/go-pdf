@@ -22,6 +22,8 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// PDF 2.0 sections: 14.10.4
+
 // Identifier represents a digital identifier for a web capture content set.
 type Identifier struct {
 	// ID represents the digital identifier of the content set.
@@ -50,7 +52,6 @@ func ExtractIdentifier(x *pdf.Extractor, obj pdf.Object) (*Identifier, error) {
 
 // Embed converts the identifier to a PDF byte string as an indirect object.
 func (id *Identifier) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	// Validate the ID
 	if len(id.ID) != 16 {
 		return nil, fmt.Errorf("invalid identifier length: %d != 16", len(id.ID))

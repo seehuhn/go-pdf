@@ -151,7 +151,6 @@ func extractType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
 }
 
 func (h *Type16) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := pdf.CheckVersion(rm.Out(), "Type 16 halftone screening", pdf.V1_3); err != nil {
 		return nil, err
 	}
@@ -225,6 +224,7 @@ func (h *Type16) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 		_, err = stm.Write(data)
 		if err != nil {
+			stm.Close()
 			return nil, err
 		}
 	}

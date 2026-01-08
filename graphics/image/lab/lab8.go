@@ -24,6 +24,9 @@ import (
 	pdfimage "seehuhn.de/go/pdf/graphics/image"
 )
 
+// PDF 2.0 sections: 8.9.5
+
+// Lab8 represents an image in the Lab color space with 8 bits per component.
 type Lab8 struct {
 	Width  int
 	Height int

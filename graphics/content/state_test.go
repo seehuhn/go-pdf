@@ -19,7 +19,7 @@ package content
 import (
 	"testing"
 
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/state"
 )
 
 func TestNewState_Page(t *testing.T) {
@@ -27,18 +27,18 @@ func TestNewState_Page(t *testing.T) {
 
 	// Page: Set=initializedStateBits, Known=initializedStateBits
 	// Font is NOT in initializedStateBits
-	if s.Set&graphics.StateTextFont != 0 {
+	if s.Set&state.TextFont != 0 {
 		t.Error("Page: font should be Unset")
 	}
-	if s.Known&graphics.StateTextFont != 0 {
+	if s.Known&state.TextFont != 0 {
 		t.Error("Page: font should not be Known")
 	}
 
 	// LineWidth should be Set and Known
-	if s.Set&graphics.StateLineWidth == 0 {
+	if s.Set&state.LineWidth == 0 {
 		t.Error("Page: line width should be Set")
 	}
-	if s.Known&graphics.StateLineWidth == 0 {
+	if s.Known&state.LineWidth == 0 {
 		t.Error("Page: line width should be Known")
 	}
 }
@@ -47,7 +47,7 @@ func TestNewState_Form(t *testing.T) {
 	s := NewState(Form)
 
 	// Form: Set=AllStateBits, Known=0
-	if s.Set != graphics.AllStateBits {
+	if s.Set != state.AllBits {
 		t.Errorf("Form: Set = %v, want AllStateBits", s.Set)
 	}
 	if s.Known != 0 {
@@ -59,12 +59,12 @@ func TestState_IsKnown(t *testing.T) {
 	s := NewState(Page)
 
 	// LineWidth is Known for Page
-	if !s.IsKnown(graphics.StateLineWidth) {
+	if !s.IsKnown(state.LineWidth) {
 		t.Error("line width should be Known")
 	}
 
 	// Font is not Known
-	if s.IsKnown(graphics.StateTextFont) {
+	if s.IsKnown(state.TextFont) {
 		t.Error("font should not be Known")
 	}
 }
@@ -73,10 +73,10 @@ func TestState_IsSet(t *testing.T) {
 	s := NewState(Form)
 
 	// Everything is Set for Form
-	if !s.IsSet(graphics.StateLineWidth) {
+	if !s.IsSet(state.LineWidth) {
 		t.Error("line width should be Set")
 	}
-	if !s.IsSet(graphics.StateTextFont) {
+	if !s.IsSet(state.TextFont) {
 		t.Error("font should be Set")
 	}
 }
@@ -85,13 +85,13 @@ func TestState_MarkAsSet(t *testing.T) {
 	s := NewState(Form)
 
 	// Initially not Known
-	if s.IsKnown(graphics.StateLineWidth) {
+	if s.IsKnown(state.LineWidth) {
 		t.Error("line width should not be Known initially")
 	}
 
 	// After MarkAsSet
-	s.MarkAsSet(graphics.StateLineWidth)
-	if !s.IsKnown(graphics.StateLineWidth) {
+	s.MarkAsSet(state.LineWidth)
+	if !s.IsKnown(state.LineWidth) {
 		t.Error("line width should be Known after MarkAsSet")
 	}
 }
@@ -100,15 +100,15 @@ func TestState_MarkUsedUnknown(t *testing.T) {
 	s := NewState(Form)
 
 	// Use a Set-Unknown parameter
-	s.MarkAsUsed(graphics.StateLineWidth)
-	if s.FromContext&graphics.StateLineWidth == 0 {
+	s.MarkAsUsed(state.LineWidth)
+	if s.FromContext&state.LineWidth == 0 {
 		t.Error("line width should be in UsedUnknown")
 	}
 
 	// Known params should not be marked
-	s.MarkAsSet(graphics.StateLineCap)
-	s.MarkAsUsed(graphics.StateLineCap)
-	if s.FromContext&graphics.StateLineCap != 0 {
+	s.MarkAsSet(state.LineCap)
+	s.MarkAsUsed(state.LineCap)
+	if s.FromContext&state.LineCap != 0 {
 		t.Error("line cap should not be in UsedUnknown (it's Known)")
 	}
 }
@@ -117,8 +117,8 @@ func TestState_PushPop(t *testing.T) {
 	s := NewState(Form) // Form has Set=All, Known=0
 
 	// Mark line width as Known
-	s.MarkAsSet(graphics.StateLineWidth)
-	if !s.IsKnown(graphics.StateLineWidth) {
+	s.MarkAsSet(state.LineWidth)
+	if !s.IsKnown(state.LineWidth) {
 		t.Fatal("line width should be Known after MarkAsSet")
 	}
 
@@ -136,7 +136,7 @@ func TestState_PushPop(t *testing.T) {
 	}
 
 	// Known should be restored
-	if !s.IsKnown(graphics.StateLineWidth) {
+	if !s.IsKnown(state.LineWidth) {
 		t.Error("line width Known bit should be restored after Pop")
 	}
 }

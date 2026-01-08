@@ -21,6 +21,8 @@ import (
 	"seehuhn.de/go/xmp"
 )
 
+// PDF 2.0 sections: 14.3
+
 // Stream represents an XMP metadata stream.
 //
 // The metadata may either refer to a PDF document as a whole, or to
@@ -48,9 +50,8 @@ func Extract(r pdf.Getter, ref pdf.Object) (*Stream, error) {
 }
 
 // Embed adds the XMP metadata stream to the PDF file.
-// This implements the pdf.Embedder interface.
+// This implements the [pdf.Embedder] interface.
 func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	w := rm.Out()
 	if err := pdf.CheckVersion(w, "XMP metadata stream", pdf.V1_4); err != nil {
 		return nil, err

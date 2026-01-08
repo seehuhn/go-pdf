@@ -21,7 +21,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
-// PDF 2.0 sections: 8.10.3, 11.6.6
+// PDF 2.0 sections: 8.10 11.6.6
 
 // TransparencyAttributes represents a transparency group attributes dictionary
 // (Tables 94 and 145 in the PDF spec).
@@ -60,6 +60,17 @@ type TransparencyAttributes struct {
 	// This allows the embedding code to return the dictionary directly
 	// instead of creating an indirect reference.
 	SingleUse bool
+}
+
+// Equal reports whether two TransparencyAttributes are equal.
+func (a *TransparencyAttributes) Equal(other *TransparencyAttributes) bool {
+	if a == nil || other == nil {
+		return a == nil && other == nil
+	}
+	return color.SpacesEqual(a.CS, other.CS) &&
+		a.Isolated == other.Isolated &&
+		a.Knockout == other.Knockout &&
+		a.SingleUse == other.SingleUse
 }
 
 // Embed adds the transparency group attributes dictionary to a PDF file.

@@ -30,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/graphics/group"
 	"seehuhn.de/go/pdf/graphics/image/thumbnail"
+	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/page/boxcolor"
@@ -158,14 +159,14 @@ type Page struct {
 	UserUnit float64
 
 	// VP (optional) specifies rectangular viewport regions of the page.
-	VP pdf.Object // TODO: array of viewport dictionaries
+	VP *measure.ViewPortArray
 
 	// AF (optional; PDF 2.0) lists associated files for this page.
 	AF []*file.Specification
 
 	// OutputIntents (optional; PDF 2.0) specifies color characteristics
 	// for output devices.
-	OutputIntents pdf.Object // TODO: array of output intent dictionaries
+	OutputIntents pdf.Object
 
 	// DPart (optional; PDF 2.0) references the DPart whose range includes
 	// this page. Required if this page is within a DPart range.
@@ -316,12 +317,16 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["Trans"] = transObj
 	}
 
-	// Annots
+	// Annots (spec requires indirect references)
 	if len(p.Annots) > 0 {
 		arr := make(pdf.Array, len(p.Annots))
 		for i, annot := range p.Annots {
-			ref, err := annot.Encode(rm)
+			annotDict, err := annot.Encode(rm)
 			if err != nil {
+				return nil, err
+			}
+			ref := rm.Out.Alloc()
+			if err := rm.Out.Put(ref, annotDict); err != nil {
 				return nil, err
 			}
 			arr[i] = ref
@@ -462,7 +467,11 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(w, "VP", pdf.V1_6); err != nil {
 			return nil, err
 		}
-		dict["VP"] = p.VP
+		vpObj, err := rm.Embed(p.VP)
+		if err != nil {
+			return nil, err
+		}
+		dict["VP"] = vpObj
 	}
 
 	// AF
@@ -609,10 +618,13 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	// Rotate (optional, inheritable)
+	// Normalize to 0, 90, 180, 270; invalid values default to 0.
 	if rotate, err := pdf.Optional(x.GetInteger(dict["Rotate"])); err != nil {
 		return nil, err
+	} else if rotate%90 != 0 {
+		p.Rotate = 0
 	} else {
-		p.Rotate = int(rotate)
+		p.Rotate = ((int(rotate) % 360) + 360) % 360
 	}
 
 	// Group (optional)
@@ -634,7 +646,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	// B (optional)
 	if bArray, err := pdf.Optional(x.GetArray(dict["B"])); err != nil {
 		return nil, err
-	} else if bArray != nil {
+	} else {
 		for _, item := range bArray {
 			if ref, ok := item.(pdf.Reference); ok {
 				p.ArticleBeads = append(p.ArticleBeads, ref)
@@ -661,7 +673,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	// Annots (optional)
 	if annotsArray, err := pdf.Optional(x.GetArray(dict["Annots"])); err != nil {
 		return nil, err
-	} else if annotsArray != nil {
+	} else {
 		for _, item := range annotsArray {
 			annot, err := annotation.Decode(x, item)
 			if err != nil {
@@ -768,7 +780,11 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	// VP (optional)
-	p.VP = dict["VP"]
+	if vp, err := pdf.ExtractorGetOptional(x, dict["VP"], measure.ExtractViewportArray); err != nil {
+		return nil, err
+	} else {
+		p.VP = vp
+	}
 
 	// AF (optional)
 	if afArray, err := pdf.Optional(x.GetArray(dict["AF"])); err != nil {

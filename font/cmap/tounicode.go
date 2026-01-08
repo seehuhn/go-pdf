@@ -344,7 +344,6 @@ rangesLoop:
 }
 
 func (tu *ToUnicodeFile) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	opt := rm.Out().GetOptions()
 
 	// TODO(voss): review this once

@@ -21,6 +21,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/state"
 )
 
 // This file implements functions to set the stroke and fill colors.
@@ -45,17 +46,17 @@ func (w *Writer) SetFillColor(c color.Color) {
 func (w *Writer) setColor(c color.Color, fill bool) {
 	var cur color.Color
 	if fill {
-		if w.isSet(StateFillColor) {
+		if w.isSet(state.FillColor) {
 			cur = w.FillColor
 		}
 		w.FillColor = c
-		w.Set |= StateFillColor
+		w.Set |= state.FillColor
 	} else {
-		if w.isSet(StateStrokeColor) {
+		if w.isSet(state.StrokeColor) {
 			cur = w.StrokeColor
 		}
 		w.StrokeColor = c
-		w.Set |= StateStrokeColor
+		w.Set |= state.StrokeColor
 	}
 
 	cs := c.ColorSpace()

@@ -23,6 +23,9 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// PDF 2.0 sections: 7.9.7
+
+// InMemory represents a number tree held entirely in memory.
 type InMemory struct {
 	Data map[pdf.Integer]pdf.Object
 }

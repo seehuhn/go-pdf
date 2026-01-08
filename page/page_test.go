@@ -109,7 +109,7 @@ var testCases = []testCase{
 		name: "page with rotation",
 		page: &Page{
 			MediaBox:  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792},
-			Rotate:    90,
+			Rotate:    270,
 			Resources: &content.Resources{SingleUse: true},
 		},
 	},

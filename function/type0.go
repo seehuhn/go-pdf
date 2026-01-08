@@ -28,6 +28,8 @@ import (
 
 const maxSampleBits = 1 << 23 // 1MB
 
+// PDF 2.0 sections: 7.10.2
+
 // Type0 represents a Type 0 sampled function that uses a table of sample
 // values with interpolation to approximate functions with bounded domains
 // and ranges.
@@ -285,11 +287,9 @@ func (f *Type0) validate() error {
 
 // Embed embeds the function into a PDF file.
 func (f *Type0) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := pdf.CheckVersion(rm.Out(), "Type 0 functions", pdf.V1_2); err != nil {
 		return nil, err
-	}
-	if err := f.validate(); err != nil {
+	} else if err := f.validate(); err != nil {
 		return nil, err
 	}
 

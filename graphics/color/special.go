@@ -28,6 +28,8 @@ import (
 
 // == Indexed ================================================================
 
+// PDF 2.0 sections: 8.6.6.3
+
 // SpaceIndexed represents an indexed color space.
 type SpaceIndexed struct {
 	NumCol int
@@ -104,7 +106,6 @@ func (s *SpaceIndexed) Channels() int {
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
 func (s *SpaceIndexed) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := pdf.CheckVersion(rm.Out(), "Indexed color space", pdf.V1_1); err != nil {
 		return nil, err
 	}
@@ -148,6 +149,8 @@ func (c colorIndexed) ColorSpace() Space {
 }
 
 // == Separation =============================================================
+
+// PDF 2.0 sections: 8.6.6.4
 
 // SpaceSeparation represents a Separation color space.
 //
@@ -209,9 +212,8 @@ func (s *SpaceSeparation) Channels() int {
 }
 
 // Embed adds the color space to a PDF file.
-// This implements the pdf.Embedder interface.
+// This implements the [pdf.Embedder] interface.
 func (s *SpaceSeparation) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := pdf.CheckVersion(rm.Out(), "Separation color space", pdf.V1_2); err != nil {
 		return nil, err
 	}
@@ -251,6 +253,8 @@ func (c colorSeparation) ColorSpace() Space {
 }
 
 // == DeviceN ================================================================
+
+// PDF 2.0 sections: 8.6.6.5
 
 // SpaceDeviceN represents a DeviceN color space.
 //
@@ -349,9 +353,8 @@ func (s *SpaceDeviceN) Channels() int {
 }
 
 // Embed adds the color space to a PDF file.
-// This implements the pdf.Embedder interface.
+// This implements the [pdf.Embedder] interface.
 func (s *SpaceDeviceN) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := pdf.CheckVersion(rm.Out(), "DeviceN color space", pdf.V1_3); err != nil {
 		return nil, err
 	}

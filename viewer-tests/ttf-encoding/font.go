@@ -325,7 +325,6 @@ type testFont struct {
 }
 
 func (f *testFont) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	fontDictRef := rm.Alloc()
 	fontDescriptorRef := rm.Alloc()
 	fontFileRef := rm.Alloc()

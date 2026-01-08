@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/state"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/property"
 	"seehuhn.de/go/pdf/reader/scanner"
@@ -175,7 +176,7 @@ func (r *Reader) do() error {
 			lineWidth := op.GetNumber()
 			if op.OK() {
 				r.LineWidth = lineWidth
-				r.Set |= graphics.StateLineWidth
+				r.Set |= state.LineWidth
 			}
 
 		case "J": // line cap style
@@ -187,7 +188,7 @@ func (r *Reader) do() error {
 					lineCap = 2
 				}
 				r.LineCap = graphics.LineCapStyle(lineCap)
-				r.Set |= graphics.StateLineCap
+				r.Set |= state.LineCap
 			}
 
 		case "j": // line join style
@@ -199,7 +200,7 @@ func (r *Reader) do() error {
 					lineJoin = 2
 				}
 				r.LineJoin = graphics.LineJoinStyle(lineJoin)
-				r.Set |= graphics.StateLineJoin
+				r.Set |= state.LineJoin
 			}
 
 		case "M": // miter limit
@@ -209,7 +210,7 @@ func (r *Reader) do() error {
 					miterLimit = 1
 				}
 				r.MiterLimit = miterLimit
-				r.Set |= graphics.StateMiterLimit
+				r.Set |= state.MiterLimit
 			}
 
 		case "d": // dash pattern and phase
@@ -220,7 +221,7 @@ func (r *Reader) do() error {
 				if ok {
 					r.DashPattern = pat
 					r.DashPhase = phase
-					r.Set |= graphics.StateLineDash
+					r.Set |= state.LineDash
 				}
 			}
 
@@ -228,7 +229,7 @@ func (r *Reader) do() error {
 			intent := op.GetName()
 			if op.OK() {
 				r.RenderingIntent = graphics.RenderingIntent(intent)
-				r.Set |= graphics.StateRenderingIntent
+				r.Set |= state.RenderingIntent
 			}
 
 		case "i": // flatness tolerance
@@ -240,7 +241,7 @@ func (r *Reader) do() error {
 					flatness = 100
 				}
 				r.FlatnessTolerance = flatness
-				r.Set |= graphics.StateFlatnessTolerance
+				r.Set |= state.FlatnessTolerance
 			}
 
 		case "gs": // extGState
@@ -261,12 +262,12 @@ func (r *Reader) do() error {
 			if op.OK() {
 				r.TextMatrix = matrix.Identity
 				r.TextLineMatrix = matrix.Identity
-				r.Set |= graphics.StateTextMatrix
+				r.Set |= state.TextMatrix
 			}
 
 		case "ET":
 			if op.OK() {
-				r.Set &= ^graphics.StateTextMatrix
+				r.Set &= ^state.TextMatrix
 			}
 
 		// Table 103 - Text state operators
@@ -275,28 +276,28 @@ func (r *Reader) do() error {
 			charSpace := op.GetNumber()
 			if op.OK() {
 				r.TextCharacterSpacing = charSpace
-				r.Set |= graphics.StateTextCharacterSpacing
+				r.Set |= state.TextCharacterSpacing
 			}
 
 		case "Tw":
 			wordSpace := op.GetNumber()
 			if op.OK() {
 				r.TextWordSpacing = wordSpace
-				r.Set |= graphics.StateTextWordSpacing
+				r.Set |= state.TextWordSpacing
 			}
 
 		case "Tz":
 			scale := op.GetNumber()
 			if op.OK() {
 				r.TextHorizontalScaling = scale / 100
-				r.Set |= graphics.StateTextHorizontalScaling
+				r.Set |= state.TextHorizontalScaling
 			}
 
 		case "TL":
 			leading := op.GetNumber()
 			if op.OK() {
 				r.TextLeading = leading
-				r.Set |= graphics.StateTextLeading
+				r.Set |= state.TextLeading
 			}
 
 		case "Tf":
@@ -312,7 +313,7 @@ func (r *Reader) do() error {
 					}
 					r.TextFont = F
 					r.TextFontSize = size
-					r.Set |= graphics.StateTextFont
+					r.Set |= state.TextFont
 				}
 			}
 
@@ -325,14 +326,14 @@ func (r *Reader) do() error {
 					render = 7
 				}
 				r.TextRenderingMode = graphics.TextRenderingMode(render)
-				r.Set |= graphics.StateTextRenderingMode
+				r.Set |= state.TextRenderingMode
 			}
 
 		case "Ts":
 			rise := op.GetNumber()
 			if op.OK() {
 				r.TextRise = rise
-				r.Set |= graphics.StateTextRise
+				r.Set |= state.TextRise
 			}
 
 		// Table 106 - Text-positioning operators
@@ -353,7 +354,7 @@ func (r *Reader) do() error {
 			ty := op.GetNumber()
 			if op.OK() {
 				r.TextLeading = -ty
-				r.Set |= graphics.StateTextLeading
+				r.Set |= state.TextLeading
 				r.TextLineMatrix = matrix.Translate(tx, ty).Mul(r.TextLineMatrix)
 				r.TextMatrix = r.TextLineMatrix
 				if r.TextEvent != nil {
@@ -369,7 +370,7 @@ func (r *Reader) do() error {
 			if op.OK() {
 				r.TextMatrix = m
 				r.TextLineMatrix = m
-				r.Set |= graphics.StateTextMatrix
+				r.Set |= state.TextMatrix
 				if r.TextEvent != nil {
 					r.TextEvent(TextEventMove, 0)
 				}
@@ -416,7 +417,7 @@ func (r *Reader) do() error {
 			if op.OK() && r.TextFont != nil {
 				r.TextWordSpacing = aw
 				r.TextCharacterSpacing = ac
-				r.Set |= graphics.StateTextWordSpacing | graphics.StateTextCharacterSpacing
+				r.Set |= state.TextWordSpacing | state.TextCharacterSpacing
 				r.TextLineMatrix = matrix.Translate(0, -r.TextLeading).Mul(r.TextLineMatrix)
 				r.TextMatrix = r.TextLineMatrix
 				if r.TextEvent != nil {
@@ -510,10 +511,10 @@ func (r *Reader) do() error {
 
 			if op.Name == "CS" {
 				r.StrokeColor = cs.Default()
-				r.Set |= graphics.StateStrokeColor
+				r.Set |= state.StrokeColor
 			} else {
 				r.FillColor = cs.Default()
-				r.Set |= graphics.StateFillColor
+				r.Set |= state.FillColor
 			}
 
 		case "SC", "SCN", "sc", "scn":
@@ -546,52 +547,52 @@ func (r *Reader) do() error {
 			}
 			if op.Name == "SC" || op.Name == "SCN" {
 				r.StrokeColor = color.SCN(r.StrokeColor, values, pat)
-				r.Set |= graphics.StateStrokeColor
+				r.Set |= state.StrokeColor
 			} else {
 				r.FillColor = color.SCN(r.FillColor, values, pat)
-				r.Set |= graphics.StateFillColor
+				r.Set |= state.FillColor
 			}
 
 		case "G":
 			gray := op.GetNumber()
 			if op.OK() {
 				r.StrokeColor = color.DeviceGray(gray)
-				r.Set |= graphics.StateStrokeColor
+				r.Set |= state.StrokeColor
 			}
 
 		case "g":
 			gray := op.GetNumber()
 			if op.OK() {
 				r.FillColor = color.DeviceGray(gray)
-				r.Set |= graphics.StateFillColor
+				r.Set |= state.FillColor
 			}
 
 		case "RG":
 			red, green, blue := op.GetNumber(), op.GetNumber(), op.GetNumber()
 			if op.OK() {
 				r.StrokeColor = color.DeviceRGB{red, green, blue}
-				r.Set |= graphics.StateStrokeColor
+				r.Set |= state.StrokeColor
 			}
 
 		case "rg":
 			red, green, blue := op.GetNumber(), op.GetNumber(), op.GetNumber()
 			if op.OK() {
 				r.FillColor = color.DeviceRGB{red, green, blue}
-				r.Set |= graphics.StateFillColor
+				r.Set |= state.FillColor
 			}
 
 		case "K":
 			c, m, y, k := op.GetNumber(), op.GetNumber(), op.GetNumber(), op.GetNumber()
 			if op.OK() {
 				r.StrokeColor = color.DeviceCMYK{c, m, y, k}
-				r.Set |= graphics.StateStrokeColor
+				r.Set |= state.StrokeColor
 			}
 
 		case "k":
 			c, m, y, k := op.GetNumber(), op.GetNumber(), op.GetNumber(), op.GetNumber()
 			if op.OK() {
 				r.FillColor = color.DeviceCMYK{c, m, y, k}
-				r.Set |= graphics.StateFillColor
+				r.Set |= state.FillColor
 			}
 
 		// Table 76 - Shading operator

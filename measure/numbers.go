@@ -30,6 +30,8 @@ const (
 	FractionTruncate FractionalFormat = 3 // truncate to whole unit
 )
 
+// PDF 2.0 sections: 12.9
+
 // NumberFormat represents a unit of measurement with formatting information.
 type NumberFormat struct {
 	// Unit specifies the label for displaying this unit.
@@ -186,7 +188,6 @@ func ExtractNumberFormat(x *pdf.Extractor, obj pdf.Object) (*NumberFormat, error
 
 // Embed converts the NumberFormat into a PDF dictionary.
 func (nf *NumberFormat) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	// Validate required fields
 	if nf.Unit == "" {
 		return nil, pdf.Errorf("missing required Unit")

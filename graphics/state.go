@@ -17,16 +17,15 @@
 package graphics
 
 import (
-	"fmt"
-	"math/bits"
 	"slices"
-	"strings"
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/graphics/blend"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/halftone"
+	"seehuhn.de/go/pdf/graphics/state"
 	"seehuhn.de/go/pdf/graphics/transfer"
 )
 
@@ -76,7 +75,7 @@ type Parameters struct {
 	// small relative to the pixel resolution of the output device.
 	StrokeAdjustment bool
 
-	BlendMode              pdf.Object
+	BlendMode              blend.Mode
 	SoftMask               pdf.Object
 	StrokeAlpha            float64
 	FillAlpha              float64
@@ -130,7 +129,7 @@ func (p *Parameters) Clone() *Parameters {
 // State represents the graphics state of a PDF processor.
 type State struct {
 	*Parameters
-	Set StateBits
+	Set state.Bits
 }
 
 // NewState returns a new graphics state with default values,
@@ -167,7 +166,7 @@ func NewState() State {
 
 	param.RenderingIntent = RelativeColorimetric
 	param.StrokeAdjustment = false
-	param.BlendMode = pdf.Name("Normal")
+	param.BlendMode = blend.Mode{blend.ModeNormal}
 	param.SoftMask = nil
 	param.StrokeAlpha = 1
 	param.FillAlpha = 1
@@ -198,16 +197,16 @@ func NewState() State {
 }
 
 // isSet returns true, if all of the given fields in the graphics state are set.
-func (s State) isSet(bits StateBits) bool {
+func (s State) isSet(bits state.Bits) bool {
 	return s.Set&bits == bits
 }
 
-func (s *State) mustBeSet(bits StateBits) error {
+func (s *State) mustBeSet(bits state.Bits) error {
 	missing := ^s.Set & bits
 	if missing == 0 {
 		return nil
 	}
-	return errMissingState(missing)
+	return state.ErrMissing(missing)
 }
 
 // CopyTo applies the graphics state parameters to the given state.
@@ -219,87 +218,87 @@ func (s State) CopyTo(other *State) {
 
 	param := s.Parameters
 	otherParam := other.Parameters
-	if set&StateTextFont != 0 {
+	if set&state.TextFont != 0 {
 		otherParam.TextFont = param.TextFont
 		otherParam.TextFontSize = param.TextFontSize
 	}
-	if set&StateTextKnockout != 0 {
+	if set&state.TextKnockout != 0 {
 		otherParam.TextKnockout = param.TextKnockout
 	}
-	if set&StateLineWidth != 0 {
+	if set&state.LineWidth != 0 {
 		otherParam.LineWidth = param.LineWidth
 	}
-	if set&StateLineCap != 0 {
+	if set&state.LineCap != 0 {
 		otherParam.LineCap = param.LineCap
 	}
-	if set&StateLineJoin != 0 {
+	if set&state.LineJoin != 0 {
 		otherParam.LineJoin = param.LineJoin
 	}
-	if set&StateMiterLimit != 0 {
+	if set&state.MiterLimit != 0 {
 		otherParam.MiterLimit = param.MiterLimit
 	}
-	if set&StateLineDash != 0 {
+	if set&state.LineDash != 0 {
 		otherParam.DashPattern = slices.Clone(param.DashPattern)
 		otherParam.DashPhase = param.DashPhase
 	}
-	if set&StateRenderingIntent != 0 {
+	if set&state.RenderingIntent != 0 {
 		otherParam.RenderingIntent = param.RenderingIntent
 	}
-	if set&StateStrokeAdjustment != 0 {
+	if set&state.StrokeAdjustment != 0 {
 		otherParam.StrokeAdjustment = param.StrokeAdjustment
 	}
-	if set&StateBlendMode != 0 {
+	if set&state.BlendMode != 0 {
 		otherParam.BlendMode = param.BlendMode
 	}
-	if set&StateSoftMask != 0 {
+	if set&state.SoftMask != 0 {
 		otherParam.SoftMask = param.SoftMask
 	}
-	if set&StateStrokeAlpha != 0 {
+	if set&state.StrokeAlpha != 0 {
 		otherParam.StrokeAlpha = param.StrokeAlpha
 	}
-	if set&StateFillAlpha != 0 {
+	if set&state.FillAlpha != 0 {
 		otherParam.FillAlpha = param.FillAlpha
 	}
-	if set&StateAlphaSourceFlag != 0 {
+	if set&state.AlphaSourceFlag != 0 {
 		otherParam.AlphaSourceFlag = param.AlphaSourceFlag
 	}
-	if set&StateBlackPointCompensation != 0 {
+	if set&state.BlackPointCompensation != 0 {
 		otherParam.BlackPointCompensation = param.BlackPointCompensation
 	}
-	if set&StateOverprint != 0 {
+	if set&state.Overprint != 0 {
 		otherParam.OverprintStroke = param.OverprintStroke
 		otherParam.OverprintFill = param.OverprintFill
 	}
-	if set&StateOverprintMode != 0 {
+	if set&state.OverprintMode != 0 {
 		otherParam.OverprintMode = param.OverprintMode
 	}
-	if set&StateBlackGeneration != 0 {
+	if set&state.BlackGeneration != 0 {
 		otherParam.BlackGeneration = param.BlackGeneration
 	}
-	if set&StateUndercolorRemoval != 0 {
+	if set&state.UndercolorRemoval != 0 {
 		otherParam.UndercolorRemoval = param.UndercolorRemoval
 	}
-	if set&StateTransferFunction != 0 {
+	if set&state.TransferFunction != 0 {
 		otherParam.TransferFunction = param.TransferFunction
 	}
-	if set&StateHalftone != 0 {
+	if set&state.Halftone != 0 {
 		otherParam.Halftone = param.Halftone
 	}
-	if set&StateHalftoneOrigin != 0 {
+	if set&state.HalftoneOrigin != 0 {
 		otherParam.HalftoneOriginX = param.HalftoneOriginX
 		otherParam.HalftoneOriginY = param.HalftoneOriginY
 	}
-	if set&StateFlatnessTolerance != 0 {
+	if set&state.FlatnessTolerance != 0 {
 		otherParam.FlatnessTolerance = param.FlatnessTolerance
 	}
-	if set&StateSmoothnessTolerance != 0 {
+	if set&state.SmoothnessTolerance != 0 {
 		otherParam.SmoothnessTolerance = param.SmoothnessTolerance
 	}
 }
 
 // GetTextPositionDevice returns the current text position in device coordinates.
 func (s State) GetTextPositionDevice() (float64, float64) {
-	if err := s.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
+	if err := s.mustBeSet(state.TextFont | state.TextMatrix | state.TextHorizontalScaling | state.TextRise); err != nil {
 		panic(err)
 	}
 	M := matrix.Matrix{s.TextFontSize * s.TextHorizontalScaling, 0, 0, s.TextFontSize, 0, s.TextRise}
@@ -310,7 +309,7 @@ func (s State) GetTextPositionDevice() (float64, float64) {
 
 // GetTextPositionUser returns the current text position in user coordinates.
 func (s State) GetTextPositionUser() (float64, float64) {
-	if err := s.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
+	if err := s.mustBeSet(state.TextFont | state.TextMatrix | state.TextHorizontalScaling | state.TextRise); err != nil {
 		panic(err)
 	}
 	M := matrix.Matrix{s.TextFontSize * s.TextHorizontalScaling, 0, 0, s.TextFontSize, 0, s.TextRise}
@@ -318,141 +317,30 @@ func (s State) GetTextPositionUser() (float64, float64) {
 	return M[4], M[5]
 }
 
-// StateBits is a bit mask for the fields of the State struct.
-type StateBits uint64
-
-// Names returns a string representation of the set bits.
-func (b StateBits) Names() string {
-	var parts []string
-
-	for i := 0; i < len(stateNames); i++ {
-		if b&(1<<i) != 0 {
-			parts = append(parts, stateNames[i])
-		}
-	}
-	b = b & ^AllStateBits
-	if b != 0 {
-		parts = append(parts, fmt.Sprintf("0x%x", b))
-	}
-
-	return strings.Join(parts, "|")
-}
-
-// Possible values for StateBits.
-const (
-	// CTM is always set, so it is not included in the bit mask.
-	// ClippingPath is always set, so it is not included in the bit mask.
-
-	StateStrokeColor StateBits = 1 << iota
-	StateFillColor
-
-	StateTextCharacterSpacing
-	StateTextWordSpacing
-	StateTextHorizontalScaling
-	StateTextLeading
-	StateTextFont // includes size
-	StateTextRenderingMode
-	StateTextRise
-	StateTextKnockout
-
-	StateTextMatrix // text matrix and text line matrix
-
-	StateLineWidth
-	StateLineCap
-	StateLineJoin
-	StateMiterLimit
-	StateLineDash // pattern and phase
-
-	StateRenderingIntent
-	StateStrokeAdjustment
-	StateBlendMode
-	StateSoftMask
-	StateStrokeAlpha
-	StateFillAlpha
-	StateAlphaSourceFlag
-	StateBlackPointCompensation
-
-	StateOverprint
-	StateOverprintMode
-	StateBlackGeneration
-	StateUndercolorRemoval
-	StateTransferFunction
-	StateHalftone
-	StateHalftoneOrigin
-	StateFlatnessTolerance
-	StateSmoothnessTolerance
-
-	stateFirstUnused
-	AllStateBits = stateFirstUnused - 1
-)
-
-var stateNames = []string{
-	"StrokeColor",
-	"FillColor",
-	"TextCharacterSpacing",
-	"TextWordSpacing",
-	"TextHorizontalScaling",
-	"TextLeading",
-	"TextFont",
-	"TextRenderingMode",
-	"TextRise",
-	"TextKnockout",
-	"TextMatrix",
-	"LineWidth",
-	"LineCap",
-	"LineJoin",
-	"MiterLimit",
-	"LineDash",
-	"RenderingIntent",
-	"StrokeAdjustment",
-	"BlendMode",
-	"SoftMask",
-	"StrokeAlpha",
-	"FillAlpha",
-	"AlphaSourceFlag",
-	"BlackPointCompensation",
-	"Overprint",
-	"OverprintMode",
-	"BlackGeneration",
-	"UndercolorRemoval",
-	"TransferFunction",
-	"Halftone",
-	"HalftoneOrigin",
-	"FlatnessTolerance",
-	"SmoothnessTolerance",
-}
-
 const (
 	// initializedStateBits lists the parameters which are initialized to
 	// their default values in [NewState].
-	initializedStateBits = StateStrokeColor | StateFillColor |
-		StateTextCharacterSpacing | StateTextWordSpacing |
-		StateTextHorizontalScaling | StateTextLeading | StateTextRenderingMode |
-		StateTextRise | StateTextKnockout | StateLineWidth | StateLineCap |
-		StateLineJoin | StateMiterLimit | StateLineDash | StateRenderingIntent |
-		StateStrokeAdjustment | StateBlendMode | StateSoftMask |
-		StateStrokeAlpha | StateFillAlpha | StateAlphaSourceFlag |
-		StateBlackPointCompensation | StateOverprint | StateOverprintMode |
-		StateFlatnessTolerance
+	initializedStateBits = state.StrokeColor | state.FillColor |
+		state.TextCharacterSpacing | state.TextWordSpacing |
+		state.TextHorizontalScaling | state.TextLeading | state.TextRenderingMode |
+		state.TextRise | state.TextKnockout | state.LineWidth | state.LineCap |
+		state.LineJoin | state.MiterLimit | state.LineDash | state.RenderingIntent |
+		state.StrokeAdjustment | state.BlendMode | state.SoftMask |
+		state.StrokeAlpha | state.FillAlpha | state.AlphaSourceFlag |
+		state.BlackPointCompensation | state.Overprint | state.OverprintMode |
+		state.FlatnessTolerance
 
 	// extGStateBits lists the graphical parameters which can be encoded in an
 	// ExtGState resource.
-	extGStateBits = StateTextFont | StateTextKnockout | StateLineWidth |
-		StateLineCap | StateLineJoin | StateMiterLimit | StateLineDash |
-		StateRenderingIntent | StateStrokeAdjustment | StateBlendMode |
-		StateSoftMask | StateStrokeAlpha | StateFillAlpha |
-		StateAlphaSourceFlag | StateBlackPointCompensation | StateOverprint |
-		StateOverprintMode | StateBlackGeneration | StateUndercolorRemoval |
-		StateTransferFunction | StateHalftone | StateHalftoneOrigin |
-		StateFlatnessTolerance | StateSmoothnessTolerance
+	extGStateBits = state.TextFont | state.TextKnockout | state.LineWidth |
+		state.LineCap | state.LineJoin | state.MiterLimit | state.LineDash |
+		state.RenderingIntent | state.StrokeAdjustment | state.BlendMode |
+		state.SoftMask | state.StrokeAlpha | state.FillAlpha |
+		state.AlphaSourceFlag | state.BlackPointCompensation | state.Overprint |
+		state.OverprintMode | state.BlackGeneration | state.UndercolorRemoval |
+		state.TransferFunction | state.Halftone | state.HalftoneOrigin |
+		state.FlatnessTolerance | state.SmoothnessTolerance
 )
-
-type errMissingState StateBits
-
-func (e errMissingState) Error() string {
-	k := bits.TrailingZeros64(uint64(e))
-	return stateNames[k] + " not set"
-}
 
 // TextRenderingMode is the rendering mode for text.
 type TextRenderingMode uint8

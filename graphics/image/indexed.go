@@ -24,6 +24,8 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
+// PDF 2.0 sections: 8.9.5
+
 // Indexed represents an image with an indexed color space.
 type Indexed struct {
 	Pix        []uint8

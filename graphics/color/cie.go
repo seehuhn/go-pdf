@@ -26,6 +26,8 @@ import (
 
 // == CalGray ================================================================
 
+// PDF 2.0 sections: 8.6.5.2
+
 // SpaceCalGray represents a CalGray color space.
 type SpaceCalGray struct {
 	whitePoint []float64
@@ -121,6 +123,8 @@ func (c colorCalGray) ColorSpace() Space {
 }
 
 // == CalRGB =================================================================
+
+// PDF 2.0 sections: 8.6.5.3
 
 // SpaceCalRGB represents a CalRGB color space.
 type SpaceCalRGB struct {
@@ -248,6 +252,8 @@ func (c colorCalRGB) ColorSpace() Space {
 // For further details on CIE-based color conversion in PDF, see ISO
 // 32000-1:2008, sections 8.6.5 (CIE-Based Colour Spaces) and 10.3 (CIE-Based
 // Colour to Device Colour).
+
+// PDF 2.0 sections: 8.6.5.4
 
 // SpaceLab represents a CIE 1976 L*a*b* color space.
 type SpaceLab struct {

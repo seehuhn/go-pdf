@@ -164,7 +164,6 @@ func extractItemValue(x *pdf.Extractor, obj pdf.Object) (*ItemValue, error) {
 
 // Embed converts the collection item dictionary to a PDF object.
 func (item *ItemDict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	if err := pdf.CheckVersion(rm.Out(), "collection item dictionary", pdf.V1_7); err != nil {
 		return nil, err
 	}

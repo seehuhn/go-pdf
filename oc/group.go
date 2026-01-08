@@ -95,7 +95,6 @@ func ExtractGroup(x *pdf.Extractor, obj pdf.Object) (*Group, error) {
 
 // Embed adds the optional content group to a PDF file.
 func (g *Group) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-
 	// validate required fields
 	if g.Name == "" {
 		return nil, errors.New("Group.Name is required")
