@@ -23,21 +23,6 @@ import (
 // This file implements the "XObject operator".
 // The operator is defined in table 86 of ISO 32000-2:2020.
 
-// XObject represents a PDF XObject.
-type XObject interface {
-	Subtype() pdf.Name
-	pdf.Embedder
-}
-
-// ImageMask is an optional interface implemented by XObjects that are
-// stencil masks (PDF image XObjects with ImageMask=true).
-// Image masks are allowed in contexts where other images are forbidden
-// (uncolored tiling patterns and Type 3 glyphs with d1).
-type ImageMask interface {
-	XObject
-	IsImageMask() bool
-}
-
 func IsImageMask(xobj XObject) bool {
 	if xobj.Subtype() != "Image" {
 		return false

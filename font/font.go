@@ -113,6 +113,8 @@ const (
 // InstancesEqual compares two font instances for semantic equality.
 // Two fonts are equal if they have the same PostScript name, writing mode,
 // and code space range.
+//
+// TODO(voss): implement a more specific comparison.
 func InstancesEqual(a, b Instance) bool {
 	if a == nil || b == nil {
 		return a == nil && b == nil

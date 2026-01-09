@@ -73,9 +73,6 @@ func TestCryptV1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err != nil {
-		t.Fatal(err)
-	}
 	contentsRef := w.Alloc()
 	s, err := w.OpenStream(contentsRef, nil)
 	if err != nil {

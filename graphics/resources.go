@@ -31,8 +31,37 @@ type Shading interface {
 	pdf.Embedder
 }
 
+// XObject represents a PDF XObject.
+type XObject interface {
+	Subtype() pdf.Name
+	pdf.Embedder
+}
+
+// ImageMask is an optional interface implemented by XObjects that are
+// stencil masks (PDF image XObjects with ImageMask=true).
+// Image masks are allowed in contexts where other images are forbidden
+// (uncolored tiling patterns and Type 3 glyphs with d1).
+type ImageMask interface {
+	XObject
+	IsImageMask() bool
+}
+
 // Image represents a raster image which can be embedded in a PDF file.
 type Image interface {
 	XObject
 	Bounds() rect.IntRect
+}
+
+// SoftClip represents a soft mask for use in the graphics state.
+//
+// Soft masks define position-dependent mask values derived from a transparency
+// group. Two derivation methods are supported: Alpha (using the group's
+// computed alpha, ignoring color) and Luminosity (converting the group's
+// computed color to a single-component luminosity value).
+//
+// See PDF 32000-1:2008, 11.6.5 "Specifying soft masks".
+type SoftClip interface {
+	pdf.Embedder
+	IsSoftClip() bool
+	Equals(other SoftClip) bool
 }

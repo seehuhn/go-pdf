@@ -22,6 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
@@ -41,7 +42,6 @@ const (
 )
 
 // Mask represents a soft-mask dictionary (PDF 1.4, section 11.6.5.1).
-// Use a nil *Mask to represent /None (absence of soft mask).
 type Mask struct {
 	// S specifies the derivation method: Alpha or Luminosity.
 	S Type
@@ -57,6 +57,10 @@ type Mask struct {
 	// TR is the transfer function (optional).
 	// nil means identity (the default).
 	TR pdf.Function
+}
+
+func (m *Mask) IsSoftClip() bool {
+	return true
 }
 
 // Embed implements the [pdf.Embedder] interface.
@@ -115,28 +119,33 @@ func (m *Mask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return dict, nil
 }
 
-// Equal reports whether two Mask values are equal.
-func (m *Mask) Equal(other *Mask) bool {
+// Equals reports whether two Mask values are equal.
+func (m *Mask) Equals(other graphics.SoftClip) bool {
 	if m == nil || other == nil {
 		return m == nil && other == nil
 	}
 
-	if m.S != other.S {
+	o, ok := other.(*Mask)
+	if !ok {
 		return false
 	}
 
-	if (m.G == nil) != (other.G == nil) {
-		return false
-	}
-	if m.G != nil && !m.G.Equal(other.G) {
+	if m.S != o.S {
 		return false
 	}
 
-	if !slices.Equal(m.BC, other.BC) {
+	if (m.G == nil) != (o.G == nil) {
+		return false
+	}
+	if m.G != nil && !m.G.Equal(o.G) {
 		return false
 	}
 
-	if !function.Equal(m.TR, other.TR) {
+	if !slices.Equal(m.BC, o.BC) {
+		return false
+	}
+
+	if !function.Equal(m.TR, o.TR) {
 		return false
 	}
 

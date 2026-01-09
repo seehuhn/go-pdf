@@ -17,7 +17,5 @@
 // Package extract provides functions for reading PDF graphics resources.
 //
 // All Extract functions for resource types that may recursively contain other
-// resources are consolidated here to avoid import cycles. This enables the
-// pattern package to import the content package (for content.Stream) without
-// creating a cycle.
+// resources are consolidated here to avoid import cycles.
 package extract

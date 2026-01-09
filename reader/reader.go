@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/graphics/state"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/property"
@@ -248,7 +249,7 @@ func (r *Reader) do() error {
 			dictName := op.GetName()
 			if op.OK() {
 				// TODO(voss): use caching
-				extGState, err := graphics.ExtractExtGState(r.x, r.Resources.ExtGState[dictName])
+				extGState, err := extract.ExtGState(r.x, r.Resources.ExtGState[dictName])
 				if err == nil {
 					extGState.ApplyTo(&r.State)
 				} else if !pdf.IsMalformed(err) {

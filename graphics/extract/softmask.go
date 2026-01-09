@@ -21,13 +21,14 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/softclip"
 )
 
 // SoftMaskDict reads a soft-mask dictionary from a PDF file.
 // Returns nil without error if obj is nil or /None.
 // Note: For soft-mask images, use [SoftMaskImage] instead.
-func SoftMaskDict(x *pdf.Extractor, obj pdf.Object) (*softclip.Mask, error) {
+func SoftMaskDict(x *pdf.Extractor, obj pdf.Object) (graphics.SoftClip, error) {
 	if obj == nil {
 		return nil, nil
 	}

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics
+package graphics_test
 
 import (
 	"bytes"
@@ -24,7 +24,9 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/blend"
+	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/graphics/halftone"
 	"seehuhn.de/go/pdf/graphics/state"
 	"seehuhn.de/go/pdf/graphics/transfer"
@@ -34,12 +36,12 @@ import (
 var testCases = []struct {
 	name    string
 	version pdf.Version
-	data    *ExtGState
+	data    *graphics.ExtGState
 }{
 	{
 		name:    "minimal",
 		version: pdf.V1_7,
-		data: &ExtGState{
+		data: &graphics.ExtGState{
 			Set:       state.LineWidth,
 			LineWidth: 2.0,
 		},
@@ -47,7 +49,7 @@ var testCases = []struct {
 	{
 		name:    "text_knockout",
 		version: pdf.V1_7,
-		data: &ExtGState{
+		data: &graphics.ExtGState{
 			Set:          state.TextKnockout,
 			TextKnockout: true,
 		},
@@ -55,18 +57,18 @@ var testCases = []struct {
 	{
 		name:    "line_styles",
 		version: pdf.V1_7,
-		data: &ExtGState{
+		data: &graphics.ExtGState{
 			Set:        state.LineWidth | state.LineCap | state.LineJoin | state.MiterLimit,
 			LineWidth:  1.5,
-			LineCap:    LineCapRound,
-			LineJoin:   LineJoinBevel,
+			LineCap:    graphics.LineCapRound,
+			LineJoin:   graphics.LineJoinBevel,
 			MiterLimit: 10.0,
 		},
 	},
 	{
 		name:    "dash_pattern",
 		version: pdf.V1_7,
-		data: &ExtGState{
+		data: &graphics.ExtGState{
 			Set:         state.LineDash,
 			DashPattern: []float64{3, 2, 1, 2},
 			DashPhase:   1.5,
@@ -75,7 +77,7 @@ var testCases = []struct {
 	{
 		name:    "alpha_and_blend",
 		version: pdf.V1_7,
-		data: &ExtGState{
+		data: &graphics.ExtGState{
 			Set:             state.StrokeAlpha | state.FillAlpha | state.AlphaSourceFlag | state.BlendMode,
 			StrokeAlpha:     0.7,
 			FillAlpha:       0.5,
@@ -86,7 +88,7 @@ var testCases = []struct {
 	{
 		name:    "overprint",
 		version: pdf.V1_7,
-		data: &ExtGState{
+		data: &graphics.ExtGState{
 			Set:             state.Overprint | state.OverprintMode,
 			OverprintStroke: true,
 			OverprintFill:   false,
@@ -96,7 +98,7 @@ var testCases = []struct {
 	{
 		name:    "color_functions_nil",
 		version: pdf.V1_7,
-		data: &ExtGState{
+		data: &graphics.ExtGState{
 			Set:               state.BlackGeneration | state.UndercolorRemoval,
 			BlackGeneration:   nil,
 			UndercolorRemoval: nil,
@@ -105,7 +107,7 @@ var testCases = []struct {
 	{
 		name:    "transfer_function_identity",
 		version: pdf.V1_7,
-		data: &ExtGState{
+		data: &graphics.ExtGState{
 			Set: state.TransferFunction,
 			TransferFunction: transfer.Functions{
 				Red:   transfer.Identity,
@@ -118,7 +120,7 @@ var testCases = []struct {
 	{
 		name:    "halftone_type1",
 		version: pdf.V1_7,
-		data: &ExtGState{
+		data: &graphics.ExtGState{
 			Set: state.Halftone,
 			Halftone: &halftone.Type1{
 				Frequency:    60,
@@ -130,7 +132,7 @@ var testCases = []struct {
 	{
 		name:    "tolerances",
 		version: pdf.V1_7,
-		data: &ExtGState{
+		data: &graphics.ExtGState{
 			Set:                 state.FlatnessTolerance | state.SmoothnessTolerance,
 			FlatnessTolerance:   1.0,
 			SmoothnessTolerance: 0.5,
@@ -139,7 +141,7 @@ var testCases = []struct {
 	{
 		name:    "halftone_origin_pdf2",
 		version: pdf.V2_0,
-		data: &ExtGState{
+		data: &graphics.ExtGState{
 			Set:             state.HalftoneOrigin,
 			HalftoneOriginX: 10.0,
 			HalftoneOriginY: 20.0,
@@ -148,7 +150,7 @@ var testCases = []struct {
 	{
 		name:    "black_point_compensation_pdf2",
 		version: pdf.V2_0,
-		data: &ExtGState{
+		data: &graphics.ExtGState{
 			Set:                    state.BlackPointCompensation,
 			BlackPointCompensation: pdf.Name("ON"),
 		},
@@ -156,7 +158,7 @@ var testCases = []struct {
 	{
 		name:    "singleuse_true",
 		version: pdf.V1_7,
-		data: &ExtGState{
+		data: &graphics.ExtGState{
 			Set:              state.StrokeAdjustment,
 			StrokeAdjustment: true,
 			SingleUse:        true,
@@ -165,7 +167,7 @@ var testCases = []struct {
 	{
 		name:    "singleuse_false",
 		version: pdf.V1_7,
-		data: &ExtGState{
+		data: &graphics.ExtGState{
 			Set:              state.StrokeAdjustment,
 			StrokeAdjustment: true,
 			SingleUse:        false,
@@ -174,21 +176,29 @@ var testCases = []struct {
 	{
 		name:    "complex_state",
 		version: pdf.V1_7,
-		data: &ExtGState{
+		data: &graphics.ExtGState{
 			Set: state.LineWidth | state.LineCap | state.RenderingIntent |
 				state.StrokeAlpha | state.FillAlpha | state.Overprint,
 			LineWidth:       3.0,
-			LineCap:         LineCapSquare,
-			RenderingIntent: RenderingIntent("Perceptual"),
+			LineCap:         graphics.LineCapSquare,
+			RenderingIntent: graphics.RenderingIntent("Perceptual"),
 			StrokeAlpha:     0.8,
 			FillAlpha:       0.6,
 			OverprintStroke: false,
 			OverprintFill:   true,
 		},
 	},
+	{
+		name:    "softmask_none",
+		version: pdf.V1_7,
+		data: &graphics.ExtGState{
+			Set:      state.SoftMask,
+			SoftMask: nil, // represents /None in PDF
+		},
+	},
 }
 
-func roundTripTest(t *testing.T, version pdf.Version, data *ExtGState) {
+func roundTripTest(t *testing.T, version pdf.Version, data *graphics.ExtGState) {
 	t.Helper()
 
 	w, _ := memfile.NewPDFWriter(version, nil)
@@ -206,7 +216,7 @@ func roundTripTest(t *testing.T, version pdf.Version, data *ExtGState) {
 
 	// Extract the ExtGState
 	x := pdf.NewExtractor(w)
-	extracted, err := ExtractExtGState(x, embedded)
+	extracted, err := extract.ExtGState(x, embedded)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -275,7 +285,7 @@ func FuzzExtGStateRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		objGo, err := ExtractExtGState(x, objPDF)
+		objGo, err := extract.ExtGState(x, objPDF)
 		if err != nil {
 			t.Skip("malformed PDF object")
 		}

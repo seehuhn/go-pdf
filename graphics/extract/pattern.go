@@ -21,7 +21,6 @@ import (
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/pattern"
@@ -110,7 +109,7 @@ func extractType2(x *pdf.Extractor, dict pdf.Dict, isIndirect bool) (*pattern.Ty
 	}
 
 	// extract optional ExtGState
-	if extGState, err := pdf.Optional(graphics.ExtractExtGState(x, dict["ExtGState"])); err != nil {
+	if extGState, err := pdf.Optional(ExtGState(x, dict["ExtGState"])); err != nil {
 		return nil, err
 	} else {
 		pat.ExtGState = extGState

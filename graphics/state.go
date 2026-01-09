@@ -76,7 +76,7 @@ type Parameters struct {
 	StrokeAdjustment bool
 
 	BlendMode              blend.Mode
-	SoftMask               pdf.Object
+	SoftMask               SoftClip
 	StrokeAlpha            float64
 	FillAlpha              float64
 	AlphaSourceFlag        bool

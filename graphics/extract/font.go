@@ -22,12 +22,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/dict"
-	"seehuhn.de/go/pdf/graphics"
 )
-
-func init() {
-	graphics.FontExtractFunc = Font
-}
 
 // Font extracts a font from a PDF file as an immutable font object.
 // This combines Dict with MakeFont() for convenience.
