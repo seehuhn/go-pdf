@@ -161,8 +161,12 @@ type Page struct {
 	// VP (optional) specifies rectangular viewport regions of the page.
 	VP *measure.ViewPortArray
 
-	// AF (optional; PDF 2.0) lists associated files for this page.
-	AF []*file.Specification
+	// AssociatedFiles (optional; PDF 2.0) is an array of files associated with
+	// the page. The relationship that the associated files have to the page
+	// is supplied by the Specification.AFRelationship field.
+	//
+	// This corresponds to the /AF entry in the PDF page dictionary.
+	AssociatedFiles []*file.Specification
 
 	// OutputIntents (optional; PDF 2.0) specifies color characteristics
 	// for output devices.
@@ -475,13 +479,13 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// AF
-	if len(p.AF) > 0 {
+	if p.AssociatedFiles != nil {
 		if err := pdf.CheckVersion(w, "page AF entry", pdf.V2_0); err != nil {
 			return nil, err
 		}
 
 		// validate each file specification can be used as associated file
-		for i, spec := range p.AF {
+		for i, spec := range p.AssociatedFiles {
 			if spec == nil {
 				continue
 			}
@@ -492,7 +496,7 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 		// embed the file specifications
 		var afArray pdf.Array
-		for _, spec := range p.AF {
+		for _, spec := range p.AssociatedFiles {
 			if spec != nil {
 				embedded, err := rm.Embed(spec)
 				if err != nil {
@@ -706,7 +710,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	// PieceInfo (optional)
-	if piece, err := pdf.Optional(pieceinfo.Extract(x.R, dict["PieceInfo"])); err != nil {
+	if piece, err := pdf.Optional(pieceinfo.Extract(x, dict["PieceInfo"])); err != nil {
 		return nil, err
 	} else {
 		p.PieceInfo = piece
@@ -790,12 +794,12 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	if afArray, err := pdf.Optional(x.GetArray(dict["AF"])); err != nil {
 		return nil, err
 	} else if afArray != nil {
-		p.AF = make([]*file.Specification, 0, len(afArray))
+		p.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
 		for _, afObj := range afArray {
 			if spec, err := pdf.ExtractorGetOptional(x, afObj, file.ExtractSpecification); err != nil {
 				return nil, err
 			} else if spec != nil {
-				p.AF = append(p.AF, spec)
+				p.AssociatedFiles = append(p.AssociatedFiles, spec)
 			}
 		}
 	}

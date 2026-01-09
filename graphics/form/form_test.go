@@ -17,11 +17,13 @@
 package form_test
 
 import (
+	"io"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
@@ -352,5 +354,109 @@ func TestFormWithStructParent(t *testing.T) {
 	// Verify StructParent value 0 was preserved
 	if key, ok := form2.StructParent.Get(); !ok || key != 0 {
 		t.Errorf("StructParent value 0 not preserved: got %v (present=%v), want 0", key, ok)
+	}
+}
+
+// TestFormWithAssociatedFiles verifies that AssociatedFiles (AF) are properly
+// handled during form XObject read/write cycles.
+func TestFormWithAssociatedFiles(t *testing.T) {
+	writer1, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm1 := pdf.NewResourceManager(writer1)
+
+	// create test associated files
+	testSpec := &file.Specification{
+		FileName:        "source.xml",
+		FileNameUnicode: "source.xml",
+		Description:     "Source XML data",
+		AFRelationship:  file.RelationshipSource,
+		EmbeddedFiles: map[string]*file.Stream{
+			"UF": {
+				MimeType: "application/xml",
+				ModDate:  time.Date(2026, 1, 9, 12, 0, 0, 0, time.UTC),
+				WriteData: func(w io.Writer) error {
+					_, err := w.Write([]byte("<data>test content</data>"))
+					return err
+				},
+			},
+		},
+	}
+
+	form0 := makeTestForm()
+	form0.AssociatedFiles = []*file.Specification{testSpec}
+
+	ref, err := rm1.Embed(form0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = rm1.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = writer1.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x1 := pdf.NewExtractor(writer1)
+	form1, err := extract.Form(x1, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// verify AssociatedFiles was preserved
+	if form1.AssociatedFiles == nil {
+		t.Error("AssociatedFiles was not preserved during extraction")
+		return
+	}
+	if len(form1.AssociatedFiles) != 1 {
+		t.Errorf("AssociatedFiles length mismatch: got %d, want 1", len(form1.AssociatedFiles))
+		return
+	}
+
+	// check AssociatedFiles content
+	extractedSpec := form1.AssociatedFiles[0]
+	if extractedSpec.FileNameUnicode != "source.xml" {
+		t.Errorf("AssociatedFiles FileNameUnicode mismatch: got %s, want source.xml", extractedSpec.FileNameUnicode)
+	}
+	if extractedSpec.AFRelationship != file.RelationshipSource {
+		t.Errorf("AssociatedFiles AFRelationship mismatch: got %s, want %s", extractedSpec.AFRelationship, file.RelationshipSource)
+	}
+
+	// test round-trip
+	writer2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm2 := pdf.NewResourceManager(writer2)
+	ref2, err := rm2.Embed(form1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = rm2.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = writer2.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x2 := pdf.NewExtractor(writer2)
+	form2, err := extract.Form(x2, ref2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// check that AssociatedFiles round-tripped correctly
+	if form2.AssociatedFiles == nil {
+		t.Error("AssociatedFiles was lost during round-trip")
+		return
+	}
+	if len(form2.AssociatedFiles) != 1 {
+		t.Errorf("AssociatedFiles length mismatch after round-trip: got %d, want 1", len(form2.AssociatedFiles))
+		return
+	}
+
+	// verify content matches
+	if form2.AssociatedFiles[0].FileNameUnicode != form1.AssociatedFiles[0].FileNameUnicode {
+		t.Errorf("AssociatedFiles FileNameUnicode round trip failed: got %s, want %s",
+			form2.AssociatedFiles[0].FileNameUnicode, form1.AssociatedFiles[0].FileNameUnicode)
 	}
 }

@@ -145,7 +145,7 @@ func (e *ExtGState) Equal(other *ExtGState) bool {
 		if (e.SoftMask == nil) != (other.SoftMask == nil) {
 			return false
 		}
-		if e.SoftMask != nil && !e.SoftMask.Equals(other.SoftMask) {
+		if e.SoftMask != nil && !e.SoftMask.Equal(other.SoftMask) {
 			return false
 		}
 	}

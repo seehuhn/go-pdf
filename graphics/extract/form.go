@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/graphics/group"
@@ -83,7 +84,7 @@ func Form(x *pdf.Extractor, obj pdf.Object) (*form.Form, error) {
 	}
 
 	// PieceInfo (optional)
-	if piece, err := pdf.Optional(pieceinfo.Extract(x.R, dict["PieceInfo"])); err != nil {
+	if piece, err := pdf.Optional(pieceinfo.Extract(x, dict["PieceInfo"])); err != nil {
 		return nil, err
 	} else {
 		f.PieceInfo = piece
@@ -123,6 +124,20 @@ func Form(x *pdf.Extractor, obj pdf.Object) (*form.Form, error) {
 			return nil, err
 		} else {
 			f.StructParent.Set(key)
+		}
+	}
+
+	// extract AssociatedFiles (AF)
+	if afArray, err := pdf.Optional(x.GetArray(dict["AF"])); err != nil {
+		return nil, err
+	} else if afArray != nil {
+		f.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
+		for _, afObj := range afArray {
+			if spec, err := pdf.ExtractorGetOptional(x, afObj, file.ExtractSpecification); err != nil {
+				return nil, err
+			} else if spec != nil {
+				f.AssociatedFiles = append(f.AssociatedFiles, spec)
+			}
 		}
 	}
 

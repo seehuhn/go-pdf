@@ -18,11 +18,13 @@ package form
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"seehuhn.de/go/geom/matrix"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/group"
 	"seehuhn.de/go/pdf/measure"
@@ -81,7 +83,12 @@ type Form struct {
 
 	// TODO(voss): StructParents
 
-	// TODO(voss): AF
+	// AssociatedFiles (optional; PDF 2.0) is an array of files associated with
+	// the form XObject. The relationship that the associated files have to the
+	// XObject is supplied by the Specification.AFRelationship field.
+	//
+	// This corresponds to the AF entry in the form XObject dictionary.
+	AssociatedFiles []*file.Specification
 }
 
 // Subtype returns "Form".
@@ -189,6 +196,36 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["StructParent"] = key
 	}
 
+	if f.AssociatedFiles != nil {
+		if err := pdf.CheckVersion(rm.Out(), "form XObject AF entry", pdf.V2_0); err != nil {
+			return nil, err
+		}
+
+		// Validate each file specification can be used as associated file
+		version := pdf.GetVersion(rm.Out())
+		for i, spec := range f.AssociatedFiles {
+			if spec == nil {
+				continue
+			}
+			if err := spec.CanBeAF(version); err != nil {
+				return nil, fmt.Errorf("AssociatedFiles[%d]: %w", i, err)
+			}
+		}
+
+		// Embed the file specifications
+		var afArray pdf.Array
+		for _, spec := range f.AssociatedFiles {
+			if spec != nil {
+				embedded, err := rm.Embed(spec)
+				if err != nil {
+					return nil, err
+				}
+				afArray = append(afArray, embedded)
+			}
+		}
+		dict["AF"] = afArray
+	}
+
 	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
 		return nil, err
@@ -219,9 +256,9 @@ func (f *Form) validate() error {
 
 // Equal compares two forms for value equality.
 //
-// TODO(voss): at the moment, Metadata, PieceInfo, OptionalContent, Measure and
-// PtData sre ignored in the comparison.  Implement and use proper equality
-// checks for these types.
+// TODO(voss): at the moment, Metadata, PieceInfo, OptionalContent, Measure,
+// PtData, and AssociatedFiles are ignored in the comparison.  Implement and
+// use proper equality checks for these types.
 func (f *Form) Equal(other *Form) bool {
 	if f == nil || other == nil || f == other {
 		return f == other

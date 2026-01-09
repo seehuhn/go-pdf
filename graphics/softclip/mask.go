@@ -119,8 +119,8 @@ func (m *Mask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return dict, nil
 }
 
-// Equals reports whether two Mask values are equal.
-func (m *Mask) Equals(other graphics.SoftClip) bool {
+// Equal reports whether two Mask values are equal.
+func (m *Mask) Equal(other graphics.SoftClip) bool {
 	if m == nil || other == nil {
 		return m == nil && other == nil
 	}

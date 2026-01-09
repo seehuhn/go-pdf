@@ -63,5 +63,5 @@ type Image interface {
 type SoftClip interface {
 	pdf.Embedder
 	IsSoftClip() bool
-	Equals(other SoftClip) bool
+	Equal(other SoftClip) bool
 }

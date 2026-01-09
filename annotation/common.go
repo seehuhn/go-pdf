@@ -24,6 +24,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation/appearance"
+	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/oc"
 	"seehuhn.de/go/pdf/optional"
@@ -122,11 +123,12 @@ type Common struct {
 	// This corresponds to the /NM entry in the PDF annotation dictionary.
 	Name string
 
-	// Files (optional) is an array of file specification dictionaries which
-	// denote the associated files for this annotation.
+	// AssociatedFiles (optional; PDF 2.0) is an array of files associated with
+	// the annotation. The relationship that the associated files have to the
+	// annotation is supplied by the Specification.AFRelationship field.
 	//
 	// This corresponds to the /AF entry in the PDF annotation dictionary.
-	Files []pdf.Reference
+	AssociatedFiles []*file.Specification
 
 	// StructParent (required if the annotation is a structural content item)
 	// is the integer key of the annotation's entry in the structural parent
@@ -271,13 +273,32 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool)
 		dict["OC"] = ocObj
 	}
 
-	if c.Files != nil {
+	if c.AssociatedFiles != nil {
 		if err := pdf.CheckVersion(w, "annotation AF entry", pdf.V2_0); err != nil {
 			return err
 		}
-		afArray := make(pdf.Array, len(c.Files))
-		for i, ref := range c.Files {
-			afArray[i] = ref
+
+		// Validate each file specification can be used as associated file
+		version := pdf.GetVersion(w)
+		for i, spec := range c.AssociatedFiles {
+			if spec == nil {
+				continue
+			}
+			if err := spec.CanBeAF(version); err != nil {
+				return fmt.Errorf("AssociatedFiles[%d]: %w", i, err)
+			}
+		}
+
+		// Embed the file specifications
+		var afArray pdf.Array
+		for _, spec := range c.AssociatedFiles {
+			if spec != nil {
+				embedded, err := rm.Embed(spec)
+				if err != nil {
+					return err
+				}
+				afArray = append(afArray, embedded)
+			}
 		}
 		dict["AF"] = afArray
 	}
@@ -364,7 +385,7 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 	}
 
 	// Border (optional)
-	if border, err := pdf.Optional(ExtractBorder(x.R, dict["Border"])); err != nil {
+	if border, err := pdf.Optional(ExtractBorder(x, dict["Border"])); err != nil {
 		return err
 	} else {
 		common.Border = border
@@ -407,14 +428,17 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 	}
 
 	// AF (optional)
-	if af, err := x.GetArray(dict["AF"]); err == nil && len(af) > 0 {
-		refs := make([]pdf.Reference, len(af))
-		for i, fileRef := range af {
-			if ref, ok := fileRef.(pdf.Reference); ok {
-				refs[i] = ref
+	if afArray, err := pdf.Optional(x.GetArray(dict["AF"])); err != nil {
+		return err
+	} else if afArray != nil {
+		common.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
+		for _, afObj := range afArray {
+			if spec, err := pdf.ExtractorGetOptional(x, afObj, file.ExtractSpecification); err != nil {
+				return err
+			} else if spec != nil {
+				common.AssociatedFiles = append(common.AssociatedFiles, spec)
 			}
 		}
-		common.Files = refs
 	}
 
 	// CA (optional) - default value is 1.0

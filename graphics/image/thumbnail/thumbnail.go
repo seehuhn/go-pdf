@@ -131,24 +131,18 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
 	// decode array (optional)
 	if decodeArray, err := pdf.Optional(x.GetArray(dict["Decode"])); err != nil {
 		return nil, err
-	} else if decodeArray != nil {
-		expectedLen := 2 * cs.Channels()
-		if len(decodeArray) != expectedLen {
-			// ignore malformed decode array
-			decodeArray = nil
-		} else {
-			decode := make([]float64, len(decodeArray))
-			for i, val := range decodeArray {
-				num, err := x.GetNumber(val)
-				if err != nil {
-					// ignore malformed decode array
-					decode = nil
-					break
-				}
-				decode[i] = num
+	} else if decodeArray != nil && len(decodeArray) == 2*cs.Channels() {
+		decode := make([]float64, len(decodeArray))
+		for i, val := range decodeArray {
+			num, err := x.GetNumber(val)
+			if err != nil {
+				// ignore malformed decode array
+				decode = nil
+				break
 			}
-			thumb.Decode = decode
+			decode[i] = num
 		}
+		thumb.Decode = decode
 	}
 
 	// set up WriteData function
@@ -349,4 +343,18 @@ func isValidBitsPerComponent(bpc int) bool {
 	default:
 		return false
 	}
+}
+
+// Detach loads the thumbnail data into memory, allowing the source file to be
+// closed and surfacing any errors early.
+func (t *Thumbnail) Detach() error {
+	buf := &bytes.Buffer{}
+	if err := t.WriteData(buf); err != nil {
+		return err
+	}
+	t.WriteData = func(w io.Writer) error {
+		_, err := w.Write(buf.Bytes())
+		return err
+	}
+	return nil
 }

@@ -74,7 +74,7 @@ func TestMaskRoundTrip(t *testing.T) {
 				t.Fatalf("Extract: %v", err)
 			}
 
-			if !tc.mask.Equals(got) {
+			if !tc.mask.Equal(got) {
 				t.Errorf("round-trip mismatch:\nwant: %+v\ngot:  %+v", tc.mask, got)
 			}
 		})
