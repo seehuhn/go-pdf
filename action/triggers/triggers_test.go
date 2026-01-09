@@ -18,7 +18,6 @@ package triggers
 
 import (
 	"bytes"
-	"errors"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -88,8 +87,7 @@ func testAnnotationRoundTrip(t *testing.T, v pdf.Version, aa *Annotation) {
 
 	obj, err := aa.Encode(rm)
 	if err != nil {
-		var versionError *pdf.VersionError
-		if errors.As(err, &versionError) {
+		if pdf.IsWrongVersion(err) {
 			t.Skip()
 		}
 		t.Fatalf("encode failed: %v", err)
@@ -198,8 +196,7 @@ func testPageRoundTrip(t *testing.T, v pdf.Version, aa *Page) {
 
 	obj, err := aa.Encode(rm)
 	if err != nil {
-		var versionError *pdf.VersionError
-		if errors.As(err, &versionError) {
+		if pdf.IsWrongVersion(err) {
 			t.Skip()
 		}
 		t.Fatalf("encode failed: %v", err)
@@ -312,8 +309,7 @@ func testFormRoundTrip(t *testing.T, v pdf.Version, aa *Form) {
 
 	obj, err := aa.Encode(rm)
 	if err != nil {
-		var versionError *pdf.VersionError
-		if errors.As(err, &versionError) {
+		if pdf.IsWrongVersion(err) {
 			t.Skip()
 		}
 		t.Fatalf("encode failed: %v", err)
@@ -436,8 +432,7 @@ func testCatalogRoundTrip(t *testing.T, v pdf.Version, aa *Catalog) {
 
 	obj, err := aa.Encode(rm)
 	if err != nil {
-		var versionError *pdf.VersionError
-		if errors.As(err, &versionError) {
+		if pdf.IsWrongVersion(err) {
 			t.Skip()
 		}
 		t.Fatalf("encode failed: %v", err)

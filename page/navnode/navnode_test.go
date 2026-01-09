@@ -18,7 +18,6 @@ package navnode
 
 import (
 	"bytes"
-	"errors"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -91,8 +90,7 @@ func roundTripTest(t *testing.T, version pdf.Version, nodes1 []*Node) {
 	rm := pdf.NewResourceManager(w)
 
 	encoded, err := Encode(rm, nodes1)
-	var versionError *pdf.VersionError
-	if errors.As(err, &versionError) {
+	if pdf.IsWrongVersion(err) {
 		t.Skip("version not supported")
 	} else if err != nil {
 		t.Fatalf("encode failed: %v", err)

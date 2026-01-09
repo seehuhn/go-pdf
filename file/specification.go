@@ -128,7 +128,14 @@ type Specification struct {
 
 // ExtractSpecification extracts a file specification dictionary from a PDF object.
 func ExtractSpecification(x *pdf.Extractor, obj pdf.Object) (*Specification, error) {
-	_, isIndirect := obj.(pdf.Reference)
+	// Check if the object was indirect. When called via ExtractorGetOptional,
+	// the reference is resolved before this function is called, so we use
+	// x.IsIndirect which is set by ExtractorGet.
+	isIndirect := x.IsIndirect
+	if _, ok := obj.(pdf.Reference); ok {
+		// Also handle direct calls with a reference
+		isIndirect = true
+	}
 
 	dict, err := x.GetDictTyped(obj, "Filespec")
 	if err != nil {

@@ -386,7 +386,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*graphics.ExtGState, error) {
 		}
 	}
 
-	res.SingleUse = !isIndirect
+	res.SingleUse = !isIndirect && !x.IsIndirect
 
 	res.Set = set
 	return res, nil

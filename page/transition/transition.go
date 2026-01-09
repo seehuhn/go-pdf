@@ -270,7 +270,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Transition, error) {
 		t.Opaque = bool(b)
 	}
 
-	t.SingleUse = !isIndirect
+	t.SingleUse = !isIndirect && !x.IsIndirect
 
 	return t, nil
 }

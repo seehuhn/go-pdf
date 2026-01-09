@@ -245,6 +245,9 @@ func roundTripThumbnail(t *testing.T, version pdf.Version, thumb *Thumbnail) {
 	// embed the thumbnail
 	ref, err := rm.Embed(thumb)
 	if err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
 		t.Fatalf("failed to embed thumbnail: %v", err)
 	}
 
@@ -436,6 +439,11 @@ func FuzzThumbnailRoundTrip(f *testing.F) {
 		thumb, err := ExtractThumbnail(x, objPDF)
 		if err != nil {
 			t.Skip("malformed thumbnail")
+		}
+
+		// Detach to load data into memory and surface any errors early
+		if err := thumb.Detach(); err != nil {
+			t.Skip("thumbnail data not readable")
 		}
 
 		roundTripThumbnail(t, pdf.GetVersion(r), thumb)

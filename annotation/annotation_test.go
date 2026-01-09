@@ -18,7 +18,6 @@ package annotation
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -107,8 +106,7 @@ func roundTripTest(t *testing.T, v pdf.Version, a1 Annotation) {
 
 	// embed the annotation
 	dict, err := a1.Encode(rm)
-	var versionError *pdf.VersionError
-	if errors.As(err, &versionError) {
+	if pdf.IsWrongVersion(err) {
 		t.Skip()
 	} else if err != nil {
 		t.Fatal(err)

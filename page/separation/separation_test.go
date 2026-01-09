@@ -18,7 +18,6 @@ package separation
 
 import (
 	"bytes"
-	"errors"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -95,8 +94,7 @@ func roundTripTest(t *testing.T, version pdf.Version, d1 *Dict) {
 	rm := pdf.NewResourceManager(w)
 
 	dict, err := d1.Encode(rm)
-	var versionError *pdf.VersionError
-	if errors.As(err, &versionError) {
+	if pdf.IsWrongVersion(err) {
 		t.Skip("version not supported")
 	} else if err != nil {
 		t.Fatalf("encode failed: %v", err)

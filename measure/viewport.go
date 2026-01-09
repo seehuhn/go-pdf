@@ -198,7 +198,7 @@ func ExtractViewportArray(x *pdf.Extractor, obj pdf.Object) (*ViewPortArray, err
 		}
 		viewports[i] = vp
 	}
-	return &ViewPortArray{Viewports: viewports, SingleUse: !isIndirect}, nil
+	return &ViewPortArray{Viewports: viewports, SingleUse: !isIndirect && !x.IsIndirect}, nil
 }
 
 // Embed converts the ViewPortArray into a PDF array.

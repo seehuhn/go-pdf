@@ -18,7 +18,6 @@ package file
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"testing"
 	"time"
@@ -552,8 +551,7 @@ func roundTripTest(t *testing.T, v pdf.Version, spec1 *Specification) {
 
 	// encode the specification
 	obj, err := rm.Embed(spec1)
-	var versionError *pdf.VersionError
-	if errors.As(err, &versionError) {
+	if pdf.IsWrongVersion(err) {
 		t.Skip()
 	} else if err != nil {
 		t.Fatal(err)

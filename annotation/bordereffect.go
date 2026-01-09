@@ -47,8 +47,8 @@ type BorderEffect struct {
 
 var _ pdf.Embedder = (*BorderEffect)(nil)
 
-func ExtractBorderEffect(r pdf.Getter, obj pdf.Object) (*BorderEffect, error) {
-	dict, err := pdf.GetDict(r, obj)
+func ExtractBorderEffect(x *pdf.Extractor, obj pdf.Object) (*BorderEffect, error) {
+	dict, err := pdf.GetDict(x.R, obj)
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -57,7 +57,7 @@ func ExtractBorderEffect(r pdf.Getter, obj pdf.Object) (*BorderEffect, error) {
 
 	effect := &BorderEffect{}
 
-	if style, err := pdf.Optional(pdf.GetName(r, dict["S"])); err != nil {
+	if style, err := pdf.Optional(pdf.GetName(x.R, dict["S"])); err != nil {
 		return nil, err
 	} else if style != "" {
 		effect.Style = style
@@ -66,7 +66,7 @@ func ExtractBorderEffect(r pdf.Getter, obj pdf.Object) (*BorderEffect, error) {
 	}
 
 	if effect.Style == "C" {
-		if intensity, err := pdf.Optional(pdf.GetNumber(r, dict["I"])); err != nil {
+		if intensity, err := pdf.Optional(pdf.GetNumber(x.R, dict["I"])); err != nil {
 			return nil, err
 		} else if intensity >= 0.0 && intensity <= 2.0 {
 			effect.Intensity = float64(intensity)
@@ -76,7 +76,7 @@ func ExtractBorderEffect(r pdf.Getter, obj pdf.Object) (*BorderEffect, error) {
 	}
 
 	_, isIndirect := obj.(pdf.Reference)
-	effect.SingleUse = !isIndirect
+	effect.SingleUse = !isIndirect && !x.IsIndirect
 
 	return effect, nil
 }

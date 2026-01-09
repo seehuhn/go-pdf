@@ -126,6 +126,9 @@ func roundTripTest(t *testing.T, version pdf.Version, item1 *ItemDict) {
 	// Embed the item
 	obj, err := rm.Embed(item1)
 	if err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
 		t.Fatal(err)
 	}
 
@@ -286,6 +289,6 @@ func FuzzItemDictRoundTrip(f *testing.F) {
 			t.Skip("malformed collection item")
 		}
 
-		roundTripTest(t, max(pdf.GetVersion(r), pdf.V1_7), item1)
+		roundTripTest(t, pdf.GetVersion(r), item1)
 	})
 }

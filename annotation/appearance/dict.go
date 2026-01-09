@@ -61,7 +61,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	_, isIndirect := obj.(pdf.Reference)
 
 	res := &Dict{
-		SingleUse: !isIndirect,
+		SingleUse: !isIndirect && !x.IsIndirect,
 	}
 
 	dict, err := x.GetDict(obj)

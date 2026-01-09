@@ -26,18 +26,20 @@ import (
 )
 
 func TestExtract(t *testing.T) {
+	x := pdf.NewExtractor(mock.Getter)
+
 	// test with nil object
-	info, err := Extract(nil, nil)
+	info, err := Extract(x, nil)
 	if err != nil {
-		t.Errorf("Extract(nil, nil) returned error: %v", err)
+		t.Errorf("Extract(x, nil) returned error: %v", err)
 	}
 	if info != nil {
-		t.Errorf("Extract(nil, nil) returned non-nil info: %v", info)
+		t.Errorf("Extract(x, nil) returned non-nil info: %v", info)
 	}
 
 	// test with empty dictionary
 	emptyDict := pdf.Dict{}
-	info, err = Extract(nil, emptyDict)
+	info, err = Extract(x, emptyDict)
 	if err != nil {
 		t.Errorf("Extract with empty dict returned error: %v", err)
 	}
@@ -95,7 +97,8 @@ func TestExtractWithValidData(t *testing.T) {
 		"TestApp": dataDict,
 	}
 
-	info, err := Extract(mock.Getter, pieceDict)
+	x := pdf.NewExtractor(mock.Getter)
+	info, err := Extract(x, pieceDict)
 	if err != nil {
 		t.Fatalf("Extract returned error: %v", err)
 	}
@@ -170,7 +173,8 @@ func TestErrDiscard(t *testing.T) {
 		testName: dataDict,
 	}
 
-	info, err := Extract(mock.Getter, pieceDict)
+	x := pdf.NewExtractor(mock.Getter)
+	info, err := Extract(x, pieceDict)
 	if err != nil {
 		t.Fatalf("Extract returned error: %v", err)
 	}
@@ -196,7 +200,8 @@ func TestSingleUse(t *testing.T) {
 		"TestApp": dataDict,
 	}
 
-	info, err := Extract(mock.Getter, pieceDict)
+	x := pdf.NewExtractor(mock.Getter)
+	info, err := Extract(x, pieceDict)
 	if err != nil {
 		t.Fatalf("Extract with direct dict returned error: %v", err)
 	}
@@ -213,7 +218,8 @@ func TestSingleUse(t *testing.T) {
 		t.Fatalf("Failed to write indirect object: %v", err)
 	}
 
-	info2, err := Extract(w2, ref)
+	x2 := pdf.NewExtractor(w2)
+	info2, err := Extract(x2, ref)
 	if err != nil {
 		t.Fatalf("Extract with reference returned error: %v", err)
 	}

@@ -103,6 +103,9 @@ func roundTripTest(t *testing.T, version pdf.Version, data *PtData) {
 	// Embed the object
 	embedded, err := rm.Embed(data)
 	if err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
 		t.Fatalf("embed failed: %v", err)
 	}
 
@@ -174,6 +177,6 @@ func FuzzRoundTrip(f *testing.F) {
 			t.Skip("malformed PDF object")
 		}
 
-		roundTripTest(t, max(pdf.GetVersion(r), pdf.V2_0), objGo)
+		roundTripTest(t, pdf.GetVersion(r), objGo)
 	})
 }

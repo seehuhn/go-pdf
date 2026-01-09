@@ -111,14 +111,8 @@ func Wrap(err error, loc string) error {
 // IsMalformed returns true if the error or any of its wrapped errors is a
 // [MalformedFileError].
 func IsMalformed(err error) bool {
-	// TODO(voss): should this be using errors.Is?
-	for err != nil {
-		if _, ok := err.(*MalformedFileError); ok {
-			return true
-		}
-		err = errors.Unwrap(err)
-	}
-	return false
+	var malformed *MalformedFileError
+	return errors.As(err, &malformed)
 }
 
 // IsReadError returns true if the error the error is non-nil
@@ -151,4 +145,11 @@ func CheckVersion(pdf *Writer, operation string, minVersion Version) error {
 func (err *VersionError) Error() string {
 	return (err.Operation + " requires PDF version " +
 		err.Earliest.String() + " or later")
+}
+
+// IsWrongVersion returns true if the error or any of its wrapped errors is a
+// [VersionError].
+func IsWrongVersion(err error) bool {
+	var versionError *VersionError
+	return errors.As(err, &versionError)
 }

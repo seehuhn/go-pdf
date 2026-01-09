@@ -18,7 +18,6 @@ package page
 
 import (
 	"bytes"
-	"errors"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -153,8 +152,7 @@ func roundTripTest(t *testing.T, v pdf.Version, p1 *Page) {
 
 	// Encode the page
 	dict, err := p1.Encode(rm)
-	var versionError *pdf.VersionError
-	if errors.As(err, &versionError) {
+	if pdf.IsWrongVersion(err) {
 		t.Skip("version not supported")
 	} else if err != nil {
 		t.Fatalf("encode failed: %v", err)

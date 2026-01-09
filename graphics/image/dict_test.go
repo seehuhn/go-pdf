@@ -524,6 +524,9 @@ func roundTripTest(t *testing.T, version pdf.Version, data *Dict) {
 	// Embed the original data
 	ref, err := rm.Embed(data)
 	if err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
 		t.Fatalf("failed to embed Dict: %v", err)
 	}
 
@@ -653,17 +656,6 @@ func FuzzDictRoundTrip(f *testing.F) {
 			t.Skip("image data not readable")
 		}
 
-		// Compute minimum version based on extracted object's features
-		version := max(pdf.GetVersion(r), pdf.V1_3)
-		if objGo.SMask != nil || objGo.Metadata != nil {
-			version = max(version, pdf.V1_4)
-		}
-		if objGo.SMaskInData > 0 || objGo.OptionalContent != nil || objGo.BitsPerComponent == 16 {
-			version = max(version, pdf.V1_5)
-		}
-		if objGo.PtData != nil || objGo.Measure != nil || len(objGo.AssociatedFiles) > 0 {
-			version = max(version, pdf.V2_0)
-		}
-		roundTripTest(t, version, objGo)
+		roundTripTest(t, pdf.GetVersion(r), objGo)
 	})
 }

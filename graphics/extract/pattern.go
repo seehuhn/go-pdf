@@ -99,7 +99,7 @@ func extractType2(x *pdf.Extractor, dict pdf.Dict, isIndirect bool) (*pattern.Ty
 
 	pat := &pattern.Type2{
 		Shading:   sh,
-		SingleUse: !isIndirect,
+		SingleUse: !isIndirect && !x.IsIndirect,
 	}
 
 	// extract optional Matrix

@@ -129,11 +129,8 @@ func FuzzType2Dict(f *testing.F) {
 			t.Skip("not a CIDFontType2 font")
 		}
 
-		// We need at version 1.6, in case an OpenType font is used.
-		v := max(pdf.GetVersion(r), pdf.V1_6)
-
 		// Make sure we can write the dict, and read it back.
-		checkRoundtripT2(t, d, v)
+		checkRoundtripT2(t, d, pdf.GetVersion(r))
 	})
 }
 
@@ -173,6 +170,9 @@ func checkRoundtripT2(t *testing.T, d1 *dict.CIDFontType2, v pdf.Version) {
 	}
 	fontDictRef, err := rm.Embed(d1)
 	if err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
 		t.Fatal(err)
 	}
 	err = rm.Close()

@@ -87,7 +87,8 @@ func TestBorderEffectRoundTrip(t *testing.T) {
 			}
 
 			// extract it back
-			extracted, err := ExtractBorderEffect(buf, embedded)
+			x := pdf.NewExtractor(buf)
+			extracted, err := ExtractBorderEffect(x, embedded)
 			if err != nil {
 				t.Fatal(err)
 			}

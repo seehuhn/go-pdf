@@ -164,7 +164,7 @@ func ExtractTransparencyAttributes(x *pdf.Extractor, obj pdf.Object) (*Transpare
 		a.Knockout = bool(knockout)
 	}
 
-	a.SingleUse = !isIndirect
+	a.SingleUse = !isIndirect && !x.IsIndirect
 
 	return a, nil
 }
