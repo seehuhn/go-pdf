@@ -23,6 +23,8 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
+// PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.23
+
 // Redact represents a redaction annotation (PDF 1.7+).
 // Redaction annotations identify content intended to be removed from the document
 // through a two-phase process: content identification and content removal.

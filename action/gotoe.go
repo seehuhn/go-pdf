@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// PDF 2.0 sections: 12.6.2 12.6.4.4
-
 package action
 
 import (
@@ -23,6 +21,8 @@ import (
 	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/file"
 )
+
+// PDF 2.0 sections: 12.6.2 12.6.4.4
 
 // GoToE represents a go-to embedded action that navigates to a destination
 // in an embedded file.

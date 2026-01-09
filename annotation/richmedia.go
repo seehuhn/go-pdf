@@ -18,6 +18,8 @@ package annotation
 
 import "seehuhn.de/go/pdf"
 
+// PDF 2.0 sections: 12.5.2 12.5.6.25
+
 // RichMedia represents a rich media annotation (PDF 2.0).
 // Rich media annotations share structural similarities with 3D artwork and can
 // contain various types of rich media content like 3D models, sound, and video.

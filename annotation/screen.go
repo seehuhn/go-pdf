@@ -18,6 +18,8 @@ package annotation
 
 import "seehuhn.de/go/pdf"
 
+// PDF 2.0 sections: 12.5.2 12.5.6.18
+
 // Screen specifies a region of a page upon which media clips may be played. It
 // also serves as an object from which actions can be triggered.
 type Screen struct {

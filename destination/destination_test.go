@@ -31,6 +31,19 @@ type testCase struct {
 	Dest Destination
 }
 
+// decodeTestCase represents a test case for decoding raw PDF arrays.
+// These may include malformed inputs, as long as the decode function
+// has code to fix them up so they can round-trip.
+type decodeTestCase struct {
+	Name string
+	Obj  pdf.Object // raw PDF object to decode
+}
+
+var decodeTestCases = []decodeTestCase{
+	// FitR with null coordinates - nulls decode as 0, creating invalid rectangle
+	{"FitR with nulls", pdf.Array{pdf.Reference(10), pdf.Name("FitR"), nil, nil, nil, nil}},
+}
+
 var testCases = []testCase{
 	{"XYZ", &XYZ{Page: Target(pdf.Reference(10)), Left: 100, Top: 200, Zoom: 1.5}},
 	{"XYZ with Unset", &XYZ{Page: Target(pdf.Reference(10)), Left: Unset, Top: Unset, Zoom: Unset}},
@@ -447,6 +460,24 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
+func TestDecodeRoundTrip(t *testing.T) {
+	for _, tc := range decodeTestCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+			// decode
+			x := pdf.NewExtractor(w)
+			dest, err := Decode(x, tc.Obj)
+			if err != nil {
+				t.Fatalf("decode failed: %v", err)
+			}
+
+			// round-trip
+			testRoundTrip(t, dest)
+		})
+	}
+}
+
 func TestDecodeNamedFromName(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
@@ -516,6 +547,18 @@ func FuzzRoundTrip(f *testing.F) {
 
 		w.GetMeta().Trailer["Quir:E"] = obj
 		err = w.Close()
+		if err != nil {
+			continue
+		}
+
+		f.Add(buf.Data)
+	}
+
+	for _, tc := range decodeTestCases {
+		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+
+		w.GetMeta().Trailer["Quir:E"] = tc.Obj
+		err := w.Close()
 		if err != nil {
 			continue
 		}

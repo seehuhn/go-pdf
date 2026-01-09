@@ -36,11 +36,14 @@ type Caret struct {
 	// TODO(voss): review this once
 	// https://github.com/pdf-association/pdf-issues/issues/592 is resolved.
 	//
-	// This corresponds to the /Margin entry in the PDF annotation dictionary.
+	// This corresponds to the /RD entry in the PDF annotation dictionary.
 	Margin []float64
 
 	// Symbol (optional) specifies a symbol that is associated with the caret:
 	//  - "P": A new paragraph symbol (¶) is associated with the caret
+	//  - "None": No symbol is associated with the caret
+	//
+	// On write, an empty string is treated as "None".
 	//
 	// This corresponds to the /SY entry in the PDF annotation dictionary.
 	Symbol pdf.Name
@@ -76,6 +79,9 @@ func decodeCaret(x *pdf.Extractor, dict pdf.Dict) (*Caret, error) {
 	// Sy (optional)
 	if sy, err := x.GetName(dict["Sy"]); err == nil && sy != "" {
 		caret.Symbol = sy
+	}
+	if caret.Symbol == "" {
+		caret.Symbol = "None"
 	}
 
 	return caret, nil

@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// PDF 2.0 sections: 12.6.1 12.6.2
-
 package action
 
 import (
@@ -125,6 +123,8 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (Action, error) {
 		return nil, pdf.Error("unknown action type: " + string(actionType))
 	}
 }
+
+// PDF 2.0 sections: 12.6.1 12.6.2
 
 // ActionList represents a sequence of actions to be performed.
 type ActionList []Action

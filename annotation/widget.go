@@ -22,6 +22,8 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// PDF 2.0 sections: 12.5.2 12.5.6.19
+
 // Widget represents a widget annotation used by interactive forms to represent
 // the appearance of fields and to manage user interactions. When a field has
 // only a single associated widget annotation, the contents of the field

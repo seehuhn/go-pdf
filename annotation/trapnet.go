@@ -18,6 +18,8 @@ package annotation
 
 import "seehuhn.de/go/pdf"
 
+// PDF 2.0 sections: 12.5.2 12.5.6.21
+
 // TrapNet represents a trap network annotation that defines the trapping
 // characteristics for a page of a PDF document. Trapping is the process of
 // adding marks to a page along color boundaries to avoid unwanted visual

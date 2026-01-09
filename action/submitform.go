@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// PDF 2.0 sections: 12.6.2 12.7.6.2
-
 package action
 
 import (
 	"seehuhn.de/go/pdf"
 )
+
+// PDF 2.0 sections: 12.6.2 12.7.6.2
 
 // SubmitForm represents a submit-form action that sends form data to a URL.
 type SubmitForm struct {

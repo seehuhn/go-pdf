@@ -18,6 +18,8 @@ package annotation
 
 import "seehuhn.de/go/pdf"
 
+// PDF 2.0 sections: 12.5.2 12.5.6.17
+
 // Movie represents a movie annotation containing animated graphics and sound
 // to be presented on the computer screen and through the speakers. When the
 // annotation is activated, the movie is played.

@@ -21,6 +21,8 @@ import (
 	"seehuhn.de/go/pdf/action"
 )
 
+// PDF 2.0 sections: 12.6.3
+
 // Form represents a form field's additional-actions dictionary.
 // This corresponds to the AA entry in a form field dictionary.
 //

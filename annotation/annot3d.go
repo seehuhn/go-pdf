@@ -22,6 +22,8 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.25
+
 // Annot3D represents a 3D annotation (PDF 1.6+).
 // 3D annotations are a way to include 3D artwork in PDF documents.
 type Annot3D struct {

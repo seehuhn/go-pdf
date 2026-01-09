@@ -626,6 +626,7 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Editor",
 					Subject: "Insert text here",
 				},
+				Symbol: "None",
 			},
 		},
 		{
@@ -655,6 +656,7 @@ var testCases = map[pdf.Name][]testCase{
 					Subject: "Spacing adjustment",
 				},
 				Margin: []float64{2.0, 3.0, 2.0, 5.0}, // Rectangle differences
+				Symbol: "None",
 			},
 		},
 	},

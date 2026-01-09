@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// PDF 2.0 sections: 12.6.2 12.6.4.15
-
 package action
 
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/page/transition"
 )
+
+// PDF 2.0 sections: 12.6.2 12.6.4.15
 
 // Trans represents a transition action that updates the display using
 // a transition dictionary.

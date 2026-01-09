@@ -18,6 +18,8 @@ package annotation
 
 import "seehuhn.de/go/pdf"
 
+// PDF 2.0 sections: 12.5.2 12.5.6.20
+
 // PrinterMark represents a printer's mark annotation that contains a graphic
 // symbol, such as a registration target, color bar, or cut mark, that may be
 // added to a page to assist production personnel in identifying components

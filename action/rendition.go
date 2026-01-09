@@ -14,13 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// PDF 2.0 sections: 12.6.2 12.6.4.14
-
 package action
 
 import (
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/optional"
 )
+
+// PDF 2.0 sections: 12.6.2 12.6.4.14
 
 // Rendition represents a rendition action that controls multimedia playback.
 type Rendition struct {
@@ -30,8 +31,17 @@ type Rendition struct {
 	// AN is the screen annotation for playback.
 	AN pdf.Reference
 
-	// OP is the operation to perform (0-4).
-	OP *int
+	// OP is the operation to perform when the action is triggered.
+	// Required if JS is not present; otherwise optional.
+	// Valid values are:
+	//   - 0: Play the rendition R, associating it with annotation AN.
+	//        If a rendition is already associated, stop it first.
+	//   - 1: Stop any rendition associated with AN and remove the association.
+	//   - 2: Pause any rendition associated with AN.
+	//   - 3: Resume any paused rendition associated with AN.
+	//   - 4: Play the rendition R if none is associated with AN,
+	//        or resume if paused; otherwise do nothing.
+	OP optional.Int
 
 	// JS is the ECMAScript to execute.
 	JS pdf.Object
@@ -61,8 +71,13 @@ func (a *Rendition) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["AN"] = a.AN
 	}
 
-	if a.OP != nil {
-		dict["OP"] = pdf.Integer(*a.OP)
+	if op, ok := a.OP.Get(); ok {
+		if op < 0 || op > 4 {
+			return nil, pdf.Error("Rendition action OP must be 0-4")
+		}
+		dict["OP"] = op
+	} else if a.JS == nil {
+		return nil, pdf.Error("Rendition action requires OP or JS")
 	}
 
 	if a.JS != nil {
@@ -81,10 +96,17 @@ func (a *Rendition) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 func decodeRendition(x *pdf.Extractor, dict pdf.Dict) (*Rendition, error) {
 	an, _ := dict["AN"].(pdf.Reference)
 
-	var op *int
-	if opVal, err := pdf.Optional(x.GetInteger(dict["OP"])); err == nil {
-		i := int(opVal)
-		op = &i
+	var op optional.Int
+	if dict["OP"] != nil {
+		if opVal, err := x.GetInteger(dict["OP"]); err == nil && opVal >= 0 && opVal <= 4 {
+			op.Set(opVal)
+		} else {
+			// Out of bounds or invalid: default to 0
+			op.Set(0)
+		}
+	} else if dict["JS"] == nil {
+		// OP is required when JS is absent
+		op.Set(0)
 	}
 
 	next, err := DecodeActionList(x, dict["Next"])

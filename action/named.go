@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// PDF 2.0 sections: 12.6.2 12.6.4.12
-
 package action
 
 import (
 	"seehuhn.de/go/pdf"
 )
+
+// PDF 2.0 sections: 12.6.2 12.6.4.12
 
 // Named represents a named action that executes a predefined action.
 // Standard names include NextPage, PrevPage, FirstPage, LastPage.

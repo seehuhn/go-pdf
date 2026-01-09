@@ -37,6 +37,10 @@ import (
 
 // PDF 2.0 sections: 8.9.5
 
+// Dict represents a PDF image XObject dictionary.
+//
+// TODO(voss): currently there is no way to write JPXDecode images.  Rethink
+// the whole WriteData approach.
 type Dict struct {
 	// Width is the width of the image in pixels.
 	Width int

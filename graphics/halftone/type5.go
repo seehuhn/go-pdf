@@ -21,7 +21,18 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/transfer"
 )
+
+// isPrimaryColorant returns true if the colorant name is a primary
+// colour component as defined in PDF 2.0 section 10.6.5.6.
+func isPrimaryColorant(name pdf.Name) bool {
+	switch name {
+	case "Cyan", "Magenta", "Yellow", "Black", "Red", "Green", "Blue", "Gray":
+		return true
+	}
+	return false
+}
 
 // PDF 2.0 sections: 10.6.5.1 10.6.5.6
 
@@ -69,13 +80,44 @@ func extractType5(x *pdf.Extractor, dict pdf.Dict) (*Type5, error) {
 			return nil, err
 		} else if ht != nil {
 			if ht.HalftoneType() == 5 {
-				return nil, pdf.Error("invalid Default halftone")
+				return nil, pdf.Errorf("invalid colorant halftone for %q", colorant)
 			}
 			h.Colorants[colorant] = ht
 		}
 	}
 
+	// Fix up missing transfer functions where required by the spec.
+	hasNonPrimaryColorants := false
+	for colorant := range h.Colorants {
+		if !isPrimaryColorant(colorant) {
+			hasNonPrimaryColorants = true
+			break
+		}
+	}
+	if hasNonPrimaryColorants && h.Default.GetTransferFunction() == nil {
+		setTransferFunction(h.Default, transfer.Identity)
+	}
+	for colorant, ht := range h.Colorants {
+		if !isPrimaryColorant(colorant) && ht.GetTransferFunction() == nil {
+			setTransferFunction(ht, transfer.Identity)
+		}
+	}
+
 	return h, nil
+}
+
+// setTransferFunction sets the transfer function on a halftone.
+func setTransferFunction(ht Halftone, tf pdf.Function) {
+	switch h := ht.(type) {
+	case *Type1:
+		h.TransferFunction = tf
+	case *Type6:
+		h.TransferFunction = tf
+	case *Type10:
+		h.TransferFunction = tf
+	case *Type16:
+		h.TransferFunction = tf
+	}
 }
 
 func (h *Type5) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
@@ -100,32 +142,38 @@ func (h *Type5) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["Type"] = pdf.Name("Halftone")
 	}
 
-	if h.Default != nil {
-		if h.Default.GetTransferFunction() == nil {
-			return nil, errors.New("missing transfer function")
+	// Check if there are nonprimary colorants
+	hasNonPrimaryColorants := false
+	for colorant := range h.Colorants {
+		if !isPrimaryColorant(colorant) {
+			hasNonPrimaryColorants = true
+			break
 		}
-		defaultEmbedded, err := rm.Embed(h.Default)
-		if err != nil {
-			return nil, err
-		}
-		dict["Default"] = defaultEmbedded
 	}
 
+	// Default requires transfer function only if there are nonprimary colorants
+	if hasNonPrimaryColorants && h.Default.GetTransferFunction() == nil {
+		return nil, errors.New("default halftone missing transfer function")
+	}
+
+	defaultEmbedded, err := rm.Embed(h.Default)
+	if err != nil {
+		return nil, err
+	}
+	dict["Default"] = defaultEmbedded
+
 	for colorant, ht := range h.Colorants {
-		var isPrimary bool
 		switch colorant {
 		case "Type", "HalftoneType", "HalftoneName", "Default":
 			return nil, fmt.Errorf("invalid colorant name %q", colorant)
-		case "Cyan", "Magenta", "Yellow", "Black", "Red", "Green", "Blue", "Gray":
-			isPrimary = true
 		}
 
 		if ht.HalftoneType() == 5 {
 			return nil, fmt.Errorf("colorant halftone for %q cannot be Type 5", colorant)
 		}
 
-		if !isPrimary && ht.GetTransferFunction() == nil {
-			return nil, errors.New("missing transfer function")
+		if !isPrimaryColorant(colorant) && ht.GetTransferFunction() == nil {
+			return nil, fmt.Errorf("colorant %q missing transfer function", colorant)
 		}
 
 		colorantEmbedded, err := rm.Embed(ht)

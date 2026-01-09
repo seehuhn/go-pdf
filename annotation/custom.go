@@ -23,6 +23,9 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// PDF 2.0 sections: 12.5.2
+
+// Custom represents an annotation with an unknown or unsupported subtype.
 type Custom struct {
 	Common
 

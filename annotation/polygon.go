@@ -113,7 +113,7 @@ func decodePolygon(x *pdf.Extractor, dict pdf.Dict) (*Polygon, error) {
 	}
 
 	// BE (optional)
-	if be, err := pdf.Optional(ExtractBorderEffect(x.R, dict["BE"])); err != nil {
+	if be, err := pdf.Optional(ExtractBorderEffect(x, dict["BE"])); err != nil {
 		return nil, err
 	} else {
 		polygon.BorderEffect = be

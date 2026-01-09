@@ -18,6 +18,8 @@ package annotation
 
 import "seehuhn.de/go/pdf"
 
+// PDF 2.0 sections: 12.5.2 12.5.6.22
+
 // Watermark represents a watermark annotation used to represent graphics that
 // are to be printed at a fixed size relative to the target media, and fixed
 // relative position on the target media, regardless of the dimensions of that media.

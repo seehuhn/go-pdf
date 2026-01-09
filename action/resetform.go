@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// PDF 2.0 sections: 12.6.2 12.7.6.3
-
 package action
 
 import (
 	"seehuhn.de/go/pdf"
 )
+
+// PDF 2.0 sections: 12.6.2 12.7.6.3
 
 // ResetForm represents a reset-form action that resets form fields to
 // their default values.

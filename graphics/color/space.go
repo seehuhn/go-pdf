@@ -33,6 +33,7 @@ type Space interface {
 	Family() pdf.Name
 
 	// Channels returns the dimensionality of the color space.
+	// This returns 0 for colored tiling patterns and shading patterns.
 	Channels() int
 
 	// Default returns the default color of the color space.

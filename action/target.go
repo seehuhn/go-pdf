@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// PDF 2.0 sections: 12.6.4.4
-
 package action
 
 import (
@@ -32,6 +30,8 @@ type Target interface {
 	pdf.Encoder
 	encodeTargetSafe(rm *pdf.ResourceManager, visited map[Target]bool) (pdf.Native, error)
 }
+
+// PDF 2.0 sections: 12.6.4.4
 
 // TargetParent navigates up to the parent document.
 type TargetParent struct {

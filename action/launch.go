@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// PDF 2.0 sections: 12.6.2 12.6.4.6
-
 package action
 
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/file"
 )
+
+// PDF 2.0 sections: 12.6.2 12.6.4.6
 
 // Launch represents a launch action that launches an application or opens
 // or prints a document.

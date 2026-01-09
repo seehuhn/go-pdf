@@ -89,7 +89,7 @@ func writeTestPage(w *pdf.Writer) error {
 		"Type":      pdf.Name("Page"),
 		"Contents":  contentRef,
 		"Resources": pdf.AsDict(content.Resources),
-		"MediaBox":  &pdf.Rectangle{0, 0, 595, 842},
+		"MediaBox":  &pdf.Rectangle{URx: 595, URy: 842},
 	}
 	err = pageTree.AppendPage(page)
 	if err != nil {

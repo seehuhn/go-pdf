@@ -133,6 +133,10 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (Destination, error) {
 		bottom, _ := pdf.Optional(x.GetNumber(arr[3]))
 		right, _ := pdf.Optional(x.GetNumber(arr[4]))
 		top, _ := pdf.Optional(x.GetNumber(arr[5]))
+		if left >= right || bottom >= top {
+			// Invalid rectangle, fall back to Fit
+			return &Fit{Page: page}, nil
+		}
 		return &FitR{Page: page, Left: left, Bottom: bottom,
 			Right: right, Top: top}, nil
 
@@ -157,6 +161,8 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (Destination, error) {
 		return nil, pdf.Error("unknown destination type: " + string(typeName))
 	}
 }
+
+// PDF 2.0 sections: 12.3.2
 
 // XYZ displays the page with coordinates (Left, Top) positioned at the
 // upper-left corner of the window and contents magnified by Zoom factor. Use
@@ -189,6 +195,8 @@ func (d *XYZ) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}, nil
 }
 
+// PDF 2.0 sections: 12.3.2
+
 // Fit displays the page magnified to fit entirely within the window
 // both horizontally and vertically. If the required horizontal and vertical
 // magnification factors are different, uses the smaller of the two,
@@ -205,6 +213,8 @@ func (d *Fit) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		pdf.Name(TypeFit),
 	}, nil
 }
+
+// PDF 2.0 sections: 12.3.2
 
 // FitH displays the page with the vertical coordinate Top positioned at the
 // top edge of the window and contents magnified to fit the entire width of
@@ -229,6 +239,8 @@ func (d *FitH) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}, nil
 }
 
+// PDF 2.0 sections: 12.3.2
+
 // FitV displays the page with the horizontal coordinate Left positioned at
 // the left edge of the window and contents magnified to fit the entire height
 // of the page within the window.
@@ -251,6 +263,8 @@ func (d *FitV) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		encodeOptionalNumber(d.Left),
 	}, nil
 }
+
+// PDF 2.0 sections: 12.3.2
 
 // FitR displays the page with contents magnified to fit the rectangle
 // specified by the coordinates entirely within the window. If the required
@@ -294,6 +308,8 @@ func (d *FitR) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}, nil
 }
 
+// PDF 2.0 sections: 12.3.2
+
 // FitB displays the page with contents magnified to fit the page's bounding
 // box entirely within the window. If the required horizontal and vertical
 // magnification factors are different, uses the smaller of the two,
@@ -314,6 +330,8 @@ func (d *FitB) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		pdf.Name(TypeFitB),
 	}, nil
 }
+
+// PDF 2.0 sections: 12.3.2
 
 // FitBH displays the page with the vertical coordinate Top positioned at the
 // top edge of the window and contents magnified to fit the entire width of
@@ -342,6 +360,8 @@ func (d *FitBH) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}, nil
 }
 
+// PDF 2.0 sections: 12.3.2
+
 // FitBV displays the page with the horizontal coordinate Left positioned at
 // the left edge of the window and contents magnified to fit the entire height
 // of the page's bounding box within the window.
@@ -368,6 +388,8 @@ func (d *FitBV) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		encodeOptionalNumber(d.Left),
 	}, nil
 }
+
+// PDF 2.0 sections: 12.3.2
 
 // Named represents a named destination that must be looked up in the document
 // catalog's Dests dictionary or Names/Dests name tree. The Name field contains

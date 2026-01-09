@@ -18,6 +18,8 @@ package annotation
 
 import "seehuhn.de/go/pdf"
 
+// PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.16
+
 // Sound represents a sound annotation that contains sound recorded from the
 // computer's microphone or imported from a file. When the annotation is
 // activated, the sound is played. The annotation behaves like a text annotation

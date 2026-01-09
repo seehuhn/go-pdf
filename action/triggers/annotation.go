@@ -21,6 +21,8 @@ import (
 	"seehuhn.de/go/pdf/action"
 )
 
+// PDF 2.0 sections: 12.6.3
+
 // Annotation represents an annotation's additional-actions dictionary.
 // This corresponds to the AA entry in an annotation dictionary.
 //

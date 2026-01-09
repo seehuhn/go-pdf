@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// PDF 2.0 sections: 12.6.2 12.6.4.5
-
 package action
 
 import (
 	"seehuhn.de/go/pdf"
 )
+
+// PDF 2.0 sections: 12.6.2 12.6.4.5
 
 // GoToDp represents a go-to document part action that navigates to a
 // specified DPart in the current document (PDF 2.0).

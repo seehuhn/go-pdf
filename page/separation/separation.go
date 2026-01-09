@@ -28,6 +28,8 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
+// PDF 2.0 sections: 14.11.4
+
 // Dict represents a separation dictionary (Table 400 in the PDF spec).
 //
 // In preseparated PDF files, separations for a page are described as separate

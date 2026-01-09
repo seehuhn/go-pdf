@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// PDF 2.0 sections: 12.3.3
-
 package outline
 
 import (
@@ -27,6 +25,8 @@ import (
 	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/graphics/color"
 )
+
+// PDF 2.0 sections: 12.3.3
 
 // Outline represents the root of a document outline.
 // Use [Read] to read an outline from a PDF file, or create a new outline

@@ -116,7 +116,7 @@ func decodeCircle(x *pdf.Extractor, dict pdf.Dict) (*Circle, error) {
 		circle.Border = nil
 
 		// BE (optional)
-		if be, err := pdf.Optional(ExtractBorderEffect(r, dict["BE"])); err != nil {
+		if be, err := pdf.Optional(ExtractBorderEffect(x, dict["BE"])); err != nil {
 			return nil, err
 		} else {
 			circle.BorderEffect = be

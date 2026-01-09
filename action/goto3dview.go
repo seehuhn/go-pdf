@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// PDF 2.0 sections: 12.6.2 12.6.4.16
-
 package action
 
 import (
 	"seehuhn.de/go/pdf"
 )
+
+// PDF 2.0 sections: 12.6.2 12.6.4.16
 
 // GoTo3DView represents a go-to-3D-view action that sets the current view
 // of a 3D annotation.

@@ -18,6 +18,8 @@ package annotation
 
 import "seehuhn.de/go/pdf"
 
+// PDF 2.0 sections: 12.5.2 12.5.6.24
+
 // Projection represents a projection annotation (PDF 2.0).
 // Projection annotations are markup annotation subtypes that provide a way to
 // save 3D and other specialised measurements and comments as markup annotations.

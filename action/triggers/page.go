@@ -21,6 +21,8 @@ import (
 	"seehuhn.de/go/pdf/action"
 )
 
+// PDF 2.0 sections: 12.6.3
+
 // Page represents a page object's additional-actions dictionary.
 // This corresponds to the AA entry in a page dictionary.
 //
