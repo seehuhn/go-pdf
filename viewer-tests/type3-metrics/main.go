@@ -98,7 +98,7 @@ func createDocument(filename string) error {
 		}
 	}
 
-	text.Show(w.Writer,
+	text.Show(w.Builder,
 		text.M{X: 36, Y: 550},
 		note,
 		text.Wrap(340,

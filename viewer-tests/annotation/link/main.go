@@ -31,8 +31,8 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 )
 
 const (
@@ -64,7 +64,7 @@ func createDocument(filename string) error {
 	}
 
 	w := &writer{
-		Page:    page.Writer,
+		Page:    page.Builder,
 		Roman:   standard.TimesRoman.New(),
 		Italic:  standard.TimesItalic.New(),
 		TextCol: color.DeviceGray(0.1),
@@ -257,7 +257,7 @@ func createDocument(filename string) error {
 }
 
 type writer struct {
-	Page    *graphics.Writer
+	Page    *builder.Builder
 	Roman   font.Layouter
 	Italic  font.Layouter
 	TextCol color.Color

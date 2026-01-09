@@ -23,8 +23,8 @@ import (
 
 // Shading represents a PDF shading dictionary.
 //
-// Shadings can either be drawn to the page using the [Writer.DrawShading]
-// method, or can be used as the basis of a shading pattern.
+// Shadings can be drawn directly using the DrawShading method,
+// or can be used as the basis of a shading pattern.
 type Shading interface {
 	ShadingType() int
 
@@ -64,4 +64,15 @@ type SoftClip interface {
 	pdf.Embedder
 	IsSoftClip() bool
 	Equal(other SoftClip) bool
+}
+
+// IsImageMask returns true if the given XObject is an image mask.
+func IsImageMask(xobj XObject) bool {
+	if xobj.Subtype() != "Image" {
+		return false
+	}
+	if im, ok := xobj.(ImageMask); ok {
+		return im.IsImageMask()
+	}
+	return false
 }

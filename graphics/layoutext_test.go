@@ -30,8 +30,9 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 	"seehuhn.de/go/pdf/internal/squarefont"
@@ -42,21 +43,18 @@ import (
 func TestGetQuadPointsSimple(t *testing.T) {
 	F := squarefont.All[0].MakeFont()
 
-	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	rm := pdf.NewResourceManager(data)
-	w := graphics.NewWriter(io.Discard, rm)
+	b := builder.New(content.Page, nil)
 
-	w.TextBegin()
-	w.TextSetFont(F, 10)
-	w.TextFirstLine(100, 100)
-	gg := w.TextLayout(nil, "A")
-	corners := w.TextGetQuadPoints(gg, 0)
-	w.TextShowGlyphs(gg)
-	w.TextEnd()
+	b.TextBegin()
+	b.TextSetFont(F, 10)
+	b.TextFirstLine(100, 100)
+	gg := b.TextLayout(nil, "A")
+	corners := b.TextGetQuadPoints(gg, 0)
+	b.TextShowGlyphs(gg)
+	b.TextEnd()
 
-	err := rm.Close()
-	if err != nil {
-		t.Fatal(err)
+	if b.Err != nil {
+		t.Fatal(b.Err)
 	}
 
 	expected := []vec.Vec2{
@@ -79,15 +77,15 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 	testCases := []struct {
 		name         string
 		fontSize     float64
-		setupFunc    func(*graphics.Writer) *font.GlyphSeq
+		setupFunc    func(*builder.Builder) *font.GlyphSeq
 		expectedFunc func() []vec.Vec2
 	}{
 		{
 			name:     "identity_transform",
 			fontSize: 10.0,
-			setupFunc: func(w *graphics.Writer) *font.GlyphSeq {
+			setupFunc: func(b *builder.Builder) *font.GlyphSeq {
 				// Basic identity transform with standard text layout
-				return w.TextLayout(nil, "A A")
+				return b.TextLayout(nil, "A A")
 			},
 			expectedFunc: func() []vec.Vec2 {
 				return calculateExpectedQuadPoints(10.0, 0, 0, matrix.Identity, matrix.Identity)
@@ -96,9 +94,9 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 		{
 			name:     "text_matrix_translate",
 			fontSize: 10.0,
-			setupFunc: func(w *graphics.Writer) *font.GlyphSeq {
-				w.TextSetMatrix(matrix.Translate(20, 30))
-				return w.TextLayout(nil, "A A")
+			setupFunc: func(b *builder.Builder) *font.GlyphSeq {
+				b.TextSetMatrix(matrix.Translate(20, 30))
+				return b.TextLayout(nil, "A A")
 			},
 			expectedFunc: func() []vec.Vec2 {
 				return calculateExpectedQuadPoints(10.0, 0, 0, matrix.Identity, matrix.Translate(20, 30))
@@ -107,9 +105,9 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 		{
 			name:     "text_matrix_scale",
 			fontSize: 10.0,
-			setupFunc: func(w *graphics.Writer) *font.GlyphSeq {
-				w.TextSetMatrix(matrix.Scale(1.5, 1.2))
-				return w.TextLayout(nil, "A A")
+			setupFunc: func(b *builder.Builder) *font.GlyphSeq {
+				b.TextSetMatrix(matrix.Scale(1.5, 1.2))
+				return b.TextLayout(nil, "A A")
 			},
 			expectedFunc: func() []vec.Vec2 {
 				return calculateExpectedQuadPoints(10.0, 0, 0, matrix.Identity, matrix.Scale(1.5, 1.2))
@@ -118,9 +116,9 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 		{
 			name:     "text_rise",
 			fontSize: 10.0,
-			setupFunc: func(w *graphics.Writer) *font.GlyphSeq {
-				w.TextSetRise(5.0)
-				return w.TextLayout(nil, "A A")
+			setupFunc: func(b *builder.Builder) *font.GlyphSeq {
+				b.TextSetRise(5.0)
+				return b.TextLayout(nil, "A A")
 			},
 			expectedFunc: func() []vec.Vec2 {
 				return calculateExpectedQuadPoints(10.0, 5.0, 0, matrix.Identity, matrix.Identity)
@@ -131,22 +129,20 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create test font
-			font := squarefont.All[0].MakeFont()
+			testFont := squarefont.All[0].MakeFont()
 
-			// Create graphics writer
-			data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-			rm := pdf.NewResourceManager(data)
-			w := graphics.NewWriter(io.Discard, rm)
+			// Create builder
+			b := builder.New(content.Page, nil)
 
 			// Start text object and set font
-			w.TextBegin()
-			w.TextSetFont(font, tc.fontSize)
+			b.TextBegin()
+			b.TextSetFont(testFont, tc.fontSize)
 
 			// Run setup function to configure transforms and get glyph sequence
-			glyphSeq := tc.setupFunc(w)
+			glyphSeq := tc.setupFunc(b)
 
 			// Call the method under test
-			result := w.TextGetQuadPoints(glyphSeq, 0)
+			result := b.TextGetQuadPoints(glyphSeq, 0)
 
 			// Calculate expected values
 			expected := tc.expectedFunc()
@@ -163,7 +159,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 				}
 			}
 
-			w.TextEnd()
+			b.TextEnd()
 		})
 	}
 }
@@ -225,17 +221,15 @@ func calculateExpectedQuadPoints(fontSize, textRise, skip float64, ctm, textMatr
 
 func TestGetGlyphQuadPointsStateValidation(t *testing.T) {
 	// Test that function returns nil when required text state is not set
-	font := squarefont.All[0].MakeFont()
+	testFont := squarefont.All[0].MakeFont()
 
-	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	rm := pdf.NewResourceManager(data)
-	w := graphics.NewWriter(io.Discard, rm)
+	b := builder.New(content.Page, nil)
 
 	// Create a glyph sequence without setting up text state
-	glyphSeq := font.Layout(nil, 12.0, "A")
+	glyphSeq := testFont.Layout(nil, 12.0, "A")
 
 	// Should return nil because text state is not properly set
-	result := w.TextGetQuadPoints(glyphSeq, 0)
+	result := b.TextGetQuadPoints(glyphSeq, 0)
 	if result != nil {
 		t.Errorf("expected nil result when text state not set, got %v", result)
 	}
@@ -243,26 +237,24 @@ func TestGetGlyphQuadPointsStateValidation(t *testing.T) {
 
 func TestGetGlyphQuadPointsTextMatrixTransform(t *testing.T) {
 	// Test combined text matrix and CTM transformation
-	font := squarefont.All[0].MakeFont()
+	testFont := squarefont.All[0].MakeFont()
 
-	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	rm := pdf.NewResourceManager(data)
-	w := graphics.NewWriter(io.Discard, rm)
+	b := builder.New(content.Page, nil)
 
 	// Set up text state
-	w.TextSetFont(font, 10.0)
+	b.TextSetFont(testFont, 10.0)
 
 	// Apply CTM transformation before starting text object
-	w.Transform(matrix.Scale(2, 2))
+	b.Transform(matrix.Scale(2, 2))
 
 	// Start text object and set text matrix
-	w.TextBegin()
-	w.TextSetMatrix(matrix.Translate(5, 10))
+	b.TextBegin()
+	b.TextSetMatrix(matrix.Translate(5, 10))
 
-	glyphSeq := w.TextLayout(nil, "A")
+	glyphSeq := b.TextLayout(nil, "A")
 
 	// The function should account for both text matrix and CTM
-	result := w.TextGetQuadPoints(glyphSeq, 0)
+	result := b.TextGetQuadPoints(glyphSeq, 0)
 
 	// Should get a valid result (not nil)
 	if result == nil {
@@ -274,12 +266,11 @@ func TestGetGlyphQuadPointsTextMatrixTransform(t *testing.T) {
 		t.Errorf("expected 4 points, got %d", len(result))
 	}
 
-	w.TextEnd()
+	b.TextEnd()
 }
 
 func TestGlyphWidths(t *testing.T) {
 	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	rm := pdf.NewResourceManager(data)
 
 	F := standard.TimesRoman.New()
 
@@ -288,12 +279,11 @@ func TestGlyphWidths(t *testing.T) {
 		t.Fatal("wrong number of glyphs")
 	}
 
-	buf := &bytes.Buffer{}
-	out := graphics.NewWriter(buf, rm)
-	out.TextBegin()
-	out.TextSetHorizontalScaling(2)
-	out.TextSetFont(F, 50)
-	out.TextFirstLine(100, 100)
+	b := builder.New(content.Page, nil)
+	b.TextBegin()
+	b.TextSetHorizontalScaling(2)
+	b.TextSetFont(F, 50)
+	b.TextFirstLine(100, 100)
 	gg := &font.GlyphSeq{
 		Seq: []font.Glyph{
 			{
@@ -307,15 +297,20 @@ func TestGlyphWidths(t *testing.T) {
 			},
 		},
 	}
-	out.TextShowGlyphs(gg)
-	out.TextEnd()
+	b.TextShowGlyphs(gg)
+	b.TextEnd()
 
-	err := rm.Close()
+	if b.Err != nil {
+		t.Fatal(b.Err)
+	}
+
+	buf := &bytes.Buffer{}
+	err := content.Write(buf, b.Stream, pdf.V1_7, content.Page, b.Resources)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	in := reader.New(data, nil)
+	in := reader.New(data)
 	var xxOut []float64
 	in.Character = func(cid cid.CID, text string) error {
 		x, _ := in.GetTextPositionDevice()
@@ -323,7 +318,7 @@ func TestGlyphWidths(t *testing.T) {
 		return nil
 	}
 	in.Reset()
-	in.Resources = out.Resources
+	in.Resources = b.Resources
 	err = in.ParseContentStream(buf)
 	if err != nil {
 		t.Fatal(err)
@@ -363,9 +358,10 @@ func writeDummyDocument(w io.Writer, makeFont func() font.Layouter) error {
 
 	F := makeFont()
 
+	const leading = 12.0
 	setStyle := func(page *document.Page) {
 		page.TextSetFont(F, 10)
-		page.TextSetLeading(12)
+		page.TextSetLeading(leading)
 		page.SetFillColor(color.Black)
 	}
 
@@ -396,7 +392,7 @@ func writeDummyDocument(w io.Writer, makeFont func() font.Layouter) error {
 		}
 		page.TextShow(line)
 		page.TextNextLine()
-		yPos -= page.TextLeading
+		yPos -= leading
 		return nil
 	}
 

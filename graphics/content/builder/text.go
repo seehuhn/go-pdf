@@ -218,7 +218,8 @@ func (b *Builder) TextNextLine() {
 // This implements the PDF graphics operator "Tj".
 func (b *Builder) TextShowRaw(s pdf.String) {
 	b.updateTextPosition(s)
-	b.emit(content.OpTextShow, s)
+	// Clone the string to avoid aliasing if caller reuses the slice
+	b.emit(content.OpTextShow, cloneString(s))
 }
 
 // TextShowNextLineRaw starts a new line and then shows an already encoded text
@@ -230,7 +231,8 @@ func (b *Builder) TextShowNextLineRaw(s pdf.String) {
 	b.Param.TextLineMatrix = matrix.Translate(0, -b.Param.TextLeading).Mul(b.Param.TextLineMatrix)
 	b.Param.TextMatrix = b.Param.TextLineMatrix
 	b.updateTextPosition(s)
-	b.emit(content.OpTextShowMoveNextLine, s)
+	// Clone the string to avoid aliasing if caller reuses the slice
+	b.emit(content.OpTextShowMoveNextLine, cloneString(s))
 }
 
 // TextShowSpacedRaw adjusts word and character spacing and then shows an
@@ -245,8 +247,9 @@ func (b *Builder) TextShowSpacedRaw(wordSpacing, charSpacing float64, s pdf.Stri
 	b.Param.TextLineMatrix = matrix.Translate(0, -b.Param.TextLeading).Mul(b.Param.TextLineMatrix)
 	b.Param.TextMatrix = b.Param.TextLineMatrix
 	b.updateTextPosition(s)
+	// Clone the string to avoid aliasing if caller reuses the slice
 	b.emit(content.OpTextShowMoveNextLineSetSpacing,
-		pdf.Number(wordSpacing), pdf.Number(charSpacing), s)
+		pdf.Number(wordSpacing), pdf.Number(charSpacing), cloneString(s))
 }
 
 // TextShowKernedRaw shows an already encoded text in the PDF file, using
@@ -264,22 +267,28 @@ func (b *Builder) TextShowKernedRaw(args ...pdf.Object) {
 	if b.Param.TextFont != nil {
 		wMode = b.Param.TextFont.WritingMode()
 	}
-	for _, arg := range args {
+	// Clone strings to avoid aliasing if caller reuses slices
+	clonedArgs := make(pdf.Array, len(args))
+	for i, arg := range args {
 		switch arg := arg.(type) {
 		case pdf.String:
 			b.updateTextPosition(arg)
+			clonedArgs[i] = cloneString(arg)
 		case pdf.Real:
 			b.applyTextKern(float64(arg), wMode)
+			clonedArgs[i] = arg
 		case pdf.Integer:
 			b.applyTextKern(float64(arg), wMode)
+			clonedArgs[i] = arg
 		case pdf.Number:
 			b.applyTextKern(float64(arg), wMode)
+			clonedArgs[i] = arg
 		default:
 			b.Err = fmt.Errorf("TextShowKernedRaw: invalid argument type %T", arg)
 			return
 		}
 	}
-	b.emit(content.OpTextShowArray, pdf.Array(args))
+	b.emit(content.OpTextShowArray, clonedArgs)
 }
 
 // applyTextKern applies a kerning adjustment to the text matrix.
@@ -318,4 +327,40 @@ func (b *Builder) updateTextPosition(s pdf.String) {
 			b.Param.TextMatrix = matrix.Translate(0, width).Mul(b.Param.TextMatrix)
 		}
 	}
+}
+
+// GetTextPositionUser returns the current text position in user coordinates.
+func (b *Builder) GetTextPositionUser() (float64, float64) {
+	p := &b.Param
+	M := matrix.Matrix{
+		p.TextFontSize * p.TextHorizontalScaling, 0,
+		0, p.TextFontSize,
+		0, p.TextRise,
+	}
+	M = M.Mul(p.TextMatrix)
+	return M[4], M[5]
+}
+
+// GetTextPositionDevice returns the current text position in device coordinates.
+func (b *Builder) GetTextPositionDevice() (float64, float64) {
+	p := &b.Param
+	M := matrix.Matrix{
+		p.TextFontSize * p.TextHorizontalScaling, 0,
+		0, p.TextFontSize,
+		0, p.TextRise,
+	}
+	M = M.Mul(p.TextMatrix)
+	M = M.Mul(p.CTM)
+	return M[4], M[5]
+}
+
+// cloneString creates a copy of a pdf.String to avoid aliasing issues
+// when callers reuse the same slice backing array.
+func cloneString(s pdf.String) pdf.String {
+	if s == nil {
+		return nil
+	}
+	clone := make(pdf.String, len(s))
+	copy(clone, s)
+	return clone
 }

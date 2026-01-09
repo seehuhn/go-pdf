@@ -17,13 +17,13 @@
 package font_test
 
 import (
-	"io"
 	"testing"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/fonttypes"
@@ -65,24 +65,32 @@ func TestToUnicodeSimple1(t *testing.T) {
 			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(buf)
 
-			page := graphics.NewWriter(io.Discard, rm)
-			page.SetFontNameInternal(F, fontName)
-			page.TextSetFont(F, fontSize)
-			page.TextBegin()
-			page.TextShowGlyphs(seq)
-			page.TextEnd()
-
-			if page.Err != nil {
-				t.Fatal(page.Err)
+			b := builder.New(content.Page, nil)
+			err := b.SetFontNameInternal(F, fontName)
+			if err != nil {
+				t.Fatal(err)
 			}
-			err := rm.Close()
+			b.TextSetFont(F, fontSize)
+			b.TextBegin()
+			b.TextShowGlyphs(seq)
+			b.TextEnd()
+
+			if b.Err != nil {
+				t.Fatal(b.Err)
+			}
+
+			// Embed the font and get its reference
+			fontRef, err := rm.Embed(F)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = rm.Close()
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			ref := page.Resources.Font[fontName]
 			x := pdf.NewExtractor(buf)
-			d, err := extract.Dict(x, ref)
+			d, err := extract.Dict(x, fontRef)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -114,24 +122,32 @@ func TestToUnicodeSimple2(t *testing.T) {
 			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(buf)
 
-			page := graphics.NewWriter(io.Discard, rm)
-			page.SetFontNameInternal(F, fontName)
-			page.TextSetFont(F, fontSize)
-			page.TextBegin()
-			page.TextShowGlyphs(seq)
-			page.TextEnd()
-
-			if page.Err != nil {
-				t.Fatal(page.Err)
+			b := builder.New(content.Page, nil)
+			err := b.SetFontNameInternal(F, fontName)
+			if err != nil {
+				t.Fatal(err)
 			}
-			err := rm.Close()
+			b.TextSetFont(F, fontSize)
+			b.TextBegin()
+			b.TextShowGlyphs(seq)
+			b.TextEnd()
+
+			if b.Err != nil {
+				t.Fatal(b.Err)
+			}
+
+			// Embed the font and get its reference
+			fontRef, err := rm.Embed(F)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = rm.Close()
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			ref := page.Resources.Font[fontName]
 			x := pdf.NewExtractor(buf)
-			d, err := extract.Dict(x, ref)
+			d, err := extract.Dict(x, fontRef)
 			if err != nil {
 				t.Fatal(err)
 			}

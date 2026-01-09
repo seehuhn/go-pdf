@@ -23,7 +23,8 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/property"
 )
@@ -43,29 +44,33 @@ func TestMarkedContentInline(t *testing.T) {
 	propIndirect, _ := property.ExtractList(x, pdf.Dict{"X": pdf.NewReference(1, 0)})
 
 	var testCases = []TestCase{
-		{nil, "/test MP\n", nil},
-		{propDirect, "/test<</X 1>>DP\n", nil},
-		{propIndirect, "", graphics.ErrNotDirect},
+		{nil, "/test MP", nil},
+		{propDirect, "/test <</X 1>> DP", nil},
+		{propIndirect, "", builder.ErrNotDirect},
 	}
 
-	rm := pdf.NewResourceManager(data)
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("test%02d", i), func(t *testing.T) {
-			buf := &bytes.Buffer{}
-			w := graphics.NewWriter(buf, rm)
-			mc := &graphics.MarkedContent{
+			b := builder.New(content.Page, nil)
+			mc := &builder.MarkedContent{
 				Tag:        "test",
 				Properties: tc.Prop,
 				Inline:     true,
 			}
 
-			w.MarkedContentPoint(mc)
-			if w.Err != tc.err {
-				t.Fatalf("expected %v, got %v", tc.err, w.Err)
+			b.MarkedContentPoint(mc)
+			if b.Err != tc.err {
+				t.Fatalf("expected %v, got %v", tc.err, b.Err)
 			}
 
-			if tc.out != "" && !strings.Contains(buf.String(), tc.out) {
-				t.Errorf("expected %q, got %q", tc.out, buf.String())
+			if tc.out != "" {
+				buf := &bytes.Buffer{}
+				for _, op := range b.Stream {
+					content.WriteOperator(buf, op)
+				}
+				if !strings.Contains(buf.String(), tc.out) {
+					t.Errorf("expected %q, got %q", tc.out, buf.String())
+				}
 			}
 		})
 	}

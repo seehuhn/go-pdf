@@ -83,7 +83,7 @@ func createDocument(filename string) error {
 		Color: color.DeviceRGB{0, 0, 0.7},
 	}
 
-	text.Show(page.Writer,
+	text.Show(page.Builder,
 		text.M{X: 72, Y: 750},
 		note,
 		text.Wrap(340, description),

@@ -18,13 +18,13 @@ package text
 
 import (
 	"bytes"
-	"io"
 	"strings"
 	"testing"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/standard"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/property"
@@ -38,21 +38,25 @@ func TestTextExtractorBasic(t *testing.T) {
 	F := standard.Helvetica.New()
 
 	pageTree := pagetree.NewWriter(w)
-	contentBuf := &bytes.Buffer{}
-	content := graphics.NewWriter(contentBuf, rm)
-	content.TextBegin()
-	content.TextFirstLine(100, 700)
-	content.TextSetFont(F, 12)
-	content.TextShow("Hello World")
-	content.TextEnd()
 
-	// create stream from buffer
+	b := builder.New(content.Page, nil)
+	b.TextBegin()
+	b.TextFirstLine(100, 700)
+	b.TextSetFont(F, 12)
+	b.TextShow("Hello World")
+	b.TextEnd()
+
+	if b.Err != nil {
+		t.Fatal(b.Err)
+	}
+
+	// create stream from builder
 	contentRef := w.Alloc()
 	stream, err := w.OpenStream(contentRef, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = io.Copy(stream, contentBuf)
+	err = content.Write(stream, b.Stream, pdf.V2_0, content.Page, b.Resources)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,11 +65,17 @@ func TestTextExtractorBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// embed resources
+	resRef, err := rm.Embed(b.Resources)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	page := pdf.Dict{
 		"Type":      pdf.Name("Page"),
 		"Contents":  contentRef,
-		"Resources": pdf.AsDict(content.Resources),
-		"MediaBox":  &pdf.Rectangle{0, 0, 595, 842},
+		"Resources": resRef,
+		"MediaBox":  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 595, URy: 842},
 	}
 	err = pageTree.AppendPage(page)
 	if err != nil {
@@ -117,46 +127,50 @@ func TestTextExtractorActualText(t *testing.T) {
 	F := standard.Helvetica.New()
 
 	pageTree := pagetree.NewWriter(w)
-	contentBuf := &bytes.Buffer{}
-	content := graphics.NewWriter(contentBuf, rm)
+
+	b := builder.New(content.Page, nil)
 
 	// normal text
-	content.TextBegin()
-	content.TextFirstLine(100, 700)
-	content.TextSetFont(F, 12)
-	content.TextShow("the ")
-	content.TextEnd()
+	b.TextBegin()
+	b.TextFirstLine(100, 700)
+	b.TextSetFont(F, 12)
+	b.TextShow("the ")
+	b.TextEnd()
 
 	// text with ActualText
 	actualText := &property.ActualText{
 		Text:      "replaced",
 		SingleUse: true,
 	}
-	mc := &graphics.MarkedContent{
+	mc := &builder.MarkedContent{
 		Tag:        "Span",
 		Properties: actualText,
 		Inline:     true,
 	}
-	content.MarkedContentStart(mc)
-	content.TextBegin()
-	content.TextSetFont(F, 12)
-	content.TextShow("original")
-	content.TextEnd()
-	content.MarkedContentEnd()
+	b.MarkedContentStart(mc)
+	b.TextBegin()
+	b.TextSetFont(F, 12)
+	b.TextShow("original")
+	b.TextEnd()
+	b.MarkedContentEnd()
 
 	// more normal text
-	content.TextBegin()
-	content.TextSetFont(F, 12)
-	content.TextShow(" text")
-	content.TextEnd()
+	b.TextBegin()
+	b.TextSetFont(F, 12)
+	b.TextShow(" text")
+	b.TextEnd()
 
-	// create stream from buffer
+	if b.Err != nil {
+		t.Fatal(b.Err)
+	}
+
+	// create stream from builder
 	contentRef := w.Alloc()
 	stream, err := w.OpenStream(contentRef, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = io.Copy(stream, contentBuf)
+	err = content.Write(stream, b.Stream, pdf.V2_0, content.Page, b.Resources)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,11 +179,17 @@ func TestTextExtractorActualText(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// embed resources
+	resRef, err := rm.Embed(b.Resources)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	page := pdf.Dict{
 		"Type":      pdf.Name("Page"),
 		"Contents":  contentRef,
-		"Resources": pdf.AsDict(content.Resources),
-		"MediaBox":  &pdf.Rectangle{0, 0, 595, 842},
+		"Resources": resRef,
+		"MediaBox":  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 595, URy: 842},
 	}
 	err = pageTree.AppendPage(page)
 	if err != nil {

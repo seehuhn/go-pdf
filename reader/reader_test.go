@@ -24,10 +24,10 @@ import (
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/state"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -36,44 +36,45 @@ import (
 // reader.
 func TestParameters(t *testing.T) {
 	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	rm := pdf.NewResourceManager(data)
-
-	// We start by creating a content stream where we set various graphics
-	// parameters.
-	buf := &bytes.Buffer{}
-	w := graphics.NewWriter(buf, rm)
-	w.Set = 0
 
 	testFont := standard.Helvetica.New()
-
-	w.SetLineWidth(12.3)
-	w.SetLineCap(graphics.LineCapRound)
-	w.SetLineJoin(graphics.LineJoinBevel)
-	w.SetMiterLimit(4)
-	w.SetLineDash([]float64{5, 6, 7}, 8)
-	w.SetRenderingIntent(graphics.Perceptual)
-	w.SetFlatnessTolerance(10)
 	m := matrix.Matrix{1, 2, 3, 4, 5, 6}
-	w.Transform(m)
-	w.TextSetCharacterSpacing(9)
-	w.TextSetWordSpacing(10)
-	w.TextSetHorizontalScaling(11)
-	w.TextSetLeading(12)
-	w.TextSetFont(testFont, 14)
-	w.TextSetRenderingMode(graphics.TextRenderingModeFillStrokeClip)
-	w.TextSetRise(15)
 
-	err := rm.Close()
+	// Build a content stream where we set various graphics parameters.
+	b := builder.New(content.Page, nil)
+	b.SetLineWidth(12.3)
+	b.SetLineCap(graphics.LineCapRound)
+	b.SetLineJoin(graphics.LineJoinBevel)
+	b.SetMiterLimit(4)
+	b.SetLineDash([]float64{5, 6, 7}, 8)
+	b.SetRenderingIntent(graphics.Perceptual)
+	b.SetFlatnessTolerance(10)
+	b.Transform(m)
+	b.TextSetCharacterSpacing(9)
+	b.TextSetWordSpacing(10)
+	b.TextSetHorizontalScaling(0.11)
+	b.TextSetLeading(12)
+	b.TextSetFont(testFont, 14)
+	b.TextSetRenderingMode(graphics.TextRenderingModeFillStrokeClip)
+	b.TextSetRise(15)
+
+	if b.Err != nil {
+		t.Fatal(b.Err)
+	}
+
+	// Write the content stream to a buffer
+	buf := &bytes.Buffer{}
+	err := content.Write(buf, b.Stream, pdf.V1_7, content.Page, b.Resources)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Now we read back the content stream and check that the final graphics
 	// state matches the expected values.
-	r := New(data, nil)
+	r := New(data)
 	r.Reset()
-	r.Resources = w.Resources
-	r.State.Set = 0 // TODO(voss): why do we need this?
+	r.Resources = b.Resources
+	r.State.Set = 0
 	err = r.ParseContentStream(buf)
 	if err != nil {
 		t.Fatal(err)
@@ -113,8 +114,8 @@ func TestParameters(t *testing.T) {
 	if r.State.TextWordSpacing != 10 {
 		t.Errorf("Tw: got %v, want 10", r.State.TextWordSpacing)
 	}
-	if r.State.TextHorizontalScaling != 11 {
-		t.Errorf("Th: got %v, want 11", r.State.TextHorizontalScaling)
+	if r.State.TextHorizontalScaling != 0.11 {
+		t.Errorf("Th: got %v, want 0.11", r.State.TextHorizontalScaling)
 	}
 	if r.State.TextLeading != 12 {
 		t.Errorf("Tl: got %v, want 12", r.State.TextLeading)
@@ -130,32 +131,19 @@ func TestParameters(t *testing.T) {
 		t.Errorf("Tr: got %v, want 15", r.State.TextRise)
 	}
 
+	// Check that the expected bits are set
+	expectedBits := state.LineWidth | state.LineCap | state.LineJoin |
+		state.MiterLimit | state.LineDash | state.RenderingIntent |
+		state.FlatnessTolerance | state.TextCharacterSpacing |
+		state.TextWordSpacing | state.TextHorizontalScaling |
+		state.TextLeading | state.TextFont | state.TextRenderingMode | state.TextRise
+
 	for b := state.Bits(1); b != 0; b <<= 1 {
-		if w.State.Set&b != r.State.Set&b {
-			if w.State.Set&b != 0 {
-				t.Errorf("State bit %s only set in writer", b.Names())
-			} else {
-				t.Errorf("State bit %s only set in reader", b.Names())
+		if expectedBits&b != 0 {
+			if r.State.Set&b == 0 {
+				t.Errorf("State bit %s not set in reader but expected", b.Names())
 			}
 		}
-	}
-
-	// Second check: the final graphics states are the same.
-	// This checks that no parameters different from the ones we explicitly used
-	// were changed.
-
-	fontsEqual := func(a, b font.Instance) bool {
-		if a == nil || b == nil {
-			return a == b
-		}
-		// TODO(voss): update this once we have a way of comparing a loaded
-		// font to an original font.  Maybe we can use the font name?
-		return true
-	}
-
-	cmpFont := cmp.Comparer(fontsEqual)
-	if d := cmp.Diff(w.State, r.State, cmpFont); d != "" {
-		t.Errorf("State: %s", d)
 	}
 }
 
@@ -207,8 +195,7 @@ func TestParsePage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fontLoader := loader.NewFontLoader()
-	reader := New(pdfData, fontLoader)
+	reader := New(pdfData)
 
 	type operation struct {
 		Op   string

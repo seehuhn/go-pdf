@@ -48,7 +48,7 @@ type TextExtractor struct {
 // New creates a new TextExtractor that writes to w.
 func New(doc pdf.Getter, w io.Writer) *TextExtractor {
 	e := &TextExtractor{
-		reader:               reader.New(doc, nil),
+		reader:               reader.New(doc),
 		writer:               w,
 		XRangeMin:            math.Inf(-1),
 		XRangeMax:            math.Inf(1),

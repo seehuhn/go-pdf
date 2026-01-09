@@ -18,13 +18,6 @@ package graphics
 
 import "math"
 
-func ifelse[T any](c bool, a, b T) T {
-	if c {
-		return a
-	}
-	return b
-}
-
 func nearlyEqual(a, b float64) bool {
 	const ε = 1e-6
 	return math.Abs(a-b) < ε

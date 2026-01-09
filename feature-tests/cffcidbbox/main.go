@@ -82,7 +82,7 @@ func createDocument(fname string) error {
 
 	// draw the text, including the large test glyphs
 	var x, y float64
-	text.Show(w.Writer,
+	text.Show(w.Builder,
 		text.M{X: 36, Y: 530},
 		note, "This file shows two versions of the same font.", text.NL,
 		"One version is a regular CFF font, while the other version has", text.NL,

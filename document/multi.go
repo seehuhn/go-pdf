@@ -17,13 +17,13 @@
 package document
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"os"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
@@ -113,9 +113,10 @@ func (doc *MultiPage) Close() error {
 func (doc *MultiPage) AddPage() *Page {
 	doc.numOpen++
 
-	page := graphics.NewWriter(&bytes.Buffer{}, doc.RM)
+	page := builder.New(content.Page, nil)
 	return &Page{
-		Writer: page,
+		Builder: page,
+		RM:      doc.RM,
 		PageDict: pdf.Dict{
 			"Type":     pdf.Name("Page"),
 			"MediaBox": doc.mediaBox,

@@ -185,7 +185,7 @@ func createDocument(filename string) error {
 		Color: color.Blue,
 	}
 
-	text.Show(doc.Writer,
+	text.Show(doc.Builder,
 		text.M{X: 50, Y: 370},
 		body,
 		text.Wrap(400, `

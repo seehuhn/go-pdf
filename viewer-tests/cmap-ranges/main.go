@@ -86,7 +86,7 @@ func createDocument(fname string) error {
 		Color: color.DeviceRGB{0, 0, 0.7},
 	}
 
-	text.Show(page.Writer,
+	text.Show(page.Builder,
 		text.M{X: 50, Y: 370},
 		note,
 		text.Wrap(360, description),

@@ -17,20 +17,22 @@
 package document
 
 import (
-	"bytes"
 	"errors"
-	"io"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
 // Page represents a page in a PDF document.
-// The contents of the page can be drawn using the [graphics.Writer] methods.
+// The contents of the page can be drawn using the [builder.Builder] methods.
 type Page struct {
-	// Writer is used to draw the contents of the page.
-	*graphics.Writer
+	// Builder is used to draw the contents of the page.
+	*builder.Builder
+
+	// RM is the resource manager for embedding resources.
+	RM *pdf.ResourceManager
 
 	// PageDict is the PDF dictionary for this page.
 	// This can be modified by the user.  The values at the time
@@ -67,8 +69,8 @@ func (p *Page) GetPageSize() *pdf.Rectangle {
 // Close writes the page to the PDF file.
 // The page contents can no longer be modified after this call.
 func (p *Page) Close() error {
-	if p.Writer.Err != nil {
-		return p.Writer.Err
+	if p.Builder.Err != nil {
+		return p.Builder.Err
 	}
 	if p.PageDict["MediaBox"] == nil || p.PageDict["MediaBox"] == (*pdf.Rectangle)(nil) {
 		return errors.New("page size not set")
@@ -80,12 +82,14 @@ func (p *Page) Close() error {
 		filters = append(filters, pdf.FilterCompress{})
 	}
 
+	// Write content stream
 	contentRef := p.Out.Alloc()
 	stream, err := p.Out.OpenStream(contentRef, nil, filters...)
 	if err != nil {
 		return err
 	}
-	_, err = io.Copy(stream, p.Writer.Content.(*bytes.Buffer))
+	err = content.Write(stream, p.Builder.Stream,
+		p.Out.GetMeta().Version, content.Page, p.Builder.Resources)
 	if err != nil {
 		return err
 	}
@@ -93,8 +97,15 @@ func (p *Page) Close() error {
 	if err != nil {
 		return err
 	}
+
+	// Embed resources
+	resObj, err := p.RM.Embed(p.Builder.Resources)
+	if err != nil {
+		return err
+	}
+
 	p.PageDict["Contents"] = contentRef
-	p.PageDict["Resources"] = pdf.AsDict(p.Writer.Resources)
+	p.PageDict["Resources"] = resObj
 
 	ref := p.Ref
 	if ref == 0 {
@@ -111,7 +122,7 @@ func (p *Page) Close() error {
 	}
 
 	// Disable the page, since it cannot be modified anymore.
-	p.Writer.Content = nil
-	p.Writer = nil
+	p.Builder.Stream = nil
+	p.Builder = nil
 	return nil
 }

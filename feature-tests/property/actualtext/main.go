@@ -17,15 +17,14 @@
 package main
 
 import (
-	"bytes"
-	"io"
 	"log"
 	"os"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
-	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/property"
 )
@@ -64,32 +63,39 @@ func writeTestPage(w *pdf.Writer) error {
 	F := standard.Helvetica.New()
 
 	pageTree := pagetree.NewWriter(w)
-	contentBuf := &bytes.Buffer{}
-	content := graphics.NewWriter(contentBuf, rm)
 
-	writeTestContent(content, F)
+	// Create a builder to accumulate drawing operations
+	b := builder.New(content.Page, nil)
 
-	// create content stream
+	writeTestContent(b, F)
+
+	// Write the content stream
 	contentRef := w.Alloc()
 	stream, err := w.OpenStream(contentRef, nil)
 	if err != nil {
 		return err
 	}
-	_, err = io.Copy(stream, contentBuf)
-	if err != nil {
+	if err := content.Write(stream, b.Stream, w.GetMeta().Version, content.Page, b.Resources); err != nil {
 		return err
 	}
-	err = stream.Close()
+	if err := stream.Close(); err != nil {
+		return err
+	}
+
+	// Embed resources
+	resObj, err := rm.Embed(b.Resources)
 	if err != nil {
 		return err
 	}
 
 	// create page
 	page := pdf.Dict{
-		"Type":      pdf.Name("Page"),
-		"Contents":  contentRef,
-		"Resources": pdf.AsDict(content.Resources),
-		"MediaBox":  &pdf.Rectangle{URx: 595, URy: 842},
+		"Type":     pdf.Name("Page"),
+		"Contents": contentRef,
+		"MediaBox": &pdf.Rectangle{URx: 595, URy: 842},
+	}
+	if resObj != nil {
+		page["Resources"] = resObj
 	}
 	err = pageTree.AppendPage(page)
 	if err != nil {
@@ -114,24 +120,24 @@ func writeTestPage(w *pdf.Writer) error {
 //  1. Normal text without ActualText
 //  2. Simple ActualText replacement
 //  3. Nested ActualText (inner should be suppressed)
-func writeTestContent(content *graphics.Writer, F font.Layouter) {
+func writeTestContent(b *builder.Builder, F font.Layouter) {
 	y := 800.0
 
 	// 1. normal text
-	content.TextBegin()
-	content.TextFirstLine(100, y)
-	content.TextSetFont(F, 12)
-	content.TextShow("normal text")
-	content.TextEnd()
+	b.TextBegin()
+	b.TextFirstLine(100, y)
+	b.TextSetFont(F, 12)
+	b.TextShow("normal text")
+	b.TextEnd()
 	y -= 30
 
 	// 2. simple ActualText: "the original text" -> "the replaced text"
-	content.TextBegin()
-	content.TextFirstLine(100, y)
-	content.TextSetFont(F, 12)
-	content.TextShow("the ")
+	b.TextBegin()
+	b.TextFirstLine(100, y)
+	b.TextSetFont(F, 12)
+	b.TextShow("the ")
 
-	content.MarkedContentStart(&graphics.MarkedContent{
+	b.MarkedContentStart(&builder.MarkedContent{
 		Tag: "Span",
 		Properties: &property.ActualText{
 			Text:      "replaced",
@@ -139,22 +145,22 @@ func writeTestContent(content *graphics.Writer, F font.Layouter) {
 		},
 		Inline: true,
 	})
-	content.TextShow("original")
-	content.MarkedContentEnd()
+	b.TextShow("original")
+	b.MarkedContentEnd()
 
-	content.TextShow(" text")
-	content.TextEnd()
+	b.TextShow(" text")
+	b.TextEnd()
 	y -= 30
 
 	// 3. nested ActualText: outer wins, inner suppressed
 	// "some two-level nested text example" -> "some replaced example"
-	content.TextBegin()
-	content.TextFirstLine(100, y)
-	content.TextSetFont(F, 12)
-	content.TextShow("some ")
+	b.TextBegin()
+	b.TextFirstLine(100, y)
+	b.TextSetFont(F, 12)
+	b.TextShow("some ")
 
 	// outer ActualText
-	content.MarkedContentStart(&graphics.MarkedContent{
+	b.MarkedContentStart(&builder.MarkedContent{
 		Tag: "Span",
 		Properties: &property.ActualText{
 			Text:      "replaced",
@@ -162,10 +168,10 @@ func writeTestContent(content *graphics.Writer, F font.Layouter) {
 		},
 		Inline: true,
 	})
-	content.TextShow("two-level ")
+	b.TextShow("two-level ")
 
 	// inner ActualText (suppressed by outer)
-	content.MarkedContentStart(&graphics.MarkedContent{
+	b.MarkedContentStart(&builder.MarkedContent{
 		Tag: "Span",
 		Properties: &property.ActualText{
 			Text:      "inner",
@@ -173,12 +179,12 @@ func writeTestContent(content *graphics.Writer, F font.Layouter) {
 		},
 		Inline: true,
 	})
-	content.TextShow("nested")
-	content.MarkedContentEnd()
+	b.TextShow("nested")
+	b.MarkedContentEnd()
 
-	content.TextShow(" text")
-	content.MarkedContentEnd()
+	b.TextShow(" text")
+	b.MarkedContentEnd()
 
-	content.TextShow(" example")
-	content.TextEnd()
+	b.TextShow(" example")
+	b.TextEnd()
 }

@@ -115,7 +115,7 @@ type generator struct {
 
 func (g *generator) TitlePage() error {
 	page := g.doc.AddPage()
-	text.Show(page.Writer,
+	text.Show(page.Builder,
 		text.F{Font: g.F, Size: 10},
 		text.M{X: 40, Y: 250},
 		"Image Compression Test",

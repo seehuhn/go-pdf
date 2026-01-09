@@ -10,10 +10,7 @@ weight = 100
 
 - Make Resource dictionaries file-independent.
 - make dict.Type3 file-independent
-- Try to merge `updateTextPosition` in "op-text.go" with the
-  corresponding code from `processText` in "reader/reader.go".
 - Get rid of `ResourceManagerEmbedFunc` and `EmbedHelperEmbedFunc`.
-- Should graphics.NewWriter really take a ResourceManager argument?
 
 ## API
 

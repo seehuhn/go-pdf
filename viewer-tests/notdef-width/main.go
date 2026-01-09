@@ -96,7 +96,7 @@ func createDocument(filename string) error {
 
 	var y float64
 
-	text.Show(page.Writer,
+	text.Show(page.Builder,
 		text.M{X: margin, Y: 800},
 		note,
 		text.Wrap(340,
@@ -139,7 +139,7 @@ func createDocument(filename string) error {
 	showRow(page, test, &y, 'C', 2, 2)
 	y -= smallskip
 
-	text.Show(page.Writer,
+	text.Show(page.Builder,
 		text.M{X: 330, Y: y - 40},
 		note,
 		text.Wrap(200,
@@ -154,7 +154,7 @@ func createDocument(filename string) error {
 	page.LineTo(245, y-53)
 	page.Stroke()
 
-	text.Show(page.Writer,
+	text.Show(page.Builder,
 		text.M{X: margin, Y: y},
 		title, "Test 1: glyph present", text.NL,
 		note, text.Wrap(340,
@@ -167,7 +167,7 @@ func createDocument(filename string) error {
 	showRow(page, test, &y, 'C', 2, 2)
 	y -= smallskip
 
-	text.Show(page.Writer,
+	text.Show(page.Builder,
 		text.M{X: margin, Y: y},
 		title, "Test 2: missing glyph, no notdef CID", text.NL,
 		note, text.Wrap(340,
@@ -180,7 +180,7 @@ func createDocument(filename string) error {
 	showRow(page, test, &y, 'E', 0, 2)
 	y -= smallskip
 
-	text.Show(page.Writer,
+	text.Show(page.Builder,
 		text.M{X: margin, Y: y},
 		title, "Test 3: missing glyph, notdef glyph present", text.NL,
 		note, text.Wrap(340,
@@ -192,7 +192,7 @@ func createDocument(filename string) error {
 	showRow(page, test, &y, 'e', 1, -1)
 	y -= smallskip
 
-	text.Show(page.Writer,
+	text.Show(page.Builder,
 		text.M{X: margin, Y: y},
 		title, "Test 4: missing glyph, notdef glyph specified but missing", text.NL,
 		note, text.Wrap(340,
@@ -204,7 +204,7 @@ func createDocument(filename string) error {
 	showRow(page, test, &y, 'x', 0, -1)
 	y -= smallskip
 
-	text.Show(page.Writer,
+	text.Show(page.Builder,
 		text.M{X: margin, Y: y},
 		title, "Test 5: unmapped code, no notdef CID", text.NL,
 		note, text.Wrap(340,
@@ -216,7 +216,7 @@ func createDocument(filename string) error {
 	showRow(page, test, &y, '0', 0, 0)
 	y -= smallskip
 
-	text.Show(page.Writer,
+	text.Show(page.Builder,
 		text.M{X: margin, Y: y},
 		title, "Test 6: unmapped code, notdef glyph present", text.NL,
 		note, text.Wrap(340,
@@ -228,7 +228,7 @@ func createDocument(filename string) error {
 	showRow(page, test, &y, '1', 1, 1)
 	y -= smallskip
 
-	text.Show(page.Writer,
+	text.Show(page.Builder,
 		text.M{X: margin, Y: y},
 		title, "Test 7: unmapped code, notdef glyph specified but missing", text.NL,
 		note, text.Wrap(340,
@@ -240,7 +240,7 @@ func createDocument(filename string) error {
 	showRow(page, test, &y, '2', 0, 1)
 	y -= smallskip
 
-	text.Show(page.Writer,
+	text.Show(page.Builder,
 		text.M{X: margin, Y: y},
 		title, "Test 8: invalid code", text.NL,
 		note, text.Wrap(340,
@@ -310,7 +310,7 @@ func showRow(page *document.Page, test text.F, y *float64, code byte, gIdx, wIdx
 		}
 	}
 	choice(page, *y, 9)
-	text.Show(page.Writer,
+	text.Show(page.Builder,
 		text.M{X: margin, Y: *y},
 		test,
 		pdf.String{code, 'D', 'D', 'D', 'D', 'D', 'A'},

@@ -22,25 +22,25 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 )
 
-func Show(w *graphics.Writer, args ...any) {
-	if w.Err != nil {
+func Show(b *builder.Builder, args ...any) {
+	if b.Err != nil {
 		return
 	}
 
 	var leading float64
 	var leadingSet bool
 
-	w.TextBegin()
+	b.TextBegin()
 	for _, arg := range args {
 		switch v := arg.(type) {
 		case M:
-			w.TextFirstLine(v.X, v.Y)
+			b.TextFirstLine(v.X, v.Y)
 		case F:
-			w.TextSetFont(v.Font, v.Size)
+			b.TextSetFont(v.Font, v.Size)
 			leading = 0
 			if l, ok := v.Font.(font.Layouter); ok {
 				leading = l.GetGeometry().Leading * v.Size
@@ -50,37 +50,37 @@ func Show(w *graphics.Writer, args ...any) {
 			}
 			leadingSet = false
 			if v.Color != nil {
-				w.SetFillColor(v.Color)
+				b.SetFillColor(v.Color)
 			}
 		case Leading:
 			leading = float64(v)
 			leadingSet = true
-			w.TextSetLeading(leading)
+			b.TextSetLeading(leading)
 		case string:
-			w.TextShow(v)
+			b.TextShow(v)
 		case pdf.String:
-			w.TextShowRaw(v)
+			b.TextShowRaw(v)
 		case color.Color:
-			w.SetFillColor(v)
+			b.SetFillColor(v)
 		case nl:
 			if !leadingSet {
-				w.TextSecondLine(0, -leading)
+				b.TextSecondLine(0, -leading)
 				leadingSet = true
 			} else {
-				w.TextNextLine()
+				b.TextNextLine()
 			}
 		case *wrap:
-			for line := range v.Lines(w.TextFont.(font.Layouter), w.TextFontSize) {
-				w.TextShowGlyphs(line)
+			for line := range v.Lines(b.Param.TextFont.(font.Layouter), b.Param.TextFontSize) {
+				b.TextShowGlyphs(line)
 				if !leadingSet {
-					w.TextSecondLine(0, -leading)
+					b.TextSecondLine(0, -leading)
 					leadingSet = true
 				} else {
-					w.TextNextLine()
+					b.TextNextLine()
 				}
 			}
 		case RecordPos:
-			x, y := w.GetTextPositionUser()
+			x, y := b.GetTextPositionUser()
 			if v.UserX != nil {
 				*v.UserX = x
 			}
@@ -91,7 +91,7 @@ func Show(w *graphics.Writer, args ...any) {
 			panic(fmt.Sprintf("unexpected argument type %T", v))
 		}
 	}
-	w.TextEnd()
+	b.TextEnd()
 }
 
 type nl struct{}

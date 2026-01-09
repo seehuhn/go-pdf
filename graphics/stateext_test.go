@@ -17,14 +17,13 @@
 package graphics_test
 
 import (
-	"io"
 	"math"
 	"testing"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/gofont"
-	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 )
 
 // TestTextLayout1 tests that no text content is lost when a glyph sequence
@@ -32,15 +31,12 @@ import (
 func TestTextLayout1(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
-			data, _ := memfile.NewPDFWriter(v, nil)
-			rm := pdf.NewResourceManager(data)
-
 			F, err := gofont.Regular.NewSimple(nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			out := graphics.NewWriter(io.Discard, rm)
-			out.TextSetFont(F, 10)
+			b := builder.New(content.Page, nil)
+			b.TextSetFont(F, 10)
 
 			var testCases = []string{
 				"",
@@ -53,7 +49,7 @@ func TestTextLayout1(t *testing.T) {
 				"ﬁsh",    // ligature in source text
 			}
 			for _, s := range testCases {
-				gg := out.TextLayout(nil, s)
+				gg := b.TextLayout(nil, s)
 				if gg == nil {
 					t.Fatal("typesetting failed")
 				}
@@ -70,18 +66,15 @@ func TestTextLayout1(t *testing.T) {
 func TestTextLayout2(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
-			data, _ := memfile.NewPDFWriter(v, nil)
-			rm := pdf.NewResourceManager(data)
-
 			F, err := gofont.Regular.NewSimple(nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			out := graphics.NewWriter(io.Discard, rm)
-			out.TextSetFont(F, 10)
+			b := builder.New(content.Page, nil)
+			b.TextSetFont(F, 10)
 
 			// First make sure the font uses ligatures:
-			gg := out.TextLayout(nil, "fi")
+			gg := b.TextLayout(nil, "fi")
 			if gg == nil {
 				t.Fatal("typesetting failed")
 			}
@@ -91,8 +84,8 @@ func TestTextLayout2(t *testing.T) {
 
 			// Then make sure that ligatures are disabled when character
 			// spacing is non-zero:
-			out.TextSetCharacterSpacing(1)
-			gg = out.TextLayout(nil, "fi")
+			b.TextSetCharacterSpacing(1)
+			gg = b.TextLayout(nil, "fi")
 			if gg == nil {
 				t.Fatal("layout failed")
 			}
@@ -106,19 +99,16 @@ func TestTextLayout2(t *testing.T) {
 // TestTextLayout3 tests that the width of a glyph sequence scales
 // with the font size.
 func TestTextLayout3(t *testing.T) {
-	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	rm := pdf.NewResourceManager(data)
-
 	F, err := gofont.Regular.NewSimple(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := graphics.NewWriter(io.Discard, rm)
+	b := builder.New(content.Page, nil)
 
-	out.TextSetFont(F, 10)
-	L1 := out.TextLayout(nil, "hello world!").TotalWidth()
-	out.TextSetFont(F, 20)
-	L2 := out.TextLayout(nil, "hello world!").TotalWidth()
+	b.TextSetFont(F, 10)
+	L1 := b.TextLayout(nil, "hello world!").TotalWidth()
+	b.TextSetFont(F, 20)
+	L2 := b.TextLayout(nil, "hello world!").TotalWidth()
 
 	if L1 <= 0 {
 		t.Fatalf("invalid width: %f", L1)

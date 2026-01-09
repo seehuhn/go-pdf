@@ -80,7 +80,7 @@ func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if len(r.ExtGState) > 0 {
 		extGStateDict := pdf.Dict{}
 		for name, gs := range r.ExtGState {
-			ref, err := gs.Embed(rm)
+			ref, err := rm.Embed(gs)
 			if err != nil {
 				return nil, err
 			}
@@ -93,7 +93,7 @@ func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if len(r.ColorSpace) > 0 {
 		colorSpaceDict := pdf.Dict{}
 		for name, cs := range r.ColorSpace {
-			ref, err := cs.Embed(rm)
+			ref, err := rm.Embed(cs)
 			if err != nil {
 				return nil, err
 			}
@@ -106,7 +106,7 @@ func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if len(r.Pattern) > 0 {
 		patternDict := pdf.Dict{}
 		for name, pat := range r.Pattern {
-			ref, err := pat.Embed(rm)
+			ref, err := rm.Embed(pat)
 			if err != nil {
 				return nil, err
 			}
@@ -119,7 +119,7 @@ func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if len(r.Shading) > 0 {
 		shadingDict := pdf.Dict{}
 		for name, sh := range r.Shading {
-			ref, err := sh.Embed(rm)
+			ref, err := rm.Embed(sh)
 			if err != nil {
 				return nil, err
 			}
@@ -132,7 +132,7 @@ func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if len(r.XObject) > 0 {
 		xobjectDict := pdf.Dict{}
 		for name, xobj := range r.XObject {
-			ref, err := xobj.Embed(rm)
+			ref, err := rm.Embed(xobj)
 			if err != nil {
 				return nil, err
 			}
@@ -145,7 +145,7 @@ func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if len(r.Font) > 0 {
 		fontDict := pdf.Dict{}
 		for name, f := range r.Font {
-			ref, err := f.Embed(rm)
+			ref, err := rm.Embed(f)
 			if err != nil {
 				return nil, err
 			}

@@ -17,6 +17,7 @@
 package graphics
 
 import (
+	"errors"
 	"slices"
 
 	"seehuhn.de/go/geom/matrix"
@@ -27,6 +28,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/halftone"
 	"seehuhn.de/go/pdf/graphics/state"
 	"seehuhn.de/go/pdf/graphics/transfer"
+	"seehuhn.de/go/pdf/property"
 )
 
 // Parameters collects all graphical parameters of the PDF processor.
@@ -177,28 +179,23 @@ func NewState() State {
 	param.OverprintFill = false
 	param.OverprintMode = 0
 
-	param.BlackGeneration = nil   // defaul: device dependent
-	param.UndercolorRemoval = nil // defaul: device dependent
+	param.BlackGeneration = nil   // default: device dependent
+	param.UndercolorRemoval = nil // default: device dependent
 	param.TransferFunction = transfer.Functions{
-		Red:   nil, // defaul: device dependent
-		Green: nil, // defaul: device dependent
-		Blue:  nil, // defaul: device dependent
-		Gray:  nil, // defaul: device dependent
+		Red:   nil, // default: device dependent
+		Green: nil, // default: device dependent
+		Blue:  nil, // default: device dependent
+		Gray:  nil, // default: device dependent
 	}
 
-	param.Halftone = nil // defaul: device dependent
-	// param.HalftoneOriginX = 0     // defaul: device dependent
-	// param.HalftoneOriginY = 0     // defaul: device dependent
+	param.Halftone = nil // default: device dependent
+	// param.HalftoneOriginX = 0     // default: device dependent
+	// param.HalftoneOriginY = 0     // default: device dependent
 
 	param.FlatnessTolerance = 1
-	// param.SmoothnessTolerance = 0 // defaul: device dependent
+	// param.SmoothnessTolerance = 0 // default: device dependent
 
 	return State{param, initializedStateBits}
-}
-
-// isSet returns true, if all of the given fields in the graphics state are set.
-func (s State) isSet(bits state.Bits) bool {
-	return s.Set&bits == bits
 }
 
 func (s *State) mustBeSet(bits state.Bits) error {
@@ -391,3 +388,23 @@ const (
 	Saturation           RenderingIntent = "Saturation"
 	Perceptual           RenderingIntent = "Perceptual"
 )
+
+// MarkedContent represents a marked-content point or sequence.
+type MarkedContent struct {
+	// Tag specifies the role or significance of the point/sequence.
+	Tag pdf.Name
+
+	// Properties is an optional property list providing additional data.
+	// Set to nil for marked content without properties (MP/BMC operators).
+	Properties property.List
+
+	// Inline controls whether the property list is embedded inline in the
+	// content stream (true) or referenced via the Properties resource
+	// dictionary (false). Only relevant if Properties is not nil.
+	// Property lists can only be inlined if Properties.IsDirect() returns true.
+	Inline bool
+}
+
+// ErrNotDirect is returned when attempting to inline a property list
+// that cannot be embedded inline in the content stream.
+var ErrNotDirect = errors.New("property list cannot be inlined in content stream")

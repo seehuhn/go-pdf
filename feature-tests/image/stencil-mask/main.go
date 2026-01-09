@@ -56,7 +56,7 @@ func run(filename string) error {
 		Color: gray,
 	}
 
-	text.Show(page.Writer,
+	text.Show(page.Builder,
 		text.M{X: 20, Y: 570},
 		F,
 		text.Wrap(370, gibberish.Generate(480, 0)),

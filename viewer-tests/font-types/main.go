@@ -47,7 +47,7 @@ func run() error {
 			Size: 15,
 		}
 
-		text.Show(out.Writer,
+		text.Show(out.Builder,
 			text.M{X: 36, Y: 360}, F,
 			text.Wrap(480, gibberish.Generate(100, 0)),
 			text.NL,

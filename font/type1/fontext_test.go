@@ -112,7 +112,7 @@ func TestTextContent(t *testing.T) {
 
 	// step 2: extract the encoded string from the content stream
 	var textString pdf.String
-	r := reader.New(page.Out, nil)
+	r := reader.New(page.Out)
 	r.EveryOp = func(op string, args []pdf.Object) error {
 		switch op {
 		case "Tj":

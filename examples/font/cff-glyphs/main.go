@@ -40,8 +40,9 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
@@ -181,12 +182,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 	}
 
 	for i, g := range fnt.Glyphs {
-		contentRef := ctx.pageTree.Out.Alloc()
-		stream, err := ctx.pageTree.Out.OpenStream(contentRef, nil, pdf.FilterCompress{})
-		if err != nil {
-			return err
-		}
-		page := graphics.NewWriter(stream, ctx.rm)
+		page := builder.New(content.Page, nil)
 
 		// show the glyph extent as a shaded rectangle
 		bbox := g.Extent()
@@ -306,18 +302,29 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 			page.PopGraphicsState()
 		}
 
+		contentRef := ctx.pageTree.Out.Alloc()
+		stream, err := ctx.pageTree.Out.OpenStream(contentRef, nil, pdf.FilterCompress{})
+		if err != nil {
+			return err
+		}
+		err = content.Write(stream, page.Stream, pdf.V1_7, content.Page, page.Resources)
+		if err != nil {
+			return err
+		}
 		err = stream.Close()
 		if err != nil {
 			return err
 		}
 
-		pageDict := pdf.Dict{
-			"Type":     pdf.Name("Page"),
-			"Contents": contentRef,
-			"MediaBox": pageSize,
+		resObj, err := ctx.rm.Embed(page.Resources)
+		if err != nil {
+			return err
 		}
-		if page.Resources != nil {
-			pageDict["Resources"] = pdf.AsDict(page.Resources)
+		pageDict := pdf.Dict{
+			"Type":      pdf.Name("Page"),
+			"Contents":  contentRef,
+			"MediaBox":  pageSize,
+			"Resources": resObj,
 		}
 		err = ctx.pageTree.AppendPage(pageDict)
 		if err != nil {
