@@ -85,10 +85,11 @@ func (e *TextExtractor) setupCallbacks() {
 	e.reader.TextEvent = func(op reader.TextEvent, arg float64) {
 		switch op {
 		case reader.TextEventSpace:
-			fontSpaceWidth, ok := e.spaceWidth[e.reader.TextFont]
+			F := e.reader.State.GState.TextFont
+			fontSpaceWidth, ok := e.spaceWidth[F]
 			if !ok {
-				fontSpaceWidth = getSpaceWidth(e.reader.TextFont)
-				e.spaceWidth[e.reader.TextFont] = fontSpaceWidth
+				fontSpaceWidth = getSpaceWidth(F)
+				e.spaceWidth[F] = fontSpaceWidth
 			}
 			if arg > 0.3*fontSpaceWidth {
 				fmt.Fprint(e.writer, " ")
@@ -105,7 +106,7 @@ func (e *TextExtractor) setupCallbacks() {
 		}
 
 		if text == "" {
-			currentFont := e.reader.TextFont
+			currentFont := e.reader.State.GState.TextFont
 			cidMapping, ok := e.extraTextCache[currentFont]
 			if !ok {
 				cidMapping = getExtraMapping(currentFont)

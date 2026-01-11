@@ -23,14 +23,14 @@ import (
 )
 
 func TestNewState_Page(t *testing.T) {
-	s := NewState(Page)
+	s := NewState(Page, &Resources{})
 
 	// Page: Set=initializedStateBits, Known=initializedStateBits
 	// Font is NOT in initializedStateBits
 	if s.Usable&state.TextFont != 0 {
 		t.Error("Page: font should be Unset")
 	}
-	if s.Set&state.TextFont != 0 {
+	if s.GState.Set&state.TextFont != 0 {
 		t.Error("Page: font should not be Known")
 	}
 
@@ -38,89 +38,54 @@ func TestNewState_Page(t *testing.T) {
 	if s.Usable&state.LineWidth == 0 {
 		t.Error("Page: line width should be Set")
 	}
-	if s.Set&state.LineWidth == 0 {
+	if s.GState.Set&state.LineWidth == 0 {
 		t.Error("Page: line width should be Known")
 	}
 }
 
 func TestNewState_Form(t *testing.T) {
-	s := NewState(Form)
+	s := NewState(Form, &Resources{})
 
 	// Form: Set=AllStateBits, Known=0
 	if s.Usable != state.AllBits {
 		t.Errorf("Form: Set = %v, want AllStateBits", s.Usable)
 	}
-	if s.Set != 0 {
-		t.Errorf("Form: Known = %v, want 0", s.Set)
+	if s.GState.Set != 0 {
+		t.Errorf("Form: Known = %v, want 0", s.GState.Set)
 	}
 }
 
 func TestState_IsKnown(t *testing.T) {
-	s := NewState(Page)
+	s := NewState(Page, &Resources{})
 
 	// LineWidth is Known for Page
-	if !s.IsKnown(state.LineWidth) {
+	if !s.IsSet(state.LineWidth) {
 		t.Error("line width should be Known")
 	}
 
 	// Font is not Known
-	if s.IsKnown(state.TextFont) {
+	if s.IsSet(state.TextFont) {
 		t.Error("font should not be Known")
 	}
 }
 
 func TestState_IsSet(t *testing.T) {
-	s := NewState(Form)
+	s := NewState(Form, &Resources{})
 
 	// Everything is Set for Form
-	if !s.IsSet(state.LineWidth) {
+	if !s.IsUsable(state.LineWidth) {
 		t.Error("line width should be Set")
 	}
-	if !s.IsSet(state.TextFont) {
+	if !s.IsUsable(state.TextFont) {
 		t.Error("font should be Set")
 	}
 }
 
-func TestState_MarkAsSet(t *testing.T) {
-	s := NewState(Form)
-
-	// Initially not Known
-	if s.IsKnown(state.LineWidth) {
-		t.Error("line width should not be Known initially")
-	}
-
-	// After MarkAsSet
-	s.MarkAsSet(state.LineWidth)
-	if !s.IsKnown(state.LineWidth) {
-		t.Error("line width should be Known after MarkAsSet")
-	}
-}
-
-func TestState_MarkUsedUnknown(t *testing.T) {
-	s := NewState(Form)
-
-	// Use a Set-Unknown parameter
-	s.MarkAsUsed(state.LineWidth)
-	if s.FromContext&state.LineWidth == 0 {
-		t.Error("line width should be in UsedUnknown")
-	}
-
-	// Known params should not be marked
-	s.MarkAsSet(state.LineCap)
-	s.MarkAsUsed(state.LineCap)
-	if s.FromContext&state.LineCap != 0 {
-		t.Error("line cap should not be in UsedUnknown (it's Known)")
-	}
-}
-
 func TestState_PushPop(t *testing.T) {
-	s := NewState(Form) // Form has Set=All, Known=0
+	s := NewState(Form, &Resources{}) // Form has Set=All, Known=0
 
-	// Mark line width as Known
-	s.MarkAsSet(state.LineWidth)
-	if !s.IsKnown(state.LineWidth) {
-		t.Fatal("line width should be Known after MarkAsSet")
-	}
+	s.Usable |= state.LineWidth
+	s.GState.Set |= state.LineWidth
 
 	// Push state
 	if err := s.Push(); err != nil {
@@ -128,7 +93,7 @@ func TestState_PushPop(t *testing.T) {
 	}
 
 	// Modify Known bits
-	s.Set = 0
+	s.GState.Set = 0
 
 	// Pop state
 	if err := s.Pop(); err != nil {
@@ -136,13 +101,13 @@ func TestState_PushPop(t *testing.T) {
 	}
 
 	// Known should be restored
-	if !s.IsKnown(state.LineWidth) {
+	if !s.IsSet(state.LineWidth) {
 		t.Error("line width Known bit should be restored after Pop")
 	}
 }
 
 func TestState_PopEmpty(t *testing.T) {
-	s := NewState(Page)
+	s := NewState(Page, &Resources{})
 
 	// Pop on empty stack should error
 	if err := s.Pop(); err == nil {
@@ -151,7 +116,7 @@ func TestState_PopEmpty(t *testing.T) {
 }
 
 func TestState_MaxStackDepth(t *testing.T) {
-	s := NewState(Page)
+	s := NewState(Page, &Resources{})
 
 	for i := 0; i < 5; i++ {
 		s.Push()
@@ -206,7 +171,7 @@ func TestState_Validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := NewState(Page)
+			s := NewState(Page, &Resources{})
 			tt.setup(s)
 			err := s.CanClose()
 			if (err != nil) != tt.wantErr {

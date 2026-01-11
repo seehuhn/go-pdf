@@ -61,9 +61,11 @@ func (p *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	dict := pdf.Dict{
-		// "Type":        pdf.Name("Pattern"),
 		"PatternType": pdf.Integer(2),
 		"Shading":     sh,
+	}
+	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Pattern")
 	}
 	if p.Matrix != matrix.Identity && p.Matrix != matrix.Zero {
 		dict["Matrix"] = toPDF(p.Matrix[:])

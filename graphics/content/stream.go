@@ -99,14 +99,14 @@ func (ct Type) String() string {
 // Operators that are invalid in the current graphics object context are
 // either fixed up (text operators get BT auto-inserted) or skipped
 // (path operators outside path context).
-func ReadStream(r io.Reader, v pdf.Version, ct Type) (Stream, error) {
+func ReadStream(r io.Reader, v pdf.Version, ct Type, res *Resources) (Stream, error) {
 	s := &streamScanner{
 		buf: make([]byte, 512),
 	}
 	s.src = r
 
 	var stream Stream
-	state := NewState(ct) // tracks nesting, compatibility, and current object
+	state := NewState(ct, res) // tracks nesting, compatibility, and current object
 
 	for {
 		op, err := s.scan()
@@ -171,7 +171,7 @@ func ReadStream(r io.Reader, v pdf.Version, ct Type) (Stream, error) {
 			// update state bits for operators that set new state
 			if info != nil && info.Sets != 0 {
 				state.Usable |= info.Sets
-				state.Set |= info.Sets
+				state.GState.Set |= info.Sets
 			}
 
 			stream = append(stream, op)

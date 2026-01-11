@@ -247,7 +247,7 @@ func TestDPOperatorResourceReference(t *testing.T) {
 	r.Reset()
 
 	// Set up Resources with a property list
-	r.Resources = &content.Resources{
+	r.State.Resources = &content.Resources{
 		Properties: map[pdf.Name]property.List{
 			"P1": &property.ActualText{
 				MCID: optional.NewInt(42),

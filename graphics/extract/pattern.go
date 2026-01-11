@@ -210,7 +210,7 @@ func extractType1(x *pdf.Extractor, stream *pdf.Stream) (*pattern.Type1, error) 
 		return nil, err
 	}
 
-	pat.Content, err = content.ReadStream(stm, pdf.GetVersion(x.R), stmType)
+	pat.Content, err = content.ReadStream(stm, pdf.GetVersion(x.R), stmType, pat.Res)
 	closeErr := stm.Close()
 	if err != nil {
 		return nil, err

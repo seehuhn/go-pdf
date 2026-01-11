@@ -159,7 +159,7 @@ func Form(x *pdf.Extractor, obj pdf.Object) (*form.Form, error) {
 		return nil, err
 	}
 
-	f.Content, err = content.ReadStream(stm, pdf.GetVersion(x.R), content.Form)
+	f.Content, err = content.ReadStream(stm, pdf.GetVersion(x.R), content.Form, f.Res)
 	closeErr := stm.Close()
 	if err != nil {
 		return nil, err

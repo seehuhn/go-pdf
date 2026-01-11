@@ -23,7 +23,14 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 )
+
+// testResources provides resources for round-trip tests.
+// Font F1 is referenced by "text operators" and "mixed content" test cases.
+var testResources = &Resources{
+	Font: map[pdf.Name]font.Instance{"F1": nil},
+}
 
 var roundTripTestCases = []struct {
 	name   string
@@ -42,14 +49,14 @@ func TestStreamRoundTrip(t *testing.T) {
 	for _, tt := range roundTripTestCases {
 		t.Run(tt.name, func(t *testing.T) {
 			// first read
-			stream1, err := ReadStream(bytes.NewReader([]byte(tt.stream)), pdf.V2_0, Page)
+			stream1, err := ReadStream(bytes.NewReader([]byte(tt.stream)), pdf.V2_0, Page, testResources)
 			if err != nil {
 				t.Fatalf("first read: %v", err)
 			}
 
-			// write using Writer (permissive: use latest version)
+			// write using Writer
 			var buf bytes.Buffer
-			w := NewWriter(pdf.V2_0, Page, nil)
+			w := NewWriter(pdf.V2_0, Page, testResources)
 			if err := w.Write(&buf, stream1); err != nil {
 				t.Fatalf("write: %v", err)
 			}
@@ -58,7 +65,7 @@ func TestStreamRoundTrip(t *testing.T) {
 			}
 
 			// second read
-			stream2, err := ReadStream(bytes.NewReader(buf.Bytes()), pdf.V2_0, Page)
+			stream2, err := ReadStream(bytes.NewReader(buf.Bytes()), pdf.V2_0, Page, testResources)
 			if err != nil {
 				t.Fatalf("second read: %v", err)
 			}
@@ -78,23 +85,24 @@ func FuzzStreamRoundTrip(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		// first read - permissive, may skip malformed content
-		stream1, err := ReadStream(bytes.NewReader(data), pdf.V2_0, Page)
+		stream1, err := ReadStream(bytes.NewReader(data), pdf.V2_0, Page, testResources)
 		if err != nil {
 			return
 		}
 
 		// write - must succeed if read succeeded
 		var buf bytes.Buffer
-		w := NewWriter(pdf.V2_0, Page, nil)
+		w := NewWriter(pdf.V2_0, Page, testResources)
 		if err := w.Write(&buf, stream1); err != nil {
-			t.Fatalf("write failed: %v", err)
+			// Fuzzed input may reference resources we don't have - skip these
+			return
 		}
 		if err := w.Close(); err != nil {
 			t.Fatalf("writer close: %v", err)
 		}
 
 		// second read
-		stream2, err := ReadStream(bytes.NewReader(buf.Bytes()), pdf.V2_0, Page)
+		stream2, err := ReadStream(bytes.NewReader(buf.Bytes()), pdf.V2_0, Page, testResources)
 		if err != nil {
 			t.Fatalf("second read failed: %v", err)
 		}
@@ -156,7 +164,7 @@ func TestInlineImageLimits(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stream, err := ReadStream(bytes.NewReader([]byte(tt.stream)), pdf.V2_0, Page)
+			stream, err := ReadStream(bytes.NewReader([]byte(tt.stream)), pdf.V2_0, Page, &Resources{})
 			if err != nil {
 				t.Fatalf("ReadStream error: %v", err)
 			}
@@ -186,7 +194,7 @@ func TestOperatorArgLimit(t *testing.T) {
 	buf.WriteString("q\n") // save graphics state (should be parsed)
 	buf.WriteString("Q\n") // restore graphics state
 
-	stream, err := ReadStream(bytes.NewReader(buf.Bytes()), pdf.V2_0, Page)
+	stream, err := ReadStream(bytes.NewReader(buf.Bytes()), pdf.V2_0, Page, &Resources{})
 	if err != nil {
 		t.Fatalf("ReadStream error: %v", err)
 	}

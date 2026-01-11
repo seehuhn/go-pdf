@@ -142,8 +142,8 @@ func values(c Color) []float64 {
 		return c.Values[:c.Space.N]
 	case colorSRGB:
 		return c[:]
-	case *colorUncoloredPattern:
-		return values(c)
+	case colorUncoloredPattern:
+		return values(c.Col)
 	case colorIndexed:
 		return []float64{float64(c.Index)}
 	case colorSeparation:

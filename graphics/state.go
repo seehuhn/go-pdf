@@ -29,10 +29,8 @@ import (
 	"seehuhn.de/go/pdf/graphics/transfer"
 )
 
-// Parameters collects all graphical parameters of the PDF processor.
-//
-// See section 8.4 of PDF 32000-1:2008.
-type Parameters struct {
+// State represents the graphics state of a PDF processor.
+type State struct {
 	// CTM is the "current transformation matrix", which maps positions from
 	// user coordinates to device coordinates.
 	CTM matrix.Matrix
@@ -165,6 +163,9 @@ type Parameters struct {
 	// fraction of the range of each color component.
 	SmoothnessTolerance float64
 
+	// Set indicates which of the parameters above are valid/used.
+	Set state.Bits
+
 	// StartX is the X coordinate of the current subpath's starting point, in user space.
 	StartX float64
 
@@ -184,84 +185,76 @@ type Parameters struct {
 	ThisSubpathClosed bool
 }
 
-// Clone returns a shallow copy of the parameter vector.
-func (p *Parameters) Clone() *Parameters {
-	res := *p
-	return &res
-}
-
-// State represents the graphics state of a PDF processor.
-type State struct {
-	// Parameters holds the actual graphics parameter values.
-	*Parameters
-
-	// Set indicates which parameters have been explicitly set.
-	Set state.Bits
+// Clone returns a copy of the graphics state.
+func (s *State) Clone() *State {
+	clone := *s
+	clone.DashPattern = slices.Clone(s.DashPattern)
+	return &clone
 }
 
 // NewState returns a new graphics state with parameters initialized to
 // their default values as defined by the PDF specification. The returned
 // State's Set field indicates which parameters have been initialized.
 func NewState() State {
-	param := &Parameters{}
+	return State{
+		CTM: matrix.Identity,
 
-	param.CTM = matrix.Identity
+		AllSubpathsClosed: true,
+		ThisSubpathClosed: true,
 
-	param.AllSubpathsClosed = true
-	param.ThisSubpathClosed = true
+		StrokeColor: color.Black,
+		FillColor:   color.Black,
 
-	param.StrokeColor = color.Black
-	param.FillColor = color.Black
+		TextCharacterSpacing:  0,
+		TextWordSpacing:       0,
+		TextHorizontalScaling: 1,
+		TextLeading:           0,
+		// no default for TextFont
+		// no default for TextFontSize
+		TextRenderingMode: 0,
+		TextRise:          0,
+		TextKnockout:      true,
 
-	param.TextCharacterSpacing = 0
-	param.TextWordSpacing = 0
-	param.TextHorizontalScaling = 1
-	param.TextLeading = 0
-	// no default for Font
-	// no default for FontSize
-	param.TextRenderingMode = 0
-	param.TextRise = 0
-	param.TextKnockout = true
+		// TextMatrix and TextLineMatrix are reset at the start of each text object
 
-	// Tm and Tlm are reset at the start of each text object
+		LineWidth:   1,
+		LineCap:     LineCapButt,
+		LineJoin:    LineJoinMiter,
+		MiterLimit:  10,
+		DashPattern: []float64{},
+		DashPhase:   0,
 
-	param.LineWidth = 1
-	param.LineCap = LineCapButt
-	param.LineJoin = LineJoinMiter
-	param.MiterLimit = 10
-	param.DashPattern = []float64{}
-	param.DashPhase = 0
+		RenderingIntent:        RelativeColorimetric,
+		StrokeAdjustment:       false,
+		BlendMode:              blend.Mode{blend.ModeNormal},
+		SoftMask:               nil,
+		StrokeAlpha:            1,
+		FillAlpha:              1,
+		AlphaSourceFlag:        false,
+		BlackPointCompensation: pdf.Name("Default"),
 
-	param.RenderingIntent = RelativeColorimetric
-	param.StrokeAdjustment = false
-	param.BlendMode = blend.Mode{blend.ModeNormal}
-	param.SoftMask = nil
-	param.StrokeAlpha = 1
-	param.FillAlpha = 1
-	param.AlphaSourceFlag = false
-	param.BlackPointCompensation = pdf.Name("Default")
+		OverprintStroke: false,
+		OverprintFill:   false,
+		OverprintMode:   0,
 
-	param.OverprintStroke = false
-	param.OverprintFill = false
-	param.OverprintMode = 0
+		BlackGeneration:   nil, // default: device dependent
+		UndercolorRemoval: nil, // default: device dependent
+		TransferFunction: transfer.Functions{
+			Red:   nil, // default: device dependent
+			Green: nil, // default: device dependent
+			Blue:  nil, // default: device dependent
+			Gray:  nil, // default: device dependent
+		},
 
-	param.BlackGeneration = nil   // default: device dependent
-	param.UndercolorRemoval = nil // default: device dependent
-	param.TransferFunction = transfer.Functions{
-		Red:   nil, // default: device dependent
-		Green: nil, // default: device dependent
-		Blue:  nil, // default: device dependent
-		Gray:  nil, // default: device dependent
+		Halftone: nil, // default: device dependent
+		// HalftoneOriginX: 0, // default: device dependent
+		// HalftoneOriginY: 0, // default: device dependent
+
+		FlatnessTolerance: 1,
+		// SmoothnessTolerance: 0, // default: device dependent
+
+		Set: initializedStateBits,
 	}
-
-	param.Halftone = nil // default: device dependent
-	// param.HalftoneOriginX = 0     // default: device dependent
-	// param.HalftoneOriginY = 0     // default: device dependent
-
-	param.FlatnessTolerance = 1
-	// param.SmoothnessTolerance = 0 // default: device dependent
-
-	return State{param, initializedStateBits}
 }
 
 func (s *State) mustBeSet(bits state.Bits) error {
@@ -277,83 +270,81 @@ func (s *State) ApplyTo(other *State) {
 	set := s.Set
 	other.Set |= set
 
-	param := s.Parameters
-	otherParam := other.Parameters
 	if set&state.TextFont != 0 {
-		otherParam.TextFont = param.TextFont
-		otherParam.TextFontSize = param.TextFontSize
+		other.TextFont = s.TextFont
+		other.TextFontSize = s.TextFontSize
 	}
 	if set&state.TextKnockout != 0 {
-		otherParam.TextKnockout = param.TextKnockout
+		other.TextKnockout = s.TextKnockout
 	}
 	if set&state.LineWidth != 0 {
-		otherParam.LineWidth = param.LineWidth
+		other.LineWidth = s.LineWidth
 	}
 	if set&state.LineCap != 0 {
-		otherParam.LineCap = param.LineCap
+		other.LineCap = s.LineCap
 	}
 	if set&state.LineJoin != 0 {
-		otherParam.LineJoin = param.LineJoin
+		other.LineJoin = s.LineJoin
 	}
 	if set&state.MiterLimit != 0 {
-		otherParam.MiterLimit = param.MiterLimit
+		other.MiterLimit = s.MiterLimit
 	}
 	if set&state.LineDash != 0 {
-		otherParam.DashPattern = slices.Clone(param.DashPattern)
-		otherParam.DashPhase = param.DashPhase
+		other.DashPattern = slices.Clone(s.DashPattern)
+		other.DashPhase = s.DashPhase
 	}
 	if set&state.RenderingIntent != 0 {
-		otherParam.RenderingIntent = param.RenderingIntent
+		other.RenderingIntent = s.RenderingIntent
 	}
 	if set&state.StrokeAdjustment != 0 {
-		otherParam.StrokeAdjustment = param.StrokeAdjustment
+		other.StrokeAdjustment = s.StrokeAdjustment
 	}
 	if set&state.BlendMode != 0 {
-		otherParam.BlendMode = param.BlendMode
+		other.BlendMode = s.BlendMode
 	}
 	if set&state.SoftMask != 0 {
-		otherParam.SoftMask = param.SoftMask
+		other.SoftMask = s.SoftMask
 	}
 	if set&state.StrokeAlpha != 0 {
-		otherParam.StrokeAlpha = param.StrokeAlpha
+		other.StrokeAlpha = s.StrokeAlpha
 	}
 	if set&state.FillAlpha != 0 {
-		otherParam.FillAlpha = param.FillAlpha
+		other.FillAlpha = s.FillAlpha
 	}
 	if set&state.AlphaSourceFlag != 0 {
-		otherParam.AlphaSourceFlag = param.AlphaSourceFlag
+		other.AlphaSourceFlag = s.AlphaSourceFlag
 	}
 	if set&state.BlackPointCompensation != 0 {
-		otherParam.BlackPointCompensation = param.BlackPointCompensation
+		other.BlackPointCompensation = s.BlackPointCompensation
 	}
 	if set&state.Overprint != 0 {
-		otherParam.OverprintStroke = param.OverprintStroke
-		otherParam.OverprintFill = param.OverprintFill
+		other.OverprintStroke = s.OverprintStroke
+		other.OverprintFill = s.OverprintFill
 	}
 	if set&state.OverprintMode != 0 {
-		otherParam.OverprintMode = param.OverprintMode
+		other.OverprintMode = s.OverprintMode
 	}
 	if set&state.BlackGeneration != 0 {
-		otherParam.BlackGeneration = param.BlackGeneration
+		other.BlackGeneration = s.BlackGeneration
 	}
 	if set&state.UndercolorRemoval != 0 {
-		otherParam.UndercolorRemoval = param.UndercolorRemoval
+		other.UndercolorRemoval = s.UndercolorRemoval
 	}
 	if set&state.TransferFunction != 0 {
-		otherParam.TransferFunction = param.TransferFunction
+		other.TransferFunction = s.TransferFunction
 	}
 	if set&state.Halftone != 0 {
-		otherParam.Halftone = param.Halftone
+		other.Halftone = s.Halftone
 	}
 	if set&state.HalftoneOrigin != 0 {
-		otherParam.HalftoneOriginX = param.HalftoneOriginX
-		otherParam.HalftoneOriginY = param.HalftoneOriginY
+		other.HalftoneOriginX = s.HalftoneOriginX
+		other.HalftoneOriginY = s.HalftoneOriginY
 	}
 	if set&state.FlatnessTolerance != 0 {
-		otherParam.FlatnessTolerance = param.FlatnessTolerance
+		other.FlatnessTolerance = s.FlatnessTolerance
 	}
 	if set&state.SmoothnessTolerance != 0 {
-		otherParam.SmoothnessTolerance = param.SmoothnessTolerance
+		other.SmoothnessTolerance = s.SmoothnessTolerance
 	}
 }
 

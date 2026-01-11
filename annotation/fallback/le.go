@@ -178,7 +178,7 @@ func (le butt) size(lw float64) float64 {
 
 func (le butt) drawBuilder(b *builder.Builder) {
 	n := le.Dir.Normal()
-	n.IMul(le.size(b.Param.LineWidth) / 2)
+	n.IMul(le.size(b.State.GState.LineWidth) / 2)
 
 	if le.IsStart {
 		p1 := le.At.Add(n)
@@ -244,7 +244,7 @@ func (le slash) drawBuilder(b *builder.Builder) {
 	a := 0.5              // cos(60°)
 	c := math.Sqrt(3) / 2 // sin(60°)
 	n := vec.Vec2{X: a*le.Dir.X - c*le.Dir.Y, Y: a*le.Dir.Y + c*le.Dir.X}
-	n.IMul(le.size(b.Param.LineWidth) / 2)
+	n.IMul(le.size(b.State.GState.LineWidth) / 2)
 
 	if le.IsStart {
 		p1 := le.At.Add(n)
@@ -298,7 +298,7 @@ func (le square) size(lw float64) float64 {
 }
 
 func (le square) drawBuilder(b *builder.Builder) {
-	size := le.size(b.Param.LineWidth)
+	size := le.size(b.State.GState.LineWidth)
 	a := (size / 2) / max(math.Abs(le.Dir.X), math.Abs(le.Dir.Y))
 
 	if le.IsStart {
@@ -358,7 +358,7 @@ func (le circle) size(lw float64) float64 {
 }
 
 func (le circle) drawBuilder(b *builder.Builder) {
-	size := le.size(b.Param.LineWidth)
+	size := le.size(b.State.GState.LineWidth)
 
 	if le.IsStart {
 		if le.FillColor != nil {
@@ -422,7 +422,7 @@ func (le diamond) size(lw float64) float64 {
 }
 
 func (le diamond) drawBuilder(b *builder.Builder) {
-	size := le.size(b.Param.LineWidth)
+	size := le.size(b.State.GState.LineWidth)
 	a := size / (math.Abs(le.Dir.X) + math.Abs(le.Dir.Y)) / 2
 	L := size
 
@@ -500,7 +500,7 @@ func (le arrow) extend(b *pdf.Rectangle, lw float64) {
 }
 
 func (le arrow) drawBuilder(b *builder.Builder) {
-	tip, base1, base2 := le.corners(b.Param.LineWidth)
+	tip, base1, base2 := le.corners(b.State.GState.LineWidth)
 
 	var connectX, connectY float64
 	if le.reverse {
@@ -509,7 +509,7 @@ func (le arrow) drawBuilder(b *builder.Builder) {
 		m := vec.Middle(base1, base2)
 		connectX, connectY = m.X, m.Y
 	} else {
-		v, _ := linalg.Miter(base1, tip, base2, b.Param.LineWidth, false)
+		v, _ := linalg.Miter(base1, tip, base2, b.State.GState.LineWidth, false)
 		connectX, connectY = v.X, v.Y
 	}
 

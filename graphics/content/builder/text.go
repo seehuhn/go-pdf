@@ -33,8 +33,6 @@ import (
 //
 // This implements the PDF graphics operator "BT".
 func (b *Builder) TextBegin() {
-	b.Param.TextMatrix = matrix.Identity
-	b.Param.TextLineMatrix = matrix.Identity
 	b.emit(content.OpTextBegin)
 }
 
@@ -51,11 +49,10 @@ func (b *Builder) TextEnd() {
 //
 // This implements the PDF graphics operator "Tc".
 func (b *Builder) TextSetCharacterSpacing(charSpacing float64) {
-	if b.isKnown(state.TextCharacterSpacing) &&
-		nearlyEqual(charSpacing, b.Param.TextCharacterSpacing) {
+	if b.isSet(state.TextCharacterSpacing) &&
+		nearlyEqual(charSpacing, b.State.GState.TextCharacterSpacing) {
 		return
 	}
-	b.Param.TextCharacterSpacing = charSpacing
 	b.emit(content.OpTextSetCharacterSpacing, pdf.Number(charSpacing))
 }
 
@@ -63,11 +60,10 @@ func (b *Builder) TextSetCharacterSpacing(charSpacing float64) {
 //
 // This implements the PDF graphics operator "Tw".
 func (b *Builder) TextSetWordSpacing(wordSpacing float64) {
-	if b.isKnown(state.TextWordSpacing) &&
-		nearlyEqual(wordSpacing, b.Param.TextWordSpacing) {
+	if b.isSet(state.TextWordSpacing) &&
+		nearlyEqual(wordSpacing, b.State.GState.TextWordSpacing) {
 		return
 	}
-	b.Param.TextWordSpacing = wordSpacing
 	b.emit(content.OpTextSetWordSpacing, pdf.Number(wordSpacing))
 }
 
@@ -76,11 +72,10 @@ func (b *Builder) TextSetWordSpacing(wordSpacing float64) {
 //
 // This implements the PDF graphics operator "Tz".
 func (b *Builder) TextSetHorizontalScaling(scaling float64) {
-	if b.isKnown(state.TextHorizontalScaling) &&
-		nearlyEqual(scaling, b.Param.TextHorizontalScaling) {
+	if b.isSet(state.TextHorizontalScaling) &&
+		nearlyEqual(scaling, b.State.GState.TextHorizontalScaling) {
 		return
 	}
-	b.Param.TextHorizontalScaling = scaling
 	// PDF operator expects percentage (100 = normal)
 	b.emit(content.OpTextSetHorizontalScaling, pdf.Number(scaling*100))
 }
@@ -89,11 +84,10 @@ func (b *Builder) TextSetHorizontalScaling(scaling float64) {
 //
 // This implements the PDF graphics operator "TL".
 func (b *Builder) TextSetLeading(leading float64) {
-	if b.isKnown(state.TextLeading) &&
-		nearlyEqual(leading, b.Param.TextLeading) {
+	if b.isSet(state.TextLeading) &&
+		nearlyEqual(leading, b.State.GState.TextLeading) {
 		return
 	}
-	b.Param.TextLeading = leading
 	b.emit(content.OpTextSetLeading, pdf.Number(leading))
 }
 
@@ -105,11 +99,10 @@ func (b *Builder) TextSetRenderingMode(mode graphics.TextRenderingMode) {
 		b.Err = fmt.Errorf("TextSetRenderingMode: invalid mode %d", mode)
 		return
 	}
-	if b.isKnown(state.TextRenderingMode) &&
-		mode == b.Param.TextRenderingMode {
+	if b.isSet(state.TextRenderingMode) &&
+		mode == b.State.GState.TextRenderingMode {
 		return
 	}
-	b.Param.TextRenderingMode = mode
 	b.emit(content.OpTextSetRenderingMode, pdf.Integer(mode))
 }
 
@@ -117,11 +110,10 @@ func (b *Builder) TextSetRenderingMode(mode graphics.TextRenderingMode) {
 //
 // This implements the PDF graphics operator "Ts".
 func (b *Builder) TextSetRise(rise float64) {
-	if b.isKnown(state.TextRise) &&
-		nearlyEqual(rise, b.Param.TextRise) {
+	if b.isSet(state.TextRise) &&
+		nearlyEqual(rise, b.State.GState.TextRise) {
 		return
 	}
-	b.Param.TextRise = rise
 	b.emit(content.OpTextSetRise, pdf.Number(rise))
 }
 
@@ -133,14 +125,11 @@ func (b *Builder) TextSetFont(f font.Instance, size float64) {
 		return
 	}
 
-	if b.isKnown(state.TextFont) &&
-		b.Param.TextFont == f &&
-		nearlyEqual(b.Param.TextFontSize, size) {
+	if b.isSet(state.TextFont) &&
+		b.State.GState.TextFont == f &&
+		nearlyEqual(b.State.GState.TextFontSize, size) {
 		return
 	}
-
-	b.Param.TextFont = f
-	b.Param.TextFontSize = size
 
 	name := b.getFontName(f)
 	b.emit(content.OpTextSetFont, name, pdf.Number(size))
@@ -173,8 +162,6 @@ func (b *Builder) SetFontNameInternal(f font.Instance, name pdf.Name) error {
 //
 // This implements the PDF graphics operator "Td".
 func (b *Builder) TextFirstLine(x, y float64) {
-	b.Param.TextLineMatrix = matrix.Translate(x, y).Mul(b.Param.TextLineMatrix)
-	b.Param.TextMatrix = b.Param.TextLineMatrix
 	b.emit(content.OpTextMoveOffset, pdf.Number(x), pdf.Number(y))
 }
 
@@ -184,9 +171,6 @@ func (b *Builder) TextFirstLine(x, y float64) {
 //
 // This implements the PDF graphics operator "TD".
 func (b *Builder) TextSecondLine(dx, dy float64) {
-	b.Param.TextLineMatrix = matrix.Translate(dx, dy).Mul(b.Param.TextLineMatrix)
-	b.Param.TextMatrix = b.Param.TextLineMatrix
-	b.Param.TextLeading = -dy
 	b.emit(content.OpTextMoveOffsetSetLeading, pdf.Number(dx), pdf.Number(dy))
 }
 
@@ -194,8 +178,6 @@ func (b *Builder) TextSecondLine(dx, dy float64) {
 //
 // This implements the PDF graphics operator "Tm".
 func (b *Builder) TextSetMatrix(m matrix.Matrix) {
-	b.Param.TextMatrix = m
-	b.Param.TextLineMatrix = m
 	b.emit(content.OpTextSetMatrix,
 		pdf.Number(m[0]), pdf.Number(m[1]),
 		pdf.Number(m[2]), pdf.Number(m[3]),
@@ -206,8 +188,6 @@ func (b *Builder) TextSetMatrix(m matrix.Matrix) {
 //
 // This implements the PDF graphics operator "T*".
 func (b *Builder) TextNextLine() {
-	b.Param.TextLineMatrix = matrix.Translate(0, -b.Param.TextLeading).Mul(b.Param.TextLineMatrix)
-	b.Param.TextMatrix = b.Param.TextLineMatrix
 	b.emit(content.OpTextNextLine)
 }
 
@@ -228,11 +208,11 @@ func (b *Builder) TextShowRaw(s pdf.String) {
 //
 // This implements the PDF graphics operator "'".
 func (b *Builder) TextShowNextLineRaw(s pdf.String) {
-	b.Param.TextLineMatrix = matrix.Translate(0, -b.Param.TextLeading).Mul(b.Param.TextLineMatrix)
-	b.Param.TextMatrix = b.Param.TextLineMatrix
-	b.updateTextPosition(s)
 	// Clone the string to avoid aliasing if caller reuses the slice
+	// emit() handles line matrix update via applyOperatorToParams
 	b.emit(content.OpTextShowMoveNextLine, cloneString(s))
+	// Then advance for glyph widths
+	b.updateTextPosition(s)
 }
 
 // TextShowSpacedRaw adjusts word and character spacing and then shows an
@@ -242,14 +222,12 @@ func (b *Builder) TextShowNextLineRaw(s pdf.String) {
 //
 // This implements the PDF graphics operator '"'.
 func (b *Builder) TextShowSpacedRaw(wordSpacing, charSpacing float64, s pdf.String) {
-	b.Param.TextWordSpacing = wordSpacing
-	b.Param.TextCharacterSpacing = charSpacing
-	b.Param.TextLineMatrix = matrix.Translate(0, -b.Param.TextLeading).Mul(b.Param.TextLineMatrix)
-	b.Param.TextMatrix = b.Param.TextLineMatrix
-	b.updateTextPosition(s)
 	// Clone the string to avoid aliasing if caller reuses the slice
+	// emit() handles spacing updates and line matrix update via applyOperatorToParams
 	b.emit(content.OpTextShowMoveNextLineSetSpacing,
 		pdf.Number(wordSpacing), pdf.Number(charSpacing), cloneString(s))
+	// Then advance for glyph widths (using the new spacing values)
+	b.updateTextPosition(s)
 }
 
 // TextShowKernedRaw shows an already encoded text in the PDF file, using
@@ -264,8 +242,8 @@ func (b *Builder) TextShowKernedRaw(args ...pdf.Object) {
 		return
 	}
 	wMode := font.Horizontal
-	if b.Param.TextFont != nil {
-		wMode = b.Param.TextFont.WritingMode()
+	if b.State.GState.TextFont != nil {
+		wMode = b.State.GState.TextFont.WritingMode()
 	}
 	// Clone strings to avoid aliasing if caller reuses slices
 	clonedArgs := make(pdf.Array, len(args))
@@ -296,42 +274,42 @@ func (b *Builder) applyTextKern(delta float64, wMode font.WritingMode) {
 	if delta == 0 {
 		return
 	}
-	delta *= -b.Param.TextFontSize / 1000
+	delta *= -b.State.GState.TextFontSize / 1000
 	if wMode == font.Horizontal {
-		b.Param.TextMatrix = matrix.Translate(delta*b.Param.TextHorizontalScaling, 0).Mul(b.Param.TextMatrix)
+		b.State.GState.TextMatrix = matrix.Translate(delta*b.State.GState.TextHorizontalScaling, 0).Mul(b.State.GState.TextMatrix)
 	} else {
-		b.Param.TextMatrix = matrix.Translate(0, delta).Mul(b.Param.TextMatrix)
+		b.State.GState.TextMatrix = matrix.Translate(0, delta).Mul(b.State.GState.TextMatrix)
 	}
 }
 
 // updateTextPosition advances the text matrix based on the glyphs in the string.
 func (b *Builder) updateTextPosition(s pdf.String) {
-	if b.Param.TextFont == nil {
+	if b.State.GState.TextFont == nil {
 		return
 	}
 
-	wmode := b.Param.TextFont.WritingMode()
-	for info := range b.Param.TextFont.Codes(s) {
-		width := info.Width*b.Param.TextFontSize + b.Param.TextCharacterSpacing
+	wmode := b.State.GState.TextFont.WritingMode()
+	for info := range b.State.GState.TextFont.Codes(s) {
+		width := info.Width*b.State.GState.TextFontSize + b.State.GState.TextCharacterSpacing
 		if info.UseWordSpacing {
-			width += b.Param.TextWordSpacing
+			width += b.State.GState.TextWordSpacing
 		}
 		if wmode == font.Horizontal {
-			width *= b.Param.TextHorizontalScaling
+			width *= b.State.GState.TextHorizontalScaling
 		}
 
 		switch wmode {
 		case font.Horizontal:
-			b.Param.TextMatrix = matrix.Translate(width, 0).Mul(b.Param.TextMatrix)
+			b.State.GState.TextMatrix = matrix.Translate(width, 0).Mul(b.State.GState.TextMatrix)
 		case font.Vertical:
-			b.Param.TextMatrix = matrix.Translate(0, width).Mul(b.Param.TextMatrix)
+			b.State.GState.TextMatrix = matrix.Translate(0, width).Mul(b.State.GState.TextMatrix)
 		}
 	}
 }
 
 // GetTextPositionUser returns the current text position in user coordinates.
 func (b *Builder) GetTextPositionUser() (float64, float64) {
-	p := &b.Param
+	p := b.State.GState
 	M := matrix.Matrix{
 		p.TextFontSize * p.TextHorizontalScaling, 0,
 		0, p.TextFontSize,
@@ -343,7 +321,7 @@ func (b *Builder) GetTextPositionUser() (float64, float64) {
 
 // GetTextPositionDevice returns the current text position in device coordinates.
 func (b *Builder) GetTextPositionDevice() (float64, float64) {
-	p := &b.Param
+	p := b.State.GState
 	M := matrix.Matrix{
 		p.TextFontSize * p.TextHorizontalScaling, 0,
 		0, p.TextFontSize,

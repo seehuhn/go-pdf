@@ -63,7 +63,6 @@ type Image interface {
 // See PDF 32000-1:2008, 11.6.5 "Specifying soft masks".
 type SoftClip interface {
 	pdf.Embedder
-	IsSoftClip() bool
 	Equal(other SoftClip) bool
 }
 

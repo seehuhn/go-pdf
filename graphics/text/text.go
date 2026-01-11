@@ -70,7 +70,7 @@ func Show(b *builder.Builder, args ...any) {
 				b.TextNextLine()
 			}
 		case *wrap:
-			for line := range v.Lines(b.Param.TextFont.(font.Layouter), b.Param.TextFontSize) {
+			for line := range v.Lines(b.State.GState.TextFont.(font.Layouter), b.State.GState.TextFontSize) {
 				b.TextShowGlyphs(line)
 				if !leadingSet {
 					b.TextSecondLine(0, -leading)

@@ -28,8 +28,17 @@ import (
 	"seehuhn.de/go/pdf/property"
 )
 
-// PDF 2.0 sections: 14.2 7.8
-
+// Resources represents a PDF resource dictionary.
+//
+// A resource dictionary enumerates the named resources needed by operators
+// in a content stream and the names by which they can be referred to.
+// Operators in a content stream can only use direct objects as operands;
+// when an operator needs to refer to an external object (such as a font
+// dictionary or an image stream), it does so by name through this dictionary.
+//
+// The scope of resource names is local to a particular content stream.
+// Different content streams may use different names for the same resource,
+// or the same name for different resources.
 type Resources struct {
 	ExtGState  map[pdf.Name]*extgstate.ExtGState
 	ColorSpace map[pdf.Name]color.Space

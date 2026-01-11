@@ -72,63 +72,63 @@ func TestParameters(t *testing.T) {
 	// Now we read back the content stream and check that the final graphics
 	// state matches the expected values.
 	r := New(data)
-	r.Reset()
-	r.Resources = b.Resources
-	r.State.Set = 0
+	r.State = content.NewState(content.Page, b.Resources)
+	r.State.GState.Set = 0
 	err = r.ParseContentStream(buf)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	p := r.State.GState
 	// First check: the individual parameters are as we set them.
-	if r.State.LineWidth != 12.3 {
-		t.Errorf("LineWidth: got %v, want 12.3", r.State.LineWidth)
+	if p.LineWidth != 12.3 {
+		t.Errorf("LineWidth: got %v, want 12.3", p.LineWidth)
 	}
-	if r.State.LineCap != graphics.LineCapRound {
-		t.Errorf("LineCap: got %v, want %v", r.State.LineCap, graphics.LineCapRound)
+	if p.LineCap != graphics.LineCapRound {
+		t.Errorf("LineCap: got %v, want %v", p.LineCap, graphics.LineCapRound)
 	}
-	if r.State.LineJoin != graphics.LineJoinBevel {
-		t.Errorf("LineJoin: got %v, want %v", r.State.LineJoin, graphics.LineJoinBevel)
+	if p.LineJoin != graphics.LineJoinBevel {
+		t.Errorf("LineJoin: got %v, want %v", p.LineJoin, graphics.LineJoinBevel)
 	}
-	if r.State.MiterLimit != 4 {
-		t.Errorf("MiterLimit: got %v, want 4", r.State.MiterLimit)
+	if p.MiterLimit != 4 {
+		t.Errorf("MiterLimit: got %v, want 4", p.MiterLimit)
 	}
-	if d := cmp.Diff(r.State.DashPattern, []float64{5, 6, 7}); d != "" {
+	if d := cmp.Diff(p.DashPattern, []float64{5, 6, 7}); d != "" {
 		t.Errorf("DashPattern: %s", d)
 	}
-	if r.State.DashPhase != 8 {
-		t.Errorf("DashPhase: got %v, want 8", r.State.DashPhase)
+	if p.DashPhase != 8 {
+		t.Errorf("DashPhase: got %v, want 8", p.DashPhase)
 	}
-	if r.State.RenderingIntent != graphics.Perceptual {
-		t.Errorf("RenderingIntent: got %v, want %v", r.State.RenderingIntent, graphics.Perceptual)
+	if p.RenderingIntent != graphics.Perceptual {
+		t.Errorf("RenderingIntent: got %v, want %v", p.RenderingIntent, graphics.Perceptual)
 	}
-	if r.State.FlatnessTolerance != 10 {
-		t.Errorf("Flatness: got %v, want 10", r.State.FlatnessTolerance)
+	if p.FlatnessTolerance != 10 {
+		t.Errorf("Flatness: got %v, want 10", p.FlatnessTolerance)
 	}
-	if r.State.CTM != m {
-		t.Errorf("CTM: got %v, want %v", r.State.CTM, m)
+	if p.CTM != m {
+		t.Errorf("CTM: got %v, want %v", p.CTM, m)
 	}
-	if r.State.TextCharacterSpacing != 9 {
-		t.Errorf("Tc: got %v, want 9", r.State.TextCharacterSpacing)
+	if p.TextCharacterSpacing != 9 {
+		t.Errorf("Tc: got %v, want 9", p.TextCharacterSpacing)
 	}
-	if r.State.TextWordSpacing != 10 {
-		t.Errorf("Tw: got %v, want 10", r.State.TextWordSpacing)
+	if p.TextWordSpacing != 10 {
+		t.Errorf("Tw: got %v, want 10", p.TextWordSpacing)
 	}
-	if r.State.TextHorizontalScaling != 0.11 {
-		t.Errorf("Th: got %v, want 0.11", r.State.TextHorizontalScaling)
+	if p.TextHorizontalScaling != 0.11 {
+		t.Errorf("Th: got %v, want 0.11", p.TextHorizontalScaling)
 	}
-	if r.State.TextLeading != 12 {
-		t.Errorf("Tl: got %v, want 12", r.State.TextLeading)
+	if p.TextLeading != 12 {
+		t.Errorf("Tl: got %v, want 12", p.TextLeading)
 	}
 	// TODO(voss): compare the fonts
-	if r.State.TextFontSize != 14 {
-		t.Errorf("Font: got %v, %v, want %v, 14", r.State.TextFont, r.State.TextFontSize, testFont)
+	if p.TextFontSize != 14 {
+		t.Errorf("Font: got %v, %v, want %v, 14", p.TextFont, p.TextFontSize, testFont)
 	}
-	if r.State.TextRenderingMode != graphics.TextRenderingModeFillStrokeClip {
-		t.Errorf("TextRenderingMode: got %v, want %v", r.State.TextRenderingMode, graphics.TextRenderingModeFillStrokeClip)
+	if p.TextRenderingMode != graphics.TextRenderingModeFillStrokeClip {
+		t.Errorf("TextRenderingMode: got %v, want %v", p.TextRenderingMode, graphics.TextRenderingModeFillStrokeClip)
 	}
-	if r.State.TextRise != 15 {
-		t.Errorf("Tr: got %v, want 15", r.State.TextRise)
+	if p.TextRise != 15 {
+		t.Errorf("Tr: got %v, want 15", p.TextRise)
 	}
 
 	// Check that the expected bits are set
@@ -140,7 +140,7 @@ func TestParameters(t *testing.T) {
 
 	for b := state.Bits(1); b != 0; b <<= 1 {
 		if expectedBits&b != 0 {
-			if r.State.Set&b == 0 {
+			if r.State.GState.Set&b == 0 {
 				t.Errorf("State bit %s not set in reader but expected", b.Names())
 			}
 		}

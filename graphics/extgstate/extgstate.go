@@ -38,7 +38,7 @@ import (
 // ExtGState represents a combination of graphics state parameters. This
 // combination of parameters can then be set in a single command, using the
 // [Writer.SetExtGState] method.  The parameters here form a subset of the
-// parameters in the [graphics.Parameters] struct.  Parameters not present in the
+// parameters in the [graphics.State] struct.  Parameters not present in the
 // ExtGState struct, for example colors, cannot be controlled using an extended
 // graphics state.
 type ExtGState struct {

@@ -35,11 +35,7 @@ type Builder struct {
 	Resources *content.Resources
 	Stream    content.Stream
 	State     *content.State
-	Param     graphics.Parameters
 	Err       error
-
-	// paramStack holds saved Param values for q/Q operators.
-	paramStack []*graphics.Parameters
 
 	// resName tracks allocated resource names for deduplication
 	resName map[resKey]pdf.Name
@@ -75,8 +71,7 @@ func New(ct content.Type, res *content.Resources) *Builder {
 	b := &Builder{
 		contentType: ct,
 		Resources:   res,
-		State:       content.NewState(ct),
-		Param:       *graphics.NewState().Parameters,
+		State:       content.NewState(ct, res),
 		resName:     make(map[resKey]pdf.Name),
 	}
 
@@ -128,10 +123,8 @@ func (b *Builder) Close() error {
 // This allows generating multiple separate content streams that share resources.
 func (b *Builder) Reset() {
 	b.Stream = nil
-	b.State = content.NewState(b.contentType)
-	b.Param = *graphics.NewState().Parameters
+	b.State = content.NewState(b.contentType, b.Resources)
 	b.Err = nil
-	b.paramStack = nil
 }
 
 // emit appends an operator to the content stream and updates the graphics state.
@@ -154,8 +147,8 @@ func (b *Builder) emit(name content.OpName, args ...pdf.Object) {
 	b.Stream = append(b.Stream, op)
 }
 
-func (b *Builder) isKnown(bits state.Bits) bool {
-	return b.State.IsKnown(bits)
+func (b *Builder) isUsable(bits state.Bits) bool {
+	return b.State.IsUsable(bits)
 }
 
 func (b *Builder) isSet(bits state.Bits) bool {
@@ -247,8 +240,8 @@ func (b *Builder) getXObjectName(x graphics.XObject) pdf.Name {
 }
 
 func allocateName[T any](prefix pdf.Name, dict map[pdf.Name]T) pdf.Name {
-	// Start from len+1 and decrement to avoid quadratic complexity when
-	// allocating many resources: the first check usually succeeds.
+	// In normal sequential use, len(dict)+1 is always free (one iteration).
+	// Decrementing handles user-assigned names by filling gaps downward.
 	for k := len(dict) + 1; ; k-- {
 		name := pdf.Name(string(prefix) + strconv.Itoa(k))
 		if _, exists := dict[name]; !exists {

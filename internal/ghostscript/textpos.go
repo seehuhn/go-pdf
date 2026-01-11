@@ -51,7 +51,7 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 	// We adjust the marker to compensate for variations in the font metrics
 	// and font size, so that the marker is always the same size.
 	markerFontSize := 10.0
-	param := &r.Page.Param
+	param := r.Page.State.GState
 	M := matrix.Matrix{markerFontSize * param.TextHorizontalScaling, 0, 0, markerFontSize, 0, param.TextRise}
 	M = M.Mul(param.TextMatrix)
 	M = M.Mul(param.CTM)

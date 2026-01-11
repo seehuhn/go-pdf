@@ -59,10 +59,6 @@ type Mask struct {
 	TR pdf.Function
 }
 
-func (m *Mask) IsSoftClip() bool {
-	return true
-}
-
 // Embed implements the [pdf.Embedder] interface.
 func (m *Mask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out(), "soft mask", pdf.V1_4); err != nil {

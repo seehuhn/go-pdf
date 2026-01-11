@@ -72,7 +72,7 @@ func ExtractContent(x *pdf.Extractor, obj pdf.Object) (*Content, error) {
 	}
 	defer stm.Close()
 
-	operators, err := content.ReadStream(stm, pdf.GetVersion(x.R), content.Page)
+	operators, err := content.ReadStream(stm, pdf.GetVersion(x.R), content.Page, &content.Resources{})
 	if err != nil {
 		return nil, err
 	}

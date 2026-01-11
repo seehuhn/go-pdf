@@ -318,8 +318,7 @@ func TestGlyphWidths(t *testing.T) {
 		xxOut = append(xxOut, x)
 		return nil
 	}
-	in.Reset()
-	in.Resources = b.Resources
+	in.State = content.NewState(content.Page, b.Resources)
 	err = in.ParseContentStream(buf)
 	if err != nil {
 		t.Fatal(err)

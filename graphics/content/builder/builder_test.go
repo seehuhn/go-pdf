@@ -28,12 +28,12 @@ func TestBuilder_NewForContent(t *testing.T) {
 	b := New(content.Page, nil)
 
 	// Page: line width is Known (can elide)
-	if !b.State.IsKnown(state.LineWidth) {
+	if !b.State.IsSet(state.LineWidth) {
 		t.Error("Page: line width should be Known")
 	}
 
 	// Page: font is NOT Known
-	if b.State.IsKnown(state.TextFont) {
+	if b.State.IsSet(state.TextFont) {
 		t.Error("Page: font should not be Known")
 	}
 }
@@ -42,10 +42,10 @@ func TestBuilder_FormNoElision(t *testing.T) {
 	b := New(content.Form, nil)
 
 	// Form: line width is Set but not Known (cannot elide)
-	if !b.State.IsSet(state.LineWidth) {
+	if !b.State.IsUsable(state.LineWidth) {
 		t.Error("Form: line width should be Set")
 	}
-	if b.State.IsKnown(state.LineWidth) {
+	if b.State.IsSet(state.LineWidth) {
 		t.Error("Form: line width should not be Known")
 	}
 }

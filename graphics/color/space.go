@@ -168,7 +168,7 @@ func ExtractSpace(x *pdf.Extractor, desc pdf.Object) (Space, error) {
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "high value"))
 			break
-		} else if hiVal < 1 || hiVal > 255 {
+		} else if hiVal < 0 || hiVal > 255 {
 			d.MarkAsInvalid()
 			break
 		}

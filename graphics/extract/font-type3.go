@@ -77,6 +77,14 @@ func extractFontType3(x *pdf.Extractor, obj pdf.Object) (*dict.Type3, error) {
 	if err != nil {
 		return nil, pdf.Wrap(err, "CharProcs")
 	}
+
+	// Extract font-level resources (PDF spec 7.8: search order is glyph stream,
+	// then font dict, then page dict). We can access glyph and font resources here.
+	var fontRes *content.Resources
+	if fontDict["Resources"] != nil {
+		fontRes, _ = Resources(x, fontDict["Resources"])
+	}
+
 	v := pdf.GetVersion(x.R)
 	charProcs := make(map[pdf.Name]*dict.CharProc, len(charProcsDict))
 	for name, obj := range charProcsDict {
@@ -88,10 +96,22 @@ func extractFontType3(x *pdf.Extractor, obj pdf.Object) (*dict.Type3, error) {
 			continue
 		}
 
-		// Extract per-glyph resources if present
+		// Extract glyph resources per PDF spec 7.8 search order:
+		// 1. glyph stream dict, 2. font dict, 3. page dict (not available here)
+		// We track foundRes separately to store nil in CharProc when no resources were found.
 		var res *content.Resources
+		var foundRes *content.Resources
 		if stm.Dict["Resources"] != nil {
-			res, _ = Resources(x, stm.Dict["Resources"])
+			foundRes, _ = Resources(x, stm.Dict["Resources"])
+			res = foundRes
+		} else if fontRes != nil {
+			foundRes = fontRes
+			res = fontRes
+		} else {
+			// TODO(voss): ideally we should use page resources here per PDF spec 7.8,
+			// but we don't have access to the page context during font extraction.
+			res = &content.Resources{}
+			// foundRes stays nil - we didn't find actual resources
 		}
 
 		// Parse the content stream
@@ -99,7 +119,7 @@ func extractFontType3(x *pdf.Extractor, obj pdf.Object) (*dict.Type3, error) {
 		if err != nil {
 			continue // permissive
 		}
-		stream, err := content.ReadStream(body, v, content.Glyph)
+		stream, err := content.ReadStream(body, v, content.Glyph, res)
 		body.Close()
 		if err != nil {
 			continue // permissive
@@ -116,7 +136,7 @@ func extractFontType3(x *pdf.Extractor, obj pdf.Object) (*dict.Type3, error) {
 
 		charProcs[name] = &dict.CharProc{
 			Content:   stream,
-			Resources: res,
+			Resources: foundRes, // nil if no resources found in PDF
 		}
 	}
 	d.CharProcs = charProcs

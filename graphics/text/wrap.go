@@ -94,9 +94,14 @@ func (w *wrap) Lines(F font.Layouter, ptSize float64) iter.Seq[*font.GlyphSeq] {
 						return
 					}
 					startPos = breakPos + 1
+					// recalculate width for the new line (glyphs from startPos to i)
 					currentWidth = 0
+					for j := startPos; j <= i; j++ {
+						currentWidth += glyphs.Seq[j].Advance
+					}
+				} else {
+					currentWidth += g.Advance
 				}
-				currentWidth += g.Advance
 			}
 			// emit remaining text in this paragraph
 			if startPos < len(glyphs.Seq) {

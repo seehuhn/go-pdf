@@ -21,25 +21,16 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/state"
 )
 
 // State tracks graphics state during content stream building and writing.
 type State struct {
 	// Usable indicates which graphics parameters have usable values.
-	// If the corresponding Known bit is also set, a concrete value is available.
+	// If the corresponding GState.Set bit is also set, a concrete value is available.
 	// Otherwise, the value is inherited from the surrounding context.
 	Usable state.Bits
-
-	// Set indicates parameters with concrete values (subset of Usable).
-	Set state.Bits
-
-	// FromContext tracks which graphics parameters were used from inherited
-	// context. This is updated, every time a graphics operator uses a
-	// parameter which is not listed in Known.
-	//
-	// Commands like Stroke and Fill update this field.
-	FromContext state.Bits
 
 	// ColorOpsForbidden is set for uncolored Type 3 glyphs (d1) and
 	// uncolored tiling patterns (PaintType 2).
@@ -47,15 +38,6 @@ type State struct {
 
 	// CurrentObject is the current graphics object context.
 	CurrentObject Object
-
-	// Path closure tracking for conditional LineCap validation.
-	// AllSubpathsClosed is true if all completed subpaths in the current path are closed.
-	// ThisSubpathClosed is true if the current subpath is closed (or has no segments yet).
-	AllSubpathsClosed bool
-	ThisSubpathClosed bool
-
-	// HasNonEmptyDashPattern is true when a dash pattern with at least one element is active.
-	HasNonEmptyDashPattern bool
 
 	// MaxStackDepth tracks the highest nesting depth reached.
 	MaxStackDepth int
@@ -68,6 +50,12 @@ type State struct {
 
 	// compatibilityDepth counts BX/EX nesting for fast "inside compatibility" checks.
 	compatibilityDepth int
+
+	// GState holds the full graphics state parameters.
+	GState *graphics.State
+
+	// Resources is the resource dictionary for resolving named resources.
+	Resources *Resources
 }
 
 // pairType identifies a type of paired operator.
@@ -82,39 +70,42 @@ const (
 
 // savedState holds state saved by the q operator.
 type savedState struct {
-	Set                    state.Bits
-	Known                  state.Bits
-	AllSubpathsClosed      bool
-	ThisSubpathClosed      bool
-	HasNonEmptyDashPattern bool
+	Usable state.Bits
+	GState *graphics.State
 }
 
 // NewState creates a State initialized for the given content type.
-func NewState(ct Type) *State {
+// The res argument is mandatory and must not be nil.
+func NewState(ct Type, res *Resources) *State {
+	if res == nil {
+		panic("NewState: res must not be nil")
+	}
+
+	gstate := graphics.NewState()
 	s := &State{
-		CurrentObject:     ObjPage,
-		AllSubpathsClosed: true,
-		ThisSubpathClosed: true,
+		CurrentObject: ObjPage,
+		GState:        &gstate,
+		Resources:     res,
 	}
 
 	switch ct {
 	case Page:
 		// PDF-defined defaults are Set and Known, except font
 		s.Usable = initializedStateBits
-		s.Set = initializedStateBits
+		// GState.Set already has initializedStateBits from graphics.NewState()
 	case Form, PatternColored:
-		// All parameters inherited (Set but not Known)
+		// All parameters inherited (Usable but not Set)
 		s.Usable = state.AllBits
-		s.Set = 0
+		s.GState.Set = 0
 	case PatternUncolored:
-		// All parameters inherited (Set but not Known)
+		// All parameters inherited (Usable but not Set)
 		s.Usable = state.AllBits
-		s.Set = 0
+		s.GState.Set = 0
 		s.ColorOpsForbidden = true
 	case Glyph:
-		// All parameters inherited (Set but not Known)
+		// All parameters inherited (Usable but not Set)
 		s.Usable = state.AllBits
-		s.Set = 0
+		s.GState.Set = 0
 		s.CurrentObject = ObjType3Start
 	}
 
@@ -126,36 +117,21 @@ func NewState(ct Type) *State {
 // the text font and font size.
 const initializedStateBits = state.AllBits & ^state.TextFont
 
-// IsSet returns true if all specified parameters are Set.
-func (s *State) IsSet(bits state.Bits) bool {
+// IsUsable returns true if all specified parameters are known to have usable values.
+func (s *State) IsUsable(bits state.Bits) bool {
 	return s.Usable&bits == bits
 }
 
-// IsKnown returns true if all specified parameters are Known.
-func (s *State) IsKnown(bits state.Bits) bool {
-	return s.Set&bits == bits
-}
-
-// MarkAsSet records that parameters were set by a graphics operator.
-func (s *State) MarkAsSet(bits state.Bits) {
-	s.Usable |= bits
-	s.Set |= bits
-}
-
-// MarkAsUsed records that parameters were used by a graphics operator.
-func (s *State) MarkAsUsed(bits state.Bits) {
-	setUnknown := s.Usable &^ s.Set
-	s.FromContext |= bits & setUnknown
+// IsSet returns true if all specified parameters are set to known values.
+func (s *State) IsSet(bits state.Bits) bool {
+	return s.GState.Set&bits == bits
 }
 
 // Push saves the current graphics state (for the q operator).
 func (s *State) Push() error {
 	s.stack = append(s.stack, savedState{
-		Set:                    s.Usable,
-		Known:                  s.Set,
-		AllSubpathsClosed:      s.AllSubpathsClosed,
-		ThisSubpathClosed:      s.ThisSubpathClosed,
-		HasNonEmptyDashPattern: s.HasNonEmptyDashPattern,
+		Usable: s.Usable,
+		GState: s.GState.Clone(),
 	})
 	if len(s.stack) > s.MaxStackDepth {
 		s.MaxStackDepth = len(s.stack)
@@ -172,12 +148,8 @@ func (s *State) Pop() error {
 	saved := s.stack[len(s.stack)-1]
 	s.stack = s.stack[:len(s.stack)-1]
 
-	s.Usable = saved.Set
-	s.Set = saved.Known
-	s.AllSubpathsClosed = saved.AllSubpathsClosed
-	s.ThisSubpathClosed = saved.ThisSubpathClosed
-	s.HasNonEmptyDashPattern = saved.HasNonEmptyDashPattern
-	// Note: FromContext is NOT restored (cumulative across stream)
+	s.Usable = saved.Usable
+	s.GState = saved.GState
 
 	return nil
 }
@@ -200,7 +172,7 @@ func (s *State) TextEnd() error {
 	s.CurrentObject = ObjPage
 	// The text matrix does not persist between text objects (ISO 32000-2:2020, 9.4.1)
 	s.Usable &^= state.TextMatrix
-	s.Set &^= state.TextMatrix
+	s.GState.Set &^= state.TextMatrix
 	return nil
 }
 
@@ -260,7 +232,7 @@ func (s *State) ApplyOperator(name OpName, args []pdf.Object) error {
 		requires := info.Requires
 
 		// Conditional LineCap relaxation: not needed for closed paths without dashes
-		if isStrokeOp(name) && s.AllSubpathsClosed && !s.HasNonEmptyDashPattern {
+		if isStrokeOp(name) && s.GState.AllSubpathsClosed && len(s.GState.DashPattern) == 0 {
 			requires &^= state.LineCap
 		}
 
@@ -275,7 +247,7 @@ func (s *State) ApplyOperator(name OpName, args []pdf.Object) error {
 		// Update state bits
 		if info.Sets != 0 {
 			s.Usable |= info.Sets
-			s.Set |= info.Sets
+			s.GState.Set |= info.Sets
 		}
 	}
 
@@ -321,45 +293,40 @@ func (s *State) ApplyStateChanges(name OpName, args []pdf.Object) error {
 	// Path construction operators
 	case OpMoveTo:
 		// starting new subpath while current is open
-		if !s.ThisSubpathClosed {
-			s.AllSubpathsClosed = false
+		if !s.GState.ThisSubpathClosed {
+			s.GState.AllSubpathsClosed = false
 		}
-		s.ThisSubpathClosed = true // positioned but no segments yet
+		s.GState.ThisSubpathClosed = true // positioned but no segments yet
 	case OpRectangle:
 		// rectangle is always a closed subpath
-		if !s.ThisSubpathClosed {
-			s.AllSubpathsClosed = false
+		if !s.GState.ThisSubpathClosed {
+			s.GState.AllSubpathsClosed = false
 		}
-		s.ThisSubpathClosed = true
+		s.GState.ThisSubpathClosed = true
 	case OpLineTo, OpCurveTo, OpCurveToV, OpCurveToY:
-		s.ThisSubpathClosed = false
+		s.GState.ThisSubpathClosed = false
 	case OpClosePath:
-		s.ThisSubpathClosed = true
+		s.GState.ThisSubpathClosed = true
 
 	// Path painting operators reset path state
 	case OpStroke, OpCloseAndStroke, OpFill, OpFillCompat, OpFillEvenOdd,
 		OpFillAndStroke, OpFillAndStrokeEvenOdd, OpCloseFillAndStroke,
 		OpCloseFillAndStrokeEvenOdd, OpEndPath:
 		// finalize current subpath
-		if !s.ThisSubpathClosed {
-			s.AllSubpathsClosed = false
+		if !s.GState.ThisSubpathClosed {
+			s.GState.AllSubpathsClosed = false
 		}
 		// reset for next path
-		s.AllSubpathsClosed = true
-		s.ThisSubpathClosed = true
+		s.GState.AllSubpathsClosed = true
+		s.GState.ThisSubpathClosed = true
 
-	// Dash pattern tracking
-	case OpSetLineDash:
-		if len(args) > 0 {
-			if arr, ok := args[0].(pdf.Array); ok {
-				s.HasNonEmptyDashPattern = len(arr) > 0
-			}
-		}
+		// Note: DashPattern is updated in GState.DashPattern by applyOperatorToParams
 	}
 	if err != nil {
 		return err
 	}
 	s.applyTransition(name)
+	s.applyOperatorToParams(name, args)
 	return nil
 }
 

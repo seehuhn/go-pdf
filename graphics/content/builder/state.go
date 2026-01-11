@@ -32,10 +32,6 @@ import (
 //
 // This implements the PDF graphics operator "q".
 func (b *Builder) PushGraphicsState() {
-	if b.Err != nil {
-		return
-	}
-	b.paramStack = append(b.paramStack, b.Param.Clone())
 	b.emit(content.OpPushGraphicsState)
 }
 
@@ -43,15 +39,7 @@ func (b *Builder) PushGraphicsState() {
 //
 // This implements the PDF graphics operator "Q".
 func (b *Builder) PopGraphicsState() {
-	if b.Err != nil {
-		return
-	}
-	stackLen := len(b.paramStack)
 	b.emit(content.OpPopGraphicsState)
-	if b.Err == nil && stackLen > 0 {
-		b.Param = *b.paramStack[stackLen-1]
-		b.paramStack = b.paramStack[:stackLen-1]
-	}
 }
 
 // Transform applies a transformation matrix to the coordinate system.
@@ -61,7 +49,9 @@ func (b *Builder) PopGraphicsState() {
 //
 // This implements the PDF graphics operator "cm".
 func (b *Builder) Transform(m matrix.Matrix) {
-	b.Param.CTM = m.Mul(b.Param.CTM)
+	if b.Err != nil {
+		return
+	}
 	b.emit(content.OpTransform,
 		pdf.Number(m[0]), pdf.Number(m[1]),
 		pdf.Number(m[2]), pdf.Number(m[3]),
@@ -76,10 +66,9 @@ func (b *Builder) SetLineCap(cap graphics.LineCapStyle) {
 		b.Err = fmt.Errorf("SetLineCap: invalid line cap style %d", cap)
 		return
 	}
-	if b.isKnown(state.LineCap) && cap == b.Param.LineCap {
+	if b.isSet(state.LineCap) && cap == b.State.GState.LineCap {
 		return
 	}
-	b.Param.LineCap = cap
 	b.emit(content.OpSetLineCap, pdf.Integer(cap))
 }
 
@@ -91,10 +80,9 @@ func (b *Builder) SetLineJoin(join graphics.LineJoinStyle) {
 		b.Err = fmt.Errorf("SetLineJoin: invalid line join style %d", join)
 		return
 	}
-	if b.isKnown(state.LineJoin) && join == b.Param.LineJoin {
+	if b.isSet(state.LineJoin) && join == b.State.GState.LineJoin {
 		return
 	}
-	b.Param.LineJoin = join
 	b.emit(content.OpSetLineJoin, pdf.Integer(join))
 }
 
@@ -106,10 +94,9 @@ func (b *Builder) SetMiterLimit(limit float64) {
 		b.Err = fmt.Errorf("SetMiterLimit: invalid miter limit %f", limit)
 		return
 	}
-	if b.isKnown(state.MiterLimit) && nearlyEqual(limit, b.Param.MiterLimit) {
+	if b.isSet(state.MiterLimit) && nearlyEqual(limit, b.State.GState.MiterLimit) {
 		return
 	}
-	b.Param.MiterLimit = limit
 	b.emit(content.OpSetMiterLimit, pdf.Number(limit))
 }
 
@@ -117,14 +104,11 @@ func (b *Builder) SetMiterLimit(limit float64) {
 //
 // This implements the PDF graphics operator "d".
 func (b *Builder) SetLineDash(pattern []float64, phase float64) {
-	if b.isKnown(state.LineDash) &&
-		sliceNearlyEqual(pattern, b.Param.DashPattern) &&
-		nearlyEqual(phase, b.Param.DashPhase) {
+	if b.isSet(state.LineDash) &&
+		sliceNearlyEqual(pattern, b.State.GState.DashPattern) &&
+		nearlyEqual(phase, b.State.GState.DashPhase) {
 		return
 	}
-
-	b.Param.DashPattern = pattern
-	b.Param.DashPhase = phase
 
 	arr := make(pdf.Array, len(pattern))
 	for i, v := range pattern {
@@ -141,10 +125,9 @@ func (b *Builder) SetRenderingIntent(intent graphics.RenderingIntent) {
 		b.Err = err
 		return
 	}
-	if b.isKnown(state.RenderingIntent) && intent == b.Param.RenderingIntent {
+	if b.isSet(state.RenderingIntent) && intent == b.State.GState.RenderingIntent {
 		return
 	}
-	b.Param.RenderingIntent = intent
 	b.emit(content.OpSetRenderingIntent, pdf.Name(intent))
 }
 
@@ -156,10 +139,9 @@ func (b *Builder) SetFlatnessTolerance(flatness float64) {
 		b.Err = fmt.Errorf("SetFlatnessTolerance: invalid flatness tolerance %f", flatness)
 		return
 	}
-	if b.isKnown(state.FlatnessTolerance) && nearlyEqual(flatness, b.Param.FlatnessTolerance) {
+	if b.isSet(state.FlatnessTolerance) && nearlyEqual(flatness, b.State.GState.FlatnessTolerance) {
 		return
 	}
-	b.Param.FlatnessTolerance = flatness
 	b.emit(content.OpSetFlatnessTolerance, pdf.Number(flatness))
 }
 
@@ -171,10 +153,9 @@ func (b *Builder) SetLineWidth(width float64) {
 		b.Err = fmt.Errorf("SetLineWidth: negative width %f", width)
 		return
 	}
-	if b.isKnown(state.LineWidth) && nearlyEqual(width, b.Param.LineWidth) {
+	if b.isSet(state.LineWidth) && nearlyEqual(width, b.State.GState.LineWidth) {
 		return
 	}
-	b.Param.LineWidth = width
 	b.emit(content.OpSetLineWidth, pdf.Number(width))
 }
 
@@ -192,13 +173,8 @@ func (b *Builder) SetExtGState(gs *extgstate.ExtGState) {
 	}
 	name := b.getExtGStateName(gs)
 
-	// Apply the ExtGState to our State
-	// Use a temporary graphics.State to leverage ExtGState.ApplyTo
-	//
-	// TODO(voss): make this less ugly
-	tmp := graphics.State{Parameters: &b.Param, Set: b.State.Set}
-	gs.ApplyTo(&tmp)
-	b.State.Set = tmp.Set
+	// Apply the ExtGState to our GState
+	gs.ApplyTo(b.State.GState)
 
 	b.emit(content.OpSetExtGState, name)
 }

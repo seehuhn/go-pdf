@@ -16,7 +16,7 @@
 
 // Package graphics provides types and constants for PDF graphics operations.
 //
-// This package defines the graphics state types ([State], [Parameters]),
+// This package defines the graphics state type ([State]),
 // rendering constants ([LineCapStyle], [LineJoinStyle], [TextRenderingMode]),
 // and resource interfaces ([XObject], [Shading], [Image]).
 //

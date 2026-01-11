@@ -72,16 +72,17 @@ func (b *Builder) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 		return 0
 	}
 
-	if !b.isSet(state.TextFont | state.TextMatrix |
+	if !b.isUsable(state.TextFont | state.TextMatrix |
 		state.TextHorizontalScaling | state.TextRise) {
 		b.Err = errors.New("required text state not set")
 		return 0
 	}
 
-	E := b.Param.TextFont
+	E := b.State.GState.TextFont
 	layouter, ok := E.(font.Layouter)
 	if !ok {
-		panic("font does not implement Layouter")
+		b.Err = errors.New("font does not implement Layouter")
+		return 0
 	}
 
 	left := seq.Skip
@@ -115,13 +116,13 @@ func (b *Builder) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 
 	xActual := 0.0
 	xWanted := left
-	param := &b.Param
+	param := b.State.GState
 	if E.WritingMode() != 0 {
 		panic("vertical writing mode not implemented")
 	}
 	codec := layouter.Codec()
 	for _, g := range gg {
-		if !b.isSet(state.TextRise) || math.Abs(g.Rise-param.TextRise) > 1e-6 {
+		if !b.isUsable(state.TextRise) || math.Abs(g.Rise-param.TextRise) > 1e-6 {
 			flush()
 			b.TextSetRise(g.Rise)
 			if b.Err != nil {
@@ -165,7 +166,7 @@ func (b *Builder) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 		xActual += float64(xOffsetInt) / 1000 * param.TextFontSize * param.TextHorizontalScaling
 	}
 	flush()
-	b.Param.TextMatrix = matrix.Translate(xActual, 0).Mul(b.Param.TextMatrix)
+	b.State.GState.TextMatrix = matrix.Translate(xActual, 0).Mul(b.State.GState.TextMatrix)
 
 	return xActual
 }
@@ -185,13 +186,13 @@ func (b *Builder) TextLayout(seq *font.GlyphSeq, text string) *font.GlyphSeq {
 		return seq
 	}
 
-	layouter, ok := b.Param.TextFont.(font.Layouter)
+	layouter, ok := b.State.GState.TextFont.(font.Layouter)
 	if !ok {
 		b.Err = errors.New("no font set, or font does not support layout")
 		return seq
 	}
 
-	param := &b.Param
+	param := b.State.GState
 	T := font.NewTypesetter(layouter, param.TextFontSize)
 	T.SetCharacterSpacing(param.TextCharacterSpacing)
 	T.SetWordSpacing(param.TextWordSpacing)
@@ -211,17 +212,17 @@ func (b *Builder) TextGetQuadPoints(seq *font.GlyphSeq, padding float64) []vec.V
 	if seq == nil || len(seq.Seq) == 0 {
 		return nil
 	}
-	if !b.isSet(state.TextFont | state.TextMatrix) {
+	if !b.isUsable(state.TextFont | state.TextMatrix) {
 		return nil
 	}
 
 	// get bounding rectangle in PDF text space units
-	f, ok := b.Param.TextFont.(font.Layouter)
+	f, ok := b.State.GState.TextFont.(font.Layouter)
 	if !ok {
 		return nil
 	}
 	geom := f.GetGeometry()
-	size := b.Param.TextFontSize
+	size := b.State.GState.TextFontSize
 
 	height := geom.Ascent * size
 	depth := -geom.Descent * size
@@ -271,7 +272,7 @@ func (b *Builder) TextGetQuadPoints(seq *font.GlyphSeq, padding float64) []vec.V
 	}
 
 	// transform the bounding rectangle from text space to default user space
-	M := b.Param.TextMatrix.Mul(b.Param.CTM)
+	M := b.State.GState.TextMatrix.Mul(b.State.GState.CTM)
 	rectUser := make([]vec.Vec2, 4)
 	for i := range 4 {
 		x, y := M.Apply(rectText[2*i], rectText[2*i+1])

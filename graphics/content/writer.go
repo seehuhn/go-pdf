@@ -33,8 +33,11 @@ type Writer struct {
 
 // NewWriter creates a Writer for the given content type and PDF version.
 func NewWriter(v pdf.Version, ct Type, res *Resources) *Writer {
+	if res == nil {
+		res = &Resources{}
+	}
 	return &Writer{
-		state:   NewState(ct),
+		state:   NewState(ct, res),
 		version: v,
 		res:     res,
 	}
@@ -63,10 +66,8 @@ func (w *Writer) Validate(s Stream) error {
 		if err := w.state.ApplyOperator(op.Name, op.Args); err != nil {
 			return fmt.Errorf("operator %d (%s): %w", i, op.Name, err)
 		}
-		if w.res != nil {
-			if err := w.validateResources(op); err != nil {
-				return fmt.Errorf("operator %d (%s): %w", i, op.Name, err)
-			}
+		if err := w.validateResources(op); err != nil {
+			return fmt.Errorf("operator %d (%s): %w", i, op.Name, err)
 		}
 	}
 	return nil
@@ -144,7 +145,7 @@ func (w *Writer) validateResources(op Operator) error {
 				}
 				// Update state with what the ExtGState sets
 				w.state.Usable |= gs.Set
-				w.state.Set |= gs.Set
+				w.state.GState.Set |= gs.Set
 			}
 		}
 
