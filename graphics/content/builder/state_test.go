@@ -19,8 +19,8 @@ package builder
 import (
 	"testing"
 
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/state"
 )
 
@@ -37,7 +37,7 @@ func TestSliceNearlyEqual(t *testing.T) {
 func TestSetExtGState(t *testing.T) {
 	b := New(content.Page, nil)
 
-	gs := &graphics.ExtGState{
+	gs := &extgstate.ExtGState{
 		Set:       state.LineWidth | state.FillAlpha,
 		LineWidth: 5.0,
 		FillAlpha: 0.5,

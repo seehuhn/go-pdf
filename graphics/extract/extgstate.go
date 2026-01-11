@@ -21,13 +21,14 @@ import (
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/blend"
+	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/halftone"
 	"seehuhn.de/go/pdf/graphics/state"
 	"seehuhn.de/go/pdf/graphics/transfer"
 )
 
 // ExtGState extracts an extended graphics state from a PDF file.
-func ExtGState(x *pdf.Extractor, obj pdf.Object) (*graphics.ExtGState, error) {
+func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 	_, isIndirect := obj.(pdf.Reference)
 
 	dict, err := x.GetDictTyped(obj, "ExtGState")
@@ -35,7 +36,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*graphics.ExtGState, error) {
 		return nil, err
 	}
 
-	res := &graphics.ExtGState{}
+	res := &extgstate.ExtGState{}
 	var set state.Bits
 	var overprintFillSet bool
 	var bg1, bg2 pdf.Object

@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/standard"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
@@ -142,7 +143,7 @@ func TestTextExtractorActualText(t *testing.T) {
 		Text:      "replaced",
 		SingleUse: true,
 	}
-	mc := &builder.MarkedContent{
+	mc := &graphics.MarkedContent{
 		Tag:        "Span",
 		Properties: actualText,
 		Inline:     true,

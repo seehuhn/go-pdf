@@ -439,7 +439,7 @@ func (s *Type5) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// Create one buffer for all vertices
 	buf := make([]byte, (totalBits+7)/8)
-	var bufBytePos, bufBitsFree int = 0, 8
+	var bufBytePos, bufBitsFree = 0, 8
 
 	addBits := func(bits uint32, n int) {
 		for n > 0 {

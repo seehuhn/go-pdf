@@ -143,8 +143,8 @@ func (w *Writer) validateResources(op Operator) error {
 					return fmt.Errorf("ExtGState %q not in resources", name)
 				}
 				// Update state with what the ExtGState sets
+				w.state.Usable |= gs.Set
 				w.state.Set |= gs.Set
-				w.state.Known |= gs.Set
 			}
 		}
 

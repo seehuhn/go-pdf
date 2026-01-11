@@ -17,7 +17,6 @@
 package graphics
 
 import (
-	"errors"
 	"slices"
 
 	"seehuhn.de/go/geom/matrix"
@@ -28,7 +27,6 @@ import (
 	"seehuhn.de/go/pdf/graphics/halftone"
 	"seehuhn.de/go/pdf/graphics/state"
 	"seehuhn.de/go/pdf/graphics/transfer"
-	"seehuhn.de/go/pdf/property"
 )
 
 // Parameters collects all graphical parameters of the PDF processor.
@@ -37,58 +35,100 @@ import (
 type Parameters struct {
 	// CTM is the "current transformation matrix", which maps positions from
 	// user coordinates to device coordinates.
-	// (default: device-dependent)
 	CTM matrix.Matrix
 
-	StartX, StartY     float64 // the starting point of the current path
-	CurrentX, CurrentY float64 // the "current point"
-	AllSubpathsClosed  bool    // all subpaths of the current path are closed
-	ThisSubpathClosed  bool    // the current subpath is closed
-
+	// StrokeColor is the color used for stroking operations.
 	StrokeColor color.Color
-	FillColor   color.Color
 
-	// Text State parameters:
-	TextCharacterSpacing  float64 // character spacing (T_c)
-	TextWordSpacing       float64 // word spacing (T_w)
-	TextHorizontalScaling float64 // horizonal scaling (T_h, normal spacing = 1)
-	TextLeading           float64 // leading (T_l)
-	TextFont              font.Instance
-	TextFontSize          float64
-	TextRenderingMode     TextRenderingMode
-	TextRise              float64
-	TextKnockout          bool
+	// FillColor is the color used for filling and other non-stroking operations.
+	FillColor color.Color
 
-	// See https://github.com/pdf-association/pdf-issues/issues/368
-	TextMatrix     matrix.Matrix // reset at the start of each text object
-	TextLineMatrix matrix.Matrix // reset at the start of each text object
+	// TextCharacterSpacing is extra spacing between glyphs, in unscaled text space units.
+	TextCharacterSpacing float64
 
-	LineWidth   float64
-	LineCap     LineCapStyle
-	LineJoin    LineJoinStyle
-	MiterLimit  float64
+	// TextWordSpacing is extra spacing between words, in unscaled text space units.
+	TextWordSpacing float64
+
+	// TextHorizontalScaling is the horizontal scaling factor, where 1 means the natural width.
+	TextHorizontalScaling float64
+
+	// TextLeading is the vertical distance between baselines, in unscaled text space units.
+	TextLeading float64
+
+	// TextFont is the current font.
+	TextFont font.Instance
+
+	// TextFontSize is the size at which glyphs are rendered.
+	TextFontSize float64
+
+	// TextRenderingMode controls how glyphs are painted.
+	TextRenderingMode TextRenderingMode
+
+	// TextRise is the vertical offset for superscript/subscript, in unscaled text space units.
+	TextRise float64
+
+	// TextKnockout controls whether overlapping glyphs knock out or overprint.
+	TextKnockout bool
+
+	// TextMatrix is the text matrix, reset at the start of each text object.
+	TextMatrix matrix.Matrix
+
+	// TextLineMatrix is the text line matrix, reset at the start of each text object.
+	TextLineMatrix matrix.Matrix
+
+	// LineWidth is the thickness of stroked paths, in user space units.
+	LineWidth float64
+
+	// LineCap is the shape used at the ends of open stroked paths.
+	LineCap LineCapStyle
+
+	// LineJoin is the shape used at corners of stroked paths.
+	LineJoin LineJoinStyle
+
+	// MiterLimit is the maximum miter length to line width ratio for mitered joins.
+	MiterLimit float64
+
+	// DashPattern specifies the lengths of alternating dashes and gaps, in user space units.
 	DashPattern []float64
-	DashPhase   float64
 
+	// DashPhase is the distance into the dash pattern at which to start, in user space units.
+	DashPhase float64
+
+	// RenderingIntent specifies how CIE-based colors are converted to device colors.
 	RenderingIntent RenderingIntent
 
-	// StrokeAdjustment is a flag specifying whether to compensate for possible
-	// rasterization effects when stroking a path with a line width that is
-	// small relative to the pixel resolution of the output device.
+	// StrokeAdjustment controls whether to compensate for rasterization effects
+	// when stroking paths with small line widths.
 	StrokeAdjustment bool
 
-	BlendMode              blend.Mode
-	SoftMask               SoftClip
-	StrokeAlpha            float64
-	FillAlpha              float64
-	AlphaSourceFlag        bool
+	// BlendMode is the blend mode for the transparent imaging model.
+	BlendMode blend.Mode
+
+	// SoftMask specifies mask shape or opacity values for transparency.
+	SoftMask SoftClip
+
+	// StrokeAlpha is the constant opacity for stroking operations, from 0 to 1.
+	StrokeAlpha float64
+
+	// FillAlpha is the constant opacity for non-stroking operations, from 0 to 1.
+	FillAlpha float64
+
+	// AlphaSourceFlag specifies whether soft mask and alpha are interpreted
+	// as shape values (true) or opacity values (false).
+	AlphaSourceFlag bool
+
+	// BlackPointCompensation controls the black point compensation algorithm
+	// for CIE-based color conversions (PDF 2.0).
 	BlackPointCompensation pdf.Name
 
-	// The following parameters are device-dependent:
-
+	// OverprintStroke controls whether stroking in one colorant erases other colorants.
 	OverprintStroke bool
-	OverprintFill   bool // for PDF<1.3 this must equal OverprintStroke
-	OverprintMode   int  // for PDF<1.3 this must be 0
+
+	// OverprintFill controls whether filling in one colorant erases other colorants.
+	OverprintFill bool
+
+	// OverprintMode controls how zero values in DeviceCMYK are treated when overprinting.
+	OverprintMode int
 
 	// BlackGeneration specifies the black generation function to be used for
 	// color conversion from DeviceRGB to DeviceCMYK.  The value nil represents
@@ -100,26 +140,48 @@ type Parameters struct {
 	// represents the device-specific default function.
 	UndercolorRemoval pdf.Function
 
-	// TransferFunction represents the transfer functions for the individual
-	// color components.
+	// TransferFunction (deprecated in PDF 2.0) represents the transfer
+	// functions for the individual color components.
 	TransferFunction transfer.Functions
 
 	// Halftone specifies the halftone screen to be used.
 	// The value nil represents the device-dependent default halftone.
 	Halftone halftone.Halftone
 
-	HalftoneOriginX float64 //  https://github.com/pdf-association/pdf-issues/issues/260
+	// HalftoneOriginX (PDF 2.0) is the X coordinate of the halftone origin.
+	HalftoneOriginX float64
+
+	// HalftoneOriginY (PDF 2.0) is the Y coordinate of the halftone origin.
 	HalftoneOriginY float64
 
 	// FlatnessTolerance is a positive number specifying the precision with
-	// which curves are be rendered on the output device.  Smaller numbers give
-	// smoother curves, but also increase the amount of computation needed
-	// (default: 1).
+	// which curves are rendered on the output device, in device pixels.
+	// Smaller numbers give smoother curves, but also increase the amount of
+	// computation needed.
 	FlatnessTolerance float64
 
-	// SmoothnessTolerance is a number in the range 0 to 1 specifying the
-	// precision of smooth shading (default: device-dependent).
+	// SmoothnessTolerance controls the precision for rendering color
+	// gradients.  This is a number from 0 (accurate) to 1 (fast), as a
+	// fraction of the range of each color component.
 	SmoothnessTolerance float64
+
+	// StartX is the X coordinate of the current subpath's starting point, in user space.
+	StartX float64
+
+	// StartY is the Y coordinate of the current subpath's starting point, in user space.
+	StartY float64
+
+	// CurrentX is the X coordinate of the current point, in user space.
+	CurrentX float64
+
+	// CurrentY is the Y coordinate of the current point, in user space.
+	CurrentY float64
+
+	// AllSubpathsClosed is true if all subpaths of the current path are closed.
+	AllSubpathsClosed bool
+
+	// ThisSubpathClosed is true if the current subpath is closed.
+	ThisSubpathClosed bool
 }
 
 // Clone returns a shallow copy of the parameter vector.
@@ -130,12 +192,16 @@ func (p *Parameters) Clone() *Parameters {
 
 // State represents the graphics state of a PDF processor.
 type State struct {
+	// Parameters holds the actual graphics parameter values.
 	*Parameters
+
+	// Set indicates which parameters have been explicitly set.
 	Set state.Bits
 }
 
-// NewState returns a new graphics state with default values,
-// and a bit mask indicating which fields are set to their default values.
+// NewState returns a new graphics state with parameters initialized to
+// their default values as defined by the PDF specification. The returned
+// State's Set field indicates which parameters have been initialized.
 func NewState() State {
 	param := &Parameters{}
 
@@ -206,10 +272,8 @@ func (s *State) mustBeSet(bits state.Bits) error {
 	return state.ErrMissing(missing)
 }
 
-// CopyTo applies the graphics state parameters to the given state.
-//
-// TODO(voss): rename to MergeInto?
-func (s State) CopyTo(other *State) {
+// ApplyTo applies the graphics state parameters to the given state.
+func (s *State) ApplyTo(other *State) {
 	set := s.Set
 	other.Set |= set
 
@@ -294,7 +358,7 @@ func (s State) CopyTo(other *State) {
 }
 
 // GetTextPositionDevice returns the current text position in device coordinates.
-func (s State) GetTextPositionDevice() (float64, float64) {
+func (s *State) GetTextPositionDevice() (float64, float64) {
 	if err := s.mustBeSet(state.TextFont | state.TextMatrix | state.TextHorizontalScaling | state.TextRise); err != nil {
 		panic(err)
 	}
@@ -305,7 +369,7 @@ func (s State) GetTextPositionDevice() (float64, float64) {
 }
 
 // GetTextPositionUser returns the current text position in user coordinates.
-func (s State) GetTextPositionUser() (float64, float64) {
+func (s *State) GetTextPositionUser() (float64, float64) {
 	if err := s.mustBeSet(state.TextFont | state.TextMatrix | state.TextHorizontalScaling | state.TextRise); err != nil {
 		panic(err)
 	}
@@ -314,97 +378,14 @@ func (s State) GetTextPositionUser() (float64, float64) {
 	return M[4], M[5]
 }
 
-const (
-	// initializedStateBits lists the parameters which are initialized to
-	// their default values in [NewState].
-	initializedStateBits = state.StrokeColor | state.FillColor |
-		state.TextCharacterSpacing | state.TextWordSpacing |
-		state.TextHorizontalScaling | state.TextLeading | state.TextRenderingMode |
-		state.TextRise | state.TextKnockout | state.LineWidth | state.LineCap |
-		state.LineJoin | state.MiterLimit | state.LineDash | state.RenderingIntent |
-		state.StrokeAdjustment | state.BlendMode | state.SoftMask |
-		state.StrokeAlpha | state.FillAlpha | state.AlphaSourceFlag |
-		state.BlackPointCompensation | state.Overprint | state.OverprintMode |
-		state.FlatnessTolerance
-
-	// extGStateBits lists the graphical parameters which can be encoded in an
-	// ExtGState resource.
-	extGStateBits = state.TextFont | state.TextKnockout | state.LineWidth |
-		state.LineCap | state.LineJoin | state.MiterLimit | state.LineDash |
-		state.RenderingIntent | state.StrokeAdjustment | state.BlendMode |
-		state.SoftMask | state.StrokeAlpha | state.FillAlpha |
-		state.AlphaSourceFlag | state.BlackPointCompensation | state.Overprint |
-		state.OverprintMode | state.BlackGeneration | state.UndercolorRemoval |
-		state.TransferFunction | state.Halftone | state.HalftoneOrigin |
-		state.FlatnessTolerance | state.SmoothnessTolerance
-)
-
-// TextRenderingMode is the rendering mode for text.
-type TextRenderingMode uint8
-
-// Possible values for TextRenderingMode.
-// See section 9.3.6 of ISO 32000-2:2020.
-const (
-	TextRenderingModeFill TextRenderingMode = iota
-	TextRenderingModeStroke
-	TextRenderingModeFillStroke
-	TextRenderingModeInvisible
-	TextRenderingModeFillClip
-	TextRenderingModeStrokeClip
-	TextRenderingModeFillStrokeClip
-	TextRenderingModeClip
-)
-
-// LineCapStyle is the style of the end of a line.
-type LineCapStyle uint8
-
-// Possible values for LineCapStyle.
-// See section 8.4.3.3 of PDF 32000-1:2008.
-const (
-	LineCapButt   LineCapStyle = 0
-	LineCapRound  LineCapStyle = 1
-	LineCapSquare LineCapStyle = 2
-)
-
-// LineJoinStyle is the style of the corner of a line.
-type LineJoinStyle uint8
-
-// Possible values for LineJoinStyle.
-const (
-	LineJoinMiter LineJoinStyle = 0
-	LineJoinRound LineJoinStyle = 1
-	LineJoinBevel LineJoinStyle = 2
-)
-
-// A RenderingIntent specifies the PDF rendering intent.
-//
-// See section 8.6.5.8 of ISO 32000-2:2020.
-type RenderingIntent pdf.Name
-
-// The PDF standard rendering intents.
-const (
-	AbsoluteColorimetric RenderingIntent = "AbsoluteColorimetric"
-	RelativeColorimetric RenderingIntent = "RelativeColorimetric"
-	Saturation           RenderingIntent = "Saturation"
-	Perceptual           RenderingIntent = "Perceptual"
-)
-
-// MarkedContent represents a marked-content point or sequence.
-type MarkedContent struct {
-	// Tag specifies the role or significance of the point/sequence.
-	Tag pdf.Name
-
-	// Properties is an optional property list providing additional data.
-	// Set to nil for marked content without properties (MP/BMC operators).
-	Properties property.List
-
-	// Inline controls whether the property list is embedded inline in the
-	// content stream (true) or referenced via the Properties resource
-	// dictionary (false). Only relevant if Properties is not nil.
-	// Property lists can only be inlined if Properties.IsDirect() returns true.
-	Inline bool
-}
-
-// ErrNotDirect is returned when attempting to inline a property list
-// that cannot be embedded inline in the content stream.
-var ErrNotDirect = errors.New("property list cannot be inlined in content stream")
+// initializedStateBits lists the parameters which are initialized to
+// their default values in [NewState].
+const initializedStateBits = state.StrokeColor | state.FillColor |
+	state.TextCharacterSpacing | state.TextWordSpacing |
+	state.TextHorizontalScaling | state.TextLeading | state.TextRenderingMode |
+	state.TextRise | state.TextKnockout | state.LineWidth | state.LineCap |
+	state.LineJoin | state.MiterLimit | state.LineDash | state.RenderingIntent |
+	state.StrokeAdjustment | state.BlendMode | state.SoftMask |
+	state.StrokeAlpha | state.FillAlpha | state.AlphaSourceFlag |
+	state.BlackPointCompensation | state.Overprint | state.OverprintMode |
+	state.FlatnessTolerance

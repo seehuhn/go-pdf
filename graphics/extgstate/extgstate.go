@@ -14,7 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics
+// Package extgstate provides the ExtGState type for PDF extended graphics
+// state dictionaries.
+package extgstate
 
 import (
 	"errors"
@@ -24,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/function"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/blend"
 	"seehuhn.de/go/pdf/graphics/halftone"
 	"seehuhn.de/go/pdf/graphics/state"
@@ -35,32 +38,75 @@ import (
 // ExtGState represents a combination of graphics state parameters. This
 // combination of parameters can then be set in a single command, using the
 // [Writer.SetExtGState] method.  The parameters here form a subset of the
-// parameters in the [Parameters] struct.  Parameters not present in the
+// parameters in the [graphics.Parameters] struct.  Parameters not present in the
 // ExtGState struct, for example colors, cannot be controlled using an extended
 // graphics state.
 type ExtGState struct {
+	// Set indicates which parameters in this ExtGState are active.
 	Set state.Bits
 
-	TextFont               font.Instance
-	TextFontSize           float64
-	TextKnockout           bool
-	LineWidth              float64
-	LineCap                LineCapStyle
-	LineJoin               LineJoinStyle
-	MiterLimit             float64
-	DashPattern            []float64
-	DashPhase              float64
-	RenderingIntent        RenderingIntent
-	StrokeAdjustment       bool
-	BlendMode              blend.Mode
-	SoftMask               SoftClip
-	StrokeAlpha            float64
-	FillAlpha              float64
-	AlphaSourceFlag        bool
+	// TextFont is the current font.
+	TextFont font.Instance
+
+	// TextFontSize is the size at which glyphs are rendered.
+	TextFontSize float64
+
+	// TextKnockout controls whether overlapping glyphs knock out or overprint.
+	TextKnockout bool
+
+	// LineWidth is the thickness of stroked paths, in user space units.
+	LineWidth float64
+
+	// LineCap is the shape used at the ends of open stroked paths.
+	LineCap graphics.LineCapStyle
+
+	// LineJoin is the shape used at corners of stroked paths.
+	LineJoin graphics.LineJoinStyle
+
+	// MiterLimit is the maximum miter length to line width ratio for mitered joins.
+	MiterLimit float64
+
+	// DashPattern specifies the lengths of alternating dashes and gaps, in user space units.
+	DashPattern []float64
+
+	// DashPhase is the distance into the dash pattern at which to start, in user space units.
+	DashPhase float64
+
+	// RenderingIntent specifies how CIE-based colors are converted to device colors.
+	RenderingIntent graphics.RenderingIntent
+
+	// StrokeAdjustment controls whether to compensate for rasterization effects
+	// when stroking paths with small line widths.
+	StrokeAdjustment bool
+
+	// BlendMode is the blend mode for the transparent imaging model.
+	BlendMode blend.Mode
+
+	// SoftMask specifies mask shape or opacity values for transparency.
+	SoftMask graphics.SoftClip
+
+	// StrokeAlpha is the constant opacity for stroking operations, from 0 to 1.
+	StrokeAlpha float64
+
+	// FillAlpha is the constant opacity for non-stroking operations, from 0 to 1.
+	FillAlpha float64
+
+	// AlphaSourceFlag specifies whether soft mask and alpha are interpreted
+	// as shape values (true) or opacity values (false).
+	AlphaSourceFlag bool
+
+	// BlackPointCompensation controls the black point compensation algorithm
+	// for CIE-based color conversions (PDF 2.0).
 	BlackPointCompensation pdf.Name
-	OverprintStroke        bool
-	OverprintFill          bool // for PDF<1.3 this must equal OverprintStroke
-	OverprintMode          int  // for PDF<1.3 this must be 0
+
+	// OverprintStroke controls whether stroking in one colorant erases other colorants.
+	OverprintStroke bool
+
+	// OverprintFill controls whether filling in one colorant erases other colorants.
+	OverprintFill bool
+
+	// OverprintMode controls how zero values in DeviceCMYK are treated when overprinting.
+	OverprintMode int
 
 	// BlackGeneration specifies the black generation function to be used for
 	// color conversion from DeviceRGB to DeviceCMYK.  The value nil represents
@@ -72,26 +118,48 @@ type ExtGState struct {
 	// represents the device-specific default function.
 	UndercolorRemoval pdf.Function
 
-	// TransferFunction specifies the transfer functions for the color
-	// components.
-	TransferFunction transfer.Functions // deprecated in PDF 2.0
+	// TransferFunction (deprecated in PDF 2.0) represents the transfer
+	// functions for the individual color components.
+	TransferFunction transfer.Functions
 
 	// Halftone specifies the halftone screen to be used.
 	// The value nil represents the device-dependent default halftone.
 	Halftone halftone.Halftone
 
+	// HalftoneOriginX (PDF 2.0) is the X coordinate of the halftone origin.
 	HalftoneOriginX float64
+
+	// HalftoneOriginY (PDF 2.0) is the Y coordinate of the halftone origin.
 	HalftoneOriginY float64
 
-	FlatnessTolerance   float64
+	// FlatnessTolerance is a positive number specifying the precision with
+	// which curves are rendered on the output device, in device pixels.
+	// Smaller numbers give smoother curves, but also increase the amount of
+	// computation needed.
+	FlatnessTolerance float64
+
+	// SmoothnessTolerance controls the precision for rendering color
+	// gradients.  This is a number from 0 (accurate) to 1 (fast), as a
+	// fraction of the range of each color component.
 	SmoothnessTolerance float64
 
 	// SingleUse can be set if the extended graphics state is used only in a
-	// single content stream, in order to slightly reduce output file size.  In
+	// single content stream, in order to slightly reduce output file size. In
 	// this case, the graphics state is embedded in the corresponding resource
 	// dictionary, instead of being stored as an indirect object.
 	SingleUse bool
 }
+
+// extGStateBits lists the graphical parameters which can be encoded in an
+// ExtGState resource.
+var extGStateBits = state.TextFont | state.TextKnockout | state.LineWidth |
+	state.LineCap | state.LineJoin | state.MiterLimit | state.LineDash |
+	state.RenderingIntent | state.StrokeAdjustment | state.BlendMode |
+	state.SoftMask | state.StrokeAlpha | state.FillAlpha |
+	state.AlphaSourceFlag | state.BlackPointCompensation | state.Overprint |
+	state.OverprintMode | state.BlackGeneration | state.UndercolorRemoval |
+	state.TransferFunction | state.Halftone | state.HalftoneOrigin |
+	state.FlatnessTolerance | state.SmoothnessTolerance
 
 // Equal reports whether two ExtGState values are equal.
 func (e *ExtGState) Equal(other *ExtGState) bool {
@@ -530,85 +598,84 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 // ApplyTo modifies the given graphics state according to the parameters in
 // the extended graphics state.
-func (e *ExtGState) ApplyTo(s *State) {
+func (e *ExtGState) ApplyTo(s *graphics.State) {
 	set := e.Set
 	s.Set |= set
 
-	param := s.Parameters
 	if set&state.TextFont != 0 {
-		param.TextFont = e.TextFont
-		param.TextFontSize = e.TextFontSize
+		s.TextFont = e.TextFont
+		s.TextFontSize = e.TextFontSize
 	}
 	if set&state.TextKnockout != 0 {
-		param.TextKnockout = e.TextKnockout
+		s.TextKnockout = e.TextKnockout
 	}
 	if set&state.LineWidth != 0 {
-		param.LineWidth = e.LineWidth
+		s.LineWidth = e.LineWidth
 	}
 	if set&state.LineCap != 0 {
-		param.LineCap = e.LineCap
+		s.LineCap = e.LineCap
 	}
 	if set&state.LineJoin != 0 {
-		param.LineJoin = e.LineJoin
+		s.LineJoin = e.LineJoin
 	}
 	if set&state.MiterLimit != 0 {
-		param.MiterLimit = e.MiterLimit
+		s.MiterLimit = e.MiterLimit
 	}
 	if set&state.LineDash != 0 {
-		param.DashPattern = slices.Clone(e.DashPattern)
-		param.DashPhase = e.DashPhase
+		s.DashPattern = slices.Clone(e.DashPattern)
+		s.DashPhase = e.DashPhase
 	}
 	if set&state.RenderingIntent != 0 {
-		param.RenderingIntent = e.RenderingIntent
+		s.RenderingIntent = e.RenderingIntent
 	}
 	if set&state.StrokeAdjustment != 0 {
-		param.StrokeAdjustment = e.StrokeAdjustment
+		s.StrokeAdjustment = e.StrokeAdjustment
 	}
 	if set&state.BlendMode != 0 {
-		param.BlendMode = e.BlendMode
+		s.BlendMode = e.BlendMode
 	}
 	if set&state.SoftMask != 0 {
-		param.SoftMask = e.SoftMask
+		s.SoftMask = e.SoftMask
 	}
 	if set&state.StrokeAlpha != 0 {
-		param.StrokeAlpha = e.StrokeAlpha
+		s.StrokeAlpha = e.StrokeAlpha
 	}
 	if set&state.FillAlpha != 0 {
-		param.FillAlpha = e.FillAlpha
+		s.FillAlpha = e.FillAlpha
 	}
 	if set&state.AlphaSourceFlag != 0 {
-		param.AlphaSourceFlag = e.AlphaSourceFlag
+		s.AlphaSourceFlag = e.AlphaSourceFlag
 	}
 	if set&state.BlackPointCompensation != 0 {
-		param.BlackPointCompensation = e.BlackPointCompensation
+		s.BlackPointCompensation = e.BlackPointCompensation
 	}
 	if set&state.Overprint != 0 {
-		param.OverprintStroke = e.OverprintStroke
-		param.OverprintFill = e.OverprintFill
+		s.OverprintStroke = e.OverprintStroke
+		s.OverprintFill = e.OverprintFill
 	}
 	if set&state.OverprintMode != 0 {
-		param.OverprintMode = e.OverprintMode
+		s.OverprintMode = e.OverprintMode
 	}
 	if set&state.BlackGeneration != 0 {
-		param.BlackGeneration = e.BlackGeneration
+		s.BlackGeneration = e.BlackGeneration
 	}
 	if set&state.UndercolorRemoval != 0 {
-		param.UndercolorRemoval = e.UndercolorRemoval
+		s.UndercolorRemoval = e.UndercolorRemoval
 	}
 	if set&state.TransferFunction != 0 {
-		param.TransferFunction = e.TransferFunction
+		s.TransferFunction = e.TransferFunction
 	}
 	if set&state.Halftone != 0 {
-		param.Halftone = e.Halftone
+		s.Halftone = e.Halftone
 	}
 	if set&state.HalftoneOrigin != 0 {
-		param.HalftoneOriginX = e.HalftoneOriginX
-		param.HalftoneOriginY = e.HalftoneOriginY
+		s.HalftoneOriginX = e.HalftoneOriginX
+		s.HalftoneOriginY = e.HalftoneOriginY
 	}
 	if set&state.FlatnessTolerance != 0 {
-		param.FlatnessTolerance = e.FlatnessTolerance
+		s.FlatnessTolerance = e.FlatnessTolerance
 	}
 	if set&state.SmoothnessTolerance != 0 {
-		param.SmoothnessTolerance = e.SmoothnessTolerance
+		s.SmoothnessTolerance = e.SmoothnessTolerance
 	}
 }

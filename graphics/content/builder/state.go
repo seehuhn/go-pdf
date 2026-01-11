@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/state"
 )
 
@@ -185,7 +186,7 @@ func nearlyEqual(a, b float64) bool {
 // SetExtGState sets selected graphics state parameters.
 //
 // This implements the PDF graphics operator "gs".
-func (b *Builder) SetExtGState(gs *graphics.ExtGState) {
+func (b *Builder) SetExtGState(gs *extgstate.ExtGState) {
 	if b.Err != nil {
 		return
 	}
@@ -195,9 +196,9 @@ func (b *Builder) SetExtGState(gs *graphics.ExtGState) {
 	// Use a temporary graphics.State to leverage ExtGState.ApplyTo
 	//
 	// TODO(voss): make this less ugly
-	tmp := graphics.State{Parameters: &b.Param, Set: b.State.Known}
+	tmp := graphics.State{Parameters: &b.Param, Set: b.State.Set}
 	gs.ApplyTo(&tmp)
-	b.State.Known = tmp.Set
+	b.State.Set = tmp.Set
 
 	b.emit(content.OpSetExtGState, name)
 }

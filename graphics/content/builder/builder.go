@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/state"
 )
 
@@ -175,13 +176,13 @@ func (b *Builder) getColorSpaceName(cs color.Space) pdf.Name {
 	return name
 }
 
-func (b *Builder) getExtGStateName(gs *graphics.ExtGState) pdf.Name {
+func (b *Builder) getExtGStateName(gs *extgstate.ExtGState) pdf.Name {
 	key := resKey{resExtGState, gs}
 	if name, ok := b.resName[key]; ok {
 		return name
 	}
 	if b.Resources.ExtGState == nil {
-		b.Resources.ExtGState = make(map[pdf.Name]*graphics.ExtGState)
+		b.Resources.ExtGState = make(map[pdf.Name]*extgstate.ExtGState)
 	}
 	name := allocateName("E", b.Resources.ExtGState)
 	b.Resources.ExtGState[name] = gs

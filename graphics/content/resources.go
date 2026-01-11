@@ -24,13 +24,14 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/property"
 )
 
 // PDF 2.0 sections: 14.2 7.8
 
 type Resources struct {
-	ExtGState  map[pdf.Name]*graphics.ExtGState
+	ExtGState  map[pdf.Name]*extgstate.ExtGState
 	ColorSpace map[pdf.Name]color.Space
 	Pattern    map[pdf.Name]color.Pattern
 	Shading    map[pdf.Name]graphics.Shading
@@ -211,7 +212,7 @@ func (r *Resources) Equal(other *Resources) bool {
 	}
 	return r.SingleUse == other.SingleUse &&
 		r.ProcSet == other.ProcSet &&
-		maps.EqualFunc(r.ExtGState, other.ExtGState, (*graphics.ExtGState).Equal) &&
+		maps.EqualFunc(r.ExtGState, other.ExtGState, (*extgstate.ExtGState).Equal) &&
 		maps.EqualFunc(r.ColorSpace, other.ColorSpace, color.SpacesEqual) &&
 		haveSameKeys(r.Pattern, other.Pattern) &&
 		haveSameKeys(r.Shading, other.Shading) &&

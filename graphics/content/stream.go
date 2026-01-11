@@ -159,7 +159,7 @@ func ReadStream(r io.Reader, v pdf.Version, ct Type) (Stream, error) {
 			// skip operators whose required state is not set (e.g., text-showing
 			// operators when no font has been set)
 			info := operators[op.Name]
-			if info != nil && info.Requires&^state.Set != 0 {
+			if info != nil && info.Requires&^state.Usable != 0 {
 				continue
 			}
 
@@ -170,8 +170,8 @@ func ReadStream(r io.Reader, v pdf.Version, ct Type) (Stream, error) {
 
 			// update state bits for operators that set new state
 			if info != nil && info.Sets != 0 {
+				state.Usable |= info.Sets
 				state.Set |= info.Sets
-				state.Known |= info.Sets
 			}
 
 			stream = append(stream, op)

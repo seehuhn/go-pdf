@@ -318,7 +318,7 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	// Extract Alternates (alternates of alternates not allowed per spec)
 	if alts, err := pdf.Optional(x.GetArray(dict["Alternates"])); err != nil {
 		return nil, err
-	} else if alts != nil {
+	} else {
 		for i, altObj := range alts {
 			altDict, err := pdf.ExtractorGetOptional(x, altObj, ExtractDict)
 			if err != nil {

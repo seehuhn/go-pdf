@@ -26,13 +26,13 @@ import (
 
 // State tracks graphics state during content stream building and writing.
 type State struct {
-	// Set indicates which graphics parameters have usable values.
+	// Usable indicates which graphics parameters have usable values.
 	// If the corresponding Known bit is also set, a concrete value is available.
 	// Otherwise, the value is inherited from the surrounding context.
-	Set state.Bits
+	Usable state.Bits
 
-	// Known indicates parameters with concrete values (subset of Set).
-	Known state.Bits
+	// Set indicates parameters with concrete values (subset of Usable).
+	Set state.Bits
 
 	// FromContext tracks which graphics parameters were used from inherited
 	// context. This is updated, every time a graphics operator uses a
@@ -100,21 +100,21 @@ func NewState(ct Type) *State {
 	switch ct {
 	case Page:
 		// PDF-defined defaults are Set and Known, except font
+		s.Usable = initializedStateBits
 		s.Set = initializedStateBits
-		s.Known = initializedStateBits
 	case Form, PatternColored:
 		// All parameters inherited (Set but not Known)
-		s.Set = state.AllBits
-		s.Known = 0
+		s.Usable = state.AllBits
+		s.Set = 0
 	case PatternUncolored:
 		// All parameters inherited (Set but not Known)
-		s.Set = state.AllBits
-		s.Known = 0
+		s.Usable = state.AllBits
+		s.Set = 0
 		s.ColorOpsForbidden = true
 	case Glyph:
 		// All parameters inherited (Set but not Known)
-		s.Set = state.AllBits
-		s.Known = 0
+		s.Usable = state.AllBits
+		s.Set = 0
 		s.CurrentObject = ObjType3Start
 	}
 
@@ -128,31 +128,31 @@ const initializedStateBits = state.AllBits & ^state.TextFont
 
 // IsSet returns true if all specified parameters are Set.
 func (s *State) IsSet(bits state.Bits) bool {
-	return s.Set&bits == bits
+	return s.Usable&bits == bits
 }
 
 // IsKnown returns true if all specified parameters are Known.
 func (s *State) IsKnown(bits state.Bits) bool {
-	return s.Known&bits == bits
+	return s.Set&bits == bits
 }
 
 // MarkAsSet records that parameters were set by a graphics operator.
 func (s *State) MarkAsSet(bits state.Bits) {
+	s.Usable |= bits
 	s.Set |= bits
-	s.Known |= bits
 }
 
 // MarkAsUsed records that parameters were used by a graphics operator.
 func (s *State) MarkAsUsed(bits state.Bits) {
-	setUnknown := s.Set &^ s.Known
+	setUnknown := s.Usable &^ s.Set
 	s.FromContext |= bits & setUnknown
 }
 
 // Push saves the current graphics state (for the q operator).
 func (s *State) Push() error {
 	s.stack = append(s.stack, savedState{
-		Set:                    s.Set,
-		Known:                  s.Known,
+		Set:                    s.Usable,
+		Known:                  s.Set,
 		AllSubpathsClosed:      s.AllSubpathsClosed,
 		ThisSubpathClosed:      s.ThisSubpathClosed,
 		HasNonEmptyDashPattern: s.HasNonEmptyDashPattern,
@@ -172,8 +172,8 @@ func (s *State) Pop() error {
 	saved := s.stack[len(s.stack)-1]
 	s.stack = s.stack[:len(s.stack)-1]
 
-	s.Set = saved.Set
-	s.Known = saved.Known
+	s.Usable = saved.Set
+	s.Set = saved.Known
 	s.AllSubpathsClosed = saved.AllSubpathsClosed
 	s.ThisSubpathClosed = saved.ThisSubpathClosed
 	s.HasNonEmptyDashPattern = saved.HasNonEmptyDashPattern
@@ -199,8 +199,8 @@ func (s *State) TextEnd() error {
 	}
 	s.CurrentObject = ObjPage
 	// The text matrix does not persist between text objects (ISO 32000-2:2020, 9.4.1)
+	s.Usable &^= state.TextMatrix
 	s.Set &^= state.TextMatrix
-	s.Known &^= state.TextMatrix
 	return nil
 }
 
@@ -266,7 +266,7 @@ func (s *State) ApplyOperator(name OpName, args []pdf.Object) error {
 
 		// Validate requirements
 		if requires != 0 {
-			missing := requires &^ s.Set
+			missing := requires &^ s.Usable
 			if missing != 0 {
 				return fmt.Errorf("%s: required state not set: %v", name, missing)
 			}
@@ -274,8 +274,8 @@ func (s *State) ApplyOperator(name OpName, args []pdf.Object) error {
 
 		// Update state bits
 		if info.Sets != 0 {
+			s.Usable |= info.Sets
 			s.Set |= info.Sets
-			s.Known |= info.Sets
 		}
 	}
 

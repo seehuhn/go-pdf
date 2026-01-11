@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics_test
+package document_test
 
 import (
 	"fmt"
@@ -30,6 +30,36 @@ import (
 	"seehuhn.de/go/pdf/internal/fonttypes"
 	"seehuhn.de/go/pdf/internal/ghostscript"
 )
+
+// TestLineWidth checks that a vertical line of width 6 colours the correct
+// pixels.
+func TestLineWidth(t *testing.T) {
+	img := ghostscript.Render(t, 20, 5, pdf.V1_7, func(r *document.Page) error {
+		r.SetLineWidth(6.0)
+		r.MoveTo(10, 0)
+		r.LineTo(10, 5)
+		r.Stroke()
+		return nil
+	})
+
+	rect := img.Bounds()
+	for i := rect.Min.X; i < rect.Max.X; i++ {
+		for j := rect.Min.Y; j < rect.Max.Y; j++ {
+			r, g, b, a := img.At(i, j).RGBA()
+			if i >= 4*7 && i < 4*13 {
+				// should be black
+				if r != 0 || g != 0 || b != 0 || a != 0xffff {
+					t.Errorf("pixel (%d,%d) should be black, but is %d,%d,%d,%d", i, j, r, g, b, a)
+				}
+			} else {
+				// should be white
+				if r != 0xffff || g != 0xffff || b != 0xffff || a != 0xffff {
+					t.Errorf("pixel (%d,%d) should be white, but is %d,%d,%d,%d", i, j, r, g, b, a)
+				}
+			}
+		}
+	}
+}
 
 func TestTextPos(t *testing.T) {
 	for i, setup := range testcases.All {

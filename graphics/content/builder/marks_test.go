@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics_test
+package builder
 
 import (
 	"bytes"
@@ -23,8 +23,8 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
-	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/property"
 )
@@ -46,13 +46,13 @@ func TestMarkedContentInline(t *testing.T) {
 	var testCases = []TestCase{
 		{nil, "/test MP", nil},
 		{propDirect, "/test <</X 1>> DP", nil},
-		{propIndirect, "", builder.ErrNotDirect},
+		{propIndirect, "", ErrNotDirect},
 	}
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("test%02d", i), func(t *testing.T) {
-			b := builder.New(content.Page, nil)
-			mc := &builder.MarkedContent{
+			b := New(content.Page, nil)
+			mc := &graphics.MarkedContent{
 				Tag:        "test",
 				Properties: tc.Prop,
 				Inline:     true,

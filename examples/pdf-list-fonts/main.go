@@ -61,13 +61,12 @@ func doit(fname string) error {
 			return err
 		}
 
-		resources := &pdf.Resources{}
-		err = pdf.DecodeDict(r, resources, resourcesDict)
+		fontDict, err := pdf.GetDict(r, resourcesDict["Font"])
 		if err != nil {
 			return err
 		}
 
-		for _, font := range resources.Font {
+		for _, font := range fontDict {
 			fontRef, ok := font.(pdf.Reference)
 			if !ok {
 				fmt.Printf("funny font on page %d: %s\n", pageNo, pdf.AsString(font))

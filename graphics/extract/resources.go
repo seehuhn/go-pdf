@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/property"
 )
 
@@ -64,7 +65,7 @@ func Resources(x *pdf.Extractor, obj pdf.Object) (*content.Resources, error) {
 				continue // permissive
 			}
 			if res.ExtGState == nil {
-				res.ExtGState = make(map[pdf.Name]*graphics.ExtGState)
+				res.ExtGState = make(map[pdf.Name]*extgstate.ExtGState)
 			}
 			res.ExtGState[name] = gs
 		}

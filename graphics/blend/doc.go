@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2024  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,23 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics
-
-import "math"
-
-func nearlyEqual(a, b float64) bool {
-	const ε = 1e-6
-	return math.Abs(a-b) < ε
-}
-
-func sliceNearlyEqual(a, b []float64) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i, x := range a {
-		if !nearlyEqual(x, b[i]) {
-			return false
-		}
-	}
-	return true
-}
+// Package blend defines PDF blend modes for transparency compositing.
+// It supports all 16 standard blend modes from PDF section 11.3.5,
+// including Normal, Multiply, Screen, Overlay, and others.
+package blend

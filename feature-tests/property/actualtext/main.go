@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/pagetree"
@@ -137,7 +138,7 @@ func writeTestContent(b *builder.Builder, F font.Layouter) {
 	b.TextSetFont(F, 12)
 	b.TextShow("the ")
 
-	b.MarkedContentStart(&builder.MarkedContent{
+	b.MarkedContentStart(&graphics.MarkedContent{
 		Tag: "Span",
 		Properties: &property.ActualText{
 			Text:      "replaced",
@@ -160,7 +161,7 @@ func writeTestContent(b *builder.Builder, F font.Layouter) {
 	b.TextShow("some ")
 
 	// outer ActualText
-	b.MarkedContentStart(&builder.MarkedContent{
+	b.MarkedContentStart(&graphics.MarkedContent{
 		Tag: "Span",
 		Properties: &property.ActualText{
 			Text:      "replaced",
@@ -171,7 +172,7 @@ func writeTestContent(b *builder.Builder, F font.Layouter) {
 	b.TextShow("two-level ")
 
 	// inner ActualText (suppressed by outer)
-	b.MarkedContentStart(&builder.MarkedContent{
+	b.MarkedContentStart(&graphics.MarkedContent{
 		Tag: "Span",
 		Properties: &property.ActualText{
 			Text:      "inner",

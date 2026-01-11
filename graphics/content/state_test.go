@@ -27,18 +27,18 @@ func TestNewState_Page(t *testing.T) {
 
 	// Page: Set=initializedStateBits, Known=initializedStateBits
 	// Font is NOT in initializedStateBits
-	if s.Set&state.TextFont != 0 {
+	if s.Usable&state.TextFont != 0 {
 		t.Error("Page: font should be Unset")
 	}
-	if s.Known&state.TextFont != 0 {
+	if s.Set&state.TextFont != 0 {
 		t.Error("Page: font should not be Known")
 	}
 
 	// LineWidth should be Set and Known
-	if s.Set&state.LineWidth == 0 {
+	if s.Usable&state.LineWidth == 0 {
 		t.Error("Page: line width should be Set")
 	}
-	if s.Known&state.LineWidth == 0 {
+	if s.Set&state.LineWidth == 0 {
 		t.Error("Page: line width should be Known")
 	}
 }
@@ -47,11 +47,11 @@ func TestNewState_Form(t *testing.T) {
 	s := NewState(Form)
 
 	// Form: Set=AllStateBits, Known=0
-	if s.Set != state.AllBits {
-		t.Errorf("Form: Set = %v, want AllStateBits", s.Set)
+	if s.Usable != state.AllBits {
+		t.Errorf("Form: Set = %v, want AllStateBits", s.Usable)
 	}
-	if s.Known != 0 {
-		t.Errorf("Form: Known = %v, want 0", s.Known)
+	if s.Set != 0 {
+		t.Errorf("Form: Known = %v, want 0", s.Set)
 	}
 }
 
@@ -128,7 +128,7 @@ func TestState_PushPop(t *testing.T) {
 	}
 
 	// Modify Known bits
-	s.Known = 0
+	s.Set = 0
 
 	// Pop state
 	if err := s.Pop(); err != nil {

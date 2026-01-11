@@ -21,6 +21,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/extgstate"
 )
 
 // PDF 2.0 sections: 8.7.4.1
@@ -32,7 +33,7 @@ import (
 type Type2 struct {
 	Shading   graphics.Shading
 	Matrix    matrix.Matrix
-	ExtGState *graphics.ExtGState
+	ExtGState *extgstate.ExtGState
 
 	SingleUse bool
 }

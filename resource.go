@@ -69,13 +69,6 @@ func (e *EmbedHelper) Out() *Writer {
 	return e.rm.Out
 }
 
-// TODO(voss): remove this once it is no longer needed.
-//
-// Deprecated: this will go away.
-func (e *EmbedHelper) GetRM() *ResourceManager {
-	return e.rm
-}
-
 func (e *EmbedHelper) Defer(fn func(*EmbedHelper) error) {
 	e.rm.deferred = append(e.rm.deferred, fn)
 }

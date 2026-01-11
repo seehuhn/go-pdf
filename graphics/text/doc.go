@@ -14,16 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package graphics
-
-import "testing"
-
-func TestSliceNearlyEqual(t *testing.T) {
-	// Two identical slices should be equal.
-	a := []float64{1.0, 2.0, 3.0}
-	b := []float64{1.0, 2.0, 3.0}
-
-	if !sliceNearlyEqual(a, b) {
-		t.Errorf("sliceNearlyEqual(%v, %v) = false, want true", a, b)
-	}
-}
+// Package text provides helper functions for text output in PDF documents.
+// It includes the Show function for displaying formatted text with various
+// attributes, and Wrap for automatic line wrapping at specified widths.
+package text

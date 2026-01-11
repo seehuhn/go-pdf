@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font/extended"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/graphics/state"
 )
@@ -60,11 +61,11 @@ type Style struct {
 
 	// reset is used to set a default graphics state at the beginning of each
 	// appearance stream.
-	reset *graphics.ExtGState
+	reset *extgstate.ExtGState
 }
 
 func NewStyle() *Style {
-	reset := &graphics.ExtGState{
+	reset := &extgstate.ExtGState{
 		Set: state.TextKnockout |
 			state.LineCap |
 			state.LineJoin |

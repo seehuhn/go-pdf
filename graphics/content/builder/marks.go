@@ -20,31 +20,16 @@ import (
 	"errors"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/property"
 )
-
-// MarkedContent represents a marked-content point or sequence.
-type MarkedContent struct {
-	// Tag specifies the role or significance of the point/sequence.
-	Tag pdf.Name
-
-	// Properties is an optional property list providing additional data.
-	// Set to nil for marked content without properties (MP/BMC operators).
-	Properties property.List
-
-	// Inline controls whether the property list is embedded inline in the
-	// content stream (true) or referenced via the Properties resource
-	// dictionary (false). Only relevant if Properties is not nil.
-	// Property lists can only be inlined if IsDirect() returns true.
-	Inline bool
-}
 
 // MarkedContentPoint adds a marked-content point to the content stream.
 //
 // This implements the PDF graphics operators "MP" (without properties)
 // and "DP" (with properties).
-func (b *Builder) MarkedContentPoint(mc *MarkedContent) {
+func (b *Builder) MarkedContentPoint(mc *graphics.MarkedContent) {
 	if b.Err != nil {
 		return
 	}
@@ -65,7 +50,7 @@ func (b *Builder) MarkedContentPoint(mc *MarkedContent) {
 // terminated by a call to [Builder.MarkedContentEnd].
 //
 // This implements the PDF graphics operators "BMC" and "BDC".
-func (b *Builder) MarkedContentStart(mc *MarkedContent) {
+func (b *Builder) MarkedContentStart(mc *graphics.MarkedContent) {
 	if b.Err != nil {
 		return
 	}
@@ -88,7 +73,7 @@ func (b *Builder) MarkedContentEnd() {
 	b.emit(content.OpEndMarkedContent)
 }
 
-func (b *Builder) getProperties(mc *MarkedContent) pdf.Object {
+func (b *Builder) getProperties(mc *graphics.MarkedContent) pdf.Object {
 	if mc.Inline {
 		if !mc.Properties.IsDirect() {
 			b.Err = ErrNotDirect

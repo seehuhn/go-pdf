@@ -19,6 +19,7 @@ package graphics
 import (
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/property"
 )
 
 // Shading represents a PDF shading dictionary.
@@ -76,3 +77,70 @@ func IsImageMask(xobj XObject) bool {
 	}
 	return false
 }
+
+// MarkedContent represents a marked-content point or sequence.
+type MarkedContent struct {
+	// Tag specifies the role or significance of the point/sequence.
+	Tag pdf.Name
+
+	// Properties is an optional property list providing additional data.
+	// Set to nil for marked content without properties (MP/BMC operators).
+	Properties property.List
+
+	// Inline controls whether the property list is embedded inline in the
+	// content stream (true) or referenced via the Properties resource
+	// dictionary (false). Only relevant if Properties is not nil.
+	// Property lists can only be inlined if Properties.IsDirect() returns true.
+	Inline bool
+}
+
+// TextRenderingMode is the rendering mode for text.
+type TextRenderingMode uint8
+
+// Possible values for TextRenderingMode.
+// See section 9.3.6 of ISO 32000-2:2020.
+const (
+	TextRenderingModeFill TextRenderingMode = iota
+	TextRenderingModeStroke
+	TextRenderingModeFillStroke
+	TextRenderingModeInvisible
+	TextRenderingModeFillClip
+	TextRenderingModeStrokeClip
+	TextRenderingModeFillStrokeClip
+	TextRenderingModeClip
+)
+
+// LineCapStyle is the style of the end of a line.
+type LineCapStyle uint8
+
+// Possible values for LineCapStyle.
+// See section 8.4.3.3 of PDF 32000-1:2008.
+const (
+	LineCapButt   LineCapStyle = 0
+	LineCapRound  LineCapStyle = 1
+	LineCapSquare LineCapStyle = 2
+)
+
+// LineJoinStyle is the style of the corner of a line.
+type LineJoinStyle uint8
+
+// Possible values for LineJoinStyle.
+// See section 8.4.3.4 of PDF 32000-1:2008.
+const (
+	LineJoinMiter LineJoinStyle = 0
+	LineJoinRound LineJoinStyle = 1
+	LineJoinBevel LineJoinStyle = 2
+)
+
+// A RenderingIntent specifies the PDF rendering intent.
+//
+// See section 8.6.5.8 of ISO 32000-2:2020.
+type RenderingIntent pdf.Name
+
+// The PDF standard rendering intents.
+const (
+	AbsoluteColorimetric RenderingIntent = "AbsoluteColorimetric"
+	RelativeColorimetric RenderingIntent = "RelativeColorimetric"
+	Saturation           RenderingIntent = "Saturation"
+	Perceptual           RenderingIntent = "Perceptual"
+)
