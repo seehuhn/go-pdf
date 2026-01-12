@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
@@ -82,6 +83,40 @@ type Type5Vertex struct {
 // ShadingType implements the [Shading] interface.
 func (s *Type5) ShadingType() int {
 	return 5
+}
+
+// Equal implements the [Shading] interface.
+func (s *Type5) Equal(other graphics.Shading) bool {
+	if s == nil || other == nil {
+		return s == nil && other == nil
+	}
+	o, ok := other.(*Type5)
+	if !ok {
+		return false
+	}
+	return color.SpacesEqual(s.ColorSpace, o.ColorSpace) &&
+		s.BitsPerCoordinate == o.BitsPerCoordinate &&
+		s.BitsPerComponent == o.BitsPerComponent &&
+		s.VerticesPerRow == o.VerticesPerRow &&
+		slices.Equal(s.Decode, o.Decode) &&
+		type5VerticesEqual(s.Vertices, o.Vertices) &&
+		function.Equal(s.F, o.F) &&
+		slices.Equal(s.Background, o.Background) &&
+		s.BBox.Equal(o.BBox) &&
+		s.AntiAlias == o.AntiAlias
+}
+
+func type5VerticesEqual(a, b []Type5Vertex) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].X != b[i].X || a[i].Y != b[i].Y ||
+			!slices.Equal(a[i].Color, b[i].Color) {
+			return false
+		}
+	}
+	return true
 }
 
 // extractType5 reads a Type 5 (lattice-form Gouraud-shaded triangle mesh) shading from a PDF stream.

@@ -21,7 +21,8 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics/transfer"
+	"seehuhn.de/go/pdf/function"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 // isPrimaryColorant returns true if the colorant name is a primary
@@ -41,16 +42,16 @@ func isPrimaryColorant(name pdf.Name) bool {
 type Type5 struct {
 	// Default is the halftone for colorants without specific entries.
 	// Must not be Type 5. Required to have transfer function if nonprimary colorants exist.
-	Default Halftone
+	Default graphics.Halftone
 
 	// Colorants maps colorant names to their specific halftone dictionaries.
 	// Standard names include: "Cyan", "Magenta", "Yellow", "Black" (CMYK);
 	// "Red", "Green", "Blue" (RGB); "Gray" (DeviceGray).
 	// Spot colors use specific colorant names.
-	Colorants map[pdf.Name]Halftone
+	Colorants map[pdf.Name]graphics.Halftone
 }
 
-var _ Halftone = (*Type5)(nil)
+var _ graphics.Halftone = (*Type5)(nil)
 
 // extractType5 reads a Type 5 halftone from a PDF dictionary.
 func extractType5(x *pdf.Extractor, dict pdf.Dict) (*Type5, error) {
@@ -68,7 +69,7 @@ func extractType5(x *pdf.Extractor, dict pdf.Dict) (*Type5, error) {
 		return nil, pdf.Error("missing Default halftone")
 	}
 
-	h.Colorants = make(map[pdf.Name]Halftone)
+	h.Colorants = make(map[pdf.Name]graphics.Halftone)
 	for colorant, val := range dict {
 		switch colorant {
 		case "Type", "HalftoneType", "HalftoneName", "Default":
@@ -95,11 +96,11 @@ func extractType5(x *pdf.Extractor, dict pdf.Dict) (*Type5, error) {
 		}
 	}
 	if hasNonPrimaryColorants && h.Default.GetTransferFunction() == nil {
-		setTransferFunction(h.Default, transfer.Identity)
+		setTransferFunction(h.Default, function.Identity)
 	}
 	for colorant, ht := range h.Colorants {
 		if !isPrimaryColorant(colorant) && ht.GetTransferFunction() == nil {
-			setTransferFunction(ht, transfer.Identity)
+			setTransferFunction(ht, function.Identity)
 		}
 	}
 
@@ -107,7 +108,7 @@ func extractType5(x *pdf.Extractor, dict pdf.Dict) (*Type5, error) {
 }
 
 // setTransferFunction sets the transfer function on a halftone.
-func setTransferFunction(ht Halftone, tf pdf.Function) {
+func setTransferFunction(ht graphics.Halftone, tf pdf.Function) {
 	switch h := ht.(type) {
 	case *Type1:
 		h.TransferFunction = tf
@@ -192,13 +193,13 @@ func (h *Type5) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 }
 
 // HalftoneType returns 5.
-// This implements the [Halftone] interface.
+// This implements the [graphics.Halftone] interface.
 func (h *Type5) HalftoneType() int {
 	return 5
 }
 
 // GetTransferFunction returns nil.
-// This implements the [Halftone] interface.
+// This implements the [graphics.Halftone] interface.
 func (h *Type5) GetTransferFunction() pdf.Function {
 	return nil
 }

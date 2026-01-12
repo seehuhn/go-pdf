@@ -212,9 +212,8 @@ func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 // Equal compares two Resources for value equality.
 //
-// TODO(voss): Patterns, Shadings, and XObjects are currently ignored
-// in the comparison, as long as the same keys are present. Implement proper
-// equality checks for these types.
+// TODO(voss): XObjects are currently ignored in the comparison, as long as the
+// same keys are present. Implement proper equality checks for these types.
 func (r *Resources) Equal(other *Resources) bool {
 	if r == nil || other == nil || r == other {
 		return r == other
@@ -223,11 +222,25 @@ func (r *Resources) Equal(other *Resources) bool {
 		r.ProcSet == other.ProcSet &&
 		maps.EqualFunc(r.ExtGState, other.ExtGState, (*extgstate.ExtGState).Equal) &&
 		maps.EqualFunc(r.ColorSpace, other.ColorSpace, color.SpacesEqual) &&
-		haveSameKeys(r.Pattern, other.Pattern) &&
-		haveSameKeys(r.Shading, other.Shading) &&
+		maps.EqualFunc(r.Pattern, other.Pattern, patternsEqual) &&
+		maps.EqualFunc(r.Shading, other.Shading, shadingsEqual) &&
 		haveSameKeys(r.XObject, other.XObject) &&
 		maps.EqualFunc(r.Font, other.Font, font.InstancesEqual) &&
 		maps.EqualFunc(r.Properties, other.Properties, property.ListsEqual)
+}
+
+func patternsEqual(a, b color.Pattern) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.Equal(b)
+}
+
+func shadingsEqual(a, b graphics.Shading) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.Equal(b)
 }
 
 func haveSameKeys[Val pdf.Embedder](a, b map[pdf.Name]Val) bool {

@@ -24,7 +24,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
-	"seehuhn.de/go/pdf/graphics/state"
 )
 
 // Text Object Operators
@@ -49,7 +48,7 @@ func (b *Builder) TextEnd() {
 //
 // This implements the PDF graphics operator "Tc".
 func (b *Builder) TextSetCharacterSpacing(charSpacing float64) {
-	if b.isSet(state.TextCharacterSpacing) &&
+	if b.isSet(graphics.StateTextCharacterSpacing) &&
 		nearlyEqual(charSpacing, b.State.GState.TextCharacterSpacing) {
 		return
 	}
@@ -60,7 +59,7 @@ func (b *Builder) TextSetCharacterSpacing(charSpacing float64) {
 //
 // This implements the PDF graphics operator "Tw".
 func (b *Builder) TextSetWordSpacing(wordSpacing float64) {
-	if b.isSet(state.TextWordSpacing) &&
+	if b.isSet(graphics.StateTextWordSpacing) &&
 		nearlyEqual(wordSpacing, b.State.GState.TextWordSpacing) {
 		return
 	}
@@ -72,7 +71,7 @@ func (b *Builder) TextSetWordSpacing(wordSpacing float64) {
 //
 // This implements the PDF graphics operator "Tz".
 func (b *Builder) TextSetHorizontalScaling(scaling float64) {
-	if b.isSet(state.TextHorizontalScaling) &&
+	if b.isSet(graphics.StateTextHorizontalScaling) &&
 		nearlyEqual(scaling, b.State.GState.TextHorizontalScaling) {
 		return
 	}
@@ -84,7 +83,7 @@ func (b *Builder) TextSetHorizontalScaling(scaling float64) {
 //
 // This implements the PDF graphics operator "TL".
 func (b *Builder) TextSetLeading(leading float64) {
-	if b.isSet(state.TextLeading) &&
+	if b.isSet(graphics.StateTextLeading) &&
 		nearlyEqual(leading, b.State.GState.TextLeading) {
 		return
 	}
@@ -99,7 +98,7 @@ func (b *Builder) TextSetRenderingMode(mode graphics.TextRenderingMode) {
 		b.Err = fmt.Errorf("TextSetRenderingMode: invalid mode %d", mode)
 		return
 	}
-	if b.isSet(state.TextRenderingMode) &&
+	if b.isSet(graphics.StateTextRenderingMode) &&
 		mode == b.State.GState.TextRenderingMode {
 		return
 	}
@@ -110,7 +109,7 @@ func (b *Builder) TextSetRenderingMode(mode graphics.TextRenderingMode) {
 //
 // This implements the PDF graphics operator "Ts".
 func (b *Builder) TextSetRise(rise float64) {
-	if b.isSet(state.TextRise) &&
+	if b.isSet(graphics.StateTextRise) &&
 		nearlyEqual(rise, b.State.GState.TextRise) {
 		return
 	}
@@ -125,7 +124,7 @@ func (b *Builder) TextSetFont(f font.Instance, size float64) {
 		return
 	}
 
-	if b.isSet(state.TextFont) &&
+	if b.isSet(graphics.StateTextFont) &&
 		b.State.GState.TextFont == f &&
 		nearlyEqual(b.State.GState.TextFontSize, size) {
 		return

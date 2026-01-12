@@ -22,7 +22,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/graphics/state"
 )
 
 // State tracks graphics state during content stream building and writing.
@@ -30,7 +29,7 @@ type State struct {
 	// Usable indicates which graphics parameters have usable values.
 	// If the corresponding GState.Set bit is also set, a concrete value is available.
 	// Otherwise, the value is inherited from the surrounding context.
-	Usable state.Bits
+	Usable graphics.Bits
 
 	// ColorOpsForbidden is set for uncolored Type 3 glyphs (d1) and
 	// uncolored tiling patterns (PaintType 2).
@@ -70,7 +69,7 @@ const (
 
 // savedState holds state saved by the q operator.
 type savedState struct {
-	Usable state.Bits
+	Usable graphics.Bits
 	GState *graphics.State
 }
 
@@ -95,16 +94,21 @@ func NewState(ct Type, res *Resources) *State {
 		// GState.Set already has initializedStateBits from graphics.NewState()
 	case Form, PatternColored:
 		// All parameters inherited (Usable but not Set)
-		s.Usable = state.AllBits
+		s.Usable = graphics.AllBits
 		s.GState.Set = 0
+	case TransparencyGroup:
+		// Inherit all state, but reset blend mode, alpha constants, and soft mask
+		// to initial values (PDF 32000-1:2008, section 11.6.6).
+		s.Usable = graphics.AllBits
+		s.GState.Set = graphics.StateBlendMode | graphics.StateStrokeAlpha | graphics.StateFillAlpha | graphics.StateSoftMask
 	case PatternUncolored:
 		// All parameters inherited (Usable but not Set)
-		s.Usable = state.AllBits
+		s.Usable = graphics.AllBits
 		s.GState.Set = 0
 		s.ColorOpsForbidden = true
 	case Glyph:
 		// All parameters inherited (Usable but not Set)
-		s.Usable = state.AllBits
+		s.Usable = graphics.AllBits
 		s.GState.Set = 0
 		s.CurrentObject = ObjType3Start
 	}
@@ -115,15 +119,15 @@ func NewState(ct Type, res *Resources) *State {
 // initializedStateBits lists parameters where PDF defines initial values
 // at the start of a page content stream.  This includes all parameters except
 // the text font and font size.
-const initializedStateBits = state.AllBits & ^state.TextFont
+const initializedStateBits = graphics.AllBits & ^graphics.StateTextFont
 
 // IsUsable returns true if all specified parameters are known to have usable values.
-func (s *State) IsUsable(bits state.Bits) bool {
+func (s *State) IsUsable(bits graphics.Bits) bool {
 	return s.Usable&bits == bits
 }
 
 // IsSet returns true if all specified parameters are set to known values.
-func (s *State) IsSet(bits state.Bits) bool {
+func (s *State) IsSet(bits graphics.Bits) bool {
 	return s.GState.Set&bits == bits
 }
 
@@ -171,8 +175,8 @@ func (s *State) TextEnd() error {
 	}
 	s.CurrentObject = ObjPage
 	// The text matrix does not persist between text objects (ISO 32000-2:2020, 9.4.1)
-	s.Usable &^= state.TextMatrix
-	s.GState.Set &^= state.TextMatrix
+	s.Usable &^= graphics.StateTextMatrix
+	s.GState.Set &^= graphics.StateTextMatrix
 	return nil
 }
 
@@ -233,7 +237,7 @@ func (s *State) ApplyOperator(name OpName, args []pdf.Object) error {
 
 		// Conditional LineCap relaxation: not needed for closed paths without dashes
 		if isStrokeOp(name) && s.GState.AllSubpathsClosed && len(s.GState.DashPattern) == 0 {
-			requires &^= state.LineCap
+			requires &^= graphics.StateLineCap
 		}
 
 		// Validate requirements

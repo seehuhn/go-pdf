@@ -23,7 +23,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics/transfer"
+	"seehuhn.de/go/pdf/function"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
@@ -45,7 +46,7 @@ var testCases = map[int][]testCase{
 				Angle:            30.0,
 				SpotFunction:     Round,
 				AccurateScreens:  true,
-				TransferFunction: transfer.Identity,
+				TransferFunction: function.Identity,
 			},
 		},
 	},
@@ -57,9 +58,9 @@ var testCases = map[int][]testCase{
 					Frequency:        60.0,
 					Angle:            45.0,
 					SpotFunction:     SimpleDot,
-					TransferFunction: transfer.Identity,
+					TransferFunction: function.Identity,
 				},
-				Colorants: map[pdf.Name]Halftone{
+				Colorants: map[pdf.Name]graphics.Halftone{
 					"Cyan": &Type1{
 						Frequency:    72.0,
 						Angle:        15.0,
@@ -89,7 +90,7 @@ var testCases = map[int][]testCase{
 				Width:            2,
 				Height:           2,
 				ThresholdData:    []byte{0, 255, 127, 128},
-				TransferFunction: transfer.Identity,
+				TransferFunction: function.Identity,
 			},
 		},
 	},
@@ -108,7 +109,7 @@ var testCases = map[int][]testCase{
 				Size1:            2,
 				Size2:            1,
 				ThresholdData:    []byte{0, 255, 127, 128, 64},
-				TransferFunction: transfer.Identity,
+				TransferFunction: function.Identity,
 			},
 		},
 	},
@@ -137,7 +138,7 @@ var testCases = map[int][]testCase{
 				Width:            1,
 				Height:           1,
 				ThresholdData:    []uint16{32767},
-				TransferFunction: transfer.Identity,
+				TransferFunction: function.Identity,
 			},
 		},
 	},
@@ -145,7 +146,7 @@ var testCases = map[int][]testCase{
 
 type testCase struct {
 	name     string
-	halftone Halftone
+	halftone graphics.Halftone
 }
 
 func TestRoundTrip(t *testing.T) {
@@ -159,7 +160,7 @@ func TestRoundTrip(t *testing.T) {
 }
 
 // roundTripTest performs a round-trip test for any halftone type
-func roundTripTest(t *testing.T, originalHalftone Halftone) {
+func roundTripTest(t *testing.T, originalHalftone graphics.Halftone) {
 	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(buf)
 

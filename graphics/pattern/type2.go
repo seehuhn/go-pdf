@@ -52,6 +52,26 @@ func (p *Type2) PaintType() int {
 	return 1
 }
 
+// Equal implements the [color.Pattern] interface.
+func (p *Type2) Equal(other color.Pattern) bool {
+	if p == nil || other == nil {
+		return p == nil && other == nil
+	}
+	o, ok := other.(*Type2)
+	if !ok {
+		return false
+	}
+	if (p.Shading == nil) != (o.Shading == nil) {
+		return false
+	}
+	if p.Shading != nil && !p.Shading.Equal(o.Shading) {
+		return false
+	}
+	return p.Matrix == o.Matrix &&
+		p.ExtGState.Equal(o.ExtGState) &&
+		p.SingleUse == o.SingleUse
+}
+
 // Embed returns the pattern dictionary for the shading pattern.
 // This implements the [seehuhn.de/go/pdf/graphics/color.Pattern] interface.
 func (p *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {

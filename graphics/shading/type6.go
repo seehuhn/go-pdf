@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"slices"
 
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
@@ -90,6 +91,52 @@ type Type6Patch struct {
 // ShadingType implements the [Shading] interface.
 func (s *Type6) ShadingType() int {
 	return 6
+}
+
+// Equal implements the [Shading] interface.
+func (s *Type6) Equal(other graphics.Shading) bool {
+	if s == nil || other == nil {
+		return s == nil && other == nil
+	}
+	o, ok := other.(*Type6)
+	if !ok {
+		return false
+	}
+	return color.SpacesEqual(s.ColorSpace, o.ColorSpace) &&
+		s.BitsPerCoordinate == o.BitsPerCoordinate &&
+		s.BitsPerComponent == o.BitsPerComponent &&
+		s.BitsPerFlag == o.BitsPerFlag &&
+		slices.Equal(s.Decode, o.Decode) &&
+		type6PatchesEqual(s.Patches, o.Patches) &&
+		function.Equal(s.F, o.F) &&
+		slices.Equal(s.Background, o.Background) &&
+		s.BBox.Equal(o.BBox) &&
+		s.AntiAlias == o.AntiAlias
+}
+
+func type6PatchesEqual(a, b []Type6Patch) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].ControlPoints != b[i].ControlPoints || a[i].Flag != b[i].Flag ||
+			!cornerColorsEqual(a[i].CornerColors, b[i].CornerColors) {
+			return false
+		}
+	}
+	return true
+}
+
+func cornerColorsEqual(a, b [][]float64) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !slices.Equal(a[i], b[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 // EdgeConnection defines how a connected patch inherits data from the previous patch.

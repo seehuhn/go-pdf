@@ -21,7 +21,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/graphics/state"
 )
 
 // applyOperatorToParams updates the graphics state parameters based on the operator.
@@ -41,7 +40,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 	case OpSetLineWidth: // w
 		if w, ok := getNumber(args, 0); ok {
 			p.LineWidth = w
-			s.GState.Set |= state.LineWidth
+			s.GState.Set |= graphics.StateLineWidth
 		}
 
 	case OpSetLineCap: // J
@@ -52,7 +51,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 				cap = 2
 			}
 			p.LineCap = graphics.LineCapStyle(cap)
-			s.GState.Set |= state.LineCap
+			s.GState.Set |= graphics.StateLineCap
 		}
 
 	case OpSetLineJoin: // j
@@ -63,7 +62,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 				join = 2
 			}
 			p.LineJoin = graphics.LineJoinStyle(join)
-			s.GState.Set |= state.LineJoin
+			s.GState.Set |= graphics.StateLineJoin
 		}
 
 	case OpSetMiterLimit: // M
@@ -72,7 +71,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 				limit = 1
 			}
 			p.MiterLimit = limit
-			s.GState.Set |= state.MiterLimit
+			s.GState.Set |= graphics.StateMiterLimit
 		}
 
 	case OpSetLineDash: // d
@@ -82,7 +81,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 					if pat, dok := convertDashPattern(patArr); dok {
 						p.DashPattern = pat
 						p.DashPhase = phase
-						s.GState.Set |= state.LineDash
+						s.GState.Set |= graphics.StateLineDash
 					}
 				}
 			}
@@ -91,7 +90,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 	case OpSetRenderingIntent: // ri
 		if intent, ok := getName(args, 0); ok {
 			p.RenderingIntent = graphics.RenderingIntent(intent)
-			s.GState.Set |= state.RenderingIntent
+			s.GState.Set |= graphics.StateRenderingIntent
 		}
 
 	case OpSetFlatnessTolerance: // i
@@ -102,7 +101,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 				flatness = 100
 			}
 			p.FlatnessTolerance = flatness
-			s.GState.Set |= state.FlatnessTolerance
+			s.GState.Set |= graphics.StateFlatnessTolerance
 		}
 
 	case OpSetExtGState: // gs
@@ -120,7 +119,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 	case OpTextBegin: // BT
 		p.TextMatrix = matrix.Identity
 		p.TextLineMatrix = matrix.Identity
-		s.GState.Set |= state.TextMatrix
+		s.GState.Set |= graphics.StateTextMatrix
 
 	case OpTextEnd: // ET
 		// TextMatrix is cleared by ApplyStateChanges
@@ -130,25 +129,25 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 	case OpTextSetCharacterSpacing: // Tc
 		if cs, ok := getNumber(args, 0); ok {
 			p.TextCharacterSpacing = cs
-			s.GState.Set |= state.TextCharacterSpacing
+			s.GState.Set |= graphics.StateTextCharacterSpacing
 		}
 
 	case OpTextSetWordSpacing: // Tw
 		if ws, ok := getNumber(args, 0); ok {
 			p.TextWordSpacing = ws
-			s.GState.Set |= state.TextWordSpacing
+			s.GState.Set |= graphics.StateTextWordSpacing
 		}
 
 	case OpTextSetHorizontalScaling: // Tz
 		if scale, ok := getNumber(args, 0); ok {
 			p.TextHorizontalScaling = scale / 100
-			s.GState.Set |= state.TextHorizontalScaling
+			s.GState.Set |= graphics.StateTextHorizontalScaling
 		}
 
 	case OpTextSetLeading: // TL
 		if leading, ok := getNumber(args, 0); ok {
 			p.TextLeading = leading
-			s.GState.Set |= state.TextLeading
+			s.GState.Set |= graphics.StateTextLeading
 		}
 
 	case OpTextSetFont: // Tf
@@ -158,7 +157,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 			if F := s.Resources.Font[fontName]; F != nil {
 				p.TextFont = F
 				p.TextFontSize = size
-				s.GState.Set |= state.TextFont
+				s.GState.Set |= graphics.StateTextFont
 			}
 		}
 
@@ -170,13 +169,13 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 				mode = 7
 			}
 			p.TextRenderingMode = graphics.TextRenderingMode(mode)
-			s.GState.Set |= state.TextRenderingMode
+			s.GState.Set |= graphics.StateTextRenderingMode
 		}
 
 	case OpTextSetRise: // Ts
 		if rise, ok := getNumber(args, 0); ok {
 			p.TextRise = rise
-			s.GState.Set |= state.TextRise
+			s.GState.Set |= graphics.StateTextRise
 		}
 
 	// Text positioning operators (Table 106)
@@ -194,7 +193,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 		ty, ok2 := getNumber(args, 1)
 		if ok1 && ok2 {
 			p.TextLeading = -ty
-			s.GState.Set |= state.TextLeading
+			s.GState.Set |= graphics.StateTextLeading
 			p.TextLineMatrix = matrix.Translate(tx, ty).Mul(p.TextLineMatrix)
 			p.TextMatrix = p.TextLineMatrix
 		}
@@ -203,7 +202,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 		if m, ok := getMatrix(args); ok {
 			p.TextMatrix = m
 			p.TextLineMatrix = m
-			s.GState.Set |= state.TextMatrix
+			s.GState.Set |= graphics.StateTextMatrix
 		}
 
 	case OpTextNextLine: // T*
@@ -224,7 +223,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 		if ok1 && ok2 {
 			p.TextWordSpacing = aw
 			p.TextCharacterSpacing = ac
-			s.GState.Set |= state.TextWordSpacing | state.TextCharacterSpacing
+			s.GState.Set |= graphics.StateTextWordSpacing | graphics.StateTextCharacterSpacing
 			p.TextLineMatrix = matrix.Translate(0, -p.TextLeading).Mul(p.TextLineMatrix)
 			p.TextMatrix = p.TextLineMatrix
 		}
@@ -236,7 +235,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 			cs := s.getColorSpace(name)
 			if cs != nil {
 				p.StrokeColor = cs.Default()
-				s.GState.Set |= state.StrokeColor
+				s.GState.Set |= graphics.StateStrokeColor
 			}
 		}
 
@@ -245,30 +244,30 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 			cs := s.getColorSpace(name)
 			if cs != nil {
 				p.FillColor = cs.Default()
-				s.GState.Set |= state.FillColor
+				s.GState.Set |= graphics.StateFillColor
 			}
 		}
 
 	case OpSetStrokeColor, OpSetStrokeColorN: // SC, SCN
 		values, pat := s.parseColorArgs(args)
 		p.StrokeColor = color.SCN(p.StrokeColor, values, pat)
-		s.GState.Set |= state.StrokeColor
+		s.GState.Set |= graphics.StateStrokeColor
 
 	case OpSetFillColor, OpSetFillColorN: // sc, scn
 		values, pat := s.parseColorArgs(args)
 		p.FillColor = color.SCN(p.FillColor, values, pat)
-		s.GState.Set |= state.FillColor
+		s.GState.Set |= graphics.StateFillColor
 
 	case OpSetStrokeGray: // G
 		if gray, ok := getNumber(args, 0); ok {
 			p.StrokeColor = color.DeviceGray(gray)
-			s.GState.Set |= state.StrokeColor
+			s.GState.Set |= graphics.StateStrokeColor
 		}
 
 	case OpSetFillGray: // g
 		if gray, ok := getNumber(args, 0); ok {
 			p.FillColor = color.DeviceGray(gray)
-			s.GState.Set |= state.FillColor
+			s.GState.Set |= graphics.StateFillColor
 		}
 
 	case OpSetStrokeRGB: // RG
@@ -277,7 +276,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 		b, ok3 := getNumber(args, 2)
 		if ok1 && ok2 && ok3 {
 			p.StrokeColor = color.DeviceRGB{r, g, b}
-			s.GState.Set |= state.StrokeColor
+			s.GState.Set |= graphics.StateStrokeColor
 		}
 
 	case OpSetFillRGB: // rg
@@ -286,7 +285,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 		b, ok3 := getNumber(args, 2)
 		if ok1 && ok2 && ok3 {
 			p.FillColor = color.DeviceRGB{r, g, b}
-			s.GState.Set |= state.FillColor
+			s.GState.Set |= graphics.StateFillColor
 		}
 
 	case OpSetStrokeCMYK: // K
@@ -296,7 +295,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 		k, ok4 := getNumber(args, 3)
 		if ok1 && ok2 && ok3 && ok4 {
 			p.StrokeColor = color.DeviceCMYK{c, m, y, k}
-			s.GState.Set |= state.StrokeColor
+			s.GState.Set |= graphics.StateStrokeColor
 		}
 
 	case OpSetFillCMYK: // k
@@ -306,7 +305,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 		k, ok4 := getNumber(args, 3)
 		if ok1 && ok2 && ok3 && ok4 {
 			p.FillColor = color.DeviceCMYK{c, m, y, k}
-			s.GState.Set |= state.FillColor
+			s.GState.Set |= graphics.StateFillColor
 		}
 	}
 }

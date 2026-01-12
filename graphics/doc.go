@@ -14,12 +14,26 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package graphics provides types and constants for PDF graphics operations.
+// Package graphics provides the graphics state and supporting types for PDF
+// content streams.
 //
-// This package defines the graphics state type ([State]),
-// rendering constants ([LineCapStyle], [LineJoinStyle], [TextRenderingMode]),
-// and resource interfaces ([XObject], [Shading], [Image]).
+// # Content Streams and Graphics State
 //
-// To create PDF content streams, use the [seehuhn.de/go/pdf/graphics/content/builder]
-// package. For reading content streams, use the [seehuhn.de/go/pdf/reader] package.
+// PDF pages are described by content streams: sequences of operators that
+// paint text, graphics, and images onto the page. These operators work within
+// a graphics state - a collection of parameters that control appearance,
+// including the current transformation matrix, colors, line styles, and text
+// properties.
+//
+// The [State] type represents this complete graphics state as specified in
+// PDF 32000-1:2008 section 8.4. The package also provides rendering constants
+// ([LineCapStyle], [LineJoinStyle], [TextRenderingMode]) and interfaces for
+// some external objects that can be painted in content streams ([XObject],
+// [Shading], [Image]).
+//
+// # Related Packages
+//
+//   - [seehuhn.de/go/pdf/graphics/content/builder]: create content streams programmatically
+//   - [seehuhn.de/go/pdf/document]: high-level page creation
+//   - [seehuhn.de/go/pdf/reader]: read existing content streams
 package graphics

@@ -31,6 +31,9 @@ type Pattern interface {
 	// PaintType returns 1 for colored patterns and 2 for uncolored patterns.
 	PaintType() int
 
+	// Equal reports whether two patterns are equal.
+	Equal(other Pattern) bool
+
 	pdf.Embedder
 }
 

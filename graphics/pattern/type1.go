@@ -75,6 +75,24 @@ func (p *Type1) PaintType() int {
 	return 2
 }
 
+// Equal implements the [color.Pattern] interface.
+func (p *Type1) Equal(other color.Pattern) bool {
+	if p == nil || other == nil {
+		return p == nil && other == nil
+	}
+	o, ok := other.(*Type1)
+	if !ok {
+		return false
+	}
+	return p.TilingType == o.TilingType &&
+		p.BBox.Equal(o.BBox) &&
+		p.XStep == o.XStep && p.YStep == o.YStep &&
+		p.Matrix == o.Matrix &&
+		p.Color == o.Color &&
+		p.Content.Equal(o.Content) &&
+		p.Res.Equal(o.Res)
+}
+
 func (p *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if p.TilingType < 1 || p.TilingType > 3 {
 		return nil, fmt.Errorf("invalid tiling type: %d", p.TilingType)

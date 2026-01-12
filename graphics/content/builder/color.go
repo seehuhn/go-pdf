@@ -23,7 +23,6 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
-	"seehuhn.de/go/pdf/graphics/state"
 )
 
 // SetStrokeColor sets the color to use for stroking operations.
@@ -47,11 +46,11 @@ func (b *Builder) setColor(c color.Color, fill bool) {
 
 	var cur color.Color
 	if fill {
-		if b.isSet(state.FillColor) {
+		if b.isSet(graphics.StateFillColor) {
 			cur = b.State.GState.FillColor
 		}
 	} else {
-		if b.isSet(state.StrokeColor) {
+		if b.isSet(graphics.StateStrokeColor) {
 			cur = b.State.GState.StrokeColor
 		}
 	}

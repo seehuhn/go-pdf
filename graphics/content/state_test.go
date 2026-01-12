@@ -19,7 +19,7 @@ package content
 import (
 	"testing"
 
-	"seehuhn.de/go/pdf/graphics/state"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 func TestNewState_Page(t *testing.T) {
@@ -27,18 +27,18 @@ func TestNewState_Page(t *testing.T) {
 
 	// Page: Set=initializedStateBits, Known=initializedStateBits
 	// Font is NOT in initializedStateBits
-	if s.Usable&state.TextFont != 0 {
+	if s.Usable&graphics.StateTextFont != 0 {
 		t.Error("Page: font should be Unset")
 	}
-	if s.GState.Set&state.TextFont != 0 {
+	if s.GState.Set&graphics.StateTextFont != 0 {
 		t.Error("Page: font should not be Known")
 	}
 
 	// LineWidth should be Set and Known
-	if s.Usable&state.LineWidth == 0 {
+	if s.Usable&graphics.StateLineWidth == 0 {
 		t.Error("Page: line width should be Set")
 	}
-	if s.GState.Set&state.LineWidth == 0 {
+	if s.GState.Set&graphics.StateLineWidth == 0 {
 		t.Error("Page: line width should be Known")
 	}
 }
@@ -47,7 +47,7 @@ func TestNewState_Form(t *testing.T) {
 	s := NewState(Form, &Resources{})
 
 	// Form: Set=AllStateBits, Known=0
-	if s.Usable != state.AllBits {
+	if s.Usable != graphics.AllBits {
 		t.Errorf("Form: Set = %v, want AllStateBits", s.Usable)
 	}
 	if s.GState.Set != 0 {
@@ -59,12 +59,12 @@ func TestState_IsKnown(t *testing.T) {
 	s := NewState(Page, &Resources{})
 
 	// LineWidth is Known for Page
-	if !s.IsSet(state.LineWidth) {
+	if !s.IsSet(graphics.StateLineWidth) {
 		t.Error("line width should be Known")
 	}
 
 	// Font is not Known
-	if s.IsSet(state.TextFont) {
+	if s.IsSet(graphics.StateTextFont) {
 		t.Error("font should not be Known")
 	}
 }
@@ -73,10 +73,10 @@ func TestState_IsSet(t *testing.T) {
 	s := NewState(Form, &Resources{})
 
 	// Everything is Set for Form
-	if !s.IsUsable(state.LineWidth) {
+	if !s.IsUsable(graphics.StateLineWidth) {
 		t.Error("line width should be Set")
 	}
-	if !s.IsUsable(state.TextFont) {
+	if !s.IsUsable(graphics.StateTextFont) {
 		t.Error("font should be Set")
 	}
 }
@@ -84,8 +84,8 @@ func TestState_IsSet(t *testing.T) {
 func TestState_PushPop(t *testing.T) {
 	s := NewState(Form, &Resources{}) // Form has Set=All, Known=0
 
-	s.Usable |= state.LineWidth
-	s.GState.Set |= state.LineWidth
+	s.Usable |= graphics.StateLineWidth
+	s.GState.Set |= graphics.StateLineWidth
 
 	// Push state
 	if err := s.Push(); err != nil {
@@ -101,7 +101,7 @@ func TestState_PushPop(t *testing.T) {
 	}
 
 	// Known should be restored
-	if !s.IsSet(state.LineWidth) {
+	if !s.IsSet(graphics.StateLineWidth) {
 		t.Error("line width Known bit should be restored after Pop")
 	}
 }

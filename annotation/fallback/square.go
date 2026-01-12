@@ -18,11 +18,11 @@ package fallback
 
 import (
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/form"
-	"seehuhn.de/go/pdf/graphics/state"
 )
 
 func (s *Style) addSquareAppearance(a *annotation.Square) *form.Form {
@@ -54,7 +54,7 @@ func (s *Style) addSquareAppearance(a *annotation.Square) *form.Form {
 	b.SetExtGState(s.reset)
 	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
 		gs := &extgstate.ExtGState{
-			Set:         state.StrokeAlpha | state.FillAlpha,
+			Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
 			StrokeAlpha: 1 - a.StrokingTransparency,
 			FillAlpha:   1 - a.NonStrokingTransparency,
 			SingleUse:   true,

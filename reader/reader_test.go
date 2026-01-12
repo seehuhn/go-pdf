@@ -28,7 +28,6 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
-	"seehuhn.de/go/pdf/graphics/state"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
@@ -132,13 +131,13 @@ func TestParameters(t *testing.T) {
 	}
 
 	// Check that the expected bits are set
-	expectedBits := state.LineWidth | state.LineCap | state.LineJoin |
-		state.MiterLimit | state.LineDash | state.RenderingIntent |
-		state.FlatnessTolerance | state.TextCharacterSpacing |
-		state.TextWordSpacing | state.TextHorizontalScaling |
-		state.TextLeading | state.TextFont | state.TextRenderingMode | state.TextRise
+	expectedBits := graphics.StateLineWidth | graphics.StateLineCap | graphics.StateLineJoin |
+		graphics.StateMiterLimit | graphics.StateLineDash | graphics.StateRenderingIntent |
+		graphics.StateFlatnessTolerance | graphics.StateTextCharacterSpacing |
+		graphics.StateTextWordSpacing | graphics.StateTextHorizontalScaling |
+		graphics.StateTextLeading | graphics.StateTextFont | graphics.StateTextRenderingMode | graphics.StateTextRise
 
-	for b := state.Bits(1); b != 0; b <<= 1 {
+	for b := graphics.Bits(1); b != 0; b <<= 1 {
 		if expectedBits&b != 0 {
 			if r.State.GState.Set&b == 0 {
 				t.Errorf("State bit %s not set in reader but expected", b.Names())

@@ -67,9 +67,9 @@ func TestValues(t *testing.T) {
 	deviceN, _ := DeviceN([]pdf.Name{"a", "b"}, SpaceDeviceRGB, testDeviceNTransform(), nil)
 
 	tests := []struct {
-		name   string
-		color  Color
-		want   []float64
+		name  string
+		color Color
+		want  []float64
 	}{
 		{
 			name:  "DeviceGray",

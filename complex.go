@@ -315,6 +315,15 @@ func (r Rectangle) IsZero() bool {
 	return r.LLx == 0 && r.LLy == 0 && r.URx == 0 && r.URy == 0
 }
 
+// Equal reports whether two rectangles have identical coordinates.
+func (r *Rectangle) Equal(other *Rectangle) bool {
+	if r == nil || other == nil {
+		return r == other
+	}
+	return r.LLx == other.LLx && r.LLy == other.LLy &&
+		r.URx == other.URx && r.URy == other.URy
+}
+
 // NearlyEqual reports whether the corner coordinates of two rectangles
 // differ by less than `eps`.
 func (r *Rectangle) NearlyEqual(other *Rectangle, eps float64) bool {

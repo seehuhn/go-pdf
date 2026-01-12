@@ -275,3 +275,15 @@ func (f *Type2) Equal(other *Type2) bool {
 
 	return true
 }
+
+// Identity is the identity function f(x) = x for the domain [0, 1].
+// This sentinel value corresponds to the name /Identity in PDF dictionaries,
+// used for transfer functions (graphics state TR/TR2) and halftone
+// TransferFunction entries.
+var Identity = &Type2{
+	XMin: 0,
+	XMax: 1,
+	C0:   []float64{0},
+	C1:   []float64{1},
+	N:    1,
+}

@@ -19,6 +19,7 @@ package shading
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
@@ -85,6 +86,25 @@ var _ graphics.Shading = (*Type2)(nil)
 // ShadingType implements the [Shading] interface.
 func (s *Type2) ShadingType() int {
 	return 2
+}
+
+// Equal implements the [Shading] interface.
+func (s *Type2) Equal(other graphics.Shading) bool {
+	if s == nil || other == nil {
+		return s == nil && other == nil
+	}
+	o, ok := other.(*Type2)
+	if !ok {
+		return false
+	}
+	return color.SpacesEqual(s.ColorSpace, o.ColorSpace) &&
+		s.P0 == o.P0 && s.P1 == o.P1 &&
+		function.Equal(s.F, o.F) &&
+		s.TMin == o.TMin && s.TMax == o.TMax &&
+		s.ExtendStart == o.ExtendStart && s.ExtendEnd == o.ExtendEnd &&
+		slices.Equal(s.Background, o.Background) &&
+		s.BBox.Equal(o.BBox) &&
+		s.AntiAlias == o.AntiAlias
 }
 
 // extractType2 reads a Type 2 (axial) shading from a PDF dictionary.

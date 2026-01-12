@@ -29,7 +29,6 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/shading"
-	"seehuhn.de/go/pdf/graphics/state"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/property"
 )
@@ -48,7 +47,7 @@ func TestRoundTrip(t *testing.T) {
 			resource: &content.Resources{
 				ExtGState: map[pdf.Name]*extgstate.ExtGState{
 					"GS1": {
-						Set:       state.LineWidth,
+						Set:       graphics.StateLineWidth,
 						LineWidth: 2.0,
 					},
 				},
@@ -93,7 +92,7 @@ func TestRoundTrip(t *testing.T) {
 			resource: &content.Resources{
 				ExtGState: map[pdf.Name]*extgstate.ExtGState{
 					"GS1": {
-						Set:       state.LineWidth,
+						Set:       graphics.StateLineWidth,
 						LineWidth: 1.5,
 					},
 				},
@@ -623,7 +622,7 @@ func FuzzRoundTrip(f *testing.F) {
 			resource: &content.Resources{
 				ExtGState: map[pdf.Name]*extgstate.ExtGState{
 					"GS1": {
-						Set:       state.LineWidth,
+						Set:       graphics.StateLineWidth,
 						LineWidth: 1.5,
 					},
 				},

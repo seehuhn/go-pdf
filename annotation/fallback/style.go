@@ -28,7 +28,6 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/form"
-	"seehuhn.de/go/pdf/graphics/state"
 )
 
 // The following fields are ignored when an annotation has an appearance
@@ -66,12 +65,12 @@ type Style struct {
 
 func NewStyle() *Style {
 	reset := &extgstate.ExtGState{
-		Set: state.TextKnockout |
-			state.LineCap |
-			state.LineJoin |
-			state.MiterLimit |
-			state.LineDash |
-			state.StrokeAdjustment,
+		Set: graphics.StateTextKnockout |
+			graphics.StateLineCap |
+			graphics.StateLineJoin |
+			graphics.StateMiterLimit |
+			graphics.StateLineDash |
+			graphics.StateStrokeAdjustment,
 		TextKnockout:     false,
 		LineCap:          graphics.LineCapButt,
 		LineJoin:         graphics.LineJoinMiter,

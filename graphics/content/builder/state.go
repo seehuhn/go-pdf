@@ -25,7 +25,6 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/extgstate"
-	"seehuhn.de/go/pdf/graphics/state"
 )
 
 // PushGraphicsState saves the current graphics state.
@@ -66,7 +65,7 @@ func (b *Builder) SetLineCap(cap graphics.LineCapStyle) {
 		b.Err = fmt.Errorf("SetLineCap: invalid line cap style %d", cap)
 		return
 	}
-	if b.isSet(state.LineCap) && cap == b.State.GState.LineCap {
+	if b.isSet(graphics.StateLineCap) && cap == b.State.GState.LineCap {
 		return
 	}
 	b.emit(content.OpSetLineCap, pdf.Integer(cap))
@@ -80,7 +79,7 @@ func (b *Builder) SetLineJoin(join graphics.LineJoinStyle) {
 		b.Err = fmt.Errorf("SetLineJoin: invalid line join style %d", join)
 		return
 	}
-	if b.isSet(state.LineJoin) && join == b.State.GState.LineJoin {
+	if b.isSet(graphics.StateLineJoin) && join == b.State.GState.LineJoin {
 		return
 	}
 	b.emit(content.OpSetLineJoin, pdf.Integer(join))
@@ -94,7 +93,7 @@ func (b *Builder) SetMiterLimit(limit float64) {
 		b.Err = fmt.Errorf("SetMiterLimit: invalid miter limit %f", limit)
 		return
 	}
-	if b.isSet(state.MiterLimit) && nearlyEqual(limit, b.State.GState.MiterLimit) {
+	if b.isSet(graphics.StateMiterLimit) && nearlyEqual(limit, b.State.GState.MiterLimit) {
 		return
 	}
 	b.emit(content.OpSetMiterLimit, pdf.Number(limit))
@@ -104,7 +103,7 @@ func (b *Builder) SetMiterLimit(limit float64) {
 //
 // This implements the PDF graphics operator "d".
 func (b *Builder) SetLineDash(pattern []float64, phase float64) {
-	if b.isSet(state.LineDash) &&
+	if b.isSet(graphics.StateLineDash) &&
 		sliceNearlyEqual(pattern, b.State.GState.DashPattern) &&
 		nearlyEqual(phase, b.State.GState.DashPhase) {
 		return
@@ -125,7 +124,7 @@ func (b *Builder) SetRenderingIntent(intent graphics.RenderingIntent) {
 		b.Err = err
 		return
 	}
-	if b.isSet(state.RenderingIntent) && intent == b.State.GState.RenderingIntent {
+	if b.isSet(graphics.StateRenderingIntent) && intent == b.State.GState.RenderingIntent {
 		return
 	}
 	b.emit(content.OpSetRenderingIntent, pdf.Name(intent))
@@ -139,7 +138,7 @@ func (b *Builder) SetFlatnessTolerance(flatness float64) {
 		b.Err = fmt.Errorf("SetFlatnessTolerance: invalid flatness tolerance %f", flatness)
 		return
 	}
-	if b.isSet(state.FlatnessTolerance) && nearlyEqual(flatness, b.State.GState.FlatnessTolerance) {
+	if b.isSet(graphics.StateFlatnessTolerance) && nearlyEqual(flatness, b.State.GState.FlatnessTolerance) {
 		return
 	}
 	b.emit(content.OpSetFlatnessTolerance, pdf.Number(flatness))
@@ -153,7 +152,7 @@ func (b *Builder) SetLineWidth(width float64) {
 		b.Err = fmt.Errorf("SetLineWidth: negative width %f", width)
 		return
 	}
-	if b.isSet(state.LineWidth) && nearlyEqual(width, b.State.GState.LineWidth) {
+	if b.isSet(graphics.StateLineWidth) && nearlyEqual(width, b.State.GState.LineWidth) {
 		return
 	}
 	b.emit(content.OpSetLineWidth, pdf.Number(width))

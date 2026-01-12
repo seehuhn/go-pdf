@@ -22,14 +22,15 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/graphics/blend"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/graphics/halftone"
-	"seehuhn.de/go/pdf/graphics/state"
-	"seehuhn.de/go/pdf/graphics/transfer"
 )
 
-// State represents the graphics state of a PDF processor.
+// State represents the current graphics state of a PDF processor,
+// within a content stream.  When reading or writing content streams,
+// this is updated after each operator in the stream.
+//
+// Not all fields of State are required to be set at all times.
+// The bitmask State.Set indicates which fields are valid/used.
 type State struct {
 	// CTM is the "current transformation matrix", which maps positions from
 	// user coordinates to device coordinates.
@@ -100,7 +101,7 @@ type State struct {
 	StrokeAdjustment bool
 
 	// BlendMode is the blend mode for the transparent imaging model.
-	BlendMode blend.Mode
+	BlendMode BlendMode
 
 	// SoftMask specifies mask shape or opacity values for transparency.
 	SoftMask SoftClip
@@ -130,21 +131,21 @@ type State struct {
 
 	// BlackGeneration specifies the black generation function to be used for
 	// color conversion from DeviceRGB to DeviceCMYK.  The value nil represents
-	// the device-specific default function.
+	// a device-specific default function.
 	BlackGeneration pdf.Function
 
 	// UndercolorRemoval specifies the undercolor removal function to be used
 	// for color conversion from DeviceRGB to DeviceCMYK.  The value nil
-	// represents the device-specific default function.
+	// represents a device-specific default function.
 	UndercolorRemoval pdf.Function
 
-	// TransferFunction (deprecated in PDF 2.0) represents the transfer
+	// TransferFunctions (deprecated in PDF 2.0) represents the transfer
 	// functions for the individual color components.
-	TransferFunction transfer.Functions
+	TransferFunctions TransferFunctions
 
 	// Halftone specifies the halftone screen to be used.
 	// The value nil represents the device-dependent default halftone.
-	Halftone halftone.Halftone
+	Halftone Halftone
 
 	// HalftoneOriginX (PDF 2.0) is the X coordinate of the halftone origin.
 	HalftoneOriginX float64
@@ -164,7 +165,7 @@ type State struct {
 	SmoothnessTolerance float64
 
 	// Set indicates which of the parameters above are valid/used.
-	Set state.Bits
+	Set Bits
 
 	// StartX is the X coordinate of the current subpath's starting point, in user space.
 	StartX float64
@@ -193,14 +194,11 @@ func (s *State) Clone() *State {
 }
 
 // NewState returns a new graphics state with parameters initialized to
-// their default values as defined by the PDF specification. The returned
-// State's Set field indicates which parameters have been initialized.
+// their default values for page content streams, as defined in PDF 32000-1:2008
+// Tables 51 and 52.
 func NewState() State {
 	return State{
 		CTM: matrix.Identity,
-
-		AllSubpathsClosed: true,
-		ThisSubpathClosed: true,
 
 		StrokeColor: color.Black,
 		FillColor:   color.Black,
@@ -226,7 +224,7 @@ func NewState() State {
 
 		RenderingIntent:        RelativeColorimetric,
 		StrokeAdjustment:       false,
-		BlendMode:              blend.Mode{blend.ModeNormal},
+		BlendMode:              BlendMode{BlendModeNormal},
 		SoftMask:               nil,
 		StrokeAlpha:            1,
 		FillAlpha:              1,
@@ -239,7 +237,7 @@ func NewState() State {
 
 		BlackGeneration:   nil, // default: device dependent
 		UndercolorRemoval: nil, // default: device dependent
-		TransferFunction: transfer.Functions{
+		TransferFunctions: TransferFunctions{
 			Red:   nil, // default: device dependent
 			Green: nil, // default: device dependent
 			Blue:  nil, // default: device dependent
@@ -254,103 +252,110 @@ func NewState() State {
 		// SmoothnessTolerance: 0, // default: device dependent
 
 		Set: initializedStateBits,
+
+		AllSubpathsClosed: true,
+		ThisSubpathClosed: true,
 	}
 }
 
-func (s *State) mustBeSet(bits state.Bits) error {
-	missing := ^s.Set & bits
-	if missing == 0 {
-		return nil
-	}
-	return state.ErrMissing(missing)
-}
+// initializedStateBits lists the parameters which are initialized to
+// their default values in [NewState].
+const initializedStateBits = StateStrokeColor | StateFillColor |
+	StateTextCharacterSpacing | StateTextWordSpacing |
+	StateTextHorizontalScaling | StateTextLeading | StateTextRenderingMode |
+	StateTextRise | StateTextKnockout | StateLineWidth | StateLineCap |
+	StateLineJoin | StateMiterLimit | StateLineDash | StateRenderingIntent |
+	StateStrokeAdjustment | StateBlendMode | StateSoftMask |
+	StateStrokeAlpha | StateFillAlpha | StateAlphaSourceFlag |
+	StateBlackPointCompensation | StateOverprint | StateOverprintMode |
+	StateFlatnessTolerance
 
 // ApplyTo applies the graphics state parameters to the given state.
 func (s *State) ApplyTo(other *State) {
 	set := s.Set
 	other.Set |= set
 
-	if set&state.TextFont != 0 {
+	if set&StateTextFont != 0 {
 		other.TextFont = s.TextFont
 		other.TextFontSize = s.TextFontSize
 	}
-	if set&state.TextKnockout != 0 {
+	if set&StateTextKnockout != 0 {
 		other.TextKnockout = s.TextKnockout
 	}
-	if set&state.LineWidth != 0 {
+	if set&StateLineWidth != 0 {
 		other.LineWidth = s.LineWidth
 	}
-	if set&state.LineCap != 0 {
+	if set&StateLineCap != 0 {
 		other.LineCap = s.LineCap
 	}
-	if set&state.LineJoin != 0 {
+	if set&StateLineJoin != 0 {
 		other.LineJoin = s.LineJoin
 	}
-	if set&state.MiterLimit != 0 {
+	if set&StateMiterLimit != 0 {
 		other.MiterLimit = s.MiterLimit
 	}
-	if set&state.LineDash != 0 {
+	if set&StateLineDash != 0 {
 		other.DashPattern = slices.Clone(s.DashPattern)
 		other.DashPhase = s.DashPhase
 	}
-	if set&state.RenderingIntent != 0 {
+	if set&StateRenderingIntent != 0 {
 		other.RenderingIntent = s.RenderingIntent
 	}
-	if set&state.StrokeAdjustment != 0 {
+	if set&StateStrokeAdjustment != 0 {
 		other.StrokeAdjustment = s.StrokeAdjustment
 	}
-	if set&state.BlendMode != 0 {
+	if set&StateBlendMode != 0 {
 		other.BlendMode = s.BlendMode
 	}
-	if set&state.SoftMask != 0 {
+	if set&StateSoftMask != 0 {
 		other.SoftMask = s.SoftMask
 	}
-	if set&state.StrokeAlpha != 0 {
+	if set&StateStrokeAlpha != 0 {
 		other.StrokeAlpha = s.StrokeAlpha
 	}
-	if set&state.FillAlpha != 0 {
+	if set&StateFillAlpha != 0 {
 		other.FillAlpha = s.FillAlpha
 	}
-	if set&state.AlphaSourceFlag != 0 {
+	if set&StateAlphaSourceFlag != 0 {
 		other.AlphaSourceFlag = s.AlphaSourceFlag
 	}
-	if set&state.BlackPointCompensation != 0 {
+	if set&StateBlackPointCompensation != 0 {
 		other.BlackPointCompensation = s.BlackPointCompensation
 	}
-	if set&state.Overprint != 0 {
+	if set&StateOverprint != 0 {
 		other.OverprintStroke = s.OverprintStroke
 		other.OverprintFill = s.OverprintFill
 	}
-	if set&state.OverprintMode != 0 {
+	if set&StateOverprintMode != 0 {
 		other.OverprintMode = s.OverprintMode
 	}
-	if set&state.BlackGeneration != 0 {
+	if set&StateBlackGeneration != 0 {
 		other.BlackGeneration = s.BlackGeneration
 	}
-	if set&state.UndercolorRemoval != 0 {
+	if set&StateUndercolorRemoval != 0 {
 		other.UndercolorRemoval = s.UndercolorRemoval
 	}
-	if set&state.TransferFunction != 0 {
-		other.TransferFunction = s.TransferFunction
+	if set&StateTransferFunction != 0 {
+		other.TransferFunctions = s.TransferFunctions
 	}
-	if set&state.Halftone != 0 {
+	if set&StateHalftone != 0 {
 		other.Halftone = s.Halftone
 	}
-	if set&state.HalftoneOrigin != 0 {
+	if set&StateHalftoneOrigin != 0 {
 		other.HalftoneOriginX = s.HalftoneOriginX
 		other.HalftoneOriginY = s.HalftoneOriginY
 	}
-	if set&state.FlatnessTolerance != 0 {
+	if set&StateFlatnessTolerance != 0 {
 		other.FlatnessTolerance = s.FlatnessTolerance
 	}
-	if set&state.SmoothnessTolerance != 0 {
+	if set&StateSmoothnessTolerance != 0 {
 		other.SmoothnessTolerance = s.SmoothnessTolerance
 	}
 }
 
 // GetTextPositionDevice returns the current text position in device coordinates.
 func (s *State) GetTextPositionDevice() (float64, float64) {
-	if err := s.mustBeSet(state.TextFont | state.TextMatrix | state.TextHorizontalScaling | state.TextRise); err != nil {
+	if err := s.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
 		panic(err)
 	}
 	M := matrix.Matrix{s.TextFontSize * s.TextHorizontalScaling, 0, 0, s.TextFontSize, 0, s.TextRise}
@@ -361,7 +366,7 @@ func (s *State) GetTextPositionDevice() (float64, float64) {
 
 // GetTextPositionUser returns the current text position in user coordinates.
 func (s *State) GetTextPositionUser() (float64, float64) {
-	if err := s.mustBeSet(state.TextFont | state.TextMatrix | state.TextHorizontalScaling | state.TextRise); err != nil {
+	if err := s.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
 		panic(err)
 	}
 	M := matrix.Matrix{s.TextFontSize * s.TextHorizontalScaling, 0, 0, s.TextFontSize, 0, s.TextRise}
@@ -369,14 +374,10 @@ func (s *State) GetTextPositionUser() (float64, float64) {
 	return M[4], M[5]
 }
 
-// initializedStateBits lists the parameters which are initialized to
-// their default values in [NewState].
-const initializedStateBits = state.StrokeColor | state.FillColor |
-	state.TextCharacterSpacing | state.TextWordSpacing |
-	state.TextHorizontalScaling | state.TextLeading | state.TextRenderingMode |
-	state.TextRise | state.TextKnockout | state.LineWidth | state.LineCap |
-	state.LineJoin | state.MiterLimit | state.LineDash | state.RenderingIntent |
-	state.StrokeAdjustment | state.BlendMode | state.SoftMask |
-	state.StrokeAlpha | state.FillAlpha | state.AlphaSourceFlag |
-	state.BlackPointCompensation | state.Overprint | state.OverprintMode |
-	state.FlatnessTolerance
+func (s *State) mustBeSet(bits Bits) error {
+	missing := ^s.Set & bits
+	if missing == 0 {
+		return nil
+	}
+	return ErrMissing(missing)
+}

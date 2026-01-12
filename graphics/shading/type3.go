@@ -19,6 +19,7 @@ package shading
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
@@ -78,6 +79,26 @@ var _ graphics.Shading = (*Type3)(nil)
 // ShadingType implements the [Shading] interface.
 func (s *Type3) ShadingType() int {
 	return 3
+}
+
+// Equal implements the [Shading] interface.
+func (s *Type3) Equal(other graphics.Shading) bool {
+	if s == nil || other == nil {
+		return s == nil && other == nil
+	}
+	o, ok := other.(*Type3)
+	if !ok {
+		return false
+	}
+	return color.SpacesEqual(s.ColorSpace, o.ColorSpace) &&
+		s.Center1 == o.Center1 && s.R1 == o.R1 &&
+		s.Center2 == o.Center2 && s.R2 == o.R2 &&
+		function.Equal(s.F, o.F) &&
+		s.TMin == o.TMin && s.TMax == o.TMax &&
+		s.ExtendStart == o.ExtendStart && s.ExtendEnd == o.ExtendEnd &&
+		slices.Equal(s.Background, o.Background) &&
+		s.BBox.Equal(o.BBox) &&
+		s.AntiAlias == o.AntiAlias
 }
 
 // extractType3 reads a Type 3 (radial) shading from a PDF dictionary.

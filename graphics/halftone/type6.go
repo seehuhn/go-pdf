@@ -23,7 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
-	"seehuhn.de/go/pdf/graphics/transfer"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 // PDF 2.0 sections: 10.6.4 10.6.5.1 10.6.5.3
@@ -43,11 +43,11 @@ type Type6 struct {
 	ThresholdData []byte
 
 	// TransferFunction (optional) overrides the current transfer function for
-	// this component. Use [transfer.Identity] for the identity function.
+	// this component. Use [function.Identity] for the identity function.
 	TransferFunction pdf.Function
 }
 
-var _ Halftone = (*Type6)(nil)
+var _ graphics.Halftone = (*Type6)(nil)
 
 // extractType6 reads a Type 6 halftone from a PDF stream.
 func extractType6(x *pdf.Extractor, stream *pdf.Stream) (*Type6, error) {
@@ -74,7 +74,7 @@ func extractType6(x *pdf.Extractor, stream *pdf.Stream) (*Type6, error) {
 	if tf, err := pdf.Resolve(x.R, dict["TransferFunction"]); err != nil {
 		return nil, err
 	} else if tf == pdf.Name("Identity") {
-		h.TransferFunction = transfer.Identity
+		h.TransferFunction = function.Identity
 	} else {
 		if F, err := pdf.Optional(function.Extract(x, tf)); err != nil {
 			return nil, err
@@ -133,7 +133,7 @@ func (h *Type6) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["Type"] = pdf.Name("Halftone")
 	}
 
-	if h.TransferFunction == transfer.Identity {
+	if h.TransferFunction == function.Identity {
 		dict["TransferFunction"] = pdf.Name("Identity")
 	} else if h.TransferFunction != nil {
 		if !isValidTransferFunction(h.TransferFunction) {
@@ -166,13 +166,13 @@ func (h *Type6) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 }
 
 // HalftoneType returns 6.
-// This implements the [Halftone] interface.
+// This implements the [graphics.Halftone] interface.
 func (h *Type6) HalftoneType() int {
 	return 6
 }
 
 // GetTransferFunction returns the transfer function given in the halftone.
-// This implements the [Halftone] interface.
+// This implements the [graphics.Halftone] interface.
 func (h *Type6) GetTransferFunction() pdf.Function {
 	return h.TransferFunction
 }

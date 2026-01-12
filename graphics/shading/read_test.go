@@ -514,11 +514,56 @@ func roundTripTest(t *testing.T, originalShading graphics.Shading) {
 			originalShading.ShadingType(), readShading.ShadingType())
 	}
 
-	// Use cmp.Diff to compare the original and read shading
-	// Ignore unexported fields and use tolerance for floating point comparisons
+	// Use cmp.Diff to compare the original and read shading.
+	// We use custom Comparers that dereference pointers to compare by value,
+	// which bypasses the Equal methods (defined on pointer receivers) and
+	// allows cmpopts.EquateApprox to handle floating-point precision loss.
+	approx := cmpopts.EquateApprox(0.5, 0.01)
 	opts := []cmp.Option{
 		cmpopts.IgnoreUnexported(Type1{}, Type2{}, Type3{}, Type4{}, Type5{}, Type6{}, Type7{}),
-		cmpopts.EquateApprox(0.5, 0.01), // Allow precision differences from bit quantization
+		approx,
+		cmp.Comparer(func(a, b *Type1) bool {
+			if a == nil || b == nil {
+				return a == b
+			}
+			return cmp.Equal(*a, *b, cmp.AllowUnexported(Type1{}), approx)
+		}),
+		cmp.Comparer(func(a, b *Type2) bool {
+			if a == nil || b == nil {
+				return a == b
+			}
+			return cmp.Equal(*a, *b, cmp.AllowUnexported(Type2{}), approx)
+		}),
+		cmp.Comparer(func(a, b *Type3) bool {
+			if a == nil || b == nil {
+				return a == b
+			}
+			return cmp.Equal(*a, *b, cmp.AllowUnexported(Type3{}), approx)
+		}),
+		cmp.Comparer(func(a, b *Type4) bool {
+			if a == nil || b == nil {
+				return a == b
+			}
+			return cmp.Equal(*a, *b, cmp.AllowUnexported(Type4{}), approx)
+		}),
+		cmp.Comparer(func(a, b *Type5) bool {
+			if a == nil || b == nil {
+				return a == b
+			}
+			return cmp.Equal(*a, *b, cmp.AllowUnexported(Type5{}), approx)
+		}),
+		cmp.Comparer(func(a, b *Type6) bool {
+			if a == nil || b == nil {
+				return a == b
+			}
+			return cmp.Equal(*a, *b, cmp.AllowUnexported(Type6{}), approx)
+		}),
+		cmp.Comparer(func(a, b *Type7) bool {
+			if a == nil || b == nil {
+				return a == b
+			}
+			return cmp.Equal(*a, *b, cmp.AllowUnexported(Type7{}), approx)
+		}),
 	}
 	if diff := cmp.Diff(originalShading, readShading, opts...); diff != "" {
 		t.Errorf("round trip failed (-want +got):\n%s", diff)

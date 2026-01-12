@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package state provides the Bits type for tracking graphics state parameters.
-package state
+package graphics
 
 import (
 	"fmt"
@@ -48,83 +47,83 @@ const (
 	// CTM is always set, so it is not included in the bit mask.
 	// ClippingPath is always set, so it is not included in the bit mask.
 
-	StrokeColor Bits = 1 << iota
-	FillColor
+	StateStrokeColor Bits = 1 << iota
+	StateFillColor
 
-	TextCharacterSpacing
-	TextWordSpacing
-	TextHorizontalScaling
-	TextLeading
-	TextFont // includes size
-	TextRenderingMode
-	TextRise
-	TextKnockout
+	StateTextCharacterSpacing
+	StateTextWordSpacing
+	StateTextHorizontalScaling
+	StateTextLeading
+	StateTextFont // includes size
+	StateTextRenderingMode
+	StateTextRise
+	StateTextKnockout
 
-	TextMatrix // text matrix and text line matrix
+	StateTextMatrix // text matrix and text line matrix
 
-	LineWidth
-	LineCap
-	LineJoin
-	MiterLimit
-	LineDash // pattern and phase
+	StateLineWidth
+	StateLineCap
+	StateLineJoin
+	StateMiterLimit
+	StateLineDash // pattern and phase
 
-	RenderingIntent
-	StrokeAdjustment
-	BlendMode
-	SoftMask
-	StrokeAlpha
-	FillAlpha
-	AlphaSourceFlag
-	BlackPointCompensation
+	StateRenderingIntent
+	StateStrokeAdjustment
+	StateBlendMode
+	StateSoftMask
+	StateStrokeAlpha
+	StateFillAlpha
+	StateAlphaSourceFlag
+	StateBlackPointCompensation
 
-	Overprint
-	OverprintMode
-	BlackGeneration
-	UndercolorRemoval
-	TransferFunction
-	Halftone
-	HalftoneOrigin
-	FlatnessTolerance
-	SmoothnessTolerance
+	StateOverprint
+	StateOverprintMode
+	StateBlackGeneration
+	StateUndercolorRemoval
+	StateTransferFunction
+	StateHalftone
+	StateHalftoneOrigin
+	StateFlatnessTolerance
+	StateSmoothnessTolerance
 
 	firstUnused
 	AllBits = firstUnused - 1
 )
 
 var names = []string{
-	"StrokeColor",
-	"FillColor",
-	"TextCharacterSpacing",
-	"TextWordSpacing",
-	"TextHorizontalScaling",
-	"TextLeading",
-	"TextFont",
-	"TextRenderingMode",
-	"TextRise",
-	"TextKnockout",
-	"TextMatrix",
-	"LineWidth",
-	"LineCap",
-	"LineJoin",
-	"MiterLimit",
-	"LineDash",
-	"RenderingIntent",
-	"StrokeAdjustment",
-	"BlendMode",
-	"SoftMask",
-	"StrokeAlpha",
-	"FillAlpha",
-	"AlphaSourceFlag",
-	"BlackPointCompensation",
-	"Overprint",
-	"OverprintMode",
-	"BlackGeneration",
-	"UndercolorRemoval",
-	"TransferFunction",
-	"Halftone",
-	"HalftoneOrigin",
-	"FlatnessTolerance",
-	"SmoothnessTolerance",
+	"StateStrokeColor",
+	"StateFillColor",
+	"StateTextCharacterSpacing",
+	"StateTextWordSpacing",
+	"StateTextHorizontalScaling",
+	"StateTextLeading",
+	"StateTextFont",
+	"StateTextRenderingMode",
+	"StateTextRise",
+	"StateTextKnockout",
+	"StateTextMatrix",
+	"StateLineWidth",
+	"StateLineCap",
+	"StateLineJoin",
+	"StateMiterLimit",
+	"StateLineDash",
+	"StateRenderingIntent",
+	"StateStrokeAdjustment",
+	"StateBlendMode",
+	"StateSoftMask",
+	"StateStrokeAlpha",
+	"StateFillAlpha",
+	"StateAlphaSourceFlag",
+	"StateBlackPointCompensation",
+	"StateOverprint",
+	"StateOverprintMode",
+	"StateBlackGeneration",
+	"StateUndercolorRemoval",
+	"StateTransferFunction",
+	"StateHalftone",
+	"StateHalftoneOrigin",
+	"StateFlatnessTolerance",
+	"StateSmoothnessTolerance",
 }
 
 // ErrMissing is returned when a required state parameter is not set.

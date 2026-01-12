@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
@@ -86,6 +87,40 @@ type Type4Vertex struct {
 // ShadingType implements the [Shading] interface.
 func (s *Type4) ShadingType() int {
 	return 4
+}
+
+// Equal implements the [Shading] interface.
+func (s *Type4) Equal(other graphics.Shading) bool {
+	if s == nil || other == nil {
+		return s == nil && other == nil
+	}
+	o, ok := other.(*Type4)
+	if !ok {
+		return false
+	}
+	return color.SpacesEqual(s.ColorSpace, o.ColorSpace) &&
+		s.BitsPerCoordinate == o.BitsPerCoordinate &&
+		s.BitsPerComponent == o.BitsPerComponent &&
+		s.BitsPerFlag == o.BitsPerFlag &&
+		slices.Equal(s.Decode, o.Decode) &&
+		type4VerticesEqual(s.Vertices, o.Vertices) &&
+		function.Equal(s.F, o.F) &&
+		slices.Equal(s.Background, o.Background) &&
+		s.BBox.Equal(o.BBox) &&
+		s.AntiAlias == o.AntiAlias
+}
+
+func type4VerticesEqual(a, b []Type4Vertex) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].X != b[i].X || a[i].Y != b[i].Y || a[i].Flag != b[i].Flag ||
+			!slices.Equal(a[i].Color, b[i].Color) {
+			return false
+		}
+	}
+	return true
 }
 
 // extractType4 reads a Type 4 (free-form Gouraud-shaded triangle mesh) shading from a PDF stream.

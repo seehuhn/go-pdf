@@ -20,11 +20,8 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/graphics/blend"
 	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/halftone"
-	"seehuhn.de/go/pdf/graphics/state"
-	"seehuhn.de/go/pdf/graphics/transfer"
 )
 
 // ExtGState extracts an extended graphics state from a PDF file.
@@ -37,7 +34,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 	}
 
 	res := &extgstate.ExtGState{}
-	var set state.Bits
+	var set graphics.Bits
 	var overprintFillSet bool
 	var bg1, bg2 pdf.Object
 	var ucr1, ucr2 pdf.Object
@@ -78,7 +75,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 
 			res.TextFont = F
 			res.TextFontSize = size
-			set |= state.TextFont
+			set |= graphics.StateTextFont
 		case "TK":
 			val, err := x.GetBoolean(v)
 			if pdf.IsMalformed(err) {
@@ -87,7 +84,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				return nil, err
 			}
 			res.TextKnockout = bool(val)
-			set |= state.TextKnockout
+			set |= graphics.StateTextKnockout
 		case "LW":
 			lw, err := x.GetNumber(v)
 			if pdf.IsMalformed(err) {
@@ -96,7 +93,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				return nil, err
 			}
 			res.LineWidth = lw
-			set |= state.LineWidth
+			set |= graphics.StateLineWidth
 		case "LC":
 			lineCap, err := x.GetInteger(v)
 			if pdf.IsMalformed(err) {
@@ -110,7 +107,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				lineCap = 2
 			}
 			res.LineCap = graphics.LineCapStyle(lineCap)
-			set |= state.LineCap
+			set |= graphics.StateLineCap
 		case "LJ":
 			lineJoin, err := x.GetInteger(v)
 			if pdf.IsMalformed(err) {
@@ -124,7 +121,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				lineJoin = 2
 			}
 			res.LineJoin = graphics.LineJoinStyle(lineJoin)
-			set |= state.LineJoin
+			set |= graphics.StateLineJoin
 		case "ML":
 			miterLimit, err := x.GetNumber(v)
 			if pdf.IsMalformed(err) {
@@ -136,7 +133,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				miterLimit = 1
 			}
 			res.MiterLimit = miterLimit
-			set |= state.MiterLimit
+			set |= graphics.StateMiterLimit
 		case "D":
 			dashPattern, phase, err := readDash(x.R, v)
 			if err != nil {
@@ -144,7 +141,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 			} else if dashPattern != nil {
 				res.DashPattern = dashPattern
 				res.DashPhase = phase
-				set |= state.LineDash
+				set |= graphics.StateLineDash
 			}
 		case "RI":
 			ri, err := x.GetName(v)
@@ -154,7 +151,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				return nil, err
 			}
 			res.RenderingIntent = graphics.RenderingIntent(ri)
-			set |= state.RenderingIntent
+			set |= graphics.StateRenderingIntent
 		case "SA":
 			val, err := x.GetBoolean(v)
 			if pdf.IsMalformed(err) {
@@ -163,9 +160,9 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				return nil, err
 			}
 			res.StrokeAdjustment = bool(val)
-			set |= state.StrokeAdjustment
+			set |= graphics.StateStrokeAdjustment
 		case "BM":
-			bm, err := blend.Extract(x.R, v)
+			bm, err := BlendMode(x, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -173,7 +170,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 			}
 			if !bm.IsZero() {
 				res.BlendMode = bm
-				set |= state.BlendMode
+				set |= graphics.StateBlendMode
 			}
 		case "SMask":
 			sMask, err := pdf.Optional(SoftMaskDict(x, v))
@@ -181,7 +178,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				return nil, err
 			}
 			res.SoftMask = sMask
-			set |= state.SoftMask
+			set |= graphics.StateSoftMask
 		case "CA":
 			ca, err := x.GetNumber(v)
 			if pdf.IsMalformed(err) {
@@ -190,7 +187,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				return nil, err
 			}
 			res.StrokeAlpha = ca
-			set |= state.StrokeAlpha
+			set |= graphics.StateStrokeAlpha
 		case "ca":
 			ca, err := x.GetNumber(v)
 			if pdf.IsMalformed(err) {
@@ -199,7 +196,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				return nil, err
 			}
 			res.FillAlpha = ca
-			set |= state.FillAlpha
+			set |= graphics.StateFillAlpha
 		case "AIS":
 			ais, err := x.GetBoolean(v)
 			if pdf.IsMalformed(err) {
@@ -208,7 +205,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				return nil, err
 			}
 			res.AlphaSourceFlag = bool(ais)
-			set |= state.AlphaSourceFlag
+			set |= graphics.StateAlphaSourceFlag
 		case "UseBlackPtComp":
 			val, err := x.GetName(v)
 			if pdf.IsMalformed(err) {
@@ -217,7 +214,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				return nil, err
 			}
 			res.BlackPointCompensation = val
-			set |= state.BlackPointCompensation
+			set |= graphics.StateBlackPointCompensation
 		case "OP":
 			op, err := x.GetBoolean(v)
 			if pdf.IsMalformed(err) {
@@ -226,7 +223,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				return nil, err
 			}
 			res.OverprintStroke = bool(op)
-			set |= state.Overprint
+			set |= graphics.StateOverprint
 		case "op":
 			op, err := x.GetBoolean(v)
 			if pdf.IsMalformed(err) {
@@ -235,7 +232,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				return nil, err
 			}
 			res.OverprintFill = bool(op)
-			set |= state.Overprint
+			set |= graphics.StateOverprint
 			overprintFillSet = true
 		case "OPM":
 			opm, err := x.GetInteger(v)
@@ -247,7 +244,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 			if opm != 0 {
 				res.OverprintMode = 1
 			}
-			set |= state.OverprintMode
+			set |= graphics.StateOverprintMode
 		case "BG":
 			bg1 = v
 		case "BG2":
@@ -268,7 +265,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				return nil, err
 			}
 			res.Halftone = ht
-			set |= state.Halftone
+			set |= graphics.StateHalftone
 		case "HTO":
 			a, err := x.GetArray(v)
 			if pdf.IsMalformed(err) {
@@ -291,7 +288,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 			}
 			res.HalftoneOriginX = xCoord
 			res.HalftoneOriginY = yCoord
-			set |= state.HalftoneOrigin
+			set |= graphics.StateHalftoneOrigin
 		case "FL":
 			fl, err := x.GetNumber(v)
 			if pdf.IsMalformed(err) {
@@ -300,7 +297,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				return nil, err
 			}
 			res.FlatnessTolerance = fl
-			set |= state.FlatnessTolerance
+			set |= graphics.StateFlatnessTolerance
 		case "SM":
 			sm, err := x.GetNumber(v)
 			if pdf.IsMalformed(err) {
@@ -309,12 +306,12 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				return nil, err
 			}
 			res.SmoothnessTolerance = sm
-			set |= state.SmoothnessTolerance
+			set |= graphics.StateSmoothnessTolerance
 		}
 	}
 
 	// Handle overprint fill fallback (like in reader)
-	if set&state.Overprint != 0 && !overprintFillSet {
+	if set&graphics.StateOverprint != 0 && !overprintFillSet {
 		res.OverprintFill = res.OverprintStroke
 	}
 
@@ -322,23 +319,23 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 	if bg2 == pdf.Name("Default") {
 		res.BlackGeneration = nil
 		bg2 = nil
-		set |= state.BlackGeneration
+		set |= graphics.StateBlackGeneration
 	}
-	if set&state.BlackGeneration == 0 && bg2 != nil {
+	if set&graphics.StateBlackGeneration == 0 && bg2 != nil {
 		fn, err := function.Extract(x, bg2)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.BlackGeneration = fn
-				set |= state.BlackGeneration
+				set |= graphics.StateBlackGeneration
 			}
 		}
 	}
-	if set&state.BlackGeneration == 0 && bg1 != nil {
+	if set&graphics.StateBlackGeneration == 0 && bg1 != nil {
 		fn, err := function.Extract(x, bg1)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.BlackGeneration = fn
-				set |= state.BlackGeneration
+				set |= graphics.StateBlackGeneration
 			}
 		}
 	}
@@ -347,23 +344,23 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 	if ucr2 == pdf.Name("Default") {
 		res.UndercolorRemoval = nil
 		ucr2 = nil
-		set |= state.UndercolorRemoval
+		set |= graphics.StateUndercolorRemoval
 	}
-	if set&state.UndercolorRemoval == 0 && ucr2 != nil {
+	if set&graphics.StateUndercolorRemoval == 0 && ucr2 != nil {
 		fn, err := function.Extract(x, ucr2)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.UndercolorRemoval = fn
-				set |= state.UndercolorRemoval
+				set |= graphics.StateUndercolorRemoval
 			}
 		}
 	}
-	if set&state.UndercolorRemoval == 0 && ucr1 != nil {
+	if set&graphics.StateUndercolorRemoval == 0 && ucr1 != nil {
 		fn, err := function.Extract(x, ucr1)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.UndercolorRemoval = fn
-				set |= state.UndercolorRemoval
+				set |= graphics.StateUndercolorRemoval
 			}
 		}
 	}
@@ -375,15 +372,15 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 			if err != nil {
 				return nil, err
 			}
-			res.TransferFunction = fn
-			set |= state.TransferFunction
+			res.TransferFunctions = fn
+			set |= graphics.StateTransferFunction
 		} else if tr1 != nil {
 			fn, err := parseTransferFunction(x.R, tr1)
 			if err != nil {
 				return nil, err
 			}
-			res.TransferFunction = fn
-			set |= state.TransferFunction
+			res.TransferFunctions = fn
+			set |= graphics.StateTransferFunction
 		}
 	}
 
@@ -391,6 +388,38 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 
 	res.Set = set
 	return res, nil
+}
+
+// BlendMode extracts a blend mode from a PDF object.
+// Handles both name and array forms (array deprecated in PDF 2.0).
+func BlendMode(x *pdf.Extractor, obj pdf.Object) (graphics.BlendMode, error) {
+	obj, err := pdf.Resolve(x.R, obj)
+	if err != nil {
+		return nil, err
+	}
+	if obj == nil {
+		return nil, nil
+	}
+
+	switch v := obj.(type) {
+	case pdf.Name:
+		return graphics.BlendMode{v}, nil
+	case pdf.Array:
+		result := make(graphics.BlendMode, 0, len(v))
+		for _, elem := range v {
+			name, err := x.GetName(elem)
+			if err != nil {
+				continue // skip malformed entries
+			}
+			result = append(result, name)
+		}
+		if len(result) == 0 {
+			return nil, nil
+		}
+		return result, nil
+	default:
+		return nil, pdf.Errorf("invalid blend mode type: %T", obj)
+	}
 }
 
 func readDash(r pdf.Getter, obj pdf.Object) (pat []float64, ph float64, err error) {
@@ -423,14 +452,14 @@ func readDash(r pdf.Getter, obj pdf.Object) (pat []float64, ph float64, err erro
 	return pat, float64(phase), nil
 }
 
-func parseTransferFunction(r pdf.Getter, obj pdf.Object) (transfer.Functions, error) {
-	var zero transfer.Functions
+func parseTransferFunction(r pdf.Getter, obj pdf.Object) (graphics.TransferFunctions, error) {
+	var zero graphics.TransferFunctions
 
 	x := pdf.NewExtractor(r)
 
 	// check if it's an array of four or more transfer functions
 	if arr, err := pdf.GetArray(r, obj); err == nil && len(arr) >= 4 {
-		var result transfer.Functions
+		var result graphics.TransferFunctions
 
 		// parse Red component
 		fn, err := parseSingleTransfer(x, arr[0])
@@ -468,7 +497,7 @@ func parseTransferFunction(r pdf.Getter, obj pdf.Object) (transfer.Functions, er
 	if err != nil {
 		return zero, err
 	}
-	return transfer.Functions{
+	return graphics.TransferFunctions{
 		Red:   fn,
 		Green: fn,
 		Blue:  fn,
@@ -480,7 +509,7 @@ func parseSingleTransfer(x *pdf.Extractor, obj pdf.Object) (pdf.Function, error)
 	if name, isName := obj.(pdf.Name); isName {
 		switch name {
 		case "Identity":
-			return transfer.Identity, nil
+			return function.Identity, nil
 		default:
 			// treat all other names (including "Default") as the default
 			// transfer function.

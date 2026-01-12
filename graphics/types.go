@@ -22,20 +22,23 @@ import (
 	"seehuhn.de/go/pdf/property"
 )
 
-// Shading represents a PDF shading dictionary.
+// XObject represents an external object—a self-contained piece of graphical
+// content (image, form, etc.) that can be referenced by name and drawn
+// multiple times.
 //
-// Shadings can be drawn directly using the DrawShading method,
-// or can be used as the basis of a shading pattern.
-type Shading interface {
-	ShadingType() int
-
-	pdf.Embedder
-}
-
-// XObject represents a PDF XObject.
+// See [seehuhn.de/go/pdf/graphics/image] and [seehuhn.de/go/pdf/graphics/form]
+// for implementations.
 type XObject interface {
 	Subtype() pdf.Name
 	pdf.Embedder
+}
+
+// Image represents a raster image XObject with known pixel dimensions.
+//
+// See [seehuhn.de/go/pdf/graphics/image] for implementations.
+type Image interface {
+	XObject
+	Bounds() rect.IntRect
 }
 
 // ImageMask is an optional interface implemented by XObjects that are
@@ -47,10 +50,26 @@ type ImageMask interface {
 	IsImageMask() bool
 }
 
-// Image represents a raster image which can be embedded in a PDF file.
-type Image interface {
-	XObject
-	Bounds() rect.IntRect
+// IsImageMask returns true if the given XObject is an image mask.
+func IsImageMask(xobj XObject) bool {
+	if xobj.Subtype() != "Image" {
+		return false
+	}
+	if im, ok := xobj.(ImageMask); ok {
+		return im.IsImageMask()
+	}
+	return false
+}
+
+// Shading defines a smooth color gradient that can fill an area.
+// Shadings can be drawn directly or used as the basis of a shading pattern.
+//
+// See [seehuhn.de/go/pdf/graphics/shading] for implementations.
+type Shading interface {
+	ShadingType() int
+	Equal(other Shading) bool
+
+	pdf.Embedder
 }
 
 // SoftClip represents a soft mask for use in the graphics state.
@@ -66,48 +85,96 @@ type SoftClip interface {
 	Equal(other SoftClip) bool
 }
 
-// IsImageMask returns true if the given XObject is an image mask.
-func IsImageMask(xobj XObject) bool {
-	if xobj.Subtype() != "Image" {
+// Halftone represents a PDF halftone dictionary or stream.
+//
+// See [seehuhn.de/go/pdf/graphics/halftone] for implementations.
+type Halftone interface {
+	// HalftoneType returns the halftone type (1, 5, 6, 10, or 16).
+	HalftoneType() int
+
+	// GetTransferFunction returns the transfer function specified in the
+	// halftone, or nil if none is specified.
+	GetTransferFunction() pdf.Function
+
+	pdf.Embedder
+}
+
+// TransferFunctions holds the transfer functions for the color components.
+// Transfer functions adjust color component values during rendering,
+// mapping input values to output values for each color channel.
+//
+// Each function must have one input and one output.
+// Use [function.Identity] to represent the PDF name /Identity.
+// Use nil to represent the device-specific default transfer function.
+type TransferFunctions struct {
+	Red   pdf.Function
+	Green pdf.Function
+	Blue  pdf.Function
+	Gray  pdf.Function
+}
+
+// BlendMode represents a PDF blend mode.
+// Internally stored as a slice to handle the deprecated array form.
+// When writing: len==1 emits name, len>1 emits array.
+// When reading: name becomes len==1 slice, array becomes full slice.
+//
+// See PDF 32000-2:2020, sections 8.4.5, 11.3.5, 11.6.3.
+type BlendMode []pdf.Name
+
+// All 16 standard blend mode names (section 11.3.5).
+const (
+	BlendModeNormal     pdf.Name = "Normal"
+	BlendModeCompatible pdf.Name = "Compatible" // deprecated in PDF 2.0
+	BlendModeMultiply   pdf.Name = "Multiply"
+	BlendModeScreen     pdf.Name = "Screen"
+	BlendModeOverlay    pdf.Name = "Overlay"
+	BlendModeDarken     pdf.Name = "Darken"
+	BlendModeLighten    pdf.Name = "Lighten"
+	BlendModeColorDodge pdf.Name = "ColorDodge"
+	BlendModeColorBurn  pdf.Name = "ColorBurn"
+	BlendModeHardLight  pdf.Name = "HardLight"
+	BlendModeSoftLight  pdf.Name = "SoftLight"
+	BlendModeDifference pdf.Name = "Difference"
+	BlendModeExclusion  pdf.Name = "Exclusion"
+	BlendModeHue        pdf.Name = "Hue"
+	BlendModeSaturation pdf.Name = "Saturation"
+	BlendModeColor      pdf.Name = "Color"
+	BlendModeLuminosity pdf.Name = "Luminosity"
+)
+
+// AsPDF returns the PDF representation: name for single mode, array for multiple.
+func (m BlendMode) AsPDF() pdf.Object {
+	switch len(m) {
+	case 0:
+		return nil
+	case 1:
+		return m[0]
+	default:
+		arr := make(pdf.Array, len(m))
+		for i, n := range m {
+			arr[i] = n
+		}
+		return arr
+	}
+}
+
+// IsZero returns true if the BlendMode is empty (unset).
+func (m BlendMode) IsZero() bool {
+	return len(m) == 0
+}
+
+// Equal reports whether two BlendModes are equal.
+func (m BlendMode) Equal(other BlendMode) bool {
+	if len(m) != len(other) {
 		return false
 	}
-	if im, ok := xobj.(ImageMask); ok {
-		return im.IsImageMask()
+	for i, n := range m {
+		if n != other[i] {
+			return false
+		}
 	}
-	return false
+	return true
 }
-
-// MarkedContent represents a marked-content point or sequence.
-type MarkedContent struct {
-	// Tag specifies the role or significance of the point/sequence.
-	Tag pdf.Name
-
-	// Properties is an optional property list providing additional data.
-	// Set to nil for marked content without properties (MP/BMC operators).
-	Properties property.List
-
-	// Inline controls whether the property list is embedded inline in the
-	// content stream (true) or referenced via the Properties resource
-	// dictionary (false). Only relevant if Properties is not nil.
-	// Property lists can only be inlined if Properties.IsDirect() returns true.
-	Inline bool
-}
-
-// TextRenderingMode is the rendering mode for text.
-type TextRenderingMode uint8
-
-// Possible values for TextRenderingMode.
-// See section 9.3.6 of ISO 32000-2:2020.
-const (
-	TextRenderingModeFill TextRenderingMode = iota
-	TextRenderingModeStroke
-	TextRenderingModeFillStroke
-	TextRenderingModeInvisible
-	TextRenderingModeFillClip
-	TextRenderingModeStrokeClip
-	TextRenderingModeFillStrokeClip
-	TextRenderingModeClip
-)
 
 // LineCapStyle is the style of the end of a line.
 type LineCapStyle uint8
@@ -131,7 +198,8 @@ const (
 	LineJoinBevel LineJoinStyle = 2
 )
 
-// A RenderingIntent specifies the PDF rendering intent.
+// RenderingIntent controls how colors are adjusted when converting between
+// color spaces with different gamuts.
 //
 // See section 8.6.5.8 of ISO 32000-2:2020.
 type RenderingIntent pdf.Name
@@ -143,3 +211,37 @@ const (
 	Saturation           RenderingIntent = "Saturation"
 	Perceptual           RenderingIntent = "Perceptual"
 )
+
+// TextRenderingMode is the rendering mode for text.
+type TextRenderingMode uint8
+
+// Possible values for TextRenderingMode.
+// See section 9.3.6 of ISO 32000-2:2020.
+const (
+	TextRenderingModeFill           TextRenderingMode = 0
+	TextRenderingModeStroke         TextRenderingMode = 1
+	TextRenderingModeFillStroke     TextRenderingMode = 2
+	TextRenderingModeInvisible      TextRenderingMode = 3
+	TextRenderingModeFillClip       TextRenderingMode = 4
+	TextRenderingModeStrokeClip     TextRenderingMode = 5
+	TextRenderingModeFillStrokeClip TextRenderingMode = 6
+	TextRenderingModeClip           TextRenderingMode = 7
+)
+
+// MarkedContent represents a marked-content point or sequence in a content
+// stream, used for accessibility tagging, optional content layers, or logical
+// document structure.
+type MarkedContent struct {
+	// Tag specifies the role or significance of the point/sequence.
+	Tag pdf.Name
+
+	// Properties is an optional property list providing additional data.
+	// Set to nil for marked content without properties (MP/BMC operators).
+	Properties property.List
+
+	// Inline controls whether the property list is embedded inline in the
+	// content stream (true) or referenced via the Properties resource
+	// dictionary (false). Only relevant if Properties is not nil.
+	// Property lists can only be inlined if Properties.IsDirect() returns true.
+	Inline bool
+}

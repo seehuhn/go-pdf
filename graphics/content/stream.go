@@ -55,11 +55,12 @@ func (s Stream) Equal(other Stream) bool {
 type Type int
 
 const (
-	Page             Type = iota // page content stream
-	Form                         // Form XObject (includes annotation appearances)
-	PatternColored               // tiling pattern, PaintType 1 (colored)
-	PatternUncolored             // tiling pattern, PaintType 2 (uncolored)
-	Glyph                        // Type 3 font glyph
+	Page              Type = iota // page content stream
+	Form                          // Form XObject (includes annotation appearances)
+	TransparencyGroup             // transparency group XObject
+	PatternColored                // tiling pattern, PaintType 1 (colored)
+	PatternUncolored              // tiling pattern, PaintType 2 (uncolored)
+	Glyph                         // Type 3 font glyph
 )
 
 func (ct Type) String() string {
@@ -68,6 +69,8 @@ func (ct Type) String() string {
 		return "page"
 	case Form:
 		return "form"
+	case TransparencyGroup:
+		return "transparency group"
 	case PatternColored:
 		return "pattern (colored)"
 	case PatternUncolored:

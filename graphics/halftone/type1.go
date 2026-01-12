@@ -22,7 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
-	"seehuhn.de/go/pdf/graphics/transfer"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 // PDF 2.0 sections: 10.6.3 10.6.5.1 10.6.5.2
@@ -51,11 +51,11 @@ type Type1 struct {
 	AccurateScreens bool
 
 	// TransferFunction (optional) overrides the current transfer function for
-	// this component. Use [transfer.Identity] for the identity function.
+	// this component. Use [function.Identity] for the identity function.
 	TransferFunction pdf.Function
 }
 
-var _ Halftone = (*Type1)(nil)
+var _ graphics.Halftone = (*Type1)(nil)
 
 // extractType1 reads a Type 1 halftone from a PDF dictionary.
 func extractType1(x *pdf.Extractor, dict pdf.Dict) (*Type1, error) {
@@ -125,7 +125,7 @@ func extractType1(x *pdf.Extractor, dict pdf.Dict) (*Type1, error) {
 	if tf, err := pdf.Resolve(x.R, dict["TransferFunction"]); err != nil {
 		return nil, err
 	} else if tf == pdf.Name("Identity") {
-		h.TransferFunction = transfer.Identity
+		h.TransferFunction = function.Identity
 	} else {
 		if F, err := pdf.Optional(function.Extract(x, tf)); err != nil {
 			return nil, err
@@ -186,7 +186,7 @@ func (h *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["AccurateScreens"] = pdf.Boolean(true)
 	}
 
-	if h.TransferFunction == transfer.Identity {
+	if h.TransferFunction == function.Identity {
 		dict["TransferFunction"] = pdf.Name("Identity")
 	} else if h.TransferFunction != nil {
 		if !isValidTransferFunction(h.TransferFunction) {

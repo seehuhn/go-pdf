@@ -19,6 +19,7 @@ package shading
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
@@ -70,6 +71,24 @@ var _ graphics.Shading = (*Type1)(nil)
 // ShadingType implements the [Shading] interface.
 func (s *Type1) ShadingType() int {
 	return 1
+}
+
+// Equal implements the [Shading] interface.
+func (s *Type1) Equal(other graphics.Shading) bool {
+	if s == nil || other == nil {
+		return s == nil && other == nil
+	}
+	o, ok := other.(*Type1)
+	if !ok {
+		return false
+	}
+	return color.SpacesEqual(s.ColorSpace, o.ColorSpace) &&
+		function.Equal(s.F, o.F) &&
+		slices.Equal(s.Domain, o.Domain) &&
+		slices.Equal(s.Matrix, o.Matrix) &&
+		slices.Equal(s.Background, o.Background) &&
+		s.BBox.Equal(o.BBox) &&
+		s.AntiAlias == o.AntiAlias
 }
 
 // extractType1 reads a Type 1 (function-based) shading from a PDF dictionary.

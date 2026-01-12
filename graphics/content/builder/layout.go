@@ -24,8 +24,8 @@ import (
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
-	"seehuhn.de/go/pdf/graphics/state"
 )
 
 // TextShow draws a string. Returns the advance width.
@@ -72,8 +72,8 @@ func (b *Builder) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 		return 0
 	}
 
-	if !b.isUsable(state.TextFont | state.TextMatrix |
-		state.TextHorizontalScaling | state.TextRise) {
+	if !b.isUsable(graphics.StateTextFont | graphics.StateTextMatrix |
+		graphics.StateTextHorizontalScaling | graphics.StateTextRise) {
 		b.Err = errors.New("required text state not set")
 		return 0
 	}
@@ -122,7 +122,7 @@ func (b *Builder) TextShowGlyphs(seq *font.GlyphSeq) float64 {
 	}
 	codec := layouter.Codec()
 	for _, g := range gg {
-		if !b.isUsable(state.TextRise) || math.Abs(g.Rise-param.TextRise) > 1e-6 {
+		if !b.isUsable(graphics.StateTextRise) || math.Abs(g.Rise-param.TextRise) > 1e-6 {
 			flush()
 			b.TextSetRise(g.Rise)
 			if b.Err != nil {
@@ -212,7 +212,7 @@ func (b *Builder) TextGetQuadPoints(seq *font.GlyphSeq, padding float64) []vec.V
 	if seq == nil || len(seq.Seq) == 0 {
 		return nil
 	}
-	if !b.isUsable(state.TextFont | state.TextMatrix) {
+	if !b.isUsable(graphics.StateTextFont | graphics.StateTextMatrix) {
 		return nil
 	}
 

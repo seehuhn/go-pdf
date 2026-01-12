@@ -25,7 +25,6 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/extgstate"
-	"seehuhn.de/go/pdf/graphics/state"
 )
 
 // Builder constructs PDF content streams using a type-safe API.
@@ -147,11 +146,11 @@ func (b *Builder) emit(name content.OpName, args ...pdf.Object) {
 	b.Stream = append(b.Stream, op)
 }
 
-func (b *Builder) isUsable(bits state.Bits) bool {
+func (b *Builder) isUsable(bits graphics.Bits) bool {
 	return b.State.IsUsable(bits)
 }
 
-func (b *Builder) isSet(bits state.Bits) bool {
+func (b *Builder) isSet(bits graphics.Bits) bool {
 	return b.State.IsSet(bits)
 }
 

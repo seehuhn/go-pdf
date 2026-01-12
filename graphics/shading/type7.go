@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"slices"
 
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
@@ -90,6 +91,40 @@ type Type7Patch struct {
 // ShadingType implements the [Shading] interface.
 func (s *Type7) ShadingType() int {
 	return 7
+}
+
+// Equal implements the [Shading] interface.
+func (s *Type7) Equal(other graphics.Shading) bool {
+	if s == nil || other == nil {
+		return s == nil && other == nil
+	}
+	o, ok := other.(*Type7)
+	if !ok {
+		return false
+	}
+	return color.SpacesEqual(s.ColorSpace, o.ColorSpace) &&
+		s.BitsPerCoordinate == o.BitsPerCoordinate &&
+		s.BitsPerComponent == o.BitsPerComponent &&
+		s.BitsPerFlag == o.BitsPerFlag &&
+		slices.Equal(s.Decode, o.Decode) &&
+		type7PatchesEqual(s.Patches, o.Patches) &&
+		function.Equal(s.F, o.F) &&
+		slices.Equal(s.Background, o.Background) &&
+		s.BBox.Equal(o.BBox) &&
+		s.AntiAlias == o.AntiAlias
+}
+
+func type7PatchesEqual(a, b []Type7Patch) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].ControlPoints != b[i].ControlPoints || a[i].Flag != b[i].Flag ||
+			!cornerColorsEqual(a[i].CornerColors, b[i].CornerColors) {
+			return false
+		}
+	}
+	return true
 }
 
 // Embed implements the [Shading] interface.
