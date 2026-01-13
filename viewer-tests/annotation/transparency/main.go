@@ -65,7 +65,6 @@ func withoutAP(filename string) error {
 	}
 	page.DrawShading(background)
 
-	var annots pdf.Array
 	for CA := 0.1; CA <= 1.0; CA += 0.2 {
 		x := CA * 500
 		y := CA * 500
@@ -96,19 +95,8 @@ func withoutAP(filename string) error {
 			FillColor: color.DeviceRGB{0.5056, 0.9555, 0.9956},
 		}
 
-		dict, err := a.Encode(page.RM)
-		if err != nil {
-			return err
-		}
-		ref := page.RM.Out.Alloc()
-		err = page.RM.Out.Put(ref, dict)
-		if err != nil {
-			return err
-		}
-		annots = append(annots, ref)
+		page.Page.Annots = append(page.Page.Annots, a)
 	}
-
-	page.PageDict["Annots"] = annots
 
 	return page.Close()
 }
@@ -134,7 +122,6 @@ func withAP(filename string) error {
 
 	style := fallback.NewStyle()
 
-	var annots pdf.Array
 	for ca := 0.1; ca <= 1.0; ca += 0.2 {
 		for CA := 0.1; CA <= 1.0; CA += 0.2 {
 			x := CA * 500
@@ -170,20 +157,9 @@ func withAP(filename string) error {
 				return err
 			}
 
-			dict, err := a.Encode(page.RM)
-			if err != nil {
-				return err
-			}
-			ref := page.RM.Out.Alloc()
-			err = page.RM.Out.Put(ref, dict)
-			if err != nil {
-				return err
-			}
-			annots = append(annots, ref)
+			page.Page.Annots = append(page.Page.Annots, a)
 		}
 	}
-
-	page.PageDict["Annots"] = annots
 
 	return page.Close()
 }

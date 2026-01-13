@@ -28,8 +28,9 @@ import (
 
 // Concat represents a PDF file made by concatenating other PDF files.
 type Concat struct {
-	v pdf.Version
-	w *pdf.Writer
+	v  pdf.Version
+	w  *pdf.Writer
+	rm *pdf.ResourceManager
 
 	pages    *pagetree.Writer
 	numPages int
@@ -51,11 +52,13 @@ func NewConcat(out string, v pdf.Version) (*Concat, error) {
 		return nil, err
 	}
 
-	pages := pagetree.NewWriter(w)
+	rm := pdf.NewResourceManager(w)
+	pages := pagetree.NewWriter(w, rm)
 
 	c := &Concat{
 		v:     v,
 		w:     w,
+		rm:    rm,
 		pages: pages,
 	}
 
@@ -78,16 +81,18 @@ func (c *Concat) Close() error {
 	}
 	meta.Catalog.Pages = pagesRef
 
-	rm := pdf.NewResourceManager(c.w)
-	defer rm.Close()
-
 	outlineTree := &outline.Outline{}
 	for _, child := range c.children {
 		entry := outlineTree.AddItem(child.Title)
 		entry.Destination = &destination.Fit{Page: child.FirstPage}
 		entry.Children = child.Outline
 	}
-	err = outlineTree.Write(rm)
+	err = outlineTree.Write(c.rm)
+	if err != nil {
+		return err
+	}
+
+	err = c.rm.Close()
 	if err != nil {
 		return err
 	}
@@ -133,7 +138,7 @@ func (c *Concat) Append(fname string) error {
 			copyError = err
 			break
 		}
-		err = c.pages.AppendPageRef(newRef, newDict)
+		err = c.pages.AppendPageDict(newRef, newDict)
 		if err != nil {
 			copyError = err
 			break

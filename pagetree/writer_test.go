@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
@@ -33,13 +34,13 @@ func TestBalance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tree := pagetree.NewWriter(out)
+	rm := pdf.NewResourceManager(out)
+	tree := pagetree.NewWriter(out, rm)
 	for i := 0; i < 16*16; i++ { // maxDegree = 16 -> this should give depth 2
-		dict := pdf.Dict{
-			"Type":     pdf.Name("Page"),
-			"MediaBox": document.A4,
+		p := &page.Page{
+			MediaBox: document.A4,
 		}
-		err := tree.AppendPage(dict)
+		err := tree.AppendPage(p)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -49,6 +50,10 @@ func TestBalance(t *testing.T) {
 		t.Fatal(err)
 	}
 	out.GetMeta().Catalog.Pages = ref
+	err = rm.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = out.Close()
 	if err != nil {
 		t.Fatal(err)

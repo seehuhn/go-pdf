@@ -73,7 +73,6 @@ func createDocument(filename string) error {
 	page.DrawShading(background)
 
 	w := &writer{
-		annots:   pdf.Array{},
 		page:     page,
 		style:    fallback.NewStyle(),
 		currentY: startY,
@@ -120,10 +119,7 @@ func createDocument(filename string) error {
 			LineEndingStyle: [2]annotation.LineEndingStyle{style, style},
 			FillColor:       color.Red,
 		}
-		err = w.addAnnotationPair(line)
-		if err != nil {
-			return err
-		}
+		w.addAnnotationPair(line)
 
 		w.currentY -= lineEndingStep
 	}
@@ -154,10 +150,7 @@ func createDocument(filename string) error {
 			pdf.Round(w.currentY, 2),
 		},
 	}
-	err = w.addAnnotationPair(borderLine1)
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(borderLine1)
 
 	w.currentY -= borderTestStep
 
@@ -182,10 +175,7 @@ func createDocument(filename string) error {
 		},
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "D", DashArray: []float64{10, 2}, SingleUse: true},
 	}
-	err = w.addAnnotationPair(borderLine2)
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(borderLine2)
 
 	w.currentY -= borderTestStep
 
@@ -209,10 +199,7 @@ func createDocument(filename string) error {
 			pdf.Round(w.currentY, 2),
 		},
 	}
-	err = w.addAnnotationPair(borderLine3)
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(borderLine3)
 
 	// -----------------------------------------------------------------------
 
@@ -241,10 +228,7 @@ func createDocument(filename string) error {
 		BorderStyle: lineStyle,
 		Caption:     true,
 	}
-	err = w.addAnnotationPair(captionInline)
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(captionInline)
 
 	w.currentY -= captionTestStep
 
@@ -271,10 +255,7 @@ func createDocument(filename string) error {
 		Caption:       true,
 		CaptionOffset: []float64{20, 3},
 	}
-	err = w.addAnnotationPair(captionInline)
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(captionInline)
 
 	w.currentY -= captionTestStep
 
@@ -301,10 +282,7 @@ func createDocument(filename string) error {
 		Caption:      true,
 		CaptionAbove: true,
 	}
-	err = w.addAnnotationPair(captionTop)
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(captionTop)
 
 	// -----------------------------------------------------------------------
 
@@ -341,10 +319,7 @@ func createDocument(filename string) error {
 		BorderStyle: lineStyle,
 		LL:          24,
 	}
-	err = w.addAnnotationPair(leaderPos)
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(leaderPos)
 
 	w.currentY -= 36
 
@@ -378,10 +353,7 @@ func createDocument(filename string) error {
 		BorderStyle: lineStyle,
 		LL:          -24,
 	}
-	err = w.addAnnotationPair(leaderNeg)
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(leaderNeg)
 
 	w.currentY -= 120
 
@@ -418,43 +390,24 @@ func createDocument(filename string) error {
 		LL:          50,
 		LLO:         10,
 	}
-	err = w.addAnnotationPair(leaderCombo)
-	if err != nil {
-		return err
-	}
-
-	page.PageDict["Annots"] = w.annots
+	w.addAnnotationPair(leaderCombo)
 
 	return page.Close()
 }
 
 type writer struct {
-	annots   pdf.Array
 	page     *document.Page
 	style    *fallback.Style
 	currentY float64
 }
 
-func (w *writer) embed(a annotation.Annotation) error {
-	obj, err := a.Encode(w.page.RM)
-	if err != nil {
-		return err
-	}
-	ref := w.page.RM.Out.Alloc()
-	err = w.page.RM.Out.Put(ref, obj)
-	if err != nil {
-		return err
-	}
-	w.annots = append(w.annots, ref)
-	return nil
+func (w *writer) addAnnotation(a annotation.Annotation) {
+	w.page.Page.Annots = append(w.page.Page.Annots, a)
 }
 
-func (w *writer) addAnnotationPair(line *annotation.Line) error {
-	// embed left annotation as-is
-	err := w.embed(line)
-	if err != nil {
-		return err
-	}
+func (w *writer) addAnnotationPair(line *annotation.Line) {
+	// add left annotation as-is
+	w.addAnnotation(line)
 
 	// create shallow copy for right column
 	rightLine := clone(line)
@@ -468,8 +421,8 @@ func (w *writer) addAnnotationPair(line *annotation.Line) error {
 
 	w.style.AddAppearance(rightLine)
 
-	// embed right annotation
-	return w.embed(rightLine)
+	// add right annotation
+	w.addAnnotation(rightLine)
 }
 
 func clone[T any](v *T) *T {

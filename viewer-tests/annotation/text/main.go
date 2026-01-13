@@ -76,11 +76,10 @@ func createDocument(filename string) error {
 	H := standard.Helvetica.New()
 
 	w := &writer{
-		annots: pdf.Array{},
-		page:   page,
-		style:  fallback.NewStyle(),
-		yPos:   startY,
-		font:   H,
+		page:  page,
+		style: fallback.NewStyle(),
+		yPos:  startY,
+		font:  H,
 	}
 
 	// add headers
@@ -116,10 +115,7 @@ func createDocument(filename string) error {
 			},
 			Icon: icon,
 		}
-		err = w.addAnnotationPair(text, string(icon))
-		if err != nil {
-			return err
-		}
+		w.addAnnotationPair(text, string(icon))
 	}
 
 	// test with pink color
@@ -136,10 +132,7 @@ func createDocument(filename string) error {
 		},
 		Icon: annotation.TextIconNote,
 	}
-	err = w.addAnnotationPair(text, "Common.Color = pink")
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(text, "Common.Color = pink")
 
 	// test with transparent color (no appearance stream)
 	text = &annotation.Text{
@@ -154,10 +147,7 @@ func createDocument(filename string) error {
 		},
 		Icon: annotation.TextIconNote,
 	}
-	err = w.addAnnotationPair(text, "Common.Color = transparent")
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(text, "Common.Color = transparent")
 
 	// test with border width
 	text = &annotation.Text{
@@ -171,41 +161,23 @@ func createDocument(filename string) error {
 		},
 		Icon: annotation.TextIconNote,
 	}
-	err = w.addAnnotationPair(text, "Common.Border.Width = 2")
-	if err != nil {
-		return err
-	}
-
-	page.PageDict["Annots"] = w.annots
+	w.addAnnotationPair(text, "Common.Border.Width = 2")
 
 	return page.Close()
 }
 
 type writer struct {
-	annots pdf.Array
-	page   *document.Page
-	style  *fallback.Style
-	yPos   float64
-	font   font.Layouter
+	page  *document.Page
+	style *fallback.Style
+	yPos  float64
+	font  font.Layouter
 }
 
-func (w *writer) embed(a annotation.Annotation, ref pdf.Reference) error {
-	obj, err := a.Encode(w.page.RM)
-	if err != nil {
-		return err
-	}
-	err = w.page.RM.Out.Put(ref, obj)
-	if err != nil {
-		return err
-	}
-	w.annots = append(w.annots, ref)
-	return nil
+func (w *writer) addAnnotation(a annotation.Annotation) {
+	w.page.Page.Annots = append(w.page.Page.Annots, a)
 }
 
-func (w *writer) addAnnotationPair(left *annotation.Text, label string) error {
-	leftRef := w.page.RM.Out.Alloc()
-	rightRef := w.page.RM.Out.Alloc()
-
+func (w *writer) addAnnotationPair(left *annotation.Text, label string) {
 	// center icons horizontally in columns
 	leftCenter := (leftColStart + leftColEnd) / 2
 	rightCenter := (rightColStart + rightColEnd) / 2
@@ -215,12 +187,6 @@ func (w *writer) addAnnotationPair(left *annotation.Text, label string) error {
 	w.page.TextSetFont(w.font, 10)
 	w.page.TextSetMatrix(matrix.Translate(commentStart, w.yPos-iconSize/2-3))
 	w.page.TextShow(label)
-	w.page.TextSetFont(w.font, 6)
-	w.page.TextSetHorizontalScaling(0.9)
-	w.page.TextSetMatrix(matrix.Translate(leftCenter+iconSize/2+3, w.yPos-iconSize))
-	w.page.TextShow(fmt.Sprintf("%d %d R", leftRef.Number(), leftRef.Generation()))
-	w.page.TextSetMatrix(matrix.Translate(rightCenter+iconSize/2+3, w.yPos-iconSize))
-	w.page.TextShow(fmt.Sprintf("%d %d R", rightRef.Number(), rightRef.Generation()))
 	w.page.TextEnd()
 
 	right := clone(left)
@@ -243,19 +209,10 @@ func (w *writer) addAnnotationPair(left *annotation.Text, label string) error {
 
 	w.style.AddAppearance(right)
 
-	err := w.embed(left, leftRef)
-	if err != nil {
-		return err
-	}
-
-	err = w.embed(right, rightRef)
-	if err != nil {
-		return err
-	}
+	w.addAnnotation(left)
+	w.addAnnotation(right)
 
 	w.yPos -= iconSize + 12.0
-
-	return nil
 }
 
 func clone[T any](v *T) *T {

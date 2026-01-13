@@ -90,28 +90,17 @@ func createDocument(fname string) error {
 		},
 		Icon: annotation.TextIconNote,
 	}
-	textNative, err := text.Encode(doc.RM)
+	// Use StoreAt for bidirectional refs (text.Popup <-> popup.Parent)
+	err = doc.RM.StoreAt(textRef, text)
 	if err != nil {
 		return err
 	}
-	err = doc.RM.Out.Put(textRef, textNative)
-	if err != nil {
-		return err
-	}
-
-	popupNative, err := popup.Encode(doc.RM)
-	if err != nil {
-		return err
-	}
-	err = doc.RM.Out.Put(popupRef, popupNative)
+	err = doc.RM.StoreAt(popupRef, popup)
 	if err != nil {
 		return err
 	}
 
-	p := w.page
-	annots, _ := p.PageDict["Annots"].(pdf.Array)
-	annots = append(annots, textRef, popupRef)
-	p.PageDict["Annots"] = annots
+	w.page.Page.Annots = append(w.page.Page.Annots, text, popup)
 
 	w.printf("Link Annotation")
 
@@ -154,19 +143,7 @@ func createDocument(fname string) error {
 		},
 		QuadPoints: quadPoints,
 	}
-	linkRef := doc.RM.Out.Alloc()
-	linkNative, err := link.Encode(doc.RM)
-	if err != nil {
-		return err
-	}
-	err = doc.RM.Out.Put(linkRef, linkNative)
-	if err != nil {
-		return err
-	}
-
-	annots, _ = p.PageDict["Annots"].(pdf.Array)
-	annots = append(annots, linkRef)
-	p.PageDict["Annots"] = annots
+	w.page.Page.Annots = append(w.page.Page.Annots, link)
 
 	err = w.Close()
 	if err != nil {

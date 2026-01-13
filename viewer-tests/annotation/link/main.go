@@ -71,7 +71,7 @@ func createDocument(filename string) error {
 		LinkCol: color.DeviceRGB{0, 0, 0.9},
 
 		style: fallback.NewStyle(),
-		RM:    page.RM,
+		page:  page,
 		yPos:  startY,
 	}
 
@@ -251,8 +251,6 @@ func createDocument(filename string) error {
 		[]vec.Vec2{hex[3], hex[4], hex[5], hex[0]})
 	w.yPos -= 280
 
-	page.PageDict["Annots"] = w.annots
-
 	return page.Close()
 }
 
@@ -263,23 +261,13 @@ type writer struct {
 	TextCol color.Color
 	LinkCol color.Color
 
-	style  *fallback.Style
-	RM     *pdf.ResourceManager
-	annots pdf.Array
-	yPos   float64
+	style *fallback.Style
+	page  *document.Page
+	yPos  float64
 }
 
-func (w *writer) embed(a annotation.Annotation, ref pdf.Reference) error {
-	obj, err := a.Encode(w.RM)
-	if err != nil {
-		return err
-	}
-	err = w.RM.Out.Put(ref, obj)
-	if err != nil {
-		return err
-	}
-	w.annots = append(w.annots, ref)
-	return nil
+func (w *writer) addAnnotation(a annotation.Annotation) {
+	w.page.Page.Annots = append(w.page.Page.Annots, a)
 }
 
 // addParagraph adds a paragraph to the PDF document at the specified position.
@@ -367,9 +355,6 @@ func (w *writer) makeLink(text string) []vec.Vec2 {
 }
 
 func (w *writer) addAnnotationPair(left *annotation.Link) error {
-	leftRef := w.RM.Out.Alloc()
-	rightRef := w.RM.Out.Alloc()
-
 	page := w.Page
 
 	text := left.Common.Contents
@@ -393,18 +378,6 @@ func (w *writer) addAnnotationPair(left *annotation.Link) error {
 	page.TextShowGlyphs(glyphs)
 	page.TextEnd()
 
-	// display reference markers for both annotations
-	page.TextBegin()
-	page.TextSetFont(w.Roman, 6)
-	page.TextSetHorizontalScaling(0.9)
-	page.TextSetWordSpacing(1)
-	page.SetFillColor(w.TextCol)
-	page.TextSetMatrix(matrix.Translate(leftX+boxW+3, w.yPos-6))
-	page.TextShow(fmt.Sprintf("%d %d R", leftRef.Number(), leftRef.Generation()))
-	page.TextSetMatrix(matrix.Translate(rightX+boxW+3, w.yPos-6))
-	page.TextShow(fmt.Sprintf("%d %d R", rightRef.Number(), rightRef.Generation()))
-	page.TextEnd()
-
 	// create a pair of annotations
 	right := clone(left)
 
@@ -415,10 +388,7 @@ func (w *writer) addAnnotationPair(left *annotation.Link) error {
 		URy: pdf.Round(w.yPos+14, 2),
 	}
 	left.Common.Contents = "www.example.com (viewer)"
-	err := w.embed(left, leftRef)
-	if err != nil {
-		return err
-	}
+	w.addAnnotation(left)
 
 	right.Common.Rect = pdf.Rectangle{
 		LLx: pdf.Round(rightX, 2),
@@ -427,14 +397,11 @@ func (w *writer) addAnnotationPair(left *annotation.Link) error {
 		URy: pdf.Round(w.yPos+14, 2),
 	}
 	right.Common.Contents = "www.example.com (quire)"
-	err = w.style.AddAppearance(right)
+	err := w.style.AddAppearance(right)
 	if err != nil {
 		return err
 	}
-	err = w.embed(right, rightRef)
-	if err != nil {
-		return err
-	}
+	w.addAnnotation(right)
 
 	w.yPos -= 36.0
 
@@ -532,11 +499,7 @@ func (w *writer) MakeAnnotation(url string, title string, bs *annotation.BorderS
 		}
 	}
 
-	ref := w.RM.Out.Alloc()
-	err := w.embed(link, ref)
-	if err != nil {
-		return err
-	}
+	w.addAnnotation(link)
 
 	return nil
 }

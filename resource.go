@@ -178,6 +178,43 @@ func ResourceManagerEmbedFunc[T any](rm *ResourceManager, f func(*EmbedHelper, T
 	return EmbedHelperEmbedFunc(e, f, obj)
 }
 
+// Store encodes an Encoder object and stores it in the PDF file.
+//
+// If the encoder was previously stored (via Store or StoreAt), the cached
+// reference is returned without encoding again.
+func (rm *ResourceManager) Store(enc Encoder) (Reference, error) {
+	if ref, ok := rm.embedded[enc].(Reference); ok {
+		return ref, nil
+	}
+	ref := rm.Out.Alloc()
+	if err := rm.StoreAt(ref, enc); err != nil {
+		return 0, err
+	}
+	return ref, nil
+}
+
+// StoreAt encodes an Encoder object and stores it at a specific reference.
+//
+// This is useful when references must be allocated before encoding, such as
+// when two objects need to reference each other (e.g., popup and text annotations).
+//
+// Returns an error if enc.Encode returns a Reference, since that would conflict
+// with the explicitly provided reference.
+func (rm *ResourceManager) StoreAt(ref Reference, enc Encoder) error {
+	native, err := enc.Encode(rm)
+	if err != nil {
+		return err
+	}
+	if _, isRef := native.(Reference); isRef {
+		return errors.New("cannot use StoreAt: Encode returned a Reference")
+	}
+	if err := rm.Out.Put(ref, native); err != nil {
+		return err
+	}
+	rm.embedded[enc] = ref
+	return nil
+}
+
 // Close runs all defered calls registered with [EmbedHelper.Defer].
 //
 // After Close has been called, the resource manager can no longer be used.

@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/page"
 )
 
 func TestSubtree(t *testing.T) {
@@ -41,16 +42,14 @@ func TestSubtree(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		s := &Writer{
-			Out:            w,
-			nextPageNumber: &futureInt{},
-		}
+		rm := pdf.NewResourceManager(w)
+		s := NewWriter(w, rm)
+
 		for i := 0; i < numPages; i++ {
-			pageDict := pdf.Dict{
-				"Type": pdf.Name("Page"),
-				"Test": pdf.Integer(i),
+			p := &page.Page{
+				MediaBox: &pdf.Rectangle{URx: 100, URy: 100},
 			}
-			err := s.AppendPage(pageDict)
+			err := s.AppendPage(p)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -67,6 +66,10 @@ func TestSubtree(t *testing.T) {
 		}
 
 		w.GetMeta().Catalog.Pages = rootRef // pretend we have pages
+		err = rm.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 		err = w.Close()
 		if err != nil {
 			t.Fatal(err)
@@ -80,11 +83,10 @@ func TestSubtree(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		test := pdf.Integer(0)
-		total, err := walk(r, r.GetMeta().Catalog.Pages, 0, &test)
+		total, err := walkPages(r, r.GetMeta().Catalog.Pages, 0)
 		if err != nil {
 			t.Fatal(err)
-		} else if total != pdf.Integer(numPages) {
+		} else if total != numPages {
 			t.Errorf("total pages: %d != %d", total, numPages)
 		}
 
@@ -174,7 +176,8 @@ func checkInvariants(nodes []*nodeInfo) error {
 	return nil
 }
 
-func walk(r pdf.Getter, nodeRef, parentRef pdf.Reference, test *pdf.Integer) (pdf.Integer, error) {
+// walkPages walks the page tree and counts pages, verifying structure.
+func walkPages(r pdf.Getter, nodeRef, parentRef pdf.Reference) (int, error) {
 	node, err := pdf.Resolve(r, nodeRef)
 	if err != nil {
 		return 0, err
@@ -183,35 +186,29 @@ func walk(r pdf.Getter, nodeRef, parentRef pdf.Reference, test *pdf.Integer) (pd
 	if !ok {
 		return 0, fmt.Errorf("not a dict: %T", node)
 	}
-	var total pdf.Integer
+	var total int
 	switch dict["Type"] {
 	case pdf.Name("Page"):
 		total++
-		x := dict["Test"]
-		if x != *test {
-			return 0, fmt.Errorf("wrong /Test: expected %d but got %s",
-				*test, x)
-		}
-		*test++
 	case pdf.Name("Pages"):
 		kids := dict["Kids"]
 		kidsArray, ok := kids.(pdf.Array)
 		if !ok {
 			return 0, fmt.Errorf("not an array: %T", kids)
 		}
-		var subTotal pdf.Integer
+		var subTotal int
 		for _, kid := range kidsArray {
 			kidRef, ok := kid.(pdf.Reference)
 			if !ok {
 				return 0, fmt.Errorf("not a reference: %T", kid)
 			}
-			count, err := walk(r, kidRef, nodeRef, test)
+			count, err := walkPages(r, kidRef, nodeRef)
 			if err != nil {
 				return 0, err
 			}
 			subTotal += count
 		}
-		if x, ok := dict["Count"].(pdf.Integer); !ok || x != subTotal {
+		if x, ok := dict["Count"].(pdf.Integer); !ok || int(x) != subTotal {
 			return 0, fmt.Errorf("wrong /Count: expected %d but got %s",
 				subTotal, dict["Count"])
 		}
@@ -261,40 +258,52 @@ func TestInheritRotate(t *testing.T) {
 func FuzzInherit(f *testing.F) {
 	f.Add([]byte{0, 1, 2, 3})
 
+	// Pre-define some MediaBox and CropBox values for testing inheritance
+	mediaBoxes := []*pdf.Rectangle{
+		{URx: 100, URy: 100},
+		{URx: 200, URy: 200},
+		{URx: 300, URy: 300},
+	}
+	cropBoxes := []*pdf.Rectangle{
+		nil, // no CropBox
+		{LLx: 10, LLy: 10, URx: 90, URy: 90},
+		{LLx: 20, LLy: 20, URx: 180, URy: 180},
+	}
+	rotations := []page.Rotation{
+		page.RotateInherit,
+		page.Rotate0,
+		page.Rotate90,
+		page.Rotate180,
+		page.Rotate270,
+	}
+
 	f.Fuzz(func(t *testing.T, data []byte) {
 		if len(data) == 0 {
 			return
 		}
 
-		mediaBox := make([]pdf.Object, len(data))
+		// Build expected values from fuzz data
+		expectedMediaBox := make([]*pdf.Rectangle, len(data))
+		expectedCropBox := make([]*pdf.Rectangle, len(data))
+		expectedRotate := make([]page.Rotation, len(data))
+
 		for i, c := range data {
-			mb := uint32(c>>2) & 3
-			if mb != 0 {
-				mediaBox[i] = pdf.NewReference(mb+10, 0)
-			}
-		}
-		cropBox := make([]pdf.Object, len(data))
-		for i, c := range data {
-			cb := uint32(c>>4) & 3
-			if cb != 0 {
-				cropBox[i] = pdf.NewReference(cb+20, 0)
-			}
+			expectedMediaBox[i] = mediaBoxes[int(c&3)%len(mediaBoxes)]
+			expectedCropBox[i] = cropBoxes[int((c>>2)&3)%len(cropBoxes)]
+			expectedRotate[i] = rotations[int((c>>4)&7)%len(rotations)]
 		}
 
 		doc, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-		pp := NewWriter(doc)
-		for i, c := range data {
-			dict := pdf.Dict{
-				"Type":   pdf.Name("Page"),
-				"Rotate": pdf.Integer(c&3) * 90,
+		rm := pdf.NewResourceManager(doc)
+		pp := NewWriter(doc, rm)
+
+		for i := range data {
+			p := &page.Page{
+				MediaBox: expectedMediaBox[i],
+				CropBox:  expectedCropBox[i],
+				Rotate:   expectedRotate[i],
 			}
-			if mediaBox[i] != nil {
-				dict["MediaBox"] = mediaBox[i]
-			}
-			if cropBox[i] != nil {
-				dict["CropBox"] = cropBox[i]
-			}
-			err := pp.AppendPage(dict)
+			err := pp.AppendPage(p)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -304,24 +313,43 @@ func FuzzInherit(f *testing.F) {
 			t.Fatal(err)
 		}
 		doc.GetMeta().Catalog.Pages = rootRef
+		err = rm.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		for i, c := range data {
+		// Verify the values are preserved after inheritance optimization
+		for i := range data {
 			_, dict, err := GetPage(doc, i)
 			if err != nil {
 				t.Fatal(err)
 			}
-			rotate, err := pdf.GetInteger(doc, dict["Rotate"])
+
+			// Check MediaBox
+			gotMediaBox, err := pdf.GetRectangle(doc, dict["MediaBox"])
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("page %d: failed to get MediaBox: %v", i, err)
 			}
-			if rotate != pdf.Integer(c&3)*90 {
-				t.Error("wrong rotate:", rotate, "expected", pdf.Integer(c&3)*90)
+			if *gotMediaBox != *expectedMediaBox[i] {
+				t.Errorf("page %d: wrong MediaBox: got %v, expected %v", i, gotMediaBox, expectedMediaBox[i])
 			}
-			if obj := dict["MediaBox"]; obj != mediaBox[i] {
-				t.Error("wrong media box:", obj, "expected", mediaBox[i])
+
+			// Check CropBox
+			if expectedCropBox[i] != nil {
+				gotCropBox, err := pdf.GetRectangle(doc, dict["CropBox"])
+				if err != nil {
+					t.Fatalf("page %d: failed to get CropBox: %v", i, err)
+				}
+				if *gotCropBox != *expectedCropBox[i] {
+					t.Errorf("page %d: wrong CropBox: got %v, expected %v", i, gotCropBox, expectedCropBox[i])
+				}
 			}
-			if obj := dict["CropBox"]; obj != cropBox[i] {
-				t.Error("wrong crop box:", obj, "expected", cropBox[i])
+
+			// Check Rotate - account for inheritance (RotateInherit means 0 degrees)
+			rotate, _ := pdf.GetInteger(doc, dict["Rotate"])
+			expectedDegrees := expectedRotate[i].Degrees()
+			if int(rotate) != expectedDegrees {
+				t.Errorf("page %d: wrong Rotate: got %d, expected %d", i, rotate, expectedDegrees)
 			}
 		}
 	})

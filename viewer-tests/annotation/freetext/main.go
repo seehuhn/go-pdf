@@ -76,9 +76,8 @@ func createDocument(filename string) error {
 	page.DrawShading(background)
 
 	w := &writer{
-		annots: pdf.Array{},
-		page:   page,
-		style:  fallback.NewStyle(),
+		page:  page,
+		style: fallback.NewStyle(),
 	}
 
 	leStyles := []annotation.LineEndingStyle{
@@ -139,43 +138,24 @@ func createDocument(filename string) error {
 			},
 			LineEndingStyle: style,
 		}
-		err := w.addAnnotationPair(template)
-		if err != nil {
-			return err
-		}
+		w.addAnnotationPair(template)
 	}
-
-	page.PageDict["Annots"] = w.annots
 
 	return page.Close()
 }
 
 type writer struct {
-	annots pdf.Array
-	page   *document.Page
-	style  *fallback.Style
+	page  *document.Page
+	style *fallback.Style
 }
 
-func (w *writer) embed(a annotation.Annotation) error {
-	obj, err := a.Encode(w.page.RM)
-	if err != nil {
-		return err
-	}
-	ref := w.page.RM.Out.Alloc()
-	err = w.page.RM.Out.Put(ref, obj)
-	if err != nil {
-		return err
-	}
-	w.annots = append(w.annots, ref)
-	return nil
+func (w *writer) addAnnotation(a annotation.Annotation) {
+	w.page.Page.Annots = append(w.page.Page.Annots, a)
 }
 
-func (w *writer) addAnnotationPair(left *annotation.FreeText) error {
-	// embed left annotation as-is
-	err := w.embed(left)
-	if err != nil {
-		return err
-	}
+func (w *writer) addAnnotationPair(left *annotation.FreeText) {
+	// add left annotation as-is
+	w.addAnnotation(left)
 
 	// create shallow copy for right column
 	right := clone(left)
@@ -190,8 +170,8 @@ func (w *writer) addAnnotationPair(left *annotation.FreeText) error {
 
 	w.style.AddAppearance(right)
 
-	// embed right annotation
-	return w.embed(right)
+	// add right annotation
+	w.addAnnotation(right)
 }
 
 func clone[T any](v *T) *T {

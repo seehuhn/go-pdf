@@ -42,6 +42,55 @@ import (
 
 // PDF 2.0 sections: 7.7.3
 
+// Rotation specifies the clockwise rotation of a page in degrees.
+// Use RotateInherit to inherit the rotation from the parent Pages node.
+type Rotation int
+
+const (
+	// RotateInherit indicates that the rotation should be inherited from
+	// the parent Pages node. This is the default value.
+	RotateInherit Rotation = iota
+	// Rotate0 explicitly sets the rotation to 0 degrees.
+	Rotate0
+	// Rotate90 sets the rotation to 90 degrees clockwise.
+	Rotate90
+	// Rotate180 sets the rotation to 180 degrees.
+	Rotate180
+	// Rotate270 sets the rotation to 270 degrees clockwise.
+	Rotate270
+)
+
+// Degrees returns the rotation in degrees.
+// For RotateInherit, this returns 0 (the default inherited value).
+func (r Rotation) Degrees() int {
+	switch r {
+	case Rotate90:
+		return 90
+	case Rotate180:
+		return 180
+	case Rotate270:
+		return 270
+	default:
+		return 0
+	}
+}
+
+// degrees returns the rotation in degrees, or -1 for RotateInherit.
+func (r Rotation) degrees() int {
+	switch r {
+	case Rotate0:
+		return 0
+	case Rotate90:
+		return 90
+	case Rotate180:
+		return 180
+	case Rotate270:
+		return 270
+	default:
+		return -1
+	}
+}
+
 // Page represents a PDF page object (Table 31 in the PDF spec).
 // It implements [pdf.Encoder] for file-dependent embedding.
 //
@@ -81,8 +130,8 @@ type Page struct {
 	BoxColorInfo *boxcolor.Info
 
 	// Rotate (optional; inheritable) specifies clockwise rotation in degrees.
-	// Must be a multiple of 90.
-	Rotate int
+	// Use RotateInherit to inherit from the parent Pages node.
+	Rotate Rotation
 
 	// Group (optional) specifies transparency group attributes for the page.
 	Group *group.TransparencyAttributes
@@ -180,7 +229,12 @@ type Page struct {
 var _ pdf.Encoder = (*Page)(nil)
 
 // Encode writes the page dictionary to the PDF file.
+// Parent must be set before calling Encode.
 func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
+	if p.Parent == 0 {
+		return nil, errors.New("page Parent must be set before encoding")
+	}
+
 	w := rm.Out
 	v := pdf.GetVersion(w)
 
@@ -266,12 +320,11 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["BoxColorInfo"] = obj
 	}
 
-	// Rotate (must be multiple of 90)
-	if p.Rotate != 0 {
-		if p.Rotate%90 != 0 {
-			return nil, fmt.Errorf("Rotate must be a multiple of 90, got %d", p.Rotate)
-		}
-		dict["Rotate"] = pdf.Integer(p.Rotate)
+	// Rotate
+	if deg := p.Rotate.degrees(); deg >= 0 {
+		dict["Rotate"] = pdf.Integer(deg)
+	} else if p.Rotate != RotateInherit {
+		return nil, fmt.Errorf("invalid Rotate value: %d", p.Rotate)
 	}
 
 	// Group
@@ -325,12 +378,8 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if len(p.Annots) > 0 {
 		arr := make(pdf.Array, len(p.Annots))
 		for i, annot := range p.Annots {
-			annotDict, err := annot.Encode(rm)
+			ref, err := rm.Store(annot)
 			if err != nil {
-				return nil, err
-			}
-			ref := rm.Out.Alloc()
-			if err := rm.Out.Put(ref, annotDict); err != nil {
 				return nil, err
 			}
 			arr[i] = ref
@@ -622,14 +671,28 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	// Rotate (optional, inheritable)
-	// Normalize to 0, 90, 180, 270; invalid values default to 0.
-	if rotate, err := pdf.Optional(x.GetInteger(dict["Rotate"])); err != nil {
-		return nil, err
-	} else if rotate%90 != 0 {
-		p.Rotate = 0
-	} else {
-		p.Rotate = ((int(rotate) % 360) + 360) % 360
+	if dict["Rotate"] != nil {
+		rotate, err := pdf.Optional(x.GetInteger(dict["Rotate"]))
+		if err != nil {
+			return nil, err
+		}
+		// Normalize to 0, 90, 180, 270
+		deg := ((int(rotate) % 360) + 360) % 360
+		switch deg {
+		case 0:
+			p.Rotate = Rotate0
+		case 90:
+			p.Rotate = Rotate90
+		case 180:
+			p.Rotate = Rotate180
+		case 270:
+			p.Rotate = Rotate270
+		default:
+			// Invalid values default to Rotate0
+			p.Rotate = Rotate0
+		}
 	}
+	// If Rotate key is absent, p.Rotate remains RotateInherit (zero value)
 
 	// Group (optional)
 	if dict["Group"] != nil {

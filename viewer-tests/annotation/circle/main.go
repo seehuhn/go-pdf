@@ -76,11 +76,10 @@ func createDocument(filename string) error {
 	H := standard.Helvetica.New()
 
 	w := &writer{
-		annots: pdf.Array{},
-		page:   page,
-		style:  fallback.NewStyle(),
-		yPos:   startY,
-		font:   H,
+		page:  page,
+		style: fallback.NewStyle(),
+		yPos:  startY,
+		font:  H,
 	}
 
 	page.TextBegin()
@@ -100,10 +99,7 @@ func createDocument(filename string) error {
 			Color:    color.Blue,
 		},
 	}
-	err = w.addAnnotationPair(a)
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(a)
 
 	a = &annotation.Circle{
 		Common: annotation.Common{
@@ -113,10 +109,7 @@ func createDocument(filename string) error {
 			Color:    color.Blue,
 		},
 	}
-	err = w.addAnnotationPair(a)
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(a)
 
 	a = &annotation.Circle{
 		Common: annotation.Common{
@@ -126,10 +119,7 @@ func createDocument(filename string) error {
 		},
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
 	}
-	err = w.addAnnotationPair(a)
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(a)
 
 	a = &annotation.Circle{
 		Common: annotation.Common{
@@ -144,10 +134,7 @@ func createDocument(filename string) error {
 			SingleUse: true,
 		},
 	}
-	err = w.addAnnotationPair(a)
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(a)
 
 	a = &annotation.Circle{
 		Common: annotation.Common{
@@ -161,10 +148,7 @@ func createDocument(filename string) error {
 			SingleUse: true,
 		},
 	}
-	err = w.addAnnotationPair(a)
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(a)
 
 	a = &annotation.Circle{
 		Common: annotation.Common{
@@ -178,10 +162,7 @@ func createDocument(filename string) error {
 			SingleUse: true,
 		},
 	}
-	err = w.addAnnotationPair(a)
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(a)
 
 	a = &annotation.Circle{
 		Common: annotation.Common{
@@ -190,10 +171,7 @@ func createDocument(filename string) error {
 			Border:   &annotation.Border{Width: 2, SingleUse: true},
 		},
 	}
-	err = w.addAnnotationPair(a)
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(a)
 
 	a = &annotation.Circle{
 		Common: annotation.Common{
@@ -204,10 +182,7 @@ func createDocument(filename string) error {
 		},
 		FillColor: color.White,
 	}
-	err = w.addAnnotationPair(a)
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(a)
 
 	a = &annotation.Circle{
 		Common: annotation.Common{
@@ -227,10 +202,7 @@ func createDocument(filename string) error {
 			SingleUse: true,
 		},
 	}
-	err = w.addAnnotationPair(a)
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(a)
 
 	a = &annotation.Circle{
 		Common: annotation.Common{
@@ -250,10 +222,7 @@ func createDocument(filename string) error {
 			SingleUse: true,
 		},
 	}
-	err = w.addAnnotationPair(a)
-	if err != nil {
-		return err
-	}
+	w.addAnnotationPair(a)
 
 	a = &annotation.Circle{
 		Common: annotation.Common{
@@ -273,55 +242,31 @@ func createDocument(filename string) error {
 			SingleUse: true,
 		},
 	}
-	err = w.addAnnotationPair(a)
-	if err != nil {
-		return err
-	}
-
-	page.PageDict["Annots"] = w.annots
+	w.addAnnotationPair(a)
 
 	return page.Close()
 }
 
 type writer struct {
-	annots pdf.Array
-	page   *document.Page
-	style  *fallback.Style
-	yPos   float64
-	font   font.Layouter
+	page  *document.Page
+	style *fallback.Style
+	yPos  float64
+	font  font.Layouter
 }
 
-func (w *writer) embed(a annotation.Annotation, ref pdf.Reference) error {
-	obj, err := a.Encode(w.page.RM)
-	if err != nil {
-		return err
-	}
-	err = w.page.RM.Out.Put(ref, obj)
-	if err != nil {
-		return err
-	}
-	w.annots = append(w.annots, ref)
-	return nil
+func (w *writer) addAnnotation(a annotation.Annotation) {
+	w.page.Page.Annots = append(w.page.Page.Annots, a)
 }
 
-func (w *writer) addAnnotationPair(left *annotation.Circle) error {
+func (w *writer) addAnnotationPair(left *annotation.Circle) {
 	if left.BorderEffect != nil {
 		w.yPos -= 5 * left.BorderEffect.Intensity
 	}
-
-	leftRef := w.page.RM.Out.Alloc()
-	rightRef := w.page.RM.Out.Alloc()
 
 	w.page.TextBegin()
 	w.page.TextSetFont(w.font, 10)
 	w.page.TextSetMatrix(matrix.Translate(commentStart, w.yPos-circleSize/2-3))
 	w.page.TextShow(left.Contents)
-	w.page.TextSetFont(w.font, 6)
-	w.page.TextSetHorizontalScaling(0.9)
-	w.page.TextSetMatrix(matrix.Translate(leftColEnd+3, w.yPos-circleSize))
-	w.page.TextShow(fmt.Sprintf("%d %d R", leftRef.Number(), leftRef.Generation()))
-	w.page.TextSetMatrix(matrix.Translate(rightColEnd+3, w.yPos-circleSize))
-	w.page.TextShow(fmt.Sprintf("%d %d R", rightRef.Number(), rightRef.Generation()))
 	w.page.TextEnd()
 
 	right := clone(left)
@@ -344,22 +289,13 @@ func (w *writer) addAnnotationPair(left *annotation.Circle) error {
 
 	w.style.AddAppearance(right)
 
-	err := w.embed(left, leftRef)
-	if err != nil {
-		return err
-	}
-
-	err = w.embed(right, rightRef)
-	if err != nil {
-		return err
-	}
+	w.addAnnotation(left)
+	w.addAnnotation(right)
 
 	w.yPos -= circleSize + 12.0
 	if left.BorderEffect != nil {
 		w.yPos -= 5 * left.BorderEffect.Intensity
 	}
-
-	return nil
 }
 
 func clone[T any](v *T) *T {

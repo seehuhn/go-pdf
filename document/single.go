@@ -22,6 +22,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
+	"seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
@@ -46,24 +47,25 @@ func WriteSinglePage(w io.Writer, pageSize *pdf.Rectangle, v pdf.Version, opt *p
 }
 
 func singlePage(w *pdf.Writer, pageSize *pdf.Rectangle) (*Page, error) {
-	tree := pagetree.NewWriter(w)
 	rm := pdf.NewResourceManager(w)
-	page := builder.New(content.Page, nil)
+	tree := pagetree.NewWriter(w, rm)
 
-	pageDict := pdf.Dict{
-		"Type": pdf.Name("Page"),
-	}
-	if pageSize != nil {
-		pageDict["MediaBox"] = pageSize
+	// Create shared resources between page and builder
+	res := &content.Resources{}
+
+	b := builder.New(content.Page, res)
+	pg := &page.Page{
+		MediaBox:  pageSize,
+		Resources: res,
 	}
 
 	p := &Page{
-		Builder:  page,
-		RM:       rm,
-		PageDict: pageDict,
-		Out:      w,
-		tree:     tree,
-		closeFn:  closePage,
+		Builder: b,
+		RM:      rm,
+		Page:    pg,
+		Out:     w,
+		tree:    tree,
+		closeFn: closePage,
 	}
 	return p, nil
 }

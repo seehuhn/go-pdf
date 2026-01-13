@@ -20,8 +20,8 @@ import (
 	"errors"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
+	"seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
@@ -34,14 +34,10 @@ type Page struct {
 	// RM is the resource manager for embedding resources.
 	RM *pdf.ResourceManager
 
-	// PageDict is the PDF dictionary for this page.
-	// This can be modified by the user.  The values at the time
+	// Page is the typed page object.
+	// This can be modified by the user. The values at the time
 	// when the page is closed will be written to the PDF file.
-	//
-	// See section 7.7.3.3. of PDF 32000-1:2008 for a list of
-	// possible entries in this dictionary:
-	// https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf#page=85
-	PageDict pdf.Dict
+	Page *page.Page
 
 	// Out is the PDF file which contains this page.
 	// This can be used to embed fonts, images, etc.
@@ -58,60 +54,34 @@ type Page struct {
 }
 
 func (p *Page) SetPageSize(paper *pdf.Rectangle) {
-	p.PageDict["MediaBox"] = paper
+	p.Page.MediaBox = paper
 }
 
 func (p *Page) GetPageSize() *pdf.Rectangle {
-	paper, _ := p.PageDict["MediaBox"].(*pdf.Rectangle)
-	return paper
+	return p.Page.MediaBox
 }
 
 // Close writes the page to the PDF file.
 // The page contents can no longer be modified after this call.
 func (p *Page) Close() error {
+	if p.Builder == nil {
+		return errors.New("page already closed")
+	}
 	if p.Builder.Err != nil {
 		return p.Builder.Err
 	}
-	if p.PageDict["MediaBox"] == nil || p.PageDict["MediaBox"] == (*pdf.Rectangle)(nil) {
+	if p.Page.MediaBox == nil {
 		return errors.New("page size not set")
 	}
 
-	var filters []pdf.Filter
-	opt := p.Out.GetOptions()
-	if !opt.HasAny(pdf.OptPretty) {
-		filters = append(filters, pdf.FilterCompress{})
-	}
-
-	// Write content stream
-	contentRef := p.Out.Alloc()
-	stream, err := p.Out.OpenStream(contentRef, nil, filters...)
-	if err != nil {
-		return err
-	}
-	err = content.Write(stream, p.Builder.Stream,
-		p.Out.GetMeta().Version, content.Page, p.Builder.Resources)
-	if err != nil {
-		return err
-	}
-	err = stream.Close()
-	if err != nil {
-		return err
-	}
-
-	// Embed resources
-	resObj, err := p.RM.Embed(p.Builder.Resources)
-	if err != nil {
-		return err
-	}
-
-	p.PageDict["Contents"] = contentRef
-	p.PageDict["Resources"] = resObj
+	// Set up page contents from builder stream
+	p.Page.Contents = []*page.Content{{Operators: p.Builder.Stream}}
 
 	ref := p.Ref
 	if ref == 0 {
 		ref = p.Out.Alloc()
 	}
-	err = p.tree.AppendPageRef(ref, p.PageDict)
+	err := p.tree.AppendPageRef(ref, p.Page)
 	if err != nil {
 		return err
 	}
@@ -121,8 +91,7 @@ func (p *Page) Close() error {
 		return err
 	}
 
-	// Disable the page, since it cannot be modified anymore.
-	p.Builder.Stream = nil
+	// Disable the builder, but keep p.Page accessible for inspection.
 	p.Builder = nil
 	return nil
 }

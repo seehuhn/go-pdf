@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
@@ -31,13 +32,14 @@ func TestFindPages(t *testing.T) {
 
 	numPages := 234
 	pageRefsIn := make([]pdf.Reference, numPages)
-	tree := pagetree.NewWriter(doc)
+	rm := pdf.NewResourceManager(doc)
+	tree := pagetree.NewWriter(doc, rm)
 	for i := 0; i < numPages; i++ {
 		pageRefsIn[i] = doc.Alloc()
-		pageDict := pdf.Dict{
-			"Type": pdf.Name("Page"),
+		p := &page.Page{
+			MediaBox: &pdf.Rectangle{URx: 100, URy: 100},
 		}
-		err := tree.AppendPageRef(pageRefsIn[i], pageDict)
+		err := tree.AppendPageRef(pageRefsIn[i], p)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -47,6 +49,10 @@ func TestFindPages(t *testing.T) {
 		t.Fatal(err)
 	}
 	doc.GetMeta().Catalog.Pages = treeRef
+	err = rm.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	pageRefsOut, err := pagetree.FindPages(doc)
 	if err != nil {

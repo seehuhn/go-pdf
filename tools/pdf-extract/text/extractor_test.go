@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/property"
 )
@@ -38,7 +39,7 @@ func TestTextExtractorBasic(t *testing.T) {
 
 	F := standard.Helvetica.New()
 
-	pageTree := pagetree.NewWriter(w)
+	pageTree := pagetree.NewWriter(w, rm)
 
 	b := builder.New(content.Page, nil)
 	b.TextBegin()
@@ -51,34 +52,12 @@ func TestTextExtractorBasic(t *testing.T) {
 		t.Fatal(b.Err)
 	}
 
-	// create stream from builder
-	contentRef := w.Alloc()
-	stream, err := w.OpenStream(contentRef, nil)
-	if err != nil {
-		t.Fatal(err)
+	p := &page.Page{
+		MediaBox:  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 595, URy: 842},
+		Resources: b.Resources,
+		Contents:  []*page.Content{{Operators: b.Stream}},
 	}
-	err = content.Write(stream, b.Stream, pdf.V2_0, content.Page, b.Resources)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = stream.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// embed resources
-	resRef, err := rm.Embed(b.Resources)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	page := pdf.Dict{
-		"Type":      pdf.Name("Page"),
-		"Contents":  contentRef,
-		"Resources": resRef,
-		"MediaBox":  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 595, URy: 842},
-	}
-	err = pageTree.AppendPage(page)
+	err := pageTree.AppendPage(p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +106,7 @@ func TestTextExtractorActualText(t *testing.T) {
 
 	F := standard.Helvetica.New()
 
-	pageTree := pagetree.NewWriter(w)
+	pageTree := pagetree.NewWriter(w, rm)
 
 	b := builder.New(content.Page, nil)
 
@@ -165,34 +144,12 @@ func TestTextExtractorActualText(t *testing.T) {
 		t.Fatal(b.Err)
 	}
 
-	// create stream from builder
-	contentRef := w.Alloc()
-	stream, err := w.OpenStream(contentRef, nil)
-	if err != nil {
-		t.Fatal(err)
+	p := &page.Page{
+		MediaBox:  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 595, URy: 842},
+		Resources: b.Resources,
+		Contents:  []*page.Content{{Operators: b.Stream}},
 	}
-	err = content.Write(stream, b.Stream, pdf.V2_0, content.Page, b.Resources)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = stream.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// embed resources
-	resRef, err := rm.Embed(b.Resources)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	page := pdf.Dict{
-		"Type":      pdf.Name("Page"),
-		"Contents":  contentRef,
-		"Resources": resRef,
-		"MediaBox":  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 595, URy: 842},
-	}
-	err = pageTree.AppendPage(page)
+	err := pageTree.AppendPage(p)
 	if err != nil {
 		t.Fatal(err)
 	}

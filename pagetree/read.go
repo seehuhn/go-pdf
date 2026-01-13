@@ -205,12 +205,12 @@ func (i *Iterator) All() iter.Seq2[pdf.Reference, pdf.Dict] {
 
 func getInheritable(v pdf.Version) []pdf.Name {
 	if v < pdf.V1_3 {
-		return inheritedOld
+		return inheritableOld
 	}
 	return inheritableNew
 }
 
 var (
 	inheritableNew = []pdf.Name{"Resources", "MediaBox", "CropBox", "Rotate"}       // Since PDF 1.3
-	inheritedOld   = []pdf.Name{"Resources", "MediaBox", "CropBox", "Rotate", "AA"} // Before PDF 1.3
+	inheritableOld = []pdf.Name{"Resources", "MediaBox", "CropBox", "Rotate", "AA"} // Before PDF 1.3
 )

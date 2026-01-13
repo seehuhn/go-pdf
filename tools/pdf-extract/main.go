@@ -206,7 +206,8 @@ func (pe PDFExtractor) Process(doc pdf.Getter, pages *PageSet, outputFile string
 	}
 
 	// create page tree writer and copier
-	pageTreeOut := pagetree.NewWriter(out)
+	rm := pdf.NewResourceManager(out)
+	pageTreeOut := pagetree.NewWriter(out, rm)
 	copier := pdf.NewCopier(out, doc)
 
 	// extract each selected page
@@ -233,13 +234,18 @@ func (pe PDFExtractor) Process(doc pdf.Getter, pages *PageSet, outputFile string
 		}
 
 		// add page to output page tree
-		pageTreeOut.AppendPageRef(refOut, pageOut)
+		pageTreeOut.AppendPageDict(refOut, pageOut)
 	}
 
 	// finalize page tree
 	treeRef, err := pageTreeOut.Close()
 	if err != nil {
 		return fmt.Errorf("failed to close page tree: %w", err)
+	}
+
+	err = rm.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close resource manager: %w", err)
 	}
 
 	// set up output metadata

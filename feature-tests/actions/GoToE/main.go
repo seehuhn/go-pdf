@@ -274,18 +274,7 @@ func addFileAttachment(page *document.Page, name string, data []byte) error {
 		FS: fileRef.(pdf.Reference),
 	}
 
-	annotDict, err := annot.Encode(page.RM)
-	if err != nil {
-		return err
-	}
-
-	annotRef := page.RM.Out.Alloc()
-	if err := page.RM.Out.Put(annotRef, annotDict); err != nil {
-		return err
-	}
-
-	existingAnnots, _ := page.PageDict["Annots"].(pdf.Array)
-	page.PageDict["Annots"] = append(existingAnnots, annotRef)
+	page.Page.Annots = append(page.Page.Annots, annot)
 
 	return nil
 }
@@ -426,18 +415,7 @@ func addPageLink(page *document.Page, fromDoc, toDoc string, toPage int, rect pd
 		}
 	}
 
-	linkDict, err := link.Encode(page.RM)
-	if err != nil {
-		return err
-	}
-
-	linkRef := page.RM.Out.Alloc()
-	if err := page.RM.Out.Put(linkRef, linkDict); err != nil {
-		return err
-	}
-
-	existingAnnots, _ := page.PageDict["Annots"].(pdf.Array)
-	page.PageDict["Annots"] = append(existingAnnots, linkRef)
+	page.Page.Annots = append(page.Page.Annots, link)
 
 	return nil
 }

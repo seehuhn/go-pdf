@@ -22,6 +22,8 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/page"
 )
 
 type dictInfo struct {
@@ -31,6 +33,12 @@ type dictInfo struct {
 
 type nodeInfo struct {
 	*dictInfo
+
+	// pendingPage holds a page.Page that hasn't been encoded yet.
+	// When mergeNodes processes this node, it will set Parent, encode
+	// the page, and populate dictInfo.
+	pendingPage *page.Page
+
 	pageCount pdf.Integer
 	depth     int // upper bound
 }
@@ -100,6 +108,9 @@ func (w *Writer) merge(a, b []*nodeInfo) []*nodeInfo {
 
 // mergeNodes collapses nodes a, ..., b-1 into a new internal node.
 func (w *Writer) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
+	if w.err != nil {
+		return nodes
+	}
 	if a < 0 || b > len(nodes) || b-a < 2 || b-a > maxDegree {
 		// TODO(voss): remove
 		panic(fmt.Errorf("invalid subtree node range %d, %d", a, b))
@@ -109,18 +120,37 @@ func (w *Writer) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
 	}
 	childNodes := nodes[a:b]
 
+	parentRef := w.Out.Alloc()
+
+	// First pass: encode any pending pages now that Parent is known
+	for _, node := range childNodes {
+		if node.pendingPage != nil {
+			node.pendingPage.Parent = parentRef
+			if node.pendingPage.Resources == nil {
+				node.pendingPage.Resources = &content.Resources{}
+			}
+			dict, err := node.pendingPage.Encode(w.RM)
+			if err != nil {
+				w.err = err
+				return nodes
+			}
+			node.dict = dict.(pdf.Dict)
+			node.pendingPage = nil
+		} else {
+			node.dict["Parent"] = parentRef
+		}
+	}
+
 	parentDict := pdf.Dict{
 		"Type": pdf.Name("Pages"),
 	}
 
-	inherit(parentDict, childNodes)
+	inherit(parentDict, childNodes, w.Out.GetMeta().Version)
 
 	kids := make(pdf.Array, len(childNodes))
-	parentRef := w.Out.Alloc()
 	var pageCount pdf.Integer
 	maxDepth := 0
 	for i, node := range childNodes {
-		node.dict["Parent"] = parentRef
 		kids[i] = node.ref
 
 		w.outRefs = append(w.outRefs, node.ref)
@@ -148,39 +178,18 @@ func (w *Writer) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
 	return nodes
 }
 
-func sanitize(pageDict pdf.Dict) {
-	if _, ok := pageDict["Resources"]; !ok {
-		// This field is required by the spec.  If the called failed to assign
-		// a value, we use an empty dict (indicating that no resources are
-		// required by the page).
-		pageDict["Resources"] = pdf.Dict{}
-	}
-
-	if _, ok := pageDict["Rotate"]; !ok {
-		// This is the default value.  We add it here to help the function
-		// [inherit].  Our convention:
-		//
-		// - 0: At least one page in this subtree inherits the value
-		//   and expects the inherited value to be 0.
-		// - unset (on internal nodes): all child nodes set the value
-		//   explicitly, so the value in the current node does not matter.
-		// - anything else: the value is set explicitly in this node.
-		//
-		// If possible, [inherit] will remove this entry again before writing
-		// the node to the output.
-		pageDict["Rotate"] = pdf.Integer(0)
-	}
-}
-
 // inherit extracts inheritable attributes from the child nodes
 // and adds them to the parentDict.
-func inherit(parentDict pdf.Dict, childNodes []*nodeInfo) {
+func inherit(parentDict pdf.Dict, childNodes []*nodeInfo, v pdf.Version) {
 	// We don't try to inherit /Resources, since (a) it is uncommon
 	// for different pages to use exactly the same resources, and
 	// (b) the PDF-2.0 spec recommends against it.
 	inheritKey("MediaBox", parentDict, childNodes)
 	inheritKey("CropBox", parentDict, childNodes)
 	inheritRotate(parentDict, childNodes)
+	if v < pdf.V1_3 {
+		inheritKey("AA", parentDict, childNodes)
+	}
 }
 
 func inheritKey(key pdf.Name, parentDict pdf.Dict, childNodes []*nodeInfo) {

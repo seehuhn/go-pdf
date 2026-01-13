@@ -35,7 +35,13 @@ var _ pdf.Embedder = (*Content)(nil)
 // No resource validation is performed; validation is done at the Page level.
 func (pc *Content) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	ref := rm.Alloc()
-	stm, err := rm.Out().OpenStream(ref, nil, pdf.FilterCompress{})
+
+	var filters []pdf.Filter
+	if !rm.Out().GetOptions().HasAny(pdf.OptPretty) {
+		filters = append(filters, pdf.FilterCompress{})
+	}
+
+	stm, err := rm.Out().OpenStream(ref, nil, filters...)
 	if err != nil {
 		return nil, err
 	}

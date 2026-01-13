@@ -26,7 +26,6 @@ import (
 
 func TestContentStream(t *testing.T) {
 	pdfData, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	tree := NewWriter(pdfData)
 
 	A := addStream(t, pdfData, "A")
 	B := addStream(t, pdfData, "B", pdf.FilterCompress{})
@@ -71,22 +70,38 @@ func TestContentStream(t *testing.T) {
 		},
 	}
 
-	for _, test := range cases {
+	// Build pages and page tree manually (not using pagetree.Writer)
+	// to test ContentStream reading with raw content stream references.
+	pagesRef := pdfData.Alloc()
+	kids := make(pdf.Array, len(cases))
+	for i, test := range cases {
 		test.ref = pdfData.Alloc()
 		dict := pdf.Dict{
-			"Contents": test.contents,
+			"Type":     pdf.Name("Page"),
+			"Parent":   pagesRef,
+			"MediaBox": &pdf.Rectangle{URx: 100, URy: 100},
 		}
-		err := tree.AppendPageRef(test.ref, dict)
+		if test.contents != nil {
+			dict["Contents"] = test.contents
+		}
+		err := pdfData.Put(test.ref, dict)
 		if err != nil {
 			t.Fatal(err)
 		}
+		kids[i] = test.ref
 	}
 
-	treeRef, err := tree.Close()
+	pagesDict := pdf.Dict{
+		"Type":  pdf.Name("Pages"),
+		"Kids":  kids,
+		"Count": pdf.Integer(len(cases)),
+	}
+	err := pdfData.Put(pagesRef, pagesDict)
 	if err != nil {
 		t.Fatal(err)
 	}
-	pdfData.GetMeta().Catalog.Pages = treeRef
+
+	pdfData.GetMeta().Catalog.Pages = pagesRef
 	err = pdfData.Close()
 	if err != nil {
 		t.Fatal(err)

@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
+	"seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
@@ -59,7 +60,7 @@ func WriteMultiPage(w io.Writer, pageSize *pdf.Rectangle, v pdf.Version, opt *pd
 	}
 
 	rm := pdf.NewResourceManager(out)
-	tree := pagetree.NewWriter(out)
+	tree := pagetree.NewWriter(out, rm)
 
 	return &MultiPage{
 		Out:      out,
@@ -71,7 +72,7 @@ func WriteMultiPage(w io.Writer, pageSize *pdf.Rectangle, v pdf.Version, opt *pd
 
 func AddMultiPage(out *pdf.Writer, pageSize *pdf.Rectangle) (*MultiPage, error) {
 	rm := pdf.NewResourceManager(out)
-	tree := pagetree.NewWriter(out)
+	tree := pagetree.NewWriter(out, rm)
 
 	return &MultiPage{
 		Out:      out,
@@ -113,17 +114,21 @@ func (doc *MultiPage) Close() error {
 func (doc *MultiPage) AddPage() *Page {
 	doc.numOpen++
 
-	page := builder.New(content.Page, nil)
+	// Create shared resources between page and builder
+	res := &content.Resources{}
+
+	b := builder.New(content.Page, res)
+	p := &page.Page{
+		MediaBox:  doc.mediaBox,
+		Resources: res,
+	}
 	return &Page{
-		Builder: page,
+		Builder: b,
 		RM:      doc.RM,
-		PageDict: pdf.Dict{
-			"Type":     pdf.Name("Page"),
-			"MediaBox": doc.mediaBox,
-		},
-		Out:  doc.Out,
-		tree: doc.Tree,
-		closeFn: func(p *Page) error {
+		Page:    p,
+		Out:     doc.Out,
+		tree:    doc.Tree,
+		closeFn: func(pg *Page) error {
 			doc.numOpen--
 			return nil
 		},

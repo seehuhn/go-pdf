@@ -22,13 +22,17 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/page"
 )
 
 // Writer writes a page tree to a PDF file.
 type Writer struct {
 	Out *pdf.Writer
+	RM  *pdf.ResourceManager
 
 	isClosed bool
+	err      error // sticky error from encoding
 
 	parent *Writer
 
@@ -64,9 +68,11 @@ type Writer struct {
 }
 
 // NewWriter creates a new page tree which adds pages to the PDF document w.
-func NewWriter(w *pdf.Writer) *Writer {
+// The ResourceManager rm is used to encode page objects.
+func NewWriter(w *pdf.Writer, rm *pdf.ResourceManager) *Writer {
 	t := &Writer{
 		Out:            w,
+		RM:             rm,
 		nextPageNumber: &futureInt{},
 	}
 	return t
@@ -81,6 +87,9 @@ func NewWriter(w *pdf.Writer) *Writer {
 //
 // TODO(voss): get rid of the Reference return value
 func (w *Writer) Close() (pdf.Reference, error) {
+	if w.err != nil {
+		return 0, w.err
+	}
 	if w.isClosed {
 		return 0, errors.New("page tree is closed")
 	}
@@ -103,6 +112,10 @@ func (w *Writer) Close() (pdf.Reference, error) {
 		w.children = nil
 	}
 
+	if w.err != nil {
+		return 0, w.err
+	}
+
 	w.checkInvariants()
 
 	if len(w.numPagesCb) != 0 {
@@ -122,6 +135,9 @@ func (w *Writer) Close() (pdf.Reference, error) {
 
 	if w.parent == nil { // If we are at the root of the tree ...
 		w.collapse()
+		if w.err != nil {
+			return 0, w.err
+		}
 		if len(w.tail) == 0 {
 			return 0, errors.New("no pages in document")
 		}
@@ -129,7 +145,10 @@ func (w *Writer) Close() (pdf.Reference, error) {
 		w.tail = nil
 
 		// the root node cannot be a leaf
-		rootNode.dictInfo = w.wrapIfLeaf(rootNode.dictInfo)
+		rootNode.dictInfo = w.wrapIfLeaf(rootNode)
+		if w.err != nil {
+			return 0, w.err
+		}
 
 		w.outRefs = append(w.outRefs, rootNode.ref)
 		w.outObjects = append(w.outObjects, rootNode.dict)
@@ -153,28 +172,75 @@ func (w *Writer) Close() (pdf.Reference, error) {
 
 // AppendPage adds a new page to the page tree.
 //
-// This function takes ownership of the pageDict object, and
-// adds the /Parent entry before writing the object to the PDF file.
-func (w *Writer) AppendPage(pageDict pdf.Dict) error {
-	return w.AppendPageRef(w.Out.Alloc(), pageDict)
+// This function takes ownership of the page object, and
+// sets the Parent field before encoding the page to the PDF file.
+func (w *Writer) AppendPage(p *page.Page) error {
+	return w.AppendPageRef(w.Out.Alloc(), p)
 }
 
 // AppendPageRef adds a new page to the page tree, using the given reference
 // for the page dictionary.
 //
-// This function takes ownership of the pageDict object, and
-// adds the /Parent entry before writing the object to the PDF file.
-func (w *Writer) AppendPageRef(ref pdf.Reference, pageDict pdf.Dict) error {
+// This function takes ownership of the page object, and
+// sets the Parent field before encoding the page to the PDF file.
+func (w *Writer) AppendPageRef(ref pdf.Reference, p *page.Page) error {
 	if w.isClosed {
 		return errors.New("page tree is closed")
 	}
 
-	sanitize(pageDict)
+	node := &nodeInfo{
+		dictInfo: &dictInfo{
+			ref: ref,
+		},
+		pendingPage: p,
+		pageCount:   1,
+		depth:       0,
+	}
+	w.tail = append(w.tail, node)
+
+	for _, fn := range w.nextPageNumberCb {
+		w.nextPageNumber.WhenAvailable(fn)
+	}
+	w.nextPageNumberCb = w.nextPageNumberCb[:0]
+
+	// increment the page numbers
+	w.nextPageNumber = w.nextPageNumber.Inc()
+
+	for {
+		n := len(w.tail)
+		if n < maxDegree || w.tail[n-1].depth != w.tail[n-maxDegree].depth {
+			break
+		}
+		w.tail = w.mergeNodes(w.tail, n-maxDegree, n)
+	}
+	w.checkInvariants()
+
+	if len(w.outObjects) >= objStreamChunkSize {
+		err := w.flush()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// AppendPageDict adds a page to the page tree using a raw dictionary.
+// This is useful for page copying operations where the page dictionary
+// is already constructed.
+//
+// Unlike [AppendPageRef], this does not encode the page - it assumes
+// the dict is already in the correct format.  The Parent field will be
+// set automatically when the page tree is built.
+func (w *Writer) AppendPageDict(ref pdf.Reference, dict pdf.Dict) error {
+	if w.isClosed {
+		return errors.New("page tree is closed")
+	}
 
 	node := &nodeInfo{
 		dictInfo: &dictInfo{
-			dict: pageDict,
 			ref:  ref,
+			dict: dict,
 		},
 		pageCount: 1,
 		depth:     0,
@@ -186,7 +252,6 @@ func (w *Writer) AppendPageRef(ref pdf.Reference, pageDict pdf.Dict) error {
 	}
 	w.nextPageNumberCb = w.nextPageNumberCb[:0]
 
-	// increment the page numbers
 	w.nextPageNumber = w.nextPageNumber.Inc()
 
 	for {
@@ -220,6 +285,7 @@ func (w *Writer) NewRange() (*Writer, error) {
 		before := &Writer{
 			parent: w,
 			Out:    w.Out,
+			RM:     w.RM,
 			tail:   w.tail,
 		}
 		// TODO(voss): should we close this child already here?
@@ -229,6 +295,7 @@ func (w *Writer) NewRange() (*Writer, error) {
 	subTree := &Writer{
 		parent:         w,
 		Out:            w.Out,
+		RM:             w.RM,
 		nextPageNumber: w.nextPageNumber,
 	}
 	w.nextPageNumber = &futureInt{numMissing: 2}
@@ -255,24 +322,53 @@ func (w *Writer) NextPageNumber(cb func(int)) {
 	w.nextPageNumberCb = append(w.nextPageNumberCb, cb)
 }
 
-// wrapIfLeaf ensures that the given dictionary is a /Pages object.
+// wrapIfLeaf ensures that the given node is a /Pages object.
 // A wrapper /Pages object is created if necessary.
-func (w *Writer) wrapIfLeaf(info *dictInfo) *dictInfo {
-	if info.dict["Type"] == pdf.Name("Pages") {
-		return info
+// For single-page documents, this encodes the pending page.
+func (w *Writer) wrapIfLeaf(node *nodeInfo) *dictInfo {
+	// Handle pending page first - we know it will be a Page needing a wrapper
+	if node.pendingPage != nil {
+		wrapperRef := w.Out.Alloc()
+		node.pendingPage.Parent = wrapperRef
+		if node.pendingPage.Resources == nil {
+			node.pendingPage.Resources = &content.Resources{}
+		}
+		dict, err := node.pendingPage.Encode(w.RM)
+		if err != nil {
+			w.err = err
+			return nil
+		}
+		node.dict = dict.(pdf.Dict)
+		node.pendingPage = nil
+
+		// Write the page and create wrapper
+		w.outRefs = append(w.outRefs, node.ref)
+		w.outObjects = append(w.outObjects, node.dict)
+
+		wrapper := pdf.Dict{
+			"Type":  pdf.Name("Pages"),
+			"Count": pdf.Integer(1),
+			"Kids":  pdf.Array{node.ref},
+		}
+		return &dictInfo{dict: wrapper, ref: wrapperRef}
 	}
 
+	// Already-encoded dict that's a Pages node - no wrapper needed
+	if node.dict["Type"] == pdf.Name("Pages") {
+		return node.dictInfo
+	}
+
+	// Already-encoded Page dict - needs wrapper
 	wrapperRef := w.Out.Alloc()
-	info.dict["Parent"] = wrapperRef
-	w.outRefs = append(w.outRefs, info.ref)
-	w.outObjects = append(w.outObjects, info.dict)
+	node.dict["Parent"] = wrapperRef
+	w.outRefs = append(w.outRefs, node.ref)
+	w.outObjects = append(w.outObjects, node.dict)
 
 	wrapper := pdf.Dict{
 		"Type":  pdf.Name("Pages"),
 		"Count": pdf.Integer(1),
-		"Kids":  pdf.Array{info.ref},
+		"Kids":  pdf.Array{node.ref},
 	}
-
 	return &dictInfo{dict: wrapper, ref: wrapperRef}
 }
 

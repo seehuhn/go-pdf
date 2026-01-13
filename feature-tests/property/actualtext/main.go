@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
+	"seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/property"
 )
@@ -63,42 +64,20 @@ func writeTestPage(w *pdf.Writer) error {
 	rm := pdf.NewResourceManager(w)
 	F := standard.Helvetica.New()
 
-	pageTree := pagetree.NewWriter(w)
+	pageTree := pagetree.NewWriter(w, rm)
 
 	// Create a builder to accumulate drawing operations
 	b := builder.New(content.Page, nil)
 
 	writeTestContent(b, F)
 
-	// Write the content stream
-	contentRef := w.Alloc()
-	stream, err := w.OpenStream(contentRef, nil)
-	if err != nil {
-		return err
-	}
-	if err := content.Write(stream, b.Stream, w.GetMeta().Version, content.Page, b.Resources); err != nil {
-		return err
-	}
-	if err := stream.Close(); err != nil {
-		return err
-	}
-
-	// Embed resources
-	resObj, err := rm.Embed(b.Resources)
-	if err != nil {
-		return err
-	}
-
 	// create page
-	page := pdf.Dict{
-		"Type":     pdf.Name("Page"),
-		"Contents": contentRef,
-		"MediaBox": &pdf.Rectangle{URx: 595, URy: 842},
+	p := &page.Page{
+		MediaBox:  &pdf.Rectangle{URx: 595, URy: 842},
+		Resources: b.Resources,
+		Contents:  []*page.Content{{Operators: b.Stream}},
 	}
-	if resObj != nil {
-		page["Resources"] = resObj
-	}
-	err = pageTree.AppendPage(page)
+	err := pageTree.AppendPage(p)
 	if err != nil {
 		return err
 	}

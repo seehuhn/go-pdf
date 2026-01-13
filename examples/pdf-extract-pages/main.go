@@ -113,7 +113,8 @@ func extractPages(w io.Writer, inputFile string, pages *pagerange.PageRange) err
 	if err != nil {
 		return err
 	}
-	pageTreeOut := pagetree.NewWriter(out)
+	rm := pdf.NewResourceManager(out)
+	pageTreeOut := pagetree.NewWriter(out, rm)
 
 	copy := pdf.NewCopier(out, in)
 
@@ -142,10 +143,15 @@ func extractPages(w io.Writer, inputFile string, pages *pagerange.PageRange) err
 			copy.Redirect(refIn, refOut)
 		}
 
-		pageTreeOut.AppendPageRef(refOut, pageOut)
+		pageTreeOut.AppendPageDict(refOut, pageOut)
 	}
 
 	treeRef, err := pageTreeOut.Close()
+	if err != nil {
+		return err
+	}
+
+	err = rm.Close()
 	if err != nil {
 		return err
 	}

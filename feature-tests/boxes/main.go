@@ -40,22 +40,17 @@ func doit() error {
 		return err
 	}
 
-	page.PageDict["MediaBox"] = &pdf.Rectangle{LLx: 0, LLy: 0, URx: 600, URy: 600}
-	page.PageDict["CropBox"] = &pdf.Rectangle{LLx: 50, LLy: 50, URx: 550, URy: 550}
-	page.PageDict["TrimBox"] = &pdf.Rectangle{LLx: 100, LLy: 100, URx: 500, URy: 500}
-	page.PageDict["BleedBox"] = &pdf.Rectangle{LLx: 85, LLy: 85, URx: 515, URy: 515}
-	page.PageDict["ArtBox"] = &pdf.Rectangle{LLx: 150, LLy: 150, URx: 450, URy: 450}
-	boxColorInfo := &boxcolor.Info{
+	page.Page.MediaBox = &pdf.Rectangle{LLx: 0, LLy: 0, URx: 600, URy: 600}
+	page.Page.CropBox = &pdf.Rectangle{LLx: 50, LLy: 50, URx: 550, URy: 550}
+	page.Page.TrimBox = &pdf.Rectangle{LLx: 100, LLy: 100, URx: 500, URy: 500}
+	page.Page.BleedBox = &pdf.Rectangle{LLx: 85, LLy: 85, URx: 515, URy: 515}
+	page.Page.ArtBox = &pdf.Rectangle{LLx: 150, LLy: 150, URx: 450, URy: 450}
+	page.Page.BoxColorInfo = &boxcolor.Info{
 		CropBox:  &boxcolor.Style{Color: color.DeviceRGB{0.4, 0, 0.8}, LineWidth: 2}, // purple
 		TrimBox:  &boxcolor.Style{Color: color.DeviceRGB{0.8, 0.4, 0}, LineWidth: 2}, // orange
 		BleedBox: &boxcolor.Style{Color: color.DeviceRGB{0, 0, 0.8}, LineWidth: 2},   // blue
 		ArtBox:   &boxcolor.Style{Color: color.DeviceRGB{0, 0.8, 0}, LineWidth: 2},   // green
 	}
-	boxColorObj, err := page.RM.Embed(boxColorInfo)
-	if err != nil {
-		return err
-	}
-	page.PageDict["BoxColorInfo"] = boxColorObj
 
 	F := standard.Helvetica.New()
 	geom := F.GetGeometry()
