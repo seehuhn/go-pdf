@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// NumPages returns the number of pages in the document.
 func NumPages(r pdf.Getter) (int, error) {
 	catalog := r.GetMeta().Catalog
 	pageTreeNode, err := pdf.GetDict(r, catalog.Pages)
@@ -43,7 +44,7 @@ func NumPages(r pdf.Getter) (int, error) {
 	return int(count), nil
 }
 
-// GetPage returns the page tree node for a given page number.
+// GetPage returns the page dictionary for a given page number.
 // Page numbers start at 0.
 // Inheritable attributes are copied from the parent nodes.
 // The /Parent attribute is removed from the returned dictionary.

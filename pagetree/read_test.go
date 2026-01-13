@@ -63,6 +63,49 @@ func TestFindPages(t *testing.T) {
 	}
 }
 
+func TestFindPagesInvalidKid(t *testing.T) {
+	// Test that invalid kids get 0 placeholder at the correct position.
+	// A malformed PDF might have non-reference entries in Kids array.
+	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	// Create three page objects
+	page0Ref := data.Alloc()
+	page1Ref := data.Alloc()
+	page2Ref := data.Alloc()
+
+	for _, ref := range []pdf.Reference{page0Ref, page1Ref, page2Ref} {
+		data.Put(ref, pdf.Dict{
+			"Type": pdf.Name("Page"),
+		})
+	}
+
+	// Create root with kids [page0, invalidEntry, page2]
+	// The invalid entry is an inline dict instead of a reference
+	rootRef := data.Alloc()
+	root := pdf.Dict{
+		"Type":  pdf.Name("Pages"),
+		"Count": pdf.Integer(3),
+		"Kids": pdf.Array{
+			page0Ref,
+			pdf.Dict{"Type": pdf.Name("Page")}, // invalid: not a reference
+			page2Ref,
+		},
+	}
+	data.Put(rootRef, root)
+	data.GetMeta().Catalog.Pages = rootRef
+
+	pages, err := pagetree.FindPages(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Invalid kids are silently skipped (permissive reader)
+	expected := []pdf.Reference{page0Ref, page2Ref}
+	if d := cmp.Diff(expected, pages); d != "" {
+		t.Errorf("unexpected pages (-want +got):\n%s", d)
+	}
+}
+
 func TestIterator(t *testing.T) {
 	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 

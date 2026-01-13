@@ -42,11 +42,14 @@ func FindPages(r pdf.Getter) ([]pdf.Reference, error) {
 		ref := todo[k]
 		todo = todo[:k]
 
-		node, err := pdf.GetDict(r, ref)
+		node, err := pdf.Optional(pdf.GetDict(r, ref))
 		if err != nil {
 			return nil, err
 		}
-		tp, err := pdf.GetName(r, node["Type"])
+		if node == nil {
+			continue
+		}
+		tp, err := pdf.Optional(pdf.GetName(r, node["Type"]))
 		if err != nil {
 			return nil, err
 		}
@@ -54,17 +57,18 @@ func FindPages(r pdf.Getter) ([]pdf.Reference, error) {
 		case "Page":
 			res = append(res, ref)
 		case "Pages":
-			kids, err := pdf.GetArray(r, node["Kids"])
+			kids, err := pdf.Optional(pdf.GetArray(r, node["Kids"]))
 			if err != nil {
 				return nil, err
+			}
+			if kids == nil {
+				continue
 			}
 			for i := len(kids) - 1; i >= 0; i-- {
 				kid := kids[i]
 				if kidRef, ok := kid.(pdf.Reference); ok && !seen[kidRef] {
 					todo = append(todo, kidRef)
 					seen[kidRef] = true
-				} else {
-					res = append(res, 0)
 				}
 			}
 		}
@@ -73,23 +77,22 @@ func FindPages(r pdf.Getter) ([]pdf.Reference, error) {
 	return res, nil
 }
 
+// Iterator iterates over the pages in a PDF document.
 type Iterator struct {
+	// Err holds any error encountered during iteration.
+	// Check this after the loop completes.
 	Err error
-	r   pdf.Getter
+
+	r pdf.Getter
 }
 
 func NewIterator(r pdf.Getter) *Iterator {
 	return &Iterator{r: r}
 }
 
-// All returns a function which iterates over all pages in the document.
-// The arguments are the reference to the page dictionary and the page
-// dictionary itself.
-//
-// The function must return true if the iteration should continue, or false if it
-// should stop.
-//
-// TODO(voss): change this to iterate over (page number, page dictionary) pairs?
+// All iterates over all pages in the document.
+// Each iteration yields the page reference and page dictionary.
+// Inheritable attributes are copied from parent nodes.
 func (i *Iterator) All() iter.Seq2[pdf.Reference, pdf.Dict] {
 	yield := func(yield func(pdf.Reference, pdf.Dict) bool) {
 		if i.Err != nil {

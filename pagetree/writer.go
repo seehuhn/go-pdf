@@ -83,7 +83,7 @@ func NewWriter(w *pdf.Writer, rm *pdf.ResourceManager) *Writer {
 //
 // If the tree is the root of a page tree, the complete tree is written
 // to the PDF file and a reference to the root node is returned.
-// Otherwise, the returned reference is nil.
+// Otherwise, the returned reference is 0.
 //
 // TODO(voss): get rid of the Reference return value
 func (w *Writer) Close() (pdf.Reference, error) {
@@ -274,7 +274,7 @@ func (w *Writer) AppendPageDict(ref pdf.Reference, dict pdf.Dict) error {
 }
 
 // NewRange creates a new Writer that can insert pages into a PDF document at
-// position position current at the time of the call.  Pages added to the parent
+// the current position at the time of the call. Pages added to the parent
 // Writer will be inserted after the pages from the newly returned Writer.
 func (w *Writer) NewRange() (*Writer, error) {
 	if w.isClosed {
