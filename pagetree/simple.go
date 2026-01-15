@@ -25,6 +25,9 @@ import (
 )
 
 // NumPages returns the number of pages in the document.
+//
+// The value is obtained from the /Count attribute of the root page tree node.
+// If the PDF file is malformed, the value may not be accurate.
 func NumPages(r pdf.Getter) (int, error) {
 	catalog := r.GetMeta().Catalog
 	pageTreeNode, err := pdf.GetDict(r, catalog.Pages)
