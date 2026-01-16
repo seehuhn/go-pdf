@@ -461,7 +461,7 @@ var testCases = []struct {
 			Height:           1,
 			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 16,
-			StructParent:     optional.NewInt(0),
+			StructParent:     optional.NewUInt(0),
 			WriteData: func(w io.Writer) error {
 				_, err := w.Write([]byte{0, 1, 2, 3, 4, 5})
 				return err
@@ -476,7 +476,7 @@ var testCases = []struct {
 			Height:           1,
 			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 16,
-			StructParent:     optional.NewInt(42),
+			StructParent:     optional.NewUInt(42),
 			WriteData: func(w io.Writer) error {
 				_, err := w.Write([]byte{0, 1, 2, 3, 4, 5})
 				return err

@@ -19,6 +19,7 @@ package extract
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"seehuhn.de/go/geom/matrix"
@@ -122,8 +123,8 @@ func Form(x *pdf.Extractor, obj pdf.Object) (*form.Form, error) {
 	if keyObj := dict["StructParent"]; keyObj != nil {
 		if key, err := pdf.Optional(x.GetInteger(dict["StructParent"])); err != nil {
 			return nil, err
-		} else {
-			f.StructParent.Set(key)
+		} else if key >= 0 && uint64(key) <= math.MaxUint {
+			f.StructParent.Set(uint(key))
 		}
 	}
 

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"image"
 	"io"
+	"math"
 
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
@@ -64,7 +65,7 @@ type Mask struct {
 
 	// StructParent (required if the image mask is a structural content item)
 	// is the integer key of the image mask's entry in the structural parent tree.
-	StructParent optional.Int
+	StructParent optional.UInt
 
 	// Metadata (optional) is a metadata stream containing metadata for the image.
 	Metadata *metadata.Stream
@@ -308,8 +309,8 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 	if keyObj := dict["StructParent"]; keyObj != nil {
 		if key, err := pdf.Optional(x.GetInteger(dict["StructParent"])); err != nil {
 			return nil, err
-		} else {
-			mask.StructParent.Set(key)
+		} else if key >= 0 && uint64(key) <= math.MaxUint {
+			mask.StructParent.Set(uint(key))
 		}
 	}
 
@@ -453,7 +454,7 @@ func (m *Mask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out(), "image mask StructParent entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		dict["StructParent"] = key
+		dict["StructParent"] = pdf.Integer(key)
 	}
 
 	ref := rm.Alloc()

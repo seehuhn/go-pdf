@@ -41,7 +41,7 @@ type Rendition struct {
 	//   - 3: Resume any paused rendition associated with AN.
 	//   - 4: Play the rendition R if none is associated with AN,
 	//        or resume if paused; otherwise do nothing.
-	OP optional.Int
+	OP optional.UInt
 
 	// JS is the ECMAScript to execute.
 	JS pdf.Object
@@ -72,10 +72,10 @@ func (a *Rendition) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	if op, ok := a.OP.Get(); ok {
-		if op < 0 || op > 4 {
+		if op > 4 {
 			return nil, pdf.Error("Rendition action OP must be 0-4")
 		}
-		dict["OP"] = op
+		dict["OP"] = pdf.Integer(op)
 	} else if a.JS == nil {
 		return nil, pdf.Error("Rendition action requires OP or JS")
 	}
@@ -96,16 +96,15 @@ func (a *Rendition) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 func decodeRendition(x *pdf.Extractor, dict pdf.Dict) (*Rendition, error) {
 	an, _ := dict["AN"].(pdf.Reference)
 
-	var op optional.Int
+	var op optional.UInt
 	if dict["OP"] != nil {
 		if opVal, err := x.GetInteger(dict["OP"]); err == nil && opVal >= 0 && opVal <= 4 {
-			op.Set(opVal)
-		} else {
-			// Out of bounds or invalid: default to 0
-			op.Set(0)
+			op.Set(uint(opVal))
 		}
-	} else if dict["JS"] == nil {
-		// OP is required when JS is absent
+		// else: invalid OP value, treat as absent
+	}
+	// if OP is not set (absent or invalid) and JS is also absent, default to 0
+	if _, ok := op.Get(); !ok && dict["JS"] == nil {
 		op.Set(0)
 	}
 

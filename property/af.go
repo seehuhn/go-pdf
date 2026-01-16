@@ -32,7 +32,7 @@ import (
 // to sections of content in a content stream.
 type AF struct {
 	// MCID (optional) is the marked-content identifier for structure.
-	MCID optional.Int
+	MCID optional.UInt
 
 	// AssociatedFiles is an array of file specifications.
 	// This corresponds to the MCAF entry in the property list (Table 409a).
@@ -60,7 +60,7 @@ func (a *AF) Get(key pdf.Name) (*ResolvedObject, error) {
 	switch key {
 	case "MCID":
 		if v, ok := a.MCID.Get(); ok {
-			return &ResolvedObject{obj: v, x: nil}, nil
+			return &ResolvedObject{obj: pdf.Integer(v), x: nil}, nil
 		}
 	case "MCAF":
 		w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
@@ -100,7 +100,7 @@ func (a *AF) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	dict := make(pdf.Dict)
 
 	if mcid, ok := a.MCID.Get(); ok {
-		dict["MCID"] = mcid
+		dict["MCID"] = pdf.Integer(mcid)
 	}
 
 	arr := make(pdf.Array, len(a.AssociatedFiles))

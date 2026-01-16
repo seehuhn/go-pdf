@@ -17,6 +17,8 @@
 package property
 
 import (
+	"math"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/optional"
 )
@@ -30,7 +32,7 @@ import (
 // PDF 2.0 section 14.9
 type ActualText struct {
 	// MCID (optional) is the marked-content identifier for structure.
-	MCID optional.Int
+	MCID optional.UInt
 
 	// Text is the replacement text string.
 	Text string
@@ -56,7 +58,7 @@ func (a *ActualText) Get(key pdf.Name) (*ResolvedObject, error) {
 	switch key {
 	case "MCID":
 		if v, ok := a.MCID.Get(); ok {
-			return &ResolvedObject{obj: v, x: nil}, nil
+			return &ResolvedObject{obj: pdf.Integer(v), x: nil}, nil
 		}
 	case "ActualText":
 		return &ResolvedObject{obj: pdf.TextString(a.Text), x: nil}, nil
@@ -72,7 +74,7 @@ func (a *ActualText) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	dict := make(pdf.Dict)
 
 	if mcid, ok := a.MCID.Get(); ok {
-		dict["MCID"] = mcid
+		dict["MCID"] = pdf.Integer(mcid)
 	}
 
 	dict["ActualText"] = pdf.TextString(a.Text)
@@ -98,8 +100,8 @@ func ExtractActualText(x *pdf.Extractor, obj pdf.Object) (*ActualText, error) {
 
 	result := &ActualText{}
 
-	if mcid, ok := dict["MCID"].(pdf.Integer); ok {
-		result.MCID.Set(mcid)
+	if mcid, ok := dict["MCID"].(pdf.Integer); ok && mcid >= 0 && uint64(mcid) <= math.MaxUint {
+		result.MCID.Set(uint(mcid))
 	}
 
 	if actualTextObj, ok := dict["ActualText"]; ok {

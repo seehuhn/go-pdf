@@ -250,7 +250,7 @@ func TestDPOperatorResourceReference(t *testing.T) {
 	r.State.Resources = &content.Resources{
 		Properties: map[pdf.Name]property.List{
 			"P1": &property.ActualText{
-				MCID: optional.NewInt(42),
+				MCID: optional.NewUInt(42),
 				Text: "",
 			},
 		},

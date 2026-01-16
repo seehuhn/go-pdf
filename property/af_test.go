@@ -53,7 +53,7 @@ func TestAFKeys(t *testing.T) {
 		{
 			name: "MCAF and MCID",
 			af: &AF{
-				MCID:            optional.NewInt(42),
+				MCID:            optional.NewUInt(42),
 				AssociatedFiles: []*file.Specification{{FileName: "test.txt"}},
 			},
 			want: []pdf.Name{"MCAF", "MCID"},
@@ -61,7 +61,7 @@ func TestAFKeys(t *testing.T) {
 		{
 			name: "empty AssociatedFiles",
 			af: &AF{
-				MCID: optional.NewInt(42),
+				MCID: optional.NewUInt(42),
 			},
 			want: []pdf.Name{"MCAF", "MCID"},
 		},
@@ -79,7 +79,7 @@ func TestAFKeys(t *testing.T) {
 
 func TestAFGet(t *testing.T) {
 	af := &AF{
-		MCID: optional.NewInt(42),
+		MCID: optional.NewUInt(42),
 		AssociatedFiles: []*file.Specification{
 			{FileName: "test1.txt"},
 			{FileName: "test2.txt"},
@@ -134,7 +134,7 @@ func TestAFRoundTripSingleUse(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	original := &AF{
-		MCID: optional.NewInt(99),
+		MCID: optional.NewUInt(99),
 		AssociatedFiles: []*file.Specification{
 			{
 				FileName:       "report.xml",
@@ -183,7 +183,7 @@ func TestAFRoundTripIndirect(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	original := &AF{
-		MCID: optional.NewInt(42),
+		MCID: optional.NewUInt(42),
 		AssociatedFiles: []*file.Specification{
 			{
 				FileName:       "data1.csv",

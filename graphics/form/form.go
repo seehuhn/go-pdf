@@ -79,7 +79,7 @@ type Form struct {
 
 	// StructParent (required if the form is a structural content item)
 	// is the integer key of the form's entry in the structural parent tree.
-	StructParent optional.Int
+	StructParent optional.UInt
 
 	// TODO(voss): StructParents
 
@@ -193,7 +193,7 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out(), "form XObject StructParent entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		dict["StructParent"] = key
+		dict["StructParent"] = pdf.Integer(key)
 	}
 
 	if f.AssociatedFiles != nil {

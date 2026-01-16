@@ -437,46 +437,6 @@ func GetMatrix(r Getter, obj Object) (m matrix.Matrix, err error) {
 	return m, nil
 }
 
-// Info represents a PDF Document Information Dictionary.
-// All fields in this structure are optional.
-//
-// The Document Information Dictionary is documented in section
-// 14.3.3 of PDF 32000-1:2008.
-type Info struct {
-	Title    TextString `pdf:"optional"`
-	Author   TextString `pdf:"optional"`
-	Subject  TextString `pdf:"optional"`
-	Keywords TextString `pdf:"optional"`
-
-	// Creator gives the name of the application that created the original
-	// document, if the document was converted to PDF from another format.
-	Creator TextString `pdf:"optional"`
-
-	// Producer gives the name of the application that converted the document,
-	// if the document was converted to PDF from another format.
-	Producer TextString `pdf:"optional"`
-
-	// CreationDate gives the date and time the document was created.
-	CreationDate Date `pdf:"optional"`
-
-	// ModDate gives the date and time the document was most recently modified.
-	ModDate Date `pdf:"optional"`
-
-	// Trapped indicates whether the document has been modified to include
-	// trapping information.  (A trap is an overlap between adjacent areas of
-	// of different colours, used to avoid visual problems caused by imprecise
-	// alignment of different layers of ink.) Possible values are:
-	//   * "True": The document has been fully trapped.  No further trapping is
-	//     necessary.
-	//   * "False": The document has not been trapped.
-	//   * "Unknown" (default): Either it is unknown whether the document has
-	//     been trapped, or the document has been partially trapped.  Further
-	//     trapping may be necessary.
-	Trapped Name `pdf:"optional,allowstring"`
-
-	// Custom contains all non-standard fields in the Info dictionary.
-	Custom map[string]string `pdf:"extra"`
-}
 
 // Function represents a PDF function.
 // Concrete implementations of this interface can be found in the

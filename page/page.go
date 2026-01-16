@@ -20,6 +20,7 @@ package page
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"seehuhn.de/go/pdf"
@@ -174,7 +175,7 @@ type Page struct {
 
 	// StructParents (optional) is this page's key in the structural parent tree.
 	// Required if the page contains structural content items.
-	StructParents optional.Int
+	StructParents optional.UInt
 
 	// ID (optional; deprecated in PDF 2.0) is the digital identifier of the
 	// page's parent Web Capture content set.
@@ -438,7 +439,7 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(w, "StructParents", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		dict["StructParents"] = key
+		dict["StructParents"] = pdf.Integer(key)
 	}
 
 	// ID (deprecated in 2.0)
@@ -783,8 +784,8 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	if dict["StructParents"] != nil {
 		if key, err := pdf.Optional(x.GetInteger(dict["StructParents"])); err != nil {
 			return nil, err
-		} else {
-			p.StructParents.Set(key)
+		} else if key >= 0 && uint64(key) <= math.MaxUint {
+			p.StructParents.Set(uint(key))
 		}
 	}
 

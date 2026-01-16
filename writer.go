@@ -260,14 +260,17 @@ func (w *Writer) Close() error {
 	}
 	trailer["Root"] = catRef
 
-	infoDict := AsDict(w.meta.Info)
-	if len(infoDict) > 0 {
-		infoRef := w.Alloc()
-		err := w.Put(infoRef, infoDict)
+	if w.meta.Info != nil {
+		rm := NewResourceManager(w)
+		infoRef, err := rm.Embed(w.meta.Info)
 		if err != nil {
 			return err
 		}
-		trailer["Info"] = infoRef
+		if infoRef != nil {
+			trailer["Info"] = infoRef
+		} else {
+			delete(trailer, "Info")
+		}
 	} else {
 		delete(trailer, "Info")
 	}

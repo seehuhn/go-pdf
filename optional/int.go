@@ -16,38 +16,37 @@
 
 package optional
 
-import "seehuhn.de/go/pdf"
-
-// Int represents an optional integer.
-type Int struct {
-	val uint64
+// UInt represents an optional integer.
+type UInt struct {
+	isSet bool
+	val   uint
 }
 
-func NewInt(v pdf.Integer) Int {
-	var k Int
+// NewUInt creates a new UInt with the given value.
+func NewUInt(v uint) UInt {
+	var k UInt
 	k.Set(v)
 	return k
 }
 
-func (k Int) Get() (pdf.Integer, bool) {
-	if k.val == 0 {
-		return 0, false
-	}
-	return pdf.Integer(k.val - 1), true
+// Get returns the value and whether it is set.
+func (k UInt) Get() (uint, bool) {
+	return k.val, k.isSet
 }
 
-func (k *Int) Set(v pdf.Integer) {
-	if v < 0 || uint64(v) >= 1<<64-1 {
-		panic("key value out of range")
-	}
-	k.val = uint64(v) + 1
+// Set sets the value.
+func (k *UInt) Set(v uint) {
+	k.isSet = true
+	k.val = v
 }
 
-func (k *Int) Clear() {
+// Clear clears the value.
+func (k *UInt) Clear() {
+	k.isSet = false
 	k.val = 0
 }
 
-// Equal compares two Keys for equality.
-func (k Int) Equal(other Int) bool {
-	return k.val == other.val
+// Equal compares two UInts for equality.
+func (k UInt) Equal(other UInt) bool {
+	return k.isSet == other.isSet && k.val == other.val
 }

@@ -22,8 +22,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestTextString_Get(t *testing.T) {
@@ -358,82 +356,5 @@ func TestCatalogWriteMissingPages(t *testing.T) {
 	dict := AsDict(catalog)
 	if _, present := dict["Pages"]; present {
 		t.Errorf("missing Pages not ignored")
-	}
-}
-
-func TestDocumentInfoRegular(t *testing.T) {
-	// test missing struct
-	var info1 *Info
-	d1 := AsDict(info1)
-	if d1 != nil {
-		t.Error("wrong dict for nil Info struct")
-	}
-
-	// test empty struct
-	info1 = &Info{}
-	d1 = AsDict(info1)
-	if d1 == nil || len(d1) != 0 {
-		t.Errorf("wrong dict for empty Info struct: %#v", d1)
-	}
-
-	// test all regular fields
-	now := time.Now()
-	info1 = &Info{
-		Title:        "Test Title",
-		Author:       "Jochen Voß",
-		Subject:      "unit testing",
-		Keywords:     "tests, go, DecodeDict",
-		Creator:      "TestDocumentInfoRegular",
-		Producer:     "seehuhn.de/go/pdf",
-		CreationDate: Date(now.Add(-1 * time.Second)),
-		ModDate:      Date(now),
-		Trapped:      "Unknown",
-	}
-	d1 = AsDict(info1)
-	info2 := &Info{}
-	err := DecodeDict(nil, info2, d1)
-
-	if info1.CreationDate.String() != info2.CreationDate.String() {
-		t.Errorf("wrong CreationDate: %s != %s", info1.CreationDate, info2.CreationDate)
-	}
-	info1.CreationDate = Date{}
-	info2.CreationDate = Date{}
-	if info1.ModDate.String() != info2.ModDate.String() {
-		t.Errorf("wrong ModDate: %s != %s", info1.ModDate, info2.ModDate)
-	}
-	info1.ModDate = Date{}
-	info2.ModDate = Date{}
-
-	if err != nil {
-		t.Error(err)
-	} else if d := cmp.Diff(info1, info2); d != "" {
-		t.Errorf("wrong Info: %s", d)
-	}
-}
-
-func TestDocumentInfoCustom(t *testing.T) {
-	// test custom fields
-	d1 := Dict{
-		"grumpy": TextString("bärbeißig"),
-		"funny":  TextString("\000\001\002 \\<>'\")("),
-	}
-
-	info := &Info{}
-	err := DecodeDict(nil, info, d1)
-	if err != nil {
-		t.Error(err)
-	}
-	if len(info.Custom) != 2 {
-		t.Errorf("wrong Extra: %v", info.Custom)
-	}
-
-	d2 := AsDict(info)
-	if len(d1) != len(d2) {
-		t.Fatalf("wrong d2: %s", AsString(d2))
-	}
-	for key, val := range d1 {
-		if d2[key] != val {
-			t.Errorf("wrong d2[%s]: %s", key, AsString(d2[key]))
-		}
 	}
 }

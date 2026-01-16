@@ -22,6 +22,7 @@ import (
 	"image"
 	gocol "image/color"
 	"io"
+	"math"
 
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
@@ -110,7 +111,7 @@ type Dict struct {
 
 	// StructParent (required if the image is a structural content item)
 	// is the integer key of the image's entry in the structural parent tree.
-	StructParent optional.Int
+	StructParent optional.UInt
 
 	// Metadata (optional) is a metadata stream containing metadata for the image.
 	Metadata *metadata.Stream
@@ -396,8 +397,8 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	if keyObj := dict["StructParent"]; keyObj != nil {
 		if key, err := pdf.Optional(x.GetInteger(dict["StructParent"])); err != nil {
 			return nil, err
-		} else {
-			img.StructParent.Set(key)
+		} else if key >= 0 && uint64(key) <= math.MaxUint {
+			img.StructParent.Set(uint(key))
 		}
 	}
 
@@ -675,7 +676,7 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out(), "image dictionary StructParent entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		dict["StructParent"] = key
+		dict["StructParent"] = pdf.Integer(key)
 	}
 
 	if len(d.AssociatedFiles) > 0 {

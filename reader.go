@@ -210,16 +210,10 @@ func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
 		r.meta.ID = nil
 	}
 
-	infoDict, err := GetDict(r, trailer["Info"])
+	x := NewExtractor(r)
+	r.meta.Info, err = ExtractInfo(x, trailer["Info"])
 	if shouldExit(err) {
 		return nil, err
-	}
-	if infoDict != nil {
-		r.meta.Info = &Info{}
-		err = DecodeDict(r, r.meta.Info, infoDict)
-		if shouldExit(err) {
-			return nil, err
-		}
 	}
 
 	// remove xref-related information from trailer dictionary

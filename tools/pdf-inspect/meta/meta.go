@@ -89,8 +89,12 @@ func showInfo(obj pdf.Object, info *pdf.Info) {
 	if !info.ModDate.IsZero() {
 		fmt.Println("ModDate:", info.ModDate)
 	}
-	if info.Trapped != "" {
-		fmt.Println("Trapped:", info.Trapped)
+	if trapped, ok := info.Trapped.Get(); ok {
+		if trapped {
+			fmt.Println("Trapped: True")
+		} else {
+			fmt.Println("Trapped: False")
+		}
 	}
 	for name, value := range info.Custom {
 		fmt.Printf("%s: %v\n", name, value)

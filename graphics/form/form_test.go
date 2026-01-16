@@ -301,7 +301,7 @@ func TestFormWithStructParent(t *testing.T) {
 	rm1 := pdf.NewResourceManager(writer1)
 
 	form0 := makeTestForm()
-	form0.StructParent = optional.NewInt(42)
+	form0.StructParent = optional.NewUInt(42)
 	ref, err := rm1.Embed(form0)
 	if err != nil {
 		t.Fatal(err)
@@ -331,7 +331,7 @@ func TestFormWithStructParent(t *testing.T) {
 	rm2 := pdf.NewResourceManager(writer2)
 
 	form0Zero := makeTestForm()
-	form0Zero.StructParent = optional.NewInt(0)
+	form0Zero.StructParent = optional.NewUInt(0)
 	ref2, err := rm2.Embed(form0Zero)
 	if err != nil {
 		t.Fatal(err)

@@ -19,6 +19,7 @@ package annotation
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"golang.org/x/text/language"
 
@@ -133,7 +134,7 @@ type Common struct {
 	// StructParent (required if the annotation is a structural content item)
 	// is the integer key of the annotation's entry in the structural parent
 	// tree.
-	StructParent optional.Int
+	StructParent optional.UInt
 
 	// OptionalContent (optional) specifies the optional content properties for
 	// the annotation.
@@ -259,7 +260,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool)
 		if err := pdf.CheckVersion(w, "annotation StructParent entry", pdf.V1_3); err != nil {
 			return err
 		}
-		dict["StructParent"] = key
+		dict["StructParent"] = pdf.Integer(key)
 	}
 
 	if c.OptionalContent != nil {
@@ -415,8 +416,8 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 	if dict["StructParent"] != nil {
 		if key, err := pdf.Optional(x.GetInteger(dict["StructParent"])); err != nil {
 			return err
-		} else {
-			common.StructParent.Set(key)
+		} else if key >= 0 && uint64(key) <= math.MaxUint {
+			common.StructParent.Set(uint(key))
 		}
 	}
 
