@@ -183,74 +183,74 @@ func TestTextShowRaw(t *testing.T) {
 // in the graphics state.
 func TestTextShowRaw2(t *testing.T) {
 	testString := ".MiAbc"
-	// TODO(voss): also try PDF.V2_0, once
-	// https://bugs.ghostscript.com/show_bug.cgi?id=707475 is resolved.
-	for _, sample := range fonttypes.All {
-		t.Run(sample.Label, func(t *testing.T) {
-			const fontSize = 100
-			var s pdf.String
+	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
+		for _, sample := range fonttypes.All {
+			t.Run(fmt.Sprintf("%s/%s", v, sample.Label), func(t *testing.T) {
+				const fontSize = 100
+				var s pdf.String
 
-			F := sample.MakeFont()
-			codec := F.Codec()
+				F := sample.MakeFont()
+				codec := F.Codec()
 
-			// First print glyphs one-by-one and record the x positions.
-			var xx []float64
-			img1 := ghostscript.Render(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
-				r.TextSetFont(F, fontSize)
-				r.TextBegin()
-				r.TextFirstLine(10, 10)
-
-				for _, g := range r.TextLayout(nil, testString).Seq {
-					xx = append(xx, r.State.GState.TextMatrix[4])
-					code, ok := F.Encode(g.GID, string(g.Text))
-					if !ok {
-						t.Fatalf("cannot encode glyph ID %d (%q)", g.GID, g.Text)
-					}
-					s = codec.AppendCode(s[:0], code)
-					r.TextShowRaw(s)
-				}
-				r.TextEnd()
-
-				return nil
-			})
-			// Then print each glyph at the recorded x positions.
-			img2 := ghostscript.Render(t, 400, 120, pdf.V1_7, func(r *document.Page) error {
-				r.TextSetFont(F, fontSize)
-
-				for i, g := range r.TextLayout(nil, testString).Seq {
+				// First print glyphs one-by-one and record the x positions.
+				var xx []float64
+				img1 := ghostscript.Render(t, 400, 120, v, func(r *document.Page) error {
+					r.TextSetFont(F, fontSize)
 					r.TextBegin()
-					r.TextFirstLine(xx[i], 10)
-					code, ok := F.Encode(g.GID, string(g.Text))
-					if !ok {
-						t.Fatalf("cannot encode glyph ID %d (%q)", g.GID, g.Text)
+					r.TextFirstLine(10, 10)
+
+					for _, g := range r.TextLayout(nil, testString).Seq {
+						xx = append(xx, r.State.GState.TextMatrix[4])
+						code, ok := F.Encode(g.GID, string(g.Text))
+						if !ok {
+							t.Fatalf("cannot encode glyph ID %d (%q)", g.GID, g.Text)
+						}
+						s = codec.AppendCode(s[:0], code)
+						r.TextShowRaw(s)
 					}
-					s = codec.AppendCode(s[:0], code)
-					r.TextShowRaw(s)
 					r.TextEnd()
+
+					return nil
+				})
+				// Then print each glyph at the recorded x positions.
+				img2 := ghostscript.Render(t, 400, 120, v, func(r *document.Page) error {
+					r.TextSetFont(F, fontSize)
+
+					for i, g := range r.TextLayout(nil, testString).Seq {
+						r.TextBegin()
+						r.TextFirstLine(xx[i], 10)
+						code, ok := F.Encode(g.GID, string(g.Text))
+						if !ok {
+							t.Fatalf("cannot encode glyph ID %d (%q)", g.GID, g.Text)
+						}
+						s = codec.AppendCode(s[:0], code)
+						r.TextShowRaw(s)
+						r.TextEnd()
+					}
+
+					return nil
+				})
+
+				// check that the two images are the same
+				rect := img1.Bounds()
+				if rect != img2.Bounds() {
+					t.Errorf("image bounds differ: %v, %v", img1.Bounds(), img2.Bounds())
 				}
-
-				return nil
-			})
-
-			// check that all three images are the same
-			rect := img1.Bounds()
-			if rect != img2.Bounds() {
-				t.Errorf("image bounds differ: %v, %v", img1.Bounds(), img2.Bounds())
-			}
-			for i := rect.Min.X; i < rect.Max.X; i++ {
-				for j := rect.Min.Y; j < rect.Max.Y; j++ {
-					r1, g1, b1, a1 := img1.At(i, j).RGBA()
-					r2, g2, b2, a2 := img2.At(i, j).RGBA()
-					if r1 != r2 || g1 != g2 || b1 != b2 || a1 != a2 {
-						t.Errorf("pixel (%d,%d) differs: %d vs %d",
-							i, j,
-							[]uint32{r1, g1, b1, a1},
-							[]uint32{r2, g2, b2, a2})
-						goto tooMuch
+				for i := rect.Min.X; i < rect.Max.X; i++ {
+					for j := rect.Min.Y; j < rect.Max.Y; j++ {
+						r1, g1, b1, a1 := img1.At(i, j).RGBA()
+						r2, g2, b2, a2 := img2.At(i, j).RGBA()
+						if r1 != r2 || g1 != g2 || b1 != b2 || a1 != a2 {
+							t.Errorf("pixel (%d,%d) differs: %d vs %d",
+								i, j,
+								[]uint32{r1, g1, b1, a1},
+								[]uint32{r2, g2, b2, a2})
+							goto tooMuch
+						}
 					}
 				}
-			}
-		tooMuch:
-		})
+			tooMuch:
+			})
+		}
 	}
 }
