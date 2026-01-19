@@ -2,7 +2,7 @@ package pdf
 
 import "seehuhn.de/go/pdf/optional"
 
-// PDF 2.0 sections: 14.3.3
+// PDF 2.0 sections: 14.3
 
 // Info represents a PDF Document Information Dictionary.
 //
@@ -147,7 +147,7 @@ func ExtractInfo(x *Extractor, obj Object) (*Info, error) {
 // This implements the [Embedder] interface.
 //
 // If all fields are empty, the function returns nil.
-func (info *Info) Embed(rm *EmbedHelper) (Native, error) {
+func (info *Info) Embed(e *EmbedHelper) (Native, error) {
 	if info == nil {
 		return nil, nil
 	}
@@ -173,12 +173,15 @@ func (info *Info) Embed(rm *EmbedHelper) (Native, error) {
 		dict["Producer"] = info.Producer
 	}
 	if !info.CreationDate.IsZero() {
-		dict["CreationDate"] = info.CreationDate.AsPDF(rm.Out().GetOptions())
+		dict["CreationDate"] = info.CreationDate.AsPDF(e.Out().GetOptions())
 	}
 	if !info.ModDate.IsZero() {
-		dict["ModDate"] = info.ModDate.AsPDF(rm.Out().GetOptions())
+		dict["ModDate"] = info.ModDate.AsPDF(e.Out().GetOptions())
 	}
 	if trapped, ok := info.Trapped.Get(); ok {
+		if err := CheckVersion(e.Out(), "Info Trapped entry", V1_3); err != nil {
+			return nil, err
+		}
 		if trapped {
 			dict["Trapped"] = Name("True")
 		} else {
@@ -194,8 +197,8 @@ func (info *Info) Embed(rm *EmbedHelper) (Native, error) {
 		return nil, nil
 	}
 
-	ref := rm.Alloc()
-	if err := rm.Out().Put(ref, dict); err != nil {
+	ref := e.Alloc()
+	if err := e.Out().Put(ref, dict); err != nil {
 		return nil, err
 	}
 	return ref, nil

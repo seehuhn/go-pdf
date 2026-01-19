@@ -338,11 +338,13 @@ func (m *Mask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	dict := pdf.Dict{
-		"Type":      pdf.Name("XObject"),
 		"Subtype":   pdf.Name("Image"),
 		"Width":     pdf.Integer(m.Width),
 		"Height":    pdf.Integer(m.Height),
 		"ImageMask": pdf.Boolean(true),
+	}
+	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("XObject")
 	}
 	if m.Interpolate {
 		dict["Interpolate"] = pdf.Boolean(true)

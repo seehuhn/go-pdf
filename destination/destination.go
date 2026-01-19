@@ -103,9 +103,9 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (Destination, error) {
 		if len(arr) < 5 {
 			return nil, pdf.Error("XYZ destination requires 5 elements")
 		}
-		left := getOptionalNumber(x.R, arr[2])
-		top := getOptionalNumber(x.R, arr[3])
-		zoom := getOptionalNumber(x.R, arr[4])
+		left := getOptionalNumber(x, arr[2])
+		top := getOptionalNumber(x, arr[3])
+		zoom := getOptionalNumber(x, arr[4])
 		return &XYZ{Page: page, Left: left, Top: top, Zoom: zoom}, nil
 
 	case TypeFit:
@@ -115,14 +115,14 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (Destination, error) {
 		if len(arr) < 3 {
 			return nil, pdf.Error("FitH destination requires 3 elements")
 		}
-		top := getOptionalNumber(x.R, arr[2])
+		top := getOptionalNumber(x, arr[2])
 		return &FitH{Page: page, Top: top}, nil
 
 	case TypeFitV:
 		if len(arr) < 3 {
 			return nil, pdf.Error("FitV destination requires 3 elements")
 		}
-		left := getOptionalNumber(x.R, arr[2])
+		left := getOptionalNumber(x, arr[2])
 		return &FitV{Page: page, Left: left}, nil
 
 	case TypeFitR:
@@ -147,14 +147,14 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (Destination, error) {
 		if len(arr) < 3 {
 			return nil, pdf.Error("FitBH destination requires 3 elements")
 		}
-		top := getOptionalNumber(x.R, arr[2])
+		top := getOptionalNumber(x, arr[2])
 		return &FitBH{Page: page, Top: top}, nil
 
 	case TypeFitBV:
 		if len(arr) < 3 {
 			return nil, pdf.Error("FitBV destination requires 3 elements")
 		}
-		left := getOptionalNumber(x.R, arr[2])
+		left := getOptionalNumber(x, arr[2])
 		return &FitBV{Page: page, Left: left}, nil
 
 	default:
@@ -409,11 +409,11 @@ func (d *Named) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 // getOptionalNumber reads a number from a PDF object, treating null as Unset
-func getOptionalNumber(r pdf.Getter, obj pdf.Object) float64 {
+func getOptionalNumber(x *pdf.Extractor, obj pdf.Object) float64 {
 	if obj == nil {
 		return Unset
 	}
-	num, err := pdf.Optional(pdf.GetNumber(r, obj))
+	num, err := pdf.Optional(x.GetNumber(obj))
 	if err != nil {
 		return Unset
 	}
