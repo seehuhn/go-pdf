@@ -187,6 +187,17 @@ const (
 	LineCapSquare LineCapStyle = 2
 )
 
+func (c LineCapStyle) String() string {
+	switch c {
+	case LineCapRound:
+		return "round"
+	case LineCapSquare:
+		return "square"
+	default:
+		return "butt"
+	}
+}
+
 // LineJoinStyle is the style of the corner of a line.
 type LineJoinStyle uint8
 
@@ -197,6 +208,17 @@ const (
 	LineJoinRound LineJoinStyle = 1
 	LineJoinBevel LineJoinStyle = 2
 )
+
+func (j LineJoinStyle) String() string {
+	switch j {
+	case LineJoinRound:
+		return "round"
+	case LineJoinBevel:
+		return "bevel"
+	default:
+		return "miter"
+	}
+}
 
 // RenderingIntent controls how colors are adjusted when converting between
 // color spaces with different gamuts.

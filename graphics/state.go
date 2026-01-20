@@ -76,6 +76,9 @@ type State struct {
 	TextLineMatrix matrix.Matrix
 
 	// LineWidth is the thickness of stroked paths, in user space units.
+	//
+	// The value 0 stands for the thinnest line that can be rendered at device
+	// resolution.  Obviously, the result is device-dependent.
 	LineWidth float64
 
 	// LineCap is the shape used at the ends of open stroked paths.
