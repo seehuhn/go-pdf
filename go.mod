@@ -13,8 +13,8 @@ require (
 	golang.org/x/text v0.26.0
 	seehuhn.de/go/geom v0.6.1-0.20260122190945-198dce7a651c
 	seehuhn.de/go/icc v0.0.0-20240801195843-cfc244e2c55a
-	seehuhn.de/go/postscript v0.6.1-0.20250805053126-20e516ce5746
-	seehuhn.de/go/sfnt v0.6.1-0.20250805053320-86c13f5239b6
+	seehuhn.de/go/postscript v0.6.1-0.20260122191546-dc016e424c73
+	seehuhn.de/go/sfnt v0.6.1-0.20260122191817-776f0c8a4c68
 	seehuhn.de/go/xmp v0.3.1-0.20250914024658-99b3372159f4
 )
 
