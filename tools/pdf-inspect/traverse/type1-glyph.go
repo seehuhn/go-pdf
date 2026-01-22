@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/postscript/type1"
 )
 
@@ -68,32 +69,29 @@ func (c *type1GlyphCtx) Show() error {
 	}
 
 	// Show outline path
-	if len(c.glyph.Cmds) > 0 {
+	if c.glyph.Outline != nil && len(c.glyph.Outline.Cmds) > 0 {
 		fmt.Println("\nOutline Path:")
 		currentX, currentY := 0.0, 0.0
+		coordIdx := 0
 
-		for i, cmd := range c.glyph.Cmds {
-			switch cmd.Op {
-			case type1.OpMoveTo:
-				if len(cmd.Args) >= 2 {
-					currentX, currentY = cmd.Args[0], cmd.Args[1]
-					fmt.Printf("  %d: MoveTo(%g, %g)\n", i, currentX, currentY)
-				}
-			case type1.OpLineTo:
-				if len(cmd.Args) >= 2 {
-					currentX, currentY = cmd.Args[0], cmd.Args[1]
-					fmt.Printf("  %d: LineTo(%g, %g)\n", i, currentX, currentY)
-				}
-			case type1.OpCurveTo:
-				if len(cmd.Args) >= 6 {
-					currentX, currentY = cmd.Args[4], cmd.Args[5]
-					fmt.Printf("  %d: CurveTo(%g, %g, %g, %g, %g, %g)\n", i,
-						cmd.Args[0], cmd.Args[1], cmd.Args[2], cmd.Args[3], currentX, currentY)
-				}
-			case type1.OpClosePath:
+		for i, cmd := range c.glyph.Outline.Cmds {
+			switch cmd {
+			case path.CmdMoveTo:
+				currentX, currentY = c.glyph.Outline.Coords[coordIdx].X, c.glyph.Outline.Coords[coordIdx].Y
+				coordIdx++
+				fmt.Printf("  %d: MoveTo(%g, %g)\n", i, currentX, currentY)
+			case path.CmdLineTo:
+				currentX, currentY = c.glyph.Outline.Coords[coordIdx].X, c.glyph.Outline.Coords[coordIdx].Y
+				coordIdx++
+				fmt.Printf("  %d: LineTo(%g, %g)\n", i, currentX, currentY)
+			case path.CmdCubeTo:
+				x1, y1 := c.glyph.Outline.Coords[coordIdx].X, c.glyph.Outline.Coords[coordIdx].Y
+				x2, y2 := c.glyph.Outline.Coords[coordIdx+1].X, c.glyph.Outline.Coords[coordIdx+1].Y
+				currentX, currentY = c.glyph.Outline.Coords[coordIdx+2].X, c.glyph.Outline.Coords[coordIdx+2].Y
+				coordIdx += 3
+				fmt.Printf("  %d: CurveTo(%g, %g, %g, %g, %g, %g)\n", i, x1, y1, x2, y2, currentX, currentY)
+			case path.CmdClose:
 				fmt.Printf("  %d: ClosePath()\n", i)
-			default:
-				fmt.Printf("  %d: %s(%v)\n", i, cmd.Op, cmd.Args)
 			}
 		}
 	} else {

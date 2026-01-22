@@ -65,7 +65,7 @@ func TestBlankGlyphs(t *testing.T) {
 		psFont := F.Font
 		metrics := F.Metrics
 		for name, g := range psFont.Glyphs {
-			isBlank := len(g.Cmds) == 0
+			isBlank := g.Outline == nil || len(g.Outline.Cmds) == 0
 			claimedBlank := metrics.Glyphs[name].BBox.IsZero()
 			// TODO(voss): fix this for the .notdef glyphs by
 			// life-patching the type 1 fonts after loading.
