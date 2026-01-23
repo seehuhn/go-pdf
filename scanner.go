@@ -673,13 +673,9 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 		return nil, err
 	}
 
-	isEncrypted := false
+	var crypt *filterCrypt
 	if s.enc != nil {
-		streamData, err = s.enc.DecryptStream(s.encRef, streamData)
-		if err != nil {
-			return nil, err
-		}
-		isEncrypted = true
+		crypt = &filterCrypt{enc: s.enc, ref: s.encRef}
 	}
 
 	err = s.SkipWhiteSpace()
@@ -693,9 +689,9 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 	}
 
 	return &Stream{
-		Dict:        dict,
-		R:           streamData,
-		isEncrypted: isEncrypted,
+		Dict:  dict,
+		R:     streamData,
+		crypt: crypt,
 	}, nil
 }
 

@@ -44,6 +44,44 @@ type encryptInfo struct {
 	UserPermissions Perm
 }
 
+// filterCrypt is a filter that handles stream encryption/decryption.
+// Unlike regular filters which are stored in the PDF file's stream dictionary,
+// this filter is applied transparently based on the document's encryption settings.
+//
+// This filter allows Stream.R to remain the raw (possibly encrypted) seekable
+// stream data from the file. Decryption happens on-the-fly when the stream is
+// read through DecodeStream, allowing streams to be:
+//   - Read multiple times (by seeking back to the beginning)
+//   - Properly decoded even after seeking
+type filterCrypt struct {
+	enc *encryptInfo
+	ref Reference
+}
+
+// Info implements the [Filter] interface.
+// The crypt filter is transparent and does not appear in the stream dictionary.
+func (f *filterCrypt) Info(Version) (Name, Dict, error) {
+	return "", nil, nil
+}
+
+// Encode implements the [Filter] interface.
+func (f *filterCrypt) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, error) {
+	return f.enc.EncryptStream(f.ref, w)
+}
+
+// Decode implements the [Filter] interface.
+func (f *filterCrypt) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
+	decrypted, err := f.enc.DecryptStream(f.ref, r)
+	if err != nil {
+		return nil, err
+	}
+	// wrap in ReadCloser since DecryptStream returns io.Reader
+	if rc, ok := decrypted.(io.ReadCloser); ok {
+		return rc, nil
+	}
+	return io.NopCloser(decrypted), nil
+}
+
 func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) string) (*encryptInfo, error) {
 	enc, err := GetDict(r, encObj)
 	if err != nil {
