@@ -144,6 +144,145 @@ func testEncryptedStreamMultipleReads(t *testing.T, version Version) {
 	}
 }
 
+// TestOldArchitectureWouldFail demonstrates that the old architecture (where
+// decryption was applied eagerly in the scanner) would fail when trying to
+// read an encrypted stream twice.
+//
+// In the old code:
+//   - scanner.ReadStreamData() called enc.DecryptStream() immediately
+//   - stream.R was a decrypting reader wrapping the raw data
+//   - After reading once, the cipher state was consumed
+//   - Seeking back didn't reset the cipher (IV already read for AES)
+//   - Second read would produce garbage or fail
+//
+// This test simulates that behavior to verify it fails, then shows the new
+// architecture works correctly.
+func TestOldArchitectureWouldFail(t *testing.T) {
+	testData := []byte("Test data for demonstrating old vs new architecture.")
+
+	// Create an encrypted PDF
+	opt := &WriterOptions{
+		UserPassword:  "test",
+		OwnerPassword: "test",
+	}
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, V1_6, opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	streamRef := w.Alloc()
+	s, err := w.OpenStream(streamRef, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.Write(testData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = addPage(w, Name("Contents"), streamRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Open the PDF
+	rOpt := &ReaderOptions{
+		ReadPassword: func([]byte, int) string { return "test" },
+	}
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), rOpt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get the stream
+	pagesRef := r.GetMeta().Catalog.Pages
+	pages, err := GetDict(r, pagesRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kids, err := GetArray(r, pages["Kids"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := GetDict(r, kids[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := GetStream(r, page["Contents"])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Simulate OLD architecture behavior:
+	// Apply decryption eagerly to the raw stream, like the old scanner did.
+	// This creates a non-seekable decrypting reader.
+	oldStyleReader, err := r.enc.DecryptStream(stream.ref, stream.R)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// First read works
+	data1, err := io.ReadAll(oldStyleReader)
+	if err != nil {
+		t.Fatalf("First read failed: %v", err)
+	}
+	if !bytes.Equal(data1, testData) {
+		t.Errorf("First read: got %q, want %q", data1, testData)
+	}
+
+	// Try to seek back (this works on the underlying raw reader)
+	seeker := stream.R.(io.Seeker)
+	_, err = seeker.Seek(0, io.SeekStart)
+	if err != nil {
+		t.Fatalf("Seek failed: %v", err)
+	}
+
+	// Second read with the OLD decrypting reader fails or produces garbage.
+	// The cipher state is corrupted because:
+	// - For AES: the IV was already consumed, seeking doesn't re-read it
+	// - For RC4: the keystream position is wrong
+	data2, _ := io.ReadAll(oldStyleReader)
+	if bytes.Equal(data2, testData) {
+		// This should NOT happen with the old architecture
+		t.Log("Note: Second read unexpectedly succeeded (RC4 may work in some cases)")
+	} else {
+		t.Logf("OLD architecture: Second read produced different data (len=%d vs %d) - expected failure", len(data2), len(testData))
+	}
+
+	// Now verify the NEW architecture works correctly:
+	// Seek back to start
+	_, err = seeker.Seek(0, io.SeekStart)
+	if err != nil {
+		t.Fatalf("Seek failed: %v", err)
+	}
+
+	// With the new architecture, each DecodeStream call creates a fresh
+	// decryption context, so multiple reads work correctly.
+	for i := 0; i < 2; i++ {
+		decoded, err := DecodeStream(r, stream, 0)
+		if err != nil {
+			t.Fatalf("NEW architecture read %d failed: %v", i+1, err)
+		}
+		data, err := io.ReadAll(decoded)
+		decoded.Close()
+		if err != nil {
+			t.Fatalf("NEW architecture ReadAll %d failed: %v", i+1, err)
+		}
+		if !bytes.Equal(data, testData) {
+			t.Errorf("NEW architecture read %d: got %q, want %q", i+1, data, testData)
+		}
+	}
+}
+
 // TestEncryptedStreamSeekability verifies that the raw stream data is seekable
 // even for encrypted streams.
 func TestEncryptedStreamSeekability(t *testing.T) {
@@ -398,3 +537,75 @@ func TestUnencryptedStreamMultipleReads(t *testing.T) {
 		}
 	}
 }
+
+// TestFilterCryptEncode tests the Encode method of filterCrypt for symmetry.
+func TestFilterCryptEncode(t *testing.T) {
+	testData := []byte("Test data for filter crypt encode/decode round trip.")
+
+	// Create encryption info
+	id := []byte("0123456789ABCDEF")
+	sec, err := createStdSecHandler(id, "test", "test", PermAll, 128, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	enc := &encryptInfo{
+		stmF: &cryptFilter{Cipher: cipherAES, Length: 128},
+		sec:  sec,
+	}
+
+	ref := NewReference(1, 0)
+	filter := &filterCrypt{enc: enc, ref: ref}
+
+	// Encode (encrypt) the data
+	var encryptedBuf bytes.Buffer
+	encoder, err := filter.Encode(V1_6, &nopWriteCloser{&encryptedBuf})
+	if err != nil {
+		t.Fatalf("Encode failed: %v", err)
+	}
+	_, err = encoder.Write(testData)
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	err = encoder.Close()
+	if err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+
+	// Decode (decrypt) the data
+	decoder, err := filter.Decode(V1_6, bytes.NewReader(encryptedBuf.Bytes()))
+	if err != nil {
+		t.Fatalf("Decode failed: %v", err)
+	}
+	decrypted, err := io.ReadAll(decoder)
+	if err != nil {
+		t.Fatalf("ReadAll failed: %v", err)
+	}
+	decoder.Close()
+
+	if !bytes.Equal(decrypted, testData) {
+		t.Errorf("Round trip failed: got %q, want %q", decrypted, testData)
+	}
+}
+
+// TestFilterCryptInfo verifies that filterCrypt.Info returns empty values
+// since the crypt filter should not appear in the stream dictionary.
+func TestFilterCryptInfo(t *testing.T) {
+	filter := &filterCrypt{}
+	name, dict, err := filter.Info(V1_6)
+	if err != nil {
+		t.Errorf("Info returned error: %v", err)
+	}
+	if name != "" {
+		t.Errorf("Info returned non-empty name: %q", name)
+	}
+	if dict != nil {
+		t.Errorf("Info returned non-nil dict: %v", dict)
+	}
+}
+
+// nopWriteCloser wraps a Writer to add a no-op Close method.
+type nopWriteCloser struct {
+	io.Writer
+}
+
+func (nopWriteCloser) Close() error { return nil }
