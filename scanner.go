@@ -673,13 +673,13 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 		return nil, err
 	}
 
-	isEncrypted := false
+	// Store encryption info for lazy decryption in DecodeStream.
+	// This keeps the stream data seekable and allows multiple reads.
+	var enc *encryptInfo
+	var ref Reference
 	if s.enc != nil {
-		streamData, err = s.enc.DecryptStream(s.encRef, streamData)
-		if err != nil {
-			return nil, err
-		}
-		isEncrypted = true
+		enc = s.enc
+		ref = s.encRef
 	}
 
 	err = s.SkipWhiteSpace()
@@ -693,9 +693,10 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 	}
 
 	return &Stream{
-		Dict:        dict,
-		R:           streamData,
-		isEncrypted: isEncrypted,
+		Dict: dict,
+		R:    streamData,
+		enc:  enc,
+		ref:  ref,
 	}, nil
 }
 

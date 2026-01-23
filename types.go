@@ -894,11 +894,21 @@ func (d Dict) SortedKeys() []Name {
 
 // Stream represent a stream object in a PDF file.
 // Use the [DecodeStream] function to access the contents of the stream.
+//
+// The R field contains the raw stream data from the file. For encrypted PDFs,
+// this data is still encrypted - decryption happens on-the-fly when the stream
+// is decoded via [DecodeStream]. This design allows streams to be seekable and
+// readable multiple times.
 type Stream struct {
 	Dict
 	R io.Reader
 
-	isEncrypted bool
+	// enc holds the encryption info for this stream, or nil if the stream
+	// is not encrypted. Decryption is applied lazily in DecodeStream.
+	enc *encryptInfo
+	// ref is the object reference for this stream, needed for key derivation
+	// during decryption.
+	ref Reference
 }
 
 func (x *Stream) isNative() {}

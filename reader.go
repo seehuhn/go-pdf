@@ -456,7 +456,7 @@ func getObjStm(r Getter, stream *Stream, getInt getIntFn, enc *encryptInfo) (_ *
 	}
 	n := int(N)
 
-	if stream.isEncrypted {
+	if stream.enc != nil {
 		// Objects in encrypted streams are not encrypted again.
 		enc = nil
 	}
