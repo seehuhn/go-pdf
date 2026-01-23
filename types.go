@@ -938,6 +938,7 @@ func ReadAll(r Getter, s *Stream) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer in.Close()
 	data, err := io.ReadAll(in)
 	if err != nil {
 		return nil, err

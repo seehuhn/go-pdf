@@ -250,7 +250,10 @@ func GetStreamReader(r Getter, ref Object) (io.ReadCloser, error) {
 // decoded once.
 func DecodeStream(r Getter, x *Stream, numFilters int) (io.ReadCloser, error) {
 	if seeker, ok := x.R.(io.Seeker); ok {
-		seeker.Seek(0, io.SeekStart)
+		_, err := seeker.Seek(0, io.SeekStart)
+		if err != nil {
+			return nil, err
+		}
 	}
 	filters, err := GetFilters(r, x.Dict)
 	if err != nil {
