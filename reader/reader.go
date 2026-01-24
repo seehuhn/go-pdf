@@ -127,13 +127,14 @@ func (r *Reader) ParseContentStream(in io.Reader) error {
 }
 
 func (r *Reader) processStream(stream content.Stream) error {
-	p := r.State.GState
-
 	for _, op := range stream {
 		origArgs := op.Args
 
-		// Apply state changes first (updates p via r.State.GState)
+		// Apply state changes first
 		_ = r.State.ApplyOperator(op.Name, op.Args) // ignore errors in permissive reader
+
+		// Get current graphics state (may have changed after ApplyOperator)
+		p := r.State.GState
 
 		// Handle reader-specific callbacks
 		switch op.Name {

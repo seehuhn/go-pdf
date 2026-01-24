@@ -437,7 +437,6 @@ func GetMatrix(r Getter, obj Object) (m matrix.Matrix, err error) {
 	return m, nil
 }
 
-
 // Function represents a PDF function.
 // Concrete implementations of this interface can be found in the
 // seehuhn.de/go/pdf/function package.

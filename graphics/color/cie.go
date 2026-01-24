@@ -122,6 +122,14 @@ func (c colorCalGray) ColorSpace() Space {
 	return c.Space
 }
 
+// ToXYZ converts a CalGray color to CIE 1931 XYZ coordinates.
+func (c colorCalGray) ToXYZ() (X, Y, Z float64) {
+	A := math.Pow(c.Value, c.Space.gamma)
+	return c.Space.whitePoint[0] * A,
+		c.Space.whitePoint[1] * A,
+		c.Space.whitePoint[2] * A
+}
+
 // == CalRGB =================================================================
 
 // PDF 2.0 sections: 8.6.5.3
@@ -234,6 +242,21 @@ type colorCalRGB struct {
 // ColorSpace implements the [Color] interface.
 func (c colorCalRGB) ColorSpace() Space {
 	return c.Space
+}
+
+// ToXYZ converts a CalRGB color to CIE 1931 XYZ coordinates.
+func (c colorCalRGB) ToXYZ() (X, Y, Z float64) {
+	// apply gamma to each component
+	A := math.Pow(c.Values[0], c.Space.gamma[0])
+	B := math.Pow(c.Values[1], c.Space.gamma[1])
+	C := math.Pow(c.Values[2], c.Space.gamma[2])
+
+	// apply the 3x3 matrix (stored in column-major order)
+	m := c.Space.matrix
+	X = m[0]*A + m[3]*B + m[6]*C
+	Y = m[1]*A + m[4]*B + m[7]*C
+	Z = m[2]*A + m[5]*B + m[8]*C
+	return X, Y, Z
 }
 
 // == Lab ====================================================================

@@ -173,3 +173,8 @@ type colorICCBased struct {
 func (c colorICCBased) ColorSpace() Space {
 	return c.Space
 }
+
+// Components returns the colour component values.
+func (c colorICCBased) Components() []float64 {
+	return c.Values[:c.Space.N]
+}
