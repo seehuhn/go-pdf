@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2025-01-25
+
+### Added
+- **Complete PDF Action Support:** New `action` package implements all 19 PDF action types (GoTo, URI, JavaScript, SubmitForm, etc.) with typed Go structs and action triggers for annotations, pages, and forms.
+- **Typed Destinations:** New `destination` package provides type-safe PDF destinations (XYZ, Fit, FitH, FitR, etc.) with validation.
+- **Annotation Support:** New `annotation` package covers all PDF 2.0 annotation types with automatic fallback appearance generation for Text, FreeText, Link, Line, Square, and Circle annotations.
+- **Content Streams as Objects:** New `graphics/content` package parses content streams into `[]Operator` slices that can be read, modified, and written between files. Includes builder subpackage for programmatic construction.
+- **Optional Content (Layers):** New `oc` package for PDF 1.5+ layer support.
+- **Typed Page Objects:** New `page` package with subpackages for box colors, navigation nodes, separation info, and transitions.
+- **Text Extraction Improvements:** ActualText support for accessible text, new `pdf-extract` tool, and improved space detection.
+- **PDF 2.0 Features:** RunLengthDecode filter, Lab8 image type, shading types 5-7, measure dictionaries, and collection support.
+
+### Changed
+- `color.DeviceGray`, `DeviceRGB`, `DeviceCMYK` are now types instead of functions.
+- `font.Layouter.Encode()` simplified by removing width parameter.
+- `annotation.Link` uses typed `Action` and `Destination` fields; `QuadPoints` changed from `[]float64` to `[]vec.Vec2`.
+- `outline` package redesigned with typed destination and action fields.
+- `GetResources` renamed to `ExtractResources`; `DecodeDict` deprecated.
+- Merged `resource/` and `graphics/operator/` into `graphics/content/`.
+- Unified graphics state management with typed state bits and blend modes.
+- Type 3 font CharProcs now use `content.Stream`.
+- Standardized extraction APIs to use `pdf.Extractor` parameter throughout.
+
+### Fixed
+- Stream decryption now applied lazily, enabling multiple reads from encrypted streams.
+- Page tree reader more permissive with malformed Kids arrays.
+- Various graphics state and color handling bugs.
+- Numerous fuzzing failures addressed.
+
 ## [0.6.0] - 2025-06-30
 
 ### Added
