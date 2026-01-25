@@ -92,4 +92,10 @@ type FontInfoType3 struct {
 	// Resources (optional) holds named resources shared by all glyph content
 	// streams that don't have their own resource dictionary.
 	Resources *content.Resources
+
+	// Encoding maps character codes to glyph names.
+	Encoding encoding.Simple
+
+	// FontBBox (optional) is the font bounding box in glyph space units.
+	FontBBox *pdf.Rectangle
 }

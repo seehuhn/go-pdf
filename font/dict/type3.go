@@ -265,6 +265,8 @@ func (d *Type3) FontInfo() any {
 		CharProcs:  d.CharProcs,
 		FontMatrix: d.FontMatrix,
 		Resources:  d.Resources,
+		Encoding:   d.Encoding,
+		FontBBox:   d.FontBBox,
 	}
 }
 
