@@ -269,7 +269,7 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 
 	pat := &pattern.Type1{
 		TilingType: 1,
-		BBox:       &pdf.Rectangle{URx: w, URy: h},
+		BBox:       pdf.Rectangle{URx: w, URy: h},
 		XStep:      w,
 		YStep:      h,
 		Matrix:     matrix.Identity,
@@ -320,7 +320,7 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 
 	pat := &pattern.Type1{
 		TilingType: 1,
-		BBox:       &pdf.Rectangle{URx: w, URy: h},
+		BBox:       pdf.Rectangle{URx: w, URy: h},
 		XStep:      w,
 		YStep:      h,
 		Matrix:     matrix.Identity,

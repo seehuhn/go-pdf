@@ -67,11 +67,7 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 	trailer := Dict{}
 	first := true
 	seen := make(map[int64]bool)
-	for {
-		// avoid xref loops
-		if seen[start] {
-			break
-		}
+	for !seen[start] {
 		seen[start] = true
 
 		s, err := r.scannerFrom(start, false)

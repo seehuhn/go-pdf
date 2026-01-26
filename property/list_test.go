@@ -61,7 +61,7 @@ var testCases = []testCase{
 		Name: "Artifact-Full",
 		Dict: pdf.Dict{
 			"Type":     pdf.Name("Layout"),
-			"BBox":     &pdf.Rectangle{10, 20, 100, 200},
+			"BBox":     &pdf.Rectangle{LLx: 10, LLy: 20, URx: 100, URy: 200},
 			"Attached": pdf.Array{pdf.Name("Top"), pdf.Name("Bottom")},
 			"Subtype":  pdf.Name("Header"),
 		},

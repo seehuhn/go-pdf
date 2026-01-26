@@ -236,7 +236,7 @@ var t0Dicts = []*dict.CIDFontType0{
 			1: {OffsY: 880, DeltaY: -900},
 			2: {OffsY: 880, DeltaY: -900},
 		},
-		DefaultVMetrics: dict.DefaultVMetrics{800, -800},
+		DefaultVMetrics: dict.DefaultVMetrics{OffsY: 800, DeltaY: -800},
 		ToUnicode: &cmap.ToUnicodeFile{
 			CodeSpaceRange: charcode.Simple,
 			Singles: []cmap.ToUnicodeSingle{

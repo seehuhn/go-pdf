@@ -35,7 +35,7 @@ type Type1 struct {
 
 	// The pattern cell's bounding box.
 	// The pattern cell is clipped to this rectangle before it is painted.
-	BBox *pdf.Rectangle
+	BBox pdf.Rectangle
 
 	// XStep is the horizontal spacing between pattern cells.
 	XStep float64
@@ -85,7 +85,7 @@ func (p *Type1) Equal(other color.Pattern) bool {
 		return false
 	}
 	return p.TilingType == o.TilingType &&
-		p.BBox.Equal(o.BBox) &&
+		p.BBox == o.BBox &&
 		p.XStep == o.XStep && p.YStep == o.YStep &&
 		p.Matrix == o.Matrix &&
 		p.Color == o.Color &&
@@ -96,6 +96,9 @@ func (p *Type1) Equal(other color.Pattern) bool {
 func (p *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if p.TilingType < 1 || p.TilingType > 3 {
 		return nil, fmt.Errorf("invalid tiling type: %d", p.TilingType)
+	}
+	if p.BBox.IsZero() {
+		return nil, fmt.Errorf("missing or invalid BBox")
 	}
 	if p.XStep == 0 || p.YStep == 0 {
 		return nil, fmt.Errorf("invalid step size: (%f, %f)", p.XStep, p.YStep)
@@ -116,7 +119,7 @@ func (p *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		"PatternType": pdf.Integer(1),
 		"PaintType":   pdf.Integer(p.PaintType()),
 		"TilingType":  pdf.Integer(p.TilingType),
-		"BBox":        p.BBox,
+		"BBox":        &p.BBox,
 		"XStep":       pdf.Number(p.XStep),
 		"YStep":       pdf.Number(p.YStep),
 		"Resources":   resObj,

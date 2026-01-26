@@ -191,7 +191,7 @@ func isConsistent(F *type1.Font, M *afm.Metrics) bool {
 	return true
 }
 
-// GetName returns the PostScript name of the font.
+// PostScriptName returns the PostScript name of the font.
 func (f *Instance) PostScriptName() string {
 	if f.Metrics != nil {
 		return f.Metrics.FontName

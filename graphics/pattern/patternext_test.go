@@ -44,7 +44,7 @@ func makeType1Colored() *pattern.Type1 {
 	b.Fill()
 	return &pattern.Type1{
 		TilingType: 1,
-		BBox:       &pdf.Rectangle{LLx: 0, LLy: 0, URx: 10, URy: 10},
+		BBox:       pdf.Rectangle{LLx: 0, LLy: 0, URx: 10, URy: 10},
 		XStep:      10,
 		YStep:      10,
 		Color:      true,
@@ -59,7 +59,7 @@ func makeType1Uncolored() *pattern.Type1 {
 	b.Fill()
 	return &pattern.Type1{
 		TilingType: 2,
-		BBox:       &pdf.Rectangle{LLx: 0, LLy: 0, URx: 20, URy: 20},
+		BBox:       pdf.Rectangle{LLx: 0, LLy: 0, URx: 20, URy: 20},
 		XStep:      20,
 		YStep:      20,
 		Color:      false,

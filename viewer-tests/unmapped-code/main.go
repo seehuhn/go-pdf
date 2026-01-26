@@ -62,6 +62,9 @@ func createDocument(fname string) error {
 	F := standard.Helvetica.New()
 
 	X, err := makeTestFont()
+	if err != nil {
+		return err
+	}
 
 	M := makeMarkerFont()
 

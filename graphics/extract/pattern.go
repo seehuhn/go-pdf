@@ -176,7 +176,7 @@ func extractType1(x *pdf.Extractor, stream *pdf.Stream) (*pattern.Type1, error) 
 
 	pat := &pattern.Type1{
 		TilingType: int(tilingType),
-		BBox:       bbox,
+		BBox:       *bbox,
 		XStep:      xStep,
 		YStep:      yStep,
 		Color:      paintType == 1,

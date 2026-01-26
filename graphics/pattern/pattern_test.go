@@ -30,7 +30,7 @@ func TestPatternEqual(t *testing.T) {
 	patterns := []color.Pattern{
 		&Type1{
 			TilingType: 1,
-			BBox:       &pdf.Rectangle{LLx: 0, LLy: 0, URx: 10, URy: 10},
+			BBox:       pdf.Rectangle{LLx: 0, LLy: 0, URx: 10, URy: 10},
 			XStep:      10,
 			YStep:      10,
 			Color:      true,

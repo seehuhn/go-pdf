@@ -1850,7 +1850,7 @@ types:
     pdfType: rectangle
     required: true
     introduced: '1.2'
-    goType: '*pdf.Rectangle'
+    goType: pdf.Rectangle
     purpose: 'The pattern cell''s bounding box.
 
       The pattern cell is clipped to this rectangle before it is painted.'

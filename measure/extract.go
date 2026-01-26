@@ -86,7 +86,7 @@ func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict) (*RectilinearMea
 			xFactor := rm.XAxis[0].ConversionFactor
 			xUnit := rm.XAxis[0].Unit
 
-			if rm.YAxis != nil && len(rm.YAxis) > 0 &&
+			if len(rm.YAxis) > 0 &&
 				(rm.YAxis[0].ConversionFactor != xFactor || rm.YAxis[0].Unit != xUnit) {
 				// X and Y differ
 				yFactor := rm.YAxis[0].ConversionFactor
