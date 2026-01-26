@@ -4,7 +4,6 @@ types:
 - name: AlternateImage
   goType: null
   pdfRepr: dict
-  arlingtonSrc: AlternateImage.tsv
   fields:
   - goName: null
     pdfKey: Image
@@ -32,7 +31,6 @@ types:
   goType: graphics/color.SpaceCalGray
   pdfRepr: dict
   introduced: '1.1'
-  arlingtonSrc: CalGrayColorSpace.tsv
   fields:
   - goName: null
     pdfKey: '0'
@@ -58,7 +56,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.1'
-  arlingtonSrc: CalGrayDict.tsv
   fields:
   - goName: null
     pdfKey: WhitePoint
@@ -88,7 +85,6 @@ types:
   goType: graphics/color.SpaceCalRGB
   pdfRepr: dict
   introduced: '1.1'
-  arlingtonSrc: CalRGBColorSpace.tsv
   fields:
   - goName: null
     pdfKey: '0'
@@ -114,7 +110,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.1'
-  arlingtonSrc: CalRGBDict.tsv
   fields:
   - goName: null
     pdfKey: WhitePoint
@@ -152,7 +147,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.3'
-  arlingtonSrc: ColorantsDict.tsv
   fields:
   - goName: null
     pdfKey: '*'
@@ -166,7 +160,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.0'
-  arlingtonSrc: DeviceCMYKColorSpace.tsv
   fields:
   - goName: null
     pdfKey: '0'
@@ -180,7 +173,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.0'
-  arlingtonSrc: DeviceGrayColorSpace.tsv
   fields:
   - goName: null
     pdfKey: '0'
@@ -194,7 +186,6 @@ types:
   goType: graphics/color.SpaceDeviceN
   pdfRepr: dict
   introduced: '1.3'
-  arlingtonSrc: DeviceNColorSpace.tsv
   fields:
   - goName: null
     pdfKey: '0'
@@ -256,7 +247,6 @@ types:
   pdfSubtype: DeviceN
   pdfRepr: dict
   introduced: '1.6'
-  arlingtonSrc: DeviceNDict.tsv
   fields:
   - goName: null
     pdfKey: Subtype
@@ -293,7 +283,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.6'
-  arlingtonSrc: DeviceNMixingHints.tsv
   fields:
   - goName: null
     pdfKey: Solidities
@@ -321,7 +310,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.6'
-  arlingtonSrc: DeviceNProcess.tsv
   fields:
   - goName: null
     pdfKey: ColorSpace
@@ -351,7 +339,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.0'
-  arlingtonSrc: DeviceRGBColorSpace.tsv
   fields:
   - goName: null
     pdfKey: '0'
@@ -364,7 +351,6 @@ types:
 - name: FunctionType0
   goType: function.Type0
   pdfRepr: stream
-  arlingtonSrc: FunctionType0.tsv
   fields:
   - goName: null
     pdfKey: FunctionType
@@ -531,7 +517,6 @@ types:
   goType: function.Type2
   pdfRepr: dict
   introduced: '1.3'
-  arlingtonSrc: FunctionType2.tsv
   fields:
   - goName: null
     pdfKey: FunctionType
@@ -600,7 +585,6 @@ types:
   goType: function.Type3
   pdfRepr: dict
   introduced: '1.3'
-  arlingtonSrc: FunctionType3.tsv
   fields:
   - goName: null
     pdfKey: FunctionType
@@ -674,7 +658,6 @@ types:
 - name: FunctionType4
   goType: function.Type4
   pdfRepr: stream
-  arlingtonSrc: FunctionType4.tsv
   fields:
   - goName: null
     pdfKey: FunctionType
@@ -783,7 +766,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 270
-  arlingtonSrc: GeographicCoordinateSystem.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -809,7 +791,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 57
-  arlingtonSrc: GraphicsStateParameter.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1111,7 +1092,6 @@ types:
   pdfRepr: dict
   introduced: '1.4'
   specTable: Table 94
-  arlingtonSrc: GroupAttributes.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1180,7 +1160,6 @@ types:
   goType: graphics/color.SpaceICCBased
   pdfRepr: dict
   introduced: '1.3'
-  arlingtonSrc: ICCBasedColorSpace.tsv
   fields:
   - goName: null
     pdfKey: '0'
@@ -1205,7 +1184,6 @@ types:
 - name: ICCProfileStream
   goType: null
   pdfRepr: stream
-  arlingtonSrc: ICCProfileStream.tsv
   fields:
   - goName: null
     pdfKey: N
@@ -1322,7 +1300,6 @@ types:
   goType: graphics/color.SpaceIndexed
   pdfRepr: dict
   introduced: '1.0'
-  arlingtonSrc: IndexedColorSpace.tsv
   fields:
   - goName: null
     pdfKey: '0'
@@ -1384,7 +1361,6 @@ types:
   goType: graphics/color.SpaceLab
   pdfRepr: dict
   introduced: '1.1'
-  arlingtonSrc: LabColorSpace.tsv
   fields:
   - goName: null
     pdfKey: '0'
@@ -1410,7 +1386,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.1'
-  arlingtonSrc: LabDict.tsv
   fields:
   - goName: null
     pdfKey: WhitePoint
@@ -1441,7 +1416,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 266
-  arlingtonSrc: MeasureGEO.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1517,7 +1491,6 @@ types:
   pdfRepr: dict
   introduced: '1.6'
   specTable: Table 266
-  arlingtonSrc: MeasureRL.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1609,7 +1582,6 @@ types:
   pdfRepr: dict
   introduced: '1.6'
   specTable: Table 268
-  arlingtonSrc: NumberFormat.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1698,7 +1670,6 @@ types:
   pdfRepr: dict
   introduced: '1.4'
   specTable: Table 401
-  arlingtonSrc: OutputIntents.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1769,7 +1740,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.2'
-  arlingtonSrc: PatternColorSpace.tsv
   fields:
   - goName: null
     pdfKey: '0'
@@ -1807,7 +1777,6 @@ types:
   pdfRepr: stream
   introduced: '1.2'
   specTable: Table 5
-  arlingtonSrc: PatternType1.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1970,7 +1939,6 @@ types:
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 75
-  arlingtonSrc: PatternType2.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2027,7 +1995,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 272
-  arlingtonSrc: PointData.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2064,7 +2031,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 271
-  arlingtonSrc: ProjectedCoordinateSystem.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2088,7 +2054,6 @@ types:
   goType: graphics/color.SpaceSeparation
   pdfRepr: dict
   introduced: '1.2'
-  arlingtonSrc: SeparationColorSpace.tsv
   fields:
   - goName: null
     pdfKey: '0'
@@ -2144,7 +2109,6 @@ types:
   goType: graphics/shading.Type1
   pdfRepr: dict
   introduced: '1.3'
-  arlingtonSrc: ShadingType1.tsv
   fields:
   - goName: Domain
     pdfKey: Domain
@@ -2251,7 +2215,6 @@ types:
   goType: graphics/shading.Type2
   pdfRepr: dict
   introduced: '1.3'
-  arlingtonSrc: ShadingType2.tsv
   fields:
   - goName: null
     pdfKey: Coords
@@ -2359,7 +2322,6 @@ types:
   goType: graphics/shading.Type3
   pdfRepr: dict
   introduced: '1.3'
-  arlingtonSrc: ShadingType3.tsv
   fields:
   - goName: null
     pdfKey: Coords
@@ -2460,7 +2422,6 @@ types:
 - name: ShadingType4
   goType: graphics/shading.Type4
   pdfRepr: stream
-  arlingtonSrc: ShadingType4.tsv
   fields:
   - goName: BitsPerCoordinate
     pdfKey: BitsPerCoordinate
@@ -2659,7 +2620,6 @@ types:
 - name: ShadingType5
   goType: graphics/shading.Type5
   pdfRepr: stream
-  arlingtonSrc: ShadingType5.tsv
   fields:
   - goName: BitsPerCoordinate
     pdfKey: BitsPerCoordinate
@@ -2858,7 +2818,6 @@ types:
 - name: ShadingType6
   goType: graphics/shading.Type6
   pdfRepr: stream
-  arlingtonSrc: ShadingType6.tsv
   fields:
   - goName: BitsPerCoordinate
     pdfKey: BitsPerCoordinate
@@ -3053,7 +3012,6 @@ types:
 - name: ShadingType7
   goType: graphics/shading.Type7
   pdfRepr: stream
-  arlingtonSrc: ShadingType7.tsv
   fields:
   - goName: BitsPerCoordinate
     pdfKey: BitsPerCoordinate
@@ -3251,7 +3209,6 @@ types:
   pdfRepr: dict
   introduced: '1.4'
   specTable: Table 142
-  arlingtonSrc: SoftMaskAlpha.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -3301,7 +3258,6 @@ types:
   pdfRepr: dict
   introduced: '1.4'
   specTable: Table 142
-  arlingtonSrc: SoftMaskLuminosity.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -3349,7 +3305,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.6'
-  arlingtonSrc: Solidities.tsv
   fields:
   - goName: null
     pdfKey: Default
@@ -3370,7 +3325,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '2.0'
-  arlingtonSrc: SpectralData.tsv
   fields:
   - goName: null
     pdfKey: '*'
@@ -3385,7 +3339,6 @@ types:
   pdfType: XObject
   pdfRepr: stream
   specTable: Table 5
-  arlingtonSrc: Thumbnail.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -3536,7 +3489,6 @@ types:
   pdfRepr: dict
   introduced: '1.6'
   specTable: Table 265
-  arlingtonSrc: Viewport.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -3591,7 +3543,6 @@ types:
   pdfRepr: stream
   introduced: '1.1'
   specTable: Table 5
-  arlingtonSrc: XObjectFormPS.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -3691,7 +3642,6 @@ types:
   pdfRepr: stream
   introduced: '1.1'
   specTable: Table 5
-  arlingtonSrc: XObjectFormPSpassthrough.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -3829,7 +3779,6 @@ types:
   pdfRepr: stream
   introduced: '1.4'
   specTable: Table 5
-  arlingtonSrc: XObjectFormPrinterMark.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -4047,7 +3996,6 @@ types:
   pdfRepr: stream
   introduced: '1.3'
   specTable: Table 93
-  arlingtonSrc: XObjectFormTrapNet.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -4313,7 +4261,6 @@ types:
   pdfType: XObject
   pdfRepr: stream
   specTable: Table 5
-  arlingtonSrc: XObjectFormType1.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -4607,7 +4554,6 @@ types:
   pdfType: XObject
   pdfRepr: stream
   specTable: Table 5
-  arlingtonSrc: XObjectImage.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -4993,7 +4939,6 @@ types:
   pdfRepr: stream
   introduced: '1.3'
   specTable: Table 5
-  arlingtonSrc: XObjectImageMask.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -5302,7 +5247,6 @@ types:
   pdfRepr: stream
   introduced: '1.4'
   specTable: Table 143
-  arlingtonSrc: XObjectImageSoftMask.tsv
   fields:
   - goName: null
     pdfKey: Type

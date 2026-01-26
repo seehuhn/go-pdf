@@ -7,7 +7,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 295
-  arlingtonSrc: FloatingWindowParameters.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -96,7 +95,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 284
-  arlingtonSrc: MediaClipData.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -171,7 +169,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: MediaClipDataMHBE.tsv
   fields:
   - goName: null
     pdfKey: BU
@@ -185,7 +182,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 284
-  arlingtonSrc: MediaClipSection.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -240,7 +236,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: MediaClipSectionMHBE.tsv
   fields:
   - goName: null
     pdfKey: B
@@ -267,7 +262,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 279
-  arlingtonSrc: MediaCriteria.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -351,7 +345,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 292
-  arlingtonSrc: MediaDuration.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -383,7 +376,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 296
-  arlingtonSrc: MediaOffsetFrame.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -413,7 +405,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 296
-  arlingtonSrc: MediaOffsetMarker.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -441,7 +432,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 296
-  arlingtonSrc: MediaOffsetTime.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -471,7 +461,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 286
-  arlingtonSrc: MediaPermissions.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -498,7 +487,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 290
-  arlingtonSrc: MediaPlayParameters.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -533,7 +521,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: MediaPlayParametersBE.tsv
   fields:
   - goName: null
     pdfKey: V
@@ -589,7 +576,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: MediaPlayParametersMH.tsv
   fields:
   - goName: null
     pdfKey: V
@@ -647,7 +633,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 302
-  arlingtonSrc: MediaPlayerInfo.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -684,7 +669,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 301
-  arlingtonSrc: MediaPlayers.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -721,7 +705,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 293
-  arlingtonSrc: MediaScreenParameters.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -749,7 +732,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: MediaScreenParametersMHBE.tsv
   fields:
   - goName: null
     pdfKey: W
@@ -805,7 +787,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 280
-  arlingtonSrc: MinimumBitDepth.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -841,7 +822,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 281
-  arlingtonSrc: MinimumScreenSize.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -880,7 +860,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 165
-  arlingtonSrc: NavNode.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -975,7 +954,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: Requirements3DMarkup.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1022,7 +1000,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsAcroFormInteract.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1069,7 +1046,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsAction.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1116,7 +1092,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsAttachment.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1163,7 +1138,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsAttachmentEditing.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1210,7 +1184,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsCollection.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1257,7 +1230,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsCollectionEditing.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1304,7 +1276,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsDPartInteract.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1351,7 +1322,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsDigSig.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1406,7 +1376,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsDigSigMDP.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1461,7 +1430,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsDigSigValidation.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1516,7 +1484,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 273
-  arlingtonSrc: RequirementsEnableJavaScripts.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1563,7 +1530,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsEncryption.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1618,7 +1584,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsGeospatial2D.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1665,7 +1630,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsGeospatial3D.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1712,7 +1676,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 276
-  arlingtonSrc: RequirementsHandler.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1741,7 +1704,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsMarkup.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1788,7 +1750,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsMultimedia.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1835,7 +1796,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsNavigation.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1882,7 +1842,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsOCAutoStates.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1929,7 +1888,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsOCInteract.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1976,7 +1934,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsPRC.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2023,7 +1980,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsRichMedia.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2070,7 +2026,6 @@ types:
   pdfRepr: dict
   introduced: fn:Extension(ISO_TS_24064,2.0)
   specTable: Table 273
-  arlingtonSrc: RequirementsSTEP.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2117,7 +2072,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsSeparationSimulation.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2164,7 +2118,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsTransitions.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2211,7 +2164,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsU3D.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2258,7 +2210,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
-  arlingtonSrc: RequirementsglTF.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2306,7 +2257,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 341
-  arlingtonSrc: RichMediaContent.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2344,7 +2294,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 303
-  arlingtonSrc: SoftwareIdentifier.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2401,7 +2350,6 @@ types:
   pdfRepr: stream
   introduced: '1.2'
   specTable: Table 5
-  arlingtonSrc: SoundObject.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2545,7 +2493,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 300
-  arlingtonSrc: Timespan.tsv
   fields:
   - goName: null
     pdfKey: Type

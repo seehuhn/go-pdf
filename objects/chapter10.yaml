@@ -6,7 +6,6 @@ types:
   pdfType: FontDescriptor
   pdfRepr: dict
   introduced: '1.2'
-  arlingtonSrc: CIDFontDescriptorMetrics.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -106,7 +105,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.2'
-  arlingtonSrc: CIDSystemInfo.tsv
   fields:
   - goName: null
     pdfKey: Registry
@@ -130,7 +128,6 @@ types:
   pdfRepr: stream
   introduced: '1.2'
   specTable: Table 5
-  arlingtonSrc: CMapStream.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -309,7 +306,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 112
-  arlingtonSrc: Encoding.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -341,7 +337,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 115
-  arlingtonSrc: FontCIDType0.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -436,7 +431,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 115
-  arlingtonSrc: FontCIDType2.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -531,7 +525,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 120
-  arlingtonSrc: FontDescriptorCIDType0.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -729,7 +722,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 120
-  arlingtonSrc: FontDescriptorCIDType2.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -932,7 +924,6 @@ types:
   pdfType: FontDescriptor
   pdfRepr: dict
   specTable: Table 120
-  arlingtonSrc: FontDescriptorTrueType.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1108,7 +1099,6 @@ types:
   pdfType: FontDescriptor
   pdfRepr: dict
   specTable: Table 120
-  arlingtonSrc: FontDescriptorType1.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1284,7 +1274,6 @@ types:
   pdfType: FontDescriptor
   pdfRepr: dict
   specTable: Table 120
-  arlingtonSrc: FontDescriptorType3.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1435,7 +1424,6 @@ types:
   goType: font/cmap.File
   pdfRepr: stream
   introduced: '1.2'
-  arlingtonSrc: FontFile.tsv
   fields:
   - goName: null
     pdfKey: Length1
@@ -1545,7 +1533,6 @@ types:
   goType: null
   pdfRepr: stream
   introduced: '1.2'
-  arlingtonSrc: FontFile2.tsv
   fields:
   - goName: null
     pdfKey: Length1
@@ -1649,7 +1636,6 @@ types:
   goType: null
   pdfRepr: stream
   introduced: '1.3'
-  arlingtonSrc: FontFile3CIDType0.tsv
   fields:
   - goName: null
     pdfKey: Length1
@@ -1753,7 +1739,6 @@ types:
   goType: null
   pdfRepr: stream
   introduced: '1.6'
-  arlingtonSrc: FontFile3OpenType.tsv
   fields:
   - goName: null
     pdfKey: Length1
@@ -1857,7 +1842,6 @@ types:
   goType: null
   pdfRepr: stream
   introduced: '1.2'
-  arlingtonSrc: FontFile3Type1.tsv
   fields:
   - goName: null
     pdfKey: Length1
@@ -1961,7 +1945,6 @@ types:
   goType: null
   pdfRepr: stream
   introduced: '1.2'
-  arlingtonSrc: FontFileType1.tsv
   fields:
   - goName: null
     pdfKey: Length1
@@ -2066,7 +2049,6 @@ types:
   pdfType: Font
   pdfRepr: dict
   specTable: Table 109
-  arlingtonSrc: FontMultipleMaster.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2141,7 +2123,6 @@ types:
   pdfType: Font
   pdfRepr: dict
   specTable: Table 109
-  arlingtonSrc: FontTrueType.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2232,7 +2213,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 119
-  arlingtonSrc: FontType0.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2347,7 +2327,6 @@ types:
   pdfType: Font
   pdfRepr: dict
   specTable: Table 109
-  arlingtonSrc: FontType1.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2438,7 +2417,6 @@ types:
   goType: font/dict.Type3
   pdfType: Font
   pdfRepr: dict
-  arlingtonSrc: FontType3.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2554,7 +2532,6 @@ types:
   pdfRepr: stream
   introduced: '1.2'
   specTable: Table 118
-  arlingtonSrc: ToUnicodeCMapStream.tsv
   fields:
   - goName: null
     pdfKey: Type

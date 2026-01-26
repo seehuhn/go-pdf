@@ -7,7 +7,6 @@ types:
   pdfRepr: dict
   introduced: '1.1'
   specTable: Table 163
-  arlingtonSrc: Bead.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -58,7 +57,6 @@ types:
   pdfRepr: dict
   introduced: '1.1'
   specTable: Table 163
-  arlingtonSrc: BeadFirst.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -108,7 +106,6 @@ types:
   pdfType: Catalog
   pdfRepr: dict
   specTable: Table 29
-  arlingtonSrc: Catalog.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -531,7 +528,6 @@ types:
   pdfRepr: dict
   introduced: '1.6'
   specTable: Table 409
-  arlingtonSrc: DPart.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -591,7 +587,6 @@ types:
   pdfRepr: dict
   introduced: '1.6'
   specTable: Table 408
-  arlingtonSrc: DPartRoot.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -625,7 +620,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.3'
-  arlingtonSrc: Data.tsv
   fields:
   - goName: null
     pdfKey: LastModified
@@ -659,7 +653,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 49
-  arlingtonSrc: DevExtensions.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -696,7 +689,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.3'
-  arlingtonSrc: EmbeddedFileParameter.tsv
   fields:
   - goName: null
     pdfKey: Size
@@ -736,7 +728,6 @@ types:
   pdfRepr: stream
   introduced: '1.3'
   specTable: Table 5
-  arlingtonSrc: EmbeddedFileStream.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -860,7 +851,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 28
-  arlingtonSrc: EncryptedPayload.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -888,7 +878,6 @@ types:
 - name: EncryptionPublicKey
   goType: null
   pdfRepr: stream
-  arlingtonSrc: EncryptionPublicKey.tsv
   fields:
   - goName: null
     pdfKey: Recipients
@@ -999,7 +988,6 @@ types:
 - name: EncryptionStandard
   goType: null
   pdfRepr: stream
-  arlingtonSrc: EncryptionStandard.tsv
   fields:
   - goName: null
     pdfKey: Filter
@@ -1127,7 +1115,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 48
-  arlingtonSrc: Extensions.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1168,7 +1155,6 @@ types:
 - name: FileSpecEF
   goType: null
   pdfRepr: dict
-  arlingtonSrc: FileSpecEF.tsv
   fields:
   - goName: null
     pdfKey: F
@@ -1188,7 +1174,6 @@ types:
 - name: FileSpecRF
   goType: null
   pdfRepr: dict
-  arlingtonSrc: FileSpecRF.tsv
   fields:
   - goName: null
     pdfKey: F
@@ -1211,7 +1196,6 @@ types:
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 43
-  arlingtonSrc: FileSpecification.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1345,7 +1329,6 @@ types:
 - name: FileTrailer
   goType: null
   pdfRepr: dict
-  arlingtonSrc: FileTrailer.tsv
   fields:
   - goName: null
     pdfKey: Size
@@ -1424,7 +1407,6 @@ types:
 - name: FilterCCITTFaxDecode
   goType: null
   pdfRepr: dict
-  arlingtonSrc: FilterCCITTFaxDecode.tsv
   fields:
   - goName: null
     pdfKey: K
@@ -1493,7 +1475,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 14
-  arlingtonSrc: FilterCrypt.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1513,7 +1494,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.0'
-  arlingtonSrc: FilterDCTDecode.tsv
   fields:
   - goName: null
     pdfKey: ColorTransform
@@ -1528,7 +1508,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.2'
-  arlingtonSrc: FilterFlateDecode.tsv
   fields:
   - goName: null
     pdfKey: Predictor
@@ -1575,7 +1554,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.4'
-  arlingtonSrc: FilterJBIG2Decode.tsv
   fields:
   - goName: null
     pdfKey: JBIG2Globals
@@ -1589,7 +1567,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.0'
-  arlingtonSrc: FilterLZWDecode.tsv
   fields:
   - goName: null
     pdfKey: Predictor
@@ -1646,7 +1623,6 @@ types:
   pdfType: DeveloperExtensions
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
-  arlingtonSrc: GTSm_DevExtensions.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1687,7 +1663,6 @@ types:
   pdfType: DeveloperExtensions
   pdfRepr: dict
   introduced: '1.7'
-  arlingtonSrc: ISO_DevExtensions.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1739,7 +1714,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.2'
-  arlingtonSrc: LinearizationParameterDict.tsv
   fields:
   - goName: null
     pdfKey: Linearized
@@ -1808,7 +1782,6 @@ types:
 - name: MarkInfo
   goType: null
   pdfRepr: dict
-  arlingtonSrc: MarkInfo.tsv
   fields:
   - goName: null
     pdfKey: Marked
@@ -1833,7 +1806,6 @@ types:
 - name: Name
   goType: null
   pdfRepr: dict
-  arlingtonSrc: Name.tsv
   fields:
   - goName: null
     pdfKey: Dests
@@ -1939,7 +1911,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 356
-  arlingtonSrc: Namespace.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1974,7 +1945,6 @@ types:
   pdfRepr: stream
   introduced: '1.5'
   specTable: Table 5
-  arlingtonSrc: ObjectStream.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2079,7 +2049,6 @@ types:
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 161
-  arlingtonSrc: PageLabel.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2118,7 +2087,6 @@ types:
   pdfType: Page
   pdfRepr: dict
   specTable: Table 31
-  arlingtonSrc: PageObject.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2477,7 +2445,6 @@ types:
   pdfRepr: dict
   introduced: '1.0'
   specTable: Table 30
-  arlingtonSrc: PageTreeNode.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2551,7 +2518,6 @@ types:
   pdfRepr: dict
   introduced: '1.0'
   specTable: Table 30
-  arlingtonSrc: PageTreeNodeRoot.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2609,7 +2575,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.4'
-  arlingtonSrc: Reference.tsv
   fields:
   - goName: null
     pdfKey: F
@@ -2636,7 +2601,6 @@ types:
 - name: Resource
   goType: graphics/content.Resources
   pdfRepr: dict
-  arlingtonSrc: Resource.tsv
   fields:
   - goName: ExtGState
     pdfKey: ExtGState
@@ -2720,7 +2684,6 @@ types:
 - name: Stream
   goType: metadata.Stream
   pdfRepr: stream
-  arlingtonSrc: Stream.tsv
   fields:
   - goName: null
     pdfKey: Length
@@ -2819,7 +2782,6 @@ types:
   pdfRepr: dict
   introduced: '1.1'
   specTable: Table 162
-  arlingtonSrc: Thread.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2857,7 +2819,6 @@ types:
 - name: ViewerPreferences
   goType: null
   pdfRepr: dict
-  arlingtonSrc: ViewerPreferences.tsv
   fields:
   - goName: null
     pdfKey: HideToolbar
@@ -3025,7 +2986,6 @@ types:
   pdfRepr: stream
   introduced: '1.5'
   specTable: Table 5
-  arlingtonSrc: XRefStream.tsv
   fields:
   - goName: null
     pdfKey: Type

@@ -4,7 +4,6 @@ types:
 - name: 3DActivation
   goType: null
   pdfRepr: dict
-  arlingtonSrc: 3DActivation.tsv
   fields:
   - goName: null
     pdfKey: A
@@ -86,7 +85,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 312
-  arlingtonSrc: 3DAnimationStyle.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -127,7 +125,6 @@ types:
   pdfRepr: dict
   introduced: '1.6'
   specTable: Table 317
-  arlingtonSrc: 3DBackground.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -173,7 +170,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 322
-  arlingtonSrc: 3DCrossSection.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -254,7 +250,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 320
-  arlingtonSrc: 3DLightingScheme.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -289,7 +284,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 326
-  arlingtonSrc: 3DMeasure3DC.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -370,7 +364,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 326
-  arlingtonSrc: 3DMeasureAD3.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -511,7 +504,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 326
-  arlingtonSrc: 3DMeasureLD3.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -630,7 +622,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 326
-  arlingtonSrc: 3DMeasurePD3.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -756,7 +747,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 326
-  arlingtonSrc: 3DMeasureRD3.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -910,7 +900,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 323
-  arlingtonSrc: 3DNode.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -972,7 +961,6 @@ types:
   pdfRepr: dict
   introduced: '1.6'
   specTable: Table 314
-  arlingtonSrc: 3DReference.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -995,7 +983,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 318
-  arlingtonSrc: 3DRenderMode.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1066,7 +1053,6 @@ types:
   pdfRepr: stream
   introduced: '1.6'
   specTable: Table 5
-  arlingtonSrc: 3DStream.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1206,7 +1192,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.7'
-  arlingtonSrc: 3DUnits.tsv
   fields:
   - goName: null
     pdfKey: TSm
@@ -1266,7 +1251,6 @@ types:
   pdfRepr: dict
   introduced: '1.6'
   specTable: Table 315
-  arlingtonSrc: 3DView.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1381,7 +1365,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 315
-  arlingtonSrc: 3DViewAddEntries.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1508,7 +1491,6 @@ types:
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 196
-  arlingtonSrc: ActionECMAScript.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1582,7 +1564,6 @@ types:
   pdfRepr: dict
   introduced: '1.1'
   specTable: Table 196
-  arlingtonSrc: ActionGoTo.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1672,7 +1653,6 @@ types:
   pdfRepr: dict
   introduced: '1.6'
   specTable: Table 196
-  arlingtonSrc: ActionGoTo3DView.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1750,7 +1730,6 @@ types:
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 196
-  arlingtonSrc: ActionGoToDp.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1813,7 +1792,6 @@ types:
   pdfRepr: dict
   introduced: '1.6'
   specTable: Table 196
-  arlingtonSrc: ActionGoToE.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -1913,7 +1891,6 @@ types:
   pdfRepr: dict
   introduced: '1.1'
   specTable: Table 196
-  arlingtonSrc: ActionGoToR.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2027,7 +2004,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 196
-  arlingtonSrc: ActionHide.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2168,7 +2144,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 196
-  arlingtonSrc: ActionImportData.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2245,7 +2220,6 @@ types:
   pdfRepr: dict
   introduced: '1.1'
   specTable: Table 196
-  arlingtonSrc: ActionLaunch.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2355,7 +2329,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 196
-  arlingtonSrc: ActionMovie.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2458,7 +2431,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 196
-  arlingtonSrc: ActionNOP.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2507,7 +2479,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 196
-  arlingtonSrc: ActionNamed.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2590,7 +2561,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 196
-  arlingtonSrc: ActionRendition.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2697,7 +2667,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 196
-  arlingtonSrc: ActionResetForm.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2786,7 +2755,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 196
-  arlingtonSrc: ActionRichMediaExecute.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2868,7 +2836,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 196
-  arlingtonSrc: ActionSetOCGState.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -2950,7 +2917,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 196
-  arlingtonSrc: ActionSetState.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -3020,7 +2986,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 196
-  arlingtonSrc: ActionSound.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -3141,7 +3106,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 196
-  arlingtonSrc: ActionSubmitForm.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -3249,7 +3213,6 @@ types:
   pdfRepr: dict
   introduced: '1.1'
   specTable: Table 196
-  arlingtonSrc: ActionThread.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -3346,7 +3309,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 196
-  arlingtonSrc: ActionTransition.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -3412,7 +3374,6 @@ types:
   pdfRepr: dict
   introduced: '1.1'
   specTable: Table 196
-  arlingtonSrc: ActionURI.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -3493,7 +3454,6 @@ types:
   goType: action/triggers.Catalog
   pdfRepr: dict
   introduced: '1.4'
-  arlingtonSrc: AddActionCatalog.tsv
   fields:
   - goName: null
     pdfKey: DC
@@ -3544,7 +3504,6 @@ types:
   goType: action/triggers.Form
   pdfRepr: dict
   introduced: '1.3'
-  arlingtonSrc: AddActionFormField.tsv
   fields:
   - goName: null
     pdfKey: K
@@ -3583,7 +3542,6 @@ types:
   goType: action/triggers.Page
   pdfRepr: dict
   introduced: '1.2'
-  arlingtonSrc: AddActionPageObject.tsv
   fields:
   - goName: null
     pdfKey: O
@@ -3670,7 +3628,6 @@ types:
   goType: action/triggers.Annotation
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: AddActionScreenAnnotation.tsv
   fields:
   - goName: null
     pdfKey: E
@@ -3920,7 +3877,6 @@ types:
 - name: AddActionWidgetAnnotation
   goType: action/triggers.Annotation
   pdfRepr: dict
-  arlingtonSrc: AddActionWidgetAnnotation.tsv
   fields:
   - goName: null
     pdfKey: E
@@ -4540,7 +4496,6 @@ types:
   pdfRepr: dict
   introduced: '1.6'
   specTable: Table 166
-  arlingtonSrc: Annot3D.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -4621,7 +4576,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 166
-  arlingtonSrc: AnnotCaret.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -4670,7 +4624,6 @@ types:
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 166
-  arlingtonSrc: AnnotCircle.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -4731,7 +4684,6 @@ types:
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 166
-  arlingtonSrc: AnnotFileAttachment.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -4795,7 +4747,6 @@ types:
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 166
-  arlingtonSrc: AnnotFreeText.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -4897,7 +4848,6 @@ types:
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 166
-  arlingtonSrc: AnnotHighlight.tsv
   fields:
   - goName: Type
     pdfKey: Type
@@ -4946,7 +4896,6 @@ types:
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 166
-  arlingtonSrc: AnnotInk.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -5013,7 +4962,6 @@ types:
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 166
-  arlingtonSrc: AnnotLine.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -5154,7 +5102,6 @@ types:
   pdfType: Annot
   pdfRepr: dict
   specTable: Table 166
-  arlingtonSrc: AnnotLink.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -5300,7 +5247,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 166
-  arlingtonSrc: AnnotMovie.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -5371,7 +5317,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 166
-  arlingtonSrc: AnnotPolyLine.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -5471,7 +5416,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 166
-  arlingtonSrc: AnnotPolygon.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -5569,7 +5513,6 @@ types:
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 166
-  arlingtonSrc: AnnotPopup.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -5658,7 +5601,6 @@ types:
   pdfRepr: dict
   introduced: '1.4'
   specTable: Table 166
-  arlingtonSrc: AnnotPrinterMark.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -5702,7 +5644,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 166
-  arlingtonSrc: AnnotProjection.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -5734,7 +5675,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 166
-  arlingtonSrc: AnnotRedact.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -5824,7 +5764,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 166
-  arlingtonSrc: AnnotRichMedia.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -5878,7 +5817,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 166
-  arlingtonSrc: AnnotScreen.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -5969,7 +5907,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 166
-  arlingtonSrc: AnnotSound.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -6028,7 +5965,6 @@ types:
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 166
-  arlingtonSrc: AnnotSquare.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -6089,7 +6025,6 @@ types:
   pdfRepr: dict
   introduced: '1.4'
   specTable: Table 166
-  arlingtonSrc: AnnotSquiggly.tsv
   fields:
   - goName: Type
     pdfKey: Type
@@ -6138,7 +6073,6 @@ types:
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 166
-  arlingtonSrc: AnnotStamp.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -6206,7 +6140,6 @@ types:
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 166
-  arlingtonSrc: AnnotStrikeOut.tsv
   fields:
   - goName: Type
     pdfKey: Type
@@ -6254,7 +6187,6 @@ types:
   pdfType: Annot
   pdfRepr: dict
   specTable: Table 166
-  arlingtonSrc: AnnotText.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -6368,7 +6300,6 @@ types:
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 403
-  arlingtonSrc: AnnotTrapNetwork.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -6455,7 +6386,6 @@ types:
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 166
-  arlingtonSrc: AnnotUnderline.tsv
   fields:
   - goName: Type
     pdfKey: Type
@@ -6504,7 +6434,6 @@ types:
   pdfRepr: dict
   introduced: '1.6'
   specTable: Table 166
-  arlingtonSrc: AnnotWatermark.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -6548,7 +6477,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 166
-  arlingtonSrc: AnnotWidget.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -6716,7 +6644,6 @@ types:
   goType: annotation/appearance.Dict
   pdfRepr: dict
   introduced: '1.2'
-  arlingtonSrc: Appearance.tsv
   fields:
   - goName: null
     pdfKey: N
@@ -6762,7 +6689,6 @@ types:
 - name: AppearanceCharacteristics
   goType: null
   pdfRepr: dict
-  arlingtonSrc: AppearanceCharacteristics.tsv
   fields:
   - goName: null
     pdfKey: R
@@ -6849,7 +6775,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.4'
-  arlingtonSrc: AppearancePrinterMark.tsv
   fields:
   - goName: null
     pdfKey: N
@@ -6882,7 +6807,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.4'
-  arlingtonSrc: AppearancePrinterMarkSubDict.tsv
   fields:
   - goName: null
     pdfKey: '*'
@@ -6896,7 +6820,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.3'
-  arlingtonSrc: AppearanceSubDict.tsv
   fields:
   - goName: null
     pdfKey: '*'
@@ -6910,7 +6833,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.3'
-  arlingtonSrc: AppearanceTrapNet.tsv
   fields:
   - goName: null
     pdfKey: N
@@ -6946,7 +6868,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.3'
-  arlingtonSrc: AppearanceTrapNetSubDict.tsv
   fields:
   - goName: null
     pdfKey: '*'
@@ -6962,7 +6883,6 @@ types:
   pdfSubtype: C
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: BorderEffect.tsv
   fields:
   - goName: Style
     pdfKey: S
@@ -7001,7 +6921,6 @@ types:
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 168
-  arlingtonSrc: BorderStyle.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -7055,7 +6974,6 @@ types:
 - name: DestDict
   goType: null
   pdfRepr: dict
-  arlingtonSrc: DestDict.tsv
   fields:
   - goName: null
     pdfKey: D
@@ -7082,7 +7000,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '2.0'
-  arlingtonSrc: DestOutputProfileRef.tsv
   fields:
   - goName: null
     pdfKey: CheckSum
@@ -7125,7 +7042,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 324
-  arlingtonSrc: ExData3DMarkup.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -7167,7 +7083,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 173
-  arlingtonSrc: ExDataMarkupGeo.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -7190,7 +7105,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 332
-  arlingtonSrc: ExDataProjection.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -7221,7 +7135,6 @@ types:
 - name: Field
   goType: null
   pdfRepr: dict
-  arlingtonSrc: Field.tsv
   fields:
   - goName: null
     pdfKey: Parent
@@ -7275,7 +7188,6 @@ types:
 - name: FieldBtnCheckbox
   goType: null
   pdfRepr: dict
-  arlingtonSrc: FieldBtnCheckbox.tsv
   fields:
   - goName: null
     pdfKey: FT
@@ -7389,7 +7301,6 @@ types:
 - name: FieldBtnPush
   goType: null
   pdfRepr: dict
-  arlingtonSrc: FieldBtnPush.tsv
   fields:
   - goName: null
     pdfKey: FT
@@ -7494,7 +7405,6 @@ types:
 - name: FieldBtnRadio
   goType: null
   pdfRepr: dict
-  arlingtonSrc: FieldBtnRadio.tsv
   fields:
   - goName: null
     pdfKey: FT
@@ -7609,7 +7519,6 @@ types:
 - name: FieldChoice
   goType: null
   pdfRepr: dict
-  arlingtonSrc: FieldChoice.tsv
   fields:
   - goName: null
     pdfKey: FT
@@ -7748,7 +7657,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 259
-  arlingtonSrc: FieldMDPTransformParameters.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -7785,7 +7693,6 @@ types:
 - name: FieldSig
   goType: null
   pdfRepr: dict
-  arlingtonSrc: FieldSig.tsv
   fields:
   - goName: null
     pdfKey: FT
@@ -7910,7 +7817,6 @@ types:
 - name: FieldTx
   goType: null
   pdfRepr: dict
-  arlingtonSrc: FieldTx.tsv
   fields:
   - goName: null
     pdfKey: FT
@@ -8029,7 +7935,6 @@ types:
   pdfRepr: dict
   introduced: '1.6'
   specTable: Table 194
-  arlingtonSrc: FixedPrint.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -8060,7 +7965,6 @@ types:
 - name: IconFit
   goType: null
   pdfRepr: dict
-  arlingtonSrc: IconFit.tsv
   fields:
   - goName: null
     pdfKey: SW
@@ -8100,7 +8004,6 @@ types:
 - name: InteractiveForm
   goType: null
   pdfRepr: dict
-  arlingtonSrc: InteractiveForm.tsv
   fields:
   - goName: null
     pdfKey: Fields
@@ -8168,7 +8071,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.3'
-  arlingtonSrc: Mac.tsv
   fields:
   - goName: null
     pdfKey: Subtype
@@ -8195,7 +8097,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.1'
-  arlingtonSrc: MicrosoftWindowsLaunchParam.tsv
   fields:
   - goName: null
     pdfKey: F
@@ -8230,7 +8131,6 @@ types:
   goType: annotation.Movie
   pdfRepr: dict
   introduced: '1.2'
-  arlingtonSrc: Movie.tsv
   fields:
   - goName: null
     pdfKey: F
@@ -8275,7 +8175,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.2'
-  arlingtonSrc: MovieActivation.tsv
   fields:
   - goName: null
     pdfKey: Start
@@ -8358,7 +8257,6 @@ types:
 - name: OptContentConfig
   goType: null
   pdfRepr: dict
-  arlingtonSrc: OptContentConfig.tsv
   fields:
   - goName: null
     pdfKey: Name
@@ -8449,7 +8347,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: OptContentCreatorInfo.tsv
   fields:
   - goName: null
     pdfKey: Creator
@@ -8479,7 +8376,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: OptContentExport.tsv
   fields:
   - goName: null
     pdfKey: ExportState
@@ -8496,7 +8392,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 96
-  arlingtonSrc: OptContentGroup.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -8554,7 +8449,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: OptContentLanguage.tsv
   fields:
   - goName: null
     pdfKey: Lang
@@ -8577,7 +8471,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 97
-  arlingtonSrc: OptContentMembership.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -8635,7 +8528,6 @@ types:
   pdfSubtype: HF
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: OptContentPageElement.tsv
   fields:
   - goName: null
     pdfKey: Subtype
@@ -8652,7 +8544,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: OptContentPrint.tsv
   fields:
   - goName: null
     pdfKey: Subtype
@@ -8672,7 +8563,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: OptContentProperties.tsv
   fields:
   - goName: null
     pdfKey: OCGs
@@ -8700,7 +8590,6 @@ types:
   goType: oc.Usage
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: OptContentUsage.tsv
   fields:
   - goName: null
     pdfKey: CreatorInfo
@@ -8768,7 +8657,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: OptContentUsageApplication.tsv
   fields:
   - goName: null
     pdfKey: Event
@@ -8800,7 +8688,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 100
-  arlingtonSrc: OptContentUser.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -8823,7 +8710,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: OptContentView.tsv
   fields:
   - goName: null
     pdfKey: ViewState
@@ -8838,7 +8724,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: OptContentZoom.tsv
   fields:
   - goName: null
     pdfKey: min
@@ -8864,7 +8749,6 @@ types:
   pdfRepr: dict
   introduced: '1.0'
   specTable: Table 150
-  arlingtonSrc: Outline.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -8898,7 +8782,6 @@ types:
 - name: OutlineItem
   goType: null
   pdfRepr: dict
-  arlingtonSrc: OutlineItem.tsv
   fields:
   - goName: null
     pdfKey: Title
@@ -9029,7 +8912,6 @@ types:
   pdfSubtype: O
   pdfRepr: dict
   introduced: '1.6'
-  arlingtonSrc: Projection.tsv
   fields:
   - goName: null
     pdfKey: Subtype
@@ -9104,7 +8986,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: RenditionBE.tsv
   fields:
   - goName: null
     pdfKey: C
@@ -9118,7 +8999,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.5'
-  arlingtonSrc: RenditionMH.tsv
   fields:
   - goName: null
     pdfKey: C
@@ -9134,7 +9014,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 277
-  arlingtonSrc: RenditionMedia.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -9199,7 +9078,6 @@ types:
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 277
-  arlingtonSrc: RenditionSelector.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -9249,7 +9127,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 335
-  arlingtonSrc: RichMediaActivation.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -9312,7 +9189,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 337
-  arlingtonSrc: RichMediaAnimation.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -9360,7 +9236,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 223
-  arlingtonSrc: RichMediaCommand.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -9388,7 +9263,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 342
-  arlingtonSrc: RichMediaConfiguration.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -9425,7 +9299,6 @@ types:
   pdfRepr: dict
   introduced: fn:Extension(ADBE_Extn3,1.7)
   specTable: Table 9
-  arlingtonSrc: RichMediaCuePoint.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -9489,7 +9362,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 336
-  arlingtonSrc: RichMediaDeactivation.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -9513,7 +9385,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.7'
-  arlingtonSrc: RichMediaHeight.tsv
   fields:
   - goName: null
     pdfKey: Default
@@ -9546,7 +9417,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 343
-  arlingtonSrc: RichMediaInstance.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -9596,7 +9466,6 @@ types:
   pdfRepr: dict
   introduced: fn:Extension(ADBE_Extn3,1.7)
   specTable: Table 9
-  arlingtonSrc: RichMediaParams.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -9655,7 +9524,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 340
-  arlingtonSrc: RichMediaPosition.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -9703,7 +9571,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 338
-  arlingtonSrc: RichMediaPresentation.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -9759,7 +9626,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 334
-  arlingtonSrc: RichMediaSettings.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -9787,7 +9653,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.7'
-  arlingtonSrc: RichMediaWidth.tsv
   fields:
   - goName: null
     pdfKey: Default
@@ -9820,7 +9685,6 @@ types:
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 339
-  arlingtonSrc: RichMediaWindow.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -9857,7 +9721,6 @@ types:
   pdfRepr: dict
   introduced: '1.4'
   specTable: Table 308
-  arlingtonSrc: SlideShow.tsv
   fields:
   - goName: null
     pdfKey: Type
@@ -9896,7 +9759,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.6'
-  arlingtonSrc: Target.tsv
   fields:
   - goName: null
     pdfKey: R
@@ -9941,7 +9803,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.6'
-  arlingtonSrc: TargetEmbedded.tsv
   fields:
   - goName: null
     pdfKey: R
@@ -9983,7 +9844,6 @@ types:
   goType: action.URI
   pdfRepr: dict
   introduced: '1.1'
-  arlingtonSrc: URI.tsv
   fields:
   - goName: null
     pdfKey: Base
@@ -9999,7 +9859,6 @@ types:
   goType: null
   pdfRepr: dict
   introduced: '1.7'
-  arlingtonSrc: ViewParams.tsv
   fields:
   - goName: null
     pdfKey: Instance
