@@ -1,0 +1,5608 @@
+chapter: 8
+title: Graphics
+types:
+- name: AlternateImage
+  goType: null
+  pdfRepr: dict
+  arlingtonSrc: AlternateImage.tsv
+  fields:
+  - goName: null
+    pdfKey: Image
+    pdfType: stream
+    required: true
+    introduced: '1.3'
+    refTypes:
+    - XObjectImage
+    notes: Table 89
+  - goName: null
+    pdfKey: DefaultForPrinting
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.3'
+  - goName: null
+    pdfKey: OC
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - OptContentGroup
+    - OptContentMembership
+- name: CalGrayColorSpace
+  goType: graphics/color.SpaceCalGray
+  pdfRepr: dict
+  introduced: '1.1'
+  arlingtonSrc: CalGrayColorSpace.tsv
+  fields:
+  - goName: null
+    pdfKey: '0'
+    pdfType: name
+    required: true
+    introduced: '1.1'
+    possibleValues:
+    - CalGray
+    notes: Clause 8.6.5.2
+  - goName: null
+    pdfKey: '1'
+    pdfType: dictionary
+    required: true
+    introduced: '1.1'
+    refTypes:
+    - CalGrayDict
+  writeMethod: (*SpaceCalGray).Embed
+  readFunc: extract.ColorSpace
+  goPackage: color
+  goRepr: struct
+  specSection: 8.6.5.4
+- name: CalGrayDict
+  goType: null
+  pdfRepr: dict
+  introduced: '1.1'
+  arlingtonSrc: CalGrayDict.tsv
+  fields:
+  - goName: null
+    pdfKey: WhitePoint
+    pdfType: array
+    required: true
+    introduced: '1.1'
+    refTypes:
+    - WhitepointArray
+    notes: Table 62
+  - goName: null
+    pdfKey: BlackPoint
+    pdfType: array
+    required: false
+    default: '[0.0 0.0 0.0]'
+    introduced: '1.1'
+    refTypes:
+    - BlackpointArray
+  - goName: null
+    pdfKey: Gamma
+    pdfType: number
+    required: false
+    default: '1'
+    introduced: '1.1'
+    possibleValues:
+    - fn:Eval(@Gamma>0)
+- name: CalRGBColorSpace
+  goType: graphics/color.SpaceCalRGB
+  pdfRepr: dict
+  introduced: '1.1'
+  arlingtonSrc: CalRGBColorSpace.tsv
+  fields:
+  - goName: null
+    pdfKey: '0'
+    pdfType: name
+    required: true
+    introduced: '1.1'
+    possibleValues:
+    - CalRGB
+    notes: Clause 8.6.5.3
+  - goName: null
+    pdfKey: '1'
+    pdfType: dictionary
+    required: true
+    introduced: '1.1'
+    refTypes:
+    - CalRGBDict
+  writeMethod: (*SpaceCalRGB).Embed
+  readFunc: extract.ColorSpace
+  goPackage: color
+  goRepr: struct
+  specSection: 8.6.5.4
+- name: CalRGBDict
+  goType: null
+  pdfRepr: dict
+  introduced: '1.1'
+  arlingtonSrc: CalRGBDict.tsv
+  fields:
+  - goName: null
+    pdfKey: WhitePoint
+    pdfType: array
+    required: true
+    introduced: '1.1'
+    refTypes:
+    - WhitepointArray
+    notes: Table 63
+  - goName: null
+    pdfKey: BlackPoint
+    pdfType: array
+    required: false
+    default: '[0.0 0.0 0.0]'
+    introduced: '1.1'
+    refTypes:
+    - BlackpointArray
+  - goName: null
+    pdfKey: Gamma
+    pdfType: array
+    required: false
+    default: '[1.0 1.0 1.0]'
+    introduced: '1.1'
+    refTypes:
+    - GammaArray
+  - goName: null
+    pdfKey: Matrix
+    pdfType: array
+    required: false
+    default: '[1 0 0 0 1 0 0 0 1]'
+    introduced: '1.1'
+    refTypes:
+    - ArrayOf_9Numbers
+- name: ColorantsDict
+  goType: null
+  pdfRepr: dict
+  introduced: '1.3'
+  arlingtonSrc: ColorantsDict.tsv
+  fields:
+  - goName: null
+    pdfKey: '*'
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - SeparationColorSpace
+    notes: Table 70, Colorants cell
+- name: DeviceCMYKColorSpace
+  goType: null
+  pdfRepr: dict
+  introduced: '1.0'
+  arlingtonSrc: DeviceCMYKColorSpace.tsv
+  fields:
+  - goName: null
+    pdfKey: '0'
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - DeviceCMYK
+    notes: Clause 8.6.3 and https://github.com/pdf-association/pdf-issues/issues/552
+- name: DeviceGrayColorSpace
+  goType: null
+  pdfRepr: dict
+  introduced: '1.0'
+  arlingtonSrc: DeviceGrayColorSpace.tsv
+  fields:
+  - goName: null
+    pdfKey: '0'
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - DeviceGray
+    notes: Clause 8.6.3 and https://github.com/pdf-association/pdf-issues/issues/552
+- name: DeviceNColorSpace
+  goType: graphics/color.SpaceDeviceN
+  pdfRepr: dict
+  introduced: '1.3'
+  arlingtonSrc: DeviceNColorSpace.tsv
+  fields:
+  - goName: null
+    pdfKey: '0'
+    pdfType: name
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - DeviceN
+    notes: Clause 8.6.6.5
+  - goName: null
+    pdfKey: '1'
+    pdfType: array
+    required: true
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNamesGeneral
+  - goName: null
+    pdfKey: '2'
+    pdfType: array;name
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - DeviceCMYK
+    - DeviceRGB
+    - DeviceGray
+    refTypes:
+    - DeviceGrayColorSpace
+    - DeviceRGBColorSpace
+    - DeviceCMYKColorSpace
+    - CalGrayColorSpace
+    - CalRGBColorSpace
+    - LabColorSpace
+    - ICCBasedColorSpace
+    notes: cannot be Pattern,Indexed,Separation,DeviceN
+  - goName: null
+    pdfKey: '3'
+    pdfType: dictionary;stream
+    required: true
+    introduced: '1.3'
+    refTypes:
+    - FunctionType2
+    - FunctionType3
+    - FunctionType0
+    - FunctionType4
+  - goName: null
+    pdfKey: '4'
+    pdfType: dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - DeviceNDict
+  writeMethod: (*SpaceDeviceN).Embed
+  readFunc: extract.ColorSpace
+  goPackage: color
+  goRepr: struct
+  specSection: 8.6.6.5
+- name: DeviceNDict
+  goType: null
+  pdfSubtype: DeviceN
+  pdfRepr: dict
+  introduced: '1.6'
+  arlingtonSrc: DeviceNDict.tsv
+  fields:
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: false
+    default: DeviceN
+    introduced: '1.6'
+    possibleValues:
+    - DeviceN
+    - NChannel
+    notes: Table 70
+  - goName: null
+    pdfKey: Colorants
+    pdfType: dictionary
+    required: fn:IsRequired(fn:SinceVersion(1.6,(@Subtype==NChannel)) && fn:HasSpotColorants(parent::1))
+    introduced: '1.3'
+    refTypes:
+    - ColorantsDict
+  - goName: null
+    pdfKey: Process
+    pdfType: dictionary
+    required: fn:IsRequired((@Subtype==NChannel) && fn:HasProcessColorants(parent::1))
+    introduced: '1.6'
+    refTypes:
+    - DeviceNProcess
+  - goName: null
+    pdfKey: MixingHints
+    pdfType: dictionary
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - DeviceNMixingHints
+- name: DeviceNMixingHints
+  goType: null
+  pdfRepr: dict
+  introduced: '1.6'
+  arlingtonSrc: DeviceNMixingHints.tsv
+  fields:
+  - goName: null
+    pdfKey: Solidities
+    pdfType: dictionary
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - Solidities
+    notes: Table 72
+  - goName: null
+    pdfKey: PrintingOrder
+    pdfType: array
+    required: fn:IsRequired(fn:IsPresent(Solidities))
+    introduced: '1.6'
+    refTypes:
+    - ArrayOfNamesForPrintingOrder
+  - goName: null
+    pdfKey: DotGain
+    pdfType: dictionary
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - DictionaryOfFunctions
+- name: DeviceNProcess
+  goType: null
+  pdfRepr: dict
+  introduced: '1.6'
+  arlingtonSrc: DeviceNProcess.tsv
+  fields:
+  - goName: null
+    pdfKey: ColorSpace
+    pdfType: array;name
+    required: true
+    introduced: '1.6'
+    possibleValues:
+    - DeviceCMYK
+    - DeviceRGB
+    - DeviceGray
+    refTypes:
+    - DeviceGrayColorSpace
+    - DeviceRGBColorSpace
+    - DeviceCMYKColorSpace
+    - CalGrayColorSpace
+    - CalRGBColorSpace
+    - ICCBasedColorSpace
+    notes: Table 71 - except Lab
+  - goName: null
+    pdfKey: Components
+    pdfType: array
+    required: true
+    introduced: '1.6'
+    refTypes:
+    - ArrayOfNamesGeneral
+- name: DeviceRGBColorSpace
+  goType: null
+  pdfRepr: dict
+  introduced: '1.0'
+  arlingtonSrc: DeviceRGBColorSpace.tsv
+  fields:
+  - goName: null
+    pdfKey: '0'
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - DeviceRGB
+    notes: Clause 8.6.3 and https://github.com/pdf-association/pdf-issues/issues/552
+- name: FunctionType0
+  goType: function.Type0
+  pdfRepr: stream
+  arlingtonSrc: FunctionType0.tsv
+  fields:
+  - goName: null
+    pdfKey: FunctionType
+    pdfType: integer
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - '0'
+    notes: Table 5, Table 38 and Table 39
+  - goName: Domain
+    pdfKey: Domain
+    pdfType: array
+    required: true
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Domain defines the valid input ranges as [min0, max0, min1, max1, ...].
+
+      The length must be 2*m, where m is the number of input variables.'
+  - goName: Range
+    pdfKey: Range
+    pdfType: array
+    required: true
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Range gives clipping ranges for the output variables as [min0, max0, min1, max1, ...].
+
+      The length must be 2*n, where n is the number of output variables.'
+  - goName: Size
+    pdfKey: Size
+    pdfType: array
+    required: true
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfIntegersGeneral
+    notes: array of m positive integers
+    goType: '[]int'
+    purpose: 'Size specifies the number of samples in each input dimension.
+
+      The length must be m, where m is the number of input variables.'
+  - goName: BitsPerSample
+    pdfKey: BitsPerSample
+    pdfType: integer
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - '1'
+    - '2'
+    - '4'
+    - '8'
+    - '12'
+    - '16'
+    - '24'
+    - '32'
+    goType: int
+    purpose: BitsPerSample is the number of bits per sample value (1, 2, 4, 8, 12, 16, 24, 32).
+  - goName: null
+    pdfKey: Order
+    pdfType: integer
+    required: false
+    default: '1'
+    introduced: '1.2'
+    possibleValues:
+    - '1'
+    - '3'
+  - goName: Encode
+    pdfKey: Encode
+    pdfType: array
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Encode maps inputs to sample table indices as [min0, max0, min1, max1, ...].
+
+      The length must be 2*m, where m is the number of input variables.'
+  - goName: Decode
+    pdfKey: Decode
+    pdfType: array
+    required: false
+    default: '@Range'
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Decode maps samples to output range as [min0, max0, min1, max1, ...].
+
+      The length must be 2*n, where n is the number of output variables.'
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  goPackage: function
+  goRepr: struct
+  specSection: 7.10.2
+  writeMethod: (*Type0).Embed
+- name: FunctionType2
+  goType: function.Type2
+  pdfRepr: dict
+  introduced: '1.3'
+  arlingtonSrc: FunctionType2.tsv
+  fields:
+  - goName: null
+    pdfKey: FunctionType
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '2'
+    notes: Table 38 and Table 40
+  - goName: null
+    pdfKey: Domain
+    pdfType: array
+    required: true
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+  - goName: Range
+    pdfKey: Range
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Range (optional) defines clipping ranges for the outputs, in the form
+
+      [min0, max0, min1, max1, ...]. It this is missing, no clipping is
+
+      applied.  If present, this must have the same length as C0 and C1.'
+  - goName: C0
+    pdfKey: C0
+    pdfType: array
+    required: false
+    default: '[0.0]'
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'C0 defines function result when x = 0.
+
+      This must have the same length as C1.'
+  - goName: C1
+    pdfKey: C1
+    pdfType: array
+    required: false
+    default: '[0.0]'
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'C1 defines function result when x = 1.
+
+      This must have the same length as C0.'
+  - goName: N
+    pdfKey: N
+    pdfType: number
+    required: true
+    introduced: '1.3'
+    goType: float64
+    purpose: N is the interpolation exponent.
+  goPackage: function
+  goRepr: struct
+  specSection: 7.10.3
+  writeMethod: (*Type2).Embed
+- name: FunctionType3
+  goType: function.Type3
+  pdfRepr: dict
+  introduced: '1.3'
+  arlingtonSrc: FunctionType3.tsv
+  fields:
+  - goName: null
+    pdfKey: FunctionType
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '3'
+    notes: Table 38 and Table 41
+  - goName: null
+    pdfKey: Domain
+    pdfType: array
+    required: true
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+  - goName: Range
+    pdfKey: Range
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Range (optional) defines the valid output ranges as [min0, max0, min1,
+
+      max1, ...].'
+  - goName: Functions
+    pdfKey: Functions
+    pdfType: array
+    required: true
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfFunctions
+    goType: '[]pdf.Function'
+    purpose: 'Functions is the array of k functions to be combined.
+
+      All functions must have 1 input and the same number of outputs.'
+  - goName: Bounds
+    pdfKey: Bounds
+    pdfType: array
+    required: true
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Bounds defines the boundaries between subdomains.
+
+      It must have k-1 elements, in increasing order, within the input range.
+
+      The first function applies to the range [XMin, Bounds[0]),
+
+      the second to [Bounds[0], Bounds[1]), ..., the last to
+
+      [Bounds[k-2], XMax].'
+  - goName: Encode
+    pdfKey: Encode
+    pdfType: array
+    required: true
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Encode maps each subdomain to corresponding function''s domain as
+
+      [min0, max0, min1, max1, ...].'
+  goPackage: function
+  goRepr: struct
+  specSection: 7.10.4
+  writeMethod: (*Type3).Embed
+- name: FunctionType4
+  goType: function.Type4
+  pdfRepr: stream
+  arlingtonSrc: FunctionType4.tsv
+  fields:
+  - goName: null
+    pdfKey: FunctionType
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '4'
+    notes: Table 5 and Table 38 and Clause 7.10.5
+  - goName: Domain
+    pdfKey: Domain
+    pdfType: array
+    required: true
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Domain defines the valid input ranges as [min0, max0, min1, max1, ...].
+
+      The length must be 2*m, where m is the number of input variables.'
+  - goName: Range
+    pdfKey: Range
+    pdfType: array
+    required: true
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Range gives clipping ranges for the output variables as [min0, max0, min1, max1, ...].
+
+      The length must be 2*n, where n is the number of output variables.'
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  goPackage: function
+  goRepr: struct
+  specSection: 7.10.5
+  writeMethod: (*Type4).Embed
+- name: GeographicCoordinateSystem
+  goType: null
+  pdfType: GEOGCS
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 270
+  arlingtonSrc: GeographicCoordinateSystem.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - GEOGCS
+    notes: Table 270
+  - goName: null
+    pdfKey: EPSG
+    pdfType: integer
+    required: false
+    introduced: '1.7'
+  - goName: null
+    pdfKey: WKT
+    pdfType: ascii-string
+    required: false
+    introduced: '1.7'
+- name: GraphicsStateParameter
+  goType: graphics/extgstate.ExtGState
+  pdfType: ExtGState
+  pdfRepr: dict
+  introduced: '1.2'
+  specTable: Table 57
+  arlingtonSrc: GraphicsStateParameter.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - ExtGState
+    notes: Table 57
+  - goName: null
+    pdfKey: LW
+    pdfType: number
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - fn:Eval(@LW>=0)
+  - goName: null
+    pdfKey: LC
+    pdfType: integer
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - fn:Eval((@LC>=0) && (@LC<=2))
+    notes: Table 53
+  - goName: null
+    pdfKey: LJ
+    pdfType: integer
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - fn:Eval((@LJ>=0) && (@LJ<=2))
+    notes: Table 54
+  - goName: null
+    pdfKey: ML
+    pdfType: number
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - fn:Eval(@ML>=1)
+  - goName: null
+    pdfKey: D
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfGSPDashPatterns
+  - goName: null
+    pdfKey: RI
+    pdfType: name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - AbsoluteColorimetric
+    - RelativeColorimetric
+    - Saturation
+    - Perceptual
+    notes: Table 69
+  - goName: null
+    pdfKey: OP
+    pdfType: boolean
+    required: false
+    introduced: '1.2'
+  - goName: null
+    pdfKey: op
+    pdfType: boolean
+    required: false
+    introduced: '1.3'
+  - goName: null
+    pdfKey: OPM
+    pdfType: integer
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - fn:Eval((@OPM>=0) && (@OPM<=1))
+  - goName: null
+    pdfKey: Font
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfFontAndSize
+  - goName: null
+    pdfKey: BG
+    pdfType: fn:SinceVersion(1.3,dictionary);stream
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - fn:SinceVersion(1.3
+    - FunctionType2)
+    - fn:SinceVersion(1.3
+    - FunctionType3)
+    - FunctionType0
+    - fn:SinceVersion(1.3
+    - FunctionType4)
+  - goName: null
+    pdfKey: BG2
+    pdfType: dictionary;name;stream
+    required: false
+    default: '[];[Default];[]'
+    introduced: '1.3'
+    refTypes:
+    - FunctionType2
+    - FunctionType3
+    - FunctionType0
+    - FunctionType4
+  - goName: null
+    pdfKey: UCR
+    pdfType: fn:SinceVersion(1.3,dictionary);stream
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - fn:SinceVersion(1.3
+    - FunctionType2)
+    - fn:SinceVersion(1.3
+    - FunctionType3)
+    - FunctionType0
+    - fn:SinceVersion(1.3
+    - FunctionType4)
+  - goName: null
+    pdfKey: UCR2
+    pdfType: dictionary;name;stream
+    required: false
+    default: '[];[Default];[]'
+    introduced: '1.3'
+    refTypes:
+    - FunctionType2
+    - FunctionType3
+    - FunctionType0
+    - FunctionType4
+  - goName: null
+    pdfKey: TR
+    pdfType: array;fn:SinceVersion(1.3,dictionary);name;stream
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    refTypes:
+    - ArrayOf4Functions
+    - fn:SinceVersion(1.3
+    - FunctionType2)
+    - fn:SinceVersion(1.3
+    - FunctionType3)
+    - FunctionType0
+    - fn:SinceVersion(1.3
+    - FunctionType4)
+  - goName: null
+    pdfKey: TR2
+    pdfType: array;dictionary;name;stream
+    required: false
+    default: '[];[];[Default];[]'
+    introduced: '1.3'
+    deprecated: '2.0'
+    refTypes:
+    - ArrayOf4Functions
+    - FunctionType2
+    - FunctionType3
+    - FunctionType0
+    - FunctionType4
+  - goName: null
+    pdfKey: HT
+    pdfType: dictionary;name;stream
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - HalftoneType1
+    - HalftoneType5
+    - HalftoneType6
+    - HalftoneType10
+    - fn:SinceVersion(1.3
+    - HalftoneType16)
+  - goName: null
+    pdfKey: FL
+    pdfType: number
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - fn:Eval(@FL>0)
+  - goName: null
+    pdfKey: SM
+    pdfType: number
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - fn:Eval((@SM>=0) && (@SM<=1))
+  - goName: null
+    pdfKey: SA
+    pdfType: boolean
+    required: false
+    introduced: '1.2'
+  - goName: BlendMode
+    pdfKey: BM
+    pdfType: fn:Deprecated(2.0,array);name
+    required: false
+    introduced: '1.4'
+    possibleValues:
+    - fn:Deprecated(1.4,Compatible)
+    - Normal
+    - Multiply
+    - Screen
+    - Difference
+    - Darken
+    - Lighten
+    - ColorDodge
+    - ColorBurn
+    - Exclusion
+    - HardLight
+    - Overlay
+    - SoftLight
+    - Luminosity
+    - Hue
+    - Saturation
+    - Color
+    refTypes:
+    - ArrayOfBlendModes
+    notes: Table 134 and Table 135
+    goType: graphics.BlendMode
+    purpose: BlendMode is the blend mode for the transparent imaging model.
+  - goName: null
+    pdfKey: SMask
+    pdfType: dictionary;name
+    required: false
+    introduced: '1.4'
+    possibleValues:
+    - None
+    refTypes:
+    - SoftMaskAlpha
+    - SoftMaskLuminosity
+  - goName: null
+    pdfKey: CA
+    pdfType: number
+    required: false
+    introduced: '1.4'
+    possibleValues:
+    - fn:Eval((@CA>=0) && (@CA<=1))
+  - goName: null
+    pdfKey: ca
+    pdfType: number
+    required: false
+    introduced: '1.4'
+    possibleValues:
+    - fn:Eval((@ca>=0) && (@ca<=1))
+  - goName: null
+    pdfKey: AIS
+    pdfType: boolean
+    required: false
+    introduced: '1.4'
+  - goName: null
+    pdfKey: TK
+    pdfType: boolean
+    required: false
+    introduced: '1.4'
+  - goName: null
+    pdfKey: UseBlackPtComp
+    pdfType: name
+    required: false
+    default: Default
+    introduced: '2.0'
+    possibleValues:
+    - 'OFF'
+    - 'ON'
+    - Default
+  - goName: null
+    pdfKey: HTO
+    pdfType: array
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - ArrayOf_2Numbers
+  - goName: null
+    pdfKey: HTP
+    pdfType: array
+    required: false
+    introduced: '1.2'
+    deprecated: '1.3'
+    refTypes:
+    - ArrayOf_2Integers
+  - goName: null
+    pdfKey: AAPL:AA
+    pdfType: boolean
+    required: false
+    introduced: fn:Extension(AAPL,1.2)
+    notes: Apple Anti-aliasing
+  - goName: null
+    pdfKey: AAPL:ST
+    pdfType: dictionary;name
+    required: false
+    default: '[];[None]'
+    introduced: fn:Extension(AAPL,1.2)
+    refTypes:
+    - AAPL_ST
+    notes: Apple Gaussian blue drop-shadow style dictionary
+  writeMethod: (*ExtGState).Embed
+  readFunc: extract.ExtGState
+  goPackage: extgstate
+  goRepr: struct
+  specSection: 8.4.5
+- name: GroupAttributes
+  goType: graphics/group.TransparencyAttributes
+  pdfType: Group
+  pdfRepr: dict
+  introduced: '1.4'
+  specTable: Table 94
+  arlingtonSrc: GroupAttributes.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.4'
+    possibleValues:
+    - Group
+    notes: Table 94 and Table 145
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '1.4'
+    possibleValues:
+    - Transparency
+  - goName: CS
+    pdfKey: CS
+    pdfType: array;name
+    required: false
+    introduced: '1.4'
+    possibleValues:
+    - DeviceCMYK
+    - DeviceRGB
+    - DeviceGray
+    refTypes:
+    - DeviceGrayColorSpace
+    - DeviceRGBColorSpace
+    - DeviceCMYKColorSpace
+    - CalGrayColorSpace
+    - CalRGBColorSpace
+    - ICCBasedColorSpace
+    goType: color.Space
+    purpose: 'CS is the group color space, used for compositing within the group.
+
+      For isolated groups, this specifies the color space for compositing.
+
+      For non-isolated groups, this is inherited from the parent if not set.
+
+
+      The color space must be a device or CIE-based color space that treats
+
+      its components as independent additive or subtractive values.
+
+      Special color spaces (Pattern, Indexed, Separation, DeviceN) and
+
+      Lab color spaces are not allowed.'
+  - goName: null
+    pdfKey: I
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.4'
+  - goName: null
+    pdfKey: K
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.4'
+  readFunc: group.ExtractTransparencyAttributes
+  writeMethod: (*TransparencyAttributes).Embed
+  goPackage: group
+  goRepr: struct
+  specSection: '8.10'
+- name: ICCBasedColorSpace
+  goType: graphics/color.SpaceICCBased
+  pdfRepr: dict
+  introduced: '1.3'
+  arlingtonSrc: ICCBasedColorSpace.tsv
+  fields:
+  - goName: null
+    pdfKey: '0'
+    pdfType: name
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - ICCBased
+    notes: Clause 8.6.5.5
+  - goName: null
+    pdfKey: '1'
+    pdfType: stream
+    required: true
+    introduced: '1.3'
+    refTypes:
+    - ICCProfileStream
+  writeMethod: (*SpaceICCBased).Embed
+  readFunc: extract.ColorSpace
+  goPackage: color
+  goRepr: struct
+  specSection: 8.6.5.5
+- name: ICCProfileStream
+  goType: null
+  pdfRepr: stream
+  arlingtonSrc: ICCProfileStream.tsv
+  fields:
+  - goName: null
+    pdfKey: N
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '1'
+    - '3'
+    - '4'
+    notes: Table 5 and Table 65
+  - goName: null
+    pdfKey: Alternate
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - DeviceGray
+    - DeviceRGB
+    - DeviceCMYK
+    refTypes:
+    - DeviceGrayColorSpace
+    - DeviceRGBColorSpace
+    - DeviceCMYKColorSpace
+    - CalGrayColorSpace
+    - CalRGBColorSpace
+    - DeviceNColorSpace
+    - IndexedColorSpace
+    - LabColorSpace
+    - SeparationColorSpace
+  - goName: null
+    pdfKey: Range
+    pdfType: array
+    required: false
+    default: '[0.0 1.0 0.0 1.0 ...]'
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+  - goName: null
+    pdfKey: Metadata
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - Metadata
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+- name: IndexedColorSpace
+  goType: graphics/color.SpaceIndexed
+  pdfRepr: dict
+  introduced: '1.0'
+  arlingtonSrc: IndexedColorSpace.tsv
+  fields:
+  - goName: null
+    pdfKey: '0'
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - Indexed
+    notes: Clause 8.6.6.3
+  - goName: null
+    pdfKey: '1'
+    pdfType: fn:SinceVersion(1.1,array);name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - DeviceCMYK
+    - DeviceRGB
+    - DeviceGray
+    refTypes:
+    - fn:SinceVersion(1.1
+    - DeviceGrayColorSpace)
+    - fn:SinceVersion(1.1
+    - DeviceRGBColorSpace)
+    - fn:SinceVersion(1.1
+    - DeviceCMYKColorSpace)
+    - fn:SinceVersion(1.1
+    - CalGrayColorSpace)
+    - fn:SinceVersion(1.1
+    - CalRGBColorSpace)
+    - fn:SinceVersion(1.1
+    - LabColorSpace)
+    - fn:SinceVersion(1.3
+    - ICCBasedColorSpace)
+    - fn:SinceVersion(1.2
+    - SeparationColorSpace)
+    - fn:SinceVersion(1.3
+    - DeviceNColorSpace)
+    notes: cannot be pattern or indexed
+  - goName: null
+    pdfKey: '2'
+    pdfType: integer
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - fn:Eval((@2>=0) && (@2<=255))
+  - goName: null
+    pdfKey: '3'
+    pdfType: stream;string
+    required: true
+    introduced: '1.0'
+    refTypes:
+    - Stream
+  writeMethod: (*SpaceIndexed).Embed
+  readFunc: extract.ColorSpace
+  goPackage: color
+  goRepr: struct
+  specSection: 8.6.6.5
+- name: LabColorSpace
+  goType: graphics/color.SpaceLab
+  pdfRepr: dict
+  introduced: '1.1'
+  arlingtonSrc: LabColorSpace.tsv
+  fields:
+  - goName: null
+    pdfKey: '0'
+    pdfType: name
+    required: true
+    introduced: '1.1'
+    possibleValues:
+    - Lab
+    notes: Clause 8.6.5.4
+  - goName: null
+    pdfKey: '1'
+    pdfType: dictionary
+    required: true
+    introduced: '1.1'
+    refTypes:
+    - LabDict
+  writeMethod: (*SpaceLab).Embed
+  readFunc: extract.ColorSpace
+  goPackage: color
+  goRepr: struct
+  specSection: 8.6.5.4
+- name: LabDict
+  goType: null
+  pdfRepr: dict
+  introduced: '1.1'
+  arlingtonSrc: LabDict.tsv
+  fields:
+  - goName: null
+    pdfKey: WhitePoint
+    pdfType: array
+    required: true
+    introduced: '1.1'
+    refTypes:
+    - WhitepointArray
+    notes: Table 64
+  - goName: null
+    pdfKey: BlackPoint
+    pdfType: array
+    required: false
+    default: '[0.0 0.0 0.0]'
+    introduced: '1.1'
+    refTypes:
+    - BlackpointArray
+  - goName: null
+    pdfKey: Range
+    pdfType: array
+    required: false
+    introduced: '1.1'
+    refTypes:
+    - LabRangeArray
+- name: MeasureGEO
+  goType: null
+  pdfType: Measure
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 266
+  arlingtonSrc: MeasureGEO.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Measure
+    notes: Table 266 and Table 269
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - GEO
+  - goName: null
+    pdfKey: Bounds
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - ArrayOfNumbersGeneral
+  - goName: null
+    pdfKey: GCS
+    pdfType: dictionary
+    required: true
+    introduced: '1.7'
+    refTypes:
+    - GeographicCoordinateSystem
+    - ProjectedCoordinateSystem
+  - goName: null
+    pdfKey: DCS
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - GeographicCoordinateSystem
+    - ProjectedCoordinateSystem
+  - goName: null
+    pdfKey: PDU
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - ArrayOf3PDUNames
+    notes: Preferred Display Units
+  - goName: null
+    pdfKey: GPTS
+    pdfType: array
+    required: true
+    introduced: '1.7'
+    refTypes:
+    - ArrayOfNumbersGeneral
+  - goName: null
+    pdfKey: LPTS
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - ArrayOfNumbersGeneral
+  - goName: null
+    pdfKey: PCSM
+    pdfType: array
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - ArrayOf3DTransMatrix
+    notes: Projected Coordinate System Matrix
+- name: MeasureRL
+  goType: measure.RectilinearMeasure
+  pdfType: Measure
+  pdfRepr: dict
+  introduced: '1.6'
+  specTable: Table 266
+  arlingtonSrc: MeasureRL.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - Measure
+    notes: Table 266 and Table 267
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - RL
+  - goName: null
+    pdfKey: R
+    pdfType: text-string
+    required: true
+    introduced: '1.6'
+  - goName: null
+    pdfKey: X
+    pdfType: array
+    required: true
+    introduced: '1.6'
+    refTypes:
+    - ArrayOfNumberFormats
+  - goName: null
+    pdfKey: Y
+    pdfType: array
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - ArrayOfNumberFormats
+  - goName: null
+    pdfKey: D
+    pdfType: array
+    required: true
+    introduced: '1.6'
+    refTypes:
+    - ArrayOfNumberFormats
+  - goName: null
+    pdfKey: A
+    pdfType: array
+    required: true
+    introduced: '1.6'
+    refTypes:
+    - ArrayOfNumberFormats
+  - goName: null
+    pdfKey: T
+    pdfType: array
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - ArrayOfNumberFormats
+  - goName: null
+    pdfKey: S
+    pdfType: array
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - ArrayOfNumberFormats
+  - goName: null
+    pdfKey: O
+    pdfType: array
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - ArrayOf_2Numbers
+  - goName: CYX
+    pdfKey: CYX
+    pdfType: number
+    required: false
+    introduced: '1.6'
+    goType: float64
+    purpose: 'CYX is the y-to-x axis conversion factor.
+
+      TODO(voss): Clarify the semantics when Y units match X units.
+
+      Zero means the value is not present in the PDF.'
+  goPackage: measure
+  goRepr: struct
+  specSection: '12.9'
+  writeMethod: (*RectilinearMeasure).Embed
+- name: NumberFormat
+  goType: measure.NumberFormat
+  pdfType: NumberFormat
+  pdfRepr: dict
+  introduced: '1.6'
+  specTable: Table 268
+  arlingtonSrc: NumberFormat.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - NumberFormat
+    notes: Table 268
+  - goName: null
+    pdfKey: U
+    pdfType: text-string
+    required: true
+    introduced: '1.6'
+  - goName: null
+    pdfKey: C
+    pdfType: number
+    required: true
+    introduced: '1.6'
+  - goName: null
+    pdfKey: F
+    pdfType: name
+    required: false
+    default: D
+    introduced: '1.6'
+    possibleValues:
+    - D
+    - F
+    - R
+    - T
+  - goName: null
+    pdfKey: D
+    pdfType: integer
+    required: false
+    default: '16'
+    introduced: '1.6'
+    possibleValues:
+    - fn:Eval(@D>0)
+  - goName: null
+    pdfKey: FD
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.6'
+  - goName: null
+    pdfKey: RT
+    pdfType: text-string
+    required: false
+    default: ''','''
+    introduced: '1.6'
+  - goName: null
+    pdfKey: RD
+    pdfType: text-string
+    required: false
+    default: '''.'''
+    introduced: '1.6'
+  - goName: null
+    pdfKey: PS
+    pdfType: text-string
+    required: false
+    default: ''' '''
+    introduced: '1.6'
+  - goName: null
+    pdfKey: SS
+    pdfType: text-string
+    required: false
+    default: ''' '''
+    introduced: '1.6'
+  - goName: null
+    pdfKey: O
+    pdfType: name
+    required: false
+    default: S
+    introduced: '1.6'
+    possibleValues:
+    - S
+    - P
+  goPackage: measure
+  goRepr: struct
+  specSection: '12.9'
+  readFunc: measure.ExtractNumberFormat
+  writeMethod: (*NumberFormat).Embed
+- name: OutputIntents
+  goType: null
+  pdfType: OutputIntent
+  pdfRepr: dict
+  introduced: '1.4'
+  specTable: Table 401
+  arlingtonSrc: OutputIntents.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.4'
+    possibleValues:
+    - OutputIntent
+    notes: Table 401
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '1.4'
+    possibleValues:
+    - GTS_PDFX
+    - GTS_PDFA1
+    - ISO_PDFE1
+  - goName: null
+    pdfKey: OutputCondition
+    pdfType: text-string
+    required: false
+    introduced: '1.4'
+  - goName: null
+    pdfKey: OutputConditionIdentifier
+    pdfType: text-string
+    required: true
+    introduced: '1.4'
+  - goName: null
+    pdfKey: RegistryName
+    pdfType: text-string
+    required: false
+    introduced: '1.4'
+  - goName: null
+    pdfKey: Info
+    pdfType: text-string
+    required: false
+    introduced: '1.4'
+  - goName: null
+    pdfKey: DestOutputProfile
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - ICCProfileStream
+  - goName: null
+    pdfKey: DestOutputProfileRef
+    pdfType: dictionary
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - DestOutputProfileRef
+  - goName: null
+    pdfKey: MixingHints
+    pdfType: dictionary
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - DeviceNMixingHints
+  - goName: null
+    pdfKey: SpectralData
+    pdfType: dictionary
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - SpectralData
+- name: PatternColorSpace
+  goType: null
+  pdfRepr: dict
+  introduced: '1.2'
+  arlingtonSrc: PatternColorSpace.tsv
+  fields:
+  - goName: null
+    pdfKey: '0'
+    pdfType: name
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - Pattern
+    notes: Clause 8.7.3.3
+  - goName: null
+    pdfKey: '1'
+    pdfType: array;name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - DeviceCMYK
+    - DeviceRGB
+    - DeviceGray
+    refTypes:
+    - DeviceGrayColorSpace
+    - DeviceRGBColorSpace
+    - DeviceCMYKColorSpace
+    - CalGrayColorSpace
+    - CalRGBColorSpace
+    - LabColorSpace
+    - fn:SinceVersion(1.3
+    - ICCBasedColorSpace)
+    - IndexedColorSpace
+    - SeparationColorSpace
+    - fn:SinceVersion(1.3
+    - DeviceNColorSpace)
+- name: PatternType1
+  goType: graphics/pattern.Type1
+  pdfType: Pattern
+  pdfRepr: stream
+  introduced: '1.2'
+  specTable: Table 5
+  arlingtonSrc: PatternType1.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - Pattern
+    notes: Table 5 and Table 74
+  - goName: null
+    pdfKey: PatternType
+    pdfType: integer
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - '1'
+  - goName: null
+    pdfKey: PaintType
+    pdfType: integer
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - '1'
+    - '2'
+  - goName: TilingType
+    pdfKey: TilingType
+    pdfType: integer
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - '1'
+    - '2'
+    - '3'
+    goType: int
+    purpose: 'TilingType is a a code that controls adjustments to the spacing of tiles
+
+      relative to the device pixel grid.'
+  - goName: BBox
+    pdfKey: BBox
+    pdfType: rectangle
+    required: true
+    introduced: '1.2'
+    goType: '*pdf.Rectangle'
+    purpose: 'The pattern cell''s bounding box.
+
+      The pattern cell is clipped to this rectangle before it is painted.'
+  - goName: XStep
+    pdfKey: XStep
+    pdfType: number
+    required: true
+    introduced: '1.2'
+    goType: float64
+    purpose: XStep is the horizontal spacing between pattern cells.
+  - goName: YStep
+    pdfKey: YStep
+    pdfType: number
+    required: true
+    introduced: '1.2'
+    goType: float64
+    purpose: YStep is the vertical spacing between pattern cells.
+  - goName: null
+    pdfKey: Resources
+    pdfType: dictionary
+    required: true
+    introduced: '1.2'
+    refTypes:
+    - Resource
+  - goName: Matrix
+    pdfKey: Matrix
+    pdfType: matrix
+    required: false
+    introduced: '1.2'
+    goType: matrix.Matrix
+    purpose: 'Matrix is an array of six numbers specifying the pattern cell''s matrix.
+
+      Leave this empty to use the identity matrix.'
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.2'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  - goName: null
+    pdfKey: XUID
+    pdfType: array
+    required: false
+    introduced: '1.2'
+    deprecated: '1.3'
+    refTypes:
+    - ArrayOfIntegersGeneral
+  writeMethod: (*Type1).Embed
+  readFunc: extract.Pattern
+  goPackage: pattern
+  goRepr: struct
+  specSection: 8.7.3.1
+- name: PatternType2
+  goType: graphics/pattern.Type2
+  pdfType: Pattern
+  pdfRepr: dict
+  introduced: '1.3'
+  specTable: Table 75
+  arlingtonSrc: PatternType2.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - Pattern
+    notes: Table 75
+  - goName: null
+    pdfKey: PatternType
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '2'
+  - goName: Shading
+    pdfKey: Shading
+    pdfType: dictionary;stream
+    required: true
+    introduced: '1.3'
+    refTypes:
+    - ShadingType1
+    - ShadingType2
+    - ShadingType3
+    - ShadingType4
+    - ShadingType5
+    - ShadingType6
+    - ShadingType7
+    goType: graphics.Shading
+  - goName: Matrix
+    pdfKey: Matrix
+    pdfType: matrix
+    required: false
+    default: '[1 0 0 1 0 0]'
+    introduced: '1.3'
+    goType: matrix.Matrix
+  - goName: ExtGState
+    pdfKey: ExtGState
+    pdfType: dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - GraphicsStateParameter
+    goType: '*extgstate.ExtGState'
+  writeMethod: (*Type2).Embed
+  readFunc: extract.Pattern
+  goPackage: pattern
+  goRepr: struct
+  specSection: 8.7.4.1
+- name: PointData
+  goType: null
+  pdfType: PtData
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 272
+  arlingtonSrc: PointData.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - PtData
+    notes: Table 272
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - Cloud
+  - goName: null
+    pdfKey: Names
+    pdfType: array
+    required: true
+    introduced: '1.7'
+    refTypes:
+    - ArrayOfNamesInPtData
+  - goName: null
+    pdfKey: XPTS
+    pdfType: array
+    required: true
+    introduced: '1.7'
+    refTypes:
+    - ArrayOfArraysXPTSValues
+- name: ProjectedCoordinateSystem
+  goType: null
+  pdfType: PROJCS
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 271
+  arlingtonSrc: ProjectedCoordinateSystem.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - PROJCS
+    notes: Table 271
+  - goName: null
+    pdfKey: EPSG
+    pdfType: integer
+    required: fn:IsRequired(fn:Not(fn:IsPresent(WKT)))
+    introduced: '1.7'
+  - goName: null
+    pdfKey: WKT
+    pdfType: ascii-string
+    required: fn:IsRequired(fn:Not(fn:IsPresent(EPSG)))
+    introduced: '1.7'
+- name: SeparationColorSpace
+  goType: graphics/color.SpaceSeparation
+  pdfRepr: dict
+  introduced: '1.2'
+  arlingtonSrc: SeparationColorSpace.tsv
+  fields:
+  - goName: null
+    pdfKey: '0'
+    pdfType: name
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - Separation
+    notes: Clause 8.6.6.4
+  - goName: null
+    pdfKey: '1'
+    pdfType: name
+    required: true
+    introduced: '1.2'
+  - goName: null
+    pdfKey: '2'
+    pdfType: array;name
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - DeviceCMYK
+    - DeviceRGB
+    - DeviceGray
+    refTypes:
+    - DeviceGrayColorSpace
+    - DeviceRGBColorSpace
+    - DeviceCMYKColorSpace
+    - CalGrayColorSpace
+    - CalRGBColorSpace
+    - LabColorSpace
+    - fn:SinceVersion(1.3
+    - ICCBasedColorSpace)
+    notes: cannot be Pattern, Indexed,Separation,DeviceN
+  - goName: null
+    pdfKey: '3'
+    pdfType: fn:SinceVersion(1.3,dictionary);stream
+    required: true
+    introduced: '1.2'
+    refTypes:
+    - fn:SinceVersion(1.3
+    - FunctionType2)
+    - fn:SinceVersion(1.3
+    - FunctionType3)
+    - FunctionType0
+    - fn:SinceVersion(1.3
+    - FunctionType4)
+  writeMethod: (*SpaceSeparation).Embed
+  readFunc: extract.ColorSpace
+  goPackage: color
+  goRepr: struct
+  specSection: 8.6.6.5
+- name: ShadingType1
+  goType: graphics/shading.Type1
+  pdfRepr: dict
+  introduced: '1.3'
+  arlingtonSrc: ShadingType1.tsv
+  fields:
+  - goName: Domain
+    pdfKey: Domain
+    pdfType: array
+    required: false
+    default: '[0 1 0 1]'
+    introduced: '1.3'
+    refTypes:
+    - ArrayOf_4Numbers
+    notes: Table 77 and Table 78
+    goType: '[]float64'
+    purpose: 'Domain (optional) specifies the rectangular coordinate domain [xmin xmax
+
+      ymin ymax]. The default is [0 1 0 1].'
+  - goName: Matrix
+    pdfKey: Matrix
+    pdfType: matrix
+    required: false
+    default: '[1 0 0 1 0 0]'
+    introduced: '1.3'
+    goType: '[]float64'
+    purpose: 'Matrix (optional) transforms domain coordinates to target coordinate
+
+      space. Default: identity matrix [1 0 0 1 0 0].'
+  - goName: null
+    pdfKey: Function
+    pdfType: array;dictionary;stream
+    required: true
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfFunctions
+    - FunctionType2
+    - FunctionType3
+    - FunctionType0
+    - FunctionType4
+  - goName: null
+    pdfKey: ShadingType
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '1'
+  - goName: ColorSpace
+    pdfKey: ColorSpace
+    pdfType: array;name
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - DeviceCMYK
+    - DeviceRGB
+    - DeviceGray
+    refTypes:
+    - DeviceGrayColorSpace
+    - DeviceRGBColorSpace
+    - DeviceCMYKColorSpace
+    - CalGrayColorSpace
+    - CalRGBColorSpace
+    - LabColorSpace
+    - ICCBasedColorSpace
+    - IndexedColorSpace
+    - SeparationColorSpace
+    - DeviceNColorSpace
+    notes: except pattern
+    goType: color.Space
+    purpose: ColorSpace defines the color space for shading color values.
+  - goName: Background
+    pdfKey: Background
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Background (optional) specifies the color for areas outside the
+
+      transformed domain, when used in a shading pattern. The default is to
+
+      leave points outside the transformed domain unpainted.'
+  - goName: BBox
+    pdfKey: BBox
+    pdfType: rectangle
+    required: false
+    introduced: '1.3'
+    goType: '*pdf.Rectangle'
+    purpose: 'BBox (optional) defines the shading''s bounding box as a clipping
+
+      boundary.'
+  - goName: AntiAlias
+    pdfKey: AntiAlias
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.3'
+    goType: bool
+    purpose: 'AntiAlias controls whether to filter the shading function to prevent
+
+      aliasing. Default: false.'
+  writeMethod: (*Type1).Embed
+  readFunc: extract.Shading
+  goPackage: shading
+  goRepr: struct
+  specSection: 8.7.4.3
+- name: ShadingType2
+  goType: graphics/shading.Type2
+  pdfRepr: dict
+  introduced: '1.3'
+  arlingtonSrc: ShadingType2.tsv
+  fields:
+  - goName: null
+    pdfKey: Coords
+    pdfType: array
+    required: true
+    introduced: '1.3'
+    refTypes:
+    - ArrayOf_4Numbers
+    notes: Table 77 and Table 79
+  - goName: null
+    pdfKey: Domain
+    pdfType: array
+    required: false
+    default: '[0.0 1.0]'
+    introduced: '1.3'
+    refTypes:
+    - ArrayOf_2Numbers
+  - goName: null
+    pdfKey: Function
+    pdfType: array;dictionary;stream
+    required: true
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfFunctions
+    - FunctionType2
+    - FunctionType3
+    - FunctionType0
+    - FunctionType4
+  - goName: null
+    pdfKey: Extend
+    pdfType: array
+    required: false
+    default: '[false false]'
+    introduced: '1.3'
+    refTypes:
+    - ArrayOf_2Booleans
+  - goName: null
+    pdfKey: ShadingType
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '2'
+  - goName: ColorSpace
+    pdfKey: ColorSpace
+    pdfType: array;name
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - DeviceCMYK
+    - DeviceRGB
+    - DeviceGray
+    refTypes:
+    - DeviceGrayColorSpace
+    - DeviceRGBColorSpace
+    - DeviceCMYKColorSpace
+    - CalGrayColorSpace
+    - CalRGBColorSpace
+    - LabColorSpace
+    - ICCBasedColorSpace
+    - IndexedColorSpace
+    - SeparationColorSpace
+    - DeviceNColorSpace
+    notes: except pattern
+    goType: color.Space
+    purpose: ColorSpace defines the color space for shading color values.
+  - goName: Background
+    pdfKey: Background
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Background (optional) specifies the color for areas outside the
+
+      shading''s bounds, when used in a shading pattern. The default is to
+
+      leave such points unpainted.'
+  - goName: BBox
+    pdfKey: BBox
+    pdfType: rectangle
+    required: false
+    introduced: '1.3'
+    goType: '*pdf.Rectangle'
+    purpose: 'BBox (optional) defines the shading''s bounding box as a clipping
+
+      boundary.'
+  - goName: AntiAlias
+    pdfKey: AntiAlias
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.3'
+    goType: bool
+    purpose: 'AntiAlias controls whether to filter the shading function to prevent
+
+      aliasing.'
+  writeMethod: (*Type2).Embed
+  readFunc: extract.Shading
+  goPackage: shading
+  goRepr: struct
+  specSection: 8.7.4.3
+- name: ShadingType3
+  goType: graphics/shading.Type3
+  pdfRepr: dict
+  introduced: '1.3'
+  arlingtonSrc: ShadingType3.tsv
+  fields:
+  - goName: null
+    pdfKey: Coords
+    pdfType: array
+    required: true
+    introduced: '1.3'
+    refTypes:
+    - ArrayOf_6Numbers
+    notes: Table 77 and Table 80
+  - goName: null
+    pdfKey: Domain
+    pdfType: array
+    required: false
+    default: '[0 1]'
+    introduced: '1.3'
+    refTypes:
+    - ArrayOf_2Numbers
+  - goName: null
+    pdfKey: Function
+    pdfType: array;dictionary;stream
+    required: true
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfFunctions
+    - FunctionType2
+    - FunctionType3
+    - FunctionType0
+    - FunctionType4
+  - goName: null
+    pdfKey: Extend
+    pdfType: array
+    required: false
+    default: '[false false]'
+    introduced: '1.3'
+    refTypes:
+    - ArrayOf_2Booleans
+  - goName: null
+    pdfKey: ShadingType
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '3'
+  - goName: ColorSpace
+    pdfKey: ColorSpace
+    pdfType: array;name
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - DeviceCMYK
+    - DeviceRGB
+    - DeviceGray
+    refTypes:
+    - DeviceGrayColorSpace
+    - DeviceRGBColorSpace
+    - DeviceCMYKColorSpace
+    - CalGrayColorSpace
+    - CalRGBColorSpace
+    - LabColorSpace
+    - ICCBasedColorSpace
+    - IndexedColorSpace
+    - SeparationColorSpace
+    - DeviceNColorSpace
+    notes: except pattern
+    goType: color.Space
+    purpose: ColorSpace defines the color space for shading color values.
+  - goName: Background
+    pdfKey: Background
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Background (optional) specifies the color for areas outside the
+
+      shading''s bounds, when used in a shading pattern.'
+  - goName: BBox
+    pdfKey: BBox
+    pdfType: rectangle
+    required: false
+    introduced: '1.3'
+    goType: '*pdf.Rectangle'
+    purpose: BBox (optional) defines the shading's bounding box as a clipping boundary.
+  - goName: AntiAlias
+    pdfKey: AntiAlias
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.3'
+    goType: bool
+    purpose: AntiAlias controls whether to filter the shading function to prevent aliasing.
+  writeMethod: (*Type3).Embed
+  readFunc: extract.Shading
+  goPackage: shading
+  goRepr: struct
+  specSection: 8.7.4.3
+- name: ShadingType4
+  goType: graphics/shading.Type4
+  pdfRepr: stream
+  arlingtonSrc: ShadingType4.tsv
+  fields:
+  - goName: BitsPerCoordinate
+    pdfKey: BitsPerCoordinate
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '1'
+    - '2'
+    - '4'
+    - '8'
+    - '12'
+    - '16'
+    - '24'
+    - '32'
+    notes: Table 5 and Table 77 and Table 81
+    goType: int
+    purpose: BitsPerCoordinate specifies the number of bits used to represent each vertex coordinate.
+  - goName: BitsPerComponent
+    pdfKey: BitsPerComponent
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '1'
+    - '2'
+    - '4'
+    - '8'
+    - '12'
+    - '16'
+    goType: int
+    purpose: BitsPerComponent specifies the number of bits used to represent each color component.
+  - goName: BitsPerFlag
+    pdfKey: BitsPerFlag
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '2'
+    - '4'
+    - '8'
+    goType: int
+    purpose: BitsPerFlag specifies the number of bits used to represent the edge flag for each vertex.
+  - goName: Decode
+    pdfKey: Decode
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Decode specifies how to map vertex coordinates and color components into
+
+      the appropriate ranges of values.'
+  - goName: null
+    pdfKey: Function
+    pdfType: array;dictionary;stream
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfFunctions
+    - FunctionType2
+    - FunctionType3
+    - FunctionType0
+    - FunctionType4
+  - goName: null
+    pdfKey: ShadingType
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '4'
+  - goName: ColorSpace
+    pdfKey: ColorSpace
+    pdfType: array;name
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - DeviceCMYK
+    - DeviceRGB
+    - DeviceGray
+    refTypes:
+    - DeviceGrayColorSpace
+    - DeviceRGBColorSpace
+    - DeviceCMYKColorSpace
+    - CalGrayColorSpace
+    - CalRGBColorSpace
+    - LabColorSpace
+    - ICCBasedColorSpace
+    - IndexedColorSpace
+    - SeparationColorSpace
+    - DeviceNColorSpace
+    notes: except pattern
+    goType: color.Space
+    purpose: ColorSpace defines the color space for shading color values.
+  - goName: Background
+    pdfKey: Background
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Background (optional) specifies the color for areas outside the
+
+      shading''s bounds, when used in a shading pattern.'
+  - goName: BBox
+    pdfKey: BBox
+    pdfType: rectangle
+    required: false
+    introduced: '1.3'
+    goType: '*pdf.Rectangle'
+    purpose: BBox (optional) defines the shading's bounding box as a clipping boundary.
+  - goName: AntiAlias
+    pdfKey: AntiAlias
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.3'
+    goType: bool
+    purpose: AntiAlias controls whether to filter the shading function to prevent aliasing.
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: F
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FileSpecification
+    goType: pdf.Function
+    purpose: F (optional) is a 1->n function for mapping parametric values to colors.
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  writeMethod: (*Type4).Embed
+  readFunc: extract.Shading
+  goPackage: shading
+  goRepr: struct
+  specSection: 8.7.4.3
+- name: ShadingType5
+  goType: graphics/shading.Type5
+  pdfRepr: stream
+  arlingtonSrc: ShadingType5.tsv
+  fields:
+  - goName: BitsPerCoordinate
+    pdfKey: BitsPerCoordinate
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '1'
+    - '2'
+    - '4'
+    - '8'
+    - '12'
+    - '16'
+    - '24'
+    - '32'
+    notes: Table 5 and Table 77 and Table 82
+    goType: int
+    purpose: BitsPerCoordinate specifies the number of bits used to represent each vertex coordinate.
+  - goName: BitsPerComponent
+    pdfKey: BitsPerComponent
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '1'
+    - '2'
+    - '4'
+    - '8'
+    - '12'
+    - '16'
+    goType: int
+    purpose: BitsPerComponent specifies the number of bits used to represent each color component.
+  - goName: VerticesPerRow
+    pdfKey: VerticesPerRow
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - fn:Eval(@VerticesPerRow>=2)
+    goType: int
+    purpose: 'VerticesPerRow specifies the number of vertices in each row of the lattice.
+
+      The value must be greater than or equal to 2.'
+  - goName: Decode
+    pdfKey: Decode
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Decode specifies how to map vertex coordinates and color components into
+
+      the appropriate ranges of values.'
+  - goName: null
+    pdfKey: Function
+    pdfType: array;dictionary;stream
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfFunctions
+    - FunctionType2
+    - FunctionType3
+    - FunctionType0
+    - FunctionType4
+  - goName: null
+    pdfKey: ShadingType
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '5'
+  - goName: ColorSpace
+    pdfKey: ColorSpace
+    pdfType: array;name
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - DeviceCMYK
+    - DeviceRGB
+    - DeviceGray
+    refTypes:
+    - DeviceGrayColorSpace
+    - DeviceRGBColorSpace
+    - DeviceCMYKColorSpace
+    - CalGrayColorSpace
+    - CalRGBColorSpace
+    - LabColorSpace
+    - ICCBasedColorSpace
+    - IndexedColorSpace
+    - SeparationColorSpace
+    - DeviceNColorSpace
+    notes: except pattern
+    goType: color.Space
+    purpose: ColorSpace defines the color space for shading color values.
+  - goName: Background
+    pdfKey: Background
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Background (optional) specifies the color for areas outside the
+
+      shading''s bounds, when used in a shading pattern.'
+  - goName: BBox
+    pdfKey: BBox
+    pdfType: rectangle
+    required: false
+    introduced: '1.3'
+    goType: '*pdf.Rectangle'
+    purpose: BBox (optional) defines the shading's bounding box as a clipping boundary.
+  - goName: AntiAlias
+    pdfKey: AntiAlias
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.3'
+    goType: bool
+    purpose: AntiAlias controls whether to filter the shading function to prevent aliasing.
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: F
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FileSpecification
+    goType: pdf.Function
+    purpose: F (optional) is a 1->n function for mapping parametric values to colors.
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  writeMethod: (*Type5).Embed
+  readFunc: extract.Shading
+  goPackage: shading
+  goRepr: struct
+  specSection: 8.7.4.3
+- name: ShadingType6
+  goType: graphics/shading.Type6
+  pdfRepr: stream
+  arlingtonSrc: ShadingType6.tsv
+  fields:
+  - goName: BitsPerCoordinate
+    pdfKey: BitsPerCoordinate
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '1'
+    - '2'
+    - '4'
+    - '8'
+    - '12'
+    - '16'
+    - '24'
+    - '32'
+    notes: Table 5 and Table 77 and Table 83
+    goType: int
+    purpose: BitsPerCoordinate specifies the number of bits used to represent each coordinate.
+  - goName: BitsPerComponent
+    pdfKey: BitsPerComponent
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '1'
+    - '2'
+    - '4'
+    - '8'
+    - '12'
+    - '16'
+    goType: int
+    purpose: BitsPerComponent specifies the number of bits used to represent each color component.
+  - goName: BitsPerFlag
+    pdfKey: BitsPerFlag
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    goType: int
+    purpose: BitsPerFlag specifies the number of bits used to represent the edge flag for each patch.
+  - goName: Decode
+    pdfKey: Decode
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Decode specifies how to map coordinates and color components into
+
+      the appropriate ranges of values.'
+  - goName: null
+    pdfKey: Function
+    pdfType: array;dictionary;stream
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfFunctions
+    - FunctionType2
+    - FunctionType3
+    - FunctionType0
+    - FunctionType4
+  - goName: null
+    pdfKey: ShadingType
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '6'
+  - goName: ColorSpace
+    pdfKey: ColorSpace
+    pdfType: array;name
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - DeviceCMYK
+    - DeviceRGB
+    - DeviceGray
+    refTypes:
+    - DeviceGrayColorSpace
+    - DeviceRGBColorSpace
+    - DeviceCMYKColorSpace
+    - CalGrayColorSpace
+    - CalRGBColorSpace
+    - LabColorSpace
+    - ICCBasedColorSpace
+    - IndexedColorSpace
+    - SeparationColorSpace
+    - DeviceNColorSpace
+    notes: except pattern
+    goType: color.Space
+    purpose: ColorSpace defines the color space for shading color values.
+  - goName: Background
+    pdfKey: Background
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Background (optional) specifies the color for areas outside the
+
+      shading''s bounds, when used in a shading pattern.'
+  - goName: BBox
+    pdfKey: BBox
+    pdfType: rectangle
+    required: false
+    introduced: '1.3'
+    goType: '*pdf.Rectangle'
+    purpose: BBox (optional) defines the shading's bounding box as a clipping boundary.
+  - goName: AntiAlias
+    pdfKey: AntiAlias
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.3'
+    goType: bool
+    purpose: AntiAlias controls whether to filter the shading function to prevent aliasing.
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: F
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FileSpecification
+    goType: pdf.Function
+    purpose: F (optional) is a 1->n function for mapping parametric values to colors.
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  writeMethod: (*Type6).Embed
+  readFunc: extract.Shading
+  goPackage: shading
+  goRepr: struct
+  specSection: 8.7.4.3
+- name: ShadingType7
+  goType: graphics/shading.Type7
+  pdfRepr: stream
+  arlingtonSrc: ShadingType7.tsv
+  fields:
+  - goName: BitsPerCoordinate
+    pdfKey: BitsPerCoordinate
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '1'
+    - '2'
+    - '4'
+    - '8'
+    - '12'
+    - '16'
+    - '24'
+    - '32'
+    notes: Table 5 and Table 77 and Table 83
+    goType: int
+    purpose: BitsPerCoordinate specifies the number of bits used to represent each coordinate.
+  - goName: BitsPerComponent
+    pdfKey: BitsPerComponent
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '1'
+    - '2'
+    - '4'
+    - '8'
+    - '12'
+    - '16'
+    goType: int
+    purpose: BitsPerComponent specifies the number of bits used to represent each color component.
+  - goName: BitsPerFlag
+    pdfKey: BitsPerFlag
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    goType: int
+    purpose: BitsPerFlag specifies the number of bits used to represent the edge flag for each patch.
+  - goName: Decode
+    pdfKey: Decode
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Decode specifies how to map coordinates and color components into
+
+      the appropriate ranges of values.'
+  - goName: null
+    pdfKey: Function
+    pdfType: array;dictionary;stream
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfFunctions
+    - FunctionType2
+    - FunctionType3
+    - FunctionType0
+    - FunctionType4
+  - goName: null
+    pdfKey: ShadingType
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '7'
+  - goName: ColorSpace
+    pdfKey: ColorSpace
+    pdfType: array;name
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - DeviceCMYK
+    - DeviceRGB
+    - DeviceGray
+    refTypes:
+    - DeviceGrayColorSpace
+    - DeviceRGBColorSpace
+    - DeviceCMYKColorSpace
+    - CalGrayColorSpace
+    - CalRGBColorSpace
+    - LabColorSpace
+    - ICCBasedColorSpace
+    - IndexedColorSpace
+    - SeparationColorSpace
+    - DeviceNColorSpace
+    notes: except pattern
+    goType: color.Space
+    purpose: ColorSpace defines the color space for shading color values.
+  - goName: Background
+    pdfKey: Background
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Background (optional) specifies the color for areas outside the
+
+      shading''s bounds, when used in a shading pattern.'
+  - goName: BBox
+    pdfKey: BBox
+    pdfType: rectangle
+    required: false
+    introduced: '1.3'
+    goType: '*pdf.Rectangle'
+    purpose: BBox (optional) defines the shading's bounding box as a clipping boundary.
+  - goName: AntiAlias
+    pdfKey: AntiAlias
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.3'
+    goType: bool
+    purpose: AntiAlias controls whether to filter the shading function to prevent aliasing.
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: F
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FileSpecification
+    goType: pdf.Function
+    purpose: F (optional) is a 1->n function for mapping parametric values to colors.
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  writeMethod: (*Type7).Embed
+  readFunc: extract.Shading
+  goPackage: shading
+  goRepr: struct
+  specSection: 8.7.4.3
+- name: SoftMaskAlpha
+  goType: null
+  pdfType: Mask
+  pdfRepr: dict
+  introduced: '1.4'
+  specTable: Table 142
+  arlingtonSrc: SoftMaskAlpha.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.4'
+    possibleValues:
+    - Mask
+    notes: Table 142
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '1.4'
+    possibleValues:
+    - Alpha
+  - goName: null
+    pdfKey: G
+    pdfType: stream
+    required: true
+    introduced: '1.4'
+    refTypes:
+    - XObjectFormType1
+  - goName: null
+    pdfKey: BC
+    pdfType: array
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - ArrayOfNumbersGeneral
+  - goName: null
+    pdfKey: TR
+    pdfType: dictionary;name;stream
+    required: false
+    default: '[];[Identity];[]'
+    introduced: '1.4'
+    possibleValues:
+    - Identity
+    refTypes:
+    - FunctionType2
+    - FunctionType3
+    - FunctionType0
+    - FunctionType4
+- name: SoftMaskLuminosity
+  goType: null
+  pdfType: Mask
+  pdfRepr: dict
+  introduced: '1.4'
+  specTable: Table 142
+  arlingtonSrc: SoftMaskLuminosity.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.4'
+    possibleValues:
+    - Mask
+    notes: Table 142
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '1.4'
+    possibleValues:
+    - Luminosity
+  - goName: null
+    pdfKey: G
+    pdfType: stream
+    required: true
+    introduced: '1.4'
+    refTypes:
+    - XObjectFormType1
+  - goName: null
+    pdfKey: BC
+    pdfType: array
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - ArrayOfNumbersGeneral
+  - goName: null
+    pdfKey: TR
+    pdfType: dictionary;name;stream
+    required: false
+    default: '[];[Identity];[]'
+    introduced: '1.4'
+    possibleValues:
+    - Identity
+    refTypes:
+    - FunctionType2
+    - FunctionType3
+    - FunctionType0
+    - FunctionType4
+- name: Solidities
+  goType: null
+  pdfRepr: dict
+  introduced: '1.6'
+  arlingtonSrc: Solidities.tsv
+  fields:
+  - goName: null
+    pdfKey: Default
+    pdfType: number
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - fn:Eval((@Default>=0) && (@Default<=1))
+    notes: Table 72
+  - goName: null
+    pdfKey: '*'
+    pdfType: number
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - fn:Eval((@*>=0) && (@*<=1))
+- name: SpectralData
+  goType: null
+  pdfRepr: dict
+  introduced: '2.0'
+  arlingtonSrc: SpectralData.tsv
+  fields:
+  - goName: null
+    pdfKey: '*'
+    pdfType: stream
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Stream
+    notes: Table 401, SpectralData cell
+- name: Thumbnail
+  goType: graphics/image/thumbnail.Thumbnail
+  pdfType: XObject
+  pdfRepr: stream
+  specTable: Table 5
+  arlingtonSrc: Thumbnail.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.0'
+    possibleValues:
+    - XObject
+    notes: Table 5 and Table 87 and Clause 12.3.4
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: false
+    introduced: '1.0'
+    possibleValues:
+    - Image
+  - goName: null
+    pdfKey: Width
+    pdfType: integer
+    required: true
+    introduced: '1.0'
+  - goName: null
+    pdfKey: Height
+    pdfType: integer
+    required: true
+    introduced: '1.0'
+  - goName: null
+    pdfKey: ColorSpace
+    pdfType: array;name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - DeviceRGB
+    - DeviceGray
+    refTypes:
+    - DeviceGrayColorSpace
+    - DeviceRGBColorSpace
+    - IndexedColorSpace
+  - goName: null
+    pdfKey: BitsPerComponent
+    pdfType: integer
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - '1'
+    - '2'
+    - '4'
+    - '8'
+    - '16'
+  - goName: null
+    pdfKey: Decode
+    pdfType: array
+    required: false
+    introduced: '1.0'
+    refTypes:
+    - ArrayOfNumbersGeneral
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - CCITTFaxDecode
+    - fn:SinceVersion(1.4,JBIG2Decode)
+    - DCTDecode
+    - fn:SinceVersion(1.5,JPXDecode)
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - FilterCCITTFaxDecode
+    - fn:SinceVersion(1.4
+    - FilterJBIG2Decode)
+    - FilterDCTDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - CCITTFaxDecode
+    - fn:SinceVersion(1.4,JBIG2Decode)
+    - DCTDecode
+    - fn:SinceVersion(1.5,JPXDecode)
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - FilterCCITTFaxDecode
+    - fn:SinceVersion(1.4
+    - FilterJBIG2Decode)
+    - FilterDCTDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  readFunc: thumbnail.ExtractThumbnail
+  writeMethod: (*Thumbnail).Embed
+  goPackage: thumbnail
+  goRepr: struct
+  specSection: 8.9.5
+- name: Viewport
+  goType: measure.Viewport
+  pdfType: Viewport
+  pdfRepr: dict
+  introduced: '1.6'
+  specTable: Table 265
+  arlingtonSrc: Viewport.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - Viewport
+    notes: Table 265
+  - goName: BBox
+    pdfKey: BBox
+    pdfType: rectangle
+    required: true
+    introduced: '1.6'
+    goType: pdf.Rectangle
+    purpose: BBox specifies the location of the viewport on the page.
+  - goName: Name
+    pdfKey: Name
+    pdfType: text-string
+    required: false
+    introduced: '1.6'
+    goType: string
+    purpose: Name is a descriptive title of the viewport (optional).
+  - goName: Measure
+    pdfKey: Measure
+    pdfType: dictionary
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - MeasureRL
+    - fn:SinceVersion(2.0
+    - MeasureGEO)
+    goType: Measure
+    purpose: Measure specifies the scale and units for measurements within the viewport (optional).
+  - goName: PtData
+    pdfKey: PtData
+    pdfType: dictionary
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - PointData
+    goType: '*PtData'
+    purpose: PtData (optional; PDF 2.0) contains extended geospatial point data.
+  goPackage: measure
+  goRepr: struct
+  specSection: '12.9'
+  readFunc: measure.ExtractViewport
+  writeMethod: (*Viewport).Embed
+- name: XObjectFormPS
+  goType: null
+  pdfType: XObject
+  pdfRepr: stream
+  introduced: '1.1'
+  specTable: Table 5
+  arlingtonSrc: XObjectFormPS.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.1'
+    deprecated: '1.3'
+    possibleValues:
+    - XObject
+    notes: Table 5 and
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.1'
+    deprecated: '1.3'
+    possibleValues:
+    - PS
+  - goName: null
+    pdfKey: Level1
+    pdfType: stream
+    required: false
+    introduced: '1.1'
+    deprecated: '1.3'
+    refTypes:
+    - Stream
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.1'
+    deprecated: '1.3'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.1'
+    deprecated: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - fn:SinceVersion(1.2,FlateDecode)
+    - RunLengthDecode
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.1'
+    deprecated: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - fn:SinceVersion(1.2
+    - FilterFlateDecode)
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.1'
+    deprecated: '1.3'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.2'
+    deprecated: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.2'
+    deprecated: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+- name: XObjectFormPSpassthrough
+  goType: null
+  pdfType: XObject
+  pdfRepr: stream
+  introduced: '1.1'
+  specTable: Table 5
+  arlingtonSrc: XObjectFormPSpassthrough.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.1'
+    deprecated: '1.3'
+    possibleValues:
+    - XObject
+    notes: 'Table 5 and '
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.1'
+    deprecated: '1.3'
+    possibleValues:
+    - PS
+  - goName: null
+    pdfKey: Subtype2
+    pdfType: name
+    required: true
+    introduced: '1.1'
+    deprecated: '1.3'
+    possibleValues:
+    - PS
+  - goName: null
+    pdfKey: Level1
+    pdfType: stream
+    required: false
+    introduced: '1.1'
+    deprecated: '1.3'
+    refTypes:
+    - Stream
+  - goName: null
+    pdfKey: PS
+    pdfType: stream
+    required: true
+    introduced: '1.1'
+    deprecated: '1.3'
+    refTypes:
+    - Stream
+  - goName: null
+    pdfKey: FormType
+    pdfType: integer
+    required: fn:IsRequired(fn:BeforeVersion(1.3))
+    introduced: '1.1'
+    deprecated: '1.3'
+    possibleValues:
+    - '1'
+  - goName: null
+    pdfKey: BBox
+    pdfType: rectangle
+    required: true
+    default: '[0 0 0 0]'
+    introduced: '1.1'
+    deprecated: '1.3'
+  - goName: null
+    pdfKey: Matrix
+    pdfType: matrix
+    required: fn:IsRequired(fn:BeforeVersion(1.3))
+    default: '[1 0 0 1 0 0]'
+    introduced: '1.1'
+    deprecated: '1.3'
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.1'
+    deprecated: '1.3'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.1'
+    deprecated: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - fn:SinceVersion(1.2,FlateDecode)
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.1'
+    deprecated: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - fn:SinceVersion(1.2
+    - FilterFlateDecode)
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.1'
+    deprecated: '1.3'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.2'
+    deprecated: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.2'
+    deprecated: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+- name: XObjectFormPrinterMark
+  goType: null
+  pdfType: XObject
+  pdfRepr: stream
+  introduced: '1.4'
+  specTable: Table 5
+  arlingtonSrc: XObjectFormPrinterMark.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.4'
+    possibleValues:
+    - XObject
+    notes: Table 5, Table 93 and Table 399
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.4'
+    possibleValues:
+    - Form
+  - goName: null
+    pdfKey: FormType
+    pdfType: integer
+    required: false
+    introduced: '1.4'
+    possibleValues:
+    - '1'
+  - goName: null
+    pdfKey: BBox
+    pdfType: rectangle
+    required: true
+    introduced: '1.4'
+  - goName: null
+    pdfKey: Matrix
+    pdfType: matrix
+    required: false
+    default: '[1 0 0 1 0 0]'
+    introduced: '1.4'
+  - goName: null
+    pdfKey: Resources
+    pdfType: dictionary
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - Resource
+  - goName: null
+    pdfKey: Group
+    pdfType: dictionary
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - GroupAttributes
+  - goName: null
+    pdfKey: Ref
+    pdfType: dictionary
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - Reference
+  - goName: null
+    pdfKey: Metadata
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - Metadata
+  - goName: null
+    pdfKey: PieceInfo
+    pdfType: dictionary
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - PagePiece
+  - goName: null
+    pdfKey: LastModified
+    pdfType: date
+    required: fn:IsRequired(fn:IsPresent(PieceInfo))
+    introduced: '1.4'
+  - goName: null
+    pdfKey: StructParent
+    pdfType: integer
+    required: false
+    introduced: '1.4'
+    notes: Table 359
+  - goName: null
+    pdfKey: StructParents
+    pdfType: integer
+    required: false
+    introduced: '1.4'
+    notes: Table 359
+  - goName: null
+    pdfKey: OPI
+    pdfType: dictionary
+    required: false
+    introduced: '1.4'
+    deprecated: '2.0'
+    refTypes:
+    - OPIVersion13
+    - OPIVersion20
+  - goName: null
+    pdfKey: OC
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - OptContentGroup
+    - OptContentMembership
+  - goName: null
+    pdfKey: Name
+    pdfType: name
+    required: false
+    introduced: '1.4'
+    deprecated: '2.0'
+  - goName: null
+    pdfKey: AF
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - ArrayOfAFFileSpecifications
+  - goName: null
+    pdfKey: Measure
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - MeasureRL
+    - MeasureGEO
+  - goName: null
+    pdfKey: PtData
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - PointData
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.4'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.4'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.4'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  - goName: null
+    pdfKey: MarkStyle
+    pdfType: text-string
+    required: false
+    introduced: '1.4'
+    notes: from Table 399 printer mark form dictionary
+  - goName: null
+    pdfKey: Colorants
+    pdfType: dictionary
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - ColorantsDict
+- name: XObjectFormTrapNet
+  goType: null
+  pdfType: XObject
+  pdfRepr: stream
+  introduced: '1.3'
+  specTable: Table 93
+  arlingtonSrc: XObjectFormTrapNet.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    possibleValues:
+    - XObject
+    notes: Table 93 and Table 404
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.3'
+    deprecated: '2.0'
+    possibleValues:
+    - Form
+  - goName: null
+    pdfKey: FormType
+    pdfType: integer
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    possibleValues:
+    - '1'
+  - goName: null
+    pdfKey: BBox
+    pdfType: rectangle
+    required: true
+    introduced: '1.3'
+    deprecated: '2.0'
+  - goName: null
+    pdfKey: Matrix
+    pdfType: matrix
+    required: false
+    default: '[1 0 0 1 0 0]'
+    introduced: '1.3'
+    deprecated: '2.0'
+  - goName: null
+    pdfKey: Resources
+    pdfType: dictionary
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    refTypes:
+    - Resource
+  - goName: null
+    pdfKey: Group
+    pdfType: dictionary
+    required: false
+    introduced: '1.4'
+    deprecated: '2.0'
+    refTypes:
+    - GroupAttributes
+  - goName: null
+    pdfKey: Ref
+    pdfType: dictionary
+    required: false
+    introduced: '1.4'
+    deprecated: '2.0'
+    refTypes:
+    - Reference
+  - goName: null
+    pdfKey: Metadata
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    deprecated: '2.0'
+    refTypes:
+    - Metadata
+  - goName: null
+    pdfKey: PieceInfo
+    pdfType: dictionary
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    refTypes:
+    - PagePiece
+  - goName: null
+    pdfKey: LastModified
+    pdfType: date
+    required: fn:IsRequired(fn:IsPresent(PieceInfo))
+    introduced: '1.3'
+    deprecated: '2.0'
+  - goName: null
+    pdfKey: StructParent
+    pdfType: integer
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    notes: Table 359
+  - goName: null
+    pdfKey: StructParents
+    pdfType: integer
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    notes: Table 359
+  - goName: null
+    pdfKey: OPI
+    pdfType: dictionary
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    refTypes:
+    - OPIVersion13
+    - OPIVersion20
+  - goName: null
+    pdfKey: OC
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    deprecated: '2.0'
+    refTypes:
+    - OptContentGroup
+    - OptContentMembership
+  - goName: null
+    pdfKey: Name
+    pdfType: name
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+  - goName: null
+    pdfKey: AF
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    deprecated: '2.0'
+    refTypes:
+    - ArrayOfAFFileSpecifications
+  - goName: null
+    pdfKey: Measure
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    deprecated: '2.0'
+    refTypes:
+    - MeasureRL
+  - goName: null
+    pdfKey: PtData
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    deprecated: '2.0'
+    refTypes:
+    - PointData
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    deprecated: '2.0'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+    deprecated: '2.0'
+  - goName: null
+    pdfKey: PCM
+    pdfType: name
+    required: true
+    introduced: '1.3'
+    deprecated: '2.0'
+    possibleValues:
+    - DeviceGray
+    - DeviceRGB
+    - DeviceCMYK
+    - DeviceCMY
+    - DeviceRGBK
+    - DeviceN
+    notes: Table 404
+  - goName: null
+    pdfKey: SeparationColorNames
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    refTypes:
+    - ArrayOfNamesGeneral
+    notes: Table 404
+  - goName: null
+    pdfKey: TrapRegions
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    refTypes:
+    - ArrayOfTrapRegions
+    notes: Table 404
+  - goName: null
+    pdfKey: TrapStyles
+    pdfType: text-string
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    notes: Table 404
+- name: XObjectFormType1
+  goType: graphics/form.Form
+  pdfType: XObject
+  pdfRepr: stream
+  specTable: Table 5
+  arlingtonSrc: XObjectFormType1.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.0'
+    possibleValues:
+    - XObject
+    notes: Table 5 and Table 93
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - Form
+  - goName: null
+    pdfKey: FormType
+    pdfType: integer
+    required: fn:IsRequired(fn:BeforeVersion(1.3))
+    introduced: '1.0'
+    possibleValues:
+    - '1'
+  - goName: BBox
+    pdfKey: BBox
+    pdfType: rectangle
+    required: true
+    introduced: '1.0'
+    goType: pdf.Rectangle
+    purpose: BBox is the form's bounding box in form coordinate space.
+  - goName: Matrix
+    pdfKey: Matrix
+    pdfType: matrix
+    required: fn:IsRequired(fn:BeforeVersion(1.3))
+    default: '[1 0 0 1 0 0]'
+    introduced: '1.0'
+    goType: matrix.Matrix
+    purpose: 'Matrix transforms form coordinates to user space coordinates.
+
+
+      When writing forms to a PDF file, the zero matrix can be used as an
+
+      alternative to the identity matrix for convenience.'
+  - goName: null
+    pdfKey: Resources
+    pdfType: dictionary
+    required: true
+    introduced: '1.2'
+    refTypes:
+    - Resource
+  - goName: Group
+    pdfKey: Group
+    pdfType: dictionary
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - GroupAttributes
+    goType: '*group.TransparencyAttributes'
+    purpose: 'Group specifies transparency group attributes (PDF 1.4).
+
+      If non-nil, this form XObject is a transparency group XObject.'
+  - goName: null
+    pdfKey: Ref
+    pdfType: dictionary
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - Reference
+  - goName: Metadata
+    pdfKey: Metadata
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - Metadata
+    goType: '*metadata.Stream'
+    purpose: Metadata is an optional reference to metadata for this form.
+  - goName: PieceInfo
+    pdfKey: PieceInfo
+    pdfType: dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - PagePiece
+    goType: '*pieceinfo.PieceInfo'
+    purpose: PieceInfo contains private application data.
+  - goName: LastModified
+    pdfKey: LastModified
+    pdfType: date
+    required: fn:IsRequired(fn:IsPresent(PieceInfo))
+    introduced: '1.3'
+    goType: time.Time
+    purpose: 'LastModified (Required if PieceInfo is present; optional otherwise) is
+
+      the date the form was last modified.'
+  - goName: StructParent
+    pdfKey: StructParent
+    pdfType: integer
+    required: false
+    introduced: '1.3'
+    notes: Table 359
+    goType: optional.UInt
+    purpose: 'StructParent (required if the form is a structural content item)
+
+      is the integer key of the form''s entry in the structural parent tree.'
+  - goName: null
+    pdfKey: StructParents
+    pdfType: integer
+    required: false
+    introduced: '1.3'
+    notes: Table 359
+  - goName: null
+    pdfKey: OPI
+    pdfType: dictionary
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    refTypes:
+    - OPIVersion13
+    - OPIVersion20
+  - goName: OptionalContent
+    pdfKey: OC
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - OptContentGroup
+    - OptContentMembership
+    goType: oc.Conditional
+    purpose: OptionalContent (optional) allows to control the visibility of the form.
+  - goName: null
+    pdfKey: Name
+    pdfType: name
+    required: fn:IsRequired(fn:BeforeVersion(1.3))
+    introduced: '1.0'
+    deprecated: '2.0'
+  - goName: AssociatedFiles
+    pdfKey: AF
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - ArrayOfAFFileSpecifications
+    goType: '[]*file.Specification'
+    purpose: 'AssociatedFiles (optional; PDF 2.0) is an array of files associated with
+
+      the form XObject. The relationship that the associated files have to the
+
+      XObject is supplied by the Specification.AFRelationship field.
+
+
+      This corresponds to the AF entry in the form XObject dictionary.'
+  - goName: Measure
+    pdfKey: Measure
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - MeasureRL
+    - MeasureGEO
+    goType: measure.Measure
+    purpose: 'Measure (optional) is a measure dictionary that specifies the scale and
+
+      units which shall apply to the form.'
+  - goName: PtData
+    pdfKey: PtData
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - PointData
+    goType: '*measure.PtData'
+    purpose: PtData (optional; PDF 2.0) contains extended geospatial point data.
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.0'
+    notes: from stream
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.0'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - fn:SinceVersion(1.2,FlateDecode)
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+    notes: Table 6
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.0'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - fn:SinceVersion(1.2
+    - FilterFlateDecode)
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+    notes: Table 6
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  - goName: null
+    pdfKey: XUID
+    pdfType: array
+    required: false
+    introduced: '1.0'
+    deprecated: '1.3'
+    refTypes:
+    - ArrayOfIntegersGeneral
+  - goName: null
+    pdfKey: GTS_XID
+    pdfType: string
+    required: false
+    introduced: fn:Extension(PDF_VT2,1.6)
+    notes: PDF/VT-2
+  - goName: null
+    pdfKey: GTS_Scope
+    pdfType: name
+    required: false
+    introduced: fn:Extension(PDF_VT2,1.6)
+    possibleValues:
+    - SingleUse
+    - Record
+    - File
+    - Stream
+    - Global
+    - Unknown
+    notes: PDF/VT-2
+  - goName: null
+    pdfKey: GTS_Env
+    pdfType: text-string
+    required: fn:IsRequired((@GTS_Scope==Stream) || (@GTS_Scope==Global))
+    introduced: fn:Extension(PDF_VT2,1.6)
+    notes: PDF/VT-2
+  - goName: null
+    pdfKey: GTS_Encapsulated
+    pdfType: boolean
+    required: false
+    introduced: fn:Extension(PDF_VT2,1.6)
+    notes: PDF/VT-2
+  writeMethod: (*Form).Encode
+  readFunc: extract.Form
+  goPackage: form
+  goRepr: struct
+  specSection: '8.10'
+- name: XObjectImage
+  goType: graphics/image.Dict
+  pdfType: XObject
+  pdfRepr: stream
+  specTable: Table 5
+  arlingtonSrc: XObjectImage.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.0'
+    possibleValues:
+    - XObject
+    notes: Table 5 and Table 87
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - Image
+  - goName: Width
+    pdfKey: Width
+    pdfType: integer
+    required: true
+    introduced: '1.0'
+    goType: int
+    purpose: Width is the width of the image in pixels.
+  - goName: Height
+    pdfKey: Height
+    pdfType: integer
+    required: true
+    introduced: '1.0'
+    goType: int
+    purpose: Height is the height of the image in pixels.
+  - goName: ColorSpace
+    pdfKey: ColorSpace
+    pdfType: array;name
+    required: fn:IsRequired(fn:Not(fn:Contains(@Filter,JPXDecode) || (@ImageMask==true)))
+    introduced: '1.0'
+    possibleValues:
+    - DeviceCMYK
+    - DeviceRGB
+    - DeviceGray
+    refTypes:
+    - DeviceGrayColorSpace
+    - DeviceRGBColorSpace
+    - DeviceCMYKColorSpace
+    - fn:SinceVersion(1.1
+    - CalGrayColorSpace)
+    - fn:SinceVersion(1.1
+    - CalRGBColorSpace)
+    - fn:SinceVersion(1.1
+    - LabColorSpace)
+    - fn:SinceVersion(1.3
+    - ICCBasedColorSpace)
+    - IndexedColorSpace
+    - fn:SinceVersion(1.2
+    - SeparationColorSpace)
+    - fn:SinceVersion(1.3
+    - DeviceNColorSpace)
+    - fn:SinceVersion(1.2
+    - PatternColorSpace)
+    goType: color.Space
+    purpose: 'ColorSpace is the color space in which image samples are specified.
+
+      It can be any type of color space except Pattern.'
+  - goName: BitsPerComponent
+    pdfKey: BitsPerComponent
+    pdfType: integer
+    required: fn:IsRequired(fn:Not(fn:Contains(@Filter,JPXDecode) || (@ImageMask==true)))
+    introduced: '1.0'
+    possibleValues:
+    - fn:RequiredValue((@Filter==CCITTFaxDecode) || (@Filter==JBIG2Decode) || (@ImageMask==true),1)
+    - '2'
+    - '4'
+    - fn:RequiredValue((@Filter==RunLengthDecode) || (@Filter==DCTDecode),8)
+    - fn:SinceVersion(1.5,16)
+    goType: int
+    purpose: 'BitsPerComponent is the number of bits used to represent each color component.
+
+      The value must be 1, 2, 4, 8, or (from PDF 1.5) 16.'
+  - goName: Intent
+    pdfKey: Intent
+    pdfType: name
+    required: false
+    introduced: '1.1'
+    goType: graphics.RenderingIntent
+    purpose: 'Intent (optional) is the name of a color rendering intent to be used in
+
+      rendering the image.'
+  - goName: null
+    pdfKey: ImageMask
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.0'
+  - goName: null
+    pdfKey: Mask
+    pdfType: array;stream
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfIntegersGeneral
+    - XObjectImageMask
+  - goName: Decode
+    pdfKey: Decode
+    pdfType: array
+    required: false
+    introduced: '1.0'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Decode (optional) is an array of numbers describing how to map image
+
+      samples into the range of values appropriate for the image''s color
+
+      space. The slice must have twice the number of color components in the
+
+      ColorSpace.'
+  - goName: Interpolate
+    pdfKey: Interpolate
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.0'
+    goType: bool
+    purpose: 'Interpolate indicates whether image interpolation should be performed by
+
+      a PDF processor.'
+  - goName: Alternates
+    pdfKey: Alternates
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfImageAlternates
+    goType: '[]*Dict'
+    purpose: Alternates (optional) is an array of alternate image dictionaries for this image.
+  - goName: SMask
+    pdfKey: SMask
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - XObjectImageSoftMask
+    goType: '*SoftMask'
+    purpose: 'SMask (optional; PDF 1.4) is a subsidiary image XObject defining a
+
+      soft-mask image for transparency effects.'
+  - goName: SMaskInData
+    pdfKey: SMaskInData
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - '0'
+    - '1'
+    - '2'
+    goType: int
+    purpose: 'SMaskInData (optional for JPXDecode; PDF 1.5) specifies how soft-mask
+
+      information encoded with image samples should be used:
+
+      0 = ignore encoded soft-mask info (default)
+
+      1 = image data includes encoded soft-mask values
+
+      2 = image data includes premultiplied opacity channel'
+  - goName: Name
+    pdfKey: Name
+    pdfType: name
+    required: fn:IsRequired(fn:IsPDFVersion(1.0))
+    introduced: '1.0'
+    deprecated: '2.0'
+    goType: pdf.Name
+    purpose: 'Name is deprecated and should be left empty.
+
+      Only used in PDF 1.0 where it was the name used to reference the image
+
+      mask from within content streams.'
+  - goName: StructParent
+    pdfKey: StructParent
+    pdfType: integer
+    required: fn:IsRequired(fn:ImageIsStructContentItem())
+    introduced: '1.3'
+    notes: Table 359
+    goType: optional.UInt
+    purpose: 'StructParent (required if the image is a structural content item)
+
+      is the integer key of the image''s entry in the structural parent tree.'
+  - goName: null
+    pdfKey: ID
+    pdfType: byte-string
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    notes: https://github.com/pdf-association/pdf-issues/issues/619
+  - goName: null
+    pdfKey: OPI
+    pdfType: dictionary
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    refTypes:
+    - OPIVersion13
+    - OPIVersion20
+  - goName: Metadata
+    pdfKey: Metadata
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - Metadata
+    goType: '*metadata.Stream'
+    purpose: Metadata (optional) is a metadata stream containing metadata for the image.
+  - goName: OptionalContent
+    pdfKey: OC
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - OptContentGroup
+    - OptContentMembership
+    goType: oc.Conditional
+    purpose: OptionalContent (optional) allows to control the visibility of the image.
+  - goName: AssociatedFiles
+    pdfKey: AF
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - ArrayOfAFFileSpecifications
+    goType: '[]*file.Specification'
+    purpose: 'AssociatedFiles (optional; PDF 2.0) is an array of files associated with
+
+      the image. The relationship that the associated files have to the
+
+      XObject is supplied by the Specification.AFRelationship field.
+
+
+      This corresponds to the AF entry in the image dictionary.'
+  - goName: Measure
+    pdfKey: Measure
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - MeasureRL
+    - MeasureGEO
+    goType: measure.Measure
+    purpose: 'Measure (optional; PDF 2.0) specifies the scale and units that apply to
+
+      the image.'
+  - goName: PtData
+    pdfKey: PtData
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - PointData
+    goType: '*measure.PtData'
+    purpose: PtData (optional; PDF 2.0) contains extended geospatial point data.
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.0'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.0'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - fn:SinceVersion(1.2,FlateDecode)
+    - RunLengthDecode
+    - CCITTFaxDecode
+    - fn:SinceVersion(1.4,JBIG2Decode)
+    - DCTDecode
+    - fn:SinceVersion(1.5,JPXDecode)
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.0'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - fn:SinceVersion(1.2
+    - FilterFlateDecode)
+    - FilterCCITTFaxDecode
+    - fn:SinceVersion(1.4
+    - FilterJBIG2Decode)
+    - FilterDCTDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: fn:SinceVersion(1.1,dictionary);string
+    required: false
+    introduced: '1.0'
+    refTypes:
+    - fn:SinceVersion(1.1
+    - FileSpecification)
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - CCITTFaxDecode
+    - fn:SinceVersion(1.4,JBIG2Decode)
+    - DCTDecode
+    - fn:SinceVersion(1.5,JPXDecode)
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - FilterCCITTFaxDecode
+    - fn:SinceVersion(1.4
+    - FilterJBIG2Decode)
+    - FilterDCTDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  - goName: null
+    pdfKey: GTS_XID
+    pdfType: string
+    required: false
+    introduced: fn:Extension(PDF_VT2,1.6)
+    notes: PDF/VT-2
+  - goName: null
+    pdfKey: GTS_Scope
+    pdfType: name
+    required: false
+    introduced: fn:Extension(PDF_VT2,1.6)
+    possibleValues:
+    - SingleUse
+    - Record
+    - File
+    - Stream
+    - Global
+    - Unknown
+    notes: PDF/VT-2
+  - goName: null
+    pdfKey: GTS_Env
+    pdfType: text-string
+    required: fn:IsRequired((@GTS_Scope==Stream) || (@GTS_Scope==Global))
+    introduced: fn:Extension(PDF_VT2,1.6)
+    notes: PDF/VT-2
+  - goName: null
+    pdfKey: GTS_Encapsulated
+    pdfType: boolean
+    required: false
+    introduced: fn:Extension(PDF_VT2,1.6)
+    notes: PDF/VT-2
+  readFunc: image.ExtractDict
+  writeMethod: (*Dict).Encode
+  goPackage: image
+  goRepr: struct
+  specSection: 8.9.5
+- name: XObjectImageMask
+  goType: graphics/image.Dict
+  pdfType: XObject
+  pdfRepr: stream
+  introduced: '1.3'
+  specTable: Table 5
+  arlingtonSrc: XObjectImageMask.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - XObject
+    notes: Table 5 and Table 87
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - Image
+  - goName: Width
+    pdfKey: Width
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    goType: int
+    purpose: Width is the width of the image in pixels.
+  - goName: Height
+    pdfKey: Height
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    goType: int
+    purpose: Height is the height of the image in pixels.
+  - goName: BitsPerComponent
+    pdfKey: BitsPerComponent
+    pdfType: integer
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - '1'
+    goType: int
+    purpose: 'BitsPerComponent is the number of bits used to represent each color component.
+
+      The value must be 1, 2, 4, 8, or (from PDF 1.5) 16.'
+  - goName: Intent
+    pdfKey: Intent
+    pdfType: name
+    required: false
+    introduced: '1.3'
+    goType: graphics.RenderingIntent
+    purpose: 'Intent (optional) is the name of a color rendering intent to be used in
+
+      rendering the image.'
+  - goName: null
+    pdfKey: ImageMask
+    pdfType: boolean
+    required: true
+    default: true
+    introduced: '1.3'
+  - goName: Decode
+    pdfKey: Decode
+    pdfType: array
+    required: false
+    default: '[0 1]'
+    introduced: '1.3'
+    possibleValues:
+    - '[0 1]'
+    - '[1 0]'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Decode (optional) is an array of numbers describing how to map image
+
+      samples into the range of values appropriate for the image''s color
+
+      space. The slice must have twice the number of color components in the
+
+      ColorSpace.'
+  - goName: Interpolate
+    pdfKey: Interpolate
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.3'
+    goType: bool
+    purpose: 'Interpolate indicates whether image interpolation should be performed by
+
+      a PDF processor.'
+  - goName: Alternates
+    pdfKey: Alternates
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfImageAlternates
+    goType: '[]*Dict'
+    purpose: Alternates (optional) is an array of alternate image dictionaries for this image.
+  - goName: SMask
+    pdfKey: SMask
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - XObjectImageSoftMask
+    goType: '*SoftMask'
+    purpose: 'SMask (optional; PDF 1.4) is a subsidiary image XObject defining a
+
+      soft-mask image for transparency effects.'
+  - goName: SMaskInData
+    pdfKey: SMaskInData
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+    goType: int
+    purpose: 'SMaskInData (optional for JPXDecode; PDF 1.5) specifies how soft-mask
+
+      information encoded with image samples should be used:
+
+      0 = ignore encoded soft-mask info (default)
+
+      1 = image data includes encoded soft-mask values
+
+      2 = image data includes premultiplied opacity channel'
+  - goName: Name
+    pdfKey: Name
+    pdfType: name
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    goType: pdf.Name
+    purpose: 'Name is deprecated and should be left empty.
+
+      Only used in PDF 1.0 where it was the name used to reference the image
+
+      mask from within content streams.'
+  - goName: StructParent
+    pdfKey: StructParent
+    pdfType: integer
+    required: fn:IsRequired(fn:ImageIsStructContentItem())
+    introduced: '1.3'
+    notes: Table 359
+    goType: optional.UInt
+    purpose: 'StructParent (required if the image is a structural content item)
+
+      is the integer key of the image''s entry in the structural parent tree.'
+  - goName: null
+    pdfKey: ID
+    pdfType: byte-string
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    notes: https://github.com/pdf-association/pdf-issues/issues/619
+  - goName: null
+    pdfKey: OPI
+    pdfType: dictionary
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    refTypes:
+    - OPIVersion13
+    - OPIVersion20
+  - goName: Metadata
+    pdfKey: Metadata
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - Metadata
+    goType: '*metadata.Stream'
+    purpose: Metadata (optional) is a metadata stream containing metadata for the image.
+  - goName: OptionalContent
+    pdfKey: OC
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - OptContentGroup
+    - OptContentMembership
+    goType: oc.Conditional
+    purpose: OptionalContent (optional) allows to control the visibility of the image.
+  - goName: AssociatedFiles
+    pdfKey: AF
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - ArrayOfAFFileSpecifications
+    goType: '[]*file.Specification'
+    purpose: 'AssociatedFiles (optional; PDF 2.0) is an array of files associated with
+
+      the image. The relationship that the associated files have to the
+
+      XObject is supplied by the Specification.AFRelationship field.
+
+
+      This corresponds to the AF entry in the image dictionary.'
+  - goName: Measure
+    pdfKey: Measure
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - MeasureRL
+    - MeasureGEO
+    goType: measure.Measure
+    purpose: 'Measure (optional; PDF 2.0) specifies the scale and units that apply to
+
+      the image.'
+  - goName: PtData
+    pdfKey: PtData
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - PointData
+    goType: '*measure.PtData'
+    purpose: PtData (optional; PDF 2.0) contains extended geospatial point data.
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - CCITTFaxDecode
+    - fn:SinceVersion(1.4,JBIG2Decode)
+    - DCTDecode
+    - fn:SinceVersion(1.5,JPXDecode)
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - FilterCCITTFaxDecode
+    - fn:SinceVersion(1.4
+    - FilterJBIG2Decode)
+    - FilterDCTDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - CCITTFaxDecode
+    - fn:SinceVersion(1.4,JBIG2Decode)
+    - DCTDecode
+    - fn:SinceVersion(1.5,JPXDecode)
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - FilterCCITTFaxDecode
+    - fn:SinceVersion(1.4
+    - FilterJBIG2Decode)
+    - FilterDCTDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  readFunc: image.ExtractDict
+  writeMethod: (*Dict).Encode
+  goPackage: image
+  goRepr: struct
+  specSection: 8.9.5
+- name: XObjectImageSoftMask
+  goType: graphics/image.Dict
+  pdfType: XObject
+  pdfRepr: stream
+  introduced: '1.4'
+  specTable: Table 143
+  arlingtonSrc: XObjectImageSoftMask.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.4'
+    possibleValues:
+    - XObject
+    notes: Table87 and Table 143 and Table 144
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.4'
+    possibleValues:
+    - Image
+  - goName: Width
+    pdfKey: Width
+    pdfType: integer
+    required: true
+    introduced: '1.4'
+    goType: int
+    purpose: Width is the width of the image in pixels.
+  - goName: Height
+    pdfKey: Height
+    pdfType: integer
+    required: true
+    introduced: '1.4'
+    goType: int
+    purpose: Height is the height of the image in pixels.
+  - goName: ColorSpace
+    pdfKey: ColorSpace
+    pdfType: array;name
+    required: true
+    introduced: '1.4'
+    possibleValues:
+    - DeviceGray
+    refTypes:
+    - DeviceGrayColorSpace
+    goType: color.Space
+    purpose: 'ColorSpace is the color space in which image samples are specified.
+
+      It can be any type of color space except Pattern.'
+  - goName: BitsPerComponent
+    pdfKey: BitsPerComponent
+    pdfType: integer
+    required: fn:IsRequired(fn:Not(fn:Contains(@Filter,JPXDecode) || (@ImageMask==true)))
+    introduced: '1.4'
+    possibleValues:
+    - fn:RequiredValue((fn:Contains(@Filter,CCITTFaxDecode) || fn:Contains(@Filter,JBIG2Decode)),1)
+    - '2'
+    - '4'
+    - fn:RequiredValue((fn:Contains(@Filter,RunLengthDecode) || fn:Contains(@Filter,DCTDecode)),8)
+    - fn:SinceVersion(1.5,16)
+    goType: int
+    purpose: 'BitsPerComponent is the number of bits used to represent each color component.
+
+      The value must be 1, 2, 4, 8, or (from PDF 1.5) 16.'
+  - goName: Intent
+    pdfKey: Intent
+    pdfType: name
+    required: false
+    introduced: '1.4'
+    goType: graphics.RenderingIntent
+    purpose: 'Intent (optional) is the name of a color rendering intent to be used in
+
+      rendering the image.'
+  - goName: null
+    pdfKey: ImageMask
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.4'
+    notes: Table 143
+  - goName: Name
+    pdfKey: Name
+    pdfType: name
+    required: false
+    introduced: '1.4'
+    deprecated: '2.0'
+    goType: pdf.Name
+    purpose: 'Name is deprecated and should be left empty.
+
+      Only used in PDF 1.0 where it was the name used to reference the image
+
+      mask from within content streams.'
+  - goName: Decode
+    pdfKey: Decode
+    pdfType: array
+    required: false
+    default: '[0 1]'
+    introduced: '1.4'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    goType: '[]float64'
+    purpose: 'Decode (optional) is an array of numbers describing how to map image
+
+      samples into the range of values appropriate for the image''s color
+
+      space. The slice must have twice the number of color components in the
+
+      ColorSpace.'
+  - goName: Interpolate
+    pdfKey: Interpolate
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.4'
+    goType: bool
+    purpose: 'Interpolate indicates whether image interpolation should be performed by
+
+      a PDF processor.'
+  - goName: null
+    pdfKey: Matte
+    pdfType: array
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - ArrayOfNumbersGeneral
+    notes: Table 144
+  - goName: Metadata
+    pdfKey: Metadata
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - Metadata
+    goType: '*metadata.Stream'
+    purpose: Metadata (optional) is a metadata stream containing metadata for the image.
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.4'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.4'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - CCITTFaxDecode
+    - JBIG2Decode
+    - DCTDecode
+    - fn:SinceVersion(1.5,JPXDecode)
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - FilterCCITTFaxDecode
+    - FilterJBIG2Decode
+    - FilterDCTDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.4'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - CCITTFaxDecode
+    - JBIG2Decode
+    - DCTDecode
+    - fn:SinceVersion(1.5,JPXDecode)
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - FilterCCITTFaxDecode
+    - FilterJBIG2Decode
+    - FilterDCTDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  - goName: AssociatedFiles
+    pdfKey: AF
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - ArrayOfAFFileSpecifications
+    goType: '[]*file.Specification'
+    purpose: 'AssociatedFiles (optional; PDF 2.0) is an array of files associated with
+
+      the image. The relationship that the associated files have to the
+
+      XObject is supplied by the Specification.AFRelationship field.
+
+
+      This corresponds to the AF entry in the image dictionary.'
+  readFunc: image.ExtractDict
+  writeMethod: (*Dict).Encode
+  goPackage: image
+  goRepr: struct
+  specSection: 8.9.5
+interfaces:
+- name: Function
+  goType: pdf.Function
+  goPackage: seehuhn.de/go/pdf
+  extractFunc: function.Extract
+  discriminatorKey: FunctionType
+  discriminatorType: integer
+  implementations:
+  - type: FunctionType0
+    value: 0
+  - type: FunctionType2
+    value: 2
+  - type: FunctionType3
+    value: 3
+  - type: FunctionType4
+    value: 4
+- name: ColorSpace
+  goType: color.Space
+  goPackage: seehuhn.de/go/pdf/graphics/color
+  extractFunc: extract.ColorSpace
+  discriminatorKey: null
+  implementations:
+  - type: CalGrayColorSpace
+  - type: CalRGBColorSpace
+  - type: LabColorSpace
+  - type: ICCBasedColorSpace
+  - type: IndexedColorSpace
+  - type: SeparationColorSpace
+  - type: DeviceNColorSpace
+- name: Shading
+  goType: graphics.Shading
+  goPackage: seehuhn.de/go/pdf/graphics
+  extractFunc: extract.Shading
+  discriminatorKey: ShadingType
+  discriminatorType: integer
+  implementations:
+  - type: ShadingType1
+    value: 1
+  - type: ShadingType2
+    value: 2
+  - type: ShadingType3
+    value: 3
+  - type: ShadingType4
+    value: 4
+  - type: ShadingType5
+    value: 5
+  - type: ShadingType6
+    value: 6
+  - type: ShadingType7
+    value: 7
+- name: Pattern
+  goType: color.Pattern
+  goPackage: seehuhn.de/go/pdf/graphics/color
+  extractFunc: extract.Pattern
+  discriminatorKey: PatternType
+  discriminatorType: integer
+  implementations:
+  - type: PatternType1
+    value: 1
+  - type: PatternType2
+    value: 2
+- name: XObject
+  goType: graphics.XObject
+  goPackage: seehuhn.de/go/pdf/graphics
+  extractFunc: extract.XObject
+  discriminatorKey: Subtype
+  discriminatorType: name
+  implementations:
+  - type: XObjectFormType1
+    value: Form
+  - type: XObjectImage
+    value: Image

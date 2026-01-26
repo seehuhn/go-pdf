@@ -1,0 +1,2569 @@
+chapter: 13
+title: Multimedia
+types:
+- name: FloatingWindowParameters
+  goType: null
+  pdfType: FWParams
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 295
+  arlingtonSrc: FloatingWindowParameters.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - FWParams
+    notes: Table 295
+  - goName: null
+    pdfKey: D
+    pdfType: array
+    required: true
+    introduced: '1.5'
+    refTypes:
+    - ArrayOf_2Integers
+  - goName: null
+    pdfKey: RT
+    pdfType: integer
+    required: false
+    default: '0'
+    introduced: '1.5'
+    possibleValues:
+    - '0'
+    - '1'
+    - '2'
+    - '3'
+  - goName: null
+    pdfKey: P
+    pdfType: integer
+    required: false
+    default: '4'
+    introduced: '1.5'
+    possibleValues:
+    - '0'
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+    - '6'
+    - '7'
+    - '8'
+  - goName: null
+    pdfKey: O
+    pdfType: integer
+    required: false
+    default: '1'
+    introduced: '1.5'
+    possibleValues:
+    - '0'
+    - '1'
+    - '2'
+  - goName: null
+    pdfKey: T
+    pdfType: boolean
+    required: false
+    default: true
+    introduced: '1.5'
+  - goName: null
+    pdfKey: UC
+    pdfType: boolean
+    required: false
+    default: true
+    introduced: '1.5'
+  - goName: null
+    pdfKey: R
+    pdfType: integer
+    required: false
+    default: '0'
+    introduced: '1.5'
+    possibleValues:
+    - '0'
+    - '1'
+    - '2'
+  - goName: null
+    pdfKey: TT
+    pdfType: array
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - ArrayOfStringsText
+- name: MediaClipData
+  goType: null
+  pdfType: MediaClip
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 284
+  arlingtonSrc: MediaClipData.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - MediaClip
+    notes: Table 284 and Table 285
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - MCD
+  - goName: null
+    pdfKey: N
+    pdfType: text-string
+    required: false
+    introduced: '1.5'
+  - goName: null
+    pdfKey: D
+    pdfType: dictionary;stream;string
+    required: true
+    introduced: '1.5'
+    refTypes:
+    - FileSpecification
+    - XObjectFormType1
+  - goName: null
+    pdfKey: CT
+    pdfType: ascii-string
+    required: false
+    introduced: '1.5'
+    notes: should conform to the content type specification described in RFC 2045
+  - goName: null
+    pdfKey: P
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - MediaPermissions
+  - goName: null
+    pdfKey: Alt
+    pdfType: array
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - ArrayOfStringsText
+  - goName: null
+    pdfKey: PL
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - MediaPlayers
+  - goName: null
+    pdfKey: MH
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - MediaClipDataMHBE
+  - goName: null
+    pdfKey: BE
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - MediaClipDataMHBE
+- name: MediaClipDataMHBE
+  goType: null
+  pdfRepr: dict
+  introduced: '1.5'
+  arlingtonSrc: MediaClipDataMHBE.tsv
+  fields:
+  - goName: null
+    pdfKey: BU
+    pdfType: ascii-string
+    required: false
+    introduced: '1.5'
+    notes: Table 287 - absolute URL as base URL
+- name: MediaClipSection
+  goType: null
+  pdfType: MediaClip
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 284
+  arlingtonSrc: MediaClipSection.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - MediaClip
+    notes: Table 284 and Table 288
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - MCS
+  - goName: null
+    pdfKey: N
+    pdfType: text-string
+    required: false
+    introduced: '1.5'
+  - goName: null
+    pdfKey: D
+    pdfType: dictionary
+    required: true
+    introduced: '1.5'
+    refTypes:
+    - MediaClipSection
+    - MediaClipData
+  - goName: null
+    pdfKey: Alt
+    pdfType: array
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - ArrayOfStringsText
+  - goName: null
+    pdfKey: MH
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - MediaClipSectionMHBE
+  - goName: null
+    pdfKey: BE
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - MediaClipSectionMHBE
+- name: MediaClipSectionMHBE
+  goType: null
+  pdfRepr: dict
+  introduced: '1.5'
+  arlingtonSrc: MediaClipSectionMHBE.tsv
+  fields:
+  - goName: null
+    pdfKey: B
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - MediaOffsetTime
+    - MediaOffsetMarker
+    - MediaOffsetFrame
+    notes: Table 289
+  - goName: null
+    pdfKey: E
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - MediaOffsetTime
+    - MediaOffsetMarker
+    - MediaOffsetFrame
+- name: MediaCriteria
+  goType: null
+  pdfType: MediaCriteria
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 279
+  arlingtonSrc: MediaCriteria.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - MediaCriteria
+    notes: Table 279
+  - goName: null
+    pdfKey: A
+    pdfType: boolean
+    required: false
+    introduced: '1.5'
+    notes: hear audio description, equivalent to SMIL's systemAudioDesc attribute
+  - goName: null
+    pdfKey: C
+    pdfType: boolean
+    required: false
+    introduced: '1.5'
+    notes: see text captions, equivalent to SMIL's systemCaptions attribute
+  - goName: null
+    pdfKey: O
+    pdfType: boolean
+    required: false
+    introduced: '1.5'
+    notes: hear audio overdubs
+  - goName: null
+    pdfKey: S
+    pdfType: boolean
+    required: false
+    introduced: '1.5'
+    notes: see subtitles
+  - goName: null
+    pdfKey: R
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+    notes: bits per second, equivalent to SMIL's systemBitrate attribute
+  - goName: null
+    pdfKey: D
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - MinimumBitDepth
+    notes: Equivalent to SMIL's systemScreenDepth attribute
+  - goName: null
+    pdfKey: Z
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - MinimumScreenSize
+    notes: Equivalent to SMIL's systemScreenSize attribute
+  - goName: null
+    pdfKey: V
+    pdfType: array
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - ArrayOfSoftwareIdentifiers
+  - goName: null
+    pdfKey: P
+    pdfType: array
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - ArrayOfNamesGeneral
+  - goName: null
+    pdfKey: L
+    pdfType: array
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - ArrayOfStringsText
+    notes: Equivalent to SMIL's systemLanguage attribute
+- name: MediaDuration
+  goType: null
+  pdfType: MediaDuration
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 292
+  arlingtonSrc: MediaDuration.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - MediaDuration
+    notes: Table 292
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - I
+    - F
+    - T
+  - goName: null
+    pdfKey: T
+    pdfType: dictionary
+    required: fn:IsRequired(@S==T)
+    introduced: '1.5'
+    refTypes:
+    - Timespan
+- name: MediaOffsetFrame
+  goType: null
+  pdfType: MediaOffset
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 296
+  arlingtonSrc: MediaOffsetFrame.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - MediaOffset
+    notes: Table 296 and Table 298
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - F
+  - goName: null
+    pdfKey: F
+    pdfType: integer
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval(@F>=0)
+- name: MediaOffsetMarker
+  goType: null
+  pdfType: MediaOffset
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 296
+  arlingtonSrc: MediaOffsetMarker.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - MediaOffset
+    notes: Table 296 and Table 299
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - M
+  - goName: null
+    pdfKey: M
+    pdfType: text-string
+    required: true
+    introduced: '1.5'
+- name: MediaOffsetTime
+  goType: null
+  pdfType: MediaOffset
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 296
+  arlingtonSrc: MediaOffsetTime.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - MediaOffset
+    notes: Table 296 and Table 297
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - T
+  - goName: null
+    pdfKey: T
+    pdfType: dictionary
+    required: true
+    introduced: '1.5'
+    refTypes:
+    - Timespan
+- name: MediaPermissions
+  goType: null
+  pdfType: MediaPermissions
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 286
+  arlingtonSrc: MediaPermissions.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - MediaPermissions
+    notes: Table 286
+  - goName: null
+    pdfKey: TF
+    pdfType: ascii-string
+    required: false
+    default: '''TEMPNEVER'''
+    introduced: '1.5'
+    possibleValues:
+    - '''TEMPNEVER'''
+    - '''TEMPALWAYS'''
+    - '''TEMPEXTRACT'''
+    - '''TEMPACCESS'''
+- name: MediaPlayParameters
+  goType: null
+  pdfType: MediaPlayParams
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 290
+  arlingtonSrc: MediaPlayParameters.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - MediaPlayParams
+    notes: Table 290
+  - goName: null
+    pdfKey: PL
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - MediaPlayers
+  - goName: null
+    pdfKey: MH
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - MediaPlayParametersMH
+  - goName: null
+    pdfKey: BE
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - MediaPlayParametersBE
+- name: MediaPlayParametersBE
+  goType: null
+  pdfRepr: dict
+  introduced: '1.5'
+  arlingtonSrc: MediaPlayParametersBE.tsv
+  fields:
+  - goName: null
+    pdfKey: V
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval((@V>=0) && (@V<=100))
+    notes: Table 291 - percentage volume
+  - goName: null
+    pdfKey: C
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.5'
+  - goName: null
+    pdfKey: F
+    pdfType: integer
+    required: false
+    default: '5'
+    introduced: '1.5'
+    possibleValues:
+    - '0'
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+  - goName: null
+    pdfKey: D
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - MediaDuration
+  - goName: null
+    pdfKey: A
+    pdfType: boolean
+    required: false
+    default: true
+    introduced: '1.5'
+  - goName: null
+    pdfKey: RC
+    pdfType: number
+    required: false
+    default: '1.0'
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval(@RC>=0.0)
+    notes: repeat count (zero means forever)
+- name: MediaPlayParametersMH
+  goType: null
+  pdfRepr: dict
+  introduced: '1.5'
+  arlingtonSrc: MediaPlayParametersMH.tsv
+  fields:
+  - goName: null
+    pdfKey: V
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval((@V>=0) && (@V<=100))
+    notes: Table 291 - percentage volume
+  - goName: null
+    pdfKey: C
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.5'
+  - goName: null
+    pdfKey: F
+    pdfType: integer
+    required: false
+    default: '5'
+    introduced: '1.5'
+    possibleValues:
+    - '0'
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+  - goName: null
+    pdfKey: D
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - MediaDuration
+  - goName: null
+    pdfKey: A
+    pdfType: boolean
+    required: false
+    default: true
+    introduced: '1.5'
+  - goName: null
+    pdfKey: RC
+    pdfType: number
+    required: false
+    default: '1.0'
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval(@RC>=0.0)
+    notes: repeat count (zero means forever)
+- name: MediaPlayerInfo
+  goType: null
+  pdfType: MediaPlayerInfo
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 302
+  arlingtonSrc: MediaPlayerInfo.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - MediaPlayerInfo
+    notes: Table 302
+  - goName: null
+    pdfKey: PID
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - SoftwareIdentifier
+  - goName: null
+    pdfKey: MH
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - _UniversalDictionary
+  - goName: null
+    pdfKey: BE
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - _UniversalDictionary
+- name: MediaPlayers
+  goType: null
+  pdfType: MediaPlayers
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 301
+  arlingtonSrc: MediaPlayers.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - MediaPlayers
+    notes: Table 301
+  - goName: null
+    pdfKey: MU
+    pdfType: array
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - ArrayOfMediaPlayerInfo
+  - goName: null
+    pdfKey: A
+    pdfType: array
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - ArrayOfMediaPlayerInfo
+  - goName: null
+    pdfKey: NU
+    pdfType: array
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - ArrayOfMediaPlayerInfo
+- name: MediaScreenParameters
+  goType: null
+  pdfType: MediaScreenParams
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 293
+  arlingtonSrc: MediaScreenParameters.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - MediaScreenParams
+    notes: Table 293
+  - goName: null
+    pdfKey: MH
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - MediaScreenParametersMHBE
+  - goName: null
+    pdfKey: BE
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - MediaScreenParametersMHBE
+- name: MediaScreenParametersMHBE
+  goType: null
+  pdfRepr: dict
+  introduced: '1.5'
+  arlingtonSrc: MediaScreenParametersMHBE.tsv
+  fields:
+  - goName: null
+    pdfKey: W
+    pdfType: integer
+    required: false
+    default: '3'
+    introduced: '1.5'
+    possibleValues:
+    - '0'
+    - '1'
+    - '2'
+    - '3'
+    notes: Table 294
+  - goName: null
+    pdfKey: B
+    pdfType: array
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - ArrayOf_3RGBNumbers
+  - goName: null
+    pdfKey: O
+    pdfType: number
+    required: false
+    default: '1.0'
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval((@O>=0.0) && (@O<=1.0))
+  - goName: null
+    pdfKey: M
+    pdfType: integer
+    required: false
+    default: '0'
+    introduced: '1.5'
+    possibleValues:
+    - '0'
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+    - '6'
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - FloatingWindowParameters
+- name: MinimumBitDepth
+  goType: null
+  pdfType: MinBitDepth
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 280
+  arlingtonSrc: MinimumBitDepth.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - MinBitDepth
+    notes: Table 280
+  - goName: null
+    pdfKey: V
+    pdfType: integer
+    required: true
+    introduced: '1.5'
+  - goName: null
+    pdfKey: M
+    pdfType: integer
+    required: false
+    default: '0'
+    introduced: '1.5'
+    possibleValues:
+    - '0'
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+    - '6'
+    notes: Table 304
+- name: MinimumScreenSize
+  goType: null
+  pdfType: MinScreenSize
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 281
+  arlingtonSrc: MinimumScreenSize.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - MinScreenSize
+    notes: Table 281
+  - goName: null
+    pdfKey: V
+    pdfType: array
+    required: true
+    introduced: '1.5'
+    refTypes:
+    - ArrayOf_2Integers
+    notes: '2 non-negative integers of screen: width, height'
+  - goName: null
+    pdfKey: M
+    pdfType: integer
+    required: false
+    default: '0'
+    introduced: '1.5'
+    possibleValues:
+    - '0'
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+    - '6'
+    notes: Table 304
+- name: NavNode
+  goType: null
+  pdfType: NavNode
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 165
+  arlingtonSrc: NavNode.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - NavNode
+    notes: Table 165
+  - goName: null
+    pdfKey: NA
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - ActionGoTo
+    - ActionGoToR
+    - fn:SinceVersion(1.6
+    - ActionGoToE)
+    - fn:SinceVersion(2.0
+    - ActionGoToDp)
+    - ActionLaunch
+    - ActionThread
+    - ActionURI
+    - ActionSound
+    - ActionMovie
+    - ActionHide
+    - ActionNamed
+    - ActionSubmitForm
+    - ActionResetForm
+    - ActionImportData
+    - ActionSetOCGState
+    - ActionRendition
+    - ActionTransition
+    - fn:SinceVersion(1.6
+    - ActionGoTo3DView)
+    - ActionECMAScript
+    - fn:SinceVersion(2.0
+    - ActionRichMediaExecute)
+  - goName: null
+    pdfKey: PA
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - ActionGoTo
+    - ActionGoToR
+    - fn:SinceVersion(1.6
+    - ActionGoToE)
+    - fn:SinceVersion(2.0
+    - ActionGoToDp)
+    - ActionLaunch
+    - ActionThread
+    - ActionURI
+    - ActionSound
+    - ActionMovie
+    - ActionHide
+    - ActionNamed
+    - ActionSubmitForm
+    - ActionResetForm
+    - ActionImportData
+    - ActionSetOCGState
+    - ActionRendition
+    - ActionTransition
+    - fn:SinceVersion(1.6
+    - ActionGoTo3DView)
+    - ActionECMAScript
+    - fn:SinceVersion(2.0
+    - ActionRichMediaExecute)
+  - goName: null
+    pdfKey: Next
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - NavNode
+  - goName: null
+    pdfKey: Prev
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - NavNode
+  - goName: null
+    pdfKey: Dur
+    pdfType: number
+    required: false
+    introduced: '1.5'
+- name: Requirements3DMarkup
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: Requirements3DMarkup.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - 3DMarkup
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsAcroFormInteract
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsAcroFormInteract.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - AcroFormInteract
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsAction
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsAction.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - Action
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsAttachment
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsAttachment.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - Attachment
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsAttachmentEditing
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsAttachmentEditing.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - AttachmentEditing
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsCollection
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsCollection.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - Collection
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsCollectionEditing
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsCollectionEditing.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - CollectionEditing
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsDPartInteract
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsDPartInteract.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - DPartInteract
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsDigSig
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsDigSig.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 274 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - DigSig
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+  - goName: null
+    pdfKey: DigSig
+    pdfType: dictionary
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Signature
+    - DocTimeStamp
+- name: RequirementsDigSigMDP
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsDigSigMDP.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 274 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - DigSigMDP
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+  - goName: null
+    pdfKey: DigSig
+    pdfType: dictionary
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Signature
+    - DocTimeStamp
+- name: RequirementsDigSigValidation
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsDigSigValidation.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 274 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - DigSigValidation
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+  - goName: null
+    pdfKey: DigSig
+    pdfType: dictionary
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Signature
+    - DocTimeStamp
+- name: RequirementsEnableJavaScripts
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 273
+  arlingtonSrc: RequirementsEnableJavaScripts.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - EnableJavaScripts
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '1.7'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsEncryption
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsEncryption.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 274 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - Encryption
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+  - goName: null
+    pdfKey: Encrypt
+    pdfType: dictionary
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - EncryptionStandard
+    - EncryptionPublicKey
+- name: RequirementsGeospatial2D
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsGeospatial2D.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - Geospatial2D
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsGeospatial3D
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsGeospatial3D.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - Geospatial3D
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsHandler
+  goType: null
+  pdfType: ReqHandler
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 276
+  arlingtonSrc: RequirementsHandler.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - ReqHandler
+    notes: Table 276
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - JS
+    - NoOp
+  - goName: null
+    pdfKey: Script
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+- name: RequirementsMarkup
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsMarkup.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - Markup
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsMultimedia
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsMultimedia.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - Multimedia
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsNavigation
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsNavigation.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - Navigation
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsOCAutoStates
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsOCAutoStates.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - OCAutoStates
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsOCInteract
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsOCInteract.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - OCInteract
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsPRC
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsPRC.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - PRC
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsRichMedia
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsRichMedia.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - RichMedia
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsSTEP
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: fn:Extension(ISO_TS_24064,2.0)
+  specTable: Table 273
+  arlingtonSrc: RequirementsSTEP.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: fn:Extension(ISO_TS_24064,2.0)
+    possibleValues:
+    - Requirement
+    notes: Table 273 and ISO/TS 24064
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: fn:Extension(ISO_TS_24064,2.0)
+    possibleValues:
+    - STEP
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: fn:Extension(ISO_TS_24064,2.0)
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: fn:Extension(ISO_TS_24064,2.0)
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: fn:Extension(ISO_TS_24064,2.0)
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsSeparationSimulation
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsSeparationSimulation.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - SeparationSimulation
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsTransitions
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsTransitions.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - Transitions
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsU3D
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsU3D.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and Table 275
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - U3D
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary;name
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Extensions
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RequirementsglTF
+  goType: null
+  pdfType: Requirement
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 273
+  arlingtonSrc: RequirementsglTF.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Requirement
+    notes: Table 273 and ISO/TS 32007
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - glTF
+  - goName: null
+    pdfKey: V
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - '2.0'
+    notes: version of ISO/IEC 12113 according to ISO/TS 32007
+  - goName: null
+    pdfKey: RH
+    pdfType: array;dictionary
+    required: false
+    default: '[[]];[]'
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfRequirementsHandlers
+    - RequirementsHandler
+  - goName: null
+    pdfKey: Penalty
+    pdfType: integer
+    required: false
+    default: '100'
+    introduced: '2.0'
+    possibleValues:
+    - fn:Eval((@Penalty>=0) && (@Penalty<=100))
+- name: RichMediaContent
+  goType: null
+  pdfType: RichMediaContent
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 341
+  arlingtonSrc: RichMediaContent.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - RichMediaContent
+    notes: Table 341
+  - goName: null
+    pdfKey: Assets
+    pdfType: name-tree
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: Configurations
+    pdfType: array
+    required: true
+    introduced: '1.7'
+    refTypes:
+    - ArrayOfRichMediaConfiguration
+    notes: https://github.com/pdf-association/pdf-issues/issues/166
+  - goName: null
+    pdfKey: Views
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - ArrayOf3DViewAddEntries
+- name: SoftwareIdentifier
+  goType: null
+  pdfType: SoftwareIdentifier
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 303
+  arlingtonSrc: SoftwareIdentifier.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - SoftwareIdentifier
+    notes: Table 303
+  - goName: null
+    pdfKey: U
+    pdfType: ascii-string
+    required: true
+    introduced: '1.5'
+  - goName: null
+    pdfKey: L
+    pdfType: array
+    required: false
+    default: '[0]'
+    introduced: '1.5'
+    refTypes:
+    - ArrayOfSoftwareVersions
+  - goName: null
+    pdfKey: LI
+    pdfType: boolean
+    required: false
+    default: true
+    introduced: '1.5'
+  - goName: null
+    pdfKey: H
+    pdfType: array
+    required: false
+    default: '[]'
+    introduced: '1.5'
+    refTypes:
+    - ArrayOfSoftwareVersions
+  - goName: null
+    pdfKey: HI
+    pdfType: boolean
+    required: false
+    default: true
+    introduced: '1.5'
+  - goName: null
+    pdfKey: OS
+    pdfType: array
+    required: false
+    default: '[]'
+    introduced: '1.5'
+    refTypes:
+    - ArrayOfStringsByte
+- name: SoundObject
+  goType: null
+  pdfType: Sound
+  pdfRepr: stream
+  introduced: '1.2'
+  specTable: Table 5
+  arlingtonSrc: SoundObject.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    possibleValues:
+    - Sound
+    notes: Table 5 and Table 305
+  - goName: null
+    pdfKey: R
+    pdfType: number
+    required: true
+    introduced: '1.2'
+    deprecated: '2.0'
+    possibleValues:
+    - fn:Eval(@R>0)
+    notes: sampling per second
+  - goName: null
+    pdfKey: C
+    pdfType: integer
+    required: false
+    default: '1'
+    introduced: '1.2'
+    deprecated: '2.0'
+    possibleValues:
+    - fn:Eval(@C>0)
+    notes: number of sound channels
+  - goName: null
+    pdfKey: B
+    pdfType: integer
+    required: false
+    default: '8'
+    introduced: '1.2'
+    deprecated: '2.0'
+    possibleValues:
+    - fn:Eval(@B>0)
+    notes: bits per sample value per channel
+  - goName: null
+    pdfKey: E
+    pdfType: name
+    required: false
+    default: Raw
+    introduced: '1.2'
+    deprecated: '2.0'
+    possibleValues:
+    - Raw
+    - Signed
+    - muLaw
+    - ALaw
+  - goName: null
+    pdfKey: CO
+    pdfType: name
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+  - goName: null
+    pdfKey: CP
+    pdfType: array;dictionary;stream
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    refTypes:
+    - _UniversalArray
+    - _UniversalDictionary
+    - Stream
+    notes: various
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.2'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval(@DL>=0)
+- name: Timespan
+  goType: null
+  pdfType: Timespan
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 300
+  arlingtonSrc: Timespan.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - Timespan
+    notes: Table 300
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - S
+  - goName: null
+    pdfKey: V
+    pdfType: number
+    required: true
+    introduced: '1.5'

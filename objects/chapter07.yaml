@@ -1,0 +1,3192 @@
+chapter: 7
+title: Document Structure
+types:
+- name: Bead
+  goType: null
+  pdfType: Bead
+  pdfRepr: dict
+  introduced: '1.1'
+  specTable: Table 163
+  arlingtonSrc: Bead.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.1'
+    possibleValues:
+    - Bead
+    notes: Table 163
+  - goName: null
+    pdfKey: T
+    pdfType: dictionary
+    required: false
+    introduced: '1.1'
+    refTypes:
+    - Thread
+  - goName: null
+    pdfKey: N
+    pdfType: dictionary
+    required: true
+    introduced: '1.1'
+    refTypes:
+    - BeadFirst
+    - Bead
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary
+    required: true
+    introduced: '1.1'
+    refTypes:
+    - BeadFirst
+    - Bead
+  - goName: null
+    pdfKey: P
+    pdfType: dictionary
+    required: true
+    introduced: '1.1'
+    refTypes:
+    - PageObject
+  - goName: null
+    pdfKey: R
+    pdfType: rectangle
+    required: true
+    introduced: '1.1'
+- name: BeadFirst
+  goType: null
+  pdfType: Bead
+  pdfRepr: dict
+  introduced: '1.1'
+  specTable: Table 163
+  arlingtonSrc: BeadFirst.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.1'
+    possibleValues:
+    - Bead
+    notes: Table 163
+  - goName: null
+    pdfKey: T
+    pdfType: dictionary
+    required: true
+    introduced: '1.1'
+    refTypes:
+    - Thread
+  - goName: null
+    pdfKey: N
+    pdfType: dictionary
+    required: true
+    introduced: '1.1'
+    refTypes:
+    - BeadFirst
+    - Bead
+  - goName: null
+    pdfKey: V
+    pdfType: dictionary
+    required: true
+    introduced: '1.1'
+    refTypes:
+    - BeadFirst
+    - Bead
+  - goName: null
+    pdfKey: P
+    pdfType: dictionary
+    required: true
+    introduced: '1.1'
+    refTypes:
+    - PageObject
+  - goName: null
+    pdfKey: R
+    pdfType: rectangle
+    required: true
+    introduced: '1.1'
+- name: Catalog
+  goType: pdf.Catalog
+  pdfType: Catalog
+  pdfRepr: dict
+  specTable: Table 29
+  arlingtonSrc: Catalog.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - Catalog
+    notes: Table 29
+  - goName: Version
+    pdfKey: Version
+    pdfType: name
+    required: false
+    introduced: '1.4'
+    possibleValues:
+    - '1.0'
+    - '1.1'
+    - '1.2'
+    - '1.3'
+    - '1.4'
+    - '1.5'
+    - '1.6'
+    - '1.7'
+    - '2.0'
+    goType: Version
+    purpose: 'Version (optional, PDF 1.4) specifies the PDF version this document
+
+      conforms to if later than the version in the file header.'
+  - goName: Extensions
+    pdfKey: Extensions
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - Extensions
+    goType: Object
+    purpose: 'Extensions (optional, PDF 1.4) contains developer extensions information
+
+      for extensions that occur in this document.'
+  - goName: Pages
+    pdfKey: Pages
+    pdfType: dictionary
+    required: true
+    introduced: '1.0'
+    refTypes:
+    - PageTreeNodeRoot
+    goType: Reference
+    purpose: Pages is the root of the document's page tree.
+  - goName: PageLabels
+    pdfKey: PageLabels
+    pdfType: number-tree
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - PageLabel
+    goType: Object
+    purpose: 'PageLabels (optional, PDF 1.3) defines the page labeling for the
+
+      document as a number tree where keys are page indices and values are
+
+      page label dictionaries.'
+  - goName: Names
+    pdfKey: Names
+    pdfType: dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - Name
+    goType: Object
+    purpose: Names (optional, PDF 1.2) is the document's name dictionary.
+  - goName: Dests
+    pdfKey: Dests
+    pdfType: dictionary
+    required: false
+    introduced: '1.1'
+    refTypes:
+    - DestsMap
+    notes: https://github.com/pdf-association/pdf-issues/issues/106
+    goType: Object
+    purpose: 'Dests (optional, PDF 1.1) contains a dictionary of names and
+
+      corresponding destinations.'
+  - goName: ViewerPreferences
+    pdfKey: ViewerPreferences
+    pdfType: dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ViewerPreferences
+    goType: Object
+    purpose: 'ViewerPreferences (optional, PDF 1.2) specifies how the document should
+
+      be displayed on screen.'
+  - goName: PageLayout
+    pdfKey: PageLayout
+    pdfType: name
+    required: false
+    default: SinglePage
+    introduced: '1.0'
+    possibleValues:
+    - SinglePage
+    - OneColumn
+    - TwoColumnLeft
+    - TwoColumnRight
+    - TwoPageLeft
+    - TwoPageRight
+    goType: Name
+    purpose: 'PageLayout (optional) specifies the page layout to use when the document
+
+      is opened. Valid values are SinglePage, OneColumn, TwoColumnLeft,
+
+      TwoColumnRight, TwoPageLeft, TwoPageRight.'
+  - goName: PageMode
+    pdfKey: PageMode
+    pdfType: name
+    required: false
+    default: UseNone
+    introduced: '1.0'
+    possibleValues:
+    - UseNone
+    - UseOutlines
+    - UseThumbs
+    - FullScreen
+    - UseOC
+    - UseAttachments
+    goType: Name
+    purpose: 'PageMode (optional) specifies how the document should be displayed when
+
+      opened. Valid values are UseNone, UseOutlines, UseThumbs, FullScreen,
+
+      UseOC, UseAttachments.'
+  - goName: Outlines
+    pdfKey: Outlines
+    pdfType: dictionary
+    required: false
+    introduced: '1.0'
+    refTypes:
+    - Outline
+    notes: https://github.com/pdf-association/pdf-issues/issues/106
+    goType: Reference
+    purpose: Outlines (optional) is the root of the document's outline hierarchy.
+  - goName: Threads
+    pdfKey: Threads
+    pdfType: array
+    required: false
+    introduced: '1.1'
+    refTypes:
+    - ArrayOfThreads
+    notes: https://github.com/pdf-association/pdf-issues/issues/106
+    goType: Reference
+    purpose: 'Threads (optional, PDF 1.1) contains an array of thread dictionaries
+
+      representing the document''s article threads.'
+  - goName: OpenAction
+    pdfKey: OpenAction
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.1'
+    refTypes:
+    - DestXYZArray
+    - Dest0Array
+    - Dest1Array
+    - Dest4Array
+    - ActionGoTo
+    - ActionGoToR
+    - fn:SinceVersion(1.6
+    - ActionGoToE)
+    - fn:SinceVersion(2.0
+    - ActionGoToDp)
+    - ActionLaunch
+    - fn:IsPDFVersion(1.2
+    - ActionNOP)
+    - fn:IsPDFVersion(1.2
+    - ActionSetState)
+    - ActionThread
+    - ActionURI
+    - fn:SinceVersion(1.2
+    - ActionSound)
+    - fn:SinceVersion(1.2
+    - ActionMovie)
+    - fn:SinceVersion(1.2
+    - ActionHide)
+    - fn:SinceVersion(1.2
+    - ActionNamed)
+    - fn:SinceVersion(1.2
+    - ActionSubmitForm)
+    - fn:SinceVersion(1.2
+    - ActionResetForm)
+    - fn:SinceVersion(1.2
+    - ActionImportData)
+    - fn:SinceVersion(1.5
+    - ActionSetOCGState)
+    - fn:SinceVersion(1.5
+    - ActionRendition)
+    - fn:SinceVersion(1.5
+    - ActionTransition)
+    - fn:SinceVersion(1.6
+    - ActionGoTo3DView)
+    - fn:SinceVersion(1.3
+    - ActionECMAScript)
+    - fn:SinceVersion(2.0
+    - ActionRichMediaExecute)
+    goType: Object
+    purpose: 'OpenAction (optional, PDF 1.1) specifies a destination to display or
+
+      action to perform when the document is opened.'
+  - goName: AA
+    pdfKey: AA
+    pdfType: dictionary
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - AddActionCatalog
+    goType: Object
+    purpose: 'AA (optional, PDF 1.2) defines additional actions to take in response to
+
+      various trigger events affecting the document.'
+  - goName: URI
+    pdfKey: URI
+    pdfType: dictionary
+    required: false
+    introduced: '1.1'
+    refTypes:
+    - URI
+    goType: Object
+    purpose: 'URI (optional, PDF 1.1) contains document-level information for URI
+
+      actions.'
+  - goName: AcroForm
+    pdfKey: AcroForm
+    pdfType: dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - InteractiveForm
+    goType: Object
+    purpose: 'AcroForm (optional, PDF 1.2) is the document''s interactive form
+
+      dictionary.'
+  - goName: Metadata
+    pdfKey: Metadata
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - Metadata
+    goType: Reference
+    purpose: Metadata (optional, PDF 1.4) contains metadata for the document.
+  - goName: StructTreeRoot
+    pdfKey: StructTreeRoot
+    pdfType: dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - StructTreeRoot
+    notes: https://github.com/pdf-association/pdf-issues/issues/348
+    goType: Object
+    purpose: 'StructTreeRoot (optional, PDF 1.3) is the document''s structure tree root
+
+      dictionary.'
+  - goName: MarkInfo
+    pdfKey: MarkInfo
+    pdfType: dictionary
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - MarkInfo
+    goType: Object
+    purpose: 'MarkInfo (optional, PDF 1.4) contains information about the document''s
+
+      usage of tagged PDF conventions.'
+  - goName: Lang
+    pdfKey: Lang
+    pdfType: text-string
+    required: false
+    introduced: '1.4'
+    goType: language.Tag
+    purpose: 'Lang (optional, PDF 1.4) specifies the natural language for all text in
+
+      the document.'
+  - goName: SpiderInfo
+    pdfKey: SpiderInfo
+    pdfType: dictionary
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    refTypes:
+    - WebCaptureInfo
+    notes: https://github.com/pdf-association/pdf-issues/issues/672
+    goType: Object
+    purpose: SpiderInfo (optional, PDF 1.3) contains Web Capture information and state.
+  - goName: OutputIntents
+    pdfKey: OutputIntents
+    pdfType: array
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - ArrayOfOutputIntents
+    goType: Object
+    purpose: 'OutputIntents (optional, PDF 1.4) specifies the color characteristics of
+
+      output devices on which the document might be rendered.'
+  - goName: PieceInfo
+    pdfKey: PieceInfo
+    pdfType: dictionary
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - PagePiece
+    goType: Object
+    purpose: 'PieceInfo (optional, PDF 1.4) is a page-piece dictionary associated with
+
+      the document.'
+  - goName: OCProperties
+    pdfKey: OCProperties
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - OptContentProperties
+    goType: Object
+    purpose: 'OCProperties (optional, PDF 1.5) contains the document''s optional
+
+      content properties. Required if the document contains optional content.'
+  - goName: Perms
+    pdfKey: Perms
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - Permissions
+    goType: Object
+    purpose: 'Perms (optional, PDF 1.5) specifies user access permissions for the
+
+      document.'
+  - goName: Legal
+    pdfKey: Legal
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - LegalAttestation
+    goType: Object
+    purpose: 'Legal (optional, PDF 1.5) contains attestations regarding the content of
+
+      the PDF document as it relates to the legality of digital signatures.'
+  - goName: Requirements
+    pdfKey: Requirements
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - ArrayOfRequirements
+    goType: Object
+    purpose: 'Requirements (optional, PDF 1.7) contains an array of requirement
+
+      dictionaries that represent requirements for the document.'
+  - goName: Collection
+    pdfKey: Collection
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - Collection
+    goType: Object
+    purpose: 'Collection (optional, PDF 1.7) enhances the presentation of file
+
+      attachments stored in the PDF document.'
+  - goName: NeedsRendering
+    pdfKey: NeedsRendering
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.0'
+    deprecated: '2.0'
+    goType: bool
+    purpose: 'NeedsRendering (optional, deprecated in PDF 2.0) specifies whether the
+
+      document should be regenerated when first opened. Used for XFA forms.'
+  - goName: DSS
+    pdfKey: DSS
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - DSS
+    notes: see ETSI EN 319 142-1 (PAdES) https://github.com/pdf-association/arlington-pdf-model/issues/121
+    goType: Object
+    purpose: DSS (optional, PDF 2.0) contains document-wide security information.
+  - goName: AF
+    pdfKey: AF
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - ArrayOfAFFileSpecifications
+    goType: Object
+    purpose: 'AF (optional, PDF 2.0) contains an array of file specification
+
+      dictionaries denoting the associated files for this PDF document.'
+  - goName: DPartRoot
+    pdfKey: DPartRoot
+    pdfType: dictionary
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - DPartRoot
+    notes: https://github.com/pdf-association/pdf-issues/issues/614
+    goType: Object
+    purpose: 'DPartRoot (optional, PDF 2.0) describes the document parts hierarchy for
+
+      this PDF document.'
+  goPackage: pdf
+  goRepr: struct
+  readFunc: pdf.ExtractCatalog
+  writeMethod: (*Catalog).Encode
+- name: DPart
+  goType: null
+  pdfType: DPart
+  pdfRepr: dict
+  introduced: '1.6'
+  specTable: Table 409
+  arlingtonSrc: DPart.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - DPart
+    notes: Table 409
+  - goName: null
+    pdfKey: Parent
+    pdfType: dictionary
+    required: true
+    introduced: '1.6'
+    refTypes:
+    - DPart
+    - DPartRoot
+    notes: https://github.com/pdf-association/pdf-issues/issues/290
+  - goName: null
+    pdfKey: DParts
+    pdfType: array
+    required: fn:IsRequired(fn:Not(fn:IsPresent(Start)))
+    introduced: '1.6'
+    refTypes:
+    - ArrayOfDPartArrays
+  - goName: null
+    pdfKey: Start
+    pdfType: dictionary
+    required: fn:IsRequired(fn:Not(fn:IsPresent(DParts)))
+    introduced: '1.6'
+    refTypes:
+    - PageObject
+  - goName: null
+    pdfKey: End
+    pdfType: dictionary
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - PageObject
+  - goName: null
+    pdfKey: DPM
+    pdfType: dictionary
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - DPM
+  - goName: null
+    pdfKey: AF
+    pdfType: array
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfAFFileSpecifications
+- name: DPartRoot
+  goType: null
+  pdfType: DPartRoot
+  pdfRepr: dict
+  introduced: '1.6'
+  specTable: Table 408
+  arlingtonSrc: DPartRoot.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - DPartRoot
+    notes: Table 408
+  - goName: null
+    pdfKey: DPartRootNode
+    pdfType: dictionary
+    required: true
+    introduced: '1.6'
+    refTypes:
+    - DPart
+  - goName: null
+    pdfKey: RecordLevel
+    pdfType: integer
+    required: false
+    introduced: '1.6'
+  - goName: null
+    pdfKey: NodeNameList
+    pdfType: array
+    required: fn:IsRequired(fn:Extension(PDF_VT2))
+    introduced: '1.6'
+    refTypes:
+    - ArrayOfNamesGeneral
+    notes: since PDF/X-4 with PDF 1.6
+- name: Data
+  goType: null
+  pdfRepr: dict
+  introduced: '1.3'
+  arlingtonSrc: Data.tsv
+  fields:
+  - goName: null
+    pdfKey: LastModified
+    pdfType: date
+    required: true
+    introduced: '1.3'
+    notes: Table 351
+  - goName: null
+    pdfKey: Private
+    pdfType: array;boolean;dictionary;integer;name;number;stream;string
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - _UniversalArray
+    - _UniversalDictionary
+    - Stream
+    notes: anything
+  - goName: null
+    pdfKey: '*'
+    pdfType: array;boolean;dictionary;integer;name;number;stream;string
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - _UniversalArray
+    - _UniversalDictionary
+    - Stream
+    notes: see https://github.com/pdf-association/pdf-issues/issues/69
+- name: DevExtensions
+  goType: null
+  pdfType: DeveloperExtensions
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 49
+  arlingtonSrc: DevExtensions.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - DeveloperExtensions
+    notes: Table 49
+  - goName: null
+    pdfKey: BaseVersion
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - '1.7'
+    - '2.0'
+  - goName: null
+    pdfKey: ExtensionLevel
+    pdfType: integer
+    required: true
+    introduced: '1.7'
+  - goName: null
+    pdfKey: URL
+    pdfType: string
+    required: false
+    introduced: '2.0'
+  - goName: null
+    pdfKey: ExtensionRevision
+    pdfType: text-string
+    required: false
+    introduced: '2.0'
+- name: EmbeddedFileParameter
+  goType: null
+  pdfRepr: dict
+  introduced: '1.3'
+  arlingtonSrc: EmbeddedFileParameter.tsv
+  fields:
+  - goName: null
+    pdfKey: Size
+    pdfType: integer
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - fn:Eval(@Size>=0)
+    notes: Table 45
+  - goName: null
+    pdfKey: CreationDate
+    pdfType: date
+    required: false
+    introduced: '1.3'
+  - goName: null
+    pdfKey: ModDate
+    pdfType: date
+    required: false
+    introduced: '1.3'
+  - goName: null
+    pdfKey: Mac
+    pdfType: dictionary
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    refTypes:
+    - Mac
+  - goName: null
+    pdfKey: CheckSum
+    pdfType: byte-string
+    required: false
+    introduced: '1.3'
+    notes: MD5 checksum - https://github.com/pdf-association/pdf-issues/issues/382
+- name: EmbeddedFileStream
+  goType: file.Stream
+  pdfType: EmbeddedFile
+  pdfRepr: stream
+  introduced: '1.3'
+  specTable: Table 5
+  arlingtonSrc: EmbeddedFileStream.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - EmbeddedFile
+    notes: Table 5 and Table 44
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: false
+    introduced: '1.3'
+    notes: https://github.com/pdf-association/pdf-issues/issues/155, https://github.com/pdf-association/pdf-issues/issues/156
+      - also check every page/Annots/RichMediaContent/Assets
+  - goName: null
+    pdfKey: Params
+    pdfType: dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - EmbeddedFileParameter
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - CCITTFaxDecode
+    - fn:SinceVersion(1.4,JBIG2Decode)
+    - DCTDecode
+    - fn:SinceVersion(1.5,JPXDecode)
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - FilterCCITTFaxDecode
+    - fn:SinceVersion(1.4
+    - FilterJBIG2Decode)
+    - FilterDCTDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - CCITTFaxDecode
+    - fn:SinceVersion(1.4,JBIG2Decode)
+    - DCTDecode
+    - fn:SinceVersion(1.5,JPXDecode)
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - FilterCCITTFaxDecode
+    - fn:SinceVersion(1.4
+    - FilterJBIG2Decode)
+    - FilterDCTDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  - goName: null
+    pdfKey: Mail_MediaTypeParameters
+    pdfType: text-string
+    required: false
+    introduced: fn:Extension(EAPDF_1,1.7)
+    notes: EA=PDF 1.0 and https://github.com/pdf-association/pdf-issues/issues/155
+  goPackage: file
+  goRepr: struct
+  specSection: 7.11.4
+  readFunc: metadata.Extract
+  writeMethod: (*Stream).Embed
+- name: EncryptedPayload
+  goType: file.EncryptedPayload
+  pdfType: EncryptedPayload
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 28
+  arlingtonSrc: EncryptedPayload.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - EncryptedPayload
+    notes: Table 28
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '2.0'
+  - goName: null
+    pdfKey: Version
+    pdfType: name
+    required: false
+    introduced: '2.0'
+  goPackage: file
+  goRepr: struct
+  specSection: 7.6.7
+  readFunc: file.ExtractEncryptedPayload
+  writeMethod: (*EncryptedPayload).Embed
+- name: EncryptionPublicKey
+  goType: null
+  pdfRepr: stream
+  arlingtonSrc: EncryptionPublicKey.tsv
+  fields:
+  - goName: null
+    pdfKey: Recipients
+    pdfType: array
+    required: fn:IsRequired((@SubFilter==adbe.pkcs7.s3) || (@SubFilter==adbe.pkcs7.s4))
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfStringsByte
+    notes: Clause 7.6.5, Table 20 and Table 23, https://github.com/pdf-association/pdf-issues/issues/16
+  - goName: null
+    pdfKey: P
+    pdfType: bitmask
+    required: false
+    default: '0'
+    introduced: '1.3'
+    deprecated: '2.0'
+    notes: Table 23 and Table 24 - removed from ISO 32000-2:2020
+  - goName: null
+    pdfKey: Filter
+    pdfType: name
+    required: true
+    introduced: '1.1'
+    possibleValues:
+    - Adobe.PubSec
+    - AdobePPKLite
+    notes: Table 20
+  - goName: null
+    pdfKey: SubFilter
+    pdfType: name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - adbe.pkcs7.s3
+    - fn:SinceVersion(1.4,adbe.pkcs7.s4)
+    - fn:SinceVersion(1.5,adbe.pkcs7.s5)
+    notes: https://github.com/pdf-association/pdf-issues/issues/219
+  - goName: null
+    pdfKey: V
+    pdfType: integer
+    required: true
+    introduced: '1.1'
+    possibleValues:
+    - fn:Deprecated(1.1,0)
+    - fn:Deprecated(2.0,1)
+    - fn:Deprecated(2.0,fn:SinceVersion(1.4,2))
+    - fn:Deprecated(2.0,fn:SinceVersion(1.4,3))
+    - fn:Deprecated(2.0,fn:SinceVersion(1.5,4))
+    - fn:IsPDFVersion(1.7,fn:Extension(ADBE_Extn3,5))
+    - fn:SinceVersion(2.0,5)
+    - fn:SinceVersion(2.0,fn:Extension(ISO_TS_32003,6))
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: false
+    default: '40'
+    introduced: '1.4'
+    deprecated: '2.0'
+    possibleValues:
+    - fn:Eval((@Length>=40) && (@Length<=128) && ((@Length mod 8)==0))
+  - goName: null
+    pdfKey: CF
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - CryptFilterMap
+    - CryptFilterPublicKeyMap
+  - goName: null
+    pdfKey: StmF
+    pdfType: name
+    required: false
+    default: Identity
+    introduced: '1.5'
+    possibleValues:
+    - Identity
+    - DefaultCryptFilter
+    - DefEmbeddedFile
+  - goName: null
+    pdfKey: StrF
+    pdfType: name
+    required: false
+    default: Identity
+    introduced: '1.5'
+    possibleValues:
+    - Identity
+    - DefaultCryptFilter
+  - goName: null
+    pdfKey: EFF
+    pdfType: name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - Identity
+    - DefaultCryptFilter
+    - DefEmbeddedFile
+  - goName: null
+    pdfKey: EncryptMetadata
+    pdfType: boolean
+    required: false
+    default: true
+    introduced: '1.5'
+  - goName: null
+    pdfKey: KDFSalt
+    pdfType: byte-string
+    required: false
+    introduced: fn:Extension(ISO_TS_32004,2.0)
+    notes: ISO/TS 32004 integrity protection
+- name: EncryptionStandard
+  goType: null
+  pdfRepr: stream
+  arlingtonSrc: EncryptionStandard.tsv
+  fields:
+  - goName: null
+    pdfKey: Filter
+    pdfType: name
+    required: true
+    default: Standard
+    introduced: '1.1'
+    possibleValues:
+    - Standard
+    notes: Table 20 and Table 21
+  - goName: null
+    pdfKey: SubFilter
+    pdfType: name
+    required: false
+    introduced: '1.3'
+  - goName: null
+    pdfKey: V
+    pdfType: integer
+    required: true
+    introduced: '1.1'
+    possibleValues:
+    - fn:Deprecated(1.1,0)
+    - fn:Deprecated(2.0,1)
+    - fn:Deprecated(2.0,fn:SinceVersion(1.4,2))
+    - fn:Deprecated(2.0,fn:SinceVersion(1.4,3))
+    - fn:Deprecated(2.0,fn:SinceVersion(1.5,4))
+    - fn:IsPDFVersion(1.7,fn:Extension(ADBE_Extn3,5))
+    - fn:SinceVersion(2.0,5)
+    - fn:SinceVersion(2.0,fn:Extension(ISO_TS_32003,6))
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: false
+    default: '40'
+    introduced: '1.4'
+    deprecated: '2.0'
+    possibleValues:
+    - fn:Eval((@Length>=40) && ((@Length<=128) || fn:Extension(ADBE_Extn3,(@Length<=256))) && ((@Length mod 8)==0))
+  - goName: null
+    pdfKey: CF
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - CryptFilterMap
+  - goName: null
+    pdfKey: StmF
+    pdfType: name
+    required: false
+    default: Identity
+    introduced: '1.5'
+  - goName: null
+    pdfKey: StrF
+    pdfType: name
+    required: false
+    default: Identity
+    introduced: '1.5'
+  - goName: null
+    pdfKey: EFF
+    pdfType: name
+    required: false
+    introduced: '1.1'
+  - goName: null
+    pdfKey: R
+    pdfType: integer
+    required: true
+    introduced: '1.1'
+    possibleValues:
+    - fn:Deprecated(2.0,fn:RequiredValue(@V<2,2))
+    - fn:Deprecated(2.0,fn:RequiredValue((@V==2) || (@V==3),3))
+    - fn:Deprecated(2.0,fn:RequiredValue(@V==4,4))
+    - fn:Deprecated(2.0,fn:IsPDFVersion(1.7,fn:Extension(ADBE_Extn3,5)))
+    - fn:Deprecated(2.0,fn:SinceVersion(2.0,5))
+    - fn:SinceVersion(2.0,fn:RequiredValue(@V==5,6))
+    - fn:SinceVersion(2.0,fn:Extension(ISO_TS_32003,7))
+  - goName: null
+    pdfKey: O
+    pdfType: byte-string
+    required: true
+    introduced: '1.1'
+    notes: 32 bytes long if the value of R is 4 or less and 48 bytes long if the value of R is 6
+  - goName: null
+    pdfKey: U
+    pdfType: byte-string
+    required: true
+    introduced: '1.1'
+    notes: 32 bytes long if the value of R is 4 or less and 48 bytes long if the value of R is 6
+  - goName: null
+    pdfKey: OE
+    pdfType: byte-string
+    required: fn:IsRequired((@R==5) || (@R==6))
+    introduced: '1.1'
+    notes: 32 byte string
+  - goName: null
+    pdfKey: UE
+    pdfType: byte-string
+    required: fn:IsRequired((@R==5) || (@R==6))
+    introduced: '1.1'
+  - goName: null
+    pdfKey: P
+    pdfType: bitmask
+    required: true
+    introduced: '1.1'
+    notes: Table 22
+  - goName: null
+    pdfKey: Perms
+    pdfType: byte-string
+    required: fn:IsRequired((@R==5) || (@R==6))
+    introduced: '1.1'
+  - goName: null
+    pdfKey: EncryptMetadata
+    pdfType: boolean
+    required: false
+    default: true
+    introduced: '1.5'
+  - goName: null
+    pdfKey: KDFSalt
+    pdfType: byte-string
+    required: false
+    introduced: fn:Extension(ISO_TS_32004,2.0)
+    notes: ISO/TS 32004 integrity protection
+- name: Extensions
+  goType: null
+  pdfType: Extensions
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 48
+  arlingtonSrc: Extensions.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - Extensions
+    notes: Table 48
+  - goName: null
+    pdfKey: ISO_
+    pdfType: fn:SinceVersion(2.0,array);dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - fn:SinceVersion(2.0
+    - ArrayOfDevExtensions)
+    - ISO_DevExtensions
+  - goName: null
+    pdfKey: GTSm
+    pdfType: fn:SinceVersion(2.0,array);dictionary
+    required: false
+    introduced: fn:Extension(ISO_21812,1.7)
+    refTypes:
+    - fn:SinceVersion(2.0
+    - ArrayOfDevExtensions)
+    - GTSm_DevExtensions
+    notes: see ISO 21812-1:2019
+  - goName: null
+    pdfKey: '*'
+    pdfType: fn:SinceVersion(2.0,array);dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - fn:SinceVersion(2.0
+    - ArrayOfDevExtensions)
+    - DevExtensions
+- name: FileSpecEF
+  goType: null
+  pdfRepr: dict
+  arlingtonSrc: FileSpecEF.tsv
+  fields:
+  - goName: null
+    pdfKey: F
+    pdfType: stream
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - EmbeddedFileStream
+    notes: Table 43, EF cell
+  - goName: null
+    pdfKey: UF
+    pdfType: stream
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - EmbeddedFileStream
+- name: FileSpecRF
+  goType: null
+  pdfRepr: dict
+  arlingtonSrc: FileSpecRF.tsv
+  fields:
+  - goName: null
+    pdfKey: F
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - RelatedFilesArray
+    notes: Table 43, RF cell
+  - goName: null
+    pdfKey: UF
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - RelatedFilesArray
+- name: FileSpecification
+  goType: file.Specification
+  pdfType: Filespec
+  pdfRepr: dict
+  introduced: '1.3'
+  specTable: Table 43
+  arlingtonSrc: FileSpecification.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: fn:IsRequired(fn:IsPresent(EF) || fn:SinceVersion(2.0,fn:IsPresent(EP)) || fn:IsPresent(RF))
+    introduced: '1.3'
+    possibleValues:
+    - Filespec
+    notes: Table 43 and https://github.com/pdf-association/pdf-issues/issues/298
+  - goName: null
+    pdfKey: FS
+    pdfType: name
+    required: false
+    introduced: '1.1'
+    possibleValues:
+    - URL
+    - '*'
+  - goName: null
+    pdfKey: F
+    pdfType: string
+    required: fn:IsRequired(fn:Not(fn:IsPresent(DOS)) && fn:Not(fn:IsPresent(Mac)) && fn:Not(fn:IsPresent(Unix)))
+    introduced: '1.1'
+  - goName: null
+    pdfKey: UF
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName: null
+    pdfKey: DOS
+    pdfType: byte-string
+    required: false
+    introduced: '1.1'
+    deprecated: '2.0'
+  - goName: null
+    pdfKey: Mac
+    pdfType: byte-string
+    required: false
+    introduced: '1.1'
+    deprecated: '2.0'
+  - goName: null
+    pdfKey: Unix
+    pdfType: byte-string
+    required: false
+    introduced: '1.1'
+    deprecated: '2.0'
+  - goName: ID
+    pdfKey: ID
+    pdfType: array
+    required: false
+    introduced: '1.1'
+    refTypes:
+    - ArrayOf_2StringsByte
+    goType: '[]string'
+    purpose: ID contains an identifier for the described file, as two byte strings.
+  - goName: null
+    pdfKey: V
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.2'
+  - goName: null
+    pdfKey: EF
+    pdfType: dictionary
+    required: fn:IsRequired(fn:IsPresent(RF))
+    introduced: '1.3'
+    refTypes:
+    - FileSpecEF
+  - goName: null
+    pdfKey: RF
+    pdfType: dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FileSpecRF
+  - goName: null
+    pdfKey: Desc
+    pdfType: string
+    required: false
+    introduced: '1.6'
+  - goName: null
+    pdfKey: CI
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - CollectionItem
+  - goName: null
+    pdfKey: Thumb
+    pdfType: stream
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - Thumbnail
+  - goName: AFRelationship
+    pdfKey: AFRelationship
+    pdfType: name
+    required: false
+    default: Unspecified
+    introduced: '1.7'
+    possibleValues:
+    - Source
+    - Data
+    - Alternative
+    - Supplement
+    - fn:SinceVersion(2.0,EncryptedPayload)
+    - fn:SinceVersion(2.0,FormData)
+    - fn:SinceVersion(2.0,Schema)
+    - Unspecified
+    - fn:Extension(C2PA,C2PA_Manifest)
+    goType: Relationship
+    purpose: 'AFRelationship (PDF 2.0) specifies the relationship between the
+
+      referencing component and the associated file.
+
+
+      When writing file specifications, and empty name can be used as a
+
+      shorthand for [RelationshipUnspecified].'
+  - goName: null
+    pdfKey: EP
+    pdfType: dictionary
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - EncryptedPayload
+  goPackage: file
+  goRepr: struct
+  specSection: 7.11.3
+  readFunc: file.ExtractSpecification
+  writeMethod: (*Specification).Embed
+- name: FileTrailer
+  goType: null
+  pdfRepr: dict
+  arlingtonSrc: FileTrailer.tsv
+  fields:
+  - goName: null
+    pdfKey: Size
+    pdfType: integer
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - fn:Eval(@Size>0)
+    notes: Table 15 and Table 19
+  - goName: null
+    pdfKey: Prev
+    pdfType: integer
+    required: false
+    introduced: '1.0'
+    possibleValues:
+    - fn:Eval((@Prev>=0) && (@Prev<=fn:FileSize()))
+  - goName: null
+    pdfKey: Root
+    pdfType: dictionary
+    required: true
+    introduced: '1.0'
+    refTypes:
+    - Catalog
+  - goName: null
+    pdfKey: Encrypt
+    pdfType: dictionary
+    required: false
+    introduced: '1.1'
+    refTypes:
+    - EncryptionStandard
+    - EncryptionPublicKey
+  - goName: null
+    pdfKey: Info
+    pdfType: dictionary
+    required: fn:IsRequired(fn:SinceVersion(1.4,fn:IsPresent(trailer::Catalog::PieceInfo)))
+    introduced: '1.0'
+    refTypes:
+    - DocInfo
+    notes: https://github.com/pdf-association/pdf-issues/issues/106
+  - goName: null
+    pdfKey: ID
+    pdfType: array
+    required: fn:IsRequired(fn:SinceVersion(2.0) || fn:IsPresent(Encrypt))
+    introduced: '1.1'
+    refTypes:
+    - TrailerIDArray
+  - goName: null
+    pdfKey: XRefStm
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval((@XRefStm>=0) && (@XRefStm<=fn:FileSize()))
+  - goName: null
+    pdfKey: AuthCode
+    pdfType: dictionary
+    required: false
+    introduced: fn:Extension(ISO_TS_32004,2.0)
+    refTypes:
+    - AuthCode
+    notes: ISO/TS 32004 integrity protection
+  - goName: null
+    pdfKey: AdditionalStreams
+    pdfType: array
+    required: false
+    introduced: fn:Extension(OpenOffice)
+    refTypes:
+    - OOAdditionalStmsArray
+    notes: OpenOffice/LibreOffice extension - array of MIME types and streams
+  - goName: null
+    pdfKey: DocChecksum
+    pdfType: name
+    required: false
+    introduced: fn:Extension(OpenOffice)
+    notes: OpenOffice/LibreOffice extension - hex MD5 as a name object
+- name: FilterCCITTFaxDecode
+  goType: null
+  pdfRepr: dict
+  arlingtonSrc: FilterCCITTFaxDecode.tsv
+  fields:
+  - goName: null
+    pdfKey: K
+    pdfType: integer
+    required: false
+    default: '0'
+    introduced: '1.0'
+    notes: Table 11
+  - goName: null
+    pdfKey: EndOfLine
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.0'
+  - goName: null
+    pdfKey: EncodedByteAlign
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.0'
+  - goName: null
+    pdfKey: Columns
+    pdfType: integer
+    required: false
+    default: '1728'
+    introduced: '1.0'
+    possibleValues:
+    - fn:Eval(@Columns>=0)
+  - goName: null
+    pdfKey: Rows
+    pdfType: integer
+    required: false
+    default: '0'
+    introduced: '1.0'
+    possibleValues:
+    - fn:Eval(@Rows>=0)
+  - goName: null
+    pdfKey: EndOfBlock
+    pdfType: boolean
+    required: false
+    default: true
+    introduced: '1.0'
+  - goName: null
+    pdfKey: BlackIs1
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.0'
+  - goName: null
+    pdfKey: DamagedRowsBeforeError
+    pdfType: integer
+    required: false
+    default: '0'
+    introduced: '1.0'
+    possibleValues:
+    - fn:Eval(@DamagedRowsBeforeError>=0)
+  - goName: null
+    pdfKey: Blackls1
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: fn:Extension(Malforms)
+- name: FilterCrypt
+  goType: null
+  pdfType: CryptFilterDecodeParms
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 14
+  arlingtonSrc: FilterCrypt.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - CryptFilterDecodeParms
+    notes: Table 14
+  - goName: null
+    pdfKey: Name
+    pdfType: name
+    required: false
+    default: Identity
+    introduced: '1.5'
+- name: FilterDCTDecode
+  goType: null
+  pdfRepr: dict
+  introduced: '1.0'
+  arlingtonSrc: FilterDCTDecode.tsv
+  fields:
+  - goName: null
+    pdfKey: ColorTransform
+    pdfType: integer
+    required: false
+    introduced: '1.0'
+    possibleValues:
+    - '0'
+    - '1'
+    notes: Table 13
+- name: FilterFlateDecode
+  goType: null
+  pdfRepr: dict
+  introduced: '1.2'
+  arlingtonSrc: FilterFlateDecode.tsv
+  fields:
+  - goName: null
+    pdfKey: Predictor
+    pdfType: integer
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - '1'
+    - '2'
+    - '10'
+    - '11'
+    - '12'
+    - '13'
+    - '14'
+    - '15'
+    notes: Table 8 and Table 10
+  - goName: null
+    pdfKey: Colors
+    pdfType: integer
+    required: false
+    default: '1'
+    introduced: '1.2'
+    possibleValues:
+    - fn:Eval((@Colors>=1) && fn:BeforeVersion(1.3,fn:Eval(@Colors<=4)))
+  - goName: null
+    pdfKey: BitsPerComponent
+    pdfType: integer
+    required: false
+    default: '8'
+    introduced: '1.2'
+    possibleValues:
+    - '1'
+    - '2'
+    - '4'
+    - '8'
+    - fn:SinceVersion(1.5,16)
+  - goName: null
+    pdfKey: Columns
+    pdfType: integer
+    required: false
+    default: '1'
+    introduced: '1.2'
+- name: FilterJBIG2Decode
+  goType: null
+  pdfRepr: dict
+  introduced: '1.4'
+  arlingtonSrc: FilterJBIG2Decode.tsv
+  fields:
+  - goName: null
+    pdfKey: JBIG2Globals
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - Stream
+    notes: Table 12
+- name: FilterLZWDecode
+  goType: null
+  pdfRepr: dict
+  introduced: '1.0'
+  arlingtonSrc: FilterLZWDecode.tsv
+  fields:
+  - goName: null
+    pdfKey: Predictor
+    pdfType: integer
+    required: false
+    introduced: '1.0'
+    possibleValues:
+    - '1'
+    - '2'
+    - '10'
+    - '11'
+    - '12'
+    - '13'
+    - '14'
+    - '15'
+    notes: Table 8 and Table 10
+  - goName: null
+    pdfKey: Colors
+    pdfType: integer
+    required: false
+    default: '1'
+    introduced: '1.0'
+    possibleValues:
+    - fn:Eval((@Colors>=1) && fn:BeforeVersion(1.3,fn:Eval(@Colors<=4)))
+  - goName: null
+    pdfKey: BitsPerComponent
+    pdfType: integer
+    required: false
+    default: '8'
+    introduced: '1.0'
+    possibleValues:
+    - '1'
+    - '2'
+    - '4'
+    - '8'
+    - fn:SinceVersion(1.5,16)
+  - goName: null
+    pdfKey: Columns
+    pdfType: integer
+    required: false
+    default: '1'
+    introduced: '1.0'
+  - goName: null
+    pdfKey: EarlyChange
+    pdfType: integer
+    required: false
+    default: '1'
+    introduced: '1.0'
+    possibleValues:
+    - '0'
+    - '1'
+- name: GTSm_DevExtensions
+  goType: null
+  pdfType: DeveloperExtensions
+  pdfRepr: dict
+  introduced: fn:Extension(ISO_21812,1.7)
+  arlingtonSrc: GTSm_DevExtensions.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: fn:Extension(ISO_21812,1.7)
+    possibleValues:
+    - DeveloperExtensions
+    notes: see ISO 21812-1:2019
+  - goName: null
+    pdfKey: BaseVersion
+    pdfType: name
+    required: true
+    introduced: fn:Extension(ISO_21812,1.7)
+    possibleValues:
+    - '1.7'
+    notes: always 1.7
+  - goName: null
+    pdfKey: ExtensionLevel
+    pdfType: integer
+    required: true
+    introduced: fn:Extension(ISO_21812,1.7)
+    possibleValues:
+    - '1'
+    notes: see ISO 21812-1:2019, Clause 5
+  - goName: null
+    pdfKey: URL
+    pdfType: string
+    required: false
+    introduced: fn:Extension(ISO_21812,2.0)
+  - goName: null
+    pdfKey: ExtensionRevision
+    pdfType: text-string
+    required: false
+    introduced: fn:Extension(ISO_21812,2.0)
+- name: ISO_DevExtensions
+  goType: null
+  pdfType: DeveloperExtensions
+  pdfRepr: dict
+  introduced: '1.7'
+  arlingtonSrc: ISO_DevExtensions.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - DeveloperExtensions
+    notes: see various ISO/TS documents
+  - goName: null
+    pdfKey: BaseVersion
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - '2.0'
+    notes: always 2.0
+  - goName: null
+    pdfKey: ExtensionLevel
+    pdfType: integer
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - '32001'
+    - '32002'
+    - '32003'
+    - '32004'
+    - '24064'
+    - '32007'
+    notes: the ISO/TS document number
+  - goName: null
+    pdfKey: URL
+    pdfType: string
+    required: true
+    introduced: '2.0'
+    notes: ISO webpage https://www.iso.org/standard/_some-number_.html
+  - goName: null
+    pdfKey: ExtensionRevision
+    pdfType: text-string
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - ''':2022'''
+    - ''':2023'''
+    - '''1:2023'''
+    - ''':2024'''
+    notes: ISO/TS publication year
+- name: LinearizationParameterDict
+  goType: null
+  pdfRepr: dict
+  introduced: '1.2'
+  arlingtonSrc: LinearizationParameterDict.tsv
+  fields:
+  - goName: null
+    pdfKey: Linearized
+    pdfType: number
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - '1.0'
+    notes: Table F.1 version - https://github.com/pdf-association/pdf-issues/issues/153 and https://github.com/pdf-association/pdf-issues/issues/331
+  - goName: null
+    pdfKey: L
+    pdfType: integer
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - fn:Eval(@L>0)
+    notes: length of file
+  - goName: null
+    pdfKey: H
+    pdfType: array
+    required: true
+    introduced: '1.2'
+    refTypes:
+    - ArrayOf_2Integers
+    - ArrayOf_4Integers
+  - goName: null
+    pdfKey: O
+    pdfType: integer
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - fn:Eval(@O>0)
+    notes: object number of the first pages page object
+  - goName: null
+    pdfKey: E
+    pdfType: integer
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - fn:Eval((@E>0) && (@E<=@L))
+    notes: offset of the end of the first page
+  - goName: null
+    pdfKey: N
+    pdfType: integer
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - fn:Eval(@N>0)
+    notes: number of pages
+  - goName: null
+    pdfKey: T
+    pdfType: integer
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - fn:Eval(@T>0)
+  - goName: null
+    pdfKey: P
+    pdfType: integer
+    required: false
+    default: '0'
+    introduced: '1.2'
+    possibleValues:
+    - fn:Eval(@P>=0)
+    notes: page index of first page
+- name: MarkInfo
+  goType: null
+  pdfRepr: dict
+  arlingtonSrc: MarkInfo.tsv
+  fields:
+  - goName: null
+    pdfKey: Marked
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.4'
+    notes: Table 353
+  - goName: null
+    pdfKey: UserProperties
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.6'
+  - goName: null
+    pdfKey: Suspects
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.6'
+    deprecated: '2.0'
+- name: Name
+  goType: null
+  pdfRepr: dict
+  arlingtonSrc: Name.tsv
+  fields:
+  - goName: null
+    pdfKey: Dests
+    pdfType: name-tree
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ActionGoTo
+    - fn:SinceVersion(1.6
+    - ActionGoToE)
+    - ActionGoToR
+    - DestDict
+    - DestXYZArray
+    - Dest0Array
+    - Dest1Array
+    - Dest4Array
+    notes: Table 32
+  - goName: null
+    pdfKey: AP
+    pdfType: name-tree
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - XObjectFormType1
+    - XObjectFormPS
+    - XObjectFormPSpassthrough
+  - goName: null
+    pdfKey: JavaScript
+    pdfType: name-tree
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ActionECMAScript
+  - goName: null
+    pdfKey: Pages
+    pdfType: name-tree
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - PageObject
+  - goName: null
+    pdfKey: Templates
+    pdfType: name-tree
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - PageObject
+  - goName: null
+    pdfKey: IDS
+    pdfType: name-tree
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    refTypes:
+    - WebCaptureImageSet
+    - WebCapturePageSet
+    notes: https://github.com/pdf-association/pdf-issues/issues/672
+  - goName: null
+    pdfKey: URLS
+    pdfType: name-tree
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    refTypes:
+    - WebCaptureImageSet
+    - WebCapturePageSet
+    notes: https://github.com/pdf-association/pdf-issues/issues/672
+  - goName: null
+    pdfKey: EmbeddedFiles
+    pdfType: name-tree
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: AlternatePresentations
+    pdfType: name-tree
+    required: false
+    introduced: '1.4'
+    deprecated: '2.0'
+    refTypes:
+    - SlideShow
+  - goName: null
+    pdfKey: Renditions
+    pdfType: name-tree
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - RenditionMedia
+    - RenditionSelector
+  - goName: null
+    pdfKey: XFAResources
+    pdfType: name-tree
+    required: false
+    introduced: fn:Extension(ADBE_Extn3,1.7)
+    deprecated: '2.0'
+    refTypes:
+    - Stream
+    notes: Adobe Extension Level 3
+- name: Namespace
+  goType: null
+  pdfType: Namespace
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 356
+  arlingtonSrc: Namespace.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Namespace
+    notes: Table 356
+  - goName: null
+    pdfKey: NS
+    pdfType: text-string
+    required: true
+    introduced: '2.0'
+  - goName: null
+    pdfKey: Schema
+    pdfType: dictionary;string
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: RoleMapNS
+    pdfType: dictionary
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - RoleMapNS
+- name: ObjectStream
+  goType: null
+  pdfType: ObjStm
+  pdfRepr: stream
+  introduced: '1.5'
+  specTable: Table 5
+  arlingtonSrc: ObjectStream.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - ObjStm
+    notes: Table 5 and Table 16
+  - goName: null
+    pdfKey: N
+    pdfType: integer
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval(@N>=0)
+  - goName: null
+    pdfKey: First
+    pdfType: integer
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval(@First>=0)
+  - goName: null
+    pdfKey: Extends
+    pdfType: stream
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - ObjectStream
+    notes: forms a directed acyclic graph
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.5'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - Crypt
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - FilterCrypt
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - Crypt
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - FilterCrypt
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval(@DL>=0)
+- name: PageLabel
+  goType: null
+  pdfType: PageLabel
+  pdfRepr: dict
+  introduced: '1.3'
+  specTable: Table 161
+  arlingtonSrc: PageLabel.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - PageLabel
+    notes: Table 161
+  - goName: null
+    pdfKey: S
+    pdfType: name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - D
+    - R
+    - r
+    - A
+    - a
+  - goName: null
+    pdfKey: P
+    pdfType: text-string
+    required: false
+    introduced: '1.3'
+  - goName: null
+    pdfKey: St
+    pdfType: integer
+    required: false
+    default: '1'
+    introduced: '1.3'
+    possibleValues:
+    - fn:Eval(@St>=1)
+- name: PageObject
+  goType: page.Page
+  pdfType: Page
+  pdfRepr: dict
+  specTable: Table 31
+  arlingtonSrc: PageObject.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - Page
+    - Template
+    notes: Table 31
+  - goName: Parent
+    pdfKey: Parent
+    pdfType: dictionary
+    required: fn:IsRequired(@Type!=Template)
+    introduced: '1.0'
+    refTypes:
+    - PageTreeNode
+    - PageTreeNodeRoot
+    goType: pdf.Reference
+    purpose: Parent is the page tree node that is the immediate parent of this page.
+  - goName: LastModified
+    pdfKey: LastModified
+    pdfType: date
+    required: fn:IsRequired(fn:IsPresent(PieceInfo))
+    introduced: '1.3'
+    goType: time.Time
+    purpose: 'LastModified (optional) is when the page contents were last modified.
+
+      Required if PieceInfo is present.'
+  - goName: Resources
+    pdfKey: Resources
+    pdfType: dictionary
+    required: true
+    introduced: '1.0'
+    inheritable: true
+    refTypes:
+    - Resource
+    notes: Inheritable from Parent
+    goType: '*content.Resources'
+    purpose: Resources (inheritable) contains resources required by the page contents.
+  - goName: MediaBox
+    pdfKey: MediaBox
+    pdfType: rectangle
+    required: true
+    introduced: '1.0'
+    inheritable: true
+    notes: Inheritable from Parent
+    goType: '*pdf.Rectangle'
+    purpose: 'MediaBox (inheritable) defines the boundaries of the physical medium
+
+      on which the page is displayed or printed.'
+  - goName: CropBox
+    pdfKey: CropBox
+    pdfType: rectangle
+    required: false
+    default: '@MediaBox'
+    introduced: '1.0'
+    inheritable: true
+    notes: Inheritable from Parent
+    goType: '*pdf.Rectangle'
+    purpose: 'CropBox (optional; inheritable) defines the visible region of the page.
+
+      Default: MediaBox.'
+  - goName: BleedBox
+    pdfKey: BleedBox
+    pdfType: rectangle
+    required: false
+    default: '@CropBox'
+    introduced: '1.3'
+    notes: Inheritable from Parent
+    goType: '*pdf.Rectangle'
+    purpose: 'BleedBox (optional) defines the clipping region for production output.
+
+      Default: CropBox.'
+  - goName: TrimBox
+    pdfKey: TrimBox
+    pdfType: rectangle
+    required: false
+    default: '@CropBox'
+    introduced: '1.3'
+    goType: '*pdf.Rectangle'
+    purpose: 'TrimBox (optional) defines the intended dimensions after trimming.
+
+      Default: CropBox.'
+  - goName: ArtBox
+    pdfKey: ArtBox
+    pdfType: rectangle
+    required: false
+    default: '@CropBox'
+    introduced: '1.3'
+    goType: '*pdf.Rectangle'
+    purpose: 'ArtBox (optional) defines the extent of the page''s meaningful content.
+
+      Default: CropBox.'
+  - goName: BoxColorInfo
+    pdfKey: BoxColorInfo
+    pdfType: dictionary
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - BoxColorInfo
+    goType: '*boxcolor.Info'
+    purpose: 'BoxColorInfo (optional) specifies colors for displaying page boundary
+
+      guidelines on screen.'
+  - goName: Contents
+    pdfKey: Contents
+    pdfType: array;stream
+    required: false
+    introduced: '1.0'
+    refTypes:
+    - ArrayOfStreamsGeneral
+    - Stream
+    goType: '[]*Content'
+    purpose: Contents (optional) holds content streams describing the page's appearance.
+  - goName: Rotate
+    pdfKey: Rotate
+    pdfType: integer
+    required: false
+    default: '0'
+    introduced: '1.0'
+    possibleValues:
+    - fn:Eval((@Rotate mod 90)==0)
+    inheritable: true
+    notes: Inheritable from Parent
+    goType: Rotation
+    purpose: 'Rotate (optional; inheritable) specifies clockwise rotation in degrees.
+
+      Use RotateInherit to inherit from the parent Pages node.'
+  - goName: Group
+    pdfKey: Group
+    pdfType: dictionary
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - GroupAttributes
+    goType: '*group.TransparencyAttributes'
+    purpose: Group (optional) specifies transparency group attributes for the page.
+  - goName: null
+    pdfKey: Thumb
+    pdfType: stream
+    required: false
+    introduced: '1.0'
+    refTypes:
+    - Thumbnail
+  - goName: null
+    pdfKey: B
+    pdfType: array
+    required: false
+    introduced: '1.1'
+    refTypes:
+    - ArrayOfBeads
+  - goName: null
+    pdfKey: Dur
+    pdfType: number
+    required: false
+    introduced: '1.1'
+  - goName: null
+    pdfKey: Trans
+    pdfType: dictionary
+    required: false
+    introduced: '1.1'
+    refTypes:
+    - Transition
+  - goName: Annots
+    pdfKey: Annots
+    pdfType: array
+    required: false
+    introduced: '1.0'
+    refTypes:
+    - ArrayOfAnnots
+    goType: '[]annotation.Annotation'
+    purpose: Annots (optional) lists annotations associated with the page.
+  - goName: AA
+    pdfKey: AA
+    pdfType: dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - AddActionPageObject
+    goType: '*triggers.Page'
+    purpose: AA (optional) defines additional actions for page open/close events.
+  - goName: Metadata
+    pdfKey: Metadata
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - Metadata
+    goType: '*metadata.Stream'
+    purpose: Metadata (optional) is a metadata stream for the page.
+  - goName: PieceInfo
+    pdfKey: PieceInfo
+    pdfType: dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - PagePiece
+    goType: '*pieceinfo.PieceInfo'
+    purpose: PieceInfo (optional) holds application-specific page data.
+  - goName: StructParents
+    pdfKey: StructParents
+    pdfType: integer
+    required: fn:IsRequired(fn:PageContainsStructContentItems())
+    introduced: '1.3'
+    notes: Table 359
+    goType: optional.UInt
+    purpose: 'StructParents (optional) is this page''s key in the structural parent tree.
+
+      Required if the page contains structural content items.'
+  - goName: ID
+    pdfKey: ID
+    pdfType: byte-string
+    required: false
+    introduced: '1.3'
+    deprecated: '2.0'
+    notes: https://github.com/pdf-association/pdf-issues/issues/106 and https://github.com/pdf-association/pdf-issues/issues/619
+    goType: pdf.String
+    purpose: 'ID (optional; deprecated in PDF 2.0) is the digital identifier of the
+
+      page''s parent Web Capture content set.'
+  - goName: PZ
+    pdfKey: PZ
+    pdfType: number
+    required: false
+    introduced: '1.3'
+    goType: float64
+    purpose: PZ (optional) is the preferred zoom factor for the page.
+  - goName: SeparationInfo
+    pdfKey: SeparationInfo
+    pdfType: dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - Separation
+    goType: '*separation.Dict'
+    purpose: 'SeparationInfo (optional) contains color separation information
+
+      for preseparated PDF files (deprecated with PDF 2.0).'
+  - goName: Tabs
+    pdfKey: Tabs
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - R
+    - C
+    - S
+    - fn:IsPDFVersion(1.7,fn:Extension(ADBE_Extn3,A))
+    - fn:IsPDFVersion(1.7,fn:Extension(ADBE_Extn3,W))
+    - fn:SinceVersion(2.0,A)
+    - fn:SinceVersion(2.0,W)
+    goType: pdf.Name
+    purpose: 'Tabs (optional) specifies the tab order for annotations.
+
+      Values: R (row), C (column), S (structure), A (array order; PDF 2.0),
+
+      W (widget order; PDF 2.0).'
+  - goName: TemplateInstantiated
+    pdfKey: TemplateInstantiated
+    pdfType: name
+    required: fn:IsRequired(fn:InNameTree(trailer::Catalog::Names::Pages) || fn:InNameTree(trailer::Catalog::Names::Templates))
+    introduced: '1.5'
+    goType: pdf.Name
+    purpose: 'TemplateInstantiated (optional) is the name of the originating named page
+
+      object, if this page was created from one.'
+  - goName: PresSteps
+    pdfKey: PresSteps
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - NavNode
+    goType: '[]*navnode.Node'
+    purpose: 'PresSteps (optional) is the list of navigation nodes for sub-page navigation.
+
+      Navigation nodes allow navigating between different states of the same page
+
+      during presentations (PDF 1.5).'
+  - goName: UserUnit
+    pdfKey: UserUnit
+    pdfType: number
+    required: false
+    default: '1.0'
+    introduced: '1.6'
+    goType: float64
+    purpose: 'UserUnit (optional) is the size of user space units in multiples of
+
+      1/72 inch.
+
+
+      When writing, 0 is treated as 1.0.'
+  - goName: VP
+    pdfKey: VP
+    pdfType: array
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - ArrayOfViewports
+    goType: '*measure.ViewPortArray'
+    purpose: VP (optional) specifies rectangular viewport regions of the page.
+  - goName: AssociatedFiles
+    pdfKey: AF
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - ArrayOfAFFileSpecifications
+    goType: '[]*file.Specification'
+    purpose: 'AssociatedFiles (optional; PDF 2.0) is an array of files associated with
+
+      the page. The relationship that the associated files have to the page
+
+      is supplied by the Specification.AFRelationship field.
+
+
+      This corresponds to the /AF entry in the PDF page dictionary.'
+  - goName: OutputIntents
+    pdfKey: OutputIntents
+    pdfType: array
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - ArrayOfOutputIntents
+    goType: pdf.Object
+    purpose: 'OutputIntents (optional; PDF 2.0) specifies color characteristics
+
+      for output devices.'
+  - goName: DPart
+    pdfKey: DPart
+    pdfType: dictionary
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - DPart
+    goType: pdf.Reference
+    purpose: 'DPart (optional; PDF 2.0) references the DPart whose range includes
+
+      this page. Required if this page is within a DPart range.'
+  - goName: null
+    pdfKey: Hid
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.1'
+    deprecated: '1.3'
+    inheritable: true
+  goPackage: page
+  goRepr: struct
+  specSection: 7.7.3
+  writeMethod: (*Page).Encode
+- name: PageTreeNode
+  goType: null
+  pdfType: Pages
+  pdfRepr: dict
+  introduced: '1.0'
+  specTable: Table 30
+  arlingtonSrc: PageTreeNode.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - Pages
+    notes: Table 30
+  - goName: null
+    pdfKey: Parent
+    pdfType: dictionary
+    required: true
+    introduced: '1.0'
+    refTypes:
+    - PageTreeNode
+    - PageTreeNodeRoot
+  - goName: null
+    pdfKey: Kids
+    pdfType: array
+    required: true
+    introduced: '1.0'
+    refTypes:
+    - ArrayOfPageTreeNodeKids
+    notes: https://github.com/pdf-association/pdf-issues/issues/271
+  - goName: null
+    pdfKey: Count
+    pdfType: integer
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - fn:Eval(@Count>0)
+    notes: https://github.com/pdf-association/pdf-issues/issues/271
+  - goName: null
+    pdfKey: Resources
+    pdfType: dictionary
+    required: false
+    introduced: '1.0'
+    inheritable: true
+    refTypes:
+    - Resource
+    notes: Inheritable from Parent
+  - goName: null
+    pdfKey: MediaBox
+    pdfType: rectangle
+    required: false
+    introduced: '1.0'
+    inheritable: true
+    notes: Inheritable from Parent
+  - goName: null
+    pdfKey: CropBox
+    pdfType: rectangle
+    required: false
+    default: '@MediaBox'
+    introduced: '1.0'
+    inheritable: true
+    notes: Inheritable from Parent
+  - goName: null
+    pdfKey: Rotate
+    pdfType: integer
+    required: false
+    default: '0'
+    introduced: '1.0'
+    possibleValues:
+    - fn:Eval((@Rotate mod 90)==0)
+    inheritable: true
+    notes: Inheritable from Parent
+- name: PageTreeNodeRoot
+  goType: null
+  pdfType: Pages
+  pdfRepr: dict
+  introduced: '1.0'
+  specTable: Table 30
+  arlingtonSrc: PageTreeNodeRoot.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - Pages
+    notes: Table 30 and Table 31 for inheritable keys
+  - goName: null
+    pdfKey: Kids
+    pdfType: array
+    required: true
+    introduced: '1.0'
+    refTypes:
+    - ArrayOfPageTreeNodeKids
+  - goName: null
+    pdfKey: Count
+    pdfType: integer
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - fn:Eval(@Count>=0)
+  - goName: null
+    pdfKey: Resources
+    pdfType: dictionary
+    required: false
+    introduced: '1.0'
+    refTypes:
+    - Resource
+    notes: Inheritable
+  - goName: null
+    pdfKey: MediaBox
+    pdfType: rectangle
+    required: false
+    introduced: '1.0'
+    notes: Inheritable
+  - goName: null
+    pdfKey: CropBox
+    pdfType: rectangle
+    required: false
+    default: '@MediaBox'
+    introduced: '1.0'
+    notes: Inheritable
+  - goName: null
+    pdfKey: Rotate
+    pdfType: integer
+    required: false
+    default: '0'
+    introduced: '1.0'
+    possibleValues:
+    - fn:Eval((@Rotate mod 90)==0)
+    notes: Inheritable
+- name: Reference
+  goType: null
+  pdfRepr: dict
+  introduced: '1.4'
+  arlingtonSrc: Reference.tsv
+  fields:
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: true
+    introduced: '1.4'
+    refTypes:
+    - FileSpecification
+    notes: Table 95
+  - goName: null
+    pdfKey: Page
+    pdfType: integer;text-string
+    required: true
+    introduced: '1.4'
+    possibleValues:
+    - fn:Eval(@Page>=0)
+  - goName: null
+    pdfKey: ID
+    pdfType: array
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - ArrayOf_2StringsByte
+- name: Resource
+  goType: graphics/content.Resources
+  pdfRepr: dict
+  arlingtonSrc: Resource.tsv
+  fields:
+  - goName: ExtGState
+    pdfKey: ExtGState
+    pdfType: dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - GraphicsStateParameterMap
+    notes: Table 34
+    goType: map[pdf.Name]*extgstate.ExtGState
+  - goName: ColorSpace
+    pdfKey: ColorSpace
+    pdfType: dictionary
+    required: false
+    introduced: '1.0'
+    refTypes:
+    - ColorSpaceMap
+    goType: map[pdf.Name]color.Space
+  - goName: Pattern
+    pdfKey: Pattern
+    pdfType: dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - PatternMap
+    goType: map[pdf.Name]color.Pattern
+  - goName: Shading
+    pdfKey: Shading
+    pdfType: dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ShadingMap
+    goType: map[pdf.Name]graphics.Shading
+  - goName: XObject
+    pdfKey: XObject
+    pdfType: dictionary
+    required: false
+    introduced: '1.0'
+    refTypes:
+    - XObjectMap
+    goType: map[pdf.Name]graphics.XObject
+  - goName: Font
+    pdfKey: Font
+    pdfType: dictionary
+    required: false
+    introduced: '1.0'
+    refTypes:
+    - FontMap
+    goType: map[pdf.Name]font.Instance
+  - goName: ProcSet
+    pdfKey: ProcSet
+    pdfType: array
+    required: false
+    introduced: '1.0'
+    deprecated: '2.0'
+    refTypes:
+    - ArrayOfNamesForProcSet
+    notes: https://github.com/pdf-association/pdf-issues/issues/367
+    goType: ProcSet
+  - goName: Properties
+    pdfKey: Properties
+    pdfType: dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - DictionaryOfDictionaries
+    goType: map[pdf.Name]property.List
+  - goName: null
+    pdfKey: Encoding
+    pdfType: dictionary
+    required: false
+    introduced: '1.0'
+    deprecated: '1.2'
+    refTypes:
+    - Encoding
+    notes: see Adobe PDF Reference 1.0, 6.8.3
+  writeMethod: (*Resources).Embed
+  goPackage: content
+  goRepr: struct
+- name: Stream
+  goType: metadata.Stream
+  pdfRepr: stream
+  arlingtonSrc: Stream.tsv
+  fields:
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.0'
+    notes: Table 5
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.0'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - fn:SinceVersion(1.2,FlateDecode)
+    - RunLengthDecode
+    - CCITTFaxDecode
+    - fn:SinceVersion(1.4,JBIG2Decode)
+    - DCTDecode
+    - fn:SinceVersion(1.5,JPXDecode)
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfFilterNames
+    notes: Table 6
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.0'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - fn:SinceVersion(1.2
+    - FilterFlateDecode)
+    - FilterCCITTFaxDecode
+    - fn:SinceVersion(1.4
+    - FilterJBIG2Decode)
+    - FilterDCTDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - CCITTFaxDecode
+    - fn:SinceVersion(1.4,JBIG2Decode)
+    - DCTDecode
+    - fn:SinceVersion(1.5,JPXDecode)
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - FilterCCITTFaxDecode
+    - fn:SinceVersion(1.4
+    - FilterJBIG2Decode)
+    - FilterDCTDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  goPackage: metadata
+  goRepr: struct
+  specSection: '14.3'
+  readFunc: metadata.Extract
+  writeMethod: (*Stream).Embed
+- name: Thread
+  goType: action.Thread
+  pdfType: Thread
+  pdfRepr: dict
+  introduced: '1.1'
+  specTable: Table 162
+  arlingtonSrc: Thread.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.1'
+    possibleValues:
+    - Thread
+    notes: Table 162
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary
+    required: true
+    introduced: '1.1'
+    refTypes:
+    - BeadFirst
+  - goName: null
+    pdfKey: I
+    pdfType: dictionary
+    required: false
+    introduced: '1.1'
+    refTypes:
+    - DocInfo
+  - goName: null
+    pdfKey: Metadata
+    pdfType: stream
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Metadata
+  goPackage: action
+  goRepr: struct
+  specSection: 12.6.2
+  writeMethod: (*Thread).Encode
+- name: ViewerPreferences
+  goType: null
+  pdfRepr: dict
+  arlingtonSrc: ViewerPreferences.tsv
+  fields:
+  - goName: null
+    pdfKey: HideToolbar
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.2'
+    notes: Table 147
+  - goName: null
+    pdfKey: HideMenubar
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.2'
+  - goName: null
+    pdfKey: HideWindowUI
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.2'
+  - goName: null
+    pdfKey: FitWindow
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.2'
+  - goName: null
+    pdfKey: CenterWindow
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.2'
+  - goName: null
+    pdfKey: DisplayDocTitle
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.4'
+  - goName: null
+    pdfKey: NonFullScreenPageMode
+    pdfType: name
+    required: false
+    default: UseNone
+    introduced: '1.2'
+    possibleValues:
+    - UseNone
+    - UseOutlines
+    - UseThumbs
+    - UseOC
+    - fn:SinceVersion(2.0,UseAttachments)
+    notes: https://github.com/pdf-association/pdf-issues/issues/275
+  - goName: null
+    pdfKey: Direction
+    pdfType: name
+    required: false
+    default: L2R
+    introduced: '1.3'
+    possibleValues:
+    - L2R
+    - R2L
+  - goName: null
+    pdfKey: ViewArea
+    pdfType: name
+    required: false
+    default: CropBox
+    introduced: '1.4'
+    deprecated: '2.0'
+    possibleValues:
+    - MediaBox
+    - CropBox
+    - BleedBox
+    - TrimBox
+    - ArtBox
+  - goName: null
+    pdfKey: ViewClip
+    pdfType: name
+    required: false
+    default: CropBox
+    introduced: '1.4'
+    deprecated: '2.0'
+    possibleValues:
+    - MediaBox
+    - CropBox
+    - BleedBox
+    - TrimBox
+    - ArtBox
+  - goName: null
+    pdfKey: PrintArea
+    pdfType: name
+    required: false
+    default: CropBox
+    introduced: '1.4'
+    deprecated: '2.0'
+    possibleValues:
+    - MediaBox
+    - CropBox
+    - BleedBox
+    - TrimBox
+    - ArtBox
+  - goName: null
+    pdfKey: PrintClip
+    pdfType: name
+    required: false
+    default: CropBox
+    introduced: '1.4'
+    deprecated: '2.0'
+    possibleValues:
+    - MediaBox
+    - CropBox
+    - BleedBox
+    - TrimBox
+    - ArtBox
+  - goName: null
+    pdfKey: PrintScaling
+    pdfType: name
+    required: false
+    default: AppDefault
+    introduced: '1.6'
+    possibleValues:
+    - None
+    - AppDefault
+    - '*'
+  - goName: null
+    pdfKey: Duplex
+    pdfType: name
+    required: false
+    default: fn:ImplementationDependent()
+    introduced: '1.7'
+    possibleValues:
+    - Simplex
+    - DuplexFlipShortEdge
+    - DuplexFlipLongEdge
+  - goName: null
+    pdfKey: PickTrayByPDFSize
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.7'
+  - goName: null
+    pdfKey: PrintPageRange
+    pdfType: array
+    required: false
+    default: fn:ImplementationDependent()
+    introduced: '1.7'
+    refTypes:
+    - ArrayOfIntegersGreaterThanZero
+  - goName: null
+    pdfKey: NumCopies
+    pdfType: integer
+    required: false
+    default: fn:ImplementationDependent()
+    introduced: '1.7'
+    possibleValues:
+    - fn:Eval(@NumCopies>0)
+  - goName: null
+    pdfKey: Enforce
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - ArrayOfNamesForEnforce
+- name: XRefStream
+  goType: null
+  pdfType: XRef
+  pdfRepr: stream
+  introduced: '1.5'
+  specTable: Table 5
+  arlingtonSrc: XRefStream.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - XRef
+    notes: Table 5 and Table 15 and Table 17
+  - goName: null
+    pdfKey: Size
+    pdfType: integer
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval(@Size>1)
+  - goName: null
+    pdfKey: Index
+    pdfType: array
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - ArrayOfXRefIndexIntegers
+    notes: Must be even array length. Object numbers can only be in one subsection.
+  - goName: null
+    pdfKey: Prev
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval((@Prev>=0) && (@Prev<=fn:FileSize()))
+  - goName: null
+    pdfKey: W
+    pdfType: array
+    required: true
+    introduced: '1.5'
+    refTypes:
+    - ArrayOfXRefWIntegers
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval(@Length>=0)
+    notes: https://github.com/pdf-association/pdf-issues/issues/246
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    refTypes:
+    - ArrayOfCompressionFilterNames
+    notes: Table 6
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.5'
+    deprecated: '2.0'
+    refTypes:
+    - FileSpecification
+    notes: https://github.com/pdf-association/pdf-issues/issues/246
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.5'
+    deprecated: '2.0'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    refTypes:
+    - ArrayOfCompressionFilterNames
+    notes: Table 6, https://github.com/pdf-association/pdf-issues/issues/246
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.5'
+    deprecated: '2.0'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    notes: https://github.com/pdf-association/pdf-issues/issues/246
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval(@DL>=0)
+  - goName: null
+    pdfKey: Root
+    pdfType: dictionary
+    required: true
+    introduced: '1.5'
+    refTypes:
+    - Catalog
+  - goName: null
+    pdfKey: Info
+    pdfType: dictionary
+    required: fn:IsRequired(fn:IsPresent(trailer::Catalog::PieceInfo))
+    introduced: '1.5'
+    refTypes:
+    - DocInfo
+    notes: https://github.com/pdf-association/pdf-issues/issues/106
+  - goName: null
+    pdfKey: ID
+    pdfType: array
+    required: fn:IsRequired(fn:SinceVersion(2.0) || fn:IsPresent(Encrypt))
+    introduced: '1.5'
+    refTypes:
+    - TrailerIDArray
+  - goName: null
+    pdfKey: Encrypt
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - EncryptionStandard
+    - EncryptionPublicKey
+    notes: https://github.com/pdf-association/pdf-issues/issues/246
+  - goName: null
+    pdfKey: AuthCode
+    pdfType: dictionary
+    required: false
+    introduced: fn:Extension(ISO_TS_32004,2.0)
+    refTypes:
+    - AuthCode
+    notes: ISO/TS 32004 integrity protection
+  - goName: null
+    pdfKey: AdditionalStreams
+    pdfType: array
+    required: false
+    introduced: fn:Extension(OpenOffice,1.5)
+    refTypes:
+    - OOAdditionalStmsArray
+    notes: OpenOffice/LibreOffice extension - array of MIME types and streams
+  - goName: null
+    pdfKey: DocChecksum
+    pdfType: name
+    required: false
+    introduced: fn:Extension(OpenOffice,1.5)
+    notes: OpenOffice/LibreOffice extension - hex MD5 as a name object

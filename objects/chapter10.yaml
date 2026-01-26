@@ -1,0 +1,2728 @@
+chapter: 10
+title: Fonts
+types:
+- name: CIDFontDescriptorMetrics
+  goType: null
+  pdfType: FontDescriptor
+  pdfRepr: dict
+  introduced: '1.2'
+  arlingtonSrc: CIDFontDescriptorMetrics.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - FontDescriptor
+    notes: Clause 9.8.3.3
+  - goName: null
+    pdfKey: FontName
+    pdfType: name
+    required: true
+    introduced: '1.2'
+  - goName: null
+    pdfKey: Flags
+    pdfType: bitmask
+    required: true
+    introduced: '1.2'
+    notes: Table 121
+  - goName: null
+    pdfKey: FontBBox
+    pdfType: rectangle
+    required: true
+    introduced: '1.2'
+  - goName: null
+    pdfKey: ItalicAngle
+    pdfType: number
+    required: true
+    introduced: '1.2'
+  - goName: null
+    pdfKey: Ascent
+    pdfType: number
+    required: true
+    introduced: '1.2'
+  - goName: null
+    pdfKey: Descent
+    pdfType: number
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - fn:Eval(@Descent<=0)
+    notes: https://github.com/pdf-association/pdf-issues/issues/190
+  - goName: null
+    pdfKey: Leading
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.2'
+  - goName: null
+    pdfKey: CapHeight
+    pdfType: number
+    required: false
+    introduced: '1.2'
+  - goName: null
+    pdfKey: XHeight
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.2'
+  - goName: null
+    pdfKey: StemV
+    pdfType: number
+    required: true
+    introduced: '1.2'
+  - goName: null
+    pdfKey: StemH
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.2'
+  - goName: null
+    pdfKey: AvgWidth
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.2'
+  - goName: null
+    pdfKey: MaxWidth
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.2'
+  - goName: null
+    pdfKey: MissingWidth
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.2'
+  - goName: null
+    pdfKey: CharSet
+    pdfType: string
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+- name: CIDSystemInfo
+  goType: null
+  pdfRepr: dict
+  introduced: '1.2'
+  arlingtonSrc: CIDSystemInfo.tsv
+  fields:
+  - goName: null
+    pdfKey: Registry
+    pdfType: ascii-string
+    required: true
+    introduced: '1.2'
+    notes: Table 114
+  - goName: null
+    pdfKey: Ordering
+    pdfType: ascii-string
+    required: true
+    introduced: '1.2'
+  - goName: null
+    pdfKey: Supplement
+    pdfType: integer
+    required: true
+    introduced: '1.2'
+- name: CMapStream
+  goType: font/cmap.File
+  pdfType: CMap
+  pdfRepr: stream
+  introduced: '1.2'
+  specTable: Table 5
+  arlingtonSrc: CMapStream.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - CMap
+    notes: Table 5 and Table 118
+  - goName: null
+    pdfKey: CMapName
+    pdfType: name
+    required: true
+    introduced: '1.2'
+  - goName: null
+    pdfKey: CIDSystemInfo
+    pdfType: dictionary
+    required: true
+    introduced: '1.2'
+    refTypes:
+    - CIDSystemInfo
+  - goName: WMode
+    pdfKey: WMode
+    pdfType: integer
+    required: false
+    default: '0'
+    introduced: '1.2'
+    possibleValues:
+    - '1'
+    - '0'
+    goType: font.WritingMode
+  - goName: null
+    pdfKey: UseCMap
+    pdfType: name;stream
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - GB-EUC-H
+    - GB-EUC-V
+    - GBpc-EUC-H
+    - GBpc-EUC-V
+    - GBK-EUC-H
+    - GBK-EUC-V
+    - GBKp-EUC-H
+    - GBKp-EUC-V
+    - GBK2K-H
+    - GBK2K-V
+    - UniGB-UCS2-H
+    - UniGB-UCS2-V
+    - UniGB-UTF16-H
+    - UniGB-UTF16-V
+    - B5pc-H
+    - B5pc-V
+    - HKscs-B5-H
+    - HKscs-B5-V
+    - ETen-B5-H
+    - ETen-B5-V
+    - ETenms-B5-H
+    - ETenms-B5-V
+    - CNS-EUC-H
+    - CNS-EUC-V
+    - UniCNS-UCS2-H
+    - UniCNS-UCS2-V
+    - UniCNS-UTF16-H
+    - UniCNS-UTF16-V
+    - 83pv-RKSJ-H
+    - 90ms-RKSJ-H
+    - 90ms-RKSJ-V
+    - 90msp-RKSJ-H
+    - 90msp-RKSJ-V
+    - 90pv-RKSJ-H
+    - Add-RKSJ-H
+    - Add-RKSJ-V
+    - EUC-H
+    - EUC-V
+    - Ext-RKSJ-H
+    - Ext-RKSJ-V
+    - H
+    - V
+    - UniJIS-UCS2-H
+    - UniJIS-UCS2-V
+    - UniJIS-UCS2-HW-H
+    - UniJIS-UCS2-HW-V
+    - UniJIS-UTF16-H
+    - UniJIS-UTF16-V
+    - KSC-EUC-H
+    - KSC-EUC-V
+    - KSCms-UHC-H
+    - KSCms-UHC-V
+    - KSCms-UHC-HW-H
+    - KSCms-UHC-HW-V
+    - KSCpc-EUC-H
+    - UniKS-UCS2-H
+    - UniKS-UCS2-V
+    - UniKS-UTF16-H
+    - UniKS-UTF16-V
+    - Identity-H
+    - Identity-V
+    refTypes:
+    - Stream
+    notes: Table 116
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.2'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  readFunc: cmap.Extract
+  writeMethod: (*File).Embed
+  goPackage: cmap
+  goRepr: struct
+- name: Encoding
+  goType: null
+  pdfType: Encoding
+  pdfRepr: dict
+  introduced: '1.2'
+  specTable: Table 112
+  arlingtonSrc: Encoding.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - Encoding
+    notes: Table 112
+  - goName: null
+    pdfKey: BaseEncoding
+    pdfType: name
+    required: false
+    introduced: '1.0'
+    possibleValues:
+    - MacRomanEncoding
+    - MacExpertEncoding
+    - WinAnsiEncoding
+  - goName: null
+    pdfKey: Differences
+    pdfType: array
+    required: false
+    introduced: '1.0'
+    refTypes:
+    - ArrayOfDifferences
+- name: FontCIDType0
+  goType: font/dict.CIDFontType0
+  pdfType: Font
+  pdfRepr: dict
+  introduced: '1.2'
+  specTable: Table 115
+  arlingtonSrc: FontCIDType0.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - Font
+    notes: Table 115
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - CIDFontType0
+  - goName: null
+    pdfKey: BaseFont
+    pdfType: name
+    required: true
+    introduced: '1.2'
+  - goName: null
+    pdfKey: CIDSystemInfo
+    pdfType: dictionary
+    required: true
+    introduced: '1.2'
+    refTypes:
+    - CIDSystemInfo
+  - goName: null
+    pdfKey: FontDescriptor
+    pdfType: dictionary
+    required: true
+    introduced: '1.2'
+    refTypes:
+    - FontDescriptorCIDType0
+    notes: https://github.com/pdf-association/pdf-issues/issues/106
+  - goName: null
+    pdfKey: DW
+    pdfType: integer;fn:SinceVersion(2.0,number)
+    required: false
+    default: '[1000];[1000]'
+    introduced: '1.2'
+    notes: https://github.com/pdf-association/arlington-pdf-model/issues/125
+  - goName: null
+    pdfKey: W
+    pdfType: array
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfCIDGlyphMetricsW
+  - goName: null
+    pdfKey: DW2
+    pdfType: array
+    required: false
+    default: '[880 -1000]'
+    introduced: '1.2'
+    refTypes:
+    - ArrayOf_2Numbers
+  - goName: null
+    pdfKey: W2
+    pdfType: array
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfCIDGlyphMetricsW2
+  - goName: null
+    pdfKey: CIDToGIDMap
+    pdfType: name;stream
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - Identity
+    refTypes:
+    - Stream
+  - goName: ToUnicode
+    pdfKey: ToUnicode
+    pdfType: stream
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ToUnicodeCMapStream
+    goType: '*cmap.ToUnicodeFile'
+    purpose: 'ToUnicode (optional) specifies how character codes are mapped to Unicode
+
+      strings.  This overrides any mapping implied by the CID values.'
+  writeMethod: (*CIDFontType0).Embed
+  goPackage: dict
+  goRepr: struct
+- name: FontCIDType2
+  goType: font/dict.CIDFontType2
+  pdfType: Font
+  pdfRepr: dict
+  introduced: '1.2'
+  specTable: Table 115
+  arlingtonSrc: FontCIDType2.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - Font
+    notes: Table 115
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - CIDFontType2
+  - goName: null
+    pdfKey: BaseFont
+    pdfType: name
+    required: true
+    introduced: '1.2'
+  - goName: null
+    pdfKey: CIDSystemInfo
+    pdfType: dictionary
+    required: true
+    introduced: '1.2'
+    refTypes:
+    - CIDSystemInfo
+  - goName: null
+    pdfKey: FontDescriptor
+    pdfType: dictionary
+    required: true
+    introduced: '1.2'
+    refTypes:
+    - FontDescriptorCIDType2
+    notes: https://github.com/pdf-association/pdf-issues/issues/106
+  - goName: null
+    pdfKey: DW
+    pdfType: integer;fn:SinceVersion(2.0,number)
+    required: false
+    default: '[1000];[1000]'
+    introduced: '1.2'
+    notes: https://github.com/pdf-association/arlington-pdf-model/issues/125
+  - goName: null
+    pdfKey: W
+    pdfType: array
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfCIDGlyphMetricsW
+  - goName: null
+    pdfKey: DW2
+    pdfType: array
+    required: false
+    default: '[880 -1000]'
+    introduced: '1.2'
+    refTypes:
+    - ArrayOf_2Numbers
+  - goName: null
+    pdfKey: W2
+    pdfType: array
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfCIDGlyphMetricsW2
+  - goName: null
+    pdfKey: CIDToGIDMap
+    pdfType: name;stream
+    required: fn:IsRequired(fn:SinceVersion(2.0) && fn:IsPresent(FontDescriptor::FontFile2))
+    introduced: '1.2'
+    possibleValues:
+    - Identity
+    refTypes:
+    - Stream
+  - goName: ToUnicode
+    pdfKey: ToUnicode
+    pdfType: stream
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ToUnicodeCMapStream
+    goType: '*cmap.ToUnicodeFile'
+    purpose: 'ToUnicode (optional) specifies how character codes are mapped to Unicode
+
+      strings.  This overrides any mapping implied by the CID values.'
+  writeMethod: (*CIDFontType2).Embed
+  goPackage: dict
+  goRepr: struct
+- name: FontDescriptorCIDType0
+  goType: font.Descriptor
+  pdfType: FontDescriptor
+  pdfRepr: dict
+  introduced: '1.2'
+  specTable: Table 120
+  arlingtonSrc: FontDescriptorCIDType0.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - FontDescriptor
+    notes: Table 120 and Table 122
+  - goName: FontName
+    pdfKey: FontName
+    pdfType: name
+    required: true
+    introduced: '1.2'
+    goType: string
+    purpose: 'FontName (required, except for Type 3 fonts) is the PostScript name of the font.
+
+      If the font has been subsetted, the name is prefixed with a subset tag
+
+      of the form "ABCDEF+".
+
+
+      This field is used primarily for the purpose of determining if a font has been subset.
+
+      See https://github.com/pdf-association/pdf-issues/issues/11 .'
+  - goName: FontFamily
+    pdfKey: FontFamily
+    pdfType: string
+    required: false
+    introduced: '1.5'
+    goType: string
+  - goName: FontStretch
+    pdfKey: FontStretch
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - UltraCondensed
+    - ExtraCondensed
+    - Condensed
+    - SemiCondensed
+    - Normal
+    - SemiExpanded
+    - Expanded
+    - ExtraExpanded
+    - UltraExpanded
+    goType: os2.Width
+  - goName: FontWeight
+    pdfKey: FontWeight
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval((@FontWeight>=1) && (@FontWeight<=1000))
+    notes: https://github.com/pdf-association/pdf-issues/issues/474
+    goType: os2.Weight
+  - goName: null
+    pdfKey: Flags
+    pdfType: bitmask
+    required: true
+    introduced: '1.2'
+    notes: Table 121
+  - goName: FontBBox
+    pdfKey: FontBBox
+    pdfType: rectangle
+    required: true
+    introduced: '1.2'
+    goType: rect.Rect
+  - goName: ItalicAngle
+    pdfKey: ItalicAngle
+    pdfType: number
+    required: true
+    introduced: '1.2'
+    goType: float64
+  - goName: Ascent
+    pdfKey: Ascent
+    pdfType: number
+    required: true
+    introduced: '1.2'
+    goType: float64
+  - goName: Descent
+    pdfKey: Descent
+    pdfType: number
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - fn:Eval(@Descent<=0)
+    notes: https://github.com/pdf-association/pdf-issues/issues/190
+    goType: float64
+  - goName: Leading
+    pdfKey: Leading
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.2'
+    goType: float64
+  - goName: CapHeight
+    pdfKey: CapHeight
+    pdfType: number
+    required: fn:IsRequired(fn:FontHasLatinChars())
+    introduced: '1.2'
+    goType: float64
+  - goName: XHeight
+    pdfKey: XHeight
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.2'
+    goType: float64
+  - goName: StemV
+    pdfKey: StemV
+    pdfType: number
+    required: true
+    introduced: '1.2'
+    goType: float64
+  - goName: StemH
+    pdfKey: StemH
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.2'
+    goType: float64
+  - goName: AvgWidth
+    pdfKey: AvgWidth
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.2'
+    goType: float64
+  - goName: MaxWidth
+    pdfKey: MaxWidth
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.2'
+    goType: float64
+  - goName: MissingWidth
+    pdfKey: MissingWidth
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.2'
+    goType: float64
+  - goName: null
+    pdfKey: FontFile
+    pdfType: stream
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - FontFile
+    notes: Table 124
+  - goName: null
+    pdfKey: FontFile3
+    pdfType: stream
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FontFile3CIDType0
+    - fn:SinceVersion(1.6
+    - FontFile3OpenType)
+    notes: Table 124, https://github.com/pdf-association/arlington-pdf-model/issues/98
+  - goName: null
+    pdfKey: Style
+    pdfType: dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - StyleDict
+  - goName: null
+    pdfKey: Lang
+    pdfType: name
+    required: false
+    introduced: '1.5'
+  - goName: null
+    pdfKey: FD
+    pdfType: dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - FDDict
+  - goName: null
+    pdfKey: CIDSet
+    pdfType: stream
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    refTypes:
+    - Stream
+  goPackage: font
+  goRepr: struct
+  readFunc: font.ExtractDescriptor
+- name: FontDescriptorCIDType2
+  goType: font.Descriptor
+  pdfType: FontDescriptor
+  pdfRepr: dict
+  introduced: '1.2'
+  specTable: Table 120
+  arlingtonSrc: FontDescriptorCIDType2.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - FontDescriptor
+    notes: Table 120 and Table 122
+  - goName: FontName
+    pdfKey: FontName
+    pdfType: name
+    required: true
+    introduced: '1.2'
+    goType: string
+    purpose: 'FontName (required, except for Type 3 fonts) is the PostScript name of the font.
+
+      If the font has been subsetted, the name is prefixed with a subset tag
+
+      of the form "ABCDEF+".
+
+
+      This field is used primarily for the purpose of determining if a font has been subset.
+
+      See https://github.com/pdf-association/pdf-issues/issues/11 .'
+  - goName: FontFamily
+    pdfKey: FontFamily
+    pdfType: string
+    required: false
+    introduced: '1.5'
+    goType: string
+  - goName: FontStretch
+    pdfKey: FontStretch
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - UltraCondensed
+    - ExtraCondensed
+    - Condensed
+    - SemiCondensed
+    - Normal
+    - SemiExpanded
+    - Expanded
+    - ExtraExpanded
+    - UltraExpanded
+    goType: os2.Width
+  - goName: FontWeight
+    pdfKey: FontWeight
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval((@FontWeight>=1) && (@FontWeight<=1000))
+    notes: https://github.com/pdf-association/pdf-issues/issues/474
+    goType: os2.Weight
+  - goName: null
+    pdfKey: Flags
+    pdfType: bitmask
+    required: true
+    introduced: '1.2'
+    notes: Table 121
+  - goName: FontBBox
+    pdfKey: FontBBox
+    pdfType: rectangle
+    required: true
+    introduced: '1.2'
+    goType: rect.Rect
+  - goName: ItalicAngle
+    pdfKey: ItalicAngle
+    pdfType: number
+    required: true
+    introduced: '1.2'
+    goType: float64
+  - goName: Ascent
+    pdfKey: Ascent
+    pdfType: number
+    required: true
+    introduced: '1.2'
+    goType: float64
+  - goName: Descent
+    pdfKey: Descent
+    pdfType: number
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - fn:Eval(@Descent<=0)
+    notes: https://github.com/pdf-association/pdf-issues/issues/190
+    goType: float64
+  - goName: Leading
+    pdfKey: Leading
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.2'
+    goType: float64
+  - goName: CapHeight
+    pdfKey: CapHeight
+    pdfType: number
+    required: fn:IsRequired(fn:FontHasLatinChars())
+    introduced: '1.2'
+    goType: float64
+  - goName: XHeight
+    pdfKey: XHeight
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.2'
+    goType: float64
+  - goName: StemV
+    pdfKey: StemV
+    pdfType: number
+    required: true
+    introduced: '1.2'
+    goType: float64
+  - goName: StemH
+    pdfKey: StemH
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.2'
+    goType: float64
+  - goName: AvgWidth
+    pdfKey: AvgWidth
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.2'
+    goType: float64
+  - goName: MaxWidth
+    pdfKey: MaxWidth
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.2'
+    goType: float64
+  - goName: MissingWidth
+    pdfKey: MissingWidth
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.2'
+    goType: float64
+  - goName: null
+    pdfKey: FontFile
+    pdfType: stream
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - FontFile
+    notes: Table 124
+  - goName: null
+    pdfKey: FontFile2
+    pdfType: stream
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - FontFile2
+    notes: Table 124
+  - goName: null
+    pdfKey: Style
+    pdfType: dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - StyleDict
+  - goName: null
+    pdfKey: Lang
+    pdfType: name
+    required: false
+    introduced: '1.5'
+  - goName: null
+    pdfKey: FD
+    pdfType: dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - FDDict
+  - goName: null
+    pdfKey: CIDSet
+    pdfType: stream
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    refTypes:
+    - Stream
+  - goName: null
+    pdfKey: FontFile3
+    pdfType: stream
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - FontFile3OpenType
+    notes: Table 124, https://github.com/pdf-association/arlington-pdf-model/issues/98
+  goPackage: font
+  goRepr: struct
+  readFunc: font.ExtractDescriptor
+- name: FontDescriptorTrueType
+  goType: font.Descriptor
+  pdfType: FontDescriptor
+  pdfRepr: dict
+  specTable: Table 120
+  arlingtonSrc: FontDescriptorTrueType.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - FontDescriptor
+    notes: Table 120
+  - goName: FontName
+    pdfKey: FontName
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    goType: string
+    purpose: 'FontName (required, except for Type 3 fonts) is the PostScript name of the font.
+
+      If the font has been subsetted, the name is prefixed with a subset tag
+
+      of the form "ABCDEF+".
+
+
+      This field is used primarily for the purpose of determining if a font has been subset.
+
+      See https://github.com/pdf-association/pdf-issues/issues/11 .'
+  - goName: FontFamily
+    pdfKey: FontFamily
+    pdfType: byte-string
+    required: false
+    introduced: '1.5'
+    goType: string
+  - goName: FontStretch
+    pdfKey: FontStretch
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - UltraCondensed
+    - ExtraCondensed
+    - Condensed
+    - SemiCondensed
+    - Normal
+    - SemiExpanded
+    - Expanded
+    - ExtraExpanded
+    - UltraExpanded
+    goType: os2.Width
+  - goName: FontWeight
+    pdfKey: FontWeight
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval((@FontWeight>=1) && (@FontWeight<=1000))
+    notes: https://github.com/pdf-association/pdf-issues/issues/474
+    goType: os2.Weight
+  - goName: null
+    pdfKey: Flags
+    pdfType: bitmask
+    required: true
+    introduced: '1.0'
+    notes: Table 121
+  - goName: FontBBox
+    pdfKey: FontBBox
+    pdfType: rectangle
+    required: true
+    introduced: '1.0'
+    goType: rect.Rect
+  - goName: ItalicAngle
+    pdfKey: ItalicAngle
+    pdfType: number
+    required: true
+    introduced: '1.0'
+    goType: float64
+  - goName: Ascent
+    pdfKey: Ascent
+    pdfType: number
+    required: true
+    introduced: '1.0'
+    goType: float64
+  - goName: Descent
+    pdfKey: Descent
+    pdfType: number
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - fn:Eval(@Descent<=0)
+    notes: https://github.com/pdf-association/pdf-issues/issues/190
+    goType: float64
+  - goName: Leading
+    pdfKey: Leading
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.0'
+    goType: float64
+  - goName: CapHeight
+    pdfKey: CapHeight
+    pdfType: number
+    required: fn:IsRequired(fn:FontHasLatinChars())
+    introduced: '1.0'
+    goType: float64
+  - goName: XHeight
+    pdfKey: XHeight
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.0'
+    goType: float64
+  - goName: StemV
+    pdfKey: StemV
+    pdfType: number
+    required: true
+    introduced: '1.0'
+    goType: float64
+  - goName: StemH
+    pdfKey: StemH
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.0'
+    goType: float64
+  - goName: AvgWidth
+    pdfKey: AvgWidth
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.0'
+    goType: float64
+  - goName: MaxWidth
+    pdfKey: MaxWidth
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.0'
+    goType: float64
+  - goName: MissingWidth
+    pdfKey: MissingWidth
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.0'
+    goType: float64
+  - goName: null
+    pdfKey: FontFile
+    pdfType: stream
+    required: false
+    introduced: '1.1'
+    refTypes:
+    - FontFileType1
+    notes: Table 124
+  - goName: null
+    pdfKey: FontFile2
+    pdfType: stream
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - FontFile2
+    notes: Table 124
+  - goName: null
+    pdfKey: FontFile3
+    pdfType: stream
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - FontFile3OpenType
+    notes: Table 124, https://github.com/pdf-association/arlington-pdf-model/issues/98
+  goPackage: font
+  goRepr: struct
+  readFunc: font.ExtractDescriptor
+- name: FontDescriptorType1
+  goType: font.Descriptor
+  pdfType: FontDescriptor
+  pdfRepr: dict
+  specTable: Table 120
+  arlingtonSrc: FontDescriptorType1.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - FontDescriptor
+    notes: Table 120
+  - goName: FontName
+    pdfKey: FontName
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    goType: string
+    purpose: 'FontName (required, except for Type 3 fonts) is the PostScript name of the font.
+
+      If the font has been subsetted, the name is prefixed with a subset tag
+
+      of the form "ABCDEF+".
+
+
+      This field is used primarily for the purpose of determining if a font has been subset.
+
+      See https://github.com/pdf-association/pdf-issues/issues/11 .'
+  - goName: FontFamily
+    pdfKey: FontFamily
+    pdfType: byte-string
+    required: false
+    introduced: '1.5'
+    goType: string
+  - goName: FontStretch
+    pdfKey: FontStretch
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - UltraCondensed
+    - ExtraCondensed
+    - Condensed
+    - SemiCondensed
+    - Normal
+    - SemiExpanded
+    - Expanded
+    - ExtraExpanded
+    - UltraExpanded
+    goType: os2.Width
+  - goName: FontWeight
+    pdfKey: FontWeight
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval((@FontWeight>=1) && (@FontWeight<=1000))
+    notes: https://github.com/pdf-association/pdf-issues/issues/474
+    goType: os2.Weight
+  - goName: null
+    pdfKey: Flags
+    pdfType: bitmask
+    required: true
+    introduced: '1.0'
+    notes: Table 121
+  - goName: FontBBox
+    pdfKey: FontBBox
+    pdfType: rectangle
+    required: true
+    introduced: '1.0'
+    goType: rect.Rect
+  - goName: ItalicAngle
+    pdfKey: ItalicAngle
+    pdfType: number
+    required: true
+    introduced: '1.0'
+    goType: float64
+  - goName: Ascent
+    pdfKey: Ascent
+    pdfType: number
+    required: true
+    introduced: '1.0'
+    goType: float64
+  - goName: Descent
+    pdfKey: Descent
+    pdfType: number
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - fn:Eval(@Descent<=0)
+    notes: https://github.com/pdf-association/pdf-issues/issues/190
+    goType: float64
+  - goName: Leading
+    pdfKey: Leading
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.0'
+    goType: float64
+  - goName: CapHeight
+    pdfKey: CapHeight
+    pdfType: number
+    required: false
+    introduced: '1.0'
+    goType: float64
+  - goName: XHeight
+    pdfKey: XHeight
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.0'
+    goType: float64
+  - goName: StemV
+    pdfKey: StemV
+    pdfType: number
+    required: true
+    introduced: '1.0'
+    goType: float64
+  - goName: StemH
+    pdfKey: StemH
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.0'
+    goType: float64
+  - goName: AvgWidth
+    pdfKey: AvgWidth
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.0'
+    goType: float64
+  - goName: MaxWidth
+    pdfKey: MaxWidth
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.0'
+    goType: float64
+  - goName: MissingWidth
+    pdfKey: MissingWidth
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.0'
+    goType: float64
+  - goName: null
+    pdfKey: FontFile
+    pdfType: stream
+    required: false
+    introduced: '1.0'
+    refTypes:
+    - FontFileType1
+    notes: Table 124
+  - goName: null
+    pdfKey: FontFile3
+    pdfType: stream
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - FontFile3Type1
+    - fn:SinceVersion(1.6
+    - FontFile3OpenType)
+    notes: Table 124, https://github.com/pdf-association/arlington-pdf-model/issues/98
+  - goName: null
+    pdfKey: CharSet
+    pdfType: ascii-string;byte-string
+    required: false
+    introduced: '1.1'
+    deprecated: '2.0'
+  goPackage: font
+  goRepr: struct
+  readFunc: font.ExtractDescriptor
+- name: FontDescriptorType3
+  goType: font.Descriptor
+  pdfType: FontDescriptor
+  pdfRepr: dict
+  specTable: Table 120
+  arlingtonSrc: FontDescriptorType3.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - FontDescriptor
+    notes: Table 120
+  - goName: FontName
+    pdfKey: FontName
+    pdfType: name
+    required: false
+    introduced: '1.0'
+    goType: string
+    purpose: 'FontName (required, except for Type 3 fonts) is the PostScript name of the font.
+
+      If the font has been subsetted, the name is prefixed with a subset tag
+
+      of the form "ABCDEF+".
+
+
+      This field is used primarily for the purpose of determining if a font has been subset.
+
+      See https://github.com/pdf-association/pdf-issues/issues/11 .'
+  - goName: FontFamily
+    pdfKey: FontFamily
+    pdfType: byte-string
+    required: false
+    introduced: '1.5'
+    goType: string
+  - goName: FontStretch
+    pdfKey: FontStretch
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - UltraCondensed
+    - ExtraCondensed
+    - Condensed
+    - SemiCondensed
+    - Normal
+    - SemiExpanded
+    - Expanded
+    - ExtraExpanded
+    - UltraExpanded
+    goType: os2.Width
+  - goName: FontWeight
+    pdfKey: FontWeight
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval((@FontWeight>=1) && (@FontWeight<=1000))
+    notes: https://github.com/pdf-association/pdf-issues/issues/474
+    goType: os2.Weight
+  - goName: null
+    pdfKey: Flags
+    pdfType: bitmask
+    required: true
+    introduced: '1.0'
+    notes: Table 121
+  - goName: FontBBox
+    pdfKey: FontBBox
+    pdfType: rectangle
+    required: false
+    introduced: '1.0'
+    goType: rect.Rect
+  - goName: ItalicAngle
+    pdfKey: ItalicAngle
+    pdfType: number
+    required: true
+    introduced: '1.0'
+    goType: float64
+  - goName: Ascent
+    pdfKey: Ascent
+    pdfType: number
+    required: false
+    introduced: '1.0'
+    goType: float64
+  - goName: Descent
+    pdfKey: Descent
+    pdfType: number
+    required: false
+    introduced: '1.0'
+    possibleValues:
+    - fn:Eval(@Descent<=0)
+    notes: https://github.com/pdf-association/pdf-issues/issues/190
+    goType: float64
+  - goName: Leading
+    pdfKey: Leading
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.0'
+    goType: float64
+  - goName: CapHeight
+    pdfKey: CapHeight
+    pdfType: number
+    required: fn:IsRequired(fn:FontHasLatinChars())
+    introduced: '1.0'
+    goType: float64
+  - goName: XHeight
+    pdfKey: XHeight
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.0'
+    goType: float64
+  - goName: StemV
+    pdfKey: StemV
+    pdfType: number
+    required: false
+    introduced: '1.0'
+    goType: float64
+  - goName: StemH
+    pdfKey: StemH
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.0'
+    goType: float64
+  - goName: AvgWidth
+    pdfKey: AvgWidth
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.0'
+    goType: float64
+  - goName: MaxWidth
+    pdfKey: MaxWidth
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.0'
+    goType: float64
+  - goName: MissingWidth
+    pdfKey: MissingWidth
+    pdfType: number
+    required: false
+    default: '0'
+    introduced: '1.0'
+    goType: float64
+  goPackage: font
+  goRepr: struct
+  readFunc: font.ExtractDescriptor
+- name: FontFile
+  goType: font/cmap.File
+  pdfRepr: stream
+  introduced: '1.2'
+  arlingtonSrc: FontFile.tsv
+  fields:
+  - goName: null
+    pdfKey: Length1
+    pdfType: integer
+    required: false
+    introduced: '1.2'
+    notes: Table 5 and Table 125
+  - goName: null
+    pdfKey: Length2
+    pdfType: integer
+    required: false
+    introduced: '1.2'
+  - goName: null
+    pdfKey: Length3
+    pdfType: integer
+    required: false
+    introduced: '1.2'
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - Type1C
+    - CIDFontType0C
+    - fn:SinceVersion(1.6,OpenType)
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  - goName: null
+    pdfKey: Metadata
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - Metadata
+    notes: Adobe PDF 1.x references
+  readFunc: cmap.Extract
+  writeMethod: (*File).Embed
+  goPackage: cmap
+  goRepr: struct
+- name: FontFile2
+  goType: null
+  pdfRepr: stream
+  introduced: '1.2'
+  arlingtonSrc: FontFile2.tsv
+  fields:
+  - goName: null
+    pdfKey: Length1
+    pdfType: integer
+    required: fn:IsRequired(parent::parent::@Subtype==TrueType)
+    introduced: '1.2'
+    notes: Table 5 and Table 125
+  - goName: null
+    pdfKey: Length2
+    pdfType: integer
+    required: false
+    introduced: '1.2'
+  - goName: null
+    pdfKey: Length3
+    pdfType: integer
+    required: false
+    introduced: '1.2'
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: false
+    introduced: '1.2'
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.2'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - fn:SinceVersion(1.2,FlateDecode)
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - fn:SinceVersion(1.2
+    - FilterFlateDecode)
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - fn:SinceVersion(1.2,FlateDecode)
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - fn:SinceVersion(1.2
+    - FilterFlateDecode)
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  - goName: null
+    pdfKey: Metadata
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - Metadata
+    notes: Adobe PDF 1.x references
+- name: FontFile3CIDType0
+  goType: null
+  pdfRepr: stream
+  introduced: '1.3'
+  arlingtonSrc: FontFile3CIDType0.tsv
+  fields:
+  - goName: null
+    pdfKey: Length1
+    pdfType: integer
+    required: false
+    introduced: '1.3'
+    notes: Table 5 and Table 125
+  - goName: null
+    pdfKey: Length2
+    pdfType: integer
+    required: false
+    introduced: '1.3'
+  - goName: null
+    pdfKey: Length3
+    pdfType: integer
+    required: false
+    introduced: '1.3'
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - CIDFontType0C
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  - goName: null
+    pdfKey: Metadata
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - Metadata
+    notes: Adobe PDF 1.x references
+- name: FontFile3OpenType
+  goType: null
+  pdfRepr: stream
+  introduced: '1.6'
+  arlingtonSrc: FontFile3OpenType.tsv
+  fields:
+  - goName: null
+    pdfKey: Length1
+    pdfType: integer
+    required: false
+    introduced: '1.6'
+    notes: Table 5 and Table 125, https://github.com/pdf-association/arlington-pdf-model/issues/98
+  - goName: null
+    pdfKey: Length2
+    pdfType: integer
+    required: false
+    introduced: '1.6'
+  - goName: null
+    pdfKey: Length3
+    pdfType: integer
+    required: false
+    introduced: '1.6'
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.6'
+    possibleValues:
+    - OpenType
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.6'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.6'
+  - goName: null
+    pdfKey: Metadata
+    pdfType: stream
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - Metadata
+    notes: Adobe PDF 1.x references
+- name: FontFile3Type1
+  goType: null
+  pdfRepr: stream
+  introduced: '1.2'
+  arlingtonSrc: FontFile3Type1.tsv
+  fields:
+  - goName: null
+    pdfKey: Length1
+    pdfType: integer
+    required: false
+    introduced: '1.2'
+    notes: Table 5 and Table 125
+  - goName: null
+    pdfKey: Length2
+    pdfType: integer
+    required: false
+    introduced: '1.2'
+  - goName: null
+    pdfKey: Length3
+    pdfType: integer
+    required: false
+    introduced: '1.2'
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - Type1C
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  - goName: null
+    pdfKey: Metadata
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - Metadata
+    notes: Adobe PDF 1.x references
+- name: FontFileType1
+  goType: null
+  pdfRepr: stream
+  introduced: '1.2'
+  arlingtonSrc: FontFileType1.tsv
+  fields:
+  - goName: null
+    pdfKey: Length1
+    pdfType: integer
+    required: true
+    introduced: '1.0'
+    notes: Table 5 and Table 125
+  - goName: null
+    pdfKey: Length2
+    pdfType: integer
+    required: true
+    introduced: '1.0'
+  - goName: null
+    pdfKey: Length3
+    pdfType: integer
+    required: true
+    introduced: '1.0'
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - Type1C
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  - goName: null
+    pdfKey: Metadata
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - Metadata
+    notes: Adobe PDF 1.x references
+- name: FontMultipleMaster
+  goType: null
+  pdfType: Font
+  pdfRepr: dict
+  specTable: Table 109
+  arlingtonSrc: FontMultipleMaster.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - Font
+    notes: Table 109 and Clause 9.6.2.3
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - MMType1
+  - goName: null
+    pdfKey: Name
+    pdfType: name
+    required: fn:IsRequired(fn:IsPDFVersion(1.0))
+    introduced: '1.0'
+    deprecated: '2.0'
+  - goName: null
+    pdfKey: BaseFont
+    pdfType: name
+    required: true
+    introduced: '1.0'
+  - goName: null
+    pdfKey: FirstChar
+    pdfType: integer
+    required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
+    introduced: '1.0'
+  - goName: null
+    pdfKey: LastChar
+    pdfType: integer
+    required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
+    introduced: '1.0'
+  - goName: null
+    pdfKey: Widths
+    pdfType: array
+    required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
+    introduced: '1.0'
+    refTypes:
+    - ArrayOfNumbersGeneral
+  - goName: null
+    pdfKey: FontDescriptor
+    pdfType: dictionary
+    required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
+    introduced: '1.0'
+    refTypes:
+    - FontDescriptorType1
+  - goName: null
+    pdfKey: Encoding
+    pdfType: dictionary;name
+    required: false
+    introduced: '1.0'
+    possibleValues:
+    - MacRomanEncoding
+    - MacExpertEncoding
+    - WinAnsiEncoding
+    refTypes:
+    - Encoding
+  - goName: null
+    pdfKey: ToUnicode
+    pdfType: stream
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ToUnicodeCMapStream
+- name: FontTrueType
+  goType: font/dict.TrueType
+  pdfType: Font
+  pdfRepr: dict
+  specTable: Table 109
+  arlingtonSrc: FontTrueType.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - Font
+    notes: Table 109 and Clause 9.6.3
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - TrueType
+  - goName: Name
+    pdfKey: Name
+    pdfType: name
+    required: fn:IsRequired(fn:IsPDFVersion(1.0))
+    introduced: '1.0'
+    deprecated: '2.0'
+    goType: pdf.Name
+    purpose: 'Name is deprecated and should be left empty.
+
+      Only used in PDF 1.0 where it was the name used to reference the font
+
+      from within content streams.'
+  - goName: null
+    pdfKey: BaseFont
+    pdfType: name
+    required: true
+    introduced: '1.0'
+  - goName: null
+    pdfKey: FirstChar
+    pdfType: integer
+    required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
+    introduced: '1.0'
+  - goName: null
+    pdfKey: LastChar
+    pdfType: integer
+    required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
+    introduced: '1.0'
+  - goName: null
+    pdfKey: Widths
+    pdfType: array
+    required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
+    introduced: '1.0'
+    refTypes:
+    - ArrayOfNumbersGeneral
+  - goName: null
+    pdfKey: FontDescriptor
+    pdfType: dictionary
+    required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
+    introduced: '1.0'
+    refTypes:
+    - FontDescriptorTrueType
+  - goName: Encoding
+    pdfKey: Encoding
+    pdfType: dictionary;name
+    required: false
+    introduced: '1.0'
+    possibleValues:
+    - MacRomanEncoding
+    - MacExpertEncoding
+    - WinAnsiEncoding
+    refTypes:
+    - Encoding
+    goType: encoding.Simple
+    purpose: Encoding maps character codes to glyph names.
+  - goName: ToUnicode
+    pdfKey: ToUnicode
+    pdfType: stream
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ToUnicodeCMapStream
+    goType: '*cmap.ToUnicodeFile'
+    purpose: 'ToUnicode (optional) specifies how character codes are mapped to Unicode
+
+      strings.  This overrides the mapping implied by the glyph names.'
+  writeMethod: (*TrueType).Embed
+  goPackage: dict
+  goRepr: struct
+- name: FontType0
+  goType: function.Type0
+  pdfType: Font
+  pdfRepr: dict
+  introduced: '1.2'
+  specTable: Table 119
+  arlingtonSrc: FontType0.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - Font
+    notes: Table 119
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - Type0
+  - goName: null
+    pdfKey: BaseFont
+    pdfType: name
+    required: true
+    introduced: '1.2'
+  - goName: null
+    pdfKey: Encoding
+    pdfType: name;stream
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - GB-EUC-H
+    - GB-EUC-V
+    - GBpc-EUC-H
+    - GBpc-EUC-V
+    - GBK-EUC-H
+    - GBK-EUC-V
+    - GBKp-EUC-H
+    - GBKp-EUC-V
+    - GBK2K-H
+    - GBK2K-V
+    - UniGB-UCS2-H
+    - UniGB-UCS2-V
+    - UniGB-UTF16-H
+    - UniGB-UTF16-V
+    - B5pc-H
+    - B5pc-V
+    - HKscs-B5-H
+    - HKscs-B5-V
+    - ETen-B5-H
+    - ETen-B5-V
+    - ETenms-B5-H
+    - ETenms-B5-V
+    - CNS-EUC-H
+    - CNS-EUC-V
+    - UniCNS-UCS2-H
+    - UniCNS-UCS2-V
+    - UniCNS-UTF16-H
+    - UniCNS-UTF16-V
+    - 83pv-RKSJ-H
+    - 90ms-RKSJ-H
+    - 90ms-RKSJ-V
+    - 90msp-RKSJ-H
+    - 90msp-RKSJ-V
+    - 90pv-RKSJ-H
+    - Add-RKSJ-H
+    - Add-RKSJ-V
+    - EUC-H
+    - EUC-V
+    - Ext-RKSJ-H
+    - Ext-RKSJ-V
+    - H
+    - V
+    - UniJIS-UCS2-H
+    - UniJIS-UCS2-V
+    - UniJIS-UCS2-HW-H
+    - UniJIS-UCS2-HW-V
+    - UniJIS-UTF16-H
+    - UniJIS-UTF16-V
+    - KSC-EUC-H
+    - KSC-EUC-V
+    - KSCms-UHC-H
+    - KSCms-UHC-V
+    - KSCms-UHC-HW-H
+    - KSCms-UHC-HW-V
+    - KSCpc-EUC-H
+    - UniKS-UCS2-H
+    - UniKS-UCS2-V
+    - UniKS-UTF16-H
+    - UniKS-UTF16-V
+    - Identity-H
+    - Identity-V
+    refTypes:
+    - CMapStream
+    notes: Table 116
+  - goName: null
+    pdfKey: DescendantFonts
+    pdfType: array
+    required: true
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfDescendantFonts
+  - goName: null
+    pdfKey: ToUnicode
+    pdfType: stream
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ToUnicodeCMapStream
+  goPackage: function
+  goRepr: struct
+  specSection: 7.10.2
+  writeMethod: (*Type0).Embed
+- name: FontType1
+  goType: font/dict.Type1
+  pdfType: Font
+  pdfRepr: dict
+  specTable: Table 109
+  arlingtonSrc: FontType1.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - Font
+    notes: Table 109
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - Type1
+  - goName: Name
+    pdfKey: Name
+    pdfType: name
+    required: fn:IsRequired(fn:IsPDFVersion(1.0))
+    introduced: '1.0'
+    deprecated: '2.0'
+    goType: pdf.Name
+    purpose: 'Name is deprecated and should be left empty.
+
+      Only used in PDF 1.0 where it was the name used to reference the font
+
+      from within content streams.'
+  - goName: null
+    pdfKey: BaseFont
+    pdfType: name
+    required: true
+    introduced: '1.0'
+  - goName: null
+    pdfKey: FirstChar
+    pdfType: integer
+    required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
+    introduced: '1.0'
+  - goName: null
+    pdfKey: LastChar
+    pdfType: integer
+    required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
+    introduced: '1.0'
+  - goName: null
+    pdfKey: Widths
+    pdfType: array
+    required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
+    introduced: '1.0'
+    refTypes:
+    - ArrayOfNumbersGeneral
+  - goName: null
+    pdfKey: FontDescriptor
+    pdfType: dictionary
+    required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
+    introduced: '1.0'
+    refTypes:
+    - FontDescriptorType1
+    notes: https://github.com/pdf-association/pdf-issues/issues/106
+  - goName: Encoding
+    pdfKey: Encoding
+    pdfType: dictionary;name
+    required: false
+    introduced: '1.0'
+    possibleValues:
+    - MacRomanEncoding
+    - MacExpertEncoding
+    - WinAnsiEncoding
+    refTypes:
+    - Encoding
+    goType: encoding.Simple
+    purpose: Encoding maps character codes to glyph names.
+  - goName: ToUnicode
+    pdfKey: ToUnicode
+    pdfType: stream
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ToUnicodeCMapStream
+    goType: '*cmap.ToUnicodeFile'
+    purpose: 'ToUnicode (optional) specifies how character codes are mapped to Unicode
+
+      strings.  This overrides the mapping implied by the glyph names.'
+  writeMethod: (*Type1).Embed
+  goPackage: dict
+  goRepr: struct
+  specSection: 9.6.2
+- name: FontType3
+  goType: font/dict.Type3
+  pdfType: Font
+  pdfRepr: dict
+  arlingtonSrc: FontType3.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - Font
+  - goName: null
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.0'
+    possibleValues:
+    - Type3
+    notes: Table 110
+  - goName: Name
+    pdfKey: Name
+    pdfType: name
+    required: fn:IsRequired(fn:IsPDFVersion(1.0))
+    introduced: '1.0'
+    goType: pdf.Name
+    purpose: 'Name is deprecated and should be left empty.
+
+      Only used in PDF 1.0 where it was the name used to reference the font
+
+      from within content streams.'
+  - goName: FontBBox
+    pdfKey: FontBBox
+    pdfType: rectangle
+    required: true
+    introduced: '1.0'
+    goType: '*pdf.Rectangle'
+    purpose: FontBBox (optional) is the font bounding box in glyph space units.
+  - goName: FontMatrix
+    pdfKey: FontMatrix
+    pdfType: matrix
+    required: true
+    introduced: '1.0'
+    goType: matrix.Matrix
+    purpose: The FontMatrix maps glyph space to text space.
+  - goName: CharProcs
+    pdfKey: CharProcs
+    pdfType: dictionary
+    required: true
+    introduced: '1.0'
+    refTypes:
+    - CharProcMap
+    goType: map[pdf.Name]*CharProc
+    purpose: CharProcs maps glyph names to their content streams.
+  - goName: Encoding
+    pdfKey: Encoding
+    pdfType: dictionary
+    required: true
+    introduced: '1.0'
+    refTypes:
+    - Encoding
+    goType: encoding.Simple
+    purpose: Encoding maps character codes to glyph names.
+  - goName: null
+    pdfKey: FirstChar
+    pdfType: integer
+    required: true
+    introduced: '1.0'
+  - goName: null
+    pdfKey: LastChar
+    pdfType: integer
+    required: true
+    introduced: '1.0'
+  - goName: null
+    pdfKey: Widths
+    pdfType: array
+    required: true
+    introduced: '1.0'
+    refTypes:
+    - ArrayOfNumbersGeneral
+  - goName: null
+    pdfKey: FontDescriptor
+    pdfType: dictionary
+    required: fn:IsRequired(fn:IsPDFTagged())
+    introduced: '1.0'
+    refTypes:
+    - FontDescriptorType3
+    notes: https://github.com/pdf-association/pdf-issues/issues/106
+  - goName: Resources
+    pdfKey: Resources
+    pdfType: dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - Resource
+    goType: '*content.Resources'
+    purpose: 'Resources (optional) holds named resources shared by all glyph content
+
+      streams that don''t have their own resource dictionary.'
+  - goName: ToUnicode
+    pdfKey: ToUnicode
+    pdfType: stream
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ToUnicodeCMapStream
+    goType: '*cmap.ToUnicodeFile'
+    purpose: 'ToUnicode (optional) specifies how character codes are mapped to Unicode
+
+      strings.  This overrides the mapping implied by the glyph names.'
+  writeMethod: (*Type3).Embed
+  goPackage: dict
+  goRepr: struct
+- name: ToUnicodeCMapStream
+  goType: font/cmap.ToUnicodeFile
+  pdfType: CMap
+  pdfRepr: stream
+  introduced: '1.2'
+  specTable: Table 118
+  arlingtonSrc: ToUnicodeCMapStream.tsv
+  fields:
+  - goName: null
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - CMap
+    notes: https://github.com/pdf-association/pdf-issues/issues/462 (same as Table 118 but everything optional)
+  - goName: null
+    pdfKey: CMapName
+    pdfType: name
+    required: false
+    introduced: '1.2'
+  - goName: null
+    pdfKey: CIDSystemInfo
+    pdfType: dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - CIDSystemInfo
+  - goName: null
+    pdfKey: WMode
+    pdfType: integer
+    required: false
+    default: '0'
+    introduced: '1.2'
+    possibleValues:
+    - '1'
+    - '0'
+  - goName: null
+    pdfKey: UseCMap
+    pdfType: name;stream
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - GB-EUC-H
+    - GB-EUC-V
+    - GBpc-EUC-H
+    - GBpc-EUC-V
+    - GBK-EUC-H
+    - GBK-EUC-V
+    - GBKp-EUC-H
+    - GBKp-EUC-V
+    - GBK2K-H
+    - GBK2K-V
+    - UniGB-UCS2-H
+    - UniGB-UCS2-V
+    - UniGB-UTF16-H
+    - UniGB-UTF16-V
+    - B5pc-H
+    - B5pc-V
+    - HKscs-B5-H
+    - HKscs-B5-V
+    - ETen-B5-H
+    - ETen-B5-V
+    - ETenms-B5-H
+    - ETenms-B5-V
+    - CNS-EUC-H
+    - CNS-EUC-V
+    - UniCNS-UCS2-H
+    - UniCNS-UCS2-V
+    - UniCNS-UTF16-H
+    - UniCNS-UTF16-V
+    - 83pv-RKSJ-H
+    - 90ms-RKSJ-H
+    - 90ms-RKSJ-V
+    - 90msp-RKSJ-H
+    - 90msp-RKSJ-V
+    - 90pv-RKSJ-H
+    - Add-RKSJ-H
+    - Add-RKSJ-V
+    - EUC-H
+    - EUC-V
+    - Ext-RKSJ-H
+    - Ext-RKSJ-V
+    - H
+    - V
+    - UniJIS-UCS2-H
+    - UniJIS-UCS2-V
+    - UniJIS-UCS2-HW-H
+    - UniJIS-UCS2-HW-V
+    - UniJIS-UTF16-H
+    - UniJIS-UTF16-V
+    - KSC-EUC-H
+    - KSC-EUC-V
+    - KSCms-UHC-H
+    - KSCms-UHC-V
+    - KSCms-UHC-HW-H
+    - KSCms-UHC-HW-V
+    - KSCpc-EUC-H
+    - UniKS-UCS2-H
+    - UniKS-UCS2-V
+    - UniKS-UTF16-H
+    - UniKS-UTF16-V
+    - Identity-H
+    - Identity-V
+    refTypes:
+    - Stream
+    notes: Table 116
+  - goName: null
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.2'
+  - goName: null
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - FileSpecification
+  - goName: null
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.2'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+    refTypes:
+    - ArrayOfCompressionFilterNames
+  - goName: null
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - ArrayOfDecodeParams
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - fn:SinceVersion(1.5
+    - FilterCrypt)
+  - goName: null
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  readFunc: cmap.ExtractToUnicode
+  writeMethod: (*ToUnicodeFile).Embed
+  goPackage: cmap
+  goRepr: struct

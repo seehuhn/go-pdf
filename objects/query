@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""Query tool for PDF object schema.
+
+Usage:
+    pdf-schema type <name>    # single type, embeds resolved
+    pdf-schema types          # all types, embeds resolved
+"""
+
+import signal
+import sys
+from pathlib import Path
+
+import yaml
+
+# Handle SIGPIPE gracefully (e.g., when piped to head/yq)
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
+SCHEMA_DIR = Path(__file__).parent
+
+
+def load_all_types() -> dict[str, dict]:
+    """Load types from all chapter*.yaml files, indexed by name."""
+    types = {}
+    for path in sorted(SCHEMA_DIR.glob("chapter*.yaml")):
+        with open(path) as f:
+            data = yaml.safe_load(f)
+        for t in data.get("types", []):
+            types[t["name"]] = t
+    return types
+
+
+def resolve_type(types: dict[str, dict], name: str) -> dict:
+    """Resolve a type's embeds recursively, adding source to fields."""
+    if name not in types:
+        raise KeyError(f"Unknown type: {name}")
+
+    t = types[name]
+    resolved = {k: v for k, v in t.items() if k != "fields"}
+
+    # Collect fields: embedded first, then own
+    all_fields = []
+
+    for embed_name in t.get("embeds", []):
+        embedded = resolve_type(types, embed_name)
+        for field in embedded.get("fields", []):
+            # Preserve source if already set (nested embeds), otherwise set it
+            if "source" not in field:
+                field = {**field, "source": embed_name}
+            all_fields.append(field)
+
+    # Add own fields with source
+    for field in t.get("fields", []):
+        all_fields.append({**field, "source": name})
+
+    resolved["fields"] = all_fields
+    return resolved
+
+
+def cmd_type(name: str) -> None:
+    """Output single resolved type."""
+    types = load_all_types()
+    try:
+        resolved = resolve_type(types, name)
+    except KeyError as e:
+        print(str(e), file=sys.stderr)
+        sys.exit(1)
+    yaml.dump(resolved, sys.stdout, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+
+def cmd_types() -> None:
+    """Output all resolved types."""
+    types = load_all_types()
+    resolved = []
+    for name in types:
+        resolved.append(resolve_type(types, name))
+    yaml.dump(resolved, sys.stdout, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+
+def main() -> None:
+    if len(sys.argv) < 2:
+        print(__doc__, file=sys.stderr)
+        sys.exit(1)
+
+    cmd = sys.argv[1]
+
+    if cmd == "type":
+        if len(sys.argv) < 3:
+            print("Usage: pdf-schema type <name>", file=sys.stderr)
+            sys.exit(1)
+        cmd_type(sys.argv[2])
+    elif cmd == "types":
+        cmd_types()
+    else:
+        print(f"Unknown command: {cmd}", file=sys.stderr)
+        print(__doc__, file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
