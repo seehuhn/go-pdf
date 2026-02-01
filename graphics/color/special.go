@@ -20,6 +20,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	stdcolor "image/color"
 	"math"
 	"slices"
 
@@ -139,6 +140,42 @@ func (s *SpaceIndexed) New(idx int) Color {
 	return colorIndexed{Space: s, Index: idx}
 }
 
+// Convert converts a color to the indexed color space by finding the
+// nearest palette entry.
+// This implements the [stdcolor.Model] interface.
+func (s *SpaceIndexed) Convert(c stdcolor.Color) stdcolor.Color {
+	// fast path: already this indexed space
+	if ci, ok := c.(colorIndexed); ok && ci.Space == s {
+		return ci
+	}
+
+	// find nearest palette entry by RGB distance
+	r32, g32, b32, _ := c.RGBA()
+	r := float64(r32) / 65535.0
+	g := float64(g32) / 65535.0
+	b := float64(b32) / 65535.0
+
+	bestIdx := 0
+	bestDist := math.MaxFloat64
+
+	for idx := 0; idx < s.NumCol; idx++ {
+		palColor := colorIndexed{Space: s, Index: idx}
+		pr32, pg32, pb32, _ := palColor.RGBA()
+		pr := float64(pr32) / 65535.0
+		pg := float64(pg32) / 65535.0
+		pb := float64(pb32) / 65535.0
+
+		// squared RGB distance
+		dist := (r-pr)*(r-pr) + (g-pg)*(g-pg) + (b-pb)*(b-pb)
+		if dist < bestDist {
+			bestDist = dist
+			bestIdx = idx
+		}
+	}
+
+	return colorIndexed{Space: s, Index: bestIdx}
+}
+
 type colorIndexed struct {
 	Space *SpaceIndexed
 	Index int
@@ -146,6 +183,70 @@ type colorIndexed struct {
 
 func (c colorIndexed) ColorSpace() Space {
 	return c.Space
+}
+
+// RGBA implements the color.Color interface.
+func (c colorIndexed) RGBA() (r, g, b, a uint32) {
+	baseColor := c.getBaseColor()
+	return baseColor.RGBA()
+}
+
+// getBaseColor returns the color from the palette at the given index.
+func (c colorIndexed) getBaseColor() Color {
+	base := c.Space.Base
+	n := base.Channels()
+	offset := c.Index * n
+
+	if offset+n > len(c.Space.lookup) {
+		return base.Default()
+	}
+
+	// decode the lookup table bytes to color values
+	var min, max []float64
+	switch space := base.(type) {
+	case spaceDeviceGray, *SpaceCalGray:
+		min = []float64{0}
+		max = []float64{1}
+	case spaceDeviceRGB, *SpaceCalRGB:
+		min = []float64{0, 0, 0}
+		max = []float64{1, 1, 1}
+	case spaceDeviceCMYK:
+		min = []float64{0, 0, 0, 0}
+		max = []float64{1, 1, 1, 1}
+	case *SpaceLab:
+		min = []float64{0, space.ranges[0], space.ranges[2]}
+		max = []float64{100, space.ranges[1], space.ranges[3]}
+	default:
+		return base.Default()
+	}
+
+	vals := make([]float64, n)
+	for i := range n {
+		b := float64(c.Space.lookup[offset+i])
+		vals[i] = min[i] + (b/255.0)*(max[i]-min[i])
+	}
+
+	// construct a color in the base space
+	switch space := base.(type) {
+	case spaceDeviceGray:
+		return DeviceGray(vals[0])
+	case *SpaceCalGray:
+		return space.New(vals[0])
+	case spaceDeviceRGB:
+		return DeviceRGB{vals[0], vals[1], vals[2]}
+	case *SpaceCalRGB:
+		return space.New(vals[0], vals[1], vals[2])
+	case spaceDeviceCMYK:
+		return DeviceCMYK{vals[0], vals[1], vals[2], vals[3]}
+	case *SpaceLab:
+		col, _ := space.New(vals[0], vals[1], vals[2])
+		if col == nil {
+			return base.Default()
+		}
+		return col
+	default:
+		return base.Default()
+	}
 }
 
 // == Separation =============================================================
@@ -241,6 +342,28 @@ func (s *SpaceSeparation) Default() Color {
 	return s.New(1)
 }
 
+// Convert converts a color to the separation color space.
+// Since separation spaces represent specific inks, this uses a luminance-based
+// heuristic to estimate the tint value.
+// This implements the [stdcolor.Model] interface.
+func (s *SpaceSeparation) Convert(c stdcolor.Color) stdcolor.Color {
+	// fast path: already this separation space
+	if cs, ok := c.(colorSeparation); ok && cs.Space == s {
+		return cs
+	}
+
+	// use luminance as inverse tint (lighter = less ink)
+	r32, g32, b32, _ := c.RGBA()
+	r := float64(r32) / 65535.0
+	g := float64(g32) / 65535.0
+	b := float64(b32) / 65535.0
+	lum := 0.299*r + 0.587*g + 0.114*b
+
+	// tint: 0 = no ink (light), 1 = full ink (dark)
+	tint := clamp01(1 - lum)
+	return colorSeparation{Space: s, Tint: tint}
+}
+
 type colorSeparation struct {
 	Space *SpaceSeparation
 	Tint  float64
@@ -250,6 +373,14 @@ type colorSeparation struct {
 // This implements the [Color] interface.
 func (c colorSeparation) ColorSpace() Space {
 	return c.Space
+}
+
+// RGBA implements the color.Color interface.
+func (c colorSeparation) RGBA() (r, g, b, a uint32) {
+	// apply the transform function to get alternate color values
+	altValues := c.Space.Transform.Apply(c.Tint)
+	altColor := SCN(c.Space.Alternate.Default(), altValues, nil)
+	return altColor.RGBA()
 }
 
 // == DeviceN ================================================================
@@ -399,6 +530,31 @@ func (s *SpaceDeviceN) Default() Color {
 	return s.New(make([]float64, s.Channels()))
 }
 
+// Convert converts a color to the DeviceN color space.
+// This uses a luminance-based heuristic since DeviceN spaces can represent
+// arbitrary colorants.
+// This implements the [stdcolor.Model] interface.
+func (s *SpaceDeviceN) Convert(c stdcolor.Color) stdcolor.Color {
+	// fast path: already this DeviceN space
+	if cd, ok := c.(colorDeviceN); ok && cd.Space == s {
+		return cd
+	}
+
+	// use luminance as inverse tint for all channels
+	r32, g32, b32, _ := c.RGBA()
+	r := float64(r32) / 65535.0
+	g := float64(g32) / 65535.0
+	b := float64(b32) / 65535.0
+	lum := 0.299*r + 0.587*g + 0.114*b
+	tint := clamp01(1 - lum)
+
+	values := make([]float64, s.Channels())
+	for i := range values {
+		values[i] = tint
+	}
+	return s.New(values)
+}
+
 // New returns a new color in the color space.
 func (s *SpaceDeviceN) New(x []float64) Color {
 	n := s.Channels()
@@ -442,9 +598,18 @@ func (c *colorDeviceN) set(x []float64) {
 func (c colorDeviceN) get() []float64 {
 	n := c.Space.Channels()
 	x := make([]float64, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		bits := binary.LittleEndian.Uint64([]byte(c.data[i*8 : (i+1)*8]))
 		x[i] = math.Float64frombits(bits)
 	}
 	return x
+}
+
+// RGBA implements the color.Color interface.
+func (c colorDeviceN) RGBA() (r, g, b, a uint32) {
+	// apply the transform function to get alternate color values
+	tints := c.get()
+	altValues := c.Space.Transform.Apply(tints...)
+	altColor := SCN(c.Space.Alternate.Default(), altValues, nil)
+	return altColor.RGBA()
 }

@@ -18,6 +18,7 @@ package color
 
 import (
 	_ "embed" // for the sRGB ICC profiles
+	stdcolor "image/color"
 
 	"seehuhn.de/go/pdf"
 )
@@ -83,6 +84,23 @@ func (s spaceSRGB) Default() Color {
 	return colorSRGB{0, 0, 0}
 }
 
+// Convert converts a color to the sRGB color space.
+// This implements the [stdcolor.Model] interface.
+func (s spaceSRGB) Convert(c stdcolor.Color) stdcolor.Color {
+	// fast path: already colorSRGB
+	if srgb, ok := c.(colorSRGB); ok {
+		return srgb
+	}
+
+	// input is assumed to be sRGB-encoded, just extract values
+	r32, g32, b32, _ := c.RGBA()
+	return colorSRGB{
+		float64(r32) / 65535.0,
+		float64(g32) / 65535.0,
+		float64(b32) / 65535.0,
+	}
+}
+
 type colorSRGB [3]float64
 
 // SRGB returns a color in the sRGB color space.
@@ -97,6 +115,11 @@ func SRGB(r, g, b float64) Color {
 
 func (c colorSRGB) ColorSpace() Space {
 	return spaceSRGB{}
+}
+
+// RGBA implements the color.Color interface.
+func (c colorSRGB) RGBA() (r, g, b, a uint32) {
+	return toUint32(c[0]), toUint32(c[1]), toUint32(c[2]), 0xffff
 }
 
 //go:embed icc/sRGB-v2-micro.icc

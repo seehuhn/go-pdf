@@ -17,6 +17,8 @@
 package color
 
 import (
+	stdcolor "image/color"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -72,6 +74,17 @@ func (s spacePatternColored) Default() Color {
 	return colorColoredPattern{Pat: nil}
 }
 
+// Convert returns the default color (nil pattern) since a color cannot be
+// meaningfully converted to a pattern.
+// This implements the [stdcolor.Model] interface.
+func (s spacePatternColored) Convert(c stdcolor.Color) stdcolor.Color {
+	// patterns cannot be derived from other colors
+	if cp, ok := c.(colorColoredPattern); ok {
+		return cp
+	}
+	return s.Default()
+}
+
 type colorColoredPattern struct {
 	Pat Pattern
 }
@@ -87,6 +100,13 @@ func PatternColored(p Pattern) Color {
 
 func (colorColoredPattern) ColorSpace() Space {
 	return spacePatternColored{}
+}
+
+// RGBA implements the color.Color interface.
+// For colored patterns, returns a neutral gray since the actual color
+// depends on the pattern content which is not available here.
+func (colorColoredPattern) RGBA() (r, g, b, a uint32) {
+	return 0x8000, 0x8000, 0x8000, 0xffff
 }
 
 // == uncolored patterns =====================================================
@@ -130,6 +150,26 @@ func (s spacePatternUncolored) Default() Color {
 	return colorUncoloredPattern{Pat: nil, Col: s.base.Default()}
 }
 
+// Convert converts the base colour and returns it with a nil pattern.
+// This implements the [stdcolor.Model] interface.
+func (s spacePatternUncolored) Convert(c stdcolor.Color) stdcolor.Color {
+	if up, ok := c.(colorUncoloredPattern); ok {
+		// if it's already an uncolored pattern with same base space, return as-is
+		if _, ok := up.Col.ColorSpace().(interface{ Family() pdf.Name }); ok {
+			if up.Col.ColorSpace().Family() == s.base.Family() {
+				return up
+			}
+		}
+	}
+
+	// convert the colour to the base space
+	baseColor := s.base.Convert(c)
+	if bc, ok := baseColor.(Color); ok {
+		return colorUncoloredPattern{Pat: nil, Col: bc}
+	}
+	return s.Default()
+}
+
 type colorUncoloredPattern struct {
 	Pat Pattern
 	Col Color
@@ -146,4 +186,10 @@ func PatternUncolored(p Pattern, col Color) Color {
 
 func (c colorUncoloredPattern) ColorSpace() Space {
 	return spacePatternUncolored{base: c.Col.ColorSpace()}
+}
+
+// RGBA implements the color.Color interface.
+// Returns the RGBA values of the underlying color.
+func (c colorUncoloredPattern) RGBA() (r, g, b, a uint32) {
+	return c.Col.RGBA()
 }

@@ -17,6 +17,7 @@
 package color
 
 import (
+	"image/color"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -38,6 +39,21 @@ var (
 	_ Color = colorIndexed{}
 	_ Color = colorSeparation{}
 	_ Color = colorDeviceN{}
+)
+
+// The following types implement Go's standard color.Color interface.
+var (
+	_ color.Color = DeviceGray(0)
+	_ color.Color = DeviceRGB{0, 0, 0}
+	_ color.Color = DeviceCMYK{0, 0, 0, 1}
+	_ color.Color = colorCalGray{}
+	_ color.Color = colorCalRGB{}
+	_ color.Color = colorLab{}
+	_ color.Color = colorICCBased{}
+	_ color.Color = colorSRGB{}
+	_ color.Color = colorIndexed{}
+	_ color.Color = colorSeparation{}
+	_ color.Color = colorDeviceN{}
 )
 
 // TestColorsComparable verifies that Colors are comparable, and are not

@@ -19,6 +19,8 @@ package color
 import (
 	"bytes"
 	"fmt"
+	stdcolor "image/color"
+	"math"
 	"reflect"
 	"testing"
 
@@ -30,6 +32,11 @@ import (
 // color.Space implements pdf.Embedder
 var (
 	_ pdf.Embedder = Space(nil)
+)
+
+// color.Space implements stdcolor.Model
+var (
+	_ stdcolor.Model = Space(nil)
 )
 
 // The following types implement the ColorSpace interface:
@@ -159,6 +166,168 @@ func TestSpaceRoundTrip(t *testing.T) {
 			name := fmt.Sprintf("%02d-%s-v%s", i, space.Family(), version)
 			t.Run(name, func(t *testing.T) {
 				spaceRoundTrip(t, version, space)
+			})
+		}
+	}
+}
+
+// TestSpaceConvertIdentity verifies that converting the default colour
+// of each space returns an equivalent colour.
+func TestSpaceConvertIdentity(t *testing.T) {
+	for i, space := range testColorSpaces {
+		t.Run(fmt.Sprintf("%02d-%s", i, space.Family()), func(t *testing.T) {
+			def := space.Default()
+			converted := space.Convert(def)
+
+			// the converted colour should have matching RGBA values
+			r1, g1, b1, a1 := def.RGBA()
+			r2, g2, b2, a2 := converted.RGBA()
+
+			if r1 != r2 || g1 != g2 || b1 != b2 || a1 != a2 {
+				t.Errorf("Convert(Default()) != Default()\n  got:  RGBA(%d,%d,%d,%d)\n  want: RGBA(%d,%d,%d,%d)",
+					r2, g2, b2, a2, r1, g1, b1, a1)
+			}
+		})
+	}
+}
+
+// TestSpaceConvertKnownValues tests conversion with known input/output values.
+func TestSpaceConvertKnownValues(t *testing.T) {
+	// test DeviceGray conversion
+	t.Run("DeviceGray-from-white", func(t *testing.T) {
+		white := stdcolor.White
+		result := SpaceDeviceGray.Convert(white)
+		gray, ok := result.(DeviceGray)
+		if !ok {
+			t.Fatalf("expected DeviceGray, got %T", result)
+		}
+		if gray < 0.99 {
+			t.Errorf("white -> DeviceGray = %f, want ~1.0", gray)
+		}
+	})
+
+	t.Run("DeviceGray-from-black", func(t *testing.T) {
+		black := stdcolor.Black
+		result := SpaceDeviceGray.Convert(black)
+		gray, ok := result.(DeviceGray)
+		if !ok {
+			t.Fatalf("expected DeviceGray, got %T", result)
+		}
+		if gray > 0.01 {
+			t.Errorf("black -> DeviceGray = %f, want ~0.0", gray)
+		}
+	})
+
+	// test DeviceRGB conversion
+	t.Run("DeviceRGB-from-red", func(t *testing.T) {
+		red := stdcolor.RGBA{R: 255, G: 0, B: 0, A: 255}
+		result := SpaceDeviceRGB.Convert(red)
+		rgb, ok := result.(DeviceRGB)
+		if !ok {
+			t.Fatalf("expected DeviceRGB, got %T", result)
+		}
+		if rgb[0] < 0.99 || rgb[1] > 0.01 || rgb[2] > 0.01 {
+			t.Errorf("red -> DeviceRGB = %v, want [1,0,0]", rgb)
+		}
+	})
+
+	// test DeviceCMYK conversion
+	t.Run("DeviceCMYK-from-white", func(t *testing.T) {
+		white := stdcolor.White
+		result := SpaceDeviceCMYK.Convert(white)
+		cmyk, ok := result.(DeviceCMYK)
+		if !ok {
+			t.Fatalf("expected DeviceCMYK, got %T", result)
+		}
+		// white = no ink
+		if cmyk[0] > 0.01 || cmyk[1] > 0.01 || cmyk[2] > 0.01 || cmyk[3] > 0.01 {
+			t.Errorf("white -> DeviceCMYK = %v, want [0,0,0,0]", cmyk)
+		}
+	})
+
+	t.Run("DeviceCMYK-from-black", func(t *testing.T) {
+		black := stdcolor.Black
+		result := SpaceDeviceCMYK.Convert(black)
+		cmyk, ok := result.(DeviceCMYK)
+		if !ok {
+			t.Fatalf("expected DeviceCMYK, got %T", result)
+		}
+		// black = full K
+		if cmyk[3] < 0.99 {
+			t.Errorf("black -> DeviceCMYK = %v, want [_,_,_,1]", cmyk)
+		}
+	})
+}
+
+// TestSpaceConvertRoundTrip tests that converting a colour back and forth
+// produces stable results.
+func TestSpaceConvertRoundTrip(t *testing.T) {
+	colors := []stdcolor.Color{
+		stdcolor.White,
+		stdcolor.Black,
+		stdcolor.RGBA{R: 255, G: 0, B: 0, A: 255},
+		stdcolor.RGBA{R: 0, G: 255, B: 0, A: 255},
+		stdcolor.RGBA{R: 0, G: 0, B: 255, A: 255},
+		stdcolor.RGBA{R: 128, G: 128, B: 128, A: 255},
+	}
+
+	for i, space := range testColorSpaces {
+		for j, c := range colors {
+			name := fmt.Sprintf("%02d-%s-color%d", i, space.Family(), j)
+			t.Run(name, func(t *testing.T) {
+				// convert to space
+				c1 := space.Convert(c)
+				// convert again (should be stable)
+				c2 := space.Convert(c1)
+
+				r1, g1, b1, a1 := c1.RGBA()
+				r2, g2, b2, a2 := c2.RGBA()
+
+				if r1 != r2 || g1 != g2 || b1 != b2 || a1 != a2 {
+					t.Errorf("Convert not idempotent:\n  first:  RGBA(%d,%d,%d,%d)\n  second: RGBA(%d,%d,%d,%d)",
+						r1, g1, b1, a1, r2, g2, b2, a2)
+				}
+			})
+		}
+	}
+}
+
+// TestConvertPreservesApproximateColor tests that conversion approximately
+// preserves colour appearance (RGBA values are similar).
+func TestConvertPreservesApproximateColor(t *testing.T) {
+	// tolerance for RGBA comparison (allowing for gamut mapping)
+	const tolerance = 0.15 * 65535.0
+
+	colors := []stdcolor.Color{
+		stdcolor.RGBA{R: 128, G: 128, B: 128, A: 255}, // neutral gray
+		stdcolor.White,
+		stdcolor.Black,
+	}
+
+	// test only spaces that can reasonably represent arbitrary colours
+	representableSpaces := []Space{
+		SpaceDeviceGray,
+		SpaceDeviceRGB,
+		SpaceSRGB,
+	}
+
+	for _, space := range representableSpaces {
+		for j, c := range colors {
+			name := fmt.Sprintf("%s-color%d", space.Family(), j)
+			t.Run(name, func(t *testing.T) {
+				converted := space.Convert(c)
+
+				r1, g1, b1, _ := c.RGBA()
+				r2, g2, b2, _ := converted.RGBA()
+
+				dr := math.Abs(float64(r1) - float64(r2))
+				dg := math.Abs(float64(g1) - float64(g2))
+				db := math.Abs(float64(b1) - float64(b2))
+
+				if dr > tolerance || dg > tolerance || db > tolerance {
+					t.Errorf("colour not preserved:\n  input:  RGBA(%d,%d,%d)\n  output: RGBA(%d,%d,%d)\n  delta: (%.0f,%.0f,%.0f)",
+						r1, g1, b1, r2, g2, b2, dr, dg, db)
+				}
 			})
 		}
 	}

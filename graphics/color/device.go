@@ -16,7 +16,11 @@
 
 package color
 
-import "seehuhn.de/go/pdf"
+import (
+	stdcolor "image/color"
+
+	"seehuhn.de/go/pdf"
+)
 
 // PDF 2.0 sections: 8.6.4
 
@@ -52,6 +56,23 @@ func (s spaceDeviceGray) Default() Color {
 	return DeviceGray(0)
 }
 
+// Convert converts a color to the DeviceGray color space.
+// This implements the [stdcolor.Model] interface.
+func (s spaceDeviceGray) Convert(c stdcolor.Color) stdcolor.Color {
+	// fast path: already DeviceGray
+	if g, ok := c.(DeviceGray); ok {
+		return g
+	}
+
+	// use luminance formula: 0.299R + 0.587G + 0.114B
+	r32, g32, b32, _ := c.RGBA()
+	r := float64(r32) / 65535.0
+	g := float64(g32) / 65535.0
+	b := float64(b32) / 65535.0
+	gray := 0.299*r + 0.587*g + 0.114*b
+	return DeviceGray(clamp01(gray))
+}
+
 // DeviceGray is a color in the DeviceGray color space.
 // The value must be in the range from 0 (black) to 1 (white).
 type DeviceGray float64
@@ -59,6 +80,12 @@ type DeviceGray float64
 // ColorSpace implements the [Color] interface.
 func (c DeviceGray) ColorSpace() Space {
 	return spaceDeviceGray{}
+}
+
+// RGBA implements the color.Color interface.
+func (c DeviceGray) RGBA() (r, g, b, a uint32) {
+	v := toUint32(float64(c))
+	return v, v, v, 0xffff
 }
 
 // == DeviceRGB ==============================================================
@@ -95,6 +122,22 @@ func (s spaceDeviceRGB) Default() Color {
 	return DeviceRGB{0, 0, 0}
 }
 
+// Convert converts a color to the DeviceRGB color space.
+// This implements the [stdcolor.Model] interface.
+func (s spaceDeviceRGB) Convert(c stdcolor.Color) stdcolor.Color {
+	// fast path: already DeviceRGB
+	if rgb, ok := c.(DeviceRGB); ok {
+		return rgb
+	}
+
+	r32, g32, b32, _ := c.RGBA()
+	return DeviceRGB{
+		float64(r32) / 65535.0,
+		float64(g32) / 65535.0,
+		float64(b32) / 65535.0,
+	}
+}
+
 // DeviceRGB is a color in the DeviceRGB color space.
 // The values are r, g, and b, and must be in the range from 0 (dark) to 1 (light).
 type DeviceRGB [3]float64
@@ -102,6 +145,11 @@ type DeviceRGB [3]float64
 // ColorSpace implements the [Color] interface.
 func (c DeviceRGB) ColorSpace() Space {
 	return spaceDeviceRGB{}
+}
+
+// RGBA implements the color.Color interface.
+func (c DeviceRGB) RGBA() (r, g, b, a uint32) {
+	return toUint32(c[0]), toUint32(c[1]), toUint32(c[2]), 0xffff
 }
 
 // == DeviceCMYK =============================================================
@@ -139,6 +187,43 @@ func (s spaceDeviceCMYK) Default() Color {
 	return DeviceCMYK{0, 0, 0, 1}
 }
 
+// Convert converts a color to the DeviceCMYK color space.
+// This implements the [stdcolor.Model] interface.
+func (s spaceDeviceCMYK) Convert(c stdcolor.Color) stdcolor.Color {
+	// fast path: already DeviceCMYK
+	if cmyk, ok := c.(DeviceCMYK); ok {
+		return cmyk
+	}
+
+	// RGB to CMY, then undercolor removal
+	r32, g32, b32, _ := c.RGBA()
+	r := float64(r32) / 65535.0
+	g := float64(g32) / 65535.0
+	b := float64(b32) / 65535.0
+
+	cyan := 1 - r
+	magenta := 1 - g
+	yellow := 1 - b
+
+	// undercolor removal: extract black component
+	k := min(cyan, min(magenta, yellow))
+	if k >= 1 {
+		return DeviceCMYK{0, 0, 0, 1}
+	}
+
+	// adjust CMY values
+	cyan = (cyan - k) / (1 - k)
+	magenta = (magenta - k) / (1 - k)
+	yellow = (yellow - k) / (1 - k)
+
+	return DeviceCMYK{
+		clamp01(cyan),
+		clamp01(magenta),
+		clamp01(yellow),
+		clamp01(k),
+	}
+}
+
 // DeviceCMYK is a color in the DeviceCMYK color space.
 // The value are c, m, y, and k, and must be in the range from 0 (light) to 1 (dark).
 // They control the amount of cyan, magenta, yellow, and black in the color.
@@ -147,4 +232,13 @@ type DeviceCMYK [4]float64
 // ColorSpace implements the [Color] interface.
 func (c DeviceCMYK) ColorSpace() Space {
 	return spaceDeviceCMYK{}
+}
+
+// RGBA implements the color.Color interface.
+func (c DeviceCMYK) RGBA() (r, g, b, a uint32) {
+	cyan, magenta, yellow, black := c[0], c[1], c[2], c[3]
+	rf := (1 - cyan) * (1 - black)
+	gf := (1 - magenta) * (1 - black)
+	bf := (1 - yellow) * (1 - black)
+	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }

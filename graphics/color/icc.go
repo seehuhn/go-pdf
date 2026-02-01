@@ -19,7 +19,9 @@ package color
 import (
 	"errors"
 	"fmt"
+	stdcolor "image/color"
 	"math"
+	"sync"
 
 	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
@@ -36,6 +38,10 @@ type SpaceICCBased struct {
 	metadata *metadata.Stream
 	profile  []byte
 	def      []float64
+
+	// cached transform for Convert()
+	transformOnce sync.Once
+	transform     *icc.Transform
 }
 
 // ICCBased returns a new ICC-based color space.
@@ -152,6 +158,72 @@ func (s *SpaceICCBased) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return pdf.Array{FamilyICCBased, sRef}, nil
 }
 
+// Convert converts a color to the ICC-based color space.
+// This implements the [stdcolor.Model] interface.
+func (s *SpaceICCBased) Convert(c stdcolor.Color) stdcolor.Color {
+	// fast path: already this ICC space
+	if ic, ok := c.(colorICCBased); ok && ic.Space == s {
+		return ic
+	}
+
+	// get XYZ from input colour (assumed sRGB)
+	X, Y, Z := colorToXYZ(c)
+
+	// initialise transform on first use
+	s.transformOnce.Do(func() {
+		p, err := icc.Decode(s.profile)
+		if err != nil {
+			return
+		}
+		s.transform, _ = icc.NewTransform(p, icc.PCSToDevice, icc.RelativeColorimetric)
+	})
+
+	var values []float64
+	if s.transform != nil {
+		values = s.transform.FromXYZ(X, Y, Z)
+	} else {
+		// fallback if transform not available
+		values = s.fallbackFromXYZ(X, Y, Z)
+	}
+
+	result := colorICCBased{Space: s}
+	for i := 0; i < s.N && i < len(values); i++ {
+		// scale to the space's ranges
+		min, max := s.Ranges[2*i], s.Ranges[2*i+1]
+		result.Values[i] = clamp(values[i]*(max-min)+min, min, max)
+	}
+	return result
+}
+
+func (s *SpaceICCBased) fallbackFromXYZ(X, Y, Z float64) []float64 {
+	// simple fallback: convert XYZ to sRGB-like values
+	r, g, b := xyzToSRGB(X, Y, Z)
+	switch s.N {
+	case 1:
+		// grayscale: use luminance
+		return []float64{0.299*r + 0.587*g + 0.114*b}
+	case 3:
+		return []float64{r, g, b}
+	case 4:
+		// CMYK approximation
+		cyan := 1 - r
+		magenta := 1 - g
+		yellow := 1 - b
+		k := min(cyan, min(magenta, yellow))
+		if k >= 1 {
+			return []float64{0, 0, 0, 1}
+		}
+		return []float64{
+			(cyan - k) / (1 - k),
+			(magenta - k) / (1 - k),
+			(yellow - k) / (1 - k),
+			k,
+		}
+	default:
+		return make([]float64, s.N)
+	}
+}
+
 // New returns a new color in the ICC-based color space.
 func (s *SpaceICCBased) New(values []float64) (Color, error) {
 	if len(values) != s.N {
@@ -180,4 +252,37 @@ func (c colorICCBased) ColorSpace() Space {
 // Components returns the colour component values.
 func (c colorICCBased) Components() []float64 {
 	return c.Values[:c.Space.N]
+}
+
+// RGBA implements the color.Color interface.
+// Since full ICC profile conversion is complex, this returns a fallback
+// based on the number of components: grayscale for 1 component,
+// RGB for 3 components, or CMYK-to-RGB conversion for 4 components.
+func (c colorICCBased) RGBA() (r, g, b, a uint32) {
+	// normalise values from Ranges to [0,1]
+	norm := make([]float64, c.Space.N)
+	for i := range c.Space.N {
+		min, max := c.Space.Ranges[2*i], c.Space.Ranges[2*i+1]
+		if max > min {
+			norm[i] = (c.Values[i] - min) / (max - min)
+		} else {
+			norm[i] = 0
+		}
+	}
+
+	switch c.Space.N {
+	case 1:
+		v := toUint32(norm[0])
+		return v, v, v, 0xffff
+	case 3:
+		return toUint32(norm[0]), toUint32(norm[1]), toUint32(norm[2]), 0xffff
+	case 4:
+		cyan, magenta, yellow, black := norm[0], norm[1], norm[2], norm[3]
+		rf := (1 - cyan) * (1 - black)
+		gf := (1 - magenta) * (1 - black)
+		bf := (1 - yellow) * (1 - black)
+		return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
+	default:
+		return 0x8000, 0x8000, 0x8000, 0xffff
+	}
 }

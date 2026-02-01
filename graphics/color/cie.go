@@ -19,6 +19,7 @@ package color
 import (
 	"errors"
 	"fmt"
+	stdcolor "image/color"
 	"math"
 
 	"seehuhn.de/go/pdf"
@@ -93,6 +94,33 @@ func (s *SpaceCalGray) New(gray float64) Color {
 	return colorCalGray{Space: s, Value: gray}
 }
 
+// Convert converts a color to the CalGray color space.
+// This implements the [stdcolor.Model] interface.
+func (s *SpaceCalGray) Convert(c stdcolor.Color) stdcolor.Color {
+	// fast path: already this CalGray space
+	if cg, ok := c.(colorCalGray); ok && cg.Space == s {
+		return cg
+	}
+
+	// convert via XYZ, only Y (luminance) is used
+	_, Y, _ := colorToXYZ(c)
+	return s.FromXYZ(0, Y, 0)
+}
+
+// FromXYZ converts CIE 1931 XYZ coordinates to a CalGray color.
+// Only the Y component (luminance) is used.
+func (s *SpaceCalGray) FromXYZ(_, Y, _ float64) Color {
+	yNorm := Y / s.whitePoint[1]
+	if yNorm <= 0 {
+		return colorCalGray{Space: s, Value: 0}
+	}
+	if yNorm >= 1 {
+		return colorCalGray{Space: s, Value: 1}
+	}
+	gray := math.Pow(yNorm, 1.0/s.gamma)
+	return colorCalGray{Space: s, Value: clamp(gray, 0, 1)}
+}
+
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
 func (s *SpaceCalGray) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
@@ -128,6 +156,13 @@ func (c colorCalGray) ToXYZ() (X, Y, Z float64) {
 	return c.Space.whitePoint[0] * A,
 		c.Space.whitePoint[1] * A,
 		c.Space.whitePoint[2] * A
+}
+
+// RGBA implements the color.Color interface.
+func (c colorCalGray) RGBA() (r, g, b, a uint32) {
+	X, Y, Z := c.ToXYZ()
+	rf, gf, bf := xyzToSRGB(X, Y, Z)
+	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }
 
 // == CalRGB =================================================================
@@ -216,6 +251,67 @@ func (s *SpaceCalRGB) New(r, g, b float64) Color {
 	return colorCalRGB{Space: s, Values: [3]float64{r, g, b}}
 }
 
+// Convert converts a color to the CalRGB color space.
+// This implements the [stdcolor.Model] interface.
+func (s *SpaceCalRGB) Convert(c stdcolor.Color) stdcolor.Color {
+	// fast path: already this CalRGB space
+	if cr, ok := c.(colorCalRGB); ok && cr.Space == s {
+		return cr
+	}
+
+	// convert via XYZ
+	X, Y, Z := colorToXYZ(c)
+	return s.FromXYZ(X, Y, Z)
+}
+
+// FromXYZ converts CIE 1931 XYZ coordinates to a CalRGB color.
+func (s *SpaceCalRGB) FromXYZ(X, Y, Z float64) Color {
+	// invert the matrix (stored in column-major order in matrix field)
+	m := s.matrix
+	det := m[0]*(m[4]*m[8]-m[5]*m[7]) - m[3]*(m[1]*m[8]-m[2]*m[7]) + m[6]*(m[1]*m[5]-m[2]*m[4])
+	if det == 0 {
+		return colorCalRGB{Space: s, Values: [3]float64{0, 0, 0}}
+	}
+	invDet := 1.0 / det
+
+	// inverse matrix elements
+	i00 := (m[4]*m[8] - m[5]*m[7]) * invDet
+	i01 := (m[6]*m[5] - m[3]*m[8]) * invDet
+	i02 := (m[3]*m[7] - m[6]*m[4]) * invDet
+	i10 := (m[2]*m[7] - m[1]*m[8]) * invDet
+	i11 := (m[0]*m[8] - m[6]*m[2]) * invDet
+	i12 := (m[6]*m[1] - m[0]*m[7]) * invDet
+	i20 := (m[1]*m[5] - m[2]*m[4]) * invDet
+	i21 := (m[3]*m[2] - m[0]*m[5]) * invDet
+	i22 := (m[0]*m[4] - m[3]*m[1]) * invDet
+
+	// linear RGB values
+	A := i00*X + i01*Y + i02*Z
+	B := i10*X + i11*Y + i12*Z
+	C := i20*X + i21*Y + i22*Z
+
+	// apply inverse gamma
+	r := invGamma(A, s.gamma[0])
+	g := invGamma(B, s.gamma[1])
+	b := invGamma(C, s.gamma[2])
+
+	return colorCalRGB{Space: s, Values: [3]float64{
+		clamp(r, 0, 1),
+		clamp(g, 0, 1),
+		clamp(b, 0, 1),
+	}}
+}
+
+func invGamma(v, gamma float64) float64 {
+	if v <= 0 {
+		return 0
+	}
+	if v >= 1 {
+		return 1
+	}
+	return math.Pow(v, 1.0/gamma)
+}
+
 // Channels returns 3.
 // This implements the [Space] interface.
 func (s *SpaceCalRGB) Channels() int {
@@ -257,6 +353,13 @@ func (c colorCalRGB) ToXYZ() (X, Y, Z float64) {
 	Y = m[1]*A + m[4]*B + m[7]*C
 	Z = m[2]*A + m[5]*B + m[8]*C
 	return X, Y, Z
+}
+
+// RGBA implements the color.Color interface.
+func (c colorCalRGB) RGBA() (r, g, b, a uint32) {
+	X, Y, Z := c.ToXYZ()
+	rf, gf, bf := xyzToSRGB(X, Y, Z)
+	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }
 
 // == Lab ====================================================================
@@ -351,6 +454,19 @@ func (s *SpaceLab) Channels() int {
 	return 3
 }
 
+// Convert converts a color to the Lab color space.
+// This implements the [stdcolor.Model] interface.
+func (s *SpaceLab) Convert(c stdcolor.Color) stdcolor.Color {
+	// fast path: already this Lab space
+	if cl, ok := c.(colorLab); ok && cl.Space == s {
+		return cl
+	}
+
+	// convert via XYZ
+	X, Y, Z := colorToXYZ(c)
+	return s.FromXYZ(X, Y, Z)
+}
+
 // Default returns the black (or the closest representable color) in an Lab
 // color space.
 // This implements the [Space] interface.
@@ -416,6 +532,13 @@ func (c colorLab) ToXYZ() (X, Y, Z float64) {
 	Y = YW * labG(M)
 	Z = ZW * labG(N)
 	return X, Y, Z
+}
+
+// RGBA implements the color.Color interface.
+func (c colorLab) RGBA() (r, g, b, a uint32) {
+	X, Y, Z := c.ToXYZ()
+	rf, gf, bf := xyzToSRGB(X, Y, Z)
+	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }
 
 // FromXYZ converts CIE 1931 XYZ coordinates to a Lab color.

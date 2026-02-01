@@ -18,11 +18,16 @@ package color
 
 import (
 	"fmt"
+	stdcolor "image/color"
 	"math"
 )
 
 // Color represents a PDF color.
+// It embeds Go's standard color.Color interface, allowing PDF colors
+// to be used with Go's image package. The RGBA conversion may be lossy
+// for color spaces that cannot be exactly represented in sRGB.
 type Color interface {
+	stdcolor.Color
 	ColorSpace() Space
 }
 
