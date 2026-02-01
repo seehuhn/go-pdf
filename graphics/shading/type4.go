@@ -283,19 +283,19 @@ func extractType4(x *pdf.Extractor, stream *pdf.Stream) (*Type4, error) {
 	// Read stream data to extract vertices
 	stmReader, err := pdf.DecodeStream(x.R, stream, 0)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode stream: %w", err)
+		return nil, pdf.Errorf("failed to decode shading stream")
 	}
 	defer stmReader.Close()
 
 	data, err := io.ReadAll(stmReader)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read stream data: %w", err)
+		return nil, pdf.Errorf("failed to read shading stream")
 	}
 
 	// Parse vertices from binary data
 	vertices, err := parseType4Vertices(data, s)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse vertices: %w", err)
+		return nil, err
 	}
 	s.Vertices = vertices
 
@@ -377,9 +377,9 @@ func parseType4Vertices(data []byte, s *Type4) ([]Type4Vertex, error) {
 }
 
 // Embed implements the [Shading] interface.
-func (s *Type4) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+func (s *Type4) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	// Version check
-	if err := pdf.CheckVersion(rm.Out(), "Type 4 shadings", pdf.V1_3); err != nil {
+	if err := pdf.CheckVersion(e.Out(), "Type 4 shadings", pdf.V1_3); err != nil {
 		return nil, err
 	}
 
@@ -436,7 +436,7 @@ func (s *Type4) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, errors.New("Function not allowed for indexed color space")
 	}
 
-	csE, err := rm.Embed(s.ColorSpace)
+	csE, err := e.Embed(s.ColorSpace)
 	if err != nil {
 		return nil, err
 	}
@@ -459,7 +459,7 @@ func (s *Type4) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["AntiAlias"] = pdf.Boolean(true)
 	}
 	if s.F != nil {
-		fn, err := rm.Embed(s.F)
+		fn, err := e.Embed(s.F)
 		if err != nil {
 			return nil, err
 		}
@@ -469,8 +469,8 @@ func (s *Type4) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	vertexBits := s.BitsPerFlag + 2*s.BitsPerCoordinate + numValues*s.BitsPerComponent
 	vertexBytes := (vertexBits + 7) / 8
 
-	ref := rm.Alloc()
-	stm, err := rm.Out().OpenStream(ref, dict)
+	ref := e.Alloc()
+	stm, err := e.Out().OpenStream(ref, dict)
 	if err != nil {
 		return nil, err
 	}

@@ -78,7 +78,7 @@ func Form(x *pdf.Extractor, obj pdf.Object) (*form.Form, error) {
 	}
 
 	// Metadata (optional)
-	if meta, err := pdf.Optional(metadata.Extract(x.R, dict["Metadata"])); err != nil {
+	if meta, err := pdf.Optional(metadata.Extract(x, dict["Metadata"])); err != nil {
 		return nil, err
 	} else {
 		f.Metadata = meta

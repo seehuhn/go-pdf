@@ -255,7 +255,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 
 	// Extract Metadata
 	if metaObj, ok := dict["Metadata"]; ok {
-		meta, err := metadata.Extract(x.R, metaObj)
+		meta, err := metadata.Extract(x, metaObj)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Metadata: %w", err)
 		}

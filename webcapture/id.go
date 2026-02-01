@@ -22,50 +22,53 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// PDF 2.0 sections: 14.10.4
+// PDF 2.0 sections: 14.10.3
 
 // Identifier represents a digital identifier for a web capture content set.
 type Identifier struct {
 	// ID represents the digital identifier of the content set.
 	// This is an MD5 hash of the content (16 bytes).
 	ID []byte
+
+	// SingleUse determines if Embed returns a string (true) or
+	// a reference (false).
+	SingleUse bool
 }
 
 // ExtractIdentifier extracts an identifier from a PDF byte string object.
+// Returns nil, nil if the object is absent or malformed.
 func ExtractIdentifier(x *pdf.Extractor, obj pdf.Object) (*Identifier, error) {
 	str, err := pdf.Optional(x.GetString(obj))
 	if err != nil {
 		return nil, err
 	}
-
-	hash := []byte(str)
-	if len(hash) != 16 {
-		return nil, pdf.Errorf("invalid identifier length: %d != 16", len(hash))
+	if len(str) != 16 {
+		return nil, nil
 	}
 
-	id := &Identifier{
-		ID: hash,
-	}
-
-	return id, nil
+	return &Identifier{ID: []byte(str)}, nil
 }
 
-// Embed converts the identifier to a PDF byte string as an indirect object.
-func (id *Identifier) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-	// Validate the ID
+// Embed converts the identifier to a PDF byte string.
+func (id *Identifier) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
+	if err := pdf.CheckVersion(e.Out(), "web capture identifier", pdf.V1_3); err != nil {
+		return nil, err
+	}
+
 	if len(id.ID) != 16 {
 		return nil, fmt.Errorf("invalid identifier length: %d != 16", len(id.ID))
 	}
 
-	// Create PDF byte string
 	pdfStr := pdf.String(id.ID)
 
-	// Always create as indirect object
-	ref := rm.Alloc()
-	err := rm.Out().Put(ref, pdfStr)
+	if id.SingleUse {
+		return pdfStr, nil
+	}
+
+	ref := e.Alloc()
+	err := e.Out().Put(ref, pdfStr)
 	if err != nil {
 		return nil, err
 	}
-
 	return ref, nil
 }

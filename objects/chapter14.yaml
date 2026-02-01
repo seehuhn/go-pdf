@@ -4530,7 +4530,7 @@ types:
     pdfKey: AF
     pdfType: array
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
     refTypes:
     - ArrayOfAFFileSpecifications
   - goName: null
@@ -4631,7 +4631,7 @@ types:
     pdfKey: AF
     pdfType: array
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
     refTypes:
     - ArrayOfAFFileSpecifications
 - name: StructureAttributesDict

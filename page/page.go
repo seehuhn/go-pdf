@@ -500,7 +500,7 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if len(p.PresSteps) > 0 {
 		presSteps, err := navnode.Encode(rm, p.PresSteps)
 		if err != nil {
-			return nil, pdf.Wrap(err, "PresSteps")
+			return nil, err
 		}
 		dict["PresSteps"] = presSteps
 	}
@@ -760,7 +760,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	// Metadata (optional)
-	if meta, err := pdf.Optional(metadata.Extract(x.R, dict["Metadata"])); err != nil {
+	if meta, err := pdf.Optional(metadata.Extract(x, dict["Metadata"])); err != nil {
 		return nil, err
 	} else {
 		p.Metadata = meta
@@ -790,7 +790,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	// ID (optional, deprecated)
-	if id, err := pdf.Optional(pdf.GetString(x.R, dict["ID"])); err != nil {
+	if id, err := pdf.Optional(x.GetString(dict["ID"])); err != nil {
 		return nil, err
 	} else {
 		p.ID = id

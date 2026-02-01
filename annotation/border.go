@@ -57,7 +57,7 @@ var PDFDefaultBorder = &Border{Width: 1}
 func ExtractBorder(x *pdf.Extractor, obj pdf.Object) (*Border, error) {
 	_, isIndirect := obj.(pdf.Reference)
 
-	border, err := pdf.Optional(pdf.GetArray(x.R, obj))
+	border, err := pdf.Optional(x.GetArray(obj))
 	if err != nil {
 		return nil, err
 	}
@@ -68,19 +68,19 @@ func ExtractBorder(x *pdf.Extractor, obj pdf.Object) (*Border, error) {
 
 	b := &Border{}
 
-	if h, err := pdf.Optional(pdf.GetNumber(x.R, border[0])); err != nil {
+	if h, err := pdf.Optional(x.GetNumber(border[0])); err != nil {
 		return nil, err
 	} else {
 		b.HCornerRadius = float64(h)
 	}
 
-	if v, err := pdf.Optional(pdf.GetNumber(x.R, border[1])); err != nil {
+	if v, err := pdf.Optional(x.GetNumber(border[1])); err != nil {
 		return nil, err
 	} else {
 		b.VCornerRadius = float64(v)
 	}
 
-	if w, err := pdf.Optional(pdf.GetNumber(x.R, border[2])); err != nil {
+	if w, err := pdf.Optional(x.GetNumber(border[2])); err != nil {
 		return nil, err
 	} else {
 		b.Width = float64(w)

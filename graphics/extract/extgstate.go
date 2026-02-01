@@ -368,14 +368,14 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 	// Handle TransferFunction precedence: TR2 > TR (deprecated in PDF 2.0)
 	if pdf.GetVersion(x.R) < pdf.V2_0 {
 		if tr2 != nil {
-			fn, err := parseTransferFunction(x.R, tr2)
+			fn, err := parseTransferFunction(x, tr2)
 			if err != nil {
 				return nil, err
 			}
 			res.TransferFunctions = fn
 			set |= graphics.StateTransferFunction
 		} else if tr1 != nil {
-			fn, err := parseTransferFunction(x.R, tr1)
+			fn, err := parseTransferFunction(x, tr1)
 			if err != nil {
 				return nil, err
 			}
@@ -452,13 +452,11 @@ func readDash(r pdf.Getter, obj pdf.Object) (pat []float64, ph float64, err erro
 	return pat, float64(phase), nil
 }
 
-func parseTransferFunction(r pdf.Getter, obj pdf.Object) (graphics.TransferFunctions, error) {
+func parseTransferFunction(x *pdf.Extractor, obj pdf.Object) (graphics.TransferFunctions, error) {
 	var zero graphics.TransferFunctions
 
-	x := pdf.NewExtractor(r)
-
 	// check if it's an array of four or more transfer functions
-	if arr, err := pdf.GetArray(r, obj); err == nil && len(arr) >= 4 {
+	if arr, err := x.GetArray(obj); err == nil && len(arr) >= 4 {
 		var result graphics.TransferFunctions
 
 		// parse Red component

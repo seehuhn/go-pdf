@@ -302,13 +302,13 @@ func (e Simple) AsPDFType1(baseIsStd bool, opt pdf.OutputOptions) (pdf.Object, e
 
 // ExtractType3 extracts the encoding from the /Encoding entry of a Type3
 // font dictionary.
-func ExtractType3(r pdf.Getter, obj pdf.Object) (Simple, error) {
-	dict, err := pdf.GetDictTyped(r, obj, "Encoding")
+func ExtractType3(x *pdf.Extractor, obj pdf.Object) (Simple, error) {
+	dict, err := x.GetDictTyped(obj, "Encoding")
 	if err != nil {
 		return nil, err
 	}
 
-	diffArray, err := pdf.GetArray(r, dict["Differences"])
+	diffArray, err := x.GetArray(dict["Differences"])
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +317,7 @@ func ExtractType3(r pdf.Getter, obj pdf.Object) (Simple, error) {
 
 	currentCode := pdf.Integer(-1)
 	for _, item := range diffArray {
-		item, err = pdf.Resolve(r, item)
+		item, err = pdf.Resolve(x.R, item)
 		if err != nil {
 			return nil, err
 		}

@@ -86,7 +86,7 @@ func TestMembershipRoundTrip(t *testing.T) {
 					Args: []VisibilityExpression{
 						&VisibilityExpressionGroup{Group: &Group{Name: "Layer1"}},
 						&VisibilityExpressionNot{
-							Args: &VisibilityExpressionGroup{Group: &Group{Name: "Layer2"}},
+							Arg: &VisibilityExpressionGroup{Group: &Group{Name: "Layer2"}},
 						},
 						&VisibilityExpressionAnd{
 							Args: []VisibilityExpression{
@@ -201,7 +201,7 @@ func normalizeVisibilityExpression(ve VisibilityExpression) {
 			normalizeVisibilityExpression(operand)
 		}
 	case *VisibilityExpressionNot:
-		normalizeVisibilityExpression(expr.Args)
+		normalizeVisibilityExpression(expr.Arg)
 	}
 }
 

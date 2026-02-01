@@ -17,6 +17,7 @@
 package color
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"testing"
@@ -121,4 +122,98 @@ func must(space Space, err error) Space {
 		panic(err)
 	}
 	return space
+}
+
+func spaceRoundTrip(t *testing.T, version pdf.Version, space Space) {
+	t.Helper()
+
+	w, _ := memfile.NewPDFWriter(version, nil)
+	rm := pdf.NewResourceManager(w)
+
+	obj, err := rm.Embed(space)
+	if err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
+		t.Fatalf("embed failed: %v", err)
+	}
+	err = rm.Close()
+	if err != nil {
+		t.Fatalf("close resource manager failed: %v", err)
+	}
+
+	x := pdf.NewExtractor(w)
+	decoded, err := ExtractSpace(x, obj)
+	if err != nil {
+		t.Fatalf("extract failed: %v", err)
+	}
+
+	if !SpacesEqual(space, decoded) {
+		t.Errorf("round trip failed:\n  got:  %#v\n  want: %#v", decoded, space)
+	}
+}
+
+func TestSpaceRoundTrip(t *testing.T) {
+	for i, space := range testColorSpaces {
+		for _, version := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
+			name := fmt.Sprintf("%02d-%s-v%s", i, space.Family(), version)
+			t.Run(name, func(t *testing.T) {
+				spaceRoundTrip(t, version, space)
+			})
+		}
+	}
+}
+
+func FuzzSpaceRoundTrip(f *testing.F) {
+	opt := &pdf.WriterOptions{
+		HumanReadable: true,
+	}
+	for _, version := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
+		for _, space := range testColorSpaces {
+			w, buf := memfile.NewPDFWriter(version, opt)
+
+			err := memfile.AddBlankPage(w)
+			if err != nil {
+				continue
+			}
+
+			rm := pdf.NewResourceManager(w)
+			obj, err := rm.Embed(space)
+			if err != nil {
+				continue
+			}
+			err = rm.Close()
+			if err != nil {
+				continue
+			}
+
+			w.GetMeta().Trailer["Quir:CS"] = obj
+			err = w.Close()
+			if err != nil {
+				continue
+			}
+
+			f.Add(buf.Data)
+		}
+	}
+
+	f.Fuzz(func(t *testing.T, fileData []byte) {
+		r, err := pdf.NewReader(bytes.NewReader(fileData), nil)
+		if err != nil {
+			t.Skip("invalid PDF")
+		}
+
+		obj := r.GetMeta().Trailer["Quir:CS"]
+		if obj == nil {
+			t.Skip("missing color space")
+		}
+
+		x := pdf.NewExtractor(r)
+		space, err := ExtractSpace(x, obj)
+		if err != nil {
+			t.Skip("malformed color space")
+		}
+
+		spaceRoundTrip(t, pdf.GetVersion(r), space)
+	})
 }

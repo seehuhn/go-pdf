@@ -54,7 +54,7 @@ type Style struct {
 
 // ExtractStyle extracts a box style dictionary from a PDF object.
 func ExtractStyle(x *pdf.Extractor, obj pdf.Object) (*Style, error) {
-	dict, err := pdf.GetDict(x.R, obj)
+	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -67,9 +67,9 @@ func ExtractStyle(x *pdf.Extractor, obj pdf.Object) (*Style, error) {
 	if cArray, err := pdf.Optional(x.GetArray(dict["C"])); err != nil {
 		return nil, err
 	} else if len(cArray) >= 3 {
-		r, _ := pdf.GetNumber(x.R, cArray[0])
-		g, _ := pdf.GetNumber(x.R, cArray[1])
-		b, _ := pdf.GetNumber(x.R, cArray[2])
+		r, _ := x.GetNumber(cArray[0])
+		g, _ := x.GetNumber(cArray[1])
+		b, _ := x.GetNumber(cArray[2])
 		style.Color = color.DeviceRGB{
 			clamp(float64(r), 0, 1),
 			clamp(float64(g), 0, 1),
@@ -78,7 +78,7 @@ func ExtractStyle(x *pdf.Extractor, obj pdf.Object) (*Style, error) {
 	}
 
 	// line width
-	if w, err := pdf.Optional(pdf.GetNumber(x.R, dict["W"])); err != nil {
+	if w, err := pdf.Optional(x.GetNumber(dict["W"])); err != nil {
 		return nil, err
 	} else if w != 0 {
 		style.LineWidth = float64(w)
@@ -87,7 +87,7 @@ func ExtractStyle(x *pdf.Extractor, obj pdf.Object) (*Style, error) {
 	}
 
 	// line style
-	if s, err := pdf.Optional(pdf.GetName(x.R, dict["S"])); err != nil {
+	if s, err := pdf.Optional(x.GetName(dict["S"])); err != nil {
 		return nil, err
 	} else if s != "" {
 		style.Style = LineStyle(s)
@@ -101,7 +101,7 @@ func ExtractStyle(x *pdf.Extractor, obj pdf.Object) (*Style, error) {
 	} else if len(dArray) > 0 {
 		style.DashPattern = make([]float64, len(dArray))
 		for i, v := range dArray {
-			n, _ := pdf.GetNumber(x.R, v)
+			n, _ := x.GetNumber(v)
 			style.DashPattern[i] = float64(n)
 		}
 	} else {

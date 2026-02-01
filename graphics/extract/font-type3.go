@@ -58,7 +58,7 @@ func extractFontType3(x *pdf.Extractor, obj pdf.Object) (*dict.Type3, error) {
 	fd, _ := font.ExtractDescriptor(x.R, fdDict)
 	d.Descriptor = fd
 
-	enc, err := encoding.ExtractType3(x.R, fontDict["Encoding"])
+	enc, err := encoding.ExtractType3(x, fontDict["Encoding"])
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func extractFontType3(x *pdf.Extractor, obj pdf.Object) (*dict.Type3, error) {
 	}
 	getSimpleWidths(d.Width[:], x.R, fontDict, defaultWidth)
 
-	d.ToUnicode, _ = cmap.ExtractToUnicode(x.R, fontDict["ToUnicode"])
+	d.ToUnicode, _ = cmap.ExtractToUnicode(x, fontDict["ToUnicode"])
 
 	// Extract CharProcs - parse each content stream
 	charProcsDict, err := x.GetDict(fontDict["CharProcs"])

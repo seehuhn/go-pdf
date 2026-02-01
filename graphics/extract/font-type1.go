@@ -132,7 +132,7 @@ func extractFontType1(x *pdf.Extractor, obj pdf.Object) (*dict.Type1, error) {
 		}
 	}
 
-	d.ToUnicode, _ = cmap.ExtractToUnicode(x.R, fontDict["ToUnicode"])
+	d.ToUnicode, _ = cmap.ExtractToUnicode(x, fontDict["ToUnicode"])
 
 	repairType1(d, x.R)
 

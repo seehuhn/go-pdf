@@ -31,11 +31,11 @@ type Stream struct {
 	Data *xmp.Packet
 }
 
-func Extract(r pdf.Getter, ref pdf.Object) (*Stream, error) {
+func Extract(x *pdf.Extractor, ref pdf.Object) (*Stream, error) {
 	if ref == nil {
 		return nil, nil
 	}
-	body, err := pdf.GetStreamReader(r, ref)
+	body, err := pdf.GetStreamReader(x.R, ref)
 	if err != nil {
 		return nil, err
 	}

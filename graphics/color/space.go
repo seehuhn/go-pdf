@@ -144,7 +144,7 @@ func ExtractSpace(x *pdf.Extractor, desc pdf.Object) (Space, error) {
 	case FamilyICCBased:
 		var meta *metadata.Stream
 		if ref, ok := d.dict["Metadata"]; ok {
-			meta, err = metadata.Extract(x.R, ref)
+			meta, err = pdf.Optional(metadata.Extract(x, ref))
 			if err != nil {
 				d.SetError(err)
 			}
@@ -199,7 +199,7 @@ func ExtractSpace(x *pdf.Extractor, desc pdf.Object) (Space, error) {
 		}
 
 	case FamilySeparation:
-		if len(d.args) < 2 {
+		if len(d.args) < 3 {
 			d.MarkAsInvalid()
 			break
 		}

@@ -562,7 +562,7 @@ types:
     pdfKey: C1
     pdfType: array
     required: false
-    default: '[0.0]'
+    default: '[1.0]'
     introduced: '1.3'
     refTypes:
     - ArrayOfNumbersGeneral
@@ -3892,7 +3892,7 @@ types:
     pdfKey: AF
     pdfType: array
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
     refTypes:
     - ArrayOfAFFileSpecifications
   - goName: null
@@ -4119,30 +4119,6 @@ types:
     required: false
     introduced: '1.3'
     deprecated: '2.0'
-  - goName: null
-    pdfKey: AF
-    pdfType: array
-    required: false
-    introduced: '1.7'
-    deprecated: '2.0'
-    refTypes:
-    - ArrayOfAFFileSpecifications
-  - goName: null
-    pdfKey: Measure
-    pdfType: dictionary
-    required: false
-    introduced: '1.7'
-    deprecated: '2.0'
-    refTypes:
-    - MeasureRL
-  - goName: null
-    pdfKey: PtData
-    pdfType: dictionary
-    required: false
-    introduced: '1.7'
-    deprecated: '2.0'
-    refTypes:
-    - PointData
   - goName: null
     pdfKey: Length
     pdfType: integer
@@ -4401,7 +4377,7 @@ types:
     pdfKey: AF
     pdfType: array
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
     refTypes:
     - ArrayOfAFFileSpecifications
     goType: '[]*file.Specification'
@@ -4779,7 +4755,7 @@ types:
     pdfKey: AF
     pdfType: array
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
     refTypes:
     - ArrayOfAFFileSpecifications
     goType: '[]*file.Specification'
@@ -5120,7 +5096,7 @@ types:
     pdfKey: AF
     pdfType: array
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
     refTypes:
     - ArrayOfAFFileSpecifications
     goType: '[]*file.Specification'
@@ -5461,7 +5437,7 @@ types:
     pdfKey: AF
     pdfType: array
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
     refTypes:
     - ArrayOfAFFileSpecifications
     goType: '[]*file.Specification'

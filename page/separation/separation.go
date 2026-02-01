@@ -112,7 +112,7 @@ func pagesArray(refs []pdf.Reference) pdf.Array {
 
 // Decode reads a separation dictionary from a PDF object.
 func Decode(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
-	dict, err := pdf.GetDict(x.R, obj)
+	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err
 	}

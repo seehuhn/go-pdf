@@ -69,27 +69,27 @@ func (r ToUnicodeRange) String() string {
 	return fmt.Sprintf("% 02x-% 02x: %q", r.First, r.Last, r.Values)
 }
 
-func ExtractToUnicode(r pdf.Getter, obj pdf.Object) (*ToUnicodeFile, error) {
+func ExtractToUnicode(x *pdf.Extractor, obj pdf.Object) (*ToUnicodeFile, error) {
 	cycle := pdf.NewCycleChecker()
-	return safeExtractToUnicode(r, cycle, obj)
+	return safeExtractToUnicode(x, cycle, obj)
 }
 
-func safeExtractToUnicode(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object) (*ToUnicodeFile, error) {
+func safeExtractToUnicode(x *pdf.Extractor, cycle *pdf.CycleChecker, obj pdf.Object) (*ToUnicodeFile, error) {
 	if err := cycle.Check(obj); err != nil {
 		return nil, err
 	}
 
-	stmObj, err := pdf.GetStream(r, obj)
+	stmObj, err := x.GetStream(obj)
 	if err != nil || stmObj == nil {
 		return nil, err
 	}
 
-	err = pdf.CheckDictType(r, stmObj.Dict, "CMap")
+	err = pdf.CheckDictType(x.R, stmObj.Dict, "CMap")
 	if err != nil {
 		return nil, err
 	}
 
-	body, err := pdf.DecodeStream(r, stmObj, 0)
+	body, err := pdf.DecodeStream(x.R, stmObj, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func safeExtractToUnicode(r pdf.Getter, cycle *pdf.CycleChecker, obj pdf.Object)
 
 	parent := stmObj.Dict["UseCMap"]
 	if parent != nil {
-		parentInfo, err := safeExtractToUnicode(r, cycle, parent)
+		parentInfo, err := safeExtractToUnicode(x, cycle, parent)
 		if pdf.IsReadError(err) {
 			return nil, err
 		}

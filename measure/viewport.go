@@ -44,7 +44,7 @@ type Viewport struct {
 
 // ExtractViewport extracts a Viewport from a PDF object.
 func ExtractViewport(x *pdf.Extractor, obj pdf.Object) (*Viewport, error) {
-	dict, err := pdf.GetDictTyped(x.R, obj, "Viewport")
+	dict, err := x.GetDictTyped(obj, "Viewport")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -65,7 +65,7 @@ func ExtractViewport(x *pdf.Extractor, obj pdf.Object) (*Viewport, error) {
 
 	// Extract optional Name field
 	if dict["Name"] != nil {
-		name, err := pdf.Optional(pdf.GetString(x.R, dict["Name"]))
+		name, err := pdf.Optional(x.GetString(dict["Name"]))
 		if err != nil {
 			return nil, err
 		}
@@ -182,7 +182,7 @@ func (va *ViewPortArray) Select(point vec.Vec2) *Viewport {
 func ExtractViewportArray(x *pdf.Extractor, obj pdf.Object) (*ViewPortArray, error) {
 	_, isIndirect := obj.(pdf.Reference)
 
-	a, err := pdf.GetArray(x.R, obj)
+	a, err := x.GetArray(obj)
 	if err != nil {
 		return nil, err
 	}

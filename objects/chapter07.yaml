@@ -142,7 +142,7 @@ types:
     refTypes:
     - Extensions
     goType: Object
-    purpose: 'Extensions (optional, PDF 1.4) contains developer extensions information
+    purpose: 'Extensions (optional, PDF 1.7) contains developer extensions information
 
       for extensions that occur in this document.'
   - goName: Pages
@@ -316,7 +316,7 @@ types:
     pdfKey: AA
     pdfType: dictionary
     required: false
-    introduced: '1.4'
+    introduced: '1.2'
     refTypes:
     - AddActionCatalog
     goType: Object
@@ -479,7 +479,7 @@ types:
     pdfType: boolean
     required: false
     default: false
-    introduced: '1.0'
+    introduced: '1.5'
     deprecated: '2.0'
     goType: bool
     purpose: 'NeedsRendering (optional, deprecated in PDF 2.0) specifies whether the
@@ -489,7 +489,7 @@ types:
     pdfKey: DSS
     pdfType: dictionary
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
     refTypes:
     - DSS
     notes: see ETSI EN 319 142-1 (PAdES) https://github.com/pdf-association/arlington-pdf-model/issues/121
@@ -499,7 +499,7 @@ types:
     pdfKey: AF
     pdfType: array
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
     refTypes:
     - ArrayOfAFFileSpecifications
     goType: Object
@@ -510,7 +510,7 @@ types:
     pdfKey: DPartRoot
     pdfType: dictionary
     required: false
-    introduced: '1.6'
+    introduced: '2.0'
     refTypes:
     - DPartRoot
     notes: https://github.com/pdf-association/pdf-issues/issues/614
@@ -526,14 +526,14 @@ types:
   goType: null
   pdfType: DPart
   pdfRepr: dict
-  introduced: '1.6'
+  introduced: '2.0'
   specTable: Table 409
   fields:
   - goName: null
     pdfKey: Type
     pdfType: name
     required: false
-    introduced: '1.6'
+    introduced: '2.0'
     possibleValues:
     - DPart
     notes: Table 409
@@ -541,7 +541,7 @@ types:
     pdfKey: Parent
     pdfType: dictionary
     required: true
-    introduced: '1.6'
+    introduced: '2.0'
     refTypes:
     - DPart
     - DPartRoot
@@ -550,28 +550,28 @@ types:
     pdfKey: DParts
     pdfType: array
     required: fn:IsRequired(fn:Not(fn:IsPresent(Start)))
-    introduced: '1.6'
+    introduced: '2.0'
     refTypes:
     - ArrayOfDPartArrays
   - goName: null
     pdfKey: Start
     pdfType: dictionary
     required: fn:IsRequired(fn:Not(fn:IsPresent(DParts)))
-    introduced: '1.6'
+    introduced: '2.0'
     refTypes:
     - PageObject
   - goName: null
     pdfKey: End
     pdfType: dictionary
     required: false
-    introduced: '1.6'
+    introduced: '2.0'
     refTypes:
     - PageObject
   - goName: null
     pdfKey: DPM
     pdfType: dictionary
     required: false
-    introduced: '1.6'
+    introduced: '2.0'
     refTypes:
     - DPM
   - goName: null
@@ -585,14 +585,14 @@ types:
   goType: null
   pdfType: DPartRoot
   pdfRepr: dict
-  introduced: '1.6'
+  introduced: '2.0'
   specTable: Table 408
   fields:
   - goName: null
     pdfKey: Type
     pdfType: name
     required: false
-    introduced: '1.6'
+    introduced: '2.0'
     possibleValues:
     - DPartRoot
     notes: Table 408
@@ -600,19 +600,19 @@ types:
     pdfKey: DPartRootNode
     pdfType: dictionary
     required: true
-    introduced: '1.6'
+    introduced: '2.0'
     refTypes:
     - DPart
   - goName: null
     pdfKey: RecordLevel
     pdfType: integer
     required: false
-    introduced: '1.6'
+    introduced: '2.0'
   - goName: null
     pdfKey: NodeNameList
     pdfType: array
     required: fn:IsRequired(fn:Extension(PDF_VT2))
-    introduced: '1.6'
+    introduced: '2.0'
     refTypes:
     - ArrayOfNamesGeneral
     notes: since PDF/X-4 with PDF 1.6
@@ -2393,7 +2393,7 @@ types:
     pdfKey: AF
     pdfType: array
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
     refTypes:
     - ArrayOfAFFileSpecifications
     goType: '[]*file.Specification'
@@ -2420,7 +2420,7 @@ types:
     pdfKey: DPart
     pdfType: dictionary
     required: false
-    introduced: '1.6'
+    introduced: '2.0'
     refTypes:
     - DPart
     goType: pdf.Reference

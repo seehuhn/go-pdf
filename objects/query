@@ -2,8 +2,8 @@
 """Query tool for PDF object schema.
 
 Usage:
-    pdf-schema type <name>    # single type, embeds resolved
-    pdf-schema types          # all types, embeds resolved
+    ./query type <name>    # single type, embeds resolved
+    ./query types          # all types, embeds resolved
 """
 
 import signal
@@ -85,7 +85,7 @@ def main() -> None:
 
     if cmd == "type":
         if len(sys.argv) < 3:
-            print("Usage: pdf-schema type <name>", file=sys.stderr)
+            print("Usage: ./query type <name>", file=sys.stderr)
             sys.exit(1)
         cmd_type(sys.argv[2])
     elif cmd == "types":

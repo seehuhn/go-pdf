@@ -81,7 +81,7 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
 		return nil, err
 	} else if subtypeName != "Image" && subtypeName != "" {
 		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("invalid Subtype %q for soft mask XObject", subtypeName),
+			Err: fmt.Errorf("invalid Subtype %q for thumbnail", subtypeName),
 		}
 	}
 
@@ -170,6 +170,10 @@ func (t *Thumbnail) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		"Width":            pdf.Integer(t.Width),
 		"Height":           pdf.Integer(t.Height),
 		"BitsPerComponent": pdf.Integer(t.BitsPerComponent),
+	}
+	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("XObject")
+		dict["Subtype"] = pdf.Name("Image")
 	}
 
 	// embed color space

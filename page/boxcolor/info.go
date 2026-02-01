@@ -42,7 +42,7 @@ type Info struct {
 
 // ExtractInfo extracts a box colour information dictionary from a PDF object.
 func ExtractInfo(x *pdf.Extractor, obj pdf.Object) (*Info, error) {
-	dict, err := pdf.GetDict(x.R, obj)
+	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err
 	}

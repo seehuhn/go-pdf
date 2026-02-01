@@ -125,6 +125,9 @@ func (s *SpaceICCBased) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	if s.metadata != nil {
+		if err := pdf.CheckVersion(w, "ICCBased Metadata", pdf.V1_4); err != nil {
+			return nil, err
+		}
 		mRef, err := rm.Embed(s.metadata)
 		if err != nil {
 			return nil, err
