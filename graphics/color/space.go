@@ -19,7 +19,7 @@ package color
 import (
 	"bytes"
 	"fmt"
-	stdcolor "image/color"
+	gocolor "image/color"
 	"math"
 	"slices"
 
@@ -29,7 +29,9 @@ import (
 )
 
 // Space represents a PDF color space which can be embedded in a PDF file.
-// All implementations of Space also implement Go's [stdcolor.Model] interface.
+//
+// This interface extends Go's standard [gocolor.Model] interface, allowing
+// PDF color spaces to be used with Go's image package.
 type Space interface {
 	// Family returns the family of the color space.
 	Family() pdf.Name
@@ -41,11 +43,9 @@ type Space interface {
 	// Default returns the default color of the color space.
 	Default() Color
 
-	// Convert converts a color from any color space to this color space.
-	// This implements the [stdcolor.Model] interface.
-	Convert(c stdcolor.Color) stdcolor.Color
-
 	pdf.Embedder
+
+	gocolor.Model
 }
 
 // IsSpecial reports whether the color space is a special color space.
