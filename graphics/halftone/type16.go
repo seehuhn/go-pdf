@@ -99,7 +99,7 @@ func extractType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
 	} else if tf == pdf.Name("Identity") {
 		h.TransferFunction = function.Identity
 	} else {
-		if F, err := pdf.Optional(function.Extract(x, tf)); err != nil {
+		if F, err := pdf.ExtractorGetOptional(x, tf, function.Extract); err != nil {
 			return nil, err
 		} else if isValidTransferFunction(F) {
 			h.TransferFunction = F
@@ -127,14 +127,14 @@ func extractType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
 
 		stmReader, err := pdf.DecodeStream(x.R, stream, 0)
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode stream: %w", err)
+			return nil, err
 		}
 		defer stmReader.Close()
 
 		data := make([]byte, expectedBytes)
 		n, err := io.ReadFull(stmReader, data)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read threshold data: %w", err)
+			return nil, err
 		}
 		if n != expectedBytes {
 			return nil, fmt.Errorf("incomplete threshold data: expected %d bytes, got %d", expectedBytes, n)

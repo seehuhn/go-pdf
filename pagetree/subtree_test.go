@@ -232,29 +232,6 @@ func walkPages(r pdf.Getter, nodeRef, parentRef pdf.Reference) (int, error) {
 	return total, nil
 }
 
-func TestInheritRotate(t *testing.T) {
-	n := maxDegree
-	cc := make([]*nodeInfo, n)
-	for i := 0; i < n; i++ {
-		dict := pdf.Dict{}
-		switch i {
-		case 0:
-			dict["Rotate"] = pdf.Integer(0)
-		case 1:
-			dict["Rotate"] = pdf.Integer(90)
-		default:
-			dict["Rotate"] = pdf.Integer(180)
-		}
-		cc[i] = &nodeInfo{dictInfo: &dictInfo{dict: dict}}
-	}
-	parentDict := pdf.Dict{}
-	inheritRotate(parentDict, cc)
-	fmt.Println("parent:", pdf.AsString(parentDict))
-	for i := 0; i < n; i++ {
-		fmt.Printf("child %d: %s\n", i, pdf.AsString(cc[i].dict))
-	}
-}
-
 func FuzzInherit(f *testing.F) {
 	f.Add([]byte{0, 1, 2, 3})
 

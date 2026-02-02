@@ -314,6 +314,9 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// BoxColorInfo
 	if p.BoxColorInfo != nil {
+		if err := pdf.CheckVersion(w, "BoxColorInfo", pdf.V1_4); err != nil {
+			return nil, err
+		}
 		obj, err := rm.Embed(p.BoxColorInfo)
 		if err != nil {
 			return nil, err
@@ -330,6 +333,9 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// Group
 	if p.Group != nil {
+		if err := pdf.CheckVersion(w, "Group", pdf.V1_4); err != nil {
+			return nil, err
+		}
 		groupObj, err := rm.Embed(p.Group)
 		if err != nil {
 			return nil, err

@@ -265,8 +265,9 @@ func inheritRotate(parentDict pdf.Dict, childNodes []*nodeInfo) {
 	for i, node := range childNodes {
 		val, ok := node.dict[key]
 		if !ok {
-			// Missing entries indicate that this child does not
-			// use the inherited value.
+			// missing /Rotate means the page needs the PDF default (0 degrees)
+			repr[i] = defaultString
+			numDefault++
 			continue
 		}
 		r := pdf.AsString(val)
