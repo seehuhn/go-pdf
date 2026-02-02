@@ -200,28 +200,24 @@ func roundTripTest(t *testing.T, originalHalftone graphics.Halftone) {
 	}
 }
 
-func FuzzRead(f *testing.F) {
-	// Seed the fuzzer with valid test cases from all halftone types
+func FuzzRoundTrip(f *testing.F) {
+	opt := &pdf.WriterOptions{
+		HumanReadable: true,
+	}
 	for _, cases := range testCases {
 		for _, tc := range cases {
-			out := memfile.New()
-			opt := &pdf.WriterOptions{
-				HumanReadable: true,
-			}
-			w, err := pdf.NewWriter(out, pdf.V2_0, opt)
-			if err != nil {
-				f.Fatal(err)
-			}
-			rm := pdf.NewResourceManager(w)
+			w, buf := memfile.NewPDFWriter(pdf.V2_0, opt)
 
-			ref := w.Alloc()
-
-			embedded, err := rm.Embed(tc.halftone)
+			// AddBlankPage creates a minimal valid PDF structure.
+			// Without this, the seeds will likely be rejected by pdf.NewReader.
+			err := memfile.AddBlankPage(w)
 			if err != nil {
 				continue
 			}
 
-			err = w.Put(ref, embedded)
+			rm := pdf.NewResourceManager(w)
+
+			embedded, err := rm.Embed(tc.halftone)
 			if err != nil {
 				continue
 			}
@@ -231,39 +227,32 @@ func FuzzRead(f *testing.F) {
 				continue
 			}
 
-			w.GetMeta().Trailer["Quir:E"] = ref
+			w.GetMeta().Trailer["Quir:E"] = embedded
 
 			err = w.Close()
 			if err != nil {
 				continue
 			}
 
-			f.Add(out.Data)
+			f.Add(buf.Data)
 		}
 	}
 
 	f.Fuzz(func(t *testing.T, fileData []byte) {
-		// Get a "random" halftone from the PDF file.
-
-		// Make sure we don't panic on random input.
-		opt := &pdf.ReaderOptions{
-			ErrorHandling: pdf.ErrorHandlingReport,
-		}
-		r, err := pdf.NewReader(bytes.NewReader(fileData), opt)
+		r, err := pdf.NewReader(bytes.NewReader(fileData), nil)
 		if err != nil {
-			t.Skip("broken PDF: " + err.Error())
+			t.Skip("invalid PDF")
 		}
 		obj := r.GetMeta().Trailer["Quir:E"]
 		if obj == nil {
-			t.Skip("broken reference")
+			t.Skip("missing PDF object")
 		}
 		x := pdf.NewExtractor(r)
 		halftone, err := Extract(x, obj)
 		if err != nil {
-			t.Skip("broken halftone")
+			t.Skip("malformed PDF object")
 		}
 
-		// Make sure we can write the halftone, and read it back.
 		roundTripTest(t, halftone)
 	})
 }

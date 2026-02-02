@@ -2225,32 +2225,40 @@ types:
     - GroupAttributes
     goType: '*group.TransparencyAttributes'
     purpose: Group (optional) specifies transparency group attributes for the page.
-  - goName: null
+  - goName: Thumbnail
     pdfKey: Thumb
     pdfType: stream
     required: false
     introduced: '1.0'
     refTypes:
     - Thumbnail
-  - goName: null
+    goType: '*thumbnail.Thumbnail'
+    purpose: Thumbnail (optional) is a thumbnail image for the page.
+  - goName: ArticleBeads
     pdfKey: B
     pdfType: array
     required: false
     introduced: '1.1'
     refTypes:
     - ArrayOfBeads
-  - goName: null
+    goType: '[]pdf.Reference'
+    purpose: ArticleBeads (optional) lists article beads on the page, in reading order.
+  - goName: Duration
     pdfKey: Dur
     pdfType: number
     required: false
     introduced: '1.1'
-  - goName: null
+    goType: float64
+    purpose: Duration (optional) is the display duration in seconds for presentations.
+  - goName: Transition
     pdfKey: Trans
     pdfType: dictionary
     required: false
     introduced: '1.1'
     refTypes:
     - Transition
+    goType: '*transition.Transition'
+    purpose: Transition (optional) describes the transition effect for presentations.
   - goName: Annots
     pdfKey: Annots
     pdfType: array

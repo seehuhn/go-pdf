@@ -1556,7 +1556,7 @@ types:
       Can be a text string or a stream.
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.6.4.17
   writeMethod: (*JavaScript).Encode
 - name: ActionGoTo
   goType: action.GoTo

@@ -48,6 +48,9 @@ func (a *JavaScript) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		"S":  pdf.Name(TypeJavaScript),
 		"JS": a.JS,
 	}
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Action")
+	}
 
 	if next, err := a.Next.Encode(rm); err != nil {
 		return nil, err
@@ -64,7 +67,7 @@ func decodeJavaScript(x *pdf.Extractor, dict pdf.Dict) (*JavaScript, error) {
 		return nil, pdf.Error("JavaScript action missing JS entry")
 	}
 
-	next, err := DecodeActionList(x, dict["Next"])
+	next, err := pdf.Optional(DecodeActionList(x, dict["Next"]))
 	if err != nil {
 		return nil, err
 	}
