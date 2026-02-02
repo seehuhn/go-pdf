@@ -67,6 +67,9 @@ func (a *GoToE) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		"S": pdf.Name(TypeGoToE),
 		"D": destObj,
 	}
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Action")
+	}
 
 	if a.F != nil {
 		fn, err := rm.Embed(a.F)

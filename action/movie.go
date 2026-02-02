@@ -51,6 +51,9 @@ func (a *Movie) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{
 		"S": pdf.Name(TypeMovie),
 	}
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Action")
+	}
 
 	if a.Annotation != nil {
 		dict["Annotation"] = a.Annotation

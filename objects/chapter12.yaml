@@ -1645,7 +1645,7 @@ types:
     - Dest4StructArray
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.6.4.2
   writeMethod: (*GoTo).Encode
 - name: ActionGoTo3DView
   goType: action.GoTo3DView
@@ -1722,7 +1722,7 @@ types:
     purpose: V is the 3D view to use.
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.6.4.16
   writeMethod: (*GoTo3DView).Encode
 - name: ActionGoToDp
   goType: action.GoToDp
@@ -1784,7 +1784,7 @@ types:
     - DPart
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.6.4.5
   writeMethod: (*GoToDp).Encode
 - name: ActionGoToE
   goType: action.GoToE
@@ -1883,7 +1883,7 @@ types:
       Optional if F is present; otherwise required.
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.6.4.4
   writeMethod: (*GoToE).Encode
 - name: ActionGoToR
   goType: action.GoToR
@@ -1996,7 +1996,7 @@ types:
     purpose: NewWindow specifies how the target document should be displayed.
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.6.4.3
   writeMethod: (*GoToR).Encode
 - name: ActionHide
   goType: action.Hide
@@ -2136,7 +2136,7 @@ types:
       Default is true.
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.6.4.11
   writeMethod: (*Hide).Encode
 - name: ActionImportData
   goType: action.ImportData
@@ -2212,7 +2212,7 @@ types:
     purpose: F is the FDF file from which to import data.
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.7.6.4
   writeMethod: (*ImportData).Encode
 - name: ActionLaunch
   goType: action.Launch
@@ -2321,7 +2321,7 @@ types:
     purpose: NewWindow specifies how the target document should be displayed.
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.6.4.6
   writeMethod: (*Launch).Encode
 - name: ActionMovie
   goType: action.Movie
@@ -2423,7 +2423,7 @@ types:
     purpose: Operation specifies the operation to perform.
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.6.4.10
   writeMethod: (*Movie).Encode
 - name: ActionNOP
   goType: null
@@ -2553,7 +2553,7 @@ types:
     purpose: N is the name of the action to perform.
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.6.4.12
   writeMethod: (*Named).Encode
 - name: ActionRendition
   goType: action.Rendition
@@ -2659,7 +2659,7 @@ types:
     purpose: JS is the ECMAScript to execute.
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.6.4.14
   writeMethod: (*Rendition).Encode
 - name: ActionResetForm
   goType: action.ResetForm
@@ -2747,7 +2747,7 @@ types:
     purpose: Flags specifies reset options.
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.7.6.3
   writeMethod: (*ResetForm).Encode
 - name: ActionRichMediaExecute
   goType: action.RichMediaExecute
@@ -2828,7 +2828,7 @@ types:
     - RichMediaCommand
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.6.4.18
   writeMethod: (*RichMediaExecute).Encode
 - name: ActionSetOCGState
   goType: action.SetOCGState
@@ -2909,7 +2909,7 @@ types:
       Default is true.
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.6.4.13
   writeMethod: (*SetOCGState).Encode
 - name: ActionSetState
   goType: null
@@ -3098,7 +3098,7 @@ types:
     purpose: Mix indicates whether to mix with other sounds.
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.6.4.9
   writeMethod: (*Sound).Encode
 - name: ActionSubmitForm
   goType: action.SubmitForm
@@ -3205,7 +3205,7 @@ types:
     purpose: Next is the sequence of actions to perform after this action.
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.7.6.2
   writeMethod: (*SubmitForm).Encode
 - name: ActionThread
   goType: action.Thread
@@ -3301,7 +3301,7 @@ types:
     purpose: B specifies a bead in the thread.
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.6.4.7
   writeMethod: (*Thread).Encode
 - name: ActionTransition
   goType: page/transition.Transition
@@ -3367,7 +3367,7 @@ types:
   writeMethod: (*Transition).Embed
   goPackage: transition
   goRepr: struct
-  specSection: 12.4.4
+  specSection: 12.6.2 12.6.4.15
 - name: ActionURI
   goType: action.URI
   pdfType: Action
@@ -3448,7 +3448,7 @@ types:
     purpose: IsMap indicates whether the URI is a map area.
   goPackage: action
   goRepr: struct
-  specSection: 12.6.2
+  specSection: 12.6.2 12.6.4.8
   writeMethod: (*URI).Encode
 - name: AddActionCatalog
   goType: action/triggers.Catalog

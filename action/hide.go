@@ -53,6 +53,9 @@ func (a *Hide) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		"S": pdf.Name(TypeHide),
 		"T": a.T,
 	}
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Action")
+	}
 
 	// only write H if false (true is default)
 	if !a.H {

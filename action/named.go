@@ -48,6 +48,9 @@ func (a *Named) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		"S": pdf.Name(TypeNamed),
 		"N": a.N,
 	}
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Action")
+	}
 
 	if next, err := a.Next.Encode(rm); err != nil {
 		return nil, err
@@ -62,6 +65,9 @@ func decodeNamed(x *pdf.Extractor, dict pdf.Dict) (*Named, error) {
 	n, err := x.GetName(dict["N"])
 	if err != nil {
 		return nil, err
+	}
+	if n == "" {
+		return nil, pdf.Error("Named action: missing N field")
 	}
 
 	next, err := DecodeActionList(x, dict["Next"])

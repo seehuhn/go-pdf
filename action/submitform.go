@@ -53,6 +53,9 @@ func (a *SubmitForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		"S": pdf.Name(TypeSubmitForm),
 		"F": a.F,
 	}
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Action")
+	}
 
 	if a.Fields != nil {
 		dict["Fields"] = a.Fields

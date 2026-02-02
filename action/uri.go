@@ -50,6 +50,9 @@ func (a *URI) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		"S":   pdf.Name(TypeURI),
 		"URI": pdf.String(a.URI),
 	}
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Action")
+	}
 
 	if a.IsMap {
 		if err := pdf.CheckVersion(rm.Out, "URI action IsMap entry", pdf.V1_2); err != nil {

@@ -54,6 +54,9 @@ func (a *SetOCGState) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		"S":     pdf.Name(TypeSetOCGState),
 		"State": a.State,
 	}
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Action")
+	}
 
 	// only write PreserveRB if false (true is default)
 	if !a.PreserveRB {

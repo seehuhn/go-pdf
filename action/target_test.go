@@ -17,6 +17,7 @@
 package action
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
@@ -26,22 +27,14 @@ import (
 )
 
 var targetTestCases = []Target{
-	// Simple cases
+	// TargetParent
 	&TargetParent{},
-	&TargetNamedChild{Name: pdf.String("embedded.pdf")},
-	&TargetAnnotationChild{
-		Page:       pdf.Integer(0),
-		Annotation: pdf.Integer(1),
-	},
-	&TargetAnnotationChild{
-		Page:       pdf.String("chapter1"),
-		Annotation: pdf.String("attachment1"),
-	},
-
-	// Chained cases
 	&TargetParent{
 		Next: &TargetNamedChild{Name: pdf.String("child.pdf")},
 	},
+
+	// TargetNamedChild
+	&TargetNamedChild{Name: pdf.String("embedded.pdf")},
 	&TargetNamedChild{
 		Name: pdf.String("level1.pdf"),
 		Next: &TargetNamedChild{Name: pdf.String("level2.pdf")},
@@ -53,16 +46,48 @@ var targetTestCases = []Target{
 			Annotation: pdf.String("attach"),
 		},
 	},
+
+	// TargetAnnotationChild
+	&TargetAnnotationChild{
+		Page:       pdf.Integer(0),
+		Annotation: pdf.Integer(1),
+	},
+	&TargetAnnotationChild{
+		Page:       pdf.String("chapter1"),
+		Annotation: pdf.String("attachment1"),
+	},
 }
 
-func testTargetRoundTrip(t *testing.T, target Target) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	defer w.Close()
+func targetTypeName(t Target) string {
+	switch t.(type) {
+	case *TargetParent:
+		return "TargetParent"
+	case *TargetNamedChild:
+		return "TargetNamedChild"
+	case *TargetAnnotationChild:
+		return "TargetAnnotationChild"
+	default:
+		return fmt.Sprintf("%T", t)
+	}
+}
+
+func testTargetRoundTrip(t *testing.T, version pdf.Version, target Target) {
+	t.Helper()
+
+	w, _ := memfile.NewPDFWriter(version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	encoded, err := target.Encode(rm)
 	if err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
 		t.Fatalf("encode error: %v", err)
+	}
+
+	err = rm.Close()
+	if err != nil {
+		t.Fatalf("rm.Close error: %v", err)
 	}
 
 	x := pdf.NewExtractor(w)
@@ -77,70 +102,75 @@ func testTargetRoundTrip(t *testing.T, target Target) {
 }
 
 func TestTargetRoundTrip(t *testing.T) {
-	for i, target := range targetTestCases {
-		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			testTargetRoundTrip(t, target)
+	versions := []pdf.Version{pdf.V1_7, pdf.V2_0}
+
+	for _, version := range versions {
+		t.Run(version.String(), func(t *testing.T) {
+			for _, target := range targetTestCases {
+				t.Run(targetTypeName(target), func(t *testing.T) {
+					testTargetRoundTrip(t, version, target)
+				})
+			}
 		})
 	}
 }
 
-func TestTargetParentEncode(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	defer w.Close()
-	rm := pdf.NewResourceManager(w)
-
-	target := &TargetParent{}
-
-	obj, err := target.Encode(rm)
-	if err != nil {
-		t.Fatalf("encode error: %v", err)
+func FuzzTargetRoundTrip(f *testing.F) {
+	opt := &pdf.WriterOptions{
+		HumanReadable: true,
 	}
 
-	dict, ok := obj.(pdf.Dict)
-	if !ok {
-		t.Fatalf("expected Dict, got %T", obj)
+	for _, target := range targetTestCases {
+		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+
+		err := memfile.AddBlankPage(w)
+		if err != nil {
+			continue
+		}
+
+		rm := pdf.NewResourceManager(w)
+		obj, err := target.Encode(rm)
+		if err != nil {
+			continue
+		}
+
+		err = rm.Close()
+		if err != nil {
+			continue
+		}
+
+		w.GetMeta().Trailer["Quir:E"] = obj
+		err = w.Close()
+		if err != nil {
+			continue
+		}
+
+		f.Add(buf.Data)
 	}
 
-	if dict["R"] != pdf.Name("P") {
-		t.Errorf("R = %v, want P", dict["R"])
-	}
-}
+	f.Fuzz(func(t *testing.T, fileData []byte) {
+		r, err := pdf.NewReader(bytes.NewReader(fileData), nil)
+		if err != nil {
+			t.Skip("invalid PDF")
+		}
 
-func TestTargetNamedChildEncode(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	defer w.Close()
-	rm := pdf.NewResourceManager(w)
+		obj := r.GetMeta().Trailer["Quir:E"]
+		if obj == nil {
+			t.Skip("missing test object")
+		}
 
-	target := &TargetNamedChild{
-		Name: pdf.String("embedded.pdf"),
-	}
+		x := pdf.NewExtractor(r)
+		target, err := DecodeTarget(x, obj)
+		if err != nil {
+			t.Skip("malformed target")
+		}
 
-	obj, err := target.Encode(rm)
-	if err != nil {
-		t.Fatalf("encode error: %v", err)
-	}
-
-	dict, ok := obj.(pdf.Dict)
-	if !ok {
-		t.Fatalf("expected Dict, got %T", obj)
-	}
-
-	if dict["R"] != pdf.Name("C") {
-		t.Errorf("R = %v, want C", dict["R"])
-	}
-
-	name, ok := dict["N"].(pdf.String)
-	if !ok {
-		t.Fatalf("N is not a pdf.String, got %T", dict["N"])
-	}
-	if string(name) != "embedded.pdf" {
-		t.Errorf("N = %v, want embedded.pdf", name)
-	}
+		testTargetRoundTrip(t, pdf.GetVersion(r), target)
+	})
 }
 
 func TestTargetNamedChildEmptyName(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	defer w.Close()
 	rm := pdf.NewResourceManager(w)
 
 	target := &TargetNamedChild{
@@ -153,46 +183,8 @@ func TestTargetNamedChildEmptyName(t *testing.T) {
 	}
 }
 
-func TestTargetAnnotationChildEncode(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	defer w.Close()
-	rm := pdf.NewResourceManager(w)
-
-	target := &TargetAnnotationChild{
-		Page:       pdf.Integer(5),
-		Annotation: pdf.String("attach1"),
-	}
-
-	obj, err := target.Encode(rm)
-	if err != nil {
-		t.Fatalf("encode error: %v", err)
-	}
-
-	dict, ok := obj.(pdf.Dict)
-	if !ok {
-		t.Fatalf("expected Dict, got %T", obj)
-	}
-
-	if dict["R"] != pdf.Name("C") {
-		t.Errorf("R = %v, want C", dict["R"])
-	}
-
-	if dict["P"] != pdf.Integer(5) {
-		t.Errorf("P = %v, want 5", dict["P"])
-	}
-
-	annot, ok := dict["A"].(pdf.String)
-	if !ok {
-		t.Fatalf("A is not a pdf.String, got %T", dict["A"])
-	}
-	if string(annot) != "attach1" {
-		t.Errorf("A = %v, want attach1", annot)
-	}
-}
-
 func TestTargetAnnotationChildMissingFields(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	defer w.Close()
 	rm := pdf.NewResourceManager(w)
 
 	tests := []struct {
@@ -215,7 +207,6 @@ func TestTargetAnnotationChildMissingFields(t *testing.T) {
 
 func TestTargetCycle(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	defer w.Close()
 	rm := pdf.NewResourceManager(w)
 
 	// Create a cycle: t1 -> t2 -> t1
@@ -227,88 +218,5 @@ func TestTargetCycle(t *testing.T) {
 	_, err := t1.Encode(rm)
 	if err != errTargetCycle {
 		t.Errorf("expected cycle error, got %v", err)
-	}
-}
-
-func TestDecodeTargetParent(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	defer w.Close()
-
-	dict := pdf.Dict{
-		"R": pdf.Name("P"),
-	}
-
-	x := pdf.NewExtractor(w)
-	target, err := DecodeTarget(x, dict)
-	if err != nil {
-		t.Fatalf("decode error: %v", err)
-	}
-
-	parent, ok := target.(*TargetParent)
-	if !ok {
-		t.Fatalf("expected *TargetParent, got %T", target)
-	}
-
-	if parent.Next != nil {
-		t.Error("expected Next to be nil")
-	}
-}
-
-func TestDecodeTargetNamedChild(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	defer w.Close()
-
-	dict := pdf.Dict{
-		"R": pdf.Name("C"),
-		"N": pdf.String("embedded.pdf"),
-	}
-
-	x := pdf.NewExtractor(w)
-	target, err := DecodeTarget(x, dict)
-	if err != nil {
-		t.Fatalf("decode error: %v", err)
-	}
-
-	child, ok := target.(*TargetNamedChild)
-	if !ok {
-		t.Fatalf("expected *TargetNamedChild, got %T", target)
-	}
-
-	if string(child.Name) != "embedded.pdf" {
-		t.Errorf("Name = %v, want embedded.pdf", child.Name)
-	}
-}
-
-func TestDecodeTargetAnnotationChild(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	defer w.Close()
-
-	dict := pdf.Dict{
-		"R": pdf.Name("C"),
-		"P": pdf.Integer(5),
-		"A": pdf.String("attach"),
-	}
-
-	x := pdf.NewExtractor(w)
-	target, err := DecodeTarget(x, dict)
-	if err != nil {
-		t.Fatalf("decode error: %v", err)
-	}
-
-	child, ok := target.(*TargetAnnotationChild)
-	if !ok {
-		t.Fatalf("expected *TargetAnnotationChild, got %T", target)
-	}
-
-	if child.Page != pdf.Integer(5) {
-		t.Errorf("Page = %v, want 5", child.Page)
-	}
-
-	annotStr, ok := child.Annotation.(pdf.String)
-	if !ok {
-		t.Fatalf("Annotation is not a pdf.String, got %T", child.Annotation)
-	}
-	if string(annotStr) != "attach" {
-		t.Errorf("Annotation = %v, want attach", annotStr)
 	}
 }

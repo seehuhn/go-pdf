@@ -46,6 +46,9 @@ func (a *Thread) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{
 		"S": pdf.Name(TypeThread),
 	}
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Action")
+	}
 
 	if a.D != nil {
 		dict["D"] = a.D

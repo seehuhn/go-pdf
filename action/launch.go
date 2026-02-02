@@ -57,6 +57,9 @@ func (a *Launch) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{
 		"S": pdf.Name(TypeLaunch),
 	}
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Action")
+	}
 
 	if a.F != nil {
 		fn, err := rm.Embed(a.F)

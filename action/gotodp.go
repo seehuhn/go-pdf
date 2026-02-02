@@ -48,6 +48,9 @@ func (a *GoToDp) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		"S":     pdf.Name(TypeGoToDp),
 		"DPart": a.DPart,
 	}
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Action")
+	}
 
 	if next, err := a.Next.Encode(rm); err != nil {
 		return nil, err

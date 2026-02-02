@@ -47,6 +47,9 @@ func (a *ResetForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{
 		"S": pdf.Name(TypeResetForm),
 	}
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Action")
+	}
 
 	if a.Fields != nil {
 		dict["Fields"] = a.Fields

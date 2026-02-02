@@ -53,6 +53,9 @@ func (a *RichMediaExecute) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{
 		"S": pdf.Name(TypeRichMediaExecute),
 	}
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Action")
+	}
 
 	if a.TA != 0 {
 		dict["TA"] = a.TA

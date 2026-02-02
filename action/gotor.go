@@ -76,6 +76,9 @@ func (a *GoToR) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		"F": fn,
 		"D": destObj,
 	}
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Action")
+	}
 
 	if a.SD != nil {
 		if err := pdf.CheckVersion(rm.Out, "GoToR action SD entry", pdf.V2_0); err != nil {

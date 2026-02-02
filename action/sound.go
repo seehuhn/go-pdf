@@ -62,6 +62,9 @@ func (a *Sound) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		"S":     pdf.Name(TypeSound),
 		"Sound": a.Sound,
 	}
+	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("Action")
+	}
 
 	if a.Volume != 1.0 {
 		dict["Volume"] = pdf.Number(a.Volume)
@@ -92,8 +95,10 @@ func decodeSound(x *pdf.Extractor, dict pdf.Dict) (*Sound, error) {
 	}
 
 	volume := 1.0
-	if v, err := pdf.Optional(x.GetNumber(dict["Volume"])); err == nil {
-		volume = v
+	if dict["Volume"] != nil {
+		if v, err := pdf.Optional(x.GetNumber(dict["Volume"])); err == nil {
+			volume = v
+		}
 	}
 
 	synchronous, _ := pdf.Optional(x.GetBoolean(dict["Synchronous"]))
