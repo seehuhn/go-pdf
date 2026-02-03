@@ -156,8 +156,8 @@ func testRoundTrip(t *testing.T, dict pdf.Dict, isIndirect bool) {
 			t.Fatalf("decoded.Get(%q) failed: %v", key, err)
 		}
 
-		// convert to string representation for comparison since ResolvedObject
-		// has unexported fields that can't be compared directly
+		// convert to string representation for comparison since the objects
+		// returned by Get() may wrap internal state
 		var origBuf, decodedBuf bytes.Buffer
 		err = pdf.Format(&origBuf, 0, origVal)
 		if err != nil {

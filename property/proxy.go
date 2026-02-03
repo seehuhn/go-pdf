@@ -55,12 +55,12 @@ func (p *proxyList) Keys() []pdf.Name {
 	return keys
 }
 
-func (p *proxyList) Get(key pdf.Name) (*ResolvedObject, error) {
+func (p *proxyList) Get(key pdf.Name) (pdf.Object, error) {
 	obj, ok := p.dict[key]
 	if !ok {
 		return nil, ErrNoKey
 	}
-	return &ResolvedObject{obj, p.x}, nil
+	return &resolvedObject{obj, p.x}, nil
 }
 
 func (p *proxyList) IsDirect() bool {

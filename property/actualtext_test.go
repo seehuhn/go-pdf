@@ -24,34 +24,81 @@ import (
 )
 
 func TestActualTextRoundTrip(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	rm := pdf.NewResourceManager(w)
-
-	original := &ActualText{
-		Text:      "replacement text",
-		SingleUse: true,
+	testCases := []struct {
+		name string
+		at   *ActualText
+	}{
+		{
+			name: "SingleUse true, no MCID",
+			at: &ActualText{
+				Text:      "replacement text",
+				SingleUse: true,
+			},
+		},
+		{
+			name: "SingleUse false, no MCID",
+			at: &ActualText{
+				Text:      "indirect text",
+				SingleUse: false,
+			},
+		},
+		{
+			name: "with MCID",
+			at: func() *ActualText {
+				a := &ActualText{Text: "text with mcid"}
+				a.MCID.Set(42)
+				return a
+			}(),
+		},
 	}
 
-	// embed
-	embedded, err := rm.Embed(original)
-	if err != nil {
-		t.Fatalf("embed failed: %v", err)
-	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			rm := pdf.NewResourceManager(w)
 
-	err = rm.Close()
-	if err != nil {
-		t.Fatalf("rm.Close failed: %v", err)
-	}
+			// embed
+			embedded, err := rm.Embed(tc.at)
+			if err != nil {
+				t.Fatalf("embed failed: %v", err)
+			}
 
-	// extract
-	x := pdf.NewExtractor(w)
-	decoded, err := ExtractActualText(x, embedded)
-	if err != nil {
-		t.Fatalf("extract failed: %v", err)
-	}
+			err = rm.Close()
+			if err != nil {
+				t.Fatalf("rm.Close failed: %v", err)
+			}
 
-	if decoded.Text != original.Text {
-		t.Errorf("Text = %q, want %q", decoded.Text, original.Text)
+			// extract using generic ExtractList
+			x := pdf.NewExtractor(w)
+			decoded, err := ExtractList(x, embedded)
+			if err != nil {
+				t.Fatalf("extract failed: %v", err)
+			}
+
+			// verify ActualText value
+			val, err := decoded.Get("ActualText")
+			if err != nil {
+				t.Fatalf("Get(ActualText) failed: %v", err)
+			}
+			pdfStr, ok := val.AsPDF(0).(pdf.String)
+			if !ok {
+				t.Fatalf("ActualText value is %T, want pdf.String", val.AsPDF(0))
+			}
+			if string(pdfStr.AsTextString()) != tc.at.Text {
+				t.Errorf("Text = %q, want %q", pdfStr.AsTextString(), tc.at.Text)
+			}
+
+			// verify MCID if set
+			if mcid, ok := tc.at.MCID.Get(); ok {
+				mcidVal, err := decoded.Get("MCID")
+				if err != nil {
+					t.Fatalf("Get(MCID) failed: %v", err)
+				}
+				if got := mcidVal.AsPDF(0).(pdf.Integer); uint(got) != mcid {
+					t.Errorf("MCID = %d, want %d", got, mcid)
+				}
+			}
+		})
 	}
 }
 

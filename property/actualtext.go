@@ -17,8 +17,6 @@
 package property
 
 import (
-	"math"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/optional"
 )
@@ -28,8 +26,6 @@ import (
 // ActualText represents an ActualText property list for marked content.
 // This provides replacement text for content that should be used during
 // text extraction, searching, and accessibility.
-//
-// PDF 2.0 section 14.9
 type ActualText struct {
 	// MCID (optional) is the marked-content identifier for structure.
 	MCID optional.UInt
@@ -37,14 +33,16 @@ type ActualText struct {
 	// Text is the replacement text string.
 	Text string
 
-	// SingleUse controls whether the property list is embedded as a direct
-	// object in the Properties resource dictionary (true) or as an indirect
-	// object (false).
+	// SingleUse controls whether the property list is embedded directly
+	// in the content stream (true) or as an indirect object via the
+	// Properties resource dictionary (false).
 	SingleUse bool
 }
 
 var _ List = (*ActualText)(nil)
 
+// Keys returns the dictionary keys used by this property list.
+// This implements the [List] interface.
 func (a *ActualText) Keys() []pdf.Name {
 	var keys []pdf.Name
 	keys = append(keys, "ActualText")
@@ -54,22 +52,29 @@ func (a *ActualText) Keys() []pdf.Name {
 	return keys
 }
 
-func (a *ActualText) Get(key pdf.Name) (*ResolvedObject, error) {
+// Get retrieves the value for a given key.
+// This implements the [List] interface.
+func (a *ActualText) Get(key pdf.Name) (pdf.Object, error) {
 	switch key {
 	case "MCID":
 		if v, ok := a.MCID.Get(); ok {
-			return &ResolvedObject{obj: pdf.Integer(v), x: nil}, nil
+			return pdf.Integer(v), nil
 		}
 	case "ActualText":
-		return &ResolvedObject{obj: pdf.TextString(a.Text), x: nil}, nil
+		return pdf.TextString(a.Text), nil
 	}
 	return nil, ErrNoKey
 }
 
+// IsDirect reports whether this property list can be embedded directly
+// into a content stream.
+// This implements the [List] interface.
 func (a *ActualText) IsDirect() bool {
 	return a.SingleUse
 }
 
+// Embed writes the property list to the PDF file.
+// This implements the [pdf.Embedder] interface.
 func (a *ActualText) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	dict := make(pdf.Dict)
 
@@ -89,28 +94,4 @@ func (a *ActualText) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 	return ref, nil
-}
-
-// ExtractActualText extracts an ActualText property list from a PDF object.
-func ExtractActualText(x *pdf.Extractor, obj pdf.Object) (*ActualText, error) {
-	dict, err := x.GetDictTyped(obj, "")
-	if err != nil {
-		return nil, err
-	}
-
-	result := &ActualText{}
-
-	if mcid, ok := dict["MCID"].(pdf.Integer); ok && mcid >= 0 && uint64(mcid) <= math.MaxUint {
-		result.MCID.Set(uint(mcid))
-	}
-
-	if actualTextObj, ok := dict["ActualText"]; ok {
-		text, err := pdf.Optional(pdf.GetTextString(x.R, actualTextObj))
-		if err != nil {
-			return nil, err
-		}
-		result.Text = string(text)
-	}
-
-	return result, nil
 }

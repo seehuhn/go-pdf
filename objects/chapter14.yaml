@@ -82,7 +82,6 @@ types:
     notes: Replacement text for content
   goPackage: property
   goRepr: struct
-  readFunc: property.ExtractActualText
   writeMethod: (*ActualText).Embed
 - name: AFEmbeddedFileParameter
   goType: null
@@ -402,13 +401,15 @@ types:
   specSection: 14.13.5
   specTable: Table 409a
   fields:
-  - goName: null
+  - goName: MCID
+    goType: optional.UInt
     pdfKey: MCID
     pdfType: integer
     required: false
     introduced: '2.0'
     notes: Marked-content identifier for structure
-  - goName: null
+  - goName: AssociatedFiles
+    goType: '[]*file.Specification'
     pdfKey: MCAF
     pdfType: array
     required: true

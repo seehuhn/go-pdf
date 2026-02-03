@@ -81,20 +81,20 @@ var actionTestCases = []Action{
 
 	// Thread
 	&Thread{D: pdf.Integer(0)},
-	&Thread{D: pdf.Reference(1)},                        // thread by reference
-	&Thread{D: pdf.Integer(0), B: pdf.Integer(0)},       // with bead index
-	&Thread{D: pdf.Reference(1), B: pdf.Reference(2)},   // thread and bead by reference
+	&Thread{D: pdf.Reference(1)},                      // thread by reference
+	&Thread{D: pdf.Integer(0), B: pdf.Integer(0)},     // with bead index
+	&Thread{D: pdf.Reference(1), B: pdf.Reference(2)}, // thread and bead by reference
 
 	// URI
 	&URI{URI: "https://example.com"},
 	&URI{URI: "https://example.com", IsMap: true},
-	&URI{URI: "mailto:user@example.com"},                // mailto URI
-	&URI{URI: "file:///path/to/file.pdf"},               // file URI
+	&URI{URI: "mailto:user@example.com"},  // mailto URI
+	&URI{URI: "file:///path/to/file.pdf"}, // file URI
 
 	// Sound
 	&Sound{Sound: pdf.Reference(1), Volume: 1.0},
-	&Sound{Sound: pdf.Reference(1), Volume: 0.5},        // half volume
-	&Sound{Sound: pdf.Reference(1), Volume: -1.0},       // negative volume (muted)
+	&Sound{Sound: pdf.Reference(1), Volume: 0.5},  // half volume
+	&Sound{Sound: pdf.Reference(1), Volume: -1.0}, // negative volume (muted)
 	&Sound{Sound: pdf.Reference(1), Volume: 1.0, Synchronous: true},
 	&Sound{Sound: pdf.Reference(1), Volume: 1.0, Repeat: true},
 	&Sound{Sound: pdf.Reference(1), Volume: 1.0, Mix: true},
@@ -102,7 +102,7 @@ var actionTestCases = []Action{
 
 	// Movie
 	&Movie{T: pdf.String("movie1")},
-	&Movie{Annotation: pdf.Reference(1)},                // by annotation reference
+	&Movie{Annotation: pdf.Reference(1)}, // by annotation reference
 	&Movie{T: pdf.String("intro"), Operation: "Play"},
 	&Movie{T: pdf.String("video"), Operation: "Stop"},
 	&Movie{T: pdf.String("clip"), Operation: "Pause"},

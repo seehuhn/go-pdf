@@ -91,8 +91,8 @@ func TestAFGet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get(MCID) failed: %v", err)
 	}
-	if val.obj.(pdf.Integer) != 42 {
-		t.Errorf("Get(MCID) = %v, want 42", val.obj)
+	if val.(pdf.Integer) != 42 {
+		t.Errorf("Get(MCID) = %v, want 42", val)
 	}
 
 	// test getting MCAF - should return array of file spec references
@@ -100,9 +100,9 @@ func TestAFGet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get(MCAF) failed: %v", err)
 	}
-	arr, ok := mcafVal.obj.(pdf.Array)
+	arr, ok := mcafVal.AsPDF(0).(pdf.Array)
 	if !ok {
-		t.Fatalf("Get(MCAF) returned %T, want pdf.Array", mcafVal.obj)
+		t.Fatalf("Get(MCAF) returned %T, want pdf.Array", mcafVal.AsPDF(0))
 	}
 	if len(arr) != 2 {
 		t.Errorf("Get(MCAF) array length = %d, want 2", len(arr))
@@ -172,7 +172,7 @@ func TestAFRoundTripSingleUse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get(MCID) failed: %v", err)
 	}
-	mcidInt := mcidVal.obj.(pdf.Integer)
+	mcidInt := mcidVal.AsPDF(0).(pdf.Integer)
 	if mcidInt != 99 {
 		t.Errorf("MCID = %d, want 99", mcidInt)
 	}

@@ -47,6 +47,8 @@ type AF struct {
 
 var _ List = (*AF)(nil)
 
+// Keys returns the dictionary keys used by this property list.
+// This implements the [List] interface.
 func (a *AF) Keys() []pdf.Name {
 	var keys []pdf.Name
 	keys = append(keys, "MCAF")
@@ -56,11 +58,13 @@ func (a *AF) Keys() []pdf.Name {
 	return keys
 }
 
-func (a *AF) Get(key pdf.Name) (*ResolvedObject, error) {
+// Get retrieves the value for a given key.
+// This implements the [List] interface.
+func (a *AF) Get(key pdf.Name) (pdf.Object, error) {
 	switch key {
 	case "MCID":
 		if v, ok := a.MCID.Get(); ok {
-			return &ResolvedObject{obj: pdf.Integer(v), x: nil}, nil
+			return pdf.Integer(v), nil
 		}
 	case "MCAF":
 		w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
@@ -81,18 +85,27 @@ func (a *AF) Get(key pdf.Name) (*ResolvedObject, error) {
 		}
 
 		x := pdf.NewExtractor(w)
-		return &ResolvedObject{obj: arr, x: x}, nil
+		return &resolvedObject{obj: arr, x: x}, nil
 	}
 	return nil, ErrNoKey
 }
 
+// IsDirect reports whether this property list can be embedded directly
+// into a content stream.
+// This implements the [List] interface.
 func (a *AF) IsDirect() bool {
 	// AF can never be inline in content stream because it contains
 	// file specifications with indirect references to embedded files.
 	return false
 }
 
+// Embed writes the property list to the PDF file.
+// This implements the [pdf.Embedder] interface.
 func (a *AF) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+	if err := pdf.CheckVersion(rm.Out(), "AF property list", pdf.V2_0); err != nil {
+		return nil, err
+	}
+
 	if len(a.AssociatedFiles) == 0 {
 		return nil, errors.New("AF property list requires at least one associated file")
 	}

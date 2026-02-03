@@ -6289,7 +6289,6 @@ types:
   goPackage: annotation
   goRepr: struct
   specSection: 12.5.2
-  readFunc: property.ExtractActualText
   writeMethod: (*Text).Encode
   embeds:
   - AnnotCommon

@@ -62,7 +62,7 @@ type List interface {
 
 	// Get retrieves the value associated with the given key.
 	// If the key is not present, the error [ErrNoKey] is returned.
-	Get(key pdf.Name) (*ResolvedObject, error)
+	Get(key pdf.Name) (pdf.Object, error)
 
 	// IsDirect returns true if the property list can be embedded inline
 	// in a content stream (i.e., contains only direct objects).
@@ -73,17 +73,16 @@ type List interface {
 	pdf.Embedder
 }
 
-// ResolvedObject wraps a PDF object with its extractor context, allowing
+// resolvedObject wraps a PDF object with its extractor context, allowing
 // references to be resolved during conversion to PDF format.
-// This makes the object independent of the source file it may have come from.
-type ResolvedObject struct {
+type resolvedObject struct {
 	obj pdf.Object
 	x   *pdf.Extractor
 }
 
-var _ pdf.Object = (*ResolvedObject)(nil)
+var _ pdf.Object = (*resolvedObject)(nil)
 
-func (r *ResolvedObject) AsPDF(opt pdf.OutputOptions) pdf.Native {
+func (r *resolvedObject) AsPDF(opt pdf.OutputOptions) pdf.Native {
 	obj := r.obj.AsPDF(opt)
 
 	if ref, ok := obj.(pdf.Reference); ok {
@@ -98,20 +97,20 @@ func (r *ResolvedObject) AsPDF(opt pdf.OutputOptions) pdf.Native {
 	case pdf.Dict:
 		res := make(pdf.Dict, len(obj))
 		for k, v := range obj {
-			res[k] = &ResolvedObject{v, r.x}
+			res[k] = &resolvedObject{v, r.x}
 		}
 		return res
 	case pdf.Array:
 		res := make(pdf.Array, len(obj))
 		for i, v := range obj {
-			res[i] = &ResolvedObject{v, r.x}
+			res[i] = &resolvedObject{v, r.x}
 		}
 		return res
 	case *pdf.Stream:
 		res := *obj
 		res.Dict = make(pdf.Dict, len(obj.Dict))
 		for k, v := range obj.Dict {
-			res.Dict[k] = &ResolvedObject{v, r.x}
+			res.Dict[k] = &resolvedObject{v, r.x}
 		}
 		return &res
 	default:
