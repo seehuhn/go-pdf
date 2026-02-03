@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/action"
 	"seehuhn.de/go/pdf/destination"
+	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -889,8 +890,11 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Data Analyst",
 					Subject: "Supporting data",
 				},
-				FS:   pdf.NewReference(100, 0), // File specification reference
-				Icon: FileAttachmentIconGraph,  // Icon for data files
+				FS: &file.Specification{
+					FileName:       "spreadsheet.xlsx",
+					AFRelationship: file.RelationshipUnspecified,
+				},
+				Icon: FileAttachmentIconGraph, // Icon for data files
 			},
 		},
 		{
@@ -905,7 +909,10 @@ var testCases = map[pdf.Name][]testCase{
 					Subject:      "Supporting document",
 					CreationDate: time.Date(2023, 11, 15, 9, 30, 0, 0, time.UTC),
 				},
-				FS:   pdf.NewReference(200, 0),  // File specification reference
+				FS: &file.Specification{
+					FileName:       "document.pdf",
+					AFRelationship: file.RelationshipUnspecified,
+				},
 				Icon: FileAttachmentIconPushPin, // Default value
 			},
 		},
@@ -920,7 +927,10 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Secretary",
 					Subject: "Office document",
 				},
-				FS:   pdf.NewReference(300, 0),    // File specification reference
+				FS: &file.Specification{
+					FileName:       "attachment.docx",
+					AFRelationship: file.RelationshipUnspecified,
+				},
 				Icon: FileAttachmentIconPaperclip, // Paperclip icon
 			},
 		},
@@ -936,8 +946,11 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Librarian",
 					Subject: "Reference material",
 				},
-				FS:   pdf.NewReference(400, 0), // File specification reference
-				Icon: FileAttachmentIconTag,    // Tag icon
+				FS: &file.Specification{
+					FileName:       "reference.pdf",
+					AFRelationship: file.RelationshipUnspecified,
+				},
+				Icon: FileAttachmentIconTag, // Tag icon
 			},
 		},
 		{
@@ -949,7 +962,10 @@ var testCases = map[pdf.Name][]testCase{
 				Markup: Markup{
 					User: "User",
 				},
-				FS:   pdf.NewReference(500, 0),  // Required file specification
+				FS: &file.Specification{
+					FileName:       "file.dat",
+					AFRelationship: file.RelationshipUnspecified,
+				},
 				Icon: FileAttachmentIconPushPin, // Default value
 			},
 		},

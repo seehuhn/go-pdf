@@ -4709,7 +4709,7 @@ types:
     introduced: '1.3'
     refTypes:
     - FileSpecification
-    goType: pdf.Reference
+    goType: '*file.Specification'
     purpose: |-
       FS (required) is the file specification associated with this annotation.
       This typically references an embedded file stream.

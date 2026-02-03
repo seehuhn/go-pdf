@@ -196,9 +196,7 @@ func generateMainPDF(child1Data, child2Data []byte, nav *navInfo) error {
 		page.Ref = pageRefs[pageNum]
 
 		if pageNum == 0 {
-			if err := addFileAttachment(page, "child2.pdf", child2Data); err != nil {
-				return err
-			}
+			addFileAttachment(page, "child2.pdf", child2Data)
 		}
 
 		if err := drawTree(page, "main", pageNum, pageRefs, nav); err != nil {
@@ -254,16 +252,11 @@ func embedFile(doc *document.MultiPage, name string, data []byte) error {
 	return nil
 }
 
-func addFileAttachment(page *document.Page, name string, data []byte) error {
+func addFileAttachment(page *document.Page, name string, data []byte) {
 	spec := &file.Specification{
 		FileName:        name,
 		FileNameUnicode: name,
 		EmbeddedFiles:   map[string]*file.Stream{"F": createFileStream(data)},
-	}
-
-	fileRef, err := page.RM.Embed(spec)
-	if err != nil {
-		return err
 	}
 
 	annot := &annotation.FileAttachment{
@@ -271,12 +264,10 @@ func addFileAttachment(page *document.Page, name string, data []byte) error {
 			Rect:     pdf.Rectangle{LLx: 10, LLy: paper.URy - 30, URx: 20, URy: paper.URy - 20},
 			Contents: name,
 		},
-		FS: fileRef.(pdf.Reference),
+		FS: spec,
 	}
 
 	page.Page.Annots = append(page.Page.Annots, annot)
-
-	return nil
 }
 
 func allocatePageRefs(doc *document.MultiPage, n int) []pdf.Reference {

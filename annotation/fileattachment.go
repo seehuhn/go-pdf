@@ -16,7 +16,12 @@
 
 package annotation
 
-import "seehuhn.de/go/pdf"
+import (
+	"errors"
+
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/file"
+)
 
 // PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.15
 
@@ -39,7 +44,7 @@ type FileAttachment struct {
 
 	// FS (required) is the file specification associated with this annotation.
 	// This typically references an embedded file stream.
-	FS pdf.Reference
+	FS *file.Specification
 }
 
 var _ Annotation = (*FileAttachment)(nil)
@@ -66,7 +71,9 @@ func decodeFileAttachment(x *pdf.Extractor, dict pdf.Dict) (*FileAttachment, err
 
 	// Extract file attachment-specific fields
 	// FS (required)
-	if fs, ok := dict["FS"].(pdf.Reference); ok {
+	if fs, err := pdf.ExtractorGetOptional(x, dict["FS"], file.ExtractSpecification); err != nil {
+		return nil, err
+	} else {
 		fileAttachment.FS = fs
 	}
 
@@ -102,9 +109,14 @@ func (f *FileAttachment) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// Add file attachment-specific fields
 	// FS (required)
-	if f.FS != 0 {
-		dict["FS"] = f.FS
+	if f.FS == nil {
+		return nil, errors.New("file attachment annotation requires FS entry")
 	}
+	fsObj, err := rm.Embed(f.FS)
+	if err != nil {
+		return nil, err
+	}
+	dict["FS"] = fsObj
 
 	if f.Icon != "" && f.Icon != FileAttachmentIconPushPin {
 		dict["Name"] = pdf.Name(f.Icon)
