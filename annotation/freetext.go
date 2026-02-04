@@ -145,7 +145,7 @@ func decodeFreeText(x *pdf.Extractor, dict pdf.Dict) (*FreeText, error) {
 		f.CalloutLine = points
 	}
 
-	if be, err := pdf.Optional(ExtractBorderEffect(x, dict["BE"])); err != nil {
+	if be, err := pdf.ExtractorGetOptional(x, dict["BE"], ExtractBorderEffect); err != nil {
 		return nil, err
 	} else {
 		f.BorderEffect = be

@@ -163,7 +163,7 @@ func TestRoundTrip(t *testing.T) {
 
 			// extract it back
 			x := pdf.NewExtractor(w)
-			extracted, err := Resources(x, obj)
+			extracted, err := pdf.ExtractorGet(x, obj, Resources)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -539,7 +539,7 @@ func TestProcSetConversion(t *testing.T) {
 			}
 
 			x := pdf.NewExtractor(w)
-			extracted, err := Resources(x, obj)
+			extracted, err := pdf.ExtractorGet(x, obj, Resources)
 			if err != nil {
 				t.Fatalf("extract failed: %v", err)
 			}
@@ -580,7 +580,7 @@ func TestProcSetUnknownNames(t *testing.T) {
 
 	// extract and verify only known names are preserved
 	x := pdf.NewExtractor(w)
-	extracted, err := Resources(x, ref)
+	extracted, err := pdf.ExtractorGet(x, ref, Resources)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -678,7 +678,7 @@ func FuzzRoundTrip(f *testing.F) {
 
 		// first extraction - permissive
 		x1 := pdf.NewExtractor(r)
-		resource1, err := Resources(x1, objPDF)
+		resource1, err := pdf.ExtractorGet(x1, objPDF, Resources)
 		if err != nil {
 			t.Skip("extraction failed (permissive)")
 		}
@@ -704,7 +704,7 @@ func FuzzRoundTrip(f *testing.F) {
 
 		// second extraction
 		x2 := pdf.NewExtractor(w)
-		resource2, err := Resources(x2, embedded)
+		resource2, err := pdf.ExtractorGet(x2, embedded, Resources)
 		if err != nil {
 			t.Fatalf("second extraction failed: %v", err)
 		}

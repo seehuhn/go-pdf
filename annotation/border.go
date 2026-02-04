@@ -55,7 +55,7 @@ var PDFDefaultBorder = &Border{Width: 1}
 // If no border entry exists, returns the PDF default (solid border with width 1).
 // If no border is to be drawn, returns nil.
 func ExtractBorder(x *pdf.Extractor, obj pdf.Object) (*Border, error) {
-	_, isIndirect := obj.(pdf.Reference)
+	singleUse := !x.IsIndirect // capture before other x method calls
 
 	border, err := pdf.Optional(x.GetArray(obj))
 	if err != nil {
@@ -107,7 +107,7 @@ func ExtractBorder(x *pdf.Extractor, obj pdf.Object) (*Border, error) {
 		}
 	}
 
-	b.SingleUse = !isIndirect && !x.IsIndirect
+	b.SingleUse = singleUse
 
 	return b, nil
 }

@@ -17,6 +17,7 @@
 package oc
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -25,84 +26,89 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-func TestGroupRoundTrip(t *testing.T) {
-	tests := []struct {
-		name  string
-		group *Group
-	}{
-		{
-			name: "minimal",
-			group: &Group{
-				Name: "Test Group",
-			},
+var groupTestCases = []struct {
+	name  string
+	group *Group
+}{
+	{
+		name: "minimal",
+		group: &Group{
+			Name: "Test Group",
 		},
-		{
-			name: "with_single_intent",
-			group: &Group{
-				Name:   "Design Layer",
-				Intent: []pdf.Name{"Design"},
-			},
+	},
+	{
+		name: "with_single_intent",
+		group: &Group{
+			Name:   "Design Layer",
+			Intent: []pdf.Name{"Design"},
 		},
-		{
-			name: "with_multiple_intents",
-			group: &Group{
-				Name:   "Multi Purpose Layer",
-				Intent: []pdf.Name{"View", "Design"},
-			},
+	},
+	{
+		name: "with_multiple_intents",
+		group: &Group{
+			Name:   "Multi Purpose Layer",
+			Intent: []pdf.Name{"View", "Design"},
 		},
-		{
-			name: "with_usage",
-			group: &Group{
-				Name: "Language Layer",
-				Usage: &Usage{
-					Language: &UsageLanguage{
-						Lang:      language.English,
-						Preferred: true,
-					},
+	},
+	{
+		name: "with_usage",
+		group: &Group{
+			Name: "Language Layer",
+			Usage: &Usage{
+				Language: &UsageLanguage{
+					Lang:      language.English,
+					Preferred: true,
 				},
 			},
 		},
-		{
-			name: "complex",
-			group: &Group{
-				Name:   "Complex Layer",
-				Intent: []pdf.Name{"View", "Print"},
-				Usage: &Usage{
-					Creator: &UsageCreator{
-						Creator: "Test App",
-						Subtype: "Artwork",
-					},
-					Language: &UsageLanguage{
-						Lang:      language.MustParse("es-MX"),
-						Preferred: false,
-					},
-					Zoom: &UsageZoom{
-						Min: 1.0,
-						Max: 10.0,
-					},
-					Print: &UsagePrint{
-						Subtype:    PrintSubtypeWatermark,
-						PrintState: true,
-					},
+	},
+	{
+		name: "complex",
+		group: &Group{
+			Name:   "Complex Layer",
+			Intent: []pdf.Name{"View", "Print"},
+			Usage: &Usage{
+				Creator: &UsageCreator{
+					Creator: "Test App",
+					Subtype: "Artwork",
+				},
+				Language: &UsageLanguage{
+					Lang:      language.MustParse("es-MX"),
+					Preferred: false,
+				},
+				Zoom: &UsageZoom{
+					Min: 1.0,
+					Max: 10.0,
+				},
+				Print: &UsagePrint{
+					Subtype:    PrintSubtypeWatermark,
+					PrintState: true,
 				},
 			},
 		},
-	}
+	},
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			testGroupRoundTrip(t, tt.group)
+func TestGroupRoundTrip(t *testing.T) {
+	for _, tc := range groupTestCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testGroupRoundTrip(t, pdf.V1_7, tc.group)
 		})
 	}
 }
 
-func testGroupRoundTrip(t *testing.T, original *Group) {
-	buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
-	rm := pdf.NewResourceManager(buf)
+func testGroupRoundTrip(t *testing.T, version pdf.Version, original *Group) {
+	t.Helper()
+
+	w, _ := memfile.NewPDFWriter(version, nil)
+	rm := pdf.NewResourceManager(w)
 
 	// embed the group
 	obj, err := rm.Embed(original)
 	if err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
 		t.Fatalf("embed: %v", err)
 	}
 
@@ -114,11 +120,16 @@ func testGroupRoundTrip(t *testing.T, original *Group) {
 
 	err = rm.Close()
 	if err != nil {
-		t.Fatalf("close writer: %v", err)
+		t.Fatalf("rm.Close: %v", err)
+	}
+
+	err = w.Close()
+	if err != nil {
+		t.Fatalf("w.Close: %v", err)
 	}
 
 	// extract the group
-	extractor := pdf.NewExtractor(buf)
+	extractor := pdf.NewExtractor(w)
 	extracted, err := ExtractGroup(extractor, ref)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
@@ -197,7 +208,7 @@ func TestGroupIntentHandling(t *testing.T) {
 				Intent: tt.inputIntent,
 			}
 
-			testGroupRoundTrip(t, group)
+			testGroupRoundTrip(t, pdf.V1_7, group)
 
 			// verify the intent was set correctly
 			if len(group.Intent) != len(tt.expectedIntent) {
@@ -210,4 +221,61 @@ func TestGroupIntentHandling(t *testing.T) {
 			}
 		})
 	}
+}
+
+func FuzzGroupRoundTrip(f *testing.F) {
+	opt := &pdf.WriterOptions{
+		HumanReadable: true,
+	}
+
+	// build seed corpus from test cases
+	for _, tc := range groupTestCases {
+		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+
+		err := memfile.AddBlankPage(w)
+		if err != nil {
+			continue
+		}
+
+		rm := pdf.NewResourceManager(w)
+
+		obj, err := rm.Embed(tc.group)
+		if err != nil {
+			continue
+		}
+
+		err = rm.Close()
+		if err != nil {
+			continue
+		}
+
+		w.GetMeta().Trailer["Quir:E"] = obj
+		err = w.Close()
+		if err != nil {
+			continue
+		}
+
+		f.Add(buf.Data)
+	}
+
+	// fuzz function: read-write-read cycle
+	f.Fuzz(func(t *testing.T, fileData []byte) {
+		r, err := pdf.NewReader(bytes.NewReader(fileData), nil)
+		if err != nil {
+			t.Skip("invalid PDF")
+		}
+
+		obj := r.GetMeta().Trailer["Quir:E"]
+		if obj == nil {
+			t.Skip("missing test object")
+		}
+
+		x := pdf.NewExtractor(r)
+		data, err := ExtractGroup(x, obj)
+		if err != nil {
+			t.Skip("malformed object")
+		}
+
+		testGroupRoundTrip(t, pdf.GetVersion(r), data)
+	})
 }

@@ -59,6 +59,8 @@ func ExtractGroup(x *pdf.Extractor, obj pdf.Object) (*Group, error) {
 		return nil, err
 	} else if name != "" {
 		group.Name = string(name)
+	} else {
+		group.Name = "Unnamed"
 	}
 
 	// Intent (optional) can be either a single name or an array of names.

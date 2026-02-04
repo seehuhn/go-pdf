@@ -177,7 +177,7 @@ func roundTripTest(t *testing.T, version pdf.Version, original *Transition) {
 	}
 
 	x := pdf.NewExtractor(buf)
-	extracted, err := Extract(x, embedded)
+	extracted, err := pdf.ExtractorGet(x, embedded, Extract)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		trans, err := Extract(x, obj)
+		trans, err := pdf.ExtractorGet(x, obj, Extract)
 		if err != nil {
 			t.Skip("malformed transition")
 		}

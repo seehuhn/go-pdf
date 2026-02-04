@@ -102,7 +102,7 @@ func (s *Type3) Equal(other graphics.Shading) bool {
 }
 
 // extractType3 reads a Type 3 (radial) shading from a PDF dictionary.
-func extractType3(x *pdf.Extractor, d pdf.Dict, isIndirect bool) (*Type3, error) {
+func extractType3(x *pdf.Extractor, d pdf.Dict, singleUse bool) (*Type3, error) {
 	s := &Type3{}
 
 	// Read required ColorSpace
@@ -244,8 +244,7 @@ func extractType3(x *pdf.Extractor, d pdf.Dict, isIndirect bool) (*Type3, error)
 		}
 	}
 
-	// obj is indirect if passed as a reference or accessed through one
-	s.SingleUse = !isIndirect && !x.IsIndirect
+	s.SingleUse = singleUse
 
 	return s, nil
 }

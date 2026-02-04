@@ -26,7 +26,7 @@ import (
 
 // ExtGState extracts an extended graphics state from a PDF file.
 func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
-	_, isIndirect := obj.(pdf.Reference)
+	singleUse := !x.IsIndirect // capture before other x method calls
 
 	dict, err := x.GetDictTyped(obj, "ExtGState")
 	if err != nil {
@@ -258,7 +258,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 		case "TR2":
 			tr2 = v
 		case "HT":
-			ht, err := halftone.Extract(x, v)
+			ht, err := pdf.ExtractorGetOptional(x, v, halftone.Extract)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -322,7 +322,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 		set |= graphics.StateBlackGeneration
 	}
 	if set&graphics.StateBlackGeneration == 0 && bg2 != nil {
-		fn, err := function.Extract(x, bg2)
+		fn, err := pdf.ExtractorGet(x, bg2, function.Extract)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.BlackGeneration = fn
@@ -331,7 +331,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 		}
 	}
 	if set&graphics.StateBlackGeneration == 0 && bg1 != nil {
-		fn, err := function.Extract(x, bg1)
+		fn, err := pdf.ExtractorGet(x, bg1, function.Extract)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.BlackGeneration = fn
@@ -347,7 +347,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 		set |= graphics.StateUndercolorRemoval
 	}
 	if set&graphics.StateUndercolorRemoval == 0 && ucr2 != nil {
-		fn, err := function.Extract(x, ucr2)
+		fn, err := pdf.ExtractorGet(x, ucr2, function.Extract)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.UndercolorRemoval = fn
@@ -356,7 +356,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 		}
 	}
 	if set&graphics.StateUndercolorRemoval == 0 && ucr1 != nil {
-		fn, err := function.Extract(x, ucr1)
+		fn, err := pdf.ExtractorGet(x, ucr1, function.Extract)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.UndercolorRemoval = fn
@@ -384,7 +384,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 		}
 	}
 
-	res.SingleUse = !isIndirect && !x.IsIndirect
+	res.SingleUse = singleUse
 
 	res.Set = set
 	return res, nil
@@ -515,7 +515,7 @@ func parseSingleTransfer(x *pdf.Extractor, obj pdf.Object) (pdf.Function, error)
 		}
 	}
 
-	fn, err := function.Extract(x, obj)
+	fn, err := pdf.ExtractorGet(x, obj, function.Extract)
 	if err != nil {
 		return nil, err
 	}

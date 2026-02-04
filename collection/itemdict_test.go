@@ -151,7 +151,7 @@ func roundTripTest(t *testing.T, version pdf.Version, item1 *ItemDict) {
 		t.Fatal("missing test object")
 	}
 
-	item2, err := ExtractItemDict(x, objFromTrailer)
+	item2, err := pdf.ExtractorGet(x, objFromTrailer, ExtractItemDict)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,7 +284,7 @@ func FuzzItemDictRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		item1, err := ExtractItemDict(x, objPDF)
+		item1, err := pdf.ExtractorGet(x, objPDF, ExtractItemDict)
 		if err != nil {
 			t.Skip("malformed collection item")
 		}

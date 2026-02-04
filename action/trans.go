@@ -68,7 +68,7 @@ func (a *Trans) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeTrans(x *pdf.Extractor, dict pdf.Dict) (*Trans, error) {
-	trans, err := transition.Extract(x, dict["Trans"])
+	trans, err := pdf.ExtractorGet(x, dict["Trans"], transition.Extract)
 	if err != nil {
 		return nil, err
 	}

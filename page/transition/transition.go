@@ -201,7 +201,7 @@ func (t *Transition) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 // Extract reads a transition dictionary from a PDF file.
 func Extract(x *pdf.Extractor, obj pdf.Object) (*Transition, error) {
-	_, isIndirect := obj.(pdf.Reference)
+	singleUse := !x.IsIndirect // capture before other x method calls
 
 	dict, err := x.GetDictTyped(obj, "Trans")
 	if err != nil {
@@ -270,7 +270,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Transition, error) {
 		t.Opaque = bool(b)
 	}
 
-	t.SingleUse = !isIndirect && !x.IsIndirect
+	t.SingleUse = singleUse
 
 	return t, nil
 }

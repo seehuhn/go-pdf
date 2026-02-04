@@ -29,8 +29,7 @@ import (
 
 // Pattern extracts a pattern from a PDF file and returns a color.Pattern.
 func Pattern(x *pdf.Extractor, obj pdf.Object) (color.Pattern, error) {
-	// check if original object was a reference before resolving
-	_, isIndirect := obj.(pdf.Reference)
+	singleUse := !x.IsIndirect // capture before other x method calls
 
 	// resolve references
 	resolved, err := x.Resolve(obj)
@@ -74,7 +73,7 @@ func Pattern(x *pdf.Extractor, obj pdf.Object) (color.Pattern, error) {
 		}
 		return extractType1(x, stream)
 	case 2:
-		return extractType2(x, dict, isIndirect)
+		return extractType2(x, dict, singleUse)
 	default:
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("unsupported pattern type %d", patternType),
@@ -83,7 +82,7 @@ func Pattern(x *pdf.Extractor, obj pdf.Object) (color.Pattern, error) {
 }
 
 // extractType2 extracts a Type2 (shading) pattern from a PDF dictionary.
-func extractType2(x *pdf.Extractor, dict pdf.Dict, isIndirect bool) (*pattern.Type2, error) {
+func extractType2(x *pdf.Extractor, dict pdf.Dict, singleUse bool) (*pattern.Type2, error) {
 	// extract required Shading
 	shadingObj := dict["Shading"]
 	if shadingObj == nil {
@@ -99,7 +98,7 @@ func extractType2(x *pdf.Extractor, dict pdf.Dict, isIndirect bool) (*pattern.Ty
 
 	pat := &pattern.Type2{
 		Shading:   sh,
-		SingleUse: !isIndirect && !x.IsIndirect,
+		SingleUse: singleUse,
 	}
 
 	// extract optional Matrix

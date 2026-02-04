@@ -50,6 +50,8 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (Measure, error) {
 
 // extractRectilinearMeasure extracts a RectilinearMeasure from a PDF dictionary.
 func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict) (*RectilinearMeasure, error) {
+	singleUse := !x.IsIndirect
+
 	rm := &RectilinearMeasure{}
 
 	// Extract X axis first (needed for autogenerating ScaleRatio if missing)
@@ -182,6 +184,8 @@ func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict) (*RectilinearMea
 		rm.CYX = float64(cyx)
 	}
 
+	rm.SingleUse = singleUse
+
 	return rm, nil
 }
 
@@ -189,7 +193,7 @@ func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict) (*RectilinearMea
 func extractNumberFormatArray(x *pdf.Extractor, arr pdf.Array) ([]*NumberFormat, error) {
 	formats := make([]*NumberFormat, len(arr))
 	for i, obj := range arr {
-		nf, err := ExtractNumberFormat(x, obj)
+		nf, err := pdf.ExtractorGet(x, obj, ExtractNumberFormat)
 		if err != nil {
 			return nil, err
 		}

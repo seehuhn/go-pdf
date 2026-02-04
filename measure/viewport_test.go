@@ -63,6 +63,7 @@ var viewportTestCases = []struct {
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
+					DecimalSeparator: ".",
 				}},
 				Distance: []*NumberFormat{{
 					Unit:             "m",
@@ -70,6 +71,7 @@ var viewportTestCases = []struct {
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
+					DecimalSeparator: ".",
 				}},
 				Area: []*NumberFormat{{
 					Unit:             "m²",
@@ -77,6 +79,7 @@ var viewportTestCases = []struct {
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
+					DecimalSeparator: ".",
 				}},
 				Origin:    [2]float64{0, 0},
 				SingleUse: true,
@@ -117,6 +120,7 @@ var viewportTestCases = []struct {
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
+					DecimalSeparator: ".",
 				}},
 				YAxis: []*NumberFormat{{
 					Unit:             "ft",
@@ -124,6 +128,7 @@ var viewportTestCases = []struct {
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
+					DecimalSeparator: ".",
 				}},
 				Distance: []*NumberFormat{{
 					Unit:             "ft",
@@ -131,6 +136,7 @@ var viewportTestCases = []struct {
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
+					DecimalSeparator: ".",
 				}},
 				Area: []*NumberFormat{{
 					Unit:             "ft²",
@@ -138,6 +144,7 @@ var viewportTestCases = []struct {
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
+					DecimalSeparator: ".",
 				}},
 				Origin:    [2]float64{100, 100},
 				SingleUse: false,
@@ -165,6 +172,7 @@ var viewportTestCases = []struct {
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
+					DecimalSeparator: ".",
 				}},
 				YAxis: []*NumberFormat{{
 					Unit:             "m",
@@ -172,6 +180,7 @@ var viewportTestCases = []struct {
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
+					DecimalSeparator: ".",
 				}},
 				Distance: []*NumberFormat{{
 					Unit:             "m",
@@ -179,6 +188,7 @@ var viewportTestCases = []struct {
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
+					DecimalSeparator: ".",
 				}},
 				Area: []*NumberFormat{{
 					Unit:             "m²",
@@ -186,6 +196,7 @@ var viewportTestCases = []struct {
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
+					DecimalSeparator: ".",
 				}},
 				Origin:    [2]float64{0, 0},
 				CYX:       30.0,
@@ -206,6 +217,9 @@ func viewportRoundTripTest(t *testing.T, version pdf.Version, vp *Viewport) {
 	// Write the viewport
 	embedded, err := rm.Embed(vp)
 	if err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
 		t.Fatalf("embed failed: %v", err)
 	}
 
@@ -214,57 +228,70 @@ func viewportRoundTripTest(t *testing.T, version pdf.Version, vp *Viewport) {
 		t.Fatalf("resource manager close failed: %v", err)
 	}
 
+	err = w.Close()
+	if err != nil {
+		t.Fatalf("w.Close failed: %v", err)
+	}
+
 	// Read it back
-	extracted, err := ExtractViewport(pdf.NewExtractor(w), embedded)
+	x := pdf.NewExtractor(w)
+	extracted, err := pdf.ExtractorGet(x, embedded, ExtractViewport)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
-
-	// Fix SingleUse fields for comparison (not stored in PDF)
-	fixSingleUse(extracted, vp)
 
 	if diff := cmp.Diff(vp, extracted); diff != "" {
 		t.Errorf("round trip failed (-want +got):\n%s", diff)
 	}
 }
 
-// fixSingleUse adjusts SingleUse fields that are not preserved in PDF
-func fixSingleUse(extracted, original *Viewport) {
-	extracted.SingleUse = original.SingleUse
-
-	if extracted.Measure != nil && original.Measure != nil {
-		if extractedRM, ok := extracted.Measure.(*RectilinearMeasure); ok {
-			if originalRM, ok := original.Measure.(*RectilinearMeasure); ok {
-				extractedRM.SingleUse = originalRM.SingleUse
-				fixNumberFormats(extractedRM, originalRM)
-			}
-		}
-	}
-
-	if extracted.PtData != nil && original.PtData != nil {
-		extracted.PtData.SingleUse = original.PtData.SingleUse
-	}
-}
-
-func fixNumberFormats(extracted, original *RectilinearMeasure) {
-	fixNumberFormatArray(extracted.XAxis, original.XAxis)
-	fixNumberFormatArray(extracted.YAxis, original.YAxis)
-	fixNumberFormatArray(extracted.Distance, original.Distance)
-	fixNumberFormatArray(extracted.Area, original.Area)
-	fixNumberFormatArray(extracted.Angle, original.Angle)
-	fixNumberFormatArray(extracted.Slope, original.Slope)
-}
-
-func fixNumberFormatArray(extracted, original []*NumberFormat) {
-	for i, nf := range extracted {
-		if i < len(original) {
-			nf.SingleUse = original[i].SingleUse
-			// Empty DecimalSeparator becomes default after round-trip
-			if original[i].DecimalSeparator == "" {
-				nf.DecimalSeparator = ""
-			}
-		}
-	}
+// viewportArrayTestCases holds representative samples of ViewPortArray objects for testing
+var viewportArrayTestCases = []struct {
+	name    string
+	version pdf.Version
+	data    *ViewPortArray
+}{
+	{
+		name:    "empty array",
+		version: pdf.V1_6,
+		data:    &ViewPortArray{Viewports: []*Viewport{}},
+	},
+	{
+		name:    "single viewport",
+		version: pdf.V1_7,
+		data: &ViewPortArray{
+			Viewports: []*Viewport{
+				{
+					BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+					Name:      "Single",
+					SingleUse: true,
+				},
+			},
+		},
+	},
+	{
+		name:    "multiple viewports",
+		version: pdf.V2_0,
+		data: &ViewPortArray{
+			Viewports: []*Viewport{
+				{
+					BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 50, URy: 50},
+					Name:      "First",
+					SingleUse: true,
+				},
+				{
+					BBox:      pdf.Rectangle{LLx: 50, LLy: 50, URx: 100, URy: 100},
+					Name:      "Second",
+					SingleUse: false,
+				},
+				{
+					BBox:      pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 200},
+					Name:      "Third",
+					SingleUse: true,
+				},
+			},
+		},
+	},
 }
 
 // TestViewportRoundTrip tests round-trip behavior for all test cases
@@ -285,12 +312,13 @@ func FuzzViewportRoundTrip(f *testing.F) {
 	// Add test cases as seed corpus
 	for _, tc := range viewportTestCases {
 		w, buf := memfile.NewPDFWriter(tc.version, opt)
-		rm := pdf.NewResourceManager(w)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {
 			continue
 		}
+
+		rm := pdf.NewResourceManager(w)
 
 		embedded, err := rm.Embed(tc.data)
 		if err != nil {
@@ -322,7 +350,8 @@ func FuzzViewportRoundTrip(f *testing.F) {
 			t.Skip("missing test object")
 		}
 
-		vp, err := ExtractViewport(pdf.NewExtractor(r), objPDF)
+		x := pdf.NewExtractor(r)
+		vp, err := pdf.ExtractorGet(x, objPDF, ExtractViewport)
 		if err != nil {
 			t.Skip("malformed viewport")
 		}
@@ -330,6 +359,99 @@ func FuzzViewportRoundTrip(f *testing.F) {
 		// Use the reader's version for round-trip
 		version := pdf.GetVersion(r)
 		viewportRoundTripTest(t, version, vp)
+	})
+}
+
+// viewportArrayRoundTripTest performs a write-read cycle for ViewPortArray
+func viewportArrayRoundTripTest(t *testing.T, version pdf.Version, data *ViewPortArray) {
+	t.Helper()
+
+	w, _ := memfile.NewPDFWriter(version, nil)
+	rm := pdf.NewResourceManager(w)
+
+	embedded, err := rm.Embed(data)
+	if err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
+		t.Fatalf("embed failed: %v", err)
+	}
+
+	err = rm.Close()
+	if err != nil {
+		t.Fatalf("rm.Close failed: %v", err)
+	}
+
+	err = w.Close()
+	if err != nil {
+		t.Fatalf("w.Close failed: %v", err)
+	}
+
+	x := pdf.NewExtractor(w)
+	extracted, err := pdf.ExtractorGet(x, embedded, ExtractViewportArray)
+	if err != nil {
+		t.Fatalf("extract failed: %v", err)
+	}
+
+	if diff := cmp.Diff(data, extracted); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+}
+
+// FuzzViewPortArrayRoundTrip implements fuzzing for viewport array round-trips
+func FuzzViewPortArrayRoundTrip(f *testing.F) {
+	opt := &pdf.WriterOptions{
+		HumanReadable: true,
+	}
+
+	// build seed corpus from test cases
+	for _, tc := range viewportArrayTestCases {
+		w, buf := memfile.NewPDFWriter(tc.version, opt)
+
+		err := memfile.AddBlankPage(w)
+		if err != nil {
+			continue
+		}
+
+		rm := pdf.NewResourceManager(w)
+
+		embedded, err := rm.Embed(tc.data)
+		if err != nil {
+			continue
+		}
+
+		err = rm.Close()
+		if err != nil {
+			continue
+		}
+
+		w.GetMeta().Trailer["Quir:E"] = embedded
+		err = w.Close()
+		if err != nil {
+			continue
+		}
+
+		f.Add(buf.Data)
+	}
+
+	f.Fuzz(func(t *testing.T, fileData []byte) {
+		r, err := pdf.NewReader(bytes.NewReader(fileData), nil)
+		if err != nil {
+			t.Skip("invalid PDF")
+		}
+
+		obj := r.GetMeta().Trailer["Quir:E"]
+		if obj == nil {
+			t.Skip("missing test object")
+		}
+
+		x := pdf.NewExtractor(r)
+		data, err := pdf.ExtractorGet(x, obj, ExtractViewportArray)
+		if err != nil {
+			t.Skip("malformed object")
+		}
+
+		viewportArrayRoundTripTest(t, pdf.GetVersion(r), data)
 	})
 }
 
@@ -507,7 +629,8 @@ func TestExtractViewportMalformed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			vp, err := ExtractViewport(pdf.NewExtractor(w), tt.obj)
+			x := pdf.NewExtractor(w)
+			vp, err := pdf.ExtractorGet(x, tt.obj, ExtractViewport)
 			if tt.shouldErr {
 				if err == nil {
 					t.Error("expected error but got none")
@@ -592,192 +715,11 @@ func TestViewPortArraySelect(t *testing.T) {
 	}
 }
 
-// TestViewPortArrayEmbed tests embedding of viewport arrays
-func TestViewPortArrayEmbed(t *testing.T) {
-	viewports := &ViewPortArray{
-		Viewports: []*Viewport{
-			{
-				BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-				Name:      "First",
-				SingleUse: true,
-			},
-			{
-				BBox:      pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 200},
-				Name:      "Second",
-				SingleUse: false,
-			},
-		},
-		SingleUse: true,
-	}
-
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	rm := pdf.NewResourceManager(w)
-
-	// Embed array
-	embedded, err := rm.Embed(viewports)
-	if err != nil {
-		t.Fatalf("Embed failed: %v", err)
-	}
-
-	arr, ok := embedded.(pdf.Array)
-	if !ok {
-		t.Fatalf("Expected pdf.Array, got %T", embedded)
-	}
-
-	if len(arr) != 2 {
-		t.Fatalf("expected 2 elements in array, got %d", len(arr))
-	}
-
-	// Extract back to verify
-	extracted, err := ExtractViewportArray(pdf.NewExtractor(w), arr)
-	if err != nil {
-		t.Fatalf("ExtractViewportArray failed: %v", err)
-	}
-
-	// Fix SingleUse for comparison (SingleUse is write-only, not stored in PDF)
-	extracted.Viewports[0].SingleUse = true
-	extracted.Viewports[1].SingleUse = false
-	extracted.SingleUse = true
-
-	if diff := cmp.Diff(viewports, extracted); diff != "" {
-		t.Errorf("array round trip failed (-want +got):\n%s", diff)
-	}
-}
-
-// TestViewPortArrayExtract tests extraction of viewport arrays
-func TestViewPortArrayExtract(t *testing.T) {
-	// Create test viewports
-	vp1 := &Viewport{
-		BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-		Name:      "First",
-		SingleUse: true,
-	}
-	vp2 := &Viewport{
-		BBox:      pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 200},
-		Name:      "Second",
-		SingleUse: true,
-	}
-
-	// Create a test PDF writer
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	res := pdf.NewResourceManager(w)
-
-	// Embed viewports
-	embedded1, err := res.Embed(vp1)
-	if err != nil {
-		t.Fatalf("embed vp1 failed: %v", err)
-	}
-	embedded2, err := res.Embed(vp2)
-	if err != nil {
-		t.Fatalf("embed vp2 failed: %v", err)
-	}
-
-	// Create array
-	arr := pdf.Array{embedded1, embedded2}
-
-	// Extract array
-	extracted, err := ExtractViewportArray(pdf.NewExtractor(w), arr)
-	if err != nil {
-		t.Fatalf("ExtractViewportArray failed: %v", err)
-	}
-
-	if len(extracted.Viewports) != 2 {
-		t.Fatalf("expected 2 viewports, got %d", len(extracted.Viewports))
-	}
-
-	// Fix SingleUse for comparison
-	extracted.Viewports[0].SingleUse = true
-	extracted.Viewports[1].SingleUse = true
-
-	if extracted.Viewports[0].Name != "First" {
-		t.Errorf("first viewport name = %q, want %q", extracted.Viewports[0].Name, "First")
-	}
-	if extracted.Viewports[1].Name != "Second" {
-		t.Errorf("second viewport name = %q, want %q", extracted.Viewports[1].Name, "Second")
-	}
-}
-
 // TestViewPortArrayRoundTrip tests array-specific round-trip behavior
 func TestViewPortArrayRoundTrip(t *testing.T) {
-	testArrays := []struct {
-		name    string
-		version pdf.Version
-		data    *ViewPortArray
-	}{
-		{
-			name:    "empty array",
-			version: pdf.V1_6,
-			data:    &ViewPortArray{Viewports: []*Viewport{}},
-		},
-		{
-			name:    "single viewport",
-			version: pdf.V1_7,
-			data: &ViewPortArray{
-				Viewports: []*Viewport{
-					{
-						BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-						Name:      "Single",
-						SingleUse: true,
-					},
-				},
-			},
-		},
-		{
-			name:    "multiple viewports",
-			version: pdf.V2_0,
-			data: &ViewPortArray{
-				Viewports: []*Viewport{
-					{
-						BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 50, URy: 50},
-						Name:      "First",
-						SingleUse: true,
-					},
-					{
-						BBox:      pdf.Rectangle{LLx: 50, LLy: 50, URx: 100, URy: 100},
-						Name:      "Second",
-						SingleUse: false,
-					},
-					{
-						BBox:      pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 200},
-						Name:      "Third",
-						SingleUse: true,
-					},
-				},
-			},
-		},
-	}
-
-	for _, tc := range testArrays {
+	for _, tc := range viewportArrayTestCases {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(tc.version, nil)
-			rm := pdf.NewResourceManager(w)
-
-			// Embed the array
-			embedded, err := rm.Embed(tc.data)
-			if err != nil {
-				t.Fatalf("embed failed: %v", err)
-			}
-
-			err = rm.Close()
-			if err != nil {
-				t.Fatalf("resource manager close failed: %v", err)
-			}
-
-			extracted, err := ExtractViewportArray(pdf.NewExtractor(w), embedded)
-			if err != nil {
-				t.Fatalf("extract failed: %v", err)
-			}
-
-			// Fix SingleUse for comparison
-			for i := range extracted.Viewports {
-				if i < len(tc.data.Viewports) {
-					extracted.Viewports[i].SingleUse = tc.data.Viewports[i].SingleUse
-				}
-			}
-
-			if diff := cmp.Diff(tc.data, extracted); diff != "" {
-				t.Errorf("round trip failed (-want +got):\n%s", diff)
-			}
+			viewportArrayRoundTripTest(t, tc.version, tc.data)
 		})
 	}
 }

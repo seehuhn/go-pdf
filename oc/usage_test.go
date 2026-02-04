@@ -17,6 +17,7 @@
 package oc
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -25,181 +26,184 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-func TestUsageRoundTrip(t *testing.T) {
-	tests := []struct {
-		name  string
-		usage *Usage
-	}{
-		{
-			name:  "empty",
-			usage: &Usage{},
-		},
-		{
-			name: "creator_info",
-			usage: &Usage{
-				Creator: &UsageCreator{
-					Creator: "Test Application",
-					Subtype: "Artwork",
-					AdditionalInfo: pdf.Dict{
-						"Version": pdf.TextString("1.0"),
-					},
+var usageTestCases = []struct {
+	name  string
+	usage *Usage
+}{
+	{
+		name:  "empty",
+		usage: &Usage{},
+	},
+	{
+		name: "creator_info",
+		usage: &Usage{
+			Creator: &UsageCreator{
+				Creator: "Test Application",
+				Subtype: "Artwork",
+				AdditionalInfo: pdf.Dict{
+					"Version": pdf.TextString("1.0"),
 				},
 			},
 		},
-		{
-			name: "language",
-			usage: &Usage{
-				Language: &UsageLanguage{
-					Lang:      language.MustParse("es-MX"),
-					Preferred: true,
-				},
+	},
+	{
+		name: "language",
+		usage: &Usage{
+			Language: &UsageLanguage{
+				Lang:      language.MustParse("es-MX"),
+				Preferred: true,
 			},
 		},
-		{
-			name: "export",
-			usage: &Usage{
-				Export: &UsageExport{
-					ExportState: true,
-				},
+	},
+	{
+		name: "export",
+		usage: &Usage{
+			Export: &UsageExport{
+				ExportState: true,
 			},
 		},
-		{
-			name: "zoom",
-			usage: &Usage{
-				Zoom: &UsageZoom{
-					Min: 1.0,
-					Max: 10.0,
-				},
+	},
+	{
+		name: "zoom",
+		usage: &Usage{
+			Zoom: &UsageZoom{
+				Min: 1.0,
+				Max: 10.0,
 			},
 		},
-		{
-			name: "zoom_infinity",
-			usage: &Usage{
-				Zoom: &UsageZoom{
-					Min: 2.0,
-					Max: 1e308,
-				},
+	},
+	{
+		name: "zoom_infinity",
+		usage: &Usage{
+			Zoom: &UsageZoom{
+				Min: 2.0,
+				Max: 1e308,
 			},
 		},
-		{
-			name: "print",
-			usage: &Usage{
-				Print: &UsagePrint{
-					Subtype:    PrintSubtypeWatermark,
-					PrintState: true,
-				},
+	},
+	{
+		name: "print",
+		usage: &Usage{
+			Print: &UsagePrint{
+				Subtype:    PrintSubtypeWatermark,
+				PrintState: true,
 			},
 		},
-		{
-			name: "view",
-			usage: &Usage{
-				View: &UsageView{
-					ViewState: false,
-				},
+	},
+	{
+		name: "view",
+		usage: &Usage{
+			View: &UsageView{
+				ViewState: false,
 			},
 		},
-		{
-			name: "user_single",
-			usage: &Usage{
-				User: &UsageUser{
-					Type: UserTypeIndividual,
-					Name: []string{"John Doe"},
-				},
+	},
+	{
+		name: "user_single",
+		usage: &Usage{
+			User: &UsageUser{
+				Type: UserTypeIndividual,
+				Name: []string{"John Doe"},
 			},
 		},
-		{
-			name: "user_multiple",
-			usage: &Usage{
-				User: &UsageUser{
-					Type: UserTypeOrganisation,
-					Name: []string{"Company A", "Company B"},
-				},
+	},
+	{
+		name: "user_multiple",
+		usage: &Usage{
+			User: &UsageUser{
+				Type: UserTypeOrganisation,
+				Name: []string{"Company A", "Company B"},
 			},
 		},
-		{
-			name: "page_element",
-			usage: &Usage{
-				PageElement: &UsagePageElement{
-					Subtype: PageElementHeaderFooter,
-				},
+	},
+	{
+		name: "page_element",
+		usage: &Usage{
+			PageElement: &UsagePageElement{
+				Subtype: PageElementHeaderFooter,
 			},
 		},
-		{
-			name: "complex",
-			usage: &Usage{
-				Creator: &UsageCreator{
-					Creator: "PDF Editor Pro",
-					Subtype: "Technical",
-				},
-				Language: &UsageLanguage{
-					Lang:      language.English,
-					Preferred: false,
-				},
-				Export: &UsageExport{
-					ExportState: false,
-				},
-				Zoom: &UsageZoom{
-					Min: 0.5,
-					Max: 20.0,
-				},
-				Print: &UsagePrint{
-					Subtype:    PrintSubtypePrintersMarks,
-					PrintState: true,
-				},
-				View: &UsageView{
-					ViewState: true,
-				},
-				User: &UsageUser{
-					Type: UserTypeTitle,
-					Name: []string{"Manager", "Director"},
-				},
-				PageElement: &UsagePageElement{
-					Subtype: PageElementBackground,
-				},
+	},
+	{
+		name: "complex",
+		usage: &Usage{
+			Creator: &UsageCreator{
+				Creator: "PDF Editor Pro",
+				Subtype: "Technical",
+			},
+			Language: &UsageLanguage{
+				Lang:      language.English,
+				Preferred: false,
+			},
+			Export: &UsageExport{
+				ExportState: false,
+			},
+			Zoom: &UsageZoom{
+				Min: 0.5,
+				Max: 20.0,
+			},
+			Print: &UsagePrint{
+				Subtype:    PrintSubtypePrintersMarks,
+				PrintState: true,
+			},
+			View: &UsageView{
+				ViewState: true,
+			},
+			User: &UsageUser{
+				Type: UserTypeTitle,
+				Name: []string{"Manager", "Director"},
+			},
+			PageElement: &UsagePageElement{
+				Subtype: PageElementBackground,
 			},
 		},
-	}
+	},
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+func TestUsageRoundTrip(t *testing.T) {
+	for _, tc := range usageTestCases {
+		t.Run(tc.name, func(t *testing.T) {
 			// test with SingleUse = false (indirect reference)
-			tt.usage.SingleUse = false
-			testUsageRoundTrip(t, tt.usage, "indirect")
+			tc.usage.SingleUse = false
+			testUsageRoundTrip(t, pdf.V1_7, tc.usage)
 
 			// test with SingleUse = true (direct dictionary)
-			tt.usage.SingleUse = true
-			testUsageRoundTrip(t, tt.usage, "direct")
+			tc.usage.SingleUse = true
+			testUsageRoundTrip(t, pdf.V1_7, tc.usage)
 		})
 	}
 }
 
-func testUsageRoundTrip(t *testing.T, original *Usage, mode string) {
-	buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
+func testUsageRoundTrip(t *testing.T, version pdf.Version, original *Usage) {
+	t.Helper()
 
-	rm := pdf.NewResourceManager(buf)
+	w, _ := memfile.NewPDFWriter(version, nil)
+	rm := pdf.NewResourceManager(w)
 
 	// embed the usage dictionary
-	obj, err2 := rm.Embed(original)
-	if err2 != nil {
-		t.Fatalf("%s: embed: %v", mode, err2)
+	obj, err := rm.Embed(original)
+	if err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
+		t.Fatalf("embed: %v", err)
 	}
 
-	// for indirect references, store the object
-	if ref, ok := obj.(pdf.Reference); ok {
-		// object is already stored via Embed
-		obj = ref
+	err = rm.Close()
+	if err != nil {
+		t.Fatalf("rm.Close: %v", err)
 	}
 
-	err2 = rm.Close()
-	if err2 != nil {
-		t.Fatalf("%s: close writer: %v", mode, err2)
+	err = w.Close()
+	if err != nil {
+		t.Fatalf("w.Close: %v", err)
 	}
 
 	// extract the usage dictionary
-	extractor := pdf.NewExtractor(buf)
-	extracted, err3 := ExtractUsage(extractor, obj)
-	if err3 != nil {
-		t.Fatalf("%s: extract: %v", mode, err3)
+	extractor := pdf.NewExtractor(w)
+	extracted, err := pdf.ExtractorGet(extractor, obj, ExtractUsage)
+	if err != nil {
+		t.Fatalf("extract: %v", err)
 	}
 
 	// normalize for comparison
@@ -214,7 +218,7 @@ func testUsageRoundTrip(t *testing.T, original *Usage, mode string) {
 		}),
 	}
 	if diff := cmp.Diff(original, extracted, opts...); diff != "" {
-		t.Errorf("%s: round trip failed (-want +got):\n%s", mode, diff)
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
 	}
 }
 
@@ -264,4 +268,65 @@ func TestUsageValidation(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for Zoom.Min > Zoom.Max, but got none")
 	}
+}
+
+func FuzzUsageRoundTrip(f *testing.F) {
+	opt := &pdf.WriterOptions{
+		HumanReadable: true,
+	}
+
+	// build seed corpus from test cases
+	for _, tc := range usageTestCases {
+		for _, singleUse := range []bool{false, true} {
+			tc.usage.SingleUse = singleUse
+
+			w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+
+			err := memfile.AddBlankPage(w)
+			if err != nil {
+				continue
+			}
+
+			rm := pdf.NewResourceManager(w)
+
+			obj, err := rm.Embed(tc.usage)
+			if err != nil {
+				continue
+			}
+
+			err = rm.Close()
+			if err != nil {
+				continue
+			}
+
+			w.GetMeta().Trailer["Quir:E"] = obj
+			err = w.Close()
+			if err != nil {
+				continue
+			}
+
+			f.Add(buf.Data)
+		}
+	}
+
+	// fuzz function: read-write-read cycle
+	f.Fuzz(func(t *testing.T, fileData []byte) {
+		r, err := pdf.NewReader(bytes.NewReader(fileData), nil)
+		if err != nil {
+			t.Skip("invalid PDF")
+		}
+
+		obj := r.GetMeta().Trailer["Quir:E"]
+		if obj == nil {
+			t.Skip("missing test object")
+		}
+
+		x := pdf.NewExtractor(r)
+		data, err := pdf.ExtractorGet(x, obj, ExtractUsage)
+		if err != nil {
+			t.Skip("malformed object")
+		}
+
+		testUsageRoundTrip(t, pdf.GetVersion(r), data)
+	})
 }

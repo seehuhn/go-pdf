@@ -17,6 +17,7 @@
 package oc
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -24,136 +25,149 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-func TestMembershipRoundTrip(t *testing.T) {
-	tests := []struct {
-		name       string
-		membership *Membership
-	}{
-		{
-			name: "simple with single OCG and default policy",
-			membership: &Membership{
-				OCGs: []*Group{
-					{Name: "Layer1"},
+var membershipTestCases = []struct {
+	name       string
+	version    pdf.Version
+	membership *Membership
+}{
+	{
+		name:    "simple with single OCG and default policy",
+		version: pdf.V1_7,
+		membership: &Membership{
+			OCGs: []*Group{
+				{Name: "Layer1"},
+			},
+			Policy: PolicyAnyOn,
+		},
+	},
+	{
+		name:    "multiple OCGs with AllOn policy",
+		version: pdf.V1_7,
+		membership: &Membership{
+			OCGs: []*Group{
+				{Name: "Layer1"},
+				{Name: "Layer2"},
+				{Name: "Layer3"},
+			},
+			Policy: PolicyAllOn,
+		},
+	},
+	{
+		name:    "AllOff policy",
+		version: pdf.V1_7,
+		membership: &Membership{
+			OCGs: []*Group{
+				{Name: "HiddenLayer"},
+			},
+			Policy: PolicyAllOff,
+		},
+	},
+	{
+		name:    "AnyOff policy",
+		version: pdf.V1_7,
+		membership: &Membership{
+			OCGs: []*Group{
+				{Name: "Layer1"},
+				{Name: "Layer2"},
+			},
+			Policy: PolicyAnyOff,
+		},
+	},
+	{
+		name:    "with visibility expression - simple And",
+		version: pdf.V2_0,
+		membership: &Membership{
+			VE: &VisibilityExpressionAnd{
+				Args: []VisibilityExpression{
+					&VisibilityExpressionGroup{Group: &Group{Name: "Layer1"}},
+					&VisibilityExpressionGroup{Group: &Group{Name: "Layer2"}},
 				},
-				Policy: PolicyAnyOn, // default policy
 			},
 		},
-		{
-			name: "multiple OCGs with AllOn policy",
-			membership: &Membership{
-				OCGs: []*Group{
-					{Name: "Layer1"},
-					{Name: "Layer2"},
-					{Name: "Layer3"},
-				},
-				Policy: PolicyAllOn,
-			},
-		},
-		{
-			name: "AllOff policy",
-			membership: &Membership{
-				OCGs: []*Group{
-					{Name: "HiddenLayer"},
-				},
-				Policy: PolicyAllOff,
-			},
-		},
-		{
-			name: "AnyOff policy",
-			membership: &Membership{
-				OCGs: []*Group{
-					{Name: "Layer1"},
-					{Name: "Layer2"},
-				},
-				Policy: PolicyAnyOff,
-			},
-		},
-		{
-			name: "with visibility expression - simple And",
-			membership: &Membership{
-				VE: &VisibilityExpressionAnd{
-					Args: []VisibilityExpression{
-						&VisibilityExpressionGroup{Group: &Group{Name: "Layer1"}},
-						&VisibilityExpressionGroup{Group: &Group{Name: "Layer2"}},
+	},
+	{
+		name:    "with visibility expression - complex nested",
+		version: pdf.V2_0,
+		membership: &Membership{
+			VE: &VisibilityExpressionOr{
+				Args: []VisibilityExpression{
+					&VisibilityExpressionGroup{Group: &Group{Name: "Layer1"}},
+					&VisibilityExpressionNot{
+						Arg: &VisibilityExpressionGroup{Group: &Group{Name: "Layer2"}},
 					},
-				},
-			},
-		},
-		{
-			name: "with visibility expression - complex nested",
-			membership: &Membership{
-				VE: &VisibilityExpressionOr{
-					Args: []VisibilityExpression{
-						&VisibilityExpressionGroup{Group: &Group{Name: "Layer1"}},
-						&VisibilityExpressionNot{
-							Arg: &VisibilityExpressionGroup{Group: &Group{Name: "Layer2"}},
+					&VisibilityExpressionAnd{
+						Args: []VisibilityExpression{
+							&VisibilityExpressionGroup{Group: &Group{Name: "Layer3"}},
+							&VisibilityExpressionGroup{Group: &Group{Name: "Layer4"}},
 						},
-						&VisibilityExpressionAnd{
-							Args: []VisibilityExpression{
-								&VisibilityExpressionGroup{Group: &Group{Name: "Layer3"}},
-								&VisibilityExpressionGroup{Group: &Group{Name: "Layer4"}},
-							},
-						},
 					},
 				},
 			},
 		},
-		{
-			name: "VE with compatibility OCGs",
-			membership: &Membership{
-				OCGs: []*Group{
-					{Name: "Layer1"},
-					{Name: "Layer2"},
-				},
-				Policy: PolicyAllOn,
-				VE: &VisibilityExpressionAnd{
-					Args: []VisibilityExpression{
-						&VisibilityExpressionGroup{Group: &Group{Name: "Layer1"}},
-						&VisibilityExpressionGroup{Group: &Group{Name: "Layer2"}},
-					},
+	},
+	{
+		name:    "VE with compatibility OCGs",
+		version: pdf.V2_0,
+		membership: &Membership{
+			OCGs: []*Group{
+				{Name: "Layer1"},
+				{Name: "Layer2"},
+			},
+			Policy: PolicyAllOn,
+			VE: &VisibilityExpressionAnd{
+				Args: []VisibilityExpression{
+					&VisibilityExpressionGroup{Group: &Group{Name: "Layer1"}},
+					&VisibilityExpressionGroup{Group: &Group{Name: "Layer2"}},
 				},
 			},
 		},
-	}
+	},
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+func TestMembershipRoundTrip(t *testing.T) {
+	for _, tc := range membershipTestCases {
+		t.Run(tc.name, func(t *testing.T) {
 			// test with SingleUse = false (indirect reference)
-			tt.membership.SingleUse = false
-			testMembershipRoundTrip(t, tt.membership, "indirect")
+			tc.membership.SingleUse = false
+			testMembershipRoundTrip(t, tc.version, tc.membership)
 
 			// test with SingleUse = true (direct dictionary)
-			tt.membership.SingleUse = true
-			testMembershipRoundTrip(t, tt.membership, "direct")
+			tc.membership.SingleUse = true
+			testMembershipRoundTrip(t, tc.version, tc.membership)
 		})
 	}
 }
 
-func testMembershipRoundTrip(t *testing.T, original *Membership, mode string) {
-	// Use PDF 2.0 for visibility expressions, 1.7 for basic features
-	version := pdf.V1_7
-	if original.VE != nil {
-		version = pdf.V2_0
-	}
-	buf, _ := memfile.NewPDFWriter(version, nil)
-	rm := pdf.NewResourceManager(buf)
+func testMembershipRoundTrip(t *testing.T, version pdf.Version, original *Membership) {
+	t.Helper()
+
+	w, _ := memfile.NewPDFWriter(version, nil)
+	rm := pdf.NewResourceManager(w)
 
 	// embed the membership dictionary
 	obj, err := rm.Embed(original)
 	if err != nil {
-		t.Fatalf("%s: embed: %v", mode, err)
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
+		t.Fatalf("embed: %v", err)
 	}
 
 	err = rm.Close()
 	if err != nil {
-		t.Fatalf("%s: close writer: %v", mode, err)
+		t.Fatalf("rm.Close: %v", err)
+	}
+
+	err = w.Close()
+	if err != nil {
+		t.Fatalf("w.Close: %v", err)
 	}
 
 	// extract the membership dictionary
-	extractor := pdf.NewExtractor(buf)
-	extracted, err := ExtractMembership(extractor, obj)
+	extractor := pdf.NewExtractor(w)
+	extracted, err := pdf.ExtractorGet(extractor, obj, ExtractMembership)
 	if err != nil {
-		t.Fatalf("%s: extract: %v", mode, err)
+		t.Fatalf("extract: %v", err)
 	}
 
 	// normalize for comparison
@@ -161,7 +175,7 @@ func testMembershipRoundTrip(t *testing.T, original *Membership, mode string) {
 	normalizeMembership(extracted)
 
 	if diff := cmp.Diff(extracted, original, cmp.AllowUnexported(Membership{})); diff != "" {
-		t.Errorf("%s: round trip failed (-got +want):\n%s", mode, diff)
+		t.Errorf("round trip failed (-got +want):\n%s", diff)
 	}
 }
 
@@ -236,14 +250,26 @@ func TestMembershipExtractPermissive(t *testing.T) {
 	buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
 	rm := pdf.NewResourceManager(buf)
 
+	// create a minimal OCG
+	ocgDict := pdf.Dict{
+		"Type": pdf.Name("OCG"),
+		"Name": pdf.TextString("Test"),
+	}
+	ocgRef := rm.Out.Alloc()
+	err := rm.Out.Put(ocgRef, ocgDict)
+	if err != nil {
+		t.Fatalf("put ocg: %v", err)
+	}
+
 	// create membership with invalid policy that should be ignored during extraction
 	dict := pdf.Dict{
 		"Type": pdf.Name("OCMD"),
+		"OCGs": ocgRef,
 		"P":    pdf.Name("InvalidPolicy"), // invalid policy should be ignored
 	}
 
 	ref := rm.Out.Alloc()
-	err := rm.Out.Put(ref, dict)
+	err = rm.Out.Put(ref, dict)
 	if err != nil {
 		t.Fatalf("put dict: %v", err)
 	}
@@ -254,7 +280,7 @@ func TestMembershipExtractPermissive(t *testing.T) {
 	}
 
 	extractor := pdf.NewExtractor(buf)
-	membership, err := ExtractMembership(extractor, ref)
+	membership, err := pdf.ExtractorGet(extractor, ref, ExtractMembership)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -298,7 +324,7 @@ func TestMembershipSingleOCG(t *testing.T) {
 
 	extractor := pdf.NewExtractor(buf)
 
-	extracted, err := ExtractMembership(extractor, obj)
+	extracted, err := pdf.ExtractorGet(extractor, obj, ExtractMembership)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -345,7 +371,7 @@ func TestMembershipWithNullOCGs(t *testing.T) {
 	rm.Close()
 
 	extractor := pdf.NewExtractor(buf)
-	membership, err := ExtractMembership(extractor, ref)
+	membership, err := pdf.ExtractorGet(extractor, ref, ExtractMembership)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -357,4 +383,65 @@ func TestMembershipWithNullOCGs(t *testing.T) {
 	if membership.OCGs[0].Name != "ValidGroup" {
 		t.Errorf("expected OCG name 'ValidGroup', got %s", membership.OCGs[0].Name)
 	}
+}
+
+func FuzzMembershipRoundTrip(f *testing.F) {
+	opt := &pdf.WriterOptions{
+		HumanReadable: true,
+	}
+
+	// build seed corpus from test cases
+	for _, tc := range membershipTestCases {
+		for _, singleUse := range []bool{false, true} {
+			tc.membership.SingleUse = singleUse
+
+			w, buf := memfile.NewPDFWriter(tc.version, opt)
+
+			err := memfile.AddBlankPage(w)
+			if err != nil {
+				continue
+			}
+
+			rm := pdf.NewResourceManager(w)
+
+			obj, err := rm.Embed(tc.membership)
+			if err != nil {
+				continue
+			}
+
+			err = rm.Close()
+			if err != nil {
+				continue
+			}
+
+			w.GetMeta().Trailer["Quir:E"] = obj
+			err = w.Close()
+			if err != nil {
+				continue
+			}
+
+			f.Add(buf.Data)
+		}
+	}
+
+	// fuzz function: read-write-read cycle
+	f.Fuzz(func(t *testing.T, fileData []byte) {
+		r, err := pdf.NewReader(bytes.NewReader(fileData), nil)
+		if err != nil {
+			t.Skip("invalid PDF")
+		}
+
+		obj := r.GetMeta().Trailer["Quir:E"]
+		if obj == nil {
+			t.Skip("missing test object")
+		}
+
+		x := pdf.NewExtractor(r)
+		data, err := pdf.ExtractorGet(x, obj, ExtractMembership)
+		if err != nil {
+			t.Skip("malformed object")
+		}
+
+		testMembershipRoundTrip(t, pdf.GetVersion(r), data)
+	})
 }

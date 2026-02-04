@@ -78,6 +78,8 @@ type NumberFormat struct {
 
 // ExtractNumberFormat extracts a NumberFormat from a PDF object.
 func ExtractNumberFormat(x *pdf.Extractor, obj pdf.Object) (*NumberFormat, error) {
+	singleUse := !x.IsIndirect
+
 	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err
@@ -182,6 +184,8 @@ func ExtractNumberFormat(x *pdf.Extractor, obj pdf.Object) (*NumberFormat, error
 	} else {
 		nf.PrefixLabel = (o == "P")
 	}
+
+	nf.SingleUse = singleUse
 
 	return nf, nil
 }

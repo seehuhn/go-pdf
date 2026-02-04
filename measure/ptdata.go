@@ -59,6 +59,8 @@ type PtData struct {
 
 // ExtractPtData extracts a PtData object from a PDF dictionary.
 func ExtractPtData(x *pdf.Extractor, obj pdf.Object) (*PtData, error) {
+	singleUse := !x.IsIndirect
+
 	dict, err := x.GetDictTyped(obj, "PtData")
 	if err != nil {
 		return nil, err
@@ -117,6 +119,8 @@ func ExtractPtData(x *pdf.Extractor, obj pdf.Object) (*PtData, error) {
 		}
 	}
 	ptData.XPTS = xpts
+
+	ptData.SingleUse = singleUse
 
 	return ptData, nil
 }

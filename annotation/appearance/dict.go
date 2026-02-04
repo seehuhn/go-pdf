@@ -58,10 +58,10 @@ type Dict struct {
 var _ pdf.Embedder = (*Dict)(nil)
 
 func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
-	_, isIndirect := obj.(pdf.Reference)
+	singleUse := !x.IsIndirect // capture before other x method calls
 
 	res := &Dict{
-		SingleUse: !isIndirect && !x.IsIndirect,
+		SingleUse: singleUse,
 	}
 
 	dict, err := x.GetDict(obj)
@@ -78,14 +78,14 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		res.NormalMap = make(map[pdf.Name]*form.Form)
 		for key, obj := range N {
 			state := key
-			formObj, err := extract.Form(x, obj)
+			formObj, err := pdf.ExtractorGet(x, obj, extract.Form)
 			if err != nil {
 				return nil, err
 			}
 			res.NormalMap[state] = formObj
 		}
 	case *pdf.Stream:
-		formObj, err := extract.Form(x, N)
+		formObj, err := pdf.ExtractorGet(x, N, extract.Form)
 		if err != nil {
 			return nil, err
 		}
@@ -103,14 +103,14 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		res.RollOverMap = make(map[pdf.Name]*form.Form)
 		for key, obj := range R {
 			state := key
-			formObj, err := extract.Form(x, obj)
+			formObj, err := pdf.ExtractorGet(x, obj, extract.Form)
 			if err != nil {
 				return nil, err
 			}
 			res.RollOverMap[state] = formObj
 		}
 	case *pdf.Stream:
-		formObj, err := extract.Form(x, R)
+		formObj, err := pdf.ExtractorGet(x, R, extract.Form)
 		if err != nil {
 			return nil, err
 		}
@@ -126,14 +126,14 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		res.DownMap = make(map[pdf.Name]*form.Form)
 		for key, obj := range D {
 			state := key
-			formObj, err := extract.Form(x, obj)
+			formObj, err := pdf.ExtractorGet(x, obj, extract.Form)
 			if err != nil {
 				return nil, err
 			}
 			res.DownMap[state] = formObj
 		}
 	case *pdf.Stream:
-		formObj, err := extract.Form(x, D)
+		formObj, err := pdf.ExtractorGet(x, D, extract.Form)
 		if err != nil {
 			return nil, err
 		}

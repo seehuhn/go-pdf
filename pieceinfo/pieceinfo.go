@@ -89,6 +89,8 @@ func (p *PieceInfo) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 // Extract reads a page-piece dictionary from a PDF object.
 // Returns nil if obj is nil.
 func Extract(x *pdf.Extractor, obj pdf.Object) (*PieceInfo, error) {
+	singleUse := !x.IsIndirect // capture before other x method calls
+
 	r := x.R
 	dict, err := pdf.GetDict(r, obj)
 	if dict == nil {
@@ -96,12 +98,9 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*PieceInfo, error) {
 	}
 
 	info := &PieceInfo{
-		Entries: make(map[pdf.Name]Data),
+		Entries:   make(map[pdf.Name]Data),
+		SingleUse: singleUse,
 	}
-
-	// Set SingleUse based on whether obj is a direct dictionary or indirect reference.
-	_, isReference := obj.(pdf.Reference)
-	info.SingleUse = !isReference && !x.IsIndirect
 
 	for key, val := range dict {
 		dataDict, _ := pdf.GetDict(r, val)

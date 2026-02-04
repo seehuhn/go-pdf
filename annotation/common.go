@@ -376,7 +376,9 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 	}
 
 	// AP (optional)
-	if ap, err := appearance.Extract(x, dict["AP"]); err == nil && ap != nil {
+	if ap, err := pdf.ExtractorGetOptional(x, dict["AP"], appearance.Extract); err != nil {
+		return err
+	} else {
 		common.Appearance = ap
 	}
 
@@ -386,7 +388,7 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 	}
 
 	// Border (optional)
-	if border, err := pdf.Optional(ExtractBorder(x, dict["Border"])); err != nil {
+	if border, err := pdf.ExtractorGetOptional(x, dict["Border"], ExtractBorder); err != nil {
 		return err
 	} else {
 		common.Border = border

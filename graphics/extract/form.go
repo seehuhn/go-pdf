@@ -78,14 +78,14 @@ func Form(x *pdf.Extractor, obj pdf.Object) (*form.Form, error) {
 	}
 
 	// Metadata (optional)
-	if meta, err := pdf.Optional(metadata.Extract(x, dict["Metadata"])); err != nil {
+	if meta, err := pdf.ExtractorGetOptional(x, dict["Metadata"], metadata.Extract); err != nil {
 		return nil, err
 	} else {
 		f.Metadata = meta
 	}
 
 	// PieceInfo (optional)
-	if piece, err := pdf.Optional(pieceinfo.Extract(x, dict["PieceInfo"])); err != nil {
+	if piece, err := pdf.ExtractorGetOptional(x, dict["PieceInfo"], pieceinfo.Extract); err != nil {
 		return nil, err
 	} else {
 		f.PieceInfo = piece
@@ -106,14 +106,14 @@ func Form(x *pdf.Extractor, obj pdf.Object) (*form.Form, error) {
 	}
 
 	// Measure (optional)
-	if m, err := pdf.Optional(measure.Extract(x, dict["Measure"])); err != nil {
+	if m, err := pdf.ExtractorGetOptional(x, dict["Measure"], measure.Extract); err != nil {
 		return nil, err
 	} else {
 		f.Measure = m
 	}
 
 	// PtData (optional)
-	if ptData, err := pdf.Optional(measure.ExtractPtData(x, dict["PtData"])); err != nil {
+	if ptData, err := pdf.ExtractorGetOptional(x, dict["PtData"], measure.ExtractPtData); err != nil {
 		return nil, err
 	} else {
 		f.PtData = ptData
@@ -145,7 +145,7 @@ func Form(x *pdf.Extractor, obj pdf.Object) (*form.Form, error) {
 	// extract resources
 	f.Res = &content.Resources{}
 	if resObj := dict["Resources"]; resObj != nil {
-		res, err := Resources(x, resObj)
+		res, err := pdf.ExtractorGet(x, resObj, Resources)
 		if err != nil {
 			return nil, err
 		}

@@ -110,13 +110,11 @@ func roundTripTest(t *testing.T, version pdf.Version, data *PtData) {
 	}
 
 	// Extract the object
-	extracted, err := ExtractPtData(pdf.NewExtractor(w), embedded)
+	x := pdf.NewExtractor(w)
+	extracted, err := pdf.ExtractorGet(x, embedded, ExtractPtData)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
-
-	// SingleUse is not stored in PDF, so reset it for comparison
-	extracted.SingleUse = data.SingleUse
 
 	if diff := cmp.Diff(data, extracted, cmp.AllowUnexported(PtData{})); diff != "" {
 		t.Errorf("round trip failed (-want +got):\n%s", diff)
@@ -172,7 +170,8 @@ func FuzzRoundTrip(f *testing.F) {
 			t.Skip("missing test object")
 		}
 
-		objGo, err := ExtractPtData(pdf.NewExtractor(r), objPDF)
+		x := pdf.NewExtractor(r)
+		objGo, err := pdf.ExtractorGet(x, objPDF, ExtractPtData)
 		if err != nil {
 			t.Skip("malformed PDF object")
 		}

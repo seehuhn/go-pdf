@@ -41,6 +41,7 @@ var rectilinearTestCases = []struct {
 				Precision:        100000,
 				FractionFormat:   FractionDecimal,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}},
 			YAxis: []*NumberFormat{{
 				Unit:             "ft",
@@ -48,6 +49,7 @@ var rectilinearTestCases = []struct {
 				Precision:        1,
 				FractionFormat:   FractionDecimal,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}},
 			Distance: []*NumberFormat{{
 				Unit:             "mi",
@@ -55,24 +57,28 @@ var rectilinearTestCases = []struct {
 				Precision:        100000,
 				FractionFormat:   FractionDecimal,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}, {
 				Unit:             "ft",
 				ConversionFactor: 5280,
 				Precision:        1,
 				FractionFormat:   FractionDecimal,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}, {
 				Unit:             "in",
 				ConversionFactor: 12,
 				Precision:        8,
 				FractionFormat:   FractionFraction,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}},
 			Area: []*NumberFormat{{
 				Unit:             "acres",
 				ConversionFactor: 640,
 				Precision:        100,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}},
 			Origin:    [2]float64{0, 0},
 			CYX:       0.000189394,
@@ -89,24 +95,28 @@ var rectilinearTestCases = []struct {
 				ConversionFactor: 1.0,
 				Precision:        100,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}},
 			YAxis: []*NumberFormat{{
 				Unit:             "m",
 				ConversionFactor: 1.0,
 				Precision:        100,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}},
 			Distance: []*NumberFormat{{
 				Unit:             "m",
 				ConversionFactor: 1.0,
 				Precision:        100,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}},
 			Area: []*NumberFormat{{
 				Unit:             "m²",
 				ConversionFactor: 1.0,
 				Precision:        100,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}},
 			Origin:    [2]float64{0, 0},
 			CYX:       1.0,
@@ -123,24 +133,28 @@ var rectilinearTestCases = []struct {
 				ConversionFactor: 100.0,
 				Precision:        10,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}},
 			YAxis: []*NumberFormat{{
 				Unit:             "m",
 				ConversionFactor: 100.0,
 				Precision:        10,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}},
 			Distance: []*NumberFormat{{
 				Unit:             "m",
 				ConversionFactor: 100.0,
 				Precision:        10,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}},
 			Area: []*NumberFormat{{
 				Unit:             "m²",
 				ConversionFactor: 10000.0,
 				Precision:        100,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}},
 			Origin:    [2]float64{100.5, 200.75},
 			CYX:       1.0,
@@ -157,36 +171,42 @@ var rectilinearTestCases = []struct {
 				ConversionFactor: 1.0,
 				Precision:        1,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}},
 			YAxis: []*NumberFormat{{
 				Unit:             "mm",
 				ConversionFactor: 1.0,
 				Precision:        1,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}},
 			Distance: []*NumberFormat{{
 				Unit:             "mm",
 				ConversionFactor: 1.0,
 				Precision:        1,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}},
 			Area: []*NumberFormat{{
 				Unit:             "mm²",
 				ConversionFactor: 1.0,
 				Precision:        1,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}},
 			Angle: []*NumberFormat{{
 				Unit:             "deg",
 				ConversionFactor: 1.0,
 				Precision:        10,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}},
 			Slope: []*NumberFormat{{
 				Unit:             "%",
 				ConversionFactor: 100.0,
 				Precision:        10,
 				SingleUse:        true,
+				DecimalSeparator: ".",
 			}},
 			Origin:    [2]float64{0, 0},
 			CYX:       1.0,
@@ -203,6 +223,9 @@ func rectilinearRoundTripTest(t *testing.T, version pdf.Version, data *Rectiline
 	rm := pdf.NewResourceManager(w)
 	embedded, err := rm.Embed(data)
 	if err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
 		t.Fatalf("embed failed: %v", err)
 	}
 
@@ -211,7 +234,13 @@ func rectilinearRoundTripTest(t *testing.T, version pdf.Version, data *Rectiline
 		t.Fatalf("resource manager close failed: %v", err)
 	}
 
-	decoded, err := Extract(pdf.NewExtractor(w), embedded)
+	err = w.Close()
+	if err != nil {
+		t.Fatalf("w.Close failed: %v", err)
+	}
+
+	x := pdf.NewExtractor(w)
+	decoded, err := pdf.ExtractorGet(x, embedded, Extract)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -222,56 +251,8 @@ func rectilinearRoundTripTest(t *testing.T, version pdf.Version, data *Rectiline
 		t.Fatalf("extracted measure is not RectilinearMeasure, got %T", decoded)
 	}
 
-	// Fix SingleUse fields for comparison (not stored in PDF)
-	fixSingleUseFields(decodedRL, data)
-
 	if diff := cmp.Diff(data, decodedRL); diff != "" {
 		t.Errorf("round trip failed (-want +got):\n%s", diff)
-	}
-}
-
-// fixSingleUseFields sets SingleUse fields to match original for comparison
-func fixSingleUseFields(decoded, original *RectilinearMeasure) {
-	decoded.SingleUse = original.SingleUse
-
-	// Helper function to fix NumberFormat fields
-	fixNumberFormat := func(decoded, original *NumberFormat) {
-		decoded.SingleUse = original.SingleUse
-		// DecimalSeparator: empty string becomes period after round-trip
-		if original.DecimalSeparator == "" {
-			decoded.DecimalSeparator = ""
-		}
-	}
-
-	for i, nf := range decoded.XAxis {
-		if i < len(original.XAxis) {
-			fixNumberFormat(nf, original.XAxis[i])
-		}
-	}
-	for i, nf := range decoded.YAxis {
-		if i < len(original.YAxis) {
-			fixNumberFormat(nf, original.YAxis[i])
-		}
-	}
-	for i, nf := range decoded.Distance {
-		if i < len(original.Distance) {
-			fixNumberFormat(nf, original.Distance[i])
-		}
-	}
-	for i, nf := range decoded.Area {
-		if i < len(original.Area) {
-			fixNumberFormat(nf, original.Area[i])
-		}
-	}
-	for i, nf := range decoded.Angle {
-		if i < len(original.Angle) {
-			fixNumberFormat(nf, original.Angle[i])
-		}
-	}
-	for i, nf := range decoded.Slope {
-		if i < len(original.Slope) {
-			fixNumberFormat(nf, original.Slope[i])
-		}
 	}
 }
 
@@ -325,7 +306,8 @@ func FuzzRectilinearRoundTrip(f *testing.F) {
 			t.Skip("missing PDF object")
 		}
 
-		objGo, err := Extract(pdf.NewExtractor(r), objPDF)
+		x := pdf.NewExtractor(r)
+		objGo, err := pdf.ExtractorGet(x, objPDF, Extract)
 		if err != nil {
 			t.Skip("malformed PDF object")
 		}
@@ -335,7 +317,7 @@ func FuzzRectilinearRoundTrip(f *testing.F) {
 			t.Skip("not a RectilinearMeasure")
 		}
 
-		rectilinearRoundTripTest(t, pdf.V1_7, objGoRL)
+		rectilinearRoundTripTest(t, pdf.GetVersion(r), objGoRL)
 	})
 }
 

@@ -119,7 +119,7 @@ func (a *TransparencyAttributes) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) 
 // ExtractTransparencyAttributes reads a transparency group attributes
 // dictionary from a PDF file.
 func ExtractTransparencyAttributes(x *pdf.Extractor, obj pdf.Object) (*TransparencyAttributes, error) {
-	_, isIndirect := obj.(pdf.Reference)
+	singleUse := !x.IsIndirect // capture before other x method calls
 
 	dict, err := x.GetDictTyped(obj, "Group")
 	if err != nil {
@@ -164,7 +164,7 @@ func ExtractTransparencyAttributes(x *pdf.Extractor, obj pdf.Object) (*Transpare
 		a.Knockout = bool(knockout)
 	}
 
-	a.SingleUse = !isIndirect && !x.IsIndirect
+	a.SingleUse = singleUse
 
 	return a, nil
 }

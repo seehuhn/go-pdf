@@ -108,7 +108,7 @@ func (s *Type2) Equal(other graphics.Shading) bool {
 }
 
 // extractType2 reads a Type 2 (axial) shading from a PDF dictionary.
-func extractType2(x *pdf.Extractor, d pdf.Dict, isIndirect bool) (*Type2, error) {
+func extractType2(x *pdf.Extractor, d pdf.Dict, singleUse bool) (*Type2, error) {
 	s := &Type2{}
 
 	// Read required ColorSpace
@@ -248,8 +248,7 @@ func extractType2(x *pdf.Extractor, d pdf.Dict, isIndirect bool) (*Type2, error)
 		}
 	}
 
-	// obj is indirect if passed as a reference or accessed through one
-	s.SingleUse = !isIndirect && !x.IsIndirect
+	s.SingleUse = singleUse
 
 	return s, nil
 }

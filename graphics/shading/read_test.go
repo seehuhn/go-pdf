@@ -503,7 +503,7 @@ func roundTripTest(t *testing.T, originalShading graphics.Shading) {
 
 	// Read the shading back
 	x := pdf.NewExtractor(buf)
-	readShading, err := Extract(x, ref)
+	readShading, err := pdf.ExtractorGet(x, ref, Extract)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -856,7 +856,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		shading, err := Extract(x, obj)
+		shading, err := pdf.ExtractorGet(x, obj, Extract)
 		if err != nil {
 			t.Skip("malformed shading")
 		}

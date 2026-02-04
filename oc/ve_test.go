@@ -154,6 +154,9 @@ func testVisibilityExpressionRoundTrip(t *testing.T, version pdf.Version, origin
 
 	obj, err := rm.Embed(original)
 	if err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
 		t.Fatalf("embed: %v", err)
 	}
 

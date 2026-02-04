@@ -48,6 +48,8 @@ type BorderEffect struct {
 var _ pdf.Embedder = (*BorderEffect)(nil)
 
 func ExtractBorderEffect(x *pdf.Extractor, obj pdf.Object) (*BorderEffect, error) {
+	singleUse := !x.IsIndirect // capture before other x method calls
+
 	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err
@@ -75,8 +77,7 @@ func ExtractBorderEffect(x *pdf.Extractor, obj pdf.Object) (*BorderEffect, error
 		}
 	}
 
-	_, isIndirect := obj.(pdf.Reference)
-	effect.SingleUse = !isIndirect && !x.IsIndirect
+	effect.SingleUse = singleUse
 
 	return effect, nil
 }

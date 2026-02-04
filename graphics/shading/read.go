@@ -25,8 +25,7 @@ import (
 
 // Extract extracts a shading from a PDF file and returns a graphics.Shading.
 func Extract(x *pdf.Extractor, obj pdf.Object) (graphics.Shading, error) {
-	// Check if original object was a reference before resolving
-	_, isIndirect := obj.(pdf.Reference)
+	singleUse := !x.IsIndirect // capture before other x method calls
 
 	obj, err := x.Resolve(obj)
 	if err != nil {
@@ -63,11 +62,11 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (graphics.Shading, error) {
 
 	switch stNum {
 	case 1:
-		return extractType1(x, dict, isIndirect)
+		return extractType1(x, dict, singleUse)
 	case 2:
-		return extractType2(x, dict, isIndirect)
+		return extractType2(x, dict, singleUse)
 	case 3:
-		return extractType3(x, dict, isIndirect)
+		return extractType3(x, dict, singleUse)
 	case 4:
 		if stream, ok := obj.(*pdf.Stream); ok {
 			return extractType4(x, stream)

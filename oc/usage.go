@@ -62,8 +62,7 @@ var _ pdf.Embedder = (*Usage)(nil)
 
 // ExtractUsage extracts a usage dictionary from a PDF object.
 func ExtractUsage(x *pdf.Extractor, obj pdf.Object) (*Usage, error) {
-	// check if obj is indirect before resolving
-	_, isIndirect := obj.(pdf.Reference)
+	singleUse := !x.IsIndirect // capture before other x method calls
 
 	r := x.R
 	dict, err := pdf.GetDict(r, obj)
@@ -110,27 +109,24 @@ func ExtractUsage(x *pdf.Extractor, obj pdf.Object) (*Usage, error) {
 	if langDict, err := pdf.Optional(pdf.GetDict(r, dict["Language"])); err != nil {
 		return nil, err
 	} else if langDict != nil {
-		info := &UsageLanguage{}
-
 		if langStr, err := pdf.Optional(pdf.GetTextString(r, langDict["Lang"])); err != nil {
 			return nil, err
 		} else if langStr != "" {
 			// parse language tag
 			tag, err := language.Parse(string(langStr))
-			if err != nil {
-				// use Und (undetermined) for invalid language codes
-				tag = language.Und
+			if err == nil {
+				info := &UsageLanguage{Lang: tag}
+
+				if preferred, err := pdf.Optional(pdf.GetName(r, langDict["Preferred"])); err != nil {
+					return nil, err
+				} else if preferred == "ON" {
+					info.Preferred = true
+				}
+
+				usage.Language = info
 			}
-			info.Lang = tag
+			// silently ignore invalid language codes
 		}
-
-		if preferred, err := pdf.Optional(pdf.GetName(r, langDict["Preferred"])); err != nil {
-			return nil, err
-		} else if preferred == "ON" {
-			info.Preferred = true
-		}
-
-		usage.Language = info
 	}
 
 	// extract Export dictionary
@@ -255,8 +251,7 @@ func ExtractUsage(x *pdf.Extractor, obj pdf.Object) (*Usage, error) {
 		usage.PageElement = info
 	}
 
-	// obj is indirect if passed as a reference or accessed through one
-	usage.SingleUse = !isIndirect && !x.IsIndirect
+	usage.SingleUse = singleUse
 
 	return usage, nil
 }

@@ -44,6 +44,8 @@ type Viewport struct {
 
 // ExtractViewport extracts a Viewport from a PDF object.
 func ExtractViewport(x *pdf.Extractor, obj pdf.Object) (*Viewport, error) {
+	singleUse := !x.IsIndirect
+
 	dict, err := x.GetDictTyped(obj, "Viewport")
 	if err != nil {
 		return nil, err
@@ -74,7 +76,7 @@ func ExtractViewport(x *pdf.Extractor, obj pdf.Object) (*Viewport, error) {
 
 	// Extract optional Measure field
 	if dict["Measure"] != nil {
-		measure, err := Extract(x, dict["Measure"])
+		measure, err := pdf.ExtractorGet(x, dict["Measure"], Extract)
 		if err != nil {
 			// Use Optional for permissive reading
 			if _, isMalformed := err.(*pdf.MalformedFileError); isMalformed {
@@ -88,11 +90,13 @@ func ExtractViewport(x *pdf.Extractor, obj pdf.Object) (*Viewport, error) {
 	}
 
 	// Extract optional PtData field
-	if ptData, err := pdf.Optional(ExtractPtData(x, dict["PtData"])); err != nil {
+	if ptData, err := pdf.ExtractorGetOptional(x, dict["PtData"], ExtractPtData); err != nil {
 		return nil, err
 	} else {
 		vp.PtData = ptData
 	}
+
+	vp.SingleUse = singleUse
 
 	return vp, nil
 }
@@ -180,7 +184,7 @@ func (va *ViewPortArray) Select(point vec.Vec2) *Viewport {
 
 // ExtractViewportArray extracts an array of viewports from a PDF array.
 func ExtractViewportArray(x *pdf.Extractor, obj pdf.Object) (*ViewPortArray, error) {
-	_, isIndirect := obj.(pdf.Reference)
+	singleUse := !x.IsIndirect
 
 	a, err := x.GetArray(obj)
 	if err != nil {
@@ -192,13 +196,13 @@ func ExtractViewportArray(x *pdf.Extractor, obj pdf.Object) (*ViewPortArray, err
 
 	viewports := make([]*Viewport, len(a))
 	for i, obj := range a {
-		vp, err := ExtractViewport(x, obj)
+		vp, err := pdf.ExtractorGet(x, obj, ExtractViewport)
 		if err != nil {
 			return nil, err
 		}
 		viewports[i] = vp
 	}
-	return &ViewPortArray{Viewports: viewports, SingleUse: !isIndirect && !x.IsIndirect}, nil
+	return &ViewPortArray{Viewports: viewports, SingleUse: singleUse}, nil
 }
 
 // Embed converts the ViewPortArray into a PDF array.

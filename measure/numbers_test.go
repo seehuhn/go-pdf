@@ -100,7 +100,8 @@ func TestNumberFormatExtractEmbed(t *testing.T) {
 			}
 
 			// Extract the NumberFormat back
-			extracted, err := ExtractNumberFormat(pdf.NewExtractor(w), embedded)
+			x := pdf.NewExtractor(w)
+			extracted, err := pdf.ExtractorGet(x, embedded, ExtractNumberFormat)
 			if err != nil {
 				t.Fatalf("extract failed: %v", err)
 			}
@@ -129,7 +130,8 @@ func TestNumberFormatExtractDefaults(t *testing.T) {
 		"D": pdf.Integer(100),
 	}
 
-	extracted, err := ExtractNumberFormat(pdf.NewExtractor(w), dict)
+	x := pdf.NewExtractor(w)
+	extracted, err := pdf.ExtractorGet(x, dict, ExtractNumberFormat)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -145,6 +147,7 @@ func TestNumberFormatExtractDefaults(t *testing.T) {
 		PrefixSpacing:      "",
 		SuffixSpacing:      "",
 		PrefixLabel:        false,
+		SingleUse:          true, // direct dict, not a reference
 	}
 
 	if diff := cmp.Diff(*extracted, expected); diff != "" {

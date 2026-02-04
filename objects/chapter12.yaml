@@ -8653,11 +8653,16 @@ types:
   readFunc: oc.ExtractUsage
   writeMethod: (*Usage).Embed
 - name: OptContentUsageApplication
-  goType: null
+  goType: oc.UsageApplication
+  goPackage: oc
+  goRepr: struct
   pdfRepr: dict
   introduced: '1.5'
+  specSection: 8.11.4.4
+  readFunc: oc.ExtractUsageApplication
+  writeMethod: (*UsageApplication).Embed
   fields:
-  - goName: null
+  - goName: Event
     pdfKey: Event
     pdfType: name
     required: true
@@ -8667,14 +8672,14 @@ types:
     - Print
     - Export
     notes: Table 101
-  - goName: null
+  - goName: OCGs
     pdfKey: OCGs
     pdfType: array
     required: false
     introduced: '1.5'
     refTypes:
     - ArrayOfOCG
-  - goName: null
+  - goName: Category
     pdfKey: Category
     pdfType: array
     required: true

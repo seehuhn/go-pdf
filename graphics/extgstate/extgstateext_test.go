@@ -218,7 +218,7 @@ func roundTripTest(t *testing.T, version pdf.Version, data *extgstate.ExtGState)
 
 	// Extract the ExtGState
 	x := pdf.NewExtractor(w)
-	extracted, err := extract.ExtGState(x, embedded)
+	extracted, err := pdf.ExtractorGet(x, embedded, extract.ExtGState)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -287,7 +287,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		objGo, err := extract.ExtGState(x, objPDF)
+		objGo, err := pdf.ExtractorGet(x, objPDF, extract.ExtGState)
 		if err != nil {
 			t.Skip("malformed PDF object")
 		}
