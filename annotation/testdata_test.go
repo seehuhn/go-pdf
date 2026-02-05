@@ -203,6 +203,61 @@ var testCases = map[pdf.Name][]testCase{
 				Margin:            []float64{5.0, 3.0, 5.0, 3.0}, // Inner rectangle margins
 			},
 		},
+		{
+			name: "free text with border style",
+			annotation: &FreeText{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 10, LLy: 10, URx: 200, URy: 60},
+				},
+				DefaultAppearance: "/Helvetica 10 Tf 0 g",
+				BorderStyle: &BorderStyle{
+					Width:     2,
+					Style:     "D",
+					DashArray: []float64{3, 1},
+				},
+			},
+		},
+		{
+			name: "free text with 2-point callout line",
+			annotation: &FreeText{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 100, LLy: 100, URx: 300, URy: 150},
+				},
+				Markup: Markup{
+					Intent: "FreeTextCallout",
+				},
+				DefaultAppearance: "/Helvetica 10 Tf 0 g",
+				CalloutLine:       []vec.Vec2{{X: 50, Y: 80}, {X: 100, Y: 100}},
+				LineEndingStyle:   LineEndingStyleNone,
+			},
+		},
+		{
+			name: "free text with border effect",
+			annotation: &FreeText{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 20, LLy: 20, URx: 220, URy: 80},
+				},
+				DefaultAppearance: "/Courier 11 Tf 0 g",
+				BorderEffect: &BorderEffect{
+					Style:     "C",
+					Intensity: 1.5,
+				},
+			},
+		},
+		{
+			name: "free text callout with line ending",
+			annotation: &FreeText{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 100, LLy: 200, URx: 300, URy: 260},
+				},
+				Markup: Markup{
+					Intent: "FreeTextCallout",
+				},
+				DefaultAppearance: "/Helvetica 9 Tf 0 0 0 rg",
+				CalloutLine:       []vec.Vec2{{X: 50, Y: 180}, {X: 75, Y: 190}, {X: 100, Y: 200}},
+				LineEndingStyle:   LineEndingStyleClosedArrow,
+			},
+		},
 	},
 	"Line": {
 		{
@@ -322,6 +377,38 @@ var testCases = map[pdf.Name][]testCase{
 				},
 				FillColor: color.DeviceRGB{0.9, 0.9, 0.9}, // Light gray interior
 				Margin:    []float64{5.0, 5.0, 5.0, 5.0},  // Rectangle differences
+			},
+		},
+		{
+			name: "square with border style",
+			annotation: &Square{
+				Common: Common{
+					Rect: pdf.Rectangle{LLx: 50, LLy: 50, URx: 200, URy: 150},
+				},
+				BorderStyle: &BorderStyle{
+					Width:     2,
+					Style:     "D",
+					DashArray: []float64{3, 1},
+				},
+			},
+		},
+		{
+			name: "square with border style and effect",
+			annotation: &Square{
+				Common: Common{
+					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 300, URy: 250},
+					Contents: "Cloudy square",
+				},
+				BorderStyle: &BorderStyle{
+					Width: 1.5,
+					Style: "S",
+				},
+				BorderEffect: &BorderEffect{
+					Style:     "C",
+					Intensity: 1.0,
+				},
+				FillColor: color.DeviceGray(0.95),
+				Margin:    []float64{3.0, 3.0, 3.0, 3.0},
 			},
 		},
 	},

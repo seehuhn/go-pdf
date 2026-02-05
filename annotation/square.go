@@ -135,13 +135,22 @@ func decodeSquare(x *pdf.Extractor, dict pdf.Dict) (*Square, error) {
 
 	// RD (optional)
 	if rd, err := pdf.GetFloatArray(r, dict["RD"]); err == nil && len(rd) == 4 {
-		square.Margin = rd
+		for i := range rd {
+			rd[i] = max(rd[i], 0)
+		}
+		if rd[0]+rd[2] < square.Rect.Dx() && rd[1]+rd[3] < square.Rect.Dy() {
+			square.Margin = rd
+		}
 	}
 
 	return square, nil
 }
 
 func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
+	if err := pdf.CheckVersion(rm.Out, "square annotations", pdf.V1_3); err != nil {
+		return nil, err
+	}
+
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Square"),
 	}
@@ -206,6 +215,9 @@ func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// RD (optional)
+	// The spec says "left, top, right, bottom" but all implementations
+	// use "left, bottom, right, top".
+	// See https://github.com/pdf-association/pdf-issues/issues/592
 	if s.Margin != nil {
 		if err := pdf.CheckVersion(rm.Out, "square annotation RD entry", pdf.V1_5); err != nil {
 			return nil, err

@@ -16,7 +16,11 @@
 
 package annotation
 
-import "seehuhn.de/go/pdf"
+import (
+	"errors"
+
+	"seehuhn.de/go/pdf"
+)
 
 // PDF 2.0 sections: 12.5.2 12.5.6.21
 
@@ -76,13 +80,15 @@ func decodeTrapNet(x *pdf.Extractor, dict pdf.Dict) (*TrapNet, error) {
 	}
 
 	// Extract trap network-specific fields
-	// LastModified (conditional)
-	if lastModified, err := pdf.GetTextString(r, dict["LastModified"]); err == nil && lastModified != "" {
+	if lastModified, err := pdf.Optional(pdf.GetTextString(r, dict["LastModified"])); err != nil {
+		return nil, err
+	} else if lastModified != "" {
 		trapNet.LastModified = string(lastModified)
 	}
 
-	// Version (conditional)
-	if version, err := pdf.GetArray(r, dict["Version"]); err == nil && len(version) > 0 {
+	if version, err := pdf.Optional(pdf.GetArray(r, dict["Version"])); err != nil {
+		return nil, err
+	} else if len(version) > 0 {
 		refs := make([]pdf.Reference, 0, len(version))
 		for _, obj := range version {
 			if ref, ok := obj.(pdf.Reference); ok {
@@ -94,8 +100,9 @@ func decodeTrapNet(x *pdf.Extractor, dict pdf.Dict) (*TrapNet, error) {
 		}
 	}
 
-	// AnnotStates (conditional)
-	if annotStates, err := pdf.GetArray(r, dict["AnnotStates"]); err == nil && len(annotStates) > 0 {
+	if annotStates, err := pdf.Optional(pdf.GetArray(r, dict["AnnotStates"])); err != nil {
+		return nil, err
+	} else if len(annotStates) > 0 {
 		states := make([]pdf.Name, len(annotStates))
 		for i, obj := range annotStates {
 			if name, ok := obj.(pdf.Name); ok {
@@ -107,8 +114,9 @@ func decodeTrapNet(x *pdf.Extractor, dict pdf.Dict) (*TrapNet, error) {
 		trapNet.AnnotStates = states
 	}
 
-	// FontFauxing (optional)
-	if fontFauxing, err := pdf.GetArray(r, dict["FontFauxing"]); err == nil && len(fontFauxing) > 0 {
+	if fontFauxing, err := pdf.Optional(pdf.GetArray(r, dict["FontFauxing"])); err != nil {
+		return nil, err
+	} else if len(fontFauxing) > 0 {
 		refs := make([]pdf.Reference, 0, len(fontFauxing))
 		for _, obj := range fontFauxing {
 			if ref, ok := obj.(pdf.Reference); ok {
@@ -120,12 +128,50 @@ func decodeTrapNet(x *pdf.Extractor, dict pdf.Dict) (*TrapNet, error) {
 		}
 	}
 
+	// repair field combinations
+	hasLM := trapNet.LastModified != ""
+	hasVer := len(trapNet.Version) > 0
+	hasAS := len(trapNet.AnnotStates) > 0
+	switch {
+	case hasLM && !hasVer && !hasAS:
+		// valid: LastModified only
+	case !hasLM && hasVer && hasAS:
+		// valid: Version + AnnotStates
+	case hasLM && hasVer && hasAS:
+		// all present: prefer Version+AnnotStates
+		trapNet.LastModified = ""
+	case hasLM:
+		// LastModified + incomplete pair: keep LastModified, drop the rest
+		trapNet.Version = nil
+		trapNet.AnnotStates = nil
+	default:
+		// no valid combination: set LastModified, drop incomplete pair
+		trapNet.LastModified = "D:19700101000000Z"
+		trapNet.Version = nil
+		trapNet.AnnotStates = nil
+	}
+
 	return trapNet, nil
 }
 
 func (t *TrapNet) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "trap network annotation", pdf.V1_3); err != nil {
 		return nil, err
+	}
+
+	// validate field combinations
+	hasLM := t.LastModified != ""
+	hasVer := len(t.Version) > 0
+	hasAS := len(t.AnnotStates) > 0
+	switch {
+	case hasLM && !hasVer && !hasAS:
+		if err := pdf.CheckVersion(rm.Out, "trap network annotation LastModified entry", pdf.V1_4); err != nil {
+			return nil, err
+		}
+	case !hasLM && hasVer && hasAS:
+		// ok: Version + AnnotStates
+	default:
+		return nil, errors.New("trap network annotation requires either LastModified or Version+AnnotStates")
 	}
 
 	dict := pdf.Dict{
@@ -138,11 +184,7 @@ func (t *TrapNet) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Add trap network-specific fields
-	// LastModified (conditional)
 	if t.LastModified != "" {
-		if err := pdf.CheckVersion(rm.Out, "trap network annotation LastModified entry", pdf.V1_4); err != nil {
-			return nil, err
-		}
 		dict["LastModified"] = pdf.TextString(t.LastModified)
 	}
 

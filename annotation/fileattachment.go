@@ -73,6 +73,8 @@ func decodeFileAttachment(x *pdf.Extractor, dict pdf.Dict) (*FileAttachment, err
 	// FS (required)
 	if fs, err := pdf.ExtractorGetOptional(x, dict["FS"], file.ExtractSpecification); err != nil {
 		return nil, err
+	} else if fs == nil {
+		return nil, errors.New("file attachment annotation requires FS entry")
 	} else {
 		fileAttachment.FS = fs
 	}

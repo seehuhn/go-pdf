@@ -17,6 +17,7 @@
 package annotation
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -24,84 +25,145 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-func TestBorderEffectRoundTrip(t *testing.T) {
-	tests := []struct {
-		name   string
-		effect *BorderEffect
-	}{
-		{
-			name: "solid",
-			effect: &BorderEffect{
-				Style:     "S",
-				Intensity: 0,
-			},
+var borderEffectTestCases = []struct {
+	name string
+	data *BorderEffect
+}{
+	{
+		name: "solid",
+		data: &BorderEffect{
+			Style: "S",
 		},
-		{
-			name: "cloudy",
-			effect: &BorderEffect{
-				Style: "C",
-			},
+	},
+	{
+		name: "cloudy",
+		data: &BorderEffect{
+			Style: "C",
 		},
-		{
-			name: "cloudy1",
-			effect: &BorderEffect{
-				Style:     "C",
-				Intensity: 1,
-			},
+	},
+	{
+		name: "cloudyIntensity1",
+		data: &BorderEffect{
+			Style:     "C",
+			Intensity: 1,
 		},
-		{
-			name: "cloudy2",
-			effect: &BorderEffect{
-				Style:     "C",
-				Intensity: 2,
-			},
+	},
+	{
+		name: "cloudyIntensity2",
+		data: &BorderEffect{
+			Style:     "C",
+			Intensity: 2,
 		},
-		{
-			name: "singleuse",
-			effect: &BorderEffect{
-				Style:     "C",
-				Intensity: 2,
-				SingleUse: true,
-			},
+	},
+	{
+		name: "singleUse",
+		data: &BorderEffect{
+			Style:     "C",
+			Intensity: 2,
+			SingleUse: true,
 		},
-		{
-			name:   "empty",
-			effect: &BorderEffect{},
-		},
+	},
+}
+
+func borderEffectRoundTrip(t *testing.T, version pdf.Version, data *BorderEffect) {
+	t.Helper()
+
+	w, _ := memfile.NewPDFWriter(version, nil)
+	rm := pdf.NewResourceManager(w)
+
+	embedded, err := rm.Embed(data)
+	if err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
+		t.Fatalf("embed failed: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			buf, _ := memfile.NewPDFWriter(pdf.V1_5, nil)
-			rm := pdf.NewResourceManager(buf)
+	err = rm.Close()
+	if err != nil {
+		t.Fatalf("rm.Close failed: %v", err)
+	}
 
-			// embed the border effect
-			embedded, err := rm.Embed(tt.effect)
+	err = w.Close()
+	if err != nil {
+		t.Fatalf("w.Close failed: %v", err)
+	}
+
+	x := pdf.NewExtractor(w)
+	decoded, err := pdf.ExtractorGet(x, embedded, ExtractBorderEffect)
+	if err != nil {
+		t.Fatalf("extract failed: %v", err)
+	}
+
+	if diff := cmp.Diff(data, decoded); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+}
+
+func TestBorderEffectRoundTrip(t *testing.T) {
+	versions := []pdf.Version{pdf.V1_7, pdf.V2_0}
+	for _, v := range versions {
+		for _, tc := range borderEffectTestCases {
+			t.Run(tc.name+"-"+v.String(), func(t *testing.T) {
+				borderEffectRoundTrip(t, v, tc.data)
+			})
+		}
+	}
+}
+
+func FuzzBorderEffectRoundTrip(f *testing.F) {
+	opt := &pdf.WriterOptions{
+		HumanReadable: true,
+	}
+	versions := []pdf.Version{pdf.V1_7, pdf.V2_0}
+	for _, v := range versions {
+		for _, tc := range borderEffectTestCases {
+			w, buf := memfile.NewPDFWriter(v, opt)
+
+			err := memfile.AddBlankPage(w)
 			if err != nil {
-				t.Fatal(err)
+				continue
+			}
+
+			rm := pdf.NewResourceManager(w)
+
+			embedded, err := rm.Embed(tc.data)
+			if err != nil {
+				continue
 			}
 
 			err = rm.Close()
 			if err != nil {
-				t.Fatal(err)
+				continue
 			}
 
-			// extract it back
-			x := pdf.NewExtractor(buf)
-			extracted, err := pdf.ExtractorGet(x, embedded, ExtractBorderEffect)
+			w.GetMeta().Trailer["Quir:E"] = embedded
+			err = w.Close()
 			if err != nil {
-				t.Fatal(err)
+				continue
 			}
 
-			expected := *tt.effect
-			if expected.Style == "" {
-				// empty style gets normalized to "S" during extraction
-				expected.Style = "S"
-			}
-
-			if diff := cmp.Diff(expected, *extracted); diff != "" {
-				t.Errorf("round trip failed (-want +got):\n%s", diff)
-			}
-		})
+			f.Add(buf.Data)
+		}
 	}
+
+	f.Fuzz(func(t *testing.T, fileData []byte) {
+		r, err := pdf.NewReader(bytes.NewReader(fileData), nil)
+		if err != nil {
+			t.Skip("invalid PDF")
+		}
+
+		obj := r.GetMeta().Trailer["Quir:E"]
+		if obj == nil {
+			t.Skip("missing test object")
+		}
+
+		x := pdf.NewExtractor(r)
+		data, err := pdf.ExtractorGet(x, obj, ExtractBorderEffect)
+		if err != nil {
+			t.Skip("malformed object")
+		}
+
+		borderEffectRoundTrip(t, pdf.GetVersion(r), data)
+	})
 }

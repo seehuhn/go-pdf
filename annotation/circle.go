@@ -135,7 +135,12 @@ func decodeCircle(x *pdf.Extractor, dict pdf.Dict) (*Circle, error) {
 
 	// RD (optional)
 	if rd, err := pdf.GetFloatArray(r, dict["RD"]); err == nil && len(rd) == 4 {
-		circle.Margin = rd
+		for i := range rd {
+			rd[i] = max(rd[i], 0)
+		}
+		if rd[0]+rd[2] < circle.Rect.Dx() && rd[1]+rd[3] < circle.Rect.Dy() {
+			circle.Margin = rd
+		}
 	}
 
 	return circle, nil

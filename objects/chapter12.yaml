@@ -4825,7 +4825,7 @@ types:
     pdfKey: BS
     pdfType: dictionary
     required: false
-    introduced: '1.6'
+    introduced: '1.3'
     goType: '*BorderStyle'
     refTypes:
     - BorderStyle
@@ -6037,7 +6037,7 @@ types:
     notes: https://github.com/pdf-association/pdf-issues/issues/524
   goPackage: annotation
   goRepr: struct
-  specSection: 12.5.2
+  specSection: 12.5.2 12.5.6.2 12.5.6.8
   writeMethod: (*Square).Encode
   embeds:
   - AnnotCommon
@@ -6398,7 +6398,7 @@ types:
       generation of trap networks for the page.
   goPackage: annotation
   goRepr: struct
-  specSection: 12.5.2
+  specSection: 12.5.2 12.5.6.21
   writeMethod: (*TrapNet).Encode
   embeds:
   - AnnotCommon
@@ -6924,7 +6924,7 @@ types:
 
       When writing annotations, an empty Style value can be used
       as a shorthand for "S".
-  - goName: null
+  - goName: Intensity
     pdfKey: I
     pdfType: number
     required: false
@@ -6932,6 +6932,7 @@ types:
     introduced: '1.5'
     possibleValues:
     - fn:Eval((@I>=0.0) && (@I<=2.0))
+    goType: float64
   goPackage: annotation
   goRepr: struct
   specSection: 12.5.4

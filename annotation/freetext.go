@@ -113,7 +113,7 @@ func decodeFreeText(x *pdf.Extractor, dict pdf.Dict) (*FreeText, error) {
 		return nil, err
 	}
 
-	if da, err := pdf.Optional(pdf.GetTextString(x.R, dict["DA"])); err != nil {
+	if da, err := pdf.Optional(pdf.GetString(x.R, dict["DA"])); err != nil {
 		return nil, err
 	} else {
 		f.DefaultAppearance = string(da)
@@ -135,7 +135,7 @@ func decodeFreeText(x *pdf.Extractor, dict pdf.Dict) (*FreeText, error) {
 		return nil, err
 	} else if f.Intent == FreeTextIntentCallout && (len(cl) == 4 || len(cl) == 6) {
 		points := make([]vec.Vec2, len(cl)/2)
-		for i := 0; i < len(points); i++ {
+		for i := range len(points) {
 			if px, err := x.GetNumber(cl[i*2]); err == nil {
 				if py, err := x.GetNumber(cl[i*2+1]); err == nil {
 					points[i] = vec.Vec2{X: px, Y: py}
@@ -159,7 +159,9 @@ func decodeFreeText(x *pdf.Extractor, dict pdf.Dict) (*FreeText, error) {
 			num, _ := x.GetNumber(diff)
 			a[i] = max(num, 0)
 		}
-		f.Margin = a
+		if a[0]+a[2] < f.Rect.Dx() && a[1]+a[3] < f.Rect.Dy() {
+			f.Margin = a
+		}
 	}
 
 	if bs, err := pdf.ExtractorGetOptional(x, dict["BS"], ExtractBorderStyle); err != nil {
@@ -222,7 +224,7 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Add free text-specific fields
-	dict["DA"] = pdf.TextString(f.DefaultAppearance)
+	dict["DA"] = pdf.String(f.DefaultAppearance)
 
 	if f.Align != TextAlignLeft {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation Q entry", pdf.V1_4); err != nil {
