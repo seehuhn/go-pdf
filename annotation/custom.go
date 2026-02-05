@@ -111,7 +111,7 @@ func (c *Custom) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// Add/override common annotation fields
 	d["Subtype"] = c.Type
-	if err := c.Common.fillDict(rm, d, isMarkup(c)); err != nil {
+	if err := c.Common.fillDict(rm, d, isMarkup(c), false); err != nil {
 		return nil, err
 	}
 

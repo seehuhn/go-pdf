@@ -17,6 +17,8 @@
 package annotation
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/measure"
@@ -154,6 +156,10 @@ func decodeLine(x *pdf.Extractor, dict pdf.Dict) (*Line, error) {
 		return nil, err
 	} else {
 		line.BorderStyle = bs
+		if bs != nil {
+			// per PDF spec, Border is ignored when BS is present
+			line.Common.Border = nil
+		}
 	}
 
 	// LE (optional; PDF 1.4) - default is [None, None]
@@ -232,12 +238,16 @@ func decodeLine(x *pdf.Extractor, dict pdf.Dict) (*Line, error) {
 }
 
 func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
+	if l.BorderStyle != nil && l.Common.Border != nil {
+		return nil, errors.New("Border and BorderStyle are mutually exclusive")
+	}
+
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Line"),
 	}
 
 	// Add common annotation fields
-	if err := l.Common.fillDict(rm, dict, isMarkup(l)); err != nil {
+	if err := l.Common.fillDict(rm, dict, isMarkup(l), l.BorderStyle != nil); err != nil {
 		return nil, err
 	}
 

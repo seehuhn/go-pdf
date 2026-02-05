@@ -72,7 +72,7 @@ func (p *PrinterMark) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Add common annotation fields
-	if err := p.Common.fillDict(rm, dict, isMarkup(p)); err != nil {
+	if err := p.Common.fillDict(rm, dict, isMarkup(p), false); err != nil {
 		return nil, err
 	}
 

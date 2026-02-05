@@ -144,7 +144,7 @@ func (t *Text) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		"Subtype": pdf.Name("Text"),
 	}
 
-	if err := t.Common.fillDict(rm, dict, isMarkup(t)); err != nil {
+	if err := t.Common.fillDict(rm, dict, isMarkup(t), false); err != nil {
 		return nil, err
 	}
 	if err := t.Markup.fillDict(rm, dict); err != nil {

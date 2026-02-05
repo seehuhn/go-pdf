@@ -207,6 +207,9 @@ func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	if d.ToUnicode != nil {
+		if err := pdf.CheckVersion(w, "ToUnicode CMap", pdf.V1_2); err != nil {
+			return nil, err
+		}
 		ref, err := rm.Embed(d.ToUnicode)
 		if err != nil {
 			return nil, err

@@ -184,6 +184,9 @@ func (d *CIDFontType2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	var toUni pdf.Object
 	if d.ToUnicode != nil {
+		if err := pdf.CheckVersion(w, "ToUnicode CMap", pdf.V1_2); err != nil {
+			return nil, err
+		}
 		toUni, err = rm.Embed(d.ToUnicode)
 		if err != nil {
 			return nil, err

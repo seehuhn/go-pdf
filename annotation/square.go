@@ -113,7 +113,10 @@ func decodeSquare(x *pdf.Extractor, dict pdf.Dict) (*Square, error) {
 		return nil, err
 	} else {
 		square.BorderStyle = bs
-		square.Border = nil
+		if bs != nil {
+			// per PDF spec, Border is ignored when BS is present
+			square.Common.Border = nil
+		}
 
 		// BE (optional)
 		if be, err := pdf.ExtractorGetOptional(x, dict["BE"], ExtractBorderEffect); err != nil {
@@ -145,7 +148,7 @@ func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	if s.BorderStyle != nil {
 		if s.Common.Border != nil {
-			return nil, errors.New("conflicting border settings")
+			return nil, errors.New("Border and BorderStyle are mutually exclusive")
 		}
 		if s.BorderStyle.Style == "D" {
 			if len(s.BorderStyle.DashArray) == 0 {
@@ -159,7 +162,7 @@ func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Add common annotation fields
-	if err := s.Common.fillDict(rm, dict, isMarkup(s)); err != nil {
+	if err := s.Common.fillDict(rm, dict, isMarkup(s), s.BorderStyle != nil); err != nil {
 		return nil, err
 	}
 
@@ -176,7 +179,6 @@ func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 			return nil, err
 		}
 		dict["BS"] = bs
-		delete(dict, "Border")
 	}
 
 	// BE (optional)

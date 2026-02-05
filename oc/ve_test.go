@@ -174,8 +174,8 @@ func testVisibilityExpressionRoundTrip(t *testing.T, version pdf.Version, origin
 	normalizeVisibilityExpression(original)
 	normalizeVisibilityExpression(extracted)
 
-	if diff := cmp.Diff(extracted, original); diff != "" {
-		t.Errorf("round trip failed (-got +want):\n%s", diff)
+	if diff := cmp.Diff(original, extracted); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
 	}
 }
 

@@ -103,7 +103,7 @@ func (s *Stamp) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		"Subtype": pdf.Name("Stamp"),
 	}
 
-	if err := s.Common.fillDict(rm, dict, isMarkup(s)); err != nil {
+	if err := s.Common.fillDict(rm, dict, isMarkup(s), false); err != nil {
 		return nil, err
 	}
 	if err := s.Markup.fillDict(rm, dict); err != nil {

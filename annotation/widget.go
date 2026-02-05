@@ -115,7 +115,10 @@ func decodeWidget(x *pdf.Extractor, dict pdf.Dict) (*Widget, error) {
 		return nil, err
 	} else {
 		widget.BorderStyle = bs
-		widget.Common.Border = nil
+		if bs != nil {
+			// per PDF spec, Border is ignored when BS is present
+			widget.Common.Border = nil
+		}
 	}
 
 	// Parent (optional)
@@ -131,8 +134,8 @@ func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 
-	if w.Common.Border != nil && w.BorderStyle != nil {
-		return nil, errors.New("conflicting border settings")
+	if w.BorderStyle != nil && w.Common.Border != nil {
+		return nil, errors.New("Border and BorderStyle are mutually exclusive")
 	}
 
 	dict := pdf.Dict{
@@ -140,7 +143,7 @@ func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Add common annotation fields
-	if err := w.Common.fillDict(rm, dict, isMarkup(w)); err != nil {
+	if err := w.Common.fillDict(rm, dict, isMarkup(w), w.BorderStyle != nil); err != nil {
 		return nil, err
 	}
 
@@ -172,7 +175,6 @@ func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 			return nil, err
 		}
 		dict["BS"] = bs
-		delete(dict, "Border")
 	}
 
 	// Parent (optional)

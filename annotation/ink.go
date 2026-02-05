@@ -16,7 +16,11 @@
 
 package annotation
 
-import "seehuhn.de/go/pdf"
+import (
+	"errors"
+
+	"seehuhn.de/go/pdf"
+)
 
 // PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.13
 
@@ -91,6 +95,10 @@ func decodeInk(x *pdf.Extractor, dict pdf.Dict) (*Ink, error) {
 		return nil, err
 	} else {
 		ink.BorderStyle = bs
+		if bs != nil {
+			// per PDF spec, Border is ignored when BS is present
+			ink.Common.Border = nil
+		}
 	}
 
 	// Path (optional; PDF 2.0)
@@ -114,12 +122,16 @@ func (i *Ink) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 
+	if i.BorderStyle != nil && i.Common.Border != nil {
+		return nil, errors.New("Border and BorderStyle are mutually exclusive")
+	}
+
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Ink"),
 	}
 
 	// Add common annotation fields
-	if err := i.Common.fillDict(rm, dict, isMarkup(i)); err != nil {
+	if err := i.Common.fillDict(rm, dict, isMarkup(i), i.BorderStyle != nil); err != nil {
 		return nil, err
 	}
 

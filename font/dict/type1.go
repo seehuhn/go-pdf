@@ -196,6 +196,9 @@ func (d *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	if d.ToUnicode != nil {
+		if err := pdf.CheckVersion(w, "ToUnicode CMap", pdf.V1_2); err != nil {
+			return nil, err
+		}
 		ref, err := rm.Embed(d.ToUnicode)
 		if err != nil {
 			return nil, err
@@ -205,7 +208,7 @@ func (d *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return nil, fmt.Errorf("Type 1 font dict: %w", err)
+		return nil, err
 	}
 
 	return ref, nil

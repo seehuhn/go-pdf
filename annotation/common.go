@@ -157,7 +157,9 @@ func (c *Common) GetCommon() *Common {
 // fillDict adds the fields corresponding to the Common struct
 // to the given PDF dictionary.  If fields are not valid for the PDF version
 // corresponding to the ResourceManager, an error is returned.
-func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool) error {
+// If ignoreBorder is true, the Border entry is not written to the PDF dict.
+// This is used when BS (BorderStyle) is present, since Border is ignored in that case.
+func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool, ignoreBorder bool) error {
 	w := rm.Out
 
 	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
@@ -226,12 +228,14 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool)
 		return errors.New("missing AS entry")
 	}
 
-	borderValue, err := rm.Embed(c.Border)
-	if err != nil {
-		return err
-	}
-	if borderValue != nil {
-		dict["Border"] = borderValue
+	if !ignoreBorder {
+		borderValue, err := rm.Embed(c.Border)
+		if err != nil {
+			return err
+		}
+		if borderValue != nil {
+			dict["Border"] = borderValue
+		}
 	}
 
 	if c.Color != nil {

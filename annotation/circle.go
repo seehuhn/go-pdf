@@ -113,7 +113,10 @@ func decodeCircle(x *pdf.Extractor, dict pdf.Dict) (*Circle, error) {
 		return nil, err
 	} else {
 		circle.BorderStyle = bs
-		circle.Border = nil
+		if bs != nil {
+			// per PDF spec, Border is ignored when BS is present
+			circle.Common.Border = nil
+		}
 
 		// BE (optional)
 		if be, err := pdf.ExtractorGetOptional(x, dict["BE"], ExtractBorderEffect); err != nil {
@@ -145,7 +148,7 @@ func (c *Circle) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	if c.BorderStyle != nil {
 		if c.Common.Border != nil {
-			return nil, errors.New("conflicting border settings")
+			return nil, errors.New("Border and BorderStyle are mutually exclusive")
 		}
 		if c.BorderStyle.Style == "D" {
 			if len(c.BorderStyle.DashArray) == 0 {
@@ -159,7 +162,7 @@ func (c *Circle) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Add common annotation fields
-	if err := c.Common.fillDict(rm, dict, isMarkup(c)); err != nil {
+	if err := c.Common.fillDict(rm, dict, isMarkup(c), c.BorderStyle != nil); err != nil {
 		return nil, err
 	}
 
@@ -176,7 +179,6 @@ func (c *Circle) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 			return nil, err
 		}
 		dict["BS"] = bs
-		delete(dict, "Border")
 	}
 
 	// BE (optional)

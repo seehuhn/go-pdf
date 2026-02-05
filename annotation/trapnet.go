@@ -133,7 +133,7 @@ func (t *TrapNet) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Add common annotation fields
-	if err := t.Common.fillDict(rm, dict, isMarkup(t)); err != nil {
+	if err := t.Common.fillDict(rm, dict, isMarkup(t), false); err != nil {
 		return nil, err
 	}
 

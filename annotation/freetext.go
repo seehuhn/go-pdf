@@ -44,7 +44,7 @@ type FreeText struct {
 	DefaultStyle string
 
 	// Align specifies the text alignment used for the annotation's text.
-	// The zero value if [TextAlignLeft].
+	// The zero value is [TextAlignLeft].
 	// The other allowed values are [TextAlignCenter] and [TextAlignRight].
 	//
 	// This corresponds to the /Q entry in the PDF annotation dictionary.
@@ -166,6 +166,10 @@ func decodeFreeText(x *pdf.Extractor, dict pdf.Dict) (*FreeText, error) {
 		return nil, err
 	} else {
 		f.BorderStyle = bs
+		if bs != nil {
+			// per PDF spec, Border is ignored when BS is present
+			f.Common.Border = nil
+		}
 	}
 
 	if f.Intent == FreeTextIntentCallout {
@@ -186,6 +190,10 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 
+	if f.DefaultAppearance == "" {
+		return nil, errors.New("DefaultAppearance is required for free text annotations")
+	}
+
 	switch f.Markup.Intent {
 	case "":
 		// intent is optional
@@ -195,6 +203,10 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, fmt.Errorf("invalid Intent %q for free text annotation", f.Intent)
 	}
 
+	if f.BorderStyle != nil && f.Common.Border != nil {
+		return nil, errors.New("Border and BorderStyle are mutually exclusive")
+	}
+
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("FreeText"),
 	}
@@ -202,7 +214,7 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["Type"] = pdf.Name("Annot")
 	}
 
-	if err := f.Common.fillDict(rm, dict, isMarkup(f)); err != nil {
+	if err := f.Common.fillDict(rm, dict, isMarkup(f), f.BorderStyle != nil); err != nil {
 		return nil, err
 	}
 	if err := f.Markup.fillDict(rm, dict); err != nil {

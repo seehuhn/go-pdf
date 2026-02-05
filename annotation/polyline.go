@@ -17,6 +17,8 @@
 package annotation
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/measure"
@@ -127,6 +129,10 @@ func decodePolyline(x *pdf.Extractor, dict pdf.Dict) (*PolyLine, error) {
 		return nil, err
 	} else {
 		polyline.BorderStyle = bs
+		if bs != nil {
+			// per PDF spec, Border is ignored when BS is present
+			polyline.Common.Border = nil
+		}
 	}
 
 	// IC (optional; PDF 1.4)
@@ -162,12 +168,16 @@ func decodePolyline(x *pdf.Extractor, dict pdf.Dict) (*PolyLine, error) {
 }
 
 func (p *PolyLine) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
+	if p.BorderStyle != nil && p.Common.Border != nil {
+		return nil, errors.New("Border and BorderStyle are mutually exclusive")
+	}
+
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("PolyLine"),
 	}
 
 	// Add common annotation fields
-	if err := p.Common.fillDict(rm, dict, isMarkup(p)); err != nil {
+	if err := p.Common.fillDict(rm, dict, isMarkup(p), p.BorderStyle != nil); err != nil {
 		return nil, err
 	}
 

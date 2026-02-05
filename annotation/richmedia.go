@@ -74,7 +74,7 @@ func (r *RichMedia) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Add common annotation fields
-	if err := r.Common.fillDict(rm, dict, isMarkup(r)); err != nil {
+	if err := r.Common.fillDict(rm, dict, isMarkup(r), false); err != nil {
 		return nil, err
 	}
 

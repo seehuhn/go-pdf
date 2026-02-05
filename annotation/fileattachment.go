@@ -98,7 +98,7 @@ func (f *FileAttachment) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Add common annotation fields
-	if err := f.Common.fillDict(rm, dict, isMarkup(f)); err != nil {
+	if err := f.Common.fillDict(rm, dict, isMarkup(f), false); err != nil {
 		return nil, err
 	}
 

@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/measure"
 )
 
 type testCase struct {
@@ -399,6 +400,14 @@ var testCases = map[pdf.Name][]testCase{
 				},
 				Vertices:  []float64{150, 100, 300, 150, 250, 250, 100, 200}, // Quadrilateral
 				FillColor: color.DeviceRGB{0.0, 1.0, 0.5},                    // Green-cyan interior
+				BorderStyle: &BorderStyle{
+					Width: 2.0,
+					Style: "S",
+				},
+				BorderEffect: &BorderEffect{
+					Style:     "C",
+					Intensity: 1.5,
+				},
 			},
 		},
 		{
@@ -418,6 +427,28 @@ var testCases = map[pdf.Name][]testCase{
 					{400, 250}, // lineto
 					{350, 350}, // lineto
 					{200, 300}, // lineto
+				},
+				Measure: &measure.RectilinearMeasure{
+					ScaleRatio: "1 cm = 1 m",
+					XAxis: []*measure.NumberFormat{{
+						Unit:             "m",
+						ConversionFactor: 0.01,
+						Precision:        100,
+						DecimalSeparator: ".",
+					}},
+					Distance: []*measure.NumberFormat{{
+						Unit:             "m",
+						ConversionFactor: 0.01,
+						Precision:        100,
+						DecimalSeparator: ".",
+					}},
+					Area: []*measure.NumberFormat{{
+						Unit:             "m²",
+						ConversionFactor: 0.0001,
+						Precision:        100,
+						DecimalSeparator: ".",
+					}},
+					SingleUse: true,
 				},
 			},
 		},

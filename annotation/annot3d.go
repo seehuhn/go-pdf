@@ -98,7 +98,7 @@ func (a *Annot3D) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Add common annotation fields
-	if err := a.Common.fillDict(rm, dict, isMarkup(a)); err != nil {
+	if err := a.Common.fillDict(rm, dict, isMarkup(a), false); err != nil {
 		return nil, err
 	}
 

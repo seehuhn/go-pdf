@@ -64,7 +64,7 @@ func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict) (*RectilinearMea
 		return nil, err
 	}
 	if len(rm.XAxis) == 0 {
-		rm.XAxis = []*NumberFormat{{Unit: "pt", ConversionFactor: 1, Precision: 100}}
+		rm.XAxis = []*NumberFormat{{Unit: "pt", ConversionFactor: 1, Precision: 100, DecimalSeparator: "."}}
 	}
 
 	// Extract Y axis - if missing, leave as nil
@@ -116,7 +116,7 @@ func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict) (*RectilinearMea
 		return nil, err
 	}
 	if len(rm.Distance) == 0 {
-		rm.Distance = []*NumberFormat{{Unit: "pt", ConversionFactor: 1, Precision: 100}}
+		rm.Distance = []*NumberFormat{{Unit: "pt", ConversionFactor: 1, Precision: 100, DecimalSeparator: "."}}
 	}
 
 	// Extract Area
@@ -129,7 +129,7 @@ func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict) (*RectilinearMea
 		return nil, err
 	}
 	if len(rm.Area) == 0 {
-		rm.Area = []*NumberFormat{{Unit: "pt²", ConversionFactor: 1, Precision: 100}}
+		rm.Area = []*NumberFormat{{Unit: "pt²", ConversionFactor: 1, Precision: 100, DecimalSeparator: "."}}
 	}
 
 	// Extract optional fields

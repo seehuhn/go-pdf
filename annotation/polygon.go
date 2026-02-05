@@ -17,6 +17,8 @@
 package annotation
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/measure"
@@ -103,6 +105,10 @@ func decodePolygon(x *pdf.Extractor, dict pdf.Dict) (*Polygon, error) {
 		return nil, err
 	} else {
 		polygon.BorderStyle = bs
+		if bs != nil {
+			// per PDF spec, Border is ignored when BS is present
+			polygon.Common.Border = nil
+		}
 	}
 
 	// IC (optional)
@@ -153,12 +159,16 @@ func decodePolygon(x *pdf.Extractor, dict pdf.Dict) (*Polygon, error) {
 }
 
 func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
+	if p.BorderStyle != nil && p.Common.Border != nil {
+		return nil, errors.New("Border and BorderStyle are mutually exclusive")
+	}
+
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Polygon"),
 	}
 
 	// Add common annotation fields
-	if err := p.Common.fillDict(rm, dict, isMarkup(p)); err != nil {
+	if err := p.Common.fillDict(rm, dict, isMarkup(p), p.BorderStyle != nil); err != nil {
 		return nil, err
 	}
 

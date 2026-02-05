@@ -90,11 +90,11 @@ func ExtractNumberFormat(x *pdf.Extractor, obj pdf.Object) (*NumberFormat, error
 	nf := &NumberFormat{}
 
 	// Extract required fields
-	unit, err := x.GetString(dict["U"])
+	unit, err := pdf.GetTextString(x.R, dict["U"])
 	if err != nil {
 		return nil, err
 	}
-	if len(unit) == 0 {
+	if unit == "" {
 		return nil, pdf.Error("missing required Unit")
 	}
 	nf.Unit = string(unit)
@@ -148,31 +148,29 @@ func ExtractNumberFormat(x *pdf.Extractor, obj pdf.Object) (*NumberFormat, error
 		nf.ForceExactFraction = bool(fd)
 	}
 
-	if rt, err := pdf.Optional(x.GetString(dict["RT"])); err != nil {
+	if rt, err := pdf.Optional(pdf.GetTextString(x.R, dict["RT"])); err != nil {
 		return nil, err
 	} else {
 		// RT present: use the value (even if empty string)
 		nf.ThousandsSeparator = string(rt)
 	} // If RT not present, PDF uses comma default, but we leave empty in Go
 
-	if rd, err := pdf.Optional(x.GetString(dict["RD"])); err != nil {
+	if rd, err := pdf.Optional(pdf.GetTextString(x.R, dict["RD"])); err != nil {
 		return nil, err
-	} else if rd != nil && string(rd) != "" {
-		// RD present and non-empty: use the value
+	} else if rd != "" {
 		nf.DecimalSeparator = string(rd)
 	} else {
-		// RD not present or empty: use period
 		nf.DecimalSeparator = "."
 	}
 
-	if ps, err := pdf.Optional(x.GetString(dict["PS"])); err != nil {
+	if ps, err := pdf.Optional(pdf.GetTextString(x.R, dict["PS"])); err != nil {
 		return nil, err
 	} else {
 		// PS: store the value (empty if not present)
 		nf.PrefixSpacing = string(ps)
 	}
 
-	if ss, err := pdf.Optional(x.GetString(dict["SS"])); err != nil {
+	if ss, err := pdf.Optional(pdf.GetTextString(x.R, dict["SS"])); err != nil {
 		return nil, err
 	} else {
 		// SS: store the value (empty if not present)
@@ -216,7 +214,7 @@ func (nf *NumberFormat) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	dict := pdf.Dict{
-		"U": pdf.String(nf.Unit),
+		"U": pdf.TextString(nf.Unit),
 		"C": pdf.Number(nf.ConversionFactor),
 	}
 
@@ -257,25 +255,21 @@ func (nf *NumberFormat) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// Separators and spacing - optimize by using PDF defaults
 	// RT: default is comma, so always write it (even if empty string)
-	dict["RT"] = pdf.String(nf.ThousandsSeparator)
+	dict["RT"] = pdf.TextString(nf.ThousandsSeparator)
 
 	// RD: empty string is shorthand for period, only write if different from period
-	decimalSep := nf.DecimalSeparator
-	if decimalSep == "" {
-		decimalSep = "."
-	}
-	if decimalSep != "." {
-		dict["RD"] = pdf.String(decimalSep)
+	if nf.DecimalSeparator != "" && nf.DecimalSeparator != "." {
+		dict["RD"] = pdf.TextString(nf.DecimalSeparator)
 	}
 
 	// PS: default is single space, only write if different from default
 	if nf.PrefixSpacing != " " {
-		dict["PS"] = pdf.String(nf.PrefixSpacing)
+		dict["PS"] = pdf.TextString(nf.PrefixSpacing)
 	}
 
 	// SS: default is single space, only write if different from default
 	if nf.SuffixSpacing != " " {
-		dict["SS"] = pdf.String(nf.SuffixSpacing)
+		dict["SS"] = pdf.TextString(nf.SuffixSpacing)
 	}
 
 	// Label position

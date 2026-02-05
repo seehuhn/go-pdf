@@ -93,7 +93,7 @@ func (s *Screen) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Add common annotation fields
-	if err := s.Common.fillDict(rm, dict, isMarkup(s)); err != nil {
+	if err := s.Common.fillDict(rm, dict, isMarkup(s), false); err != nil {
 		return nil, err
 	}
 

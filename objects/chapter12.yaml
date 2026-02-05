@@ -4765,64 +4765,79 @@ types:
     possibleValues:
     - FreeText
     discriminator: true
-  - goName: null
+  - goName: DefaultAppearance
     pdfKey: DA
     pdfType: byte-string
     required: true
     introduced: '1.3'
+    goType: string
     notes: https://github.com/pdf-association/pdf-issues/issues/318
-  - goName: null
+    purpose: Default appearance string for formatting text.
+  - goName: Align
     pdfKey: Q
     pdfType: integer
     required: false
     default: '0'
     introduced: '1.4'
+    goType: TextAlign
     possibleValues:
     - '0'
     - '1'
     - '2'
-  - goName: null
+    purpose: Text alignment (0=left, 1=center, 2=right).
+  - goName: DefaultStyle
     pdfKey: DS
     pdfType: text-string
     required: false
     introduced: '1.5'
-  - goName: null
+    goType: string
+    purpose: Default style string for rich text formatting.
+  - goName: CalloutLine
     pdfKey: CL
     pdfType: array
     required: false
     introduced: '1.6'
+    goType: '[]vec.Vec2'
     refTypes:
     - ArrayOf_3or4CalloutLineNumbers
-  - goName: null
+    purpose: Callout line coordinates (2 or 3 points).
+  - goName: BorderEffect
     pdfKey: BE
     pdfType: dictionary
     required: false
-    introduced: '1.7'
+    introduced: '1.6'
+    goType: '*BorderEffect'
     refTypes:
     - BorderEffect
     notes: https://github.com/pdf-association/pdf-issues/issues/592
-  - goName: null
+    purpose: Border effect dictionary.
+  - goName: Margin
     pdfKey: RD
     pdfType: array
     required: false
-    introduced: '1.7'
+    introduced: '1.6'
+    goType: '[]float64'
     refTypes:
     - ArrayOf_4Numbers
     notes: https://github.com/pdf-association/pdf-issues/issues/524 and https://github.com/pdf-association/pdf-issues/issues/592
-  - goName: null
+    purpose: Margin differences between Rect and inner text rectangle.
+  - goName: BorderStyle
     pdfKey: BS
     pdfType: dictionary
     required: false
-    introduced: '1.7'
+    introduced: '1.6'
+    goType: '*BorderStyle'
     refTypes:
     - BorderStyle
     notes: https://github.com/pdf-association/pdf-issues/issues/592
-  - goName: null
+    purpose: Border style dictionary.
+  - goName: LineEndingStyle
     pdfKey: LE
     pdfType: name
     required: false
     default: None
-    introduced: '1.7'
+    introduced: '1.6'
+    goType: LineEndingStyle
     possibleValues:
     - Square
     - Circle
@@ -4835,9 +4850,10 @@ types:
     - RClosedArrow
     - Slash
     notes: https://github.com/pdf-association/pdf-issues/issues/592
+    purpose: Line ending style for callout line.
   goPackage: annotation
   goRepr: struct
-  specSection: 12.5.2
+  specSection: 12.5.2 12.5.6.2 12.5.6.6
   writeMethod: (*FreeText).Encode
   embeds:
   - AnnotCommon
@@ -5454,27 +5470,34 @@ types:
     introduced: '1.5'
     refTypes:
     - ArrayOf_2LineEndingsNames
-  - goName: null
+    notes: Meaningful only for polyline annotations.
+  - goName: BorderStyle
     pdfKey: BS
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - BorderStyle
-  - goName: null
+    goType: '*BorderStyle'
+    purpose: Border style dictionary specifying the width and dash pattern for drawing the polygon.
+  - goName: FillColor
     pdfKey: IC
     pdfType: array
     required: false
-    introduced: '1.5'
+    introduced: '1.4'
     refTypes:
     - ArrayOf_4NumbersColorAnnotation
-  - goName: null
+    goType: color.Color
+    purpose: Interior color used to fill the polygon shape.
+  - goName: BorderEffect
     pdfKey: BE
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - BorderEffect
+    goType: '*BorderEffect'
+    purpose: Border effect dictionary describing an effect applied to the border.
   - goName: Measure
     pdfKey: Measure
     pdfType: dictionary
@@ -5502,7 +5525,7 @@ types:
       Each array contains pairs of values specifying points for path drawing operations.
   goPackage: annotation
   goRepr: struct
-  specSection: 12.5.2
+  specSection: 12.5.6.9
   writeMethod: (*Polygon).Encode
   embeds:
   - AnnotCommon

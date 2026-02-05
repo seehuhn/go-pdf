@@ -94,7 +94,7 @@ func (m *Movie) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Add common annotation fields
-	if err := m.Common.fillDict(rm, dict, isMarkup(m)); err != nil {
+	if err := m.Common.fillDict(rm, dict, isMarkup(m), false); err != nil {
 		return nil, err
 	}
 

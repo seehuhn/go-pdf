@@ -97,7 +97,7 @@ func (c *Caret) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Add common annotation fields
-	if err := c.Common.fillDict(rm, dict, isMarkup(c)); err != nil {
+	if err := c.Common.fillDict(rm, dict, isMarkup(c), false); err != nil {
 		return nil, err
 	}
 

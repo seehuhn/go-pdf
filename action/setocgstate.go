@@ -77,6 +77,9 @@ func decodeSetOCGState(x *pdf.Extractor, dict pdf.Dict) (*SetOCGState, error) {
 	if err != nil {
 		return nil, err
 	}
+	if state == nil {
+		state = pdf.Array{} // empty state = no-op action
+	}
 
 	preserveRB := true // default value
 	if dict["PreserveRB"] != nil {

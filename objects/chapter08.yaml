@@ -2223,7 +2223,7 @@ types:
     introduced: '1.3'
     refTypes:
     - ArrayOf_4Numbers
-    notes: Table 77 and Table 79
+    notes: Maps to P0 (x0,y0) and P1 (x1,y1) in Go struct
   - goName: null
     pdfKey: Domain
     pdfType: array
@@ -2232,6 +2232,7 @@ types:
     introduced: '1.3'
     refTypes:
     - ArrayOf_2Numbers
+    notes: Maps to TMin and TMax in Go struct
   - goName: null
     pdfKey: Function
     pdfType: array;dictionary;stream
@@ -2243,6 +2244,7 @@ types:
     - FunctionType3
     - FunctionType0
     - FunctionType4
+    notes: Maps to F in Go struct
   - goName: null
     pdfKey: Extend
     pdfType: array
@@ -2251,6 +2253,7 @@ types:
     introduced: '1.3'
     refTypes:
     - ArrayOf_2Booleans
+    notes: Maps to ExtendStart and ExtendEnd in Go struct
   - goName: null
     pdfKey: ShadingType
     pdfType: integer
@@ -2317,7 +2320,7 @@ types:
   readFunc: extract.Shading
   goPackage: shading
   goRepr: struct
-  specSection: 8.7.4.3
+  specSection: 8.7.4.3 8.7.4.5.3
 - name: ShadingType3
   goType: graphics/shading.Type3
   pdfRepr: dict

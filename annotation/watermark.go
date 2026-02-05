@@ -127,7 +127,7 @@ func (w *Watermark) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Add common annotation fields
-	if err := w.Common.fillDict(rm, dict, isMarkup(w)); err != nil {
+	if err := w.Common.fillDict(rm, dict, isMarkup(w), false); err != nil {
 		return nil, err
 	}
 
