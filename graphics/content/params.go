@@ -18,6 +18,7 @@ package content
 
 import (
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -367,6 +368,20 @@ func getNumber(args []pdf.Object, idx int) (float64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+// getVec2 extracts a pair of numbers as a Vec2 from the argument slice,
+// starting at the given index.
+func getVec2(args []pdf.Object, idx int) (vec.Vec2, bool) {
+	x, ok := getNumber(args, idx)
+	if !ok {
+		return vec.Vec2{}, false
+	}
+	y, ok := getNumber(args, idx+1)
+	if !ok {
+		return vec.Vec2{}, false
+	}
+	return vec.Vec2{X: x, Y: y}, true
 }
 
 // getInteger extracts an integer from the argument slice at the given index.

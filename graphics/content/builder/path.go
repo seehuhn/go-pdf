@@ -29,8 +29,6 @@ import (
 //
 // This implements the PDF graphics operator "m".
 func (b *Builder) MoveTo(x, y float64) {
-	b.State.GState.StartX, b.State.GState.StartY = x, y
-	b.State.GState.CurrentX, b.State.GState.CurrentY = x, y
 	b.emit(content.OpMoveTo, pdf.Number(x), pdf.Number(y))
 }
 
@@ -38,7 +36,6 @@ func (b *Builder) MoveTo(x, y float64) {
 //
 // This implements the PDF graphics operator "l".
 func (b *Builder) LineTo(x, y float64) {
-	b.State.GState.CurrentX, b.State.GState.CurrentY = x, y
 	b.emit(content.OpLineTo, pdf.Number(x), pdf.Number(y))
 }
 
@@ -46,8 +43,7 @@ func (b *Builder) LineTo(x, y float64) {
 //
 // This implements the PDF graphics operators "c", "v", and "y".
 func (b *Builder) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
-	x0, y0 := b.State.GState.CurrentX, b.State.GState.CurrentY
-	b.State.GState.CurrentX, b.State.GState.CurrentY = x3, y3
+	x0, y0 := b.State.CurrentX, b.State.CurrentY
 	if nearlyEqual(x0, x1) && nearlyEqual(y0, y1) {
 		// first control point at current point → "v"
 		b.emit(content.OpCurveToV,
@@ -70,7 +66,6 @@ func (b *Builder) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
 //
 // This implements the PDF graphics operator "h".
 func (b *Builder) ClosePath() {
-	b.State.GState.CurrentX, b.State.GState.CurrentY = b.State.GState.StartX, b.State.GState.StartY
 	b.emit(content.OpClosePath)
 }
 
@@ -78,8 +73,6 @@ func (b *Builder) ClosePath() {
 //
 // This implements the PDF graphics operator "re".
 func (b *Builder) Rectangle(x, y, width, height float64) {
-	b.State.GState.StartX, b.State.GState.StartY = x, y
-	b.State.GState.CurrentX, b.State.GState.CurrentY = x, y
 	b.emit(content.OpRectangle,
 		pdf.Number(x), pdf.Number(y),
 		pdf.Number(width), pdf.Number(height))

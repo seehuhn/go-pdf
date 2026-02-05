@@ -20,10 +20,18 @@ import (
 	"slices"
 
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics/color"
 )
+
+// ClipPath represents a clipping region added by the W or W* operator.
+type ClipPath struct {
+	Path    *path.Data
+	EvenOdd bool
+	CTM     matrix.Matrix
+}
 
 // State represents the current graphics state of a PDF processor,
 // within a content stream.  When reading or writing content streams,
@@ -167,32 +175,19 @@ type State struct {
 	// fraction of the range of each color component.
 	SmoothnessTolerance float64
 
+	// ClipPaths is the list of active clipping paths.
+	// The effective clip region is the intersection of all entries.
+	ClipPaths []ClipPath
+
 	// Set indicates which of the parameters above are valid/used.
 	Set Bits
-
-	// StartX is the X coordinate of the current subpath's starting point, in user space.
-	StartX float64
-
-	// StartY is the Y coordinate of the current subpath's starting point, in user space.
-	StartY float64
-
-	// CurrentX is the X coordinate of the current point, in user space.
-	CurrentX float64
-
-	// CurrentY is the Y coordinate of the current point, in user space.
-	CurrentY float64
-
-	// AllSubpathsClosed is true if all subpaths of the current path are closed.
-	AllSubpathsClosed bool
-
-	// ThisSubpathClosed is true if the current subpath is closed.
-	ThisSubpathClosed bool
 }
 
 // Clone returns a copy of the graphics state.
 func (s *State) Clone() *State {
 	clone := *s
 	clone.DashPattern = slices.Clone(s.DashPattern)
+	clone.ClipPaths = slices.Clone(s.ClipPaths)
 	return &clone
 }
 
@@ -255,9 +250,6 @@ func NewState() State {
 		// SmoothnessTolerance: 0, // default: device dependent
 
 		Set: initializedStateBits,
-
-		AllSubpathsClosed: true,
-		ThisSubpathClosed: true,
 	}
 }
 

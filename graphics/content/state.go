@@ -19,7 +19,10 @@ package content
 import (
 	"errors"
 	"fmt"
+	"slices"
 
+	"seehuhn.de/go/geom/path"
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 )
@@ -55,6 +58,28 @@ type State struct {
 
 	// Resources is the resource dictionary for resolving named resources.
 	Resources *Resources
+
+	// StartX, StartY is the starting point of the current subpath, in user space.
+	// Not saved/restored by q/Q.
+	StartX, StartY float64
+
+	// CurrentX, CurrentY is the current point, in user space.
+	// Not saved/restored by q/Q.
+	CurrentX, CurrentY float64
+
+	// currentPath accumulates path data from construction operators.
+	// Not saved/restored by q/Q (the current path is not part of the graphics state).
+	currentPath path.Data
+
+	// paintedPath holds the path consumed by the most recent paint operator.
+	paintedPath path.Data
+
+	// pendingClip is true when W or W* has been issued but the paint operator
+	// has not yet fired.
+	pendingClip bool
+
+	// pendingClipEvenOdd records the fill rule for the pending clip.
+	pendingClipEvenOdd bool
 }
 
 // pairType identifies a type of paired operator.
@@ -236,7 +261,7 @@ func (s *State) ApplyOperator(name OpName, args []pdf.Object) error {
 		requires := info.Requires
 
 		// Conditional LineCap relaxation: not needed for closed paths without dashes
-		if isStrokeOp(name) && s.GState.AllSubpathsClosed && len(s.GState.DashPattern) == 0 {
+		if isStrokeOp(name) && s.allSubpathsClosed() && len(s.GState.DashPattern) == 0 {
 			requires &^= graphics.StateLineCap
 		}
 
@@ -256,6 +281,41 @@ func (s *State) ApplyOperator(name OpName, args []pdf.Object) error {
 	}
 
 	return s.ApplyStateChanges(name, args)
+}
+
+// allSubpathsClosed reports whether every subpath in the current path is closed.
+// A subpath with no drawing segments (bare MoveTo) counts as closed.
+func (s *State) allSubpathsClosed() bool {
+	hasSegments := false
+	for _, cmd := range s.currentPath.Cmds {
+		switch cmd {
+		case path.CmdMoveTo:
+			if hasSegments {
+				return false
+			}
+		case path.CmdLineTo, path.CmdQuadTo, path.CmdCubeTo:
+			hasSegments = true
+		case path.CmdClose:
+			hasSegments = false
+		}
+	}
+	return !hasSegments
+}
+
+// PaintedPath returns the path consumed by the most recent paint operator.
+// The returned pointer is valid until the next call to ApplyStateChanges
+// with a paint operator.
+func (s *State) PaintedPath() *path.Data {
+	return &s.paintedPath
+}
+
+// needsClose returns true if the operator implicitly closes the path.
+func needsClose(name OpName) bool {
+	switch name {
+	case OpCloseAndStroke, OpCloseFillAndStroke, OpCloseFillAndStrokeEvenOdd:
+		return true
+	}
+	return false
 }
 
 // isStrokeOp returns true if the operator is a stroking operation.
@@ -296,35 +356,95 @@ func (s *State) ApplyStateChanges(name OpName, args []pdf.Object) error {
 
 	// Path construction operators
 	case OpMoveTo:
-		// starting new subpath while current is open
-		if !s.GState.ThisSubpathClosed {
-			s.GState.AllSubpathsClosed = false
+		if p, ok := getVec2(args, 0); ok {
+			s.currentPath.MoveTo(p)
+			s.StartX, s.StartY = p.X, p.Y
+			s.CurrentX, s.CurrentY = p.X, p.Y
 		}
-		s.GState.ThisSubpathClosed = true // positioned but no segments yet
-	case OpRectangle:
-		// rectangle is always a closed subpath
-		if !s.GState.ThisSubpathClosed {
-			s.GState.AllSubpathsClosed = false
+	case OpLineTo:
+		if p, ok := getVec2(args, 0); ok {
+			s.currentPath.LineTo(p)
+			s.CurrentX, s.CurrentY = p.X, p.Y
 		}
-		s.GState.ThisSubpathClosed = true
-	case OpLineTo, OpCurveTo, OpCurveToV, OpCurveToY:
-		s.GState.ThisSubpathClosed = false
+	case OpCurveTo:
+		if p1, ok := getVec2(args, 0); ok {
+			if p2, ok := getVec2(args, 2); ok {
+				if p3, ok := getVec2(args, 4); ok {
+					s.currentPath.CubeTo(p1, p2, p3)
+					s.CurrentX, s.CurrentY = p3.X, p3.Y
+				}
+			}
+		}
+	case OpCurveToV:
+		if p2, ok := getVec2(args, 0); ok {
+			if p3, ok := getVec2(args, 2); ok {
+				p1 := vec.Vec2{X: s.CurrentX, Y: s.CurrentY}
+				s.currentPath.CubeTo(p1, p2, p3)
+				s.CurrentX, s.CurrentY = p3.X, p3.Y
+			}
+		}
+	case OpCurveToY:
+		if p1, ok := getVec2(args, 0); ok {
+			if p3, ok := getVec2(args, 2); ok {
+				s.currentPath.CubeTo(p1, p3, p3)
+				s.CurrentX, s.CurrentY = p3.X, p3.Y
+			}
+		}
 	case OpClosePath:
-		s.GState.ThisSubpathClosed = true
+		s.currentPath.Close()
+		s.CurrentX, s.CurrentY = s.StartX, s.StartY
+	case OpRectangle:
+		if p, ok := getVec2(args, 0); ok {
+			if sz, ok := getVec2(args, 2); ok {
+				s.currentPath.MoveTo(p)
+				s.currentPath.LineTo(vec.Vec2{X: p.X + sz.X, Y: p.Y})
+				s.currentPath.LineTo(vec.Vec2{X: p.X + sz.X, Y: p.Y + sz.Y})
+				s.currentPath.LineTo(vec.Vec2{X: p.X, Y: p.Y + sz.Y})
+				s.currentPath.Close()
+				s.StartX, s.StartY = p.X, p.Y
+				s.CurrentX, s.CurrentY = p.X, p.Y
+			}
+		}
 
-	// Path painting operators reset path state
+	// clipping path operators
+	case OpClipNonZero:
+		s.pendingClip = true
+		s.pendingClipEvenOdd = false
+	case OpClipEvenOdd:
+		s.pendingClip = true
+		s.pendingClipEvenOdd = true
+
+	// path painting operators reset path state
 	case OpStroke, OpCloseAndStroke, OpFill, OpFillCompat, OpFillEvenOdd,
 		OpFillAndStroke, OpFillAndStrokeEvenOdd, OpCloseFillAndStroke,
 		OpCloseFillAndStrokeEvenOdd, OpEndPath:
-		// finalize current subpath
-		if !s.GState.ThisSubpathClosed {
-			s.GState.AllSubpathsClosed = false
+		// close path for close-first operators (s, b, b*)
+		if needsClose(name) {
+			n := len(s.currentPath.Cmds)
+			if n > 0 && s.currentPath.Cmds[n-1] != path.CmdClose {
+				s.currentPath.Close()
+				s.CurrentX, s.CurrentY = s.StartX, s.StartY
+			}
 		}
-		// reset for next path
-		s.GState.AllSubpathsClosed = true
-		s.GState.ThisSubpathClosed = true
 
-		// Note: DashPattern is updated in GState.DashPattern by applyOperatorToParams
+		// capture clip path if pending
+		if s.pendingClip {
+			clipData := &path.Data{
+				Cmds:   slices.Clone(s.currentPath.Cmds),
+				Coords: slices.Clone(s.currentPath.Coords),
+			}
+			s.GState.ClipPaths = append(s.GState.ClipPaths, graphics.ClipPath{
+				Path:    clipData,
+				EvenOdd: s.pendingClipEvenOdd,
+				CTM:     s.GState.CTM,
+			})
+			s.pendingClip = false
+		}
+
+		// move path to paintedPath; swap reuses backing arrays
+		s.paintedPath, s.currentPath = s.currentPath, s.paintedPath
+		s.currentPath.Cmds = s.currentPath.Cmds[:0]
+		s.currentPath.Coords = s.currentPath.Coords[:0]
 	}
 	if err != nil {
 		return err

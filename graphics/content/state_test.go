@@ -19,6 +19,9 @@ package content
 import (
 	"testing"
 
+	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/path"
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 )
 
@@ -178,5 +181,265 @@ func TestState_Validate(t *testing.T) {
 				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+// applyOps is a helper that applies a sequence of (opName, args) pairs.
+func applyOps(s *State, ops ...any) {
+	for i := 0; i < len(ops); i += 2 {
+		name := ops[i].(OpName)
+		args := ops[i+1].([]pdf.Object)
+		s.ApplyStateChanges(name, args)
+	}
+}
+
+func n(v float64) pdf.Object { return pdf.Number(v) }
+
+func TestClipCapture(t *testing.T) {
+	s := NewState(Page, &Resources{})
+
+	// 100 100 200 200 re W n
+	applyOps(s,
+		OpRectangle, []pdf.Object{n(100), n(100), n(200), n(200)},
+		OpClipNonZero, []pdf.Object{},
+		OpEndPath, []pdf.Object{},
+	)
+
+	if len(s.GState.ClipPaths) != 1 {
+		t.Fatalf("got %d clip paths, want 1", len(s.GState.ClipPaths))
+	}
+	cp := s.GState.ClipPaths[0]
+	if cp.EvenOdd {
+		t.Error("expected non-zero winding rule")
+	}
+	// rectangle: MoveTo + 3 LineTo + Close = 5 commands
+	if len(cp.Path.Cmds) != 5 {
+		t.Errorf("got %d path commands, want 5", len(cp.Path.Cmds))
+	}
+	if cp.Path.Cmds[0] != path.CmdMoveTo {
+		t.Errorf("first command = %v, want MoveTo", cp.Path.Cmds[0])
+	}
+}
+
+func TestClipEvenOdd(t *testing.T) {
+	s := NewState(Page, &Resources{})
+
+	applyOps(s,
+		OpRectangle, []pdf.Object{n(0), n(0), n(50), n(50)},
+		OpClipEvenOdd, []pdf.Object{},
+		OpEndPath, []pdf.Object{},
+	)
+
+	if len(s.GState.ClipPaths) != 1 {
+		t.Fatalf("got %d clip paths, want 1", len(s.GState.ClipPaths))
+	}
+	if !s.GState.ClipPaths[0].EvenOdd {
+		t.Error("expected even-odd fill rule")
+	}
+}
+
+func TestClipWithPaint(t *testing.T) {
+	s := NewState(Page, &Resources{})
+
+	// W followed by f (fill) should still capture the clip
+	applyOps(s,
+		OpRectangle, []pdf.Object{n(10), n(10), n(80), n(80)},
+		OpClipNonZero, []pdf.Object{},
+		OpFill, []pdf.Object{},
+	)
+
+	if len(s.GState.ClipPaths) != 1 {
+		t.Fatalf("got %d clip paths, want 1", len(s.GState.ClipPaths))
+	}
+}
+
+func TestClipSaveRestore(t *testing.T) {
+	s := NewState(Page, &Resources{})
+
+	// q ... W n ... Q should revert ClipPaths
+	applyOps(s,
+		OpPushGraphicsState, []pdf.Object{},
+		OpRectangle, []pdf.Object{n(0), n(0), n(100), n(100)},
+		OpClipNonZero, []pdf.Object{},
+		OpEndPath, []pdf.Object{},
+	)
+	if len(s.GState.ClipPaths) != 1 {
+		t.Fatalf("after clip: got %d clip paths, want 1", len(s.GState.ClipPaths))
+	}
+
+	applyOps(s,
+		OpPopGraphicsState, []pdf.Object{},
+	)
+	if len(s.GState.ClipPaths) != 0 {
+		t.Errorf("after Q: got %d clip paths, want 0", len(s.GState.ClipPaths))
+	}
+}
+
+func TestClipNested(t *testing.T) {
+	s := NewState(Page, &Resources{})
+
+	// two successive clips
+	applyOps(s,
+		OpRectangle, []pdf.Object{n(0), n(0), n(200), n(200)},
+		OpClipNonZero, []pdf.Object{},
+		OpEndPath, []pdf.Object{},
+		OpRectangle, []pdf.Object{n(50), n(50), n(100), n(100)},
+		OpClipEvenOdd, []pdf.Object{},
+		OpEndPath, []pdf.Object{},
+	)
+
+	if len(s.GState.ClipPaths) != 2 {
+		t.Fatalf("got %d clip paths, want 2", len(s.GState.ClipPaths))
+	}
+	if s.GState.ClipPaths[0].EvenOdd {
+		t.Error("first clip should be non-zero")
+	}
+	if !s.GState.ClipPaths[1].EvenOdd {
+		t.Error("second clip should be even-odd")
+	}
+}
+
+func TestClipCTMCapture(t *testing.T) {
+	s := NewState(Page, &Resources{})
+
+	// apply a CTM transformation, then clip
+	scale := matrix.Matrix{2, 0, 0, 2, 10, 20}
+	applyOps(s,
+		OpTransform, []pdf.Object{n(2), n(0), n(0), n(2), n(10), n(20)},
+		OpRectangle, []pdf.Object{n(0), n(0), n(50), n(50)},
+		OpClipNonZero, []pdf.Object{},
+		OpEndPath, []pdf.Object{},
+	)
+
+	if len(s.GState.ClipPaths) != 1 {
+		t.Fatalf("got %d clip paths, want 1", len(s.GState.ClipPaths))
+	}
+	got := s.GState.ClipPaths[0].CTM
+	if got != scale {
+		t.Errorf("CTM = %v, want %v", got, scale)
+	}
+}
+
+func TestPaintedPathFill(t *testing.T) {
+	s := NewState(Page, &Resources{})
+
+	// rectangle produces MoveTo + 3 LineTo + Close = 5 cmds
+	applyOps(s,
+		OpRectangle, []pdf.Object{n(0), n(0), n(100), n(100)},
+		OpFill, []pdf.Object{},
+	)
+
+	pp := s.PaintedPath()
+	if len(pp.Cmds) != 5 {
+		t.Errorf("PaintedPath after fill: got %d cmds, want 5", len(pp.Cmds))
+	}
+	if pp.Cmds[0] != path.CmdMoveTo {
+		t.Errorf("first cmd = %v, want MoveTo", pp.Cmds[0])
+	}
+	if len(s.currentPath.Cmds) != 0 {
+		t.Errorf("currentPath not cleared: %d cmds remain", len(s.currentPath.Cmds))
+	}
+}
+
+func TestPaintedPathCloseAndStroke(t *testing.T) {
+	s := NewState(Page, &Resources{})
+
+	// open triangle: m l l s → library closes → MoveTo + 2 LineTo + Close = 4 cmds
+	applyOps(s,
+		OpMoveTo, []pdf.Object{n(0), n(0)},
+		OpLineTo, []pdf.Object{n(100), n(0)},
+		OpLineTo, []pdf.Object{n(50), n(80)},
+		OpCloseAndStroke, []pdf.Object{},
+	)
+
+	pp := s.PaintedPath()
+	if len(pp.Cmds) != 4 {
+		t.Errorf("PaintedPath after s: got %d cmds, want 4", len(pp.Cmds))
+	}
+	if pp.Cmds[len(pp.Cmds)-1] != path.CmdClose {
+		t.Errorf("last cmd = %v, want Close", pp.Cmds[len(pp.Cmds)-1])
+	}
+}
+
+func TestPaintedPathClipIncludesClose(t *testing.T) {
+	s := NewState(Page, &Resources{})
+
+	// W followed by b (close-fill-stroke) should produce a clip path
+	// that includes the implicit close
+	applyOps(s,
+		OpMoveTo, []pdf.Object{n(0), n(0)},
+		OpLineTo, []pdf.Object{n(100), n(0)},
+		OpLineTo, []pdf.Object{n(50), n(80)},
+		OpClipNonZero, []pdf.Object{},
+		OpCloseFillAndStroke, []pdf.Object{},
+	)
+
+	if len(s.GState.ClipPaths) != 1 {
+		t.Fatalf("got %d clip paths, want 1", len(s.GState.ClipPaths))
+	}
+	cp := s.GState.ClipPaths[0]
+	if len(cp.Path.Cmds) != 4 {
+		t.Errorf("clip path: got %d cmds, want 4", len(cp.Path.Cmds))
+	}
+	if cp.Path.Cmds[len(cp.Path.Cmds)-1] != path.CmdClose {
+		t.Errorf("clip path last cmd = %v, want Close", cp.Path.Cmds[len(cp.Path.Cmds)-1])
+	}
+}
+
+func TestPaintedPathEndPath(t *testing.T) {
+	s := NewState(Page, &Resources{})
+
+	applyOps(s,
+		OpRectangle, []pdf.Object{n(10), n(20), n(30), n(40)},
+		OpEndPath, []pdf.Object{},
+	)
+
+	pp := s.PaintedPath()
+	if len(pp.Cmds) != 5 {
+		t.Errorf("PaintedPath after n: got %d cmds, want 5", len(pp.Cmds))
+	}
+}
+
+func TestPaintedPathOverwrite(t *testing.T) {
+	s := NewState(Page, &Resources{})
+
+	// first paint: rectangle (5 cmds)
+	applyOps(s,
+		OpRectangle, []pdf.Object{n(0), n(0), n(100), n(100)},
+		OpFill, []pdf.Object{},
+	)
+	if len(s.PaintedPath().Cmds) != 5 {
+		t.Fatalf("first paint: got %d cmds, want 5", len(s.PaintedPath().Cmds))
+	}
+
+	// second paint: triangle (3 cmds: m l l)
+	applyOps(s,
+		OpMoveTo, []pdf.Object{n(0), n(0)},
+		OpLineTo, []pdf.Object{n(50), n(0)},
+		OpLineTo, []pdf.Object{n(25), n(40)},
+		OpStroke, []pdf.Object{},
+	)
+	if len(s.PaintedPath().Cmds) != 3 {
+		t.Errorf("second paint: got %d cmds, want 3", len(s.PaintedPath().Cmds))
+	}
+	if len(s.currentPath.Cmds) != 0 {
+		t.Errorf("currentPath not cleared: %d cmds remain", len(s.currentPath.Cmds))
+	}
+}
+
+func TestClipPathReset(t *testing.T) {
+	s := NewState(Page, &Resources{})
+
+	// after a paint op without W, current path should be cleared
+	applyOps(s,
+		OpRectangle, []pdf.Object{n(0), n(0), n(100), n(100)},
+		OpEndPath, []pdf.Object{},
+	)
+
+	if len(s.GState.ClipPaths) != 0 {
+		t.Errorf("got %d clip paths without W, want 0", len(s.GState.ClipPaths))
+	}
+	if len(s.currentPath.Cmds) != 0 {
+		t.Errorf("current path not cleared: %d commands remain", len(s.currentPath.Cmds))
 	}
 }
