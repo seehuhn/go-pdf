@@ -144,6 +144,25 @@ var thumbnailTestCases = []struct {
 		},
 	},
 	{
+		name:    "grayscale_2bit",
+		version: pdf.V1_7,
+		thumbnail: &Thumbnail{
+			Width:            64,
+			Height:           64,
+			ColorSpace:       color.SpaceDeviceGray,
+			BitsPerComponent: 2,
+			WriteData: func(w io.Writer) error {
+				// 64 pixels at 2 bits = 16 bytes per row
+				data := make([]byte, 16*64)
+				for i := range data {
+					data[i] = byte(0x55) // repeating 01 01 01 01
+				}
+				_, err := w.Write(data)
+				return err
+			},
+		},
+	},
+	{
 		name:    "grayscale_1bit",
 		version: pdf.V1_7,
 		thumbnail: &Thumbnail{
@@ -175,6 +194,25 @@ var thumbnailTestCases = []struct {
 				data := make([]byte, 30*60)
 				for i := range data {
 					data[i] = byte((i%16)<<4 | ((i + 1) % 16))
+				}
+				_, err := w.Write(data)
+				return err
+			},
+		},
+	},
+	{
+		name:    "rgb_16bit",
+		version: pdf.V1_7,
+		thumbnail: &Thumbnail{
+			Width:            16,
+			Height:           16,
+			ColorSpace:       color.SpaceDeviceRGB,
+			BitsPerComponent: 16,
+			WriteData: func(w io.Writer) error {
+				// 16 pixels * 3 channels * 2 bytes = 96 bytes per row
+				data := make([]byte, 96*16)
+				for i := range data {
+					data[i] = byte(i % 256)
 				}
 				_, err := w.Write(data)
 				return err

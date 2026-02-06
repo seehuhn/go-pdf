@@ -80,9 +80,7 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
 	if subtypeName, err := pdf.Optional(x.GetName(dict["Subtype"])); err != nil {
 		return nil, err
 	} else if subtypeName != "Image" && subtypeName != "" {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("invalid Subtype %q for thumbnail", subtypeName),
-		}
+		return nil, pdf.Errorf("invalid Subtype %q for thumbnail", subtypeName)
 	}
 
 	thumb := &Thumbnail{}
@@ -161,8 +159,8 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
 }
 
 // Embed converts the thumbnail to a PDF object.
-func (t *Thumbnail) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-	if err := t.check(rm.Out()); err != nil {
+func (t *Thumbnail) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
+	if err := t.check(e.Out()); err != nil {
 		return nil, err
 	}
 
@@ -171,13 +169,13 @@ func (t *Thumbnail) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		"Height":           pdf.Integer(t.Height),
 		"BitsPerComponent": pdf.Integer(t.BitsPerComponent),
 	}
-	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
+	if e.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("XObject")
 		dict["Subtype"] = pdf.Name("Image")
 	}
 
 	// embed color space
-	csObj, err := rm.Embed(t.ColorSpace)
+	csObj, err := e.Embed(t.ColorSpace)
 	if err != nil {
 		return nil, err
 	}
@@ -193,8 +191,8 @@ func (t *Thumbnail) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	// create the stream
-	ref := rm.Alloc()
-	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
+	ref := e.Alloc()
+	stm, err := e.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
 		return nil, err
 	}

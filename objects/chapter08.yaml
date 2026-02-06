@@ -3342,6 +3342,7 @@ types:
   pdfType: XObject
   pdfRepr: stream
   specTable: Table 5
+  specSection: 8.9.5 12.3.4
   fields:
   - goName: null
     pdfKey: Type
@@ -3358,17 +3359,20 @@ types:
     introduced: '1.0'
     possibleValues:
     - Image
-  - goName: null
+  - goName: Width
+    goType: int
     pdfKey: Width
     pdfType: integer
     required: true
     introduced: '1.0'
-  - goName: null
+  - goName: Height
+    goType: int
     pdfKey: Height
     pdfType: integer
     required: true
     introduced: '1.0'
-  - goName: null
+  - goName: ColorSpace
+    goType: color.Space
     pdfKey: ColorSpace
     pdfType: array;name
     required: true
@@ -3380,7 +3384,8 @@ types:
     - DeviceGrayColorSpace
     - DeviceRGBColorSpace
     - IndexedColorSpace
-  - goName: null
+  - goName: BitsPerComponent
+    goType: int
     pdfKey: BitsPerComponent
     pdfType: integer
     required: true
@@ -3391,7 +3396,8 @@ types:
     - '4'
     - '8'
     - '16'
-  - goName: null
+  - goName: Decode
+    goType: '[]float64'
     pdfKey: Decode
     pdfType: array
     required: false
