@@ -144,6 +144,11 @@ func (t *transparent) ColorSpace() color.Space {
 	return nil
 }
 
+// ToXYZ returns zero XYZ values for the transparent pseudo-color.
+func (t *transparent) ToXYZ() (X, Y, Z float64) {
+	return 0, 0, 0
+}
+
 // RGBA implements the color.Color interface.
 // Returns fully transparent (alpha = 0).
 func (t *transparent) RGBA() (r, g, b, a uint32) {

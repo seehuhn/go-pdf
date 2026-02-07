@@ -102,6 +102,14 @@ func (colorColoredPattern) ColorSpace() Space {
 	return spacePatternColored{}
 }
 
+// ToXYZ returns the colour as CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+// For colored patterns, returns a neutral mid-gray since the actual color
+// depends on the pattern content which is not available here.
+func (colorColoredPattern) ToXYZ() (X, Y, Z float64) {
+	return srgbToXYZ(0.5, 0.5, 0.5)
+}
+
 // RGBA implements the color.Color interface.
 // For colored patterns, returns a neutral gray since the actual color
 // depends on the pattern content which is not available here.
@@ -186,6 +194,12 @@ func PatternUncolored(p Pattern, col Color) Color {
 
 func (c colorUncoloredPattern) ColorSpace() Space {
 	return spacePatternUncolored{base: c.Col.ColorSpace()}
+}
+
+// ToXYZ returns the colour as CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (c colorUncoloredPattern) ToXYZ() (X, Y, Z float64) {
+	return c.Col.ToXYZ()
 }
 
 // RGBA implements the color.Color interface.

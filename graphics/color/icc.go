@@ -39,9 +39,13 @@ type SpaceICCBased struct {
 	profile  []byte
 	def      []float64
 
-	// cached transform for Convert()
+	// cached transform for Convert() (PCSToDevice)
 	transformOnce sync.Once
 	transform     *icc.Transform
+
+	// cached transform for RGBA() (DeviceToPCS)
+	fwdTransformOnce sync.Once
+	fwdTransform     *icc.Transform
 }
 
 // ICCBased returns a new ICC-based color space.
@@ -254,35 +258,54 @@ func (c colorICCBased) Components() []float64 {
 	return c.Values[:c.Space.N]
 }
 
-// RGBA implements the color.Color interface.
-// Since full ICC profile conversion is complex, this returns a fallback
-// based on the number of components: grayscale for 1 component,
-// RGB for 3 components, or CMYK-to-RGB conversion for 4 components.
-func (c colorICCBased) RGBA() (r, g, b, a uint32) {
+// ToXYZ returns the colour as CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+// It uses the embedded ICC profile when available, otherwise falls back
+// to a naive conversion based on the number of components.
+func (c colorICCBased) ToXYZ() (X, Y, Z float64) {
 	// normalise values from Ranges to [0,1]
 	norm := make([]float64, c.Space.N)
 	for i := range c.Space.N {
-		min, max := c.Space.Ranges[2*i], c.Space.Ranges[2*i+1]
-		if max > min {
-			norm[i] = (c.Values[i] - min) / (max - min)
+		lo, hi := c.Space.Ranges[2*i], c.Space.Ranges[2*i+1]
+		if hi > lo {
+			norm[i] = (c.Values[i] - lo) / (hi - lo)
 		} else {
 			norm[i] = 0
 		}
 	}
 
+	// try ICC profile transform
+	c.Space.fwdTransformOnce.Do(func() {
+		p, err := icc.Decode(c.Space.profile)
+		if err != nil {
+			return
+		}
+		c.Space.fwdTransform, _ = icc.NewTransform(p, icc.DeviceToPCS, icc.Perceptual)
+	})
+	if c.Space.fwdTransform != nil {
+		return c.Space.fwdTransform.ToXYZ(norm)
+	}
+
+	// fallback without profile: treat as sRGB-like
 	switch c.Space.N {
 	case 1:
-		v := toUint32(norm[0])
-		return v, v, v, 0xffff
+		return srgbToXYZ(norm[0], norm[0], norm[0])
 	case 3:
-		return toUint32(norm[0]), toUint32(norm[1]), toUint32(norm[2]), 0xffff
+		return srgbToXYZ(norm[0], norm[1], norm[2])
 	case 4:
 		cyan, magenta, yellow, black := norm[0], norm[1], norm[2], norm[3]
 		rf := (1 - cyan) * (1 - black)
 		gf := (1 - magenta) * (1 - black)
 		bf := (1 - yellow) * (1 - black)
-		return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
+		return srgbToXYZ(rf, gf, bf)
 	default:
-		return 0x8000, 0x8000, 0x8000, 0xffff
+		return srgbToXYZ(0.5, 0.5, 0.5)
 	}
+}
+
+// RGBA implements the color.Color interface.
+func (c colorICCBased) RGBA() (r, g, b, a uint32) {
+	X, Y, Z := c.ToXYZ()
+	rf, gf, bf := xyzToSRGB(X, Y, Z)
+	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }

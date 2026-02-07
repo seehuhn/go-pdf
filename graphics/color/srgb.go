@@ -117,6 +117,12 @@ func (c colorSRGB) ColorSpace() Space {
 	return spaceSRGB{}
 }
 
+// ToXYZ returns the colour as CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (c colorSRGB) ToXYZ() (X, Y, Z float64) {
+	return srgbToXYZ(c[0], c[1], c[2])
+}
+
 // RGBA implements the color.Color interface.
 func (c colorSRGB) RGBA() (r, g, b, a uint32) {
 	return toUint32(c[0]), toUint32(c[1]), toUint32(c[2]), 0xffff

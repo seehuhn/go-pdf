@@ -185,10 +185,15 @@ func (c colorIndexed) ColorSpace() Space {
 	return c.Space
 }
 
+// ToXYZ returns the colour as CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (c colorIndexed) ToXYZ() (X, Y, Z float64) {
+	return c.getBaseColor().ToXYZ()
+}
+
 // RGBA implements the color.Color interface.
 func (c colorIndexed) RGBA() (r, g, b, a uint32) {
-	baseColor := c.getBaseColor()
-	return baseColor.RGBA()
+	return c.getBaseColor().RGBA()
 }
 
 // getBaseColor returns the color from the palette at the given index.
@@ -375,12 +380,19 @@ func (c colorSeparation) ColorSpace() Space {
 	return c.Space
 }
 
-// RGBA implements the color.Color interface.
-func (c colorSeparation) RGBA() (r, g, b, a uint32) {
-	// apply the transform function to get alternate color values
+// ToXYZ returns the colour as CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (c colorSeparation) ToXYZ() (X, Y, Z float64) {
 	altValues := c.Space.Transform.Apply(c.Tint)
 	altColor := SCN(c.Space.Alternate.Default(), altValues, nil)
-	return altColor.RGBA()
+	return altColor.ToXYZ()
+}
+
+// RGBA implements the color.Color interface.
+func (c colorSeparation) RGBA() (r, g, b, a uint32) {
+	X, Y, Z := c.ToXYZ()
+	rf, gf, bf := xyzToSRGB(X, Y, Z)
+	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }
 
 // == DeviceN ================================================================
@@ -586,6 +598,15 @@ func (c colorDeviceN) ColorSpace() Space {
 	return c.Space
 }
 
+// ToXYZ returns the colour as CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (c colorDeviceN) ToXYZ() (X, Y, Z float64) {
+	tints := c.get()
+	altValues := c.Space.Transform.Apply(tints...)
+	altColor := SCN(c.Space.Alternate.Default(), altValues, nil)
+	return altColor.ToXYZ()
+}
+
 func (c *colorDeviceN) set(x []float64) {
 	buf := make([]byte, 0, 8*len(x))
 	for _, v := range x {
@@ -607,9 +628,7 @@ func (c colorDeviceN) get() []float64 {
 
 // RGBA implements the color.Color interface.
 func (c colorDeviceN) RGBA() (r, g, b, a uint32) {
-	// apply the transform function to get alternate color values
-	tints := c.get()
-	altValues := c.Space.Transform.Apply(tints...)
-	altColor := SCN(c.Space.Alternate.Default(), altValues, nil)
-	return altColor.RGBA()
+	X, Y, Z := c.ToXYZ()
+	rf, gf, bf := xyzToSRGB(X, Y, Z)
+	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }

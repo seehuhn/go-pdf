@@ -102,15 +102,16 @@ func (s *SpaceCalGray) Convert(c stdcolor.Color) stdcolor.Color {
 		return cg
 	}
 
-	// convert via XYZ, only Y (luminance) is used
-	_, Y, _ := colorToXYZ(c)
-	return s.FromXYZ(0, Y, 0)
+	// convert via XYZ
+	X, Y, Z := colorToXYZ(c)
+	return s.FromXYZ(X, Y, Z)
 }
 
-// FromXYZ converts CIE 1931 XYZ coordinates to a CalGray color.
-// Only the Y component (luminance) is used.
-func (s *SpaceCalGray) FromXYZ(_, Y, _ float64) Color {
-	yNorm := Y / s.whitePoint[1]
+// FromXYZ converts D50-adapted CIE XYZ coordinates to a CalGray color.
+// Only the Y component (luminance) is used after adaptation.
+func (s *SpaceCalGray) FromXYZ(X, Y, Z float64) Color {
+	_, Ya, _ := bradfordAdapt(X, Y, Z, WhitePointD50, s.whitePoint)
+	yNorm := Ya / s.whitePoint[1]
 	if yNorm <= 0 {
 		return colorCalGray{Space: s, Value: 0}
 	}
@@ -150,12 +151,14 @@ func (c colorCalGray) ColorSpace() Space {
 	return c.Space
 }
 
-// ToXYZ converts a CalGray color to CIE 1931 XYZ coordinates.
+// ToXYZ converts a CalGray color to CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
 func (c colorCalGray) ToXYZ() (X, Y, Z float64) {
 	A := math.Pow(c.Value, c.Space.gamma)
-	return c.Space.whitePoint[0] * A,
-		c.Space.whitePoint[1] * A,
-		c.Space.whitePoint[2] * A
+	X = c.Space.whitePoint[0] * A
+	Y = c.Space.whitePoint[1] * A
+	Z = c.Space.whitePoint[2] * A
+	return bradfordAdapt(X, Y, Z, c.Space.whitePoint, WhitePointD50)
 }
 
 // RGBA implements the color.Color interface.
@@ -264,8 +267,10 @@ func (s *SpaceCalRGB) Convert(c stdcolor.Color) stdcolor.Color {
 	return s.FromXYZ(X, Y, Z)
 }
 
-// FromXYZ converts CIE 1931 XYZ coordinates to a CalRGB color.
+// FromXYZ converts D50-adapted CIE XYZ coordinates to a CalRGB color.
 func (s *SpaceCalRGB) FromXYZ(X, Y, Z float64) Color {
+	X, Y, Z = bradfordAdapt(X, Y, Z, WhitePointD50, s.whitePoint)
+
 	// invert the matrix (stored in column-major order in matrix field)
 	m := s.matrix
 	det := m[0]*(m[4]*m[8]-m[5]*m[7]) - m[3]*(m[1]*m[8]-m[2]*m[7]) + m[6]*(m[1]*m[5]-m[2]*m[4])
@@ -340,7 +345,8 @@ func (c colorCalRGB) ColorSpace() Space {
 	return c.Space
 }
 
-// ToXYZ converts a CalRGB color to CIE 1931 XYZ coordinates.
+// ToXYZ converts a CalRGB color to CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
 func (c colorCalRGB) ToXYZ() (X, Y, Z float64) {
 	// apply gamma to each component
 	A := math.Pow(c.Values[0], c.Space.gamma[0])
@@ -352,7 +358,7 @@ func (c colorCalRGB) ToXYZ() (X, Y, Z float64) {
 	X = m[0]*A + m[3]*B + m[6]*C
 	Y = m[1]*A + m[4]*B + m[7]*C
 	Z = m[2]*A + m[5]*B + m[8]*C
-	return X, Y, Z
+	return bradfordAdapt(X, Y, Z, c.Space.whitePoint, WhitePointD50)
 }
 
 // RGBA implements the color.Color interface.
@@ -516,7 +522,8 @@ func (c colorLab) ColorSpace() Space {
 	return c.Space
 }
 
-// ToXYZ converts a Lab color to CIE 1931 XYZ coordinates.
+// ToXYZ converts a Lab color to CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
 func (c colorLab) ToXYZ() (X, Y, Z float64) {
 	LStar, aStar, bStar := c.Values[0], c.Values[1], c.Values[2]
 	XW, YW, ZW := c.Space.whitePoint[0], c.Space.whitePoint[1], c.Space.whitePoint[2]
@@ -531,7 +538,7 @@ func (c colorLab) ToXYZ() (X, Y, Z float64) {
 	X = XW * labG(L)
 	Y = YW * labG(M)
 	Z = ZW * labG(N)
-	return X, Y, Z
+	return bradfordAdapt(X, Y, Z, c.Space.whitePoint, WhitePointD50)
 }
 
 // RGBA implements the color.Color interface.
@@ -541,9 +548,11 @@ func (c colorLab) RGBA() (r, g, b, a uint32) {
 	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }
 
-// FromXYZ converts CIE 1931 XYZ coordinates to a Lab color.
+// FromXYZ converts D50-adapted CIE XYZ coordinates to a Lab color.
 // Values outside the valid range are clamped.
 func (s *SpaceLab) FromXYZ(X, Y, Z float64) Color {
+	X, Y, Z = bradfordAdapt(X, Y, Z, WhitePointD50, s.whitePoint)
+
 	XW, YW, ZW := s.whitePoint[0], s.whitePoint[1], s.whitePoint[2]
 
 	// Inverse of stage 2

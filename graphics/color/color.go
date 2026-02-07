@@ -29,6 +29,10 @@ import (
 type Color interface {
 	ColorSpace() Space
 
+	// ToXYZ returns the colour as CIE XYZ tristimulus values
+	// adapted to the D50 illuminant (the ICC Profile Connection Space).
+	ToXYZ() (X, Y, Z float64)
+
 	gocolor.Color
 }
 

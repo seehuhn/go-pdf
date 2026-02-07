@@ -47,6 +47,9 @@ func XObject(x *pdf.Extractor, obj pdf.Object) (graphics.XObject, error) {
 
 	switch subtype {
 	case "Image":
+		if isImageMask, _ := x.GetBoolean(stm.Dict["ImageMask"]); isImageMask {
+			return image.ExtractMask(x, obj)
+		}
 		img, err := image.ExtractDict(x, stm)
 		return img, err
 	case "Form":

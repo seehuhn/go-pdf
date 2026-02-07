@@ -26,10 +26,8 @@ import (
 
 // xyzToSRGB converts CIE XYZ (D50) to sRGB.
 func xyzToSRGB(X, Y, Z float64) (r, g, b float64) {
-	// Bradford chromatic adaptation D50 to D65
-	X2 := 0.9555766*X - 0.0230393*Y + 0.0631636*Z
-	Y2 := -0.0282895*X + 1.0099416*Y + 0.0210077*Z
-	Z2 := 0.0122982*X - 0.0204830*Y + 1.3299098*Z
+	// adapt from D50 to D65
+	X2, Y2, Z2 := bradfordAdapt(X, Y, Z, WhitePointD50, WhitePointD65)
 
 	// XYZ (D65) to linear sRGB
 	rLin := 3.2404542*X2 - 1.5371385*Y2 - 0.4985314*Z2
@@ -70,22 +68,84 @@ func srgbToXYZ(r, g, b float64) (X, Y, Z float64) {
 	Y2 := 0.2126729*rLin + 0.7151522*gLin + 0.0721750*bLin
 	Z2 := 0.0193339*rLin + 0.1191920*gLin + 0.9503041*bLin
 
-	// Bradford chromatic adaptation D65 to D50
-	X = 1.0478112*X2 + 0.0228866*Y2 - 0.0501270*Z2
-	Y = 0.0295424*X2 + 0.9904844*Y2 - 0.0170491*Z2
-	Z = -0.0092345*X2 + 0.0150436*Y2 + 0.7521316*Z2
-
-	return X, Y, Z
+	// adapt from D65 to D50
+	return bradfordAdapt(X2, Y2, Z2, WhitePointD65, WhitePointD50)
 }
 
 // colorToXYZ extracts D50 XYZ from any Go color.Color.
-// This assumes the input color is in sRGB space (as is typical for Go colors).
+// For PDF colors, this uses the ToXYZ method directly.
+// For other colors, the input is assumed to be in sRGB space.
 func colorToXYZ(c stdcolor.Color) (X, Y, Z float64) {
+	if cc, ok := c.(Color); ok {
+		return cc.ToXYZ()
+	}
+	// sRGB fallback for non-PDF colors
 	r32, g32, b32, _ := c.RGBA()
 	r := float64(r32) / 65535.0
 	g := float64(g32) / 65535.0
 	b := float64(b32) / 65535.0
 	return srgbToXYZ(r, g, b)
+}
+
+// bradfordAdapt performs Bradford chromatic adaptation from srcWP to dstWP.
+// Both whitepoints are CIE 1931 XYZ coordinates (e.g. WhitePointD50).
+func bradfordAdapt(X, Y, Z float64, srcWP, dstWP []float64) (float64, float64, float64) {
+	// short-circuit when whitepoints are (nearly) identical
+	if math.Abs(srcWP[0]-dstWP[0]) < 1e-10 &&
+		math.Abs(srcWP[1]-dstWP[1]) < 1e-10 &&
+		math.Abs(srcWP[2]-dstWP[2]) < 1e-10 {
+		return X, Y, Z
+	}
+
+	// Bradford cone-response matrix M
+	const (
+		m00 = 0.8951
+		m01 = 0.2664
+		m02 = -0.1614
+		m10 = -0.7502
+		m11 = 1.7135
+		m12 = 0.0367
+		m20 = 0.0389
+		m21 = -0.0685
+		m22 = 1.0296
+	)
+
+	// cone responses for source and destination whitepoints
+	srcR := m00*srcWP[0] + m01*srcWP[1] + m02*srcWP[2]
+	srcG := m10*srcWP[0] + m11*srcWP[1] + m12*srcWP[2]
+	srcB := m20*srcWP[0] + m21*srcWP[1] + m22*srcWP[2]
+
+	dstR := m00*dstWP[0] + m01*dstWP[1] + m02*dstWP[2]
+	dstG := m10*dstWP[0] + m11*dstWP[1] + m12*dstWP[2]
+	dstB := m20*dstWP[0] + m21*dstWP[1] + m22*dstWP[2]
+
+	// cone response of input colour
+	cR := m00*X + m01*Y + m02*Z
+	cG := m10*X + m11*Y + m12*Z
+	cB := m20*X + m21*Y + m22*Z
+
+	// scale by destination/source ratio
+	cR *= dstR / srcR
+	cG *= dstG / srcG
+	cB *= dstB / srcB
+
+	// inverse Bradford matrix M^-1
+	const (
+		i00 = 0.9869929
+		i01 = -0.1470543
+		i02 = 0.1599627
+		i10 = 0.4323053
+		i11 = 0.5183603
+		i12 = 0.0492912
+		i20 = -0.0085287
+		i21 = 0.0400428
+		i22 = 0.9684867
+	)
+
+	Xo := i00*cR + i01*cG + i02*cB
+	Yo := i10*cR + i11*cG + i12*cB
+	Zo := i20*cR + i21*cG + i22*cB
+	return Xo, Yo, Zo
 }
 
 func clamp01(v float64) float64 {

@@ -18,7 +18,9 @@ package color
 
 import (
 	stdcolor "image/color"
+	"sync"
 
+	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
 )
 
@@ -80,6 +82,13 @@ type DeviceGray float64
 // ColorSpace implements the [Color] interface.
 func (c DeviceGray) ColorSpace() Space {
 	return spaceDeviceGray{}
+}
+
+// ToXYZ returns the colour as CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (c DeviceGray) ToXYZ() (X, Y, Z float64) {
+	v := float64(c)
+	return srgbToXYZ(v, v, v)
 }
 
 // RGBA implements the color.Color interface.
@@ -145,6 +154,12 @@ type DeviceRGB [3]float64
 // ColorSpace implements the [Color] interface.
 func (c DeviceRGB) ColorSpace() Space {
 	return spaceDeviceRGB{}
+}
+
+// ToXYZ returns the colour as CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (c DeviceRGB) ToXYZ() (X, Y, Z float64) {
+	return srgbToXYZ(c[0], c[1], c[2])
 }
 
 // RGBA implements the color.Color interface.
@@ -234,11 +249,39 @@ func (c DeviceCMYK) ColorSpace() Space {
 	return spaceDeviceCMYK{}
 }
 
-// RGBA implements the color.Color interface.
-func (c DeviceCMYK) RGBA() (r, g, b, a uint32) {
+var (
+	cmykFwdOnce      sync.Once
+	cmykFwdTransform *icc.Transform
+)
+
+// ToXYZ returns the colour as CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+// It uses the CGATS001 CMYK profile when available, otherwise falls back
+// to a naive CMYK to sRGB conversion.
+func (c DeviceCMYK) ToXYZ() (X, Y, Z float64) {
+	cmykFwdOnce.Do(func() {
+		p, err := icc.Decode(icc.CGATS001Profile)
+		if err != nil {
+			return
+		}
+		cmykFwdTransform, _ = icc.NewTransform(p, icc.DeviceToPCS, icc.Perceptual)
+	})
+
+	if cmykFwdTransform != nil {
+		return cmykFwdTransform.ToXYZ(c[:])
+	}
+
+	// fallback: naive CMYK -> sRGB -> XYZ
 	cyan, magenta, yellow, black := c[0], c[1], c[2], c[3]
 	rf := (1 - cyan) * (1 - black)
 	gf := (1 - magenta) * (1 - black)
 	bf := (1 - yellow) * (1 - black)
+	return srgbToXYZ(rf, gf, bf)
+}
+
+// RGBA implements the color.Color interface.
+func (c DeviceCMYK) RGBA() (r, g, b, a uint32) {
+	X, Y, Z := c.ToXYZ()
+	rf, gf, bf := xyzToSRGB(X, Y, Z)
 	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }
