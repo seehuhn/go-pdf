@@ -17,9 +17,9 @@
 package color
 
 import (
-	_ "embed" // for the sRGB ICC profiles
 	stdcolor "image/color"
 
+	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
 )
 
@@ -61,10 +61,10 @@ func (s spaceSRGB) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	var iccData []byte
 	if pdf.GetVersion(w) >= pdf.V1_7 {
 		// ICC version 4.2.0 is supported since PDF 1.7
-		iccData = sRGBv4
+		iccData = icc.SRGBv4Profile
 	} else {
 		// ICC version 2.1.0 is supported since PDF 1.3
-		iccData = sRGBv2
+		iccData = icc.SRGBv2Profile
 	}
 	_, err = body.Write(iccData)
 	if err != nil {
@@ -121,9 +121,3 @@ func (c colorSRGB) ColorSpace() Space {
 func (c colorSRGB) RGBA() (r, g, b, a uint32) {
 	return toUint32(c[0]), toUint32(c[1]), toUint32(c[2]), 0xffff
 }
-
-//go:embed icc/sRGB-v2-micro.icc
-var sRGBv2 []byte
-
-//go:embed icc/sRGB-v4.icc
-var sRGBv4 []byte

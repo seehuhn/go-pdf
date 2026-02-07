@@ -1,6 +1,0 @@
-The files sRGB-v2-micro.icc and sRGB-v4.icc were downloaded from
-https://github.com/saucecontrol/Compact-ICC-Profiles .
-
-The author put these files in the public domain, using the Creative Commons
-CC0 1.0 Universal (CC0 1.0) Public Domain Dedication:
-http://creativecommons.org/publicdomain/zero/1.0/

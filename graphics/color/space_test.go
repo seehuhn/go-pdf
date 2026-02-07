@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"testing"
 
+	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
@@ -73,8 +74,8 @@ var testColorSpaces = []Space{
 	must(Lab(WhitePointD65, nil, nil)),
 	must(Lab(WhitePointD65, []float64{0.1, 0, 0}, []float64{-90, 90, -110, 110})),
 
-	must(ICCBased(sRGBv2, nil)),
-	must(ICCBased(sRGBv4, nil)),
+	must(ICCBased(icc.SRGBv2Profile, nil)),
+	must(ICCBased(icc.SRGBv4Profile, nil)),
 
 	spacePatternColored{},
 

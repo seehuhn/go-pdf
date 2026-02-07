@@ -20,6 +20,7 @@ import (
 	"image/color"
 	"testing"
 
+	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
 )
@@ -77,7 +78,7 @@ func TestValues(t *testing.T) {
 	calGray, _ := CalGray(WhitePointD65, nil, 1)
 	calRGB, _ := CalRGB(WhitePointD65, nil, nil, nil)
 	lab, _ := Lab(WhitePointD65, nil, nil)
-	iccBased, _ := ICCBased(sRGBv2, nil)
+	iccBased, _ := ICCBased(icc.SRGBv2Profile, nil)
 	indexed, _ := Indexed([]Color{DeviceRGB{0, 0, 0}, DeviceRGB{1, 1, 1}})
 	separation, _ := Separation("spot", SpaceDeviceRGB, testTintTransform())
 	deviceN, _ := DeviceN([]pdf.Name{"a", "b"}, SpaceDeviceRGB, testDeviceNTransform(), nil)

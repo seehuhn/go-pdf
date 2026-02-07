@@ -16,10 +16,14 @@
 
 package color
 
-import "testing"
+import (
+	"testing"
+
+	"seehuhn.de/go/icc"
+)
 
 func TestICCBased(t *testing.T) {
-	for _, profile := range [][]byte{sRGBv2, sRGBv4} {
+	for _, profile := range [][]byte{icc.SRGBv2Profile, icc.SRGBv4Profile} {
 		icc, err := ICCBased(profile, nil)
 		if err != nil {
 			t.Errorf("ICCBased: %v", err)
