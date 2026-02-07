@@ -18,6 +18,7 @@ package pdf
 
 import (
 	"compress/zlib"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -25,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/internal/filter/ascii85"
 	"seehuhn.de/go/pdf/internal/filter/asciihex"
 	"seehuhn.de/go/pdf/internal/filter/ccittfax"
+	"seehuhn.de/go/pdf/internal/filter/dct"
 	"seehuhn.de/go/pdf/internal/filter/lzw"
 	"seehuhn.de/go/pdf/internal/filter/predict"
 	"seehuhn.de/go/pdf/internal/filter/runlength"
@@ -44,8 +46,10 @@ import (
 // Filter represents a PDF stream filter.
 //
 // Currently, the following filter types are implemented by this library:
-// [FilterASCII85], [FilterASCIIHex], [FilterFlate], [FilterLZW],
-// [FilterRunLength].  In addition, [FilterCompress] can be used to select the
+// [FilterASCII85], [FilterASCIIHex], [FilterCCITTFax], [FilterDCT],
+// [FilterFlate], [FilterLZW], [FilterRunLength].
+// [FilterDCT] supports decoding only.
+// In addition, [FilterCompress] can be used to select the
 // best available compression filter when writing PDF streams.  This is
 // FilterFlate for PDF versions 1.2 and above, and FilterLZW for older versions.
 type Filter interface {
@@ -73,6 +77,8 @@ func makeFilter(filter Name, param Dict) Filter {
 		return FilterLZW(param)
 	case "CCITTFaxDecode":
 		return FilterCCITTFax(param)
+	case "DCTDecode":
+		return FilterDCT{}
 	case "RunLengthDecode":
 		return FilterRunLength{}
 	default:
@@ -152,6 +158,28 @@ func (f FilterRunLength) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, er
 // Decode implements the [Filter] interface.
 func (f FilterRunLength) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 	return runlength.Decode(r), nil
+}
+
+// FilterDCT is the DCTDecode filter, used for JPEG-compressed data.
+// This filter supports decoding only.
+//
+// TODO: support the ColorTransform parameter from DecodeParms (table 13).
+type FilterDCT struct{}
+
+// Info implements the [Filter] interface.
+func (f FilterDCT) Info(_ Version) (Name, Dict, error) {
+	return "DCTDecode", nil, nil
+}
+
+// Encode implements the [Filter] interface.
+// DCTDecode encoding is not supported via the filter interface.
+func (f FilterDCT) Encode(_ Version, _ io.WriteCloser) (io.WriteCloser, error) {
+	return nil, errors.New("DCTDecode encoding not supported via filter interface")
+}
+
+// Decode implements the [Filter] interface.
+func (f FilterDCT) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
+	return dct.Decode(r)
 }
 
 // FilterCompress is a special filter name, which is used to select the
