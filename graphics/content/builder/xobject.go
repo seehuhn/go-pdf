@@ -19,6 +19,7 @@ package builder
 import (
 	"errors"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
 )
@@ -38,4 +39,23 @@ func (b *Builder) DrawXObject(obj graphics.XObject) {
 	}
 	name := b.getXObjectName(obj)
 	b.emit(content.OpXObject, name)
+}
+
+// DrawInlineImageRaw embeds a small image directly in the content stream.
+//
+// The dict should contain the image parameters using the abbreviated
+// inline image keys (W, H, BPC, CS, etc.) as defined in PDF table 90.
+// The data contains the (possibly compressed) image samples.
+//
+// Inline images are limited to small images; for larger images use
+// [Builder.DrawXObject] instead.
+func (b *Builder) DrawInlineImageRaw(dict pdf.Dict, data []byte) {
+	if b.Err != nil {
+		return
+	}
+	if b.State.ColorOpsForbidden {
+		b.Err = errors.New("inline images not allowed in this context")
+		return
+	}
+	b.emit(content.OpInlineImage, dict, pdf.String(data))
 }
