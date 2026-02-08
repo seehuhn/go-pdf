@@ -124,7 +124,11 @@ func extractFontType1(x *pdf.Extractor, obj pdf.Object) (*dict.Type1, error) {
 	}
 	if !getSimpleWidths(d.Width[:], x.R, fontDict, defaultWidth) && stdInfo != nil {
 		for c := range 256 {
-			w, ok := stdInfo.Width[enc(byte(c))]
+			name := enc(byte(c))
+			if name == encoding.UseBuiltin {
+				name = stdInfo.Encoding[c]
+			}
+			w, ok := stdInfo.Width[name]
 			if !ok {
 				w = stdInfo.Width[".notdef"]
 			}

@@ -140,7 +140,7 @@ func readItem(r pdf.Getter, seen map[pdf.Reference]bool, ref pdf.Reference) (*It
 	}
 	item.Title = string(title)
 
-	count, _ := dict["Count"].(pdf.Integer)
+	count, _ := pdf.GetInteger(r, dict["Count"])
 	item.Open = count > 0
 
 	v := pdf.GetVersion(r)
@@ -168,7 +168,7 @@ func readItem(r pdf.Getter, seen map[pdf.Reference]bool, ref pdf.Reference) (*It
 			item.Color = color.DeviceRGB{float64(cr), float64(cg), float64(cb)}
 		}
 
-		if f, _ := dict["F"].(pdf.Integer); f != 0 {
+		if f, _ := pdf.GetInteger(r, dict["F"]); f != 0 {
 			item.Italic = f&1 != 0
 			item.Bold = f&2 != 0
 		}

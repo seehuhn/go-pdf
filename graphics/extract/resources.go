@@ -46,7 +46,7 @@ func Resources(x *pdf.Extractor, obj pdf.Object) (*content.Resources, error) {
 	}
 
 	// extract ExtGState subdictionary
-	if extGStateDict, ok := dict["ExtGState"].(pdf.Dict); ok {
+	if extGStateDict, err := x.GetDict(dict["ExtGState"]); err == nil && extGStateDict != nil {
 		for name, obj := range extGStateDict {
 			gs, err := pdf.ExtractorGet(x, obj, ExtGState)
 			if err != nil {
@@ -60,7 +60,7 @@ func Resources(x *pdf.Extractor, obj pdf.Object) (*content.Resources, error) {
 	}
 
 	// extract ColorSpace subdictionary
-	if colorSpaceDict, ok := dict["ColorSpace"].(pdf.Dict); ok {
+	if colorSpaceDict, err := x.GetDict(dict["ColorSpace"]); err == nil && colorSpaceDict != nil {
 		for name, obj := range colorSpaceDict {
 			cs, err := pdf.ExtractorGet(x, obj, ColorSpace)
 			if err != nil {
@@ -74,7 +74,7 @@ func Resources(x *pdf.Extractor, obj pdf.Object) (*content.Resources, error) {
 	}
 
 	// extract Pattern subdictionary
-	if patternDict, ok := dict["Pattern"].(pdf.Dict); ok {
+	if patternDict, err := x.GetDict(dict["Pattern"]); err == nil && patternDict != nil {
 		for name, obj := range patternDict {
 			pat, err := pdf.ExtractorGet(x, obj, Pattern)
 			if err != nil {
@@ -88,7 +88,7 @@ func Resources(x *pdf.Extractor, obj pdf.Object) (*content.Resources, error) {
 	}
 
 	// extract Shading subdictionary
-	if shadingDict, ok := dict["Shading"].(pdf.Dict); ok {
+	if shadingDict, err := x.GetDict(dict["Shading"]); err == nil && shadingDict != nil {
 		for name, obj := range shadingDict {
 			sh, err := pdf.ExtractorGet(x, obj, Shading)
 			if err != nil {
@@ -102,7 +102,7 @@ func Resources(x *pdf.Extractor, obj pdf.Object) (*content.Resources, error) {
 	}
 
 	// extract XObject subdictionary
-	if xobjectDict, ok := dict["XObject"].(pdf.Dict); ok {
+	if xobjectDict, err := x.GetDict(dict["XObject"]); err == nil && xobjectDict != nil {
 		for name, obj := range xobjectDict {
 			xobj, err := pdf.ExtractorGet(x, obj, XObject)
 			if err != nil {
@@ -116,7 +116,7 @@ func Resources(x *pdf.Extractor, obj pdf.Object) (*content.Resources, error) {
 	}
 
 	// extract Font subdictionary
-	if fontDict, ok := dict["Font"].(pdf.Dict); ok {
+	if fontDict, err := x.GetDict(dict["Font"]); err == nil && fontDict != nil {
 		for name, obj := range fontDict {
 			f, err := pdf.ExtractorGet(x, obj, Font)
 			if err != nil {
@@ -130,7 +130,7 @@ func Resources(x *pdf.Extractor, obj pdf.Object) (*content.Resources, error) {
 	}
 
 	// extract Properties subdictionary
-	if propertiesDict, ok := dict["Properties"].(pdf.Dict); ok {
+	if propertiesDict, err := x.GetDict(dict["Properties"]); err == nil && propertiesDict != nil {
 		for name, obj := range propertiesDict {
 			props, err := pdf.ExtractorGet(x, obj, property.ExtractList)
 			if err != nil {
@@ -144,7 +144,7 @@ func Resources(x *pdf.Extractor, obj pdf.Object) (*content.Resources, error) {
 	}
 
 	// extract ProcSet
-	if procSetArray, ok := dict["ProcSet"].(pdf.Array); ok {
+	if procSetArray, err := x.GetArray(dict["ProcSet"]); err == nil && procSetArray != nil {
 		for _, obj := range procSetArray {
 			name, ok := obj.(pdf.Name)
 			if !ok {

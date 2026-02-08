@@ -13,7 +13,7 @@ require (
 	golang.org/x/text v0.26.0
 	seehuhn.de/go/geom v0.7.0
 	seehuhn.de/go/icc v0.7.1-0.20260207233849-f06230622a13
-	seehuhn.de/go/postscript v0.7.0
+	seehuhn.de/go/postscript v0.7.1-0.20260208133223-8d399700345f
 	seehuhn.de/go/sfnt v0.7.0
 	seehuhn.de/go/xmp v0.7.0
 )
