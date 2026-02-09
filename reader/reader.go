@@ -49,6 +49,11 @@ type Reader struct {
 	UnknownOp func(op string, args []pdf.Object) error
 	EveryOp   func(op string, args []pdf.Object) error
 
+	GraphicsStateSaved    func() error
+	GraphicsStateRestored func() error
+	XObject               func(obj graphics.XObject, ctm matrix.Matrix) error
+	InlineImage           func(dict pdf.Dict, data []byte, ctm matrix.Matrix) error
+
 	MarkedContent      func(event MarkedContentEvent, mc *graphics.MarkedContent) error
 	MarkedContentStack []*graphics.MarkedContent
 }
@@ -123,10 +128,12 @@ func (r *Reader) ParseContentStream(in io.Reader) error {
 	if err != nil {
 		return err
 	}
-	return r.processStream(stream)
+	return r.ProcessStream(stream)
 }
 
-func (r *Reader) processStream(stream content.Stream) error {
+// ProcessStream processes a parsed content stream, calling the appropriate
+// callback functions for each operator.
+func (r *Reader) ProcessStream(stream content.Stream) error {
 	for _, op := range stream {
 		origArgs := op.Args
 
@@ -304,11 +311,54 @@ func (r *Reader) processStream(stream content.Stream) error {
 				}
 			}
 
+		// handled by typed callbacks below
+		case content.OpPushGraphicsState, content.OpPopGraphicsState,
+			content.OpXObject, content.OpInlineImage:
+
 		default:
 			if r.UnknownOp != nil {
 				err := r.UnknownOp(string(op.Name), op.Args)
 				if err != nil {
 					return err
+				}
+			}
+		}
+
+		// typed callbacks
+		switch op.Name {
+		case content.OpPushGraphicsState:
+			if r.GraphicsStateSaved != nil {
+				if err := r.GraphicsStateSaved(); err != nil {
+					return err
+				}
+			}
+		case content.OpPopGraphicsState:
+			if r.GraphicsStateRestored != nil {
+				if err := r.GraphicsStateRestored(); err != nil {
+					return err
+				}
+			}
+		case content.OpXObject:
+			if r.XObject != nil && len(origArgs) >= 1 {
+				if name, ok := origArgs[0].(pdf.Name); ok {
+					res := r.State.Resources
+					if res != nil && res.XObject != nil {
+						if obj := res.XObject[name]; obj != nil {
+							if err := r.XObject(obj, p.CTM); err != nil {
+								return err
+							}
+						}
+					}
+				}
+			}
+		case content.OpInlineImage:
+			if r.InlineImage != nil && len(origArgs) >= 2 {
+				if dict, ok := origArgs[0].(pdf.Dict); ok {
+					if data, ok := origArgs[1].(pdf.String); ok {
+						if err := r.InlineImage(dict, []byte(data), p.CTM); err != nil {
+							return err
+						}
+					}
 				}
 			}
 		}

@@ -461,17 +461,22 @@ func (s *State) applyTransition(name OpName) {
 	}
 }
 
-// expectNesting checks that the top of the nesting stack matches the expected type.
+// expectNesting finds and removes the innermost entry of the expected type
+// from the nesting stack.  If the entry is not at the top, it is still
+// removed, tolerating cross-nested operator pairs (e.g. q BDC Q EMC).
+// Intervening entries of other types are left in place.
+//
+// TODO(voss): investigate what PDF viewers actually do with cross-nested
+// operator pairs, and whether the writer needs to ensure proper nesting
+// for PDF 2.0 conformance.
 func (s *State) expectNesting(expected pairType, opName string) error {
-	if len(s.nesting) == 0 {
-		return errors.New(opName + ": no matching opening operator")
+	for i := len(s.nesting) - 1; i >= 0; i-- {
+		if s.nesting[i] == expected {
+			s.nesting = append(s.nesting[:i], s.nesting[i+1:]...)
+			return nil
+		}
 	}
-	top := s.nesting[len(s.nesting)-1]
-	if top != expected {
-		return errors.New(opName + ": improper nesting, expected " + expected.String() + " but got " + top.String())
-	}
-	s.nesting = s.nesting[:len(s.nesting)-1]
-	return nil
+	return errors.New(opName + ": no matching opening operator")
 }
 
 // CanClose returns an error if paired operators are unbalanced.
