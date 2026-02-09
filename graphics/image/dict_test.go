@@ -576,6 +576,16 @@ func roundTripTest(t *testing.T, version pdf.Version, data *Dict) {
 		decoded.PtData.SingleUse = data.PtData.SingleUse
 	}
 
+	// normalize Decode (read fills in the default)
+	if data.Decode == nil {
+		data.Decode = DefaultDecode(data.ColorSpace, data.BitsPerComponent)
+	}
+	for _, alt := range data.Alternates {
+		if alt != nil && alt.Decode == nil {
+			alt.Decode = DefaultDecode(alt.ColorSpace, alt.BitsPerComponent)
+		}
+	}
+
 	// Compare the round-tripped data
 	// We need to exclude WriteData from comparison since it's a function
 	opts := []cmp.Option{

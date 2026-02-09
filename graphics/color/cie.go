@@ -30,10 +30,18 @@ import (
 // PDF 2.0 sections: 8.6.5.2
 
 // SpaceCalGray represents a CalGray color space.
+// Use [CalGray] to create new CalGray color spaces.
 type SpaceCalGray struct {
-	whitePoint []float64
-	blackPoint []float64
-	gamma      float64
+	// WhitePoint is the diffuse white point in CIE 1931 XYZ coordinates
+	// (positive entries, Y=1).
+	WhitePoint [3]float64
+
+	// BlackPoint is the diffuse black point in CIE 1931 XYZ coordinates
+	// (non-negative entries).
+	BlackPoint [3]float64
+
+	// Gamma is the gamma value (positive).
+	Gamma float64
 }
 
 // CalGray returns a new CalGray color space.
@@ -63,11 +71,10 @@ func CalGray(whitePoint, blackPoint []float64, gamma float64) (*SpaceCalGray, er
 		return nil, fmt.Errorf("CalGray: expected gamma > 0, got %f", gamma)
 	}
 
-	return &SpaceCalGray{
-		whitePoint: whitePoint,
-		blackPoint: blackPoint,
-		gamma:      gamma,
-	}, nil
+	res := &SpaceCalGray{Gamma: gamma}
+	copy(res.WhitePoint[:], whitePoint)
+	copy(res.BlackPoint[:], blackPoint)
+	return res, nil
 }
 
 // Family returns /CalGray.
@@ -110,15 +117,15 @@ func (s *SpaceCalGray) Convert(c stdcolor.Color) stdcolor.Color {
 // FromXYZ converts D50-adapted CIE XYZ coordinates to a CalGray color.
 // Only the Y component (luminance) is used after adaptation.
 func (s *SpaceCalGray) FromXYZ(X, Y, Z float64) Color {
-	_, Ya, _ := bradfordAdapt(X, Y, Z, WhitePointD50, s.whitePoint)
-	yNorm := Ya / s.whitePoint[1]
+	_, Ya, _ := bradfordAdapt(X, Y, Z, WhitePointD50, s.WhitePoint[:])
+	yNorm := Ya / s.WhitePoint[1]
 	if yNorm <= 0 {
 		return colorCalGray{Space: s, Value: 0}
 	}
 	if yNorm >= 1 {
 		return colorCalGray{Space: s, Value: 1}
 	}
-	gray := math.Pow(yNorm, 1.0/s.gamma)
+	gray := math.Pow(yNorm, 1.0/s.Gamma)
 	return colorCalGray{Space: s, Value: clamp(gray, 0, 1)}
 }
 
@@ -130,12 +137,12 @@ func (s *SpaceCalGray) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	dict := pdf.Dict{}
-	dict["WhitePoint"] = toPDF(s.whitePoint)
-	if !isZero(s.blackPoint) {
-		dict["BlackPoint"] = toPDF(s.blackPoint)
+	dict["WhitePoint"] = toPDF(s.WhitePoint[:])
+	if !isZero(s.BlackPoint[:]) {
+		dict["BlackPoint"] = toPDF(s.BlackPoint[:])
 	}
-	if math.Abs(s.gamma-1) >= ε {
-		dict["Gamma"] = pdf.Number(s.gamma)
+	if math.Abs(s.Gamma-1) >= ε {
+		dict["Gamma"] = pdf.Number(s.Gamma)
 	}
 
 	return pdf.Array{pdf.Name("CalGray"), dict}, nil
@@ -154,11 +161,11 @@ func (c colorCalGray) ColorSpace() Space {
 // ToXYZ converts a CalGray color to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorCalGray) ToXYZ() (X, Y, Z float64) {
-	A := math.Pow(c.Value, c.Space.gamma)
-	X = c.Space.whitePoint[0] * A
-	Y = c.Space.whitePoint[1] * A
-	Z = c.Space.whitePoint[2] * A
-	return bradfordAdapt(X, Y, Z, c.Space.whitePoint, WhitePointD50)
+	A := math.Pow(c.Value, c.Space.Gamma)
+	X = c.Space.WhitePoint[0] * A
+	Y = c.Space.WhitePoint[1] * A
+	Z = c.Space.WhitePoint[2] * A
+	return bradfordAdapt(X, Y, Z, c.Space.WhitePoint[:], WhitePointD50)
 }
 
 // RGBA implements the color.Color interface.
@@ -173,11 +180,22 @@ func (c colorCalGray) RGBA() (r, g, b, a uint32) {
 // PDF 2.0 sections: 8.6.5.3
 
 // SpaceCalRGB represents a CalRGB color space.
+// Use [CalRGB] to create new CalRGB color spaces.
 type SpaceCalRGB struct {
-	whitePoint []float64
-	blackPoint []float64
-	gamma      []float64
-	matrix     []float64
+	// WhitePoint is the diffuse white point in CIE 1931 XYZ coordinates
+	// (positive entries, Y=1).
+	WhitePoint [3]float64
+
+	// BlackPoint is the diffuse black point in CIE 1931 XYZ coordinates
+	// (non-negative entries).
+	BlackPoint [3]float64
+
+	// Gamma contains the gamma values for R, G, B (all positive).
+	Gamma [3]float64
+
+	// Matrix is a 3x3 matrix in column-major order that maps
+	// decoded ABC values to CIE 1931 XYZ coordinates.
+	Matrix [9]float64
 }
 
 // CalRGB returns a new CalRGB color space.
@@ -218,12 +236,12 @@ func CalRGB(whitePoint, blackPoint, gamma, matrix []float64) (*SpaceCalRGB, erro
 		return nil, errors.New("CalRGB: invalid matrix")
 	}
 
-	return &SpaceCalRGB{
-		whitePoint: whitePoint,
-		blackPoint: blackPoint,
-		gamma:      gamma,
-		matrix:     matrix,
-	}, nil
+	res := &SpaceCalRGB{}
+	copy(res.WhitePoint[:], whitePoint)
+	copy(res.BlackPoint[:], blackPoint)
+	copy(res.Gamma[:], gamma)
+	copy(res.Matrix[:], matrix)
+	return res, nil
 }
 
 // Embed adds the color space to a PDF file.
@@ -234,15 +252,15 @@ func (s *SpaceCalRGB) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	dict := pdf.Dict{}
-	dict["WhitePoint"] = toPDF(s.whitePoint)
-	if !isZero(s.blackPoint) {
-		dict["BlackPoint"] = toPDF(s.blackPoint)
+	dict["WhitePoint"] = toPDF(s.WhitePoint[:])
+	if !isZero(s.BlackPoint[:]) {
+		dict["BlackPoint"] = toPDF(s.BlackPoint[:])
 	}
-	if !isConst(s.gamma, 1) {
-		dict["Gamma"] = toPDF(s.gamma)
+	if !isConst(s.Gamma[:], 1) {
+		dict["Gamma"] = toPDF(s.Gamma[:])
 	}
-	if !isValues(s.matrix, 1, 0, 0, 0, 1, 0, 0, 0, 1) {
-		dict["Matrix"] = toPDF(s.matrix)
+	if !isValues(s.Matrix[:], 1, 0, 0, 0, 1, 0, 0, 0, 1) {
+		dict["Matrix"] = toPDF(s.Matrix[:])
 	}
 
 	return pdf.Array{pdf.Name("CalRGB"), dict}, nil
@@ -269,10 +287,10 @@ func (s *SpaceCalRGB) Convert(c stdcolor.Color) stdcolor.Color {
 
 // FromXYZ converts D50-adapted CIE XYZ coordinates to a CalRGB color.
 func (s *SpaceCalRGB) FromXYZ(X, Y, Z float64) Color {
-	X, Y, Z = bradfordAdapt(X, Y, Z, WhitePointD50, s.whitePoint)
+	X, Y, Z = bradfordAdapt(X, Y, Z, WhitePointD50, s.WhitePoint[:])
 
 	// invert the matrix (stored in column-major order in matrix field)
-	m := s.matrix
+	m := s.Matrix
 	det := m[0]*(m[4]*m[8]-m[5]*m[7]) - m[3]*(m[1]*m[8]-m[2]*m[7]) + m[6]*(m[1]*m[5]-m[2]*m[4])
 	if det == 0 {
 		return colorCalRGB{Space: s, Values: [3]float64{0, 0, 0}}
@@ -296,9 +314,9 @@ func (s *SpaceCalRGB) FromXYZ(X, Y, Z float64) Color {
 	C := i20*X + i21*Y + i22*Z
 
 	// apply inverse gamma
-	r := invGamma(A, s.gamma[0])
-	g := invGamma(B, s.gamma[1])
-	b := invGamma(C, s.gamma[2])
+	r := invGamma(A, s.Gamma[0])
+	g := invGamma(B, s.Gamma[1])
+	b := invGamma(C, s.Gamma[2])
 
 	return colorCalRGB{Space: s, Values: [3]float64{
 		clamp(r, 0, 1),
@@ -349,16 +367,16 @@ func (c colorCalRGB) ColorSpace() Space {
 // adapted to the D50 illuminant.
 func (c colorCalRGB) ToXYZ() (X, Y, Z float64) {
 	// apply gamma to each component
-	A := math.Pow(c.Values[0], c.Space.gamma[0])
-	B := math.Pow(c.Values[1], c.Space.gamma[1])
-	C := math.Pow(c.Values[2], c.Space.gamma[2])
+	A := math.Pow(c.Values[0], c.Space.Gamma[0])
+	B := math.Pow(c.Values[1], c.Space.Gamma[1])
+	C := math.Pow(c.Values[2], c.Space.Gamma[2])
 
 	// apply the 3x3 matrix (stored in column-major order)
-	m := c.Space.matrix
+	m := c.Space.Matrix
 	X = m[0]*A + m[3]*B + m[6]*C
 	Y = m[1]*A + m[4]*B + m[7]*C
 	Z = m[2]*A + m[5]*B + m[8]*C
-	return bradfordAdapt(X, Y, Z, c.Space.whitePoint, WhitePointD50)
+	return bradfordAdapt(X, Y, Z, c.Space.WhitePoint[:], WhitePointD50)
 }
 
 // RGBA implements the color.Color interface.
@@ -389,9 +407,16 @@ func (c colorCalRGB) RGBA() (r, g, b, a uint32) {
 
 // SpaceLab represents a CIE 1976 L*a*b* color space.
 type SpaceLab struct {
-	whitePoint []float64
-	blackPoint []float64
-	ranges     []float64
+	// WhitePoint is the diffuse white point in CIE 1931 XYZ coordinates
+	// (positive entries, Y=1).
+	WhitePoint [3]float64
+
+	// BlackPoint is the diffuse black point in CIE 1931 XYZ coordinates
+	// (non-negative entries).
+	BlackPoint [3]float64
+
+	// Ranges is [aMin, aMax, bMin, bMax] for the a* and b* components.
+	Ranges [4]float64
 }
 
 // Lab returns a new CIE 1976 L*a*b* color space.
@@ -422,11 +447,11 @@ func Lab(whitePoint, blackPoint, ranges []float64) (*SpaceLab, error) {
 		return nil, errors.New("Lab: invalid ranges")
 	}
 
-	return &SpaceLab{
-		whitePoint: whitePoint,
-		blackPoint: blackPoint,
-		ranges:     ranges,
-	}, nil
+	res := &SpaceLab{}
+	copy(res.WhitePoint[:], whitePoint)
+	copy(res.BlackPoint[:], blackPoint)
+	copy(res.Ranges[:], ranges)
+	return res, nil
 }
 
 // Family returns /Lab.
@@ -442,13 +467,13 @@ func (s *SpaceLab) New(l, a, b float64) (Color, error) {
 	if l < 0 || l > 100 {
 		return nil, fmt.Errorf("Lab: invalid L* value %g∉[0,100]", l)
 	}
-	if a < s.ranges[0] || a > s.ranges[1] {
+	if a < s.Ranges[0] || a > s.Ranges[1] {
 		return nil, fmt.Errorf("Lab: invalid a* value %g∉[%g,%g]",
-			a, s.ranges[0], s.ranges[1])
+			a, s.Ranges[0], s.Ranges[1])
 	}
-	if b < s.ranges[2] || b > s.ranges[3] {
+	if b < s.Ranges[2] || b > s.Ranges[3] {
 		return nil, fmt.Errorf("Lab: invalid b* value %g∉[%g,%g]",
-			b, s.ranges[2], s.ranges[3])
+			b, s.Ranges[2], s.Ranges[3])
 	}
 
 	return colorLab{Space: s, Values: [3]float64{l, a, b}}, nil
@@ -478,16 +503,16 @@ func (s *SpaceLab) Convert(c stdcolor.Color) stdcolor.Color {
 // This implements the [Space] interface.
 func (s *SpaceLab) Default() Color {
 	a := 0.0
-	if a < s.ranges[0] {
-		a = s.ranges[0]
-	} else if a > s.ranges[1] {
-		a = s.ranges[1]
+	if a < s.Ranges[0] {
+		a = s.Ranges[0]
+	} else if a > s.Ranges[1] {
+		a = s.Ranges[1]
 	}
 	b := 0.0
-	if b < s.ranges[2] {
-		b = s.ranges[2]
-	} else if b > s.ranges[3] {
-		b = s.ranges[3]
+	if b < s.Ranges[2] {
+		b = s.Ranges[2]
+	} else if b > s.Ranges[3] {
+		b = s.Ranges[3]
 	}
 
 	return colorLab{Space: s, Values: [3]float64{0, a, b}}
@@ -501,12 +526,12 @@ func (s *SpaceLab) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	dict := pdf.Dict{}
-	dict["WhitePoint"] = toPDF(s.whitePoint)
-	if !isZero(s.blackPoint) {
-		dict["BlackPoint"] = toPDF(s.blackPoint)
+	dict["WhitePoint"] = toPDF(s.WhitePoint[:])
+	if !isZero(s.BlackPoint[:]) {
+		dict["BlackPoint"] = toPDF(s.BlackPoint[:])
 	}
-	if !isValues(s.ranges, -100, 100, -100, 100) {
-		dict["Range"] = toPDF(s.ranges)
+	if !isValues(s.Ranges[:], -100, 100, -100, 100) {
+		dict["Range"] = toPDF(s.Ranges[:])
 	}
 
 	return pdf.Array{FamilyLab, dict}, nil
@@ -526,7 +551,7 @@ func (c colorLab) ColorSpace() Space {
 // adapted to the D50 illuminant.
 func (c colorLab) ToXYZ() (X, Y, Z float64) {
 	LStar, aStar, bStar := c.Values[0], c.Values[1], c.Values[2]
-	XW, YW, ZW := c.Space.whitePoint[0], c.Space.whitePoint[1], c.Space.whitePoint[2]
+	XW, YW, ZW := c.Space.WhitePoint[0], c.Space.WhitePoint[1], c.Space.WhitePoint[2]
 
 	// Stage 1: L*a*b* to intermediate (L, M, N)
 	common := (LStar + 16) / 116
@@ -538,7 +563,7 @@ func (c colorLab) ToXYZ() (X, Y, Z float64) {
 	X = XW * labG(L)
 	Y = YW * labG(M)
 	Z = ZW * labG(N)
-	return bradfordAdapt(X, Y, Z, c.Space.whitePoint, WhitePointD50)
+	return bradfordAdapt(X, Y, Z, c.Space.WhitePoint[:], WhitePointD50)
 }
 
 // RGBA implements the color.Color interface.
@@ -551,9 +576,9 @@ func (c colorLab) RGBA() (r, g, b, a uint32) {
 // FromXYZ converts D50-adapted CIE XYZ coordinates to a Lab color.
 // Values outside the valid range are clamped.
 func (s *SpaceLab) FromXYZ(X, Y, Z float64) Color {
-	X, Y, Z = bradfordAdapt(X, Y, Z, WhitePointD50, s.whitePoint)
+	X, Y, Z = bradfordAdapt(X, Y, Z, WhitePointD50, s.WhitePoint[:])
 
-	XW, YW, ZW := s.whitePoint[0], s.whitePoint[1], s.whitePoint[2]
+	XW, YW, ZW := s.WhitePoint[0], s.WhitePoint[1], s.WhitePoint[2]
 
 	// Inverse of stage 2
 	L := labF(X / XW)
@@ -567,8 +592,8 @@ func (s *SpaceLab) FromXYZ(X, Y, Z float64) Color {
 
 	// Clamp to valid ranges
 	LStar = clamp(LStar, 0, 100)
-	aStar = clamp(aStar, s.ranges[0], s.ranges[1])
-	bStar = clamp(bStar, s.ranges[2], s.ranges[3])
+	aStar = clamp(aStar, s.Ranges[0], s.Ranges[1])
+	bStar = clamp(bStar, s.Ranges[2], s.Ranges[3])
 
 	return colorLab{Space: s, Values: [3]float64{LStar, aStar, bStar}}
 }

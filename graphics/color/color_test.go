@@ -71,7 +71,7 @@ func TestColorsComparable(t *testing.T) {
 	}
 }
 
-// TestValues verifies that the values() function returns correct values
+// TestValues verifies that the Values function returns correct values
 // for all color types.
 func TestValues(t *testing.T) {
 	// Create test color spaces needed for some color types
@@ -162,9 +162,9 @@ func TestValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := values(tt.color)
+			got, _ := Values(tt.color)
 			if !floatSlicesEqualTol(got, tt.want, 1e-9) {
-				t.Errorf("values() = %v, want %v", got, tt.want)
+				t.Errorf("Values() = %v, want %v", got, tt.want)
 			}
 		})
 	}

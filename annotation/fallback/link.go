@@ -148,7 +148,7 @@ func getDarkLightCol(col color.Color) (dark, light color.Color) {
 		return col, col
 	}
 
-	components, _, _ := color.Operator(col)
+	components, _ := color.Values(col)
 	s := col.ColorSpace()
 	switch s.Family() {
 	case color.FamilyDeviceGray:

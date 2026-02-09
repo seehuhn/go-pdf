@@ -251,12 +251,12 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 
 	case OpSetStrokeColor, OpSetStrokeColorN: // SC, SCN
 		values, pat := s.parseColorArgs(args)
-		p.StrokeColor = color.SCN(p.StrokeColor, values, pat)
+		p.StrokeColor = color.FromValues(p.StrokeColor.ColorSpace(), values, pat)
 		s.GState.Set |= graphics.StateStrokeColor
 
 	case OpSetFillColor, OpSetFillColorN: // sc, scn
 		values, pat := s.parseColorArgs(args)
-		p.FillColor = color.SCN(p.FillColor, values, pat)
+		p.FillColor = color.FromValues(p.FillColor.ColorSpace(), values, pat)
 		s.GState.Set |= graphics.StateFillColor
 
 	case OpSetStrokeGray: // G

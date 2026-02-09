@@ -487,24 +487,24 @@ func SpacesEqual(a, b Space) bool {
 
 	case *SpaceCalGray:
 		if vb, ok := b.(*SpaceCalGray); ok {
-			return floatSlicesEqual(va.whitePoint, vb.whitePoint, floatEpsilon) &&
-				floatSlicesEqual(va.blackPoint, vb.blackPoint, floatEpsilon) &&
-				math.Abs(va.gamma-vb.gamma) <= floatEpsilon
+			return floatSlicesEqual(va.WhitePoint[:], vb.WhitePoint[:], floatEpsilon) &&
+				floatSlicesEqual(va.BlackPoint[:], vb.BlackPoint[:], floatEpsilon) &&
+				math.Abs(va.Gamma-vb.Gamma) <= floatEpsilon
 		}
 
 	case *SpaceCalRGB:
 		if vb, ok := b.(*SpaceCalRGB); ok {
-			return floatSlicesEqual(va.whitePoint, vb.whitePoint, floatEpsilon) &&
-				floatSlicesEqual(va.blackPoint, vb.blackPoint, floatEpsilon) &&
-				floatSlicesEqual(va.gamma, vb.gamma, floatEpsilon) &&
-				floatSlicesEqual(va.matrix, vb.matrix, floatEpsilon)
+			return floatSlicesEqual(va.WhitePoint[:], vb.WhitePoint[:], floatEpsilon) &&
+				floatSlicesEqual(va.BlackPoint[:], vb.BlackPoint[:], floatEpsilon) &&
+				floatSlicesEqual(va.Gamma[:], vb.Gamma[:], floatEpsilon) &&
+				floatSlicesEqual(va.Matrix[:], vb.Matrix[:], floatEpsilon)
 		}
 
 	case *SpaceLab:
 		if vb, ok := b.(*SpaceLab); ok {
-			return floatSlicesEqual(va.whitePoint, vb.whitePoint, floatEpsilon) &&
-				floatSlicesEqual(va.blackPoint, vb.blackPoint, floatEpsilon) &&
-				floatSlicesEqual(va.ranges, vb.ranges, floatEpsilon)
+			return floatSlicesEqual(va.WhitePoint[:], vb.WhitePoint[:], floatEpsilon) &&
+				floatSlicesEqual(va.BlackPoint[:], vb.BlackPoint[:], floatEpsilon) &&
+				floatSlicesEqual(va.Ranges[:], vb.Ranges[:], floatEpsilon)
 		}
 
 	case *SpaceICCBased:

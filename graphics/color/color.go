@@ -36,132 +36,144 @@ type Color interface {
 	gocolor.Color
 }
 
-// SCN returns a new color in the same color space as c, but with the given
-// component values and pattern (if c is from a pattern color space).
-func SCN(c Color, values []float64, pat Pattern) Color {
-	switch d := c.(type) {
-	case DeviceGray:
+// FromValues returns a new color in the given color space with the specified
+// component values and pattern (if cs is a pattern color space).
+func FromValues(cs Space, values []float64, pat Pattern) Color {
+	switch cs := cs.(type) {
+	case spaceDeviceGray:
 		if len(values) >= 1 {
 			return DeviceGray(values[0])
 		}
-		return d
-	case DeviceRGB:
-		copy(d[:], values)
-		return d
-	case DeviceCMYK:
-		copy(d[:], values)
-		return d
-	case colorCalGray:
+		return cs.Default()
+	case spaceDeviceRGB:
+		var c DeviceRGB
+		copy(c[:], values)
+		return c
+	case spaceDeviceCMYK:
+		var c DeviceCMYK
+		copy(c[:], values)
+		return c
+	case *SpaceCalGray:
 		if len(values) >= 1 {
-			d.Value = values[0]
+			return cs.New(values[0])
 		}
-		return d
-	case colorCalRGB:
+		return cs.Default()
+	case *SpaceCalRGB:
+		if len(values) >= 3 {
+			return cs.New(values[0], values[1], values[2])
+		}
+		return cs.Default()
+	case *SpaceLab:
+		if len(values) >= 3 {
+			c, _ := cs.New(values[0], values[1], values[2])
+			if c != nil {
+				return c
+			}
+		}
+		return cs.Default()
+	case *SpaceICCBased:
+		d := colorICCBased{Space: cs}
 		copy(d.Values[:], values)
 		return d
-	case colorLab:
-		copy(d.Values[:], values)
-		return d
-	case colorICCBased:
-		copy(d.Values[:], values)
-		return d
-	case colorSRGB:
-		copy(d[:], values)
-		return d
-	case colorColoredPattern:
-		d.Pat = pat
-		return d
-	case colorUncoloredPattern:
-		d.Col = SCN(d.Col, values, nil)
-		d.Pat = pat
-		return d
-	case colorIndexed:
+	case spaceSRGB:
+		var c colorSRGB
+		copy(c[:], values)
+		return c
+	case spacePatternColored:
+		return colorColoredPattern{Pat: pat}
+	case spacePatternUncolored:
+		col := FromValues(cs.base, values, nil)
+		return colorUncoloredPattern{Col: col, Pat: pat}
+	case *SpaceIndexed:
 		if len(values) >= 1 {
-			d.Index = int(math.Round(values[0]))
+			return cs.New(int(math.Round(values[0])))
 		}
-		return d
-	case colorSeparation:
+		return cs.Default()
+	case *SpaceSeparation:
 		if len(values) >= 1 {
-			d.Tint = values[0]
+			return cs.New(values[0])
 		}
-		return d
-	case colorDeviceN:
-		n := d.Space.Channels()
+		return cs.Default()
+	case *SpaceDeviceN:
+		n := cs.Channels()
 		if len(values) >= n {
-			d.set(values[:n])
+			return cs.New(values[:n])
 		}
-		return d
+		return cs.Default()
 	default:
-		panic(fmt.Sprintf("unknown color type %T", d))
+		panic(fmt.Sprintf("unknown color space type %T", cs))
 	}
 }
 
-// Operator returns the color values, the pattern resource, and the operator
-// name for the given color.  The operator name is for stroking operations. The
-// corresponding operator for filling operations is the operator name converted
-// to lower case.
-func Operator(c Color) ([]float64, Pattern, string) {
-	v := values(c)
+// Values returns the color component values and the pattern resource (if any)
+// for the given color. The returned slice must not be modified.
+func Values(c Color) ([]float64, Pattern) {
 	switch c := c.(type) {
 	case DeviceGray:
-		return v, nil, "G"
+		return []float64{float64(c)}, nil
 	case DeviceRGB:
-		return v, nil, "RG"
+		return c[:], nil
 	case DeviceCMYK:
-		return v, nil, "K"
+		return c[:], nil
 	case colorCalGray:
-		return v, nil, "SC"
+		return []float64{c.Value}, nil
 	case colorCalRGB:
-		return v, nil, "SC"
+		return c.Values[:], nil
 	case colorLab:
-		return v, nil, "SC"
+		return c.Values[:], nil
 	case colorICCBased:
-		return v, nil, "SCN"
+		return c.Values[:c.Space.N], nil
 	case colorSRGB:
-		return v, nil, "SCN"
+		return c[:], nil
 	case colorColoredPattern:
-		return v, c.Pat, "SCN"
+		return nil, c.Pat
 	case colorUncoloredPattern:
-		return v, c.Pat, "SCN"
+		v, _ := Values(c.Col)
+		return v, c.Pat
 	case colorIndexed:
-		return v, nil, "SC"
+		return []float64{float64(c.Index)}, nil
 	case colorSeparation:
-		return v, nil, "SCN"
+		return []float64{c.Tint}, nil
 	case colorDeviceN:
-		return v, nil, "SCN"
+		return c.get(), nil
+	default:
+		return nil, nil
+	}
+}
+
+// Operator returns the PDF operator name for setting the given color.
+// The operator name is for stroking operations. The corresponding operator
+// for filling operations is the operator name converted to lower case.
+func Operator(c Color) string {
+	switch c.(type) {
+	case DeviceGray:
+		return "G"
+	case DeviceRGB:
+		return "RG"
+	case DeviceCMYK:
+		return "K"
+	case colorCalGray:
+		return "SC"
+	case colorCalRGB:
+		return "SC"
+	case colorLab:
+		return "SC"
+	case colorICCBased:
+		return "SCN"
+	case colorSRGB:
+		return "SCN"
+	case colorColoredPattern:
+		return "SCN"
+	case colorUncoloredPattern:
+		return "SCN"
+	case colorIndexed:
+		return "SC"
+	case colorSeparation:
+		return "SCN"
+	case colorDeviceN:
+		return "SCN"
 	default:
 		panic(fmt.Sprintf("unknown color type %T", c))
-	}
-}
-
-func values(c Color) []float64 {
-	switch c := c.(type) {
-	case DeviceGray:
-		return []float64{float64(c)}
-	case DeviceRGB:
-		return c[:]
-	case DeviceCMYK:
-		return c[:]
-	case colorCalGray:
-		return []float64{c.Value}
-	case colorCalRGB:
-		return c.Values[:]
-	case colorLab:
-		return c.Values[:]
-	case colorICCBased:
-		return c.Values[:c.Space.N]
-	case colorSRGB:
-		return c[:]
-	case colorUncoloredPattern:
-		return values(c.Col)
-	case colorIndexed:
-		return []float64{float64(c.Index)}
-	case colorSeparation:
-		return []float64{c.Tint}
-	case colorDeviceN:
-		return c.get()
-	default:
-		return nil
 	}
 }
 

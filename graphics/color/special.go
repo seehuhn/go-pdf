@@ -62,8 +62,8 @@ func Indexed(colors []Color) (*SpaceIndexed, error) {
 		min = []float64{0, 0, 0, 0}
 		max = []float64{1, 1, 1, 1}
 	case *SpaceLab:
-		min = []float64{0, space.ranges[0], space.ranges[2]}
-		max = []float64{100, space.ranges[1], space.ranges[3]}
+		min = []float64{0, space.Ranges[0], space.Ranges[2]}
+		max = []float64{100, space.Ranges[1], space.Ranges[3]}
 	case spacePatternColored, spacePatternUncolored, *SpaceIndexed:
 		return nil, fmt.Errorf("Indexed: invalid base color space %s", space.Family())
 	}
@@ -73,7 +73,7 @@ func Indexed(colors []Color) (*SpaceIndexed, error) {
 		if color.ColorSpace() != space {
 			return nil, errors.New("Indexed: inconsistent color spaces")
 		}
-		v := values(color)
+		v, _ := Values(color)
 		for i, x := range v {
 			b := int(math.Floor((x - min[i]) / (max[i] - min[i]) * 256))
 			if b < 0 {
@@ -219,8 +219,8 @@ func (c colorIndexed) getBaseColor() Color {
 		min = []float64{0, 0, 0, 0}
 		max = []float64{1, 1, 1, 1}
 	case *SpaceLab:
-		min = []float64{0, space.ranges[0], space.ranges[2]}
-		max = []float64{100, space.ranges[1], space.ranges[3]}
+		min = []float64{0, space.Ranges[0], space.Ranges[2]}
+		max = []float64{100, space.Ranges[1], space.Ranges[3]}
 	default:
 		return base.Default()
 	}
@@ -384,7 +384,7 @@ func (c colorSeparation) ColorSpace() Space {
 // adapted to the D50 illuminant.
 func (c colorSeparation) ToXYZ() (X, Y, Z float64) {
 	altValues := c.Space.Transform.Apply(c.Tint)
-	altColor := SCN(c.Space.Alternate.Default(), altValues, nil)
+	altColor := FromValues(c.Space.Alternate, altValues, nil)
 	return altColor.ToXYZ()
 }
 
@@ -603,7 +603,7 @@ func (c colorDeviceN) ColorSpace() Space {
 func (c colorDeviceN) ToXYZ() (X, Y, Z float64) {
 	tints := c.get()
 	altValues := c.Space.Transform.Apply(tints...)
-	altColor := SCN(c.Space.Alternate.Default(), altValues, nil)
+	altColor := FromValues(c.Space.Alternate, altValues, nil)
 	return altColor.ToXYZ()
 }
 

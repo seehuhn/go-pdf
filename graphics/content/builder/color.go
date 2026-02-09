@@ -84,7 +84,8 @@ func (b *Builder) setColor(c color.Color, fill bool) {
 	if cur != c {
 		var args []pdf.Object
 
-		values, pattern, op := color.Operator(c)
+		values, pattern := color.Values(c)
+		op := color.Operator(c)
 		for _, val := range values {
 			args = append(args, pdf.Number(val))
 		}

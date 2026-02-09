@@ -23,6 +23,7 @@ import (
 	gocol "image/color"
 	"io"
 	"math"
+	"slices"
 
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
@@ -290,7 +291,7 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		}
 	}
 
-	// Extract Decode array (must have 2 * numChannels entries, else use default)
+	// extract Decode array, substituting the default if not present
 	if decodeArray, err := pdf.Optional(x.GetArray(dict["Decode"])); err != nil {
 		return nil, err
 	} else if len(decodeArray) == 2*img.ColorSpace.Channels() {
@@ -309,6 +310,9 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 		if valid {
 			img.Decode = decode
 		}
+	}
+	if img.Decode == nil {
+		img.Decode = DefaultDecode(img.ColorSpace, img.BitsPerComponent)
 	}
 
 	// Extract Interpolate
@@ -587,7 +591,7 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 		dict["Mask"] = mask
 	}
-	if d.Decode != nil {
+	if !slices.Equal(d.Decode, DefaultDecode(d.ColorSpace, d.BitsPerComponent)) {
 		var decode pdf.Array
 		for _, v := range d.Decode {
 			decode = append(decode, pdf.Number(v))

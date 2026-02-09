@@ -248,7 +248,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool,
 			fam := s.Family()
 			switch fam {
 			case color.FamilyDeviceGray, color.FamilyDeviceRGB, color.FamilyDeviceCMYK:
-				x, _, _ = color.Operator(c.Color)
+				x, _ = color.Values(c.Color)
 			default:
 				return fmt.Errorf("unexpected color space %s", fam)
 			}

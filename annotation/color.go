@@ -61,7 +61,7 @@ func encodeColor(c color.Color) (pdf.Array, error) {
 		fam := s.Family()
 		switch fam {
 		case color.FamilyDeviceGray, color.FamilyDeviceRGB, color.FamilyDeviceCMYK:
-			x, _, _ = color.Operator(c)
+			x, _ = color.Values(c)
 		default:
 			return nil, fmt.Errorf("unexpected color space %s", fam)
 		}
@@ -121,7 +121,7 @@ func encodeColorRGB(c color.Color) (pdf.Array, error) {
 		return nil, fmt.Errorf("color must be DeviceRGB, got %s", fam)
 	}
 
-	x, _, _ := color.Operator(c)
+	x, _ := color.Values(c)
 	if len(x) != 3 {
 		return nil, fmt.Errorf("unexpected number of color components: %d", len(x))
 	}
