@@ -279,7 +279,7 @@ func (f *SimpleGlyf) makeDict() (*dict.TrueType, error) {
 				subtable[uint32(rr[0])] = glyph.ID(gid)
 			}
 			subsetFont.CMapTable = sfntcmap.Table{
-				{PlatformID: 3, EncodingID: 1}: subtable.Encode(1),
+				{PlatformID: 3, EncodingID: 1}: subtable.Encode(0),
 			}
 		}
 	}

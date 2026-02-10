@@ -64,16 +64,16 @@ single-byte code `c` to a glyph in a TrueType font. An overview is given below.
 For full details see section 9.6.5.4 (Encodings for TrueType fonts) of ISO
 32000-2:2020.
 
-1. Use a (1,0) "cmap" subtable to map `c` to a GID.
-2. In a (3,0) "cmap" subtable, look up `c`, `c+0xF000`, `c+0xF100`, or
-   `c+0xF200`, in order, to get a GID.
-3. Use the encoding to map `c` to a name, use Mac OS Roman to map the name to
-    a code, and use a (1,0) "cmap" subtable to map this code to a GID.
-4. Use the encoding to map `c` to a name, use the Adobe Glyph List to map the
-    name to unicode, and use a (3,1) "cmap" subtable to map this character to a
-    GID.
-5. Use the encoding to map `c` to a name, and use the "post" table to look
-    up the glyph by name.
+- **A.** Use a (1,0) "cmap" subtable to map `c` to a GID.
+- **B.** In a (3,0) "cmap" subtable, look up `c`, `c+0xF000`, `c+0xF100`, or
+  `c+0xF200`, in order, to get a GID.
+- **C.** Use the encoding to map `c` to a name, use Mac OS Roman to map the name to
+  a code, and use a (1,0) "cmap" subtable to map this code to a GID.
+- **D.** Use the encoding to map `c` to a name, use the Adobe Glyph List to map the
+  name to unicode, and use a (3,1) "cmap" subtable to map this character to a
+  GID.
+- **E.** Use the encoding to map `c` to a name, and use the "post" table to look
+  up the glyph by name.
 
 It is not completely specified which method should be used under which
 circumstances.  The spec recommends to avoid use of simple TrueType fonts and
@@ -84,12 +84,12 @@ This library uses the following methods when writing a TrueType font dictionary:
 
 |             | non-symbolic | symbolic   |
 | ----------: | :----------: | :--------: |
-| encoding    | 4            | 2          |
-| no encoding | avoid        | 1          |
+| encoding    | D            | B          |
+| no encoding | avoid        | A          |
 
 The following methods are tried in order when reading a TrueType font dictionary:
 
 |             | non-symbolic | symbolic   |
 | ----------: | :----------: | :--------: |
-| encoding    | 4, 3, 2, 1   | 4, 2, 5, 1 |
-| no encoding | 2, 1         | 2, 1       |
+| encoding    | D, C, E, B   | D, B, E, A |
+| no encoding | B, A         | B, A       |

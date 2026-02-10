@@ -25,6 +25,7 @@ import (
 
 	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/graphics/color"
 )
@@ -39,16 +40,7 @@ func main() {
 
 func createDocument(fname string) error {
 	pdfVersion := pdf.V2_0
-	useSymbolic := false
-	useEncoding := true
-	base := uint16(0x0000)
-
-	var methods string
-	if useEncoding {
-		methods = "ABCDE"
-	} else {
-		methods = "AB"
-	}
+	base := uint16(0xF000)
 
 	fb, err := NewFontBuilder()
 	if err != nil {
@@ -64,38 +56,94 @@ func createDocument(fname string) error {
 		return err
 	}
 
-	cs, err := color.CalRGB(color.WhitePointD65, nil, nil, nil)
-	if err != nil {
-		return err
-	}
-	black := cs.New(0, 0, 0)
-	gray := cs.New(0.7, 0.7, 0.7)
-	blue := cs.New(0, 0, 0.8)
+	black := color.DeviceGray(0)
+	gray := color.DeviceGray(0.65)
+	blue := color.DeviceRGB{0, 0, 0.8}
 
 	out, err := NewOutput(fname, pdfVersion)
 	if err != nil {
 		return err
 	}
+
+	// title page
 	out.Println(black, textFont,
-		fmt.Sprintf("PDF version %s, symbolic=%t, encoding=%t, base=0x%04X",
-			pdfVersion, useSymbolic, useEncoding, base))
+		"TrueType Character Encoding Test")
 	out.Println()
-	out.Println(`A: Use a (1,0) subtable to map c to a glyph.`)
-	out.Println(`B: Use a (3,0) subtable to map c+base to a glyph.`)
-	out.Println(`C: Use the encoding to map c to a MacOS Roman name,`)
-	out.Println(`    then use a (1,0) subtable to map the name to a glyph.`)
-	out.Println(`D: Use the encoding to map c to a glyph name,`)
-	out.Println(`    then use a (3,1) subtable to map the name to a glyph.`)
-	out.Println(`E: Use the encoding to map c to a glyph name,`)
-	out.Println(`    then use the PostScript table to map the name to a glyph.`)
+	out.Println("This document determines which method a PDF viewer uses to map")
+	out.Println("character codes to glyphs in simple TrueType fonts.  Each test")
+	out.Println("uses a specially crafted font where different methods produce")
+	out.Println("different three-digit codes.  Different PDF viewers may show")
+	out.Println("different codes, depending on the glyph selection algorithm used.")
+	out.Println()
+	out.Println("Read the code your viewer shows, then follow the matching line")
+	out.Println("to the next test until you reach a result (shown in blue).")
+	out.Println()
+	out.Println("Given a single-byte code c, the methods are:")
+	out.Println()
+	out.Println(labelFont, "A", textFont,
+		": look up c directly in a (1,0) cmap subtable.")
+	out.Println(labelFont, "B", textFont,
+		": look up c+0xF000 in a (3,0) cmap subtable.")
+	out.Println(labelFont, "C", textFont,
+		": use the PDF encoding to map c to a glyph name,")
+	out.Println("    map the name to a Mac OS Roman code,")
+	out.Println("    then look up that code in a (1,0) cmap subtable.")
+	out.Println(labelFont, "D", textFont,
+		": use the PDF encoding to map c to a glyph name,")
+	out.Println("    map the name to Unicode via the Adobe Glyph List,")
+	out.Println("    then look up the character in a (3,1) cmap subtable.")
+	out.Println(labelFont, "E", textFont,
+		": use the PDF encoding to map c to a glyph name,")
+	out.Println("    then look up the name in the post table.")
+	out.Println()
+	out.Println("Four decision trees follow, one for each combination of the")
+	out.Println("Symbolic flag and the Encoding entry in the PDF font dictionary.")
+
+	for _, useEncoding := range []bool{true, false} {
+		for _, useSymbolic := range []bool{true, false} {
+			out.NewPage()
+			err := writeTree(out, fb, labelFont, textFont,
+				black, gray, blue, useSymbolic, useEncoding, base)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return out.Close()
+}
+
+type node struct {
+	tag     string
+	choices []string
+}
+
+func writeTree(out *output, fb *fontBuilder,
+	labelFont, textFont font.Instance,
+	black, gray, blue color.Color,
+	useSymbolic, useEncoding bool,
+	base uint16,
+) error {
+	var methods string
+	if useEncoding {
+		methods = "ABCDE"
+	} else {
+		methods = "AB"
+	}
+
+	out.Println(black, textFont,
+		fmt.Sprintf("symbolic=%t, encoding=%t",
+			useSymbolic, useEncoding))
 	out.Println()
 
-	type node struct {
-		tag     string
-		choices []string
-	}
 	var candidates []string
 	for _, subset := range subsets(methods) {
+		// A and C both use the (1,0) cmap, so a viewer cannot
+		// support both independently.  Exclude orderings that
+		// contain both.
+		if strings.ContainsRune(subset, 'A') && strings.ContainsRune(subset, 'C') {
+			continue
+		}
 		candidates = append(candidates, permutations(subset)...)
 	}
 	todo := []node{
@@ -109,7 +157,6 @@ func createDocument(fname string) error {
 		todo = todo[:k]
 
 		if len(cur.choices) == 1 {
-			// no choice to make, this is a leaf node
 			out.Println(
 				black, labelFont, cur.tag,
 				textFont, ": order ", blue, cur.choices[0])
@@ -129,6 +176,12 @@ func createDocument(fname string) error {
 			for _, order := range cur.choices {
 				x := findFirstMatch(order, sel)
 				m[x] = append(m[x], order)
+			}
+
+			// at most one candidate may fall through to "XXX",
+			// otherwise those candidates would be indistinguishable
+			if len(m['X']) > 1 {
+				continue
 			}
 
 			min := len(cur.choices) + 1
@@ -166,9 +219,16 @@ func createDocument(fname string) error {
 		}
 		cc := maps.Keys(bestM)
 		slices.Sort(cc)
-		var xxx []string
+		var leaves []any
 		for _, c := range cc {
 			choices := bestM[c]
+			if c == 'X' {
+				if len(choices) == 1 {
+					leaves = append(leaves, black, ", XXX=", blue, choices[0])
+				}
+				continue
+			}
+
 			tag := fmt.Sprintf("%03d", nextNodeID)
 			nextNodeID++
 
@@ -183,12 +243,12 @@ func createDocument(fname string) error {
 				enc.cmap_3_1 = tag
 			case 'E':
 				enc.post = tag
-			case 'X':
-				xxx = choices
 			default:
 				panic(fmt.Sprintf("unexpected selector type %q", c))
 			}
-			if c != 'X' {
+			if len(choices) == 1 {
+				leaves = append(leaves, black, ", "+tag+"=", blue, choices[0])
+			} else {
 				todo = append(todo, node{tag, choices})
 			}
 		}
@@ -205,12 +265,11 @@ func createDocument(fname string) error {
 		rev[enc.post] = append(rev[enc.post], 'E')
 
 		var tags []string
-		if len(cur.choices) > 6-len(xxx) {
+		if len(cur.choices) > 6 {
 			tags = append(tags, fmt.Sprintf("%d orders", len(cur.choices)))
 		} else {
 			tags = append(tags, strings.Join(cur.choices, "|"))
 		}
-
 		keys := maps.Keys(rev)
 		sort.Strings(keys)
 		for _, tag := range keys {
@@ -227,22 +286,11 @@ func createDocument(fname string) error {
 			X, pdf.String(markerString),
 			textFont, gray, " " + strings.Join(tags, ", "),
 		}
-
-		if len(xxx) > 0 && len(xxx) < 6 {
-			if len(xxx) == 1 {
-				aa = append(aa, ", ", black, "XXX -> order ", blue, xxx[0])
-			} else {
-				aa = append(aa, ", XXX->"+strings.Join(xxx, "|"))
-			}
-		}
+		aa = append(aa, leaves...)
 
 		out.Println(aa...)
 	}
 
-	err = out.Close()
-	if err != nil {
-		return err
-	}
 	return nil
 }
 

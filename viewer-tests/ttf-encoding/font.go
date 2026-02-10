@@ -148,15 +148,9 @@ func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Instance, error) {
 	}
 
 	cmap_1_0 := &sfntcmap.Format0{}
-	for i := range cmap_1_0.Data {
-		cmap_1_0.Data[i] = byte(findGlyph['X'])
-	}
 	useCmap_1_0 := false
 
 	cmap_3_0 := sfntcmap.Format4{}
-	for c := range 256 {
-		cmap_3_0[uint16(c)+enc.base] = findGlyph['X']
-	}
 	useCmap_3_0 := false
 
 	cmap_3_1 := sfntcmap.Format4{}
@@ -164,12 +158,34 @@ func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Instance, error) {
 
 	var postTable *post.Info
 
-	// method A: in a (1,0) "cmap" look up `c` to get the GID
-	if enc.cmap_1_0 != "" {
-		rr := []rune(enc.cmap_1_0)
-		cmap_1_0.Data[markerString[0]] = byte(findGlyph[rr[0]])
-		cmap_1_0.Data[markerString[1]] = byte(findGlyph[rr[1]])
-		cmap_1_0.Data[markerString[2]] = byte(findGlyph[rr[2]])
+	// methods A and C both use the (1,0) cmap, so they must always be
+	// paired to avoid ambiguity (Format0 is a fixed 256-entry array).
+	if enc.cmap_1_0 != "" || enc.cmap_1_0_enc != "" {
+		// method A: look up `c` directly in the (1,0) cmap
+		if enc.cmap_1_0 != "" {
+			rr := []rune(enc.cmap_1_0)
+			cmap_1_0.Data[markerString[0]] = byte(findGlyph[rr[0]])
+			cmap_1_0.Data[markerString[1]] = byte(findGlyph[rr[1]])
+			cmap_1_0.Data[markerString[2]] = byte(findGlyph[rr[2]])
+		}
+
+		// method C: use encoding to map `c` to a MacOS Roman code,
+		// then look up that code in the (1,0) cmap
+		if enc.cmap_1_0_enc != "" {
+			if !enc.useEncoding {
+				return nil, errIncompatibleContraints
+			}
+			rr := []rune(enc.cmap_1_0_enc)
+			for i := range 3 {
+				name := pdfenc.WinAnsi.Encoding[markerString[i]]
+				macCode, ok := macOSRomanInv[name]
+				if !ok {
+					return nil, fmt.Errorf("no Mac Roman code for %q", name)
+				}
+				cmap_1_0.Data[macCode] = byte(findGlyph[rr[i]])
+			}
+		}
+
 		useCmap_1_0 = true
 	}
 
@@ -180,21 +196,6 @@ func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Instance, error) {
 		cmap_3_0[uint16(markerString[1])+enc.base] = findGlyph[rr[1]]
 		cmap_3_0[uint16(markerString[2])+enc.base] = findGlyph[rr[2]]
 		useCmap_3_0 = true
-	}
-
-	// method C: use the encoding to map `c` to a name, use MacOS Roman to map
-	// the name to a code, and then look up this code in a (1, 0) "cmap" to get
-	// the GID.
-	if enc.cmap_1_0_enc != "" {
-		if !enc.useEncoding {
-			return nil, errIncompatibleContraints
-		}
-
-		rr := []rune(enc.cmap_1_0_enc)
-		cmap_1_0.Data[macOSRomanInv[pdfenc.WinAnsi.Encoding[markerString[0]]]] = byte(findGlyph[rr[0]])
-		cmap_1_0.Data[macOSRomanInv[pdfenc.WinAnsi.Encoding[markerString[1]]]] = byte(findGlyph[rr[1]])
-		cmap_1_0.Data[macOSRomanInv[pdfenc.WinAnsi.Encoding[markerString[2]]]] = byte(findGlyph[rr[2]])
-		useCmap_1_0 = true
 	}
 
 	// method D: Use the encoding to map `c` to a name, use the Adobe Glyph
@@ -252,10 +253,14 @@ func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Instance, error) {
 		}
 	}
 
-	// build the subset	font
+	// build the subset font
 
 	newTTF := fb.base.Subset(glyphs)
 	newTTF.CMapTable = make(sfntcmap.Table)
+
+	// make .notdef (GID 0) look like X, so unmapped lookups render as "X"
+	outlines := newTTF.Outlines.(*glyf.Outlines)
+	outlines.Glyphs[0] = outlines.Glyphs[findGlyph['X']]
 	newTTF.FamilyName = fmt.Sprintf("Test%03d", fb.num)
 	fb.num++
 
@@ -271,7 +276,6 @@ func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Instance, error) {
 
 	// Since we are not sure which glyphs are going to be shown,
 	// make sure that all glyphs have the same width.
-	outlines := newTTF.Outlines.(*glyf.Outlines)
 	var w funit.Int16
 	for _, wi := range outlines.Widths[1:] {
 		if wi > w {
@@ -402,7 +406,14 @@ func (f *testFont) WritingMode() font.WritingMode {
 
 func (f *testFont) Codes(s pdf.String) iter.Seq[*font.Code] {
 	return func(yield func(*font.Code) bool) {
-		// TODO(voss): implement
+		var res font.Code
+		res.Width = f.width / 1000
+		for _, code := range s {
+			res.UseWordSpacing = (code == 0x20)
+			if !yield(&res) {
+				return
+			}
+		}
 	}
 }
 
@@ -417,18 +428,12 @@ func (f *testFont) Codec() *charcode.Codec {
 	return charcode.SimpleCodec
 }
 
-// CodesRemaining returns the number of character codes that can still be
-// allocated in this font instance.
-func (f *testFont) CodesRemaining() int {
-	return 0
-}
-
 // FontInfo returns information required to load the font file and to
 // extract the the glyph corresponding to a character identifier. The
 // result is a pointer to one of the FontInfo* types defined in the
 // font/dict package.
 func (f *testFont) FontInfo() any {
-	panic("not implemented") // TODO: Implement
+	panic("testFont.FontInfo not implemented")
 }
 
 var (

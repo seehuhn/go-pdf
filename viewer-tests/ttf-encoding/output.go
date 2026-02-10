@@ -85,6 +85,23 @@ func (o *output) Close() error {
 	return nil
 }
 
+// NewPage forces a page break before the next Println.
+func (o *output) NewPage() {
+	if o.err != nil {
+		return
+	}
+	o.page.TextEnd()
+	err := o.page.Close()
+	if err != nil {
+		o.err = err
+		return
+	}
+	o.page = o.doc.AddPage()
+	o.page.TextBegin()
+	o.yPos = o.top
+	o.lineNo = 0
+}
+
 func (o *output) Println(args ...any) {
 	if o.err != nil {
 		return

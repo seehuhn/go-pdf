@@ -33,17 +33,15 @@ order they are tried.
 Results
 -------
 
-|           | Preview  |  Ghostscript  |  Acrobat Reader  |  FireFox  | Chrome  |
-| :-------: | :------: | :-----------: | :--------------: | :-------: | :-----: |
-| 2.0/+S/+E | DBC      |  BDA          |  DBA             |  BE       |  DBEA   | B
-| 2.0/-S/+E | DBC      |  DC           |  DC              |  DC       |  DC     | DC
-| 2.0/+S/-E | BA       |  BA           |  BA              |  BA       |  BA     | BA
-| 2.0/-S/-E | B        |  -            |  -               |  A        |  AB     | -
-|           |          |               |                  |           |         |
-| 1.2/+S/+E | DBC      |  BDA          |  DBA             |  BE       |  DBEA   |
-| 1.2/-S/+E | DBC      |  DC           |  DC              |  DC       |  DC     |
-| 1.2/+S/-E | BA       |  BA           |  BA              |  BA       |  BA     |
-| 1.2/-S/-E | B        |  -            |  -               |  A        |  AB     |
+|       | Preview | Ghostscript | Acrobat Reader | Firefox | Chrome |
+| :---: | :-----: | :---------: | :------------: | :-----: | :----: |
+| +S/+E | DBCE    |  BDA        |  DBA           |  BE     |  DBEA  |
+| -S/+E | DBCE    |  DC         |  DCE           |  DCE    |  DCBE  |
+| +S/-E | BA      |  BA         |  BA            |  BA     |  BA    |
+| -S/-E | B       |  A          |  BA            |  A      |  A     |
+
++S = symbolic flag set, +E = Encoding entry present.
+Results marked ? need re-testing with the current version of the test file.
 
 
 Conclusions
@@ -52,6 +50,4 @@ Conclusions
 - Good choices when writing a PDF file seem to be the following:
   - symbolic font, no encoding, use method B
   - non-symbolic font, encoding, use method D
-- For readers, implementing the behaviour of Google Chrome seems a good choice.
-- Existing viewers seem to ignore the PDF version.
-- I found no evidence that Adobe Acrobat Reader implements method E.
+

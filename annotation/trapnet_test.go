@@ -166,7 +166,7 @@ func TestTrapNetDecodeRepair(t *testing.T) {
 		dict := pdf.Dict{
 			"Subtype":      pdf.Name("TrapNet"),
 			"Rect":         &pdf.Rectangle{URx: 612, URy: 792},
-			"LastModified":  pdf.TextString("D:20231215103000Z"),
+			"LastModified": pdf.TextString("D:20231215103000Z"),
 			"Version":      pdf.Array{pdf.NewReference(1, 0)},
 			"AnnotStates":  pdf.Array{pdf.Name("N")},
 		}
@@ -189,7 +189,7 @@ func TestTrapNetDecodeRepair(t *testing.T) {
 		dict := pdf.Dict{
 			"Subtype":      pdf.Name("TrapNet"),
 			"Rect":         &pdf.Rectangle{URx: 612, URy: 792},
-			"LastModified":  pdf.TextString("D:20231215103000Z"),
+			"LastModified": pdf.TextString("D:20231215103000Z"),
 			"Version":      pdf.Array{pdf.NewReference(1, 0)},
 		}
 		tn, err := decodeTrapNet(x, dict)
@@ -208,7 +208,7 @@ func TestTrapNetDecodeRepair(t *testing.T) {
 		dict := pdf.Dict{
 			"Subtype":      pdf.Name("TrapNet"),
 			"Rect":         &pdf.Rectangle{URx: 612, URy: 792},
-			"LastModified":  pdf.TextString("D:20231215103000Z"),
+			"LastModified": pdf.TextString("D:20231215103000Z"),
 			"AnnotStates":  pdf.Array{pdf.Name("N")},
 		}
 		tn, err := decodeTrapNet(x, dict)
