@@ -459,7 +459,8 @@ types:
   pdfRepr: dict
   introduced: '1.4'
   fields:
-  - goName: null
+  - goName: CropBox
+    goType: '*boxcolor.Style'
     pdfKey: CropBox
     pdfType: dictionary
     required: false
@@ -467,28 +468,31 @@ types:
     refTypes:
     - BoxStyle
     notes: Table 396
-  - goName: null
+  - goName: BleedBox
+    goType: '*boxcolor.Style'
     pdfKey: BleedBox
     pdfType: dictionary
     required: false
     introduced: '1.4'
     refTypes:
     - BoxStyle
-  - goName: null
+  - goName: TrimBox
+    goType: '*boxcolor.Style'
     pdfKey: TrimBox
     pdfType: dictionary
     required: false
     introduced: '1.4'
     refTypes:
     - BoxStyle
-  - goName: null
+  - goName: ArtBox
+    goType: '*boxcolor.Style'
     pdfKey: ArtBox
     pdfType: dictionary
     required: false
     introduced: '1.4'
     refTypes:
     - BoxStyle
-  readFunc: font.ExtractCIDSystemInfo
+  readFunc: boxcolor.ExtractInfo
   writeMethod: (*Info).Embed
   goPackage: boxcolor
   goRepr: struct
@@ -498,7 +502,8 @@ types:
   pdfRepr: dict
   introduced: '1.4'
   fields:
-  - goName: null
+  - goName: Color
+    goType: color.DeviceRGB
     pdfKey: C
     pdfType: array
     required: false
@@ -507,24 +512,24 @@ types:
     refTypes:
     - ArrayOf_3RGBNumbers
     notes: Table 397
-  - goName: null
+  - goName: LineWidth
+    goType: float64
     pdfKey: W
     pdfType: number
     required: false
     default: '1'
     introduced: '1.4'
     notes: line width
-  - goName: null
+  - goName: Style
+    goType: LineStyle
     pdfKey: S
     pdfType: name
     required: false
     default: S
     introduced: '1.4'
-    possibleValues:
-    - S
-    - D
-    notes: style (solid or dashed)
-  - goName: null
+    notes: style (solid or dashed); spec allows future styles
+  - goName: DashPattern
+    goType: '[]float64'
     pdfKey: D
     pdfType: array
     required: false
@@ -533,7 +538,7 @@ types:
     refTypes:
     - ArrayOfDashPatterns
     notes: dash pattern
-  readFunc: annotation.ExtractBorderStyle
+  readFunc: boxcolor.ExtractStyle
   writeMethod: (*Style).Embed
   goPackage: boxcolor
   goRepr: struct

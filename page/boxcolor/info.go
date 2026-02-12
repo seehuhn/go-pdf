@@ -38,10 +38,16 @@ type Info struct {
 	// ArtBox (optional) describes how guidelines for the page's art box
 	// should be shown.
 	ArtBox *Style
+
+	// SingleUse determines if Embed returns a dictionary (true) or
+	// a reference (false).
+	SingleUse bool
 }
 
 // ExtractInfo extracts a box colour information dictionary from a PDF object.
 func ExtractInfo(x *pdf.Extractor, obj pdf.Object) (*Info, error) {
+	singleUse := !x.IsIndirect
+
 	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err
@@ -51,6 +57,7 @@ func ExtractInfo(x *pdf.Extractor, obj pdf.Object) (*Info, error) {
 	}
 
 	info := &Info{}
+	info.SingleUse = singleUse
 
 	if style, err := pdf.ExtractorGetOptional(x, dict["CropBox"], ExtractStyle); err != nil {
 		return nil, err
@@ -88,7 +95,7 @@ func (i *Info) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	dict := pdf.Dict{}
 
 	if i.CropBox != nil {
-		obj, err := i.CropBox.Embed(e)
+		obj, err := e.Embed(i.CropBox)
 		if err != nil {
 			return nil, err
 		}
@@ -96,7 +103,7 @@ func (i *Info) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	if i.BleedBox != nil {
-		obj, err := i.BleedBox.Embed(e)
+		obj, err := e.Embed(i.BleedBox)
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +111,7 @@ func (i *Info) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	if i.TrimBox != nil {
-		obj, err := i.TrimBox.Embed(e)
+		obj, err := e.Embed(i.TrimBox)
 		if err != nil {
 			return nil, err
 		}
@@ -112,12 +119,21 @@ func (i *Info) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	if i.ArtBox != nil {
-		obj, err := i.ArtBox.Embed(e)
+		obj, err := e.Embed(i.ArtBox)
 		if err != nil {
 			return nil, err
 		}
 		dict["ArtBox"] = obj
 	}
 
-	return dict, nil
+	if i.SingleUse {
+		return dict, nil
+	}
+
+	ref := e.Alloc()
+	err := e.Out().Put(ref, dict)
+	if err != nil {
+		return nil, err
+	}
+	return ref, nil
 }

@@ -686,11 +686,13 @@ types:
     required: false
     introduced: '2.0'
 - name: EmbeddedFileParameter
-  goType: null
+  goType: file.Stream
   pdfRepr: dict
   introduced: '1.3'
+  notes: fields are flattened into file.Stream
   fields:
-  - goName: null
+  - goName: Size
+    goType: int64
     pdfKey: Size
     pdfType: integer
     required: false
@@ -698,12 +700,14 @@ types:
     possibleValues:
     - fn:Eval(@Size>=0)
     notes: Table 45
-  - goName: null
+  - goName: CreationDate
+    goType: time.Time
     pdfKey: CreationDate
     pdfType: date
     required: false
     introduced: '1.3'
-  - goName: null
+  - goName: ModDate
+    goType: time.Time
     pdfKey: ModDate
     pdfType: date
     required: false
@@ -716,7 +720,8 @@ types:
     deprecated: '2.0'
     refTypes:
     - Mac
-  - goName: null
+  - goName: CheckSum
+    goType: '[]byte'
     pdfKey: CheckSum
     pdfType: byte-string
     required: false
@@ -727,7 +732,7 @@ types:
   pdfType: EmbeddedFile
   pdfRepr: stream
   introduced: '1.3'
-  specTable: Table 5
+  specTable: Table 44
   fields:
   - goName: null
     pdfKey: Type
@@ -737,7 +742,8 @@ types:
     possibleValues:
     - EmbeddedFile
     notes: Table 5 and Table 44
-  - goName: null
+  - goName: MimeType
+    goType: string
     pdfKey: Subtype
     pdfType: name
     required: false
@@ -843,7 +849,7 @@ types:
   goPackage: file
   goRepr: struct
   specSection: 7.11.4
-  readFunc: metadata.Extract
+  readFunc: file.ExtractStream
   writeMethod: (*Stream).Embed
 - name: EncryptedPayload
   goType: file.EncryptedPayload

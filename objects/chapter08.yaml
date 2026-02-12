@@ -157,28 +157,40 @@ types:
     - SeparationColorSpace
     notes: Table 70, Colorants cell
 - name: DeviceCMYKColorSpace
-  goType: null
-  pdfRepr: dict
-  introduced: '1.0'
+  goType: graphics/color.spaceDeviceCMYK
+  writeMethod: (spaceDeviceCMYK).Embed
+  readFunc: extract.ColorSpace
+  goPackage: color
+  goRepr: struct
+  pdfRepr: name
+  introduced: '1.1'
+  specSection: '8.6.4'
+  notes: unexported type, exported as SpaceDeviceCMYK variable
   fields:
   - goName: null
     pdfKey: '0'
     pdfType: name
     required: true
-    introduced: '1.0'
+    introduced: '1.1'
     possibleValues:
     - DeviceCMYK
     notes: Clause 8.6.3 and https://github.com/pdf-association/pdf-issues/issues/552
 - name: DeviceGrayColorSpace
-  goType: null
-  pdfRepr: dict
-  introduced: '1.0'
+  goType: graphics/color.spaceDeviceGray
+  writeMethod: (spaceDeviceGray).Embed
+  readFunc: extract.ColorSpace
+  goPackage: color
+  goRepr: struct
+  pdfRepr: name
+  introduced: '1.1'
+  specSection: '8.6.4'
+  notes: unexported type, exported as SpaceDeviceGray variable
   fields:
   - goName: null
     pdfKey: '0'
     pdfType: name
     required: true
-    introduced: '1.0'
+    introduced: '1.1'
     possibleValues:
     - DeviceGray
     notes: Clause 8.6.3 and https://github.com/pdf-association/pdf-issues/issues/552
@@ -336,15 +348,21 @@ types:
     refTypes:
     - ArrayOfNamesGeneral
 - name: DeviceRGBColorSpace
-  goType: null
-  pdfRepr: dict
-  introduced: '1.0'
+  goType: graphics/color.spaceDeviceRGB
+  writeMethod: (spaceDeviceRGB).Embed
+  readFunc: extract.ColorSpace
+  goPackage: color
+  goRepr: struct
+  pdfRepr: name
+  introduced: '1.1'
+  specSection: '8.6.4'
+  notes: unexported type, exported as SpaceDeviceRGB variable
   fields:
   - goName: null
     pdfKey: '0'
     pdfType: name
     required: true
-    introduced: '1.0'
+    introduced: '1.1'
     possibleValues:
     - DeviceRGB
     notes: Clause 8.6.3 and https://github.com/pdf-association/pdf-issues/issues/552

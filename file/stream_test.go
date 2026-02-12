@@ -107,6 +107,24 @@ var streamTestCases = []struct {
 			},
 		},
 	},
+	{
+		name:    "comprehensive stream V2.0",
+		version: pdf.V2_0,
+		stream: &Stream{
+			MimeType:     "image/png",
+			Size:         512,
+			CreationDate: time.Date(2024, 5, 10, 8, 0, 0, 0, time.UTC),
+			ModDate:      time.Date(2024, 5, 10, 9, 30, 0, 0, time.UTC),
+			CheckSum: func() []byte {
+				hash := md5.Sum([]byte("PDF 2.0 test data"))
+				return hash[:]
+			}(),
+			WriteData: func(w io.Writer) error {
+				_, err := w.Write([]byte("PDF 2.0 test data"))
+				return err
+			},
+		},
+	},
 }
 
 func streamRoundTripTest(t *testing.T, version pdf.Version, stream *Stream) {
@@ -118,7 +136,10 @@ func streamRoundTripTest(t *testing.T, version pdf.Version, stream *Stream) {
 	rm := pdf.NewResourceManager(w)
 	obj, err := rm.Embed(stream)
 	if err != nil {
-		t.Fatalf("Embed failed: %v", err)
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
+		t.Fatalf("embed failed: %v", err)
 	}
 
 	err = rm.Close()
@@ -256,13 +277,13 @@ func FuzzStreamRoundTrip(f *testing.F) {
 
 	for _, tc := range streamTestCases {
 		w, buf := memfile.NewPDFWriter(tc.version, opt)
-		rm := pdf.NewResourceManager(w)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {
 			continue
 		}
 
+		rm := pdf.NewResourceManager(w)
 		obj, err := rm.Embed(tc.stream)
 		if err != nil {
 			continue
@@ -299,6 +320,6 @@ func FuzzStreamRoundTrip(f *testing.F) {
 			t.Skip("malformed stream object")
 		}
 
-		streamRoundTripTest(t, pdf.V1_7, stream)
+		streamRoundTripTest(t, pdf.GetVersion(r), stream)
 	})
 }

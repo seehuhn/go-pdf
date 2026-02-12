@@ -25,6 +25,8 @@ import (
 
 // PDF 2.0 sections: 14.11.2
 
+// Style specifies the visual characteristics for displaying a page boundary
+// guideline.
 type Style struct {
 	// Color specifies the line color to use.
 	//
@@ -32,6 +34,8 @@ type Style struct {
 	Color color.DeviceRGB
 
 	// LineWidth specifies the line width to use, in default user space units.
+	//
+	// On write, the value 0 can be used as a shorthand for 1.
 	//
 	// This corresponds to the /W entry in the PDF box style dictionary.
 	LineWidth float64
@@ -43,17 +47,24 @@ type Style struct {
 	// This corresponds to the /S entry in the PDF box style dictionary.
 	Style LineStyle
 
-	// DashPattern specifies the dash pattern to use for dashed lines,
-	// in default user space units
+	// DashPattern specifies the dash pattern for dashed lines,
+	// in default user space units.
+	// Must be nil for solid line styles.
 	//
-	// On write, an empty slice can be used as a shorthand for []float64{3}.
+	// On write, a nil value is equivalent to []float64{3}.
 	//
 	// This corresponds to the /D entry in the PDF box style dictionary.
 	DashPattern []float64
+
+	// SingleUse determines if Embed returns a dictionary (true) or
+	// a reference (false).
+	SingleUse bool
 }
 
 // ExtractStyle extracts a box style dictionary from a PDF object.
 func ExtractStyle(x *pdf.Extractor, obj pdf.Object) (*Style, error) {
+	singleUse := !x.IsIndirect
+
 	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err
@@ -62,6 +73,7 @@ func ExtractStyle(x *pdf.Extractor, obj pdf.Object) (*Style, error) {
 	}
 
 	style := &Style{}
+	style.SingleUse = singleUse
 
 	// color (clamp to valid range [0.0, 1.0])
 	if cArray, err := pdf.Optional(x.GetArray(dict["C"])); err != nil {
@@ -95,17 +107,19 @@ func ExtractStyle(x *pdf.Extractor, obj pdf.Object) (*Style, error) {
 		style.Style = StyleSolid // PDF default
 	}
 
-	// dash pattern
+	// dash pattern (only for non-solid styles)
 	if dArray, err := pdf.Optional(x.GetArray(dict["D"])); err != nil {
 		return nil, err
-	} else if len(dArray) > 0 {
-		style.DashPattern = make([]float64, len(dArray))
-		for i, v := range dArray {
-			n, _ := x.GetNumber(v)
-			style.DashPattern[i] = float64(n)
+	} else if style.Style != StyleSolid {
+		if len(dArray) > 0 {
+			style.DashPattern = make([]float64, len(dArray))
+			for i, v := range dArray {
+				n, _ := x.GetNumber(v)
+				style.DashPattern[i] = max(0, float64(n))
+			}
+		} else {
+			style.DashPattern = []float64{3}
 		}
-	} else {
-		style.DashPattern = []float64{3}
 	}
 
 	return style, nil
@@ -113,7 +127,7 @@ func ExtractStyle(x *pdf.Extractor, obj pdf.Object) (*Style, error) {
 
 // Embed converts the box style dictionary to a PDF dictionary.
 func (s *Style) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
-	if err := pdf.CheckVersion(e.Out(), "box colour information dictionary", pdf.V1_4); err != nil {
+	if err := pdf.CheckVersion(e.Out(), "box style dictionary", pdf.V1_4); err != nil {
 		return nil, err
 	}
 
@@ -146,9 +160,17 @@ func (s *Style) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["S"] = pdf.Name(s.Style)
 	}
 
-	// dash pattern
+	// dash pattern (must be nil for solid styles)
+	if (s.Style == "" || s.Style == StyleSolid) && s.DashPattern != nil {
+		return nil, fmt.Errorf("dash pattern must be nil for solid line style")
+	}
 	dashPattern := s.DashPattern
-	if len(dashPattern) > 0 && (len(dashPattern) != 1 || dashPattern[0] != 3) {
+	for i, v := range dashPattern {
+		if v < 0 {
+			return nil, fmt.Errorf("dash pattern element %d must be non-negative: %g", i, v)
+		}
+	}
+	if len(dashPattern) > 0 && (len(dashPattern) != 1 || dashPattern[0] != defaultDashPattern[0]) {
 		dashArray := make(pdf.Array, len(dashPattern))
 		for i, v := range dashPattern {
 			dashArray[i] = pdf.Number(v)
@@ -156,8 +178,20 @@ func (s *Style) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["D"] = dashArray
 	}
 
-	return dict, nil
+	if s.SingleUse {
+		return dict, nil
+	}
+
+	ref := e.Alloc()
+	err := e.Out().Put(ref, dict)
+	if err != nil {
+		return nil, err
+	}
+	return ref, nil
 }
+
+// defaultDashPattern is the PDF default dash pattern for box style guidelines.
+var defaultDashPattern = []float64{3}
 
 type LineStyle pdf.Name
 

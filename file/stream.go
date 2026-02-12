@@ -18,6 +18,7 @@ package file
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"time"
 
@@ -26,18 +27,16 @@ import (
 
 // PDF 2.0 sections: 7.11.4
 
-// Stream represents an embedded file stream dictionary.
-// Embedded file streams allow external files to be embedded directly
-// within the PDF document body, making it self-contained.
+// Stream represents an embedded file stream.
+// This allows the contents of an external file to be stored
+// within the body of a PDF document.
 type Stream struct {
-	// MimeType (optional) specifies the MIME media type of the embedded file.
-	//
-	// This corresponds to the /Subtype entry in the PDF dictionary.
+	// MimeType (optional) specifies the MIME media type of the embedded file,
+	// for example "application/pdf" or "image/png".
 	MimeType string
 
-	// Size (optional) specifies the uncompressed size of the embedded file in
-	// bytes. A zero value means the Size entry is omitted from the PDF
-	// dictionary.
+	// Size (optional) specifies the uncompressed size of the embedded file
+	// in bytes.
 	Size int64
 
 	// CreationDate (optional) specifies when the embedded file was created.
@@ -46,8 +45,8 @@ type Stream struct {
 	// ModDate (optional) specifies when the embedded file was last modified.
 	ModDate time.Time
 
-	// CheckSum (optional) contains the MD5 checksum of the uncompressed
-	// embedded file. Must be exactly 16 bytes when present.
+	// CheckSum (optional) is the MD5 checksum of the uncompressed
+	// embedded file. It must be exactly 16 bytes when present.
 	CheckSum []byte
 
 	// WriteData writes the embedded file data to the provided writer.
@@ -60,7 +59,7 @@ func ExtractStream(x *pdf.Extractor, obj pdf.Object) (*Stream, error) {
 	if err != nil {
 		return nil, err
 	} else if stream == nil {
-		return nil, pdf.Errorf("missing embedded file stream")
+		return nil, pdf.Error("missing embedded file stream")
 	}
 
 	// Check Type field - optional for embedded file streams
@@ -128,54 +127,42 @@ func ExtractStream(x *pdf.Extractor, obj pdf.Object) (*Stream, error) {
 }
 
 // Embed converts the Stream to a PDF stream object.
-func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-	// Check PDF version requirement for embedded file streams (PDF 1.3)
-	if err := pdf.CheckVersion(rm.Out(), "embedded file streams", pdf.V1_3); err != nil {
+func (s *Stream) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
+	if err := pdf.CheckVersion(e.Out(), "embedded file streams", pdf.V1_3); err != nil {
 		return nil, err
 	}
 
-	// Validate WriteData is provided
 	if s.WriteData == nil {
-		return nil, pdf.Errorf("WriteData function is required for embedded file streams")
+		return nil, errors.New("WriteData function is required for embedded file streams")
 	}
 
-	// Validate CheckSum length if present
 	if len(s.CheckSum) != 0 && len(s.CheckSum) != 16 {
-		return nil, pdf.Errorf("CheckSum must be exactly 16 bytes when present")
+		return nil, errors.New("CheckSum must be exactly 16 bytes when present")
 	}
 
-	// Create stream dictionary
 	dict := pdf.Dict{}
-	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
+	if e.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("EmbeddedFile")
 	}
 
-	// Add Subtype (MimeType) if present
 	if s.MimeType != "" {
 		dict["Subtype"] = pdf.Name(s.MimeType)
 	}
 
-	// Create Params dictionary only if any fields have data
+	// params dictionary
 	var paramsDict pdf.Dict
 	if s.Size > 0 || !s.CreationDate.IsZero() || !s.ModDate.IsZero() || len(s.CheckSum) > 0 {
 		paramsDict = pdf.Dict{}
 
-		// Add Size if greater than 0
 		if s.Size > 0 {
 			paramsDict["Size"] = pdf.Integer(s.Size)
 		}
-
-		// Add CreationDate if not zero
 		if !s.CreationDate.IsZero() {
 			paramsDict["CreationDate"] = pdf.Date(s.CreationDate)
 		}
-
-		// Add ModDate if not zero
 		if !s.ModDate.IsZero() {
 			paramsDict["ModDate"] = pdf.Date(s.ModDate)
 		}
-
-		// Add CheckSum if present
 		if len(s.CheckSum) == 16 {
 			paramsDict["CheckSum"] = pdf.String(s.CheckSum)
 		}
@@ -183,25 +170,20 @@ func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["Params"] = paramsDict
 	}
 
-	// Create the stream object
-	ref := rm.Alloc()
+	ref := e.Alloc()
 
-	// Open stream for writing
-	w, err := rm.Out().OpenStream(ref, dict)
+	w, err := e.Out().OpenStream(ref, dict)
 	if err != nil {
 		return nil, err
 	}
 
-	// Write data using the WriteData function
 	err = s.WriteData(w)
+	closeErr := w.Close()
 	if err != nil {
 		return nil, err
 	}
-
-	// Close the stream
-	err = w.Close()
-	if err != nil {
-		return nil, err
+	if closeErr != nil {
+		return nil, closeErr
 	}
 
 	return ref, nil
@@ -225,14 +207,8 @@ func (s *Stream) Equal(other *Stream) bool {
 		return false
 	}
 
-	// Compare CheckSum
-	if len(s.CheckSum) != len(other.CheckSum) {
+	if !bytes.Equal(s.CheckSum, other.CheckSum) {
 		return false
-	}
-	for i, b := range s.CheckSum {
-		if b != other.CheckSum[i] {
-			return false
-		}
 	}
 
 	// Compare WriteData function outputs

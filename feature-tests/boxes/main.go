@@ -46,10 +46,11 @@ func doit() error {
 	page.Page.BleedBox = &pdf.Rectangle{LLx: 85, LLy: 85, URx: 515, URy: 515}
 	page.Page.ArtBox = &pdf.Rectangle{LLx: 150, LLy: 150, URx: 450, URy: 450}
 	page.Page.BoxColorInfo = &boxcolor.Info{
-		CropBox:  &boxcolor.Style{Color: color.DeviceRGB{0.4, 0, 0.8}, LineWidth: 2}, // purple
-		TrimBox:  &boxcolor.Style{Color: color.DeviceRGB{0.8, 0.4, 0}, LineWidth: 2}, // orange
-		BleedBox: &boxcolor.Style{Color: color.DeviceRGB{0, 0, 0.8}, LineWidth: 2},   // blue
-		ArtBox:   &boxcolor.Style{Color: color.DeviceRGB{0, 0.8, 0}, LineWidth: 2},   // green
+		CropBox:   &boxcolor.Style{Color: color.DeviceRGB{0.4, 0, 0.8}, LineWidth: 2, SingleUse: true}, // purple
+		TrimBox:   &boxcolor.Style{Color: color.DeviceRGB{0.8, 0.4, 0}, LineWidth: 2, SingleUse: true}, // orange
+		BleedBox:  &boxcolor.Style{Color: color.DeviceRGB{0, 0, 0.8}, LineWidth: 2, SingleUse: true},   // blue
+		ArtBox:    &boxcolor.Style{Color: color.DeviceRGB{0, 0.8, 0}, LineWidth: 2, SingleUse: true},   // green
+		SingleUse: true,
 	}
 
 	F := standard.Helvetica.New()

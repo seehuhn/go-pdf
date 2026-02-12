@@ -4683,7 +4683,8 @@ types:
   pdfType: Annot
   pdfRepr: dict
   introduced: '1.3'
-  specTable: Table 166
+  specTable: Table 187
+  specSection: 12.5.6.15
   fields:
   - goName: null
     pdfKey: Type
