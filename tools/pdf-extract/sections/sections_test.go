@@ -190,12 +190,12 @@ func TestPagesSpanningMultiplePages(t *testing.T) {
 
 	// pre-allocate page references
 	var pageRefs []pdf.Reference
-	for i := 0; i < 6; i++ {
+	for range 6 {
 		pageRefs = append(pageRefs, doc.Out.Alloc())
 	}
 
 	// create pages
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		page := doc.AddPage()
 		page.Ref = pageRefs[i]
 		err = page.Close()

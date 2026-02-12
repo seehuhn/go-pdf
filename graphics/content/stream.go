@@ -463,7 +463,7 @@ func (s *streamScanner) readInlineImage() (Operator, error) {
 			return Operator{}, errParse
 		}
 		imageData = make([]byte, length)
-		for i := 0; i < length; i++ {
+		for i := range length {
 			b, err := s.readByte()
 			if err != nil {
 				return Operator{}, err
@@ -668,7 +668,7 @@ func (s *streamScanner) readString() (pdf.String, error) {
 				ignoreLF = true
 			case '0', '1', '2', '3', '4', '5', '6', '7': // octal
 				oct := b - '0'
-				for i := 0; i < 2; i++ {
+				for range 2 {
 					b, err = s.peek()
 					if err == io.EOF {
 						break
@@ -861,10 +861,7 @@ func (s *streamScanner) peekN(n int) []byte {
 	}
 
 	a := s.pos
-	b := s.pos + n
-	if b > s.used {
-		b = s.used
-	}
+	b := min(s.pos+n, s.used)
 	return s.buf[a:b]
 }
 

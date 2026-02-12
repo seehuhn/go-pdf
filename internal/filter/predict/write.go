@@ -84,10 +84,7 @@ func (w *writer) Write(data []byte) (n int, err error) {
 		available := len(data) - pos
 		needed := w.params.bytesPerRow() - w.tempLen
 
-		copyLen := available
-		if copyLen > needed {
-			copyLen = needed
-		}
+		copyLen := min(available, needed)
 
 		copy(w.tempBuffer[w.tempLen:], data[pos:pos+copyLen])
 		w.tempLen += copyLen
@@ -290,7 +287,7 @@ func (w *writer) applyPNGPredictor(rowData []byte, algorithm byte) ([]byte, erro
 
 	bytesPerPixel := w.params.bytesPerPixel()
 
-	for i := 0; i < len(rowData); i++ {
+	for i := range rowData {
 		var predictor byte
 
 		switch algorithm {

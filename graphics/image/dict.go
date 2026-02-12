@@ -799,7 +799,7 @@ func (d *Dict) check(out *pdf.Writer) error {
 					return fmt.Errorf("MaskColors[%d] value %d exceeds maximum %d", i, v, maxVal)
 				}
 			}
-			for i := 0; i < numChannels; i++ {
+			for i := range numChannels {
 				if d.MaskColors[2*i] > d.MaskColors[2*i+1] {
 					return fmt.Errorf("MaskColors[%d] > MaskColors[%d]", 2*i, 2*i+1)
 				}

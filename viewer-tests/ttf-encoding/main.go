@@ -313,13 +313,13 @@ func permutations(s string) []string {
 func subsets(s string) []string {
 	var res []string
 	for bits := 1; bits < 1<<len(s); bits++ {
-		var choice string
+		var choice strings.Builder
 		for j, char := range s {
 			if bits&(1<<j) != 0 {
-				choice += string(char)
+				choice.WriteString(string(char))
 			}
 		}
-		res = append(res, choice)
+		res = append(res, choice.String())
 	}
 	return res
 }

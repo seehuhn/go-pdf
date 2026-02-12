@@ -87,7 +87,7 @@ func (g *Generator) GenerateText(wordCount int) string {
 	var result []string
 	currentWord := g.startNewSentence()
 
-	for i := 0; i < wordCount; i++ {
+	for i := range wordCount {
 		result = append(result, currentWord)
 
 		// Add punctuation occasionally to create natural sentence breaks

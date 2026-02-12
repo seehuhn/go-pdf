@@ -33,7 +33,7 @@ func TestKnownOrderings(t *testing.T) {
 
 	// to exercise the caching paths, we run the tests twice
 	var cacheSize [2]int
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		for _, ordering := range knownOrderings {
 			mapping, err := GetCIDTextMapping("Adobe", ordering)
 			if err != nil {

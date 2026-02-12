@@ -67,7 +67,7 @@ func TestGetQuadPointsSimple(t *testing.T) {
 	if len(corners) != len(expected) {
 		t.Fatalf("expected %d points, got %d", len(expected), len(corners))
 	}
-	for i := 0; i < len(expected); i++ {
+	for i := range expected {
 		if math.Abs(corners[i].X-expected[i].X) > 1e-6 || math.Abs(corners[i].Y-expected[i].Y) > 1e-6 {
 			t.Errorf("point %d: expected (%.6f, %.6f), got (%.6f, %.6f)", i, expected[i].X, expected[i].Y, corners[i].X, corners[i].Y)
 		}
@@ -154,7 +154,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 				return
 			}
 
-			for i := 0; i < len(expected); i++ {
+			for i := range expected {
 				if math.Abs(result[i].X-expected[i].X) > 1e-6 || math.Abs(result[i].Y-expected[i].Y) > 1e-6 {
 					t.Errorf("point %d: expected (%.6f, %.6f), got (%.6f, %.6f)", i, expected[i].X, expected[i].Y, result[i].X, result[i].Y)
 				}
@@ -212,7 +212,7 @@ func calculateExpectedQuadPoints(fontSize, textRise, skip float64, ctm, textMatr
 
 	// Transform all corners to default user space
 	result := make([]vec.Vec2, 4)
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		x, y := M.Apply(rectText[2*i], rectText[2*i+1])
 		result[i] = vec.Vec2{X: x, Y: y}
 	}
@@ -399,10 +399,10 @@ func writeDummyDocument(w io.Writer, makeFont func() font.Layouter) error {
 	rng := rand.New(rand.NewSource(0))
 
 	var par []string
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		n := rng.Intn(9) + 1
 		par = par[:0]
-		for j := 0; j < n; j++ {
+		for range n {
 			if rng.Intn(2) == 0 {
 				par = append(par, words1...)
 			} else {

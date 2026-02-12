@@ -54,8 +54,8 @@ var testCases = []struct {
 			BitsPerComponent: 8,
 			WriteData: func(w io.Writer) error {
 				// Simple test pattern: alternating red and blue pixels
-				for y := 0; y < 50; y++ {
-					for x := 0; x < 100; x++ {
+				for y := range 50 {
+					for x := range 100 {
 						if (x+y)%2 == 0 {
 							_, err := w.Write([]byte{255, 0, 0}) // red
 							if err != nil {
@@ -84,8 +84,8 @@ var testCases = []struct {
 			Interpolate:      true,
 			WriteData: func(w io.Writer) error {
 				// Gradient pattern
-				for y := 0; y < 25; y++ {
-					for x := 0; x < 25; x++ {
+				for y := range 25 {
+					for x := range 25 {
 						gray := uint8((x + y) * 255 / 48)
 						if _, err := w.Write([]byte{gray}); err != nil {
 							return err
@@ -107,8 +107,8 @@ var testCases = []struct {
 			Decode:           []float64{0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0},
 			WriteData: func(w io.Writer) error {
 				// Simple CMYK test pattern
-				for y := 0; y < 10; y++ {
-					for x := 0; x < 10; x++ {
+				for y := range 10 {
+					for x := range 10 {
 						c := uint8(x * 25)
 						m := uint8(y * 25)
 						y_val := uint8((x + y) * 12)
@@ -133,7 +133,7 @@ var testCases = []struct {
 			Intent:           graphics.RenderingIntent("Perceptual"),
 			WriteData: func(w io.Writer) error {
 				// Solid color
-				for i := 0; i < 20*20; i++ {
+				for range 20 * 20 {
 					if _, err := w.Write([]byte{128, 64, 192}); err != nil {
 						return err
 					}
@@ -153,8 +153,8 @@ var testCases = []struct {
 			MaskColors:       []uint16{0, 10, 0, 10, 0, 10}, // mask near-black pixels
 			WriteData: func(w io.Writer) error {
 				// Pattern with some pixels that will be masked
-				for y := 0; y < 15; y++ {
-					for x := 0; x < 15; x++ {
+				for y := range 15 {
+					for x := range 15 {
 						if x == 0 || y == 0 {
 							_, err := w.Write([]byte{5, 5, 5}) // will be masked
 							if err != nil {
@@ -186,8 +186,8 @@ var testCases = []struct {
 				BitsPerComponent: 8,
 				WriteData: func(w io.Writer) error {
 					// Alpha gradient
-					for y := 0; y < 8; y++ {
-						for x := 0; x < 8; x++ {
+					for y := range 8 {
+						for x := range 8 {
 							alpha := uint8((x + y) * 255 / 14)
 							if _, err := w.Write([]byte{alpha}); err != nil {
 								return err
@@ -199,8 +199,8 @@ var testCases = []struct {
 			},
 			WriteData: func(w io.Writer) error {
 				// RGB data
-				for y := 0; y < 8; y++ {
-					for x := 0; x < 8; x++ {
+				for y := range 8 {
+					for x := range 8 {
 						r := uint8(x * 32)
 						g := uint8(y * 32)
 						b := uint8(128)
@@ -228,7 +228,7 @@ var testCases = []struct {
 				Matte:            []float64{0.5, 0.3, 0.7}, // RGB matte color
 				WriteData: func(w io.Writer) error {
 					// Simple alpha pattern
-					for i := 0; i < 16; i++ {
+					for i := range 16 {
 						alpha := uint8((i % 4) * 85)
 						if _, err := w.Write([]byte{alpha}); err != nil {
 							return err
@@ -239,7 +239,7 @@ var testCases = []struct {
 			},
 			WriteData: func(w io.Writer) error {
 				// Pre-blended RGB data
-				for i := 0; i < 16; i++ {
+				for range 16 {
 					r := uint8(200)
 					g := uint8(150)
 					b := uint8(100)
@@ -262,7 +262,7 @@ var testCases = []struct {
 			SMaskInData:      1, // image data includes encoded soft-mask values
 			WriteData: func(w io.Writer) error {
 				// RGB data (SMaskInData would normally be for JPXDecode)
-				for i := 0; i < 36; i++ {
+				for i := range 36 {
 					r := uint8(i * 7)
 					g := uint8(100)
 					b := uint8(200 - i*5)
@@ -285,9 +285,9 @@ var testCases = []struct {
 			WriteData: func(w io.Writer) error {
 				// Checkerboard pattern in 1-bit
 				buf := NewPixelRow(16, 1)
-				for y := 0; y < 16; y++ {
+				for y := range 16 {
 					buf.Reset()
-					for x := 0; x < 16; x++ {
+					for x := range 16 {
 						bit := uint16((x + y) % 2)
 						buf.AppendBits(bit)
 					}
@@ -310,9 +310,9 @@ var testCases = []struct {
 			WriteData: func(w io.Writer) error {
 				// High precision RGB data
 				buf := NewPixelRow(5*3, 16) // 5 pixels * 3 channels
-				for y := 0; y < 5; y++ {
+				for y := range 5 {
 					buf.Reset()
-					for x := 0; x < 5; x++ {
+					for x := range 5 {
 						r := uint16(x * 13107) // 0-52428 range
 						g := uint16(y * 13107)
 						b := uint16(32768) // mid value
@@ -344,7 +344,7 @@ var testCases = []struct {
 					BitsPerComponent: 8,
 					WriteData: func(w io.Writer) error {
 						// RGB version
-						for i := 0; i < 144; i++ {
+						for i := range 144 {
 							val := uint8(i * 255 / 143)
 							if _, err := w.Write([]byte{val, val / 2, val / 3}); err != nil {
 								return err
@@ -356,7 +356,7 @@ var testCases = []struct {
 			},
 			WriteData: func(w io.Writer) error {
 				// Grayscale version
-				for i := 0; i < 144; i++ {
+				for i := range 144 {
 					val := uint8(i * 255 / 143)
 					if _, err := w.Write([]byte{val}); err != nil {
 						return err
@@ -377,7 +377,7 @@ var testCases = []struct {
 			// Skip metadata for now - requires properly initialized XMP packet
 			WriteData: func(w io.Writer) error {
 				// Simple pattern
-				for i := 0; i < 64; i++ {
+				for i := range 64 {
 					val := uint8(i * 4)
 					if _, err := w.Write([]byte{val}); err != nil {
 						return err
@@ -413,8 +413,8 @@ var testCases = []struct {
 			},
 			WriteData: func(w io.Writer) error {
 				// Geospatial RGB data
-				for y := 0; y < 6; y++ {
-					for x := 0; x < 6; x++ {
+				for y := range 6 {
+					for x := range 6 {
 						r := uint8(x * 42)
 						g := uint8(y * 42)
 						b := uint8(128)
@@ -441,7 +441,7 @@ var testCases = []struct {
 			},
 			WriteData: func(w io.Writer) error {
 				// Simple RGB pattern
-				for i := 0; i < 100; i++ {
+				for i := range 100 {
 					r := uint8((i * 3) % 256)
 					g := uint8((i * 5) % 256)
 					b := uint8((i * 7) % 256)

@@ -780,7 +780,7 @@ var (
 	zlibReaderPool = &sync.Pool{}
 
 	zlibWriterPool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			zw, _ := zlib.NewWriterLevel(nil, zlib.BestCompression)
 			return zw
 		},

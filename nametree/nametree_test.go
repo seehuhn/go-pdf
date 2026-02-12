@@ -207,7 +207,7 @@ func TestLargeTree(t *testing.T) {
 	}
 
 	// add many entries to force multi-level tree
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		key := pdf.Name(string(rune('a'+i%26)) + string(rune('a'+(i/26)%26)) + string(rune('0'+i%10)))
 		tree.Data[key] = pdf.Integer(i)
 	}
@@ -330,7 +330,7 @@ func TestStreamingVeryLargeTree(t *testing.T) {
 
 	// streaming iterator that generates entries on demand
 	data := func(yield func(pdf.Name, pdf.Object) bool) {
-		for i := 0; i < numEntries; i++ {
+		for i := range numEntries {
 			key := pdf.Name(fmt.Sprintf("key%06d", i))
 			value := pdf.Integer(i)
 			if !yield(key, value) {
@@ -454,7 +454,7 @@ func TestWriteMapLarge(t *testing.T) {
 
 	// large map to test sorting and tree structure
 	data := make(map[pdf.Name]pdf.Object)
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		key := pdf.Name(fmt.Sprintf("key%03d", i))
 		data[key] = pdf.Integer(i)
 	}

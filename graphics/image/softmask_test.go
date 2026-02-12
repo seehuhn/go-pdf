@@ -56,9 +56,9 @@ var softMaskTests = []struct {
 			WriteData: func(w io.Writer) error {
 				// generate 1-bit test pattern (checkerboard)
 				buf := NewPixelRow(32, 1)
-				for y := 0; y < 16; y++ {
+				for y := range 16 {
 					buf.Reset()
-					for x := 0; x < 32; x++ {
+					for x := range 32 {
 						bit := uint16((x + y) % 2)
 						buf.AppendBits(bit)
 					}
@@ -80,9 +80,9 @@ var softMaskTests = []struct {
 			WriteData: func(w io.Writer) error {
 				// generate 4-bit test pattern
 				buf := NewPixelRow(64, 4)
-				for y := 0; y < 32; y++ {
+				for y := range 32 {
 					buf.Reset()
-					for x := 0; x < 64; x++ {
+					for x := range 64 {
 						val := uint16((x + y) % 16)
 						buf.AppendBits(val)
 					}
@@ -105,8 +105,8 @@ var softMaskTests = []struct {
 				// radial gradient
 				buf := make([]byte, 25*25)
 				center := 12.0
-				for y := 0; y < 25; y++ {
-					for x := 0; x < 25; x++ {
+				for y := range 25 {
+					for x := range 25 {
 						dx := float64(x) - center
 						dy := float64(y) - center
 						dist := dx*dx + dy*dy
@@ -129,8 +129,8 @@ var softMaskTests = []struct {
 			WriteData: func(w io.Writer) error {
 				// diagonal gradient
 				buf := make([]byte, 40*30)
-				for y := 0; y < 30; y++ {
-					for x := 0; x < 40; x++ {
+				for y := range 30 {
+					for x := range 40 {
 						val := (x + y) * 255 / (40 + 30 - 2)
 						buf[y*40+x] = byte(val)
 					}
@@ -149,9 +149,9 @@ var softMaskTests = []struct {
 			WriteData: func(w io.Writer) error {
 				// generate 2-bit test pattern
 				buf := NewPixelRow(16, 2)
-				for y := 0; y < 8; y++ {
+				for y := range 8 {
 					buf.Reset()
-					for x := 0; x < 16; x++ {
+					for x := range 16 {
 						val := uint16((x + y) % 4)
 						buf.AppendBits(val)
 					}

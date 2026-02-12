@@ -88,10 +88,7 @@ func (r *reader) Read(p []byte) (n int, err error) {
 		// Return any buffered output data first
 		if r.outputPos < r.outputLen {
 			available := r.outputLen - r.outputPos
-			copyLen := len(p) - totalRead
-			if copyLen > available {
-				copyLen = available
-			}
+			copyLen := min(len(p)-totalRead, available)
 			copy(p[totalRead:], r.outputBuffer[r.outputPos:r.outputPos+copyLen])
 			r.outputPos += copyLen
 			totalRead += copyLen
@@ -319,7 +316,7 @@ func (r *reader) decodePNGRow(encodedData []byte) ([]byte, error) {
 	result := make([]byte, len(rowData))
 	bytesPerPixel := r.params.bytesPerPixel()
 
-	for i := 0; i < len(rowData); i++ {
+	for i := range rowData {
 		var predictor byte
 
 		switch algorithm {

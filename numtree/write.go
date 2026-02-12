@@ -270,10 +270,7 @@ func (w *numberTreeWriter) writeRootWithKids(kidRef pdf.Reference) (pdf.Referenc
 
 func (w *numberTreeWriter) collapse() error {
 	for len(w.tail) > 1 {
-		start := len(w.tail) - maxChildren
-		if start < 0 {
-			start = 0
-		}
+		start := max(len(w.tail)-maxChildren, 0)
 		// find start of same depth group
 		for start > 0 && w.tail[start-1].depth == w.tail[start].depth {
 			start--

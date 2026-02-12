@@ -172,7 +172,7 @@ func parseType6Patches(data []byte, s *Type6) ([]Type6Patch, error) {
 	// bit extraction helper (same as Type4/5)
 	extractBits := func(data []byte, bitOffset, numBits int) uint32 {
 		var result uint32
-		for i := 0; i < numBits; i++ {
+		for i := range numBits {
 			byteIndex := (bitOffset + i) / 8
 			bitIndex := 7 - ((bitOffset + i) % 8)
 			if byteIndex < len(data) && (data[byteIndex]&(1<<bitIndex)) != 0 {
@@ -219,7 +219,7 @@ func parseType6Patches(data []byte, s *Type6) ([]Type6Patch, error) {
 		if flag == 0 {
 			// New patch: read 24 coordinates (12 points) + 4 corner colors
 			// Extract all 12 control points
-			for i := 0; i < 12; i++ {
+			for i := range 12 {
 				xEncoded := extractBits(data, bitOffset, s.BitsPerCoordinate)
 				patch.ControlPoints[i].X = decodeCoord(xEncoded, s.BitsPerCoordinate, s.Decode[0], s.Decode[1])
 				bitOffset += s.BitsPerCoordinate
@@ -231,7 +231,7 @@ func parseType6Patches(data []byte, s *Type6) ([]Type6Patch, error) {
 
 			// Extract all 4 corner colors
 			patch.CornerColors = make([][]float64, 4)
-			for i := 0; i < 4; i++ {
+			for i := range 4 {
 				patch.CornerColors[i] = make([]float64, numColorValues)
 				for j := 0; j < numColorValues; j++ {
 					colorEncoded := extractBits(data, bitOffset, s.BitsPerComponent)
@@ -255,13 +255,13 @@ func parseType6Patches(data []byte, s *Type6) ([]Type6Patch, error) {
 			prevPatch := patches[len(patches)-1]
 
 			// Copy implicit control points from previous patch
-			for i := 0; i < 4; i++ {
+			for i := range 4 {
 				patch.ControlPoints[i] = prevPatch.ControlPoints[conn.ImplicitPoints[i]]
 			}
 
 			// Copy implicit corner colors from previous patch
 			patch.CornerColors = make([][]float64, 4)
-			for i := 0; i < 2; i++ {
+			for i := range 2 {
 				patch.CornerColors[i] = make([]float64, numColorValues)
 				copy(patch.CornerColors[i], prevPatch.CornerColors[conn.ImplicitColors[i]])
 			}
@@ -619,12 +619,12 @@ func (s *Type6) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 		if patch.Flag == 0 {
 			// New patch: write all 12 control points
-			for i := 0; i < 12; i++ {
+			for i := range 12 {
 				addBits(coord(patch.ControlPoints[i].X, s.Decode[0], s.Decode[1], s.BitsPerCoordinate), s.BitsPerCoordinate)
 				addBits(coord(patch.ControlPoints[i].Y, s.Decode[2], s.Decode[3], s.BitsPerCoordinate), s.BitsPerCoordinate)
 			}
 			// Write all 4 corner colors
-			for i := 0; i < 4; i++ {
+			for i := range 4 {
 				for j := 0; j < numValues; j++ {
 					addBits(coord(patch.CornerColors[i][j], s.Decode[4+2*j], s.Decode[4+2*j+1], s.BitsPerComponent), s.BitsPerComponent)
 				}

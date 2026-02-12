@@ -41,9 +41,9 @@ func generateDataFile() error {
 	var names []string
 	for _, entry := range entries {
 		name := entry.Name()
-		if strings.HasSuffix(name, ".gz") {
+		if before, ok := strings.CutSuffix(name, ".gz"); ok {
 			// Remove .gz extension
-			name = strings.TrimSuffix(name, ".gz")
+			name = before
 			names = append(names, name)
 		}
 	}

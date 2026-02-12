@@ -94,7 +94,7 @@ func TestMakeSimpleToUnicode(t *testing.T) {
 			}
 
 			// Check that all mappings are preserved exactly
-			for b := charcode.Code(0); b < 256; b++ {
+			for b := range charcode.Code(256) {
 				got := decoded[b]
 				want := tt.input[b]
 				if got != want {

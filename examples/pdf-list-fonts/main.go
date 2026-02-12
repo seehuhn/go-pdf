@@ -19,10 +19,9 @@ package main
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
-	"sort"
-
-	"golang.org/x/exp/maps"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/pagetree"
@@ -50,7 +49,7 @@ func doit(fname string) error {
 		return err
 	}
 	fontMap := make(map[pdf.Reference]bool)
-	for pageNo := 0; pageNo < numPages; pageNo++ {
+	for pageNo := range numPages {
 		_, pageDict, err := pagetree.GetPage(r, pageNo)
 		if err != nil {
 			return err
@@ -76,10 +75,7 @@ func doit(fname string) error {
 		}
 	}
 
-	allFonts := maps.Keys(fontMap)
-	sort.Slice(allFonts, func(i, j int) bool {
-		return allFonts[i] < allFonts[j]
-	})
+	allFonts := slices.Sorted(maps.Keys(fontMap))
 
 	fmt.Printf("%d fonts on %d pages\n", len(allFonts), numPages)
 	for _, fontRef := range allFonts {

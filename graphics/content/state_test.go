@@ -121,7 +121,7 @@ func TestState_PopEmpty(t *testing.T) {
 func TestState_MaxStackDepth(t *testing.T) {
 	s := NewState(Page, &Resources{})
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		s.Push()
 	}
 	if s.MaxStackDepth != 5 {

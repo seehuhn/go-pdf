@@ -133,7 +133,7 @@ func (nav *navInfo) buildTarget(from, to string) action.Target {
 	}
 
 	stepsUp := len(fromPath) - commonIdx
-	for i := 0; i < stepsUp; i++ {
+	for range stepsUp {
 		target = &action.TargetParent{Next: target}
 	}
 
@@ -191,7 +191,7 @@ func generateMainPDF(child1Data, child2Data []byte, nav *navInfo) error {
 
 	pageRefs := allocatePageRefs(doc, numPages)
 
-	for pageNum := 0; pageNum < numPages; pageNum++ {
+	for pageNum := range numPages {
 		page := doc.AddPage()
 		page.Ref = pageRefs[pageNum]
 
@@ -344,7 +344,7 @@ func drawDocBox(page *document.Page, font font.Layouter, docName string, x, y fl
 	drawFilledBox(page, x, titleY, boxWidth, boxTitleH, color.DeviceGray(1))
 	drawTextAt(page, font, x+3, titleY+boxTitleH/2-3, 10, docName)
 
-	for i := 0; i < numPages; i++ {
+	for i := range numPages {
 		pageY := y - boxTitleH - float64(i+1)*boxPageH
 		isCurrentPage := docName == currentDoc && i == currentPage
 

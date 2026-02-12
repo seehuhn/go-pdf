@@ -183,7 +183,7 @@ func (t *Simple) Encode(gid glyph.ID, baseGlyphName, text string, width float64)
 
 	bestScore := -1
 	bestCode := byte(0)
-	for codeInt := 0; codeInt < 256; codeInt++ {
+	for codeInt := range 256 {
 		code := byte(codeInt)
 		if _, used := t.info[code]; used {
 			continue

@@ -233,7 +233,7 @@ func TestRoundTripLargeImage(t *testing.T) {
 	originalData := make([]byte, imageSize)
 
 	// Fill with somewhat realistic image data (gradients)
-	for row := 0; row < 100; row++ {
+	for row := range 100 {
 		for col := 0; col < params.Columns; col++ {
 			offset := (row*params.Columns + col) * params.Colors
 			originalData[offset] = byte(row + col) // R

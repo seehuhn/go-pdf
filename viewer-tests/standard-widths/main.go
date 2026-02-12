@@ -140,7 +140,7 @@ func createDocument(filename string) error {
 			gg := &font.GlyphSeq{
 				Seq: make([]font.Glyph, k),
 			}
-			for j := 0; j < k; j++ {
+			for j := range k {
 				gg.Seq[j] = font.Glyph{
 					GID:     gid,
 					Advance: glyphWidth,

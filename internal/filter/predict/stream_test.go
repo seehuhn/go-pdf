@@ -120,10 +120,7 @@ func TestPartialWrites(t *testing.T) {
 			// Write data in chunks of bufSize
 			pos := 0
 			for pos < len(originalData) {
-				end := pos + bufSize
-				if end > len(originalData) {
-					end = len(originalData)
-				}
+				end := min(pos+bufSize, len(originalData))
 
 				n, err := writer.Write(originalData[pos:end])
 				if err != nil {

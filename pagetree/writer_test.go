@@ -36,7 +36,7 @@ func TestBalance(t *testing.T) {
 	}
 	rm := pdf.NewResourceManager(out)
 	tree := pagetree.NewWriter(out, rm)
-	for i := 0; i < 16*16; i++ { // maxDegree = 16 -> this should give depth 2
+	for range 16 * 16 { // maxDegree = 16 -> this should give depth 2
 		p := &page.Page{
 			MediaBox: document.A4,
 		}

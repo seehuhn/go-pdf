@@ -204,7 +204,7 @@ func (w *writer) Close() error {
 	return nil
 }
 
-func (w *writer) printf(format string, args ...interface{}) {
+func (w *writer) printf(format string, args ...any) {
 	text := fmt.Sprintf(format, args...)
 	lines := strings.Split(text, "\n")
 

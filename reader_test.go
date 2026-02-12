@@ -368,8 +368,8 @@ func TestStreamLengthCycle2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = s1.Write([]byte(fmt.Sprintf("%d 0\n%d 2\n6\n90",
-		L1.Number(), xRef.Number())))
+	_, err = s1.Write(fmt.Appendf(nil, "%d 0\n%d 2\n6\n90",
+		L1.Number(), xRef.Number()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -388,7 +388,7 @@ func TestStreamLengthCycle2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = s2.Write([]byte(fmt.Sprintf("%d 0\n12", L2.Number())))
+	_, err = s2.Write(fmt.Appendf(nil, "%d 0\n12", L2.Number()))
 	if err != nil {
 		t.Fatal(err)
 	}

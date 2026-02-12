@@ -241,7 +241,7 @@ func (s *scanner) readString() (pdf.String, error) {
 				ignoreLF = true
 			case '0', '1', '2', '3', '4', '5', '6', '7':
 				oct := b - '0'
-				for i := 0; i < 2; i++ {
+				for range 2 {
 					b, err = s.peek()
 					if err == io.EOF {
 						break

@@ -45,7 +45,7 @@ func TestSubtree(t *testing.T) {
 		rm := pdf.NewResourceManager(w)
 		s := NewWriter(w, rm)
 
-		for i := 0; i < numPages; i++ {
+		for range numPages {
 			p := &page.Page{
 				MediaBox: &pdf.Rectangle{URx: 100, URy: 100},
 			}

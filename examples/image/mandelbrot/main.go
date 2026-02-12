@@ -85,16 +85,16 @@ func mandelbrot() image.Image {
 	)
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 
-	for i := 0; i < width; i++ {
+	for i := range width {
 	yLoop:
-		for j := 0; j < height; j++ {
+		for j := range height {
 			x := xmin + (xmax-xmin)*float64(i)/width
 			y := ymin + (ymax-ymin)*float64(j)/height
 			z := complex(x, y)
 
 			maxDepth := 200
 			var v complex128
-			for n := 0; n < maxDepth; n++ {
+			for n := range maxDepth {
 				v = v*v + z
 				if (real(v)*real(v) + imag(v)*imag(v)) > 4 {
 					img.Set(i, j, palette(n, maxDepth))

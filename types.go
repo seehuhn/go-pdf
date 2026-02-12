@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"slices"
 	"strconv"
@@ -765,10 +766,7 @@ func (x Name) AsPDF(opt OutputOptions) Native {
 }
 
 func (x Name) isSecondClassName() bool {
-	k := len(x)
-	if k > 5 {
-		k = 5
-	}
+	k := min(len(x), 5)
 	for _, c := range x[:k] {
 		if c == ':' || c == '_' {
 			return true
@@ -861,9 +859,7 @@ func (d Dict) Clone() Dict {
 	}
 
 	rea := make(Dict, len(d))
-	for k, v := range d {
-		rea[k] = v
-	}
+	maps.Copy(rea, d)
 	return rea
 }
 

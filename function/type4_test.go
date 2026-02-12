@@ -374,17 +374,6 @@ func TestType4PDFSpecExamples(t *testing.T) {
 	}
 }
 
-// TestType4Empty tests that Type4 functions with no inputs or outputs
-// are handled correctly.
-func TestType4Empty(t *testing.T) {
-	fn := &Type4{}
-
-	result := fn.Apply()
-	if len(result) != 0 {
-		t.Fatalf("expected no outputs, got %d", len(result))
-	}
-}
-
 // TestType4Constant tests that a Type4 function with no inputs and one output
 // returns the constant value.
 func TestType4Constant(t *testing.T) {

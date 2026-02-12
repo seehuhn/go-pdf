@@ -34,7 +34,7 @@ func TestFindPages(t *testing.T) {
 	pageRefsIn := make([]pdf.Reference, numPages)
 	rm := pdf.NewResourceManager(doc)
 	tree := pagetree.NewWriter(doc, rm)
-	for i := 0; i < numPages; i++ {
+	for i := range numPages {
 		pageRefsIn[i] = doc.Alloc()
 		p := &page.Page{
 			MediaBox: &pdf.Rectangle{URx: 100, URy: 100},

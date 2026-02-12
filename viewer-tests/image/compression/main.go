@@ -223,10 +223,10 @@ func (img *testImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	q := float64(uint(1)<<img.bpc - 1)
 	row := image.NewPixelRow(size*nChannels, img.bpc)
-	for i := 0; i < size; i++ {
+	for i := range size {
 		row.Reset()
-		for j := 0; j < size; j++ {
-			for c := 0; c < nChannels; c++ {
+		for j := range size {
+			for c := range nChannels {
 				x := ripple(i, j, c)
 				if nChannels <= 3 {
 					x = 1 - x

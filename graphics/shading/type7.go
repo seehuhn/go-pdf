@@ -271,12 +271,12 @@ func (s *Type7) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 		if patch.Flag == 0 {
 			// New patch: write all 16 control points in stream order
-			for i := 0; i < 16; i++ {
+			for i := range 16 {
 				addBits(coord(patch.ControlPoints[i].X, s.Decode[0], s.Decode[1], s.BitsPerCoordinate), s.BitsPerCoordinate)
 				addBits(coord(patch.ControlPoints[i].Y, s.Decode[2], s.Decode[3], s.BitsPerCoordinate), s.BitsPerCoordinate)
 			}
 			// Write all 4 corner colors
-			for i := 0; i < 4; i++ {
+			for i := range 4 {
 				for j := 0; j < numValues; j++ {
 					addBits(coord(patch.CornerColors[i][j], s.Decode[4+2*j], s.Decode[4+2*j+1], s.BitsPerComponent), s.BitsPerComponent)
 				}
@@ -353,7 +353,7 @@ var gridToStreamOrder = [4][4]int{
 // are mathematical inverses, ensuring the control point mapping is correct.
 func validateControlPointMappings() error {
 	// Verify streamToGrid → gridToStreamOrder → streamToGrid round trip
-	for streamIdx := 0; streamIdx < 16; streamIdx++ {
+	for streamIdx := range 16 {
 		row, col := streamToGrid[streamIdx][0], streamToGrid[streamIdx][1]
 		if row < 0 || row >= 4 || col < 0 || col >= 4 {
 			return fmt.Errorf("streamToGrid[%d] = (%d,%d) is out of bounds", streamIdx, row, col)
@@ -366,8 +366,8 @@ func validateControlPointMappings() error {
 	}
 
 	// Verify gridToStreamOrder → streamToGrid → gridToStreamOrder round trip
-	for row := 0; row < 4; row++ {
-		for col := 0; col < 4; col++ {
+	for row := range 4 {
+		for col := range 4 {
 			streamIdx := gridToStreamOrder[row][col]
 			if streamIdx < 0 || streamIdx >= 16 {
 				return fmt.Errorf("gridToStreamOrder[%d][%d] = %d is out of bounds", row, col, streamIdx)
@@ -613,7 +613,7 @@ func parseType7Patches(data []byte, s *Type7) ([]Type7Patch, error) {
 	// bit extraction helper (same as Type4/5/6)
 	extractBits := func(data []byte, bitOffset, numBits int) uint32 {
 		var result uint32
-		for i := 0; i < numBits; i++ {
+		for i := range numBits {
 			byteIndex := (bitOffset + i) / 8
 			bitIndex := 7 - ((bitOffset + i) % 8)
 			if byteIndex < len(data) && (data[byteIndex]&(1<<bitIndex)) != 0 {
@@ -660,7 +660,7 @@ func parseType7Patches(data []byte, s *Type7) ([]Type7Patch, error) {
 		if flag == 0 {
 			// New patch: read 32 coordinates (16 points) + 4 corner colors
 			// Extract all 16 control points in stream order
-			for i := 0; i < 16; i++ {
+			for i := range 16 {
 				xEncoded := extractBits(data, bitOffset, s.BitsPerCoordinate)
 				patch.ControlPoints[i].X = decodeCoord(xEncoded, s.BitsPerCoordinate, s.Decode[0], s.Decode[1])
 				bitOffset += s.BitsPerCoordinate
@@ -672,7 +672,7 @@ func parseType7Patches(data []byte, s *Type7) ([]Type7Patch, error) {
 
 			// Extract all 4 corner colors
 			patch.CornerColors = make([][]float64, 4)
-			for i := 0; i < 4; i++ {
+			for i := range 4 {
 				patch.CornerColors[i] = make([]float64, numColorValues)
 				for j := 0; j < numColorValues; j++ {
 					colorEncoded := extractBits(data, bitOffset, s.BitsPerComponent)
@@ -698,13 +698,13 @@ func parseType7Patches(data []byte, s *Type7) ([]Type7Patch, error) {
 			// Copy implicit control points from previous patch to left edge (column 0)
 			// Current patch grid positions (0,0), (0,1), (0,2), (0,3)
 			// correspond to stream indices 0, 1, 2, 3
-			for i := 0; i < 4; i++ {
+			for i := range 4 {
 				patch.ControlPoints[i] = prevPatch.ControlPoints[conn.ImplicitStreamIndices[i]]
 			}
 
 			// Copy implicit corner colors from previous patch
 			patch.CornerColors = make([][]float64, 4)
-			for i := 0; i < 2; i++ {
+			for i := range 2 {
 				patch.CornerColors[i] = make([]float64, numColorValues)
 				copy(patch.CornerColors[i], prevPatch.CornerColors[conn.ImplicitColorIndices[i]])
 			}

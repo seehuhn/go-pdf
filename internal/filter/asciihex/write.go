@@ -45,12 +45,10 @@ func (w *writer) Write(p []byte) (n int, err error) {
 			}
 		}
 
-		chunkSize := (cap(w.buf) - len(w.buf) - 1) / 2 // leave space for '\n'
-		if chunkSize > len(p) {
-			chunkSize = len(p)
-		}
+		// leave space for '\n'
+		chunkSize := min((cap(w.buf)-len(w.buf)-1)/2, len(p))
 
-		for i := 0; i < chunkSize; i++ {
+		for i := range chunkSize {
 			w.buf = append(w.buf, alphabet[p[i]>>4], alphabet[p[i]&0x0f])
 		}
 		p = p[chunkSize:]

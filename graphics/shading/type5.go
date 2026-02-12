@@ -327,7 +327,7 @@ func parseType5Vertices(data []byte, s *Type5) ([]Type5Vertex, error) {
 	// bit extraction helper (same as Type4/6/7)
 	extractBits := func(data []byte, bitOffset, numBits int) uint32 {
 		var result uint32
-		for i := 0; i < numBits; i++ {
+		for i := range numBits {
 			byteIndex := (bitOffset + i) / 8
 			bitIndex := 7 - ((bitOffset + i) % 8)
 			if byteIndex < len(data) && (data[byteIndex]&(1<<bitIndex)) != 0 {
@@ -346,7 +346,7 @@ func parseType5Vertices(data []byte, s *Type5) ([]Type5Vertex, error) {
 
 	// Process vertices using continuous bit stream (not byte-aligned chunks)
 	bitOffset := 0
-	for i := 0; i < numVertices; i++ {
+	for i := range numVertices {
 		// No flag extraction for Type5 - vertices are positioned by lattice structure
 
 		// Extract X coordinate

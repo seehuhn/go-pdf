@@ -107,8 +107,8 @@ func generateImageData() []byte {
 
 	data := make([]byte, size*size)
 
-	for y := 0; y < size; y++ {
-		for x := 0; x < size; x++ {
+	for y := range size {
+		for x := range size {
 			dx := float64(x) + 0.5 - center
 			dy := float64(y) + 0.5 - center
 			dist := math.Sqrt(dx*dx + dy*dy)

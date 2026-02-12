@@ -68,7 +68,7 @@ func toType1(info *sfnt.Font) (*type1.Font, error) {
 	}
 
 	encoding := make([]string, 256)
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		name := psenc.StandardEncoding[i]
 		if _, ok := newOutlines[name]; ok {
 			encoding[i] = name
@@ -136,7 +136,7 @@ func toAFM(info *sfnt.Font) (*afm.Metrics, error) {
 
 	n := info.NumGlyphs()
 	newGlyphs := make(map[string]*afm.GlyphInfo, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		gid := glyph.ID(i)
 		name := info.GlyphName(gid)
 		bbox := info.GlyphBBox(gid)
@@ -154,7 +154,7 @@ func toAFM(info *sfnt.Font) (*afm.Metrics, error) {
 	}
 
 	encoding := make([]string, 256)
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		name := psenc.StandardEncoding[i]
 		if _, ok := newGlyphs[name]; ok {
 			encoding[i] = name

@@ -375,10 +375,7 @@ func (w *Writer) wrapIfLeaf(node *nodeInfo) *dictInfo {
 // Collapse reduces the tail to (at most) one node.
 func (w *Writer) collapse() {
 	for len(w.tail) > 1 {
-		start := len(w.tail) - maxDegree
-		if start < 0 {
-			start = 0
-		}
+		start := max(len(w.tail)-maxDegree, 0)
 		for start > 0 && w.tail[start-1].depth == w.tail[start].depth {
 			start++
 		}

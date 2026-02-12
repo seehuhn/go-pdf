@@ -250,12 +250,9 @@ func (w *DocumentWriter) createFontPages(entry fontEntry) error {
 	}
 
 	// Create pages for each chunk
-	for pageIndex := 0; pageIndex < totalPages; pageIndex++ {
+	for pageIndex := range totalPages {
 		startIdx := pageIndex * glyphsPerPageCapacity
-		endIdx := startIdx + glyphsPerPageCapacity
-		if endIdx > len(nonBlankGlyphs) {
-			endIdx = len(nonBlankGlyphs)
-		}
+		endIdx := min(startIdx+glyphsPerPageCapacity, len(nonBlankGlyphs))
 
 		pageGlyphs := nonBlankGlyphs[startIdx:endIdx]
 
@@ -295,10 +292,7 @@ func (w *DocumentWriter) createFontPageWithMultipleInstances(entry fontEntry, pa
 	currentRow := 0
 
 	for i := 0; i < len(pageGlyphs); i += maxGlyphsPerFontInstance {
-		endIdx := i + maxGlyphsPerFontInstance
-		if endIdx > len(pageGlyphs) {
-			endIdx = len(pageGlyphs)
-		}
+		endIdx := min(i+maxGlyphsPerFontInstance, len(pageGlyphs))
 
 		instanceGlyphs := pageGlyphs[i:endIdx]
 

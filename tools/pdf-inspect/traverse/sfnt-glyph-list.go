@@ -76,7 +76,7 @@ func (c *sfntGlyphListCtx) Show() error {
 	}
 
 	numGlyphs := c.font.NumGlyphs()
-	for i := 0; i < numGlyphs; i++ {
+	for i := range numGlyphs {
 		gid := glyph.ID(i)
 		name := c.font.GlyphName(gid)
 		bbox := c.font.GlyphBBox(gid)

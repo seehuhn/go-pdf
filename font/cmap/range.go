@@ -25,7 +25,7 @@ func rangeIsValid(first, last []byte) bool {
 	if len(first) != len(last) || len(first) == 0 {
 		return false
 	}
-	for i := 0; i < len(first); i++ {
+	for i := range first {
 		if first[i] > last[i] {
 			return false
 		}

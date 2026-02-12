@@ -29,7 +29,7 @@ import (
 // If the argument is nil, the result is nil.
 //
 // This is the converse of [DecodeDict].
-func AsDict(s interface{}) Dict {
+func AsDict(s any) Dict {
 	if s == nil {
 		return nil
 	}
@@ -47,7 +47,7 @@ fieldLoop:
 		fInfo := vt.Field(i)
 
 		optional := false
-		for _, t := range strings.Split(fInfo.Tag.Get("pdf"), ",") {
+		for t := range strings.SplitSeq(fInfo.Tag.Get("pdf"), ",") {
 			switch t {
 			case "":
 				// pass
@@ -127,7 +127,7 @@ fieldLoop:
 // Deprecated: This function will be removed.
 //
 // TODO(voss): remove
-func DecodeDict(r Getter, dst interface{}, src Dict) error {
+func DecodeDict(r Getter, dst any, src Dict) error {
 	v := reflect.Indirect(reflect.ValueOf(dst))
 	vt := v.Type()
 
@@ -151,7 +151,7 @@ fieldLoop:
 		// read the struct tags
 		optional := false
 		allowstring := false
-		for _, t := range strings.Split(fInfo.Tag.Get("pdf"), ",") {
+		for t := range strings.SplitSeq(fInfo.Tag.Get("pdf"), ",") {
 			switch t {
 			case "optional":
 				optional = true

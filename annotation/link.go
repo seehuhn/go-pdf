@@ -132,8 +132,8 @@ func decodeLink(x *pdf.Extractor, dict pdf.Dict) (*Link, error) {
 		// process floats in groups of 8, each group becomes 4 Vec2 points
 		numCompleteQuads := len(quadPoints) / 8
 		points := make([]vec.Vec2, numCompleteQuads*4)
-		for quad := 0; quad < numCompleteQuads; quad++ {
-			for corner := 0; corner < 4; corner++ {
+		for quad := range numCompleteQuads {
+			for corner := range 4 {
 				idx := quad*8 + corner*2
 				points[quad*4+corner] = vec.Vec2{X: quadPoints[idx], Y: quadPoints[idx+1]}
 			}

@@ -17,6 +17,7 @@
 package function
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -59,25 +60,17 @@ func (f *Type4) GetDomain() []float64 {
 }
 
 // extractType4 reads a Type 4 function from a PDF stream object.
-func extractType4(r pdf.Getter, stream *pdf.Stream) (*Type4, error) {
+func extractType4(x *pdf.Extractor, stream *pdf.Stream) (*Type4, error) {
 	d := stream.Dict
 
-	var domain []float64
-	if domainObj, ok := d["Domain"]; ok {
-		var err error
-		domain, err = pdf.GetFloatArray(r, domainObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read Domain: %w", err)
-		}
+	domain, err := pdf.Optional(getFloatArray(x, d["Domain"]))
+	if err != nil {
+		return nil, err
 	}
 
-	var rangeArray []float64
-	if rangeObj, ok := d["Range"]; ok {
-		var err error
-		rangeArray, err = pdf.GetFloatArray(r, rangeObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read Range: %w", err)
-		}
+	rangeArray, err := pdf.Optional(getFloatArray(x, d["Range"]))
+	if err != nil {
+		return nil, err
 	}
 
 	f := &Type4{
@@ -85,16 +78,22 @@ func extractType4(r pdf.Getter, stream *pdf.Stream) (*Type4, error) {
 		Range:  rangeArray,
 	}
 
-	// Read PostScript program from stream
-	stmReader, err := pdf.DecodeStream(r, stream, 0)
+	// read PostScript program from stream
+	stmReader, err := pdf.DecodeStream(x.R, stream, 0)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode stream: %w", err)
+		return nil, err
 	}
 	defer stmReader.Close()
 
-	programBytes, err := io.ReadAll(stmReader)
+	const maxProgramSize = 16 * 1024
+	programBytes, err := io.ReadAll(io.LimitReader(stmReader, maxProgramSize+1))
 	if err != nil {
-		return nil, fmt.Errorf("failed to read program: %w", err)
+		return nil, err
+	}
+	if len(programBytes) > maxProgramSize {
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("Type 4 function program too large"),
+		}
 	}
 
 	program := string(programBytes)

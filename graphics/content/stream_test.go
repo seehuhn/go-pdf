@@ -187,7 +187,7 @@ func TestInlineImageLimits(t *testing.T) {
 func TestOperatorArgLimit(t *testing.T) {
 	// Build a stream with 100 numbers followed by an operator, then a valid operator
 	var buf bytes.Buffer
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		buf.WriteString("1 ")
 	}
 	buf.WriteString("m\n") // moveto with 100 args (should be skipped)

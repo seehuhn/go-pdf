@@ -208,7 +208,7 @@ func TestLargeTree(t *testing.T) {
 	}
 
 	// add many entries to force multi-level tree
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		tree.Data[pdf.Integer(i)] = pdf.Integer(i * i)
 	}
 
@@ -334,7 +334,7 @@ func TestStreamingVeryLargeTree(t *testing.T) {
 
 	// streaming iterator that generates entries on demand
 	data := func(yield func(pdf.Integer, pdf.Object) bool) {
-		for i := 0; i < numEntries; i++ {
+		for i := range numEntries {
 			key := pdf.Integer(i)
 			value := pdf.Integer(i * 2)
 			if !yield(key, value) {

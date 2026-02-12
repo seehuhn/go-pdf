@@ -509,7 +509,7 @@ func TestEncryptStream(t *testing.T) {
 func TestPerm(t *testing.T) {
 	// We iterate over all combinations of bits
 	// 3, 4, 5, 6, 9, 11, and 12 (1-based).
-	for b := uint32(0); b < 127; b++ {
+	for b := range uint32(127) {
 		// bit in b -> bit in P
 		//       0  ->  3-1 = 2
 		//       1  ->  4-1 = 3

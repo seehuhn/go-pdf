@@ -294,7 +294,7 @@ func showHeaders(page *document.Page, font text.F, y *float64) {
 }
 
 func showRow(page *document.Page, test text.F, y *float64, code byte, gIdx, wIdx int) {
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if i == gIdx {
 			good(page, *y, i)
 		} else {
@@ -302,7 +302,7 @@ func showRow(page *document.Page, test text.F, y *float64, code byte, gIdx, wIdx
 		}
 	}
 	choice(page, *y, 5)
-	for j := 0; j < 3; j++ {
+	for j := range 3 {
 		if j == wIdx {
 			good(page, *y, j+6)
 		} else {

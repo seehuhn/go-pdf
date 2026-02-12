@@ -195,7 +195,7 @@ func (f *fontTables) MakeColumns(G standard.Font) error {
 		tmpGlyph := curGlyph
 		page.PushGraphicsState()
 		page.SetFillColor(color.DeviceRGB{.4, 1, .4})
-		for col := 0; col < 4; col++ {
+		for col := range 4 {
 			x := f.margin + float64(col)*colWidth
 			for i := 0; i < nRows; i++ {
 				if tmpGlyph >= nGlyph {
@@ -221,7 +221,7 @@ func (f *fontTables) MakeColumns(G standard.Font) error {
 		page.PopGraphicsState()
 
 		// Then draw the glyphs and their codes/names.
-		for col := 0; col < 4; col++ {
+		for col := range 4 {
 			page.TextBegin()
 			x := f.margin + float64(col)*colWidth
 			for i := 0; i < nRows; i++ {

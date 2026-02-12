@@ -73,8 +73,8 @@ func (f *Type2) GetDomain() []float64 {
 }
 
 // extractType2 reads a Type 2 exponential interpolation function from a PDF dictionary.
-func extractType2(r pdf.Getter, d pdf.Dict) (*Type2, error) {
-	domain, err := pdf.GetFloatArray(r, d["Domain"])
+func extractType2(x *pdf.Extractor, d pdf.Dict) (*Type2, error) {
+	domain, err := getFloatArray(x, d["Domain"])
 	if err != nil {
 		return nil, err
 	}
@@ -82,22 +82,22 @@ func extractType2(r pdf.Getter, d pdf.Dict) (*Type2, error) {
 		domain = []float64{0, 1}
 	}
 
-	rnge, err := pdf.GetFloatArray(r, d["Range"])
+	rnge, err := getFloatArray(x, d["Range"])
 	if err != nil {
 		return nil, err
 	}
 
-	C0, err := pdf.GetFloatArray(r, d["C0"])
+	C0, err := getFloatArray(x, d["C0"])
 	if err != nil {
 		return nil, err
 	}
 
-	C1, err := pdf.GetFloatArray(r, d["C1"])
+	C1, err := getFloatArray(x, d["C1"])
 	if err != nil {
 		return nil, err
 	}
 
-	gamma, err := pdf.GetNumber(r, d["N"])
+	gamma, err := x.GetNumber(d["N"])
 	if err != nil {
 		return nil, err
 	}

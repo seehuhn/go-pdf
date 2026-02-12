@@ -53,10 +53,7 @@ func (w *Writer) merge(a, b []*nodeInfo) []*nodeInfo {
 
 	nextDepth := b[0].depth
 	for len(a) > 1 && a[len(a)-1].depth < nextDepth {
-		start := len(a) - maxDegree
-		if start < 0 {
-			start = 0
-		}
+		start := max(len(a)-maxDegree, 0)
 		for start > 0 && a[start-1].depth == a[start].depth {
 			start++
 		}

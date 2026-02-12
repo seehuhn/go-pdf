@@ -95,8 +95,8 @@ func Circle(n int) goimg.Image {
 	radius := float64(n) / 2.0
 
 	// Iterate through each pixel
-	for y := 0; y < n; y++ {
-		for x := 0; x < n; x++ {
+	for y := range n {
+		for x := range n {
 			// Calculate distance from center of pixel to center of image
 			dx := float64(x) + 0.5 - center
 			dy := float64(y) + 0.5 - center

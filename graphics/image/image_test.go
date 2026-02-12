@@ -41,8 +41,8 @@ func TestPNGRefactored(t *testing.T) {
 
 	// Create a test image with transparency
 	testImg := image.NewRGBA(image.Rect(0, 0, 4, 4))
-	for y := 0; y < 4; y++ {
-		for x := 0; x < 4; x++ {
+	for y := range 4 {
+		for x := range 4 {
 			// Create a gradient with varying alpha
 			alpha := uint8((x + y) * 32)
 			testImg.Set(x, y, gocol.RGBA{R: uint8(x * 64), G: uint8(y * 64), B: 128, A: alpha})

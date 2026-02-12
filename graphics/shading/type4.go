@@ -326,7 +326,7 @@ func parseType4Vertices(data []byte, s *Type4) ([]Type4Vertex, error) {
 	// bit extraction helper
 	extractBits := func(data []byte, bitOffset, numBits int) uint32 {
 		var result uint32
-		for i := 0; i < numBits; i++ {
+		for i := range numBits {
 			byteIndex := (bitOffset + i) / 8
 			bitIndex := 7 - ((bitOffset + i) % 8)
 			if byteIndex < len(data) && (data[byteIndex]&(1<<bitIndex)) != 0 {
@@ -343,7 +343,7 @@ func parseType4Vertices(data []byte, s *Type4) ([]Type4Vertex, error) {
 		return decodeMin + t*(decodeMax-decodeMin)
 	}
 
-	for i := 0; i < numVertices; i++ {
+	for i := range numVertices {
 		vertexData := data[i*vertexBytes : (i+1)*vertexBytes]
 		bitOffset := 0
 

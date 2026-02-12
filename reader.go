@@ -468,7 +468,7 @@ func getObjStm(r Getter, stream *Stream, getInt getIntFn, enc *encryptInfo) (_ *
 	s := newScanner(decoded, getInt, enc)
 
 	idx := make([]stmObj, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		no, err := s.ReadInteger()
 		if err != nil {
 			return nil, err

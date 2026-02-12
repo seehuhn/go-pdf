@@ -40,7 +40,7 @@ func PDFDocEncode(s string) (String, bool) {
 
 // PDFDocDecode converts a PDFDocEncoding string to a Go string.
 func PDFDocDecode(s String) string {
-	for i := 0; i < len(s); i++ {
+	for i := range s {
 		if s[i] >= 0x80 || fromPDFDoc[s[i]] != rune(s[i]) {
 			goto Decode
 		}
@@ -49,7 +49,7 @@ func PDFDocDecode(s String) string {
 
 Decode:
 	r := make([]rune, len(s))
-	for i := 0; i < len(s); i++ {
+	for i := range s {
 		r[i] = fromPDFDoc[s[i]]
 	}
 	return string(r)

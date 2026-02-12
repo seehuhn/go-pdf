@@ -77,10 +77,7 @@ func extractText(fname string, pageMin, pageMax int, xRangeMin, xRangeMax float6
 	}
 
 	startPage := pageMin
-	endPage := pageMax
-	if endPage > numPages {
-		endPage = numPages
-	}
+	endPage := min(pageMax, numPages)
 
 	extractor := text.New(r, os.Stdout)
 	extractor.UseActualText = useActualText

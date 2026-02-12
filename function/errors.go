@@ -36,7 +36,7 @@ func (e *InvalidFunctionError) Is(target error) bool {
 }
 
 // newInvalidFunctionError creates a new InvalidFunctionError.
-func newInvalidFunctionError(functionType int, field, format string, args ...interface{}) *InvalidFunctionError {
+func newInvalidFunctionError(functionType int, field, format string, args ...any) *InvalidFunctionError {
 	return &InvalidFunctionError{
 		FunctionType: functionType,
 		Field:        field,

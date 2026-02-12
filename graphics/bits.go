@@ -29,7 +29,7 @@ type Bits uint64
 func (b Bits) Names() string {
 	var parts []string
 
-	for i := 0; i < len(names); i++ {
+	for i := range names {
 		if b&(1<<i) != 0 {
 			parts = append(parts, names[i])
 		}

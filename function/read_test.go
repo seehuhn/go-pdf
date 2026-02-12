@@ -263,21 +263,29 @@ type testCase struct {
 func TestRoundTrip(t *testing.T) {
 	for functionType, cases := range testCases {
 		for _, tc := range cases {
-			t.Run(fmt.Sprintf("Type%d-%s", functionType, tc.name), func(t *testing.T) {
-				roundTripTest(t, tc.function)
-			})
+			for _, version := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
+				name := fmt.Sprintf("Type%d-%s/%s", functionType, tc.name, version)
+				t.Run(name, func(t *testing.T) {
+					roundTripTest(t, version, tc.function)
+				})
+			}
 		}
 	}
 }
 
 // roundTripTest performs a round-trip test for any function type
-func roundTripTest(t *testing.T, f1 pdf.Function) {
-	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+func roundTripTest(t *testing.T, version pdf.Version, f1 pdf.Function) {
+	t.Helper()
+
+	buf, _ := memfile.NewPDFWriter(version, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	// Embed the function
 	embedded, err := rm.Embed(f1)
 	if err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
 		t.Fatal(err)
 	}
 
@@ -609,12 +617,18 @@ func TestDomainRangeClipping(t *testing.T) {
 
 func FuzzRead(f *testing.F) {
 	// Seed the fuzzer with valid test cases from all function types
+	opt := &pdf.WriterOptions{
+		HumanReadable: true,
+	}
 	for _, cases := range testCases {
 		for _, tc := range cases {
-			opt := &pdf.WriterOptions{
-				HumanReadable: true,
-			}
 			w, out := memfile.NewPDFWriter(pdf.V2_0, opt)
+
+			err := memfile.AddBlankPage(w)
+			if err != nil {
+				continue
+			}
+
 			rm := pdf.NewResourceManager(w)
 
 			embedded, err := rm.Embed(tc.function)
@@ -640,25 +654,25 @@ func FuzzRead(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, fileData []byte) {
 		// Make sure we don't panic on random input.
-		opt := &pdf.ReaderOptions{
+		rOpt := &pdf.ReaderOptions{
 			ErrorHandling: pdf.ErrorHandlingReport,
 		}
-		r, err := pdf.NewReader(bytes.NewReader(fileData), opt)
+		r, err := pdf.NewReader(bytes.NewReader(fileData), rOpt)
 		if err != nil {
 			t.Skip("invalid PDF")
 		}
 		obj := r.GetMeta().Trailer["Quir:E"]
 		if obj == nil {
-			t.Skip("broken reference")
+			t.Skip("missing PDF object")
 		}
 		x := pdf.NewExtractor(r)
 		function, err := Extract(x, obj)
 		if err != nil {
-			t.Skip("broken function")
+			t.Skip("malformed PDF object")
 		}
 
 		// Make sure we can write the function, and read it back.
-		roundTripTest(t, function)
+		roundTripTest(t, pdf.GetVersion(r), function)
 
 		// Test function evaluation doesn't panic
 		m, n := function.Shape()

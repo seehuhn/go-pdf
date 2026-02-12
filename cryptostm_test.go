@@ -126,7 +126,7 @@ func testEncryptedStreamMultipleReads(t *testing.T, version Version) {
 	}
 
 	// Read the stream multiple times - this should work with the new architecture
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		decoded, err := DecodeStream(r, stream, 0)
 		if err != nil {
 			t.Fatalf("DecodeStream failed on read %d: %v", i+1, err)
@@ -214,7 +214,7 @@ func TestEncryptedStreamWithFilters(t *testing.T) {
 
 	// Read the stream twice - the filter chain (crypt + flate) should work
 	// correctly both times
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		decoded, err := DecodeStream(r, stream, 0)
 		if err != nil {
 			t.Fatalf("DecodeStream failed on read %d: %v", i+1, err)
@@ -299,7 +299,7 @@ func TestUnencryptedStreamMultipleReads(t *testing.T) {
 	}
 
 	// Read multiple times
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		decoded, err := DecodeStream(r, stream, 0)
 		if err != nil {
 			t.Fatalf("DecodeStream failed on read %d: %v", i+1, err)

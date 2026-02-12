@@ -349,10 +349,10 @@ func writeSoftMaskData(w io.Writer, img image.Image, bitsPerComponent int) error
 	buf := NewPixelRow(width, bitsPerComponent)
 	shift := 16 - bitsPerComponent
 
-	for y := 0; y < height; y++ {
+	for y := range height {
 		buf.Reset()
 
-		for x := 0; x < width; x++ {
+		for x := range width {
 			_, _, _, a := img.At(bounds.Min.X+x, bounds.Min.Y+y).RGBA()
 			// Convert 16-bit alpha to the specified bit depth (0=transparent, max=opaque)
 			buf.AppendBits(uint16(a >> shift))
