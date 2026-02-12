@@ -5665,14 +5665,14 @@ types:
   goType: annotation.Projection
   pdfType: Annot
   pdfRepr: dict
-  introduced: '1.7'
+  introduced: '2.0'
   specTable: Table 166
   fields:
   - goName: null
     pdfKey: Type
     pdfType: name
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
     possibleValues:
     - Annot
     notes: Table 166 and Table 172 and Clause 12.5.6.24 (markup annot)
@@ -5681,13 +5681,13 @@ types:
     pdfKey: Subtype
     pdfType: name
     required: true
-    introduced: '1.7'
+    introduced: '2.0'
     possibleValues:
     - Projection
     discriminator: true
   goPackage: annotation
   goRepr: struct
-  specSection: 12.5.2
+  specSection: 12.5.2, 12.5.6.24
   writeMethod: (*Projection).Encode
   embeds:
   - AnnotCommon
