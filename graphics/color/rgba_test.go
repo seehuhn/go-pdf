@@ -156,7 +156,7 @@ func TestLabRoundTrip(t *testing.T) {
 }
 
 func TestToXYZRGBAConsistency(t *testing.T) {
-	// for every color type: ToXYZ -> xyzToSRGB -> toUint32 should match RGBA
+	// for every color type: ToXYZ -> XYZToSRGB -> toUint32 should match RGBA
 	calGray, _ := CalGray(WhitePointD65, nil, 1)
 	calRGB, _ := CalRGB(WhitePointD65, nil, nil, nil)
 	lab, _ := Lab(WhitePointD65, nil, nil)
@@ -179,7 +179,7 @@ func TestToXYZRGBAConsistency(t *testing.T) {
 
 	for _, c := range testColors {
 		X, Y, Z := c.ToXYZ()
-		rf, gf, bf := xyzToSRGB(X, Y, Z)
+		rf, gf, bf := XYZToSRGB(X, Y, Z)
 		r1, g1, b1 := toUint32(rf), toUint32(gf), toUint32(bf)
 		r2, g2, b2, _ := c.RGBA()
 

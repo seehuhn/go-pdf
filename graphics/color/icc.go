@@ -171,7 +171,7 @@ func (s *SpaceICCBased) Convert(c stdcolor.Color) stdcolor.Color {
 	}
 
 	// get XYZ from input colour (assumed sRGB)
-	X, Y, Z := colorToXYZ(c)
+	X, Y, Z := ColorToXYZ(c)
 
 	// initialise transform on first use
 	s.transformOnce.Do(func() {
@@ -201,7 +201,7 @@ func (s *SpaceICCBased) Convert(c stdcolor.Color) stdcolor.Color {
 
 func (s *SpaceICCBased) fallbackFromXYZ(X, Y, Z float64) []float64 {
 	// simple fallback: convert XYZ to sRGB-like values
-	r, g, b := xyzToSRGB(X, Y, Z)
+	r, g, b := XYZToSRGB(X, Y, Z)
 	switch s.N {
 	case 1:
 		// grayscale: use luminance
@@ -289,23 +289,23 @@ func (c colorICCBased) ToXYZ() (X, Y, Z float64) {
 	// fallback without profile: treat as sRGB-like
 	switch c.Space.N {
 	case 1:
-		return srgbToXYZ(norm[0], norm[0], norm[0])
+		return SRGBToXYZ(norm[0], norm[0], norm[0])
 	case 3:
-		return srgbToXYZ(norm[0], norm[1], norm[2])
+		return SRGBToXYZ(norm[0], norm[1], norm[2])
 	case 4:
 		cyan, magenta, yellow, black := norm[0], norm[1], norm[2], norm[3]
 		rf := (1 - cyan) * (1 - black)
 		gf := (1 - magenta) * (1 - black)
 		bf := (1 - yellow) * (1 - black)
-		return srgbToXYZ(rf, gf, bf)
+		return SRGBToXYZ(rf, gf, bf)
 	default:
-		return srgbToXYZ(0.5, 0.5, 0.5)
+		return SRGBToXYZ(0.5, 0.5, 0.5)
 	}
 }
 
 // RGBA implements the color.Color interface.
 func (c colorICCBased) RGBA() (r, g, b, a uint32) {
 	X, Y, Z := c.ToXYZ()
-	rf, gf, bf := xyzToSRGB(X, Y, Z)
+	rf, gf, bf := XYZToSRGB(X, Y, Z)
 	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }

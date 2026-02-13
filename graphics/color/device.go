@@ -88,7 +88,7 @@ func (c DeviceGray) ColorSpace() Space {
 // adapted to the D50 illuminant.
 func (c DeviceGray) ToXYZ() (X, Y, Z float64) {
 	v := float64(c)
-	return srgbToXYZ(v, v, v)
+	return SRGBToXYZ(v, v, v)
 }
 
 // RGBA implements the color.Color interface.
@@ -159,7 +159,7 @@ func (c DeviceRGB) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c DeviceRGB) ToXYZ() (X, Y, Z float64) {
-	return srgbToXYZ(c[0], c[1], c[2])
+	return SRGBToXYZ(c[0], c[1], c[2])
 }
 
 // RGBA implements the color.Color interface.
@@ -276,12 +276,12 @@ func (c DeviceCMYK) ToXYZ() (X, Y, Z float64) {
 	rf := (1 - cyan) * (1 - black)
 	gf := (1 - magenta) * (1 - black)
 	bf := (1 - yellow) * (1 - black)
-	return srgbToXYZ(rf, gf, bf)
+	return SRGBToXYZ(rf, gf, bf)
 }
 
 // RGBA implements the color.Color interface.
 func (c DeviceCMYK) RGBA() (r, g, b, a uint32) {
 	X, Y, Z := c.ToXYZ()
-	rf, gf, bf := xyzToSRGB(X, Y, Z)
+	rf, gf, bf := XYZToSRGB(X, Y, Z)
 	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }

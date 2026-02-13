@@ -110,7 +110,7 @@ func (s *SpaceCalGray) Convert(c stdcolor.Color) stdcolor.Color {
 	}
 
 	// convert via XYZ
-	X, Y, Z := colorToXYZ(c)
+	X, Y, Z := ColorToXYZ(c)
 	return s.FromXYZ(X, Y, Z)
 }
 
@@ -171,7 +171,7 @@ func (c colorCalGray) ToXYZ() (X, Y, Z float64) {
 // RGBA implements the color.Color interface.
 func (c colorCalGray) RGBA() (r, g, b, a uint32) {
 	X, Y, Z := c.ToXYZ()
-	rf, gf, bf := xyzToSRGB(X, Y, Z)
+	rf, gf, bf := XYZToSRGB(X, Y, Z)
 	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }
 
@@ -281,7 +281,7 @@ func (s *SpaceCalRGB) Convert(c stdcolor.Color) stdcolor.Color {
 	}
 
 	// convert via XYZ
-	X, Y, Z := colorToXYZ(c)
+	X, Y, Z := ColorToXYZ(c)
 	return s.FromXYZ(X, Y, Z)
 }
 
@@ -382,7 +382,7 @@ func (c colorCalRGB) ToXYZ() (X, Y, Z float64) {
 // RGBA implements the color.Color interface.
 func (c colorCalRGB) RGBA() (r, g, b, a uint32) {
 	X, Y, Z := c.ToXYZ()
-	rf, gf, bf := xyzToSRGB(X, Y, Z)
+	rf, gf, bf := XYZToSRGB(X, Y, Z)
 	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }
 
@@ -494,7 +494,7 @@ func (s *SpaceLab) Convert(c stdcolor.Color) stdcolor.Color {
 	}
 
 	// convert via XYZ
-	X, Y, Z := colorToXYZ(c)
+	X, Y, Z := ColorToXYZ(c)
 	return s.FromXYZ(X, Y, Z)
 }
 
@@ -569,7 +569,7 @@ func (c colorLab) ToXYZ() (X, Y, Z float64) {
 // RGBA implements the color.Color interface.
 func (c colorLab) RGBA() (r, g, b, a uint32) {
 	X, Y, Z := c.ToXYZ()
-	rf, gf, bf := xyzToSRGB(X, Y, Z)
+	rf, gf, bf := XYZToSRGB(X, Y, Z)
 	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }
 

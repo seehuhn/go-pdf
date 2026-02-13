@@ -107,7 +107,7 @@ func (colorColoredPattern) ColorSpace() Space {
 // For colored patterns, returns a neutral mid-gray since the actual color
 // depends on the pattern content which is not available here.
 func (colorColoredPattern) ToXYZ() (X, Y, Z float64) {
-	return srgbToXYZ(0.5, 0.5, 0.5)
+	return SRGBToXYZ(0.5, 0.5, 0.5)
 }
 
 // RGBA implements the color.Color interface.
