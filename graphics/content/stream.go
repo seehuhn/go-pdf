@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"math"
 	"slices"
 	"strconv"
@@ -27,7 +28,10 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Stream represents a PDF content stream.
+// Stream represents a PDF content stream as an iterable sequence of operators.
+// The All method yields operator name/args pairs. Args are transient: they are
+// only valid for the current iteration step (similar to [bufio.Scanner.Bytes]).
+// Callers that need to retain args must clone them.
 //
 // Content streams can occur in the following places:
 //   - Page contents
@@ -35,11 +39,38 @@ import (
 //   - Patterns
 //   - Type 3 fonts
 //   - Annotation appearances
-type Stream []Operator
+type Stream interface {
+	// All returns an iterator over the operators in the stream.
+	// The args slice yielded by each step is only valid until the next step.
+	All() iter.Seq2[OpName, []pdf.Object]
+
+	// Err returns any IO error encountered during iteration.
+	// It is always nil for [Operators].
+	Err() error
+}
+
+// Operators represents a PDF content stream as a slice of operators.
+type Operators []Operator
+
+// All returns an iterator over the operators.
+func (s Operators) All() iter.Seq2[OpName, []pdf.Object] {
+	return func(yield func(OpName, []pdf.Object) bool) {
+		for _, op := range s {
+			if !yield(op.Name, op.Args) {
+				return
+			}
+		}
+	}
+}
+
+// Err always returns nil for Operators.
+func (s Operators) Err() error {
+	return nil
+}
 
 // Equal determines whether two content streams contain the same sequence of
 // operators.
-func (s Stream) Equal(other Stream) bool {
+func (s Operators) Equal(other Operators) bool {
 	if len(s) != len(other) {
 		return false
 	}
@@ -102,128 +133,199 @@ func (ct Type) String() string {
 // Operators that are invalid in the current graphics object context are
 // either fixed up (text operators get BT auto-inserted) or skipped
 // (path operators outside path context).
-func ReadStream(r io.Reader, v pdf.Version, ct Type, res *Resources) (Stream, error) {
-	s := &streamScanner{
-		buf: make([]byte, 512),
+func ReadStream(r io.Reader, v pdf.Version, ct Type, res *Resources) (Operators, error) {
+	s := NewScanner(r, v, ct, res)
+	var ops Operators
+	for name, args := range s.All() {
+		ops = append(ops, Operator{Name: name, Args: slices.Clone(args)})
 	}
-	s.src = r
+	return ops, s.Err()
+}
 
-	var stream Stream
-	state := NewState(ct, res) // tracks nesting, compatibility, and current object
+// scannerStream implements [Stream] by lazily scanning a content stream.
+// The args yielded by [scannerStream.All] are transient and valid only for
+// the current iteration step.
+type scannerStream struct {
+	s       *streamScanner
+	state   *State
+	version pdf.Version
+	ct      Type
+	res     *Resources
+	err     error
 
-	for {
-		op, err := s.scan()
-		switch err {
-		case nil:
-			// filter based on version validation
-			validErr := op.isValidName(v)
-			if validErr == ErrUnknown || validErr == ErrVersion {
-				if state.InCompatibilitySection() {
-					// inside BX/EX: keep unknown operators
-				} else if v > pdf.MaxVersion {
-					// future PDF version: keep (may be valid)
-				} else {
-					// known PDF version: drop unknown/version-incompatible
-					continue
-				}
+	// rewind support
+	startOffset int64
+	seekable    bool
+	started     bool
+	seeker      io.Seeker
+}
+
+// NewScanner returns a [Stream] that lazily scans a content stream from r.
+// No data is read until [Stream.All] is called.
+//
+// If r implements [io.Seeker], the returned Stream supports calling All
+// multiple times by rewinding to the initial position. Otherwise, calling
+// All a second time sets Err to a non-nil error and returns an empty iterator.
+//
+// The args yielded by All are transient: they share the scanner's internal
+// buffer and are only valid for the current iteration step. Callers that
+// need to retain args must clone them.
+func NewScanner(r io.Reader, v pdf.Version, ct Type, res *Resources) Stream {
+	ss := &scannerStream{
+		s: &streamScanner{
+			buf: make([]byte, 512),
+			src: r,
+		},
+		state:   NewState(ct, res),
+		version: v,
+		ct:      ct,
+		res:     res,
+	}
+	if seeker, ok := r.(io.Seeker); ok {
+		off, err := seeker.Seek(0, io.SeekCurrent)
+		if err == nil {
+			ss.startOffset = off
+			ss.seekable = true
+			ss.seeker = seeker
+		}
+	}
+	return ss
+}
+
+// All returns an iterator over the operators in the stream.
+// If the underlying reader is seekable, All can be called multiple times.
+func (ss *scannerStream) All() iter.Seq2[OpName, []pdf.Object] {
+	if ss.started {
+		if ss.seekable {
+			// rewind to start
+			if _, err := ss.seeker.Seek(ss.startOffset, io.SeekStart); err != nil {
+				ss.err = err
+				return func(yield func(OpName, []pdf.Object) bool) {}
 			}
-			// handle deprecated operators by substitution
-			if validErr == ErrDeprecated {
-				switch op.Name {
-				case OpFillCompat:
-					op.Name = OpFill // F -> f
-				default:
-					continue // drop other deprecated operators
-				}
+			ss.s = &streamScanner{
+				buf: make([]byte, 512),
+				src: ss.seeker.(io.Reader),
 			}
-
-			// filter Type 3 operators based on content type
-			if ct != Glyph {
-				if op.Name == OpType3ColoredGlyph || op.Name == OpType3UncoloredGlyph {
-					continue
-				}
-			}
-
-			// check if operator is allowed in current state and fix up if needed
-			if state.CheckOperatorAllowed(op.Name) != nil {
-				// not allowed - try to fix up by inserting prefix operators
-				if fixOps := fixupOperator(state, op); fixOps != nil {
-					for _, fixOp := range fixOps {
-						state.ApplyStateChanges(fixOp.Name, fixOp.Args)
-						stream = append(stream, fixOp)
+			ss.state = NewState(ss.ct, ss.res)
+			ss.err = nil
+		} else {
+			ss.err = errors.New("content stream is not rewindable")
+			return func(yield func(OpName, []pdf.Object) bool) {}
+		}
+	}
+	ss.started = true
+	return func(yield func(OpName, []pdf.Object) bool) {
+		for {
+			op, err := ss.s.scan()
+			switch err {
+			case nil:
+				// filter based on version validation
+				opName := op.Name
+				validErr := opName.isValidName(ss.version)
+				if validErr == ErrUnknown || validErr == ErrVersion {
+					if ss.state.InCompatibilitySection() {
+						// inside BX/EX: keep unknown operators
+					} else if ss.version > pdf.MaxVersion {
+						// future PDF version: keep (may be valid)
+					} else {
+						// known PDF version: drop unknown/version-incompatible
+						continue
 					}
-					// fall through to process original operator via main path
-				} else {
-					// can't fix up - skip
+				}
+				// handle deprecated operators by substitution
+				if validErr == ErrDeprecated {
+					switch opName {
+					case OpFillCompat:
+						opName = OpFill // F -> f
+					default:
+						continue // drop other deprecated operators
+					}
+				}
+
+				// filter Type 3 operators based on content type
+				if ss.ct != Glyph {
+					if opName == OpType3ColoredGlyph || opName == OpType3UncoloredGlyph {
+						continue
+					}
+				}
+
+				// check if operator is allowed in current state and fix up if needed
+				if ss.state.CheckOperatorAllowed(opName) != nil {
+					if fixNames := fixupOperatorName(ss.state, opName); fixNames != nil {
+						for _, fixName := range fixNames {
+							ss.state.ApplyStateChanges(fixName, nil)
+							if !yield(fixName, nil) {
+								return
+							}
+						}
+						// fall through to process original operator via main path
+					} else {
+						continue
+					}
+				}
+
+				// skip operators whose required state is not set
+				info := operators[opName]
+				if info != nil && info.Requires&^ss.state.Usable != 0 {
 					continue
 				}
-			}
 
-			// skip operators whose required state is not set (e.g., text-showing
-			// operators when no font has been set)
-			info := operators[op.Name]
-			if info != nil && info.Requires&^state.Usable != 0 {
-				continue
-			}
+				// update state and filter improperly nested operators
+				if ss.state.ApplyStateChanges(opName, op.Args) != nil {
+					continue
+				}
 
-			// update state and filter improperly nested operators
-			if state.ApplyStateChanges(op.Name, op.Args) != nil {
-				continue // drop mismatched/unbalanced closing operators
-			}
+				// update state bits for operators that set new state
+				if info != nil && info.Sets != 0 {
+					ss.state.Usable |= info.Sets
+					ss.state.GState.Set |= info.Sets
+				}
 
-			// update state bits for operators that set new state
-			if info != nil && info.Sets != 0 {
-				state.Usable |= info.Sets
-				state.GState.Set |= info.Sets
+				if !yield(opName, op.Args) {
+					return
+				}
+			case io.EOF:
+				// yield closing operators for open contexts
+				for _, name := range ss.state.ClosingOperators() {
+					if !yield(name, nil) {
+						return
+					}
+				}
+				return
+			case errParse:
+				// permissive: skip malformed content
+			default:
+				// IO error
+				ss.err = err
+				return
 			}
-
-			stream = append(stream, op)
-		case io.EOF:
-			// auto-close open contexts
-			stream = append(stream, closeOpenContexts(state)...)
-			return stream, nil
-		case errParse:
-			// permissive: skip malformed content
-		default:
-			// IO error
-			return stream, err
 		}
 	}
 }
 
-// fixupOperator returns prefix operators to insert before op to make its
-// context valid, or nil if the operator cannot be fixed up and should be
-// skipped. The returned operators do NOT include op itself - the caller
-// should process op through the main validation path after applying the
-// prefix operators.
-func fixupOperator(state *State, op Operator) []Operator {
-	info := operators[op.Name]
+// Err returns any IO error encountered during iteration.
+func (ss *scannerStream) Err() error {
+	return ss.err
+}
+
+// fixupOperatorName returns prefix operator names to insert before opName to
+// make its context valid, or nil if it cannot be fixed up and should be
+// skipped. The returned names do NOT include opName itself.
+func fixupOperatorName(state *State, opName OpName) []OpName {
+	info := operators[opName]
 	if info == nil {
 		return nil
 	}
 
 	// text operator outside text context: auto-insert BT if allowed
 	if info.Allowed == ObjText && state.CurrentObject != ObjText {
-		// BT is only allowed in page context
 		if state.CurrentObject == ObjPage {
-			return []Operator{{Name: OpTextBegin}}
+			return []OpName{OpTextBegin}
 		}
-		// can't insert BT in path or other context - skip the operator
 		return nil
 	}
 
-	// can't fix up other cases
 	return nil
-}
-
-// closeOpenContexts returns operators to close any open contexts at EOF.
-func closeOpenContexts(state *State) []Operator {
-	names := state.ClosingOperators()
-	ops := make([]Operator, len(names))
-	for i, name := range names {
-		ops[i] = Operator{Name: name}
-	}
-	return ops
 }
 
 // streamScanner is an internal scanner for content streams
@@ -329,7 +431,7 @@ tokenLoop:
 				return s.readInlineImage()
 			}
 
-			return Operator{Name: opName, Args: slices.Clone(s.args)}, nil
+			return Operator{Name: opName, Args: s.args}, nil
 		} else {
 			if len(s.args) < maxOperatorArgs {
 				s.args = append(s.args, obj)

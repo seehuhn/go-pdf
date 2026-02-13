@@ -52,7 +52,7 @@ type Type1 struct {
 	Color bool
 
 	// Content is the content stream that draws a single pattern cell.
-	Content content.Stream
+	Content content.Operators
 
 	// Res contains the resources used by the content stream (required).
 	Res *content.Resources

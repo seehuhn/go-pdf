@@ -26,7 +26,7 @@ import (
 // Content represents a single content stream that can be shared
 // across multiple pages. It implements [pdf.Embedder] for deduplication.
 type Content struct {
-	Operators content.Stream
+	Operators content.Operators
 }
 
 var _ pdf.Embedder = (*Content)(nil)

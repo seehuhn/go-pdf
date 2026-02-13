@@ -28,7 +28,7 @@ func TestWriter_WriteSimple(t *testing.T) {
 	var buf bytes.Buffer
 	w := NewWriter(pdf.V1_7, Page, &Resources{})
 
-	stream := Stream{
+	stream := Operators{
 		{Name: OpSetLineWidth, Args: []pdf.Object{pdf.Number(2)}},
 		{Name: OpMoveTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
 		{Name: OpLineTo, Args: []pdf.Object{pdf.Number(200), pdf.Number(200)}},
@@ -50,7 +50,7 @@ func TestWriter_VersionCheck(t *testing.T) {
 	w := NewWriter(pdf.V1_0, Page, &Resources{})
 
 	// ri operator requires PDF 1.1
-	stream := Stream{
+	stream := Operators{
 		{Name: OpSetRenderingIntent, Args: []pdf.Object{pdf.Name("Perceptual")}},
 	}
 
@@ -66,7 +66,7 @@ func TestWriter_StateTracking(t *testing.T) {
 	w := NewWriter(pdf.V1_7, Page, res)
 
 	// Write q/Q sequence
-	stream := Stream{
+	stream := Operators{
 		{Name: OpPushGraphicsState},
 		{Name: OpSetLineWidth, Args: []pdf.Object{pdf.Number(5)}},
 		{Name: OpPopGraphicsState},
@@ -77,8 +77,8 @@ func TestWriter_StateTracking(t *testing.T) {
 	}
 
 	// MaxStackDepth should be 1
-	if w.state.MaxStackDepth != 1 {
-		t.Errorf("MaxStackDepth = %d, want 1", w.state.MaxStackDepth)
+	if w.v.state.MaxStackDepth != 1 {
+		t.Errorf("MaxStackDepth = %d, want 1", w.v.state.MaxStackDepth)
 	}
 }
 
@@ -86,7 +86,7 @@ func TestWriter_UnbalancedQ(t *testing.T) {
 	var buf bytes.Buffer
 	w := NewWriter(pdf.V1_7, Page, &Resources{})
 
-	stream := Stream{
+	stream := Operators{
 		{Name: OpPushGraphicsState},
 		// Missing Q
 	}
@@ -102,13 +102,13 @@ func TestWriter_ResourceValidation(t *testing.T) {
 	tests := []struct {
 		name   string
 		res    *Resources
-		stream Stream
+		stream Operators
 		errMsg string
 	}{
 		{
 			name: "missing font",
 			res:  &Resources{},
-			stream: Stream{
+			stream: Operators{
 				{Name: OpTextBegin},
 				{Name: OpTextSetFont, Args: []pdf.Object{pdf.Name("F1"), pdf.Number(12)}},
 			},
@@ -119,7 +119,7 @@ func TestWriter_ResourceValidation(t *testing.T) {
 			res: &Resources{
 				Font: map[pdf.Name]font.Instance{"F1": nil},
 			},
-			stream: Stream{
+			stream: Operators{
 				{Name: OpTextBegin},
 				{Name: OpTextSetFont, Args: []pdf.Object{pdf.Name("F1"), pdf.Number(12)}},
 			},
@@ -128,7 +128,7 @@ func TestWriter_ResourceValidation(t *testing.T) {
 		{
 			name: "missing XObject",
 			res:  &Resources{},
-			stream: Stream{
+			stream: Operators{
 				{Name: OpXObject, Args: []pdf.Object{pdf.Name("X1")}},
 			},
 			errMsg: "XObject",
@@ -136,7 +136,7 @@ func TestWriter_ResourceValidation(t *testing.T) {
 		{
 			name: "missing ExtGState",
 			res:  &Resources{},
-			stream: Stream{
+			stream: Operators{
 				{Name: OpSetExtGState, Args: []pdf.Object{pdf.Name("E1")}},
 			},
 			errMsg: "ExtGState",
@@ -144,7 +144,7 @@ func TestWriter_ResourceValidation(t *testing.T) {
 		{
 			name: "missing shading",
 			res:  &Resources{},
-			stream: Stream{
+			stream: Operators{
 				{Name: OpShading, Args: []pdf.Object{pdf.Name("S1")}},
 			},
 			errMsg: "shading",
@@ -152,7 +152,7 @@ func TestWriter_ResourceValidation(t *testing.T) {
 		{
 			name: "missing color space",
 			res:  &Resources{},
-			stream: Stream{
+			stream: Operators{
 				{Name: OpSetStrokeColorSpace, Args: []pdf.Object{pdf.Name("CS1")}},
 			},
 			errMsg: "color space",
@@ -160,7 +160,7 @@ func TestWriter_ResourceValidation(t *testing.T) {
 		{
 			name: "device color space allowed",
 			res:  &Resources{},
-			stream: Stream{
+			stream: Operators{
 				{Name: OpSetStrokeColorSpace, Args: []pdf.Object{pdf.Name("DeviceRGB")}},
 			},
 			errMsg: "",
@@ -168,7 +168,7 @@ func TestWriter_ResourceValidation(t *testing.T) {
 		{
 			name: "missing pattern",
 			res:  &Resources{},
-			stream: Stream{
+			stream: Operators{
 				{Name: OpSetStrokeColorN, Args: []pdf.Object{pdf.Name("P1")}},
 			},
 			errMsg: "pattern",
@@ -176,7 +176,7 @@ func TestWriter_ResourceValidation(t *testing.T) {
 		{
 			name: "SCN with color components only",
 			res:  &Resources{},
-			stream: Stream{
+			stream: Operators{
 				{Name: OpSetStrokeColorN, Args: []pdf.Object{pdf.Number(0.5), pdf.Number(0.5), pdf.Number(0.5)}},
 			},
 			errMsg: "",
@@ -199,5 +199,19 @@ func TestWriter_ResourceValidation(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestWriter_ValidateWithScanner(t *testing.T) {
+	input := "q\n1 0 0 1 100 200 cm\nQ\n"
+	r := bytes.NewReader([]byte(input))
+	s := NewScanner(r, pdf.V1_7, Page, &Resources{})
+
+	w := NewWriter(pdf.V1_7, Page, &Resources{})
+	if err := w.Validate(s); err != nil {
+		t.Fatalf("Validate failed: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
 	}
 }

@@ -45,9 +45,17 @@ type Reader struct {
 	Character func(cid cid.CID, text string) error
 	TextEvent func(event TextEvent, arg float64)
 
-	Text      func(text string) error
+	Text func(text string) error
+
+	// UnknownOp is called for operators not handled by typed callbacks.
+	// The args slice may be transient (shared with scanner buffers);
+	// callers that need to retain args must clone them.
 	UnknownOp func(op string, args []pdf.Object) error
-	EveryOp   func(op string, args []pdf.Object) error
+
+	// EveryOp is called for every operator after all other processing.
+	// The args slice may be transient (shared with scanner buffers);
+	// callers that need to retain args must clone them.
+	EveryOp func(op string, args []pdf.Object) error
 
 	GraphicsStateSaved    func() error
 	GraphicsStateRestored func() error
@@ -124,27 +132,22 @@ func (r *Reader) ParsePage(page pdf.Object, ctm matrix.Matrix) error {
 // ParseContentStream parses a PDF content stream.
 func (r *Reader) ParseContentStream(in io.Reader) error {
 	v := pdf.GetVersion(r.R)
-	stream, err := content.ReadStream(in, v, content.Page, r.State.Resources)
-	if err != nil {
-		return err
-	}
+	stream := content.NewScanner(in, v, content.Page, r.State.Resources)
 	return r.ProcessStream(stream)
 }
 
 // ProcessStream processes a parsed content stream, calling the appropriate
 // callback functions for each operator.
 func (r *Reader) ProcessStream(stream content.Stream) error {
-	for _, op := range stream {
-		origArgs := op.Args
-
+	for name, args := range stream.All() {
 		// Apply state changes first
-		_ = r.State.ApplyOperator(op.Name, op.Args) // ignore errors in permissive reader
+		_ = r.State.ApplyOperator(name, args) // ignore errors in permissive reader
 
 		// Get current graphics state (may have changed after ApplyOperator)
 		p := r.State.GState
 
 		// Handle reader-specific callbacks
-		switch op.Name {
+		switch name {
 
 		// Text-positioning operators - emit TextEvent callbacks
 		case content.OpTextMoveOffset, content.OpTextMoveOffsetSetLeading, content.OpTextNextLine: // Td, TD, T*
@@ -159,7 +162,7 @@ func (r *Reader) ProcessStream(stream content.Stream) error {
 
 		// Text-showing operators
 		case content.OpTextShow: // Tj
-			if s, ok := getString(op.Args, 0); ok && p.TextFont != nil {
+			if s, ok := getString(args, 0); ok && p.TextFont != nil {
 				err := r.processText(s)
 				if err != nil {
 					return err
@@ -171,7 +174,7 @@ func (r *Reader) ProcessStream(stream content.Stream) error {
 			if r.TextEvent != nil {
 				r.TextEvent(TextEventNL, 0)
 			}
-			if s, ok := getString(op.Args, 0); ok && p.TextFont != nil {
+			if s, ok := getString(args, 0); ok && p.TextFont != nil {
 				err := r.processText(s)
 				if err != nil {
 					return err
@@ -183,7 +186,7 @@ func (r *Reader) ProcessStream(stream content.Stream) error {
 			if r.TextEvent != nil {
 				r.TextEvent(TextEventNL, 0)
 			}
-			if s, ok := getString(op.Args, 2); ok && p.TextFont != nil {
+			if s, ok := getString(args, 2); ok && p.TextFont != nil {
 				err := r.processText(s)
 				if err != nil {
 					return err
@@ -191,7 +194,7 @@ func (r *Reader) ProcessStream(stream content.Stream) error {
 			}
 
 		case content.OpTextShowArray: // TJ
-			if a, ok := getArray(op.Args, 0); ok && p.TextFont != nil {
+			if a, ok := getArray(args, 0); ok && p.TextFont != nil {
 				for _, ai := range a {
 					var d float64
 					switch ai := ai.(type) {
@@ -225,7 +228,7 @@ func (r *Reader) ProcessStream(stream content.Stream) error {
 
 		// Marked-content operators
 		case content.OpMarkedContentPoint: // MP
-			if tag, ok := getName(op.Args, 0); ok && r.MarkedContent != nil {
+			if tag, ok := getName(args, 0); ok && r.MarkedContent != nil {
 				mc := &graphics.MarkedContent{
 					Tag:        tag,
 					Properties: nil,
@@ -237,7 +240,7 @@ func (r *Reader) ProcessStream(stream content.Stream) error {
 			}
 
 		case content.OpBeginMarkedContent: // BMC
-			if tag, ok := getName(op.Args, 0); ok && len(r.MarkedContentStack) < maxMarkedContentDepth {
+			if tag, ok := getName(args, 0); ok && len(r.MarkedContentStack) < maxMarkedContentDepth {
 				mc := &graphics.MarkedContent{
 					Tag:        tag,
 					Properties: nil,
@@ -252,15 +255,15 @@ func (r *Reader) ProcessStream(stream content.Stream) error {
 			}
 
 		case content.OpMarkedContentPointWithProperties: // DP
-			if len(op.Args) != 2 {
+			if len(args) != 2 {
 				break
 			}
-			tag, ok1 := op.Args[0].(pdf.Name)
+			tag, ok1 := args[0].(pdf.Name)
 			if !ok1 {
 				break
 			}
 
-			mc, err := r.extractMarkedContent(tag, op.Args[1])
+			mc, err := r.extractMarkedContent(tag, args[1])
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -275,16 +278,16 @@ func (r *Reader) ProcessStream(stream content.Stream) error {
 			}
 
 		case content.OpBeginMarkedContentWithProperties: // BDC
-			if len(op.Args) != 2 {
+			if len(args) != 2 {
 				break
 			}
 
-			tag, ok1 := op.Args[0].(pdf.Name)
+			tag, ok1 := args[0].(pdf.Name)
 			if !ok1 || len(r.MarkedContentStack) >= maxMarkedContentDepth {
 				break
 			}
 
-			mc, err := r.extractMarkedContent(tag, op.Args[1])
+			mc, err := r.extractMarkedContent(tag, args[1])
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -317,7 +320,7 @@ func (r *Reader) ProcessStream(stream content.Stream) error {
 
 		default:
 			if r.UnknownOp != nil {
-				err := r.UnknownOp(string(op.Name), op.Args)
+				err := r.UnknownOp(string(name), args)
 				if err != nil {
 					return err
 				}
@@ -325,7 +328,7 @@ func (r *Reader) ProcessStream(stream content.Stream) error {
 		}
 
 		// typed callbacks
-		switch op.Name {
+		switch name {
 		case content.OpPushGraphicsState:
 			if r.GraphicsStateSaved != nil {
 				if err := r.GraphicsStateSaved(); err != nil {
@@ -339,11 +342,11 @@ func (r *Reader) ProcessStream(stream content.Stream) error {
 				}
 			}
 		case content.OpXObject:
-			if r.XObject != nil && len(origArgs) >= 1 {
-				if name, ok := origArgs[0].(pdf.Name); ok {
+			if r.XObject != nil && len(args) >= 1 {
+				if xname, ok := args[0].(pdf.Name); ok {
 					res := r.State.Resources
 					if res != nil && res.XObject != nil {
-						if obj := res.XObject[name]; obj != nil {
+						if obj := res.XObject[xname]; obj != nil {
 							if err := r.XObject(obj, p.CTM); err != nil {
 								return err
 							}
@@ -352,9 +355,9 @@ func (r *Reader) ProcessStream(stream content.Stream) error {
 				}
 			}
 		case content.OpInlineImage:
-			if r.InlineImage != nil && len(origArgs) >= 2 {
-				if dict, ok := origArgs[0].(pdf.Dict); ok {
-					if data, ok := origArgs[1].(pdf.String); ok {
+			if r.InlineImage != nil && len(args) >= 2 {
+				if dict, ok := args[0].(pdf.Dict); ok {
+					if data, ok := args[1].(pdf.String); ok {
 						if err := r.InlineImage(dict, []byte(data), p.CTM); err != nil {
 							return err
 						}
@@ -364,14 +367,14 @@ func (r *Reader) ProcessStream(stream content.Stream) error {
 		}
 
 		if r.EveryOp != nil {
-			err := r.EveryOp(string(op.Name), origArgs)
+			err := r.EveryOp(string(name), args)
 			if err != nil {
 				return err
 			}
 		}
 
 	}
-	return nil
+	return stream.Err()
 }
 
 // extractMarkedContent extracts marked content properties from operator arguments.

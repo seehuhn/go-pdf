@@ -60,8 +60,8 @@ func (o Operator) Equal(other Operator) bool {
 // It returns ErrUnknown if the operator is not recognized, ErrDeprecated if
 // the operator is deprecated in the given version, or ErrVersion if the
 // operator was not yet available in the given version.
-func (o Operator) isValidName(v pdf.Version) error {
-	info, ok := operators[o.Name]
+func (name OpName) isValidName(v pdf.Version) error {
+	info, ok := operators[name]
 	if !ok {
 		return ErrUnknown
 	}

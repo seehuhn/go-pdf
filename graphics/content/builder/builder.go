@@ -32,7 +32,7 @@ type Builder struct {
 	contentType content.Type
 
 	Resources *content.Resources
-	Stream    content.Stream
+	Stream    content.Operators
 	State     *content.State
 	Err       error
 
@@ -100,7 +100,7 @@ func New(ct content.Type, res *content.Resources) *Builder {
 // Harvest returns the stream built so far and clears it.
 // State continues for building the next segment.
 // Returns error if Err is set (error is sticky, not cleared).
-func (b *Builder) Harvest() (content.Stream, error) {
+func (b *Builder) Harvest() (content.Operators, error) {
 	if b.Err != nil {
 		return nil, b.Err
 	}

@@ -182,7 +182,7 @@ func testRoundTrip(t *testing.T, pat color.Pattern) {
 	// compare extracted patterns
 	// For Type1, we compare Content streams semantically
 	opts := cmp.Options{
-		cmp.Comparer(func(a, b content.Stream) bool {
+		cmp.Comparer(func(a, b content.Operators) bool {
 			return a.Equal(b)
 		}),
 		cmp.Comparer(func(a, b *content.Resources) bool {

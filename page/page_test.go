@@ -51,7 +51,7 @@ var testCases = []testCase{
 			},
 			Contents: []*Content{
 				{
-					Operators: content.Stream{
+					Operators: content.Operators{
 						{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
 						{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(200), pdf.Number(200)}},
 						{Name: content.OpStroke},
@@ -70,14 +70,14 @@ var testCases = []testCase{
 			Contents: []*Content{
 				{
 					// first stream: self-balanced graphics state
-					Operators: content.Stream{
+					Operators: content.Operators{
 						{Name: content.OpPushGraphicsState},
 						{Name: content.OpPopGraphicsState},
 					},
 				},
 				{
 					// second stream: draw operations
-					Operators: content.Stream{
+					Operators: content.Operators{
 						{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(50), pdf.Number(50)}},
 						{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
 						{Name: content.OpStroke},
@@ -85,7 +85,7 @@ var testCases = []testCase{
 				},
 				{
 					// third stream: another self-balanced operation
-					Operators: content.Stream{
+					Operators: content.Operators{
 						{Name: content.OpPushGraphicsState},
 						{Name: content.OpPopGraphicsState},
 					},
@@ -223,7 +223,7 @@ func TestRoundTrip(t *testing.T) {
 func TestPageContent_Embed(t *testing.T) {
 	// Create a simple content stream
 	pc := &Content{
-		Operators: content.Stream{
+		Operators: content.Operators{
 			{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
 			{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(200), pdf.Number(200)}},
 			{Name: content.OpStroke},
@@ -262,7 +262,7 @@ func TestPageContent_Embed(t *testing.T) {
 func TestPageContent_Deduplication(t *testing.T) {
 	// Create a content stream and use it twice
 	pc := &Content{
-		Operators: content.Stream{
+		Operators: content.Operators{
 			{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(0), pdf.Number(0)}},
 			{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
 			{Name: content.OpStroke},
@@ -318,7 +318,7 @@ func TestPage_Encode_ValidationError(t *testing.T) {
 		},
 		Contents: []*Content{
 			{
-				Operators: content.Stream{
+				Operators: content.Operators{
 					{Name: content.OpPushGraphicsState},
 					// Missing Q
 				},

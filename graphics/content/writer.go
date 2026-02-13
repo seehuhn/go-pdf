@@ -24,81 +24,175 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Writer outputs content streams with version checking.
-type Writer struct {
+// validator holds state for validating a content stream operator by operator.
+type validator struct {
 	state   *State
 	version pdf.Version
 	res     *Resources
+	i       int
 }
 
-// NewWriter creates a Writer for the given content type and PDF version.
-func NewWriter(v pdf.Version, ct Type, res *Resources) *Writer {
+func newValidator(v pdf.Version, ct Type, res *Resources) validator {
 	if res == nil {
 		res = &Resources{}
 	}
-	return &Writer{
+	return validator{
 		state:   NewState(ct, res),
 		version: v,
 		res:     res,
 	}
 }
 
-// Validate checks that a content stream is valid without writing it.
-// It performs the same validation as Write but produces no output.
-func (w *Writer) Validate(s Stream) error {
-	for i, op := range s {
-		// Check version compatibility.
-		// Unknown operators are allowed inside BX/EX compatibility sections.
-		if err := op.isValidName(w.version); err != nil {
-			if !((err == ErrUnknown || err == ErrVersion) && w.state.InCompatibilitySection()) {
-				return fmt.Errorf("operator %d (%s): %w", i, op.Name, err)
-			}
-		}
-
-		// q/Q operators are only allowed in text objects for PDF 2.0+
-		if w.version < pdf.V2_0 && w.state.CurrentObject == ObjText {
-			if op.Name == OpPushGraphicsState || op.Name == OpPopGraphicsState {
-				return fmt.Errorf("operator %d (%s): not allowed in text object before PDF 2.0", i, op.Name)
-			}
-		}
-
-		// Update state based on operator
-		if err := w.state.ApplyOperator(op.Name, op.Args); err != nil {
-			return fmt.Errorf("operator %d (%s): %w", i, op.Name, err)
-		}
-		if err := w.validateResources(op); err != nil {
-			return fmt.Errorf("operator %d (%s): %w", i, op.Name, err)
+// check validates a single operator.
+func (v *validator) check(name OpName, args []pdf.Object) error {
+	// Check version compatibility.
+	// Unknown operators are allowed inside BX/EX compatibility sections.
+	if err := name.isValidName(v.version); err != nil {
+		if !((err == ErrUnknown || err == ErrVersion) && v.state.InCompatibilitySection()) {
+			return fmt.Errorf("operator %d (%s): %w", v.i, name, err)
 		}
 	}
+
+	// q/Q operators are only allowed in text objects for PDF 2.0+
+	if v.version < pdf.V2_0 && v.state.CurrentObject == ObjText {
+		if name == OpPushGraphicsState || name == OpPopGraphicsState {
+			return fmt.Errorf("operator %d (%s): not allowed in text object before PDF 2.0", v.i, name)
+		}
+	}
+
+	// Update state based on operator
+	if err := v.state.ApplyOperator(name, args); err != nil {
+		return fmt.Errorf("operator %d (%s): %w", v.i, name, err)
+	}
+	if err := v.validateResources(name, args); err != nil {
+		return fmt.Errorf("operator %d (%s): %w", v.i, name, err)
+	}
+	v.i++
 	return nil
 }
 
-// Write outputs a stream, validating and checking version compatibility.
-func (w *Writer) Write(out io.Writer, s Stream) error {
-	if err := w.Validate(s); err != nil {
-		return err
-	}
-	for _, op := range s {
-		if err := WriteOperator(out, op); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// Close checks for balanced operators and version-specific stack depth limits.
-func (w *Writer) Close() error {
-	if err := w.state.CanClose(); err != nil {
+// close checks for balanced operators and version-specific stack depth limits.
+func (v *validator) close() error {
+	if err := v.state.CanClose(); err != nil {
 		return err
 	}
 
 	// PDF 1.7 and earlier: max stack depth is 28
-	if w.version < pdf.V2_0 && w.state.MaxStackDepth > 28 {
+	if v.version < pdf.V2_0 && v.state.MaxStackDepth > 28 {
 		return fmt.Errorf("stack depth %d exceeds limit of 28 for PDF %s",
-			w.state.MaxStackDepth, w.version)
+			v.state.MaxStackDepth, v.version)
 	}
 
 	return nil
+}
+
+// validateResources checks that resources referenced by the operator exist.
+func (v *validator) validateResources(op OpName, args []pdf.Object) error {
+	switch op {
+	case OpTextSetFont: // Tf name size
+		if len(args) >= 1 {
+			if name, ok := args[0].(pdf.Name); ok {
+				if _, exists := v.res.Font[name]; !exists {
+					return fmt.Errorf("font %q not in resources", name)
+				}
+			}
+		}
+
+	case OpXObject: // Do name
+		if len(args) >= 1 {
+			if name, ok := args[0].(pdf.Name); ok {
+				if _, exists := v.res.XObject[name]; !exists {
+					return fmt.Errorf("XObject %q not in resources", name)
+				}
+			}
+		}
+
+	case OpSetExtGState: // gs name
+		if len(args) >= 1 {
+			if name, ok := args[0].(pdf.Name); ok {
+				gs, exists := v.res.ExtGState[name]
+				if !exists {
+					return fmt.Errorf("ExtGState %q not in resources", name)
+				}
+				// Update state with what the ExtGState sets
+				v.state.Usable |= gs.Set
+				v.state.GState.Set |= gs.Set
+			}
+		}
+
+	case OpShading: // sh name
+		if len(args) >= 1 {
+			if name, ok := args[0].(pdf.Name); ok {
+				if _, exists := v.res.Shading[name]; !exists {
+					return fmt.Errorf("shading %q not in resources", name)
+				}
+			}
+		}
+
+	case OpSetStrokeColorSpace, OpSetFillColorSpace: // CS/cs name
+		if len(args) >= 1 {
+			if name, ok := args[0].(pdf.Name); ok {
+				// reserved color space names are built-in, not in resources
+				if !isReservedColorSpaceName(name) {
+					if _, exists := v.res.ColorSpace[name]; !exists {
+						return fmt.Errorf("color space %q not in resources", name)
+					}
+				}
+			}
+		}
+
+	case OpSetStrokeColorN, OpSetFillColorN: // SCN/scn c1...cn [name]
+		// pattern names are pdf.Name, color components are numbers
+		if len(args) > 0 {
+			if name, ok := args[len(args)-1].(pdf.Name); ok {
+				if _, exists := v.res.Pattern[name]; !exists {
+					return fmt.Errorf("pattern %q not in resources", name)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// Writer outputs content streams with version checking.
+type Writer struct {
+	v validator
+}
+
+// NewWriter creates a Writer for the given content type and PDF version.
+func NewWriter(v pdf.Version, ct Type, res *Resources) *Writer {
+	return &Writer{
+		v: newValidator(v, ct, res),
+	}
+}
+
+// Validate checks that a content stream is valid without writing it.
+// It performs the same validation as Write but produces no output.
+func (w *Writer) Validate(s Stream) error {
+	for name, args := range s.All() {
+		if err := w.v.check(name, args); err != nil {
+			return err
+		}
+	}
+	return s.Err()
+}
+
+// Write outputs a stream, validating and checking version compatibility.
+func (w *Writer) Write(out io.Writer, s Stream) error {
+	for name, args := range s.All() {
+		if err := w.v.check(name, args); err != nil {
+			return err
+		}
+		if err := WriteOperator(out, Operator{Name: name, Args: args}); err != nil {
+			return err
+		}
+	}
+	return s.Err()
+}
+
+// Close checks for balanced operators and version-specific stack depth limits.
+func (w *Writer) Close() error {
+	return w.v.close()
 }
 
 // Write serializes a content stream to an io.Writer with validation.
@@ -113,74 +207,6 @@ func Write(out io.Writer, s Stream, v pdf.Version, ct Type, res *Resources) erro
 		return err
 	}
 	return w.Close()
-}
-
-// validateResources checks that resources referenced by the operator exist.
-func (w *Writer) validateResources(op Operator) error {
-	switch op.Name {
-	case OpTextSetFont: // Tf name size
-		if len(op.Args) >= 1 {
-			if name, ok := op.Args[0].(pdf.Name); ok {
-				if _, exists := w.res.Font[name]; !exists {
-					return fmt.Errorf("font %q not in resources", name)
-				}
-			}
-		}
-
-	case OpXObject: // Do name
-		if len(op.Args) >= 1 {
-			if name, ok := op.Args[0].(pdf.Name); ok {
-				if _, exists := w.res.XObject[name]; !exists {
-					return fmt.Errorf("XObject %q not in resources", name)
-				}
-			}
-		}
-
-	case OpSetExtGState: // gs name
-		if len(op.Args) >= 1 {
-			if name, ok := op.Args[0].(pdf.Name); ok {
-				gs, exists := w.res.ExtGState[name]
-				if !exists {
-					return fmt.Errorf("ExtGState %q not in resources", name)
-				}
-				// Update state with what the ExtGState sets
-				w.state.Usable |= gs.Set
-				w.state.GState.Set |= gs.Set
-			}
-		}
-
-	case OpShading: // sh name
-		if len(op.Args) >= 1 {
-			if name, ok := op.Args[0].(pdf.Name); ok {
-				if _, exists := w.res.Shading[name]; !exists {
-					return fmt.Errorf("shading %q not in resources", name)
-				}
-			}
-		}
-
-	case OpSetStrokeColorSpace, OpSetFillColorSpace: // CS/cs name
-		if len(op.Args) >= 1 {
-			if name, ok := op.Args[0].(pdf.Name); ok {
-				// reserved color space names are built-in, not in resources
-				if !isReservedColorSpaceName(name) {
-					if _, exists := w.res.ColorSpace[name]; !exists {
-						return fmt.Errorf("color space %q not in resources", name)
-					}
-				}
-			}
-		}
-
-	case OpSetStrokeColorN, OpSetFillColorN: // SCN/scn c1...cn [name]
-		// pattern names are pdf.Name, color components are numbers
-		if len(op.Args) > 0 {
-			if name, ok := op.Args[len(op.Args)-1].(pdf.Name); ok {
-				if _, exists := w.res.Pattern[name]; !exists {
-					return fmt.Errorf("pattern %q not in resources", name)
-				}
-			}
-		}
-	}
-	return nil
 }
 
 // isReservedColorSpaceName returns true for color space names that are

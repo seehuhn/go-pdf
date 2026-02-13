@@ -39,7 +39,7 @@ import (
 // Form represents a PDF form XObject that can contain reusable graphics content.
 type Form struct {
 	// Content is the content stream that draws the form.
-	Content content.Stream
+	Content content.Operators
 
 	// Res contains the resources used by the content stream (required).
 	Res *content.Resources

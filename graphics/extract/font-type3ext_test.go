@@ -212,7 +212,7 @@ func FuzzType3Dict(f *testing.F) {
 var testCharProcs = map[string]*dict.CharProc{
 	// d0 with simple filled rectangle
 	"filledRect": {
-		Content: content.Stream{
+		Content: content.Operators{
 			{Name: content.OpType3ColoredGlyph, Args: []pdf.Object{pdf.Number(500), pdf.Integer(0)}},
 			{Name: content.OpRectangle, Args: []pdf.Object{pdf.Integer(50), pdf.Integer(0), pdf.Integer(400), pdf.Integer(700)}},
 			{Name: content.OpFill},
@@ -220,7 +220,7 @@ var testCharProcs = map[string]*dict.CharProc{
 	},
 	// d0 with stroked path and color
 	"strokedPath": {
-		Content: content.Stream{
+		Content: content.Operators{
 			{Name: content.OpType3ColoredGlyph, Args: []pdf.Object{pdf.Number(600), pdf.Integer(0)}},
 			{Name: content.OpSetStrokeGray, Args: []pdf.Object{pdf.Number(0.5)}},
 			{Name: content.OpSetLineWidth, Args: []pdf.Object{pdf.Number(10)}},
@@ -231,7 +231,7 @@ var testCharProcs = map[string]*dict.CharProc{
 	},
 	// d1 (uncolored) with bounding box and filled shape
 	"uncolored": {
-		Content: content.Stream{
+		Content: content.Operators{
 			{Name: content.OpType3UncoloredGlyph, Args: []pdf.Object{
 				pdf.Number(500), pdf.Integer(0), // wx, wy
 				pdf.Integer(0), pdf.Integer(0), pdf.Integer(500), pdf.Integer(700), // bbox
@@ -242,7 +242,7 @@ var testCharProcs = map[string]*dict.CharProc{
 	},
 	// d0 with nested q/Q (save/restore graphics state)
 	"nested": {
-		Content: content.Stream{
+		Content: content.Operators{
 			{Name: content.OpType3ColoredGlyph, Args: []pdf.Object{pdf.Number(500), pdf.Integer(0)}},
 			{Name: content.OpPushGraphicsState},
 			{Name: content.OpSetFillGray, Args: []pdf.Object{pdf.Number(0.8)}},
@@ -255,7 +255,7 @@ var testCharProcs = map[string]*dict.CharProc{
 	},
 	// d0 with bezier curve
 	"curve": {
-		Content: content.Stream{
+		Content: content.Operators{
 			{Name: content.OpType3ColoredGlyph, Args: []pdf.Object{pdf.Number(500), pdf.Integer(0)}},
 			{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Integer(0), pdf.Integer(0)}},
 			{Name: content.OpCurveTo, Args: []pdf.Object{
@@ -269,7 +269,7 @@ var testCharProcs = map[string]*dict.CharProc{
 	},
 	// d0 with fill and stroke
 	"fillAndStroke": {
-		Content: content.Stream{
+		Content: content.Operators{
 			{Name: content.OpType3ColoredGlyph, Args: []pdf.Object{pdf.Number(500), pdf.Integer(0)}},
 			{Name: content.OpSetFillRGB, Args: []pdf.Object{pdf.Number(1), pdf.Number(0), pdf.Number(0)}},
 			{Name: content.OpSetStrokeRGB, Args: []pdf.Object{pdf.Number(0), pdf.Number(0), pdf.Number(1)}},
@@ -280,7 +280,7 @@ var testCharProcs = map[string]*dict.CharProc{
 	},
 	// minimal d0 (just width, no drawing)
 	"minimal": {
-		Content: content.Stream{
+		Content: content.Operators{
 			{Name: content.OpType3ColoredGlyph, Args: []pdf.Object{pdf.Number(250), pdf.Integer(0)}},
 		},
 	},

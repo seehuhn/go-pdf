@@ -92,7 +92,7 @@ type Glyph struct {
 	// Content is the glyph's content stream.
 	// It must start with either the d0 or d1 operator.
 	// Use [content/builder.Builder] to construct content streams.
-	Content content.Stream
+	Content content.Operators
 
 	// Resources (optional) holds named resources used by this glyph's content
 	// stream. If set, the resources are embedded in the glyph's stream
@@ -181,7 +181,7 @@ func getNumber(obj pdf.Object) (float64, bool) {
 }
 
 // computeBBoxFromPath computes a bounding box from path control points.
-func computeBBoxFromPath(stream content.Stream) rect.Rect {
+func computeBBoxFromPath(stream content.Operators) rect.Rect {
 	bbox := rect.Rect{
 		LLx: math.Inf(+1),
 		LLy: math.Inf(+1),

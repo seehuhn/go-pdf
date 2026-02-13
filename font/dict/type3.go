@@ -36,7 +36,7 @@ import (
 // CharProc represents a Type 3 glyph procedure (content stream).
 type CharProc struct {
 	// Content is the parsed content stream for the glyph.
-	Content content.Stream
+	Content content.Operators
 
 	// Resources (optional) holds named resources used by this glyph's content
 	// stream. If nil, resources are looked up from the font's Resources field.

@@ -18,6 +18,8 @@ package content
 
 import (
 	"bytes"
+	"io"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -205,5 +207,109 @@ func TestOperatorArgLimit(t *testing.T) {
 	}
 	if len(stream) > 0 && stream[0].Name != OpPushGraphicsState {
 		t.Errorf("got operator %q, want %q", stream[0].Name, OpPushGraphicsState)
+	}
+}
+
+// collectStream collects all operators from a Stream into an Operators slice.
+func collectStream(s Stream) (Operators, error) {
+	var ops Operators
+	for name, args := range s.All() {
+		ops = append(ops, Operator{Name: name, Args: slices.Clone(args)})
+	}
+	return ops, s.Err()
+}
+
+func TestNewScannerMatchesReadStream(t *testing.T) {
+	for _, tt := range roundTripTestCases {
+		t.Run(tt.name, func(t *testing.T) {
+			data := []byte(tt.stream)
+
+			// ReadStream result
+			want, err := ReadStream(bytes.NewReader(data), pdf.V2_0, Page, testResources)
+			if err != nil {
+				t.Fatalf("ReadStream: %v", err)
+			}
+
+			// NewScanner result
+			s := NewScanner(bytes.NewReader(data), pdf.V2_0, Page, testResources)
+			got, err := collectStream(s)
+			if err != nil {
+				t.Fatalf("NewScanner: %v", err)
+			}
+
+			if diff := cmp.Diff(want, got, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("mismatch (-ReadStream +NewScanner):\n%s", diff)
+			}
+		})
+	}
+}
+
+func FuzzNewScannerMatchesReadStream(f *testing.F) {
+	for _, tc := range roundTripTestCases {
+		f.Add([]byte(tc.stream))
+	}
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		want, err1 := ReadStream(bytes.NewReader(data), pdf.V2_0, Page, testResources)
+
+		s := NewScanner(bytes.NewReader(data), pdf.V2_0, Page, testResources)
+		got, err2 := collectStream(s)
+
+		// both should either succeed or fail
+		if (err1 != nil) != (err2 != nil) {
+			t.Fatalf("error mismatch: ReadStream=%v, NewScanner=%v", err1, err2)
+		}
+		if err1 != nil {
+			return
+		}
+
+		if diff := cmp.Diff(want, got, cmpopts.EquateEmpty()); diff != "" {
+			t.Errorf("mismatch (-ReadStream +NewScanner):\n%s", diff)
+		}
+	})
+}
+
+func TestScannerRewind(t *testing.T) {
+	input := []byte("q\n1 0 0 1 100 200 cm\nQ\n")
+	r := bytes.NewReader(input)
+	s := NewScanner(r, pdf.V2_0, Page, &Resources{})
+
+	first, err := collectStream(s)
+	if err != nil {
+		t.Fatalf("first iteration: %v", err)
+	}
+
+	second, err := collectStream(s)
+	if err != nil {
+		t.Fatalf("second iteration: %v", err)
+	}
+
+	if diff := cmp.Diff(first, second, cmpopts.EquateEmpty()); diff != "" {
+		t.Errorf("rewind mismatch (-first +second):\n%s", diff)
+	}
+}
+
+// nonSeekReader wraps a reader to hide any Seek method.
+type nonSeekReader struct {
+	io.Reader
+}
+
+func TestScannerNoRewind(t *testing.T) {
+	input := []byte("q\nQ\n")
+	r := nonSeekReader{bytes.NewReader(input)}
+	s := NewScanner(r, pdf.V2_0, Page, &Resources{})
+
+	// first call should succeed
+	_, err := collectStream(s)
+	if err != nil {
+		t.Fatalf("first iteration: %v", err)
+	}
+
+	// second call on non-seekable should yield empty iterator
+	for range s.All() {
+		t.Fatal("expected empty iterator on second call")
+	}
+	if s.Err() == nil {
+		t.Error("expected non-nil error after second All() on non-seekable reader")
 	}
 }

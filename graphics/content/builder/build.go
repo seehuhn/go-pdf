@@ -21,7 +21,7 @@ import "seehuhn.de/go/pdf/graphics/content"
 // Build resets the builder, runs buildFunc to populate the stream,
 // and returns the resulting content stream.
 // On error, it returns nil and the error is stored in b.Err.
-func (b *Builder) Build(buildFunc func(b *Builder) error) content.Stream {
+func (b *Builder) Build(buildFunc func(b *Builder) error) content.Operators {
 	if b.Err != nil {
 		return nil
 	}
@@ -40,7 +40,7 @@ func (b *Builder) Build(buildFunc func(b *Builder) error) content.Stream {
 }
 
 // MustBuild is like Build but panics on error.
-func (b *Builder) MustBuild(buildFunc func(b *Builder) error) content.Stream {
+func (b *Builder) MustBuild(buildFunc func(b *Builder) error) content.Operators {
 	stream := b.Build(buildFunc)
 	if b.Err != nil {
 		panic(b.Err)
