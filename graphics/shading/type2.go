@@ -52,7 +52,8 @@ type Type2 struct {
 	// TMin, TMax specify the limiting values of the parametric variable t.
 	// The variable is considered to vary linearly between these two values
 	// as the color gradient varies between the starting and ending points
-	// of the axis. Default: [0.0, 1.0].
+	// of the axis.  When writing, TMin=0, TMax=0 is treated as TMin=0,
+	// TMax=1.
 	TMin, TMax float64
 
 	// ExtendStart specifies whether to extend the shading beyond the starting
@@ -274,9 +275,14 @@ func (s *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 	}
 
-	// validate domain relationship
-	if s.TMin > s.TMax {
-		return nil, fmt.Errorf("TMin (%g) must be less than or equal to TMax (%g)", s.TMin, s.TMax)
+	// substitute PDF default for Go zero value
+	tMin, tMax := s.TMin, s.TMax
+	if tMin == 0 && tMax == 0 {
+		tMax = 1
+	}
+
+	if tMin > tMax {
+		return nil, fmt.Errorf("TMin (%g) must be less than or equal to TMax (%g)", tMin, tMax)
 	}
 
 	if s.F == nil {
@@ -289,7 +295,7 @@ func (s *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	// Validate function domain contains shading domain
-	shadingDomain := []float64{s.TMin, s.TMax}
+	shadingDomain := []float64{tMin, tMax}
 	functionDomain := s.F.GetDomain()
 	if !domainContains(functionDomain, shadingDomain) {
 		return nil, fmt.Errorf("function domain %v must contain shading domain %v", functionDomain, shadingDomain)
@@ -323,8 +329,8 @@ func (s *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if s.AntiAlias {
 		dict["AntiAlias"] = pdf.Boolean(true)
 	}
-	if s.TMin != 0 || s.TMax != 1 {
-		dict["Domain"] = pdf.Array{pdf.Number(s.TMin), pdf.Number(s.TMax)}
+	if tMin != 0 || tMax != 1 {
+		dict["Domain"] = pdf.Array{pdf.Number(tMin), pdf.Number(tMax)}
 	}
 	if s.ExtendStart || s.ExtendEnd {
 		dict["Extend"] = pdf.Array{pdf.Boolean(s.ExtendStart), pdf.Boolean(s.ExtendEnd)}

@@ -50,7 +50,7 @@ type Type3 struct {
 	F pdf.Function
 
 	// TMin, TMax specify the limiting values of the parametric variable t.
-	// Default: [0, 1].
+	// When writing, TMin=0, TMax=0 is treated as TMin=0, TMax=1.
 	TMin, TMax float64
 
 	// ExtendStart specifies whether to extend the shading beyond the starting circle.
@@ -280,8 +280,18 @@ func (s *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, errors.New("missing function")
 	}
 
+	// substitute PDF default for Go zero value
+	tMin, tMax := s.TMin, s.TMax
+	if tMin == 0 && tMax == 0 {
+		tMax = 1
+	}
+
+	if tMin > tMax {
+		return nil, fmt.Errorf("TMin (%g) must be less than or equal to TMax (%g)", tMin, tMax)
+	}
+
 	// Validate function domain contains shading domain
-	shadingDomain := []float64{s.TMin, s.TMax}
+	shadingDomain := []float64{tMin, tMax}
 	functionDomain := s.F.GetDomain()
 	if !domainContains(functionDomain, shadingDomain) {
 		return nil, fmt.Errorf("function domain %v must contain shading domain %v", functionDomain, shadingDomain)
@@ -315,8 +325,8 @@ func (s *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if s.AntiAlias {
 		dict["AntiAlias"] = pdf.Boolean(true)
 	}
-	if s.TMin != 0 || s.TMax != 1 {
-		dict["Domain"] = pdf.Array{pdf.Number(s.TMin), pdf.Number(s.TMax)}
+	if tMin != 0 || tMax != 1 {
+		dict["Domain"] = pdf.Array{pdf.Number(tMin), pdf.Number(tMax)}
 	}
 	if s.ExtendStart || s.ExtendEnd {
 		dict["Extend"] = pdf.Array{pdf.Boolean(s.ExtendStart), pdf.Boolean(s.ExtendEnd)}

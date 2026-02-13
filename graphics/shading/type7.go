@@ -77,7 +77,8 @@ type Type7Patch struct {
 	// These are arranged in a 4×4 grid but stored in stream order according to the PDF spec.
 	ControlPoints [16]vec.Vec2
 
-	// CornerColors contains the color values for the 4 corners (c₀₀, c₀₃, c₃₃, c₃₀).
+	// CornerColors contains the color values for the 4 corners in boundary
+	// traversal order (c₀₀, c₃₀, c₃₃, c₀₃), matching the Type 6 convention.
 	// If Function is present, each corner has a single parametric value.
 	// Otherwise, each corner has n color components.
 	CornerColors [][]float64
@@ -402,21 +403,21 @@ var type7EdgeConnections = map[uint8]Type7EdgeConnection{
 	// Current (0,0),(0,1),(0,2),(0,3) get previous (0,3),(1,3),(2,3),(3,3)
 	1: {
 		ImplicitStreamIndices: [4]int{9, 8, 7, 6}, // stream indices for (0,3),(1,3),(2,3),(3,3)
-		ImplicitColorIndices:  [2]int{1, 2},       // c₀₀ = c₀₃ previous, c₀₃ = c₃₃ previous
+		ImplicitColorIndices:  [2]int{1, 2},       // new[0] = prev bottom-right, new[1] = prev top-right
 	},
 
 	// f = 2: Connect to previous patch's top edge (row 3)
 	// Current (0,0),(0,1),(0,2),(0,3) get previous (3,3),(3,2),(3,1),(3,0)
 	2: {
 		ImplicitStreamIndices: [4]int{6, 5, 4, 3}, // stream indices for (3,3),(3,2),(3,1),(3,0)
-		ImplicitColorIndices:  [2]int{2, 3},       // c₀₀ = c₃₃ previous, c₀₃ = c₃₀ previous
+		ImplicitColorIndices:  [2]int{2, 3},       // new[0] = prev top-right, new[1] = prev top-left
 	},
 
 	// f = 3: Connect to previous patch's left edge (column 0)
 	// Current (0,0),(0,1),(0,2),(0,3) get previous (3,0),(2,0),(1,0),(0,0)
 	3: {
 		ImplicitStreamIndices: [4]int{3, 2, 1, 0}, // stream indices for (3,0),(2,0),(1,0),(0,0)
-		ImplicitColorIndices:  [2]int{3, 0},       // c₀₀ = c₃₀ previous, c₀₃ = c₀₀ previous
+		ImplicitColorIndices:  [2]int{3, 0},       // new[0] = prev top-left, new[1] = prev bottom-left
 	},
 }
 

@@ -97,6 +97,7 @@ var testCases = map[int][]testCase{
 					C1: []float64{0, 0, 1},
 					N:  1.0,
 				},
+				TMax: 1,
 			},
 		},
 		{
@@ -131,6 +132,7 @@ var testCases = map[int][]testCase{
 					C1: []float64{0, 1, 1},
 					N:  0.5,
 				},
+				TMax: 1,
 				BBox: &pdf.Rectangle{LLx: -10, LLy: -10, URx: 60, URy: 60},
 			},
 		},
@@ -150,6 +152,7 @@ var testCases = map[int][]testCase{
 					C1: []float64{0, 0, 1},
 					N:  1.0,
 				},
+				TMax: 1,
 			},
 		},
 		{
