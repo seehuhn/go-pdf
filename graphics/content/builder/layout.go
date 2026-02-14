@@ -275,8 +275,7 @@ func (b *Builder) TextGetQuadPoints(seq *font.GlyphSeq, padding float64) []vec.V
 	M := b.State.GState.TextMatrix.Mul(b.State.GState.CTM)
 	rectUser := make([]vec.Vec2, 4)
 	for i := range 4 {
-		x, y := M.Apply(rectText[2*i], rectText[2*i+1])
-		rectUser[i] = vec.Vec2{X: x, Y: y}
+		rectUser[i] = M.Apply(vec.Vec2{X: rectText[2*i], Y: rectText[2*i+1]})
 	}
 
 	return rectUser

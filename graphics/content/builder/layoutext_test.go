@@ -213,8 +213,7 @@ func calculateExpectedQuadPoints(fontSize, textRise, skip float64, ctm, textMatr
 	// Transform all corners to default user space
 	result := make([]vec.Vec2, 4)
 	for i := range 4 {
-		x, y := M.Apply(rectText[2*i], rectText[2*i+1])
-		result[i] = vec.Vec2{X: x, Y: y}
+		result[i] = M.Apply(vec.Vec2{X: rectText[2*i], Y: rectText[2*i+1]})
 	}
 
 	return result

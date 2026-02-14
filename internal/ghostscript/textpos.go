@@ -18,6 +18,7 @@ package ghostscript
 
 import (
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/vec"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
@@ -55,21 +56,21 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 	M := matrix.Matrix{markerFontSize * param.TextHorizontalScaling, 0, 0, markerFontSize, 0, param.TextRise}
 	M = M.Mul(param.TextMatrix)
 	M = M.Mul(param.CTM)
-	xc, yc := M.Apply(0, 0)
+	c := M.Apply(vec.Vec2{})
 
 	// Build the marker glyph content stream
 	b := builder.New(content.Glyph, nil)
 	b.Type3ColoredGlyph(0, 0) // d0: colored glyph with zero width
 	b.SetFillColor(color.DeviceRGB{1.0, 0, 0})
 	A := M.Inv()
-	p, q := A.Apply(xc-1, yc-1)
-	b.MoveTo(p*1000, q*1000)
-	p, q = A.Apply(xc+1, yc-1)
-	b.LineTo(p*1000, q*1000)
-	p, q = A.Apply(xc+1, yc+1)
-	b.LineTo(p*1000, q*1000)
-	p, q = A.Apply(xc-1, yc+1)
-	b.LineTo(p*1000, q*1000)
+	pq := A.Apply(vec.Vec2{X: c.X - 1, Y: c.Y - 1})
+	b.MoveTo(pq.X*1000, pq.Y*1000)
+	pq = A.Apply(vec.Vec2{X: c.X + 1, Y: c.Y - 1})
+	b.LineTo(pq.X*1000, pq.Y*1000)
+	pq = A.Apply(vec.Vec2{X: c.X + 1, Y: c.Y + 1})
+	b.LineTo(pq.X*1000, pq.Y*1000)
+	pq = A.Apply(vec.Vec2{X: c.X - 1, Y: c.Y + 1})
+	b.LineTo(pq.X*1000, pq.Y*1000)
 	b.Fill()
 
 	stream, err := b.Harvest()

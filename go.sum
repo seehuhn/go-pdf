@@ -38,13 +38,13 @@ golang.org/x/tools v0.1.12/go.mod h1:hNGJHUnrk76NpqgfD5Aqm5Crs+Hm0VOH/i9J2+nxYbc
 golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5 h1:X3EdZgozH+/MKCx+N/1ZkEfNgQQ0ohd2U8f9tBj4Oc8=
 seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5/go.mod h1:se0NAaAL9aI9pRBRK0EvlY3572GJTsF0J7RwMXEiKz4=
-seehuhn.de/go/geom v0.7.1-0.20260214200458-9b2a844a8bb3 h1:rXdtGJ6WgpX/vVRRtDSz1vM+vn9CMxQK4kd77p1txjA=
-seehuhn.de/go/geom v0.7.1-0.20260214200458-9b2a844a8bb3/go.mod h1:YSriOfxNICtKWqxX1Ykdl9pMEwGmG9rwlYOOhobxXQA=
+seehuhn.de/go/geom v0.7.1-0.20260214224423-6457959953df h1:jD4xrDv5RDP/HI6ACe7rx9hYwgw7tYEFzqLfe9haaaU=
+seehuhn.de/go/geom v0.7.1-0.20260214224423-6457959953df/go.mod h1:YSriOfxNICtKWqxX1Ykdl9pMEwGmG9rwlYOOhobxXQA=
 seehuhn.de/go/icc v0.7.1-0.20260207233849-f06230622a13 h1:ROMcnbwmCBLjhViLW0SU+tRnJFmzDgQ/COqYNCl1AiE=
 seehuhn.de/go/icc v0.7.1-0.20260207233849-f06230622a13/go.mod h1:Km5HduR/BMQHMQD8S0kar+jsGrrFBLjqFvsY2xjiwtY=
 seehuhn.de/go/postscript v0.7.1-0.20260208133223-8d399700345f h1:drQSE2nXTiNenn2hcUfanSg3Pr5MjnnKm4SNkLMCXbY=
 seehuhn.de/go/postscript v0.7.1-0.20260208133223-8d399700345f/go.mod h1:qwrxEiinFyS84xE8GuqiVE/7nL1cgrfE79+PCIPr+TI=
-seehuhn.de/go/sfnt v0.7.0 h1:FX0jHNkKrMUyKaPtkPBau42xNkdVoXC736AVCqwrp8o=
-seehuhn.de/go/sfnt v0.7.0/go.mod h1:kfKCFzPOrTZz8n7nLWrLp20Ieu2I244Rp0WwCmTD3XQ=
+seehuhn.de/go/sfnt v0.7.1-0.20260214225039-7300a10399dd h1:u9NXZBOypIEi7fGmAVgoUThVO6mqSb9e+7FikIDoBuw=
+seehuhn.de/go/sfnt v0.7.1-0.20260214225039-7300a10399dd/go.mod h1:LyTtY5p4iWg1Q4q4Y6KqqmoQRJEI9KOxhpKrGJG7tSs=
 seehuhn.de/go/xmp v0.7.0 h1:uATn6xlKUMuArQFXnGqxobGkZEcHTgJAv6jPlG+xTEs=
 seehuhn.de/go/xmp v0.7.0/go.mod h1:jGgG+sBWq1z1L4NdE/QPTiiy4MH5c7YSWFFUfDJM6MI=
