@@ -39,7 +39,7 @@ import (
 // Form represents a PDF form XObject that can contain reusable graphics content.
 type Form struct {
 	// Content is the content stream that draws the form.
-	Content content.Operators
+	Content content.Stream
 
 	// Res contains the resources used by the content stream (required).
 	Res *content.Resources
@@ -235,9 +235,11 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if f.Group != nil {
 		ct = content.TransparencyGroup
 	}
-	err = content.Write(stm, f.Content, pdf.GetVersion(rm.Out()), ct, f.Res)
-	if err != nil {
-		return nil, err
+	if f.Content != nil {
+		err = content.Write(stm, f.Content, pdf.GetVersion(rm.Out()), ct, f.Res)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = stm.Close()
@@ -267,7 +269,7 @@ func (f *Form) Equal(other *Form) bool {
 	if f == nil || other == nil || f == other {
 		return f == other
 	}
-	if !f.Content.Equal(other.Content) {
+	if !content.StreamsEqual(f.Content, other.Content) {
 		return false
 	}
 	if !f.Res.Equal(other.Res) {

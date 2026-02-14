@@ -358,6 +358,116 @@ func TestDataLoadPatternError(t *testing.T) {
 	}
 }
 
+func TestSampleNearest(t *testing.T) {
+	// 3x2 gray image: row 0 = [0, 0.5, 1], row 1 = [0.25, 0.75, 0]
+	d := NewData(color.SpaceDeviceGray, 3, 2)
+	d.Set(0, 0, color.DeviceGray(0))
+	d.Set(1, 0, color.DeviceGray(0.5))
+	d.Set(2, 0, color.DeviceGray(1))
+	d.Set(0, 1, color.DeviceGray(0.25))
+	d.Set(1, 1, color.DeviceGray(0.75))
+	d.Set(2, 1, color.DeviceGray(0))
+
+	dst := make([]float64, 1)
+
+	// in-bounds sample
+	d.SampleNearest(1, 0, dst)
+	if !floatsClose(dst, []float64{0.5}, 1e-9) {
+		t.Errorf("SampleNearest(1,0) = %v, want 0.5", dst[0])
+	}
+
+	d.SampleNearest(0, 1, dst)
+	if !floatsClose(dst, []float64{0.25}, 1e-9) {
+		t.Errorf("SampleNearest(0,1) = %v, want 0.25", dst[0])
+	}
+
+	// clamping: negative coords -> (0,0)
+	d.SampleNearest(-1, -1, dst)
+	if !floatsClose(dst, []float64{0}, 1e-9) {
+		t.Errorf("SampleNearest(-1,-1) = %v, want 0", dst[0])
+	}
+
+	// clamping: beyond bounds -> edge pixel
+	d.SampleNearest(10, 10, dst)
+	if !floatsClose(dst, []float64{0}, 1e-9) {
+		t.Errorf("SampleNearest(10,10) = %v, want 0 (pixel 2,1)", dst[0])
+	}
+}
+
+func TestSampleBilinear(t *testing.T) {
+	// 2x2 gray image: [0, 1; 0, 1]
+	d := NewData(color.SpaceDeviceGray, 2, 2)
+	d.Set(0, 0, color.DeviceGray(0))
+	d.Set(1, 0, color.DeviceGray(1))
+	d.Set(0, 1, color.DeviceGray(0))
+	d.Set(1, 1, color.DeviceGray(1))
+
+	dst := make([]float64, 1)
+
+	// center of pixel (0,0): coords (0.5, 0.5) -> value 0
+	d.SampleBilinear(0.5, 0.5, dst)
+	if !floatsClose(dst, []float64{0}, 1e-9) {
+		t.Errorf("SampleBilinear(0.5,0.5) = %v, want 0", dst[0])
+	}
+
+	// center of pixel (1,0): coords (1.5, 0.5) -> value 1
+	d.SampleBilinear(1.5, 0.5, dst)
+	if !floatsClose(dst, []float64{1}, 1e-9) {
+		t.Errorf("SampleBilinear(1.5,0.5) = %v, want 1", dst[0])
+	}
+
+	// midpoint between pixels (0,0) and (1,0) -> 0.5
+	d.SampleBilinear(1.0, 0.5, dst)
+	if !floatsClose(dst, []float64{0.5}, 1e-6) {
+		t.Errorf("SampleBilinear(1.0,0.5) = %v, want 0.5", dst[0])
+	}
+
+	// edge clamping: far out-of-bounds should return edge value
+	d.SampleBilinear(-10, 0.5, dst)
+	if !floatsClose(dst, []float64{0}, 1e-9) {
+		t.Errorf("SampleBilinear(-10,0.5) = %v, want 0", dst[0])
+	}
+}
+
+func TestSampleBilinearRGB(t *testing.T) {
+	// 2x1 RGB image: pixel 0 = red, pixel 1 = blue
+	d := NewData(color.SpaceDeviceRGB, 2, 1)
+	d.Set(0, 0, color.DeviceRGB{1, 0, 0})
+	d.Set(1, 0, color.DeviceRGB{0, 0, 1})
+
+	dst := make([]float64, 3)
+
+	// midpoint between red and blue
+	d.SampleBilinear(1.0, 0.5, dst)
+	want := []float64{0.5, 0, 0.5}
+	if !floatsClose(dst, want, 1e-6) {
+		t.Errorf("SampleBilinear(1.0,0.5) = %v, want %v", dst, want)
+	}
+}
+
+func TestToRGBA(t *testing.T) {
+	d := NewData(color.SpaceDeviceRGB, 2, 1)
+	d.Set(0, 0, color.DeviceRGB{1, 0, 0})
+	d.Set(1, 0, color.DeviceRGB{0, 1, 0})
+
+	rgba := d.ToRGBA()
+	if rgba.Bounds() != d.Bounds() {
+		t.Fatalf("bounds mismatch: %v vs %v", rgba.Bounds(), d.Bounds())
+	}
+
+	// red pixel
+	r, g, b, a := rgba.At(0, 0).RGBA()
+	if r>>8 != 255 || g>>8 != 0 || b>>8 != 0 || a>>8 != 255 {
+		t.Errorf("pixel (0,0): got (%d,%d,%d,%d), want (255,0,0,255)", r>>8, g>>8, b>>8, a>>8)
+	}
+
+	// green pixel
+	r, g, b, a = rgba.At(1, 0).RGBA()
+	if r>>8 != 0 || g>>8 < 127 || b>>8 != 0 || a>>8 != 255 {
+		t.Errorf("pixel (1,0): got (%d,%d,%d,%d), want (0,~128+,0,255)", r>>8, g>>8, b>>8, a>>8)
+	}
+}
+
 func floatsClose(a, b []float64, tol float64) bool {
 	if len(a) != len(b) {
 		return false

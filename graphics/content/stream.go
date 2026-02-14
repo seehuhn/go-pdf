@@ -49,6 +49,58 @@ type Stream interface {
 	Err() error
 }
 
+// StreamsEqual reports whether two Stream values contain the same sequence of
+// operators. Both nil -> true; one nil -> false. If both are Operators, the
+// comparison uses Operators.Equal for efficiency.
+func StreamsEqual(a, b Stream) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+
+	// fast path: both are Operators
+	aOps, aOk := a.(Operators)
+	bOps, bOk := b.(Operators)
+	if aOk && bOk {
+		return aOps.Equal(bOps)
+	}
+
+	// general path: iterate both streams
+	nextA, stopA := iter.Pull2(a.All())
+	defer stopA()
+	nextB, stopB := iter.Pull2(b.All())
+	defer stopB()
+
+	for {
+		nameA, argsA, okA := nextA()
+		nameB, argsB, okB := nextB()
+		if !okA && !okB {
+			break
+		}
+		if okA != okB {
+			return false
+		}
+		if nameA != nameB {
+			return false
+		}
+		if len(argsA) != len(argsB) {
+			return false
+		}
+		for i := range argsA {
+			if !pdf.Equal(argsA[i], argsB[i]) {
+				return false
+			}
+		}
+	}
+
+	if a.Err() != nil || b.Err() != nil {
+		return false
+	}
+	return true
+}
+
 // Operators represents a PDF content stream as a slice of operators.
 type Operators []Operator
 
@@ -340,7 +392,9 @@ type streamScanner struct {
 	src       io.Reader
 	buf       []byte
 	pos, used int
-	crSeen    bool
+
+	tokenBuf []byte // reusable buffer for nextToken
+	crSeen   bool
 }
 
 type scanStackFrame struct {
@@ -667,7 +721,7 @@ func (s *streamScanner) nextToken() (pdf.Native, error) {
 		return pdf.Operator(">>"), nil
 	default:
 		firstByte := bb[0]
-		opBytes := []byte{firstByte}
+		s.tokenBuf = append(s.tokenBuf[:0], firstByte)
 		s.readByte()
 		if class[firstByte] == regular {
 			for {
@@ -681,17 +735,17 @@ func (s *streamScanner) nextToken() (pdf.Native, error) {
 					break
 				}
 				s.readByte() // skip b
-				opBytes = append(opBytes, b)
+				s.tokenBuf = append(s.tokenBuf, b)
 			}
 		}
 
-		if opBytes[0] >= '0' && opBytes[0] <= '9' || opBytes[0] == '.' || opBytes[0] == '-' || opBytes[0] == '+' {
-			if x := parseNumber(opBytes); x != nil {
+		if s.tokenBuf[0] >= '0' && s.tokenBuf[0] <= '9' || s.tokenBuf[0] == '.' || s.tokenBuf[0] == '-' || s.tokenBuf[0] == '+' {
+			if x := parseNumber(s.tokenBuf); x != nil {
 				return x, nil
 			}
 		}
 
-		switch string(opBytes) {
+		switch string(s.tokenBuf) {
 		case "false":
 			return pdf.Boolean(false), nil
 		case "true":
@@ -699,7 +753,10 @@ func (s *streamScanner) nextToken() (pdf.Native, error) {
 		case "null":
 			return nil, nil
 		}
-		return pdf.Operator(opBytes), nil
+		if op, ok := operatorTable[string(s.tokenBuf)]; ok {
+			return op, nil
+		}
+		return pdf.Operator(s.tokenBuf), nil
 	}
 }
 
@@ -1021,17 +1078,14 @@ func hexDigit(c byte) byte {
 // The function returns [pdf.Integer] or [pdf.Real] in case s is a valid
 // number, and nil otherwise.
 func parseNumber(s []byte) pdf.Native {
-	x, err := strconv.ParseInt(string(s), 10, 64)
-	if err == nil {
-		return pdf.Integer(x)
-	}
-
+	hasDecimal := false
 	isSimple := true
 	for i, c := range s {
 		if i == 0 && (c == '+' || c == '-') {
 			continue
 		}
 		if c == '.' {
+			hasDecimal = true
 			continue
 		}
 		if c < '0' || c > '9' {
@@ -1039,12 +1093,22 @@ func parseNumber(s []byte) pdf.Native {
 			break
 		}
 	}
+	if !isSimple {
+		return nil
+	}
 
-	if isSimple {
-		y, err := strconv.ParseFloat(string(s), 64)
-		if err == nil && !math.IsInf(y, 0) && !math.IsNaN(y) {
-			return pdf.Real(y)
+	str := string(s)
+
+	if !hasDecimal {
+		x, err := strconv.ParseInt(str, 10, 64)
+		if err == nil {
+			return pdf.Integer(x)
 		}
+	}
+
+	y, err := strconv.ParseFloat(str, 64)
+	if err == nil && !math.IsInf(y, 0) && !math.IsNaN(y) {
+		return pdf.Real(y)
 	}
 
 	return nil
@@ -1067,6 +1131,36 @@ const (
 	space
 	delimiter
 )
+
+// operatorTable maps operator names to pre-allocated pdf.Operator values,
+// avoiding a []byte to string conversion on every call.
+var operatorTable = map[string]pdf.Operator{
+	"b": "b", "B": "B", "b*": "b*", "B*": "B*", "BDC": "BDC",
+	"BI": "BI", "BMC": "BMC", "BT": "BT", "BX": "BX",
+	"c": "c", "cm": "cm", "CS": "CS", "cs": "cs",
+	"d": "d", "d0": "d0", "d1": "d1", "Do": "Do", "DP": "DP",
+	"EI": "EI", "EMC": "EMC", "ET": "ET", "EX": "EX",
+	"f": "f", "F": "F", "f*": "f*",
+	"G": "G", "g": "g", "gs": "gs",
+	"h": "h",
+	"i": "i", "ID": "ID",
+	"j": "j", "J": "J",
+	"K": "K", "k": "k",
+	"l": "l",
+	"m": "m", "M": "M", "MP": "MP",
+	"n": "n",
+	"q": "q", "Q": "Q",
+	"re": "re", "RG": "RG", "rg": "rg", "ri": "ri",
+	"s": "s", "S": "S",
+	"SC": "SC", "sc": "sc", "SCN": "SCN", "scn": "scn", "sh": "sh",
+	"T*": "T*", "Tc": "Tc", "Td": "Td", "TD": "TD", "Tf": "Tf",
+	"Tj": "Tj", "TJ": "TJ", "TL": "TL", "Tm": "Tm", "Tr": "Tr",
+	"Ts": "Ts", "Tw": "Tw", "Tz": "Tz",
+	"v": "v",
+	"w": "w", "W": "W", "W*": "W*",
+	"y": "y",
+	"'": "'", "\"": "\"",
+}
 
 var class = [256]characterClass{
 	space,     // 0

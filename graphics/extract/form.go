@@ -17,8 +17,10 @@
 package extract
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"time"
 
@@ -154,19 +156,24 @@ func Form(x *pdf.Extractor, obj pdf.Object) (*form.Form, error) {
 		}
 	}
 
-	// read content stream
+	// buffer decompressed content stream bytes (cheap);
+	// defer tokenization/parsing until All() is called (lazy)
 	stm, err := pdf.DecodeStream(x.R, stream, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	f.Content, err = content.ReadStream(stm, pdf.GetVersion(x.R), content.Form, f.Res)
+	data, err := io.ReadAll(stm)
 	closeErr := stm.Close()
 	if err != nil {
 		return nil, err
 	}
 	if closeErr != nil {
 		return nil, closeErr
+	}
+
+	if len(data) > 0 {
+		f.Content = content.NewScanner(bytes.NewReader(data), pdf.GetVersion(x.R), content.Form, f.Res)
 	}
 
 	return f, nil

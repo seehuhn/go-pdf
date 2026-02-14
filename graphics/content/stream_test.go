@@ -294,6 +294,52 @@ type nonSeekReader struct {
 	io.Reader
 }
 
+func TestStreamsEqual(t *testing.T) {
+	data := []byte("q\n1 0 0 1 100 200 cm\nQ\n")
+
+	ops, err := ReadStream(bytes.NewReader(data), pdf.V2_0, Page, &Resources{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scanner := NewScanner(bytes.NewReader(data), pdf.V2_0, Page, &Resources{})
+
+	// Operators vs Scanner
+	if !StreamsEqual(ops, scanner) {
+		t.Error("expected Operators and Scanner to be equal")
+	}
+
+	// Operators vs Operators
+	ops2, _ := ReadStream(bytes.NewReader(data), pdf.V2_0, Page, &Resources{})
+	if !StreamsEqual(ops, ops2) {
+		t.Error("expected two Operators to be equal")
+	}
+
+	// Scanner vs Scanner
+	s1 := NewScanner(bytes.NewReader(data), pdf.V2_0, Page, &Resources{})
+	s2 := NewScanner(bytes.NewReader(data), pdf.V2_0, Page, &Resources{})
+	if !StreamsEqual(s1, s2) {
+		t.Error("expected two Scanners to be equal")
+	}
+
+	// nil cases
+	if !StreamsEqual(nil, nil) {
+		t.Error("expected nil == nil")
+	}
+	if StreamsEqual(ops, nil) {
+		t.Error("expected non-nil != nil")
+	}
+	if StreamsEqual(nil, ops) {
+		t.Error("expected nil != non-nil")
+	}
+
+	// different streams
+	other, _ := ReadStream(bytes.NewReader([]byte("q\nQ\n")), pdf.V2_0, Page, &Resources{})
+	if StreamsEqual(ops, other) {
+		t.Error("expected different streams to be unequal")
+	}
+}
+
 func TestScannerNoRewind(t *testing.T) {
 	input := []byte("q\nQ\n")
 	r := nonSeekReader{bytes.NewReader(input)}

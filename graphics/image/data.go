@@ -22,6 +22,7 @@ import (
 	"image"
 	gocolor "image/color"
 	"image/draw"
+	"math"
 
 	"seehuhn.de/go/pdf/graphics/color"
 )
@@ -36,18 +37,30 @@ var (
 // It implements [draw.Image], allowing pixel-level read/write access
 // using native PDF color objects.
 type Data struct {
-	pix    []float64
-	cs     color.Space
-	width  int
-	height int
-	ncomp  int
+	// Pix holds pixel values in the color space specified by CS.
+	// Each pixel occupies NComp consecutive float64 values.
+	// The pixel at (x, y) starts at Pix[(y-Rect.Min.Y)*Stride + (x-Rect.Min.X)*NComp].
+	Pix []float64
+
+	// Stride is the number of float64 elements per row.
+	Stride int
+
+	// Rect is the image bounds.
+	Rect image.Rectangle
+
+	// CS is the color space of the pixel data.
+	CS color.Space
+
+	// NComp is the number of color components per pixel.
+	NComp int
 }
 
 // NewData creates a new Data image with the given color space and dimensions.
 // All pixels are initialized to the default color of the color space.
 func NewData(cs color.Space, width, height int) *Data {
 	ncomp := cs.Channels()
-	pix := make([]float64, width*height*ncomp)
+	stride := width * ncomp
+	pix := make([]float64, height*stride)
 
 	// fill with default color values
 	defVals, _ := color.Values(cs.Default())
@@ -58,44 +71,135 @@ func NewData(cs color.Space, width, height int) *Data {
 	}
 
 	return &Data{
-		pix:    pix,
-		cs:     cs,
-		width:  width,
-		height: height,
-		ncomp:  ncomp,
+		Pix:    pix,
+		Stride: stride,
+		Rect:   image.Rect(0, 0, width, height),
+		CS:     cs,
+		NComp:  ncomp,
 	}
 }
 
 // ColorModel returns the color space as a [gocolor.Model].
 func (d *Data) ColorModel() gocolor.Model {
-	return d.cs
+	return d.CS
 }
 
 // Bounds returns the image bounds.
 func (d *Data) Bounds() image.Rectangle {
-	return image.Rect(0, 0, d.width, d.height)
+	return d.Rect
 }
 
 // At returns the color at position (x, y).
 // If (x, y) is out of bounds, the default color is returned.
 func (d *Data) At(x, y int) gocolor.Color {
-	if x < 0 || x >= d.width || y < 0 || y >= d.height {
-		return d.cs.Default()
+	w := d.Rect.Dx()
+	h := d.Rect.Dy()
+	rx := x - d.Rect.Min.X
+	ry := y - d.Rect.Min.Y
+	if rx < 0 || rx >= w || ry < 0 || ry >= h {
+		return d.CS.Default()
 	}
-	offset := (y*d.width + x) * d.ncomp
-	return color.FromValues(d.cs, d.pix[offset:offset+d.ncomp], nil)
+	offset := ry*d.Stride + rx*d.NComp
+	return color.FromValues(d.CS, d.Pix[offset:offset+d.NComp], nil)
 }
 
 // Set sets the color at position (x, y).
 // If (x, y) is out of bounds, the call is a no-op.
 func (d *Data) Set(x, y int, c gocolor.Color) {
-	if x < 0 || x >= d.width || y < 0 || y >= d.height {
+	w := d.Rect.Dx()
+	h := d.Rect.Dy()
+	rx := x - d.Rect.Min.X
+	ry := y - d.Rect.Min.Y
+	if rx < 0 || rx >= w || ry < 0 || ry >= h {
 		return
 	}
-	converted := d.cs.Convert(c)
+	converted := d.CS.Convert(c)
 	vals, _ := color.Values(converted.(color.Color))
-	offset := (y*d.width + x) * d.ncomp
-	copy(d.pix[offset:], vals[:d.ncomp])
+	offset := ry*d.Stride + rx*d.NComp
+	copy(d.Pix[offset:], vals[:d.NComp])
+}
+
+// SampleNearest writes the nearest-neighbor pixel value into dst.
+// Coordinates are in pixel space where pixel (i,j) is centered at (i+0.5, j+0.5).
+// Out-of-bounds coordinates are clamped to the image edge.
+func (d *Data) SampleNearest(x, y float64, dst []float64) {
+	w := d.Rect.Dx()
+	h := d.Rect.Dy()
+	ix := clampInt(int(math.Floor(x)), 0, w-1)
+	iy := clampInt(int(math.Floor(y)), 0, h-1)
+	offset := iy*d.Stride + ix*d.NComp
+	copy(dst[:d.NComp], d.Pix[offset:offset+d.NComp])
+}
+
+// SampleBilinear writes bilinearly interpolated pixel values into dst.
+// Coordinates are in pixel space where pixel (i,j) is centered at (i+0.5, j+0.5).
+// Out-of-bounds coordinates are clamped to the image edge.
+func (d *Data) SampleBilinear(x, y float64, dst []float64) {
+	w := d.Rect.Dx()
+	h := d.Rect.Dy()
+
+	// shift to pixel centers: pixel (i,j) is centered at (i+0.5, j+0.5)
+	fx := x - 0.5
+	fy := y - 0.5
+
+	x0 := int(math.Floor(fx))
+	y0 := int(math.Floor(fy))
+	dx := fx - float64(x0)
+	dy := fy - float64(y0)
+
+	// clamp to valid pixel range
+	x0c := clampInt(x0, 0, w-1)
+	x1c := clampInt(x0+1, 0, w-1)
+	y0c := clampInt(y0, 0, h-1)
+	y1c := clampInt(y0+1, 0, h-1)
+
+	// offsets for the four neighbors
+	off00 := y0c*d.Stride + x0c*d.NComp
+	off10 := y0c*d.Stride + x1c*d.NComp
+	off01 := y1c*d.Stride + x0c*d.NComp
+	off11 := y1c*d.Stride + x1c*d.NComp
+
+	w00 := (1 - dx) * (1 - dy)
+	w10 := dx * (1 - dy)
+	w01 := (1 - dx) * dy
+	w11 := dx * dy
+
+	for c := range d.NComp {
+		dst[c] = w00*d.Pix[off00+c] +
+			w10*d.Pix[off10+c] +
+			w01*d.Pix[off01+c] +
+			w11*d.Pix[off11+c]
+	}
+}
+
+// ToRGBA converts the image to sRGB, returning an [*image.RGBA].
+func (d *Data) ToRGBA() *image.RGBA {
+	w := d.Rect.Dx()
+	h := d.Rect.Dy()
+	out := image.NewRGBA(d.Rect)
+	for y := range h {
+		for x := range w {
+			offset := y*d.Stride + x*d.NComp
+			c := color.FromValues(d.CS, d.Pix[offset:offset+d.NComp], nil)
+			r, g, b, a := c.RGBA()
+			i := out.PixOffset(x+d.Rect.Min.X, y+d.Rect.Min.Y)
+			out.Pix[i+0] = uint8(r >> 8)
+			out.Pix[i+1] = uint8(g >> 8)
+			out.Pix[i+2] = uint8(b >> 8)
+			out.Pix[i+3] = uint8(a >> 8)
+		}
+	}
+	return out
+}
+
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
 }
 
 // Load decodes the pixel data from a Dict into a Data image.
@@ -133,12 +237,13 @@ func (d *Dict) Load() (*Data, error) {
 		}
 	}
 
+	stride := width * ncomp
 	return &Data{
-		pix:    pix,
-		cs:     cs,
-		width:  width,
-		height: height,
-		ncomp:  ncomp,
+		Pix:    pix,
+		Stride: stride,
+		Rect:   image.Rect(0, 0, width, height),
+		CS:     cs,
+		NComp:  ncomp,
 	}, nil
 }
 

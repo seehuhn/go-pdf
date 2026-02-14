@@ -17,7 +17,9 @@
 package extract
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
@@ -199,7 +201,8 @@ func extractType1(x *pdf.Extractor, stream *pdf.Stream) (*pattern.Type1, error) 
 		}
 	}
 
-	// read content stream
+	// buffer decompressed content stream bytes (cheap);
+	// defer tokenization/parsing until All() is called (lazy)
 	stmType := content.PatternColored
 	if !pat.Color {
 		stmType = content.PatternUncolored
@@ -209,13 +212,17 @@ func extractType1(x *pdf.Extractor, stream *pdf.Stream) (*pattern.Type1, error) 
 		return nil, err
 	}
 
-	pat.Content, err = content.ReadStream(stm, pdf.GetVersion(x.R), stmType, pat.Res)
+	data, err := io.ReadAll(stm)
 	closeErr := stm.Close()
 	if err != nil {
 		return nil, err
 	}
 	if closeErr != nil {
 		return nil, closeErr
+	}
+
+	if len(data) > 0 {
+		pat.Content = content.NewScanner(bytes.NewReader(data), pdf.GetVersion(x.R), stmType, pat.Res)
 	}
 
 	return pat, nil

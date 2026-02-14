@@ -52,7 +52,7 @@ type Type1 struct {
 	Color bool
 
 	// Content is the content stream that draws a single pattern cell.
-	Content content.Operators
+	Content content.Stream
 
 	// Res contains the resources used by the content stream (required).
 	Res *content.Resources
@@ -89,7 +89,7 @@ func (p *Type1) Equal(other color.Pattern) bool {
 		p.XStep == o.XStep && p.YStep == o.YStep &&
 		p.Matrix == o.Matrix &&
 		p.Color == o.Color &&
-		p.Content.Equal(o.Content) &&
+		content.StreamsEqual(p.Content, o.Content) &&
 		p.Res.Equal(o.Res)
 }
 
@@ -142,9 +142,11 @@ func (p *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if !p.Color {
 		ct = content.PatternUncolored
 	}
-	err = content.Write(stm, p.Content, pdf.GetVersion(rm.Out()), ct, p.Res)
-	if err != nil {
-		return nil, err
+	if p.Content != nil {
+		err = content.Write(stm, p.Content, pdf.GetVersion(rm.Out()), ct, p.Res)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = stm.Close()
