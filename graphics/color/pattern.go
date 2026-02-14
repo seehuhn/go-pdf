@@ -85,6 +85,13 @@ func (s spacePatternColored) Convert(c stdcolor.Color) stdcolor.Color {
 	return s.Default()
 }
 
+// ToXYZ returns a placeholder mid-gray in CIE XYZ tristimulus values
+// adapted to the D50 illuminant, since the actual color depends on the
+// pattern content.
+func (s spacePatternColored) ToXYZ(values []float64) (X, Y, Z float64) {
+	return SRGBToXYZ(0.5, 0.5, 0.5)
+}
+
 type colorColoredPattern struct {
 	Pat Pattern
 }
@@ -176,6 +183,12 @@ func (s spacePatternUncolored) Convert(c stdcolor.Color) stdcolor.Color {
 		return colorUncoloredPattern{Pat: nil, Col: bc}
 	}
 	return s.Default()
+}
+
+// ToXYZ converts the base color values to CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (s spacePatternUncolored) ToXYZ(values []float64) (X, Y, Z float64) {
+	return s.base.ToXYZ(values)
 }
 
 type colorUncoloredPattern struct {

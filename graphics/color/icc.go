@@ -244,6 +244,48 @@ func (s *SpaceICCBased) New(values []float64) (Color, error) {
 	return c, nil
 }
 
+// ToXYZ converts ICC-based color values to CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (s *SpaceICCBased) ToXYZ(values []float64) (X, Y, Z float64) {
+	// normalise values from Ranges to [0,1] using stack allocation
+	var buf [4]float64
+	norm := buf[:s.N]
+	for i := range s.N {
+		lo, hi := s.Ranges[2*i], s.Ranges[2*i+1]
+		if hi > lo {
+			norm[i] = (values[i] - lo) / (hi - lo)
+		}
+	}
+
+	// try ICC profile transform
+	s.fwdTransformOnce.Do(func() {
+		p, err := icc.Decode(s.profile)
+		if err != nil {
+			return
+		}
+		s.fwdTransform, _ = icc.NewTransform(p, icc.DeviceToPCS, icc.Perceptual)
+	})
+	if s.fwdTransform != nil {
+		return s.fwdTransform.ToXYZ(norm)
+	}
+
+	// fallback without profile: treat as sRGB-like
+	switch s.N {
+	case 1:
+		return SRGBToXYZ(norm[0], norm[0], norm[0])
+	case 3:
+		return SRGBToXYZ(norm[0], norm[1], norm[2])
+	case 4:
+		cyan, magenta, yellow, black := norm[0], norm[1], norm[2], norm[3]
+		rf := (1 - cyan) * (1 - black)
+		gf := (1 - magenta) * (1 - black)
+		bf := (1 - yellow) * (1 - black)
+		return SRGBToXYZ(rf, gf, bf)
+	default:
+		return SRGBToXYZ(0.5, 0.5, 0.5)
+	}
+}
+
 type colorICCBased struct {
 	Space  *SpaceICCBased
 	Values [4]float64
@@ -260,47 +302,8 @@ func (c colorICCBased) Components() []float64 {
 
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
-// It uses the embedded ICC profile when available, otherwise falls back
-// to a naive conversion based on the number of components.
 func (c colorICCBased) ToXYZ() (X, Y, Z float64) {
-	// normalise values from Ranges to [0,1]
-	norm := make([]float64, c.Space.N)
-	for i := range c.Space.N {
-		lo, hi := c.Space.Ranges[2*i], c.Space.Ranges[2*i+1]
-		if hi > lo {
-			norm[i] = (c.Values[i] - lo) / (hi - lo)
-		} else {
-			norm[i] = 0
-		}
-	}
-
-	// try ICC profile transform
-	c.Space.fwdTransformOnce.Do(func() {
-		p, err := icc.Decode(c.Space.profile)
-		if err != nil {
-			return
-		}
-		c.Space.fwdTransform, _ = icc.NewTransform(p, icc.DeviceToPCS, icc.Perceptual)
-	})
-	if c.Space.fwdTransform != nil {
-		return c.Space.fwdTransform.ToXYZ(norm)
-	}
-
-	// fallback without profile: treat as sRGB-like
-	switch c.Space.N {
-	case 1:
-		return SRGBToXYZ(norm[0], norm[0], norm[0])
-	case 3:
-		return SRGBToXYZ(norm[0], norm[1], norm[2])
-	case 4:
-		cyan, magenta, yellow, black := norm[0], norm[1], norm[2], norm[3]
-		rf := (1 - cyan) * (1 - black)
-		gf := (1 - magenta) * (1 - black)
-		bf := (1 - yellow) * (1 - black)
-		return SRGBToXYZ(rf, gf, bf)
-	default:
-		return SRGBToXYZ(0.5, 0.5, 0.5)
-	}
+	return c.Space.ToXYZ(c.Values[:c.Space.N])
 }
 
 // RGBA implements the color.Color interface.

@@ -75,6 +75,13 @@ func (s spaceDeviceGray) Convert(c stdcolor.Color) stdcolor.Color {
 	return DeviceGray(clamp01(gray))
 }
 
+// ToXYZ converts a gray value to CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (s spaceDeviceGray) ToXYZ(values []float64) (X, Y, Z float64) {
+	v := values[0]
+	return SRGBToXYZ(v, v, v)
+}
+
 // DeviceGray is a color in the DeviceGray color space.
 // The value must be in the range from 0 (black) to 1 (white).
 type DeviceGray float64
@@ -147,6 +154,12 @@ func (s spaceDeviceRGB) Convert(c stdcolor.Color) stdcolor.Color {
 	}
 }
 
+// ToXYZ converts RGB values to CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (s spaceDeviceRGB) ToXYZ(values []float64) (X, Y, Z float64) {
+	return SRGBToXYZ(values[0], values[1], values[2])
+}
+
 // DeviceRGB is a color in the DeviceRGB color space.
 // The values are r, g, and b, and must be in the range from 0 (dark) to 1 (light).
 type DeviceRGB [3]float64
@@ -159,7 +172,7 @@ func (c DeviceRGB) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c DeviceRGB) ToXYZ() (X, Y, Z float64) {
-	return SRGBToXYZ(c[0], c[1], c[2])
+	return spaceDeviceRGB{}.ToXYZ(c[:])
 }
 
 // RGBA implements the color.Color interface.
@@ -239,6 +252,12 @@ func (s spaceDeviceCMYK) Convert(c stdcolor.Color) stdcolor.Color {
 	}
 }
 
+// ToXYZ converts CMYK values to CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (s spaceDeviceCMYK) ToXYZ(values []float64) (X, Y, Z float64) {
+	return deviceCMYKToXYZ(values)
+}
+
 // DeviceCMYK is a color in the DeviceCMYK color space.
 // The value are c, m, y, and k, and must be in the range from 0 (light) to 1 (dark).
 // They control the amount of cyan, magenta, yellow, and black in the color.
@@ -259,6 +278,10 @@ var (
 // It uses the CGATS001 CMYK profile when available, otherwise falls back
 // to a naive CMYK to sRGB conversion.
 func (c DeviceCMYK) ToXYZ() (X, Y, Z float64) {
+	return deviceCMYKToXYZ(c[:])
+}
+
+func deviceCMYKToXYZ(values []float64) (X, Y, Z float64) {
 	cmykFwdOnce.Do(func() {
 		p, err := icc.Decode(icc.CGATS001Profile)
 		if err != nil {
@@ -268,11 +291,11 @@ func (c DeviceCMYK) ToXYZ() (X, Y, Z float64) {
 	})
 
 	if cmykFwdTransform != nil {
-		return cmykFwdTransform.ToXYZ(c[:])
+		return cmykFwdTransform.ToXYZ(values)
 	}
 
 	// fallback: naive CMYK -> sRGB -> XYZ
-	cyan, magenta, yellow, black := c[0], c[1], c[2], c[3]
+	cyan, magenta, yellow, black := values[0], values[1], values[2], values[3]
 	rf := (1 - cyan) * (1 - black)
 	gf := (1 - magenta) * (1 - black)
 	bf := (1 - yellow) * (1 - black)

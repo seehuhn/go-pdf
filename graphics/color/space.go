@@ -43,6 +43,10 @@ type Space interface {
 	// Default returns the default color of the color space.
 	Default() Color
 
+	// ToXYZ converts component values to CIE XYZ tristimulus values
+	// adapted to the D50 illuminant (the ICC Profile Connection Space).
+	ToXYZ(values []float64) (X, Y, Z float64)
+
 	pdf.Embedder
 
 	gocolor.Model

@@ -101,6 +101,12 @@ func (s spaceSRGB) Convert(c stdcolor.Color) stdcolor.Color {
 	}
 }
 
+// ToXYZ converts sRGB values to CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (s spaceSRGB) ToXYZ(values []float64) (X, Y, Z float64) {
+	return SRGBToXYZ(values[0], values[1], values[2])
+}
+
 type colorSRGB [3]float64
 
 // SRGB returns a color in the sRGB color space.
@@ -120,7 +126,7 @@ func (c colorSRGB) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorSRGB) ToXYZ() (X, Y, Z float64) {
-	return SRGBToXYZ(c[0], c[1], c[2])
+	return spaceSRGB{}.ToXYZ(c[:])
 }
 
 // RGBA implements the color.Color interface.

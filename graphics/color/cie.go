@@ -148,6 +148,16 @@ func (s *SpaceCalGray) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return pdf.Array{pdf.Name("CalGray"), dict}, nil
 }
 
+// ToXYZ converts a CalGray value to CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (s *SpaceCalGray) ToXYZ(values []float64) (X, Y, Z float64) {
+	A := math.Pow(values[0], s.Gamma)
+	X = s.WhitePoint[0] * A
+	Y = s.WhitePoint[1] * A
+	Z = s.WhitePoint[2] * A
+	return bradfordAdapt(X, Y, Z, s.WhitePoint[:], WhitePointD50)
+}
+
 type colorCalGray struct {
 	Space *SpaceCalGray
 	Value float64
@@ -161,11 +171,7 @@ func (c colorCalGray) ColorSpace() Space {
 // ToXYZ converts a CalGray color to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorCalGray) ToXYZ() (X, Y, Z float64) {
-	A := math.Pow(c.Value, c.Space.Gamma)
-	X = c.Space.WhitePoint[0] * A
-	Y = c.Space.WhitePoint[1] * A
-	Z = c.Space.WhitePoint[2] * A
-	return bradfordAdapt(X, Y, Z, c.Space.WhitePoint[:], WhitePointD50)
+	return c.Space.ToXYZ([]float64{c.Value})
 }
 
 // RGBA implements the color.Color interface.
@@ -353,6 +359,20 @@ func (s *SpaceCalRGB) Family() pdf.Name {
 	return FamilyCalRGB
 }
 
+// ToXYZ converts CalRGB values to CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (s *SpaceCalRGB) ToXYZ(values []float64) (X, Y, Z float64) {
+	A := math.Pow(values[0], s.Gamma[0])
+	B := math.Pow(values[1], s.Gamma[1])
+	C := math.Pow(values[2], s.Gamma[2])
+
+	m := s.Matrix
+	X = m[0]*A + m[3]*B + m[6]*C
+	Y = m[1]*A + m[4]*B + m[7]*C
+	Z = m[2]*A + m[5]*B + m[8]*C
+	return bradfordAdapt(X, Y, Z, s.WhitePoint[:], WhitePointD50)
+}
+
 type colorCalRGB struct {
 	Space  *SpaceCalRGB
 	Values [3]float64 // R, G, B
@@ -366,17 +386,7 @@ func (c colorCalRGB) ColorSpace() Space {
 // ToXYZ converts a CalRGB color to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorCalRGB) ToXYZ() (X, Y, Z float64) {
-	// apply gamma to each component
-	A := math.Pow(c.Values[0], c.Space.Gamma[0])
-	B := math.Pow(c.Values[1], c.Space.Gamma[1])
-	C := math.Pow(c.Values[2], c.Space.Gamma[2])
-
-	// apply the 3x3 matrix (stored in column-major order)
-	m := c.Space.Matrix
-	X = m[0]*A + m[3]*B + m[6]*C
-	Y = m[1]*A + m[4]*B + m[7]*C
-	Z = m[2]*A + m[5]*B + m[8]*C
-	return bradfordAdapt(X, Y, Z, c.Space.WhitePoint[:], WhitePointD50)
+	return c.Space.ToXYZ(c.Values[:])
 }
 
 // RGBA implements the color.Color interface.
@@ -537,6 +547,23 @@ func (s *SpaceLab) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return pdf.Array{FamilyLab, dict}, nil
 }
 
+// ToXYZ converts Lab values to CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (s *SpaceLab) ToXYZ(values []float64) (X, Y, Z float64) {
+	LStar, aStar, bStar := values[0], values[1], values[2]
+	XW, YW, ZW := s.WhitePoint[0], s.WhitePoint[1], s.WhitePoint[2]
+
+	common := (LStar + 16) / 116
+	L := common + aStar/500
+	M := common
+	N := common - bStar/200
+
+	X = XW * labG(L)
+	Y = YW * labG(M)
+	Z = ZW * labG(N)
+	return bradfordAdapt(X, Y, Z, s.WhitePoint[:], WhitePointD50)
+}
+
 type colorLab struct {
 	Space  *SpaceLab
 	Values [3]float64 // L, a, b
@@ -550,20 +577,7 @@ func (c colorLab) ColorSpace() Space {
 // ToXYZ converts a Lab color to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorLab) ToXYZ() (X, Y, Z float64) {
-	LStar, aStar, bStar := c.Values[0], c.Values[1], c.Values[2]
-	XW, YW, ZW := c.Space.WhitePoint[0], c.Space.WhitePoint[1], c.Space.WhitePoint[2]
-
-	// Stage 1: L*a*b* to intermediate (L, M, N)
-	common := (LStar + 16) / 116
-	L := common + aStar/500
-	M := common
-	N := common - bStar/200
-
-	// Stage 2: Intermediate to XYZ
-	X = XW * labG(L)
-	Y = YW * labG(M)
-	Z = ZW * labG(N)
-	return bradfordAdapt(X, Y, Z, c.Space.WhitePoint[:], WhitePointD50)
+	return c.Space.ToXYZ(c.Values[:])
 }
 
 // RGBA implements the color.Color interface.

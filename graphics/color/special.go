@@ -176,6 +176,59 @@ func (s *SpaceIndexed) Convert(c stdcolor.Color) stdcolor.Color {
 	return colorIndexed{Space: s, Index: bestIdx}
 }
 
+// lookupValues decodes the palette entry at the given index into color values
+// for the base color space.
+func (s *SpaceIndexed) lookupValues(index int) []float64 {
+	base := s.Base
+	n := base.Channels()
+	offset := index * n
+
+	if offset+n > len(s.lookup) {
+		// return default values for the base space
+		vals, _ := Values(base.Default())
+		return vals
+	}
+
+	var lo, hi []float64
+	switch space := base.(type) {
+	case spaceDeviceGray, *SpaceCalGray:
+		lo = []float64{0}
+		hi = []float64{1}
+	case spaceDeviceRGB, *SpaceCalRGB:
+		lo = []float64{0, 0, 0}
+		hi = []float64{1, 1, 1}
+	case spaceDeviceCMYK:
+		lo = []float64{0, 0, 0, 0}
+		hi = []float64{1, 1, 1, 1}
+	case *SpaceLab:
+		lo = []float64{0, space.Ranges[0], space.Ranges[2]}
+		hi = []float64{100, space.Ranges[1], space.Ranges[3]}
+	default:
+		vals, _ := Values(base.Default())
+		return vals
+	}
+
+	vals := make([]float64, n)
+	for i := range n {
+		b := float64(s.lookup[offset+i])
+		vals[i] = lo[i] + (b/255.0)*(hi[i]-lo[i])
+	}
+	return vals
+}
+
+// ToXYZ converts an indexed color value to CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (s *SpaceIndexed) ToXYZ(values []float64) (X, Y, Z float64) {
+	index := int(math.Round(values[0]))
+	if index < 0 {
+		index = 0
+	} else if index >= s.NumCol {
+		index = s.NumCol - 1
+	}
+	baseVals := s.lookupValues(index)
+	return s.Base.ToXYZ(baseVals)
+}
+
 type colorIndexed struct {
 	Space *SpaceIndexed
 	Index int
@@ -188,7 +241,7 @@ func (c colorIndexed) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorIndexed) ToXYZ() (X, Y, Z float64) {
-	return c.getBaseColor().ToXYZ()
+	return c.Space.ToXYZ([]float64{float64(c.Index)})
 }
 
 // RGBA implements the color.Color interface.
@@ -198,60 +251,8 @@ func (c colorIndexed) RGBA() (r, g, b, a uint32) {
 
 // getBaseColor returns the color from the palette at the given index.
 func (c colorIndexed) getBaseColor() Color {
-	base := c.Space.Base
-	n := base.Channels()
-	offset := c.Index * n
-
-	if offset+n > len(c.Space.lookup) {
-		return base.Default()
-	}
-
-	// decode the lookup table bytes to color values
-	var min, max []float64
-	switch space := base.(type) {
-	case spaceDeviceGray, *SpaceCalGray:
-		min = []float64{0}
-		max = []float64{1}
-	case spaceDeviceRGB, *SpaceCalRGB:
-		min = []float64{0, 0, 0}
-		max = []float64{1, 1, 1}
-	case spaceDeviceCMYK:
-		min = []float64{0, 0, 0, 0}
-		max = []float64{1, 1, 1, 1}
-	case *SpaceLab:
-		min = []float64{0, space.Ranges[0], space.Ranges[2]}
-		max = []float64{100, space.Ranges[1], space.Ranges[3]}
-	default:
-		return base.Default()
-	}
-
-	vals := make([]float64, n)
-	for i := range n {
-		b := float64(c.Space.lookup[offset+i])
-		vals[i] = min[i] + (b/255.0)*(max[i]-min[i])
-	}
-
-	// construct a color in the base space
-	switch space := base.(type) {
-	case spaceDeviceGray:
-		return DeviceGray(vals[0])
-	case *SpaceCalGray:
-		return space.New(vals[0])
-	case spaceDeviceRGB:
-		return DeviceRGB{vals[0], vals[1], vals[2]}
-	case *SpaceCalRGB:
-		return space.New(vals[0], vals[1], vals[2])
-	case spaceDeviceCMYK:
-		return DeviceCMYK{vals[0], vals[1], vals[2], vals[3]}
-	case *SpaceLab:
-		col, _ := space.New(vals[0], vals[1], vals[2])
-		if col == nil {
-			return base.Default()
-		}
-		return col
-	default:
-		return base.Default()
-	}
+	vals := c.Space.lookupValues(c.Index)
+	return FromValues(c.Space.Base, vals, nil)
 }
 
 // == Separation =============================================================
@@ -369,6 +370,13 @@ func (s *SpaceSeparation) Convert(c stdcolor.Color) stdcolor.Color {
 	return colorSeparation{Space: s, Tint: tint}
 }
 
+// ToXYZ converts a separation tint value to CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (s *SpaceSeparation) ToXYZ(values []float64) (X, Y, Z float64) {
+	altValues := s.Transform.Apply(values[0])
+	return s.Alternate.ToXYZ(altValues)
+}
+
 type colorSeparation struct {
 	Space *SpaceSeparation
 	Tint  float64
@@ -383,9 +391,7 @@ func (c colorSeparation) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorSeparation) ToXYZ() (X, Y, Z float64) {
-	altValues := c.Space.Transform.Apply(c.Tint)
-	altColor := FromValues(c.Space.Alternate, altValues, nil)
-	return altColor.ToXYZ()
+	return c.Space.ToXYZ([]float64{c.Tint})
 }
 
 // RGBA implements the color.Color interface.
@@ -584,6 +590,13 @@ func (s *SpaceDeviceN) New(x []float64) Color {
 	return colorDeviceN{Space: s, data: string(buf)}
 }
 
+// ToXYZ converts DeviceN tint values to CIE XYZ tristimulus values
+// adapted to the D50 illuminant.
+func (s *SpaceDeviceN) ToXYZ(values []float64) (X, Y, Z float64) {
+	altValues := s.Transform.Apply(values...)
+	return s.Alternate.ToXYZ(altValues)
+}
+
 type colorDeviceN struct {
 	Space *SpaceDeviceN
 
@@ -601,10 +614,7 @@ func (c colorDeviceN) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorDeviceN) ToXYZ() (X, Y, Z float64) {
-	tints := c.get()
-	altValues := c.Space.Transform.Apply(tints...)
-	altColor := FromValues(c.Space.Alternate, altValues, nil)
-	return altColor.ToXYZ()
+	return c.Space.ToXYZ(c.get())
 }
 
 func (c *colorDeviceN) set(x []float64) {
