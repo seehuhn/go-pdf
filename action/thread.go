@@ -36,7 +36,7 @@ type Thread struct {
 
 // ActionType returns "Thread".
 // This implements the [Action] interface.
-func (a *Thread) ActionType() Type { return TypeThread }
+func (a *Thread) ActionType() pdf.Name { return TypeThread }
 
 func (a *Thread) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "Thread action", pdf.V1_1); err != nil {

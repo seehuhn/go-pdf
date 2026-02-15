@@ -35,7 +35,7 @@ type GoTo struct {
 
 // ActionType returns "GoTo".
 // This implements the [Action] interface.
-func (a *GoTo) ActionType() Type { return TypeGoTo }
+func (a *GoTo) ActionType() pdf.Name { return TypeGoTo }
 
 func (a *GoTo) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "GoTo action", pdf.V1_1); err != nil {
@@ -67,7 +67,7 @@ func (a *GoTo) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeGoTo(x *pdf.Extractor, dict pdf.Dict) (Action, error) {
+func decodeGoTo(x *pdf.Extractor, dict pdf.Dict) (pdf.Action, error) {
 	dest, err := destination.Decode(x, dict["D"])
 	if err != nil {
 		return nil, err

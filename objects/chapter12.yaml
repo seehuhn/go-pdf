@@ -2316,7 +2316,7 @@ types:
     - Stop
     - Pause
     - Resume
-    goType: pdf.Name
+    goType: MovieOperation
     purpose: Operation specifies the operation to perform.
   goPackage: action
   goRepr: struct

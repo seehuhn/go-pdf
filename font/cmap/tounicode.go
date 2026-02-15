@@ -24,6 +24,7 @@ import (
 	"hash"
 	"io"
 	"iter"
+	"slices"
 	"strings"
 	"text/template"
 	"unicode/utf16"
@@ -258,43 +259,44 @@ func (tu *ToUnicodeFile) writeBinary(h hash.Hash, maxGen int) {
 }
 
 func (tu *ToUnicodeFile) All(codec *charcode.Codec) iter.Seq2[charcode.Code, string] {
-	return func(yield func(charcode.Code, string) bool) {
-		if tu.Parent != nil {
-			for code, s := range tu.Parent.All(codec) {
-				if !yield(code, s) {
-					return
-				}
-			}
-		}
+	// collect the chain of ToUnicode files, root first
+	var chain []*ToUnicodeFile
+	for g := tu; g != nil; g = g.Parent {
+		chain = append(chain, g)
+	}
+	slices.Reverse(chain)
 
-		for _, r := range tu.Ranges {
-			if len(r.Values) == 0 {
-				continue
-			}
-			for i, codeBytes := range codesInRange(r.First, r.Last) {
-				code, k, valid := codec.Decode(codeBytes)
-				if !valid || k != len(codeBytes) {
+	return func(yield func(charcode.Code, string) bool) {
+		for _, g := range chain {
+			for _, r := range g.Ranges {
+				if len(r.Values) == 0 {
 					continue
 				}
-
-				if i < len(r.Values) {
-					if !yield(code, r.Values[i]) {
-						return
+				for i, codeBytes := range codesInRange(r.First, r.Last) {
+					code, k, valid := codec.Decode(codeBytes)
+					if !valid || k != len(codeBytes) {
+						continue
 					}
-				} else {
-					if !yield(code, nextString(r.Values[0], i)) {
-						return
+
+					if i < len(r.Values) {
+						if !yield(code, r.Values[i]) {
+							return
+						}
+					} else {
+						if !yield(code, nextString(r.Values[0], i)) {
+							return
+						}
 					}
 				}
 			}
-		}
-		for _, single := range tu.Singles {
-			code, k, valid := codec.Decode(single.Code)
-			if !valid || k != len(single.Code) {
-				continue
-			}
-			if !yield(code, single.Value) {
-				return
+			for _, single := range g.Singles {
+				code, k, valid := codec.Decode(single.Code)
+				if !valid || k != len(single.Code) {
+					continue
+				}
+				if !yield(code, single.Value) {
+					return
+				}
 			}
 		}
 	}

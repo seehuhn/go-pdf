@@ -450,6 +450,9 @@ func FuzzViewPortArrayRoundTrip(f *testing.F) {
 		if err != nil {
 			t.Skip("malformed object")
 		}
+		if data == nil {
+			t.Skip("no data")
+		}
 
 		viewportArrayRoundTripTest(t, pdf.GetVersion(r), data)
 	})

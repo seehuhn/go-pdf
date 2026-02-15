@@ -55,7 +55,6 @@ func ExtractViewport(x *pdf.Extractor, obj pdf.Object) (*Viewport, error) {
 
 	vp := &Viewport{}
 
-	// Extract required BBox field
 	bbox, err := pdf.GetRectangle(x.R, dict["BBox"])
 	if err != nil {
 		return nil, err
@@ -65,31 +64,18 @@ func ExtractViewport(x *pdf.Extractor, obj pdf.Object) (*Viewport, error) {
 	}
 	vp.BBox = *bbox
 
-	// Extract optional Name field
-	if dict["Name"] != nil {
-		name, err := pdf.Optional(x.GetString(dict["Name"]))
-		if err != nil {
-			return nil, err
-		}
+	if name, err := pdf.Optional(x.GetString(dict["Name"])); err != nil {
+		return nil, err
+	} else {
 		vp.Name = string(name)
 	}
 
-	// Extract optional Measure field
-	if dict["Measure"] != nil {
-		measure, err := pdf.ExtractorGet(x, dict["Measure"], Extract)
-		if err != nil {
-			// Use Optional for permissive reading
-			if _, isMalformed := err.(*pdf.MalformedFileError); isMalformed {
-				// Ignore malformed measure, continue without it
-			} else {
-				return nil, err
-			}
-		} else {
-			vp.Measure = measure
-		}
+	if measure, err := pdf.ExtractorGetOptional(x, dict["Measure"], Extract); err != nil {
+		return nil, err
+	} else {
+		vp.Measure = measure
 	}
 
-	// Extract optional PtData field
 	if ptData, err := pdf.ExtractorGetOptional(x, dict["PtData"], ExtractPtData); err != nil {
 		return nil, err
 	} else {
@@ -103,27 +89,22 @@ func ExtractViewport(x *pdf.Extractor, obj pdf.Object) (*Viewport, error) {
 
 // Embed converts the Viewport into a PDF object.
 func (v *Viewport) Embed(res *pdf.EmbedHelper) (pdf.Native, error) {
-	// Version check for PDF 1.6+
 	if err := pdf.CheckVersion(res.Out(), "viewport dictionaries", pdf.V1_6); err != nil {
 		return nil, err
 	}
 
 	dict := pdf.Dict{}
 
-	// Optional Type field
 	if res.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Viewport")
 	}
 
-	// Required BBox field
 	dict["BBox"] = &v.BBox
 
-	// Optional Name field
 	if v.Name != "" {
 		dict["Name"] = pdf.String(v.Name)
 	}
 
-	// Optional Measure field
 	if v.Measure != nil {
 		embedded, err := res.Embed(v.Measure)
 		if err != nil {
@@ -132,7 +113,6 @@ func (v *Viewport) Embed(res *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["Measure"] = embedded
 	}
 
-	// Optional PtData field (PDF 2.0)
 	if v.PtData != nil {
 		if err := pdf.CheckVersion(res.Out(), "viewport PtData entry", pdf.V2_0); err != nil {
 			return nil, err
@@ -173,7 +153,6 @@ type ViewPortArray struct {
 // Implements the algorithm from PDF spec: examine in reverse order,
 // return first viewport whose BBox contains the point.
 func (va *ViewPortArray) Select(point vec.Vec2) *Viewport {
-	// Iterate backwards through viewports array
 	for i := len(va.Viewports) - 1; i >= 0; i-- {
 		if va.Viewports[i].BBox.Contains(point) {
 			return va.Viewports[i]

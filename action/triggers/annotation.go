@@ -30,43 +30,43 @@ import (
 type Annotation struct {
 	// Enter is an action performed when the cursor enters the annotation's
 	// active area.
-	Enter action.Action
+	Enter pdf.Action
 
 	// Exit is an action performed when the cursor exits the annotation's
 	// active area.
-	Exit action.Action
+	Exit pdf.Action
 
 	// Down is an action performed when the mouse button is pressed inside
 	// the annotation's active area.
-	Down action.Action
+	Down pdf.Action
 
 	// Up is an action performed when the mouse button is released inside
 	// the annotation's active area.
-	Up action.Action
+	Up pdf.Action
 
 	// Focus is an action performed when the annotation receives the input
 	// focus (widget annotations only).
-	Focus action.Action
+	Focus pdf.Action
 
 	// Blur is an action performed when the annotation loses the input focus
 	// (widget annotations only).
-	Blur action.Action
+	Blur pdf.Action
 
 	// PageOpen is an action performed when the page containing the annotation
 	// is opened (PDF 1.5).
-	PageOpen action.Action
+	PageOpen pdf.Action
 
 	// PageClose is an action performed when the page containing the annotation
 	// is closed (PDF 1.5).
-	PageClose action.Action
+	PageClose pdf.Action
 
 	// PageVisible is an action performed when the page containing the
 	// annotation becomes visible (PDF 1.5).
-	PageVisible action.Action
+	PageVisible pdf.Action
 
 	// PageInvisible is an action performed when the page containing the
 	// annotation is no longer visible (PDF 1.5).
-	PageInvisible action.Action
+	PageInvisible pdf.Action
 }
 
 var _ pdf.Encoder = (*Annotation)(nil)

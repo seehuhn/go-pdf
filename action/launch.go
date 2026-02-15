@@ -47,7 +47,7 @@ type Launch struct {
 
 // ActionType returns "Launch".
 // This implements the [Action] interface.
-func (a *Launch) ActionType() Type { return TypeLaunch }
+func (a *Launch) ActionType() pdf.Name { return TypeLaunch }
 
 func (a *Launch) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "Launch action", pdf.V1_1); err != nil {

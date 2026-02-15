@@ -91,7 +91,7 @@ func TestNewWindowMode(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		action Action
+		action pdf.Action
 		mode   NewWindowMode
 	}{
 		{

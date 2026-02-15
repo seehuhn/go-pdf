@@ -20,38 +20,27 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Action represents a PDF action that can be performed when triggered.
-// Actions can navigate within or between documents, launch applications,
-// play media, manipulate form fields, and more.
-type Action interface {
-	ActionType() Type
-	pdf.Encoder
-}
-
-// Type identifies the type of action.
-type Type pdf.Name
-
 const (
-	TypeGoTo             Type = "GoTo"
-	TypeGoToR            Type = "GoToR"
-	TypeGoToE            Type = "GoToE"
-	TypeGoToDp           Type = "GoToDp"
-	TypeLaunch           Type = "Launch"
-	TypeThread           Type = "Thread"
-	TypeURI              Type = "URI"
-	TypeSound            Type = "Sound"
-	TypeMovie            Type = "Movie"
-	TypeHide             Type = "Hide"
-	TypeNamed            Type = "Named"
-	TypeSubmitForm       Type = "SubmitForm"
-	TypeResetForm        Type = "ResetForm"
-	TypeImportData       Type = "ImportData"
-	TypeSetOCGState      Type = "SetOCGState"
-	TypeRendition        Type = "Rendition"
-	TypeTrans            Type = "Trans"
-	TypeGoTo3DView       Type = "GoTo3DView"
-	TypeJavaScript       Type = "JavaScript"
-	TypeRichMediaExecute Type = "RichMediaExecute"
+	TypeGoTo             pdf.Name = "GoTo"
+	TypeGoToR            pdf.Name = "GoToR"
+	TypeGoToE            pdf.Name = "GoToE"
+	TypeGoToDp           pdf.Name = "GoToDp"
+	TypeLaunch           pdf.Name = "Launch"
+	TypeThread           pdf.Name = "Thread"
+	TypeURI              pdf.Name = "URI"
+	TypeSound            pdf.Name = "Sound"
+	TypeMovie            pdf.Name = "Movie"
+	TypeHide             pdf.Name = "Hide"
+	TypeNamed            pdf.Name = "Named"
+	TypeSubmitForm       pdf.Name = "SubmitForm"
+	TypeResetForm        pdf.Name = "ResetForm"
+	TypeImportData       pdf.Name = "ImportData"
+	TypeSetOCGState      pdf.Name = "SetOCGState"
+	TypeRendition        pdf.Name = "Rendition"
+	TypeTrans            pdf.Name = "Trans"
+	TypeGoTo3DView       pdf.Name = "GoTo3DView"
+	TypeJavaScript       pdf.Name = "JavaScript"
+	TypeRichMediaExecute pdf.Name = "RichMediaExecute"
 )
 
 // NewWindowMode specifies how a target document should be displayed.
@@ -67,7 +56,7 @@ const (
 )
 
 // Decode reads an action from a PDF object.
-func Decode(x *pdf.Extractor, obj pdf.Object) (Action, error) {
+func Decode(x *pdf.Extractor, obj pdf.Object) (pdf.Action, error) {
 	dict, err := x.GetDictTyped(obj, "Action")
 	if err != nil {
 		return nil, err
@@ -78,7 +67,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (Action, error) {
 		return nil, err
 	}
 
-	switch Type(actionType) {
+	switch actionType {
 	case TypeGoTo:
 		return decodeGoTo(x, dict)
 	case TypeGoToR:
@@ -127,7 +116,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (Action, error) {
 // PDF 2.0 sections: 12.6.1 12.6.2
 
 // ActionList represents a sequence of actions to be performed.
-type ActionList []Action
+type ActionList []pdf.Action
 
 // Encode encodes the action list for the Next entry.
 // Returns nil for empty, single dict for one action, array for multiple.

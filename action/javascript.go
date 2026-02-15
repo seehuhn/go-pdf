@@ -34,7 +34,7 @@ type JavaScript struct {
 
 // ActionType returns "JavaScript".
 // This implements the [Action] interface.
-func (a *JavaScript) ActionType() Type { return TypeJavaScript }
+func (a *JavaScript) ActionType() pdf.Name { return TypeJavaScript }
 
 func (a *JavaScript) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "JavaScript action", pdf.V1_3); err != nil {

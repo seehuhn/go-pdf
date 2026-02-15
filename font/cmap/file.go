@@ -25,6 +25,7 @@ import (
 	"io"
 	"iter"
 	"math"
+	"slices"
 	"text/template"
 
 	"seehuhn.de/go/postscript"
@@ -135,7 +136,9 @@ func safeExtractCMap(x *pdf.Extractor, cycle *pdf.CycleChecker, obj pdf.Object) 
 	}
 
 	if name, _ := x.GetName(dict["CMapName"]); name != "" {
-		res.Name = string(name)
+		if clean := sanitizeName(string(name)); clean != "" {
+			res.Name = clean
+		}
 	}
 	if ros, _ := font.ExtractCIDSystemInfo(x, dict["CIDSystemInfo"]); ros != nil {
 		res.ROS = ros
@@ -160,6 +163,19 @@ func safeExtractCMap(x *pdf.Extractor, cycle *pdf.CycleChecker, obj pdf.Object) 
 	}
 
 	return res, nil
+}
+
+// sanitizeName removes characters which are not valid in PostScript names.
+func sanitizeName(s string) string {
+	clean := make([]byte, 0, len(s))
+	for i := range len(s) {
+		c := s[i]
+		if c > 32 && c != '(' && c != ')' && c != '<' && c != '>' &&
+			c != '[' && c != ']' && c != '{' && c != '}' && c != '/' && c != '%' {
+			clean = append(clean, c)
+		}
+	}
+	return string(clean)
 }
 
 // readCMap reads and parses a CMap from a PostScript stream.
@@ -364,33 +380,34 @@ func (f *File) Codec() (*charcode.Codec, error) {
 }
 
 func (f *File) All(codec *charcode.Codec) iter.Seq2[charcode.Code, cid.CID] {
+	// collect the chain of CMap files, root first
+	var chain []*File
+	for g := f; g != nil; g = g.Parent {
+		chain = append(chain, g)
+	}
+	slices.Reverse(chain)
+
 	return func(yield func(charcode.Code, cid.CID) bool) {
-		if f.Parent != nil {
-			for code, cid := range f.Parent.All(codec) {
-				if !yield(code, cid) {
-					return
+		for _, g := range chain {
+			for _, r := range g.CIDRanges {
+				for i, codeBytes := range codesInRange(r.First, r.Last) {
+					code, k, valid := codec.Decode(codeBytes)
+					if !valid || k != len(codeBytes) {
+						continue
+					}
+					if !yield(code, r.Value+CID(i)) {
+						return
+					}
 				}
 			}
-		}
-
-		for _, r := range f.CIDRanges {
-			for i, codeBytes := range codesInRange(r.First, r.Last) {
-				code, k, valid := codec.Decode(codeBytes)
-				if !valid || k != len(codeBytes) {
+			for _, single := range g.CIDSingles {
+				code, k, valid := codec.Decode(single.Code)
+				if !valid || k != len(single.Code) {
 					continue
 				}
-				if !yield(code, r.Value+CID(i)) {
+				if !yield(code, single.Value) {
 					return
 				}
-			}
-		}
-		for _, single := range f.CIDSingles {
-			code, k, valid := codec.Decode(single.Code)
-			if !valid || k != len(single.Code) {
-				continue
-			}
-			if !yield(code, single.Value) {
-				return
 			}
 		}
 	}

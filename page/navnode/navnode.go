@@ -37,10 +37,10 @@ import (
 // within a page's presentation states.
 type Node struct {
 	// NA is the action (or sequence of actions) executed on forward navigation.
-	NA action.Action
+	NA pdf.Action
 
 	// PA is the action (or sequence of actions) executed on backward navigation.
-	PA action.Action
+	PA pdf.Action
 
 	// Dur is the auto-advance duration in seconds.
 	// A value of 0 means no automatic advance.

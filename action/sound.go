@@ -17,6 +17,8 @@
 package action
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -48,14 +50,17 @@ type Sound struct {
 
 // ActionType returns "Sound".
 // This implements the [Action] interface.
-func (a *Sound) ActionType() Type { return TypeSound }
+func (a *Sound) ActionType() pdf.Name { return TypeSound }
 
 func (a *Sound) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "Sound action", pdf.V1_2); err != nil {
 		return nil, err
 	}
 	if a.Sound == 0 {
-		return nil, pdf.Error("Sound action must have a Sound reference")
+		return nil, errors.New("Sound action must have a Sound reference")
+	}
+	if a.Volume < -1 || a.Volume > 1 {
+		return nil, errors.New("Sound action Volume must be in range -1.0 to 1.0")
 	}
 
 	dict := pdf.Dict{
@@ -96,14 +101,25 @@ func decodeSound(x *pdf.Extractor, dict pdf.Dict) (*Sound, error) {
 
 	volume := 1.0
 	if dict["Volume"] != nil {
-		if v, err := pdf.Optional(x.GetNumber(dict["Volume"])); err == nil {
-			volume = v
+		v, err := pdf.Optional(x.GetNumber(dict["Volume"]))
+		if err != nil {
+			return nil, err
 		}
+		volume = v
 	}
 
-	synchronous, _ := pdf.Optional(x.GetBoolean(dict["Synchronous"]))
-	repeat, _ := pdf.Optional(x.GetBoolean(dict["Repeat"]))
-	mix, _ := pdf.Optional(x.GetBoolean(dict["Mix"]))
+	synchronous, err := pdf.Optional(x.GetBoolean(dict["Synchronous"]))
+	if err != nil {
+		return nil, err
+	}
+	repeat, err := pdf.Optional(x.GetBoolean(dict["Repeat"]))
+	if err != nil {
+		return nil, err
+	}
+	mix, err := pdf.Optional(x.GetBoolean(dict["Mix"]))
+	if err != nil {
+		return nil, err
+	}
 
 	next, err := DecodeActionList(x, dict["Next"])
 	if err != nil {

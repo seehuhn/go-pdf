@@ -17,6 +17,8 @@
 package action
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -33,7 +35,9 @@ type Movie struct {
 	T pdf.String
 
 	// Operation specifies the operation to perform.
-	Operation pdf.Name
+	//
+	// On write, an empty name can be used as a shorthand for [MovieOperationPlay].
+	Operation MovieOperation
 
 	// Next is the sequence of actions to perform after this action.
 	Next ActionList
@@ -41,7 +45,7 @@ type Movie struct {
 
 // ActionType returns "Movie".
 // This implements the [Action] interface.
-func (a *Movie) ActionType() Type { return TypeMovie }
+func (a *Movie) ActionType() pdf.Name { return TypeMovie }
 
 func (a *Movie) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "Movie action", pdf.V1_2); err != nil {
@@ -55,16 +59,19 @@ func (a *Movie) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["Type"] = pdf.Name("Action")
 	}
 
-	if a.Annotation != nil {
+	switch {
+	case a.Annotation != nil && len(a.T) > 0:
+		return nil, errors.New("Movie action must not have both Annotation and T")
+	case a.Annotation != nil:
 		dict["Annotation"] = a.Annotation
-	}
-
-	if len(a.T) > 0 {
+	case len(a.T) > 0:
 		dict["T"] = a.T
+	default:
+		return nil, errors.New("Movie action requires Annotation or T")
 	}
 
-	if a.Operation != "" {
-		dict["Operation"] = a.Operation
+	if a.Operation != "" && a.Operation != MovieOperationPlay {
+		dict["Operation"] = pdf.Name(a.Operation)
 	}
 
 	if next, err := a.Next.Encode(rm); err != nil {
@@ -77,8 +84,27 @@ func (a *Movie) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeMovie(x *pdf.Extractor, dict pdf.Dict) (*Movie, error) {
-	t, _ := x.GetString(dict["T"])
-	operation, _ := x.GetName(dict["Operation"])
+	annotation := dict["Annotation"]
+	t, err := pdf.Optional(x.GetString(dict["T"]))
+	if err != nil {
+		return nil, err
+	}
+
+	// the spec requires exactly one of Annotation or T
+	switch {
+	case annotation != nil && len(t) > 0:
+		t = nil
+	case annotation == nil && len(t) == 0:
+		return nil, pdf.Error("Movie action missing both Annotation and T")
+	}
+
+	operation, err := pdf.Optional(x.GetName(dict["Operation"]))
+	if err != nil {
+		return nil, err
+	}
+	if operation == "" {
+		operation = pdf.Name(MovieOperationPlay)
+	}
 
 	next, err := DecodeActionList(x, dict["Next"])
 	if err != nil {
@@ -86,9 +112,19 @@ func decodeMovie(x *pdf.Extractor, dict pdf.Dict) (*Movie, error) {
 	}
 
 	return &Movie{
-		Annotation: dict["Annotation"],
+		Annotation: annotation,
 		T:          t,
-		Operation:  operation,
+		Operation:  MovieOperation(operation),
 		Next:       next,
 	}, nil
 }
+
+// MovieOperation specifies the operation to perform on a movie.
+type MovieOperation pdf.Name
+
+const (
+	MovieOperationPlay   MovieOperation = "Play"
+	MovieOperationStop   MovieOperation = "Stop"
+	MovieOperationPause  MovieOperation = "Pause"
+	MovieOperationResume MovieOperation = "Resume"
+)

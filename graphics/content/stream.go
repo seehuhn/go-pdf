@@ -56,8 +56,12 @@ func StreamsEqual(a, b Stream) bool {
 	if a == nil && b == nil {
 		return true
 	}
-	if a == nil || b == nil {
-		return false
+	if a == nil {
+		// treat an empty stream as equivalent to nil
+		return streamIsEmpty(b)
+	}
+	if b == nil {
+		return streamIsEmpty(a)
 	}
 
 	// fast path: both are Operators
@@ -99,6 +103,14 @@ func StreamsEqual(a, b Stream) bool {
 		return false
 	}
 	return true
+}
+
+// streamIsEmpty reports whether s yields zero operators.
+func streamIsEmpty(s Stream) bool {
+	for range s.All() {
+		return false
+	}
+	return s.Err() == nil
 }
 
 // Operators represents a PDF content stream as a slice of operators.

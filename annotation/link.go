@@ -43,7 +43,7 @@ type Link struct {
 	// annotation is activated. Mutually exclusive with Destination.
 	//
 	// This corresponds to the /A entry in the PDF annotation dictionary.
-	Action action.Action
+	Action pdf.Action
 
 	// Destination (optional) is a destination that is displayed when the
 	// annotation is activated. Mutually exclusive with Action.

@@ -232,7 +232,9 @@ func ExtractUsage(x *pdf.Extractor, obj pdf.Object) (*Usage, error) {
 			info.Name = []string{string(str)}
 		}
 
-		usage.User = info
+		if info.Type != "" {
+			usage.User = info
+		}
 	}
 
 	// extract PageElement dictionary

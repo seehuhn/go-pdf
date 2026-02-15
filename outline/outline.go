@@ -61,7 +61,7 @@ type Item struct {
 	// Action (optional; PDF 1.1) is performed when the outline item is activated.
 	// Use for external links, other PDF files, or special actions.
 	// Destination and Action are mutually exclusive.
-	Action action.Action
+	Action pdf.Action
 
 	// Children contains the child outline items (e.g. subsections of a section).
 	Children []*Item

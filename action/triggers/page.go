@@ -31,12 +31,12 @@ type Page struct {
 	// PageOpen is an action performed when the page is opened (for example,
 	// when the user navigates to it from the next or previous page or by
 	// means of a link annotation or outline item).
-	PageOpen action.Action
+	PageOpen pdf.Action
 
 	// PageClose is an action performed when the page is closed (for example,
 	// when the user navigates to the next or previous page or follows a link
 	// annotation or an outline item).
-	PageClose action.Action
+	PageClose pdf.Action
 }
 
 var _ pdf.Encoder = (*Page)(nil)

@@ -488,14 +488,15 @@ type NameTree interface {
 	Embedder
 }
 
-// Action represents a PDF action.
+// Action represents a PDF action that can be performed when triggered.
+// Actions can navigate within or between documents, launch applications,
+// play media, manipulate form fields, and more.
+//
 // The different implementations of this interface can be found in the
 // seehuhn.de/go/pdf/action package.
 type Action interface {
 	// ActionType returns the type of the action, e.g. "GoTo", "URI", etc.
 	ActionType() Name
 
-	Next() []Object
-
-	Object
+	Encoder
 }

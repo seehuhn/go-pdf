@@ -121,7 +121,7 @@ func roundTripTest(t *testing.T, version pdf.Version, nodes1 []*Node) {
 
 	// compare using action type equality
 	opts := []cmp.Option{
-		cmp.Comparer(func(a, b action.Action) bool {
+		cmp.Comparer(func(a, b pdf.Action) bool {
 			if a == nil && b == nil {
 				return true
 			}

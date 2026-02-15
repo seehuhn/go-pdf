@@ -34,7 +34,7 @@ type Named struct {
 
 // ActionType returns "Named".
 // This implements the [Action] interface.
-func (a *Named) ActionType() Type { return TypeNamed }
+func (a *Named) ActionType() pdf.Name { return TypeNamed }
 
 func (a *Named) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "Named action", pdf.V1_2); err != nil {

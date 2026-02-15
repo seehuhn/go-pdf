@@ -279,7 +279,7 @@ func copyPageTarget(cp *pdf.Copier, page destination.Target) (destination.Target
 }
 
 // copyAction copies an action, translating page references in GoTo actions.
-func copyAction(cp *pdf.Copier, act action.Action) (action.Action, error) {
+func copyAction(cp *pdf.Copier, act pdf.Action) (pdf.Action, error) {
 	switch a := act.(type) {
 	case *action.GoTo:
 		newDest, err := copyDestination(cp, a.Dest)

@@ -29,7 +29,7 @@ import (
 	"seehuhn.de/go/pdf/page/transition"
 )
 
-var actionTestCases = []Action{
+var actionTestCases = []pdf.Action{
 	// GoTo
 	&GoTo{Dest: &destination.Fit{Page: pdf.Reference(1)}},
 	&GoTo{Dest: &destination.XYZ{Page: pdf.Reference(5), Left: 100, Top: 200, Zoom: 1.5}},
@@ -101,8 +101,9 @@ var actionTestCases = []Action{
 	&Sound{Sound: pdf.Reference(1), Volume: 0.75, Synchronous: true, Repeat: true, Mix: true},
 
 	// Movie
-	&Movie{T: pdf.String("movie1")},
-	&Movie{Annotation: pdf.Reference(1)}, // by annotation reference
+	&Movie{T: pdf.String("movie1"), Operation: MovieOperationPlay},
+	&Movie{Annotation: pdf.Reference(1), Operation: MovieOperationPlay},
+	// raw strings to verify they round-trip correctly
 	&Movie{T: pdf.String("intro"), Operation: "Play"},
 	&Movie{T: pdf.String("video"), Operation: "Stop"},
 	&Movie{T: pdf.String("clip"), Operation: "Pause"},
@@ -199,7 +200,7 @@ var actionTestCases = []Action{
 	},
 }
 
-func testActionRoundTrip(t *testing.T, version pdf.Version, action Action) {
+func testActionRoundTrip(t *testing.T, version pdf.Version, action pdf.Action) {
 	t.Helper()
 
 	w, _ := memfile.NewPDFWriter(version, nil)
