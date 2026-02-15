@@ -18,9 +18,25 @@ Pipe to yq for filtering:
 
 yq quirks: `*` is a wildcard in `==` (use `test("^\\*pdf\\.Rectangle$")` for literal matching); object keys must be quoted `{"key": .val}`.
 
-## Schema structure
+## Graph tool
 
-- Types use `embeds: [AnnotCommon, AnnotMarkup]` for Go struct embedding
+```bash
+./graph stats            # summary statistics
+./graph edges            # all edges (A -> B)
+./graph loops            # all cycles
+./graph file-boundary    # fi -> fd boundary edges
+./graph field-collisions # PDF keys mapping to different Go names/types
+./graph docs             # auto-generate documentation
+```
+
+## Schema notes
+
+- `refTypes` lists valid PDF object types for a field (string or `{type, collection, since, deprecated}`)
+- Internal map types use `_` prefix (e.g. `_FontMap`) with `refTypes` at the type level
+- Interface names in `refTypes` expand to all implementations
+- `embeds: [AnnotCommon, AnnotMarkup]` for Go struct embedding
 - `discriminator: true` marks PDF-only Type/Subtype fields
 - `goName: null` means field not implemented in Go
+- `fileDependent: true` = Encode/Decode, `false` = Embed/Extract, omit if unknown
+- `deprecated: "2.0"` marks types/fields deprecated in a PDF version
 - See SCHEMA.md for full format

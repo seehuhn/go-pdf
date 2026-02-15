@@ -12,11 +12,13 @@ objects/
   chapter07.yaml     # Document Structure (excluding 7.3 basic types)
   chapter08.yaml     # Graphics
   chapter09.yaml     # Text
-  chapter10.yaml     # Fonts (partial - see also chapter09)
-  chapter11.yaml     # Rendering
+  chapter10.yaml     # Rendering
+  chapter11.yaml     # Transparency
   chapter12.yaml     # Interactive Features
   chapter13.yaml     # Multimedia
   chapter14.yaml     # Document Interchange
+  graph              # graph analysis tool (edges, loops, file-boundary, etc.)
+  query              # type lookup tool
 ```
 
 ## Defaults
@@ -32,6 +34,8 @@ objects/
 | `goPresenceTracking` | `false` | uses optional.* or pointer for presence |
 | `discriminator` | `false` | field is PDF-only type discriminator |
 | `embeds` | `[]` | type embeds other types (Go struct embedding) |
+| `fileDependent` | *(unset)* | `true` = Encode/Decode, `false` = Embed/Extract, omit if unknown |
+| `deprecated` | `null` | PDF version when type/field was deprecated |
 
 ## File Structure
 
@@ -56,24 +60,27 @@ interfaces:
 
 ```yaml
 types:
+  # Implemented type with embedding
   - name: TextAnnotation
     goType: "annotation.Text"
     pdfType: Annot
     pdfSubtype: Text
     pdfRepr: dict
+    fileDependent: true                   # uses Encode/Decode
     readFunc: "annotation.Extract"
     writeMethod: "(*Text).Encode"
+    embeds: [AnnotCommon, AnnotMarkup]    # inherits fields from these types
     specSection: "12.5.6.4"
     specTable: "Table 176"
-
     fields:
-      # ...
+      # only type-specific fields here
 
-  # Stream-based type
+  # Stream-based, file-independent type
   - name: Type0Function
     goType: "function.Type0"
     pdfType: null                         # no /Type field
     pdfRepr: stream
+    fileDependent: false                  # uses Embed/Extract
     readFunc: "function.Extract"
     writeMethod: "(*Type0).Embed"
     specSection: "7.10.2"
@@ -94,18 +101,17 @@ types:
     goType: "annotation.Common"
     pdfType: null                         # embedded, not standalone
     pdfRepr: dict
-    notes: "Fields common to all annotations"
     fields:
       # ...
 
-  # Type with embedding
-  - name: TextAnnotation
-    goType: "annotation.Text"
-    pdfType: Annot
-    pdfSubtype: Text
-    embeds: [AnnotCommon, AnnotMarkup]    # inherits fields from these types
-    fields:
-      # only type-specific fields here
+  # Deprecated type
+  - name: ActionMovie
+    goType: null
+    pdfType: Action
+    pdfSubtype: Movie
+    pdfRepr: dict
+    deprecated: "2.0"                     # PDF version when deprecated
+    specTable: "Table 200"
 ```
 
 ## Field Definition
@@ -156,7 +162,7 @@ fields:
     goType: "*content.Resources"
     pdfKey: "Resources"
     pdfType: dictionary
-    refType: ResourceDictionary
+    refTypes: [Resource]
     purpose: "Resource dictionary"
 
   # Closed enum (reference)
@@ -197,6 +203,69 @@ fields:
     pdfType: number
     purpose: "Non-stroking transparency"
 ```
+
+## refTypes
+
+The `refTypes` field on a field entry lists the PDF object types that the PDF
+field may contain.  It describes the PDF side, not the Go side.  Each entry
+is a "target" — either a plain string or an object with version constraints.
+
+Each entry is either a plain YAML name (shorthand) or an object:
+- Plain string: a YAML type or interface name, e.g. `PageObject`, `Action`
+- Object with `type` key: adds version constraints and/or collection info
+
+```yaml
+fields:
+  # Simple reference
+  - pdfKey: "Resources"
+    refTypes: [Resource]
+
+  # Interface reference (any annotation subtype)
+  - pdfKey: "A"
+    refTypes: [Action]
+
+  # Array of objects
+  - pdfKey: "Annots"
+    refTypes:
+      - {type: Annotation, collection: array}
+
+  # Multiple alternatives (the list means "any of these")
+  - pdfKey: "D"
+    refTypes: [DestXYZArray, Action]
+
+  # Version-constrained alternatives
+  - pdfKey: "Next"
+    refTypes:
+      - Action
+      - {type: Action, collection: array}
+
+  # Version-constrained type
+  - pdfKey: "Dest"
+    refTypes:
+      - DestXYZArray
+      - {type: ActionGoToE, since: "1.6"}
+      - {type: ActionGoToDp, since: "2.0", deprecated: "2.0"}
+
+  # Array with version constraint
+  - pdfKey: "AF"
+    refTypes:
+      - {type: AFFileSpecification, collection: array, since: "2.0"}
+```
+
+**Internal map types** use a `_` prefix to indicate they don't correspond
+to a type in the PDF spec or Go code.  These types have `refTypes` at the
+type level (not on fields) to describe the map's value type:
+
+```yaml
+types:
+  - name: _FontMap
+    pdfRepr: map
+    refTypes: [Font]           # what the map values can be
+```
+
+`refTypes` is only for references to typed PDF objects.  Value types
+(arrays of numbers, boolean flags, etc.) are described by `pdfType` alone
+and do not need `refTypes`.
 
 ## Special Mappings
 
@@ -294,12 +363,15 @@ yq '.types[] | {type: .name, field: .fields[] | select(.goName == null) | .pdfKe
 # PDF types with multiple Go representations
 yq ea '[.types[]] | group_by(.pdfType) | .[] | select(length > 1) | .[].name' objects/*.yaml
 
-# Objects containing resource dictionaries
-yq ea '.types[] | select(.fields[].refType == "ResourceDictionary") | .name' objects/*.yaml
+# Fields referencing a type (handles both string and object entries)
+yq '.types[] | {type: .name, field: .fields[] | select(.refTypes[] == "Resource" or .refTypes[].type == "Resource") | .pdfKey}' objects/*.yaml
 
 # All fields introduced after 1.0
 yq '.types[].fields[] | select(.introduced != null) | {name: .goName, version: .introduced}' objects/*.yaml
 
 # All required fields
 yq '.types[] | {type: .name, fields: [.fields[] | select(.required == true) | .goName]}' objects/*.yaml
+
+# All interfaces
+yq '.interfaces[].name' objects/*.yaml
 ```

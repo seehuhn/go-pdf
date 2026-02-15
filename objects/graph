@@ -1,0 +1,334 @@
+#!/usr/bin/env python3
+"""Graph analysis tool for PDF object schema.
+
+Usage:
+    ./graph edges              # all edges (A -> B where A may reference B)
+    ./graph loops              # all cycles in the type graph
+    ./graph file-boundary      # edges from file-independent to file-dependent types
+    ./graph field-collisions   # PDF field names mapping to different Go names/types
+    ./graph docs               # auto-generate minimal documentation
+    ./graph stats              # summary statistics
+"""
+
+import signal
+import sys
+from collections import defaultdict
+from pathlib import Path
+
+import yaml
+
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
+SCHEMA_DIR = Path(__file__).parent
+GO_PKG_BASE = "seehuhn.de/go/pdf"
+
+
+def load_all() -> tuple[dict[str, dict], list[dict]]:
+    """Load types and interfaces from all chapter*.yaml files."""
+    types = {}
+    interfaces = []
+    for path in sorted(SCHEMA_DIR.glob("chapter*.yaml")):
+        with open(path) as f:
+            data = yaml.safe_load(f)
+        for t in data.get("types", []):
+            types[t["name"]] = t
+        for iface in data.get("interfaces", []):
+            interfaces.append(iface)
+    return types, interfaces
+
+
+def resolve_fields(types: dict[str, dict], name: str) -> list[dict]:
+    """Resolve a type's fields including embeds."""
+    t = types[name]
+    fields = []
+    for embed_name in t.get("embeds", []):
+        fields.extend(resolve_fields(types, embed_name))
+    fields.extend(t.get("fields", []))
+    return fields
+
+
+def ref_target(ref) -> str | None:
+    """Extract the YAML type name from a refTypes entry (string or object)."""
+    if isinstance(ref, str):
+        return ref
+    if isinstance(ref, dict):
+        return ref.get("type")
+    return None
+
+
+def build_graph(types: dict[str, dict], interfaces: list[dict]) -> dict[str, set[str]]:
+    """Build directed graph: edges[A] = {B, C, ...} where A references B, C."""
+    # map interface names to their implementation type names
+    iface_impls = {}
+    for iface in interfaces:
+        iface_impls[iface["name"]] = [
+            impl["type"] for impl in iface.get("implementations", [])
+        ]
+
+    def resolve_target(target: str) -> list[str]:
+        """Resolve a target name to type names, expanding interfaces."""
+        if target in types:
+            return [target]
+        if target in iface_impls:
+            return [t for t in iface_impls[target] if t in types]
+        return []
+
+    edges = defaultdict(set)
+    for name, t in types.items():
+        # type-level refTypes (for internal map types)
+        for ref in t.get("refTypes", []):
+            target = ref_target(ref)
+            if target:
+                for resolved in resolve_target(target):
+                    edges[name].add(resolved)
+        # field-level refTypes
+        for field in resolve_fields(types, name):
+            for ref in field.get("refTypes", []):
+                target = ref_target(ref)
+                if target:
+                    for resolved in resolve_target(target):
+                        edges[name].add(resolved)
+    return edges
+
+
+def find_cycles(graph: dict[str, set[str]]) -> list[list[str]]:
+    """Find all elementary cycles using Johnson's algorithm (simplified)."""
+    cycles = []
+    visited = set()
+    stack = []
+    on_stack = set()
+
+    def dfs(node: str, start: str) -> None:
+        visited.add(node)
+        stack.append(node)
+        on_stack.add(node)
+        for neighbor in graph.get(node, set()):
+            if neighbor == start and len(stack) > 1:
+                cycles.append(list(stack))
+            elif neighbor not in on_stack and neighbor not in visited:
+                dfs(neighbor, start)
+        stack.pop()
+        on_stack.discard(node)
+
+    all_nodes = set(graph.keys())
+    for targets in graph.values():
+        all_nodes.update(targets)
+
+    # Use Tarjan-style SCC detection for efficiency
+    # Simplified: just find all cycles via DFS from each node
+    for start in sorted(all_nodes):
+        visited.clear()
+        dfs(start, start)
+
+    # Deduplicate cycles (normalize by rotating to smallest element first)
+    unique = set()
+    result = []
+    for cycle in cycles:
+        min_idx = cycle.index(min(cycle))
+        normalized = tuple(cycle[min_idx:] + cycle[:min_idx])
+        if normalized not in unique:
+            unique.add(normalized)
+            result.append(list(normalized))
+    return sorted(result, key=lambda c: (len(c), c))
+
+
+def fd_label(t: dict) -> str:
+    """Return file-dependency label: fd, fi, or ? (unknown/unimplemented)."""
+    if t.get("fileDependent"):
+        return "fd"
+    if t.get("writeMethod"):
+        return "fi"  # has writeMethod but not fileDependent => Embed
+    return "?"
+
+
+def cmd_edges(types: dict[str, dict], interfaces: list[dict]) -> None:
+    """Print all edges in the type graph."""
+    graph = build_graph(types, interfaces)
+    for src in sorted(graph):
+        for dst in sorted(graph[src]):
+            print(f"{src} [{fd_label(types[src])}] -> {dst} [{fd_label(types[dst])}]")
+
+
+def cmd_loops(types: dict[str, dict], interfaces: list[dict]) -> None:
+    """Print all cycles in the type graph."""
+    graph = build_graph(types, interfaces)
+    cycles = find_cycles(graph)
+    if not cycles:
+        print("No cycles found.")
+        return
+    for cycle in cycles:
+        print(" -> ".join(cycle) + " -> " + cycle[0])
+
+
+def cmd_file_boundary(types: dict[str, dict], interfaces: list[dict]) -> None:
+    """Print edges from file-independent to file-dependent types."""
+    graph = build_graph(types, interfaces)
+    found = False
+    for src in sorted(graph):
+        src_label = fd_label(types[src])
+        if src_label == "fd":
+            continue
+        for dst in sorted(graph[src]):
+            if types[dst].get("fileDependent"):
+                print(f"{src} [{src_label}] -> {dst} [fd]")
+                found = True
+    if not found:
+        print("No file-independent -> file-dependent edges found.")
+
+
+def cmd_field_collisions(types: dict[str, dict]) -> None:
+    """Find PDF field names/types with inconsistent Go mappings."""
+    # Collect: pdfKey -> set of (goName, goType) across all types
+    pdf_to_go_name = defaultdict(lambda: defaultdict(set))
+    pdf_to_go_type = defaultdict(lambda: defaultdict(set))
+
+    for name, t in types.items():
+        for field in resolve_fields(types, name):
+            pdf_key = field.get("pdfKey")
+            go_name = field.get("goName")
+            go_type = field.get("goType")
+            if not pdf_key:
+                continue
+            if go_name:
+                pdf_to_go_name[pdf_key][go_name].add(name)
+            if go_type and go_name:
+                pdf_to_go_type[pdf_key][go_type].add(name)
+
+    print("=== PDF keys mapping to different Go field names ===")
+    found = False
+    for pdf_key in sorted(pdf_to_go_name):
+        mappings = pdf_to_go_name[pdf_key]
+        if len(mappings) > 1:
+            found = True
+            print(f"\n  /{pdf_key}:")
+            for go_name, type_names in sorted(mappings.items()):
+                examples = ", ".join(sorted(type_names)[:3])
+                suffix = f" (+{len(type_names)-3} more)" if len(type_names) > 3 else ""
+                print(f"    -> {go_name}  (used by: {examples}{suffix})")
+    if not found:
+        print("  (none)")
+
+    print("\n=== PDF keys mapping to different Go field types ===")
+    found = False
+    for pdf_key in sorted(pdf_to_go_type):
+        mappings = pdf_to_go_type[pdf_key]
+        if len(mappings) > 1:
+            found = True
+            print(f"\n  /{pdf_key}:")
+            for go_type, type_names in sorted(mappings.items()):
+                examples = ", ".join(sorted(type_names)[:3])
+                suffix = f" (+{len(type_names)-3} more)" if len(type_names) > 3 else ""
+                print(f"    -> {go_type}  (used by: {examples}{suffix})")
+    if not found:
+        print("  (none)")
+
+
+def cmd_docs(types: dict[str, dict], interfaces: list[dict]) -> None:
+    """Generate minimal documentation in Markdown."""
+    # Group types by chapter
+    chapter_types = defaultdict(list)
+    for path in sorted(SCHEMA_DIR.glob("chapter*.yaml")):
+        with open(path) as f:
+            data = yaml.safe_load(f)
+        chapter = data.get("chapter", "?")
+        title = data.get("title", "Unknown")
+        for t in data.get("types", []):
+            chapter_types[(chapter, title)].append(t)
+
+    print("# PDF Object Types\n")
+    print(f"Total: {len(types)} types, {sum(1 for t in types.values() if t.get('goType'))} implemented\n")
+
+    for (chapter, title), ctypes in sorted(chapter_types.items()):
+        impl = sum(1 for t in ctypes if t.get("goType"))
+        print(f"## Chapter {chapter}: {title} ({impl}/{len(ctypes)} implemented)\n")
+
+        for t in ctypes:
+            name = t["name"]
+            go_type = t.get("goType")
+            purpose = t.get("purpose", "")
+            introduced = t.get("introduced", "1.0")
+            deprecated = t.get("deprecated")
+            label = fd_label(t)
+            fd = f" ({label})" if label != "?" else ""
+
+            version_info = f"[{introduced}"
+            if deprecated:
+                version_info += f", deprecated {deprecated}"
+            version_info += "]"
+
+            if go_type:
+                pkg_parts = go_type.rsplit(".", 1)
+                if len(pkg_parts) == 2:
+                    pkg, typ = pkg_parts
+                    url = f"https://pkg.go.dev/{GO_PKG_BASE}/{pkg}#{typ}"
+                else:
+                    url = f"https://pkg.go.dev/{GO_PKG_BASE}#{go_type}"
+                print(f"- **{name}** {version_info}: {purpose}{fd}")
+                print(f"  - Go: [`{go_type}`]({url})")
+            else:
+                print(f"- {name} {version_info}: {purpose} *(not implemented)*")
+
+        print()
+
+    if interfaces:
+        print("## Interfaces\n")
+        for iface in interfaces:
+            name = iface["name"]
+            go_type = iface.get("goType", "")
+            impls = iface.get("implementations", [])
+            print(f"- **{name}** (`{go_type}`): {len(impls)} implementations")
+            for impl in impls:
+                print(f"  - {impl['type']} (value: {impl.get('value', '?')})")
+        print()
+
+
+def cmd_stats(types: dict[str, dict], interfaces: list[dict]) -> None:
+    """Print summary statistics."""
+    total = len(types)
+    impl = sum(1 for t in types.values() if t.get("goType"))
+    fd = sum(1 for t in types.values() if t.get("fileDependent"))
+    fi_with_write = sum(1 for t in types.values()
+                        if t.get("writeMethod") and not t.get("fileDependent"))
+    with_deprecated = sum(1 for t in types.values() if t.get("deprecated"))
+
+    graph = build_graph(types, interfaces)
+    edge_count = sum(len(targets) for targets in graph.values())
+    cycles = find_cycles(graph)
+
+    print(f"Types:          {total}")
+    print(f"Implemented:    {impl} ({100*impl//total}%)")
+    print(f"File-dependent: {fd}")
+    print(f"File-independ:  {fi_with_write}")
+    print(f"Deprecated:     {with_deprecated}")
+    print(f"Interfaces:     {len(interfaces)}")
+    print(f"Graph edges:    {edge_count}")
+    print(f"Cycles:         {len(cycles)}")
+
+
+def main() -> None:
+    if len(sys.argv) < 2:
+        print(__doc__, file=sys.stderr)
+        sys.exit(1)
+
+    cmd = sys.argv[1]
+    types, interfaces = load_all()
+
+    commands = {
+        "edges": lambda: cmd_edges(types, interfaces),
+        "loops": lambda: cmd_loops(types, interfaces),
+        "file-boundary": lambda: cmd_file_boundary(types, interfaces),
+        "field-collisions": lambda: cmd_field_collisions(types),
+        "docs": lambda: cmd_docs(types, interfaces),
+        "stats": lambda: cmd_stats(types, interfaces),
+    }
+
+    if cmd in commands:
+        commands[cmd]()
+    else:
+        print(f"Unknown command: {cmd}", file=sys.stderr)
+        print(__doc__, file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

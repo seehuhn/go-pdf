@@ -48,15 +48,15 @@ import (
 //  - Sy: "symbol" for Caret
 
 type Style struct {
+	// ContentFont is the font used to render the text content of annotations,
+	// for example for FreeText annotations.
+	ContentFont font.Layouter
+
 	// iconFont is the font used to render symbols inside some of the icons for
 	// text annotations.  If this is changed to be different from
 	// extended.NimbusRomanBold, the layout of some text icons may need to be
 	// adjusted.
 	iconFont font.Layouter
-
-	// contentFont is the font used to render the text content of annotations,
-	// for example for FreeText annotations.
-	contentFont font.Layouter
 
 	// reset is used to set a default graphics state at the beginning of each
 	// appearance stream.
@@ -84,7 +84,7 @@ func NewStyle() *Style {
 	// font is embedded in an output file.
 	return &Style{
 		iconFont:    extended.NimbusRomanBold.New(),
-		contentFont: standard.Helvetica.New(),
+		ContentFont: standard.Helvetica.New(),
 		reset:       reset,
 	}
 }

@@ -52,7 +52,7 @@ func (w *Writer) merge(a, b []*nodeInfo) []*nodeInfo {
 	}
 
 	nextDepth := b[0].depth
-	for len(a) > 1 && a[len(a)-1].depth < nextDepth {
+	for len(a) > 1 && a[len(a)-1].depth < nextDepth && w.err == nil {
 		start := max(len(a)-maxDegree, 0)
 		for start > 0 && a[start-1].depth == a[start].depth {
 			start++
@@ -83,7 +83,7 @@ func (w *Writer) merge(a, b []*nodeInfo) []*nodeInfo {
 
 	for depth := nextDepth; ; depth++ {
 		changed := false
-		for end >= start+maxDegree {
+		for end >= start+maxDegree && w.err == nil {
 			a = w.mergeNodes(a, start, start+maxDegree)
 			start++
 			end -= maxDegree - 1

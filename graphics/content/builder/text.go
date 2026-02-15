@@ -130,7 +130,7 @@ func (b *Builder) TextSetFont(f font.Instance, size float64) {
 		return
 	}
 
-	name := b.getFontName(f)
+	name := b.FontName(f)
 	b.emit(content.OpTextSetFont, name, pdf.Number(size))
 }
 

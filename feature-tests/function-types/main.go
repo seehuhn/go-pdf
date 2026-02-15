@@ -399,6 +399,7 @@ func (w *writer) test2DStrip(f pdf.Function) error {
 	w.page.TextFirstLine(margin, area1.LLy+5)
 	w.page.TextShow("function")
 	w.page.TextEnd()
+	w.page.PopGraphicsState()
 
 	s := &shading.Type1{
 		ColorSpace: cs,
@@ -416,6 +417,7 @@ func (w *writer) test2DStrip(f pdf.Function) error {
 	w.page.TextFirstLine(margin, area2.LLy+5)
 	w.page.TextShow("image")
 	w.page.TextEnd()
+	w.page.PopGraphicsState()
 
 	img := &imageStrip{
 		width:  int(math.Round(area2.Dx())),
@@ -478,6 +480,7 @@ func (w *writer) test1DStrip(f pdf.Function) error {
 	w.page.TextFirstLine(margin, area1.LLy+5)
 	w.page.TextShow("function")
 	w.page.TextEnd()
+	w.page.PopGraphicsState()
 
 	s := &shading.Type2{
 		ColorSpace: cs,
@@ -498,6 +501,7 @@ func (w *writer) test1DStrip(f pdf.Function) error {
 	w.page.TextFirstLine(margin, area2.LLy+5)
 	w.page.TextShow("image")
 	w.page.TextEnd()
+	w.page.PopGraphicsState()
 
 	img := &axialImageStrip{
 		width:  int(math.Round(area2.Dx())),

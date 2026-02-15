@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"slices"
 
 	"seehuhn.de/go/geom/vec"
 
@@ -80,6 +81,10 @@ func createDocument(filename string) error {
 		style: fallback.NewStyle(),
 	}
 
+	// register the content font in the page resources for DA-based rendering
+	fontName := page.FontName(w.style.ContentFont)
+	da := fmt.Sprintf("/%s 12 Tf 0 g", fontName)
+
 	leStyles := []annotation.LineEndingStyle{
 		annotation.LineEndingStyleSquare,
 		annotation.LineEndingStyleCircle,
@@ -116,6 +121,7 @@ func createDocument(filename string) error {
 		}
 
 		template := &annotation.FreeText{
+			DefaultAppearance: da,
 			Common: annotation.Common{
 				Rect: pdf.Rectangle{
 					LLx: pdf.Round(leftX0, 2),
@@ -164,9 +170,12 @@ func (w *writer) addAnnotationPair(left *annotation.FreeText) {
 	deltaX := rightX0 - leftX0
 	right.Rect.LLx += deltaX
 	right.Rect.URx += deltaX
-	right.CalloutLine[0] = vec.Vec2{X: pdf.Round(mid2, 2), Y: right.CalloutLine[0].Y}    // mid2 instead of mid1, keep same Y
-	right.CalloutLine[1] = vec.Vec2{X: pdf.Round(mid2+50, 2), Y: right.CalloutLine[1].Y} // mid2+50 instead of mid1-50, keep same Y
-	right.CalloutLine[2] = vec.Vec2{X: pdf.Round(rightX0, 2), Y: right.CalloutLine[2].Y} // rightX0 instead of leftX1, keep same Y
+	right.Margin = slices.Clone(right.Margin)
+	right.CalloutLine = []vec.Vec2{
+		{X: pdf.Round(mid2, 2), Y: left.CalloutLine[0].Y},    // mid2 instead of mid1, keep same Y
+		{X: pdf.Round(mid2+50, 2), Y: left.CalloutLine[1].Y}, // mid2+50 instead of mid1-50, keep same Y
+		{X: pdf.Round(rightX0, 2), Y: left.CalloutLine[2].Y}, // rightX0 instead of leftX1, keep same Y
+	}
 
 	w.style.AddAppearance(right)
 

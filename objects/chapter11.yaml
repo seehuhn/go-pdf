@@ -1,336 +1,47 @@
 chapter: 11
-title: Rendering
+title: Transparency
 types:
-- name: HalftoneType1
-  goType: graphics/halftone.Type1
-  pdfType: Halftone
+- name: SoftMaskAlpha
+  purpose: "soft mask with alpha channel"
+  goType:
+  pdfType: Mask
   pdfRepr: dict
-  introduced: '1.2'
-  specTable: Table 128
+  introduced: '1.4'
+  specTable: Table 142
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
-    introduced: '1.2'
+    introduced: '1.4'
     possibleValues:
-    - Halftone
-    notes: Table 128
-  - goName: null
-    pdfKey: HalftoneType
-    pdfType: integer
-    required: true
-    introduced: '1.2'
-    possibleValues:
-    - '1'
-  - goName: null
-    pdfKey: HalftoneName
-    pdfType: byte-string
-    required: false
-    introduced: '1.2'
-  - goName: Frequency
-    pdfKey: Frequency
-    pdfType: number
-    required: true
-    introduced: '1.2'
-    possibleValues:
-    - fn:Eval(@Frequency>=0)
-    goType: float64
-    purpose: Frequency is the screen frequency (halftone cells per inch).
-  - goName: Angle
-    pdfKey: Angle
-    pdfType: number
-    required: true
-    introduced: '1.2'
-    goType: float64
-    purpose: 'Angle is the screen angle in (degrees counterclockwise) relative to the
-
-      device coordinate system.'
-  - goName: SpotFunction
-    pdfKey: SpotFunction
-    pdfType: array;fn:SinceVersion(1.3,dictionary);name;stream
-    required: true
-    introduced: '1.2'
-    possibleValues:
-    - SimpleDot
-    - InvertedSimpleDot
-    - DoubleDot
-    - InvertedDoubleDot
-    - CosineDot
-    - Double
-    - InvertedDouble
-    - Line
-    - LineX
-    - LineY
-    - Round
-    - Ellipse
-    - EllipseA
-    - InvertedEllipseA
-    - EllipseB
-    - EllipseC
-    - InvertedEllipseC
-    - Square
-    - Cross
-    - Rhomboid
-    - Diamond
-    refTypes:
-    - ArrayOfFunctions
-    - fn:SinceVersion(1.3
-    - FunctionType2)
-    - fn:SinceVersion(1.3
-    - FunctionType3)
-    - FunctionType0
-    - fn:SinceVersion(1.3
-    - FunctionType4)
-    goType: pdf.Function
-    purpose: 'SpotFunction defines the pixel adjustment order for gray levels. This
-
-      can either be a predefined spot function (e.g., [SimpleDot], [Round],
-
-      [Ellipse]) or a custom function object.  The function must map the cell
-
-      [-1, 1]x[-1, 1] to [-1, 1].
-
-
-      Note that this library does not support writing halftone dictionaries
-
-      with non-standard named spot functions.'
-  - goName: AccurateScreens
-    pdfKey: AccurateScreens
-    pdfType: boolean
-    required: false
-    default: false
-    introduced: '1.2'
-    goType: bool
-    purpose: 'AccurateScreens enables a more precise but computationally expensive
-
-      halftone algorithm.'
-  - goName: TransferFunction
-    pdfKey: TransferFunction
-    pdfType: fn:SinceVersion(1.3,dictionary);name;stream
-    required: fn:IsRequired(parent::@HalftoneType==5)
-    introduced: '1.2'
-    possibleValues:
-    - Identity
-    refTypes:
-    - fn:SinceVersion(1.3
-    - FunctionType2)
-    - fn:SinceVersion(1.3
-    - FunctionType3)
-    - FunctionType0
-    - fn:SinceVersion(1.3
-    - FunctionType4)
-    goType: pdf.Function
-    purpose: 'TransferFunction (optional) overrides the current transfer function for
-
-      this component. Use [function.Identity] for the identity function.'
-  writeMethod: (*Type1).Embed
-  goPackage: halftone
-  goRepr: struct
-  specSection: 10.6.3
-- name: HalftoneType10
-  goType: graphics/halftone.Type10
-  pdfType: Halftone
-  pdfRepr: stream
-  introduced: '1.2'
-  specTable: Table 5
-  fields:
-  - goName: null
-    pdfKey: Type
+    - Mask
+    notes: Table 142
+  - goName:
+    pdfKey: S
     pdfType: name
-    required: false
-    introduced: '1.2'
-    possibleValues:
-    - Halftone
-    notes: Table 5 and Table 130
-  - goName: null
-    pdfKey: HalftoneType
-    pdfType: integer
     required: true
-    introduced: '1.2'
+    introduced: '1.4'
     possibleValues:
-    - '10'
-  - goName: null
-    pdfKey: HalftoneName
-    pdfType: byte-string
-    required: false
-    introduced: '1.2'
-  - goName: null
-    pdfKey: Xsquare
-    pdfType: integer
+    - Alpha
+  - goName:
+    pdfKey: G
+    pdfType: stream
     required: true
-    introduced: '1.2'
-    possibleValues:
-    - fn:Eval(@Xsquare>0)
-  - goName: null
-    pdfKey: Ysquare
-    pdfType: integer
-    required: true
-    introduced: '1.2'
-    possibleValues:
-    - fn:Eval(@Ysquare>0)
-  - goName: TransferFunction
-    pdfKey: TransferFunction
-    pdfType: fn:SinceVersion(1.3,dictionary);name;stream
-    required: fn:IsRequired(parent::@HalftoneType==5)
-    introduced: '1.2'
-    possibleValues:
-    - Identity
+    introduced: '1.4'
     refTypes:
-    - fn:SinceVersion(1.3
-    - FunctionType2)
-    - fn:SinceVersion(1.3
-    - FunctionType3)
-    - FunctionType0
-    - fn:SinceVersion(1.3
-    - FunctionType4)
-    goType: pdf.Function
-    purpose: 'TransferFunction (optional) overrides the current transfer function for
-
-      this component. Use [function.Identity] for the identity function.'
-  - goName: null
-    pdfKey: Length
-    pdfType: integer
-    required: true
-    introduced: '1.3'
-  - goName: null
-    pdfKey: Filter
-    pdfType: array;name
+    - XObjectFormType1
+  - goName:
+    pdfKey: BC
+    pdfType: array
     required: false
-    introduced: '1.3'
-    possibleValues:
-    - ASCIIHexDecode
-    - ASCII85Decode
-    - LZWDecode
-    - FlateDecode
-    - RunLengthDecode
-    - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
-    pdfKey: DecodeParms
-    pdfType: array;dictionary
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - ArrayOfDecodeParams
-    - FilterLZWDecode
-    - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
-    pdfKey: F
-    pdfType: dictionary;string
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - FileSpecification
-  - goName: null
-    pdfKey: FFilter
-    pdfType: array;name
-    required: false
-    introduced: '1.3'
-    possibleValues:
-    - ASCIIHexDecode
-    - ASCII85Decode
-    - LZWDecode
-    - FlateDecode
-    - RunLengthDecode
-    - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
-    pdfKey: FDecodeParms
-    pdfType: array;dictionary
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - ArrayOfDecodeParams
-    - FilterLZWDecode
-    - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
-    pdfKey: DL
-    pdfType: integer
-    required: false
-    introduced: '1.5'
-  writeMethod: (*Type10).Embed
-  goPackage: halftone
-  goRepr: struct
-  specSection: 10.6.4
-- name: HalftoneType16
-  goType: graphics/halftone.Type16
-  pdfType: Halftone
-  pdfRepr: stream
-  introduced: '1.3'
-  specTable: Table 5
-  fields:
-  - goName: null
-    pdfKey: Type
-    pdfType: name
-    required: false
-    introduced: '1.3'
-    possibleValues:
-    - Halftone
-    notes: Table 5 and Table 131
-  - goName: null
-    pdfKey: HalftoneType
-    pdfType: integer
-    required: true
-    introduced: '1.3'
-    possibleValues:
-    - '16'
-  - goName: null
-    pdfKey: HalftoneName
-    pdfType: byte-string
-    required: false
-    introduced: '1.3'
-  - goName: Width
-    pdfKey: Width
-    pdfType: integer
-    required: true
-    introduced: '1.3'
-    possibleValues:
-    - fn:Eval(@Width>0)
-    goType: int
-    purpose: Width is the width of the first (or only) rectangle in device pixels.
-  - goName: Height
-    pdfKey: Height
-    pdfType: integer
-    required: true
-    introduced: '1.3'
-    possibleValues:
-    - fn:Eval(@Height>0)
-    goType: int
-    purpose: Height is the height of the first (or only) rectangle in device pixels.
-  - goName: Width2
-    pdfKey: Width2
-    pdfType: integer
-    required: false
-    introduced: '1.3'
-    possibleValues:
-    - fn:Eval(@Width2>0)
-    goType: int
-    purpose: 'Width2 (optional) is the width of the second rectangle.
-
-      If present, Height2 must also be present.'
-  - goName: Height2
-    pdfKey: Height2
-    pdfType: integer
-    required: false
-    introduced: '1.3'
-    possibleValues:
-    - fn:Eval(@Height2>0)
-    goType: int
-    purpose: 'Height2 (optional) is the height of the second rectangle.
-
-      If present, Width2 must also be present.'
-  - goName: TransferFunction
-    pdfKey: TransferFunction
+    introduced: '1.4'
+  - goName:
+    pdfKey: TR
     pdfType: dictionary;name;stream
-    required: fn:IsRequired(parent::@HalftoneType==5)
-    introduced: '1.3'
+    required: false
+    default: '[];[Identity];[]'
+    introduced: '1.4'
     possibleValues:
     - Identity
     refTypes:
@@ -338,389 +49,281 @@ types:
     - FunctionType3
     - FunctionType0
     - FunctionType4
-    goType: pdf.Function
-    purpose: 'TransferFunction (optional) overrides the current transfer function for
-
-      this component. Use [function.Identity] for the identity function.'
-  - goName: null
-    pdfKey: Length
-    pdfType: integer
-    required: true
-    introduced: '1.3'
-  - goName: null
-    pdfKey: Filter
-    pdfType: array;name
-    required: false
-    introduced: '1.3'
-    possibleValues:
-    - ASCIIHexDecode
-    - ASCII85Decode
-    - LZWDecode
-    - FlateDecode
-    - RunLengthDecode
-    - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
-    pdfKey: DecodeParms
-    pdfType: array;dictionary
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - ArrayOfDecodeParams
-    - FilterLZWDecode
-    - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
-    pdfKey: F
-    pdfType: dictionary;string
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - FileSpecification
-  - goName: null
-    pdfKey: FFilter
-    pdfType: array;name
-    required: false
-    introduced: '1.3'
-    possibleValues:
-    - ASCIIHexDecode
-    - ASCII85Decode
-    - LZWDecode
-    - FlateDecode
-    - RunLengthDecode
-    - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
-    pdfKey: FDecodeParms
-    pdfType: array;dictionary
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - ArrayOfDecodeParams
-    - FilterLZWDecode
-    - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
-    pdfKey: DL
-    pdfType: integer
-    required: false
-    introduced: '1.5'
-  writeMethod: (*Type16).Embed
-  goPackage: halftone
-  goRepr: struct
-  specSection: 10.6.4
-- name: HalftoneType5
-  goType: graphics/halftone.Type5
-  pdfType: Halftone
+- name: SoftMaskLuminosity
+  purpose: "soft mask with luminosity channel"
+  goType:
+  pdfType: Mask
   pdfRepr: dict
-  introduced: '1.2'
-  specTable: Table 132
+  introduced: '1.4'
+  specTable: Table 142
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
-    introduced: '1.2'
+    introduced: '1.4'
     possibleValues:
-    - Halftone
-    notes: Table 132
-  - goName: null
-    pdfKey: HalftoneType
-    pdfType: integer
+    - Mask
+    notes: Table 142
+  - goName:
+    pdfKey: S
+    pdfType: name
     required: true
-    introduced: '1.2'
+    introduced: '1.4'
     possibleValues:
-    - '5'
-  - goName: null
-    pdfKey: HalftoneName
-    pdfType: byte-string
-    required: false
-    introduced: '1.2'
-  - goName: Default
-    pdfKey: Default
-    pdfType: dictionary;stream
+    - Luminosity
+  - goName:
+    pdfKey: G
+    pdfType: stream
     required: true
-    introduced: '1.2'
+    introduced: '1.4'
     refTypes:
-    - HalftoneType1
-    - HalftoneType6
-    - HalftoneType10
-    - fn:SinceVersion(1.3
-    - HalftoneType16)
-    goType: graphics.Halftone
-    purpose: 'Default is the halftone for colorants without specific entries.
-
-      Must not be Type 5. Required to have transfer function if nonprimary colorants exist.'
-  - goName: null
-    pdfKey: '*'
-    pdfType: dictionary;stream
+    - XObjectFormType1
+  - goName:
+    pdfKey: BC
+    pdfType: array
     required: false
-    introduced: '1.2'
+    introduced: '1.4'
+  - goName:
+    pdfKey: TR
+    pdfType: dictionary;name;stream
+    required: false
+    default: '[];[Identity];[]'
+    introduced: '1.4'
+    possibleValues:
+    - Identity
     refTypes:
-    - HalftoneType1
-    - HalftoneType6
-    - HalftoneType10
-    - fn:SinceVersion(1.3
-    - HalftoneType16)
-  writeMethod: (*Type5).Embed
-  goPackage: halftone
-  goRepr: struct
-  specSection: 10.6.5.1
-- name: HalftoneType6
-  goType: graphics/halftone.Type6
-  pdfType: Halftone
+    - FunctionType2
+    - FunctionType3
+    - FunctionType0
+    - FunctionType4
+- name: XObjectImageSoftMask
+  purpose: "soft-masked image XObject"
+  goType: graphics/image.Dict
+  pdfType: XObject
   pdfRepr: stream
-  introduced: '1.2'
-  specTable: Table 129
+  introduced: '1.4'
+  specTable: Table 143
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
-    introduced: '1.2'
+    introduced: '1.4'
     possibleValues:
-    - Halftone
-    notes: Table 129
-  - goName: null
-    pdfKey: HalftoneType
-    pdfType: integer
+    - XObject
+    notes: Table87 and Table 143 and Table 144
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
     required: true
-    introduced: '1.2'
+    introduced: '1.4'
     possibleValues:
-    - '6'
-  - goName: null
-    pdfKey: HalftoneName
-    pdfType: byte-string
-    required: false
-    introduced: '1.2'
+    - Image
   - goName: Width
     pdfKey: Width
     pdfType: integer
     required: true
-    introduced: '1.2'
-    possibleValues:
-    - fn:Eval(@Width>0)
+    introduced: '1.4'
     goType: int
-    purpose: Width is the threshold array width in device pixels.
+    purpose: Width is the width of the image in pixels.
   - goName: Height
     pdfKey: Height
     pdfType: integer
     required: true
-    introduced: '1.2'
-    possibleValues:
-    - fn:Eval(@Height>=0)
+    introduced: '1.4'
     goType: int
-    purpose: Height is the threshold array height in device pixels.
-  - goName: TransferFunction
-    pdfKey: TransferFunction
-    pdfType: fn:SinceVersion(1.3,dictionary);name;stream
-    required: false
-    introduced: '1.2'
+    purpose: Height is the height of the image in pixels.
+  - goName: ColorSpace
+    pdfKey: ColorSpace
+    pdfType: array;name
+    required: true
+    introduced: '1.4'
     possibleValues:
-    - Identity
+    - DeviceGray
     refTypes:
-    - fn:SinceVersion(1.3
-    - FunctionType2)
-    - fn:SinceVersion(1.3
-    - FunctionType3)
-    - FunctionType0
-    - fn:SinceVersion(1.3
-    - FunctionType4)
-    goType: pdf.Function
-    purpose: 'TransferFunction (optional) overrides the current transfer function for
+    - DeviceGrayColorSpace
+    goType: color.Space
+    purpose: 'ColorSpace is the color space in which image samples are specified.
 
-      this component. Use [function.Identity] for the identity function.'
-  - goName: null
+      It can be any type of color space except Pattern.'
+  - goName: BitsPerComponent
+    pdfKey: BitsPerComponent
+    pdfType: integer
+    required: fn:IsRequired(fn:Not(fn:Contains(@Filter,JPXDecode) || (@ImageMask==true)))
+    introduced: '1.4'
+    possibleValues:
+    - fn:RequiredValue((fn:Contains(@Filter,CCITTFaxDecode) || fn:Contains(@Filter,JBIG2Decode)),1)
+    - '2'
+    - '4'
+    - fn:RequiredValue((fn:Contains(@Filter,RunLengthDecode) || fn:Contains(@Filter,DCTDecode)),8)
+    - fn:SinceVersion(1.5,16)
+    goType: int
+    purpose: 'BitsPerComponent is the number of bits used to represent each color component.
+
+      The value must be 1, 2, 4, 8, or (from PDF 1.5) 16.'
+  - goName: Intent
+    pdfKey: Intent
+    pdfType: name
+    required: false
+    introduced: '1.4'
+    goType: graphics.RenderingIntent
+    purpose: 'Intent (optional) is the name of a color rendering intent to be used in
+
+      rendering the image.'
+  - goName:
+    pdfKey: ImageMask
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.4'
+    notes: Table 143
+  - goName: Name
+    pdfKey: Name
+    pdfType: name
+    required: false
+    introduced: '1.4'
+    deprecated: '2.0'
+    goType: pdf.Name
+    purpose: 'Name is deprecated and should be left empty.
+
+      Only used in PDF 1.0 where it was the name used to reference the image
+
+      mask from within content streams.'
+  - goName: Decode
+    pdfKey: Decode
+    pdfType: array
+    required: false
+    default: '[0 1]'
+    introduced: '1.4'
+    goType: '[]float64'
+    purpose: 'Decode (optional) is an array of numbers describing how to map image
+
+      samples into the range of values appropriate for the image''s color
+
+      space. The slice must have twice the number of color components in the
+
+      ColorSpace.'
+  - goName: Interpolate
+    pdfKey: Interpolate
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.4'
+    goType: bool
+    purpose: 'Interpolate indicates whether image interpolation should be performed by
+
+      a PDF processor.'
+  - goName:
+    pdfKey: Matte
+    pdfType: array
+    required: false
+    introduced: '1.4'
+    notes: Table 144
+  - goName: Metadata
+    pdfKey: Metadata
+    pdfType: stream
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - Metadata
+    goType: '*metadata.Stream'
+    purpose: Metadata (optional) is a metadata stream containing metadata for the image.
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
-    introduced: '1.3'
-  - goName: null
+    introduced: '1.4'
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
-    introduced: '1.3'
+    introduced: '1.4'
     possibleValues:
     - ASCIIHexDecode
     - ASCII85Decode
     - LZWDecode
     - FlateDecode
     - RunLengthDecode
+    - CCITTFaxDecode
+    - JBIG2Decode
+    - DCTDecode
+    - fn:SinceVersion(1.5,JPXDecode)
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
-    introduced: '1.3'
+    introduced: '1.4'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - FilterCCITTFaxDecode
+    - FilterJBIG2Decode
+    - FilterDCTDecode
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: F
     pdfType: dictionary;string
     required: false
-    introduced: '1.3'
+    introduced: '1.4'
     refTypes:
     - FileSpecification
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
-    introduced: '1.3'
+    introduced: '1.4'
     possibleValues:
     - ASCIIHexDecode
     - ASCII85Decode
     - LZWDecode
     - FlateDecode
     - RunLengthDecode
+    - CCITTFaxDecode
+    - JBIG2Decode
+    - DCTDecode
+    - fn:SinceVersion(1.5,JPXDecode)
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
-    introduced: '1.3'
+    introduced: '1.4'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - FilterCCITTFaxDecode
+    - FilterJBIG2Decode
+    - FilterDCTDecode
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: DL
     pdfType: integer
     required: false
     introduced: '1.5'
-  writeMethod: (*Type6).Embed
-  goPackage: halftone
-  goRepr: struct
-  specSection: 10.6.4
-- name: Transition
-  goType: page/transition.Transition
-  pdfType: Trans
-  pdfRepr: dict
-  introduced: '1.1'
-  specTable: Table 164
-  fields:
-  - goName: null
-    pdfKey: Type
-    pdfType: name
-    required: false
-    introduced: '1.1'
-    possibleValues:
-    - Trans
-    notes: Table 164
-  - goName: Style
-    pdfKey: S
-    pdfType: name
-    required: false
-    default: R
-    introduced: '1.1'
-    possibleValues:
-    - Split
-    - Blinds
-    - Box
-    - Wipe
-    - Dissolve
-    - Glitter
-    - R
-    - Fly
-    - Push
-    - Cover
-    - Uncover
-    - Fade
-    goType: Style
-    purpose: 'Style specifies the transition style.
-
-      Default: StyleReplace (no effect).'
-  - goName: Duration
-    pdfKey: D
-    pdfType: number
-    required: false
-    default: '1'
-    introduced: '1.1'
-    possibleValues:
-    - fn:Eval(@D>=0)
-    goType: float64
-    purpose: 'Duration is the duration of the transition effect in seconds.
-
-      Default: 1.0.'
-  - goName: null
-    pdfKey: Dm
-    pdfType: name
-    required: false
-    default: H
-    introduced: '1.1'
-    possibleValues:
-    - H
-    - V
-  - goName: null
-    pdfKey: M
-    pdfType: name
-    required: false
-    default: I
-    introduced: '1.1'
-    possibleValues:
-    - I
-    - O
-  - goName: null
-    pdfKey: Di
-    pdfType: integer;name
-    required: false
-    default: '[0];[]'
-    introduced: '1.1'
-    possibleValues:
-    - '0'
-    - '90'
-    - '180'
-    - '270'
-    - '315'
-    - None
-  - goName: null
-    pdfKey: SS
-    pdfType: number
-    required: false
-    default: '1.0'
-    introduced: '1.5'
-  - goName: null
-    pdfKey: B
-    pdfType: boolean
-    required: false
-    default: false
-    introduced: '1.5'
-  readFunc: transition.Extract
-  writeMethod: (*Transition).Embed
-  goPackage: transition
-  goRepr: struct
-  specSection: 12.4.4
-- name: TrapRegion
-  goType: null
-  pdfRepr: dict
-  introduced: '1.3'
-  fields:
-  - goName: null
-    pdfKey: TP
-    pdfType: name
-    required: true
-    introduced: '1.3'
-    deprecated: '2.0'
-    notes: Adobe TechNote 5620 Clause 5.34 - trapping parameters
-  - goName: null
-    pdfKey: TZ
+  - goName: AssociatedFiles
+    pdfKey: AF
     pdfType: array
     required: false
-    introduced: '1.3'
-    deprecated: '2.0'
+    introduced: '2.0'
     refTypes:
-    - ArrayOf_ArrayOfNumbers
-    notes: trap zone
+    - type: AFFileSpecification
+      collection: array
+    goType: '[]*file.Specification'
+    purpose: 'AssociatedFiles (optional; PDF 2.0) is an array of files associated with
+
+      the image. The relationship that the associated files have to the
+
+      XObject is supplied by the Specification.AFRelationship field.
+
+
+      This corresponds to the AF entry in the image dictionary.'
+  readFunc: image.ExtractDict
+  fileDependent: true
+  writeMethod: (*Dict).Encode
+  goPackage: image
+  goRepr: struct
+  specSection: 8.9.5

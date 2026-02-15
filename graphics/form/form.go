@@ -98,52 +98,52 @@ func (f *Form) Subtype() pdf.Name {
 }
 
 // Embed implements the [pdf.Embedder] interface for form XObjects.
-func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+func (f *Form) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	if err := f.validate(); err != nil {
 		return nil, err
 	}
 
 	// embed resources
-	resObj, err := f.Res.Embed(rm)
+	resObj, err := e.Embed(f.Res)
 	if err != nil {
 		return nil, err
 	}
 
-	ref := rm.Alloc()
+	ref := e.Alloc()
 
 	dict := pdf.Dict{
 		"Subtype":   pdf.Name("Form"),
 		"BBox":      &f.BBox,
 		"Resources": resObj,
 	}
-	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
+	if e.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("XObject")
 	}
 	if f.Matrix != matrix.Identity && f.Matrix != matrix.Zero {
 		dict["Matrix"] = toPDF(f.Matrix[:])
 	}
 	if f.Group != nil {
-		if err := pdf.CheckVersion(rm.Out(), "transparency group XObject", pdf.V1_4); err != nil {
+		if err := pdf.CheckVersion(e.Out(), "transparency group XObject", pdf.V1_4); err != nil {
 			return nil, err
 		}
-		groupObj, err := rm.Embed(f.Group)
+		groupObj, err := e.Embed(f.Group)
 		if err != nil {
 			return nil, err
 		}
 		dict["Group"] = groupObj
 	}
 	if f.Metadata != nil {
-		rmEmbedded, err := rm.Embed(f.Metadata)
+		embedded, err := e.Embed(f.Metadata)
 		if err != nil {
 			return nil, err
 		}
-		dict["Metadata"] = rmEmbedded
+		dict["Metadata"] = embedded
 	}
 	if f.PieceInfo != nil {
 		if f.LastModified.IsZero() {
 			return nil, errors.New("missing LastModified")
 		}
-		pieceInfoObj, err := rm.Embed(f.PieceInfo)
+		pieceInfoObj, err := e.Embed(f.PieceInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -156,10 +156,10 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	if f.OptionalContent != nil {
-		if err := pdf.CheckVersion(rm.Out(), "form XObject OC entry", pdf.V1_5); err != nil {
+		if err := pdf.CheckVersion(e.Out(), "form XObject OC entry", pdf.V1_5); err != nil {
 			return nil, err
 		}
-		embedded, err := rm.Embed(f.OptionalContent)
+		embedded, err := e.Embed(f.OptionalContent)
 		if err != nil {
 			return nil, err
 		}
@@ -167,10 +167,10 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	if f.Measure != nil {
-		if err := pdf.CheckVersion(rm.Out(), "form XObject Measure entry", pdf.V2_0); err != nil {
+		if err := pdf.CheckVersion(e.Out(), "form XObject Measure entry", pdf.V2_0); err != nil {
 			return nil, err
 		}
-		embedded, err := rm.Embed(f.Measure)
+		embedded, err := e.Embed(f.Measure)
 		if err != nil {
 			return nil, err
 		}
@@ -179,10 +179,10 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// PtData (optional; PDF 2.0)
 	if f.PtData != nil {
-		if err := pdf.CheckVersion(rm.Out(), "form XObject PtData entry", pdf.V2_0); err != nil {
+		if err := pdf.CheckVersion(e.Out(), "form XObject PtData entry", pdf.V2_0); err != nil {
 			return nil, err
 		}
-		embedded, err := rm.Embed(f.PtData)
+		embedded, err := e.Embed(f.PtData)
 		if err != nil {
 			return nil, err
 		}
@@ -190,19 +190,19 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	if key, ok := f.StructParent.Get(); ok {
-		if err := pdf.CheckVersion(rm.Out(), "form XObject StructParent entry", pdf.V1_3); err != nil {
+		if err := pdf.CheckVersion(e.Out(), "form XObject StructParent entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
 		dict["StructParent"] = pdf.Integer(key)
 	}
 
 	if f.AssociatedFiles != nil {
-		if err := pdf.CheckVersion(rm.Out(), "form XObject AF entry", pdf.V2_0); err != nil {
+		if err := pdf.CheckVersion(e.Out(), "form XObject AF entry", pdf.V2_0); err != nil {
 			return nil, err
 		}
 
 		// Validate each file specification can be used as associated file
-		version := pdf.GetVersion(rm.Out())
+		version := pdf.GetVersion(e.Out())
 		for i, spec := range f.AssociatedFiles {
 			if spec == nil {
 				continue
@@ -216,7 +216,7 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		var afArray pdf.Array
 		for _, spec := range f.AssociatedFiles {
 			if spec != nil {
-				embedded, err := rm.Embed(spec)
+				embedded, err := e.Embed(spec)
 				if err != nil {
 					return nil, err
 				}
@@ -226,7 +226,7 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["AF"] = afArray
 	}
 
-	stm, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
+	stm, err := e.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +236,7 @@ func (f *Form) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		ct = content.TransparencyGroup
 	}
 	if f.Content != nil {
-		err = content.Write(stm, f.Content, pdf.GetVersion(rm.Out()), ct, f.Res)
+		err = content.Write(stm, f.Content, pdf.GetVersion(e.Out()), ct, f.Res)
 		if err != nil {
 			return nil, err
 		}

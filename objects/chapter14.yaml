@@ -2,12 +2,13 @@ chapter: 14
 title: Document Interchange
 types:
 - name: AAPL_ST
-  goType: null
+  purpose: "Apple-specific structure tree attributes"
+  goType:
   pdfType: Style
   pdfRepr: dict
   introduced: fn:Extension(AAPL,1.2)
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -15,27 +16,25 @@ types:
     possibleValues:
     - Style
     notes: AAPL:ST in Graphics State
-  - goName: null
+  - goName:
     pdfKey: Subtype
     pdfType: name
     required: false
     introduced: fn:Extension(AAPL,1.2)
     possibleValues:
     - Shadow
-  - goName: null
+  - goName:
     pdfKey: Offset
     pdfType: array
     required: false
     introduced: fn:Extension(AAPL,1.2)
-    refTypes:
-    - ArrayOf_2Numbers
     notes: X,Y offset for drop shadow
-  - goName: null
+  - goName:
     pdfKey: Radius
     pdfType: number
     required: false
     introduced: fn:Extension(AAPL,1.2)
-  - goName: null
+  - goName:
     pdfKey: ColorSpace
     pdfType: array;name
     required: false
@@ -45,36 +44,35 @@ types:
     - DeviceRGB
     - DeviceGray
     refTypes:
-    - fn:SinceVersion(1.1
-    - CalGrayColorSpace)
-    - fn:SinceVersion(1.1
-    - CalRGBColorSpace)
-    - fn:SinceVersion(1.1
-    - LabColorSpace)
-    - fn:SinceVersion(1.3
-    - ICCBasedColorSpace)
+    - type: CalGrayColorSpace
+      since: '1.1'
+    - type: CalRGBColorSpace
+      since: '1.1'
+    - type: LabColorSpace
+      since: '1.1'
+    - type: ICCBasedColorSpace
+      since: '1.3'
     - IndexedColorSpace
     notes: unknown if supports array form for Device color spaces but never seen so not indicated as supported
-  - goName: null
+  - goName:
     pdfKey: Color
     pdfType: array
     required: false
     introduced: fn:Extension(AAPL,1.2)
-    refTypes:
-    - ArrayOfNumbersGeneral
 - name: ActualTextPropertyList
+  purpose: "actual text properties for a structure element"
   goType: property.ActualText
   pdfRepr: dict
   introduced: '1.4'
   specSection: '14.9'
   fields:
-  - goName: null
+  - goName:
     pdfKey: MCID
     pdfType: integer
     required: false
     introduced: '1.4'
     notes: Marked-content identifier for structure
-  - goName: null
+  - goName:
     pdfKey: ActualText
     pdfType: text-string
     required: true
@@ -82,13 +80,15 @@ types:
     notes: Replacement text for content
   goPackage: property
   goRepr: struct
+  fileDependent: false
   writeMethod: (*ActualText).Embed
 - name: AFEmbeddedFileParameter
-  goType: null
+  purpose: "parameters for an associated embedded file"
+  goType:
   pdfRepr: dict
   introduced: '1.7'
   fields:
-  - goName: null
+  - goName:
     pdfKey: Size
     pdfType: integer
     required: false
@@ -96,17 +96,17 @@ types:
     possibleValues:
     - fn:Eval(@Size>=0)
     notes: Table 45
-  - goName: null
+  - goName:
     pdfKey: CreationDate
     pdfType: date
     required: false
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: ModDate
     pdfType: date
     required: true
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: Mac
     pdfType: dictionary
     required: false
@@ -114,20 +114,21 @@ types:
     deprecated: '2.0'
     refTypes:
     - Mac
-  - goName: null
+  - goName:
     pdfKey: CheckSum
     pdfType: byte-string
     required: false
     introduced: '1.7'
     notes: MD5 checksum - https://github.com/pdf-association/pdf-issues/issues/382
 - name: AFEmbeddedFileStream
-  goType: null
+  purpose: "stream containing an associated embedded file"
+  goType:
   pdfType: EmbeddedFile
   pdfRepr: stream
   introduced: '1.7'
   specTable: Table 5
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -135,26 +136,25 @@ types:
     possibleValues:
     - EmbeddedFile
     notes: Table 5 and Table 44
-  - goName: null
+  - goName:
     pdfKey: Subtype
     pdfType: name
     required: true
     introduced: '1.7'
-    notes: https://github.com/pdf-association/pdf-issues/issues/155, https://github.com/pdf-association/pdf-issues/issues/156
-      - also check every page/Annots/RichMediaContent/Assets
-  - goName: null
+    notes: https://github.com/pdf-association/pdf-issues/issues/155, https://github.com/pdf-association/pdf-issues/issues/156 - also check every page/Annots/RichMediaContent/Assets
+  - goName:
     pdfKey: Params
     pdfType: dictionary
     required: true
     introduced: '1.7'
     refTypes:
     - AFEmbeddedFileParameter
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -170,31 +170,28 @@ types:
     - DCTDecode
     - fn:SinceVersion(1.5,JPXDecode)
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.7'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
     - FilterCCITTFaxDecode
-    - fn:SinceVersion(1.4
-    - FilterJBIG2Decode)
+    - type: FilterJBIG2Decode
+      since: '1.4'
     - FilterDCTDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: F
     pdfType: dictionary;string
     required: false
     introduced: '1.7'
     refTypes:
     - FileSpecification
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -210,40 +207,38 @@ types:
     - DCTDecode
     - fn:SinceVersion(1.5,JPXDecode)
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.7'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
     - FilterCCITTFaxDecode
-    - fn:SinceVersion(1.4
-    - FilterJBIG2Decode)
+    - type: FilterJBIG2Decode
+      since: '1.4'
     - FilterDCTDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: DL
     pdfType: integer
     required: false
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: Mail_MediaTypeParameters
     pdfType: text-string
     required: false
     introduced: fn:Extension(EAPDF_1,1.7)
     notes: EA=PDF 1.0 and https://github.com/pdf-association/pdf-issues/issues/155
 - name: AFFileSpecEF
-  goType: null
+  purpose: "embedded file streams in an associated file specification"
+  goType:
   pdfRepr: dict
   introduced: '1.7'
   fields:
-  - goName: null
+  - goName:
     pdfKey: F
     pdfType: stream
     required: fn:IsRequired(fn:Not(fn:IsPresent(UF)))
@@ -251,7 +246,7 @@ types:
     refTypes:
     - AFEmbeddedFileStream
     notes: Table 43, EF cell
-  - goName: null
+  - goName:
     pdfKey: UF
     pdfType: stream
     required: fn:IsRequired(fn:Not(fn:IsPresent(F)))
@@ -259,13 +254,14 @@ types:
     refTypes:
     - AFEmbeddedFileStream
 - name: AFFileSpecification
+  purpose: "associated file specification"
   goType: file.Specification
   pdfType: Filespec
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 43
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -273,7 +269,7 @@ types:
     possibleValues:
     - Filespec
     notes: Table 43 and https://github.com/pdf-association/pdf-issues/issues/298
-  - goName: null
+  - goName:
     pdfKey: FS
     pdfType: name
     required: false
@@ -281,29 +277,29 @@ types:
     possibleValues:
     - URL
     - '*'
-  - goName: null
+  - goName:
     pdfKey: F
     pdfType: string
     required: fn:IsRequired(fn:Not(fn:IsPresent(DOS)) && fn:Not(fn:IsPresent(Mac)) && fn:Not(fn:IsPresent(Unix)))
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: UF
     pdfType: text-string
     required: false
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: DOS
     pdfType: byte-string
     required: false
     introduced: '1.7'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Mac
     pdfType: byte-string
     required: false
     introduced: '1.7'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Unix
     pdfType: byte-string
     required: false
@@ -314,43 +310,41 @@ types:
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOf_2StringsByte
     goType: '[]string'
     purpose: ID contains an identifier for the described file, as two byte strings.
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: boolean
     required: false
     default: false
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: EF
     pdfType: dictionary
     required: true
     introduced: '1.7'
     refTypes:
     - AFFileSpecEF
-  - goName: null
+  - goName:
     pdfKey: RF
     pdfType: dictionary
     required: false
     introduced: '1.7'
     refTypes:
     - FileSpecRF
-  - goName: null
+  - goName:
     pdfKey: Desc
     pdfType: string
     required: false
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: CI
     pdfType: dictionary
     required: false
     introduced: '1.7'
     refTypes:
     - CollectionItem
-  - goName: null
+  - goName:
     pdfKey: Thumb
     pdfType: stream
     required: false
@@ -382,7 +376,7 @@ types:
       When writing file specifications, and empty name can be used as a
 
       shorthand for [RelationshipUnspecified].'
-  - goName: null
+  - goName:
     pdfKey: EP
     pdfType: dictionary
     required: fn:IsRequired(@AFRelationship==EncryptedPayload)
@@ -393,8 +387,10 @@ types:
   goRepr: struct
   specSection: 7.11.3
   readFunc: file.ExtractSpecification
+  fileDependent: false
   writeMethod: (*Specification).Embed
 - name: AFPropertyList
+  purpose: "associated file property list"
   goType: property.AF
   pdfRepr: dict
   introduced: '2.0'
@@ -419,13 +415,15 @@ types:
     notes: Array of file specification dictionaries
   goPackage: property
   goRepr: struct
+  fileDependent: false
   writeMethod: (*AF).Embed
 - name: AuthCode
-  goType: null
+  purpose: "authorization code for a document"
+  goType:
   pdfRepr: dict
   introduced: fn:Extension(ISO_TS_32004,2.0)
   fields:
-  - goName: null
+  - goName:
     pdfKey: MACLocation
     pdfType: name
     required: true
@@ -434,19 +432,17 @@ types:
     - Standalone
     - AttachedToSig
     notes: ISO/TS 32004 Integrity protection, clause 5.2.3, Table 2
-  - goName: null
+  - goName:
     pdfKey: ByteRange
     pdfType: array
     required: fn:IsRequired(@MACLocation==Standalone)
     introduced: fn:Extension(ISO_TS_32004,2.0)
-    refTypes:
-    - ArrayOf_4Integers
-  - goName: null
+  - goName:
     pdfKey: MAC
     pdfType: byte-string
     required: fn:IsRequired(@MACLocation==Standalone)
     introduced: fn:Extension(ISO_TS_32004,2.0)
-  - goName: null
+  - goName:
     pdfKey: SigObjRef
     pdfType: dictionary
     required: fn:IsRequired(@MACLocation==AttachedToSig)
@@ -455,6 +451,7 @@ types:
     - Signature
     - DocTimeStamp
 - name: BoxColorInfo
+  purpose: "display colors for page boundary boxes"
   goType: page/boxcolor.Info
   pdfRepr: dict
   introduced: '1.4'
@@ -493,11 +490,13 @@ types:
     refTypes:
     - BoxStyle
   readFunc: boxcolor.ExtractInfo
+  fileDependent: false
   writeMethod: (*Info).Embed
   goPackage: boxcolor
   goRepr: struct
   specSection: 14.11.2
 - name: BoxStyle
+  purpose: "style for displaying a page boundary box"
   goType: page/boxcolor.Style
   pdfRepr: dict
   introduced: '1.4'
@@ -509,8 +508,6 @@ types:
     required: false
     default: '[0.0 0.0 0.0]'
     introduced: '1.4'
-    refTypes:
-    - ArrayOf_3RGBNumbers
     notes: Table 397
   - goName: LineWidth
     goType: float64
@@ -535,22 +532,22 @@ types:
     required: false
     default: '[3]'
     introduced: '1.4'
-    refTypes:
-    - ArrayOfDashPatterns
     notes: dash pattern
   readFunc: boxcolor.ExtractStyle
+  fileDependent: false
   writeMethod: (*Style).Embed
   goPackage: boxcolor
   goRepr: struct
   specSection: 14.11.2
 - name: CIP4_Address
-  goType: null
+  purpose: "CIP4 JDF address"
+  goType:
   pdfType: CIP4_Address
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 28
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -558,7 +555,7 @@ types:
     possibleValues:
     - CIP4_Address
     notes: ISO 21812-1:2019 Table 28
-  - goName: null
+  - goName:
     pdfKey: CIP4_AddressUsage
     pdfType: name
     required: false
@@ -568,67 +565,66 @@ types:
     - Residence
     - '*'
     notes: extendible
-  - goName: null
+  - goName:
     pdfKey: CIP4_AddressLines
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-    refTypes:
-    - ArrayOfStringsText
-  - goName: null
+  - goName:
     pdfKey: CIP4_City
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_CivicNumber
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_Country
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_CountryCode
     pdfType: name
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     notes: ISO 3166-1 alpha-2 code of the country
-  - goName: null
+  - goName:
     pdfKey: CIP4_PostalCode
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_PostBox
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_Region
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_Street
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_StreetName
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
 - name: CIP4_AssemblingIntent
-  goType: null
+  purpose: "CIP4 JDF assembling intent"
+  goType:
   pdfType: CIP4_AssemblingIntent
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 7
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -636,49 +632,54 @@ types:
     possibleValues:
     - CIP4_AssemblingIntent
     notes: ISO 21812-1:2019 Table 7
-  - goName: null
+  - goName:
     pdfKey: CIP4_Container
     pdfType: dictionary
     required: true
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - DPart
-  - goName: null
+  - goName:
     pdfKey: CIP4_AssemblyItem
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
-    - ArrayOfCIP4_AssemblyItem
-  - goName: null
+    - type: CIP4_AssemblyItem
+      collection: array
+  - goName:
     pdfKey: CIP4_BindIn
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
-    - ArrayOfCIP4_BindIn
-  - goName: null
+    - type: CIP4_BindIn
+      collection: array
+  - goName:
     pdfKey: CIP4_BlowIn
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
-    - ArrayOfCIP4_BlowIn
-  - goName: null
+    - type: CIP4_BlowIn
+      collection: array
+  - goName:
     pdfKey: CIP4_StickOn
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
-    - ArrayOfCIP4_StickOn
+    - type: CIP4_StickOn
+      collection: array
 - name: CIP4_AssemblyItem
-  goType: null
+  purpose: "CIP4 JDF assembly item"
+  goType:
   pdfType: CIP4_AssemblyItem
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 8
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -686,7 +687,7 @@ types:
     possibleValues:
     - CIP4_AssemblyItem
     notes: ISO 21812-1:2019 Table 8
-  - goName: null
+  - goName:
     pdfKey: CIP4_Child
     pdfType: dictionary
     required: true
@@ -694,13 +695,14 @@ types:
     refTypes:
     - DPart
 - name: CIP4_BindIn
-  goType: null
+  purpose: "CIP4 JDF bind-in insert"
+  goType:
   pdfType: CIP4_BindIn
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 9
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -708,7 +710,7 @@ types:
     possibleValues:
     - CIP4_BindIn
     notes: ISO 21812-1:2019 Table 9
-  - goName: null
+  - goName:
     pdfKey: CIP4_Child
     pdfType: dictionary
     required: true
@@ -716,13 +718,14 @@ types:
     refTypes:
     - DPart
 - name: CIP4_BindingIntent
-  goType: null
+  purpose: "CIP4 JDF binding intent"
+  goType:
   pdfType: CIP4_BindingIntent
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 12
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -730,7 +733,7 @@ types:
     possibleValues:
     - CIP4_BindingIntent
     notes: ISO 21812-1:2019 Table 12
-  - goName: null
+  - goName:
     pdfKey: CIP4_BindingSide
     pdfType: name
     required: false
@@ -740,7 +743,7 @@ types:
     - Right
     - Top
     - Bottom
-  - goName: null
+  - goName:
     pdfKey: CIP4_BindingType
     pdfType: name
     required: true
@@ -762,14 +765,14 @@ types:
     - StripBind
     - Tape
     - WireComb
-  - goName: null
+  - goName:
     pdfKey: CIP4_SaddleStitching
     pdfType: dictionary
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - CIP4_SaddleStitching
-  - goName: null
+  - goName:
     pdfKey: CIP4_SideStitching
     pdfType: dictionary
     required: false
@@ -777,13 +780,14 @@ types:
     refTypes:
     - CIP4_SideStitching
 - name: CIP4_BlowIn
-  goType: null
+  purpose: "CIP4 JDF blow-in insert"
+  goType:
   pdfType: CIP4_BlowIn
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 10
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -791,7 +795,7 @@ types:
     possibleValues:
     - CIP4_BlowIn
     notes: ISO 21812-1:2019 Table 10
-  - goName: null
+  - goName:
     pdfKey: CIP4_Child
     pdfType: dictionary
     required: true
@@ -799,13 +803,14 @@ types:
     refTypes:
     - DPart
 - name: CIP4_ColorIntent
-  goType: null
+  purpose: "CIP4 JDF color intent"
+  goType:
   pdfType: CIP4_ColorIntent
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 15
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -813,21 +818,20 @@ types:
     possibleValues:
     - CIP4_ColorIntent
     notes: ISO 21812-1:2019 Table 15
-  - goName: null
+  - goName:
     pdfKey: CIP4_Coatings
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-    refTypes:
-    - ArrayOfCIP4_Coatings
 - name: CIP4_ComChannel
-  goType: null
+  purpose: "CIP4 JDF communication channel"
+  goType:
   pdfType: CIP4_ComChannel
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 29
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -835,7 +839,7 @@ types:
     possibleValues:
     - CIP4_ComChannel
     notes: ISO 21812-1:2019 Table 29
-  - goName: null
+  - goName:
     pdfKey: CIP4_ChannelType
     pdfType: name
     required: false
@@ -848,31 +852,30 @@ types:
     - WWW
     - '*'
     notes: extendible
-  - goName: null
+  - goName:
     pdfKey: CIP4_ChannelUsage
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-    refTypes:
-    - ArrayOfCIP4_ChannelUsage
-  - goName: null
+  - goName:
     pdfKey: CIP4_DescriptiveName
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_Locator
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
 - name: CIP4_Company
-  goType: null
+  purpose: "CIP4 JDF company information"
+  goType:
   pdfType: CIP4_Company
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 27
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -880,29 +883,30 @@ types:
     possibleValues:
     - CIP4_Company
     notes: ISO 21812-1:2019 Table 27
-  - goName: null
+  - goName:
     pdfKey: CIP4_DescriptiveName
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_OrganizationName
     pdfType: string
     required: true
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_OrganizationalUnit
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
 - name: CIP4_Contact
-  goType: null
+  purpose: "CIP4 JDF contact information"
+  goType:
   pdfType: CIP4_Contact
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 25
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -910,40 +914,39 @@ types:
     possibleValues:
     - CIP4_Contact
     notes: ISO 21812-1:2019 Table 25
-  - goName: null
+  - goName:
     pdfKey: CIP4_Address
     pdfType: dictionary
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - CIP4_Address
-  - goName: null
+  - goName:
     pdfKey: CIP4_ComChannel
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
-    - ArrayOfCIP4_ComChannel
-  - goName: null
+    - type: CIP4_ComChannel
+      collection: array
+  - goName:
     pdfKey: CIP4_Company
     pdfType: dictionary
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - CIP4_Company
-  - goName: null
+  - goName:
     pdfKey: CIP4_ContactTypes
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-    refTypes:
-    - ArrayOfCIP4_ContactTypes
-  - goName: null
+  - goName:
     pdfKey: CIP4_DescriptiveName
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_Person
     pdfType: dictionary
     required: false
@@ -951,13 +954,14 @@ types:
     refTypes:
     - CIP4_Person
 - name: CIP4_FoldingIntent
-  goType: null
+  purpose: "CIP4 JDF folding intent"
+  goType:
   pdfType: CIP4_FoldingIntent
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 16
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -965,7 +969,7 @@ types:
     possibleValues:
     - CIP4_FoldingIntent
     notes: ISO 21812-1:2019 Table 16
-  - goName: null
+  - goName:
     pdfKey: CIP4_FoldCatalog
     pdfType: name
     required: false
@@ -981,7 +985,7 @@ types:
     - F8-4
     - '*'
     notes: ISO 21812-1:2019 Table 17
-  - goName: null
+  - goName:
     pdfKey: CIP4_Orientation
     pdfType: name
     required: false
@@ -996,13 +1000,14 @@ types:
     - Flip180
     - Flip270
 - name: CIP4_HoleMakingIntent
-  goType: null
+  purpose: "CIP4 JDF hole-making intent"
+  goType:
   pdfType: CIP4_HoleMakingIntent
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 18
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -1010,21 +1015,23 @@ types:
     possibleValues:
     - CIP4_HoleMakingIntent
     notes: ISO 21812-1:2019 Table 18
-  - goName: null
+  - goName:
     pdfKey: CIP4_HolePattern
     pdfType: array
     required: true
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
-    - ArrayOfCIP4_HolePattern
+    - type: CIP4_HolePattern
+      collection: array
 - name: CIP4_HolePattern
-  goType: null
+  purpose: "CIP4 JDF hole pattern"
+  goType:
   pdfType: CIP4_HolePattern
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 19
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -1032,7 +1039,7 @@ types:
     possibleValues:
     - CIP4_HolePattern
     notes: ISO 21812-1:2019 Table 19
-  - goName: null
+  - goName:
     pdfKey: CIP4_HoleReferenceEdge
     pdfType: name
     required: false
@@ -1043,20 +1050,21 @@ types:
     - Top
     - Bottom
     - Pattern
-  - goName: null
+  - goName:
     pdfKey: CIP4_Pattern
     pdfType: name
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     notes: Extendible, see Appendix G Hole Pattern Catalo of XJDF
 - name: CIP4_Intent
-  goType: null
+  purpose: "CIP4 JDF processing intent"
+  goType:
   pdfType: CIP4_Intent
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 6
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -1064,7 +1072,7 @@ types:
     possibleValues:
     - CIP4_Intent
     notes: ISO 21812-1:2019 Table 6
-  - goName: null
+  - goName:
     pdfKey: CIP4_ProductType
     pdfType: name
     required: false
@@ -1098,56 +1106,56 @@ types:
     - Spine
     - WrapAroundCover
     - '*'
-  - goName: null
+  - goName:
     pdfKey: CIP4_AssemblingIntent
     pdfType: dictionary
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - CIP4_AssemblingIntent
-  - goName: null
+  - goName:
     pdfKey: CIP4_BindingIntent
     pdfType: dictionary
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - CIP4_BindingIntent
-  - goName: null
+  - goName:
     pdfKey: CIP4_ColorIntent
     pdfType: dictionary
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - CIP4_ColorIntent
-  - goName: null
+  - goName:
     pdfKey: CIP4_FoldingIntent
     pdfType: dictionary
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - CIP4_FoldingIntent
-  - goName: null
+  - goName:
     pdfKey: CIP4_HoleMakingIntent
     pdfType: dictionary
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - CIP4_HoleMakingIntent
-  - goName: null
+  - goName:
     pdfKey: CIP4_LayoutIntent
     pdfType: dictionary
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - CIP4_LayoutIntent
-  - goName: null
+  - goName:
     pdfKey: CIP4_MediaIntent
     pdfType: dictionary
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - CIP4_MediaIntent
-  - goName: null
+  - goName:
     pdfKey: CIP4_ProductionIntent
     pdfType: dictionary
     required: false
@@ -1156,13 +1164,14 @@ types:
     - CIP4_ProductionIntent
     notes: https://github.com/pdf-association/pdf-issues/issues/459
 - name: CIP4_IntentSummary
-  goType: null
+  purpose: "CIP4 JDF intent summary"
+  goType:
   pdfType: CIP4_Intent
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 23
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -1170,71 +1179,80 @@ types:
     possibleValues:
     - CIP4_Intent
     notes: ISO 21812-1:2019 Table 23
-  - goName: null
+  - goName:
     pdfKey: CIP4_AssemblingIntent
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
-    - ArrayOfCIP4_AssemblingIntent
-  - goName: null
+    - type: CIP4_AssemblingIntent
+      collection: array
+  - goName:
     pdfKey: CIP4_BindingIntent
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
-    - ArrayOfCIP4_BindingIntent
-  - goName: null
+    - type: CIP4_BindingIntent
+      collection: array
+  - goName:
     pdfKey: CIP4_ColorIntent
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
-    - ArrayOfCIP4_ColorIntent
-  - goName: null
+    - type: CIP4_ColorIntent
+      collection: array
+  - goName:
     pdfKey: CIP4_FoldingIntent
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
-    - ArrayOfCIP4_FoldingIntent
-  - goName: null
+    - type: CIP4_FoldingIntent
+      collection: array
+  - goName:
     pdfKey: CIP4_HoleMakingIntent
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
-    - ArrayOfCIP4_HoleMakingIntent
-  - goName: null
+    - type: CIP4_HoleMakingIntent
+      collection: array
+  - goName:
     pdfKey: CIP4_LayoutIntent
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
-    - ArrayOfCIP4_LayoutIntent
-  - goName: null
+    - type: CIP4_LayoutIntent
+      collection: array
+  - goName:
     pdfKey: CIP4_MediaIntent
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
-    - ArrayOfCIP4_MediaIntent
-  - goName: null
+    - type: CIP4_MediaIntent
+      collection: array
+  - goName:
     pdfKey: CIP4_ProductionIntent
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
-    - ArrayOfCIP4_ProductionIntent
+    - type: CIP4_ProductionIntent
+      collection: array
     notes: https://github.com/pdf-association/pdf-issues/issues/459
 - name: CIP4_LayoutIntent
-  goType: null
+  purpose: "CIP4 JDF layout intent"
+  goType:
   pdfType: CIP4_LayoutIntent
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 20
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -1242,7 +1260,7 @@ types:
     possibleValues:
     - CIP4_LayoutIntent
     notes: ISO 21812-1:2019 Table 20
-  - goName: null
+  - goName:
     pdfKey: CIP4_Sides
     pdfType: name
     required: true
@@ -1252,14 +1270,12 @@ types:
     - OneSidedBack
     - TwoSidedHeadToHead
     - TwoSidedHeadToFoot
-  - goName: null
+  - goName:
     pdfKey: CIP4_FinishedDimensions
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-    refTypes:
-    - ArrayOfCIP4_FinishedDimensions
-  - goName: null
+  - goName:
     pdfKey: CIP4_SpreadType
     pdfType: name
     required: false
@@ -1269,13 +1285,14 @@ types:
     - SinglePage
     - Spread
 - name: CIP4_MediaIntent
-  goType: null
+  purpose: "CIP4 JDF media intent"
+  goType:
   pdfType: CIP4_MediaIntent
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 21
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -1283,7 +1300,7 @@ types:
     possibleValues:
     - CIP4_MediaIntent
     notes: ISO 21812-1:2019 Table 21
-  - goName: null
+  - goName:
     pdfKey: CIP4_BackCoating
     pdfType: name
     required: false
@@ -1298,7 +1315,7 @@ types:
     - UV
     - Varnish
     - WaterResistant
-  - goName: null
+  - goName:
     pdfKey: CIP4_Coating
     pdfType: name
     required: false
@@ -1309,7 +1326,7 @@ types:
     - Gloss
     - Matte
     - Satin
-  - goName: null
+  - goName:
     pdfKey: CIP4_ISOPaperSubstrate
     pdfType: name
     required: false
@@ -1323,15 +1340,13 @@ types:
     - PS6
     - PS7
     - PS8
-  - goName: null
+  - goName:
     pdfKey: CIP4_LABColorValue
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-    refTypes:
-    - ArrayOfCIP4_LABColorValue
     notes: specify an array of number that defines the CIELAB colour value of the media, computed as specified in TAPPI T527
-  - goName: null
+  - goName:
     pdfKey: CIP4_MediaColor
     pdfType: name
     required: false
@@ -1354,23 +1369,23 @@ types:
     - Teal
     - Aqua
     notes: as per https://www.w3.org/TR/html4/types.html#h-6.5
-  - goName: null
+  - goName:
     pdfKey: CIP4_MediaColorDetails
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_MediaQuality
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_MediaTypeDetails
     pdfType: name
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     notes: extendible
-  - goName: null
+  - goName:
     pdfKey: CIP4_Weight
     pdfType: number
     required: false
@@ -1379,13 +1394,14 @@ types:
     - fn:Eval(@CIP4_Weight>0)
     notes: in g/m^2
 - name: CIP4_Metadata
-  goType: null
+  purpose: "CIP4 JDF metadata"
+  goType:
   pdfType: CIP4_Metadata
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 4
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -1393,55 +1409,53 @@ types:
     possibleValues:
     - CIP4_Metadata
     notes: ISO 21812-1:2019 Table 4
-  - goName: null
+  - goName:
     pdfKey: CIP4_Accounting
     pdfType: dictionary
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - CIP4_Contact
-  - goName: null
+  - goName:
     pdfKey: CIP4_Administrator
     pdfType: dictionary
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - CIP4_Contact
-  - goName: null
+  - goName:
     pdfKey: CIP4_Author
     pdfType: dictionary
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - CIP4_Contact
-  - goName: null
+  - goName:
     pdfKey: CIP4_Conformance
     pdfType: array
     required: true
     introduced: fn:Extension(ISO_21812,1.7)
-    refTypes:
-    - ArrayOfStringsText
-  - goName: null
+  - goName:
     pdfKey: CIP4_Creator
     pdfType: string
     required: true
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_JobID
     pdfType: name
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_ModificationDate
     pdfType: date
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_ProjectID
     pdfType: name
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_Sender
     pdfType: dictionary
     required: false
@@ -1449,13 +1463,14 @@ types:
     refTypes:
     - CIP4_Contact
 - name: CIP4_Person
-  goType: null
+  purpose: "CIP4 JDF person information"
+  goType:
   pdfType: CIP4_Person
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 26
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -1463,54 +1478,55 @@ types:
     possibleValues:
     - CIP4_Person
     notes: ISO 21812-1:2019 Table 26
-  - goName: null
+  - goName:
     pdfKey: CIP4_DescriptiveName
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_AdditionalNames
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_FirstName
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_FullName
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_JobTitle
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_FamilyName
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_NamePrefix
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_NameSuffix
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
 - name: CIP4_Production
-  goType: null
+  purpose: "CIP4 JDF production information"
+  goType:
   pdfType: CIP4_Production
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 24
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -1518,33 +1534,32 @@ types:
     possibleValues:
     - CIP4_Production
     notes: ISO 21812-1:2019 Table 24
-  - goName: null
+  - goName:
     pdfKey: CIP4_CopyCount
     pdfType: integer
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     possibleValues:
     - fn:Eval(@CIP4_CopyCount>0)
-  - goName: null
+  - goName:
     pdfKey: CIP4_DescriptiveName
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_Resource
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-    refTypes:
-    - ArrayOfCIP4_Resource
 - name: CIP4_ProductionIntent
-  goType: null
+  purpose: "CIP4 JDF production intent"
+  goType:
   pdfType: CIP4_ProductionIntent
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 22
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -1552,7 +1567,7 @@ types:
     possibleValues:
     - CIP4_ProductionIntent
     notes: ISO 21812-1:2019 Table 22
-  - goName: null
+  - goName:
     pdfKey: CIP4_PrintPreference
     pdfType: name
     required: false
@@ -1562,25 +1577,24 @@ types:
     - CostEffective
     - Fastest
     - HighestQuality
-  - goName: null
+  - goName:
     pdfKey: CIP4_PrintProcess
     pdfType: array
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-    refTypes:
-    - ArrayOfCIP4_PrintProcess
 - name: CIP4_Recipient
-  goType: null
+  purpose: "CIP4 JDF recipient information"
+  goType:
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   fields:
-  - goName: null
+  - goName:
     pdfKey: CIP4_ExternalID
     pdfType: name
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     notes: ISO 21812-1:2019 Table 5
-  - goName: null
+  - goName:
     pdfKey: CIP4_Contact
     pdfType: dictionary
     required: false
@@ -1588,13 +1602,14 @@ types:
     refTypes:
     - CIP4_Contact
 - name: CIP4_Root
-  goType: null
+  purpose: "root of CIP4 JDF metadata"
+  goType:
   pdfType: CIP4_Root
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 3
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -1602,45 +1617,45 @@ types:
     possibleValues:
     - CIP4_Root
     notes: ISO 21812-1:2019 Table 3
-  - goName: null
+  - goName:
     pdfKey: CIP4_DescriptiveName
     pdfType: string
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_ExternalID
     pdfType: name
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
-  - goName: null
+  - goName:
     pdfKey: CIP4_Intent
     pdfType: dictionary
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - CIP4_Intent
-  - goName: null
+  - goName:
     pdfKey: CIP4_IntentSummary
     pdfType: dictionary
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - CIP4_IntentSummary
-  - goName: null
+  - goName:
     pdfKey: CIP4_Metadata
     pdfType: dictionary
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - CIP4_Metadata
-  - goName: null
+  - goName:
     pdfKey: CIP4_Production
     pdfType: dictionary
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - CIP4_Production
-  - goName: null
+  - goName:
     pdfKey: CIP4_Recipient
     pdfType: dictionary
     required: false
@@ -1648,13 +1663,14 @@ types:
     refTypes:
     - CIP4_Recipient
 - name: CIP4_SaddleStitching
-  goType: null
+  purpose: "CIP4 JDF saddle stitching parameters"
+  goType:
   pdfType: CIP4_SaddleStitching
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 13
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -1662,19 +1678,20 @@ types:
     possibleValues:
     - CIP4_SaddleStitching
     notes: ISO 21812-1:2019 Table 13
-  - goName: null
+  - goName:
     pdfKey: CIP4_StitchNumber
     pdfType: integer
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
 - name: CIP4_SideStitching
-  goType: null
+  purpose: "CIP4 JDF side stitching parameters"
+  goType:
   pdfType: CIP4_SideStitching
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 14
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -1682,19 +1699,20 @@ types:
     possibleValues:
     - CIP4_SideStitching
     notes: ISO 21812-1:2019 Table 14
-  - goName: null
+  - goName:
     pdfKey: CIP4_StitchNumber
     pdfType: integer
     required: false
     introduced: fn:Extension(ISO_21812,1.7)
 - name: CIP4_StickOn
-  goType: null
+  purpose: "CIP4 JDF stick-on element"
+  goType:
   pdfType: CIP4_StickOn
   pdfRepr: dict
   introduced: fn:Extension(ISO_21812,1.7)
   specTable: Table 11
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -1702,7 +1720,7 @@ types:
     possibleValues:
     - CIP4_StickOn
     notes: ISO 21812-1:2019 Table 11
-  - goName: null
+  - goName:
     pdfKey: CIP4_Child
     pdfType: dictionary
     required: true
@@ -1710,13 +1728,14 @@ types:
     refTypes:
     - DPart
 - name: CertSeedValue
-  goType: null
+  purpose: "certificate requirements for a signature field"
+  goType:
   pdfType: SVCert
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 238
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1724,30 +1743,28 @@ types:
     possibleValues:
     - SVCert
     notes: Table 238
-  - goName: null
+  - goName:
     pdfKey: Ff
     pdfType: bitmask
     required: false
     default: '0'
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: Subject
     pdfType: array
     required: false
     introduced: '1.5'
-    refTypes:
-    - ArrayOfStringsByte
-  - goName: null
+  - goName:
     pdfKey: SignaturePolicyOID
     pdfType: ascii-string
     required: false
     introduced: '2.0'
-  - goName: null
+  - goName:
     pdfKey: SignaturePolicyHashValue
     pdfType: string
     required: false
     introduced: '2.0'
-  - goName: null
+  - goName:
     pdfKey: SignaturePolicyHashAlgorithm
     pdfType: name
     required: false
@@ -1759,48 +1776,41 @@ types:
     - ETSI.CAdES.detached
     - ETSI.RFC3161
     notes: Table 260
-  - goName: null
+  - goName:
     pdfKey: SignaturePolicyCommitmentType
     pdfType: array
     required: false
     introduced: '2.0'
-    refTypes:
-    - ArrayOfStringsASCII
-  - goName: null
+  - goName:
     pdfKey: SubjectDN
     pdfType: array
     required: false
     introduced: '1.7'
     refTypes:
-    - ArrayOfSubjectDN
-  - goName: null
+    - type: SubjectDN
+      collection: array
+  - goName:
     pdfKey: KeyUsage
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOfStringsASCII
     notes: RFC 5280
-  - goName: null
+  - goName:
     pdfKey: Issuer
     pdfType: array
     required: false
     introduced: '1.5'
-    refTypes:
-    - ArrayOfStringsByte
-  - goName: null
+  - goName:
     pdfKey: OID
     pdfType: array
     required: false
     introduced: '1.5'
-    refTypes:
-    - ArrayOfStringsByte
-  - goName: null
+  - goName:
     pdfKey: URL
     pdfType: ascii-string
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: URLType
     pdfType: name
     required: false
@@ -1810,13 +1820,14 @@ types:
     - Browser
     - '*'
 - name: Collection
-  goType: null
+  purpose: "portable collection (PDF portfolio) properties"
+  goType:
   pdfType: Collection
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 153
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1824,19 +1835,19 @@ types:
     possibleValues:
     - Collection
     notes: Table 153
-  - goName: null
+  - goName:
     pdfKey: Schema
     pdfType: dictionary
     required: false
     introduced: '1.7'
     refTypes:
     - CollectionSchema
-  - goName: null
+  - goName:
     pdfKey: D
     pdfType: byte-string
     required: fn:IsRequired(fn:SinceVersion(2.0,fn:IsEncryptedWrapper()))
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: View
     pdfType: name
     required: fn:IsRequired(fn:SinceVersion(2.0,fn:IsEncryptedWrapper()))
@@ -1848,42 +1859,42 @@ types:
     - H
     - fn:IsPDFVersion(1.7,fn:Extension(ADBE_Extn3,C))
     - fn:SinceVersion(2.0,C)
-  - goName: null
+  - goName:
     pdfKey: Navigator
     pdfType: dictionary
     required: fn:IsRequired(@View==C)
     introduced: '1.7'
     refTypes:
     - Navigator
-  - goName: null
+  - goName:
     pdfKey: Colors
     pdfType: dictionary
     required: false
     introduced: '1.7'
     refTypes:
     - CollectionColors
-  - goName: null
+  - goName:
     pdfKey: Sort
     pdfType: dictionary
     required: false
     introduced: '1.7'
     refTypes:
     - CollectionSort
-  - goName: null
+  - goName:
     pdfKey: Folders
     pdfType: dictionary
     required: false
     introduced: '1.7'
     refTypes:
     - CollectionFolder
-  - goName: null
+  - goName:
     pdfKey: Split
     pdfType: dictionary
     required: false
     introduced: '1.7'
     refTypes:
     - CollectionSplit
-  - goName: null
+  - goName:
     pdfKey: Resources
     pdfType: name-tree
     required: false
@@ -1893,13 +1904,14 @@ types:
     - Stream
     notes: Adobe Extension Level 3 only
 - name: CollectionColors
-  goType: null
+  purpose: "color scheme for a portable collection"
+  goType:
   pdfType: CollectionColors
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 157
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1907,49 +1919,40 @@ types:
     possibleValues:
     - CollectionColors
     notes: Table 157
-  - goName: null
+  - goName:
     pdfKey: Background
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOf_3RGBNumbers
-  - goName: null
+  - goName:
     pdfKey: CardBackground
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOf_3RGBNumbers
-  - goName: null
+  - goName:
     pdfKey: CardBorder
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOf_3RGBNumbers
-  - goName: null
+  - goName:
     pdfKey: PrimaryText
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOf_3RGBNumbers
-  - goName: null
+  - goName:
     pdfKey: SecondaryText
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOf_3RGBNumbers
 - name: CollectionField
-  goType: null
+  purpose: "field definition in a portable collection schema"
+  goType:
   pdfType: CollectionField
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 155
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1957,7 +1960,7 @@ types:
     possibleValues:
     - CollectionField
     notes: Table 155
-  - goName: null
+  - goName:
     pdfKey: Subtype
     pdfType: name
     required: true
@@ -1973,36 +1976,37 @@ types:
     - Size
     - fn:IsPDFVersion(1.7,fn:Extension(ADBE_Extn3,CompressedSize))
     - fn:SinceVersion(2.0,CompressedSize)
-  - goName: null
+  - goName:
     pdfKey: N
     pdfType: text-string
     required: true
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: O
     pdfType: integer
     required: false
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: boolean
     required: false
     default: true
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: E
     pdfType: boolean
     required: false
     default: false
     introduced: '1.7'
 - name: CollectionFolder
-  goType: null
+  purpose: "folder in a portable collection"
+  goType:
   pdfType: Folder
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 159
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -2010,82 +2014,81 @@ types:
     possibleValues:
     - Folder
     notes: Table 159
-  - goName: null
+  - goName:
     pdfKey: ID
     pdfType: integer
     required: true
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: Name
     pdfType: text-string
     required: true
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: Parent
     pdfType: dictionary
     required: false
     introduced: '1.7'
     refTypes:
     - CollectionFolder
-  - goName: null
+  - goName:
     pdfKey: Child
     pdfType: dictionary
     required: false
     introduced: '1.7'
     refTypes:
     - CollectionFolder
-  - goName: null
+  - goName:
     pdfKey: Next
     pdfType: dictionary
     required: false
     introduced: '1.7'
     refTypes:
     - CollectionFolder
-  - goName: null
+  - goName:
     pdfKey: CI
     pdfType: dictionary
     required: false
     introduced: '1.7'
     refTypes:
     - CollectionItem
-  - goName: null
+  - goName:
     pdfKey: Desc
     pdfType: text-string
     required: false
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: CreationDate
     pdfType: date
     required: false
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: ModDate
     pdfType: date
     required: false
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: Thumb
     pdfType: stream
     required: false
     introduced: '1.7'
     refTypes:
     - Thumbnail
-  - goName: null
+  - goName:
     pdfKey: Free
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOfNumbersGeneral
     notes: only used by root folder
 - name: CollectionItem
+  purpose: "item data for a file in a portable collection"
   goType: collection.ItemDict
   pdfType: CollectionItem
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 46
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -2093,7 +2096,7 @@ types:
     possibleValues:
     - CollectionItem
     notes: Table 46
-  - goName: null
+  - goName:
     pdfKey: '*'
     pdfType: date;dictionary;number;text-string
     required: false
@@ -2104,15 +2107,17 @@ types:
   goRepr: struct
   specSection: 7.11.6
   readFunc: collection.ExtractItemDict
+  fileDependent: false
   writeMethod: (*ItemDict).Embed
 - name: CollectionSchema
-  goType: null
+  purpose: "schema defining fields of a portable collection"
+  goType:
   pdfType: CollectionSchema
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 154
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -2120,7 +2125,7 @@ types:
     possibleValues:
     - CollectionSchema
     notes: Table 154
-  - goName: null
+  - goName:
     pdfKey: '*'
     pdfType: dictionary
     required: false
@@ -2128,13 +2133,14 @@ types:
     refTypes:
     - CollectionField
 - name: CollectionSort
-  goType: null
+  purpose: "sort order for a portable collection"
+  goType:
   pdfType: CollectionSort
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 156
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -2142,29 +2148,26 @@ types:
     possibleValues:
     - CollectionSort
     notes: Table 156
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: array;name
     required: true
     introduced: '1.7'
-    refTypes:
-    - ArrayOfNamesGeneral
-  - goName: null
+  - goName:
     pdfKey: A
     pdfType: array;boolean
     required: false
     default: '[];[true]'
     introduced: '1.7'
-    refTypes:
-    - ArrayOfBooleansGeneral
 - name: CollectionSplit
-  goType: null
+  purpose: "split view parameters for a portable collection"
+  goType:
   pdfType: CollectionSplit
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 158
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -2172,7 +2175,7 @@ types:
     possibleValues:
     - CollectionSplit
     notes: Table 158
-  - goName: null
+  - goName:
     pdfKey: Direction
     pdfType: name
     required: false
@@ -2181,7 +2184,7 @@ types:
     - H
     - V
     - N
-  - goName: null
+  - goName:
     pdfKey: Position
     pdfType: number
     required: false
@@ -2189,13 +2192,14 @@ types:
     possibleValues:
     - fn:Eval((@Position>=0) && (@Position<=100))
 - name: CollectionSubitem
-  goType: null
+  purpose: "sub-item in a portable collection item"
+  goType:
   pdfType: CollectionSubitem
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 47
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -2203,24 +2207,25 @@ types:
     possibleValues:
     - CollectionSubitem
     notes: Table 47
-  - goName: null
+  - goName:
     pdfKey: D
     pdfType: date;number;text-string
     required: false
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: P
     pdfType: text-string
     required: false
     introduced: '1.7'
 - name: CryptFilter
-  goType: null
+  purpose: "encryption filter for a document"
+  goType:
   pdfType: CryptFilter
   pdfRepr: stream
   introduced: '1.5'
   specTable: Table 25
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -2228,7 +2233,7 @@ types:
     possibleValues:
     - CryptFilter
     notes: 'Table 25 '
-  - goName: null
+  - goName:
     pdfKey: CFM
     pdfType: name
     required: false
@@ -2241,7 +2246,7 @@ types:
     - fn:Deprecated(2.0,fn:IsPDFVersion(1.7,fn:Extension(ADBE_Extn3,AESV3)))
     - fn:SinceVersion(2.0,AESV3)
     - fn:SinceVersion(2.0,fn:Extension(ISO_TS_32003,AESV4))
-  - goName: null
+  - goName:
     pdfKey: AuthEvent
     pdfType: name
     required: false
@@ -2250,7 +2255,7 @@ types:
     possibleValues:
     - DocOpen
     - EFOpen
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
@@ -2262,33 +2267,32 @@ types:
     - fn:Eval((@Length>=5) && (@Length<=16))
     notes: Expressed in BYTES. https://github.com/pdf-association/pdf-issues/issues/184
 - name: CryptFilterPublicKey
-  goType: null
+  purpose: "public-key encryption filter"
+  goType:
   pdfType: CryptFilter
   pdfRepr: stream
   introduced: '1.5'
   fields:
-  - goName: null
+  - goName:
     pdfKey: Recipients
     pdfType: array;byte-string
     required: true
     introduced: '1.5'
-    refTypes:
-    - ArrayOfStringsByte
     notes: Table 25 and Table 27, https://github.com/pdf-association/pdf-issues/issues/16
-  - goName: null
+  - goName:
     pdfKey: EncryptMetadata
     pdfType: boolean
     required: false
     default: true
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
     introduced: '1.5'
     possibleValues:
     - CryptFilter
-  - goName: null
+  - goName:
     pdfKey: CFM
     pdfType: name
     required: false
@@ -2301,7 +2305,7 @@ types:
     - fn:Deprecated(2.0,fn:IsPDFVersion(1.7,fn:Extension(ADBE_Extn3,AESV3)))
     - fn:SinceVersion(2.0,AESV3)
     - fn:SinceVersion(2.0,fn:Extension(ISO_TS_32003,AESV4))
-  - goName: null
+  - goName:
     pdfKey: AuthEvent
     pdfType: name
     required: false
@@ -2310,7 +2314,7 @@ types:
     possibleValues:
     - DocOpen
     - EFOpen
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
@@ -2322,26 +2326,23 @@ types:
     - fn:Eval((@Length>=40) && (@Length<=128) && ((@Length mod 8)==0))
     notes: Expressed in BITS. https://github.com/pdf-association/pdf-issues/issues/184
 - name: DPM
-  goType: null
+  purpose: "document part metadata"
+  goType:
   pdfRepr: dict
   fields:
-  - goName: null
+  - goName:
     pdfKey: GTS_Managed
     pdfType: dictionary
     required: false
     introduced: fn:Extension(PDF_VT2,1.6)
-    refTypes:
-    - _UniversalDictionary
     notes: Clause 14.12.4.2 and ISO 16612-3 PDF/VT
-  - goName: null
+  - goName:
     pdfKey: GTS_Suspect
     pdfType: dictionary
     required: false
     introduced: fn:Extension(PDF_VT2,1.6)
-    refTypes:
-    - _UniversalDictionary
     notes: PDF/VT
-  - goName: null
+  - goName:
     pdfKey: CIP4_Root
     pdfType: dictionary
     required: false
@@ -2349,23 +2350,21 @@ types:
     refTypes:
     - CIP4_Root
     notes: ISO 21812-1:2019
-  - goName: null
+  - goName:
     pdfKey: '*'
     pdfType: array;boolean;date;dictionary;integer;name;number;text-string
     required: false
     introduced: '1.6'
-    refTypes:
-    - _UniversalArray
-    - _UniversalDictionary
     notes: https://github.com/pdf-association/pdf-issues/issues/86
 - name: DSS
-  goType: null
+  purpose: "document security store for long-term validation"
+  goType:
   pdfType: DSS
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 261
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -2373,86 +2372,81 @@ types:
     possibleValues:
     - DSS
     notes: Table 261 and ETSI EN 319 142-1 (PAdES) https://github.com/pdf-association/arlington-pdf-model/issues/121
-  - goName: null
+  - goName:
     pdfKey: VRI
     pdfType: dictionary
     required: false
     introduced: '1.7'
     refTypes:
-    - VRIMap
-  - goName: null
+    - _VRIMap
+  - goName:
     pdfKey: Certs
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOfStreamsGeneral
-  - goName: null
+  - goName:
     pdfKey: OCSPs
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOfStreamsGeneral
-  - goName: null
+  - goName:
     pdfKey: CRLs
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOfStreamsGeneral
 - name: DocInfo
+  purpose: "document metadata (title, author, etc.)"
   goType: pdf.Info
   pdfRepr: dict
   fields:
-  - goName: null
+  - goName:
     pdfKey: Title
     pdfType: text-string
     required: false
     introduced: '1.1'
     deprecated: '2.0'
     notes: Table 349
-  - goName: null
+  - goName:
     pdfKey: Author
     pdfType: text-string
     required: false
     introduced: '1.0'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Subject
     pdfType: text-string
     required: false
     introduced: '1.1'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Keywords
     pdfType: text-string
     required: false
     introduced: '1.1'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Creator
     pdfType: text-string
     required: false
     introduced: '1.0'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Producer
     pdfType: text-string
     required: false
     introduced: '1.0'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: CreationDate
     pdfType: date
     required: false
     introduced: '1.0'
-  - goName: null
+  - goName:
     pdfKey: ModDate
     pdfType: date
     required: false
     introduced: '1.1'
-  - goName: null
+  - goName:
     pdfKey: Trapped
     pdfType: name
     required: false
@@ -2463,19 +2457,17 @@ types:
     - 'True'
     - 'False'
     - Unknown
-  - goName: null
+  - goName:
     pdfKey: AAPL:Keywords
     pdfType: array
     required: false
     introduced: fn:Extension(AAPL)
-    refTypes:
-    - ArrayOfStringsText
-  - goName: null
+  - goName:
     pdfKey: GTS_PDFXVersion
     pdfType: text-string
     required: false
     introduced: fn:Extension(PDF_X)
-  - goName: null
+  - goName:
     pdfKey: '*'
     pdfType: text-string
     required: false
@@ -2486,15 +2478,17 @@ types:
   goRepr: struct
   specSection: '14.3'
   readFunc: font.ExtractCIDSystemInfo
+  fileDependent: false
   writeMethod: (*Info).Embed
 - name: DocMDPTransformParameters
-  goType: null
+  purpose: "modification detection and prevention parameters"
+  goType:
   pdfType: TransformParams
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 257
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -2502,7 +2496,7 @@ types:
     possibleValues:
     - TransformParams
     notes: Table 257
-  - goName: null
+  - goName:
     pdfKey: P
     pdfType: integer
     required: false
@@ -2513,7 +2507,7 @@ types:
     - '2'
     - '3'
     notes: https://github.com/pdf-association/pdf-issues/issues/152
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: name
     required: false
@@ -2522,13 +2516,14 @@ types:
     possibleValues:
     - '1.2'
 - name: DocTimeStamp
-  goType: null
+  purpose: "document-level time stamp"
+  goType:
   pdfType: DocTimeStamp
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 255
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -2536,13 +2531,13 @@ types:
     possibleValues:
     - DocTimeStamp
     notes: Table 255 and ETSI EN 319 142-1 (PAdES) https://github.com/pdf-association/arlington-pdf-model/issues/121
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: name
     required: true
     introduced: '1.7'
     notes: https://github.com/pdf-association/pdf-issues/issues/121
-  - goName: null
+  - goName:
     pdfKey: SubFilter
     pdfType: name
     required: false
@@ -2550,78 +2545,73 @@ types:
     possibleValues:
     - ETSI.RFC3161
     - '*'
-  - goName: null
+  - goName:
     pdfKey: Contents
     pdfType: byte-string
     required: true
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: Cert
     pdfType: array;byte-string
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOfStringsByte
-  - goName: null
+  - goName:
     pdfKey: ByteRange
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOfNonNegativeIntegersGeneral
-  - goName: null
+  - goName:
     pdfKey: Reference
     pdfType: array
     required: false
     introduced: '1.7'
     refTypes:
-    - ArrayOfSignatureReferences
-  - goName: null
+    - type: SignatureReferenceDocMDP
+      collection: array
+  - goName:
     pdfKey: Changes
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOf_3NonNegativeIntegers
-  - goName: null
+  - goName:
     pdfKey: Name
     pdfType: text-string
     required: false
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: M
     pdfType: date
     required: false
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: Location
     pdfType: text-string
     required: false
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: Reason
     pdfType: text-string
     required: false
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: ContactInfo
     pdfType: text-string
     required: false
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: R
     pdfType: integer
     required: false
     introduced: '1.7'
     deprecated: '2.0'
     notes: 'also see _Adobe PDF Signature Build Dictionary Specification_ shall not be used since PDF 1.5 '
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: integer
     required: false
     default: '0'
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: Prop_Build
     pdfType: dictionary
     required: false
@@ -2629,7 +2619,7 @@ types:
     refTypes:
     - SignatureBuildPropDict
     notes: see _Adobe PDF Signature Build Dictionary Specification_
-  - goName: null
+  - goName:
     pdfKey: Prop_AuthTime
     pdfType: integer
     required: false
@@ -2637,7 +2627,7 @@ types:
     possibleValues:
     - fn:Eval(@Prop_AuthTime>=0)
     notes: see _Adobe PDF Signature Build Dictionary Specification_
-  - goName: null
+  - goName:
     pdfKey: Prop_AuthType
     pdfType: name
     required: false
@@ -2648,11 +2638,12 @@ types:
     - Fingerprint
     notes: see _Adobe PDF Signature Build Dictionary Specification_
 - name: FDDict
-  goType: null
+  purpose: "FDF (Forms Data Format) dictionary"
+  goType:
   pdfRepr: dict
   introduced: '1.2'
   fields:
-  - goName: null
+  - goName:
     pdfKey: '*'
     pdfType: dictionary
     required: false
@@ -2661,11 +2652,12 @@ types:
     - CIDFontDescriptorMetrics
     notes: Table 122 and Clause 9.8.3.3
 - name: GTS_ProcStepsGroup
-  goType: null
+  purpose: "graphic technology process steps group"
+  goType:
   pdfRepr: dict
   introduced: fn:Extension(ISO_19593,1.7)
   fields:
-  - goName: null
+  - goName:
     pdfKey: GTS_ProcStepsGroup
     pdfType: name
     required: true
@@ -2681,7 +2673,7 @@ types:
     - Primer
     - PlateMaking
     notes: ISO 19593-1 Table 2 and Table 3.
-  - goName: null
+  - goName:
     pdfKey: GTS_ProcStepsType
     pdfType: name
     required: fn:IsRequired((@GTS_ProcStepsGroup==Structural) || (@GTS_ProcStepsGroup==Positions) || (@GTS_ProcStepsGroup==PlateMaking))
@@ -2720,133 +2712,135 @@ types:
     - OverstepArea
     - NoMark
     notes: Custom names not indicated
-  - goName: null
+  - goName:
     pdfKey: GTS_ProcStepsColorants
     pdfType: name
     required: fn:IsRequired((@GTS_ProcStepsType==Cutting) || (@GTS_ProcStepsType==Bleed) || (@GTS_ProcStepsType==NoMark))
     introduced: fn:Extension(ISO_19593,1.7)
 - name: LegalAttestation
-  goType: null
+  purpose: "legal attestation for document content"
+  goType:
   pdfRepr: dict
   introduced: '1.5'
   fields:
-  - goName: null
+  - goName:
     pdfKey: JavaScriptActions
     pdfType: integer
     required: false
     introduced: '1.5'
     notes: Table 264
-  - goName: null
+  - goName:
     pdfKey: LaunchActions
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: URIActions
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: MovieActions
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: SoundActions
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: HideAnnotationActions
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: GoToRemoteActions
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: AlternateImages
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: ExternalStreams
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: TrueTypeFonts
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: ExternalRefXobjects
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: ExternalOPIdicts
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: NonEmbeddedFonts
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: DevDepGS_OP
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: DevDepGS_HT
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: DevDepGS_TR
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: DevDepGS_UCR
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: DevDepGS_BG
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: DevDepGS_FL
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: Annotations
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: OptionalContent
     pdfType: boolean
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: Attestation
     pdfType: text-string
     required: false
     introduced: '1.5'
 - name: MDPDict
-  goType: null
+  purpose: "modification detection policy"
+  goType:
   pdfRepr: dict
   introduced: '1.6'
   fields:
-  - goName: null
+  - goName:
     pdfKey: P
     pdfType: integer
     required: false
@@ -2858,13 +2852,14 @@ types:
     - '3'
     notes: Table 237, MDP cell
 - name: MarkedContentReference
-  goType: null
+  purpose: "reference to marked content in a structure tree"
+  goType:
   pdfType: MCR
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 357
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -2872,7 +2867,7 @@ types:
     possibleValues:
     - MCR
     notes: Table 357
-  - goName: null
+  - goName:
     pdfKey: Pg
     pdfType: dictionary
     required: fn:IsRequired(fn:Not(fn:IsPresent(parent::Pg)))
@@ -2880,35 +2875,34 @@ types:
     refTypes:
     - PageObject
     notes: https://github.com/pdf-association/pdf-issues/issues/431
-  - goName: null
+  - goName:
     pdfKey: Stm
     pdfType: stream
     required: false
     introduced: '1.3'
     refTypes:
     - XObjectFormType1
-  - goName: null
+  - goName:
     pdfKey: StmOwn
     pdfType: array;dictionary;stream
     required: false
     introduced: '1.3'
     refTypes:
-    - _UniversalArray
-    - _UniversalDictionary
     - Stream
-  - goName: null
+  - goName:
     pdfKey: MCID
     pdfType: integer
     required: true
     introduced: '1.3'
 - name: Metadata
+  purpose: "XMP metadata stream"
   goType: metadata.Stream
   pdfType: Metadata
   pdfRepr: stream
   introduced: '1.4'
   specTable: Table 5
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -2916,19 +2910,19 @@ types:
     possibleValues:
     - Metadata
     notes: Table 5 and Table 347
-  - goName: null
+  - goName:
     pdfKey: Subtype
     pdfType: name
     required: true
     introduced: '1.4'
     possibleValues:
     - XML
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.4'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -2940,27 +2934,24 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.4'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: F
     pdfType: dictionary;string
     required: false
     introduced: '1.4'
     refTypes:
     - FileSpecification
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -2972,20 +2963,17 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.4'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: DL
     pdfType: integer
     required: false
@@ -2994,15 +2982,17 @@ types:
   goRepr: struct
   specSection: '14.3'
   readFunc: metadata.Extract
+  fileDependent: false
   writeMethod: (*Stream).Embed
 - name: Navigator
-  goType: null
+  purpose: "navigation node in a document"
+  goType:
   pdfType: Navigator
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 160
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -3010,7 +3000,7 @@ types:
     possibleValues:
     - Navigator
     notes: Table 160
-  - goName: null
+  - goName:
     pdfKey: Layout
     pdfType: array;name
     required: true
@@ -3024,58 +3014,56 @@ types:
     - Linear
     - Tree
     - '*'
-    refTypes:
-    - ArrayOfNavigatorLayoutNames
-  - goName: null
+  - goName:
     pdfKey: SWF
     pdfType: text-string
     required: true
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '2.0'
     notes: Adobe Extension Level 3 only
-  - goName: null
+  - goName:
     pdfKey: Name
     pdfType: text-string
     required: false
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '2.0'
     notes: Adobe Extension Level 3 only
-  - goName: null
+  - goName:
     pdfKey: Desc
     pdfType: text-string
     required: false
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '2.0'
     notes: Adobe Extension Level 3 only
-  - goName: null
+  - goName:
     pdfKey: Category
     pdfType: text-string
     required: false
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '2.0'
     notes: Adobe Extension Level 3 only
-  - goName: null
+  - goName:
     pdfKey: ID
     pdfType: text-string
     required: true
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '2.0'
     notes: Adobe Extension Level 3 only
-  - goName: null
+  - goName:
     pdfKey: Version
     pdfType: text-string
     required: false
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '2.0'
     notes: Adobe Extension Level 3 only
-  - goName: null
+  - goName:
     pdfKey: APIVersion
     pdfType: text-string
     required: true
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '2.0'
     notes: Adobe Extension Level 3 only
-  - goName: null
+  - goName:
     pdfKey: LoadType
     pdfType: name
     required: false
@@ -3086,28 +3074,28 @@ types:
     - Module
     - Default
     notes: Adobe Extension Level 3 only
-  - goName: null
+  - goName:
     pdfKey: Icon
     pdfType: text-string
     required: false
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '2.0'
     notes: Adobe Extension Level 3 only
-  - goName: null
+  - goName:
     pdfKey: Locale
     pdfType: text-string
     required: false
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '2.0'
     notes: Adobe Extension Level 3 only
-  - goName: null
+  - goName:
     pdfKey: Strings
     pdfType: name-tree
     required: false
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '2.0'
     notes: Adobe Extension Level 3 only
-  - goName: null
+  - goName:
     pdfKey: InitialFields
     pdfType: dictionary
     required: false
@@ -3116,7 +3104,7 @@ types:
     refTypes:
     - CollectionSchema
     notes: Adobe Extension Level 3 only
-  - goName: null
+  - goName:
     pdfKey: Resources
     pdfType: name-tree
     required: true
@@ -3126,11 +3114,12 @@ types:
     - Stream
     notes: Adobe Extension Level 3 only
 - name: OPIVersion13
-  goType: null
+  purpose: "OPI 1.3 proxy image"
+  goType:
   pdfRepr: dict
   introduced: '1.2'
   fields:
-  - goName: null
+  - goName:
     pdfKey: '1.3'
     pdfType: dictionary
     required: false
@@ -3140,13 +3129,14 @@ types:
     - OPIVersion13Dict
     notes: Table 405
 - name: OPIVersion13Dict
-  goType: null
+  purpose: "OPI 1.3 dictionary entries"
+  goType:
   pdfType: OPI
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 406
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -3155,7 +3145,7 @@ types:
     possibleValues:
     - OPI
     notes: Table 406
-  - goName: null
+  - goName:
     pdfKey: Version
     pdfType: number
     required: true
@@ -3163,7 +3153,7 @@ types:
     deprecated: '2.0'
     possibleValues:
     - '1.3'
-  - goName: null
+  - goName:
     pdfKey: F
     pdfType: dictionary;string
     required: true
@@ -3171,118 +3161,103 @@ types:
     deprecated: '2.0'
     refTypes:
     - FileSpecification
-  - goName: null
+  - goName:
     pdfKey: ID
     pdfType: byte-string
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Comments
     pdfType: text-string
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Size
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-    refTypes:
-    - ArrayOf_2Integers
-  - goName: null
+  - goName:
     pdfKey: CropRect
     pdfType: rectangle
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: CropFixed
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-    refTypes:
-    - ArrayOf_4Numbers
-  - goName: null
+  - goName:
     pdfKey: Position
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-    refTypes:
-    - ArrayOf_8Numbers
-  - goName: null
+  - goName:
     pdfKey: Resolution
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-    refTypes:
-    - ArrayOf_2Numbers
-  - goName: null
+  - goName:
     pdfKey: ColorType
     pdfType: name
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Color
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-    refTypes:
-    - ArrayOfOPI13Color
-  - goName: null
+  - goName:
     pdfKey: Tint
     pdfType: number
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Overprint
     pdfType: boolean
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: ImageType
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-    refTypes:
-    - ArrayOf_2Integers
-  - goName: null
+  - goName:
     pdfKey: GrayMap
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-    refTypes:
-    - ArrayOfIntegersGeneral
-  - goName: null
+  - goName:
     pdfKey: Transparency
     pdfType: boolean
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Tags
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-    refTypes:
-    - ArrayOfTags
 - name: OPIVersion20
-  goType: null
+  purpose: "OPI 2.0 proxy image"
+  goType:
   pdfRepr: dict
   introduced: '1.2'
   fields:
-  - goName: null
+  - goName:
     pdfKey: '2.0'
     pdfType: dictionary
     required: false
@@ -3292,13 +3267,14 @@ types:
     - OPIVersion20Dict
     notes: Table 405
 - name: OPIVersion20Dict
-  goType: null
+  purpose: "OPI 2.0 dictionary entries"
+  goType:
   pdfType: OPI
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 407
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -3307,7 +3283,7 @@ types:
     possibleValues:
     - OPI
     notes: Table 407
-  - goName: null
+  - goName:
     pdfKey: Version
     pdfType: number
     required: true
@@ -3315,7 +3291,7 @@ types:
     deprecated: '2.0'
     possibleValues:
     - '2.0'
-  - goName: null
+  - goName:
     pdfKey: F
     pdfType: dictionary;string
     required: true
@@ -3323,41 +3299,37 @@ types:
     deprecated: '2.0'
     refTypes:
     - FileSpecification
-  - goName: null
+  - goName:
     pdfKey: MainImage
     pdfType: byte-string
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Tags
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-    refTypes:
-    - ArrayOfTags
-  - goName: null
+  - goName:
     pdfKey: Size
     pdfType: array
     required: fn:IsRequired(fn:IsPresent(CropRect))
     introduced: '1.2'
     deprecated: '2.0'
-    refTypes:
-    - ArrayOf_2Numbers
-  - goName: null
+  - goName:
     pdfKey: CropRect
     pdfType: rectangle
     required: fn:IsRequired(fn:IsPresent(Size))
     introduced: '1.2'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Overprint
     pdfType: boolean
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Inks
     pdfType: array;name
     required: false
@@ -3366,17 +3338,13 @@ types:
     possibleValues:
     - full_color
     - registration
-    refTypes:
-    - ArrayOfOPI2Inks
-  - goName: null
+  - goName:
     pdfKey: IncludedImageDimensions
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-    refTypes:
-    - ArrayOf_2Integers
-  - goName: null
+  - goName:
     pdfKey: IncludedImageQuality
     pdfType: number
     required: false
@@ -3387,13 +3355,14 @@ types:
     - '2'
     - '3'
 - name: ObjectReference
-  goType: null
+  purpose: "reference to a PDF object in a structure tree"
+  goType:
   pdfType: OBJR
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 358
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -3401,7 +3370,7 @@ types:
     possibleValues:
     - OBJR
     notes: Table 358
-  - goName: null
+  - goName:
     pdfKey: Pg
     pdfType: dictionary
     required: fn:IsRequired(fn:Not(fn:IsPresent(parent::Pg)))
@@ -3409,24 +3378,23 @@ types:
     refTypes:
     - PageObject
     notes: https://github.com/pdf-association/pdf-issues/issues/431
-  - goName: null
+  - goName:
     pdfKey: Obj
     pdfType: array;dictionary;stream
     required: true
     introduced: '1.3'
     refTypes:
-    - _UniversalArray
-    - _UniversalDictionary
     - XObjectFormType1
     - XObjectImage
 - name: PaperMetaData
-  goType: null
+  purpose: "paper-related metadata"
+  goType:
   pdfType: PaperMetaData
   pdfRepr: dict
   introduced: fn:Extension(ADBE_Extn3,1.7)
   specTable: Table 8
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -3435,7 +3403,7 @@ types:
     possibleValues:
     - PaperMetaData
     notes: Adobe Extension Level 3, Table 8.39b
-  - goName: null
+  - goName:
     pdfKey: Version
     pdfType: number
     required: true
@@ -3443,20 +3411,20 @@ types:
     deprecated: '2.0'
     possibleValues:
     - '1'
-  - goName: null
+  - goName:
     pdfKey: Resolution
     pdfType: number
     required: false
     default: '300'
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Caption
     pdfType: text-string
     required: false
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Symbology
     pdfType: name
     required: true
@@ -3466,31 +3434,31 @@ types:
     - PDF417
     - QRCode
     - DataMatrix
-  - goName: null
+  - goName:
     pdfKey: Width
     pdfType: number
     required: true
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Height
     pdfType: number
     required: true
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: XSymWidth
     pdfType: integer
     required: true
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: YSymHeight
     pdfType: integer
     required: true
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: ECC
     pdfType: integer
     required: fn:IsRequired((@Symbology==PDF417) || (@Symbology==QRCode))
@@ -3498,14 +3466,14 @@ types:
     deprecated: '2.0'
     possibleValues:
     - fn:Eval((@ECC>=0) && (((@Symbology==PDF417) && (@ECC<=8)) || ((@Symbology==QRCode) && (@ECC<=3))))
-  - goName: null
+  - goName:
     pdfKey: nCodeWordRow
     pdfType: number
     required: false
     default: '0'
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '1.7'
-  - goName: null
+  - goName:
     pdfKey: nCodeWordCol
     pdfType: number
     required: false
@@ -3513,11 +3481,12 @@ types:
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '1.7'
 - name: PagePiece
+  purpose: "page-piece dictionary for private application data"
   goType: pieceinfo.PieceInfo
   pdfRepr: dict
   introduced: '1.3'
   fields:
-  - goName: null
+  - goName:
     pdfKey: '*'
     pdfType: dictionary
     required: false
@@ -3529,13 +3498,15 @@ types:
   goRepr: struct
   specSection: '14.5'
   readFunc: pieceinfo.Extract
+  fileDependent: false
   writeMethod: (*PieceInfo).Embed
 - name: Permissions
-  goType: null
+  purpose: "document permissions dictionary"
+  goType:
   pdfRepr: dict
   introduced: '1.5'
   fields:
-  - goName: null
+  - goName:
     pdfKey: DocMDP
     pdfType: dictionary
     required: false
@@ -3543,7 +3514,7 @@ types:
     refTypes:
     - Signature
     notes: Table 263 and https://github.com/pdf-association/pdf-issues/issues/218
-  - goName: null
+  - goName:
     pdfKey: UR3
     pdfType: dictionary
     required: false
@@ -3552,37 +3523,38 @@ types:
     refTypes:
     - Signature
 - name: RoleMapNS
-  goType: null
+  purpose: "role mapping with namespace for structure elements"
+  goType:
   pdfRepr: dict
   introduced: '2.0'
   fields:
-  - goName: null
+  - goName:
     pdfKey: '*'
     pdfType: array;name
     required: false
     introduced: '2.0'
-    refTypes:
-    - ArrayOf_RoleMapNS
     notes: Table 356
 - name: Separation
+  purpose: "separation dictionary for color separations"
   goType: page/separation.Dict
   pdfRepr: dict
   introduced: '1.3'
   fields:
-  - goName: null
+  - goName:
     pdfKey: Pages
     pdfType: array
     required: true
     introduced: '1.3'
     refTypes:
-    - ArrayOfPages
+    - type: PageObject
+      collection: array
     notes: Table 400
-  - goName: null
+  - goName:
     pdfKey: DeviceColorant
     pdfType: name;string
     required: true
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: ColorSpace
     pdfType: array
     required: false
@@ -3591,18 +3563,20 @@ types:
     - SeparationColorSpace
     - DeviceNColorSpace
   readFunc: image.ExtractDict
+  fileDependent: true
   writeMethod: (*Dict).Encode
   goPackage: separation
   goRepr: struct
   specSection: 14.11.4
 - name: SigFieldLock
-  goType: null
+  purpose: "fields to lock when a signature field is signed"
+  goType:
   pdfType: SigFieldLock
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 236
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -3610,7 +3584,7 @@ types:
     possibleValues:
     - SigFieldLock
     notes: Table 236
-  - goName: null
+  - goName:
     pdfKey: Action
     pdfType: name
     required: true
@@ -3619,14 +3593,12 @@ types:
     - All
     - Include
     - Exclude
-  - goName: null
+  - goName:
     pdfKey: Fields
     pdfType: array
     required: fn:IsRequired((@Action==Include) || (@Action==Exclude))
     introduced: '1.5'
-    refTypes:
-    - ArrayOfStringsText
-  - goName: null
+  - goName:
     pdfKey: P
     pdfType: number
     required: false
@@ -3636,13 +3608,14 @@ types:
     - '2'
     - '3'
 - name: SigFieldSeedValue
-  goType: null
+  purpose: "seed values for a signature form field"
+  goType:
   pdfType: SV
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 237
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -3650,33 +3623,29 @@ types:
     possibleValues:
     - SV
     notes: Table 237
-  - goName: null
+  - goName:
     pdfKey: Ff
     pdfType: bitmask
     required: false
     default: '0'
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: name
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: SubFilter
     pdfType: array
     required: false
     introduced: '1.5'
-    refTypes:
-    - ArrayOfSignatureSubFilterNames
-  - goName: null
+  - goName:
     pdfKey: DigestMethod
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOfDigestMethod
     notes: https://github.com/pdf-association/pdf-issues/issues/159
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: integer
     required: false
@@ -3686,47 +3655,43 @@ types:
     - '1'
     - '2'
     - '3'
-  - goName: null
+  - goName:
     pdfKey: Cert
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - CertSeedValue
-  - goName: null
+  - goName:
     pdfKey: Reasons
     pdfType: array
     required: false
     introduced: '1.5'
-    refTypes:
-    - ArrayOfStringsText
-  - goName: null
+  - goName:
     pdfKey: MDP
     pdfType: dictionary
     required: false
     introduced: '1.6'
     refTypes:
     - MDPDict
-  - goName: null
+  - goName:
     pdfKey: TimeStamp
     pdfType: dictionary
     required: false
     introduced: '1.6'
     refTypes:
     - TimeStampDict
-  - goName: null
+  - goName:
     pdfKey: LegalAttestation
     pdfType: array
     required: false
     introduced: '1.6'
-    refTypes:
-    - ArrayOfStringsText
-  - goName: null
+  - goName:
     pdfKey: AddRevInfo
     pdfType: boolean
     required: false
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: LockDocument
     pdfType: name
     required: false
@@ -3735,19 +3700,20 @@ types:
     - 'true'
     - 'false'
     - auto
-  - goName: null
+  - goName:
     pdfKey: AppearanceFilter
     pdfType: text-string
     required: false
     introduced: '1.7'
 - name: Signature
-  goType: null
+  purpose: "digital signature dictionary"
+  goType:
   pdfType: Sig
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 255
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -3755,7 +3721,7 @@ types:
     possibleValues:
     - Sig
     notes: Table 255
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: name
     required: true
@@ -3766,7 +3732,7 @@ types:
     - CICI.SignIt
     - VeriSign.PPKVS
     - '*'
-  - goName: null
+  - goName:
     pdfKey: SubFilter
     pdfType: name
     required: false
@@ -3778,79 +3744,74 @@ types:
     - fn:Extension(ETSI_PAdES,ETSI.CAdES.detached)
     - fn:SinceVersion(2.0,ETSI.CAdES.detached)
     notes: Table 260 and https://github.com/pdf-association/pdf-issues/issues/219
-  - goName: null
+  - goName:
     pdfKey: Contents
     pdfType: byte-string
     required: true
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: Cert
     pdfType: array;byte-string
     required: fn:IsRequired(@SubFilter==adbe.x509.rsa_sha1)
     introduced: '1.3'
-    refTypes:
-    - ArrayOfStringsByte
     notes: Table 260
-  - goName: null
+  - goName:
     pdfKey: ByteRange
     pdfType: array
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNonNegativeIntegersGeneral
-  - goName: null
+  - goName:
     pdfKey: Reference
     pdfType: array
     required: false
     introduced: '1.5'
     refTypes:
-    - ArrayOfSignatureReferences
-  - goName: null
+    - type: SignatureReferenceDocMDP
+      collection: array
+  - goName:
     pdfKey: Changes
     pdfType: array
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOf_3NonNegativeIntegers
-  - goName: null
+  - goName:
     pdfKey: Name
     pdfType: text-string
     required: false
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: M
     pdfType: date
     required: false
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: Location
     pdfType: text-string
     required: false
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: Reason
     pdfType: text-string
     required: false
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: ContactInfo
     pdfType: text-string
     required: false
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: R
     pdfType: integer
     required: false
     introduced: '1.3'
     deprecated: '1.5'
     notes: 'see _Adobe PDF Signature Build Dictionary Specification_ shall not be used since PDF 1.5 '
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: integer
     required: false
     default: '0'
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: Prop_Build
     pdfType: dictionary
     required: false
@@ -3858,7 +3819,7 @@ types:
     refTypes:
     - SignatureBuildPropDict
     notes: see _Adobe PDF Signature Build Dictionary Specification_
-  - goName: null
+  - goName:
     pdfKey: Prop_AuthTime
     pdfType: integer
     required: false
@@ -3866,7 +3827,7 @@ types:
     possibleValues:
     - fn:Eval(@Prop_AuthTime>=0)
     notes: see _Adobe PDF Signature Build Dictionary Specification_
-  - goName: null
+  - goName:
     pdfKey: Prop_AuthType
     pdfType: name
     required: false
@@ -3876,7 +3837,7 @@ types:
     - Password
     - Fingerprint
     notes: see _Adobe PDF Signature Build Dictionary Specification_
-  - goName: null
+  - goName:
     pdfKey: ADBE_Build
     pdfType: string
     required: false
@@ -3884,174 +3845,172 @@ types:
     deprecated: '1.5'
     notes: see _Adobe PDF Signature Build Dictionary Specification_
 - name: SignatureBuildDataAppDict
-  goType: null
+  purpose: "application data in a signature build dictionary"
+  goType:
   pdfRepr: dict
   fields:
-  - goName: null
+  - goName:
     pdfKey: Name
     pdfType: name
     required: false
     introduced: '1.5'
     notes: Adobe _Digital Signature Build Dictionary Specification_ Table 2 and Table 3
-  - goName: null
+  - goName:
     pdfKey: Date
     pdfType: text-string
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: R
     pdfType: number
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: PreRelease
     pdfType: boolean
     required: false
     default: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: OS
     pdfType: array
     required: false
     introduced: '1.5'
-    refTypes:
-    - ArrayOfStringsTextOrNames
     notes: Adobe Acrobat DC generates an array of names which is undocumented
-  - goName: null
+  - goName:
     pdfKey: NonEFontNoWarn
     pdfType: boolean
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: TrustedMode
     pdfType: boolean
     required: false
     default: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: number
     required: false
     introduced: '1.5'
     deprecated: '1.7'
-  - goName: null
+  - goName:
     pdfKey: REx
     pdfType: text-string
     required: false
     introduced: '1.6'
 - name: SignatureBuildDataDict
-  goType: null
+  purpose: "build data in a signature dictionary"
+  goType:
   pdfRepr: dict
   introduced: '1.5'
   fields:
-  - goName: null
+  - goName:
     pdfKey: Name
     pdfType: name
     required: false
     introduced: '1.5'
     notes: Adobe _Digital Signature Build Dictionary Specification_ Table 2
-  - goName: null
+  - goName:
     pdfKey: Date
     pdfType: text-string
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: R
     pdfType: number
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: PreRelease
     pdfType: boolean
     required: false
     default: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: OS
     pdfType: array
     required: false
     introduced: '1.5'
-    refTypes:
-    - ArrayOfStringsText
-  - goName: null
+  - goName:
     pdfKey: NonEFontNoWarn
     pdfType: boolean
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: TrustedMode
     pdfType: boolean
     required: false
     default: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: number
     required: false
     introduced: '1.5'
     deprecated: '1.7'
 - name: SignatureBuildDataSigQDict
-  goType: null
+  purpose: "signature quality data"
+  goType:
   pdfRepr: dict
   fields:
-  - goName: null
+  - goName:
     pdfKey: Name
     pdfType: name
     required: false
     introduced: '1.5'
     notes: Adobe _Digital Signature Build Dictionary Specification_ Table 2 and Table 4
-  - goName: null
+  - goName:
     pdfKey: Date
     pdfType: text-string
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: R
     pdfType: number
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: PreRelease
     pdfType: boolean
     required: false
     default: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: OS
     pdfType: array
     required: false
     introduced: '1.5'
-    refTypes:
-    - ArrayOfStringsText
-  - goName: null
+  - goName:
     pdfKey: NonEFontNoWarn
     pdfType: boolean
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: TrustedMode
     pdfType: boolean
     required: false
     default: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: number
     required: false
     introduced: '1.5'
     deprecated: '1.7'
-  - goName: null
+  - goName:
     pdfKey: Preview
     pdfType: boolean
     required: false
     default: false
     introduced: '1.7'
 - name: SignatureBuildPropDict
-  goType: null
+  purpose: "build properties in a signature dictionary"
+  goType:
   pdfRepr: dict
   introduced: '1.5'
   fields:
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: dictionary
     required: false
@@ -4059,21 +4018,21 @@ types:
     refTypes:
     - SignatureBuildDataDict
     notes: Adobe _Digital Signature Build Dictionary Specification_ Table 1
-  - goName: null
+  - goName:
     pdfKey: PubSec
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - SignatureBuildDataDict
-  - goName: null
+  - goName:
     pdfKey: App
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - SignatureBuildDataAppDict
-  - goName: null
+  - goName:
     pdfKey: SigQ
     pdfType: dictionary
     required: false
@@ -4081,13 +4040,14 @@ types:
     refTypes:
     - SignatureBuildDataSigQDict
 - name: SignatureReferenceDocMDP
-  goType: null
+  purpose: "document MDP signature reference"
+  goType:
   pdfType: SigRef
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 256
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -4095,31 +4055,29 @@ types:
     possibleValues:
     - SigRef
     notes: Table 256
-  - goName: null
+  - goName:
     pdfKey: TransformMethod
     pdfType: name
     required: true
     introduced: '1.5'
     possibleValues:
     - DocMDP
-  - goName: null
+  - goName:
     pdfKey: TransformParams
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - DocMDPTransformParameters
-  - goName: null
+  - goName:
     pdfKey: Data
     pdfType: array;boolean;dictionary;integer;name;stream;string
     required: false
     introduced: '1.5'
     refTypes:
-    - _UniversalArray
-    - _UniversalDictionary
     - Stream
     notes: various
-  - goName: null
+  - goName:
     pdfKey: DigestMethod
     pdfType: name
     required: false
@@ -4138,30 +4096,29 @@ types:
     - fn:Extension(ISO_TS_32001,SHA3-512)
     - fn:Extension(ISO_TS_32001,SHAKE256)
     notes: see https://github.com/pdf-association/pdf-issues/issues/117
-  - goName: null
+  - goName:
     pdfKey: DigestValue
     pdfType: string
     required: fn:IsRequired(fn:IsPDFVersion(1.5))
     introduced: '1.5'
     deprecated: '2.0'
     notes: see Adobe PDF 1.7 reference, Table 8.103
-  - goName: null
+  - goName:
     pdfKey: DigestLocation
     pdfType: array
     required: fn:IsRequired(fn:IsPDFVersion(1.5) && ((@TransformMethod==FieldMDP) || (@TransformMethod==DocMDP)))
     introduced: '1.5'
     deprecated: '2.0'
-    refTypes:
-    - ArrayOf_2NonNegativeIntegers
     notes: see Adobe PDF 1.7 reference, Table 8.103
 - name: SignatureReferenceFieldMDP
-  goType: null
+  purpose: "field MDP signature reference"
+  goType:
   pdfType: SigRef
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 256
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -4169,31 +4126,29 @@ types:
     possibleValues:
     - SigRef
     notes: Table 256
-  - goName: null
+  - goName:
     pdfKey: TransformMethod
     pdfType: name
     required: true
     introduced: '1.5'
     possibleValues:
     - FieldMDP
-  - goName: null
+  - goName:
     pdfKey: TransformParams
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - FieldMDPTransformParameters
-  - goName: null
+  - goName:
     pdfKey: Data
     pdfType: array;boolean;dictionary;integer;name;stream;string
     required: true
     introduced: '1.5'
     refTypes:
-    - _UniversalArray
-    - _UniversalDictionary
     - Stream
     notes: various
-  - goName: null
+  - goName:
     pdfKey: DigestMethod
     pdfType: name
     required: false
@@ -4211,30 +4166,29 @@ types:
     - fn:Extension(ISO_TS_32001,SHA3-512)
     - fn:Extension(ISO_TS_32001,SHAKE256)
     notes: see https://github.com/pdf-association/pdf-issues/issues/117
-  - goName: null
+  - goName:
     pdfKey: DigestValue
     pdfType: string
     required: fn:IsRequired(fn:IsPDFVersion(1.5))
     introduced: '1.5'
     deprecated: '2.0'
     notes: see Adobe PDF 1.7 reference, Table 8.103
-  - goName: null
+  - goName:
     pdfKey: DigestLocation
     pdfType: array
     required: fn:IsRequired(fn:IsPDFVersion(1.5) && ((@TransformMethod==FieldMDP) || (@TransformMethod==DocMDP)))
     introduced: '1.5'
     deprecated: '2.0'
-    refTypes:
-    - ArrayOf_2NonNegativeIntegers
     notes: see Adobe PDF 1.7 reference, Table 8.103
 - name: SignatureReferenceIdentity
-  goType: null
+  purpose: "identity signature reference"
+  goType:
   pdfType: SigRef
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 256
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -4243,7 +4197,7 @@ types:
     possibleValues:
     - SigRef
     notes: Table 256. ISO 32000 does not mention Identity, but PDF 1.7 from Adobe (2006) does
-  - goName: null
+  - goName:
     pdfKey: TransformMethod
     pdfType: name
     required: true
@@ -4251,18 +4205,16 @@ types:
     deprecated: '1.7'
     possibleValues:
     - Identity
-  - goName: null
+  - goName:
     pdfKey: Data
     pdfType: array;boolean;dictionary;integer;name;stream;string
     required: true
     introduced: '1.5'
     deprecated: '1.7'
     refTypes:
-    - _UniversalArray
-    - _UniversalDictionary
     - Stream
     notes: various
-  - goName: null
+  - goName:
     pdfKey: DigestMethod
     pdfType: name
     required: false
@@ -4281,30 +4233,29 @@ types:
     - fn:Extension(ISO_TS_32001,SHA3-512)
     - fn:Extension(ISO_TS_32001,SHAKE256)
     notes: see https://github.com/pdf-association/pdf-issues/issues/117
-  - goName: null
+  - goName:
     pdfKey: DigestValue
     pdfType: string
     required: false
     introduced: '1.5'
     deprecated: '2.0'
     notes: see Adobe PDF 1.7 reference, Table 8.103
-  - goName: null
+  - goName:
     pdfKey: DigestLocation
     pdfType: array
     required: false
     introduced: '1.5'
     deprecated: '2.0'
-    refTypes:
-    - ArrayOf_2NonNegativeIntegers
     notes: see Adobe PDF 1.7 reference, Table 8.103
 - name: SignatureReferenceUR
-  goType: null
+  purpose: "usage rights signature reference"
+  goType:
   pdfType: SigRef
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 256
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -4313,7 +4264,7 @@ types:
     possibleValues:
     - SigRef
     notes: Table 256
-  - goName: null
+  - goName:
     pdfKey: TransformMethod
     pdfType: name
     required: true
@@ -4322,7 +4273,7 @@ types:
     possibleValues:
     - UR
     - UR3
-  - goName: null
+  - goName:
     pdfKey: TransformParams
     pdfType: dictionary
     required: false
@@ -4330,17 +4281,15 @@ types:
     deprecated: '2.0'
     refTypes:
     - URTransformParameters
-  - goName: null
+  - goName:
     pdfKey: Data
     pdfType: array;boolean;dictionary;integer;name;stream;string
     required: false
     introduced: '1.5'
     deprecated: '2.0'
     refTypes:
-    - _UniversalArray
-    - _UniversalDictionary
     - Stream
-  - goName: null
+  - goName:
     pdfKey: DigestMethod
     pdfType: name
     required: false
@@ -4359,28 +4308,27 @@ types:
     - fn:Extension(ISO_TS_32001,SHA3-512)
     - fn:Extension(ISO_TS_32001,SHAKE256)
     notes: see https://github.com/pdf-association/pdf-issues/issues/117
-  - goName: null
+  - goName:
     pdfKey: DigestValue
     pdfType: string
     required: false
     introduced: '1.5'
     deprecated: '2.0'
     notes: see Adobe PDF 1.7 reference, Table 8.103
-  - goName: null
+  - goName:
     pdfKey: DigestLocation
     pdfType: array
     required: false
     introduced: '1.5'
     deprecated: '2.0'
-    refTypes:
-    - ArrayOf_2NonNegativeIntegers
     notes: see Adobe PDF 1.7 reference, Table 8.103
 - name: SourceInformation
-  goType: null
+  purpose: "source information for web capture content"
+  goType:
   pdfRepr: dict
   introduced: '1.3'
   fields:
-  - goName: null
+  - goName:
     pdfKey: AU
     pdfType: dictionary;ascii-string
     required: true
@@ -4389,19 +4337,19 @@ types:
     refTypes:
     - URLAlias
     notes: Table 391
-  - goName: null
+  - goName:
     pdfKey: TS
     pdfType: date
     required: false
     introduced: '1.3'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: E
     pdfType: date
     required: false
     introduced: '1.3'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: integer
     required: false
@@ -4413,7 +4361,7 @@ types:
     - '1'
     - '2'
     notes: only for spider page sets
-  - goName: null
+  - goName:
     pdfKey: C
     pdfType: dictionary
     required: false
@@ -4423,13 +4371,14 @@ types:
     - WebCaptureCommand
     notes: only for spider page sets
 - name: StructElem
-  goType: null
+  purpose: "structure element in the document structure tree"
+  goType:
   pdfType: StructElem
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 355
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -4437,12 +4386,12 @@ types:
     possibleValues:
     - StructElem
     notes: Table 355
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: P
     pdfType: dictionary
     required: true
@@ -4450,36 +4399,38 @@ types:
     refTypes:
     - StructElem
     - StructTreeRoot
-  - goName: null
+  - goName:
     pdfKey: ID
     pdfType: byte-string
     required: false
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: Ref
     pdfType: array
     required: false
     introduced: '2.0'
     refTypes:
-    - ArrayOfStructElem
-  - goName: null
+    - type: StructElem
+      collection: array
+  - goName:
     pdfKey: Pg
     pdfType: dictionary
     required: false
     introduced: '1.3'
     refTypes:
     - PageObject
-  - goName: null
+  - goName:
     pdfKey: K
     pdfType: array;dictionary;integer
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfStructElemKids
+    - type: StructElem
+      collection: array
     - StructElem
     - MarkedContentReference
     - ObjectReference
-  - goName: null
+  - goName:
     pdfKey: A
     pdfType: array;dictionary;stream
     required: false
@@ -4487,17 +4438,14 @@ types:
     possibleValues:
     - fn:Eval(fn:ArrayLength(A)>=1)
     refTypes:
-    - ArrayOfAttributeRevisions
     - StructureAttributesDict
     - Stream
-  - goName: null
+  - goName:
     pdfKey: C
     pdfType: array;name
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOfClassNamesRevisions
-  - goName: null
+  - goName:
     pdfKey: R
     pdfType: integer
     required: false
@@ -4507,64 +4455,66 @@ types:
     possibleValues:
     - fn:Eval(@R>=0)
     notes: see https://github.com/pdf-association/pdf-issues/issues/93
-  - goName: null
+  - goName:
     pdfKey: T
     pdfType: text-string
     required: false
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: Lang
     pdfType: text-string
     required: false
     introduced: '1.4'
-  - goName: null
+  - goName:
     pdfKey: Alt
     pdfType: text-string
     required: false
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: E
     pdfType: text-string
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: ActualText
     pdfType: text-string
     required: false
     introduced: '1.4'
-  - goName: null
+  - goName:
     pdfKey: AF
     pdfType: array
     required: false
     introduced: '2.0'
     refTypes:
-    - ArrayOfAFFileSpecifications
-  - goName: null
+    - type: AFFileSpecification
+      collection: array
+  - goName:
     pdfKey: NS
     pdfType: dictionary
     required: false
     introduced: '2.0'
     refTypes:
     - Namespace
-  - goName: null
+  - goName:
     pdfKey: PhoneticAlphabet
     pdfType: name
     required: false
     default: ipa
     introduced: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Phoneme
     pdfType: text-string
     required: false
     introduced: '2.0'
 - name: StructTreeRoot
-  goType: null
+  purpose: "root of the document structure tree"
+  goType:
   pdfType: StructTreeRoot
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 354
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -4572,15 +4522,16 @@ types:
     possibleValues:
     - StructTreeRoot
     notes: Table 354
-  - goName: null
+  - goName:
     pdfKey: K
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfStructElem
+    - type: StructElem
+      collection: array
     - StructElem
-  - goName: null
+  - goName:
     pdfKey: IDTree
     pdfType: name-tree
     required: false
@@ -4589,65 +4540,68 @@ types:
     - StructElem
     - MarkedContentReference
     - ObjectReference
-  - goName: null
+  - goName:
     pdfKey: ParentTree
     pdfType: number-tree
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfStructElemParentTree
     - StructElem
     - MarkedContentReference
     - ObjectReference
     notes: https://github.com/pdf-association/pdf-issues/issues/308
-  - goName: null
+  - goName:
     pdfKey: ParentTreeNextKey
     pdfType: integer
     required: false
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: RoleMap
     pdfType: dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - RoleMap
-  - goName: null
+    - _RoleMap
+  - goName:
     pdfKey: ClassMap
     pdfType: dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ClassMap
-  - goName: null
+    - _ClassMap
+  - goName:
     pdfKey: Namespaces
     pdfType: array
     required: false
     introduced: '2.0'
     refTypes:
-    - ArrayOfNamespace
-  - goName: null
+    - type: Namespace
+      collection: array
+  - goName:
     pdfKey: PronunciationLexicon
     pdfType: array
     required: false
     introduced: '2.0'
     refTypes:
-    - ArrayOfFileSpecifications
-  - goName: null
+    - type: FileSpecification
+      collection: array
+  - goName:
     pdfKey: AF
     pdfType: array
     required: false
     introduced: '2.0'
     refTypes:
-    - ArrayOfAFFileSpecifications
+    - type: AFFileSpecification
+      collection: array
 - name: StructureAttributesDict
-  goType: null
+  purpose: "attributes of a structure element"
+  goType:
   pdfType: Pagination
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 385
   fields:
-  - goName: null
+  - goName:
     pdfKey: O
     pdfType: name
     required: true
@@ -4674,7 +4628,7 @@ types:
     - fn:Extension(WTPDF,FENote)
     - '*'
     notes: Table 360 and Table 376
-  - goName: null
+  - goName:
     pdfKey: NS
     pdfType: dictionary
     required: fn:IsRequired(@O==NSO)
@@ -4682,7 +4636,7 @@ types:
     refTypes:
     - Namespace
     notes: Table 360
-  - goName: null
+  - goName:
     pdfKey: Placement
     pdfType: name
     required: false
@@ -4694,7 +4648,7 @@ types:
     - End
     - Inline
     notes: Table 378
-  - goName: null
+  - goName:
     pdfKey: WritingMode
     pdfType: name
     required: false
@@ -4711,25 +4665,20 @@ types:
     - fn:SinceVersion(2.0,BtLr)
     inheritable: true
     notes: Table 378
-  - goName: null
+  - goName:
     pdfKey: BackgroundColor
     pdfType: array
     required: false
     introduced: '1.5'
-    refTypes:
-    - ArrayOf_3RGBNumbers
     notes: Table 378
-  - goName: null
+  - goName:
     pdfKey: BorderColor
     pdfType: array
     required: false
     introduced: '1.5'
     inheritable: true
-    refTypes:
-    - ArrayOf_4BorderColorArrays
-    - ArrayOf_3RGBNumbers
     notes: Table 378
-  - goName: null
+  - goName:
     pdfKey: BorderStyle
     pdfType: array;name
     required: false
@@ -4746,52 +4695,44 @@ types:
     - Ridge
     - Inset
     - Outset
-    refTypes:
-    - ArrayOf_4BorderStyleNames
     notes: Table 378
-  - goName: null
+  - goName:
     pdfKey: BorderThickness
     pdfType: array;number
     required: false
     default: '[];[0]'
     introduced: '1.5'
     inheritable: true
-    refTypes:
-    - ArrayOf_4BorderThicknessNumbers
     notes: Table 378
-  - goName: null
+  - goName:
     pdfKey: Padding
     pdfType: array;number
     required: false
     default: '[];[0]'
     introduced: '1.5'
-    refTypes:
-    - ArrayOf_4Integers
     notes: Table 378
-  - goName: null
+  - goName:
     pdfKey: Color
     pdfType: array
     required: false
     introduced: '1.5'
     inheritable: true
-    refTypes:
-    - ArrayOf_3RGBNumbers
     notes: Table 378
-  - goName: null
+  - goName:
     pdfKey: SpaceBefore
     pdfType: number
     required: false
     default: '0'
     introduced: '1.4'
     notes: Table 379
-  - goName: null
+  - goName:
     pdfKey: SpaceAfter
     pdfType: number
     required: false
     default: '0'
     introduced: '1.4'
     notes: Table 379
-  - goName: null
+  - goName:
     pdfKey: StartIndent
     pdfType: number
     required: false
@@ -4799,7 +4740,7 @@ types:
     introduced: '1.4'
     inheritable: true
     notes: Table 379
-  - goName: null
+  - goName:
     pdfKey: EndIndent
     pdfType: number
     required: false
@@ -4807,7 +4748,7 @@ types:
     introduced: '1.4'
     inheritable: true
     notes: Table 379
-  - goName: null
+  - goName:
     pdfKey: TextIndent
     pdfType: number
     required: false
@@ -4815,7 +4756,7 @@ types:
     introduced: '1.4'
     inheritable: true
     notes: Table 379
-  - goName: null
+  - goName:
     pdfKey: TextAlign
     pdfType: name
     required: false
@@ -4828,27 +4769,27 @@ types:
     - Justify
     inheritable: true
     notes: Table 379
-  - goName: null
+  - goName:
     pdfKey: BBox
     pdfType: rectangle
     required: false
     introduced: '1.4'
     notes: Table 379 and Table 385 - https://github.com/pdf-association/pdf-issues/issues/226
-  - goName: null
+  - goName:
     pdfKey: Width
     pdfType: name;number
     required: false
     default: '[Auto];[]'
     introduced: '1.4'
     notes: Table 379
-  - goName: null
+  - goName:
     pdfKey: Height
     pdfType: name;number
     required: false
     default: '[Auto];[]'
     introduced: '1.4'
     notes: Table 379
-  - goName: null
+  - goName:
     pdfKey: BlockAlign
     pdfType: name
     required: false
@@ -4861,7 +4802,7 @@ types:
     - Justify
     inheritable: true
     notes: Table 379
-  - goName: null
+  - goName:
     pdfKey: InlineAlign
     pdfType: name
     required: false
@@ -4873,7 +4814,7 @@ types:
     - End
     inheritable: true
     notes: Table 379
-  - goName: null
+  - goName:
     pdfKey: TBorderStyle
     pdfType: array;name
     required: false
@@ -4891,20 +4832,16 @@ types:
     - Inset
     - Outset
     inheritable: true
-    refTypes:
-    - ArrayOf_4BorderStyleNames
     notes: Table 379
-  - goName: null
+  - goName:
     pdfKey: TPadding
     pdfType: array;integer
     required: false
     default: '[];[0]'
     introduced: '1.5'
     inheritable: true
-    refTypes:
-    - ArrayOf_4Integers
     notes: Table 379
-  - goName: null
+  - goName:
     pdfKey: BaselineShift
     pdfType: number
     required: false
@@ -4912,7 +4849,7 @@ types:
     introduced: '1.4'
     inheritable: true
     notes: Table 380
-  - goName: null
+  - goName:
     pdfKey: LineHeight
     pdfType: name;number
     required: false
@@ -4923,7 +4860,7 @@ types:
     - Auto
     inheritable: true
     notes: Table 380
-  - goName: null
+  - goName:
     pdfKey: TextPosition
     pdfType: name
     required: false
@@ -4935,23 +4872,21 @@ types:
     - Normal
     inheritable: true
     notes: Table 380
-  - goName: null
+  - goName:
     pdfKey: TextDecorationColor
     pdfType: array
     required: false
     introduced: '1.5'
     inheritable: true
-    refTypes:
-    - ArrayOf_3RGBNumbers
     notes: Table 380
-  - goName: null
+  - goName:
     pdfKey: TextDecorationThickness
     pdfType: number
     required: false
     introduced: '1.5'
     inheritable: true
     notes: Table 380
-  - goName: null
+  - goName:
     pdfKey: TextDecorationType
     pdfType: name
     required: false
@@ -4964,7 +4899,7 @@ types:
     - LineThrough
     inheritable: true
     notes: Table 380
-  - goName: null
+  - goName:
     pdfKey: RubyAlign
     pdfType: name
     required: false
@@ -4978,7 +4913,7 @@ types:
     - Distribute
     inheritable: true
     notes: Table 380
-  - goName: null
+  - goName:
     pdfKey: RubyPosition
     pdfType: name
     required: false
@@ -4991,7 +4926,7 @@ types:
     - Inline
     inheritable: true
     notes: Table 380
-  - goName: null
+  - goName:
     pdfKey: GlyphOrientationVertical
     pdfType: integer;name
     required: false
@@ -5008,30 +4943,26 @@ types:
     - Auto
     inheritable: true
     notes: Table 380 and https://github.com/pdf-association/pdf-issues/issues/152
-  - goName: null
+  - goName:
     pdfKey: ColumnCount
     pdfType: integer
     required: false
     default: '1'
     introduced: '1.6'
     notes: Table 381
-  - goName: null
+  - goName:
     pdfKey: ColumnGap
     pdfType: array;number
     required: false
     introduced: '1.6'
-    refTypes:
-    - ArrayOfNumbersGeneral
     notes: Table 381
-  - goName: null
+  - goName:
     pdfKey: ColumnWidths
     pdfType: array;number
     required: false
     introduced: '1.6'
-    refTypes:
-    - ArrayOfNumbersGeneral
     notes: Table 381
-  - goName: null
+  - goName:
     pdfKey: ListNumbering
     pdfType: name
     required: false
@@ -5052,20 +4983,20 @@ types:
     - LowerAlpha
     inheritable: true
     notes: Table 382
-  - goName: null
+  - goName:
     pdfKey: ContinuedList
     pdfType: boolean
     required: false
     default: false
     introduced: '2.0'
     notes: Table 382
-  - goName: null
+  - goName:
     pdfKey: ContinuedFrom
     pdfType: byte-string
     required: false
     introduced: '2.0'
     notes: Table 382
-  - goName: null
+  - goName:
     pdfKey: Role
     pdfType: name
     required: false
@@ -5077,7 +5008,7 @@ types:
     - tv
     - lb
     notes: Table 383
-  - goName: null
+  - goName:
     pdfKey: Checked
     pdfType: name
     required: false
@@ -5088,7 +5019,7 @@ types:
     - 'off'
     - neutral
     notes: Table 383
-  - goName: null
+  - goName:
     pdfKey: checked
     pdfType: name
     required: false
@@ -5100,35 +5031,33 @@ types:
     - 'off'
     - neutral
     notes: Table 383
-  - goName: null
+  - goName:
     pdfKey: Desc
     pdfType: text-string
     required: false
     introduced: '1.7'
     notes: Table 383
-  - goName: null
+  - goName:
     pdfKey: RowSpan
     pdfType: integer
     required: false
     default: '1'
     introduced: '1.4'
     notes: Table 384
-  - goName: null
+  - goName:
     pdfKey: ColSpan
     pdfType: integer
     required: false
     default: '1'
     introduced: '1.4'
     notes: Table 384
-  - goName: null
+  - goName:
     pdfKey: Headers
     pdfType: array
     required: false
     introduced: '1.4'
-    refTypes:
-    - ArrayOfStringsByte
     notes: Table 384
-  - goName: null
+  - goName:
     pdfKey: Scope
     pdfType: name
     required: false
@@ -5138,27 +5067,28 @@ types:
     - Column
     - Both
     notes: Table 384
-  - goName: null
+  - goName:
     pdfKey: Summary
     pdfType: text-string
     required: false
     introduced: '1.7'
     notes: Table 384
-  - goName: null
+  - goName:
     pdfKey: Short
     pdfType: text-string
     required: false
     introduced: '2.0'
     notes: Table 384
-  - goName: null
+  - goName:
     pdfKey: P
     pdfType: array
     required: fn:IsRequired(@O==UserProperties)
     introduced: '1.6'
     refTypes:
-    - ArrayOfUserProperty
+    - type: UserProperty
+      collection: array
     notes: Table 361
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -5170,7 +5100,7 @@ types:
     - fn:IsPDFVersion(1.7,fn:Extension(ADBE_Extn3,BatesN))
     - fn:SinceVersion(2.0,Inline)
     notes: Table 385
-  - goName: null
+  - goName:
     pdfKey: Subtype
     pdfType: name
     required: false
@@ -5184,15 +5114,13 @@ types:
     - fn:SinceVersion(2.0,LineNum)
     - fn:SinceVersion(2.0,Redaction)
     notes: Table 385
-  - goName: null
+  - goName:
     pdfKey: Contents
     pdfType: array;text-string
     required: false
     introduced: fn:Extension(ADBE_Extn3,1.7)
     deprecated: '2.0'
-    refTypes:
-    - ArrayOfStringsText
-  - goName: null
+  - goName:
     pdfKey: NoteType
     pdfType: name
     required: false
@@ -5204,39 +5132,42 @@ types:
     - fn:Extension(WTPDF,None)
     notes: Well-Tagged PDF v1.0 Table 1 and Table 2
 - name: StyleDict
-  goType: null
+  purpose: "style parameters for structure element presentation"
+  goType:
   pdfRepr: dict
   introduced: '1.2'
   fields:
-  - goName: null
+  - goName:
     pdfKey: Panose
     pdfType: byte-string
     required: false
     introduced: '1.2'
     notes: Clause 9.8.3.2
 - name: SubjectDN
-  goType: null
+  purpose: "subject distinguished name for certificate matching"
+  goType:
   pdfRepr: dict
   introduced: '1.7'
   fields:
-  - goName: null
+  - goName:
     pdfKey: '*'
     pdfType: text-string
     required: false
     introduced: '1.7'
     notes: Table 238, SubjectDN cell
 - name: TimeStampDict
-  goType: null
+  purpose: "time stamp dictionary"
+  goType:
   pdfRepr: dict
   introduced: '1.6'
   fields:
-  - goName: null
+  - goName:
     pdfKey: URL
     pdfType: ascii-string
     required: true
     introduced: '1.6'
     notes: Table 237, TimeStamp cell
-  - goName: null
+  - goName:
     pdfKey: Ff
     pdfType: integer
     required: true
@@ -5246,31 +5177,31 @@ types:
     - '0'
     - '1'
 - name: URLAlias
-  goType: null
+  purpose: "URL alias for web capture content"
+  goType:
   pdfRepr: dict
   introduced: '1.3'
   fields:
-  - goName: null
+  - goName:
     pdfKey: U
     pdfType: ascii-string
     required: true
     introduced: '1.3'
     notes: Table 392
-  - goName: null
+  - goName:
     pdfKey: C
     pdfType: array
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOfArraysURLStrings
 - name: URTransformParameters
-  goType: null
+  purpose: "usage rights transform parameters"
+  goType:
   pdfType: TransformParams
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 258
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -5279,60 +5210,50 @@ types:
     possibleValues:
     - TransformParams
     notes: Table 258
-  - goName: null
+  - goName:
     pdfKey: Document
     pdfType: array
     required: false
     introduced: '1.5'
     deprecated: '2.0'
-    refTypes:
-    - URTransformParamDocumentArray
-  - goName: null
+  - goName:
     pdfKey: Msg
     pdfType: text-string
     required: false
     introduced: '1.5'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: name
     required: false
     default: '2.2'
     introduced: '1.5'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Annots
     pdfType: array
     required: false
     introduced: '1.5'
     deprecated: '2.0'
-    refTypes:
-    - URTransformParamAnnotsArray
-  - goName: null
+  - goName:
     pdfKey: Form
     pdfType: array
     required: false
     introduced: '1.5'
     deprecated: '2.0'
-    refTypes:
-    - URTransformParamFormArray
-  - goName: null
+  - goName:
     pdfKey: Signature
     pdfType: array
     required: false
     introduced: '1.5'
     deprecated: '2.0'
-    refTypes:
-    - URTransformParamSignatureArray
-  - goName: null
+  - goName:
     pdfKey: EF
     pdfType: array
     required: false
     introduced: '1.6'
     deprecated: '2.0'
-    refTypes:
-    - URTransformParamEFArray
-  - goName: null
+  - goName:
     pdfKey: P
     pdfType: boolean
     required: false
@@ -5340,45 +5261,45 @@ types:
     introduced: '1.6'
     deprecated: '2.0'
 - name: UserProperty
-  goType: null
+  purpose: "user-defined property of a structure element"
+  goType:
   pdfRepr: dict
   introduced: '1.6'
   fields:
-  - goName: null
+  - goName:
     pdfKey: N
     pdfType: text-string
     required: true
     introduced: '1.6'
     notes: Table 362
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: array;boolean;dictionary;name;null;number;stream;string
     required: true
     introduced: '1.6'
     refTypes:
-    - _UniversalArray
-    - _UniversalDictionary
     - Stream
     notes: any PDF object
-  - goName: null
+  - goName:
     pdfKey: F
     pdfType: text-string
     required: false
     introduced: '1.6'
-  - goName: null
+  - goName:
     pdfKey: H
     pdfType: boolean
     required: false
     default: false
     introduced: '1.6'
 - name: VRI
-  goType: null
+  purpose: "validation-related information for a signature"
+  goType:
   pdfType: VRI
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 262
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -5386,34 +5307,28 @@ types:
     possibleValues:
     - VRI
     notes: Table 262 and ETSI EN 319 142-1 (PAdES) https://github.com/pdf-association/arlington-pdf-model/issues/121
-  - goName: null
+  - goName:
     pdfKey: Cert
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOfStreamsGeneral
     notes: each stream is a DER-encoded X.509 certificate
-  - goName: null
+  - goName:
     pdfKey: CRL
     pdfType: array
     required: fn:IsRequired(fn:ArrayLength(parent::CRLs)>0)
     introduced: '1.7'
-    refTypes:
-    - ArrayOfStreamsGeneral
-  - goName: null
+  - goName:
     pdfKey: OCSP
     pdfType: array
     required: fn:IsRequired(fn:ArrayLength(parent::OCSPs)>0)
     introduced: '1.7'
-    refTypes:
-    - ArrayOfStreamsGeneral
-  - goName: null
+  - goName:
     pdfKey: TU
     pdfType: date
     required: false
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: TS
     pdfType: stream
     required: false
@@ -5422,25 +5337,26 @@ types:
     - Stream
     notes: DER-encoded timestamp
 - name: WebCaptureCommand
-  goType: null
+  purpose: "command for web capture"
+  goType:
   pdfRepr: dict
   introduced: '1.3'
   fields:
-  - goName: null
+  - goName:
     pdfKey: URL
     pdfType: ascii-string
     required: true
     introduced: '1.3'
     deprecated: '2.0'
     notes: Table 393
-  - goName: null
+  - goName:
     pdfKey: L
     pdfType: integer
     required: false
     default: '1'
     introduced: '1.3'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: F
     pdfType: bitmask
     required: false
@@ -5448,7 +5364,7 @@ types:
     introduced: '1.3'
     deprecated: '2.0'
     notes: Table 394
-  - goName: null
+  - goName:
     pdfKey: P
     pdfType: stream;string
     required: false
@@ -5456,7 +5372,7 @@ types:
     deprecated: '2.0'
     refTypes:
     - Stream
-  - goName: null
+  - goName:
     pdfKey: CT
     pdfType: ascii-string
     required: false
@@ -5464,13 +5380,13 @@ types:
     introduced: '1.3'
     deprecated: '2.0'
     notes: shall describe the content type of the posted data as described in Internet RFC 2045
-  - goName: null
+  - goName:
     pdfKey: H
     pdfType: string
     required: false
     introduced: '1.3'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: dictionary
     required: false
@@ -5479,28 +5395,26 @@ types:
     refTypes:
     - WebCaptureCommandSettings
 - name: WebCaptureCommandSettings
-  goType: null
+  purpose: "settings for a web capture command"
+  goType:
   pdfRepr: dict
   introduced: '1.3'
   fields:
-  - goName: null
+  - goName:
     pdfKey: G
     pdfType: dictionary
     required: false
     introduced: '1.3'
     deprecated: '2.0'
-    refTypes:
-    - _UniversalDictionary
     notes: Table 395
-  - goName: null
+  - goName:
     pdfKey: C
     pdfType: dictionary
     required: false
     introduced: '1.3'
     deprecated: '2.0'
-    refTypes:
-    - _UniversalDictionary
 - name: WebCaptureContentSetId
+  purpose: "content set identifier for web capture"
   goType: webcapture.Identifier
   pdfRepr: byte-string
   introduced: '1.3'
@@ -5521,15 +5435,17 @@ types:
   goPackage: webcapture
   goRepr: struct
   readFunc: webcapture.ExtractIdentifier
+  fileDependent: false
   writeMethod: (*Identifier).Embed
 - name: WebCaptureImageSet
-  goType: null
+  purpose: "image set from web capture"
+  goType:
   pdfType: SpiderContentSet
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 388
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -5538,7 +5454,7 @@ types:
     possibleValues:
     - SpiderContentSet
     notes: Table 388 and Table 390
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
@@ -5546,56 +5462,57 @@ types:
     deprecated: '2.0'
     possibleValues:
     - SIS
-  - goName: null
+  - goName:
     pdfKey: ID
     pdfType: string
     required: true
     introduced: '1.3'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: O
     pdfType: array
     required: true
     introduced: '1.3'
     deprecated: '2.0'
     refTypes:
-    - ArrayOfWebCaptureImages
-  - goName: null
+    - type: WebCaptureImageSet
+      collection: array
+  - goName:
     pdfKey: SI
     pdfType: array;dictionary
     required: true
     introduced: '1.3'
     deprecated: '2.0'
     refTypes:
-    - ArrayOfSourceInformation
+    - type: SourceInformation
+      collection: array
     - SourceInformation
-  - goName: null
+  - goName:
     pdfKey: CT
     pdfType: string
     required: false
     introduced: '1.3'
     deprecated: '2.0'
     notes: shall conform to the content type specification described in Internet RFC 2045
-  - goName: null
+  - goName:
     pdfKey: TS
     pdfType: date
     required: false
     introduced: '1.3'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: R
     pdfType: array;integer
     required: true
     introduced: '1.3'
     deprecated: '2.0'
-    refTypes:
-    - ArrayOfIntegersGeneral
 - name: WebCaptureInfo
-  goType: null
+  purpose: "web capture information dictionary"
+  goType:
   pdfRepr: dict
   introduced: '1.3'
   fields:
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: number
     required: true
@@ -5604,22 +5521,24 @@ types:
     possibleValues:
     - '1'
     notes: Table 386
-  - goName: null
+  - goName:
     pdfKey: C
     pdfType: array
     required: false
     introduced: '1.3'
     deprecated: '2.0'
     refTypes:
-    - ArrayOfWebCaptureCommands
+    - type: WebCaptureCommand
+      collection: array
 - name: WebCapturePageSet
-  goType: null
+  purpose: "page set from web capture"
+  goType:
   pdfType: SpiderContentSet
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 388
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -5628,7 +5547,7 @@ types:
     possibleValues:
     - SpiderContentSet
     notes: Table 388 and Table 389
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
@@ -5636,49 +5555,51 @@ types:
     deprecated: '2.0'
     possibleValues:
     - SPS
-  - goName: null
+  - goName:
     pdfKey: ID
     pdfType: byte-string
     required: true
     introduced: '1.3'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: O
     pdfType: array
     required: true
     introduced: '1.3'
     deprecated: '2.0'
     refTypes:
-    - ArrayOfWebCapturePages
-  - goName: null
+    - type: WebCapturePageSet
+      collection: array
+  - goName:
     pdfKey: SI
     pdfType: array;dictionary
     required: true
     introduced: '1.3'
     deprecated: '2.0'
     refTypes:
-    - ArrayOfSourceInformation
+    - type: SourceInformation
+      collection: array
     - SourceInformation
-  - goName: null
+  - goName:
     pdfKey: CT
     pdfType: ascii-string
     required: false
     introduced: '1.3'
     deprecated: '2.0'
     notes: shall conform to the content type specification described in Internet RFC 2045
-  - goName: null
+  - goName:
     pdfKey: TS
     pdfType: date
     required: false
     introduced: '1.3'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: T
     pdfType: text-string
     required: false
     introduced: '1.3'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: TID
     pdfType: byte-string
     required: false

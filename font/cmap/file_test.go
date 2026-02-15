@@ -387,7 +387,7 @@ func FuzzReadCMap(f *testing.F) {
 		if err != nil {
 			f.Fatal(err)
 		}
-		f.Add(buf.Bytes())
+		f.Add(bytes.Clone(buf.Bytes()))
 	}
 
 	// Also add all predefined CMaps

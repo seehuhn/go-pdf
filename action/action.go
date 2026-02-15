@@ -68,7 +68,7 @@ const (
 
 // Decode reads an action from a PDF object.
 func Decode(x *pdf.Extractor, obj pdf.Object) (Action, error) {
-	dict, err := x.GetDict(obj)
+	dict, err := x.GetDictTyped(obj, "Action")
 	if err != nil {
 		return nil, err
 	}

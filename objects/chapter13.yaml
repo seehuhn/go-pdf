@@ -2,13 +2,14 @@ chapter: 13
 title: Multimedia
 types:
 - name: FloatingWindowParameters
-  goType: null
+  purpose: "floating window parameters"
+  goType:
   pdfType: FWParams
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 295
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -16,14 +17,12 @@ types:
     possibleValues:
     - FWParams
     notes: Table 295
-  - goName: null
+  - goName:
     pdfKey: D
     pdfType: array
     required: true
     introduced: '1.5'
-    refTypes:
-    - ArrayOf_2Integers
-  - goName: null
+  - goName:
     pdfKey: RT
     pdfType: integer
     required: false
@@ -34,7 +33,7 @@ types:
     - '1'
     - '2'
     - '3'
-  - goName: null
+  - goName:
     pdfKey: P
     pdfType: integer
     required: false
@@ -50,7 +49,7 @@ types:
     - '6'
     - '7'
     - '8'
-  - goName: null
+  - goName:
     pdfKey: O
     pdfType: integer
     required: false
@@ -60,19 +59,19 @@ types:
     - '0'
     - '1'
     - '2'
-  - goName: null
+  - goName:
     pdfKey: T
     pdfType: boolean
     required: false
     default: true
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: UC
     pdfType: boolean
     required: false
     default: true
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: R
     pdfType: integer
     required: false
@@ -82,21 +81,20 @@ types:
     - '0'
     - '1'
     - '2'
-  - goName: null
+  - goName:
     pdfKey: TT
     pdfType: array
     required: false
     introduced: '1.5'
-    refTypes:
-    - ArrayOfStringsText
 - name: MediaClipData
-  goType: null
+  purpose: "reference to actual media data"
+  goType:
   pdfType: MediaClip
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 284
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -104,19 +102,19 @@ types:
     possibleValues:
     - MediaClip
     notes: Table 284 and Table 285
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '1.5'
     possibleValues:
     - MCD
-  - goName: null
+  - goName:
     pdfKey: N
     pdfType: text-string
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: D
     pdfType: dictionary;stream;string
     required: true
@@ -124,41 +122,39 @@ types:
     refTypes:
     - FileSpecification
     - XObjectFormType1
-  - goName: null
+  - goName:
     pdfKey: CT
     pdfType: ascii-string
     required: false
     introduced: '1.5'
     notes: should conform to the content type specification described in RFC 2045
-  - goName: null
+  - goName:
     pdfKey: P
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - MediaPermissions
-  - goName: null
+  - goName:
     pdfKey: Alt
     pdfType: array
     required: false
     introduced: '1.5'
-    refTypes:
-    - ArrayOfStringsText
-  - goName: null
+  - goName:
     pdfKey: PL
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - MediaPlayers
-  - goName: null
+  - goName:
     pdfKey: MH
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - MediaClipDataMHBE
-  - goName: null
+  - goName:
     pdfKey: BE
     pdfType: dictionary
     required: false
@@ -166,24 +162,26 @@ types:
     refTypes:
     - MediaClipDataMHBE
 - name: MediaClipDataMHBE
-  goType: null
+  purpose: "media clip specification"
+  goType:
   pdfRepr: dict
   introduced: '1.5'
   fields:
-  - goName: null
+  - goName:
     pdfKey: BU
     pdfType: ascii-string
     required: false
     introduced: '1.5'
     notes: Table 287 - absolute URL as base URL
 - name: MediaClipSection
-  goType: null
+  purpose: "section of a media clip"
+  goType:
   pdfType: MediaClip
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 284
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -191,19 +189,19 @@ types:
     possibleValues:
     - MediaClip
     notes: Table 284 and Table 288
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '1.5'
     possibleValues:
     - MCS
-  - goName: null
+  - goName:
     pdfKey: N
     pdfType: text-string
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: D
     pdfType: dictionary
     required: true
@@ -211,21 +209,19 @@ types:
     refTypes:
     - MediaClipSection
     - MediaClipData
-  - goName: null
+  - goName:
     pdfKey: Alt
     pdfType: array
     required: false
     introduced: '1.5'
-    refTypes:
-    - ArrayOfStringsText
-  - goName: null
+  - goName:
     pdfKey: MH
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - MediaClipSectionMHBE
-  - goName: null
+  - goName:
     pdfKey: BE
     pdfType: dictionary
     required: false
@@ -233,11 +229,12 @@ types:
     refTypes:
     - MediaClipSectionMHBE
 - name: MediaClipSectionMHBE
-  goType: null
+  purpose: "media clip specification"
+  goType:
   pdfRepr: dict
   introduced: '1.5'
   fields:
-  - goName: null
+  - goName:
     pdfKey: B
     pdfType: dictionary
     required: false
@@ -247,7 +244,7 @@ types:
     - MediaOffsetMarker
     - MediaOffsetFrame
     notes: Table 289
-  - goName: null
+  - goName:
     pdfKey: E
     pdfType: dictionary
     required: false
@@ -257,13 +254,14 @@ types:
     - MediaOffsetMarker
     - MediaOffsetFrame
 - name: MediaCriteria
-  goType: null
+  purpose: "media selection criteria"
+  goType:
   pdfType: MediaCriteria
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 279
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -271,37 +269,37 @@ types:
     possibleValues:
     - MediaCriteria
     notes: Table 279
-  - goName: null
+  - goName:
     pdfKey: A
     pdfType: boolean
     required: false
     introduced: '1.5'
     notes: hear audio description, equivalent to SMIL's systemAudioDesc attribute
-  - goName: null
+  - goName:
     pdfKey: C
     pdfType: boolean
     required: false
     introduced: '1.5'
     notes: see text captions, equivalent to SMIL's systemCaptions attribute
-  - goName: null
+  - goName:
     pdfKey: O
     pdfType: boolean
     required: false
     introduced: '1.5'
     notes: hear audio overdubs
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: boolean
     required: false
     introduced: '1.5'
     notes: see subtitles
-  - goName: null
+  - goName:
     pdfKey: R
     pdfType: integer
     required: false
     introduced: '1.5'
     notes: bits per second, equivalent to SMIL's systemBitrate attribute
-  - goName: null
+  - goName:
     pdfKey: D
     pdfType: dictionary
     required: false
@@ -309,7 +307,7 @@ types:
     refTypes:
     - MinimumBitDepth
     notes: Equivalent to SMIL's systemScreenDepth attribute
-  - goName: null
+  - goName:
     pdfKey: Z
     pdfType: dictionary
     required: false
@@ -317,36 +315,34 @@ types:
     refTypes:
     - MinimumScreenSize
     notes: Equivalent to SMIL's systemScreenSize attribute
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: array
     required: false
     introduced: '1.5'
     refTypes:
-    - ArrayOfSoftwareIdentifiers
-  - goName: null
+    - type: SoftwareIdentifier
+      collection: array
+  - goName:
     pdfKey: P
     pdfType: array
     required: false
     introduced: '1.5'
-    refTypes:
-    - ArrayOfNamesGeneral
-  - goName: null
+  - goName:
     pdfKey: L
     pdfType: array
     required: false
     introduced: '1.5'
-    refTypes:
-    - ArrayOfStringsText
     notes: Equivalent to SMIL's systemLanguage attribute
 - name: MediaDuration
-  goType: null
+  purpose: "media duration specification"
+  goType:
   pdfType: MediaDuration
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 292
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -354,7 +350,7 @@ types:
     possibleValues:
     - MediaDuration
     notes: Table 292
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
@@ -363,7 +359,7 @@ types:
     - I
     - F
     - T
-  - goName: null
+  - goName:
     pdfKey: T
     pdfType: dictionary
     required: fn:IsRequired(@S==T)
@@ -371,13 +367,14 @@ types:
     refTypes:
     - Timespan
 - name: MediaOffsetFrame
-  goType: null
+  purpose: "frame-based media offset"
+  goType:
   pdfType: MediaOffset
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 296
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -385,14 +382,14 @@ types:
     possibleValues:
     - MediaOffset
     notes: Table 296 and Table 298
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '1.5'
     possibleValues:
     - F
-  - goName: null
+  - goName:
     pdfKey: F
     pdfType: integer
     required: true
@@ -400,13 +397,14 @@ types:
     possibleValues:
     - fn:Eval(@F>=0)
 - name: MediaOffsetMarker
-  goType: null
+  purpose: "marker-based media offset"
+  goType:
   pdfType: MediaOffset
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 296
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -414,26 +412,27 @@ types:
     possibleValues:
     - MediaOffset
     notes: Table 296 and Table 299
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '1.5'
     possibleValues:
     - M
-  - goName: null
+  - goName:
     pdfKey: M
     pdfType: text-string
     required: true
     introduced: '1.5'
 - name: MediaOffsetTime
-  goType: null
+  purpose: "time-based media offset"
+  goType:
   pdfType: MediaOffset
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 296
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -441,14 +440,14 @@ types:
     possibleValues:
     - MediaOffset
     notes: Table 296 and Table 297
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '1.5'
     possibleValues:
     - T
-  - goName: null
+  - goName:
     pdfKey: T
     pdfType: dictionary
     required: true
@@ -456,13 +455,14 @@ types:
     refTypes:
     - Timespan
 - name: MediaPermissions
-  goType: null
+  purpose: "permissions for media playback"
+  goType:
   pdfType: MediaPermissions
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 286
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -470,7 +470,7 @@ types:
     possibleValues:
     - MediaPermissions
     notes: Table 286
-  - goName: null
+  - goName:
     pdfKey: TF
     pdfType: ascii-string
     required: false
@@ -482,13 +482,14 @@ types:
     - '''TEMPEXTRACT'''
     - '''TEMPACCESS'''
 - name: MediaPlayParameters
-  goType: null
+  purpose: "playback parameters for media"
+  goType:
   pdfType: MediaPlayParams
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 290
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -496,21 +497,21 @@ types:
     possibleValues:
     - MediaPlayParams
     notes: Table 290
-  - goName: null
+  - goName:
     pdfKey: PL
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - MediaPlayers
-  - goName: null
+  - goName:
     pdfKey: MH
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - MediaPlayParametersMH
-  - goName: null
+  - goName:
     pdfKey: BE
     pdfType: dictionary
     required: false
@@ -518,11 +519,12 @@ types:
     refTypes:
     - MediaPlayParametersBE
 - name: MediaPlayParametersBE
-  goType: null
+  purpose: "unspecified multimedia object"
+  goType:
   pdfRepr: dict
   introduced: '1.5'
   fields:
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: integer
     required: false
@@ -531,13 +533,13 @@ types:
     possibleValues:
     - fn:Eval((@V>=0) && (@V<=100))
     notes: Table 291 - percentage volume
-  - goName: null
+  - goName:
     pdfKey: C
     pdfType: boolean
     required: false
     default: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: F
     pdfType: integer
     required: false
@@ -550,20 +552,20 @@ types:
     - '3'
     - '4'
     - '5'
-  - goName: null
+  - goName:
     pdfKey: D
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - MediaDuration
-  - goName: null
+  - goName:
     pdfKey: A
     pdfType: boolean
     required: false
     default: true
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: RC
     pdfType: number
     required: false
@@ -573,11 +575,12 @@ types:
     - fn:Eval(@RC>=0.0)
     notes: repeat count (zero means forever)
 - name: MediaPlayParametersMH
-  goType: null
+  purpose: "unspecified multimedia object"
+  goType:
   pdfRepr: dict
   introduced: '1.5'
   fields:
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: integer
     required: false
@@ -586,13 +589,13 @@ types:
     possibleValues:
     - fn:Eval((@V>=0) && (@V<=100))
     notes: Table 291 - percentage volume
-  - goName: null
+  - goName:
     pdfKey: C
     pdfType: boolean
     required: false
     default: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: F
     pdfType: integer
     required: false
@@ -605,20 +608,20 @@ types:
     - '3'
     - '4'
     - '5'
-  - goName: null
+  - goName:
     pdfKey: D
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - MediaDuration
-  - goName: null
+  - goName:
     pdfKey: A
     pdfType: boolean
     required: false
     default: true
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: RC
     pdfType: number
     required: false
@@ -628,13 +631,14 @@ types:
     - fn:Eval(@RC>=0.0)
     notes: repeat count (zero means forever)
 - name: MediaPlayerInfo
-  goType: null
+  purpose: "information about a specific media player"
+  goType:
   pdfType: MediaPlayerInfo
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 302
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -642,35 +646,32 @@ types:
     possibleValues:
     - MediaPlayerInfo
     notes: Table 302
-  - goName: null
+  - goName:
     pdfKey: PID
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - SoftwareIdentifier
-  - goName: null
+  - goName:
     pdfKey: MH
     pdfType: dictionary
     required: false
     introduced: '1.5'
-    refTypes:
-    - _UniversalDictionary
-  - goName: null
+  - goName:
     pdfKey: BE
     pdfType: dictionary
     required: false
     introduced: '1.5'
-    refTypes:
-    - _UniversalDictionary
 - name: MediaPlayers
-  goType: null
+  purpose: "media player requirements"
+  goType:
   pdfType: MediaPlayers
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 301
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -678,35 +679,39 @@ types:
     possibleValues:
     - MediaPlayers
     notes: Table 301
-  - goName: null
+  - goName:
     pdfKey: MU
     pdfType: array
     required: false
     introduced: '1.5'
     refTypes:
-    - ArrayOfMediaPlayerInfo
-  - goName: null
+    - type: MediaPlayerInfo
+      collection: array
+  - goName:
     pdfKey: A
     pdfType: array
     required: false
     introduced: '1.5'
     refTypes:
-    - ArrayOfMediaPlayerInfo
-  - goName: null
+    - type: MediaPlayerInfo
+      collection: array
+  - goName:
     pdfKey: NU
     pdfType: array
     required: false
     introduced: '1.5'
     refTypes:
-    - ArrayOfMediaPlayerInfo
+    - type: MediaPlayerInfo
+      collection: array
 - name: MediaScreenParameters
-  goType: null
+  purpose: "screen display parameters for media"
+  goType:
   pdfType: MediaScreenParams
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 293
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -714,14 +719,14 @@ types:
     possibleValues:
     - MediaScreenParams
     notes: Table 293
-  - goName: null
+  - goName:
     pdfKey: MH
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - MediaScreenParametersMHBE
-  - goName: null
+  - goName:
     pdfKey: BE
     pdfType: dictionary
     required: false
@@ -729,11 +734,12 @@ types:
     refTypes:
     - MediaScreenParametersMHBE
 - name: MediaScreenParametersMHBE
-  goType: null
+  purpose: "unspecified multimedia object"
+  goType:
   pdfRepr: dict
   introduced: '1.5'
   fields:
-  - goName: null
+  - goName:
     pdfKey: W
     pdfType: integer
     required: false
@@ -745,14 +751,12 @@ types:
     - '2'
     - '3'
     notes: Table 294
-  - goName: null
+  - goName:
     pdfKey: B
     pdfType: array
     required: false
     introduced: '1.5'
-    refTypes:
-    - ArrayOf_3RGBNumbers
-  - goName: null
+  - goName:
     pdfKey: O
     pdfType: number
     required: false
@@ -760,7 +764,7 @@ types:
     introduced: '1.5'
     possibleValues:
     - fn:Eval((@O>=0.0) && (@O<=1.0))
-  - goName: null
+  - goName:
     pdfKey: M
     pdfType: integer
     required: false
@@ -774,7 +778,7 @@ types:
     - '4'
     - '5'
     - '6'
-  - goName: null
+  - goName:
     pdfKey: F
     pdfType: dictionary
     required: false
@@ -782,13 +786,14 @@ types:
     refTypes:
     - FloatingWindowParameters
 - name: MinimumBitDepth
-  goType: null
+  purpose: "minimum bit depth requirement"
+  goType:
   pdfType: MinBitDepth
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 280
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -796,12 +801,12 @@ types:
     possibleValues:
     - MinBitDepth
     notes: Table 280
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: integer
     required: true
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: M
     pdfType: integer
     required: false
@@ -817,13 +822,14 @@ types:
     - '6'
     notes: Table 304
 - name: MinimumScreenSize
-  goType: null
+  purpose: "minimum screen size requirement"
+  goType:
   pdfType: MinScreenSize
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 281
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -831,15 +837,13 @@ types:
     possibleValues:
     - MinScreenSize
     notes: Table 281
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: array
     required: true
     introduced: '1.5'
-    refTypes:
-    - ArrayOf_2Integers
     notes: '2 non-negative integers of screen: width, height'
-  - goName: null
+  - goName:
     pdfKey: M
     pdfType: integer
     required: false
@@ -855,13 +859,14 @@ types:
     - '6'
     notes: Table 304
 - name: NavNode
-  goType: null
+  purpose: "navigation node"
+  goType:
   pdfType: NavNode
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 165
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -869,7 +874,7 @@ types:
     possibleValues:
     - NavNode
     notes: Table 165
-  - goName: null
+  - goName:
     pdfKey: NA
     pdfType: dictionary
     required: false
@@ -877,10 +882,10 @@ types:
     refTypes:
     - ActionGoTo
     - ActionGoToR
-    - fn:SinceVersion(1.6
-    - ActionGoToE)
-    - fn:SinceVersion(2.0
-    - ActionGoToDp)
+    - type: ActionGoToE
+      since: '1.6'
+    - type: ActionGoToDp
+      since: '2.0'
     - ActionLaunch
     - ActionThread
     - ActionURI
@@ -894,12 +899,12 @@ types:
     - ActionSetOCGState
     - ActionRendition
     - ActionTransition
-    - fn:SinceVersion(1.6
-    - ActionGoTo3DView)
+    - type: ActionGoTo3DView
+      since: '1.6'
     - ActionECMAScript
-    - fn:SinceVersion(2.0
-    - ActionRichMediaExecute)
-  - goName: null
+    - type: ActionRichMediaExecute
+      since: '2.0'
+  - goName:
     pdfKey: PA
     pdfType: dictionary
     required: false
@@ -907,10 +912,10 @@ types:
     refTypes:
     - ActionGoTo
     - ActionGoToR
-    - fn:SinceVersion(1.6
-    - ActionGoToE)
-    - fn:SinceVersion(2.0
-    - ActionGoToDp)
+    - type: ActionGoToE
+      since: '1.6'
+    - type: ActionGoToDp
+      since: '2.0'
     - ActionLaunch
     - ActionThread
     - ActionURI
@@ -924,38 +929,39 @@ types:
     - ActionSetOCGState
     - ActionRendition
     - ActionTransition
-    - fn:SinceVersion(1.6
-    - ActionGoTo3DView)
+    - type: ActionGoTo3DView
+      since: '1.6'
     - ActionECMAScript
-    - fn:SinceVersion(2.0
-    - ActionRichMediaExecute)
-  - goName: null
+    - type: ActionRichMediaExecute
+      since: '2.0'
+  - goName:
     pdfKey: Next
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - NavNode
-  - goName: null
+  - goName:
     pdfKey: Prev
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - NavNode
-  - goName: null
+  - goName:
     pdfKey: Dur
     pdfType: number
     required: false
     introduced: '1.5'
 - name: Requirements3DMarkup
-  goType: null
+  purpose: "requirement for 3dmarkup"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -963,30 +969,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - 3DMarkup
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -995,13 +1002,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsAcroFormInteract
-  goType: null
+  purpose: "requirement for acroforminteract"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1009,30 +1017,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - AcroFormInteract
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1041,13 +1050,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsAction
-  goType: null
+  purpose: "requirement for action"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1055,30 +1065,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - Action
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1087,13 +1098,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsAttachment
-  goType: null
+  purpose: "requirement for attachment"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1101,30 +1113,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - Attachment
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1133,13 +1146,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsAttachmentEditing
-  goType: null
+  purpose: "requirement for attachmentediting"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1147,30 +1161,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - AttachmentEditing
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1179,13 +1194,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsCollection
-  goType: null
+  purpose: "requirement for collection"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1193,30 +1209,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - Collection
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1225,13 +1242,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsCollectionEditing
-  goType: null
+  purpose: "requirement for collectionediting"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1239,30 +1257,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - CollectionEditing
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1271,13 +1290,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsDPartInteract
-  goType: null
+  purpose: "requirement for dpartinteract"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1285,30 +1305,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - DPartInteract
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1317,13 +1338,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsDigSig
-  goType: null
+  purpose: "requirement for digsig"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1331,30 +1353,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 274 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - DigSig
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1362,7 +1385,7 @@ types:
     introduced: '2.0'
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
-  - goName: null
+  - goName:
     pdfKey: DigSig
     pdfType: dictionary
     required: false
@@ -1371,13 +1394,14 @@ types:
     - Signature
     - DocTimeStamp
 - name: RequirementsDigSigMDP
-  goType: null
+  purpose: "requirement for digsigmdp"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1385,30 +1409,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 274 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - DigSigMDP
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1416,7 +1441,7 @@ types:
     introduced: '2.0'
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
-  - goName: null
+  - goName:
     pdfKey: DigSig
     pdfType: dictionary
     required: false
@@ -1425,13 +1450,14 @@ types:
     - Signature
     - DocTimeStamp
 - name: RequirementsDigSigValidation
-  goType: null
+  purpose: "requirement for digsigvalidation"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1439,30 +1465,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 274 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - DigSigValidation
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1470,7 +1497,7 @@ types:
     introduced: '2.0'
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
-  - goName: null
+  - goName:
     pdfKey: DigSig
     pdfType: dictionary
     required: false
@@ -1479,13 +1506,14 @@ types:
     - Signature
     - DocTimeStamp
 - name: RequirementsEnableJavaScripts
-  goType: null
+  purpose: "requirement for enablejavascripts"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1493,30 +1521,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '1.7'
     possibleValues:
     - EnableJavaScripts
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '1.7'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1525,13 +1554,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsEncryption
-  goType: null
+  purpose: "requirement for encryption"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1539,30 +1569,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 274 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - Encryption
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1570,7 +1601,7 @@ types:
     introduced: '2.0'
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
-  - goName: null
+  - goName:
     pdfKey: Encrypt
     pdfType: dictionary
     required: false
@@ -1579,13 +1610,14 @@ types:
     - EncryptionStandard
     - EncryptionPublicKey
 - name: RequirementsGeospatial2D
-  goType: null
+  purpose: "requirement for geospatial2d"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1593,30 +1625,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - Geospatial2D
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1625,13 +1658,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsGeospatial3D
-  goType: null
+  purpose: "requirement for geospatial3d"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1639,30 +1673,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - Geospatial3D
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1671,13 +1706,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsHandler
-  goType: null
+  purpose: "requirement for handler"
+  goType:
   pdfType: ReqHandler
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 276
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1685,7 +1721,7 @@ types:
     possibleValues:
     - ReqHandler
     notes: Table 276
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
@@ -1693,19 +1729,20 @@ types:
     possibleValues:
     - JS
     - NoOp
-  - goName: null
+  - goName:
     pdfKey: Script
     pdfType: text-string
     required: false
     introduced: '1.7'
 - name: RequirementsMarkup
-  goType: null
+  purpose: "requirement for markup"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1713,30 +1750,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - Markup
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1745,13 +1783,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsMultimedia
-  goType: null
+  purpose: "requirement for multimedia"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1759,30 +1798,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - Multimedia
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1791,13 +1831,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsNavigation
-  goType: null
+  purpose: "requirement for navigation"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1805,30 +1846,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - Navigation
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1837,13 +1879,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsOCAutoStates
-  goType: null
+  purpose: "requirement for ocautostates"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1851,30 +1894,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - OCAutoStates
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1883,13 +1927,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsOCInteract
-  goType: null
+  purpose: "requirement for ocinteract"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1897,30 +1942,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - OCInteract
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1929,13 +1975,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsPRC
-  goType: null
+  purpose: "requirement for prc"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1943,30 +1990,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - PRC
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -1975,13 +2023,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsRichMedia
-  goType: null
+  purpose: "requirement for richmedia"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1989,30 +2038,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - RichMedia
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -2021,13 +2071,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsSTEP
-  goType: null
+  purpose: "requirement for step"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: fn:Extension(ISO_TS_24064,2.0)
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -2035,30 +2086,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and ISO/TS 24064
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: fn:Extension(ISO_TS_24064,2.0)
     possibleValues:
     - STEP
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: fn:Extension(ISO_TS_24064,2.0)
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: fn:Extension(ISO_TS_24064,2.0)
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -2067,13 +2119,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsSeparationSimulation
-  goType: null
+  purpose: "requirement for separationsimulation"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -2081,30 +2134,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - SeparationSimulation
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -2113,13 +2167,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsTransitions
-  goType: null
+  purpose: "requirement for transitions"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -2127,30 +2182,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - Transitions
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -2159,13 +2215,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsU3D
-  goType: null
+  purpose: "requirement for u3d"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -2173,30 +2230,31 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and Table 275
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - U3D
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: dictionary;name
     required: false
     introduced: '2.0'
     refTypes:
     - Extensions
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -2205,13 +2263,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RequirementsglTF
-  goType: null
+  purpose: "requirement for gltf"
+  goType:
   pdfType: Requirement
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 273
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -2219,14 +2278,14 @@ types:
     possibleValues:
     - Requirement
     notes: Table 273 and ISO/TS 32007
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '2.0'
     possibleValues:
     - glTF
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: name
     required: true
@@ -2234,16 +2293,17 @@ types:
     possibleValues:
     - '2.0'
     notes: version of ISO/IEC 12113 according to ISO/TS 32007
-  - goName: null
+  - goName:
     pdfKey: RH
     pdfType: array;dictionary
     required: false
     default: '[[]];[]'
     introduced: '2.0'
     refTypes:
-    - ArrayOfRequirementsHandlers
+    - type: RequirementsHandler
+      collection: array
     - RequirementsHandler
-  - goName: null
+  - goName:
     pdfKey: Penalty
     pdfType: integer
     required: false
@@ -2252,13 +2312,14 @@ types:
     possibleValues:
     - fn:Eval((@Penalty>=0) && (@Penalty<=100))
 - name: RichMediaContent
-  goType: null
+  purpose: "rich media content specification"
+  goType:
   pdfType: RichMediaContent
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 341
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -2266,36 +2327,39 @@ types:
     possibleValues:
     - RichMediaContent
     notes: Table 341
-  - goName: null
+  - goName:
     pdfKey: Assets
     pdfType: name-tree
     required: false
     introduced: '1.7'
     refTypes:
     - FileSpecification
-  - goName: null
+  - goName:
     pdfKey: Configurations
     pdfType: array
     required: true
     introduced: '1.7'
     refTypes:
-    - ArrayOfRichMediaConfiguration
+    - type: RichMediaConfiguration
+      collection: array
     notes: https://github.com/pdf-association/pdf-issues/issues/166
-  - goName: null
+  - goName:
     pdfKey: Views
     pdfType: array
     required: false
     introduced: '1.7'
     refTypes:
-    - ArrayOf3DViewAddEntries
+    - type: 3DViewAddEntries
+      collection: array
 - name: SoftwareIdentifier
-  goType: null
+  purpose: "identifier for a software application"
+  goType:
   pdfType: SoftwareIdentifier
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 303
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -2303,55 +2367,51 @@ types:
     possibleValues:
     - SoftwareIdentifier
     notes: Table 303
-  - goName: null
+  - goName:
     pdfKey: U
     pdfType: ascii-string
     required: true
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: L
     pdfType: array
     required: false
     default: '[0]'
     introduced: '1.5'
-    refTypes:
-    - ArrayOfSoftwareVersions
-  - goName: null
+  - goName:
     pdfKey: LI
     pdfType: boolean
     required: false
     default: true
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: H
     pdfType: array
     required: false
     default: '[]'
     introduced: '1.5'
-    refTypes:
-    - ArrayOfSoftwareVersions
-  - goName: null
+  - goName:
     pdfKey: HI
     pdfType: boolean
     required: false
     default: true
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: OS
     pdfType: array
     required: false
     default: '[]'
     introduced: '1.5'
-    refTypes:
-    - ArrayOfStringsByte
 - name: SoundObject
-  goType: null
+  purpose: "sound data stream"
+  deprecated: "2.0"
+  goType:
   pdfType: Sound
   pdfRepr: stream
   introduced: '1.2'
   specTable: Table 5
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -2360,7 +2420,7 @@ types:
     possibleValues:
     - Sound
     notes: Table 5 and Table 305
-  - goName: null
+  - goName:
     pdfKey: R
     pdfType: number
     required: true
@@ -2369,7 +2429,7 @@ types:
     possibleValues:
     - fn:Eval(@R>0)
     notes: sampling per second
-  - goName: null
+  - goName:
     pdfKey: C
     pdfType: integer
     required: false
@@ -2379,7 +2439,7 @@ types:
     possibleValues:
     - fn:Eval(@C>0)
     notes: number of sound channels
-  - goName: null
+  - goName:
     pdfKey: B
     pdfType: integer
     required: false
@@ -2389,7 +2449,7 @@ types:
     possibleValues:
     - fn:Eval(@B>0)
     notes: bits per sample value per channel
-  - goName: null
+  - goName:
     pdfKey: E
     pdfType: name
     required: false
@@ -2401,29 +2461,27 @@ types:
     - Signed
     - muLaw
     - ALaw
-  - goName: null
+  - goName:
     pdfKey: CO
     pdfType: name
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: CP
     pdfType: array;dictionary;stream
     required: false
     introduced: '1.2'
     deprecated: '2.0'
     refTypes:
-    - _UniversalArray
-    - _UniversalDictionary
     - Stream
     notes: various
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.2'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -2435,27 +2493,24 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.2'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: F
     pdfType: dictionary;string
     required: false
     introduced: '1.2'
     refTypes:
     - FileSpecification
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -2467,20 +2522,17 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.2'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: DL
     pdfType: integer
     required: false
@@ -2488,13 +2540,14 @@ types:
     possibleValues:
     - fn:Eval(@DL>=0)
 - name: Timespan
-  goType: null
+  purpose: "time span specification"
+  goType:
   pdfType: Timespan
   pdfRepr: dict
   introduced: '1.5'
   specTable: Table 300
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -2502,14 +2555,14 @@ types:
     possibleValues:
     - Timespan
     notes: Table 300
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
     introduced: '1.5'
     possibleValues:
     - S
-  - goName: null
+  - goName:
     pdfKey: V
     pdfType: number
     required: true

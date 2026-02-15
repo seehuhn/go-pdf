@@ -373,7 +373,7 @@ func FuzzReadToUnicode(f *testing.F) {
 		if err != nil {
 			f.Fatal(err)
 		}
-		f.Add(buf.Bytes())
+		f.Add(bytes.Clone(buf.Bytes()))
 	}
 
 	// Normal CMaps are not valid here, but since they are very similar

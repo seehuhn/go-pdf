@@ -17,6 +17,8 @@
 package fallback
 
 import (
+	"fmt"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -68,9 +70,6 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 	a.BorderStyle = nil
 	a.BorderEffect = nil
 
-	// zero out the remaining ignored fields
-	// TODO(voss): is this the right thing to do?
-	a.DefaultAppearance = ""
 	a.Align = annotation.TextAlignLeft
 	a.DefaultStyle = ""
 
@@ -124,7 +123,7 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 
 	// render text content if present
 	if a.Contents != "" {
-		F := s.contentFont
+		F := s.ContentFont
 
 		clipLeft := inner.LLx + lw + freeTextPadding
 		clipBottom := inner.LLy + lw + freeTextPadding
@@ -173,6 +172,10 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 
 		b.PopGraphicsState()
 	}
+
+	// set DA to match the font/size/color used in the appearance stream
+	fontName := b.FontName(s.ContentFont)
+	a.DefaultAppearance = fmt.Sprintf("/%s %d Tf 0 g", fontName, freeTextFontSize)
 
 	return &form.Form{
 		Content: b.Stream,

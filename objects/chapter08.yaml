@@ -2,10 +2,11 @@ chapter: 8
 title: Graphics
 types:
 - name: AlternateImage
-  goType: null
+  purpose: "alternate image for different output conditions"
+  goType:
   pdfRepr: dict
   fields:
-  - goName: null
+  - goName:
     pdfKey: Image
     pdfType: stream
     required: true
@@ -13,13 +14,13 @@ types:
     refTypes:
     - XObjectImage
     notes: Table 89
-  - goName: null
+  - goName:
     pdfKey: DefaultForPrinting
     pdfType: boolean
     required: false
     default: false
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: OC
     pdfType: dictionary
     required: false
@@ -28,11 +29,12 @@ types:
     - OptContentGroup
     - OptContentMembership
 - name: CalGrayColorSpace
+  purpose: "calibrated grayscale color space (array form)"
   goType: graphics/color.SpaceCalGray
   pdfRepr: dict
   introduced: '1.1'
   fields:
-  - goName: null
+  - goName:
     pdfKey: '0'
     pdfType: name
     required: true
@@ -40,40 +42,38 @@ types:
     possibleValues:
     - CalGray
     notes: Clause 8.6.5.2
-  - goName: null
+  - goName:
     pdfKey: '1'
     pdfType: dictionary
     required: true
     introduced: '1.1'
     refTypes:
     - CalGrayDict
+  fileDependent: false
   writeMethod: (*SpaceCalGray).Embed
   readFunc: extract.ColorSpace
   goPackage: color
   goRepr: struct
   specSection: 8.6.5.4
 - name: CalGrayDict
-  goType: null
+  purpose: "parameters for a CalGray color space"
+  goType:
   pdfRepr: dict
   introduced: '1.1'
   fields:
-  - goName: null
+  - goName:
     pdfKey: WhitePoint
     pdfType: array
     required: true
     introduced: '1.1'
-    refTypes:
-    - WhitepointArray
     notes: Table 62
-  - goName: null
+  - goName:
     pdfKey: BlackPoint
     pdfType: array
     required: false
     default: '[0.0 0.0 0.0]'
     introduced: '1.1'
-    refTypes:
-    - BlackpointArray
-  - goName: null
+  - goName:
     pdfKey: Gamma
     pdfType: number
     required: false
@@ -82,11 +82,12 @@ types:
     possibleValues:
     - fn:Eval(@Gamma>0)
 - name: CalRGBColorSpace
+  purpose: "calibrated RGB color space (array form)"
   goType: graphics/color.SpaceCalRGB
   pdfRepr: dict
   introduced: '1.1'
   fields:
-  - goName: null
+  - goName:
     pdfKey: '0'
     pdfType: name
     required: true
@@ -94,61 +95,56 @@ types:
     possibleValues:
     - CalRGB
     notes: Clause 8.6.5.3
-  - goName: null
+  - goName:
     pdfKey: '1'
     pdfType: dictionary
     required: true
     introduced: '1.1'
     refTypes:
     - CalRGBDict
+  fileDependent: false
   writeMethod: (*SpaceCalRGB).Embed
   readFunc: extract.ColorSpace
   goPackage: color
   goRepr: struct
   specSection: 8.6.5.4
 - name: CalRGBDict
-  goType: null
+  purpose: "parameters for a CalRGB color space"
+  goType:
   pdfRepr: dict
   introduced: '1.1'
   fields:
-  - goName: null
+  - goName:
     pdfKey: WhitePoint
     pdfType: array
     required: true
     introduced: '1.1'
-    refTypes:
-    - WhitepointArray
     notes: Table 63
-  - goName: null
+  - goName:
     pdfKey: BlackPoint
     pdfType: array
     required: false
     default: '[0.0 0.0 0.0]'
     introduced: '1.1'
-    refTypes:
-    - BlackpointArray
-  - goName: null
+  - goName:
     pdfKey: Gamma
     pdfType: array
     required: false
     default: '[1.0 1.0 1.0]'
     introduced: '1.1'
-    refTypes:
-    - GammaArray
-  - goName: null
+  - goName:
     pdfKey: Matrix
     pdfType: array
     required: false
     default: '[1 0 0 0 1 0 0 0 1]'
     introduced: '1.1'
-    refTypes:
-    - ArrayOf_9Numbers
 - name: ColorantsDict
-  goType: null
+  purpose: "named colorants in a DeviceN color space"
+  goType:
   pdfRepr: dict
   introduced: '1.3'
   fields:
-  - goName: null
+  - goName:
     pdfKey: '*'
     pdfType: array
     required: false
@@ -157,7 +153,9 @@ types:
     - SeparationColorSpace
     notes: Table 70, Colorants cell
 - name: DeviceCMYKColorSpace
+  purpose: "device-dependent CMYK color space"
   goType: graphics/color.spaceDeviceCMYK
+  fileDependent: false
   writeMethod: (spaceDeviceCMYK).Embed
   readFunc: extract.ColorSpace
   goPackage: color
@@ -167,7 +165,7 @@ types:
   specSection: '8.6.4'
   notes: unexported type, exported as SpaceDeviceCMYK variable
   fields:
-  - goName: null
+  - goName:
     pdfKey: '0'
     pdfType: name
     required: true
@@ -176,7 +174,9 @@ types:
     - DeviceCMYK
     notes: Clause 8.6.3 and https://github.com/pdf-association/pdf-issues/issues/552
 - name: DeviceGrayColorSpace
+  purpose: "device-dependent grayscale color space"
   goType: graphics/color.spaceDeviceGray
+  fileDependent: false
   writeMethod: (spaceDeviceGray).Embed
   readFunc: extract.ColorSpace
   goPackage: color
@@ -186,7 +186,7 @@ types:
   specSection: '8.6.4'
   notes: unexported type, exported as SpaceDeviceGray variable
   fields:
-  - goName: null
+  - goName:
     pdfKey: '0'
     pdfType: name
     required: true
@@ -195,11 +195,12 @@ types:
     - DeviceGray
     notes: Clause 8.6.3 and https://github.com/pdf-association/pdf-issues/issues/552
 - name: DeviceNColorSpace
+  purpose: "multi-component color space (array form)"
   goType: graphics/color.SpaceDeviceN
   pdfRepr: dict
   introduced: '1.3'
   fields:
-  - goName: null
+  - goName:
     pdfKey: '0'
     pdfType: name
     required: true
@@ -207,14 +208,12 @@ types:
     possibleValues:
     - DeviceN
     notes: Clause 8.6.6.5
-  - goName: null
+  - goName:
     pdfKey: '1'
     pdfType: array
     required: true
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNamesGeneral
-  - goName: null
+  - goName:
     pdfKey: '2'
     pdfType: array;name
     required: true
@@ -232,7 +231,7 @@ types:
     - LabColorSpace
     - ICCBasedColorSpace
     notes: cannot be Pattern,Indexed,Separation,DeviceN
-  - goName: null
+  - goName:
     pdfKey: '3'
     pdfType: dictionary;stream
     required: true
@@ -242,25 +241,27 @@ types:
     - FunctionType3
     - FunctionType0
     - FunctionType4
-  - goName: null
+  - goName:
     pdfKey: '4'
     pdfType: dictionary
     required: false
     introduced: '1.3'
     refTypes:
     - DeviceNDict
+  fileDependent: false
   writeMethod: (*SpaceDeviceN).Embed
   readFunc: extract.ColorSpace
   goPackage: color
   goRepr: struct
   specSection: 8.6.6.5
 - name: DeviceNDict
-  goType: null
+  purpose: "attributes of a DeviceN color space"
+  goType:
   pdfSubtype: DeviceN
   pdfRepr: dict
   introduced: '1.6'
   fields:
-  - goName: null
+  - goName:
     pdfKey: Subtype
     pdfType: name
     required: false
@@ -270,21 +271,21 @@ types:
     - DeviceN
     - NChannel
     notes: Table 70
-  - goName: null
+  - goName:
     pdfKey: Colorants
     pdfType: dictionary
     required: fn:IsRequired(fn:SinceVersion(1.6,(@Subtype==NChannel)) && fn:HasSpotColorants(parent::1))
     introduced: '1.3'
     refTypes:
     - ColorantsDict
-  - goName: null
+  - goName:
     pdfKey: Process
     pdfType: dictionary
     required: fn:IsRequired((@Subtype==NChannel) && fn:HasProcessColorants(parent::1))
     introduced: '1.6'
     refTypes:
     - DeviceNProcess
-  - goName: null
+  - goName:
     pdfKey: MixingHints
     pdfType: dictionary
     required: false
@@ -292,11 +293,12 @@ types:
     refTypes:
     - DeviceNMixingHints
 - name: DeviceNMixingHints
-  goType: null
+  purpose: "mixing hints for DeviceN color space"
+  goType:
   pdfRepr: dict
   introduced: '1.6'
   fields:
-  - goName: null
+  - goName:
     pdfKey: Solidities
     pdfType: dictionary
     required: false
@@ -304,26 +306,25 @@ types:
     refTypes:
     - Solidities
     notes: Table 72
-  - goName: null
+  - goName:
     pdfKey: PrintingOrder
     pdfType: array
     required: fn:IsRequired(fn:IsPresent(Solidities))
     introduced: '1.6'
-    refTypes:
-    - ArrayOfNamesForPrintingOrder
-  - goName: null
+  - goName:
     pdfKey: DotGain
     pdfType: dictionary
     required: false
     introduced: '1.6'
     refTypes:
-    - DictionaryOfFunctions
+    - _DictionaryOfFunctions
 - name: DeviceNProcess
-  goType: null
+  purpose: "process color components for DeviceN"
+  goType:
   pdfRepr: dict
   introduced: '1.6'
   fields:
-  - goName: null
+  - goName:
     pdfKey: ColorSpace
     pdfType: array;name
     required: true
@@ -340,15 +341,15 @@ types:
     - CalRGBColorSpace
     - ICCBasedColorSpace
     notes: Table 71 - except Lab
-  - goName: null
+  - goName:
     pdfKey: Components
     pdfType: array
     required: true
     introduced: '1.6'
-    refTypes:
-    - ArrayOfNamesGeneral
 - name: DeviceRGBColorSpace
+  purpose: "device-dependent RGB color space"
   goType: graphics/color.spaceDeviceRGB
+  fileDependent: false
   writeMethod: (spaceDeviceRGB).Embed
   readFunc: extract.ColorSpace
   goPackage: color
@@ -358,7 +359,7 @@ types:
   specSection: '8.6.4'
   notes: unexported type, exported as SpaceDeviceRGB variable
   fields:
-  - goName: null
+  - goName:
     pdfKey: '0'
     pdfType: name
     required: true
@@ -367,10 +368,11 @@ types:
     - DeviceRGB
     notes: Clause 8.6.3 and https://github.com/pdf-association/pdf-issues/issues/552
 - name: FunctionType0
+  purpose: "sampled function"
   goType: function.Type0
   pdfRepr: stream
   fields:
-  - goName: null
+  - goName:
     pdfKey: FunctionType
     pdfType: integer
     required: true
@@ -383,8 +385,6 @@ types:
     pdfType: array
     required: true
     introduced: '1.2'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Domain defines the valid input ranges as [min0, max0, min1, max1, ...].
 
@@ -394,8 +394,6 @@ types:
     pdfType: array
     required: true
     introduced: '1.2'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Range gives clipping ranges for the output variables as [min0, max0, min1, max1, ...].
 
@@ -405,8 +403,6 @@ types:
     pdfType: array
     required: true
     introduced: '1.2'
-    refTypes:
-    - ArrayOfIntegersGeneral
     notes: array of m positive integers
     goType: '[]int'
     purpose: 'Size specifies the number of samples in each input dimension.
@@ -428,7 +424,7 @@ types:
     - '32'
     goType: int
     purpose: BitsPerSample is the number of bits per sample value (1, 2, 4, 8, 12, 16, 24, 32).
-  - goName: null
+  - goName:
     pdfKey: Order
     pdfType: integer
     required: false
@@ -442,8 +438,6 @@ types:
     pdfType: array
     required: false
     introduced: '1.2'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Encode maps inputs to sample table indices as [min0, max0, min1, max1, ...].
 
@@ -454,18 +448,16 @@ types:
     required: false
     default: '@Range'
     introduced: '1.2'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Decode maps samples to output range as [min0, max0, min1, max1, ...].
 
       The length must be 2*n, where n is the number of output variables.'
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -477,27 +469,24 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: F
     pdfType: dictionary;string
     required: false
     introduced: '1.3'
     refTypes:
     - FileSpecification
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -509,20 +498,17 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: DL
     pdfType: integer
     required: false
@@ -530,13 +516,15 @@ types:
   goPackage: function
   goRepr: struct
   specSection: 7.10.2
+  fileDependent: false
   writeMethod: (*Type0).Embed
 - name: FunctionType2
+  purpose: "exponential interpolation function"
   goType: function.Type2
   pdfRepr: dict
   introduced: '1.3'
   fields:
-  - goName: null
+  - goName:
     pdfKey: FunctionType
     pdfType: integer
     required: true
@@ -544,20 +532,16 @@ types:
     possibleValues:
     - '2'
     notes: Table 38 and Table 40
-  - goName: null
+  - goName:
     pdfKey: Domain
     pdfType: array
     required: true
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
   - goName: Range
     pdfKey: Range
     pdfType: array
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Range (optional) defines clipping ranges for the outputs, in the form
 
@@ -570,8 +554,6 @@ types:
     required: false
     default: '[0.0]'
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'C0 defines function result when x = 0.
 
@@ -582,8 +564,6 @@ types:
     required: false
     default: '[1.0]'
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'C1 defines function result when x = 1.
 
@@ -598,13 +578,15 @@ types:
   goPackage: function
   goRepr: struct
   specSection: 7.10.3
+  fileDependent: false
   writeMethod: (*Type2).Embed
 - name: FunctionType3
+  purpose: "stitched function"
   goType: function.Type3
   pdfRepr: dict
   introduced: '1.3'
   fields:
-  - goName: null
+  - goName:
     pdfKey: FunctionType
     pdfType: integer
     required: true
@@ -612,20 +594,16 @@ types:
     possibleValues:
     - '3'
     notes: Table 38 and Table 41
-  - goName: null
+  - goName:
     pdfKey: Domain
     pdfType: array
     required: true
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
   - goName: Range
     pdfKey: Range
     pdfType: array
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Range (optional) defines the valid output ranges as [min0, max0, min1,
 
@@ -636,7 +614,8 @@ types:
     required: true
     introduced: '1.3'
     refTypes:
-    - ArrayOfFunctions
+    - type: Function
+      collection: array
     goType: '[]pdf.Function'
     purpose: 'Functions is the array of k functions to be combined.
 
@@ -646,8 +625,6 @@ types:
     pdfType: array
     required: true
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Bounds defines the boundaries between subdomains.
 
@@ -663,8 +640,6 @@ types:
     pdfType: array
     required: true
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Encode maps each subdomain to corresponding function''s domain as
 
@@ -672,12 +647,14 @@ types:
   goPackage: function
   goRepr: struct
   specSection: 7.10.4
+  fileDependent: false
   writeMethod: (*Type3).Embed
 - name: FunctionType4
+  purpose: "PostScript calculator function"
   goType: function.Type4
   pdfRepr: stream
   fields:
-  - goName: null
+  - goName:
     pdfKey: FunctionType
     pdfType: integer
     required: true
@@ -690,8 +667,6 @@ types:
     pdfType: array
     required: true
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Domain defines the valid input ranges as [min0, max0, min1, max1, ...].
 
@@ -701,18 +676,16 @@ types:
     pdfType: array
     required: true
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Range gives clipping ranges for the output variables as [min0, max0, min1, max1, ...].
 
       The length must be 2*n, where n is the number of output variables.'
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -724,27 +697,24 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: F
     pdfType: dictionary;string
     required: false
     introduced: '1.3'
     refTypes:
     - FileSpecification
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -756,20 +726,17 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: DL
     pdfType: integer
     required: false
@@ -777,15 +744,17 @@ types:
   goPackage: function
   goRepr: struct
   specSection: 7.10.5
+  fileDependent: false
   writeMethod: (*Type4).Embed
 - name: GeographicCoordinateSystem
-  goType: null
+  purpose: "geographic coordinate system"
+  goType:
   pdfType: GEOGCS
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 270
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -793,24 +762,25 @@ types:
     possibleValues:
     - GEOGCS
     notes: Table 270
-  - goName: null
+  - goName:
     pdfKey: EPSG
     pdfType: integer
     required: false
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: WKT
     pdfType: ascii-string
     required: false
     introduced: '1.7'
 - name: GraphicsStateParameter
+  purpose: "graphics state parameter"
   goType: graphics/extgstate.ExtGState
   pdfType: ExtGState
   pdfRepr: dict
   introduced: '1.2'
   specTable: Table 57
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -818,14 +788,14 @@ types:
     possibleValues:
     - ExtGState
     notes: Table 57
-  - goName: null
+  - goName:
     pdfKey: LW
     pdfType: number
     required: false
     introduced: '1.3'
     possibleValues:
     - fn:Eval(@LW>=0)
-  - goName: null
+  - goName:
     pdfKey: LC
     pdfType: integer
     required: false
@@ -833,7 +803,7 @@ types:
     possibleValues:
     - fn:Eval((@LC>=0) && (@LC<=2))
     notes: Table 53
-  - goName: null
+  - goName:
     pdfKey: LJ
     pdfType: integer
     required: false
@@ -841,21 +811,19 @@ types:
     possibleValues:
     - fn:Eval((@LJ>=0) && (@LJ<=2))
     notes: Table 54
-  - goName: null
+  - goName:
     pdfKey: ML
     pdfType: number
     required: false
     introduced: '1.3'
     possibleValues:
     - fn:Eval(@ML>=1)
-  - goName: null
+  - goName:
     pdfKey: D
     pdfType: array
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOfGSPDashPatterns
-  - goName: null
+  - goName:
     pdfKey: RI
     pdfType: name
     required: false
@@ -866,44 +834,42 @@ types:
     - Saturation
     - Perceptual
     notes: Table 69
-  - goName: null
+  - goName:
     pdfKey: OP
     pdfType: boolean
     required: false
     introduced: '1.2'
-  - goName: null
+  - goName:
     pdfKey: op
     pdfType: boolean
     required: false
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: OPM
     pdfType: integer
     required: false
     introduced: '1.3'
     possibleValues:
     - fn:Eval((@OPM>=0) && (@OPM<=1))
-  - goName: null
+  - goName:
     pdfKey: Font
     pdfType: array
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOfFontAndSize
-  - goName: null
+  - goName:
     pdfKey: BG
     pdfType: fn:SinceVersion(1.3,dictionary);stream
     required: false
     introduced: '1.2'
     refTypes:
-    - fn:SinceVersion(1.3
-    - FunctionType2)
-    - fn:SinceVersion(1.3
-    - FunctionType3)
+    - type: FunctionType2
+      since: '1.3'
+    - type: FunctionType3
+      since: '1.3'
     - FunctionType0
-    - fn:SinceVersion(1.3
-    - FunctionType4)
-  - goName: null
+    - type: FunctionType4
+      since: '1.3'
+  - goName:
     pdfKey: BG2
     pdfType: dictionary;name;stream
     required: false
@@ -914,20 +880,20 @@ types:
     - FunctionType3
     - FunctionType0
     - FunctionType4
-  - goName: null
+  - goName:
     pdfKey: UCR
     pdfType: fn:SinceVersion(1.3,dictionary);stream
     required: false
     introduced: '1.2'
     refTypes:
-    - fn:SinceVersion(1.3
-    - FunctionType2)
-    - fn:SinceVersion(1.3
-    - FunctionType3)
+    - type: FunctionType2
+      since: '1.3'
+    - type: FunctionType3
+      since: '1.3'
     - FunctionType0
-    - fn:SinceVersion(1.3
-    - FunctionType4)
-  - goName: null
+    - type: FunctionType4
+      since: '1.3'
+  - goName:
     pdfKey: UCR2
     pdfType: dictionary;name;stream
     required: false
@@ -938,22 +904,23 @@ types:
     - FunctionType3
     - FunctionType0
     - FunctionType4
-  - goName: null
+  - goName:
     pdfKey: TR
     pdfType: array;fn:SinceVersion(1.3,dictionary);name;stream
     required: false
     introduced: '1.2'
     deprecated: '2.0'
     refTypes:
-    - ArrayOf4Functions
-    - fn:SinceVersion(1.3
-    - FunctionType2)
-    - fn:SinceVersion(1.3
-    - FunctionType3)
+    - type: Function
+      collection: array
+    - type: FunctionType2
+      since: '1.3'
+    - type: FunctionType3
+      since: '1.3'
     - FunctionType0
-    - fn:SinceVersion(1.3
-    - FunctionType4)
-  - goName: null
+    - type: FunctionType4
+      since: '1.3'
+  - goName:
     pdfKey: TR2
     pdfType: array;dictionary;name;stream
     required: false
@@ -961,12 +928,13 @@ types:
     introduced: '1.3'
     deprecated: '2.0'
     refTypes:
-    - ArrayOf4Functions
+    - type: Function
+      collection: array
     - FunctionType2
     - FunctionType3
     - FunctionType0
     - FunctionType4
-  - goName: null
+  - goName:
     pdfKey: HT
     pdfType: dictionary;name;stream
     required: false
@@ -976,23 +944,23 @@ types:
     - HalftoneType5
     - HalftoneType6
     - HalftoneType10
-    - fn:SinceVersion(1.3
-    - HalftoneType16)
-  - goName: null
+    - type: HalftoneType16
+      since: '1.3'
+  - goName:
     pdfKey: FL
     pdfType: number
     required: false
     introduced: '1.3'
     possibleValues:
     - fn:Eval(@FL>0)
-  - goName: null
+  - goName:
     pdfKey: SM
     pdfType: number
     required: false
     introduced: '1.3'
     possibleValues:
     - fn:Eval((@SM>=0) && (@SM<=1))
-  - goName: null
+  - goName:
     pdfKey: SA
     pdfType: boolean
     required: false
@@ -1020,12 +988,10 @@ types:
     - Hue
     - Saturation
     - Color
-    refTypes:
-    - ArrayOfBlendModes
     notes: Table 134 and Table 135
     goType: graphics.BlendMode
     purpose: BlendMode is the blend mode for the transparent imaging model.
-  - goName: null
+  - goName:
     pdfKey: SMask
     pdfType: dictionary;name
     required: false
@@ -1035,31 +1001,31 @@ types:
     refTypes:
     - SoftMaskAlpha
     - SoftMaskLuminosity
-  - goName: null
+  - goName:
     pdfKey: CA
     pdfType: number
     required: false
     introduced: '1.4'
     possibleValues:
     - fn:Eval((@CA>=0) && (@CA<=1))
-  - goName: null
+  - goName:
     pdfKey: ca
     pdfType: number
     required: false
     introduced: '1.4'
     possibleValues:
     - fn:Eval((@ca>=0) && (@ca<=1))
-  - goName: null
+  - goName:
     pdfKey: AIS
     pdfType: boolean
     required: false
     introduced: '1.4'
-  - goName: null
+  - goName:
     pdfKey: TK
     pdfType: boolean
     required: false
     introduced: '1.4'
-  - goName: null
+  - goName:
     pdfKey: UseBlackPtComp
     pdfType: name
     required: false
@@ -1069,28 +1035,24 @@ types:
     - 'OFF'
     - 'ON'
     - Default
-  - goName: null
+  - goName:
     pdfKey: HTO
     pdfType: array
     required: false
     introduced: '2.0'
-    refTypes:
-    - ArrayOf_2Numbers
-  - goName: null
+  - goName:
     pdfKey: HTP
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '1.3'
-    refTypes:
-    - ArrayOf_2Integers
-  - goName: null
+  - goName:
     pdfKey: AAPL:AA
     pdfType: boolean
     required: false
     introduced: fn:Extension(AAPL,1.2)
     notes: Apple Anti-aliasing
-  - goName: null
+  - goName:
     pdfKey: AAPL:ST
     pdfType: dictionary;name
     required: false
@@ -1099,19 +1061,21 @@ types:
     refTypes:
     - AAPL_ST
     notes: Apple Gaussian blue drop-shadow style dictionary
+  fileDependent: false
   writeMethod: (*ExtGState).Embed
   readFunc: extract.ExtGState
   goPackage: extgstate
   goRepr: struct
   specSection: 8.4.5
 - name: GroupAttributes
+  purpose: "group transparency attributes"
   goType: graphics/group.TransparencyAttributes
   pdfType: Group
   pdfRepr: dict
   introduced: '1.4'
   specTable: Table 94
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1119,7 +1083,7 @@ types:
     possibleValues:
     - Group
     notes: Table 94 and Table 145
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
@@ -1157,29 +1121,31 @@ types:
       Special color spaces (Pattern, Indexed, Separation, DeviceN) and
 
       Lab color spaces are not allowed.'
-  - goName: null
+  - goName:
     pdfKey: I
     pdfType: boolean
     required: false
     default: false
     introduced: '1.4'
-  - goName: null
+  - goName:
     pdfKey: K
     pdfType: boolean
     required: false
     default: false
     introduced: '1.4'
   readFunc: group.ExtractTransparencyAttributes
+  fileDependent: false
   writeMethod: (*TransparencyAttributes).Embed
   goPackage: group
   goRepr: struct
   specSection: '8.10'
 - name: ICCBasedColorSpace
+  purpose: "ICC profile-based color space (array form)"
   goType: graphics/color.SpaceICCBased
   pdfRepr: dict
   introduced: '1.3'
   fields:
-  - goName: null
+  - goName:
     pdfKey: '0'
     pdfType: name
     required: true
@@ -1187,23 +1153,25 @@ types:
     possibleValues:
     - ICCBased
     notes: Clause 8.6.5.5
-  - goName: null
+  - goName:
     pdfKey: '1'
     pdfType: stream
     required: true
     introduced: '1.3'
     refTypes:
     - ICCProfileStream
+  fileDependent: false
   writeMethod: (*SpaceICCBased).Embed
   readFunc: extract.ColorSpace
   goPackage: color
   goRepr: struct
   specSection: 8.6.5.5
 - name: ICCProfileStream
-  goType: null
+  purpose: "ICC color profile stream"
+  goType:
   pdfRepr: stream
   fields:
-  - goName: null
+  - goName:
     pdfKey: N
     pdfType: integer
     required: true
@@ -1213,7 +1181,7 @@ types:
     - '3'
     - '4'
     notes: Table 5 and Table 65
-  - goName: null
+  - goName:
     pdfKey: Alternate
     pdfType: array;name
     required: false
@@ -1232,27 +1200,25 @@ types:
     - IndexedColorSpace
     - LabColorSpace
     - SeparationColorSpace
-  - goName: null
+  - goName:
     pdfKey: Range
     pdfType: array
     required: false
     default: '[0.0 1.0 0.0 1.0 ...]'
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
-  - goName: null
+  - goName:
     pdfKey: Metadata
     pdfType: stream
     required: false
     introduced: '1.4'
     refTypes:
     - Metadata
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -1264,27 +1230,24 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: F
     pdfType: dictionary;string
     required: false
     introduced: '1.3'
     refTypes:
     - FileSpecification
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -1296,30 +1259,28 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: DL
     pdfType: integer
     required: false
     introduced: '1.5'
 - name: IndexedColorSpace
+  purpose: "indexed color space (array form)"
   goType: graphics/color.SpaceIndexed
   pdfRepr: dict
   introduced: '1.0'
   fields:
-  - goName: null
+  - goName:
     pdfKey: '0'
     pdfType: name
     required: true
@@ -1327,7 +1288,7 @@ types:
     possibleValues:
     - Indexed
     notes: Clause 8.6.6.3
-  - goName: null
+  - goName:
     pdfKey: '1'
     pdfType: fn:SinceVersion(1.1,array);name
     required: true
@@ -1337,50 +1298,52 @@ types:
     - DeviceRGB
     - DeviceGray
     refTypes:
-    - fn:SinceVersion(1.1
-    - DeviceGrayColorSpace)
-    - fn:SinceVersion(1.1
-    - DeviceRGBColorSpace)
-    - fn:SinceVersion(1.1
-    - DeviceCMYKColorSpace)
-    - fn:SinceVersion(1.1
-    - CalGrayColorSpace)
-    - fn:SinceVersion(1.1
-    - CalRGBColorSpace)
-    - fn:SinceVersion(1.1
-    - LabColorSpace)
-    - fn:SinceVersion(1.3
-    - ICCBasedColorSpace)
-    - fn:SinceVersion(1.2
-    - SeparationColorSpace)
-    - fn:SinceVersion(1.3
-    - DeviceNColorSpace)
+    - type: DeviceGrayColorSpace
+      since: '1.1'
+    - type: DeviceRGBColorSpace
+      since: '1.1'
+    - type: DeviceCMYKColorSpace
+      since: '1.1'
+    - type: CalGrayColorSpace
+      since: '1.1'
+    - type: CalRGBColorSpace
+      since: '1.1'
+    - type: LabColorSpace
+      since: '1.1'
+    - type: ICCBasedColorSpace
+      since: '1.3'
+    - type: SeparationColorSpace
+      since: '1.2'
+    - type: DeviceNColorSpace
+      since: '1.3'
     notes: cannot be pattern or indexed
-  - goName: null
+  - goName:
     pdfKey: '2'
     pdfType: integer
     required: true
     introduced: '1.0'
     possibleValues:
     - fn:Eval((@2>=0) && (@2<=255))
-  - goName: null
+  - goName:
     pdfKey: '3'
     pdfType: stream;string
     required: true
     introduced: '1.0'
     refTypes:
     - Stream
+  fileDependent: false
   writeMethod: (*SpaceIndexed).Embed
   readFunc: extract.ColorSpace
   goPackage: color
   goRepr: struct
   specSection: 8.6.6.5
 - name: LabColorSpace
+  purpose: "CIE L*a*b* color space (array form)"
   goType: graphics/color.SpaceLab
   pdfRepr: dict
   introduced: '1.1'
   fields:
-  - goName: null
+  - goName:
     pdfKey: '0'
     pdfType: name
     required: true
@@ -1388,54 +1351,51 @@ types:
     possibleValues:
     - Lab
     notes: Clause 8.6.5.4
-  - goName: null
+  - goName:
     pdfKey: '1'
     pdfType: dictionary
     required: true
     introduced: '1.1'
     refTypes:
     - LabDict
+  fileDependent: false
   writeMethod: (*SpaceLab).Embed
   readFunc: extract.ColorSpace
   goPackage: color
   goRepr: struct
   specSection: 8.6.5.4
 - name: LabDict
-  goType: null
+  purpose: "parameters for a Lab color space"
+  goType:
   pdfRepr: dict
   introduced: '1.1'
   fields:
-  - goName: null
+  - goName:
     pdfKey: WhitePoint
     pdfType: array
     required: true
     introduced: '1.1'
-    refTypes:
-    - WhitepointArray
     notes: Table 64
-  - goName: null
+  - goName:
     pdfKey: BlackPoint
     pdfType: array
     required: false
     default: '[0.0 0.0 0.0]'
     introduced: '1.1'
-    refTypes:
-    - BlackpointArray
-  - goName: null
+  - goName:
     pdfKey: Range
     pdfType: array
     required: false
     introduced: '1.1'
-    refTypes:
-    - LabRangeArray
 - name: MeasureGEO
-  goType: null
+  purpose: "geographic measure dictionary"
+  goType:
   pdfType: Measure
   pdfRepr: dict
   introduced: '2.0'
   specTable: Table 266
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1443,21 +1403,19 @@ types:
     possibleValues:
     - Measure
     notes: Table 266 and Table 269
-  - goName: null
+  - goName:
     pdfKey: Subtype
     pdfType: name
     required: false
     introduced: '2.0'
     possibleValues:
     - GEO
-  - goName: null
+  - goName:
     pdfKey: Bounds
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOfNumbersGeneral
-  - goName: null
+  - goName:
     pdfKey: GCS
     pdfType: dictionary
     required: true
@@ -1465,7 +1423,7 @@ types:
     refTypes:
     - GeographicCoordinateSystem
     - ProjectedCoordinateSystem
-  - goName: null
+  - goName:
     pdfKey: DCS
     pdfType: dictionary
     required: false
@@ -1473,44 +1431,37 @@ types:
     refTypes:
     - GeographicCoordinateSystem
     - ProjectedCoordinateSystem
-  - goName: null
+  - goName:
     pdfKey: PDU
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOf3PDUNames
     notes: Preferred Display Units
-  - goName: null
+  - goName:
     pdfKey: GPTS
     pdfType: array
     required: true
     introduced: '1.7'
-    refTypes:
-    - ArrayOfNumbersGeneral
-  - goName: null
+  - goName:
     pdfKey: LPTS
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - ArrayOfNumbersGeneral
-  - goName: null
+  - goName:
     pdfKey: PCSM
     pdfType: array
     required: false
     introduced: '2.0'
-    refTypes:
-    - ArrayOf3DTransMatrix
     notes: Projected Coordinate System Matrix
 - name: MeasureRL
+  purpose: "rectilinear measure dictionary"
   goType: measure.RectilinearMeasure
   pdfType: Measure
   pdfRepr: dict
   introduced: '1.6'
   specTable: Table 266
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1518,67 +1469,71 @@ types:
     possibleValues:
     - Measure
     notes: Table 266 and Table 267
-  - goName: null
+  - goName:
     pdfKey: Subtype
     pdfType: name
     required: false
     introduced: '1.6'
     possibleValues:
     - RL
-  - goName: null
+  - goName:
     pdfKey: R
     pdfType: text-string
     required: true
     introduced: '1.6'
-  - goName: null
+  - goName:
     pdfKey: X
     pdfType: array
     required: true
     introduced: '1.6'
     refTypes:
-    - ArrayOfNumberFormats
-  - goName: null
+    - type: NumberFormat
+      collection: array
+  - goName:
     pdfKey: Y
     pdfType: array
     required: false
     introduced: '1.6'
     refTypes:
-    - ArrayOfNumberFormats
-  - goName: null
+    - type: NumberFormat
+      collection: array
+  - goName:
     pdfKey: D
     pdfType: array
     required: true
     introduced: '1.6'
     refTypes:
-    - ArrayOfNumberFormats
-  - goName: null
+    - type: NumberFormat
+      collection: array
+  - goName:
     pdfKey: A
     pdfType: array
     required: true
     introduced: '1.6'
     refTypes:
-    - ArrayOfNumberFormats
-  - goName: null
+    - type: NumberFormat
+      collection: array
+  - goName:
     pdfKey: T
     pdfType: array
     required: false
     introduced: '1.6'
     refTypes:
-    - ArrayOfNumberFormats
-  - goName: null
+    - type: NumberFormat
+      collection: array
+  - goName:
     pdfKey: S
     pdfType: array
     required: false
     introduced: '1.6'
     refTypes:
-    - ArrayOfNumberFormats
-  - goName: null
+    - type: NumberFormat
+      collection: array
+  - goName:
     pdfKey: O
     pdfType: array
     required: false
     introduced: '1.6'
-    refTypes:
-    - ArrayOf_2Numbers
   - goName: CYX
     pdfKey: CYX
     pdfType: number
@@ -1593,15 +1548,17 @@ types:
   goPackage: measure
   goRepr: struct
   specSection: '12.9'
+  fileDependent: false
   writeMethod: (*RectilinearMeasure).Embed
 - name: NumberFormat
+  purpose: "format for numeric display"
   goType: measure.NumberFormat
   pdfType: NumberFormat
   pdfRepr: dict
   introduced: '1.6'
   specTable: Table 268
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1609,17 +1566,17 @@ types:
     possibleValues:
     - NumberFormat
     notes: Table 268
-  - goName: null
+  - goName:
     pdfKey: U
     pdfType: text-string
     required: true
     introduced: '1.6'
-  - goName: null
+  - goName:
     pdfKey: C
     pdfType: number
     required: true
     introduced: '1.6'
-  - goName: null
+  - goName:
     pdfKey: F
     pdfType: name
     required: false
@@ -1630,7 +1587,7 @@ types:
     - F
     - R
     - T
-  - goName: null
+  - goName:
     pdfKey: D
     pdfType: integer
     required: false
@@ -1638,37 +1595,37 @@ types:
     introduced: '1.6'
     possibleValues:
     - fn:Eval(@D>0)
-  - goName: null
+  - goName:
     pdfKey: FD
     pdfType: boolean
     required: false
     default: false
     introduced: '1.6'
-  - goName: null
+  - goName:
     pdfKey: RT
     pdfType: text-string
     required: false
     default: ''','''
     introduced: '1.6'
-  - goName: null
+  - goName:
     pdfKey: RD
     pdfType: text-string
     required: false
     default: '''.'''
     introduced: '1.6'
-  - goName: null
+  - goName:
     pdfKey: PS
     pdfType: text-string
     required: false
     default: ''' '''
     introduced: '1.6'
-  - goName: null
+  - goName:
     pdfKey: SS
     pdfType: text-string
     required: false
     default: ''' '''
     introduced: '1.6'
-  - goName: null
+  - goName:
     pdfKey: O
     pdfType: name
     required: false
@@ -1681,15 +1638,17 @@ types:
   goRepr: struct
   specSection: '12.9'
   readFunc: measure.ExtractNumberFormat
+  fileDependent: false
   writeMethod: (*NumberFormat).Embed
 - name: OutputIntents
-  goType: null
+  purpose: "output intent specification"
+  goType:
   pdfType: OutputIntent
   pdfRepr: dict
   introduced: '1.4'
   specTable: Table 401
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1697,7 +1656,7 @@ types:
     possibleValues:
     - OutputIntent
     notes: Table 401
-  - goName: null
+  - goName:
     pdfKey: S
     pdfType: name
     required: true
@@ -1706,48 +1665,48 @@ types:
     - GTS_PDFX
     - GTS_PDFA1
     - ISO_PDFE1
-  - goName: null
+  - goName:
     pdfKey: OutputCondition
     pdfType: text-string
     required: false
     introduced: '1.4'
-  - goName: null
+  - goName:
     pdfKey: OutputConditionIdentifier
     pdfType: text-string
     required: true
     introduced: '1.4'
-  - goName: null
+  - goName:
     pdfKey: RegistryName
     pdfType: text-string
     required: false
     introduced: '1.4'
-  - goName: null
+  - goName:
     pdfKey: Info
     pdfType: text-string
     required: false
     introduced: '1.4'
-  - goName: null
+  - goName:
     pdfKey: DestOutputProfile
     pdfType: stream
     required: false
     introduced: '1.4'
     refTypes:
     - ICCProfileStream
-  - goName: null
+  - goName:
     pdfKey: DestOutputProfileRef
     pdfType: dictionary
     required: false
     introduced: '2.0'
     refTypes:
     - DestOutputProfileRef
-  - goName: null
+  - goName:
     pdfKey: MixingHints
     pdfType: dictionary
     required: false
     introduced: '2.0'
     refTypes:
     - DeviceNMixingHints
-  - goName: null
+  - goName:
     pdfKey: SpectralData
     pdfType: dictionary
     required: false
@@ -1755,11 +1714,12 @@ types:
     refTypes:
     - SpectralData
 - name: PatternColorSpace
-  goType: null
+  purpose: "pattern color space"
+  goType:
   pdfRepr: dict
   introduced: '1.2'
   fields:
-  - goName: null
+  - goName:
     pdfKey: '0'
     pdfType: name
     required: true
@@ -1767,7 +1727,7 @@ types:
     possibleValues:
     - Pattern
     notes: Clause 8.7.3.3
-  - goName: null
+  - goName:
     pdfKey: '1'
     pdfType: array;name
     required: false
@@ -1783,20 +1743,21 @@ types:
     - CalGrayColorSpace
     - CalRGBColorSpace
     - LabColorSpace
-    - fn:SinceVersion(1.3
-    - ICCBasedColorSpace)
+    - type: ICCBasedColorSpace
+      since: '1.3'
     - IndexedColorSpace
     - SeparationColorSpace
-    - fn:SinceVersion(1.3
-    - DeviceNColorSpace)
+    - type: DeviceNColorSpace
+      since: '1.3'
 - name: PatternType1
+  purpose: "tiling pattern"
   goType: graphics/pattern.Type1
   pdfType: Pattern
   pdfRepr: stream
   introduced: '1.2'
   specTable: Table 5
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1804,14 +1765,14 @@ types:
     possibleValues:
     - Pattern
     notes: Table 5 and Table 74
-  - goName: null
+  - goName:
     pdfKey: PatternType
     pdfType: integer
     required: true
     introduced: '1.2'
     possibleValues:
     - '1'
-  - goName: null
+  - goName:
     pdfKey: PaintType
     pdfType: integer
     required: true
@@ -1855,7 +1816,7 @@ types:
     introduced: '1.2'
     goType: float64
     purpose: YStep is the vertical spacing between pattern cells.
-  - goName: null
+  - goName:
     pdfKey: Resources
     pdfType: dictionary
     required: true
@@ -1871,12 +1832,12 @@ types:
     purpose: 'Matrix is an array of six numbers specifying the pattern cell''s matrix.
 
       Leave this empty to use the identity matrix.'
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.2'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -1888,27 +1849,24 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.2'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: F
     pdfType: dictionary;string
     required: false
     introduced: '1.2'
     refTypes:
     - FileSpecification
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -1920,45 +1878,42 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.2'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: DL
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: XUID
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '1.3'
-    refTypes:
-    - ArrayOfIntegersGeneral
+  fileDependent: false
   writeMethod: (*Type1).Embed
   readFunc: extract.Pattern
   goPackage: pattern
   goRepr: struct
   specSection: 8.7.3.1
 - name: PatternType2
+  purpose: "shading pattern"
   goType: graphics/pattern.Type2
   pdfType: Pattern
   pdfRepr: dict
   introduced: '1.3'
   specTable: Table 75
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -1966,7 +1921,7 @@ types:
     possibleValues:
     - Pattern
     notes: Table 75
-  - goName: null
+  - goName:
     pdfKey: PatternType
     pdfType: integer
     required: true
@@ -2002,19 +1957,21 @@ types:
     refTypes:
     - GraphicsStateParameter
     goType: '*extgstate.ExtGState'
+  fileDependent: false
   writeMethod: (*Type2).Embed
   readFunc: extract.Pattern
   goPackage: pattern
   goRepr: struct
   specSection: 8.7.4.1
 - name: PointData
-  goType: null
+  purpose: "geospatial point data"
+  goType:
   pdfType: PtData
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 272
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -2022,35 +1979,32 @@ types:
     possibleValues:
     - PtData
     notes: Table 272
-  - goName: null
+  - goName:
     pdfKey: Subtype
     pdfType: name
     required: true
     introduced: '1.7'
     possibleValues:
     - Cloud
-  - goName: null
+  - goName:
     pdfKey: Names
     pdfType: array
     required: true
     introduced: '1.7'
-    refTypes:
-    - ArrayOfNamesInPtData
-  - goName: null
+  - goName:
     pdfKey: XPTS
     pdfType: array
     required: true
     introduced: '1.7'
-    refTypes:
-    - ArrayOfArraysXPTSValues
 - name: ProjectedCoordinateSystem
-  goType: null
+  purpose: "projected coordinate system"
+  goType:
   pdfType: PROJCS
   pdfRepr: dict
   introduced: '1.7'
   specTable: Table 271
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: true
@@ -2058,22 +2012,23 @@ types:
     possibleValues:
     - PROJCS
     notes: Table 271
-  - goName: null
+  - goName:
     pdfKey: EPSG
     pdfType: integer
     required: fn:IsRequired(fn:Not(fn:IsPresent(WKT)))
     introduced: '1.7'
-  - goName: null
+  - goName:
     pdfKey: WKT
     pdfType: ascii-string
     required: fn:IsRequired(fn:Not(fn:IsPresent(EPSG)))
     introduced: '1.7'
 - name: SeparationColorSpace
+  purpose: "separation color space (array form)"
   goType: graphics/color.SpaceSeparation
   pdfRepr: dict
   introduced: '1.2'
   fields:
-  - goName: null
+  - goName:
     pdfKey: '0'
     pdfType: name
     required: true
@@ -2081,12 +2036,12 @@ types:
     possibleValues:
     - Separation
     notes: Clause 8.6.6.4
-  - goName: null
+  - goName:
     pdfKey: '1'
     pdfType: name
     required: true
     introduced: '1.2'
-  - goName: null
+  - goName:
     pdfKey: '2'
     pdfType: array;name
     required: true
@@ -2102,28 +2057,30 @@ types:
     - CalGrayColorSpace
     - CalRGBColorSpace
     - LabColorSpace
-    - fn:SinceVersion(1.3
-    - ICCBasedColorSpace)
+    - type: ICCBasedColorSpace
+      since: '1.3'
     notes: cannot be Pattern, Indexed,Separation,DeviceN
-  - goName: null
+  - goName:
     pdfKey: '3'
     pdfType: fn:SinceVersion(1.3,dictionary);stream
     required: true
     introduced: '1.2'
     refTypes:
-    - fn:SinceVersion(1.3
-    - FunctionType2)
-    - fn:SinceVersion(1.3
-    - FunctionType3)
+    - type: FunctionType2
+      since: '1.3'
+    - type: FunctionType3
+      since: '1.3'
     - FunctionType0
-    - fn:SinceVersion(1.3
-    - FunctionType4)
+    - type: FunctionType4
+      since: '1.3'
+  fileDependent: false
   writeMethod: (*SpaceSeparation).Embed
   readFunc: extract.ColorSpace
   goPackage: color
   goRepr: struct
   specSection: 8.6.6.5
 - name: ShadingType1
+  purpose: "function-based shading"
   goType: graphics/shading.Type1
   pdfRepr: dict
   introduced: '1.3'
@@ -2134,8 +2091,6 @@ types:
     required: false
     default: '[0 1 0 1]'
     introduced: '1.3'
-    refTypes:
-    - ArrayOf_4Numbers
     notes: Table 77 and Table 78
     goType: '[]float64'
     purpose: 'Domain (optional) specifies the rectangular coordinate domain [xmin xmax
@@ -2151,18 +2106,19 @@ types:
     purpose: 'Matrix (optional) transforms domain coordinates to target coordinate
 
       space. Default: identity matrix [1 0 0 1 0 0].'
-  - goName: null
+  - goName:
     pdfKey: Function
     pdfType: array;dictionary;stream
     required: true
     introduced: '1.3'
     refTypes:
-    - ArrayOfFunctions
+    - type: Function
+      collection: array
     - FunctionType2
     - FunctionType3
     - FunctionType0
     - FunctionType4
-  - goName: null
+  - goName:
     pdfKey: ShadingType
     pdfType: integer
     required: true
@@ -2197,8 +2153,6 @@ types:
     pdfType: array
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Background (optional) specifies the color for areas outside the
 
@@ -2224,55 +2178,52 @@ types:
     purpose: 'AntiAlias controls whether to filter the shading function to prevent
 
       aliasing. Default: false.'
+  fileDependent: false
   writeMethod: (*Type1).Embed
   readFunc: extract.Shading
   goPackage: shading
   goRepr: struct
   specSection: 8.7.4.3
 - name: ShadingType2
+  purpose: "axial shading"
   goType: graphics/shading.Type2
   pdfRepr: dict
   introduced: '1.3'
   fields:
-  - goName: null
+  - goName:
     pdfKey: Coords
     pdfType: array
     required: true
     introduced: '1.3'
-    refTypes:
-    - ArrayOf_4Numbers
     notes: Maps to P0 (x0,y0) and P1 (x1,y1) in Go struct
-  - goName: null
+  - goName:
     pdfKey: Domain
     pdfType: array
     required: false
     default: '[0.0 1.0]'
     introduced: '1.3'
-    refTypes:
-    - ArrayOf_2Numbers
     notes: Maps to TMin and TMax in Go struct
-  - goName: null
+  - goName:
     pdfKey: Function
     pdfType: array;dictionary;stream
     required: true
     introduced: '1.3'
     refTypes:
-    - ArrayOfFunctions
+    - type: Function
+      collection: array
     - FunctionType2
     - FunctionType3
     - FunctionType0
     - FunctionType4
     notes: Maps to F in Go struct
-  - goName: null
+  - goName:
     pdfKey: Extend
     pdfType: array
     required: false
     default: '[false false]'
     introduced: '1.3'
-    refTypes:
-    - ArrayOf_2Booleans
     notes: Maps to ExtendStart and ExtendEnd in Go struct
-  - goName: null
+  - goName:
     pdfKey: ShadingType
     pdfType: integer
     required: true
@@ -2307,8 +2258,6 @@ types:
     pdfType: array
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Background (optional) specifies the color for areas outside the
 
@@ -2334,52 +2283,49 @@ types:
     purpose: 'AntiAlias controls whether to filter the shading function to prevent
 
       aliasing.'
+  fileDependent: false
   writeMethod: (*Type2).Embed
   readFunc: extract.Shading
   goPackage: shading
   goRepr: struct
   specSection: 8.7.4.3 8.7.4.5.3
 - name: ShadingType3
+  purpose: "radial shading"
   goType: graphics/shading.Type3
   pdfRepr: dict
   introduced: '1.3'
   fields:
-  - goName: null
+  - goName:
     pdfKey: Coords
     pdfType: array
     required: true
     introduced: '1.3'
-    refTypes:
-    - ArrayOf_6Numbers
     notes: Table 77 and Table 80
-  - goName: null
+  - goName:
     pdfKey: Domain
     pdfType: array
     required: false
     default: '[0 1]'
     introduced: '1.3'
-    refTypes:
-    - ArrayOf_2Numbers
-  - goName: null
+  - goName:
     pdfKey: Function
     pdfType: array;dictionary;stream
     required: true
     introduced: '1.3'
     refTypes:
-    - ArrayOfFunctions
+    - type: Function
+      collection: array
     - FunctionType2
     - FunctionType3
     - FunctionType0
     - FunctionType4
-  - goName: null
+  - goName:
     pdfKey: Extend
     pdfType: array
     required: false
     default: '[false false]'
     introduced: '1.3'
-    refTypes:
-    - ArrayOf_2Booleans
-  - goName: null
+  - goName:
     pdfKey: ShadingType
     pdfType: integer
     required: true
@@ -2414,8 +2360,6 @@ types:
     pdfType: array
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Background (optional) specifies the color for areas outside the
 
@@ -2435,12 +2379,14 @@ types:
     introduced: '1.3'
     goType: bool
     purpose: AntiAlias controls whether to filter the shading function to prevent aliasing.
+  fileDependent: false
   writeMethod: (*Type3).Embed
   readFunc: extract.Shading
   goPackage: shading
   goRepr: struct
   specSection: 8.7.4.3
 - name: ShadingType4
+  purpose: "free-form Gouraud-shaded triangle mesh"
   goType: graphics/shading.Type4
   pdfRepr: stream
   fields:
@@ -2491,24 +2437,23 @@ types:
     pdfType: array
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Decode specifies how to map vertex coordinates and color components into
 
       the appropriate ranges of values.'
-  - goName: null
+  - goName:
     pdfKey: Function
     pdfType: array;dictionary;stream
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfFunctions
+    - type: Function
+      collection: array
     - FunctionType2
     - FunctionType3
     - FunctionType0
     - FunctionType4
-  - goName: null
+  - goName:
     pdfKey: ShadingType
     pdfType: integer
     required: true
@@ -2543,8 +2488,6 @@ types:
     pdfType: array
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Background (optional) specifies the color for areas outside the
 
@@ -2564,12 +2507,12 @@ types:
     introduced: '1.3'
     goType: bool
     purpose: AntiAlias controls whether to filter the shading function to prevent aliasing.
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -2581,19 +2524,16 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
+    - type: FilterCrypt
+      since: '1.5'
   - goName: F
     pdfKey: F
     pdfType: dictionary;string
@@ -2603,7 +2543,7 @@ types:
     - FileSpecification
     goType: pdf.Function
     purpose: F (optional) is a 1->n function for mapping parametric values to colors.
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -2615,30 +2555,29 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: DL
     pdfType: integer
     required: false
     introduced: '1.5'
+  fileDependent: false
   writeMethod: (*Type4).Embed
   readFunc: extract.Shading
   goPackage: shading
   goRepr: struct
   specSection: 8.7.4.3
 - name: ShadingType5
+  purpose: "lattice-form Gouraud-shaded triangle mesh"
   goType: graphics/shading.Type5
   pdfRepr: stream
   fields:
@@ -2689,24 +2628,23 @@ types:
     pdfType: array
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Decode specifies how to map vertex coordinates and color components into
 
       the appropriate ranges of values.'
-  - goName: null
+  - goName:
     pdfKey: Function
     pdfType: array;dictionary;stream
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfFunctions
+    - type: Function
+      collection: array
     - FunctionType2
     - FunctionType3
     - FunctionType0
     - FunctionType4
-  - goName: null
+  - goName:
     pdfKey: ShadingType
     pdfType: integer
     required: true
@@ -2741,8 +2679,6 @@ types:
     pdfType: array
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Background (optional) specifies the color for areas outside the
 
@@ -2762,12 +2698,12 @@ types:
     introduced: '1.3'
     goType: bool
     purpose: AntiAlias controls whether to filter the shading function to prevent aliasing.
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -2779,19 +2715,16 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
+    - type: FilterCrypt
+      since: '1.5'
   - goName: F
     pdfKey: F
     pdfType: dictionary;string
@@ -2801,7 +2734,7 @@ types:
     - FileSpecification
     goType: pdf.Function
     purpose: F (optional) is a 1->n function for mapping parametric values to colors.
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -2813,30 +2746,29 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: DL
     pdfType: integer
     required: false
     introduced: '1.5'
+  fileDependent: false
   writeMethod: (*Type5).Embed
   readFunc: extract.Shading
   goPackage: shading
   goRepr: struct
   specSection: 8.7.4.3
 - name: ShadingType6
+  purpose: "Coons patch mesh shading"
   goType: graphics/shading.Type6
   pdfRepr: stream
   fields:
@@ -2883,24 +2815,23 @@ types:
     pdfType: array
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Decode specifies how to map coordinates and color components into
 
       the appropriate ranges of values.'
-  - goName: null
+  - goName:
     pdfKey: Function
     pdfType: array;dictionary;stream
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfFunctions
+    - type: Function
+      collection: array
     - FunctionType2
     - FunctionType3
     - FunctionType0
     - FunctionType4
-  - goName: null
+  - goName:
     pdfKey: ShadingType
     pdfType: integer
     required: true
@@ -2935,8 +2866,6 @@ types:
     pdfType: array
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Background (optional) specifies the color for areas outside the
 
@@ -2956,12 +2885,12 @@ types:
     introduced: '1.3'
     goType: bool
     purpose: AntiAlias controls whether to filter the shading function to prevent aliasing.
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -2973,19 +2902,16 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
+    - type: FilterCrypt
+      since: '1.5'
   - goName: F
     pdfKey: F
     pdfType: dictionary;string
@@ -2995,7 +2921,7 @@ types:
     - FileSpecification
     goType: pdf.Function
     purpose: F (optional) is a 1->n function for mapping parametric values to colors.
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -3007,30 +2933,29 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: DL
     pdfType: integer
     required: false
     introduced: '1.5'
+  fileDependent: false
   writeMethod: (*Type6).Embed
   readFunc: extract.Shading
   goPackage: shading
   goRepr: struct
   specSection: 8.7.4.3
 - name: ShadingType7
+  purpose: "tensor-product patch mesh shading"
   goType: graphics/shading.Type7
   pdfRepr: stream
   fields:
@@ -3077,24 +3002,23 @@ types:
     pdfType: array
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Decode specifies how to map coordinates and color components into
 
       the appropriate ranges of values.'
-  - goName: null
+  - goName:
     pdfKey: Function
     pdfType: array;dictionary;stream
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfFunctions
+    - type: Function
+      collection: array
     - FunctionType2
     - FunctionType3
     - FunctionType0
     - FunctionType4
-  - goName: null
+  - goName:
     pdfKey: ShadingType
     pdfType: integer
     required: true
@@ -3129,8 +3053,6 @@ types:
     pdfType: array
     required: false
     introduced: '1.3'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Background (optional) specifies the color for areas outside the
 
@@ -3150,12 +3072,12 @@ types:
     introduced: '1.3'
     goType: bool
     purpose: AntiAlias controls whether to filter the shading function to prevent aliasing.
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -3167,19 +3089,16 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
+    - type: FilterCrypt
+      since: '1.5'
   - goName: F
     pdfKey: F
     pdfType: dictionary;string
@@ -3189,7 +3108,7 @@ types:
     - FileSpecification
     goType: pdf.Function
     purpose: F (optional) is a 1->n function for mapping parametric values to colors.
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -3201,133 +3120,34 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: DL
     pdfType: integer
     required: false
     introduced: '1.5'
+  fileDependent: false
   writeMethod: (*Type7).Embed
   readFunc: extract.Shading
   goPackage: shading
   goRepr: struct
   specSection: 8.7.4.3
-- name: SoftMaskAlpha
-  goType: null
-  pdfType: Mask
-  pdfRepr: dict
-  introduced: '1.4'
-  specTable: Table 142
-  fields:
-  - goName: null
-    pdfKey: Type
-    pdfType: name
-    required: false
-    introduced: '1.4'
-    possibleValues:
-    - Mask
-    notes: Table 142
-  - goName: null
-    pdfKey: S
-    pdfType: name
-    required: true
-    introduced: '1.4'
-    possibleValues:
-    - Alpha
-  - goName: null
-    pdfKey: G
-    pdfType: stream
-    required: true
-    introduced: '1.4'
-    refTypes:
-    - XObjectFormType1
-  - goName: null
-    pdfKey: BC
-    pdfType: array
-    required: false
-    introduced: '1.4'
-    refTypes:
-    - ArrayOfNumbersGeneral
-  - goName: null
-    pdfKey: TR
-    pdfType: dictionary;name;stream
-    required: false
-    default: '[];[Identity];[]'
-    introduced: '1.4'
-    possibleValues:
-    - Identity
-    refTypes:
-    - FunctionType2
-    - FunctionType3
-    - FunctionType0
-    - FunctionType4
-- name: SoftMaskLuminosity
-  goType: null
-  pdfType: Mask
-  pdfRepr: dict
-  introduced: '1.4'
-  specTable: Table 142
-  fields:
-  - goName: null
-    pdfKey: Type
-    pdfType: name
-    required: false
-    introduced: '1.4'
-    possibleValues:
-    - Mask
-    notes: Table 142
-  - goName: null
-    pdfKey: S
-    pdfType: name
-    required: true
-    introduced: '1.4'
-    possibleValues:
-    - Luminosity
-  - goName: null
-    pdfKey: G
-    pdfType: stream
-    required: true
-    introduced: '1.4'
-    refTypes:
-    - XObjectFormType1
-  - goName: null
-    pdfKey: BC
-    pdfType: array
-    required: false
-    introduced: '1.4'
-    refTypes:
-    - ArrayOfNumbersGeneral
-  - goName: null
-    pdfKey: TR
-    pdfType: dictionary;name;stream
-    required: false
-    default: '[];[Identity];[]'
-    introduced: '1.4'
-    possibleValues:
-    - Identity
-    refTypes:
-    - FunctionType2
-    - FunctionType3
-    - FunctionType0
-    - FunctionType4
 - name: Solidities
-  goType: null
+  purpose: "solidities for DeviceN color space"
+  goType:
   pdfRepr: dict
   introduced: '1.6'
   fields:
-  - goName: null
+  - goName:
     pdfKey: Default
     pdfType: number
     required: false
@@ -3335,7 +3155,7 @@ types:
     possibleValues:
     - fn:Eval((@Default>=0) && (@Default<=1))
     notes: Table 72
-  - goName: null
+  - goName:
     pdfKey: '*'
     pdfType: number
     required: false
@@ -3343,11 +3163,12 @@ types:
     possibleValues:
     - fn:Eval((@*>=0) && (@*<=1))
 - name: SpectralData
-  goType: null
+  purpose: "spectral data for color measurement"
+  goType:
   pdfRepr: dict
   introduced: '2.0'
   fields:
-  - goName: null
+  - goName:
     pdfKey: '*'
     pdfType: stream
     required: false
@@ -3356,13 +3177,14 @@ types:
     - Stream
     notes: Table 401, SpectralData cell
 - name: Thumbnail
+  purpose: "thumbnail image for a page"
   goType: graphics/image/thumbnail.Thumbnail
   pdfType: XObject
   pdfRepr: stream
   specTable: Table 5
   specSection: 8.9.5 12.3.4
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -3370,7 +3192,7 @@ types:
     possibleValues:
     - XObject
     notes: Table 5 and Table 87 and Clause 12.3.4
-  - goName: null
+  - goName:
     pdfKey: Subtype
     pdfType: name
     required: false
@@ -3420,14 +3242,12 @@ types:
     pdfType: array
     required: false
     introduced: '1.0'
-    refTypes:
-    - ArrayOfNumbersGeneral
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -3443,31 +3263,28 @@ types:
     - DCTDecode
     - fn:SinceVersion(1.5,JPXDecode)
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
     - FilterCCITTFaxDecode
-    - fn:SinceVersion(1.4
-    - FilterJBIG2Decode)
+    - type: FilterJBIG2Decode
+      since: '1.4'
     - FilterDCTDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: F
     pdfType: dictionary;string
     required: false
     introduced: '1.3'
     refTypes:
     - FileSpecification
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -3483,41 +3300,39 @@ types:
     - DCTDecode
     - fn:SinceVersion(1.5,JPXDecode)
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
     - FilterCCITTFaxDecode
-    - fn:SinceVersion(1.4
-    - FilterJBIG2Decode)
+    - type: FilterJBIG2Decode
+      since: '1.4'
     - FilterDCTDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: DL
     pdfType: integer
     required: false
     introduced: '1.5'
   readFunc: thumbnail.ExtractThumbnail
+  fileDependent: false
   writeMethod: (*Thumbnail).Embed
   goPackage: thumbnail
   goRepr: struct
-  specSection: 8.9.5
 - name: Viewport
+  purpose: "rectangular region with associated measure"
   goType: measure.Viewport
   pdfType: Viewport
   pdfRepr: dict
   introduced: '1.6'
   specTable: Table 265
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -3546,8 +3361,8 @@ types:
     introduced: '1.6'
     refTypes:
     - MeasureRL
-    - fn:SinceVersion(2.0
-    - MeasureGEO)
+    - type: MeasureGEO
+      since: '2.0'
     goType: Measure
     purpose: Measure specifies the scale and units for measurements within the viewport (optional).
   - goName: PtData
@@ -3563,15 +3378,17 @@ types:
   goRepr: struct
   specSection: '12.9'
   readFunc: measure.ExtractViewport
+  fileDependent: false
   writeMethod: (*Viewport).Embed
 - name: XObjectFormPS
-  goType: null
+  purpose: "PostScript form XObject"
+  goType:
   pdfType: XObject
   pdfRepr: stream
   introduced: '1.1'
   specTable: Table 5
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -3580,7 +3397,7 @@ types:
     possibleValues:
     - XObject
     notes: Table 5 and
-  - goName: null
+  - goName:
     pdfKey: Subtype
     pdfType: name
     required: true
@@ -3588,7 +3405,7 @@ types:
     deprecated: '1.3'
     possibleValues:
     - PS
-  - goName: null
+  - goName:
     pdfKey: Level1
     pdfType: stream
     required: false
@@ -3596,13 +3413,13 @@ types:
     deprecated: '1.3'
     refTypes:
     - Stream
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.1'
     deprecated: '1.3'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -3614,22 +3431,19 @@ types:
     - LZWDecode
     - fn:SinceVersion(1.2,FlateDecode)
     - RunLengthDecode
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.1'
     deprecated: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
-    - fn:SinceVersion(1.2
-    - FilterFlateDecode)
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterFlateDecode
+      since: '1.2'
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: F
     pdfType: dictionary;string
     required: false
@@ -3637,7 +3451,7 @@ types:
     deprecated: '1.3'
     refTypes:
     - FileSpecification
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -3649,28 +3463,26 @@ types:
     - LZWDecode
     - FlateDecode
     - RunLengthDecode
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.2'
     deprecated: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
+    - type: FilterCrypt
+      since: '1.5'
 - name: XObjectFormPSpassthrough
-  goType: null
+  purpose: "PostScript passthrough form XObject"
+  goType:
   pdfType: XObject
   pdfRepr: stream
   introduced: '1.1'
   specTable: Table 5
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -3679,7 +3491,7 @@ types:
     possibleValues:
     - XObject
     notes: 'Table 5 and '
-  - goName: null
+  - goName:
     pdfKey: Subtype
     pdfType: name
     required: true
@@ -3687,7 +3499,7 @@ types:
     deprecated: '1.3'
     possibleValues:
     - PS
-  - goName: null
+  - goName:
     pdfKey: Subtype2
     pdfType: name
     required: true
@@ -3695,7 +3507,7 @@ types:
     deprecated: '1.3'
     possibleValues:
     - PS
-  - goName: null
+  - goName:
     pdfKey: Level1
     pdfType: stream
     required: false
@@ -3703,7 +3515,7 @@ types:
     deprecated: '1.3'
     refTypes:
     - Stream
-  - goName: null
+  - goName:
     pdfKey: PS
     pdfType: stream
     required: true
@@ -3711,7 +3523,7 @@ types:
     deprecated: '1.3'
     refTypes:
     - Stream
-  - goName: null
+  - goName:
     pdfKey: FormType
     pdfType: integer
     required: fn:IsRequired(fn:BeforeVersion(1.3))
@@ -3719,27 +3531,27 @@ types:
     deprecated: '1.3'
     possibleValues:
     - '1'
-  - goName: null
+  - goName:
     pdfKey: BBox
     pdfType: rectangle
     required: true
     default: '[0 0 0 0]'
     introduced: '1.1'
     deprecated: '1.3'
-  - goName: null
+  - goName:
     pdfKey: Matrix
     pdfType: matrix
     required: fn:IsRequired(fn:BeforeVersion(1.3))
     default: '[1 0 0 1 0 0]'
     introduced: '1.1'
     deprecated: '1.3'
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.1'
     deprecated: '1.3'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -3752,22 +3564,19 @@ types:
     - fn:SinceVersion(1.2,FlateDecode)
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.1'
     deprecated: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
-    - fn:SinceVersion(1.2
-    - FilterFlateDecode)
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterFlateDecode
+      since: '1.2'
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: F
     pdfType: dictionary;string
     required: false
@@ -3775,7 +3584,7 @@ types:
     deprecated: '1.3'
     refTypes:
     - FileSpecification
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -3788,26 +3597,24 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.2'
     deprecated: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
 - name: XObjectFormPrinterMark
-  goType: null
+  purpose: "printer mark form XObject"
+  goType:
   pdfType: XObject
   pdfRepr: stream
   introduced: '1.4'
   specTable: Table 5
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -3815,84 +3622,84 @@ types:
     possibleValues:
     - XObject
     notes: Table 5, Table 93 and Table 399
-  - goName: null
+  - goName:
     pdfKey: Subtype
     pdfType: name
     required: true
     introduced: '1.4'
     possibleValues:
     - Form
-  - goName: null
+  - goName:
     pdfKey: FormType
     pdfType: integer
     required: false
     introduced: '1.4'
     possibleValues:
     - '1'
-  - goName: null
+  - goName:
     pdfKey: BBox
     pdfType: rectangle
     required: true
     introduced: '1.4'
-  - goName: null
+  - goName:
     pdfKey: Matrix
     pdfType: matrix
     required: false
     default: '[1 0 0 1 0 0]'
     introduced: '1.4'
-  - goName: null
+  - goName:
     pdfKey: Resources
     pdfType: dictionary
     required: false
     introduced: '1.4'
     refTypes:
     - Resource
-  - goName: null
+  - goName:
     pdfKey: Group
     pdfType: dictionary
     required: false
     introduced: '1.4'
     refTypes:
     - GroupAttributes
-  - goName: null
+  - goName:
     pdfKey: Ref
     pdfType: dictionary
     required: false
     introduced: '1.4'
     refTypes:
     - Reference
-  - goName: null
+  - goName:
     pdfKey: Metadata
     pdfType: stream
     required: false
     introduced: '1.4'
     refTypes:
     - Metadata
-  - goName: null
+  - goName:
     pdfKey: PieceInfo
     pdfType: dictionary
     required: false
     introduced: '1.4'
     refTypes:
     - PagePiece
-  - goName: null
+  - goName:
     pdfKey: LastModified
     pdfType: date
     required: fn:IsRequired(fn:IsPresent(PieceInfo))
     introduced: '1.4'
-  - goName: null
+  - goName:
     pdfKey: StructParent
     pdfType: integer
     required: false
     introduced: '1.4'
     notes: Table 359
-  - goName: null
+  - goName:
     pdfKey: StructParents
     pdfType: integer
     required: false
     introduced: '1.4'
     notes: Table 359
-  - goName: null
+  - goName:
     pdfKey: OPI
     pdfType: dictionary
     required: false
@@ -3901,7 +3708,7 @@ types:
     refTypes:
     - OPIVersion13
     - OPIVersion20
-  - goName: null
+  - goName:
     pdfKey: OC
     pdfType: dictionary
     required: false
@@ -3909,20 +3716,21 @@ types:
     refTypes:
     - OptContentGroup
     - OptContentMembership
-  - goName: null
+  - goName:
     pdfKey: Name
     pdfType: name
     required: false
     introduced: '1.4'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: AF
     pdfType: array
     required: false
     introduced: '2.0'
     refTypes:
-    - ArrayOfAFFileSpecifications
-  - goName: null
+    - type: AFFileSpecification
+      collection: array
+  - goName:
     pdfKey: Measure
     pdfType: dictionary
     required: false
@@ -3930,19 +3738,19 @@ types:
     refTypes:
     - MeasureRL
     - MeasureGEO
-  - goName: null
+  - goName:
     pdfKey: PtData
     pdfType: dictionary
     required: false
     introduced: '1.7'
     refTypes:
     - PointData
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.4'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -3954,27 +3762,24 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.4'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: F
     pdfType: dictionary;string
     required: false
     introduced: '1.4'
     refTypes:
     - FileSpecification
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -3986,31 +3791,28 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.4'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: DL
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: MarkStyle
     pdfType: text-string
     required: false
     introduced: '1.4'
     notes: from Table 399 printer mark form dictionary
-  - goName: null
+  - goName:
     pdfKey: Colorants
     pdfType: dictionary
     required: false
@@ -4018,13 +3820,14 @@ types:
     refTypes:
     - ColorantsDict
 - name: XObjectFormTrapNet
-  goType: null
+  purpose: "trap network form XObject"
+  goType:
   pdfType: XObject
   pdfRepr: stream
   introduced: '1.3'
   specTable: Table 93
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -4033,7 +3836,7 @@ types:
     possibleValues:
     - XObject
     notes: Table 93 and Table 404
-  - goName: null
+  - goName:
     pdfKey: Subtype
     pdfType: name
     required: true
@@ -4041,7 +3844,7 @@ types:
     deprecated: '2.0'
     possibleValues:
     - Form
-  - goName: null
+  - goName:
     pdfKey: FormType
     pdfType: integer
     required: false
@@ -4049,20 +3852,20 @@ types:
     deprecated: '2.0'
     possibleValues:
     - '1'
-  - goName: null
+  - goName:
     pdfKey: BBox
     pdfType: rectangle
     required: true
     introduced: '1.3'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Matrix
     pdfType: matrix
     required: false
     default: '[1 0 0 1 0 0]'
     introduced: '1.3'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Resources
     pdfType: dictionary
     required: false
@@ -4070,7 +3873,7 @@ types:
     deprecated: '2.0'
     refTypes:
     - Resource
-  - goName: null
+  - goName:
     pdfKey: Group
     pdfType: dictionary
     required: false
@@ -4078,7 +3881,7 @@ types:
     deprecated: '2.0'
     refTypes:
     - GroupAttributes
-  - goName: null
+  - goName:
     pdfKey: Ref
     pdfType: dictionary
     required: false
@@ -4086,7 +3889,7 @@ types:
     deprecated: '2.0'
     refTypes:
     - Reference
-  - goName: null
+  - goName:
     pdfKey: Metadata
     pdfType: stream
     required: false
@@ -4094,7 +3897,7 @@ types:
     deprecated: '2.0'
     refTypes:
     - Metadata
-  - goName: null
+  - goName:
     pdfKey: PieceInfo
     pdfType: dictionary
     required: false
@@ -4102,27 +3905,27 @@ types:
     deprecated: '2.0'
     refTypes:
     - PagePiece
-  - goName: null
+  - goName:
     pdfKey: LastModified
     pdfType: date
     required: fn:IsRequired(fn:IsPresent(PieceInfo))
     introduced: '1.3'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: StructParent
     pdfType: integer
     required: false
     introduced: '1.3'
     deprecated: '2.0'
     notes: Table 359
-  - goName: null
+  - goName:
     pdfKey: StructParents
     pdfType: integer
     required: false
     introduced: '1.3'
     deprecated: '2.0'
     notes: Table 359
-  - goName: null
+  - goName:
     pdfKey: OPI
     pdfType: dictionary
     required: false
@@ -4131,7 +3934,7 @@ types:
     refTypes:
     - OPIVersion13
     - OPIVersion20
-  - goName: null
+  - goName:
     pdfKey: OC
     pdfType: dictionary
     required: false
@@ -4140,19 +3943,19 @@ types:
     refTypes:
     - OptContentGroup
     - OptContentMembership
-  - goName: null
+  - goName:
     pdfKey: Name
     pdfType: name
     required: false
     introduced: '1.3'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.3'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -4165,21 +3968,18 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     deprecated: '2.0'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: F
     pdfType: dictionary;string
     required: false
@@ -4187,7 +3987,7 @@ types:
     deprecated: '2.0'
     refTypes:
     - FileSpecification
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -4200,27 +4000,24 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     deprecated: '2.0'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: DL
     pdfType: integer
     required: false
     introduced: '1.5'
     deprecated: '2.0'
-  - goName: null
+  - goName:
     pdfKey: PCM
     pdfType: name
     required: true
@@ -4234,25 +4031,21 @@ types:
     - DeviceRGBK
     - DeviceN
     notes: Table 404
-  - goName: null
+  - goName:
     pdfKey: SeparationColorNames
     pdfType: array
     required: false
     introduced: '1.3'
     deprecated: '2.0'
-    refTypes:
-    - ArrayOfNamesGeneral
     notes: Table 404
-  - goName: null
+  - goName:
     pdfKey: TrapRegions
     pdfType: array
     required: false
     introduced: '1.3'
     deprecated: '2.0'
-    refTypes:
-    - ArrayOfTrapRegions
     notes: Table 404
-  - goName: null
+  - goName:
     pdfKey: TrapStyles
     pdfType: text-string
     required: false
@@ -4260,12 +4053,13 @@ types:
     deprecated: '2.0'
     notes: Table 404
 - name: XObjectFormType1
+  purpose: "type 1 form XObject"
   goType: graphics/form.Form
   pdfType: XObject
   pdfRepr: stream
   specTable: Table 5
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -4273,14 +4067,14 @@ types:
     possibleValues:
     - XObject
     notes: Table 5 and Table 93
-  - goName: null
+  - goName:
     pdfKey: Subtype
     pdfType: name
     required: true
     introduced: '1.0'
     possibleValues:
     - Form
-  - goName: null
+  - goName:
     pdfKey: FormType
     pdfType: integer
     required: fn:IsRequired(fn:BeforeVersion(1.3))
@@ -4307,7 +4101,7 @@ types:
       When writing forms to a PDF file, the zero matrix can be used as an
 
       alternative to the identity matrix for convenience.'
-  - goName: null
+  - goName:
     pdfKey: Resources
     pdfType: dictionary
     required: true
@@ -4325,7 +4119,7 @@ types:
     purpose: 'Group specifies transparency group attributes (PDF 1.4).
 
       If non-nil, this form XObject is a transparency group XObject.'
-  - goName: null
+  - goName:
     pdfKey: Ref
     pdfType: dictionary
     required: false
@@ -4369,13 +4163,13 @@ types:
     purpose: 'StructParent (required if the form is a structural content item)
 
       is the integer key of the form''s entry in the structural parent tree.'
-  - goName: null
+  - goName:
     pdfKey: StructParents
     pdfType: integer
     required: false
     introduced: '1.3'
     notes: Table 359
-  - goName: null
+  - goName:
     pdfKey: OPI
     pdfType: dictionary
     required: false
@@ -4394,7 +4188,7 @@ types:
     - OptContentMembership
     goType: oc.Conditional
     purpose: OptionalContent (optional) allows to control the visibility of the form.
-  - goName: null
+  - goName:
     pdfKey: Name
     pdfType: name
     required: fn:IsRequired(fn:BeforeVersion(1.3))
@@ -4406,7 +4200,8 @@ types:
     required: false
     introduced: '2.0'
     refTypes:
-    - ArrayOfAFFileSpecifications
+    - type: AFFileSpecification
+      collection: array
     goType: '[]*file.Specification'
     purpose: 'AssociatedFiles (optional; PDF 2.0) is an array of files associated with
 
@@ -4420,7 +4215,7 @@ types:
     pdfKey: Measure
     pdfType: dictionary
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
     refTypes:
     - MeasureRL
     - MeasureGEO
@@ -4432,18 +4227,18 @@ types:
     pdfKey: PtData
     pdfType: dictionary
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
     refTypes:
     - PointData
     goType: '*measure.PtData'
     purpose: PtData (optional; PDF 2.0) contains extended geospatial point data.
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.0'
     notes: from stream
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -4455,29 +4250,26 @@ types:
     - fn:SinceVersion(1.2,FlateDecode)
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
     notes: Table 6
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.0'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
-    - fn:SinceVersion(1.2
-    - FilterFlateDecode)
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterFlateDecode
+      since: '1.2'
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: F
     pdfType: dictionary;string
     required: false
     introduced: '1.2'
     refTypes:
     - FileSpecification
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -4489,40 +4281,35 @@ types:
     - FlateDecode
     - RunLengthDecode
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfCompressionFilterNames
     notes: Table 6
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.2'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: DL
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: XUID
     pdfType: array
     required: false
     introduced: '1.0'
     deprecated: '1.3'
-    refTypes:
-    - ArrayOfIntegersGeneral
-  - goName: null
+  - goName:
     pdfKey: GTS_XID
     pdfType: string
     required: false
     introduced: fn:Extension(PDF_VT2,1.6)
     notes: PDF/VT-2
-  - goName: null
+  - goName:
     pdfKey: GTS_Scope
     pdfType: name
     required: false
@@ -4535,30 +4322,32 @@ types:
     - Global
     - Unknown
     notes: PDF/VT-2
-  - goName: null
+  - goName:
     pdfKey: GTS_Env
     pdfType: text-string
     required: fn:IsRequired((@GTS_Scope==Stream) || (@GTS_Scope==Global))
     introduced: fn:Extension(PDF_VT2,1.6)
     notes: PDF/VT-2
-  - goName: null
+  - goName:
     pdfKey: GTS_Encapsulated
     pdfType: boolean
     required: false
     introduced: fn:Extension(PDF_VT2,1.6)
     notes: PDF/VT-2
-  writeMethod: (*Form).Encode
+  fileDependent: false
+  writeMethod: (*Form).Embed
   readFunc: extract.Form
   goPackage: form
   goRepr: struct
   specSection: '8.10'
 - name: XObjectImage
+  purpose: "image XObject"
   goType: graphics/image.Dict
   pdfType: XObject
   pdfRepr: stream
   specTable: Table 5
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -4566,7 +4355,7 @@ types:
     possibleValues:
     - XObject
     notes: Table 5 and Table 87
-  - goName: null
+  - goName:
     pdfKey: Subtype
     pdfType: name
     required: true
@@ -4600,21 +4389,21 @@ types:
     - DeviceGrayColorSpace
     - DeviceRGBColorSpace
     - DeviceCMYKColorSpace
-    - fn:SinceVersion(1.1
-    - CalGrayColorSpace)
-    - fn:SinceVersion(1.1
-    - CalRGBColorSpace)
-    - fn:SinceVersion(1.1
-    - LabColorSpace)
-    - fn:SinceVersion(1.3
-    - ICCBasedColorSpace)
+    - type: CalGrayColorSpace
+      since: '1.1'
+    - type: CalRGBColorSpace
+      since: '1.1'
+    - type: LabColorSpace
+      since: '1.1'
+    - type: ICCBasedColorSpace
+      since: '1.3'
     - IndexedColorSpace
-    - fn:SinceVersion(1.2
-    - SeparationColorSpace)
-    - fn:SinceVersion(1.3
-    - DeviceNColorSpace)
-    - fn:SinceVersion(1.2
-    - PatternColorSpace)
+    - type: SeparationColorSpace
+      since: '1.2'
+    - type: DeviceNColorSpace
+      since: '1.3'
+    - type: PatternColorSpace
+      since: '1.2'
     goType: color.Space
     purpose: 'ColorSpace is the color space in which image samples are specified.
 
@@ -4643,27 +4432,24 @@ types:
     purpose: 'Intent (optional) is the name of a color rendering intent to be used in
 
       rendering the image.'
-  - goName: null
+  - goName:
     pdfKey: ImageMask
     pdfType: boolean
     required: false
     default: false
     introduced: '1.0'
-  - goName: null
+  - goName:
     pdfKey: Mask
     pdfType: array;stream
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfIntegersGeneral
     - XObjectImageMask
   - goName: Decode
     pdfKey: Decode
     pdfType: array
     required: false
     introduced: '1.0'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Decode (optional) is an array of numbers describing how to map image
 
@@ -4688,7 +4474,8 @@ types:
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfImageAlternates
+    - type: AlternateImage
+      collection: array
     goType: '[]*Dict'
     purpose: Alternates (optional) is an array of alternate image dictionaries for this image.
   - goName: SMask
@@ -4743,14 +4530,14 @@ types:
     purpose: 'StructParent (required if the image is a structural content item)
 
       is the integer key of the image''s entry in the structural parent tree.'
-  - goName: null
+  - goName:
     pdfKey: ID
     pdfType: byte-string
     required: false
     introduced: '1.3'
     deprecated: '2.0'
     notes: https://github.com/pdf-association/pdf-issues/issues/619
-  - goName: null
+  - goName:
     pdfKey: OPI
     pdfType: dictionary
     required: false
@@ -4784,7 +4571,8 @@ types:
     required: false
     introduced: '2.0'
     refTypes:
-    - ArrayOfAFFileSpecifications
+    - type: AFFileSpecification
+      collection: array
     goType: '[]*file.Specification'
     purpose: 'AssociatedFiles (optional; PDF 2.0) is an array of files associated with
 
@@ -4815,12 +4603,12 @@ types:
     - PointData
     goType: '*measure.PtData'
     purpose: PtData (optional; PDF 2.0) contains extended geospatial point data.
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.0'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -4836,33 +4624,30 @@ types:
     - DCTDecode
     - fn:SinceVersion(1.5,JPXDecode)
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.0'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
-    - fn:SinceVersion(1.2
-    - FilterFlateDecode)
+    - type: FilterFlateDecode
+      since: '1.2'
     - FilterCCITTFaxDecode
-    - fn:SinceVersion(1.4
-    - FilterJBIG2Decode)
+    - type: FilterJBIG2Decode
+      since: '1.4'
     - FilterDCTDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: F
     pdfType: fn:SinceVersion(1.1,dictionary);string
     required: false
     introduced: '1.0'
     refTypes:
-    - fn:SinceVersion(1.1
-    - FileSpecification)
-  - goName: null
+    - type: FileSpecification
+      since: '1.1'
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -4878,35 +4663,32 @@ types:
     - DCTDecode
     - fn:SinceVersion(1.5,JPXDecode)
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.2'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
     - FilterCCITTFaxDecode
-    - fn:SinceVersion(1.4
-    - FilterJBIG2Decode)
+    - type: FilterJBIG2Decode
+      since: '1.4'
     - FilterDCTDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: DL
     pdfType: integer
     required: false
     introduced: '1.5'
-  - goName: null
+  - goName:
     pdfKey: GTS_XID
     pdfType: string
     required: false
     introduced: fn:Extension(PDF_VT2,1.6)
     notes: PDF/VT-2
-  - goName: null
+  - goName:
     pdfKey: GTS_Scope
     pdfType: name
     required: false
@@ -4919,31 +4701,33 @@ types:
     - Global
     - Unknown
     notes: PDF/VT-2
-  - goName: null
+  - goName:
     pdfKey: GTS_Env
     pdfType: text-string
     required: fn:IsRequired((@GTS_Scope==Stream) || (@GTS_Scope==Global))
     introduced: fn:Extension(PDF_VT2,1.6)
     notes: PDF/VT-2
-  - goName: null
+  - goName:
     pdfKey: GTS_Encapsulated
     pdfType: boolean
     required: false
     introduced: fn:Extension(PDF_VT2,1.6)
     notes: PDF/VT-2
   readFunc: image.ExtractDict
+  fileDependent: true
   writeMethod: (*Dict).Encode
   goPackage: image
   goRepr: struct
   specSection: 8.9.5
 - name: XObjectImageMask
+  purpose: "image mask XObject"
   goType: graphics/image.Dict
   pdfType: XObject
   pdfRepr: stream
   introduced: '1.3'
   specTable: Table 5
   fields:
-  - goName: null
+  - goName:
     pdfKey: Type
     pdfType: name
     required: false
@@ -4951,7 +4735,7 @@ types:
     possibleValues:
     - XObject
     notes: Table 5 and Table 87
-  - goName: null
+  - goName:
     pdfKey: Subtype
     pdfType: name
     required: true
@@ -4992,7 +4776,7 @@ types:
     purpose: 'Intent (optional) is the name of a color rendering intent to be used in
 
       rendering the image.'
-  - goName: null
+  - goName:
     pdfKey: ImageMask
     pdfType: boolean
     required: true
@@ -5007,8 +4791,6 @@ types:
     possibleValues:
     - '[0 1]'
     - '[1 0]'
-    refTypes:
-    - ArrayOfNumbersGeneral
     goType: '[]float64'
     purpose: 'Decode (optional) is an array of numbers describing how to map image
 
@@ -5033,7 +4815,8 @@ types:
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfImageAlternates
+    - type: AlternateImage
+      collection: array
     goType: '[]*Dict'
     purpose: Alternates (optional) is an array of alternate image dictionaries for this image.
   - goName: SMask
@@ -5084,14 +4867,14 @@ types:
     purpose: 'StructParent (required if the image is a structural content item)
 
       is the integer key of the image''s entry in the structural parent tree.'
-  - goName: null
+  - goName:
     pdfKey: ID
     pdfType: byte-string
     required: false
     introduced: '1.3'
     deprecated: '2.0'
     notes: https://github.com/pdf-association/pdf-issues/issues/619
-  - goName: null
+  - goName:
     pdfKey: OPI
     pdfType: dictionary
     required: false
@@ -5125,7 +4908,8 @@ types:
     required: false
     introduced: '2.0'
     refTypes:
-    - ArrayOfAFFileSpecifications
+    - type: AFFileSpecification
+      collection: array
     goType: '[]*file.Specification'
     purpose: 'AssociatedFiles (optional; PDF 2.0) is an array of files associated with
 
@@ -5156,12 +4940,12 @@ types:
     - PointData
     goType: '*measure.PtData'
     purpose: PtData (optional; PDF 2.0) contains extended geospatial point data.
-  - goName: null
+  - goName:
     pdfKey: Length
     pdfType: integer
     required: true
     introduced: '1.3'
-  - goName: null
+  - goName:
     pdfKey: Filter
     pdfType: array;name
     required: false
@@ -5177,31 +4961,28 @@ types:
     - DCTDecode
     - fn:SinceVersion(1.5,JPXDecode)
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfFilterNames
-  - goName: null
+  - goName:
     pdfKey: DecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
     - FilterCCITTFaxDecode
-    - fn:SinceVersion(1.4
-    - FilterJBIG2Decode)
+    - type: FilterJBIG2Decode
+      since: '1.4'
     - FilterDCTDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: F
     pdfType: dictionary;string
     required: false
     introduced: '1.3'
     refTypes:
     - FileSpecification
-  - goName: null
+  - goName:
     pdfKey: FFilter
     pdfType: array;name
     required: false
@@ -5217,272 +4998,34 @@ types:
     - DCTDecode
     - fn:SinceVersion(1.5,JPXDecode)
     - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfFilterNames
-  - goName: null
+  - goName:
     pdfKey: FDecodeParms
     pdfType: array;dictionary
     required: false
     introduced: '1.3'
     refTypes:
-    - ArrayOfDecodeParams
     - FilterLZWDecode
     - FilterFlateDecode
     - FilterCCITTFaxDecode
-    - fn:SinceVersion(1.4
-    - FilterJBIG2Decode)
+    - type: FilterJBIG2Decode
+      since: '1.4'
     - FilterDCTDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
     pdfKey: DL
     pdfType: integer
     required: false
     introduced: '1.5'
   readFunc: image.ExtractDict
-  writeMethod: (*Dict).Encode
-  goPackage: image
-  goRepr: struct
-  specSection: 8.9.5
-- name: XObjectImageSoftMask
-  goType: graphics/image.Dict
-  pdfType: XObject
-  pdfRepr: stream
-  introduced: '1.4'
-  specTable: Table 143
-  fields:
-  - goName: null
-    pdfKey: Type
-    pdfType: name
-    required: false
-    introduced: '1.4'
-    possibleValues:
-    - XObject
-    notes: Table87 and Table 143 and Table 144
-  - goName: null
-    pdfKey: Subtype
-    pdfType: name
-    required: true
-    introduced: '1.4'
-    possibleValues:
-    - Image
-  - goName: Width
-    pdfKey: Width
-    pdfType: integer
-    required: true
-    introduced: '1.4'
-    goType: int
-    purpose: Width is the width of the image in pixels.
-  - goName: Height
-    pdfKey: Height
-    pdfType: integer
-    required: true
-    introduced: '1.4'
-    goType: int
-    purpose: Height is the height of the image in pixels.
-  - goName: ColorSpace
-    pdfKey: ColorSpace
-    pdfType: array;name
-    required: true
-    introduced: '1.4'
-    possibleValues:
-    - DeviceGray
-    refTypes:
-    - DeviceGrayColorSpace
-    goType: color.Space
-    purpose: 'ColorSpace is the color space in which image samples are specified.
-
-      It can be any type of color space except Pattern.'
-  - goName: BitsPerComponent
-    pdfKey: BitsPerComponent
-    pdfType: integer
-    required: fn:IsRequired(fn:Not(fn:Contains(@Filter,JPXDecode) || (@ImageMask==true)))
-    introduced: '1.4'
-    possibleValues:
-    - fn:RequiredValue((fn:Contains(@Filter,CCITTFaxDecode) || fn:Contains(@Filter,JBIG2Decode)),1)
-    - '2'
-    - '4'
-    - fn:RequiredValue((fn:Contains(@Filter,RunLengthDecode) || fn:Contains(@Filter,DCTDecode)),8)
-    - fn:SinceVersion(1.5,16)
-    goType: int
-    purpose: 'BitsPerComponent is the number of bits used to represent each color component.
-
-      The value must be 1, 2, 4, 8, or (from PDF 1.5) 16.'
-  - goName: Intent
-    pdfKey: Intent
-    pdfType: name
-    required: false
-    introduced: '1.4'
-    goType: graphics.RenderingIntent
-    purpose: 'Intent (optional) is the name of a color rendering intent to be used in
-
-      rendering the image.'
-  - goName: null
-    pdfKey: ImageMask
-    pdfType: boolean
-    required: false
-    default: false
-    introduced: '1.4'
-    notes: Table 143
-  - goName: Name
-    pdfKey: Name
-    pdfType: name
-    required: false
-    introduced: '1.4'
-    deprecated: '2.0'
-    goType: pdf.Name
-    purpose: 'Name is deprecated and should be left empty.
-
-      Only used in PDF 1.0 where it was the name used to reference the image
-
-      mask from within content streams.'
-  - goName: Decode
-    pdfKey: Decode
-    pdfType: array
-    required: false
-    default: '[0 1]'
-    introduced: '1.4'
-    refTypes:
-    - ArrayOfNumbersGeneral
-    goType: '[]float64'
-    purpose: 'Decode (optional) is an array of numbers describing how to map image
-
-      samples into the range of values appropriate for the image''s color
-
-      space. The slice must have twice the number of color components in the
-
-      ColorSpace.'
-  - goName: Interpolate
-    pdfKey: Interpolate
-    pdfType: boolean
-    required: false
-    default: false
-    introduced: '1.4'
-    goType: bool
-    purpose: 'Interpolate indicates whether image interpolation should be performed by
-
-      a PDF processor.'
-  - goName: null
-    pdfKey: Matte
-    pdfType: array
-    required: false
-    introduced: '1.4'
-    refTypes:
-    - ArrayOfNumbersGeneral
-    notes: Table 144
-  - goName: Metadata
-    pdfKey: Metadata
-    pdfType: stream
-    required: false
-    introduced: '1.4'
-    refTypes:
-    - Metadata
-    goType: '*metadata.Stream'
-    purpose: Metadata (optional) is a metadata stream containing metadata for the image.
-  - goName: null
-    pdfKey: Length
-    pdfType: integer
-    required: true
-    introduced: '1.4'
-  - goName: null
-    pdfKey: Filter
-    pdfType: array;name
-    required: false
-    introduced: '1.4'
-    possibleValues:
-    - ASCIIHexDecode
-    - ASCII85Decode
-    - LZWDecode
-    - FlateDecode
-    - RunLengthDecode
-    - CCITTFaxDecode
-    - JBIG2Decode
-    - DCTDecode
-    - fn:SinceVersion(1.5,JPXDecode)
-    - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfFilterNames
-  - goName: null
-    pdfKey: DecodeParms
-    pdfType: array;dictionary
-    required: false
-    introduced: '1.4'
-    refTypes:
-    - ArrayOfDecodeParams
-    - FilterLZWDecode
-    - FilterFlateDecode
-    - FilterCCITTFaxDecode
-    - FilterJBIG2Decode
-    - FilterDCTDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
-    pdfKey: F
-    pdfType: dictionary;string
-    required: false
-    introduced: '1.4'
-    refTypes:
-    - FileSpecification
-  - goName: null
-    pdfKey: FFilter
-    pdfType: array;name
-    required: false
-    introduced: '1.4'
-    possibleValues:
-    - ASCIIHexDecode
-    - ASCII85Decode
-    - LZWDecode
-    - FlateDecode
-    - RunLengthDecode
-    - CCITTFaxDecode
-    - JBIG2Decode
-    - DCTDecode
-    - fn:SinceVersion(1.5,JPXDecode)
-    - fn:SinceVersion(1.5,Crypt)
-    refTypes:
-    - ArrayOfFilterNames
-  - goName: null
-    pdfKey: FDecodeParms
-    pdfType: array;dictionary
-    required: false
-    introduced: '1.4'
-    refTypes:
-    - ArrayOfDecodeParams
-    - FilterLZWDecode
-    - FilterFlateDecode
-    - FilterCCITTFaxDecode
-    - FilterJBIG2Decode
-    - FilterDCTDecode
-    - fn:SinceVersion(1.5
-    - FilterCrypt)
-  - goName: null
-    pdfKey: DL
-    pdfType: integer
-    required: false
-    introduced: '1.5'
-  - goName: AssociatedFiles
-    pdfKey: AF
-    pdfType: array
-    required: false
-    introduced: '2.0'
-    refTypes:
-    - ArrayOfAFFileSpecifications
-    goType: '[]*file.Specification'
-    purpose: 'AssociatedFiles (optional; PDF 2.0) is an array of files associated with
-
-      the image. The relationship that the associated files have to the
-
-      XObject is supplied by the Specification.AFRelationship field.
-
-
-      This corresponds to the AF entry in the image dictionary.'
-  readFunc: image.ExtractDict
+  fileDependent: true
   writeMethod: (*Dict).Encode
   goPackage: image
   goRepr: struct
   specSection: 8.9.5
 interfaces:
 - name: Function
+  purpose: "function dictionary"
   goType: pdf.Function
   goPackage: seehuhn.de/go/pdf
   extractFunc: function.Extract
@@ -5498,10 +5041,11 @@ interfaces:
   - type: FunctionType4
     value: 4
 - name: ColorSpace
+  purpose: "color space dictionary"
   goType: color.Space
   goPackage: seehuhn.de/go/pdf/graphics/color
   extractFunc: extract.ColorSpace
-  discriminatorKey: null
+  discriminatorKey:
   implementations:
   - type: CalGrayColorSpace
   - type: CalRGBColorSpace
@@ -5511,6 +5055,7 @@ interfaces:
   - type: SeparationColorSpace
   - type: DeviceNColorSpace
 - name: Shading
+  purpose: "shading dictionary"
   goType: graphics.Shading
   goPackage: seehuhn.de/go/pdf/graphics
   extractFunc: extract.Shading
@@ -5532,6 +5077,7 @@ interfaces:
   - type: ShadingType7
     value: 7
 - name: Pattern
+  purpose: "pattern dictionary"
   goType: color.Pattern
   goPackage: seehuhn.de/go/pdf/graphics/color
   extractFunc: extract.Pattern
@@ -5543,6 +5089,7 @@ interfaces:
   - type: PatternType2
     value: 2
 - name: XObject
+  purpose: "external object"
   goType: graphics.XObject
   goPackage: seehuhn.de/go/pdf/graphics
   extractFunc: extract.XObject

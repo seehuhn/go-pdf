@@ -182,7 +182,10 @@ func (b *Builder) getExtGStateName(gs *extgstate.ExtGState) pdf.Name {
 	return name
 }
 
-func (b *Builder) getFontName(f font.Instance) pdf.Name {
+// FontName returns the resource name for the given font instance.
+// If the font hasn't been registered yet, it is added to the builder's
+// font resources with an automatically allocated name.
+func (b *Builder) FontName(f font.Instance) pdf.Name {
 	key := resKey{resFont, f}
 	if name, ok := b.resName[key]; ok {
 		return name
