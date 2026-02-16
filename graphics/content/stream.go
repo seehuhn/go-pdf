@@ -410,7 +410,7 @@ type streamScanner struct {
 }
 
 type scanStackFrame struct {
-	data   []pdf.Native
+	data   []pdf.Object
 	isDict bool
 }
 
@@ -472,12 +472,7 @@ tokenLoop:
 				// unexpected "]"
 				continue tokenLoop
 			}
-			// convert []pdf.Native to pdf.Array ([]pdf.Object)
-			arr := make(pdf.Array, len(s.stack[len(s.stack)-1].data))
-			for i, elem := range s.stack[len(s.stack)-1].data {
-				arr[i] = elem
-			}
-			obj = arr
+			obj = pdf.Array(s.stack[len(s.stack)-1].data)
 			s.stack = s.stack[:len(s.stack)-1]
 		}
 

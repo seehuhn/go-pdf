@@ -317,7 +317,7 @@ func (d *CIDFontType0) MakeFont() font.Instance {
 		CIDFontType0: d,
 		codec:        codec,
 		text:         textMap,
-		cache:        make(map[charcode.Code]*font.Code),
+		cache:        make(map[charcode.Code]font.Code),
 	}
 }
 
@@ -329,7 +329,7 @@ type t0Font struct {
 	*CIDFontType0
 	codec *charcode.Codec
 	text  map[charcode.Code]string
-	cache map[charcode.Code]*font.Code
+	cache map[charcode.Code]font.Code
 }
 
 func (f *t0Font) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
@@ -363,14 +363,13 @@ func (f *t0Font) WritingMode() font.WritingMode {
 	return f.CMap.WMode
 }
 
-func (f *t0Font) Codes(str pdf.String) iter.Seq[*font.Code] {
-	return func(yield func(*font.Code) bool) {
+func (f *t0Font) Codes(str pdf.String) iter.Seq[font.Code] {
+	return func(yield func(font.Code) bool) {
 		for len(str) > 0 {
 			code, k, isValid := f.codec.Decode(str)
 
 			res, seen := f.cache[code]
 			if !seen {
-				res = &font.Code{}
 				codeBytes := str[:k]
 				if isValid {
 					res.CID = f.CMap.LookupCID(codeBytes)

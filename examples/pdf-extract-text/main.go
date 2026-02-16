@@ -22,6 +22,8 @@ import (
 	"log"
 	"math"
 	"os"
+	"runtime"
+	"runtime/pprof"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/pagerange"
@@ -35,7 +37,21 @@ func main() {
 	xRange := flag.String("x", "", "Only include text at x coordinates `A-B`")
 	showPageNumbers := flag.Bool("P", false, "show page numbers")
 	useActualText := flag.Bool("use-actualtext", false, "use ActualText from marked content")
+	cpuprofile := flag.String("cpuprofile", "", "write cpu profile to `file`")
+	memprofile := flag.String("memprofile", "", "write memory profile to `file`")
 	flag.Parse()
+
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal("could not create CPU profile: ", err)
+		}
+		defer f.Close()
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatal("could not start CPU profile: ", err)
+		}
+		defer pprof.StopCPUProfile()
+	}
 
 	if pages.Start < 1 {
 		pages.Start = 1
@@ -53,6 +69,23 @@ func main() {
 
 	for _, fname := range flag.Args() {
 		err := extractText(fname, pages.Start, pages.End, xRangeMin, xRangeMax, *showPageNumbers, *useActualText)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if *memprofile != "" {
+		f, err := os.Create(*memprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		runtime.GC()
+		if allocs := pprof.Lookup("allocs"); allocs == nil {
+			log.Fatal("could not lookup memory profile")
+		} else if err := allocs.WriteTo(f, 0); err != nil {
+			log.Fatal("could not write memory profile: ", err)
+		}
+		err = f.Close()
 		if err != nil {
 			log.Fatal(err)
 		}

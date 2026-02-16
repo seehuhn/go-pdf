@@ -358,8 +358,8 @@ func (f *instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 	return seq
 }
 
-func (f *instance) Codes(s pdf.String) iter.Seq[*font.Code] {
-	return func(yield func(*font.Code) bool) {
+func (f *instance) Codes(s pdf.String) iter.Seq[font.Code] {
+	return func(yield func(font.Code) bool) {
 		q := 1000 * f.Font.FontMatrix[0]
 		for code := range f.Simple.Codes(s) {
 			code.Width *= q

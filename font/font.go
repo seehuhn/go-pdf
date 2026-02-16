@@ -41,10 +41,7 @@ type Instance interface {
 
 	// Codes iterates over the character codes in a PDF string, yielding
 	// information about each character code.
-	//
-	// The returned pointer points to memory that is reused across iterations.
-	// The caller must not modify the pointed-to structure.
-	Codes(s pdf.String) iter.Seq[*Code]
+	Codes(s pdf.String) iter.Seq[Code]
 
 	// FontInfo returns information required to load the font file and to
 	// extract the the glyph corresponding to a character identifier. The

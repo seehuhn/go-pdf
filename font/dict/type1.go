@@ -304,8 +304,8 @@ func (*t1Font) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
 
-func (f *t1Font) Codes(s pdf.String) iter.Seq[*font.Code] {
-	return func(yield func(*font.Code) bool) {
+func (f *t1Font) Codes(s pdf.String) iter.Seq[font.Code] {
+	return func(yield func(font.Code) bool) {
 		var res font.Code
 		for _, code := range s {
 			if f.Dict.Encoding(code) == "" {
@@ -316,7 +316,7 @@ func (f *t1Font) Codes(s pdf.String) iter.Seq[*font.Code] {
 			res.Width = f.Dict.Width[code] / 1000
 			res.Text = f.Text[code]
 			res.UseWordSpacing = code == 0x20
-			if !yield(&res) {
+			if !yield(res) {
 				return
 			}
 		}

@@ -289,6 +289,52 @@ func TestScannerRewind(t *testing.T) {
 	}
 }
 
+func TestParseNumber(t *testing.T) {
+	tests := []struct {
+		input string
+		want  pdf.Native
+	}{
+		// integers
+		{"0", pdf.Integer(0)},
+		{"1", pdf.Integer(1)},
+		{"42", pdf.Integer(42)},
+		{"-1", pdf.Integer(-1)},
+		{"+1", pdf.Integer(1)},
+		{"-0", pdf.Integer(0)},
+		{"+0", pdf.Integer(0)},
+		{"123456789", pdf.Integer(123456789)},
+
+		// reals
+		{"0.0", pdf.Real(0)},
+		{"1.0", pdf.Real(1)},
+		{".5", pdf.Real(0.5)},
+		{"-.5", pdf.Real(-0.5)},
+		{"+.5", pdf.Real(0.5)},
+		{"3.14", pdf.Real(3.14)},
+		{"-3.14", pdf.Real(-3.14)},
+		{"100.", pdf.Real(100)},
+
+		// invalid
+		{"", nil},
+		{"abc", nil},
+		{"+", nil},
+		{"-", nil},
+		{".", nil},
+		{"1.2.3", nil},
+		{"12abc", nil},
+		{"--1", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := parseNumber([]byte(tt.input))
+			if got != tt.want {
+				t.Errorf("parseNumber(%q) = %v (%T), want %v (%T)",
+					tt.input, got, got, tt.want, tt.want)
+			}
+		})
+	}
+}
+
 // nonSeekReader wraps a reader to hide any Seek method.
 type nonSeekReader struct {
 	io.Reader

@@ -46,7 +46,7 @@ type CIDEncoder interface {
 
 	// Codes iterates over the character codes in a PDF string.
 	// The iterator returns the information stored for each code.
-	Codes(s pdf.String) iter.Seq[*font.Code]
+	Codes(s pdf.String) iter.Seq[font.Code]
 
 	// MappedCodes iterates over all codes known to the encoder.
 	MappedCodes() iter.Seq2[charcode.Code, *Info]

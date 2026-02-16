@@ -404,13 +404,13 @@ func (f *testFont) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
 
-func (f *testFont) Codes(s pdf.String) iter.Seq[*font.Code] {
-	return func(yield func(*font.Code) bool) {
+func (f *testFont) Codes(s pdf.String) iter.Seq[font.Code] {
+	return func(yield func(font.Code) bool) {
 		var res font.Code
 		res.Width = f.width / 1000
 		for _, code := range s {
 			res.UseWordSpacing = (code == 0x20)
-			if !yield(&res) {
+			if !yield(res) {
 				return
 			}
 		}

@@ -100,8 +100,8 @@ func (*Simple) WritingMode() font.WritingMode {
 // Codes returns an iterator over the characters in the PDF string. Each code
 // includes the CID, width, and associated text. Missing glyphs map to CID 0
 // (notdef).
-func (t *Simple) Codes(s pdf.String) iter.Seq[*font.Code] {
-	return func(yield func(*font.Code) bool) {
+func (t *Simple) Codes(s pdf.String) iter.Seq[font.Code] {
+	return func(yield func(font.Code) bool) {
 		var code font.Code
 		for _, c := range s {
 			info := t.get(c)
@@ -113,7 +113,7 @@ func (t *Simple) Codes(s pdf.String) iter.Seq[*font.Code] {
 			code.Width = info.Width / 1000
 			code.UseWordSpacing = (c == 0x20)
 			code.Text = info.Text
-			if !yield(&code) {
+			if !yield(code) {
 				return
 			}
 		}

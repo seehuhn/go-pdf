@@ -79,8 +79,8 @@ func (f *fixed) WritingMode() font.WritingMode {
 
 // Codes iterates over the character codes in a PDF string.
 // The iterator returns the information stored for each code.
-func (f *fixed) Codes(s pdf.String) iter.Seq[*font.Code] {
-	return func(yield func(*font.Code) bool) {
+func (f *fixed) Codes(s pdf.String) iter.Seq[font.Code] {
+	return func(yield func(font.Code) bool) {
 		var code font.Code
 		for len(s) > 0 {
 			c, k, valid := f.codec.Decode(s)
@@ -108,7 +108,7 @@ func (f *fixed) Codes(s pdf.String) iter.Seq[*font.Code] {
 				}
 			}
 
-			if !yield(&code) {
+			if !yield(code) {
 				return
 			}
 			s = s[k:]
