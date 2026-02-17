@@ -21,10 +21,12 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"strings"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/action"
 	"seehuhn.de/go/pdf/destination"
+	"seehuhn.de/go/pdf/nametree"
 	"seehuhn.de/go/pdf/outline"
 	"seehuhn.de/go/pdf/pagetree"
 )
@@ -119,7 +121,7 @@ func findMatches(r pdf.Getter, pageNumbers map[pdf.Reference]int, item *outline.
 
 	// check if current item matches
 	if regex.MatchString(item.Title) {
-		pageNo, yCoord, hasCoord, err := extractDestination(pageNumbers, item)
+		pageNo, yCoord, hasCoord, err := extractDestination(r, pageNumbers, item)
 		if err != nil {
 			return err
 		}
@@ -143,8 +145,9 @@ func findMatches(r pdf.Getter, pageNumbers map[pdf.Reference]int, item *outline.
 	return nil
 }
 
-// extractDestination extracts page number and Y coordinate from an outline entry's destination
-func extractDestination(pageNumbers map[pdf.Reference]int, item *outline.Item) (pageNo int, yCoord float64, hasCoord bool, err error) {
+// extractDestination extracts page number and Y coordinate from an outline entry's destination.
+// Named destinations are resolved using the document's name trees.
+func extractDestination(r pdf.Getter, pageNumbers map[pdf.Reference]int, item *outline.Item) (pageNo int, yCoord float64, hasCoord bool, err error) {
 	// get destination from either Destination field or GoTo action
 	var dest destination.Destination
 	if item.Destination != nil {
@@ -157,6 +160,15 @@ func extractDestination(pageNumbers map[pdf.Reference]int, item *outline.Item) (
 
 	if dest == nil {
 		return -1, 0, false, errors.New("outline entry has nil destination")
+	}
+
+	// resolve named destinations
+	if named, ok := dest.(*destination.Named); ok {
+		resolved, err := resolveNamedDest(r, named.Name)
+		if err != nil {
+			return -1, 0, false, err
+		}
+		dest = resolved
 	}
 
 	// extract page reference from the destination
@@ -258,6 +270,44 @@ func extractDestination(pageNumbers map[pdf.Reference]int, item *outline.Item) (
 	return pageNo, 0, false, nil
 }
 
+// resolveNamedDest looks up a named destination in the document's Dests
+// dictionary or Names/Dests name tree.
+func resolveNamedDest(r pdf.Getter, name pdf.String) (destination.Destination, error) {
+	meta := r.GetMeta()
+	x := pdf.NewExtractor(r)
+
+	// try catalog Dests dictionary (PDF 1.1)
+	if meta.Catalog.Dests != nil {
+		destsDict, err := x.GetDict(meta.Catalog.Dests)
+		if err == nil && destsDict != nil {
+			if obj := destsDict[pdf.Name(name)]; obj != nil {
+				dest, err := destination.Decode(x, obj)
+				if err == nil {
+					return dest, nil
+				}
+			}
+		}
+	}
+
+	// try Names/Dests name tree (PDF 1.2+)
+	if meta.Catalog.Names != nil {
+		namesDict, err := x.GetDict(meta.Catalog.Names)
+		if err == nil && namesDict != nil {
+			if destsObj := namesDict["Dests"]; destsObj != nil {
+				tree, err := nametree.ExtractFromFile(r, destsObj)
+				if err == nil {
+					obj, err := tree.Lookup(pdf.Name(name))
+					if err == nil {
+						return destination.Decode(x, obj)
+					}
+				}
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("named destination %q not found", name)
+}
+
 // findSectionEnd determines where the matched section ends by finding the next section
 func findSectionEnd(r pdf.Getter, pageNumbers map[pdf.Reference]int, root *outline.Outline, match sectionMatch) (endPage int, endY float64, err error) {
 	// find the level of the matched section
@@ -272,7 +322,7 @@ func findSectionEnd(r pdf.Getter, pageNumbers map[pdf.Reference]int, root *outli
 	}
 
 	// get the page and coordinates of the next section
-	nextPageNo, nextY, hasNextCoord, err := extractDestination(pageNumbers, nextSection)
+	nextPageNo, nextY, hasNextCoord, err := extractDestination(r, pageNumbers, nextSection)
 	if err != nil {
 		return -1, 0, err
 	}
@@ -343,6 +393,7 @@ func findNextAtLevel(items []*outline.Item, target *outline.Item, targetLevel, c
 }
 
 // ListAll returns a list of all outline entries in the document.
+// Each entry is formatted with dotted-line padding and a page number.
 func ListAll(r pdf.Getter) ([]string, error) {
 	tree, err := outline.Read(r)
 	if err != nil {
@@ -352,25 +403,42 @@ func ListAll(r pdf.Getter) ([]string, error) {
 		return nil, errors.New("document has no outline")
 	}
 
+	// build page number mapping
+	pageNumbers := make(map[pdf.Reference]int)
+	pageNo := 0
+	for ref := range pagetree.NewIterator(r).All() {
+		pageNumbers[ref] = pageNo
+		pageNo++
+	}
+
 	var sections []string
 	for _, item := range tree.Items {
-		collectSections(item, "", &sections)
+		collectSections(r, pageNumbers, item, "", &sections)
 	}
 	return sections, nil
 }
 
 // collectSections recursively collects all section titles with indentation
-func collectSections(item *outline.Item, indent string, sections *[]string) {
+// and page numbers
+func collectSections(r pdf.Getter, pageNumbers map[pdf.Reference]int, item *outline.Item, indent string, sections *[]string) {
 	if item == nil {
 		return
 	}
 
 	if item.Title != "" {
-		*sections = append(*sections, indent+item.Title)
+		line := indent + item.Title
+
+		pageNo, _, _, err := extractDestination(r, pageNumbers, item)
+		if err == nil {
+			rep := max(70-len(line), 3)
+			line += "  " + strings.Repeat(".", rep) + fmt.Sprintf(" page %d", pageNo+1)
+		}
+
+		*sections = append(*sections, line)
 	}
 
 	for _, child := range item.Children {
-		collectSections(child, indent+"  ", sections)
+		collectSections(r, pageNumbers, child, indent+"  ", sections)
 	}
 }
 

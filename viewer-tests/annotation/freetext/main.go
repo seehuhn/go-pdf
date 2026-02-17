@@ -70,11 +70,7 @@ func createDocument(filename string) error {
 		return err
 	}
 
-	background, err := pageBackground(paper)
-	if err != nil {
-		return err
-	}
-	page.DrawShading(background)
+	page.DrawShading(pageBackground(paper))
 
 	w := &writer{
 		page:  page,
@@ -144,7 +140,10 @@ func createDocument(filename string) error {
 			},
 			LineEndingStyle: style,
 		}
-		w.addAnnotationPair(template)
+		err = w.addAnnotationPair(template)
+		if err != nil {
+			return err
+		}
 	}
 
 	return page.Close()
@@ -159,7 +158,7 @@ func (w *writer) addAnnotation(a annotation.Annotation) {
 	w.page.Page.Annots = append(w.page.Page.Annots, a)
 }
 
-func (w *writer) addAnnotationPair(left *annotation.FreeText) {
+func (w *writer) addAnnotationPair(left *annotation.FreeText) error {
 	// add left annotation as-is
 	w.addAnnotation(left)
 
@@ -177,10 +176,14 @@ func (w *writer) addAnnotationPair(left *annotation.FreeText) {
 		{X: pdf.Round(rightX0, 2), Y: left.CalloutLine[2].Y}, // rightX0 instead of leftX1, keep same Y
 	}
 
-	w.style.AddAppearance(right)
+	err := w.style.AddAppearance(right)
+	if err != nil {
+		return err
+	}
 
 	// add right annotation
 	w.addAnnotation(right)
+	return nil
 }
 
 func clone[T any](v *T) *T {
@@ -191,7 +194,7 @@ func clone[T any](v *T) *T {
 	return &clone
 }
 
-func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {
+func pageBackground(paper *pdf.Rectangle) graphics.Shading {
 	alpha := 30.0 / 360 * 2 * math.Pi
 
 	nx := math.Cos(alpha)
@@ -214,5 +217,5 @@ func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {
 		TMin:       t0,
 		TMax:       t1,
 	}
-	return background, nil
+	return background
 }

@@ -19,10 +19,13 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
+	"runtime/pprof"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -33,18 +36,39 @@ import (
 	"seehuhn.de/go/pdf/tools/pdf-extract/text"
 )
 
-// PageSet represents a set of pages with Y coordinate bounds
+// config holds all command-line flag values.
+type config struct {
+	outputType      string
+	force           bool
+	showNextSection bool
+	noActualText    bool
+	showPageNumbers bool
+}
+
+// PageSet represents a set of pages with coordinate bounds.
 type PageSet struct {
 	Pages map[int]PageBounds // map from page number (0-based) to bounds
 }
 
-// PageBounds represents the Y coordinate bounds for a page
+// SortedPages returns the page numbers in ascending order.
+func (ps *PageSet) SortedPages() []int {
+	pages := make([]int, 0, len(ps.Pages))
+	for pageNo := range ps.Pages {
+		pages = append(pages, pageNo)
+	}
+	slices.Sort(pages)
+	return pages
+}
+
+// PageBounds represents the coordinate bounds for a page.
 type PageBounds struct {
+	XMin float64 // left bound
+	XMax float64 // right bound
 	YMin float64 // bottom bound (smaller Y value)
 	YMax float64 // top bound (larger Y value)
 }
 
-// Region represents a way to select/filter pages
+// Region represents a way to select/filter pages.
 type Region interface {
 	Apply(doc pdf.Getter, pages *PageSet) (*PageSet, error)
 	String() string
@@ -80,39 +104,29 @@ func (pr PageRegion) String() string {
 	return fmt.Sprintf("pages %d-%d", pr.Start+1, pr.End+1)
 }
 
-func (pr PageRegion) Apply(doc pdf.Getter, pages *PageSet) (*PageSet, error) {
+func (pr PageRegion) Apply(_ pdf.Getter, pages *PageSet) (*PageSet, error) {
 	result := &PageSet{Pages: make(map[int]PageBounds)}
 
 	for pageNo, bounds := range pages.Pages {
-		include := false
-
-		// check page number bounds
 		if pr.Start != -1 && pageNo < pr.Start {
 			continue
 		}
 		if pr.End != -1 && pageNo > pr.End {
 			continue
 		}
-
-		// check odd/even
 		if pr.Odd && (pageNo+1)%2 == 0 { // pageNo is 0-based, so add 1 for 1-based odd check
 			continue
 		}
 		if pr.Even && (pageNo+1)%2 == 1 {
 			continue
 		}
-
-		include = true
-
-		if include {
-			result.Pages[pageNo] = bounds
-		}
+		result.Pages[pageNo] = bounds
 	}
 
 	return result, nil
 }
 
-// SectionRegion represents section-based selection
+// SectionRegion represents section-based selection.
 type SectionRegion struct {
 	Pattern string
 }
@@ -122,7 +136,6 @@ func (sr SectionRegion) String() string {
 }
 
 func (sr SectionRegion) Apply(doc pdf.Getter, pages *PageSet) (*PageSet, error) {
-	// get the section page range
 	sectionRange, err := sections.Pages(doc, sr.Pattern)
 	if err != nil {
 		return nil, fmt.Errorf("section selection failed: %w", err)
@@ -137,13 +150,13 @@ func (sr SectionRegion) Apply(doc pdf.Getter, pages *PageSet) (*PageSet, error) 
 
 		// adjust Y bounds based on section bounds
 		newBounds := bounds
-		if pageNo == sectionRange.FirstPage && sectionRange.YMax > 0 {
+		if pageNo == sectionRange.FirstPage && !math.IsInf(sectionRange.YMax, +1) {
 			// on first page, section goes from YMax downward - set upper bound
 			if math.IsInf(bounds.YMax, +1) || bounds.YMax > sectionRange.YMax {
 				newBounds.YMax = sectionRange.YMax
 			}
 		}
-		if pageNo == sectionRange.LastPage && sectionRange.YMin > 0 {
+		if pageNo == sectionRange.LastPage && !math.IsInf(sectionRange.YMin, -1) {
 			// on last page, section goes down to YMin - set lower bound
 			if math.IsInf(bounds.YMin, -1) || bounds.YMin < sectionRange.YMin {
 				newBounds.YMin = sectionRange.YMin
@@ -156,51 +169,51 @@ func (sr SectionRegion) Apply(doc pdf.Getter, pages *PageSet) (*PageSet, error) 
 	return result, nil
 }
 
-// OutputProcessor defines the interface for processing selected pages
-type OutputProcessor interface {
-	Process(doc pdf.Getter, pages *PageSet, outputFile string) error
-	Name() string
+// XRangeRegion represents X coordinate range filtering.
+type XRangeRegion struct {
+	Min float64
+	Max float64
 }
 
-// PDFExtractor extracts full pages to a new PDF file
+func (xr XRangeRegion) String() string {
+	return fmt.Sprintf("xrange %g-%g", xr.Min, xr.Max)
+}
+
+func (xr XRangeRegion) Apply(_ pdf.Getter, pages *PageSet) (*PageSet, error) {
+	result := &PageSet{Pages: make(map[int]PageBounds)}
+	for pageNo, bounds := range pages.Pages {
+		newBounds := bounds
+		if newBounds.XMin < xr.Min {
+			newBounds.XMin = xr.Min
+		}
+		if newBounds.XMax > xr.Max {
+			newBounds.XMax = xr.Max
+		}
+		result.Pages[pageNo] = newBounds
+	}
+	return result, nil
+}
+
+// OutputProcessor defines the interface for processing selected pages.
+type OutputProcessor interface {
+	Process(doc pdf.Getter, pages *PageSet, w io.Writer) error
+}
+
+// PDFExtractor extracts full pages to a new PDF file.
 type PDFExtractor struct{}
 
-func (pe PDFExtractor) Name() string {
-	return "PDF page extraction"
-}
-
-func (pe PDFExtractor) Process(doc pdf.Getter, pages *PageSet, outputFile string) error {
+func (pe PDFExtractor) Process(doc pdf.Getter, pages *PageSet, w io.Writer) error {
 	if len(pages.Pages) == 0 {
 		return fmt.Errorf("no pages selected for extraction")
 	}
 
-	// collect page numbers and sort them
-	var pageNums []int
-	for pageNo := range pages.Pages {
-		pageNums = append(pageNums, pageNo)
-	}
-
-	// simple sort
-	for i := 0; i < len(pageNums); i++ {
-		for j := i + 1; j < len(pageNums); j++ {
-			if pageNums[i] > pageNums[j] {
-				pageNums[i], pageNums[j] = pageNums[j], pageNums[i]
-			}
-		}
-	}
-
-	// create output file
-	outFile, err := os.Create(outputFile)
-	if err != nil {
-		return fmt.Errorf("failed to create output file: %w", err)
-	}
-	defer outFile.Close()
+	pageNums := pages.SortedPages()
 
 	// get input metadata
 	metaIn := doc.GetMeta()
 
 	// create output PDF writer
-	out, err := pdf.NewWriter(outFile, metaIn.Version, nil)
+	out, err := pdf.NewWriter(w, metaIn.Version, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create PDF writer: %w", err)
 	}
@@ -212,28 +225,24 @@ func (pe PDFExtractor) Process(doc pdf.Getter, pages *PageSet, outputFile string
 
 	// extract each selected page
 	for _, pageNo := range pageNums {
-		// get the page from input
 		refIn, pageIn, err := pagetree.GetPage(doc, pageNo)
 		if err != nil {
 			return fmt.Errorf("failed to get page %d: %w", pageNo+1, err)
 		}
 
-		// remove annotations to avoid reference issues (like in the example)
+		// remove annotations to avoid reference issues
 		delete(pageIn, "Annots")
 
-		// copy the page dictionary
 		pageOut, err := copier.CopyDict(pageIn)
 		if err != nil {
 			return fmt.Errorf("failed to copy page %d: %w", pageNo+1, err)
 		}
 
-		// allocate reference in output and redirect
 		refOut := out.Alloc()
 		if refIn != 0 {
 			copier.Redirect(refIn, refOut)
 		}
 
-		// add page to output page tree
 		pageTreeOut.AppendPageDict(refOut, pageOut)
 	}
 
@@ -253,64 +262,39 @@ func (pe PDFExtractor) Process(doc pdf.Getter, pages *PageSet, outputFile string
 	metaOut.Catalog.Pages = treeRef
 	metaOut.Info = metaIn.Info
 
-	// close output PDF
-	err = out.Close()
-	if err != nil {
-		return fmt.Errorf("failed to close output PDF: %w", err)
-	}
-
-	fmt.Fprintf(os.Stderr, "Extracted %d pages to %s\n", len(pageNums), outputFile)
-	return nil
+	return out.Close()
 }
 
-// TextExtractor extracts text content (placeholder)
-type TextExtractor struct{}
-
-func (te TextExtractor) Name() string {
-	return "text extraction"
+// TextExtractor extracts text content.
+type TextExtractor struct {
+	UseActualText   bool
+	ShowPageNumbers bool
 }
 
-func (te TextExtractor) Process(doc pdf.Getter, pages *PageSet, outputFile string) error {
+func (te TextExtractor) Process(doc pdf.Getter, pages *PageSet, w io.Writer) error {
 	if len(pages.Pages) == 0 {
 		return fmt.Errorf("no pages selected for text extraction")
 	}
 
-	// collect page numbers and sort them
-	var pageNums []int
-	for pageNo := range pages.Pages {
-		pageNums = append(pageNums, pageNo)
-	}
-
-	// simple sort
-	for i := 0; i < len(pageNums); i++ {
-		for j := i + 1; j < len(pageNums); j++ {
-			if pageNums[i] > pageNums[j] {
-				pageNums[i], pageNums[j] = pageNums[j], pageNums[i]
-			}
-		}
-	}
-
-	// create output file
-	outFile, err := os.Create(outputFile)
-	if err != nil {
-		return fmt.Errorf("failed to create output file: %w", err)
-	}
-	defer outFile.Close()
+	pageNums := pages.SortedPages()
 
 	// create text extractor
-	extractor := text.New(doc, outFile)
-	extractor.UseActualText = true // always use ActualText in pdf-extract
+	extractor := text.New(doc, w)
+	extractor.UseActualText = te.UseActualText
 
 	// extract text from each selected page
 	for _, pageNo := range pageNums {
+		bounds := pages.Pages[pageNo]
+		extractor.XRangeMin = bounds.XMin
+		extractor.XRangeMax = bounds.XMax
+
 		_, pageDict, err := pagetree.GetPage(doc, pageNo)
 		if err != nil {
 			return fmt.Errorf("failed to get page %d: %w", pageNo+1, err)
 		}
 
-		// add page separator if multiple pages
-		if len(pageNums) > 1 {
-			fmt.Fprintf(outFile, "\n--- Page %d ---\n\n", pageNo+1)
+		if te.ShowPageNumbers {
+			fmt.Fprintf(w, "--- Page %d ---\n\n", pageNo+1)
 		}
 
 		err = extractor.ExtractPage(pageDict)
@@ -318,18 +302,20 @@ func (te TextExtractor) Process(doc pdf.Getter, pages *PageSet, outputFile strin
 			return fmt.Errorf("failed to extract page %d: %w", pageNo+1, err)
 		}
 
-		fmt.Fprintln(outFile)
+		fmt.Fprintln(w)
 	}
 
-	fmt.Fprintf(os.Stderr, "Extracted text from %d pages to %s\n", len(pageNums), outputFile)
 	return nil
 }
 
-// getOutputProcessor returns the appropriate processor based on file extension or explicit type
-func getOutputProcessor(filename, explicitType string) (OutputProcessor, error) {
+// getOutputProcessor returns the appropriate processor based on file extension
+// or explicit type.
+func getOutputProcessor(filename, explicitType string, cfg config) (OutputProcessor, error) {
 	var fileType string
 	if explicitType != "" {
 		fileType = explicitType
+	} else if filename == "-" {
+		fileType = "pdf"
 	} else {
 		ext := strings.ToLower(filepath.Ext(filename))
 		switch ext {
@@ -346,23 +332,62 @@ func getOutputProcessor(filename, explicitType string) (OutputProcessor, error) 
 	case "pdf":
 		return PDFExtractor{}, nil
 	case "txt":
-		return TextExtractor{}, nil
+		return TextExtractor{
+			UseActualText:   !cfg.noActualText,
+			ShowPageNumbers: cfg.showPageNumbers,
+		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported file type: %s (supported: pdf, txt)", fileType)
 	}
 }
 
+// openOutputFile opens the output file for writing. If outputFile is "-",
+// os.Stdout is returned. Otherwise, the file is opened with overwrite
+// protection unless forceOverwrite is set.
+func openOutputFile(outputFile string, forceOverwrite bool) (io.Writer, io.Closer, error) {
+	if outputFile == "-" {
+		return os.Stdout, nil, nil
+	}
+
+	flags := os.O_WRONLY | os.O_CREATE
+	if forceOverwrite {
+		flags |= os.O_TRUNC
+	} else {
+		flags |= os.O_EXCL
+	}
+	file, err := os.OpenFile(outputFile, flags, 0666)
+	if err != nil {
+		if os.IsExist(err) {
+			return nil, nil, fmt.Errorf("file %s already exists (use -f to overwrite)", outputFile)
+		}
+		return nil, nil, err
+	}
+
+	return file, file, nil
+}
+
 func main() {
-	// define command line flags
-	var (
-		typeFlag        = flag.String("type", "", "output type (pdf or txt), overrides file extension")
-		showNextSection = flag.Bool("show-next-section", false, "show the name of the next section after processing")
-		help            = flag.Bool("help", false, "show help information")
-	)
+	os.Exit(main1())
+}
+
+func main1() int {
+	cpuprofile := flag.String("cpuprofile", "", "write cpu profile to `file`")
+	memprofile := flag.String("memprofile", "", "write memory profile to `file`")
+
+	var cfg config
+	flag.StringVar(&cfg.outputType, "type", "", "output type (pdf or txt), overrides file extension")
+	flag.BoolVar(&cfg.force, "f", false, "overwrite output file if it exists")
+	flag.BoolVar(&cfg.showNextSection, "show-next-section", false, "show the name of the next section after processing")
+	flag.BoolVar(&cfg.noActualText, "no-actualtext", false, "disable ActualText substitution")
+	flag.BoolVar(&cfg.showPageNumbers, "P", false, "show page numbers in text output")
+	help := flag.Bool("help", false, "show help information")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] FILENAME [region ...] [to OUTPUT_FILE]\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Extract pages or sections from a PDF file.\n\n")
+		fmt.Fprintf(os.Stderr, "Extract pages or text from a PDF file.\n")
+		fmt.Fprintf(os.Stderr, "The output format is determined by the file extension (.pdf or .txt),\n")
+		fmt.Fprintf(os.Stderr, "or by the -type flag. PDF output copies full pages; text output extracts\n")
+		fmt.Fprintf(os.Stderr, "the text content.\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nRegion types:\n")
@@ -371,11 +396,15 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  pages odd    - extract odd-numbered pages\n")
 		fmt.Fprintf(os.Stderr, "  pages even   - extract even-numbered pages\n")
 		fmt.Fprintf(os.Stderr, "  section PAT  - extract section matching regex pattern PAT\n")
+		fmt.Fprintf(os.Stderr, "  xrange A-B   - restrict to X coordinates A through B\n")
+		fmt.Fprintf(os.Stderr, "\nQueries (no output file needed):\n")
 		fmt.Fprintf(os.Stderr, "  sections     - list all sections in document\n")
 		fmt.Fprintf(os.Stderr, "  pages        - show total page count\n")
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  %s doc.pdf page 1 to page1.pdf\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s doc.pdf section \"Introduction\" to intro.txt\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s doc.pdf page 1 to page1.pdf          # extract a page\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s doc.pdf section \"Intro\" to intro.txt  # extract text\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s doc.pdf page 1 to -                   # write to stdout\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -type txt doc.pdf section \"Intro\" xrange 100-500 to -\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s doc.pdf sections\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s doc.pdf pages\n", os.Args[0])
 	}
@@ -384,9 +413,58 @@ func main() {
 
 	if *help {
 		flag.Usage()
-		return
+		return 0
 	}
 
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "could not create CPU profile: %v\n", err)
+			return 1
+		}
+		defer f.Close()
+		if err := pprof.StartCPUProfile(f); err != nil {
+			fmt.Fprintf(os.Stderr, "could not start CPU profile: %v\n", err)
+			return 1
+		}
+		defer pprof.StopCPUProfile()
+	}
+
+	err := run(cfg)
+
+	if *memprofile != "" {
+		f, err := os.Create(*memprofile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "could not create memory profile: %v\n", err)
+			return 1
+		}
+		runtime.GC()
+		allocs := pprof.Lookup("allocs")
+		if allocs == nil {
+			fmt.Fprintln(os.Stderr, "could not lookup memory profile")
+			f.Close()
+			return 1
+		}
+		if err := allocs.WriteTo(f, 0); err != nil {
+			fmt.Fprintf(os.Stderr, "could not write memory profile: %v\n", err)
+			f.Close()
+			return 1
+		}
+		if err := f.Close(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+
+	return 0
+}
+
+func run(cfg config) error {
 	args := flag.Args()
 	if len(args) < 1 {
 		flag.Usage()
@@ -411,11 +489,11 @@ func main() {
 	if toIndex >= 0 {
 		processedRegionArgs = regionArgs[:toIndex]
 		if toIndex+1 >= len(regionArgs) {
-			log.Fatal("expected output filename after 'to'")
+			return fmt.Errorf("expected output filename after 'to'")
 		}
 		outputFile = regionArgs[toIndex+1]
 		if toIndex+2 < len(regionArgs) {
-			log.Fatal("unexpected arguments after output filename")
+			return fmt.Errorf("unexpected arguments after output filename")
 		}
 	} else {
 		processedRegionArgs = regionArgs
@@ -424,54 +502,58 @@ func main() {
 	// open PDF
 	doc, err := pdf.Open(filename, nil)
 	if err != nil {
-		log.Fatalf("failed to open PDF: %v", err)
+		return fmt.Errorf("failed to open PDF: %w", err)
 	}
 	defer doc.Close()
 
 	// initialize with all pages
-	totalPages := 0
-	for range pagetree.NewIterator(doc).All() {
-		totalPages++
+	totalPages, err := pagetree.NumPages(doc)
+	if err != nil {
+		return fmt.Errorf("failed to read page tree: %w", err)
 	}
 
 	initialPages := &PageSet{Pages: make(map[int]PageBounds)}
-	for i := 0; i < totalPages; i++ {
-		initialPages.Pages[i] = PageBounds{YMin: math.Inf(-1), YMax: math.Inf(+1)} // infinite bounds means full page
+	for i := range totalPages {
+		initialPages.Pages[i] = PageBounds{
+			XMin: math.Inf(-1),
+			XMax: math.Inf(+1),
+			YMin: math.Inf(-1),
+			YMax: math.Inf(+1),
+		}
 	}
 
 	// check for special cases that don't require full processing
 	if len(processedRegionArgs) == 1 {
 		switch processedRegionArgs[0] {
 		case "section", "sections":
-			sections, err := sections.ListAll(doc)
+			ss, err := sections.ListAll(doc)
 			if err != nil {
-				log.Fatalf("failed to list sections: %v", err)
+				return fmt.Errorf("failed to list sections: %w", err)
 			}
-			if len(sections) == 0 {
+			if len(ss) == 0 {
 				fmt.Println("No sections found in document")
 			} else {
 				fmt.Println("Sections:")
-				for _, section := range sections {
+				for _, section := range ss {
 					fmt.Println(section)
 				}
 			}
-			return
+			return nil
 		case "page", "pages":
 			fmt.Printf("Total pages: %d\n", totalPages)
-			return
+			return nil
 		}
 	}
 
 	// parse and apply regions
 	regions, err := parseRegions(processedRegionArgs)
 	if err != nil {
-		log.Fatalf("failed to parse regions: %v", err)
+		return fmt.Errorf("failed to parse regions: %w", err)
 	}
 
 	// check if we need to track the next section for -show-next-section flag
 	var nextSectionTitle string
-	if *showNextSection {
-		// find the first section region to use for next section lookup
+	if cfg.showNextSection {
 		var sectionPattern string
 		for _, region := range regions {
 			if sr, ok := region.(SectionRegion); ok {
@@ -480,11 +562,11 @@ func main() {
 			}
 		}
 		if sectionPattern == "" {
-			log.Fatal("-show-next-section can only be used with section-based selection")
+			return fmt.Errorf("-show-next-section can only be used with section-based selection")
 		}
 		nextSectionTitle, err = sections.FindNext(doc, sectionPattern)
 		if err != nil {
-			log.Fatalf("failed to find next section: %v", err)
+			return fmt.Errorf("failed to find next section: %w", err)
 		}
 	}
 
@@ -492,30 +574,54 @@ func main() {
 	for _, region := range regions {
 		currentPages, err = region.Apply(doc, currentPages)
 		if err != nil {
-			log.Fatalf("failed to apply region %s: %v", region, err)
+			return fmt.Errorf("failed to apply region %s: %w", region, err)
 		}
 	}
 
 	// handle output
 	if outputFile != "" {
-		processor, err := getOutputProcessor(outputFile, *typeFlag)
+		processor, err := getOutputProcessor(outputFile, cfg.outputType, cfg)
 		if err != nil {
-			log.Fatalf("output error: %v", err)
+			return err
 		}
 
-		err = processor.Process(doc, currentPages, outputFile)
+		w, closer, err := openOutputFile(outputFile, cfg.force)
 		if err != nil {
-			log.Fatalf("failed to process output: %v", err)
+			return err
 		}
+
+		err = processor.Process(doc, currentPages, w)
+		if err != nil {
+			if closer != nil {
+				closer.Close()
+				os.Remove(outputFile)
+			}
+			return err
+		}
+
+		if closer != nil {
+			err = closer.Close()
+			if err != nil {
+				return err
+			}
+		}
+
+		outputName := outputFile
+		if outputName == "-" {
+			outputName = "stdout"
+		}
+		fmt.Fprintf(os.Stderr, "extracted %d pages to %s\n", len(currentPages.Pages), outputName)
 	} else {
 		// no output file specified, just print the result
 		printPageSet(currentPages, regions)
 	}
 
 	// show next section if requested
-	if *showNextSection && nextSectionTitle != "" {
+	if cfg.showNextSection && nextSectionTitle != "" {
 		fmt.Println(nextSectionTitle)
 	}
+
+	return nil
 }
 
 func parseRegions(args []string) ([]Region, error) {
@@ -540,6 +646,18 @@ func parseRegions(args []string) ([]Region, error) {
 			}
 			i++
 			regions = append(regions, SectionRegion{Pattern: args[i]})
+
+		case "xrange":
+			if i+1 >= len(args) {
+				return nil, fmt.Errorf("expected range specification after %q", args[i])
+			}
+			i++
+			var xMin, xMax float64
+			_, err := fmt.Sscanf(args[i], "%f-%f", &xMin, &xMax)
+			if err != nil || xMin >= xMax {
+				return nil, fmt.Errorf("invalid x-range specification %q (expected A-B where A < B)", args[i])
+			}
+			regions = append(regions, XRangeRegion{Min: xMin, Max: xMax})
 
 		default:
 			return nil, fmt.Errorf("unknown region type %q", args[i])
@@ -619,36 +737,42 @@ func printPageSet(pages *PageSet, regions []Region) {
 		fmt.Println()
 	}
 
-	// collect and sort page numbers
-	var pageNums []int
-	for pageNo := range pages.Pages {
-		pageNums = append(pageNums, pageNo)
-	}
-
-	// simple sort
-	for i := 0; i < len(pageNums); i++ {
-		for j := i + 1; j < len(pageNums); j++ {
-			if pageNums[i] > pageNums[j] {
-				pageNums[i], pageNums[j] = pageNums[j], pageNums[i]
-			}
-		}
-	}
+	pageNums := pages.SortedPages()
 
 	fmt.Printf("Selected pages (%d total):\n", len(pageNums))
 	for _, pageNo := range pageNums {
 		bounds := pages.Pages[pageNo]
-		if math.IsInf(bounds.YMin, -1) && math.IsInf(bounds.YMax, +1) {
+		xFull := math.IsInf(bounds.XMin, -1) && math.IsInf(bounds.XMax, +1)
+		yFull := math.IsInf(bounds.YMin, -1) && math.IsInf(bounds.YMax, +1)
+
+		if xFull && yFull {
 			fmt.Printf("  Page %d: full page\n", pageNo+1)
-		} else {
+			continue
+		}
+
+		var parts []string
+		if !yFull {
 			yMinStr := fmt.Sprintf("%g", bounds.YMin)
 			if math.IsInf(bounds.YMin, -1) {
-				yMinStr = "-∞"
+				yMinStr = "-\u221e"
 			}
 			yMaxStr := fmt.Sprintf("%g", bounds.YMax)
 			if math.IsInf(bounds.YMax, +1) {
-				yMaxStr = "+∞"
+				yMaxStr = "+\u221e"
 			}
-			fmt.Printf("  Page %d: Y=%s to Y=%s\n", pageNo+1, yMinStr, yMaxStr)
+			parts = append(parts, fmt.Sprintf("Y=%s to %s", yMinStr, yMaxStr))
 		}
+		if !xFull {
+			xMinStr := fmt.Sprintf("%g", bounds.XMin)
+			if math.IsInf(bounds.XMin, -1) {
+				xMinStr = "-\u221e"
+			}
+			xMaxStr := fmt.Sprintf("%g", bounds.XMax)
+			if math.IsInf(bounds.XMax, +1) {
+				xMaxStr = "+\u221e"
+			}
+			parts = append(parts, fmt.Sprintf("X=%s to %s", xMinStr, xMaxStr))
+		}
+		fmt.Printf("  Page %d: %s\n", pageNo+1, strings.Join(parts, ", "))
 	}
 }

@@ -66,16 +66,12 @@ func createDocument(filename string) error {
 		return err
 	}
 
-	background, err := pageBackground(paper)
-	if err != nil {
-		return err
-	}
-	page.DrawShading(background)
+	page.DrawShading(pageBackground(paper))
 
 	w := &writer{
 		page:     page,
 		style:    fallback.NewStyle(),
-		currentY: startY,
+		yPos: startY,
 	}
 
 	lineStyle := &annotation.BorderStyle{
@@ -101,9 +97,9 @@ func createDocument(filename string) error {
 			Common: annotation.Common{
 				Rect: pdf.Rectangle{
 					LLx: pdf.Round(leftColStart-10, 2),
-					LLy: pdf.Round(w.currentY-10, 2),
+					LLy: pdf.Round(w.yPos-10, 2),
 					URx: pdf.Round(leftColEnd+10, 2),
-					URy: pdf.Round(w.currentY+10, 2),
+					URy: pdf.Round(w.yPos+10, 2),
 				},
 				Contents: string(style),
 				Color:    color.Black,
@@ -111,32 +107,35 @@ func createDocument(filename string) error {
 			},
 			Coords: [4]float64{
 				pdf.Round(leftColStart, 2),
-				pdf.Round(w.currentY, 2),
+				pdf.Round(w.yPos, 2),
 				pdf.Round(leftColEnd, 2),
-				pdf.Round(w.currentY, 2),
+				pdf.Round(w.yPos, 2),
 			},
 			BorderStyle:     lineStyle,
 			LineEndingStyle: [2]annotation.LineEndingStyle{style, style},
 			FillColor:       color.Red,
 		}
-		w.addAnnotationPair(line)
+		err = w.addAnnotationPair(line)
+		if err != nil {
+			return err
+		}
 
-		w.currentY -= lineEndingStep
+		w.yPos -= lineEndingStep
 	}
 
 	// -----------------------------------------------------------------------
 
 	// Group 2: Border comparison test
-	w.currentY -= 24 // extra gap before next group
+	w.yPos -= 24 // extra gap before next group
 
 	// line with Common.Border
 	borderLine1 := &annotation.Line{
 		Common: annotation.Common{
 			Rect: pdf.Rectangle{
 				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.currentY-10, 2),
+				LLy: pdf.Round(w.yPos-10, 2),
 				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.currentY+10, 2),
+				URy: pdf.Round(w.yPos+10, 2),
 			},
 			Contents: "Common.Border with dash",
 			Color:    color.Black,
@@ -145,23 +144,26 @@ func createDocument(filename string) error {
 		},
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
-			pdf.Round(w.currentY, 2),
+			pdf.Round(w.yPos, 2),
 			pdf.Round(leftColEnd, 2),
-			pdf.Round(w.currentY, 2),
+			pdf.Round(w.yPos, 2),
 		},
 	}
-	w.addAnnotationPair(borderLine1)
+	err = w.addAnnotationPair(borderLine1)
+	if err != nil {
+		return err
+	}
 
-	w.currentY -= borderTestStep
+	w.yPos -= borderTestStep
 
 	// line with BorderStyle
 	borderLine2 := &annotation.Line{
 		Common: annotation.Common{
 			Rect: pdf.Rectangle{
 				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.currentY-10, 2),
+				LLy: pdf.Round(w.yPos-10, 2),
 				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.currentY+10, 2),
+				URy: pdf.Round(w.yPos+10, 2),
 			},
 			Contents: "BorderStyle with dash",
 			Color:    color.Black,
@@ -169,24 +171,27 @@ func createDocument(filename string) error {
 		},
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
-			pdf.Round(w.currentY, 2),
+			pdf.Round(w.yPos, 2),
 			pdf.Round(leftColEnd, 2),
-			pdf.Round(w.currentY, 2),
+			pdf.Round(w.yPos, 2),
 		},
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "D", DashArray: []float64{10, 2}, SingleUse: true},
 	}
-	w.addAnnotationPair(borderLine2)
+	err = w.addAnnotationPair(borderLine2)
+	if err != nil {
+		return err
+	}
 
-	w.currentY -= borderTestStep
+	w.yPos -= borderTestStep
 
-	// line with BorderStyle
+	// line with no border or border style
 	borderLine3 := &annotation.Line{
 		Common: annotation.Common{
 			Rect: pdf.Rectangle{
 				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.currentY-10, 2),
+				LLy: pdf.Round(w.yPos-10, 2),
 				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.currentY+10, 2),
+				URy: pdf.Round(w.yPos+10, 2),
 			},
 			Contents: "no line style specified",
 			Color:    color.Black,
@@ -194,26 +199,29 @@ func createDocument(filename string) error {
 		},
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
-			pdf.Round(w.currentY, 2),
+			pdf.Round(w.yPos, 2),
 			pdf.Round(leftColEnd, 2),
-			pdf.Round(w.currentY, 2),
+			pdf.Round(w.yPos, 2),
 		},
 	}
-	w.addAnnotationPair(borderLine3)
+	err = w.addAnnotationPair(borderLine3)
+	if err != nil {
+		return err
+	}
 
 	// -----------------------------------------------------------------------
 
 	// Group 3: Caption tests
-	w.currentY -= 48 // extra gap before next group
+	w.yPos -= 48 // extra gap before next group
 
 	// caption inline
 	captionInline := &annotation.Line{
 		Common: annotation.Common{
 			Rect: pdf.Rectangle{
 				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.currentY-15, 2),
+				LLy: pdf.Round(w.yPos-15, 2),
 				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.currentY+15, 2),
+				URy: pdf.Round(w.yPos+15, 2),
 			},
 			Contents: "inline caption",
 			Color:    color.Black,
@@ -221,25 +229,28 @@ func createDocument(filename string) error {
 		},
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
-			pdf.Round(w.currentY, 2),
+			pdf.Round(w.yPos, 2),
 			pdf.Round(leftColEnd, 2),
-			pdf.Round(w.currentY, 2),
+			pdf.Round(w.yPos, 2),
 		},
 		BorderStyle: lineStyle,
 		Caption:     true,
 	}
-	w.addAnnotationPair(captionInline)
+	err = w.addAnnotationPair(captionInline)
+	if err != nil {
+		return err
+	}
 
-	w.currentY -= captionTestStep
+	w.yPos -= captionTestStep
 
 	// shifted inline caption
 	captionInline = &annotation.Line{
 		Common: annotation.Common{
 			Rect: pdf.Rectangle{
 				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.currentY-30, 2),
+				LLy: pdf.Round(w.yPos-30, 2),
 				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.currentY+30, 2),
+				URy: pdf.Round(w.yPos+30, 2),
 			},
 			Contents: "shifted inline caption",
 			Color:    color.Black,
@@ -247,26 +258,29 @@ func createDocument(filename string) error {
 		},
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
-			pdf.Round(w.currentY, 2),
+			pdf.Round(w.yPos, 2),
 			pdf.Round(leftColEnd, 2),
-			pdf.Round(w.currentY, 2),
+			pdf.Round(w.yPos, 2),
 		},
 		BorderStyle:   lineStyle,
 		Caption:       true,
 		CaptionOffset: []float64{20, 3},
 	}
-	w.addAnnotationPair(captionInline)
+	err = w.addAnnotationPair(captionInline)
+	if err != nil {
+		return err
+	}
 
-	w.currentY -= captionTestStep
+	w.yPos -= captionTestStep
 
 	// caption on top
 	captionTop := &annotation.Line{
 		Common: annotation.Common{
 			Rect: pdf.Rectangle{
 				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.currentY-10, 2),
+				LLy: pdf.Round(w.yPos-10, 2),
 				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.currentY+20, 2),
+				URy: pdf.Round(w.yPos+20, 2),
 			},
 			Contents: "top caption",
 			Color:    color.Black,
@@ -274,27 +288,30 @@ func createDocument(filename string) error {
 		},
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
-			pdf.Round(w.currentY, 2),
+			pdf.Round(w.yPos, 2),
 			pdf.Round(leftColEnd, 2),
-			pdf.Round(w.currentY, 2),
+			pdf.Round(w.yPos, 2),
 		},
 		BorderStyle:  lineStyle,
 		Caption:      true,
 		CaptionAbove: true,
 	}
-	w.addAnnotationPair(captionTop)
+	err = w.addAnnotationPair(captionTop)
+	if err != nil {
+		return err
+	}
 
 	// -----------------------------------------------------------------------
 
 	// Group 4: Leader line tests
-	w.currentY -= 72 // extra gap before next group
+	w.yPos -= 72 // extra gap before next group
 
 	// positive LL
 	page.PushGraphicsState()
 	page.SetLineWidth(5)
 	page.SetStrokeColor(color.DeviceGray(0.9))
-	page.MoveTo(pdf.Round(leftColStart, 2), pdf.Round(w.currentY, 2))
-	page.LineTo(pdf.Round(leftColEnd, 2), pdf.Round(w.currentY, 2))
+	page.MoveTo(pdf.Round(leftColStart, 2), pdf.Round(w.yPos, 2))
+	page.LineTo(pdf.Round(leftColEnd, 2), pdf.Round(w.yPos, 2))
 	page.Stroke()
 	page.PopGraphicsState()
 
@@ -302,9 +319,9 @@ func createDocument(filename string) error {
 		Common: annotation.Common{
 			Rect: pdf.Rectangle{
 				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.currentY-30, 2),
+				LLy: pdf.Round(w.yPos-30, 2),
 				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.currentY+30, 2),
+				URy: pdf.Round(w.yPos+30, 2),
 			},
 			Contents: "LL=30 (positive)",
 			Color:    color.Black,
@@ -312,23 +329,26 @@ func createDocument(filename string) error {
 		},
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
-			pdf.Round(w.currentY, 2),
+			pdf.Round(w.yPos, 2),
 			pdf.Round(leftColEnd, 2),
-			pdf.Round(w.currentY, 2),
+			pdf.Round(w.yPos, 2),
 		},
 		BorderStyle: lineStyle,
 		LL:          24,
 	}
-	w.addAnnotationPair(leaderPos)
+	err = w.addAnnotationPair(leaderPos)
+	if err != nil {
+		return err
+	}
 
-	w.currentY -= 36
+	w.yPos -= 36
 
 	// negative LL
 	page.PushGraphicsState()
 	page.SetLineWidth(5)
 	page.SetStrokeColor(color.DeviceGray(0.9))
-	page.MoveTo(pdf.Round(leftColStart, 2), pdf.Round(w.currentY, 2))
-	page.LineTo(pdf.Round(leftColEnd, 2), pdf.Round(w.currentY, 2))
+	page.MoveTo(pdf.Round(leftColStart, 2), pdf.Round(w.yPos, 2))
+	page.LineTo(pdf.Round(leftColEnd, 2), pdf.Round(w.yPos, 2))
 	page.Stroke()
 	page.PopGraphicsState()
 
@@ -336,9 +356,9 @@ func createDocument(filename string) error {
 		Common: annotation.Common{
 			Rect: pdf.Rectangle{
 				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.currentY-30, 2),
+				LLy: pdf.Round(w.yPos-30, 2),
 				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.currentY+30, 2),
+				URy: pdf.Round(w.yPos+30, 2),
 			},
 			Contents: "LL=-24 (negative)",
 			Color:    color.Black,
@@ -346,23 +366,26 @@ func createDocument(filename string) error {
 		},
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
-			pdf.Round(w.currentY, 2),
+			pdf.Round(w.yPos, 2),
 			pdf.Round(leftColEnd, 2),
-			pdf.Round(w.currentY, 2),
+			pdf.Round(w.yPos, 2),
 		},
 		BorderStyle: lineStyle,
 		LL:          -24,
 	}
-	w.addAnnotationPair(leaderNeg)
+	err = w.addAnnotationPair(leaderNeg)
+	if err != nil {
+		return err
+	}
 
-	w.currentY -= 120
+	w.yPos -= 120
 
 	// combined LL, LLE, LLO
 	page.PushGraphicsState()
 	page.SetLineWidth(5)
 	page.SetStrokeColor(color.DeviceGray(0.9))
-	page.MoveTo(pdf.Round(leftColStart, 2), pdf.Round(w.currentY, 2))
-	page.LineTo(pdf.Round(leftColEnd, 2), pdf.Round(w.currentY, 2))
+	page.MoveTo(pdf.Round(leftColStart, 2), pdf.Round(w.yPos, 2))
+	page.LineTo(pdf.Round(leftColEnd, 2), pdf.Round(w.yPos, 2))
 	page.Stroke()
 	page.PopGraphicsState()
 
@@ -370,19 +393,19 @@ func createDocument(filename string) error {
 		Common: annotation.Common{
 			Rect: pdf.Rectangle{
 				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.currentY-30, 2),
+				LLy: pdf.Round(w.yPos-30, 2),
 				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.currentY+30, 2),
+				URy: pdf.Round(w.yPos+30, 2),
 			},
-			Contents: "LL=20, LLE=15, LLO=10",
+			Contents: "LL=50, LLE=10, LLO=10",
 			Color:    color.Black,
 			Flags:    annotation.FlagPrint,
 		},
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
-			pdf.Round(w.currentY, 2),
+			pdf.Round(w.yPos, 2),
 			pdf.Round(leftColEnd, 2),
-			pdf.Round(w.currentY, 2),
+			pdf.Round(w.yPos, 2),
 		},
 		BorderStyle: lineStyle,
 		FillColor:   color.DeviceRGB{1, 1, 0.5},
@@ -390,7 +413,10 @@ func createDocument(filename string) error {
 		LL:          50,
 		LLO:         10,
 	}
-	w.addAnnotationPair(leaderCombo)
+	err = w.addAnnotationPair(leaderCombo)
+	if err != nil {
+		return err
+	}
 
 	return page.Close()
 }
@@ -398,14 +424,14 @@ func createDocument(filename string) error {
 type writer struct {
 	page     *document.Page
 	style    *fallback.Style
-	currentY float64
+	yPos float64
 }
 
 func (w *writer) addAnnotation(a annotation.Annotation) {
 	w.page.Page.Annots = append(w.page.Page.Annots, a)
 }
 
-func (w *writer) addAnnotationPair(line *annotation.Line) {
+func (w *writer) addAnnotationPair(line *annotation.Line) error {
 	// add left annotation as-is
 	w.addAnnotation(line)
 
@@ -419,10 +445,14 @@ func (w *writer) addAnnotationPair(line *annotation.Line) {
 	rightLine.Coords[0] += deltaX
 	rightLine.Coords[2] += deltaX
 
-	w.style.AddAppearance(rightLine)
+	err := w.style.AddAppearance(rightLine)
+	if err != nil {
+		return err
+	}
 
 	// add right annotation
 	w.addAnnotation(rightLine)
+	return nil
 }
 
 func clone[T any](v *T) *T {
@@ -433,7 +463,7 @@ func clone[T any](v *T) *T {
 	return &clone
 }
 
-func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {
+func pageBackground(paper *pdf.Rectangle) graphics.Shading {
 	alpha := 30.0 / 360 * 2 * math.Pi
 
 	nx := math.Cos(alpha)
@@ -456,5 +486,5 @@ func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {
 		TMin:       t0,
 		TMax:       t1,
 	}
-	return background, nil
+	return background
 }

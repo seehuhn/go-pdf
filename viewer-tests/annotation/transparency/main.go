@@ -46,6 +46,8 @@ func main() {
 	}
 }
 
+// withoutAP generates a PDF 1.7 file where ca=CA and appearance streams are
+// left to the viewer.
 func withoutAP(filename string) error {
 	paper := &pdf.Rectangle{
 		URx: 500,
@@ -59,11 +61,7 @@ func withoutAP(filename string) error {
 		return err
 	}
 
-	background, err := pageBackground(paper)
-	if err != nil {
-		return err
-	}
-	page.DrawShading(background)
+	page.DrawShading(pageBackground(paper))
 
 	for CA := 0.1; CA <= 1.0; CA += 0.2 {
 		x := CA * 500
@@ -101,6 +99,8 @@ func withoutAP(filename string) error {
 	return page.Close()
 }
 
+// withAP generates a PDF 2.0 file where ca and CA vary independently.
+// PDF 2.0 requires appearance streams for all annotations.
 func withAP(filename string) error {
 	paper := &pdf.Rectangle{
 		URx: 500,
@@ -114,11 +114,7 @@ func withAP(filename string) error {
 		return err
 	}
 
-	background, err := pageBackground(paper)
-	if err != nil {
-		return err
-	}
-	page.DrawShading(background)
+	page.DrawShading(pageBackground(paper))
 
 	style := fallback.NewStyle()
 
@@ -164,7 +160,7 @@ func withAP(filename string) error {
 	return page.Close()
 }
 
-func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {
+func pageBackground(paper *pdf.Rectangle) graphics.Shading {
 	alpha := 30.0 / 360 * 2 * math.Pi
 
 	nx := math.Cos(alpha)
@@ -187,5 +183,5 @@ func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {
 		TMin:       t0,
 		TMax:       t1,
 	}
-	return background, nil
+	return background
 }

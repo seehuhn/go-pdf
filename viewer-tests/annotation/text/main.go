@@ -66,11 +66,7 @@ func createDocument(filename string) error {
 		return err
 	}
 
-	background, err := pageBackground(paper)
-	if err != nil {
-		return err
-	}
-	page.DrawShading(background)
+	page.DrawShading(pageBackground(paper))
 
 	B := standard.TimesBold.New()
 	H := standard.Helvetica.New()
@@ -115,7 +111,10 @@ func createDocument(filename string) error {
 			},
 			Icon: icon,
 		}
-		w.addAnnotationPair(text, string(icon))
+		err = w.addAnnotationPair(text, string(icon))
+		if err != nil {
+			return err
+		}
 	}
 
 	// test with pink color
@@ -132,7 +131,10 @@ func createDocument(filename string) error {
 		},
 		Icon: annotation.TextIconNote,
 	}
-	w.addAnnotationPair(text, "Common.Color = pink")
+	err = w.addAnnotationPair(text, "Common.Color = pink")
+	if err != nil {
+		return err
+	}
 
 	// test with transparent color (no appearance stream)
 	text = &annotation.Text{
@@ -147,7 +149,10 @@ func createDocument(filename string) error {
 		},
 		Icon: annotation.TextIconNote,
 	}
-	w.addAnnotationPair(text, "Common.Color = transparent")
+	err = w.addAnnotationPair(text, "Common.Color = transparent")
+	if err != nil {
+		return err
+	}
 
 	// test with border width
 	text = &annotation.Text{
@@ -161,7 +166,10 @@ func createDocument(filename string) error {
 		},
 		Icon: annotation.TextIconNote,
 	}
-	w.addAnnotationPair(text, "Common.Border.Width = 2")
+	err = w.addAnnotationPair(text, "Common.Border.Width = 2")
+	if err != nil {
+		return err
+	}
 
 	return page.Close()
 }
@@ -177,7 +185,7 @@ func (w *writer) addAnnotation(a annotation.Annotation) {
 	w.page.Page.Annots = append(w.page.Page.Annots, a)
 }
 
-func (w *writer) addAnnotationPair(left *annotation.Text, label string) {
+func (w *writer) addAnnotationPair(left *annotation.Text, label string) error {
 	// center icons horizontally in columns
 	leftCenter := (leftColStart + leftColEnd) / 2
 	rightCenter := (rightColStart + rightColEnd) / 2
@@ -207,12 +215,16 @@ func (w *writer) addAnnotationPair(left *annotation.Text, label string) {
 	}
 	right.Contents += " (quire)"
 
-	w.style.AddAppearance(right)
+	err := w.style.AddAppearance(right)
+	if err != nil {
+		return err
+	}
 
 	w.addAnnotation(left)
 	w.addAnnotation(right)
 
 	w.yPos -= iconSize + 12.0
+	return nil
 }
 
 func clone[T any](v *T) *T {
@@ -223,7 +235,7 @@ func clone[T any](v *T) *T {
 	return &clone
 }
 
-func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {
+func pageBackground(paper *pdf.Rectangle) graphics.Shading {
 	alpha := 30.0 / 360 * 2 * math.Pi
 
 	nx := math.Cos(alpha)
@@ -246,5 +258,5 @@ func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {
 		TMin:       t0,
 		TMax:       t1,
 	}
-	return background, nil
+	return background
 }

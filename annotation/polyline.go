@@ -18,6 +18,7 @@ package annotation
 
 import (
 	"errors"
+	"fmt"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -62,8 +63,8 @@ type PolyLine struct {
 	// This corresponds to the /LE entry in the PDF annotation dictionary.
 	LineEndingStyle [2]LineEndingStyle
 
-	// FillColor (optional; PDF 1.4) is the colour used to fill the
-	// polyline's line endings, if applicable.
+	// FillColor (optional) is the colour used to fill the polyline's line
+	// endings, if applicable.
 	//
 	// Only certain color types are allowed:
 	//  - colors in the [color.DeviceGray] color space
@@ -74,8 +75,8 @@ type PolyLine struct {
 	// This corresponds to the /IC entry in the PDF annotation dictionary.
 	FillColor color.Color
 
-	// Measure (optional; PDF 1.7) is a measure dictionary that specifies the
-	// scale and units that apply to the annotation.
+	// Measure (optional) is a measure dictionary that specifies the scale and
+	// units that apply to the annotation.
 	Measure measure.Measure
 }
 
@@ -106,7 +107,7 @@ func decodePolyline(x *pdf.Extractor, dict pdf.Dict) (*PolyLine, error) {
 		polyline.Vertices = vertices
 	}
 
-	// LE (optional; PDF 1.4) - default is [None, None]
+	// LE (optional) - default is [None, None]
 	polyline.LineEndingStyle = [2]LineEndingStyle{LineEndingStyleNone, LineEndingStyleNone}
 	if le, err := pdf.Optional(x.GetArray(dict["LE"])); err != nil {
 		return nil, err
@@ -125,7 +126,7 @@ func decodePolyline(x *pdf.Extractor, dict pdf.Dict) (*PolyLine, error) {
 	}
 
 	// BS (optional)
-	if bs, err := pdf.Optional(pdf.ExtractorGet(x, dict["BS"], ExtractBorderStyle)); err != nil {
+	if bs, err := pdf.ExtractorGetOptional(x, dict["BS"], ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		polyline.BorderStyle = bs
@@ -135,7 +136,7 @@ func decodePolyline(x *pdf.Extractor, dict pdf.Dict) (*PolyLine, error) {
 		}
 	}
 
-	// IC (optional; PDF 1.4)
+	// IC (optional)
 	if ic, err := pdf.Optional(extractColor(x.R, dict["IC"])); err != nil {
 		return nil, err
 	} else {
@@ -143,12 +144,10 @@ func decodePolyline(x *pdf.Extractor, dict pdf.Dict) (*PolyLine, error) {
 	}
 
 	// Measure (optional)
-	if dict["Measure"] != nil {
-		if m, err := pdf.Optional(measure.Extract(x, dict["Measure"])); err != nil {
-			return nil, err
-		} else {
-			polyline.Measure = m
-		}
+	if m, err := pdf.Optional(measure.Extract(x, dict["Measure"])); err != nil {
+		return nil, err
+	} else {
+		polyline.Measure = m
 	}
 
 	// Path (optional; PDF 2.0)
@@ -168,6 +167,10 @@ func decodePolyline(x *pdf.Extractor, dict pdf.Dict) (*PolyLine, error) {
 }
 
 func (p *PolyLine) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
+	if err := pdf.CheckVersion(rm.Out, "polyline annotations", pdf.V1_5); err != nil {
+		return nil, err
+	}
+
 	if p.BorderStyle != nil && p.Common.Border != nil {
 		return nil, errors.New("Border and BorderStyle are mutually exclusive")
 	}
@@ -186,20 +189,40 @@ func (p *PolyLine) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 
-	// Add polyline-specific fields
 	// Vertices (required unless Path is present)
-	if p.Path == nil && p.Vertices != nil && len(p.Vertices) > 0 {
-		if err := pdf.CheckVersion(rm.Out, "polyline annotation", pdf.V1_5); err != nil {
+	if len(p.Path) > 0 {
+		if err := pdf.CheckVersion(rm.Out, "polyline annotation Path entry", pdf.V2_0); err != nil {
 			return nil, err
+		}
+		if len(p.Path[0]) != 2 {
+			return nil, errors.New("first Path entry must have length 2 (moveto)")
+		}
+		pathArray := make(pdf.Array, len(p.Path))
+		for i, pathEntry := range p.Path {
+			if i > 0 && len(pathEntry) != 2 && len(pathEntry) != 6 {
+				return nil, fmt.Errorf("Path entry %d has length %d, expected 2 or 6", i, len(pathEntry))
+			}
+			entryArray := make(pdf.Array, len(pathEntry))
+			for j, coord := range pathEntry {
+				entryArray[j] = pdf.Number(coord)
+			}
+			pathArray[i] = entryArray
+		}
+		dict["Path"] = pathArray
+	} else if len(p.Vertices) > 0 {
+		if len(p.Vertices)%2 != 0 {
+			return nil, errors.New("Vertices must have an even number of elements")
 		}
 		verticesArray := make(pdf.Array, len(p.Vertices))
 		for i, vertex := range p.Vertices {
 			verticesArray[i] = pdf.Number(vertex)
 		}
 		dict["Vertices"] = verticesArray
+	} else {
+		return nil, errors.New("polyline annotation requires Vertices or Path")
 	}
 
-	// LE (optional; PDF 1.4) - only write if not default [None, None]
+	// LE (optional) - only write if not default [None, None]
 	// normalize empty strings to None as documented
 	normalized := p.LineEndingStyle
 	if normalized[0] == "" {
@@ -210,9 +233,6 @@ func (p *PolyLine) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	if normalized != [2]LineEndingStyle{LineEndingStyleNone, LineEndingStyleNone} {
-		if err := pdf.CheckVersion(rm.Out, "polyline annotation LE entry", pdf.V1_4); err != nil {
-			return nil, err
-		}
 		leArray := make(pdf.Array, 2)
 		leArray[0] = pdf.Name(normalized[0])
 		leArray[1] = pdf.Name(normalized[1])
@@ -228,11 +248,8 @@ func (p *PolyLine) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["BS"] = bs
 	}
 
-	// IC (optional; PDF 1.4)
+	// IC (optional)
 	if p.FillColor != nil {
-		if err := pdf.CheckVersion(rm.Out, "polyline annotation IC entry", pdf.V1_4); err != nil {
-			return nil, err
-		}
 		if icArray, err := encodeColor(p.FillColor); err != nil {
 			return nil, err
 		} else if icArray != nil {
@@ -250,26 +267,6 @@ func (p *PolyLine) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 			return nil, err
 		}
 		dict["Measure"] = embedded
-	}
-
-	// Path (optional; PDF 2.0)
-	if len(p.Path) > 0 {
-		if err := pdf.CheckVersion(rm.Out, "polyline annotation Path entry", pdf.V2_0); err != nil {
-			return nil, err
-		}
-		pathArray := make(pdf.Array, 0, len(p.Path))
-		for _, pathEntry := range p.Path {
-			if pathEntry != nil {
-				entryArray := make(pdf.Array, len(pathEntry))
-				for j, coord := range pathEntry {
-					entryArray[j] = pdf.Number(coord)
-				}
-				pathArray = append(pathArray, entryArray)
-			}
-		}
-		if len(pathArray) > 0 {
-			dict["Path"] = pathArray
-		}
 	}
 
 	return dict, nil

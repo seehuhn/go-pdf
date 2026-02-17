@@ -5228,31 +5228,30 @@ types:
       specifying the alternating horizontal and vertical coordinates of each
 
       vertex in default user space.'
-  - goName:
+  - goName: LineEndingStyle
     pdfKey: LE
     pdfType: array
     required: false
     default: '[None None]'
     introduced: '1.5'
-  - goName:
+    goType: '[2]LineEndingStyle'
+    purpose: Line ending styles for the start and end points.
+  - goName: BorderStyle
     pdfKey: BS
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - BorderStyle
-  - goName:
+    goType: '*BorderStyle'
+    purpose: Border style dictionary specifying the width and dash pattern for drawing the polyline.
+  - goName: FillColor
     pdfKey: IC
     pdfType: array
     required: false
     introduced: '1.5'
-  - goName:
-    pdfKey: BE
-    pdfType: dictionary
-    required: false
-    introduced: '1.5'
-    refTypes:
-    - BorderEffect
+    goType: color.Color
+    purpose: Interior color used to fill the polyline's line endings.
   - goName: Measure
     pdfKey: Measure
     pdfType: dictionary
@@ -5283,7 +5282,7 @@ types:
       lineto operators, and arrays of length 6 specify curveto operators.'
   goPackage: annotation
   goRepr: struct
-  specSection: 12.5.2
+  specSection: 12.5.6.9
   fileDependent: true
   writeMethod: (*PolyLine).Encode
   embeds:
@@ -5325,13 +5324,6 @@ types:
       the alternating horizontal and vertical coordinates of each vertex in default
 
       user space.'
-  - goName:
-    pdfKey: LE
-    pdfType: array
-    required: false
-    default: '[None None]'
-    introduced: '1.5'
-    notes: Meaningful only for polyline annotations.
   - goName: BorderStyle
     pdfKey: BS
     pdfType: dictionary
@@ -5345,7 +5337,7 @@ types:
     pdfKey: IC
     pdfType: array
     required: false
-    introduced: '1.4'
+    introduced: '1.5'
     goType: color.Color
     purpose: Interior color used to fill the polygon shape.
   - goName: BorderEffect

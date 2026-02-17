@@ -139,10 +139,10 @@ func createDocument(filename string) error {
 		Common: annotation.Common{
 			Contents: "BorderStyle.Width=2",
 			Flags:    annotation.FlagPrint,
-			Border:   &annotation.Border{Width: 2, SingleUse: true},
 			Color:    w.LinkCol,
 		},
-		Action: &action.URI{URI: "https://www.example.com/"},
+		Action:      &action.URI{URI: "https://www.example.com/"},
+		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
 	}
 	err = w.addAnnotationPair(a)
 	if err != nil {

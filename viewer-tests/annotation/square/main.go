@@ -66,11 +66,7 @@ func createDocument(filename string) error {
 		return err
 	}
 
-	background, err := pageBackground(paper)
-	if err != nil {
-		return err
-	}
-	page.DrawShading(background)
+	page.DrawShading(pageBackground(paper))
 
 	B := standard.TimesBold.New()
 	H := standard.Helvetica.New()
@@ -99,7 +95,10 @@ func createDocument(filename string) error {
 			Color:    color.Blue,
 		},
 	}
-	w.addAnnotationPair(a)
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
 
 	a = &annotation.Square{
 		Common: annotation.Common{
@@ -109,7 +108,10 @@ func createDocument(filename string) error {
 			Color:    color.Blue,
 		},
 	}
-	w.addAnnotationPair(a)
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
 
 	a = &annotation.Square{
 		Common: annotation.Common{
@@ -119,7 +121,10 @@ func createDocument(filename string) error {
 		},
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
 	}
-	w.addAnnotationPair(a)
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
 
 	a = &annotation.Square{
 		Common: annotation.Common{
@@ -134,7 +139,10 @@ func createDocument(filename string) error {
 			SingleUse: true,
 		},
 	}
-	w.addAnnotationPair(a)
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
 
 	a = &annotation.Square{
 		Common: annotation.Common{
@@ -148,7 +156,10 @@ func createDocument(filename string) error {
 			SingleUse: true,
 		},
 	}
-	w.addAnnotationPair(a)
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
 
 	a = &annotation.Square{
 		Common: annotation.Common{
@@ -162,7 +173,10 @@ func createDocument(filename string) error {
 			SingleUse: true,
 		},
 	}
-	w.addAnnotationPair(a)
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
 
 	a = &annotation.Square{
 		Common: annotation.Common{
@@ -171,7 +185,10 @@ func createDocument(filename string) error {
 			Border:   &annotation.Border{Width: 2, SingleUse: true},
 		},
 	}
-	w.addAnnotationPair(a)
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
 
 	a = &annotation.Square{
 		Common: annotation.Common{
@@ -182,7 +199,10 @@ func createDocument(filename string) error {
 		},
 		FillColor: color.White,
 	}
-	w.addAnnotationPair(a)
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
 
 	a = &annotation.Square{
 		Common: annotation.Common{
@@ -202,7 +222,10 @@ func createDocument(filename string) error {
 			SingleUse: true,
 		},
 	}
-	w.addAnnotationPair(a)
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
 
 	a = &annotation.Square{
 		Common: annotation.Common{
@@ -222,7 +245,10 @@ func createDocument(filename string) error {
 			SingleUse: true,
 		},
 	}
-	w.addAnnotationPair(a)
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
 
 	a = &annotation.Square{
 		Common: annotation.Common{
@@ -242,7 +268,10 @@ func createDocument(filename string) error {
 			SingleUse: true,
 		},
 	}
-	w.addAnnotationPair(a)
+	err = w.addAnnotationPair(a)
+	if err != nil {
+		return err
+	}
 
 	return page.Close()
 }
@@ -258,7 +287,7 @@ func (w *writer) addAnnotation(a annotation.Annotation) {
 	w.page.Page.Annots = append(w.page.Page.Annots, a)
 }
 
-func (w *writer) addAnnotationPair(left *annotation.Square) {
+func (w *writer) addAnnotationPair(left *annotation.Square) error {
 	if left.BorderEffect != nil {
 		w.yPos -= 5 * left.BorderEffect.Intensity
 	}
@@ -287,7 +316,10 @@ func (w *writer) addAnnotationPair(left *annotation.Square) {
 	}
 	right.Contents += " (quire)"
 
-	w.style.AddAppearance(right)
+	err := w.style.AddAppearance(right)
+	if err != nil {
+		return err
+	}
 
 	w.addAnnotation(left)
 	w.addAnnotation(right)
@@ -296,6 +328,7 @@ func (w *writer) addAnnotationPair(left *annotation.Square) {
 	if left.BorderEffect != nil {
 		w.yPos -= 5 * left.BorderEffect.Intensity
 	}
+	return nil
 }
 
 func clone[T any](v *T) *T {
@@ -306,7 +339,7 @@ func clone[T any](v *T) *T {
 	return &clone
 }
 
-func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {
+func pageBackground(paper *pdf.Rectangle) graphics.Shading {
 	alpha := 30.0 / 360 * 2 * math.Pi
 
 	nx := math.Cos(alpha)
@@ -329,5 +362,5 @@ func pageBackground(paper *pdf.Rectangle) (graphics.Shading, error) {
 		TMin:       t0,
 		TMax:       t1,
 	}
-	return background, nil
+	return background
 }

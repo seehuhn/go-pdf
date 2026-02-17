@@ -18,6 +18,7 @@ package annotation
 
 import (
 	"errors"
+	"fmt"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -38,9 +39,12 @@ type Polygon struct {
 	// user space.
 	Vertices []float64
 
-	// Path (optional; PDF 2.0) is an array of n arrays, each supplying operands
+	// Path (optional; PDF 2.0) is an array of arrays, each supplying operands
 	// for path building operators (m, l, or c). If present, Vertices is ignored.
-	// Each array contains pairs of values specifying points for path drawing operations.
+	// Each array contains pairs of values specifying points for path drawing
+	// operations. The first array is of length 2 (moveto), subsequent arrays of
+	// length 2 specify lineto operators, and arrays of length 6 specify curveto
+	// operators.
 	Path [][]float64
 
 	// BorderStyle (optional) is a border style dictionary specifying the width
@@ -57,7 +61,7 @@ type Polygon struct {
 	// This corresponds to the /BE entry in the PDF annotation dictionary.
 	BorderEffect *BorderEffect
 
-	// FillColor (optional; PDF 1.4) is the colour used to fill the polygon.
+	// FillColor (optional) is the colour used to fill the polygon.
 	//
 	// Only certain color types are allowed:
 	//  - colors in the [color.DeviceGray] color space
@@ -68,8 +72,8 @@ type Polygon struct {
 	// This corresponds to the /IC entry in the PDF annotation dictionary.
 	FillColor color.Color
 
-	// Measure (optional; PDF 1.7) is a measure dictionary that specifies the
-	// scale and units that apply to the annotation.
+	// Measure (optional) is a measure dictionary that specifies the scale and
+	// units that apply to the annotation.
 	Measure measure.Measure
 }
 
@@ -134,31 +138,25 @@ func decodePolygon(x *pdf.Extractor, dict pdf.Dict) (*Polygon, error) {
 
 	// Path (optional; PDF 2.0)
 	if path, err := x.GetArray(dict["Path"]); err == nil && len(path) > 0 {
-		pathArrays := make([][]float64, len(path))
-		for i, pathEntry := range path {
-			if pathArray, err := x.GetArray(pathEntry); err == nil {
-				if len(pathArray) > 0 {
-					coords := make([]float64, len(pathArray))
-					for j, coord := range pathArray {
-						if num, err := x.GetNumber(coord); err == nil {
-							coords[j] = num
-						}
-					}
-					pathArrays[i] = coords
-				} else {
-					pathArrays[i] = []float64{} // empty slice instead of nil
-				}
-			} else {
-				pathArrays[i] = []float64{} // default to empty slice if extraction fails
+		pathArrays := make([][]float64, 0, len(path))
+		for _, pathEntry := range path {
+			if coords, err := pdf.GetFloatArray(x.R, pathEntry); err == nil {
+				pathArrays = append(pathArrays, coords)
 			}
 		}
-		polygon.Path = pathArrays
+		if len(pathArrays) > 0 {
+			polygon.Path = pathArrays
+		}
 	}
 
 	return polygon, nil
 }
 
 func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
+	if err := pdf.CheckVersion(rm.Out, "polygon annotations", pdf.V1_5); err != nil {
+		return nil, err
+	}
+
 	if p.BorderStyle != nil && p.Common.Border != nil {
 		return nil, errors.New("Border and BorderStyle are mutually exclusive")
 	}
@@ -177,17 +175,37 @@ func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 
-	// Add polygon-specific fields
 	// Vertices (required unless Path is present)
-	if p.Path == nil && p.Vertices != nil && len(p.Vertices) > 0 {
-		if err := pdf.CheckVersion(rm.Out, "polygon annotation", pdf.V1_5); err != nil {
+	if len(p.Path) > 0 {
+		if err := pdf.CheckVersion(rm.Out, "polygon annotation Path entry", pdf.V2_0); err != nil {
 			return nil, err
+		}
+		if len(p.Path[0]) != 2 {
+			return nil, errors.New("first Path entry must have length 2 (moveto)")
+		}
+		pathArray := make(pdf.Array, len(p.Path))
+		for i, pathEntry := range p.Path {
+			if i > 0 && len(pathEntry) != 2 && len(pathEntry) != 6 {
+				return nil, fmt.Errorf("Path entry %d has length %d, expected 2 or 6", i, len(pathEntry))
+			}
+			entryArray := make(pdf.Array, len(pathEntry))
+			for j, coord := range pathEntry {
+				entryArray[j] = pdf.Number(coord)
+			}
+			pathArray[i] = entryArray
+		}
+		dict["Path"] = pathArray
+	} else if len(p.Vertices) > 0 {
+		if len(p.Vertices)%2 != 0 {
+			return nil, errors.New("Vertices must have an even number of elements")
 		}
 		verticesArray := make(pdf.Array, len(p.Vertices))
 		for i, vertex := range p.Vertices {
 			verticesArray[i] = pdf.Number(vertex)
 		}
 		dict["Vertices"] = verticesArray
+	} else {
+		return nil, errors.New("polygon annotation requires Vertices or Path")
 	}
 
 	// BS (optional)
@@ -201,9 +219,6 @@ func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// IC (optional)
 	if p.FillColor != nil {
-		if err := pdf.CheckVersion(rm.Out, "polygon annotation IC entry", pdf.V1_4); err != nil {
-			return nil, err
-		}
 		if icArray, err := encodeColor(p.FillColor); err != nil {
 			return nil, err
 		} else if icArray != nil {
@@ -213,9 +228,6 @@ func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// BE (optional)
 	if p.BorderEffect != nil {
-		if err := pdf.CheckVersion(rm.Out, "polygon annotation BE entry", pdf.V1_5); err != nil {
-			return nil, err
-		}
 		be, err := rm.Embed(p.BorderEffect)
 		if err != nil {
 			return nil, err
@@ -233,26 +245,6 @@ func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 			return nil, err
 		}
 		dict["Measure"] = embedded
-	}
-
-	// Path (optional; PDF 2.0)
-	if len(p.Path) > 0 {
-		if err := pdf.CheckVersion(rm.Out, "polygon annotation Path entry", pdf.V2_0); err != nil {
-			return nil, err
-		}
-		pathArray := make(pdf.Array, len(p.Path))
-		for i, pathEntry := range p.Path {
-			if len(pathEntry) > 0 {
-				entryArray := make(pdf.Array, len(pathEntry))
-				for j, coord := range pathEntry {
-					entryArray[j] = pdf.Number(coord)
-				}
-				pathArray[i] = entryArray
-			} else {
-				pathArray[i] = pdf.Array{} // Empty array for empty path entries
-			}
-		}
-		dict["Path"] = pathArray
 	}
 
 	return dict, nil
