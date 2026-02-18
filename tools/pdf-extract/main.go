@@ -23,8 +23,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"runtime"
-	"runtime/pprof"
 	"slices"
 	"strconv"
 	"strings"
@@ -32,6 +30,8 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/pagetree"
 
+	"seehuhn.de/go/pdf/tools/internal/buildinfo"
+	"seehuhn.de/go/pdf/tools/internal/profile"
 	"seehuhn.de/go/pdf/tools/pdf-extract/sections"
 	"seehuhn.de/go/pdf/tools/pdf-extract/text"
 )
@@ -243,7 +243,9 @@ func (pe PDFExtractor) Process(doc pdf.Getter, pages *PageSet, w io.Writer) erro
 			copier.Redirect(refIn, refOut)
 		}
 
-		pageTreeOut.AppendPageDict(refOut, pageOut)
+		if err := pageTreeOut.AppendPageDict(refOut, pageOut); err != nil {
+			return fmt.Errorf("failed to append page %d: %w", pageNo+1, err)
+		}
 	}
 
 	// finalize page tree
@@ -367,10 +369,6 @@ func openOutputFile(outputFile string, forceOverwrite bool) (io.Writer, io.Close
 }
 
 func main() {
-	os.Exit(main1())
-}
-
-func main1() int {
 	cpuprofile := flag.String("cpuprofile", "", "write cpu profile to `file`")
 	memprofile := flag.String("memprofile", "", "write memory profile to `file`")
 
@@ -383,94 +381,60 @@ func main1() int {
 	help := flag.Bool("help", false, "show help information")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [options] FILENAME [region ...] [to OUTPUT_FILE]\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Extract pages or text from a PDF file.\n")
-		fmt.Fprintf(os.Stderr, "The output format is determined by the file extension (.pdf or .txt),\n")
-		fmt.Fprintf(os.Stderr, "or by the -type flag. PDF output copies full pages; text output extracts\n")
-		fmt.Fprintf(os.Stderr, "the text content.\n\n")
+		fmt.Fprintf(os.Stderr, "pdf-extract \u2014 extract pages or text from a PDF file\n")
+		fmt.Fprintf(os.Stderr, "%s\n\n", buildinfo.Short("pdf-extract"))
+		fmt.Fprintf(os.Stderr, "Usage:\n")
+		fmt.Fprintf(os.Stderr, "  pdf-extract [options] <file.pdf> [region...] [to <output>]\n\n")
+		fmt.Fprintf(os.Stderr, "Arguments:\n")
+		fmt.Fprintf(os.Stderr, "  file.pdf   PDF file to extract from\n")
+		fmt.Fprintf(os.Stderr, "  output     output file (.pdf or .txt), or - for stdout\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nRegion types:\n")
-		fmt.Fprintf(os.Stderr, "  page N       - extract page N (1-based)\n")
-		fmt.Fprintf(os.Stderr, "  pages N-M    - extract pages N through M\n")
-		fmt.Fprintf(os.Stderr, "  pages odd    - extract odd-numbered pages\n")
-		fmt.Fprintf(os.Stderr, "  pages even   - extract even-numbered pages\n")
-		fmt.Fprintf(os.Stderr, "  section PAT  - extract section matching regex pattern PAT\n")
-		fmt.Fprintf(os.Stderr, "  xrange A-B   - restrict to X coordinates A through B\n")
+		fmt.Fprintf(os.Stderr, "  page N       extract page N (1-based)\n")
+		fmt.Fprintf(os.Stderr, "  pages N-M    extract pages N through M\n")
+		fmt.Fprintf(os.Stderr, "  pages odd    extract odd-numbered pages\n")
+		fmt.Fprintf(os.Stderr, "  pages even   extract even-numbered pages\n")
+		fmt.Fprintf(os.Stderr, "  section PAT  extract section matching regex pattern PAT\n")
+		fmt.Fprintf(os.Stderr, "  xrange A-B   restrict to X coordinates A through B\n")
 		fmt.Fprintf(os.Stderr, "\nQueries (no output file needed):\n")
-		fmt.Fprintf(os.Stderr, "  sections     - list all sections in document\n")
-		fmt.Fprintf(os.Stderr, "  pages        - show total page count\n")
+		fmt.Fprintf(os.Stderr, "  sections     list all sections in document\n")
+		fmt.Fprintf(os.Stderr, "  pages        show total page count\n")
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  %s doc.pdf page 1 to page1.pdf          # extract a page\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s doc.pdf section \"Intro\" to intro.txt  # extract text\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s doc.pdf page 1 to -                   # write to stdout\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s -type txt doc.pdf section \"Intro\" xrange 100-500 to -\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s doc.pdf sections\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "  %s doc.pdf pages\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  pdf-extract doc.pdf page 1 to page1.pdf\n")
+		fmt.Fprintf(os.Stderr, "  pdf-extract doc.pdf section \"Intro\" to intro.txt\n")
+		fmt.Fprintf(os.Stderr, "  pdf-extract doc.pdf page 1 to -\n")
+		fmt.Fprintf(os.Stderr, "  pdf-extract -type txt doc.pdf section \"Intro\" xrange 100-500 to -\n")
+		fmt.Fprintf(os.Stderr, "  pdf-extract doc.pdf sections\n")
+		fmt.Fprintf(os.Stderr, "  pdf-extract doc.pdf pages\n")
 	}
 
 	flag.Parse()
 
 	if *help {
 		flag.Usage()
-		return 0
+		return
 	}
 
-	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "could not create CPU profile: %v\n", err)
-			return 1
-		}
-		defer f.Close()
-		if err := pprof.StartCPUProfile(f); err != nil {
-			fmt.Fprintf(os.Stderr, "could not start CPU profile: %v\n", err)
-			return 1
-		}
-		defer pprof.StopCPUProfile()
-	}
-
-	err := run(cfg)
-
-	if *memprofile != "" {
-		f, err := os.Create(*memprofile)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "could not create memory profile: %v\n", err)
-			return 1
-		}
-		runtime.GC()
-		allocs := pprof.Lookup("allocs")
-		if allocs == nil {
-			fmt.Fprintln(os.Stderr, "could not lookup memory profile")
-			f.Close()
-			return 1
-		}
-		if err := allocs.WriteTo(f, 0); err != nil {
-			fmt.Fprintf(os.Stderr, "could not write memory profile: %v\n", err)
-			f.Close()
-			return 1
-		}
-		if err := f.Close(); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			return 1
-		}
-	}
-
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
-	}
-
-	return 0
-}
-
-func run(cfg config) error {
-	args := flag.Args()
-	if len(args) < 1 {
+	if flag.NArg() < 1 {
 		flag.Usage()
 		os.Exit(1)
 	}
 
+	if err := run(cfg, *cpuprofile, *memprofile); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run(cfg config, cpuprofile, memprofile string) error {
+	stop, err := profile.Start(cpuprofile, memprofile)
+	if err != nil {
+		return err
+	}
+	defer stop()
+
+	args := flag.Args()
 	filename := args[0]
 	regionArgs := args[1:]
 

@@ -17,10 +17,9 @@
 package cmap
 
 import (
+	"maps"
 	"slices"
 	"sort"
-
-	"golang.org/x/exp/maps"
 
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/postscript/cid"
@@ -57,9 +56,8 @@ func (f *File) SetMapping(codec *charcode.Codec, data map[charcode.Code]cid.CID)
 	}
 
 	// find all ranges, in sorted order
-	keys := maps.Keys(ranges)
-	sort.Slice(keys, func(i, j int) bool {
-		return slices.Compare([]byte(keys[i]), []byte(keys[j])) < 0
+	keys := slices.SortedFunc(maps.Keys(ranges), func(a, b string) int {
+		return slices.Compare([]byte(a), []byte(b))
 	})
 
 	// for each range, add the required CIDRanges and CIDSingles

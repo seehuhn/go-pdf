@@ -17,9 +17,8 @@
 package dict
 
 import (
+	"maps"
 	"slices"
-
-	"golang.org/x/exp/maps"
 
 	"seehuhn.de/go/pdf"
 	_ "seehuhn.de/go/pdf/font" // for the doc strings
@@ -71,8 +70,7 @@ func setSimpleWidths(w *pdf.Writer, fontDict pdf.Dict, ww []float64, enc encodin
 // encodeCompositeWidths creates a W array for a composite font from a map of CID to width values.
 // Uses the most compact representation possible.
 func encodeCompositeWidths(widthMap map[cid.CID]float64) pdf.Array {
-	cidList := maps.Keys(widthMap)
-	slices.Sort(cidList)
+	cidList := slices.Sorted(maps.Keys(widthMap))
 
 	// There are two ways to encode the widths:
 	//   - elements `startCID, endCID, width` indicate a run of CIDs with the same width
@@ -202,8 +200,7 @@ func encodeVMetrics(metrics map[cid.CID]VMetrics) pdf.Array {
 
 	res := pdf.Array{}
 
-	cids := maps.Keys(metrics)
-	slices.Sort(cids)
+	cids := slices.Sorted(maps.Keys(metrics))
 	for len(cids) > 0 {
 		// Try to find a range of consecutive CIDs
 		// with pairwise different metrics:

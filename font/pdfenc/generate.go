@@ -26,12 +26,12 @@ import (
 	"fmt"
 	"go/format"
 	"log"
+	"maps"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
-
-	"golang.org/x/exp/maps"
 
 	"seehuhn.de/go/postscript/type1/names"
 
@@ -185,10 +185,7 @@ func writeLatin(data map[pdf.Name]record, fname string) error {
 	}
 	defer w.Close()
 
-	glyphNames := maps.Keys(data)
-	sort.Slice(glyphNames, func(i, j int) bool {
-		return glyphNames[i] < glyphNames[j]
-	})
+	glyphNames := slices.Sorted(maps.Keys(data))
 
 	_, err = w.WriteString(header)
 	if err != nil {

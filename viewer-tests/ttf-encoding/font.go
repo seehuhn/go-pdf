@@ -21,10 +21,10 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"maps"
 	"math"
 	"slices"
 
-	"golang.org/x/exp/maps"
 	"golang.org/x/image/font/gofont/gomono"
 
 	"seehuhn.de/go/sfnt"
@@ -117,8 +117,7 @@ func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Instance, error) {
 		}
 	}
 	runeUsed['X'] = yes
-	runes := maps.Keys(runeUsed)
-	slices.Sort(runes)
+	runes := slices.Sorted(maps.Keys(runeUsed))
 
 	glyphsUsed := make(map[glyph.ID]rune)
 	glyphsUsed[0] = 0xFFFD
@@ -129,8 +128,7 @@ func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Instance, error) {
 		}
 		glyphsUsed[gid] = r
 	}
-	glyphs := maps.Keys(glyphsUsed)
-	slices.Sort(glyphs)
+	glyphs := slices.Sorted(maps.Keys(glyphsUsed))
 
 	findGlyph := make(map[rune]glyph.ID, len(glyphs)-1)
 	for subsetGID, origGID := range glyphs {

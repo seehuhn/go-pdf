@@ -20,10 +20,10 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"maps"
 	"math/bits"
 	"slices"
 
-	"golang.org/x/exp/maps"
 	"golang.org/x/text/unicode/norm"
 
 	"seehuhn.de/go/pdf"
@@ -285,8 +285,7 @@ func (t *Simple) Glyphs() []glyph.ID {
 	for k := range t.code {
 		gidIsUsed[k.gid] = struct{}{}
 	}
-	glyphs := maps.Keys(gidIsUsed)
-	slices.Sort(glyphs)
+	glyphs := slices.Sorted(maps.Keys(gidIsUsed))
 	return glyphs
 }
 

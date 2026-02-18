@@ -69,9 +69,9 @@ func createDocument(filename string) error {
 	page.DrawShading(pageBackground(paper))
 
 	w := &writer{
-		page:     page,
-		style:    fallback.NewStyle(),
-		yPos: startY,
+		page:  page,
+		style: fallback.NewStyle(),
+		yPos:  startY,
 	}
 
 	lineStyle := &annotation.BorderStyle{
@@ -422,9 +422,9 @@ func createDocument(filename string) error {
 }
 
 type writer struct {
-	page     *document.Page
-	style    *fallback.Style
-	yPos float64
+	page  *document.Page
+	style *fallback.Style
+	yPos  float64
 }
 
 func (w *writer) addAnnotation(a annotation.Annotation) {

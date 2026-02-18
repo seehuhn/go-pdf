@@ -18,11 +18,11 @@ package pdf
 
 import (
 	"bytes"
-	"sort"
+	"cmp"
+	"maps"
+	"slices"
 	"strings"
 	"testing"
-
-	"golang.org/x/exp/maps"
 )
 
 func TestSequential(t *testing.T) {
@@ -88,9 +88,8 @@ trailer
 			objs[n] = objInfo{obj.ObjStart, obj.Reference.Generation()}
 		}
 	}
-	keys := maps.Keys(objs)
-	sort.Slice(keys, func(i, j int) bool {
-		return objs[keys[i]].pos < objs[keys[j]].pos
+	keys := slices.SortedFunc(maps.Keys(objs), func(a, b uint32) int {
+		return cmp.Compare(objs[a].pos, objs[b].pos)
 	})
 
 	buf := &bytes.Buffer{}

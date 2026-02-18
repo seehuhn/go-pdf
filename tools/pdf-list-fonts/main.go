@@ -18,6 +18,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"maps"
 	"os"
@@ -25,20 +26,71 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/pagetree"
+	"seehuhn.de/go/pdf/tools/internal/buildinfo"
+	"seehuhn.de/go/pdf/tools/internal/profile"
+)
+
+var (
+	passwdArg  = flag.String("p", "", "PDF password")
+	cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
+	memprofile = flag.String("memprofile", "", "write memory profile to `file`")
 )
 
 func main() {
-	for _, fname := range os.Args[1:] {
-		err := doit(fname)
-		if err != nil {
-			panic(err)
-		}
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "pdf-list-fonts \u2014 list fonts used in a PDF file\n")
+		fmt.Fprintf(os.Stderr, "%s\n\n", buildinfo.Short("pdf-list-fonts"))
+		fmt.Fprintf(os.Stderr, "Usage:\n")
+		fmt.Fprintf(os.Stderr, "  pdf-list-fonts [options] <file.pdf>...\n\n")
+		fmt.Fprintf(os.Stderr, "Arguments:\n")
+		fmt.Fprintf(os.Stderr, "  file.pdf   one or more PDF files to inspect\n\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nExamples:\n")
+		fmt.Fprintf(os.Stderr, "  pdf-list-fonts document.pdf\n")
+		fmt.Fprintf(os.Stderr, "  pdf-list-fonts -p secret encrypted.pdf\n")
+	}
+	flag.Parse()
+
+	if flag.NArg() < 1 {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 }
 
-func doit(fname string) error {
+func run() error {
+	stop, err := profile.Start(*cpuprofile, *memprofile)
+	if err != nil {
+		return err
+	}
+	defer stop()
+
+	for _, fname := range flag.Args() {
+		err := listFonts(fname)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func listFonts(fname string) error {
+	var opt *pdf.ReaderOptions
+	if *passwdArg != "" {
+		opt = &pdf.ReaderOptions{
+			ReadPassword: func(_ []byte, _ int) string {
+				return *passwdArg
+			},
+		}
+	}
+
 	fmt.Println("loading", fname, "...")
-	r, err := pdf.Open(fname, nil)
+	r, err := pdf.Open(fname, opt)
 	if err != nil {
 		return err
 	}
@@ -191,8 +243,7 @@ func doit(fname string) error {
 			desc = "TrueType/ext"
 
 		default:
-			fmt.Printf("%s: %q %q %q\n", fontRef, subtype, f3Subtype, fontName)
-			panic("unknown font type")
+			return fmt.Errorf("unknown font type: %s %q %q %q", fontRef, subtype, f3Subtype, fontName)
 		}
 
 		fmt.Printf("%-10s %s %-14s %-20s %s\n", fontRef, tp, desc, encoding, fontName)

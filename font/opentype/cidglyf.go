@@ -18,10 +18,9 @@ package opentype
 
 import (
 	"errors"
+	"maps"
 	"math"
 	"slices"
-
-	"golang.org/x/exp/maps"
 
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/type1/names"
@@ -190,8 +189,7 @@ func (f *CompositeGlyf) makeDict() (*dict.CIDFontType2, error) {
 	for cidVal := range f.usedCIDs {
 		cidSet[cidVal] = struct{}{}
 	}
-	cidList := maps.Keys(cidSet)
-	slices.Sort(cidList)
+	cidList := slices.Sorted(maps.Keys(cidSet))
 
 	glyphs := make([]glyph.ID, len(cidList))
 	for i, cidVal := range cidList {

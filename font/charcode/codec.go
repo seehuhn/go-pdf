@@ -18,10 +18,9 @@ package charcode
 
 import (
 	"errors"
+	"maps"
 	"slices"
 	"sort"
-
-	"golang.org/x/exp/maps"
 )
 
 // Code represents a character code within a [Codec].
@@ -353,8 +352,7 @@ func newTree(ranges CodeSpaceRange, depth int) (tree, []byte, error) {
 		breaks[int(r.Low[depth])] = true
 		breaks[int(r.High[depth])+1] = true
 	}
-	bSlice := maps.Keys(breaks)
-	slices.Sort(bSlice)
+	bSlice := slices.Sorted(maps.Keys(breaks))
 
 	var childRanges CodeSpaceRange
 
@@ -477,8 +475,7 @@ func newLinearizer() *linearizer {
 }
 
 func (l *linearizer) AppendNodes(t tree) uint16 {
-	bb := maps.Keys(t)
-	slices.Sort(bb)
+	bb := slices.Sorted(maps.Keys(t))
 
 	// reserve space for the child nodes
 	base := len(l.nodes)

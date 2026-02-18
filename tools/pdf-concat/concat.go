@@ -75,7 +75,7 @@ func (c *Concat) Close() error {
 	meta := c.w.GetMeta()
 	now := time.Now()
 	meta.Info = &pdf.Info{
-		Producer:     "seehuhn.de/go/pdf/examples/concat",
+		Producer:     "seehuhn.de/go/pdf/tools/pdf-concat",
 		CreationDate: pdf.Date(now),
 		ModDate:      pdf.Date(now),
 	}
@@ -185,17 +185,17 @@ func (c *Concat) CopyOutlineItems(cp *pdf.Copier, in []*outline.Item) ([]*outlin
 			Italic:   child.Italic,
 		}
 
-		// Copy destination with page reference translation
+		// copy destination with page reference translation
 		if child.Destination != nil {
-			entry.Destination, err = copyDestination(cp, child.Destination)
+			entry.Destination, err = copyDestination(cp, c.rm, child.Destination)
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		// Copy action with page reference translation (for GoTo actions)
+		// copy action with page reference translation
 		if child.Action != nil {
-			entry.Action, err = copyAction(cp, child.Action)
+			entry.Action, err = copyAction(cp, c.rm, child.Action)
 			if err != nil {
 				return nil, err
 			}
@@ -207,89 +207,34 @@ func (c *Concat) CopyOutlineItems(cp *pdf.Copier, in []*outline.Item) ([]*outlin
 }
 
 // copyDestination copies a destination, translating page references.
-func copyDestination(cp *pdf.Copier, dest destination.Destination) (destination.Destination, error) {
-	switch d := dest.(type) {
-	case *destination.XYZ:
-		newPage, err := copyPageTarget(cp, d.Page)
-		if err != nil {
-			return nil, err
-		}
-		return &destination.XYZ{Page: newPage, Left: d.Left, Top: d.Top, Zoom: d.Zoom}, nil
-	case *destination.Fit:
-		newPage, err := copyPageTarget(cp, d.Page)
-		if err != nil {
-			return nil, err
-		}
-		return &destination.Fit{Page: newPage}, nil
-	case *destination.FitH:
-		newPage, err := copyPageTarget(cp, d.Page)
-		if err != nil {
-			return nil, err
-		}
-		return &destination.FitH{Page: newPage, Top: d.Top}, nil
-	case *destination.FitV:
-		newPage, err := copyPageTarget(cp, d.Page)
-		if err != nil {
-			return nil, err
-		}
-		return &destination.FitV{Page: newPage, Left: d.Left}, nil
-	case *destination.FitR:
-		newPage, err := copyPageTarget(cp, d.Page)
-		if err != nil {
-			return nil, err
-		}
-		return &destination.FitR{Page: newPage, Left: d.Left, Bottom: d.Bottom, Right: d.Right, Top: d.Top}, nil
-	case *destination.FitB:
-		newPage, err := copyPageTarget(cp, d.Page)
-		if err != nil {
-			return nil, err
-		}
-		return &destination.FitB{Page: newPage}, nil
-	case *destination.FitBH:
-		newPage, err := copyPageTarget(cp, d.Page)
-		if err != nil {
-			return nil, err
-		}
-		return &destination.FitBH{Page: newPage, Top: d.Top}, nil
-	case *destination.FitBV:
-		newPage, err := copyPageTarget(cp, d.Page)
-		if err != nil {
-			return nil, err
-		}
-		return &destination.FitBV{Page: newPage, Left: d.Left}, nil
-	case *destination.Named:
-		// Named destinations don't need translation
-		return &destination.Named{Name: d.Name}, nil
-	default:
-		return nil, nil
+func copyDestination(cp *pdf.Copier, rm *pdf.ResourceManager,
+	dest destination.Destination) (destination.Destination, error) {
+	if _, ok := dest.(*destination.Named); ok {
+		return dest, nil
 	}
+	encoded, err := dest.Encode(rm)
+	if err != nil {
+		return nil, err
+	}
+	copied, err := cp.Copy(encoded)
+	if err != nil {
+		return nil, err
+	}
+	x := pdf.NewExtractor(rm.Out)
+	return destination.Decode(x, copied)
 }
 
-// copyPageTarget copies a page target (reference or integer).
-func copyPageTarget(cp *pdf.Copier, page destination.Target) (destination.Target, error) {
-	if ref, ok := page.(pdf.Reference); ok {
-		newRef, err := cp.CopyReference(ref)
-		if err != nil {
-			return nil, err
-		}
-		return newRef, nil
+// copyAction copies an action, translating page references.
+func copyAction(cp *pdf.Copier, rm *pdf.ResourceManager,
+	act pdf.Action) (pdf.Action, error) {
+	encoded, err := act.Encode(rm)
+	if err != nil {
+		return nil, err
 	}
-	// Page numbers don't need translation
-	return page, nil
-}
-
-// copyAction copies an action, translating page references in GoTo actions.
-func copyAction(cp *pdf.Copier, act pdf.Action) (pdf.Action, error) {
-	switch a := act.(type) {
-	case *action.GoTo:
-		newDest, err := copyDestination(cp, a.Dest)
-		if err != nil {
-			return nil, err
-		}
-		return &action.GoTo{Dest: newDest}, nil
-	default:
-		// For other action types, just return the same action
-		// (they may contain references that need copying, but that's complex)
-		return act, nil
+	copied, err := cp.Copy(encoded)
+	if err != nil {
+		return nil, err
 	}
+	x := pdf.NewExtractor(rm.Out)
+	return action.Decode(x, copied)
 }

@@ -18,10 +18,10 @@ package cff
 
 import (
 	"errors"
+	"maps"
 	"math"
 	"slices"
 
-	"golang.org/x/exp/maps"
 	"golang.org/x/text/language"
 
 	"seehuhn.de/go/geom/matrix"
@@ -264,8 +264,7 @@ func (f *Composite) makeDict() (*dict.CIDFontType0, error) {
 	for cidVal := range f.usedCIDs {
 		cidSet[cidVal] = struct{}{}
 	}
-	cidList := maps.Keys(cidSet)
-	slices.Sort(cidList)
+	cidList := slices.Sorted(maps.Keys(cidSet))
 
 	glyphs := make([]glyph.ID, len(cidList))
 	for i, cidVal := range cidList {

@@ -17,11 +17,9 @@
 package cmap
 
 import (
-	intermaps "maps"
+	"maps"
 	"slices"
 	"sort"
-
-	"golang.org/x/exp/maps"
 
 	"seehuhn.de/go/pdf/font/charcode"
 )
@@ -53,9 +51,8 @@ func NewToUnicodeFile(csr charcode.CodeSpaceRange, data map[charcode.Code]string
 	}
 
 	// find all ranges, in sorted order
-	keys := maps.Keys(ranges)
-	sort.Slice(keys, func(i, j int) bool {
-		return slices.Compare([]byte(keys[i]), []byte(keys[j])) < 0
+	keys := slices.SortedFunc(maps.Keys(ranges), func(a, b string) int {
+		return slices.Compare([]byte(a), []byte(b))
 	})
 
 	// for each range, add the required CIDRanges and CIDSingles
@@ -119,7 +116,7 @@ func (tu *ToUnicodeFile) GetMapping() (map[charcode.Code]string, error) {
 		return nil, err
 	}
 
-	return intermaps.Collect(tu.All(codec)), nil
+	return maps.Collect(tu.All(codec)), nil
 }
 
 func nextString(s string, inc int) string {

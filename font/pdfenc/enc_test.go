@@ -17,11 +17,11 @@
 package pdfenc
 
 import (
+	"maps"
 	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"golang.org/x/exp/maps"
 )
 
 func TestEncoding(t *testing.T) {
@@ -43,11 +43,9 @@ func TestEncoding(t *testing.T) {
 			}
 			seen[name] = true
 		}
-		names1 := maps.Keys(seen)
-		slices.Sort(names1)
+		names1 := slices.Sorted(maps.Keys(seen))
 
-		names2 := maps.Keys(enc.Has)
-		slices.Sort(names2)
+		names2 := slices.Sorted(maps.Keys(enc.Has))
 
 		if d := cmp.Diff(names1, names2); d != "" {
 			t.Errorf("%d: inconsistent name lists:\n%s", i, d)

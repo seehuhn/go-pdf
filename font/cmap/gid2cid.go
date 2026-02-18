@@ -20,9 +20,8 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"maps"
 	"slices"
-
-	"golang.org/x/exp/maps"
 
 	"seehuhn.de/go/pdf/font/mapping"
 	"seehuhn.de/go/postscript/cid"
@@ -83,8 +82,7 @@ func (g *gidToCIDSequential) ROS() *cid.SystemInfo {
 	h := sha256.New()
 	h.Write([]byte("seehuhn.de/go/pdf/font/cmap.gidToCIDSequential\n"))
 	binary.Write(h, binary.BigEndian, uint64(len(g.g2c)))
-	gg := maps.Keys(g.g2c)
-	slices.Sort(gg)
+	gg := slices.Sorted(maps.Keys(g.g2c))
 	for _, gid := range gg {
 		binary.Write(h, binary.BigEndian, gid)
 		binary.Write(h, binary.BigEndian, g.g2c[gid])

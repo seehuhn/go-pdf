@@ -18,9 +18,8 @@ package charcode
 
 import (
 	"iter"
+	"maps"
 	"slices"
-
-	"golang.org/x/exp/maps"
 )
 
 // Range represents a range of character codes.
@@ -127,8 +126,7 @@ func testSequences(ranges ...CodeSpaceRange) seqGen {
 			}
 		}
 
-		breaks := maps.Keys(allBreaks)
-		slices.Sort(breaks)
+		breaks := slices.Sorted(maps.Keys(allBreaks))
 
 		// All values between two breaks are equivalent, because in the absence
 		// of breaks the code space ranges have no way to distinguish between

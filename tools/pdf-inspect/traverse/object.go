@@ -21,14 +21,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
-
-	"golang.org/x/exp/maps"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/pagetree"
@@ -252,7 +251,7 @@ func (c *objectCtx) Show() error {
 				return err
 			}
 		} else {
-			fmt.Printf("warning: cannote decode stream: %v\n", err)
+			fmt.Printf("warning: cannot decode stream: %v\n", err)
 		}
 
 	case pdf.Dict:
@@ -404,14 +403,18 @@ func (c *objectCtx) explainShort(obj pdf.Object) (string, error) {
 }
 
 func dictKeys(obj pdf.Dict) []pdf.Name {
-	keys := maps.Keys(obj)
-	sort.Slice(keys, func(i, j int) bool {
-		if order(keys[i]) != order(keys[j]) {
-			return order(keys[i]) < order(keys[j])
+	return slices.SortedFunc(maps.Keys(obj), func(a, b pdf.Name) int {
+		if order(a) != order(b) {
+			return order(a) - order(b)
 		}
-		return keys[i] < keys[j]
+		if a < b {
+			return -1
+		}
+		if a > b {
+			return 1
+		}
+		return 0
 	})
-	return keys
 }
 
 func order(key pdf.Name) int {

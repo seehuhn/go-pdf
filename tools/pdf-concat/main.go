@@ -27,31 +27,59 @@ import (
 	"os"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/tools/internal/buildinfo"
+	"seehuhn.de/go/pdf/tools/internal/profile"
+)
+
+var (
+	out        = flag.String("o", "out.pdf", "output file name")
+	force      = flag.Bool("f", false, "overwrite output file if it exists")
+	cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
+	memprofile = flag.String("memprofile", "", "write memory profile to `file`")
 )
 
 func main() {
-	out := flag.String("o", "out.pdf", "output file name")
-	force := flag.Bool("f", false, "overwrite output file if it exists")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "pdf-concat \u2014 concatenate PDF files\n")
+		fmt.Fprintf(os.Stderr, "%s\n\n", buildinfo.Short("pdf-concat"))
+		fmt.Fprintf(os.Stderr, "Usage:\n")
+		fmt.Fprintf(os.Stderr, "  pdf-concat [options] <input.pdf>...\n\n")
+		fmt.Fprintf(os.Stderr, "Arguments:\n")
+		fmt.Fprintf(os.Stderr, "  input.pdf   one or more PDF files to concatenate\n\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nExamples:\n")
+		fmt.Fprintf(os.Stderr, "  pdf-concat -o combined.pdf a.pdf b.pdf c.pdf\n")
+		fmt.Fprintf(os.Stderr, "  pdf-concat -f -o out.pdf *.pdf\n")
+	}
 	flag.Parse()
 
-	if len(flag.Args()) < 1 {
+	if flag.NArg() < 1 {
 		fmt.Fprintln(os.Stderr, "error: no input files given")
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	if !*force {
-		if _, err := os.Stat(*out); !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "error: output file %q already exists\n", *out)
-			os.Exit(1)
-		}
-	}
-
-	err := concatFiles(*out, flag.Args())
-	if err != nil {
+	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func run() error {
+	stop, err := profile.Start(*cpuprofile, *memprofile)
+	if err != nil {
+		return err
+	}
+	defer stop()
+
+	if !*force {
+		if _, err := os.Stat(*out); !os.IsNotExist(err) {
+			return fmt.Errorf("output file %q already exists (use -f to overwrite)", *out)
+		}
+	}
+
+	return concatFiles(*out, flag.Args())
 }
 
 func concatFiles(out string, in []string) error {

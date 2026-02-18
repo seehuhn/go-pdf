@@ -18,59 +18,100 @@ package main
 
 import (
 	"flag"
-	"log"
+	"fmt"
 	"os"
-	"runtime/pprof"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/tools/internal/buildinfo"
+	"seehuhn.de/go/pdf/tools/internal/profile"
 )
 
-var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+var (
+	out        = flag.String("o", "out.pdf", "output file name")
+	force      = flag.Bool("f", false, "overwrite output file if it exists")
+	cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
+	memprofile = flag.String("memprofile", "", "write memory profile to `file`")
+)
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "pdf-copy \u2014 copy a PDF file\n")
+		fmt.Fprintf(os.Stderr, "%s\n\n", buildinfo.Short("pdf-copy"))
+		fmt.Fprintf(os.Stderr, "Usage:\n")
+		fmt.Fprintf(os.Stderr, "  pdf-copy [options] <input.pdf>\n\n")
+		fmt.Fprintf(os.Stderr, "Arguments:\n")
+		fmt.Fprintf(os.Stderr, "  input.pdf   PDF file to copy\n\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nExamples:\n")
+		fmt.Fprintf(os.Stderr, "  pdf-copy input.pdf\n")
+		fmt.Fprintf(os.Stderr, "  pdf-copy -o copy.pdf -f input.pdf\n")
+	}
 	flag.Parse()
 
-	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
-		if err != nil {
-			log.Fatal(err)
-		}
-		err = pprof.StartCPUProfile(f)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer pprof.StopCPUProfile()
+	if flag.NArg() != 1 {
+		flag.Usage()
+		os.Exit(1)
 	}
 
-	r, err := pdf.Open(flag.Arg(0), nil)
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	stop, err := profile.Start(*cpuprofile, *memprofile)
 	if err != nil {
-		log.Fatal(err)
+		return err
+	}
+	defer stop()
+
+	if !*force {
+		if _, err := os.Stat(*out); !os.IsNotExist(err) {
+			return fmt.Errorf("output file %q already exists (use -f to overwrite)", *out)
+		}
+	}
+
+	return copyPDF(flag.Arg(0), *out)
+}
+
+func copyPDF(inFile, outFile string) (retErr error) {
+	r, err := pdf.Open(inFile, nil)
+	if err != nil {
+		return err
 	}
 	defer r.Close()
 
-	w, err := pdf.Create("out.pdf", pdf.GetVersion(r), nil)
+	w, err := pdf.Create(outFile, pdf.GetVersion(r), nil)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+	defer func() {
+		if retErr != nil {
+			os.Remove(outFile)
+		}
+	}()
 
 	trans := pdf.NewCopier(w, r)
 
-	newCatalog, err := pdf.CopierCopyStruct(trans, r.GetMeta().Catalog)
+	rawCatalog, err := pdf.GetDict(r, r.GetMeta().Trailer["Root"])
 	if err != nil {
-		log.Fatal(err)
+		return err
+	}
+	newDict, err := trans.CopyDict(rawCatalog)
+	if err != nil {
+		return err
+	}
+	newCatalog, err := pdf.ExtractCatalog(w, newDict)
+	if err != nil {
+		return err
 	}
 	w.GetMeta().Catalog = newCatalog
 
-	newInfo, err := pdf.CopierCopyStruct(trans, r.GetMeta().Info)
-	if err != nil {
-		log.Fatal(err)
-	}
-	w.GetMeta().Info = newInfo
+	w.GetMeta().Info = r.GetMeta().Info
 
 	w.GetMeta().ID = r.GetMeta().ID
 
-	err = w.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
+	return w.Close()
 }

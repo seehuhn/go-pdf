@@ -18,12 +18,11 @@ package main
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"slices"
-	"sort"
 	"strings"
 
-	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/gofont"
@@ -217,8 +216,7 @@ func writeTree(out *output, fb *fontBuilder,
 			useSymbolic: useSymbolic,
 			base:        base,
 		}
-		cc := maps.Keys(bestM)
-		slices.Sort(cc)
+		cc := slices.Sorted(maps.Keys(bestM))
 		var leaves []any
 		for _, c := range cc {
 			choices := bestM[c]
@@ -270,8 +268,7 @@ func writeTree(out *output, fb *fontBuilder,
 		} else {
 			tags = append(tags, strings.Join(cur.choices, "|"))
 		}
-		keys := maps.Keys(rev)
-		sort.Strings(keys)
+		keys := slices.Sorted(maps.Keys(rev))
 		for _, tag := range keys {
 			if len(tag) > 0 {
 				mm := rev[tag]

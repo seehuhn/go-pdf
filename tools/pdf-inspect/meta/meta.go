@@ -17,12 +17,13 @@
 package meta
 
 import (
+	"encoding/xml"
 	"fmt"
+	"maps"
 	"reflect"
-	"sort"
+	"slices"
 	"strings"
 
-	"golang.org/x/exp/maps"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/xmp"
 )
@@ -253,12 +254,20 @@ func getXMPRaw(label string, value xmp.Raw) []string {
 			}
 		}
 	case xmp.RawStruct:
-		keys := maps.Keys(value.Value)
-		sort.Slice(keys, func(i, j int) bool {
-			if keys[i].Space != keys[j].Space {
-				return keys[i].Space < keys[j].Space
+		keys := slices.SortedFunc(maps.Keys(value.Value), func(a, b xml.Name) int {
+			if a.Space != b.Space {
+				if a.Space < b.Space {
+					return -1
+				}
+				return 1
 			}
-			return keys[i].Local < keys[j].Local
+			if a.Local < b.Local {
+				return -1
+			}
+			if a.Local > b.Local {
+				return 1
+			}
+			return 0
 		})
 		for _, key := range keys {
 			lab := fmt.Sprintf("%s %s:", key.Space, key.Local)

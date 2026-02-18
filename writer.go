@@ -23,11 +23,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"slices"
 	"strconv"
-
-	"golang.org/x/exp/maps"
 )
 
 // WriterOptions allows to influence the way a PDF file is generated.

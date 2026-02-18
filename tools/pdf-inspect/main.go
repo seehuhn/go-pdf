@@ -20,40 +20,55 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 
+	"seehuhn.de/go/pdf/tools/internal/buildinfo"
+	"seehuhn.de/go/pdf/tools/internal/profile"
 	"seehuhn.de/go/pdf/tools/pdf-inspect/traverse"
 )
 
 var (
-	passwdArg = flag.String("p", "", "PDF password")
+	passwdArg  = flag.String("p", "", "PDF password")
+	cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
+	memprofile = flag.String("memprofile", "", "write memory profile to `file`")
 )
 
 func main() {
-	flag.Parse()
-	flag.CommandLine.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(),
-			"Usage: %s [options] <file.pdf> <path>...\n",
-			filepath.Base(os.Args[0]))
-		fmt.Fprintln(flag.CommandLine.Output())
-		fmt.Fprintln(flag.CommandLine.Output(), "The given path describes an object in the PDF file,")
-		fmt.Fprintln(flag.CommandLine.Output(), "starting from the document catalog.")
-		fmt.Fprintln(flag.CommandLine.Output())
-		fmt.Fprintln(flag.CommandLine.Output(), "Options:")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "pdf-inspect \u2014 inspect PDF file structure\n")
+		fmt.Fprintf(os.Stderr, "%s\n\n", buildinfo.Short("pdf-inspect"))
+		fmt.Fprintf(os.Stderr, "Usage:\n")
+		fmt.Fprintf(os.Stderr, "  pdf-inspect [options] <file.pdf> [path...]\n\n")
+		fmt.Fprintf(os.Stderr, "Arguments:\n")
+		fmt.Fprintf(os.Stderr, "  file.pdf   PDF file to inspect\n")
+		fmt.Fprintf(os.Stderr, "  path       sequence of selectors to navigate the document structure\n\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nExamples:\n")
+		fmt.Fprintf(os.Stderr, "  pdf-inspect file.pdf\n")
+		fmt.Fprintf(os.Stderr, "  pdf-inspect file.pdf Pages 1\n")
+		fmt.Fprintf(os.Stderr, "  pdf-inspect -p secret file.pdf Pages 1 @contents\n")
 	}
-	args := flag.Args()
+	flag.Parse()
 
-	if len(args) == 0 {
-		flag.CommandLine.Usage()
+	if flag.NArg() == 0 {
+		flag.Usage()
 		os.Exit(1)
 	}
 
-	err := showObject(args...)
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	stop, err := profile.Start(*cpuprofile, *memprofile)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
+	defer stop()
+
+	return showObject(flag.Args()...)
 }
 
 func showObject(args ...string) error {
