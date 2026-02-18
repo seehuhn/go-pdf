@@ -77,10 +77,11 @@ func showObject(args ...string) error {
 		passwords = append(passwords, *passwdArg)
 	}
 
-	obj, err := traverse.Root(args[0], passwords...)
+	obj, cleanup, err := traverse.Root(args[0], passwords...)
 	if err != nil {
 		return err
 	}
+	defer cleanup()
 
 	for _, key := range args[1:] {
 		steps := obj.Next()

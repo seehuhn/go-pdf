@@ -55,7 +55,7 @@ type Step struct {
 	Next func(key string) (Context, error)
 }
 
-func Root(fileName string, passwords ...string) (Context, error) {
+func Root(fileName string, passwords ...string) (Context, func(), error) {
 	tryPasswd := func(_ []byte, try int) string {
 		if try < len(passwords) {
 			return passwords[try]
@@ -72,7 +72,7 @@ func Root(fileName string, passwords ...string) (Context, error) {
 
 	fd, err := os.Open(fileName)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	opt := &pdf.ReaderOptions{
 		ReadPassword:  tryPasswd,
@@ -80,16 +80,19 @@ func Root(fileName string, passwords ...string) (Context, error) {
 	}
 	r, err := pdf.NewReader(fd, opt)
 	if err != nil {
-		return nil, err
+		fd.Close()
+		return nil, nil, err
 	}
-
-	// TODO(voss): where should fd and r be closed?
 
 	c := &fileCtx{
 		fd: fd,
 		r:  r,
 	}
-	return c, nil
+	cleanup := func() {
+		r.Close()
+		fd.Close()
+	}
+	return c, cleanup, nil
 }
 
 type fileCtx struct {

@@ -95,11 +95,7 @@ func copyPDF(inFile, outFile string) (retErr error) {
 
 	trans := pdf.NewCopier(w, r)
 
-	rawCatalog, err := pdf.GetDict(r, r.GetMeta().Trailer["Root"])
-	if err != nil {
-		return err
-	}
-	newDict, err := trans.CopyDict(rawCatalog)
+	newDict, err := trans.CopyDict(pdf.AsDict(r.GetMeta().Catalog))
 	if err != nil {
 		return err
 	}
