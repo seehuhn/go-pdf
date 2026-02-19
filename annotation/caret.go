@@ -21,15 +21,23 @@ import "seehuhn.de/go/pdf"
 // PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.11
 
 // Caret represents a caret annotation that is a visual symbol indicating
-// the presence of text edits.
+// the presence of text edits. When opened, it displays a pop-up window
+// containing the text of an associated note.
+//
+//   - The caret is drawn as a filled shape within the annotation Rect,
+//     inset by the Margin (RD) if specified.
+//   - The caret color is specified by the Common.Color field.
+//     If this is nil, no visible caret is drawn.
+//   - When Symbol is set to "P", a pilcrow (¶) is drawn below the caret
+//     and the Rect and Margin are expanded to accommodate it.
 type Caret struct {
 	Common
 	Markup
 
-	// Margin (optional; PDF 1.5) describes the numerical differences between
-	// the Rect entry of the annotation and the actual boundaries of the
-	// underlying caret. This can occur when a paragraph symbol specified by Sy
-	// is displayed along with the caret.
+	// Margin (optional) describes the numerical differences between the Rect
+	// entry of the annotation and the actual boundaries of the underlying
+	// caret. This can occur when a paragraph symbol specified by Sy is
+	// displayed along with the caret.
 	//
 	// Slice of four numbers: [left, bottom, right, top]
 	//
