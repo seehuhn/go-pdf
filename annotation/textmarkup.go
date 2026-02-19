@@ -36,9 +36,19 @@ const (
 	TextMarkupTypeUnderline TextMarkupType = "Underline"
 )
 
-// TextMarkup represents a text markup annotation that appears as highlights,
-// underlines, strikeouts, or jagged ("squiggly") underlines in the text.
-// When opened, it displays a pop-up window containing the text of the associated note.
+// TextMarkup represents an annotation that appears as a highlight, underline,
+// strikeout, or jagged ("squiggly") underline on a piece of text. When
+// opened, it displays a pop-up window containing the text of an associated
+// note.
+//
+//   - The markup type is specified by the Type field.
+//   - The text region is defined by the QuadPoints field.
+//     Each quadrilateral should span the full line height, from the
+//     descender to the ascender of the font.
+//   - The markup color is specified by the Common.Color field.
+//     If this is nil, no visible markup is drawn.
+//   - For underline, strikeout, and squiggly annotations, the line width
+//     is determined by Common.Border.Width (default 1).
 type TextMarkup struct {
 	Common
 	Markup

@@ -18,6 +18,7 @@ package fallback
 
 import (
 	"fmt"
+	"slices"
 
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
@@ -50,20 +51,10 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 
 	outer := inner
 	if hasCallout {
-		for _, point := range calloutLine {
-			joint := pdf.Rectangle{
-				LLx: point.X - lw/2,
-				LLy: point.Y - lw/2,
-				URx: point.X + lw/2,
-				URy: point.Y + lw/2,
-			}
-			outer.Extend(&joint)
-		}
-		leInfo := lineEndingInfo{
-			At:  calloutLine[0],
-			Dir: calloutLine[0].Sub(calloutLine[1]),
-		}
-		lineEndingBBox(&outer, a.LineEndingStyle, leInfo, lw)
+		reversed := slices.Clone(calloutLine)
+		slices.Reverse(reversed)
+		clBBox := openPolylineBBox(reversed, lw, annotation.LineEndingStyleNone, a.LineEndingStyle)
+		outer.Extend(&clBBox)
 	}
 
 	// Set some relevant ignored fields: even if they are not used
@@ -136,18 +127,9 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 	if hasCallout {
 		b.SetLineWidth(lw)
 		b.SetStrokeColor(color.Black)
-		k := len(calloutLine)
-		lastPoint := calloutLine[k-1]
-		b.MoveTo(lastPoint.X, lastPoint.Y)
-		for i := k - 2; i >= 1; i-- {
-			b.LineTo(calloutLine[i].X, calloutLine[i].Y)
-		}
-		leInfo := lineEndingInfo{
-			FillColor: bgCol,
-			At:        calloutLine[0],
-			Dir:       calloutLine[0].Sub(calloutLine[1]),
-		}
-		drawLineEndingBuilder(b, a.LineEndingStyle, leInfo)
+		reversed := slices.Clone(calloutLine)
+		slices.Reverse(reversed)
+		drawOpenPolyline(b, reversed, annotation.LineEndingStyleNone, a.LineEndingStyle, bgCol)
 	}
 
 	// render text content if present

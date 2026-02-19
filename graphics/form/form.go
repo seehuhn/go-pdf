@@ -41,7 +41,7 @@ type Form struct {
 	// Content is the content stream that draws the form.
 	Content content.Stream
 
-	// Res contains the resources used by the content stream (required).
+	// Res (required) contains the resources used by the content stream.
 	Res *content.Resources
 
 	// BBox is the form's bounding box in form coordinate space.

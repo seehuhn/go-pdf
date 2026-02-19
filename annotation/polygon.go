@@ -26,9 +26,9 @@ import (
 
 // PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.9
 
-// Polygon represents a polygon annotation that displays a closed polygon on
-// the page. When opened, the annotation displays a pop-up window containing
-// the text of an associated note.
+// Polygon represents an annotation that displays a closed polygon on the page.
+// When opened, the annotation displays a pop-up window containing the text of
+// an associated note.
 //
 //   - The polygon shape is defined by the Vertices field.
 //     Vertices are connected by straight lines, with the first and last vertex

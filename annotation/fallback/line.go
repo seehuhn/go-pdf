@@ -99,25 +99,22 @@ func calculateLineBBox(a *annotation.Line, lw float64) pdf.Rectangle {
 	bbox.URx += lw / 2
 	bbox.URy += lw / 2
 
-	// calculate direction vector
-	dx := x2 - x1
-	dy := y2 - y1
-
 	// expand for line endings
-	if a.LineEndingStyle[0] != "" && a.LineEndingStyle[0] != annotation.LineEndingStyleNone {
+	le0 := normalizeLE(a.LineEndingStyle[0])
+	le1 := normalizeLE(a.LineEndingStyle[1])
+	if le0 != annotation.LineEndingStyleNone {
 		info := lineEndingInfo{
 			At:  vec.Vec2{X: x1, Y: y1},
-			Dir: vec.Vec2{X: -dx, Y: -dy},
+			Dir: vec.Vec2{X: x1 - x2, Y: y1 - y2},
 		}
-		lineEndingBBox(&bbox, a.LineEndingStyle[0], info, lw)
+		lineEndingBBox(&bbox, le0, info, lw)
 	}
-
-	if a.LineEndingStyle[1] != "" && a.LineEndingStyle[1] != annotation.LineEndingStyleNone {
+	if le1 != annotation.LineEndingStyleNone {
 		info := lineEndingInfo{
 			At:  vec.Vec2{X: x2, Y: y2},
-			Dir: vec.Vec2{X: dx, Y: dy},
+			Dir: vec.Vec2{X: x2 - x1, Y: y2 - y1},
 		}
-		lineEndingBBox(&bbox, a.LineEndingStyle[1], info, lw)
+		lineEndingBBox(&bbox, le1, info, lw)
 	}
 
 	// expand for leader lines if present
@@ -188,35 +185,13 @@ func expandBBoxForLeaderLines(bbox *pdf.Rectangle, a *annotation.Line, lw float6
 
 // drawSimpleLineBuilder draws a line without leader lines
 func drawSimpleLineBuilder(b *builder.Builder, a *annotation.Line) {
-	x1, y1 := a.Coords[0], a.Coords[1]
-	x2, y2 := a.Coords[2], a.Coords[3]
-
-	// draw start ending if present
-	if a.LineEndingStyle[0] != "" && a.LineEndingStyle[0] != annotation.LineEndingStyleNone {
-		info := lineEndingInfo{
-			At:        vec.Vec2{X: x1, Y: y1},
-			Dir:       vec.Vec2{X: x1 - x2, Y: y1 - y2},
-			FillColor: a.FillColor,
-			IsStart:   true,
-		}
-		drawLineEndingBuilder(b, a.LineEndingStyle[0], info)
-	} else {
-		b.MoveTo(pdf.Round(x1, 2), pdf.Round(y1, 2))
+	points := []vec.Vec2{
+		{X: a.Coords[0], Y: a.Coords[1]},
+		{X: a.Coords[2], Y: a.Coords[3]},
 	}
-
-	// draw end ending if present
-	if a.LineEndingStyle[1] != "" && a.LineEndingStyle[1] != annotation.LineEndingStyleNone {
-		info := lineEndingInfo{
-			At:        vec.Vec2{X: x2, Y: y2},
-			Dir:       vec.Vec2{X: x2 - x1, Y: y2 - y1},
-			FillColor: a.FillColor,
-			IsStart:   false,
-		}
-		drawLineEndingBuilder(b, a.LineEndingStyle[1], info)
-	} else {
-		b.LineTo(pdf.Round(x2, 2), pdf.Round(y2, 2))
-		b.Stroke()
-	}
+	le0 := normalizeLE(a.LineEndingStyle[0])
+	le1 := normalizeLE(a.LineEndingStyle[1])
+	drawOpenPolyline(b, points, le0, le1, a.FillColor)
 }
 
 // drawLineWithLeaderLinesBuilder draws a line with leader lines (dimension line style)
