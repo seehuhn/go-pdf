@@ -19,8 +19,10 @@ package fallback
 import (
 	"fmt"
 
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
@@ -34,14 +36,15 @@ const (
 )
 
 func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
-	// TODO(voss): implement border effects
-
 	// extract information from the pre-set fields
 	lw := a.BorderWidth()
 	bgCol := a.Color
 
 	calloutLine := a.CalloutLine
 	hasCallout := a.Intent == annotation.FreeTextIntentCallout && len(calloutLine) >= 2
+
+	be := a.BorderEffect
+	isCloudy := be != nil && be.Style == "C" && be.Intensity > 0
 
 	inner := applyMargins(a.Rect, a.Margin)
 
@@ -68,39 +71,65 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 	// needs to be re-generated after edits.
 	a.Border = &annotation.Border{Width: lw}
 	a.BorderStyle = nil
-	a.BorderEffect = nil
+	if !isCloudy {
+		a.BorderEffect = nil
+	}
 
 	a.Align = annotation.TextAlignLeft
 	a.DefaultStyle = ""
-
-	outer.IRound(1)
-	a.Rect = outer
-	if inner.NearlyEqual(&outer, 0.01) {
-		a.Margin = nil
-	} else {
-		a.Margin = []float64{
-			pdf.Round(inner.LLx-outer.LLx, 4),
-			pdf.Round(inner.LLy-outer.LLy, 4),
-			pdf.Round(inner.URx-outer.URx, 4),
-			pdf.Round(inner.URy-outer.URy, 4),
-		}
-	}
 
 	// generate the appearance stream
 	b := builder.New(content.Form, nil)
 
 	b.SetExtGState(s.reset)
 
+	// precompute cloud outline if applicable
+	var co *cloudOutline
+	if isCloudy && a.Intent != annotation.FreeTextIntentTypeWriter {
+		x0 := inner.LLx + lw/2
+		y0 := inner.LLy + lw/2
+		x1 := inner.URx - lw/2
+		y1 := inner.URy - lw/2
+		verts := []vec.Vec2{
+			{X: x0, Y: y0},
+			{X: x1, Y: y0},
+			{X: x1, Y: y1},
+			{X: x0, Y: y1},
+		}
+		co = newCloudOutline(verts, be.Intensity, lw)
+	}
+
+	// draw border
 	if a.Intent != annotation.FreeTextIntentTypeWriter {
 		b.SetLineWidth(lw)
 		b.SetStrokeColor(color.Black)
-		if bgCol != nil {
-			b.SetFillColor(bgCol)
-			b.Rectangle(inner.LLx+lw/2, inner.LLy+lw/2, inner.Dx()-lw, inner.Dy()-lw)
-			b.FillAndStroke()
-		} else {
-			b.Rectangle(inner.LLx+lw/2, inner.LLy+lw/2, inner.Dx()-lw, inner.Dy()-lw)
+		if co != nil {
+			if bgCol != nil {
+				b.SetFillColor(bgCol)
+				fillBBox := co.fillPath(b)
+				b.Fill()
+				outer.Extend(&fillBBox)
+			}
+			b.SetLineCap(graphics.LineCapRound)
+			strokeBBox := co.strokePath(b)
 			b.Stroke()
+			outer.Extend(&strokeBBox)
+			// expand for stroke width
+			outer = pdf.Rectangle{
+				LLx: outer.LLx - lw/2,
+				LLy: outer.LLy - lw/2,
+				URx: outer.URx + lw/2,
+				URy: outer.URy + lw/2,
+			}
+		} else {
+			if bgCol != nil {
+				b.SetFillColor(bgCol)
+				b.Rectangle(inner.LLx+lw/2, inner.LLy+lw/2, inner.Dx()-lw, inner.Dy()-lw)
+				b.FillAndStroke()
+			} else {
+				b.Rectangle(inner.LLx+lw/2, inner.LLy+lw/2, inner.Dx()-lw, inner.Dy()-lw)
+				b.Stroke()
+			}
 		}
 	}
 
@@ -133,7 +162,11 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 		lineHeight := pdf.Round(F.GetGeometry().Leading*freeTextFontSize, 2)
 
 		b.PushGraphicsState()
-		b.Rectangle(clipLeft, clipBottom, clipWidth, clipHeight)
+		if co != nil {
+			co.fillPath(b)
+		} else {
+			b.Rectangle(clipLeft, clipBottom, clipWidth, clipHeight)
+		}
 		b.ClipNonZero()
 		b.EndPath()
 
@@ -171,6 +204,20 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 		b.TextEnd()
 
 		b.PopGraphicsState()
+	}
+
+	// finalize outer rectangle
+	outer.IRound(1)
+	a.Rect = outer
+	if inner.NearlyEqual(&outer, 0.01) {
+		a.Margin = nil
+	} else {
+		a.Margin = []float64{
+			pdf.Round(inner.LLx-outer.LLx, 4),
+			pdf.Round(inner.LLy-outer.LLy, 4),
+			pdf.Round(inner.URx-outer.URx, 4),
+			pdf.Round(inner.URy-outer.URy, 4),
+		}
 	}
 
 	// set DA to match the font/size/color used in the appearance stream

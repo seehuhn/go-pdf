@@ -62,7 +62,6 @@ type Square struct {
 	//  - colors in the [color.DeviceGray] color space
 	//  - colors in the [color.DeviceRGB] color space
 	//  - colors in the [color.DeviceCMYK] color space
-	//  - the [Transparent] color
 	//
 	// If this is nil, the rectangle is not filled.
 	//

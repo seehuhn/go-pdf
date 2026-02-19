@@ -18,7 +18,6 @@ package annotation
 
 import (
 	"errors"
-	"fmt"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -27,25 +26,28 @@ import (
 
 // PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.9
 
-// Polygon represents a polygon annotation that displays closed polygons on the page.
-// Polygons may have many vertices connected by straight lines, with the first and
-// last vertex implicitly connected to close the shape.
+// Polygon represents a polygon annotation that displays a closed polygon on
+// the page. When opened, the annotation displays a pop-up window containing
+// the text of an associated note.
+//
+//   - The polygon shape is defined by the Vertices field.
+//     Vertices are connected by straight lines, with the first and last vertex
+//     implicitly connected to close the shape.
+//   - The border line color is specified by the Common.Color field.
+//     If this is nil, no border is drawn.
+//   - The fill color is specified by the FillColor field.
+//     If this is nil, no fill is applied.
+//   - The border line style is specified by the BorderStyle field.
+//     If this is nil, the Common.Border field is used instead.
+//     If both are nil, a solid border with width 1 is used.
 type Polygon struct {
 	Common
 	Markup
 
-	// Vertices (required unless Path is present) is an array of numbers specifying
-	// the alternating horizontal and vertical coordinates of each vertex in default
-	// user space.
+	// Vertices (required) is an array of numbers specifying the alternating
+	// horizontal and vertical coordinates of each vertex in default user
+	// space coordinates.
 	Vertices []float64
-
-	// Path (optional; PDF 2.0) is an array of arrays, each supplying operands
-	// for path building operators (m, l, or c). If present, Vertices is ignored.
-	// Each array contains pairs of values specifying points for path drawing
-	// operations. The first array is of length 2 (moveto), subsequent arrays of
-	// length 2 specify lineto operators, and arrays of length 6 specify curveto
-	// operators.
-	Path [][]float64
 
 	// BorderStyle (optional) is a border style dictionary specifying the width
 	// and dash pattern used in drawing the polygon.
@@ -67,7 +69,6 @@ type Polygon struct {
 	//  - colors in the [color.DeviceGray] color space
 	//  - colors in the [color.DeviceRGB] color space
 	//  - colors in the [color.DeviceCMYK] color space
-	//  - the [Transparent] color
 	//
 	// This corresponds to the /IC entry in the PDF annotation dictionary.
 	FillColor color.Color
@@ -75,6 +76,15 @@ type Polygon struct {
 	// Measure (optional) is a measure dictionary that specifies the scale and
 	// units that apply to the annotation.
 	Measure measure.Measure
+
+	// Path (optional; PDF 2.0) is an array of arrays, each supplying operands
+	// for path building operators (m, l, or c).  Each array contains pairs of
+	// values specifying points for path drawing operations.  The first array is
+	// of length 2 (moveto), subsequent arrays of length 2 specify lineto
+	// operators, and arrays of length 6 specify curveto operators.
+	//
+	// See https://github.com/pdf-association/pdf-issues/issues/730 .
+	Path [][]float64
 }
 
 var _ Annotation = (*Polygon)(nil)
@@ -99,9 +109,11 @@ func decodePolygon(x *pdf.Extractor, dict pdf.Dict) (*Polygon, error) {
 	}
 
 	// Extract polygon-specific fields
-	// Vertices (required unless Path is present)
-	if vertices, err := pdf.GetFloatArray(x.R, dict["Vertices"]); err == nil && len(vertices) > 0 {
-		polygon.Vertices = vertices
+	// Vertices (required)
+	if vertices, err := pdf.GetFloatArray(x.R, dict["Vertices"]); err == nil && len(vertices) >= 4 {
+		polygon.Vertices = vertices[:len(vertices)&^1]
+	} else {
+		return nil, errors.New("polygon annotation requires Vertices")
 	}
 
 	// BS (optional)
@@ -175,27 +187,7 @@ func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 
-	// Vertices (required unless Path is present)
-	if len(p.Path) > 0 {
-		if err := pdf.CheckVersion(rm.Out, "polygon annotation Path entry", pdf.V2_0); err != nil {
-			return nil, err
-		}
-		if len(p.Path[0]) != 2 {
-			return nil, errors.New("first Path entry must have length 2 (moveto)")
-		}
-		pathArray := make(pdf.Array, len(p.Path))
-		for i, pathEntry := range p.Path {
-			if i > 0 && len(pathEntry) != 2 && len(pathEntry) != 6 {
-				return nil, fmt.Errorf("Path entry %d has length %d, expected 2 or 6", i, len(pathEntry))
-			}
-			entryArray := make(pdf.Array, len(pathEntry))
-			for j, coord := range pathEntry {
-				entryArray[j] = pdf.Number(coord)
-			}
-			pathArray[i] = entryArray
-		}
-		dict["Path"] = pathArray
-	} else if len(p.Vertices) > 0 {
+	if len(p.Vertices) > 0 {
 		if len(p.Vertices)%2 != 0 {
 			return nil, errors.New("Vertices must have an even number of elements")
 		}
@@ -205,7 +197,18 @@ func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		}
 		dict["Vertices"] = verticesArray
 	} else {
-		return nil, errors.New("polygon annotation requires Vertices or Path")
+		return nil, errors.New("polygon annotation requires Vertices")
+	}
+
+	if len(p.Path) > 0 {
+		if err := pdf.CheckVersion(rm.Out, "polygon annotation Path entry", pdf.V2_0); err != nil {
+			return nil, err
+		}
+		pathArray, err := encodePath(p.Path)
+		if err != nil {
+			return nil, err
+		}
+		dict["Path"] = pathArray
 	}
 
 	// BS (optional)

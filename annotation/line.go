@@ -67,7 +67,6 @@ type Line struct {
 	//  - colors in the [color.DeviceGray] color space
 	//  - colors in the [color.DeviceRGB] color space
 	//  - colors in the [color.DeviceCMYK] color space
-	//  - the [Transparent] color
 	//
 	// This corresponds to the /IC entry in the PDF annotation dictionary.
 	FillColor color.Color

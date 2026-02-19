@@ -19,6 +19,8 @@ package fallback
 import (
 	"math"
 
+	"seehuhn.de/go/geom/vec"
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
@@ -33,21 +35,22 @@ func (s *Style) addCircleAppearance(a *annotation.Circle) *form.Form {
 	col := a.Color
 
 	rect := applyMargins(a.Rect, a.Margin)
-	bbox := rect // TODO(voss): implement boundary effects
 
 	if m := min(rect.Dx(), rect.Dy()); lw > m/2 {
 		lw = m / 2
 	}
 
-	a.Rect = rect
+	be := a.BorderEffect
+	isCloudy := be != nil && be.Style == "C" && be.Intensity > 0
 
-	hasOutline := col != nil && col != annotation.Transparent && lw > 0
+	hasOutline := col != nil && lw > 0
 	hasFill := a.FillColor != nil
 	if !(hasOutline || hasFill) {
+		a.Rect = rect
 		return &form.Form{
 			Content: nil,
 			Res:     &content.Resources{},
-			BBox:    bbox,
+			BBox:    rect,
 		}
 	}
 
@@ -68,34 +71,60 @@ func (s *Style) addCircleAppearance(a *annotation.Circle) *form.Form {
 		b.SetLineWidth(lw)
 		b.SetStrokeColor(col)
 		if len(dashPattern) > 0 {
-			b.SetLineCap(graphics.LineCapButt)
+			b.SetLineDash(dashPattern, 0)
 		}
 	}
 	if hasFill {
 		b.SetFillColor(a.FillColor)
 	}
 
-	xMid := (rect.LLx + rect.URx) / 2
-	yMid := (rect.LLy + rect.URy) / 2
-	rx := (rect.Dx() - lw) / 2
-	ry := (rect.Dy() - lw) / 2
+	var cloudVerts []vec.Vec2
+	if isCloudy {
+		cloudVerts = flattenEllipse(rect, lw)
+		isCloudy = cloudVerts != nil
+	}
 
-	k := (math.Sqrt2 - 1.0) * 4 / 3 // control point offset for cubic Bezier approximation of a circle
+	var bbox pdf.Rectangle
+	if isCloudy {
+		cloudBBox := drawCloudyBorder(b, cloudVerts, be.Intensity, lw, hasFill, hasOutline)
+		bbox = pdf.Rectangle{
+			LLx: cloudBBox.LLx - lw/2,
+			LLy: cloudBBox.LLy - lw/2,
+			URx: cloudBBox.URx + lw/2,
+			URy: cloudBBox.URy + lw/2,
+		}
+		bbox.IRound(1)
+		a.Margin = []float64{
+			max(0, rect.LLx-bbox.LLx),
+			max(0, rect.LLy-bbox.LLy),
+			max(0, bbox.URx-rect.URx),
+			max(0, bbox.URy-rect.URy),
+		}
+		a.Rect = bbox
+	} else {
+		xMid := (rect.LLx + rect.URx) / 2
+		yMid := (rect.LLy + rect.URy) / 2
+		rx := (rect.Dx() - lw) / 2
+		ry := (rect.Dy() - lw) / 2
 
-	b.MoveTo(xMid+rx, yMid)
-	b.CurveTo(xMid+rx, yMid+ry*k, xMid+rx*k, rect.URy-lw, xMid, rect.URy-lw)
-	b.CurveTo(xMid-rx*k, rect.URy-lw, rect.LLx+lw, yMid+ry*k, rect.LLx+lw, yMid)
-	b.CurveTo(rect.LLx+lw, yMid-ry*k, xMid-rx*k, rect.LLy+lw, xMid, rect.LLy+lw)
-	b.CurveTo(xMid+rx*k, rect.LLy+lw, xMid+rx, yMid-ry*k, xMid+rx, yMid)
-	b.ClosePath()
+		k := (math.Sqrt2 - 1.0) * 4 / 3
 
-	switch {
-	case hasOutline && hasFill:
-		b.FillAndStroke()
-	case hasFill:
-		b.Fill()
-	default: // hasOutline
-		b.Stroke()
+		b.MoveTo(xMid+rx, yMid)
+		b.CurveTo(xMid+rx, yMid+ry*k, xMid+rx*k, yMid+ry, xMid, yMid+ry)
+		b.CurveTo(xMid-rx*k, yMid+ry, xMid-rx, yMid+ry*k, xMid-rx, yMid)
+		b.CurveTo(xMid-rx, yMid-ry*k, xMid-rx*k, yMid-ry, xMid, yMid-ry)
+		b.CurveTo(xMid+rx*k, yMid-ry, xMid+rx, yMid-ry*k, xMid+rx, yMid)
+		b.ClosePath()
+		bbox = rect
+		a.Rect = rect
+		switch {
+		case hasOutline && hasFill:
+			b.FillAndStroke()
+		case hasFill:
+			b.Fill()
+		default: // hasOutline
+			b.Stroke()
+		}
 	}
 
 	return &form.Form{
@@ -103,4 +132,34 @@ func (s *Style) addCircleAppearance(a *annotation.Circle) *form.Form {
 		Res:     b.Resources,
 		BBox:    bbox,
 	}
+}
+
+// flattenEllipse approximates the ellipse inscribed in rect (inset by lw/2) as
+// a polygon with enough vertices for smooth cloud curls.
+func flattenEllipse(rect pdf.Rectangle, lw float64) []vec.Vec2 {
+	xMid := (rect.LLx + rect.URx) / 2
+	yMid := (rect.LLy + rect.URy) / 2
+	rx := (rect.Dx() - lw) / 2
+	ry := (rect.Dy() - lw) / 2
+
+	if rx < 0.5 || ry < 0.5 {
+		return nil
+	}
+
+	// approximate perimeter (Ramanujan)
+	h := (rx - ry) * (rx - ry) / ((rx + ry) * (rx + ry))
+	perimeter := math.Pi * (rx + ry) * (1 + 3*h/(10+math.Sqrt(4-3*h)))
+
+	// target segment length ~4 points
+	n := max(12, int(math.Ceil(perimeter/4)))
+
+	verts := make([]vec.Vec2, n)
+	for i := range n {
+		theta := 2 * math.Pi * float64(i) / float64(n)
+		verts[i] = vec.Vec2{
+			X: xMid + rx*math.Cos(theta),
+			Y: yMid + ry*math.Sin(theta),
+		}
+	}
+	return verts
 }

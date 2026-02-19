@@ -93,6 +93,13 @@ func (c *objectCtx) Next() []Step {
 						if err != nil {
 							return nil, &KeyError{Key: key, Ctx: "page number"}
 						}
+						numPages, err := pagetree.NumPages(c.r)
+						if err != nil {
+							return nil, err
+						}
+						if pageNo < 1 || int(pageNo) > numPages {
+							return nil, fmt.Errorf("page not found (valid page numbers are 1 to %d)", numPages)
+						}
 						ref, _, err := pagetree.GetPage(c.r, int(pageNo)-1)
 						if err != nil {
 							return nil, err

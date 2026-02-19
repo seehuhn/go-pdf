@@ -166,7 +166,7 @@ func createDocument(filename string) error {
 		Common: annotation.Common{
 			Contents: "transparent border",
 			Flags:    annotation.FlagPrint,
-			Color:    annotation.Transparent,
+			Color:    nil,
 		},
 		Action:      &action.URI{URI: "https://www.example.com/"},
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},

@@ -49,7 +49,6 @@ type Common struct {
 	//  - colors in the [color.DeviceGray] color space
 	//  - colors in the [color.DeviceRGB] color space
 	//  - colors in the [color.DeviceCMYK] color space
-	//  - the [Transparent] color
 	//
 	// The effect of a nil Color value depends on the annotation type.
 	//
@@ -408,7 +407,7 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 		}
 		switch len(colors) {
 		case 0:
-			common.Color = Transparent
+			// empty array, treat as absent
 		case 1:
 			common.Color = color.DeviceGray(colors[0])
 		case 3:

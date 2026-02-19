@@ -140,7 +140,7 @@ func createDocument(filename string) error {
 	text = &annotation.Text{
 		Common: annotation.Common{
 			Contents: "Transparent background",
-			Color:    annotation.Transparent,
+			Color:    nil,
 			Border:   annotation.PDFDefaultBorder,
 			Flags:    annotation.FlagPrint,
 		},

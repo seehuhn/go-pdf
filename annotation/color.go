@@ -38,7 +38,7 @@ func extractColor(r pdf.Getter, obj pdf.Object) (color.Color, error) {
 
 	switch len(colors) {
 	case 0:
-		return Transparent, nil
+		return nil, nil
 	case 1:
 		return color.DeviceGray(colors[0]), nil
 	case 3:
@@ -131,26 +131,4 @@ func encodeColorRGB(c color.Color) (pdf.Array, error) {
 		colorArray[i] = pdf.Number(v)
 	}
 	return colorArray, nil
-}
-
-// Transparent is a special color that indicates that part of an annotation
-// (for example the border) should not be painted at all.  This can only be
-// used for the Color field in the [Common] struct.
-var Transparent color.Color = &transparent{}
-
-type transparent struct{}
-
-func (t *transparent) ColorSpace() color.Space {
-	return nil
-}
-
-// ToXYZ returns zero XYZ values for the transparent pseudo-color.
-func (t *transparent) ToXYZ() (X, Y, Z float64) {
-	return 0, 0, 0
-}
-
-// RGBA implements the color.Color interface.
-// Returns fully transparent (alpha = 0).
-func (t *transparent) RGBA() (r, g, b, a uint32) {
-	return 0, 0, 0, 0
 }

@@ -368,7 +368,7 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 200, LLy: 200, URx: 350, URy: 300},
 					Contents: "Complex square",
-					Color:    Transparent, // transparent
+					Color:    color.DeviceGray(0),
 				},
 				Markup: Markup{
 					User:    "Reviewer",
@@ -509,6 +509,7 @@ var testCases = map[pdf.Name][]testCase{
 					Subject: "Measured polygon",
 					Intent:  "PolygonDimension",
 				},
+				Vertices: []float64{250, 200, 400, 250, 350, 350, 200, 300},
 				Path: [][]float64{
 					{250, 200}, // moveto
 					{400, 250}, // lineto
@@ -584,6 +585,7 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Artist",
 					Subject: "Bezier curve",
 				},
+				Vertices: []float64{250, 300, 400, 300, 450, 320},
 				Path: [][]float64{
 					{250, 300},                     // moveto
 					{300, 250, 350, 350, 400, 300}, // curveto (6 coordinates)
@@ -919,6 +921,9 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Artist",
 					Subject: "Bezier curve drawing",
 				},
+				InkList: [][]float64{
+					{150, 650, 300, 650, 350, 670},
+				},
 				Path: [][]float64{
 					{150, 650},                     // moveto
 					{200, 620, 250, 680, 300, 650}, // curveto (6 coordinates)
@@ -1252,7 +1257,7 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 350, URy: 250},
 					Contents: "Click to play video",
-					Color:    Transparent,
+					Color:    color.DeviceGray(0),
 				},
 				Title:  "Action Trigger",
 				Action: pdf.NewReference(1200, 0), // Action dictionary

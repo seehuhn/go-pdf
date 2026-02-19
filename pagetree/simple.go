@@ -53,7 +53,11 @@ func NumPages(r pdf.Getter) (int, error) {
 // The /Parent attribute is removed from the returned dictionary.
 func GetPage(r pdf.Getter, pageNo int) (pdf.Reference, pdf.Dict, error) {
 	if pageNo < 0 {
-		return 0, nil, errors.New("invalid page number")
+		numPages, err := NumPages(r)
+		if err == nil {
+			return 0, nil, fmt.Errorf("page not found (valid page numbers are 0 to %d)", numPages-1)
+		}
+		return 0, nil, errors.New("page not found")
 	}
 
 	meta := r.GetMeta()

@@ -39,10 +39,12 @@ type Ink struct {
 	InkList [][]float64
 
 	// Path (optional; PDF 2.0) is an array of arrays, each supplying operands
-	// for path building operators (m, l, or c).  Each array inner contains
-	// pairs of values specifying points for path drawing operations. The first
-	// array is of length 2 (moveto), subsequent arrays of length 2 specify
-	// lineto operators, and arrays of length 6 specify curveto operators.
+	// for path building operators (m, l, or c).  Each array contains pairs of
+	// values specifying points for path drawing operations.  The first array is
+	// of length 2 (moveto), subsequent arrays of length 2 specify lineto
+	// operators, and arrays of length 6 specify curveto operators.
+	//
+	// See https://github.com/pdf-association/pdf-issues/issues/730 .
 	Path [][]float64
 
 	// BorderStyle (optional) is a border style dictionary specifying the line
@@ -88,6 +90,8 @@ func decodeInk(x *pdf.Extractor, dict pdf.Dict) (*Ink, error) {
 			}
 		}
 		ink.InkList = paths
+	} else {
+		return nil, errors.New("ink annotation requires InkList")
 	}
 
 	// BS (optional)
@@ -140,7 +144,6 @@ func (i *Ink) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 
-	// Add ink-specific fields
 	// InkList (required)
 	if len(i.InkList) > 0 {
 		inkArray := make(pdf.Array, len(i.InkList))
@@ -152,10 +155,12 @@ func (i *Ink) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 				}
 				inkArray[i] = pathArray
 			} else {
-				inkArray[i] = pdf.Array{} // Empty array for empty paths
+				inkArray[i] = pdf.Array{}
 			}
 		}
 		dict["InkList"] = inkArray
+	} else {
+		return nil, errors.New("ink annotation requires InkList")
 	}
 
 	// BS (optional)
@@ -172,19 +177,11 @@ func (i *Ink) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out, "ink annotation Path entry", pdf.V2_0); err != nil {
 			return nil, err
 		}
-		pathArray := make(pdf.Array, 0, len(i.Path))
-		for _, pathEntry := range i.Path {
-			if pathEntry != nil {
-				entryArray := make(pdf.Array, len(pathEntry))
-				for j, coord := range pathEntry {
-					entryArray[j] = pdf.Number(coord)
-				}
-				pathArray = append(pathArray, entryArray)
-			}
+		pathArray, err := encodePath(i.Path)
+		if err != nil {
+			return nil, err
 		}
-		if len(pathArray) > 0 {
-			dict["Path"] = pathArray
-		}
+		dict["Path"] = pathArray
 	}
 
 	return dict, nil

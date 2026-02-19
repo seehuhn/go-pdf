@@ -26,9 +26,9 @@ import (
 
 // PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.8
 
-// Circle represents an annotation that displays an ellipse on the page. When
-// opened, the annotation displays a pop-up window containing the text of the
-// associated note:
+// Circle represents an annotation that displays an ellipse (!) on the page.
+// When opened, the annotation displays a pop-up window containing the text of
+// an associated note:
 //
 //   - The location of the ellipse is given by the Common.Rect field and
 //     optionally modified by the Margin field.
@@ -37,7 +37,6 @@ import (
 //   - The border line style is specified by the BorderStyle field.
 //     If this is nil, the Common.Border field is used instead.
 //     If both are nil, a solid border with width 1 is used.
-//     If the border width is 0, no border is drawn.
 type Circle struct {
 	Common
 	Markup
@@ -62,7 +61,6 @@ type Circle struct {
 	//  - colors in the [color.DeviceGray] color space
 	//  - colors in the [color.DeviceRGB] color space
 	//  - colors in the [color.DeviceCMYK] color space
-	//  - the [Transparent] color
 	//
 	// If this is nil, the ellipse is not filled.
 	//

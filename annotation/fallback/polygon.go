@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2026  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -27,14 +27,14 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addSquareAppearance(a *annotation.Square) *form.Form {
+func (s *Style) addPolygonAppearance(a *annotation.Polygon) *form.Form {
 	lw := getBorderLineWidth(a.Common.Border, a.BorderStyle)
 	dashPattern := getBorderDashPattern(a.Common.Border, a.BorderStyle)
 	col := a.Color
 
-	rect := applyMargins(a.Rect, a.Margin)
+	bbox := a.Rect
 
-	if m := min(rect.Dx(), rect.Dy()); lw > m/2 {
+	if m := min(bbox.Dx(), bbox.Dy()); lw > m/2 {
 		lw = m / 2
 	}
 
@@ -44,11 +44,10 @@ func (s *Style) addSquareAppearance(a *annotation.Square) *form.Form {
 	hasOutline := col != nil && lw > 0
 	hasFill := a.FillColor != nil
 	if !(hasOutline || hasFill) {
-		a.Rect = rect
 		return &form.Form{
 			Content: nil,
 			Res:     &content.Resources{},
-			BBox:    rect,
+			BBox:    bbox,
 		}
 	}
 
@@ -68,37 +67,32 @@ func (s *Style) addSquareAppearance(a *annotation.Square) *form.Form {
 	if hasOutline {
 		b.SetLineWidth(lw)
 		b.SetStrokeColor(col)
-		b.SetLineDash(dashPattern, 0)
+		if len(dashPattern) > 0 {
+			b.SetLineDash(dashPattern, 0)
+		}
 	}
 	if hasFill {
 		b.SetFillColor(a.FillColor)
 	}
 
-	var bbox pdf.Rectangle
+	drawn := false
 	if isCloudy {
-		// CCW rectangle inset by half the line width
-		x0 := rect.LLx + lw/2
-		y0 := rect.LLy + lw/2
-		x1 := rect.URx - lw/2
-		y1 := rect.URy - lw/2
-		verts := []vec.Vec2{
-			{X: x0, Y: y0},
-			{X: x1, Y: y0},
-			{X: x1, Y: y1},
-			{X: x0, Y: y1},
+		verts := polygonVertices(a)
+		if len(verts) >= 3 {
+			cloudBBox := drawCloudyBorder(b, verts, be.Intensity, lw, hasFill, hasOutline)
+			bbox = pdf.Rectangle{
+				LLx: cloudBBox.LLx - lw/2,
+				LLy: cloudBBox.LLy - lw/2,
+				URx: cloudBBox.URx + lw/2,
+				URy: cloudBBox.URy + lw/2,
+			}
+			bbox.IRound(1)
+			a.Rect = bbox
+			drawn = true
 		}
-		cloudBBox := drawCloudyBorder(b, verts, be.Intensity, lw, hasFill, hasOutline)
-		// expand by half line width for stroke
-		bbox = pdf.Rectangle{
-			LLx: cloudBBox.LLx - lw/2,
-			LLy: cloudBBox.LLy - lw/2,
-			URx: cloudBBox.URx + lw/2,
-			URy: cloudBBox.URy + lw/2,
-		}
-		bbox.IRound(1)
-	} else {
-		b.Rectangle(rect.LLx+lw/2, rect.LLy+lw/2, rect.Dx()-lw, rect.Dy()-lw)
-		bbox = rect
+	}
+	if !drawn {
+		drawPolygonPath(b, a)
 		switch {
 		case hasOutline && hasFill:
 			b.FillAndStroke()
@@ -109,22 +103,33 @@ func (s *Style) addSquareAppearance(a *annotation.Square) *form.Form {
 		}
 	}
 
-	if isCloudy {
-		// update Rect and Margin to reflect the expanded bounding box
-		a.Margin = []float64{
-			max(0, rect.LLx-bbox.LLx),
-			max(0, rect.LLy-bbox.LLy),
-			max(0, bbox.URx-rect.URx),
-			max(0, bbox.URy-rect.URy),
-		}
-		a.Rect = bbox
-	} else {
-		a.Rect = rect
-	}
-
 	return &form.Form{
 		Content: b.Stream,
 		Res:     b.Resources,
 		BBox:    bbox,
 	}
+}
+
+// polygonVertices extracts the vertex list from a polygon annotation.
+func polygonVertices(a *annotation.Polygon) []vec.Vec2 {
+	if len(a.Vertices) >= 4 {
+		n := len(a.Vertices) / 2
+		verts := make([]vec.Vec2, n)
+		for i := range n {
+			verts[i] = vec.Vec2{X: a.Vertices[2*i], Y: a.Vertices[2*i+1]}
+		}
+		return verts
+	}
+	return nil
+}
+
+// drawPolygonPath draws the original (non-cloudy) polygon path.
+func drawPolygonPath(b *builder.Builder, a *annotation.Polygon) {
+	if len(a.Vertices) >= 4 {
+		b.MoveTo(a.Vertices[0], a.Vertices[1])
+		for i := 2; i+1 < len(a.Vertices); i += 2 {
+			b.LineTo(a.Vertices[i], a.Vertices[i+1])
+		}
+	}
+	b.ClosePath()
 }

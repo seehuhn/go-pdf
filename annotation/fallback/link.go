@@ -55,7 +55,7 @@ func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 
 	bbox := a.Rect
 
-	if borderWidth <= 0 || col == annotation.Transparent {
+	if borderWidth <= 0 || col == nil {
 		return &form.Form{
 			Content: nil,
 			Res:     &content.Resources{},
@@ -144,7 +144,7 @@ func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 }
 
 func getDarkLightCol(col color.Color) (dark, light color.Color) {
-	if col == annotation.Transparent {
+	if col == nil {
 		return col, col
 	}
 

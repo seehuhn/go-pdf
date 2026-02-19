@@ -106,6 +106,8 @@ func (s *Style) AddAppearance(a annotation.Annotation) error {
 		normal = s.addSquareAppearance(a)
 	case *annotation.Circle:
 		normal = s.addCircleAppearance(a)
+	case *annotation.Polygon:
+		normal = s.addPolygonAppearance(a)
 	default:
 		return fmt.Errorf("unsupported annotation type: %T", a)
 	}
