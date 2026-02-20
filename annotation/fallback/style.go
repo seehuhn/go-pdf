@@ -114,6 +114,8 @@ func (s *Style) AddAppearance(a annotation.Annotation) error {
 		normal = s.addTextMarkupAppearance(a)
 	case *annotation.Caret:
 		normal = s.addCaretAppearance(a)
+	case *annotation.Stamp:
+		normal = s.addStampAppearance(a)
 	default:
 		return fmt.Errorf("unsupported annotation type: %T", a)
 	}

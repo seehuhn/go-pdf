@@ -26,7 +26,13 @@ import (
 
 // Stamp represents a rubber stamp annotation that displays text or graphics
 // intended to look as if they were stamped on the page with a rubber stamp.
-// When opened, it displays a pop-up window containing the text of the associated note.
+// When opened, it displays a pop-up window containing the text of the
+// associated note.
+//
+//   - The stamp icon is specified by the Icon field.
+//     If this is empty, the default icon "Draft" is used.
+//   - The stamp color is specified by the Common.Color field.
+//     If this is nil, a dark red is used.
 type Stamp struct {
 	Common
 	Markup
