@@ -220,7 +220,8 @@ func TestType3ApplyWithBoundaries(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.function.Apply(tt.input)
+			result := make([]float64, 1)
+			tt.function.Apply(result, tt.input)
 
 			// For the first test case, we expect result[0] = 1.0 if boundary handling is correct
 			// For the second test case, we expect result[0] = 0.5 if special case is handled correctly

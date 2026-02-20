@@ -345,11 +345,15 @@ func (f *Type0) isDefaultDecode() bool {
 	return true
 }
 
-// Apply applies the function to the given input values.
-func (f *Type0) Apply(inputs ...float64) []float64 {
+// Apply applies the function to the given input values
+// and writes the output values into out.
+func (f *Type0) Apply(out []float64, inputs ...float64) {
 	m, n := f.Shape()
 	if len(inputs) != m {
 		panic(fmt.Sprintf("expected %d inputs, got %d", m, len(inputs)))
+	}
+	if len(out) != n {
+		panic(fmt.Sprintf("expected %d outputs, got %d", n, len(out)))
 	}
 
 	indices := make([]float64, m)
@@ -366,14 +370,11 @@ func (f *Type0) Apply(inputs ...float64) []float64 {
 		samples = f.sampleLinear(indices)
 	}
 
-	outputs := make([]float64, n)
 	maxSample := float64((uint(1) << f.BitsPerSample) - 1)
 	for j, xj := range samples {
 		val := interpolate(xj, 0, maxSample, f.Decode[2*j], f.Decode[2*j+1])
-		outputs[j] = clip(val, f.Range[2*j], f.Range[2*j+1])
+		out[j] = clip(val, f.Range[2*j], f.Range[2*j+1])
 	}
-
-	return outputs
 }
 
 // sampleLinear performs multidimensional linear interpolation on the sample table.

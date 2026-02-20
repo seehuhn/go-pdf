@@ -289,6 +289,11 @@ func roundTripTest(t *testing.T, version pdf.Version, f1 pdf.Function) {
 		t.Fatal(err)
 	}
 
+	err = rm.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	err = buf.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -401,10 +406,8 @@ func TestFunctionEvaluation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.function.Apply(tt.inputs...)
-			if len(result) != len(tt.expected) {
-				t.Fatalf("expected %d outputs, got %d", len(tt.expected), len(result))
-			}
+			result := make([]float64, len(tt.expected))
+			tt.function.Apply(result, tt.inputs...)
 			for i, expected := range tt.expected {
 				if math.Abs(result[i]-expected) > tt.tolerance {
 					t.Errorf("output[%d]: expected %f, got %f (diff: %e)",
@@ -602,10 +605,8 @@ func TestDomainRangeClipping(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.function.Apply(tt.inputs...)
-			if len(result) != len(tt.expected) {
-				t.Fatalf("expected %d outputs, got %d", len(tt.expected), len(result))
-			}
+			result := make([]float64, len(tt.expected))
+			tt.function.Apply(result, tt.inputs...)
 			for i, expected := range tt.expected {
 				if math.Abs(result[i]-expected) > 1e-10 {
 					t.Errorf("output[%d]: expected %f, got %f", i, expected, result[i])
@@ -615,7 +616,7 @@ func TestDomainRangeClipping(t *testing.T) {
 	}
 }
 
-func FuzzRead(f *testing.F) {
+func FuzzRoundTrip(f *testing.F) {
 	// Seed the fuzzer with valid test cases from all function types
 	opt := &pdf.WriterOptions{
 		HumanReadable: true,
@@ -681,10 +682,8 @@ func FuzzRead(f *testing.F) {
 			for i := range inputs {
 				inputs[i] = 0.5
 			}
-			outputs := function.Apply(inputs...)
-			if len(outputs) != n {
-				t.Errorf("expected %d outputs, got %d", n, len(outputs))
-			}
+			outputs := make([]float64, n)
+			function.Apply(outputs, inputs...)
 		}
 	})
 }
@@ -725,10 +724,8 @@ func FuzzApply(f *testing.F) {
 			t.Skip("function doesn't have single input")
 		}
 
-		outputs := fn.Apply(inputs...)
-		if len(outputs) != n {
-			t.Errorf("expected %d outputs, got %d", n, len(outputs))
-		}
+		outputs := make([]float64, n)
+		fn.Apply(outputs, inputs...)
 
 		// Test that all outputs are finite numbers
 		for i, output := range outputs {

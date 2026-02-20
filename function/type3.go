@@ -236,8 +236,9 @@ func (f *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return ref, nil
 }
 
-// Apply applies the function to the given input value and returns the output values.
-func (f *Type3) Apply(inputs ...float64) []float64 {
+// Apply applies the function to the given input value
+// and writes the output values into out.
+func (f *Type3) Apply(out []float64, inputs ...float64) {
 	if len(inputs) != 1 {
 		panic(fmt.Sprintf("Type 3 function expects 1 input, got %d", len(inputs)))
 	}
@@ -250,17 +251,15 @@ func (f *Type3) Apply(inputs ...float64) []float64 {
 	encodeMax := f.Encode[2*subdomainIndex+1]
 	encodedInput := interpolate(x, a, b, encodeMin, encodeMax)
 
-	outputs := f.Functions[subdomainIndex].Apply(encodedInput)
+	f.Functions[subdomainIndex].Apply(out, encodedInput)
 
 	if f.Range != nil {
-		for i, yi := range outputs {
+		for i := range out {
 			min := f.Range[2*i]
 			max := f.Range[2*i+1]
-			outputs[i] = clip(yi, min, max)
+			out[i] = clip(out[i], min, max)
 		}
 	}
-
-	return outputs
 }
 
 // findSubdomain determines which subdomain the input x belongs to and returns

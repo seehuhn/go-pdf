@@ -219,30 +219,32 @@ func (f *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return ref, nil
 }
 
-// Apply applies the function to the given input value and returns the output values.
-func (f *Type2) Apply(inputs ...float64) []float64 {
+// Apply applies the function to the given input value
+// and writes the output values into out.
+func (f *Type2) Apply(out []float64, inputs ...float64) {
 	if len(inputs) != 1 {
 		panic(fmt.Sprintf("Type 2 function expects 1 input, got %d", len(inputs)))
+	}
+
+	_, n := f.Shape()
+	if len(out) != n {
+		panic(fmt.Sprintf("expected %d outputs, got %d", n, len(out)))
 	}
 
 	x := clip(inputs[0], f.XMin, f.XMax)
 	xPowN := math.Pow(x, f.N)
 
-	_, n := f.Shape()
-	outputs := make([]float64, n)
 	for i := range n {
-		outputs[i] = f.C0[i] + xPowN*(f.C1[i]-f.C0[i])
+		out[i] = f.C0[i] + xPowN*(f.C1[i]-f.C0[i])
 	}
 
 	if f.Range != nil {
 		for i := range n {
 			min := f.Range[2*i]
 			max := f.Range[2*i+1]
-			outputs[i] = clip(outputs[i], min, max)
+			out[i] = clip(out[i], min, max)
 		}
 	}
-
-	return outputs
 }
 
 // Equal reports whether f and other represent the same Type2 function.

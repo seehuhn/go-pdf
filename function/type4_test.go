@@ -17,8 +17,12 @@
 package function
 
 import (
+	"fmt"
 	"math"
+	"math/rand"
 	"testing"
+
+	"seehuhn.de/go/postscript"
 )
 
 // TestType4NewOperators demonstrates all the newly implemented PostScript operators.
@@ -225,16 +229,11 @@ func TestType4NewOperators(t *testing.T) {
 				fn.Range[2*i+1] = 1000
 			}
 
-			result := fn.Apply(tt.inputs...)
-			if len(result) != len(tt.expected) {
-				t.Fatalf("expected %d outputs, got %d", len(tt.expected), len(result))
-			}
+			result := make([]float64, len(tt.expected))
+			fn.Apply(result, tt.inputs...)
 
 			for i, expected := range tt.expected {
 				tolerance := 1e-10
-				if tt.name == "complex expression" {
-					tolerance = 1e-10
-				}
 				if math.Abs(result[i]-expected) > tolerance {
 					t.Errorf("output[%d]: expected %f, got %f (diff: %e)",
 						i, expected, result[i], math.Abs(result[i]-expected))
@@ -274,10 +273,8 @@ func TestType4DoubleDotSpotFunction(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		result := fn.Apply(tc.x, tc.y)
-		if len(result) != 1 {
-			t.Fatalf("expected 1 output, got %d", len(result))
-		}
+		result := make([]float64, 1)
+		fn.Apply(result, tc.x, tc.y)
 
 		tolerance := 1e-10
 		if math.Abs(result[0]-tc.expected) > tolerance {
@@ -355,10 +352,8 @@ func TestType4PDFSpecExamples(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.function.Apply(tt.inputs...)
-			if len(result) != len(tt.expected) {
-				t.Fatalf("expected %d outputs, got %d", len(tt.expected), len(result))
-			}
+			result := make([]float64, len(tt.expected))
+			tt.function.Apply(result, tt.inputs...)
 
 			for i, expected := range tt.expected {
 				tolerance := 1e-10
@@ -383,10 +378,8 @@ func TestType4Constant(t *testing.T) {
 		Program: "42", // Constant function
 	}
 
-	result := fn.Apply()
-	if len(result) != 1 {
-		t.Fatalf("expected 1 output, got %d", len(result))
-	}
+	result := make([]float64, 1)
+	fn.Apply(result)
 	if result[0] != 42 {
 		t.Errorf("expected output 42, got %f", result[0])
 	}
@@ -472,5 +465,268 @@ func TestType4Repair(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// referenceApply evaluates a Type 4 function using the full PostScript
+// interpreter.  This serves as an oracle against which the bytecode VM
+// is compared.
+func referenceApply(program string, inputs []float64, n int) ([]float64, error) {
+	allowedOps := []string{
+		"abs", "add", "atan", "ceiling", "cos", "cvi", "cvr", "div", "exp",
+		"floor", "idiv", "ln", "log", "mod", "mul", "neg", "round", "sin",
+		"sqrt", "sub", "truncate",
+		"and", "bitshift", "eq", "ge", "gt", "le", "lt", "ne", "not", "or", "xor",
+		"if", "ifelse",
+		"copy", "dup", "exch", "index", "pop", "roll",
+	}
+
+	tempIntp := postscript.NewInterpreter()
+	sysDict := tempIntp.SystemDict
+
+	type4Dict := postscript.Dict{
+		"true":  postscript.Boolean(true),
+		"false": postscript.Boolean(false),
+	}
+	for _, name := range allowedOps {
+		if impl, exists := sysDict[postscript.Name(name)]; exists {
+			type4Dict[postscript.Name(name)] = impl
+		}
+	}
+
+	intp := postscript.NewInterpreter()
+	intp.DictStack = []postscript.Dict{type4Dict, {}}
+	intp.SystemDict = type4Dict
+
+	for _, input := range inputs {
+		intp.Stack = append(intp.Stack, postscript.Real(input))
+	}
+
+	err := intp.ExecuteString(program)
+	if err != nil {
+		return nil, err
+	}
+
+	outputs := make([]float64, len(intp.Stack))
+	for i, obj := range intp.Stack {
+		switch v := obj.(type) {
+		case postscript.Integer:
+			outputs[i] = float64(v)
+		case postscript.Real:
+			outputs[i] = float64(v)
+		case postscript.Boolean:
+			if v {
+				outputs[i] = 1
+			}
+		default:
+			return nil, fmt.Errorf("invalid result type: %T", obj)
+		}
+	}
+
+	if len(outputs) > n {
+		outputs = outputs[len(outputs)-n:]
+	} else {
+		for len(outputs) < n {
+			outputs = append(outputs, 0)
+		}
+	}
+
+	return outputs, nil
+}
+
+func TestType4VsReference(t *testing.T) {
+	programs := []struct {
+		program string
+		nIn     int
+		nOut    int
+	}{
+		{"add", 2, 1},
+		{"sub", 2, 1},
+		{"mul", 2, 1},
+		{"div", 2, 1},
+		{"neg", 1, 1},
+		{"abs", 1, 1},
+		{"ceiling", 1, 1},
+		{"floor", 1, 1},
+		{"round", 1, 1},
+		{"truncate", 1, 1},
+		{"sqrt", 1, 1},
+		{"ln", 1, 1},
+		{"log", 1, 1},
+		{"sin", 1, 1},
+		{"cos", 1, 1},
+		{"1 atan", 1, 1},
+		{"0.5 exp", 1, 1},
+		{"dup mul", 1, 1},
+		{"dup 0.5 gt { pop 1.0 } { pop 0.0 } ifelse", 1, 1},
+		{"exch", 2, 2},
+		{"dup", 1, 2},
+		{"360 mul sin 2 div exch 360 mul sin 2 div add", 2, 1},
+	}
+
+	rng := rand.New(rand.NewSource(42))
+	for _, p := range programs {
+		t.Run(p.program, func(t *testing.T) {
+			for range 20 {
+				inputs := make([]float64, p.nIn)
+				for i := range inputs {
+					inputs[i] = rng.Float64()*10 + 0.01
+				}
+
+				fn := &Type4{
+					Domain:  make([]float64, p.nIn*2),
+					Range:   make([]float64, p.nOut*2),
+					Program: p.program,
+				}
+				for i := range p.nIn {
+					fn.Domain[2*i] = -1000
+					fn.Domain[2*i+1] = 1000
+				}
+				for i := range p.nOut {
+					fn.Range[2*i] = -1000
+					fn.Range[2*i+1] = 1000
+				}
+
+				got := make([]float64, p.nOut)
+				fn.Apply(got, inputs...)
+
+				ref, err := referenceApply(p.program, inputs, p.nOut)
+				if err != nil {
+					continue
+				}
+
+				// clip reference outputs
+				for i := range p.nOut {
+					ref[i] = clip(ref[i], fn.Range[2*i], fn.Range[2*i+1])
+				}
+
+				for i := range p.nOut {
+					if math.Abs(got[i]-ref[i]) > 1e-10 {
+						t.Errorf("inputs=%v: output[%d] VM=%g ref=%g",
+							inputs, i, got[i], ref[i])
+					}
+				}
+			}
+		})
+	}
+}
+
+func FuzzType4(f *testing.F) {
+	f.Add("add", 0.3, 0.7)
+	f.Add("sub", 1.0, 0.5)
+	f.Add("mul", 2.0, 3.0)
+	f.Add("div", 6.0, 2.0)
+	f.Add("neg", 1.0, 0.0)
+	f.Add("abs", -3.0, 0.0)
+	f.Add("dup mul", 5.0, 0.0)
+	f.Add("exch", 0.3, 0.7)
+	f.Add("dup 0.5 gt { pop 1.0 } { pop 0.0 } ifelse", 0.7, 0.0)
+	f.Add("360 mul sin 2 div exch 360 mul sin 2 div add", 0.25, 0.5)
+	f.Add("dup dup mul exch 2 mul add sqrt", 3.0, 0.0)
+	f.Add("sin", 90.0, 0.0)
+	f.Add("cos", 0.0, 0.0)
+	f.Add("1 atan", 1.0, 0.0)
+	f.Add("0.5 exp", 9.0, 0.0)
+	f.Add("ceiling", 3.2, 0.0)
+	f.Add("floor", 3.7, 0.0)
+	f.Add("round", 3.5, 0.0)
+	f.Add("truncate", 3.7, 0.0)
+
+	f.Fuzz(func(t *testing.T, program string, x, y float64) {
+		// skip degenerate inputs
+		if math.IsNaN(x) || math.IsInf(x, 0) || math.IsNaN(y) || math.IsInf(y, 0) {
+			return
+		}
+		if math.Abs(x) > 1e6 || math.Abs(y) > 1e6 {
+			return
+		}
+
+		// try compiling; skip invalid programs
+		code, err := compile(program)
+		if err != nil {
+			return
+		}
+
+		// determine input/output counts by running in VM
+		inputs := []float64{x, y}
+
+		// try with 2 inputs first, then 1
+		for _, nIn := range []int{2, 1} {
+			in := inputs[:nIn]
+
+			// run via the reference interpreter to discover nOut
+			// and get expected values
+			initStack := make([]value, len(in))
+			for i, v := range in {
+				initStack[i] = realVal(v)
+			}
+			stack, vmErr := execute(code, initStack)
+			if vmErr != nil {
+				continue
+			}
+			nOut := len(stack)
+			if nOut == 0 || nOut > 4 {
+				continue
+			}
+
+			ref, refErr := referenceApply(program, in, nOut)
+			if refErr != nil {
+				continue
+			}
+
+			// run via Apply
+			fn := &Type4{
+				Domain:  make([]float64, nIn*2),
+				Range:   make([]float64, nOut*2),
+				Program: program,
+			}
+			for i := range nIn {
+				fn.Domain[2*i] = -1e7
+				fn.Domain[2*i+1] = 1e7
+			}
+			for i := range nOut {
+				fn.Range[2*i] = -1e7
+				fn.Range[2*i+1] = 1e7
+			}
+			vmOut := make([]float64, nOut)
+			fn.Apply(vmOut, in...)
+
+			for i := range nOut {
+				// clip reference to same range
+				ref[i] = clip(ref[i], fn.Range[2*i], fn.Range[2*i+1])
+				diff := math.Abs(vmOut[i] - ref[i])
+				if diff > 1e-9 && diff > 1e-6*math.Abs(ref[i]) {
+					t.Errorf("program=%q inputs=%v output[%d]: VM=%g ref=%g",
+						program, in, i, vmOut[i], ref[i])
+				}
+			}
+			return
+		}
+	})
+}
+
+func TestType4StackOverflow(t *testing.T) {
+	// build a program: "dup 2 copy 4 copy 8 copy ... 256 copy"
+	// each copy doubles the stack, so after 256 copy we'd have 512 elements
+	program := "dup 2 copy 4 copy 8 copy 16 copy 32 copy 64 copy 128 copy 256 copy"
+	fn := &Type4{
+		Domain:  []float64{0, 1},
+		Range:   []float64{0, 1},
+		Program: program,
+	}
+
+	// Apply should not panic; the VM returns a stack overflow error
+	// which Apply handles by returning zeros clipped to range
+	result := make([]float64, 1)
+	fn.Apply(result, 0.5)
+
+	// verify the VM itself returns a stack overflow error
+	code, err := compile(program)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = execute(code, []value{realVal(0.5)})
+	if err != errStackOverflow {
+		t.Errorf("expected stack overflow error, got %v", err)
 	}
 }

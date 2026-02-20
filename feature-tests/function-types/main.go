@@ -552,17 +552,17 @@ func (img *imageStrip) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	buf := make([]byte, 0, img.width*img.height*img.n)
 	m, _ := img.f.Shape()
+	res := make([]float64, img.n)
 
 	for i := range img.height {
 		y := 1 - float64(i)/float64(img.height-1)
 		for j := range img.width {
 			x := float64(j) / float64(img.width-1)
 
-			var res []float64
 			if m == 1 {
-				res = img.f.Apply(x)
+				img.f.Apply(res, x)
 			} else {
-				res = img.f.Apply(x, y)
+				img.f.Apply(res, x, y)
 			}
 			for k := range img.n {
 				b := byte(math.Round(res[k] * 255))
@@ -617,12 +617,13 @@ func (img *axialImageStrip) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		"BitsPerComponent": pdf.Integer(8),
 	}
 	buf := make([]byte, 0, img.width*img.height*img.n)
+	res := make([]float64, img.n)
 
 	for range img.height {
 		for j := range img.width {
 			t := float64(j) / float64(img.width-1)
 
-			res := img.f.Apply(t)
+			img.f.Apply(res, t)
 			for k := range img.n {
 				b := byte(math.Round(res[k] * 255))
 				buf = append(buf, b)

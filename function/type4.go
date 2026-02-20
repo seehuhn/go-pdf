@@ -22,13 +22,14 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/postscript"
 )
 
 // PDF 2.0 sections: 7.10.5
 
 // Type4 represents a Type 4 PostScript calculator function that uses a subset
 // of PostScript language to define arbitrary calculations.
+//
+// A Type4 function must not be used concurrently.
 type Type4 struct {
 	// Domain defines the valid input ranges as [min0, max0, min1, max1, ...].
 	// The length must be 2*m, where m is the number of input variables.
@@ -40,6 +41,10 @@ type Type4 struct {
 
 	// Program contains the PostScript code (without enclosing braces).
 	Program string
+
+	compiled   []instruction
+	compileErr error
+	stack      []value
 }
 
 // FunctionType returns 4 for Type 4 functions.
@@ -209,126 +214,75 @@ func (f *Type4) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return ref, nil
 }
 
-// Apply applies the function to the given input values and returns the output values.
-func (f *Type4) Apply(inputs ...float64) []float64 {
+// Reset clears the compiled bytecode cache.
+// This must be called if Program is modified after the first Apply call.
+func (f *Type4) Reset() {
+	f.compiled = nil
+	f.compileErr = nil
+	f.stack = nil
+}
+
+// Apply applies the function to the given input values
+// and writes the output values into out.
+func (f *Type4) Apply(out []float64, inputs ...float64) {
 	m, n := f.Shape()
 	if len(inputs) != m {
 		panic(fmt.Sprintf("expected %d inputs, got %d", m, len(inputs)))
 	}
-
-	// Clip inputs to domain
-	clippedInputs := make([]float64, m)
-	for i := range m {
-		min := f.Domain[2*i]
-		max := f.Domain[2*i+1]
-		clippedInputs[i] = clip(inputs[i], min, max)
+	if len(out) != n {
+		panic(fmt.Sprintf("expected %d outputs, got %d", n, len(out)))
 	}
 
-	// Execute PostScript program
-	outputs, err := f.executePostScript(clippedInputs)
-	if err != nil {
-		// In case of error, return zero values
-		outputs = make([]float64, n)
+	// compile on first use
+	if f.compiled == nil && f.compileErr == nil {
+		f.compiled, f.compileErr = compile(f.Program)
 	}
 
-	// Clip outputs to range
+	clear(out)
+
+	if f.compileErr == nil {
+		// reset stack and push clipped inputs
+		f.stack = f.stack[:0]
+		for i := range m {
+			min := f.Domain[2*i]
+			max := f.Domain[2*i+1]
+			f.stack = append(f.stack, realVal(clip(inputs[i], min, max)))
+		}
+
+		var err error
+		f.stack, err = execute(f.compiled, f.stack)
+		if err == nil {
+			// extract outputs from stack (last n values)
+			start := 0
+			if len(f.stack) > n {
+				start = len(f.stack) - n
+			}
+			for i := range n {
+				si := start + i
+				if si >= len(f.stack) {
+					break
+				}
+				v := f.stack[si]
+				switch v.tag {
+				case tagInt:
+					out[i] = float64(v.ival)
+				case tagReal:
+					out[i] = v.fval
+				case tagBool:
+					if v.ival != 0 {
+						out[i] = 1
+					}
+				}
+			}
+		}
+	}
+
+	// clip outputs to range
 	for i := range n {
 		min := f.Range[2*i]
 		max := f.Range[2*i+1]
-		outputs[i] = clip(outputs[i], min, max)
+		out[i] = clip(out[i], min, max)
 	}
-
-	return outputs
-}
-
-// executePostScript executes the PostScript program with the given inputs using
-// a restricted PostScript interpreter that only supports PDF Type 4 operators.
-func (f *Type4) executePostScript(inputs []float64) ([]float64, error) {
-	// create a PostScript interpreter with Type 4 restricted operators
-	intp := postscript.NewInterpreter()
-	type4Dict := f.makeType4SystemDict()
-	intp.DictStack = []postscript.Dict{
-		type4Dict,
-		{}, // userdict
-	}
-	intp.SystemDict = type4Dict
-
-	for _, input := range inputs {
-		intp.Stack = append(intp.Stack, postscript.Real(input))
-	}
-
-	err := intp.ExecuteString(f.Program)
-	if err != nil {
-		return nil, err
-	}
-
-	outputs := make([]float64, len(intp.Stack))
-	for i, obj := range intp.Stack {
-		switch v := obj.(type) {
-		case postscript.Integer:
-			outputs[i] = float64(v)
-		case postscript.Real:
-			outputs[i] = float64(v)
-		case postscript.Boolean:
-			if v {
-				outputs[i] = 1.0
-			} else {
-				outputs[i] = 0.0
-			}
-		default:
-			return nil, fmt.Errorf("invalid result type on stack: %T", obj)
-		}
-	}
-
-	_, n := f.Shape()
-	if len(outputs) > n {
-		outputs = outputs[len(outputs)-n:] // take last n outputs
-	} else {
-		for len(outputs) < n {
-			outputs = append(outputs, 0.0) // pad with zeros if not enough outputs
-		}
-	}
-
-	return outputs, nil
-}
-
-// makeType4SystemDict creates a restricted system dictionary for Type 4 functions
-// containing only the operators allowed by the PDF specification.
-func (f *Type4) makeType4SystemDict() postscript.Dict {
-	// get a full system dictionary to copy implementations from
-	tempIntp := postscript.NewInterpreter()
-	systemDict := tempIntp.SystemDict
-
-	// Create Type 4 dictionary with only allowed operators from Table 42
-	// of the PDF 2.0 specification.
-	type4Dict := postscript.Dict{
-		"true":  postscript.Boolean(true),
-		"false": postscript.Boolean(false),
-	}
-	for _, name := range allowedOps {
-		if impl, exists := systemDict[postscript.Name(name)]; exists {
-			type4Dict[postscript.Name(name)] = impl
-		}
-	}
-
-	return type4Dict
-}
-
-// list of operators allowed in Type 4 functions per PDF specification Table 42
-var allowedOps = []string{
-	// Arithmetic operators
-	"abs", "add", "atan", "ceiling", "cos", "cvi", "cvr", "div", "exp",
-	"floor", "idiv", "ln", "log", "mod", "mul", "neg", "round", "sin",
-	"sqrt", "sub", "truncate",
-
-	// Relational, boolean, and bitwise operators
-	"and", "bitshift", "eq", "ge", "gt", "le", "lt", "ne", "not", "or", "xor",
-
-	// Conditional operators
-	"if", "ifelse",
-
-	// Stack operators
-	"copy", "dup", "exch", "index", "pop", "roll",
 }
 
 // Equal reports whether f and other represent the same Type4 function.

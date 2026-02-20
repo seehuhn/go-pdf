@@ -373,8 +373,10 @@ func (s *SpaceSeparation) Convert(c stdcolor.Color) stdcolor.Color {
 // ToXYZ converts a separation tint value to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (s *SpaceSeparation) ToXYZ(values []float64) (X, Y, Z float64) {
-	altValues := s.Transform.Apply(values[0])
-	return s.Alternate.ToXYZ(altValues)
+	_, n := s.Transform.Shape()
+	var altValues [4]float64
+	s.Transform.Apply(altValues[:n], values[0])
+	return s.Alternate.ToXYZ(altValues[:n])
 }
 
 type colorSeparation struct {
@@ -593,8 +595,10 @@ func (s *SpaceDeviceN) New(x []float64) Color {
 // ToXYZ converts DeviceN tint values to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (s *SpaceDeviceN) ToXYZ(values []float64) (X, Y, Z float64) {
-	altValues := s.Transform.Apply(values...)
-	return s.Alternate.ToXYZ(altValues)
+	_, n := s.Transform.Shape()
+	var altValues [4]float64
+	s.Transform.Apply(altValues[:n], values...)
+	return s.Alternate.ToXYZ(altValues[:n])
 }
 
 type colorDeviceN struct {

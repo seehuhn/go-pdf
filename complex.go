@@ -456,8 +456,8 @@ type Function interface {
 	Embedder
 
 	// Apply applies the function to the given m input values
-	// and returns the n output values.
-	Apply(...float64) []float64
+	// and writes the n output values into out.
+	Apply(out []float64, in ...float64)
 }
 
 // NumberTree represents a PDF number tree.
