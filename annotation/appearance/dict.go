@@ -14,9 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Package appearance handles annotation appearance dictionaries.
 package appearance
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/graphics/form"
@@ -30,7 +33,7 @@ type Dict struct {
 	// This is mutually exclusive with NormalMap.
 	Normal *form.Form
 
-	// NormalMap give the annotation's normal appearance for each state.
+	// NormalMap gives the annotation's normal appearance for each state.
 	// This is mutually exclusive with Normal.
 	NormalMap map[pdf.Name]*form.Form
 
@@ -57,6 +60,7 @@ type Dict struct {
 
 var _ pdf.Embedder = (*Dict)(nil)
 
+// Extract reads an annotation appearance dictionary from the PDF object obj.
 func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	singleUse := !x.IsIndirect // capture before other x method calls
 
@@ -143,24 +147,37 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	return res, nil
 }
 
-func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-	if err := pdf.CheckVersion(rm.Out(), "appearance streams", pdf.V1_2); err != nil {
+func (d *Dict) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
+	if err := pdf.CheckVersion(e.Out(), "appearance streams", pdf.V1_2); err != nil {
 		return nil, err
+	}
+
+	if d.Normal != nil && d.NormalMap != nil {
+		return nil, errors.New("Normal and NormalMap are mutually exclusive")
+	}
+	if d.Normal == nil && d.NormalMap == nil {
+		return nil, errors.New("normal appearance is required")
+	}
+	if d.RollOver != nil && d.RollOverMap != nil {
+		return nil, errors.New("RollOver and RollOverMap are mutually exclusive")
+	}
+	if d.Down != nil && d.DownMap != nil {
+		return nil, errors.New("Down and DownMap are mutually exclusive")
 	}
 
 	dict := pdf.Dict{}
 
-	// Embed Normal appearance
+	// normal appearance
 	if d.Normal != nil {
-		nRef, err := rm.Embed(d.Normal)
+		nRef, err := e.Embed(d.Normal)
 		if err != nil {
 			return nil, err
 		}
 		dict["N"] = nRef
-	} else if d.NormalMap != nil {
+	} else {
 		nDict := pdf.Dict{}
 		for state, form := range d.NormalMap {
-			formRef, err := rm.Embed(form)
+			formRef, err := e.Embed(form)
 			if err != nil {
 				return nil, err
 			}
@@ -169,9 +186,9 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["N"] = nDict
 	}
 
-	// Embed RollOver appearance
+	// rollover appearance
 	if d.RollOver != nil {
-		rRef, err := rm.Embed(d.RollOver)
+		rRef, err := e.Embed(d.RollOver)
 		if err != nil {
 			return nil, err
 		}
@@ -179,7 +196,7 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	} else if d.RollOverMap != nil {
 		rDict := pdf.Dict{}
 		for state, form := range d.RollOverMap {
-			formRef, err := rm.Embed(form)
+			formRef, err := e.Embed(form)
 			if err != nil {
 				return nil, err
 			}
@@ -188,9 +205,9 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["R"] = rDict
 	}
 
-	// Embed Down appearance
+	// down appearance
 	if d.Down != nil {
-		dRef, err := rm.Embed(d.Down)
+		dRef, err := e.Embed(d.Down)
 		if err != nil {
 			return nil, err
 		}
@@ -198,7 +215,7 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	} else if d.DownMap != nil {
 		dDict := pdf.Dict{}
 		for state, form := range d.DownMap {
-			formRef, err := rm.Embed(form)
+			formRef, err := e.Embed(form)
 			if err != nil {
 				return nil, err
 			}
@@ -211,8 +228,8 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return dict, nil
 	}
 
-	ref := rm.Alloc()
-	err := rm.Out().Put(ref, dict)
+	ref := e.Alloc()
+	err := e.Out().Put(ref, dict)
 	if err != nil {
 		return nil, err
 	}
@@ -220,6 +237,7 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return ref, nil
 }
 
+// HasDicts reports whether any appearance uses a state-dependent map.
 func (d *Dict) HasDicts() bool {
 	if d == nil {
 		return false

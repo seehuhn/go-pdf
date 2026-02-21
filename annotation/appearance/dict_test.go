@@ -17,6 +17,7 @@
 package appearance
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -49,13 +50,15 @@ var (
 )
 
 type testCase struct {
-	name string
-	data *Dict
+	name    string
+	version pdf.Version
+	data    *Dict
 }
 
 var testCases = []testCase{
 	{
-		name: "streams",
+		name:    "streams/V1.7",
+		version: pdf.V1_7,
 		data: &Dict{
 			Normal:   appA,
 			RollOver: appB,
@@ -63,7 +66,17 @@ var testCases = []testCase{
 		},
 	},
 	{
-		name: "single",
+		name:    "streams/V2.0",
+		version: pdf.V2_0,
+		data: &Dict{
+			Normal:   appA,
+			RollOver: appB,
+			Down:     appC,
+		},
+	},
+	{
+		name:    "single/V1.7",
+		version: pdf.V1_7,
 		data: &Dict{
 			Normal:    appA,
 			RollOver:  appB,
@@ -72,77 +85,149 @@ var testCases = []testCase{
 		},
 	},
 	{
-		name: "maps",
+		name:    "single/V2.0",
+		version: pdf.V2_0,
+		data: &Dict{
+			Normal:    appA,
+			RollOver:  appB,
+			Down:      appC,
+			SingleUse: true,
+		},
+	},
+	{
+		name:    "maps/V1.7",
+		version: pdf.V1_7,
 		data: &Dict{
 			NormalMap: map[pdf.Name]*form.Form{
-				"N": appA,
-				"D": appB,
+				"On":  appA,
+				"Off": appB,
 			},
 			RollOverMap: map[pdf.Name]*form.Form{
-				"N": appB,
-				"D": appC,
+				"On":  appB,
+				"Off": appC,
 			},
 			DownMap: map[pdf.Name]*form.Form{
-				"N": appC,
-				"D": appA,
+				"On":  appC,
+				"Off": appA,
 			},
+		},
+	},
+	{
+		name:    "maps/V2.0",
+		version: pdf.V2_0,
+		data: &Dict{
+			NormalMap: map[pdf.Name]*form.Form{
+				"On":  appA,
+				"Off": appB,
+			},
+			RollOverMap: map[pdf.Name]*form.Form{
+				"On":  appB,
+				"Off": appC,
+			},
+			DownMap: map[pdf.Name]*form.Form{
+				"On":  appC,
+				"Off": appA,
+			},
+		},
+	},
+	{
+		name:    "normalOnly/V2.0",
+		version: pdf.V2_0,
+		data: &Dict{
+			Normal:   appA,
+			RollOver: appA,
+			Down:     appA,
 		},
 	},
 }
 
-// TestRoundTrip tests the round-trip of an annotation appearance dictionary.
+func roundTripTest(t *testing.T, version pdf.Version, data *Dict) {
+	t.Helper()
+
+	w, _ := memfile.NewPDFWriter(version, nil)
+	rm := pdf.NewResourceManager(w)
+	ref, err := rm.Embed(data)
+	if err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
+		t.Fatalf("embed failed: %v", err)
+	}
+	err = rm.Close()
+	if err != nil {
+		t.Fatalf("rm.Close failed: %v", err)
+	}
+	err = w.Close()
+	if err != nil {
+		t.Fatalf("w.Close failed: %v", err)
+	}
+
+	x := pdf.NewExtractor(w)
+	decoded, err := pdf.ExtractorGet(x, ref, Extract)
+	if err != nil {
+		t.Fatalf("extract failed: %v", err)
+	}
+
+	if diff := cmp.Diff(data, decoded); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+}
+
 func TestRoundTrip(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// embed the Dict into a PDF
-			w1, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-			rm1 := pdf.NewResourceManager(w1)
-			ref, err := rm1.Embed(tc.data)
-			if err != nil {
-				t.Fatal(err)
-			}
-			err = rm1.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-			err = w1.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			// extract the Dict from the PDF
-			x1 := pdf.NewExtractor(w1)
-			extracted1, err := Extract(x1, ref)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			// embed the extracted Dict into a new PDF
-			w2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-			rm2 := pdf.NewResourceManager(w2)
-			ref2, err := rm2.Embed(extracted1)
-			if err != nil {
-				t.Fatal(err)
-			}
-			err = rm2.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-			err = w2.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			// extract the Dict again
-			x2 := pdf.NewExtractor(w2)
-			extracted2, err := Extract(x2, ref2)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if diff := cmp.Diff(extracted1, extracted2); diff != "" {
-				t.Errorf("round trip failed (-got +want):\n%s", diff)
-			}
+			roundTripTest(t, tc.version, tc.data)
 		})
 	}
+}
+
+func FuzzRoundTrip(f *testing.F) {
+	opt := &pdf.WriterOptions{
+		HumanReadable: true,
+	}
+	for _, tc := range testCases {
+		w, buf := memfile.NewPDFWriter(tc.version, opt)
+
+		err := memfile.AddBlankPage(w)
+		if err != nil {
+			continue
+		}
+
+		rm := pdf.NewResourceManager(w)
+		ref, err := rm.Embed(tc.data)
+		if err != nil {
+			continue
+		}
+		err = rm.Close()
+		if err != nil {
+			continue
+		}
+
+		w.GetMeta().Trailer["Quir:E"] = ref
+		err = w.Close()
+		if err != nil {
+			continue
+		}
+
+		f.Add(buf.Data)
+	}
+
+	f.Fuzz(func(t *testing.T, fileData []byte) {
+		r, err := pdf.NewReader(bytes.NewReader(fileData), nil)
+		if err != nil {
+			t.Skip("invalid PDF")
+		}
+		objPDF := r.GetMeta().Trailer["Quir:E"]
+		if objPDF == nil {
+			t.Skip("missing PDF object")
+		}
+
+		x := pdf.NewExtractor(r)
+		objGo, err := pdf.ExtractorGet(x, objPDF, Extract)
+		if err != nil {
+			t.Skip("malformed PDF object")
+		}
+
+		roundTripTest(t, pdf.GetVersion(r), objGo)
+	})
 }

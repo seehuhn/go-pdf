@@ -237,7 +237,9 @@ func TestDecodeDate(t *testing.T) {
 		"D:19981223195200-08'00'",
 		"D:20000101000000Z",
 		"D:20201224163012+01'30'",
-		"D:20010809191510 ", // trailing space, seen in some PDF files
+		"D:20010809191510 ",      // trailing space, seen in some PDF files
+		"D:20240429120000+2'00'", // single-digit timezone hour
+		"D:20240718013304Z00'00'",
 	}
 	for i, test := range cases {
 		in := String(test)

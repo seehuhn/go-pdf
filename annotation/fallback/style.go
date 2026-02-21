@@ -47,6 +47,9 @@ import (
 //  - MK: "appearance characteristics dictionary" for Screen, Widget
 //  - Sy: "symbol" for Caret
 
+// Style controls the visual appearance of fallback annotation streams.
+// The ContentFont field may be replaced after construction to use a
+// different font for text content.
 type Style struct {
 	// ContentFont is the font used to render the text content of annotations,
 	// for example for FreeText annotations.
@@ -63,6 +66,7 @@ type Style struct {
 	reset *extgstate.ExtGState
 }
 
+// NewStyle returns a new Style with default fonts and graphics state.
 func NewStyle() *Style {
 	reset := &extgstate.ExtGState{
 		Set: graphics.StateTextKnockout |
@@ -89,6 +93,10 @@ func NewStyle() *Style {
 	}
 }
 
+// AddAppearance generates a normal appearance stream for the annotation
+// and sets it in the annotation's appearance dictionary. Any existing
+// rollover and down appearances are cleared. The annotation's Rect and
+// other fields may be adjusted to match the generated appearance.
 func (s *Style) AddAppearance(a annotation.Annotation) error {
 	// TODO(voss): cache appearances where possible
 
@@ -139,10 +147,10 @@ func (s *Style) AddAppearance(a annotation.Annotation) error {
 			c.Appearance.NormalMap = make(map[pdf.Name]*form.Form)
 		}
 		c.Appearance.NormalMap[c.AppearanceState] = normal
-		if c.Appearance.RollOver != nil {
+		if c.Appearance.RollOverMap != nil {
 			delete(c.Appearance.RollOverMap, c.AppearanceState)
 		}
-		if c.Appearance.Down != nil {
+		if c.Appearance.DownMap != nil {
 			delete(c.Appearance.DownMap, c.AppearanceState)
 		}
 	}

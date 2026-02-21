@@ -6565,7 +6565,7 @@ types:
     - XObjectFormType1
     - XObjectFormPS
     - XObjectFormPSpassthrough
-    notes: Table 170
+    notes: 'Table 170. Go uses Normal/*form.Form or NormalMap/map[pdf.Name]*form.Form'
   - goName:
     pdfKey: R
     pdfType: fn:SinceVersion(1.3,dictionary);stream
@@ -6578,6 +6578,7 @@ types:
     - XObjectFormType1
     - XObjectFormPS
     - XObjectFormPSpassthrough
+    notes: 'Go uses RollOver/*form.Form or RollOverMap/map[pdf.Name]*form.Form'
   - goName:
     pdfKey: D
     pdfType: fn:SinceVersion(1.3,dictionary);stream
@@ -6590,9 +6591,10 @@ types:
     - XObjectFormType1
     - XObjectFormPS
     - XObjectFormPSpassthrough
-  readFunc: image.ExtractDict
-  fileDependent: true
-  writeMethod: (*Dict).Encode
+    notes: 'Go uses Down/*form.Form or DownMap/map[pdf.Name]*form.Form'
+  readFunc: Extract
+  fileDependent: false
+  writeMethod: (*Dict).Embed
   goPackage: appearance
   goRepr: struct
   specSection: 12.5.5

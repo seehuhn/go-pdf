@@ -194,6 +194,15 @@ func (x String) AsDate() (Date, error) {
 
 	s = strings.TrimSpace(s)
 	s = strings.ReplaceAll(s, "'", "")
+
+	// pad single-digit timezone hour offsets (e.g. +200 → +0200)
+	if i := strings.LastIndexAny(s, "+-"); i > 2 {
+		offset := s[i+1:]
+		if len(offset) == 1 || len(offset) == 3 {
+			s = s[:i+1] + "0" + offset
+		}
+	}
+
 	if s == "D:" || s == "" {
 		return zero, nil
 	}

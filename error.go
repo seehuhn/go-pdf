@@ -28,7 +28,7 @@ var (
 	errInvalidID       = errors.New("invalid PDF file identifier")
 	errInvalidPassword = errors.New("invalid password")
 	errInvalidXref     = errors.New("invalid cross-reference table")
-	errNoDate          = errors.New("not a valid date string")
+	errNoDate          = Error("not a valid date string")
 	errNoPDF           = errors.New("no header")
 	errNoRectangle     = errors.New("not a valid PDF rectangle")
 	errVersion         = errors.New("unsupported PDF version")
