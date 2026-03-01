@@ -23,6 +23,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -91,6 +93,27 @@ var testCases = []testCase{
 					},
 				},
 			},
+		},
+	},
+	{
+		name: "page with text",
+		page: &Page{
+			MediaBox: &pdf.Rectangle{URx: 612, URy: 792},
+			Resources: &content.Resources{
+				SingleUse: true,
+				Font: map[pdf.Name]font.Instance{
+					"F1": standard.TimesRoman.New(),
+				},
+			},
+			Contents: []*Content{{
+				Operators: content.Operators{
+					{Name: content.OpTextBegin},
+					{Name: content.OpTextSetFont, Args: []pdf.Object{pdf.Name("F1"), pdf.Number(12)}},
+					{Name: content.OpTextMoveOffset, Args: []pdf.Object{pdf.Number(72), pdf.Number(720)}},
+					{Name: content.OpTextShow, Args: []pdf.Object{pdf.String("Hello")}},
+					{Name: content.OpTextEnd},
+				},
+			}},
 		},
 	},
 	{

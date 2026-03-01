@@ -625,7 +625,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 		switch c := resolved.(type) {
 		case *pdf.Stream:
 			// Single stream
-			pc, err := ExtractContent(x, contentsObj)
+			pc, err := extractContent(x, contentsObj, p.Resources)
 			if err != nil {
 				return nil, err
 			}
@@ -633,7 +633,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 		case pdf.Array:
 			// Array of streams
 			for _, item := range c {
-				pc, err := ExtractContent(x, item)
+				pc, err := extractContent(x, item, p.Resources)
 				if err != nil {
 					return nil, err
 				}

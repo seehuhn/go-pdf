@@ -60,8 +60,10 @@ func (pc *Content) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return ref, nil
 }
 
-// ExtractContent reads a single content stream from a PDF object.
-func ExtractContent(x *pdf.Extractor, obj pdf.Object) (*Content, error) {
+// extractContent reads a single content stream from a PDF object.
+// The res parameter provides the page resources needed to correctly
+// parse operators such as Tf that depend on resource lookups.
+func extractContent(x *pdf.Extractor, obj pdf.Object, res *content.Resources) (*Content, error) {
 	resolved, err := x.Resolve(obj)
 	if err != nil {
 		return nil, err
@@ -78,7 +80,7 @@ func ExtractContent(x *pdf.Extractor, obj pdf.Object) (*Content, error) {
 	}
 	defer stm.Close()
 
-	operators, err := content.ReadStream(stm, pdf.GetVersion(x.R), content.Page, &content.Resources{})
+	operators, err := content.ReadStream(stm, pdf.GetVersion(x.R), content.Page, res)
 	if err != nil {
 		return nil, err
 	}
