@@ -442,9 +442,10 @@ func TestMarkedContentStackOverflow(t *testing.T) {
 
 	var beginCount, endCount int
 	r.MarkedContent = func(event MarkedContentEvent, mc *graphics.MarkedContent) error {
-		if event == MarkedContentBegin {
+		switch event {
+		case MarkedContentBegin:
 			beginCount++
-		} else if event == MarkedContentEnd {
+		case MarkedContentEnd:
 			endCount++
 		}
 		return nil
