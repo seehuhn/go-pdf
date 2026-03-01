@@ -48,7 +48,7 @@ type TextExtractor struct {
 // New creates a new TextExtractor that writes to w.
 func New(doc pdf.Getter, w io.Writer) *TextExtractor {
 	e := &TextExtractor{
-		reader:               reader.New(doc),
+		reader:               reader.New(pdf.NewExtractor(doc)),
 		writer:               w,
 		XRangeMin:            math.Inf(-1),
 		XRangeMax:            math.Inf(1),
@@ -138,12 +138,12 @@ func (e *TextExtractor) handleActualTextBegin(mc *graphics.MarkedContent) {
 		return
 	}
 
-	text, err := pdf.GetTextString(e.reader.R, actualTextObj.AsPDF(0))
-	if err != nil {
+	s, ok := actualTextObj.AsPDF(0).(pdf.String)
+	if !ok {
 		return
 	}
 
-	fmt.Fprint(e.writer, text)
+	fmt.Fprint(e.writer, s.AsTextString())
 	e.actualTextStartDepth = len(e.reader.MarkedContentStack)
 }
 

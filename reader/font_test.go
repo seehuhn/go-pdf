@@ -69,7 +69,7 @@ func TestExtractText(t *testing.T) {
 			}
 
 			var pieces []string
-			contents := New(r)
+			contents := New(pdf.NewExtractor(r))
 			contents.Text = func(text string) error {
 				pieces = append(pieces, text)
 				return nil

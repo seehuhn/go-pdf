@@ -310,7 +310,7 @@ func TestGlyphWidths(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	in := reader.New(data)
+	in := reader.New(pdf.NewExtractor(data))
 	var xxOut []float64
 	in.Character = func(cid cid.CID, text string) error {
 		x, _ := in.GetTextPositionDevice()

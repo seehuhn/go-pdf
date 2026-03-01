@@ -33,7 +33,6 @@ import (
 
 // A Reader reads a PDF content stream.
 type Reader struct {
-	R pdf.Getter
 	x *pdf.Extractor
 
 	// State tracks the graphics state during content stream processing.
@@ -84,10 +83,9 @@ const (
 )
 
 // New creates a new Reader.
-func New(r pdf.Getter) *Reader {
+func New(x *pdf.Extractor) *Reader {
 	return &Reader{
-		R:                  r,
-		x:                  pdf.NewExtractor(r),
+		x:                  x,
 		MarkedContentStack: make([]*graphics.MarkedContent, 0, 8),
 	}
 }
@@ -101,7 +99,7 @@ func (r *Reader) Reset() {
 
 // ParsePage parses a page, and calls the appropriate callback functions.
 func (r *Reader) ParsePage(page pdf.Object, ctm matrix.Matrix) error {
-	pageDict, err := pdf.GetDictTyped(r.R, page, "Page")
+	pageDict, err := r.x.GetDictTyped(page, "Page")
 	if err != nil {
 		return err
 	}
@@ -122,7 +120,7 @@ func (r *Reader) ParsePage(page pdf.Object, ctm matrix.Matrix) error {
 	r.State.GState.CTM = ctm
 	r.MarkedContentStack = r.MarkedContentStack[:0]
 
-	contentReader, err := pagetree.ContentStream(r.R, page)
+	contentReader, err := pagetree.ContentStream(r.x.R, page)
 	if err != nil {
 		return err
 	}
@@ -131,7 +129,7 @@ func (r *Reader) ParsePage(page pdf.Object, ctm matrix.Matrix) error {
 
 // ParseContentStream parses a PDF content stream.
 func (r *Reader) ParseContentStream(in io.Reader) error {
-	v := pdf.GetVersion(r.R)
+	v := pdf.GetVersion(r.x.R)
 	stream := content.NewScanner(in, v, content.Page, r.State.Resources)
 	return r.ProcessStream(stream)
 }

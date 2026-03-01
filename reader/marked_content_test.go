@@ -90,7 +90,7 @@ func TestMaxMarkedContentDepthConstant(t *testing.T) {
 
 func TestMPOperator(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	r := New(w)
+	r := New(pdf.NewExtractor(w))
 	r.Reset()
 
 	var called bool
@@ -135,7 +135,7 @@ func TestMPOperator(t *testing.T) {
 
 func TestBMCOperator(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	r := New(w)
+	r := New(pdf.NewExtractor(w))
 	r.Reset()
 
 	var events []MarkedContentEvent
@@ -189,7 +189,7 @@ func TestBMCOperator(t *testing.T) {
 
 func TestDPOperatorInline(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	r := New(w)
+	r := New(pdf.NewExtractor(w))
 	r.Reset()
 
 	var called bool
@@ -243,7 +243,7 @@ func TestDPOperatorInline(t *testing.T) {
 
 func TestDPOperatorResourceReference(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	r := New(w)
+	r := New(pdf.NewExtractor(w))
 	r.Reset()
 
 	// Set up Resources with a property list
@@ -301,7 +301,7 @@ func TestDPOperatorResourceReference(t *testing.T) {
 
 func TestBDCOperator(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	r := New(w)
+	r := New(pdf.NewExtractor(w))
 	r.Reset()
 
 	var events []MarkedContentEvent
@@ -369,7 +369,7 @@ func TestBDCOperator(t *testing.T) {
 
 func TestEMCOperator(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	r := New(w)
+	r := New(pdf.NewExtractor(w))
 	r.Reset()
 
 	var events []MarkedContentEvent
@@ -413,7 +413,7 @@ func TestEMCOperator(t *testing.T) {
 
 func TestUnmatchedEMC(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	r := New(w)
+	r := New(pdf.NewExtractor(w))
 	r.Reset()
 
 	var callCount int
@@ -437,7 +437,7 @@ func TestUnmatchedEMC(t *testing.T) {
 
 func TestMarkedContentStackOverflow(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	r := New(w)
+	r := New(pdf.NewExtractor(w))
 	r.Reset()
 
 	var beginCount, endCount int
@@ -480,7 +480,7 @@ func TestMarkedContentStackOverflow(t *testing.T) {
 
 func TestNestedMarkedContent(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	r := New(w)
+	r := New(pdf.NewExtractor(w))
 	r.Reset()
 
 	type eventRecord struct {
@@ -533,7 +533,7 @@ func TestNestedMarkedContent(t *testing.T) {
 
 func TestMalformedPropertyExtraction(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	r := New(w)
+	r := New(pdf.NewExtractor(w))
 	r.Reset()
 
 	var callCount int

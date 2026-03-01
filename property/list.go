@@ -22,8 +22,6 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// PDF 2.0 sections: 14.6
-
 // Standard tags (from Table 352a and spec):
 //   1. AF - Associated files (14.13.5)
 //   2. Artifact - Artifacts (14.8.2.2.2)
@@ -51,9 +49,11 @@ import (
 //   - Alt, ActualText, E, Lang (text strings) - from 14.9.x
 //
 // For OC tag:
-//   - The property list IS an OCG or OCMD dictionary, so it has those
+//   - The property list itself is an OCG or OCMD dictionary, so it has those
 //     dictionary keys (Type, Name, Intent, Usage for OCG; Type, OCGs, P,
 //     VE for OCMD).
+
+// PDF 2.0 sections: 14.6
 
 // List represents a marked-property list.
 type List interface {
@@ -61,6 +61,8 @@ type List interface {
 	Keys() []pdf.Name
 
 	// Get retrieves the value associated with the given key.
+	// The returned object is always fully resolved and never contains
+	// references to indirect objects.
 	// If the key is not present, the error [ErrNoKey] is returned.
 	Get(key pdf.Name) (pdf.Object, error)
 

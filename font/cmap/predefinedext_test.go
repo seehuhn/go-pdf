@@ -129,7 +129,7 @@ func TestPredefined(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	reader := reader.New(r)
+	reader := reader.New(pdf.NewExtractor(r))
 	allText := ""
 	reader.Text = func(text string) error {
 		allText += text

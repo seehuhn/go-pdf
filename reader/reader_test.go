@@ -70,7 +70,7 @@ func TestParameters(t *testing.T) {
 
 	// Now we read back the content stream and check that the final graphics
 	// state matches the expected values.
-	r := New(data)
+	r := New(pdf.NewExtractor(data))
 	r.State = content.NewState(content.Page, b.Resources)
 	r.State.GState.Set = 0
 	err = r.ParseContentStream(buf)
@@ -194,7 +194,7 @@ func TestParsePage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	reader := New(pdfData)
+	reader := New(pdf.NewExtractor(pdfData))
 
 	type operation struct {
 		Op   string
