@@ -47,7 +47,7 @@ type GoToR struct {
 }
 
 // ActionType returns "GoToR".
-// This implements the [Action] interface.
+// This implements the [pdf.Action] interface.
 func (a *GoToR) ActionType() pdf.Name { return TypeGoToR }
 
 func (a *GoToR) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

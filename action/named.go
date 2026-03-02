@@ -33,7 +33,7 @@ type Named struct {
 }
 
 // ActionType returns "Named".
-// This implements the [Action] interface.
+// This implements the [pdf.Action] interface.
 func (a *Named) ActionType() pdf.Name { return TypeNamed }
 
 func (a *Named) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

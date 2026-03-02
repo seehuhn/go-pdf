@@ -206,12 +206,15 @@ func (w *Writer) AppendPageRef(ref pdf.Reference, p *page.Page) error {
 	// increment the page numbers
 	w.nextPageNumber = w.nextPageNumber.Inc()
 
-	for {
+	for w.err == nil {
 		n := len(w.tail)
 		if n < maxDegree || w.tail[n-1].depth != w.tail[n-maxDegree].depth {
 			break
 		}
 		w.tail = w.mergeNodes(w.tail, n-maxDegree, n)
+	}
+	if w.err != nil {
+		return w.err
 	}
 	w.checkInvariants()
 
@@ -254,12 +257,15 @@ func (w *Writer) AppendPageDict(ref pdf.Reference, dict pdf.Dict) error {
 
 	w.nextPageNumber = w.nextPageNumber.Inc()
 
-	for {
+	for w.err == nil {
 		n := len(w.tail)
 		if n < maxDegree || w.tail[n-1].depth != w.tail[n-maxDegree].depth {
 			break
 		}
 		w.tail = w.mergeNodes(w.tail, n-maxDegree, n)
+	}
+	if w.err != nil {
+		return w.err
 	}
 	w.checkInvariants()
 

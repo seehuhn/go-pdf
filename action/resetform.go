@@ -36,7 +36,7 @@ type ResetForm struct {
 }
 
 // ActionType returns "ResetForm".
-// This implements the [Action] interface.
+// This implements the [pdf.Action] interface.
 func (a *ResetForm) ActionType() pdf.Name { return TypeResetForm }
 
 func (a *ResetForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

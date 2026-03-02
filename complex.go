@@ -396,6 +396,21 @@ func (r *Rectangle) ExtendVec(v vec.Vec2) {
 	}
 }
 
+// Intersect returns the intersection of r and other, or nil if the
+// intersection is empty.
+func (r *Rectangle) Intersect(other *Rectangle) *Rectangle {
+	result := &Rectangle{
+		LLx: max(r.LLx, other.LLx),
+		LLy: max(r.LLy, other.LLy),
+		URx: min(r.URx, other.URx),
+		URy: min(r.URy, other.URy),
+	}
+	if result.LLx >= result.URx || result.LLy >= result.URy {
+		return nil
+	}
+	return result
+}
+
 // Round rounds the corner coordinates of the rectangle to the given number of
 // decimal places and returns the result.
 func (r Rectangle) Round(digits int) Rectangle {

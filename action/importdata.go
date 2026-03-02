@@ -34,7 +34,7 @@ type ImportData struct {
 }
 
 // ActionType returns "ImportData".
-// This implements the [Action] interface.
+// This implements the [pdf.Action] interface.
 func (a *ImportData) ActionType() pdf.Name { return TypeImportData }
 
 func (a *ImportData) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

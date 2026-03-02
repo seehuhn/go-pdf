@@ -14,26 +14,25 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package action implements PDF actions as defined in section 12.6 of the
-// PDF 2.0 specification.
+// Package action implements PDF actions.
 //
 // Actions define operations that can be triggered by user interaction,
-// document opening, or other events. This package provides support for all
-// 19 standard action types including navigation (GoTo, GoToR, URI),
-// form operations (SubmitForm, ResetForm, ImportData), multimedia control
-// (Sound, Movie, Rendition), and scripting (JavaScript).
+// document opening, or other events. This package provides support for all 20
+// standard action types including navigation (GoTo, GoToR, URI), form
+// operations (SubmitForm, ResetForm, ImportData), multimedia control (Sound,
+// Movie, Rendition), and scripting (JavaScript).
 //
 // # Basic Usage
 //
 // Create an action and encode it:
 //
 //	action := &action.GoTo{
-//		Dest: &destination.XYZ{
-//			Page: pageRef,
-//			Left: 100,
-//			Top:  200,
-//			Zoom: 1.5,
-//		},
+//	    Dest: &destination.XYZ{
+//	        Page: pageRef,
+//	        Left: 100,
+//	        Top:  200,
+//	        Zoom: 1.5,
+//	    },
 //	}
 //	dict, err := action.Encode(rm)
 //
@@ -42,9 +41,9 @@
 //	action, err := action.Decode(x, obj)
 //	switch a := action.(type) {
 //	case *action.GoTo:
-//		// handle go-to action
+//	    // handle go-to action
 //	case *action.URI:
-//		// handle URI action
+//	    // handle URI action
 //	}
 //
 // # Action Chaining
@@ -61,21 +60,50 @@
 //
 // # Action Types
 //
-// Navigation actions: GoTo, GoToR, GoToE, GoToDp, Thread
+// Navigation actions:
 //
-// Web and external: URI, Launch
+//   - [GoTo] navigates to a destination in the current document.
+//   - [GoToR] navigates to a destination in another PDF file.
+//   - [GoToE] navigates to a destination in an embedded file.
+//   - [GoToDp] navigates to a document part in the current document (PDF 2.0).
+//   - [Thread] begins reading an article thread.
 //
-// Predefined: Named (NextPage, PrevPage, FirstPage, LastPage)
+// Web and external actions:
 //
-// Form actions: SubmitForm, ResetForm, ImportData
+//   - [URI] resolves a uniform resource identifier.
+//   - [Launch] launches an application or opens or prints a document.
 //
-// Multimedia: Sound (deprecated), Movie (deprecated), Rendition
+// Predefined actions:
 //
-// Annotation: Hide
+//   - [Named] executes a predefined action (NextPage, PrevPage, FirstPage, LastPage).
 //
-// Scripting: JavaScript
+// Form actions:
 //
-// Optional content: SetOCGState
+//   - [SubmitForm] sends form data to a URL.
+//   - [ResetForm] resets form fields to their default values.
+//   - [ImportData] imports form field values from a file.
 //
-// 3D and rich media: GoTo3DView, RichMediaExecute, Trans
+// Multimedia actions:
+//
+//   - [Rendition] controls multimedia playback.
+//   - [Sound] plays a sound (deprecated in PDF 2.0).
+//   - [Movie] plays a movie (deprecated in PDF 2.0).
+//
+// Display actions:
+//
+//   - [Trans] updates the display using a transition dictionary.
+//   - [Hide] shows or hides annotations.
+//
+// Scripting actions:
+//
+//   - [JavaScript] executes ECMAScript.
+//
+// Optional content actions:
+//
+//   - [SetOCGState] sets the state of optional content groups.
+//
+// 3D and rich media actions:
+//
+//   - [GoTo3DView] sets the current view of a 3D annotation.
+//   - [RichMediaExecute] sends a command to a rich media annotation's handler (PDF 2.0).
 package action

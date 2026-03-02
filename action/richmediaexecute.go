@@ -42,7 +42,7 @@ type RichMediaExecute struct {
 }
 
 // ActionType returns "RichMediaExecute".
-// This implements the [Action] interface.
+// This implements the [pdf.Action] interface.
 func (a *RichMediaExecute) ActionType() pdf.Name { return TypeRichMediaExecute }
 
 func (a *RichMediaExecute) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

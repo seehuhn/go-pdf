@@ -424,6 +424,113 @@ func TestPage_VersionChecks(t *testing.T) {
 	}
 }
 
+func TestPage_Encode_InvalidBoxCoords(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	parentRef := w.Alloc()
+
+	page := &Page{
+		Parent:   parentRef,
+		MediaBox: &pdf.Rectangle{LLx: 100, LLy: 0, URx: 50, URy: 792}, // LLx > URx
+		Resources: &content.Resources{
+			SingleUse: true,
+		},
+	}
+	rm := pdf.NewResourceManager(w)
+	_, err := page.Encode(rm)
+	if err == nil {
+		t.Fatal("expected error for inverted MediaBox coordinates")
+	}
+}
+
+func TestPage_Encode_BoxOutsideMediaBox(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	parentRef := w.Alloc()
+
+	page := &Page{
+		Parent:   parentRef,
+		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792},
+		CropBox:  &pdf.Rectangle{LLx: -10, LLy: 0, URx: 612, URy: 792},
+		Resources: &content.Resources{
+			SingleUse: true,
+		},
+	}
+	rm := pdf.NewResourceManager(w)
+	_, err := page.Encode(rm)
+	if err == nil {
+		t.Fatal("expected error for CropBox extending beyond MediaBox")
+	}
+}
+
+func TestPage_Decode_ClipsBoxes(t *testing.T) {
+	// write a page dict directly with boxes extending beyond MediaBox
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	parentRef := w.Alloc()
+
+	mediaBox := &pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}
+	cropBox := &pdf.Rectangle{LLx: -10, LLy: -10, URx: 620, URy: 800}
+
+	dict := pdf.Dict{
+		"Type":      pdf.Name("Page"),
+		"Parent":    parentRef,
+		"MediaBox":  mediaBox,
+		"CropBox":   cropBox,
+		"Resources": pdf.Dict{},
+	}
+
+	if err := w.Put(parentRef, pdf.Dict{"Type": pdf.Name("Pages")}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	p, err := Decode(x, dict)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+
+	// CropBox should be clipped to MediaBox
+	want := &pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}
+	if p.CropBox == nil {
+		t.Fatal("CropBox is nil after clipping")
+	}
+	if !p.CropBox.NearlyEqual(want, 1e-9) {
+		t.Errorf("CropBox = %v, want %v", p.CropBox, want)
+	}
+}
+
+func TestPage_Decode_ClipsToNil(t *testing.T) {
+	// write a page dict with a TrimBox completely outside MediaBox
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	parentRef := w.Alloc()
+
+	dict := pdf.Dict{
+		"Type":      pdf.Name("Page"),
+		"Parent":    parentRef,
+		"MediaBox":  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+		"TrimBox":   &pdf.Rectangle{LLx: 200, LLy: 200, URx: 300, URy: 300},
+		"Resources": pdf.Dict{},
+	}
+
+	if err := w.Put(parentRef, pdf.Dict{"Type": pdf.Name("Pages")}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	p, err := Decode(x, dict)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+
+	if p.TrimBox != nil {
+		t.Errorf("TrimBox should be nil when completely outside MediaBox, got %v", p.TrimBox)
+	}
+}
+
 func FuzzRoundTrip(f *testing.F) {
 	// Seed the fuzzer with valid test cases
 	opt := &pdf.WriterOptions{

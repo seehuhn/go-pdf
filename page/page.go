@@ -312,6 +312,35 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["ArtBox"] = p.ArtBox
 	}
 
+	// validate box coordinates
+	for _, entry := range []struct {
+		name string
+		box  *pdf.Rectangle
+	}{
+		{"MediaBox", p.MediaBox},
+		{"CropBox", p.CropBox},
+		{"BleedBox", p.BleedBox},
+		{"TrimBox", p.TrimBox},
+		{"ArtBox", p.ArtBox},
+	} {
+		if err := validateBox(entry.name, entry.box); err != nil {
+			return nil, err
+		}
+	}
+	for _, entry := range []struct {
+		name string
+		box  *pdf.Rectangle
+	}{
+		{"CropBox", p.CropBox},
+		{"BleedBox", p.BleedBox},
+		{"TrimBox", p.TrimBox},
+		{"ArtBox", p.ArtBox},
+	} {
+		if err := checkContainedIn(entry.name, entry.box, p.MediaBox); err != nil {
+			return nil, err
+		}
+	}
+
 	// BoxColorInfo
 	if p.BoxColorInfo != nil {
 		if err := pdf.CheckVersion(w, "BoxColorInfo", pdf.V1_4); err != nil {
@@ -670,6 +699,14 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 		p.ArtBox = artBox
 	}
 
+	// clip optional boxes to MediaBox
+	if p.MediaBox != nil {
+		p.CropBox = clipBox(p.CropBox, p.MediaBox)
+		p.BleedBox = clipBox(p.BleedBox, p.MediaBox)
+		p.TrimBox = clipBox(p.TrimBox, p.MediaBox)
+		p.ArtBox = clipBox(p.ArtBox, p.MediaBox)
+	}
+
 	// BoxColorInfo (optional)
 	if bci, err := pdf.ExtractorGetOptional(x, dict["BoxColorInfo"], boxcolor.ExtractInfo); err != nil {
 		return nil, err
@@ -883,4 +920,32 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	return p, nil
+}
+
+func validateBox(name string, box *pdf.Rectangle) error {
+	if box == nil {
+		return nil
+	}
+	if box.LLx > box.URx || box.LLy > box.URy {
+		return fmt.Errorf("%s has invalid coordinates %s", name, box)
+	}
+	return nil
+}
+
+func checkContainedIn(name string, box, mediaBox *pdf.Rectangle) error {
+	if box == nil || mediaBox == nil {
+		return nil
+	}
+	if box.LLx < mediaBox.LLx || box.LLy < mediaBox.LLy ||
+		box.URx > mediaBox.URx || box.URy > mediaBox.URy {
+		return fmt.Errorf("%s %s extends beyond MediaBox %s", name, box, mediaBox)
+	}
+	return nil
+}
+
+func clipBox(box, bounds *pdf.Rectangle) *pdf.Rectangle {
+	if box == nil {
+		return nil
+	}
+	return box.Intersect(bounds)
 }

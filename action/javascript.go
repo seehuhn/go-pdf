@@ -33,7 +33,7 @@ type JavaScript struct {
 }
 
 // ActionType returns "JavaScript".
-// This implements the [Action] interface.
+// This implements the [pdf.Action] interface.
 func (a *JavaScript) ActionType() pdf.Name { return TypeJavaScript }
 
 func (a *JavaScript) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

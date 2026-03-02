@@ -35,7 +35,7 @@ type URI struct {
 }
 
 // ActionType returns "URI".
-// This implements the [Action] interface.
+// This implements the [pdf.Action] interface.
 func (a *URI) ActionType() pdf.Name { return TypeURI }
 
 func (a *URI) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

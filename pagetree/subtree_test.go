@@ -244,7 +244,7 @@ func FuzzInherit(f *testing.F) {
 	cropBoxes := []*pdf.Rectangle{
 		nil, // no CropBox
 		{LLx: 10, LLy: 10, URx: 90, URy: 90},
-		{LLx: 20, LLy: 20, URx: 180, URy: 180},
+		{LLx: 5, LLy: 5, URx: 80, URy: 80},
 	}
 	rotations := []page.Rotation{
 		page.RotateInherit,

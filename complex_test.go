@@ -318,6 +318,68 @@ func TestRectangle2(t *testing.T) {
 	}
 }
 
+func TestRectangleIntersect(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b *Rectangle
+		want *Rectangle
+	}{
+		{
+			name: "overlapping",
+			a:    &Rectangle{0, 0, 10, 10},
+			b:    &Rectangle{5, 5, 15, 15},
+			want: &Rectangle{5, 5, 10, 10},
+		},
+		{
+			name: "non-overlapping",
+			a:    &Rectangle{0, 0, 5, 5},
+			b:    &Rectangle{6, 6, 10, 10},
+			want: nil,
+		},
+		{
+			name: "contained",
+			a:    &Rectangle{0, 0, 100, 100},
+			b:    &Rectangle{10, 10, 90, 90},
+			want: &Rectangle{10, 10, 90, 90},
+		},
+		{
+			name: "identical",
+			a:    &Rectangle{0, 0, 612, 792},
+			b:    &Rectangle{0, 0, 612, 792},
+			want: &Rectangle{0, 0, 612, 792},
+		},
+		{
+			name: "touching edge",
+			a:    &Rectangle{0, 0, 10, 10},
+			b:    &Rectangle{10, 0, 20, 10},
+			want: nil,
+		},
+		{
+			name: "partial overlap X only",
+			a:    &Rectangle{0, 0, 10, 10},
+			b:    &Rectangle{5, 20, 15, 30},
+			want: nil,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.a.Intersect(tc.b)
+			if tc.want == nil {
+				if got != nil {
+					t.Fatalf("expected nil, got %v", got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatalf("expected %v, got nil", tc.want)
+			}
+			if !got.NearlyEqual(tc.want, 1e-9) {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestCatalog(t *testing.T) {
 	pRef := NewReference(1, 2)
 

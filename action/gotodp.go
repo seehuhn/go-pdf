@@ -33,7 +33,7 @@ type GoToDp struct {
 }
 
 // ActionType returns "GoToDp".
-// This implements the [Action] interface.
+// This implements the [pdf.Action] interface.
 func (a *GoToDp) ActionType() pdf.Name { return TypeGoToDp }
 
 func (a *GoToDp) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

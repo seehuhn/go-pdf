@@ -44,7 +44,7 @@ type Movie struct {
 }
 
 // ActionType returns "Movie".
-// This implements the [Action] interface.
+// This implements the [pdf.Action] interface.
 func (a *Movie) ActionType() pdf.Name { return TypeMovie }
 
 func (a *Movie) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
