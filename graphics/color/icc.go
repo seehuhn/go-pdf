@@ -32,12 +32,12 @@ import (
 
 // SpaceICCBased represents an ICC-based color space.
 type SpaceICCBased struct {
-	N      int
-	Ranges []float64
+	N        int
+	Ranges   []float64
+	Profile  *icc.Profile
+	Metadata *metadata.Stream
 
-	metadata *metadata.Stream
-	profile  []byte
-	def      []float64
+	def []float64
 
 	// cached transform for Convert() (PCSToDevice)
 	transformOnce sync.Once
@@ -58,7 +58,6 @@ func ICCBased(profile []byte, metadata *metadata.Stream) (*SpaceICCBased, error)
 	if err != nil {
 		return nil, err
 	}
-
 	n := p.ColorSpace.NumComponents()
 	if n != 1 && n != 3 && n != 4 {
 		return nil, fmt.Errorf("ICCBased: invalid number of components %d", n)
@@ -85,8 +84,8 @@ func ICCBased(profile []byte, metadata *metadata.Stream) (*SpaceICCBased, error)
 	res := &SpaceICCBased{
 		N:        n,
 		Ranges:   ranges,
-		metadata: metadata,
-		profile:  profile,
+		Metadata: metadata,
+		Profile:  p,
 		def:      def,
 	}
 	return res, nil
@@ -134,11 +133,11 @@ func (s *SpaceICCBased) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["Range"] = toPDF(s.Ranges)
 	}
 
-	if s.metadata != nil {
+	if s.Metadata != nil {
 		if err := pdf.CheckVersion(w, "ICCBased Metadata", pdf.V1_4); err != nil {
 			return nil, err
 		}
-		mRef, err := rm.Embed(s.metadata)
+		mRef, err := rm.Embed(s.Metadata)
 		if err != nil {
 			return nil, err
 		}
@@ -150,7 +149,11 @@ func (s *SpaceICCBased) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = body.Write(s.profile)
+	profileBytes, err := s.Profile.Encode()
+	if err != nil {
+		return nil, err
+	}
+	_, err = body.Write(profileBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -175,11 +178,7 @@ func (s *SpaceICCBased) Convert(c stdcolor.Color) stdcolor.Color {
 
 	// initialise transform on first use
 	s.transformOnce.Do(func() {
-		p, err := icc.Decode(s.profile)
-		if err != nil {
-			return
-		}
-		s.transform, _ = icc.NewTransform(p, icc.PCSToDevice, icc.RelativeColorimetric)
+		s.transform, _ = icc.NewTransform(s.Profile, icc.PCSToDevice, icc.RelativeColorimetric)
 	})
 
 	var values []float64
@@ -259,11 +258,7 @@ func (s *SpaceICCBased) ToXYZ(values []float64) (X, Y, Z float64) {
 
 	// try ICC profile transform
 	s.fwdTransformOnce.Do(func() {
-		p, err := icc.Decode(s.profile)
-		if err != nil {
-			return
-		}
-		s.fwdTransform, _ = icc.NewTransform(p, icc.DeviceToPCS, icc.Perceptual)
+		s.fwdTransform, _ = icc.NewTransform(s.Profile, icc.DeviceToPCS, icc.Perceptual)
 	})
 	if s.fwdTransform != nil {
 		return s.fwdTransform.ToXYZ(norm)

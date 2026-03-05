@@ -515,9 +515,9 @@ func SpacesEqual(a, b Space) bool {
 		if vb, ok := b.(*SpaceICCBased); ok {
 			return va.N == vb.N &&
 				floatSlicesEqual(va.Ranges, vb.Ranges, floatEpsilon) &&
-				bytes.Equal(va.profile, vb.profile) &&
+				va.Profile.Equal(vb.Profile) &&
 				floatSlicesEqual(va.def, vb.def, floatEpsilon) &&
-				metadataEqual(va.metadata, vb.metadata)
+				metadataEqual(va.Metadata, vb.Metadata)
 		}
 
 	case *SpaceIndexed:
