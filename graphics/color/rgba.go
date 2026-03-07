@@ -24,8 +24,8 @@ import (
 // This file contains helper functions for converting between colour spaces,
 // used by the RGBA() and Convert() methods throughout the color package.
 
-// XYZToSRGB converts CIE XYZ (D50) to sRGB.
-func XYZToSRGB(X, Y, Z float64) (r, g, b float64) {
+// xyzToSRGB converts CIE XYZ (D50) to sRGB.
+func xyzToSRGB(X, Y, Z float64) (r, g, b float64) {
 	// adapt from D50 to D65
 	X2, Y2, Z2 := bradfordAdapt(X, Y, Z, WhitePointD50, WhitePointD65)
 
@@ -56,8 +56,8 @@ func srgbGammaInv(v float64) float64 {
 	return math.Pow((v+0.055)/1.055, 2.4)
 }
 
-// SRGBToXYZ converts sRGB [0,1] to CIE XYZ (D50).
-func SRGBToXYZ(r, g, b float64) (X, Y, Z float64) {
+// srgbToXYZ converts sRGB [0,1] to CIE XYZ (D50).
+func srgbToXYZ(r, g, b float64) (X, Y, Z float64) {
 	// sRGB to linear
 	rLin := srgbGammaInv(r)
 	gLin := srgbGammaInv(g)
@@ -84,7 +84,7 @@ func ColorToXYZ(c stdcolor.Color) (X, Y, Z float64) {
 	r := float64(r32) / 65535.0
 	g := float64(g32) / 65535.0
 	b := float64(b32) / 65535.0
-	return SRGBToXYZ(r, g, b)
+	return srgbToXYZ(r, g, b)
 }
 
 // bradfordAdapt performs Bradford chromatic adaptation from srcWP to dstWP.

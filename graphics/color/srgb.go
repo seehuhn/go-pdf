@@ -104,7 +104,13 @@ func (s spaceSRGB) Convert(c stdcolor.Color) stdcolor.Color {
 // ToXYZ converts sRGB values to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (s spaceSRGB) ToXYZ(values []float64) (X, Y, Z float64) {
-	return SRGBToXYZ(values[0], values[1], values[2])
+	return srgbToXYZ(values[0], values[1], values[2])
+}
+
+// FromXYZ converts D50-adapted CIE XYZ to sRGB component values.
+func (s spaceSRGB) FromXYZ(X, Y, Z float64) []float64 {
+	r, g, b := xyzToSRGB(X, Y, Z)
+	return []float64{r, g, b}
 }
 
 type colorSRGB [3]float64

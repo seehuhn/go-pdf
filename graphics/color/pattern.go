@@ -89,7 +89,7 @@ func (s spacePatternColored) Convert(c stdcolor.Color) stdcolor.Color {
 // adapted to the D50 illuminant, since the actual color depends on the
 // pattern content.
 func (s spacePatternColored) ToXYZ(values []float64) (X, Y, Z float64) {
-	return SRGBToXYZ(0.5, 0.5, 0.5)
+	return srgbToXYZ(0.5, 0.5, 0.5)
 }
 
 type colorColoredPattern struct {
@@ -114,7 +114,7 @@ func (colorColoredPattern) ColorSpace() Space {
 // For colored patterns, returns a neutral mid-gray since the actual color
 // depends on the pattern content which is not available here.
 func (colorColoredPattern) ToXYZ() (X, Y, Z float64) {
-	return SRGBToXYZ(0.5, 0.5, 0.5)
+	return srgbToXYZ(0.5, 0.5, 0.5)
 }
 
 // RGBA implements the color.Color interface.

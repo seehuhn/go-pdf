@@ -399,7 +399,7 @@ func (c colorSeparation) ToXYZ() (X, Y, Z float64) {
 // RGBA implements the color.Color interface.
 func (c colorSeparation) RGBA() (r, g, b, a uint32) {
 	X, Y, Z := c.ToXYZ()
-	rf, gf, bf := XYZToSRGB(X, Y, Z)
+	rf, gf, bf := xyzToSRGB(X, Y, Z)
 	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }
 
@@ -643,6 +643,6 @@ func (c colorDeviceN) get() []float64 {
 // RGBA implements the color.Color interface.
 func (c colorDeviceN) RGBA() (r, g, b, a uint32) {
 	X, Y, Z := c.ToXYZ()
-	rf, gf, bf := XYZToSRGB(X, Y, Z)
+	rf, gf, bf := xyzToSRGB(X, Y, Z)
 	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }

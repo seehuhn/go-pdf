@@ -79,7 +79,13 @@ func (s spaceDeviceGray) Convert(c stdcolor.Color) stdcolor.Color {
 // adapted to the D50 illuminant.
 func (s spaceDeviceGray) ToXYZ(values []float64) (X, Y, Z float64) {
 	v := values[0]
-	return SRGBToXYZ(v, v, v)
+	return srgbToXYZ(v, v, v)
+}
+
+// FromXYZ converts D50-adapted CIE XYZ to a DeviceGray component value.
+func (s spaceDeviceGray) FromXYZ(X, Y, Z float64) []float64 {
+	r, g, b := xyzToSRGB(X, Y, Z)
+	return []float64{0.299*r + 0.587*g + 0.114*b}
 }
 
 // DeviceGray is a color in the DeviceGray color space.
@@ -95,7 +101,7 @@ func (c DeviceGray) ColorSpace() Space {
 // adapted to the D50 illuminant.
 func (c DeviceGray) ToXYZ() (X, Y, Z float64) {
 	v := float64(c)
-	return SRGBToXYZ(v, v, v)
+	return srgbToXYZ(v, v, v)
 }
 
 // RGBA implements the color.Color interface.
@@ -157,7 +163,13 @@ func (s spaceDeviceRGB) Convert(c stdcolor.Color) stdcolor.Color {
 // ToXYZ converts RGB values to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (s spaceDeviceRGB) ToXYZ(values []float64) (X, Y, Z float64) {
-	return SRGBToXYZ(values[0], values[1], values[2])
+	return srgbToXYZ(values[0], values[1], values[2])
+}
+
+// FromXYZ converts D50-adapted CIE XYZ to DeviceRGB component values.
+func (s spaceDeviceRGB) FromXYZ(X, Y, Z float64) []float64 {
+	r, g, b := xyzToSRGB(X, Y, Z)
+	return []float64{r, g, b}
 }
 
 // DeviceRGB is a color in the DeviceRGB color space.
@@ -258,6 +270,33 @@ func (s spaceDeviceCMYK) ToXYZ(values []float64) (X, Y, Z float64) {
 	return deviceCMYKToXYZ(values)
 }
 
+var (
+	cmykInvOnce      sync.Once
+	cmykInvTransform *icc.Transform
+)
+
+// FromXYZ converts D50-adapted CIE XYZ to DeviceCMYK component values.
+func (s spaceDeviceCMYK) FromXYZ(X, Y, Z float64) []float64 {
+	cmykInvOnce.Do(func() {
+		p, err := icc.Decode(icc.CGATS001Profile)
+		if err != nil {
+			return
+		}
+		cmykInvTransform, _ = icc.NewTransform(p, icc.PCSToDevice, icc.Perceptual)
+	})
+	if cmykInvTransform != nil {
+		return cmykInvTransform.FromXYZ(X, Y, Z)
+	}
+	// fallback: naive sRGB to CMYK
+	r, g, b := xyzToSRGB(X, Y, Z)
+	c, m, y := 1-r, 1-g, 1-b
+	k := min(c, min(m, y))
+	if k >= 1 {
+		return []float64{0, 0, 0, 1}
+	}
+	return []float64{(c - k) / (1 - k), (m - k) / (1 - k), (y - k) / (1 - k), k}
+}
+
 // DeviceCMYK is a color in the DeviceCMYK color space.
 // The value are c, m, y, and k, and must be in the range from 0 (light) to 1 (dark).
 // They control the amount of cyan, magenta, yellow, and black in the color.
@@ -299,12 +338,12 @@ func deviceCMYKToXYZ(values []float64) (X, Y, Z float64) {
 	rf := (1 - cyan) * (1 - black)
 	gf := (1 - magenta) * (1 - black)
 	bf := (1 - yellow) * (1 - black)
-	return SRGBToXYZ(rf, gf, bf)
+	return srgbToXYZ(rf, gf, bf)
 }
 
 // RGBA implements the color.Color interface.
 func (c DeviceCMYK) RGBA() (r, g, b, a uint32) {
 	X, Y, Z := c.ToXYZ()
-	rf, gf, bf := XYZToSRGB(X, Y, Z)
+	rf, gf, bf := xyzToSRGB(X, Y, Z)
 	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }

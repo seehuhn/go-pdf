@@ -110,10 +110,9 @@ func TestCIERoundTrip(t *testing.T) {
 	for _, val := range []float64{0, 0.25, 0.5, 0.75, 1} {
 		c := s.New(val)
 		X, Y, Z := c.ToXYZ()
-		c2 := s.FromXYZ(X, Y, Z)
-		cg := c2.(colorCalGray)
-		if math.Abs(cg.Value-val) > 1e-6 {
-			t.Errorf("CalGray round-trip for %g: got %g", val, cg.Value)
+		v := s.FromXYZ(X, Y, Z)
+		if math.Abs(v[0]-val) > 1e-6 {
+			t.Errorf("CalGray round-trip for %g: got %g", val, v[0])
 		}
 	}
 }
@@ -126,12 +125,11 @@ func TestCalRGBRoundTrip(t *testing.T) {
 
 	c := s.New(0.3, 0.5, 0.7)
 	X, Y, Z := c.ToXYZ()
-	c2 := s.FromXYZ(X, Y, Z)
-	cr := c2.(colorCalRGB)
-	if math.Abs(cr.Values[0]-0.3) > 1e-6 ||
-		math.Abs(cr.Values[1]-0.5) > 1e-6 ||
-		math.Abs(cr.Values[2]-0.7) > 1e-6 {
-		t.Errorf("CalRGB round-trip: got %v, want [0.3, 0.5, 0.7]", cr.Values)
+	v := s.FromXYZ(X, Y, Z)
+	if math.Abs(v[0]-0.3) > 1e-6 ||
+		math.Abs(v[1]-0.5) > 1e-6 ||
+		math.Abs(v[2]-0.7) > 1e-6 {
+		t.Errorf("CalRGB round-trip: got %v, want [0.3, 0.5, 0.7]", v)
 	}
 }
 
@@ -146,17 +144,16 @@ func TestLabRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	X, Y, Z := c.ToXYZ()
-	c2 := s.FromXYZ(X, Y, Z)
-	cl := c2.(colorLab)
-	if math.Abs(cl.Values[0]-50) > 0.01 ||
-		math.Abs(cl.Values[1]-20) > 0.01 ||
-		math.Abs(cl.Values[2]+30) > 0.01 {
-		t.Errorf("Lab round-trip: got %v, want [50, 20, -30]", cl.Values)
+	v := s.FromXYZ(X, Y, Z)
+	if math.Abs(v[0]-50) > 0.01 ||
+		math.Abs(v[1]-20) > 0.01 ||
+		math.Abs(v[2]+30) > 0.01 {
+		t.Errorf("Lab round-trip: got %v, want [50, 20, -30]", v)
 	}
 }
 
 func TestToXYZRGBAConsistency(t *testing.T) {
-	// for every color type: ToXYZ -> XYZToSRGB -> toUint32 should match RGBA
+	// for every color type: ToXYZ -> xyzToSRGB -> toUint32 should match RGBA
 	calGray, _ := CalGray(WhitePointD65, nil, 1)
 	calRGB, _ := CalRGB(WhitePointD65, nil, nil, nil)
 	lab, _ := Lab(WhitePointD65, nil, nil)
@@ -179,7 +176,7 @@ func TestToXYZRGBAConsistency(t *testing.T) {
 
 	for _, c := range testColors {
 		X, Y, Z := c.ToXYZ()
-		rf, gf, bf := XYZToSRGB(X, Y, Z)
+		rf, gf, bf := xyzToSRGB(X, Y, Z)
 		r1, g1, b1 := toUint32(rf), toUint32(gf), toUint32(bf)
 		r2, g2, b2, _ := c.RGBA()
 

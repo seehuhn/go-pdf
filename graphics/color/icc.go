@@ -165,18 +165,8 @@ func (s *SpaceICCBased) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return pdf.Array{FamilyICCBased, sRef}, nil
 }
 
-// Convert converts a color to the ICC-based color space.
-// This implements the [stdcolor.Model] interface.
-func (s *SpaceICCBased) Convert(c stdcolor.Color) stdcolor.Color {
-	// fast path: already this ICC space
-	if ic, ok := c.(colorICCBased); ok && ic.Space == s {
-		return ic
-	}
-
-	// get XYZ from input colour (assumed sRGB)
-	X, Y, Z := ColorToXYZ(c)
-
-	// initialise transform on first use
+// FromXYZ converts D50-adapted CIE XYZ to ICC-based component values.
+func (s *SpaceICCBased) FromXYZ(X, Y, Z float64) []float64 {
 	s.transformOnce.Do(func() {
 		s.transform, _ = icc.NewTransform(s.Profile, icc.PCSToDevice, icc.RelativeColorimetric)
 	})
@@ -185,22 +175,36 @@ func (s *SpaceICCBased) Convert(c stdcolor.Color) stdcolor.Color {
 	if s.transform != nil {
 		values = s.transform.FromXYZ(X, Y, Z)
 	} else {
-		// fallback if transform not available
 		values = s.fallbackFromXYZ(X, Y, Z)
 	}
 
-	result := colorICCBased{Space: s}
+	result := make([]float64, s.N)
 	for i := 0; i < s.N && i < len(values); i++ {
-		// scale to the space's ranges
-		min, max := s.Ranges[2*i], s.Ranges[2*i+1]
-		result.Values[i] = clamp(values[i]*(max-min)+min, min, max)
+		lo, hi := s.Ranges[2*i], s.Ranges[2*i+1]
+		result[i] = clamp(values[i]*(hi-lo)+lo, lo, hi)
 	}
+	return result
+}
+
+// Convert converts a color to the ICC-based color space.
+// This implements the [stdcolor.Model] interface.
+func (s *SpaceICCBased) Convert(c stdcolor.Color) stdcolor.Color {
+	// fast path: already this ICC space
+	if ic, ok := c.(colorICCBased); ok && ic.Space == s {
+		return ic
+	}
+
+	X, Y, Z := ColorToXYZ(c)
+	values := s.FromXYZ(X, Y, Z)
+
+	result := colorICCBased{Space: s}
+	copy(result.Values[:], values)
 	return result
 }
 
 func (s *SpaceICCBased) fallbackFromXYZ(X, Y, Z float64) []float64 {
 	// simple fallback: convert XYZ to sRGB-like values
-	r, g, b := XYZToSRGB(X, Y, Z)
+	r, g, b := xyzToSRGB(X, Y, Z)
 	switch s.N {
 	case 1:
 		// grayscale: use luminance
@@ -267,17 +271,17 @@ func (s *SpaceICCBased) ToXYZ(values []float64) (X, Y, Z float64) {
 	// fallback without profile: treat as sRGB-like
 	switch s.N {
 	case 1:
-		return SRGBToXYZ(norm[0], norm[0], norm[0])
+		return srgbToXYZ(norm[0], norm[0], norm[0])
 	case 3:
-		return SRGBToXYZ(norm[0], norm[1], norm[2])
+		return srgbToXYZ(norm[0], norm[1], norm[2])
 	case 4:
 		cyan, magenta, yellow, black := norm[0], norm[1], norm[2], norm[3]
 		rf := (1 - cyan) * (1 - black)
 		gf := (1 - magenta) * (1 - black)
 		bf := (1 - yellow) * (1 - black)
-		return SRGBToXYZ(rf, gf, bf)
+		return srgbToXYZ(rf, gf, bf)
 	default:
-		return SRGBToXYZ(0.5, 0.5, 0.5)
+		return srgbToXYZ(0.5, 0.5, 0.5)
 	}
 }
 
@@ -304,6 +308,6 @@ func (c colorICCBased) ToXYZ() (X, Y, Z float64) {
 // RGBA implements the color.Color interface.
 func (c colorICCBased) RGBA() (r, g, b, a uint32) {
 	X, Y, Z := c.ToXYZ()
-	rf, gf, bf := XYZToSRGB(X, Y, Z)
+	rf, gf, bf := xyzToSRGB(X, Y, Z)
 	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }
