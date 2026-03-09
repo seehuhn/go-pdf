@@ -119,7 +119,13 @@ func createDocument(fname string) error {
 	}
 
 	// Write outline
-	writer.outline.Write(doc.RM)
+	outlineRef, err := writer.outline.Encode(doc.RM)
+	if err != nil {
+		return err
+	}
+	if ref, ok := outlineRef.(pdf.Reference); ok {
+		doc.Out.GetMeta().Catalog.Outlines = ref
+	}
 
 	return doc.Close()
 }

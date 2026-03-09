@@ -29,15 +29,14 @@ import (
 // PDF 2.0 sections: 12.3.3
 
 // Outline represents the root of a document outline.
-// Use [Read] to read an outline from a PDF file, or create a new outline
+// Use [Decode] to read an outline from a PDF file, or create a new outline
 // and populate it using [Outline.AddItem].
 type Outline struct {
 	// Items contains the top-level outline items.
 	Items []*Item
 }
 
-// Item represents an outline item, with a title and a destination or action.
-// This is used both for leaves and for internal nodes in the outline tree (apart from the root).
+// Item represents a single entry in a document outline.
 // Items form a tree structure via the Children field.
 type Item struct {
 	// Title is the text displayed for this outline item.
@@ -93,10 +92,11 @@ func (item *Item) AddChild(title string) *Item {
 	return child
 }
 
-// Read reads the document outline from a PDF file.
-// Returns nil if the document has no outline.
-func Read(r pdf.Getter) (*Outline, error) {
-	rootRef := r.GetMeta().Catalog.Outlines
+// Decode reads a document outline from a PDF file.
+// The obj argument should be the value of the Outlines entry in the catalog.
+// Returns nil if obj is nil or not a reference.
+func Decode(x *pdf.Extractor, obj pdf.Object) (*Outline, error) {
+	rootRef, _ := obj.(pdf.Reference)
 	if rootRef == 0 {
 		return nil, nil
 	}
@@ -104,13 +104,13 @@ func Read(r pdf.Getter) (*Outline, error) {
 	seen := map[pdf.Reference]bool{}
 	seen[rootRef] = true
 
-	rootDict, err := pdf.GetDictTyped(r, rootRef, "Outlines")
+	rootDict, err := pdf.GetDictTyped(x.R, rootRef, "Outlines")
 	if err != nil {
 		return nil, err
 	}
 
 	firstRef, _ := rootDict["First"].(pdf.Reference)
-	items, err := readChildren(r, seen, firstRef)
+	items, err := readChildren(x, seen, firstRef)
 	if err != nil {
 		return nil, err
 	}
@@ -118,42 +118,41 @@ func Read(r pdf.Getter) (*Outline, error) {
 	return &Outline{Items: items}, nil
 }
 
-func readItem(r pdf.Getter, seen map[pdf.Reference]bool, ref pdf.Reference) (*Item, pdf.Dict, error) {
+func readItem(x *pdf.Extractor, seen map[pdf.Reference]bool, ref pdf.Reference) (*Item, pdf.Dict, error) {
 	if seen[ref] {
 		return nil, nil, pdf.Errorf("outline tree contains a loop")
 	}
 	seen[ref] = true
 	if len(seen) > 65536 {
-		return nil, nil, errors.New("outline too large")
+		return nil, nil, pdf.Error("outline too large")
 	}
 
-	dict, err := pdf.GetDict(r, ref)
+	dict, err := pdf.GetDict(x.R, ref)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	item := &Item{}
 
-	title, err := pdf.GetTextString(r, dict["Title"])
+	title, err := pdf.GetTextString(x.R, dict["Title"])
 	if err != nil {
 		return nil, nil, pdf.Wrap(err, "/Title in outline")
 	}
 	item.Title = string(title)
 
-	count, _ := pdf.GetInteger(r, dict["Count"])
+	count, _ := pdf.GetInteger(x.R, dict["Count"])
 	item.Open = count > 0
 
-	v := pdf.GetVersion(r)
+	v := pdf.GetVersion(x.R)
 
-	x := pdf.NewExtractor(r)
 	if dict["Dest"] != nil {
-		dest, err := destination.Decode(x, dict["Dest"])
+		dest, err := pdf.ExtractorGetOptional(x, dict["Dest"], destination.Decode)
 		if err != nil {
 			return nil, nil, pdf.Wrap(err, "/Dest in outline")
 		}
 		item.Destination = dest
 	} else if dict["A"] != nil && v >= pdf.V1_1 {
-		a, err := pdf.Optional(action.Decode(x, dict["A"]))
+		a, err := pdf.ExtractorGetOptional(x, dict["A"], action.Decode)
 		if err != nil {
 			return nil, nil, pdf.Wrap(err, "/A in outline")
 		}
@@ -161,14 +160,14 @@ func readItem(r pdf.Getter, seen map[pdf.Reference]bool, ref pdf.Reference) (*It
 	}
 
 	if v >= pdf.V1_4 {
-		if cArr, _ := pdf.GetArray(r, dict["C"]); len(cArr) == 3 {
-			cr, _ := pdf.GetNumber(r, cArr[0])
-			cg, _ := pdf.GetNumber(r, cArr[1])
-			cb, _ := pdf.GetNumber(r, cArr[2])
+		if cArr, _ := pdf.GetArray(x.R, dict["C"]); len(cArr) == 3 {
+			cr, _ := pdf.GetNumber(x.R, cArr[0])
+			cg, _ := pdf.GetNumber(x.R, cArr[1])
+			cb, _ := pdf.GetNumber(x.R, cArr[2])
 			item.Color = color.DeviceRGB{float64(cr), float64(cg), float64(cb)}
 		}
 
-		if f, _ := pdf.GetInteger(r, dict["F"]); f != 0 {
+		if f, _ := pdf.GetInteger(x.R, dict["F"]); f != 0 {
 			item.Italic = f&1 != 0
 			item.Bold = f&2 != 0
 		}
@@ -179,7 +178,7 @@ func readItem(r pdf.Getter, seen map[pdf.Reference]bool, ref pdf.Reference) (*It
 	}
 
 	firstRef, _ := dict["First"].(pdf.Reference)
-	children, err := readChildren(r, seen, firstRef)
+	children, err := readChildren(x, seen, firstRef)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -188,10 +187,10 @@ func readItem(r pdf.Getter, seen map[pdf.Reference]bool, ref pdf.Reference) (*It
 	return item, dict, nil
 }
 
-func readChildren(r pdf.Getter, seen map[pdf.Reference]bool, ref pdf.Reference) ([]*Item, error) {
+func readChildren(x *pdf.Extractor, seen map[pdf.Reference]bool, ref pdf.Reference) ([]*Item, error) {
 	var res []*Item
 	for ref != 0 {
-		item, dict, err := readItem(r, seen, ref)
+		item, dict, err := readItem(x, seen, ref)
 		if err != nil {
 			return nil, err
 		}
@@ -203,10 +202,11 @@ func readChildren(r pdf.Getter, seen map[pdf.Reference]bool, ref pdf.Reference) 
 	return res, nil
 }
 
-// Write writes the outline to the PDF file and installs it in the catalog.
-func (o *Outline) Write(rm *pdf.ResourceManager) error {
+// Encode writes the outline to a PDF file and returns the root reference.
+// Returns nil if the outline is nil or empty.
+func (o *Outline) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if o == nil || len(o.Items) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	ww := &writer{
@@ -244,16 +244,15 @@ func (o *Outline) Write(rm *pdf.ResourceManager) error {
 
 	err := ww.writeChildren(rootRef, first, last, o.Items)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = ww.flush()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	rm.Out.GetMeta().Catalog.Outlines = rootRef
-	return nil
+	return rootRef, nil
 }
 
 type writer struct {

@@ -20,6 +20,7 @@ import (
 	"errors"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/pagetree"
@@ -75,7 +76,7 @@ func (p *Page) Close() error {
 	}
 
 	// Set up page contents from builder stream
-	p.Page.Contents = []*page.Content{{Operators: p.Builder.Stream}}
+	p.Page.Contents = []content.Stream{p.Builder.Stream}
 
 	ref := p.Ref
 	if ref == 0 {

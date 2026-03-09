@@ -210,6 +210,18 @@ func TestOperatorArgLimit(t *testing.T) {
 	}
 }
 
+// appendClosingOps tracks state on ops and appends any closing operators.
+func appendClosingOps(ops Operators, ct Type, res *Resources) Operators {
+	state := NewState(ct, res)
+	for _, op := range ops {
+		state.ApplyStateChanges(op.Name, op.Args)
+	}
+	for _, name := range state.ClosingOperators() {
+		ops = append(ops, Operator{Name: name})
+	}
+	return ops
+}
+
 // collectStream collects all operators from a Stream into an Operators slice.
 func collectStream(s Stream) (Operators, error) {
 	var ops Operators
@@ -224,18 +236,19 @@ func TestNewScannerMatchesReadStream(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			data := []byte(tt.stream)
 
-			// ReadStream result
+			// ReadStream result (includes closing ops)
 			want, err := ReadStream(bytes.NewReader(data), pdf.V2_0, Page, testResources)
 			if err != nil {
 				t.Fatalf("ReadStream: %v", err)
 			}
 
-			// NewScanner result
+			// NewScanner result (no closing ops); append them manually
 			s := NewScanner(bytes.NewReader(data), pdf.V2_0, Page, testResources)
 			got, err := collectStream(s)
 			if err != nil {
 				t.Fatalf("NewScanner: %v", err)
 			}
+			got = appendClosingOps(got, Page, testResources)
 
 			if diff := cmp.Diff(want, got, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("mismatch (-ReadStream +NewScanner):\n%s", diff)
@@ -262,6 +275,8 @@ func FuzzNewScannerMatchesReadStream(f *testing.F) {
 		if err1 != nil {
 			return
 		}
+
+		got = appendClosingOps(got, Page, testResources)
 
 		if diff := cmp.Diff(want, got, cmpopts.EquateEmpty()); diff != "" {
 			t.Errorf("mismatch (-ReadStream +NewScanner):\n%s", diff)

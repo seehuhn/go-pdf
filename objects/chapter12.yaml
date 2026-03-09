@@ -8658,53 +8658,74 @@ types:
     notes: Default is really infinity
 - name: Outline
   purpose: root of the document outline (bookmarks) tree
-  goType:
+  goType: outline.Outline
   pdfType: Outlines
   pdfRepr: dict
   introduced: '1.0'
   specTable: Table 150
+  goPackage: outline
+  goRepr: struct
+  specSection: '12.3.3'
+  fileDependent: true
+  writeMethod: (*Outline).Encode
+  readFunc: outline.Decode
   fields:
-  - goName:
+  - goName: null
     pdfKey: Type
     pdfType: name
     required: false
     introduced: '1.0'
     possibleValues:
     - Outlines
+    discriminator: true
     notes: Table 150
-  - goName:
+    source: Outline
+  - goName: null
     pdfKey: First
     pdfType: dictionary
     required: false
     introduced: '1.0'
     refTypes:
     - OutlineItem
-  - goName:
+    purpose: linked-list structure, represented as Items slice in Go
+    source: Outline
+  - goName: null
     pdfKey: Last
     pdfType: dictionary
     required: false
     introduced: '1.0'
     refTypes:
     - OutlineItem
-  - goName:
+    purpose: linked-list structure, represented as Items slice in Go
+    source: Outline
+  - goName: null
     pdfKey: Count
     pdfType: integer
     required: false
     introduced: '1.0'
     possibleValues:
     - fn:Eval(@Count>=0)
+    purpose: computed from tree structure
+    source: Outline
 - name: OutlineItem
   purpose: single entry in the document outline (bookmark)
-  goType:
+  goType: outline.Item
   pdfRepr: dict
+  goPackage: outline
+  goRepr: struct
+  specSection: '12.3.3'
+  fileDependent: true
   fields:
-  - goName:
+  - goName: Title
     pdfKey: Title
     pdfType: text-string
     required: true
     introduced: '1.0'
+    goType: string
+    purpose: Title is the text displayed for this outline item.
     notes: Table 151
-  - goName:
+    source: OutlineItem
+  - goName: null
     pdfKey: Parent
     pdfType: dictionary
     required: true
@@ -8712,49 +8733,65 @@ types:
     refTypes:
     - OutlineItem
     - Outline
-  - goName:
+    purpose: linked-list structure, implicit in tree representation
+    source: OutlineItem
+  - goName: null
     pdfKey: Prev
     pdfType: dictionary
     required: false
     introduced: '1.0'
     refTypes:
     - OutlineItem
-  - goName:
+    purpose: linked-list structure, implicit in tree representation
+    source: OutlineItem
+  - goName: null
     pdfKey: Next
     pdfType: dictionary
     required: false
     introduced: '1.0'
     refTypes:
     - OutlineItem
-  - goName:
+    purpose: linked-list structure, implicit in tree representation
+    source: OutlineItem
+  - goName: null
     pdfKey: First
     pdfType: dictionary
     required: false
     introduced: '1.0'
     refTypes:
     - OutlineItem
-  - goName:
+    purpose: linked-list structure, represented as Children slice in Go
+    source: OutlineItem
+  - goName: null
     pdfKey: Last
     pdfType: dictionary
     required: false
     introduced: '1.0'
     refTypes:
     - OutlineItem
-  - goName:
+    purpose: linked-list structure, represented as Children slice in Go
+    source: OutlineItem
+  - goName: null
     pdfKey: Count
     pdfType: integer
     required: false
     introduced: '1.0'
-  - goName:
+    purpose: computed from Open field and tree structure
+    source: OutlineItem
+  - goName: Destination
     pdfKey: Dest
     pdfType: array;name;byte-string
     required: false
     introduced: '1.0'
-  - goName:
+    goType: destination.Destination
+    purpose: Destination is the view to show when the outline item is activated.
+    source: OutlineItem
+  - goName: Action
     pdfKey: A
     pdfType: dictionary
     required: false
     introduced: '1.1'
+    goType: pdf.Action
     refTypes:
     - ActionGoTo
     - ActionGoToR
@@ -8791,26 +8828,36 @@ types:
       since: '1.3'
     - type: ActionRichMediaExecute
       since: '2.0'
-  - goName:
+    purpose: Action is performed when the outline item is activated.
+    source: OutlineItem
+  - goName: StructEntry
     pdfKey: SE
     pdfType: dictionary
     required: false
     introduced: '1.3'
+    goType: pdf.Reference
     refTypes:
     - StructElem
-  - goName:
+    purpose: StructEntry is the structure element associated with this item.
+    source: OutlineItem
+  - goName: Color
     pdfKey: C
     pdfType: array
     required: false
     default: '[0.0 0.0 0.0]'
     introduced: '1.4'
-  - goName:
+    goType: color.DeviceRGB
+    purpose: Color specifies the colour for the outline entry's text.
+    source: OutlineItem
+  - goName: null
     pdfKey: F
     pdfType: bitmask
     required: false
     default: '0'
     introduced: '1.4'
+    purpose: split into Bold and Italic bool fields in Go
     notes: Table 152
+    source: OutlineItem
 - name: Projection
   purpose: projection parameters for 3D rendering
   pdfSubtype: O

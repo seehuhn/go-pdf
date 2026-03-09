@@ -148,7 +148,7 @@ func TestBMCOperator(t *testing.T) {
 	}
 
 	// Parse: BMC /Artifact
-	// Note: ReadStream auto-closes unclosed BMC with EMC at EOF
+	// Note: ProcessStream auto-closes unclosed BMC with EMC at EOF
 	contentStream := strings.NewReader("/Artifact BMC")
 	err := r.ParseContentStream(contentStream)
 	if err != nil {
@@ -314,7 +314,7 @@ func TestBDCOperator(t *testing.T) {
 	}
 
 	// Parse: BDC /Span <</Lang (en-US)>>
-	// Note: ReadStream auto-closes unclosed BDC with EMC at EOF
+	// Note: ProcessStream auto-closes unclosed BDC with EMC at EOF
 	contentStream := strings.NewReader("/Span <</Lang (en-US)>> BDC")
 	err := r.ParseContentStream(contentStream)
 	if err != nil {

@@ -55,7 +55,7 @@ func Pages(r pdf.Getter, pattern string) (*PageRange, error) {
 		return nil, fmt.Errorf("invalid regex pattern: %w", err)
 	}
 
-	tree, err := outline.Read(r)
+	tree, err := outline.Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read outline: %w", err)
 	}
@@ -395,7 +395,7 @@ func findNextAtLevel(items []*outline.Item, target *outline.Item, targetLevel, c
 // ListAll returns a list of all outline entries in the document.
 // Each entry is formatted with dotted-line padding and a page number.
 func ListAll(r pdf.Getter) ([]string, error) {
-	tree, err := outline.Read(r)
+	tree, err := outline.Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read outline: %w", err)
 	}
@@ -450,7 +450,7 @@ func FindNext(r pdf.Getter, pattern string) (string, error) {
 		return "", fmt.Errorf("invalid regex pattern: %w", err)
 	}
 
-	tree, err := outline.Read(r)
+	tree, err := outline.Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines)
 	if err != nil {
 		return "", fmt.Errorf("failed to read outline: %w", err)
 	}

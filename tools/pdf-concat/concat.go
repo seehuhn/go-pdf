@@ -87,10 +87,11 @@ func (c *Concat) Close() error {
 		entry.Destination = &destination.Fit{Page: child.FirstPage}
 		entry.Children = child.Outline
 	}
-	err = outlineTree.Write(c.rm)
+	outlineRef, err := outlineTree.Encode(c.rm)
 	if err != nil {
 		return err
 	}
+	c.rm.Out.GetMeta().Catalog.Outlines, _ = outlineRef.(pdf.Reference)
 
 	err = c.rm.Close()
 	if err != nil {
@@ -111,7 +112,7 @@ func (c *Concat) Append(fname string) error {
 	copy := pdf.NewCopier(c.w, r)
 
 	meta := r.GetMeta()
-	outlineTree, _ := outline.Read(r)
+	outlineTree, _ := outline.Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines)
 
 	var title string
 	if meta.Info != nil && meta.Info.Title != "" {

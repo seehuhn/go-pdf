@@ -192,18 +192,26 @@ func (ct Type) String() string {
 // parsing continues. IO errors are returned to the caller.
 //
 // If the stream has unbalanced state at EOF (unclosed q/Q, BT/ET, BMC/EMC,
-// or BX/EX), the missing closing operators are appended automatically.
+// or BX/EX), ReadStream appends the missing closing operators.
 //
 // Operators that are invalid in the current graphics object context are
 // either fixed up (text operators get BT auto-inserted) or skipped
 // (path operators outside path context).
 func ReadStream(r io.Reader, v pdf.Version, ct Type, res *Resources) (Operators, error) {
 	s := NewScanner(r, v, ct, res)
+	state := NewState(ct, res)
 	var ops Operators
 	for name, args := range s.All() {
+		state.ApplyStateChanges(name, args)
 		ops = append(ops, Operator{Name: name, Args: slices.Clone(args)})
 	}
-	return ops, s.Err()
+	if err := s.Err(); err != nil {
+		return nil, err
+	}
+	for _, name := range state.ClosingOperators() {
+		ops = append(ops, Operator{Name: name})
+	}
+	return ops, nil
 }
 
 // scannerStream implements [Stream] by lazily scanning a content stream.
@@ -279,93 +287,180 @@ func (ss *scannerStream) All() iter.Seq2[OpName, []pdf.Object] {
 	}
 	ss.started = true
 	return func(yield func(OpName, []pdf.Object) bool) {
-		for {
-			op, err := ss.s.scan()
-			switch err {
-			case nil:
-				// filter based on version validation
-				opName := op.Name
-				validErr := opName.isValidName(ss.version)
-				if validErr == ErrUnknown || validErr == ErrVersion {
-					if ss.state.InCompatibilitySection() {
-						// inside BX/EX: keep unknown operators
-					} else if ss.version > pdf.MaxVersion {
-						// future PDF version: keep (may be valid)
-					} else {
-						// known PDF version: drop unknown/version-incompatible
-						continue
-					}
-				}
-				// handle deprecated operators by substitution
-				if validErr == ErrDeprecated {
-					switch opName {
-					case OpFillCompat:
-						opName = OpFill // F -> f
-					default:
-						continue // drop other deprecated operators
-					}
-				}
+		ss.scanLoop(yield)
+	}
+}
 
-				// filter Type 3 operators based on content type
-				if ss.ct != Glyph {
-					if opName == OpType3ColoredGlyph || opName == OpType3UncoloredGlyph {
-						continue
-					}
-				}
+// scanLoop scans operators from ss.s, applying filtering and yielding through
+// yield. Returns true if the reader was exhausted normally, false if yield
+// returned false or an IO error occurred.
+func (ss *scannerStream) scanLoop(yield func(OpName, []pdf.Object) bool) bool {
+	// save any trailing args from previous reader (for multi-stream pages)
+	savedArgs := slices.Clone(ss.s.args)
+	hasSavedArgs := len(savedArgs) > 0
 
-				// check if operator is allowed in current state and fix up if needed
-				if ss.state.CheckOperatorAllowed(opName) != nil {
-					if fixNames := fixupOperatorName(ss.state, opName); fixNames != nil {
-						for _, fixName := range fixNames {
-							ss.state.ApplyStateChanges(fixName, nil)
-							if !yield(fixName, nil) {
-								return
-							}
-						}
-						// fall through to process original operator via main path
-					} else {
-						continue
-					}
-				}
+	for {
+		op, err := ss.s.scan()
+		switch err {
+		case nil:
+			opName := op.Name
 
-				// skip operators whose required state is not set
-				info := operators[opName]
-				if info != nil && info.Requires&^ss.state.Usable != 0 {
-					continue
-				}
-
-				// update state and filter improperly nested operators
-				if ss.state.ApplyStateChanges(opName, op.Args) != nil {
-					continue
-				}
-
-				// update state bits for operators that set new state
-				if info != nil && info.Sets != 0 {
-					ss.state.Usable |= info.Sets
-					ss.state.GState.Set |= info.Sets
-				}
-
-				if !yield(opName, op.Args) {
-					return
-				}
-			case io.EOF:
-				// yield closing operators for open contexts
-				for _, name := range ss.state.ClosingOperators() {
-					if !yield(name, nil) {
-						return
-					}
-				}
-				return
-			case errParse:
-				// permissive: skip malformed content
-			default:
-				// IO error
-				ss.err = err
-				return
+			// prepend trailing args from previous reader to first real operator
+			if hasSavedArgs && opName != OpRawContent {
+				op.Args = append(savedArgs, op.Args...)
+				hasSavedArgs = false
 			}
+
+			// filter based on version validation
+			validErr := opName.isValidName(ss.version)
+			if validErr == ErrUnknown || validErr == ErrVersion {
+				if ss.state.InCompatibilitySection() {
+					// inside BX/EX: keep unknown operators
+				} else if ss.version > pdf.MaxVersion {
+					// future PDF version: keep (may be valid)
+				} else {
+					// known PDF version: drop unknown/version-incompatible
+					continue
+				}
+			}
+			// handle deprecated operators by substitution
+			if validErr == ErrDeprecated {
+				switch opName {
+				case OpFillCompat:
+					opName = OpFill // F -> f
+				default:
+					continue // drop other deprecated operators
+				}
+			}
+
+			// filter Type 3 operators based on content type
+			if ss.ct != Glyph {
+				if opName == OpType3ColoredGlyph || opName == OpType3UncoloredGlyph {
+					continue
+				}
+			}
+
+			// check if operator is allowed in current state and fix up if needed
+			if ss.state.CheckOperatorAllowed(opName) != nil {
+				if fixNames := fixupOperatorName(ss.state, opName); fixNames != nil {
+					for _, fixName := range fixNames {
+						ss.state.ApplyStateChanges(fixName, nil)
+						if !yield(fixName, nil) {
+							return false
+						}
+					}
+					// fall through to process original operator via main path
+				} else {
+					continue
+				}
+			}
+
+			// skip operators whose required state is not set
+			info := operators[opName]
+			if info != nil && info.Requires&^ss.state.Usable != 0 {
+				continue
+			}
+
+			// update state and filter improperly nested operators
+			if ss.state.ApplyStateChanges(opName, op.Args) != nil {
+				continue
+			}
+
+			// drop Tf operators that reference fonts not in resources
+			if opName == OpTextSetFont {
+				name, ok := getName(op.Args, 0)
+				if !ok || ss.res == nil || ss.res.Font[name] == nil {
+					continue
+				}
+			}
+
+			// update state bits for operators that set new state
+			if info != nil && info.Sets != 0 {
+				ss.state.Usable |= info.Sets
+				ss.state.GState.Set |= info.Sets
+			}
+
+			if !yield(opName, op.Args) {
+				return false
+			}
+		case io.EOF:
+			return true
+		case errParse:
+			// permissive: skip malformed content
+		default:
+			// IO error
+			ss.err = err
+			return false
 		}
 	}
 }
+
+// PageScanner scans page content streams that may span multiple PDF stream
+// objects. It carries scanner state (graphics state, arg stack) across
+// stream boundaries, so that paths and operators split across streams
+// are handled correctly.
+type PageScanner struct {
+	ss *scannerStream
+}
+
+// NewPageScanner creates a scanner for page content streams.
+func NewPageScanner(v pdf.Version, res *Resources) *PageScanner {
+	return &PageScanner{
+		ss: &scannerStream{
+			s: &streamScanner{
+				buf: make([]byte, 512),
+				src: eofReader{},
+			},
+			state:   NewState(Page, res),
+			version: v,
+			ct:      Page,
+			res:     res,
+		},
+	}
+}
+
+// SetInitialArgs sets trailing args from a previous content stream segment.
+// This must be called before the first ScanReader call.
+func (ps *PageScanner) SetInitialArgs(args []pdf.Object) {
+	ps.ss.s.args = slices.Clone(args)
+}
+
+// ScanReader scans operators from r, calling yield for each filtered operator.
+// At EOF of r, it returns without emitting closing operators.
+// The scanner state and any trailing args carry over for subsequent calls.
+// Returns true if the reader was fully consumed, false if yield returned false
+// or an IO error occurred.
+func (ps *PageScanner) ScanReader(r io.Reader, yield func(OpName, []pdf.Object) bool) bool {
+	ps.ss.s = &streamScanner{
+		buf:  make([]byte, 512),
+		src:  r,
+		args: ps.ss.s.args,
+	}
+	return ps.ss.scanLoop(yield)
+}
+
+// ClosingOps returns the operators needed to close any open contexts
+// (unbalanced q/Q, BT/ET, BMC/EMC, BX/EX, or open paths).
+func (ps *PageScanner) ClosingOps() []OpName {
+	return ps.ss.state.ClosingOperators()
+}
+
+// TrailingArgs returns any operator arguments left on the scanner's stack
+// after the most recent ScanReader call. These are args that appeared after
+// the last operator in a stream, typically because the operator is in the
+// next stream segment.
+func (ps *PageScanner) TrailingArgs() []pdf.Object {
+	return slices.Clone(ps.ss.s.args)
+}
+
+// Err returns any IO error encountered during scanning.
+func (ps *PageScanner) Err() error {
+	return ps.ss.err
+}
+
+type eofReader struct{}
+
+func (eofReader) Read([]byte) (int, error) { return 0, io.EOF }
 
 // Err returns any IO error encountered during iteration.
 func (ss *scannerStream) Err() error {

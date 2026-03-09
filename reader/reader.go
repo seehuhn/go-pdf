@@ -135,244 +135,251 @@ func (r *Reader) ParseContentStream(in io.Reader) error {
 }
 
 // ProcessStream processes a parsed content stream, calling the appropriate
-// callback functions for each operator.
+// callback functions for each operator. After iteration, ProcessStream
+// emits closing operators for any open contexts (unbalanced q/Q, BT/ET,
+// BMC/EMC, or BX/EX).
 func (r *Reader) ProcessStream(stream content.Stream) error {
 	for name, args := range stream.All() {
-		// Apply state changes first
-		_ = r.State.ApplyOperator(name, args) // ignore errors in permissive reader
+		if err := r.processOperator(name, args); err != nil {
+			return err
+		}
+	}
+	if err := stream.Err(); err != nil {
+		return err
+	}
+	for _, name := range r.State.ClosingOperators() {
+		if err := r.processOperator(name, nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-		// Get current graphics state (may have changed after ApplyOperator)
-		p := r.State.GState
+// processOperator handles a single content stream operator.
+func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
+	// apply state changes first
+	_ = r.State.ApplyOperator(name, args) // ignore errors in permissive reader
 
-		// Handle reader-specific callbacks
-		switch name {
+	// get current graphics state (may have changed after ApplyOperator)
+	p := r.State.GState
 
-		// Text-positioning operators - emit TextEvent callbacks
-		case content.OpTextMoveOffset, content.OpTextMoveOffsetSetLeading, content.OpTextNextLine: // Td, TD, T*
-			if r.TextEvent != nil {
-				r.TextEvent(TextEventNL, 0)
+	// handle reader-specific callbacks
+	switch name {
+
+	// text-positioning operators - emit TextEvent callbacks
+	case content.OpTextMoveOffset, content.OpTextMoveOffsetSetLeading, content.OpTextNextLine: // Td, TD, T*
+		if r.TextEvent != nil {
+			r.TextEvent(TextEventNL, 0)
+		}
+
+	case content.OpTextSetMatrix: // Tm
+		if r.TextEvent != nil {
+			r.TextEvent(TextEventMove, 0)
+		}
+
+	// text-showing operators
+	case content.OpTextShow: // Tj
+		if s, ok := getString(args, 0); ok && p.TextFont != nil {
+			if err := r.processText(s); err != nil {
+				return err
 			}
+		}
 
-		case content.OpTextSetMatrix: // Tm
-			if r.TextEvent != nil {
-				r.TextEvent(TextEventMove, 0)
+	case content.OpTextShowMoveNextLine: // '
+		// state already moved to next line
+		if r.TextEvent != nil {
+			r.TextEvent(TextEventNL, 0)
+		}
+		if s, ok := getString(args, 0); ok && p.TextFont != nil {
+			if err := r.processText(s); err != nil {
+				return err
 			}
+		}
 
-		// Text-showing operators
-		case content.OpTextShow: // Tj
-			if s, ok := getString(args, 0); ok && p.TextFont != nil {
-				err := r.processText(s)
-				if err != nil {
-					return err
-				}
+	case content.OpTextShowMoveNextLineSetSpacing: // "
+		// state already set spacing and moved to next line
+		if r.TextEvent != nil {
+			r.TextEvent(TextEventNL, 0)
+		}
+		if s, ok := getString(args, 2); ok && p.TextFont != nil {
+			if err := r.processText(s); err != nil {
+				return err
 			}
+		}
 
-		case content.OpTextShowMoveNextLine: // '
-			// State already moved to next line
-			if r.TextEvent != nil {
-				r.TextEvent(TextEventNL, 0)
-			}
-			if s, ok := getString(args, 0); ok && p.TextFont != nil {
-				err := r.processText(s)
-				if err != nil {
-					return err
-				}
-			}
-
-		case content.OpTextShowMoveNextLineSetSpacing: // "
-			// State already set spacing and moved to next line
-			if r.TextEvent != nil {
-				r.TextEvent(TextEventNL, 0)
-			}
-			if s, ok := getString(args, 2); ok && p.TextFont != nil {
-				err := r.processText(s)
-				if err != nil {
-					return err
-				}
-			}
-
-		case content.OpTextShowArray: // TJ
-			if a, ok := getArray(args, 0); ok && p.TextFont != nil {
-				for _, ai := range a {
-					var d float64
-					switch ai := ai.(type) {
-					case pdf.String:
-						err := r.processText(ai)
-						if err != nil {
-							return err
-						}
-					case pdf.Integer:
-						d = float64(ai)
-					case pdf.Real:
-						d = float64(ai)
-					case pdf.Number:
-						d = float64(ai)
-					}
-					if d != 0 {
-						if d < 0 && r.TextEvent != nil {
-							r.TextEvent(TextEventSpace, -d)
-						}
-
-						d = d / 1000 * p.TextFontSize
-						switch p.TextFont.WritingMode() {
-						case font.Horizontal:
-							p.TextMatrix = matrix.Translate(-d*p.TextHorizontalScaling, 0).Mul(p.TextMatrix)
-						case font.Vertical:
-							p.TextMatrix = matrix.Translate(0, -d).Mul(p.TextMatrix)
-						}
-					}
-				}
-			}
-
-		// Marked-content operators
-		case content.OpMarkedContentPoint: // MP
-			if tag, ok := getName(args, 0); ok && r.MarkedContent != nil {
-				mc := &graphics.MarkedContent{
-					Tag:        tag,
-					Properties: nil,
-				}
-				err := r.MarkedContent(MarkedContentPoint, mc)
-				if err != nil {
-					return err
-				}
-			}
-
-		case content.OpBeginMarkedContent: // BMC
-			if tag, ok := getName(args, 0); ok && len(r.MarkedContentStack) < maxMarkedContentDepth {
-				mc := &graphics.MarkedContent{
-					Tag:        tag,
-					Properties: nil,
-				}
-				r.MarkedContentStack = append(r.MarkedContentStack, mc)
-				if r.MarkedContent != nil {
-					err := r.MarkedContent(MarkedContentBegin, mc)
-					if err != nil {
+	case content.OpTextShowArray: // TJ
+		if a, ok := getArray(args, 0); ok && p.TextFont != nil {
+			for _, ai := range a {
+				var d float64
+				switch ai := ai.(type) {
+				case pdf.String:
+					if err := r.processText(ai); err != nil {
 						return err
 					}
+				case pdf.Integer:
+					d = float64(ai)
+				case pdf.Real:
+					d = float64(ai)
+				case pdf.Number:
+					d = float64(ai)
+				}
+				if d != 0 {
+					if d < 0 && r.TextEvent != nil {
+						r.TextEvent(TextEventSpace, -d)
+					}
+
+					d = d / 1000 * p.TextFontSize
+					switch p.TextFont.WritingMode() {
+					case font.Horizontal:
+						p.TextMatrix = matrix.Translate(-d*p.TextHorizontalScaling, 0).Mul(p.TextMatrix)
+					case font.Vertical:
+						p.TextMatrix = matrix.Translate(0, -d).Mul(p.TextMatrix)
+					}
 				}
 			}
+		}
 
-		case content.OpMarkedContentPointWithProperties: // DP
-			if len(args) != 2 {
-				break
+	// marked-content operators
+	case content.OpMarkedContentPoint: // MP
+		if tag, ok := getName(args, 0); ok && r.MarkedContent != nil {
+			mc := &graphics.MarkedContent{
+				Tag:        tag,
+				Properties: nil,
 			}
-			tag, ok1 := args[0].(pdf.Name)
-			if !ok1 {
-				break
-			}
-
-			mc, err := r.extractMarkedContent(tag, args[1])
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
+			if err := r.MarkedContent(MarkedContentPoint, mc); err != nil {
 				return err
 			}
+		}
 
-			if r.MarkedContent != nil {
-				err := r.MarkedContent(MarkedContentPoint, mc)
-				if err != nil {
-					return err
-				}
+	case content.OpBeginMarkedContent: // BMC
+		if tag, ok := getName(args, 0); ok && len(r.MarkedContentStack) < maxMarkedContentDepth {
+			mc := &graphics.MarkedContent{
+				Tag:        tag,
+				Properties: nil,
 			}
-
-		case content.OpBeginMarkedContentWithProperties: // BDC
-			if len(args) != 2 {
-				break
-			}
-
-			tag, ok1 := args[0].(pdf.Name)
-			if !ok1 || len(r.MarkedContentStack) >= maxMarkedContentDepth {
-				break
-			}
-
-			mc, err := r.extractMarkedContent(tag, args[1])
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
-				return err
-			}
-
 			r.MarkedContentStack = append(r.MarkedContentStack, mc)
 			if r.MarkedContent != nil {
-				err := r.MarkedContent(MarkedContentBegin, mc)
-				if err != nil {
-					return err
-				}
-			}
-
-		case content.OpEndMarkedContent: // EMC
-			if len(r.MarkedContentStack) > 0 {
-				mc := r.MarkedContentStack[len(r.MarkedContentStack)-1]
-				r.MarkedContentStack = r.MarkedContentStack[:len(r.MarkedContentStack)-1]
-				if r.MarkedContent != nil {
-					err := r.MarkedContent(MarkedContentEnd, mc)
-					if err != nil {
-						return err
-					}
-				}
-			}
-
-		// handled by typed callbacks below
-		case content.OpPushGraphicsState, content.OpPopGraphicsState,
-			content.OpXObject, content.OpInlineImage:
-
-		default:
-			if r.UnknownOp != nil {
-				err := r.UnknownOp(string(name), args)
-				if err != nil {
+				if err := r.MarkedContent(MarkedContentBegin, mc); err != nil {
 					return err
 				}
 			}
 		}
 
-		// typed callbacks
-		switch name {
-		case content.OpPushGraphicsState:
-			if r.GraphicsStateSaved != nil {
-				if err := r.GraphicsStateSaved(); err != nil {
+	case content.OpMarkedContentPointWithProperties: // DP
+		if len(args) != 2 {
+			break
+		}
+		tag, ok1 := args[0].(pdf.Name)
+		if !ok1 {
+			break
+		}
+
+		mc, err := r.extractMarkedContent(tag, args[1])
+		if pdf.IsMalformed(err) {
+			break
+		} else if err != nil {
+			return err
+		}
+
+		if r.MarkedContent != nil {
+			if err := r.MarkedContent(MarkedContentPoint, mc); err != nil {
+				return err
+			}
+		}
+
+	case content.OpBeginMarkedContentWithProperties: // BDC
+		if len(args) != 2 {
+			break
+		}
+
+		tag, ok1 := args[0].(pdf.Name)
+		if !ok1 || len(r.MarkedContentStack) >= maxMarkedContentDepth {
+			break
+		}
+
+		mc, err := r.extractMarkedContent(tag, args[1])
+		if pdf.IsMalformed(err) {
+			break
+		} else if err != nil {
+			return err
+		}
+
+		r.MarkedContentStack = append(r.MarkedContentStack, mc)
+		if r.MarkedContent != nil {
+			if err := r.MarkedContent(MarkedContentBegin, mc); err != nil {
+				return err
+			}
+		}
+
+	case content.OpEndMarkedContent: // EMC
+		if len(r.MarkedContentStack) > 0 {
+			mc := r.MarkedContentStack[len(r.MarkedContentStack)-1]
+			r.MarkedContentStack = r.MarkedContentStack[:len(r.MarkedContentStack)-1]
+			if r.MarkedContent != nil {
+				if err := r.MarkedContent(MarkedContentEnd, mc); err != nil {
 					return err
 				}
 			}
-		case content.OpPopGraphicsState:
-			if r.GraphicsStateRestored != nil {
-				if err := r.GraphicsStateRestored(); err != nil {
-					return err
-				}
+		}
+
+	// handled by typed callbacks below
+	case content.OpPushGraphicsState, content.OpPopGraphicsState,
+		content.OpXObject, content.OpInlineImage:
+
+	default:
+		if r.UnknownOp != nil {
+			if err := r.UnknownOp(string(name), args); err != nil {
+				return err
 			}
-		case content.OpXObject:
-			if r.XObject != nil && len(args) >= 1 {
-				if xname, ok := args[0].(pdf.Name); ok {
-					res := r.State.Resources
-					if res != nil && res.XObject != nil {
-						if obj := res.XObject[xname]; obj != nil {
-							if err := r.XObject(obj, p.CTM); err != nil {
-								return err
-							}
-						}
-					}
-				}
+		}
+	}
+
+	// typed callbacks
+	switch name {
+	case content.OpPushGraphicsState:
+		if r.GraphicsStateSaved != nil {
+			if err := r.GraphicsStateSaved(); err != nil {
+				return err
 			}
-		case content.OpInlineImage:
-			if r.InlineImage != nil && len(args) >= 2 {
-				if dict, ok := args[0].(pdf.Dict); ok {
-					if data, ok := args[1].(pdf.String); ok {
-						if err := r.InlineImage(dict, []byte(data), p.CTM); err != nil {
+		}
+	case content.OpPopGraphicsState:
+		if r.GraphicsStateRestored != nil {
+			if err := r.GraphicsStateRestored(); err != nil {
+				return err
+			}
+		}
+	case content.OpXObject:
+		if r.XObject != nil && len(args) >= 1 {
+			if xname, ok := args[0].(pdf.Name); ok {
+				res := r.State.Resources
+				if res != nil && res.XObject != nil {
+					if obj := res.XObject[xname]; obj != nil {
+						if err := r.XObject(obj, p.CTM); err != nil {
 							return err
 						}
 					}
 				}
 			}
 		}
-
-		if r.EveryOp != nil {
-			err := r.EveryOp(string(name), args)
-			if err != nil {
-				return err
+	case content.OpInlineImage:
+		if r.InlineImage != nil && len(args) >= 2 {
+			if dict, ok := args[0].(pdf.Dict); ok {
+				if data, ok := args[1].(pdf.String); ok {
+					if err := r.InlineImage(dict, []byte(data), p.CTM); err != nil {
+						return err
+					}
+				}
 			}
 		}
-
 	}
-	return stream.Err()
+
+	if r.EveryOp != nil {
+		if err := r.EveryOp(string(name), args); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // extractMarkedContent extracts marked content properties from operator arguments.

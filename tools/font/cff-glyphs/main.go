@@ -306,7 +306,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 		pg := &page.Page{
 			MediaBox:  pageSize,
 			Resources: b.Resources,
-			Contents:  []*page.Content{{Operators: b.Stream}},
+			Contents:  []content.Stream{b.Stream},
 		}
 		err := ctx.pageTree.AppendPage(pg)
 		if err != nil {

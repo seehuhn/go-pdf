@@ -108,7 +108,9 @@ type Page struct {
 	Resources *content.Resources
 
 	// Contents (optional) holds content streams describing the page's appearance.
-	Contents []*Content
+	// From-scratch pages typically store [content.Operators] values.
+	// Pages read from file store *contentSegment values (unexported).
+	Contents []content.Stream
 
 	// CropBox (optional; inheritable) defines the visible region of the page.
 	// Default: MediaBox.
@@ -242,10 +244,13 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	// Validate all content streams as concatenation
 	if len(p.Contents) > 0 {
 		cw := content.NewWriter(v, content.Page, p.Resources)
-		for _, pc := range p.Contents {
-			if err := cw.Validate(pc.Operators); err != nil {
-				return nil, err
+		for _, s := range p.Contents {
+			if ops, ok := s.(content.Operators); ok {
+				if err := cw.Validate(ops); err != nil {
+					return nil, err
+				}
 			}
+			// contentSegments from read files are already validated
 		}
 		if err := cw.Close(); err != nil {
 			return nil, err
@@ -272,15 +277,15 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// Contents
 	if len(p.Contents) == 1 {
-		ref, err := rm.Embed(p.Contents[0])
+		ref, err := embedPageContent(rm, p.Contents[0])
 		if err != nil {
 			return nil, err
 		}
 		dict["Contents"] = ref
 	} else if len(p.Contents) > 1 {
 		arr := make(pdf.Array, len(p.Contents))
-		for i, pc := range p.Contents {
-			ref, err := rm.Embed(pc)
+		for i, s := range p.Contents {
+			ref, err := embedPageContent(rm, s)
 			if err != nil {
 				return nil, err
 			}
@@ -651,23 +656,38 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 		if err != nil {
 			return nil, err
 		}
+		ver := pdf.GetVersion(x.R)
 		switch c := resolved.(type) {
 		case *pdf.Stream:
-			// Single stream
-			pc, err := extractContent(x, contentsObj, p.Resources)
-			if err != nil {
-				return nil, err
+			seg := &contentSegment{
+				stream:  c,
+				getter:  x.R,
+				version: ver,
+				res:     p.Resources,
 			}
-			p.Contents = []*Content{pc}
+			p.Contents = []content.Stream{seg}
 		case pdf.Array:
-			// Array of streams
+			segments := make([]content.Stream, 0, len(c))
+			var prev *contentSegment
 			for _, item := range c {
-				pc, err := extractContent(x, item, p.Resources)
+				stm, err := pdf.GetStream(x.R, item)
 				if err != nil {
 					return nil, err
 				}
-				p.Contents = append(p.Contents, pc)
+				if stm == nil {
+					continue
+				}
+				seg := &contentSegment{
+					prev:    prev,
+					stream:  stm,
+					getter:  x.R,
+					version: ver,
+					res:     p.Resources,
+				}
+				segments = append(segments, seg)
+				prev = seg
 			}
+			p.Contents = segments
 		}
 	}
 
@@ -920,6 +940,25 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	return p, nil
+}
+
+// ContentStream returns a single content.Stream that concatenates all
+// content streams of the page, carrying scanner state across stream
+// boundaries. For pages read from file with multiple content streams,
+// this correctly handles operators and paths split across streams.
+// For pages with zero or one content stream, this returns nil or the
+// single stream directly.
+func (p *Page) ContentStream() content.Stream {
+	switch len(p.Contents) {
+	case 0:
+		return nil
+	case 1:
+		return p.Contents[0]
+	default:
+		return &combinedPageStream{
+			parts: p.Contents,
+		}
+	}
 }
 
 func validateBox(name string, box *pdf.Rectangle) error {

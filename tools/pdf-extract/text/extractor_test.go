@@ -55,7 +55,7 @@ func TestTextExtractorBasic(t *testing.T) {
 	p := &page.Page{
 		MediaBox:  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 595, URy: 842},
 		Resources: b.Resources,
-		Contents:  []*page.Content{{Operators: b.Stream}},
+		Contents:  []content.Stream{b.Stream},
 	}
 	err := pageTree.AppendPage(p)
 	if err != nil {
@@ -147,7 +147,7 @@ func TestTextExtractorActualText(t *testing.T) {
 	p := &page.Page{
 		MediaBox:  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 595, URy: 842},
 		Resources: b.Resources,
-		Contents:  []*page.Content{{Operators: b.Stream}},
+		Contents:  []content.Stream{b.Stream},
 	}
 	err := pageTree.AppendPage(p)
 	if err != nil {

@@ -205,10 +205,11 @@ func testRoundTrip(t *testing.T, v pdf.Version, o *Outline) {
 		t.Fatalf("create document: %v", err)
 	}
 
-	err = o.Write(doc.RM)
+	outlineRef, err := o.Encode(doc.RM)
 	if err != nil {
 		t.Fatalf("write outline: %v", err)
 	}
+	doc.Out.GetMeta().Catalog.Outlines, _ = outlineRef.(pdf.Reference)
 
 	err = doc.Close()
 	if err != nil {
@@ -221,7 +222,7 @@ func testRoundTrip(t *testing.T, v pdf.Version, o *Outline) {
 	}
 	defer r.Close()
 
-	decoded, err := Read(r)
+	decoded, err := Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines)
 	if err != nil {
 		t.Fatalf("read outline: %v", err)
 	}
@@ -251,10 +252,11 @@ func FuzzRoundTrip(f *testing.F) {
 			continue
 		}
 
-		err = tc.outline.Write(doc.RM)
+		outlineRef, err := tc.outline.Encode(doc.RM)
 		if err != nil {
 			continue
 		}
+		doc.Out.GetMeta().Catalog.Outlines, _ = outlineRef.(pdf.Reference)
 
 		err = doc.Close()
 		if err != nil {
@@ -271,7 +273,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 		defer r.Close()
 
-		outline, err := Read(r)
+		outline, err := Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines)
 		if err != nil {
 			t.Skip("malformed outline")
 		}
@@ -281,6 +283,59 @@ func FuzzRoundTrip(f *testing.F) {
 
 		testRoundTrip(t, pdf.GetVersion(r), outline)
 	})
+}
+
+func TestStructEntry(t *testing.T) {
+	buf := &bytes.Buffer{}
+	doc, err := document.WriteSinglePage(buf, &pdf.Rectangle{URx: 100, URy: 100}, pdf.V1_7, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// allocate a dummy structure element
+	seRef := doc.Out.Alloc()
+	err = doc.Out.Put(seRef, pdf.Dict{
+		"Type": pdf.Name("StructElem"),
+		"S":    pdf.Name("P"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	o := &Outline{
+		Items: []*Item{
+			{Title: "With SE", StructEntry: seRef},
+		},
+	}
+
+	outlineRef, err := o.Encode(doc.RM)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc.Out.GetMeta().Catalog.Outlines, _ = outlineRef.(pdf.Reference)
+
+	err = doc.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+
+	decoded, err := Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(decoded.Items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(decoded.Items))
+	}
+	if decoded.Items[0].StructEntry == 0 {
+		t.Error("StructEntry not preserved in round trip")
+	}
 }
 
 func TestReadLoop(t *testing.T) {
@@ -363,7 +418,7 @@ func TestReadLoop(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, err = Read(r)
+		_, err = Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines)
 		if (err == nil) != good {
 			t.Errorf("good=%v, err=%v", good, err)
 		}

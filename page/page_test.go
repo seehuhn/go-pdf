@@ -18,6 +18,7 @@ package page
 
 import (
 	"bytes"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -51,13 +52,11 @@ var testCases = []testCase{
 			Resources: &content.Resources{
 				SingleUse: true,
 			},
-			Contents: []*Content{
-				{
-					Operators: content.Operators{
-						{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
-						{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(200), pdf.Number(200)}},
-						{Name: content.OpStroke},
-					},
+			Contents: []content.Stream{
+				content.Operators{
+					{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
+					{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(200), pdf.Number(200)}},
+					{Name: content.OpStroke},
 				},
 			},
 		},
@@ -69,28 +68,22 @@ var testCases = []testCase{
 			Resources: &content.Resources{
 				SingleUse: true,
 			},
-			Contents: []*Content{
-				{
-					// first stream: self-balanced graphics state
-					Operators: content.Operators{
-						{Name: content.OpPushGraphicsState},
-						{Name: content.OpPopGraphicsState},
-					},
+			Contents: []content.Stream{
+				// first stream: self-balanced graphics state
+				content.Operators{
+					{Name: content.OpPushGraphicsState},
+					{Name: content.OpPopGraphicsState},
 				},
-				{
-					// second stream: draw operations
-					Operators: content.Operators{
-						{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(50), pdf.Number(50)}},
-						{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
-						{Name: content.OpStroke},
-					},
+				// second stream: draw operations
+				content.Operators{
+					{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(50), pdf.Number(50)}},
+					{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
+					{Name: content.OpStroke},
 				},
-				{
-					// third stream: another self-balanced operation
-					Operators: content.Operators{
-						{Name: content.OpPushGraphicsState},
-						{Name: content.OpPopGraphicsState},
-					},
+				// third stream: another self-balanced operation
+				content.Operators{
+					{Name: content.OpPushGraphicsState},
+					{Name: content.OpPopGraphicsState},
 				},
 			},
 		},
@@ -105,15 +98,15 @@ var testCases = []testCase{
 					"F1": standard.TimesRoman.New(),
 				},
 			},
-			Contents: []*Content{{
-				Operators: content.Operators{
+			Contents: []content.Stream{
+				content.Operators{
 					{Name: content.OpTextBegin},
 					{Name: content.OpTextSetFont, Args: []pdf.Object{pdf.Name("F1"), pdf.Number(12)}},
 					{Name: content.OpTextMoveOffset, Args: []pdf.Object{pdf.Number(72), pdf.Number(720)}},
 					{Name: content.OpTextShow, Args: []pdf.Object{pdf.String("Hello")}},
 					{Name: content.OpTextEnd},
 				},
-			}},
+			},
 		},
 	},
 	{
@@ -159,6 +152,18 @@ var testCases = []testCase{
 			Resources: &content.Resources{SingleUse: true},
 		},
 	},
+}
+
+// collectOps collects all operators from a content.Stream into an Operators slice.
+func collectOps(s content.Stream) content.Operators {
+	if s == nil {
+		return nil
+	}
+	var ops content.Operators
+	for name, args := range s.All() {
+		ops = append(ops, content.Operator{Name: name, Args: slices.Clone(args)})
+	}
+	return ops
 }
 
 // roundTripTest encodes a page, decodes it back, and verifies the result.
@@ -208,11 +213,22 @@ func roundTripTest(t *testing.T, v pdf.Version, p1 *Page) {
 		p1.UserUnit = 1.0
 	}
 
-	// Compare using cmp.Diff
+	// Collect operators from both pages for comparison.
+	// The original may have multiple content streams; the decoded page
+	// preserves per-stream identity, so compare the combined content.
+	var wantOps content.Operators
+	for _, s := range p1.Contents {
+		wantOps = append(wantOps, collectOps(s)...)
+	}
+	gotOps := collectOps(p2.ContentStream())
+
+	if !wantOps.Equal(gotOps) {
+		t.Errorf("content stream mismatch:\nwant: %v\n got: %v", wantOps, gotOps)
+	}
+
+	// Compare all fields except Parent and Contents (already compared above)
 	opts := []cmp.Option{
-		// Ignore Parent since it's set externally
-		cmpopts.IgnoreFields(Page{}, "Parent"),
-		// Compare Resources using Equal method
+		cmpopts.IgnoreFields(Page{}, "Parent", "Contents"),
 		cmp.Comparer(func(a, b *content.Resources) bool {
 			if a == nil && b == nil {
 				return true
@@ -243,17 +259,13 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
-func TestPageContent_Embed(t *testing.T) {
-	// Create a simple content stream
-	pc := &Content{
-		Operators: content.Operators{
-			{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
-			{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(200), pdf.Number(200)}},
-			{Name: content.OpStroke},
-		},
+func TestContentStream_Embed(t *testing.T) {
+	ops := content.Operators{
+		{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
+		{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(200), pdf.Number(200)}},
+		{Name: content.OpStroke},
 	}
 
-	// Create a PDF writer
 	buf := &bytes.Buffer{}
 	w, err := pdf.NewWriter(buf, pdf.V1_7, nil)
 	if err != nil {
@@ -261,7 +273,7 @@ func TestPageContent_Embed(t *testing.T) {
 	}
 
 	rm := pdf.NewResourceManager(w)
-	ref, err := rm.Embed(pc)
+	ref, err := embedPageContent(rm, ops)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,45 +294,62 @@ func TestPageContent_Embed(t *testing.T) {
 	}
 }
 
-func TestPageContent_Deduplication(t *testing.T) {
-	// Create a content stream and use it twice
-	pc := &Content{
-		Operators: content.Operators{
-			{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(0), pdf.Number(0)}},
-			{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
-			{Name: content.OpStroke},
+func TestContentSegment_Deduplication(t *testing.T) {
+	// encode a page with content to get a contentSegment via round-trip
+	w1, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	parentRef := w1.Alloc()
+	p := &Page{
+		Parent:   parentRef,
+		MediaBox: &pdf.Rectangle{URx: 100, URy: 100},
+		Resources: &content.Resources{
+			SingleUse: true,
+		},
+		Contents: []content.Stream{
+			content.Operators{
+				{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(0), pdf.Number(0)}},
+				{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
+				{Name: content.OpStroke},
+			},
 		},
 	}
+	rm1 := pdf.NewResourceManager(w1)
+	dict, err := p.Encode(rm1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rm1.Close()
+	w1.Put(parentRef, pdf.Dict{"Type": pdf.Name("Pages")})
+	w1.Close()
 
-	buf := &bytes.Buffer{}
-	w, err := pdf.NewWriter(buf, pdf.V1_7, nil)
+	// decode back to get a contentSegment
+	decoded, err := Decode(pdf.NewExtractor(w1), dict)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(decoded.Contents) == 0 {
+		t.Skip("no content streams")
+	}
+	seg := decoded.Contents[0]
+
+	// embedding the same contentSegment twice should produce the same reference
+	w2, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm2 := pdf.NewResourceManager(w2)
+
+	ref1, err := embedPageContent(rm2, seg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref2, err := embedPageContent(rm2, seg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	rm := pdf.NewResourceManager(w)
-
-	// Embed the same PageContent twice
-	ref1, err := rm.Embed(pc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ref2, err := rm.Embed(pc)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Should get the same reference (deduplication)
 	if ref1 != ref2 {
 		t.Errorf("expected same reference for deduplicated content, got %v and %v", ref1, ref2)
 	}
 
-	if err := rm.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err := w.Close(); err != nil {
-		t.Fatal(err)
-	}
+	rm2.Close()
+	w2.Close()
 }
 
 func TestPage_Encode_ValidationError(t *testing.T) {
@@ -332,19 +361,17 @@ func TestPage_Encode_ValidationError(t *testing.T) {
 
 	parentRef := w.Alloc()
 
-	// Create a page with unbalanced q/Q
+	// page with unbalanced q/Q
 	page := &Page{
 		Parent:   parentRef,
 		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792},
 		Resources: &content.Resources{
 			SingleUse: true,
 		},
-		Contents: []*Content{
-			{
-				Operators: content.Operators{
-					{Name: content.OpPushGraphicsState},
-					// Missing Q
-				},
+		Contents: []content.Stream{
+			content.Operators{
+				{Name: content.OpPushGraphicsState},
+				// missing Q
 			},
 		},
 	}

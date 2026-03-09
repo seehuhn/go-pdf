@@ -91,10 +91,11 @@ func TestPages(t *testing.T) {
 		},
 	}
 
-	err = tree.Write(doc.RM)
+	outlineRef, err := tree.Encode(doc.RM)
 	if err != nil {
 		t.Fatal(err)
 	}
+	doc.Out.GetMeta().Catalog.Outlines, _ = outlineRef.(pdf.Reference)
 
 	err = doc.Close()
 	if err != nil {
@@ -222,10 +223,11 @@ func TestPagesSpanningMultiplePages(t *testing.T) {
 		},
 	}
 
-	err = tree.Write(doc.RM)
+	outlineRef, err := tree.Encode(doc.RM)
 	if err != nil {
 		t.Fatal(err)
 	}
+	doc.Out.GetMeta().Catalog.Outlines, _ = outlineRef.(pdf.Reference)
 
 	err = doc.Close()
 	if err != nil {
