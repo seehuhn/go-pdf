@@ -36,7 +36,8 @@ type URI struct {
 
 // ActionType returns "URI".
 // This implements the [pdf.Action] interface.
-func (a *URI) ActionType() pdf.Name { return TypeURI }
+func (a *URI) ActionType() pdf.Name  { return TypeURI }
+func (a *URI) GetNext() []pdf.Action { return []pdf.Action(a.Next) }
 
 func (a *URI) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "URI action", pdf.V1_1); err != nil {

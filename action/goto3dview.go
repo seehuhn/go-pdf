@@ -37,7 +37,8 @@ type GoTo3DView struct {
 
 // ActionType returns "GoTo3DView".
 // This implements the [pdf.Action] interface.
-func (a *GoTo3DView) ActionType() pdf.Name { return TypeGoTo3DView }
+func (a *GoTo3DView) ActionType() pdf.Name  { return TypeGoTo3DView }
+func (a *GoTo3DView) GetNext() []pdf.Action { return []pdf.Action(a.Next) }
 
 func (a *GoTo3DView) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "GoTo3DView action", pdf.V1_6); err != nil {

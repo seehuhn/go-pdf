@@ -38,8 +38,7 @@ type contentSegment struct {
 	stream *pdf.Stream
 	getter pdf.Getter
 
-	version pdf.Version
-	res     *content.Resources
+	res *content.Resources
 
 	mu           sync.Mutex
 	trailingArgs []pdf.Object
@@ -81,7 +80,7 @@ func (seg *contentSegment) ensureDecoded() error {
 	defer r.Close()
 
 	// scan the stream using a PageScanner to compute trailing args
-	ps := content.NewPageScanner(seg.version, seg.res)
+	ps := content.NewPageScanner(pdf.GetVersion(seg.getter), seg.res)
 	if len(initArgs) > 0 {
 		ps.SetInitialArgs(initArgs)
 	}
@@ -126,7 +125,7 @@ func (seg *contentSegment) All() iter.Seq2[content.OpName, []pdf.Object] {
 		}
 		defer r.Close()
 
-		ps := content.NewPageScanner(seg.version, seg.res)
+		ps := content.NewPageScanner(pdf.GetVersion(seg.getter), seg.res)
 		if len(initArgs) > 0 {
 			ps.SetInitialArgs(initArgs)
 		}

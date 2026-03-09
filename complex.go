@@ -522,5 +522,8 @@ type Action interface {
 	// ActionType returns the type of the action, e.g. "GoTo", "URI", etc.
 	ActionType() Name
 
+	// GetNext returns the sequence of actions to perform after this action.
+	GetNext() []Action
+
 	Encoder
 }

@@ -39,7 +39,8 @@ type Hide struct {
 
 // ActionType returns "Hide".
 // This implements the [pdf.Action] interface.
-func (a *Hide) ActionType() pdf.Name { return TypeHide }
+func (a *Hide) ActionType() pdf.Name  { return TypeHide }
+func (a *Hide) GetNext() []pdf.Action { return []pdf.Action(a.Next) }
 
 func (a *Hide) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "Hide action", pdf.V1_2); err != nil {

@@ -40,7 +40,8 @@ type SetOCGState struct {
 
 // ActionType returns "SetOCGState".
 // This implements the [pdf.Action] interface.
-func (a *SetOCGState) ActionType() pdf.Name { return TypeSetOCGState }
+func (a *SetOCGState) ActionType() pdf.Name  { return TypeSetOCGState }
+func (a *SetOCGState) GetNext() []pdf.Action { return []pdf.Action(a.Next) }
 
 func (a *SetOCGState) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "SetOCGState action", pdf.V1_5); err != nil {

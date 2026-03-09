@@ -39,7 +39,8 @@ type SubmitForm struct {
 
 // ActionType returns "SubmitForm".
 // This implements the [pdf.Action] interface.
-func (a *SubmitForm) ActionType() pdf.Name { return TypeSubmitForm }
+func (a *SubmitForm) ActionType() pdf.Name  { return TypeSubmitForm }
+func (a *SubmitForm) GetNext() []pdf.Action { return []pdf.Action(a.Next) }
 
 func (a *SubmitForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "SubmitForm action", pdf.V1_2); err != nil {

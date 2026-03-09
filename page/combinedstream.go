@@ -25,6 +25,10 @@ import (
 
 // combinedPageStream wraps multiple content.Stream parts into a single
 // content.Stream, concatenating their operators.
+// When all parts are *contentSegment (the normal case for pages read from
+// file), a single PageScanner is used so that scanner state (current
+// object type, graphics state stack, trailing args) carries across stream
+// boundaries.
 type combinedPageStream struct {
 	parts []content.Stream
 	err   error
@@ -34,6 +38,53 @@ var _ content.Stream = (*combinedPageStream)(nil)
 
 // All returns an iterator over all operators from all parts.
 func (c *combinedPageStream) All() iter.Seq2[content.OpName, []pdf.Object] {
+	// check whether all parts are contentSegments so we can use a
+	// single PageScanner with shared state
+	segments := make([]*contentSegment, len(c.parts))
+	for i, p := range c.parts {
+		seg, ok := p.(*contentSegment)
+		if !ok {
+			return c.allFallback()
+		}
+		segments[i] = seg
+	}
+	return c.allScanner(segments)
+}
+
+// allScanner iterates using a single PageScanner across all raw readers,
+// so that path construction state carries across stream boundaries.
+func (c *combinedPageStream) allScanner(segments []*contentSegment) iter.Seq2[content.OpName, []pdf.Object] {
+	return func(yield func(content.OpName, []pdf.Object) bool) {
+		if len(segments) == 0 {
+			return
+		}
+		ps := content.NewPageScanner(pdf.GetVersion(segments[0].getter), segments[0].res)
+		for _, seg := range segments {
+			r, err := seg.rawReader()
+			if err != nil {
+				c.err = err
+				return
+			}
+			exhausted := ps.ScanReader(r, yield)
+			r.Close()
+			if !exhausted {
+				return
+			}
+		}
+		for _, name := range ps.ClosingOps() {
+			if !yield(name, nil) {
+				return
+			}
+		}
+		if psErr := ps.Err(); psErr != nil {
+			c.err = psErr
+		}
+	}
+}
+
+// allFallback iterates each part independently (used when parts are
+// not all *contentSegment).
+func (c *combinedPageStream) allFallback() iter.Seq2[content.OpName, []pdf.Object] {
 	return func(yield func(content.OpName, []pdf.Object) bool) {
 		for _, part := range c.parts {
 			for name, args := range part.All() {

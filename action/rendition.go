@@ -52,7 +52,8 @@ type Rendition struct {
 
 // ActionType returns "Rendition".
 // This implements the [pdf.Action] interface.
-func (a *Rendition) ActionType() pdf.Name { return TypeRendition }
+func (a *Rendition) ActionType() pdf.Name  { return TypeRendition }
+func (a *Rendition) GetNext() []pdf.Action { return []pdf.Action(a.Next) }
 
 func (a *Rendition) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "Rendition action", pdf.V1_5); err != nil {

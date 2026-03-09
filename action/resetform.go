@@ -37,7 +37,8 @@ type ResetForm struct {
 
 // ActionType returns "ResetForm".
 // This implements the [pdf.Action] interface.
-func (a *ResetForm) ActionType() pdf.Name { return TypeResetForm }
+func (a *ResetForm) ActionType() pdf.Name  { return TypeResetForm }
+func (a *ResetForm) GetNext() []pdf.Action { return []pdf.Action(a.Next) }
 
 func (a *ResetForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "ResetForm action", pdf.V1_2); err != nil {

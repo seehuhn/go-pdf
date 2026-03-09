@@ -45,7 +45,8 @@ type Movie struct {
 
 // ActionType returns "Movie".
 // This implements the [pdf.Action] interface.
-func (a *Movie) ActionType() pdf.Name { return TypeMovie }
+func (a *Movie) ActionType() pdf.Name  { return TypeMovie }
+func (a *Movie) GetNext() []pdf.Action { return []pdf.Action(a.Next) }
 
 func (a *Movie) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "Movie action", pdf.V1_2); err != nil {

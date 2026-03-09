@@ -35,7 +35,8 @@ type Trans struct {
 
 // ActionType returns "Trans".
 // This implements the [pdf.Action] interface.
-func (a *Trans) ActionType() pdf.Name { return TypeTrans }
+func (a *Trans) ActionType() pdf.Name  { return TypeTrans }
+func (a *Trans) GetNext() []pdf.Action { return []pdf.Action(a.Next) }
 
 func (a *Trans) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "Trans action", pdf.V1_5); err != nil {

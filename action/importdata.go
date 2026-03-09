@@ -35,7 +35,8 @@ type ImportData struct {
 
 // ActionType returns "ImportData".
 // This implements the [pdf.Action] interface.
-func (a *ImportData) ActionType() pdf.Name { return TypeImportData }
+func (a *ImportData) ActionType() pdf.Name  { return TypeImportData }
+func (a *ImportData) GetNext() []pdf.Action { return []pdf.Action(a.Next) }
 
 func (a *ImportData) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "ImportData action", pdf.V1_2); err != nil {

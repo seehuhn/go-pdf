@@ -50,7 +50,8 @@ type Sound struct {
 
 // ActionType returns "Sound".
 // This implements the [pdf.Action] interface.
-func (a *Sound) ActionType() pdf.Name { return TypeSound }
+func (a *Sound) ActionType() pdf.Name  { return TypeSound }
+func (a *Sound) GetNext() []pdf.Action { return []pdf.Action(a.Next) }
 
 func (a *Sound) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "Sound action", pdf.V1_2); err != nil {

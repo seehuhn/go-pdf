@@ -656,14 +656,12 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 		if err != nil {
 			return nil, err
 		}
-		ver := pdf.GetVersion(x.R)
 		switch c := resolved.(type) {
 		case *pdf.Stream:
 			seg := &contentSegment{
-				stream:  c,
-				getter:  x.R,
-				version: ver,
-				res:     p.Resources,
+				stream: c,
+				getter: x.R,
+				res:    p.Resources,
 			}
 			p.Contents = []content.Stream{seg}
 		case pdf.Array:
@@ -678,11 +676,10 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 					continue
 				}
 				seg := &contentSegment{
-					prev:    prev,
-					stream:  stm,
-					getter:  x.R,
-					version: ver,
-					res:     p.Resources,
+					prev:   prev,
+					stream: stm,
+					getter: x.R,
+					res:    p.Resources,
 				}
 				segments = append(segments, seg)
 				prev = seg
