@@ -42,14 +42,14 @@ type Item struct {
 	// Title is the text displayed for this outline item.
 	Title string
 
-	// Color (PDF 1.4) specifies the color for the outline entry's text.
+	// Color specifies the color for the outline entry's text.
 	// Components must be in the range 0.0 to 1.0.
 	Color color.DeviceRGB
 
-	// Bold (PDF 1.4) displays the item in bold.
+	// Bold displays the item in bold.
 	Bold bool
 
-	// Italic (PDF 1.4) displays the item in italic.
+	// Italic displays the item in italic.
 	Italic bool
 
 	// Destination (optional) specifies the view to show when the outline item is activated.
@@ -57,7 +57,7 @@ type Item struct {
 	// Destination and Action are mutually exclusive.
 	Destination destination.Destination
 
-	// Action (optional; PDF 1.1) is performed when the outline item is activated.
+	// Action (optional) is performed when the outline item is activated.
 	// Use for external links, other PDF files, or special actions.
 	// Destination and Action are mutually exclusive.
 	Action pdf.Action
@@ -69,7 +69,7 @@ type Item struct {
 	// or collapsed when the document is opened.
 	Open bool
 
-	// StructEntry (optional, PDF 1.3) is an indirect reference to the structure
+	// StructEntry (optional) is an indirect reference to the structure
 	// element associated with this item.
 	StructEntry pdf.Reference
 }
@@ -143,15 +143,13 @@ func readItem(x *pdf.Extractor, seen map[pdf.Reference]bool, ref pdf.Reference) 
 	count, _ := pdf.GetInteger(x.R, dict["Count"])
 	item.Open = count > 0
 
-	v := pdf.GetVersion(x.R)
-
 	if dict["Dest"] != nil {
 		dest, err := pdf.ExtractorGetOptional(x, dict["Dest"], destination.Decode)
 		if err != nil {
 			return nil, nil, pdf.Wrap(err, "/Dest in outline")
 		}
 		item.Destination = dest
-	} else if dict["A"] != nil && v >= pdf.V1_1 {
+	} else if dict["A"] != nil {
 		a, err := pdf.ExtractorGetOptional(x, dict["A"], action.Decode)
 		if err != nil {
 			return nil, nil, pdf.Wrap(err, "/A in outline")
@@ -159,21 +157,19 @@ func readItem(x *pdf.Extractor, seen map[pdf.Reference]bool, ref pdf.Reference) 
 		item.Action = a
 	}
 
-	if v >= pdf.V1_4 {
-		if cArr, _ := pdf.GetArray(x.R, dict["C"]); len(cArr) == 3 {
-			cr, _ := pdf.GetNumber(x.R, cArr[0])
-			cg, _ := pdf.GetNumber(x.R, cArr[1])
-			cb, _ := pdf.GetNumber(x.R, cArr[2])
-			item.Color = color.DeviceRGB{float64(cr), float64(cg), float64(cb)}
-		}
-
-		if f, _ := pdf.GetInteger(x.R, dict["F"]); f != 0 {
-			item.Italic = f&1 != 0
-			item.Bold = f&2 != 0
-		}
+	if cArr, _ := pdf.GetArray(x.R, dict["C"]); len(cArr) == 3 {
+		cr, _ := pdf.GetNumber(x.R, cArr[0])
+		cg, _ := pdf.GetNumber(x.R, cArr[1])
+		cb, _ := pdf.GetNumber(x.R, cArr[2])
+		item.Color = color.DeviceRGB{float64(cr), float64(cg), float64(cb)}
 	}
 
-	if se, ok := dict["SE"].(pdf.Reference); ok && v >= pdf.V1_3 {
+	if f, _ := pdf.GetInteger(x.R, dict["F"]); f != 0 {
+		item.Italic = f&1 != 0
+		item.Bold = f&2 != 0
+	}
+
+	if se, ok := dict["SE"].(pdf.Reference); ok {
 		item.StructEntry = se
 	}
 

@@ -23,8 +23,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/action"
-	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
 type testCase struct {
@@ -199,24 +199,33 @@ var testCases = []testCase{
 func testRoundTrip(t *testing.T, v pdf.Version, o *Outline) {
 	t.Helper()
 
-	buf := &bytes.Buffer{}
-	doc, err := document.WriteSinglePage(buf, &pdf.Rectangle{URx: 100, URy: 100}, v, nil)
+	w, buf := memfile.NewPDFWriter(v, nil)
+
+	err := memfile.AddBlankPage(w)
 	if err != nil {
-		t.Fatalf("create document: %v", err)
+		t.Fatalf("add blank page: %v", err)
 	}
 
-	outlineRef, err := o.Encode(doc.RM)
+	rm := pdf.NewResourceManager(w)
+	outlineRef, err := o.Encode(rm)
 	if err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
 		t.Fatalf("write outline: %v", err)
 	}
-	doc.Out.GetMeta().Catalog.Outlines, _ = outlineRef.(pdf.Reference)
+	w.GetMeta().Catalog.Outlines, _ = outlineRef.(pdf.Reference)
 
-	err = doc.Close()
+	err = rm.Close()
 	if err != nil {
-		t.Fatalf("close document: %v", err)
+		t.Fatalf("close resource manager: %v", err)
+	}
+	err = w.Close()
+	if err != nil {
+		t.Fatalf("close writer: %v", err)
 	}
 
-	r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
+	r, err := pdf.NewReader(bytes.NewReader(buf.Data), nil)
 	if err != nil {
 		t.Fatalf("open document: %v", err)
 	}
@@ -246,24 +255,30 @@ func FuzzRoundTrip(f *testing.F) {
 	}
 
 	for _, tc := range testCases {
-		buf := &bytes.Buffer{}
-		doc, err := document.WriteSinglePage(buf, &pdf.Rectangle{URx: 100, URy: 100}, tc.version, opt)
+		w, buf := memfile.NewPDFWriter(tc.version, opt)
+
+		err := memfile.AddBlankPage(w)
 		if err != nil {
 			continue
 		}
 
-		outlineRef, err := tc.outline.Encode(doc.RM)
+		rm := pdf.NewResourceManager(w)
+		outlineRef, err := tc.outline.Encode(rm)
 		if err != nil {
 			continue
 		}
-		doc.Out.GetMeta().Catalog.Outlines, _ = outlineRef.(pdf.Reference)
+		w.GetMeta().Catalog.Outlines, _ = outlineRef.(pdf.Reference)
 
-		err = doc.Close()
+		err = rm.Close()
+		if err != nil {
+			continue
+		}
+		err = w.Close()
 		if err != nil {
 			continue
 		}
 
-		f.Add(buf.Bytes())
+		f.Add(buf.Data)
 	}
 
 	f.Fuzz(func(t *testing.T, fileData []byte) {
@@ -286,15 +301,16 @@ func FuzzRoundTrip(f *testing.F) {
 }
 
 func TestStructEntry(t *testing.T) {
-	buf := &bytes.Buffer{}
-	doc, err := document.WriteSinglePage(buf, &pdf.Rectangle{URx: 100, URy: 100}, pdf.V1_7, nil)
+	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	err := memfile.AddBlankPage(w)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// allocate a dummy structure element
-	seRef := doc.Out.Alloc()
-	err = doc.Out.Put(seRef, pdf.Dict{
+	seRef := w.Alloc()
+	err = w.Put(seRef, pdf.Dict{
 		"Type": pdf.Name("StructElem"),
 		"S":    pdf.Name("P"),
 	})
@@ -308,18 +324,23 @@ func TestStructEntry(t *testing.T) {
 		},
 	}
 
-	outlineRef, err := o.Encode(doc.RM)
+	rm := pdf.NewResourceManager(w)
+	outlineRef, err := o.Encode(rm)
 	if err != nil {
 		t.Fatal(err)
 	}
-	doc.Out.GetMeta().Catalog.Outlines, _ = outlineRef.(pdf.Reference)
+	w.GetMeta().Catalog.Outlines, _ = outlineRef.(pdf.Reference)
 
-	err = doc.Close()
+	err = rm.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
+	r, err := pdf.NewReader(bytes.NewReader(buf.Data), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,21 +360,18 @@ func TestStructEntry(t *testing.T) {
 }
 
 func TestReadLoop(t *testing.T) {
-	buf := &bytes.Buffer{}
-
 	for _, good := range []bool{true, false} {
-		buf.Reset()
-		doc, err := document.WriteSinglePage(buf, &pdf.Rectangle{URx: 100, URy: 100}, pdf.V1_7, nil)
+		w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+		err := memfile.AddBlankPage(w)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		out := doc.Out
-
-		refRoot := out.Alloc()
-		refA := out.Alloc()
-		refB := out.Alloc()
-		refC := out.Alloc()
+		refRoot := w.Alloc()
+		refA := w.Alloc()
+		refB := w.Alloc()
+		refC := w.Alloc()
 
 		var A pdf.Dict
 		if good {
@@ -389,31 +407,31 @@ func TestReadLoop(t *testing.T) {
 			"Last":  refC,
 		}
 
-		err = out.Put(refA, A)
+		err = w.Put(refA, A)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = out.Put(refB, B)
+		err = w.Put(refB, B)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = out.Put(refC, C)
+		err = w.Put(refC, C)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = out.Put(refRoot, root)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		out.GetMeta().Catalog.Outlines = refRoot
-
-		err = doc.Close()
+		err = w.Put(refRoot, root)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
+		w.GetMeta().Catalog.Outlines = refRoot
+
+		err = w.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		r, err := pdf.NewReader(bytes.NewReader(buf.Data), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
