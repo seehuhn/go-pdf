@@ -41,7 +41,6 @@ type config struct {
 	outputType      string
 	force           bool
 	showNextSection bool
-	noActualText    bool
 	showPageNumbers bool
 }
 
@@ -269,7 +268,6 @@ func (pe PDFExtractor) Process(doc pdf.Getter, pages *PageSet, w io.Writer) erro
 
 // TextExtractor extracts text content.
 type TextExtractor struct {
-	UseActualText   bool
 	ShowPageNumbers bool
 }
 
@@ -282,7 +280,6 @@ func (te TextExtractor) Process(doc pdf.Getter, pages *PageSet, w io.Writer) err
 
 	// create text extractor
 	extractor := text.New(doc, w)
-	extractor.UseActualText = te.UseActualText
 
 	// extract text from each selected page
 	for _, pageNo := range pageNums {
@@ -335,7 +332,6 @@ func getOutputProcessor(filename, explicitType string, cfg config) (OutputProces
 		return PDFExtractor{}, nil
 	case "txt":
 		return TextExtractor{
-			UseActualText:   !cfg.noActualText,
 			ShowPageNumbers: cfg.showPageNumbers,
 		}, nil
 	default:
@@ -376,7 +372,6 @@ func main() {
 	flag.StringVar(&cfg.outputType, "type", "", "output type (pdf or txt), overrides file extension")
 	flag.BoolVar(&cfg.force, "f", false, "overwrite output file if it exists")
 	flag.BoolVar(&cfg.showNextSection, "show-next-section", false, "show the name of the next section after processing")
-	flag.BoolVar(&cfg.noActualText, "no-actualtext", false, "disable ActualText substitution")
 	flag.BoolVar(&cfg.showPageNumbers, "P", false, "show page numbers in text output")
 	help := flag.Bool("help", false, "show help information")
 

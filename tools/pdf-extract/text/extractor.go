@@ -27,21 +27,20 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/textextract"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/reader"
 )
 
-// TextExtractor extracts text from PDF pages with optional ActualText support.
+// TextExtractor extracts text from PDF pages.
 type TextExtractor struct {
 	reader *reader.Reader
 	writer io.Writer
 
-	UseActualText bool
-	XRangeMin     float64
-	XRangeMax     float64
+	XRangeMin float64
+	XRangeMax float64
 
 	extraTextCache       map[font.Instance]map[cid.CID]string
-	spaceWidth           map[font.Instance]float64
 	actualTextStartDepth int // -1 if not in ActualText region
 }
 
@@ -53,7 +52,6 @@ func New(doc pdf.Getter, w io.Writer) *TextExtractor {
 		XRangeMin:            math.Inf(-1),
 		XRangeMax:            math.Inf(1),
 		extraTextCache:       make(map[font.Instance]map[cid.CID]string),
-		spaceWidth:           make(map[font.Instance]float64),
 		actualTextStartDepth: -1,
 	}
 
@@ -68,10 +66,6 @@ func (e *TextExtractor) setupCallbacks() {
 	// - When stack depth < saved depth: exit region, reset to -1
 	// This naturally handles nested ActualText (outer wins) and nested content.
 	e.reader.MarkedContent = func(event reader.MarkedContentEvent, mc *graphics.MarkedContent) error {
-		if !e.UseActualText {
-			return nil
-		}
-
 		switch event {
 		case reader.MarkedContentBegin:
 			e.handleActualTextBegin(mc)
@@ -85,15 +79,7 @@ func (e *TextExtractor) setupCallbacks() {
 	e.reader.TextEvent = func(op reader.TextEvent, arg float64) {
 		switch op {
 		case reader.TextEventSpace:
-			F := e.reader.State.GState.TextFont
-			fontSpaceWidth, ok := e.spaceWidth[F]
-			if !ok {
-				fontSpaceWidth = getSpaceWidth(F)
-				e.spaceWidth[F] = fontSpaceWidth
-			}
-			if arg > 0.3*fontSpaceWidth {
-				fmt.Fprint(e.writer, " ")
-			}
+			fmt.Fprint(e.writer, " ")
 		case reader.TextEventNL, reader.TextEventMove:
 			fmt.Fprintln(e.writer)
 		}
@@ -109,7 +95,7 @@ func (e *TextExtractor) setupCallbacks() {
 			currentFont := e.reader.State.GState.TextFont
 			cidMapping, ok := e.extraTextCache[currentFont]
 			if !ok {
-				cidMapping = getExtraMapping(currentFont)
+				cidMapping = textextract.GlyphNameMapping(currentFont)
 				e.extraTextCache[currentFont] = cidMapping
 			}
 			text = cidMapping[cid]

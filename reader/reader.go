@@ -24,6 +24,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/textextract"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/extract"
@@ -63,6 +64,8 @@ type Reader struct {
 
 	MarkedContent      func(event MarkedContentEvent, mc *graphics.MarkedContent) error
 	MarkedContentStack []*graphics.MarkedContent
+
+	spaceWidthCache map[font.Instance]float64
 }
 
 type TextEvent uint8
@@ -225,7 +228,10 @@ func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
 				}
 				if d != 0 {
 					if d < 0 && r.TextEvent != nil {
-						r.TextEvent(TextEventSpace, -d)
+						sw := r.getSpaceWidth(p.TextFont)
+						if -d >= 0.3*sw {
+							r.TextEvent(TextEventSpace, -d)
+						}
 					}
 
 					d = d / 1000 * p.TextFontSize
@@ -485,6 +491,18 @@ func getArray(args []pdf.Object, idx int) (pdf.Array, bool) {
 // GetTextPositionDevice returns the current text position in device coordinates.
 func (r *Reader) GetTextPositionDevice() (float64, float64) {
 	return r.State.GState.GetTextPositionDevice()
+}
+
+func (r *Reader) getSpaceWidth(f font.Instance) float64 {
+	if sw, ok := r.spaceWidthCache[f]; ok {
+		return sw
+	}
+	sw := textextract.SpaceWidth(f)
+	if r.spaceWidthCache == nil {
+		r.spaceWidthCache = make(map[font.Instance]float64)
+	}
+	r.spaceWidthCache[f] = sw
+	return sw
 }
 
 const maxMarkedContentDepth = 64

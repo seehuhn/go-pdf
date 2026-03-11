@@ -81,8 +81,6 @@ func TestTextExtractorBasic(t *testing.T) {
 	// extract text
 	var buf bytes.Buffer
 	extractor := New(w, &buf)
-	extractor.UseActualText = false
-
 	_, pageDict, err := pagetree.GetPage(w, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -170,41 +168,24 @@ func TestTextExtractorActualText(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// extract without ActualText
-	var buf1 bytes.Buffer
-	extractor1 := New(w, &buf1)
-	extractor1.UseActualText = false
+	var buf bytes.Buffer
+	extractor := New(w, &buf)
 
 	_, pageDict, err := pagetree.GetPage(w, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = extractor1.ExtractPage(pageDict)
+	err = extractor.ExtractPage(pageDict)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	extracted1 := strings.TrimSpace(buf1.String())
-	if !strings.Contains(extracted1, "the original text") {
-		t.Errorf("without ActualText: got %q, want to contain \"the original text\"", extracted1)
+	extracted := strings.TrimSpace(buf.String())
+	if !strings.Contains(extracted, "the replaced text") {
+		t.Errorf("got %q, want to contain \"the replaced text\"", extracted)
 	}
-
-	// extract with ActualText
-	var buf2 bytes.Buffer
-	extractor2 := New(w, &buf2)
-	extractor2.UseActualText = true
-
-	err = extractor2.ExtractPage(pageDict)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	extracted2 := strings.TrimSpace(buf2.String())
-	if !strings.Contains(extracted2, "the replaced text") {
-		t.Errorf("with ActualText: got %q, want to contain \"the replaced text\"", extracted2)
-	}
-	if strings.Contains(extracted2, "original") {
-		t.Errorf("with ActualText: got %q, should not contain \"original\"", extracted2)
+	if strings.Contains(extracted, "original") {
+		t.Errorf("got %q, should not contain \"original\"", extracted)
 	}
 }

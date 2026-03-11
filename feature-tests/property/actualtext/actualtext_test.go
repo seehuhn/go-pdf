@@ -46,36 +46,18 @@ func TestActualText(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// test without ActualText
-	var buf1 bytes.Buffer
-	extractor1 := text.New(w, &buf1)
-	extractor1.UseActualText = false
+	var buf bytes.Buffer
+	extractor := text.New(w, &buf)
 
-	err = extractor1.ExtractPage(pageDict)
+	err = extractor.ExtractPage(pageDict)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	extracted1 := normalizeWhitespace(buf1.String())
-	expected1 := "normal text the original text some two-level nested text example"
-	if extracted1 != expected1 {
-		t.Errorf("without ActualText:\ngot:  %q\nwant: %q", extracted1, expected1)
-	}
-
-	// test with ActualText
-	var buf2 bytes.Buffer
-	extractor2 := text.New(w, &buf2)
-	extractor2.UseActualText = true
-
-	err = extractor2.ExtractPage(pageDict)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	extracted2 := normalizeWhitespace(buf2.String())
-	expected2 := "normal text the replaced text some replaced example"
-	if extracted2 != expected2 {
-		t.Errorf("with ActualText:\ngot:  %q\nwant: %q", extracted2, expected2)
+	extracted := normalizeWhitespace(buf.String())
+	expected := "normal text the replaced text some replaced example"
+	if extracted != expected {
+		t.Errorf("got:  %q\nwant: %q", extracted, expected)
 	}
 }
 
