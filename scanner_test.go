@@ -27,9 +27,11 @@ import (
 
 func testScanner(contents string) *scanner {
 	buf := bytes.NewReader([]byte(contents))
-	return newScanner(buf, func(o Object) (Integer, error) {
+	s := newScanner(buf, func(o Object) (Integer, error) {
 		return o.(Integer), nil
 	}, nil)
+	s.fileReader = buf
+	return s
 }
 
 func TestRefill(t *testing.T) {
@@ -326,7 +328,9 @@ var testCases = []struct {
 
 func TestStreamReader(t *testing.T) {
 	in := "<< /Length 6 >>\nstream\nABCDEF\nendstream 1 2"
-	s := newScanner(strings.NewReader(in), func(x Object) (Integer, error) { return x.(Integer), nil }, nil)
+	sr := strings.NewReader(in)
+	s := newScanner(sr, func(x Object) (Integer, error) { return x.(Integer), nil }, nil)
+	s.fileReader = sr
 	stmObj, err := s.ReadObject()
 	if err != nil {
 		t.Fatal(err)
@@ -361,7 +365,9 @@ func TestStreamReader(t *testing.T) {
 
 func TestStreamReaderSeek(t *testing.T) {
 	in := "<< /Length 6 >>\nstream\nABCDEF\nendstream"
-	s := newScanner(strings.NewReader(in), func(x Object) (Integer, error) { return x.(Integer), nil }, nil)
+	sr := strings.NewReader(in)
+	s := newScanner(sr, func(x Object) (Integer, error) { return x.(Integer), nil }, nil)
+	s.fileReader = sr
 	stmObj, err := s.ReadObject()
 	if err != nil {
 		t.Fatal(err)

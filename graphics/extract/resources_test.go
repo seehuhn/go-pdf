@@ -672,7 +672,7 @@ func FuzzRoundTrip(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, fileData []byte) {
 		// try to parse as PDF file
-		r, err := pdf.NewReader(bytes.NewReader(fileData), nil)
+		r, err := pdf.NewReader(bytes.NewReader(fileData), int64(len(fileData)), nil)
 		if err != nil {
 			t.Skip("invalid PDF")
 		}

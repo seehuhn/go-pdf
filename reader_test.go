@@ -72,7 +72,7 @@ func TestObjectStream(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestReferenceChain(t *testing.T) {
 	// 	t.Fatal(err)
 	// }
 
-	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +161,7 @@ func TestReferenceLoop(t *testing.T) {
 	// 	t.Fatal(err)
 	// }
 
-	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +212,7 @@ func TestIndirectStreamLength(t *testing.T) {
 	// 	t.Fatal(err)
 	// }
 
-	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -272,7 +272,7 @@ func TestStreamLengthInStream(t *testing.T) {
 	// 	t.Fatal(err)
 	// }
 
-	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -332,7 +332,7 @@ func TestStreamLengthCycle(t *testing.T) {
 	// 	t.Fatal(err)
 	// }
 
-	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,7 +418,7 @@ func TestStreamLengthCycle2(t *testing.T) {
 	// 	t.Fatal(err)
 	// }
 
-	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -438,7 +438,7 @@ func TestReaderGoFuzz(t *testing.T) {
 	}
 	for _, test := range cases {
 		buf := strings.NewReader(test)
-		_, _ = NewReader(buf, nil)
+		_, _ = NewReader(buf, int64(len(test)), nil)
 	}
 }
 
@@ -489,7 +489,7 @@ func FuzzReader(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, in []byte) {
 		buf := bytes.NewReader(in)
-		r, err := NewReader(buf, nil)
+		r, err := NewReader(buf, int64(len(in)), nil)
 		if err != nil {
 			return
 		}

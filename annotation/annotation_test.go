@@ -318,7 +318,7 @@ func FuzzRoundTrip(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, fileData []byte) {
 		// Make sure we don't panic on random input.
-		r, err := pdf.NewReader(bytes.NewReader(fileData), nil)
+		r, err := pdf.NewReader(bytes.NewReader(fileData), int64(len(fileData)), nil)
 		if err != nil {
 			t.Skipf("invalid PDF: %s", err)
 		}

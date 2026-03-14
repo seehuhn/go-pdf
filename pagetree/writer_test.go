@@ -62,7 +62,7 @@ func TestBalance(t *testing.T) {
 
 	// read back the file and inspect the page tree
 	readBuf := bytes.NewReader(testData)
-	in, err := pdf.NewReader(readBuf, nil)
+	in, err := pdf.NewReader(readBuf, int64(len(testData)), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

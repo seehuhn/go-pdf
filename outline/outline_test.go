@@ -225,7 +225,7 @@ func testRoundTrip(t *testing.T, v pdf.Version, o *Outline) {
 		t.Fatalf("close writer: %v", err)
 	}
 
-	r, err := pdf.NewReader(bytes.NewReader(buf.Data), nil)
+	r, err := pdf.NewReader(bytes.NewReader(buf.Data), int64(len(buf.Data)), nil)
 	if err != nil {
 		t.Fatalf("open document: %v", err)
 	}
@@ -282,7 +282,7 @@ func FuzzRoundTrip(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, fileData []byte) {
-		r, err := pdf.NewReader(bytes.NewReader(fileData), nil)
+		r, err := pdf.NewReader(bytes.NewReader(fileData), int64(len(fileData)), nil)
 		if err != nil {
 			t.Skip("invalid PDF")
 		}
@@ -340,7 +340,7 @@ func TestStructEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r, err := pdf.NewReader(bytes.NewReader(buf.Data), nil)
+	r, err := pdf.NewReader(bytes.NewReader(buf.Data), int64(len(buf.Data)), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -431,7 +431,7 @@ func TestReadLoop(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		r, err := pdf.NewReader(bytes.NewReader(buf.Data), nil)
+		r, err := pdf.NewReader(bytes.NewReader(buf.Data), int64(len(buf.Data)), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

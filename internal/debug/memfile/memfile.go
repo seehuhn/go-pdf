@@ -23,7 +23,7 @@ import (
 
 // MemFile is a temporary in-memory file.
 //
-// This type implements the [io.ReadWriteSeeker] interface.
+// This type implements the [io.ReadWriteSeeker] and [io.ReaderAt] interfaces.
 type MemFile struct {
 	// Data are the file contents.
 	Data []byte
@@ -74,6 +74,22 @@ func (f *MemFile) Read(p []byte) (n int, err error) {
 		err = io.EOF
 	}
 	return
+}
+
+// ReadAt reads data from the file at the given offset.
+// This implements the [io.ReaderAt] interface.
+func (f *MemFile) ReadAt(p []byte, off int64) (int, error) {
+	if off < 0 {
+		return 0, errInvalidOffset
+	}
+	if off >= int64(len(f.Data)) {
+		return 0, io.EOF
+	}
+	n := copy(p, f.Data[off:])
+	if n < len(p) {
+		return n, io.EOF
+	}
+	return n, nil
 }
 
 // Seek sets the offset in the file.

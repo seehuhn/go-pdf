@@ -63,7 +63,7 @@ func TestExtractText(t *testing.T) {
 			// os.WriteFile("test.pdf", buf.Bytes(), 0644)
 
 			// Now try to read back the text.
-			r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
+			r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
 			if err != nil {
 				t.Fatal(err)
 			}

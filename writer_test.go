@@ -123,8 +123,9 @@ ET
 
 	// os.WriteFile("debug.pdf", out.Bytes(), 0o644)
 
-	outR := bytes.NewReader(out.Bytes())
-	r, err := NewReader(outR, nil)
+	outData := out.Bytes()
+	outR := bytes.NewReader(outData)
+	r, err := NewReader(outR, int64(len(outData)), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,7 +285,7 @@ func TestWriter_ID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

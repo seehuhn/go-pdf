@@ -91,7 +91,8 @@ func TestCryptV1(t *testing.T) {
 
 	// os.WriteFile("test_TestV1.pdf", buf.Bytes(), 0o666)
 
-	in := bytes.NewReader(buf.Bytes())
+	inData := buf.Bytes()
+	in := bytes.NewReader(inData)
 	pwdFunc := func(_ []byte, try int) string {
 		switch try {
 		case 0:
@@ -103,7 +104,7 @@ func TestCryptV1(t *testing.T) {
 	rOpt := &ReaderOptions{
 		ReadPassword: pwdFunc,
 	}
-	r, err := NewReader(in, rOpt)
+	r, err := NewReader(in, int64(len(inData)), rOpt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,11 +168,12 @@ func TestAuthentication(t *testing.T) {
 				return res
 			}
 
-			in := bytes.NewReader(buf.Bytes())
+			inData := buf.Bytes()
+			in := bytes.NewReader(inData)
 			rOpt := &ReaderOptions{
 				ReadPassword: pwdFunc,
 			}
-			r, err := NewReader(in, rOpt)
+			r, err := NewReader(in, int64(len(inData)), rOpt)
 			if err != nil {
 				t.Fatal(err, i)
 			}
@@ -585,7 +587,7 @@ func TestAuthEmbed(t *testing.T) {
 		},
 		ErrorHandling: ErrorHandlingReport,
 	}
-	r, err := NewReader(bytes.NewReader(buf.Bytes()), rOpt)
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), rOpt)
 	if err != nil {
 		t.Fatal(err)
 	}

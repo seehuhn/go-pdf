@@ -300,7 +300,7 @@ func FuzzUsageAppRoundTrip(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, fileData []byte) {
-		r, err := pdf.NewReader(bytes.NewReader(fileData), nil)
+		r, err := pdf.NewReader(bytes.NewReader(fileData), int64(len(fileData)), nil)
 		if err != nil {
 			t.Skip("invalid PDF")
 		}

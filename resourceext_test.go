@@ -75,7 +75,7 @@ func TestResourceManager(t *testing.T) {
 
 	// part 2: read the document and check that the font is only embedded once
 
-	r, err := pdf.NewReader(buf, nil)
+	r, err := pdf.NewReader(buf, int64(len(buf.Data)), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

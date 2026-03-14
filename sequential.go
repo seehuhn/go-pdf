@@ -26,7 +26,7 @@ import (
 
 // FileInfo contains global information about a PDF file.
 type FileInfo struct {
-	R             io.ReadSeeker
+	R             io.ReaderAt
 	FileSize      int64
 	PDFStart      int64
 	PDFEnd        int64
@@ -62,8 +62,8 @@ type FileObject struct {
 // about the file structure and the location of indirect objects.
 // This can be used to attempt to read damaged PDF files, in particular
 // in cases where the cross-reference table is missing or corrupt.
-func SequentialScan(r io.ReadSeeker) (*FileInfo, error) {
-	fi := &FileInfo{R: r}
+func SequentialScan(r io.ReaderAt, size int64) (*FileInfo, error) {
+	fi := &FileInfo{R: r, FileSize: size}
 	err := fi.locateObjects()
 	if err != nil {
 		return nil, err
@@ -91,18 +91,9 @@ func (fi *FileInfo) doRead(objInfo *FileObject, getInt getIntFn) (Object, int64,
 		return nil, 0, nil
 	}
 
-	// safe the current file position and restore it later
-	prevPos, err := fi.R.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer fi.R.Seek(prevPos, io.SeekStart)
-
-	_, err = fi.R.Seek(objInfo.ObjStart, io.SeekStart)
-	if err != nil {
-		return nil, 0, err
-	}
-	s := newScanner(fi.R, getInt, nil)
+	sr := io.NewSectionReader(fi.R, objInfo.ObjStart, fi.FileSize-objInfo.ObjStart)
+	s := newScanner(sr, getInt, nil)
+	s.fileReader = fi.R
 	s.filePos = objInfo.ObjStart
 
 	x, ref, err := s.ReadIndirectObject()
@@ -127,6 +118,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 
 	r := &Reader{
 		r:           fi.R,
+		size:        fi.FileSize,
 		unencrypted: make(map[Reference]bool),
 	}
 
@@ -205,19 +197,8 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 }
 
 func (fi *FileInfo) locateObjects() error {
-	r := fi.R
-
-	size, err := getSize(r)
-	if err != nil {
-		return err
-	}
-	fi.FileSize = size
-
-	_, err = r.Seek(0, io.SeekStart)
-	if err != nil {
-		return err
-	}
-	s := newScanner(r, nil, nil)
+	sr := io.NewSectionReader(fi.R, 0, fi.FileSize)
+	s := newScanner(sr, nil, nil)
 
 	pos, m, err := s.find(startRegexp)
 	if err == io.EOF {
@@ -478,21 +459,11 @@ func (fi *FileInfo) readTrailer(sect *FileSection) (Dict, error) {
 		return nil, errors.New("no trailer found in section")
 	}
 
-	// safe the current file position and restore it later
-	prevPos, err := fi.R.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return nil, err
-	}
-	defer fi.R.Seek(prevPos, io.SeekStart)
-
-	_, err = fi.R.Seek(sect.TrailerPos, io.SeekStart)
-	if err != nil {
-		return nil, err
-	}
-	s := newScanner(fi.R, dummyGetInt, nil)
+	sr := io.NewSectionReader(fi.R, sect.TrailerPos, fi.FileSize-sect.TrailerPos)
+	s := newScanner(sr, dummyGetInt, nil)
 	s.filePos = sect.TrailerPos
 
-	err = s.SkipString("trailer")
+	err := s.SkipString("trailer")
 	if err != nil {
 		return nil, err
 	}

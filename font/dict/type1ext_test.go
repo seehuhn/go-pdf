@@ -68,7 +68,7 @@ func TestType1Embedding(t *testing.T) {
 	}
 
 	// step 2: read the PDF document, find the font dict, and check
-	r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
+	r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

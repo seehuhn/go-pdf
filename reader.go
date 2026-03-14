@@ -67,7 +67,8 @@ const (
 type Reader struct {
 	meta MetaInfo
 
-	r      io.ReadSeeker
+	r      io.ReaderAt
+	size   int64
 	closeR bool
 
 	xref map[uint32]*xRefEntry
@@ -88,7 +89,12 @@ func Open(fname string, opt *ReaderOptions) (*Reader, error) {
 	if err != nil {
 		return nil, Wrap(err, fname)
 	}
-	r, err := NewReader(fd, opt)
+	fi, err := fd.Stat()
+	if err != nil {
+		fd.Close()
+		return nil, Wrap(err, fname)
+	}
+	r, err := NewReader(fd, fi.Size(), opt)
 	if err != nil {
 		fd.Close()
 		return nil, Wrap(err, fname)
@@ -98,13 +104,14 @@ func Open(fname string, opt *ReaderOptions) (*Reader, error) {
 }
 
 // NewReader creates a new Reader object.
-func NewReader(data io.ReadSeeker, opt *ReaderOptions) (*Reader, error) {
+func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error) {
 	if opt == nil {
 		opt = &ReaderOptions{}
 	}
 
 	r := &Reader{
 		r:           data,
+		size:        size,
 		unencrypted: make(map[Reference]bool),
 	}
 
@@ -305,7 +312,7 @@ func (r *Reader) Get(ref Reference, canObjStm bool) (_ Native, err error) {
 				Loc: []string{"object " + ref.String()},
 			}
 		}
-		getInt := safeGetInteger(r, r.r, true)
+		getInt := safeGetInteger(r, true)
 		return getFromObjStm(r, ref.Number(), entry.InStream, getInt, r.enc)
 	}
 
@@ -510,47 +517,28 @@ func (s *objStm) Close() error {
 }
 
 // safeGetInteger returns a function that reads an integer from a getter.
-// Before reading the integer, the current position in the file is saved, and
-// restored on return.
 //
 // If canObjStm is false, the function will return an error if the object is in
 // an object stream.  This is used to avoid infinite recursion when reading
 // object streams.
-func safeGetInteger(r Getter, file io.Seeker, canObjStm bool) getIntFn {
-	return func(obj Object) (x Integer, err error) {
+func safeGetInteger(r Getter, canObjStm bool) getIntFn {
+	return func(obj Object) (Integer, error) {
 		if x, ok := obj.(Integer); ok {
 			return x, nil
 		}
-
-		savedPos, err := file.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return 0, err
-		}
-		defer func() {
-			_, e2 := file.Seek(savedPos, io.SeekStart)
-			if err == nil {
-				err = e2
-			}
-		}()
-
 		if canObjStm {
 			return GetInteger(r, obj)
-		} else {
-			return getIntegerNoObjStm(r, obj)
 		}
+		return getIntegerNoObjStm(r, obj)
 	}
 }
 
 func (r *Reader) scannerFrom(pos int64, canObjStm bool) (*scanner, error) {
-	getInt := safeGetInteger(r, r.r, canObjStm)
-	s := newScanner(r.r, getInt, r.enc)
+	getInt := safeGetInteger(r, canObjStm)
+	sr := io.NewSectionReader(r.r, pos, r.size-pos)
+	s := newScanner(sr, getInt, r.enc)
+	s.fileReader = r.r
 	s.unencrypted = r.unencrypted
-
-	_, err := r.r.Seek(pos, io.SeekStart)
-	if err != nil {
-		return nil, err
-	}
 	s.filePos = pos
-
 	return s, nil
 }

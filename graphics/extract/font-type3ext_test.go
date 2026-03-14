@@ -135,7 +135,7 @@ func FuzzType3Dict(f *testing.F) {
 		opt := &pdf.ReaderOptions{
 			ErrorHandling: pdf.ErrorHandlingReport,
 		}
-		r, err := pdf.NewReader(bytes.NewReader(fileData), opt)
+		r, err := pdf.NewReader(bytes.NewReader(fileData), int64(len(fileData)), opt)
 		if err != nil {
 			t.Skip("broken PDF: " + err.Error())
 		}

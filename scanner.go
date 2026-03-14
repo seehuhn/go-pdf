@@ -38,6 +38,11 @@ type scanner struct {
 	bufPos  int // current position within buf
 	bufEnd  int // end of valid data within buf
 
+	// fileReader, if set, is the underlying io.ReaderAt for the whole file.
+	// This is used to create streamReader instances that can read at
+	// absolute file positions.
+	fileReader io.ReaderAt
+
 	// GetInt is used to get the length of a stream, when the length is
 	// specified as an indirect object.
 	getInt getIntFn
@@ -653,11 +658,10 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 		}
 	}
 
-	origReader, ok := s.r.(io.ReadSeeker)
-	if !ok {
-		// TODO(voss): can this be reached at all?
+	origReader := s.fileReader
+	if origReader == nil {
 		return nil, &MalformedFileError{
-			Err: errors.New("cannot seek"),
+			Err: errors.New("cannot read stream data"),
 		}
 	}
 	start := s.currentPos()
@@ -919,7 +923,7 @@ func (s *scanner) find(pat *regexp.Regexp) (int64, []string, error) {
 }
 
 type streamReader struct {
-	r     io.ReadSeeker
+	r     io.ReaderAt
 	start int64
 	pos   int64
 	end   int64
@@ -932,28 +936,14 @@ func (r *streamReader) Read(buf []byte) (int, error) {
 	if int64(len(buf)) > r.end-r.pos {
 		buf = buf[:r.end-r.pos]
 	}
-
-	prevPos, err := r.r.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return 0, err
-	}
-
-	_, err = r.r.Seek(r.pos, io.SeekStart)
-	if err != nil {
-		return 0, err
-	}
-	n, err := r.r.Read(buf)
+	n, err := r.r.ReadAt(buf, r.pos)
 	r.pos += int64(n)
-	if err != nil {
-		return n, err
+	if err == io.EOF {
+		if n > 0 {
+			err = nil
+		}
 	}
-
-	_, err = r.r.Seek(prevPos, io.SeekStart)
-	if err != nil {
-		return n, err
-	}
-
-	return n, nil
+	return n, err
 }
 
 func (r *streamReader) Seek(offset int64, whence int) (int64, error) {

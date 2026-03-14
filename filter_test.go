@@ -80,7 +80,7 @@ func TestFilterChaining(t *testing.T) {
 			opt := &ReaderOptions{
 				ErrorHandling: ErrorHandlingReport,
 			}
-			r, err := NewReader(bytes.NewReader(buf.Bytes()), opt)
+			r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), opt)
 			if err != nil {
 				t.Fatal(err)
 			}

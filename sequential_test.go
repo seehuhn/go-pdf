@@ -65,7 +65,7 @@ trailer
 /Root 1 0 R
 >>
 `
-	info, err := SequentialScan(strings.NewReader(file))
+	info, err := SequentialScan(strings.NewReader(file), int64(len(file)))
 	if err != nil {
 		t.Fatal(err)
 	}

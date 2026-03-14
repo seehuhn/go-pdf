@@ -53,10 +53,7 @@ func (r *Reader) findXRef(size int64) (int64, error) {
 }
 
 func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
-	size, err := getSize(r.r)
-	if err != nil {
-		return nil, nil, err
-	}
+	size := r.size
 
 	start, err := r.findXRef(size)
 	if err != nil {
@@ -436,11 +433,7 @@ func (r *Reader) lastOccurence(pat string, size int64) (int64, error) {
 	pos := size
 	for pos >= k {
 		start := max(pos-chunkSize, 0)
-		_, err := r.r.Seek(start, io.SeekStart)
-		if err != nil {
-			return 0, err
-		}
-		n, err := r.r.Read(buf[:pos-start])
+		n, err := r.r.ReadAt(buf[:pos-start], start)
 		if err != nil && err != io.EOF {
 			return 0, err
 		}
@@ -677,23 +670,4 @@ type xRefEntry struct {
 
 func (entry *xRefEntry) IsFree() bool {
 	return entry == nil || entry.Pos < 0
-}
-
-func getSize(r io.Seeker) (int64, error) {
-	cur, err := r.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return 0, err
-	}
-
-	size, err := r.Seek(0, io.SeekEnd)
-	if err != nil {
-		return 0, err
-	}
-
-	_, err = r.Seek(cur, io.SeekStart)
-	if err != nil {
-		return 0, err
-	}
-
-	return size, nil
 }

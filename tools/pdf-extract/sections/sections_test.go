@@ -103,7 +103,7 @@ func TestPages(t *testing.T) {
 	}
 
 	// open the PDF for reading
-	r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
+	r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +169,7 @@ func TestPagesWithoutOutline(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
+	r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +234,7 @@ func TestPagesSpanningMultiplePages(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), nil)
+	r, err := pdf.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

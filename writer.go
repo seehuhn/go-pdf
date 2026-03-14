@@ -351,7 +351,7 @@ func (w *Writer) Get(ref Reference, canObjStm bool) (obj Native, err error) {
 				Loc: []string{"object " + ref.String()},
 			}
 		}
-		getInt := safeGetInteger(w, r, true)
+		getInt := safeGetInteger(w, true)
 		return getFromObjStm(w, ref.Number(), entry.InStream, getInt, w.w.enc)
 	}
 
@@ -391,8 +391,11 @@ func (w *Writer) Get(ref Reference, canObjStm bool) (obj Native, err error) {
 
 func (w *Writer) scannerFrom(pos int64, canObjStm bool) (*scanner, error) {
 	r := w.origW.(io.ReadSeeker)
-	getInt := safeGetInteger(w, r, canObjStm)
+	getInt := safeGetInteger(w, canObjStm)
 	s := newScanner(r, getInt, w.w.enc)
+	if ra, ok := w.origW.(io.ReaderAt); ok {
+		s.fileReader = ra
+	}
 
 	_, err := r.Seek(pos, io.SeekStart)
 	if err != nil {

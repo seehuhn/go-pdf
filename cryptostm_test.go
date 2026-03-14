@@ -88,7 +88,7 @@ func testEncryptedStreamMultipleReads(t *testing.T, version Version) {
 	rOpt := &ReaderOptions{
 		ReadPassword: func([]byte, int) string { return "user" },
 	}
-	r, err := NewReader(bytes.NewReader(buf.Bytes()), rOpt)
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), rOpt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +185,7 @@ func TestEncryptedStreamWithFilters(t *testing.T) {
 	rOpt := &ReaderOptions{
 		ReadPassword: func([]byte, int) string { return "secret" },
 	}
-	r, err := NewReader(bytes.NewReader(buf.Bytes()), rOpt)
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), rOpt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +266,7 @@ func TestUnencryptedStreamMultipleReads(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r, err := NewReader(bytes.NewReader(buf.Bytes()), nil)
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

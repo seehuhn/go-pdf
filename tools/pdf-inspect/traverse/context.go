@@ -74,11 +74,16 @@ func Root(fileName string, passwords ...string) (Context, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	fi, err := fd.Stat()
+	if err != nil {
+		fd.Close()
+		return nil, nil, err
+	}
 	opt := &pdf.ReaderOptions{
 		ReadPassword:  tryPasswd,
 		ErrorHandling: pdf.ErrorHandlingReport,
 	}
-	r, err := pdf.NewReader(fd, opt)
+	r, err := pdf.NewReader(fd, fi.Size(), opt)
 	if err != nil {
 		fd.Close()
 		return nil, nil, err

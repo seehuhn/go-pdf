@@ -658,7 +658,7 @@ func FuzzRoundTrip(f *testing.F) {
 		rOpt := &pdf.ReaderOptions{
 			ErrorHandling: pdf.ErrorHandlingReport,
 		}
-		r, err := pdf.NewReader(bytes.NewReader(fileData), rOpt)
+		r, err := pdf.NewReader(bytes.NewReader(fileData), int64(len(fileData)), rOpt)
 		if err != nil {
 			t.Skip("invalid PDF")
 		}
