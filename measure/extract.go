@@ -202,7 +202,101 @@ func extractNumberFormatArray(x *pdf.Extractor, arr pdf.Array) ([]*NumberFormat,
 	return formats, nil
 }
 
-// extractGeospatialMeasure is a placeholder for geospatial measures.
+// extractGeospatialMeasure extracts a GeospatialMeasure from a PDF dictionary.
 func extractGeospatialMeasure(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (Measure, error) {
-	panic("geospatial measures not yet implemented")
+	gm := &GeospatialMeasure{}
+
+	// GCS (required)
+	gcs, err := pdf.ExtractorGet(x, dict["GCS"], ExtractCoordinateSystem)
+	if err != nil {
+		return nil, err
+	}
+	gm.GCS = gcs
+
+	// DCS (optional)
+	dcs, err := pdf.ExtractorGetOptional(x, dict["DCS"], ExtractCoordinateSystem)
+	if err != nil {
+		return nil, err
+	}
+	gm.DCS = dcs
+
+	// GPTS (required)
+	gpts, err := pdf.GetFloatArray(x.R, dict["GPTS"])
+	if err != nil {
+		return nil, err
+	}
+	// truncate to even length (coordinate pairs)
+	gpts = gpts[:len(gpts)&^1]
+	if len(gpts) == 0 {
+		return nil, pdf.Error("missing required GPTS")
+	}
+	gm.GPTS = gpts
+
+	// LPTS (optional)
+	if dict["LPTS"] != nil {
+		lpts, err := pdf.GetFloatArray(x.R, dict["LPTS"])
+		if err != nil {
+			return nil, err
+		}
+		// truncate to even length and match GPTS length
+		lpts = lpts[:len(lpts)&^1]
+		if len(lpts) != len(gpts) {
+			lpts = nil
+		}
+		gm.LPTS = lpts
+	}
+
+	// Bounds (optional)
+	if dict["Bounds"] != nil {
+		bounds, err := pdf.GetFloatArray(x.R, dict["Bounds"])
+		if err != nil {
+			return nil, err
+		}
+		// truncate to even length
+		bounds = bounds[:len(bounds)&^1]
+		if len(bounds) > 0 {
+			gm.Bounds = bounds
+		}
+	}
+
+	// PDU (optional, all three must be present)
+	if dict["PDU"] != nil {
+		pduArray, err := pdf.Optional(x.GetArray(dict["PDU"]))
+		if err != nil {
+			return nil, err
+		}
+		if len(pduArray) >= 3 {
+			var pdu [3]pdf.Name
+			valid := true
+			for i := range 3 {
+				name, err := pdf.Optional(x.GetName(pduArray[i]))
+				if err != nil {
+					return nil, err
+				}
+				if name == "" {
+					valid = false
+					break
+				}
+				pdu[i] = name
+			}
+			if valid {
+				gm.PDU = pdu
+			}
+		}
+	}
+
+	// PCSM (optional, must be exactly 12 elements)
+	if dict["PCSM"] != nil {
+		pcsm, err := pdf.GetFloatArray(x.R, dict["PCSM"])
+		if err != nil {
+			return nil, err
+		}
+		if len(pcsm) == 12 {
+			gm.PCSM = pcsm
+		}
+	}
+
+	gm.SingleUse = isDirect
+
+	return gm, nil
 }

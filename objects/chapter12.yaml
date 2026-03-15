@@ -7862,6 +7862,41 @@ types:
     required: false
     default: '0'
     introduced: '1.6'
+- name: GeographicCoordinateSystem
+  purpose: "geographic coordinate system"
+  goType: measure.CoordinateSystem
+  pdfType: GEOGCS
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 270
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - GEOGCS
+    discriminator: true
+    notes: Table 270
+  - goName: EPSG
+    goType: int
+    pdfKey: EPSG
+    pdfType: integer
+    required: false
+    introduced: '2.0'
+  - goName: WKT
+    goType: string
+    pdfKey: WKT
+    pdfType: ascii-string
+    required: false
+    introduced: '2.0'
+  goPackage: measure
+  goRepr: struct
+  specSection: '12.10'
+  readFunc: measure.ExtractCoordinateSystem
+  fileDependent: false
+  writeMethod: (*CoordinateSystem).Embed
 - name: IconFit
   purpose: how to fit an icon within an annotation rectangle
   goType:
@@ -7994,6 +8029,182 @@ types:
     deprecated: '2.0'
     refTypes:
     - Stream
+- name: MeasureGEO
+  purpose: "geographic measure dictionary"
+  goType: measure.GeospatialMeasure
+  pdfType: Measure
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 266
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - Measure
+    notes: Table 266 and Table 269
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - GEO
+  - goName: Bounds
+    goType: '[]float64'
+    pdfKey: Bounds
+    pdfType: array
+    required: false
+    introduced: '2.0'
+  - goName: GCS
+    goType: '*measure.CoordinateSystem'
+    pdfKey: GCS
+    pdfType: dictionary
+    required: true
+    introduced: '2.0'
+    refTypes:
+    - GeographicCoordinateSystem
+    - ProjectedCoordinateSystem
+  - goName: DCS
+    goType: '*measure.CoordinateSystem'
+    pdfKey: DCS
+    pdfType: dictionary
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - GeographicCoordinateSystem
+    - ProjectedCoordinateSystem
+  - goName: PDU
+    goType: '[3]pdf.Name'
+    pdfKey: PDU
+    pdfType: array
+    required: false
+    introduced: '2.0'
+    notes: Preferred Display Units
+  - goName: GPTS
+    goType: '[]float64'
+    pdfKey: GPTS
+    pdfType: array
+    required: true
+    introduced: '2.0'
+  - goName: LPTS
+    goType: '[]float64'
+    pdfKey: LPTS
+    pdfType: array
+    required: false
+    introduced: '2.0'
+  - goName: PCSM
+    goType: '[]float64'
+    pdfKey: PCSM
+    pdfType: array
+    required: false
+    introduced: '2.0'
+    notes: Projected Coordinate System Matrix
+  goPackage: measure
+  goRepr: struct
+  specSection: '12.10'
+  readFunc: measure.Extract
+  fileDependent: false
+  writeMethod: (*GeospatialMeasure).Embed
+- name: MeasureRL
+  purpose: "rectilinear measure dictionary"
+  goType: measure.RectilinearMeasure
+  pdfType: Measure
+  pdfRepr: dict
+  introduced: '1.6'
+  specTable: Table 266
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - Measure
+    notes: Table 266 and Table 267
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - RL
+  - goName:
+    pdfKey: R
+    pdfType: text-string
+    required: true
+    introduced: '1.6'
+  - goName:
+    pdfKey: X
+    pdfType: array
+    required: true
+    introduced: '1.6'
+    refTypes:
+    - type: NumberFormat
+      collection: array
+  - goName:
+    pdfKey: Y
+    pdfType: array
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - type: NumberFormat
+      collection: array
+  - goName:
+    pdfKey: D
+    pdfType: array
+    required: true
+    introduced: '1.6'
+    refTypes:
+    - type: NumberFormat
+      collection: array
+  - goName:
+    pdfKey: A
+    pdfType: array
+    required: true
+    introduced: '1.6'
+    refTypes:
+    - type: NumberFormat
+      collection: array
+  - goName:
+    pdfKey: T
+    pdfType: array
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - type: NumberFormat
+      collection: array
+  - goName:
+    pdfKey: S
+    pdfType: array
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - type: NumberFormat
+      collection: array
+  - goName:
+    pdfKey: O
+    pdfType: array
+    required: false
+    introduced: '1.6'
+  - goName: CYX
+    pdfKey: CYX
+    pdfType: number
+    required: false
+    introduced: '1.6'
+    goType: float64
+    purpose: 'CYX is the y-to-x axis conversion factor.
+
+      TODO(voss): Clarify the semantics when Y units match X units.
+
+      Zero means the value is not present in the PDF.'
+  goPackage: measure
+  goRepr: struct
+  specSection: '12.9'
+  fileDependent: false
+  writeMethod: (*RectilinearMeasure).Embed
 - name: MicrosoftWindowsLaunchParam
   purpose: Windows-specific launch parameters
   goType:
@@ -8148,6 +8359,96 @@ types:
     default: '[0.5 0.5]'
     introduced: '1.2'
     deprecated: '2.0'
+- name: NumberFormat
+  purpose: "format for numeric display"
+  goType: measure.NumberFormat
+  pdfType: NumberFormat
+  pdfRepr: dict
+  introduced: '1.6'
+  specTable: Table 268
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - NumberFormat
+    notes: Table 268
+  - goName:
+    pdfKey: U
+    pdfType: text-string
+    required: true
+    introduced: '1.6'
+  - goName:
+    pdfKey: C
+    pdfType: number
+    required: true
+    introduced: '1.6'
+  - goName:
+    pdfKey: F
+    pdfType: name
+    required: false
+    default: D
+    introduced: '1.6'
+    possibleValues:
+    - D
+    - F
+    - R
+    - T
+  - goName:
+    pdfKey: D
+    pdfType: integer
+    required: false
+    default: '16'
+    introduced: '1.6'
+    possibleValues:
+    - fn:Eval(@D>0)
+  - goName:
+    pdfKey: FD
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.6'
+  - goName:
+    pdfKey: RT
+    pdfType: text-string
+    required: false
+    default: ''','''
+    introduced: '1.6'
+  - goName:
+    pdfKey: RD
+    pdfType: text-string
+    required: false
+    default: '''.'''
+    introduced: '1.6'
+  - goName:
+    pdfKey: PS
+    pdfType: text-string
+    required: false
+    default: ''' '''
+    introduced: '1.6'
+  - goName:
+    pdfKey: SS
+    pdfType: text-string
+    required: false
+    default: ''' '''
+    introduced: '1.6'
+  - goName:
+    pdfKey: O
+    pdfType: name
+    required: false
+    default: S
+    introduced: '1.6'
+    possibleValues:
+    - S
+    - P
+  goPackage: measure
+  goRepr: struct
+  specSection: '12.9'
+  readFunc: measure.ExtractNumberFormat
+  fileDependent: false
+  writeMethod: (*NumberFormat).Embed
 - name: OptContentConfig
   purpose: optional content configuration
   goType:
@@ -8858,6 +9159,84 @@ types:
     purpose: split into Bold and Italic bool fields in Go
     notes: Table 152
     source: OutlineItem
+- name: PointData
+  purpose: "geospatial point data"
+  goType: measure.PtData
+  pdfType: PtData
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 272
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - PtData
+    discriminator: true
+    notes: Table 272
+  - goName: Subtype
+    goType: string
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - Cloud
+  - goName: Names
+    goType: '[]string'
+    pdfKey: Names
+    pdfType: array
+    required: true
+    introduced: '2.0'
+  - goName: XPTS
+    goType: '[][]pdf.Object'
+    pdfKey: XPTS
+    pdfType: array
+    required: true
+    introduced: '2.0'
+  goPackage: measure
+  goRepr: struct
+  specSection: '12.10'
+  readFunc: measure.ExtractPtData
+  fileDependent: false
+  writeMethod: (*PtData).Embed
+- name: ProjectedCoordinateSystem
+  purpose: "projected coordinate system"
+  goType: measure.CoordinateSystem
+  pdfType: PROJCS
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 271
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '2.0'
+    possibleValues:
+    - PROJCS
+    discriminator: true
+    notes: Table 271
+  - goName: EPSG
+    goType: int
+    pdfKey: EPSG
+    pdfType: integer
+    required: fn:IsRequired(fn:Not(fn:IsPresent(WKT)))
+    introduced: '2.0'
+  - goName: WKT
+    goType: string
+    pdfKey: WKT
+    pdfType: ascii-string
+    required: fn:IsRequired(fn:Not(fn:IsPresent(EPSG)))
+    introduced: '2.0'
+  goPackage: measure
+  goRepr: struct
+  specSection: '12.10'
+  readFunc: measure.ExtractCoordinateSystem
+  fileDependent: false
+  writeMethod: (*CoordinateSystem).Embed
 - name: Projection
   purpose: projection parameters for 3D rendering
   pdfSubtype: O
@@ -9848,6 +10227,62 @@ types:
     introduced: '1.7'
     refTypes:
     - Stream
+- name: Viewport
+  purpose: "rectangular region with associated measure"
+  goType: measure.Viewport
+  pdfType: Viewport
+  pdfRepr: dict
+  introduced: '1.6'
+  specTable: Table 265
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - Viewport
+    notes: Table 265
+  - goName: BBox
+    pdfKey: BBox
+    pdfType: rectangle
+    required: true
+    introduced: '1.6'
+    goType: pdf.Rectangle
+    purpose: BBox specifies the location of the viewport on the page.
+  - goName: Name
+    pdfKey: Name
+    pdfType: text-string
+    required: false
+    introduced: '1.6'
+    goType: string
+    purpose: Name is a descriptive title of the viewport (optional).
+  - goName: Measure
+    pdfKey: Measure
+    pdfType: dictionary
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - MeasureRL
+    - type: MeasureGEO
+      since: '2.0'
+    goType: Measure
+    purpose: Measure specifies the scale and units for measurements within the viewport (optional).
+  - goName: PtData
+    pdfKey: PtData
+    pdfType: dictionary
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - PointData
+    goType: '*PtData'
+    purpose: PtData (optional; PDF 2.0) contains extended geospatial point data.
+  goPackage: measure
+  goRepr: struct
+  specSection: '12.9'
+  readFunc: measure.ExtractViewport
+  fileDependent: false
+  writeMethod: (*Viewport).Embed
 interfaces:
 - name: Annotation
   goType: annotation.Annotation
