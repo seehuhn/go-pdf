@@ -91,7 +91,7 @@ var (
 //
 // The argument desc is typically a value in the ColorSpace sub-dictionary of
 // a Resources dictionary.
-func ExtractSpace(x *pdf.Extractor, desc pdf.Object) (Space, error) {
+func ExtractSpace(x *pdf.Extractor, desc pdf.Object, _ bool) (Space, error) {
 	d := newDecoder(x.R, desc)
 
 	var res Space
@@ -154,7 +154,7 @@ func ExtractSpace(x *pdf.Extractor, desc pdf.Object) (Space, error) {
 	case FamilyICCBased:
 		var meta *metadata.Stream
 		if ref, ok := d.dict["Metadata"]; ok {
-			meta, err = pdf.Optional(metadata.Extract(x, ref))
+			meta, err = pdf.Optional(metadata.Extract(x, ref, false))
 			if err != nil {
 				d.SetError(err)
 			}

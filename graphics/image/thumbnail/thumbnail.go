@@ -63,7 +63,7 @@ type Thumbnail struct {
 }
 
 // ExtractThumbnail reads a thumbnail image from a PDF object.
-func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
+func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object, _ bool) (*Thumbnail, error) {
 	stm, err := x.GetStream(obj)
 	if err != nil {
 		return nil, err
@@ -104,7 +104,7 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object) (*Thumbnail, error) {
 	thumb.Height = int(height)
 
 	// color space (required)
-	cs, err := color.ExtractSpace(x, dict["ColorSpace"])
+	cs, err := color.ExtractSpace(x, dict["ColorSpace"], false)
 	if err != nil {
 		return nil, err
 	} else if cs == nil {

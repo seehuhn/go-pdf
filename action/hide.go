@@ -84,7 +84,7 @@ func decodeHide(x *pdf.Extractor, dict pdf.Dict) (*Hide, error) {
 		h = bool(hVal)
 	}
 
-	next, err := DecodeActionList(x, dict["Next"])
+	next, err := DecodeActionList(x, dict["Next"], false)
 	if err != nil {
 		return nil, err
 	}

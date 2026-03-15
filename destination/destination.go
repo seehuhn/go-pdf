@@ -59,7 +59,7 @@ var Unset = math.NaN()
 // Decode reads a destination from a PDF object.
 // The object can be an array (explicit destination), a name/string (named destination),
 // or a dictionary with a D entry.
-func Decode(x *pdf.Extractor, obj pdf.Object) (Destination, error) {
+func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (Destination, error) {
 	obj, err := x.Resolve(obj)
 	if err != nil {
 		return nil, err

@@ -26,8 +26,8 @@ import (
 
 // Font extracts a font from a PDF file as an immutable font object.
 // This combines Dict with MakeFont() for convenience.
-func Font(x *pdf.Extractor, obj pdf.Object) (font.Instance, error) {
-	d, err := Dict(x, obj)
+func Font(x *pdf.Extractor, obj pdf.Object, _ bool) (font.Instance, error) {
+	d, err := Dict(x, obj, false)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func Font(x *pdf.Extractor, obj pdf.Object) (font.Instance, error) {
 // Dict reads a font dictionary from a PDF file.
 // This returns a concrete type implementing dict.Dict,
 // allowing access to font-specific properties.
-func Dict(x *pdf.Extractor, obj pdf.Object) (dict.Dict, error) {
+func Dict(x *pdf.Extractor, obj pdf.Object, _ bool) (dict.Dict, error) {
 	fontDict, err := x.GetDictTyped(obj, "Font")
 	if err != nil {
 		return nil, err

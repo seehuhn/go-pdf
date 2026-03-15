@@ -231,7 +231,7 @@ func testRoundTrip(t *testing.T, v pdf.Version, o *Outline) {
 	}
 	defer r.Close()
 
-	decoded, err := Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines)
+	decoded, err := Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines, false)
 	if err != nil {
 		t.Fatalf("read outline: %v", err)
 	}
@@ -288,7 +288,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 		defer r.Close()
 
-		outline, err := Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines)
+		outline, err := Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines, false)
 		if err != nil {
 			t.Skip("malformed outline")
 		}
@@ -346,7 +346,7 @@ func TestStructEntry(t *testing.T) {
 	}
 	defer r.Close()
 
-	decoded, err := Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines)
+	decoded, err := Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -436,7 +436,7 @@ func TestReadLoop(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, err = Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines)
+		_, err = Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines, false)
 		if (err == nil) != good {
 			t.Errorf("good=%v, err=%v", good, err)
 		}

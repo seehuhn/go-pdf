@@ -187,7 +187,7 @@ func TestMaskWithPtData(t *testing.T) {
 	}
 
 	x1 := pdf.NewExtractor(writer1)
-	mask1, err := ExtractMask(x1, ref)
+	mask1, err := ExtractMask(x1, ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +226,7 @@ func TestMaskWithPtData(t *testing.T) {
 	}
 
 	x2 := pdf.NewExtractor(writer2)
-	mask2, err := ExtractMask(x2, ref2)
+	mask2, err := ExtractMask(x2, ref2, false)
 	if err != nil {
 		t.Fatal(err)
 	}

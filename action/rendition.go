@@ -112,7 +112,7 @@ func decodeRendition(x *pdf.Extractor, dict pdf.Dict) (*Rendition, error) {
 		op.Set(0)
 	}
 
-	next, err := DecodeActionList(x, dict["Next"])
+	next, err := DecodeActionList(x, dict["Next"], false)
 	if err != nil {
 		return nil, err
 	}

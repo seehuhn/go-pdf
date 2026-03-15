@@ -24,7 +24,7 @@ import (
 )
 
 // Extract extracts a halftone from a PDF file.
-func Extract(x *pdf.Extractor, obj pdf.Object) (graphics.Halftone, error) {
+func Extract(x *pdf.Extractor, obj pdf.Object, _ bool) (graphics.Halftone, error) {
 	resolved, err := pdf.Resolve(x.R, obj)
 	if err != nil {
 		return nil, err

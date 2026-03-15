@@ -164,7 +164,7 @@ func TestExtractorGetArrayCycle(t *testing.T) {
 	// use the writer as a getter and try to resolve
 	x := pdf.NewExtractor(w)
 
-	extract := func(x *pdf.Extractor, obj pdf.Object) (pdf.Array, error) {
+	extract := func(x *pdf.Extractor, obj pdf.Object, _ bool) (pdf.Array, error) {
 		arr, err := x.GetArray(obj.AsPDF(0))
 		if err != nil {
 			return nil, err

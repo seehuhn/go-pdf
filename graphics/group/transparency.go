@@ -118,12 +118,14 @@ func (a *TransparencyAttributes) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) 
 
 // ExtractTransparencyAttributes reads a transparency group attributes
 // dictionary from a PDF file.
-func ExtractTransparencyAttributes(x *pdf.Extractor, obj pdf.Object) (*TransparencyAttributes, error) {
-	singleUse := !x.IsIndirect // capture before other x method calls
+func ExtractTransparencyAttributes(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*TransparencyAttributes, error) {
 
 	dict, err := x.GetDictTyped(obj, "Group")
 	if err != nil {
 		return nil, err
+	}
+	if dict == nil {
+		return nil, nil
 	}
 
 	// verify subtype
@@ -139,7 +141,7 @@ func ExtractTransparencyAttributes(x *pdf.Extractor, obj pdf.Object) (*Transpare
 
 	// extract color space (optional)
 	if csObj, ok := dict["CS"]; ok {
-		cs, err := color.ExtractSpace(x, csObj)
+		cs, err := color.ExtractSpace(x, csObj, false)
 		if err != nil {
 			return nil, pdf.Wrap(err, "group color space")
 		}
@@ -164,7 +166,7 @@ func ExtractTransparencyAttributes(x *pdf.Extractor, obj pdf.Object) (*Transpare
 		a.Knockout = bool(knockout)
 	}
 
-	a.SingleUse = singleUse
+	a.SingleUse = isDirect
 
 	return a, nil
 }

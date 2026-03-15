@@ -620,7 +620,7 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 // Decode reads a page dictionary from a PDF object.
 // The page dictionary should already have inherited attributes resolved
 // (e.g., via [pagetree.Iterator]).
-func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
+func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (*Page, error) {
 	dict, err := x.GetDictTyped(obj, "Page")
 	if err != nil {
 		return nil, err
@@ -644,7 +644,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	// Resources (required, inheritable)
-	if res, err := extract.Resources(x, dict["Resources"]); err != nil {
+	if res, err := pdf.ExtractorGet(x, dict["Resources"], extract.Resources); err != nil {
 		return nil, err
 	} else {
 		p.Resources = res
@@ -756,11 +756,9 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	// If Rotate key is absent, p.Rotate remains RotateInherit (zero value)
 
 	// Group (optional)
-	if dict["Group"] != nil {
-		grp, err := group.ExtractTransparencyAttributes(x, dict["Group"])
-		if err != nil {
-			return nil, err
-		}
+	if grp, err := pdf.ExtractorGetOptional(x, dict["Group"], group.ExtractTransparencyAttributes); err != nil {
+		return nil, err
+	} else {
 		p.Group = grp
 	}
 
@@ -790,11 +788,9 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	// Trans (optional)
-	if dict["Trans"] != nil {
-		trans, err := transition.Extract(x, dict["Trans"])
-		if err != nil {
-			return nil, err
-		}
+	if trans, err := pdf.ExtractorGetOptional(x, dict["Trans"], transition.Extract); err != nil {
+		return nil, err
+	} else {
 		p.Transition = trans
 	}
 
@@ -803,7 +799,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 		return nil, err
 	} else {
 		for _, item := range annotsArray {
-			annot, err := annotation.Decode(x, item)
+			annot, err := annotation.Decode(x, item, false)
 			if err != nil {
 				// permissive: skip invalid annotations
 				continue
@@ -813,14 +809,14 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	// AA (optional)
-	if aa, err := triggers.DecodePage(x, dict["AA"]); err != nil {
+	if aa, err := triggers.DecodePage(x, dict["AA"], false); err != nil {
 		return nil, err
 	} else {
 		p.AA = aa
 	}
 
 	// Metadata (optional)
-	if meta, err := pdf.Optional(metadata.Extract(x, dict["Metadata"])); err != nil {
+	if meta, err := pdf.Optional(metadata.Extract(x, dict["Metadata"], false)); err != nil {
 		return nil, err
 	} else {
 		p.Metadata = meta
@@ -834,7 +830,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	// PieceInfo (optional)
-	if piece, err := pdf.Optional(pieceinfo.Extract(x, dict["PieceInfo"])); err != nil {
+	if piece, err := pdf.Optional(pieceinfo.Extract(x, dict["PieceInfo"], false)); err != nil {
 		return nil, err
 	} else {
 		p.PieceInfo = piece
@@ -865,7 +861,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 
 	// SeparationInfo (optional)
 	if dict["SeparationInfo"] != nil {
-		sep, err := separation.Decode(x, dict["SeparationInfo"])
+		sep, err := separation.Decode(x, dict["SeparationInfo"], false)
 		if err != nil {
 			return nil, err
 		}
@@ -892,7 +888,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
 	}
 
 	// PresSteps (optional)
-	if presSteps, err := navnode.Decode(x, dict["PresSteps"]); err != nil {
+	if presSteps, err := navnode.Decode(x, dict["PresSteps"], false); err != nil {
 		return nil, pdf.Wrap(err, "PresSteps")
 	} else {
 		p.PresSteps = presSteps

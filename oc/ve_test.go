@@ -166,7 +166,7 @@ func testVisibilityExpressionRoundTrip(t *testing.T, version pdf.Version, origin
 	}
 
 	extractor := pdf.NewExtractor(w)
-	extracted, err := ExtractVisibilityExpression(extractor, obj)
+	extracted, err := ExtractVisibilityExpression(extractor, obj, false)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -395,7 +395,7 @@ func FuzzVisibilityExpression(f *testing.F) {
 		}
 
 		extractor := pdf.NewExtractor(r)
-		ve, err := ExtractVisibilityExpression(extractor, objPDF)
+		ve, err := ExtractVisibilityExpression(extractor, objPDF, false)
 		if err != nil {
 			t.Skip("malformed visibility expression")
 		}

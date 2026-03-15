@@ -107,7 +107,7 @@ func decodeMovie(x *pdf.Extractor, dict pdf.Dict) (*Movie, error) {
 		operation = pdf.Name(MovieOperationPlay)
 	}
 
-	next, err := DecodeActionList(x, dict["Next"])
+	next, err := DecodeActionList(x, dict["Next"], false)
 	if err != nil {
 		return nil, err
 	}

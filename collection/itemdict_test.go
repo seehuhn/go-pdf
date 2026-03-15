@@ -218,7 +218,7 @@ func TestExtractItemDictMalformed(t *testing.T) {
 		w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 		x := pdf.NewExtractor(w)
 
-		_, err := ExtractItemDict(x, nil)
+		_, err := ExtractItemDict(x, nil, false)
 		if err == nil {
 			t.Error("expected error for missing dictionary, got nil")
 		}
@@ -233,7 +233,7 @@ func TestExtractItemDictMalformed(t *testing.T) {
 			"Key":  pdf.TextString("value"),
 		}
 
-		_, err := ExtractItemDict(x, dict)
+		_, err := ExtractItemDict(x, dict, false)
 		if err == nil {
 			t.Error("expected error for wrong type, got nil")
 		}

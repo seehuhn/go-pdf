@@ -109,7 +109,7 @@ func (s *Type2) Equal(other graphics.Shading) bool {
 }
 
 // extractType2 reads a Type 2 (axial) shading from a PDF dictionary.
-func extractType2(x *pdf.Extractor, d pdf.Dict, singleUse bool) (*Type2, error) {
+func extractType2(x *pdf.Extractor, d pdf.Dict, isDirect bool) (*Type2, error) {
 	s := &Type2{}
 
 	// Read required ColorSpace
@@ -119,7 +119,7 @@ func extractType2(x *pdf.Extractor, d pdf.Dict, singleUse bool) (*Type2, error) 
 			Err: fmt.Errorf("missing /ColorSpace entry"),
 		}
 	}
-	cs, err := color.ExtractSpace(x, csObj)
+	cs, err := color.ExtractSpace(x, csObj, false)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +249,7 @@ func extractType2(x *pdf.Extractor, d pdf.Dict, singleUse bool) (*Type2, error) 
 		}
 	}
 
-	s.SingleUse = singleUse
+	s.SingleUse = isDirect
 
 	return s, nil
 }

@@ -95,13 +95,13 @@ func extractType1(x *pdf.Extractor, dict pdf.Dict) (*Type1, error) {
 				}
 			}
 		case pdf.Dict:
-			spotFunc, err := function.Extract(x, spot)
+			spotFunc, err := function.Extract(x, spot, false)
 			if err != nil {
 				return nil, err
 			}
 			h.SpotFunction = spotFunc
 		case *pdf.Stream:
-			spotFunc, err := function.Extract(x, spot)
+			spotFunc, err := function.Extract(x, spot, false)
 			if err != nil {
 				return nil, err
 			}
@@ -127,7 +127,7 @@ func extractType1(x *pdf.Extractor, dict pdf.Dict) (*Type1, error) {
 	} else if tf == pdf.Name("Identity") {
 		h.TransferFunction = function.Identity
 	} else {
-		if F, err := pdf.Optional(function.Extract(x, tf)); err != nil {
+		if F, err := pdf.Optional(function.Extract(x, tf, false)); err != nil {
 			return nil, err
 		} else if isValidTransferFunction(F) {
 			h.TransferFunction = F

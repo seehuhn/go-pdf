@@ -68,7 +68,7 @@ func decodeJavaScript(x *pdf.Extractor, dict pdf.Dict) (*JavaScript, error) {
 		return nil, pdf.Error("JavaScript action missing JS entry")
 	}
 
-	next, err := pdf.Optional(DecodeActionList(x, dict["Next"]))
+	next, err := pdf.Optional(DecodeActionList(x, dict["Next"], false))
 	if err != nil {
 		return nil, err
 	}

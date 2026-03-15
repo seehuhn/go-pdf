@@ -108,7 +108,7 @@ func (a *GoToR) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeGoToR(x *pdf.Extractor, dict pdf.Dict) (*GoToR, error) {
-	f, err := file.ExtractSpecification(x, dict["F"])
+	f, err := pdf.ExtractorGet(x, dict["F"], file.ExtractSpecification)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func decodeGoToR(x *pdf.Extractor, dict pdf.Dict) (*GoToR, error) {
 		return nil, pdf.Error("GoToR action missing F entry")
 	}
 
-	dest, err := destination.Decode(x, dict["D"])
+	dest, err := destination.Decode(x, dict["D"], false)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func decodeGoToR(x *pdf.Extractor, dict pdf.Dict) (*GoToR, error) {
 		}
 	}
 
-	next, err := DecodeActionList(x, dict["Next"])
+	next, err := DecodeActionList(x, dict["Next"], false)
 	if err != nil {
 		return nil, err
 	}

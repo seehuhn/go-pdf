@@ -90,7 +90,7 @@ func TestToUnicodeSimple1(t *testing.T) {
 			}
 
 			x := pdf.NewExtractor(buf)
-			d, err := extract.Dict(x, fontRef)
+			d, err := extract.Dict(x, fontRef, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -147,7 +147,7 @@ func TestToUnicodeSimple2(t *testing.T) {
 			}
 
 			x := pdf.NewExtractor(buf)
-			d, err := extract.Dict(x, fontRef)
+			d, err := extract.Dict(x, fontRef, false)
 			if err != nil {
 				t.Fatal(err)
 			}

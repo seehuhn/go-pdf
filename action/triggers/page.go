@@ -72,7 +72,7 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 // DecodePage reads a page object's additional-actions dictionary from
 // a PDF object.
-func DecodePage(x *pdf.Extractor, obj pdf.Object) (*Page, error) {
+func DecodePage(x *pdf.Extractor, obj pdf.Object, _ bool) (*Page, error) {
 	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err

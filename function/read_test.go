@@ -301,7 +301,7 @@ func roundTripTest(t *testing.T, version pdf.Version, f1 pdf.Function) {
 
 	// Read the function back
 	x := pdf.NewExtractor(buf)
-	f2, err := Extract(x, embedded)
+	f2, err := Extract(x, embedded, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -667,7 +667,7 @@ func FuzzRoundTrip(f *testing.F) {
 			t.Skip("missing PDF object")
 		}
 		x := pdf.NewExtractor(r)
-		function, err := Extract(x, obj)
+		function, err := Extract(x, obj, false)
 		if err != nil {
 			t.Skip("malformed PDF object")
 		}

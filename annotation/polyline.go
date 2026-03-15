@@ -158,7 +158,7 @@ func decodePolyline(x *pdf.Extractor, dict pdf.Dict) (*PolyLine, error) {
 	}
 
 	// Measure (optional)
-	if m, err := pdf.Optional(measure.Extract(x, dict["Measure"])); err != nil {
+	if m, err := pdf.ExtractorGetOptional(x, dict["Measure"], measure.Extract); err != nil {
 		return nil, err
 	} else {
 		polyline.Measure = m

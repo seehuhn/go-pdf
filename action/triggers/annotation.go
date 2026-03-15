@@ -190,7 +190,7 @@ func (a *Annotation) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 // DecodeAnnotation reads an annotation's additional-actions dictionary from
 // a PDF object.
-func DecodeAnnotation(x *pdf.Extractor, obj pdf.Object) (*Annotation, error) {
+func DecodeAnnotation(x *pdf.Extractor, obj pdf.Object, _ bool) (*Annotation, error) {
 	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err

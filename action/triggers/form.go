@@ -103,7 +103,7 @@ func (f *Form) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 // DecodeForm reads a form field's additional-actions dictionary from
 // a PDF object.
-func DecodeForm(x *pdf.Extractor, obj pdf.Object) (*Form, error) {
+func DecodeForm(x *pdf.Extractor, obj pdf.Object, _ bool) (*Form, error) {
 	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err

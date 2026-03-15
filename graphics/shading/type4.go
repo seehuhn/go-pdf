@@ -135,7 +135,7 @@ func extractType4(x *pdf.Extractor, stream *pdf.Stream) (*Type4, error) {
 			Err: fmt.Errorf("missing /ColorSpace entry"),
 		}
 	}
-	cs, err := color.ExtractSpace(x, csObj)
+	cs, err := color.ExtractSpace(x, csObj, false)
 	if err != nil {
 		return nil, err
 	}

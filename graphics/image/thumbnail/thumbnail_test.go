@@ -301,7 +301,7 @@ func roundTripThumbnail(t *testing.T, version pdf.Version, thumb *Thumbnail) {
 
 	// extract back using the writer as getter
 	x := pdf.NewExtractor(w)
-	decoded, err := ExtractThumbnail(x, ref)
+	decoded, err := ExtractThumbnail(x, ref, false)
 	if err != nil {
 		t.Fatalf("failed to extract thumbnail: %v", err)
 	}
@@ -474,7 +474,7 @@ func FuzzThumbnailRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		thumb, err := ExtractThumbnail(x, objPDF)
+		thumb, err := ExtractThumbnail(x, objPDF, false)
 		if err != nil {
 			t.Skip("malformed thumbnail")
 		}

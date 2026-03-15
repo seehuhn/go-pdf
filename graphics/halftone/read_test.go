@@ -183,7 +183,7 @@ func roundTripTest(t *testing.T, originalHalftone graphics.Halftone) {
 
 	// Read the halftone back
 	x := pdf.NewExtractor(buf)
-	readHalftone, err := Extract(x, ref)
+	readHalftone, err := Extract(x, ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +248,7 @@ func FuzzRoundTrip(f *testing.F) {
 			t.Skip("missing PDF object")
 		}
 		x := pdf.NewExtractor(r)
-		halftone, err := Extract(x, obj)
+		halftone, err := Extract(x, obj, false)
 		if err != nil {
 			t.Skip("malformed PDF object")
 		}

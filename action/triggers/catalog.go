@@ -110,7 +110,7 @@ func (c *Catalog) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 // DecodeCatalog reads a document catalog's additional-actions dictionary from
 // a PDF object.
-func DecodeCatalog(x *pdf.Extractor, obj pdf.Object) (*Catalog, error) {
+func DecodeCatalog(x *pdf.Extractor, obj pdf.Object, _ bool) (*Catalog, error) {
 	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err

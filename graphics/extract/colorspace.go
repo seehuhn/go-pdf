@@ -22,6 +22,6 @@ import (
 )
 
 // ColorSpace extracts a color space from a PDF file.
-func ColorSpace(x *pdf.Extractor, obj pdf.Object) (color.Space, error) {
-	return color.ExtractSpace(x, obj)
+func ColorSpace(x *pdf.Extractor, obj pdf.Object, _ bool) (color.Space, error) {
+	return color.ExtractSpace(x, obj, false)
 }

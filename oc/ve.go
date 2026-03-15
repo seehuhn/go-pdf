@@ -39,7 +39,7 @@ var (
 // ExtractVisibilityExpression reads a visibility expression from a PDF object.
 // The object can be either an array (for And/Or/Not expressions) or a dictionary
 // (for a single optional content group reference).
-func ExtractVisibilityExpression(x *pdf.Extractor, obj pdf.Object) (VisibilityExpression, error) {
+func ExtractVisibilityExpression(x *pdf.Extractor, obj pdf.Object, _ bool) (VisibilityExpression, error) {
 	obj, err := x.Resolve(obj)
 	if err != nil {
 		return nil, err

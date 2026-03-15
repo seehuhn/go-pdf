@@ -27,9 +27,7 @@ import (
 )
 
 // Resources extracts a resource dictionary from a PDF file.
-func Resources(x *pdf.Extractor, obj pdf.Object) (*content.Resources, error) {
-	singleUse := !x.IsIndirect // capture before other x method calls
-
+func Resources(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*content.Resources, error) {
 	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err
@@ -42,7 +40,7 @@ func Resources(x *pdf.Extractor, obj pdf.Object) (*content.Resources, error) {
 
 	// create result with SingleUse based on indirectness
 	res := &content.Resources{
-		SingleUse: singleUse,
+		SingleUse: isDirect,
 	}
 
 	// extract ExtGState subdictionary

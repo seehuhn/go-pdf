@@ -142,7 +142,7 @@ func decodePolygon(x *pdf.Extractor, dict pdf.Dict) (*Polygon, error) {
 	}
 
 	// Measure (optional)
-	if m, err := pdf.Optional(measure.Extract(x, dict["Measure"])); err != nil {
+	if m, err := pdf.ExtractorGetOptional(x, dict["Measure"], measure.Extract); err != nil {
 		return nil, err
 	} else {
 		polygon.Measure = m

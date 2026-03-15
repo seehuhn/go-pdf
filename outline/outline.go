@@ -95,7 +95,7 @@ func (item *Item) AddChild(title string) *Item {
 // Decode reads a document outline from a PDF file.
 // The obj argument should be the value of the Outlines entry in the catalog.
 // Returns nil if obj is nil or not a reference.
-func Decode(x *pdf.Extractor, obj pdf.Object) (*Outline, error) {
+func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (*Outline, error) {
 	rootRef, _ := obj.(pdf.Reference)
 	if rootRef == 0 {
 		return nil, nil

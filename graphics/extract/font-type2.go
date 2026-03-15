@@ -82,12 +82,12 @@ func extractFontCIDType2(x *pdf.Extractor, obj pdf.Object) (*dict.CIDFontType2, 
 
 	// fields in the font dictionary
 
-	d.CMap, err = cmap.Extract(x, fontDict["Encoding"])
+	d.CMap, err = cmap.Extract(x, fontDict["Encoding"], false)
 	if err != nil {
 		return nil, err
 	}
 
-	d.ToUnicode, _ = cmap.ExtractToUnicode(x, fontDict["ToUnicode"])
+	d.ToUnicode, _ = cmap.ExtractToUnicode(x, fontDict["ToUnicode"], false)
 
 	// fields in the CIDFont dictionary
 
@@ -108,7 +108,7 @@ func extractFontCIDType2(x *pdf.Extractor, obj pdf.Object) (*dict.CIDFontType2, 
 	}
 	d.Descriptor, _ = font.ExtractDescriptor(x.R, fdDict)
 
-	d.ROS, _ = font.ExtractCIDSystemInfo(x, cidFontDict["CIDSystemInfo"])
+	d.ROS, _ = font.ExtractCIDSystemInfo(x, cidFontDict["CIDSystemInfo"], false)
 
 	d.Width, err = decodeCompositeWidths(x.R, cidFontDict["W"])
 	if err != nil {
@@ -177,7 +177,7 @@ func extractFontCIDType2(x *pdf.Extractor, obj pdf.Object) (*dict.CIDFontType2, 
 
 	for _, key := range []pdf.Name{"FontFile2", "FontFile3"} {
 		if fontFile, err := pdf.ExtractorGetOptional(x, fdDict[key],
-			func(x *pdf.Extractor, obj pdf.Object) (*glyphdata.Stream, error) {
+			func(x *pdf.Extractor, obj pdf.Object, _ bool) (*glyphdata.Stream, error) {
 				return glyphdata.ExtractStream(x, obj, "TrueType", key)
 			}); err != nil {
 			return nil, err
@@ -230,8 +230,12 @@ func repairCIDType2(d *dict.CIDFontType2) {
 
 	d.Descriptor.MissingWidth = 0
 
+	if d.CMap == nil {
+		d.CMap, _ = cmap.Predefined("Identity-H")
+	}
+
 	if d.ROS == nil {
-		if d.CMap.ROS != nil {
+		if d.CMap != nil && d.CMap.ROS != nil {
 			d.ROS = d.CMap.ROS
 		} else {
 			d.ROS = &cid.SystemInfo{
@@ -242,15 +246,17 @@ func repairCIDType2(d *dict.CIDFontType2) {
 		}
 	}
 
-	if d.CMap.Name != "Identity-H" && d.CMap.Name != "Identity-V" ||
-		!d.CMap.IsPredefined() {
-		if d.CMap.ROS == nil {
-			d.CMap = d.CMap.Clone()
-			d.CMap.ROS = d.ROS
-		} else if d.ROS.Registry != d.CMap.ROS.Registry ||
-			d.ROS.Ordering != d.CMap.ROS.Ordering {
-			d.CMap = d.CMap.Clone()
-			d.CMap.ROS = d.ROS
+	if d.CMap != nil {
+		if d.CMap.Name != "Identity-H" && d.CMap.Name != "Identity-V" ||
+			!d.CMap.IsPredefined() {
+			if d.CMap.ROS == nil {
+				d.CMap = d.CMap.Clone()
+				d.CMap.ROS = d.ROS
+			} else if d.ROS.Registry != d.CMap.ROS.Registry ||
+				d.ROS.Ordering != d.CMap.ROS.Ordering {
+				d.CMap = d.CMap.Clone()
+				d.CMap.ROS = d.ROS
+			}
 		}
 	}
 }

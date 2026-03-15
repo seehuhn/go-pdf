@@ -70,7 +70,7 @@ func (r ToUnicodeRange) String() string {
 	return fmt.Sprintf("% 02x-% 02x: %q", r.First, r.Last, r.Values)
 }
 
-func ExtractToUnicode(x *pdf.Extractor, obj pdf.Object) (*ToUnicodeFile, error) {
+func ExtractToUnicode(x *pdf.Extractor, obj pdf.Object, _ bool) (*ToUnicodeFile, error) {
 	cycle := pdf.NewCycleChecker()
 	return safeExtractToUnicode(x, cycle, obj)
 }

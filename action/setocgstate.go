@@ -88,7 +88,7 @@ func decodeSetOCGState(x *pdf.Extractor, dict pdf.Dict) (*SetOCGState, error) {
 		preserveRB = bool(rb)
 	}
 
-	next, err := DecodeActionList(x, dict["Next"])
+	next, err := DecodeActionList(x, dict["Next"], false)
 	if err != nil {
 		return nil, err
 	}

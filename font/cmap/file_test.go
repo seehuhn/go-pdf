@@ -273,7 +273,7 @@ func TestExtractCMAP(t *testing.T) {
 
 	}
 
-	child, err := Extract(pdf.NewExtractor(data), childRef)
+	child, err := Extract(pdf.NewExtractor(data), childRef, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -513,7 +513,7 @@ func TestExtractPredefined(t *testing.T) {
 	for _, name := range names {
 		data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 		t.Run(string(name), func(t *testing.T) {
-			info, err := Extract(pdf.NewExtractor(data), name)
+			info, err := Extract(pdf.NewExtractor(data), name, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -590,7 +590,7 @@ func TestExtractLoop(t *testing.T) {
 				}
 			}
 
-			info, err := Extract(pdf.NewExtractor(data), refs[0])
+			info, err := Extract(pdf.NewExtractor(data), refs[0], false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -624,7 +624,7 @@ func TestEmbedCMap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info2, err := ExtractToUnicode(pdf.NewExtractor(data), ref)
+	info2, err := ExtractToUnicode(pdf.NewExtractor(data), ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}

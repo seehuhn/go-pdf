@@ -21,7 +21,7 @@ import (
 )
 
 // Decode reads an annotation from a PDF file.
-func Decode(x *pdf.Extractor, obj pdf.Object) (Annotation, error) {
+func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (Annotation, error) {
 	dict, err := x.GetDictTyped(obj, "Annot")
 	if err != nil {
 		return nil, err

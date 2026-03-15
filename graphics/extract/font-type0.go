@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/postscript/cid"
 )
 
 // extractFontCIDType0 reads a Type 0 CIDFont dictionary from the PDF file.
@@ -77,12 +78,12 @@ func extractFontCIDType0(x *pdf.Extractor, obj pdf.Object) (*dict.CIDFontType0, 
 
 	// fields in the font dictionary
 
-	d.CMap, err = cmap.Extract(x, fontDict["Encoding"])
+	d.CMap, err = cmap.Extract(x, fontDict["Encoding"], false)
 	if err != nil {
 		return nil, err
 	}
 
-	d.ToUnicode, _ = cmap.ExtractToUnicode(x, fontDict["ToUnicode"])
+	d.ToUnicode, _ = cmap.ExtractToUnicode(x, fontDict["ToUnicode"], false)
 
 	// fields in the CIDFont dictionary
 
@@ -103,7 +104,7 @@ func extractFontCIDType0(x *pdf.Extractor, obj pdf.Object) (*dict.CIDFontType0, 
 	}
 	d.Descriptor, _ = font.ExtractDescriptor(x.R, fdDict)
 
-	d.ROS, _ = font.ExtractCIDSystemInfo(x, cidFontDict["CIDSystemInfo"])
+	d.ROS, _ = font.ExtractCIDSystemInfo(x, cidFontDict["CIDSystemInfo"], false)
 
 	d.Width, err = decodeCompositeWidths(x.R, cidFontDict["W"])
 	if err != nil {
@@ -131,7 +132,7 @@ func extractFontCIDType0(x *pdf.Extractor, obj pdf.Object) (*dict.CIDFontType0, 
 	d.VMetrics = w2
 
 	if fontFile, err := pdf.ExtractorGetOptional(x, fdDict["FontFile3"],
-		func(x *pdf.Extractor, obj pdf.Object) (*glyphdata.Stream, error) {
+		func(x *pdf.Extractor, obj pdf.Object, _ bool) (*glyphdata.Stream, error) {
 			return glyphdata.ExtractStream(x, obj, "Type0", "FontFile3")
 		}); err != nil {
 		return nil, err
@@ -174,12 +175,21 @@ func repairCIDType0(d *dict.CIDFontType0) {
 
 	d.Descriptor.MissingWidth = 0
 
-	if d.CMap.Name != "Identity-H" && d.CMap.Name != "Identity-V" ||
-		!d.CMap.IsPredefined() {
-		if d.ROS.Registry != d.CMap.ROS.Registry ||
-			d.ROS.Ordering != d.CMap.ROS.Ordering {
-			d.CMap = d.CMap.Clone()
-			d.CMap.ROS = d.ROS
+	if d.ROS == nil {
+		d.ROS = &cid.SystemInfo{}
+	}
+	if d.CMap == nil {
+		d.CMap, _ = cmap.Predefined("Identity-H")
+	}
+
+	if d.CMap != nil && d.CMap.ROS != nil {
+		if d.CMap.Name != "Identity-H" && d.CMap.Name != "Identity-V" ||
+			!d.CMap.IsPredefined() {
+			if d.ROS.Registry != d.CMap.ROS.Registry ||
+				d.ROS.Ordering != d.CMap.ROS.Ordering {
+				d.CMap = d.CMap.Clone()
+				d.CMap.ROS = d.ROS
+			}
 		}
 	}
 }

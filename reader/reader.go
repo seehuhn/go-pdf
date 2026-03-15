@@ -111,7 +111,7 @@ func (r *Reader) ParsePage(page pdf.Object, ctm matrix.Matrix) error {
 	// code in seehuhn.de/go/pdf/pagetree that copies inherited resources from
 	// the parent, but this needs to be checked and documented.  Also, it
 	// reduces generality of the ParsePage method.
-	res, err := extract.Resources(r.x, pageDict["Resources"])
+	res, err := pdf.ExtractorGet(r.x, pageDict["Resources"], extract.Resources)
 	if err != nil {
 		return err
 	}
@@ -404,7 +404,7 @@ func (r *Reader) extractMarkedContent(tag pdf.Name, propArg pdf.Object) (*graphi
 	} else {
 		// Inline property dictionary
 		var err error
-		list, err = property.ExtractList(r.x, propArg)
+		list, err = property.ExtractList(r.x, propArg, true)
 		if err != nil {
 			return nil, err
 		}

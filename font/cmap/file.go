@@ -88,7 +88,7 @@ func (r Range) String() string {
 
 // Extract extracts a CMap from a PDF object.
 // The argument must be the name of a predefined CMap or a stream containing a CMap.
-func Extract(x *pdf.Extractor, obj pdf.Object) (*File, error) {
+func Extract(x *pdf.Extractor, obj pdf.Object, _ bool) (*File, error) {
 	cycle := pdf.NewCycleChecker()
 	return safeExtractCMap(x, cycle, obj)
 }
@@ -140,7 +140,7 @@ func safeExtractCMap(x *pdf.Extractor, cycle *pdf.CycleChecker, obj pdf.Object) 
 			res.Name = clean
 		}
 	}
-	if ros, _ := font.ExtractCIDSystemInfo(x, dict["CIDSystemInfo"]); ros != nil {
+	if ros, _ := font.ExtractCIDSystemInfo(x, dict["CIDSystemInfo"], false); ros != nil {
 		res.ROS = ros
 	}
 	if wMode, _ := x.GetInteger(dict["WMode"]); wMode == 1 {

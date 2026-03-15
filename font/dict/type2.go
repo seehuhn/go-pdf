@@ -122,6 +122,13 @@ func (d *CIDFontType2) validate() error {
 		return errors.New("MissingWidth must be 0 for composite fonts")
 	}
 
+	if d.CMap == nil {
+		return errors.New("missing CMap")
+	}
+	if d.ROS == nil {
+		return errors.New("missing ROS")
+	}
+
 	if d.CMap.Name != "Identity-H" && d.CMap.Name != "Identity-V" ||
 		!d.CMap.IsPredefined() {
 		if d.ROS.Registry != d.CMap.ROS.Registry ||

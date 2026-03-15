@@ -200,7 +200,7 @@ func (sm *SoftMask) check(out *pdf.Writer) error {
 }
 
 // ExtractSoftMask extracts a soft-mask image from a PDF stream.
-func ExtractSoftMask(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
+func ExtractSoftMask(x *pdf.Extractor, obj pdf.Object, _ bool) (*SoftMask, error) {
 	stm, err := x.GetStream(obj)
 	if err != nil {
 		return nil, err
@@ -221,7 +221,7 @@ func ExtractSoftMask(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
 
 	// Validate ColorSpace is DeviceGray (required for soft masks)
 	if csObj, ok := dict["ColorSpace"]; ok {
-		cs, err := color.ExtractSpace(x, csObj)
+		cs, err := color.ExtractSpace(x, csObj, false)
 		if err != nil {
 			return nil, err
 		}

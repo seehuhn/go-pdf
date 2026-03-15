@@ -155,7 +155,7 @@ func TestAFRoundTripSingleUse(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := ExtractList(x, embedded)
+	decoded, err := ExtractList(x, embedded, true)
 	if err != nil {
 		t.Fatalf("ExtractList() failed: %v", err)
 	}
@@ -208,7 +208,7 @@ func TestAFRoundTripIndirect(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := ExtractList(x, embedded)
+	decoded, err := ExtractList(x, embedded, false)
 	if err != nil {
 		t.Fatalf("ExtractList() failed: %v", err)
 	}
@@ -254,7 +254,7 @@ func TestAFWithoutMCID(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := ExtractList(x, embedded)
+	decoded, err := ExtractList(x, embedded, true)
 	if err != nil {
 		t.Fatalf("ExtractList() failed: %v", err)
 	}

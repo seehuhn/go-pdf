@@ -55,8 +55,7 @@ type Membership struct {
 var _ pdf.Embedder = (*Membership)(nil)
 
 // ExtractMembership extracts an optional content membership dictionary from a PDF object.
-func ExtractMembership(x *pdf.Extractor, obj pdf.Object) (*Membership, error) {
-	singleUse := !x.IsIndirect // capture before other x method calls
+func ExtractMembership(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Membership, error) {
 
 	dict, err := x.GetDictTyped(obj, "OCMD")
 	if err != nil {
@@ -109,7 +108,7 @@ func ExtractMembership(x *pdf.Extractor, obj pdf.Object) (*Membership, error) {
 		return nil, pdf.Error("membership dictionary must have either OCGs or VE")
 	}
 
-	m.SingleUse = singleUse
+	m.SingleUse = isDirect
 
 	return m, nil
 }

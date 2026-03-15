@@ -30,8 +30,7 @@ import (
 )
 
 // Pattern extracts a pattern from a PDF file and returns a color.Pattern.
-func Pattern(x *pdf.Extractor, obj pdf.Object) (color.Pattern, error) {
-	singleUse := !x.IsIndirect // capture before other x method calls
+func Pattern(x *pdf.Extractor, obj pdf.Object, isDirect bool) (color.Pattern, error) {
 
 	// resolve references
 	resolved, err := x.Resolve(obj)
@@ -75,7 +74,7 @@ func Pattern(x *pdf.Extractor, obj pdf.Object) (color.Pattern, error) {
 		}
 		return extractType1(x, stream)
 	case 2:
-		return extractType2(x, dict, singleUse)
+		return extractType2(x, dict, isDirect)
 	default:
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("unsupported pattern type %d", patternType),
@@ -84,7 +83,7 @@ func Pattern(x *pdf.Extractor, obj pdf.Object) (color.Pattern, error) {
 }
 
 // extractType2 extracts a Type2 (shading) pattern from a PDF dictionary.
-func extractType2(x *pdf.Extractor, dict pdf.Dict, singleUse bool) (*pattern.Type2, error) {
+func extractType2(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (*pattern.Type2, error) {
 	// extract required Shading
 	shadingObj := dict["Shading"]
 	if shadingObj == nil {
@@ -93,14 +92,14 @@ func extractType2(x *pdf.Extractor, dict pdf.Dict, singleUse bool) (*pattern.Typ
 		}
 	}
 
-	sh, err := shading.Extract(x, shadingObj)
+	sh, err := pdf.ExtractorGet(x, shadingObj, shading.Extract)
 	if err != nil {
 		return nil, err
 	}
 
 	pat := &pattern.Type2{
 		Shading:   sh,
-		SingleUse: singleUse,
+		SingleUse: isDirect,
 	}
 
 	// extract optional Matrix
@@ -110,7 +109,7 @@ func extractType2(x *pdf.Extractor, dict pdf.Dict, singleUse bool) (*pattern.Typ
 	}
 
 	// extract optional ExtGState
-	if extGState, err := pdf.Optional(ExtGState(x, dict["ExtGState"])); err != nil {
+	if extGState, err := pdf.Optional(ExtGState(x, dict["ExtGState"], false)); err != nil {
 		return nil, err
 	} else {
 		pat.ExtGState = extGState
@@ -192,7 +191,7 @@ func extractType1(x *pdf.Extractor, stream *pdf.Stream) (*pattern.Type1, error) 
 	// extract resources (required)
 	pat.Res = &content.Resources{}
 	if resObj := dict["Resources"]; resObj != nil {
-		res, err := Resources(x, resObj)
+		res, err := pdf.ExtractorGet(x, resObj, Resources)
 		if err != nil {
 			return nil, err
 		}

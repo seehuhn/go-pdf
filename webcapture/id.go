@@ -37,7 +37,7 @@ type Identifier struct {
 
 // ExtractIdentifier extracts an identifier from a PDF byte string object.
 // Returns nil, nil if the object is absent or malformed.
-func ExtractIdentifier(x *pdf.Extractor, obj pdf.Object) (*Identifier, error) {
+func ExtractIdentifier(x *pdf.Extractor, obj pdf.Object, _ bool) (*Identifier, error) {
 	str, err := pdf.Optional(x.GetString(obj))
 	if err != nil {
 		return nil, err

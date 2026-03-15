@@ -73,7 +73,7 @@ func decodeResetForm(x *pdf.Extractor, dict pdf.Dict) (*ResetForm, error) {
 	fields, _ := x.GetArray(dict["Fields"])
 	flags, _ := pdf.Optional(x.GetInteger(dict["Flags"]))
 
-	next, err := DecodeActionList(x, dict["Next"])
+	next, err := DecodeActionList(x, dict["Next"], false)
 	if err != nil {
 		return nil, err
 	}

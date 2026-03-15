@@ -56,7 +56,7 @@ const (
 )
 
 // Decode reads an action from a PDF object.
-func Decode(x *pdf.Extractor, obj pdf.Object) (pdf.Action, error) {
+func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (pdf.Action, error) {
 	dict, err := x.GetDictTyped(obj, "Action")
 	if err != nil {
 		return nil, err
@@ -140,7 +140,7 @@ func (al ActionList) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 // DecodeActionList reads an action list from a PDF object.
 // Handles both single dictionary and array formats.
-func DecodeActionList(x *pdf.Extractor, obj pdf.Object) (ActionList, error) {
+func DecodeActionList(x *pdf.Extractor, obj pdf.Object, _ bool) (ActionList, error) {
 	if obj == nil {
 		return nil, nil
 	}
@@ -148,7 +148,7 @@ func DecodeActionList(x *pdf.Extractor, obj pdf.Object) (ActionList, error) {
 	// try single action dictionary first
 	dict, err := x.GetDict(obj)
 	if err == nil && dict != nil {
-		action, err := Decode(x, dict)
+		action, err := Decode(x, dict, false)
 		if err != nil {
 			return nil, err
 		}
@@ -163,7 +163,7 @@ func DecodeActionList(x *pdf.Extractor, obj pdf.Object) (ActionList, error) {
 
 	result := make(ActionList, 0, len(arr))
 	for _, item := range arr {
-		action, err := Decode(x, item)
+		action, err := Decode(x, item, false)
 		if err != nil {
 			return nil, err
 		}

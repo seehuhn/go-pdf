@@ -771,7 +771,7 @@ func TestReadErrors(t *testing.T) {
 			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 
 			x := pdf.NewExtractor(buf)
-			_, err := Extract(x, tt.dict)
+			_, err := Extract(x, tt.dict, false)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Read() error = %v, wantErr %v", err, tt.wantErr)
 			}

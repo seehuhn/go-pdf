@@ -28,7 +28,7 @@ import (
 // SoftMaskDict reads a soft-mask dictionary from a PDF file.
 // Returns nil without error if obj is nil or /None.
 // Note: For soft-mask images, use [SoftMaskImage] instead.
-func SoftMaskDict(x *pdf.Extractor, obj pdf.Object) (graphics.SoftClip, error) {
+func SoftMaskDict(x *pdf.Extractor, obj pdf.Object, _ bool) (graphics.SoftClip, error) {
 	if obj == nil {
 		return nil, nil
 	}
@@ -75,7 +75,7 @@ func SoftMaskDict(x *pdf.Extractor, obj pdf.Object) (graphics.SoftClip, error) {
 			Err: errors.New("soft mask: missing G entry"),
 		}
 	}
-	g, err := Form(x, gObj)
+	g, err := Form(x, gObj, false)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func SoftMaskDict(x *pdf.Extractor, obj pdf.Object) (graphics.SoftClip, error) {
 			return nil, err
 		}
 		if trResolved != pdf.Name("Identity") {
-			tr, err := function.Extract(x, trObj)
+			tr, err := function.Extract(x, trObj, false)
 			if err != nil {
 				return nil, err
 			}

@@ -99,7 +99,7 @@ func extractFontTrueType(x *pdf.Extractor, obj pdf.Object) (*dict.TrueType, erro
 
 	for _, key := range []pdf.Name{"FontFile2", "FontFile3"} {
 		if fontFile, err := pdf.ExtractorGetOptional(x, fdDict[key],
-			func(x *pdf.Extractor, obj pdf.Object) (*glyphdata.Stream, error) {
+			func(x *pdf.Extractor, obj pdf.Object, _ bool) (*glyphdata.Stream, error) {
 				return glyphdata.ExtractStream(x, obj, "TrueType", key)
 			}); err != nil {
 			return nil, err
@@ -132,7 +132,7 @@ func extractFontTrueType(x *pdf.Extractor, obj pdf.Object) (*dict.TrueType, erro
 		}
 	}
 
-	d.ToUnicode, _ = cmap.ExtractToUnicode(x, fontDict["ToUnicode"])
+	d.ToUnicode, _ = cmap.ExtractToUnicode(x, fontDict["ToUnicode"], false)
 
 	repairTrueType(d, x.R)
 

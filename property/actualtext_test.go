@@ -70,7 +70,7 @@ func TestActualTextRoundTrip(t *testing.T) {
 
 			// extract using generic ExtractList
 			x := pdf.NewExtractor(w)
-			decoded, err := ExtractList(x, embedded)
+			decoded, err := ExtractList(x, embedded, tc.at.SingleUse)
 			if err != nil {
 				t.Fatalf("extract failed: %v", err)
 			}

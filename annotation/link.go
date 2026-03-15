@@ -104,14 +104,14 @@ func decodeLink(x *pdf.Extractor, dict pdf.Dict) (*Link, error) {
 
 	// Extract link-specific fields
 	if dict["A"] != nil {
-		act, err := pdf.Optional(action.Decode(x, dict["A"]))
+		act, err := pdf.Optional(action.Decode(x, dict["A"], false))
 		if err != nil {
 			return nil, err
 		}
 		link.Action = act
 	}
 	if dict["Dest"] != nil && link.Action == nil {
-		dest, err := pdf.Optional(destination.Decode(x, dict["Dest"]))
+		dest, err := pdf.Optional(destination.Decode(x, dict["Dest"], false))
 		if err != nil {
 			return nil, err
 		}

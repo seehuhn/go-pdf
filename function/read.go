@@ -23,7 +23,7 @@ import (
 )
 
 // Extract extracts a function from a PDF file.
-func Extract(x *pdf.Extractor, obj pdf.Object) (pdf.Function, error) {
+func Extract(x *pdf.Extractor, obj pdf.Object, _ bool) (pdf.Function, error) {
 	// Type 3 functions are recursive, so we need to check for cycles.
 	cycleChecker := pdf.NewCycleChecker()
 	return safeExtract(x, obj, cycleChecker)

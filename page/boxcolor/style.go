@@ -62,8 +62,7 @@ type Style struct {
 }
 
 // ExtractStyle extracts a box style dictionary from a PDF object.
-func ExtractStyle(x *pdf.Extractor, obj pdf.Object) (*Style, error) {
-	singleUse := !x.IsIndirect
+func ExtractStyle(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Style, error) {
 
 	dict, err := x.GetDict(obj)
 	if err != nil {
@@ -73,7 +72,7 @@ func ExtractStyle(x *pdf.Extractor, obj pdf.Object) (*Style, error) {
 	}
 
 	style := &Style{}
-	style.SingleUse = singleUse
+	style.SingleUse = isDirect
 
 	// color (clamp to valid range [0.0, 1.0])
 	if cArray, err := pdf.Optional(x.GetArray(dict["C"])); err != nil {

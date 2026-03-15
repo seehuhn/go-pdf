@@ -45,8 +45,7 @@ type Info struct {
 }
 
 // ExtractInfo extracts a box colour information dictionary from a PDF object.
-func ExtractInfo(x *pdf.Extractor, obj pdf.Object) (*Info, error) {
-	singleUse := !x.IsIndirect
+func ExtractInfo(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Info, error) {
 
 	dict, err := x.GetDict(obj)
 	if err != nil {
@@ -57,7 +56,7 @@ func ExtractInfo(x *pdf.Extractor, obj pdf.Object) (*Info, error) {
 	}
 
 	info := &Info{}
-	info.SingleUse = singleUse
+	info.SingleUse = isDirect
 
 	if style, err := pdf.ExtractorGetOptional(x, dict["CropBox"], ExtractStyle); err != nil {
 		return nil, err

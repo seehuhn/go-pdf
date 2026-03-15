@@ -47,7 +47,7 @@ type EncryptedPayload struct {
 var _ pdf.Embedder = (*EncryptedPayload)(nil)
 
 // ExtractEncryptedPayload extracts an encrypted payload dictionary from a PDF object.
-func ExtractEncryptedPayload(x *pdf.Extractor, obj pdf.Object) (*EncryptedPayload, error) {
+func ExtractEncryptedPayload(x *pdf.Extractor, obj pdf.Object, _ bool) (*EncryptedPayload, error) {
 	dict, err := x.GetDictTyped(obj, "EncryptedPayload")
 	if err != nil {
 		return nil, err

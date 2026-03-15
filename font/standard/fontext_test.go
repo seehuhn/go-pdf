@@ -68,7 +68,7 @@ func TestEmbedStandard(t *testing.T) {
 				// as expected:
 
 				x := pdf.NewExtractor(data)
-				dictObj, err := extract.Dict(x, ref)
+				dictObj, err := extract.Dict(x, ref, false)
 				if err != nil {
 					t.Fatal(err)
 				}

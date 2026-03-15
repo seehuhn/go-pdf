@@ -86,7 +86,7 @@ func (a *RichMediaExecute) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 func decodeRichMediaExecute(x *pdf.Extractor, dict pdf.Dict) (*RichMediaExecute, error) {
 	ta, _ := dict["TA"].(pdf.Reference)
 
-	next, err := DecodeActionList(x, dict["Next"])
+	next, err := DecodeActionList(x, dict["Next"], false)
 	if err != nil {
 		return nil, err
 	}

@@ -61,16 +61,17 @@ type Dict struct {
 var _ pdf.Embedder = (*Dict)(nil)
 
 // Extract reads an annotation appearance dictionary from the PDF object obj.
-func Extract(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
-	singleUse := !x.IsIndirect // capture before other x method calls
-
-	res := &Dict{
-		SingleUse: singleUse,
-	}
-
+func Extract(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Dict, error) {
 	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err
+	}
+	if dict == nil {
+		return nil, nil
+	}
+
+	res := &Dict{
+		SingleUse: isDirect,
 	}
 
 	N, err := x.Resolve(dict["N"])

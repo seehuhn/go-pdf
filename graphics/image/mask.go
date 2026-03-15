@@ -146,7 +146,7 @@ func writeImageMaskData(w io.Writer, img image.Image) error {
 }
 
 // ExtractMask extracts an image mask from a PDF stream.
-func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
+func ExtractMask(x *pdf.Extractor, obj pdf.Object, _ bool) (*Mask, error) {
 	stream, err := x.GetStream(obj)
 	if err != nil {
 		return nil, err
@@ -255,7 +255,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 
 	// Extract Metadata
 	if metaObj, ok := dict["Metadata"]; ok {
-		meta, err := metadata.Extract(x, metaObj)
+		meta, err := metadata.Extract(x, metaObj, false)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Metadata: %w", err)
 		}
@@ -270,7 +270,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 
 	// Extract Measure
 	if measureObj, ok := dict["Measure"]; ok {
-		m, err := measure.Extract(x, measureObj)
+		m, err := pdf.ExtractorGet(x, measureObj, measure.Extract)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Measure: %w", err)
 		}
@@ -278,7 +278,7 @@ func ExtractMask(x *pdf.Extractor, obj pdf.Object) (*Mask, error) {
 	}
 
 	// Extract PtData
-	if ptData, err := pdf.Optional(measure.ExtractPtData(x, dict["PtData"])); err != nil {
+	if ptData, err := pdf.ExtractorGetOptional(x, dict["PtData"], measure.ExtractPtData); err != nil {
 		return nil, err
 	} else {
 		mask.PtData = ptData

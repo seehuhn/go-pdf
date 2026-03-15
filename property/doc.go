@@ -40,7 +40,7 @@
 //
 // To read property lists from PDF, use [ExtractList]:
 //
-//	propList, err := property.ExtractList(x, obj)
+//	propList, err := property.ExtractList(x, obj, isDirect)
 //	keys := propList.Keys()
 //	val, err := propList.Get("ActualText")
 //

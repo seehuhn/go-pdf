@@ -146,7 +146,7 @@ type Dict struct {
 }
 
 // ExtractDict extracts an image dictionary from a PDF stream.
-func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
+func ExtractDict(x *pdf.Extractor, obj pdf.Object, _ bool) (*Dict, error) {
 	stream, err := x.GetStream(obj)
 	if err != nil {
 		return nil, err
@@ -218,7 +218,7 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 
 	// Extract ColorSpace (required for images, Pattern not allowed)
 	if csObj, ok := dict["ColorSpace"]; ok {
-		cs, err := color.ExtractSpace(x, csObj)
+		cs, err := color.ExtractSpace(x, csObj, false)
 		if err != nil {
 			return nil, fmt.Errorf("invalid ColorSpace: %w", err)
 		}
@@ -338,9 +338,7 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 
 	// Extract SMask (soft-mask image)
 	if smaskObj, ok := dict["SMask"]; ok {
-		smask, err := pdf.ExtractorGetOptional(x, smaskObj, func(x *pdf.Extractor, obj pdf.Object) (*SoftMask, error) {
-			return ExtractSoftMask(x, obj)
-		})
+		smask, err := pdf.ExtractorGetOptional(x, smaskObj, ExtractSoftMask)
 		if err != nil {
 			return nil, fmt.Errorf("invalid SMask: %w", err)
 		}
@@ -367,7 +365,7 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 
 	// Extract Metadata
 	if metaObj, ok := dict["Metadata"]; ok {
-		meta, err := metadata.Extract(x, metaObj)
+		meta, err := metadata.Extract(x, metaObj, false)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Metadata: %w", err)
 		}
@@ -383,7 +381,7 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 
 	// Extract Measure
 	if measureObj, ok := dict["Measure"]; ok {
-		m, err := measure.Extract(x, measureObj)
+		m, err := pdf.ExtractorGet(x, measureObj, measure.Extract)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Measure: %w", err)
 		}
@@ -391,7 +389,7 @@ func ExtractDict(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	}
 
 	// Extract PtData
-	if ptData, err := pdf.Optional(measure.ExtractPtData(x, dict["PtData"])); err != nil {
+	if ptData, err := pdf.ExtractorGetOptional(x, dict["PtData"], measure.ExtractPtData); err != nil {
 		return nil, err
 	} else {
 		img.PtData = ptData

@@ -102,7 +102,7 @@ func (s *Type3) Equal(other graphics.Shading) bool {
 }
 
 // extractType3 reads a Type 3 (radial) shading from a PDF dictionary.
-func extractType3(x *pdf.Extractor, d pdf.Dict, singleUse bool) (*Type3, error) {
+func extractType3(x *pdf.Extractor, d pdf.Dict, isDirect bool) (*Type3, error) {
 	s := &Type3{}
 
 	// Read required ColorSpace
@@ -112,7 +112,7 @@ func extractType3(x *pdf.Extractor, d pdf.Dict, singleUse bool) (*Type3, error) 
 			Err: fmt.Errorf("missing /ColorSpace entry"),
 		}
 	}
-	cs, err := color.ExtractSpace(x, csObj)
+	cs, err := color.ExtractSpace(x, csObj, false)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +244,7 @@ func extractType3(x *pdf.Extractor, d pdf.Dict, singleUse bool) (*Type3, error) 
 		}
 	}
 
-	s.SingleUse = singleUse
+	s.SingleUse = isDirect
 
 	return s, nil
 }

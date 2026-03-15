@@ -92,7 +92,7 @@ func (s *Type1) Equal(other graphics.Shading) bool {
 }
 
 // extractType1 reads a Type 1 (function-based) shading from a PDF dictionary.
-func extractType1(x *pdf.Extractor, d pdf.Dict, singleUse bool) (*Type1, error) {
+func extractType1(x *pdf.Extractor, d pdf.Dict, isDirect bool) (*Type1, error) {
 	s := &Type1{}
 
 	// Read required ColorSpace
@@ -102,7 +102,7 @@ func extractType1(x *pdf.Extractor, d pdf.Dict, singleUse bool) (*Type1, error) 
 			Err: fmt.Errorf("missing /ColorSpace entry"),
 		}
 	}
-	cs, err := color.ExtractSpace(x, csObj)
+	cs, err := color.ExtractSpace(x, csObj, false)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +204,7 @@ func extractType1(x *pdf.Extractor, d pdf.Dict, singleUse bool) (*Type1, error) 
 		// Invalid antiAlias values are ignored, using zero value (false)
 	}
 
-	s.SingleUse = singleUse
+	s.SingleUse = isDirect
 
 	return s, nil
 }

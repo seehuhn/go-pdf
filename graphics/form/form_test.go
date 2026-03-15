@@ -82,7 +82,7 @@ func TestRead(t *testing.T) {
 	}
 
 	x1 := pdf.NewExtractor(writer1)
-	form1, err := extract.Form(x1, ref)
+	form1, err := extract.Form(x1, ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestRead(t *testing.T) {
 	}
 
 	x2 := pdf.NewExtractor(writer2)
-	form2, err := extract.Form(x2, ref2)
+	form2, err := extract.Form(x2, ref2, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +145,7 @@ func TestReadWithPieceInfo(t *testing.T) {
 	}
 
 	x1 := pdf.NewExtractor(writer1)
-	form1, err := extract.Form(x1, ref)
+	form1, err := extract.Form(x1, ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestReadWithPieceInfo(t *testing.T) {
 	}
 
 	x2 := pdf.NewExtractor(writer2)
-	form2, err := extract.Form(x2, ref2)
+	form2, err := extract.Form(x2, ref2, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +239,7 @@ func TestFormWithPtData(t *testing.T) {
 	}
 
 	x1 := pdf.NewExtractor(writer1)
-	form1, err := extract.Form(x1, ref)
+	form1, err := extract.Form(x1, ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,7 +278,7 @@ func TestFormWithPtData(t *testing.T) {
 	}
 
 	x2 := pdf.NewExtractor(writer2)
-	form2, err := extract.Form(x2, ref2)
+	form2, err := extract.Form(x2, ref2, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,7 +316,7 @@ func TestFormWithStructParent(t *testing.T) {
 	}
 
 	x1 := pdf.NewExtractor(writer1)
-	form1, err := extract.Form(x1, ref)
+	form1, err := extract.Form(x1, ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,7 +346,7 @@ func TestFormWithStructParent(t *testing.T) {
 	}
 
 	x2 := pdf.NewExtractor(writer2)
-	form2, err := extract.Form(x2, ref2)
+	form2, err := extract.Form(x2, ref2, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -398,7 +398,7 @@ func TestFormWithAssociatedFiles(t *testing.T) {
 	}
 
 	x1 := pdf.NewExtractor(writer1)
-	form1, err := extract.Form(x1, ref)
+	form1, err := extract.Form(x1, ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -439,7 +439,7 @@ func TestFormWithAssociatedFiles(t *testing.T) {
 	}
 
 	x2 := pdf.NewExtractor(writer2)
-	form2, err := extract.Form(x2, ref2)
+	form2, err := extract.Form(x2, ref2, false)
 	if err != nil {
 		t.Fatal(err)
 	}

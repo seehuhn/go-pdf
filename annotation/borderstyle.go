@@ -44,7 +44,7 @@ type BorderStyle struct {
 
 var _ pdf.Embedder = (*BorderStyle)(nil)
 
-func ExtractBorderStyle(x *pdf.Extractor, obj pdf.Object) (*BorderStyle, error) {
+func ExtractBorderStyle(x *pdf.Extractor, obj pdf.Object, _ bool) (*BorderStyle, error) {
 	dict, err := x.GetDictTyped(obj, "Border")
 	if dict == nil {
 		return nil, err

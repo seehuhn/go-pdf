@@ -120,7 +120,7 @@ func testRoundTrip(t *testing.T, dict pdf.Dict, isIndirect bool) {
 	}
 
 	x := pdf.NewExtractor(w)
-	original, err := ExtractList(x, obj)
+	original, err := ExtractList(x, obj, !isIndirect)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -132,7 +132,7 @@ func testRoundTrip(t *testing.T, dict pdf.Dict, isIndirect bool) {
 	}
 
 	// extract again
-	decoded, err := ExtractList(x, embedded)
+	decoded, err := ExtractList(x, embedded, !isIndirect)
 	if err != nil {
 		t.Fatalf("second extract failed: %v", err)
 	}
@@ -228,7 +228,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		propList, err := ExtractList(x, obj)
+		propList, err := pdf.ExtractorGet(x, obj, ExtractList)
 		if err != nil {
 			t.Skip("malformed property list")
 		}
@@ -268,7 +268,7 @@ func FuzzRoundTrip(f *testing.F) {
 
 		// use the writer as a getter
 		x2 := pdf.NewExtractor(w)
-		decoded, err := ExtractList(x2, embedded)
+		decoded, err := pdf.ExtractorGet(x2, embedded, ExtractList)
 		if err != nil {
 			t.Fatalf("second extract failed: %v", err)
 		}

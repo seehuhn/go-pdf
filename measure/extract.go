@@ -23,7 +23,7 @@ import (
 )
 
 // Extract extracts a PDF Measure Dictionary from a PDF file.
-func Extract(x *pdf.Extractor, obj pdf.Object) (Measure, error) {
+func Extract(x *pdf.Extractor, obj pdf.Object, isDirect bool) (Measure, error) {
 	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err
@@ -39,18 +39,18 @@ func Extract(x *pdf.Extractor, obj pdf.Object) (Measure, error) {
 
 	switch subtype {
 	case "RL":
-		return extractRectilinearMeasure(x, dict)
+		return extractRectilinearMeasure(x, dict, isDirect)
 	case "GEO":
-		return extractGeospatialMeasure(x, dict)
+		return extractGeospatialMeasure(x, dict, isDirect)
 	default:
 		// Unknown subtype - default to RL for permissive reading
-		return extractRectilinearMeasure(x, dict)
+		return extractRectilinearMeasure(x, dict, isDirect)
 	}
 }
 
 // extractRectilinearMeasure extracts a RectilinearMeasure from a PDF dictionary.
-func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict) (*RectilinearMeasure, error) {
-	singleUse := !x.IsIndirect
+func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (*RectilinearMeasure, error) {
+	singleUse := isDirect
 
 	rm := &RectilinearMeasure{}
 
@@ -203,6 +203,6 @@ func extractNumberFormatArray(x *pdf.Extractor, arr pdf.Array) ([]*NumberFormat,
 }
 
 // extractGeospatialMeasure is a placeholder for geospatial measures.
-func extractGeospatialMeasure(x *pdf.Extractor, dict pdf.Dict) (Measure, error) {
+func extractGeospatialMeasure(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (Measure, error) {
 	panic("geospatial measures not yet implemented")
 }

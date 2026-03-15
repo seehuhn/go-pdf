@@ -102,8 +102,7 @@ type UsageApplication struct {
 var _ pdf.Embedder = (*UsageApplication)(nil)
 
 // ExtractUsageApplication extracts a usage application dictionary from a PDF object.
-func ExtractUsageApplication(x *pdf.Extractor, obj pdf.Object) (*UsageApplication, error) {
-	singleUse := !x.IsIndirect // capture before other x method calls
+func ExtractUsageApplication(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*UsageApplication, error) {
 
 	r := x.R
 	dict, err := pdf.GetDict(r, obj)
@@ -166,7 +165,7 @@ func ExtractUsageApplication(x *pdf.Extractor, obj pdf.Object) (*UsageApplicatio
 		return nil, pdf.Error("usage application dictionary has no recognized categories")
 	}
 
-	ua.SingleUse = singleUse
+	ua.SingleUse = isDirect
 
 	return ua, nil
 }

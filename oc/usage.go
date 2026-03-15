@@ -61,8 +61,7 @@ type Usage struct {
 var _ pdf.Embedder = (*Usage)(nil)
 
 // ExtractUsage extracts a usage dictionary from a PDF object.
-func ExtractUsage(x *pdf.Extractor, obj pdf.Object) (*Usage, error) {
-	singleUse := !x.IsIndirect // capture before other x method calls
+func ExtractUsage(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Usage, error) {
 
 	dict, err := x.GetDict(obj)
 	if err != nil {
@@ -250,7 +249,7 @@ func ExtractUsage(x *pdf.Extractor, obj pdf.Object) (*Usage, error) {
 		}
 	}
 
-	usage.SingleUse = singleUse
+	usage.SingleUse = isDirect
 
 	return usage, nil
 }

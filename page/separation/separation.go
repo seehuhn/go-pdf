@@ -111,7 +111,7 @@ func pagesArray(refs []pdf.Reference) pdf.Array {
 }
 
 // Decode reads a separation dictionary from a PDF object.
-func Decode(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
+func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (*Dict, error) {
 	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err
@@ -152,7 +152,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object) (*Dict, error) {
 	}
 
 	// ColorSpace (optional)
-	d.ColorSpace, _ = color.ExtractSpace(x, dict["ColorSpace"])
+	d.ColorSpace, _ = color.ExtractSpace(x, dict["ColorSpace"], false)
 	if d.validateColorSpace() != nil {
 		d.ColorSpace = nil
 	}

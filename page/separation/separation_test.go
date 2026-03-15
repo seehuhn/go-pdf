@@ -118,7 +118,7 @@ func roundTripTest(t *testing.T, version pdf.Version, d1 *Dict) {
 	}
 
 	x := pdf.NewExtractor(w)
-	d2, err := Decode(x, dict)
+	d2, err := Decode(x, dict, false)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -193,7 +193,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		d, err := Decode(x, obj)
+		d, err := Decode(x, obj, false)
 		if err != nil {
 			t.Skip("malformed separation dictionary")
 		}

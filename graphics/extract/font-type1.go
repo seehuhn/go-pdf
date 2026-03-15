@@ -99,7 +99,7 @@ func extractFontType1(x *pdf.Extractor, obj pdf.Object) (*dict.Type1, error) {
 
 	for _, key := range []pdf.Name{"FontFile", "FontFile3"} {
 		if fontFile, err := pdf.ExtractorGetOptional(x, fdDict[key],
-			func(x *pdf.Extractor, obj pdf.Object) (*glyphdata.Stream, error) {
+			func(x *pdf.Extractor, obj pdf.Object, _ bool) (*glyphdata.Stream, error) {
 				return glyphdata.ExtractStream(x, obj, "Type1", key)
 			}); err != nil {
 			return nil, err
@@ -136,7 +136,7 @@ func extractFontType1(x *pdf.Extractor, obj pdf.Object) (*dict.Type1, error) {
 		}
 	}
 
-	d.ToUnicode, _ = cmap.ExtractToUnicode(x, fontDict["ToUnicode"])
+	d.ToUnicode, _ = cmap.ExtractToUnicode(x, fontDict["ToUnicode"], false)
 
 	repairType1(d, x.R)
 

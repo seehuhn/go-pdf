@@ -71,7 +71,7 @@ func decodeNamed(x *pdf.Extractor, dict pdf.Dict) (*Named, error) {
 		return nil, pdf.Error("Named action: missing N field")
 	}
 
-	next, err := pdf.Optional(DecodeActionList(x, dict["Next"]))
+	next, err := pdf.Optional(DecodeActionList(x, dict["Next"], false))
 	if err != nil {
 		return nil, err
 	}

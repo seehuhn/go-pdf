@@ -155,7 +155,7 @@ func (t *TargetAnnotationChild) encodeTargetSafe(rm *pdf.ResourceManager, visite
 }
 
 // DecodeTarget reads a target dictionary from a PDF object.
-func DecodeTarget(x *pdf.Extractor, obj pdf.Object) (Target, error) {
+func DecodeTarget(x *pdf.Extractor, obj pdf.Object, _ bool) (Target, error) {
 	if obj == nil {
 		return nil, nil
 	}
@@ -173,7 +173,7 @@ func DecodeTarget(x *pdf.Extractor, obj pdf.Object) (Target, error) {
 	// recursively decode nested target
 	var next Target
 	if dict["T"] != nil {
-		next, err = DecodeTarget(x, dict["T"])
+		next, err = DecodeTarget(x, dict["T"], false)
 		if err != nil {
 			return nil, err
 		}

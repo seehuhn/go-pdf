@@ -54,7 +54,7 @@ type Stream struct {
 }
 
 // ExtractStream extracts an embedded file stream from a PDF stream object.
-func ExtractStream(x *pdf.Extractor, obj pdf.Object) (*Stream, error) {
+func ExtractStream(x *pdf.Extractor, obj pdf.Object, _ bool) (*Stream, error) {
 	stream, err := x.GetStream(obj)
 	if err != nil {
 		return nil, err

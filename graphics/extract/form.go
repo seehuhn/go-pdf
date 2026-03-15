@@ -37,7 +37,7 @@ import (
 )
 
 // Form extracts a form XObject from a PDF file.
-func Form(x *pdf.Extractor, obj pdf.Object) (*form.Form, error) {
+func Form(x *pdf.Extractor, obj pdf.Object, _ bool) (*form.Form, error) {
 	stream, err := x.GetStream(obj)
 	if err != nil {
 		return nil, err

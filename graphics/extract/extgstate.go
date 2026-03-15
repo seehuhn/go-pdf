@@ -25,12 +25,14 @@ import (
 )
 
 // ExtGState extracts an extended graphics state from a PDF file.
-func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
-	singleUse := !x.IsIndirect // capture before other x method calls
+func ExtGState(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*extgstate.ExtGState, error) {
 
 	dict, err := x.GetDictTyped(obj, "ExtGState")
 	if err != nil {
 		return nil, err
+	}
+	if dict == nil {
+		return nil, nil
 	}
 
 	res := &extgstate.ExtGState{}
@@ -66,7 +68,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				return nil, err
 			}
 
-			F, err := Font(x, fontRef)
+			F, err := Font(x, fontRef, false)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -173,7 +175,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 				set |= graphics.StateBlendMode
 			}
 		case "SMask":
-			sMask, err := pdf.Optional(SoftMaskDict(x, v))
+			sMask, err := pdf.Optional(SoftMaskDict(x, v, false))
 			if err != nil {
 				return nil, err
 			}
@@ -384,7 +386,7 @@ func ExtGState(x *pdf.Extractor, obj pdf.Object) (*extgstate.ExtGState, error) {
 		}
 	}
 
-	res.SingleUse = singleUse
+	res.SingleUse = isDirect
 
 	res.Set = set
 	return res, nil

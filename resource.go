@@ -279,10 +279,9 @@ var ErrCycle = errors.New("cycle in recursive structure")
 // reference multiple times returns the same Go object. It also detects cycles
 // in PDF object structures to prevent infinite recursion.
 type Extractor struct {
-	R          Getter
-	IsIndirect bool
-	cache      map[extractorKey]any
-	path       map[Reference]bool
+	R     Getter
+	cache map[extractorKey]any
+	path  map[Reference]bool
 }
 
 type extractorKey struct {
@@ -300,7 +299,7 @@ func NewExtractor(r Getter) *Extractor {
 	}
 }
 
-func ExtractorGet[T any](x *Extractor, obj Object, extract func(*Extractor, Object) (T, error)) (T, error) {
+func ExtractorGet[T any](x *Extractor, obj Object, extract func(*Extractor, Object, bool) (T, error)) (T, error) {
 	var zero T
 	tp := reflect.TypeFor[T]()
 
@@ -334,8 +333,8 @@ func ExtractorGet[T any](x *Extractor, obj Object, extract func(*Extractor, Obje
 		}
 	}
 
-	x.IsIndirect = len(refs) > 0
-	res, err := extract(x, obj)
+	isDirect := len(refs) == 0
+	res, err := extract(x, obj, isDirect)
 
 	// cleanup path
 	for _, ref := range refs {
@@ -355,7 +354,7 @@ func ExtractorGet[T any](x *Extractor, obj Object, extract func(*Extractor, Obje
 	return res, nil
 }
 
-func ExtractorGetOptional[T any](x *Extractor, obj Object, extract func(*Extractor, Object) (T, error)) (T, error) {
+func ExtractorGetOptional[T any](x *Extractor, obj Object, extract func(*Extractor, Object, bool) (T, error)) (T, error) {
 	return Optional(ExtractorGet(x, obj, extract))
 }
 

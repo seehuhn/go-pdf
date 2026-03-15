@@ -99,7 +99,7 @@ func testAnnotationRoundTrip(t *testing.T, v pdf.Version, aa *Annotation) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := DecodeAnnotation(x, obj)
+	decoded, err := DecodeAnnotation(x, obj, false)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -161,7 +161,7 @@ func FuzzAnnotationRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		aa, err := DecodeAnnotation(x, obj)
+		aa, err := DecodeAnnotation(x, obj, false)
 		if err != nil {
 			t.Skip("malformed annotation AA")
 		}
@@ -208,7 +208,7 @@ func testPageRoundTrip(t *testing.T, v pdf.Version, aa *Page) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := DecodePage(x, obj)
+	decoded, err := DecodePage(x, obj, false)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -270,7 +270,7 @@ func FuzzPageRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		aa, err := DecodePage(x, obj)
+		aa, err := DecodePage(x, obj, false)
 		if err != nil {
 			t.Skip("malformed page AA")
 		}
@@ -321,7 +321,7 @@ func testFormRoundTrip(t *testing.T, v pdf.Version, aa *Form) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := DecodeForm(x, obj)
+	decoded, err := DecodeForm(x, obj, false)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -383,7 +383,7 @@ func FuzzFormRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		aa, err := DecodeForm(x, obj)
+		aa, err := DecodeForm(x, obj, false)
 		if err != nil {
 			t.Skip("malformed form AA")
 		}
@@ -444,7 +444,7 @@ func testCatalogRoundTrip(t *testing.T, v pdf.Version, aa *Catalog) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := DecodeCatalog(x, obj)
+	decoded, err := DecodeCatalog(x, obj, false)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -506,7 +506,7 @@ func FuzzCatalogRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		aa, err := DecodeCatalog(x, obj)
+		aa, err := DecodeCatalog(x, obj, false)
 		if err != nil {
 			t.Skip("malformed catalog AA")
 		}

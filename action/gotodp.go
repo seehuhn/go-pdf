@@ -68,7 +68,7 @@ func decodeGoToDp(x *pdf.Extractor, dict pdf.Dict) (*GoToDp, error) {
 		return nil, pdf.Error("GoToDp action missing or invalid DPart entry")
 	}
 
-	next, err := DecodeActionList(x, dict["Next"])
+	next, err := DecodeActionList(x, dict["Next"], false)
 	if err != nil {
 		return nil, err
 	}

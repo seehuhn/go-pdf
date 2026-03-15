@@ -60,7 +60,7 @@ func TestEmbed(t *testing.T) {
 
 	// step 2: read back the font and verify that everything is as expected
 	x := pdf.NewExtractor(w)
-	dictObj, err := extract.Dict(x, ref)
+	dictObj, err := extract.Dict(x, ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func TestTextContent(t *testing.T) {
 
 	// step 3: read back the font dictionary to inspect it.
 	x := pdf.NewExtractor(page.Out)
-	dictObj, err := extract.Dict(x, ref)
+	dictObj, err := extract.Dict(x, ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}

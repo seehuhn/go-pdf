@@ -302,7 +302,7 @@ func (e Simple) AsPDFType1(baseIsStd bool, opt pdf.OutputOptions) (pdf.Object, e
 
 // ExtractType3 extracts the encoding from the /Encoding entry of a Type3
 // font dictionary.
-func ExtractType3(x *pdf.Extractor, obj pdf.Object) (Simple, error) {
+func ExtractType3(x *pdf.Extractor, obj pdf.Object, _ bool) (Simple, error) {
 	dict, err := x.GetDictTyped(obj, "Encoding")
 	if err != nil {
 		return nil, err

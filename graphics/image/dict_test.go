@@ -542,7 +542,7 @@ func roundTripTest(t *testing.T, version pdf.Version, data *Dict) {
 
 	// Extract the data back
 	x := pdf.NewExtractor(w)
-	decoded, err := ExtractDict(x, ref)
+	decoded, err := ExtractDict(x, ref, false)
 	if err != nil {
 		t.Fatalf("failed to extract Dict: %v", err)
 	}
@@ -656,7 +656,7 @@ func FuzzDictRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		objGo, err := ExtractDict(x, objPDF)
+		objGo, err := ExtractDict(x, objPDF, false)
 		if err != nil {
 			t.Skip("malformed PDF object")
 		}

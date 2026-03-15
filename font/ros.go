@@ -24,7 +24,7 @@ import (
 )
 
 // ExtractCIDSystemInfo extracts a CIDSystemInfo object from a PDF file.
-func ExtractCIDSystemInfo(x *pdf.Extractor, obj pdf.Object) (*cid.SystemInfo, error) {
+func ExtractCIDSystemInfo(x *pdf.Extractor, obj pdf.Object, _ bool) (*cid.SystemInfo, error) {
 	dict, err := x.GetDict(obj)
 	if err != nil {
 		return nil, err

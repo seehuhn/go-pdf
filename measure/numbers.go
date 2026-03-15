@@ -77,8 +77,7 @@ type NumberFormat struct {
 }
 
 // ExtractNumberFormat extracts a NumberFormat from a PDF object.
-func ExtractNumberFormat(x *pdf.Extractor, obj pdf.Object) (*NumberFormat, error) {
-	singleUse := !x.IsIndirect
+func ExtractNumberFormat(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*NumberFormat, error) {
 
 	dict, err := x.GetDict(obj)
 	if err != nil {
@@ -183,7 +182,7 @@ func ExtractNumberFormat(x *pdf.Extractor, obj pdf.Object) (*NumberFormat, error
 		nf.PrefixLabel = (o == "P")
 	}
 
-	nf.SingleUse = singleUse
+	nf.SingleUse = isDirect
 
 	return nf, nil
 }

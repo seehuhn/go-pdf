@@ -72,7 +72,7 @@ func TestActionListMultipleActions(t *testing.T) {
 
 	// decode and verify
 	x := pdf.NewExtractor(w)
-	decoded, err := Decode(x, obj)
+	decoded, err := Decode(x, obj, false)
 	if err != nil {
 		t.Fatalf("decode error: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestNewWindowMode(t *testing.T) {
 			}
 
 			// decode and verify
-			decoded, err := Decode(x, obj)
+			decoded, err := Decode(x, obj, false)
 			if err != nil {
 				t.Fatalf("decode error: %v", err)
 			}

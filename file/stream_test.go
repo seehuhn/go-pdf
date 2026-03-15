@@ -161,7 +161,7 @@ func streamRoundTripTest(t *testing.T, version pdf.Version, stream *Stream) {
 		t.Fatal("missing test object")
 	}
 
-	decoded, err := ExtractStream(x, streamObj)
+	decoded, err := ExtractStream(x, streamObj, false)
 	if err != nil {
 		t.Fatalf("ExtractStream failed: %v", err)
 	}
@@ -315,7 +315,7 @@ func FuzzStreamRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		stream, err := ExtractStream(x, objPDF)
+		stream, err := ExtractStream(x, objPDF, false)
 		if err != nil {
 			t.Skip("malformed stream object")
 		}

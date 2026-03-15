@@ -43,8 +43,7 @@ type Viewport struct {
 }
 
 // ExtractViewport extracts a Viewport from a PDF object.
-func ExtractViewport(x *pdf.Extractor, obj pdf.Object) (*Viewport, error) {
-	singleUse := !x.IsIndirect
+func ExtractViewport(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Viewport, error) {
 
 	dict, err := x.GetDictTyped(obj, "Viewport")
 	if err != nil {
@@ -82,7 +81,7 @@ func ExtractViewport(x *pdf.Extractor, obj pdf.Object) (*Viewport, error) {
 		vp.PtData = ptData
 	}
 
-	vp.SingleUse = singleUse
+	vp.SingleUse = isDirect
 
 	return vp, nil
 }
@@ -162,8 +161,7 @@ func (va *ViewPortArray) Select(point vec.Vec2) *Viewport {
 }
 
 // ExtractViewportArray extracts an array of viewports from a PDF array.
-func ExtractViewportArray(x *pdf.Extractor, obj pdf.Object) (*ViewPortArray, error) {
-	singleUse := !x.IsIndirect
+func ExtractViewportArray(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*ViewPortArray, error) {
 
 	a, err := x.GetArray(obj)
 	if err != nil {
@@ -181,7 +179,7 @@ func ExtractViewportArray(x *pdf.Extractor, obj pdf.Object) (*ViewPortArray, err
 		}
 		viewports[i] = vp
 	}
-	return &ViewPortArray{Viewports: viewports, SingleUse: singleUse}, nil
+	return &ViewPortArray{Viewports: viewports, SingleUse: isDirect}, nil
 }
 
 // Embed converts the ViewPortArray into a PDF array.

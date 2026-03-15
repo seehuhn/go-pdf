@@ -220,7 +220,7 @@ func testActionRoundTrip(t *testing.T, version pdf.Version, action pdf.Action) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := Decode(x, encoded)
+	decoded, err := Decode(x, encoded, false)
 	if err != nil {
 		t.Fatalf("decode error: %v", err)
 	}
@@ -289,7 +289,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		action, err := Decode(x, obj)
+		action, err := Decode(x, obj, false)
 		if err != nil {
 			t.Skip("malformed action")
 		}

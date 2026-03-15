@@ -23,6 +23,6 @@ import (
 )
 
 // Shading extracts a shading from a PDF file.
-func Shading(x *pdf.Extractor, obj pdf.Object) (graphics.Shading, error) {
-	return shading.Extract(x, obj)
+func Shading(x *pdf.Extractor, obj pdf.Object, isDirect bool) (graphics.Shading, error) {
+	return shading.Extract(x, obj, isDirect)
 }

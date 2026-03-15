@@ -44,7 +44,7 @@ type Group struct {
 var _ pdf.Embedder = (*Group)(nil)
 
 // ExtractGroup extracts an optional content group from a PDF object.
-func ExtractGroup(x *pdf.Extractor, obj pdf.Object) (*Group, error) {
+func ExtractGroup(x *pdf.Extractor, obj pdf.Object, _ bool) (*Group, error) {
 	dict, err := x.GetDictTyped(obj, "OCG")
 	if err != nil {
 		return nil, err

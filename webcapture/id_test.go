@@ -82,7 +82,7 @@ func roundTripTest(t *testing.T, version pdf.Version, id *Identifier) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := ExtractIdentifier(x, obj)
+	decoded, err := ExtractIdentifier(x, obj, false)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestExtractIdentifierNil(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
-	id, err := ExtractIdentifier(x, nil)
+	id, err := ExtractIdentifier(x, nil, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestExtractIdentifierWrongLength(t *testing.T) {
 	x := pdf.NewExtractor(w)
 
 	// too short
-	id, err := ExtractIdentifier(x, pdf.String([]byte{1, 2, 3}))
+	id, err := ExtractIdentifier(x, pdf.String([]byte{1, 2, 3}), false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestExtractIdentifierWrongLength(t *testing.T) {
 	}
 
 	// too long
-	id, err = ExtractIdentifier(x, pdf.String(make([]byte, 32)))
+	id, err = ExtractIdentifier(x, pdf.String(make([]byte, 32)), false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -203,7 +203,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		id, err := ExtractIdentifier(x, obj)
+		id, err := ExtractIdentifier(x, obj, false)
 		if err != nil {
 			t.Skip("malformed identifier")
 		}
