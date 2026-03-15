@@ -57,16 +57,10 @@ func TestComputeOU(t *testing.T) {
 	}
 }
 
-func (sec *stdSecHandler) deauthenticate() {
-	sec.key = nil
-	sec.ownerAuthenticated = false
-}
-
 func TestCryptV1(t *testing.T) {
 	opt := &WriterOptions{
 		UserPassword:  "AA",
 		OwnerPassword: "BB",
-		// UserPermissions: PermAll,
 	}
 	buf := &bytes.Buffer{}
 	w, err := NewWriter(buf, V1_1, opt)
@@ -89,35 +83,24 @@ func TestCryptV1(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// os.WriteFile("test_TestV1.pdf", buf.Bytes(), 0o666)
-
 	inData := buf.Bytes()
 	in := bytes.NewReader(inData)
-	pwdFunc := func(_ []byte, try int) string {
-		switch try {
-		case 0:
-			return "BB"
-		default:
-			return ""
-		}
-	}
 	rOpt := &ReaderOptions{
-		ReadPassword: pwdFunc,
+		Password: "BB",
 	}
 	r, err := NewReader(in, int64(len(inData)), rOpt)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = r.AuthenticateOwner()
-	if err != nil {
-		t.Error(err)
+	if r.GetMeta().Permissions != PermAll {
+		t.Error("expected owner permissions")
 	}
 }
 
 func TestAuthentication(t *testing.T) {
 	msg := TextString("super secret")
-	for i, v := range []Version{V1_6, V1_4, V1_3, V1_1} {
-		for _, userFirst := range []bool{true, false} {
+	for _, v := range []Version{V1_6, V1_4, V1_3, V1_1} {
+		t.Run("PDF-"+v.String(), func(t *testing.T) {
 			buf := &bytes.Buffer{}
 
 			opt := &WriterOptions{
@@ -152,58 +135,58 @@ func TestAuthentication(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// os.WriteFile(fmt.Sprintf("debug%d.pdf", i), buf.Bytes(), 0o666)
-
-			var pwdList []string
-			if userFirst {
-				pwdList = append(pwdList, "don't know", "user")
-			}
-			pwdList = append(pwdList, "friend", "owner")
-			pwdFunc := func([]byte, int) string {
-				if len(pwdList) == 0 {
-					return ""
-				}
-				res := pwdList[0]
-				pwdList = pwdList[1:]
-				return res
-			}
-
 			inData := buf.Bytes()
-			in := bytes.NewReader(inData)
-			rOpt := &ReaderOptions{
-				ReadPassword: pwdFunc,
-			}
-			r, err := NewReader(in, int64(len(inData)), rOpt)
-			if err != nil {
-				t.Fatal(err, i)
-			}
-			if userFirst {
+
+			// open with user password
+			t.Run("user", func(t *testing.T) {
+				in := bytes.NewReader(inData)
+				rOpt := &ReaderOptions{Password: "user"}
+				r, err := NewReader(in, int64(len(inData)), rOpt)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if r.GetMeta().Permissions != PermCopy {
+					t.Errorf("expected PermCopy, got %v", r.GetMeta().Permissions)
+				}
 				dec, err := GetTextString(r, ref)
 				if err != nil {
-					t.Error(err, i, userFirst)
+					t.Error(err)
 				}
 				if dec != msg {
-					t.Error("got wrong message", i)
+					t.Error("got wrong message")
 				}
-				if len(pwdList) != 2 {
-					t.Error("wrong user password used", i)
+			})
+
+			// open with owner password
+			t.Run("owner", func(t *testing.T) {
+				in := bytes.NewReader(inData)
+				rOpt := &ReaderOptions{Password: "owner"}
+				r, err := NewReader(in, int64(len(inData)), rOpt)
+				if err != nil {
+					t.Fatal(err)
 				}
-			}
-			if r.enc.sec.ownerAuthenticated {
-				t.Fatal("owner wrongly authenticated")
-			}
-			err = r.AuthenticateOwner()
-			if err != nil {
-				t.Error(err, "PDF-"+v.String(), i, userFirst)
-				continue
-			}
-			if !r.enc.sec.ownerAuthenticated {
-				t.Fatal("owner not authenticated")
-			}
-			if len(pwdList) != 0 {
-				t.Error("wrong owner password used", i, userFirst, pwdList)
-			}
-		}
+				if r.GetMeta().Permissions != PermAll {
+					t.Errorf("expected PermAll, got %v", r.GetMeta().Permissions)
+				}
+				dec, err := GetTextString(r, ref)
+				if err != nil {
+					t.Error(err)
+				}
+				if dec != msg {
+					t.Error("got wrong message")
+				}
+			})
+
+			// wrong password
+			t.Run("wrong", func(t *testing.T) {
+				in := bytes.NewReader(inData)
+				rOpt := &ReaderOptions{Password: "wrong"}
+				_, err := NewReader(in, int64(len(inData)), rOpt)
+				if _, ok := err.(*AuthenticationError); !ok {
+					t.Errorf("expected AuthenticationError, got %v", err)
+				}
+			})
+		})
 	}
 }
 
@@ -217,60 +200,58 @@ func TestAuth(t *testing.T) {
 		{"secret", "secret"},
 	}
 	for i, test := range cases {
-		trials := [][]string{
-			{"wrong"},
-			{"wrong", test.user},
-			{"wrong", test.owner},
+		id := []byte("0123456789ABCDEF")
+		sec, err := createStdSecHandler(id, test.user, test.owner, PermModify, 128, 4)
+		if err != nil {
+			t.Fatal(err)
 		}
-		for j, pwds := range trials {
-			id := []byte("0123456789ABCDEF")
-			sec, err := createStdSecHandler(id, test.user, test.owner, PermModify, 128, 4)
-			if err != nil {
-				t.Fatal(err)
-			}
-			key := sec.key
+		key := sec.key
 
-			sec.deauthenticate()
+		// wrong password should fail (unless user password is empty)
+		sec.key = nil
+		_, err = sec.authenticate("wrong")
+		if test.user == "" {
+			// empty user password means "wrong" will still fail owner,
+			// but empty string would succeed user — authenticate("wrong")
+			// should fail
+			if err == nil {
+				t.Errorf("%d: wrong password accepted", i)
+			}
+		} else {
+			if _, authErr := err.(*AuthenticationError); !authErr {
+				t.Errorf("%d: expected AuthenticationError, got %v", i, err)
+			}
+		}
 
-			pwdPos := -1
-			lastPwd := ""
-			sec.readPwd = func([]byte, int) string {
-				candidate := ""
-				pwdPos++
-				if pwdPos < len(pwds) {
-					candidate = pwds[pwdPos]
-				}
-				lastPwd = candidate
-				return candidate
+		// user password should work
+		sec.key = nil
+		perm, err := sec.authenticate(test.user)
+		if err != nil {
+			t.Errorf("%d: user password failed: %v", i, err)
+			continue
+		}
+		if !bytes.Equal(key, sec.key) {
+			t.Errorf("%d: wrong key from user password", i)
+		}
+		if test.user == test.owner {
+			// same password authenticates as owner (tried first)
+			if perm != PermAll {
+				t.Errorf("%d: expected PermAll for same password", i)
 			}
+		}
 
-			computedKey, err := sec.GetKey(false)
-			if _, authErr := err.(*AuthenticationError); err != nil && !authErr {
-				t.Errorf("wrong error: %s", err)
-				continue
-			}
-			if test.user != "" && len(pwds) < 2 {
-				// need password, and only the wrong one supplied
-				if _, authErr := err.(*AuthenticationError); !authErr {
-					t.Error("wrong password not detected")
-				} else if pwdPos < len(pwds) {
-					t.Error("not all passwords tried")
-				}
-				continue
-			} else if err != nil {
-				t.Errorf("%d.%d: unexpected error: %s", i, j, err)
-				continue
-			}
-
-			if !bytes.Equal(key, computedKey) {
-				t.Errorf("wrong key")
-			}
-
-			if (lastPwd == test.owner) != sec.ownerAuthenticated {
-				t.Errorf("%d.%d: wrong value for .OwnerAuthenticated"+
-					" (%q %q %t)",
-					i, j, lastPwd, test.owner, sec.ownerAuthenticated)
-			}
+		// owner password should work and give PermAll
+		sec.key = nil
+		perm, err = sec.authenticate(test.owner)
+		if err != nil {
+			t.Errorf("%d: owner password failed: %v", i, err)
+			continue
+		}
+		if !bytes.Equal(key, sec.key) {
+			t.Errorf("%d: wrong key from owner password", i)
+		}
+		if perm != PermAll {
+			t.Errorf("%d: expected PermAll from owner password", i)
 		}
 	}
 }
@@ -282,18 +263,15 @@ func TestAuth2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	key := sec.key
 
-	key, err := sec.GetKey(false)
+	// empty user password should authenticate via authenticate("")
+	sec.key = nil
+	_, err = sec.authenticate("")
 	if err != nil {
 		t.Fatal(err)
 	}
-	sec.deauthenticate()
-
-	key2, err := sec.GetKey(false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(key, key2) {
+	if !bytes.Equal(key, sec.key) {
 		t.Error("wrong key")
 	}
 }
@@ -335,7 +313,7 @@ func TestAuth3(t *testing.T) {
 
 		if sec.R < 6 {
 			// test 1: the user password works
-			sec.deauthenticate()
+			sec.key = nil
 			padded, err := padPasswd(userPasswd)
 			if err != nil {
 				t.Fatal(err)
@@ -345,12 +323,10 @@ func TestAuth3(t *testing.T) {
 				t.Error(err)
 			} else if sec.key == nil {
 				t.Error("key not set")
-			} else if sec.ownerAuthenticated {
-				t.Error("ownerAuthenticated true")
 			}
 
 			// test 2: the owner password works
-			sec.deauthenticate()
+			sec.key = nil
 			padded, err = padPasswd(ownerPasswd)
 			if err != nil {
 				t.Fatal(err)
@@ -360,18 +336,16 @@ func TestAuth3(t *testing.T) {
 				t.Error(err)
 			} else if sec.key == nil {
 				t.Error("key not set")
-			} else if !sec.ownerAuthenticated {
-				t.Error("ownerAuthenticated false")
 			}
 
 			// test 3: the user password does not authenticate the owner
-			sec.deauthenticate()
+			sec.key = nil
 			padded, err = padPasswd(userPasswd)
 			if err != nil {
 				t.Fatal(err)
 			}
 			err = sec.authenticateOwner(padded)
-			if err == nil || sec.key != nil || sec.ownerAuthenticated {
+			if err == nil || sec.key != nil {
 				t.Error("wrong password accepted")
 			}
 			if _, ok := err.(*AuthenticationError); !ok {
@@ -379,7 +353,7 @@ func TestAuth3(t *testing.T) {
 			}
 		} else {
 			// test 1: the user password works
-			sec.deauthenticate()
+			sec.key = nil
 			padded, err := utf8Passwd(userPasswd)
 			if err != nil {
 				t.Fatal(err)
@@ -389,12 +363,10 @@ func TestAuth3(t *testing.T) {
 				t.Error(err)
 			} else if sec.key == nil {
 				t.Error("key not set")
-			} else if sec.ownerAuthenticated {
-				t.Error("ownerAuthenticated true")
 			}
 
 			// test 2: the owner password works
-			sec.deauthenticate()
+			sec.key = nil
 			padded, err = utf8Passwd(ownerPasswd)
 			if err != nil {
 				t.Fatal(err)
@@ -404,18 +376,16 @@ func TestAuth3(t *testing.T) {
 				t.Error(err)
 			} else if sec.key == nil {
 				t.Error("key not set")
-			} else if !sec.ownerAuthenticated {
-				t.Error("ownerAuthenticated false")
 			}
 
 			// test 3: the user password does not authenticate the owner
-			sec.deauthenticate()
+			sec.key = nil
 			padded, err = utf8Passwd(userPasswd)
 			if err != nil {
 				t.Fatal(err)
 			}
 			err = sec.authenticateOwner6(padded)
-			if err == nil || sec.key != nil || sec.ownerAuthenticated {
+			if err == nil || sec.key != nil {
 				t.Error("wrong password accepted")
 			}
 			if _, ok := err.(*AuthenticationError); !ok {
@@ -579,12 +549,15 @@ func TestAuthEmbed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	passWordRequired := false
+	// opening without a password should fail (user password is non-empty)
+	_, err = NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
+	if _, ok := err.(*AuthenticationError); !ok {
+		t.Errorf("expected AuthenticationError, got %v", err)
+	}
+
+	// opening with the user password should work
 	rOpt := &ReaderOptions{
-		ReadPassword: func([]byte, int) string {
-			passWordRequired = true
-			return "A"
-		},
+		Password:      "A",
 		ErrorHandling: ErrorHandlingReport,
 	}
 	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), rOpt)
@@ -594,8 +567,5 @@ func TestAuthEmbed(t *testing.T) {
 	_, err = r.Get(ref, true)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if !passWordRequired {
-		t.Error("password not required")
 	}
 }

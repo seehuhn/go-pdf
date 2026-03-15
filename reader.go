@@ -26,13 +26,11 @@ import (
 
 // ReaderOptions provides additional information for opening a PDF file.
 type ReaderOptions struct {
-	// ReadPassword is a function that queries the user for a password for the
-	// document with the given ID.  The function is called repeatedly, with
-	// sequentially increasing values of try (starting at 0), until the correct
-	// password is entered.  If the function returns the empty string, the
-	// authentication attempt is aborted and [AuthenticationError] is reported
-	// to the caller.
-	ReadPassword func(ID []byte, try int) string
+	// Password is the password to use for opening encrypted PDF files.
+	// The empty string is always tried first, even if Password is set.
+	// If authentication fails, [Open] and [NewReader] return an
+	// [AuthenticationError].
+	Password string
 
 	ErrorHandling ReaderErrorHandling
 }
@@ -161,14 +159,24 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 		if ref, ok := encObj.(Reference); ok {
 			r.unencrypted[ref] = true
 		}
-		r.enc, err = r.parseEncryptDict(encObj, opt.ReadPassword)
+		var perm Perm
+		r.enc, perm, err = r.parseEncryptDict(encObj, opt.Password)
 		if err != nil {
+			// AuthenticationError should not be swallowed by shouldExit
+			var authErr *AuthenticationError
+			if errors.As(err, &authErr) {
+				return nil, err
+			}
 			err = Wrap(err, "encryption dictionary")
 			if shouldExit(err) {
 				return nil, err
 			}
 		}
-	} else if r.meta.ID == nil && IDObj != nil {
+		r.meta.Permissions = perm
+	} else {
+		r.meta.Permissions = PermAll
+	}
+	if r.meta.ID == nil && IDObj != nil {
 		// If the file is not encrypted, ID may be an indirect object.
 		r.meta.ID, err = r.getID(IDObj)
 		if shouldExit(err) {
@@ -245,36 +253,6 @@ func (r *Reader) Close() error {
 		}
 	}
 	return nil
-}
-
-// AuthenticateOwner tries to authenticate the owner of a document. If a
-// password is required, this calls the ReadPassword function specified in the
-// [ReaderOptions] struct.  The return value is nil if the owner was
-// authenticated (or if no authentication is required), and an object of type
-// [AuthenticationError] if the required password was not supplied.
-func (r *Reader) AuthenticateOwner() error {
-	if r.enc == nil || r.enc.sec.ownerAuthenticated {
-		return nil
-	}
-	_, err := r.enc.sec.GetKey(true)
-	return err
-}
-
-// Authenticate tries to authenticate the actions given in perm.  If a
-// password is required, this calls the ReadPassword function specified in the
-// [ReaderOptions] struct.  The return value is nil if the owner was
-// authenticated (or if no authentication is required), and an object of type
-// [AuthenticationError] if the required password was not supplied.
-func (r *Reader) Authenticate(perm Perm) error {
-	if r.enc == nil || r.enc.sec.key != nil {
-		return nil
-	}
-	perm &= PermAll
-	if perm&r.enc.UserPermissions == perm {
-		return nil
-	}
-	_, err := r.enc.sec.GetKey(false)
-	return err
 }
 
 // GetMeta returns meta information about the file.

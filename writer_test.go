@@ -139,11 +139,6 @@ ET
 		t.Error("encryption dictionaries differ")
 	}
 
-	_, err = r.enc.sec.GetKey(false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	if r.meta.Info == nil {
 		t.Fatal("no document information dictionary")
 	}

@@ -94,9 +94,7 @@ func listFonts(fname string) error {
 	var opt *pdf.ReaderOptions
 	if *passwdArg != "" {
 		opt = &pdf.ReaderOptions{
-			ReadPassword: func(_ []byte, _ int) string {
-				return *passwdArg
-			},
+			Password: *passwdArg,
 		}
 	}
 

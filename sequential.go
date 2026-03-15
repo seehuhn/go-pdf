@@ -153,11 +153,18 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 		if ref, ok := encObj.(Reference); ok {
 			r.unencrypted[ref] = true
 		}
-		r.enc, err = r.parseEncryptDict(encObj, opt.ReadPassword)
+		var perm Perm
+		r.enc, perm, err = r.parseEncryptDict(encObj, opt.Password)
 		if err != nil {
+			var authErr *AuthenticationError
+			if errors.As(err, &authErr) {
+				return nil, err
+			}
 			return nil, Wrap(err, "encryption dictionary")
 		}
-		// TODO(voss): extract the permission bits
+		r.meta.Permissions = perm
+	} else {
+		r.meta.Permissions = PermAll
 	}
 
 	shouldExit := func(err error) bool {

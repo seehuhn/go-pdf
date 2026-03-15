@@ -86,7 +86,7 @@ func testEncryptedStreamMultipleReads(t *testing.T, version Version) {
 
 	// Open the PDF for reading
 	rOpt := &ReaderOptions{
-		ReadPassword: func([]byte, int) string { return "user" },
+		Password: "user",
 	}
 	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), rOpt)
 	if err != nil {
@@ -183,7 +183,7 @@ func TestEncryptedStreamWithFilters(t *testing.T) {
 	}
 
 	rOpt := &ReaderOptions{
-		ReadPassword: func([]byte, int) string { return "secret" },
+		Password: "secret",
 	}
 	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), rOpt)
 	if err != nil {

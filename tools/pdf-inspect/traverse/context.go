@@ -17,6 +17,7 @@
 package traverse
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -56,20 +57,6 @@ type Step struct {
 }
 
 func Root(fileName string, passwords ...string) (Context, func(), error) {
-	tryPasswd := func(_ []byte, try int) string {
-		if try < len(passwords) {
-			return passwords[try]
-		}
-		fmt.Print("password: ")
-		passwd, err := term.ReadPassword(syscall.Stdin)
-		if err != nil {
-			fmt.Println("XXX")
-			return ""
-		}
-		fmt.Println("***")
-		return string(passwd)
-	}
-
 	fd, err := os.Open(fileName)
 	if err != nil {
 		return nil, nil, err
@@ -80,10 +67,37 @@ func Root(fileName string, passwords ...string) (Context, func(), error) {
 		return nil, nil, err
 	}
 	opt := &pdf.ReaderOptions{
-		ReadPassword:  tryPasswd,
 		ErrorHandling: pdf.ErrorHandlingReport,
 	}
-	r, err := pdf.NewReader(fd, fi.Size(), opt)
+
+	// try each password from the command line
+	var r *pdf.Reader
+	for i := range len(passwords) + 1 {
+		if i > 0 {
+			opt.Password = passwords[i-1]
+		}
+		r, err = pdf.NewReader(fd, fi.Size(), opt)
+		if err == nil {
+			break
+		}
+		var authErr *pdf.AuthenticationError
+		if !errors.As(err, &authErr) {
+			fd.Close()
+			return nil, nil, err
+		}
+	}
+
+	// prompt interactively until the user enters an empty password
+	for err != nil {
+		fmt.Print("password: ")
+		passwd, readErr := term.ReadPassword(syscall.Stdin)
+		fmt.Println("***")
+		if readErr != nil || len(passwd) == 0 {
+			break
+		}
+		opt.Password = string(passwd)
+		r, err = pdf.NewReader(fd, fi.Size(), opt)
+	}
 	if err != nil {
 		fd.Close()
 		return nil, nil, err

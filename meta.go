@@ -42,6 +42,10 @@ type MetaInfo struct {
 	// the cross-reference table, and the entries corresponding to the `ID`,
 	// `Catalog` and `Info` fields above, are omitted.
 	Trailer Dict
+
+	// Permissions records the access permissions granted when the file
+	// was opened.  For unencrypted files this is PermAll.
+	Permissions Perm
 }
 
 // Version represents a version of the PDF standard.

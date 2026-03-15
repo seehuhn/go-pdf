@@ -40,8 +40,6 @@ type encryptInfo struct {
 	strF *cryptFilter // strings
 	stmF *cryptFilter // streams
 	efF  *cryptFilter // embedded files
-
-	UserPermissions Perm
 }
 
 // filterCrypt is a filter that handles stream encryption/decryption.
@@ -82,30 +80,26 @@ func (f *filterCrypt) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 	return io.NopCloser(decrypted), nil
 }
 
-func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) string) (*encryptInfo, error) {
+func (r *Reader) parseEncryptDict(encObj Object, password string) (*encryptInfo, Perm, error) {
 	enc, err := GetDict(r, encObj)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if len(r.meta.ID) != 2 {
-		return nil, &MalformedFileError{Err: errors.New("found Encrypt but no ID")}
+		return nil, 0, &MalformedFileError{Err: errors.New("found Encrypt but no ID")}
 	}
 
 	res := &encryptInfo{}
 
 	filter, err := GetName(r, enc["Filter"])
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	// subFilter, err := GetName(r, enc["SubFilter"])
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	// version of the encryption/decryption algorithm
 	V, err := GetInteger(r, enc["V"])
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	var keyBytes int
@@ -127,7 +121,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 		}
 		if obj, ok := enc["Length"].(Integer); ok && (V == 2 || V == 3) {
 			if obj < 40 || obj > 128 || obj%8 != 0 {
-				return nil, &MalformedFileError{
+				return nil, 0, &MalformedFileError{
 					Err: fmt.Errorf("invalid Length=%d", obj),
 				}
 			}
@@ -145,14 +139,14 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 		if obj, ok := enc["StmF"].(Name); ok {
 			cf, err := getCryptFilter(obj, CF)
 			if err != nil {
-				return nil, Wrap(err, "StmF")
+				return nil, 0, Wrap(err, "StmF")
 			}
 			res.stmF = cf
 		}
 		if obj, ok := enc["StrF"].(Name); ok {
 			cf, err := getCryptFilter(obj, CF)
 			if err != nil {
-				return nil, Wrap(err, "StrF")
+				return nil, 0, Wrap(err, "StrF")
 			}
 			res.strF = cf
 		}
@@ -160,7 +154,7 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 		if obj, ok := enc["EFF"].(Name); ok {
 			cf, err := getCryptFilter(obj, CF)
 			if err != nil {
-				return nil, Wrap(err, "EFF")
+				return nil, 0, Wrap(err, "EFF")
 			}
 			res.efF = cf
 		}
@@ -171,26 +165,34 @@ func (r *Reader) parseEncryptDict(encObj Object, readPwd func([]byte, int) strin
 		}
 
 	default:
-		return nil, &MalformedFileError{
+		return nil, 0, &MalformedFileError{
 			Err: fmt.Errorf("invalid V=%d", V),
 		}
 	}
 
 	switch filter {
 	case "Standard":
-		sec, err := openStdSecHandler(enc, keyBytes, r.meta.ID[0], readPwd)
+		sec, err := openStdSecHandler(enc, keyBytes, r.meta.ID[0])
 		if err != nil {
-			return nil, Wrap(err, "standard security handler")
+			return nil, 0, Wrap(err, "standard security handler")
 		}
 		res.sec = sec
-		res.UserPermissions = stdSecPToPerm(sec.R, sec.P)
 	default:
-		return nil, &MalformedFileError{
+		return nil, 0, &MalformedFileError{
 			Err: fmt.Errorf("unsupported Filter=%s", filter),
 		}
 	}
 
-	return res, nil
+	// eager authentication
+	perm, err := res.sec.authenticate("")
+	if err != nil && password != "" {
+		perm, err = res.sec.authenticate(password)
+	}
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return res, perm, nil
 }
 
 func (enc *encryptInfo) AsDict(version Version) (Dict, error) {
@@ -471,8 +473,7 @@ type stdSecHandler struct {
 
 	keyBytes int
 
-	readPwd func([]byte, int) string
-	key     []byte
+	key []byte
 
 	// unencryptedMetadata specifies whether document-level XMP metadata
 	// streams are encrypted.
@@ -481,13 +482,11 @@ type stdSecHandler struct {
 	// the Go default value (unencryptedMetadata==false) corresponds to the
 	// PDF default value (/EncryptMetadata true).
 	unencryptedMetadata bool
-
-	ownerAuthenticated bool
 }
 
 // openStdSecHandler creates a new stdSecHandler from the encryption dictionary
 // and the document ID.  This is used when reading existing PDF documents.
-func openStdSecHandler(enc Dict, keyBytes int, ID []byte, readPwd func([]byte, int) string) (*stdSecHandler, error) {
+func openStdSecHandler(enc Dict, keyBytes int, ID []byte) (*stdSecHandler, error) {
 	R, ok := enc["R"].(Integer)
 	if !ok || R < 2 || R == 5 || R > 6 {
 		return nil, &MalformedFileError{Err: errors.New("invalid Encrypt.R")}
@@ -526,7 +525,6 @@ func openStdSecHandler(enc Dict, keyBytes int, ID []byte, readPwd func([]byte, i
 	sec := &stdSecHandler{
 		ID:       ID,
 		keyBytes: keyBytes,
-		readPwd:  readPwd,
 
 		R: int(R),
 		O: []byte(O),
@@ -602,8 +600,6 @@ func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, length,
 		keyBytes: keyBytes,
 		R:        R,
 		P:        stdSecPermToP(perm),
-
-		ownerAuthenticated: true,
 	}
 
 	switch R {
@@ -651,14 +647,13 @@ func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, length,
 }
 
 func (sec *stdSecHandler) KeyForRef(cf *cryptFilter, ref Reference) ([]byte, error) {
-	key, err := sec.GetKey(false)
-	if err != nil {
-		return nil, err
+	if sec.key == nil {
+		return nil, &AuthenticationError{sec.ID}
 	}
 	switch sec.R {
 	case 2, 3, 4:
 		h := md5.New()
-		h.Write(key)
+		h.Write(sec.key)
 		num := ref.Number()
 		gen := ref.Generation()
 		h.Write([]byte{
@@ -670,67 +665,43 @@ func (sec *stdSecHandler) KeyForRef(cf *cryptFilter, ref Reference) ([]byte, err
 		l := min(sec.keyBytes+5, 16)
 		return h.Sum(nil)[:l], nil
 	case 6:
-		return key, nil
+		return sec.key, nil
 	default:
 		panic("invalid R")
 	}
 }
 
-// GetKey returns the file encryption key to decrypt string and stream data.
-// Passwords will be requested via the getPasswd callback.  If the correct
-// owner password was supplied, the OwnerAuthenticated field will be set to
-// true, in addition to returning the key.
-func (sec *stdSecHandler) GetKey(needOwner bool) ([]byte, error) {
-	if sec.key != nil && (sec.ownerAuthenticated || !needOwner) {
-		return sec.key, nil
-	}
-
-	passwd := ""
-	passWdTry := 0
-	for { // try different passwords until one succeeds
-		if sec.R < 6 {
-			padded, err := padPasswd(passwd)
-			if err != nil {
-				continue
-			}
-			err = sec.authenticateOwner(padded)
-			if err == nil {
-				return sec.key, nil
-			}
-			if !needOwner {
-				err = sec.authenticateUser(padded)
-				if err == nil {
-					return sec.key, nil
-				}
-			}
-		} else {
-			prepared, err := utf8Passwd(passwd)
-			if err != nil {
-				continue
-			}
-			err = sec.authenticateOwner6(prepared)
-			if err == nil {
-				return sec.key, nil
-			}
-			if !needOwner {
-				err = sec.authenticateUser6(prepared)
-				if err == nil {
-					return sec.key, nil
-				}
-			}
+// authenticate tries the given password as both owner and user password.
+// On success it sets sec.key and returns the corresponding permissions.
+func (sec *stdSecHandler) authenticate(passwd string) (Perm, error) {
+	if sec.R < 6 {
+		padded, err := padPasswd(passwd)
+		if err != nil {
+			return 0, err
 		}
-
-		// wrong password, try another one
-		if sec.readPwd != nil {
-			passwd = sec.readPwd(sec.ID, passWdTry)
-			passWdTry++
-		} else {
-			passwd = ""
+		err = sec.authenticateOwner(padded)
+		if err == nil {
+			return PermAll, nil
 		}
-		if passwd == "" {
-			return nil, &AuthenticationError{sec.ID}
+		err = sec.authenticateUser(padded)
+		if err == nil {
+			return stdSecPToPerm(sec.R, sec.P), nil
+		}
+	} else {
+		prepared, err := utf8Passwd(passwd)
+		if err != nil {
+			return 0, err
+		}
+		err = sec.authenticateOwner6(prepared)
+		if err == nil {
+			return PermAll, nil
+		}
+		err = sec.authenticateUser6(prepared)
+		if err == nil {
+			return stdSecPToPerm(sec.R, sec.P), nil
 		}
 	}
+	return 0, &AuthenticationError{sec.ID}
 }
 
 // Algorithm 2: compute the file encryption key for R <= 4.
@@ -958,12 +929,7 @@ func (sec *stdSecHandler) authenticateOwner(paddedOwnerPwd []byte) error {
 		}
 	}
 
-	err := sec.authenticateUser(buf)
-	if err != nil {
-		return err
-	}
-	sec.ownerAuthenticated = true
-	return nil
+	return sec.authenticateUser(buf)
 }
 
 // Algorithm 8: Computing U and UE (Security handlers of revision 6)
@@ -1073,7 +1039,6 @@ func (sec *stdSecHandler) authenticateOwner6(utf8Passwd []byte) error {
 	}
 
 	sec.key = fileEncryptionKey
-	sec.ownerAuthenticated = true
 	return nil
 }
 
