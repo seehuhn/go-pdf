@@ -60,7 +60,7 @@ type Reader struct {
 	GraphicsStateSaved    func() error
 	GraphicsStateRestored func() error
 	XObject               func(obj graphics.XObject, ctm matrix.Matrix) error
-	InlineImage           func(dict pdf.Dict, data []byte, ctm matrix.Matrix) error
+	InlineImage           func(op content.Operator, ctm matrix.Matrix) error
 
 	MarkedContent      func(event MarkedContentEvent, mc *graphics.MarkedContent) error
 	MarkedContentStack []*graphics.MarkedContent
@@ -368,13 +368,10 @@ func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
 			}
 		}
 	case content.OpInlineImage:
-		if r.InlineImage != nil && len(args) >= 2 {
-			if dict, ok := args[0].(pdf.Dict); ok {
-				if data, ok := args[1].(pdf.String); ok {
-					if err := r.InlineImage(dict, []byte(data), p.CTM); err != nil {
-						return err
-					}
-				}
+		if r.InlineImage != nil {
+			op := content.Operator{Name: name, Args: args}
+			if err := r.InlineImage(op, p.CTM); err != nil {
+				return err
 			}
 		}
 	}
