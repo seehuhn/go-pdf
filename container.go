@@ -314,7 +314,7 @@ func GetFilters(r Getter, dict Dict) ([]Filter, error) {
 				return nil, fmt.Errorf("wrong type, expected Dict but got %T", decodeParams)
 			}
 		}
-		res = append(res, makeFilter(f, pDict))
+		res = append(res, MakeFilter(f, pDict))
 	case Array:
 		pa, ok := decodeParams.(Array)
 		if !ok && decodeParams != nil {
@@ -343,7 +343,7 @@ func GetFilters(r Getter, dict Dict) ([]Filter, error) {
 					}
 				}
 			}
-			res = append(res, makeFilter(name, pDict))
+			res = append(res, MakeFilter(name, pDict))
 		}
 	default:
 		return nil, Error("invalid /Filter field")

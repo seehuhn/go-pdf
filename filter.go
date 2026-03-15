@@ -65,7 +65,8 @@ type Filter interface {
 	Decode(Version, io.Reader) (io.ReadCloser, error)
 }
 
-func makeFilter(filter Name, param Dict) Filter {
+// MakeFilter constructs a [Filter] for the given filter name and parameters.
+func MakeFilter(filter Name, param Dict) Filter {
 	switch filter {
 	case "ASCII85Decode":
 		return FilterASCII85{}
