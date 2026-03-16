@@ -46,11 +46,9 @@ type encryptInfo struct {
 // Unlike regular filters which are stored in the PDF file's stream dictionary,
 // this filter is applied transparently based on the document's encryption settings.
 //
-// This filter allows Stream.R to remain the raw (possibly encrypted) seekable
-// stream data from the file. Decryption happens on-the-fly when the stream is
-// read through DecodeStream, allowing streams to be:
-//   - Read multiple times (by seeking back to the beginning)
-//   - Properly decoded even after seeking
+// The raw (possibly encrypted) stream data stays in the Stream object.
+// Decryption happens on-the-fly when the stream is read through DecodeStream,
+// so each call to NewReader yields independently decryptable data.
 type filterCrypt struct {
 	enc *encryptInfo
 	ref Reference

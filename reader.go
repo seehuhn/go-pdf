@@ -62,17 +62,20 @@ const (
 
 // Reader represents a pdf file opened for reading.  Use [Open] or
 // [NewReader] to create a Reader.
+//
+// After construction, [Reader.Get] and [Reader.GetMeta] are safe for
+// concurrent use from multiple goroutines.
 type Reader struct {
-	meta MetaInfo
+	meta MetaInfo // immutable after construction
 
-	r      io.ReaderAt
-	size   int64
-	closeR bool
+	r          io.ReaderAt // concurrent-safe by contract
+	size       int64       // immutable after construction
+	ownsReader bool        // true if Close should close r
 
-	xref map[uint32]*xRefEntry
+	xref map[uint32]*xRefEntry // read-only after construction
 
-	enc         *encryptInfo
-	unencrypted map[Reference]bool
+	enc         *encryptInfo       // read-only after construction
+	unencrypted map[Reference]bool // read-only after construction
 
 	// Errors is a list of errors encountered while opening the file.
 	// This is only used if the ErrorHandling option is set to
@@ -97,7 +100,7 @@ func Open(fname string, opt *ReaderOptions) (*Reader, error) {
 		fd.Close()
 		return nil, Wrap(err, fname)
 	}
-	r.closeR = true
+	r.ownsReader = true
 	return r, nil
 }
 
@@ -246,7 +249,7 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 //
 // This call only has an effect if the Reader was created by [Open].
 func (r *Reader) Close() error {
-	if r.closeR {
+	if r.ownsReader {
 		err := r.r.(io.Closer).Close()
 		if err != nil {
 			return err

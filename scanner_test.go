@@ -62,36 +62,7 @@ func TestReadObject(t *testing.T) {
 			s := testScanner(body)
 
 			val, err := s.ReadObject()
-			if stm2, expectStm := test.val.(*Stream); expectStm {
-				stm1, haveStm := val.(*Stream)
-				if !haveStm {
-					t.Errorf("%q: wrong type: expected *Stream, got %T",
-						body, val)
-					continue
-				}
-				if !Equal(stm1.Dict, stm2.Dict) {
-					t.Errorf("%q: wrong value: expected %#v, got %#v",
-						body, stm2.Dict, stm1.Dict)
-					continue
-				}
-				data1, err := io.ReadAll(stm1.R)
-				if err != nil {
-					t.Errorf("%q: %s", body, err)
-				}
-
-				// rewind the reader for the second suffix
-				stm2r := stm2.R.(io.Seeker)
-				stm2r.Seek(0, io.SeekStart)
-
-				data2, err := io.ReadAll(stm2.R)
-				if err != nil {
-					t.Errorf("%q: %s", body, err)
-				}
-				if !bytes.Equal(data1, data2) {
-					t.Errorf("%q: wrong data in stream, expected %x, got %x",
-						body, data2, data1)
-				}
-			} else if !Equal(val, test.val) {
+			if !Equal(val, test.val) {
 				t.Errorf("%q: wrong value: expected %q, got %q",
 					body, AsString(test.val), AsString(val))
 			}
@@ -315,13 +286,6 @@ var testCases = []struct {
 		Name("key3"): Integer(3),
 	}, true},
 
-	{"<< /Length 5 >>\nstream\nhello\nendstream", &Stream{
-		Dict: Dict{
-			Name("Length"): Integer(5),
-		},
-		R: strings.NewReader("hello"),
-	}, true},
-
 	{"fals", nil, false},
 	{"abc", nil, false},
 }
@@ -347,7 +311,7 @@ func TestStreamReader(t *testing.T) {
 		t.Errorf("expected 1, got %d", x1)
 	}
 
-	stmData, err := io.ReadAll(stm.R)
+	stmData, err := io.ReadAll(stm.NewReader())
 	if err != nil {
 		t.Error(err)
 	}
@@ -363,7 +327,32 @@ func TestStreamReader(t *testing.T) {
 	}
 }
 
-func TestStreamReaderSeek(t *testing.T) {
+func TestStreamFromScanner(t *testing.T) {
+	in := "<< /Length 5 >>\nstream\nhello\nendstream"
+	sr := strings.NewReader(in)
+	s := newScanner(sr, func(x Object) (Integer, error) { return x.(Integer), nil }, nil)
+	s.fileReader = sr
+	stmObj, err := s.ReadObject()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stm, ok := stmObj.(*Stream)
+	if !ok {
+		t.Fatalf("expected stream, got %T", stmObj)
+	}
+	if !Equal(stm.Dict, Dict{Name("Length"): Integer(5)}) {
+		t.Errorf("wrong dict: %v", stm.Dict)
+	}
+	data, err := io.ReadAll(stm.NewReader())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "hello" {
+		t.Errorf("expected %q, got %q", "hello", data)
+	}
+}
+
+func TestStreamConcurrentReaders(t *testing.T) {
 	in := "<< /Length 6 >>\nstream\nABCDEF\nendstream"
 	sr := strings.NewReader(in)
 	s := newScanner(sr, func(x Object) (Integer, error) { return x.(Integer), nil }, nil)
@@ -377,58 +366,39 @@ func TestStreamReaderSeek(t *testing.T) {
 		t.Fatalf("expected stream, got %T", stmObj)
 	}
 
-	firstRead, err := io.ReadAll(stm.R)
+	// multiple independent readers return the same data
+	r1 := stm.NewReader()
+	r2 := stm.NewReader()
+
+	data1, err := io.ReadAll(r1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(firstRead) != "ABCDEF" {
-		t.Errorf("first read: expected ABCDEF, got %q", firstRead)
-	}
-
-	if seeker, ok := stm.R.(io.Seeker); ok {
-		_, err := seeker.Seek(0, io.SeekStart)
-		if err != nil {
-			t.Fatal(err)
-		}
-	} else {
-		t.Fatal("stream reader does not implement io.Seeker")
-	}
-
-	secondRead, err := io.ReadAll(stm.R)
+	data2, err := io.ReadAll(r2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(secondRead) != "ABCDEF" {
-		t.Errorf("second read after seek: expected ABCDEF, got %q", secondRead)
+	if string(data1) != "ABCDEF" || string(data2) != "ABCDEF" {
+		t.Errorf("expected ABCDEF from both readers, got %q and %q", data1, data2)
 	}
 
-	seeker, _ := stm.R.(io.Seeker)
-	seeker.Seek(0, io.SeekStart)
-
+	// partial read on one reader does not affect another
+	r3 := stm.NewReader()
 	buf := make([]byte, 3)
-	n, err := stm.R.Read(buf)
-	if err != nil || n != 3 || string(buf) != "ABC" {
-		t.Errorf("partial read after seek: expected ABC, got %q (n=%d, err=%v)", buf[:n], n, err)
-	}
-
-	seeker.Seek(0, io.SeekStart)
-
-	thirdRead, err := io.ReadAll(stm.R)
+	_, err = r3.Read(buf)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(thirdRead) != "ABCDEF" {
-		t.Errorf("third read after partial consumption: expected ABCDEF, got %q", thirdRead)
+	if string(buf) != "ABC" {
+		t.Errorf("expected ABC, got %q", buf)
 	}
 
-	pos, err := seeker.Seek(3, io.SeekStart)
-	if err != nil || pos != 3 {
-		t.Errorf("seek to position 3: expected pos=3, got pos=%d, err=%v", pos, err)
+	r4 := stm.NewReader()
+	data4, err := io.ReadAll(r4)
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	buf4 := make([]byte, 3)
-	n, err = stm.R.Read(buf4)
-	if err != nil || n != 3 || string(buf4) != "DEF" {
-		t.Errorf("read from position 3: expected DEF, got %q (n=%d, err=%v)", buf4[:n], n, err)
+	if string(data4) != "ABCDEF" {
+		t.Errorf("expected ABCDEF, got %q", data4)
 	}
 }

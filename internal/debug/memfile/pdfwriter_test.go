@@ -18,7 +18,6 @@ package memfile
 
 import (
 	"io"
-	"strings"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -34,10 +33,7 @@ func TestWriterReadAfterClose(t *testing.T) {
 	streamDict := pdf.Dict{
 		"Length": pdf.Integer(len(content)),
 	}
-	stream := &pdf.Stream{
-		Dict: streamDict,
-		R:    strings.NewReader(content),
-	}
+	stream := pdf.NewStream(streamDict, []byte(content))
 
 	// Write the stream to the PDF
 	ref := writer.Alloc()

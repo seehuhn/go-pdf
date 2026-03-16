@@ -242,19 +242,11 @@ func GetStreamReader(r Getter, ref Object) (io.ReadCloser, error) {
 // DecodeStream returns a reader for the decoded stream data. If numFilters is
 // non-zero, only the first numFilters filters are decoded.
 //
-// If the x.R implements io.ReadSeeker, the stream will be reset to the
-// beginning before decoding.  In particular, this is the case for streams read
-// from a file.  This allows streams to be decoded multiple times.
+// Each call creates a fresh reader, so streams can be decoded multiple times.
 //
 // For encrypted PDFs, decryption is applied on-the-fly before any other
 // filters. This does not count towards numFilters.
 func DecodeStream(r Getter, x *Stream, numFilters int) (io.ReadCloser, error) {
-	if seeker, ok := x.R.(io.Seeker); ok {
-		_, err := seeker.Seek(0, io.SeekStart)
-		if err != nil {
-			return nil, err
-		}
-	}
 	filters, err := GetFilters(r, x.Dict)
 	if err != nil {
 		return nil, err
@@ -265,7 +257,7 @@ func DecodeStream(r Getter, x *Stream, numFilters int) (io.ReadCloser, error) {
 		v = GetVersion(r)
 	}
 
-	out := io.NopCloser(x.R)
+	out := io.NopCloser(x.NewReader())
 
 	// apply decryption before other filters
 	if x.crypt != nil {

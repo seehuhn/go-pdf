@@ -888,19 +888,48 @@ func (d Dict) SortedKeys() []Name {
 
 // TODO(voss): handle the F field for streams (data stored in an external file).
 
-// Stream represent a stream object in a PDF file.
+// Stream represents a stream object in a PDF file.
 // Use the [DecodeStream] function to access the contents of the stream.
 //
-// The R field contains the raw stream data from the file. For encrypted PDFs,
-// this data is still encrypted - decryption happens on-the-fly when the stream
-// is decoded via [DecodeStream].
+// For encrypted PDFs, the raw data is still encrypted — decryption happens
+// on-the-fly when the stream is decoded via [DecodeStream].
+//
+// Use [NewStream] to construct streams from in-memory data.
+// Use [Stream.NewReader] to obtain an independent reader over the raw data.
 type Stream struct {
 	Dict
-	R io.Reader
+
+	data   io.ReaderAt // concurrent-safe data source
+	start  int64
+	length int64
 
 	// crypt is the decryption filter for this stream, or nil if the stream
 	// is not encrypted. Decryption is applied lazily in DecodeStream.
 	crypt *filterCrypt
+}
+
+// NewStream creates a Stream from in-memory data.
+func NewStream(dict Dict, data []byte) *Stream {
+	return &Stream{
+		Dict:   dict,
+		data:   bytes.NewReader(data),
+		length: int64(len(data)),
+	}
+}
+
+// NewReader returns a new, independent reader over the raw stream data.
+// Each call returns a reader with its own cursor, starting at position 0.
+// Concurrent calls are safe.
+func (s *Stream) NewReader() io.ReadSeeker {
+	if s.data == nil {
+		return &streamReader{}
+	}
+	return &streamReader{
+		r:     s.data,
+		start: s.start,
+		pos:   s.start,
+		end:   s.start + s.length,
+	}
 }
 
 func (x *Stream) isNative() {}

@@ -666,12 +666,6 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 	}
 	start := s.currentPos()
 	l := int64(length)
-	var streamData io.Reader = &streamReader{
-		r:     origReader,
-		start: start,
-		pos:   start,
-		end:   start + l,
-	}
 	err = s.Discard(l)
 	if err != nil {
 		return nil, err
@@ -693,9 +687,11 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 	}
 
 	return &Stream{
-		Dict:  dict,
-		R:     streamData,
-		crypt: crypt,
+		Dict:   dict,
+		data:   origReader,
+		start:  start,
+		length: l,
+		crypt:  crypt,
 	}, nil
 }
 

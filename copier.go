@@ -16,6 +16,11 @@
 
 package pdf
 
+import (
+	"bytes"
+	"io"
+)
+
 // A Copier is used to copy objects from one PDF file to another. The Copier
 // keeps track of the objects that have already been copied and ensures that
 // each object is copied only once.
@@ -53,8 +58,23 @@ func (c *Copier) Copy(obj Native) (Native, error) {
 			return nil, err
 		}
 		res := &Stream{
-			Dict: dict,
-			R:    x.R,
+			Dict:   dict,
+			data:   x.data,
+			start:  x.start,
+			length: x.length,
+		}
+		if x.crypt != nil {
+			// strip source encryption; the writer re-encrypts for the
+			// destination
+			raw, err := stripStreamEncryption(x)
+			if err != nil {
+				return nil, err
+			}
+			res.data = bytes.NewReader(raw)
+			res.start = 0
+			res.length = int64(len(raw))
+			// remove stale Length so the writer recomputes it
+			delete(res.Dict, "Length")
 		}
 		return res, nil
 	case Reference:
@@ -126,6 +146,18 @@ func (c *Copier) CopyReference(obj Reference) (Reference, error) {
 // Redirect replaces an indirect object in the old file with one in the new file.
 func (c *Copier) Redirect(origRef, newRef Reference) {
 	c.trans[origRef] = newRef
+}
+
+// stripStreamEncryption decrypts the raw stream data, removing the source
+// file's encryption layer while preserving content filters (e.g. FlateDecode).
+func stripStreamEncryption(x *Stream) ([]byte, error) {
+	r := io.NopCloser(x.NewReader())
+	dec, err := x.crypt.Decode(0, r)
+	if err != nil {
+		return nil, err
+	}
+	defer dec.Close()
+	return io.ReadAll(dec)
 }
 
 // CopierCopyStruct copies a struct from the source file to the target file.

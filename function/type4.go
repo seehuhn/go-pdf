@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 
 	"seehuhn.de/go/pdf"
 )
@@ -29,7 +30,7 @@ import (
 // Type4 represents a Type 4 PostScript calculator function that uses a subset
 // of PostScript language to define arbitrary calculations.
 //
-// A Type4 function must not be used concurrently.
+// Apply is safe for concurrent use.
 type Type4 struct {
 	// Domain defines the valid input ranges as [min0, max0, min1, max1, ...].
 	// The length must be 2*m, where m is the number of input variables.
@@ -42,9 +43,9 @@ type Type4 struct {
 	// Program contains the PostScript code (without enclosing braces).
 	Program string
 
-	compiled   []instruction
-	compileErr error
-	stack      []value
+	compileOnce sync.Once
+	compiled    []instruction // immutable after compileOnce
+	compileErr  error         // immutable after compileOnce
 }
 
 // FunctionType returns 4 for Type 4 functions.
@@ -216,10 +217,11 @@ func (f *Type4) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 // Reset clears the compiled bytecode cache.
 // This must be called if Program is modified after the first Apply call.
+// Reset must not be called concurrently with Apply.
 func (f *Type4) Reset() {
+	f.compileOnce = sync.Once{}
 	f.compiled = nil
 	f.compileErr = nil
-	f.stack = nil
 }
 
 // Apply applies the function to the given input values
@@ -234,35 +236,36 @@ func (f *Type4) Apply(out []float64, inputs ...float64) {
 	}
 
 	// compile on first use
-	if f.compiled == nil && f.compileErr == nil {
+	f.compileOnce.Do(func() {
 		f.compiled, f.compileErr = compile(f.Program)
-	}
+	})
 
 	clear(out)
 
 	if f.compileErr == nil {
-		// reset stack and push clipped inputs
-		f.stack = f.stack[:0]
+		// stack allocated on the goroutine stack
+		var buf [32]value
+		stack := buf[:0]
 		for i := range m {
 			min := f.Domain[2*i]
 			max := f.Domain[2*i+1]
-			f.stack = append(f.stack, realVal(clip(inputs[i], min, max)))
+			stack = append(stack, realVal(clip(inputs[i], min, max)))
 		}
 
 		var err error
-		f.stack, err = execute(f.compiled, f.stack)
+		stack, err = execute(f.compiled, stack)
 		if err == nil {
 			// extract outputs from stack (last n values)
 			start := 0
-			if len(f.stack) > n {
-				start = len(f.stack) - n
+			if len(stack) > n {
+				start = len(stack) - n
 			}
 			for i := range n {
 				si := start + i
-				if si >= len(f.stack) {
+				if si >= len(stack) {
 					break
 				}
-				v := f.stack[si]
+				v := stack[si]
 				switch v.tag {
 				case tagInt:
 					out[i] = float64(v.ival)

@@ -138,13 +138,10 @@ func TestStreamNavigation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stream := &pdf.Stream{
-				Dict: pdf.Dict{
-					"Type":   pdf.Name("XObject"),
-					"Length": pdf.Integer(100),
-				},
-				R: strings.NewReader("test stream content"),
-			}
+			stream := pdf.NewStream(pdf.Dict{
+				"Type":   pdf.Name("XObject"),
+				"Length": pdf.Integer(100),
+			}, []byte("test stream content"))
 
 			ctx := &objectCtx{obj: stream, r: nil} // Note: r is nil for this simple test
 			result, err := navigateContext(ctx, tt.key)
@@ -185,7 +182,7 @@ func TestPageContents(t *testing.T) {
 			pageDict: pdf.Dict{
 				"Type":     pdf.Name("Page"),
 				"Parent":   pdf.NewReference(1, 0),
-				"Contents": &pdf.Stream{R: strings.NewReader("BT /F1 12 Tf (Hello) Tj ET")},
+				"Contents": pdf.NewStream(nil, []byte("BT /F1 12 Tf (Hello) Tj ET")),
 			},
 			expectError: false,
 		},
@@ -194,7 +191,7 @@ func TestPageContents(t *testing.T) {
 			pageDict: pdf.Dict{
 				"Type":     pdf.Name("Page"),
 				"Parent":   pdf.NewReference(1, 0),
-				"Contents": pdf.Array{&pdf.Stream{R: strings.NewReader("BT")}, &pdf.Stream{R: strings.NewReader("ET")}},
+				"Contents": pdf.Array{pdf.NewStream(nil, []byte("BT")), pdf.NewStream(nil, []byte("ET"))},
 			},
 			expectError: false,
 		},
@@ -202,7 +199,7 @@ func TestPageContents(t *testing.T) {
 			name: "invalid - missing Type",
 			pageDict: pdf.Dict{
 				"Parent":   pdf.NewReference(1, 0),
-				"Contents": &pdf.Stream{R: strings.NewReader("test")},
+				"Contents": pdf.NewStream(nil, []byte("test")),
 			},
 			expectError: true,
 		},
@@ -211,7 +208,7 @@ func TestPageContents(t *testing.T) {
 			pageDict: pdf.Dict{
 				"Type":     pdf.Name("Catalog"),
 				"Parent":   pdf.NewReference(1, 0),
-				"Contents": &pdf.Stream{R: strings.NewReader("test")},
+				"Contents": pdf.NewStream(nil, []byte("test")),
 			},
 			expectError: true,
 		},
@@ -219,7 +216,7 @@ func TestPageContents(t *testing.T) {
 			name: "invalid - missing Parent",
 			pageDict: pdf.Dict{
 				"Type":     pdf.Name("Page"),
-				"Contents": &pdf.Stream{R: strings.NewReader("test")},
+				"Contents": pdf.NewStream(nil, []byte("test")),
 			},
 			expectError: true,
 		},

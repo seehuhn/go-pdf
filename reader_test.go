@@ -223,7 +223,7 @@ func TestIndirectStreamLength(t *testing.T) {
 	if sObj.Dict["Length"] != sLength {
 		t.Errorf("wrong stream length: got %v, want %v", sObj.Dict["Length"], sLength)
 	}
-	sData, err := io.ReadAll(sObj.R)
+	sData, err := io.ReadAll(sObj.NewReader())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +283,7 @@ func TestStreamLengthInStream(t *testing.T) {
 	if sObj.Dict["Length"] != sLength {
 		t.Errorf("wrong stream length: got %v, want %v", sObj.Dict["Length"], sLength)
 	}
-	sData, err := io.ReadAll(sObj.R)
+	sData, err := io.ReadAll(sObj.NewReader())
 	if err != nil {
 		t.Fatal(err)
 	}

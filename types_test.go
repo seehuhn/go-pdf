@@ -251,13 +251,9 @@ func TestDict_SortedKeys(t *testing.T) {
 
 func TestStreamRead(t *testing.T) {
 	dataIn := "\nbinary stream data\000123\n   "
-	rIn := strings.NewReader(dataIn)
-	stream := &Stream{
-		Dict: map[Name]Object{
-			"Length": Integer(len(dataIn)),
-		},
-		R: rIn,
-	}
+	stream := NewStream(Dict{
+		"Length": Integer(len(dataIn)),
+	}, []byte(dataIn))
 	dataOut, err := ReadAll(nil, stream)
 	if err != nil {
 		t.Fatal(err)

@@ -418,7 +418,7 @@ func (w *Writer) Put(ref Reference, obj Object) error {
 		if err != nil {
 			return err
 		}
-		_, err = io.Copy(w, stm.R)
+		_, err = io.Copy(w, stm.NewReader())
 		if err != nil {
 			return err
 		}

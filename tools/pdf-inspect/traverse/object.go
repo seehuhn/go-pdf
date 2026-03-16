@@ -170,7 +170,7 @@ func (c *objectCtx) Next() []Step {
 			Match: regexp.MustCompile(`^@encoded$`),
 			Desc:  "`@encoded`",
 			Next: func(key string) (Context, error) {
-				return &rawStreamCtx{r: x.R}, nil
+				return &rawStreamCtx{r: x.NewReader()}, nil
 			},
 		})
 		steps = append(steps, Step{

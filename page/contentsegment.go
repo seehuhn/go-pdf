@@ -110,7 +110,9 @@ func (seg *contentSegment) All() iter.Seq2[content.OpName, []pdf.Object] {
 		var initArgs []pdf.Object
 		if seg.prev != nil {
 			if err := seg.prev.ensureDecoded(); err != nil {
+				seg.mu.Lock()
 				seg.err = err
+				seg.mu.Unlock()
 				return
 			}
 			seg.prev.mu.Lock()
@@ -120,7 +122,9 @@ func (seg *contentSegment) All() iter.Seq2[content.OpName, []pdf.Object] {
 
 		r, err := seg.rawReader()
 		if err != nil {
+			seg.mu.Lock()
 			seg.err = err
+			seg.mu.Unlock()
 			return
 		}
 		defer r.Close()
@@ -130,16 +134,14 @@ func (seg *contentSegment) All() iter.Seq2[content.OpName, []pdf.Object] {
 			ps.SetInitialArgs(initArgs)
 		}
 		exhausted := ps.ScanReader(r, yield)
+		seg.mu.Lock()
 		if psErr := ps.Err(); psErr != nil {
 			seg.err = psErr
-		} else if exhausted {
-			seg.mu.Lock()
-			if !seg.decoded {
-				seg.decoded = true
-				seg.trailingArgs = ps.TrailingArgs()
-			}
-			seg.mu.Unlock()
+		} else if exhausted && !seg.decoded {
+			seg.decoded = true
+			seg.trailingArgs = ps.TrailingArgs()
 		}
+		seg.mu.Unlock()
 	}
 }
 
@@ -150,5 +152,7 @@ func (seg *contentSegment) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 
 // Err returns any IO error encountered during iteration.
 func (seg *contentSegment) Err() error {
+	seg.mu.Lock()
+	defer seg.mu.Unlock()
 	return seg.err
 }

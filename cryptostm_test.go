@@ -23,9 +23,8 @@ import (
 )
 
 // TestEncryptedStreamMultipleReads verifies that encrypted streams can be
-// read multiple times. This tests the new architecture where Stream.R contains
-// the raw (encrypted) seekable data, and decryption happens lazily in
-// DecodeStream.
+// read multiple times. Each call to NewReader() returns a fresh reader over
+// the raw (encrypted) data, and decryption happens lazily in DecodeStream.
 func TestEncryptedStreamMultipleReads(t *testing.T) {
 	testCases := []struct {
 		name    string
@@ -314,6 +313,137 @@ func TestUnencryptedStreamMultipleReads(t *testing.T) {
 		if !bytes.Equal(data, testData) {
 			t.Errorf("read %d: got %q, want %q", i+1, data, testData)
 		}
+	}
+}
+
+// TestCopierEncryptedStream verifies that copying a stream from an encrypted
+// PDF produces correct data in the destination, regardless of whether the
+// destination is encrypted.
+func TestCopierEncryptedStream(t *testing.T) {
+	testData := []byte("stream data for copier encryption test")
+
+	for _, tc := range []struct {
+		name    string
+		dstOpt  *WriterOptions
+		readOpt *ReaderOptions
+	}{
+		{
+			name:    "encrypted to unencrypted",
+			dstOpt:  nil,
+			readOpt: nil,
+		},
+		{
+			name: "encrypted to encrypted",
+			dstOpt: &WriterOptions{
+				UserPassword:  "dst",
+				OwnerPassword: "dst",
+			},
+			readOpt: &ReaderOptions{Password: "dst"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// write an encrypted source PDF with a stream
+			srcBuf := &bytes.Buffer{}
+			srcW, err := NewWriter(srcBuf, V1_6, &WriterOptions{
+				UserPassword:  "src",
+				OwnerPassword: "src",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			streamRef := srcW.Alloc()
+			s, err := srcW.OpenStream(streamRef, nil, FilterFlate{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = s.Write(testData)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = s.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = addPage(srcW, Name("Contents"), streamRef)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = srcW.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// open the source PDF for reading
+			srcR, err := NewReader(bytes.NewReader(srcBuf.Bytes()), int64(srcBuf.Len()),
+				&ReaderOptions{Password: "src"})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// navigate to the stream
+			pagesRef := srcR.GetMeta().Catalog.Pages
+			pages, err := GetDict(srcR, pagesRef)
+			if err != nil {
+				t.Fatal(err)
+			}
+			kids, err := GetArray(srcR, pages["Kids"])
+			if err != nil {
+				t.Fatal(err)
+			}
+			page, err := GetDict(srcR, kids[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// copy the stream to a new PDF
+			dstBuf := &bytes.Buffer{}
+			dstW, err := NewWriter(dstBuf, V1_6, tc.dstOpt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			copier := NewCopier(dstW, srcR)
+			copiedRef, err := copier.Copy(page["Contents"].(Reference).AsPDF(0))
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = addPage(dstW, Name("Contents"), copiedRef)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = dstW.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// read back the destination PDF and verify stream content
+			dstR, err := NewReader(bytes.NewReader(dstBuf.Bytes()), int64(dstBuf.Len()), tc.readOpt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			dPages, err := GetDict(dstR, dstR.GetMeta().Catalog.Pages)
+			if err != nil {
+				t.Fatal(err)
+			}
+			dKids, err := GetArray(dstR, dPages["Kids"])
+			if err != nil {
+				t.Fatal(err)
+			}
+			dPage, err := GetDict(dstR, dKids[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			stream, err := GetStream(dstR, dPage["Contents"])
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := ReadAll(dstR, stream)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(got, testData) {
+				t.Errorf("copied stream data mismatch: got %q, want %q", got, testData)
+			}
+		})
 	}
 }
 
