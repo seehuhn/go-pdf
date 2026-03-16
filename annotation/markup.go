@@ -158,7 +158,7 @@ func (m *Markup) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 }
 
 // decodeMarkup extracts fields common to all markup annotations from a PDF dictionary.
-func decodeMarkup(x *pdf.Extractor, dict pdf.Dict, markup *Markup) error {
+func decodeMarkup(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, markup *Markup) error {
 	// T (optional)
 	if t, err := pdf.Optional(pdf.GetTextString(x.R, dict["T"])); err != nil {
 		return err
@@ -196,14 +196,14 @@ func decodeMarkup(x *pdf.Extractor, dict pdf.Dict, markup *Markup) error {
 	}
 
 	// RT (optional)
-	if rt, err := pdf.Optional(x.GetName(dict["RT"])); err != nil {
+	if rt, err := pdf.Optional(x.GetName(path, dict["RT"])); err != nil {
 		return err
 	} else {
 		markup.RT = rt
 	}
 
 	// IT (optional)
-	if it, err := pdf.Optional(x.GetName(dict["IT"])); err != nil {
+	if it, err := pdf.Optional(x.GetName(path, dict["IT"])); err != nil {
 		return err
 	} else {
 		markup.Intent = it

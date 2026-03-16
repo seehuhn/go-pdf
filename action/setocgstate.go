@@ -73,8 +73,8 @@ func (a *SetOCGState) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeSetOCGState(x *pdf.Extractor, dict pdf.Dict) (*SetOCGState, error) {
-	state, err := x.GetArray(dict["State"])
+func decodeSetOCGState(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*SetOCGState, error) {
+	state, err := x.GetArray(path, dict["State"])
 	if err != nil {
 		return nil, err
 	}
@@ -84,11 +84,11 @@ func decodeSetOCGState(x *pdf.Extractor, dict pdf.Dict) (*SetOCGState, error) {
 
 	preserveRB := true // default value
 	if dict["PreserveRB"] != nil {
-		rb, _ := pdf.Optional(x.GetBoolean(dict["PreserveRB"]))
+		rb, _ := pdf.Optional(x.GetBoolean(path, dict["PreserveRB"]))
 		preserveRB = bool(rb)
 	}
 
-	next, err := DecodeActionList(x, dict["Next"], false)
+	next, err := DecodeActionList(x, path, dict["Next"], false)
 	if err != nil {
 		return nil, err
 	}

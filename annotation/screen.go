@@ -50,12 +50,12 @@ func (s *Screen) AnnotationType() pdf.Name {
 	return "Screen"
 }
 
-func decodeScreen(x *pdf.Extractor, dict pdf.Dict) (*Screen, error) {
+func decodeScreen(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Screen, error) {
 	r := x.R
 	screen := &Screen{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, &screen.Common, dict); err != nil {
+	if err := decodeCommon(x, path, &screen.Common, dict); err != nil {
 		return nil, err
 	}
 

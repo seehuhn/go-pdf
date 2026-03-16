@@ -226,7 +226,7 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 	}
 
 	x := NewExtractor(r)
-	r.meta.Info, err = ExtractInfo(x, trailer["Info"])
+	r.meta.Info, err = ExtractInfo(x, nil, trailer["Info"])
 	if shouldExit(err) {
 		return nil, err
 	}

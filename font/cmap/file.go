@@ -88,26 +88,17 @@ func (r Range) String() string {
 
 // Extract extracts a CMap from a PDF object.
 // The argument must be the name of a predefined CMap or a stream containing a CMap.
-func Extract(x *pdf.Extractor, obj pdf.Object, _ bool) (*File, error) {
-	cycle := pdf.NewCycleChecker()
-	return safeExtractCMap(x, cycle, obj)
-}
-
-// safeExtractCMap extracts a CMap from a PDF object with cycle detection.
-// The obj parameter can be a pdf.Name (for predefined CMaps) or a stream reference.
-func safeExtractCMap(x *pdf.Extractor, cycle *pdf.CycleChecker, obj pdf.Object) (*File, error) {
-	if err := cycle.Check(obj); err != nil {
-		return nil, err
-	}
-
-	obj, err := pdf.Resolve(x.R, obj)
+// Cycle detection for recursive parent CMap chains is handled by routing
+// parent extraction through [pdf.ExtractorGet].
+func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*File, error) {
+	resolved, err := pdf.Resolve(x.R, obj)
 	if err != nil {
 		return nil, err
 	}
 
 	var body io.Reader
 	var dict pdf.Dict
-	switch obj := obj.(type) {
+	switch obj := resolved.(type) {
 	case pdf.Name:
 		return Predefined(string(obj))
 
@@ -135,31 +126,26 @@ func safeExtractCMap(x *pdf.Extractor, cycle *pdf.CycleChecker, obj pdf.Object) 
 		return nil, err
 	}
 
-	if name, _ := x.GetName(dict["CMapName"]); name != "" {
+	if name, _ := x.GetName(path, dict["CMapName"]); name != "" {
 		if clean := sanitizeName(string(name)); clean != "" {
 			res.Name = clean
 		}
 	}
-	if ros, _ := font.ExtractCIDSystemInfo(x, dict["CIDSystemInfo"], false); ros != nil {
+	if ros, _ := font.ExtractCIDSystemInfo(x, path, dict["CIDSystemInfo"], false); ros != nil {
 		res.ROS = ros
 	}
-	if wMode, _ := x.GetInteger(dict["WMode"]); wMode == 1 {
+	if wMode, _ := x.GetInteger(path, dict["WMode"]); wMode == 1 {
 		res.WMode = font.Vertical
 	}
 
-	// Handle parent CMap
+	// parent CMap
 	if useCMap := dict["UseCMap"]; useCMap != nil {
-		// Stream dictionary provides the parent CMap location
-		res.Parent, err = safeExtractCMap(x, cycle, useCMap)
+		res.Parent, err = pdf.ExtractorGet(x, path, useCMap, Extract)
 		if pdf.IsReadError(err) {
 			return nil, err
 		}
 	} else if parentName != "" {
-		// No stream dictionary, try predefined CMap
-		res.Parent, err = safeExtractCMap(x, cycle, parentName)
-		if pdf.IsReadError(err) {
-			return nil, err
-		}
+		res.Parent, _ = Predefined(string(parentName))
 	}
 
 	return res, nil

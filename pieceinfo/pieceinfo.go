@@ -88,7 +88,7 @@ func (p *PieceInfo) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 // Extract reads a page-piece dictionary from a PDF object.
 // Returns nil if obj is nil.
-func Extract(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*PieceInfo, error) {
+func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*PieceInfo, error) {
 
 	r := x.R
 	dict, err := pdf.GetDict(r, obj)

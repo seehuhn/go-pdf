@@ -39,8 +39,8 @@ var (
 // ExtractVisibilityExpression reads a visibility expression from a PDF object.
 // The object can be either an array (for And/Or/Not expressions) or a dictionary
 // (for a single optional content group reference).
-func ExtractVisibilityExpression(x *pdf.Extractor, obj pdf.Object, _ bool) (VisibilityExpression, error) {
-	obj, err := x.Resolve(obj)
+func ExtractVisibilityExpression(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (VisibilityExpression, error) {
+	obj, err := x.Resolve(path, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -53,14 +53,14 @@ func ExtractVisibilityExpression(x *pdf.Extractor, obj pdf.Object, _ bool) (Visi
 
 		var args []VisibilityExpression
 		for _, elem := range v[1:] {
-			arg, err := pdf.ExtractorGet(x, elem, ExtractVisibilityExpression)
+			arg, err := pdf.ExtractorGet(x, path, elem, ExtractVisibilityExpression)
 			if err != nil {
 				return nil, err
 			}
 			args = append(args, arg)
 		}
 
-		op, err := pdf.Optional(x.GetName(v[0]))
+		op, err := pdf.Optional(x.GetName(path, v[0]))
 		if err != nil {
 			return nil, err
 		}
@@ -84,7 +84,7 @@ func ExtractVisibilityExpression(x *pdf.Extractor, obj pdf.Object, _ bool) (Visi
 			return nil, pdf.Errorf("invalid visibility expression: unknown operator %q", op)
 		}
 	case pdf.Dict:
-		g, err := pdf.ExtractorGet(x, v, ExtractGroup)
+		g, err := pdf.ExtractorGet(x, path, v, ExtractGroup)
 		if err != nil {
 			return nil, err
 		}

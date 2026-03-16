@@ -58,12 +58,12 @@ type Info struct {
 // ExtractInfo reads an Info dictionary from a PDF file.
 //
 // If obj is nil, the function returns nil.
-func ExtractInfo(x *Extractor, obj Object) (*Info, error) {
+func ExtractInfo(x *Extractor, path *CycleCheck, obj Object) (*Info, error) {
 	if obj == nil {
 		return nil, nil
 	}
 
-	dict, err := x.GetDict(obj)
+	dict, err := x.GetDict(path, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func ExtractInfo(x *Extractor, obj Object) (*Info, error) {
 
 	// trapped field
 	if trappedObj := dict["Trapped"]; trappedObj != nil {
-		if name, err := x.GetName(trappedObj); err == nil {
+		if name, err := x.GetName(path, trappedObj); err == nil {
 			switch name {
 			case "True":
 				info.Trapped.Set(true)

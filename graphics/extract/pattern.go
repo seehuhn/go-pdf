@@ -30,10 +30,10 @@ import (
 )
 
 // Pattern extracts a pattern from a PDF file and returns a color.Pattern.
-func Pattern(x *pdf.Extractor, obj pdf.Object, isDirect bool) (color.Pattern, error) {
+func Pattern(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (color.Pattern, error) {
 
 	// resolve references
-	resolved, err := x.Resolve(obj)
+	resolved, err := x.Resolve(path, obj)
 	if err != nil {
 		return nil, err
 	} else if resolved == nil {
@@ -56,7 +56,7 @@ func Pattern(x *pdf.Extractor, obj pdf.Object, isDirect bool) (color.Pattern, er
 	}
 
 	// read PatternType (required)
-	patternType, err := x.GetInteger(dict["PatternType"])
+	patternType, err := x.GetInteger(path, dict["PatternType"])
 	if err != nil {
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("missing or invalid PatternType"),
@@ -72,9 +72,9 @@ func Pattern(x *pdf.Extractor, obj pdf.Object, isDirect bool) (color.Pattern, er
 				Err: fmt.Errorf("type 1 pattern must be a stream"),
 			}
 		}
-		return extractType1(x, stream)
+		return extractType1(x, path, stream)
 	case 2:
-		return extractType2(x, dict, isDirect)
+		return extractType2(x, path, dict, isDirect)
 	default:
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("unsupported pattern type %d", patternType),
@@ -83,7 +83,7 @@ func Pattern(x *pdf.Extractor, obj pdf.Object, isDirect bool) (color.Pattern, er
 }
 
 // extractType2 extracts a Type2 (shading) pattern from a PDF dictionary.
-func extractType2(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (*pattern.Type2, error) {
+func extractType2(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, isDirect bool) (*pattern.Type2, error) {
 	// extract required Shading
 	shadingObj := dict["Shading"]
 	if shadingObj == nil {
@@ -92,7 +92,7 @@ func extractType2(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (*pattern.Type
 		}
 	}
 
-	sh, err := pdf.ExtractorGet(x, shadingObj, shading.Extract)
+	sh, err := pdf.ExtractorGet(x, path, shadingObj, shading.Extract)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func extractType2(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (*pattern.Type
 	}
 
 	// extract optional ExtGState
-	if extGState, err := pdf.Optional(ExtGState(x, dict["ExtGState"], false)); err != nil {
+	if extGState, err := pdf.Optional(ExtGState(x, path, dict["ExtGState"], false)); err != nil {
 		return nil, err
 	} else {
 		pat.ExtGState = extGState
@@ -119,11 +119,11 @@ func extractType2(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (*pattern.Type
 }
 
 // extractType1 extracts a Type1 (tiling) pattern from a PDF stream.
-func extractType1(x *pdf.Extractor, stream *pdf.Stream) (*pattern.Type1, error) {
+func extractType1(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*pattern.Type1, error) {
 	dict := stream.Dict
 
 	// extract required PaintType
-	paintType, err := x.GetInteger(dict["PaintType"])
+	paintType, err := x.GetInteger(path, dict["PaintType"])
 	if err != nil {
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("missing or invalid PaintType"),
@@ -134,7 +134,7 @@ func extractType1(x *pdf.Extractor, stream *pdf.Stream) (*pattern.Type1, error) 
 	}
 
 	// extract required TilingType
-	tilingType, err := x.GetInteger(dict["TilingType"])
+	tilingType, err := x.GetInteger(path, dict["TilingType"])
 	if err != nil {
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("missing or invalid TilingType"),
@@ -153,7 +153,7 @@ func extractType1(x *pdf.Extractor, stream *pdf.Stream) (*pattern.Type1, error) 
 	}
 
 	// extract required XStep
-	xStep, err := x.GetNumber(dict["XStep"])
+	xStep, err := x.GetNumber(path, dict["XStep"])
 	if err != nil {
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("missing or invalid XStep"),
@@ -164,7 +164,7 @@ func extractType1(x *pdf.Extractor, stream *pdf.Stream) (*pattern.Type1, error) 
 	}
 
 	// extract required YStep
-	yStep, err := x.GetNumber(dict["YStep"])
+	yStep, err := x.GetNumber(path, dict["YStep"])
 	if err != nil {
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("missing or invalid YStep"),
@@ -191,7 +191,7 @@ func extractType1(x *pdf.Extractor, stream *pdf.Stream) (*pattern.Type1, error) 
 	// extract resources (required)
 	pat.Res = &content.Resources{}
 	if resObj := dict["Resources"]; resObj != nil {
-		res, err := pdf.ExtractorGet(x, resObj, Resources)
+		res, err := pdf.ExtractorGet(x, path, resObj, Resources)
 		if err != nil {
 			return nil, err
 		}

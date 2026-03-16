@@ -31,9 +31,9 @@ type proxyList struct {
 // ExtractList extracts a property list from a PDF object.
 // The object must be a dictionary or a reference to a dictionary.
 // Returns an error if the object cannot be converted to a dictionary.
-func ExtractList(x *pdf.Extractor, obj pdf.Object, isDirect bool) (List, error) {
+func ExtractList(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (List, error) {
 	isIndirect := !isDirect
-	dict, err := x.GetDict(obj)
+	dict, err := x.GetDict(path, obj)
 	if err != nil {
 		return nil, err
 	}

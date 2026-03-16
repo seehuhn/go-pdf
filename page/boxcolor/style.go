@@ -62,9 +62,9 @@ type Style struct {
 }
 
 // ExtractStyle extracts a box style dictionary from a PDF object.
-func ExtractStyle(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Style, error) {
+func ExtractStyle(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Style, error) {
 
-	dict, err := x.GetDict(obj)
+	dict, err := x.GetDict(path, obj)
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -75,12 +75,12 @@ func ExtractStyle(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Style, erro
 	style.SingleUse = isDirect
 
 	// color (clamp to valid range [0.0, 1.0])
-	if cArray, err := pdf.Optional(x.GetArray(dict["C"])); err != nil {
+	if cArray, err := pdf.Optional(x.GetArray(path, dict["C"])); err != nil {
 		return nil, err
 	} else if len(cArray) >= 3 {
-		r, _ := x.GetNumber(cArray[0])
-		g, _ := x.GetNumber(cArray[1])
-		b, _ := x.GetNumber(cArray[2])
+		r, _ := x.GetNumber(path, cArray[0])
+		g, _ := x.GetNumber(path, cArray[1])
+		b, _ := x.GetNumber(path, cArray[2])
 		style.Color = color.DeviceRGB{
 			clamp(float64(r), 0, 1),
 			clamp(float64(g), 0, 1),
@@ -89,7 +89,7 @@ func ExtractStyle(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Style, erro
 	}
 
 	// line width
-	if w, err := pdf.Optional(x.GetNumber(dict["W"])); err != nil {
+	if w, err := pdf.Optional(x.GetNumber(path, dict["W"])); err != nil {
 		return nil, err
 	} else if w != 0 {
 		style.LineWidth = float64(w)
@@ -98,7 +98,7 @@ func ExtractStyle(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Style, erro
 	}
 
 	// line style
-	if s, err := pdf.Optional(x.GetName(dict["S"])); err != nil {
+	if s, err := pdf.Optional(x.GetName(path, dict["S"])); err != nil {
 		return nil, err
 	} else if s != "" {
 		style.Style = LineStyle(s)
@@ -107,13 +107,13 @@ func ExtractStyle(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Style, erro
 	}
 
 	// dash pattern (only for non-solid styles)
-	if dArray, err := pdf.Optional(x.GetArray(dict["D"])); err != nil {
+	if dArray, err := pdf.Optional(x.GetArray(path, dict["D"])); err != nil {
 		return nil, err
 	} else if style.Style != StyleSolid {
 		if len(dArray) > 0 {
 			style.DashPattern = make([]float64, len(dArray))
 			for i, v := range dArray {
-				n, _ := x.GetNumber(v)
+				n, _ := x.GetNumber(path, v)
 				style.DashPattern[i] = max(0, float64(n))
 			}
 		} else {

@@ -118,9 +118,9 @@ func (a *TransparencyAttributes) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) 
 
 // ExtractTransparencyAttributes reads a transparency group attributes
 // dictionary from a PDF file.
-func ExtractTransparencyAttributes(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*TransparencyAttributes, error) {
+func ExtractTransparencyAttributes(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*TransparencyAttributes, error) {
 
-	dict, err := x.GetDictTyped(obj, "Group")
+	dict, err := x.GetDictTyped(path, obj, "Group")
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func ExtractTransparencyAttributes(x *pdf.Extractor, obj pdf.Object, isDirect bo
 	}
 
 	// verify subtype
-	s, err := x.GetName(dict["S"])
+	s, err := x.GetName(path, dict["S"])
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func ExtractTransparencyAttributes(x *pdf.Extractor, obj pdf.Object, isDirect bo
 
 	// extract color space (optional)
 	if csObj, ok := dict["CS"]; ok {
-		cs, err := color.ExtractSpace(x, csObj, false)
+		cs, err := color.ExtractSpace(x, path, csObj, false)
 		if err != nil {
 			return nil, pdf.Wrap(err, "group color space")
 		}
@@ -150,7 +150,7 @@ func ExtractTransparencyAttributes(x *pdf.Extractor, obj pdf.Object, isDirect bo
 
 	// extract isolated flag (default false)
 	if iObj, ok := dict["I"]; ok {
-		isolated, err := x.GetBoolean(iObj)
+		isolated, err := x.GetBoolean(path, iObj)
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +159,7 @@ func ExtractTransparencyAttributes(x *pdf.Extractor, obj pdf.Object, isDirect bo
 
 	// extract knockout flag (default false)
 	if kObj, ok := dict["K"]; ok {
-		knockout, err := x.GetBoolean(kObj)
+		knockout, err := x.GetBoolean(path, kObj)
 		if err != nil {
 			return nil, err
 		}

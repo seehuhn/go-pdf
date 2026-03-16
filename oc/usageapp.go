@@ -102,7 +102,7 @@ type UsageApplication struct {
 var _ pdf.Embedder = (*UsageApplication)(nil)
 
 // ExtractUsageApplication extracts a usage application dictionary from a PDF object.
-func ExtractUsageApplication(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*UsageApplication, error) {
+func ExtractUsageApplication(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*UsageApplication, error) {
 
 	r := x.R
 	dict, err := pdf.GetDict(r, obj)
@@ -133,7 +133,7 @@ func ExtractUsageApplication(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*
 	} else if len(arr) > 0 {
 		var ocgs []*Group
 		for _, item := range arr {
-			if group, err := pdf.ExtractorGetOptional(x, item, ExtractGroup); err != nil {
+			if group, err := pdf.ExtractorGetOptional(x, path, item, ExtractGroup); err != nil {
 				return nil, err
 			} else if group != nil {
 				ocgs = append(ocgs, group)

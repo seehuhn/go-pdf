@@ -31,7 +31,7 @@ type Stream struct {
 	Data *xmp.Packet
 }
 
-func Extract(x *pdf.Extractor, ref pdf.Object, _ bool) (*Stream, error) {
+func Extract(x *pdf.Extractor, path *pdf.CycleCheck, ref pdf.Object, _ bool) (*Stream, error) {
 	if ref == nil {
 		return nil, nil
 	}

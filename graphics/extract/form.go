@@ -37,8 +37,8 @@ import (
 )
 
 // Form extracts a form XObject from a PDF file.
-func Form(x *pdf.Extractor, obj pdf.Object, _ bool) (*form.Form, error) {
-	stream, err := x.GetStream(obj)
+func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*form.Form, error) {
+	stream, err := x.GetStream(path, obj)
 	if err != nil {
 		return nil, err
 	} else if stream == nil {
@@ -48,7 +48,7 @@ func Form(x *pdf.Extractor, obj pdf.Object, _ bool) (*form.Form, error) {
 	}
 	dict := stream.Dict
 
-	subtypeName, _ := x.GetName(dict["Subtype"])
+	subtypeName, _ := x.GetName(path, dict["Subtype"])
 	if subtypeName != "Form" {
 		return nil, &pdf.MalformedFileError{
 			Err: errors.New("invalid Subtype for form XObject"),
@@ -73,21 +73,21 @@ func Form(x *pdf.Extractor, obj pdf.Object, _ bool) (*form.Form, error) {
 	}
 
 	// Group (optional)
-	if g, err := pdf.ExtractorGetOptional(x, dict["Group"], group.ExtractTransparencyAttributes); err != nil {
+	if g, err := pdf.ExtractorGetOptional(x, path, dict["Group"], group.ExtractTransparencyAttributes); err != nil {
 		return nil, err
 	} else {
 		f.Group = g
 	}
 
 	// Metadata (optional)
-	if meta, err := pdf.ExtractorGetOptional(x, dict["Metadata"], metadata.Extract); err != nil {
+	if meta, err := pdf.ExtractorGetOptional(x, path, dict["Metadata"], metadata.Extract); err != nil {
 		return nil, err
 	} else {
 		f.Metadata = meta
 	}
 
 	// PieceInfo (optional)
-	if piece, err := pdf.ExtractorGetOptional(x, dict["PieceInfo"], pieceinfo.Extract); err != nil {
+	if piece, err := pdf.ExtractorGetOptional(x, path, dict["PieceInfo"], pieceinfo.Extract); err != nil {
 		return nil, err
 	} else {
 		f.PieceInfo = piece
@@ -101,21 +101,21 @@ func Form(x *pdf.Extractor, obj pdf.Object, _ bool) (*form.Form, error) {
 	}
 
 	// OC (optional)
-	if ocObj, err := pdf.ExtractorGetOptional(x, dict["OC"], oc.ExtractConditional); err != nil {
+	if ocObj, err := pdf.ExtractorGetOptional(x, path, dict["OC"], oc.ExtractConditional); err != nil {
 		return nil, err
 	} else {
 		f.OptionalContent = ocObj
 	}
 
 	// Measure (optional)
-	if m, err := pdf.ExtractorGetOptional(x, dict["Measure"], measure.Extract); err != nil {
+	if m, err := pdf.ExtractorGetOptional(x, path, dict["Measure"], measure.Extract); err != nil {
 		return nil, err
 	} else {
 		f.Measure = m
 	}
 
 	// PtData (optional)
-	if ptData, err := pdf.ExtractorGetOptional(x, dict["PtData"], measure.ExtractPtData); err != nil {
+	if ptData, err := pdf.ExtractorGetOptional(x, path, dict["PtData"], measure.ExtractPtData); err != nil {
 		return nil, err
 	} else {
 		f.PtData = ptData
@@ -123,7 +123,7 @@ func Form(x *pdf.Extractor, obj pdf.Object, _ bool) (*form.Form, error) {
 
 	// extract StructParent
 	if keyObj := dict["StructParent"]; keyObj != nil {
-		if key, err := pdf.Optional(x.GetInteger(dict["StructParent"])); err != nil {
+		if key, err := pdf.Optional(x.GetInteger(path, dict["StructParent"])); err != nil {
 			return nil, err
 		} else if key >= 0 && uint64(key) <= math.MaxUint {
 			f.StructParent.Set(uint(key))
@@ -131,12 +131,12 @@ func Form(x *pdf.Extractor, obj pdf.Object, _ bool) (*form.Form, error) {
 	}
 
 	// extract AssociatedFiles (AF)
-	if afArray, err := pdf.Optional(x.GetArray(dict["AF"])); err != nil {
+	if afArray, err := pdf.Optional(x.GetArray(path, dict["AF"])); err != nil {
 		return nil, err
 	} else if afArray != nil {
 		f.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
 		for _, afObj := range afArray {
-			if spec, err := pdf.ExtractorGetOptional(x, afObj, file.ExtractSpecification); err != nil {
+			if spec, err := pdf.ExtractorGetOptional(x, path, afObj, file.ExtractSpecification); err != nil {
 				return nil, err
 			} else if spec != nil {
 				f.AssociatedFiles = append(f.AssociatedFiles, spec)
@@ -147,7 +147,7 @@ func Form(x *pdf.Extractor, obj pdf.Object, _ bool) (*form.Form, error) {
 	// extract resources
 	f.Res = &content.Resources{}
 	if resObj := dict["Resources"]; resObj != nil {
-		res, err := pdf.ExtractorGet(x, resObj, Resources)
+		res, err := pdf.ExtractorGet(x, path, resObj, Resources)
 		if err != nil {
 			return nil, err
 		}

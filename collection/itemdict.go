@@ -53,9 +53,9 @@ type ItemValue struct {
 }
 
 // ExtractItemDict extracts a collection item dictionary from a PDF object.
-func ExtractItemDict(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*ItemDict, error) {
+func ExtractItemDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*ItemDict, error) {
 
-	dict, err := x.GetDictTyped(obj, "CollectionItem")
+	dict, err := x.GetDictTyped(path, obj, "CollectionItem")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -73,7 +73,7 @@ func ExtractItemDict(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*ItemDict
 			continue
 		}
 
-		itemValue, err := pdf.Optional(extractItemValue(x, value))
+		itemValue, err := pdf.Optional(extractItemValue(x, path, value))
 		if err != nil {
 			return nil, err
 		} else if itemValue != nil {
@@ -85,8 +85,8 @@ func ExtractItemDict(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*ItemDict
 }
 
 // extractItemValue extracts a single item value from a PDF object.
-func extractItemValue(x *pdf.Extractor, obj pdf.Object) (*ItemValue, error) {
-	resolved, err := x.Resolve(obj)
+func extractItemValue(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*ItemValue, error) {
+	resolved, err := x.Resolve(path, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func extractItemValue(x *pdf.Extractor, obj pdf.Object) (*ItemValue, error) {
 		}
 
 		// Resolve the D entry
-		if resolved, err := x.Resolve(data); err != nil {
+		if resolved, err := x.Resolve(path, data); err != nil {
 			return nil, err
 		} else {
 			data = resolved

@@ -69,7 +69,7 @@ func TestMaskRoundTrip(t *testing.T) {
 			}
 
 			x := pdf.NewExtractor(writer)
-			got, err := extract.SoftMaskDict(x, embedded, false)
+			got, err := extract.SoftMaskDict(x, nil, embedded, false)
 			if err != nil {
 				t.Fatalf("Extract: %v", err)
 			}

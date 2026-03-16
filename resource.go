@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sync"
 )
 
 // Encoder represents a PDF object which is tied to a specific PDF file.
@@ -238,50 +239,35 @@ func (rm *ResourceManager) Close() error {
 	return nil
 }
 
-// CycleChecker detects circular references in PDF object structures to prevent
-// infinite recursion during object traversal. It maintains a set of visited
-// references and returns an error when a cycle is detected.
-//
-// CycleChecker is particularly useful when reading complex PDF structures like
-// nested functions, patterns, or other objects that may reference each other.
-type CycleChecker struct {
-	seen map[Reference]bool
-}
-
-// NewCycleChecker creates a new CycleChecker with an empty set of seen references.
-func NewCycleChecker() *CycleChecker {
-	return &CycleChecker{seen: make(map[Reference]bool)}
-}
-
-// Check examines the given PDF object for circular references. If the object
-// is not a reference (i.e., it's a direct value), Check returns nil immediately.
-// If the object is a reference that has already been seen by this CycleChecker,
-// Check returns ErrCycle0. Otherwise, Check marks the reference as seen and
-// returns nil.
-//
-// This method should be called before recursively processing any PDF object
-// that might contain references to other objects.
-func (s *CycleChecker) Check(obj Object) error {
-	ref, ok := obj.(Reference)
-	if !ok {
-		return nil
-	}
-	if s.seen[ref] {
-		return &MalformedFileError{Err: ErrCycle}
-	}
-	s.seen[ref] = true
-	return nil
-}
-
 var ErrCycle = errors.New("cycle in recursive structure")
 
+// CycleCheck tracks which references are currently being resolved on the call
+// stack, forming an immutable linked list. Each level of recursion extends
+// the list by prepending a node. This enables cycle detection without shared
+// mutable state, making it safe for concurrent use.
+type CycleCheck struct {
+	Ref    Reference
+	Parent *CycleCheck
+}
+
+// Seen reports whether ref is already on the path.
+func (p *CycleCheck) Seen(ref Reference) bool {
+	for n := p; n != nil; n = n.Parent {
+		if n.Ref == ref {
+			return true
+		}
+	}
+	return false
+}
+
 // Extractor caches extracted PDF objects to ensure that extracting the same
-// reference multiple times returns the same Go object. It also detects cycles
-// in PDF object structures to prevent infinite recursion.
+// reference multiple times returns the same Go object.
+//
+// The Extractor is safe for concurrent use from multiple goroutines.
 type Extractor struct {
 	R     Getter
+	mu    sync.Mutex
 	cache map[extractorKey]any
-	path  map[Reference]bool
 }
 
 type extractorKey struct {
@@ -295,11 +281,26 @@ func NewExtractor(r Getter) *Extractor {
 	return &Extractor{
 		R:     r,
 		cache: make(map[extractorKey]any),
-		path:  make(map[Reference]bool),
 	}
 }
 
-func ExtractorGet[T any](x *Extractor, obj Object, extract func(*Extractor, Object, bool) (T, error)) (T, error) {
+func (x *Extractor) cacheGet(key extractorKey) (any, bool) {
+	x.mu.Lock()
+	v, ok := x.cache[key]
+	x.mu.Unlock()
+	return v, ok
+}
+
+func (x *Extractor) cachePut(key extractorKey, val any) {
+	x.mu.Lock()
+	x.cache[key] = val
+	x.mu.Unlock()
+}
+
+// ExtractorGet resolves indirect references and extracts a typed object.
+// The path parameter tracks which references are being resolved on the current
+// call stack to detect cycles.
+func ExtractorGet[T any](x *Extractor, path *CycleCheck, obj Object, extract func(*Extractor, *CycleCheck, Object, bool) (T, error)) (T, error) {
 	var zero T
 	tp := reflect.TypeFor[T]()
 
@@ -311,12 +312,12 @@ func ExtractorGet[T any](x *Extractor, obj Object, extract func(*Extractor, Obje
 		}
 		key := extractorKey{ref: ref, tp: tp}
 
-		if v, ok := x.cache[key]; ok {
+		if v, ok := x.cacheGet(key); ok {
 			return v.(T), nil
 		}
 
 		// check for cycle
-		if x.path[ref] {
+		if path.Seen(ref) {
 			return zero, &MalformedFileError{
 				Err: ErrCycle,
 				Loc: []string{"object " + ref.String()},
@@ -324,7 +325,7 @@ func ExtractorGet[T any](x *Extractor, obj Object, extract func(*Extractor, Obje
 		}
 
 		refs = append(refs, ref)
-		x.path[ref] = true
+		path = &CycleCheck{Ref: ref, Parent: path}
 
 		var err error
 		obj, err = x.R.Get(ref, true)
@@ -334,13 +335,7 @@ func ExtractorGet[T any](x *Extractor, obj Object, extract func(*Extractor, Obje
 	}
 
 	isDirect := len(refs) == 0
-	res, err := extract(x, obj, isDirect)
-
-	// cleanup path
-	for _, ref := range refs {
-		delete(x.path, ref)
-	}
-
+	res, err := extract(x, path, obj, isDirect)
 	if err != nil {
 		return zero, err
 	}
@@ -348,14 +343,16 @@ func ExtractorGet[T any](x *Extractor, obj Object, extract func(*Extractor, Obje
 	// cache under all refs
 	for _, ref := range refs {
 		key := extractorKey{ref: ref, tp: tp}
-		x.cache[key] = res
+		x.cachePut(key, res)
 	}
 
 	return res, nil
 }
 
-func ExtractorGetOptional[T any](x *Extractor, obj Object, extract func(*Extractor, Object, bool) (T, error)) (T, error) {
-	return Optional(ExtractorGet(x, obj, extract))
+// ExtractorGetOptional is like [ExtractorGet] but treats a nil result as
+// acceptable rather than as an error.
+func ExtractorGetOptional[T any](x *Extractor, path *CycleCheck, obj Object, extract func(*Extractor, *CycleCheck, Object, bool) (T, error)) (T, error) {
+	return Optional(ExtractorGet(x, path, obj, extract))
 }
 
 // Resolve resolves references to indirect objects with cycle detection.
@@ -367,7 +364,7 @@ func ExtractorGetOptional[T any](x *Extractor, obj Object, extract func(*Extract
 //
 // If a reference loop is encountered, the function returns an error of type
 // [MalformedFileError].
-func (x *Extractor) Resolve(obj Object) (Native, error) {
+func (x *Extractor) Resolve(path *CycleCheck, obj Object) (Native, error) {
 	if obj == nil {
 		return nil, nil
 	}
@@ -377,44 +374,30 @@ func (x *Extractor) Resolve(obj Object) (Native, error) {
 		return obj.AsPDF(0), nil
 	}
 
-	var refs []Reference
-	var result Native
-	var err error
-
 	for {
-		if x.path[ref] {
-			err = &MalformedFileError{
+		if path.Seen(ref) {
+			return nil, &MalformedFileError{
 				Err: ErrCycle,
 				Loc: []string{"object " + ref.String()},
 			}
-			break
 		}
 
-		refs = append(refs, ref)
-		x.path[ref] = true
+		path = &CycleCheck{Ref: ref, Parent: path}
 
-		next, getErr := x.R.Get(ref, true)
-		if getErr != nil {
-			err = getErr
-			break
+		next, err := x.R.Get(ref, true)
+		if err != nil {
+			return nil, err
 		}
 
 		if ref, isReference = next.(Reference); !isReference {
-			result = next
-			break
+			return next, nil
 		}
 	}
-
-	for _, r := range refs {
-		delete(x.path, r)
-	}
-
-	return result, err
 }
 
-func extractorResolveAndCast[T Native](x *Extractor, obj Object) (T, error) {
+func extractorResolveAndCast[T Native](x *Extractor, path *CycleCheck, obj Object) (T, error) {
 	var zero T
-	resolved, err := x.Resolve(obj)
+	resolved, err := x.Resolve(path, obj)
 	if err != nil {
 		return zero, err
 	}
@@ -435,20 +418,20 @@ func extractorResolveAndCast[T Native](x *Extractor, obj Object) (T, error) {
 
 // GetArray resolves any indirect reference and returns the object as an Array.
 // If obj is nil, the function returns nil, nil.
-func (x *Extractor) GetArray(obj Object) (Array, error) {
-	return extractorResolveAndCast[Array](x, obj)
+func (x *Extractor) GetArray(path *CycleCheck, obj Object) (Array, error) {
+	return extractorResolveAndCast[Array](x, path, obj)
 }
 
 // GetBoolean resolves any indirect reference and returns the object as a Boolean.
 // If obj is nil, the function returns false, nil.
-func (x *Extractor) GetBoolean(obj Object) (Boolean, error) {
-	return extractorResolveAndCast[Boolean](x, obj)
+func (x *Extractor) GetBoolean(path *CycleCheck, obj Object) (Boolean, error) {
+	return extractorResolveAndCast[Boolean](x, path, obj)
 }
 
 // GetDict resolves any indirect reference and returns the object as a Dict.
 // If obj is nil, the function returns nil, nil.
-func (x *Extractor) GetDict(obj Object) (Dict, error) {
-	return extractorResolveAndCast[Dict](x, obj)
+func (x *Extractor) GetDict(path *CycleCheck, obj Object) (Dict, error) {
+	return extractorResolveAndCast[Dict](x, path, obj)
 }
 
 // GetDictTyped resolves any indirect reference and checks that the resulting
@@ -456,13 +439,13 @@ func (x *Extractor) GetDict(obj Object) (Dict, error) {
 // the dictionary, if set, is equal to the given type.
 //
 // If the object is nil, the function returns nil, nil.
-func (x *Extractor) GetDictTyped(obj Object, tp Name) (Dict, error) {
-	dict, err := x.GetDict(obj)
+func (x *Extractor) GetDictTyped(path *CycleCheck, obj Object, tp Name) (Dict, error) {
+	dict, err := x.GetDict(path, obj)
 	if dict == nil || err != nil {
 		return nil, err
 	}
 
-	haveType, err := x.GetName(dict["Type"])
+	haveType, err := x.GetName(path, dict["Type"])
 	if err != nil {
 		return nil, err
 	}
@@ -477,26 +460,26 @@ func (x *Extractor) GetDictTyped(obj Object, tp Name) (Dict, error) {
 
 // GetName resolves any indirect reference and returns the object as a Name.
 // If obj is nil, the function returns "", nil.
-func (x *Extractor) GetName(obj Object) (Name, error) {
-	return extractorResolveAndCast[Name](x, obj)
+func (x *Extractor) GetName(path *CycleCheck, obj Object) (Name, error) {
+	return extractorResolveAndCast[Name](x, path, obj)
 }
 
 // GetReal resolves any indirect reference and returns the object as a Real.
 // If obj is nil, the function returns 0, nil.
-func (x *Extractor) GetReal(obj Object) (Real, error) {
-	return extractorResolveAndCast[Real](x, obj)
+func (x *Extractor) GetReal(path *CycleCheck, obj Object) (Real, error) {
+	return extractorResolveAndCast[Real](x, path, obj)
 }
 
 // GetStream resolves any indirect reference and returns the object as a Stream.
 // If obj is nil, the function returns nil, nil.
-func (x *Extractor) GetStream(obj Object) (*Stream, error) {
-	return extractorResolveAndCast[*Stream](x, obj)
+func (x *Extractor) GetStream(path *CycleCheck, obj Object) (*Stream, error) {
+	return extractorResolveAndCast[*Stream](x, path, obj)
 }
 
 // GetString resolves any indirect reference and returns the object as a String.
 // If obj is nil, the function returns "", nil.
-func (x *Extractor) GetString(obj Object) (String, error) {
-	return extractorResolveAndCast[String](x, obj)
+func (x *Extractor) GetString(path *CycleCheck, obj Object) (String, error) {
+	return extractorResolveAndCast[String](x, path, obj)
 }
 
 // GetInteger resolves any indirect reference and returns the object as an Integer.
@@ -504,8 +487,8 @@ func (x *Extractor) GetString(obj Object) (String, error) {
 // Integers are returned as is.
 // Floating point values are silently rounded to the nearest integer.
 // All other object types result in an error.
-func (x *Extractor) GetInteger(obj Object) (Integer, error) {
-	resolved, err := x.Resolve(obj)
+func (x *Extractor) GetInteger(path *CycleCheck, obj Object) (Integer, error) {
+	resolved, err := x.Resolve(path, obj)
 	if resolved == nil {
 		return 0, err
 	}
@@ -526,8 +509,8 @@ func (x *Extractor) GetInteger(obj Object) (Integer, error) {
 // If obj is nil, the function returns 0, nil.
 // Both Integer and Real values are converted to float64.
 // All other object types result in an error.
-func (x *Extractor) GetNumber(obj Object) (float64, error) {
-	resolved, err := x.Resolve(obj)
+func (x *Extractor) GetNumber(path *CycleCheck, obj Object) (float64, error) {
+	resolved, err := x.Resolve(path, obj)
 	if resolved == nil {
 		return 0, err
 	}

@@ -44,12 +44,12 @@ func (p *PrinterMark) AnnotationType() pdf.Name {
 	return "PrinterMark"
 }
 
-func decodePrinterMark(x *pdf.Extractor, dict pdf.Dict) (*PrinterMark, error) {
+func decodePrinterMark(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*PrinterMark, error) {
 	r := x.R
 	printerMark := &PrinterMark{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, &printerMark.Common, dict); err != nil {
+	if err := decodeCommon(x, path, &printerMark.Common, dict); err != nil {
 		return nil, err
 	}
 

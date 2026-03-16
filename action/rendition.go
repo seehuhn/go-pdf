@@ -97,12 +97,12 @@ func (a *Rendition) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeRendition(x *pdf.Extractor, dict pdf.Dict) (*Rendition, error) {
+func decodeRendition(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Rendition, error) {
 	an, _ := dict["AN"].(pdf.Reference)
 
 	var op optional.UInt
 	if dict["OP"] != nil {
-		if opVal, err := x.GetInteger(dict["OP"]); err == nil && opVal >= 0 && opVal <= 4 {
+		if opVal, err := x.GetInteger(path, dict["OP"]); err == nil && opVal >= 0 && opVal <= 4 {
 			op.Set(uint(opVal))
 		}
 		// else: invalid OP value, treat as absent
@@ -112,7 +112,7 @@ func decodeRendition(x *pdf.Extractor, dict pdf.Dict) (*Rendition, error) {
 		op.Set(0)
 	}
 
-	next, err := DecodeActionList(x, dict["Next"], false)
+	next, err := DecodeActionList(x, path, dict["Next"], false)
 	if err != nil {
 		return nil, err
 	}

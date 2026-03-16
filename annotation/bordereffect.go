@@ -47,9 +47,9 @@ type BorderEffect struct {
 
 var _ pdf.Embedder = (*BorderEffect)(nil)
 
-func ExtractBorderEffect(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*BorderEffect, error) {
+func ExtractBorderEffect(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*BorderEffect, error) {
 
-	dict, err := x.GetDict(obj)
+	dict, err := x.GetDict(path, obj)
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -58,7 +58,7 @@ func ExtractBorderEffect(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Bord
 
 	effect := &BorderEffect{}
 
-	if style, err := pdf.Optional(x.GetName(dict["S"])); err != nil {
+	if style, err := pdf.Optional(x.GetName(path, dict["S"])); err != nil {
 		return nil, err
 	} else if style != "" {
 		effect.Style = style
@@ -67,7 +67,7 @@ func ExtractBorderEffect(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Bord
 	}
 
 	if effect.Style == "C" {
-		if intensity, err := pdf.Optional(x.GetNumber(dict["I"])); err != nil {
+		if intensity, err := pdf.Optional(x.GetNumber(path, dict["I"])); err != nil {
 			return nil, err
 		} else if intensity >= 0.0 && intensity <= 2.0 {
 			effect.Intensity = float64(intensity)

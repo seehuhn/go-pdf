@@ -62,13 +62,13 @@ func (a *JavaScript) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeJavaScript(x *pdf.Extractor, dict pdf.Dict) (*JavaScript, error) {
+func decodeJavaScript(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*JavaScript, error) {
 	js := dict["JS"]
 	if js == nil {
 		return nil, pdf.Error("JavaScript action missing JS entry")
 	}
 
-	next, err := pdf.Optional(DecodeActionList(x, dict["Next"], false))
+	next, err := pdf.Optional(DecodeActionList(x, path, dict["Next"], false))
 	if err != nil {
 		return nil, err
 	}

@@ -281,7 +281,7 @@ func TestSpecificationRoundTrip(t *testing.T) {
 
 			// Extract it back
 			x := pdf.NewExtractor(w)
-			decoded, err := pdf.ExtractorGet(x, obj, ExtractSpecification)
+			decoded, err := pdf.ExtractorGet(x, nil, obj, ExtractSpecification)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -517,7 +517,7 @@ func TestSpecificationMalformedInput(t *testing.T) {
 		}
 
 		// Should handle malformed RF gracefully
-		_, err := ExtractSpecification(x, dict, true)
+		_, err := ExtractSpecification(x, nil, dict, true)
 		if err != nil {
 			t.Errorf("should handle malformed RF gracefully: %v", err)
 		}
@@ -533,7 +533,7 @@ func TestSpecificationMalformedInput(t *testing.T) {
 			"ID": pdf.Array{pdf.String("only_one")},
 		}
 
-		spec, err := ExtractSpecification(x, dict, true)
+		spec, err := ExtractSpecification(x, nil, dict, true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -567,7 +567,7 @@ func roundTripTest(t *testing.T, v pdf.Version, spec1 *Specification) {
 
 	// read back
 	x := pdf.NewExtractor(buf)
-	spec2, err := pdf.ExtractorGet(x, obj, ExtractSpecification)
+	spec2, err := pdf.ExtractorGet(x, nil, obj, ExtractSpecification)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -619,7 +619,7 @@ func FuzzSpecificationRoundTrip(f *testing.F) {
 			t.Skip("missing specification")
 		}
 		x := pdf.NewExtractor(r)
-		specification, err := pdf.ExtractorGet(x, obj, ExtractSpecification)
+		specification, err := pdf.ExtractorGet(x, nil, obj, ExtractSpecification)
 		if err != nil {
 			t.Skip("broken specification")
 		}

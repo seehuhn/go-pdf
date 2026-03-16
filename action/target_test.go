@@ -91,7 +91,7 @@ func testTargetRoundTrip(t *testing.T, version pdf.Version, target Target) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := DecodeTarget(x, encoded, false)
+	decoded, err := DecodeTarget(x, nil, encoded, false)
 	if err != nil {
 		t.Fatalf("decode error: %v", err)
 	}
@@ -160,7 +160,7 @@ func FuzzTargetRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		target, err := DecodeTarget(x, obj, false)
+		target, err := DecodeTarget(x, nil, obj, false)
 		if err != nil {
 			t.Skip("malformed target")
 		}

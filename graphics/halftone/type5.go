@@ -54,11 +54,11 @@ type Type5 struct {
 var _ graphics.Halftone = (*Type5)(nil)
 
 // extractType5 reads a Type 5 halftone from a PDF dictionary.
-func extractType5(x *pdf.Extractor, dict pdf.Dict) (*Type5, error) {
+func extractType5(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Type5, error) {
 	h := &Type5{}
 
 	// TODO(voss): avoid infinite recursion!!!
-	if ht, err := pdf.ExtractorGet(x, dict["Default"], Extract); err != nil {
+	if ht, err := pdf.ExtractorGet(x, path, dict["Default"], Extract); err != nil {
 		return nil, err
 	} else if ht != nil {
 		if ht.HalftoneType() == 5 {
@@ -77,7 +77,7 @@ func extractType5(x *pdf.Extractor, dict pdf.Dict) (*Type5, error) {
 		}
 
 		// TODO(voss): avoid infinite recursion!!!
-		if ht, err := pdf.ExtractorGet(x, val, Extract); err != nil {
+		if ht, err := pdf.ExtractorGet(x, path, val, Extract); err != nil {
 			return nil, err
 		} else if ht != nil {
 			if ht.HalftoneType() == 5 {

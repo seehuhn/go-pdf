@@ -53,8 +53,8 @@ type CoordinateSystem struct {
 }
 
 // ExtractCoordinateSystem extracts a coordinate system dictionary from a PDF file.
-func ExtractCoordinateSystem(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*CoordinateSystem, error) {
-	dict, err := x.GetDict(obj)
+func ExtractCoordinateSystem(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*CoordinateSystem, error) {
+	dict, err := x.GetDict(path, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func ExtractCoordinateSystem(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*
 	cs := &CoordinateSystem{}
 
 	// read Type to determine CSType
-	csType, _ := pdf.Optional(x.GetName(dict["Type"]))
+	csType, _ := pdf.Optional(x.GetName(path, dict["Type"]))
 	switch CoordinateSystemType(csType) {
 	case CoordSysGeographic, "":
 		cs.CSType = CoordSysGeographic
@@ -76,14 +76,14 @@ func ExtractCoordinateSystem(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*
 	}
 
 	// read EPSG (optional)
-	epsg, err := pdf.Optional(x.GetInteger(dict["EPSG"]))
+	epsg, err := pdf.Optional(x.GetInteger(path, dict["EPSG"]))
 	if err != nil {
 		return nil, err
 	}
 	cs.EPSG = int(epsg)
 
 	// read WKT (optional)
-	wkt, err := pdf.Optional(x.GetString(dict["WKT"]))
+	wkt, err := pdf.Optional(x.GetString(path, dict["WKT"]))
 	if err != nil {
 		return nil, err
 	}

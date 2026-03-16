@@ -92,23 +92,23 @@ func (s *Square) AnnotationType() pdf.Name {
 	return "Square"
 }
 
-func decodeSquare(x *pdf.Extractor, dict pdf.Dict) (*Square, error) {
+func decodeSquare(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Square, error) {
 	r := x.R
 	square := &Square{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, &square.Common, dict); err != nil {
+	if err := decodeCommon(x, path, &square.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(x, dict, &square.Markup); err != nil {
+	if err := decodeMarkup(x, path, dict, &square.Markup); err != nil {
 		return nil, err
 	}
 
 	// Extract square-specific fields
 	// BS (optional)
-	if bs, err := pdf.Optional(pdf.ExtractorGet(x, dict["BS"], ExtractBorderStyle)); err != nil {
+	if bs, err := pdf.Optional(pdf.ExtractorGet(x, path, dict["BS"], ExtractBorderStyle)); err != nil {
 		return nil, err
 	} else {
 		square.BorderStyle = bs
@@ -118,7 +118,7 @@ func decodeSquare(x *pdf.Extractor, dict pdf.Dict) (*Square, error) {
 		}
 
 		// BE (optional)
-		if be, err := pdf.ExtractorGetOptional(x, dict["BE"], ExtractBorderEffect); err != nil {
+		if be, err := pdf.ExtractorGetOptional(x, path, dict["BE"], ExtractBorderEffect); err != nil {
 			return nil, err
 		} else {
 			square.BorderEffect = be

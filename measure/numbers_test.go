@@ -101,7 +101,7 @@ func TestNumberFormatExtractEmbed(t *testing.T) {
 
 			// Extract the NumberFormat back
 			x := pdf.NewExtractor(w)
-			extracted, err := pdf.ExtractorGet(x, embedded, ExtractNumberFormat)
+			extracted, err := pdf.ExtractorGet(x, nil, embedded, ExtractNumberFormat)
 			if err != nil {
 				t.Fatalf("extract failed: %v", err)
 			}
@@ -131,7 +131,7 @@ func TestNumberFormatExtractDefaults(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	extracted, err := pdf.ExtractorGet(x, dict, ExtractNumberFormat)
+	extracted, err := pdf.ExtractorGet(x, nil, dict, ExtractNumberFormat)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}

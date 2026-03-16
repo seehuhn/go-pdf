@@ -71,8 +71,8 @@ func (a *Thread) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeThread(x *pdf.Extractor, dict pdf.Dict) (*Thread, error) {
-	next, err := DecodeActionList(x, dict["Next"], false)
+func decodeThread(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Thread, error) {
+	next, err := DecodeActionList(x, path, dict["Next"], false)
 	if err != nil {
 		return nil, err
 	}

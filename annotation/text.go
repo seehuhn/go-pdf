@@ -70,24 +70,24 @@ func (t *Text) AnnotationType() pdf.Name {
 	return "Text"
 }
 
-func decodeText(x *pdf.Extractor, dict pdf.Dict) (*Text, error) {
+func decodeText(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Text, error) {
 	text := &Text{}
 
-	if err := decodeCommon(x, &text.Common, dict); err != nil {
+	if err := decodeCommon(x, path, &text.Common, dict); err != nil {
 		return nil, err
 	}
 
-	if err := decodeMarkup(x, dict, &text.Markup); err != nil {
+	if err := decodeMarkup(x, path, dict, &text.Markup); err != nil {
 		return nil, err
 	}
 
-	if open, err := pdf.Optional(x.GetBoolean(dict["Open"])); err != nil {
+	if open, err := pdf.Optional(x.GetBoolean(path, dict["Open"])); err != nil {
 		return nil, err
 	} else {
 		text.Open = bool(open)
 	}
 
-	if name, err := pdf.Optional(x.GetName(dict["Name"])); err != nil {
+	if name, err := pdf.Optional(x.GetName(path, dict["Name"])); err != nil {
 		return nil, err
 	} else if name != "" {
 		text.Icon = TextIcon(name)

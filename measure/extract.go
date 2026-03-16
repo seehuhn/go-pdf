@@ -23,8 +23,8 @@ import (
 )
 
 // Extract extracts a PDF Measure Dictionary from a PDF file.
-func Extract(x *pdf.Extractor, obj pdf.Object, isDirect bool) (Measure, error) {
-	dict, err := x.GetDict(obj)
+func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (Measure, error) {
+	dict, err := x.GetDict(path, obj)
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -32,34 +32,34 @@ func Extract(x *pdf.Extractor, obj pdf.Object, isDirect bool) (Measure, error) {
 	}
 
 	// Get subtype with default "RL"
-	subtype, _ := pdf.Optional(x.GetName(dict["Subtype"]))
+	subtype, _ := pdf.Optional(x.GetName(path, dict["Subtype"]))
 	if subtype == "" {
 		subtype = "RL"
 	}
 
 	switch subtype {
 	case "RL":
-		return extractRectilinearMeasure(x, dict, isDirect)
+		return extractRectilinearMeasure(x, path, dict, isDirect)
 	case "GEO":
-		return extractGeospatialMeasure(x, dict, isDirect)
+		return extractGeospatialMeasure(x, path, dict, isDirect)
 	default:
 		// Unknown subtype - default to RL for permissive reading
-		return extractRectilinearMeasure(x, dict, isDirect)
+		return extractRectilinearMeasure(x, path, dict, isDirect)
 	}
 }
 
 // extractRectilinearMeasure extracts a RectilinearMeasure from a PDF dictionary.
-func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (*RectilinearMeasure, error) {
+func extractRectilinearMeasure(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, isDirect bool) (*RectilinearMeasure, error) {
 	singleUse := isDirect
 
 	rm := &RectilinearMeasure{}
 
 	// Extract X axis first (needed for autogenerating ScaleRatio if missing)
-	xArray, err := x.GetArray(dict["X"])
+	xArray, err := x.GetArray(path, dict["X"])
 	if err != nil {
 		return nil, err
 	}
-	rm.XAxis, err = extractNumberFormatArray(x, xArray)
+	rm.XAxis, err = extractNumberFormatArray(x, path, xArray)
 	if err != nil {
 		return nil, err
 	}
@@ -69,11 +69,11 @@ func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (
 
 	// Extract Y axis - if missing, leave as nil
 	if dict["Y"] != nil {
-		yArray, err := x.GetArray(dict["Y"])
+		yArray, err := x.GetArray(path, dict["Y"])
 		if err != nil {
 			return nil, err
 		}
-		rm.YAxis, err = extractNumberFormatArray(x, yArray)
+		rm.YAxis, err = extractNumberFormatArray(x, path, yArray)
 		if err != nil {
 			return nil, err
 		}
@@ -81,7 +81,7 @@ func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (
 	// Note: YAxis remains nil if not present in PDF
 
 	// Extract ScaleRatio - if missing or empty, autogenerate from X/Y arrays
-	scaleRatio, _ := pdf.Optional(x.GetString(dict["R"]))
+	scaleRatio, _ := pdf.Optional(x.GetString(path, dict["R"]))
 	if string(scaleRatio) == "" {
 		// autogenerate scale ratio from X (and Y if different)
 		if len(rm.XAxis) > 0 {
@@ -107,11 +107,11 @@ func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (
 	rm.ScaleRatio = string(scaleRatio)
 
 	// Extract Distance
-	dArray, err := x.GetArray(dict["D"])
+	dArray, err := x.GetArray(path, dict["D"])
 	if err != nil {
 		return nil, err
 	}
-	rm.Distance, err = extractNumberFormatArray(x, dArray)
+	rm.Distance, err = extractNumberFormatArray(x, path, dArray)
 	if err != nil {
 		return nil, err
 	}
@@ -120,11 +120,11 @@ func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (
 	}
 
 	// Extract Area
-	aArray, err := x.GetArray(dict["A"])
+	aArray, err := x.GetArray(path, dict["A"])
 	if err != nil {
 		return nil, err
 	}
-	rm.Area, err = extractNumberFormatArray(x, aArray)
+	rm.Area, err = extractNumberFormatArray(x, path, aArray)
 	if err != nil {
 		return nil, err
 	}
@@ -134,11 +134,11 @@ func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (
 
 	// Extract optional fields
 	if dict["T"] != nil {
-		tArray, err := pdf.Optional(x.GetArray(dict["T"]))
+		tArray, err := pdf.Optional(x.GetArray(path, dict["T"]))
 		if err != nil {
 			return nil, err
 		} else if tArray != nil {
-			rm.Angle, err = extractNumberFormatArray(x, tArray)
+			rm.Angle, err = extractNumberFormatArray(x, path, tArray)
 			if err != nil {
 				return nil, err
 			}
@@ -146,11 +146,11 @@ func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (
 	}
 
 	if dict["S"] != nil {
-		sArray, err := pdf.Optional(x.GetArray(dict["S"]))
+		sArray, err := pdf.Optional(x.GetArray(path, dict["S"]))
 		if err != nil {
 			return nil, err
 		} else if sArray != nil {
-			rm.Slope, err = extractNumberFormatArray(x, sArray)
+			rm.Slope, err = extractNumberFormatArray(x, path, sArray)
 			if err != nil {
 				return nil, err
 			}
@@ -159,15 +159,15 @@ func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (
 
 	// Extract Origin - default is [0,0]
 	if dict["O"] != nil {
-		oArray, err := pdf.Optional(x.GetArray(dict["O"]))
+		oArray, err := pdf.Optional(x.GetArray(path, dict["O"]))
 		if err != nil {
 			return nil, err
 		} else if len(oArray) >= 2 {
-			origin0, err := x.GetNumber(oArray[0])
+			origin0, err := x.GetNumber(path, oArray[0])
 			if err != nil {
 				return nil, err
 			}
-			origin1, err := x.GetNumber(oArray[1])
+			origin1, err := x.GetNumber(path, oArray[1])
 			if err != nil {
 				return nil, err
 			}
@@ -177,7 +177,7 @@ func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (
 
 	// Extract CYX if present (and Y was present)
 	if dict["Y"] != nil && dict["CYX"] != nil {
-		cyx, err := pdf.Optional(x.GetNumber(dict["CYX"]))
+		cyx, err := pdf.Optional(x.GetNumber(path, dict["CYX"]))
 		if err != nil {
 			return nil, err
 		}
@@ -190,10 +190,10 @@ func extractRectilinearMeasure(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (
 }
 
 // extractNumberFormatArray extracts an array of NumberFormat objects.
-func extractNumberFormatArray(x *pdf.Extractor, arr pdf.Array) ([]*NumberFormat, error) {
+func extractNumberFormatArray(x *pdf.Extractor, path *pdf.CycleCheck, arr pdf.Array) ([]*NumberFormat, error) {
 	formats := make([]*NumberFormat, len(arr))
 	for i, obj := range arr {
-		nf, err := pdf.ExtractorGet(x, obj, ExtractNumberFormat)
+		nf, err := pdf.ExtractorGet(x, path, obj, ExtractNumberFormat)
 		if err != nil {
 			return nil, err
 		}
@@ -203,18 +203,18 @@ func extractNumberFormatArray(x *pdf.Extractor, arr pdf.Array) ([]*NumberFormat,
 }
 
 // extractGeospatialMeasure extracts a GeospatialMeasure from a PDF dictionary.
-func extractGeospatialMeasure(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (Measure, error) {
+func extractGeospatialMeasure(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, isDirect bool) (Measure, error) {
 	gm := &GeospatialMeasure{}
 
 	// GCS (required)
-	gcs, err := pdf.ExtractorGet(x, dict["GCS"], ExtractCoordinateSystem)
+	gcs, err := pdf.ExtractorGet(x, path, dict["GCS"], ExtractCoordinateSystem)
 	if err != nil {
 		return nil, err
 	}
 	gm.GCS = gcs
 
 	// DCS (optional)
-	dcs, err := pdf.ExtractorGetOptional(x, dict["DCS"], ExtractCoordinateSystem)
+	dcs, err := pdf.ExtractorGetOptional(x, path, dict["DCS"], ExtractCoordinateSystem)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +261,7 @@ func extractGeospatialMeasure(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (M
 
 	// PDU (optional, all three must be present)
 	if dict["PDU"] != nil {
-		pduArray, err := pdf.Optional(x.GetArray(dict["PDU"]))
+		pduArray, err := pdf.Optional(x.GetArray(path, dict["PDU"]))
 		if err != nil {
 			return nil, err
 		}
@@ -269,7 +269,7 @@ func extractGeospatialMeasure(x *pdf.Extractor, dict pdf.Dict, isDirect bool) (M
 			var pdu [3]pdf.Name
 			valid := true
 			for i := range 3 {
-				name, err := pdf.Optional(x.GetName(pduArray[i]))
+				name, err := pdf.Optional(x.GetName(path, pduArray[i]))
 				if err != nil {
 					return nil, err
 				}

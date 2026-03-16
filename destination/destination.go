@@ -59,8 +59,8 @@ var Unset = math.NaN()
 // Decode reads a destination from a PDF object.
 // The object can be an array (explicit destination), a name/string (named destination),
 // or a dictionary with a D entry.
-func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (Destination, error) {
-	obj, err := x.Resolve(obj)
+func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (Destination, error) {
+	obj, err := x.Resolve(path, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -74,14 +74,14 @@ func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (Destination, error) {
 	}
 
 	// Handle dictionary wrapper with D entry
-	if dict, _ := x.GetDict(obj); dict != nil {
+	if dict, _ := x.GetDict(path, obj); dict != nil {
 		if dObj := dict["D"]; dObj != nil {
 			obj = dObj
 		}
 	}
 
 	// Must be an array for explicit destination
-	arr, err := x.GetArray(obj)
+	arr, err := x.GetArray(path, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (Destination, error) {
 	page := Target(arr[0])
 
 	// Second element is the type name
-	typeName, err := pdf.Optional(x.GetName(arr[1]))
+	typeName, err := pdf.Optional(x.GetName(path, arr[1]))
 	if err != nil {
 		return nil, err
 	}
@@ -103,9 +103,9 @@ func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (Destination, error) {
 		if len(arr) < 5 {
 			return nil, pdf.Error("XYZ destination requires 5 elements")
 		}
-		left := getOptionalNumber(x, arr[2])
-		top := getOptionalNumber(x, arr[3])
-		zoom := getOptionalNumber(x, arr[4])
+		left := getOptionalNumber(x, path, arr[2])
+		top := getOptionalNumber(x, path, arr[3])
+		zoom := getOptionalNumber(x, path, arr[4])
 		return &XYZ{Page: page, Left: left, Top: top, Zoom: zoom}, nil
 
 	case TypeFit:
@@ -115,24 +115,24 @@ func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (Destination, error) {
 		if len(arr) < 3 {
 			return nil, pdf.Error("FitH destination requires 3 elements")
 		}
-		top := getOptionalNumber(x, arr[2])
+		top := getOptionalNumber(x, path, arr[2])
 		return &FitH{Page: page, Top: top}, nil
 
 	case TypeFitV:
 		if len(arr) < 3 {
 			return nil, pdf.Error("FitV destination requires 3 elements")
 		}
-		left := getOptionalNumber(x, arr[2])
+		left := getOptionalNumber(x, path, arr[2])
 		return &FitV{Page: page, Left: left}, nil
 
 	case TypeFitR:
 		if len(arr) < 6 {
 			return nil, pdf.Error("FitR destination requires 6 elements")
 		}
-		left, _ := pdf.Optional(x.GetNumber(arr[2]))
-		bottom, _ := pdf.Optional(x.GetNumber(arr[3]))
-		right, _ := pdf.Optional(x.GetNumber(arr[4]))
-		top, _ := pdf.Optional(x.GetNumber(arr[5]))
+		left, _ := pdf.Optional(x.GetNumber(path, arr[2]))
+		bottom, _ := pdf.Optional(x.GetNumber(path, arr[3]))
+		right, _ := pdf.Optional(x.GetNumber(path, arr[4]))
+		top, _ := pdf.Optional(x.GetNumber(path, arr[5]))
 		if left >= right || bottom >= top {
 			// Invalid rectangle, fall back to Fit
 			return &Fit{Page: page}, nil
@@ -147,14 +147,14 @@ func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (Destination, error) {
 		if len(arr) < 3 {
 			return nil, pdf.Error("FitBH destination requires 3 elements")
 		}
-		top := getOptionalNumber(x, arr[2])
+		top := getOptionalNumber(x, path, arr[2])
 		return &FitBH{Page: page, Top: top}, nil
 
 	case TypeFitBV:
 		if len(arr) < 3 {
 			return nil, pdf.Error("FitBV destination requires 3 elements")
 		}
-		left := getOptionalNumber(x, arr[2])
+		left := getOptionalNumber(x, path, arr[2])
 		return &FitBV{Page: page, Left: left}, nil
 
 	default:
@@ -409,11 +409,11 @@ func (d *Named) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 // getOptionalNumber reads a number from a PDF object, treating null as Unset
-func getOptionalNumber(x *pdf.Extractor, obj pdf.Object) float64 {
+func getOptionalNumber(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) float64 {
 	if obj == nil {
 		return Unset
 	}
-	num, err := pdf.Optional(x.GetNumber(obj))
+	num, err := pdf.Optional(x.GetNumber(path, obj))
 	if err != nil {
 		return Unset
 	}

@@ -56,58 +56,58 @@ const (
 )
 
 // Decode reads an action from a PDF object.
-func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (pdf.Action, error) {
-	dict, err := x.GetDictTyped(obj, "Action")
+func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (pdf.Action, error) {
+	dict, err := x.GetDictTyped(path, obj, "Action")
 	if err != nil {
 		return nil, err
 	}
 
-	actionType, err := x.GetName(dict["S"])
+	actionType, err := x.GetName(path, dict["S"])
 	if err != nil {
 		return nil, err
 	}
 
 	switch actionType {
 	case TypeGoTo:
-		return decodeGoTo(x, dict)
+		return decodeGoTo(x, path, dict)
 	case TypeGoToR:
-		return decodeGoToR(x, dict)
+		return decodeGoToR(x, path, dict)
 	case TypeGoToE:
-		return decodeGoToE(x, dict)
+		return decodeGoToE(x, path, dict)
 	case TypeGoToDp:
-		return decodeGoToDp(x, dict)
+		return decodeGoToDp(x, path, dict)
 	case TypeLaunch:
-		return decodeLaunch(x, dict)
+		return decodeLaunch(x, path, dict)
 	case TypeThread:
-		return decodeThread(x, dict)
+		return decodeThread(x, path, dict)
 	case TypeURI:
-		return decodeURI(x, dict)
+		return decodeURI(x, path, dict)
 	case TypeSound:
-		return decodeSound(x, dict)
+		return decodeSound(x, path, dict)
 	case TypeMovie:
-		return decodeMovie(x, dict)
+		return decodeMovie(x, path, dict)
 	case TypeHide:
-		return decodeHide(x, dict)
+		return decodeHide(x, path, dict)
 	case TypeNamed:
-		return decodeNamed(x, dict)
+		return decodeNamed(x, path, dict)
 	case TypeSubmitForm:
-		return decodeSubmitForm(x, dict)
+		return decodeSubmitForm(x, path, dict)
 	case TypeResetForm:
-		return decodeResetForm(x, dict)
+		return decodeResetForm(x, path, dict)
 	case TypeImportData:
-		return decodeImportData(x, dict)
+		return decodeImportData(x, path, dict)
 	case TypeSetOCGState:
-		return decodeSetOCGState(x, dict)
+		return decodeSetOCGState(x, path, dict)
 	case TypeRendition:
-		return decodeRendition(x, dict)
+		return decodeRendition(x, path, dict)
 	case TypeTrans:
-		return decodeTrans(x, dict)
+		return decodeTrans(x, path, dict)
 	case TypeGoTo3DView:
-		return decodeGoTo3DView(x, dict)
+		return decodeGoTo3DView(x, path, dict)
 	case TypeJavaScript:
-		return decodeJavaScript(x, dict)
+		return decodeJavaScript(x, path, dict)
 	case TypeRichMediaExecute:
-		return decodeRichMediaExecute(x, dict)
+		return decodeRichMediaExecute(x, path, dict)
 	default:
 		return nil, pdf.Error("unknown action type: " + string(actionType))
 	}
@@ -140,15 +140,15 @@ func (al ActionList) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 // DecodeActionList reads an action list from a PDF object.
 // Handles both single dictionary and array formats.
-func DecodeActionList(x *pdf.Extractor, obj pdf.Object, _ bool) (ActionList, error) {
+func DecodeActionList(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (ActionList, error) {
 	if obj == nil {
 		return nil, nil
 	}
 
 	// try single action dictionary first
-	dict, err := x.GetDict(obj)
+	dict, err := x.GetDict(path, obj)
 	if err == nil && dict != nil {
-		action, err := Decode(x, dict, false)
+		action, err := Decode(x, path, dict, false)
 		if err != nil {
 			return nil, err
 		}
@@ -156,14 +156,14 @@ func DecodeActionList(x *pdf.Extractor, obj pdf.Object, _ bool) (ActionList, err
 	}
 
 	// array of actions
-	arr, err := x.GetArray(obj)
+	arr, err := x.GetArray(path, obj)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(ActionList, 0, len(arr))
 	for _, item := range arr {
-		action, err := Decode(x, item, false)
+		action, err := Decode(x, path, item, false)
 		if err != nil {
 			return nil, err
 		}

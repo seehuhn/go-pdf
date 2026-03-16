@@ -51,17 +51,17 @@ func (s *Sound) AnnotationType() pdf.Name {
 	return "Sound"
 }
 
-func decodeSound(x *pdf.Extractor, dict pdf.Dict) (*Sound, error) {
+func decodeSound(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Sound, error) {
 	r := x.R
 	sound := &Sound{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, &sound.Common, dict); err != nil {
+	if err := decodeCommon(x, path, &sound.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(x, dict, &sound.Markup); err != nil {
+	if err := decodeMarkup(x, path, dict, &sound.Markup); err != nil {
 		return nil, err
 	}
 

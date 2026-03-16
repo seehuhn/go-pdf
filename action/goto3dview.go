@@ -69,8 +69,8 @@ func (a *GoTo3DView) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeGoTo3DView(x *pdf.Extractor, dict pdf.Dict) (*GoTo3DView, error) {
-	next, err := DecodeActionList(x, dict["Next"], false)
+func decodeGoTo3DView(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*GoTo3DView, error) {
+	next, err := DecodeActionList(x, path, dict["Next"], false)
 	if err != nil {
 		return nil, err
 	}

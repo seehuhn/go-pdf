@@ -94,7 +94,7 @@ func (a *Sound) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeSound(x *pdf.Extractor, dict pdf.Dict) (*Sound, error) {
+func decodeSound(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Sound, error) {
 	soundRef, ok := dict["Sound"].(pdf.Reference)
 	if !ok {
 		return nil, pdf.Error("Sound action missing or invalid Sound entry")
@@ -102,27 +102,27 @@ func decodeSound(x *pdf.Extractor, dict pdf.Dict) (*Sound, error) {
 
 	volume := 1.0
 	if dict["Volume"] != nil {
-		v, err := pdf.Optional(x.GetNumber(dict["Volume"]))
+		v, err := pdf.Optional(x.GetNumber(path, dict["Volume"]))
 		if err != nil {
 			return nil, err
 		}
 		volume = v
 	}
 
-	synchronous, err := pdf.Optional(x.GetBoolean(dict["Synchronous"]))
+	synchronous, err := pdf.Optional(x.GetBoolean(path, dict["Synchronous"]))
 	if err != nil {
 		return nil, err
 	}
-	repeat, err := pdf.Optional(x.GetBoolean(dict["Repeat"]))
+	repeat, err := pdf.Optional(x.GetBoolean(path, dict["Repeat"]))
 	if err != nil {
 		return nil, err
 	}
-	mix, err := pdf.Optional(x.GetBoolean(dict["Mix"]))
+	mix, err := pdf.Optional(x.GetBoolean(path, dict["Mix"]))
 	if err != nil {
 		return nil, err
 	}
 
-	next, err := DecodeActionList(x, dict["Next"], false)
+	next, err := DecodeActionList(x, path, dict["Next"], false)
 	if err != nil {
 		return nil, err
 	}

@@ -68,12 +68,12 @@ func (w *Watermark) AnnotationType() pdf.Name {
 	return "Watermark"
 }
 
-func decodeWatermark(x *pdf.Extractor, dict pdf.Dict) (*Watermark, error) {
+func decodeWatermark(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Watermark, error) {
 	r := x.R
 	watermark := &Watermark{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, &watermark.Common, dict); err != nil {
+	if err := decodeCommon(x, path, &watermark.Common, dict); err != nil {
 		return nil, err
 	}
 

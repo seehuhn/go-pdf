@@ -114,7 +114,7 @@ func TestDecodeSpace(t *testing.T) {
 			}
 
 			x := pdf.NewExtractor(r)
-			space2, err := ExtractSpace(x, obj, false)
+			space2, err := ExtractSpace(x, nil, obj, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -151,7 +151,7 @@ func spaceRoundTrip(t *testing.T, version pdf.Version, space Space) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := ExtractSpace(x, obj, false)
+	decoded, err := ExtractSpace(x, nil, obj, false)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -379,7 +379,7 @@ func FuzzSpaceRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		space, err := ExtractSpace(x, obj, false)
+		space, err := ExtractSpace(x, nil, obj, false)
 		if err != nil {
 			t.Skip("malformed color space")
 		}

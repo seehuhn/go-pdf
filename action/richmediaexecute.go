@@ -83,10 +83,10 @@ func (a *RichMediaExecute) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeRichMediaExecute(x *pdf.Extractor, dict pdf.Dict) (*RichMediaExecute, error) {
+func decodeRichMediaExecute(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*RichMediaExecute, error) {
 	ta, _ := dict["TA"].(pdf.Reference)
 
-	next, err := DecodeActionList(x, dict["Next"], false)
+	next, err := DecodeActionList(x, path, dict["Next"], false)
 	if err != nil {
 		return nil, err
 	}

@@ -54,12 +54,12 @@ func (m *Movie) AnnotationType() pdf.Name {
 	return "Movie"
 }
 
-func decodeMovie(x *pdf.Extractor, dict pdf.Dict) (*Movie, error) {
+func decodeMovie(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Movie, error) {
 	r := x.R
 	movie := &Movie{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, &movie.Common, dict); err != nil {
+	if err := decodeCommon(x, path, &movie.Common, dict); err != nil {
 		return nil, err
 	}
 

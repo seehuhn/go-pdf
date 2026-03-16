@@ -113,20 +113,15 @@ func Encode(rm *pdf.ResourceManager, nodes []*Node) (pdf.Native, error) {
 
 // Decode reads a navigation node list from PDF format.
 // The doubly-linked list starting at obj is flattened into a slice.
-func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) ([]*Node, error) {
+func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) ([]*Node, error) {
 	if obj == nil {
 		return nil, nil
 	}
 
-	cc := pdf.NewCycleChecker()
 	var nodes []*Node
 
 	for obj != nil {
-		if err := cc.Check(obj); err != nil {
-			return nil, err
-		}
-
-		dict, err := x.GetDict(obj)
+		dict, err := x.GetDict(path, obj)
 		if err != nil {
 			return nil, pdf.Wrap(err, "navigation node")
 		}
@@ -134,7 +129,12 @@ func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) ([]*Node, error) {
 			break
 		}
 
-		node, err := decodeNode(x, dict)
+		// extend path after resolution, so the next iteration detects cycles
+		if ref, ok := obj.(pdf.Reference); ok {
+			path = &pdf.CycleCheck{Ref: ref, Parent: path}
+		}
+
+		node, err := decodeNode(x, path, dict)
 		if err != nil {
 			return nil, err
 		}
@@ -147,12 +147,12 @@ func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) ([]*Node, error) {
 	return nodes, nil
 }
 
-func decodeNode(x *pdf.Extractor, dict pdf.Dict) (*Node, error) {
+func decodeNode(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Node, error) {
 	node := &Node{}
 
 	// NA (optional)
 	if naObj := dict["NA"]; naObj != nil {
-		na, err := action.Decode(x, naObj, false)
+		na, err := action.Decode(x, path, naObj, false)
 		if err != nil {
 			return nil, pdf.Wrap(err, "NA")
 		}
@@ -161,7 +161,7 @@ func decodeNode(x *pdf.Extractor, dict pdf.Dict) (*Node, error) {
 
 	// PA (optional)
 	if paObj := dict["PA"]; paObj != nil {
-		pa, err := action.Decode(x, paObj, false)
+		pa, err := action.Decode(x, path, paObj, false)
 		if err != nil {
 			return nil, pdf.Wrap(err, "PA")
 		}
@@ -170,7 +170,7 @@ func decodeNode(x *pdf.Extractor, dict pdf.Dict) (*Node, error) {
 
 	// Dur (optional)
 	if durObj := dict["Dur"]; durObj != nil {
-		dur, err := x.GetNumber(durObj)
+		dur, err := x.GetNumber(path, durObj)
 		if err == nil && dur > 0 {
 			node.Dur = dur
 		}

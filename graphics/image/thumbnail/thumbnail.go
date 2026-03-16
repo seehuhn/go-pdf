@@ -63,8 +63,8 @@ type Thumbnail struct {
 }
 
 // ExtractThumbnail reads a thumbnail image from a PDF object.
-func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object, _ bool) (*Thumbnail, error) {
-	stm, err := x.GetStream(obj)
+func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Thumbnail, error) {
+	stm, err := x.GetStream(path, obj)
 	if err != nil {
 		return nil, err
 	} else if stm == nil {
@@ -77,7 +77,7 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object, _ bool) (*Thumbnail, err
 	if err := pdf.CheckDictType(x.R, dict, "XObject"); err != nil {
 		return nil, err
 	}
-	if subtypeName, err := pdf.Optional(x.GetName(dict["Subtype"])); err != nil {
+	if subtypeName, err := pdf.Optional(x.GetName(path, dict["Subtype"])); err != nil {
 		return nil, err
 	} else if subtypeName != "Image" && subtypeName != "" {
 		return nil, pdf.Errorf("invalid Subtype %q for thumbnail", subtypeName)
@@ -86,7 +86,7 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object, _ bool) (*Thumbnail, err
 	thumb := &Thumbnail{}
 
 	// width (required)
-	width, err := x.GetInteger(dict["Width"])
+	width, err := x.GetInteger(path, dict["Width"])
 	if err != nil {
 		return nil, err
 	} else if width <= 0 {
@@ -95,7 +95,7 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object, _ bool) (*Thumbnail, err
 	thumb.Width = int(width)
 
 	// height (required)
-	height, err := x.GetInteger(dict["Height"])
+	height, err := x.GetInteger(path, dict["Height"])
 	if err != nil {
 		return nil, err
 	} else if height <= 0 {
@@ -104,7 +104,7 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object, _ bool) (*Thumbnail, err
 	thumb.Height = int(height)
 
 	// color space (required)
-	cs, err := color.ExtractSpace(x, dict["ColorSpace"], false)
+	cs, err := color.ExtractSpace(x, path, dict["ColorSpace"], false)
 	if err != nil {
 		return nil, err
 	} else if cs == nil {
@@ -118,7 +118,7 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object, _ bool) (*Thumbnail, err
 	thumb.ColorSpace = cs
 
 	// bits per component (required)
-	bpc, err := x.GetInteger(dict["BitsPerComponent"])
+	bpc, err := x.GetInteger(path, dict["BitsPerComponent"])
 	if err != nil {
 		return nil, err
 	} else if !isValidBitsPerComponent(int(bpc)) {
@@ -127,12 +127,12 @@ func ExtractThumbnail(x *pdf.Extractor, obj pdf.Object, _ bool) (*Thumbnail, err
 	thumb.BitsPerComponent = int(bpc)
 
 	// decode array (optional)
-	if decodeArray, err := pdf.Optional(x.GetArray(dict["Decode"])); err != nil {
+	if decodeArray, err := pdf.Optional(x.GetArray(path, dict["Decode"])); err != nil {
 		return nil, err
 	} else if decodeArray != nil && len(decodeArray) == 2*cs.Channels() {
 		decode := make([]float64, len(decodeArray))
 		for i, val := range decodeArray {
-			num, err := x.GetNumber(val)
+			num, err := x.GetNumber(path, val)
 			if err != nil {
 				// ignore malformed decode array
 				decode = nil

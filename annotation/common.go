@@ -347,7 +347,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool,
 }
 
 // decodeCommon extracts fields common to all annotations from a PDF dictionary.
-func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
+func decodeCommon(x *pdf.Extractor, path *pdf.CycleCheck, common *Common, dict pdf.Dict) error {
 	// Rect (required)
 	if rect, err := pdf.GetRectangle(x.R, dict["Rect"]); err == nil && rect != nil {
 		common.Rect = *rect
@@ -374,34 +374,34 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 	}
 
 	// F (optional)
-	if f, err := x.GetInteger(dict["F"]); err == nil && f != 0 {
+	if f, err := x.GetInteger(path, dict["F"]); err == nil && f != 0 {
 		common.Flags = Flags(f)
 	}
 
 	// AP (optional)
-	if ap, err := pdf.ExtractorGetOptional(x, dict["AP"], appearance.Extract); err != nil {
+	if ap, err := pdf.ExtractorGetOptional(x, path, dict["AP"], appearance.Extract); err != nil {
 		return err
 	} else {
 		common.Appearance = ap
 	}
 
 	// AS (optional)
-	if as, err := x.GetName(dict["AS"]); err == nil && as != "" {
+	if as, err := x.GetName(path, dict["AS"]); err == nil && as != "" {
 		common.AppearanceState = as
 	}
 
 	// Border (optional)
-	if border, err := pdf.ExtractorGetOptional(x, dict["Border"], ExtractBorder); err != nil {
+	if border, err := pdf.ExtractorGetOptional(x, path, dict["Border"], ExtractBorder); err != nil {
 		return err
 	} else {
 		common.Border = border
 	}
 
 	// C (optional)
-	if c, err := x.GetArray(dict["C"]); err == nil && c != nil {
+	if c, err := x.GetArray(path, dict["C"]); err == nil && c != nil {
 		colors := make([]float64, len(c))
 		for i, col := range c {
-			if num, err := x.GetNumber(col); err == nil {
+			if num, err := x.GetNumber(path, col); err == nil {
 				colors[i] = num
 			}
 		}
@@ -419,7 +419,7 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 
 	// StructParent (optional)
 	if dict["StructParent"] != nil {
-		if key, err := pdf.Optional(x.GetInteger(dict["StructParent"])); err != nil {
+		if key, err := pdf.Optional(x.GetInteger(path, dict["StructParent"])); err != nil {
 			return err
 		} else if key >= 0 && uint64(key) <= math.MaxUint {
 			common.StructParent.Set(uint(key))
@@ -427,19 +427,19 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 	}
 
 	// OC (optional)
-	if oc, err := pdf.ExtractorGetOptional(x, dict["OC"], oc.ExtractConditional); err != nil {
+	if oc, err := pdf.ExtractorGetOptional(x, path, dict["OC"], oc.ExtractConditional); err != nil {
 		return err
 	} else {
 		common.OptionalContent = oc
 	}
 
 	// AF (optional)
-	if afArray, err := pdf.Optional(x.GetArray(dict["AF"])); err != nil {
+	if afArray, err := pdf.Optional(x.GetArray(path, dict["AF"])); err != nil {
 		return err
 	} else if afArray != nil {
 		common.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
 		for _, afObj := range afArray {
-			if spec, err := pdf.ExtractorGetOptional(x, afObj, file.ExtractSpecification); err != nil {
+			if spec, err := pdf.ExtractorGetOptional(x, path, afObj, file.ExtractSpecification); err != nil {
 				return err
 			} else if spec != nil {
 				common.AssociatedFiles = append(common.AssociatedFiles, spec)
@@ -449,14 +449,14 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 
 	// CA (optional) - default value is 1.0
 	if dict["CA"] != nil {
-		if ca, err := x.GetNumber(dict["CA"]); err == nil {
+		if ca, err := x.GetNumber(path, dict["CA"]); err == nil {
 			common.StrokingTransparency = 1 - ca
 		}
 	}
 
 	// ca (optional) - if not present, defaults to the same value as CA
 	if dict["ca"] != nil {
-		if ca, err := x.GetNumber(dict["ca"]); err == nil {
+		if ca, err := x.GetNumber(path, dict["ca"]); err == nil {
 			common.NonStrokingTransparency = 1 - ca
 		}
 	} else {
@@ -464,7 +464,7 @@ func decodeCommon(x *pdf.Extractor, common *Common, dict pdf.Dict) error {
 	}
 
 	// BM (optional)
-	if bm, err := x.GetName(dict["BM"]); err == nil && bm != "" {
+	if bm, err := x.GetName(path, dict["BM"]); err == nil && bm != "" {
 		common.BlendMode = bm
 	}
 

@@ -30,8 +30,8 @@ import (
 )
 
 // extractFontType3 reads a Type 3 font dictionary from a PDF file.
-func extractFontType3(x *pdf.Extractor, obj pdf.Object) (*dict.Type3, error) {
-	fontDict, err := x.GetDictTyped(obj, "Font")
+func extractFontType3(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*dict.Type3, error) {
+	fontDict, err := x.GetDictTyped(path, obj, "Font")
 	if err != nil {
 		return nil, err
 	} else if fontDict == nil {
@@ -39,7 +39,7 @@ func extractFontType3(x *pdf.Extractor, obj pdf.Object) (*dict.Type3, error) {
 			Err: errors.New("missing font dictionary"),
 		}
 	}
-	subtype, err := x.GetName(fontDict["Subtype"])
+	subtype, err := x.GetName(path, fontDict["Subtype"])
 	if err != nil {
 		return nil, err
 	}
@@ -49,16 +49,16 @@ func extractFontType3(x *pdf.Extractor, obj pdf.Object) (*dict.Type3, error) {
 
 	d := &dict.Type3{}
 
-	d.Name, _ = x.GetName(fontDict["Name"])
+	d.Name, _ = x.GetName(path, fontDict["Name"])
 
-	fdDict, err := x.GetDictTyped(fontDict["FontDescriptor"], "FontDescriptor")
+	fdDict, err := x.GetDictTyped(path, fontDict["FontDescriptor"], "FontDescriptor")
 	if pdf.IsReadError(err) {
 		return nil, err
 	}
 	fd, _ := font.ExtractDescriptor(x.R, fdDict)
 	d.Descriptor = fd
 
-	enc, err := encoding.ExtractType3(x, fontDict["Encoding"], false)
+	enc, err := encoding.ExtractType3(x, path, fontDict["Encoding"], false)
 	if err != nil {
 		return nil, err
 	}
@@ -70,10 +70,10 @@ func extractFontType3(x *pdf.Extractor, obj pdf.Object) (*dict.Type3, error) {
 	}
 	getSimpleWidths(d.Width[:], x.R, fontDict, defaultWidth)
 
-	d.ToUnicode, _ = cmap.ExtractToUnicode(x, fontDict["ToUnicode"], false)
+	d.ToUnicode, _ = cmap.ExtractToUnicode(x, path, fontDict["ToUnicode"], false)
 
 	// Extract CharProcs - parse each content stream
-	charProcsDict, err := x.GetDict(fontDict["CharProcs"])
+	charProcsDict, err := x.GetDict(path, fontDict["CharProcs"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "CharProcs")
 	}
@@ -82,13 +82,13 @@ func extractFontType3(x *pdf.Extractor, obj pdf.Object) (*dict.Type3, error) {
 	// then font dict, then page dict). We can access glyph and font resources here.
 	var fontRes *content.Resources
 	if fontDict["Resources"] != nil {
-		fontRes, _ = pdf.ExtractorGet(x, fontDict["Resources"], Resources)
+		fontRes, _ = pdf.ExtractorGet(x, path, fontDict["Resources"], Resources)
 	}
 
 	v := pdf.GetVersion(x.R)
 	charProcs := make(map[pdf.Name]*dict.CharProc, len(charProcsDict))
 	for name, obj := range charProcsDict {
-		stm, err := x.GetStream(obj)
+		stm, err := x.GetStream(path, obj)
 		if err != nil {
 			continue // permissive: skip malformed CharProcs
 		}
@@ -102,7 +102,7 @@ func extractFontType3(x *pdf.Extractor, obj pdf.Object) (*dict.Type3, error) {
 		var res *content.Resources
 		var foundRes *content.Resources
 		if stm.Dict["Resources"] != nil {
-			foundRes, _ = pdf.ExtractorGet(x, stm.Dict["Resources"], Resources)
+			foundRes, _ = pdf.ExtractorGet(x, path, stm.Dict["Resources"], Resources)
 			res = foundRes
 		} else if fontRes != nil {
 			foundRes = fontRes
@@ -150,7 +150,7 @@ func extractFontType3(x *pdf.Extractor, obj pdf.Object) (*dict.Type3, error) {
 
 	// Extract font-level resources (only if present)
 	if fontDict["Resources"] != nil {
-		d.Resources, _ = pdf.ExtractorGet(x, fontDict["Resources"], Resources)
+		d.Resources, _ = pdf.ExtractorGet(x, path, fontDict["Resources"], Resources)
 	}
 
 	repairType3(d, x.R)

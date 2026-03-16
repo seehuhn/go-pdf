@@ -88,7 +88,7 @@ func (r *resolvedObject) AsPDF(opt pdf.OutputOptions) pdf.Native {
 	obj := r.obj.AsPDF(opt)
 
 	if ref, ok := obj.(pdf.Reference); ok {
-		resolved, err := r.x.Resolve(ref)
+		resolved, err := r.x.Resolve(nil, ref)
 		if err != nil {
 			resolved = nil // TODO(voss): what to do on error?
 		}

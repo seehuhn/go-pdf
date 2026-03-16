@@ -24,7 +24,7 @@ import (
 )
 
 // Extract extracts a halftone from a PDF file.
-func Extract(x *pdf.Extractor, obj pdf.Object, _ bool) (graphics.Halftone, error) {
+func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (graphics.Halftone, error) {
 	resolved, err := pdf.Resolve(x.R, obj)
 	if err != nil {
 		return nil, err
@@ -38,16 +38,16 @@ func Extract(x *pdf.Extractor, obj pdf.Object, _ bool) (graphics.Halftone, error
 
 	switch resolved := resolved.(type) {
 	case pdf.Dict:
-		halftoneType, err := x.GetInteger(resolved["HalftoneType"])
+		halftoneType, err := x.GetInteger(path, resolved["HalftoneType"])
 		if err != nil {
 			return nil, err
 		}
 
 		switch halftoneType {
 		case 1:
-			return extractType1(x, resolved)
+			return extractType1(x, path, resolved)
 		case 5:
-			return extractType5(x, resolved)
+			return extractType5(x, path, resolved)
 		default:
 			return nil, &pdf.MalformedFileError{
 				Err: fmt.Errorf("unsupported halftone type %d for dictionary", halftoneType),
@@ -55,18 +55,18 @@ func Extract(x *pdf.Extractor, obj pdf.Object, _ bool) (graphics.Halftone, error
 		}
 
 	case *pdf.Stream:
-		halftoneType, err := x.GetInteger(resolved.Dict["HalftoneType"])
+		halftoneType, err := x.GetInteger(path, resolved.Dict["HalftoneType"])
 		if err != nil {
 			return nil, err
 		}
 
 		switch halftoneType {
 		case 6:
-			return extractType6(x, resolved)
+			return extractType6(x, path, resolved)
 		case 10:
-			return extractType10(x, resolved)
+			return extractType10(x, path, resolved)
 		case 16:
-			return extractType16(x, resolved)
+			return extractType16(x, path, resolved)
 		default:
 			return nil, &pdf.MalformedFileError{
 				Err: fmt.Errorf("unsupported halftone type %d for stream", halftoneType),

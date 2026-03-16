@@ -62,13 +62,13 @@ func (a *GoToDp) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeGoToDp(x *pdf.Extractor, dict pdf.Dict) (*GoToDp, error) {
+func decodeGoToDp(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*GoToDp, error) {
 	ref, ok := dict["DPart"].(pdf.Reference)
 	if !ok {
 		return nil, pdf.Error("GoToDp action missing or invalid DPart entry")
 	}
 
-	next, err := DecodeActionList(x, dict["Next"], false)
+	next, err := DecodeActionList(x, path, dict["Next"], false)
 	if err != nil {
 		return nil, err
 	}

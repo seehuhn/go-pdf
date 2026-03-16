@@ -50,11 +50,11 @@ type Type10 struct {
 var _ graphics.Halftone = (*Type10)(nil)
 
 // extractType10 reads a Type 10 halftone from a PDF stream.
-func extractType10(x *pdf.Extractor, stream *pdf.Stream) (*Type10, error) {
+func extractType10(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*Type10, error) {
 	h := &Type10{}
 
 	if xsquare, ok := stream.Dict["Xsquare"]; ok {
-		xsquareVal, err := x.GetInteger(xsquare)
+		xsquareVal, err := x.GetInteger(path, xsquare)
 		if err != nil {
 			return nil, err
 		}
@@ -62,7 +62,7 @@ func extractType10(x *pdf.Extractor, stream *pdf.Stream) (*Type10, error) {
 	}
 
 	if ysquare, ok := stream.Dict["Ysquare"]; ok {
-		ysquareVal, err := x.GetInteger(ysquare)
+		ysquareVal, err := x.GetInteger(path, ysquare)
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +74,7 @@ func extractType10(x *pdf.Extractor, stream *pdf.Stream) (*Type10, error) {
 	} else if tf == pdf.Name("Identity") {
 		h.TransferFunction = function.Identity
 	} else {
-		if F, err := pdf.Optional(function.Extract(x, tf, false)); err != nil {
+		if F, err := pdf.Optional(function.Extract(x, path, tf, false)); err != nil {
 			return nil, err
 		} else if isValidTransferFunction(F) {
 			h.TransferFunction = F

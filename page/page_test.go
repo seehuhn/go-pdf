@@ -203,7 +203,7 @@ func roundTripTest(t *testing.T, v pdf.Version, p1 *Page) {
 
 	// Decode using extractor directly from writer
 	x := pdf.NewExtractor(w)
-	p2, err := Decode(x, dict, false)
+	p2, err := Decode(x, nil, dict, false)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -322,7 +322,7 @@ func TestContentSegment_Deduplication(t *testing.T) {
 	w1.Close()
 
 	// decode back to get a contentSegment
-	decoded, err := Decode(pdf.NewExtractor(w1), dict, false)
+	decoded, err := Decode(pdf.NewExtractor(w1), nil, dict, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -512,7 +512,7 @@ func TestPage_Decode_ClipsBoxes(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	p, err := Decode(x, dict, false)
+	p, err := Decode(x, nil, dict, false)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -548,7 +548,7 @@ func TestPage_Decode_ClipsToNil(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	p, err := Decode(x, dict, false)
+	p, err := Decode(x, nil, dict, false)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -624,7 +624,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		p, err := Decode(x, obj, false)
+		p, err := Decode(x, nil, obj, false)
 		if err != nil {
 			t.Skip("malformed page")
 		}

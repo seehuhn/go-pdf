@@ -43,9 +43,9 @@ type Viewport struct {
 }
 
 // ExtractViewport extracts a Viewport from a PDF object.
-func ExtractViewport(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Viewport, error) {
+func ExtractViewport(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Viewport, error) {
 
-	dict, err := x.GetDictTyped(obj, "Viewport")
+	dict, err := x.GetDictTyped(path, obj, "Viewport")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -63,19 +63,19 @@ func ExtractViewport(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Viewport
 	}
 	vp.BBox = *bbox
 
-	if name, err := pdf.Optional(x.GetString(dict["Name"])); err != nil {
+	if name, err := pdf.Optional(x.GetString(path, dict["Name"])); err != nil {
 		return nil, err
 	} else {
 		vp.Name = string(name)
 	}
 
-	if measure, err := pdf.ExtractorGetOptional(x, dict["Measure"], Extract); err != nil {
+	if measure, err := pdf.ExtractorGetOptional(x, path, dict["Measure"], Extract); err != nil {
 		return nil, err
 	} else {
 		vp.Measure = measure
 	}
 
-	if ptData, err := pdf.ExtractorGetOptional(x, dict["PtData"], ExtractPtData); err != nil {
+	if ptData, err := pdf.ExtractorGetOptional(x, path, dict["PtData"], ExtractPtData); err != nil {
 		return nil, err
 	} else {
 		vp.PtData = ptData
@@ -161,9 +161,9 @@ func (va *ViewPortArray) Select(point vec.Vec2) *Viewport {
 }
 
 // ExtractViewportArray extracts an array of viewports from a PDF array.
-func ExtractViewportArray(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*ViewPortArray, error) {
+func ExtractViewportArray(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*ViewPortArray, error) {
 
-	a, err := x.GetArray(obj)
+	a, err := x.GetArray(path, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +173,7 @@ func ExtractViewportArray(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Vie
 
 	viewports := make([]*Viewport, len(a))
 	for i, obj := range a {
-		vp, err := pdf.ExtractorGet(x, obj, ExtractViewport)
+		vp, err := pdf.ExtractorGet(x, path, obj, ExtractViewport)
 		if err != nil {
 			return nil, err
 		}

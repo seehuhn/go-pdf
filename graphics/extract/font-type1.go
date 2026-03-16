@@ -32,8 +32,8 @@ import (
 )
 
 // extractFontType1 reads a Type 1 font dictionary from a PDF file.
-func extractFontType1(x *pdf.Extractor, obj pdf.Object) (*dict.Type1, error) {
-	fontDict, err := x.GetDictTyped(obj, "Font")
+func extractFontType1(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*dict.Type1, error) {
+	fontDict, err := x.GetDictTyped(path, obj, "Font")
 	if err != nil {
 		return nil, err
 	} else if fontDict == nil {
@@ -41,7 +41,7 @@ func extractFontType1(x *pdf.Extractor, obj pdf.Object) (*dict.Type1, error) {
 			Err: errors.New("missing font dictionary"),
 		}
 	}
-	subtype, err := x.GetName(fontDict["Subtype"])
+	subtype, err := x.GetName(path, fontDict["Subtype"])
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func extractFontType1(x *pdf.Extractor, obj pdf.Object) (*dict.Type1, error) {
 
 	d := &dict.Type1{}
 
-	baseFont, err := x.GetName(fontDict["BaseFont"])
+	baseFont, err := x.GetName(path, fontDict["BaseFont"])
 	if err != nil {
 		return nil, err
 	}
@@ -62,14 +62,14 @@ func extractFontType1(x *pdf.Extractor, obj pdf.Object) (*dict.Type1, error) {
 		d.PostScriptName = string(baseFont)
 	}
 
-	d.Name, _ = x.GetName(fontDict["Name"])
+	d.Name, _ = x.GetName(path, fontDict["Name"])
 
 	// StdInfo will be non-nil, if the PostScript name indicates one of the
 	// standard 14 fonts. In this case, we use the corresponding metrics as
 	// default values, in case they are missing from the font dictionary.
 	stdInfo := stdmtx.Metrics[d.PostScriptName]
 
-	fdDict, err := x.GetDictTyped(fontDict["FontDescriptor"], "FontDescriptor")
+	fdDict, err := x.GetDictTyped(path, fontDict["FontDescriptor"], "FontDescriptor")
 	if pdf.IsReadError(err) {
 		return nil, err
 	}
@@ -98,9 +98,9 @@ func extractFontType1(x *pdf.Extractor, obj pdf.Object) (*dict.Type1, error) {
 	d.Descriptor = fd
 
 	for _, key := range []pdf.Name{"FontFile", "FontFile3"} {
-		if fontFile, err := pdf.ExtractorGetOptional(x, fdDict[key],
-			func(x *pdf.Extractor, obj pdf.Object, _ bool) (*glyphdata.Stream, error) {
-				return glyphdata.ExtractStream(x, obj, "Type1", key)
+		if fontFile, err := pdf.ExtractorGetOptional(x, path, fdDict[key],
+			func(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*glyphdata.Stream, error) {
+				return glyphdata.ExtractStream(x, path, obj, "Type1", key)
 			}); err != nil {
 			return nil, err
 		} else if fontFile != nil {
@@ -136,7 +136,7 @@ func extractFontType1(x *pdf.Extractor, obj pdf.Object) (*dict.Type1, error) {
 		}
 	}
 
-	d.ToUnicode, _ = cmap.ExtractToUnicode(x, fontDict["ToUnicode"], false)
+	d.ToUnicode, _ = cmap.ExtractToUnicode(x, path, fontDict["ToUnicode"], false)
 
 	repairType1(d, x.R)
 

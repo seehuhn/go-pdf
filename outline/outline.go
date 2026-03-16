@@ -95,22 +95,23 @@ func (item *Item) AddChild(title string) *Item {
 // Decode reads a document outline from a PDF file.
 // The obj argument should be the value of the Outlines entry in the catalog.
 // Returns nil if obj is nil or not a reference.
-func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (*Outline, error) {
+func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Outline, error) {
 	rootRef, _ := obj.(pdf.Reference)
 	if rootRef == 0 {
 		return nil, nil
 	}
 
-	seen := map[pdf.Reference]bool{}
-	seen[rootRef] = true
+	path = &pdf.CycleCheck{Ref: rootRef, Parent: path}
 
 	rootDict, err := pdf.GetDictTyped(x.R, rootRef, "Outlines")
 	if err != nil {
 		return nil, err
 	}
 
+	visited := map[pdf.Reference]bool{rootRef: true}
+
 	firstRef, _ := rootDict["First"].(pdf.Reference)
-	items, err := readChildren(x, seen, firstRef)
+	items, err := readChildren(x, path, visited, firstRef)
 	if err != nil {
 		return nil, err
 	}
@@ -118,14 +119,8 @@ func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (*Outline, error) {
 	return &Outline{Items: items}, nil
 }
 
-func readItem(x *pdf.Extractor, seen map[pdf.Reference]bool, ref pdf.Reference) (*Item, pdf.Dict, error) {
-	if seen[ref] {
-		return nil, nil, pdf.Errorf("outline tree contains a loop")
-	}
-	seen[ref] = true
-	if len(seen) > 65536 {
-		return nil, nil, pdf.Error("outline too large")
-	}
+func readItem(x *pdf.Extractor, path *pdf.CycleCheck, visited map[pdf.Reference]bool, ref pdf.Reference) (*Item, pdf.Dict, error) {
+	path = &pdf.CycleCheck{Ref: ref, Parent: path}
 
 	dict, err := pdf.GetDict(x.R, ref)
 	if err != nil {
@@ -144,13 +139,13 @@ func readItem(x *pdf.Extractor, seen map[pdf.Reference]bool, ref pdf.Reference) 
 	item.Open = count > 0
 
 	if dict["Dest"] != nil {
-		dest, err := pdf.ExtractorGetOptional(x, dict["Dest"], destination.Decode)
+		dest, err := pdf.ExtractorGetOptional(x, path, dict["Dest"], destination.Decode)
 		if err != nil {
 			return nil, nil, pdf.Wrap(err, "/Dest in outline")
 		}
 		item.Destination = dest
 	} else if dict["A"] != nil {
-		a, err := pdf.ExtractorGetOptional(x, dict["A"], action.Decode)
+		a, err := pdf.ExtractorGetOptional(x, path, dict["A"], action.Decode)
 		if err != nil {
 			return nil, nil, pdf.Wrap(err, "/A in outline")
 		}
@@ -174,7 +169,7 @@ func readItem(x *pdf.Extractor, seen map[pdf.Reference]bool, ref pdf.Reference) 
 	}
 
 	firstRef, _ := dict["First"].(pdf.Reference)
-	children, err := readChildren(x, seen, firstRef)
+	children, err := readChildren(x, path, visited, firstRef)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -183,10 +178,15 @@ func readItem(x *pdf.Extractor, seen map[pdf.Reference]bool, ref pdf.Reference) 
 	return item, dict, nil
 }
 
-func readChildren(x *pdf.Extractor, seen map[pdf.Reference]bool, ref pdf.Reference) ([]*Item, error) {
+func readChildren(x *pdf.Extractor, path *pdf.CycleCheck, visited map[pdf.Reference]bool, ref pdf.Reference) ([]*Item, error) {
 	var res []*Item
 	for ref != 0 {
-		item, dict, err := readItem(x, seen, ref)
+		if visited[ref] {
+			break
+		}
+		visited[ref] = true
+
+		item, dict, err := readItem(x, path, visited, ref)
 		if err != nil {
 			return nil, err
 		}

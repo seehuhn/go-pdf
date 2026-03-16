@@ -141,7 +141,7 @@ func listFonts(fname string) error {
 	fmt.Printf("%d fonts on %d pages\n", len(allFonts), numPages)
 	x := pdf.NewExtractor(r)
 	for _, fontRef := range allFonts {
-		d, err := extract.Dict(x, fontRef, false)
+		d, err := extract.Dict(x, nil, fontRef, false)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "warning: %s: %v\n", fontRef, err)
 			continue

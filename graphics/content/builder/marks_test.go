@@ -40,8 +40,8 @@ func TestMarkedContentInline(t *testing.T) {
 	x := pdf.NewExtractor(data)
 
 	// create property lists for test cases
-	propDirect, _ := property.ExtractList(x, pdf.Dict{"X": pdf.Integer(1)}, true)
-	propIndirect, _ := property.ExtractList(x, pdf.Dict{"X": pdf.NewReference(1, 0)}, true)
+	propDirect, _ := property.ExtractList(x, nil, pdf.Dict{"X": pdf.Integer(1)}, true)
+	propIndirect, _ := property.ExtractList(x, nil, pdf.Dict{"X": pdf.NewReference(1, 0)}, true)
 
 	var testCases = []TestCase{
 		{nil, "/test MP", nil},

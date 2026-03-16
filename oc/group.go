@@ -44,8 +44,8 @@ type Group struct {
 var _ pdf.Embedder = (*Group)(nil)
 
 // ExtractGroup extracts an optional content group from a PDF object.
-func ExtractGroup(x *pdf.Extractor, obj pdf.Object, _ bool) (*Group, error) {
-	dict, err := x.GetDictTyped(obj, "OCG")
+func ExtractGroup(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Group, error) {
+	dict, err := x.GetDictTyped(path, obj, "OCG")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -64,14 +64,14 @@ func ExtractGroup(x *pdf.Extractor, obj pdf.Object, _ bool) (*Group, error) {
 	}
 
 	// Intent (optional) can be either a single name or an array of names.
-	intent, err := x.Resolve(dict["Intent"])
+	intent, err := x.Resolve(path, dict["Intent"])
 	if err != nil {
 		return nil, err
 	}
 	switch intent := intent.(type) {
 	case pdf.Array:
 		for _, o := range intent {
-			if name, err := pdf.Optional(x.GetName(o)); err != nil {
+			if name, err := pdf.Optional(x.GetName(path, o)); err != nil {
 				return nil, err
 			} else if name != "" {
 				group.Intent = append(group.Intent, name)
@@ -86,7 +86,7 @@ func ExtractGroup(x *pdf.Extractor, obj pdf.Object, _ bool) (*Group, error) {
 		group.Intent = []pdf.Name{"View"}
 	}
 
-	if usage, err := pdf.ExtractorGetOptional(x, dict["Usage"], ExtractUsage); err != nil {
+	if usage, err := pdf.ExtractorGetOptional(x, path, dict["Usage"], ExtractUsage); err != nil {
 		return nil, err
 	} else {
 		group.Usage = usage

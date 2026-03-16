@@ -64,17 +64,17 @@ func (i *Ink) AnnotationType() pdf.Name {
 	return "Ink"
 }
 
-func decodeInk(x *pdf.Extractor, dict pdf.Dict) (*Ink, error) {
+func decodeInk(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Ink, error) {
 	r := x.R
 	ink := &Ink{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, &ink.Common, dict); err != nil {
+	if err := decodeCommon(x, path, &ink.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(x, dict, &ink.Markup); err != nil {
+	if err := decodeMarkup(x, path, dict, &ink.Markup); err != nil {
 		return nil, err
 	}
 
@@ -95,7 +95,7 @@ func decodeInk(x *pdf.Extractor, dict pdf.Dict) (*Ink, error) {
 	}
 
 	// BS (optional)
-	if bs, err := pdf.Optional(pdf.ExtractorGet(x, dict["BS"], ExtractBorderStyle)); err != nil {
+	if bs, err := pdf.Optional(pdf.ExtractorGet(x, path, dict["BS"], ExtractBorderStyle)); err != nil {
 		return nil, err
 	} else {
 		ink.BorderStyle = bs
@@ -106,9 +106,9 @@ func decodeInk(x *pdf.Extractor, dict pdf.Dict) (*Ink, error) {
 	}
 
 	// Path (optional; PDF 2.0)
-	if path, err := pdf.GetArray(r, dict["Path"]); err == nil && len(path) > 0 {
-		pathArrays := make([][]float64, 0, len(path))
-		for _, pathEntry := range path {
+	if pathArray, err := pdf.GetArray(r, dict["Path"]); err == nil && len(pathArray) > 0 {
+		pathArrays := make([][]float64, 0, len(pathArray))
+		for _, pathEntry := range pathArray {
 			if coords, err := pdf.GetFloatArray(r, pathEntry); err == nil {
 				pathArrays = append(pathArrays, coords)
 			}

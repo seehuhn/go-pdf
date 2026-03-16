@@ -50,12 +50,12 @@ type Type6 struct {
 var _ graphics.Halftone = (*Type6)(nil)
 
 // extractType6 reads a Type 6 halftone from a PDF stream.
-func extractType6(x *pdf.Extractor, stream *pdf.Stream) (*Type6, error) {
+func extractType6(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*Type6, error) {
 	dict := stream.Dict
 
 	h := &Type6{}
 
-	if width, err := x.GetInteger(dict["Width"]); err != nil {
+	if width, err := x.GetInteger(path, dict["Width"]); err != nil {
 		return nil, err
 	} else if width > 0 && width <= 1024 {
 		h.Width = int(width)
@@ -63,7 +63,7 @@ func extractType6(x *pdf.Extractor, stream *pdf.Stream) (*Type6, error) {
 		return nil, pdf.Error("invalid Type 6 halftone Width")
 	}
 
-	if height, err := x.GetInteger(dict["Height"]); err != nil {
+	if height, err := x.GetInteger(path, dict["Height"]); err != nil {
 		return nil, err
 	} else if height > 0 && height <= 1024 {
 		h.Height = int(height)
@@ -76,7 +76,7 @@ func extractType6(x *pdf.Extractor, stream *pdf.Stream) (*Type6, error) {
 	} else if tf == pdf.Name("Identity") {
 		h.TransferFunction = function.Identity
 	} else {
-		if F, err := pdf.Optional(function.Extract(x, tf, false)); err != nil {
+		if F, err := pdf.Optional(function.Extract(x, path, tf, false)); err != nil {
 			return nil, err
 		} else if isValidTransferFunction(F) {
 			h.TransferFunction = F

@@ -102,7 +102,7 @@ func (r *Reader) Reset() {
 
 // ParsePage parses a page, and calls the appropriate callback functions.
 func (r *Reader) ParsePage(page pdf.Object, ctm matrix.Matrix) error {
-	pageDict, err := r.x.GetDictTyped(page, "Page")
+	pageDict, err := r.x.GetDictTyped(nil, page, "Page")
 	if err != nil {
 		return err
 	}
@@ -111,7 +111,7 @@ func (r *Reader) ParsePage(page pdf.Object, ctm matrix.Matrix) error {
 	// code in seehuhn.de/go/pdf/pagetree that copies inherited resources from
 	// the parent, but this needs to be checked and documented.  Also, it
 	// reduces generality of the ParsePage method.
-	res, err := pdf.ExtractorGet(r.x, pageDict["Resources"], extract.Resources)
+	res, err := pdf.ExtractorGet(r.x, nil, pageDict["Resources"], extract.Resources)
 	if err != nil {
 		return err
 	}
@@ -401,7 +401,7 @@ func (r *Reader) extractMarkedContent(tag pdf.Name, propArg pdf.Object) (*graphi
 	} else {
 		// Inline property dictionary
 		var err error
-		list, err = property.ExtractList(r.x, propArg, true)
+		list, err = property.ExtractList(r.x, nil, propArg, true)
 		if err != nil {
 			return nil, err
 		}

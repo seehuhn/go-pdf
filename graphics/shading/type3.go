@@ -102,7 +102,7 @@ func (s *Type3) Equal(other graphics.Shading) bool {
 }
 
 // extractType3 reads a Type 3 (radial) shading from a PDF dictionary.
-func extractType3(x *pdf.Extractor, d pdf.Dict, isDirect bool) (*Type3, error) {
+func extractType3(x *pdf.Extractor, path *pdf.CycleCheck, d pdf.Dict, isDirect bool) (*Type3, error) {
 	s := &Type3{}
 
 	// Read required ColorSpace
@@ -112,7 +112,7 @@ func extractType3(x *pdf.Extractor, d pdf.Dict, isDirect bool) (*Type3, error) {
 			Err: fmt.Errorf("missing /ColorSpace entry"),
 		}
 	}
-	cs, err := color.ExtractSpace(x, csObj, false)
+	cs, err := color.ExtractSpace(x, path, csObj, false)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func extractType3(x *pdf.Extractor, d pdf.Dict, isDirect bool) (*Type3, error) {
 			Err: fmt.Errorf("missing /Function entry"),
 		}
 	}
-	fn, err := pdf.ExtractorGet(x, fnObj, function.Extract)
+	fn, err := pdf.ExtractorGet(x, path, fnObj, function.Extract)
 	if err != nil {
 		return nil, err
 	}
@@ -194,18 +194,18 @@ func extractType3(x *pdf.Extractor, d pdf.Dict, isDirect bool) (*Type3, error) {
 
 	// Read optional Extend
 	if extendObj, ok := d["Extend"]; ok {
-		if extendArray, err := pdf.Optional(x.GetArray(extendObj)); err != nil {
+		if extendArray, err := pdf.Optional(x.GetArray(path, extendObj)); err != nil {
 			return nil, err
 		} else {
 			if len(extendArray) >= 1 {
-				if extendStart, err := pdf.Optional(x.GetBoolean(extendArray[0])); err != nil {
+				if extendStart, err := pdf.Optional(x.GetBoolean(path, extendArray[0])); err != nil {
 					return nil, err
 				} else {
 					s.ExtendStart = bool(extendStart)
 				}
 			}
 			if len(extendArray) >= 2 {
-				if extendEnd, err := pdf.Optional(x.GetBoolean(extendArray[1])); err != nil {
+				if extendEnd, err := pdf.Optional(x.GetBoolean(path, extendArray[1])); err != nil {
 					return nil, err
 				} else {
 					s.ExtendEnd = bool(extendEnd)
@@ -237,7 +237,7 @@ func extractType3(x *pdf.Extractor, d pdf.Dict, isDirect bool) (*Type3, error) {
 
 	// Read optional AntiAlias
 	if aaObj, ok := d["AntiAlias"]; ok {
-		if aa, err := pdf.Optional(x.GetBoolean(aaObj)); err != nil {
+		if aa, err := pdf.Optional(x.GetBoolean(path, aaObj)); err != nil {
 			return nil, err
 		} else {
 			s.AntiAlias = bool(aa)

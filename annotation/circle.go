@@ -91,23 +91,23 @@ func (c *Circle) AnnotationType() pdf.Name {
 	return "Circle"
 }
 
-func decodeCircle(x *pdf.Extractor, dict pdf.Dict) (*Circle, error) {
+func decodeCircle(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Circle, error) {
 	r := x.R
 	circle := &Circle{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, &circle.Common, dict); err != nil {
+	if err := decodeCommon(x, path, &circle.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(x, dict, &circle.Markup); err != nil {
+	if err := decodeMarkup(x, path, dict, &circle.Markup); err != nil {
 		return nil, err
 	}
 
 	// Extract circle-specific fields
 	// BS (optional)
-	if bs, err := pdf.Optional(pdf.ExtractorGet(x, dict["BS"], ExtractBorderStyle)); err != nil {
+	if bs, err := pdf.Optional(pdf.ExtractorGet(x, path, dict["BS"], ExtractBorderStyle)); err != nil {
 		return nil, err
 	} else {
 		circle.BorderStyle = bs
@@ -117,7 +117,7 @@ func decodeCircle(x *pdf.Extractor, dict pdf.Dict) (*Circle, error) {
 		}
 
 		// BE (optional)
-		if be, err := pdf.ExtractorGetOptional(x, dict["BE"], ExtractBorderEffect); err != nil {
+		if be, err := pdf.ExtractorGetOptional(x, path, dict["BE"], ExtractBorderEffect); err != nil {
 			return nil, err
 		} else {
 			circle.BorderEffect = be

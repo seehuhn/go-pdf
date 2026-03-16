@@ -77,9 +77,9 @@ type NumberFormat struct {
 }
 
 // ExtractNumberFormat extracts a NumberFormat from a PDF object.
-func ExtractNumberFormat(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*NumberFormat, error) {
+func ExtractNumberFormat(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*NumberFormat, error) {
 
-	dict, err := x.GetDict(obj)
+	dict, err := x.GetDict(path, obj)
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -98,14 +98,14 @@ func ExtractNumberFormat(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Numb
 	}
 	nf.Unit = string(unit)
 
-	conversion, err := x.GetNumber(dict["C"])
+	conversion, err := x.GetNumber(path, dict["C"])
 	if err != nil {
 		return nil, err
 	}
 	nf.ConversionFactor = float64(conversion)
 
 	// Extract optional fields with defaults
-	if f, err := pdf.Optional(x.GetName(dict["F"])); err != nil {
+	if f, err := pdf.Optional(x.GetName(path, dict["F"])); err != nil {
 		return nil, err
 	} else {
 		switch f {
@@ -125,7 +125,7 @@ func ExtractNumberFormat(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Numb
 	// Extract Precision - conditional based on FractionFormat
 	precisionMeaningful := nf.FractionFormat == FractionDecimal || nf.FractionFormat == FractionFraction
 	if precisionMeaningful {
-		if precision, err := pdf.Optional(x.GetInteger(dict["D"])); err != nil {
+		if precision, err := pdf.Optional(x.GetInteger(path, dict["D"])); err != nil {
 			return nil, err
 		} else if precision != 0 {
 			nf.Precision = int(precision)
@@ -141,7 +141,7 @@ func ExtractNumberFormat(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Numb
 		nf.Precision = 0 // not meaningful for round/truncate
 	}
 
-	if fd, err := pdf.Optional(x.GetBoolean(dict["FD"])); err != nil {
+	if fd, err := pdf.Optional(x.GetBoolean(path, dict["FD"])); err != nil {
 		return nil, err
 	} else {
 		nf.ForceExactFraction = bool(fd)
@@ -176,7 +176,7 @@ func ExtractNumberFormat(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Numb
 		nf.SuffixSpacing = string(ss)
 	}
 
-	if o, err := pdf.Optional(x.GetName(dict["O"])); err != nil {
+	if o, err := pdf.Optional(x.GetName(path, dict["O"])); err != nil {
 		return nil, err
 	} else {
 		nf.PrefixLabel = (o == "P")

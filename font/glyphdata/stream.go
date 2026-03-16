@@ -59,28 +59,28 @@ var _ pdf.Embedder = (*Stream)(nil)
 //
 // The dictType parameter specifies the font dictionary type (e.g., "Type1", "TrueType", "Type0").
 // The fdKey parameter specifies the font descriptor key ("FontFile", "FontFile2" or "FontFile3").
-func ExtractStream(x *pdf.Extractor, obj pdf.Object, dictType, fdKey pdf.Name) (*Stream, error) {
-	stm, err := pdf.Optional(x.GetStream(obj))
+func ExtractStream(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, dictType, fdKey pdf.Name) (*Stream, error) {
+	stm, err := pdf.Optional(x.GetStream(path, obj))
 	if err != nil {
 		return nil, err
 	} else if stm == nil {
 		return nil, nil
 	}
 
-	tp, err := determineType(x, dictType, fdKey, stm.Dict)
+	tp, err := determineType(x, path, dictType, fdKey, stm.Dict)
 	if err != nil {
 		return nil, err
 	}
 
-	length1, err := pdf.Optional(x.GetInteger(stm.Dict["Length1"]))
+	length1, err := pdf.Optional(x.GetInteger(path, stm.Dict["Length1"]))
 	if err != nil {
 		return nil, err
 	}
-	length2, err := pdf.Optional(x.GetInteger(stm.Dict["Length2"]))
+	length2, err := pdf.Optional(x.GetInteger(path, stm.Dict["Length2"]))
 	if err != nil {
 		return nil, err
 	}
-	length3, err := pdf.Optional(x.GetInteger(stm.Dict["Length3"]))
+	length3, err := pdf.Optional(x.GetInteger(path, stm.Dict["Length3"]))
 	if err != nil {
 		return nil, err
 	}
@@ -211,8 +211,8 @@ func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 // determineType determines the glyphdata.Type from the font dictionary type,
 // font descriptor key, and stream dictionary.
-func determineType(x *pdf.Extractor, dictType, fdKey pdf.Name, streamDict pdf.Dict) (Type, error) {
-	subtype, err := pdf.Optional(x.GetName(streamDict["Subtype"]))
+func determineType(x *pdf.Extractor, path *pdf.CycleCheck, dictType, fdKey pdf.Name, streamDict pdf.Dict) (Type, error) {
+	subtype, err := pdf.Optional(x.GetName(path, streamDict["Subtype"]))
 	if err != nil {
 		return 0, err
 	}

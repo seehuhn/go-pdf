@@ -26,8 +26,8 @@ import (
 )
 
 // XObject extracts an XObject from a PDF file.
-func XObject(x *pdf.Extractor, obj pdf.Object, _ bool) (graphics.XObject, error) {
-	stm, err := x.GetStream(obj)
+func XObject(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (graphics.XObject, error) {
+	stm, err := x.GetStream(path, obj)
 	if err != nil {
 		return nil, err
 	} else if stm == nil {
@@ -40,23 +40,23 @@ func XObject(x *pdf.Extractor, obj pdf.Object, _ bool) (graphics.XObject, error)
 		return nil, err
 	}
 
-	subtype, err := x.GetName(stm.Dict["Subtype"])
+	subtype, err := x.GetName(path, stm.Dict["Subtype"])
 	if err != nil {
 		return nil, err
 	}
 
 	switch subtype {
 	case "Image":
-		if isImageMask, _ := x.GetBoolean(stm.Dict["ImageMask"]); isImageMask {
-			return image.ExtractMask(x, obj, false)
+		if isImageMask, _ := x.GetBoolean(path, stm.Dict["ImageMask"]); isImageMask {
+			return image.ExtractMask(x, path, obj, false)
 		}
-		img, err := image.ExtractDict(x, stm, false)
+		img, err := image.ExtractDict(x, path, stm, false)
 		return img, err
 	case "Form":
-		f, err := Form(x, stm, false)
+		f, err := Form(x, path, stm, false)
 		return f, err
 	case "PS":
-		ps, err := xobject.ExtractPostScript(x, stm)
+		ps, err := xobject.ExtractPostScript(x, path, stm)
 		return ps, err
 	default:
 		return nil, pdf.Errorf("unsupported XObject Subtype %q", subtype)

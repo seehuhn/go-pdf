@@ -90,7 +90,7 @@ func borderEffectRoundTrip(t *testing.T, version pdf.Version, data *BorderEffect
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := pdf.ExtractorGet(x, embedded, ExtractBorderEffect)
+	decoded, err := pdf.ExtractorGet(x, nil, embedded, ExtractBorderEffect)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -159,7 +159,7 @@ func FuzzBorderEffectRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		data, err := pdf.ExtractorGet(x, obj, ExtractBorderEffect)
+		data, err := pdf.ExtractorGet(x, nil, obj, ExtractBorderEffect)
 		if err != nil {
 			t.Skip("malformed object")
 		}

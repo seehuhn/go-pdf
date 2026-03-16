@@ -54,8 +54,8 @@ type Stream struct {
 }
 
 // ExtractStream extracts an embedded file stream from a PDF stream object.
-func ExtractStream(x *pdf.Extractor, obj pdf.Object, _ bool) (*Stream, error) {
-	stream, err := x.GetStream(obj)
+func ExtractStream(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Stream, error) {
+	stream, err := x.GetStream(path, obj)
 	if err != nil {
 		return nil, err
 	} else if stream == nil {
@@ -70,18 +70,18 @@ func ExtractStream(x *pdf.Extractor, obj pdf.Object, _ bool) (*Stream, error) {
 	result := &Stream{}
 
 	// Extract Subtype (MimeType) - optional
-	if subtype, err := pdf.Optional(x.GetName(stream.Dict["Subtype"])); err != nil {
+	if subtype, err := pdf.Optional(x.GetName(path, stream.Dict["Subtype"])); err != nil {
 		return nil, err
 	} else {
 		result.MimeType = string(subtype)
 	}
 
 	// Extract Params dictionary - optional
-	if paramsDict, err := pdf.Optional(x.GetDict(stream.Dict["Params"])); err != nil {
+	if paramsDict, err := pdf.Optional(x.GetDict(path, stream.Dict["Params"])); err != nil {
 		return nil, err
 	} else if paramsDict != nil {
 		// Extract Size
-		if size, err := pdf.Optional(x.GetInteger(paramsDict["Size"])); err != nil {
+		if size, err := pdf.Optional(x.GetInteger(path, paramsDict["Size"])); err != nil {
 			return nil, err
 		} else if size >= 0 {
 			result.Size = int64(size)
@@ -102,7 +102,7 @@ func ExtractStream(x *pdf.Extractor, obj pdf.Object, _ bool) (*Stream, error) {
 		}
 
 		// Extract CheckSum
-		if checkSum, err := pdf.Optional(x.GetString(paramsDict["CheckSum"])); err != nil {
+		if checkSum, err := pdf.Optional(x.GetString(path, paramsDict["CheckSum"])); err != nil {
 			return nil, err
 		} else if len(checkSum) == 16 { // MD5 is exactly 16 bytes
 			result.CheckSum = []byte(checkSum)

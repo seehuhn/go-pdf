@@ -120,7 +120,7 @@ func type5VerticesEqual(a, b []Type5Vertex) bool {
 }
 
 // extractType5 reads a Type 5 (lattice-form Gouraud-shaded triangle mesh) shading from a PDF stream.
-func extractType5(x *pdf.Extractor, stream *pdf.Stream) (*Type5, error) {
+func extractType5(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*Type5, error) {
 	d := stream.Dict
 	s := &Type5{}
 
@@ -131,7 +131,7 @@ func extractType5(x *pdf.Extractor, stream *pdf.Stream) (*Type5, error) {
 			Err: fmt.Errorf("missing /ColorSpace entry"),
 		}
 	}
-	cs, err := color.ExtractSpace(x, csObj, false)
+	cs, err := color.ExtractSpace(x, path, csObj, false)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +144,7 @@ func extractType5(x *pdf.Extractor, stream *pdf.Stream) (*Type5, error) {
 			Err: fmt.Errorf("missing /BitsPerCoordinate entry"),
 		}
 	}
-	bpc, err := x.GetInteger(bpcObj)
+	bpc, err := x.GetInteger(path, bpcObj)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +165,7 @@ func extractType5(x *pdf.Extractor, stream *pdf.Stream) (*Type5, error) {
 			Err: fmt.Errorf("missing /BitsPerComponent entry"),
 		}
 	}
-	bpcomp, err := x.GetInteger(bpcompObj)
+	bpcomp, err := x.GetInteger(path, bpcompObj)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func extractType5(x *pdf.Extractor, stream *pdf.Stream) (*Type5, error) {
 			Err: fmt.Errorf("missing /VerticesPerRow entry"),
 		}
 	}
-	vpr, err := x.GetInteger(vprObj)
+	vpr, err := x.GetInteger(path, vprObj)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func extractType5(x *pdf.Extractor, stream *pdf.Stream) (*Type5, error) {
 
 	// Read optional Function
 	if fnObj, ok := d["Function"]; ok {
-		if fn, err := pdf.Optional(pdf.ExtractorGet(x, fnObj, function.Extract)); err != nil {
+		if fn, err := pdf.Optional(pdf.ExtractorGet(x, path, fnObj, function.Extract)); err != nil {
 			return nil, err
 		} else if fn != nil {
 			s.F = fn
@@ -261,7 +261,7 @@ func extractType5(x *pdf.Extractor, stream *pdf.Stream) (*Type5, error) {
 
 	// Read optional AntiAlias
 	if aaObj, ok := d["AntiAlias"]; ok {
-		if aa, err := pdf.Optional(x.GetBoolean(aaObj)); err != nil {
+		if aa, err := pdf.Optional(x.GetBoolean(path, aaObj)); err != nil {
 			return nil, err
 		} else {
 			s.AntiAlias = bool(aa)

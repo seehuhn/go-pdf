@@ -92,7 +92,7 @@ func (s *Type1) Equal(other graphics.Shading) bool {
 }
 
 // extractType1 reads a Type 1 (function-based) shading from a PDF dictionary.
-func extractType1(x *pdf.Extractor, d pdf.Dict, isDirect bool) (*Type1, error) {
+func extractType1(x *pdf.Extractor, path *pdf.CycleCheck, d pdf.Dict, isDirect bool) (*Type1, error) {
 	s := &Type1{}
 
 	// Read required ColorSpace
@@ -102,7 +102,7 @@ func extractType1(x *pdf.Extractor, d pdf.Dict, isDirect bool) (*Type1, error) {
 			Err: fmt.Errorf("missing /ColorSpace entry"),
 		}
 	}
-	cs, err := color.ExtractSpace(x, csObj, false)
+	cs, err := color.ExtractSpace(x, path, csObj, false)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func extractType1(x *pdf.Extractor, d pdf.Dict, isDirect bool) (*Type1, error) {
 			Err: fmt.Errorf("missing /Function entry"),
 		}
 	}
-	fn, err := pdf.ExtractorGet(x, fnObj, function.Extract)
+	fn, err := pdf.ExtractorGet(x, path, fnObj, function.Extract)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func extractType1(x *pdf.Extractor, d pdf.Dict, isDirect bool) (*Type1, error) {
 
 	// Read optional AntiAlias
 	if aaObj, ok := d["AntiAlias"]; ok {
-		if aa, err := pdf.Optional(x.GetBoolean(aaObj)); err != nil {
+		if aa, err := pdf.Optional(x.GetBoolean(path, aaObj)); err != nil {
 			return nil, err
 		} else {
 			s.AntiAlias = bool(aa)

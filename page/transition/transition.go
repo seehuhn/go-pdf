@@ -200,9 +200,9 @@ func (t *Transition) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 }
 
 // Extract reads a transition dictionary from a PDF file.
-func Extract(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Transition, error) {
+func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Transition, error) {
 
-	dict, err := x.GetDictTyped(obj, "Trans")
+	dict, err := x.GetDictTyped(path, obj, "Trans")
 	if err != nil {
 		return nil, err
 	}
@@ -213,28 +213,28 @@ func Extract(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Transition, erro
 	t := &Transition{}
 
 	// S: style
-	if s, err := pdf.Optional(x.GetName(dict["S"])); err != nil {
+	if s, err := pdf.Optional(x.GetName(path, dict["S"])); err != nil {
 		return nil, err
 	} else if s != "" {
 		t.Style = Style(s)
 	}
 
 	// D: duration
-	if d, err := pdf.Optional(x.GetNumber(dict["D"])); err != nil {
+	if d, err := pdf.Optional(x.GetNumber(path, dict["D"])); err != nil {
 		return nil, err
 	} else if d != 0 {
 		t.Duration = d
 	}
 
 	// Dm: dimension
-	if dm, err := pdf.Optional(x.GetName(dict["Dm"])); err != nil {
+	if dm, err := pdf.Optional(x.GetName(path, dict["Dm"])); err != nil {
 		return nil, err
 	} else if dm != "" {
 		t.Dimension = Dimension(dm)
 	}
 
 	// M: motion
-	if m, err := pdf.Optional(x.GetName(dict["M"])); err != nil {
+	if m, err := pdf.Optional(x.GetName(path, dict["M"])); err != nil {
 		return nil, err
 	} else if m != "" {
 		t.Motion = Motion(m)
@@ -242,7 +242,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Transition, erro
 
 	// Di: direction (can be integer or name "None")
 	if diObj := dict["Di"]; diObj != nil {
-		resolved, err := x.Resolve(diObj)
+		resolved, err := x.Resolve(path, diObj)
 		if err != nil {
 			return nil, err
 		}
@@ -259,14 +259,14 @@ func Extract(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Transition, erro
 	}
 
 	// SS: scale
-	if ss, err := pdf.Optional(x.GetNumber(dict["SS"])); err != nil {
+	if ss, err := pdf.Optional(x.GetNumber(path, dict["SS"])); err != nil {
 		return nil, err
 	} else if ss != 0 {
 		t.Scale = ss
 	}
 
 	// B: opaque
-	if b, err := pdf.Optional(x.GetBoolean(dict["B"])); err != nil {
+	if b, err := pdf.Optional(x.GetBoolean(path, dict["B"])); err != nil {
 		return nil, err
 	} else {
 		t.Opaque = bool(b)

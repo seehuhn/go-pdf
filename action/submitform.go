@@ -75,16 +75,16 @@ func (a *SubmitForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeSubmitForm(x *pdf.Extractor, dict pdf.Dict) (*SubmitForm, error) {
+func decodeSubmitForm(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*SubmitForm, error) {
 	f := dict["F"]
 	if f == nil {
 		return nil, pdf.Error("SubmitForm action missing F entry")
 	}
 
-	fields, _ := x.GetArray(dict["Fields"])
-	flags, _ := pdf.Optional(x.GetInteger(dict["Flags"]))
+	fields, _ := x.GetArray(path, dict["Fields"])
+	flags, _ := pdf.Optional(x.GetInteger(path, dict["Flags"]))
 
-	next, err := DecodeActionList(x, dict["Next"], false)
+	next, err := DecodeActionList(x, path, dict["Next"], false)
 	if err != nil {
 		return nil, err
 	}

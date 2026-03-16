@@ -111,8 +111,8 @@ func pagesArray(refs []pdf.Reference) pdf.Array {
 }
 
 // Decode reads a separation dictionary from a PDF object.
-func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (*Dict, error) {
-	dict, err := x.GetDict(obj)
+func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Dict, error) {
+	dict, err := x.GetDict(path, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (*Dict, error) {
 	d := &Dict{}
 
 	// Pages (required)
-	pagesArr, err := x.GetArray(dict["Pages"])
+	pagesArr, err := x.GetArray(path, dict["Pages"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "Pages")
 	}
@@ -137,7 +137,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (*Dict, error) {
 	}
 
 	// DeviceColorant (required) - can be name or string
-	colorantObj, err := x.Resolve(dict["DeviceColorant"])
+	colorantObj, err := x.Resolve(path, dict["DeviceColorant"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "DeviceColorant")
 	}
@@ -152,7 +152,7 @@ func Decode(x *pdf.Extractor, obj pdf.Object, _ bool) (*Dict, error) {
 	}
 
 	// ColorSpace (optional)
-	d.ColorSpace, _ = color.ExtractSpace(x, dict["ColorSpace"], false)
+	d.ColorSpace, _ = color.ExtractSpace(x, path, dict["ColorSpace"], false)
 	if d.validateColorSpace() != nil {
 		d.ColorSpace = nil
 	}

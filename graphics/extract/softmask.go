@@ -28,13 +28,13 @@ import (
 // SoftMaskDict reads a soft-mask dictionary from a PDF file.
 // Returns nil without error if obj is nil or /None.
 // Note: For soft-mask images, use [SoftMaskImage] instead.
-func SoftMaskDict(x *pdf.Extractor, obj pdf.Object, _ bool) (graphics.SoftClip, error) {
+func SoftMaskDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (graphics.SoftClip, error) {
 	if obj == nil {
 		return nil, nil
 	}
 
 	// Check for /None name (explicit absence of soft mask)
-	resolved, err := pdf.Resolve(x.R, obj)
+	resolved, err := x.Resolve(path, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func SoftMaskDict(x *pdf.Extractor, obj pdf.Object, _ bool) (graphics.SoftClip, 
 		return nil, nil
 	}
 
-	dict, err := x.GetDict(obj)
+	dict, err := x.GetDict(path, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func SoftMaskDict(x *pdf.Extractor, obj pdf.Object, _ bool) (graphics.SoftClip, 
 	m := &softclip.Mask{}
 
 	// S - subtype (required)
-	sName, err := x.GetName(dict["S"])
+	sName, err := x.GetName(path, dict["S"])
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func SoftMaskDict(x *pdf.Extractor, obj pdf.Object, _ bool) (graphics.SoftClip, 
 			Err: errors.New("soft mask: missing G entry"),
 		}
 	}
-	g, err := Form(x, gObj, false)
+	g, err := Form(x, path, gObj, false)
 	if err != nil {
 		return nil, err
 	}
@@ -88,13 +88,13 @@ func SoftMaskDict(x *pdf.Extractor, obj pdf.Object, _ bool) (graphics.SoftClip, 
 
 	// BC - backdrop color (optional)
 	if bcObj := dict["BC"]; bcObj != nil {
-		bcArray, err := x.GetArray(bcObj)
+		bcArray, err := x.GetArray(path, bcObj)
 		if err != nil {
 			return nil, err
 		}
 		m.BC = make([]float64, len(bcArray))
 		for i, v := range bcArray {
-			num, err := x.GetNumber(v)
+			num, err := x.GetNumber(path, v)
 			if err != nil {
 				return nil, err
 			}
@@ -105,12 +105,12 @@ func SoftMaskDict(x *pdf.Extractor, obj pdf.Object, _ bool) (graphics.SoftClip, 
 	// TR - transfer function (optional)
 	if trObj := dict["TR"]; trObj != nil {
 		// Check for /Identity name
-		trResolved, err := pdf.Resolve(x.R, trObj)
+		trResolved, err := x.Resolve(path, trObj)
 		if err != nil {
 			return nil, err
 		}
 		if trResolved != pdf.Name("Identity") {
-			tr, err := function.Extract(x, trObj, false)
+			tr, err := function.Extract(x, path, trObj, false)
 			if err != nil {
 				return nil, err
 			}

@@ -103,8 +103,8 @@ func (f *Form) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 // DecodeForm reads a form field's additional-actions dictionary from
 // a PDF object.
-func DecodeForm(x *pdf.Extractor, obj pdf.Object, _ bool) (*Form, error) {
-	dict, err := x.GetDict(obj)
+func DecodeForm(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Form, error) {
+	dict, err := x.GetDict(path, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -114,25 +114,25 @@ func DecodeForm(x *pdf.Extractor, obj pdf.Object, _ bool) (*Form, error) {
 
 	f := &Form{}
 
-	if act, err := pdf.ExtractorGetOptional(x, dict["K"], action.Decode); err != nil {
+	if act, err := pdf.ExtractorGetOptional(x, path, dict["K"], action.Decode); err != nil {
 		return nil, err
 	} else if js, ok := act.(*action.JavaScript); ok {
 		f.Keystroke = js
 	}
 
-	if act, err := pdf.ExtractorGetOptional(x, dict["F"], action.Decode); err != nil {
+	if act, err := pdf.ExtractorGetOptional(x, path, dict["F"], action.Decode); err != nil {
 		return nil, err
 	} else if js, ok := act.(*action.JavaScript); ok {
 		f.Format = js
 	}
 
-	if act, err := pdf.ExtractorGetOptional(x, dict["V"], action.Decode); err != nil {
+	if act, err := pdf.ExtractorGetOptional(x, path, dict["V"], action.Decode); err != nil {
 		return nil, err
 	} else if js, ok := act.(*action.JavaScript); ok {
 		f.Validate = js
 	}
 
-	if act, err := pdf.ExtractorGetOptional(x, dict["C"], action.Decode); err != nil {
+	if act, err := pdf.ExtractorGetOptional(x, path, dict["C"], action.Decode); err != nil {
 		return nil, err
 	} else if js, ok := act.(*action.JavaScript); ok {
 		f.Calculate = js

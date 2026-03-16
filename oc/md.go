@@ -55,9 +55,9 @@ type Membership struct {
 var _ pdf.Embedder = (*Membership)(nil)
 
 // ExtractMembership extracts an optional content membership dictionary from a PDF object.
-func ExtractMembership(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Membership, error) {
+func ExtractMembership(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Membership, error) {
 
-	dict, err := x.GetDictTyped(obj, "OCMD")
+	dict, err := x.GetDictTyped(path, obj, "OCMD")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -66,28 +66,28 @@ func ExtractMembership(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Member
 
 	m := &Membership{}
 
-	ocgsObj, err := x.Resolve(dict["OCGs"])
+	ocgsObj, err := x.Resolve(path, dict["OCGs"])
 	if err != nil {
 		return nil, err
 	}
 	switch arr := ocgsObj.(type) {
 	case pdf.Array:
 		for _, item := range arr {
-			if group, err := pdf.ExtractorGetOptional(x, item, ExtractGroup); err != nil {
+			if group, err := pdf.ExtractorGetOptional(x, path, item, ExtractGroup); err != nil {
 				return nil, err
 			} else if group != nil {
 				m.OCGs = append(m.OCGs, group)
 			}
 		}
 	default:
-		if group, err := pdf.ExtractorGetOptional(x, ocgsObj, ExtractGroup); err != nil {
+		if group, err := pdf.ExtractorGetOptional(x, path, ocgsObj, ExtractGroup); err != nil {
 			return nil, err
 		} else if group != nil {
 			m.OCGs = []*Group{group}
 		}
 	}
 
-	if pName, err := pdf.Optional(x.GetName(dict["P"])); err != nil {
+	if pName, err := pdf.Optional(x.GetName(path, dict["P"])); err != nil {
 		return nil, err
 	} else {
 		switch Policy(pName) {
@@ -98,7 +98,7 @@ func ExtractMembership(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Member
 		}
 	}
 
-	if ve, err := pdf.ExtractorGetOptional(x, dict["VE"], ExtractVisibilityExpression); err != nil {
+	if ve, err := pdf.ExtractorGetOptional(x, path, dict["VE"], ExtractVisibilityExpression); err != nil {
 		return nil, err
 	} else {
 		m.VE = ve

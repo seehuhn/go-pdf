@@ -72,8 +72,8 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 // DecodePage reads a page object's additional-actions dictionary from
 // a PDF object.
-func DecodePage(x *pdf.Extractor, obj pdf.Object, _ bool) (*Page, error) {
-	dict, err := x.GetDict(obj)
+func DecodePage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Page, error) {
+	dict, err := x.GetDict(path, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -83,13 +83,13 @@ func DecodePage(x *pdf.Extractor, obj pdf.Object, _ bool) (*Page, error) {
 
 	p := &Page{}
 
-	if act, err := pdf.ExtractorGetOptional(x, dict["O"], action.Decode); err != nil {
+	if act, err := pdf.ExtractorGetOptional(x, path, dict["O"], action.Decode); err != nil {
 		return nil, err
 	} else {
 		p.PageOpen = act
 	}
 
-	if act, err := pdf.ExtractorGetOptional(x, dict["C"], action.Decode); err != nil {
+	if act, err := pdf.ExtractorGetOptional(x, path, dict["C"], action.Decode); err != nil {
 		return nil, err
 	} else {
 		p.PageClose = act

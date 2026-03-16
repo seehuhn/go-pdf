@@ -59,11 +59,11 @@ type Type16 struct {
 var _ graphics.Halftone = (*Type16)(nil)
 
 // extractType16 reads a Type 16 halftone from a PDF stream.
-func extractType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
+func extractType16(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*Type16, error) {
 	h := &Type16{}
 
 	if width, ok := stream.Dict["Width"]; ok {
-		widthVal, err := x.GetInteger(width)
+		widthVal, err := x.GetInteger(path, width)
 		if err != nil {
 			return nil, err
 		}
@@ -71,7 +71,7 @@ func extractType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
 	}
 
 	if height, ok := stream.Dict["Height"]; ok {
-		heightVal, err := x.GetInteger(height)
+		heightVal, err := x.GetInteger(path, height)
 		if err != nil {
 			return nil, err
 		}
@@ -79,7 +79,7 @@ func extractType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
 	}
 
 	if width2, ok := stream.Dict["Width2"]; ok {
-		width2Val, err := x.GetInteger(width2)
+		width2Val, err := x.GetInteger(path, width2)
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +87,7 @@ func extractType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
 	}
 
 	if height2, ok := stream.Dict["Height2"]; ok {
-		height2Val, err := x.GetInteger(height2)
+		height2Val, err := x.GetInteger(path, height2)
 		if err != nil {
 			return nil, err
 		}
@@ -99,7 +99,7 @@ func extractType16(x *pdf.Extractor, stream *pdf.Stream) (*Type16, error) {
 	} else if tf == pdf.Name("Identity") {
 		h.TransferFunction = function.Identity
 	} else {
-		if F, err := pdf.ExtractorGetOptional(x, tf, function.Extract); err != nil {
+		if F, err := pdf.ExtractorGetOptional(x, path, tf, function.Extract); err != nil {
 			return nil, err
 		} else if isValidTransferFunction(F) {
 			h.TransferFunction = F

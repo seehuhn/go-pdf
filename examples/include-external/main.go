@@ -106,7 +106,7 @@ func LoadFigure(fname string) (graphics.XObject, *pdf.Rectangle, error) {
 	x := pdf.NewExtractor(r)
 	var res *content.Resources
 	if resObj := pageDict["Resources"]; resObj != nil {
-		res, err = pdf.ExtractorGet(x, resObj, extract.Resources)
+		res, err = pdf.ExtractorGet(x, nil, resObj, extract.Resources)
 		if err != nil {
 			return nil, nil, err
 		}

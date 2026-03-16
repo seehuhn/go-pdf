@@ -55,7 +55,7 @@ func Pages(r pdf.Getter, pattern string) (*PageRange, error) {
 		return nil, fmt.Errorf("invalid regex pattern: %w", err)
 	}
 
-	tree, err := outline.Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines, false)
+	tree, err := outline.Decode(pdf.NewExtractor(r), nil, r.GetMeta().Catalog.Outlines, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read outline: %w", err)
 	}
@@ -278,10 +278,10 @@ func resolveNamedDest(r pdf.Getter, name pdf.String) (destination.Destination, e
 
 	// try catalog Dests dictionary (PDF 1.1)
 	if meta.Catalog.Dests != nil {
-		destsDict, err := x.GetDict(meta.Catalog.Dests)
+		destsDict, err := x.GetDict(nil, meta.Catalog.Dests)
 		if err == nil && destsDict != nil {
 			if obj := destsDict[pdf.Name(name)]; obj != nil {
-				dest, err := destination.Decode(x, obj, false)
+				dest, err := destination.Decode(x, nil, obj, false)
 				if err == nil {
 					return dest, nil
 				}
@@ -291,14 +291,14 @@ func resolveNamedDest(r pdf.Getter, name pdf.String) (destination.Destination, e
 
 	// try Names/Dests name tree (PDF 1.2+)
 	if meta.Catalog.Names != nil {
-		namesDict, err := x.GetDict(meta.Catalog.Names)
+		namesDict, err := x.GetDict(nil, meta.Catalog.Names)
 		if err == nil && namesDict != nil {
 			if destsObj := namesDict["Dests"]; destsObj != nil {
 				tree, err := nametree.ExtractFromFile(r, destsObj)
 				if err == nil {
 					obj, err := tree.Lookup(pdf.Name(name))
 					if err == nil {
-						return destination.Decode(x, obj, false)
+						return destination.Decode(x, nil, obj, false)
 					}
 				}
 			}
@@ -395,7 +395,7 @@ func findNextAtLevel(items []*outline.Item, target *outline.Item, targetLevel, c
 // ListAll returns a list of all outline entries in the document.
 // Each entry is formatted with dotted-line padding and a page number.
 func ListAll(r pdf.Getter) ([]string, error) {
-	tree, err := outline.Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines, false)
+	tree, err := outline.Decode(pdf.NewExtractor(r), nil, r.GetMeta().Catalog.Outlines, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read outline: %w", err)
 	}
@@ -450,7 +450,7 @@ func FindNext(r pdf.Getter, pattern string) (string, error) {
 		return "", fmt.Errorf("invalid regex pattern: %w", err)
 	}
 
-	tree, err := outline.Decode(pdf.NewExtractor(r), r.GetMeta().Catalog.Outlines, false)
+	tree, err := outline.Decode(pdf.NewExtractor(r), nil, r.GetMeta().Catalog.Outlines, false)
 	if err != nil {
 		return "", fmt.Errorf("failed to read outline: %w", err)
 	}

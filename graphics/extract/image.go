@@ -22,16 +22,16 @@ import (
 )
 
 // Image extracts an image dictionary from a PDF stream.
-func Image(x *pdf.Extractor, obj pdf.Object, _ bool) (*image.Dict, error) {
-	return image.ExtractDict(x, obj, false)
+func Image(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*image.Dict, error) {
+	return image.ExtractDict(x, path, obj, false)
 }
 
 // ImageMask extracts an image mask from a PDF stream.
-func ImageMask(x *pdf.Extractor, obj pdf.Object, _ bool) (*image.Mask, error) {
-	return image.ExtractMask(x, obj, false)
+func ImageMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*image.Mask, error) {
+	return image.ExtractMask(x, path, obj, false)
 }
 
 // SoftMaskImage extracts a soft mask from a PDF stream.
-func SoftMaskImage(x *pdf.Extractor, obj pdf.Object, _ bool) (*image.SoftMask, error) {
-	return image.ExtractSoftMask(x, obj, false)
+func SoftMaskImage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*image.SoftMask, error) {
+	return image.ExtractSoftMask(x, path, obj, false)
 }

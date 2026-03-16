@@ -94,31 +94,31 @@ func (l *Link) AnnotationType() pdf.Name {
 	return "Link"
 }
 
-func decodeLink(x *pdf.Extractor, dict pdf.Dict) (*Link, error) {
+func decodeLink(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Link, error) {
 	link := &Link{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, &link.Common, dict); err != nil {
+	if err := decodeCommon(x, path, &link.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract link-specific fields
 	if dict["A"] != nil {
-		act, err := pdf.Optional(action.Decode(x, dict["A"], false))
+		act, err := pdf.Optional(action.Decode(x, path, dict["A"], false))
 		if err != nil {
 			return nil, err
 		}
 		link.Action = act
 	}
 	if dict["Dest"] != nil && link.Action == nil {
-		dest, err := pdf.Optional(destination.Decode(x, dict["Dest"], false))
+		dest, err := pdf.Optional(destination.Decode(x, path, dict["Dest"], false))
 		if err != nil {
 			return nil, err
 		}
 		link.Destination = dest
 	}
 
-	if h, _ := x.GetName(dict["H"]); h != "" {
+	if h, _ := x.GetName(path, dict["H"]); h != "" {
 		link.Highlight = LinkHighlight(h)
 	} else {
 		link.Highlight = LinkHighlightInvert // default value
@@ -141,7 +141,7 @@ func decodeLink(x *pdf.Extractor, dict pdf.Dict) (*Link, error) {
 		link.QuadPoints = points
 	}
 
-	if bs, err := pdf.ExtractorGetOptional(x, dict["BS"], ExtractBorderStyle); err != nil {
+	if bs, err := pdf.ExtractorGetOptional(x, path, dict["BS"], ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		link.BorderStyle = bs

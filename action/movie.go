@@ -84,9 +84,9 @@ func (a *Movie) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeMovie(x *pdf.Extractor, dict pdf.Dict) (*Movie, error) {
+func decodeMovie(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Movie, error) {
 	annotation := dict["Annotation"]
-	t, err := pdf.Optional(x.GetString(dict["T"]))
+	t, err := pdf.Optional(x.GetString(path, dict["T"]))
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func decodeMovie(x *pdf.Extractor, dict pdf.Dict) (*Movie, error) {
 		return nil, pdf.Error("Movie action missing both Annotation and T")
 	}
 
-	operation, err := pdf.Optional(x.GetName(dict["Operation"]))
+	operation, err := pdf.Optional(x.GetName(path, dict["Operation"]))
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func decodeMovie(x *pdf.Extractor, dict pdf.Dict) (*Movie, error) {
 		operation = pdf.Name(MovieOperationPlay)
 	}
 
-	next, err := DecodeActionList(x, dict["Next"], false)
+	next, err := DecodeActionList(x, path, dict["Next"], false)
 	if err != nil {
 		return nil, err
 	}

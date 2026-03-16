@@ -68,13 +68,13 @@ func (a *Trans) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeTrans(x *pdf.Extractor, dict pdf.Dict) (*Trans, error) {
-	trans, err := pdf.ExtractorGet(x, dict["Trans"], transition.Extract)
+func decodeTrans(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Trans, error) {
+	trans, err := pdf.ExtractorGet(x, path, dict["Trans"], transition.Extract)
 	if err != nil {
 		return nil, err
 	}
 
-	next, err := DecodeActionList(x, dict["Next"], false)
+	next, err := DecodeActionList(x, path, dict["Next"], false)
 	if err != nil {
 		return nil, err
 	}

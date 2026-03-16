@@ -46,12 +46,12 @@ func (p *Popup) AnnotationType() pdf.Name {
 	return "Popup"
 }
 
-func decodePopup(x *pdf.Extractor, dict pdf.Dict) (*Popup, error) {
+func decodePopup(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Popup, error) {
 	r := x.R
 	popup := &Popup{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, &popup.Common, dict); err != nil {
+	if err := decodeCommon(x, path, &popup.Common, dict); err != nil {
 		return nil, err
 	}
 

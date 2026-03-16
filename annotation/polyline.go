@@ -100,16 +100,16 @@ func (p *PolyLine) AnnotationType() pdf.Name {
 	return "PolyLine"
 }
 
-func decodePolyline(x *pdf.Extractor, dict pdf.Dict) (*PolyLine, error) {
+func decodePolyline(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*PolyLine, error) {
 	polyline := &PolyLine{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, &polyline.Common, dict); err != nil {
+	if err := decodeCommon(x, path, &polyline.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(x, dict, &polyline.Markup); err != nil {
+	if err := decodeMarkup(x, path, dict, &polyline.Markup); err != nil {
 		return nil, err
 	}
 
@@ -123,14 +123,14 @@ func decodePolyline(x *pdf.Extractor, dict pdf.Dict) (*PolyLine, error) {
 
 	// LE (optional) - default is [None, None]
 	polyline.LineEndingStyle = [2]LineEndingStyle{LineEndingStyleNone, LineEndingStyleNone}
-	if le, err := pdf.Optional(x.GetArray(dict["LE"])); err != nil {
+	if le, err := pdf.Optional(x.GetArray(path, dict["LE"])); err != nil {
 		return nil, err
 	} else if len(le) >= 1 {
-		if name, err := x.GetName(le[0]); err == nil {
+		if name, err := x.GetName(path, le[0]); err == nil {
 			polyline.LineEndingStyle[0] = LineEndingStyle(name)
 		}
 		if len(le) >= 2 {
-			if name, err := x.GetName(le[1]); err == nil {
+			if name, err := x.GetName(path, le[1]); err == nil {
 				polyline.LineEndingStyle[1] = LineEndingStyle(name)
 			}
 		} else {
@@ -140,7 +140,7 @@ func decodePolyline(x *pdf.Extractor, dict pdf.Dict) (*PolyLine, error) {
 	}
 
 	// BS (optional)
-	if bs, err := pdf.ExtractorGetOptional(x, dict["BS"], ExtractBorderStyle); err != nil {
+	if bs, err := pdf.ExtractorGetOptional(x, path, dict["BS"], ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		polyline.BorderStyle = bs
@@ -158,16 +158,16 @@ func decodePolyline(x *pdf.Extractor, dict pdf.Dict) (*PolyLine, error) {
 	}
 
 	// Measure (optional)
-	if m, err := pdf.ExtractorGetOptional(x, dict["Measure"], measure.Extract); err != nil {
+	if m, err := pdf.ExtractorGetOptional(x, path, dict["Measure"], measure.Extract); err != nil {
 		return nil, err
 	} else {
 		polyline.Measure = m
 	}
 
 	// Path (optional; PDF 2.0)
-	if path, err := x.GetArray(dict["Path"]); err == nil && len(path) > 0 {
-		pathArrays := make([][]float64, 0, len(path))
-		for _, pathEntry := range path {
+	if pathArray, err := x.GetArray(path, dict["Path"]); err == nil && len(pathArray) > 0 {
+		pathArrays := make([][]float64, 0, len(pathArray))
+		for _, pathEntry := range pathArray {
 			if coords, err := pdf.GetFloatArray(x.R, pathEntry); err == nil {
 				pathArrays = append(pathArrays, coords)
 			}

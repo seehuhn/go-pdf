@@ -61,8 +61,8 @@ type Dict struct {
 var _ pdf.Embedder = (*Dict)(nil)
 
 // Extract reads an annotation appearance dictionary from the PDF object obj.
-func Extract(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Dict, error) {
-	dict, err := x.GetDict(obj)
+func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Dict, error) {
+	dict, err := x.GetDict(path, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Dict, error) {
 		SingleUse: isDirect,
 	}
 
-	N, err := x.Resolve(dict["N"])
+	N, err := x.Resolve(path, dict["N"])
 	if err != nil {
 		return nil, err
 	}
@@ -83,14 +83,14 @@ func Extract(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Dict, error) {
 		res.NormalMap = make(map[pdf.Name]*form.Form)
 		for key, obj := range N {
 			state := key
-			formObj, err := pdf.ExtractorGet(x, obj, extract.Form)
+			formObj, err := pdf.ExtractorGet(x, path, obj, extract.Form)
 			if err != nil {
 				return nil, err
 			}
 			res.NormalMap[state] = formObj
 		}
 	case *pdf.Stream:
-		formObj, err := pdf.ExtractorGet(x, N, extract.Form)
+		formObj, err := pdf.ExtractorGet(x, path, N, extract.Form)
 		if err != nil {
 			return nil, err
 		}
@@ -99,7 +99,7 @@ func Extract(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Dict, error) {
 		return nil, pdf.Errorf("invalid appearance dict entry: N %T", N)
 	}
 
-	R, _ := x.Resolve(dict["R"])
+	R, _ := x.Resolve(path, dict["R"])
 	if R == nil {
 		R = N
 	}
@@ -108,21 +108,21 @@ func Extract(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Dict, error) {
 		res.RollOverMap = make(map[pdf.Name]*form.Form)
 		for key, obj := range R {
 			state := key
-			formObj, err := pdf.ExtractorGet(x, obj, extract.Form)
+			formObj, err := pdf.ExtractorGet(x, path, obj, extract.Form)
 			if err != nil {
 				return nil, err
 			}
 			res.RollOverMap[state] = formObj
 		}
 	case *pdf.Stream:
-		formObj, err := pdf.ExtractorGet(x, R, extract.Form)
+		formObj, err := pdf.ExtractorGet(x, path, R, extract.Form)
 		if err != nil {
 			return nil, err
 		}
 		res.RollOver = formObj
 	}
 
-	D, _ := x.Resolve(dict["D"])
+	D, _ := x.Resolve(path, dict["D"])
 	if D == nil {
 		D = N
 	}
@@ -131,14 +131,14 @@ func Extract(x *pdf.Extractor, obj pdf.Object, isDirect bool) (*Dict, error) {
 		res.DownMap = make(map[pdf.Name]*form.Form)
 		for key, obj := range D {
 			state := key
-			formObj, err := pdf.ExtractorGet(x, obj, extract.Form)
+			formObj, err := pdf.ExtractorGet(x, path, obj, extract.Form)
 			if err != nil {
 				return nil, err
 			}
 			res.DownMap[state] = formObj
 		}
 	case *pdf.Stream:
-		formObj, err := pdf.ExtractorGet(x, D, extract.Form)
+		formObj, err := pdf.ExtractorGet(x, path, D, extract.Form)
 		if err != nil {
 			return nil, err
 		}

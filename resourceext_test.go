@@ -136,7 +136,7 @@ func TestExtractorResolveCycle(t *testing.T) {
 
 	// use the writer as a getter and try to resolve the cycle
 	x := pdf.NewExtractor(w)
-	_, err = x.Resolve(refA)
+	_, err = x.Resolve(nil, refA)
 	if err == nil {
 		t.Fatal("expected cycle error, got nil")
 	}
@@ -164,13 +164,13 @@ func TestExtractorGetArrayCycle(t *testing.T) {
 	// use the writer as a getter and try to resolve
 	x := pdf.NewExtractor(w)
 
-	extract := func(x *pdf.Extractor, obj pdf.Object, _ bool) (pdf.Array, error) {
-		arr, err := x.GetArray(obj.AsPDF(0))
+	extract := func(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (pdf.Array, error) {
+		arr, err := x.GetArray(path, obj.AsPDF(0))
 		if err != nil {
 			return nil, err
 		}
 		for i := range arr {
-			arr[i], err = x.Resolve(arr[i])
+			arr[i], err = x.Resolve(path, arr[i])
 			if err != nil {
 				return nil, err
 			}
@@ -178,7 +178,7 @@ func TestExtractorGetArrayCycle(t *testing.T) {
 		return arr, nil
 	}
 
-	_, err = pdf.ExtractorGet(x, refA, extract)
+	_, err = pdf.ExtractorGet(x, nil, refA, extract)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
 	}

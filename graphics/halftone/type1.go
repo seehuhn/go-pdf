@@ -58,10 +58,10 @@ type Type1 struct {
 var _ graphics.Halftone = (*Type1)(nil)
 
 // extractType1 reads a Type 1 halftone from a PDF dictionary.
-func extractType1(x *pdf.Extractor, dict pdf.Dict) (*Type1, error) {
+func extractType1(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Type1, error) {
 	h := &Type1{}
 
-	if freq, err := x.GetNumber(dict["Frequency"]); err != nil {
+	if freq, err := x.GetNumber(path, dict["Frequency"]); err != nil {
 		return nil, err
 	} else if freq > 0 {
 		h.Frequency = freq
@@ -70,7 +70,7 @@ func extractType1(x *pdf.Extractor, dict pdf.Dict) (*Type1, error) {
 	}
 
 	// Angle is not technically required, but we can default to 0.
-	if angle, err := pdf.Optional(x.GetNumber(dict["Angle"])); err != nil {
+	if angle, err := pdf.Optional(x.GetNumber(path, dict["Angle"])); err != nil {
 		return nil, err
 	} else {
 		h.Angle = angle
@@ -87,7 +87,7 @@ func extractType1(x *pdf.Extractor, dict pdf.Dict) (*Type1, error) {
 			}
 		case pdf.Array:
 			for _, elem := range spot {
-				if x, err := pdf.Optional(x.GetName(elem)); err == nil {
+				if x, err := pdf.Optional(x.GetName(path, elem)); err == nil {
 					if fn, ok := nameToSpot[x]; ok {
 						h.SpotFunction = fn
 						break
@@ -95,13 +95,13 @@ func extractType1(x *pdf.Extractor, dict pdf.Dict) (*Type1, error) {
 				}
 			}
 		case pdf.Dict:
-			spotFunc, err := function.Extract(x, spot, false)
+			spotFunc, err := function.Extract(x, path, spot, false)
 			if err != nil {
 				return nil, err
 			}
 			h.SpotFunction = spotFunc
 		case *pdf.Stream:
-			spotFunc, err := function.Extract(x, spot, false)
+			spotFunc, err := function.Extract(x, path, spot, false)
 			if err != nil {
 				return nil, err
 			}
@@ -115,7 +115,7 @@ func extractType1(x *pdf.Extractor, dict pdf.Dict) (*Type1, error) {
 	}
 
 	if accurateScreens, ok := dict["AccurateScreens"]; ok {
-		accurate, err := x.GetBoolean(accurateScreens)
+		accurate, err := x.GetBoolean(path, accurateScreens)
 		if err != nil {
 			return nil, err
 		}
@@ -127,7 +127,7 @@ func extractType1(x *pdf.Extractor, dict pdf.Dict) (*Type1, error) {
 	} else if tf == pdf.Name("Identity") {
 		h.TransferFunction = function.Identity
 	} else {
-		if F, err := pdf.Optional(function.Extract(x, tf, false)); err != nil {
+		if F, err := pdf.Optional(function.Extract(x, path, tf, false)); err != nil {
 			return nil, err
 		} else if isValidTransferFunction(F) {
 			h.TransferFunction = F

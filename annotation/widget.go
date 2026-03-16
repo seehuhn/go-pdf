@@ -78,12 +78,12 @@ func (w *Widget) AnnotationType() pdf.Name {
 	return "Widget"
 }
 
-func decodeWidget(x *pdf.Extractor, dict pdf.Dict) (*Widget, error) {
+func decodeWidget(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Widget, error) {
 	r := x.R
 	widget := &Widget{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, &widget.Common, dict); err != nil {
+	if err := decodeCommon(x, path, &widget.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -111,7 +111,7 @@ func decodeWidget(x *pdf.Extractor, dict pdf.Dict) (*Widget, error) {
 	}
 
 	// BS (optional)
-	if bs, err := pdf.Optional(pdf.ExtractorGet(x, dict["BS"], ExtractBorderStyle)); err != nil {
+	if bs, err := pdf.Optional(pdf.ExtractorGet(x, path, dict["BS"], ExtractBorderStyle)); err != nil {
 		return nil, err
 	} else {
 		widget.BorderStyle = bs
