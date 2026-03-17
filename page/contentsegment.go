@@ -43,10 +43,15 @@ type contentSegment struct {
 	mu           sync.Mutex
 	trailingArgs []pdf.Object
 	decoded      bool
-	err          error
+	decodeErr    error
 }
 
 var _ content.Stream = (*contentSegment)(nil)
+
+// NewIter creates a new iterator for this content segment.
+func (seg *contentSegment) NewIter() content.Iter {
+	return &segmentIter{seg: seg}
+}
 
 // ensureDecoded scans the segment (and all predecessors) to compute
 // trailingArgs. This is needed when a later segment requires the
@@ -56,7 +61,7 @@ func (seg *contentSegment) ensureDecoded() error {
 	defer seg.mu.Unlock()
 
 	if seg.decoded {
-		return seg.err
+		return seg.decodeErr
 	}
 	seg.decoded = true
 
@@ -64,7 +69,7 @@ func (seg *contentSegment) ensureDecoded() error {
 	var initArgs []pdf.Object
 	if seg.prev != nil {
 		if err := seg.prev.ensureDecoded(); err != nil {
-			seg.err = err
+			seg.decodeErr = err
 			return err
 		}
 		seg.prev.mu.Lock()
@@ -74,7 +79,7 @@ func (seg *contentSegment) ensureDecoded() error {
 
 	r, err := seg.rawReader()
 	if err != nil {
-		seg.err = err
+		seg.decodeErr = err
 		return err
 	}
 	defer r.Close()
@@ -90,7 +95,7 @@ func (seg *contentSegment) ensureDecoded() error {
 	})
 	seg.trailingArgs = ps.TrailingArgs()
 	if psErr := ps.Err(); psErr != nil {
-		seg.err = psErr
+		seg.decodeErr = psErr
 		return psErr
 	}
 	return nil
@@ -101,18 +106,29 @@ func (seg *contentSegment) rawReader() (io.ReadCloser, error) {
 	return pdf.DecodeStream(seg.getter, seg.stream, 0)
 }
 
+// Embed writes the content segment to a PDF file as a stream object.
+func (seg *contentSegment) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
+	return embedContentStream(e, seg)
+}
+
+// segmentIter is a single-use [content.Iter] for a contentSegment.
+type segmentIter struct {
+	seg *contentSegment
+	err error
+}
+
 // All returns an iterator over the operators in this segment.
 // Trailing args from the previous segment are prepended to the first
 // operator.
-func (seg *contentSegment) All() iter.Seq2[content.OpName, []pdf.Object] {
+func (si *segmentIter) All() iter.Seq2[content.OpName, []pdf.Object] {
 	return func(yield func(content.OpName, []pdf.Object) bool) {
+		seg := si.seg
+
 		// get initial args from predecessor
 		var initArgs []pdf.Object
 		if seg.prev != nil {
 			if err := seg.prev.ensureDecoded(); err != nil {
-				seg.mu.Lock()
-				seg.err = err
-				seg.mu.Unlock()
+				si.err = err
 				return
 			}
 			seg.prev.mu.Lock()
@@ -122,9 +138,7 @@ func (seg *contentSegment) All() iter.Seq2[content.OpName, []pdf.Object] {
 
 		r, err := seg.rawReader()
 		if err != nil {
-			seg.mu.Lock()
-			seg.err = err
-			seg.mu.Unlock()
+			si.err = err
 			return
 		}
 		defer r.Close()
@@ -136,7 +150,7 @@ func (seg *contentSegment) All() iter.Seq2[content.OpName, []pdf.Object] {
 		exhausted := ps.ScanReader(r, yield)
 		seg.mu.Lock()
 		if psErr := ps.Err(); psErr != nil {
-			seg.err = psErr
+			si.err = psErr
 		} else if exhausted && !seg.decoded {
 			seg.decoded = true
 			seg.trailingArgs = ps.TrailingArgs()
@@ -145,14 +159,13 @@ func (seg *contentSegment) All() iter.Seq2[content.OpName, []pdf.Object] {
 	}
 }
 
-// Embed writes the content segment to a PDF file as a stream object.
-func (seg *contentSegment) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
-	return embedContentStream(e, seg)
+// Err returns any IO error encountered during iteration.
+func (si *segmentIter) Err() error {
+	return si.err
 }
 
-// Err returns any IO error encountered during iteration.
-func (seg *contentSegment) Err() error {
-	seg.mu.Lock()
-	defer seg.mu.Unlock()
-	return seg.err
+// ClosingOperators returns nil because content segments are parts of a
+// combined page stream whose closing operators are handled at the page level.
+func (si *segmentIter) ClosingOperators() []content.OpName {
+	return nil
 }

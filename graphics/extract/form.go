@@ -17,7 +17,6 @@
 package extract
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -156,25 +155,17 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*form
 		}
 	}
 
-	// buffer decompressed content stream bytes (cheap);
-	// defer tokenization/parsing until All() is called (lazy)
-	stm, err := pdf.DecodeStream(x.R, stream, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := io.ReadAll(stm)
-	closeErr := stm.Close()
-	if err != nil {
-		return nil, err
-	}
-	if closeErr != nil {
-		return nil, closeErr
-	}
-
-	if len(data) > 0 {
-		f.Content = content.NewScanner(bytes.NewReader(data), pdf.GetVersion(x.R), content.Form, f.Res)
-	}
+	// store a reader factory closure so each iteration re-opens the PDF stream
+	stm := stream // capture for closure
+	getter := x.R
+	version := pdf.GetVersion(x.R)
+	res := f.Res
+	f.Content = content.NewScanner(
+		func() (io.ReadCloser, error) {
+			return pdf.DecodeStream(getter, stm, 0)
+		},
+		version, content.Form, res,
+	)
 
 	return f, nil
 }

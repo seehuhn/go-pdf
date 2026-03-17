@@ -116,12 +116,12 @@ func LoadFigure(fname string) (graphics.XObject, *pdf.Rectangle, error) {
 	}
 
 	// read content stream
-	stm, err := pagetree.ContentStream(r, pageDict)
+	open, err := pagetree.ContentStreamOpener(r, pageDict)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	stream, err := content.ReadStream(stm, pdf.GetVersion(r), content.Form, res)
+	stream, err := content.ReadStream(open, pdf.GetVersion(r), content.Form, res)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -31,29 +31,39 @@ import (
 // boundaries.
 type combinedPageStream struct {
 	parts []content.Stream
-	err   error
 }
 
 var _ content.Stream = (*combinedPageStream)(nil)
 
+// NewIter creates a new iterator over all combined parts.
+func (c *combinedPageStream) NewIter() content.Iter {
+	return &combinedIter{parts: c.parts}
+}
+
+// combinedIter is a single-use [content.Iter] for a combinedPageStream.
+type combinedIter struct {
+	parts []content.Stream
+	err   error
+}
+
 // All returns an iterator over all operators from all parts.
-func (c *combinedPageStream) All() iter.Seq2[content.OpName, []pdf.Object] {
+func (ci *combinedIter) All() iter.Seq2[content.OpName, []pdf.Object] {
 	// check whether all parts are contentSegments so we can use a
 	// single PageScanner with shared state
-	segments := make([]*contentSegment, len(c.parts))
-	for i, p := range c.parts {
+	segments := make([]*contentSegment, len(ci.parts))
+	for i, p := range ci.parts {
 		seg, ok := p.(*contentSegment)
 		if !ok {
-			return c.allFallback()
+			return ci.allFallback()
 		}
 		segments[i] = seg
 	}
-	return c.allScanner(segments)
+	return ci.allScanner(segments)
 }
 
 // allScanner iterates using a single PageScanner across all raw readers,
 // so that path construction state carries across stream boundaries.
-func (c *combinedPageStream) allScanner(segments []*contentSegment) iter.Seq2[content.OpName, []pdf.Object] {
+func (ci *combinedIter) allScanner(segments []*contentSegment) iter.Seq2[content.OpName, []pdf.Object] {
 	return func(yield func(content.OpName, []pdf.Object) bool) {
 		if len(segments) == 0 {
 			return
@@ -62,7 +72,7 @@ func (c *combinedPageStream) allScanner(segments []*contentSegment) iter.Seq2[co
 		for _, seg := range segments {
 			r, err := seg.rawReader()
 			if err != nil {
-				c.err = err
+				ci.err = err
 				return
 			}
 			exhausted := ps.ScanReader(r, yield)
@@ -77,23 +87,24 @@ func (c *combinedPageStream) allScanner(segments []*contentSegment) iter.Seq2[co
 			}
 		}
 		if psErr := ps.Err(); psErr != nil {
-			c.err = psErr
+			ci.err = psErr
 		}
 	}
 }
 
 // allFallback iterates each part independently (used when parts are
 // not all *contentSegment).
-func (c *combinedPageStream) allFallback() iter.Seq2[content.OpName, []pdf.Object] {
+func (ci *combinedIter) allFallback() iter.Seq2[content.OpName, []pdf.Object] {
 	return func(yield func(content.OpName, []pdf.Object) bool) {
-		for _, part := range c.parts {
-			for name, args := range part.All() {
+		for _, part := range ci.parts {
+			it := part.NewIter()
+			for name, args := range it.All() {
 				if !yield(name, args) {
 					return
 				}
 			}
-			if pErr := part.Err(); pErr != nil {
-				c.err = pErr
+			if pErr := it.Err(); pErr != nil {
+				ci.err = pErr
 				return
 			}
 		}
@@ -101,8 +112,14 @@ func (c *combinedPageStream) allFallback() iter.Seq2[content.OpName, []pdf.Objec
 }
 
 // Err returns any IO error encountered during iteration.
-func (c *combinedPageStream) Err() error {
-	return c.err
+func (ci *combinedIter) Err() error {
+	return ci.err
+}
+
+// ClosingOperators returns nil because the combined scanner already
+// yields closing operators at the end of [combinedIter.All].
+func (ci *combinedIter) ClosingOperators() []content.OpName {
+	return nil
 }
 
 // embedContentStream writes a content.Stream to a PDF file as a stream object.
@@ -119,14 +136,15 @@ func embedContentStream(e *pdf.EmbedHelper, s content.Stream) (pdf.Native, error
 		return nil, err
 	}
 
-	for name, args := range s.All() {
+	it := s.NewIter()
+	for name, args := range it.All() {
 		op := content.Operator{Name: name, Args: args}
 		if err := content.WriteOperator(stm, op); err != nil {
 			stm.Close()
 			return nil, err
 		}
 	}
-	if sErr := s.Err(); sErr != nil {
+	if sErr := it.Err(); sErr != nil {
 		stm.Close()
 		return nil, sErr
 	}

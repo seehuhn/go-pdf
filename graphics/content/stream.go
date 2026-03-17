@@ -28,10 +28,9 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Stream represents a PDF content stream as an iterable sequence of operators.
-// The All method yields operator name/args pairs. Args are transient: they are
-// only valid for the current iteration step (similar to [bufio.Scanner.Bytes]).
-// Callers that need to retain args must clone them.
+// Stream is an immutable factory for content stream iterators.
+// Each call to NewIter creates an independent [Iter] that can be used
+// to iterate over the operators in the stream.
 //
 // Content streams can occur in the following places:
 //   - Page contents
@@ -40,6 +39,15 @@ import (
 //   - Type 3 fonts
 //   - Annotation appearances
 type Stream interface {
+	// NewIter creates a new iterator over the operators in the stream.
+	NewIter() Iter
+}
+
+// Iter is a single-use iterator over content stream operators.
+// The args slice yielded by [Iter.All] is transient: it is only valid
+// for the current iteration step (similar to [bufio.Scanner.Bytes]).
+// Callers that need to retain args must clone them.
+type Iter interface {
 	// All returns an iterator over the operators in the stream.
 	// The args slice yielded by each step is only valid until the next step.
 	All() iter.Seq2[OpName, []pdf.Object]
@@ -47,6 +55,12 @@ type Stream interface {
 	// Err returns any IO error encountered during iteration.
 	// It is always nil for [Operators].
 	Err() error
+
+	// ClosingOperators returns the operator names needed to close any
+	// open contexts (unbalanced q/Q, BT/ET, BMC/EMC, BX/EX, or open
+	// paths) after iteration has completed.
+	// It is always nil for [Operators].
+	ClosingOperators() []OpName
 }
 
 // StreamsEqual reports whether two Stream values contain the same sequence of
@@ -72,9 +86,11 @@ func StreamsEqual(a, b Stream) bool {
 	}
 
 	// general path: iterate both streams
-	nextA, stopA := iter.Pull2(a.All())
+	itA := a.NewIter()
+	itB := b.NewIter()
+	nextA, stopA := iter.Pull2(itA.All())
 	defer stopA()
-	nextB, stopB := iter.Pull2(b.All())
+	nextB, stopB := iter.Pull2(itB.All())
 	defer stopB()
 
 	for {
@@ -99,7 +115,7 @@ func StreamsEqual(a, b Stream) bool {
 		}
 	}
 
-	if a.Err() != nil || b.Err() != nil {
+	if itA.Err() != nil || itB.Err() != nil {
 		return false
 	}
 	return true
@@ -107,14 +123,20 @@ func StreamsEqual(a, b Stream) bool {
 
 // streamIsEmpty reports whether s yields zero operators.
 func streamIsEmpty(s Stream) bool {
-	for range s.All() {
+	it := s.NewIter()
+	for range it.All() {
 		return false
 	}
-	return s.Err() == nil
+	return it.Err() == nil
 }
 
 // Operators represents a PDF content stream as a slice of operators.
+// It implements both [Stream] and [Iter].
 type Operators []Operator
+
+// NewIter returns the Operators value itself as an [Iter].
+// Operators has no mutable state, so it can serve as its own iterator.
+func (s Operators) NewIter() Iter { return s }
 
 // All returns an iterator over the operators.
 func (s Operators) All() iter.Seq2[OpName, []pdf.Object] {
@@ -129,6 +151,11 @@ func (s Operators) All() iter.Seq2[OpName, []pdf.Object] {
 
 // Err always returns nil for Operators.
 func (s Operators) Err() error {
+	return nil
+}
+
+// ClosingOperators always returns nil for Operators.
+func (s Operators) ClosingOperators() []OpName {
 	return nil
 }
 
@@ -197,110 +224,111 @@ func (ct Type) String() string {
 // Operators that are invalid in the current graphics object context are
 // either fixed up (text operators get BT auto-inserted) or skipped
 // (path operators outside path context).
-func ReadStream(r io.Reader, v pdf.Version, ct Type, res *Resources) (Operators, error) {
-	s := NewScanner(r, v, ct, res)
-	state := NewState(ct, res)
+func ReadStream(open func() (io.ReadCloser, error), v pdf.Version, ct Type, res *Resources) (Operators, error) {
+	s := NewScanner(open, v, ct, res)
+	it := s.NewIter()
 	var ops Operators
-	for name, args := range s.All() {
-		state.ApplyStateChanges(name, args)
+	for name, args := range it.All() {
 		ops = append(ops, Operator{Name: name, Args: slices.Clone(args)})
 	}
-	if err := s.Err(); err != nil {
+	if err := it.Err(); err != nil {
 		return nil, err
 	}
-	for _, name := range state.ClosingOperators() {
+	for _, name := range it.ClosingOperators() {
 		ops = append(ops, Operator{Name: name})
 	}
 	return ops, nil
 }
 
-// scannerStream implements [Stream] by lazily scanning a content stream.
-// The args yielded by [scannerStream.All] are transient and valid only for
-// the current iteration step.
-type scannerStream struct {
+// scanner is the immutable [Stream] implementation that creates independent
+// iterators via [scanner.NewIter].
+type scanner struct {
+	open    func() (io.ReadCloser, error)
+	version pdf.Version
+	ct      Type
+	res     *Resources
+}
+
+// NewScanner returns a [Stream] that lazily scans a content stream.
+// The open function is called each time [Stream.NewIter] creates a new
+// iterator, so the returned Stream supports multiple independent iterations.
+//
+// The args yielded by All are transient: they share the scanner's internal
+// buffer and are only valid for the current iteration step. Callers that
+// need to retain args must clone them.
+func NewScanner(open func() (io.ReadCloser, error), v pdf.Version, ct Type, res *Resources) Stream {
+	return &scanner{
+		open:    open,
+		version: v,
+		ct:      ct,
+		res:     res,
+	}
+}
+
+// NewIter creates a new iterator over the content stream.
+func (sc *scanner) NewIter() Iter {
+	return &scannerIter{
+		open:    sc.open,
+		version: sc.version,
+		ct:      sc.ct,
+		res:     sc.res,
+	}
+}
+
+// scannerIter is a single-use [Iter] that scans operators from a reader.
+type scannerIter struct {
 	s       *streamScanner
 	state   *State
 	version pdf.Version
 	ct      Type
 	res     *Resources
 	err     error
-
-	// rewind support
-	startOffset int64
-	seekable    bool
-	started     bool
-	seeker      io.Seeker
-}
-
-// NewScanner returns a [Stream] that lazily scans a content stream from r.
-// No data is read until [Stream.All] is called.
-//
-// If r implements [io.Seeker], the returned Stream supports calling All
-// multiple times by rewinding to the initial position. Otherwise, calling
-// All a second time sets Err to a non-nil error and returns an empty iterator.
-//
-// The args yielded by All are transient: they share the scanner's internal
-// buffer and are only valid for the current iteration step. Callers that
-// need to retain args must clone them.
-func NewScanner(r io.Reader, v pdf.Version, ct Type, res *Resources) Stream {
-	ss := &scannerStream{
-		s: &streamScanner{
-			buf: make([]byte, 512),
-			src: r,
-		},
-		state:   NewState(ct, res),
-		version: v,
-		ct:      ct,
-		res:     res,
-	}
-	if seeker, ok := r.(io.Seeker); ok {
-		off, err := seeker.Seek(0, io.SeekCurrent)
-		if err == nil {
-			ss.startOffset = off
-			ss.seekable = true
-			ss.seeker = seeker
-		}
-	}
-	return ss
+	open    func() (io.ReadCloser, error)
 }
 
 // All returns an iterator over the operators in the stream.
-// If the underlying reader is seekable, All can be called multiple times.
-func (ss *scannerStream) All() iter.Seq2[OpName, []pdf.Object] {
-	if ss.started {
-		if ss.seekable {
-			// rewind to start
-			if _, err := ss.seeker.Seek(ss.startOffset, io.SeekStart); err != nil {
-				ss.err = err
-				return func(yield func(OpName, []pdf.Object) bool) {}
-			}
-			ss.s = &streamScanner{
-				buf: make([]byte, 512),
-				src: ss.seeker.(io.Reader),
-			}
-			ss.state = NewState(ss.ct, ss.res)
-			ss.err = nil
-		} else {
-			ss.err = errors.New("content stream is not rewindable")
-			return func(yield func(OpName, []pdf.Object) bool) {}
-		}
-	}
-	ss.started = true
+// The open function is called to obtain a reader for the content stream.
+func (si *scannerIter) All() iter.Seq2[OpName, []pdf.Object] {
 	return func(yield func(OpName, []pdf.Object) bool) {
-		ss.scanLoop(yield)
+		r, err := si.open()
+		if err != nil {
+			si.err = err
+			return
+		}
+		defer r.Close()
+		si.s = &streamScanner{
+			buf: make([]byte, 512),
+			src: r,
+		}
+		si.state = NewState(si.ct, si.res)
+		si.scanLoop(yield)
 	}
 }
 
-// scanLoop scans operators from ss.s, applying filtering and yielding through
+// Err returns any IO error encountered during iteration.
+func (si *scannerIter) Err() error {
+	return si.err
+}
+
+// ClosingOperators returns the operator names needed to close any open
+// contexts after iteration has completed.
+func (si *scannerIter) ClosingOperators() []OpName {
+	if si.state == nil {
+		return nil
+	}
+	return si.state.ClosingOperators()
+}
+
+// scanLoop scans operators from si.s, applying filtering and yielding through
 // yield. Returns true if the reader was exhausted normally, false if yield
 // returned false or an IO error occurred.
-func (ss *scannerStream) scanLoop(yield func(OpName, []pdf.Object) bool) bool {
+func (si *scannerIter) scanLoop(yield func(OpName, []pdf.Object) bool) bool {
 	// save any trailing args from previous reader (for multi-stream pages)
-	savedArgs := slices.Clone(ss.s.args)
+	savedArgs := slices.Clone(si.s.args)
 	hasSavedArgs := len(savedArgs) > 0
 
 	for {
-		op, err := ss.s.scan()
+		op, err := si.s.scan()
 		switch err {
 		case nil:
 			opName := op.Name
@@ -312,11 +340,11 @@ func (ss *scannerStream) scanLoop(yield func(OpName, []pdf.Object) bool) bool {
 			}
 
 			// filter based on version validation
-			validErr := opName.isValidName(ss.version)
+			validErr := opName.isValidName(si.version)
 			if validErr == ErrUnknown || validErr == ErrVersion {
-				if ss.state.InCompatibilitySection() {
+				if si.state.InCompatibilitySection() {
 					// inside BX/EX: keep unknown operators
-				} else if ss.version > pdf.MaxVersion {
+				} else if si.version > pdf.MaxVersion {
 					// future PDF version: keep (may be valid)
 				} else {
 					// known PDF version: drop unknown/version-incompatible
@@ -334,17 +362,17 @@ func (ss *scannerStream) scanLoop(yield func(OpName, []pdf.Object) bool) bool {
 			}
 
 			// filter Type 3 operators based on content type
-			if ss.ct != Glyph {
+			if si.ct != Glyph {
 				if opName == OpType3ColoredGlyph || opName == OpType3UncoloredGlyph {
 					continue
 				}
 			}
 
 			// check if operator is allowed in current state and fix up if needed
-			if ss.state.CheckOperatorAllowed(opName) != nil {
-				if fixNames := fixupOperatorName(ss.state, opName); fixNames != nil {
+			if si.state.CheckOperatorAllowed(opName) != nil {
+				if fixNames := fixupOperatorName(si.state, opName); fixNames != nil {
 					for _, fixName := range fixNames {
-						ss.state.ApplyStateChanges(fixName, nil)
+						si.state.ApplyStateChanges(fixName, nil)
 						if !yield(fixName, nil) {
 							return false
 						}
@@ -357,27 +385,27 @@ func (ss *scannerStream) scanLoop(yield func(OpName, []pdf.Object) bool) bool {
 
 			// skip operators whose required state is not set
 			info := operators[opName]
-			if info != nil && info.Requires&^ss.state.Usable != 0 {
+			if info != nil && info.Requires&^si.state.Usable != 0 {
 				continue
 			}
 
 			// update state and filter improperly nested operators
-			if ss.state.ApplyStateChanges(opName, op.Args) != nil {
+			if si.state.ApplyStateChanges(opName, op.Args) != nil {
 				continue
 			}
 
 			// drop Tf operators that reference fonts not in resources
 			if opName == OpTextSetFont {
 				name, ok := getName(op.Args, 0)
-				if !ok || ss.res == nil || ss.res.Font[name] == nil {
+				if !ok || si.res == nil || si.res.Font[name] == nil {
 					continue
 				}
 			}
 
 			// update state bits for operators that set new state
 			if info != nil && info.Sets != 0 {
-				ss.state.Usable |= info.Sets
-				ss.state.GState.Set |= info.Sets
+				si.state.Usable |= info.Sets
+				si.state.GState.Set |= info.Sets
 			}
 
 			if !yield(opName, op.Args) {
@@ -389,7 +417,7 @@ func (ss *scannerStream) scanLoop(yield func(OpName, []pdf.Object) bool) bool {
 			// permissive: skip malformed content
 		default:
 			// IO error
-			ss.err = err
+			si.err = err
 			return false
 		}
 	}
@@ -400,13 +428,13 @@ func (ss *scannerStream) scanLoop(yield func(OpName, []pdf.Object) bool) bool {
 // stream boundaries, so that paths and operators split across streams
 // are handled correctly.
 type PageScanner struct {
-	ss *scannerStream
+	si *scannerIter
 }
 
 // NewPageScanner creates a scanner for page content streams.
 func NewPageScanner(v pdf.Version, res *Resources) *PageScanner {
 	return &PageScanner{
-		ss: &scannerStream{
+		si: &scannerIter{
 			s: &streamScanner{
 				buf: make([]byte, 512),
 				src: eofReader{},
@@ -422,7 +450,7 @@ func NewPageScanner(v pdf.Version, res *Resources) *PageScanner {
 // SetInitialArgs sets trailing args from a previous content stream segment.
 // This must be called before the first ScanReader call.
 func (ps *PageScanner) SetInitialArgs(args []pdf.Object) {
-	ps.ss.s.args = slices.Clone(args)
+	ps.si.s.args = slices.Clone(args)
 }
 
 // ScanReader scans operators from r, calling yield for each filtered operator.
@@ -431,18 +459,18 @@ func (ps *PageScanner) SetInitialArgs(args []pdf.Object) {
 // Returns true if the reader was fully consumed, false if yield returned false
 // or an IO error occurred.
 func (ps *PageScanner) ScanReader(r io.Reader, yield func(OpName, []pdf.Object) bool) bool {
-	ps.ss.s = &streamScanner{
+	ps.si.s = &streamScanner{
 		buf:  make([]byte, 512),
 		src:  r,
-		args: ps.ss.s.args,
+		args: ps.si.s.args,
 	}
-	return ps.ss.scanLoop(yield)
+	return ps.si.scanLoop(yield)
 }
 
 // ClosingOps returns the operators needed to close any open contexts
 // (unbalanced q/Q, BT/ET, BMC/EMC, BX/EX, or open paths).
 func (ps *PageScanner) ClosingOps() []OpName {
-	return ps.ss.state.ClosingOperators()
+	return ps.si.state.ClosingOperators()
 }
 
 // TrailingArgs returns any operator arguments left on the scanner's stack
@@ -450,22 +478,17 @@ func (ps *PageScanner) ClosingOps() []OpName {
 // the last operator in a stream, typically because the operator is in the
 // next stream segment.
 func (ps *PageScanner) TrailingArgs() []pdf.Object {
-	return slices.Clone(ps.ss.s.args)
+	return slices.Clone(ps.si.s.args)
 }
 
 // Err returns any IO error encountered during scanning.
 func (ps *PageScanner) Err() error {
-	return ps.ss.err
+	return ps.si.err
 }
 
 type eofReader struct{}
 
 func (eofReader) Read([]byte) (int, error) { return 0, io.EOF }
-
-// Err returns any IO error encountered during iteration.
-func (ss *scannerStream) Err() error {
-	return ss.err
-}
 
 // fixupOperatorName returns prefix operator names to insert before opName to
 // make its context valid, or nil if it cannot be fixed up and should be

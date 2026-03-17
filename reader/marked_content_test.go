@@ -17,6 +17,7 @@
 package reader
 
 import (
+	"io"
 	"strings"
 	"testing"
 
@@ -27,6 +28,13 @@ import (
 	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/property"
 )
+
+// stringOpener returns a reader factory for a string content stream.
+func stringOpener(s string) func() (io.ReadCloser, error) {
+	return func() (io.ReadCloser, error) {
+		return io.NopCloser(strings.NewReader(s)), nil
+	}
+}
 
 func TestMarkedContentEventConstants(t *testing.T) {
 	// Verify event constants exist and have expected values
@@ -105,8 +113,7 @@ func TestMPOperator(t *testing.T) {
 	}
 
 	// Parse: MP /Caption
-	contentStream := strings.NewReader("/Caption MP")
-	err := r.ParseContentStream(contentStream)
+	err := r.ParseContentStream(stringOpener("/Caption MP"))
 	if err != nil {
 		t.Fatalf("ParseContentStream failed: %v", err)
 	}
@@ -149,8 +156,7 @@ func TestBMCOperator(t *testing.T) {
 
 	// Parse: BMC /Artifact
 	// Note: ProcessStream auto-closes unclosed BMC with EMC at EOF
-	contentStream := strings.NewReader("/Artifact BMC")
-	err := r.ParseContentStream(contentStream)
+	err := r.ParseContentStream(stringOpener("/Artifact BMC"))
 	if err != nil {
 		t.Fatalf("ParseContentStream failed: %v", err)
 	}
@@ -204,8 +210,7 @@ func TestDPOperatorInline(t *testing.T) {
 	}
 
 	// Parse: DP /Artifact <</Type /Pagination>>
-	contentStream := strings.NewReader("/Artifact <</Type /Pagination>> DP")
-	err := r.ParseContentStream(contentStream)
+	err := r.ParseContentStream(stringOpener("/Artifact <</Type /Pagination>> DP"))
 	if err != nil {
 		t.Fatalf("ParseContentStream failed: %v", err)
 	}
@@ -266,8 +271,7 @@ func TestDPOperatorResourceReference(t *testing.T) {
 	}
 
 	// Parse: DP /Span /P1
-	contentStream := strings.NewReader("/Span /P1 DP")
-	err := r.ParseContentStream(contentStream)
+	err := r.ParseContentStream(stringOpener("/Span /P1 DP"))
 	if err != nil {
 		t.Fatalf("ParseContentStream failed: %v", err)
 	}
@@ -315,8 +319,7 @@ func TestBDCOperator(t *testing.T) {
 
 	// Parse: BDC /Span <</Lang (en-US)>>
 	// Note: ProcessStream auto-closes unclosed BDC with EMC at EOF
-	contentStream := strings.NewReader("/Span <</Lang (en-US)>> BDC")
-	err := r.ParseContentStream(contentStream)
+	err := r.ParseContentStream(stringOpener("/Span <</Lang (en-US)>> BDC"))
 	if err != nil {
 		t.Fatalf("ParseContentStream failed: %v", err)
 	}
@@ -382,8 +385,7 @@ func TestEMCOperator(t *testing.T) {
 	}
 
 	// Parse: BMC /Artifact EMC
-	contentStream := strings.NewReader("/Artifact BMC\nEMC")
-	err := r.ParseContentStream(contentStream)
+	err := r.ParseContentStream(stringOpener("/Artifact BMC\nEMC"))
 	if err != nil {
 		t.Fatalf("ParseContentStream failed: %v", err)
 	}
@@ -423,8 +425,7 @@ func TestUnmatchedEMC(t *testing.T) {
 	}
 
 	// Parse: EMC without BMC/BDC
-	contentStream := strings.NewReader("EMC")
-	err := r.ParseContentStream(contentStream)
+	err := r.ParseContentStream(stringOpener("EMC"))
 	if err != nil {
 		t.Fatalf("ParseContentStream should not fail on unmatched EMC: %v", err)
 	}
@@ -458,7 +459,7 @@ func TestMarkedContentStackOverflow(t *testing.T) {
 		content.WriteString("/Test BMC\n")
 	}
 
-	err := r.ParseContentStream(strings.NewReader(content.String()))
+	err := r.ParseContentStream(stringOpener(content.String()))
 	if err != nil {
 		t.Fatalf("ParseContentStream failed: %v", err)
 	}
@@ -506,8 +507,7 @@ func TestNestedMarkedContent(t *testing.T) {
 	//   /Inner BMC
 	//   EMC
 	// EMC
-	contentStream := strings.NewReader("/Outer BMC\n/Inner BMC\nEMC\nEMC")
-	err := r.ParseContentStream(contentStream)
+	err := r.ParseContentStream(stringOpener("/Outer BMC\n/Inner BMC\nEMC\nEMC"))
 	if err != nil {
 		t.Fatalf("ParseContentStream failed: %v", err)
 	}
@@ -545,8 +545,7 @@ func TestMalformedPropertyExtraction(t *testing.T) {
 
 	// Try to parse BDC with non-dict, non-name operand (should be skipped)
 	// This is malformed according to PDF spec
-	contentStream := strings.NewReader("/Test 123 BDC")
-	err := r.ParseContentStream(contentStream)
+	err := r.ParseContentStream(stringOpener("/Test 123 BDC"))
 	if err != nil {
 		t.Fatalf("ParseContentStream should not fail on malformed properties: %v", err)
 	}

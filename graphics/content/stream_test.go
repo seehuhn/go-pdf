@@ -18,6 +18,7 @@ package content
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"slices"
 	"testing"
@@ -32,6 +33,13 @@ import (
 // Font F1 is referenced by "text operators" and "mixed content" test cases.
 var testResources = &Resources{
 	Font: map[pdf.Name]font.Instance{"F1": nil},
+}
+
+// bytesOpener returns a reader factory that opens the given data as a stream.
+func bytesOpener(data []byte) func() (io.ReadCloser, error) {
+	return func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(data)), nil
+	}
 }
 
 var roundTripTestCases = []struct {
@@ -51,7 +59,7 @@ func TestStreamRoundTrip(t *testing.T) {
 	for _, tt := range roundTripTestCases {
 		t.Run(tt.name, func(t *testing.T) {
 			// first read
-			stream1, err := ReadStream(bytes.NewReader([]byte(tt.stream)), pdf.V2_0, Page, testResources)
+			stream1, err := ReadStream(bytesOpener([]byte(tt.stream)), pdf.V2_0, Page, testResources)
 			if err != nil {
 				t.Fatalf("first read: %v", err)
 			}
@@ -67,7 +75,7 @@ func TestStreamRoundTrip(t *testing.T) {
 			}
 
 			// second read
-			stream2, err := ReadStream(bytes.NewReader(buf.Bytes()), pdf.V2_0, Page, testResources)
+			stream2, err := ReadStream(bytesOpener(buf.Bytes()), pdf.V2_0, Page, testResources)
 			if err != nil {
 				t.Fatalf("second read: %v", err)
 			}
@@ -87,7 +95,7 @@ func FuzzStreamRoundTrip(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		// first read - permissive, may skip malformed content
-		stream1, err := ReadStream(bytes.NewReader(data), pdf.V2_0, Page, testResources)
+		stream1, err := ReadStream(bytesOpener(data), pdf.V2_0, Page, testResources)
 		if err != nil {
 			return
 		}
@@ -104,7 +112,7 @@ func FuzzStreamRoundTrip(f *testing.F) {
 		}
 
 		// second read
-		stream2, err := ReadStream(bytes.NewReader(buf.Bytes()), pdf.V2_0, Page, testResources)
+		stream2, err := ReadStream(bytesOpener(buf.Bytes()), pdf.V2_0, Page, testResources)
 		if err != nil {
 			t.Fatalf("second read failed: %v", err)
 		}
@@ -166,7 +174,7 @@ func TestInlineImageLimits(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stream, err := ReadStream(bytes.NewReader([]byte(tt.stream)), pdf.V2_0, Page, &Resources{})
+			stream, err := ReadStream(bytesOpener([]byte(tt.stream)), pdf.V2_0, Page, &Resources{})
 			if err != nil {
 				t.Fatalf("ReadStream error: %v", err)
 			}
@@ -196,7 +204,7 @@ func TestOperatorArgLimit(t *testing.T) {
 	buf.WriteString("q\n") // save graphics state (should be parsed)
 	buf.WriteString("Q\n") // restore graphics state
 
-	stream, err := ReadStream(bytes.NewReader(buf.Bytes()), pdf.V2_0, Page, &Resources{})
+	stream, err := ReadStream(bytesOpener(buf.Bytes()), pdf.V2_0, Page, &Resources{})
 	if err != nil {
 		t.Fatalf("ReadStream error: %v", err)
 	}
@@ -224,11 +232,12 @@ func appendClosingOps(ops Operators, ct Type, res *Resources) Operators {
 
 // collectStream collects all operators from a Stream into an Operators slice.
 func collectStream(s Stream) (Operators, error) {
+	it := s.NewIter()
 	var ops Operators
-	for name, args := range s.All() {
+	for name, args := range it.All() {
 		ops = append(ops, Operator{Name: name, Args: slices.Clone(args)})
 	}
-	return ops, s.Err()
+	return ops, it.Err()
 }
 
 func TestNewScannerMatchesReadStream(t *testing.T) {
@@ -237,13 +246,13 @@ func TestNewScannerMatchesReadStream(t *testing.T) {
 			data := []byte(tt.stream)
 
 			// ReadStream result (includes closing ops)
-			want, err := ReadStream(bytes.NewReader(data), pdf.V2_0, Page, testResources)
+			want, err := ReadStream(bytesOpener(data), pdf.V2_0, Page, testResources)
 			if err != nil {
 				t.Fatalf("ReadStream: %v", err)
 			}
 
 			// NewScanner result (no closing ops); append them manually
-			s := NewScanner(bytes.NewReader(data), pdf.V2_0, Page, testResources)
+			s := NewScanner(bytesOpener(data), pdf.V2_0, Page, testResources)
 			got, err := collectStream(s)
 			if err != nil {
 				t.Fatalf("NewScanner: %v", err)
@@ -263,9 +272,9 @@ func FuzzNewScannerMatchesReadStream(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		want, err1 := ReadStream(bytes.NewReader(data), pdf.V2_0, Page, testResources)
+		want, err1 := ReadStream(bytesOpener(data), pdf.V2_0, Page, testResources)
 
-		s := NewScanner(bytes.NewReader(data), pdf.V2_0, Page, testResources)
+		s := NewScanner(bytesOpener(data), pdf.V2_0, Page, testResources)
 		got, err2 := collectStream(s)
 
 		// both should either succeed or fail
@@ -286,8 +295,7 @@ func FuzzNewScannerMatchesReadStream(f *testing.F) {
 
 func TestScannerRewind(t *testing.T) {
 	input := []byte("q\n1 0 0 1 100 200 cm\nQ\n")
-	r := bytes.NewReader(input)
-	s := NewScanner(r, pdf.V2_0, Page, &Resources{})
+	s := NewScanner(bytesOpener(input), pdf.V2_0, Page, &Resources{})
 
 	first, err := collectStream(s)
 	if err != nil {
@@ -350,20 +358,15 @@ func TestParseNumber(t *testing.T) {
 	}
 }
 
-// nonSeekReader wraps a reader to hide any Seek method.
-type nonSeekReader struct {
-	io.Reader
-}
-
 func TestStreamsEqual(t *testing.T) {
 	data := []byte("q\n1 0 0 1 100 200 cm\nQ\n")
 
-	ops, err := ReadStream(bytes.NewReader(data), pdf.V2_0, Page, &Resources{})
+	ops, err := ReadStream(bytesOpener(data), pdf.V2_0, Page, &Resources{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	scanner := NewScanner(bytes.NewReader(data), pdf.V2_0, Page, &Resources{})
+	scanner := NewScanner(bytesOpener(data), pdf.V2_0, Page, &Resources{})
 
 	// Operators vs Scanner
 	if !StreamsEqual(ops, scanner) {
@@ -371,14 +374,14 @@ func TestStreamsEqual(t *testing.T) {
 	}
 
 	// Operators vs Operators
-	ops2, _ := ReadStream(bytes.NewReader(data), pdf.V2_0, Page, &Resources{})
+	ops2, _ := ReadStream(bytesOpener(data), pdf.V2_0, Page, &Resources{})
 	if !StreamsEqual(ops, ops2) {
 		t.Error("expected two Operators to be equal")
 	}
 
 	// Scanner vs Scanner
-	s1 := NewScanner(bytes.NewReader(data), pdf.V2_0, Page, &Resources{})
-	s2 := NewScanner(bytes.NewReader(data), pdf.V2_0, Page, &Resources{})
+	s1 := NewScanner(bytesOpener(data), pdf.V2_0, Page, &Resources{})
+	s2 := NewScanner(bytesOpener(data), pdf.V2_0, Page, &Resources{})
 	if !StreamsEqual(s1, s2) {
 		t.Error("expected two Scanners to be equal")
 	}
@@ -395,28 +398,42 @@ func TestStreamsEqual(t *testing.T) {
 	}
 
 	// different streams
-	other, _ := ReadStream(bytes.NewReader([]byte("q\nQ\n")), pdf.V2_0, Page, &Resources{})
+	other, _ := ReadStream(bytesOpener([]byte("q\nQ\n")), pdf.V2_0, Page, &Resources{})
 	if StreamsEqual(ops, other) {
 		t.Error("expected different streams to be unequal")
 	}
 }
 
-func TestScannerNoRewind(t *testing.T) {
-	input := []byte("q\nQ\n")
-	r := nonSeekReader{bytes.NewReader(input)}
-	s := NewScanner(r, pdf.V2_0, Page, &Resources{})
-
-	// first call should succeed
-	_, err := collectStream(s)
+func TestReadStreamUnbalancedQ(t *testing.T) {
+	// a single unbalanced q should produce exactly one closing Q
+	input := []byte("q\n1 0 0 1 0 0 cm\n")
+	ops, err := ReadStream(bytesOpener(input), pdf.V2_0, Page, &Resources{})
 	if err != nil {
-		t.Fatalf("first iteration: %v", err)
+		t.Fatal(err)
 	}
+	var qCount int
+	for _, op := range ops {
+		if op.Name == OpPopGraphicsState {
+			qCount++
+		}
+	}
+	if qCount != 1 {
+		t.Errorf("expected 1 closing Q, got %d", qCount)
+	}
+}
 
-	// second call on non-seekable should yield empty iterator
-	for range s.All() {
-		t.Fatal("expected empty iterator on second call")
+func TestScannerOpenError(t *testing.T) {
+	// test that an open function returning an error is handled correctly
+	openErr := errors.New("open failed")
+	s := NewScanner(func() (io.ReadCloser, error) {
+		return nil, openErr
+	}, pdf.V2_0, Page, &Resources{})
+
+	it := s.NewIter()
+	for range it.All() {
+		t.Fatal("expected empty iterator when open fails")
 	}
-	if s.Err() == nil {
-		t.Error("expected non-nil error after second All() on non-seekable reader")
+	if it.Err() == nil {
+		t.Error("expected non-nil error when open fails")
 	}
 }

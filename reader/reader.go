@@ -123,17 +123,19 @@ func (r *Reader) ParsePage(page pdf.Object, ctm matrix.Matrix) error {
 	r.State.GState.CTM = ctm
 	r.MarkedContentStack = r.MarkedContentStack[:0]
 
-	contentReader, err := pagetree.ContentStream(r.x.R, page)
+	open, err := pagetree.ContentStreamOpener(r.x.R, page)
 	if err != nil {
 		return err
 	}
-	return r.ParseContentStream(contentReader)
+	return r.ParseContentStream(open)
 }
 
 // ParseContentStream parses a PDF content stream.
-func (r *Reader) ParseContentStream(in io.Reader) error {
+// The open function is called each time the stream needs to be read,
+// allowing multiple independent iterations.
+func (r *Reader) ParseContentStream(open func() (io.ReadCloser, error)) error {
 	v := pdf.GetVersion(r.x.R)
-	stream := content.NewScanner(in, v, content.Page, r.State.Resources)
+	stream := content.NewScanner(open, v, content.Page, r.State.Resources)
 	return r.ProcessStream(stream)
 }
 
@@ -142,12 +144,13 @@ func (r *Reader) ParseContentStream(in io.Reader) error {
 // emits closing operators for any open contexts (unbalanced q/Q, BT/ET,
 // BMC/EMC, or BX/EX).
 func (r *Reader) ProcessStream(stream content.Stream) error {
-	for name, args := range stream.All() {
+	it := stream.NewIter()
+	for name, args := range it.All() {
 		if err := r.processOperator(name, args); err != nil {
 			return err
 		}
 	}
-	if err := stream.Err(); err != nil {
+	if err := it.Err(); err != nil {
 		return err
 	}
 	for _, name := range r.State.ClosingOperators() {

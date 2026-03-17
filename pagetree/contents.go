@@ -18,6 +18,7 @@ package pagetree
 
 import (
 	"io"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 )
@@ -25,7 +26,23 @@ import (
 // ContentStream creates a reader for the content stream of a PDF page. The
 // pageDict is the dictionary of the page object. If Contents is an array of
 // streams, the streams are concatenated, separated by newline characters.
-func ContentStream(r pdf.Getter, pageDict pdf.Object) (io.Reader, error) {
+func ContentStream(r pdf.Getter, pageDict pdf.Object) (io.ReadCloser, error) {
+	open, err := ContentStreamOpener(r, pageDict)
+	if err != nil {
+		return nil, err
+	}
+	rc, err := open()
+	if err != nil {
+		return nil, err
+	}
+	return rc, nil
+}
+
+// ContentStreamOpener returns a factory that creates readers for the content
+// stream of a PDF page.  Each call to the returned function creates an
+// independent reader.  If the page has no content, the returned function
+// produces readers that immediately return io.EOF.
+func ContentStreamOpener(r pdf.Getter, pageDict pdf.Object) (func() (io.ReadCloser, error), error) {
 	dict, err := pdf.GetDictTyped(r, pageDict, "Page")
 	if err != nil {
 		return nil, err
@@ -36,23 +53,29 @@ func ContentStream(r pdf.Getter, pageDict pdf.Object) (io.Reader, error) {
 		return nil, err
 	} else if contents == nil {
 		// empty page
-		return eofReader{}, nil
+		return func() (io.ReadCloser, error) {
+			return io.NopCloser(eofReader{}), nil
+		}, nil
 	}
 
 	var a pdf.Array
 	switch contents := contents.(type) {
 	case pdf.Array:
 		if len(contents) == 0 {
-			return eofReader{}, nil
+			return func() (io.ReadCloser, error) {
+				return io.NopCloser(eofReader{}), nil
+			}, nil
 		}
 		a = contents
 	default:
 		a = pdf.Array{contents}
 	}
 
-	return &contentReader{
-		r: r,
-		a: a,
+	return func() (io.ReadCloser, error) {
+		return &contentReader{
+			r: r,
+			a: slices.Clone(a),
+		}, nil
 	}, nil
 }
 
@@ -122,6 +145,16 @@ func (cr *contentReader) Read(p []byte) (int, error) {
 	}
 
 	return extra + n, err
+}
+
+// Close closes the current stream reader, if any.
+func (cr *contentReader) Close() error {
+	if cr.current != nil {
+		err := cr.current.Close()
+		cr.current = nil
+		return err
+	}
+	return nil
 }
 
 func (cr *contentReader) getReader() (io.ReadCloser, error) {

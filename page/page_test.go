@@ -155,13 +155,18 @@ var testCases = []testCase{
 }
 
 // collectOps collects all operators from a content.Stream into an Operators slice.
-func collectOps(s content.Stream) content.Operators {
+func collectOps(t *testing.T, s content.Stream) content.Operators {
+	t.Helper()
 	if s == nil {
 		return nil
 	}
+	it := s.NewIter()
 	var ops content.Operators
-	for name, args := range s.All() {
+	for name, args := range it.All() {
 		ops = append(ops, content.Operator{Name: name, Args: slices.Clone(args)})
+	}
+	if err := it.Err(); err != nil {
+		t.Fatal(err)
 	}
 	return ops
 }
@@ -218,9 +223,9 @@ func roundTripTest(t *testing.T, v pdf.Version, p1 *Page) {
 	// preserves per-stream identity, so compare the combined content.
 	var wantOps content.Operators
 	for _, s := range p1.Contents {
-		wantOps = append(wantOps, collectOps(s)...)
+		wantOps = append(wantOps, collectOps(t, s)...)
 	}
-	gotOps := collectOps(p2.ContentStream())
+	gotOps := collectOps(t, p2.ContentStream())
 
 	if !wantOps.Equal(gotOps) {
 		t.Errorf("content stream mismatch:\nwant: %v\n got: %v", wantOps, gotOps)

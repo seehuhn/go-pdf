@@ -169,17 +169,19 @@ func NewWriter(v pdf.Version, ct Type, res *Resources) *Writer {
 // Validate checks that a content stream is valid without writing it.
 // It performs the same validation as Write but produces no output.
 func (w *Writer) Validate(s Stream) error {
-	for name, args := range s.All() {
+	it := s.NewIter()
+	for name, args := range it.All() {
 		if err := w.v.check(name, args); err != nil {
 			return err
 		}
 	}
-	return s.Err()
+	return it.Err()
 }
 
 // Write outputs a stream, validating and checking version compatibility.
 func (w *Writer) Write(out io.Writer, s Stream) error {
-	for name, args := range s.All() {
+	it := s.NewIter()
+	for name, args := range it.All() {
 		if err := w.v.check(name, args); err != nil {
 			return err
 		}
@@ -187,7 +189,7 @@ func (w *Writer) Write(out io.Writer, s Stream) error {
 			return err
 		}
 	}
-	return s.Err()
+	return it.Err()
 }
 
 // Close checks for balanced operators and version-specific stack depth limits.

@@ -17,7 +17,6 @@
 package extract
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 
@@ -200,29 +199,21 @@ func extractType1(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 		}
 	}
 
-	// buffer decompressed content stream bytes (cheap);
-	// defer tokenization/parsing until All() is called (lazy)
+	// store a reader factory closure so each iteration re-opens the PDF stream
 	stmType := content.PatternColored
 	if !pat.Color {
 		stmType = content.PatternUncolored
 	}
-	stm, err := pdf.DecodeStream(x.R, stream, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := io.ReadAll(stm)
-	closeErr := stm.Close()
-	if err != nil {
-		return nil, err
-	}
-	if closeErr != nil {
-		return nil, closeErr
-	}
-
-	if len(data) > 0 {
-		pat.Content = content.NewScanner(bytes.NewReader(data), pdf.GetVersion(x.R), stmType, pat.Res)
-	}
+	stm := stream // capture for closure
+	getter := x.R
+	version := pdf.GetVersion(x.R)
+	res := pat.Res
+	pat.Content = content.NewScanner(
+		func() (io.ReadCloser, error) {
+			return pdf.DecodeStream(getter, stm, 0)
+		},
+		version, stmType, res,
+	)
 
 	return pat, nil
 }

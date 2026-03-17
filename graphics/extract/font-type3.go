@@ -18,6 +18,7 @@ package extract
 
 import (
 	"errors"
+	"io"
 
 	"seehuhn.de/go/geom/matrix"
 
@@ -115,12 +116,10 @@ func extractFontType3(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*
 		}
 
 		// Parse the content stream
-		body, err := pdf.DecodeStream(x.R, stm, 0)
-		if err != nil {
-			continue // permissive
-		}
-		stream, err := content.ReadStream(body, v, content.Glyph, res)
-		body.Close()
+		glyphStm := stm // capture for closure
+		stream, err := content.ReadStream(func() (io.ReadCloser, error) {
+			return pdf.DecodeStream(x.R, glyphStm, 0)
+		}, v, content.Glyph, res)
 		if err != nil {
 			continue // permissive
 		}

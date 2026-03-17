@@ -18,6 +18,7 @@ package content
 
 import (
 	"bytes"
+	"io"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -203,9 +204,10 @@ func TestWriter_ResourceValidation(t *testing.T) {
 }
 
 func TestWriter_ValidateWithScanner(t *testing.T) {
-	input := "q\n1 0 0 1 100 200 cm\nQ\n"
-	r := bytes.NewReader([]byte(input))
-	s := NewScanner(r, pdf.V1_7, Page, &Resources{})
+	input := []byte("q\n1 0 0 1 100 200 cm\nQ\n")
+	s := NewScanner(func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(input)), nil
+	}, pdf.V1_7, Page, &Resources{})
 
 	w := NewWriter(pdf.V1_7, Page, &Resources{})
 	if err := w.Validate(s); err != nil {

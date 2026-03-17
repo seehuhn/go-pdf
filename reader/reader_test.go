@@ -18,6 +18,7 @@ package reader
 
 import (
 	"bytes"
+	"io"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -73,7 +74,10 @@ func TestParameters(t *testing.T) {
 	r := New(pdf.NewExtractor(data))
 	r.State = content.NewState(content.Page, b.Resources)
 	r.State.GState.Set = 0
-	err = r.ParseContentStream(buf)
+	data2 := buf.Bytes()
+	err = r.ParseContentStream(func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(data2)), nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
