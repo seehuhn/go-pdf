@@ -94,21 +94,17 @@ func (item *Item) AddChild(title string) *Item {
 
 // Decode reads a document outline from a PDF file.
 // The obj argument should be the value of the Outlines entry in the catalog.
-// Returns nil if obj is nil or not a reference.
+// Returns nil if obj is nil.
 func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Outline, error) {
-	rootRef, _ := obj.(pdf.Reference)
-	if rootRef == 0 {
-		return nil, nil
-	}
-
-	path = &pdf.CycleCheck{Ref: rootRef, Parent: path}
-
-	rootDict, err := pdf.GetDictTyped(x.R, rootRef, "Outlines")
-	if err != nil {
+	rootDict, err := x.GetDictTyped(path, obj, "Outlines")
+	if err != nil || rootDict == nil {
 		return nil, err
 	}
 
-	visited := map[pdf.Reference]bool{rootRef: true}
+	visited := map[pdf.Reference]bool{}
+	if ref, ok := obj.(pdf.Reference); ok {
+		visited[ref] = true
+	}
 
 	firstRef, _ := rootDict["First"].(pdf.Reference)
 	items, err := readChildren(x, path, visited, firstRef)
