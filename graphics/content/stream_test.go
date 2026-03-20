@@ -194,6 +194,153 @@ func TestInlineImageLimits(t *testing.T) {
 	}
 }
 
+func TestReadValue(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  pdf.Object
+	}{
+		{
+			name:  "integer",
+			input: "42",
+			want:  pdf.Integer(42),
+		},
+		{
+			name:  "name",
+			input: "/DeviceRGB",
+			want:  pdf.Name("DeviceRGB"),
+		},
+		{
+			name:  "simple array",
+			input: "[1 0]",
+			want:  pdf.Array{pdf.Integer(1), pdf.Integer(0)},
+		},
+		{
+			name:  "nested array",
+			input: "[[1 2] [3 4]]",
+			want: pdf.Array{
+				pdf.Array{pdf.Integer(1), pdf.Integer(2)},
+				pdf.Array{pdf.Integer(3), pdf.Integer(4)},
+			},
+		},
+		{
+			name:  "simple dict",
+			input: "<</Type /XObject>>",
+			want:  pdf.Dict{"Type": pdf.Name("XObject")},
+		},
+		{
+			name:  "dict with array value",
+			input: "<</D [1 0]>>",
+			want:  pdf.Dict{"D": pdf.Array{pdf.Integer(1), pdf.Integer(0)}},
+		},
+		{
+			name:  "array with names",
+			input: "[/DeviceRGB]",
+			want:  pdf.Array{pdf.Name("DeviceRGB")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &streamScanner{
+				buf: make([]byte, 512),
+				src: bytes.NewReader([]byte(tt.input)),
+			}
+			got, err := s.readValue()
+			if err != nil {
+				t.Fatalf("readValue() error: %v", err)
+			}
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("readValue() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestReadValueDepthLimit(t *testing.T) {
+	// nesting deeper than maxValueDepth should fail
+	var buf bytes.Buffer
+	for range maxValueDepth + 1 {
+		buf.WriteByte('[')
+	}
+	buf.WriteString("1")
+	for range maxValueDepth + 1 {
+		buf.WriteByte(']')
+	}
+	s := &streamScanner{
+		buf: make([]byte, 512),
+		src: bytes.NewReader(buf.Bytes()),
+	}
+	_, err := s.readValue()
+	if err == nil {
+		t.Error("expected error for deeply nested value")
+	}
+}
+
+func TestInlineImageWithArrayValue(t *testing.T) {
+	// inline image with /D [1 0] — this previously failed because
+	// readInlineImage used nextToken which couldn't parse arrays
+	stream, err := ReadStream(
+		bytesOpener([]byte("BI\n/W 10\n/H 10\n/D [1 0]\nID\nimagedata\nEI\n")),
+		pdf.V2_0, Page, &Resources{},
+	)
+	if err != nil {
+		t.Fatalf("ReadStream error: %v", err)
+	}
+
+	hasImage := false
+	for _, op := range stream {
+		if op.Name == OpInlineImage {
+			hasImage = true
+			dict, ok := op.Args[0].(pdf.Dict)
+			if !ok {
+				t.Fatal("expected dict as first arg")
+			}
+			arr, ok := dict["D"].(pdf.Array)
+			if !ok {
+				t.Fatalf("expected array for /D, got %T", dict["D"])
+			}
+			if len(arr) != 2 {
+				t.Errorf("expected 2-element array, got %d", len(arr))
+			}
+		}
+	}
+	if !hasImage {
+		t.Error("inline image was not parsed")
+	}
+}
+
+func TestInlineImageWithDictValue(t *testing.T) {
+	// inline image with a dict value in the header
+	stream, err := ReadStream(
+		bytesOpener([]byte("BI\n/W 10\n/H 10\n/DP <</K -1>>\nID\nimagedata\nEI\n")),
+		pdf.V2_0, Page, &Resources{},
+	)
+	if err != nil {
+		t.Fatalf("ReadStream error: %v", err)
+	}
+
+	hasImage := false
+	for _, op := range stream {
+		if op.Name == OpInlineImage {
+			hasImage = true
+			dict, ok := op.Args[0].(pdf.Dict)
+			if !ok {
+				t.Fatal("expected dict as first arg")
+			}
+			dp, ok := dict["DP"].(pdf.Dict)
+			if !ok {
+				t.Fatalf("expected dict for /DP, got %T", dict["DP"])
+			}
+			if k, ok := dp["K"].(pdf.Integer); !ok || k != -1 {
+				t.Errorf("expected /K -1, got %v", dp["K"])
+			}
+		}
+	}
+	if !hasImage {
+		t.Error("inline image was not parsed")
+	}
+}
+
 func TestOperatorArgLimit(t *testing.T) {
 	// Build a stream with 100 numbers followed by an operator, then a valid operator
 	var buf bytes.Buffer

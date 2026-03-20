@@ -677,6 +677,73 @@ func isASCIIFilter(filter pdf.Name) bool {
 	return false
 }
 
+// readValue reads one complete PDF value (atomic or composite) from the stream.
+// It handles arrays ([...]) and dictionaries (<<...>>) recursively.
+func (s *streamScanner) readValue() (pdf.Object, error) {
+	return s.readValueDepth(0)
+}
+
+// maxValueDepth limits nesting of arrays and dicts to prevent stack overflow.
+const maxValueDepth = 10
+
+func (s *streamScanner) readValueDepth(depth int) (pdf.Object, error) {
+	tok, err := s.nextToken()
+	if err != nil {
+		return nil, err
+	}
+
+	switch tok {
+	case pdf.Operator("["):
+		if depth >= maxValueDepth {
+			return nil, errParse
+		}
+		var arr pdf.Array
+		for {
+			s.skipWhiteSpace()
+			if s.peekString("]") {
+				s.skipN(1)
+				return arr, nil
+			}
+			elem, err := s.readValueDepth(depth + 1)
+			if err != nil {
+				return nil, err
+			}
+			arr = append(arr, elem)
+		}
+	case pdf.Operator("<<"):
+		if depth >= maxValueDepth {
+			return nil, errParse
+		}
+		dict := pdf.Dict{}
+		for {
+			s.skipWhiteSpace()
+			if s.peekString(">>") {
+				s.skipN(2)
+				return dict, nil
+			}
+			// read key (must be a name)
+			keyObj, err := s.readValueDepth(depth + 1)
+			if err != nil {
+				return nil, err
+			}
+			key, ok := keyObj.(pdf.Name)
+			if !ok {
+				return nil, errParse
+			}
+			// read value
+			val, err := s.readValueDepth(depth + 1)
+			if err != nil {
+				return nil, err
+			}
+			if val != nil {
+				dict[key] = val
+			}
+		}
+	}
+
+	return tok, nil
+}
+
 // readInlineImage reads a BI...ID...EI sequence and returns it as a %image% pseudo-operator
 func (s *streamScanner) readInlineImage() (Operator, error) {
 	// read image dictionary (between BI and ID)
@@ -690,19 +757,18 @@ func (s *streamScanner) readInlineImage() (Operator, error) {
 			break
 		}
 
-		// read key
-		b := s.peekN(1)
-		if len(b) == 0 {
-			return Operator{}, io.EOF
+		// read key (must be a name)
+		keyObj, err := s.readValue()
+		if err != nil {
+			return Operator{}, err
 		}
-		if b[0] != '/' {
+		key, ok := keyObj.(pdf.Name)
+		if !ok {
 			return Operator{}, errParse
 		}
-		s.skipN(1)
-		key := s.readName()
 
 		// read value
-		val, err := s.nextToken()
+		val, err := s.readValue()
 		if err != nil {
 			return Operator{}, err
 		}
