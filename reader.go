@@ -17,6 +17,7 @@
 package pdf
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -74,6 +75,8 @@ type Reader struct {
 
 	xref map[uint32]*xRefEntry // read-only after construction
 
+	headerOffset int64 // byte position of '%' in '%PDF-'
+
 	enc         *encryptInfo       // read-only after construction
 	unencrypted map[Reference]bool // read-only after construction
 
@@ -116,7 +119,14 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 		unencrypted: make(map[Reference]bool),
 	}
 
-	s, err := r.scannerFrom(0, false)
+	// search the first 1024 bytes for the %PDF- signature
+	headerOffset, err := findHeaderOffset(data, size)
+	if err != nil {
+		return nil, err
+	}
+	r.headerOffset = headerOffset
+
+	s, err := r.scannerFrom(headerOffset, false)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +307,7 @@ func (r *Reader) Get(ref Reference, canObjStm bool) (_ Native, err error) {
 		return getFromObjStm(r, ref.Number(), entry.InStream, getInt, r.enc)
 	}
 
-	s, err := r.scannerFrom(entry.Pos, canObjStm)
+	s, err := r.scannerFrom(entry.Pos+r.headerOffset, canObjStm)
 	if err != nil {
 		return nil, err
 	}
@@ -512,6 +522,22 @@ func safeGetInteger(r Getter, canObjStm bool) getIntFn {
 		}
 		return getIntegerNoObjStm(r, obj)
 	}
+}
+
+// findHeaderOffset searches the first 1024 bytes of the file for the
+// %PDF- signature and returns its byte offset.
+func findHeaderOffset(data io.ReaderAt, size int64) (int64, error) {
+	n := min(size, 1024)
+	buf := make([]byte, n)
+	_, err := data.ReadAt(buf, 0)
+	if err != nil && err != io.EOF {
+		return 0, err
+	}
+	idx := bytes.Index(buf, []byte("%PDF-"))
+	if idx < 0 {
+		return 0, &MalformedFileError{Err: errNoPDF}
+	}
+	return int64(idx), nil
 }
 
 func (r *Reader) scannerFrom(pos int64, canObjStm bool) (*scanner, error) {

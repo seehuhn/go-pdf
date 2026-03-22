@@ -139,6 +139,38 @@ func TestReadHeaderVersion(t *testing.T) {
 	}
 }
 
+func TestFindHeaderOffset(t *testing.T) {
+	t.Run("no preamble", func(t *testing.T) {
+		data := []byte("%PDF-1.7\nrest of file")
+		off, err := findHeaderOffset(bytes.NewReader(data), int64(len(data)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if off != 0 {
+			t.Errorf("expected offset 0, got %d", off)
+		}
+	})
+
+	t.Run("short preamble", func(t *testing.T) {
+		data := []byte("\x00\x01\x02\x03%PDF-1.5\nrest of file")
+		off, err := findHeaderOffset(bytes.NewReader(data), int64(len(data)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if off != 4 {
+			t.Errorf("expected offset 4, got %d", off)
+		}
+	})
+
+	t.Run("no signature", func(t *testing.T) {
+		data := []byte("this is not a PDF file")
+		_, err := findHeaderOffset(bytes.NewReader(data), int64(len(data)))
+		if err == nil {
+			t.Error("expected error for missing signature")
+		}
+	})
+}
+
 func FuzzScanner(f *testing.F) {
 	for _, test := range testCases {
 		f.Add(test.in)

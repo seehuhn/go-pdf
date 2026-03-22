@@ -530,5 +530,48 @@ func addPage(w *Writer, args ...Object) error {
 	return nil
 }
 
+func TestReaderWithPreamble(t *testing.T) {
+	// create a valid PDF in memory
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, V1_7, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := w.Alloc()
+	err = w.Put(ref, Name("TestValue"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = addPage(w)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// prepend 4 bytes of junk before the PDF data
+	preamble := []byte{0xDE, 0xAD, 0xBE, 0xEF}
+	data := append(preamble, buf.Bytes()...)
+
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if r.meta.Version != V1_7 {
+		t.Errorf("expected version %d, got %d", V1_7, r.meta.Version)
+	}
+
+	obj, err := r.Get(ref, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if obj != Name("TestValue") {
+		t.Errorf("expected TestValue, got %v", obj)
+	}
+}
+
 // compile time test
 var _ Getter = &Reader{}

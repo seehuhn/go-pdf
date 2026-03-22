@@ -42,14 +42,14 @@ func (r *Reader) findXRef(size int64) (int64, error) {
 		return 0, Wrap(err, fmt.Sprintf("byte %d", pos+9))
 	}
 
-	if xRefPos <= 0 || int64(xRefPos) >= size {
+	if xRefPos <= 0 || int64(xRefPos)+r.headerOffset >= size {
 		return 0, &MalformedFileError{
 			Err: fmt.Errorf("invalid xref position %d", xRefPos),
 			Loc: []string{fmt.Sprintf("byte %d", pos+9)},
 		}
 	}
 
-	return int64(xRefPos), nil
+	return int64(xRefPos) + r.headerOffset, nil
 }
 
 func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
@@ -92,7 +92,7 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 						Err: errInvalidXref,
 					}
 				}
-				s, err = r.scannerFrom(int64(zStart), false)
+				s, err = r.scannerFrom(int64(zStart)+r.headerOffset, false)
 				if err != nil {
 					return nil, nil, err
 				}
@@ -127,13 +127,13 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 			break
 		}
 		prevStart, ok := prev.(Integer)
-		if !ok || prevStart <= 0 || int64(prevStart) >= size {
+		if !ok || prevStart <= 0 || int64(prevStart)+r.headerOffset >= size {
 			return nil, nil, &MalformedFileError{
 				Err: errors.New("invalid /Prev"),
 				Loc: []string{fmt.Sprintf("xref at byte %d", start)},
 			}
 		}
-		start = int64(prevStart)
+		start = int64(prevStart) + r.headerOffset
 	}
 
 	return xref, trailer, nil
