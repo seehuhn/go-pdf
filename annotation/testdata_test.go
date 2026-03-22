@@ -195,7 +195,6 @@ var testCases = map[pdf.Name][]testCase{
 				Markup: Markup{
 					User:         "Designer",
 					CreationDate: time.Date(2023, 6, 1, 14, 0, 0, 0, time.UTC),
-					Intent:       "FreeText",
 				},
 				DefaultAppearance: "/Times-Roman 14 Tf 0.2 0.2 0.8 rg",
 				Align:             TextAlignRight, // Right justified

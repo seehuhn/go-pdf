@@ -140,7 +140,7 @@ func (m *Markup) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 		}
 	}
 
-	if m.Intent != "" {
+	if m.Intent != "" && m.Intent != d["Subtype"] {
 		if err := pdf.CheckVersion(w, "markup annotation IT entry", pdf.V1_6); err != nil {
 			return err
 		}
@@ -202,10 +202,10 @@ func decodeMarkup(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, markup 
 		markup.RT = rt
 	}
 
-	// IT (optional)
+	// IT (optional; per spec, IT equal to Subtype means no explicit intent)
 	if it, err := pdf.Optional(x.GetName(path, dict["IT"])); err != nil {
 		return err
-	} else {
+	} else if it != dict["Subtype"] {
 		markup.Intent = it
 	}
 
