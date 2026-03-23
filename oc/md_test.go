@@ -235,7 +235,7 @@ func TestMembershipValidation(t *testing.T) {
 		OCGs: []*Group{
 			{Name: "Test"},
 		},
-		Policy: Policy("Invalid"),
+		Policy: MembershipPolicy("Invalid"),
 	}
 	_, err = rm.Embed(invalidPolicy)
 	if err == nil {
@@ -292,7 +292,7 @@ func TestMembershipExtractPermissive(t *testing.T) {
 }
 
 func TestMembershipPolicyConstants(t *testing.T) {
-	policies := []Policy{PolicyAllOn, PolicyAnyOn, PolicyAnyOff, PolicyAllOff}
+	policies := []MembershipPolicy{PolicyAllOn, PolicyAnyOn, PolicyAnyOff, PolicyAllOff}
 	expectedValues := []string{"AllOn", "AnyOn", "AnyOff", "AllOff"}
 
 	for i, policy := range policies {

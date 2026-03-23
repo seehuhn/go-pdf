@@ -242,23 +242,33 @@ func TestVisibilityExpressionIsVisible(t *testing.T) {
 	layer2 := &Group{Name: "Layer2"}
 	layer3 := &Group{Name: "Layer3"}
 
+	mkState := func(m map[*Group]bool) *GroupStates {
+		return &GroupStates{state: m}
+	}
+
+	// nonParticipating is a group not in any state map, so it won't participate
+	nonParticipating := &Group{Name: "NonParticipating"}
+
 	tests := []struct {
-		name     string
-		ve       VisibilityExpression
-		states   map[*Group]bool
-		expected bool
+		name        string
+		ve          VisibilityExpression
+		states      *GroupStates
+		wantVal     bool
+		wantOpinion bool
 	}{
 		{
-			name:     "group on",
-			ve:       &VisibilityExpressionGroup{Group: layer1},
-			states:   map[*Group]bool{layer1: true},
-			expected: true,
+			name:        "group on",
+			ve:          &VisibilityExpressionGroup{Group: layer1},
+			states:      mkState(map[*Group]bool{layer1: true}),
+			wantVal:     true,
+			wantOpinion: true,
 		},
 		{
-			name:     "group off",
-			ve:       &VisibilityExpressionGroup{Group: layer1},
-			states:   map[*Group]bool{layer1: false},
-			expected: false,
+			name:        "group off",
+			ve:          &VisibilityExpressionGroup{Group: layer1},
+			states:      mkState(map[*Group]bool{layer1: false}),
+			wantVal:     false,
+			wantOpinion: true,
 		},
 		{
 			name: "And all on",
@@ -268,8 +278,9 @@ func TestVisibilityExpressionIsVisible(t *testing.T) {
 					&VisibilityExpressionGroup{Group: layer2},
 				},
 			},
-			states:   map[*Group]bool{layer1: true, layer2: true},
-			expected: true,
+			states:      mkState(map[*Group]bool{layer1: true, layer2: true}),
+			wantVal:     true,
+			wantOpinion: true,
 		},
 		{
 			name: "And one off",
@@ -279,8 +290,9 @@ func TestVisibilityExpressionIsVisible(t *testing.T) {
 					&VisibilityExpressionGroup{Group: layer2},
 				},
 			},
-			states:   map[*Group]bool{layer1: true, layer2: false},
-			expected: false,
+			states:      mkState(map[*Group]bool{layer1: true, layer2: false}),
+			wantVal:     false,
+			wantOpinion: true,
 		},
 		{
 			name: "Or all off",
@@ -290,8 +302,9 @@ func TestVisibilityExpressionIsVisible(t *testing.T) {
 					&VisibilityExpressionGroup{Group: layer2},
 				},
 			},
-			states:   map[*Group]bool{layer1: false, layer2: false},
-			expected: false,
+			states:      mkState(map[*Group]bool{layer1: false, layer2: false}),
+			wantVal:     false,
+			wantOpinion: true,
 		},
 		{
 			name: "Or one on",
@@ -301,24 +314,27 @@ func TestVisibilityExpressionIsVisible(t *testing.T) {
 					&VisibilityExpressionGroup{Group: layer2},
 				},
 			},
-			states:   map[*Group]bool{layer1: false, layer2: true},
-			expected: true,
+			states:      mkState(map[*Group]bool{layer1: false, layer2: true}),
+			wantVal:     true,
+			wantOpinion: true,
 		},
 		{
 			name: "Not on",
 			ve: &VisibilityExpressionNot{
 				Arg: &VisibilityExpressionGroup{Group: layer1},
 			},
-			states:   map[*Group]bool{layer1: true},
-			expected: false,
+			states:      mkState(map[*Group]bool{layer1: true}),
+			wantVal:     false,
+			wantOpinion: true,
 		},
 		{
 			name: "Not off",
 			ve: &VisibilityExpressionNot{
 				Arg: &VisibilityExpressionGroup{Group: layer1},
 			},
-			states:   map[*Group]bool{layer1: false},
-			expected: true,
+			states:      mkState(map[*Group]bool{layer1: false}),
+			wantVal:     true,
+			wantOpinion: true,
 		},
 		{
 			name: "complex: OCG1 OR (NOT OCG2) OR (OCG3 AND OCG4)",
@@ -335,16 +351,71 @@ func TestVisibilityExpressionIsVisible(t *testing.T) {
 					},
 				},
 			},
-			states:   map[*Group]bool{layer1: false, layer2: true, layer3: false},
-			expected: false,
+			states:      mkState(map[*Group]bool{layer1: false, layer2: true, layer3: false}),
+			wantVal:     false,
+			wantOpinion: true,
+		},
+
+		// non-participating group tests
+		{
+			name:        "non-participating group has no opinion",
+			ve:          &VisibilityExpressionGroup{Group: nonParticipating},
+			states:      mkState(map[*Group]bool{layer1: true}),
+			wantVal:     false,
+			wantOpinion: false,
+		},
+		{
+			name: "Not(non-participating) has no opinion",
+			ve: &VisibilityExpressionNot{
+				Arg: &VisibilityExpressionGroup{Group: nonParticipating},
+			},
+			states:      mkState(map[*Group]bool{layer1: true}),
+			wantVal:     false,
+			wantOpinion: false,
+		},
+		{
+			name: "Or(non-participating, OFF) returns false with opinion",
+			ve: &VisibilityExpressionOr{
+				Args: []VisibilityExpression{
+					&VisibilityExpressionGroup{Group: nonParticipating},
+					&VisibilityExpressionGroup{Group: layer1},
+				},
+			},
+			states:      mkState(map[*Group]bool{layer1: false}),
+			wantVal:     false,
+			wantOpinion: true,
+		},
+		{
+			name: "And(non-participating, ON) returns true with opinion",
+			ve: &VisibilityExpressionAnd{
+				Args: []VisibilityExpression{
+					&VisibilityExpressionGroup{Group: nonParticipating},
+					&VisibilityExpressionGroup{Group: layer1},
+				},
+			},
+			states:      mkState(map[*Group]bool{layer1: true}),
+			wantVal:     true,
+			wantOpinion: true,
+		},
+		{
+			name: "And(non-participating, non-participating) has no opinion",
+			ve: &VisibilityExpressionAnd{
+				Args: []VisibilityExpression{
+					&VisibilityExpressionGroup{Group: nonParticipating},
+					&VisibilityExpressionGroup{Group: nonParticipating},
+				},
+			},
+			states:      mkState(map[*Group]bool{layer1: true}),
+			wantVal:     false,
+			wantOpinion: false,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := tc.ve.isVisible(tc.states)
-			if result != tc.expected {
-				t.Errorf("expected %v, got %v", tc.expected, result)
+			val, opinion := tc.ve.isVisible(tc.states)
+			if val != tc.wantVal || opinion != tc.wantOpinion {
+				t.Errorf("got (%v, %v), want (%v, %v)", val, opinion, tc.wantVal, tc.wantOpinion)
 			}
 		})
 	}

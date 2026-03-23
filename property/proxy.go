@@ -26,6 +26,7 @@ type proxyList struct {
 	x          *pdf.Extractor
 	dict       pdf.Dict
 	isIndirect bool
+	ref        pdf.Reference
 }
 
 // ExtractList extracts a property list from a PDF object.
@@ -40,10 +41,16 @@ func ExtractList(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirec
 	if dict == nil {
 		return nil, nil
 	}
+	var ref pdf.Reference
+	if !isDirect && path != nil {
+		ref = path.Ref
+	}
+
 	p := &proxyList{
 		x:          x,
 		dict:       dict,
 		isIndirect: isIndirect,
+		ref:        ref,
 	}
 	return p, nil
 }
@@ -68,6 +75,10 @@ func (p *proxyList) Get(key pdf.Name) (pdf.Object, error) {
 
 func (p *proxyList) IsDirect() bool {
 	return isDirect(p.dict)
+}
+
+func (p *proxyList) Ref() pdf.Reference {
+	return p.ref
 }
 
 // Embed converts the Go representation of the object into a PDF object,

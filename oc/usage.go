@@ -441,8 +441,10 @@ type UserType string
 const (
 	// UserTypeIndividual represents an individual user.
 	UserTypeIndividual UserType = "Ind"
+
 	// UserTypeTitle represents a title or position.
 	UserTypeTitle UserType = "Ttl"
+
 	// UserTypeOrganisation represents an organisation.
 	UserTypeOrganisation UserType = "Org"
 )
@@ -453,8 +455,10 @@ type PrintSubtype string
 const (
 	// PrintSubtypeTrapping represents trapping content.
 	PrintSubtypeTrapping PrintSubtype = "Trapping"
+
 	// PrintSubtypePrintersMarks represents printer's marks.
 	PrintSubtypePrintersMarks PrintSubtype = "PrintersMarks"
+
 	// PrintSubtypeWatermark represents watermark content.
 	PrintSubtypeWatermark PrintSubtype = "Watermark"
 )
@@ -535,10 +539,13 @@ type PageElement string
 const (
 	// PageElementHeaderFooter represents header/footer content.
 	PageElementHeaderFooter PageElement = "HF"
+
 	// PageElementForeground represents foreground image or graphics.
 	PageElementForeground PageElement = "FG"
+
 	// PageElementBackground represents background image or graphics.
 	PageElementBackground PageElement = "BG"
+
 	// PageElementLogo represents a logo.
 	PageElementLogo PageElement = "L"
 )

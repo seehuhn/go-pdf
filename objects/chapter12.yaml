@@ -8451,21 +8451,30 @@ types:
   writeMethod: (*NumberFormat).Embed
 - name: OptContentConfig
   purpose: optional content configuration
-  goType:
+  goType: oc.Configuration
   pdfRepr: dict
+  introduced: '1.5'
+  fileDependent: false
+  readFunc: oc.ExtractConfiguration
+  writeMethod: (*Configuration).Embed
+  specSection: '8.11.4.3'
+  specTable: Table 99
   fields:
-  - goName:
+  - goName: Name
+    goType: string
     pdfKey: Name
     pdfType: text-string
     required: false
     introduced: '1.5'
     notes: Table 99
-  - goName:
+  - goName: Creator
+    goType: string
     pdfKey: Creator
     pdfType: text-string
     required: false
     introduced: '1.5'
-  - goName:
+  - goName: BaseState
+    goType: BaseState
     pdfKey: BaseState
     pdfType: name
     required: false
@@ -8475,7 +8484,8 @@ types:
     - 'ON'
     - 'OFF'
     - Unchanged
-  - goName:
+  - goName: 'ON'
+    goType: '[]*Group'
     pdfKey: 'ON'
     pdfType: array
     required: false
@@ -8483,7 +8493,8 @@ types:
     refTypes:
     - type: OptContentGroup
       collection: array
-  - goName:
+  - goName: 'OFF'
+    goType: '[]*Group'
     pdfKey: 'OFF'
     pdfType: array
     required: false
@@ -8491,7 +8502,8 @@ types:
     refTypes:
     - type: OptContentGroup
       collection: array
-  - goName:
+  - goName: Intent
+    goType: '[]pdf.Name'
     pdfKey: Intent
     pdfType: array;name
     required: false
@@ -8501,7 +8513,8 @@ types:
     - All
     - Design
     - View
-  - goName:
+  - goName: AS
+    goType: '[]*UsageApplication'
     pdfKey: AS
     pdfType: array
     required: false
@@ -8509,12 +8522,14 @@ types:
     refTypes:
     - type: OptContentUsageApplication
       collection: array
-  - goName:
+  - goName: Order
+    goType: '[]OrderItem'
     pdfKey: Order
     pdfType: array
     required: false
     introduced: '1.5'
-  - goName:
+  - goName: ListMode
+    goType: ListMode
     pdfKey: ListMode
     pdfType: name
     required: false
@@ -8523,12 +8538,14 @@ types:
     possibleValues:
     - AllPages
     - VisiblePages
-  - goName:
+  - goName: RBGroups
+    goType: '[][]*Group'
     pdfKey: RBGroups
     pdfType: array
     required: false
     introduced: '1.5'
-  - goName:
+  - goName: Locked
+    goType: '[]*Group'
     pdfKey: Locked
     pdfType: array
     required: false
@@ -8763,11 +8780,17 @@ types:
     - 'OFF'
 - name: OptContentProperties
   purpose: document-wide optional content properties
-  goType:
+  goType: oc.Properties
   pdfRepr: dict
   introduced: '1.5'
+  fileDependent: false
+  readFunc: oc.ExtractProperties
+  writeMethod: (*Properties).Embed
+  specSection: '8.11.4.2'
+  specTable: Table 98
   fields:
-  - goName:
+  - goName: OCGs
+    goType: '[]*Group'
     pdfKey: OCGs
     pdfType: array
     required: true
@@ -8776,14 +8799,16 @@ types:
     - type: OptContentGroup
       collection: array
     notes: Table 98
-  - goName:
+  - goName: D
+    goType: '*Configuration'
     pdfKey: D
     pdfType: dictionary
     required: true
     introduced: '1.5'
     refTypes:
     - OptContentConfig
-  - goName:
+  - goName: Configs
+    goType: '[]*Configuration'
     pdfKey: Configs
     pdfType: array
     required: false

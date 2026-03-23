@@ -73,6 +73,12 @@ func (a *ActualText) IsDirect() bool {
 	return a.SingleUse
 }
 
+// Ref returns a zero reference since ActualText property lists are not
+// extracted from indirect OCG/OCMD dictionaries.
+func (a *ActualText) Ref() pdf.Reference {
+	return 0
+}
+
 // Embed writes the property list to the PDF file.
 // This implements the [pdf.Embedder] interface.
 func (a *ActualText) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {

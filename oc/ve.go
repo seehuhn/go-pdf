@@ -25,7 +25,7 @@ import "seehuhn.de/go/pdf"
 //   - [VisibilityExpressionOr]
 //   - [VisibilityExpressionNot]
 type VisibilityExpression interface {
-	isVisible(map[*Group]bool) bool
+	isVisible(*GroupStates) (bool, bool)
 	pdf.Embedder
 }
 
@@ -102,8 +102,12 @@ type VisibilityExpressionGroup struct {
 }
 
 // isVisible returns the state of the referenced group.
-func (g *VisibilityExpressionGroup) isVisible(states map[*Group]bool) bool {
-	return states[g.Group]
+// Non-participating groups return (false, false) to indicate no opinion.
+func (g *VisibilityExpressionGroup) isVisible(s *GroupStates) (bool, bool) {
+	if !s.Participates(g.Group) {
+		return false, false
+	}
+	return s.IsOn(g.Group), true
 }
 
 // Embed converts the group reference to a PDF object reference.
@@ -129,14 +133,24 @@ type VisibilityExpressionAnd struct {
 	Args []VisibilityExpression
 }
 
-// isVisible returns true if all operands are active.
-func (a *VisibilityExpressionAnd) isVisible(groupStates map[*Group]bool) bool {
+// isVisible returns true if all operands with an opinion are active.
+// If no operands have an opinion, it returns (false, false).
+func (a *VisibilityExpressionAnd) isVisible(s *GroupStates) (bool, bool) {
+	anyOpinion := false
 	for _, operand := range a.Args {
-		if !operand.isVisible(groupStates) {
-			return false
+		val, ok := operand.isVisible(s)
+		if !ok {
+			continue
+		}
+		anyOpinion = true
+		if !val {
+			return false, true
 		}
 	}
-	return true
+	if !anyOpinion {
+		return false, false
+	}
+	return true, true
 }
 
 // Embed converts the AND expression to a PDF array.
@@ -169,14 +183,24 @@ type VisibilityExpressionOr struct {
 	Args []VisibilityExpression
 }
 
-// isVisible returns true if any operand is active.
-func (o *VisibilityExpressionOr) isVisible(groupStates map[*Group]bool) bool {
+// isVisible returns true if any operand with an opinion is active.
+// If no operands have an opinion, it returns (false, false).
+func (o *VisibilityExpressionOr) isVisible(s *GroupStates) (bool, bool) {
+	anyOpinion := false
 	for _, operand := range o.Args {
-		if operand.isVisible(groupStates) {
-			return true
+		val, ok := operand.isVisible(s)
+		if !ok {
+			continue
+		}
+		anyOpinion = true
+		if val {
+			return true, true
 		}
 	}
-	return false // empty OR is false
+	if !anyOpinion {
+		return false, false
+	}
+	return false, true
 }
 
 // Embed converts the OR expression to a PDF array.
@@ -210,8 +234,13 @@ type VisibilityExpressionNot struct {
 }
 
 // isVisible returns the negation of the operand's state.
-func (n *VisibilityExpressionNot) isVisible(groupStates map[*Group]bool) bool {
-	return !n.Arg.isVisible(groupStates)
+// If the operand has no opinion, it returns (false, false).
+func (n *VisibilityExpressionNot) isVisible(s *GroupStates) (bool, bool) {
+	val, ok := n.Arg.isVisible(s)
+	if !ok {
+		return false, false
+	}
+	return !val, true
 }
 
 // Embed converts the NOT expression to a PDF array.

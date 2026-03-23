@@ -460,9 +460,10 @@ func (ps *PageScanner) SetInitialArgs(args []pdf.Object) {
 // or an IO error occurred.
 func (ps *PageScanner) ScanReader(r io.Reader, yield func(OpName, []pdf.Object) bool) bool {
 	ps.si.s = &streamScanner{
-		buf:  make([]byte, 512),
-		src:  r,
-		args: ps.si.s.args,
+		buf:   make([]byte, 512),
+		src:   r,
+		args:  ps.si.s.args,
+		stack: ps.si.s.stack,
 	}
 	return ps.si.scanLoop(yield)
 }

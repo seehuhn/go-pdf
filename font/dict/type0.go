@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"sync"
 
 	"seehuhn.de/go/postscript/cid"
 
@@ -336,6 +337,7 @@ type t0Font struct {
 	*CIDFontType0
 	codec *charcode.Codec
 	text  map[charcode.Code]string
+	mu    sync.Mutex
 	cache map[charcode.Code]font.Code
 }
 
@@ -375,6 +377,7 @@ func (f *t0Font) Codes(str pdf.String) iter.Seq[font.Code] {
 		for len(str) > 0 {
 			code, k, isValid := f.codec.Decode(str)
 
+			f.mu.Lock()
 			res, seen := f.cache[code]
 			if !seen {
 				codeBytes := str[:k]
@@ -394,6 +397,7 @@ func (f *t0Font) Codes(str pdf.String) iter.Seq[font.Code] {
 				res.Text = f.text[code]
 				f.cache[code] = res
 			}
+			f.mu.Unlock()
 
 			str = str[k:]
 			if !yield(res) {

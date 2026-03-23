@@ -99,6 +99,12 @@ func (a *AF) IsDirect() bool {
 	return false
 }
 
+// Ref returns a zero reference since AF property lists are not
+// extracted from indirect OCG/OCMD dictionaries.
+func (a *AF) Ref() pdf.Reference {
+	return 0
+}
+
 // Embed writes the property list to the PDF file.
 // This implements the [pdf.Embedder] interface.
 func (a *AF) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {

@@ -20,6 +20,7 @@ import (
 	"errors"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/property"
 )
 
 // PDF 2.0 sections: 8.11.2
@@ -41,7 +42,10 @@ type Group struct {
 	Usage *Usage
 }
 
-var _ pdf.Embedder = (*Group)(nil)
+var (
+	_ pdf.Embedder  = (*Group)(nil)
+	_ property.List = (*Group)(nil)
+)
 
 // ExtractGroup extracts an optional content group from a PDF object.
 func ExtractGroup(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Group, error) {
@@ -142,7 +146,32 @@ func (g *Group) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return ref, nil
 }
 
-// IsVisible returns whether the group is visible given a state map.
-func (g *Group) IsVisible(states map[*Group]bool) bool {
-	return states[g]
+// IsVisible returns whether the group is visible given a state.
+func (g *Group) IsVisible(s *GroupStates) bool {
+	return s.IsOn(g)
 }
+
+// Keys returns the PDF dictionary keys available via [Group.Get].
+func (g *Group) Keys() []pdf.Name {
+	return []pdf.Name{"Type", "Name"}
+}
+
+// Get returns the PDF value for the given key.
+// Only "Type" and "Name" are supported; use the struct fields for
+// other data.
+func (g *Group) Get(key pdf.Name) (pdf.Object, error) {
+	switch key {
+	case "Type":
+		return pdf.Name("OCG"), nil
+	case "Name":
+		return pdf.TextString(g.Name), nil
+	default:
+		return nil, property.ErrNoKey
+	}
+}
+
+// IsDirect returns false; optional content groups are always indirect.
+func (g *Group) IsDirect() bool { return false }
+
+// Ref returns 0; this is not an extracted property list.
+func (g *Group) Ref() pdf.Reference { return 0 }

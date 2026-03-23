@@ -27,6 +27,11 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// Instance represents a font as used in a PDF content stream.
+//
+// Instances returned by the extractor cache may be shared across
+// goroutines. Implementations used for reading must be safe for
+// concurrent use.
 type Instance interface {
 	// PostScriptName returns a human-readable name for the font.
 	// For most font types, this is the PostScript name of the font.

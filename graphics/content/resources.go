@@ -168,7 +168,7 @@ func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if len(r.Properties) > 0 {
 		propertiesDict := pdf.Dict{}
 		for name, props := range r.Properties {
-			ref, err := props.Embed(rm)
+			ref, err := rm.Embed(props)
 			if err != nil {
 				return nil, err
 			}

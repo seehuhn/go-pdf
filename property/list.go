@@ -72,6 +72,13 @@ type List interface {
 	// resource dictionary.
 	IsDirect() bool
 
+	// Ref returns the indirect reference from which this property list was
+	// extracted, or a zero Reference if the list was inline or not extracted
+	// via [pdf.ExtractorGet]. This enables consumers to re-extract typed
+	// objects (such as optional content groups) from the same reference,
+	// leveraging the extractor cache for pointer identity.
+	Ref() pdf.Reference
+
 	pdf.Embedder
 }
 

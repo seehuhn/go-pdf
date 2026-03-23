@@ -18,8 +18,10 @@ package oc
 
 import (
 	"errors"
+	"slices"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/property"
 )
 
 // PDF 2.0 sections: 8.11.2
@@ -39,7 +41,7 @@ type Membership struct {
 	// [PolicyAnyOff], [PolicyAllOff].
 	//
 	// If VE is present, this entry is ignored.
-	Policy Policy
+	Policy MembershipPolicy
 
 	// VE (optional) specifies a visibility expression for computing
 	// visibility based on a set of optional content groups.
@@ -52,7 +54,10 @@ type Membership struct {
 	SingleUse bool
 }
 
-var _ pdf.Embedder = (*Membership)(nil)
+var (
+	_ pdf.Embedder  = (*Membership)(nil)
+	_ property.List = (*Membership)(nil)
+)
 
 // ExtractMembership extracts an optional content membership dictionary from a PDF object.
 func ExtractMembership(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Membership, error) {
@@ -90,9 +95,9 @@ func ExtractMembership(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, i
 	if pName, err := pdf.Optional(x.GetName(path, dict["P"])); err != nil {
 		return nil, err
 	} else {
-		switch Policy(pName) {
+		switch MembershipPolicy(pName) {
 		case PolicyAllOn, PolicyAnyOn, PolicyAnyOff, PolicyAllOff:
-			m.Policy = Policy(pName)
+			m.Policy = MembershipPolicy(pName)
 		default:
 			m.Policy = PolicyAnyOn
 		}
@@ -176,60 +181,83 @@ func (m *Membership) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 // IsVisible evaluates the visibility of content controlled by this membership
 // dictionary based on the current state of optional content groups.
-func (m *Membership) IsVisible(states map[*Group]bool) bool {
+// Groups that do not participate in the state are filtered out before
+// evaluating the policy; if no groups remain, the content is visible.
+func (m *Membership) IsVisible(s *GroupStates) bool {
 	if m.VE != nil {
-		return m.VE.isVisible(states)
+		vis, ok := m.VE.isVisible(s)
+		return !ok || vis
 	}
 
-	if len(m.OCGs) == 0 {
+	// filter to participating groups
+	var ocgs []*Group
+	for _, g := range m.OCGs {
+		if s.Participates(g) {
+			ocgs = append(ocgs, g)
+		}
+	}
+	if len(ocgs) == 0 {
 		return true
 	}
 
 	switch m.Policy {
 	case PolicyAllOn:
-		for _, g := range m.OCGs {
-			if !g.IsVisible(states) {
+		for _, g := range ocgs {
+			if !s.IsOn(g) {
 				return false
 			}
 		}
 		return true
 	case PolicyAnyOff:
-		for _, g := range m.OCGs {
-			if !g.IsVisible(states) {
+		for _, g := range ocgs {
+			if !s.IsOn(g) {
 				return true
 			}
 		}
 		return false
 	case PolicyAllOff:
-		for _, g := range m.OCGs {
-			if g.IsVisible(states) {
-				return false
-			}
-		}
-		return true
+		return !slices.ContainsFunc(ocgs, s.IsOn)
 	default: // PolicyAnyOn
-		for _, g := range m.OCGs {
-			if g.IsVisible(states) {
-				return true
-			}
-		}
-		return false
+		return slices.ContainsFunc(ocgs, s.IsOn)
 	}
 }
 
-// Policy represents the visibility policy for an optional content membership dictionary.
-type Policy pdf.Name
+// Keys returns the PDF dictionary keys available via [Membership.Get].
+func (m *Membership) Keys() []pdf.Name {
+	return []pdf.Name{"Type"}
+}
+
+// Get returns the PDF value for the given key.
+// Only "Type" is supported; use the struct fields for other data.
+func (m *Membership) Get(key pdf.Name) (pdf.Object, error) {
+	switch key {
+	case "Type":
+		return pdf.Name("OCMD"), nil
+	default:
+		return nil, property.ErrNoKey
+	}
+}
+
+// IsDirect reports whether the membership dictionary can be inlined.
+func (m *Membership) IsDirect() bool { return m.SingleUse }
+
+// Ref returns 0; this is not an extracted property list.
+func (m *Membership) Ref() pdf.Reference { return 0 }
+
+// MembershipPolicy represents the visibility policy for an optional content
+// membership dictionary.
+type MembershipPolicy pdf.Name
 
 const (
 	// PolicyAllOn means visible only if all OCGs are ON.
-	PolicyAllOn Policy = "AllOn"
+	PolicyAllOn MembershipPolicy = "AllOn"
 
 	// PolicyAnyOn means visible if any of the OCGs are ON (default).
-	PolicyAnyOn Policy = "AnyOn"
+	PolicyAnyOn MembershipPolicy = "AnyOn"
 
 	// PolicyAnyOff means visible if any of the OCGs are OFF.
-	PolicyAnyOff Policy = "AnyOff"
+	PolicyAnyOff MembershipPolicy = "AnyOff"
 
 	// PolicyAllOff means visible only if all OCGs are OFF.
-	PolicyAllOff Policy = "AllOff"
+	PolicyAllOff MembershipPolicy = "AllOff"
 )
