@@ -19,99 +19,20 @@ package property
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/optional"
 )
 
-func TestAFIsDirect(t *testing.T) {
+func TestAFAsDirectDict(t *testing.T) {
 	af := &AF{
 		AssociatedFiles: []*file.Specification{
 			{FileName: "test.txt"},
 		},
 	}
-	if af.IsDirect() {
-		t.Error("AF.IsDirect() should return false")
-	}
-}
-
-func TestAFKeys(t *testing.T) {
-	tests := []struct {
-		name string
-		af   *AF
-		want []pdf.Name
-	}{
-		{
-			name: "only MCAF",
-			af: &AF{
-				AssociatedFiles: []*file.Specification{{FileName: "test.txt"}},
-			},
-			want: []pdf.Name{"MCAF"},
-		},
-		{
-			name: "MCAF and MCID",
-			af: &AF{
-				MCID:            optional.NewUInt(42),
-				AssociatedFiles: []*file.Specification{{FileName: "test.txt"}},
-			},
-			want: []pdf.Name{"MCAF", "MCID"},
-		},
-		{
-			name: "empty AssociatedFiles",
-			af: &AF{
-				MCID: optional.NewUInt(42),
-			},
-			want: []pdf.Name{"MCAF", "MCID"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.af.Keys()
-			if diff := cmp.Diff(tt.want, got); diff != "" {
-				t.Errorf("Keys() mismatch (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestAFGet(t *testing.T) {
-	af := &AF{
-		MCID: optional.NewUInt(42),
-		AssociatedFiles: []*file.Specification{
-			{FileName: "test1.txt"},
-			{FileName: "test2.txt"},
-		},
-	}
-
-	// test getting MCID
-	val, err := af.Get("MCID")
-	if err != nil {
-		t.Fatalf("Get(MCID) failed: %v", err)
-	}
-	if val.(pdf.Integer) != 42 {
-		t.Errorf("Get(MCID) = %v, want 42", val)
-	}
-
-	// test getting MCAF - should return array of file spec references
-	mcafVal, err := af.Get("MCAF")
-	if err != nil {
-		t.Fatalf("Get(MCAF) failed: %v", err)
-	}
-	arr, ok := mcafVal.AsPDF(0).(pdf.Array)
-	if !ok {
-		t.Fatalf("Get(MCAF) returned %T, want pdf.Array", mcafVal.AsPDF(0))
-	}
-	if len(arr) != 2 {
-		t.Errorf("Get(MCAF) array length = %d, want 2", len(arr))
-	}
-
-	// test getting non-existent key
-	_, err = af.Get("NonExistent")
-	if err != ErrNoKey {
-		t.Errorf("Get(NonExistent) error = %v, want ErrNoKey", err)
+	if af.AsDirectDict() != nil {
+		t.Error("AF.AsDirectDict() should return nil")
 	}
 }
 
@@ -160,21 +81,25 @@ func TestAFRoundTripSingleUse(t *testing.T) {
 		t.Fatalf("ExtractList() failed: %v", err)
 	}
 
-	// verify keys
-	origKeys := original.Keys()
-	decodedKeys := decoded.Keys()
-	if diff := cmp.Diff(origKeys, decodedKeys); diff != "" {
-		t.Errorf("keys mismatch (-want +got):\n%s", diff)
+	// AF dicts contain indirect references, so AsDirectDict returns nil
+	if decoded.AsDirectDict() != nil {
+		t.Error("decoded.AsDirectDict() should be nil for AF (contains indirect refs)")
 	}
 
-	// verify MCID
-	mcidVal, err := decoded.Get("MCID")
+	// re-embed and extract to verify round-trip equality
+	w2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm2 := pdf.NewResourceManager(w2)
+	embedded2, err := rm2.Embed(decoded)
 	if err != nil {
-		t.Fatalf("Get(MCID) failed: %v", err)
+		t.Fatalf("re-Embed() failed: %v", err)
 	}
-	mcidInt := mcidVal.AsPDF(0).(pdf.Integer)
-	if mcidInt != 99 {
-		t.Errorf("MCID = %d, want 99", mcidInt)
+	x2 := pdf.NewExtractor(w2)
+	decoded2, err := ExtractList(x2, nil, embedded2, true)
+	if err != nil {
+		t.Fatalf("second ExtractList() failed: %v", err)
+	}
+	if !ListsEqual(decoded, decoded2) {
+		t.Error("round trip failed: lists not equal")
 	}
 }
 
@@ -213,27 +138,25 @@ func TestAFRoundTripIndirect(t *testing.T) {
 		t.Fatalf("ExtractList() failed: %v", err)
 	}
 
-	// verify keys
-	origKeys := original.Keys()
-	decodedKeys := decoded.Keys()
-	if diff := cmp.Diff(origKeys, decodedKeys); diff != "" {
-		t.Errorf("keys mismatch (-want +got):\n%s", diff)
+	// indirect list should return nil from AsDirectDict
+	if decoded.AsDirectDict() != nil {
+		t.Error("decoded.AsDirectDict() should be nil for indirect list")
 	}
 
-	// verify MCAF array length
-	mcafVal, err := decoded.Get("MCAF")
+	// re-embed and extract to verify round-trip equality
+	w2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm2 := pdf.NewResourceManager(w2)
+	embedded2, err := rm2.Embed(decoded)
 	if err != nil {
-		t.Fatalf("Get(MCAF) failed: %v", err)
+		t.Fatalf("re-Embed() failed: %v", err)
 	}
-
-	// resolve the array through the extractor
-	mcafResolved := mcafVal.AsPDF(0)
-	arr, ok := mcafResolved.(pdf.Array)
-	if !ok {
-		t.Fatalf("MCAF resolved to %T, want pdf.Array", mcafResolved)
+	x2 := pdf.NewExtractor(w2)
+	decoded2, err := ExtractList(x2, nil, embedded2, false)
+	if err != nil {
+		t.Fatalf("second ExtractList() failed: %v", err)
 	}
-	if len(arr) != 2 {
-		t.Errorf("MCAF array length = %d, want 2", len(arr))
+	if !ListsEqual(decoded, decoded2) {
+		t.Error("round trip failed: lists not equal")
 	}
 }
 
@@ -259,15 +182,24 @@ func TestAFWithoutMCID(t *testing.T) {
 		t.Fatalf("ExtractList() failed: %v", err)
 	}
 
-	// should only have MCAF key
-	keys := decoded.Keys()
-	if diff := cmp.Diff([]pdf.Name{"MCAF"}, keys); diff != "" {
-		t.Errorf("keys mismatch (-want +got):\n%s", diff)
+	// AF dicts contain indirect references, so AsDirectDict returns nil
+	if decoded.AsDirectDict() != nil {
+		t.Error("decoded.AsDirectDict() should be nil for AF (contains indirect refs)")
 	}
 
-	// MCID should not be present
-	_, err = decoded.Get("MCID")
-	if err != ErrNoKey {
-		t.Errorf("Get(MCID) error = %v, want ErrNoKey", err)
+	// re-embed and extract to verify round-trip equality
+	w2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm2 := pdf.NewResourceManager(w2)
+	embedded2, err := rm2.Embed(decoded)
+	if err != nil {
+		t.Fatalf("re-Embed() failed: %v", err)
+	}
+	x2 := pdf.NewExtractor(w2)
+	decoded2, err := ExtractList(x2, nil, embedded2, true)
+	if err != nil {
+		t.Fatalf("second ExtractList() failed: %v", err)
+	}
+	if !ListsEqual(decoded, decoded2) {
+		t.Error("round trip failed: lists not equal")
 	}
 }

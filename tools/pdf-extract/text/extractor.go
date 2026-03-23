@@ -29,6 +29,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/textextract"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/property"
 	"seehuhn.de/go/pdf/reader"
 )
 
@@ -119,17 +120,13 @@ func (e *TextExtractor) handleActualTextBegin(mc *graphics.MarkedContent) {
 		return
 	}
 
-	actualTextObj, err := mc.Properties.Get("ActualText")
+	at, err := property.ListGet(mc.Properties, property.ExtractActualText)
 	if err != nil {
 		return
 	}
+	text := at.Text
 
-	s, ok := actualTextObj.AsPDF(0).(pdf.String)
-	if !ok {
-		return
-	}
-
-	fmt.Fprint(e.writer, s.AsTextString())
+	fmt.Fprint(e.writer, text)
 	e.actualTextStartDepth = len(e.reader.MarkedContentStack)
 }
 

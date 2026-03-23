@@ -75,17 +75,10 @@ func (b *Builder) MarkedContentEnd() {
 
 func (b *Builder) getProperties(mc *graphics.MarkedContent) pdf.Object {
 	if mc.Inline {
-		if !mc.Properties.IsDirect() {
+		dict := mc.Properties.AsDirectDict()
+		if dict == nil {
 			b.Err = ErrNotDirect
 			return nil
-		}
-		// build a dict from the property list
-		dict := pdf.Dict{}
-		for _, key := range mc.Properties.Keys() {
-			val, err := mc.Properties.Get(key)
-			if err == nil {
-				dict[key] = val
-			}
 		}
 		return dict
 	}

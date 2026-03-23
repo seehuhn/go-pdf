@@ -41,42 +41,48 @@ type ActualText struct {
 
 var _ List = (*ActualText)(nil)
 
-// Keys returns the dictionary keys used by this property list.
-// This implements the [List] interface.
-func (a *ActualText) Keys() []pdf.Name {
-	var keys []pdf.Name
-	keys = append(keys, "ActualText")
-	if _, ok := a.MCID.Get(); ok {
-		keys = append(keys, "MCID")
+// AsDirectDict returns the property list as a direct PDF dictionary
+// if SingleUse is true.  Returns nil otherwise.
+func (a *ActualText) AsDirectDict() pdf.Dict {
+	if !a.SingleUse {
+		return nil
 	}
-	return keys
-}
-
-// Get retrieves the value for a given key.
-// This implements the [List] interface.
-func (a *ActualText) Get(key pdf.Name) (pdf.Object, error) {
-	switch key {
-	case "MCID":
-		if v, ok := a.MCID.Get(); ok {
-			return pdf.Integer(v), nil
-		}
-	case "ActualText":
-		return pdf.TextString(a.Text), nil
+	dict := pdf.Dict{"ActualText": pdf.TextString(a.Text)}
+	if mcid, ok := a.MCID.Get(); ok {
+		dict["MCID"] = pdf.Integer(mcid)
 	}
-	return nil, ErrNoKey
+	return dict
 }
 
-// IsDirect reports whether this property list can be embedded directly
-// into a content stream.
-// This implements the [List] interface.
-func (a *ActualText) IsDirect() bool {
-	return a.SingleUse
+// Equal reports whether two property lists are semantically equal.
+func (a *ActualText) Equal(other List) bool {
+	b, ok := other.(*ActualText)
+	if !ok {
+		return false
+	}
+	return a.Text == b.Text && a.MCID == b.MCID && a.SingleUse == b.SingleUse
 }
 
-// Ref returns a zero reference since ActualText property lists are not
-// extracted from indirect OCG/OCMD dictionaries.
-func (a *ActualText) Ref() pdf.Reference {
-	return 0
+// ExtractActualText extracts an ActualText property list from a PDF object.
+func ExtractActualText(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*ActualText, error) {
+	dict, err := x.GetDict(path, obj)
+	if err != nil {
+		return nil, err
+	}
+
+	a := &ActualText{
+		SingleUse: isDirect,
+	}
+
+	if s, ok := dict["ActualText"].(pdf.String); ok {
+		a.Text = string(s.AsTextString())
+	}
+
+	if mcid, ok := dict["MCID"].(pdf.Integer); ok && mcid >= 0 {
+		a.MCID.Set(uint(mcid))
+	}
+
+	return a, nil
 }
 
 // Embed writes the property list to the PDF file.

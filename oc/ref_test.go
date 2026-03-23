@@ -49,26 +49,74 @@ func TestOCGPointerIdentity(t *testing.T) {
 		t.Fatalf("extract Group: %v", err)
 	}
 
-	// path 2: extract as property.List (simulates resource Properties extraction)
+	// path 2: extract as property.List, then re-extract as *Group via ListGet
 	props, err := pdf.ExtractorGet(x, nil, ocgRef, property.ExtractList)
 	if err != nil {
 		t.Fatalf("extract List: %v", err)
 	}
 
-	// recover the reference from the property list
-	ref := props.Ref()
-	if ref == 0 {
-		t.Fatal("Ref() returned zero for indirect property list")
-	}
-
-	// re-extract as *Group using the reference
-	group2, err := pdf.ExtractorGet(x, nil, ref, ExtractGroup)
+	group2, err := property.ListGet(props, ExtractGroup)
 	if err != nil {
-		t.Fatalf("re-extract Group: %v", err)
+		t.Fatalf("ListGet Group: %v", err)
 	}
 
 	// the two *Group pointers must be identical
 	if group1 != group2 {
 		t.Error("OCG pointers differ: extraction from OCProperties and from Properties resource returned different *Group objects")
+	}
+}
+
+// TestVEGroupPointerIdentity verifies that groups extracted from a
+// visibility expression have the same pointer identity as groups
+// extracted directly.  This is essential for OCG state evaluation.
+func TestVEGroupPointerIdentity(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	// create an OCG
+	ocgDict := pdf.Dict{
+		"Type": pdf.Name("OCG"),
+		"Name": pdf.TextString("Layer"),
+	}
+	ocgRef := w.Alloc()
+	if err := w.Put(ocgRef, ocgDict); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+
+	// extract as *Group (simulates OCProperties)
+	group1, err := pdf.ExtractorGet(x, nil, ocgRef, ExtractGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create an OCMD with a VE referencing the same OCG
+	veArray := pdf.Array{
+		pdf.Name("Not"),
+		ocgRef,
+	}
+	ocmdDict := pdf.Dict{
+		"Type": pdf.Name("OCMD"),
+		"VE":   veArray,
+	}
+
+	// extract the OCMD
+	md, err := ExtractMembership(x, nil, ocmdDict, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// the VE should contain the same *Group pointer
+	notExpr, ok := md.VE.(*VisibilityExpressionNot)
+	if !ok {
+		t.Fatalf("VE is %T, want *VisibilityExpressionNot", md.VE)
+	}
+	groupExpr, ok := notExpr.Arg.(*VisibilityExpressionGroup)
+	if !ok {
+		t.Fatalf("VE arg is %T, want *VisibilityExpressionGroup", notExpr.Arg)
+	}
+
+	if groupExpr.Group != group1 {
+		t.Error("VE group pointer differs from directly extracted group")
 	}
 }

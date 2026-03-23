@@ -21,7 +21,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/file"
-	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/optional"
 )
 
@@ -47,62 +46,33 @@ type AF struct {
 
 var _ List = (*AF)(nil)
 
-// Keys returns the dictionary keys used by this property list.
-// This implements the [List] interface.
-func (a *AF) Keys() []pdf.Name {
-	var keys []pdf.Name
-	keys = append(keys, "MCAF")
-	if _, ok := a.MCID.Get(); ok {
-		keys = append(keys, "MCID")
+// AsDirectDict returns nil since AF property lists always require
+// indirect references for embedded file specifications.
+func (a *AF) AsDirectDict() pdf.Dict {
+	return nil
+}
+
+// Equal reports whether two property lists are semantically equal.
+func (a *AF) Equal(other List) bool {
+	b, ok := other.(*AF)
+	if !ok {
+		return false
 	}
-	return keys
-}
-
-// Get retrieves the value for a given key.
-// This implements the [List] interface.
-func (a *AF) Get(key pdf.Name) (pdf.Object, error) {
-	switch key {
-	case "MCID":
-		if v, ok := a.MCID.Get(); ok {
-			return pdf.Integer(v), nil
-		}
-	case "MCAF":
-		w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-		rm := pdf.NewResourceManager(w)
-
-		arr := make(pdf.Array, len(a.AssociatedFiles))
-		for i, spec := range a.AssociatedFiles {
-			embedded, err := rm.Embed(spec)
-			if err != nil {
-				return nil, err
-			}
-			arr[i] = embedded
-		}
-
-		err := rm.Close()
-		if err != nil {
-			return nil, err
-		}
-
-		x := pdf.NewExtractor(w)
-		return &resolvedObject{obj: arr, x: x}, nil
+	if a.MCID != b.MCID || a.SingleUse != b.SingleUse {
+		return false
 	}
-	return nil, ErrNoKey
-}
-
-// IsDirect reports whether this property list can be embedded directly
-// into a content stream.
-// This implements the [List] interface.
-func (a *AF) IsDirect() bool {
-	// AF can never be inline in content stream because it contains
-	// file specifications with indirect references to embedded files.
-	return false
-}
-
-// Ref returns a zero reference since AF property lists are not
-// extracted from indirect OCG/OCMD dictionaries.
-func (a *AF) Ref() pdf.Reference {
-	return 0
+	if len(a.AssociatedFiles) != len(b.AssociatedFiles) {
+		return false
+	}
+	for i := range a.AssociatedFiles {
+		if a.AssociatedFiles[i].FileName != b.AssociatedFiles[i].FileName {
+			return false
+		}
+		if a.AssociatedFiles[i].AFRelationship != b.AssociatedFiles[i].AFRelationship {
+			return false
+		}
+	}
+	return true
 }
 
 // Embed writes the property list to the PDF file.

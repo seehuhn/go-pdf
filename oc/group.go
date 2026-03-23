@@ -18,6 +18,7 @@ package oc
 
 import (
 	"errors"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/property"
@@ -151,27 +152,16 @@ func (g *Group) IsVisible(s *GroupStates) bool {
 	return s.IsOn(g)
 }
 
-// Keys returns the PDF dictionary keys available via [Group.Get].
-func (g *Group) Keys() []pdf.Name {
-	return []pdf.Name{"Type", "Name"}
-}
+// AsDirectDict returns nil since optional content groups are always indirect.
+func (g *Group) AsDirectDict() pdf.Dict { return nil }
 
-// Get returns the PDF value for the given key.
-// Only "Type" and "Name" are supported; use the struct fields for
-// other data.
-func (g *Group) Get(key pdf.Name) (pdf.Object, error) {
-	switch key {
-	case "Type":
-		return pdf.Name("OCG"), nil
-	case "Name":
-		return pdf.TextString(g.Name), nil
-	default:
-		return nil, property.ErrNoKey
+// Equal reports whether two property lists are semantically equal.
+func (g *Group) Equal(other property.List) bool {
+	h, ok := other.(*Group)
+	if !ok {
+		return false
 	}
+	return g.Name == h.Name &&
+		slices.Equal(g.Intent, h.Intent) &&
+		usageEqual(g.Usage, h.Usage)
 }
-
-// IsDirect returns false; optional content groups are always indirect.
-func (g *Group) IsDirect() bool { return false }
-
-// Ref returns 0; this is not an extracted property list.
-func (g *Group) Ref() pdf.Reference { return 0 }

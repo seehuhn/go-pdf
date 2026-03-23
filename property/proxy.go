@@ -17,23 +17,25 @@
 package property
 
 import (
-	"slices"
-
 	"seehuhn.de/go/pdf"
 )
 
 type proxyList struct {
-	x          *pdf.Extractor
-	dict       pdf.Dict
-	isIndirect bool
-	ref        pdf.Reference
+	x         *pdf.Extractor
+	path      *pdf.CycleCheck
+	obj       pdf.Object
+	wasInline bool
 }
 
 // ExtractList extracts a property list from a PDF object.
 // The object must be a dictionary or a reference to a dictionary.
-// Returns an error if the object cannot be converted to a dictionary.
 func ExtractList(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (List, error) {
-	isIndirect := !isDirect
+	if !isDirect && path != nil {
+		obj = path.Ref
+		path = path.Parent
+	}
+
+	// validate that the object resolves to a dictionary
 	dict, err := x.GetDict(path, obj)
 	if err != nil {
 		return nil, err
@@ -41,59 +43,58 @@ func ExtractList(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirec
 	if dict == nil {
 		return nil, nil
 	}
-	var ref pdf.Reference
-	if !isDirect && path != nil {
-		ref = path.Ref
-	}
 
 	p := &proxyList{
-		x:          x,
-		dict:       dict,
-		isIndirect: isIndirect,
-		ref:        ref,
+		x:         x,
+		path:      path,
+		obj:       obj,
+		wasInline: isDirect,
 	}
 	return p, nil
 }
 
-// Keys returns the dictionary keys present in the property list.
-func (p *proxyList) Keys() []pdf.Name {
-	keys := make([]pdf.Name, 0, len(p.dict))
-	for k := range p.dict {
-		keys = append(keys, k)
+// AsDirectDict returns the property list as a direct dictionary if it can
+// be embedded inline in a content stream.  Returns nil for indirect
+// property lists or if the dictionary contains indirect references.
+func (p *proxyList) AsDirectDict() pdf.Dict {
+	if !p.wasInline {
+		return nil
 	}
-	slices.Sort(keys)
-	return keys
+	dict, _ := p.obj.(pdf.Dict)
+	if !pdf.IsDirect(dict) {
+		return nil
+	}
+	return dict
 }
 
-func (p *proxyList) Get(key pdf.Name) (pdf.Object, error) {
-	obj, ok := p.dict[key]
+// Equal reports whether two property lists are semantically equal.
+func (p *proxyList) Equal(other List) bool {
+	q, ok := other.(*proxyList)
 	if !ok {
-		return nil, ErrNoKey
+		return false
 	}
-	return &resolvedObject{obj, p.x}, nil
+	resolvedA, errA := p.x.DeepResolve(p.obj)
+	resolvedB, errB := q.x.DeepResolve(q.obj)
+	if errA != nil || errB != nil {
+		return false
+	}
+	return pdf.Equal(resolvedA, resolvedB)
 }
 
-func (p *proxyList) IsDirect() bool {
-	return isDirect(p.dict)
-}
-
-func (p *proxyList) Ref() pdf.Reference {
-	return p.ref
-}
-
-// Embed converts the Go representation of the object into a PDF object,
-// corresponding to the PDF version of the output file.
-//
-// The first return value is the PDF representation of the object.
-// If the object is embedded in the PDF file, this may be a reference.
+// Embed converts the property list into a PDF object.
 func (p *proxyList) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
-	copier := e.CopierFrom(p.x)
-	dictOut, err := copier.CopyDict(p.dict)
+	dict, err := p.x.GetDict(p.path, p.obj)
 	if err != nil {
 		return nil, err
 	}
 
-	if !p.isIndirect {
+	copier := e.CopierFrom(p.x)
+	dictOut, err := copier.CopyDict(dict)
+	if err != nil {
+		return nil, err
+	}
+
+	if p.wasInline {
 		return dictOut, nil
 	}
 
@@ -103,32 +104,4 @@ func (p *proxyList) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 	return ref, nil
-}
-
-// isDirect recursively checks if an object contains only direct objects.
-// Returns false if the object contains any references or streams.
-func isDirect(obj pdf.Object) bool {
-	switch obj := obj.(type) {
-	case pdf.Reference:
-		return false
-	case *pdf.Stream:
-		return false
-	case pdf.Dict:
-		for _, v := range obj {
-			if !isDirect(v) {
-				return false
-			}
-		}
-		return true
-	case pdf.Array:
-		for _, v := range obj {
-			if !isDirect(v) {
-				return false
-			}
-		}
-		return true
-	default:
-		// pdf.Name, pdf.Integer, pdf.Real, pdf.Boolean, pdf.String, etc.
-		return true
-	}
 }

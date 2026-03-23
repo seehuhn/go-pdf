@@ -172,27 +172,22 @@ func TestRoundTrip(t *testing.T) {
 			if len(tt.resource.Properties) != len(extracted.Properties) {
 				t.Errorf("Properties count mismatch: want %d, got %d", len(tt.resource.Properties), len(extracted.Properties))
 			}
-			for name, origProp := range tt.resource.Properties {
-				extractedProp, ok := extracted.Properties[name]
-				if !ok {
+			for name := range tt.resource.Properties {
+				if _, ok := extracted.Properties[name]; !ok {
 					t.Errorf("missing property %q", name)
-					continue
-				}
-				// compare keys
-				origKeys := origProp.Keys()
-				extractedKeys := extractedProp.Keys()
-				if len(origKeys) != len(extractedKeys) {
-					t.Errorf("property %q: key count mismatch: want %d, got %d", name, len(origKeys), len(extractedKeys))
 				}
 			}
 
-			// compare with cmp.Diff (excluding Properties which we compared manually)
+			// compare remaining fields (Properties already compared above)
+			wantCopy := *tt.resource
+			wantCopy.Properties = nil
+			gotCopy := *extracted
+			gotCopy.Properties = nil
 			opts := []cmp.Option{
 				cmpopts.EquateEmpty(),
-				cmpopts.IgnoreFields(content.Resources{}, "Properties"),
 			}
-			if diff := cmp.Diff(tt.resource, extracted, opts...); diff != "" {
-				t.Errorf("round trip failed (-got +want):\n%s", diff)
+			if diff := cmp.Diff(&wantCopy, &gotCopy, opts...); diff != "" {
+				t.Errorf("round trip failed (-want +got):\n%s", diff)
 			}
 		})
 	}

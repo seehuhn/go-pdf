@@ -97,6 +97,89 @@ func TestTextExtractorBasic(t *testing.T) {
 	}
 }
 
+func TestTextExtractorActualTextIndirect(t *testing.T) {
+	// create test PDF with ActualText via resource reference (not inline)
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w)
+
+	F := standard.Helvetica.New()
+
+	pageTree := pagetree.NewWriter(w, rm)
+
+	b := builder.New(content.Page, nil)
+
+	b.TextBegin()
+	b.TextFirstLine(100, 700)
+	b.TextSetFont(F, 12)
+	b.TextShow("the ")
+
+	// ActualText via resource reference (SingleUse=false, Inline=false)
+	b.MarkedContentStart(&graphics.MarkedContent{
+		Tag: "Span",
+		Properties: &property.ActualText{
+			Text:      "replaced",
+			SingleUse: false,
+		},
+		Inline: false,
+	})
+	b.TextShow("original")
+	b.MarkedContentEnd()
+
+	b.TextShow(" text")
+	b.TextEnd()
+
+	if b.Err != nil {
+		t.Fatal(b.Err)
+	}
+
+	p := &page.Page{
+		MediaBox:  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 595, URy: 842},
+		Resources: b.Resources,
+		Contents:  []content.Stream{b.Stream},
+	}
+	err := pageTree.AppendPage(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	treeRef, err := pageTree.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = rm.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w.GetMeta().Catalog.Pages = treeRef
+	err = w.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	extractor := New(w, &buf)
+
+	_, pageDict, err := pagetree.GetPage(w, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = extractor.ExtractPage(pageDict)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	extracted := strings.TrimSpace(buf.String())
+	if !strings.Contains(extracted, "replaced") {
+		t.Errorf("extracted text %q does not contain \"replaced\"", extracted)
+	}
+	if strings.Contains(extracted, "original") {
+		t.Errorf("extracted text %q contains \"original\"", extracted)
+	}
+}
+
 func TestTextExtractorActualText(t *testing.T) {
 	// create test PDF with ActualText
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)

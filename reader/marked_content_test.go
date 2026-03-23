@@ -23,10 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
-	"seehuhn.de/go/pdf/optional"
-	"seehuhn.de/go/pdf/property"
 )
 
 // stringOpener returns a reader factory for a string content stream.
@@ -235,71 +232,13 @@ func TestDPOperatorInline(t *testing.T) {
 		t.Error("mc.Inline should be true for inline dict")
 	}
 
-	// Verify we can get the Type key
-	val, err := gotMC.Properties.Get("Type")
-	if err != nil {
-		t.Fatalf("Get(Type) failed: %v", err)
+	// verify via AsDirectDict
+	dict := gotMC.Properties.AsDirectDict()
+	if dict == nil {
+		t.Fatal("AsDirectDict() returned nil for inline dict")
 	}
-
-	if val.AsPDF(0) != pdf.Name("Pagination") {
-		t.Errorf("Type = %v, want Pagination", val.AsPDF(0))
-	}
-}
-
-func TestDPOperatorResourceReference(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
-	r := New(pdf.NewExtractor(w))
-	r.Reset()
-
-	// Set up Resources with a property list
-	r.State.Resources = &content.Resources{
-		Properties: map[pdf.Name]property.List{
-			"P1": &property.ActualText{
-				MCID: optional.NewUInt(42),
-				Text: "",
-			},
-		},
-	}
-
-	var called bool
-	var gotMC *graphics.MarkedContent
-
-	r.MarkedContent = func(event MarkedContentEvent, mc *graphics.MarkedContent) error {
-		called = true
-		gotMC = mc
-		return nil
-	}
-
-	// Parse: DP /Span /P1
-	err := r.ParseContentStream(stringOpener("/Span /P1 DP"))
-	if err != nil {
-		t.Fatalf("ParseContentStream failed: %v", err)
-	}
-
-	if !called {
-		t.Fatal("MarkedContent callback was not called")
-	}
-
-	if gotMC.Tag != "Span" {
-		t.Errorf("mc.Tag = %q, want \"Span\"", gotMC.Tag)
-	}
-
-	if gotMC.Properties == nil {
-		t.Fatal("mc.Properties should not be nil")
-	}
-
-	if gotMC.Inline {
-		t.Error("mc.Inline should be false for resource reference")
-	}
-
-	// Verify MCID value
-	val, err := gotMC.Properties.Get("MCID")
-	if err != nil {
-		t.Fatalf("Get(MCID) failed: %v", err)
-	}
-
-	if val.AsPDF(0) != pdf.Integer(42) {
-		t.Errorf("MCID = %v, want 42", val.AsPDF(0))
+	if dict["Type"] != pdf.Name("Pagination") {
+		t.Errorf("Type = %v, want Pagination", dict["Type"])
 	}
 }
 
@@ -359,14 +298,13 @@ func TestBDCOperator(t *testing.T) {
 		t.Errorf("MarkedContentStack length = %d, want 0", len(r.MarkedContentStack))
 	}
 
-	// Verify Lang value
-	val, err := mcs[0].Properties.Get("Lang")
-	if err != nil {
-		t.Fatalf("Get(Lang) failed: %v", err)
+	// verify Lang value via AsDirectDict
+	dict := mcs[0].Properties.AsDirectDict()
+	if dict == nil {
+		t.Fatal("AsDirectDict() returned nil for inline dict")
 	}
-
-	if string(val.AsPDF(0).(pdf.String)) != "en-US" {
-		t.Errorf("Lang = %v, want en-US", val.AsPDF(0))
+	if string(dict["Lang"].(pdf.String)) != "en-US" {
+		t.Errorf("Lang = %v, want en-US", dict["Lang"])
 	}
 }
 

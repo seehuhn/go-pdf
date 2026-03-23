@@ -264,6 +264,6 @@ type MarkedContent struct {
 	// Inline controls whether the property list is embedded inline in the
 	// content stream (true) or referenced via the Properties resource
 	// dictionary (false). Only relevant if Properties is not nil.
-	// Property lists can only be inlined if Properties.IsDirect() returns true.
+	// Property lists can only be inlined if Properties.AsDirectDict() is non-nil.
 	Inline bool
 }

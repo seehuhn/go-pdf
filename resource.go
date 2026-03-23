@@ -395,6 +395,48 @@ func (x *Extractor) Resolve(path *CycleCheck, obj Object) (Native, error) {
 	}
 }
 
+// DeepResolve recursively resolves all references in a PDF object tree.
+// References are resolved through the extractor, and the values within
+// Dicts and Arrays are resolved recursively. The returned object contains
+// no References.
+func (x *Extractor) DeepResolve(obj Object) (Native, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	native := obj.AsPDF(0)
+	if ref, ok := native.(Reference); ok {
+		resolved, err := x.Resolve(nil, ref)
+		if err != nil {
+			return nil, err
+		}
+		native = resolved
+	}
+	switch v := native.(type) {
+	case Dict:
+		res := make(Dict, len(v))
+		for k, val := range v {
+			r, err := x.DeepResolve(val)
+			if err != nil {
+				return nil, err
+			}
+			res[k] = r
+		}
+		return res, nil
+	case Array:
+		res := make(Array, len(v))
+		for i, val := range v {
+			r, err := x.DeepResolve(val)
+			if err != nil {
+				return nil, err
+			}
+			res[i] = r
+		}
+		return res, nil
+	default:
+		return native, nil
+	}
+}
+
 func extractorResolveAndCast[T Native](x *Extractor, path *CycleCheck, obj Object) (T, error) {
 	var zero T
 	resolved, err := x.Resolve(path, obj)

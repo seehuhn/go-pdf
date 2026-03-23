@@ -17,8 +17,6 @@
 package property
 
 import (
-	"slices"
-
 	"seehuhn.de/go/pdf"
 )
 
@@ -57,108 +55,36 @@ import (
 
 // List represents a marked-property list.
 type List interface {
-	// Keys returns the dictionary keys present in the property list.
-	Keys() []pdf.Name
+	// AsDirectDict returns the property list as a direct PDF dictionary
+	// if it can be embedded inline in a content stream.
+	// Returns nil if the property list must be referenced via the
+	// Properties resource dictionary.
+	AsDirectDict() pdf.Dict
 
-	// Get retrieves the value associated with the given key.
-	// The returned object is always fully resolved and never contains
-	// references to indirect objects.
-	// If the key is not present, the error [ErrNoKey] is returned.
-	Get(key pdf.Name) (pdf.Object, error)
-
-	// IsDirect returns true if the property list can be embedded inline
-	// in a content stream (i.e., contains only direct objects).
-	// If false, the property list must be referenced via the Properties
-	// resource dictionary.
-	IsDirect() bool
-
-	// Ref returns the indirect reference from which this property list was
-	// extracted, or a zero Reference if the list was inline or not extracted
-	// via [pdf.ExtractorGet]. This enables consumers to re-extract typed
-	// objects (such as optional content groups) from the same reference,
-	// leveraging the extractor cache for pointer identity.
-	Ref() pdf.Reference
+	// Equal reports whether two property lists are semantically equal.
+	Equal(other List) bool
 
 	pdf.Embedder
 }
 
-// resolvedObject wraps a PDF object with its extractor context, allowing
-// references to be resolved during conversion to PDF format.
-type resolvedObject struct {
-	obj pdf.Object
-	x   *pdf.Extractor
-}
-
-var _ pdf.Object = (*resolvedObject)(nil)
-
-func (r *resolvedObject) AsPDF(opt pdf.OutputOptions) pdf.Native {
-	obj := r.obj.AsPDF(opt)
-
-	if ref, ok := obj.(pdf.Reference); ok {
-		resolved, err := r.x.Resolve(nil, ref)
-		if err != nil {
-			resolved = nil // TODO(voss): what to do on error?
-		}
-		obj = resolved
+// ListGet resolves indirect references and extracts a typed object.
+//
+// This only works for property lists that have been extracted from a PDF file.
+//
+// Once Go allows generic methods, this function can be made a method of List.
+func ListGet[T any](l List, extract func(*pdf.Extractor, *pdf.CycleCheck, pdf.Object, bool) (T, error)) (T, error) {
+	p, ok := l.(*proxyList)
+	if !ok {
+		var zero T
+		return zero, pdf.Error("ListGet only works for property lists extracted from PDF files")
 	}
-
-	switch obj := obj.(type) {
-	case pdf.Dict:
-		res := make(pdf.Dict, len(obj))
-		for k, v := range obj {
-			res[k] = &resolvedObject{v, r.x}
-		}
-		return res
-	case pdf.Array:
-		res := make(pdf.Array, len(obj))
-		for i, v := range obj {
-			res[i] = &resolvedObject{v, r.x}
-		}
-		return res
-	case *pdf.Stream:
-		res := *obj
-		res.Dict = make(pdf.Dict, len(obj.Dict))
-		for k, v := range obj.Dict {
-			res.Dict[k] = &resolvedObject{v, r.x}
-		}
-		return &res
-	default:
-		return obj
-	}
+	return pdf.ExtractorGet(p.x, p.path, p.obj, extract)
 }
-
-// ErrNoKey is returned by List.Get if the requested key is not present
-// in the property list.
-var ErrNoKey = pdf.Error("no such key in property list")
 
 // ListsEqual compares two property lists for semantic equality.
-// Two lists are equal if they have the same keys with equal PDF values.
 func ListsEqual(a, b List) bool {
 	if a == nil || b == nil {
 		return a == nil && b == nil
 	}
-
-	keysA := a.Keys()
-	keysB := b.Keys()
-	slices.Sort(keysA)
-	slices.Sort(keysB)
-	if !slices.Equal(keysA, keysB) {
-		return false
-	}
-
-	for _, key := range keysA {
-		objA, errA := a.Get(key)
-		objB, errB := b.Get(key)
-		if (errA != nil) != (errB != nil) {
-			return false
-		}
-		if errA != nil {
-			continue
-		}
-		if !pdf.Equal(objA, objB) {
-			return false
-		}
-	}
-
-	return true
+	return a.Equal(b)
 }

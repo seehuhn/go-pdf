@@ -222,27 +222,28 @@ func (m *Membership) IsVisible(s *GroupStates) bool {
 	}
 }
 
-// Keys returns the PDF dictionary keys available via [Membership.Get].
-func (m *Membership) Keys() []pdf.Name {
-	return []pdf.Name{"Type"}
-}
+// AsDirectDict returns nil since membership dictionaries are always indirect.
+func (m *Membership) AsDirectDict() pdf.Dict { return nil }
 
-// Get returns the PDF value for the given key.
-// Only "Type" is supported; use the struct fields for other data.
-func (m *Membership) Get(key pdf.Name) (pdf.Object, error) {
-	switch key {
-	case "Type":
-		return pdf.Name("OCMD"), nil
-	default:
-		return nil, property.ErrNoKey
+// Equal reports whether two property lists are semantically equal.
+func (m *Membership) Equal(other property.List) bool {
+	n, ok := other.(*Membership)
+	if !ok {
+		return false
 	}
+	if m.Policy != n.Policy || m.SingleUse != n.SingleUse {
+		return false
+	}
+	if len(m.OCGs) != len(n.OCGs) {
+		return false
+	}
+	for i := range m.OCGs {
+		if !m.OCGs[i].Equal(n.OCGs[i]) {
+			return false
+		}
+	}
+	return veEqual(m.VE, n.VE)
 }
-
-// IsDirect reports whether the membership dictionary can be inlined.
-func (m *Membership) IsDirect() bool { return m.SingleUse }
-
-// Ref returns 0; this is not an extracted property list.
-func (m *Membership) Ref() pdf.Reference { return 0 }
 
 // MembershipPolicy represents the visibility policy for an optional content
 // membership dictionary.

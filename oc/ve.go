@@ -84,7 +84,16 @@ func ExtractVisibilityExpression(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf
 			return nil, pdf.Errorf("invalid visibility expression: unknown operator %q", op)
 		}
 	case pdf.Dict:
-		g, err := pdf.ExtractorGet(x, path, v, ExtractGroup)
+		// recover the original reference so the extractor cache is
+		// consulted, preserving pointer identity with groups extracted
+		// elsewhere (e.g. from OCProperties)
+		var groupObj pdf.Object = v
+		groupPath := path
+		if path != nil {
+			groupObj = path.Ref
+			groupPath = path.Parent
+		}
+		g, err := pdf.ExtractorGet(x, groupPath, groupObj, ExtractGroup)
 		if err != nil {
 			return nil, err
 		}
@@ -261,4 +270,43 @@ func (n *VisibilityExpressionNot) Embed(e *pdf.EmbedHelper) (pdf.Native, error) 
 	// create array with operator and operand
 	arr := pdf.Array{pdf.Name("Not"), obj}
 	return arr, nil
+}
+
+// veEqual reports whether two visibility expressions are semantically equal.
+func veEqual(a, b VisibilityExpression) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	switch a := a.(type) {
+	case *VisibilityExpressionGroup:
+		b, ok := b.(*VisibilityExpressionGroup)
+		return ok && a.Group.Equal(b.Group)
+	case *VisibilityExpressionNot:
+		b, ok := b.(*VisibilityExpressionNot)
+		return ok && veEqual(a.Arg, b.Arg)
+	case *VisibilityExpressionAnd:
+		b, ok := b.(*VisibilityExpressionAnd)
+		if !ok || len(a.Args) != len(b.Args) {
+			return false
+		}
+		for i := range a.Args {
+			if !veEqual(a.Args[i], b.Args[i]) {
+				return false
+			}
+		}
+		return true
+	case *VisibilityExpressionOr:
+		b, ok := b.(*VisibilityExpressionOr)
+		if !ok || len(a.Args) != len(b.Args) {
+			return false
+		}
+		for i := range a.Args {
+			if !veEqual(a.Args[i], b.Args[i]) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }

@@ -18,6 +18,7 @@ package oc
 
 import (
 	"errors"
+	"slices"
 
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
@@ -549,3 +550,94 @@ const (
 	// PageElementLogo represents a logo.
 	PageElementLogo PageElement = "L"
 )
+
+// usageEqual compares two Usage pointers for equality.
+func usageEqual(a, b *Usage) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	if a.SingleUse != b.SingleUse {
+		return false
+	}
+
+	// Creator
+	if (a.Creator == nil) != (b.Creator == nil) {
+		return false
+	}
+	if a.Creator != nil {
+		if a.Creator.Creator != b.Creator.Creator ||
+			a.Creator.Subtype != b.Creator.Subtype ||
+			!pdf.Equal(a.Creator.AdditionalInfo, b.Creator.AdditionalInfo) {
+			return false
+		}
+	}
+
+	// Language
+	if (a.Language == nil) != (b.Language == nil) {
+		return false
+	}
+	if a.Language != nil {
+		if a.Language.Lang != b.Language.Lang ||
+			a.Language.Preferred != b.Language.Preferred {
+			return false
+		}
+	}
+
+	// Export
+	if (a.Export == nil) != (b.Export == nil) {
+		return false
+	}
+	if a.Export != nil && a.Export.ExportState != b.Export.ExportState {
+		return false
+	}
+
+	// Zoom
+	if (a.Zoom == nil) != (b.Zoom == nil) {
+		return false
+	}
+	if a.Zoom != nil {
+		if a.Zoom.Min != b.Zoom.Min || a.Zoom.Max != b.Zoom.Max {
+			return false
+		}
+	}
+
+	// Print
+	if (a.Print == nil) != (b.Print == nil) {
+		return false
+	}
+	if a.Print != nil {
+		if a.Print.Subtype != b.Print.Subtype ||
+			a.Print.PrintState != b.Print.PrintState {
+			return false
+		}
+	}
+
+	// View
+	if (a.View == nil) != (b.View == nil) {
+		return false
+	}
+	if a.View != nil && a.View.ViewState != b.View.ViewState {
+		return false
+	}
+
+	// User
+	if (a.User == nil) != (b.User == nil) {
+		return false
+	}
+	if a.User != nil {
+		if a.User.Type != b.User.Type ||
+			!slices.Equal(a.User.Name, b.User.Name) {
+			return false
+		}
+	}
+
+	// PageElement
+	if (a.PageElement == nil) != (b.PageElement == nil) {
+		return false
+	}
+	if a.PageElement != nil && a.PageElement.Subtype != b.PageElement.Subtype {
+		return false
+	}
+
+	return true
+}

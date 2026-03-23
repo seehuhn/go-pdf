@@ -75,51 +75,76 @@ func TestActualTextRoundTrip(t *testing.T) {
 				t.Fatalf("extract failed: %v", err)
 			}
 
-			// verify ActualText value
-			val, err := decoded.Get("ActualText")
-			if err != nil {
-				t.Fatalf("Get(ActualText) failed: %v", err)
-			}
-			pdfStr, ok := val.AsPDF(0).(pdf.String)
-			if !ok {
-				t.Fatalf("ActualText value is %T, want pdf.String", val.AsPDF(0))
-			}
-			if string(pdfStr.AsTextString()) != tc.at.Text {
-				t.Errorf("Text = %q, want %q", pdfStr.AsTextString(), tc.at.Text)
-			}
-
-			// verify MCID if set
-			if mcid, ok := tc.at.MCID.Get(); ok {
-				mcidVal, err := decoded.Get("MCID")
-				if err != nil {
-					t.Fatalf("Get(MCID) failed: %v", err)
+			// verify via AsDirectDict for inline case
+			if tc.at.SingleUse {
+				dict := decoded.AsDirectDict()
+				if dict == nil {
+					t.Fatal("AsDirectDict() returned nil for inline list")
 				}
-				if got := mcidVal.AsPDF(0).(pdf.Integer); uint(got) != mcid {
-					t.Errorf("MCID = %d, want %d", got, mcid)
+				obj := dict["ActualText"]
+				if obj == nil {
+					t.Fatal("ActualText not found in dict")
+				}
+				// the value may be pdf.TextString or pdf.String depending on path
+				got := obj.AsPDF(0).(pdf.String).AsTextString()
+				if string(got) != tc.at.Text {
+					t.Errorf("Text = %q, want %q", got, tc.at.Text)
+				}
+			} else {
+				if decoded.AsDirectDict() != nil {
+					t.Error("AsDirectDict() should be nil for indirect list")
 				}
 			}
 		})
 	}
 }
 
-func TestActualTextIsDirect(t *testing.T) {
+func TestActualTextAsDirectDict(t *testing.T) {
 	tests := []struct {
-		name       string
-		singleUse  bool
-		wantDirect bool
+		name     string
+		at       *ActualText
+		wantNil  bool
+		wantKeys []pdf.Name
 	}{
-		{"SingleUse true", true, true},
-		{"SingleUse false", false, false},
+		{
+			name:     "SingleUse true",
+			at:       &ActualText{Text: "test", SingleUse: true},
+			wantNil:  false,
+			wantKeys: []pdf.Name{"ActualText"},
+		},
+		{
+			name:    "SingleUse false",
+			at:      &ActualText{Text: "test", SingleUse: false},
+			wantNil: true,
+		},
+		{
+			name: "SingleUse true with MCID",
+			at: func() *ActualText {
+				a := &ActualText{Text: "test", SingleUse: true}
+				a.MCID.Set(7)
+				return a
+			}(),
+			wantNil:  false,
+			wantKeys: []pdf.Name{"ActualText", "MCID"},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := &ActualText{
-				Text:      "test",
-				SingleUse: tt.singleUse,
+			dict := tt.at.AsDirectDict()
+			if tt.wantNil {
+				if dict != nil {
+					t.Error("AsDirectDict() should return nil")
+				}
+				return
 			}
-			if got := a.IsDirect(); got != tt.wantDirect {
-				t.Errorf("IsDirect() = %v, want %v", got, tt.wantDirect)
+			if dict == nil {
+				t.Fatal("AsDirectDict() returned nil")
+			}
+			for _, key := range tt.wantKeys {
+				if _, ok := dict[key]; !ok {
+					t.Errorf("missing key %q", key)
+				}
 			}
 		})
 	}

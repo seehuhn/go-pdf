@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -137,41 +136,9 @@ func testRoundTrip(t *testing.T, dict pdf.Dict, isIndirect bool) {
 		t.Fatalf("second extract failed: %v", err)
 	}
 
-	// compare keys
-	origKeys := original.Keys()
-	decodedKeys := decoded.Keys()
-	if diff := cmp.Diff(origKeys, decodedKeys); diff != "" {
-		t.Errorf("keys mismatch (-want +got):\n%s", diff)
-	}
-
-	// compare values for each key by comparing their PDF representations
-	for _, key := range origKeys {
-		origVal, err := original.Get(key)
-		if err != nil {
-			t.Fatalf("original.Get(%q) failed: %v", key, err)
-		}
-
-		decodedVal, err := decoded.Get(key)
-		if err != nil {
-			t.Fatalf("decoded.Get(%q) failed: %v", key, err)
-		}
-
-		// convert to string representation for comparison since the objects
-		// returned by Get() may wrap internal state
-		var origBuf, decodedBuf bytes.Buffer
-		err = pdf.Format(&origBuf, 0, origVal)
-		if err != nil {
-			t.Fatalf("format original value for key %q failed: %v", key, err)
-		}
-		err = pdf.Format(&decodedBuf, 0, decodedVal)
-		if err != nil {
-			t.Fatalf("format decoded value for key %q failed: %v", key, err)
-		}
-
-		if origBuf.String() != decodedBuf.String() {
-			t.Errorf("value for key %q mismatch:\noriginal:  %s\ndecoded:   %s",
-				key, origBuf.String(), decodedBuf.String())
-		}
+	// compare using ListsEqual
+	if !ListsEqual(original, decoded) {
+		t.Error("round trip failed: lists not equal")
 	}
 }
 
@@ -233,19 +200,8 @@ func FuzzRoundTrip(f *testing.F) {
 			t.Skip("malformed property list")
 		}
 
-		// check that we can get keys without crashing
-		keys := propList.Keys()
-
-		// check that we can get all values
-		for _, key := range keys {
-			val, err := propList.Get(key)
-			if err != nil {
-				t.Fatalf("Get(%q) failed: %v", key, err)
-			}
-
-			// check that AsPDF doesn't crash
-			_ = val.AsPDF(0)
-		}
+		// check that AsDirectDict doesn't crash
+		_ = propList.AsDirectDict()
 
 		// round-trip test
 		w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
@@ -273,11 +229,9 @@ func FuzzRoundTrip(f *testing.F) {
 			t.Fatalf("second extract failed: %v", err)
 		}
 
-		// verify keys match
-		origKeys := propList.Keys()
-		decodedKeys := decoded.Keys()
-		if diff := cmp.Diff(origKeys, decodedKeys); diff != "" {
-			t.Errorf("keys mismatch (-want +got):\n%s", diff)
+		// verify round-trip equality
+		if !ListsEqual(propList, decoded) {
+			t.Error("round trip failed: lists not equal")
 		}
 	})
 }
