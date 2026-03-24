@@ -223,11 +223,11 @@ func TestMembershipValidation(t *testing.T) {
 	buf, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(buf)
 
-	// test empty membership (should fail)
+	// test empty membership (valid per spec Table 97: content always visible)
 	empty := &Membership{}
 	_, err := rm.Embed(empty)
-	if err == nil {
-		t.Error("expected error for empty membership, got nil")
+	if err != nil {
+		t.Errorf("empty membership should be valid, got %v", err)
 	}
 
 	// test invalid policy (should fail)

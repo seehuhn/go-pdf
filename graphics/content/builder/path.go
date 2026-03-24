@@ -204,10 +204,12 @@ func (b *Builder) arc(x, y, radius, startAngle, endAngle float64, move bool) {
 	phi := startAngle
 	x0 := x + radius*math.Cos(phi)
 	y0 := y + radius*math.Sin(phi)
+	rx0 := pdf.Round(x0, digits)
+	ry0 := pdf.Round(y0, digits)
 	if move {
-		b.MoveTo(pdf.Round(x0, digits), pdf.Round(y0, digits))
-	} else {
-		b.LineTo(pdf.Round(x0, digits), pdf.Round(y0, digits))
+		b.MoveTo(rx0, ry0)
+	} else if !nearlyEqual(b.State.CurrentX, rx0) || !nearlyEqual(b.State.CurrentY, ry0) {
+		b.LineTo(rx0, ry0)
 	}
 
 	for range nSegment {

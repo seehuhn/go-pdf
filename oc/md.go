@@ -109,10 +109,6 @@ func ExtractMembership(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, i
 		m.VE = ve
 	}
 
-	if len(m.OCGs) == 0 && m.VE == nil {
-		return nil, pdf.Error("membership dictionary must have either OCGs or VE")
-	}
-
 	m.SingleUse = isDirect
 
 	return m, nil
@@ -126,9 +122,7 @@ func (m *Membership) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	switch len(m.OCGs) {
 	case 0:
-		if m.VE == nil {
-			return nil, errors.New("membership dictionary must have either OCGs or VE")
-		}
+		// no OCGs; if VE is also nil, content is always visible (spec Table 97)
 	case 1:
 		ocgObj, err := rm.Embed(m.OCGs[0])
 		if err != nil {

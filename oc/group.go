@@ -112,15 +112,13 @@ func (g *Group) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		"Name": pdf.TextString(g.Name),
 	}
 
-	// embed Intent
-	if len(g.Intent) == 0 {
-		// use default
-		dict["Intent"] = pdf.Name("View")
-	} else if len(g.Intent) == 1 {
-		// single name
+	// embed Intent (omit when it equals the default "View")
+	switch {
+	case len(g.Intent) == 1 && g.Intent[0] == "View":
+		// default, omit
+	case len(g.Intent) == 1:
 		dict["Intent"] = g.Intent[0]
-	} else {
-		// array of names
+	case len(g.Intent) > 1:
 		intentArray := make(pdf.Array, len(g.Intent))
 		for i, intent := range g.Intent {
 			intentArray[i] = intent

@@ -190,14 +190,14 @@ func TestUsageAppValidation(t *testing.T) {
 		t.Error("expected error for empty Category, but got none")
 	}
 
-	// test invalid Category
+	// non-standard category values are allowed (spec uses "for example")
 	ua = &UsageApplication{
 		Event:    EventView,
-		Category: []Category{Category("Invalid")},
+		Category: []Category{Category("Custom")},
 	}
 	_, err = rm.Embed(ua)
-	if err == nil {
-		t.Error("expected error for invalid Category, but got none")
+	if err != nil {
+		t.Errorf("non-standard Category should be accepted, got %v", err)
 	}
 
 	// test version check (PDF 1.4 should fail)

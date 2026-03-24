@@ -18,6 +18,7 @@ package oc
 
 import (
 	"bytes"
+	"math"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -59,7 +60,7 @@ var usageTestCases = []struct {
 		name: "export",
 		usage: &Usage{
 			Export: &UsageExport{
-				ExportState: true,
+				ExportState: StateON,
 			},
 		},
 	},
@@ -73,11 +74,11 @@ var usageTestCases = []struct {
 		},
 	},
 	{
-		name: "zoom_infinity",
+		name: "zoom_no_max",
 		usage: &Usage{
 			Zoom: &UsageZoom{
 				Min: 2.0,
-				Max: 1e308,
+				Max: math.Inf(1),
 			},
 		},
 	},
@@ -86,7 +87,7 @@ var usageTestCases = []struct {
 		usage: &Usage{
 			Print: &UsagePrint{
 				Subtype:    PrintSubtypeWatermark,
-				PrintState: true,
+				PrintState: StateON,
 			},
 		},
 	},
@@ -94,7 +95,7 @@ var usageTestCases = []struct {
 		name: "view",
 		usage: &Usage{
 			View: &UsageView{
-				ViewState: false,
+				ViewState: StateOFF,
 			},
 		},
 	},
@@ -136,7 +137,7 @@ var usageTestCases = []struct {
 				Preferred: false,
 			},
 			Export: &UsageExport{
-				ExportState: false,
+				ExportState: StateOFF,
 			},
 			Zoom: &UsageZoom{
 				Min: 0.5,
@@ -144,10 +145,10 @@ var usageTestCases = []struct {
 			},
 			Print: &UsagePrint{
 				Subtype:    PrintSubtypePrintersMarks,
-				PrintState: true,
+				PrintState: StateON,
 			},
 			View: &UsageView{
-				ViewState: true,
+				ViewState: StateON,
 			},
 			User: &UsageUser{
 				Type: UserTypeTitle,
@@ -232,9 +233,9 @@ func normalizeUsage(u *Usage) {
 		}
 	}
 
-	// normalize zoom max value for infinity
-	if u.Zoom != nil && u.Zoom.Max >= 1e307 {
-		u.Zoom.Max = 1e308
+	// normalize zoom max: values beyond float32 range are treated as infinity
+	if u.Zoom != nil && u.Zoom.Max > math.MaxFloat32 {
+		u.Zoom.Max = math.Inf(1)
 	}
 
 	// clear AdditionalInfo if empty

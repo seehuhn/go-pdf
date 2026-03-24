@@ -82,7 +82,7 @@ var groupTestCases = []struct {
 				},
 				Print: &UsagePrint{
 					Subtype:    PrintSubtypeWatermark,
-					PrintState: true,
+					PrintState: StateON,
 				},
 			},
 		},

@@ -16,13 +16,16 @@
 
 package oc
 
-import "seehuhn.de/go/pdf"
+import (
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/property"
+)
 
 // Conditional represents an optional content element that controls visibility
 // based on conditions. This must be either a [Group] or a [Membership]
 // object.
 type Conditional interface {
-	pdf.Embedder
+	property.List
 	IsVisible(*GroupStates) bool
 }
 

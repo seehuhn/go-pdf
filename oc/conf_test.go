@@ -40,6 +40,7 @@ var (
 			version: pdf.V1_5,
 			data: &Configuration{
 				BaseState: BaseStateON,
+				Intent:    []pdf.Name{"View"},
 			},
 		},
 		{
@@ -49,6 +50,7 @@ var (
 				Name:      "Default",
 				Creator:   "TestApp",
 				BaseState: BaseStateON,
+				Intent:    []pdf.Name{"View"},
 			},
 		},
 		{
@@ -57,6 +59,7 @@ var (
 			data: &Configuration{
 				BaseState: BaseStateOFF,
 				ON:        []*Group{confGroup1},
+				Intent:    []pdf.Name{"View"},
 			},
 		},
 		{
@@ -65,6 +68,7 @@ var (
 			data: &Configuration{
 				BaseState: BaseStateON,
 				OFF:       []*Group{confGroup2, confGroup3},
+				Intent:    []pdf.Name{"View"},
 			},
 		},
 		{
@@ -88,6 +92,7 @@ var (
 			version: pdf.V1_5,
 			data: &Configuration{
 				BaseState: BaseStateON,
+				Intent:    []pdf.Name{"View"},
 				AS: []*UsageApplication{
 					{
 						SingleUse: true,
@@ -103,6 +108,7 @@ var (
 			version: pdf.V1_5,
 			data: &Configuration{
 				BaseState: BaseStateON,
+				Intent:    []pdf.Name{"View"},
 				Order:     []OrderItem{confGroup1, confGroup2},
 			},
 		},
@@ -111,6 +117,7 @@ var (
 			version: pdf.V1_5,
 			data: &Configuration{
 				BaseState: BaseStateON,
+				Intent:    []pdf.Name{"View"},
 				Order: []OrderItem{
 					&OrderGroup{
 						Label:    "Anatomy",
@@ -125,6 +132,7 @@ var (
 			version: pdf.V1_5,
 			data: &Configuration{
 				BaseState: BaseStateON,
+				Intent:    []pdf.Name{"View"},
 				Order: []OrderItem{
 					confGroup1,
 					&OrderGroup{
@@ -138,6 +146,7 @@ var (
 			version: pdf.V1_5,
 			data: &Configuration{
 				BaseState: BaseStateON,
+				Intent:    []pdf.Name{"View"},
 				ListMode:  ListModeVisiblePages,
 			},
 		},
@@ -146,6 +155,7 @@ var (
 			version: pdf.V1_5,
 			data: &Configuration{
 				BaseState: BaseStateON,
+				Intent:    []pdf.Name{"View"},
 				RBGroups:  [][]*Group{{confGroup1, confGroup2}},
 			},
 		},
@@ -154,6 +164,7 @@ var (
 			version: pdf.V1_6,
 			data: &Configuration{
 				BaseState: BaseStateON,
+				Intent:    []pdf.Name{"View"},
 				Locked:    []*Group{confGroup3},
 			},
 		},
@@ -163,6 +174,7 @@ var (
 			data: &Configuration{
 				SingleUse: true,
 				BaseState: BaseStateON,
+				Intent:    []pdf.Name{"View"},
 			},
 		},
 		{
@@ -170,6 +182,7 @@ var (
 			version: pdf.V1_7,
 			data: &Configuration{
 				BaseState: BaseStateON,
+				Intent:    []pdf.Name{"View"},
 			},
 		},
 		{
@@ -177,6 +190,7 @@ var (
 			version: pdf.V2_0,
 			data: &Configuration{
 				BaseState: BaseStateON,
+				Intent:    []pdf.Name{"View"},
 			},
 		},
 		{

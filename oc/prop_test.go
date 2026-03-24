@@ -42,6 +42,7 @@ var (
 				OCGs: []*Group{propGroup1},
 				D: &Configuration{
 					BaseState: BaseStateON,
+					Intent:    []pdf.Name{"View"},
 				},
 			},
 		},
@@ -51,8 +52,9 @@ var (
 			data: &Properties{
 				OCGs: []*Group{propGroup1, propGroup2, propGroup3},
 				D: &Configuration{
-					BaseState: BaseStateOFF,
-					ON:        []*Group{propGroup1},
+					BaseState: BaseStateON,
+					Intent:    []pdf.Name{"View"},
+					OFF:       []*Group{propGroup2, propGroup3},
 				},
 			},
 		},
@@ -63,6 +65,7 @@ var (
 				OCGs: []*Group{propGroup1, propGroup2},
 				D: &Configuration{
 					BaseState: BaseStateON,
+					Intent:    []pdf.Name{"View"},
 					OFF:       []*Group{propGroup2},
 				},
 			},
@@ -74,6 +77,7 @@ var (
 				OCGs: []*Group{propGroup1, propGroup2, propGroup3},
 				D: &Configuration{
 					BaseState: BaseStateON,
+					Intent:    []pdf.Name{"View"},
 					Order: []OrderItem{
 						propGroup1,
 						&OrderGroup{
@@ -91,16 +95,19 @@ var (
 				OCGs: []*Group{propGroup1, propGroup2},
 				D: &Configuration{
 					BaseState: BaseStateON,
+					Intent:    []pdf.Name{"View"},
 				},
 				Configs: []*Configuration{
 					{
 						Name:      "Print",
 						BaseState: BaseStateOFF,
+						Intent:    []pdf.Name{"View"},
 						ON:        []*Group{propGroup1},
 					},
 					{
 						Name:      "Export",
 						BaseState: BaseStateON,
+						Intent:    []pdf.Name{"View"},
 						OFF:       []*Group{propGroup2},
 					},
 				},
@@ -113,6 +120,7 @@ var (
 				OCGs: []*Group{propGroup1, propGroup2, propGroup3},
 				D: &Configuration{
 					BaseState: BaseStateON,
+					Intent:    []pdf.Name{"View"},
 					RBGroups:  [][]*Group{{propGroup1, propGroup2}},
 				},
 			},
@@ -124,6 +132,7 @@ var (
 				OCGs: []*Group{propGroup1},
 				D: &Configuration{
 					BaseState: BaseStateON,
+					Intent:    []pdf.Name{"View"},
 				},
 			},
 		},
@@ -134,6 +143,7 @@ var (
 				OCGs: []*Group{propGroup1},
 				D: &Configuration{
 					BaseState: BaseStateON,
+					Intent:    []pdf.Name{"View"},
 				},
 			},
 		},
@@ -143,8 +153,9 @@ var (
 			data: &Properties{
 				OCGs: []*Group{propGroup1, propGroup2, propGroup3},
 				D: &Configuration{
-					BaseState: BaseStateOFF,
-					ON:        []*Group{propGroup1},
+					BaseState: BaseStateON,
+					Intent:    []pdf.Name{"View"},
+					OFF:       []*Group{propGroup2, propGroup3},
 					Order: []OrderItem{
 						propGroup1,
 						&OrderGroup{
@@ -159,7 +170,16 @@ var (
 					{
 						Name:      "Print",
 						BaseState: BaseStateOFF,
+						Intent:    []pdf.Name{"View"},
 						ON:        []*Group{propGroup1},
+						Order: []OrderItem{
+							propGroup1,
+							&OrderGroup{
+								Label:    "Background",
+								Children: []OrderItem{propGroup2, propGroup3},
+							},
+						},
+						RBGroups: [][]*Group{{propGroup1, propGroup2}},
 					},
 				},
 			},

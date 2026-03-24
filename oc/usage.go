@@ -18,6 +18,7 @@ package oc
 
 import (
 	"errors"
+	"math"
 	"slices"
 
 	"golang.org/x/text/language"
@@ -101,7 +102,10 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 			}
 		}
 
-		usage.Creator = info
+		// only keep CreatorInfo if it has required fields
+		if info.Creator != "" {
+			usage.Creator = info
+		}
 	}
 
 	// extract Language dictionary
@@ -136,8 +140,8 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 
 		if state, err := pdf.Optional(x.GetName(path, exportDict["ExportState"])); err != nil {
 			return nil, err
-		} else if state == "ON" {
-			info.ExportState = true
+		} else {
+			info.ExportState = parseStateRec(state)
 		}
 
 		usage.Export = info
@@ -151,20 +155,25 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 
 		if min, err := pdf.Optional(x.GetNumber(path, zoomDict["min"])); err != nil {
 			return nil, err
-		} else {
+		} else if min > 0 && min <= math.MaxFloat32 {
 			info.Min = min
 		}
 
 		if max, err := pdf.Optional(x.GetNumber(path, zoomDict["max"])); err != nil {
 			return nil, err
-		} else if max != 0 {
+		} else if max < 0 {
+			// negative max is malformed; discard the entire Zoom dict
+		} else if max > 0 && max <= math.MaxFloat32 {
 			info.Max = max
 		} else {
-			// default to infinity
-			info.Max = 1e308
+			// absent, zero, or exceeds float32 range: treat as infinity
+			info.Max = math.Inf(1)
 		}
 
-		usage.Zoom = info
+		// only keep Zoom if it has a valid range that restricts visibility
+		if info.Max > 0 && info.Min <= info.Max && (info.Min > 0 || !math.IsInf(info.Max, 1)) {
+			usage.Zoom = info
+		}
 	}
 
 	// extract Print dictionary
@@ -181,8 +190,8 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 
 		if state, err := pdf.Optional(x.GetName(path, printDict["PrintState"])); err != nil {
 			return nil, err
-		} else if state == "ON" {
-			info.PrintState = true
+		} else {
+			info.PrintState = parseStateRec(state)
 		}
 
 		usage.Print = info
@@ -196,8 +205,8 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 
 		if state, err := pdf.Optional(x.GetName(path, viewDict["ViewState"])); err != nil {
 			return nil, err
-		} else if state == "ON" {
-			info.ViewState = true
+		} else {
+			info.ViewState = parseStateRec(state)
 		}
 
 		usage.View = info
@@ -303,13 +312,16 @@ func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if u.Export != nil {
 		exportDict := pdf.Dict{}
 
-		if u.Export.ExportState {
+		switch u.Export.ExportState {
+		case StateON:
 			exportDict["ExportState"] = pdf.Name("ON")
-		} else {
+		case StateOFF:
 			exportDict["ExportState"] = pdf.Name("OFF")
 		}
 
-		dict["Export"] = exportDict
+		if len(exportDict) > 0 {
+			dict["Export"] = exportDict
+		}
 	}
 
 	// embed Zoom dictionary
@@ -319,8 +331,14 @@ func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		if u.Zoom.Min < 0 {
 			return nil, errors.New("Zoom.Min must be non-negative")
 		}
+		if u.Zoom.Min > math.MaxFloat32 {
+			return nil, errors.New("Zoom.Min exceeds representable PDF number range")
+		}
 		if u.Zoom.Max <= 0 {
 			return nil, errors.New("Zoom.Max must be positive")
+		}
+		if u.Zoom.Max > math.MaxFloat32 && !math.IsInf(u.Zoom.Max, 1) {
+			return nil, errors.New("Zoom.Max exceeds representable PDF number range")
 		}
 		if u.Zoom.Min > u.Zoom.Max {
 			return nil, errors.New("Zoom.Min must be less than or equal to Zoom.Max")
@@ -328,8 +346,8 @@ func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		if u.Zoom.Min != 0 {
 			zoomDict["min"] = pdf.Number(u.Zoom.Min)
 		}
-		// only write max if it's not effectively infinity
-		if u.Zoom.Max < 1e307 {
+		// omit max if it represents infinity (no upper limit)
+		if !math.IsInf(u.Zoom.Max, 1) {
 			zoomDict["max"] = pdf.Number(u.Zoom.Max)
 		}
 
@@ -344,19 +362,13 @@ func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		printDict := pdf.Dict{}
 
 		if u.Print.Subtype != "" {
-			// validate subtype
-			switch u.Print.Subtype {
-			case PrintSubtypeTrapping, PrintSubtypePrintersMarks, PrintSubtypeWatermark:
-				printDict["Subtype"] = pdf.Name(u.Print.Subtype)
-			default:
-				return nil, errors.New("invalid Print.Subtype")
-			}
+			printDict["Subtype"] = pdf.Name(u.Print.Subtype)
 		}
 
-		if u.Print.PrintState {
+		switch u.Print.PrintState {
+		case StateON:
 			printDict["PrintState"] = pdf.Name("ON")
-		} else {
-			// only write OFF if explicitly set with a Print dictionary
+		case StateOFF:
 			printDict["PrintState"] = pdf.Name("OFF")
 		}
 
@@ -367,13 +379,16 @@ func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if u.View != nil {
 		viewDict := pdf.Dict{}
 
-		if u.View.ViewState {
+		switch u.View.ViewState {
+		case StateON:
 			viewDict["ViewState"] = pdf.Name("ON")
-		} else {
+		case StateOFF:
 			viewDict["ViewState"] = pdf.Name("OFF")
 		}
 
-		dict["View"] = viewDict
+		if len(viewDict) > 0 {
+			dict["View"] = viewDict
+		}
 	}
 
 	// embed User dictionary
@@ -488,11 +503,43 @@ type UsageLanguage struct {
 	Preferred bool
 }
 
+// StateRec represents an optional ON/OFF state recommendation.
+// The zero value means no recommendation.
+type StateRec int
+
+const (
+	// StateUnset indicates no state recommendation (leave unchanged).
+	StateUnset StateRec = iota
+
+	// StateON recommends that the group be ON.
+	StateON
+
+	// StateOFF recommends that the group be OFF.
+	StateOFF
+)
+
+// IsOn reports whether the recommendation is ON.
+// Returns false for StateOFF and StateUnset.
+func (s StateRec) IsOn() bool {
+	return s == StateON
+}
+
+func parseStateRec(name pdf.Name) StateRec {
+	switch name {
+	case "ON":
+		return StateON
+	case "OFF":
+		return StateOFF
+	default:
+		return StateUnset
+	}
+}
+
 // UsageExport contains export state information.
 type UsageExport struct {
 	// ExportState indicates the recommended state for content when the document
 	// is saved to a format that does not support optional content.
-	ExportState bool
+	ExportState StateRec
 }
 
 // UsageZoom specifies a range of magnifications at which content is best viewed.
@@ -510,13 +557,15 @@ type UsagePrint struct {
 	Subtype PrintSubtype
 
 	// PrintState indicates whether the group shall be ON or OFF when printing.
-	PrintState bool
+	// StateUnset means leave unchanged.
+	PrintState StateRec
 }
 
 // UsageView contains view state information.
 type UsageView struct {
 	// ViewState indicates the state of the group when the document is first opened.
-	ViewState bool
+	// StateUnset means leave unchanged.
+	ViewState StateRec
 }
 
 // UsageUser specifies users for whom an optional content group is primarily intended.

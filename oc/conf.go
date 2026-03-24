@@ -18,6 +18,7 @@ package oc
 
 import (
 	"errors"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 )
@@ -74,10 +75,9 @@ type Configuration struct {
 
 	// Intent (optional) lists intents to consider when determining visibility.
 	// Content controlled by groups with no matching intent is always shown.
+	// The special value "All" matches every group intent.
 	//
-	// A nil slice means the entry is absent from the PDF (defaults to "View").
-	// A non-nil empty slice means an explicit empty array was present,
-	// which per the spec means no groups participate and all content is visible.
+	// On write, nil can be used as a shorthand for "View".
 	Intent []pdf.Name
 
 	// AS (optional) lists usage application dictionaries for automatic
@@ -156,17 +156,13 @@ func ExtractConfiguration(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object
 		return nil, err
 	}
 
-	// Intent (optional)
-	// A nil slice means absent (defaults to "View" at evaluation time).
-	// A non-nil empty slice means an explicit empty array was present
-	// (per spec: no groups participate, all content visible).
+	// Intent (optional, default "View")
 	intentObj, err := x.Resolve(path, dict["Intent"])
 	if err != nil {
 		return nil, err
 	}
 	switch intent := intentObj.(type) {
 	case pdf.Array:
-		// preserve explicit empty array as non-nil empty slice
 		c.Intent = []pdf.Name{}
 		for _, o := range intent {
 			if name, err := pdf.Optional(x.GetName(path, o)); err != nil {
@@ -179,6 +175,9 @@ func ExtractConfiguration(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object
 		if intent != "" {
 			c.Intent = []pdf.Name{intent}
 		}
+	}
+	if c.Intent == nil {
+		c.Intent = []pdf.Name{"View"}
 	}
 
 	// AS (optional)
@@ -277,6 +276,13 @@ func (c *Configuration) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, errors.New("invalid BaseState value")
 	}
 
+	// validate that ON and OFF do not overlap
+	for _, on := range c.ON {
+		if slices.Contains(c.OFF, on) {
+			return nil, errors.New("group in both ON and OFF arrays")
+		}
+	}
+
 	// ON
 	if len(c.ON) > 0 {
 		arr, err := embedGroupArray(rm, c.ON)
@@ -295,20 +301,18 @@ func (c *Configuration) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["OFF"] = arr
 	}
 
-	// Intent
-	// nil = absent (default View); non-nil empty = explicit empty array
-	if c.Intent != nil {
-		if len(c.Intent) == 0 {
-			dict["Intent"] = pdf.Array{}
-		} else if len(c.Intent) == 1 {
-			dict["Intent"] = c.Intent[0]
-		} else {
-			intentArr := make(pdf.Array, len(c.Intent))
-			for i, intent := range c.Intent {
-				intentArr[i] = intent
-			}
-			dict["Intent"] = intentArr
+	// Intent (omit when nil or default "View")
+	switch {
+	case len(c.Intent) == 0 || len(c.Intent) == 1 && c.Intent[0] == "View":
+		// default, omit
+	case len(c.Intent) == 1:
+		dict["Intent"] = c.Intent[0]
+	default:
+		intentArr := make(pdf.Array, len(c.Intent))
+		for i, intent := range c.Intent {
+			intentArr[i] = intent
 		}
+		dict["Intent"] = intentArr
 	}
 
 	// AS

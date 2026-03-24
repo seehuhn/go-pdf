@@ -59,6 +59,9 @@ func ExtractProperties(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _
 	if err != nil {
 		return nil, err
 	}
+	if len(p.OCGs) == 0 {
+		return nil, pdf.Error("missing OCGs array in optional content properties")
+	}
 
 	// D (required)
 	p.D, err = pdf.ExtractorGetOptional(x, path, dict["D"], ExtractConfiguration)
@@ -79,9 +82,17 @@ func ExtractProperties(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _
 			if err != nil {
 				continue // permissive
 			}
-			if config != nil {
-				p.Configs = append(p.Configs, config)
+			if config == nil {
+				continue
 			}
+			// per spec, alternate configs inherit Order and RBGroups from D
+			if config.Order == nil {
+				config.Order = p.D.Order
+			}
+			if config.RBGroups == nil {
+				config.RBGroups = p.D.RBGroups
+			}
+			p.Configs = append(p.Configs, config)
 		}
 	}
 
@@ -99,6 +110,13 @@ func (p *Properties) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	if p.D == nil {
 		return nil, errors.New("Properties.D is required")
+	}
+	if p.D.BaseState != "" && p.D.BaseState != BaseStateON {
+		return nil, errors.New("default configuration BaseState must be ON")
+	}
+	if len(p.D.Intent) == 1 && p.D.Intent[0] != "View" ||
+		len(p.D.Intent) > 1 {
+		return nil, errors.New("default configuration Intent must be View")
 	}
 
 	dict := pdf.Dict{}

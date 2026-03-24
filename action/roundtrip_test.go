@@ -151,15 +151,14 @@ var actionTestCases = []pdf.Action{
 	&ImportData{F: &file.Specification{FileName: "data.fdf", AFRelationship: "Unspecified"}},
 
 	// SetOCGState
-	&SetOCGState{State: pdf.Array{pdf.Name("ON"), pdf.Reference(1)}, PreserveRB: true},
-	&SetOCGState{State: pdf.Array{pdf.Name("OFF"), pdf.Reference(1)}, PreserveRB: false},
+	&SetOCGState{State: pdf.Array{pdf.Name("ON"), pdf.Reference(1)}},
+	&SetOCGState{State: pdf.Array{pdf.Name("OFF"), pdf.Reference(1)}, IgnoreRBGroups: true},
 	&SetOCGState{State: pdf.Array{pdf.Name("Toggle"), pdf.Reference(1), pdf.Reference(2)}},
 	&SetOCGState{
 		State: pdf.Array{
 			pdf.Name("ON"), pdf.Reference(1), pdf.Reference(2),
 			pdf.Name("OFF"), pdf.Reference(3),
 		},
-		PreserveRB: true,
 	},
 
 	// Rendition

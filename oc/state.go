@@ -20,14 +20,34 @@ import (
 	"maps"
 	"slices"
 
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 )
+
+// ViewerContext provides runtime information needed to evaluate
+// Zoom, Language, and User usage categories.
+type ViewerContext struct {
+	// Zoom is the user-facing magnification factor.
+	// Zero means skip zoom evaluation.
+	Zoom float64
+
+	// Lang is the system locale. language.Und means skip language evaluation.
+	Lang language.Tag
+
+	// UserName is the current user's name. Empty means skip user evaluation.
+	UserName string
+
+	// UserType filters the user match to a specific type.
+	// Empty means match any type.
+	UserType UserType
+}
 
 // GroupStates tracks the visibility state of optional content groups.
 // Groups present in the map participate in visibility decisions;
 // groups absent from the map have no effect on visibility (always shown).
 type GroupStates struct {
-	state map[*Group]bool // present = participates; true = ON, false = OFF
+	state  map[*Group]bool // present = participates; true = ON, false = OFF
+	manual map[*Group]bool // groups set manually by the user
 }
 
 // IsOn returns whether the group is visible. Groups not participating
@@ -54,24 +74,40 @@ func (s *GroupStates) SetState(g *Group, on bool) {
 	s.state[g] = on
 }
 
+// SetManualState sets the visibility of a group and marks it as manually
+// overridden by the user. Groups with manual overrides are not affected
+// by [Configuration.ApplyViewUsage].
+func (s *GroupStates) SetManualState(g *Group, on bool) {
+	s.state[g] = on
+	if s.manual == nil {
+		s.manual = make(map[*Group]bool)
+	}
+	s.manual[g] = true
+}
+
+// IsManual reports whether the group was set manually by the user.
+func (s *GroupStates) IsManual(g *Group) bool {
+	if s == nil {
+		return false
+	}
+	return s.manual[g]
+}
+
 // Clone returns a deep copy of the state.
 func (s *GroupStates) Clone() *GroupStates {
 	if s == nil {
 		return nil
 	}
-	return &GroupStates{state: maps.Clone(s.state)}
+	c := &GroupStates{state: maps.Clone(s.state)}
+	if s.manual != nil {
+		c.manual = maps.Clone(s.manual)
+	}
+	return c
 }
 
 // intentOverlaps reports whether a group's intent matches a configuration's
-// intent.
-//
-// A nil config intent defaults to ["View"]. A non-nil empty config intent
-// means no groups participate (per spec 8.11.2.3: "If the configuration's
-// Intent is an empty array, no groups shall be used in determining visibility;
-// therefore, all content shall be considered visible.").
-//
-// A nil or empty group intent defaults to ["View"].
-// A config intent containing "All" matches everything.
+// intent. Nil config/group intents default to ["View"]. A config intent
+// containing "All" matches everything.
 func intentOverlaps(groupIntent, configIntent []pdf.Name) bool {
 	if len(groupIntent) == 0 {
 		groupIntent = []pdf.Name{"View"}
@@ -100,7 +136,11 @@ func intentOverlaps(groupIntent, configIntent []pdf.Name) bool {
 // configuration's intent are removed so they have no effect on visibility.
 // If allGroups is nil, BaseState has no effect and only groups explicitly
 // listed in ON, OFF, or AS are included.
-func (c *Configuration) DefaultState(allGroups []*Group, event Event) *GroupStates {
+//
+// The prior parameter provides the group states from the previously active
+// configuration. It is used when BaseState is Unchanged (alternate configs
+// only). If prior is nil, Unchanged is treated as ON.
+func (c *Configuration) DefaultState(allGroups []*Group, event Event, prior *GroupStates) *GroupStates {
 	state := make(map[*Group]bool)
 
 	// step 1: apply BaseState to all groups
@@ -119,10 +159,9 @@ func (c *Configuration) DefaultState(allGroups []*Group, event Event) *GroupStat
 			state[g] = false
 		}
 	case BaseStateUnchanged:
-		// per spec the default config must use ON, but alternate configs
-		// may use Unchanged; treat absent groups as ON so they participate
+		// preserve prior state; groups absent from prior default to ON
 		for _, g := range allGroups {
-			state[g] = true
+			state[g] = prior.IsOn(g)
 		}
 	}
 
@@ -151,7 +190,7 @@ func (c *Configuration) DefaultState(allGroups []*Group, event Event) *GroupStat
 			if g.Usage == nil {
 				continue
 			}
-			on, ok := evaluateUsage(g.Usage, ua.Category)
+			on, ok := evaluateUsage(g.Usage, ua.Category, nil)
 			if !ok {
 				continue
 			}
@@ -179,46 +218,182 @@ func (c *Configuration) DefaultState(allGroups []*Group, event Event) *GroupStat
 // It returns the recommended state and true if any categories matched,
 // or false, false if none matched.
 // Per spec: the group is ON only if all consulted categories yield ON.
-func evaluateUsage(u *Usage, categories []Category) (on bool, matched bool) {
+//
+// The ctx parameter provides runtime context for Zoom and User categories.
+// If ctx is nil, runtime categories are skipped. Language is always skipped
+// here because it requires collective evaluation across groups.
+func evaluateUsage(u *Usage, categories []Category, ctx *ViewerContext) (on bool, matched bool) {
 	allOn := true
 
 	for _, cat := range categories {
-		var val bool
-		var found bool
+		var catOn bool
+		var catMatched bool
+
 		switch cat {
 		case CategoryView:
-			if u.View != nil {
-				val = u.View.ViewState
-				found = true
+			if u.View != nil && u.View.ViewState != StateUnset {
+				catOn = u.View.ViewState.IsOn()
+				catMatched = true
 			}
 		case CategoryPrint:
-			if u.Print != nil {
-				val = u.Print.PrintState
-				found = true
+			if u.Print != nil && u.Print.PrintState != StateUnset {
+				catOn = u.Print.PrintState.IsOn()
+				catMatched = true
 			}
 		case CategoryExport:
-			if u.Export != nil {
-				val = u.Export.ExportState
-				found = true
+			if u.Export != nil && u.Export.ExportState != StateUnset {
+				catOn = u.Export.ExportState.IsOn()
+				catMatched = true
 			}
 		case CategoryZoom:
-			// zoom requires runtime magnification level; not applicable here
-		case CategoryLanguage:
-			// language requires runtime locale; not applicable here
+			if ctx != nil && ctx.Zoom > 0 && u.Zoom != nil {
+				catOn = u.Zoom.Min <= ctx.Zoom && ctx.Zoom < u.Zoom.Max
+				catMatched = true
+			}
 		case CategoryUser:
-			// user requires runtime user info; not applicable here
+			if ctx != nil && ctx.UserName != "" && u.User != nil {
+				if ctx.UserType == "" || ctx.UserType == u.User.Type {
+					catOn = slices.Contains(u.User.Name, ctx.UserName)
+				}
+				catMatched = true
+			}
+		case CategoryLanguage:
+			// language requires collective evaluation; handled by evaluateLanguage
 		case CategoryCreatorInfo:
 			// creator info does not yield a state recommendation
 		case CategoryPageElement:
 			// page element does not yield a state recommendation
 		}
-		if found {
+
+		if catMatched {
 			matched = true
-			if !val {
+			if !catOn {
 				allOn = false
 			}
 		}
 	}
 
 	return allOn, matched
+}
+
+// evaluateLanguage performs collective language matching for a single
+// usage application dictionary's OCGs list.
+//
+// Per spec (8.11.4.4): all groups with Language usage in the same AS dict
+// are considered together. If any group's language exactly matches the
+// system locale, exact-matching groups are ON and others are OFF. If no
+// exact match exists, groups whose language partially matches (same base
+// language) and whose Preferred flag is ON are turned ON; others are OFF.
+//
+// Returns a map from group to recommended state, containing only groups
+// that have Language usage.
+func evaluateLanguage(groups []*Group, sysLang language.Tag) map[*Group]bool {
+	if sysLang == language.Und {
+		return nil
+	}
+
+	// collect groups with Language usage
+	type langGroup struct {
+		group *Group
+		tag   language.Tag
+		pref  bool
+	}
+	var candidates []langGroup
+	for _, g := range groups {
+		if g.Usage == nil || g.Usage.Language == nil {
+			continue
+		}
+		candidates = append(candidates, langGroup{
+			group: g,
+			tag:   g.Usage.Language.Lang,
+			pref:  g.Usage.Language.Preferred,
+		})
+	}
+	if len(candidates) == 0 {
+		return nil
+	}
+
+	// pass 1: check for exact locale matches
+	hasExact := false
+	for _, c := range candidates {
+		if c.tag == sysLang {
+			hasExact = true
+			break
+		}
+	}
+
+	result := make(map[*Group]bool, len(candidates))
+	if hasExact {
+		// exact match: groups with exact match are ON, others OFF
+		for _, c := range candidates {
+			result[c.group] = (c.tag == sysLang)
+		}
+	} else {
+		// partial match: same base language + Preferred=ON → ON
+		sysMatcher := language.NewMatcher([]language.Tag{sysLang})
+		for _, c := range candidates {
+			_, _, conf := sysMatcher.Match(c.tag)
+			partial := conf >= language.Low
+			result[c.group] = partial && c.pref
+		}
+	}
+
+	return result
+}
+
+// ApplyViewUsage re-evaluates all View-event AS dicts with runtime context
+// and updates the state accordingly. Groups with manual overrides are
+// not affected.
+//
+// If ctx is nil, this is a no-op.
+func (c *Configuration) ApplyViewUsage(state *GroupStates, ctx *ViewerContext) {
+	if ctx == nil || len(c.AS) == 0 {
+		return
+	}
+
+	// collect recommendations per group, ANDing across AS dicts
+	recs := map[*Group]bool{}
+	for _, ua := range c.AS {
+		if ua.Event != EventView {
+			continue
+		}
+
+		// per-group evaluation for non-Language categories
+		for _, g := range ua.OCGs {
+			if g.Usage == nil || state.IsManual(g) {
+				continue
+			}
+			on, ok := evaluateUsage(g.Usage, ua.Category, ctx)
+			if !ok {
+				continue
+			}
+			prev, seen := recs[g]
+			if !seen {
+				recs[g] = on
+			} else {
+				recs[g] = prev && on
+			}
+		}
+
+		// collective language evaluation
+		if slices.Contains(ua.Category, CategoryLanguage) && ctx.Lang != language.Und {
+			langRecs := evaluateLanguage(ua.OCGs, ctx.Lang)
+			for g, on := range langRecs {
+				if state.IsManual(g) {
+					continue
+				}
+				prev, seen := recs[g]
+				if !seen {
+					recs[g] = on
+				} else {
+					recs[g] = prev && on
+				}
+			}
+		}
+	}
+
+	// apply results
+	for g, on := range recs {
+		state.SetState(g, on)
+	}
 }

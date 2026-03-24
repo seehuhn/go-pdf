@@ -2792,16 +2792,17 @@ types:
       Format: [name, ocg1, ocg2, ..., name, ocg3, ...]
 
       where name is ON, OFF, or Toggle.'
-  - goName: PreserveRB
+  - goName: IgnoreRBGroups
     pdfKey: PreserveRB
     pdfType: boolean
     required: false
     default: true
     introduced: '1.5'
     goType: bool
-    purpose: 'PreserveRB indicates whether to preserve radio-button relationships.
-
-      Default is true.'
+    purpose: 'IgnoreRBGroups, when true, causes radio-button state relationships
+      between optional content groups to be ignored. The Go field inverts the
+      PDF PreserveRB entry so that the zero value preserves radio-button groups
+      (matching the PDF default of true).'
   goPackage: action
   goRepr: struct
   specSection: 12.6.2 12.6.4.13

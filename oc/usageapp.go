@@ -67,18 +67,6 @@ const (
 	CategoryPageElement Category = "PageElement"
 )
 
-// knownCategories is the set of valid Category values.
-var knownCategories = map[Category]bool{
-	CategoryCreatorInfo: true,
-	CategoryLanguage:    true,
-	CategoryExport:      true,
-	CategoryZoom:        true,
-	CategoryPrint:       true,
-	CategoryView:        true,
-	CategoryUser:        true,
-	CategoryPageElement: true,
-}
-
 // UsageApplication specifies rules for automatically managing optional content
 // group states based on external factors such as zoom level, language, or
 // whether the document is being viewed, printed, or exported.
@@ -153,16 +141,12 @@ func ExtractUsageApplication(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Obj
 		if name, err := pdf.Optional(pdf.GetName(r, item)); err != nil {
 			return nil, err
 		} else if name != "" {
-			cat := Category(name)
-			if knownCategories[cat] {
-				ua.Category = append(ua.Category, cat)
-			}
+			ua.Category = append(ua.Category, Category(name))
 		}
 	}
 
-	// error if no recognized categories remain
 	if len(ua.Category) == 0 {
-		return nil, pdf.Error("usage application dictionary has no recognized categories")
+		return nil, pdf.Error("usage application dictionary has no categories")
 	}
 
 	ua.SingleUse = isDirect
@@ -187,11 +171,6 @@ func (ua *UsageApplication) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// validate Category
 	if len(ua.Category) == 0 {
 		return nil, errors.New("Category is required and must be non-empty")
-	}
-	for _, cat := range ua.Category {
-		if !knownCategories[cat] {
-			return nil, errors.New("invalid Category value")
-		}
 	}
 
 	dict := pdf.Dict{

@@ -30,9 +30,12 @@ type SetOCGState struct {
 	// where name is ON, OFF, or Toggle.
 	State pdf.Array
 
-	// PreserveRB indicates whether to preserve radio-button relationships.
-	// Default is true.
-	PreserveRB bool
+	// IgnoreRBGroups, when true, causes radio-button state relationships
+	// between optional content groups to be ignored.
+	//
+	// This corresponds to the PreserveRB entry in the PDF specification, but
+	// with inverted meaning.
+	IgnoreRBGroups bool
 
 	// Next is the sequence of actions to perform after this action.
 	Next ActionList
@@ -59,8 +62,8 @@ func (a *SetOCGState) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["Type"] = pdf.Name("Action")
 	}
 
-	// only write PreserveRB if false (true is default)
-	if !a.PreserveRB {
+	// only write PreserveRB when false (true is the PDF default)
+	if a.IgnoreRBGroups {
 		dict["PreserveRB"] = pdf.Boolean(false)
 	}
 
@@ -82,10 +85,10 @@ func decodeSetOCGState(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*
 		state = pdf.Array{} // empty state = no-op action
 	}
 
-	preserveRB := true // default value
+	ignoreRB := false // default: preserve radio-button groups
 	if dict["PreserveRB"] != nil {
 		rb, _ := pdf.Optional(x.GetBoolean(path, dict["PreserveRB"]))
-		preserveRB = bool(rb)
+		ignoreRB = !bool(rb)
 	}
 
 	next, err := DecodeActionList(x, path, dict["Next"], false)
@@ -94,8 +97,8 @@ func decodeSetOCGState(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*
 	}
 
 	return &SetOCGState{
-		State:      state,
-		PreserveRB: preserveRB,
-		Next:       next,
+		State:          state,
+		IgnoreRBGroups: ignoreRB,
+		Next:           next,
 	}, nil
 }
