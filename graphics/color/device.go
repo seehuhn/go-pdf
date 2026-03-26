@@ -278,7 +278,7 @@ var (
 // FromXYZ converts D50-adapted CIE XYZ to DeviceCMYK component values.
 func (s spaceDeviceCMYK) FromXYZ(X, Y, Z float64) []float64 {
 	cmykInvOnce.Do(func() {
-		p, err := icc.Decode(icc.CGATS001Profile)
+		p, err := icc.Decode(icc.CMYKProfile)
 		if err != nil {
 			return
 		}
@@ -314,7 +314,7 @@ var (
 
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
-// It uses the CGATS001 CMYK profile when available, otherwise falls back
+// It uses the built-in CMYK profile when available, otherwise falls back
 // to a naive CMYK to sRGB conversion.
 func (c DeviceCMYK) ToXYZ() (X, Y, Z float64) {
 	return deviceCMYKToXYZ(c[:])
@@ -322,7 +322,7 @@ func (c DeviceCMYK) ToXYZ() (X, Y, Z float64) {
 
 func deviceCMYKToXYZ(values []float64) (X, Y, Z float64) {
 	cmykFwdOnce.Do(func() {
-		p, err := icc.Decode(icc.CGATS001Profile)
+		p, err := icc.Decode(icc.CMYKProfile)
 		if err != nil {
 			return
 		}

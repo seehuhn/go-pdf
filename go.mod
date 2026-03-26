@@ -11,7 +11,7 @@ require (
 	golang.org/x/term v0.39.0
 	golang.org/x/text v0.34.0
 	seehuhn.de/go/geom v0.7.1-0.20260214224423-6457959953df
-	seehuhn.de/go/icc v0.7.1-0.20260305205545-8898033c1c98
+	seehuhn.de/go/icc v0.7.1-0.20260326065957-ea5a1dd01da2
 	seehuhn.de/go/postscript v0.7.1-0.20260208133223-8d399700345f
 	seehuhn.de/go/sfnt v0.7.1-0.20260214225039-7300a10399dd
 	seehuhn.de/go/xmp v0.7.0
