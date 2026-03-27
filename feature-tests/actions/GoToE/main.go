@@ -33,6 +33,7 @@ import (
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/nametree"
+	pdfpage "seehuhn.de/go/pdf/page"
 )
 
 var paper = document.A5
@@ -267,7 +268,7 @@ func addFileAttachment(page *document.Page, name string, data []byte) {
 		FS: spec,
 	}
 
-	page.Page.Annots = append(page.Page.Annots, annot)
+	page.Page.Annots = append(page.Page.Annots, pdfpage.AnnotInfo{Annot: annot, Ref: page.Out.Alloc()})
 }
 
 func allocatePageRefs(doc *document.MultiPage, n int) []pdf.Reference {
@@ -406,7 +407,7 @@ func addPageLink(page *document.Page, fromDoc, toDoc string, toPage int, rect pd
 		}
 	}
 
-	page.Page.Annots = append(page.Page.Annots, link)
+	page.Page.Annots = append(page.Page.Annots, pdfpage.AnnotInfo{Annot: link, Ref: page.Out.Alloc()})
 
 	return nil
 }

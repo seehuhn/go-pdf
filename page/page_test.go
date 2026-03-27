@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/content"
@@ -560,6 +561,195 @@ func TestPage_Decode_ClipsToNil(t *testing.T) {
 
 	if p.TrimBox != nil {
 		t.Errorf("TrimBox should be nil when completely outside MediaBox, got %v", p.TrimBox)
+	}
+}
+
+func TestAnnotInfoRoundTrip(t *testing.T) {
+	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
+		t.Run(v.String(), func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(v, nil)
+			parentRef := w.Alloc()
+			annotRef := w.Alloc()
+
+			annot := &annotation.Link{
+				Common: annotation.Common{
+					Rect: pdf.Rectangle{LLx: 10, LLy: 10, URx: 100, URy: 50},
+				},
+			}
+
+			p1 := &Page{
+				Parent:    parentRef,
+				MediaBox:  &pdf.Rectangle{URx: 612, URy: 792},
+				Resources: &content.Resources{SingleUse: true},
+				Annots:    []AnnotInfo{{Annot: annot, Ref: annotRef}},
+			}
+
+			rm := pdf.NewResourceManager(w)
+			dict, err := p1.Encode(rm)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := rm.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Put(parentRef, pdf.Dict{"Type": pdf.Name("Pages")}); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			x := pdf.NewExtractor(w)
+			p2, err := Decode(x, nil, dict, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if len(p2.Annots) != 1 {
+				t.Fatalf("got %d annotations, want 1", len(p2.Annots))
+			}
+			if p2.Annots[0].Ref != annotRef {
+				t.Errorf("ref = %v, want %v", p2.Annots[0].Ref, annotRef)
+			}
+			if _, ok := p2.Annots[0].Annot.(*annotation.Link); !ok {
+				t.Errorf("annotation type = %T, want *annotation.Link", p2.Annots[0].Annot)
+			}
+		})
+	}
+}
+
+func TestAnnotInfoIRTFiltering(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	parentRef := w.Alloc()
+
+	// two annotations on the page
+	textRef := w.Alloc()
+	replyRef := w.Alloc()
+	// a reference not on this page
+	offPageRef := pdf.NewReference(999, 0)
+
+	rm := pdf.NewResourceManager(w)
+
+	// parent text annotation
+	textAnnot := &annotation.Text{
+		Common: annotation.Common{
+			Rect: pdf.Rectangle{URx: 24, URy: 24},
+		},
+	}
+	textDict, err := textAnnot.Encode(rm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Put(textRef, textDict); err != nil {
+		t.Fatal(err)
+	}
+
+	// reply pointing to the on-page parent (should survive filtering)
+	replyAnnot := &annotation.Text{
+		Common: annotation.Common{
+			Rect: pdf.Rectangle{URx: 24, URy: 24},
+		},
+		Markup: annotation.Markup{
+			InReplyTo: textRef,
+		},
+	}
+	replyDict, err := replyAnnot.Encode(rm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Put(replyRef, replyDict); err != nil {
+		t.Fatal(err)
+	}
+
+	// orphan reply pointing off-page (should be filtered out)
+	orphanRef := w.Alloc()
+	orphanAnnot := &annotation.Text{
+		Common: annotation.Common{
+			Rect: pdf.Rectangle{URx: 24, URy: 24},
+		},
+		Markup: annotation.Markup{
+			InReplyTo: offPageRef,
+		},
+	}
+	orphanDict, err := orphanAnnot.Encode(rm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Put(orphanRef, orphanDict); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// build a page dict with all three annotations
+	pageDict := pdf.Dict{
+		"Type":      pdf.Name("Page"),
+		"Parent":    parentRef,
+		"MediaBox":  &pdf.Rectangle{URx: 612, URy: 792},
+		"Resources": pdf.Dict{},
+		"Annots":    pdf.Array{textRef, replyRef, orphanRef},
+	}
+	if err := w.Put(parentRef, pdf.Dict{"Type": pdf.Name("Pages")}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	p, err := Decode(x, nil, pageDict, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// all three annotations should remain
+	if len(p.Annots) != 3 {
+		t.Fatalf("got %d annotations, want 3", len(p.Annots))
+	}
+
+	// the on-page reply should keep its InReplyTo
+	type hasMarkup interface {
+		GetMarkup() *annotation.Markup
+	}
+	for _, ai := range p.Annots {
+		m, ok := ai.Annot.(hasMarkup)
+		if !ok {
+			continue
+		}
+		irt := m.GetMarkup().InReplyTo
+		if ai.Ref == replyRef && irt != textRef {
+			t.Errorf("on-page reply: InReplyTo = %v, want %v", irt, textRef)
+		}
+		if ai.Ref == orphanRef && irt != 0 {
+			t.Errorf("off-page orphan: InReplyTo = %v, want 0", irt)
+		}
+	}
+}
+
+func TestAnnotInfoEncodeZeroRef(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	parentRef := w.Alloc()
+
+	p := &Page{
+		Parent:    parentRef,
+		MediaBox:  &pdf.Rectangle{URx: 612, URy: 792},
+		Resources: &content.Resources{SingleUse: true},
+		Annots: []AnnotInfo{{
+			Annot: &annotation.Link{
+				Common: annotation.Common{
+					Rect: pdf.Rectangle{URx: 100, URy: 50},
+				},
+			},
+			// Ref intentionally left as zero
+		}},
+	}
+
+	rm := pdf.NewResourceManager(w)
+	_, err := p.Encode(rm)
+	if err == nil {
+		t.Fatal("expected error for zero annotation reference")
 	}
 }
 

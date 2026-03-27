@@ -79,6 +79,11 @@ type Markup struct {
 	ExData pdf.Object
 }
 
+// GetMarkup returns the markup fields.
+func (m *Markup) GetMarkup() *Markup {
+	return m
+}
+
 // fillDict adds the fields corresponding to the Markup struct
 // to the given PDF dictionary.  If fields are not valid for the PDF version
 // corresponding to the ResourceManager, an error is returned.

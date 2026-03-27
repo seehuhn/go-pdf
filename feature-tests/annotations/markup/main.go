@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/page"
 )
 
 var paper = document.A4
@@ -76,8 +77,7 @@ func date(year, month, day int) time.Time {
 
 // pageReplyThreading creates a page with a simple reply chain.
 func pageReplyThreading(doc *document.MultiPage) error {
-	page := doc.AddPage()
-	rm := doc.RM
+	p := doc.AddPage()
 
 	// allocate references for threading
 	parentRef := doc.Out.Alloc()
@@ -126,25 +126,17 @@ func pageReplyThreading(doc *document.MultiPage) error {
 		Icon: annotation.TextIconComment,
 	}
 
-	// pre-store to establish reference associations
-	if err := rm.StoreAt(parentRef, parent); err != nil {
-		return err
-	}
-	if err := rm.StoreAt(reply1Ref, reply1); err != nil {
-		return err
-	}
-	if err := rm.StoreAt(reply2Ref, reply2); err != nil {
-		return err
-	}
-
-	page.Page.Annots = append(page.Page.Annots, parent, reply1, reply2)
-	return page.Close()
+	p.Page.Annots = append(p.Page.Annots,
+		page.AnnotInfo{Annot: parent, Ref: parentRef},
+		page.AnnotInfo{Annot: reply1, Ref: reply1Ref},
+		page.AnnotInfo{Annot: reply2, Ref: reply2Ref},
+	)
+	return p.Close()
 }
 
 // pageGroupingAndNesting creates a page with grouped annotations and nested replies.
 func pageGroupingAndNesting(doc *document.MultiPage) error {
-	page := doc.AddPage()
-	rm := doc.RM
+	p := doc.AddPage()
 
 	// allocate references
 	caretRef := doc.Out.Alloc()
@@ -230,31 +222,19 @@ func pageGroupingAndNesting(doc *document.MultiPage) error {
 		State: annotation.TextStateAccepted,
 	}
 
-	if err := rm.StoreAt(caretRef, caret); err != nil {
-		return err
-	}
-	if err := rm.StoreAt(strikeoutRef, strikeout); err != nil {
-		return err
-	}
-	if err := rm.StoreAt(replyToCaretRef, replyToCaret); err != nil {
-		return err
-	}
-	if err := rm.StoreAt(nestedReplyRef, nestedReply); err != nil {
-		return err
-	}
-	if err := rm.StoreAt(stateRef, stateAnnot); err != nil {
-		return err
-	}
-
-	page.Page.Annots = append(page.Page.Annots,
-		caret, strikeout, replyToCaret, nestedReply, stateAnnot)
-	return page.Close()
+	p.Page.Annots = append(p.Page.Annots,
+		page.AnnotInfo{Annot: caret, Ref: caretRef},
+		page.AnnotInfo{Annot: strikeout, Ref: strikeoutRef},
+		page.AnnotInfo{Annot: replyToCaret, Ref: replyToCaretRef},
+		page.AnnotInfo{Annot: nestedReply, Ref: nestedReplyRef},
+		page.AnnotInfo{Annot: stateAnnot, Ref: stateRef},
+	)
+	return p.Close()
 }
 
 // pageMarkupTypes creates a page with various markup annotation types.
 func pageMarkupTypes(doc *document.MultiPage) error {
-	page := doc.AddPage()
-	rm := doc.RM
+	p := doc.AddPage()
 
 	y := 750.0
 
@@ -277,10 +257,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 			{X: 300, Y: y}, {X: 72, Y: y},
 		},
 	}
-	if err := rm.StoreAt(hlRef, hl); err != nil {
-		return err
-	}
-	page.Page.Annots = append(page.Page.Annots, hl)
+	p.Page.Annots = append(p.Page.Annots, page.AnnotInfo{Annot: hl, Ref: hlRef})
 	y -= 50
 
 	// underline
@@ -301,7 +278,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 			{X: 250, Y: y}, {X: 72, Y: y},
 		},
 	}
-	page.Page.Annots = append(page.Page.Annots, ul)
+	p.Page.Annots = append(p.Page.Annots, page.AnnotInfo{Annot: ul, Ref: doc.Out.Alloc()})
 	y -= 50
 
 	// squiggly
@@ -322,7 +299,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 			{X: 220, Y: y}, {X: 72, Y: y},
 		},
 	}
-	page.Page.Annots = append(page.Page.Annots, sq)
+	p.Page.Annots = append(p.Page.Annots, page.AnnotInfo{Annot: sq, Ref: doc.Out.Alloc()})
 	y -= 50
 
 	// freetext
@@ -338,7 +315,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 		},
 		DefaultAppearance: "/Helvetica 10 Tf 0 0 0 rg",
 	}
-	page.Page.Annots = append(page.Page.Annots, ft)
+	p.Page.Annots = append(p.Page.Annots, page.AnnotInfo{Annot: ft, Ref: doc.Out.Alloc()})
 	y -= 70
 
 	// stamp
@@ -355,7 +332,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 		},
 		Icon: "Approved",
 	}
-	page.Page.Annots = append(page.Page.Annots, st)
+	p.Page.Annots = append(p.Page.Annots, page.AnnotInfo{Annot: st, Ref: doc.Out.Alloc()})
 	y -= 70
 
 	// line
@@ -372,7 +349,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 		},
 		Coords: [4]float64{72, y - 15, 300, y - 15},
 	}
-	page.Page.Annots = append(page.Page.Annots, ln)
+	p.Page.Annots = append(p.Page.Annots, page.AnnotInfo{Annot: ln, Ref: doc.Out.Alloc()})
 	y -= 60
 
 	// square
@@ -388,7 +365,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 			Subject:      "Box",
 		},
 	}
-	page.Page.Annots = append(page.Page.Annots, sqr)
+	p.Page.Annots = append(p.Page.Annots, page.AnnotInfo{Annot: sqr, Ref: doc.Out.Alloc()})
 	y -= 80
 
 	// ink
@@ -407,15 +384,14 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 			{80, y - 10, 100, y - 30, 120, y - 10, 140, y - 30},
 		},
 	}
-	page.Page.Annots = append(page.Page.Annots, ink)
+	p.Page.Annots = append(p.Page.Annots, page.AnnotInfo{Annot: ink, Ref: doc.Out.Alloc()})
 
-	return page.Close()
+	return p.Close()
 }
 
 // pageEdgeCases creates a page with edge cases for the tool.
 func pageEdgeCases(doc *document.MultiPage) error {
-	page := doc.AddPage()
-	rm := doc.RM
+	p := doc.AddPage()
 
 	// annotation without a date (should sort first)
 	nodateRef := doc.Out.Alloc()
@@ -482,19 +458,11 @@ func pageEdgeCases(doc *document.MultiPage) error {
 		Icon: annotation.TextIconComment,
 	}
 
-	if err := rm.StoreAt(nodateRef, nodate); err != nil {
-		return err
-	}
-	if err := rm.StoreAt(longRef, longText); err != nil {
-		return err
-	}
-	if err := rm.StoreAt(emptyRef, empty); err != nil {
-		return err
-	}
-	if err := rm.StoreAt(replyRef, reply); err != nil {
-		return err
-	}
-
-	page.Page.Annots = append(page.Page.Annots, nodate, longText, empty, reply)
-	return page.Close()
+	p.Page.Annots = append(p.Page.Annots,
+		page.AnnotInfo{Annot: nodate, Ref: nodateRef},
+		page.AnnotInfo{Annot: longText, Ref: longRef},
+		page.AnnotInfo{Annot: empty, Ref: emptyRef},
+		page.AnnotInfo{Annot: reply, Ref: replyRef},
+	)
+	return p.Close()
 }

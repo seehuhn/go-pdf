@@ -30,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/shading"
+	pdfpage "seehuhn.de/go/pdf/page"
 )
 
 func main() {
@@ -93,7 +94,7 @@ func withoutAP(filename string) error {
 			FillColor: color.DeviceRGB{0.5056, 0.9555, 0.9956},
 		}
 
-		page.Page.Annots = append(page.Page.Annots, a)
+		page.Page.Annots = append(page.Page.Annots, pdfpage.AnnotInfo{Annot: a, Ref: page.Out.Alloc()})
 	}
 
 	return page.Close()
@@ -153,7 +154,7 @@ func withAP(filename string) error {
 				return err
 			}
 
-			page.Page.Annots = append(page.Page.Annots, a)
+			page.Page.Annots = append(page.Page.Annots, pdfpage.AnnotInfo{Annot: a, Ref: page.Out.Alloc()})
 		}
 	}
 

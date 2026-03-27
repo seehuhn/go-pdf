@@ -33,6 +33,7 @@ import (
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content/builder"
+	pdfpage "seehuhn.de/go/pdf/page"
 )
 
 const (
@@ -267,7 +268,7 @@ type writer struct {
 }
 
 func (w *writer) addAnnotation(a annotation.Annotation) {
-	w.page.Page.Annots = append(w.page.Page.Annots, a)
+	w.page.Page.Annots = append(w.page.Page.Annots, pdfpage.AnnotInfo{Annot: a, Ref: w.page.Out.Alloc()})
 }
 
 // addParagraph adds a paragraph to the PDF document at the specified position.

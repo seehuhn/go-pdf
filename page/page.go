@@ -92,6 +92,13 @@ func (r Rotation) degrees() int {
 	}
 }
 
+// AnnotInfo pairs a decoded annotation with its indirect object reference.
+// The PDF spec requires annotations to be indirect objects in the Annots array.
+type AnnotInfo struct {
+	Annot annotation.Annotation
+	Ref   pdf.Reference
+}
+
 // Page represents a PDF page object (Table 31 in the PDF spec).
 // It implements [pdf.Encoder] for file-dependent embedding.
 //
@@ -160,7 +167,9 @@ type Page struct {
 	Transition *transition.Transition
 
 	// Annots (optional) lists annotations associated with the page.
-	Annots []annotation.Annotation
+	// The PDF spec requires annotation dictionaries to be indirect objects,
+	// so each entry includes the object reference.
+	Annots []AnnotInfo
 
 	// AA (optional) defines additional actions for page open/close events.
 	AA *triggers.Page
@@ -418,12 +427,14 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	// Annots (spec requires indirect references)
 	if len(p.Annots) > 0 {
 		arr := make(pdf.Array, len(p.Annots))
-		for i, annot := range p.Annots {
-			ref, err := rm.Store(annot)
-			if err != nil {
+		for i, ai := range p.Annots {
+			if ai.Ref == 0 {
+				return nil, errors.New("page annotation without reference")
+			}
+			if err := rm.StoreAt(ai.Ref, ai.Annot); err != nil {
 				return nil, err
 			}
-			arr[i] = ref
+			arr[i] = ai.Ref
 		}
 		dict["Annots"] = arr
 	}
@@ -794,17 +805,39 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 		p.Transition = trans
 	}
 
-	// Annots (optional)
+	// Annots (optional; spec requires indirect references)
 	if annotsArray, err := pdf.Optional(x.GetArray(path, dict["Annots"])); err != nil {
 		return nil, err
 	} else {
+		pageRefs := map[pdf.Reference]bool{}
 		for _, item := range annotsArray {
+			ref, ok := item.(pdf.Reference)
+			if !ok {
+				continue
+			}
 			annot, err := annotation.Decode(x, path, item, false)
 			if err != nil {
 				// permissive: skip invalid annotations
 				continue
 			}
-			p.Annots = append(p.Annots, annot)
+			p.Annots = append(p.Annots, AnnotInfo{Annot: annot, Ref: ref})
+			pageRefs[ref] = true
+		}
+		// Clear InReplyTo for markup annotations whose IRT target is
+		// not on this page.  The spec requires both annotations to be
+		// on the same page (table 172, "IRT").
+		type hasMarkup interface {
+			GetMarkup() *annotation.Markup
+		}
+		for _, ai := range p.Annots {
+			m, ok := ai.Annot.(hasMarkup)
+			if !ok {
+				continue
+			}
+			markup := m.GetMarkup()
+			if markup.InReplyTo != 0 && !pageRefs[markup.InReplyTo] {
+				markup.InReplyTo = 0
+			}
 		}
 	}
 
