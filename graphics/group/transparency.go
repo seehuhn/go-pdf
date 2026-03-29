@@ -17,6 +17,8 @@
 package group
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
 )
@@ -125,7 +127,9 @@ func ExtractTransparencyAttributes(x *pdf.Extractor, path *pdf.CycleCheck, obj p
 		return nil, err
 	}
 	if dict == nil {
-		return nil, nil
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("missing transparency group attributes dictionary"),
+		}
 	}
 
 	// verify subtype

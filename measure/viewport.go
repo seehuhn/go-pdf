@@ -17,6 +17,8 @@
 package measure
 
 import (
+	"errors"
+
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 )
@@ -168,7 +170,9 @@ func ExtractViewportArray(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object
 		return nil, err
 	}
 	if a == nil {
-		return nil, nil
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("missing viewport array"),
+		}
 	}
 
 	viewports := make([]*Viewport, len(a))

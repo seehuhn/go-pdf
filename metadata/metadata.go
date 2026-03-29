@@ -17,6 +17,8 @@
 package metadata
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/xmp"
 )
@@ -33,7 +35,9 @@ type Stream struct {
 
 func Extract(x *pdf.Extractor, path *pdf.CycleCheck, ref pdf.Object, _ bool) (*Stream, error) {
 	if ref == nil {
-		return nil, nil
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("missing metadata stream"),
+		}
 	}
 	body, err := pdf.GetStreamReader(x.R, ref)
 	if err != nil {

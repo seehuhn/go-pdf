@@ -22,6 +22,7 @@ import (
 	"unicode"
 
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -164,17 +165,26 @@ func stampLabel(icon annotation.StampIcon) string {
 	return strings.ToUpper(strings.Join(parts, " "))
 }
 
-// roundedRect appends a rounded rectangle subpath to the builder
+// roundedRect appends a rounded rectangle subpath to the builder.
+//
+// Coordinates passed to LineTo are pre-rounded to match the rounding
+// applied inside LineToArc, so that the straight segments connect
+// seamlessly with the arcs.
 func roundedRect(b *builder.Builder, x, y, w, h, r float64) {
 	r = min(r, w/2, h/2)
-	b.MoveTo(x+r, y)
-	b.LineTo(x+w-r, y)
+
+	// match the rounding precision used inside arc()
+	digits := max(1, 2-int(math.Round(math.Log10(r))))
+	rnd := func(v float64) float64 { return pdf.Round(v, digits) }
+
+	b.MoveTo(rnd(x+r), rnd(y))
+	b.LineTo(rnd(x+w-r), rnd(y))
 	b.LineToArc(x+w-r, y+r, r, -math.Pi/2, 0)
-	b.LineTo(x+w, y+h-r)
+	b.LineTo(rnd(x+w), rnd(y+h-r))
 	b.LineToArc(x+w-r, y+h-r, r, 0, math.Pi/2)
-	b.LineTo(x+r, y+h)
+	b.LineTo(rnd(x+r), rnd(y+h))
 	b.LineToArc(x+r, y+h-r, r, math.Pi/2, math.Pi)
-	b.LineTo(x, y+r)
+	b.LineTo(rnd(x), rnd(y+r))
 	b.LineToArc(x+r, y+r, r, math.Pi, 3*math.Pi/2)
 	b.ClosePath()
 }

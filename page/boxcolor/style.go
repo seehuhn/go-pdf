@@ -17,6 +17,7 @@
 package boxcolor
 
 import (
+	"errors"
 	"fmt"
 
 	"seehuhn.de/go/pdf"
@@ -68,7 +69,9 @@ func ExtractStyle(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
-		return nil, nil
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("missing box style dictionary"),
+		}
 	}
 
 	style := &Style{}

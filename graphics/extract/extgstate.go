@@ -17,6 +17,8 @@
 package extract
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
@@ -32,7 +34,9 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 		return nil, err
 	}
 	if dict == nil {
-		return nil, nil
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("missing ExtGState dictionary"),
+		}
 	}
 
 	res := &extgstate.ExtGState{}

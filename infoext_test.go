@@ -136,6 +136,9 @@ func infoRoundTripTest(t *testing.T, version pdf.Version, original *pdf.Info) {
 
 	embedded, err := rm.Embed(original)
 	if err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip(err)
+		}
 		t.Fatal(err)
 	}
 

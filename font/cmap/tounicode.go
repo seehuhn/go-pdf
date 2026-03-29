@@ -80,7 +80,9 @@ func ExtractToUnicode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 	}
 	stmObj, ok := resolved.(*pdf.Stream)
 	if !ok {
-		return nil, nil
+		return nil, &pdf.MalformedFileError{
+			Err: fmt.Errorf("missing ToUnicode stream, got %T", resolved),
+		}
 	}
 
 	err = pdf.CheckDictType(x.R, stmObj.Dict, "CMap")

@@ -199,7 +199,7 @@ func extractType1(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 		}
 	}
 
-	// store a reader factory closure so each iteration re-opens the PDF stream
+	// parse the content stream
 	stmType := content.PatternColored
 	if !pat.Color {
 		stmType = content.PatternUncolored
@@ -208,12 +208,16 @@ func extractType1(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 	getter := x.R
 	version := pdf.GetVersion(x.R)
 	res := pat.Res
-	pat.Content = content.NewScanner(
+	ops, err := content.ReadStream(
 		func() (io.ReadCloser, error) {
 			return pdf.DecodeStream(getter, stm, 0)
 		},
 		version, stmType, res,
 	)
+	if err != nil {
+		return nil, &pdf.MalformedFileError{Err: err}
+	}
+	pat.Content = ops
 
 	return pat, nil
 }

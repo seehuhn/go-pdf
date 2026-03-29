@@ -17,6 +17,8 @@
 package property
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/optional"
 )
@@ -64,17 +66,23 @@ func (a *ActualText) Equal(other List) bool {
 }
 
 // ExtractActualText extracts an ActualText property list from a PDF object.
+// The dictionary must contain an ActualText key; otherwise an error is returned.
 func ExtractActualText(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*ActualText, error) {
 	dict, err := x.GetDict(path, obj)
 	if err != nil {
 		return nil, err
 	}
 
+	atObj, hasActualText := dict["ActualText"]
+	if !hasActualText {
+		return nil, errNoActualText
+	}
+
 	a := &ActualText{
 		SingleUse: isDirect,
 	}
 
-	if s, ok := dict["ActualText"].(pdf.String); ok {
+	if s, ok := atObj.(pdf.String); ok {
 		a.Text = string(s.AsTextString())
 	}
 
@@ -83,6 +91,10 @@ func ExtractActualText(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, i
 	}
 
 	return a, nil
+}
+
+var errNoActualText = &pdf.MalformedFileError{
+	Err: errors.New("not an ActualText property list"),
 }
 
 // Embed writes the property list to the PDF file.

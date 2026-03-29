@@ -17,6 +17,7 @@
 package font
 
 import (
+	"errors"
 	"math"
 
 	"seehuhn.de/go/pdf"
@@ -30,7 +31,9 @@ func ExtractCIDSystemInfo(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object
 		return nil, err
 	}
 	if dict == nil {
-		return nil, nil
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("missing CIDSystemInfo dictionary"),
+		}
 	}
 
 	var registry, ordering string

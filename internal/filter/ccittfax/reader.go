@@ -252,7 +252,8 @@ func (r *Reader) decode2D() {
 			a0 = a1
 
 		case S_Ext:
-			panic("not implemented: S_Ext")
+			r.err = errors.New("ccittfax: unsupported extension code")
+			return
 		}
 	}
 }

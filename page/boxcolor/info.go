@@ -17,7 +17,11 @@
 // Package boxcolor implements box colour information dictionaries for PDF pages.
 package boxcolor
 
-import "seehuhn.de/go/pdf"
+import (
+	"errors"
+
+	"seehuhn.de/go/pdf"
+)
 
 // PDF 2.0 sections: 14.11.2
 
@@ -52,7 +56,9 @@ func ExtractInfo(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirec
 		return nil, err
 	}
 	if dict == nil {
-		return nil, nil
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("missing box colour information dictionary"),
+		}
 	}
 
 	info := &Info{}

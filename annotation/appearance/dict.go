@@ -67,7 +67,9 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bo
 		return nil, err
 	}
 	if dict == nil {
-		return nil, nil
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("missing appearance dictionary"),
+		}
 	}
 
 	res := &Dict{
