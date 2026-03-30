@@ -120,12 +120,9 @@ func (r *Reader) decodeG4ScanLine() {
 
 	// Check for EOFB (End of Facsimile Block)
 	// EOFB in Group 4 is 24 bits: 000000000001000000000001
-	if !r.IgnoreEndOfBlock && r.peekBits(12) == 1 {
-		r.consumeBits(12)
-		if r.peekBits(12) == 1 {
-			r.consumeBits(12)
-			r.err = io.EOF
-		}
+	if !r.IgnoreEndOfBlock && r.peekBits(24) == 0x001001 {
+		r.consumeBits(24)
+		r.err = io.EOF
 	}
 }
 
@@ -181,6 +178,20 @@ func (r *Reader) decodeG3ScanLine2D() {
 	}
 }
 
+// decodeFullRun decodes a complete run length, consuming any makeup codes
+// followed by the terminating code.
+func (r *Reader) decodeFullRun(isWhite bool) int {
+	total := 0
+	for {
+		runLength, st := r.decodeRun(isWhite)
+		total += runLength
+		if st == S_TermW || st == S_TermB || st == S_EOL || r.err != nil {
+			break
+		}
+	}
+	return total
+}
+
 // decodeRun decodes a run of pixels of the specified color.
 // Returns the run length and a state indication (like S_EOL, S_TermW, S_TermB).
 func (r *Reader) decodeRun(isWhite bool) (int, state) {
@@ -232,15 +243,15 @@ func (r *Reader) decode2D() {
 			a0 = b2 // a0 jumps to position below b2
 
 		case S_Horiz:
-			// First run (of current color)
-			runLength, _ := r.decodeRun(currentCol == white)
+			// first run (of current color)
+			runLength := r.decodeFullRun(currentCol == white)
 			runLength = min(runLength, r.Columns-a0)
 			a0 = max(a0, 0)
 			r.fillRowBits(a0, a0+runLength, currentCol == 1)
 			a0 += runLength
 
-			// Second run (of opposite color)
-			runLength, _ = r.decodeRun(currentCol != white)
+			// second run (of opposite color)
+			runLength = r.decodeFullRun(currentCol != white)
 			runLength = min(runLength, r.Columns-a0)
 			r.fillRowBits(a0, a0+runLength, currentCol == 0)
 			a0 += runLength

@@ -20,18 +20,27 @@ import (
 	"bytes"
 	"image"
 	"image/color"
-	"image/jpeg"
 	"io"
+
+	"seehuhn.de/go/pdf/internal/filter/dct/jpeg"
 )
 
 // Decode decodes JPEG data from r and returns the raw pixel bytes.
+// If colorTransform is non-nil, it overrides the JPEG's APP14-based
+// color transform decision per PDF spec table 13.
 //
 // The output contains interleaved channel bytes, row by row, with no padding.
 // For color images, the output is RGB (3 bytes per pixel).
 // For grayscale images, the output is 1 byte per pixel.
 // For CMYK images, the output is 4 bytes per pixel.
-func Decode(r io.Reader) (io.ReadCloser, error) {
-	img, err := jpeg.Decode(r)
+func Decode(r io.Reader, colorTransform *int) (io.ReadCloser, error) {
+	var img image.Image
+	var err error
+	if colorTransform != nil {
+		img, err = jpeg.DecodeWithOptions(r, colorTransform)
+	} else {
+		img, err = jpeg.Decode(r)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -67,11 +76,15 @@ func Decode(r io.Reader) (io.ReadCloser, error) {
 		}
 
 	case *image.CMYK:
+		// Go's JPEG decoder uses the Adobe convention where 0 means full ink.
+		// PDF uses 0 = no ink, so we invert all CMYK bytes.
 		buf = make([]byte, w*h*4)
 		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 			srcOff := (y-bounds.Min.Y)*img.Stride + (bounds.Min.X-img.Rect.Min.X)*4
 			dstOff := (y - bounds.Min.Y) * w * 4
-			copy(buf[dstOff:dstOff+w*4], img.Pix[srcOff:srcOff+w*4])
+			for i := range w * 4 {
+				buf[dstOff+i] = 255 - img.Pix[srcOff+i]
+			}
 		}
 
 	default:

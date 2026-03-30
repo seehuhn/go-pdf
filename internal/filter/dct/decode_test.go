@@ -49,7 +49,7 @@ func TestDecodeRGB(t *testing.T) {
 	jpegBytes := buf.Bytes()
 
 	// decode using our function
-	rc, err := Decode(bytes.NewReader(jpegBytes))
+	rc, err := Decode(bytes.NewReader(jpegBytes), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestDecodeGrayscale(t *testing.T) {
 	}
 	jpegBytes := buf.Bytes()
 
-	rc, err := Decode(bytes.NewReader(jpegBytes))
+	rc, err := Decode(bytes.NewReader(jpegBytes), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestDecodeCMYK(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rc, err := Decode(bytes.NewReader(jpegBytes))
+	rc, err := Decode(bytes.NewReader(jpegBytes), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,15 +172,17 @@ func TestDecodeCMYK(t *testing.T) {
 		t.Fatalf("got %d bytes, want %d", len(data), w*h*4)
 	}
 
-	// verify pixel values match the reference
+	// verify pixel values match the reference.
+	// Go's image.CMYK uses Adobe convention (0 = full ink),
+	// but our Decode returns PDF convention (0 = no ink), so we invert.
 	i := 0
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			off := cmykImg.PixOffset(x, y)
-			wantC := cmykImg.Pix[off]
-			wantM := cmykImg.Pix[off+1]
-			wantY := cmykImg.Pix[off+2]
-			wantK := cmykImg.Pix[off+3]
+			wantC := 255 - cmykImg.Pix[off]
+			wantM := 255 - cmykImg.Pix[off+1]
+			wantY := 255 - cmykImg.Pix[off+2]
+			wantK := 255 - cmykImg.Pix[off+3]
 			if data[i] != wantC || data[i+1] != wantM || data[i+2] != wantY || data[i+3] != wantK {
 				t.Errorf("pixel (%d,%d): got (%d,%d,%d,%d), want (%d,%d,%d,%d)",
 					x, y, data[i], data[i+1], data[i+2], data[i+3],
@@ -188,6 +190,68 @@ func TestDecodeCMYK(t *testing.T) {
 			}
 			i += 4
 		}
+	}
+}
+
+func TestDecodeColorTransform(t *testing.T) {
+	// create a simple RGB image and encode it as JPEG
+	const w, h = 8, 8
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := range h {
+		for x := range w {
+			img.Set(x, y, color.RGBA{R: 200, G: 100, B: 50, A: 255})
+		}
+	}
+
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 100}); err != nil {
+		t.Fatal(err)
+	}
+	jpegBytes := buf.Bytes()
+
+	// decode with default (nil) ColorTransform — should give RGB
+	rcDefault, err := Decode(bytes.NewReader(jpegBytes), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataDefault, err := io.ReadAll(rcDefault)
+	rcDefault.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// decode with ColorTransform=1 (YCbCr→RGB) — same as default
+	ct1 := 1
+	rcCT1, err := Decode(bytes.NewReader(jpegBytes), &ct1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataCT1, err := io.ReadAll(rcCT1)
+	rcCT1.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(dataDefault, dataCT1) {
+		t.Error("ColorTransform=1 should produce the same result as default")
+	}
+
+	// decode with ColorTransform=0 (no transform) — raw YCbCr values
+	ct0 := 0
+	rcCT0, err := Decode(bytes.NewReader(jpegBytes), &ct0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataCT0, err := io.ReadAll(rcCT0)
+	rcCT0.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// with ColorTransform=0, the output should differ from the default
+	// because the YCbCr data is passed through without conversion
+	if bytes.Equal(dataDefault, dataCT0) {
+		t.Error("ColorTransform=0 should produce different output than default")
 	}
 }
 

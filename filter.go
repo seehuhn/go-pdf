@@ -79,7 +79,7 @@ func MakeFilter(filter Name, param Dict) Filter {
 	case "CCITTFaxDecode":
 		return FilterCCITTFax(param)
 	case "DCTDecode":
-		return FilterDCT{}
+		return FilterDCT(param)
 	case "RunLengthDecode":
 		return FilterRunLength{}
 	default:
@@ -163,13 +163,18 @@ func (f FilterRunLength) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 
 // FilterDCT is the DCTDecode filter, used for JPEG-compressed data.
 // This filter supports decoding only.
-//
-// TODO: support the ColorTransform parameter from DecodeParms (table 13).
-type FilterDCT struct{}
+type FilterDCT Dict
 
 // Info implements the [Filter] interface.
 func (f FilterDCT) Info(_ Version) (Name, Dict, error) {
-	return "DCTDecode", nil, nil
+	res := Dict{}
+	if val, ok := Dict(f)["ColorTransform"].(Integer); ok {
+		res["ColorTransform"] = val
+	}
+	if len(res) == 0 {
+		return "DCTDecode", nil, nil
+	}
+	return "DCTDecode", res, nil
 }
 
 // Encode implements the [Filter] interface.
@@ -180,7 +185,12 @@ func (f FilterDCT) Encode(_ Version, _ io.WriteCloser) (io.WriteCloser, error) {
 
 // Decode implements the [Filter] interface.
 func (f FilterDCT) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
-	return dct.Decode(r)
+	var ct *int
+	if val, ok := Dict(f)["ColorTransform"].(Integer); ok {
+		v := int(val)
+		ct = &v
+	}
+	return dct.Decode(r, ct)
 }
 
 // FilterCompress is a special filter name, which is used to select the
