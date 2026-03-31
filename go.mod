@@ -10,15 +10,14 @@ require (
 	golang.org/x/image v0.36.0
 	golang.org/x/term v0.39.0
 	golang.org/x/text v0.34.0
-	seehuhn.de/go/geom v0.7.1-0.20260214224423-6457959953df
+	seehuhn.de/go/geom v0.7.1
 	seehuhn.de/go/icc v0.7.1-0.20260326065957-ea5a1dd01da2
-	seehuhn.de/go/postscript v0.7.1-0.20260208133223-8d399700345f
-	seehuhn.de/go/sfnt v0.7.1-0.20260214225039-7300a10399dd
-	seehuhn.de/go/xmp v0.7.0
+	seehuhn.de/go/postscript v0.7.1
+	seehuhn.de/go/sfnt v0.7.1
+	seehuhn.de/go/xmp v0.7.1
 )
 
 require (
-	golang.org/x/exp v0.0.0-20250606033433-dcc06ee1d476 // indirect
 	golang.org/x/sys v0.40.0 // indirect
-	seehuhn.de/go/dag v0.0.0-20230612165854-b02059e84ec5 // indirect
+	seehuhn.de/go/dag v0.0.0-20250630092703-dd0e13308cb3 // indirect
 )

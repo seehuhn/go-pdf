@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-03-31
+
+### Added
+- **DCTDecode (JPEG) filter** with forked Go JPEG decoder supporting the ColorTransform parameter.
+- **Page labels** via new `pagelabel` package.
+- **Geospatial measure dictionaries** (PDF 2.0, section 12.10).
+- **Inline image decoding and rendering** (`DecodeInlineImage`, `DrawInlineImageRaw`).
+- `ToXYZ` method on `Color` and `Space` interfaces for direct D50 XYZ conversion.
+- Exported color conversion functions `XYZToSRGB`, `SRGBToXYZ`, and `ColorToXYZ`.
+- PDF colors now implement Go's standard `color.Color` interface.
+- Optional content (layers) configuration, properties, and runtime state tracking.
+- Fallback appearance generation for Stamp, Caret, PolyLine, and TextMarkup annotations.
+- Cloudy border rendering for annotations.
+- Shared text extraction helpers in `font/textextract` package.
+- Image alternate types.
+
+### Changed
+- **Stream is now concurrent-safe**, using `io.ReaderAt` instead of `io.ReadSeeker`.
+- Stream refactored into factory/iterator pattern (`Stream` + `Iter`).
+- `reader.New` accepts `*pdf.Extractor` instead of `pdf.Getter`.
+- Extraction API uses `*pdf.Extractor` consistently throughout.
+- Color `FromXYZ` methods return component values instead of `Color` objects.
+- `Action` interface moved to `pdf` package.
+- Encryption authentication API simplified.
+- Cycle detection uses immutable linked-list `CycleCheck`.
+- Content stream scanning is now lazy.
+- `property.List` interface simplified.
+- Type 4 PDF functions use a bytecode VM instead of a PostScript interpreter.
+- `tools/` directory renamed to `cmd/`.
+- `SpaceICCBased` stores decoded `*icc.Profile` with exported `Profile` and `Metadata` fields.
+
+### Fixed
+- Page box validation on write; clip to MediaBox on read.
+- `/Rotate` inheritance from page tree.
+- Annotation appearance dict validation and fallback handling.
+- Annotation `Border`/`BorderStyle` handling.
+- Date parsing.
+- PDF files with preamble before `%PDF-` signature now accepted.
+- Shading defaults for `TMin=0`, `TMax=0` treated as `[0,1]`.
+
 ## [0.7.0] - 2025-01-25
 
 ### Added
