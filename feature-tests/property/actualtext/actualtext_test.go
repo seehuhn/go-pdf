@@ -22,9 +22,9 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/cmd/pdf-extract/text"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/pagetree"
-	"seehuhn.de/go/pdf/tools/pdf-extract/text"
 )
 
 func TestActualText(t *testing.T) {

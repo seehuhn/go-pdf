@@ -16,7 +16,11 @@
 
 package image
 
-import "seehuhn.de/go/pdf/graphics/color"
+import (
+	"math"
+
+	"seehuhn.de/go/pdf/graphics/color"
+)
 
 // DefaultDecode returns the default Decode array for an image
 // with the given color space and bits per component.
@@ -41,3 +45,34 @@ func DefaultDecode(cs color.Space, bpc int) []float64 {
 	}
 	return d
 }
+
+// expectedDataSize computes the expected byte count for image data with the
+// given dimensions. It returns -1 if the computation overflows.
+func expectedDataSize(width, channels, bpc, height int) int {
+	// all factors are positive (validated by callers)
+	bitsPerRow := int64(width) * int64(channels) * int64(bpc)
+	bytesPerRow := (bitsPerRow + 7) / 8
+
+	size := bytesPerRow * int64(height)
+	if size < 0 || size > math.MaxInt {
+		return -1
+	}
+	return int(size)
+}
+
+// normalizeData pads or truncates data to match expectedSize.
+// If expectedSize is negative (overflow) or unreasonably large,
+// the data is returned as-is to avoid excessive allocation.
+func normalizeData(data []byte, expectedSize int) []byte {
+	if expectedSize < 0 || expectedSize > maxImageDataSize {
+		return data
+	}
+	if len(data) >= expectedSize {
+		return data[:expectedSize]
+	}
+	return append(data, make([]byte, expectedSize-len(data))...)
+}
+
+// maxImageDataSize is the largest image data size we'll allocate during
+// normalization (1 GiB). This guards against malicious dimensions.
+const maxImageDataSize = 1 << 30

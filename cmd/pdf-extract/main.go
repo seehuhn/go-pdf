@@ -30,10 +30,10 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/pagetree"
 
-	"seehuhn.de/go/pdf/tools/internal/buildinfo"
-	"seehuhn.de/go/pdf/tools/internal/profile"
-	"seehuhn.de/go/pdf/tools/pdf-extract/sections"
-	"seehuhn.de/go/pdf/tools/pdf-extract/text"
+	"seehuhn.de/go/pdf/cmd/internal/buildinfo"
+	"seehuhn.de/go/pdf/cmd/internal/profile"
+	"seehuhn.de/go/pdf/cmd/pdf-extract/sections"
+	"seehuhn.de/go/pdf/cmd/pdf-extract/text"
 )
 
 // config holds all command-line flag values.

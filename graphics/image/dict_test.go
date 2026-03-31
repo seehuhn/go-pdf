@@ -23,12 +23,14 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/oc"
 	"seehuhn.de/go/pdf/optional"
+	"seehuhn.de/go/pdf/webcapture"
 )
 
 var px = &measure.NumberFormat{
@@ -336,21 +338,23 @@ var testCases = []struct {
 			Height:           12,
 			ColorSpace:       color.SpaceDeviceGray,
 			BitsPerComponent: 8,
-			Alternates: []*Dict{
+			Alternates: []*Alternate{
 				{
-					Width:            12,
-					Height:           12,
-					ColorSpace:       color.SpaceDeviceRGB,
-					BitsPerComponent: 8,
-					WriteData: func(w io.Writer) error {
-						// RGB version
-						for i := range 144 {
-							val := uint8(i * 255 / 143)
-							if _, err := w.Write([]byte{val, val / 2, val / 3}); err != nil {
-								return err
+					Image: &Dict{
+						Width:            12,
+						Height:           12,
+						ColorSpace:       color.SpaceDeviceRGB,
+						BitsPerComponent: 8,
+						WriteData: func(w io.Writer) error {
+							// RGB version
+							for i := range 144 {
+								val := uint8(i * 255 / 143)
+								if _, err := w.Write([]byte{val, val / 2, val / 3}); err != nil {
+									return err
+								}
 							}
-						}
-						return nil
+							return nil
+						},
 					},
 				},
 			},
@@ -359,6 +363,83 @@ var testCases = []struct {
 				for i := range 144 {
 					val := uint8(i * 255 / 143)
 					if _, err := w.Write([]byte{val}); err != nil {
+						return err
+					}
+				}
+				return nil
+			},
+		},
+	},
+	{
+		name:    "with alternate DefaultForPrinting",
+		version: pdf.V1_3,
+		data: &Dict{
+			Width:            4,
+			Height:           4,
+			ColorSpace:       color.SpaceDeviceGray,
+			BitsPerComponent: 8,
+			Alternates: []*Alternate{
+				{
+					Image: &Dict{
+						Width:            4,
+						Height:           4,
+						ColorSpace:       color.SpaceDeviceRGB,
+						BitsPerComponent: 8,
+						WriteData: func(w io.Writer) error {
+							for range 16 {
+								if _, err := w.Write([]byte{100, 150, 200}); err != nil {
+									return err
+								}
+							}
+							return nil
+						},
+					},
+					DefaultForPrinting: true,
+				},
+			},
+			WriteData: func(w io.Writer) error {
+				for range 16 {
+					if _, err := w.Write([]byte{128}); err != nil {
+						return err
+					}
+				}
+				return nil
+			},
+		},
+	},
+	{
+		name:    "with alternate OC",
+		version: pdf.V1_5,
+		data: &Dict{
+			Width:            4,
+			Height:           4,
+			ColorSpace:       color.SpaceDeviceGray,
+			BitsPerComponent: 8,
+			Alternates: []*Alternate{
+				{
+					Image: &Dict{
+						Width:            4,
+						Height:           4,
+						ColorSpace:       color.SpaceDeviceRGB,
+						BitsPerComponent: 8,
+						WriteData: func(w io.Writer) error {
+							for range 16 {
+								if _, err := w.Write([]byte{50, 100, 150}); err != nil {
+									return err
+								}
+							}
+							return nil
+						},
+					},
+					OC: &oc.Group{
+						Name:   "PrintLayer",
+						Intent: []pdf.Name{"View"},
+					},
+				},
+			},
+			WriteData: func(w io.Writer) error {
+				for range 16 {
+					if _, err := w.Write([]byte{64}); err != nil {
 						return err
 					}
 				}
@@ -483,6 +564,96 @@ var testCases = []struct {
 			},
 		},
 	},
+	{
+		name:    "with image mask",
+		version: pdf.V1_7,
+		data: &Dict{
+			Width:            4,
+			Height:           4,
+			ColorSpace:       color.SpaceDeviceRGB,
+			BitsPerComponent: 8,
+			MaskImage: &Mask{
+				Width:  4,
+				Height: 4,
+				WriteData: func(w io.Writer) error {
+					// 4x4 1-bit mask: checkerboard
+					buf := NewPixelRow(4, 1)
+					for y := range 4 {
+						buf.Reset()
+						for x := range 4 {
+							buf.AppendBits(uint16((x + y) % 2))
+						}
+						if _, err := w.Write(buf.Bytes()); err != nil {
+							return err
+						}
+					}
+					return nil
+				},
+			},
+			WriteData: func(w io.Writer) error {
+				for range 16 {
+					if _, err := w.Write([]byte{100, 150, 200}); err != nil {
+						return err
+					}
+				}
+				return nil
+			},
+		},
+	},
+	{
+		name:    "with associated files",
+		version: pdf.V2_0,
+		data: &Dict{
+			Width:            2,
+			Height:           2,
+			ColorSpace:       color.SpaceDeviceGray,
+			BitsPerComponent: 8,
+			AssociatedFiles: []*file.Specification{
+				{
+					FileName:        "image-data.xml",
+					FileNameUnicode: "image-data.xml",
+					AFRelationship:  file.RelationshipData,
+				},
+			},
+			WriteData: func(w io.Writer) error {
+				_, err := w.Write([]byte{10, 20, 30, 40})
+				return err
+			},
+		},
+	},
+	{
+		name:    "with web capture ID",
+		version: pdf.V1_7,
+		data: &Dict{
+			Width:            2,
+			Height:           2,
+			ColorSpace:       color.SpaceDeviceGray,
+			BitsPerComponent: 8,
+			WebCaptureID: &webcapture.Identifier{
+				ID: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+					0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
+			},
+			WriteData: func(w io.Writer) error {
+				_, err := w.Write([]byte{50, 100, 150, 200})
+				return err
+			},
+		},
+	},
+	{
+		name:    "with deprecated Name",
+		version: pdf.V1_7,
+		data: &Dict{
+			Width:            2,
+			Height:           2,
+			ColorSpace:       color.SpaceDeviceGray,
+			BitsPerComponent: 8,
+			Name:             "Im0",
+			WriteData: func(w io.Writer) error {
+				_, err := w.Write([]byte{0, 255, 128, 64})
+				return err
+			},
+		},
+	},
 }
 
 // checkDictData validates that all image data in a Dict can be read.
@@ -506,8 +677,11 @@ func checkDictData(d *Dict) error {
 		}
 	}
 	for _, alt := range d.Alternates {
-		if alt != nil {
-			if err := checkDictData(alt); err != nil {
+		if alt == nil {
+			continue
+		}
+		if img, ok := alt.Image.(*Dict); ok {
+			if err := checkDictData(img); err != nil {
 				return err
 			}
 		}
@@ -576,13 +750,20 @@ func roundTripTest(t *testing.T, version pdf.Version, data *Dict) {
 		decoded.PtData.SingleUse = data.PtData.SingleUse
 	}
 
+	if decoded.WebCaptureID != nil && data.WebCaptureID != nil {
+		decoded.WebCaptureID.SingleUse = data.WebCaptureID.SingleUse
+	}
+
 	// normalize Decode (read fills in the default)
 	if data.Decode == nil {
 		data.Decode = DefaultDecode(data.ColorSpace, data.BitsPerComponent)
 	}
 	for _, alt := range data.Alternates {
-		if alt != nil && alt.Decode == nil {
-			alt.Decode = DefaultDecode(alt.ColorSpace, alt.BitsPerComponent)
+		if alt == nil {
+			continue
+		}
+		if img, ok := alt.Image.(*Dict); ok && img.Decode == nil {
+			img.Decode = DefaultDecode(img.ColorSpace, img.BitsPerComponent)
 		}
 	}
 

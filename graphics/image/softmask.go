@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"image"
 	"io"
+	"slices"
 
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
@@ -105,16 +106,18 @@ func (sm *SoftMask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	dict := pdf.Dict{
-		"Type":             pdf.Name("XObject"),
 		"Subtype":          pdf.Name("Image"),
 		"Width":            pdf.Integer(sm.Width),
 		"Height":           pdf.Integer(sm.Height),
 		"ColorSpace":       csEmbedded,
 		"BitsPerComponent": pdf.Integer(sm.BitsPerComponent),
 	}
+	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
+		dict["Type"] = pdf.Name("XObject")
+	}
 
-	// Add Decode array if specified
-	if sm.Decode != nil {
+	// suppress default [0 1]
+	if sm.Decode != nil && !slices.Equal(sm.Decode, DefaultDecode(color.SpaceDeviceGray, sm.BitsPerComponent)) {
 		var decode pdf.Array
 		for _, v := range sm.Decode {
 			decode = append(decode, pdf.Number(v))
@@ -122,12 +125,12 @@ func (sm *SoftMask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["Decode"] = decode
 	}
 
-	// Add Interpolate flag if enabled
+	// add Interpolate flag if enabled
 	if sm.Interpolate {
 		dict["Interpolate"] = pdf.Boolean(true)
 	}
 
-	// Add Matte array if specified (for pre-blended data)
+	// add Matte array if specified (for pre-blended data)
 	if sm.Matte != nil {
 		var matte pdf.Array
 		for _, v := range sm.Matte {
@@ -219,7 +222,7 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 		return nil, pdf.Errorf("invalid Subtype %q for soft mask XObject", subtypeName)
 	}
 
-	// Validate ColorSpace is DeviceGray (required for soft masks)
+	// validate ColorSpace is DeviceGray (required for soft masks)
 	if csObj, ok := dict["ColorSpace"]; ok {
 		cs, err := color.ExtractSpace(x, path, csObj, false)
 		if err != nil {
@@ -228,24 +231,16 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 		if cs.Family() != color.FamilyDeviceGray {
 			return nil, pdf.Errorf("soft mask ColorSpace must be DeviceGray, got %s", cs.Family())
 		}
-	} else {
-		return nil, pdf.Error("missing ColorSpace for soft mask")
 	}
+	// missing ColorSpace defaults to DeviceGray (the only valid value)
 
-	// Validate forbidden fields (Table 143 restrictions)
-	if isImageMask, err := x.GetBoolean(path, dict["ImageMask"]); err == nil && bool(isImageMask) {
-		return nil, pdf.Error("ImageMask must be false or absent for soft masks")
-	}
+	// ignore forbidden fields per Table 143 (permissive reading)
+	delete(dict, "ImageMask")
+	delete(dict, "Mask")
+	delete(dict, "SMask")
+	delete(dict, "SMaskInData")
 
-	if _, hasMask := dict["Mask"]; hasMask {
-		return nil, pdf.Error("Mask entry forbidden in soft masks")
-	}
-
-	if _, hasSMask := dict["SMask"]; hasSMask {
-		return nil, pdf.Error("SMask entry forbidden in soft masks")
-	}
-
-	// Extract required fields
+	// extract required fields
 	width, err := x.GetInteger(path, dict["Width"])
 	if err != nil {
 		return nil, err
@@ -309,14 +304,22 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 		}
 	}
 
+	// normalize malformed data to expected size
+	expectedSize := expectedDataSize(softMask.Width, 1, softMask.BitsPerComponent, softMask.Height)
 	softMask.WriteData = func(w io.Writer) error {
-		r, err := pdf.GetStreamReader(x.R, stm)
+		r, err := pdf.DecodeStream(x.R, stm, 0)
 		if err != nil {
 			return err
 		}
-		defer r.Close()
+		data, err := io.ReadAll(r)
+		r.Close()
+		if err != nil {
+			return err
+		}
 
-		_, err = io.Copy(w, r)
+		data = normalizeData(data, expectedSize)
+
+		_, err = w.Write(data)
 		return err
 	}
 

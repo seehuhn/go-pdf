@@ -24,12 +24,12 @@ import (
 	"slices"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/cmd/internal/buildinfo"
+	"seehuhn.de/go/pdf/cmd/internal/profile"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/pagetree"
-	"seehuhn.de/go/pdf/tools/internal/buildinfo"
-	"seehuhn.de/go/pdf/tools/internal/profile"
 )
 
 var (

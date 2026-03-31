@@ -24,9 +24,11 @@ import (
 	"seehuhn.de/go/geom/matrix"
 
 	"seehuhn.de/go/postscript/cid"
+	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/textextract"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/property"
@@ -43,6 +45,8 @@ type TextExtractor struct {
 
 	extraTextCache       map[font.Instance]map[cid.CID]string
 	actualTextStartDepth int // -1 if not in ActualText region
+	prevY                float64
+	prevYValid           bool
 }
 
 // New creates a new TextExtractor that writes to w.
@@ -81,8 +85,23 @@ func (e *TextExtractor) setupCallbacks() {
 		switch op {
 		case reader.TextEventSpace:
 			fmt.Fprint(e.writer, " ")
-		case reader.TextEventNL, reader.TextEventMove:
+		case reader.TextEventNL:
 			fmt.Fprintln(e.writer)
+			e.prevYValid = false
+		case reader.TextEventMove:
+			if e.reader.State.GState.TextFont == nil {
+				fmt.Fprintln(e.writer)
+				e.prevYValid = false
+				break
+			}
+			_, y := e.reader.GetTextPositionDevice()
+			if e.prevYValid && math.Abs(y-e.prevY) < 0.5 {
+				fmt.Fprint(e.writer, " ")
+			} else {
+				fmt.Fprintln(e.writer)
+			}
+			e.prevY = y
+			e.prevYValid = true
 		}
 	}
 
@@ -101,6 +120,8 @@ func (e *TextExtractor) setupCallbacks() {
 			}
 			text = cidMapping[cid]
 		}
+
+		text = remapPUA(text)
 
 		xDev, _ := e.reader.GetTextPositionDevice()
 		if xDev >= e.XRangeMin && xDev < e.XRangeMax {
@@ -136,7 +157,42 @@ func (e *TextExtractor) handleActualTextEnd() {
 	}
 }
 
+// remapPUA replaces Private Use Area codepoints (U+F020–U+F0FF) with their
+// Unicode equivalents.  Some PDF generators (notably older Microsoft tools)
+// map Symbol font characters to this PUA range instead of real Unicode.
+// The low byte of each PUA codepoint corresponds to the Symbol encoding
+// position.
+func remapPUA(text string) string {
+	needsRemap := false
+	for _, r := range text {
+		if r >= 0xF020 && r <= 0xF0FF {
+			needsRemap = true
+			break
+		}
+	}
+	if !needsRemap {
+		return text
+	}
+
+	var buf []rune
+	for _, r := range text {
+		if r >= 0xF020 && r <= 0xF0FF {
+			glyphName := pdfenc.Symbol.Encoding[r-0xF000]
+			if glyphName != ".notdef" {
+				replacement := names.ToUnicode(glyphName, "")
+				if replacement != "" {
+					buf = append(buf, []rune(replacement)...)
+					continue
+				}
+			}
+		}
+		buf = append(buf, r)
+	}
+	return string(buf)
+}
+
 // ExtractPage extracts text from a page dictionary.
 func (e *TextExtractor) ExtractPage(pageDict pdf.Dict) error {
+	e.prevYValid = false
 	return e.reader.ParsePage(pageDict, matrix.Identity)
 }

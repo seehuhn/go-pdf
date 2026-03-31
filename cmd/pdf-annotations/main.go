@@ -26,8 +26,8 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/cmd/internal/buildinfo"
 	"seehuhn.de/go/pdf/pagetree"
-	"seehuhn.de/go/pdf/tools/internal/buildinfo"
 )
 
 var (

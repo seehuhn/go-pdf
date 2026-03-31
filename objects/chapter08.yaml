@@ -3,24 +3,36 @@ title: Graphics
 types:
 - name: AlternateImage
   purpose: "alternate image for different output conditions"
-  goType:
+  goType: graphics/image.Alternate
   pdfRepr: dict
+  fileDependent: false
+  writeMethod: (*Alternate).Embed
+  readFunc: image.ExtractAlternate
+  goPackage: image
+  goRepr: struct
+  specSection: 8.9.5
   fields:
-  - goName:
+  - goName: Image
     pdfKey: Image
     pdfType: stream
     required: true
     introduced: '1.3'
     refTypes:
     - XObjectImage
+    - XObjectImageMask
+    goType: graphics.Image
+    purpose: Image is the alternate image XObject.
     notes: Table 89
-  - goName:
+  - goName: DefaultForPrinting
     pdfKey: DefaultForPrinting
     pdfType: boolean
     required: false
     default: false
     introduced: '1.3'
-  - goName:
+    goType: bool
+    purpose: 'DefaultForPrinting indicates whether this alternate image is the default
+      version to be used for printing.'
+  - goName: OC
     pdfKey: OC
     pdfType: dictionary
     required: false
@@ -28,6 +40,8 @@ types:
     refTypes:
     - OptContentGroup
     - OptContentMembership
+    goType: oc.Conditional
+    purpose: OC controls visibility of this alternate image.
 - name: CalGrayColorSpace
   purpose: "calibrated grayscale color space (array form)"
   goType: graphics/color.SpaceCalGray
@@ -3952,6 +3966,12 @@ types:
   pdfType: XObject
   pdfRepr: stream
   specTable: Table 5
+  fileDependent: false
+  writeMethod: (*Dict).Embed
+  readFunc: image.ExtractDict
+  goPackage: image
+  goRepr: struct
+  specSection: 8.9.5
   fields:
   - goName:
     pdfKey: Type
@@ -4044,13 +4064,26 @@ types:
     required: false
     default: false
     introduced: '1.0'
-  - goName:
+  - goName: MaskImage
     pdfKey: Mask
-    pdfType: array;stream
+    pdfType: stream
     required: false
     introduced: '1.3'
     refTypes:
     - XObjectImageMask
+    goType: '*Mask'
+    purpose: 'MaskImage (optional) determines which parts of the image are to be painted.
+
+      Only one of MaskImage or MaskColors may be specified.'
+  - goName: MaskColors
+    pdfKey: Mask
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    goType: '[]uint16'
+    purpose: 'MaskColors (optional) defines color ranges for transparency masking.
+
+      Only one of MaskImage or MaskColors may be specified.'
   - goName: Decode
     pdfKey: Decode
     pdfType: array
@@ -4082,7 +4115,7 @@ types:
     refTypes:
     - type: AlternateImage
       collection: array
-    goType: '[]*Dict'
+    goType: '[]*Alternate'
     purpose: Alternates (optional) is an array of alternate image dictionaries for this image.
   - goName: SMask
     pdfKey: SMask
@@ -4136,12 +4169,17 @@ types:
     purpose: 'StructParent (required if the image is a structural content item)
 
       is the integer key of the image''s entry in the structural parent tree.'
-  - goName:
+  - goName: WebCaptureID
     pdfKey: ID
     pdfType: byte-string
     required: false
     introduced: '1.3'
     deprecated: '2.0'
+    refTypes:
+    - WebCaptureIdentifier
+    goType: '*webcapture.Identifier'
+    purpose: 'WebCaptureID (optional) is the digital identifier of the image''s parent
+      Web Capture content set.'
     notes: https://github.com/pdf-association/pdf-issues/issues/619
   - goName:
     pdfKey: OPI
@@ -4192,7 +4230,7 @@ types:
     pdfKey: Measure
     pdfType: dictionary
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
     refTypes:
     - MeasureRL
     - MeasureGEO
@@ -4204,7 +4242,7 @@ types:
     pdfKey: PtData
     pdfType: dictionary
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
     refTypes:
     - PointData
     goType: '*measure.PtData'
@@ -4319,12 +4357,6 @@ types:
     required: false
     introduced: fn:Extension(PDF_VT2,1.6)
     notes: PDF/VT-2
-  readFunc: image.ExtractDict
-  fileDependent: true
-  writeMethod: (*Dict).Encode
-  goPackage: image
-  goRepr: struct
-  specSection: 8.9.5
 - name: XObjectImageMask
   purpose: "image mask XObject"
   goType: graphics/image.Dict
@@ -4423,8 +4455,8 @@ types:
     refTypes:
     - type: AlternateImage
       collection: array
-    goType: '[]*Dict'
-    purpose: Alternates (optional) is an array of alternate image dictionaries for this image.
+    goType: '[]*Alternate'
+    purpose: Alternates (optional) is an array of alternate image dictionaries for this mask.
   - goName: SMask
     pdfKey: SMask
     pdfType: stream
@@ -4529,7 +4561,7 @@ types:
     pdfKey: Measure
     pdfType: dictionary
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
     refTypes:
     - MeasureRL
     - MeasureGEO
@@ -4541,7 +4573,7 @@ types:
     pdfKey: PtData
     pdfType: dictionary
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
     refTypes:
     - PointData
     goType: '*measure.PtData'
@@ -4623,12 +4655,6 @@ types:
     pdfType: integer
     required: false
     introduced: '1.5'
-  readFunc: image.ExtractDict
-  fileDependent: true
-  writeMethod: (*Dict).Encode
-  goPackage: image
-  goRepr: struct
-  specSection: 8.9.5
 interfaces:
 - name: Function
   purpose: "function dictionary"

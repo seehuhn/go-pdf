@@ -75,7 +75,7 @@ func (c *Concat) Close() error {
 	meta := c.w.GetMeta()
 	now := time.Now()
 	meta.Info = &pdf.Info{
-		Producer:     "seehuhn.de/go/pdf/tools/pdf-concat",
+		Producer:     "seehuhn.de/go/pdf/cmd/pdf-concat",
 		CreationDate: pdf.Date(now),
 		ModDate:      pdf.Date(now),
 	}

@@ -27,8 +27,8 @@ import (
 	"os"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/tools/internal/buildinfo"
-	"seehuhn.de/go/pdf/tools/internal/profile"
+	"seehuhn.de/go/pdf/cmd/internal/buildinfo"
+	"seehuhn.de/go/pdf/cmd/internal/profile"
 )
 
 var (

@@ -101,7 +101,7 @@ type Dict struct {
 	Interpolate bool
 
 	// Alternates (optional) is an array of alternate image dictionaries for this image.
-	Alternates []*Dict
+	Alternates []*Alternate
 
 	// OptionalContent (optional) allows to control the visibility of the image.
 	OptionalContent oc.Conditional
@@ -320,18 +320,17 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 		img.Interpolate = bool(interp)
 	}
 
-	// Extract Alternates (alternates of alternates not allowed per spec)
+	// extract alternates (Table 89)
 	if alts, err := pdf.Optional(x.GetArray(path, dict["Alternates"])); err != nil {
 		return nil, err
 	} else {
 		for i, altObj := range alts {
-			altDict, err := pdf.ExtractorGetOptional(x, path, altObj, ExtractDict)
+			alt, err := pdf.ExtractorGetOptional(x, path, altObj, ExtractAlternate)
 			if err != nil {
 				return nil, fmt.Errorf("invalid Alternates[%d]: %w", i, err)
 			}
-			if altDict != nil {
-				altDict.Alternates = nil
-				img.Alternates = append(img.Alternates, altDict)
+			if alt != nil {
+				img.Alternates = append(img.Alternates, alt)
 			}
 		}
 	}
@@ -427,8 +426,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 
 	// Create WriteData function as a closure.
 	// Calculate expected size to normalize malformed image data.
-	bytesPerRow := (img.Width*img.ColorSpace.Channels()*img.BitsPerComponent + 7) / 8
-	expectedSize := bytesPerRow * img.Height
+	expectedSize := expectedDataSize(img.Width, img.ColorSpace.Channels(), img.BitsPerComponent, img.Height)
 	img.WriteData = func(w io.Writer) error {
 		stm, err := pdf.DecodeStream(x.R, stream, 0)
 		if err != nil {
@@ -440,12 +438,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 			return err
 		}
 
-		// normalize to expected size
-		if len(data) < expectedSize {
-			data = append(data, make([]byte, expectedSize-len(data))...)
-		} else if len(data) > expectedSize {
-			data = data[:expectedSize]
-		}
+		data = normalizeData(data, expectedSize)
 
 		_, err = w.Write(data)
 		return err
@@ -603,7 +596,7 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		var alts pdf.Array
 		for _, alt := range d.Alternates {
 			if alt == nil {
-				continue
+				return nil, errors.New("nil entry in Alternates")
 			}
 			ref, err := rm.Embed(alt)
 			if err != nil {
@@ -611,9 +604,7 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 			}
 			alts = append(alts, ref)
 		}
-		if len(alts) > 0 {
-			dict["Alternates"] = alts
-		}
+		dict["Alternates"] = alts
 	}
 
 	// Handle SMask/SMaskInData (mutually exclusive)
@@ -813,10 +804,17 @@ func (d *Dict) check(out *pdf.Writer) error {
 		if err := pdf.CheckVersion(out, "image alternates", pdf.V1_3); err != nil {
 			return err
 		}
+		defaultForPrintingCount := 0
 		for _, alt := range d.Alternates {
-			if alt != nil && len(alt.Alternates) > 0 {
+			if hasNestedAlternates(alt.Image) {
 				return errors.New("alternates of alternates not allowed")
 			}
+			if alt.DefaultForPrinting {
+				defaultForPrintingCount++
+			}
+		}
+		if defaultForPrintingCount > 1 {
+			return errors.New("at most one alternate may have DefaultForPrinting set")
 		}
 	}
 

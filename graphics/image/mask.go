@@ -58,7 +58,7 @@ type Mask struct {
 	Interpolate bool
 
 	// Alternates (optional) is an array of alternate image dictionaries for this mask.
-	Alternates []*Mask
+	Alternates []*Alternate
 
 	// OptionalContent (optional) allows to control the visibility of the mask.
 	OptionalContent oc.Conditional
@@ -236,14 +236,15 @@ func ExtractMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 
 	if alts, err := pdf.Optional(x.GetArray(path, dict["Alternates"])); err != nil {
 		return nil, err
-	} else if alts != nil {
-		mask.Alternates = make([]*Mask, len(alts))
+	} else {
 		for i, altObj := range alts {
-			altMask, err := pdf.ExtractorGetOptional(x, path, altObj, ExtractMask)
+			alt, err := pdf.ExtractorGetOptional(x, path, altObj, ExtractAlternate)
 			if err != nil {
 				return nil, fmt.Errorf("invalid Alternates[%d]: %w", i, err)
 			}
-			mask.Alternates[i] = altMask
+			if alt != nil {
+				mask.Alternates = append(mask.Alternates, alt)
+			}
 		}
 	}
 
@@ -356,6 +357,9 @@ func (m *Mask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if len(m.Alternates) > 0 {
 		var alts pdf.Array
 		for _, alt := range m.Alternates {
+			if alt == nil {
+				return nil, errors.New("nil entry in Alternates")
+			}
 			ref, err := rm.Embed(alt)
 			if err != nil {
 				return nil, err
@@ -498,11 +502,17 @@ func (m *Mask) check(out *pdf.Writer) error {
 		if err := pdf.CheckVersion(out, "image alternates", pdf.V1_3); err != nil {
 			return err
 		}
-
+		defaultForPrintingCount := 0
 		for _, alt := range m.Alternates {
-			if len(alt.Alternates) > 0 {
+			if hasNestedAlternates(alt.Image) {
 				return errors.New("alternates of alternates not allowed")
 			}
+			if alt.DefaultForPrinting {
+				defaultForPrintingCount++
+			}
+		}
+		if defaultForPrintingCount > 1 {
+			return errors.New("at most one alternate may have DefaultForPrinting set")
 		}
 	}
 	if m.Name != "" {

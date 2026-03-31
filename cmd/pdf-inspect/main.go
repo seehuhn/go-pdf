@@ -21,35 +21,36 @@ import (
 	"fmt"
 	"os"
 
-	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/tools/internal/buildinfo"
-	"seehuhn.de/go/pdf/tools/internal/profile"
+	"seehuhn.de/go/pdf/cmd/internal/buildinfo"
+	"seehuhn.de/go/pdf/cmd/internal/profile"
+	"seehuhn.de/go/pdf/cmd/pdf-inspect/traverse"
 )
 
 var (
-	out        = flag.String("o", "out.pdf", "output file name")
-	force      = flag.Bool("f", false, "overwrite output file if it exists")
+	passwdArg  = flag.String("p", "", "PDF password")
 	cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
 	memprofile = flag.String("memprofile", "", "write memory profile to `file`")
 )
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "pdf-copy \u2014 copy a PDF file\n")
-		fmt.Fprintf(os.Stderr, "%s\n\n", buildinfo.Short("pdf-copy"))
+		fmt.Fprintf(os.Stderr, "pdf-inspect \u2014 inspect PDF file structure\n")
+		fmt.Fprintf(os.Stderr, "%s\n\n", buildinfo.Short("pdf-inspect"))
 		fmt.Fprintf(os.Stderr, "Usage:\n")
-		fmt.Fprintf(os.Stderr, "  pdf-copy [options] <input.pdf>\n\n")
+		fmt.Fprintf(os.Stderr, "  pdf-inspect [options] <file.pdf> [path...]\n\n")
 		fmt.Fprintf(os.Stderr, "Arguments:\n")
-		fmt.Fprintf(os.Stderr, "  input.pdf   PDF file to copy\n\n")
+		fmt.Fprintf(os.Stderr, "  file.pdf   PDF file to inspect\n")
+		fmt.Fprintf(os.Stderr, "  path       sequence of selectors to navigate the document structure\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  pdf-copy input.pdf\n")
-		fmt.Fprintf(os.Stderr, "  pdf-copy -o copy.pdf -f input.pdf\n")
+		fmt.Fprintf(os.Stderr, "  pdf-inspect file.pdf\n")
+		fmt.Fprintf(os.Stderr, "  pdf-inspect file.pdf Pages 1\n")
+		fmt.Fprintf(os.Stderr, "  pdf-inspect -p secret file.pdf Pages 1 @contents\n")
 	}
 	flag.Parse()
 
-	if flag.NArg() != 1 {
+	if flag.NArg() == 0 {
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -67,47 +68,51 @@ func run() error {
 	}
 	defer stop()
 
-	if !*force {
-		if _, err := os.Stat(*out); !os.IsNotExist(err) {
-			return fmt.Errorf("output file %q already exists (use -f to overwrite)", *out)
-		}
-	}
-
-	return copyPDF(flag.Arg(0), *out)
+	return showObject(flag.Args()...)
 }
 
-func copyPDF(inFile, outFile string) (retErr error) {
-	r, err := pdf.Open(inFile, nil)
-	if err != nil {
-		return err
+func showObject(args ...string) error {
+	passwords := []string{}
+	if *passwdArg != "" {
+		passwords = append(passwords, *passwdArg)
 	}
-	defer r.Close()
 
-	w, err := pdf.Create(outFile, pdf.GetVersion(r), nil)
+	obj, cleanup, err := traverse.Root(args[0], passwords...)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if retErr != nil {
-			os.Remove(outFile)
+	defer cleanup()
+
+	for _, key := range args[1:] {
+		steps := obj.Next()
+		found := false
+		for _, step := range steps {
+			if step.Match.MatchString(key) {
+				obj, err = step.Next(key)
+				if err != nil {
+					return err
+				}
+				found = true
+				break
+			}
 		}
-	}()
-
-	trans := pdf.NewCopier(w, r)
-
-	newDict, err := trans.CopyDict(pdf.AsDict(r.GetMeta().Catalog))
+		if !found {
+			return fmt.Errorf("no match for key %q", key)
+		}
+	}
+	err = obj.Show()
 	if err != nil {
 		return err
 	}
-	newCatalog, err := pdf.ExtractCatalog(w, newDict)
-	if err != nil {
-		return err
+
+	steps := obj.Next()
+	if len(steps) > 0 {
+		fmt.Println("")
+		fmt.Println("next:")
+		for _, step := range steps {
+			fmt.Printf("  • %s\n", step.Desc)
+		}
 	}
-	w.GetMeta().Catalog = newCatalog
 
-	w.GetMeta().Info = r.GetMeta().Info
-
-	w.GetMeta().ID = r.GetMeta().ID
-
-	return w.Close()
+	return nil
 }
