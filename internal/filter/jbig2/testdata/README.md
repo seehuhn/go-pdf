@@ -1,0 +1,147 @@
+# JBIG2 Test Data for PDF Library
+
+Test vectors for validating a JBIG2 encoder/decoder used within a PDF library.
+Generated using the ITU-T T.88 reference implementation (2018 release) and
+jbig2enc (for PDF embedded format and non-empty globals tests).
+
+## Directory Structure
+
+```
+testdata/
+  README.md          -- this file
+  mq/                -- low-level arithmetic coder test vectors
+    mq_test_vectors.txt
+  decode/            -- segment-level decode test cases
+    <name>.globals   -- JBIG2Globals stream (may be 0 bytes)
+    <name>.page      -- JBIG2 page stream (image XObject data)
+    <name>.bmp       -- expected decoded bitmap (1-bit BMP)
+    <name>.json      -- segment manifest (types, sizes, structure)
+```
+
+## Decoder Tests (decode/)
+
+Each test case has four files sharing a base name. To test your decoder:
+
+1. Load `<name>.globals` as the JBIG2Globals stream (shared segments).
+   If the file is 0 bytes, there are no global segments for this test.
+2. Load `<name>.page` as the image stream (page-specific segments).
+3. Decode the segments to produce a bi-level bitmap.
+4. Compare the result pixel-by-pixel against `<name>.bmp`.
+
+The `.json` file documents what segment types are present and their sizes,
+which is useful for debugging when a test fails.
+
+## Encoder Tests (decode/, round-trip)
+
+To test your encoder:
+
+1. Load `<name>.bmp` as the input image.
+2. Encode it as JBIG2 (producing globals + page blobs).
+3. Decode your own output back to a bitmap.
+4. Compare the decoded result against the original `.bmp`.
+
+Your encoder does NOT need to produce byte-identical output to the
+`.page` files. Different encoders legitimately produce different bitstreams.
+The correctness check is that the round-trip produces the same image.
+
+## Arithmetic Coder Tests (mq/)
+
+`mq_test_vectors.txt` contains low-level MQ coder test vectors with known
+inputs and expected encoded byte streams. These test the arithmetic coder
+in isolation, independent of any segment format.
+
+Each test block has the format:
+```
+=== TEST: <name> ===
+<parameters>
+encoded: <hex bytes>
+RESULT: PASS
+```
+
+Test categories:
+
+- `mq_binary`: Raw binary decision encoding (50 decisions, 16 contexts)
+- `mq_integer`, `mq_integer_edge_cases`: Integer encoding via IADT, IADH,
+  IADW, IADS, IAFS, IAIT, IARI procedures, including edge values
+- `mq_iaid`: Symbol ID encoding (IAID procedure, SBSYMCODELEN=2)
+- `mq_image_*`: Bitmap encoding for templates 0-3, various patterns
+  (zeros, checkerboard, stripes, center block, 64x32 diagonal)
+- `mq_refinement_*`: Refinement region encoding for templates 0 and 1,
+  including the identical-bitmap case
+
+For each test, encode the described input and compare your output against
+the `encoded` bytes. These must match exactly (they are deterministic
+outputs from the reference MQ codec).
+
+## Test Case Coverage
+
+### Segment types exercised
+
+| Test Name | SymDict | TextRegion | GenericRegion | Refinement |
+|-----------|---------|------------|---------------|------------|
+| test_gen_template0_arith | - | - | Arith (T0) | - |
+| test_gen_template0_typred | - | - | Arith (T0, TP) | - |
+| test_gen_template1_typred | - | - | Arith (T1, TP) | - |
+| test_gen_template2_arith | - | - | Arith (T2) | - |
+| test_gen_template3_arith | - | - | Arith (T3) | - |
+| test_f01_200_default | - | - | Arith (default) | - |
+| test_param2 | Huffman | Huffman | Huffman | - |
+| test_param3 | Arith | Arith | Arith | - |
+| test_param4 | Arith | Arith | Arith (T1) | - |
+| test_param5 | Arith | Arith | Arith | SymDict refinement |
+| test_param6 | Arith | Arith+Ref | Arith | TextRegion refinement |
+| test_param7 | Arith | Arith | Arith (T0 ext) | - |
+| test_param8 | Arith | Arith+Ref | Arith | TextRegion refinement |
+| test_param9 | - | - | Huffman (large) | - |
+| test_enc_generic_tpgd | - | - | Arith (T0, TP) | - |
+| test_enc_generic_plain | - | - | Arith (T0) | - |
+| test_enc_generic_border | - | - | Arith (T0) | - |
+| test_enc_symbol_globals | Arith (globals) | Arith | - | - |
+| test_enc_symbol_large | Arith (globals) | Arith | - | - |
+| test_enc_symbol_tpgd | Arith (globals) | Arith+TPGD | - | - |
+| test_enc_multipage_p1 | Arith (globals) | Arith | - | - |
+| test_enc_multipage_p2 | Arith (globals) | Arith | - | - |
+
+### Non-empty globals tests (test_enc_symbol_*, test_enc_multipage_*)
+
+These tests exercise the **JBIG2Globals / page stream split** used in PDF:
+
+- The `.globals` file contains a symbol dictionary segment (type 0) with
+  page association 0 (global), which the PDF reader stores in the
+  JBIG2Globals parameter of the JBIG2Decode filter.
+- The `.page` file contains a page information segment and a text region
+  segment that **references segment 0 from the globals stream**.
+- `test_enc_multipage_p1` and `test_enc_multipage_p2` share identical
+  globals data, simulating a multi-page PDF where all pages reference
+  the same global symbol dictionary.
+
+Generated by jbig2enc (symbol mode, PDF output). The `.bmp` files are
+the decoded output produced by jbig2dec, not the encoder input (symbol
+classification is lossy).
+
+### PDF embedded format tests (all test_enc_*)
+
+All `test_enc_*` tests use PDF embedded organisation (ISO 32000-2,
+section 7.4.7): no JBIG2 file header, no end-of-page segments, 1-byte
+page association fields. This matches the format a PDF library encounters
+in practice.
+
+### Known limitations
+
+The reference implementation tests (test_gen_*, test_param*, test_f01_*)
+all have 0-byte `.globals` files with page-local symbol dictionaries.
+The `test_enc_*` tests fill this gap with non-empty globals streams.
+
+### Known gaps
+
+These features are NOT covered by the test data:
+
+- Halftone region segments (types 20-23)
+- Pattern dictionary segments (type 16)
+- MMR-coded generic regions (only arithmetic and Huffman modes are tested)
+- Custom Huffman table segments (type 53)
+- End-of-stripe segments / striped pages (type 50)
+- Pages with unknown height
+
+For these, source test data from real-world PDF files containing JBIG2
+images, or construct test vectors by hand.

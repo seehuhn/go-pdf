@@ -1,0 +1,56 @@
+{
+  "segments": [
+    {
+      "num": 0,
+      "type": "PageInformation",
+      "type_id": 48,
+      "page": 1,
+      "header_bytes": 11,
+      "data_bytes": 19
+    },
+    {
+      "num": 1,
+      "type": "SymbolDictionary",
+      "type_id": 0,
+      "page": 1,
+      "header_bytes": 11,
+      "data_bytes": 33
+    },
+    {
+      "num": 2,
+      "type": "SymbolDictionary",
+      "type_id": 0,
+      "page": 1,
+      "header_bytes": 12,
+      "data_bytes": 32
+    },
+    {
+      "num": 3,
+      "type": "TextRegion_Immediate",
+      "type_id": 7,
+      "page": 1,
+      "header_bytes": 13,
+      "data_bytes": 30
+    },
+    {
+      "num": 4,
+      "type": "GenericRegion_Immediate",
+      "type_id": 39,
+      "page": 1,
+      "header_bytes": 11,
+      "data_bytes": 139
+    },
+    {
+      "num": 5,
+      "type": "EndOfPage",
+      "type_id": 49,
+      "page": 1,
+      "header_bytes": 11,
+      "data_bytes": 0
+    }
+  ],
+  "globals_bytes": 0,
+  "page_bytes": 322,
+  "globals_segments": 0,
+  "page_segments": 6
+}

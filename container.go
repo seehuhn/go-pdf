@@ -338,7 +338,53 @@ func GetFilters(r Getter, dict Dict) ([]Filter, error) {
 	default:
 		return nil, Error("invalid /Filter field")
 	}
+	// resolve JBIG2Globals for any JBIG2Decode filters
+	for _, f := range res {
+		if jf, ok := f.(*FilterJBIG2); ok {
+			if err := resolveJBIG2Globals(r, jf); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	return res, nil
+}
+
+// resolveJBIG2Globals reads the JBIG2Globals stream from the filter's
+// DecodeParms dictionary and stores the bytes in the filter.
+func resolveJBIG2Globals(r Getter, f *FilterJBIG2) error {
+	globalsRef := f.Param["JBIG2Globals"]
+	if globalsRef == nil {
+		return nil
+	}
+
+	// resolve the reference to get the stream
+	obj, err := resolve(r, globalsRef, false)
+	if err != nil {
+		return err
+	}
+	if obj == nil {
+		return nil
+	}
+
+	// the globals object should be a stream; read its contents
+	stream, ok := obj.(*Stream)
+	if !ok {
+		return nil
+	}
+	stm, err := DecodeStream(r, stream, 0)
+	if err != nil {
+		return fmt.Errorf("JBIG2Globals stream: %w", err)
+	}
+	defer stm.Close()
+
+	data, err := io.ReadAll(stm)
+	if err != nil {
+		return fmt.Errorf("reading JBIG2Globals: %w", err)
+	}
+
+	f.Globals = data
+	return nil
 }
 
 // IsTagged returns true, if the PDF file is "tagged".

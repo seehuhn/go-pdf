@@ -1,15 +1,13 @@
 module seehuhn.de/go/pdf
 
-go 1.24.0
-
-toolchain go1.24.3
+go 1.25.0
 
 require (
 	github.com/google/go-cmp v0.7.0
 	github.com/xdg-go/stringprep v1.0.4
-	golang.org/x/image v0.36.0
+	golang.org/x/image v0.38.0
 	golang.org/x/term v0.39.0
-	golang.org/x/text v0.34.0
+	golang.org/x/text v0.35.0
 	seehuhn.de/go/geom v0.7.1
 	seehuhn.de/go/icc v0.7.1-0.20260326065957-ea5a1dd01da2
 	seehuhn.de/go/postscript v0.7.1

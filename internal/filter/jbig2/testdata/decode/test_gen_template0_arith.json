@@ -1,0 +1,32 @@
+{
+  "segments": [
+    {
+      "num": 0,
+      "type": "PageInformation",
+      "type_id": 48,
+      "page": 1,
+      "header_bytes": 11,
+      "data_bytes": 19
+    },
+    {
+      "num": 1,
+      "type": "GenericRegion_Immediate",
+      "type_id": 39,
+      "page": 1,
+      "header_bytes": 11,
+      "data_bytes": 173
+    },
+    {
+      "num": 2,
+      "type": "EndOfPage",
+      "type_id": 49,
+      "page": 1,
+      "header_bytes": 11,
+      "data_bytes": 0
+    }
+  ],
+  "globals_bytes": 0,
+  "page_bytes": 225,
+  "globals_segments": 0,
+  "page_segments": 3
+}

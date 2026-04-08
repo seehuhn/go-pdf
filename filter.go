@@ -17,6 +17,7 @@
 package pdf
 
 import (
+	"bytes"
 	"compress/zlib"
 	"errors"
 	"fmt"
@@ -27,6 +28,7 @@ import (
 	"seehuhn.de/go/pdf/internal/filter/asciihex"
 	"seehuhn.de/go/pdf/internal/filter/ccittfax"
 	"seehuhn.de/go/pdf/internal/filter/dct"
+	"seehuhn.de/go/pdf/internal/filter/jbig2"
 	"seehuhn.de/go/pdf/internal/filter/lzw"
 	"seehuhn.de/go/pdf/internal/filter/predict"
 	"seehuhn.de/go/pdf/internal/filter/runlength"
@@ -80,6 +82,8 @@ func MakeFilter(filter Name, param Dict) Filter {
 		return FilterCCITTFax(param)
 	case "DCTDecode":
 		return FilterDCT(param)
+	case "JBIG2Decode":
+		return &FilterJBIG2{Param: param}
 	case "RunLengthDecode":
 		return FilterRunLength{}
 	default:
@@ -191,6 +195,41 @@ func (f FilterDCT) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 		ct = &v
 	}
 	return dct.Decode(r, ct)
+}
+
+// FilterJBIG2 is the JBIG2Decode filter for bi-level image compression.
+// JBIG2Decode encoding is not supported via the filter interface;
+// use the graphics/jbig2 package for encoding.
+type FilterJBIG2 struct {
+	Param   Dict
+	Globals []byte // pre-read JBIG2Globals stream data
+}
+
+// Info implements the [Filter] interface.
+func (f *FilterJBIG2) Info(_ Version) (Name, Dict, error) {
+	return "JBIG2Decode", f.Param, nil
+}
+
+// Encode implements the [Filter] interface.
+// JBIG2Decode encoding is not supported via the filter interface.
+func (f *FilterJBIG2) Encode(_ Version, _ io.WriteCloser) (io.WriteCloser, error) {
+	return nil, errors.New("JBIG2Decode encoding not supported via filter interface")
+}
+
+// Decode implements the [Filter] interface.
+func (f *FilterJBIG2) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
+	pageData, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	bm, err := jbig2.Decode(f.Globals, pageData)
+	if err != nil {
+		return nil, err
+	}
+
+	// return packed pixel data as bytes
+	return io.NopCloser(bytes.NewReader(bm.Pix)), nil
 }
 
 // FilterCompress is a special filter name, which is used to select the

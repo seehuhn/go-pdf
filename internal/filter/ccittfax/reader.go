@@ -26,7 +26,7 @@ import (
 type Reader struct {
 	Params
 
-	r         *bufio.Reader
+	r         io.ByteReader
 	err       error  // Last read error, if any
 	current   uint32 // up to 4 bytes of input, valid bits MSB-aligned
 	validBits int    // number of valid bits in current
@@ -39,7 +39,17 @@ type Reader struct {
 }
 
 // NewReader creates a new CCITT Fax decoder.
+// The reader is buffered internally; callers that need to continue reading
+// from r after decoding should use [NewReaderRaw] with a [bytes.Reader]
+// or similar [io.ByteReader] instead.
 func NewReader(r io.Reader, p *Params) (*Reader, error) {
+	return NewReaderRaw(bufio.NewReader(r), p)
+}
+
+// NewReaderRaw creates a CCITT Fax decoder reading from an existing
+// [io.ByteReader]. Unlike [NewReader], no additional buffering is added,
+// so the caller can determine the number of bytes consumed after decoding.
+func NewReaderRaw(r io.ByteReader, p *Params) (*Reader, error) {
 	pCopy := *p
 	if pCopy.Columns == 0 {
 		pCopy.Columns = 1728 // Default as per PDF spec / common fax width
@@ -66,7 +76,7 @@ func NewReader(r io.Reader, p *Params) (*Reader, error) {
 
 	return &Reader{
 		Params:  pCopy,
-		r:       bufio.NewReader(r),
+		r:       r,
 		line:    make([]byte, 0, lineBufSize),
 		refLine: refLine,
 		numRows: 0,
@@ -182,10 +192,16 @@ func (r *Reader) decodeG3ScanLine2D() {
 // followed by the terminating code.
 func (r *Reader) decodeFullRun(isWhite bool) int {
 	total := 0
-	for {
+	// A well-formed run has at most a few makeup codes followed by a
+	// terminating code. Limit iterations to catch malformed data that
+	// produces endless makeup codes from buffered bits.
+	for range 64 {
 		runLength, st := r.decodeRun(isWhite)
 		total += runLength
 		if st == S_TermW || st == S_TermB || st == S_EOL || r.err != nil {
+			break
+		}
+		if total > r.Columns {
 			break
 		}
 	}
@@ -216,8 +232,17 @@ func (r *Reader) decode2D() {
 	white := r.whiteBit()
 
 	a0 := -1
+	prevA0 := -2         // track forward progress
+	prevCol := white ^ 1 // impossible initial value (opposite of starting color)
 	currentCol := white
 	for a0 < r.Columns && r.err == nil {
+		// guard against malformed data that doesn't advance the cursor
+		if a0 == prevA0 && currentCol == prevCol {
+			r.err = errors.New("ccittfax: no forward progress in 2D decode")
+			return
+		}
+		prevA0 = a0
+		prevCol = currentCol
 		value := r.peekBits(7)
 		entry := mainTable[value]
 

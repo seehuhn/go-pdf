@@ -56,14 +56,10 @@ func NewWriter(w io.Writer, p *Params) (*Writer, error) {
 
 	var referenceLine []byte
 	if pCopy.K != 0 {
-		// Initialize reference line to all white
-		refLine := make([]byte, lineBytes)
-		if pCopy.BlackIs1 {
-			// When BlackIs1=true, white pixels are 0 (already initialized)
-		} else {
-			// When BlackIs1=false, white pixels are 1
-			for i := range refLine {
-				refLine[i] = 0xFF
+		referenceLine = make([]byte, lineBytes)
+		if !pCopy.BlackIs1 {
+			for i := range referenceLine {
+				referenceLine[i] = 0xFF
 			}
 		}
 	}
