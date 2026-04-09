@@ -41,7 +41,7 @@ func TestRefinementDecodeTemplate1(t *testing.T) {
 		RefDX:     1,
 		RefDY:     -2,
 	}
-	got, err := decodeRefinementRegion(dec, p, nil)
+	got, err := decodeRefinementRegion(testBudget(), dec, p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func refinementRoundTrip(t *testing.T, ref, target *bitmap.Bitmap, tmpl int) {
 	data := encodeRefinementRegion(target, p)
 
 	dec := newMQDecoder(data)
-	got, err := decodeRefinementRegion(dec, p, nil)
+	got, err := decodeRefinementRegion(testBudget(), dec, p, nil)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestRefinementMQFlush(t *testing.T) {
 		RefDY:     0,
 	}
 	dec := newMQDecoder(fuzzData)
-	bm1, err := decodeRefinementRegion(dec, p, nil)
+	bm1, err := decodeRefinementRegion(testBudget(), dec, p, nil)
 	if err != nil {
 		t.Fatalf("initial decode failed: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestRefinementMQFlush(t *testing.T) {
 	encoded := encodeRefinementRegion(bm1, p)
 
 	dec2 := newMQDecoder(encoded)
-	bm2, err := decodeRefinementRegion(dec2, p, nil)
+	bm2, err := decodeRefinementRegion(testBudget(), dec2, p, nil)
 	if err != nil {
 		t.Fatalf("re-decode failed: %v", err)
 	}
@@ -224,7 +224,7 @@ func FuzzRefinementRoundTrip(f *testing.F) {
 			RefDY:     0,
 		}
 		dec := newMQDecoder(data)
-		bm1, err := decodeRefinementRegion(dec, p, nil)
+		bm1, err := decodeRefinementRegion(testBudget(), dec, p, nil)
 		if err != nil {
 			return
 		}
@@ -232,7 +232,7 @@ func FuzzRefinementRoundTrip(f *testing.F) {
 		encoded := encodeRefinementRegion(bm1, p)
 
 		dec2 := newMQDecoder(encoded)
-		bm2, err := decodeRefinementRegion(dec2, p, nil)
+		bm2, err := decodeRefinementRegion(testBudget(), dec2, p, nil)
 		if err != nil {
 			t.Fatalf("re-decode failed: %v", err)
 		}

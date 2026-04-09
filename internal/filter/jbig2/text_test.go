@@ -603,6 +603,16 @@ func TestTextRegionStrips(t *testing.T) {
 	}
 }
 
+func TestEncodeSymIDHuffTableRejectsLargeCodeLen(t *testing.T) {
+	// the RUNCODE scheme can only represent literal code lengths 0-31,
+	// so numSyms requiring codeLen > 31 must be rejected
+	w := &bitWriter{}
+	_, err := encodeSymIDHuffTable(w, 1<<31+1)
+	if err == nil {
+		t.Fatal("expected error for numSyms requiring codeLen > 31")
+	}
+}
+
 func FuzzTextRegionRoundTrip(f *testing.F) {
 	symbols := makeTextTestSymbols()
 

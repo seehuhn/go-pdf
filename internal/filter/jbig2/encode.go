@@ -670,8 +670,15 @@ type SymbolInstance struct {
 // encodeSymIDHuffTable writes the custom symbol-ID Huffman table to w
 // using run-length coding (§7.4.3.7) and returns the resulting table.
 // All symbols receive the same code length (uniform coding).
-func encodeSymIDHuffTable(w *bitWriter, numSyms int) *huffTable {
+// An error is returned if the code length exceeds 31 (the RUNCODE limit).
+func encodeSymIDHuffTable(w *bitWriter, numSyms int) (*huffTable, error) {
 	codeLen := textRegionSymCodeLen(numSyms)
+
+	// the RUNCODE scheme uses indices 0-31 for literal code lengths
+	// and 32-34 for run-length commands, so codeLen > 31 is unrepresentable
+	if codeLen > 31 {
+		return nil, fmt.Errorf("jbig2: symbol count %d requires code length %d, exceeds maximum 31", numSyms, codeLen)
+	}
 
 	// step 1: write 35 four-bit RUNCODE code lengths.
 	// Only the entry for code length `codeLen` is non-zero (prefix length 1).
@@ -728,7 +735,7 @@ func encodeSymIDHuffTable(w *bitWriter, numSyms int) *huffTable {
 	}
 	t := &huffTable{Lines: lines}
 	t.assignCodes()
-	return t
+	return t, nil
 }
 
 // EncodeTextRegionSegmentHuffman encodes a Huffman-coded text region segment.
@@ -821,7 +828,10 @@ func encodeTextRegionHuffman(
 	w := &bitWriter{}
 
 	// symbol ID table
-	symIDTable := encodeSymIDHuffTable(w, numSymbols)
+	symIDTable, err := encodeSymIDHuffTable(w, numSymbols)
+	if err != nil {
+		return nil, err
+	}
 
 	// initial STRIPT: encode 1 so stripT = -strips
 	// (B.11 minimum value is 1)
@@ -1158,20 +1168,10 @@ func halftoneATPositions(template int) (atx [4]int8, aty [4]int8) {
 }
 
 // encodeGrayScaleImage encodes a gray-scale image to bitplanes (Annex C).
-// grayValues is row-major [gsh][gsw]. Returns the concatenated MQ data.
-func encodeGrayScaleImage(grayValues []int, gsw, gsh, template int, skip *bitmap.Bitmap) []byte {
-	// determine bits per gray value
-	maxVal := 0
-	for _, v := range grayValues {
-		if v > maxVal {
-			maxVal = v
-		}
-	}
-	gsbpp := 1
-	for (1 << gsbpp) <= maxVal {
-		gsbpp++
-	}
-
+// grayValues is row-major [gsh][gsw]. gsbpp is the number of bitplanes
+// (bits per gray-scale pixel), which must equal ceil(log2(HNUMPATS)).
+// Returns the concatenated MQ data.
+func encodeGrayScaleImage(grayValues []int, gsw, gsh, gsbpp, template int, skip *bitmap.Bitmap) []byte {
 	// extract bitplanes from gray values
 	planes := make([]*bitmap.Bitmap, gsbpp)
 	for j := range gsbpp {
@@ -1224,19 +1224,9 @@ func encodeGrayScaleImage(grayValues []int, gsw, gsh, template int, skip *bitmap
 }
 
 // encodeGrayScaleImageMMR encodes a gray-scale image to MMR-coded bitplanes (Annex C).
-func encodeGrayScaleImageMMR(grayValues []int, gsw, gsh int) ([]byte, error) {
-	// determine bits per gray value
-	maxVal := 0
-	for _, v := range grayValues {
-		if v > maxVal {
-			maxVal = v
-		}
-	}
-	gsbpp := 1
-	for (1 << gsbpp) <= maxVal {
-		gsbpp++
-	}
-
+// gsbpp is the number of bitplanes (bits per gray-scale pixel),
+// which must equal ceil(log2(HNUMPATS)).
+func encodeGrayScaleImageMMR(grayValues []int, gsw, gsh, gsbpp int) ([]byte, error) {
 	// extract bitplanes from gray values
 	planes := make([]*bitmap.Bitmap, gsbpp)
 	for j := range gsbpp {
@@ -1295,6 +1285,7 @@ func encodeHalftoneRegionSegmentMMR(
 	width, height int,
 	grayValues []int, gsw, gsh int,
 	hgx, hgy, hrx, hry int,
+	hnumpats int,
 	combOp bitmap.CombOp,
 	enableSkip bool,
 ) ([]byte, error) {
@@ -1317,7 +1308,11 @@ func encodeHalftoneRegionSegmentMMR(
 	buf = appendUint16(buf, uint16(hry))
 
 	// encode gray-scale image
-	gsData, err := encodeGrayScaleImageMMR(grayValues, gsw, gsh)
+	gsbpp := bits.Len(uint(hnumpats - 1))
+	if gsbpp == 0 {
+		gsbpp = 1
+	}
+	gsData, err := encodeGrayScaleImageMMR(grayValues, gsw, gsh, gsbpp)
 	if err != nil {
 		return nil, err
 	}
@@ -1332,6 +1327,7 @@ func encodeHalftoneRegionSegment(
 	width, height int,
 	grayValues []int, gsw, gsh int,
 	hgx, hgy, hrx, hry int,
+	hnumpats int,
 	template int, combOp bitmap.CombOp,
 	enableSkip bool, hpw, hph int,
 ) []byte {
@@ -1360,7 +1356,11 @@ func encodeHalftoneRegionSegment(
 	}
 
 	// encode gray-scale image
-	buf = append(buf, encodeGrayScaleImage(grayValues, gsw, gsh, template, skip)...)
+	gsbpp := bits.Len(uint(hnumpats - 1))
+	if gsbpp == 0 {
+		gsbpp = 1
+	}
+	buf = append(buf, encodeGrayScaleImage(grayValues, gsw, gsh, gsbpp, template, skip)...)
 	return buf
 }
 

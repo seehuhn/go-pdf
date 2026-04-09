@@ -34,11 +34,11 @@ type refinementParams struct {
 }
 
 // decodeRefinementRegion decodes a generic refinement region.
-func decodeRefinementRegion(dec *mqDecoder, p *refinementParams, cx []byte) (*bitmap.Bitmap, error) {
-	if err := checkBitmapSize(p.Width, p.Height); err != nil {
+func decodeRefinementRegion(budget *int64, dec *mqDecoder, p *refinementParams, cx []byte) (*bitmap.Bitmap, error) {
+	bm, err := allocBitmap(budget, p.Width, p.Height)
+	if err != nil {
 		return nil, err
 	}
-	bm := bitmap.New(p.Width, p.Height)
 	if p.Width == 0 || p.Height == 0 {
 		return bm, nil
 	}

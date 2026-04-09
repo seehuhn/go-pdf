@@ -44,7 +44,7 @@ func TestEncodeMMRRoundTrip(t *testing.T) {
 			if err != nil {
 				t.Fatalf("encode: %v", err)
 			}
-			got, _, err := decodeMMR(data, tc.bm.Width(), tc.bm.Height())
+			got, _, err := decodeMMR(testBudget(), data, tc.bm.Width(), tc.bm.Height())
 			if err != nil {
 				t.Fatalf("decode: %v", err)
 			}
@@ -73,7 +73,7 @@ func TestEncodeMMRNonByteAligned(t *testing.T) {
 			if err != nil {
 				t.Fatalf("encode: %v", err)
 			}
-			got, _, err := decodeMMR(data, w, 10)
+			got, _, err := decodeMMR(testBudget(), data, w, 10)
 			if err != nil {
 				t.Fatalf("decode: %v", err)
 			}
@@ -132,11 +132,11 @@ func TestGrayScaleMMREncodeRoundTrip(t *testing.T) {
 		1, 3, 0, 2,
 	}
 
-	encoded, err := encodeGrayScaleImageMMR(grayValues, gsw, gsh)
+	encoded, err := encodeGrayScaleImageMMR(grayValues, gsw, gsh, 2)
 	if err != nil {
 		t.Fatalf("encode: %v", err)
 	}
-	decoded, err := decodeGrayScaleImage(encoded, true, 0, 2, gsw, gsh, false, nil)
+	decoded, err := decodeGrayScaleImage(testBudget(), encoded, true, 0, 2, gsw, gsh, false, nil)
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -173,6 +173,7 @@ func TestPatternDictMMRRoundTrip(t *testing.T) {
 	d := &decoder{
 		segments:  make(map[uint32]segmentResult),
 		inputSize: len(stream),
+		memBudget: 1 << 30,
 	}
 	if err := d.processStream(stream); err != nil {
 		t.Fatalf("decode: %v", err)
@@ -227,6 +228,7 @@ func TestHalftoneMMRRoundTrip(t *testing.T) {
 		width, height,
 		grayValues, gsw, gsh,
 		hgx, hgy, hrx, hry,
+		len(patterns),
 		bitmap.CombOpOR,
 		false,
 	)
@@ -404,7 +406,8 @@ func FuzzHalftoneMMRRoundTrip(f *testing.F) {
 	}
 	htData, err := encodeHalftoneRegionSegmentMMR(
 		width, height, grayValues, gsw, gsh,
-		0, 0, hrx, 0, bitmap.CombOpOR,
+		0, 0, hrx, 0, len(patterns),
+		bitmap.CombOpOR,
 		false,
 	)
 	if err != nil {
@@ -475,7 +478,7 @@ func FuzzMMRRoundTrip(f *testing.F) {
 		if err != nil {
 			t.Fatalf("encode failed: %v", err)
 		}
-		got, _, err := decodeMMR(data, width, height)
+		got, _, err := decodeMMR(testBudget(), data, width, height)
 		if err != nil {
 			t.Fatalf("decode failed: %v", err)
 		}

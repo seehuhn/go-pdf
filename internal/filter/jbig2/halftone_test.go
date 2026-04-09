@@ -33,8 +33,8 @@ func TestGrayScaleSingleBitplane(t *testing.T) {
 		0, 1, 0, 1,
 	}
 	tmpl := 1
-	encoded := encodeGrayScaleImage(grayValues, gsw, gsh, tmpl, nil)
-	decoded, err := decodeGrayScaleImage(encoded, false, tmpl, 1, gsw, gsh, false, nil)
+	encoded := encodeGrayScaleImage(grayValues, gsw, gsh, 1, tmpl, nil)
+	decoded, err := decodeGrayScaleImage(testBudget(), encoded, false, tmpl, 1, gsw, gsh, false, nil)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestGrayScaleMMRRoundTrip(t *testing.T) {
 	}
 
 	// decode using MMR mode
-	decoded, err := decodeGrayScaleImage(mmrData, true, 0, gsbpp, gsw, gsh, false, nil)
+	decoded, err := decodeGrayScaleImage(testBudget(), mmrData, true, 0, gsbpp, gsw, gsh, false, nil)
 	if err != nil {
 		t.Fatalf("decodeGrayScaleImage: %v", err)
 	}
@@ -130,8 +130,8 @@ func TestGrayScaleRoundTrip(t *testing.T) {
 
 	for _, tmpl := range []int{0, 1, 2, 3} {
 		t.Run(fmt.Sprintf("T%d", tmpl), func(t *testing.T) {
-			encoded := encodeGrayScaleImage(grayValues, gsw, gsh, tmpl, nil)
-			decoded, err := decodeGrayScaleImage(encoded, false, tmpl, 2, gsw, gsh, false, nil)
+			encoded := encodeGrayScaleImage(grayValues, gsw, gsh, 2, tmpl, nil)
+			decoded, err := decodeGrayScaleImage(testBudget(), encoded, false, tmpl, 2, gsw, gsh, false, nil)
 			if err != nil {
 				t.Fatalf("decode failed: %v", err)
 			}
@@ -176,6 +176,7 @@ func patternDictRoundTrip(t *testing.T, patterns []*bitmap.Bitmap, tmpl int) {
 	d := &decoder{
 		segments:  make(map[uint32]segmentResult),
 		inputSize: len(stream),
+		memBudget: 1 << 30,
 	}
 	if err := d.processStream(stream); err != nil {
 		t.Fatalf("decode failed: %v", err)
@@ -300,6 +301,7 @@ func TestHalftoneRoundTrip(t *testing.T) {
 				width, height,
 				grayValues, gsw, gsh,
 				hgx, hgy, hrx, hry,
+				len(patterns),
 				tmpl, bitmap.CombOpOR,
 				false, 0, 0,
 			)
@@ -358,6 +360,69 @@ func TestHalftoneRoundTrip(t *testing.T) {
 	}
 }
 
+// TestHalftoneRoundTripSparseGray tests that the encoder correctly handles
+// gray values that don't span the full pattern range. Before the fix,
+// the encoder would derive the bitplane count from max(grayValues) while
+// the decoder derives it from the pattern count, causing a mismatch.
+func TestHalftoneRoundTripSparseGray(t *testing.T) {
+	pw, ph := 8, 8
+	patterns := []*bitmap.Bitmap{
+		makeAllZeros(pw, ph),
+		makeCheckerboard(pw, ph),
+		makeDiagonal(pw, ph),
+		makeCenterBlock(pw, ph),
+	}
+
+	// only use patterns 0 and 1 (not 2 or 3)
+	gsw, gsh := 4, 3
+	grayValues := []int{
+		0, 1, 0, 1,
+		1, 0, 1, 0,
+		0, 1, 0, 1,
+	}
+
+	hrx := pw * 256
+	width := gsw * pw
+	height := gsh * ph
+
+	patData := encodePatternDictSegment(patterns, 1)
+	htData := encodeHalftoneRegionSegment(
+		width, height,
+		grayValues, gsw, gsh,
+		0, 0, hrx, 0,
+		len(patterns),
+		1, bitmap.CombOpOR,
+		false, 0, 0,
+	)
+
+	var stream []byte
+	stream = WriteSegmentHeader(stream, 0, segPatternDict, 0, nil, uint32(len(patData)))
+	stream = append(stream, patData...)
+	pageData := WritePageInfo(nil, width, height)
+	stream = WriteSegmentHeader(stream, 1, segPageInfo, 1, nil, uint32(len(pageData)))
+	stream = append(stream, pageData...)
+	stream = WriteSegmentHeader(stream, 2, segImmediateHalftone, 1, []uint32{0}, uint32(len(htData)))
+	stream = append(stream, htData...)
+
+	got, err := Decode(nil, stream)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+
+	expected := bitmap.New(width, height)
+	for mg := range gsh {
+		for ng := range gsw {
+			gi := grayValues[mg*gsw+ng]
+			pat := patterns[gi]
+			expected.Combine(pat, ng*pw, mg*ph, bitmap.CombOpOR)
+		}
+	}
+
+	if !bitmapsEqual(got, expected) {
+		t.Error("round-trip mismatch for sparse gray values")
+	}
+}
+
 // TestIntermediateHalftoneRoundTrip tests intermediate halftone region
 // (type 20) stored as auxiliary buffer, then referenced by a refinement.
 func TestIntermediateHalftoneRoundTrip(t *testing.T) {
@@ -378,7 +443,8 @@ func TestIntermediateHalftoneRoundTrip(t *testing.T) {
 	patData := encodePatternDictSegment(patterns, 1)
 	htData := encodeHalftoneRegionSegment(
 		width, height, grayValues, gsw, gsh,
-		0, 0, hrx, 0, 1, bitmap.CombOpOR,
+		0, 0, hrx, 0, len(patterns),
+		1, bitmap.CombOpOR,
 		false, 0, 0)
 
 	// build expected bitmap
@@ -449,7 +515,8 @@ func FuzzHalftoneRoundTrip(f *testing.F) {
 		patData := encodePatternDictSegment(patterns, tmpl)
 		htData := encodeHalftoneRegionSegment(
 			width, height, grayValues, gsw, gsh,
-			0, 0, hrx, 0, tmpl, bitmap.CombOpOR,
+			0, 0, hrx, 0, len(patterns),
+			tmpl, bitmap.CombOpOR,
 			false, 0, 0,
 		)
 

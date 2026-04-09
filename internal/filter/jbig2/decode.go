@@ -28,26 +28,49 @@ import (
 )
 
 const (
-	// maximum total pixels (width * height) for a page or region bitmap
+	// maximum total pixels (width * height) for a single bitmap
 	// (300 dpi A4 ≈ 8.7M pixels; 16M gives comfortable headroom)
 	maxPixels = 1 << 24
 
-	// maximum total pixels for a single symbol bitmap
-	// (largest practical symbol: ~100x100 at 300dpi)
-	maxSymbolPixels = 1 << 14
+	// maxBitmapBytes is the maximum byte cost ((width+7)/8 * height)
+	// for a single bitmap.  This bounds the memory overhead from row
+	// padding in narrow bitmaps: a 1-pixel-wide bitmap at maxPixels
+	// height would cost maxPixels bytes (16 MB), far more than the
+	// 2 MB needed for a square bitmap of the same pixel count.
+	// 4 MB accommodates all realistic aspect ratios (W ≥ 8 always
+	// yields ≤ 2 MB) while rejecting pathological cases.
+	maxBitmapBytes = 4 << 20
 
-	// maximum ratio of output pixel bytes to input stream bytes
-	maxExpansion = 8192
+	// baseBudget is the minimum memory budget for every decode,
+	// regardless of input size.  Region segments are decoded into a
+	// temporary bitmap and composited onto the page, so both the
+	// page bitmap and one region bitmap coexist at peak.
+	baseBudget = 2 * maxBitmapBytes
 
 	// maximum IAID code length (limits context array to 1 MB)
 	maxIAIDCodeLen = 20
 
 	// maximum number of referred-to segments in a segment header
 	maxRefCount = 1 << 16
+
+	// maximum number of instances in multi-instance aggregation
+	maxAggInstances = 1 << 14
+
+	// maximum halftone bitplanes (65536 grey levels)
+	maxBitplanes = 16
+
+	// budgetMultiplier is the number of bytes of bitmap data the
+	// decoder may allocate per byte of input data.
+	budgetMultiplier = 1024
+
+	// budgetHardCap is the absolute upper bound on the memory budget,
+	// regardless of input size.
+	budgetHardCap = 64 << 20 // 64 MB
 )
 
-// checkBitmapSize returns an error if dimensions are negative or if
-// width*height exceeds maxPixels.
+// checkBitmapSize returns an error if dimensions are negative, if
+// width*height exceeds maxPixels, or if the byte cost exceeds
+// maxBitmapBytes.
 func checkBitmapSize(width, height int) error {
 	if width < 0 || height < 0 {
 		return fmt.Errorf("negative bitmap dimensions: %d x %d", width, height)
@@ -58,16 +81,104 @@ func checkBitmapSize(width, height int) error {
 	if int64(width)*int64(height) > maxPixels {
 		return fmt.Errorf("bitmap too large: %d x %d", width, height)
 	}
+	if int64(width+7)/8*int64(height) > maxBitmapBytes {
+		return fmt.Errorf("bitmap too large: %d x %d", width, height)
+	}
 	return nil
+}
+
+// allocBitmap validates dimensions, checks the memory budget, and allocates
+// a new bitmap. The budget is decremented by the bitmap's Pix size.
+func allocBitmap(budget *int64, w, h int) (*bitmap.Bitmap, error) {
+	if err := checkBitmapSize(w, h); err != nil {
+		return nil, err
+	}
+	if w <= 0 || h <= 0 {
+		return bitmap.New(w, h), nil
+	}
+	cost := int64(w+7) / 8 * int64(h)
+	if *budget < cost {
+		return nil, errors.New("jbig2: memory budget exceeded")
+	}
+	*budget -= cost
+	return bitmap.New(w, h), nil
+}
+
+// freeBitmap returns a bitmap's Pix budget. Use this when a temporary
+// bitmap (e.g. a per-instance refinement bitmap) is no longer needed.
+func freeBitmap(budget *int64, bm *bitmap.Bitmap) {
+	if bm != nil {
+		*budget += int64(len(bm.Pix))
+	}
+}
+
+// freeInts returns a []int slice's budget.
+func freeInts(budget *int64, s []int) {
+	*budget += int64(len(s)) * 8
+}
+
+// allocInts checks the memory budget and allocates a []int slice.
+// The budget is decremented by n * 8 bytes (size of int on 64-bit).
+func allocInts(budget *int64, n int) ([]int, error) {
+	if n < 0 {
+		return nil, errors.New("jbig2: negative allocation size")
+	}
+	cost := int64(n) * 8
+	if cost/8 != int64(n) {
+		return nil, errors.New("jbig2: allocation size overflow")
+	}
+	if *budget < cost {
+		return nil, errors.New("jbig2: memory budget exceeded")
+	}
+	*budget -= cost
+	return make([]int, n), nil
+}
+
+// allocPointers checks the memory budget and allocates a []*bitmap.Bitmap slice.
+// The budget is decremented by n * 8 bytes (pointer size on 64-bit).
+func allocPointers(budget *int64, n int) ([]*bitmap.Bitmap, error) {
+	if n < 0 {
+		return nil, errors.New("jbig2: negative allocation size")
+	}
+	cost := int64(n) * 8
+	if cost/8 != int64(n) {
+		return nil, errors.New("jbig2: allocation size overflow")
+	}
+	if *budget < cost {
+		return nil, errors.New("jbig2: memory budget exceeded")
+	}
+	*budget -= cost
+	return make([]*bitmap.Bitmap, n), nil
+}
+
+// checkedMul returns a*b and an error if the multiplication overflows int.
+func checkedMul(a, b int) (int, error) {
+	if a < 0 || b < 0 {
+		return 0, fmt.Errorf("jbig2: negative operand in multiplication: %d * %d", a, b)
+	}
+	if a == 0 || b == 0 {
+		return 0, nil
+	}
+	c := a * b
+	if c/a != b {
+		return 0, fmt.Errorf("jbig2: multiplication overflow: %d * %d", a, b)
+	}
+	if c < 0 {
+		return 0, fmt.Errorf("jbig2: multiplication overflow: %d * %d", a, b)
+	}
+	return c, nil
 }
 
 // Decode decodes a JBIG2 image from PDF globals and page streams.
 // The globals stream may be nil if there are no global segments.
 func Decode(globals, page []byte) (*bitmap.Bitmap, error) {
+	inputSize := len(globals) + len(page)
+	budget := int64(baseBudget) + min(int64(budgetMultiplier)*int64(inputSize), budgetHardCap)
 	d := &decoder{
 		segments:         make(map[uint32]segmentResult),
-		inputSize:        len(globals) + len(page),
+		inputSize:        inputSize,
 		prescannedHeight: prescanPageHeight(page),
+		memBudget:        budget,
 	}
 
 	// parse global segments (page association 0)
@@ -137,8 +248,9 @@ type decoder struct {
 	pageBitmap       *bitmap.Bitmap
 	pageWidth        int
 	pageHeight       int
-	inputSize        int // total input bytes (globals + page)
-	prescannedHeight int // from prescanPageHeight; -1 if not available
+	inputSize        int   // total input bytes (globals + page)
+	prescannedHeight int   // from prescanPageHeight; -1 if not available
+	memBudget        int64 // remaining memory budget in bytes
 }
 
 func (d *decoder) processStream(data []byte) error {
@@ -228,14 +340,11 @@ func (d *decoder) processPageInfo(data []byte) error {
 	defaultPixel := flags&0x04 != 0
 
 	if d.pageHeight > 0 {
-		if err := checkBitmapSize(d.pageWidth, d.pageHeight); err != nil {
+		var err error
+		d.pageBitmap, err = allocBitmap(&d.memBudget, d.pageWidth, d.pageHeight)
+		if err != nil {
 			return err
 		}
-		pixelBytes := int64(d.pageWidth+7) / 8 * int64(d.pageHeight)
-		if d.inputSize > 0 && pixelBytes > int64(d.inputSize)*maxExpansion {
-			return errors.New("page bitmap too large for input size")
-		}
-		d.pageBitmap = bitmap.New(d.pageWidth, d.pageHeight)
 		if defaultPixel { // fill with 1 bits (black)
 			for i := range d.pageBitmap.Pix {
 				d.pageBitmap.Pix[i] = 0xFF
@@ -316,24 +425,16 @@ func (d *decoder) processGenericRegion(hdr *segmentHeader, data []byte) error {
 	}
 
 	// decode the bitmap
-	if err := checkBitmapSize(p.Width, p.Height); err != nil {
-		return err
-	}
-	pixelBytes := int64(p.Width+7) / 8 * int64(p.Height)
-	if d.inputSize > 0 && pixelBytes > int64(d.inputSize)*maxExpansion {
-		return fmt.Errorf("generic region %dx%d too large for %d bytes of input",
-			p.Width, p.Height, d.inputSize)
-	}
 	var bm *bitmap.Bitmap
 	var err error
 	if mmr {
-		bm, _, err = decodeMMR(data[offset:], p.Width, p.Height)
+		bm, _, err = decodeMMR(&d.memBudget, data[offset:], p.Width, p.Height)
 		if err != nil {
 			return err
 		}
 	} else {
 		dec := newMQDecoder(data[offset:])
-		bm, err = decodeGenericRegion(dec, p, nil)
+		bm, err = decodeGenericRegion(&d.memBudget, dec, p, nil)
 		if err != nil {
 			return err
 		}
@@ -342,9 +443,10 @@ func (d *decoder) processGenericRegion(hdr *segmentHeader, data []byte) error {
 	// composite onto page (skip for intermediate segments)
 	if hdr.Type != segIntermediateGeneric && d.pageBitmap != nil {
 		d.pageBitmap.Combine(bm, int(rsi.X), int(rsi.Y), rsi.CombOp)
+		freeBitmap(&d.memBudget, bm)
+		bm = nil
 	}
 
-	// store for potential reference
 	d.segments[hdr.Number] = segmentResult{header: hdr, bm: bm}
 	return nil
 }
@@ -373,17 +475,9 @@ func (d *decoder) processRefinementRegion(hdr *segmentHeader, data []byte) error
 		offset = 22
 	}
 
-	if err := checkBitmapSize(int(rsi.Width), int(rsi.Height)); err != nil {
-		return err
-	}
-	pixelBytes := int64(rsi.Width+7) / 8 * int64(rsi.Height)
-	if d.inputSize > 0 && pixelBytes > int64(d.inputSize)*maxExpansion {
-		return fmt.Errorf("refinement region %dx%d too large for %d bytes of input",
-			rsi.Width, rsi.Height, d.inputSize)
-	}
-
 	// obtain reference bitmap
 	var ref *bitmap.Bitmap
+	var freeRef bool
 	if len(hdr.RefSegments) > 0 {
 		// case d: reference from a referred-to segment
 		seg, ok := d.segments[hdr.RefSegments[0]]
@@ -400,12 +494,17 @@ func (d *decoder) processRefinementRegion(hdr *segmentHeader, data []byte) error
 		h := int(rsi.Height)
 		x0 := int(rsi.X)
 		y0 := int(rsi.Y)
-		ref = bitmap.New(w, h)
+		var err error
+		ref, err = allocBitmap(&d.memBudget, w, h)
+		if err != nil {
+			return err
+		}
 		for py := range h {
 			for px := range w {
 				ref.SetPixel(px, py, d.pageBitmap.GetPixel(x0+px, y0+py))
 			}
 		}
+		freeRef = true
 	}
 
 	p := &refinementParams{
@@ -419,7 +518,10 @@ func (d *decoder) processRefinementRegion(hdr *segmentHeader, data []byte) error
 	copy(p.ATY[:], aty[:])
 
 	dec := newMQDecoder(data[offset:])
-	bm, err := decodeRefinementRegion(dec, p, nil)
+	bm, err := decodeRefinementRegion(&d.memBudget, dec, p, nil)
+	if freeRef {
+		freeBitmap(&d.memBudget, ref)
+	}
 	if err != nil {
 		return err
 	}
@@ -433,6 +535,8 @@ func (d *decoder) processRefinementRegion(hdr *segmentHeader, data []byte) error
 			// case c: replace the page buffer region
 			d.pageBitmap.Combine(bm, int(rsi.X), int(rsi.Y), bitmap.CombOpReplace)
 		}
+		freeBitmap(&d.memBudget, bm)
+		bm = nil
 	}
 
 	d.segments[hdr.Number] = segmentResult{header: hdr, bm: bm}
@@ -594,7 +698,7 @@ func (d *decoder) processTextRegion(hdr *segmentHeader, data []byte) error {
 	offset += 4
 
 	// each instance needs at least a few bits of encoded data
-	if numInstances > len(data)*8 {
+	if int64(numInstances) > int64(len(data))*8 {
 		return fmt.Errorf("text region: %d instances too large for %d bytes of data",
 			numInstances, len(data))
 	}
@@ -669,7 +773,7 @@ func (d *decoder) processTextRegion(hdr *segmentHeader, data []byte) error {
 		copy(hp.RATX[:], ratx[:])
 		copy(hp.RATY[:], raty[:])
 
-		bm, err = decodeTextRegionHuffman(hr, hp)
+		bm, err = decodeTextRegionHuffman(&d.memBudget, hr, hp)
 		if err != nil {
 			return err
 		}
@@ -696,7 +800,7 @@ func (d *decoder) processTextRegion(hdr *segmentHeader, data []byte) error {
 
 		dec := newMQDecoder(data[offset:])
 		var err error
-		bm, err = decodeTextRegion(dec, p)
+		bm, err = decodeTextRegion(&d.memBudget, dec, p)
 		if err != nil {
 			return err
 		}
@@ -705,6 +809,8 @@ func (d *decoder) processTextRegion(hdr *segmentHeader, data []byte) error {
 	// composite onto page (skip for intermediate segments)
 	if hdr.Type != segIntermediateTextRegion && d.pageBitmap != nil {
 		d.pageBitmap.Combine(bm, int(rsi.X), int(rsi.Y), rsi.CombOp)
+		freeBitmap(&d.memBudget, bm)
+		bm = nil
 	}
 
 	d.segments[hdr.Number] = segmentResult{header: hdr, bm: bm}
@@ -713,11 +819,14 @@ func (d *decoder) processTextRegion(hdr *segmentHeader, data []byte) error {
 
 // splitBitmapH splits a collective bitmap horizontally into sub-bitmaps
 // with the given widths. All sub-bitmaps have the same height as src.
-func splitBitmapH(src *bitmap.Bitmap, widths []int) []*bitmap.Bitmap {
+func splitBitmapH(budget *int64, src *bitmap.Bitmap, widths []int) ([]*bitmap.Bitmap, error) {
 	result := make([]*bitmap.Bitmap, len(widths))
 	xOff := 0
 	for i, w := range widths {
-		sub := bitmap.New(w, src.Height())
+		sub, err := allocBitmap(budget, w, src.Height())
+		if err != nil {
+			return nil, err
+		}
 		for y := range src.Height() {
 			for x := range w {
 				sub.SetPixel(x, y, src.GetPixel(xOff+x, y))
@@ -726,5 +835,5 @@ func splitBitmapH(src *bitmap.Bitmap, widths []int) []*bitmap.Bitmap {
 		result[i] = sub
 		xOff += w
 	}
-	return result
+	return result, nil
 }

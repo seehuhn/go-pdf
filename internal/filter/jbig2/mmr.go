@@ -27,12 +27,9 @@ import (
 
 // decodeMMR decodes an MMR-coded (CCITT Group 4) generic region.
 // It returns the decoded bitmap and the number of bytes consumed from data.
-func decodeMMR(data []byte, width, height int) (*bitmap.Bitmap, int, error) {
+func decodeMMR(budget *int64, data []byte, width, height int) (*bitmap.Bitmap, int, error) {
 	if width <= 0 || height <= 0 {
 		return bitmap.New(0, 0), 0, nil
-	}
-	if err := checkBitmapSize(width, height); err != nil {
-		return nil, 0, err
 	}
 	stride := (width + 7) / 8
 
@@ -48,7 +45,10 @@ func decodeMMR(data []byte, width, height int) (*bitmap.Bitmap, int, error) {
 		return nil, 0, fmt.Errorf("MMR decode: %w", err)
 	}
 
-	bm := bitmap.New(width, height)
+	bm, err := allocBitmap(budget, width, height)
+	if err != nil {
+		return nil, 0, err
+	}
 
 	buf := make([]byte, stride)
 	for y := range height {

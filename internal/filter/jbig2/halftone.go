@@ -74,13 +74,19 @@ func (d *decoder) processHalftoneRegion(hdr *segmentHeader, data []byte) error {
 		hbpp = 1
 	}
 
+	// validate grid dimensions to prevent overflow in loops and allocations
+	if _, err := checkedMul(hgw, hgh); err != nil {
+		return fmt.Errorf("halftone grid: %w", err)
+	}
+
 	// compute skip bitmap if enabled (§6.6.5.1)
 	var hskip *bitmap.Bitmap
 	if henableSkip {
-		if err := checkBitmapSize(hgw, hgh); err != nil {
+		var err error
+		hskip, err = allocBitmap(&d.memBudget, hgw, hgh)
+		if err != nil {
 			return err
 		}
-		hskip = bitmap.New(hgw, hgh)
 		for mg := range hgh {
 			for ng := range hgw {
 				x := (hgx + mg*hry + ng*hrx) >> 8
@@ -93,16 +99,16 @@ func (d *decoder) processHalftoneRegion(hdr *segmentHeader, data []byte) error {
 	}
 
 	// decode gray-scale image (Annex C)
-	grayImage, err := decodeGrayScaleImage(data[offset:], hmmr, htemplate, hbpp, hgw, hgh, henableSkip, hskip)
+	grayImage, err := decodeGrayScaleImage(&d.memBudget, data[offset:], hmmr, htemplate, hbpp, hgw, hgh, henableSkip, hskip)
 	if err != nil {
 		return err
 	}
 
 	// fill region with default pixel (§6.6.5.2 step 1)
-	if err := checkBitmapSize(int(rsi.Width), int(rsi.Height)); err != nil {
+	bm, err := allocBitmap(&d.memBudget, int(rsi.Width), int(rsi.Height))
+	if err != nil {
 		return err
 	}
-	bm := bitmap.New(int(rsi.Width), int(rsi.Height))
 	if hdefPixel {
 		for i := range bm.Pix {
 			bm.Pix[i] = 0xFF
@@ -129,10 +135,15 @@ func (d *decoder) processHalftoneRegion(hdr *segmentHeader, data []byte) error {
 		}
 	}
 
+	freeBitmap(&d.memBudget, hskip)
+	freeInts(&d.memBudget, grayImage)
+
 	// composite onto page (skip for intermediate segments)
 	if hdr.Type != segIntermediateHalftone && d.pageBitmap != nil {
 		op := bitmap.CombOp(rsi.CombOp)
 		d.pageBitmap.Combine(bm, int(rsi.X), int(rsi.Y), op)
+		freeBitmap(&d.memBudget, bm)
+		bm = nil
 	}
 
 	d.segments[hdr.Number] = segmentResult{header: hdr, bm: bm}
@@ -142,35 +153,42 @@ func (d *decoder) processHalftoneRegion(hdr *segmentHeader, data []byte) error {
 // decodeGrayScaleImage decodes a gray-scale image from bitplanes (Annex C).
 // Returns a flat array of gray-scale values, row-major [hgh][hgw].
 func decodeGrayScaleImage(
+	budget *int64,
 	data []byte,
 	gsmmr bool, gstemplate int,
 	gsbpp, gsw, gsh int,
 	useSkip bool, skip *bitmap.Bitmap,
 ) ([]int, error) {
-	if int64(gsw)*int64(gsh) > maxPixels {
-		return nil, fmt.Errorf("gray-scale image too large: %d x %d", gsw, gsh)
+	if gsbpp > maxBitplanes {
+		return nil, fmt.Errorf("jbig2: %d bitplanes exceeds maximum %d", gsbpp, maxBitplanes)
 	}
-	if int64(gsw)*int64(gsh) > int64(len(data))*maxExpansion {
-		return nil, fmt.Errorf("gray-scale image %dx%d too large for %d bytes of data", gsw, gsh, len(data))
-	}
-	result := make([]int, gsw*gsh)
 
-	// decode GSBPP bitplanes (§C.5.1)
-	planes := make([]*bitmap.Bitmap, gsbpp)
+	n, err := checkedMul(gsw, gsh)
+	if err != nil {
+		return nil, err
+	}
+	result, err := allocInts(budget, n)
+	if err != nil {
+		return nil, err
+	}
+
+	// decode bitplanes incrementally (§C.5.1)
+	// Instead of allocating all gsbpp bitmaps simultaneously, we use two:
+	// running (cumulative XOR) and current (just decoded).
+	// After XOR, running holds the final Gray-decoded value for bit j.
+	var running *bitmap.Bitmap
 	dataOffset := 0
 
 	for j := gsbpp - 1; j >= 0; j-- {
+		var current *bitmap.Bitmap
 		if gsmmr {
-			// MMR-coded bitplane
 			var n int
-			var err error
-			planes[j], n, err = decodeMMR(data[dataOffset:], gsw, gsh)
+			current, n, err = decodeMMR(budget, data[dataOffset:], gsw, gsh)
 			if err != nil {
 				return nil, err
 			}
 			dataOffset += n
 		} else {
-			// arithmetic-coded bitplane
 			p := &genericRegionParams{
 				Width:    gsw,
 				Height:   gsh,
@@ -180,18 +198,15 @@ func decodeGrayScaleImage(
 				p.UseSkip = true
 				p.Skip = skip
 			}
-			// AT pixel positions for gray-scale (Table C.4)
 			atx, aty := halftoneATPositions(gstemplate)
 			copy(p.ATX[:], atx[:])
 			copy(p.ATY[:], aty[:])
 
 			dec := newMQDecoder(data[dataOffset:])
-			var err error
-			planes[j], err = decodeGenericRegion(dec, p, nil)
+			current, err = decodeGenericRegion(budget, dec, p, nil)
 			if err != nil {
 				return nil, err
 			}
-			// advance past the MQ data consumed
 			dataOffset += dec.bp + 1
 			if dataOffset > len(data) {
 				dataOffset = len(data)
@@ -199,29 +214,25 @@ func decodeGrayScaleImage(
 		}
 
 		// Gray-code XOR (§C.5.1 step 3b)
-		if j < gsbpp-1 {
-			for y := range gsh {
-				for x := range gsw {
-					above := planes[j+1].GetPixel(x, y)
-					cur := planes[j].GetPixel(x, y)
-					planes[j].SetPixel(x, y, above != cur)
-				}
+		if running == nil {
+			running = current
+		} else {
+			for i := range running.Pix {
+				running.Pix[i] ^= current.Pix[i]
 			}
+			freeBitmap(budget, current)
 		}
-	}
 
-	// assemble bitplanes into gray-scale values (§C.5.1 step 4)
-	for y := range gsh {
-		for x := range gsw {
-			v := 0
-			for j := range gsbpp {
-				if planes[j].GetPixel(x, y) {
-					v |= 1 << j
+		// accumulate bit j into gray-scale values (§C.5.1 step 4)
+		for y := range gsh {
+			for x := range gsw {
+				if running.GetPixel(x, y) {
+					result[y*gsw+x] |= 1 << j
 				}
 			}
-			result[y*gsw+x] = v
 		}
 	}
+	freeBitmap(budget, running)
 
 	return result, nil
 }

@@ -324,6 +324,7 @@ func TestCustomTableSymbolDict(t *testing.T) {
 	d := &decoder{
 		segments:  make(map[uint32]segmentResult),
 		inputSize: len(stream),
+		memBudget: 1 << 30,
 	}
 	if err := d.processStream(stream); err != nil {
 		t.Fatalf("decode failed: %v", err)

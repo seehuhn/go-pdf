@@ -54,11 +54,11 @@ type textRegionParams struct {
 }
 
 // decodeTextRegion decodes a text region bitmap using arithmetic coding.
-func decodeTextRegion(dec *mqDecoder, p *textRegionParams) (*bitmap.Bitmap, error) {
-	if err := checkBitmapSize(p.Width, p.Height); err != nil {
+func decodeTextRegion(budget *int64, dec *mqDecoder, p *textRegionParams) (*bitmap.Bitmap, error) {
+	bm, err := allocBitmap(budget, p.Width, p.Height)
+	if err != nil {
 		return nil, err
 	}
-	bm := bitmap.New(p.Width, p.Height)
 	if p.DefPixel != 0 {
 		for i := range bm.Pix {
 			bm.Pix[i] = 0xFF
@@ -150,7 +150,7 @@ func decodeTextRegion(dec *mqDecoder, p *textRegionParams) (*bitmap.Bitmap, erro
 				copy(rp.ATX[:], p.RATX[:])
 				copy(rp.ATY[:], p.RATY[:])
 				var err error
-				ib, err = decodeRefinementRegion(dec, rp, nil)
+				ib, err = decodeRefinementRegion(budget, dec, rp, nil)
 				if err != nil {
 					return nil, err
 				}
@@ -202,6 +202,9 @@ func decodeTextRegion(dec *mqDecoder, p *textRegionParams) (*bitmap.Bitmap, erro
 
 			// composite symbol (§6.4.5 step 3c-ix)
 			bm.Combine(ib, int(px), int(py), p.CombOp)
+			if ri != 0 {
+				freeBitmap(budget, ib)
+			}
 
 			// update CURS after placement (§6.4.5 step 3c-x)
 			if !p.Transposed {
@@ -256,11 +259,11 @@ type textRegionHuffParams struct {
 }
 
 // decodeTextRegionHuffman decodes a Huffman-coded text region.
-func decodeTextRegionHuffman(hr *huffReader, p *textRegionHuffParams) (*bitmap.Bitmap, error) {
-	if err := checkBitmapSize(p.Width, p.Height); err != nil {
+func decodeTextRegionHuffman(budget *int64, hr *huffReader, p *textRegionHuffParams) (*bitmap.Bitmap, error) {
+	bm, err := allocBitmap(budget, p.Width, p.Height)
+	if err != nil {
 		return nil, err
 	}
-	bm := bitmap.New(p.Width, p.Height)
 	if p.DefPixel != 0 {
 		for i := range bm.Pix {
 			bm.Pix[i] = 0xFF
@@ -329,7 +332,7 @@ func decodeTextRegionHuffman(hr *huffReader, p *textRegionHuffParams) (*bitmap.B
 
 				hr.align()
 				offset := hr.offset()
-				if offset+rsize > len(hr.data) {
+				if rsize < 0 || rsize > len(hr.data) || offset+rsize > len(hr.data) {
 					nInstances++
 					continue
 				}
@@ -348,7 +351,7 @@ func decodeTextRegionHuffman(hr *huffReader, p *textRegionHuffParams) (*bitmap.B
 
 				dec := newMQDecoder(hr.data[offset : offset+rsize])
 				var err error
-				ib, err = decodeRefinementRegion(dec, rp, nil)
+				ib, err = decodeRefinementRegion(budget, dec, rp, nil)
 				if err != nil {
 					return nil, err
 				}
@@ -401,6 +404,9 @@ func decodeTextRegionHuffman(hr *huffReader, p *textRegionHuffParams) (*bitmap.B
 			}
 
 			bm.Combine(ib, int(px), int(py), p.CombOp)
+			if ri != 0 {
+				freeBitmap(budget, ib)
+			}
 
 			// CURS post-update (§6.4.5 step 3c-x)
 			if !p.Transposed {

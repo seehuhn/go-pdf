@@ -83,6 +83,12 @@ func makeCenterBlock(w, h int) *bitmap.Bitmap {
 	return bm
 }
 
+// testBudget returns a generous memory budget for tests.
+func testBudget() *int64 {
+	b := int64(1 << 30)
+	return &b
+}
+
 func bitmapsEqual(a, b *bitmap.Bitmap) bool {
 	if a.Width() != b.Width() || a.Height() != b.Height() {
 		return false
@@ -148,7 +154,7 @@ func TestGenericRegionRoundTrip(t *testing.T) {
 				data := enc.bytes()
 
 				dec := newMQDecoder(data)
-				got, err := decodeGenericRegion(dec, p, nil)
+				got, err := decodeGenericRegion(testBudget(), dec, p, nil)
 				if err != nil {
 					t.Fatalf("decode error: %v", err)
 				}

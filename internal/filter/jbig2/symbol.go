@@ -88,6 +88,10 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 		return nil, fmt.Errorf("symbol count %d too large for %d bytes of data",
 			sdNumNewSyms, len(data))
 	}
+	if sdNumExSyms > len(data) {
+		return nil, fmt.Errorf("export count %d too large for %d bytes of data",
+			sdNumExSyms, len(data))
+	}
 
 	// collect input symbols from referred segments
 	var inputSymbols []*bitmap.Bitmap
@@ -105,7 +109,10 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 
 	// arithmetic symbol dictionary decoding
 	dec := newMQDecoder(data[offset:])
-	newSymbols := make([]*bitmap.Bitmap, sdNumNewSyms)
+	newSymbols, err := allocPointers(&d.memBudget, sdNumNewSyms)
+	if err != nil {
+		return nil, err
+	}
 
 	iadh := &intCtx{}
 	iadw := &intCtx{}
@@ -157,10 +164,6 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 			if symWidth <= 0 || hcHeight <= 0 {
 				return nil, fmt.Errorf("invalid symbol dimensions: %dx%d", symWidth, hcHeight)
 			}
-			if symWidth > maxSymbolPixels || hcHeight > maxSymbolPixels ||
-				symWidth*hcHeight > maxSymbolPixels {
-				return nil, fmt.Errorf("symbol %dx%d exceeds maximum size", symWidth, hcHeight)
-			}
 
 			iSymWidth := int(symWidth)
 			iHcHeight := int(hcHeight)
@@ -175,7 +178,7 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 				copy(p.ATX[:], sdATX[:])
 				copy(p.ATY[:], sdATY[:])
 				var err error
-				newSymbols[nDecoded], err = decodeGenericRegion(dec, p, gbCx)
+				newSymbols[nDecoded], err = decodeGenericRegion(&d.memBudget, dec, p, gbCx)
 				if err != nil {
 					return nil, err
 				}
@@ -208,14 +211,14 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 					}
 					copy(rp.ATX[:], sdrATX[:])
 					copy(rp.ATY[:], sdrATY[:])
-					sym, err := decodeRefinementRegion(dec, rp, grCx)
+					sym, err := decodeRefinementRegion(&d.memBudget, dec, rp, grCx)
 					if err != nil {
 						return nil, err
 					}
 					newSymbols[nDecoded] = sym
 				} else {
 					// multi-instance aggregation via inline text region (§6.5.8.2.3)
-					if refAggNInst > maxSymbolPixels {
+					if refAggNInst > maxAggInstances {
 						return nil, fmt.Errorf("REFAGGNINST %d exceeds limit", refAggNInst)
 					}
 					allSyms := make([]*bitmap.Bitmap, len(inputSymbols)+nDecoded)
@@ -233,7 +236,7 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 						CombOp:       bitmap.CombOpOR,
 						RefCorner:    cornerBottomLeft,
 					}
-					sym, err := decodeTextRegion(dec, tp)
+					sym, err := decodeTextRegion(&d.memBudget, dec, tp)
 					if err != nil {
 						return nil, fmt.Errorf("multi-instance aggregation: %w", err)
 					}
@@ -382,8 +385,14 @@ func (d *decoder) decodeSymbolDictHuffman(
 	}
 
 	hr := newHuffReader(data)
-	newSymbols := make([]*bitmap.Bitmap, sdNumNewSyms)
-	newSymWidths := make([]int, sdNumNewSyms)
+	newSymbols, err := allocPointers(&d.memBudget, sdNumNewSyms)
+	if err != nil {
+		return nil, err
+	}
+	newSymWidths, err := allocInts(&d.memBudget, sdNumNewSyms)
+	if err != nil {
+		return nil, err
+	}
 
 	var hcHeight int64
 	nDecoded := 0
@@ -411,10 +420,6 @@ func (d *decoder) decodeSymbolDictHuffman(
 
 			if symWidth <= 0 || hcHeight <= 0 {
 				return nil, fmt.Errorf("invalid symbol dimensions: %dx%d", symWidth, hcHeight)
-			}
-			if symWidth > maxSymbolPixels || hcHeight > maxSymbolPixels ||
-				symWidth*hcHeight > maxSymbolPixels {
-				return nil, fmt.Errorf("symbol %dx%d exceeds maximum size", symWidth, hcHeight)
 			}
 
 			totWidth += symWidth
@@ -449,21 +454,23 @@ func (d *decoder) decodeSymbolDictHuffman(
 			}
 
 			// collective bitmap: totWidth * hcHeight
-			if err := checkBitmapSize(iTotWidth, iHcHeight); err != nil {
-				return nil, err
-			}
-
 			var collectiveBM *bitmap.Bitmap
 			if bmSize == 0 {
 				// uncompressed: read raw bytes
 				rawStride := (iTotWidth + 7) / 8
-				rawSize := iHcHeight * rawStride
-				if hr.offset()+rawSize > len(data) {
+				rawSize, err := checkedMul(iHcHeight, rawStride)
+				if err != nil {
+					return nil, fmt.Errorf("uncompressed bitmap overflows: %w", err)
+				}
+				if hr.offset()+rawSize > len(data) || hr.offset()+rawSize < 0 {
 					return nil, fmt.Errorf("uncompressed bitmap overflows: offset=%d size=%d totWidth=%d hcHeight=%d len=%d",
 						hr.offset(), rawSize, iTotWidth, iHcHeight, len(data))
 				}
 				rawData := data[hr.offset() : hr.offset()+rawSize]
-				collectiveBM = bitmap.New(iTotWidth, iHcHeight)
+				collectiveBM, err = allocBitmap(&d.memBudget, iTotWidth, iHcHeight)
+				if err != nil {
+					return nil, err
+				}
 				for y := range iHcHeight {
 					copy(collectiveBM.Pix[y*collectiveBM.Stride:], rawData[y*rawStride:(y+1)*rawStride])
 				}
@@ -472,13 +479,13 @@ func (d *decoder) decodeSymbolDictHuffman(
 				hr.bitPos = 7
 			} else {
 				// MMR-coded collective bitmap
-				if hr.offset()+bmSize > len(data) {
+				if bmSize > len(data) || hr.offset()+bmSize > len(data) {
 					return nil, fmt.Errorf("MMR bitmap overflows: offset=%d bmSize=%d len=%d",
 						hr.offset(), bmSize, len(data))
 				}
 				mmrData := data[hr.offset() : hr.offset()+bmSize]
 				var err error
-				collectiveBM, _, err = decodeMMR(mmrData, iTotWidth, iHcHeight)
+				collectiveBM, _, err = decodeMMR(&d.memBudget, mmrData, iTotWidth, iHcHeight)
 				if err != nil {
 					return nil, err
 				}
@@ -487,7 +494,11 @@ func (d *decoder) decodeSymbolDictHuffman(
 			}
 
 			// split collective bitmap into individual symbols
-			parts := splitBitmapH(collectiveBM, newSymWidths[hcFirstSym:nDecoded])
+			parts, err := splitBitmapH(&d.memBudget, collectiveBM, newSymWidths[hcFirstSym:nDecoded])
+			freeBitmap(&d.memBudget, collectiveBM)
+			if err != nil {
+				return nil, err
+			}
 			copy(newSymbols[hcFirstSym:], parts)
 		} else {
 			// refinement/aggregate coding (§6.5.8)
@@ -529,7 +540,7 @@ func (d *decoder) decodeSymbolDictHuffman(
 
 					// decode refinement region from bounded data
 					startOff := hr.offset()
-					if bmSize < 0 || startOff+bmSize > len(data) {
+					if bmSize < 0 || bmSize > len(data) || startOff+bmSize > len(data) {
 						return nil, fmt.Errorf("refinement bitmap size %d overflows data", bmSize)
 					}
 					dec := newMQDecoder(data[startOff : startOff+bmSize])
@@ -544,7 +555,7 @@ func (d *decoder) decodeSymbolDictHuffman(
 					}
 					copy(rp.ATX[:], sdrATX[:])
 					copy(rp.ATY[:], sdrATY[:])
-					sym, err := decodeRefinementRegion(dec, rp, grCx)
+					sym, err := decodeRefinementRegion(&d.memBudget, dec, rp, grCx)
 					if err != nil {
 						return nil, err
 					}
@@ -555,7 +566,7 @@ func (d *decoder) decodeSymbolDictHuffman(
 					hr.bitPos = 7
 				} else {
 					// multi-instance aggregation via inline text region (§6.5.8.2.3)
-					if refAggNInst > maxSymbolPixels {
+					if refAggNInst > maxAggInstances {
 						return nil, fmt.Errorf("REFAGGNINST %d exceeds limit", refAggNInst)
 					}
 					allSyms := make([]*bitmap.Bitmap, len(inputSymbols)+i)
@@ -585,7 +596,7 @@ func (d *decoder) decodeSymbolDictHuffman(
 						DTTable:      huffTableB11,
 						SymIDTable:   symIDTable,
 					}
-					sym, err := decodeTextRegionHuffman(hr, tp)
+					sym, err := decodeTextRegionHuffman(&d.memBudget, hr, tp)
 					if err != nil {
 						return nil, fmt.Errorf("multi-instance aggregation: %w", err)
 					}
@@ -594,6 +605,8 @@ func (d *decoder) decodeSymbolDictHuffman(
 			}
 		}
 	}
+
+	freeInts(&d.memBudget, newSymWidths)
 
 	if hr.err != nil {
 		return nil, hr.err

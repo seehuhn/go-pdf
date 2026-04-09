@@ -36,23 +36,15 @@ type Bitmap struct {
 	Rect image.Rectangle
 }
 
-// maxBitmapBytes is a safety cap on the Pix buffer size (128 MB).
-// Callers handling untrusted input should validate dimensions before
-// calling New; this guard exists only as defence-in-depth.
-const maxBitmapBytes = 1 << 27
-
 // New creates a new Bitmap with the given dimensions.
 // The bitmap is initially all white (zero).
-// If the resulting pixel buffer would exceed [maxBitmapBytes],
-// an empty bitmap is returned.
+// Callers that accept untrusted dimensions must validate them
+// before calling New.
 func New(width, height int) *Bitmap {
 	if width <= 0 || height <= 0 {
 		return &Bitmap{Rect: image.Rectangle{}}
 	}
 	stride := (width + 7) / 8
-	if int64(stride)*int64(height) > maxBitmapBytes {
-		return &Bitmap{Rect: image.Rectangle{}}
-	}
 	return &Bitmap{
 		Pix:    make([]byte, stride*height),
 		Stride: stride,

@@ -57,21 +57,16 @@ func (d *decoder) processPatternDict(hdr *segmentHeader, data []byte) error {
 		offset += 8
 	}
 
-	// cap number of patterns relative to available data
-	if grayMax+1 > len(data)*maxExpansion {
-		return fmt.Errorf("pattern count %d too large for %d bytes of data", grayMax+1, len(data))
-	}
-
 	// collective bitmap: all patterns side by side
-	collectiveWidth := int(int64(grayMax+1) * int64(hdpw))
-	if err := checkBitmapSize(collectiveWidth, hdph); err != nil {
-		return err
+	collectiveWidth, err := checkedMul(grayMax+1, hdpw)
+	if err != nil {
+		return fmt.Errorf("pattern dictionary: %w", err)
 	}
 
 	var collectiveBM *bitmap.Bitmap
 	if hdmmr {
 		var err error
-		collectiveBM, _, err = decodeMMR(data[offset:], collectiveWidth, hdph)
+		collectiveBM, _, err = decodeMMR(&d.memBudget, data[offset:], collectiveWidth, hdph)
 		if err != nil {
 			return err
 		}
@@ -95,18 +90,26 @@ func (d *decoder) processPatternDict(hdr *segmentHeader, data []byte) error {
 
 		dec := newMQDecoder(data[offset:])
 		var err error
-		collectiveBM, err = decodeGenericRegion(dec, p, nil)
+		collectiveBM, err = decodeGenericRegion(&d.memBudget, dec, p, nil)
 		if err != nil {
 			return err
 		}
 	}
 
 	// split collective bitmap into individual patterns (§6.7.5 step 4)
-	widths := make([]int, grayMax+1)
+	widths, err := allocInts(&d.memBudget, grayMax+1)
+	if err != nil {
+		return err
+	}
 	for i := range widths {
 		widths[i] = hdpw
 	}
-	patterns := splitBitmapH(collectiveBM, widths)
+	patterns, err := splitBitmapH(&d.memBudget, collectiveBM, widths)
+	freeBitmap(&d.memBudget, collectiveBM)
+	freeInts(&d.memBudget, widths)
+	if err != nil {
+		return err
+	}
 
 	d.segments[hdr.Number] = segmentResult{header: hdr, patterns: patterns}
 	return nil
