@@ -161,6 +161,79 @@ func TestGenericRegionRoundTrip(t *testing.T) {
 	}
 }
 
+func TestGenericRegionTPGDON(t *testing.T) {
+	// horizontal stripes have many duplicate rows, so TPGDON should
+	// produce smaller output
+	bm := makeHStripes(64, 64)
+
+	for _, tmpl := range []int{0, 1, 2, 3} {
+		t.Run(fmt.Sprintf("T%d", tmpl), func(t *testing.T) {
+			with := EncodeGenericRegionSegment(bm, 0, 0, tmpl, bitmap.CombOpOR, true, false)
+
+			// round-trip the TPGDON-encoded version
+			var stream []byte
+			pageData := WritePageInfo(nil, bm.Width(), bm.Height())
+			stream = WriteSegmentHeader(stream, 0, segPageInfo, 1, nil, uint32(len(pageData)))
+			stream = append(stream, pageData...)
+			stream = WriteSegmentHeader(stream, 1, segImmediateGeneric, 1, nil, uint32(len(with)))
+			stream = append(stream, with...)
+
+			got, err := Decode(nil, stream)
+			if err != nil {
+				t.Fatalf("decode failed: %v", err)
+			}
+			if !bitmapsEqual(got, bm) {
+				t.Errorf("round-trip mismatch with TPGDON")
+			}
+		})
+	}
+
+	// verify TPGDON reduces size for an image with many duplicate rows:
+	// thick horizontal stripes (8 rows per stripe)
+	big := bitmap.New(128, 128)
+	for y := range 128 {
+		if (y/8)%2 == 0 {
+			for x := range 128 {
+				big.SetPixel(x, y, true)
+			}
+		}
+	}
+	without := EncodeGenericRegionSegment(big, 0, 0, 0, bitmap.CombOpOR, false, false)
+	with := EncodeGenericRegionSegment(big, 0, 0, 0, bitmap.CombOpOR, true, false)
+	if len(with) >= len(without) {
+		t.Errorf("TPGDON did not reduce size for thick stripes: %d >= %d",
+			len(with), len(without))
+	}
+}
+
+func TestGenericRegionExtTemplate(t *testing.T) {
+	patterns := []*bitmap.Bitmap{
+		makeDiagonal(32, 32),
+		makeCheckerboard(32, 32),
+		makeCenterBlock(32, 32),
+	}
+
+	for _, bm := range patterns {
+		// round-trip with extended template
+		segData := EncodeGenericRegionSegment(bm, 0, 0, 0, bitmap.CombOpOR, false, true)
+
+		var stream []byte
+		pageData := WritePageInfo(nil, bm.Width(), bm.Height())
+		stream = WriteSegmentHeader(stream, 0, segPageInfo, 1, nil, uint32(len(pageData)))
+		stream = append(stream, pageData...)
+		stream = WriteSegmentHeader(stream, 1, segImmediateGeneric, 1, nil, uint32(len(segData)))
+		stream = append(stream, segData...)
+
+		got, err := Decode(nil, stream)
+		if err != nil {
+			t.Fatalf("decode failed: %v", err)
+		}
+		if !bitmapsEqual(got, bm) {
+			t.Errorf("round-trip mismatch with ExtTemplate")
+		}
+	}
+}
+
 // fuzzBitmapRoundTrip verifies that a bitmap decoded from fuzzed input
 // survives a generic-region encode/decode cycle unchanged.
 func fuzzBitmapRoundTrip(t *testing.T, data []byte) {
@@ -174,7 +247,7 @@ func fuzzBitmapRoundTrip(t *testing.T, data []byte) {
 		return
 	}
 
-	segData := EncodeGenericRegionSegment(bm1, 0, 0, 1, bitmap.CombOpOR)
+	segData := EncodeGenericRegionSegment(bm1, 0, 0, 1, bitmap.CombOpOR, false, false)
 	var stream []byte
 	pageData := WritePageInfo(nil, bm1.Width(), bm1.Height())
 	stream = WriteSegmentHeader(stream, 0, segPageInfo, 1, nil, uint32(len(pageData)))
@@ -209,7 +282,7 @@ func FuzzGenericRegionMQRoundTrip(f *testing.F) {
 	// seed from test cases across all templates
 	for _, tmpl := range []int{0, 1, 2, 3} {
 		for _, pat := range patterns {
-			segData := EncodeGenericRegionSegment(pat.bm, 0, 0, tmpl, bitmap.CombOpOR)
+			segData := EncodeGenericRegionSegment(pat.bm, 0, 0, tmpl, bitmap.CombOpOR, false, false)
 
 			var stream []byte
 			pageData := WritePageInfo(nil, pat.bm.Width(), pat.bm.Height())

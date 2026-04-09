@@ -250,7 +250,7 @@ func customTableTextRegionRoundTrip(t *testing.T, refCorner int, transposed bool
 	trData, err := encodeTextRegionHuffman(
 		width, height, 0, 0, instances, symbols,
 		refCorner, transposed, bitmap.CombOpOR,
-		fsTable, uint16(3))
+		1, 0, 0, fsTable, uint16(3))
 	if err != nil {
 		t.Fatalf("encode text region: %v", err)
 	}
@@ -367,7 +367,7 @@ func FuzzCustomTableTextRegion(f *testing.F) {
 		trData, err := encodeTextRegionHuffman(
 			width, height, 0, 0, instances, symbols,
 			tc.refCorner, tc.transposed, bitmap.CombOpOR,
-			fsTable, uint16(3))
+			1, 0, 0, fsTable, uint16(3))
 		if err != nil {
 			f.Fatalf("encode text region: %v", err)
 		}

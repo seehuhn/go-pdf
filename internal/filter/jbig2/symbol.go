@@ -214,9 +214,30 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 					}
 					newSymbols[nDecoded] = sym
 				} else {
-					// multi-instance aggregation via text region
-					// TODO: implement full text region for aggregation
-					newSymbols[nDecoded] = bitmap.New(iSymWidth, iHcHeight)
+					// multi-instance aggregation via inline text region (§6.5.8.2.3)
+					if refAggNInst > maxSymbolPixels {
+						return nil, fmt.Errorf("REFAGGNINST %d exceeds limit", refAggNInst)
+					}
+					allSyms := make([]*bitmap.Bitmap, len(inputSymbols)+nDecoded)
+					copy(allSyms, inputSymbols)
+					copy(allSyms[len(inputSymbols):], newSymbols[:nDecoded])
+					codeLen := symCodeLen(len(allSyms))
+
+					tp := &textRegionParams{
+						Width:        iSymWidth,
+						Height:       iHcHeight,
+						NumInstances: int(refAggNInst),
+						Strips:       1,
+						Symbols:      allSyms,
+						SymCodeLen:   codeLen,
+						CombOp:       bitmap.CombOpOR,
+						RefCorner:    cornerBottomLeft,
+					}
+					sym, err := decodeTextRegion(dec, tp)
+					if err != nil {
+						return nil, fmt.Errorf("multi-instance aggregation: %w", err)
+					}
+					newSymbols[nDecoded] = sym
 				}
 			}
 			nDecoded++
@@ -533,9 +554,42 @@ func (d *decoder) decodeSymbolDictHuffman(
 					hr.bytePos = startOff + bmSize
 					hr.bitPos = 7
 				} else {
-					// multi-instance aggregation via text region
-					// TODO: implement full text region for aggregation
-					newSymbols[i] = bitmap.New(iSymWidth, iHcHeight)
+					// multi-instance aggregation via inline text region (§6.5.8.2.3)
+					if refAggNInst > maxSymbolPixels {
+						return nil, fmt.Errorf("REFAGGNINST %d exceeds limit", refAggNInst)
+					}
+					allSyms := make([]*bitmap.Bitmap, len(inputSymbols)+i)
+					copy(allSyms, inputSymbols)
+					copy(allSyms[len(inputSymbols):], newSymbols[:i])
+
+					// build symbol ID Huffman table
+					numSyms := len(allSyms)
+					symIDCodeLen := symCodeLen(numSyms)
+					lines := make([]huffLine, numSyms)
+					for k := range numSyms {
+						lines[k] = huffLine{RangeLow: int32(k), PrefLen: symIDCodeLen}
+					}
+					symIDTable := &huffTable{Lines: lines}
+					symIDTable.assignCodes()
+
+					tp := &textRegionHuffParams{
+						Width:        iSymWidth,
+						Height:       iHcHeight,
+						NumInstances: refAggNInst,
+						Strips:       1,
+						Symbols:      allSyms,
+						RefCorner:    cornerBottomLeft,
+						CombOp:       bitmap.CombOpOR,
+						FSTable:      huffTableB6,
+						DSTable:      huffTableB8,
+						DTTable:      huffTableB11,
+						SymIDTable:   symIDTable,
+					}
+					sym, err := decodeTextRegionHuffman(hr, tp)
+					if err != nil {
+						return nil, fmt.Errorf("multi-instance aggregation: %w", err)
+					}
+					newSymbols[i] = sym
 				}
 			}
 		}

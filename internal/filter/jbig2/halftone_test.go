@@ -33,7 +33,7 @@ func TestGrayScaleSingleBitplane(t *testing.T) {
 		0, 1, 0, 1,
 	}
 	tmpl := 1
-	encoded := encodeGrayScaleImage(grayValues, gsw, gsh, tmpl)
+	encoded := encodeGrayScaleImage(grayValues, gsw, gsh, tmpl, nil)
 	decoded, err := decodeGrayScaleImage(encoded, false, tmpl, 1, gsw, gsh, false, nil)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
@@ -130,7 +130,7 @@ func TestGrayScaleRoundTrip(t *testing.T) {
 
 	for _, tmpl := range []int{0, 1, 2, 3} {
 		t.Run(fmt.Sprintf("T%d", tmpl), func(t *testing.T) {
-			encoded := encodeGrayScaleImage(grayValues, gsw, gsh, tmpl)
+			encoded := encodeGrayScaleImage(grayValues, gsw, gsh, tmpl, nil)
 			decoded, err := decodeGrayScaleImage(encoded, false, tmpl, 2, gsw, gsh, false, nil)
 			if err != nil {
 				t.Fatalf("decode failed: %v", err)
@@ -301,6 +301,7 @@ func TestHalftoneRoundTrip(t *testing.T) {
 				grayValues, gsw, gsh,
 				hgx, hgy, hrx, hry,
 				tmpl, bitmap.CombOpOR,
+				false, 0, 0,
 			)
 
 			// wrap into a JBIG2 page stream:
@@ -377,7 +378,8 @@ func TestIntermediateHalftoneRoundTrip(t *testing.T) {
 	patData := encodePatternDictSegment(patterns, 1)
 	htData := encodeHalftoneRegionSegment(
 		width, height, grayValues, gsw, gsh,
-		0, 0, hrx, 0, 1, bitmap.CombOpOR)
+		0, 0, hrx, 0, 1, bitmap.CombOpOR,
+		false, 0, 0)
 
 	// build expected bitmap
 	expected := bitmap.New(width, height)
@@ -392,7 +394,7 @@ func TestIntermediateHalftoneRoundTrip(t *testing.T) {
 	}
 
 	// encode a refinement of the halftone bitmap (identity refinement)
-	refinData := EncodeRefinementRegionSegment(expected, expected, 0, 0, 1, bitmap.CombOpOR)
+	refinData := EncodeRefinementRegionSegment(expected, expected, 0, 0, 1, bitmap.CombOpOR, false)
 
 	var stream []byte
 
@@ -448,6 +450,7 @@ func FuzzHalftoneRoundTrip(f *testing.F) {
 		htData := encodeHalftoneRegionSegment(
 			width, height, grayValues, gsw, gsh,
 			0, 0, hrx, 0, tmpl, bitmap.CombOpOR,
+			false, 0, 0,
 		)
 
 		var stream []byte

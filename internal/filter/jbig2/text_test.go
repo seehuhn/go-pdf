@@ -17,6 +17,7 @@
 package jbig2
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -158,7 +159,7 @@ func textRegionRoundTrip(t *testing.T, tc textRegionTestCase) {
 	// encode text region
 	trData := EncodeTextRegionSegment(
 		width, height, 0, 0, instances, symbols,
-		tc.refCorner, tc.transposed, bitmap.CombOpOR)
+		tc.refCorner, tc.transposed, bitmap.CombOpOR, 1, 0, 0)
 
 	// build page stream
 	var stream []byte
@@ -208,7 +209,7 @@ func textRegionHuffmanRoundTrip(t *testing.T, tc textRegionTestCase) {
 	// encode text region with Huffman
 	trData, err := EncodeTextRegionSegmentHuffman(
 		width, height, 0, 0, instances, symbols,
-		tc.refCorner, tc.transposed, bitmap.CombOpOR)
+		tc.refCorner, tc.transposed, bitmap.CombOpOR, 1, 0, 0)
 	if err != nil {
 		t.Fatalf("encode failed: %v", err)
 	}
@@ -252,7 +253,7 @@ func FuzzTextRegionHuffmanRoundTrip(f *testing.F) {
 		sdData := EncodeSymbolDictSegment(symbols, 1)
 		trData, err := EncodeTextRegionSegmentHuffman(
 			width, height, 0, 0, instances, symbols,
-			tc.refCorner, tc.transposed, bitmap.CombOpOR)
+			tc.refCorner, tc.transposed, bitmap.CombOpOR, 1, 0, 0)
 		if err != nil {
 			f.Fatalf("seed encode failed: %v", err)
 		}
@@ -345,14 +346,14 @@ func textRegionRefineRoundTrip(t *testing.T, tc textRegionTestCase, huffman bool
 		var err error
 		trData, err = EncodeTextRegionSegmentHuffman(
 			width, height, 0, 0, instances, symbols,
-			tc.refCorner, tc.transposed, bitmap.CombOpOR)
+			tc.refCorner, tc.transposed, bitmap.CombOpOR, 1, 0, 0)
 		if err != nil {
 			t.Fatalf("encode failed: %v", err)
 		}
 	} else {
 		trData = EncodeTextRegionSegment(
 			width, height, 0, 0, instances, symbols,
-			tc.refCorner, tc.transposed, bitmap.CombOpOR)
+			tc.refCorner, tc.transposed, bitmap.CombOpOR, 1, 0, 0)
 	}
 
 	var stream []byte
@@ -399,7 +400,7 @@ func FuzzTextRegionRefineRoundTrip(f *testing.F) {
 		sdData := EncodeSymbolDictSegment(symbols, 1)
 		trData := EncodeTextRegionSegment(
 			width, height, 0, 0, instances, symbols,
-			tc.refCorner, tc.transposed, bitmap.CombOpOR)
+			tc.refCorner, tc.transposed, bitmap.CombOpOR, 1, 0, 0)
 
 		var stream []byte
 		stream = WriteSegmentHeader(stream, 0, segSymbolDict, 0, nil, uint32(len(sdData)))
@@ -426,7 +427,7 @@ func FuzzTextRegionHuffmanRefineRoundTrip(f *testing.F) {
 		sdData := EncodeSymbolDictSegment(symbols, 1)
 		trData, err := EncodeTextRegionSegmentHuffman(
 			width, height, 0, 0, instances, symbols,
-			tc.refCorner, tc.transposed, bitmap.CombOpOR)
+			tc.refCorner, tc.transposed, bitmap.CombOpOR, 1, 0, 0)
 		if err != nil {
 			f.Fatalf("seed encode failed: %v", err)
 		}
@@ -457,10 +458,10 @@ func TestIntermediateTextRegionRoundTrip(t *testing.T) {
 	sdData := EncodeSymbolDictSegment(symbols, 1)
 	trData := EncodeTextRegionSegment(
 		width, height, 0, 0, instances, symbols,
-		cornerBottomLeft, false, bitmap.CombOpOR)
+		cornerBottomLeft, false, bitmap.CombOpOR, 1, 0, 0)
 
 	// encode a refinement of the text region bitmap (identity refinement)
-	refinData := EncodeRefinementRegionSegment(expected, expected, 0, 0, 1, bitmap.CombOpOR)
+	refinData := EncodeRefinementRegionSegment(expected, expected, 0, 0, 1, bitmap.CombOpOR, false)
 
 	var stream []byte
 
@@ -491,6 +492,117 @@ func TestIntermediateTextRegionRoundTrip(t *testing.T) {
 	}
 }
 
+// decodeTextRegionStream is a helper that decodes a JBIG2 stream built from
+// a symbol dictionary segment and a text region segment.
+func decodeTextRegionStream(t *testing.T, sdData, trData []byte, width, height int) *bitmap.Bitmap {
+	t.Helper()
+	var stream []byte
+	stream = WriteSegmentHeader(stream, 0, segSymbolDict, 0, nil, uint32(len(sdData)))
+	stream = append(stream, sdData...)
+	pageData := WritePageInfo(nil, width, height)
+	stream = WriteSegmentHeader(stream, 1, segPageInfo, 1, nil, uint32(len(pageData)))
+	stream = append(stream, pageData...)
+	stream = WriteSegmentHeader(stream, 2, segImmediateTextRegion, 1, []uint32{0}, uint32(len(trData)))
+	stream = append(stream, trData...)
+	bm, err := Decode(nil, stream)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	return bm
+}
+
+func TestTextRegionDefPixel(t *testing.T) {
+	symbols := makeTextTestSymbols()
+	width, height, instances, _ := buildTextInstances(
+		symbols, cornerBottomLeft, false)
+	sdData := EncodeSymbolDictSegment(symbols, 1)
+
+	// encode with defPixel=1 (black background)
+	trData := EncodeTextRegionSegment(
+		width, height, 0, 0, instances, symbols,
+		cornerBottomLeft, false, bitmap.CombOpOR, 1, 0, 1)
+
+	got := decodeTextRegionStream(t, sdData, trData, width, height)
+
+	// background pixels (outside any symbol) should be black
+	if !got.GetPixel(0, 0) {
+		t.Errorf("expected black background pixel at (0,0)")
+	}
+}
+
+func TestTextRegionDSOffset(t *testing.T) {
+	symbols := makeTextTestSymbols()
+
+	// place two symbols in the same strip row with known S positions
+	sym0 := symbols[0]
+	sym1 := symbols[1]
+	width := sym0.Width() + sym1.Width() + 20
+	height := max(sym0.Height(), sym1.Height()) + 4
+
+	instances := []SymbolInstance{
+		{SymID: 0, T: 2, S: 2, Wi: sym0.Width(), Hi: sym0.Height()},
+		{SymID: 1, T: 2, S: 2 + sym0.Width() + 5, Wi: sym1.Width(), Hi: sym1.Height()},
+	}
+
+	// build expected bitmap
+	expected := bitmap.New(width, height)
+	expected.Combine(symbols[0], 2, 2, bitmap.CombOpOR)
+	expected.Combine(symbols[1], 2+sym0.Width()+5, 2, bitmap.CombOpOR)
+
+	sdData := EncodeSymbolDictSegment(symbols, 1)
+
+	for _, dsOff := range []int{-3, 0, 5} {
+		t.Run(intName("ds", dsOff), func(t *testing.T) {
+			trData := EncodeTextRegionSegment(
+				width, height, 0, 0, instances, symbols,
+				cornerTopLeft, false, bitmap.CombOpOR, 1, dsOff, 0)
+
+			got := decodeTextRegionStream(t, sdData, trData, width, height)
+			if diff := cmp.Diff(expected, got); diff != "" {
+				t.Errorf("mismatch with dsOffset=%d (-want +got):\n%s", dsOff, diff)
+			}
+		})
+	}
+}
+
+func intName(prefix string, v int) string {
+	return fmt.Sprintf("%s%d", prefix, v)
+}
+
+func TestTextRegionStrips(t *testing.T) {
+	symbols := makeTextTestSymbols()
+
+	// place symbols at different T values that span multiple strips
+	sym0 := symbols[0]
+	sym1 := symbols[1]
+	width := sym0.Width() + sym1.Width() + 20
+	height := 30
+
+	instances := []SymbolInstance{
+		{SymID: 0, T: 3, S: 2, Wi: sym0.Width(), Hi: sym0.Height()},
+		{SymID: 1, T: 5, S: 12, Wi: sym1.Width(), Hi: sym1.Height()},
+	}
+
+	expected := bitmap.New(width, height)
+	expected.Combine(symbols[0], 2, 3, bitmap.CombOpOR)
+	expected.Combine(symbols[1], 12, 5, bitmap.CombOpOR)
+
+	sdData := EncodeSymbolDictSegment(symbols, 1)
+
+	for _, strips := range []int{1, 2, 4, 8} {
+		t.Run(intName("S", strips), func(t *testing.T) {
+			trData := EncodeTextRegionSegment(
+				width, height, 0, 0, instances, symbols,
+				cornerTopLeft, false, bitmap.CombOpOR, strips, 0, 0)
+
+			got := decodeTextRegionStream(t, sdData, trData, width, height)
+			if diff := cmp.Diff(expected, got); diff != "" {
+				t.Errorf("mismatch with strips=%d (-want +got):\n%s", strips, diff)
+			}
+		})
+	}
+}
+
 func FuzzTextRegionRoundTrip(f *testing.F) {
 	symbols := makeTextTestSymbols()
 
@@ -501,7 +613,7 @@ func FuzzTextRegionRoundTrip(f *testing.F) {
 		sdData := EncodeSymbolDictSegment(symbols, 1)
 		trData := EncodeTextRegionSegment(
 			width, height, 0, 0, instances, symbols,
-			tc.refCorner, tc.transposed, bitmap.CombOpOR)
+			tc.refCorner, tc.transposed, bitmap.CombOpOR, 1, 0, 0)
 
 		var stream []byte
 		stream = WriteSegmentHeader(stream, 0, segSymbolDict, 0, nil, uint32(len(sdData)))

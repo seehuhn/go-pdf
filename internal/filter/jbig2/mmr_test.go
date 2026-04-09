@@ -228,6 +228,7 @@ func TestHalftoneMMRRoundTrip(t *testing.T) {
 		grayValues, gsw, gsh,
 		hgx, hgy, hrx, hry,
 		bitmap.CombOpOR,
+		false,
 	)
 	if err != nil {
 		t.Fatalf("encode halftone: %v", err)
@@ -404,6 +405,7 @@ func FuzzHalftoneMMRRoundTrip(f *testing.F) {
 	htData, err := encodeHalftoneRegionSegmentMMR(
 		width, height, grayValues, gsw, gsh,
 		0, 0, hrx, 0, bitmap.CombOpOR,
+		false,
 	)
 	if err != nil {
 		f.Fatalf("seed encode failed: %v", err)

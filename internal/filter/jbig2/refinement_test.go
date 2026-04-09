@@ -243,6 +243,40 @@ func FuzzRefinementRoundTrip(f *testing.F) {
 	})
 }
 
+func TestRefinementRegionTPGRON(t *testing.T) {
+	// use a target that closely matches the reference (many typical pixels)
+	ref := makeDiagonal(32, 32)
+	target := makeDiagonal(32, 32)
+	// flip a few pixels so it's not identical
+	target.SetPixel(5, 5, !target.GetPixel(5, 5))
+	target.SetPixel(10, 10, !target.GetPixel(10, 10))
+
+	for _, tmpl := range []int{0, 1} {
+		t.Run(fmt.Sprintf("T%d", tmpl), func(t *testing.T) {
+			var stream []byte
+			pageData := WritePageInfo(nil, 32, 32)
+			stream = WriteSegmentHeader(stream, 0, segPageInfo, 1, nil, uint32(len(pageData)))
+			stream = append(stream, pageData...)
+
+			refData := EncodeGenericRegionSegment(ref, 0, 0, 1, bitmap.CombOpOR, false, false)
+			stream = WriteSegmentHeader(stream, 1, segIntermediateGeneric, 1, nil, uint32(len(refData)))
+			stream = append(stream, refData...)
+
+			refinData := EncodeRefinementRegionSegment(target, ref, 0, 0, tmpl, bitmap.CombOpOR, true)
+			stream = WriteSegmentHeader(stream, 2, segImmediateRefinement, 1, []uint32{1}, uint32(len(refinData)))
+			stream = append(stream, refinData...)
+
+			got, err := Decode(nil, stream)
+			if err != nil {
+				t.Fatalf("decode failed: %v", err)
+			}
+			if !bitmapsEqual(got, target) {
+				t.Errorf("round-trip mismatch with TPGRON")
+			}
+		})
+	}
+}
+
 // TestRefinementRegionSegmentRoundTrip tests case d from T.88 §7.4.8.6:
 // an immediate refinement region segment referring to an intermediate
 // generic region segment.
@@ -259,12 +293,12 @@ func TestRefinementRegionSegmentRoundTrip(t *testing.T) {
 			stream = append(stream, pageData...)
 
 			// segment 1: intermediate generic region (reference bitmap)
-			refData := EncodeGenericRegionSegment(ref, 0, 0, 1, bitmap.CombOpOR)
+			refData := EncodeGenericRegionSegment(ref, 0, 0, 1, bitmap.CombOpOR, false, false)
 			stream = WriteSegmentHeader(stream, 1, segIntermediateGeneric, 1, nil, uint32(len(refData)))
 			stream = append(stream, refData...)
 
 			// segment 2: immediate refinement region referring to segment 1
-			refinData := EncodeRefinementRegionSegment(target, ref, 0, 0, tmpl, bitmap.CombOpOR)
+			refinData := EncodeRefinementRegionSegment(target, ref, 0, 0, tmpl, bitmap.CombOpOR, false)
 			stream = WriteSegmentHeader(stream, 2, segImmediateRefinement, 1, []uint32{1}, uint32(len(refinData)))
 			stream = append(stream, refinData...)
 
@@ -296,12 +330,12 @@ func TestRefinementRegionPageBuffer(t *testing.T) {
 			stream = append(stream, pageData...)
 
 			// segment 1: immediate generic region (places reference on page)
-			genData := EncodeGenericRegionSegment(ref, 0, 0, 1, bitmap.CombOpOR)
+			genData := EncodeGenericRegionSegment(ref, 0, 0, 1, bitmap.CombOpOR, false, false)
 			stream = WriteSegmentHeader(stream, 1, segImmediateGeneric, 1, nil, uint32(len(genData)))
 			stream = append(stream, genData...)
 
 			// segment 2: immediate refinement with no refs (refines page buffer)
-			refinData := EncodeRefinementRegionSegment(target, ref, 0, 0, tmpl, bitmap.CombOpOR)
+			refinData := EncodeRefinementRegionSegment(target, ref, 0, 0, tmpl, bitmap.CombOpOR, false)
 			stream = WriteSegmentHeader(stream, 2, segImmediateRefinement, 1, nil, uint32(len(refinData)))
 			stream = append(stream, refinData...)
 
@@ -328,11 +362,11 @@ func FuzzRefinementRegionSegmentRoundTrip(f *testing.F) {
 		stream = WriteSegmentHeader(stream, 0, segPageInfo, 1, nil, uint32(len(pageData)))
 		stream = append(stream, pageData...)
 
-		refData := EncodeGenericRegionSegment(ref, 0, 0, 1, bitmap.CombOpOR)
+		refData := EncodeGenericRegionSegment(ref, 0, 0, 1, bitmap.CombOpOR, false, false)
 		stream = WriteSegmentHeader(stream, 1, segIntermediateGeneric, 1, nil, uint32(len(refData)))
 		stream = append(stream, refData...)
 
-		refinData := EncodeRefinementRegionSegment(target, ref, 0, 0, tmpl, bitmap.CombOpOR)
+		refinData := EncodeRefinementRegionSegment(target, ref, 0, 0, tmpl, bitmap.CombOpOR, false)
 		stream = WriteSegmentHeader(stream, 2, segImmediateRefinement, 1, []uint32{1}, uint32(len(refinData)))
 		stream = append(stream, refinData...)
 
@@ -349,7 +383,7 @@ func FuzzRefinementRegionSegmentRoundTrip(f *testing.F) {
 		}
 
 		// re-encode as a simple generic region and decode again
-		segData := EncodeGenericRegionSegment(bm1, 0, 0, 1, bitmap.CombOpOR)
+		segData := EncodeGenericRegionSegment(bm1, 0, 0, 1, bitmap.CombOpOR, false, false)
 		var stream []byte
 		pageData := WritePageInfo(nil, bm1.Width(), bm1.Height())
 		stream = WriteSegmentHeader(stream, 0, segPageInfo, 1, nil, uint32(len(pageData)))
@@ -386,17 +420,17 @@ func TestIntermediateRefinementRoundTrip(t *testing.T) {
 			stream = append(stream, pageData...)
 
 			// segment 1: intermediate generic region (initial bitmap)
-			genData := EncodeGenericRegionSegment(initial, 0, 0, 1, bitmap.CombOpOR)
+			genData := EncodeGenericRegionSegment(initial, 0, 0, 1, bitmap.CombOpOR, false, false)
 			stream = WriteSegmentHeader(stream, 1, segIntermediateGeneric, 1, nil, uint32(len(genData)))
 			stream = append(stream, genData...)
 
 			// segment 2: intermediate refinement (type 40) refining seg 1 → middle
-			refin1 := EncodeRefinementRegionSegment(middle, initial, 0, 0, tmpl, bitmap.CombOpOR)
+			refin1 := EncodeRefinementRegionSegment(middle, initial, 0, 0, tmpl, bitmap.CombOpOR, false)
 			stream = WriteSegmentHeader(stream, 2, segIntermediateRefinement, 1, []uint32{1}, uint32(len(refin1)))
 			stream = append(stream, refin1...)
 
 			// segment 3: immediate refinement (type 42) refining seg 2 → final
-			refin2 := EncodeRefinementRegionSegment(final, middle, 0, 0, tmpl, bitmap.CombOpOR)
+			refin2 := EncodeRefinementRegionSegment(final, middle, 0, 0, tmpl, bitmap.CombOpOR, false)
 			stream = WriteSegmentHeader(stream, 3, segImmediateRefinement, 1, []uint32{2}, uint32(len(refin2)))
 			stream = append(stream, refin2...)
 

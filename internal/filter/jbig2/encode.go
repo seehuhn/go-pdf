@@ -19,6 +19,7 @@ package jbig2
 import (
 	"encoding/binary"
 	"fmt"
+	"math/bits"
 	"slices"
 
 	"seehuhn.de/go/pdf/graphics/bitmap"
@@ -200,6 +201,152 @@ func EncodeSymbolDictSegment(symbols []*bitmap.Bitmap, template int) []byte {
 	return buf
 }
 
+// AggregateSymbol describes how to encode a new symbol in a symbol dictionary
+// with multi-instance aggregation (REFAGGNINST > 1). Each instance is a
+// placement of an existing symbol. The instances are composited into the
+// new symbol's bitmap using a text region.
+type AggregateSymbol struct {
+	Width, Height int
+	Instances     []SymbolInstance
+}
+
+// EncodeSymbolDictSegmentAgg encodes an arithmetic-coded symbol dictionary
+// where each new symbol is defined by multi-instance aggregation. Each
+// AggregateSymbol is encoded as an inline text region within the dictionary.
+// inputSymCount is the number of input symbols from referred-to segments.
+// Symbols must be sorted by height, then by width within each height class.
+func EncodeSymbolDictSegmentAgg(
+	symbols []AggregateSymbol,
+	inputSymCount int,
+) []byte {
+	if len(symbols) == 0 {
+		return nil
+	}
+
+	// SD flags: arithmetic, sdrefagg=1, sdTemplate=1 (2 AT bytes),
+	// sdrTemplate=1 (no refinement AT bytes needed)
+	flags := uint16(0x02)    // bit 1: sdrefagg=1
+	flags |= uint16(1) << 10 // sdTemplate=1
+	flags |= uint16(1) << 12 // sdrTemplate=1
+	var buf []byte
+	buf = appendUint16(buf, flags)
+
+	// AT flags for sdTemplate=1 (2 bytes: one AT pair)
+	buf = append(buf, byte(3), byte(0xFF)) // ATX=3, ATY=-1 (nominal)
+
+	totalSyms := inputSymCount + len(symbols)
+
+	// SDNUMEXSYMS and SDNUMNEWSYMS
+	buf = appendUint32(buf, uint32(totalSyms))
+	buf = appendUint32(buf, uint32(len(symbols)))
+
+	// encode MQ data
+	enc := newMQEncoder()
+	iadh := &intCtx{}
+	iadw := &intCtx{}
+	iaai := &intCtx{}
+	iaex := &intCtx{}
+
+	hcHeight := 0
+	i := 0
+	for i < len(symbols) {
+		// start new height class
+		dh := symbols[i].Height - hcHeight
+		iadh.encode(enc, int64(dh))
+		hcHeight = symbols[i].Height
+
+		// encode symbols in this height class
+		prevWidth := 0
+		for i < len(symbols) && symbols[i].Height == hcHeight {
+			dw := symbols[i].Width - prevWidth
+			iadw.encode(enc, int64(dw))
+			prevWidth = symbols[i].Width
+
+			sym := symbols[i]
+			nInst := len(sym.Instances)
+
+			// REFAGGNINST
+			iaai.encode(enc, int64(nInst))
+
+			// encode inline text region
+			numSyms := inputSymCount + i
+			codeLen := textRegionSymCodeLen(numSyms)
+			iaid, _ := newIAIDCtx(codeLen)
+			iadt := &intCtx{}
+			iafs := &intCtx{}
+			iads := &intCtx{}
+
+			insts := sym.Instances
+			if len(insts) == 0 {
+				i++
+				continue
+			}
+
+			// initial STRIPT
+			firstT := insts[0].T
+			iadt.encode(enc, int64(-firstT))
+
+			stripT := firstT
+			firstS := 0
+			nI := 0
+
+			for nI < len(insts) {
+				curT := insts[nI].T
+				dt := curT - stripT
+				iadt.encode(enc, int64(dt))
+				stripT = curT
+
+				first := true
+				curS := 0
+				for nI < len(insts) && insts[nI].T == curT {
+					inst := insts[nI]
+					if first {
+						dfs := inst.S - firstS
+						iafs.encode(enc, int64(dfs))
+						firstS = inst.S
+						curS = inst.S
+						first = false
+					} else {
+						ids := inst.S - curS
+						iads.encode(enc, int64(ids))
+						curS = inst.S
+					}
+
+					// symbol ID
+					iaid.encode(enc, codeLen, inst.SymID)
+
+					// CURS update
+					curS += inst.Wi - 1
+
+					nI++
+				}
+				// OOB between strips, but not after the last strip
+				// (the decoder stops when nInstances reaches NumInstances,
+				// so a trailing OOB would remain unconsumed)
+				if nI < len(insts) {
+					iads.encodeOOB(enc)
+				}
+			}
+
+			i++
+		}
+		// the decoder breaks the height class loop when
+		// nDecoded >= sdNumNewSyms, before reading another DW;
+		// only write OOB if more symbols remain
+		if i < len(symbols) {
+			iadw.encodeOOB(enc)
+		}
+	}
+
+	// export flags: skip inputSymCount, export all new symbols
+	iaex.encode(enc, int64(inputSymCount))
+	iaex.encode(enc, int64(len(symbols)))
+
+	enc.flush()
+	buf = append(buf, enc.bytes()...)
+	return buf
+}
+
 // EncodeSymbolDictSegmentHuffRef encodes a Huffman-coded symbol dictionary
 // with single-instance refinement aggregation. Each symbols[i] is encoded as
 // a refinement of refSymbols[i]. The two slices must have the same length.
@@ -328,6 +475,11 @@ func EncodeSymbolDictSegmentHuffRef(
 // refCorner is one of cornerBottomLeft, cornerTopLeft, cornerBottomRight,
 // cornerTopRight. When transposed is true, T and S axes are swapped.
 // Instances with a non-nil Bitmap field are encoded with refinement.
+//
+// strips must be 1, 2, 4, or 8. When strips > 1, instances within the
+// same strip (T values differing by less than strips) share a strip row.
+// dsOffset is added to the inline coordinate for non-first instances in
+// a strip. defPixel selects the initial pixel value (0=white, 1=black).
 func EncodeTextRegionSegment(
 	width, height, x, y int,
 	instances []SymbolInstance,
@@ -335,7 +487,13 @@ func EncodeTextRegionSegment(
 	refCorner int,
 	transposed bool,
 	combOp bitmap.CombOp,
+	strips int,
+	dsOffset int,
+	defPixel int,
 ) []byte {
+	if strips < 1 {
+		strips = 1
+	}
 	numSymbols := len(symbols)
 
 	// detect whether any instance needs refinement
@@ -347,8 +505,9 @@ func EncodeTextRegionSegment(
 		}
 	}
 
-	// text region flags: arithmetic, strips=1
-	flags := uint16(0) // SBHUFF=0, LOGSBSTRIPS=0
+	// text region flags
+	logStrips := bits.TrailingZeros(uint(strips)) & 3
+	flags := uint16(logStrips) << 2 // SBHUFF=0
 	if needsRefine {
 		flags |= 0x02            // SBREFINE=1
 		flags |= uint16(1) << 15 // SBRTEMPLATE=1
@@ -358,6 +517,8 @@ func EncodeTextRegionSegment(
 		flags |= 0x40
 	}
 	flags |= uint16(combOp&3) << 7
+	flags |= uint16(defPixel&1) << 9
+	flags |= uint16(dsOffset&0x1F) << 10
 
 	var buf []byte
 	buf = WriteRegionSegmentInfo(buf, width, height, x, y, combOp)
@@ -371,6 +532,7 @@ func EncodeTextRegionSegment(
 	iadt := &intCtx{}
 	iafs := &intCtx{}
 	iads := &intCtx{}
+	iait := &intCtx{}
 	iaid, _ := newIAIDCtx(textRegionSymCodeLen(numSymbols))
 	codeLen := textRegionSymCodeLen(numSymbols)
 
@@ -390,24 +552,25 @@ func EncodeTextRegionSegment(
 		return buf
 	}
 
-	// initial STRIPT (negated, strips=1 so no multiplication)
+	// initial STRIPT (§6.4.6: encode negated, in strip units)
 	firstT := instances[0].T
-	iadt.encode(enc, int64(-firstT))
+	iadt.encode(enc, int64(-firstT/strips))
 
-	stripT := firstT
+	stripT := (firstT / strips) * strips // round down to strip boundary
 	firstS := 0
 	nInst := 0
 
 	for nInst < len(instances) {
-		curT := instances[nInst].T
-		dt := curT - stripT
+		// start a new strip row: compute strip delta
+		curStripT := (instances[nInst].T / strips) * strips
+		dt := (curStripT - stripT) / strips
 		iadt.encode(enc, int64(dt))
-		stripT = curT
+		stripT = curStripT
 
 		// encode instances in this strip
 		first := true
 		curS := 0
-		for nInst < len(instances) && instances[nInst].T == curT {
+		for nInst < len(instances) && (instances[nInst].T/strips)*strips == stripT {
 			inst := instances[nInst]
 			if first {
 				dfs := inst.S - firstS
@@ -416,9 +579,14 @@ func EncodeTextRegionSegment(
 				curS = inst.S
 				first = false
 			} else {
-				ids := inst.S - curS
+				ids := inst.S - curS - dsOffset
 				iads.encode(enc, int64(ids))
 				curS = inst.S
+			}
+
+			// T within strip (§6.4.9)
+			if strips > 1 {
+				iait.encode(enc, int64(inst.T-stripT))
 			}
 
 			// symbol ID
@@ -565,9 +733,8 @@ func encodeSymIDHuffTable(w *bitWriter, numSyms int) *huffTable {
 
 // EncodeTextRegionSegmentHuffman encodes a Huffman-coded text region segment.
 // Uses standard tables B.6 (FS), B.8 (DS), B.11 (DT).
-// refCorner is one of cornerBottomLeft, cornerTopLeft, cornerBottomRight,
-// cornerTopRight. When transposed is true, T and S axes are swapped.
-// Instances with a non-nil Bitmap field are encoded with refinement.
+// See [EncodeTextRegionSegment] for the meaning of strips, dsOffset, and
+// defPixel.
 func EncodeTextRegionSegmentHuffman(
 	width, height, x, y int,
 	instances []SymbolInstance,
@@ -575,10 +742,14 @@ func EncodeTextRegionSegmentHuffman(
 	refCorner int,
 	transposed bool,
 	combOp bitmap.CombOp,
+	strips int,
+	dsOffset int,
+	defPixel int,
 ) ([]byte, error) {
 	return encodeTextRegionHuffman(
 		width, height, x, y, instances, symbols,
 		refCorner, transposed, combOp,
+		strips, dsOffset, defPixel,
 		huffTableB6, uint16(0))
 }
 
@@ -593,9 +764,15 @@ func encodeTextRegionHuffman(
 	refCorner int,
 	transposed bool,
 	combOp bitmap.CombOp,
+	strips int,
+	dsOffset int,
+	defPixel int,
 	fsTable *huffTable,
 	htags uint16,
 ) ([]byte, error) {
+	if strips < 1 {
+		strips = 1
+	}
 	numSymbols := len(symbols)
 
 	if len(instances) == 0 {
@@ -619,8 +796,9 @@ func encodeTextRegionHuffman(
 		}
 	}
 
-	// text region flags: SBHUFF=1, LOGSBSTRIPS=0
-	flags := uint16(1) // SBHUFF=1
+	// text region flags
+	logStrips := bits.TrailingZeros(uint(strips)) & 3
+	flags := uint16(1) | uint16(logStrips)<<2 // SBHUFF=1
 	if needsRefine {
 		flags |= 0x02            // SBREFINE=1
 		flags |= uint16(1) << 15 // SBRTEMPLATE=1
@@ -630,6 +808,8 @@ func encodeTextRegionHuffman(
 		flags |= 0x40
 	}
 	flags |= uint16(combOp&3) << 7
+	flags |= uint16(defPixel&1) << 9
+	flags |= uint16(dsOffset&0x1F) << 10
 
 	var buf []byte
 	buf = WriteRegionSegmentInfo(buf, width, height, x, y, combOp)
@@ -643,26 +823,28 @@ func encodeTextRegionHuffman(
 	// symbol ID table
 	symIDTable := encodeSymIDHuffTable(w, numSymbols)
 
-	// initial STRIPT: encode 1 so stripT = -1
+	// initial STRIPT: encode 1 so stripT = -strips
 	// (B.11 minimum value is 1)
 	huffTableB11.encode(w, 1)
-	stripT := -1
+	stripT := -strips
 	firstS := 0
 	nInst := 0
 
 	for nInst < len(instances) {
-		curT := instances[nInst].T
-		dt := curT - stripT
+		// start a new strip row
+		curStripT := (instances[nInst].T / strips) * strips
+		dt := (curStripT - stripT) / strips
 		if dt < 1 {
-			return nil, fmt.Errorf("non-positive strip delta %d (curT=%d, stripT=%d)", dt, curT, stripT)
+			return nil, fmt.Errorf("non-positive strip delta %d (curStripT=%d, stripT=%d)",
+				dt, curStripT, stripT)
 		}
 		huffTableB11.encode(w, int64(dt))
-		stripT = curT
+		stripT = curStripT
 
 		// encode instances in this strip
 		first := true
 		curS := 0
-		for nInst < len(instances) && instances[nInst].T == curT {
+		for nInst < len(instances) && (instances[nInst].T/strips)*strips == stripT {
 			inst := instances[nInst]
 			if first {
 				dfs := inst.S - firstS
@@ -671,9 +853,14 @@ func encodeTextRegionHuffman(
 				curS = inst.S
 				first = false
 			} else {
-				ids := inst.S - curS
+				ids := inst.S - curS - dsOffset
 				huffTableB8.encode(w, int64(ids))
 				curS = inst.S
+			}
+
+			// T within strip (§6.4.9)
+			if strips > 1 {
+				w.writeBits(uint32(inst.T-stripT), logStrips)
 			}
 
 			// symbol ID
@@ -740,26 +927,51 @@ func encodeTextRegionHuffman(
 	return buf, nil
 }
 
-// encodeGenericRegionSegment encodes a generic region segment's data.
-func EncodeGenericRegionSegment(bm *bitmap.Bitmap, x, y int, template int, combOp bitmap.CombOp) []byte {
+// EncodeGenericRegionSegment encodes a generic region segment's data.
+// If tpgdon is true, typical prediction is enabled, which can reduce the
+// output size for images with many duplicate rows.
+// If extTemplate is true and template is 0, the extended template with 12
+// adaptive pixels is used instead of 4.
+func EncodeGenericRegionSegment(bm *bitmap.Bitmap, x, y int, template int, combOp bitmap.CombOp, tpgdon, extTemplate bool) []byte {
+	// extended template only applies to template 0
+	if template != 0 {
+		extTemplate = false
+	}
+
 	var buf []byte
 	buf = WriteRegionSegmentInfo(buf, bm.Width(), bm.Height(), x, y, combOp)
 
 	// generic region flags (1 byte)
-	flags := byte((template & 3) << 1) // MMR=0, TPGDON=0
+	flags := byte((template & 3) << 1) // MMR=0
+	if tpgdon {
+		flags |= 0x08
+	}
+	if extTemplate {
+		flags |= 0x10
+	}
 	buf = append(buf, flags)
 
 	// AT positions
-	buf, atx, aty := appendDefaultAT(buf, template)
-
-	// encode the bitmap
 	p := &genericRegionParams{
-		Width:    bm.Width(),
-		Height:   bm.Height(),
-		Template: template,
+		Width:       bm.Width(),
+		Height:      bm.Height(),
+		Template:    template,
+		TPGDON:      tpgdon,
+		ExtTemplate: extTemplate,
 	}
-	copy(p.ATX[:], atx[:])
-	copy(p.ATY[:], aty[:])
+	if extTemplate {
+		// 12 nominal AT pixel positions (matching buildContext)
+		p.ATX = [12]int8{-2, 0, -2, -1, 1, 2, -3, -4, 2, 3, -2, -3}
+		p.ATY = [12]int8{0, -2, -1, -2, -2, -1, 0, 0, -2, -1, -2, -1}
+		for i := range 12 {
+			buf = append(buf, byte(p.ATX[i]), byte(p.ATY[i]))
+		}
+	} else {
+		var atx, aty [4]int8
+		buf, atx, aty = appendDefaultAT(buf, template)
+		copy(p.ATX[:], atx[:])
+		copy(p.ATY[:], aty[:])
+	}
 
 	enc := newMQEncoder()
 	encodeGenericRegion(enc, bm, p, nil)
@@ -770,12 +982,17 @@ func EncodeGenericRegionSegment(bm *bitmap.Bitmap, x, y int, template int, combO
 
 // EncodeRefinementRegionSegment encodes a generic refinement region segment
 // (type 42). The bitmap bm is encoded as a refinement of ref.
-func EncodeRefinementRegionSegment(bm, ref *bitmap.Bitmap, x, y, template int, combOp bitmap.CombOp) []byte {
+// If tpgron is true, typical prediction is enabled for refinement.
+func EncodeRefinementRegionSegment(bm, ref *bitmap.Bitmap, x, y, template int, combOp bitmap.CombOp, tpgron bool) []byte {
 	var buf []byte
 	buf = WriteRegionSegmentInfo(buf, bm.Width(), bm.Height(), x, y, combOp)
 
 	// refinement region flags (1 byte): bit 0 = GRTEMPLATE, bit 1 = TPGRON
-	buf = append(buf, byte(template&1))
+	flags := byte(template & 1)
+	if tpgron {
+		flags |= 0x02
+	}
+	buf = append(buf, flags)
 
 	// AT positions (only for template 0)
 	p := &refinementParams{
@@ -783,6 +1000,7 @@ func EncodeRefinementRegionSegment(bm, ref *bitmap.Bitmap, x, y, template int, c
 		Height:    bm.Height(),
 		Template:  template,
 		Reference: ref,
+		TPGRON:    tpgron,
 	}
 	if template == 0 {
 		p.ATX = [2]int8{-1, -1}
@@ -941,7 +1159,7 @@ func halftoneATPositions(template int) (atx [4]int8, aty [4]int8) {
 
 // encodeGrayScaleImage encodes a gray-scale image to bitplanes (Annex C).
 // grayValues is row-major [gsh][gsw]. Returns the concatenated MQ data.
-func encodeGrayScaleImage(grayValues []int, gsw, gsh, template int) []byte {
+func encodeGrayScaleImage(grayValues []int, gsw, gsh, template int, skip *bitmap.Bitmap) []byte {
 	// determine bits per gray value
 	maxVal := 0
 	for _, v := range grayValues {
@@ -987,6 +1205,10 @@ func encodeGrayScaleImage(grayValues []int, gsw, gsh, template int) []byte {
 			Width:    gsw,
 			Height:   gsh,
 			Template: template,
+		}
+		if skip != nil {
+			p.UseSkip = true
+			p.Skip = skip
 		}
 		copy(p.ATX[:], atx[:])
 		copy(p.ATY[:], aty[:])
@@ -1051,18 +1273,39 @@ func encodeGrayScaleImageMMR(grayValues []int, gsw, gsh int) ([]byte, error) {
 	return result, nil
 }
 
+// computeHalftoneSkipBitmap computes the skip bitmap for a halftone region
+// (§6.6.5.1). Grid cells where the pattern falls entirely outside the
+// region are marked as skipped.
+func computeHalftoneSkipBitmap(gsw, gsh, hgx, hgy, hrx, hry, hpw, hph, regionW, regionH int) *bitmap.Bitmap {
+	skip := bitmap.New(gsw, gsh)
+	for mg := range gsh {
+		for ng := range gsw {
+			x := (hgx + mg*hry + ng*hrx) >> 8
+			y := (hgy + mg*hrx - ng*hry) >> 8
+			if x+hpw <= 0 || x >= regionW || y+hph <= 0 || y >= regionH {
+				skip.SetPixel(ng, mg, true)
+			}
+		}
+	}
+	return skip
+}
+
 // encodeHalftoneRegionSegmentMMR encodes a halftone region segment using MMR.
 func encodeHalftoneRegionSegmentMMR(
 	width, height int,
 	grayValues []int, gsw, gsh int,
 	hgx, hgy, hrx, hry int,
 	combOp bitmap.CombOp,
+	enableSkip bool,
 ) ([]byte, error) {
 	var buf []byte
 	buf = WriteRegionSegmentInfo(buf, width, height, 0, 0, combOp)
 
-	// halftone flags: MMR=1, template=0, enableSkip=0, combOp, defPixel=0
+	// halftone flags: MMR=1, template=0, combOp, defPixel=0
 	flags := byte(0x01) | byte((combOp&7)<<4)
+	if enableSkip {
+		flags |= 0x08
+	}
 	buf = append(buf, flags)
 
 	// grid parameters
@@ -1083,17 +1326,23 @@ func encodeHalftoneRegionSegmentMMR(
 }
 
 // encodeHalftoneRegionSegment encodes a halftone region segment's data.
+// When enableSkip is true and hpw/hph are the pattern dimensions, grid cells
+// that fall entirely outside the region are marked in a skip bitmap.
 func encodeHalftoneRegionSegment(
 	width, height int,
 	grayValues []int, gsw, gsh int,
 	hgx, hgy, hrx, hry int,
 	template int, combOp bitmap.CombOp,
+	enableSkip bool, hpw, hph int,
 ) []byte {
 	var buf []byte
 	buf = WriteRegionSegmentInfo(buf, width, height, 0, 0, combOp)
 
-	// halftone flags (1 byte): MMR=0, template, enableSkip=0, combOp, defPixel=0
+	// halftone flags (1 byte): MMR=0, template, combOp, defPixel=0
 	flags := byte((template&3)<<1) | byte((combOp&7)<<4)
+	if enableSkip {
+		flags |= 0x08
+	}
 	buf = append(buf, flags)
 
 	// grid parameters
@@ -1104,8 +1353,14 @@ func encodeHalftoneRegionSegment(
 	buf = appendUint16(buf, uint16(hrx))
 	buf = appendUint16(buf, uint16(hry))
 
+	// compute skip bitmap (§6.6.5.1)
+	var skip *bitmap.Bitmap
+	if enableSkip {
+		skip = computeHalftoneSkipBitmap(gsw, gsh, hgx, hgy, hrx, hry, hpw, hph, width, height)
+	}
+
 	// encode gray-scale image
-	buf = append(buf, encodeGrayScaleImage(grayValues, gsw, gsh, template)...)
+	buf = append(buf, encodeGrayScaleImage(grayValues, gsw, gsh, template, skip)...)
 	return buf
 }
 

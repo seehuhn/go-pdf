@@ -131,7 +131,7 @@ func (e *Encoder) EncodePage(page *Page) ([]byte, error) {
 			if reg.opts != nil {
 				template = reg.opts.Template
 			}
-			segData := internaljbig2.EncodeGenericRegionSegment(reg.bm, reg.x, reg.y, template, bitmap.CombOpOR)
+			segData := internaljbig2.EncodeGenericRegionSegment(reg.bm, reg.x, reg.y, template, bitmap.CombOpOR, true, false)
 			segNum := e.nextSegNum
 			e.nextSegNum++
 			buf = internaljbig2.WriteSegmentHeader(buf, segNum, 39, 1, nil, uint32(len(segData)))
@@ -166,7 +166,7 @@ func (e *Encoder) EncodePage(page *Page) ([]byte, error) {
 
 			segData := internaljbig2.EncodeTextRegionSegment(
 				reg.Width, reg.Height, reg.X, reg.Y, insts, e.symbols,
-				0, false, reg.CombOp) // cornerBottomLeft, not transposed
+				0, false, reg.CombOp, 1, 0, 0) // cornerBottomLeft, not transposed
 			segNum := e.nextSegNum
 			e.nextSegNum++
 			buf = internaljbig2.WriteSegmentHeader(buf, segNum, 7, 1, []uint32{sdRef}, uint32(len(segData)))

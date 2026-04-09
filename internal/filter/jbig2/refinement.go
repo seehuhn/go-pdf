@@ -102,8 +102,35 @@ func encodeRefinementRegionInline(enc *mqEncoder, bm *bitmap.Bitmap, p *refineme
 		}
 	}
 
+	ltp := 0
 	for y := range bm.Height() {
+		if p.TPGRON {
+			// determine whether we can use ltp=1 for this row:
+			// every typical pixel must match the reference
+			canUseLTP := true
+			for x := range bm.Width() {
+				if refTypicalPrediction(p, x, y) {
+					rx := x - p.RefDX
+					ry := y - p.RefDY
+					if bm.GetPixel(x, y) != p.Reference.GetPixel(rx, ry) {
+						canUseLTP = false
+						break
+					}
+				}
+			}
+			typical := 0
+			if canUseLTP {
+				typical = 1
+			}
+			sltp := ltp ^ typical
+			enc.encode(&cx[refTPGRContexts[p.Template]], sltp)
+			ltp = typical
+		}
+
 		for x := range bm.Width() {
+			if ltp != 0 && refTypicalPrediction(p, x, y) {
+				continue
+			}
 			context := buildRefContext(bm, p, x, y)
 			d := getPixel(bm, x, y)
 			enc.encode(&cx[context], d)

@@ -351,7 +351,7 @@ func FuzzHuffRefAggSymbolDict(f *testing.F) {
 		// look for any symbol dictionary segment
 		var symbols []*bitmap.Bitmap
 		for _, seg := range d1.segments {
-			if seg.symbols != nil && len(seg.symbols) > 0 {
+			if len(seg.symbols) > 0 {
 				symbols = seg.symbols
 				break
 			}
@@ -394,4 +394,82 @@ func FuzzHuffRefAggSymbolDict(f *testing.F) {
 			}
 		}
 	})
+}
+
+// TestMultiInstanceAggregation tests the encoder and decoder for
+// multi-instance aggregation (REFAGGNINST > 1) in symbol dictionaries.
+func TestMultiInstanceAggregation(t *testing.T) {
+	// create two small component symbols
+	comp0 := makeDiagonal(6, 8)     // component 0
+	comp1 := makeCheckerboard(8, 8) // component 1
+
+	// first encode a basic symbol dictionary with the components
+	compSyms := []*bitmap.Bitmap{comp0, comp1}
+	sdData := EncodeSymbolDictSegment(compSyms, 1)
+
+	// create a composite symbol by placing comp0 and comp1 side by side
+	compositeW := comp0.Width() + comp1.Width()
+	compositeH := 8
+	expected := bitmap.New(compositeW, compositeH)
+	expected.Combine(comp0, 0, 0, bitmap.CombOpOR)
+	expected.Combine(comp1, comp0.Width(), 0, bitmap.CombOpOR)
+
+	// encode an aggregate symbol dictionary using multi-instance
+	// use T=0 (top-left) for bottomLeft corner placement
+	aggSyms := []AggregateSymbol{
+		{
+			Width:  compositeW,
+			Height: compositeH,
+			Instances: []SymbolInstance{
+				{SymID: 0, T: comp0.Height() - 1, S: 0,
+					Wi: comp0.Width(), Hi: comp0.Height()},
+				{SymID: 1, T: comp1.Height() - 1, S: comp0.Width(),
+					Wi: comp1.Width(), Hi: comp1.Height()},
+			},
+		},
+	}
+	aggData := EncodeSymbolDictSegmentAgg(aggSyms, len(compSyms))
+
+	// build stream: seg 0 = component SD (global), seg 1 = aggregate SD
+	var stream []byte
+	stream = WriteSegmentHeader(stream, 0, segSymbolDict, 0, nil, uint32(len(sdData)))
+	stream = append(stream, sdData...)
+	stream = WriteSegmentHeader(stream, 1, segSymbolDict, 0, []uint32{0}, uint32(len(aggData)))
+	stream = append(stream, aggData...)
+
+	// add page info so processStream works
+	pageData := WritePageInfo(nil, 1, 1)
+	stream = WriteSegmentHeader(stream, 2, segPageInfo, 1, nil, uint32(len(pageData)))
+	stream = append(stream, pageData...)
+
+	// decode to get the symbols
+	d := &decoder{
+		segments:  make(map[uint32]segmentResult),
+		inputSize: len(stream),
+	}
+	err := d.processStream(stream)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+
+	// the aggregate SD (segment 1) should have exported symbols
+	seg1, ok := d.segments[1]
+	if !ok || seg1.symbols == nil {
+		t.Fatalf("no symbols from aggregate SD")
+	}
+
+	// find the composite symbol (last in the exported set)
+	if len(seg1.symbols) == 0 {
+		t.Fatalf("aggregate SD exported 0 symbols")
+	}
+	got := seg1.symbols[len(seg1.symbols)-1]
+
+	if got.Width() != expected.Width() || got.Height() != expected.Height() {
+		t.Fatalf("dimensions: got %dx%d, want %dx%d",
+			got.Width(), got.Height(), expected.Width(), expected.Height())
+	}
+
+	if diff := cmp.Diff(expected.Pix, got.Pix); diff != "" {
+		t.Errorf("multi-instance aggregation round-trip failed (-want +got):\n%s", diff)
+	}
 }

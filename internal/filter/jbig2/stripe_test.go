@@ -55,7 +55,7 @@ func TestUnknownPageHeightRoundTrip(t *testing.T) {
 		}
 
 		// immediate generic region at (0, y)
-		segData := EncodeGenericRegionSegment(stripe, 0, y, 1, bitmap.CombOpOR)
+		segData := EncodeGenericRegionSegment(stripe, 0, y, 1, bitmap.CombOpOR, false, false)
 		stream = WriteSegmentHeader(stream, segNum, segImmediateGeneric, 1, nil, uint32(len(segData)))
 		stream = append(stream, segData...)
 		segNum++
@@ -94,7 +94,7 @@ func TestUnknownPageHeightSingleStripe(t *testing.T) {
 	stream = append(stream, pageData...)
 
 	// segment 1: immediate generic region
-	segData := EncodeGenericRegionSegment(bm, 0, 0, 1, bitmap.CombOpOR)
+	segData := EncodeGenericRegionSegment(bm, 0, 0, 1, bitmap.CombOpOR, false, false)
 	stream = WriteSegmentHeader(stream, 1, segImmediateGeneric, 1, nil, uint32(len(segData)))
 	stream = append(stream, segData...)
 
