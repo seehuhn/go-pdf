@@ -276,11 +276,176 @@ func TestHalftoneMMRRoundTrip(t *testing.T) {
 	}
 }
 
+func FuzzGenericRegionMMRRoundTrip(f *testing.F) {
+	patterns := []struct {
+		name string
+		bm   *bitmap.Bitmap
+	}{
+		{"diagonal_16", makeDiagonal(16, 16)},
+		{"zeros_16", makeAllZeros(16, 16)},
+		{"checker_16", makeCheckerboard(16, 16)},
+		{"hstripes_16", makeHStripes(16, 16)},
+		{"vstripes_16", makeVStripes(16, 16)},
+		{"center_16", makeCenterBlock(16, 16)},
+		{"diagonal_64x32", makeDiagonal(64, 32)},
+	}
+
+	for _, pat := range patterns {
+		segData, err := EncodeGenericRegionSegmentMMR(pat.bm, 0, 0, bitmap.CombOpOR)
+		if err != nil {
+			f.Fatalf("seed encode failed: %v", err)
+		}
+		var stream []byte
+		pageData := WritePageInfo(nil, pat.bm.Width(), pat.bm.Height())
+		stream = WriteSegmentHeader(stream, 0, segPageInfo, 1, nil, uint32(len(pageData)))
+		stream = append(stream, pageData...)
+		stream = WriteSegmentHeader(stream, 1, segImmediateGeneric, 1, nil, uint32(len(segData)))
+		stream = append(stream, segData...)
+		f.Add(stream)
+	}
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBitmapRoundTrip(t, data)
+	})
+}
+
+func FuzzPatternDictMMRRoundTrip(f *testing.F) {
+	pw, ph := 8, 8
+	patterns := []*bitmap.Bitmap{
+		makeAllZeros(pw, ph),
+		makeCheckerboard(pw, ph),
+		makeDiagonal(pw, ph),
+		makeCenterBlock(pw, ph),
+	}
+
+	patData, err := encodePatternDictSegmentMMR(patterns)
+	if err != nil {
+		f.Fatalf("seed encode failed: %v", err)
+	}
+	var seed []byte
+	seed = WriteSegmentHeader(seed, 0, segPatternDict, 0, nil, uint32(len(patData)))
+	seed = append(seed, patData...)
+	pageData := WritePageInfo(nil, 1, 1)
+	seed = WriteSegmentHeader(seed, 1, segPageInfo, 1, nil, uint32(len(pageData)))
+	seed = append(seed, pageData...)
+	f.Add(seed)
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		d1 := &decoder{
+			segments:  make(map[uint32]segmentResult),
+			inputSize: len(data),
+		}
+		if err := d1.processStream(data); err != nil {
+			return
+		}
+		seg1, ok := d1.segments[0]
+		if !ok || len(seg1.patterns) == 0 {
+			return
+		}
+
+		reEncoded, err := encodePatternDictSegmentMMR(seg1.patterns)
+		if err != nil {
+			return
+		}
+		var stream []byte
+		stream = WriteSegmentHeader(stream, 0, segPatternDict, 0, nil, uint32(len(reEncoded)))
+		stream = append(stream, reEncoded...)
+		pageData := WritePageInfo(nil, 1, 1)
+		stream = WriteSegmentHeader(stream, 1, segPageInfo, 1, nil, uint32(len(pageData)))
+		stream = append(stream, pageData...)
+
+		d2 := &decoder{
+			segments:  make(map[uint32]segmentResult),
+			inputSize: len(stream),
+		}
+		if err := d2.processStream(stream); err != nil {
+			t.Fatalf("re-decode failed: %v", err)
+		}
+		seg2, ok := d2.segments[0]
+		if !ok || seg2.patterns == nil {
+			t.Fatalf("no patterns after re-decode")
+		}
+
+		if len(seg2.patterns) != len(seg1.patterns) {
+			return
+		}
+		for i := range seg1.patterns {
+			if !bitmapsEqual(seg1.patterns[i], seg2.patterns[i]) {
+				t.Errorf("pattern %d round-trip failed", i)
+			}
+		}
+	})
+}
+
+func FuzzHalftoneMMRRoundTrip(f *testing.F) {
+	pw, ph := 8, 8
+	patterns := []*bitmap.Bitmap{
+		makeAllZeros(pw, ph),
+		makeCheckerboard(pw, ph),
+		makeDiagonal(pw, ph),
+		makeCenterBlock(pw, ph),
+	}
+
+	gsw, gsh := 4, 3
+	grayValues := []int{
+		0, 1, 2, 3,
+		3, 2, 1, 0,
+		1, 3, 0, 2,
+	}
+
+	hrx := pw * 256
+	width := gsw * pw
+	height := gsh * ph
+
+	patData, err := encodePatternDictSegmentMMR(patterns)
+	if err != nil {
+		f.Fatalf("seed encode failed: %v", err)
+	}
+	htData, err := encodeHalftoneRegionSegmentMMR(
+		width, height, grayValues, gsw, gsh,
+		0, 0, hrx, 0, bitmap.CombOpOR,
+	)
+	if err != nil {
+		f.Fatalf("seed encode failed: %v", err)
+	}
+
+	var seed []byte
+	seed = WriteSegmentHeader(seed, 0, segPatternDict, 0, nil, uint32(len(patData)))
+	seed = append(seed, patData...)
+	pageData := WritePageInfo(nil, width, height)
+	seed = WriteSegmentHeader(seed, 1, segPageInfo, 1, nil, uint32(len(pageData)))
+	seed = append(seed, pageData...)
+	seed = WriteSegmentHeader(seed, 2, segImmediateHalftone, 1, []uint32{0}, uint32(len(htData)))
+	seed = append(seed, htData...)
+	f.Add(seed)
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBitmapRoundTrip(t, data)
+	})
+}
+
 func FuzzMMRRoundTrip(f *testing.F) {
-	// seed with pixel data for small bitmaps
-	f.Add(8, 8, []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF})
-	f.Add(16, 4, []byte{0xAA, 0x55, 0x55, 0xAA, 0xAA, 0x55, 0x55, 0xAA})
-	f.Add(13, 3, []byte{0xA5, 0xA0, 0x5A, 0x40, 0xA5, 0xA0})
+	// seed from the same patterns as TestEncodeMMRRoundTrip
+	mmrPatterns := []struct {
+		name string
+		bm   *bitmap.Bitmap
+	}{
+		{"diagonal_16", makeDiagonal(16, 16)},
+		{"zeros_16", makeAllZeros(16, 16)},
+		{"checker_16", makeCheckerboard(16, 16)},
+		{"hstripes_16", makeHStripes(16, 16)},
+		{"vstripes_16", makeVStripes(16, 16)},
+		{"center_16", makeCenterBlock(16, 16)},
+		{"diagonal_64x32", makeDiagonal(64, 32)},
+	}
+	for _, pat := range mmrPatterns {
+		stride := (pat.bm.Width() + 7) / 8
+		pixData := make([]byte, stride*pat.bm.Height())
+		for y := range pat.bm.Height() {
+			copy(pixData[y*stride:], pat.bm.Pix[y*pat.bm.Stride:y*pat.bm.Stride+stride])
+		}
+		f.Add(pat.bm.Width(), pat.bm.Height(), pixData)
+	}
 
 	f.Fuzz(func(t *testing.T, width, height int, pixData []byte) {
 		if width <= 0 || width > 256 || height <= 0 || height > 256 {

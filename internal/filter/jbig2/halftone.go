@@ -129,8 +129,8 @@ func (d *decoder) processHalftoneRegion(hdr *segmentHeader, data []byte) error {
 		}
 	}
 
-	// composite onto page
-	if d.pageBitmap != nil {
+	// composite onto page (skip for intermediate segments)
+	if hdr.Type != segIntermediateHalftone && d.pageBitmap != nil {
 		op := bitmap.CombOp(rsi.CombOp)
 		d.pageBitmap.Combine(bm, int(rsi.X), int(rsi.Y), op)
 	}
@@ -193,6 +193,9 @@ func decodeGrayScaleImage(
 			}
 			// advance past the MQ data consumed
 			dataOffset += dec.bp + 1
+			if dataOffset > len(data) {
+				dataOffset = len(data)
+			}
 		}
 
 		// Gray-code XOR (§C.5.1 step 3b)

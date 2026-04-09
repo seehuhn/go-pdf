@@ -263,6 +263,17 @@ func (w *Writer) encode1DRun(runLength int, runBit byte) error {
 		runLength -= 2560
 	}
 
+	if runLength >= 1792 {
+		// extended makeup codes (shared between black and white)
+		extIndex := (runLength - 1792) / 64
+		entry := extMakeupEncodeTable[extIndex]
+		err := w.writeBits(entry.Code, entry.Width)
+		if err != nil {
+			return err
+		}
+		runLength -= (extIndex + 28) * 64 // 28 = 1792/64
+	}
+
 	if runLength >= 64 {
 		makeupIndex := runLength/64 - 1
 		var entry encodeNode

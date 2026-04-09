@@ -165,7 +165,7 @@ func (e *Encoder) EncodePage(page *Page) ([]byte, error) {
 			}
 
 			segData := internaljbig2.EncodeTextRegionSegment(
-				reg.Width, reg.Height, reg.X, reg.Y, insts, len(e.symbols),
+				reg.Width, reg.Height, reg.X, reg.Y, insts, e.symbols,
 				0, false, reg.CombOp) // cornerBottomLeft, not transposed
 			segNum := e.nextSegNum
 			e.nextSegNum++

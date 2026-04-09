@@ -99,7 +99,7 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 	sdNumInSyms := len(inputSymbols)
 
 	if sdhuff {
-		return d.decodeSymbolDictHuffman(data[offset:], sdNumInSyms, sdNumNewSyms, sdNumExSyms,
+		return d.decodeSymbolDictHuffman(hdr, data[offset:], sdNumInSyms, sdNumNewSyms, sdNumExSyms,
 			inputSymbols, sdrefagg, sdrTemplate, sdrATX, sdrATY, flags)
 	}
 
@@ -125,6 +125,7 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 
 	var hcHeight, symWidth int64
 	nDecoded := 0
+	emptyClasses := 0
 
 	for nDecoded < sdNumNewSyms {
 		// decode height class delta
@@ -139,6 +140,7 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 		// The inner loop runs until OOB is received. When SDREFAGG=1,
 		// the T.88 reference encoder omits the trailing OOB, so we
 		// check the count before attempting to read another DW.
+		prevDecoded := nDecoded
 		for {
 			if sdrefagg && nDecoded >= sdNumNewSyms {
 				break
@@ -219,22 +221,43 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 			}
 			nDecoded++
 		}
+
+		// guard against malformed data producing endless empty
+		// height classes without any symbols
+		if nDecoded == prevDecoded {
+			emptyClasses++
+			if emptyClasses > 4 {
+				return nil, errors.New("too many empty height classes")
+			}
+		} else {
+			emptyClasses = 0
+		}
 	}
 
 	// decode export flags
 	if sdNumExSyms > sdNumInSyms+sdNumNewSyms {
 		sdNumExSyms = sdNumInSyms + sdNumNewSyms
 	}
-	exported := make([]*bitmap.Bitmap, 0, sdNumExSyms)
 	allSyms := make([]*bitmap.Bitmap, sdNumInSyms+sdNumNewSyms)
 	copy(allSyms, inputSymbols)
 	copy(allSyms[sdNumInSyms:], newSymbols)
 
+	exported := decodeExportFlags(allSyms, sdNumExSyms, func() int {
+		return int(iaex.decode(dec))
+	})
+	return exported, nil
+}
+
+// decodeExportFlags selects exported symbols from allSyms using
+// run-length encoded export flags. decodeRun returns the next run
+// length; it should return a negative value when the data is exhausted.
+func decodeExportFlags(allSyms []*bitmap.Bitmap, cap int, decodeRun func() int) []*bitmap.Bitmap {
+	exported := make([]*bitmap.Bitmap, 0, cap)
 	exIdx := 0
 	curFlag := 0
 	zeroRuns := 0
 	for exIdx < len(allSyms) {
-		runLen := int(iaex.decode(dec))
+		runLen := decodeRun()
 		if runLen < 0 || exIdx+runLen > len(allSyms) {
 			break
 		}
@@ -254,8 +277,7 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 		}
 		curFlag ^= 1
 	}
-
-	return exported, nil
+	return exported
 }
 
 func symCodeLen(n int) int {
@@ -267,6 +289,7 @@ func symCodeLen(n int) int {
 
 // decodeSymbolDictHuffman decodes a Huffman-coded symbol dictionary.
 func (d *decoder) decodeSymbolDictHuffman(
+	hdr *segmentHeader,
 	data []byte,
 	sdNumInSyms, sdNumNewSyms, sdNumExSyms int,
 	inputSymbols []*bitmap.Bitmap,
@@ -277,8 +300,10 @@ func (d *decoder) decodeSymbolDictHuffman(
 	// select Huffman tables from flags
 	dhSel := (flags >> 2) & 3
 	dwSel := (flags >> 4) & 3
-
+	bmSizeSel := (flags >> 6) & 1
 	aggInstSel := (flags >> 7) & 1
+
+	tableIdx := 0
 
 	var dhTable, dwTable *huffTable
 	switch dhSel {
@@ -286,6 +311,12 @@ func (d *decoder) decodeSymbolDictHuffman(
 		dhTable = huffTableB4
 	case 1:
 		dhTable = huffTableB5
+	case 3:
+		var err error
+		dhTable, err = d.customTable(hdr.RefSegments, &tableIdx)
+		if err != nil {
+			return nil, err
+		}
 	default:
 		return nil, fmt.Errorf("unsupported SDHUFFDH selection %d", dhSel)
 	}
@@ -294,8 +325,25 @@ func (d *decoder) decodeSymbolDictHuffman(
 		dwTable = huffTableB2
 	case 1:
 		dwTable = huffTableB3
+	case 3:
+		var err error
+		dwTable, err = d.customTable(hdr.RefSegments, &tableIdx)
+		if err != nil {
+			return nil, err
+		}
 	default:
 		return nil, fmt.Errorf("unsupported SDHUFFDW selection %d", dwSel)
+	}
+
+	var bmSizeTable *huffTable
+	if bmSizeSel == 0 {
+		bmSizeTable = huffTableB1
+	} else {
+		var err error
+		bmSizeTable, err = d.customTable(hdr.RefSegments, &tableIdx)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// SDHUFFAGGINST: only used when sdrefagg is true
@@ -304,7 +352,11 @@ func (d *decoder) decodeSymbolDictHuffman(
 		if aggInstSel == 0 {
 			aggInstTable = huffTableB1
 		} else {
-			return nil, fmt.Errorf("unsupported SDHUFFAGGINST selection %d", aggInstSel)
+			var err error
+			aggInstTable, err = d.customTable(hdr.RefSegments, &tableIdx)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -364,7 +416,7 @@ func (d *decoder) decodeSymbolDictHuffman(
 
 		if !sdrefagg {
 			// decode collective bitmap (MMR or uncompressed)
-			bmSize := int(huffTableB1.decode(hr))
+			bmSize := int(bmSizeTable.decode(hr))
 			if bmSize < 0 {
 				return nil, fmt.Errorf("invalid bitmap size %d", bmSize)
 			}
@@ -414,18 +466,8 @@ func (d *decoder) decodeSymbolDictHuffman(
 			}
 
 			// split collective bitmap into individual symbols
-			xOff := 0
-			for i := hcFirstSym; i < nDecoded; i++ {
-				w := newSymWidths[i]
-				sym := bitmap.New(w, iHcHeight)
-				for y := range iHcHeight {
-					for x := range w {
-						sym.SetPixel(x, y, collectiveBM.GetPixel(xOff+x, y))
-					}
-				}
-				newSymbols[i] = sym
-				xOff += w
-			}
+			parts := splitBitmapH(collectiveBM, newSymWidths[hcFirstSym:nDecoded])
+			copy(newSymbols[hcFirstSym:], parts)
 		} else {
 			// refinement/aggregate coding (§6.5.8)
 			codeLen := symCodeLen(sdNumInSyms + sdNumNewSyms)
@@ -452,7 +494,7 @@ func (d *decoder) decodeSymbolDictHuffman(
 					rdy := int(huffTableB15.decode(hr))
 
 					// refinement bitmap data size (§6.5.8.2.2 step 5)
-					bmSize := int(huffTableB1.decode(hr))
+					bmSize := int(bmSizeTable.decode(hr))
 					hr.align()
 
 					// look up reference symbol
@@ -507,35 +549,16 @@ func (d *decoder) decodeSymbolDictHuffman(
 	if sdNumExSyms > sdNumInSyms+sdNumNewSyms {
 		sdNumExSyms = sdNumInSyms + sdNumNewSyms
 	}
-	exported := make([]*bitmap.Bitmap, 0, sdNumExSyms)
 	allSyms := make([]*bitmap.Bitmap, sdNumInSyms+sdNumNewSyms)
 	copy(allSyms, inputSymbols)
 	copy(allSyms[sdNumInSyms:], newSymbols)
 
-	exIdx := 0
-	curFlag := 0
-	zeroRuns := 0
-	for exIdx < len(allSyms) && !hr.eof {
-		runLen := int(huffTableB1.decode(hr))
-		if runLen < 0 || exIdx+runLen > len(allSyms) {
-			break
+	exported := decodeExportFlags(allSyms, sdNumExSyms, func() int {
+		if hr.eof {
+			return -1
 		}
-		if runLen == 0 {
-			zeroRuns++
-			if zeroRuns > 4 {
-				break // malformed data producing endless zero-length runs
-			}
-		} else {
-			zeroRuns = 0
-		}
-		for i := 0; i < runLen && exIdx < len(allSyms); i++ {
-			if curFlag != 0 {
-				exported = append(exported, allSyms[exIdx])
-			}
-			exIdx++
-		}
-		curFlag ^= 1
-	}
+		return int(huffTableB1.decode(hr))
+	})
 	if hr.err != nil {
 		return nil, hr.err
 	}

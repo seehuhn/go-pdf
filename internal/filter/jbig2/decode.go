@@ -65,8 +65,9 @@ func checkBitmapSize(width, height int) error {
 // The globals stream may be nil if there are no global segments.
 func Decode(globals, page []byte) (*bitmap.Bitmap, error) {
 	d := &decoder{
-		segments:  make(map[uint32]segmentResult),
-		inputSize: len(globals) + len(page),
+		segments:         make(map[uint32]segmentResult),
+		inputSize:        len(globals) + len(page),
+		prescannedHeight: prescanPageHeight(page),
 	}
 
 	// parse global segments (page association 0)
@@ -87,19 +88,57 @@ func Decode(globals, page []byte) (*bitmap.Bitmap, error) {
 	return d.pageBitmap, nil
 }
 
+// prescanPageHeight scans segment headers to find the last
+// end-of-stripe segment and returns its Y coordinate + 1.
+// Returns -1 if no end-of-stripe segment is found.
+func prescanPageHeight(data []byte) int {
+	lastY := -1
+	r := bytes.NewReader(data)
+	for {
+		hdr, err := parseSegmentHeader(r)
+		if err != nil {
+			break
+		}
+		dataLen := hdr.DataLength
+		if dataLen == 0xFFFFFFFF {
+			break
+		}
+		if int(dataLen) > r.Len() {
+			break
+		}
+		if hdr.Type == segEndOfStripe && dataLen >= 4 {
+			var yBuf [4]byte
+			if _, err := r.Read(yBuf[:]); err != nil {
+				break
+			}
+			y := int(binary.BigEndian.Uint32(yBuf[:]))
+			lastY = y + 1
+			// skip remaining data
+			if dataLen > 4 {
+				r.Seek(int64(dataLen-4), io.SeekCurrent)
+			}
+		} else {
+			r.Seek(int64(dataLen), io.SeekCurrent)
+		}
+	}
+	return lastY
+}
+
 type segmentResult struct {
 	header   *segmentHeader
 	symbols  []*bitmap.Bitmap // for symbol dictionary segments
 	patterns []*bitmap.Bitmap // for pattern dictionary segments
 	bm       *bitmap.Bitmap   // for region segments
+	table    *huffTable       // for custom Huffman table segments (type 53)
 }
 
 type decoder struct {
-	segments   map[uint32]segmentResult
-	pageBitmap *bitmap.Bitmap
-	pageWidth  int
-	pageHeight int
-	inputSize  int // total input bytes (globals + page)
+	segments         map[uint32]segmentResult
+	pageBitmap       *bitmap.Bitmap
+	pageWidth        int
+	pageHeight       int
+	inputSize        int // total input bytes (globals + page)
+	prescannedHeight int // from prescanPageHeight; -1 if not available
 }
 
 func (d *decoder) processStream(data []byte) error {
@@ -140,16 +179,20 @@ func (d *decoder) processSegment(hdr *segmentHeader, data []byte) error {
 		return d.processPageInfo(data)
 	case segEndOfPage:
 		return nil
-	case segImmediateGeneric, segImmediateLosslessGeneric:
+	case segIntermediateGeneric, segImmediateGeneric, segImmediateLosslessGeneric:
 		return d.processGenericRegion(hdr, data)
+	case segIntermediateRefinement, segImmediateRefinement, segImmediateLosslessRefine:
+		return d.processRefinementRegion(hdr, data)
 	case segSymbolDict:
 		return d.processSymbolDict(hdr, data)
 	case segPatternDict:
 		return d.processPatternDict(hdr, data)
-	case segImmediateTextRegion, segImmediateLosslessText:
+	case segIntermediateTextRegion, segImmediateTextRegion, segImmediateLosslessText:
 		return d.processTextRegion(hdr, data)
-	case segImmediateHalftone, segImmediateLosslessHalf:
+	case segIntermediateHalftone, segImmediateHalftone, segImmediateLosslessHalf:
 		return d.processHalftoneRegion(hdr, data)
+	case segTables:
+		return d.processCustomTable(hdr, data)
 	case segEndOfFile, segEndOfStripe, segProfiles, segExtension:
 		return nil
 	default:
@@ -169,12 +212,17 @@ func (d *decoder) processPageInfo(data []byte) error {
 	flags := data[16]
 	// byte 17-18: striping info
 
-	if height == 0xFFFFFFFF {
-		return errors.New("unknown page height not supported")
-	}
-
 	d.pageWidth = int(width)
-	d.pageHeight = int(height)
+	if height == 0xFFFFFFFF {
+		// unknown page height: use pre-scanned height from
+		// end-of-stripe segments
+		if d.prescannedHeight <= 0 {
+			return errors.New("unknown page height without end-of-stripe segments")
+		}
+		d.pageHeight = d.prescannedHeight
+	} else {
+		d.pageHeight = int(height)
+	}
 
 	// default pixel value (bit 2 of flags)
 	defaultPixel := flags&0x04 != 0
@@ -195,6 +243,29 @@ func (d *decoder) processPageInfo(data []byte) error {
 		}
 	}
 	return nil
+}
+
+func (d *decoder) processCustomTable(hdr *segmentHeader, data []byte) error {
+	t, err := parseCustomHuffTable(data)
+	if err != nil {
+		return err
+	}
+	d.segments[hdr.Number] = segmentResult{header: hdr, table: t}
+	return nil
+}
+
+// customTable returns the next custom Huffman table from the referred-to
+// segment list, advancing the index past non-table segments.
+func (d *decoder) customTable(refs []uint32, idx *int) (*huffTable, error) {
+	for *idx < len(refs) {
+		ref := refs[*idx]
+		*idx++
+		seg, ok := d.segments[ref]
+		if ok && seg.table != nil {
+			return seg.table, nil
+		}
+	}
+	return nil, errors.New("missing custom Huffman table segment")
 }
 
 func (d *decoder) processGenericRegion(hdr *segmentHeader, data []byte) error {
@@ -268,12 +339,102 @@ func (d *decoder) processGenericRegion(hdr *segmentHeader, data []byte) error {
 		}
 	}
 
-	// composite onto page
-	if d.pageBitmap != nil {
+	// composite onto page (skip for intermediate segments)
+	if hdr.Type != segIntermediateGeneric && d.pageBitmap != nil {
 		d.pageBitmap.Combine(bm, int(rsi.X), int(rsi.Y), rsi.CombOp)
 	}
 
 	// store for potential reference
+	d.segments[hdr.Number] = segmentResult{header: hdr, bm: bm}
+	return nil
+}
+
+func (d *decoder) processRefinementRegion(hdr *segmentHeader, data []byte) error {
+	if len(data) < 18 {
+		return errors.New("refinement region data too short")
+	}
+
+	rsi := parseRegionSegmentInfo(data[:17])
+
+	flags := data[17]
+	grTemplate := int(flags & 1)
+	tpgron := flags&0x02 != 0
+
+	offset := 18
+	var atx, aty [2]int8
+	if grTemplate == 0 {
+		if len(data) < 22 {
+			return errors.New("refinement AT flags truncated")
+		}
+		atx[0] = int8(data[18])
+		aty[0] = int8(data[19])
+		atx[1] = int8(data[20])
+		aty[1] = int8(data[21])
+		offset = 22
+	}
+
+	if err := checkBitmapSize(int(rsi.Width), int(rsi.Height)); err != nil {
+		return err
+	}
+	pixelBytes := int64(rsi.Width+7) / 8 * int64(rsi.Height)
+	if d.inputSize > 0 && pixelBytes > int64(d.inputSize)*maxExpansion {
+		return fmt.Errorf("refinement region %dx%d too large for %d bytes of input",
+			rsi.Width, rsi.Height, d.inputSize)
+	}
+
+	// obtain reference bitmap
+	var ref *bitmap.Bitmap
+	if len(hdr.RefSegments) > 0 {
+		// case d: reference from a referred-to segment
+		seg, ok := d.segments[hdr.RefSegments[0]]
+		if !ok || seg.bm == nil {
+			return fmt.Errorf("refinement reference segment %d not found", hdr.RefSegments[0])
+		}
+		ref = seg.bm
+	} else {
+		// case c: reference from page buffer
+		if d.pageBitmap == nil {
+			return errors.New("refinement region: no page buffer")
+		}
+		w := int(rsi.Width)
+		h := int(rsi.Height)
+		x0 := int(rsi.X)
+		y0 := int(rsi.Y)
+		ref = bitmap.New(w, h)
+		for py := range h {
+			for px := range w {
+				ref.SetPixel(px, py, d.pageBitmap.GetPixel(x0+px, y0+py))
+			}
+		}
+	}
+
+	p := &refinementParams{
+		Width:     int(rsi.Width),
+		Height:    int(rsi.Height),
+		Template:  grTemplate,
+		TPGRON:    tpgron,
+		Reference: ref,
+	}
+	copy(p.ATX[:], atx[:])
+	copy(p.ATY[:], aty[:])
+
+	dec := newMQDecoder(data[offset:])
+	bm, err := decodeRefinementRegion(dec, p, nil)
+	if err != nil {
+		return err
+	}
+
+	// intermediate refinement: store result for later reference, no compositing
+	if hdr.Type != segIntermediateRefinement && d.pageBitmap != nil {
+		if len(hdr.RefSegments) > 0 {
+			// case d: composite using combOp
+			d.pageBitmap.Combine(bm, int(rsi.X), int(rsi.Y), rsi.CombOp)
+		} else {
+			// case c: replace the page buffer region
+			d.pageBitmap.Combine(bm, int(rsi.X), int(rsi.Y), bitmap.CombOpReplace)
+		}
+	}
+
 	d.segments[hdr.Number] = segmentResult{header: hdr, bm: bm}
 	return nil
 }
@@ -322,11 +483,21 @@ func (d *decoder) processTextRegion(hdr *segmentHeader, data []byte) error {
 		htags := binary.BigEndian.Uint16(data[offset : offset+2])
 		offset += 2
 
+		// custom table index: tracks which referred-to table segment
+		// to use next when a parameter selects value 3 (user-supplied)
+		tableIdx := 0
+
 		switch htags & 3 {
 		case 0:
 			huffFS = huffTableB6
 		case 1:
 			huffFS = huffTableB7
+		case 3:
+			var err error
+			huffFS, err = d.customTable(hdr.RefSegments, &tableIdx)
+			if err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("unsupported SBHUFFFS selection %d", htags&3)
 		}
@@ -337,8 +508,12 @@ func (d *decoder) processTextRegion(hdr *segmentHeader, data []byte) error {
 			huffDS = huffTableB9
 		case 2:
 			huffDS = huffTableB10
-		default:
-			return fmt.Errorf("unsupported SBHUFFDS selection %d", (htags>>2)&3)
+		case 3:
+			var err error
+			huffDS, err = d.customTable(hdr.RefSegments, &tableIdx)
+			if err != nil {
+				return err
+			}
 		}
 		switch (htags >> 4) & 3 {
 		case 0:
@@ -347,8 +522,12 @@ func (d *decoder) processTextRegion(hdr *segmentHeader, data []byte) error {
 			huffDT = huffTableB12
 		case 2:
 			huffDT = huffTableB13
-		default:
-			return fmt.Errorf("unsupported SBHUFFDT selection %d", (htags>>4)&3)
+		case 3:
+			var err error
+			huffDT, err = d.customTable(hdr.RefSegments, &tableIdx)
+			if err != nil {
+				return err
+			}
 		}
 
 		if sbrefine {
@@ -358,6 +537,8 @@ func (d *decoder) processTextRegion(hdr *segmentHeader, data []byte) error {
 					return huffTableB14, nil
 				case 1:
 					return huffTableB15, nil
+				case 3:
+					return d.customTable(hdr.RefSegments, &tableIdx)
 				default:
 					return nil, fmt.Errorf("unsupported refinement table selection %d", sel)
 				}
@@ -382,8 +563,11 @@ func (d *decoder) processTextRegion(hdr *segmentHeader, data []byte) error {
 			switch (htags >> 14) & 1 {
 			case 0:
 				huffRSIZE = huffTableB1
-			default:
-				return errors.New("unsupported SBHUFFRSIZE selection")
+			case 1:
+				huffRSIZE, err = d.customTable(hdr.RefSegments, &tableIdx)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -518,11 +702,29 @@ func (d *decoder) processTextRegion(hdr *segmentHeader, data []byte) error {
 		}
 	}
 
-	// composite onto page
-	if d.pageBitmap != nil {
+	// composite onto page (skip for intermediate segments)
+	if hdr.Type != segIntermediateTextRegion && d.pageBitmap != nil {
 		d.pageBitmap.Combine(bm, int(rsi.X), int(rsi.Y), rsi.CombOp)
 	}
 
 	d.segments[hdr.Number] = segmentResult{header: hdr, bm: bm}
 	return nil
+}
+
+// splitBitmapH splits a collective bitmap horizontally into sub-bitmaps
+// with the given widths. All sub-bitmaps have the same height as src.
+func splitBitmapH(src *bitmap.Bitmap, widths []int) []*bitmap.Bitmap {
+	result := make([]*bitmap.Bitmap, len(widths))
+	xOff := 0
+	for i, w := range widths {
+		sub := bitmap.New(w, src.Height())
+		for y := range src.Height() {
+			for x := range w {
+				sub.SetPixel(x, y, src.GetPixel(xOff+x, y))
+			}
+		}
+		result[i] = sub
+		xOff += w
+	}
+	return result
 }

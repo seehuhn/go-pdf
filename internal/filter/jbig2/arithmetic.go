@@ -156,29 +156,36 @@ func (e *mqEncoder) byteOut() {
 }
 
 func (e *mqEncoder) flush() {
+	// T.88 E.2.9 FLUSH: SETBITS then drain C via BYTEOUT.
 	temp := e.c + uint32(e.a)
 	e.c |= 0xFFFF
 	if e.c >= temp {
 		e.c -= 0x8000
 	}
-	// T.88 reference flush: 3-4 BYTEOUTs to drain all bits from C.
-	// Each BYTEOUT emits the previously buffered byte and extracts a new one.
-	// The final BYTEOUT (#4) emits the last data byte; its extracted byte
-	// is discarded (bp is not advanced past it).
+
+	// first two BYTEOUTs
 	e.c <<= uint(e.ct)
-	e.byteOut() // #1
+	e.byteOut()
 	e.c <<= uint(e.ct)
-	e.byteOut() // #2
+	e.byteOut()
+
+	// After a 0xFF byte, BYTEOUT extracts only 7 bits instead of 8,
+	// leaving residual data in C. A 3rd BYTEOUT flushes these bits.
+	// When B is already 0xFF, the residual is handled by the final
+	// BYTEOUT below instead.
 	if e.buf[e.bp] != 0xFF {
 		e.c <<= uint(e.ct)
-		e.byteOut() // #3 (conditional: residual bits after 7-bit mode)
+		e.byteOut()
 	}
+
+	// final BYTEOUT emits the buffered byte B; the byte it creates
+	// is not part of the output (bytes() excludes it).
 	e.c <<= uint(e.ct)
-	e.byteOut() // #4: emits final data byte; extracted byte is discarded
+	e.byteOut()
 }
 
 func (e *mqEncoder) bytes() []byte {
-	if e.bp <= 1 {
+	if e.bp < 2 {
 		return nil
 	}
 	return e.buf[1:e.bp]
@@ -194,16 +201,16 @@ type mqDecoder struct {
 	bp   int
 	b    byte
 
-	// exhaustion tracking: once the real data is consumed, only a
-	// limited number of additional decodes are allowed
+	// exhausted is set once the real data has been consumed.
+	// After exhaustion, byteIn supplies 1-bits per T.88 E.2.10.
 	exhausted    bool
 	paddingCount int
 }
 
-// maximum number of decode() calls after the real data is exhausted.
-// For legitimate data the padding budget is never reached (the encoder
-// produces enough bytes). For malformed data this bounds the total work.
-const maxMQPadding = 4096
+// maxMQPadding limits decode() calls after data exhaustion.
+// When exceeded, decode returns MPS directly — this matches what
+// the 1-bit padding would produce and is correct for legitimate data.
+const maxMQPadding = 1 << 20
 
 func newMQDecoder(data []byte) *mqDecoder {
 	d := &mqDecoder{data: data}
@@ -230,7 +237,7 @@ func (d *mqDecoder) decode(cx *byte) int {
 	if d.exhausted {
 		d.paddingCount++
 		if d.paddingCount > maxMQPadding {
-			return 0
+			return ctxMPS(*cx)
 		}
 	}
 
@@ -298,15 +305,24 @@ func (d *mqDecoder) renormd() {
 }
 
 func (d *mqDecoder) byteIn() {
+	// T.88 E.2.10: once data is exhausted (end of data or marker
+	// encountered), supply 1-bits without bit stuffing.
+	if d.exhausted {
+		d.c += 0xFF << 8
+		d.ct = 8
+		return
+	}
 	if d.b == 0xFF {
 		if d.bp+1 >= len(d.data) {
 			d.exhausted = true
+			d.c += 0xFF << 8
 			d.ct = 8
 			return
 		}
 		b1 := d.data[d.bp+1]
 		if b1 > 0x8F {
 			d.exhausted = true
+			d.c += 0xFF << 8
 			d.ct = 8
 		} else {
 			d.bp++
@@ -318,6 +334,7 @@ func (d *mqDecoder) byteIn() {
 		d.bp++
 		if d.bp >= len(d.data) {
 			d.exhausted = true
+			d.c += 0xFF << 8
 			d.ct = 8
 			return
 		}

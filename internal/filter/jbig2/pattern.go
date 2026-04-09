@@ -102,17 +102,11 @@ func (d *decoder) processPatternDict(hdr *segmentHeader, data []byte) error {
 	}
 
 	// split collective bitmap into individual patterns (§6.7.5 step 4)
-	patterns := make([]*bitmap.Bitmap, grayMax+1)
-	for i := range patterns {
-		xOff := i * hdpw
-		pat := bitmap.New(hdpw, hdph)
-		for y := range hdph {
-			for x := range hdpw {
-				pat.SetPixel(x, y, collectiveBM.GetPixel(xOff+x, y))
-			}
-		}
-		patterns[i] = pat
+	widths := make([]int, grayMax+1)
+	for i := range widths {
+		widths[i] = hdpw
 	}
+	patterns := splitBitmapH(collectiveBM, widths)
 
 	d.segments[hdr.Number] = segmentResult{header: hdr, patterns: patterns}
 	return nil

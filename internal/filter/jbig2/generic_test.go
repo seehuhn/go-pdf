@@ -161,6 +161,71 @@ func TestGenericRegionRoundTrip(t *testing.T) {
 	}
 }
 
+// fuzzBitmapRoundTrip verifies that a bitmap decoded from fuzzed input
+// survives a generic-region encode/decode cycle unchanged.
+func fuzzBitmapRoundTrip(t *testing.T, data []byte) {
+	t.Helper()
+
+	bm1, err := Decode(nil, data)
+	if err != nil || bm1 == nil {
+		return
+	}
+	if bm1.Width() == 0 || bm1.Height() == 0 {
+		return
+	}
+
+	segData := EncodeGenericRegionSegment(bm1, 0, 0, 1, bitmap.CombOpOR)
+	var stream []byte
+	pageData := WritePageInfo(nil, bm1.Width(), bm1.Height())
+	stream = WriteSegmentHeader(stream, 0, segPageInfo, 1, nil, uint32(len(pageData)))
+	stream = append(stream, pageData...)
+	stream = WriteSegmentHeader(stream, 1, segImmediateGeneric, 1, nil, uint32(len(segData)))
+	stream = append(stream, segData...)
+
+	bm2, err := Decode(nil, stream)
+	if err != nil {
+		t.Fatalf("re-decode failed: %v", err)
+	}
+
+	if !bitmapsEqual(bm1, bm2) {
+		t.Errorf("round-trip failed")
+	}
+}
+
+func FuzzGenericRegionMQRoundTrip(f *testing.F) {
+	patterns := []struct {
+		name string
+		bm   *bitmap.Bitmap
+	}{
+		{"diagonal_16", makeDiagonal(16, 16)},
+		{"zeros_16", makeAllZeros(16, 16)},
+		{"checker_16", makeCheckerboard(16, 16)},
+		{"hstripes_16", makeHStripes(16, 16)},
+		{"vstripes_16", makeVStripes(16, 16)},
+		{"center_16", makeCenterBlock(16, 16)},
+		{"diagonal_64x32", makeDiagonal(64, 32)},
+	}
+
+	// seed from test cases across all templates
+	for _, tmpl := range []int{0, 1, 2, 3} {
+		for _, pat := range patterns {
+			segData := EncodeGenericRegionSegment(pat.bm, 0, 0, tmpl, bitmap.CombOpOR)
+
+			var stream []byte
+			pageData := WritePageInfo(nil, pat.bm.Width(), pat.bm.Height())
+			stream = WriteSegmentHeader(stream, 0, segPageInfo, 1, nil, uint32(len(pageData)))
+			stream = append(stream, pageData...)
+			stream = WriteSegmentHeader(stream, 1, segImmediateGeneric, 1, nil, uint32(len(segData)))
+			stream = append(stream, segData...)
+			f.Add(stream)
+		}
+	}
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBitmapRoundTrip(t, data)
+	})
+}
+
 func TestGenericImageVectors(t *testing.T) {
 	// from mq_test_vectors.txt
 	tests := []struct {

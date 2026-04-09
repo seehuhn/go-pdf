@@ -84,11 +84,22 @@ func encodeRefinementRegion(bm *bitmap.Bitmap, p *refinementParams) []byte {
 	}
 
 	enc := newMQEncoder()
-	var cx []byte
-	if p.Template == 0 {
-		cx = make([]byte, 1<<13)
-	} else {
-		cx = make([]byte, 1<<10)
+	encodeRefinementRegionInline(enc, bm, p, nil)
+	enc.flush()
+	return enc.bytes()
+}
+
+// encodeRefinementRegionInline encodes a refinement region into an existing
+// MQ encoder. This is used by text region encoding where the refinement
+// data is interleaved with the instance data in the same MQ stream.
+// If cx is nil, a fresh context array is allocated.
+func encodeRefinementRegionInline(enc *mqEncoder, bm *bitmap.Bitmap, p *refinementParams, cx []byte) {
+	if cx == nil {
+		if p.Template == 0 {
+			cx = make([]byte, 1<<13)
+		} else {
+			cx = make([]byte, 1<<10)
+		}
 	}
 
 	for y := range bm.Height() {
@@ -98,9 +109,6 @@ func encodeRefinementRegion(bm *bitmap.Bitmap, p *refinementParams) []byte {
 			enc.encode(&cx[context], d)
 		}
 	}
-
-	enc.flush()
-	return enc.bytes()
 }
 
 func refTypicalPrediction(p *refinementParams, x, y int) bool {

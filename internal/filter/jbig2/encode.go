@@ -19,6 +19,7 @@ package jbig2
 import (
 	"encoding/binary"
 	"fmt"
+	"slices"
 
 	"seehuhn.de/go/pdf/graphics/bitmap"
 )
@@ -82,6 +83,29 @@ func WriteRegionSegmentInfo(buf []byte, width, height, x, y int, combOp bitmap.C
 	return buf
 }
 
+// appendDefaultAT appends the default adaptive template pixel positions
+// for a generic region to buf and returns the updated buf and the
+// AT coordinate arrays.
+func appendDefaultAT(buf []byte, template int) ([]byte, [4]int8, [4]int8) {
+	var atx, aty [4]int8
+	switch template {
+	case 0:
+		atx = [4]int8{3, -3, 2, -2}
+		aty = [4]int8{-1, -1, -2, -2}
+		for i := range 4 {
+			buf = append(buf, byte(atx[i]), byte(aty[i]))
+		}
+	default:
+		atx[0] = 3
+		aty[0] = -1
+		if template >= 2 {
+			atx[0] = 2
+		}
+		buf = append(buf, byte(atx[0]), byte(aty[0]))
+	}
+	return buf, atx, aty
+}
+
 // WritePageInfo writes a page information segment's data.
 func WritePageInfo(buf []byte, width, height int) []byte {
 	buf = appendUint32(buf, uint32(width))
@@ -91,6 +115,25 @@ func WritePageInfo(buf []byte, width, height int) []byte {
 	buf = append(buf, 0x01)    // flags: lossless
 	buf = appendUint16(buf, 0) // striping
 	return buf
+}
+
+// WritePageInfoStripe writes page info for a page with unknown height.
+// The page height is determined by end-of-stripe segments.
+// maxStripeHeight is the maximum number of rows in any stripe.
+func WritePageInfoStripe(buf []byte, width, maxStripeHeight int) []byte {
+	buf = appendUint32(buf, uint32(width))
+	buf = appendUint32(buf, 0xFFFFFFFF)
+	buf = appendUint32(buf, 0) // x resolution
+	buf = appendUint32(buf, 0) // y resolution
+	buf = append(buf, 0x01)    // flags: lossless
+	buf = appendUint16(buf, 0x8000|uint16(maxStripeHeight&0x7FFF))
+	return buf
+}
+
+// WriteEndOfStripe writes an end-of-stripe segment's data.
+// y is the Y coordinate of the last row in the stripe.
+func WriteEndOfStripe(buf []byte, y int) []byte {
+	return appendUint32(buf, uint32(y))
 }
 
 // EncodeSymbolDictSegment encodes a symbol dictionary segment's data.
@@ -107,23 +150,7 @@ func EncodeSymbolDictSegment(symbols []*bitmap.Bitmap, template int) []byte {
 	buf = appendUint16(buf, flags)
 
 	// AT positions
-	var atx [4]int8
-	var aty [4]int8
-	switch template {
-	case 0:
-		atx = [4]int8{3, -3, 2, -2}
-		aty = [4]int8{-1, -1, -2, -2}
-		for i := range 4 {
-			buf = append(buf, byte(atx[i]), byte(aty[i]))
-		}
-	default:
-		atx[0] = 3
-		aty[0] = -1
-		if template >= 2 {
-			atx[0] = 2
-		}
-		buf = append(buf, byte(atx[0]), byte(aty[0]))
-	}
+	buf, atx, aty := appendDefaultAT(buf, template)
 
 	// SDNUMEXSYMS and SDNUMNEWSYMS
 	buf = appendUint32(buf, uint32(len(symbols)))
@@ -300,16 +327,32 @@ func EncodeSymbolDictSegmentHuffRef(
 // EncodeTextRegionSegment encodes a text region segment's data.
 // refCorner is one of cornerBottomLeft, cornerTopLeft, cornerBottomRight,
 // cornerTopRight. When transposed is true, T and S axes are swapped.
+// Instances with a non-nil Bitmap field are encoded with refinement.
 func EncodeTextRegionSegment(
 	width, height, x, y int,
 	instances []SymbolInstance,
-	numSymbols int,
+	symbols []*bitmap.Bitmap,
 	refCorner int,
 	transposed bool,
 	combOp bitmap.CombOp,
 ) []byte {
-	// text region flags: arithmetic, no refinement, strips=1
-	flags := uint16(0) // SBHUFF=0, SBREFINE=0, LOGSBSTRIPS=0
+	numSymbols := len(symbols)
+
+	// detect whether any instance needs refinement
+	needsRefine := false
+	for i := range instances {
+		if instances[i].Bitmap != nil {
+			needsRefine = true
+			break
+		}
+	}
+
+	// text region flags: arithmetic, strips=1
+	flags := uint16(0) // SBHUFF=0, LOGSBSTRIPS=0
+	if needsRefine {
+		flags |= 0x02            // SBREFINE=1
+		flags |= uint16(1) << 15 // SBRTEMPLATE=1
+	}
 	flags |= uint16(refCorner&3) << 4
 	if transposed {
 		flags |= 0x40
@@ -330,6 +373,16 @@ func EncodeTextRegionSegment(
 	iads := &intCtx{}
 	iaid, _ := newIAIDCtx(textRegionSymCodeLen(numSymbols))
 	codeLen := textRegionSymCodeLen(numSymbols)
+
+	// refinement contexts (allocated only when needed)
+	var iari, iardw, iardh, iardx, iardy *intCtx
+	if needsRefine {
+		iari = &intCtx{}
+		iardw = &intCtx{}
+		iardh = &intCtx{}
+		iardx = &intCtx{}
+		iardy = &intCtx{}
+	}
 
 	if len(instances) == 0 {
 		enc.flush()
@@ -371,6 +424,31 @@ func EncodeTextRegionSegment(
 			// symbol ID
 			iaid.encode(enc, codeLen, inst.SymID)
 
+			// refinement (§6.4.11)
+			if needsRefine {
+				if inst.Bitmap == nil {
+					iari.encode(enc, 0)
+				} else {
+					iari.encode(enc, 1)
+					origSym := symbols[inst.SymID]
+					rdw := int64(inst.Bitmap.Width() - origSym.Width())
+					rdh := int64(inst.Bitmap.Height() - origSym.Height())
+					iardw.encode(enc, rdw)
+					iardh.encode(enc, rdh)
+					iardx.encode(enc, 0)
+					iardy.encode(enc, 0)
+					rp := &refinementParams{
+						Width:     inst.Bitmap.Width(),
+						Height:    inst.Bitmap.Height(),
+						Template:  1, // matches SBRTEMPLATE=1
+						Reference: origSym,
+						RefDX:     int(rdw >> 1),
+						RefDY:     int(rdh >> 1),
+					}
+					encodeRefinementRegionInline(enc, inst.Bitmap, rp, nil)
+				}
+			}
+
 			// CURS pre-placement update (§6.4.5 step 3c-vi)
 			if !transposed {
 				if refCorner == cornerTopRight || refCorner == cornerBottomRight {
@@ -410,10 +488,256 @@ func EncodeTextRegionSegment(
 // SymbolInstance describes a symbol placement in a text region.
 // T is the strip coordinate (Y when not transposed, X when transposed).
 // S is the inline coordinate (X when not transposed, Y when transposed).
+// When Bitmap is non-nil, the instance is encoded with refinement (ri=1)
+// against the dictionary symbol identified by SymID. Wi and Hi must then
+// match the Bitmap dimensions. When Bitmap is nil, the dictionary symbol
+// is placed as-is (ri=0).
 type SymbolInstance struct {
 	SymID  int
 	T, S   int
-	Wi, Hi int // symbol width and height for CURS update
+	Wi, Hi int            // bitmap dimensions for CURS update
+	Bitmap *bitmap.Bitmap // refined bitmap; nil = use dictionary symbol
+}
+
+// encodeSymIDHuffTable writes the custom symbol-ID Huffman table to w
+// using run-length coding (§7.4.3.7) and returns the resulting table.
+// All symbols receive the same code length (uniform coding).
+func encodeSymIDHuffTable(w *bitWriter, numSyms int) *huffTable {
+	codeLen := textRegionSymCodeLen(numSyms)
+
+	// step 1: write 35 four-bit RUNCODE code lengths.
+	// Only the entry for code length `codeLen` is non-zero (prefix length 1).
+	// Entry 32 (repeat previous) also gets prefix length 2 so we can use it.
+	for i := range 35 {
+		switch i {
+		case codeLen:
+			w.writeBits(1, 4) // prefix length 1
+		case 32:
+			w.writeBits(2, 4) // prefix length 2
+		default:
+			w.writeBits(0, 4) // unused
+		}
+	}
+
+	// step 2: build the RUNCODE table and assign codes
+	runCodeLines := make([]huffLine, 35)
+	for i := range 35 {
+		switch i {
+		case codeLen:
+			runCodeLines[i] = huffLine{RangeLow: int32(i), PrefLen: 1}
+		case 32:
+			runCodeLines[i] = huffLine{RangeLow: 32, PrefLen: 2}
+		default:
+			runCodeLines[i] = huffLine{RangeLow: int32(i), PrefLen: 0}
+		}
+	}
+	runCodeTable := &huffTable{Lines: runCodeLines}
+	runCodeTable.assignCodes()
+
+	// steps 3-5: encode the symbol code lengths.
+	// First symbol as literal, then repeat via RUNCODE 32.
+	remaining := numSyms
+	runCodeTable.encode(w, int64(codeLen)) // literal
+	remaining--
+
+	for remaining >= 3 {
+		repeat := min(remaining, 6)
+		runCodeTable.encode(w, 32)       // RUNCODE 32: repeat previous
+		w.writeBits(uint32(repeat-3), 2) // 2 extra bits: repeat count - 3
+		remaining -= repeat
+	}
+	for range remaining {
+		runCodeTable.encode(w, int64(codeLen)) // literal for remainder
+	}
+
+	// step 6: byte-align
+	w.align()
+
+	// step 7: build the symbol ID Huffman table
+	lines := make([]huffLine, numSyms)
+	for i := range numSyms {
+		lines[i] = huffLine{RangeLow: int32(i), PrefLen: codeLen}
+	}
+	t := &huffTable{Lines: lines}
+	t.assignCodes()
+	return t
+}
+
+// EncodeTextRegionSegmentHuffman encodes a Huffman-coded text region segment.
+// Uses standard tables B.6 (FS), B.8 (DS), B.11 (DT).
+// refCorner is one of cornerBottomLeft, cornerTopLeft, cornerBottomRight,
+// cornerTopRight. When transposed is true, T and S axes are swapped.
+// Instances with a non-nil Bitmap field are encoded with refinement.
+func EncodeTextRegionSegmentHuffman(
+	width, height, x, y int,
+	instances []SymbolInstance,
+	symbols []*bitmap.Bitmap,
+	refCorner int,
+	transposed bool,
+	combOp bitmap.CombOp,
+) ([]byte, error) {
+	return encodeTextRegionHuffman(
+		width, height, x, y, instances, symbols,
+		refCorner, transposed, combOp,
+		huffTableB6, uint16(0))
+}
+
+// encodeTextRegionHuffman is the shared implementation for Huffman-coded
+// text region encoding. fsTable is the Huffman table used for the first-S
+// (SBHUFFFS) values. htags is the Huffman table selection flags written
+// into the segment header.
+func encodeTextRegionHuffman(
+	width, height, x, y int,
+	instances []SymbolInstance,
+	symbols []*bitmap.Bitmap,
+	refCorner int,
+	transposed bool,
+	combOp bitmap.CombOp,
+	fsTable *huffTable,
+	htags uint16,
+) ([]byte, error) {
+	numSymbols := len(symbols)
+
+	if len(instances) == 0 {
+		return nil, fmt.Errorf("no instances to encode")
+	}
+
+	// sort instances by T (ascending) since B.11 only encodes values >= 1
+	sorted := make([]SymbolInstance, len(instances))
+	copy(sorted, instances)
+	slices.SortStableFunc(sorted, func(a, b SymbolInstance) int {
+		return a.T - b.T
+	})
+	instances = sorted
+
+	// detect whether any instance needs refinement
+	needsRefine := false
+	for i := range instances {
+		if instances[i].Bitmap != nil {
+			needsRefine = true
+			break
+		}
+	}
+
+	// text region flags: SBHUFF=1, LOGSBSTRIPS=0
+	flags := uint16(1) // SBHUFF=1
+	if needsRefine {
+		flags |= 0x02            // SBREFINE=1
+		flags |= uint16(1) << 15 // SBRTEMPLATE=1
+	}
+	flags |= uint16(refCorner&3) << 4
+	if transposed {
+		flags |= 0x40
+	}
+	flags |= uint16(combOp&3) << 7
+
+	var buf []byte
+	buf = WriteRegionSegmentInfo(buf, width, height, x, y, combOp)
+	buf = appendUint16(buf, flags)
+	buf = appendUint16(buf, htags)
+	buf = appendUint32(buf, uint32(len(instances)))
+
+	// Huffman bitstream
+	w := &bitWriter{}
+
+	// symbol ID table
+	symIDTable := encodeSymIDHuffTable(w, numSymbols)
+
+	// initial STRIPT: encode 1 so stripT = -1
+	// (B.11 minimum value is 1)
+	huffTableB11.encode(w, 1)
+	stripT := -1
+	firstS := 0
+	nInst := 0
+
+	for nInst < len(instances) {
+		curT := instances[nInst].T
+		dt := curT - stripT
+		if dt < 1 {
+			return nil, fmt.Errorf("non-positive strip delta %d (curT=%d, stripT=%d)", dt, curT, stripT)
+		}
+		huffTableB11.encode(w, int64(dt))
+		stripT = curT
+
+		// encode instances in this strip
+		first := true
+		curS := 0
+		for nInst < len(instances) && instances[nInst].T == curT {
+			inst := instances[nInst]
+			if first {
+				dfs := inst.S - firstS
+				fsTable.encode(w, int64(dfs))
+				firstS = inst.S
+				curS = inst.S
+				first = false
+			} else {
+				ids := inst.S - curS
+				huffTableB8.encode(w, int64(ids))
+				curS = inst.S
+			}
+
+			// symbol ID
+			symIDTable.encode(w, int64(inst.SymID))
+
+			// refinement (§6.4.11)
+			if needsRefine {
+				if inst.Bitmap == nil {
+					w.writeBit(0)
+				} else {
+					w.writeBit(1)
+					origSym := symbols[inst.SymID]
+					rdw := int64(inst.Bitmap.Width() - origSym.Width())
+					rdh := int64(inst.Bitmap.Height() - origSym.Height())
+					huffTableB14.encode(w, rdw)
+					huffTableB14.encode(w, rdh)
+					huffTableB14.encode(w, 0) // rdx
+					huffTableB14.encode(w, 0) // rdy
+					rp := &refinementParams{
+						Width:     inst.Bitmap.Width(),
+						Height:    inst.Bitmap.Height(),
+						Template:  1,
+						Reference: origSym,
+						RefDX:     int(rdw >> 1),
+						RefDY:     int(rdh >> 1),
+					}
+					mqData := encodeRefinementRegion(inst.Bitmap, rp)
+					huffTableB1.encode(w, int64(len(mqData)))
+					w.align()
+					w.writeBytes(mqData)
+				}
+			}
+
+			// CURS pre-placement update (§6.4.5 step 3c-vi)
+			if !transposed {
+				if refCorner == cornerTopRight || refCorner == cornerBottomRight {
+					curS += inst.Wi - 1
+				}
+			} else {
+				if refCorner == cornerBottomLeft || refCorner == cornerBottomRight {
+					curS += inst.Hi - 1
+				}
+			}
+
+			// CURS post-placement update (§6.4.5 step 3c-x)
+			if !transposed {
+				if refCorner == cornerTopLeft || refCorner == cornerBottomLeft {
+					curS += inst.Wi - 1
+				}
+			} else {
+				if refCorner == cornerTopLeft || refCorner == cornerTopRight {
+					curS += inst.Hi - 1
+				}
+			}
+
+			nInst++
+		}
+		// OOB to end strip
+		huffTableB8.encodeOOB(w)
+	}
+
+	w.align()
+	buf = append(buf, w.bytes()...)
+	return buf, nil
 }
 
 // encodeGenericRegionSegment encodes a generic region segment's data.
@@ -426,23 +750,7 @@ func EncodeGenericRegionSegment(bm *bitmap.Bitmap, x, y int, template int, combO
 	buf = append(buf, flags)
 
 	// AT positions
-	var atx [4]int8
-	var aty [4]int8
-	switch template {
-	case 0:
-		atx = [4]int8{3, -3, 2, -2}
-		aty = [4]int8{-1, -1, -2, -2}
-		for i := range 4 {
-			buf = append(buf, byte(atx[i]), byte(aty[i]))
-		}
-	default:
-		atx[0] = 3
-		aty[0] = -1
-		if template >= 2 {
-			atx[0] = 2
-		}
-		buf = append(buf, byte(atx[0]), byte(aty[0]))
-	}
+	buf, atx, aty := appendDefaultAT(buf, template)
 
 	// encode the bitmap
 	p := &genericRegionParams{
@@ -457,6 +765,33 @@ func EncodeGenericRegionSegment(bm *bitmap.Bitmap, x, y int, template int, combO
 	encodeGenericRegion(enc, bm, p, nil)
 	enc.flush()
 	buf = append(buf, enc.bytes()...)
+	return buf
+}
+
+// EncodeRefinementRegionSegment encodes a generic refinement region segment
+// (type 42). The bitmap bm is encoded as a refinement of ref.
+func EncodeRefinementRegionSegment(bm, ref *bitmap.Bitmap, x, y, template int, combOp bitmap.CombOp) []byte {
+	var buf []byte
+	buf = WriteRegionSegmentInfo(buf, bm.Width(), bm.Height(), x, y, combOp)
+
+	// refinement region flags (1 byte): bit 0 = GRTEMPLATE, bit 1 = TPGRON
+	buf = append(buf, byte(template&1))
+
+	// AT positions (only for template 0)
+	p := &refinementParams{
+		Width:     bm.Width(),
+		Height:    bm.Height(),
+		Template:  template,
+		Reference: ref,
+	}
+	if template == 0 {
+		p.ATX = [2]int8{-1, -1}
+		p.ATY = [2]int8{-1, -1}
+		buf = append(buf, byte(p.ATX[0]), byte(p.ATY[0]), byte(p.ATX[1]), byte(p.ATY[1]))
+	}
+
+	mqData := encodeRefinementRegion(bm, p)
+	buf = append(buf, mqData...)
 	return buf
 }
 
