@@ -21,9 +21,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -56,10 +58,11 @@ type Thumbnail struct {
 	// required by ColorSpace.
 	Decode []float64
 
-	// WriteData is a function that writes the thumbnail data to the provided writer.
-	// The data should be written row by row, with each row containing
-	// Width * ColorSpace.Channels() samples, each sample using BitsPerComponent bits.
-	WriteData func(io.Writer) error
+	// Source writes the body of the thumbnail stream when the Thumbnail is
+	// embedded.  For raw pixel data use
+	// [seehuhn.de/go/pdf/graphics/image.FlateSource]; pre-encoded formats
+	// provide their own Source implementations.
+	Source graphics.ImageData
 }
 
 // ExtractThumbnail reads a thumbnail image from a PDF object.
@@ -143,20 +146,99 @@ func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 		thumb.Decode = decode
 	}
 
-	// set up WriteData function
-	thumb.WriteData = func(w io.Writer) error {
-		r, err := pdf.GetStreamReader(x.R, stm)
-		if err != nil {
-			return err
-		}
-		defer r.Close()
-
-		_, err = io.Copy(w, r)
-		return err
-	}
+	thumb.Source = &thumbnailStreamData{getter: x.R, stream: stm}
 
 	return thumb, nil
 }
+
+// NewRawSource returns a [Source] that writes raw pixel bytes via the
+// given callback, compressed with Flate when embedded.  This is a
+// convenience constructor for callers that cannot import
+// [seehuhn.de/go/pdf/graphics/image.FlateSource] because of a
+// dependency cycle (notably [seehuhn.de/go/pdf/file]).  Package
+// `image` users should prefer `image.FlateSource` directly.
+func NewRawSource(writeData func(io.Writer) error) graphics.ImageData {
+	return &readThumbnailSource{read: writeData}
+}
+
+// readThumbnailSource is the Source constructed by [ExtractThumbnail] to
+// re-emit decoded thumbnail bytes.  It compresses the bytes with plain
+// Flate, matching the default encoding used by [Thumbnail.Embed].
+type readThumbnailSource struct {
+	read func(io.Writer) error
+}
+
+func (s *readThumbnailSource) Pixels() ([]byte, error) {
+	var buf bytes.Buffer
+	if err := s.read(&buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (s *readThumbnailSource) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference, dict pdf.Dict) error {
+	w, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
+	if err != nil {
+		return err
+	}
+	if err := s.read(w); err != nil {
+		w.Close()
+		return err
+	}
+	return w.Close()
+}
+
+// thumbnailStreamData lazily reads a thumbnail from a PDF stream,
+// preserving the original encoding.
+type thumbnailStreamData struct {
+	getter pdf.Getter
+	stream *pdf.Stream
+}
+
+func (s *thumbnailStreamData) Pixels() ([]byte, error) {
+	r, err := pdf.DecodeStream(s.getter, s.stream, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	return io.ReadAll(r)
+}
+
+func (s *thumbnailStreamData) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference, dict pdf.Dict) error {
+	dict = maps.Clone(dict)
+	if filter := s.stream.Dict["Filter"]; filter != nil {
+		resolved, err := pdf.Resolve(s.getter, filter)
+		if err != nil {
+			return err
+		}
+		dict["Filter"] = resolved
+	}
+	if dp := s.stream.Dict["DecodeParms"]; dp != nil {
+		resolved, err := pdf.Resolve(s.getter, dp)
+		if err != nil {
+			return err
+		}
+		dict["DecodeParms"] = resolved
+	}
+
+	raw, err := pdf.RawStreamReader(s.getter, s.stream)
+	if err != nil {
+		return err
+	}
+	defer raw.Close()
+
+	w, err := rm.Out().OpenStream(ref, dict)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(w, raw); err != nil {
+		w.Close()
+		return err
+	}
+	return w.Close()
+}
+
+var _ graphics.ImageData = (*thumbnailStreamData)(nil)
 
 // Embed converts the thumbnail to a PDF object.
 func (t *Thumbnail) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
@@ -190,24 +272,10 @@ func (t *Thumbnail) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["Decode"] = decode
 	}
 
-	// create the stream
 	ref := e.Alloc()
-	stm, err := e.Out().OpenStream(ref, dict, pdf.FilterCompress{})
-	if err != nil {
+	if err := t.Source.WriteStream(e, ref, dict); err != nil {
 		return nil, err
 	}
-
-	err = t.WriteData(stm)
-	if err != nil {
-		stm.Close()
-		return nil, err
-	}
-
-	err = stm.Close()
-	if err != nil {
-		return nil, err
-	}
-
 	return ref, nil
 }
 
@@ -257,19 +325,17 @@ func (t *Thumbnail) Equal(other *Thumbnail) bool {
 		}
 	}
 
-	// compare data
-	if (t.WriteData == nil) != (other.WriteData == nil) {
+	// compare raw pixel data
+	if (t.Source == nil) != (other.Source == nil) {
 		return false
 	}
-	if t.WriteData != nil {
-		var buf1, buf2 bytes.Buffer
-		if err := t.WriteData(&buf1); err != nil {
+	if t.Source != nil {
+		data1, err1 := t.Source.Pixels()
+		data2, err2 := other.Source.Pixels()
+		if err1 != nil || err2 != nil {
 			return false
 		}
-		if err := other.WriteData(&buf2); err != nil {
-			return false
-		}
-		if !bytes.Equal(buf1.Bytes(), buf2.Bytes()) {
+		if !bytes.Equal(data1, data2) {
 			return false
 		}
 	}
@@ -289,8 +355,8 @@ func (t *Thumbnail) check(out *pdf.Writer) error {
 	if t.Height <= 0 {
 		return fmt.Errorf("invalid thumbnail height %d", t.Height)
 	}
-	if t.WriteData == nil {
-		return errors.New("WriteData function cannot be nil")
+	if t.Source == nil {
+		return errors.New("Source cannot be nil")
 	}
 
 	switch t.BitsPerComponent {
@@ -349,14 +415,18 @@ func isValidBitsPerComponent(bpc int) bool {
 
 // Detach loads the thumbnail data into memory, allowing the source file to be
 // closed and surfacing any errors early.
+//
+// After a successful call the Source is replaced with a detached copy.
 func (t *Thumbnail) Detach() error {
-	buf := &bytes.Buffer{}
-	if err := t.WriteData(buf); err != nil {
+	data, err := t.Source.Pixels()
+	if err != nil {
 		return err
 	}
-	t.WriteData = func(w io.Writer) error {
-		_, err := w.Write(buf.Bytes())
-		return err
+	t.Source = &readThumbnailSource{
+		read: func(w io.Writer) error {
+			_, err := w.Write(data)
+			return err
+		},
 	}
 	return nil
 }

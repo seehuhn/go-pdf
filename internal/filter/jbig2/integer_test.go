@@ -45,7 +45,7 @@ func TestIntegerRoundTrip(t *testing.T) {
 func TestIntegerEdgeCases(t *testing.T) {
 	// from mq_test_vectors.txt: mq_integer_edge_cases
 	values := []int64{0, -1, 1, -2, 2, 127, 128, -128, -129, 255, 256, -256, 32767}
-	expected := hexBytes("9C 35 4E 34 D1 2A 1F AE B6 CD CC 9E 47 C9 4E 1C 3F FF")
+	expected := hexBytes("9C 35 4E 34 D1 2A 1F AE B6 CD CC 9E 47 C9 4E 1C 3F FF AC")
 
 	enc := newMQEncoder()
 	ic := &intCtx{}
@@ -86,7 +86,7 @@ func TestIAIDVector(t *testing.T) {
 	codeLen := 2
 	values := []int{0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3,
 		0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3}
-	expected := hexBytes("70 B6 EC BE AA AA AA AA AF FF")
+	expected := hexBytes("70 B6 EC BE AA AA AA AA AF FF AC")
 
 	enc := newMQEncoder()
 	ic, _ := newIAIDCtx(codeLen)

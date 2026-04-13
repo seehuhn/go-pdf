@@ -17,78 +17,85 @@
 package image
 
 import (
-	"image"
+	"errors"
+	goimage "image"
 	"image/draw"
 	"image/jpeg"
+	"maps"
 
-	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/graphics/color"
 )
 
-// JPEG creates a new PDF image from a JPEG image.
-// The file is stored in the DCTDecode format in the PDF file.
-func JPEG(src image.Image, opts *jpeg.Options) (graphics.Image, error) {
-	// convert to NRGBA format
-	b := src.Bounds()
-	img := image.NewNRGBA(b)
-	draw.Draw(img, img.Bounds(), src, b.Min, draw.Src)
+// DCTSource writes a Go [image.Image] as JPEG-encoded (DCTDecode) image
+// data to a PDF stream.  It implements [graphics.ImageData] and is
+// used as the Source of an [image.Dict] to embed a JPEG image XObject.
+//
+// The source image is converted to NRGBA before encoding.  To embed a
+// DCT-encoded image with a particular PDF colour space, set
+// [Dict.ColorSpace] on the enclosing [Dict] rather than relying on any
+// colour information carried inside the JPEG stream.
+type DCTSource struct {
+	// Image is the image data to encode.
+	Image goimage.Image
 
-	im := &jpegImage{
-		im:   img,
-		opts: opts,
+	// Options controls the JPEG encoder (quality, etc.).  If nil, the
+	// standard library's default options are used.
+	Options *jpeg.Options
+}
+
+// Pixels returns the raw, uncompressed pixel data.
+// The output format matches the image's colour model: 3 bytes per pixel
+// for colour images (RGB), 1 byte per pixel for grayscale.
+func (s *DCTSource) Pixels() ([]byte, error) {
+	if s.Image == nil {
+		return nil, errors.New("DCTSource.Image is nil")
 	}
-	return im, nil
+	b := s.Image.Bounds()
+	width, height := b.Dx(), b.Dy()
+
+	switch s.Image.(type) {
+	case *goimage.Gray, *goimage.Gray16:
+		buf := make([]byte, 0, width*height)
+		for y := b.Min.Y; y < b.Max.Y; y++ {
+			for x := b.Min.X; x < b.Max.X; x++ {
+				r, _, _, _ := s.Image.At(x, y).RGBA()
+				buf = append(buf, byte(r>>8))
+			}
+		}
+		return buf, nil
+	default:
+		buf := make([]byte, 0, width*height*3)
+		for y := b.Min.Y; y < b.Max.Y; y++ {
+			for x := b.Min.X; x < b.Max.X; x++ {
+				r, g, bl, _ := s.Image.At(x, y).RGBA()
+				buf = append(buf, byte(r>>8), byte(g>>8), byte(bl>>8))
+			}
+		}
+		return buf, nil
+	}
 }
 
-type jpegImage struct {
-	im   *image.NRGBA
-	opts *jpeg.Options
-}
+// WriteStream implements [graphics.ImageData].
+func (s *DCTSource) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference, dict pdf.Dict) error {
+	if s.Image == nil {
+		return errors.New("DCTSource.Image is nil")
+	}
 
-// Subtype returns /Image.
-// This implements the [graphics.XObject] interface.
-func (im *jpegImage) Subtype() pdf.Name {
-	return pdf.Name("Image")
-}
+	// Convert to NRGBA for deterministic colour handling.
+	b := s.Image.Bounds()
+	img := goimage.NewNRGBA(b)
+	draw.Draw(img, img.Bounds(), s.Image, b.Min, draw.Src)
 
-// Bounds implements the [graphics.Image] interface.
-func (im *jpegImage) Bounds() rect.IntRect {
-	b := im.im.Bounds()
-	return rect.IntRect{XMin: b.Min.X, YMin: b.Min.Y, XMax: b.Max.X, YMax: b.Max.Y}
-}
+	dict = maps.Clone(dict)
+	dict["Filter"] = pdf.Name("DCTDecode")
 
-// Embed ensures that the image is embedded in the PDF file.
-// This implements the [graphics.Image] interface.
-func (im *jpegImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-	ref := rm.Alloc()
-
-	// TODO(voss): write a mask if there is an alpha channel
-
-	img := im.im
-	stream, err := rm.Out().OpenStream(ref, pdf.Dict{
-		"Type":             pdf.Name("XObject"),
-		"Subtype":          pdf.Name("Image"),
-		"Width":            pdf.Integer(img.Bounds().Dx()),
-		"Height":           pdf.Integer(img.Bounds().Dy()),
-		"ColorSpace":       pdf.Name(color.FamilyDeviceRGB),
-		"BitsPerComponent": pdf.Integer(8),
-		"Filter":           pdf.Name("DCTDecode"),
-	})
+	w, err := rm.Out().OpenStream(ref, dict)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	err = jpeg.Encode(stream, img, im.opts)
-	if err != nil {
-		return nil, err
+	if err := jpeg.Encode(w, img, s.Options); err != nil {
+		w.Close()
+		return err
 	}
-
-	err = stream.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	return ref, nil
+	return w.Close()
 }

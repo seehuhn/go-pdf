@@ -174,10 +174,10 @@ var testCases = []struct {
 				Height:           2,
 				ColorSpace:       color.SpaceDeviceGray,
 				BitsPerComponent: 8,
-				WriteData: func(w io.Writer) error {
+				Source: thumbnail.NewRawSource(func(w io.Writer) error {
 					_, err := w.Write([]byte{0x00, 0x80, 0x80, 0xff})
 					return err
-				},
+				}),
 			},
 			AFRelationship: RelationshipUnspecified,
 		},
@@ -245,10 +245,10 @@ var testCases = []struct {
 				Height:           1,
 				ColorSpace:       color.SpaceDeviceRGB,
 				BitsPerComponent: 16,
-				WriteData: func(w io.Writer) error {
+				Source: thumbnail.NewRawSource(func(w io.Writer) error {
 					_, err := w.Write([]byte{0x00, 0x00, 0xff, 0xff, 0x00, 0x00})
 					return err
-				},
+				}),
 			},
 			EncryptedPayload: &EncryptedPayload{
 				FilterName: "AdvancedCrypto",
@@ -361,10 +361,10 @@ func TestSpecificationValidation(t *testing.T) {
 				Height:           1,
 				ColorSpace:       color.SpaceDeviceGray,
 				BitsPerComponent: 8,
-				WriteData: func(w io.Writer) error {
+				Source: thumbnail.NewRawSource(func(w io.Writer) error {
 					_, err := w.Write([]byte{0x00})
 					return err
-				},
+				}),
 			},
 		}
 
@@ -626,7 +626,7 @@ func FuzzSpecificationRoundTrip(f *testing.F) {
 
 		// Skip if any stream data cannot be read (e.g. unsupported filter)
 		if specification.Thumbnail != nil {
-			if err := specification.Thumbnail.WriteData(io.Discard); err != nil {
+			if _, err := specification.Thumbnail.Source.Pixels(); err != nil {
 				t.Skip("thumbnail data not readable")
 			}
 		}

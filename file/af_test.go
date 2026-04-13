@@ -14,20 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package property
+package file
 
 import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/optional"
+	"seehuhn.de/go/pdf/property"
 )
 
 func TestAFAsDirectDict(t *testing.T) {
 	af := &AF{
-		AssociatedFiles: []*file.Specification{
+		AssociatedFiles: []*Specification{
 			{FileName: "test.txt"},
 		},
 	}
@@ -41,7 +41,7 @@ func TestAFEmptyError(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	af := &AF{
-		AssociatedFiles: []*file.Specification{},
+		AssociatedFiles: []*Specification{},
 	}
 
 	_, err := rm.Embed(af)
@@ -56,10 +56,10 @@ func TestAFRoundTripSingleUse(t *testing.T) {
 
 	original := &AF{
 		MCID: optional.NewUInt(99),
-		AssociatedFiles: []*file.Specification{
+		AssociatedFiles: []*Specification{
 			{
 				FileName:       "report.xml",
-				AFRelationship: file.RelationshipData,
+				AFRelationship: RelationshipData,
 			},
 		},
 		SingleUse: true,
@@ -76,7 +76,7 @@ func TestAFRoundTripSingleUse(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := ExtractList(x, nil, embedded, true)
+	decoded, err := property.ExtractList(x, nil, embedded, true)
 	if err != nil {
 		t.Fatalf("ExtractList() failed: %v", err)
 	}
@@ -94,11 +94,11 @@ func TestAFRoundTripSingleUse(t *testing.T) {
 		t.Fatalf("re-Embed() failed: %v", err)
 	}
 	x2 := pdf.NewExtractor(w2)
-	decoded2, err := ExtractList(x2, nil, embedded2, true)
+	decoded2, err := property.ExtractList(x2, nil, embedded2, true)
 	if err != nil {
 		t.Fatalf("second ExtractList() failed: %v", err)
 	}
-	if !ListsEqual(decoded, decoded2) {
+	if !property.ListsEqual(decoded, decoded2) {
 		t.Error("round trip failed: lists not equal")
 	}
 }
@@ -109,14 +109,14 @@ func TestAFRoundTripIndirect(t *testing.T) {
 
 	original := &AF{
 		MCID: optional.NewUInt(42),
-		AssociatedFiles: []*file.Specification{
+		AssociatedFiles: []*Specification{
 			{
 				FileName:       "data1.csv",
-				AFRelationship: file.RelationshipData,
+				AFRelationship: RelationshipData,
 			},
 			{
 				FileName:       "data2.csv",
-				AFRelationship: file.RelationshipData,
+				AFRelationship: RelationshipData,
 			},
 		},
 		SingleUse: false,
@@ -133,7 +133,7 @@ func TestAFRoundTripIndirect(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := ExtractList(x, nil, embedded, false)
+	decoded, err := property.ExtractList(x, nil, embedded, false)
 	if err != nil {
 		t.Fatalf("ExtractList() failed: %v", err)
 	}
@@ -151,11 +151,11 @@ func TestAFRoundTripIndirect(t *testing.T) {
 		t.Fatalf("re-Embed() failed: %v", err)
 	}
 	x2 := pdf.NewExtractor(w2)
-	decoded2, err := ExtractList(x2, nil, embedded2, false)
+	decoded2, err := property.ExtractList(x2, nil, embedded2, false)
 	if err != nil {
 		t.Fatalf("second ExtractList() failed: %v", err)
 	}
-	if !ListsEqual(decoded, decoded2) {
+	if !property.ListsEqual(decoded, decoded2) {
 		t.Error("round trip failed: lists not equal")
 	}
 }
@@ -165,7 +165,7 @@ func TestAFWithoutMCID(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	original := &AF{
-		AssociatedFiles: []*file.Specification{
+		AssociatedFiles: []*Specification{
 			{FileName: "test.txt"},
 		},
 		SingleUse: true,
@@ -177,7 +177,7 @@ func TestAFWithoutMCID(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := ExtractList(x, nil, embedded, true)
+	decoded, err := property.ExtractList(x, nil, embedded, true)
 	if err != nil {
 		t.Fatalf("ExtractList() failed: %v", err)
 	}
@@ -195,11 +195,11 @@ func TestAFWithoutMCID(t *testing.T) {
 		t.Fatalf("re-Embed() failed: %v", err)
 	}
 	x2 := pdf.NewExtractor(w2)
-	decoded2, err := ExtractList(x2, nil, embedded2, true)
+	decoded2, err := property.ExtractList(x2, nil, embedded2, true)
 	if err != nil {
 		t.Fatalf("second ExtractList() failed: %v", err)
 	}
-	if !ListsEqual(decoded, decoded2) {
+	if !property.ListsEqual(decoded, decoded2) {
 		t.Error("round trip failed: lists not equal")
 	}
 }

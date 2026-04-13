@@ -163,7 +163,7 @@ func TestPatternDictRoundTrip(t *testing.T) {
 func patternDictRoundTrip(t *testing.T, patterns []*bitmap.Bitmap, tmpl int) {
 	t.Helper()
 
-	patData := encodePatternDictSegment(patterns, tmpl)
+	patData := EncodePatternDictSegment(patterns, tmpl)
 
 	var stream []byte
 	stream = WriteSegmentHeader(stream, 0, segPatternDict, 0, nil, uint32(len(patData)))
@@ -207,7 +207,7 @@ func FuzzPatternDictRoundTrip(f *testing.F) {
 	}
 
 	for _, tmpl := range []int{0, 1, 2, 3} {
-		patData := encodePatternDictSegment(patterns, tmpl)
+		patData := EncodePatternDictSegment(patterns, tmpl)
 		var stream []byte
 		stream = WriteSegmentHeader(stream, 0, segPatternDict, 0, nil, uint32(len(patData)))
 		stream = append(stream, patData...)
@@ -231,7 +231,7 @@ func FuzzPatternDictRoundTrip(f *testing.F) {
 		}
 
 		// re-encode with template 1
-		reEncoded := encodePatternDictSegment(seg1.patterns, 1)
+		reEncoded := EncodePatternDictSegment(seg1.patterns, 1)
 		var stream []byte
 		stream = WriteSegmentHeader(stream, 0, segPatternDict, 0, nil, uint32(len(reEncoded)))
 		stream = append(stream, reEncoded...)
@@ -294,10 +294,10 @@ func TestHalftoneRoundTrip(t *testing.T) {
 	for _, tmpl := range []int{0, 1, 2, 3} {
 		t.Run(fmt.Sprintf("T%d", tmpl), func(t *testing.T) {
 			// encode pattern dictionary segment
-			patData := encodePatternDictSegment(patterns, tmpl)
+			patData := EncodePatternDictSegment(patterns, tmpl)
 
 			// encode halftone region segment
-			htData := encodeHalftoneRegionSegment(
+			htData := EncodeHalftoneRegionSegment(
 				width, height,
 				grayValues, gsw, gsh,
 				hgx, hgy, hrx, hry,
@@ -385,8 +385,8 @@ func TestHalftoneRoundTripSparseGray(t *testing.T) {
 	width := gsw * pw
 	height := gsh * ph
 
-	patData := encodePatternDictSegment(patterns, 1)
-	htData := encodeHalftoneRegionSegment(
+	patData := EncodePatternDictSegment(patterns, 1)
+	htData := EncodeHalftoneRegionSegment(
 		width, height,
 		grayValues, gsw, gsh,
 		0, 0, hrx, 0,
@@ -440,8 +440,8 @@ func TestIntermediateHalftoneRoundTrip(t *testing.T) {
 	width := gsw * pw
 	height := gsh * ph
 
-	patData := encodePatternDictSegment(patterns, 1)
-	htData := encodeHalftoneRegionSegment(
+	patData := EncodePatternDictSegment(patterns, 1)
+	htData := EncodeHalftoneRegionSegment(
 		width, height, grayValues, gsw, gsh,
 		0, 0, hrx, 0, len(patterns),
 		1, bitmap.CombOpOR,
@@ -512,8 +512,8 @@ func FuzzHalftoneRoundTrip(f *testing.F) {
 	height := gsh * ph
 
 	for _, tmpl := range []int{0, 1, 2, 3} {
-		patData := encodePatternDictSegment(patterns, tmpl)
-		htData := encodeHalftoneRegionSegment(
+		patData := EncodePatternDictSegment(patterns, tmpl)
+		htData := EncodeHalftoneRegionSegment(
 			width, height, grayValues, gsw, gsh,
 			0, 0, hrx, 0, len(patterns),
 			tmpl, bitmap.CombOpOR,

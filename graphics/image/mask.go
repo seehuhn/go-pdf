@@ -48,10 +48,10 @@ type Mask struct {
 	//   - true: 1=opaque and 0=transparent
 	Inverted bool
 
-	// WriteData is a function that writes the mask data to the provided writer.
-	// The data should be written as a continuous bit stream, with each row
-	// starting at a new byte boundary. 0 = opaque, 1 = transparent.
-	WriteData func(io.Writer) error
+	// Source writes the body of the mask stream when the Mask is embedded.
+	// For raw 1-bit data use [CCITTFaxSource]; pre-encoded formats such as
+	// JBIG2 provide their own Source implementations.
+	Source graphics.ImageData
 
 	// Interpolate enables edge smoothing for the mask to reduce jagged
 	// appearance in low-resolution stencil masks.
@@ -108,8 +108,12 @@ func FromImageMask(img image.Image) *Mask {
 	return &Mask{
 		Width:  width,
 		Height: height,
-		WriteData: func(w io.Writer) error {
-			return writeImageMaskData(w, img)
+		Source: &CCITTFaxSource{
+			Width: width,
+			K:     -1, // Group 4
+			WriteData: func(w io.Writer) error {
+				return writeImageMaskData(w, img)
+			},
 		},
 	}
 }
@@ -315,19 +319,7 @@ func ExtractMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 		}
 	}
 
-	// Create WriteData function as a closure
-	mask.WriteData = func(w io.Writer) error {
-		stm, err := pdf.DecodeStream(x.R, stream, 0)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(w, stm)
-		if err != nil {
-			stm.Close()
-			return err
-		}
-		return stm.Close()
-	}
+	mask.Source = &streamData{getter: x.R, stream: stream}
 
 	return mask, nil
 }
@@ -464,27 +456,40 @@ func (m *Mask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	ref := rm.Alloc()
-	filters := []pdf.Filter{
-		pdf.FilterCCITTFax{
-			"Columns": pdf.Integer(m.Width),
-			"K":       pdf.Integer(-1),
-		},
-	}
-	w, err := rm.Out().OpenStream(ref, dict, filters...)
-	if err != nil {
-		return nil, fmt.Errorf("cannot open image mask stream: %w", err)
-	}
-
-	err = m.WriteData(w)
-	if err != nil {
-		return nil, err
-	}
-
-	err = w.Close()
-	if err != nil {
+	if err := m.Source.WriteStream(rm, ref, dict); err != nil {
 		return nil, err
 	}
 	return ref, nil
+}
+
+// LoadAlpha decodes the 1-bit mask data and returns an alpha image.
+// Opaque pixels get alpha 255, transparent pixels get alpha 0.
+// The [Mask.Inverted] flag controls which bit value means opaque.
+func (m *Mask) LoadAlpha() (*image.Alpha, error) {
+	raw, err := m.Source.Pixels()
+	if err != nil {
+		return nil, err
+	}
+
+	width, height := m.Width, m.Height
+	raw = normalizeData(raw, expectedDataSize(width, 1, 1, height))
+
+	alpha := image.NewAlpha(image.Rect(0, 0, width, height))
+	for y := range height {
+		rowBytes := (width + 7) / 8
+		rowStart := y * rowBytes
+		for x := range width {
+			bit := (raw[rowStart+x/8] >> (7 - x%8)) & 1
+			opaque := bit == 0
+			if m.Inverted {
+				opaque = bit == 1
+			}
+			if opaque {
+				alpha.Pix[y*alpha.Stride+x] = 255
+			}
+		}
+	}
+	return alpha, nil
 }
 
 func (m *Mask) check(out *pdf.Writer) error {
@@ -494,8 +499,8 @@ func (m *Mask) check(out *pdf.Writer) error {
 	if m.Height <= 0 {
 		return fmt.Errorf("invalid image mask height %d", m.Height)
 	}
-	if m.WriteData == nil {
-		return errors.New("WriteData function cannot be nil")
+	if m.Source == nil {
+		return errors.New("Source cannot be nil")
 	}
 
 	if m.Alternates != nil {

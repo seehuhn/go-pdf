@@ -28,6 +28,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/graphics/color"
 	pdfimage "seehuhn.de/go/pdf/graphics/image"
 )
 
@@ -72,13 +73,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	image, err := pdfimage.JPEG(imageData, nil)
-	if err != nil {
-		log.Fatal(err)
+	pdfImg := &pdfimage.Dict{
+		Width:            b.Dx(),
+		Height:           b.Dy(),
+		ColorSpace:       color.SpaceDeviceRGB,
+		BitsPerComponent: 8,
+		Data:             &pdfimage.DCTSource{Image: imageData},
 	}
 
 	doc.Transform(matrix.Scale(width, height))
-	doc.DrawXObject(image)
+	doc.DrawXObject(pdfImg)
 
 	doc.Out.GetMeta().Catalog.ViewerPreferences = pdf.Dict{
 		"FitWindow":    pdf.Boolean(true),

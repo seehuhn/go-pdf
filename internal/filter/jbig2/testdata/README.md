@@ -73,6 +73,13 @@ For each test, encode the described input and compare your output against
 the `encoded` bytes. These must match exactly (they are deterministic
 outputs from the reference MQ codec).
 
+**Note on terminating marker:** The original reference implementation output
+did not include the terminating marker byte 0xAC at the end of streams
+whose final coded byte is 0xFF. Per Figure E.11 of ITU-T T.88 (2018),
+the FLUSH procedure appends 0xAC after the trailing 0xFF to form a
+complete terminating marker code. The `encoded` values in
+`mq_test_vectors.txt` have been updated to include this byte.
+
 ## Test Case Coverage
 
 ### Segment types exercised

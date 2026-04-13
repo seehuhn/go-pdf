@@ -41,6 +41,27 @@ type Image interface {
 	Bounds() rect.IntRect
 }
 
+// ImageData provides access to the pixel component values of a PDF
+// image, both in encoded form (for writing to a PDF stream) and as
+// raw bytes (for rendering or analysis).
+//
+// Concrete types are provided by
+// [seehuhn.de/go/pdf/graphics/image] (FlateSource, CCITTFaxSource,
+// DCTSource) and [seehuhn.de/go/pdf/graphics/image/jbig2] (Image).
+type ImageData interface {
+	// WriteStream opens a PDF stream on ref, writes the encoded image
+	// data, and closes it.  The dict is pre-populated with
+	// format-independent entries (Subtype, Width, Height, ColorSpace,
+	// BitsPerComponent, Decode, ...).
+	WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference, dict pdf.Dict) error
+
+	// Pixels returns the raw pixel component values, decoding the
+	// stream data if necessary.  Each row occupies a whole number of
+	// bytes; within a row, each pixel is a sequence of component
+	// values, one per colour channel, each BitsPerComponent bits wide.
+	Pixels() ([]byte, error)
+}
+
 // ImageMask is an optional interface implemented by XObjects that are
 // stencil masks (PDF image XObjects with ImageMask=true).
 // Image masks are allowed in contexts where other images are forbidden

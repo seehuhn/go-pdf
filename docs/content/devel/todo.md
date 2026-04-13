@@ -48,8 +48,6 @@ weight = 100
 
 ## Missing Features
 
-- implement high-quality text extraction
-- implement JBIG2Decode filters
 - implement JPXDecode filters
 - implement Crypt filters
 - allow for incremental updates to PDF files

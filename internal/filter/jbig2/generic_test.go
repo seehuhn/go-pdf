@@ -313,16 +313,16 @@ func TestGenericImageVectors(t *testing.T) {
 		bm       *bitmap.Bitmap
 		expected string
 	}{
-		{"mq_image_template0", 0, makeDiagonal(16, 16), "D2 4E 0B D3 4B 60 EF FF"},
-		{"mq_image_template1", 1, makeDiagonal(16, 16), "CD 97 C1 AD 90 3F FF"},
-		{"mq_image_template2", 2, makeDiagonal(16, 16), "C4 2E D6 C1 99 FF"},
-		{"mq_image_template3", 3, makeDiagonal(16, 16), "D2 4E 0E 39 FF 7F FF"},
-		{"mq_image_templates_zeros", 0, makeAllZeros(16, 16), "AB FF"},
-		{"mq_image_pattern_zeros", 1, makeAllZeros(16, 16), "AB FF"},
-		{"mq_image_pattern_checkerboard", 1, makeCheckerboard(16, 16), "C0 F8 48 AF E0 04 7F FF"},
+		{"mq_image_template0", 0, makeDiagonal(16, 16), "D2 4E 0B D3 4B 60 EF FF AC"},
+		{"mq_image_template1", 1, makeDiagonal(16, 16), "CD 97 C1 AD 90 3F FF AC"},
+		{"mq_image_template2", 2, makeDiagonal(16, 16), "C4 2E D6 C1 99 FF AC"},
+		{"mq_image_template3", 3, makeDiagonal(16, 16), "D2 4E 0E 39 FF 7F FF AC"},
+		{"mq_image_templates_zeros", 0, makeAllZeros(16, 16), "AB FF AC"},
+		{"mq_image_pattern_zeros", 1, makeAllZeros(16, 16), "AB FF AC"},
+		{"mq_image_pattern_checkerboard", 1, makeCheckerboard(16, 16), "C0 F8 48 AF E0 04 7F FF AC"},
 		{"mq_image_pattern_hstripes", 1, makeHStripes(16, 16), "FE D5 EB 8B B1 FF 7F F8"},
-		{"mq_image_pattern_vstripes", 1, makeVStripes(16, 16), "C0 8E 33 36 7B D7 FF"},
-		{"mq_image_pattern_center_block", 1, makeCenterBlock(16, 16), "A0 03 D9 4E 16 66 42 3F 95 F0 4F FF"},
+		{"mq_image_pattern_vstripes", 1, makeVStripes(16, 16), "C0 8E 33 36 7B D7 FF AC"},
+		{"mq_image_pattern_center_block", 1, makeCenterBlock(16, 16), "A0 03 D9 4E 16 66 42 3F 95 F0 4F FF AC"},
 		{"mq_image_pattern_large_diagonal", 1, makeDiagonal(64, 32), "CD 9A 58 4A 89 1A 7F FF 7F F8"},
 	}
 

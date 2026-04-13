@@ -116,5 +116,4 @@ metadata.ExtractStream -> *metadata.Stream -> Embed(rm *pdf.EmbedHelper) (pdf.Na
 TODO:
 ./go-pdf/graphics/image/dict.go:func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 ./go-pdf/graphics/image/indexed.go:func (im *Indexed) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-./go-pdf/graphics/image/jpeg.go:func (im *jpegImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 ./go-pdf/graphics/image/png.go:func (im *PNG) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {

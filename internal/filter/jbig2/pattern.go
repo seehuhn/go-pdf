@@ -43,20 +43,6 @@ func (d *decoder) processPatternDict(hdr *segmentHeader, data []byte) error {
 
 	offset := 7
 
-	// AT positions (§7.4.4.2: present only for HDTEMPLATE=0)
-	var hdATX [4]int8
-	var hdATY [4]int8
-	if !hdmmr && hdTemplate == 0 {
-		if offset+8 > len(data) {
-			return fmt.Errorf("pattern dictionary AT flags truncated")
-		}
-		for i := range 4 {
-			hdATX[i] = int8(data[offset+i*2])
-			hdATY[i] = int8(data[offset+i*2+1])
-		}
-		offset += 8
-	}
-
 	// collective bitmap: all patterns side by side
 	collectiveWidth, err := checkedMul(grayMax+1, hdpw)
 	if err != nil {
@@ -71,6 +57,8 @@ func (d *decoder) processPatternDict(hdr *segmentHeader, data []byte) error {
 			return err
 		}
 	} else {
+		// AT positions are implied by Table 27 — not present in the
+		// segment data (unlike generic region segments).
 		p := &genericRegionParams{
 			Width:    collectiveWidth,
 			Height:   hdph,
@@ -78,8 +66,14 @@ func (d *decoder) processPatternDict(hdr *segmentHeader, data []byte) error {
 		}
 		switch hdTemplate {
 		case 0:
-			copy(p.ATX[:], hdATX[:])
-			copy(p.ATY[:], hdATY[:])
+			p.ATX[0] = int8(-hdpw)
+			p.ATY[0] = 0
+			p.ATX[1] = -3
+			p.ATY[1] = -1
+			p.ATX[2] = 2
+			p.ATY[2] = -2
+			p.ATX[3] = -2
+			p.ATY[3] = -2
 		case 1:
 			p.ATX[0] = 3
 			p.ATY[0] = -1

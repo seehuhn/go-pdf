@@ -156,7 +156,7 @@ func TestPatternDictMMRRoundTrip(t *testing.T) {
 		makeCenterBlock(pw, ph),
 	}
 
-	patData, err := encodePatternDictSegmentMMR(patterns)
+	patData, err := EncodePatternDictSegmentMMR(patterns)
 	if err != nil {
 		t.Fatalf("encode: %v", err)
 	}
@@ -218,13 +218,13 @@ func TestHalftoneMMRRoundTrip(t *testing.T) {
 	height := gsh * ph
 
 	// encode pattern dictionary (MMR)
-	patData, err := encodePatternDictSegmentMMR(patterns)
+	patData, err := EncodePatternDictSegmentMMR(patterns)
 	if err != nil {
 		t.Fatalf("encode pattern dict: %v", err)
 	}
 
 	// encode halftone region (MMR)
-	htData, err := encodeHalftoneRegionSegmentMMR(
+	htData, err := EncodeHalftoneRegionSegmentMMR(
 		width, height,
 		grayValues, gsw, gsh,
 		hgx, hgy, hrx, hry,
@@ -321,7 +321,7 @@ func FuzzPatternDictMMRRoundTrip(f *testing.F) {
 		makeCenterBlock(pw, ph),
 	}
 
-	patData, err := encodePatternDictSegmentMMR(patterns)
+	patData, err := EncodePatternDictSegmentMMR(patterns)
 	if err != nil {
 		f.Fatalf("seed encode failed: %v", err)
 	}
@@ -346,7 +346,7 @@ func FuzzPatternDictMMRRoundTrip(f *testing.F) {
 			return
 		}
 
-		reEncoded, err := encodePatternDictSegmentMMR(seg1.patterns)
+		reEncoded, err := EncodePatternDictSegmentMMR(seg1.patterns)
 		if err != nil {
 			return
 		}
@@ -400,11 +400,11 @@ func FuzzHalftoneMMRRoundTrip(f *testing.F) {
 	width := gsw * pw
 	height := gsh * ph
 
-	patData, err := encodePatternDictSegmentMMR(patterns)
+	patData, err := EncodePatternDictSegmentMMR(patterns)
 	if err != nil {
 		f.Fatalf("seed encode failed: %v", err)
 	}
-	htData, err := encodeHalftoneRegionSegmentMMR(
+	htData, err := EncodeHalftoneRegionSegmentMMR(
 		width, height, grayValues, gsw, gsh,
 		0, 0, hrx, 0, len(patterns),
 		bitmap.CombOpOR,

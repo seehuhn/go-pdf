@@ -199,7 +199,7 @@ func (f FilterDCT) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 
 // FilterJBIG2 is the JBIG2Decode filter for bi-level image compression.
 // JBIG2Decode encoding is not supported via the filter interface;
-// use the graphics/jbig2 package for encoding.
+// use the graphics/image/jbig2 package for encoding.
 type FilterJBIG2 struct {
 	Param   Dict
 	Globals []byte // pre-read JBIG2Globals stream data
@@ -228,7 +228,13 @@ func (f *FilterJBIG2) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 		return nil, err
 	}
 
-	// return packed pixel data as bytes
+	// JBIG2 uses 1=black, but the normal PDF convention for decoded
+	// bi-level image data is 0=black (see the BlackIs1 definition in
+	// §7.4.6).  Invert all bytes to match.
+	for i := range bm.Pix {
+		bm.Pix[i] ^= 0xFF
+	}
+
 	return io.NopCloser(bytes.NewReader(bm.Pix)), nil
 }
 

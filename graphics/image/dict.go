@@ -40,9 +40,6 @@ import (
 // PDF 2.0 sections: 8.9.5
 
 // Dict represents a PDF image XObject dictionary.
-//
-// TODO(voss): currently there is no way to write JPXDecode images.  Rethink
-// the whole WriteData approach.
 type Dict struct {
 	// Width is the width of the image in pixels.
 	Width int
@@ -58,17 +55,18 @@ type Dict struct {
 	// The value must be 1, 2, 4, 8, or (from PDF 1.5) 16.
 	BitsPerComponent int
 
-	// Decode (optional) is an array of numbers describing how to map image
-	// samples into the range of values appropriate for the image's color
-	// space. The slice must have twice the number of color components in the
-	// ColorSpace.
+	// Decode (optional) is an array of numbers describing how to map pixel
+	// component values into the range of values appropriate for the image's
+	// color space. The slice must have twice the number of color components in
+	// the ColorSpace.
 	Decode []float64
 
-	// WriteData is a function that writes the image data to the provided
-	// writer. The data should be written row by row, with each row containing
-	// Width * ColorSpace.Channels() samples, each sample using
-	// BitsPerComponent bits.
-	WriteData func(io.Writer) error
+	// Data holds the image pixel component values and controls how they are
+	// encoded in the PDF stream.  Each pixel consists of one value per colour
+	// channel, each BitsPerComponent bits wide, laid out row by row.  Use
+	// [FlateSource] for raw pixel data, [DCTSource] for JPEG encoding, or
+	// [seehuhn.de/go/pdf/graphics/image/jbig2.Image] for JBIG2.
+	Data graphics.ImageData
 
 	// MaskImage (optional) determines which parts of the image are to be
 	// painted.
@@ -424,25 +422,8 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 		img.WebCaptureID = webID
 	}
 
-	// Create WriteData function as a closure.
-	// Calculate expected size to normalize malformed image data.
-	expectedSize := expectedDataSize(img.Width, img.ColorSpace.Channels(), img.BitsPerComponent, img.Height)
-	img.WriteData = func(w io.Writer) error {
-		stm, err := pdf.DecodeStream(x.R, stream, 0)
-		if err != nil {
-			return err
-		}
-		data, err := io.ReadAll(stm)
-		stm.Close()
-		if err != nil {
-			return err
-		}
-
-		data = normalizeData(data, expectedSize)
-
-		_, err = w.Write(data)
-		return err
-	}
+	// lazily read from the original stream, preserving the encoding
+	img.Data = &streamData{getter: x.R, stream: stream}
 
 	return img, nil
 }
@@ -461,8 +442,14 @@ func FromImage(img image.Image, colorSpace color.Space, bitsPerComponent int) *D
 		Height:           height,
 		ColorSpace:       colorSpace,
 		BitsPerComponent: bitsPerComponent,
-		WriteData: func(w io.Writer) error {
-			return writeImageData(w, img, colorSpace, bitsPerComponent)
+		Data: &FlateSource{
+			Predictor:        15,
+			Width:            width,
+			Colors:           colorSpace.Channels(),
+			BitsPerComponent: bitsPerComponent,
+			WriteData: func(w io.Writer) error {
+				return writeImageData(w, img, colorSpace, bitsPerComponent)
+			},
 		},
 	}
 }
@@ -582,7 +569,7 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 		dict["Mask"] = mask
 	}
-	if !slices.Equal(d.Decode, DefaultDecode(d.ColorSpace, d.BitsPerComponent)) {
+	if d.Decode != nil && !slices.Equal(d.Decode, DefaultDecode(d.ColorSpace, d.BitsPerComponent)) {
 		var decode pdf.Array
 		for _, v := range d.Decode {
 			decode = append(decode, pdf.Number(v))
@@ -714,24 +701,7 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	ref := rm.Alloc()
-	compress := pdf.FilterCompress{
-		"Predictor":        pdf.Integer(15), // TODO(voss): check that this is a good choice
-		"Colors":           pdf.Integer(d.ColorSpace.Channels()),
-		"BitsPerComponent": pdf.Integer(d.BitsPerComponent),
-		"Columns":          pdf.Integer(d.Width),
-	}
-	w, err := rm.Out().OpenStream(ref, dict, compress)
-	if err != nil {
-		return nil, fmt.Errorf("cannot open image stream: %w", err)
-	}
-
-	err = d.WriteData(w)
-	if err != nil {
-		return nil, err
-	}
-
-	err = w.Close()
-	if err != nil {
+	if err := d.Data.WriteStream(rm, ref, dict); err != nil {
 		return nil, err
 	}
 	return ref, nil
@@ -744,8 +714,8 @@ func (d *Dict) check(out *pdf.Writer) error {
 	if d.Height <= 0 {
 		return fmt.Errorf("invalid image height %d", d.Height)
 	}
-	if d.WriteData == nil {
-		return errors.New("WriteData function cannot be nil")
+	if d.Data == nil {
+		return errors.New("Source cannot be nil")
 	}
 
 	if fam := d.ColorSpace.Family(); fam == color.FamilyPattern {

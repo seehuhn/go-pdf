@@ -28,8 +28,9 @@ import (
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/bitmap"
+	"seehuhn.de/go/pdf/graphics/color"
 	pdfimg "seehuhn.de/go/pdf/graphics/image"
-	"seehuhn.de/go/pdf/graphics/jbig2"
+	"seehuhn.de/go/pdf/graphics/image/jbig2"
 	"seehuhn.de/go/pdf/graphics/text"
 )
 
@@ -43,46 +44,76 @@ func main() {
 }
 
 func run(filename string) error {
-	doc, err := document.CreateMultiPage(filename, document.A4, pdf.V1_7, nil)
+	doc, err := document.CreateMultiPage(filename, document.A5r, pdf.V1_7, nil)
 	if err != nil {
 		return err
 	}
 
 	font := standard.Helvetica.New()
 
-	// page 1: generic region encoding (direct bitmap)
-	err = genericPage(doc, font)
-	if err != nil {
+	// page 1: colour sanity check
+	if err := pageColourCheck(doc, font); err != nil {
 		return err
 	}
 
-	// page 2: symbol dictionary + text region
-	err = symbolPage(doc, font)
-	if err != nil {
+	// page 2: generic region (default)
+	if err := pageGenericDefault(doc, font); err != nil {
+		return err
+	}
+
+	// page 2: generic region (MMR)
+	if err := pageGenericMMR(doc, font); err != nil {
+		return err
+	}
+
+	// page 3: generic region (typical prediction)
+	if err := pageGenericTPGD(doc, font); err != nil {
+		return err
+	}
+
+	// page 4: text region (arithmetic)
+	if err := pageTextArithmetic(doc, font); err != nil {
+		return err
+	}
+
+	// page 5: text region (Huffman)
+	if err := pageTextHuffman(doc, font); err != nil {
+		return err
+	}
+
+	// page 6: refinement region
+	if err := pageRefinement(doc, font); err != nil {
+		return err
+	}
+
+	// page 7: halftone region
+	if err := pageHalftone(doc, font); err != nil {
 		return err
 	}
 
 	return doc.Close()
 }
 
-// genericPage creates a page showing a generic region JBIG2 image
-// next to the same image encoded as a standard 1-bit image mask.
-func genericPage(doc *document.MultiPage, font *type1.Instance) error {
-	page := doc.AddPage()
+// pageColourCheck draws an all-black square as a sanity check for
+// correct colour handling.
+func pageColourCheck(doc *document.MultiPage, font *type1.Instance) error {
+	bm := bitmap.New(32, 32)
+	for y := range 32 {
+		for x := range 32 {
+			bm.SetPixel(x, y, true)
+		}
+	}
 
-	F := text.F{Font: font, Size: 16}
-	Fsmall := text.F{Font: font, Size: 10}
+	im := jbig2.NewImage(32, 32, nil)
+	im.AddGenericRegion(bm, 0, 0, nil)
+	jbig2Img := newJBIG2Image(im, 32, 32)
+	refImg := bitmapToGrayImage(bm)
 
-	text.Show(page.Builder,
-		text.M{X: 72, Y: 780},
-		F, "JBIG2 Generic Region Test",
-	)
-	text.Show(page.Builder,
-		text.M{X: 72, Y: 760},
-		Fsmall, "Both images should look identical.",
-	)
+	return drawPage(doc, font, "solid black square", jbig2Img, refImg, 32, 32)
+}
 
-	// create a test pattern: a 64×64 bitmap with concentric rectangles
+// concentricRects creates a 64x64 bitmap with concentric rectangles.
+func concentricRects() *bitmap.Bitmap {
 	bm := bitmap.New(64, 64)
 	for ring := 0; ring < 32; ring += 4 {
 		for x := ring; x < 64-ring; x++ {
@@ -94,58 +125,24 @@ func genericPage(doc *document.MultiPage, font *type1.Instance) error {
 			bm.SetPixel(63-ring, y, true)
 		}
 	}
+	return bm
+}
 
-	// left: JBIG2 encoded
-	jbig2Img, err := newJBIG2GenericImage(bm)
-	if err != nil {
-		return err
-	}
-	drawLabeledImage(page, Fsmall, "JBIG2Decode", jbig2Img, 100, 500, 200)
-
-	// right: standard image mask (Flate-compressed)
-	maskImg := bitmapToMask(bm)
-	drawLabeledImage(page, Fsmall, "Image Mask (Flate)", maskImg, 320, 500, 200)
-
-	// second row: a more complex pattern (checkerboard)
-	checker := bitmap.New(64, 64)
+// checkerboard creates a 64x64 checkerboard bitmap.
+func checkerboard() *bitmap.Bitmap {
+	bm := bitmap.New(64, 64)
 	for y := range 64 {
 		for x := range 64 {
 			if (x/4+y/4)%2 == 0 {
-				checker.SetPixel(x, y, true)
+				bm.SetPixel(x, y, true)
 			}
 		}
 	}
-
-	jbig2Check, err := newJBIG2GenericImage(checker)
-	if err != nil {
-		return err
-	}
-	drawLabeledImage(page, Fsmall, "JBIG2 Checkerboard", jbig2Check, 100, 240, 200)
-
-	maskCheck := bitmapToMask(checker)
-	drawLabeledImage(page, Fsmall, "Flate Checkerboard", maskCheck, 320, 240, 200)
-
-	return page.Close()
+	return bm
 }
 
-// symbolPage creates a page demonstrating JBIG2 symbol dictionary + text
-// region encoding, placing repeated glyphs via a shared dictionary.
-func symbolPage(doc *document.MultiPage, font *type1.Instance) error {
-	page := doc.AddPage()
-
-	F := text.F{Font: font, Size: 16}
-	Fsmall := text.F{Font: font, Size: 10}
-
-	text.Show(page.Builder,
-		text.M{X: 72, Y: 780},
-		F, "JBIG2 Symbol Dictionary Test",
-	)
-	text.Show(page.Builder,
-		text.M{X: 72, Y: 760},
-		Fsmall, "Both images should look identical.",
-	)
-
-	// define 3 small symbol bitmaps (simple geometric shapes)
+// makeSymbols creates three 8x8 symbol bitmaps: square, cross, diamond.
+func makeSymbols() []*bitmap.Bitmap {
 	symSquare := bitmap.New(8, 8)
 	for y := range 8 {
 		for x := range 8 {
@@ -171,200 +168,350 @@ func symbolPage(doc *document.MultiPage, font *type1.Instance) error {
 		symDiamond.SetPixel(4+i, 7-i, true)
 	}
 
-	symbols := []*bitmap.Bitmap{symSquare, symCross, symDiamond}
+	return []*bitmap.Bitmap{symSquare, symCross, symDiamond}
+}
 
-	// create placement pattern: symbols in a grid
-	const regionW, regionH = 80, 40
-	var placements []placement
-	symIdx := 0
+// symbolPlacements returns the placements for a grid of symbols.
+func symbolPlacements() []placement {
+	var pp []placement
+	idx := 0
 	for row := range 4 {
 		for col := range 8 {
-			placements = append(placements, placement{
-				symID: symIdx % 3,
+			pp = append(pp, placement{
+				symID: idx % 3,
 				x:     col * 10,
-				y:     (row+1)*8 - 1, // BOTTOMLEFT: y is the bottom
+				y:     (row+1)*8 - 1,
 			})
-			symIdx++
+			idx++
+		}
+	}
+	return pp
+}
+
+// renderSymbolBitmap renders the symbol placements onto a fresh bitmap.
+func renderSymbolBitmap(symbols []*bitmap.Bitmap, pp []placement, w, h int) *bitmap.Bitmap {
+	bm := bitmap.New(w, h)
+	for _, p := range pp {
+		sym := symbols[p.symID]
+		topY := p.y - sym.Height() + 1
+		bm.Combine(sym, p.x, topY, bitmap.CombOpOR)
+	}
+	return bm
+}
+
+// pageGenericDefault: generic region with default options.
+func pageGenericDefault(doc *document.MultiPage, font *type1.Instance) error {
+	bm := concentricRects()
+
+	im := jbig2.NewImage(bm.Width(), bm.Height(), nil)
+	im.AddGenericRegion(bm, 0, 0, nil)
+
+	jbig2Mask := newJBIG2Image(im, bm.Width(), bm.Height())
+	refMask := bitmapToGrayImage(bm)
+	return drawPage(doc, font, "generic region", jbig2Mask, refMask,
+		float64(bm.Width()), float64(bm.Height()))
+}
+
+// pageGenericMMR: generic region with MMR coding.
+func pageGenericMMR(doc *document.MultiPage, font *type1.Instance) error {
+	bm := concentricRects()
+
+	im := jbig2.NewImage(bm.Width(), bm.Height(), nil)
+	im.AddGenericRegion(bm, 0, 0, &jbig2.GenericOptions{UseMMR: true})
+
+	jbig2Mask := newJBIG2Image(im, bm.Width(), bm.Height())
+	refMask := bitmapToGrayImage(bm)
+	return drawPage(doc, font, "generic region (MMR)", jbig2Mask, refMask,
+		float64(bm.Width()), float64(bm.Height()))
+}
+
+// pageGenericTPGD: generic region with typical prediction.
+func pageGenericTPGD(doc *document.MultiPage, font *type1.Instance) error {
+	bm := checkerboard()
+
+	im := jbig2.NewImage(bm.Width(), bm.Height(), nil)
+	im.AddGenericRegion(bm, 0, 0, &jbig2.GenericOptions{TPGDOn: true})
+
+	jbig2Mask := newJBIG2Image(im, bm.Width(), bm.Height())
+	refMask := bitmapToGrayImage(bm)
+	return drawPage(doc, font, "generic region (typical prediction)", jbig2Mask, refMask,
+		float64(bm.Width()), float64(bm.Height()))
+}
+
+// pageTextArithmetic: text region with arithmetic coding.
+func pageTextArithmetic(doc *document.MultiPage, font *type1.Instance) error {
+	symbols := makeSymbols()
+	pp := symbolPlacements()
+	const regionW, regionH = 80, 40
+
+	g := jbig2.NewGlobals()
+	for _, sym := range symbols {
+		if _, err := g.AddSymbol(sym); err != nil {
+			return err
 		}
 	}
 
-	// left: JBIG2 symbol dictionary + text region
-	jbig2Sym, err := newJBIG2SymbolImage(symbols, placements, regionW, regionH)
+	instances := placementsToInstances(pp)
+	im := jbig2.NewImage(regionW, regionH, g)
+	im.AddTextRegion(&jbig2.TextRegion{
+		Width:     regionW,
+		Height:    regionH,
+		Instances: instances,
+	})
+
+	jbig2Mask := newJBIG2Image(im, regionW, regionH)
+	refBm := renderSymbolBitmap(symbols, pp, regionW, regionH)
+	refMask := bitmapToGrayImage(refBm)
+	return drawPage(doc, font, "text region (arithmetic)", jbig2Mask, refMask,
+		float64(regionW), float64(regionH))
+}
+
+// pageTextHuffman: text region with Huffman coding.
+func pageTextHuffman(doc *document.MultiPage, font *type1.Instance) error {
+	symbols := makeSymbols()
+	pp := symbolPlacements()
+	const regionW, regionH = 80, 40
+
+	g := jbig2.NewGlobals()
+	for _, sym := range symbols {
+		if _, err := g.AddSymbol(sym); err != nil {
+			return err
+		}
+	}
+
+	instances := placementsToInstances(pp)
+	im := jbig2.NewImage(regionW, regionH, g)
+	im.AddTextRegion(&jbig2.TextRegion{
+		Width:      regionW,
+		Height:     regionH,
+		Instances:  instances,
+		UseHuffman: true,
+	})
+
+	jbig2Mask := newJBIG2Image(im, regionW, regionH)
+	refBm := renderSymbolBitmap(symbols, pp, regionW, regionH)
+	refMask := bitmapToGrayImage(refBm)
+	return drawPage(doc, font, "text region (Huffman)", jbig2Mask, refMask,
+		float64(regionW), float64(regionH))
+}
+
+// pageRefinement: refinement region encoding.
+// The target bitmap is encoded as a refinement of a similar but
+// slightly different reference (shifted by 1 pixel).
+func pageRefinement(doc *document.MultiPage, font *type1.Instance) error {
+	target := concentricRects()
+
+	// reference: same pattern shifted by 1 pixel
+	ref := bitmap.New(64, 64)
+	for ring := 0; ring < 32; ring += 4 {
+		for x := ring; x < 64-ring; x++ {
+			ref.SetPixel(x, ring+1, true)
+			ref.SetPixel(x, 63-ring, true)
+		}
+		for y := ring; y < 64-ring; y++ {
+			ref.SetPixel(ring+1, y, true)
+			ref.SetPixel(63-ring, y, true)
+		}
+	}
+
+	im := jbig2.NewImage(target.Width(), target.Height(), nil)
+	im.AddRefinementRegion(target, ref, 0, 0, nil)
+
+	jbig2Img := newJBIG2Image(im, target.Width(), target.Height())
+	refImg := bitmapToGrayImage(target)
+	return drawPage(doc, font, "refinement region", jbig2Img, refImg,
+		float64(target.Width()), float64(target.Height()))
+}
+
+// pageHalftone: halftone region with a pattern dictionary.
+func pageHalftone(doc *document.MultiPage, font *type1.Instance) error {
+	// pattern dictionary: 8 patterns of 4x4 pixels (gray levels 0..7).
+	// Using a power-of-two count avoids out-of-range gray indices in
+	// the bitplane encoding.
+	const patW, patH = 4, 4
+	numPatterns := 8
+	// Bayer dither threshold matrix for 4x4 patterns.
+	threshold := [16]int{
+		0, 8, 2, 10,
+		12, 4, 14, 6,
+		3, 11, 1, 9,
+		15, 7, 13, 5,
+	}
+	patterns := make([]*bitmap.Bitmap, numPatterns)
+	for i := range numPatterns {
+		p := bitmap.New(patW, patH)
+		count := i * 2 // 0, 2, 4, 6, 8, 10, 12, 14 black pixels out of 16
+		for y := range patH {
+			for x := range patW {
+				if threshold[y*patW+x] < count {
+					p.SetPixel(x, y, true)
+				}
+			}
+		}
+		patterns[i] = p
+	}
+
+	g := jbig2.NewGlobals()
+	patID, err := g.AddPatternDict(patterns)
 	if err != nil {
 		return err
 	}
-	drawLabeledImage(page, Fsmall, "JBIG2 Symbol Dict", jbig2Sym, 100, 480, 240)
 
-	// right: reference image (render the same placements manually into a bitmap)
-	refBm := bitmap.New(regionW, regionH)
-	for _, p := range placements {
-		sym := symbols[p.symID]
-		// BOTTOMLEFT: bottom-left at (x, y), so top-left at (x, y-h+1)
-		topY := p.y - sym.Height() + 1
-		refBm.Combine(sym, p.x, topY, bitmap.CombOpOR)
+	// 8x6 gray-scale grid
+	const gridW, gridH = 8, 6
+	grayValues := make([]int, gridW*gridH)
+	for gy := range gridH {
+		for gx := range gridW {
+			grayValues[gy*gridW+gx] = (gx + gy*gridW) % numPatterns
+		}
 	}
-	refImg := bitmapToMask(refBm)
-	drawLabeledImage(page, Fsmall, "Reference (Flate)", refImg, 100, 220, 240)
+
+	const regionW = gridW * patW
+	const regionH = gridH * patH
+
+	im := jbig2.NewImage(regionW, regionH, g)
+	im.AddHalftoneRegion(&jbig2.HalftoneRegion{
+		Width:         regionW,
+		Height:        regionH,
+		PatternDictID: patID,
+		GrayValues:    grayValues,
+		GridWidth:     gridW,
+		GridHeight:    gridH,
+		GridX:         0,
+		GridY:         0,
+		GridVX:        patW,
+		GridVY:        0,
+	})
+
+	jbig2Mask := newJBIG2Image(im, regionW, regionH)
+
+	// manually render the halftone as the reference
+	refBm := bitmap.New(regionW, regionH)
+	for gy := range gridH {
+		for gx := range gridW {
+			gv := grayValues[gy*gridW+gx]
+			pat := patterns[gv]
+			// grid vector: column=(patW,0), row=(0,patH)
+			px := gx * patW
+			py := gy * patH
+			refBm.Combine(pat, px, py, bitmap.CombOpOR)
+		}
+	}
+	refMask := bitmapToGrayImage(refBm)
+
+	return drawPage(doc, font, "halftone region", jbig2Mask, refMask,
+		float64(regionW), float64(regionH))
+}
+
+// drawPage draws a single test page with a JBIG2 image on the left
+// and a reference image on the right.
+func drawPage(
+	doc *document.MultiPage,
+	font *type1.Instance,
+	jbig2Label string,
+	jbig2Img, refImg graphics.XObject,
+	imgPixW, imgPixH float64,
+) error {
+	page := doc.AddPage()
+
+	fTitle := text.F{Font: font, Size: 14}
+	fLabel := text.F{Font: font, Size: 9}
+
+	// A5r dimensions: 595.276 x 420.945
+	const (
+		leftX  = 40.0
+		rightX = 320.0
+		titleY = 390.0
+		labelY = 370.0
+	)
+
+	// scale images to ~180pt wide, maintaining aspect ratio
+	dispW := 180.0
+	dispH := dispW * imgPixH / imgPixW
+	if dispH > 280 {
+		dispH = 280
+		dispW = dispH * imgPixW / imgPixH
+	}
+	imgY := labelY - dispH - 10
+
+	// title
+	text.Show(page.Builder, text.M{X: leftX, Y: titleY}, fTitle,
+		"Both images should look identical.")
+
+	// left: JBIG2
+	text.Show(page.Builder, text.M{X: leftX, Y: labelY}, fLabel, jbig2Label)
+	page.PushGraphicsState()
+	page.Transform(matrix.Translate(leftX, imgY))
+	page.Transform(matrix.Scale(dispW, dispH))
+	page.DrawXObject(jbig2Img)
+	page.PopGraphicsState()
+
+	// right: reference
+	text.Show(page.Builder, text.M{X: rightX, Y: labelY}, fLabel, "reference")
+	page.PushGraphicsState()
+	page.Transform(matrix.Translate(rightX, imgY))
+	page.Transform(matrix.Scale(dispW, dispH))
+	page.DrawXObject(refImg)
+	page.PopGraphicsState()
 
 	return page.Close()
 }
 
-// drawLabeledImage draws an XObject at (x, y) scaled to size, with a label.
-func drawLabeledImage(
-	page *document.Page,
-	f text.F,
-	label string,
-	img graphics.XObject,
-	x, y, size float64,
-) {
-	text.Show(page.Builder, text.M{X: x, Y: y + size + 8}, f, label)
-	page.PushGraphicsState()
-	page.Transform(matrix.Translate(x, y))
-	page.Transform(matrix.Scale(size, size))
-	page.DrawXObject(img)
-	page.PopGraphicsState()
+// newJBIG2Image wraps a jbig2.Image as a 1-bit DeviceGray image.
+// The JBIG2Decode filter produces 0=black (matching the normal PDF
+// convention), so default Decode [0 1] works correctly.
+func newJBIG2Image(im *jbig2.Image, w, h int) *pdfimg.Dict {
+	return &pdfimg.Dict{
+		Width:            w,
+		Height:           h,
+		ColorSpace:       color.SpaceDeviceGray,
+		BitsPerComponent: 1,
+		Data:             im,
+	}
 }
 
-// newJBIG2GenericImage creates a JBIG2 XObject using generic region encoding.
-func newJBIG2GenericImage(bm *bitmap.Bitmap) (*jbig2Image, error) {
-	enc := jbig2.NewEncoder()
-	pg := jbig2.NewPage(bm.Width(), bm.Height())
-	pg.AddGenericRegion(bm, 0, 0, nil)
-
-	pageData, err := enc.EncodePage(pg)
-	if err != nil {
-		return nil, err
+// bitmapToGrayImage converts a bitmap to a 1-bit DeviceGray image.
+// This produces an opaque black-and-white image without image mask
+// semantics, providing a clean reference independent of mask conventions.
+func bitmapToGrayImage(bm *bitmap.Bitmap) *pdfimg.Dict {
+	return &pdfimg.Dict{
+		Width:            bm.Width(),
+		Height:           bm.Height(),
+		ColorSpace:       color.SpaceDeviceGray,
+		BitsPerComponent: 1,
+		Decode:           []float64{1, 0}, // bitmap 1=black → gray 0.0=black
+		Data: &pdfimg.FlateSource{
+			Width:            bm.Width(),
+			Colors:           1,
+			BitsPerComponent: 1,
+			WriteData: func(w io.Writer) error {
+				stride := (bm.Width() + 7) / 8
+				for y := 0; y < bm.Height(); y++ {
+					_, err := w.Write(bm.Pix[y*bm.Stride : y*bm.Stride+stride])
+					if err != nil {
+						return err
+					}
+				}
+				return nil
+			},
+		},
 	}
-
-	return &jbig2Image{
-		width:    bm.Width(),
-		height:   bm.Height(),
-		pageData: pageData,
-	}, nil
 }
 
-// newJBIG2SymbolImage creates a JBIG2 XObject with a symbol dictionary
-// and text region.
-func newJBIG2SymbolImage(
-	symbols []*bitmap.Bitmap,
-	pp []placement,
-	width, height int,
-) (*jbig2Image, error) {
-	enc := jbig2.NewEncoder()
-	for _, sym := range symbols {
-		enc.AddSymbol(sym)
-	}
-
-	globals, err := enc.Globals()
-	if err != nil {
-		return nil, err
-	}
-
-	instances := make([]jbig2.Instance, len(pp))
+// placementsToInstances converts placement data to JBIG2 text region instances.
+func placementsToInstances(pp []placement) []jbig2.TextRegionInstance {
+	instances := make([]jbig2.TextRegionInstance, len(pp))
 	for i, p := range pp {
-		instances[i] = jbig2.Instance{
+		instances[i] = jbig2.TextRegionInstance{
 			SymbolID: p.symID,
 			X:        p.x,
 			Y:        p.y,
 		}
 	}
-
-	pg := jbig2.NewPage(width, height)
-	pg.AddTextRegion(&jbig2.TextRegion{
-		Width:     width,
-		Height:    height,
-		Instances: instances,
-	})
-
-	pageData, err := enc.EncodePage(pg)
-	if err != nil {
-		return nil, err
-	}
-
-	return &jbig2Image{
-		width:    width,
-		height:   height,
-		globals:  globals,
-		pageData: pageData,
-	}, nil
+	return instances
 }
 
-// jbig2Image embeds JBIG2-encoded data as a PDF image XObject.
-type jbig2Image struct {
-	width, height int
-	globals       []byte // JBIG2Globals stream (nil if none)
-	pageData      []byte // JBIG2 page stream
-}
-
-func (img *jbig2Image) Subtype() pdf.Name {
-	return "Image"
-}
-
-func (img *jbig2Image) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-	ref := rm.Alloc()
-	dict := pdf.Dict{
-		"Type":      pdf.Name("XObject"),
-		"Subtype":   pdf.Name("Image"),
-		"Width":     pdf.Integer(img.width),
-		"Height":    pdf.Integer(img.height),
-		"Filter":    pdf.Name("JBIG2Decode"),
-		"ImageMask": pdf.Boolean(true),
-		"Decode":    pdf.Array{pdf.Integer(1), pdf.Integer(0)}, // JBIG2: 1=black
-	}
-
-	// embed JBIG2Globals as a separate stream if present
-	if img.globals != nil {
-		globalsRef := rm.Alloc()
-		globalsStream, err := rm.Out().OpenStream(globalsRef, pdf.Dict{})
-		if err != nil {
-			return nil, err
-		}
-		if _, err = globalsStream.Write(img.globals); err != nil {
-			globalsStream.Close()
-			return nil, err
-		}
-		if err = globalsStream.Close(); err != nil {
-			return nil, err
-		}
-
-		dict["DecodeParms"] = pdf.Dict{
-			"JBIG2Globals": globalsRef,
-		}
-	}
-
-	// the JBIG2 page data is the stream content
-	stream, err := rm.Out().OpenStream(ref, dict)
-	if err != nil {
-		return nil, err
-	}
-	if _, err = stream.Write(img.pageData); err != nil {
-		stream.Close()
-		return nil, err
-	}
-	return ref, stream.Close()
-}
-
-// bitmapToMask converts a bitmap.Bitmap to a standard PDF image mask
-// (Flate-compressed for comparison).
-func bitmapToMask(bm *bitmap.Bitmap) *pdfimg.Mask {
-	return &pdfimg.Mask{
-		Width:    bm.Width(),
-		Height:   bm.Height(),
-		Inverted: true, // 1=opaque (black) in our convention
-		WriteData: func(w io.Writer) error {
-			stride := (bm.Width() + 7) / 8
-			for y := 0; y < bm.Height(); y++ {
-				_, err := w.Write(bm.Pix[y*bm.Stride : y*bm.Stride+stride])
-				if err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	}
-}
-
-// placement describes a symbol instance for testing.
+// placement describes a symbol instance position.
 type placement struct {
 	symID int
 	x, y  int

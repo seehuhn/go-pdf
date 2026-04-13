@@ -43,13 +43,12 @@
 //	propList, err := property.ExtractList(x, path, obj, isDirect)
 //	dict := propList.AsDirectDict() // nil if indirect
 //
-// To create property lists for writing, use the specific types like [AF] or
-// [ActualText]:
+// To create property lists for writing, use the specific types like
+// [ActualText] (defined in this package) or
+// [seehuhn.de/go/pdf/file.AF] (defined alongside file specifications):
 //
-//	af := &property.AF{
-//	    AssociatedFiles: []*file.Specification{spec},
-//	}
-//	embedded, err := rm.Embed(af)
+//	actual := &property.ActualText{Text: "Hello"}
+//	embedded, err := rm.Embed(actual)
 //
 // The [List] interface provides a common API for both reading and creating
 // property lists.

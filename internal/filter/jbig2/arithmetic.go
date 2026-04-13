@@ -188,7 +188,14 @@ func (e *mqEncoder) bytes() []byte {
 	if e.bp < 2 {
 		return nil
 	}
-	return e.buf[1:e.bp]
+	out := e.buf[1:e.bp]
+	// The FLUSH procedure (Figure E.11) ends by appending the
+	// terminating marker code 0xFF 0xAC.  The 0xFF overlaps the
+	// final coded data; append 0xAC to complete the marker.
+	if len(out) > 0 && out[len(out)-1] == 0xFF {
+		out = append(out, 0xAC)
+	}
+	return out
 }
 
 // --- Decoder (Annex E) ---

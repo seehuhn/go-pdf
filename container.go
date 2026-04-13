@@ -239,6 +239,30 @@ func GetStreamReader(r Getter, ref Object) (io.ReadCloser, error) {
 	return DecodeStream(r, stm, 0)
 }
 
+// RawStreamReader returns a reader for the raw stream data after decryption
+// but before any filter decoding.  This is used to copy a stream to another
+// PDF file while preserving its original encoding.
+//
+// Each call creates a fresh reader, so streams can be read multiple times.
+func RawStreamReader(r Getter, x *Stream) (io.ReadCloser, error) {
+	v := V1_2
+	if r != nil {
+		v = GetVersion(r)
+	}
+
+	out := io.NopCloser(x.NewReader())
+
+	if x.crypt != nil {
+		var err error
+		out, err = x.crypt.Decode(v, out)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return out, nil
+}
+
 // DecodeStream returns a reader for the decoded stream data. If numFilters is
 // non-zero, only the first numFilters filters are decoded.
 //

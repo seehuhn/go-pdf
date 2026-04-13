@@ -53,10 +53,10 @@ type SoftMask struct {
 	// transparent, max to opaque.
 	Decode []float64
 
-	// WriteData is a function that writes the grayscale mask data to the
-	// provided writer. The data should be written row by row, with each row
-	// containing Width samples, each sample using BitsPerComponent bits.
-	WriteData func(io.Writer) error
+	// Source writes the body of the soft-mask stream when the SoftMask is
+	// embedded.  For raw grayscale pixel data use [FlateSource];
+	// pre-encoded formats provide their own Source implementations.
+	Source graphics.ImageData
 
 	// Interpolate indicates whether mask interpolation should be performed by
 	// a PDF processor to reduce pixelation in low-resolution masks.
@@ -140,31 +140,67 @@ func (sm *SoftMask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	ref := rm.Alloc()
-
-	// Use compression appropriate for grayscale data
-	compress := pdf.FilterCompress{
-		"Predictor":        pdf.Integer(12), // PNG UP predictor works well for grayscale
-		"Colors":           pdf.Integer(1),  // Always 1 for grayscale
-		"BitsPerComponent": pdf.Integer(sm.BitsPerComponent),
-		"Columns":          pdf.Integer(sm.Width),
-	}
-
-	w, err := rm.Out().OpenStream(ref, dict, compress)
-	if err != nil {
+	if err := sm.Source.WriteStream(rm, ref, dict); err != nil {
 		return nil, err
 	}
-
-	err = sm.WriteData(w)
-	if err != nil {
-		return nil, err
-	}
-
-	err = w.Close()
-	if err != nil {
-		return nil, err
-	}
-
 	return ref, nil
+}
+
+// LoadAlpha decodes the soft mask pixel data and returns an alpha image.
+// Sample values are mapped through the Decode array (default [0, 1])
+// so that 0 = transparent and 1 = fully opaque.
+func (sm *SoftMask) LoadAlpha() (*image.Alpha, error) {
+	raw, err := sm.Source.Pixels()
+	if err != nil {
+		return nil, err
+	}
+
+	width, height := sm.Width, sm.Height
+	bpc := sm.BitsPerComponent
+	raw = normalizeData(raw, expectedDataSize(width, 1, bpc, height))
+
+	dMin, dMax := 0.0, 1.0
+	if len(sm.Decode) >= 2 {
+		dMin, dMax = sm.Decode[0], sm.Decode[1]
+	}
+
+	alpha := image.NewAlpha(image.Rect(0, 0, width, height))
+
+	switch bpc {
+	case 8:
+		for y := range height {
+			rowStart := y * width
+			for x := range width {
+				s := float64(raw[rowStart+x]) / 255
+				alpha.Pix[y*alpha.Stride+x] = uint8((dMin + s*(dMax-dMin)) * 255)
+			}
+		}
+	case 16:
+		for y := range height {
+			rowStart := y * width * 2
+			for x := range width {
+				idx := rowStart + x*2
+				s := float64(uint16(raw[idx])<<8|uint16(raw[idx+1])) / 65535
+				alpha.Pix[y*alpha.Stride+x] = uint8((dMin + s*(dMax-dMin)) * 255)
+			}
+		}
+	case 1, 2, 4:
+		samplesPerByte := 8 / bpc
+		mask := uint8(1<<bpc - 1)
+		maxVal := float64(mask)
+		for y := range height {
+			rowBytes := (width*bpc + 7) / 8
+			rowStart := y * rowBytes
+			for x := range width {
+				byteIdx := rowStart + x/samplesPerByte
+				bitOffset := (samplesPerByte - 1 - x%samplesPerByte) * bpc
+				s := float64((raw[byteIdx]>>bitOffset)&mask) / maxVal
+				alpha.Pix[y*alpha.Stride+x] = uint8((dMin + s*(dMax-dMin)) * 255)
+			}
+		}
+	}
+
+	return alpha, nil
 }
 
 // check validates the soft mask according to PDF specification requirements.
@@ -175,8 +211,8 @@ func (sm *SoftMask) check(out *pdf.Writer) error {
 	if sm.Height <= 0 {
 		return fmt.Errorf("invalid soft mask height %d", sm.Height)
 	}
-	if sm.WriteData == nil {
-		return errors.New("WriteData function cannot be nil")
+	if sm.Source == nil {
+		return errors.New("Source cannot be nil")
 	}
 
 	// Validate BitsPerComponent
@@ -304,24 +340,7 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 		}
 	}
 
-	// normalize malformed data to expected size
-	expectedSize := expectedDataSize(softMask.Width, 1, softMask.BitsPerComponent, softMask.Height)
-	softMask.WriteData = func(w io.Writer) error {
-		r, err := pdf.DecodeStream(x.R, stm, 0)
-		if err != nil {
-			return err
-		}
-		data, err := io.ReadAll(r)
-		r.Close()
-		if err != nil {
-			return err
-		}
-
-		data = normalizeData(data, expectedSize)
-
-		_, err = w.Write(data)
-		return err
-	}
+	softMask.Source = &streamData{getter: x.R, stream: stm}
 
 	return softMask, nil
 }
@@ -337,8 +356,14 @@ func FromImageAlpha(img image.Image, bitsPerComponent int) *SoftMask {
 		Width:            width,
 		Height:           height,
 		BitsPerComponent: bitsPerComponent,
-		WriteData: func(w io.Writer) error {
-			return writeSoftMaskData(w, img, bitsPerComponent)
+		Source: &FlateSource{
+			Predictor:        12,
+			Width:            width,
+			Colors:           1,
+			BitsPerComponent: bitsPerComponent,
+			WriteData: func(w io.Writer) error {
+				return writeSoftMaskData(w, img, bitsPerComponent)
+			},
 		},
 	}
 }

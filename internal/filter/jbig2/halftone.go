@@ -179,6 +179,15 @@ func decodeGrayScaleImage(
 	var running *bitmap.Bitmap
 	dataOffset := 0
 
+	// for arithmetic coding, all bitplanes share a single MQ state
+	// and a single context array
+	var arithDec *mqDecoder
+	var arithCx []byte
+	if !gsmmr {
+		arithDec = newMQDecoder(data)
+		arithCx = make([]byte, genericContextSize(gstemplate))
+	}
+
 	for j := gsbpp - 1; j >= 0; j-- {
 		var current *bitmap.Bitmap
 		if gsmmr {
@@ -202,14 +211,9 @@ func decodeGrayScaleImage(
 			copy(p.ATX[:], atx[:])
 			copy(p.ATY[:], aty[:])
 
-			dec := newMQDecoder(data[dataOffset:])
-			current, err = decodeGenericRegion(budget, dec, p, nil)
+			current, err = decodeGenericRegion(budget, arithDec, p, arithCx)
 			if err != nil {
 				return nil, err
-			}
-			dataOffset += dec.bp + 1
-			if dataOffset > len(data) {
-				dataOffset = len(data)
 			}
 		}
 

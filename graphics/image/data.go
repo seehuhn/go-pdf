@@ -17,7 +17,6 @@
 package image
 
 import (
-	"bytes"
 	"errors"
 	"image"
 	gocolor "image/color"
@@ -218,11 +217,11 @@ func (d *Dict) Load() (*Data, error) {
 		decode = DefaultDecode(cs, d.BitsPerComponent)
 	}
 
-	var buf bytes.Buffer
-	if err := d.WriteData(&buf); err != nil {
+	data, err := d.Data.Pixels()
+	if err != nil {
 		return nil, err
 	}
-	data := buf.Bytes()
+	data = normalizeData(data, expectedDataSize(d.Width, ncomp, d.BitsPerComponent, d.Height))
 
 	width, height := d.Width, d.Height
 	bpc := d.BitsPerComponent

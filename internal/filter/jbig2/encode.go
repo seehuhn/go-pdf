@@ -1041,9 +1041,9 @@ func EncodeGenericRegionSegmentMMR(bm *bitmap.Bitmap, x, y int, combOp bitmap.Co
 	return buf, nil
 }
 
-// encodePatternDictSegment encodes a pattern dictionary segment's data.
+// EncodePatternDictSegment encodes a pattern dictionary segment's data.
 // All patterns must have the same dimensions.
-func encodePatternDictSegment(patterns []*bitmap.Bitmap, template int) []byte {
+func EncodePatternDictSegment(patterns []*bitmap.Bitmap, template int) []byte {
 	if len(patterns) == 0 {
 		return nil
 	}
@@ -1078,9 +1078,10 @@ func encodePatternDictSegment(patterns []*bitmap.Bitmap, template int) []byte {
 		Height:   hdph,
 		Template: template,
 	}
+	// AT positions are implied by Table 27 — NOT written to the
+	// segment header (unlike generic region segments).
 	switch template {
 	case 0:
-		// AT positions per Table 27 (written to header per §7.4.4.2)
 		p.ATX[0] = int8(-hdpw)
 		p.ATY[0] = 0
 		p.ATX[1] = -3
@@ -1089,14 +1090,7 @@ func encodePatternDictSegment(patterns []*bitmap.Bitmap, template int) []byte {
 		p.ATY[2] = -2
 		p.ATX[3] = -2
 		p.ATY[3] = -2
-		buf = append(buf,
-			byte(p.ATX[0]), byte(p.ATY[0]),
-			byte(p.ATX[1]), byte(p.ATY[1]),
-			byte(p.ATX[2]), byte(p.ATY[2]),
-			byte(p.ATX[3]), byte(p.ATY[3]))
 	case 1:
-		// AT positions are fixed per Table 27 and not written to the
-		// segment header (unlike symbol dict / generic region segments).
 		p.ATX[0] = 3
 		p.ATY[0] = -1
 	default:
@@ -1111,8 +1105,8 @@ func encodePatternDictSegment(patterns []*bitmap.Bitmap, template int) []byte {
 	return buf
 }
 
-// encodePatternDictSegmentMMR encodes a pattern dictionary segment using MMR.
-func encodePatternDictSegmentMMR(patterns []*bitmap.Bitmap) ([]byte, error) {
+// EncodePatternDictSegmentMMR encodes a pattern dictionary segment using MMR.
+func EncodePatternDictSegmentMMR(patterns []*bitmap.Bitmap) ([]byte, error) {
 	if len(patterns) == 0 {
 		return nil, nil
 	}
@@ -1152,17 +1146,25 @@ func encodePatternDictSegmentMMR(patterns []*bitmap.Bitmap) ([]byte, error) {
 
 // halftoneATPositions returns the Table C.4 AT positions for gray-scale
 // bitplane encoding/decoding.
+//
+// From the spec (Table C.4):
+//
+//	GBATX₁ = 3 if GSTEMPLATE ≤ 1; 2 if GSTEMPLATE ≥ 2
+//	GBATY₁ = -1
+//	GBATX₂ = -3    GBATY₂ = -1
+//	GBATX₃ = 2     GBATY₃ = -2
+//	GBATX₄ = -2    GBATY₄ = -2
 func halftoneATPositions(template int) (atx [4]int8, aty [4]int8) {
 	switch template {
 	case 0:
-		atx = [4]int8{-1, -3, -1, 2}
-		aty = [4]int8{-2, -2, -2, -2}
+		atx = [4]int8{3, -3, 2, -2}
+		aty = [4]int8{-1, -1, -2, -2}
 	case 1:
-		atx[0] = -1
-		aty[0] = -2
+		atx[0] = 3
+		aty[0] = -1
 	case 2, 3:
 		atx[0] = 2
-		aty[0] = -2
+		aty[0] = -1
 	}
 	return
 }
@@ -1197,9 +1199,12 @@ func encodeGrayScaleImage(grayValues []int, gsw, gsh, gsbpp, template int, skip 
 		}
 	}
 
-	// encode each bitplane from MSB to LSB
+	// encode all bitplanes into a single MQ stream (MSB to LSB),
+	// matching the decoder convention where one arithmetic state
+	// and one context array are shared across all bitplanes
 	atx, aty := halftoneATPositions(template)
-	var result []byte
+	enc := newMQEncoder()
+	cx := make([]byte, genericContextSize(template))
 	for j := gsbpp - 1; j >= 0; j-- {
 		p := &genericRegionParams{
 			Width:    gsw,
@@ -1213,14 +1218,10 @@ func encodeGrayScaleImage(grayValues []int, gsw, gsh, gsbpp, template int, skip 
 		copy(p.ATX[:], atx[:])
 		copy(p.ATY[:], aty[:])
 
-		enc := newMQEncoder()
-		encodeGenericRegion(enc, planes[j], p, nil)
-		enc.flush()
-		// include the trailing byte (buf[bp]) that the decoder's
-		// MQ look-ahead will read when bitplanes are concatenated
-		result = append(result, enc.buf[1:]...)
+		encodeGenericRegion(enc, planes[j], p, cx)
 	}
-	return result
+	enc.flush()
+	return enc.bytes()
 }
 
 // encodeGrayScaleImageMMR encodes a gray-scale image to MMR-coded bitplanes (Annex C).
@@ -1280,8 +1281,8 @@ func computeHalftoneSkipBitmap(gsw, gsh, hgx, hgy, hrx, hry, hpw, hph, regionW, 
 	return skip
 }
 
-// encodeHalftoneRegionSegmentMMR encodes a halftone region segment using MMR.
-func encodeHalftoneRegionSegmentMMR(
+// EncodeHalftoneRegionSegmentMMR encodes a halftone region segment using MMR.
+func EncodeHalftoneRegionSegmentMMR(
 	width, height int,
 	grayValues []int, gsw, gsh int,
 	hgx, hgy, hrx, hry int,
@@ -1320,10 +1321,10 @@ func encodeHalftoneRegionSegmentMMR(
 	return buf, nil
 }
 
-// encodeHalftoneRegionSegment encodes a halftone region segment's data.
+// EncodeHalftoneRegionSegment encodes a halftone region segment's data.
 // When enableSkip is true and hpw/hph are the pattern dimensions, grid cells
 // that fall entirely outside the region are marked in a skip bitmap.
-func encodeHalftoneRegionSegment(
+func EncodeHalftoneRegionSegment(
 	width, height int,
 	grayValues []int, gsw, gsh int,
 	hgx, hgy, hrx, hry int,

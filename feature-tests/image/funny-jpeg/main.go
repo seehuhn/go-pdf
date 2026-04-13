@@ -30,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/color"
 	pdfimg "seehuhn.de/go/pdf/graphics/image"
 	"seehuhn.de/go/pdf/graphics/text"
 )
@@ -119,9 +120,16 @@ func run(filename string) error {
 	// top row: DeviceRGB
 
 	// top-left: normal RGB JPEG
-	normalRGB, err := pdfimg.JPEG(rgbImg, &jpeg.Options{Quality: 100})
-	if err != nil {
-		return err
+	rgbBounds := rgbImg.Bounds()
+	normalRGB := &pdfimg.Dict{
+		Width:            rgbBounds.Dx(),
+		Height:           rgbBounds.Dy(),
+		ColorSpace:       color.SpaceDeviceRGB,
+		BitsPerComponent: 8,
+		Data: &pdfimg.DCTSource{
+			Image:   rgbImg,
+			Options: &jpeg.Options{Quality: 100},
+		},
 	}
 	drawImage(page, normalRGB, colL, rowT, imgSize)
 

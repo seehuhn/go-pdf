@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package property
+package file
 
 import (
 	"errors"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/optional"
+	"seehuhn.de/go/pdf/property"
 )
 
 // PDF 2.0 sections: 14.13.5
@@ -36,7 +36,7 @@ type AF struct {
 	// AssociatedFiles is an array of file specifications.
 	// This corresponds to the MCAF entry in the property list (Table 409a).
 	// Must contain at least one file specification.
-	AssociatedFiles []*file.Specification
+	AssociatedFiles []*Specification
 
 	// SingleUse controls whether the property list is embedded as a direct
 	// object in the Properties resource dictionary (true) or as an indirect
@@ -44,7 +44,7 @@ type AF struct {
 	SingleUse bool
 }
 
-var _ List = (*AF)(nil)
+var _ property.List = (*AF)(nil)
 
 // AsDirectDict returns nil since AF property lists always require
 // indirect references for embedded file specifications.
@@ -53,7 +53,7 @@ func (a *AF) AsDirectDict() pdf.Dict {
 }
 
 // Equal reports whether two property lists are semantically equal.
-func (a *AF) Equal(other List) bool {
+func (a *AF) Equal(other property.List) bool {
 	b, ok := other.(*AF)
 	if !ok {
 		return false

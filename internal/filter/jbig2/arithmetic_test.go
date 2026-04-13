@@ -49,7 +49,7 @@ func TestMQBinary(t *testing.T) {
 		0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
 		0x00, 0x01,
 	}
-	expected := hexBytes("39 56 72 A7 FF")
+	expected := hexBytes("39 56 72 A7 FF AC")
 
 	enc := newMQEncoder()
 	ctxs := make([]byte, 16) // 16 contexts, all initialized to 0

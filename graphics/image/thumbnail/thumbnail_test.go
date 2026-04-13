@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package thumbnail
+package thumbnail_test
 
 import (
 	"bytes"
@@ -25,133 +25,135 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/image"
+	"seehuhn.de/go/pdf/graphics/image/thumbnail"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
 var thumbnailTestCases = []struct {
 	name      string
 	version   pdf.Version
-	thumbnail *Thumbnail
+	thumbnail *thumbnail.Thumbnail
 }{
 	{
 		name:    "grayscale_8bit",
 		version: pdf.V1_7,
-		thumbnail: &Thumbnail{
+		thumbnail: &thumbnail.Thumbnail{
 			Width:            76,
 			Height:           99,
 			ColorSpace:       color.SpaceDeviceGray,
 			BitsPerComponent: 8,
-			WriteData: func(w io.Writer) error {
+			Source: &image.FlateSource{WriteData: func(w io.Writer) error {
 				data := make([]byte, 76*99)
 				for i := range data {
 					data[i] = byte(i % 256)
 				}
 				_, err := w.Write(data)
 				return err
-			},
+			}},
 		},
 	},
 	{
 		name:    "rgb_8bit",
 		version: pdf.V1_7,
-		thumbnail: &Thumbnail{
+		thumbnail: &thumbnail.Thumbnail{
 			Width:            100,
 			Height:           100,
 			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 8,
-			WriteData: func(w io.Writer) error {
+			Source: &image.FlateSource{WriteData: func(w io.Writer) error {
 				data := make([]byte, 100*100*3)
 				for i := range data {
 					data[i] = byte(i % 256)
 				}
 				_, err := w.Write(data)
 				return err
-			},
+			}},
 		},
 	},
 	{
 		name:    "grayscale_with_decode",
 		version: pdf.V1_7,
-		thumbnail: &Thumbnail{
+		thumbnail: &thumbnail.Thumbnail{
 			Width:            50,
 			Height:           50,
 			ColorSpace:       color.SpaceDeviceGray,
 			BitsPerComponent: 8,
 			Decode:           []float64{1.0, 0.0}, // inverted
-			WriteData: func(w io.Writer) error {
+			Source: &image.FlateSource{WriteData: func(w io.Writer) error {
 				data := make([]byte, 50*50)
 				for i := range data {
 					data[i] = byte(i % 256)
 				}
 				_, err := w.Write(data)
 				return err
-			},
+			}},
 		},
 	},
 	{
 		name:    "rgb_with_decode",
 		version: pdf.V2_0,
-		thumbnail: &Thumbnail{
+		thumbnail: &thumbnail.Thumbnail{
 			Width:            32,
 			Height:           32,
 			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 8,
 			Decode:           []float64{0.0, 1.0, 0.5, 1.0, 0.0, 0.5},
-			WriteData: func(w io.Writer) error {
+			Source: &image.FlateSource{WriteData: func(w io.Writer) error {
 				data := make([]byte, 32*32*3)
 				for i := range data {
 					data[i] = byte(i % 256)
 				}
 				_, err := w.Write(data)
 				return err
-			},
+			}},
 		},
 	},
 	{
 		name:    "indexed_grayscale",
 		version: pdf.V1_7,
-		thumbnail: &Thumbnail{
+		thumbnail: &thumbnail.Thumbnail{
 			Width:            64,
 			Height:           64,
 			ColorSpace:       makeIndexedGrayscale(),
 			BitsPerComponent: 8,
-			WriteData: func(w io.Writer) error {
+			Source: &image.FlateSource{WriteData: func(w io.Writer) error {
 				data := make([]byte, 64*64)
 				for i := range data {
 					data[i] = byte(i % 16) // use palette indices 0-15
 				}
 				_, err := w.Write(data)
 				return err
-			},
+			}},
 		},
 	},
 	{
 		name:    "indexed_rgb",
 		version: pdf.V1_7,
-		thumbnail: &Thumbnail{
+		thumbnail: &thumbnail.Thumbnail{
 			Width:            48,
 			Height:           48,
 			ColorSpace:       makeIndexedRGB(),
 			BitsPerComponent: 8,
-			WriteData: func(w io.Writer) error {
+			Source: &image.FlateSource{WriteData: func(w io.Writer) error {
 				data := make([]byte, 48*48)
 				for i := range data {
 					data[i] = byte(i % 8) // use palette indices 0-7
 				}
 				_, err := w.Write(data)
 				return err
-			},
+			}},
 		},
 	},
 	{
 		name:    "grayscale_2bit",
 		version: pdf.V1_7,
-		thumbnail: &Thumbnail{
+		thumbnail: &thumbnail.Thumbnail{
 			Width:            64,
 			Height:           64,
 			ColorSpace:       color.SpaceDeviceGray,
 			BitsPerComponent: 2,
-			WriteData: func(w io.Writer) error {
+			Source: &image.FlateSource{WriteData: func(w io.Writer) error {
 				// 64 pixels at 2 bits = 16 bytes per row
 				data := make([]byte, 16*64)
 				for i := range data {
@@ -159,18 +161,18 @@ var thumbnailTestCases = []struct {
 				}
 				_, err := w.Write(data)
 				return err
-			},
+			}},
 		},
 	},
 	{
 		name:    "grayscale_1bit",
 		version: pdf.V1_7,
-		thumbnail: &Thumbnail{
+		thumbnail: &thumbnail.Thumbnail{
 			Width:            80,
 			Height:           80,
 			ColorSpace:       color.SpaceDeviceGray,
 			BitsPerComponent: 1,
-			WriteData: func(w io.Writer) error {
+			Source: &image.FlateSource{WriteData: func(w io.Writer) error {
 				// 80 pixels = 10 bytes per row
 				data := make([]byte, 10*80)
 				for i := range data {
@@ -178,18 +180,18 @@ var thumbnailTestCases = []struct {
 				}
 				_, err := w.Write(data)
 				return err
-			},
+			}},
 		},
 	},
 	{
 		name:    "grayscale_4bit",
 		version: pdf.V1_7,
-		thumbnail: &Thumbnail{
+		thumbnail: &thumbnail.Thumbnail{
 			Width:            60,
 			Height:           60,
 			ColorSpace:       color.SpaceDeviceGray,
 			BitsPerComponent: 4,
-			WriteData: func(w io.Writer) error {
+			Source: &image.FlateSource{WriteData: func(w io.Writer) error {
 				// 60 pixels = 30 bytes per row (2 pixels per byte)
 				data := make([]byte, 30*60)
 				for i := range data {
@@ -197,18 +199,18 @@ var thumbnailTestCases = []struct {
 				}
 				_, err := w.Write(data)
 				return err
-			},
+			}},
 		},
 	},
 	{
 		name:    "rgb_16bit",
 		version: pdf.V1_7,
-		thumbnail: &Thumbnail{
+		thumbnail: &thumbnail.Thumbnail{
 			Width:            16,
 			Height:           16,
 			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 16,
-			WriteData: func(w io.Writer) error {
+			Source: &image.FlateSource{WriteData: func(w io.Writer) error {
 				// 16 pixels * 3 channels * 2 bytes = 96 bytes per row
 				data := make([]byte, 96*16)
 				for i := range data {
@@ -216,7 +218,7 @@ var thumbnailTestCases = []struct {
 				}
 				_, err := w.Write(data)
 				return err
-			},
+			}},
 		},
 	},
 }
@@ -267,14 +269,13 @@ func makeIndexedRGB() *color.SpaceIndexed {
 	return idx
 }
 
-func roundTripThumbnail(t *testing.T, version pdf.Version, thumb *Thumbnail) {
+func roundTripThumbnail(t *testing.T, version pdf.Version, thumb *thumbnail.Thumbnail) {
 	t.Helper()
 
 	// capture original data
-	var origData bytes.Buffer
-	err := thumb.WriteData(&origData)
+	origData, err := thumb.Source.Pixels()
 	if err != nil {
-		t.Fatalf("failed to write original data: %v", err)
+		t.Fatalf("failed to get original data: %v", err)
 	}
 
 	w, _ := memfile.NewPDFWriter(version, nil)
@@ -301,7 +302,7 @@ func roundTripThumbnail(t *testing.T, version pdf.Version, thumb *Thumbnail) {
 
 	// extract back using the writer as getter
 	x := pdf.NewExtractor(w)
-	decoded, err := ExtractThumbnail(x, nil, ref, false)
+	decoded, err := thumbnail.ExtractThumbnail(x, nil, ref, false)
 	if err != nil {
 		t.Fatalf("failed to extract thumbnail: %v", err)
 	}
@@ -323,14 +324,13 @@ func roundTripThumbnail(t *testing.T, version pdf.Version, thumb *Thumbnail) {
 	}
 
 	// compare data
-	var decodedData bytes.Buffer
-	err = decoded.WriteData(&decodedData)
+	decodedData, err := decoded.Source.Pixels()
 	if err != nil {
-		t.Fatalf("failed to write decoded data: %v", err)
+		t.Fatalf("failed to get decoded data: %v", err)
 	}
 
-	if !bytes.Equal(decodedData.Bytes(), origData.Bytes()) {
-		t.Errorf("data mismatch: got %d bytes, want %d bytes", decodedData.Len(), origData.Len())
+	if !bytes.Equal(decodedData, origData) {
+		t.Errorf("data mismatch: got %d bytes, want %d bytes", len(decodedData), len(origData))
 	}
 }
 
@@ -348,73 +348,73 @@ func TestInvalidThumbnails(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		thumbnail *Thumbnail
+		thumbnail *thumbnail.Thumbnail
 		wantErr   bool
 	}{
 		{
 			name: "zero_width",
-			thumbnail: &Thumbnail{
+			thumbnail: &thumbnail.Thumbnail{
 				Width:            0,
 				Height:           100,
 				ColorSpace:       color.SpaceDeviceGray,
 				BitsPerComponent: 8,
-				WriteData:        func(w io.Writer) error { return nil },
+				Source:           &image.FlateSource{WriteData: func(w io.Writer) error { return nil }},
 			},
 			wantErr: true,
 		},
 		{
 			name: "negative_height",
-			thumbnail: &Thumbnail{
+			thumbnail: &thumbnail.Thumbnail{
 				Width:            100,
 				Height:           -1,
 				ColorSpace:       color.SpaceDeviceGray,
 				BitsPerComponent: 8,
-				WriteData:        func(w io.Writer) error { return nil },
+				Source:           &image.FlateSource{WriteData: func(w io.Writer) error { return nil }},
 			},
 			wantErr: true,
 		},
 		{
 			name: "invalid_bpc",
-			thumbnail: &Thumbnail{
+			thumbnail: &thumbnail.Thumbnail{
 				Width:            100,
 				Height:           100,
 				ColorSpace:       color.SpaceDeviceGray,
 				BitsPerComponent: 3,
-				WriteData:        func(w io.Writer) error { return nil },
+				Source:           &image.FlateSource{WriteData: func(w io.Writer) error { return nil }},
 			},
 			wantErr: true,
 		},
 		{
 			name: "missing_color_space",
-			thumbnail: &Thumbnail{
+			thumbnail: &thumbnail.Thumbnail{
 				Width:            100,
 				Height:           100,
 				ColorSpace:       nil,
 				BitsPerComponent: 8,
-				WriteData:        func(w io.Writer) error { return nil },
+				Source:           &image.FlateSource{WriteData: func(w io.Writer) error { return nil }},
 			},
 			wantErr: true,
 		},
 		{
 			name: "invalid_color_space",
-			thumbnail: &Thumbnail{
+			thumbnail: &thumbnail.Thumbnail{
 				Width:            100,
 				Height:           100,
 				ColorSpace:       color.SpaceDeviceCMYK,
 				BitsPerComponent: 8,
-				WriteData:        func(w io.Writer) error { return nil },
+				Source:           &image.FlateSource{WriteData: func(w io.Writer) error { return nil }},
 			},
 			wantErr: true,
 		},
 		{
 			name: "wrong_decode_length",
-			thumbnail: &Thumbnail{
+			thumbnail: &thumbnail.Thumbnail{
 				Width:            100,
 				Height:           100,
 				ColorSpace:       color.SpaceDeviceGray,
 				BitsPerComponent: 8,
 				Decode:           []float64{0.0, 1.0, 0.0, 1.0}, // wrong: should be 2 values for grayscale
-				WriteData:        func(w io.Writer) error { return nil },
+				Source:           &image.FlateSource{WriteData: func(w io.Writer) error { return nil }},
 			},
 			wantErr: true,
 		},
@@ -474,7 +474,7 @@ func FuzzThumbnailRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		thumb, err := ExtractThumbnail(x, nil, objPDF, false)
+		thumb, err := thumbnail.ExtractThumbnail(x, nil, objPDF, false)
 		if err != nil {
 			t.Skip("malformed thumbnail")
 		}
