@@ -77,7 +77,7 @@ func TestGenericRegionRoundTrip(t *testing.T) {
 func TestGenericRegionMMR(t *testing.T) {
 	bm := bitmap.New(16, 16)
 	for y := 0; y < 16; y += 2 {
-		for x := 0; x < 16; x++ {
+		for x := range 16 {
 			bm.SetPixel(x, y, true)
 		}
 	}
@@ -86,8 +86,8 @@ func TestGenericRegionMMR(t *testing.T) {
 	im.AddGenericRegion(bm, 0, 0, &GenericOptions{UseMMR: true})
 
 	got := decodeImage(t, nil, im)
-	for y := 0; y < 16; y++ {
-		for x := 0; x < 16; x++ {
+	for y := range 16 {
+		for x := range 16 {
 			if got.GetPixel(x, y) != bm.GetPixel(x, y) {
 				t.Fatalf("pixel mismatch at (%d,%d)", x, y)
 			}
@@ -206,7 +206,7 @@ func TestGlobalsFreezeAfterEncode(t *testing.T) {
 // globals) can be encoded and decoded round-trip.
 func TestImageWithoutGlobals(t *testing.T) {
 	bm := bitmap.New(8, 8)
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		bm.SetPixel(i, i, true)
 	}
 
@@ -214,8 +214,8 @@ func TestImageWithoutGlobals(t *testing.T) {
 	im.AddGenericRegion(bm, 0, 0, nil)
 
 	got := decodeImage(t, nil, im)
-	for y := 0; y < 8; y++ {
-		for x := 0; x < 8; x++ {
+	for y := range 8 {
+		for x := range 8 {
 			if got.GetPixel(x, y) != bm.GetPixel(x, y) {
 				t.Fatalf("pixel mismatch at (%d,%d)", x, y)
 			}
