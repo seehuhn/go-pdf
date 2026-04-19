@@ -45,7 +45,9 @@
 //	id, _ := g.AddSymbol(symbolBitmap)
 //
 //	im1 := jbig2.NewImage(w, h, g)
-//	im1.AddTextRegion(&jbig2.TextRegion{...})
+//	im1.AddTextRegion(&jbig2.TextRegion{
+//		Instances: []jbig2.TextRegionInstance{{SymbolID: id, X: 0, Y: 10}},
+//	})
 //
 //	im2 := jbig2.NewImage(w, h, g)
 //	im2.AddGenericRegion(someBitmap, 0, 0, nil)
@@ -53,7 +55,25 @@
 //	mask := &image.Mask{Width: w, Height: h, Source: im1}
 //	page.DrawXObject(mask)
 //
-// Once a [Globals] is embedded (either directly or via its first image),
-// it becomes frozen.  Subsequent calls to [Globals.AddSymbol] and friends
-// return an error.
+// # Page-local symbols
+//
+// For symbols used by a single image, [Image.AddSymbol] avoids the
+// overhead of a shared globals stream.  Reference page-local symbols
+// by setting [TextRegionInstance.Local]:
+//
+//	im := jbig2.NewImage(w, h, nil)
+//	id, _ := im.AddSymbol(symbolBitmap)
+//	im.AddTextRegion(&jbig2.TextRegion{
+//		Instances: []jbig2.TextRegionInstance{
+//			{SymbolID: id, X: 0, Y: 10, Local: true},
+//		},
+//	})
+//
+// Global and page-local symbols may be mixed within the same text
+// region.
+//
+// # Freezing
+//
+// Once a [Globals] or [Image] has been embedded, it becomes frozen and
+// further Add calls return an error.
 package jbig2

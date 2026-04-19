@@ -29,25 +29,47 @@ import (
 	internaljbig2 "seehuhn.de/go/pdf/internal/filter/jbig2"
 )
 
+// JBIG2 segment types (ISO/IEC 14492, Annex D).
+const (
+	segSymbolDict               = 0
+	segTextRegionLossless       = 7
+	segPatternDict              = 16
+	segHalftoneRegionLossless   = 23
+	segGenericRegionLossless    = 39
+	segRefinementRegionLossless = 43
+	segPageInfo                 = 48
+)
+
 // Globals holds shared JBIG2 dictionaries (symbols, patterns) that may
 // be referenced from one or more [Image]s.  Sharing globals across
 // images avoids duplicating dictionary data in the PDF file.
 //
 // Globals implements [pdf.Embedder]; two [Image]s sharing the same
 // *Globals pointer produce a single globals stream in the output PDF.
-// Once embedded, the Globals is frozen and no further symbols or
-// patterns can be added.
+// Once embedded, the Globals is frozen and further calls to
+// [Globals.AddSymbol] or [Globals.AddPatternDict] return an error.
+//
+// A symbol or pattern dictionary is written to the globals stream only
+// if at least one text or halftone region references it; unreferenced
+// dictionaries are silently dropped.  This relies on all region Add
+// calls happening before the containing image is embedded.
 type Globals struct {
 	// SymbolTemplate selects the arithmetic coding template used when
-	// encoding shared symbol dictionaries (0-3).  Defaults to 0.
+	// encoding shared symbol dictionaries.  Valid values are 0-3.
+	// Defaults to 0.
 	SymbolTemplate int
 
 	// PatternTemplate selects the arithmetic coding template used when
-	// encoding shared pattern dictionaries (0-3).  Defaults to 0.
+	// encoding shared pattern dictionaries.  Valid values are 0-3.
+	// Defaults to 0.
 	PatternTemplate int
 
 	symbols  []*bitmap.Bitmap
 	patterns [][]*bitmap.Bitmap // one entry per pattern dictionary
+
+	// usage flags set eagerly by region Add calls on referring images
+	usesSymbols     bool
+	usedPatternDict []bool // same length as patterns
 
 	// internal segment numbers (set at embed time)
 	symbolSegNum  uint32 // segment number of the symbol dictionary
@@ -55,6 +77,9 @@ type Globals struct {
 
 	// idMap[i] = reordered index of the symbol added with AddSymbol(i)
 	symIDMap []int
+
+	// reordered symbol list, indexed by encoded SymID
+	reorderedSymbols []*bitmap.Bitmap
 
 	frozen    bool
 	encoded   []byte // cached output
@@ -66,10 +91,10 @@ func NewGlobals() *Globals {
 	return &Globals{}
 }
 
-// AddSymbol appends a shared symbol to the symbol dictionary and returns
-// its ID.  All symbols added to a Globals form a single symbol
-// dictionary segment.  Returns an error if the Globals has already been
-// embedded.
+// AddSymbol appends a shared symbol to the symbol dictionary and
+// returns its ID.  All symbols added to a Globals form a single symbol
+// dictionary segment.  Returns an error if the Globals has already
+// been embedded.
 func (g *Globals) AddSymbol(bm *bitmap.Bitmap) (int, error) {
 	if g.frozen {
 		return 0, errors.New("jbig2: Globals frozen; cannot add symbols after embedding")
@@ -82,7 +107,7 @@ func (g *Globals) AddSymbol(bm *bitmap.Bitmap) (int, error) {
 // AddPatternDict appends a pattern dictionary to the globals and
 // returns its ID.  All patterns within a single dictionary must have
 // the same dimensions.  Returns an error if the Globals has already
-// been embedded.
+// been embedded or if the patterns do not all share one size.
 func (g *Globals) AddPatternDict(patterns []*bitmap.Bitmap) (int, error) {
 	if g.frozen {
 		return 0, errors.New("jbig2: Globals frozen; cannot add patterns after embedding")
@@ -99,6 +124,7 @@ func (g *Globals) AddPatternDict(patterns []*bitmap.Bitmap) (int, error) {
 	}
 	id := len(g.patterns)
 	g.patterns = append(g.patterns, patterns)
+	g.usedPatternDict = append(g.usedPatternDict, false)
 	return id, nil
 }
 
@@ -132,9 +158,20 @@ func (g *Globals) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return ref, nil
 }
 
-// hasSegments reports whether the Globals contains any segment data.
+// hasSegments reports whether the Globals will emit any segment data.
+// Symbol and pattern dictionaries that no region references are
+// skipped, so the answer depends on usage flags set by region Add
+// calls.
 func (g *Globals) hasSegments() bool {
-	return len(g.symbols) > 0 || len(g.patterns) > 0
+	if len(g.symbols) > 0 && g.usesSymbols {
+		return true
+	}
+	for _, used := range g.usedPatternDict {
+		if used {
+			return true
+		}
+	}
+	return false
 }
 
 // encode materialises the Globals into a byte slice of JBIG2 segments.
@@ -153,30 +190,62 @@ func (g *Globals) encode() ([]byte, error) {
 	g.nextSegNo = 0
 
 	// symbol dictionary
-	if len(g.symbols) > 0 {
-		reordered, idMap := sortSymbols(g.symbols)
-		g.symIDMap = idMap
-
-		sdData := internaljbig2.EncodeSymbolDictSegment(reordered, g.SymbolTemplate)
+	if len(g.symbols) > 0 && g.usesSymbols {
 		g.symbolSegNum = g.nextSegNo
 		g.nextSegNo++
-		buf = internaljbig2.WriteSegmentHeader(buf, g.symbolSegNum, 0, 0, nil, uint32(len(sdData)))
-		buf = append(buf, sdData...)
+		var err error
+		buf, g.reorderedSymbols, g.symIDMap, err = appendSymbolDict(
+			buf, g.symbols, g.SymbolTemplate, g.symbolSegNum, 0, "Globals.SymbolTemplate")
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// pattern dictionaries
-	for _, pats := range g.patterns {
-		pdData := internaljbig2.EncodePatternDictSegment(pats, g.PatternTemplate)
-		segNum := g.nextSegNo
-		g.nextSegNo++
-		g.patternSegNum = append(g.patternSegNum, segNum)
-		buf = internaljbig2.WriteSegmentHeader(buf, segNum, 16, 0, nil, uint32(len(pdData)))
-		buf = append(buf, pdData...)
+	anyPatternUsed := false
+	for _, used := range g.usedPatternDict {
+		if used {
+			anyPatternUsed = true
+			break
+		}
+	}
+	if anyPatternUsed {
+		if g.PatternTemplate < 0 || g.PatternTemplate > 3 {
+			return nil, fmt.Errorf("jbig2: Globals.PatternTemplate %d out of range [0,3]", g.PatternTemplate)
+		}
+		g.patternSegNum = make([]uint32, len(g.patterns))
+		for i, pats := range g.patterns {
+			if !g.usedPatternDict[i] {
+				continue
+			}
+			pdData := internaljbig2.EncodePatternDictSegment(pats, g.PatternTemplate)
+			segNum := g.nextSegNo
+			g.nextSegNo++
+			g.patternSegNum[i] = segNum
+			buf = internaljbig2.WriteSegmentHeader(buf, segNum, segPatternDict, 0, nil, uint32(len(pdData)))
+			buf = append(buf, pdData...)
+		}
 	}
 
 	g.encoded = buf
 	g.frozen = true
 	return buf, nil
+}
+
+// appendSymbolDict sorts the given symbols, validates the template,
+// and appends a symbol-dictionary segment header plus payload to buf.
+// It returns the new buffer, the reordered symbols, and the
+// addition-order-to-encoded-ID map.  label identifies the template
+// field in error messages.
+func appendSymbolDict(buf []byte, symbols []*bitmap.Bitmap, template int, segNum uint32, pageAssoc int, label string) ([]byte, []*bitmap.Bitmap, []int, error) {
+	if template < 0 || template > 3 {
+		return nil, nil, nil, fmt.Errorf("jbig2: %s %d out of range [0,3]", label, template)
+	}
+	reordered, idMap := sortSymbols(symbols)
+	sdData := internaljbig2.EncodeSymbolDictSegment(reordered, template)
+	buf = internaljbig2.WriteSegmentHeader(buf, segNum, segSymbolDict, pageAssoc, nil, uint32(len(sdData)))
+	buf = append(buf, sdData...)
+	return buf, reordered, idMap, nil
 }
 
 // sortSymbols groups symbols by height class and returns the reordered
@@ -212,11 +281,25 @@ func sortSymbols(symbols []*bitmap.Bitmap) ([]*bitmap.Bitmap, []int) {
 // of an [seehuhn.de/go/pdf/graphics/image.Dict] (for a 1-bit
 // DeviceGray image) or the Source field of an
 // [seehuhn.de/go/pdf/graphics/image.Mask] (for a stencil mask).
+//
+// Once embedded, the Image is frozen and further Add calls return an
+// error.
 type Image struct {
-	width, height int
-	globals       *Globals
-	ops           []func(ctx *encodeCtx) error
-	encoded       []byte // cached output
+	// SymbolTemplate selects the arithmetic coding template used when
+	// encoding the page-local symbol dictionary.  Valid values are
+	// 0-3.  Defaults to 0.
+	SymbolTemplate int
+
+	width, height    int
+	globals          *Globals
+	symbols          []*bitmap.Bitmap // page-local symbols
+	usesLocalSyms    bool             // set by AddTextRegion when any instance has Local=true
+	symIDMap         []int            // set at encode time after sorting
+	reorderedSymbols []*bitmap.Bitmap // set at encode time, indexed by encoded SymID
+	symbolSegNum     uint32           // set at encode time
+	ops              []func(ctx *encodeCtx) error
+	frozen           bool
+	encoded          []byte // cached output
 }
 
 // NewImage creates an empty JBIG2 image stream of the given pixel
@@ -232,6 +315,20 @@ func NewImage(width, height int, globals *Globals) *Image {
 	}
 }
 
+// AddSymbol appends a page-local symbol and returns its ID.
+// Page-local symbols produce a symbol dictionary segment within the
+// image stream.  Text regions can reference them by setting the Local
+// flag on [TextRegionInstance].  Returns an error if the Image has
+// already been embedded.
+func (im *Image) AddSymbol(bm *bitmap.Bitmap) (int, error) {
+	if im.frozen {
+		return 0, errors.New("jbig2: Image frozen; cannot add symbols after embedding")
+	}
+	id := len(im.symbols)
+	im.symbols = append(im.symbols, bm)
+	return id, nil
+}
+
 // Bounds returns the pixel dimensions of the image.
 func (im *Image) Bounds() rect.IntRect {
 	return rect.IntRect{XMin: 0, YMin: 0, XMax: im.width, YMax: im.height}
@@ -239,7 +336,8 @@ func (im *Image) Bounds() rect.IntRect {
 
 // GenericOptions configures the encoding of a generic region.
 type GenericOptions struct {
-	// Template selects the arithmetic coding template (0-3).
+	// Template selects the arithmetic coding template.  Valid values
+	// are 0-3.
 	Template int
 
 	// TPGDOn enables typical prediction, which reduces output size for
@@ -263,11 +361,18 @@ type GenericOptions struct {
 // AddGenericRegion appends a generic region to the image.  The bitmap
 // is placed at (x, y) relative to the page origin.  If opts is nil,
 // default options (template 0, arithmetic coder, OR combination) are
-// used.
-func (im *Image) AddGenericRegion(bm *bitmap.Bitmap, x, y int, opts *GenericOptions) {
+// used.  Returns an error if the Image has already been embedded or
+// if opts.Template is out of range.
+func (im *Image) AddGenericRegion(bm *bitmap.Bitmap, x, y int, opts *GenericOptions) error {
+	if im.frozen {
+		return errors.New("jbig2: Image frozen; cannot add regions after embedding")
+	}
 	var o GenericOptions
 	if opts != nil {
 		o = *opts
+	}
+	if !o.UseMMR && (o.Template < 0 || o.Template > 3) {
+		return fmt.Errorf("jbig2: GenericOptions.Template %d out of range [0,3]", o.Template)
 	}
 	im.ops = append(im.ops, func(ctx *encodeCtx) error {
 		var segData []byte
@@ -280,14 +385,17 @@ func (im *Image) AddGenericRegion(bm *bitmap.Bitmap, x, y int, opts *GenericOpti
 		} else {
 			segData = internaljbig2.EncodeGenericRegionSegment(bm, x, y, o.Template, o.CombOp, o.TPGDOn, o.ExtTemplate)
 		}
-		return ctx.writeRegionSegment(39, nil, segData) // immediate lossless generic
+		ctx.writeRegionSegment(segGenericRegionLossless, nil, segData)
+		return nil
 	})
+	return nil
 }
 
 // RefinementOptions configures the encoding of a generic refinement
 // region.
 type RefinementOptions struct {
-	// Template selects the refinement coding template (0 or 1).
+	// Template selects the refinement coding template.  Valid values
+	// are 0-1.
 	Template int
 
 	// TPGROn enables typical prediction for refinement.
@@ -302,32 +410,45 @@ type RefinementOptions struct {
 // The bitmap bm is encoded as a refinement of ref.  The reference
 // bitmap is first written as a generic region so that the decoder can
 // extract it from the page buffer when decoding the refinement.
-func (im *Image) AddRefinementRegion(bm, ref *bitmap.Bitmap, x, y int, opts *RefinementOptions) {
+// Returns an error if the Image has already been embedded or if
+// opts.Template is out of range.
+func (im *Image) AddRefinementRegion(bm, ref *bitmap.Bitmap, x, y int, opts *RefinementOptions) error {
+	if im.frozen {
+		return errors.New("jbig2: Image frozen; cannot add regions after embedding")
+	}
 	var o RefinementOptions
 	if opts != nil {
 		o = *opts
 	}
+	if o.Template < 0 || o.Template > 1 {
+		return fmt.Errorf("jbig2: RefinementOptions.Template %d out of range [0,1]", o.Template)
+	}
 	im.ops = append(im.ops, func(ctx *encodeCtx) error {
 		// write the reference bitmap as a generic region first
 		refSeg := internaljbig2.EncodeGenericRegionSegment(ref, x, y, 0, bitmap.CombOpReplace, false, false)
-		if err := ctx.writeRegionSegment(39, nil, refSeg); err != nil {
-			return err
-		}
+		ctx.writeRegionSegment(segGenericRegionLossless, nil, refSeg)
 
 		// now encode the refinement relative to the page buffer
 		segData := internaljbig2.EncodeRefinementRegionSegment(bm, ref, x, y, o.Template, o.CombOp, o.TPGROn)
-		return ctx.writeRegionSegment(42, nil, segData)
+		ctx.writeRegionSegment(segRefinementRegionLossless, nil, segData)
+		return nil
 	})
+	return nil
 }
 
 // TextRegionInstance describes a single symbol placement within a text
-// region.  SymbolID is an index into the shared symbol dictionary of
-// the enclosing [Image]'s [Globals].  (X, Y) is the reference point in
-// page coordinates, with the corner of the symbol determined by
+// region.  SymbolID indexes into the shared [Globals] symbol dictionary
+// or, when Local is true, into the page-local symbol dictionary of
+// the enclosing [Image].  (X, Y) is the reference point in page
+// coordinates, with the corner of the symbol determined by
 // [TextRegion.RefCorner].
 type TextRegionInstance struct {
 	SymbolID int
 	X, Y     int
+
+	// Local selects the page-local symbol dictionary instead of the
+	// shared [Globals] dictionary.
+	Local bool
 }
 
 // RefCorner identifies which corner of a symbol lies at the
@@ -343,7 +464,9 @@ const (
 )
 
 // TextRegion describes a text region segment that places instances of
-// shared symbols onto the page.
+// shared symbols onto the page.  After the region is passed to
+// [Image.AddTextRegion], its slice fields are owned by the [Image] and
+// must not be modified.
 type TextRegion struct {
 	// Width and Height are the region's pixel dimensions.
 	Width, Height int
@@ -351,8 +474,7 @@ type TextRegion struct {
 	// X and Y are the top-left corner of the region within the page.
 	X, Y int
 
-	// Instances lists the symbol placements.  Each SymbolID indexes
-	// into the enclosing [Image]'s [Globals] symbol dictionary.
+	// Instances lists the symbol placements.
 	Instances []TextRegionInstance
 
 	// RefCorner identifies which corner of each symbol lies at its
@@ -386,34 +508,88 @@ type TextRegion struct {
 }
 
 // AddTextRegion appends a text region to the image.  The region
-// references symbols from the enclosing [Image]'s [Globals].  A nil
-// Globals or an empty symbol dictionary returns an error at embed time.
-func (im *Image) AddTextRegion(r *TextRegion) {
+// references symbols from the shared [Globals] dictionary, the
+// page-local dictionary (see [Image.AddSymbol]), or both.  At least
+// one symbol dictionary must contain symbols; otherwise an error is
+// returned at embed time.  Returns an error if the Image has already
+// been embedded.
+func (im *Image) AddTextRegion(r *TextRegion) error {
+	if im.frozen {
+		return errors.New("jbig2: Image frozen; cannot add regions after embedding")
+	}
+	// mark dictionary usage eagerly so that encoders can drop
+	// unreferenced dictionaries
+	for _, inst := range r.Instances {
+		if inst.Local {
+			im.usesLocalSyms = true
+		} else if im.globals != nil {
+			im.globals.usesSymbols = true
+		}
+	}
 	reg := *r
 	im.ops = append(im.ops, func(ctx *encodeCtx) error {
-		if im.globals == nil || len(im.globals.symbols) == 0 {
-			return errors.New("jbig2: text region requires Globals with at least one symbol")
+		hasGlobalSyms := im.globals != nil && len(im.globals.symbols) > 0
+		hasLocalSyms := len(im.symbols) > 0
+
+		// determine which dictionaries this region actually references
+		var usesGlobal, usesLocal bool
+		for _, inst := range reg.Instances {
+			if inst.Local {
+				usesLocal = true
+			} else {
+				usesGlobal = true
+			}
 		}
+		if !usesGlobal && !usesLocal {
+			return errors.New("jbig2: text region requires at least one symbol")
+		}
+		if usesGlobal && !hasGlobalSyms {
+			return errors.New("jbig2: text region has Local=false instance but no symbols added to Globals")
+		}
+		if usesLocal && !hasLocalSyms {
+			return errors.New("jbig2: text region has Local=true instance but no symbols added via Image.AddSymbol")
+		}
+
 		strips := reg.Strips
 		if strips <= 0 {
 			strips = 1
 		}
 
-		// map user-facing SymbolIDs (addition order) to the reordered
-		// dictionary indices used by the encoder.
-		idMap := im.globals.symIDMap
-		symbols := im.globals.symbols
+		// Build the merged symbol list and translate user-facing
+		// SymbolIDs into encoder indices.
+		//
+		// The decoder concatenates exported symbols from referred-to
+		// dictionaries in segment-reference order.  When both are
+		// referenced we list the globals dictionary first, so global
+		// symbols occupy encoder indices 0..N-1 and local symbols occupy
+		// N..N+M-1.  The merged slice uses the reordered (encoded) order
+		// so that mergedSymbols[symID] is the bitmap the decoder finds
+		// at that index.
+		var mergedSymbols []*bitmap.Bitmap
+		nGlobal := 0
+		if usesGlobal {
+			mergedSymbols = append(mergedSymbols, im.globals.reorderedSymbols...)
+			nGlobal = len(im.globals.symbols)
+		}
+		if usesLocal {
+			mergedSymbols = append(mergedSymbols, im.reorderedSymbols...)
+		}
+
 		insts := make([]internaljbig2.SymbolInstance, len(reg.Instances))
 		for i, inst := range reg.Instances {
-			origID := inst.SymbolID
-			if origID < 0 || origID >= len(symbols) {
-				return fmt.Errorf("jbig2: text region SymbolID %d out of range", origID)
+			var symID int
+			if inst.Local {
+				if inst.SymbolID < 0 || inst.SymbolID >= len(im.symbols) {
+					return fmt.Errorf("jbig2: local SymbolID %d out of range", inst.SymbolID)
+				}
+				symID = nGlobal + im.symIDMap[inst.SymbolID]
+			} else {
+				if inst.SymbolID < 0 || inst.SymbolID >= len(im.globals.symbols) {
+					return fmt.Errorf("jbig2: global SymbolID %d out of range", inst.SymbolID)
+				}
+				symID = im.globals.symIDMap[inst.SymbolID]
 			}
-			symID := origID
-			if idMap != nil {
-				symID = idMap[origID]
-			}
-			bm := symbols[origID]
+			bm := mergedSymbols[symID]
 			insts[i] = internaljbig2.SymbolInstance{
 				SymID: symID,
 				T:     inst.Y,
@@ -427,7 +603,7 @@ func (im *Image) AddTextRegion(r *TextRegion) {
 		var err error
 		if reg.UseHuffman {
 			segData, err = internaljbig2.EncodeTextRegionSegmentHuffman(
-				reg.Width, reg.Height, reg.X, reg.Y, insts, symbols,
+				reg.Width, reg.Height, reg.X, reg.Y, insts, mergedSymbols,
 				int(reg.RefCorner), reg.Transposed, reg.CombOp,
 				strips, reg.DSOffset, reg.DefPixel)
 			if err != nil {
@@ -435,19 +611,29 @@ func (im *Image) AddTextRegion(r *TextRegion) {
 			}
 		} else {
 			segData = internaljbig2.EncodeTextRegionSegment(
-				reg.Width, reg.Height, reg.X, reg.Y, insts, symbols,
+				reg.Width, reg.Height, reg.X, reg.Y, insts, mergedSymbols,
 				int(reg.RefCorner), reg.Transposed, reg.CombOp,
 				strips, reg.DSOffset, reg.DefPixel)
 		}
 
-		// text region references the shared symbol dictionary
-		refs := []uint32{im.globals.symbolSegNum}
-		return ctx.writeRegionSegment(7, refs, segData) // immediate lossless text
+		// build segment references
+		var refs []uint32
+		if usesGlobal {
+			refs = append(refs, im.globals.symbolSegNum)
+		}
+		if usesLocal {
+			refs = append(refs, im.symbolSegNum)
+		}
+		ctx.writeRegionSegment(segTextRegionLossless, refs, segData)
+		return nil
 	})
+	return nil
 }
 
 // HalftoneRegion describes a halftone region segment that renders a
-// gray-scale image using a shared pattern dictionary.
+// gray-scale image using a shared pattern dictionary.  After the
+// region is passed to [Image.AddHalftoneRegion], its slice fields are
+// owned by the [Image] and must not be modified.
 type HalftoneRegion struct {
 	// Width and Height are the region's pixel dimensions.
 	Width, Height int
@@ -471,7 +657,7 @@ type HalftoneRegion struct {
 	GridVX, GridVY int
 
 	// Template selects the arithmetic coding template used for the
-	// gray-scale bitplane encoding (0-3).
+	// gray-scale bitplane encoding.  Valid values are 0-3.
 	Template int
 
 	// CombOp controls how the region is combined with the underlying
@@ -487,11 +673,25 @@ type HalftoneRegion struct {
 	UseMMR bool
 }
 
-// AddHalftoneRegion appends a halftone region to the image.
-func (im *Image) AddHalftoneRegion(r *HalftoneRegion) {
+// AddHalftoneRegion appends a halftone region to the image.  Returns
+// an error if the Image has already been embedded or if r.Template is
+// out of range.
+func (im *Image) AddHalftoneRegion(r *HalftoneRegion) error {
+	if im.frozen {
+		return errors.New("jbig2: Image frozen; cannot add regions after embedding")
+	}
+	if !r.UseMMR && (r.Template < 0 || r.Template > 3) {
+		return fmt.Errorf("jbig2: HalftoneRegion.Template %d out of range [0,3]", r.Template)
+	}
+	// mark this specific pattern dict as used so that Globals can drop
+	// unreferenced pattern dictionary segments.  Out-of-range IDs are
+	// caught later at encode time.
+	if im.globals != nil && r.PatternDictID >= 0 && r.PatternDictID < len(im.globals.patterns) {
+		im.globals.usedPatternDict[r.PatternDictID] = true
+	}
 	reg := *r
 	im.ops = append(im.ops, func(ctx *encodeCtx) error {
-		if im.globals == nil || reg.PatternDictID >= len(im.globals.patterns) {
+		if im.globals == nil || reg.PatternDictID < 0 || reg.PatternDictID >= len(im.globals.patterns) {
 			return fmt.Errorf("jbig2: halftone region PatternDictID %d out of range", reg.PatternDictID)
 		}
 		pats := im.globals.patterns[reg.PatternDictID]
@@ -525,8 +725,10 @@ func (im *Image) AddHalftoneRegion(r *HalftoneRegion) {
 				reg.EnableSkip, hpw, hph)
 		}
 
-		return ctx.writeRegionSegment(22, []uint32{patSegNum}, segData) // immediate halftone
+		ctx.writeRegionSegment(segHalftoneRegionLossless, []uint32{patSegNum}, segData)
+		return nil
 	})
+	return nil
 }
 
 // encodeCtx carries the running segment-number counter and accumulated
@@ -538,12 +740,11 @@ type encodeCtx struct {
 
 // writeRegionSegment appends a region segment (page association 1) with
 // the given segment type, referred-to segment numbers, and data.
-func (ctx *encodeCtx) writeRegionSegment(segType int, refs []uint32, data []byte) error {
+func (ctx *encodeCtx) writeRegionSegment(segType int, refs []uint32, data []byte) {
 	segNo := ctx.nextSegNo
 	ctx.nextSegNo++
 	ctx.buf = internaljbig2.WriteSegmentHeader(ctx.buf, segNo, segType, 1, refs, uint32(len(data)))
 	ctx.buf = append(ctx.buf, data...)
-	return nil
 }
 
 // encode materialises the image into a byte slice of JBIG2 segments.
@@ -554,6 +755,17 @@ func (ctx *encodeCtx) writeRegionSegment(segType int, refs []uint32, data []byte
 func (im *Image) encode() ([]byte, error) {
 	if im.encoded != nil {
 		return im.encoded, nil
+	}
+
+	// Encode globals first (idempotent — the result is cached) so that
+	// globals.symIDMap, reorderedSymbols, symbolSegNum and patternSegNum
+	// are populated before any text or halftone region op reads them.
+	// Skip when globals has no referenced dictionaries, to avoid
+	// freezing it when nothing depends on its internal state.
+	if im.globals != nil && im.globals.hasSegments() {
+		if _, err := im.globals.encode(); err != nil {
+			return nil, err
+		}
 	}
 
 	ctx := &encodeCtx{}
@@ -571,8 +783,20 @@ func (im *Image) encode() ([]byte, error) {
 	pageInfoData := internaljbig2.WritePageInfo(nil, im.width, im.height)
 	segNo := ctx.nextSegNo
 	ctx.nextSegNo++
-	ctx.buf = internaljbig2.WriteSegmentHeader(ctx.buf, segNo, 48, 1, nil, uint32(len(pageInfoData)))
+	ctx.buf = internaljbig2.WriteSegmentHeader(ctx.buf, segNo, segPageInfo, 1, nil, uint32(len(pageInfoData)))
 	ctx.buf = append(ctx.buf, pageInfoData...)
+
+	// page-local symbol dictionary (only when a text region uses it)
+	if len(im.symbols) > 0 && im.usesLocalSyms {
+		im.symbolSegNum = ctx.nextSegNo
+		ctx.nextSegNo++
+		var err error
+		ctx.buf, im.reorderedSymbols, im.symIDMap, err = appendSymbolDict(
+			ctx.buf, im.symbols, im.SymbolTemplate, im.symbolSegNum, 1, "Image.SymbolTemplate")
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	for _, op := range im.ops {
 		if err := op(ctx); err != nil {
@@ -581,6 +805,7 @@ func (im *Image) encode() ([]byte, error) {
 	}
 
 	im.encoded = ctx.buf
+	im.frozen = true
 	return ctx.buf, nil
 }
 

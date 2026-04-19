@@ -105,7 +105,9 @@ func pageColourCheck(doc *document.MultiPage, font *type1.Instance) error {
 	}
 
 	im := jbig2.NewImage(32, 32, nil)
-	im.AddGenericRegion(bm, 0, 0, nil)
+	if err := im.AddGenericRegion(bm, 0, 0, nil); err != nil {
+		return err
+	}
 	jbig2Img := newJBIG2Image(im, 32, 32)
 	refImg := bitmapToGrayImage(bm)
 
@@ -204,7 +206,9 @@ func pageGenericDefault(doc *document.MultiPage, font *type1.Instance) error {
 	bm := concentricRects()
 
 	im := jbig2.NewImage(bm.Width(), bm.Height(), nil)
-	im.AddGenericRegion(bm, 0, 0, nil)
+	if err := im.AddGenericRegion(bm, 0, 0, nil); err != nil {
+		return err
+	}
 
 	jbig2Mask := newJBIG2Image(im, bm.Width(), bm.Height())
 	refMask := bitmapToGrayImage(bm)
@@ -217,7 +221,9 @@ func pageGenericMMR(doc *document.MultiPage, font *type1.Instance) error {
 	bm := concentricRects()
 
 	im := jbig2.NewImage(bm.Width(), bm.Height(), nil)
-	im.AddGenericRegion(bm, 0, 0, &jbig2.GenericOptions{UseMMR: true})
+	if err := im.AddGenericRegion(bm, 0, 0, &jbig2.GenericOptions{UseMMR: true}); err != nil {
+		return err
+	}
 
 	jbig2Mask := newJBIG2Image(im, bm.Width(), bm.Height())
 	refMask := bitmapToGrayImage(bm)
@@ -230,7 +236,9 @@ func pageGenericTPGD(doc *document.MultiPage, font *type1.Instance) error {
 	bm := checkerboard()
 
 	im := jbig2.NewImage(bm.Width(), bm.Height(), nil)
-	im.AddGenericRegion(bm, 0, 0, &jbig2.GenericOptions{TPGDOn: true})
+	if err := im.AddGenericRegion(bm, 0, 0, &jbig2.GenericOptions{TPGDOn: true}); err != nil {
+		return err
+	}
 
 	jbig2Mask := newJBIG2Image(im, bm.Width(), bm.Height())
 	refMask := bitmapToGrayImage(bm)
@@ -253,11 +261,13 @@ func pageTextArithmetic(doc *document.MultiPage, font *type1.Instance) error {
 
 	instances := placementsToInstances(pp)
 	im := jbig2.NewImage(regionW, regionH, g)
-	im.AddTextRegion(&jbig2.TextRegion{
+	if err := im.AddTextRegion(&jbig2.TextRegion{
 		Width:     regionW,
 		Height:    regionH,
 		Instances: instances,
-	})
+	}); err != nil {
+		return err
+	}
 
 	jbig2Mask := newJBIG2Image(im, regionW, regionH)
 	refBm := renderSymbolBitmap(symbols, pp, regionW, regionH)
@@ -281,12 +291,14 @@ func pageTextHuffman(doc *document.MultiPage, font *type1.Instance) error {
 
 	instances := placementsToInstances(pp)
 	im := jbig2.NewImage(regionW, regionH, g)
-	im.AddTextRegion(&jbig2.TextRegion{
+	if err := im.AddTextRegion(&jbig2.TextRegion{
 		Width:      regionW,
 		Height:     regionH,
 		Instances:  instances,
 		UseHuffman: true,
-	})
+	}); err != nil {
+		return err
+	}
 
 	jbig2Mask := newJBIG2Image(im, regionW, regionH)
 	refBm := renderSymbolBitmap(symbols, pp, regionW, regionH)
@@ -315,7 +327,9 @@ func pageRefinement(doc *document.MultiPage, font *type1.Instance) error {
 	}
 
 	im := jbig2.NewImage(target.Width(), target.Height(), nil)
-	im.AddRefinementRegion(target, ref, 0, 0, nil)
+	if err := im.AddRefinementRegion(target, ref, 0, 0, nil); err != nil {
+		return err
+	}
 
 	jbig2Img := newJBIG2Image(im, target.Width(), target.Height())
 	refImg := bitmapToGrayImage(target)
@@ -370,7 +384,7 @@ func pageHalftone(doc *document.MultiPage, font *type1.Instance) error {
 	const regionH = gridH * patH
 
 	im := jbig2.NewImage(regionW, regionH, g)
-	im.AddHalftoneRegion(&jbig2.HalftoneRegion{
+	if err := im.AddHalftoneRegion(&jbig2.HalftoneRegion{
 		Width:         regionW,
 		Height:        regionH,
 		PatternDictID: patID,
@@ -381,7 +395,9 @@ func pageHalftone(doc *document.MultiPage, font *type1.Instance) error {
 		GridY:         0,
 		GridVX:        patW,
 		GridVY:        0,
-	})
+	}); err != nil {
+		return err
+	}
 
 	jbig2Mask := newJBIG2Image(im, regionW, regionH)
 
