@@ -394,6 +394,219 @@ func TestImageEncodeEncodesGlobals(t *testing.T) {
 	}
 }
 
+// TestPatternDictMMRRoundTrip verifies that an MMR-coded pattern
+// dictionary, referenced by a halftone region, round-trips through
+// the decoder.  The minimal case uses two solid patterns and a 2×1
+// grid.
+func TestPatternDictMMRRoundTrip(t *testing.T) {
+	// two 4x4 patterns: all-white and all-black
+	patW, patH := 4, 4
+	patterns := []*bitmap.Bitmap{
+		bitmap.New(patW, patH),
+		bitmap.New(patW, patH),
+	}
+	for y := range patH {
+		for x := range patW {
+			patterns[1].SetPixel(x, y, true)
+		}
+	}
+
+	g := NewGlobals()
+	patID, err := g.AddPatternDict(patterns, &PatternDictOptions{UseMMR: true})
+	if err != nil {
+		t.Fatalf("AddPatternDict: %v", err)
+	}
+
+	// 2x1 grid: first cell white (0), second cell black (1)
+	gridW, gridH := 2, 1
+	grayValues := []int{0, 1}
+	regionW := gridW * patW
+	regionH := gridH * patH
+
+	im := NewImage(regionW, regionH, g)
+	if err := im.AddHalftoneRegion(&HalftoneRegion{
+		Width:         regionW,
+		Height:        regionH,
+		PatternDictID: patID,
+		GrayValues:    grayValues,
+		GridWidth:     gridW,
+		GridHeight:    gridH,
+		GridVX:        patW,
+	}); err != nil {
+		t.Fatalf("AddHalftoneRegion: %v", err)
+	}
+
+	got := decodeImage(t, g, im)
+	for x := range patW {
+		for y := range patH {
+			if got.GetPixel(x, y) {
+				t.Errorf("expected white pixel at (%d,%d) in first cell", x, y)
+			}
+			if !got.GetPixel(patW+x, y) {
+				t.Errorf("expected black pixel at (%d,%d) in second cell", patW+x, y)
+			}
+		}
+	}
+}
+
+// TestPatternDictMMRMultiple verifies that an MMR-coded pattern
+// dictionary with more than two patterns round-trips correctly, and
+// that a multi-cell grid selects the right pattern per cell.  This
+// exercises the gray-index bitplane encoding (needing >1 bit per
+// cell) and the MMR collective-bitmap layout with non-trivial
+// patterns.
+func TestPatternDictMMRMultiple(t *testing.T) {
+	patW, patH := 4, 4
+	patterns := make([]*bitmap.Bitmap, 4)
+	for i := range patterns {
+		patterns[i] = bitmap.New(patW, patH)
+	}
+	// pattern 0: all white (left as constructed)
+	// pattern 1: single pixel at (0,0)
+	patterns[1].SetPixel(0, 0, true)
+	// pattern 2: anti-diagonal
+	for i := range patW {
+		patterns[2].SetPixel(i, patH-1-i, true)
+	}
+	// pattern 3: all black
+	for y := range patH {
+		for x := range patW {
+			patterns[3].SetPixel(x, y, true)
+		}
+	}
+
+	g := NewGlobals()
+	patID, err := g.AddPatternDict(patterns, &PatternDictOptions{UseMMR: true})
+	if err != nil {
+		t.Fatalf("AddPatternDict: %v", err)
+	}
+
+	// 2x2 grid touching all four patterns
+	gridW, gridH := 2, 2
+	grayValues := []int{
+		0, 1,
+		2, 3,
+	}
+	regionW := gridW * patW
+	regionH := gridH * patH
+
+	im := NewImage(regionW, regionH, g)
+	if err := im.AddHalftoneRegion(&HalftoneRegion{
+		Width:         regionW,
+		Height:        regionH,
+		PatternDictID: patID,
+		GrayValues:    grayValues,
+		GridWidth:     gridW,
+		GridHeight:    gridH,
+		GridVX:        patW,
+	}); err != nil {
+		t.Fatalf("AddHalftoneRegion: %v", err)
+	}
+
+	// reference: tile the grid with the selected patterns.
+	want := bitmap.New(regionW, regionH)
+	for gy := range gridH {
+		for gx := range gridW {
+			pat := patterns[grayValues[gy*gridW+gx]]
+			want.Combine(pat, gx*patW, gy*patH, bitmap.CombOpOR)
+		}
+	}
+
+	got := decodeImage(t, g, im)
+	if got.Width() != regionW || got.Height() != regionH {
+		t.Fatalf("size mismatch: got %dx%d, want %dx%d",
+			got.Width(), got.Height(), regionW, regionH)
+	}
+	for y := range regionH {
+		for x := range regionW {
+			if got.GetPixel(x, y) != want.GetPixel(x, y) {
+				t.Errorf("pixel mismatch at (%d,%d): got %v, want %v",
+					x, y, got.GetPixel(x, y), want.GetPixel(x, y))
+			}
+		}
+	}
+}
+
+// TestPatternDictMMRMixed verifies that arithmetic- and MMR-coded
+// pattern dictionaries can coexist in the same Globals, with separate
+// halftone regions referencing each.  This exercises the per-dict
+// options path in Globals.encode and ensures the two encoders do not
+// interfere with each other's segment framing.
+func TestPatternDictMMRMixed(t *testing.T) {
+	patW, patH := 4, 4
+
+	// two patterns per dict: one white, one black.
+	mkPatterns := func() []*bitmap.Bitmap {
+		pw := bitmap.New(patW, patH)
+		pb := bitmap.New(patW, patH)
+		for y := range patH {
+			for x := range patW {
+				pb.SetPixel(x, y, true)
+			}
+		}
+		return []*bitmap.Bitmap{pw, pb}
+	}
+
+	g := NewGlobals()
+	arithID, err := g.AddPatternDict(mkPatterns(), nil)
+	if err != nil {
+		t.Fatalf("AddPatternDict (arith): %v", err)
+	}
+	mmrID, err := g.AddPatternDict(mkPatterns(), &PatternDictOptions{UseMMR: true})
+	if err != nil {
+		t.Fatalf("AddPatternDict (mmr): %v", err)
+	}
+
+	gridW, gridH := 2, 1
+	grayValues := []int{0, 1}
+	regionW := gridW * patW
+	regionH := gridH * patH
+
+	mkImage := func(patID int) *Image {
+		im := NewImage(regionW, regionH, g)
+		if err := im.AddHalftoneRegion(&HalftoneRegion{
+			Width:         regionW,
+			Height:        regionH,
+			PatternDictID: patID,
+			GrayValues:    grayValues,
+			GridWidth:     gridW,
+			GridHeight:    gridH,
+			GridVX:        patW,
+		}); err != nil {
+			t.Fatalf("AddHalftoneRegion (patID=%d): %v", patID, err)
+		}
+		return im
+	}
+
+	// mark both dicts used before the first encode.
+	imArith := mkImage(arithID)
+	imMMR := mkImage(mmrID)
+
+	// both images share the same Globals; each decode must produce
+	// white-then-black.
+	for _, tc := range []struct {
+		name string
+		im   *Image
+	}{
+		{"arith", imArith},
+		{"mmr", imMMR},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := decodeImage(t, g, tc.im)
+			for y := range patH {
+				for x := range patW {
+					if got.GetPixel(x, y) {
+						t.Errorf("expected white at (%d,%d)", x, y)
+					}
+					if !got.GetPixel(patW+x, y) {
+						t.Errorf("expected black at (%d,%d)", patW+x, y)
+					}
+				}
+			}
+		})
+	}
+}
+
 // TestGlobalsFreezeAfterEncode verifies that adding symbols or
 // patterns after encoding returns an error.
 func TestGlobalsFreezeAfterEncode(t *testing.T) {
@@ -407,7 +620,7 @@ func TestGlobalsFreezeAfterEncode(t *testing.T) {
 	if _, err := g.AddSymbol(bitmap.New(3, 3)); err == nil {
 		t.Error("expected error adding symbol to frozen Globals")
 	}
-	if _, err := g.AddPatternDict([]*bitmap.Bitmap{bitmap.New(4, 4)}); err == nil {
+	if _, err := g.AddPatternDict([]*bitmap.Bitmap{bitmap.New(4, 4)}, nil); err == nil {
 		t.Error("expected error adding pattern dict to frozen Globals")
 	}
 }

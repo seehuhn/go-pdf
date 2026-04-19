@@ -64,8 +64,9 @@ type Globals struct {
 	// Defaults to 0.
 	PatternTemplate int
 
-	symbols  []*bitmap.Bitmap
-	patterns [][]*bitmap.Bitmap // one entry per pattern dictionary
+	symbols        []*bitmap.Bitmap
+	patterns       [][]*bitmap.Bitmap   // one entry per pattern dictionary
+	patternOptions []PatternDictOptions // per-dict options, parallel to patterns
 
 	// usage flags set eagerly by region Add calls on referring images
 	usesSymbols     bool
@@ -104,11 +105,21 @@ func (g *Globals) AddSymbol(bm *bitmap.Bitmap) (int, error) {
 	return id, nil
 }
 
+// PatternDictOptions configures the encoding of a pattern dictionary.
+type PatternDictOptions struct {
+	// UseMMR selects the MMR (Group 4 facsimile) coder instead of the
+	// arithmetic coder for the dictionary's collective bitmap.  When
+	// UseMMR is true, [Globals.PatternTemplate] is ignored for this
+	// dictionary.
+	UseMMR bool
+}
+
 // AddPatternDict appends a pattern dictionary to the globals and
 // returns its ID.  All patterns within a single dictionary must have
-// the same dimensions.  Returns an error if the Globals has already
-// been embedded or if the patterns do not all share one size.
-func (g *Globals) AddPatternDict(patterns []*bitmap.Bitmap) (int, error) {
+// the same dimensions.  If opts is nil, the arithmetic coder is used
+// with [Globals.PatternTemplate].  Returns an error if the Globals has
+// already been embedded or if the patterns do not all share one size.
+func (g *Globals) AddPatternDict(patterns []*bitmap.Bitmap, opts *PatternDictOptions) (int, error) {
 	if g.frozen {
 		return 0, errors.New("jbig2: Globals frozen; cannot add patterns after embedding")
 	}
@@ -122,8 +133,13 @@ func (g *Globals) AddPatternDict(patterns []*bitmap.Bitmap) (int, error) {
 				i, p.Width(), p.Height(), w, h)
 		}
 	}
+	var o PatternDictOptions
+	if opts != nil {
+		o = *opts
+	}
 	id := len(g.patterns)
 	g.patterns = append(g.patterns, patterns)
+	g.patternOptions = append(g.patternOptions, o)
 	g.usedPatternDict = append(g.usedPatternDict, false)
 	return id, nil
 }
@@ -218,7 +234,16 @@ func (g *Globals) encode() ([]byte, error) {
 			if !g.usedPatternDict[i] {
 				continue
 			}
-			pdData := internaljbig2.EncodePatternDictSegment(pats, g.PatternTemplate)
+			var pdData []byte
+			if g.patternOptions[i].UseMMR {
+				d, err := internaljbig2.EncodePatternDictSegmentMMR(pats)
+				if err != nil {
+					return nil, err
+				}
+				pdData = d
+			} else {
+				pdData = internaljbig2.EncodePatternDictSegment(pats, g.PatternTemplate)
+			}
 			segNum := g.nextSegNo
 			g.nextSegNo++
 			g.patternSegNum[i] = segNum
