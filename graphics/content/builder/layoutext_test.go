@@ -38,7 +38,6 @@ import (
 	"seehuhn.de/go/pdf/internal/fonttypes"
 	"seehuhn.de/go/pdf/internal/squarefont"
 	"seehuhn.de/go/pdf/reader"
-	"seehuhn.de/go/postscript/cid"
 )
 
 func TestGetQuadPointsSimple(t *testing.T) {
@@ -272,7 +271,7 @@ func TestGetGlyphQuadPointsTextMatrixTransform(t *testing.T) {
 func TestGlyphWidths(t *testing.T) {
 	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 
-	F := standard.TimesRoman.New()
+	F := font.Must(standard.TimesRoman.New())
 
 	gg0 := F.Layout(nil, 50, "AB")
 	if len(gg0.Seq) != 2 {
@@ -312,7 +311,7 @@ func TestGlyphWidths(t *testing.T) {
 
 	in := reader.New(pdf.NewExtractor(data))
 	var xxOut []float64
-	in.Character = func(cid cid.CID, text string) error {
+	in.Character = func(c font.Code) error {
 		x, _ := in.GetTextPositionDevice()
 		xxOut = append(xxOut, x)
 		return nil

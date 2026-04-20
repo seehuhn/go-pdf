@@ -83,6 +83,13 @@ type Composite struct {
 
 var _ font.Layouter = (*Composite)(nil)
 
+// ResourceName returns the empty string: composite CFF fonts produce a
+// CIDFontType0 dictionary, which has no /Name entry in the PDF spec.
+// See [font.Instance.ResourceName].
+func (f *Composite) ResourceName() pdf.Name {
+	return ""
+}
+
 // NewComposite turns a sfnt.Font into a PDF CFF font.
 //
 // The font can be embedded as a simple font or as a composite font,
@@ -218,7 +225,7 @@ func (f *Composite) Encode(gid glyph.ID, text string) (charcode.Code, bool) {
 		return c, true
 	}
 
-	width := math.Round(f.Font.GlyphBBoxPDF(f.Font.FontMatrix, gid).URx - f.Font.GlyphBBoxPDF(f.Font.FontMatrix, gid).LLx)
+	width := math.Round(f.Font.GlyphWidthPDF(gid))
 	c, err := f.CIDEncoder.Encode(cid, text, width)
 	return c, err == nil
 }
@@ -334,21 +341,34 @@ func (f *Composite) makeDict() (*dict.CIDFontType0, error) {
 
 	// construct the font dictionary and font descriptor
 	dw := math.Round(subsetFont.GlyphWidthPDF(0))
-	ww := make(map[cmap.CID]float64)
-	isSymbolic := false
 
+	// gather widths for used CIDs (plus CID 0)
+	ww := make(map[cmap.CID]float64)
 	for _, info := range f.CIDEncoder.MappedCodes() {
-		// Only include information for CIDs that were actually used
 		if _, used := f.usedCIDs[info.CID]; used || info.CID == 0 {
 			ww[info.CID] = info.Width
+		}
+	}
 
-			if !isSymbolic {
-				// TODO(voss): if the font is simple, use the existing glyph names?
-				glyphName := names.FromUnicode(info.Text)
-				if !pdfenc.StandardLatin.Has[glyphName] {
-					isSymbolic = true
-				}
-			}
+	// determine whether the font is symbolic.  Prefer the font's own glyph
+	// name; fall back to a name derived from the Unicode text only when the
+	// original font lacks a name for this glyph.
+	isSymbolic := false
+	for _, info := range f.CIDEncoder.MappedCodes() {
+		if info.CID == 0 {
+			continue
+		}
+		if _, used := f.usedCIDs[info.CID]; !used {
+			continue
+		}
+		origGID := f.gidToCID.GID(info.CID)
+		name := f.Font.Glyphs[origGID].Name
+		if name == "" {
+			name = names.FromUnicode(info.Text)
+		}
+		if !pdfenc.StandardLatin.Has[name] {
+			isSymbolic = true
+			break
 		}
 	}
 

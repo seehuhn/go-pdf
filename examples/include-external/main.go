@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
@@ -45,8 +46,8 @@ func run() error {
 		return err
 	}
 
-	B := standard.TimesBold.New()
-	F := standard.TimesRoman.New()
+	B := font.Must(standard.TimesBold.New())
+	F := font.Must(standard.TimesRoman.New())
 
 	figure, bbox, err := LoadFigure("fig.pdf")
 	if err != nil {

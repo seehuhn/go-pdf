@@ -17,6 +17,7 @@
 package image
 
 import (
+	"errors"
 	"fmt"
 
 	"seehuhn.de/go/geom/rect"
@@ -32,6 +33,10 @@ type Indexed struct {
 	Width      int
 	Height     int
 	ColorSpace color.Space
+
+	// Name is the PDF resource-dictionary key under which this image is
+	// referenced in content streams.  See [Dict.Name] for full semantics.
+	Name pdf.Name
 }
 
 // NewIndexed returns a new Indexed image of the given size.
@@ -54,6 +59,12 @@ func (im *Indexed) Bounds() rect.IntRect {
 // This implements the [graphics.Image] interface.
 func (im *Indexed) Subtype() pdf.Name {
 	return "Image"
+}
+
+// ResourceName returns the preferred resource-dictionary key for this image.
+// See [graphics.XObject.ResourceName].
+func (im *Indexed) ResourceName() pdf.Name {
+	return im.Name
 }
 
 // Embed adds the image to the PDF file.
@@ -83,6 +94,15 @@ func (im *Indexed) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		"Height":           pdf.Integer(im.Height),
 		"ColorSpace":       csRef,
 		"BitsPerComponent": pdf.Integer(8),
+	}
+	switch v := pdf.GetVersion(rm.Out()); {
+	case v == pdf.V1_0 && im.Name == "":
+		return nil, errors.New("missing image /Name field")
+	case v >= pdf.V2_0 && im.Name != "":
+		return nil, errors.New("unexpected /Name field")
+	}
+	if im.Name != "" {
+		imDict["Name"] = im.Name
 	}
 	filter := pdf.FilterCompress{
 		"Columns":   pdf.Integer(im.Width),

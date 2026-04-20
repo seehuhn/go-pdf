@@ -64,7 +64,7 @@ var (
 )
 
 func createFont(filename string) error {
-	F := extended.NimbusMonoPSRegular.New()
+	F := font.Must(extended.NimbusMonoPSRegular.New())
 
 	psFont := F.Font
 	psFont.FontInfo.FontName = TestFontName
@@ -157,7 +157,7 @@ func createDocument(filename string) error {
 	}
 
 	body := text.F{
-		Font:  standard.TimesRoman.New(),
+		Font:  font.Must(standard.TimesRoman.New()),
 		Size:  12,
 		Color: color.Black,
 	}
@@ -180,7 +180,7 @@ func createDocument(filename string) error {
 		Color: color.Blue,
 	}
 	label := text.F{
-		Font:  extended.NimbusMonoPSRegular.New(),
+		Font:  font.Must(extended.NimbusMonoPSRegular.New()),
 		Size:  12,
 		Color: color.Blue,
 	}

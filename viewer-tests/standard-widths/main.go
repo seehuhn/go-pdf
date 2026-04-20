@@ -47,7 +47,7 @@ func createDocument(filename string) error {
 		return err
 	}
 
-	F := standard.TimesRoman.New()
+	F := font.Must(standard.TimesRoman.New())
 	geom := F.GetGeometry()
 
 	const (

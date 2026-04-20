@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics"
@@ -49,7 +50,7 @@ func run(filename string) error {
 		return err
 	}
 
-	font := standard.Helvetica.New()
+	font := font.Must(standard.Helvetica.New())
 
 	// page 1: colour sanity check
 	if err := pageColourCheck(doc, font); err != nil {

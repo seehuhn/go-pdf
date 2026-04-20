@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
 	pdfpage "seehuhn.de/go/pdf/page"
@@ -60,7 +61,7 @@ func run() error {
 	page.Fill()
 
 	// label the squares
-	F := standard.Helvetica.New()
+	F := font.Must(standard.Helvetica.New())
 	page.SetFillColor(color.DeviceGray(0))
 	page.TextBegin()
 	page.TextSetFont(F, 12)

@@ -84,7 +84,7 @@ func createDocument(filename string) error {
 
 	g := &generator{
 		doc:   doc,
-		F:     standard.Helvetica.New(),
+		F:     font.Must(standard.Helvetica.New()),
 		csMap: csMap,
 	}
 
@@ -189,6 +189,10 @@ var _ graphics.XObject = (*testImage)(nil)
 
 func (img *testImage) Subtype() pdf.Name {
 	return "Image"
+}
+
+func (img *testImage) ResourceName() pdf.Name {
+	return ""
 }
 
 func (img *testImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {

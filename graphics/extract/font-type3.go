@@ -164,6 +164,10 @@ func repairType3(d *dict.Type3, r pdf.Getter) {
 			d.Name = "Font"
 		}
 	}
+	// Unlike Type 1 / TrueType, Name is preserved in PDF 2.0 for Type 3 fonts
+	// because it is the only carrier of the font's human-readable name (Type 3
+	// has no BaseFont).  See lrosenthol's clarification at
+	// https://github.com/pdf-association/pdf-issues/issues/11#issuecomment-753665847
 
 	if d.FontMatrix.IsZero() {
 		d.FontMatrix = matrix.Matrix{0.001, 0, 0, 0.001, 0, 0}

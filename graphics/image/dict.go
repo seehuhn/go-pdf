@@ -137,9 +137,11 @@ type Dict struct {
 
 	// TODO(voss): OPI
 
-	// Name is deprecated and should be left empty.
-	// Only used in PDF 1.0 where it was the name used to reference the image
-	// mask from within content streams.
+	// Name is the PDF resource-dictionary key under which this image is
+	// referenced in content streams.  If non-empty, the builder uses this
+	// value as the /XObject subdictionary key; the spec requires the two
+	// to match (PDF 2.0 Table 93).  Required in PDF 1.0; optional in PDF
+	// 1.1–1.7; deprecated (forbidden by this library's writer) in PDF 2.0.
 	Name pdf.Name
 }
 
@@ -788,11 +790,11 @@ func (d *Dict) check(out *pdf.Writer) error {
 		}
 	}
 
-	if d.Name != "" {
-		v := pdf.GetVersion(out)
-		if v >= pdf.V2_0 {
-			return errors.New("unexpected /Name field")
-		}
+	switch v := pdf.GetVersion(out); {
+	case v == pdf.V1_0 && d.Name == "":
+		return errors.New("missing image /Name field")
+	case v >= pdf.V2_0 && d.Name != "":
+		return errors.New("unexpected /Name field")
 	}
 
 	if d.Metadata != nil {
@@ -874,4 +876,10 @@ func (d *Dict) Bounds() rect.IntRect {
 // Subtype returns the PDF XObject subtype for images.
 func (d *Dict) Subtype() pdf.Name {
 	return pdf.Name("Image")
+}
+
+// ResourceName returns the preferred resource-dictionary key for this image.
+// See [graphics.XObject.ResourceName].
+func (d *Dict) ResourceName() pdf.Name {
+	return d.Name
 }

@@ -59,7 +59,7 @@ func run() error {
 	w := &writer{
 		doc:   doc,
 		style: fallback.NewStyle(),
-		font:  standard.Helvetica.New(),
+		font:  font.Must(standard.Helvetica.New()),
 	}
 
 	w.pageVaryingSizes()

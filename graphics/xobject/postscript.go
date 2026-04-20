@@ -87,3 +87,10 @@ func (ps *postScript) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 func (ps *postScript) Subtype() pdf.Name {
 	return "PS"
 }
+
+// ResourceName returns the empty string: the PostScript XObject has
+// no user-settable resource-dictionary name.  See
+// [graphics.XObject.ResourceName].
+func (ps *postScript) ResourceName() pdf.Name {
+	return ""
+}

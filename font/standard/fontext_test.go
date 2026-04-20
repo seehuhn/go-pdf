@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/extract"
@@ -38,7 +39,7 @@ func TestEmbedStandard(t *testing.T) {
 
 				// Embed the font into a PDF file:
 
-				F := standardFont.New()
+				F := font.Must(standardFont.New())
 				ref, err := rm.Embed(F)
 				if err != nil {
 					t.Fatal(err)

@@ -35,16 +35,8 @@ var (
 func (t trueTypeEmbedder) font() font.Layouter {
 	info := makefont.TrueType()
 
-	var F font.Layouter
-	var err error
 	if t.composite {
-		F, err = truetype.NewComposite(info, nil)
-	} else {
-		F, err = truetype.NewSimple(info, nil)
+		return font.Must(truetype.NewComposite(info, nil))
 	}
-
-	if err != nil {
-		panic(err)
-	}
-	return F
+	return font.Must(truetype.NewSimple(info, nil))
 }

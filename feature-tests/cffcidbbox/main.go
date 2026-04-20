@@ -65,7 +65,7 @@ func createDocument(fname string) error {
 
 	const fontSize = 12
 
-	noteFont := standard.TimesRoman.New()
+	noteFont := font.Must(standard.TimesRoman.New())
 	note := text.F{Font: noteFont, Size: fontSize, Color: black}
 
 	orig := text.F{Font: data.origFont, Size: fontSize, Color: blue}

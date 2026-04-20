@@ -20,7 +20,6 @@ import (
 	"io"
 
 	"seehuhn.de/go/geom/matrix"
-	"seehuhn.de/go/postscript/cid"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -42,7 +41,18 @@ type Reader struct {
 
 	// User callbacks.
 	// TODO(voss): clean up this list
-	Character func(cid cid.CID, text string) error
+
+	// Character is called for each character code decoded from a text-showing
+	// operator.  The [font.Code] argument describes the decoded character:
+	// the primary CID, the notdef fallback CID from the font's CMap (zero
+	// for simple fonts and for composite fonts without a matching notdef
+	// mapping), the textual representation, and the glyph width.
+	//
+	// The reader has already used info.Width and info.UseWordSpacing to
+	// advance the text matrix before this callback fires; callbacks
+	// interested in the advance width can read r.State.
+	Character func(c font.Code) error
+
 	TextEvent func(event TextEvent, arg float64)
 
 	Text func(text string) error
@@ -433,7 +443,7 @@ func (r *Reader) processText(s pdf.String) error {
 		}
 
 		if r.Character != nil && p.TextRenderingMode != graphics.TextRenderingModeInvisible {
-			err := r.Character(info.CID, info.Text)
+			err := r.Character(info)
 			if err != nil {
 				return err
 			}

@@ -66,8 +66,8 @@ func createDocument(filename string) error {
 
 	w := &writer{
 		Page:    page.Builder,
-		Roman:   standard.TimesRoman.New(),
-		Italic:  standard.TimesItalic.New(),
+		Roman:   font.Must(standard.TimesRoman.New()),
+		Italic:  font.Must(standard.TimesItalic.New()),
 		TextCol: color.DeviceGray(0.1),
 		LinkCol: color.DeviceRGB{0, 0, 0.9},
 
@@ -78,7 +78,7 @@ func createDocument(filename string) error {
 
 	// title
 
-	B := standard.TimesBold.New()
+	B := font.Must(standard.TimesBold.New())
 	page.TextBegin()
 	page.TextSetMatrix(matrix.Translate(leftColStart, w.yPos))
 	page.TextSetFont(B, 12)

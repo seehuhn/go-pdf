@@ -70,7 +70,7 @@ func createDocument(fname string) error {
 		return err
 	}
 
-	noteFont := standard.TimesRoman.New()
+	noteFont := font.Must(standard.TimesRoman.New())
 	note := text.F{
 		Font:  noteFont,
 		Size:  10,

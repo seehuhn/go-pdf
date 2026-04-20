@@ -190,8 +190,8 @@ func newWriter(doc *document.MultiPage) *writer {
 	w := &writer{
 		doc:   doc,
 		yPos:  paper.URy - margin,
-		label: standard.Helvetica.New(),
-		body:  standard.TimesRoman.New(),
+		label: font.Must(standard.Helvetica.New()),
+		body:  font.Must(standard.TimesRoman.New()),
 	}
 
 	return w
@@ -535,6 +535,10 @@ func (img *imageStrip) Subtype() pdf.Name {
 	return "Image"
 }
 
+func (img *imageStrip) ResourceName() pdf.Name {
+	return ""
+}
+
 func (img *imageStrip) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	csEmbedded, err := rm.Embed(img.cs)
@@ -599,6 +603,10 @@ type axialImageStrip struct {
 
 func (img *axialImageStrip) Subtype() pdf.Name {
 	return "Image"
+}
+
+func (img *axialImageStrip) ResourceName() pdf.Name {
+	return ""
 }
 
 func (img *axialImageStrip) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {

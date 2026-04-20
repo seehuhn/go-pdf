@@ -21,6 +21,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/internal/squarefont"
 )
@@ -33,7 +34,7 @@ func TestRendering(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	label := standard.Courier.New()
+	label := font.Must(standard.Courier.New())
 
 	doc.TextBegin()
 	for i, sample := range squarefont.All {

@@ -55,6 +55,13 @@ type CompositeGlyf struct {
 
 var _ font.Layouter = (*CompositeGlyf)(nil)
 
+// ResourceName returns the empty string: composite OpenType/glyf fonts
+// produce a CIDFontType2 dictionary, which has no /Name entry in the
+// PDF spec.  See [font.Instance.ResourceName].
+func (f *CompositeGlyf) ResourceName() pdf.Name {
+	return ""
+}
+
 // newCompositeGlyf creates a composite OpenType font with glyf outlines.
 func newCompositeGlyf(info *sfnt.Font, opt *OptionsComposite) (*CompositeGlyf, error) {
 	if !info.IsGlyf() {
@@ -132,11 +139,11 @@ func (f *CompositeGlyf) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 // Encode converts a glyph ID to a character code.
 func (f *CompositeGlyf) Encode(gid glyph.ID, text string) (charcode.Code, bool) {
 	cid := f.gidToCID.CID(gid, []rune(text))
+	f.usedCIDs[cid] = struct{}{}
+
 	if c, ok := f.CIDEncoder.GetCode(cid, text); ok {
 		return c, true
 	}
-
-	f.usedCIDs[cid] = struct{}{}
 
 	width := math.Round(f.Font.GlyphWidthPDF(gid))
 	c, err := f.CIDEncoder.Encode(cid, text, width)
@@ -208,20 +215,34 @@ func (f *CompositeGlyf) makeDict() (*dict.CIDFontType2, error) {
 
 	// construct the font dictionary and font descriptor
 	dw := math.Round(subsetFont.GlyphWidthPDF(0))
-	ww := make(map[cid.CID]float64)
-	isSymbolic := false
 
+	// gather widths for used CIDs (plus CID 0)
+	ww := make(map[cid.CID]float64)
 	for _, info := range f.CIDEncoder.MappedCodes() {
-		// Only include information for CIDs that were actually used
 		if _, used := f.usedCIDs[info.CID]; used || info.CID == 0 {
 			ww[info.CID] = info.Width
+		}
+	}
 
-			if !isSymbolic {
-				glyphName := names.FromUnicode(info.Text)
-				if !pdfenc.StandardLatin.Has[glyphName] {
-					isSymbolic = true
-				}
-			}
+	// determine whether the font is symbolic.  Prefer the font's own glyph
+	// name; fall back to a name derived from the Unicode text only when the
+	// original font lacks a name for this glyph.
+	isSymbolic := false
+	for _, info := range f.CIDEncoder.MappedCodes() {
+		if info.CID == 0 {
+			continue
+		}
+		if _, used := f.usedCIDs[info.CID]; !used {
+			continue
+		}
+		origGID := f.gidToCID.GID(info.CID)
+		name := f.Font.GlyphName(origGID)
+		if name == "" {
+			name = names.FromUnicode(info.Text)
+		}
+		if !pdfenc.StandardLatin.Has[name] {
+			isSymbolic = true
+			break
 		}
 	}
 

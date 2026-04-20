@@ -47,35 +47,32 @@ const (
 	StandardSymbolsPS                  // extended version of Symbol
 )
 
-// New returns a new font instance for the given font and options.
-func (f Font) New() *type1.Instance {
-	inst, err := f.newInternal()
-	if err != nil {
-		panic(err)
-	}
-	return inst
-}
-
-func (f Font) newInternal() (*type1.Instance, error) {
+// New returns a new font instance for the given extended font.
+//
+// An error is returned if the font data bundled with this package cannot be
+// loaded; this indicates a broken installation and should not happen for any
+// of the predefined [Font] constants.  Callers that treat this as an
+// invariant may wrap the call in [font.Must].
+func (f Font) New() (*type1.Instance, error) {
 	name := fontName[f]
 
 	fontData, err := builtin.Open(name, loader.FontTypeType1)
 	if err != nil {
-		panic("invalid extended font ID")
+		return nil, err
 	}
 	psFont, err := pstype1.Read(fontData)
 	if err != nil {
-		panic("built-in extended font corrupted???")
+		return nil, err
 	}
 	fontData.Close()
 
 	afmData, err := builtin.Open(name, loader.FontTypeAFM)
 	if err != nil {
-		panic("built-in extended font metrics missing???")
+		return nil, err
 	}
 	metrics, err := afm.Read(afmData)
 	if err != nil {
-		panic("built-in extended font metrics corrupted???")
+		return nil, err
 	}
 	afmData.Close()
 

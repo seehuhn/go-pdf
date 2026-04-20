@@ -137,10 +137,17 @@ func (b *Builder) TextSetFont(f font.Instance, size float64) {
 // SetFontNameInternal controls how the font is referred to in the content
 // stream. Normally names are allocated automatically, and use of this
 // function is not required.
+//
+// If the font's [font.Instance.ResourceName] is non-empty, name must
+// match it; otherwise the call fails because the font's own Name and
+// the resource-dict key would disagree (PDF spec Table 109 / 110).
 func (b *Builder) SetFontNameInternal(f font.Instance, name pdf.Name) error {
 	key := resKey{resFont, f}
 	if _, exists := b.resName[key]; exists {
 		return fmt.Errorf("font already has a name assigned")
+	}
+	if rn := f.ResourceName(); rn != "" && rn != name {
+		return fmt.Errorf("font name %q conflicts with dict Name %q", name, rn)
 	}
 	if b.Resources.Font == nil {
 		b.Resources.Font = make(map[pdf.Name]font.Instance)

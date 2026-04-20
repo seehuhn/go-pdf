@@ -61,6 +61,7 @@ func (f *mockFontInstance) WritingMode() font.WritingMode        { return font.H
 func (f *mockFontInstance) Codec() *charcode.Codec               { return nil }
 func (f *mockFontInstance) Codes(pdf.String) iter.Seq[font.Code] { return nil }
 func (f *mockFontInstance) FontInfo() any                        { return nil }
+func (f *mockFontInstance) ResourceName() pdf.Name               { return "" }
 func (f *mockFontInstance) Embed(*pdf.EmbedHelper) (pdf.Native, error) {
 	return nil, nil
 }

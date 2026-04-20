@@ -96,7 +96,7 @@ var testCases = []testCase{
 			Resources: &content.Resources{
 				SingleUse: true,
 				Font: map[pdf.Name]font.Instance{
-					"F1": standard.TimesRoman.New(),
+					"F1": font.Must(standard.TimesRoman.New()),
 				},
 			},
 			Contents: []content.Stream{

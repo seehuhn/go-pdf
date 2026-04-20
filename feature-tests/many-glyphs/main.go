@@ -44,7 +44,7 @@ func createDocument(fname string) error {
 		return err
 	}
 
-	H := standard.Helvetica.New()
+	H := font.Must(standard.Helvetica.New())
 
 	for _, sample := range fonttypes.All {
 		fmt.Println(sample.Description)

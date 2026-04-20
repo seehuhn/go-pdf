@@ -50,9 +50,22 @@ type SimpleCFF struct {
 	layouter *sfnt.Layouter
 
 	*simpleenc.Simple
+
+	// Name is the PDF resource-dictionary key under which this font is
+	// referenced in content streams.  If non-empty, the builder uses this
+	// value as the /Font subdictionary key; the spec requires the two to
+	// match (PDF 2.0 Table 109).  Required in PDF 1.0; optional in PDF
+	// 1.1–1.7; deprecated (forbidden by this library's writer) in PDF 2.0.
+	Name pdf.Name
 }
 
 var _ font.Layouter = (*SimpleCFF)(nil)
+
+// ResourceName returns the preferred resource-dictionary key for this font.
+// See [font.Instance.ResourceName].
+func (f *SimpleCFF) ResourceName() pdf.Name {
+	return f.Name
+}
 
 // newSimpleCFF creates a simple OpenType font with CFF outlines.
 func newSimpleCFF(info *sfnt.Font, opt *OptionsSimple) (*SimpleCFF, error) {
@@ -273,6 +286,7 @@ func (f *SimpleCFF) makeDict() (*dict.Type1, error) {
 	fontDict := &dict.Type1{
 		PostScriptName: f.Font.PostScriptName(),
 		SubsetTag:      subsetTag,
+		Name:           f.Name,
 		Descriptor:     fd,
 		Encoding:       f.Simple.Encoding(),
 		Width:          widths,

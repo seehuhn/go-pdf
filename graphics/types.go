@@ -30,6 +30,14 @@ import (
 // for implementations.
 type XObject interface {
 	Subtype() pdf.Name
+
+	// ResourceName returns the XObject's preferred resource-dictionary
+	// key.  When non-empty, this must equal the key under which this
+	// XObject is referenced in the /XObject subdictionary of the current
+	// resource dictionary (PDF 2.0 Table 93).  When empty, the builder
+	// is free to allocate a name.
+	ResourceName() pdf.Name
+
 	pdf.Embedder
 }
 

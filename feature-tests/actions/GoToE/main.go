@@ -309,7 +309,7 @@ var boxPositions = map[string]position{
 func drawTree(page *document.Page, currentDoc string, currentPage int, pageRefs []pdf.Reference, nav *navInfo) error {
 	drawConnections(page)
 
-	font := standard.Helvetica.New()
+	font := font.Must(standard.Helvetica.New())
 	for docName, pos := range boxPositions {
 		err := drawDocBox(page, font, docName, pos.x, pos.y, currentDoc, currentPage, pageRefs, nav)
 		if err != nil {

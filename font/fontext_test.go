@@ -47,6 +47,47 @@ func TestSpaceIsBlank(t *testing.T) {
 	}
 }
 
+// TestResourceNameDefault asserts that every sample font returns an empty
+// string from ResourceName by default.  Users must opt in to a specific
+// resource name by setting the font type's Name field.
+func TestResourceNameDefault(t *testing.T) {
+	for _, sample := range fonttypes.All {
+		t.Run(sample.Label, func(t *testing.T) {
+			F := sample.MakeFont()
+			if got := F.ResourceName(); got != "" {
+				t.Errorf("ResourceName() = %q, want \"\"", got)
+			}
+		})
+	}
+}
+
+// TestSpaceWidth checks that the encoder records a non-zero width for the
+// space character.  The space glyph has an empty outline, so its bounding
+// box is zero, but its advance width is non-zero.  A font that confuses
+// bounding-box width with advance width would store zero here and, by
+// extension, write a zero /W entry to the font dictionary.
+func TestSpaceWidth(t *testing.T) {
+	for _, sample := range fonttypes.All {
+		t.Run(sample.Label, func(t *testing.T) {
+			F := sample.MakeFont()
+			seq := F.Layout(nil, 1, " ")
+			if len(seq.Seq) != 1 {
+				t.Fatalf("expected 1 glyph, got %d", len(seq.Seq))
+			}
+			code, ok := F.Encode(seq.Seq[0].GID, " ")
+			if !ok {
+				t.Fatal("failed to encode space")
+			}
+			s := F.Codec().AppendCode(nil, code)
+			for info := range F.Codes(s) {
+				if info.Width <= 0 {
+					t.Errorf("space width = %v, expected > 0", info.Width)
+				}
+			}
+		})
+	}
+}
+
 func TestToUnicodeSimple1(t *testing.T) {
 	for _, sample := range fonttypes.All {
 		if sample.Composite {

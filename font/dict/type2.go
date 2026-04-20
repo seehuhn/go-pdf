@@ -404,6 +404,12 @@ func (f *t2Font) PostScriptName() string {
 	return f.CIDFontType2.PostScriptName
 }
 
+// ResourceName returns the empty string: composite fonts produce a
+// CIDFontType2 dictionary, which has no /Name entry in the PDF spec.
+func (f *t2Font) ResourceName() pdf.Name {
+	return ""
+}
+
 func (f *t2Font) GetDict() Dict {
 	return f.CIDFontType2
 }

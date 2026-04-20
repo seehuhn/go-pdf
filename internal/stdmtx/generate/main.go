@@ -66,8 +66,8 @@ type Data map[string]*fontMetrics
 
 func getAllData() (Data, error) {
 	data := make(Data)
-	for _, font := range standard.All {
-		err := getFontData(data, font)
+	for _, f := range standard.All {
+		err := getFontData(data, f)
 		if err != nil {
 			return nil, err
 		}
@@ -75,8 +75,11 @@ func getAllData() (Data, error) {
 	return data, nil
 }
 
-func getFontData(data Data, font standard.Font) error {
-	F := font.New()
+func getFontData(data Data, f standard.Font) error {
+	F, err := f.New()
+	if err != nil {
+		return err
+	}
 	family := F.Font.FamilyName
 
 	var weight string

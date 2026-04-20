@@ -66,6 +66,8 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*form
 		BBox: *bbox,
 	}
 
+	f.Name, _ = x.GetName(path, dict["Name"])
+
 	f.Matrix, err = pdf.GetMatrix(x.R, dict["Matrix"])
 	if err != nil {
 		f.Matrix = matrix.Identity
@@ -167,5 +169,18 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*form
 		version, content.Form, res,
 	)
 
+	repairForm(f, x.R)
+
 	return f, nil
+}
+
+// repairForm fixes invalid data in a form XObject after extraction.
+func repairForm(f *form.Form, r pdf.Getter) {
+	if v := pdf.GetVersion(r); v == pdf.V1_0 {
+		if f.Name == "" {
+			f.Name = "Form"
+		}
+	} else if v >= pdf.V2_0 {
+		f.Name = ""
+	}
 }

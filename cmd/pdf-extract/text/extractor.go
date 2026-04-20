@@ -105,12 +105,13 @@ func (e *TextExtractor) setupCallbacks() {
 		}
 	}
 
-	e.reader.Character = func(cid cid.CID, text string) error {
+	e.reader.Character = func(c font.Code) error {
 		// suppress character output when inside ActualText region
 		if e.actualTextStartDepth != -1 && len(e.reader.MarkedContentStack) >= e.actualTextStartDepth {
 			return nil
 		}
 
+		text := c.Text
 		if text == "" {
 			currentFont := e.reader.State.GState.TextFont
 			cidMapping, ok := e.extraTextCache[currentFont]
@@ -118,7 +119,7 @@ func (e *TextExtractor) setupCallbacks() {
 				cidMapping = textextract.GlyphNameMapping(currentFont)
 				e.extraTextCache[currentFont] = cidMapping
 			}
-			text = cidMapping[cid]
+			text = cidMapping[c.CID]
 		}
 
 		text = remapPUA(text)

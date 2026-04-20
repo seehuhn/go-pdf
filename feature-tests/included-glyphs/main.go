@@ -55,8 +55,8 @@ func createDocument(fname string) error {
 		Creator: "seehuhn.de/go/pdf/examples/feature-tests/included-glyphs",
 	}
 
-	headerFont := standard.HelveticaBold.New()
-	bodyFont := standard.Helvetica.New()
+	headerFont := font.Must(standard.HelveticaBold.New())
+	bodyFont := font.Must(standard.Helvetica.New())
 
 	// Create DocumentWriter
 	writer := &DocumentWriter{
@@ -72,7 +72,7 @@ func createDocument(fname string) error {
 
 	// Extended fonts
 	for _, f := range extended.All {
-		fontInstance := f.New()
+		fontInstance := font.Must(f.New())
 		name := getFontDisplayName(f)
 		usage := getExtendedFontUsage(f)
 
@@ -345,7 +345,7 @@ func createFreshFontInstance(entry fontEntry) (font.Layouter, error) {
 	// Check if it's an extended font
 	for _, f := range extended.All {
 		if getFontDisplayName(f) == fontName {
-			return f.New(), nil
+			return f.New()
 		}
 	}
 
@@ -504,20 +504,20 @@ func getFontDisplayName(f extended.Font) string {
 
 func getExtendedFontUsage(f extended.Font) string {
 	names := map[extended.Font]string{
-		extended.D050000L:               "extended.D050000L.New()",
-		extended.NimbusMonoPSBold:       "extended.NimbusMonoPSBold.New()",
-		extended.NimbusMonoPSBoldItalic: "extended.NimbusMonoPSBoldItalic.New()",
-		extended.NimbusMonoPSItalic:     "extended.NimbusMonoPSItalic.New()",
-		extended.NimbusMonoPSRegular:    "extended.NimbusMonoPSRegular.New()",
-		extended.NimbusRomanBold:        "extended.NimbusRomanBold.New()",
-		extended.NimbusRomanBoldItalic:  "extended.NimbusRomanBoldItalic.New()",
-		extended.NimbusRomanItalic:      "extended.NimbusRomanItalic.New()",
-		extended.NimbusRomanRegular:     "extended.NimbusRomanRegular.New()",
-		extended.NimbusSansBold:         "extended.NimbusSansBold.New()",
-		extended.NimbusSansBoldItalic:   "extended.NimbusSansBoldItalic.New()",
-		extended.NimbusSansItalic:       "extended.NimbusSansItalic.New()",
-		extended.NimbusSansRegular:      "extended.NimbusSansRegular.New()",
-		extended.StandardSymbolsPS:      "extended.StandardSymbolsPS.New()",
+		extended.D050000L:               "font.Must(extended.D050000L.New())",
+		extended.NimbusMonoPSBold:       "font.Must(extended.NimbusMonoPSBold.New())",
+		extended.NimbusMonoPSBoldItalic: "font.Must(extended.NimbusMonoPSBoldItalic.New())",
+		extended.NimbusMonoPSItalic:     "font.Must(extended.NimbusMonoPSItalic.New())",
+		extended.NimbusMonoPSRegular:    "font.Must(extended.NimbusMonoPSRegular.New())",
+		extended.NimbusRomanBold:        "font.Must(extended.NimbusRomanBold.New())",
+		extended.NimbusRomanBoldItalic:  "font.Must(extended.NimbusRomanBoldItalic.New())",
+		extended.NimbusRomanItalic:      "font.Must(extended.NimbusRomanItalic.New())",
+		extended.NimbusRomanRegular:     "font.Must(extended.NimbusRomanRegular.New())",
+		extended.NimbusSansBold:         "font.Must(extended.NimbusSansBold.New())",
+		extended.NimbusSansBoldItalic:   "font.Must(extended.NimbusSansBoldItalic.New())",
+		extended.NimbusSansItalic:       "font.Must(extended.NimbusSansItalic.New())",
+		extended.NimbusSansRegular:      "font.Must(extended.NimbusSansRegular.New())",
+		extended.StandardSymbolsPS:      "font.Must(extended.StandardSymbolsPS.New())",
 	}
 	return names[f]
 }

@@ -22,6 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics"
@@ -59,7 +60,7 @@ func run() error {
 		return err
 	}
 
-	F := standard.Helvetica.New()
+	F := font.Must(standard.Helvetica.New())
 
 	// --- OCG setup ---
 

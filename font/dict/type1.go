@@ -286,6 +286,10 @@ func (f *t1Font) PostScriptName() string {
 	return f.Dict.PostScriptName
 }
 
+func (f *t1Font) ResourceName() pdf.Name {
+	return f.Dict.Name
+}
+
 func (f *t1Font) GetDict() Dict {
 	return f.Dict
 }

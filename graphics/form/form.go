@@ -89,12 +89,26 @@ type Form struct {
 	//
 	// This corresponds to the AF entry in the form XObject dictionary.
 	AssociatedFiles []*file.Specification
+
+	// Name is the PDF resource-dictionary key under which this form
+	// XObject is referenced in content streams.  If non-empty, the builder
+	// uses this value as the /XObject subdictionary key; the spec requires
+	// the two to match (PDF 2.0 Table 93).  Required in PDF 1.0; optional
+	// in PDF 1.1–1.7; deprecated (forbidden by this library's writer) in
+	// PDF 2.0.
+	Name pdf.Name
 }
 
 // Subtype returns "Form".
 // This implements the [graphics.XObject] interface.
 func (f *Form) Subtype() pdf.Name {
 	return "Form"
+}
+
+// ResourceName returns the preferred resource-dictionary key for this form.
+// See [graphics.XObject.ResourceName].
+func (f *Form) ResourceName() pdf.Name {
+	return f.Name
 }
 
 // Embed implements the [pdf.Embedder] interface for form XObjects.
@@ -118,6 +132,19 @@ func (f *Form) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	if e.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("XObject")
+	}
+	v := pdf.GetVersion(e.Out())
+	if v == pdf.V1_0 {
+		if f.Name == "" {
+			return nil, errors.New("missing form XObject name")
+		}
+	} else if v >= pdf.V2_0 {
+		if f.Name != "" {
+			return nil, errors.New("unexpected form XObject name")
+		}
+	}
+	if f.Name != "" {
+		dict["Name"] = f.Name
 	}
 	if f.Matrix != matrix.Identity && f.Matrix != matrix.Zero {
 		dict["Matrix"] = toPDF(f.Matrix[:])

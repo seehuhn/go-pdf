@@ -69,8 +69,8 @@ func createDocument(filename string) error {
 
 	page.DrawShading(pageBackground(paper))
 
-	B := standard.TimesBold.New()
-	H := standard.Helvetica.New()
+	B := font.Must(standard.TimesBold.New())
+	H := font.Must(standard.Helvetica.New())
 
 	w := &writer{
 		page:  page,

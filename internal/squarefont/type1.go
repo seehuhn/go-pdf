@@ -122,12 +122,8 @@ func makeType1Font(fontMatrix matrix.Matrix) font.Layouter {
 		UnderlineThickness: UnderlineThickness,
 	}
 
-	// Convert to PDF Type1 font (no AFM metrics to avoid consistency issues)
-	instance, err := pdftype1.New(F, M)
-	if err != nil {
-		panic(err)
-	}
-	return instance
+	// convert to PDF Type1 font (no AFM metrics to avoid consistency issues)
+	return font.Must(pdftype1.New(F, M))
 }
 
 // createType1EmptyGlyph creates an empty Type1 glyph.

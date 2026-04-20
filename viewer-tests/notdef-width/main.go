@@ -63,14 +63,14 @@ func createDocument(filename string) error {
 		return err
 	}
 
-	titleFont := standard.TimesBold.New()
+	titleFont := font.Must(standard.TimesBold.New())
 	title := text.F{
 		Font:  titleFont,
 		Size:  10,
 		Color: color.DeviceGray(0.2),
 	}
 
-	noteFont := standard.TimesRoman.New()
+	noteFont := font.Must(standard.TimesRoman.New())
 	note := text.F{
 		Font:  noteFont,
 		Size:  10,

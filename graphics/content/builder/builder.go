@@ -17,6 +17,7 @@
 package builder
 
 import (
+	"fmt"
 	"strconv"
 
 	"seehuhn.de/go/pdf"
@@ -83,6 +84,12 @@ func New(ct content.Type, res *content.Resources) *Builder {
 	}
 	for name, v := range res.Font {
 		b.resName[resKey{resFont, v}] = name
+		// PDF spec Table 109 / 110: when Name is present on the font, it
+		// must equal the resource-dict key used here.
+		if rn := v.ResourceName(); rn != "" && rn != name {
+			b.Err = fmt.Errorf("font resource name %q does not match dict Name %q",
+				name, rn)
+		}
 	}
 	for name, v := range res.Pattern {
 		b.resName[resKey{resPattern, v}] = name
@@ -92,6 +99,12 @@ func New(ct content.Type, res *content.Resources) *Builder {
 	}
 	for name, v := range res.XObject {
 		b.resName[resKey{resXObject, v}] = name
+		// PDF spec Table 93: when Name is present on the XObject, it
+		// must equal the resource-dict key used here.
+		if rn := v.ResourceName(); rn != "" && rn != name {
+			b.Err = fmt.Errorf("XObject resource name %q does not match dict Name %q",
+				name, rn)
+		}
 	}
 
 	return b
@@ -184,7 +197,11 @@ func (b *Builder) getExtGStateName(gs *extgstate.ExtGState) pdf.Name {
 
 // FontName returns the resource name for the given font instance.
 // If the font hasn't been registered yet, it is added to the builder's
-// font resources with an automatically allocated name.
+// font resources.  If the font's [font.Instance.ResourceName] returns a
+// non-empty value, that value is used as the resource-dict key (per
+// PDF spec Table 109 / 110); collisions with a different font already
+// stored under the same key set [Builder.Err].  Otherwise a fresh name
+// is allocated.
 func (b *Builder) FontName(f font.Instance) pdf.Name {
 	key := resKey{resFont, f}
 	if name, ok := b.resName[key]; ok {
@@ -193,7 +210,15 @@ func (b *Builder) FontName(f font.Instance) pdf.Name {
 	if b.Resources.Font == nil {
 		b.Resources.Font = make(map[pdf.Name]font.Instance)
 	}
-	name := allocateName("F", b.Resources.Font)
+	name := f.ResourceName()
+	if name != "" {
+		if existing, ok := b.Resources.Font[name]; ok && existing != f {
+			b.Err = fmt.Errorf("font name %q already in use", name)
+			return ""
+		}
+	} else {
+		name = allocateName("F", b.Resources.Font)
+	}
 	b.Resources.Font[name] = f
 	b.resName[key] = name
 	return name
@@ -235,7 +260,15 @@ func (b *Builder) getXObjectName(x graphics.XObject) pdf.Name {
 	if b.Resources.XObject == nil {
 		b.Resources.XObject = make(map[pdf.Name]graphics.XObject)
 	}
-	name := allocateName("X", b.Resources.XObject)
+	name := x.ResourceName()
+	if name != "" {
+		if existing, ok := b.Resources.XObject[name]; ok && existing != x {
+			b.Err = fmt.Errorf("XObject name %q already in use", name)
+			return ""
+		}
+	} else {
+		name = allocateName("X", b.Resources.XObject)
+	}
 	b.Resources.XObject[name] = x
 	b.resName[key] = name
 	return name

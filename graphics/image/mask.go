@@ -90,9 +90,12 @@ type Mask struct {
 	// This corresponds to the /ID entry in the image mask dictionary.
 	WebCaptureID *webcapture.Identifier
 
-	// Name is deprecated and should be left empty.
-	// Only used in PDF 1.0 where it was the name used to reference the image
-	// from within content streams.
+	// Name is the PDF resource-dictionary key under which this image mask
+	// is referenced in content streams.  If non-empty, the builder uses
+	// this value as the /XObject subdictionary key; the spec requires the
+	// two to match (PDF 2.0 Table 93).  Required in PDF 1.0; optional in
+	// PDF 1.1–1.7; deprecated (forbidden by this library's writer) in PDF
+	// 2.0.
 	Name pdf.Name
 }
 
@@ -520,11 +523,11 @@ func (m *Mask) check(out *pdf.Writer) error {
 			return errors.New("at most one alternate may have DefaultForPrinting set")
 		}
 	}
-	if m.Name != "" {
-		v := pdf.GetVersion(out)
-		if v >= pdf.V2_0 {
-			return errors.New("unexpected /Name field")
-		}
+	switch v := pdf.GetVersion(out); {
+	case v == pdf.V1_0 && m.Name == "":
+		return errors.New("missing image mask /Name field")
+	case v >= pdf.V2_0 && m.Name != "":
+		return errors.New("unexpected /Name field")
 	}
 	if m.Metadata != nil {
 		if err := pdf.CheckVersion(out, "image metadata", pdf.V1_4); err != nil {
@@ -571,6 +574,12 @@ func (m *Mask) Bounds() rect.IntRect {
 // Subtype returns the PDF XObject subtype for image masks.
 func (m *Mask) Subtype() pdf.Name {
 	return pdf.Name("Image")
+}
+
+// ResourceName returns the preferred resource-dictionary key for this image
+// mask.  See [graphics.XObject.ResourceName].
+func (m *Mask) ResourceName() pdf.Name {
+	return m.Name
 }
 
 // IsImageMask returns true, indicating this is a stencil mask.

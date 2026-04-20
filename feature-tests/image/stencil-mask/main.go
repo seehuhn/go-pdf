@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/image"
@@ -51,7 +52,7 @@ func run(filename string) error {
 	gray := color.DeviceGray(0.5)
 
 	F := text.F{
-		Font:  standard.TimesRoman.New(),
+		Font:  font.Must(standard.TimesRoman.New()),
 		Size:  12,
 		Color: gray,
 	}

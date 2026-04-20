@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
 )
@@ -35,7 +36,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	F := standard.Helvetica.New()
+	F := font.Must(standard.Helvetica.New())
 
 	x := 72.0
 	y := bbox.URy - 72.0

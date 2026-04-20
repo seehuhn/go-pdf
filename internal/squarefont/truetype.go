@@ -78,8 +78,8 @@ func makeTrueTypeFont(unitsPerEm uint16) font.Layouter {
 		{PlatformID: 0, EncodingID: 3}: cmapSubtable.Encode(0),
 	}
 
-	// Create font structure
-	font := &sfnt.Font{
+	// create font structure
+	info := &sfnt.Font{
 		FamilyName:         "SquareFont",
 		Ascent:             funit.Int16(Ascent * scale),
 		Descent:            funit.Int16(Descent * scale),
@@ -100,12 +100,8 @@ func makeTrueTypeFont(unitsPerEm uint16) font.Layouter {
 		CMapTable: cmapTable,
 	}
 
-	// Convert to PDF TrueType font
-	instance, err := truetype.NewSimple(font, nil)
-	if err != nil {
-		panic(err)
-	}
-	return instance
+	// convert to PDF TrueType font
+	return font.Must(truetype.NewSimple(info, nil))
 }
 
 // createSquareGlyph creates a filled square glyph.

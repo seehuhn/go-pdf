@@ -348,6 +348,13 @@ func (t *Thumbnail) Subtype() pdf.Name {
 	return pdf.Name("Image")
 }
 
+// ResourceName returns the empty string: thumbnails are attached to pages
+// via /Thumb, not referenced via a content stream /XObject key.  See
+// [graphics.XObject.ResourceName].
+func (t *Thumbnail) ResourceName() pdf.Name {
+	return ""
+}
+
 func (t *Thumbnail) check(out *pdf.Writer) error {
 	if t.Width <= 0 {
 		return fmt.Errorf("invalid thumbnail width %d", t.Width)

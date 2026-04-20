@@ -49,6 +49,14 @@ func (im *Lab8) Subtype() pdf.Name {
 	return pdf.Name("Image")
 }
 
+// ResourceName returns the empty string: Lab8 does not expose a Name
+// field.  Callers who need a specific resource-dict key should wrap
+// the image in a [seehuhn.de/go/pdf/graphics/image.Dict] and set its
+// Name field.  See [graphics.XObject.ResourceName].
+func (im *Lab8) ResourceName() pdf.Name {
+	return ""
+}
+
 // Embed converts the Go representation of the object into a PDF object,
 // corresponding to the PDF version of the output file.
 //

@@ -45,9 +45,10 @@ type CharProc struct {
 
 // Type3 holds the information from a Type 3 font dictionary.
 type Type3 struct {
-	// Name is deprecated and should be left empty.
-	// Only used in PDF 1.0 where it was the name used to reference the font
-	// from within content streams.
+	// Name is the name used to reference the font from within content
+	// streams in PDF 1.0.  From PDF 1.1 onward it is optional and exists
+	// only as the font's human-readable name (Type 3 has no BaseFont);
+	// see https://github.com/pdf-association/pdf-issues/issues/11#issuecomment-753665847
 	Name pdf.Name
 
 	// Descriptor (optional) is the font descriptor.
@@ -87,6 +88,11 @@ func (d *Type3) validate(w *pdf.Writer) error {
 			return errors.New("missing font name")
 		}
 	}
+	// Unlike Type 1 / TrueType, Name is not deprecated in PDF 2.0 for Type 3
+	// fonts: Type 3 has no BaseFont entry, so Name is the only carrier of the
+	// font's human-readable name.  See lrosenthol's clarification at
+	// https://github.com/pdf-association/pdf-issues/issues/11#issuecomment-753665847
+	// and the resulting change to Table 120 ("Required for non-Type 3 fonts").
 
 	if d.FontMatrix.IsZero() {
 		return errors.New("invalid FontMatrix")
@@ -304,6 +310,10 @@ func (f *t3Font) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 func (f *t3Font) PostScriptName() string {
 	return ""
+}
+
+func (f *t3Font) ResourceName() pdf.Name {
+	return f.Dict.Name
 }
 
 func (f *t3Font) GetDict() Dict {

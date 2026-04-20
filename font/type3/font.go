@@ -57,6 +57,12 @@ type Font struct {
 	// PostScriptName (optional) is the PostScript name of the font.
 	PostScriptName string
 
+	// Name is the name used to reference the font from within content
+	// streams in PDF 1.0.  From PDF 1.1 onward it is optional and exists
+	// only as the font's human-readable name (Type 3 has no BaseFont);
+	// see https://github.com/pdf-association/pdf-issues/issues/11#issuecomment-753665847
+	Name pdf.Name
+
 	// FontFamily (optional) is the name of the font family.
 	FontFamily string
 
@@ -257,7 +263,7 @@ func (f *Font) New() (font.Layouter, error) {
 		return nil, errors.New("invalid glyph 0")
 	}
 
-	// Validate all glyphs have valid content streams
+	// check that all glyphs have valid content streams
 	for i, g := range f.Glyphs {
 		if err := g.validateContent(); err != nil {
 			return nil, fmt.Errorf("glyph %d (%q): %w", i, g.Name, err)
@@ -334,6 +340,12 @@ func (f *Font) New() (font.Layouter, error) {
 // PostScriptName returns the PostScript name of the font.
 func (f *instance) PostScriptName() string {
 	return f.Font.PostScriptName
+}
+
+// ResourceName returns the preferred resource-dictionary key for this font.
+// See [font.Instance.ResourceName].
+func (f *instance) ResourceName() pdf.Name {
+	return f.Font.Name
 }
 
 // Layout converts a string to a sequence of positioned glyphs.
@@ -458,6 +470,7 @@ func (f *instance) makeFontDict(_ *pdf.EmbedHelper) (*dict.Type3, error) {
 		MissingWidth: f.Simple.DefaultWidth(),
 	}
 	d := &dict.Type3{
+		Name:       f.Font.Name,
 		Descriptor: fd,
 		Encoding:   f.Simple.Encoding(),
 		CharProcs:  charProcs,

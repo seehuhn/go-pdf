@@ -21,6 +21,7 @@ import (
 	"log"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
@@ -36,7 +37,7 @@ func main() {
 
 	rm := pdf.NewResourceManager(out)
 
-	font := standard.Helvetica.New()
+	font := font.Must(standard.Helvetica.New())
 
 	mediaBox := &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200}
 	pageTree := pagetree.NewWriter(out, rm)

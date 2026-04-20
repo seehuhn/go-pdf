@@ -59,7 +59,7 @@ func createDocument(fname string) error {
 		return err
 	}
 
-	F := standard.Helvetica.New()
+	F := font.Must(standard.Helvetica.New())
 
 	X, err := makeTestFont()
 	if err != nil {
@@ -132,11 +132,7 @@ func makeMarkerFont() font.Instance {
 			},
 		},
 	}
-	F, err := markerFont.New()
-	if err != nil {
-		panic(err)
-	}
-	return F
+	return font.Must(markerFont.New())
 }
 
 func makeTestFont() (font.Instance, error) {

@@ -50,7 +50,7 @@ func createDocument(filename string) error {
 		return err
 	}
 
-	F := standard.TimesRoman.New()
+	F := font.Must(standard.TimesRoman.New())
 	note := text.F{
 		Font:  F,
 		Size:  10,
@@ -164,9 +164,5 @@ func makeTestFont(unitsPerEm float64, rotate bool) font.Layouter {
 		Ascent:     unitsPerEm,
 		Leading:    unitsPerEm * 1.2,
 	}
-	res, err := F.New()
-	if err != nil {
-		panic(err)
-	}
-	return res
+	return font.Must(F.New())
 }

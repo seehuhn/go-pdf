@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 )
 
@@ -84,7 +85,7 @@ func TestWrap(t *testing.T) {
 
 func TestWrapOverfull(t *testing.T) {
 	w := Wrap(0, "a\nb")
-	F := standard.Helvetica.New()
+	F := font.Must(standard.Helvetica.New())
 	res := slices.Collect(w.Lines(F, 10))
 	if len(res) != 2 {
 		t.Fatal("expected two lines, got", len(res))

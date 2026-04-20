@@ -70,16 +70,8 @@ func (f openTypeEmbedder) font() font.Layouter {
 		info = makefont.OpenTypeCID2()
 	}
 
-	var F font.Layouter
-	var err error
 	if f.composite {
-		F, err = opentype.NewComposite(info, nil)
-	} else {
-		F, err = opentype.NewSimple(info, nil)
+		return font.Must(opentype.NewComposite(info, nil))
 	}
-
-	if err != nil {
-		panic(err)
-	}
-	return F
+	return font.Must(opentype.NewSimple(info, nil))
 }

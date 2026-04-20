@@ -88,6 +88,13 @@ func (sm *SoftMask) Subtype() pdf.Name {
 	return pdf.Name("Image")
 }
 
+// ResourceName returns the empty string: soft masks are referenced from
+// ExtGState / image dicts, not from a content stream's /XObject key.
+// See [graphics.XObject.ResourceName].
+func (sm *SoftMask) ResourceName() pdf.Name {
+	return ""
+}
+
 // Embed embeds the soft mask as a PDF image XObject stream.
 func (sm *SoftMask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if err := sm.check(rm.Out()); err != nil {

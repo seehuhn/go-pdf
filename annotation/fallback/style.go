@@ -87,8 +87,8 @@ func NewStyle() *Style {
 	// Allocate fonts once here, to make sure that at most one instance of each
 	// font is embedded in an output file.
 	return &Style{
-		iconFont:    extended.NimbusRomanBold.New(),
-		ContentFont: standard.Helvetica.New(),
+		iconFont:    font.Must(extended.NimbusRomanBold.New()),
+		ContentFont: font.Must(standard.Helvetica.New()),
 		reset:       reset,
 	}
 }

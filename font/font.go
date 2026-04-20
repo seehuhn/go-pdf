@@ -54,6 +54,13 @@ type Instance interface {
 	// font/dict package.
 	FontInfo() any
 
+	// ResourceName returns the font's preferred resource-dictionary key.
+	// When non-empty, this must equal the key under which this font is
+	// referenced in the /Font subdictionary of the current resource
+	// dictionary (PDF 2.0 Table 109 / 110).  When empty, the builder is
+	// free to allocate a name.
+	ResourceName() pdf.Name
+
 	pdf.Embedder
 }
 
@@ -161,4 +168,16 @@ type Code struct {
 	// with the value 0x20 (irrespective of whether the character actually
 	// represents a space).
 	UseWordSpacing bool
+}
+
+// Must is a helper that wraps a call to a font constructor returning a
+// [Layouter] and an error, and panics if the error is non-nil. It is intended
+// for use in variable initialisations such as
+//
+//	var F = font.Must(cff.NewSimple(info, nil))
+func Must[T Layouter](font T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return font
 }

@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
@@ -37,7 +38,7 @@ func TestTextExtractorBasic(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
-	F := standard.Helvetica.New()
+	F := font.Must(standard.Helvetica.New())
 
 	pageTree := pagetree.NewWriter(w, rm)
 
@@ -102,7 +103,7 @@ func TestTextExtractorActualTextIndirect(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
-	F := standard.Helvetica.New()
+	F := font.Must(standard.Helvetica.New())
 
 	pageTree := pagetree.NewWriter(w, rm)
 
@@ -185,7 +186,7 @@ func TestTextExtractorActualText(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
-	F := standard.Helvetica.New()
+	F := font.Must(standard.Helvetica.New())
 
 	pageTree := pagetree.NewWriter(w, rm)
 

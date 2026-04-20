@@ -61,14 +61,14 @@ func createDocument(filename string) error {
 
 	w := &writer{
 		b:     page.Builder,
-		font:  standard.TimesRoman.New(),
+		font:  font.Must(standard.TimesRoman.New()),
 		style: fallback.NewStyle(),
 		page:  page,
 		yPos:  startY,
 	}
 
 	// title
-	B := standard.TimesBold.New()
+	B := font.Must(standard.TimesBold.New())
 	page.TextBegin()
 	page.TextSetMatrix(matrix.Translate(leftColStart, w.yPos))
 	page.TextSetFont(B, 12)

@@ -84,7 +84,7 @@ func makeCFFFont(fontMatrix matrix.Matrix) font.Layouter {
 		{PlatformID: 0, EncodingID: 3}: cmapSubtable.Encode(0),
 	}
 
-	font := &sfnt.Font{
+	info := &sfnt.Font{
 		FamilyName:         "SquareFont",
 		Ascent:             funit.Int16(Ascent * vScale),
 		Descent:            funit.Int16(Descent * vScale),
@@ -103,12 +103,7 @@ func makeCFFFont(fontMatrix matrix.Matrix) font.Layouter {
 		CMapTable:          cmapTable,
 	}
 
-	instance, err := pdfcff.NewSimple(font, nil)
-	if err != nil {
-		panic(err)
-	}
-
-	return instance
+	return font.Must(pdfcff.NewSimple(info, nil))
 }
 
 // createCFFEmptyGlyph creates an empty CFF glyph.

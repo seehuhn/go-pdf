@@ -62,7 +62,7 @@ func generateTestPDF(filename string) error {
 // writeTestPage creates a page with ActualText test cases.
 func writeTestPage(w *pdf.Writer) error {
 	rm := pdf.NewResourceManager(w)
-	F := standard.Helvetica.New()
+	F := font.Must(standard.Helvetica.New())
 
 	pageTree := pagetree.NewWriter(w, rm)
 

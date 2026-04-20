@@ -60,40 +60,36 @@ func (f Font) PostScriptName() string {
 }
 
 // New returns a new font instance for the given standard font.
-func (f Font) New() *type1.Instance {
-	inst, err := f.newInternal()
-	if err != nil {
-		panic(err)
-	}
-	return inst
-}
-
-func (f Font) newInternal() (*type1.Instance, error) {
+//
+// An error is returned if the font data bundled with this package cannot be
+// loaded; this indicates a broken installation and should not happen for any
+// of the predefined [Font] constants.  Callers that treat this as an
+// invariant may wrap the call in [font.Must].
+func (f Font) New() (*type1.Instance, error) {
 	name := string(f)
 
 	fontData, err := builtin.Open(name, loader.FontTypeType1)
 	if err != nil {
-		return nil, err // should not happen
+		return nil, err
 	}
 	psFont, err := pstype1.Read(fontData)
 	if err != nil {
-		return nil, err // should not happen
+		return nil, err
 	}
 	fontData.Close()
 
 	afmData, err := builtin.Open(name, loader.FontTypeAFM)
 	if err != nil {
-		return nil, err // should not happen
+		return nil, err
 	}
 	metrics, err := afm.Read(afmData)
 	if err != nil {
-		return nil, err // should not happen
+		return nil, err
 	}
 	afmData.Close()
 
-	// Fix up the fonts
+	// fix up the fonts
 	family := strings.SplitN(name, "-", 2)[0]
-
 	psFont.FontName = name
 	psFont.FamilyName = family
 	psFont.Encoding = restrictGlyphList(f, psFont.Glyphs)
@@ -164,12 +160,6 @@ func (f Font) newInternal() (*type1.Instance, error) {
 	switch psFont.FamilyName {
 	case "Courier", "Times":
 		res.IsSerif = true
-	case "Helvetica":
-		// pass
-	case "Symbol", "ZapfDingbats":
-		// pass
-	default:
-		panic("unreachable: " + family)
 	}
 
 	return res, nil

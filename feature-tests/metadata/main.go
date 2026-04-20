@@ -23,6 +23,7 @@ import (
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/xmp"
 )
@@ -40,7 +41,7 @@ func run() error {
 		return err
 	}
 
-	font := standard.HelveticaBold.New()
+	font := font.Must(standard.HelveticaBold.New())
 
 	doc.TextSetFont(font, 50)
 	doc.TextBegin()

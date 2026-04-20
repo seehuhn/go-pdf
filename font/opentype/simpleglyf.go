@@ -50,9 +50,22 @@ type SimpleGlyf struct {
 	layouter *sfnt.Layouter
 
 	*simpleenc.Simple
+
+	// Name is the PDF resource-dictionary key under which this font is
+	// referenced in content streams.  If non-empty, the builder uses this
+	// value as the /Font subdictionary key; the spec requires the two to
+	// match (PDF 2.0 Table 109).  Required in PDF 1.0; optional in PDF
+	// 1.1–1.7; deprecated (forbidden by this library's writer) in PDF 2.0.
+	Name pdf.Name
 }
 
 var _ font.Layouter = (*SimpleGlyf)(nil)
+
+// ResourceName returns the preferred resource-dictionary key for this font.
+// See [font.Instance.ResourceName].
+func (f *SimpleGlyf) ResourceName() pdf.Name {
+	return f.Name
+}
 
 // newSimpleGlyf creates a simple OpenType font with glyf outlines.
 func newSimpleGlyf(info *sfnt.Font, opt *OptionsSimple) (*SimpleGlyf, error) {
@@ -317,6 +330,7 @@ func (f *SimpleGlyf) makeDict() (*dict.TrueType, error) {
 	fontDict := &dict.TrueType{
 		PostScriptName: subsetFont.PostScriptName(),
 		SubsetTag:      subsetTag,
+		Name:           f.Name,
 		Descriptor:     fd,
 		Encoding:       dictEnc,
 		Width:          widths,

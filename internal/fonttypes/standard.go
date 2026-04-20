@@ -23,6 +23,5 @@ import (
 
 // Standard makes one of the 14 standard PDF fonts.
 var Standard = func() font.Layouter {
-	F := standard.Helvetica.New()
-	return F
+	return font.Must(standard.Helvetica.New())
 }

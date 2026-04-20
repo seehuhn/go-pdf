@@ -69,13 +69,21 @@ type Instance struct {
 
 	*simpleenc.Simple
 
-	// Name is deprecated and should be left empty.
-	// Only used in PDF 1.0 where it was the name used to reference the font
-	// from within content streams.
+	// Name is the PDF resource-dictionary key under which this font is
+	// referenced in content streams.  If non-empty, the builder uses this
+	// value as the /Font subdictionary key; the spec requires the two to
+	// match (PDF 2.0 Table 109).  Required in PDF 1.0; optional in PDF
+	// 1.1–1.7; deprecated (forbidden by this library's writer) in PDF 2.0.
 	Name pdf.Name
 }
 
 var _ font.Layouter = (*Instance)(nil)
+
+// ResourceName returns the preferred resource-dictionary key for this font.
+// See [font.Instance.ResourceName].
+func (f *Instance) ResourceName() pdf.Name {
+	return f.Name
+}
 
 // New creates a new Type 1 PDF font from a Type 1 PostScript font.
 // The argument psFont must be present, metrics is optional.

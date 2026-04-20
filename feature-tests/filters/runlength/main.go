@@ -40,6 +40,10 @@ func (img *runlengthImage) Subtype() pdf.Name {
 	return pdf.Name("Image")
 }
 
+func (img *runlengthImage) ResourceName() pdf.Name {
+	return ""
+}
+
 func (img *runlengthImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	colors := []color.Color{
 		color.DeviceRGB{1, 0, 0},     // red

@@ -23,9 +23,5 @@ import (
 
 // Type3 is a Type 3 font.
 var Type3 = func() font.Layouter {
-	F, err := makefont.Type3()
-	if err != nil {
-		panic(err)
-	}
-	return F
+	return font.Must(makefont.Type3())
 }

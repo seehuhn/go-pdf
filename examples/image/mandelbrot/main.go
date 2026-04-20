@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	pdfimage "seehuhn.de/go/pdf/graphics/image"
 )
@@ -62,8 +63,8 @@ func run(fname string) error {
 	page.DrawXObject(img)
 	page.PopGraphicsState()
 
-	roman := standard.TimesRoman.New()
-	bold := standard.TimesBold.New()
+	roman := font.Must(standard.TimesRoman.New())
+	bold := font.Must(standard.TimesBold.New())
 	page.TextBegin()
 	page.TextFirstLine(72, bottom-20)
 	page.TextSetFont(bold, 10)

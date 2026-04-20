@@ -50,7 +50,7 @@ func run() error {
 		return err
 	}
 
-	F := standard.Helvetica.New()
+	F := font.Must(standard.Helvetica.New())
 
 	err = showCalRGBColors(doc, F)
 	if err != nil {

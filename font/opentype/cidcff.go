@@ -58,6 +58,13 @@ type CompositeCFF struct {
 
 var _ font.Layouter = (*CompositeCFF)(nil)
 
+// ResourceName returns the empty string: composite CFF fonts produce a
+// CIDFontType0 dictionary, which has no /Name entry in the PDF spec.
+// See [font.Instance.ResourceName].
+func (f *CompositeCFF) ResourceName() pdf.Name {
+	return ""
+}
+
 // newCompositeCFF creates a composite OpenType font with CFF outlines.
 func newCompositeCFF(info *sfnt.Font, opt *OptionsComposite) (*CompositeCFF, error) {
 	if !info.IsCFF() {
@@ -277,19 +284,32 @@ func (f *CompositeCFF) makeDict() (*dict.CIDFontType0, error) {
 
 	// construct the font dictionary and font descriptor
 	dw := math.Round(f.Font.GlyphWidthPDF(0))
+
+	// gather widths for used CIDs (plus CID 0)
 	ww := make(map[cid.CID]float64)
 	for _, info := range f.CIDEncoder.MappedCodes() {
-		// Only include information for CIDs that were actually used
 		if _, used := f.usedCIDs[info.CID]; used || info.CID == 0 {
 			ww[info.CID] = info.Width
 		}
 	}
 
+	// determine whether the font is symbolic.  Prefer the font's own glyph
+	// name; fall back to a name derived from the Unicode text only when the
+	// original font lacks a name for this glyph.
 	isSymbolic := false
 	for _, info := range f.CIDEncoder.MappedCodes() {
-		// TODO(voss): if the font is simple, use the existing glyph names?
-		glyphName := names.FromUnicode(info.Text)
-		if !pdfenc.StandardLatin.Has[glyphName] {
+		if info.CID == 0 {
+			continue
+		}
+		if _, used := f.usedCIDs[info.CID]; !used {
+			continue
+		}
+		origGID := f.gidToCID.GID(info.CID)
+		name := f.Font.GlyphName(origGID)
+		if name == "" {
+			name = names.FromUnicode(info.Text)
+		}
+		if !pdfenc.StandardLatin.Has[name] {
 			isSymbolic = true
 			break
 		}

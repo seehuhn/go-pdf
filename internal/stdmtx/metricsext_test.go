@@ -20,6 +20,7 @@ import (
 	"math"
 	"testing"
 
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/internal/stdmtx"
 )
@@ -27,14 +28,14 @@ import (
 // TestGeometry tests that the glyphs widths and bounding boxes are consistent
 // with our font files.
 func TestGeometry(t *testing.T) {
-	for _, font := range standard.All {
-		mtx, exists := stdmtx.Metrics[string(font)]
+	for _, f := range standard.All {
+		mtx, exists := stdmtx.Metrics[string(f)]
 		if !exists {
-			t.Errorf("Font %q not found in stdmtx.Metrics", font)
+			t.Errorf("Font %q not found in stdmtx.Metrics", f)
 			continue
 		}
 
-		F := font.New()
+		F := font.Must(f.New())
 
 		genFontBBox := mtx.FontBBox
 
@@ -46,16 +47,16 @@ func TestGeometry(t *testing.T) {
 			// space units instead of glyph space units).
 			q := math.Sqrt(1000)
 			if genWidth != 0 && (genWidth < 500/q || genWidth > 500*q) {
-				t.Errorf("%s:%s: implausible width: %f", font, glyphName, genWidth)
+				t.Errorf("%s:%s: implausible width: %f", f, glyphName, genWidth)
 			}
 
 			if math.Abs(actualWidth-genWidth) > 0.5 {
-				t.Errorf("%s:%s: width mismatch: %f vs %f", font, glyphName, actualWidth, genWidth)
+				t.Errorf("%s:%s: width mismatch: %f vs %f", f, glyphName, actualWidth, genWidth)
 			}
 
 			actualGlyphBBox := F.GlyphBBoxPDF(glyphName)
 			if !genFontBBox.Covers(actualGlyphBBox) {
-				t.Errorf("%s:%s: glyph bbox %v not covered by font bbox %v", font, glyphName,
+				t.Errorf("%s:%s: glyph bbox %v not covered by font bbox %v", f, glyphName,
 					actualGlyphBBox, genFontBBox)
 			}
 		}
@@ -65,15 +66,15 @@ func TestGeometry(t *testing.T) {
 // TestNotdef tests that the metrics include a non-zero width for the .notdef
 // glyph.
 func TestNotdef(t *testing.T) {
-	for _, font := range standard.All {
-		mtx, exists := stdmtx.Metrics[string(font)]
+	for _, f := range standard.All {
+		mtx, exists := stdmtx.Metrics[string(f)]
 		if !exists {
-			t.Errorf("Font %q not found in stdmtx.Metrics", font)
+			t.Errorf("Font %q not found in stdmtx.Metrics", f)
 			continue
 		}
 
 		if mtx.Width[".notdef"] < 0 || mtx.Width[".notdef"] > 1000 {
-			t.Errorf("%s: implausible .notdef width: %v", font, mtx.Width[".notdef"])
+			t.Errorf("%s: implausible .notdef width: %v", f, mtx.Width[".notdef"])
 		}
 	}
 }

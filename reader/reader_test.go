@@ -25,6 +25,7 @@ import (
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
@@ -37,7 +38,7 @@ import (
 func TestParameters(t *testing.T) {
 	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 
-	testFont := standard.Helvetica.New()
+	testFont := font.Must(standard.Helvetica.New())
 	m := matrix.Matrix{1, 2, 3, 4, 5, 6}
 
 	// Build a content stream where we set various graphics parameters.

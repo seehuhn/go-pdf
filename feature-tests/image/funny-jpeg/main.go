@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -82,9 +83,9 @@ func run(filename string) error {
 		return err
 	}
 
-	font := standard.Helvetica.New()
-	F := text.F{Font: font, Size: 14}
-	Fsmall := text.F{Font: font, Size: 10}
+	helv := font.Must(standard.Helvetica.New())
+	F := text.F{Font: helv, Size: 14}
+	Fsmall := text.F{Font: helv, Size: 10}
 
 	// title
 	text.Show(page.Builder,
@@ -265,6 +266,10 @@ type rawJPEGImage struct {
 
 func (img *rawJPEGImage) Subtype() pdf.Name {
 	return "Image"
+}
+
+func (img *rawJPEGImage) ResourceName() pdf.Name {
+	return ""
 }
 
 func (img *rawJPEGImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {

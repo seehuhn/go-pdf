@@ -66,9 +66,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	helvetica := standard.Helvetica.New()
-	italic := standard.TimesItalic.New()
-	courier := standard.Courier.New()
+	helvetica := font.Must(standard.Helvetica.New())
+	italic := font.Must(standard.TimesItalic.New())
+	courier := font.Must(standard.Courier.New())
 	opt := &embed.Options{
 		Composite: true,
 	}

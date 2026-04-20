@@ -421,6 +421,10 @@ func (f *testFont) PostScriptName() string {
 	return f.ttf.FamilyName
 }
 
+func (f *testFont) ResourceName() pdf.Name {
+	return ""
+}
+
 // Codec returns the codec for the encoding used by this font.
 func (f *testFont) Codec() *charcode.Codec {
 	return charcode.SimpleCodec

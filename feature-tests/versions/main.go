@@ -21,6 +21,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 )
 
@@ -49,7 +50,7 @@ func main() {
 				log.Fatal(err)
 			}
 
-			F := standard.TimesRoman.New()
+			F := font.Must(standard.TimesRoman.New())
 			if v == pdf.V1_0 {
 				F.Name = "F1"
 			}

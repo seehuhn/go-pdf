@@ -20,8 +20,12 @@ import (
 	"errors"
 	"testing"
 
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/form"
 )
 
 func TestBuilder_NewForContent(t *testing.T) {
@@ -158,5 +162,88 @@ func TestBuilder_ResetClearsError(t *testing.T) {
 
 	if b.Err != nil {
 		t.Error("Reset should clear Err")
+	}
+}
+
+// makeType3 builds a minimal Type 3 font for tests.
+func makeType3(t *testing.T, name pdf.Name) font.Layouter {
+	t.Helper()
+	f := &type3.Font{
+		Glyphs:     []*type3.Glyph{{}},
+		FontMatrix: [6]float64{0.001, 0, 0, 0.001, 0, 0},
+		Name:       name,
+	}
+	inst, err := f.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return inst
+}
+
+// TestBuilder_FontNameUsesResourceName verifies that FontName picks up the
+// font's configured ResourceName instead of auto-allocating.
+func TestBuilder_FontNameUsesResourceName(t *testing.T) {
+	b := New(content.Page, nil)
+	f := makeType3(t, "MyFont")
+	if got := b.FontName(f); got != "MyFont" {
+		t.Errorf("FontName = %q, want %q", got, "MyFont")
+	}
+	if _, ok := b.Resources.Font["MyFont"]; !ok {
+		t.Error("font not registered under user-supplied name")
+	}
+}
+
+// TestBuilder_FontNameCollision tests that registering two different fonts
+// under the same name surfaces an error.
+func TestBuilder_FontNameCollision(t *testing.T) {
+	b := New(content.Page, nil)
+	f1 := makeType3(t, "F")
+	f2 := makeType3(t, "F")
+	b.FontName(f1)
+	if b.Err != nil {
+		t.Fatalf("unexpected Err: %v", b.Err)
+	}
+	b.FontName(f2)
+	if b.Err == nil {
+		t.Error("expected Err for name collision")
+	}
+}
+
+// TestBuilder_SetFontNameInternalMismatch tests that SetFontNameInternal
+// refuses a name that disagrees with the font's own ResourceName.
+func TestBuilder_SetFontNameInternalMismatch(t *testing.T) {
+	b := New(content.Page, nil)
+	f := makeType3(t, "F1")
+	if err := b.SetFontNameInternal(f, "F2"); err == nil {
+		t.Error("expected error for mismatch between dict Name and requested key")
+	}
+}
+
+// TestBuilder_PrefillMismatch tests that builder.New with inconsistent
+// Resources.Font (dict-key != font.ResourceName()) sets b.Err.
+func TestBuilder_PrefillMismatch(t *testing.T) {
+	f := makeType3(t, "MyFont")
+	res := &content.Resources{
+		Font: map[pdf.Name]font.Instance{"F1": f},
+	}
+	b := New(content.Page, res)
+	if b.Err == nil {
+		t.Error("expected Err for dict-key vs Name mismatch in Resources.Font")
+	}
+}
+
+// TestBuilder_PrefillXObjectMismatch verifies the same check on XObjects.
+func TestBuilder_PrefillXObjectMismatch(t *testing.T) {
+	f := &form.Form{
+		BBox: pdf.Rectangle{URx: 10, URy: 10},
+		Res:  &content.Resources{},
+		Name: "MyForm",
+	}
+	res := &content.Resources{
+		XObject: map[pdf.Name]graphics.XObject{"X1": f},
+	}
+	b := New(content.Page, res)
+	if b.Err == nil {
+		t.Error("expected Err for dict-key vs Name mismatch in Resources.XObject")
 	}
 }
