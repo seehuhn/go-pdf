@@ -81,7 +81,7 @@ func (s *Style) addTextMarkupAppearance(a *annotation.TextMarkup) *form.Form {
 	bbox.LLy -= expand
 	bbox.URx += expand
 	bbox.URy += expand
-	bbox.IRound(1)
+	bbox.IRound(2)
 	a.Rect = bbox
 
 	b := builder.New(content.Form, nil)

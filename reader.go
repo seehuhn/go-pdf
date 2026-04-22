@@ -154,7 +154,8 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 			return false
 		}
 		if opt.ErrorHandling == ErrorHandlingReport {
-			if e, ok := err.(*MalformedFileError); ok {
+			var e *MalformedFileError
+			if errors.As(err, &e) {
 				r.Errors = append(r.Errors, e)
 				return false
 			}

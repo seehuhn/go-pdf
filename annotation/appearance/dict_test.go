@@ -223,9 +223,9 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		objGo, err := pdf.ExtractorGet(x, nil, objPDF, Extract)
-		if err != nil {
-			t.Skip("malformed PDF object")
+		objGo, _ := pdf.ExtractorGet(x, nil, objPDF, Extract)
+		if objGo == nil {
+			t.Skip("no appearance dictionary")
 		}
 
 		roundTripTest(t, pdf.GetVersion(r), objGo)

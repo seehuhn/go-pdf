@@ -172,7 +172,8 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 			return false
 		}
 		if opt.ErrorHandling == ErrorHandlingReport {
-			if e, ok := err.(*MalformedFileError); ok {
+			var e *MalformedFileError
+			if errors.As(err, &e) {
 				r.Errors = append(r.Errors, e)
 				return false
 			}
@@ -302,7 +303,7 @@ func (fi *FileInfo) checkObjects() error {
 		for _, objInfo := range section.Objects {
 			x, endPos, err := fi.doRead(objInfo, dummyGetInt)
 			if err != nil {
-				if _, isBroken := err.(*MalformedFileError); isBroken {
+				if IsMalformed(err) {
 					objInfo.Broken = true
 					continue
 				}

@@ -95,7 +95,7 @@ func (s *Style) addSquareAppearance(a *annotation.Square) *form.Form {
 			URx: cloudBBox.URx + lw/2,
 			URy: cloudBBox.URy + lw/2,
 		}
-		bbox.IRound(1)
+		bbox.IRound(2)
 	} else {
 		b.Rectangle(rect.LLx+lw/2, rect.LLy+lw/2, rect.Dx()-lw, rect.Dy()-lw)
 		bbox = rect

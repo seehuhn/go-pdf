@@ -270,6 +270,14 @@ func RawStreamReader(r Getter, x *Stream) (io.ReadCloser, error) {
 //
 // For encrypted PDFs, decryption is applied on-the-fly before any other
 // filters. This does not count towards numFilters.
+//
+// Errors returned by Read on the resulting reader are classified per the
+// package-level two-class error model: malformed-content errors are tagged
+// [*MalformedFileError] (wrapped by the filter layer), and real failures
+// from the underlying byte source propagate unchanged — even when a filter
+// layer would otherwise have transformed them (e.g. flate emitting
+// [io.ErrUnexpectedEOF]), because a sticky source-error tracker promotes
+// the original error at the top of the stack.
 func DecodeStream(r Getter, x *Stream, numFilters int) (io.ReadCloser, error) {
 	filters, err := GetFilters(r, x.Dict)
 	if err != nil {
@@ -281,13 +289,14 @@ func DecodeStream(r Getter, x *Stream, numFilters int) (io.ReadCloser, error) {
 		v = GetVersion(r)
 	}
 
-	out := io.NopCloser(x.NewReader())
+	src := &sourceErrChecker{r: x.NewReader()}
+	var out io.ReadCloser = io.NopCloser(src)
 
 	// apply decryption before other filters
 	if x.crypt != nil {
 		out, err = x.crypt.Decode(v, out)
 		if err != nil {
-			return nil, err
+			return nil, src.promote(err)
 		}
 	}
 
@@ -297,11 +306,66 @@ func DecodeStream(r Getter, x *Stream, numFilters int) (io.ReadCloser, error) {
 		}
 		out, err = fi.Decode(v, out)
 		if err != nil {
-			return nil, err
+			return nil, src.promote(err)
 		}
 	}
-	return out, nil
+	return &sourceAwareReader{inner: out, src: src}, nil
 }
+
+// sourceErrChecker wraps the raw byte source underlying a decoded PDF
+// stream. It is sticky: once a non-EOF error is observed, it is recorded
+// and returned by Err() for the rest of the reader's lifetime. The filter
+// chain above reads through this wrapper transparently; [sourceAwareReader]
+// uses the recorded error to recover source failures that filter layers
+// may have replaced with their own error (e.g. flate returning
+// [io.ErrUnexpectedEOF] when the source truncates unexpectedly).
+type sourceErrChecker struct {
+	r      io.Reader
+	srcErr error
+}
+
+func (s *sourceErrChecker) Read(p []byte) (int, error) {
+	n, err := s.r.Read(p)
+	if err != nil && !errors.Is(err, io.EOF) && s.srcErr == nil {
+		s.srcErr = err
+	}
+	return n, err
+}
+
+// Err returns the sticky non-EOF source error, or nil.
+func (s *sourceErrChecker) Err() error { return s.srcErr }
+
+// promote returns the sticky source error if one has been recorded,
+// otherwise the supplied err. It is used while the filter chain is
+// being constructed, so that a source-level IO failure observed during
+// a filter's header read is surfaced to the caller instead of the
+// (content-classified) error the filter returns.
+func (s *sourceErrChecker) promote(err error) error {
+	if s.srcErr != nil {
+		return s.srcErr
+	}
+	return err
+}
+
+// sourceAwareReader is the outermost wrapper returned by [DecodeStream].
+// When the filter chain produces a non-nil error, it checks whether the
+// underlying byte source has recorded an error of its own; if so, the
+// source error wins, so real IO failures surface to the caller even when
+// an intermediate filter layer has substituted its own content error.
+type sourceAwareReader struct {
+	inner io.ReadCloser
+	src   *sourceErrChecker
+}
+
+func (s *sourceAwareReader) Read(p []byte) (int, error) {
+	n, err := s.inner.Read(p)
+	if err != nil && s.src.srcErr != nil {
+		err = s.src.srcErr
+	}
+	return n, err
+}
+
+func (s *sourceAwareReader) Close() error { return s.inner.Close() }
 
 // GetFilters extracts the information contained in the /Filter and
 // /DecodeParms entries of a stream dictionary.

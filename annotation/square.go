@@ -108,7 +108,7 @@ func decodeSquare(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Squar
 
 	// Extract square-specific fields
 	// BS (optional)
-	if bs, err := pdf.Optional(pdf.ExtractorGet(x, path, dict["BS"], ExtractBorderStyle)); err != nil {
+	if bs, err := pdf.ExtractorGetOptional(x, path, dict["BS"], ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		square.BorderStyle = bs

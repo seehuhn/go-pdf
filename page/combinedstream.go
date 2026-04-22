@@ -107,6 +107,11 @@ func (ci *combinedIter) allFallback() iter.Seq2[content.OpName, []pdf.Object] {
 				ci.err = pErr
 				return
 			}
+			for _, name := range it.ClosingOperators() {
+				if !yield(name, nil) {
+					return
+				}
+			}
 		}
 	}
 }
@@ -147,6 +152,12 @@ func embedContentStream(e *pdf.EmbedHelper, s content.Stream) (pdf.Native, error
 	if sErr := it.Err(); sErr != nil {
 		stm.Close()
 		return nil, sErr
+	}
+	for _, name := range it.ClosingOperators() {
+		if err := content.WriteOperator(stm, content.Operator{Name: name}); err != nil {
+			stm.Close()
+			return nil, err
+		}
 	}
 
 	if err := stm.Close(); err != nil {

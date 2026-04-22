@@ -120,6 +120,6 @@ func openPolylineBBox(points []vec.Vec2, lw float64, startLE, endLE annotation.L
 		lineEndingBBox(&bbox, endLE, info, lw)
 	}
 
-	bbox.IRound(1)
+	bbox.IRound(2)
 	return bbox
 }

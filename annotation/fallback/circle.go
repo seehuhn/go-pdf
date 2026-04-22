@@ -93,7 +93,7 @@ func (s *Style) addCircleAppearance(a *annotation.Circle) *form.Form {
 			URx: cloudBBox.URx + lw/2,
 			URy: cloudBBox.URy + lw/2,
 		}
-		bbox.IRound(1)
+		bbox.IRound(2)
 		a.Margin = []float64{
 			max(0, rect.LLx-bbox.LLx),
 			max(0, rect.LLy-bbox.LLy),

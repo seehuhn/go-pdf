@@ -570,17 +570,104 @@ func TestReadStreamUnbalancedQ(t *testing.T) {
 }
 
 func TestScannerOpenError(t *testing.T) {
-	// test that an open function returning an error is handled correctly
-	openErr := errors.New("open failed")
-	s := NewScanner(func() (io.ReadCloser, error) {
-		return nil, openErr
-	}, pdf.V2_0, Page, &Resources{})
+	// Malformed-PDF errors surface as open failures too (for example an
+	// unknown /Filter detected by pdf.DecodeStream).  Per the permissive-
+	// reader policy the scanner yields an empty iteration and reports no
+	// error.
+	t.Run("malformed", func(t *testing.T) {
+		s := NewScanner(func() (io.ReadCloser, error) {
+			return nil, pdf.Error("malformed open failure")
+		}, pdf.V2_0, Page, &Resources{})
 
-	it := s.NewIter()
-	for range it.All() {
-		t.Fatal("expected empty iterator when open fails")
+		it := s.NewIter()
+		for range it.All() {
+			t.Fatal("expected empty iterator when open fails")
+		}
+		if err := it.Err(); err != nil {
+			t.Errorf("expected nil error, got %v", err)
+		}
+	})
+
+	// A real IO error at open time means the underlying byte source or
+	// the library itself failed (e.g. disk, context cancellation).  It
+	// must reach the caller unchanged.
+	t.Run("real error", func(t *testing.T) {
+		diskErr := errors.New("disk read failed")
+		s := NewScanner(func() (io.ReadCloser, error) {
+			return nil, diskErr
+		}, pdf.V2_0, Page, &Resources{})
+
+		it := s.NewIter()
+		for range it.All() {
+			t.Fatal("expected empty iterator when open fails")
+		}
+		if err := it.Err(); err != diskErr {
+			t.Errorf("expected %v, got %v", diskErr, err)
+		}
+	})
+}
+
+// errReader is an io.ReadCloser that first yields some bytes and then
+// returns the supplied error on every subsequent Read.  Used to exercise
+// the scanner's handling of read-time errors.
+type errReader struct {
+	data []byte
+	pos  int
+	err  error
+}
+
+func (r *errReader) Read(p []byte) (int, error) {
+	if r.pos >= len(r.data) {
+		return 0, r.err
 	}
-	if it.Err() == nil {
-		t.Error("expected non-nil error when open fails")
-	}
+	n := copy(p, r.data[r.pos:])
+	r.pos += n
+	return n, nil
+}
+
+func (r *errReader) Close() error { return nil }
+
+func TestScannerReadError(t *testing.T) {
+	// A malformed-PDF error raised during Read (for example, a corrupt
+	// flate body) is sticky: the reader keeps returning it.  The scanner
+	// must stop gracefully, yielding any operators already parsed and
+	// reporting no error.
+	t.Run("malformed mid-stream", func(t *testing.T) {
+		s := NewScanner(func() (io.ReadCloser, error) {
+			return &errReader{
+				data: []byte("q\n1 0 0 1 0 0 cm\n"),
+				err:  pdf.Error("corrupt filter body"),
+			}, nil
+		}, pdf.V2_0, Page, &Resources{})
+
+		it := s.NewIter()
+		ops := 0
+		for range it.All() {
+			ops++
+		}
+		if ops == 0 {
+			t.Errorf("expected at least one operator before the error")
+		}
+		if err := it.Err(); err != nil {
+			t.Errorf("expected nil error (permissive), got %v", err)
+		}
+	})
+
+	// A real read error mid-stream must reach the caller.
+	t.Run("real mid-stream error", func(t *testing.T) {
+		diskErr := errors.New("disk read failed")
+		s := NewScanner(func() (io.ReadCloser, error) {
+			return &errReader{
+				data: []byte("q\n1 0 0 1 0 0 cm\n"),
+				err:  diskErr,
+			}, nil
+		}, pdf.V2_0, Page, &Resources{})
+
+		it := s.NewIter()
+		for range it.All() {
+		}
+		if err := it.Err(); err != diskErr {
+			t.Errorf("expected %v, got %v", diskErr, err)
+		}
+	})
 }

@@ -122,7 +122,7 @@ func calculateLineBBox(a *annotation.Line, lw float64) pdf.Rectangle {
 		expandBBoxForLeaderLines(&bbox, a, lw)
 	}
 
-	bbox.IRound(1)
+	bbox.IRound(2)
 	return bbox
 }
 

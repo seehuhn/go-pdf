@@ -19,6 +19,7 @@ package annotation
 import (
 	"errors"
 
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/measure"
@@ -82,14 +83,13 @@ type PolyLine struct {
 	// units that apply to the annotation.
 	Measure measure.Measure
 
-	// Path (optional; PDF 2.0) is an array of arrays, each supplying operands
-	// for path building operators (m, l, or c).  Each array contains pairs of
-	// values specifying points for path drawing operations.  The first array is
-	// of length 2 (moveto), subsequent arrays of length 2 specify lineto
-	// operators, and arrays of length 6 specify curveto operators.
+	// Path (optional; PDF 2.0) is a sequence of path-building operators.
+	// The first entry holds a single point (moveto); subsequent entries
+	// hold one point (lineto) or three points — two control points
+	// followed by the endpoint — (curveto).
 	//
 	// See https://github.com/pdf-association/pdf-issues/issues/730 .
-	Path [][]float64
+	Path [][]vec.Vec2
 }
 
 var _ Annotation = (*PolyLine)(nil)
@@ -115,11 +115,14 @@ func decodePolyline(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Pol
 
 	// Extract polyline-specific fields
 	// Vertices (required)
-	if vertices, err := pdf.GetFloatArray(x.R, dict["Vertices"]); err == nil && len(vertices) >= 4 {
-		polyline.Vertices = vertices[:len(vertices)&^1]
-	} else {
-		return nil, errors.New("polyline annotation requires Vertices")
+	vertices, err := pdf.GetFloatArray(x.R, dict["Vertices"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "Vertices")
 	}
+	if len(vertices) < 4 {
+		return nil, pdf.Error("polyline annotation requires Vertices")
+	}
+	polyline.Vertices = vertices[:len(vertices)&^1]
 
 	// LE (optional) - default is [None, None]
 	polyline.LineEndingStyle = [2]LineEndingStyle{LineEndingStyleNone, LineEndingStyleNone}
@@ -165,16 +168,10 @@ func decodePolyline(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Pol
 	}
 
 	// Path (optional; PDF 2.0)
-	if pathArray, err := x.GetArray(path, dict["Path"]); err == nil && len(pathArray) > 0 {
-		pathArrays := make([][]float64, 0, len(pathArray))
-		for _, pathEntry := range pathArray {
-			if coords, err := pdf.GetFloatArray(x.R, pathEntry); err == nil {
-				pathArrays = append(pathArrays, coords)
-			}
-		}
-		if len(pathArrays) > 0 {
-			polyline.Path = pathArrays
-		}
+	if p, err := decodePath(x, path, dict["Path"]); err != nil {
+		return nil, err
+	} else {
+		polyline.Path = p
 	}
 
 	return polyline, nil

@@ -4516,13 +4516,20 @@ types:
     possibleValues:
     - Circle
     discriminator: true
-  - goName:
+  - goName: BorderStyle
     pdfKey: BS
     pdfType: dictionary
     required: false
     introduced: '1.3'
+    goType: '*BorderStyle'
     refTypes:
     - BorderStyle
+    purpose: 'BorderStyle (optional) is a border style dictionary specifying the line
+
+      width and dash pattern that is used in drawing the ellipse.
+
+
+      If this field is set, the Common.Border field is ignored.'
   - goName:
     pdfKey: IC
     pdfType: array
@@ -4814,38 +4821,41 @@ types:
     pdfType: array
     required: true
     introduced: '1.3'
-    goType: '[][]float64'
-    purpose: 'InkList (required) is an array of n arrays, each representing a stroked
+    goType: '[][]vec.Vec2'
+    purpose: 'InkList (required) is a sequence of stroked paths. Each inner slice
 
-      path. Each array is a series of alternating horizontal and vertical
+      lists the points along one path, in default user space. When drawn,
 
-      coordinates in default user space, specifying points along the path.
-
-      When drawn, the points are connected by straight lines or curves in an
+      consecutive points are connected by straight lines or curves in an
 
       implementation-dependent way.'
-  - goName:
+  - goName: BorderStyle
     pdfKey: BS
     pdfType: dictionary
     required: false
     introduced: '1.3'
+    goType: '*BorderStyle'
     refTypes:
     - BorderStyle
+    purpose: 'BorderStyle (optional) is a border style dictionary specifying the line
+
+      width and dash pattern that is used in drawing the ink annotation.
+
+
+      If the BorderStyle field is set, the Common.Border field is ignored.'
   - goName: Path
     pdfKey: Path
     pdfType: array
     required: false
     introduced: '2.0'
-    goType: '[][]float64'
-    purpose: 'Path (optional; PDF 2.0) is an array of arrays, each supplying operands
+    goType: '[][]vec.Vec2'
+    purpose: 'Path (optional; PDF 2.0) is a sequence of path-building operators.
 
-      for path building operators (m, l, or c).  Each array inner contains
+      The first entry holds a single point (moveto); subsequent entries hold
 
-      pairs of values specifying points for path drawing operations. The first
+      one point (lineto) or three points — two control points followed by
 
-      array is of length 2 (moveto), subsequent arrays of length 2 specify
-
-      lineto operators, and arrays of length 6 specify curveto operators.'
+      the endpoint — (curveto).'
   goPackage: annotation
   goRepr: struct
   specSection: 12.5.2
@@ -4884,13 +4894,20 @@ types:
     pdfType: array
     required: true
     introduced: '1.3'
-  - goName:
+  - goName: BorderStyle
     pdfKey: BS
     pdfType: dictionary
     required: false
     introduced: '1.3'
+    goType: '*BorderStyle'
     refTypes:
     - BorderStyle
+    purpose: 'BorderStyle (optional) is a border style dictionary specifying the width
+
+      and dash pattern that is used in drawing the line.
+
+
+      If the BorderStyle field is set, the Common.Border field is ignored.'
   - goName:
     pdfKey: LE
     pdfType: array
@@ -5096,13 +5113,20 @@ types:
       If QuadPoints is present for link annotations with a border, PDF viewers
 
       disagree on where and how any borders should be drawn.'
-  - goName:
+  - goName: BorderStyle
     pdfKey: BS
     pdfType: dictionary
     required: false
     introduced: '1.2'
+    goType: '*BorderStyle'
     refTypes:
     - BorderStyle
+    purpose: 'BorderStyle (optional) is a border style dictionary specifying the line
+
+      width and dash pattern for drawing the annotation''s border.
+
+
+      If this field is set, the Common.Border field is ignored.'
   - goName:
     pdfKey: Path
     pdfType: array
@@ -5271,16 +5295,14 @@ types:
     pdfType: array
     required: false
     introduced: '2.0'
-    goType: '[][]float64'
-    purpose: 'Path (optional; PDF 2.0) is an array of arrays, each supplying operands
+    goType: '[][]vec.Vec2'
+    purpose: 'Path (optional; PDF 2.0) is a sequence of path-building operators.
 
-      for path building operators (m, l, or c).  Each array inner contains
+      The first entry holds a single point (moveto); subsequent entries hold
 
-      pairs of values specifying points for path drawing operations. The first
+      one point (lineto) or three points — two control points followed by
 
-      array is of length 2 (moveto), subsequent arrays of length 2 specify
-
-      lineto operators, and arrays of length 6 specify curveto operators.'
+      the endpoint — (curveto).'
   goPackage: annotation
   goRepr: struct
   specSection: 12.5.6.9
@@ -5368,12 +5390,14 @@ types:
     pdfType: array
     required: false
     introduced: '2.0'
-    goType: '[][]float64'
-    purpose: 'Path (optional; PDF 2.0) is an array of n arrays, each supplying operands
+    goType: '[][]vec.Vec2'
+    purpose: 'Path (optional; PDF 2.0) is a sequence of path-building operators.
 
-      for path building operators (m, l, or c). If present, Vertices is ignored.
+      The first entry holds a single point (moveto); subsequent entries hold
 
-      Each array contains pairs of values specifying points for path drawing operations.'
+      one point (lineto) or three points — two control points followed by
+
+      the endpoint — (curveto). If present, Vertices is ignored.'
   goPackage: annotation
   goRepr: struct
   specSection: 12.5.6.9
@@ -5876,13 +5900,20 @@ types:
     possibleValues:
     - Square
     discriminator: true
-  - goName:
+  - goName: BorderStyle
     pdfKey: BS
     pdfType: dictionary
     required: false
     introduced: '1.3'
+    goType: '*BorderStyle'
     refTypes:
     - BorderStyle
+    purpose: 'BorderStyle (optional) is a border style dictionary specifying the line
+
+      width and dash pattern that is used in drawing the rectangle.
+
+
+      If this field is set, the Common.Border field is ignored.'
   - goName:
     pdfKey: IC
     pdfType: array
@@ -6478,13 +6509,20 @@ types:
     purpose: 'AA (optional; PDF 1.2) is an additional-actions dictionary defining
 
       the annotation''s behaviour in response to various trigger events.'
-  - goName:
+  - goName: BorderStyle
     pdfKey: BS
     pdfType: dictionary
     required: false
     introduced: '1.2'
+    goType: '*BorderStyle'
     refTypes:
     - BorderStyle
+    purpose: 'BorderStyle (optional; PDF 1.2) is a border style dictionary specifying
+
+      the width and dash pattern that is used in drawing the annotation''s border.
+
+
+      If this field is set, the Common.Border field is ignored.'
   - goName: Parent
     pdfKey: Parent
     pdfType: dictionary

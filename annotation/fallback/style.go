@@ -118,6 +118,8 @@ func (s *Style) AddAppearance(a annotation.Annotation) error {
 		normal = s.addPolygonAppearance(a)
 	case *annotation.PolyLine:
 		normal = s.addPolyLineAppearance(a)
+	case *annotation.Ink:
+		normal = s.addInkAppearance(a)
 	case *annotation.TextMarkup:
 		normal = s.addTextMarkupAppearance(a)
 	case *annotation.Caret:

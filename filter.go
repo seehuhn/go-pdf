@@ -105,7 +105,7 @@ func (f *filterNotImplemented) Encode(Version, io.WriteCloser) (io.WriteCloser, 
 }
 
 func (f *filterNotImplemented) Decode(Version, io.Reader) (io.ReadCloser, error) {
-	return nil, fmt.Errorf("filter %s not implemented", f.Name)
+	return nil, Errorf("filter %s not implemented", f.Name)
 }
 
 // FilterASCII85 is the ASCII85Decode filter.
@@ -124,7 +124,7 @@ func (f FilterASCII85) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, erro
 
 // Decode implements the [Filter] interface.
 func (f FilterASCII85) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
-	return ascii85.Decode(r), nil
+	return asMalformedFilter(ascii85.Decode(r), nil)
 }
 
 // FilterASCIIHex is the ASCIIHexDecode filter.
@@ -143,7 +143,7 @@ func (f FilterASCIIHex) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, err
 
 // Decode implements the [Filter] interface.
 func (f FilterASCIIHex) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
-	return asciihex.Decode(r), nil
+	return asMalformedFilter(asciihex.Decode(r), nil)
 }
 
 // FilterRunLength is the RunLengthDecode filter.
@@ -162,7 +162,7 @@ func (f FilterRunLength) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, er
 
 // Decode implements the [Filter] interface.
 func (f FilterRunLength) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
-	return runlength.Decode(r), nil
+	return asMalformedFilter(runlength.Decode(r), nil)
 }
 
 // FilterDCT is the DCTDecode filter, used for JPEG-compressed data.
@@ -194,7 +194,7 @@ func (f FilterDCT) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 		v := int(val)
 		ct = &v
 	}
-	return dct.Decode(r, ct)
+	return asMalformedFilter(dct.Decode(r, ct))
 }
 
 // FilterJBIG2 is the JBIG2Decode filter for bi-level image compression.
@@ -225,7 +225,7 @@ func (f *FilterJBIG2) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 
 	bm, err := jbig2.Decode(f.Globals, pageData)
 	if err != nil {
-		return nil, err
+		return asMalformedFilter(nil, err)
 	}
 
 	// JBIG2 uses 1=black, but the normal PDF convention for decoded
@@ -349,9 +349,9 @@ func (f FilterFlate) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error)
 func (f FilterFlate) Decode(v Version, r io.Reader) (io.ReadCloser, error) {
 	ff, err := f.parseParameters(v)
 	if err != nil {
-		return nil, err
+		return asMalformedFilter(nil, err)
 	}
-	return ff.Decode(r)
+	return asMalformedFilter(ff.Decode(r))
 }
 
 func (f FilterFlate) parseParameters(v Version) (*flateFilter, error) {
@@ -470,9 +470,9 @@ func (f FilterLZW) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error) {
 func (f FilterLZW) Decode(v Version, r io.Reader) (io.ReadCloser, error) {
 	ff, err := f.parseParameters(v)
 	if err != nil {
-		return nil, err
+		return asMalformedFilter(nil, err)
 	}
-	return ff.Decode(r)
+	return asMalformedFilter(ff.Decode(r))
 }
 
 func (f FilterLZW) parseParameters(_ Version) (*flateFilter, error) {
@@ -671,7 +671,7 @@ func (f FilterCCITTFax) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, err
 func (f FilterCCITTFax) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 	ff, err := f.parseParameters()
 	if err != nil {
-		return nil, err
+		return asMalformedFilter(nil, err)
 	}
 
 	params := &ccittfax.Params{
@@ -686,9 +686,9 @@ func (f FilterCCITTFax) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 	}
 	reader, err := ccittfax.NewReader(r, params)
 	if err != nil {
-		return nil, err
+		return asMalformedFilter(nil, err)
 	}
-	return io.NopCloser(reader), nil
+	return asMalformedFilter(io.NopCloser(reader), nil)
 }
 
 func (f FilterCCITTFax) parseParameters() (*ccittFilter, error) {
@@ -803,6 +803,38 @@ func appendFilter(streamDict Dict, name Name, parms Dict) {
 	}
 }
 
+// asMalformedFilter reclassifies the result of a Filter.Decode call.
+// Any non-[MalformedFileError] error returned by the filter's
+// construction, or by a subsequent Read from the returned reader, is
+// wrapped as [*MalformedFileError] so that permissive readers (via
+// [IsMalformed] and [Optional]) recognise it as recoverable content
+// corruption. Errors that are already malformed pass through unchanged.
+//
+// Source-read errors that flow up through a filter are also wrapped here,
+// but they remain recoverable via [errors.As]; [DecodeStream]'s
+// sourceAwareReader (phase 3) restores them at the top of the stack.
+func asMalformedFilter(rc io.ReadCloser, err error) (io.ReadCloser, error) {
+	if err != nil {
+		if !IsMalformed(err) {
+			err = &MalformedFileError{Err: err}
+		}
+		return nil, err
+	}
+	return &filterContentReader{rc}, nil
+}
+
+type filterContentReader struct {
+	io.ReadCloser
+}
+
+func (c *filterContentReader) Read(p []byte) (int, error) {
+	n, err := c.ReadCloser.Read(p)
+	if err != nil && !errors.Is(err, io.EOF) && !IsMalformed(err) {
+		err = &MalformedFileError{Err: err}
+	}
+	return n, err
+}
+
 func zlibNewReader(r io.Reader) (io.ReadCloser, error) {
 	obj := zlibReaderPool.Get()
 	if obj != nil {
@@ -824,8 +856,24 @@ type pooledZlibReader struct {
 	io.ReadCloser
 }
 
+// Read delegates to the wrapped zlib reader, but masks a final
+// [zlib.ErrChecksum] as [io.EOF].  PDF readers in the wild routinely ignore
+// the trailing Adler-32 check, and we follow suit here so that a corrupt
+// checksum does not make an otherwise readable stream unusable.
+func (r pooledZlibReader) Read(p []byte) (int, error) {
+	n, err := r.ReadCloser.Read(p)
+	if err == zlib.ErrChecksum {
+		err = io.EOF
+	}
+	return n, err
+}
+
 func (r pooledZlibReader) Close() error {
-	if err := r.ReadCloser.Close(); err != nil {
+	err := r.ReadCloser.Close()
+	if err == zlib.ErrChecksum {
+		err = nil
+	}
+	if err != nil {
 		return err
 	}
 	zlibReaderPool.Put(r.ReadCloser)

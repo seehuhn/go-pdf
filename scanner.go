@@ -539,7 +539,7 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 	for {
 		var key Name
 		key, err = s.ReadName()
-		if _, ok := err.(*MalformedFileError); ok {
+		if IsMalformed(err) {
 			break
 		} else if err != nil {
 			return nil, err
@@ -698,7 +698,8 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 func (s *scanner) readHeaderVersion() (Version, error) {
 	err := s.SkipString("%PDF-")
 	if err != nil {
-		if e, ok := err.(*MalformedFileError); ok {
+		var e *MalformedFileError
+		if errors.As(err, &e) {
 			e.Err = errNoPDF
 		}
 		return 0, err

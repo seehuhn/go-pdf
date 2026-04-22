@@ -22,6 +22,20 @@ import (
 	"strings"
 )
 
+// Error classification
+//
+// Errors returned by this package fall into two categories:
+//
+//   - Malformed-PDF errors, which wrap [*MalformedFileError]. They indicate
+//     recoverable content violations such as spec-incompatible data, unknown
+//     filters, or corrupt filter bodies. Permissive readers treat these as
+//     recoverable; strict callers can check with [IsMalformed].
+//   - Everything else is treated as a real failure (IO, context cancellation,
+//     programmer error) and is always propagated.
+//
+// Use [Optional] to apply the permissive-reader policy at a call site: it
+// returns the zero value on malformed errors and propagates everything else.
+
 var (
 	errCorrupted       = errors.New("corrupted ciphertext")
 	errDuplicateRef    = errors.New("object already written")
@@ -82,9 +96,11 @@ func (err *MalformedFileError) Unwrap() error {
 }
 
 // Optional zeros out any [MalformedFileError] but returns all other errors.
+// The check uses [errors.As] so wrapped malformed errors are recognised,
+// consistent with [IsMalformed].
 func Optional[T any](value T, err error) (T, error) {
 	var zero T
-	if _, isMalformed := err.(*MalformedFileError); isMalformed {
+	if IsMalformed(err) {
 		return zero, nil
 	} else if err != nil {
 		return zero, err
@@ -93,17 +109,19 @@ func Optional[T any](value T, err error) (T, error) {
 }
 
 // Wrap wraps an error with a location.
-// If the error is a [MalformedFileError], the location is appended to the list
-// of locations.  Otherwise, the error is wrapped using [fmt.Errorf].
+// If the error wraps a [MalformedFileError], the location is appended to the
+// list of locations on that inner error (and the outer wrapping is preserved).
+// Otherwise, the error is wrapped using [fmt.Errorf].
 //
 // This should only be used for read errors, not for write errors.
 func Wrap(err error, loc string) error {
 	if err == nil {
 		return nil
 	}
-	if e, ok := err.(*MalformedFileError); ok {
+	var e *MalformedFileError
+	if errors.As(err, &e) {
 		e.Loc = append(e.Loc, loc)
-		return e
+		return err
 	}
 	return fmt.Errorf("%s: %w", loc, err)
 }
@@ -115,8 +133,10 @@ func IsMalformed(err error) bool {
 	return errors.As(err, &malformed)
 }
 
-// IsReadError returns true if the error the error is non-nil
-// and not a [MalformedFileError].
+// IsReadError returns true if the error is non-nil and not a
+// [MalformedFileError].  It is the inverse of the malformed-content
+// predicate: a real failure (IO, context cancellation, programmer error)
+// that the caller should propagate.
 func IsReadError(err error) bool {
 	return err != nil && !IsMalformed(err)
 }

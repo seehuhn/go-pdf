@@ -19,6 +19,7 @@ package annotation
 import (
 	"errors"
 
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 )
 
@@ -31,21 +32,11 @@ type Ink struct {
 	Common
 	Markup
 
-	// InkList (required) is an array of n arrays, each representing a stroked
-	// path. Each array is a series of alternating horizontal and vertical
-	// coordinates in default user space, specifying points along the path.
-	// When drawn, the points are connected by straight lines or curves in an
+	// InkList (required) is a sequence of stroked paths. Each inner slice
+	// lists the points along one path, in default user space. When drawn,
+	// consecutive points are connected by straight lines or curves in an
 	// implementation-dependent way.
-	InkList [][]float64
-
-	// Path (optional; PDF 2.0) is an array of arrays, each supplying operands
-	// for path building operators (m, l, or c).  Each array contains pairs of
-	// values specifying points for path drawing operations.  The first array is
-	// of length 2 (moveto), subsequent arrays of length 2 specify lineto
-	// operators, and arrays of length 6 specify curveto operators.
-	//
-	// See https://github.com/pdf-association/pdf-issues/issues/730 .
-	Path [][]float64
+	InkList [][]vec.Vec2
 
 	// BorderStyle (optional) is a border style dictionary specifying the line
 	// width and dash pattern that is used in drawing the ink annotation.
@@ -54,6 +45,14 @@ type Ink struct {
 	//
 	// This corresponds to the /BS entry in the PDF annotation dictionary.
 	BorderStyle *BorderStyle
+
+	// Path (optional; PDF 2.0) is a sequence of path-building operators.
+	// The first entry holds a single point (moveto); subsequent entries
+	// hold one point (lineto) or three points — two control points
+	// followed by the endpoint — (curveto).
+	//
+	// See https://github.com/pdf-association/pdf-issues/issues/730 .
+	Path [][]vec.Vec2
 }
 
 var _ Annotation = (*Ink)(nil)
@@ -78,24 +77,32 @@ func decodeInk(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Ink, err
 		return nil, err
 	}
 
-	// Extract ink-specific fields
 	// InkList (required)
-	if inkList, err := pdf.GetArray(r, dict["InkList"]); err == nil && len(inkList) > 0 {
-		paths := make([][]float64, len(inkList))
-		for i, pathEntry := range inkList {
-			if coords, err := pdf.GetFloatArray(r, pathEntry); err == nil && len(coords) > 0 {
-				paths[i] = coords
-			} else {
-				paths[i] = []float64{} // Default to empty slice if extraction fails
-			}
-		}
-		ink.InkList = paths
-	} else {
-		return nil, errors.New("ink annotation requires InkList")
+	inkList, err := x.GetArray(path, dict["InkList"])
+	if err != nil {
+		return nil, pdf.Wrap(err, "InkList")
 	}
+	if len(inkList) == 0 {
+		return nil, pdf.Error("ink annotation requires InkList")
+	}
+	paths := make([][]vec.Vec2, len(inkList))
+	for i, pathEntry := range inkList {
+		coords, err := pdf.Optional(pdf.GetFloatArray(r, pathEntry))
+		if err != nil {
+			return nil, err
+		}
+		// pair consecutive floats; silently drop an odd trailing coordinate
+		n := len(coords) / 2
+		pts := make([]vec.Vec2, n)
+		for j := range n {
+			pts[j] = vec.Vec2{X: coords[2*j], Y: coords[2*j+1]}
+		}
+		paths[i] = pts
+	}
+	ink.InkList = paths
 
 	// BS (optional)
-	if bs, err := pdf.Optional(pdf.ExtractorGet(x, path, dict["BS"], ExtractBorderStyle)); err != nil {
+	if bs, err := pdf.ExtractorGetOptional(x, path, dict["BS"], ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		ink.BorderStyle = bs
@@ -106,16 +113,10 @@ func decodeInk(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Ink, err
 	}
 
 	// Path (optional; PDF 2.0)
-	if pathArray, err := pdf.GetArray(r, dict["Path"]); err == nil && len(pathArray) > 0 {
-		pathArrays := make([][]float64, 0, len(pathArray))
-		for _, pathEntry := range pathArray {
-			if coords, err := pdf.GetFloatArray(r, pathEntry); err == nil {
-				pathArrays = append(pathArrays, coords)
-			}
-		}
-		if len(pathArrays) > 0 {
-			ink.Path = pathArrays
-		}
+	if p, err := decodePath(x, path, dict["Path"]); err != nil {
+		return nil, err
+	} else {
+		ink.Path = p
 	}
 
 	return ink, nil
@@ -147,15 +148,16 @@ func (i *Ink) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	// InkList (required)
 	if len(i.InkList) > 0 {
 		inkArray := make(pdf.Array, len(i.InkList))
-		for i, path := range i.InkList {
+		for k, path := range i.InkList {
 			if len(path) > 0 {
-				pathArray := make(pdf.Array, len(path))
-				for j, coord := range path {
-					pathArray[j] = pdf.Number(coord)
+				pathArray := make(pdf.Array, 2*len(path))
+				for j, p := range path {
+					pathArray[2*j] = pdf.Number(p.X)
+					pathArray[2*j+1] = pdf.Number(p.Y)
 				}
-				inkArray[i] = pathArray
+				inkArray[k] = pathArray
 			} else {
-				inkArray[i] = pdf.Array{}
+				inkArray[k] = pdf.Array{}
 			}
 		}
 		dict["InkList"] = inkArray

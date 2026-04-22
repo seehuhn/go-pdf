@@ -380,8 +380,8 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 			CreationDate: date(2025, 2, 6),
 			Subject:      "Ink",
 		},
-		InkList: [][]float64{
-			{80, y - 10, 100, y - 30, 120, y - 10, 140, y - 30},
+		InkList: [][]vec.Vec2{
+			{{X: 80, Y: y - 10}, {X: 100, Y: y - 30}, {X: 120, Y: y - 10}, {X: 140, Y: y - 30}},
 		},
 	}
 	p.Page.Annots = append(p.Page.Annots, page.AnnotInfo{Annot: ink, Ref: doc.Out.Alloc()})

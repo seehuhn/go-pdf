@@ -189,7 +189,7 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 	}
 
 	// finalize outer rectangle
-	outer.IRound(1)
+	outer.IRound(2)
 	a.Rect = outer
 	if inner.NearlyEqual(&outer, 0.01) {
 		a.Margin = nil

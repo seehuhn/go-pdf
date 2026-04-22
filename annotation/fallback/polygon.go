@@ -86,7 +86,7 @@ func (s *Style) addPolygonAppearance(a *annotation.Polygon) *form.Form {
 				URx: cloudBBox.URx + lw/2,
 				URy: cloudBBox.URy + lw/2,
 			}
-			bbox.IRound(1)
+			bbox.IRound(2)
 			a.Rect = bbox
 			drawn = true
 		}

@@ -66,6 +66,12 @@ type Iter interface {
 // StreamsEqual reports whether two Stream values contain the same sequence of
 // operators. Both nil -> true; one nil -> false. If both are Operators, the
 // comparison uses Operators.Equal for efficiency.
+//
+// For streams that report [Iter.ClosingOperators] (typically produced by a
+// scanner over a file), the closing operators are treated as part of the
+// sequence.  This way a stream that ends mid-path compares equal to one
+// whose matching close operator is emitted inline — as happens after a
+// read/write/read cycle.
 func StreamsEqual(a, b Stream) bool {
 	if a == nil && b == nil {
 		return true
@@ -88,9 +94,9 @@ func StreamsEqual(a, b Stream) bool {
 	// general path: iterate both streams
 	itA := a.NewIter()
 	itB := b.NewIter()
-	nextA, stopA := iter.Pull2(itA.All())
+	nextA, stopA := iter.Pull2(allOps(itA))
 	defer stopA()
-	nextB, stopB := iter.Pull2(itB.All())
+	nextB, stopB := iter.Pull2(allOps(itB))
 	defer stopB()
 
 	for {
@@ -121,13 +127,38 @@ func StreamsEqual(a, b Stream) bool {
 	return true
 }
 
-// streamIsEmpty reports whether s yields zero operators.
+// allOps yields the operators from [Iter.All], followed by any
+// [Iter.ClosingOperators].  This matches the materialisation done by
+// [ReadStream].
+func allOps(it Iter) iter.Seq2[OpName, []pdf.Object] {
+	return func(yield func(OpName, []pdf.Object) bool) {
+		for name, args := range it.All() {
+			if !yield(name, args) {
+				return
+			}
+		}
+		if it.Err() != nil {
+			return
+		}
+		for _, name := range it.ClosingOperators() {
+			if !yield(name, nil) {
+				return
+			}
+		}
+	}
+}
+
+// streamIsEmpty reports whether s yields zero operators, ignoring any
+// closing operators that an iterator might contribute.
 func streamIsEmpty(s Stream) bool {
 	it := s.NewIter()
 	for range it.All() {
 		return false
 	}
-	return it.Err() == nil
+	if it.Err() != nil {
+		return false
+	}
+	return len(it.ClosingOperators()) == 0
 }
 
 // Operators represents a PDF content stream as a slice of operators.
@@ -288,11 +319,21 @@ type scannerIter struct {
 
 // All returns an iterator over the operators in the stream.
 // The open function is called to obtain a reader for the content stream.
+//
+// Permissive-reader policy: errors caused by malformed PDF data (unknown
+// filter, corrupt flate stream, unparsable operators, …) yield an empty
+// or truncated iteration with Err reporting nil.  Any other error — real
+// IO failures from the underlying byte source, context cancellations,
+// programmer errors — is reported via Err so callers can distinguish a
+// read failure from a malformed PDF.  See the package-level error model
+// in [pdf] for the classification.
 func (si *scannerIter) All() iter.Seq2[OpName, []pdf.Object] {
 	return func(yield func(OpName, []pdf.Object) bool) {
 		r, err := si.open()
 		if err != nil {
-			si.err = err
+			if !pdf.IsMalformed(err) {
+				si.err = err
+			}
 			return
 		}
 		defer r.Close()
@@ -329,8 +370,8 @@ func (si *scannerIter) scanLoop(yield func(OpName, []pdf.Object) bool) bool {
 
 	for {
 		op, err := si.s.scan()
-		switch err {
-		case nil:
+		switch {
+		case err == nil:
 			opName := op.Name
 
 			// prepend trailing args from previous reader to first real operator
@@ -411,12 +452,21 @@ func (si *scannerIter) scanLoop(yield func(OpName, []pdf.Object) bool) bool {
 			if !yield(opName, op.Args) {
 				return false
 			}
-		case io.EOF:
+		case errors.Is(err, io.EOF):
 			return true
-		case errParse:
-			// permissive: skip malformed content
+		case errors.Is(err, parseError{}):
+			// scanner-level parse error: non-sticky, so we skip the
+			// offending token and keep scanning.
+		case pdf.IsMalformed(err):
+			// filter-level content error (corrupt flate, invalid ASCII85
+			// char, …).  These are sticky — the reader will keep returning
+			// the same error — so we treat the reader as exhausted.  For
+			// [PageScanner] this lets iteration continue into the next
+			// stream segment of a multi-stream page rather than discarding
+			// the rest of the page.
+			return true
 		default:
-			// IO error
+			// real failure (IO, context cancellation, …): propagate.
 			si.err = err
 			return false
 		}
@@ -696,7 +746,7 @@ func (s *streamScanner) readValueDepth(depth int) (pdf.Object, error) {
 	switch tok {
 	case pdf.Operator("["):
 		if depth >= maxValueDepth {
-			return nil, errParse
+			return nil, parseError{}
 		}
 		var arr pdf.Array
 		for {
@@ -713,7 +763,7 @@ func (s *streamScanner) readValueDepth(depth int) (pdf.Object, error) {
 		}
 	case pdf.Operator("<<"):
 		if depth >= maxValueDepth {
-			return nil, errParse
+			return nil, parseError{}
 		}
 		dict := pdf.Dict{}
 		for {
@@ -729,7 +779,7 @@ func (s *streamScanner) readValueDepth(depth int) (pdf.Object, error) {
 			}
 			key, ok := keyObj.(pdf.Name)
 			if !ok {
-				return nil, errParse
+				return nil, parseError{}
 			}
 			// read value
 			val, err := s.readValueDepth(depth + 1)
@@ -765,7 +815,7 @@ func (s *streamScanner) readInlineImage() (Operator, error) {
 		}
 		key, ok := keyObj.(pdf.Name)
 		if !ok {
-			return Operator{}, errParse
+			return Operator{}, parseError{}
 		}
 
 		// read value
@@ -782,10 +832,10 @@ func (s *streamScanner) readInlineImage() (Operator, error) {
 	width := getInlineImageInt(dict, "W", "Width")
 	height := getInlineImageInt(dict, "H", "Height")
 	if width <= 0 || height <= 0 || width > maxInlineImageDim || height > maxInlineImageDim {
-		return Operator{}, errParse
+		return Operator{}, parseError{}
 	}
 	if width*height > maxInlineImagePixels {
-		return Operator{}, errParse
+		return Operator{}, parseError{}
 	}
 
 	// get length (PDF 2.0) and filter
@@ -808,7 +858,7 @@ func (s *streamScanner) readInlineImage() (Operator, error) {
 	if length > 0 {
 		// PDF 2.0: use Length key for efficient reading
 		if length > maxInlineImageBytes {
-			return Operator{}, errParse
+			return Operator{}, parseError{}
 		}
 		imageData = make([]byte, length)
 		for i := range length {
@@ -843,20 +893,20 @@ func (s *streamScanner) readInlineImage() (Operator, error) {
 
 		if len(imageData) >= maxInlineImageBytes {
 			// no valid EI found within limit
-			return Operator{}, errParse
+			return Operator{}, parseError{}
 		}
 	}
 
 	// consume the EI operator
 	if !s.peekString("EI") {
-		return Operator{}, errParse
+		return Operator{}, parseError{}
 	}
 	s.skipN(2)
 
 	// verify EI is followed by whitespace, delimiter, or EOF
 	nextByte, err := s.peek()
 	if err != io.EOF && nextByte > 32 && class[nextByte] != delimiter {
-		return Operator{}, errParse
+		return Operator{}, parseError{}
 	}
 
 	return Operator{
@@ -1065,7 +1115,7 @@ readLoop:
 		case b >= 'a' && b <= 'f':
 			lo = b - 'a' + 10
 		default:
-			return nil, errParse
+			return nil, parseError{}
 		}
 		if first {
 			hi = lo << 4
@@ -1306,7 +1356,15 @@ func parseNumber(s []byte) pdf.Native {
 	return nil
 }
 
-var errParse = errors.New("parse error")
+// parseError marks a scanner-level content-stream parse failure.  These
+// errors never escape the scanner: [scannerIter.scanLoop] recognises them,
+// skips the offending token, and keeps scanning.  A fresh empty-struct
+// value is returned at each call site — there is no shared state, and no
+// mutable global [*pdf.MalformedFileError] that [pdf.Wrap] could accidentally
+// modify.
+type parseError struct{}
+
+func (parseError) Error() string { return "content stream parse error" }
 
 // limits for defense against resource exhaustion
 const (

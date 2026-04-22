@@ -430,7 +430,7 @@ func BlendMode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (graphics
 
 func readDash(r pdf.Getter, obj pdf.Object) (pat []float64, ph float64, err error) {
 	defer func() {
-		if _, isMalformed := err.(*pdf.MalformedFileError); isMalformed {
+		if pdf.IsMalformed(err) {
 			err = nil
 		}
 	}()

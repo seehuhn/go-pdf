@@ -509,11 +509,11 @@ var testCases = map[pdf.Name][]testCase{
 					Intent:  "PolygonDimension",
 				},
 				Vertices: []float64{250, 200, 400, 250, 350, 350, 200, 300},
-				Path: [][]float64{
-					{250, 200}, // moveto
-					{400, 250}, // lineto
-					{350, 350}, // lineto
-					{200, 300}, // lineto
+				Path: [][]vec.Vec2{
+					{{X: 250, Y: 200}}, // moveto
+					{{X: 400, Y: 250}}, // lineto
+					{{X: 350, Y: 350}}, // lineto
+					{{X: 200, Y: 300}}, // lineto
 				},
 				Measure: &measure.RectilinearMeasure{
 					ScaleRatio: "1 cm = 1 m",
@@ -585,10 +585,10 @@ var testCases = map[pdf.Name][]testCase{
 					Subject: "Bezier curve",
 				},
 				Vertices: []float64{250, 300, 400, 300, 450, 320},
-				Path: [][]float64{
-					{250, 300},                     // moveto
-					{300, 250, 350, 350, 400, 300}, // curveto (6 coordinates)
-					{450, 320},                     // lineto
+				Path: [][]vec.Vec2{
+					{{X: 250, Y: 300}}, // moveto
+					{{X: 300, Y: 250}, {X: 350, Y: 350}, {X: 400, Y: 300}}, // curveto
+					{{X: 450, Y: 320}}, // lineto
 				},
 				LineEndingStyle: [2]LineEndingStyle{LineEndingStyleButt, LineEndingStyleDiamond},
 			},
@@ -868,8 +868,8 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Annotator",
 					Subject: "Hand drawing",
 				},
-				InkList: [][]float64{
-					{50, 100, 75, 120, 100, 110, 125, 130, 150, 125}, // Single stroke
+				InkList: [][]vec.Vec2{
+					{{X: 50, Y: 100}, {X: 75, Y: 120}, {X: 100, Y: 110}, {X: 125, Y: 130}, {X: 150, Y: 125}}, // Single stroke
 				},
 			},
 		},
@@ -886,10 +886,10 @@ var testCases = map[pdf.Name][]testCase{
 					Subject:      "Sketch",
 					CreationDate: time.Date(2023, 10, 5, 14, 20, 0, 0, time.UTC),
 				},
-				InkList: [][]float64{
-					{100, 250, 150, 280, 200, 260}, // First stroke
-					{180, 300, 220, 320, 250, 310}, // Second stroke
-					{120, 320, 160, 340, 190, 330}, // Third stroke
+				InkList: [][]vec.Vec2{
+					{{X: 100, Y: 250}, {X: 150, Y: 280}, {X: 200, Y: 260}}, // First stroke
+					{{X: 180, Y: 300}, {X: 220, Y: 320}, {X: 250, Y: 310}}, // Second stroke
+					{{X: 120, Y: 320}, {X: 160, Y: 340}, {X: 190, Y: 330}}, // Third stroke
 				},
 			},
 		},
@@ -904,8 +904,8 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Designer",
 					Subject: "Stylized annotation",
 				},
-				InkList: [][]float64{
-					{200, 450, 250, 470, 300, 460, 350, 480, 400, 475},
+				InkList: [][]vec.Vec2{
+					{{X: 200, Y: 450}, {X: 250, Y: 470}, {X: 300, Y: 460}, {X: 350, Y: 480}, {X: 400, Y: 475}},
 				},
 			},
 		},
@@ -920,13 +920,13 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Artist",
 					Subject: "Bezier curve drawing",
 				},
-				InkList: [][]float64{
-					{150, 650, 300, 650, 350, 670},
+				InkList: [][]vec.Vec2{
+					{{X: 150, Y: 650}, {X: 300, Y: 650}, {X: 350, Y: 670}},
 				},
-				Path: [][]float64{
-					{150, 650},                     // moveto
-					{200, 620, 250, 680, 300, 650}, // curveto (6 coordinates)
-					{350, 670},                     // lineto
+				Path: [][]vec.Vec2{
+					{{X: 150, Y: 650}}, // moveto
+					{{X: 200, Y: 620}, {X: 250, Y: 680}, {X: 300, Y: 650}}, // curveto
+					{{X: 350, Y: 670}}, // lineto
 				},
 			},
 		},
@@ -941,10 +941,10 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "User",
 					Subject: "Signature and notes",
 				},
-				InkList: [][]float64{
-					{50, 800, 80, 810, 120, 790, 160, 805, 200, 795}, // Signature stroke 1
-					{180, 820, 220, 830, 260, 815, 300, 825},         // Signature stroke 2
-					{320, 780, 350, 790, 380, 785, 400, 795},         // Additional mark
+				InkList: [][]vec.Vec2{
+					{{X: 50, Y: 800}, {X: 80, Y: 810}, {X: 120, Y: 790}, {X: 160, Y: 805}, {X: 200, Y: 795}}, // Signature stroke 1
+					{{X: 180, Y: 820}, {X: 220, Y: 830}, {X: 260, Y: 815}, {X: 300, Y: 825}},                 // Signature stroke 2
+					{{X: 320, Y: 780}, {X: 350, Y: 790}, {X: 380, Y: 785}, {X: 400, Y: 795}},                 // Additional mark
 				},
 			},
 		},

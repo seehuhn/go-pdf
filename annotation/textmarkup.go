@@ -93,10 +93,10 @@ func decodeTextMarkup(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, sub
 	// QuadPoints (required)
 	quadPoints, err := pdf.GetFloatArray(r, dict["QuadPoints"])
 	if err != nil {
-		return nil, fmt.Errorf("failed to read QuadPoints: %w", err)
+		return nil, pdf.Wrap(err, "QuadPoints")
 	}
 	if len(quadPoints) < 8 {
-		return nil, errors.New("QuadPoints is required for text markup annotations and must contain at least one quadrilateral (8 values)")
+		return nil, pdf.Error("QuadPoints is required for text markup annotations and must contain at least one quadrilateral (8 values)")
 	}
 
 	// process floats in groups of 8, each group becomes 4 Vec2 points

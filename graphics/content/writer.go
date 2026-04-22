@@ -175,10 +175,21 @@ func (w *Writer) Validate(s Stream) error {
 			return err
 		}
 	}
-	return it.Err()
+	if err := it.Err(); err != nil {
+		return err
+	}
+	for _, name := range it.ClosingOperators() {
+		if err := w.v.check(name, nil); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Write outputs a stream, validating and checking version compatibility.
+// Any closing operators reported by the iterator (for example to end an
+// open path or text object in a stream decoded from an existing file)
+// are appended after the main operators.
 func (w *Writer) Write(out io.Writer, s Stream) error {
 	it := s.NewIter()
 	for name, args := range it.All() {
@@ -189,7 +200,18 @@ func (w *Writer) Write(out io.Writer, s Stream) error {
 			return err
 		}
 	}
-	return it.Err()
+	if err := it.Err(); err != nil {
+		return err
+	}
+	for _, name := range it.ClosingOperators() {
+		if err := w.v.check(name, nil); err != nil {
+			return err
+		}
+		if err := WriteOperator(out, Operator{Name: name}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Close checks for balanced operators and version-specific stack depth limits.

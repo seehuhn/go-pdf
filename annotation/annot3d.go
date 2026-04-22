@@ -228,7 +228,7 @@ func decodeAnnot3D(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Anno
 	if threeDD := dict["3DD"]; threeDD != nil {
 		annot3D.D = threeDD
 	} else {
-		return nil, fmt.Errorf("3DD field is required")
+		return nil, pdf.Error("3DD field is required")
 	}
 
 	// 3DV (optional)
