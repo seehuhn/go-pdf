@@ -50,7 +50,7 @@ func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 
 	col := a.Color
 	if col == nil {
-		col = color.Black
+		col = quireLapis500
 	}
 
 	bbox := a.Rect

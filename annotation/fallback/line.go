@@ -23,7 +23,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
@@ -40,7 +39,7 @@ func (s *Style) addLineAppearance(a *annotation.Line) *form.Form {
 
 	b.SetExtGState(s.reset)
 	b.SetLineWidth(lw)
-	b.SetStrokeColor(color.Black)
+	b.SetStrokeColor(quireInk)
 	b.SetLineDash(dashPattern, 0)
 
 	if a.LL != 0 {

@@ -144,18 +144,23 @@ func (b *Builder) Reset() {
 // State tracking for q/Q, BT/ET, and BMC/EMC is handled via State methods.
 // Individual methods update Known bits and Builder.Param values as needed.
 //
-// If an error occurs, it is stored in b.Err and subsequent calls become no-ops.
+// If an error occurs, it is stored in b.Err and subsequent calls become
+// no-ops.  The failing operator itself is still appended to the stream so
+// that a downstream consumer (e.g. [content.Writer]) re-encounters and
+// reports the same root-cause error rather than a cascading failure such
+// as "unclosed operators: q/Q" caused by suppressed matching closers.
 func (b *Builder) emit(name content.OpName, args ...pdf.Object) {
 	if b.Err != nil {
 		return
 	}
 
+	op := content.Operator{Name: name, Args: args}
 	if err := b.State.ApplyOperator(name, args); err != nil {
 		b.Err = err
+		b.Stream = append(b.Stream, op)
 		return
 	}
 
-	op := content.Operator{Name: name, Args: args}
 	b.Stream = append(b.Stream, op)
 }
 

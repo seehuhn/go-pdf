@@ -24,7 +24,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
@@ -93,7 +92,7 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 	// draw border
 	if a.Intent != annotation.FreeTextIntentTypeWriter {
 		b.SetLineWidth(lw)
-		b.SetStrokeColor(color.Black)
+		b.SetStrokeColor(quireInk)
 		if co != nil {
 			if bgCol != nil {
 				b.SetFillColor(bgCol)
@@ -126,7 +125,7 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 
 	if hasCallout {
 		b.SetLineWidth(lw)
-		b.SetStrokeColor(color.Black)
+		b.SetStrokeColor(quireInk)
 		reversed := slices.Clone(calloutLine)
 		slices.Reverse(reversed)
 		drawOpenPolyline(b, reversed, annotation.LineEndingStyleNone, a.LineEndingStyle, bgCol)
@@ -154,7 +153,7 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 
 		b.TextBegin()
 		b.TextSetFont(F, freeTextFontSize)
-		b.SetFillColor(color.Black)
+		b.SetFillColor(quireInk)
 		b.TextSetHorizontalScaling(1)
 		b.TextSetRise(0)
 		wrapper := text.Wrap(clipWidth, a.Contents)
@@ -204,7 +203,9 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 
 	// set DA to match the font/size/color used in the appearance stream
 	fontName := b.FontName(s.ContentFont)
-	a.DefaultAppearance = fmt.Sprintf("/%s %d Tf 0 g", fontName, freeTextFontSize)
+	a.DefaultAppearance = fmt.Sprintf("/%s %d Tf %g %g %g rg",
+		fontName, freeTextFontSize,
+		quireInk[0], quireInk[1], quireInk[2])
 
 	return &form.Form{
 		Content: b.Stream,

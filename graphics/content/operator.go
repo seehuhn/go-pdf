@@ -32,6 +32,10 @@ var (
 
 	// ErrDeprecated is returned when an operator has been deprecated in the target PDF version.
 	ErrDeprecated = errors.New("deprecated operator")
+
+	// ErrInvalidContext is returned when an operator is used in a context
+	// (page/path/text/…) where it is not permitted.
+	ErrInvalidContext = errors.New("operator not allowed in current context")
 )
 
 // Operator represents a content stream operator with its arguments

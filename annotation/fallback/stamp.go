@@ -25,7 +25,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/extgstate"
@@ -35,7 +34,7 @@ import (
 func (s *Style) addStampAppearance(a *annotation.Stamp) *form.Form {
 	col := a.Color
 	if col == nil {
-		col = color.DeviceRGB{0.75, 0, 0}
+		col = quireSignalError
 	}
 
 	label := stampLabel(a.Icon)

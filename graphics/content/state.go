@@ -186,7 +186,7 @@ func (s *State) Pop() error {
 // TextBegin transitions to text object context (for the BT operator).
 func (s *State) TextBegin() error {
 	if s.CurrentObject != ObjPage {
-		return errors.New("BT: expected page context, got " + s.CurrentObject.String())
+		return fmt.Errorf("BT in %s context: %w", s.CurrentObject, ErrInvalidContext)
 	}
 	s.CurrentObject = ObjText
 	s.nesting = append(s.nesting, pairBT)
@@ -243,7 +243,7 @@ func (s *State) CheckOperatorAllowed(name OpName) error {
 	}
 
 	if s.CurrentObject&info.Allowed == 0 {
-		return fmt.Errorf("%s: not allowed in %s context", name, s.CurrentObject)
+		return fmt.Errorf("%s in %s context: %w", name, s.CurrentObject, ErrInvalidContext)
 	}
 	return nil
 }

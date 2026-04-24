@@ -19,13 +19,23 @@ package fallback
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
 func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
+	// §12.5.6.4: text annotations behave as if NoZoom and NoRotate were
+	// always set, anchored at the upper-left corner of Rect.  Pin Rect to
+	// a 24×24 square at that corner so the §12.5.5 scale-to-Rect algorithm
+	// is a no-op on viewers that don't honour the implicit flags.
+	a.Rect = pdf.Rectangle{
+		LLx: a.Rect.LLx,
+		LLy: a.Rect.URy - 24,
+		URx: a.Rect.LLx + 24,
+		URy: a.Rect.URy,
+	}
+
 	bgCol := a.Color
 	if bgCol == nil {
 		bgCol = stickyYellow
@@ -37,7 +47,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 	case annotation.TextIconComment:
 		b.SetExtGState(s.reset)
 		b.SetLineWidth(0.5)
-		b.SetStrokeColor(color.DeviceGray(0.2))
+		b.SetStrokeColor(quireInk2)
 		if bgCol != nil {
 			b.SetFillColor(bgCol)
 			b.Rectangle(0.25, 0.25, 23.5, 23.5)
@@ -51,7 +61,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		b.TextSetFont(s.iconFont, 23)
 		b.TextSetRise(0)
 		b.TextSetHorizontalScaling(1)
-		b.SetFillColor(color.DeviceGray(0.0))
+		b.SetFillColor(quireInk)
 		b.TextFirstLine(6, 2)
 		b.TextSetHorizontalScaling(0.9)
 		b.TextShow("\u201C")
@@ -60,7 +70,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 	case annotation.TextIconKey:
 		b.SetExtGState(s.reset)
 		b.SetLineWidth(0.5)
-		b.SetStrokeColor(color.DeviceGray(0.2))
+		b.SetStrokeColor(quireInk2)
 		if bgCol != nil {
 			b.SetFillColor(bgCol)
 			b.Rectangle(0.25, 0.25, 23.5, 23.5)
@@ -74,7 +84,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		b.TextSetFont(s.iconFont, 25)
 		b.TextSetRise(0)
 		b.TextSetHorizontalScaling(1)
-		b.SetFillColor(color.DeviceGray(0.0))
+		b.SetFillColor(quireInk)
 		b.TextFirstLine(5, 2)
 		b.TextShow("*")
 		b.TextEnd()
@@ -84,7 +94,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 
 		b.SetExtGState(s.reset)
 		b.SetLineWidth(0.5)
-		b.SetStrokeColor(color.DeviceGray(0.2))
+		b.SetStrokeColor(quireInk2)
 		if bgCol != nil {
 			b.SetFillColor(bgCol)
 		}
@@ -103,7 +113,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		}
 
 		b.SetLineWidth(1.5)
-		b.SetStrokeColor(color.DeviceGray(0.5))
+		b.SetStrokeColor(quireInk3)
 		for y := 19.; y > 6; y -= 3.5 {
 			b.MoveTo(4, y)
 			if y > 10 {
@@ -118,7 +128,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		b.SetExtGState(s.reset)
 
 		b.SetLineWidth(0.5)
-		b.SetStrokeColor(color.DeviceGray(0.2))
+		b.SetStrokeColor(quireInk2)
 		if bgCol != nil {
 			b.SetFillColor(bgCol)
 			b.Rectangle(0.25, 0.25, 23.5, 23.5)
@@ -132,7 +142,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		b.TextSetFont(s.iconFont, 23)
 		b.TextSetRise(0)
 		b.TextSetHorizontalScaling(1)
-		b.SetFillColor(color.DeviceGray(0.0))
+		b.SetFillColor(quireInk)
 		b.TextFirstLine(6, 4)
 		b.TextShow("?")
 		b.TextEnd()
@@ -141,7 +151,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		b.SetExtGState(s.reset)
 
 		b.SetLineWidth(0.5)
-		b.SetStrokeColor(color.DeviceGray(0.2))
+		b.SetStrokeColor(quireInk2)
 		if bgCol != nil {
 			b.SetFillColor(bgCol)
 			b.Rectangle(0.25, 0.25, 23.5, 23.5)
@@ -151,7 +161,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 			b.CloseAndStroke()
 		}
 
-		b.SetStrokeColor(color.DeviceGray(0.7))
+		b.SetStrokeColor(quireInk3)
 		b.SetLineWidth(1.5)
 		b.MoveTo(4, 19)
 		b.LineTo(17, 19)
@@ -163,8 +173,8 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 
 		m := (15.5 + 5) / 2
 
-		b.SetStrokeColor(color.Black)
-		b.SetFillColor(color.Black)
+		b.SetStrokeColor(quireInk)
+		b.SetFillColor(quireInk)
 		b.SetLineWidth(1.8)
 		b.MoveTo(17.5-0.75, 15.5)
 		b.LineTo(17.5-0.75, m)
@@ -179,7 +189,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		b.SetExtGState(s.reset)
 
 		b.SetLineWidth(0.5)
-		b.SetStrokeColor(color.DeviceGray(0.2))
+		b.SetStrokeColor(quireInk2)
 		if bgCol != nil {
 			b.SetFillColor(bgCol)
 			b.Rectangle(0.25, 0.25, 23.5, 23.5)
@@ -193,7 +203,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		b.TextSetFont(s.iconFont, 16)
 		b.TextSetRise(0)
 		b.TextSetHorizontalScaling(1)
-		b.SetFillColor(color.DeviceGray(0.0))
+		b.SetFillColor(quireInk)
 		b.TextFirstLine(6, 8)
 		b.TextSetHorizontalScaling(1.4)
 		b.TextShow("¶")
@@ -203,7 +213,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		b.SetExtGState(s.reset)
 
 		b.SetLineWidth(0.5)
-		b.SetStrokeColor(color.DeviceGray(0.2))
+		b.SetStrokeColor(quireInk2)
 		if bgCol != nil {
 			b.SetFillColor(bgCol)
 			b.Rectangle(0.25, 0.25, 23.5, 23.5)
@@ -217,7 +227,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		b.TextSetFont(s.iconFont, 16)
 		b.TextSetRise(0)
 		b.TextSetHorizontalScaling(1)
-		b.SetFillColor(color.DeviceGray(0.0))
+		b.SetFillColor(quireInk)
 		b.TextFirstLine(5.5, 4)
 		b.TextSetHorizontalScaling(1.4)
 		b.TextShow("^")
@@ -227,7 +237,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		b.SetExtGState(s.reset)
 
 		b.SetLineWidth(0.5)
-		b.SetStrokeColor(color.DeviceGray(0.2))
+		b.SetStrokeColor(quireInk2)
 		if bgCol != nil {
 			b.SetFillColor(bgCol)
 			b.Rectangle(0.25, 0.25, 23.5, 23.5)
@@ -246,5 +256,5 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 }
 
 var (
-	stickyYellow = color.DeviceRGB{0.98, 0.96, 0.75}
+	stickyYellow = quireAmber100
 )

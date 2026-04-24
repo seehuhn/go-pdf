@@ -165,6 +165,39 @@ func TestBuilder_ResetClearsError(t *testing.T) {
 	}
 }
 
+// TestBuilder_FailingOperatorRecordedInStream verifies that when an
+// operator fails validation in [Builder.emit] the failing operator is
+// still appended to [Builder.Stream].  This lets a downstream consumer
+// such as [content.Writer] replay the stream, re-trigger the same error,
+// and report the root cause rather than a cascading "unclosed operators"
+// failure caused by suppressed matching closers.
+func TestBuilder_FailingOperatorRecordedInStream(t *testing.T) {
+	b := New(content.Form, nil)
+
+	b.PushGraphicsState() // q  (valid, pushes pairQ)
+	b.LineTo(1, 2)        // l  (invalid: outside Path context — sets Err)
+	b.PopGraphicsState()  // Q  (no-op, Err is sticky)
+
+	if b.Err == nil {
+		t.Fatal("expected Err to be set by LineTo without MoveTo")
+	}
+
+	// The failing operator must be preserved in the stream.
+	if len(b.Stream) != 2 {
+		t.Fatalf("expected 2 ops in stream (q, l), got %d", len(b.Stream))
+	}
+	if b.Stream[1].Name != content.OpLineTo {
+		t.Errorf("expected last op to be %q, got %q", content.OpLineTo, b.Stream[1].Name)
+	}
+
+	// When the stream is replayed through the writer, it should surface
+	// the root-cause error — not a balance-check failure.
+	err := content.NewWriter(pdf.V2_0, content.Form, b.Resources).Validate(b.Stream)
+	if !errors.Is(err, content.ErrInvalidContext) {
+		t.Errorf("expected ErrInvalidContext, got %v", err)
+	}
+}
+
 // makeType3 builds a minimal Type 3 font for tests.
 func makeType3(t *testing.T, name pdf.Name) font.Layouter {
 	t.Helper()
