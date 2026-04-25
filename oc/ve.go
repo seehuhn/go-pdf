@@ -37,22 +37,24 @@ var (
 )
 
 // ExtractVisibilityExpression reads a visibility expression from a PDF object.
-// The object can be either an array (for And/Or/Not expressions) or a dictionary
-// (for a single optional content group reference).
-func ExtractVisibilityExpression(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (VisibilityExpression, error) {
-	obj, err := x.Resolve(path, obj)
+// The object can be either an array (for And/Or/Not expressions) or a single
+// optional content group (as a reference or inline dictionary).
+func ExtractVisibilityExpression(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (VisibilityExpression, error) {
+	// the value is either an array (operator + operands) or a single OCG
+	// reference/dict.  Detect the array case via GetArray (which resolves
+	// but returns nil for non-array values), and fall through to the
+	// single-OCG case otherwise.
+	arr, err := pdf.Optional(x.GetArray(path, obj))
 	if err != nil {
 		return nil, err
 	}
-
-	switch v := obj.(type) {
-	case pdf.Array:
-		if len(v) == 0 {
+	if arr != nil {
+		if len(arr) == 0 {
 			return nil, pdf.Error("invalid visibility expression: empty array")
 		}
 
 		var args []VisibilityExpression
-		for _, elem := range v[1:] {
+		for _, elem := range arr[1:] {
 			arg, err := pdf.ExtractorGet(x, path, elem, ExtractVisibilityExpression)
 			if err != nil {
 				return nil, err
@@ -60,7 +62,7 @@ func ExtractVisibilityExpression(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf
 			args = append(args, arg)
 		}
 
-		op, err := pdf.Optional(x.GetName(path, v[0]))
+		op, err := pdf.Optional(x.GetName(path, arr[0]))
 		if err != nil {
 			return nil, err
 		}
@@ -83,24 +85,25 @@ func ExtractVisibilityExpression(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf
 		default:
 			return nil, pdf.Errorf("invalid visibility expression: unknown operator %q", op)
 		}
-	case pdf.Dict:
-		// recover the original reference so the extractor cache is
-		// consulted, preserving pointer identity with groups extracted
-		// elsewhere (e.g. from OCProperties)
-		var groupObj pdf.Object = v
-		groupPath := path
-		if path != nil {
-			groupObj = path.Ref
-			groupPath = path.Parent
-		}
-		g, err := pdf.ExtractorGet(x, groupPath, groupObj, ExtractGroup)
-		if err != nil {
-			return nil, err
-		}
-		return &VisibilityExpressionGroup{Group: g}, nil
-	default:
-		return nil, pdf.Errorf("invalid visibility expression: unexpected %T object", obj)
 	}
+
+	// single-OCG case: when invoked via [pdf.ExtractorGet], any Reference
+	// has already been unwrapped, so recover the original Reference from
+	// the path so the extractor cache returns the same *Group as other
+	// extraction paths.
+	groupObj, groupPath := obj, path
+	if !isDirect && path != nil {
+		groupObj = path.Ref
+		groupPath = path.Parent
+	}
+	if groupObj == nil {
+		return nil, pdf.Error("invalid visibility expression: missing object")
+	}
+	g, err := pdf.ExtractorGet(x, groupPath, groupObj, ExtractGroup)
+	if err != nil {
+		return nil, err
+	}
+	return &VisibilityExpressionGroup{Group: g}, nil
 }
 
 // PDF 2.0 sections: 8.11.2

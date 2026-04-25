@@ -71,12 +71,18 @@ func ExtractMembership(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, i
 
 	m := &Membership{}
 
-	ocgsObj, err := x.Resolve(path, dict["OCGs"])
+	// /OCGs is one of: an array of OCG references/dicts, a single OCG
+	// reference, or a single inline OCG dict.  Detect the array case via
+	// GetArray (which resolves but returns nil for non-array values), and
+	// fall through to the single-OCG case otherwise — passing the original
+	// dict["OCGs"] preserves the reference so [pdf.ExtractorGet] can hit
+	// the cache and return the same *Group as other extraction paths.
+	ocgsRaw := dict["OCGs"]
+	arr, err := pdf.Optional(x.GetArray(path, ocgsRaw))
 	if err != nil {
 		return nil, err
 	}
-	switch arr := ocgsObj.(type) {
-	case pdf.Array:
+	if arr != nil {
 		for _, item := range arr {
 			if group, err := pdf.ExtractorGetOptional(x, path, item, ExtractGroup); err != nil {
 				return nil, err
@@ -84,8 +90,8 @@ func ExtractMembership(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, i
 				m.OCGs = append(m.OCGs, group)
 			}
 		}
-	default:
-		if group, err := pdf.ExtractorGetOptional(x, path, ocgsObj, ExtractGroup); err != nil {
+	} else if ocgsRaw != nil {
+		if group, err := pdf.ExtractorGetOptional(x, path, ocgsRaw, ExtractGroup); err != nil {
 			return nil, err
 		} else if group != nil {
 			m.OCGs = []*Group{group}

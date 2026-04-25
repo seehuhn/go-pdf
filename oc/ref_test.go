@@ -120,3 +120,45 @@ func TestVEGroupPointerIdentity(t *testing.T) {
 		t.Error("VE group pointer differs from directly extracted group")
 	}
 }
+
+// TestMembershipSingleRefGroupPointerIdentity verifies that when an OCMD's
+// /OCGs entry is a single OCG reference (rather than an array), the *Group
+// extracted via the membership matches the one extracted directly from the
+// same reference.  Pointer identity matters because [GroupStates] uses
+// the *Group as a map key.
+func TestMembershipSingleRefGroupPointerIdentity(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	ocgDict := pdf.Dict{
+		"Type": pdf.Name("OCG"),
+		"Name": pdf.TextString("Layer"),
+	}
+	ocgRef := w.Alloc()
+	if err := w.Put(ocgRef, ocgDict); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+
+	group1, err := pdf.ExtractorGet(x, nil, ocgRef, ExtractGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// /OCGs as a single reference (not wrapped in an array)
+	ocmdDict := pdf.Dict{
+		"Type": pdf.Name("OCMD"),
+		"OCGs": ocgRef,
+	}
+	md, err := ExtractMembership(x, nil, ocmdDict, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(md.OCGs) != 1 {
+		t.Fatalf("membership has %d OCGs, want 1", len(md.OCGs))
+	}
+	if md.OCGs[0] != group1 {
+		t.Error("membership group pointer differs from directly extracted group")
+	}
+}

@@ -19,6 +19,7 @@ package oc
 import (
 	"bytes"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
@@ -235,6 +236,85 @@ func TestVisibilityExpressionValidation(t *testing.T) {
 	}
 
 	rm.Close()
+}
+
+// TestVisibilityExpressionCycle verifies that cyclic visibility expressions
+// terminate with an error rather than recurring forever.  Malformed input
+// must not hang the reader (CLAUDE.md: "must not panic, crash, or hang on
+// malformed files").
+func TestVisibilityExpressionCycle(t *testing.T) {
+	tests := []struct {
+		name string
+		// build populates a fresh writer with the OCG and VE objects and
+		// returns the reference to the entry-point VE.
+		build func(t *testing.T, w *pdf.Writer) pdf.Reference
+	}{
+		{
+			name: "self-referential array",
+			build: func(t *testing.T, w *pdf.Writer) pdf.Reference {
+				ocgRef := w.Alloc()
+				if err := w.Put(ocgRef, pdf.Dict{
+					"Type": pdf.Name("OCG"),
+					"Name": pdf.TextString("Layer"),
+				}); err != nil {
+					t.Fatal(err)
+				}
+				veRef := w.Alloc()
+				if err := w.Put(veRef, pdf.Array{
+					pdf.Name("Or"),
+					ocgRef,
+					veRef, // points back to the enclosing array
+				}); err != nil {
+					t.Fatal(err)
+				}
+				return veRef
+			},
+		},
+		{
+			name: "two-step cycle",
+			build: func(t *testing.T, w *pdf.Writer) pdf.Reference {
+				ocgRef := w.Alloc()
+				if err := w.Put(ocgRef, pdf.Dict{
+					"Type": pdf.Name("OCG"),
+					"Name": pdf.TextString("Layer"),
+				}); err != nil {
+					t.Fatal(err)
+				}
+				aRef := w.Alloc()
+				bRef := w.Alloc()
+				if err := w.Put(aRef, pdf.Array{pdf.Name("And"), ocgRef, bRef}); err != nil {
+					t.Fatal(err)
+				}
+				if err := w.Put(bRef, pdf.Array{pdf.Name("And"), ocgRef, aRef}); err != nil {
+					t.Fatal(err)
+				}
+				return aRef
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			veRef := tc.build(t, w)
+			x := pdf.NewExtractor(w)
+
+			done := make(chan error, 1)
+			go func() {
+				_, err := pdf.ExtractorGet(x, nil, veRef, ExtractVisibilityExpression)
+				done <- err
+			}()
+
+			select {
+			case err := <-done:
+				if err == nil {
+					t.Error("expected an error for cyclic visibility expression, got nil")
+				}
+			case <-time.After(3 * time.Second):
+				t.Fatal("ExtractVisibilityExpression hung on cyclic input")
+			}
+		})
+	}
 }
 
 func TestVisibilityExpressionIsVisible(t *testing.T) {
