@@ -156,9 +156,19 @@ type Code struct {
 	// present in the font.
 	Notdef cid.CID
 
-	// Width is the glyph width in PDF text space units.
-	// This still needs to be scaled by the font size.
+	// Width is the horizontal glyph width in PDF text space units.  This
+	// still needs to be scaled by the font size.  In horizontal writing
+	// mode this is also the displacement applied to the text matrix after
+	// the glyph is shown.
 	Width float64
+
+	// VerticalAdvance is the y-component of the text-matrix displacement
+	// applied to the following glyph in vertical writing mode, in PDF text
+	// space units (typically negative, since vertical text advances
+	// downward).  Zero means "use the spec default" (one em downward); the
+	// reader and builder fall back to that when this field is left unset.
+	// In horizontal writing mode this field is unused.
+	VerticalAdvance float64
 
 	// Text is the textual representation of the character.
 	Text string

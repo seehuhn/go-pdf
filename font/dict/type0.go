@@ -379,6 +379,7 @@ func (f *t0Font) WritingMode() font.WritingMode {
 }
 
 func (f *t0Font) Codes(str pdf.String) iter.Seq[font.Code] {
+	vertical := f.CMap.WMode == font.Vertical
 	return func(yield func(font.Code) bool) {
 		for len(str) > 0 {
 			code, k, isValid := f.codec.Decode(str)
@@ -398,6 +399,13 @@ func (f *t0Font) Codes(str pdf.String) iter.Seq[font.Code] {
 					res.Width = w / 1000
 				} else {
 					res.Width = f.DefaultWidth / 1000
+				}
+				if vertical {
+					if vm, ok := f.VMetrics[res.CID]; ok {
+						res.VerticalAdvance = vm.DeltaY / 1000
+					} else {
+						res.VerticalAdvance = f.DefaultVMetrics.DeltaY / 1000
+					}
 				}
 				res.UseWordSpacing = k == 1 && code == 0x20
 				res.Text = f.text[code]

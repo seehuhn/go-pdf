@@ -192,9 +192,22 @@ func TestTextExtractorActualText(t *testing.T) {
 
 	b := builder.New(content.Page, nil)
 
+	// The string "the original text" is rendered as three text objects so
+	// that the MarkedContent / ActualText boundary lies outside the BT/ET
+	// pair.  The positions are chosen so that the three pieces flow on a
+	// single line, matching how a PDF generator would lay them out.
+	const (
+		startX         = 100.0
+		baseline       = 700.0
+		theWidth       = 20.016 // Helvetica "the " at 12pt
+		originalWidth  = 38.676 // Helvetica "original" at 12pt
+		afterTheX      = startX + theWidth
+		afterOriginalX = afterTheX + originalWidth
+	)
+
 	// normal text
 	b.TextBegin()
-	b.TextFirstLine(100, 700)
+	b.TextFirstLine(startX, baseline)
 	b.TextSetFont(F, 12)
 	b.TextShow("the ")
 	b.TextEnd()
@@ -211,6 +224,7 @@ func TestTextExtractorActualText(t *testing.T) {
 	}
 	b.MarkedContentStart(mc)
 	b.TextBegin()
+	b.TextFirstLine(afterTheX, baseline)
 	b.TextSetFont(F, 12)
 	b.TextShow("original")
 	b.TextEnd()
@@ -218,6 +232,7 @@ func TestTextExtractorActualText(t *testing.T) {
 
 	// more normal text
 	b.TextBegin()
+	b.TextFirstLine(afterOriginalX, baseline)
 	b.TextSetFont(F, 12)
 	b.TextShow(" text")
 	b.TextEnd()
@@ -266,10 +281,8 @@ func TestTextExtractorActualText(t *testing.T) {
 	}
 
 	extracted := strings.TrimSpace(buf.String())
-	if !strings.Contains(extracted, "the replaced text") {
-		t.Errorf("got %q, want to contain \"the replaced text\"", extracted)
-	}
-	if strings.Contains(extracted, "original") {
-		t.Errorf("got %q, should not contain \"original\"", extracted)
+	const want = "the replaced text"
+	if extracted != want {
+		t.Errorf("got %q, want %q", extracted, want)
 	}
 }

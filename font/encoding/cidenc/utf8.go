@@ -64,6 +64,10 @@ func (e *compositeUTF8) WritingMode() font.WritingMode {
 }
 
 func (e *compositeUTF8) Codes(s pdf.String) iter.Seq[font.Code] {
+	// TODO(voss): track per-glyph W2 metrics so that font.Code.VerticalAdvance
+	// can be populated for vertical writing mode.  Currently the encoder only
+	// stores the horizontal width, so vertical advance falls back to the spec
+	// default DW2 in the reader/builder.
 	return func(yield func(font.Code) bool) {
 		var code font.Code
 		for len(s) > 0 {

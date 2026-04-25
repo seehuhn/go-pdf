@@ -18,6 +18,7 @@ package reader
 
 import (
 	"io"
+	"math"
 
 	"seehuhn.de/go/geom/matrix"
 
@@ -46,11 +47,11 @@ type Reader struct {
 	// operator.  The [font.Code] argument describes the decoded character:
 	// the primary CID, the notdef fallback CID from the font's CMap (zero
 	// for simple fonts and for composite fonts without a matching notdef
-	// mapping), the textual representation, and the glyph width.
+	// mapping), the textual representation, and the glyph widths.
 	//
-	// The reader has already used info.Width and info.UseWordSpacing to
-	// advance the text matrix before this callback fires; callbacks
-	// interested in the advance width can read r.State.
+	// The text matrix is at the start position of the character when this
+	// callback fires; the matrix advance happens after.  Use
+	// [Reader.GetTextPositionDevice] for the start position.
 	Character func(c font.Code) error
 
 	TextEvent func(event TextEvent, arg float64)
@@ -76,15 +77,36 @@ type Reader struct {
 	MarkedContentStack []*graphics.MarkedContent
 
 	spaceWidthCache map[font.Instance]float64
+
+	// Position in device coordinates where the next character would naturally
+	// continue after the most recent text-showing operator.  Reset at the
+	// start of each page.
+	prevEndX, prevEndY float64
+	prevEndValid       bool
 }
 
+// TextEvent describes a transition between rendered characters that the
+// reader has classified as a separator.  TextEvent values are passed to the
+// [Reader.TextEvent] callback before each character that follows a
+// meaningful gap or line break in the content stream.  The classification
+// is based on the device-space gap between where the previous character
+// ended and where the next character begins, so the reader skips spurious
+// events that arise from PDF generators that wrap every glyph cluster in
+// its own BT/Tm/Tj/ET sequence.
+//
+// In horizontal writing mode "along" means the x axis and "across" means
+// the y axis; in vertical writing mode the roles are swapped.
 type TextEvent uint8
 
 const (
-	TextEventNone TextEvent = iota
-	TextEventSpace
+	// TextEventSpace indicates a gap along the writing direction, large
+	// enough to be interpreted as a word separator.  The arg is the gap
+	// in device units.
+	TextEventSpace TextEvent = iota + 1
+	// TextEventNL indicates that the text-rendering position has moved
+	// across the writing direction (a new line in horizontal mode, or a
+	// new column in vertical mode).
 	TextEventNL
-	TextEventMove
 )
 
 type MarkedContentEvent uint8
@@ -108,6 +130,7 @@ func New(x *pdf.Extractor) *Reader {
 func (r *Reader) Reset() {
 	r.State = content.NewState(content.Page, &content.Resources{})
 	r.MarkedContentStack = r.MarkedContentStack[:0]
+	r.prevEndValid = false
 }
 
 // ParsePage parses a page, and calls the appropriate callback functions.
@@ -132,6 +155,7 @@ func (r *Reader) ParsePage(page pdf.Object, ctm matrix.Matrix) error {
 	r.State = content.NewState(content.Page, res)
 	r.State.GState.CTM = ctm
 	r.MarkedContentStack = r.MarkedContentStack[:0]
+	r.prevEndValid = false
 
 	open, err := pagetree.ContentStreamOpener(r.x.R, page)
 	if err != nil {
@@ -182,18 +206,15 @@ func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
 	// handle reader-specific callbacks
 	switch name {
 
-	// text-positioning operators - emit TextEvent callbacks
-	case content.OpTextMoveOffset, content.OpTextMoveOffsetSetLeading, content.OpTextNextLine: // Td, TD, T*
-		if r.TextEvent != nil {
-			r.TextEvent(TextEventNL, 0)
-		}
+	// Text-positioning operators have no reader-specific callback: the
+	// text matrix update is handled by State.ApplyOperator above, and
+	// any TextEvent classification is deferred to processText, which
+	// compares the start position of the next character to the natural
+	// continuation of the previous text-show.
+	case content.OpTextMoveOffset, content.OpTextMoveOffsetSetLeading,
+		content.OpTextNextLine, content.OpTextSetMatrix:
+		// nothing to do here
 
-	case content.OpTextSetMatrix: // Tm
-		if r.TextEvent != nil {
-			r.TextEvent(TextEventMove, 0)
-		}
-
-	// text-showing operators
 	case content.OpTextShow: // Tj
 		if s, ok := getString(args, 0); ok && p.TextFont != nil {
 			if err := r.processText(s); err != nil {
@@ -202,10 +223,6 @@ func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
 		}
 
 	case content.OpTextShowMoveNextLine: // '
-		// state already moved to next line
-		if r.TextEvent != nil {
-			r.TextEvent(TextEventNL, 0)
-		}
 		if s, ok := getString(args, 0); ok && p.TextFont != nil {
 			if err := r.processText(s); err != nil {
 				return err
@@ -213,10 +230,6 @@ func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
 		}
 
 	case content.OpTextShowMoveNextLineSetSpacing: // "
-		// state already set spacing and moved to next line
-		if r.TextEvent != nil {
-			r.TextEvent(TextEventNL, 0)
-		}
 		if s, ok := getString(args, 2); ok && p.TextFont != nil {
 			if err := r.processText(s); err != nil {
 				return err
@@ -240,13 +253,6 @@ func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
 					d = float64(ai)
 				}
 				if d != 0 {
-					if d < 0 && r.TextEvent != nil {
-						sw := r.getSpaceWidth(p.TextFont)
-						if -d >= 0.3*sw {
-							r.TextEvent(TextEventSpace, -d)
-						}
-					}
-
 					d = d / 1000 * p.TextFontSize
 					switch p.TextFont.WritingMode() {
 					case font.Horizontal:
@@ -430,39 +436,121 @@ func (r *Reader) extractMarkedContent(tag pdf.Name, propArg pdf.Object) (*graphi
 
 func (r *Reader) processText(s pdf.String) error {
 	// TODO(voss): can this be merged with the corresponding code in op-text.go?
+	//
+	// TODO(voss): in vertical writing mode, the per-glyph (vx, vy) origin
+	// offset from W2/DW2 should be applied when reporting the glyph
+	// position to consumers — currently the offsets in dict.VMetrics are
+	// extracted but never used.
 	p := r.State.GState
 
 	wmode := p.TextFont.WritingMode()
+	visible := p.TextRenderingMode != graphics.TextRenderingModeInvisible
+
+	// trm caches the text rendering matrix for the current TextMatrix.
+	// The end-of-iteration recompute is reused as the start-of-next-
+	// iteration position, so each glyph costs one matrix recompute
+	// instead of two.
+	var trm matrix.Matrix
+	trmValid := false
+
 	for info := range p.TextFont.Codes(s) {
-		width := info.Width*p.TextFontSize + p.TextCharacterSpacing
-		if info.UseWordSpacing {
-			width += p.TextWordSpacing
-		}
-		if wmode == font.Horizontal {
-			width *= p.TextHorizontalScaling
+		// The displacement applied to the text matrix after painting the
+		// glyph; in vertical writing mode this is signed (typically
+		// negative).
+		var advance float64
+		switch wmode {
+		case font.Horizontal:
+			advance = info.Width*p.TextFontSize + p.TextCharacterSpacing
+			if info.UseWordSpacing {
+				advance += p.TextWordSpacing
+			}
+			advance *= p.TextHorizontalScaling
+		case font.Vertical:
+			vAdv := info.VerticalAdvance
+			if vAdv == 0 {
+				// spec default DW2 is [880 -1000]
+				vAdv = -1
+			}
+			advance = vAdv*p.TextFontSize + p.TextCharacterSpacing
+			if info.UseWordSpacing {
+				advance += p.TextWordSpacing
+			}
 		}
 
-		if r.Character != nil && p.TextRenderingMode != graphics.TextRenderingModeInvisible {
+		// Classify the gap between the previous text-show end position
+		// and the start of this character.  The writing direction
+		// determines which axis represents "along" (potential
+		// TextEventSpace) and which represents "across" (TextEventNL).
+		if r.TextEvent != nil && r.prevEndValid && visible {
+			if !trmValid {
+				trm = p.TextRenderingMatrix()
+				trmValid = true
+			}
+			startX, startY := trm[4], trm[5]
+			effSize := math.Hypot(trm[2], trm[3])
+			gapThresh := 0.5 * effSize
+			alongThresh := 0.3 * r.spaceWidthDevice(p, effSize)
+			dx := startX - r.prevEndX
+			dy := startY - r.prevEndY
+			var along, across float64
+			switch wmode {
+			case font.Horizontal:
+				along, across = dx, dy
+			case font.Vertical:
+				// Vertical text advances toward -y; a positive
+				// along value means an extra gap (space) in the
+				// writing direction.
+				along, across = -dy, dx
+			}
+			switch {
+			case math.Abs(across) >= gapThresh:
+				r.TextEvent(TextEventNL, 0)
+			case along >= alongThresh:
+				r.TextEvent(TextEventSpace, along)
+			}
+		}
+
+		if r.Character != nil && visible {
 			err := r.Character(info)
 			if err != nil {
 				return err
 			}
 		}
-		if r.Text != nil && p.TextRenderingMode != graphics.TextRenderingModeInvisible {
+		if r.Text != nil && visible {
 			err := r.Text(info.Text)
 			if err != nil {
 				return err
 			}
 		}
 
+		// Apply the advance; the cached trm is now stale.
 		switch wmode {
 		case font.Horizontal:
-			p.TextMatrix = matrix.Translate(width, 0).Mul(p.TextMatrix)
+			p.TextMatrix = matrix.Translate(advance, 0).Mul(p.TextMatrix)
 		case font.Vertical:
-			p.TextMatrix = matrix.Translate(0, width).Mul(p.TextMatrix)
+			p.TextMatrix = matrix.Translate(0, advance).Mul(p.TextMatrix)
+		}
+		trmValid = false
+
+		if visible {
+			trm = p.TextRenderingMatrix()
+			trmValid = true
+			r.prevEndX, r.prevEndY = trm[4], trm[5]
+			r.prevEndValid = true
 		}
 	}
 	return nil
+}
+
+// spaceWidthDevice returns the width of a space glyph in the current font,
+// in device units.  When the font does not advertise a space, the returned
+// value is a fraction of effSize.
+func (r *Reader) spaceWidthDevice(p *graphics.State, effSize float64) float64 {
+	sw := r.getSpaceWidth(p.TextFont) // text-space units, 1000 per em
+	if sw <= 0 {
+		return 0.25 * effSize
+	}
+	return sw / 1000 * effSize
 }
 
 // getName extracts a name from the argument slice at the given index.

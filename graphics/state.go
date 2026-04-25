@@ -359,6 +359,19 @@ func (s *State) GetTextPositionDevice() (float64, float64) {
 	return M[4], M[5]
 }
 
+// TextRenderingMatrix returns the text rendering matrix in device coordinates.
+// It is the permissive equivalent of [State.GetTextPositionDevice] (extended to
+// the full 3x3 matrix): it uses field values without checking which state
+// parameters have been explicitly set, so it does not panic when called from a
+// content-stream reader that has not seen every text-state operator.  When the
+// caller has not set TextFontSize or TextHorizontalScaling, the returned
+// matrix is degenerate.
+func (s *State) TextRenderingMatrix() matrix.Matrix {
+	M := matrix.Matrix{s.TextFontSize * s.TextHorizontalScaling, 0, 0, s.TextFontSize, 0, s.TextRise}
+	M = M.Mul(s.TextMatrix)
+	return M.Mul(s.CTM)
+}
+
 // GetTextPositionUser returns the current text position in user coordinates.
 func (s *State) GetTextPositionUser() (float64, float64) {
 	if err := s.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {

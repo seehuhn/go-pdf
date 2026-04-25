@@ -289,26 +289,38 @@ func (b *Builder) applyTextKern(delta float64, wMode font.WritingMode) {
 }
 
 // updateTextPosition advances the text matrix based on the glyphs in the string.
+//
+// TODO(voss): in vertical writing mode, the per-glyph (vx, vy) origin
+// offset from W2/DW2 should be applied so that GetTextPositionUser
+// reports the position the next glyph will be painted at, not the bare
+// text position.  Currently the offsets are not tracked.
 func (b *Builder) updateTextPosition(s pdf.String) {
-	if b.State.GState.TextFont == nil {
+	p := b.State.GState
+	if p.TextFont == nil {
 		return
 	}
 
-	wmode := b.State.GState.TextFont.WritingMode()
-	for info := range b.State.GState.TextFont.Codes(s) {
-		width := info.Width*b.State.GState.TextFontSize + b.State.GState.TextCharacterSpacing
-		if info.UseWordSpacing {
-			width += b.State.GState.TextWordSpacing
-		}
-		if wmode == font.Horizontal {
-			width *= b.State.GState.TextHorizontalScaling
-		}
-
+	wmode := p.TextFont.WritingMode()
+	for info := range p.TextFont.Codes(s) {
 		switch wmode {
 		case font.Horizontal:
-			b.State.GState.TextMatrix = matrix.Translate(width, 0).Mul(b.State.GState.TextMatrix)
+			advance := info.Width*p.TextFontSize + p.TextCharacterSpacing
+			if info.UseWordSpacing {
+				advance += p.TextWordSpacing
+			}
+			advance *= p.TextHorizontalScaling
+			p.TextMatrix = matrix.Translate(advance, 0).Mul(p.TextMatrix)
 		case font.Vertical:
-			b.State.GState.TextMatrix = matrix.Translate(0, width).Mul(b.State.GState.TextMatrix)
+			vAdv := info.VerticalAdvance
+			if vAdv == 0 {
+				// spec default DW2 is [880 -1000]
+				vAdv = -1
+			}
+			advance := vAdv*p.TextFontSize + p.TextCharacterSpacing
+			if info.UseWordSpacing {
+				advance += p.TextWordSpacing
+			}
+			p.TextMatrix = matrix.Translate(0, advance).Mul(p.TextMatrix)
 		}
 	}
 }

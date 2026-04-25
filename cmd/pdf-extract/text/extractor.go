@@ -45,8 +45,14 @@ type TextExtractor struct {
 
 	extraTextCache       map[font.Instance]map[cid.CID]string
 	actualTextStartDepth int // -1 if not in ActualText region
-	prevY                float64
-	prevYValid           bool
+
+	// lastWasWhitespace tracks whether the most recently emitted character
+	// was whitespace, so that an adjacent space can be collapsed.
+	// lastWasNewline narrows that to specifically a newline, so that
+	// adjacent newlines collapse but a "space then newline" run is kept
+	// intact.  Both start true to suppress leading whitespace.
+	lastWasWhitespace bool
+	lastWasNewline    bool
 }
 
 // New creates a new TextExtractor that writes to w.
@@ -58,6 +64,8 @@ func New(doc pdf.Getter, w io.Writer) *TextExtractor {
 		XRangeMax:            math.Inf(1),
 		extraTextCache:       make(map[font.Instance]map[cid.CID]string),
 		actualTextStartDepth: -1,
+		lastWasWhitespace:    true,
+		lastWasNewline:       true,
 	}
 
 	e.setupCallbacks()
@@ -81,27 +89,12 @@ func (e *TextExtractor) setupCallbacks() {
 		return nil
 	}
 
-	e.reader.TextEvent = func(op reader.TextEvent, arg float64) {
-		switch op {
+	e.reader.TextEvent = func(event reader.TextEvent, _ float64) {
+		switch event {
 		case reader.TextEventSpace:
-			fmt.Fprint(e.writer, " ")
+			e.writeSpace()
 		case reader.TextEventNL:
-			fmt.Fprintln(e.writer)
-			e.prevYValid = false
-		case reader.TextEventMove:
-			if e.reader.State.GState.TextFont == nil {
-				fmt.Fprintln(e.writer)
-				e.prevYValid = false
-				break
-			}
-			_, y := e.reader.GetTextPositionDevice()
-			if e.prevYValid && math.Abs(y-e.prevY) < 0.5 {
-				fmt.Fprint(e.writer, " ")
-			} else {
-				fmt.Fprintln(e.writer)
-			}
-			e.prevY = y
-			e.prevYValid = true
+			e.writeNewline()
 		}
 	}
 
@@ -125,11 +118,50 @@ func (e *TextExtractor) setupCallbacks() {
 		text = remapPUA(text)
 
 		xDev, _ := e.reader.GetTextPositionDevice()
-		if xDev >= e.XRangeMin && xDev < e.XRangeMax {
-			fmt.Fprint(e.writer, text)
+		if xDev < e.XRangeMin || xDev >= e.XRangeMax {
+			return nil
 		}
+
+		e.writeText(text)
 		return nil
 	}
+}
+
+// writeSpace emits a space, collapsing it against any preceding whitespace.
+func (e *TextExtractor) writeSpace() {
+	if e.lastWasWhitespace {
+		return
+	}
+	fmt.Fprint(e.writer, " ")
+	e.lastWasWhitespace = true
+	e.lastWasNewline = false
+}
+
+// writeNewline emits a newline.  Adjacent newlines collapse, but a newline
+// after a trailing space is kept (the trailing space is preserved).
+func (e *TextExtractor) writeNewline() {
+	if e.lastWasNewline {
+		return
+	}
+	fmt.Fprintln(e.writer)
+	e.lastWasWhitespace = true
+	e.lastWasNewline = true
+}
+
+// writeText emits character text from the content stream.  An empty text
+// is ignored.  A single-space text collapses against preceding whitespace.
+func (e *TextExtractor) writeText(text string) {
+	if text == "" {
+		return
+	}
+	if len(text) == 1 && text[0] == ' ' {
+		e.writeSpace()
+		return
+	}
+	fmt.Fprint(e.writer, text)
+	last := text[len(text)-1]
+	e.lastWasWhitespace = last == ' ' || last == '\n' || last == '\t'
+	e.lastWasNewline = last == '\n'
 }
 
 func (e *TextExtractor) handleActualTextBegin(mc *graphics.MarkedContent) {
@@ -148,7 +180,7 @@ func (e *TextExtractor) handleActualTextBegin(mc *graphics.MarkedContent) {
 	}
 	text := at.Text
 
-	fmt.Fprint(e.writer, text)
+	e.writeText(text)
 	e.actualTextStartDepth = len(e.reader.MarkedContentStack)
 }
 
@@ -194,6 +226,10 @@ func remapPUA(text string) string {
 
 // ExtractPage extracts text from a page dictionary.
 func (e *TextExtractor) ExtractPage(pageDict pdf.Dict) error {
-	e.prevYValid = false
+	// reset per-page state.  extraTextCache is keyed by font.Instance and
+	// CID, so it persists across pages without risk of stale data.
+	e.actualTextStartDepth = -1
+	e.lastWasWhitespace = true
+	e.lastWasNewline = true
 	return e.reader.ParsePage(pageDict, matrix.Identity)
 }

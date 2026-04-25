@@ -80,6 +80,10 @@ func (f *fixed) WritingMode() font.WritingMode {
 // Codes iterates over the character codes in a PDF string.
 // The iterator returns the information stored for each code.
 func (f *fixed) Codes(s pdf.String) iter.Seq[font.Code] {
+	// TODO(voss): track per-glyph W2 metrics so that font.Code.VerticalAdvance
+	// can be populated for vertical writing mode.  Currently the encoder only
+	// stores the horizontal width, so vertical advance falls back to the spec
+	// default DW2 in the reader/builder.
 	return func(yield func(font.Code) bool) {
 		var code font.Code
 		for len(s) > 0 {
