@@ -98,6 +98,24 @@ func createDocument(filename string) error {
 	controlFont := font.Must(standard.TimesRoman.New())
 	drawControlText(page, controlFont)
 
+	text.Show(page.Builder,
+		text.M{X: margin, Y: footerY},
+		body,
+		text.Wrap(wrapWidth,
+			"Beyond visual rendering, also try:",
+		),
+		text.NL,
+		text.Wrap(wrapWidth,
+			"1. Selecting and copy-pasting the text inside the TEST cell.",
+			"Does the viewer's text-extraction layer expose anything?",
+		),
+		text.NL,
+		text.Wrap(wrapWidth,
+			"2. Searching the document for the string \"Hello!\".",
+			"Does the test cell match?",
+		),
+	)
+
 	return page.Close()
 }
 
