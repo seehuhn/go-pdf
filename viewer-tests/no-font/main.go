@@ -24,6 +24,23 @@ import (
 	"seehuhn.de/go/pdf/document"
 )
 
+const (
+	margin      = 72.0
+	titleY      = 800.0
+	cellTopY    = 620.0
+	cellBottomY = 500.0
+	cellWidth   = 220.0
+	cellGap     = 11.0
+	cellPadX    = 18.0
+	cellPadY    = 38.0 // text origin sits this far above cellBottomY
+	crosshair   = 4.0
+	tickLength  = 60.0
+	footerY     = 460.0
+	wrapWidth   = 451.0 // page width − 2*margin
+
+	controlText = "Hello!"
+)
+
 func main() {
 	if err := createDocument("test.pdf"); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
