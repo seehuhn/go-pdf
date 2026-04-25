@@ -84,6 +84,15 @@ func (m *Markup) GetMarkup() *Markup {
 	return m
 }
 
+// MarkupAnnotation is the interface implemented by all markup annotations
+// (§12.5.6.2).  A type assertion to MarkupAnnotation tests whether a given
+// [Annotation] is a markup annotation; GetMarkup gives access to the fields
+// shared by all markup annotations.
+type MarkupAnnotation interface {
+	Annotation
+	GetMarkup() *Markup
+}
+
 // fillDict adds the fields corresponding to the Markup struct
 // to the given PDF dictionary.  If fields are not valid for the PDF version
 // corresponding to the ResourceManager, an error is returned.
