@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/text"
 )
 
@@ -60,6 +61,14 @@ func createDocument(filename string) error {
 		return err
 	}
 
+	// Inject the malformed test stream first.  Tf is part of the
+	// graphics state and persists across BT/ET, so once any text.Show
+	// or page.TextSetFont call has run, every subsequent BT/Tj
+	// inherits a non-empty font — including the test cell's Tj.  The
+	// only way to keep the test meaningful is to emit it before the
+	// first Tf appears anywhere on the page.
+	injectTestText(page)
+
 	titleFont := font.Must(standard.TimesBold.New())
 	bodyFont := font.Must(standard.TimesRoman.New())
 
@@ -90,6 +99,30 @@ func createDocument(filename string) error {
 	drawControlText(page, controlFont)
 
 	return page.Close()
+}
+
+// injectTestText appends a BT / Tm / Tj (Hello!) / ET sequence to the
+// content stream as a single OpRawContent pseudo-operator.  Wrapping
+// the malformed sequence in OpRawContent lets it pass the page-level
+// content-stream validator (which would otherwise reject Tj-without-Tf
+// when validating typed Operators), while still emitting the raw bytes
+// verbatim into the file.  No Tf is emitted, so the Tj runs with an
+// unset font in the graphics state — this is the malformed input under
+// test.  Call this before any code path that emits a Tf, since Tf
+// persists across BT/ET.
+func injectTestText(page *document.Page) {
+	originX := margin + cellPadX
+	originY := cellBottomY + cellPadY
+
+	raw := fmt.Sprintf("BT\n1 0 0 1 %g %g Tm\n(%s) Tj\nET",
+		originX, originY, controlText)
+
+	page.Builder.Stream = append(page.Builder.Stream,
+		content.Operator{
+			Name: content.OpRawContent,
+			Args: []pdf.Object{pdf.String(raw)},
+		},
+	)
 }
 
 // drawControlText renders the control string at the control cell's
