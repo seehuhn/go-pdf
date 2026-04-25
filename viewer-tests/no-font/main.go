@@ -80,5 +80,46 @@ func createDocument(filename string) error {
 		),
 	)
 
+	cellLabel := text.F{Font: bodyFont, Size: 9, Color: color.DeviceGray(0.4)}
+	drawCell(page, cellLabel, margin, "TEST: no Tf")
+	drawCell(page, cellLabel, margin+cellWidth+cellGap, "CONTROL: Times-Roman 24")
+
 	return page.Close()
+}
+
+// drawCell draws a labelled cell rectangle with a crosshair at the text
+// origin and a horizontal baseline tick.  The text origin is at
+// (cellX+cellPadX, cellBottomY+cellPadY); the caption is drawn just
+// above the top edge using the labelStyle text style.
+func drawCell(page *document.Page, labelStyle text.F, cellX float64, caption string) {
+	originX := cellX + cellPadX
+	originY := cellBottomY + cellPadY
+
+	// labelled rectangle
+	page.SetLineWidth(0.5)
+	page.SetStrokeColor(color.DeviceGray(0.7))
+	page.Rectangle(cellX, cellBottomY, cellWidth, cellTopY-cellBottomY)
+	page.Stroke()
+
+	// crosshair at text origin
+	page.SetLineWidth(0.4)
+	page.SetStrokeColor(color.DeviceGray(0.3))
+	page.MoveTo(originX-crosshair, originY)
+	page.LineTo(originX+crosshair, originY)
+	page.MoveTo(originX, originY-crosshair)
+	page.LineTo(originX, originY+crosshair)
+	page.Stroke()
+
+	// baseline tick going right from origin
+	page.SetLineWidth(0.3)
+	page.SetStrokeColor(color.DeviceGray(0.5))
+	page.MoveTo(originX, originY)
+	page.LineTo(originX+tickLength, originY)
+	page.Stroke()
+
+	// caption above the cell
+	text.Show(page.Builder,
+		text.M{X: cellX, Y: cellTopY + 4},
+		labelStyle, caption,
+	)
 }
