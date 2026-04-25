@@ -22,6 +22,10 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/standard"
+	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/text"
 )
 
 const (
@@ -53,5 +57,28 @@ func createDocument(filename string) error {
 	if err != nil {
 		return err
 	}
+
+	titleFont := font.Must(standard.TimesBold.New())
+	bodyFont := font.Must(standard.TimesRoman.New())
+
+	title := text.F{Font: titleFont, Size: 14, Color: color.DeviceGray(0)}
+	body := text.F{Font: bodyFont, Size: 10, Color: color.DeviceGray(0.1)}
+
+	text.Show(page.Builder,
+		text.M{X: margin, Y: titleY},
+		title, "Text Without a Font", text.NL,
+		text.NL,
+		body,
+		text.Wrap(wrapWidth,
+			"PDF 32000-2:2020 §9.3.1 requires the font and font size to be set",
+			"with a Tf operator before any text-showing operator (Tj, TJ, ', \").",
+			"The PDF specification does not say what a conforming reader must do",
+			"if Tf is absent.  This document tests how different viewers handle",
+			"that case.  The test cell on the left contains a Tj with no Tf",
+			"anywhere in the content stream.  The control cell on the right",
+			"shows the same string with Tf set to Times-Roman 24pt.",
+		),
+	)
+
 	return page.Close()
 }
