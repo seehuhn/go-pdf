@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"os"
 
+	"seehuhn.de/go/geom/matrix"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
@@ -84,7 +86,24 @@ func createDocument(filename string) error {
 	drawCell(page, cellLabel, margin, "TEST: no Tf")
 	drawCell(page, cellLabel, margin+cellWidth+cellGap, "CONTROL: Times-Roman 24")
 
+	controlFont := font.Must(standard.TimesRoman.New())
+	drawControlText(page, controlFont)
+
 	return page.Close()
+}
+
+// drawControlText renders the control string at the control cell's
+// text origin, using a valid Tf for Times-Roman 24pt.
+func drawControlText(page *document.Page, F font.Instance) {
+	originX := margin + cellWidth + cellGap + cellPadX
+	originY := cellBottomY + cellPadY
+
+	page.SetFillColor(color.DeviceGray(0))
+	page.TextBegin()
+	page.TextSetFont(F, 24)
+	page.TextSetMatrix(matrix.Translate(originX, originY))
+	page.TextShow(controlText)
+	page.TextEnd()
 }
 
 // drawCell draws a labelled cell rectangle with a crosshair at the text
