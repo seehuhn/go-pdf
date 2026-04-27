@@ -18,16 +18,36 @@ package action
 
 import (
 	"bytes"
+	"io"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/page/transition"
+	"seehuhn.de/go/pdf/sound"
 )
+
+// testSound is the shared sound object used by Sound action test cases.
+// Its Channels, BitsPerSample, and Encoding fields are pre-materialised
+// so the round-trip comparison succeeds without special-casing the
+// defaults.
+var testSound = &sound.Sound{
+	SampleRate:    22050,
+	Channels:      optional.NewUInt(1),
+	BitsPerSample: optional.NewUInt(8),
+	Encoding:      sound.EncodingRaw,
+	Data: &sound.InlineSource{
+		WriteData: func(w io.Writer) error {
+			_, err := w.Write([]byte{0x80, 0x80, 0x80, 0x80})
+			return err
+		},
+	},
+}
 
 var actionTestCases = []pdf.Action{
 	// GoTo
@@ -92,13 +112,13 @@ var actionTestCases = []pdf.Action{
 	&URI{URI: "file:///path/to/file.pdf"}, // file URI
 
 	// Sound
-	&Sound{Sound: pdf.Reference(1), Volume: 1.0},
-	&Sound{Sound: pdf.Reference(1), Volume: 0.5},  // half volume
-	&Sound{Sound: pdf.Reference(1), Volume: -1.0}, // negative volume (muted)
-	&Sound{Sound: pdf.Reference(1), Volume: 1.0, Synchronous: true},
-	&Sound{Sound: pdf.Reference(1), Volume: 1.0, Repeat: true},
-	&Sound{Sound: pdf.Reference(1), Volume: 1.0, Mix: true},
-	&Sound{Sound: pdf.Reference(1), Volume: 0.75, Synchronous: true, Repeat: true, Mix: true},
+	&Sound{Sound: testSound, Volume: 1.0},
+	&Sound{Sound: testSound, Volume: 0.5},  // half volume
+	&Sound{Sound: testSound, Volume: -1.0}, // negative volume (muted)
+	&Sound{Sound: testSound, Volume: 1.0, Synchronous: true},
+	&Sound{Sound: testSound, Volume: 1.0, Repeat: true},
+	&Sound{Sound: testSound, Volume: 1.0, Mix: true},
+	&Sound{Sound: testSound, Volume: 0.75, Synchronous: true, Repeat: true, Mix: true},
 
 	// Movie
 	&Movie{T: pdf.String("movie1"), Operation: MovieOperationPlay},
@@ -224,7 +244,13 @@ func testActionRoundTrip(t *testing.T, version pdf.Version, action pdf.Action) {
 		t.Fatalf("decode error: %v", err)
 	}
 
-	if diff := cmp.Diff(decoded, action); diff != "" {
+	opts := []cmp.Option{
+		// Sound sample data is supplied through closures or stream
+		// wrappers; round-trip of the bytes is exercised by the sound
+		// package's own tests.
+		cmpopts.IgnoreFields(sound.Sound{}, "Data"),
+	}
+	if diff := cmp.Diff(decoded, action, opts...); diff != "" {
 		t.Errorf("round trip failed (-got +want):\n%s", diff)
 	}
 }

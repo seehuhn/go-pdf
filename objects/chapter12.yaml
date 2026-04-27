@@ -2953,8 +2953,8 @@ types:
     deprecated: '2.0'
     refTypes:
     - SoundObject
-    goType: pdf.Reference
-    purpose: Sound is a reference to the sound object.
+    goType: "*sound.Sound"
+    purpose: the sound object to play
   - goName: Volume
     pdfKey: Volume
     pdfType: number
@@ -5848,19 +5848,17 @@ types:
     deprecated: '2.0'
     refTypes:
     - SoundObject
-    goType: pdf.Reference
-    purpose: 'Sound (required) is a sound object defining the sound that is
-
-      played when the annotation is activated.'
-  - goName: Name
+    goType: "*sound.Sound"
+    purpose: "the sound object defining the sound that is played when the annotation is activated"
+  - goName: Icon
     pdfKey: Name
     pdfType: name
     required: false
     default: Speaker
     introduced: '1.2'
     deprecated: '2.0'
-    goType: pdf.Name
-    purpose: 'Name (optional) is the name of an icon that is used in displaying
+    goType: annotation.SoundIcon
+    purpose: 'Icon (optional) is the name of an icon that is used in displaying
 
       the annotation. Standard names include:
 

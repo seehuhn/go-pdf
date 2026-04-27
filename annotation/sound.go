@@ -16,15 +16,20 @@
 
 package annotation
 
-import "seehuhn.de/go/pdf"
+import (
+	"errors"
+
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/sound"
+)
 
 // PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.16
 
 // Sound represents a sound annotation that contains sound recorded from the
 // computer's microphone or imported from a file. When the annotation is
-// activated, the sound is played. The annotation behaves like a text annotation
-// in most ways, with a different icon (by default, a speaker) to indicate that
-// it represents a sound.
+// activated, the sound is played. The annotation behaves like a text
+// annotation in most ways, with a different icon (by default, a speaker) to
+// indicate that it represents a sound.
 //
 // NOTE: Sound annotations are deprecated in PDF 2.0 and superseded by the
 // general multimedia framework.
@@ -32,15 +37,19 @@ type Sound struct {
 	Common
 	Markup
 
-	// Sound (required) is a sound object defining the sound that is
+	// Sound (required) is the sound object defining the sound that is
 	// played when the annotation is activated.
-	Sound pdf.Reference
+	Sound *sound.Sound
 
-	// Name (optional) is the name of an icon that is used in displaying
-	// the annotation. Standard names include:
-	// Speaker, Mic
-	// Default value: "Speaker"
-	Name pdf.Name
+	// Icon is the name of an icon that is used in displaying the annotation.
+	// The standard icon names are Speaker and Mic.  Viewers may support
+	// additional, application-specific names.
+	//
+	// When writing annotations, an empty Icon name can be used as a shorthand
+	// for [SoundIconSpeaker].
+	//
+	// This corresponds to the /Name entry in the PDF annotation dictionary.
+	Icon SoundIcon
 }
 
 var _ Annotation = (*Sound)(nil)
@@ -53,37 +62,41 @@ func (s *Sound) AnnotationType() pdf.Name {
 
 func decodeSound(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Sound, error) {
 	r := x.R
-	sound := &Sound{}
+	a := &Sound{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &sound.Common, dict); err != nil {
+	if err := decodeCommon(x, path, &a.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &sound.Markup); err != nil {
+	if err := decodeMarkup(x, path, dict, &a.Markup); err != nil {
 		return nil, err
 	}
 
-	// Extract sound-specific fields
 	// Sound (required)
-	if soundRef, ok := dict["Sound"].(pdf.Reference); ok {
-		sound.Sound = soundRef
+	s, err := pdf.ExtractorGet(x, path, dict["Sound"], sound.Extract)
+	if err != nil {
+		return nil, err
 	}
+	a.Sound = s
 
 	// Name (optional) - default to "Speaker" if not specified
 	if name, err := pdf.GetName(r, dict["Name"]); err == nil && name != "" {
-		sound.Name = name
+		a.Icon = SoundIcon(name)
 	} else {
-		sound.Name = "Speaker" // PDF default value
+		a.Icon = SoundIconSpeaker
 	}
 
-	return sound, nil
+	return a, nil
 }
 
 func (s *Sound) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "sound annotation", pdf.V1_2); err != nil {
 		return nil, err
+	}
+	if s.Sound == nil {
+		return nil, errors.New("sound annotation must have a Sound object")
 	}
 
 	dict := pdf.Dict{
@@ -100,16 +113,33 @@ func (s *Sound) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 
-	// Add sound-specific fields
 	// Sound (required)
-	if s.Sound != 0 {
-		dict["Sound"] = s.Sound
+	soundObj, err := rm.Embed(s.Sound)
+	if err != nil {
+		return nil, err
 	}
+	dict["Sound"] = soundObj
 
 	// Name (optional) - only write if not the default value "Speaker"
-	if s.Name != "" && s.Name != "Speaker" {
-		dict["Name"] = s.Name
+	if s.Icon != "" && s.Icon != SoundIconSpeaker {
+		dict["Name"] = pdf.Name(s.Icon)
 	}
 
 	return dict, nil
 }
+
+// SoundIcon represents the name of an icon used to represent a sound annotation.
+// The standard names defined by the PDF specification are provided as constants.
+// Other names may be used, but support is viewer dependent.
+type SoundIcon pdf.Name
+
+// Standard PDF icon names for sound annotations.
+const (
+	// SoundIconSpeaker indicates a generic sound playback annotation.
+	// Typically appears as a loudspeaker icon in PDF viewers.
+	SoundIconSpeaker SoundIcon = "Speaker"
+
+	// SoundIconMic indicates a recorded or microphone-sourced sound annotation.
+	// Typically appears as a microphone icon in PDF viewers.
+	SoundIconMic SoundIcon = "Mic"
+)

@@ -2405,22 +2405,26 @@ types:
 - name: SoundObject
   purpose: "sound data stream"
   deprecated: "2.0"
-  goType:
+  goType: "sound.Sound"
+  fileDependent: false
+  readFunc: "sound.Extract"
+  writeMethod: "(*Sound).Embed"
   pdfType: Sound
   pdfRepr: stream
   introduced: '1.2'
-  specTable: Table 5
+  specSection: "13.3"
+  specTable: Table 305
   fields:
-  - goName:
-    pdfKey: Type
+  - pdfKey: Type
     pdfType: name
+    discriminator: true
     required: false
     introduced: '1.2'
     deprecated: '2.0'
     possibleValues:
     - Sound
     notes: Table 5 and Table 305
-  - goName:
+  - goName: SampleRate
     pdfKey: R
     pdfType: number
     required: true
@@ -2429,7 +2433,9 @@ types:
     possibleValues:
     - fn:Eval(@R>0)
     notes: sampling per second
-  - goName:
+  - goName: Channels
+    goType: "optional.UInt"
+    goPresenceTracking: true
     pdfKey: C
     pdfType: integer
     required: false
@@ -2439,7 +2445,9 @@ types:
     possibleValues:
     - fn:Eval(@C>0)
     notes: number of sound channels
-  - goName:
+  - goName: BitsPerSample
+    goType: "optional.UInt"
+    goPresenceTracking: true
     pdfKey: B
     pdfType: integer
     required: false
@@ -2449,25 +2457,29 @@ types:
     possibleValues:
     - fn:Eval(@B>0)
     notes: bits per sample value per channel
-  - goName:
+  - goName: Encoding
+    goType: "sound.Encoding"
     pdfKey: E
     pdfType: name
     required: false
     default: Raw
     introduced: '1.2'
     deprecated: '2.0'
+    enum: SoundEncoding
     possibleValues:
     - Raw
     - Signed
     - muLaw
     - ALaw
-  - goName:
+  - goName: CompressionFormat
+    goType: "pdf.Name"
     pdfKey: CO
     pdfType: name
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+  - goName: CompressionParams
+    goType: "pdf.Object"
     pdfKey: CP
     pdfType: array;dictionary;stream
     required: false
@@ -2510,6 +2522,7 @@ types:
     introduced: '1.2'
     refTypes:
     - FileSpecification
+    notes: "implemented via the Sound.Data field; an *ExternalFileSource carries the file specification"
   - goName:
     pdfKey: FFilter
     pdfType: array;name
@@ -2567,3 +2580,13 @@ types:
     pdfType: number
     required: true
     introduced: '1.5'
+
+enums:
+- name: SoundEncoding
+  goType: "sound.Encoding"
+  default: "Raw"
+  values:
+  - { go: EncodingRaw,    pdf: "Raw" }
+  - { go: EncodingSigned, pdf: "Signed" }
+  - { go: EncodingMuLaw,  pdf: "muLaw" }
+  - { go: EncodingALaw,   pdf: "ALaw" }

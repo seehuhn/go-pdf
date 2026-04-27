@@ -20,6 +20,7 @@ import (
 	"errors"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/sound"
 )
 
 // PDF 2.0 sections: 12.6.2 12.6.4.9
@@ -28,8 +29,8 @@ import (
 //
 // Deprecated in PDF 2.0.
 type Sound struct {
-	// Sound is a reference to the sound object.
-	Sound pdf.Reference
+	// Sound (required) is the sound object to play.
+	Sound *sound.Sound
 
 	// Volume is the volume at which to play the sound (-1.0 to 1.0).
 	// Default is 1.0.
@@ -57,16 +58,20 @@ func (a *Sound) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "Sound action", pdf.V1_2); err != nil {
 		return nil, err
 	}
-	if a.Sound == 0 {
-		return nil, errors.New("Sound action must have a Sound reference")
+	if a.Sound == nil {
+		return nil, errors.New("Sound action must have a Sound object")
 	}
 	if a.Volume < -1 || a.Volume > 1 {
 		return nil, errors.New("Sound action Volume must be in range -1.0 to 1.0")
 	}
 
+	soundObj, err := rm.Embed(a.Sound)
+	if err != nil {
+		return nil, err
+	}
 	dict := pdf.Dict{
 		"S":     pdf.Name(TypeSound),
-		"Sound": a.Sound,
+		"Sound": soundObj,
 	}
 	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Action")
@@ -95,9 +100,9 @@ func (a *Sound) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeSound(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Sound, error) {
-	soundRef, ok := dict["Sound"].(pdf.Reference)
-	if !ok {
-		return nil, pdf.Error("Sound action missing or invalid Sound entry")
+	soundObj, err := pdf.ExtractorGet(x, path, dict["Sound"], sound.Extract)
+	if err != nil {
+		return nil, err
 	}
 
 	volume := 1.0
@@ -128,7 +133,7 @@ func decodeSound(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Sound,
 	}
 
 	return &Sound{
-		Sound:       soundRef,
+		Sound:       soundObj,
 		Volume:      volume,
 		Synchronous: bool(synchronous),
 		Repeat:      bool(repeat),

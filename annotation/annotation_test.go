@@ -34,6 +34,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/debug/mock"
+	"seehuhn.de/go/pdf/sound"
 )
 
 func makeDefaultAppearance() *form.Form {
@@ -140,6 +141,10 @@ func roundTripTest(t *testing.T, v pdf.Version, a1 Annotation) {
 	opts := []cmp.Option{
 		cmp.AllowUnexported(language.Tag{}),
 		cmpopts.EquateComparable(language.Tag{}),
+		// Sound sample data is supplied through closures or stream
+		// wrappers; round-trip of the bytes is exercised by the sound
+		// package's own tests.
+		cmpopts.IgnoreFields(sound.Sound{}, "Data"),
 		// Use form.Equal for comparing forms, which handles nil vs empty Args
 		// and ignores resource differences (SingleUse, etc.)
 		cmp.Comparer(func(a, b *form.Form) bool {

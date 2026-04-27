@@ -17,6 +17,8 @@
 package annotation
 
 import (
+	"bytes"
+	"io"
 	"time"
 
 	"seehuhn.de/go/geom/vec"
@@ -28,7 +30,26 @@ import (
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/measure"
+	"seehuhn.de/go/pdf/optional"
+	"seehuhn.de/go/pdf/sound"
 )
+
+// testSound is the shared sound object used by sound annotation test
+// cases.  Its Channels, BitsPerSample, and Encoding fields are
+// pre-materialised so the round-trip comparison succeeds without
+// special-casing the defaults.
+var testSound = &sound.Sound{
+	SampleRate:    22050,
+	Channels:      optional.NewUInt(1),
+	BitsPerSample: optional.NewUInt(8),
+	Encoding:      sound.EncodingRaw,
+	Data: &sound.InlineSource{
+		WriteData: func(w io.Writer) error {
+			_, err := w.Write(bytes.Repeat([]byte{0x80}, 16))
+			return err
+		},
+	},
+}
 
 type testCase struct {
 	name       string
@@ -1104,8 +1125,8 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Narrator",
 					Subject: "Audio explanation",
 				},
-				Sound: pdf.NewReference(600, 0), // Sound object reference
-				Name:  "Speaker",                // Default speaker icon
+				Sound: testSound,
+				Icon:  "Speaker", // Default speaker icon
 			},
 		},
 		{
@@ -1120,8 +1141,8 @@ var testCases = map[pdf.Name][]testCase{
 					Subject:      "Field recording",
 					CreationDate: time.Date(2023, 12, 1, 15, 45, 0, 0, time.UTC),
 				},
-				Sound: pdf.NewReference(700, 0), // Sound object reference
-				Name:  "Mic",                    // Microphone icon
+				Sound: testSound,
+				Icon:  "Mic", // Microphone icon
 			},
 		},
 		{
@@ -1135,8 +1156,8 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Audio Engineer",
 					Subject: "Sound sample",
 				},
-				Sound: pdf.NewReference(800, 0), // Sound object reference
-				Name:  "Speaker",                // Default value
+				Sound: testSound,
+				Icon:  "Speaker", // Default value
 			},
 		},
 		{
@@ -1151,8 +1172,8 @@ var testCases = map[pdf.Name][]testCase{
 					User:    "Journalist",
 					Subject: "Interview audio",
 				},
-				Sound: pdf.NewReference(900, 0), // Sound object reference
-				Name:  "Speaker",                // Explicit speaker icon
+				Sound: testSound,
+				Icon:  "Speaker", // Explicit speaker icon
 			},
 		},
 		{
@@ -1164,8 +1185,8 @@ var testCases = map[pdf.Name][]testCase{
 				Markup: Markup{
 					User: "User",
 				},
-				Sound: pdf.NewReference(1000, 0), // Required sound object
-				Name:  "Speaker",                 // Default value
+				Sound: testSound,
+				Icon:  "Speaker", // Default value
 			},
 		},
 	},

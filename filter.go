@@ -49,8 +49,9 @@ import (
 //
 // Currently, the following filter types are implemented by this library:
 // [FilterASCII85], [FilterASCIIHex], [FilterCCITTFax], [FilterDCT],
-// [FilterFlate], [FilterLZW], [FilterRunLength].
-// [FilterDCT] supports decoding only.
+// [FilterFlate], [FilterJBIG2], [FilterLZW], [FilterRunLength].
+// The [FilterDCT] and [FilterJBIG2] filters support decoding only.
+//
 // In addition, [FilterCompress] can be used to select the
 // best available compression filter when writing PDF streams.  This is
 // FilterFlate for PDF versions 1.2 and above, and FilterLZW for older versions.
