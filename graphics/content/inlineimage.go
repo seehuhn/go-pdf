@@ -116,7 +116,10 @@ func DecodeInlineImage(op Operator) ([]byte, error) {
 	var r io.Reader = bytes.NewReader(data)
 	var closers []io.Closer
 	for _, fs := range filters {
-		f := pdf.MakeFilter(fs.name, fs.parms)
+		f, err := pdf.MakeFilter(fs.name, fs.parms)
+		if err != nil {
+			return nil, err
+		}
 		rc, err := f.Decode(pdf.V2_0, r)
 		if err != nil {
 			return nil, err

@@ -25,7 +25,6 @@ import (
 	"io"
 	"maps"
 	"os"
-	"slices"
 	"strconv"
 )
 
@@ -580,23 +579,53 @@ func (w *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.Wri
 		return nil, errors.New("OpenStream() while stream is open")
 	}
 
+	// Per PDF spec §7.4.10, a Crypt filter must be the first entry in
+	// the /Filter array.  Reject API misuse and detect a leading Crypt
+	// filter so the document-level encryption wrap can be skipped (the
+	// CryptFilter is responsible for that stream's encryption recipe).
+	// Bail before setXRef so a not-yet-supported CryptFilter does not
+	// leave a dirty xref entry pointing at an uncreated stream.
+	var leadingCrypt CryptFilter
+	for i, f := range filters {
+		cf, isCrypt := f.(CryptFilter)
+		if !isCrypt {
+			continue
+		}
+		if i != 0 {
+			return nil, errors.New("Crypt filter must be the first filter in OpenStream")
+		}
+		if _, ok := cf.(FilterCryptIdentity); !ok {
+			return nil, fmt.Errorf("OpenStream: %T encoding is not yet supported", cf)
+		}
+		leadingCrypt = cf
+	}
+
 	err := w.setXRef(ref, &xRefEntry{Pos: w.w.pos, Generation: ref.Generation()})
 	if err != nil {
 		return nil, fmt.Errorf("Writer.OpenStream: %w", err)
 	}
 	w.w.ref = ref
 
-	// Copy dict, dict["Filter"], and dict["DecodeParms"], so that we don't
-	// modify the caller's dict.
+	// Copy dict so that we don't modify the caller's dict, and inline any
+	// indirect /Filter or /DecodeParms entries.  Inlining serves two
+	// purposes: it gives appendFilter direct Name/Array values to extend
+	// (otherwise a Reference would fall through its default branch and
+	// silently overwrite the caller's chain), and it lets the cheap
+	// /Crypt probe below decide on resolved data.
 	streamDict := maps.Clone(dict)
 	if streamDict == nil {
 		streamDict = Dict{}
 	}
-	if filter, _ := streamDict["Filter"].(Array); len(filter) > 0 {
-		streamDict["Filter"] = slices.Clone(filter)
-	}
-	if decodeParms, _ := streamDict["DecodeParms"].(Array); len(decodeParms) > 0 {
-		streamDict["DecodeParms"] = slices.Clone(decodeParms)
+	for _, key := range []Name{"Filter", "DecodeParms"} {
+		val, ok := streamDict[key]
+		if !ok {
+			continue
+		}
+		inlined, err := inlineFilterRefs(w, val)
+		if err != nil {
+			return nil, err
+		}
+		streamDict[key] = inlined
 	}
 
 	var length *Placeholder
@@ -612,7 +641,20 @@ func (w *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.Wri
 		length:     length,
 	}
 
-	if w.w.enc != nil {
+	// Skip the document-level encryption wrap when the stream's wire form
+	// declares a Crypt filter at position 0 of /Filter — either passed in
+	// via filters... or already present in dict["Filter"] (e.g. for a
+	// copied stream being written through Writer.Put).  Per PDF spec
+	// §7.4.10 the explicit Crypt filter overrides the default StmF.
+	skipDefaultEncrypt := leadingCrypt != nil
+	if !skipDefaultEncrypt {
+		startsWithCrypt, err := filterChainStartsWithCrypt(w, streamDict["Filter"])
+		if err != nil {
+			return nil, err
+		}
+		skipDefaultEncrypt = startsWithCrypt
+	}
+	if w.w.enc != nil && !skipDefaultEncrypt {
 		enc, err := w.w.enc.EncryptStream(ref, streamBody)
 		if err != nil {
 			return nil, err

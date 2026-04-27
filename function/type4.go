@@ -195,7 +195,7 @@ func (f *Type4) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	ref := rm.Alloc()
 	var filters []pdf.Filter
 	if !rm.Out().GetOptions().HasAny(pdf.OptPretty) {
-		filters = append(filters, &pdf.FilterCompress{})
+		filters = append(filters, pdf.FilterCompress{})
 	}
 	stm, err := rm.Out().OpenStream(ref, dict, filters...)
 	if err != nil {

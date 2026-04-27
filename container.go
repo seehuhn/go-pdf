@@ -244,23 +244,117 @@ func GetStreamReader(r Getter, ref Object) (io.ReadCloser, error) {
 // PDF file while preserving its original encoding.
 //
 // Each call creates a fresh reader, so streams can be read multiple times.
+//
+// Streams whose filter chain begins with an explicit /Crypt entry naming a
+// CF other than /Identity (e.g. /StdCF, or a custom /CF entry) cannot be
+// decrypted yet: the function returns an error rather than silently
+// emitting ciphertext.  Encoding/decoding such streams is Phase 2 work.
 func RawStreamReader(r Getter, x *Stream) (io.ReadCloser, error) {
-	v := V1_2
-	if r != nil {
-		v = GetVersion(r)
+	recipe, err := streamCryptRecipe(r, x)
+	if err != nil {
+		return nil, err
 	}
-
 	out := io.NopCloser(x.NewReader())
-
-	if x.crypt != nil {
-		var err error
-		out, err = x.crypt.Decode(v, out)
-		if err != nil {
-			return nil, err
+	switch recipe {
+	case cryptNone, cryptIdentity:
+		return out, nil
+	case cryptDefault:
+		v := V1_2
+		if r != nil {
+			v = GetVersion(r)
 		}
+		return x.crypt.Decode(v, out)
+	case cryptUnsupportedCF:
+		return nil, errors.New(
+			"RawStreamReader: stream uses non-Identity /Crypt filter; not yet supported")
 	}
+	panic("unreachable")
+}
 
-	return out, nil
+// cryptRecipe describes how a stream's on-disk bytes relate to its
+// post-decryption form, controlling whether [RawStreamReader] needs to
+// apply [filterCrypt] decryption and whether [Copier] can install the
+// source bytes verbatim.
+type cryptRecipe int
+
+const (
+	// cryptNone: the source document is unencrypted.  On-disk bytes
+	// equal post-decryption bytes.
+	cryptNone cryptRecipe = iota
+
+	// cryptDefault: the document is encrypted and the stream uses the
+	// default StmF crypt filter with per-object Algorithm 1 key
+	// derivation.  Post-decryption bytes require [filterCrypt.Decode].
+	cryptDefault
+
+	// cryptIdentity: the document is encrypted but the stream's filter
+	// chain declares /Crypt /Identity at position 0, overriding the
+	// default StmF.  On-disk bytes are already plaintext.
+	cryptIdentity
+
+	// cryptUnsupportedCF: the stream's filter chain declares /Crypt
+	// /StdCF or a named CF at position 0.  The bytes are encrypted
+	// with that CF's recipe (no per-object Algorithm 1), which the
+	// library does not yet implement.
+	cryptUnsupportedCF
+)
+
+// streamCryptRecipe classifies how the encryption layer applies to x.
+// It is shared between [RawStreamReader] and [Copier] so that both
+// paths agree on which streams require decryption and which the
+// library cannot yet handle.
+func streamCryptRecipe(r Getter, x *Stream) (cryptRecipe, error) {
+	if x.crypt == nil {
+		return cryptNone, nil
+	}
+	// cheap probe: most streams have no /Crypt at filter position 0
+	startsWithCrypt, err := filterChainStartsWithCrypt(r, x.Dict["Filter"])
+	if err != nil {
+		return 0, err
+	}
+	if !startsWithCrypt {
+		return cryptDefault, nil
+	}
+	filters, err := GetFilters(r, x.Dict)
+	if err != nil {
+		return 0, err
+	}
+	switch filters[0].(type) {
+	case FilterCryptIdentity:
+		return cryptIdentity, nil
+	case CryptFilter:
+		return cryptUnsupportedCF, nil
+	}
+	return cryptDefault, nil
+}
+
+// filterChainStartsWithCrypt reports whether the resolved /Filter entry
+// names the Crypt filter at position 0.  This is a cheap probe used to
+// short-circuit document-level (de)encryption without paying the cost
+// of [GetFilters] (which resolves JBIG2Globals streams and rejects
+// malformed filter chains).  The filter object and, for arrays, its
+// first element are resolved through r so that an indirect /Filter or
+// indirect first entry is handled correctly.
+func filterChainStartsWithCrypt(r Getter, filter Object) (bool, error) {
+	resolved, err := Resolve(r, filter)
+	if err != nil {
+		return false, err
+	}
+	switch f := resolved.(type) {
+	case Name:
+		return f == "Crypt", nil
+	case Array:
+		if len(f) == 0 {
+			return false, nil
+		}
+		first, err := Resolve(r, f[0])
+		if err != nil {
+			return false, err
+		}
+		name, _ := first.(Name)
+		return name == "Crypt", nil
+	}
+	return false, nil
 }
 
 // DecodeStream returns a reader for the decoded stream data. If numFilters is
@@ -292,8 +386,19 @@ func DecodeStream(r Getter, x *Stream, numFilters int) (io.ReadCloser, error) {
 	src := &sourceErrChecker{r: x.NewReader()}
 	var out io.ReadCloser = io.NopCloser(src)
 
-	// apply decryption before other filters
-	if x.crypt != nil {
+	// Skip the document-level decryption when the stream's filter chain
+	// declares its own per-stream Crypt filter at position 0.  Per PDF
+	// spec §7.4.10, an explicit /Crypt entry overrides the document's
+	// default StmF and skips the per-object Algorithm 1 key derivation;
+	// the [CryptFilter] variant at position 0 is responsible for
+	// decryption (a pass-through for [FilterCryptIdentity]).
+	applyCrypt := x.crypt != nil
+	if applyCrypt && len(filters) > 0 {
+		if _, ok := filters[0].(CryptFilter); ok {
+			applyCrypt = false
+		}
+	}
+	if applyCrypt {
 		out, err = x.crypt.Decode(v, out)
 		if err != nil {
 			return nil, src.promote(err)
@@ -392,7 +497,11 @@ func GetFilters(r Getter, dict Dict) ([]Filter, error) {
 				return nil, fmt.Errorf("wrong type, expected Dict but got %T", decodeParams)
 			}
 		}
-		res = append(res, MakeFilter(f, pDict))
+		filter, err := MakeFilter(f, pDict)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, filter)
 	case Array:
 		pa, ok := decodeParams.(Array)
 		if !ok && decodeParams != nil {
@@ -421,11 +530,28 @@ func GetFilters(r Getter, dict Dict) ([]Filter, error) {
 					}
 				}
 			}
-			res = append(res, MakeFilter(name, pDict))
+			filter, err := MakeFilter(name, pDict)
+			if err != nil {
+				return nil, err
+			}
+			res = append(res, filter)
 		}
 	default:
 		return nil, Error("invalid /Filter field")
 	}
+
+	// Per PDF spec §7.4.10, a Crypt filter must be the first entry in
+	// the /Filter array.  Reject malformed input where it appears at
+	// any other position: there is no recoverable interpretation of an
+	// out-of-position Crypt filter.
+	for i, f := range res {
+		if _, ok := f.(CryptFilter); ok && i != 0 {
+			return nil, &MalformedFileError{
+				Err: errors.New("Crypt filter must be at position 0 in /Filter"),
+			}
+		}
+	}
+
 	// resolve JBIG2Globals for any JBIG2Decode filters
 	for _, f := range res {
 		if jf, ok := f.(*FilterJBIG2); ok {
@@ -440,14 +566,17 @@ func GetFilters(r Getter, dict Dict) ([]Filter, error) {
 
 // resolveJBIG2Globals reads the JBIG2Globals stream from the filter's
 // DecodeParms dictionary and stores the bytes in the filter.
+//
+// f.GlobalsRef is preserved after resolution so that callers writing
+// the stream back out (without going through [Copier]) can decide
+// whether to keep, remap, or drop the reference.
 func resolveJBIG2Globals(r Getter, f *FilterJBIG2) error {
-	globalsRef := f.Param["JBIG2Globals"]
-	if globalsRef == nil {
+	if f.GlobalsRef == nil {
 		return nil
 	}
 
 	// resolve the reference to get the stream
-	obj, err := resolve(r, globalsRef, false)
+	obj, err := resolve(r, f.GlobalsRef, false)
 	if err != nil {
 		return err
 	}

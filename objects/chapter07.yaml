@@ -1394,29 +1394,35 @@ types:
     notes: OpenOffice/LibreOffice extension - hex MD5 as a name object
 - name: FilterCCITTFaxDecode
   purpose: decode parameters for CCITT fax compression
-  goType:
+  goType: pdf.FilterCCITTFax
   pdfRepr: dict
+  specSection: '7.4.6'
+  specTable: Table 11
   fields:
-  - goName:
+  - goName: K
+    goType: int
     pdfKey: K
     pdfType: integer
     required: false
     default: '0'
     introduced: '1.0'
     notes: Table 11
-  - goName:
+  - goName: EndOfLine
+    goType: bool
     pdfKey: EndOfLine
     pdfType: boolean
     required: false
     default: false
     introduced: '1.0'
-  - goName:
+  - goName: EncodedByteAlign
+    goType: bool
     pdfKey: EncodedByteAlign
     pdfType: boolean
     required: false
     default: false
     introduced: '1.0'
-  - goName:
+  - goName: Columns
+    goType: int
     pdfKey: Columns
     pdfType: integer
     required: false
@@ -1424,7 +1430,8 @@ types:
     introduced: '1.0'
     possibleValues:
     - fn:Eval(@Columns>=0)
-  - goName:
+  - goName: Rows
+    goType: int
     pdfKey: Rows
     pdfType: integer
     required: false
@@ -1432,19 +1439,23 @@ types:
     introduced: '1.0'
     possibleValues:
     - fn:Eval(@Rows>=0)
-  - goName:
+  - goName: IgnoreEndOfBlock
+    goType: bool
+    goTransform: invert
     pdfKey: EndOfBlock
     pdfType: boolean
     required: false
     default: true
     introduced: '1.0'
-  - goName:
+  - goName: BlackIs1
+    goType: bool
     pdfKey: BlackIs1
     pdfType: boolean
     required: false
     default: false
     introduced: '1.0'
-  - goName:
+  - goName: DamagedRowsBeforeError
+    goType: int
     pdfKey: DamagedRowsBeforeError
     pdfType: integer
     required: false
@@ -1460,21 +1471,29 @@ types:
     introduced: fn:Extension(Malforms)
 - name: FilterCrypt
   purpose: decode parameters for the Crypt filter
-  goType:
+  goType: pdf.CryptFilter
   pdfType: CryptFilterDecodeParms
   pdfRepr: dict
   introduced: '1.5'
+  specSection: '7.4.10'
   specTable: Table 14
+  notes: |
+    Sealed Go interface with three concrete implementations:
+    FilterCryptIdentity (plaintext-on-disk override), FilterCryptStandard
+    (/StdCF), and FilterCryptNamed (other named CFs from /CF).  Real
+    per-stream encryption is handled internally by filterCrypt in
+    crypto.go and is unrelated to this public interface.
   fields:
-  - goName:
-    pdfKey: Type
+  - pdfKey: Type
     pdfType: name
     required: false
     introduced: '1.5'
     possibleValues:
     - CryptFilterDecodeParms
+    discriminator: true
     notes: Table 14
-  - goName:
+  - goName: Name
+    goType: pdf.Name
     pdfKey: Name
     pdfType: name
     required: false
@@ -1482,11 +1501,15 @@ types:
     introduced: '1.5'
 - name: FilterDCTDecode
   purpose: decode parameters for DCT (JPEG) compression
-  goType:
+  goType: pdf.FilterDCT
   pdfRepr: dict
   introduced: '1.0'
+  specSection: '7.4.8'
+  specTable: Table 13
   fields:
-  - goName:
+  - goName: ColorTransform
+    goType: pdf.DCTColorTransform
+    enum: DCTColorTransform
     pdfKey: ColorTransform
     pdfType: integer
     required: false
@@ -1494,17 +1517,24 @@ types:
     possibleValues:
     - '0'
     - '1'
-    notes: Table 13
+    notes: |
+      No PDF default; the value is auto-detected from JPEG markers
+      when the entry is absent.
 - name: FilterFlateDecode
   purpose: decode parameters for Flate compression
-  goType:
+  goType: pdf.FilterFlate
   pdfRepr: dict
   introduced: '1.2'
+  specSection: '7.4.4'
+  specTable: Table 8
   fields:
-  - goName:
+  - goName: Predictor
+    goType: pdf.FlatePredictor
+    enum: FlatePredictor
     pdfKey: Predictor
     pdfType: integer
     required: false
+    default: '1'
     introduced: '1.2'
     possibleValues:
     - '1'
@@ -1516,7 +1546,8 @@ types:
     - '14'
     - '15'
     notes: Table 8 and Table 10
-  - goName:
+  - goName: Colors
+    goType: int
     pdfKey: Colors
     pdfType: integer
     required: false
@@ -1524,7 +1555,8 @@ types:
     introduced: '1.2'
     possibleValues:
     - fn:Eval((@Colors>=1) && fn:BeforeVersion(1.3,fn:Eval(@Colors<=4)))
-  - goName:
+  - goName: BitsPerComponent
+    goType: int
     pdfKey: BitsPerComponent
     pdfType: integer
     required: false
@@ -1536,7 +1568,8 @@ types:
     - '4'
     - '8'
     - fn:SinceVersion(1.5,16)
-  - goName:
+  - goName: Columns
+    goType: int
     pdfKey: Columns
     pdfType: integer
     required: false
@@ -1544,28 +1577,40 @@ types:
     introduced: '1.2'
 - name: FilterJBIG2Decode
   purpose: decode parameters for JBIG2 compression
-  goType:
+  goType: pdf.FilterJBIG2
   pdfRepr: dict
   introduced: '1.4'
+  specSection: '7.4.7'
+  specTable: Table 12
   fields:
-  - goName:
+  - goName: GlobalsRef
+    goType: pdf.Object
     pdfKey: JBIG2Globals
     pdfType: stream
     required: false
     introduced: '1.4'
     refTypes:
     - Stream
-    notes: Table 12
+    notes: |
+      The wire form: a Reference to the globals stream (or, less commonly,
+      a direct stream object).  At read time, container.go's
+      resolveJBIG2Globals dereferences this and caches the decoded byte
+      contents in the unexported-on-the-wire Globals []byte field.
 - name: FilterLZWDecode
   purpose: decode parameters for LZW compression
-  goType:
+  goType: pdf.FilterLZW
   pdfRepr: dict
   introduced: '1.0'
+  specSection: '7.4.4'
+  specTable: Table 8
   fields:
-  - goName:
+  - goName: Predictor
+    goType: pdf.FlatePredictor
+    enum: FlatePredictor
     pdfKey: Predictor
     pdfType: integer
     required: false
+    default: '1'
     introduced: '1.0'
     possibleValues:
     - '1'
@@ -1577,7 +1622,8 @@ types:
     - '14'
     - '15'
     notes: Table 8 and Table 10
-  - goName:
+  - goName: Colors
+    goType: int
     pdfKey: Colors
     pdfType: integer
     required: false
@@ -1585,7 +1631,8 @@ types:
     introduced: '1.0'
     possibleValues:
     - fn:Eval((@Colors>=1) && fn:BeforeVersion(1.3,fn:Eval(@Colors<=4)))
-  - goName:
+  - goName: BitsPerComponent
+    goType: int
     pdfKey: BitsPerComponent
     pdfType: integer
     required: false
@@ -1597,13 +1644,16 @@ types:
     - '4'
     - '8'
     - fn:SinceVersion(1.5,16)
-  - goName:
+  - goName: Columns
+    goType: int
     pdfKey: Columns
     pdfType: integer
     required: false
     default: '1'
     introduced: '1.0'
-  - goName:
+  - goName: OffByOne
+    goType: bool
+    goTransform: invert
     pdfKey: EarlyChange
     pdfType: integer
     required: false
@@ -3201,3 +3251,32 @@ types:
   pdfRepr: map
   refTypes:
   - XObject
+
+enums:
+- name: FlatePredictor
+  goType: pdf.FlatePredictor
+  default: { go: FlatePredictorNone, pdf: 1 }
+  values:
+  - { go: FlatePredictorNone,       goValue: 1,  pdf: 1  }
+  - { go: FlatePredictorTIFF,       goValue: 2,  pdf: 2  }
+  - { go: FlatePredictorPNGNone,    goValue: 10, pdf: 10 }
+  - { go: FlatePredictorPNGSub,     goValue: 11, pdf: 11 }
+  - { go: FlatePredictorPNGUp,      goValue: 12, pdf: 12 }
+  - { go: FlatePredictorPNGAverage, goValue: 13, pdf: 13 }
+  - { go: FlatePredictorPNGPaeth,   goValue: 14, pdf: 14 }
+  - { go: FlatePredictorPNGOptimum, goValue: 15, pdf: 15 }
+  notes: |
+    Predictor values from PDF spec Table 10.  The Go zero value is
+    treated as FlatePredictorNone.
+- name: DCTColorTransform
+  goType: pdf.DCTColorTransform
+  default: { go: DCTColorTransformAuto, pdf: null }
+  values:
+  - { go: DCTColorTransformAuto,  goValue: 0, pdf: null }
+  - { go: DCTColorTransformNone,  goValue: 1, pdf: 0 }
+  - { go: DCTColorTransformYCbCr, goValue: 2, pdf: 1 }
+  notes: |
+    The Auto variant omits the ColorTransform entry from the
+    parameter dictionary, leaving the choice to the JPEG markers.
+    The Go constant values do not match the PDF wire integers; the
+    mapping is performed in FilterDCT.Info and parseDCT.

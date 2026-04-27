@@ -18,6 +18,7 @@ package pdf
 
 import (
 	"bytes"
+	"compress/zlib"
 	"io"
 	"testing"
 )
@@ -444,6 +445,274 @@ func TestCopierEncryptedStream(t *testing.T) {
 				t.Errorf("copied stream data mismatch: got %q, want %q", got, testData)
 			}
 		})
+	}
+}
+
+// TestEncryptedStreamWithIdentityCrypt verifies that a stream marked with
+// FilterCryptIdentity in an encrypted document is stored plaintext on disk
+// and round-trips correctly through DecodeStream.
+func TestEncryptedStreamWithIdentityCrypt(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		version Version
+	}{
+		{"RC4-128/V1.4", V1_5},
+		{"AES-128/V1.6", V1_6},
+		{"AES-256/V2.0", V2_0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testEncryptedStreamWithIdentityCrypt(t, tc.version)
+		})
+	}
+}
+
+func testEncryptedStreamWithIdentityCrypt(t *testing.T, version Version) {
+	t.Helper()
+
+	testData := []byte("Plaintext payload exempt from document encryption.")
+
+	// Build an encrypted PDF where one stream uses /Crypt /Identity.
+	opt := &WriterOptions{
+		UserPassword:  "user",
+		OwnerPassword: "owner",
+	}
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, version, opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	streamRef := w.Alloc()
+	s, err := w.OpenStream(streamRef, nil,
+		FilterCryptIdentity{}, FilterFlate{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Write(testData); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := addPage(w, Name("Contents"), streamRef); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Re-open with the password and verify DecodeStream round-trips.
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()),
+		&ReaderOptions{Password: "user"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stream, err := GetStream(r, streamRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	decoded, err := DecodeStream(r, stream, 0)
+	if err != nil {
+		t.Fatalf("DecodeStream: %v", err)
+	}
+	got, err := io.ReadAll(decoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded.Close()
+	if !bytes.Equal(got, testData) {
+		t.Errorf("DecodeStream: got %q, want %q", got, testData)
+	}
+
+	// Verify the on-disk bytes are *not* encrypted: they should be
+	// plain Flate-compressed data, decompressible with compress/zlib
+	// directly without going through any decryption.
+	rawZlib, err := io.ReadAll(stream.NewReader())
+	if err != nil {
+		t.Fatal(err)
+	}
+	zr, err := zlib.NewReader(bytes.NewReader(rawZlib))
+	if err != nil {
+		t.Fatalf("on-disk bytes are not plain Flate: %v "+
+			"(suggests document encryption was applied)", err)
+	}
+	plain, err := io.ReadAll(zr)
+	if err != nil {
+		t.Fatalf("decompressing on-disk bytes: %v", err)
+	}
+	zr.Close()
+	if !bytes.Equal(plain, testData) {
+		t.Errorf("on-disk Flate payload: got %q, want %q", plain, testData)
+	}
+
+	// Verify the /Filter dict has [/Crypt /FlateDecode] and that
+	// /DecodeParms (if present) does not write a /Name for the Identity
+	// entry (it is the spec default).
+	filterEntry, ok := stream.Dict["Filter"].(Array)
+	if !ok || len(filterEntry) != 2 {
+		t.Fatalf("/Filter = %v, want array of length 2", stream.Dict["Filter"])
+	}
+	if filterEntry[0] != Name("Crypt") || filterEntry[1] != Name("FlateDecode") {
+		t.Errorf("/Filter = %v, want [/Crypt /FlateDecode]", filterEntry)
+	}
+}
+
+// TestCopyEncryptedStreamWithIdentityCrypt verifies that copying a PDF
+// containing an /Identity-Crypt stream into a fresh encrypted destination
+// preserves the plaintext payload (the copier must skip the document-level
+// strip for Identity streams).
+func TestCopyEncryptedStreamWithIdentityCrypt(t *testing.T) {
+	testData := []byte("Identity-crypt copier round-trip payload.")
+
+	// Encrypted source with a /Crypt /Identity + Flate stream.
+	srcBuf := &bytes.Buffer{}
+	srcW, err := NewWriter(srcBuf, V1_6, &WriterOptions{
+		UserPassword:  "src",
+		OwnerPassword: "src",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srcStreamRef := srcW.Alloc()
+	s, err := srcW.OpenStream(srcStreamRef, nil,
+		FilterCryptIdentity{}, FilterFlate{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Write(testData); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := addPage(srcW, Name("Contents"), srcStreamRef); err != nil {
+		t.Fatal(err)
+	}
+	if err := srcW.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	srcR, err := NewReader(bytes.NewReader(srcBuf.Bytes()), int64(srcBuf.Len()),
+		&ReaderOptions{Password: "src"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Copy into a fresh encrypted destination.
+	dstBuf := &bytes.Buffer{}
+	dstW, err := NewWriter(dstBuf, V1_6, &WriterOptions{
+		UserPassword:  "dst",
+		OwnerPassword: "dst",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	copier := NewCopier(dstW, srcR)
+	dstStreamRef, err := copier.CopyReference(srcStreamRef)
+	if err != nil {
+		t.Fatalf("CopyReference: %v", err)
+	}
+	if err := addPage(dstW, Name("Contents"), dstStreamRef); err != nil {
+		t.Fatal(err)
+	}
+	if err := dstW.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify the destination round-trips.
+	dstR, err := NewReader(bytes.NewReader(dstBuf.Bytes()), int64(dstBuf.Len()),
+		&ReaderOptions{Password: "dst"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dstStream, err := GetStream(dstR, dstStreamRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := DecodeStream(dstR, dstStream, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := io.ReadAll(decoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded.Close()
+	if !bytes.Equal(got, testData) {
+		t.Errorf("copied stream: got %q, want %q", got, testData)
+	}
+}
+
+// TestRawStreamReaderRejectsNonIdentityCrypt verifies that RawStreamReader
+// refuses to emit ciphertext for streams whose /Filter chain begins with a
+// non-Identity Crypt entry: until the library can decrypt /StdCF and named
+// CFs, returning the raw encrypted bytes would silently corrupt any caller
+// that copies them into a destination with different keys.
+func TestRawStreamReaderRejectsNonIdentityCrypt(t *testing.T) {
+	// Build an encrypted PDF containing a normal Flate-compressed stream.
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, V1_6, &WriterOptions{
+		UserPassword:  "u",
+		OwnerPassword: "o",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	streamRef := w.Alloc()
+	s, err := w.OpenStream(streamRef, nil, FilterFlate{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Write([]byte("payload")); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := addPage(w, Name("Contents"), streamRef); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()),
+		&ReaderOptions{Password: "u"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := GetStream(r, streamRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Mutate the dict to claim /Crypt /StdCF at filter position 0.  The
+	// on-disk bytes are not actually /StdCF-encrypted, but RawStreamReader
+	// must refuse without inspecting them.
+	for _, tc := range []struct {
+		name        string
+		decodeParms Object
+	}{
+		{"StdCF", Array{Dict{"Name": Name("StdCF")}, nil}},
+		{"NamedCF", Array{Dict{"Name": Name("MyCF")}, nil}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stream.Dict["Filter"] = Array{Name("Crypt"), Name("FlateDecode")}
+			stream.Dict["DecodeParms"] = tc.decodeParms
+			if _, err := RawStreamReader(r, stream); err == nil {
+				t.Errorf("RawStreamReader: expected error for non-Identity Crypt, got nil")
+			}
+		})
+	}
+
+	// Sanity check: the unmutated /Crypt /Identity case must still succeed.
+	stream.Dict["Filter"] = Array{Name("Crypt"), Name("FlateDecode")}
+	stream.Dict["DecodeParms"] = nil // /Identity is the default
+	if _, err := RawStreamReader(r, stream); err != nil {
+		t.Errorf("RawStreamReader: unexpected error for /Crypt /Identity: %v", err)
 	}
 }
 

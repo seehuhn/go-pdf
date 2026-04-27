@@ -105,8 +105,8 @@ func (im *Indexed) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		imDict["Name"] = im.Name
 	}
 	filter := pdf.FilterCompress{
-		"Columns":   pdf.Integer(im.Width),
-		"Predictor": pdf.Integer(15),
+		Columns:   im.Width,
+		Predictor: pdf.FlatePredictorPNGOptimum,
 	}
 	ref := rm.Alloc()
 	stream, err := rm.Out().OpenStream(ref, imDict, filter)

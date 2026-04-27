@@ -42,9 +42,18 @@ type encryptInfo struct {
 	efF  *cryptFilter // embedded files
 }
 
-// filterCrypt is a filter that handles stream encryption/decryption.
+// filterCrypt is the internal default-StmF stream encryption layer.
 // Unlike regular filters which are stored in the PDF file's stream dictionary,
-// this filter is applied transparently based on the document's encryption settings.
+// this filter is applied transparently based on the document's encryption
+// settings, using the document's StmF crypt filter and Algorithm 1
+// (per-object key derivation, PDF spec §7.6.3).
+//
+// It is unrelated to the public [CryptFilter] interface (and its variants
+// FilterCryptIdentity, FilterCryptStandard, FilterCryptNamed), which
+// represent the explicit /Crypt entries in a stream's /Filter array
+// described by PDF spec §7.4.10.  When such an entry is present at
+// position 0, the filterCrypt layer is skipped because the CryptFilter
+// variant is responsible for the stream's encryption recipe.
 //
 // The raw (possibly encrypted) stream data stays in the Stream object.
 // Decryption happens on-the-fly when the stream is read through DecodeStream,

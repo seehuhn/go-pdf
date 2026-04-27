@@ -18,6 +18,7 @@ package pdf
 
 import (
 	"bytes"
+	"errors"
 	"io"
 )
 
@@ -53,7 +54,7 @@ func (c *Copier) Copy(obj Native) (Native, error) {
 	case Array:
 		return c.CopyArray(x)
 	case *Stream:
-		dict, err := c.CopyDict(x.Dict)
+		dict, err := c.copyStreamDict(x.Dict)
 		if err != nil {
 			return nil, err
 		}
@@ -63,10 +64,29 @@ func (c *Copier) Copy(obj Native) (Native, error) {
 			start:  x.start,
 			length: x.length,
 		}
-		if x.crypt != nil {
-			// strip source encryption; the writer re-encrypts for the
-			// destination
-			raw, err := stripStreamEncryption(x)
+		// Decide whether the source's on-disk bytes need decryption
+		// before being installed in the destination.  For /Identity
+		// (and unencrypted sources) the bytes are already plaintext
+		// and can be reused in place; for the default StmF recipe we
+		// must strip the source encryption so the destination writer
+		// can apply its own; non-Identity /Crypt CFs are not yet
+		// implemented.
+		recipe, err := streamCryptRecipe(c.r, x)
+		if err != nil {
+			return nil, err
+		}
+		switch recipe {
+		case cryptNone, cryptIdentity:
+			// reuse x.data verbatim
+		case cryptDefault:
+			rc, err := RawStreamReader(c.r, x)
+			if err != nil {
+				return nil, err
+			}
+			raw, err := io.ReadAll(rc)
+			if closeErr := rc.Close(); err == nil {
+				err = closeErr
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -75,6 +95,9 @@ func (c *Copier) Copy(obj Native) (Native, error) {
 			res.length = int64(len(raw))
 			// remove stale Length so the writer recomputes it
 			delete(res.Dict, "Length")
+		case cryptUnsupportedCF:
+			return nil, errors.New(
+				"copying streams with non-Identity /Crypt filter is not yet supported")
 		}
 		return res, nil
 	case Reference:
@@ -96,6 +119,60 @@ func (c *Copier) CopyDict(obj Dict) (Dict, error) {
 	}
 
 	return res, nil
+}
+
+// copyStreamDict copies a stream's dictionary, inlining /Filter and
+// /DecodeParms so that the destination dict carries direct values
+// rather than references into the destination file.  This keeps the
+// filter chain self-describing for downstream consumers (notably the
+// cheap /Crypt probe in [Writer.OpenStream]) and matches the canonical
+// PDF form used by all writers in the library.
+func (c *Copier) copyStreamDict(src Dict) (Dict, error) {
+	res, err := c.CopyDict(src)
+	if err != nil {
+		return nil, err
+	}
+	for _, key := range []Name{"Filter", "DecodeParms"} {
+		val, ok := src[key]
+		if !ok {
+			continue
+		}
+		inlined, err := inlineFilterRefs(c.r, val)
+		if err != nil {
+			return nil, err
+		}
+		repl, err := c.Copy(inlined)
+		if err != nil {
+			return nil, err
+		}
+		res[key] = repl
+	}
+	return res, nil
+}
+
+// inlineFilterRefs resolves indirect references in a /Filter or
+// /DecodeParms entry at the top level and, for arrays, at the element
+// level.  The returned value contains only direct entries at those
+// levels; nested references inside dictionary entries are left alone
+// (the caller's [Copier.Copy] handles them).
+func inlineFilterRefs(r Getter, val Object) (Native, error) {
+	resolved, err := Resolve(r, val)
+	if err != nil {
+		return nil, err
+	}
+	arr, ok := resolved.(Array)
+	if !ok {
+		return resolved, nil
+	}
+	out := make(Array, len(arr))
+	for i, v := range arr {
+		elem, err := Resolve(r, v)
+		if err != nil {
+			return nil, err
+		}
+		out[i] = elem
+	}
+	return out, nil
 }
 
 // CopyArray copies an array from the source file to the target file,
@@ -146,18 +223,6 @@ func (c *Copier) CopyReference(obj Reference) (Reference, error) {
 // Redirect replaces an indirect object in the old file with one in the new file.
 func (c *Copier) Redirect(origRef, newRef Reference) {
 	c.trans[origRef] = newRef
-}
-
-// stripStreamEncryption decrypts the raw stream data, removing the source
-// file's encryption layer while preserving content filters (e.g. FlateDecode).
-func stripStreamEncryption(x *Stream) ([]byte, error) {
-	r := io.NopCloser(x.NewReader())
-	dec, err := x.crypt.Decode(0, r)
-	if err != nil {
-		return nil, err
-	}
-	defer dec.Close()
-	return io.ReadAll(dec)
 }
 
 // CopierCopyStruct copies a struct from the source file to the target file.

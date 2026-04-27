@@ -268,15 +268,16 @@ func TestType0BitDepthRoundTrip(t *testing.T) {
 				case 8:
 					samples[byteOffset] = byte(val)
 				case 12:
-					// Pack 12 bits across bytes
-					if bitInByte == 0 {
-						// Store high 8 bits in current byte, low 4 bits in high nibble of next
+					// pack 12 bits across bytes
+					switch bitInByte {
+					case 0:
+						// high 8 bits in current byte, low 4 bits in high nibble of next
 						samples[byteOffset] = byte(val >> 4)
 						if byteOffset+1 < len(samples) {
 							samples[byteOffset+1] |= byte(val&0xF) << 4
 						}
-					} else if bitInByte == 4 {
-						// Store high 4 bits in low nibble of current byte, low 8 bits in next
+					case 4:
+						// high 4 bits in low nibble of current byte, low 8 bits in next
 						samples[byteOffset] |= byte((val >> 8) & 0xF)
 						if byteOffset+1 < len(samples) {
 							samples[byteOffset+1] = byte(val)

@@ -72,15 +72,15 @@ func (s *FlateSource) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference, dict p
 
 	parms := pdf.FilterCompress{}
 	if s.Predictor != 0 {
-		parms["Predictor"] = pdf.Integer(s.Predictor)
+		parms.Predictor = pdf.FlatePredictor(s.Predictor)
 		if s.Colors > 0 {
-			parms["Colors"] = pdf.Integer(s.Colors)
+			parms.Colors = s.Colors
 		}
 		if s.BitsPerComponent > 0 {
-			parms["BitsPerComponent"] = pdf.Integer(s.BitsPerComponent)
+			parms.BitsPerComponent = s.BitsPerComponent
 		}
 		if s.Width > 0 {
-			parms["Columns"] = pdf.Integer(s.Width)
+			parms.Columns = s.Width
 		}
 	}
 
@@ -137,11 +137,11 @@ func (s *CCITTFaxSource) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference, dic
 	}
 
 	parms := pdf.FilterCCITTFax{
-		"Columns": pdf.Integer(s.Width),
-		"K":       pdf.Integer(s.K),
+		Columns: s.Width,
+		K:       s.K,
 	}
 	if s.BlackIs1 {
-		parms["BlackIs1"] = pdf.Boolean(true)
+		parms.BlackIs1 = true
 	}
 
 	w, err := rm.Out().OpenStream(ref, dict, parms)

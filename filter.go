@@ -50,11 +50,21 @@ import (
 // Currently, the following filter types are implemented by this library:
 // [FilterASCII85], [FilterASCIIHex], [FilterCCITTFax], [FilterDCT],
 // [FilterFlate], [FilterJBIG2], [FilterLZW], [FilterRunLength].
-// The [FilterDCT] and [FilterJBIG2] filters support decoding only.
 //
-// In addition, [FilterCompress] can be used to select the
-// best available compression filter when writing PDF streams.  This is
-// FilterFlate for PDF versions 1.2 and above, and FilterLZW for older versions.
+// The [FilterDCT] and [FilterJBIG2] filters support decoding only.
+// The [FilterJPX] type is present so that PDF files using this filter
+// survive a read/write cycle, but encoding and decoding through the
+// filter interface are not supported.
+//
+// The Crypt filter is represented by three variants implementing
+// [CryptFilter]: [FilterCryptIdentity], [FilterCryptStandard], and
+// [FilterCryptNamed].  Of these, only [FilterCryptIdentity] is
+// implemented end-to-end; the other two round-trip the wire form but
+// do not yet support encoding or decoding.
+//
+// In addition, [FilterCompress] can be used to select the best available
+// general compression filter when writing PDF streams.  This is FilterFlate
+// for PDF versions 1.2 and above, and FilterLZW for older versions.
 type Filter interface {
 	// Info returns the name and parameters of the filter,
 	// as they should be written to the PDF file.
@@ -69,26 +79,64 @@ type Filter interface {
 }
 
 // MakeFilter constructs a [Filter] for the given filter name and parameters.
-func MakeFilter(filter Name, param Dict) Filter {
+//
+// Parameters are parsed permissively within reason: unknown or out-of-range
+// values are silently replaced with PDF defaults so that malformed PDF input
+// remains readable.  Cases where there is no safe fix-up — for example, a
+// /Crypt filter whose /Name entry has the wrong PDF type — are reported as
+// a [*MalformedFileError].
+func MakeFilter(filter Name, param Dict) (Filter, error) {
 	switch filter {
 	case "ASCII85Decode":
-		return FilterASCII85{}
+		return FilterASCII85{}, nil
 	case "ASCIIHexDecode":
-		return FilterASCIIHex{}
-	case "FlateDecode":
-		return FilterFlate(param)
-	case "LZWDecode":
-		return FilterLZW(param)
-	case "CCITTFaxDecode":
-		return FilterCCITTFax(param)
-	case "DCTDecode":
-		return FilterDCT(param)
-	case "JBIG2Decode":
-		return &FilterJBIG2{Param: param}
+		return FilterASCIIHex{}, nil
 	case "RunLengthDecode":
-		return FilterRunLength{}
+		return FilterRunLength{}, nil
+	case "FlateDecode":
+		return parseFlate(param), nil
+	case "LZWDecode":
+		return parseLZW(param), nil
+	case "CCITTFaxDecode":
+		return parseCCITTFax(param), nil
+	case "DCTDecode":
+		return parseDCT(param), nil
+	case "JBIG2Decode":
+		return parseJBIG2(param), nil
+	case "JPXDecode":
+		return FilterJPX{}, nil
+	case "Crypt":
+		return parseCrypt(param)
 	default:
-		return &filterNotImplemented{Name: filter, Param: param}
+		return &filterNotImplemented{Name: filter, Param: param}, nil
+	}
+}
+
+// parseCrypt constructs the appropriate [CryptFilter] variant from a
+// /Crypt filter's /DecodeParms dict.  Unlike the other parse* helpers,
+// this one returns an error when the /Name entry is present with a
+// non-Name PDF type: there is no safe default fix-up — picking Identity
+// would silently mask a malformed file that may have intended an
+// encrypted recipe, and picking a named CF would invent a name not
+// found in the file.
+func parseCrypt(param Dict) (CryptFilter, error) {
+	var name Name
+	if val, present := param["Name"]; present {
+		n, ok := val.(Name)
+		if !ok {
+			return nil, &MalformedFileError{
+				Err: fmt.Errorf("Crypt filter: /Name has wrong type %T", val),
+			}
+		}
+		name = n
+	}
+	switch name {
+	case "", "Identity":
+		return FilterCryptIdentity{}, nil
+	case "StdCF":
+		return FilterCryptStandard{}, nil
+	default:
+		return FilterCryptNamed{Name: name}, nil
 	}
 }
 
@@ -166,20 +214,456 @@ func (f FilterRunLength) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 	return asMalformedFilter(runlength.Decode(r), nil)
 }
 
+// FlatePredictor selects the predictor algorithm used by the
+// [FilterFlate], [FilterLZW], and [FilterCompress] filters.
+//
+// The values are taken from PDF spec Table 10.  The Go zero value
+// (an unset predictor) is treated as [FlatePredictorNone] when written.
+type FlatePredictor int
+
+// Predictor values as defined by PDF spec Table 10.
+const (
+	FlatePredictorNone       FlatePredictor = 1
+	FlatePredictorTIFF       FlatePredictor = 2
+	FlatePredictorPNGNone    FlatePredictor = 10
+	FlatePredictorPNGSub     FlatePredictor = 11
+	FlatePredictorPNGUp      FlatePredictor = 12
+	FlatePredictorPNGAverage FlatePredictor = 13
+	FlatePredictorPNGPaeth   FlatePredictor = 14
+	FlatePredictorPNGOptimum FlatePredictor = 15
+)
+
+// isValid reports whether the predictor is one of the values listed
+// in PDF spec Table 10 (or the unset zero value).
+func (p FlatePredictor) isValid() bool {
+	switch p {
+	case 0,
+		FlatePredictorNone, FlatePredictorTIFF,
+		FlatePredictorPNGNone, FlatePredictorPNGSub,
+		FlatePredictorPNGUp, FlatePredictorPNGAverage,
+		FlatePredictorPNGPaeth, FlatePredictorPNGOptimum:
+		return true
+	}
+	return false
+}
+
+// FilterFlate is the FlateDecode filter.
+//
+// This filter requires PDF version 1.2 or higher.
+type FilterFlate struct {
+	// Predictor selects the predictor algorithm.
+	// On write, 0 can be used as a shorthand for [FlatePredictorNone].
+	Predictor FlatePredictor
+
+	// Colors is the number of interleaved colour components per sample.
+	// Only meaningful when Predictor selects a predictor other than
+	// [FlatePredictorNone]; setting Colors otherwise is a write-time error.
+	//
+	// On write, 0 can be used as a shorthand for 1.
+	Colors int
+
+	// BitsPerComponent is the number of bits used to represent each
+	// colour component.  Only meaningful when Predictor selects a
+	// predictor other than [FlatePredictorNone]; setting BitsPerComponent
+	// otherwise is a write-time error.
+	//
+	// On write, 0 can be used as a shorthand for 8.
+	BitsPerComponent int
+
+	// Columns is the number of samples in each row.  Only meaningful
+	// when Predictor selects a predictor other than [FlatePredictorNone];
+	// setting Columns otherwise is a write-time error.
+	//
+	// On write, 0 can be used as a shorthand for 1.
+	Columns int
+}
+
+// Info implements the [Filter] interface.
+func (f FilterFlate) Info(v Version) (Name, Dict, error) {
+	if err := f.validate(v); err != nil {
+		return "", nil, err
+	}
+	return "FlateDecode", f.toDict(), nil
+}
+
+// Encode implements the [Filter] interface.
+func (f FilterFlate) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error) {
+	if err := f.validate(v); err != nil {
+		return nil, err
+	}
+	return encodeFlateLZW(w, f.Predictor, f.Colors, f.BitsPerComponent, f.Columns, false, false)
+}
+
+// Decode implements the [Filter] interface.
+func (f FilterFlate) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
+	return asMalformedFilter(decodeFlateLZW(r, f.Predictor, f.Colors, f.BitsPerComponent, f.Columns, false, false))
+}
+
+func (f FilterFlate) validate(v Version) error {
+	if v < V1_2 {
+		return &VersionError{Operation: "FlateDecode filter", Earliest: V1_2}
+	}
+	return validateFlateLZW(v, f.Predictor, f.Colors, f.BitsPerComponent, f.Columns)
+}
+
+// toDict returns the DecodeParms dictionary, or nil if no entries are needed.
+func (f FilterFlate) toDict() Dict {
+	res := Dict{}
+	usingPredictor := f.Predictor != 0 && f.Predictor != FlatePredictorNone
+	if usingPredictor {
+		res["Predictor"] = Integer(f.Predictor)
+		if f.Colors != 0 && f.Colors != 1 {
+			res["Colors"] = Integer(f.Colors)
+		}
+		if f.BitsPerComponent != 0 && f.BitsPerComponent != 8 {
+			res["BitsPerComponent"] = Integer(f.BitsPerComponent)
+		}
+		if f.Columns != 0 && f.Columns != 1 {
+			res["Columns"] = Integer(f.Columns)
+		}
+	}
+	if len(res) == 0 {
+		return nil
+	}
+	return res
+}
+
+// FilterLZW is the LZWDecode filter.
+//
+// This is only useful to read legacy PDF files.  For new files, use
+// [FilterFlate] instead.
+type FilterLZW struct {
+	// Predictor selects the predictor algorithm.
+	// On write, 0 can be used as a shorthand for [FlatePredictorNone].
+	Predictor FlatePredictor
+
+	// Colors is the number of interleaved colour components per sample.
+	// Only meaningful when Predictor selects a predictor other than
+	// [FlatePredictorNone]; setting Colors otherwise is a write-time error.
+	//
+	// On write, 0 can be used as a shorthand for 1.
+	Colors int
+
+	// BitsPerComponent is the number of bits used to represent each
+	// colour component.  Only meaningful when Predictor selects a
+	// predictor other than [FlatePredictorNone]; setting BitsPerComponent
+	// otherwise is a write-time error.
+	//
+	// On write, 0 can be used as a shorthand for 8.
+	BitsPerComponent int
+
+	// Columns is the number of samples in each row.  Only meaningful
+	// when Predictor selects a predictor other than [FlatePredictorNone];
+	// setting Columns otherwise is a write-time error.
+	//
+	// On write, 0 can be used as a shorthand for 1.
+	Columns int
+
+	// OffByOne selects which variant of the LZW algorithm is used.
+	// The Go zero value (false) selects the corrected algorithm
+	// (PDF EarlyChange=0); set to true to use the legacy off-by-one
+	// variant (PDF EarlyChange=1, the PDF default).
+	OffByOne bool
+}
+
+// Info implements the [Filter] interface.
+func (f FilterLZW) Info(v Version) (Name, Dict, error) {
+	if err := f.validate(v); err != nil {
+		return "", nil, err
+	}
+	dict := FilterFlate{
+		Predictor:        f.Predictor,
+		Colors:           f.Colors,
+		BitsPerComponent: f.BitsPerComponent,
+		Columns:          f.Columns,
+	}.toDict()
+	if !f.OffByOne {
+		if dict == nil {
+			dict = Dict{}
+		}
+		dict["EarlyChange"] = Integer(0)
+	}
+	return "LZWDecode", dict, nil
+}
+
+// Encode implements the [Filter] interface.
+func (f FilterLZW) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error) {
+	if err := f.validate(v); err != nil {
+		return nil, err
+	}
+	return encodeFlateLZW(w, f.Predictor, f.Colors, f.BitsPerComponent, f.Columns, true, f.OffByOne)
+}
+
+// Decode implements the [Filter] interface.
+func (f FilterLZW) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
+	return asMalformedFilter(decodeFlateLZW(r, f.Predictor, f.Colors, f.BitsPerComponent, f.Columns, true, f.OffByOne))
+}
+
+func (f FilterLZW) validate(v Version) error {
+	return validateFlateLZW(v, f.Predictor, f.Colors, f.BitsPerComponent, f.Columns)
+}
+
+// FilterCompress is a special filter, which is used to select the
+// best available compression filter when writing PDF streams.  This is
+// [FilterFlate] for PDF versions 1.2 and above, and [FilterLZW] for older
+// versions.
+type FilterCompress struct {
+	// Predictor selects the predictor algorithm.
+	// On write, 0 can be used as a shorthand for [FlatePredictorNone].
+	Predictor FlatePredictor
+
+	// Colors is the number of interleaved colour components per sample.
+	// Only meaningful when Predictor selects a predictor other than
+	// [FlatePredictorNone]; setting Colors otherwise is a write-time error.
+	//
+	// On write, 0 can be used as a shorthand for 1.
+	Colors int
+
+	// BitsPerComponent is the number of bits used to represent each
+	// colour component.  Only meaningful when Predictor selects a
+	// predictor other than [FlatePredictorNone]; setting BitsPerComponent
+	// otherwise is a write-time error.
+	//
+	// On write, 0 can be used as a shorthand for 8.
+	BitsPerComponent int
+
+	// Columns is the number of samples in each row.  Only meaningful
+	// when Predictor selects a predictor other than [FlatePredictorNone];
+	// setting Columns otherwise is a write-time error.
+	//
+	// On write, 0 can be used as a shorthand for 1.
+	Columns int
+}
+
+// Info implements the [Filter] interface.
+func (f FilterCompress) Info(v Version) (Name, Dict, error) {
+	if v >= V1_2 {
+		return f.toFlate().Info(v)
+	}
+	return f.toLZW().Info(v)
+}
+
+// Encode implements the [Filter] interface.
+func (f FilterCompress) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error) {
+	if v >= V1_2 {
+		return f.toFlate().Encode(v, w)
+	}
+	return f.toLZW().Encode(v, w)
+}
+
+// Decode implements the [Filter] interface.
+func (f FilterCompress) Decode(v Version, r io.Reader) (io.ReadCloser, error) {
+	if v >= V1_2 {
+		return f.toFlate().Decode(v, r)
+	}
+	return f.toLZW().Decode(v, r)
+}
+
+func (f FilterCompress) toFlate() FilterFlate {
+	return FilterFlate{
+		Predictor:        f.Predictor,
+		Colors:           f.Colors,
+		BitsPerComponent: f.BitsPerComponent,
+		Columns:          f.Columns,
+	}
+}
+
+func (f FilterCompress) toLZW() FilterLZW {
+	return FilterLZW{
+		Predictor:        f.Predictor,
+		Colors:           f.Colors,
+		BitsPerComponent: f.BitsPerComponent,
+		Columns:          f.Columns,
+		OffByOne:         true, // PDF default
+	}
+}
+
+// FilterCCITTFax is the CCITTFaxDecode filter.
+type FilterCCITTFax struct {
+	// K identifies the encoding scheme used:
+	//   K < 0: Group 4 (pure two-dimensional)
+	//   K = 0: Group 3, one-dimensional (PDF default)
+	//   K > 0: Group 3, mixed one- and two-dimensional
+	K int
+
+	// EndOfLine indicates whether end-of-line bit patterns are present
+	// in the encoded data.
+	EndOfLine bool
+
+	// EncodedByteAlign indicates that each encoded scan line is padded
+	// with zero bits to begin on a byte boundary.
+	EncodedByteAlign bool
+
+	// Columns is the width of the image in pixels.
+	//
+	// On write, 0 can be used as a shorthand for 1728.
+	Columns int
+
+	// Rows is the height of the image in scan lines.
+	// A value of 0 means the height is not predetermined.
+	Rows int
+
+	// IgnoreEndOfBlock causes the filter to ignore end-of-block bit
+	// patterns in the encoded data.  The Go zero value (false)
+	// corresponds to the PDF default (EndOfBlock=true).
+	IgnoreEndOfBlock bool
+
+	// BlackIs1, if true, interprets bits with value 1 as black pixels
+	// (the reverse of the normal PDF convention).
+	BlackIs1 bool
+
+	// DamagedRowsBeforeError is the number of damaged rows that may be
+	// tolerated before an error occurs.
+	DamagedRowsBeforeError int
+}
+
+// Info implements the [Filter] interface.
+func (f FilterCCITTFax) Info(v Version) (Name, Dict, error) {
+	if err := f.validate(v); err != nil {
+		return "", nil, err
+	}
+
+	res := Dict{}
+	if f.K != 0 {
+		res["K"] = Integer(f.K)
+	}
+	if f.EndOfLine {
+		res["EndOfLine"] = Boolean(true)
+	}
+	if f.EncodedByteAlign {
+		res["EncodedByteAlign"] = Boolean(true)
+	}
+	if f.Columns != 0 && f.Columns != 1728 {
+		res["Columns"] = Integer(f.Columns)
+	}
+	if f.Rows > 0 {
+		res["Rows"] = Integer(f.Rows)
+	}
+	if f.IgnoreEndOfBlock {
+		res["EndOfBlock"] = Boolean(false)
+	}
+	if f.BlackIs1 {
+		res["BlackIs1"] = Boolean(true)
+	}
+	if f.DamagedRowsBeforeError > 0 {
+		res["DamagedRowsBeforeError"] = Integer(f.DamagedRowsBeforeError)
+	}
+
+	if len(res) == 0 {
+		return "CCITTFaxDecode", nil, nil
+	}
+	return "CCITTFaxDecode", res, nil
+}
+
+// Encode implements the [Filter] interface.
+func (f FilterCCITTFax) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error) {
+	if err := f.validate(v); err != nil {
+		return nil, err
+	}
+	ww, err := ccittfax.NewWriter(w, f.toParams())
+	if err != nil {
+		return nil, err
+	}
+	return &withClose{
+		Writer: ww,
+		close: func() error {
+			err := ww.Close()
+			if err != nil {
+				return err
+			}
+			return w.Close()
+		},
+	}, nil
+}
+
+// Decode implements the [Filter] interface.
+func (f FilterCCITTFax) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
+	reader, err := ccittfax.NewReader(r, f.toParams())
+	if err != nil {
+		return asMalformedFilter(nil, err)
+	}
+	return asMalformedFilter(io.NopCloser(reader), nil)
+}
+
+func (f FilterCCITTFax) validate(_ Version) error {
+	// Cap dimensions at 1<<20, matching the internal ccittfax.maxColumns
+	// constant and the Flate predictor's column bound.  This catches
+	// pathological inputs (memory exhaustion in the encoder) before
+	// setXRef rather than partway through writing.
+	const maxDim = 1 << 20
+	if f.Columns < 0 || f.Columns > maxDim {
+		return fmt.Errorf("invalid number of columns %d", f.Columns)
+	}
+	if f.Rows < 0 || f.Rows > maxDim {
+		return fmt.Errorf("invalid number of rows %d", f.Rows)
+	}
+	if f.DamagedRowsBeforeError < 0 || f.DamagedRowsBeforeError > maxDim {
+		return fmt.Errorf("invalid number of damaged rows %d", f.DamagedRowsBeforeError)
+	}
+	return nil
+}
+
+func (f FilterCCITTFax) toParams() *ccittfax.Params {
+	cols := f.Columns
+	if cols == 0 {
+		cols = 1728
+	}
+	return &ccittfax.Params{
+		Columns:                cols,
+		K:                      f.K,
+		MaxRows:                f.Rows,
+		EndOfLine:              f.EndOfLine,
+		EncodedByteAlign:       f.EncodedByteAlign,
+		BlackIs1:               f.BlackIs1,
+		IgnoreEndOfBlock:       f.IgnoreEndOfBlock,
+		DamagedRowsBeforeError: f.DamagedRowsBeforeError,
+	}
+}
+
+// DCTColorTransform selects the colour-space transformation applied
+// by the [FilterDCT] filter.
+//
+// The Go zero value [DCTColorTransformAuto] omits the ColorTransform
+// entry from the parameter dictionary, leaving the choice to the
+// JPEG markers (and, in their absence, the PDF default rules).
+type DCTColorTransform int
+
+// DCTColorTransform values.  The numeric constant values are an
+// internal Go encoding; the wire mapping happens in
+// [FilterDCT.Info] and [MakeFilter].
+const (
+	// DCTColorTransformAuto leaves the transform choice to the JPEG
+	// markers and PDF default rules (no ColorTransform entry written).
+	DCTColorTransformAuto DCTColorTransform = iota
+
+	// DCTColorTransformNone applies no colour transform (PDF value 0).
+	DCTColorTransformNone
+
+	// DCTColorTransformYCbCr converts between RGB/YCbCr (3 components)
+	// or CMYK/YCbCrK (4 components) (PDF value 1).
+	DCTColorTransformYCbCr
+)
+
 // FilterDCT is the DCTDecode filter, used for JPEG-compressed data.
 // This filter supports decoding only.
-type FilterDCT Dict
+type FilterDCT struct {
+	// ColorTransform specifies the colour-space transformation applied
+	// during decoding.
+	ColorTransform DCTColorTransform
+}
 
 // Info implements the [Filter] interface.
 func (f FilterDCT) Info(_ Version) (Name, Dict, error) {
-	res := Dict{}
-	if val, ok := Dict(f)["ColorTransform"].(Integer); ok {
-		res["ColorTransform"] = val
-	}
-	if len(res) == 0 {
+	switch f.ColorTransform {
+	case DCTColorTransformAuto:
 		return "DCTDecode", nil, nil
+	case DCTColorTransformNone:
+		return "DCTDecode", Dict{"ColorTransform": Integer(0)}, nil
+	case DCTColorTransformYCbCr:
+		return "DCTDecode", Dict{"ColorTransform": Integer(1)}, nil
+	default:
+		return "", nil, fmt.Errorf("invalid DCTColorTransform value %d", f.ColorTransform)
 	}
-	return "DCTDecode", res, nil
 }
 
 // Encode implements the [Filter] interface.
@@ -191,8 +675,12 @@ func (f FilterDCT) Encode(_ Version, _ io.WriteCloser) (io.WriteCloser, error) {
 // Decode implements the [Filter] interface.
 func (f FilterDCT) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 	var ct *int
-	if val, ok := Dict(f)["ColorTransform"].(Integer); ok {
-		v := int(val)
+	switch f.ColorTransform {
+	case DCTColorTransformNone:
+		v := 0
+		ct = &v
+	case DCTColorTransformYCbCr:
+		v := 1
 		ct = &v
 	}
 	return asMalformedFilter(dct.Decode(r, ct))
@@ -202,13 +690,37 @@ func (f FilterDCT) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 // JBIG2Decode encoding is not supported via the filter interface;
 // use the graphics/image/jbig2 package for encoding.
 type FilterJBIG2 struct {
-	Param   Dict
-	Globals []byte // pre-read JBIG2Globals stream data
+	// Globals holds the resolved contents of the JBIG2Globals stream,
+	// or nil if the encoded data does not reference global segments.
+	// The field is populated automatically when reading; for writing
+	// it has no effect (use GlobalsRef instead).
+	Globals []byte
+
+	// GlobalsRef is the /JBIG2Globals entry from the stream's
+	// /DecodeParms, or nil if absent.  Per spec the value is a
+	// [Reference] to a globals stream; the field is typed as [Object]
+	// so that malformed inputs round-trip rather than being lost.
+	//
+	// On read, GlobalsRef points into the source file's object graph;
+	// it is preserved so that round-trip writers can either use it
+	// as-is (in-place re-write) or remap it (cross-file write).
+	// [Copier] handles the cross-file remap implicitly by deep-copying
+	// the stream dictionary, so callers using Copier need not touch
+	// this field; callers writing through OpenStream from scratch must
+	// allocate a destination-side globals stream and set GlobalsRef
+	// to its [Reference].
+	GlobalsRef Object
 }
 
 // Info implements the [Filter] interface.
-func (f *FilterJBIG2) Info(_ Version) (Name, Dict, error) {
-	return "JBIG2Decode", f.Param, nil
+func (f *FilterJBIG2) Info(v Version) (Name, Dict, error) {
+	if err := checkVersionV(v, "JBIG2Decode filter", V1_4); err != nil {
+		return "", nil, err
+	}
+	if f.GlobalsRef != nil {
+		return "JBIG2Decode", Dict{"JBIG2Globals": f.GlobalsRef}, nil
+	}
+	return "JBIG2Decode", nil, nil
 }
 
 // Encode implements the [Filter] interface.
@@ -239,335 +751,322 @@ func (f *FilterJBIG2) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 	return io.NopCloser(bytes.NewReader(bm.Pix)), nil
 }
 
-// FilterCompress is a special filter name, which is used to select the
-// best available compression filter when writing PDF streams.  This is
-// [FilterFlate] for PDF versions 1.2 and above, and [FilterLZW] for older
-// versions.
-type FilterCompress Dict
+// FilterJPX is the JPXDecode filter for JPEG 2000-compressed data.
+// JPXDecode is not implemented; this type exists so PDF files using
+// the filter survive a read/write cycle.
+type FilterJPX struct{}
 
 // Info implements the [Filter] interface.
-func (f FilterCompress) Info(v Version) (Name, Dict, error) {
-	if v >= V1_2 {
-		return FilterFlate(f).Info(v)
-	}
-	return FilterLZW(f).Info(v)
-}
-
-// Encode implements the [Filter] interface.
-func (f FilterCompress) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error) {
-	if v >= V1_2 {
-		return FilterFlate(f).Encode(v, w)
-	}
-	return FilterLZW(f).Encode(v, w)
-}
-
-// Decode implements the [Filter] interface.
-func (f FilterCompress) Decode(v Version, r io.Reader) (io.ReadCloser, error) {
-	if v >= V1_2 {
-		return FilterFlate(f).Decode(v, r)
-	}
-	return FilterLZW(f).Decode(v, r)
-}
-
-// FilterFlate is the FlateDecode filter.
-//
-// The filter is represented by a dictionary of filter parameters. The following
-// parameters are supported:
-//
-//   - "Predictor": A code that selects the predictor algorithm, if any.
-//     If the value is greater than 1, the data are differenced before being
-//     encoded. (Default: 1)
-//
-//   - "Colors": The number of interleaved color components per sample.
-//     (Default: 1)
-//
-//   - "BitsPerComponent": The number of bits used to represent each color.
-//     (Default: 8)
-//
-//   - "Columns": The number of samples in each row. (Default: 1)
-//
-// The parameters are explained in detail in section 7.4.4 of PDF 32000-1:2008.
-//
-// This filter requires PDF versions 1.2 or higher.
-type FilterFlate Dict
-
-// Info implements the [Filter] interface.
-func (f FilterFlate) Info(v Version) (Name, Dict, error) {
-	ff, err := f.parseParameters(v)
-	if err != nil {
+func (f FilterJPX) Info(v Version) (Name, Dict, error) {
+	if err := checkVersionV(v, "JPXDecode filter", V1_5); err != nil {
 		return "", nil, err
 	}
-
-	res := Dict{}
-	if ff.Predictor != 1 {
-		switch ff.Predictor {
-		case 1, 2, 10, 11, 12, 13, 14, 15:
-			// pass
-		default:
-			return "", nil, fmt.Errorf("unsupported predictor %d", ff.Predictor)
-		}
-		res["Predictor"] = Integer(ff.Predictor)
-	}
-	if ff.Predictor > 1 && ff.Colors != 1 {
-		if ff.Colors < 1 || v < V1_3 && ff.Colors > 4 {
-			return "", nil, fmt.Errorf("invalid number of colour channels %d", ff.Colors)
-		}
-		res["Colors"] = Integer(ff.Colors)
-	}
-	if ff.Predictor > 1 && ff.BitsPerComponent != 8 {
-		// Valid values are 1, 2, 4, 8, and (PDF 1.5) 16
-		switch ff.BitsPerComponent {
-		case 1, 2, 4, 8, 16:
-			if v >= V1_5 || ff.BitsPerComponent <= 8 {
-				break
-			}
-			fallthrough
-		default:
-			return "", nil, fmt.Errorf("invalid number of bits per component %d", ff.BitsPerComponent)
-		}
-		res["BitsPerComponent"] = Integer(ff.BitsPerComponent)
-	}
-	if ff.Predictor > 1 && ff.Columns != 1 {
-		if ff.Columns < 1 || ff.Columns > 1<<20 {
-			return "", nil, fmt.Errorf("invalid number of columns %d", ff.Columns)
-		}
-		res["Columns"] = Integer(ff.Columns)
-	}
-
-	return "FlateDecode", res, nil
+	return "JPXDecode", nil, nil
 }
 
 // Encode implements the [Filter] interface.
-func (f FilterFlate) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error) {
-	ff, err := f.parseParameters(v)
-	if err != nil {
-		return nil, err
-	}
-	return ff.Encode(w)
+// JPXDecode encoding is not supported.
+func (f FilterJPX) Encode(_ Version, _ io.WriteCloser) (io.WriteCloser, error) {
+	return nil, errors.New("JPXDecode encoding not supported")
 }
 
 // Decode implements the [Filter] interface.
-func (f FilterFlate) Decode(v Version, r io.Reader) (io.ReadCloser, error) {
-	ff, err := f.parseParameters(v)
-	if err != nil {
-		return asMalformedFilter(nil, err)
-	}
-	return asMalformedFilter(ff.Decode(r))
+// JPXDecode decoding is not supported.
+func (f FilterJPX) Decode(_ Version, _ io.Reader) (io.ReadCloser, error) {
+	return asMalformedFilter(nil, errors.New("JPXDecode decoding not supported"))
 }
 
-func (f FilterFlate) parseParameters(v Version) (*flateFilter, error) {
-	if v < V1_2 {
-		return nil, &VersionError{Operation: "FlateDecode filter", Earliest: V1_2}
-	}
-	res := &flateFilter{ // set defaults
-		Predictor:        1,
-		Colors:           1,
-		BitsPerComponent: 8,
-		Columns:          1,
-	}
-	if val, ok := f["Predictor"].(Integer); ok {
-		res.Predictor = int(val)
-	}
-	if val, ok := f["Colors"].(Integer); ok {
-		res.Colors = int(val)
-	}
-	if val, ok := f["BitsPerComponent"].(Integer); ok {
-		res.BitsPerComponent = int(val)
-	}
-	if val, ok := f["Columns"].(Integer); ok {
-		res.Columns = int(val)
-	}
-	return res, nil
+// CryptFilter is the common interface implemented by the three Crypt
+// filter variants: [FilterCryptIdentity], [FilterCryptStandard], and
+// [FilterCryptNamed].
+//
+// Per PDF spec §7.4.10, a Crypt filter must be the first entry in a
+// stream's /Filter array.  The library enforces this on read (via
+// [GetFilters]) and on write (via [Writer.OpenStream]).
+type CryptFilter interface {
+	Filter
+	isCryptFilter()
 }
 
-// FilterLZW is the LZWDecode filter.
-//
-// This is only useful to read legacy PDF files.  For new files, use
-// [FilterFlate] instead.
-//
-// The filter is represented by a dictionary of filter parameters.
-// The following parameters are supported:
-//
-//   - "Predictor": A code that selects the predictor algorithm, if any.
-//     If the value is greater than 1, the data were differenced before being
-//     encoded. (Default: 1)
-//
-//   - "Colors": The number of interleaved color components per sample.
-//     (Default: 1)
-//
-//   - "BitsPerComponent": The number of bits used to represent each color.
-//     (Default: 8)
-//
-//   - "Columns": The number of samples in each row. (Default: 1)
-//
-//   - "EarlyChange": An integer value specifying whether the data
-//     is encoded using the correct LZW algorithm (value 0), or whether
-//     code with an off-by-one error is used (value 1).  (Default: 1)
-//
-// The parameters are explained in detail in section 7.4.4 of PDF 32000-1:2008.
-type FilterLZW Dict
+// FilterCryptIdentity declares that a stream's bytes are stored
+// plaintext on disk, even when the document otherwise uses an /Encrypt
+// dictionary.  Producers use this to mark a specific stream (for
+// example, a Metadata stream) as exempt from document-level encryption.
+type FilterCryptIdentity struct{}
+
+func (FilterCryptIdentity) isCryptFilter() {}
 
 // Info implements the [Filter] interface.
-func (f FilterLZW) Info(v Version) (Name, Dict, error) {
-	// TODO(voss): move the error handling into parseParameters
-
-	ff, err := f.parseParameters(v)
-	if err != nil {
+func (FilterCryptIdentity) Info(v Version) (Name, Dict, error) {
+	if err := checkVersionV(v, "Crypt filter", V1_5); err != nil {
 		return "", nil, err
 	}
-
-	res := Dict{}
-	if ff.Predictor != 1 {
-		switch ff.Predictor {
-		case 1, 2, 10, 11, 12, 13, 14, 15:
-			// pass
-		default:
-			return "", nil, fmt.Errorf("unsupported predictor %d", ff.Predictor)
-		}
-		res["Predictor"] = Integer(ff.Predictor)
-	}
-	if ff.Predictor > 1 && ff.Colors != 1 {
-		if ff.Colors < 1 || v < V1_3 && ff.Colors > 4 {
-			return "", nil, fmt.Errorf("invalid number of colour channels %d", ff.Colors)
-		}
-		res["Colors"] = Integer(ff.Colors)
-	}
-	if ff.Predictor > 1 && ff.BitsPerComponent != 8 {
-		// Valid values are 1, 2, 4, 8, and (PDF 1.5) 16
-		switch ff.BitsPerComponent {
-		case 1, 2, 4, 8, 16:
-			if v >= V1_5 || ff.BitsPerComponent <= 8 {
-				break
-			}
-			fallthrough
-		default:
-			return "", nil, fmt.Errorf("invalid number of bits per component %d", ff.BitsPerComponent)
-		}
-		res["BitsPerComponent"] = Integer(ff.BitsPerComponent)
-	}
-	if ff.Predictor > 1 && ff.Columns != 1 {
-		if ff.Columns < 1 || ff.Columns > 1<<20 {
-			return "", nil, fmt.Errorf("invalid number of columns %d", ff.Columns)
-		}
-		res["Columns"] = Integer(ff.Columns)
-	}
-	if !ff.EarlyChange {
-		res["EarlyChange"] = Integer(0)
-	}
-
-	return "LZWDecode", res, nil
+	return "Crypt", nil, nil
 }
 
 // Encode implements the [Filter] interface.
-func (f FilterLZW) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error) {
-	ff, err := f.parseParameters(v)
-	if err != nil {
-		return nil, err
-	}
-	return ff.Encode(w)
+// For [FilterCryptIdentity] this is a pass-through: the stream's bytes
+// are written unchanged.  The document-level encryption is bypassed
+// for this stream by [Writer.OpenStream].
+func (FilterCryptIdentity) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, error) {
+	return w, nil
 }
 
 // Decode implements the [Filter] interface.
-func (f FilterLZW) Decode(v Version, r io.Reader) (io.ReadCloser, error) {
-	ff, err := f.parseParameters(v)
-	if err != nil {
-		return asMalformedFilter(nil, err)
-	}
-	return asMalformedFilter(ff.Decode(r))
+// For [FilterCryptIdentity] this is a pass-through: the stream's bytes
+// are read unchanged.  The document-level decryption is bypassed for
+// this stream by [DecodeStream].
+func (FilterCryptIdentity) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
+	return io.NopCloser(r), nil
 }
 
-func (f FilterLZW) parseParameters(_ Version) (*flateFilter, error) {
-	res := &flateFilter{ // set defaults
-		Predictor:        1,
-		Colors:           1,
-		BitsPerComponent: 8,
-		Columns:          1,
-		EarlyChange:      true,
-		IsLZW:            true,
+// FilterCryptStandard declares that a stream is encrypted using the
+// document's /StdCF crypt filter, with the file key used as-is (no
+// per-object Algorithm 1 key derivation, per PDF spec §7.4.10).
+//
+// Encoding and decoding via the filter interface are not yet supported;
+// the type exists so PDF files using /Crypt with /Name /StdCF survive a
+// read/write cycle.
+type FilterCryptStandard struct{}
+
+func (FilterCryptStandard) isCryptFilter() {}
+
+// Info implements the [Filter] interface.
+func (FilterCryptStandard) Info(v Version) (Name, Dict, error) {
+	if err := checkVersionV(v, "Crypt filter", V1_5); err != nil {
+		return "", nil, err
 	}
-	if val, ok := f["Predictor"].(Integer); ok {
-		res.Predictor = int(val)
-	}
-	if val, ok := f["Colors"].(Integer); ok {
-		res.Colors = int(val)
-	}
-	if val, ok := f["BitsPerComponent"].(Integer); ok {
-		res.BitsPerComponent = int(val)
-	}
-	if val, ok := f["Columns"].(Integer); ok {
-		res.Columns = int(val)
-	}
-	if val, ok := f["EarlyChange"].(Integer); ok {
-		res.EarlyChange = (val != 0)
-	}
-	return res, nil
+	return "Crypt", Dict{"Name": Name("StdCF")}, nil
 }
 
-type flateFilter struct {
-	Predictor        int
-	Colors           int
-	BitsPerComponent int
-	Columns          int
-	EarlyChange      bool
-	IsLZW            bool
+// Encode implements the [Filter] interface.
+func (FilterCryptStandard) Encode(_ Version, _ io.WriteCloser) (io.WriteCloser, error) {
+	return nil, errors.New("FilterCryptStandard encoding not yet supported")
 }
 
-func (ff *flateFilter) ToDict() Dict {
-	res := Dict{}
-	if ff.Predictor != 1 {
-		res["Predictor"] = Integer(ff.Predictor)
+// Decode implements the [Filter] interface.
+func (FilterCryptStandard) Decode(_ Version, _ io.Reader) (io.ReadCloser, error) {
+	return asMalformedFilter(nil, errors.New("FilterCryptStandard decoding not yet supported"))
+}
+
+// FilterCryptNamed declares that a stream is encrypted using a named
+// crypt filter from the document's /CF dictionary, with the file key
+// used as-is (no per-object Algorithm 1 key derivation, per PDF spec
+// §7.4.10).
+//
+// Name must not be empty, "Identity" (use [FilterCryptIdentity]
+// instead), or "StdCF" (use [FilterCryptStandard] instead).
+//
+// Encoding and decoding via the filter interface are not yet supported;
+// the type exists so PDF files using a named /Crypt filter survive a
+// read/write cycle.
+type FilterCryptNamed struct {
+	Name Name
+}
+
+func (FilterCryptNamed) isCryptFilter() {}
+
+// Info implements the [Filter] interface.
+func (f FilterCryptNamed) Info(v Version) (Name, Dict, error) {
+	if err := checkVersionV(v, "Crypt filter", V1_5); err != nil {
+		return "", nil, err
 	}
-	if ff.Predictor > 1 && ff.Colors != 1 {
-		res["Colors"] = Integer(ff.Colors)
+	switch f.Name {
+	case "":
+		return "", nil, errors.New("FilterCryptNamed: Name must not be empty")
+	case "Identity":
+		return "", nil, errors.New("FilterCryptNamed: use FilterCryptIdentity for /Identity")
+	case "StdCF":
+		return "", nil, errors.New("FilterCryptNamed: use FilterCryptStandard for /StdCF")
 	}
-	if ff.Predictor > 1 && ff.BitsPerComponent != 8 {
-		res["BitsPerComponent"] = Integer(ff.BitsPerComponent)
-	}
-	if ff.Predictor > 1 && ff.Columns != 1 {
-		res["Columns"] = Integer(ff.Columns)
-	}
-	if ff.IsLZW && !ff.EarlyChange {
-		res["EarlyChange"] = Integer(0)
-	}
-	if len(res) == 0 {
+	return "Crypt", Dict{"Name": f.Name}, nil
+}
+
+// Encode implements the [Filter] interface.
+func (FilterCryptNamed) Encode(_ Version, _ io.WriteCloser) (io.WriteCloser, error) {
+	return nil, errors.New("FilterCryptNamed encoding not yet supported")
+}
+
+// Decode implements the [Filter] interface.
+func (FilterCryptNamed) Decode(_ Version, _ io.Reader) (io.ReadCloser, error) {
+	return asMalformedFilter(nil, errors.New("FilterCryptNamed decoding not yet supported"))
+}
+
+// checkVersionV is the equivalent of [CheckVersion] for use
+// when only a [Version] (and no [Writer]) is available.
+func checkVersionV(v Version, operation string, minVersion Version) error {
+	if v >= minVersion {
 		return nil
+	}
+	return &VersionError{Operation: operation, Earliest: minVersion}
+}
+
+// parseFlate parses a FlateDecode parameter dictionary into a FilterFlate.
+// The parsing is permissive: malformed or absent values are silently
+// replaced with PDF defaults so that a read→write→read cycle is stable.
+func parseFlate(d Dict) FilterFlate {
+	res := FilterFlate{
+		Predictor: FlatePredictorNone,
+	}
+	if val, ok := d["Predictor"].(Integer); ok {
+		p := FlatePredictor(val)
+		if p.isValid() && p != 0 {
+			res.Predictor = p
+		}
+	}
+	usingPredictor := res.Predictor != FlatePredictorNone
+	if usingPredictor {
+		res.Colors = 1
+		if val, ok := d["Colors"].(Integer); ok && val >= 1 && val <= Integer(maxInt) {
+			res.Colors = int(val)
+		}
+		res.BitsPerComponent = 8
+		if val, ok := d["BitsPerComponent"].(Integer); ok {
+			switch val {
+			case 1, 2, 4, 8, 16:
+				res.BitsPerComponent = int(val)
+			}
+		}
+		res.Columns = 1
+		if val, ok := d["Columns"].(Integer); ok && val >= 1 && val <= 1<<20 {
+			res.Columns = int(val)
+		}
 	}
 	return res
 }
 
-// Decode implements the [filter] interface.
-func (ff *flateFilter) Decode(r io.Reader) (io.ReadCloser, error) {
-	var res io.ReadCloser
-	var err error
-	if ff.IsLZW {
-		res = lzw.NewReader(r, ff.EarlyChange)
-	} else {
-		res, err = zlibNewReader(r)
+// parseLZW parses an LZWDecode parameter dictionary into a FilterLZW.
+func parseLZW(d Dict) FilterLZW {
+	f := parseFlate(d)
+	res := FilterLZW{
+		Predictor:        f.Predictor,
+		Colors:           f.Colors,
+		BitsPerComponent: f.BitsPerComponent,
+		Columns:          f.Columns,
+		OffByOne:         true, // PDF default
 	}
-	if err != nil {
-		return nil, err
+	if val, ok := d["EarlyChange"].(Integer); ok && val == 0 {
+		res.OffByOne = false
 	}
-
-	param := &predict.Params{
-		Colors:           ff.Colors,
-		BitsPerComponent: ff.BitsPerComponent,
-		Columns:          ff.Columns,
-		Predictor:        ff.Predictor,
-	}
-	return predict.NewReader(res, param)
+	return res
 }
 
-// Encode implements the [filter] interface.
-func (ff *flateFilter) Encode(w io.WriteCloser) (io.WriteCloser, error) {
+// parseCCITTFax parses a CCITTFaxDecode parameter dictionary into a FilterCCITTFax.
+// Out-of-range values are silently demoted to defaults so a malformed input
+// round-trips through validate() without an asymmetric write-side rejection.
+func parseCCITTFax(d Dict) FilterCCITTFax {
+	const maxDim = 1 << 20
+	res := FilterCCITTFax{
+		Columns: 1728,
+	}
+	if val, ok := d["K"].(Integer); ok {
+		switch {
+		case val < 0:
+			res.K = -1
+		case val > Integer(maxInt):
+			res.K = maxInt
+		default:
+			res.K = int(val)
+		}
+	}
+	if val, ok := d["EndOfLine"].(Boolean); ok {
+		res.EndOfLine = bool(val)
+	}
+	if val, ok := d["EncodedByteAlign"].(Boolean); ok {
+		res.EncodedByteAlign = bool(val)
+	}
+	if val, ok := d["Columns"].(Integer); ok && val > 0 && val <= maxDim {
+		res.Columns = int(val)
+	}
+	if val, ok := d["Rows"].(Integer); ok && val > 0 && val <= maxDim {
+		res.Rows = int(val)
+	}
+	if val, ok := d["EndOfBlock"].(Boolean); ok && !bool(val) {
+		res.IgnoreEndOfBlock = true
+	}
+	if val, ok := d["BlackIs1"].(Boolean); ok {
+		res.BlackIs1 = bool(val)
+	}
+	if val, ok := d["DamagedRowsBeforeError"].(Integer); ok && val > 0 && val <= maxDim {
+		res.DamagedRowsBeforeError = int(val)
+	}
+	return res
+}
+
+// parseDCT parses a DCTDecode parameter dictionary into a FilterDCT.
+func parseDCT(d Dict) FilterDCT {
+	res := FilterDCT{}
+	if val, ok := d["ColorTransform"].(Integer); ok {
+		switch val {
+		case 0:
+			res.ColorTransform = DCTColorTransformNone
+		case 1:
+			res.ColorTransform = DCTColorTransformYCbCr
+		}
+		// any other value -> Auto (the Go zero value)
+	}
+	return res
+}
+
+// parseJBIG2 parses a JBIG2Decode parameter dictionary into a FilterJBIG2.
+// The JBIG2Globals stream contents are resolved later by resolveJBIG2Globals.
+func parseJBIG2(d Dict) *FilterJBIG2 {
+	return &FilterJBIG2{
+		GlobalsRef: d["JBIG2Globals"],
+	}
+}
+
+// validateFlateLZW checks the predictor parameters shared by Flate and LZW.
+func validateFlateLZW(v Version, p FlatePredictor, colors, bpc, columns int) error {
+	if !p.isValid() {
+		return fmt.Errorf("unsupported predictor %d", p)
+	}
+	usingPredictor := p != 0 && p != FlatePredictorNone
+	if !usingPredictor && colors != 0 {
+		return fmt.Errorf("Colors=%d requires a predictor with colour components", colors)
+	}
+	if !usingPredictor && bpc != 0 {
+		return fmt.Errorf("BitsPerComponent=%d requires a predictor", bpc)
+	}
+	if !usingPredictor && columns != 0 {
+		return fmt.Errorf("Columns=%d requires a predictor", columns)
+	}
+	if usingPredictor {
+		if colors != 0 {
+			if colors < 1 || (v < V1_3 && colors > 4) {
+				return fmt.Errorf("invalid number of colour channels %d", colors)
+			}
+		}
+		if bpc != 0 {
+			switch bpc {
+			case 1, 2, 4, 8:
+				// always valid
+			case 16:
+				if err := checkVersionV(v, "FlateDecode/LZWDecode BitsPerComponent=16", V1_5); err != nil {
+					return err
+				}
+			default:
+				return fmt.Errorf("invalid number of bits per component %d", bpc)
+			}
+		}
+		if columns != 0 && (columns < 1 || columns > 1<<20) {
+			return fmt.Errorf("invalid number of columns %d", columns)
+		}
+	}
+	return nil
+}
+
+// encodeFlateLZW returns a writer that compresses data using Flate (or LZW
+// when isLZW is true), optionally followed by a predictor.
+func encodeFlateLZW(w io.WriteCloser, p FlatePredictor, colors, bpc, columns int, isLZW, lzwOffByOne bool) (io.WriteCloser, error) {
 	var zw io.WriteCloser
 	var err error
-	if ff.IsLZW {
-		zw, err = lzw.NewWriter(w, ff.EarlyChange)
+	if isLZW {
+		zw, err = lzw.NewWriter(w, lzwOffByOne)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		// zw, err = zlib.NewWriterLevel(w, zlib.BestCompression)
 		tmp := zlibWriterPool.Get().(*zlib.Writer)
 		tmp.Reset(w)
 		zw = tmp
@@ -579,176 +1078,52 @@ func (ff *flateFilter) Encode(w io.WriteCloser) (io.WriteCloser, error) {
 		if err != nil {
 			return err
 		}
-		if !ff.IsLZW {
+		if !isLZW {
 			zlibWriterPool.Put(originalZw)
 		}
 		return w.Close()
 	}
 	zw = &withClose{zw, close}
 
-	params := &predict.Params{
-		Colors:           ff.Colors,
-		BitsPerComponent: ff.BitsPerComponent,
-		Columns:          ff.Columns,
-		Predictor:        ff.Predictor,
-	}
-	return predict.NewWriter(zw, params)
+	return predict.NewWriter(zw, predictParams(p, colors, bpc, columns))
 }
 
-type FilterCCITTFax Dict
-
-// Info returns the name and parameters of the filter,
-// as they should be written to the PDF file.
-func (f FilterCCITTFax) Info(_ Version) (Name, Dict, error) {
-	ff, err := f.parseParameters()
-	if err != nil {
-		return "", nil, err
-	}
-
-	res := Dict{}
-	if ff.K != 0 {
-		res["K"] = Integer(ff.K)
-	}
-	if ff.eol {
-		res["EndOfLine"] = Boolean(ff.eol)
-	}
-	if ff.byteAlign {
-		res["EncodedByteAlign"] = Boolean(ff.byteAlign)
-	}
-	if ff.columns != 1728 {
-		res["Columns"] = Integer(ff.columns)
-	}
-	if ff.rows > 0 {
-		res["Rows"] = Integer(ff.rows)
-	}
-	if !ff.eob { // default is true
-		res["EndOfBlock"] = Boolean(false)
-	}
-	if ff.blackIs1 {
-		res["BlackIs1"] = Boolean(ff.blackIs1)
-	}
-	if ff.damagedRows > 0 {
-		res["DamagedRowsBeforeError"] = Integer(ff.damagedRows)
-	}
-
-	return "CCITTFaxDecode", res, nil
-}
-
-// Encode returns a writer which encodes data written to it.
-// The returned writer must be closed after use.
-func (f FilterCCITTFax) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, error) {
-	ff, err := f.parseParameters()
-	if err != nil {
-		return nil, err
-	}
-
-	params := &ccittfax.Params{
-		Columns:                ff.columns,
-		K:                      ff.K,
-		MaxRows:                ff.rows,
-		EndOfLine:              ff.eol,
-		EncodedByteAlign:       ff.byteAlign,
-		BlackIs1:               ff.blackIs1,
-		IgnoreEndOfBlock:       !ff.eob,
-		DamagedRowsBeforeError: ff.damagedRows,
-	}
-	ww, err := ccittfax.NewWriter(w, params)
-	if err != nil {
-		return nil, err
-	}
-	return &withClose{
-		Writer: ww,
-		close: func() error {
-			err := ww.Close()
-			if err != nil {
-				return err
-			}
-			return w.Close()
-		},
-	}, nil
-}
-
-// Decode returns a reader which decodes data read from it.
-func (f FilterCCITTFax) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
-	ff, err := f.parseParameters()
-	if err != nil {
-		return asMalformedFilter(nil, err)
-	}
-
-	params := &ccittfax.Params{
-		Columns:                ff.columns,
-		K:                      ff.K,
-		MaxRows:                ff.rows,
-		EndOfLine:              ff.eol,
-		EncodedByteAlign:       ff.byteAlign,
-		BlackIs1:               ff.blackIs1,
-		IgnoreEndOfBlock:       !ff.eob,
-		DamagedRowsBeforeError: ff.damagedRows,
-	}
-	reader, err := ccittfax.NewReader(r, params)
-	if err != nil {
-		return asMalformedFilter(nil, err)
-	}
-	return asMalformedFilter(io.NopCloser(reader), nil)
-}
-
-func (f FilterCCITTFax) parseParameters() (*ccittFilter, error) {
-	res := &ccittFilter{ // set defaults
-		K:       0,
-		columns: 1728,
-		eob:     true,
-	}
-	if val, ok := f["K"].(Integer); ok {
-		if val < 0 {
-			val = -1
-		} else if val > Integer(maxInt) {
-			val = 999
+// decodeFlateLZW returns a reader that decompresses Flate/LZW data,
+// optionally followed by a predictor decoding step.
+func decodeFlateLZW(r io.Reader, p FlatePredictor, colors, bpc, columns int, isLZW, lzwOffByOne bool) (io.ReadCloser, error) {
+	var inner io.ReadCloser
+	var err error
+	if isLZW {
+		inner = lzw.NewReader(r, lzwOffByOne)
+	} else {
+		inner, err = zlibNewReader(r)
+		if err != nil {
+			return nil, err
 		}
-		res.K = int(val)
 	}
-	if val, ok := f["EndOfLine"].(Boolean); ok {
-		res.eol = bool(val)
-	}
-	if val, ok := f["EncodedByteAlign"].(Boolean); ok {
-		res.byteAlign = bool(val)
-	}
-	if val, ok := f["Columns"].(Integer); ok {
-		if val < 1 || val > Integer(maxInt) {
-			return nil, fmt.Errorf("invalid number of columns %d", val)
-		}
-		res.columns = int(val)
-	}
-	if val, ok := f["Rows"].(Integer); ok {
-		if val < 0 || val > Integer(maxInt) {
-			return nil, fmt.Errorf("invalid number of rows %d", val)
-		}
-		res.rows = int(val)
-	}
-	if val, ok := f["EndOfBlock"].(Boolean); ok {
-		res.eob = bool(val)
-	}
-	if val, ok := f["BlackIs1"].(Boolean); ok {
-		res.blackIs1 = bool(val)
-	}
-	if val, ok := f["DamagedRowsBeforeError"].(Integer); ok {
-		if val < 0 || val > Integer(maxInt) {
-			return nil, fmt.Errorf("invalid number of damaged rows %d", val)
-		}
-		res.damagedRows = int(val)
-	}
-
-	return res, nil
+	return predict.NewReader(inner, predictParams(p, colors, bpc, columns))
 }
 
-type ccittFilter struct {
-	K           int
-	eol         bool
-	byteAlign   bool
-	columns     int
-	rows        int
-	eob         bool
-	blackIs1    bool
-	damagedRows int
+func predictParams(p FlatePredictor, colors, bpc, columns int) *predict.Params {
+	if colors == 0 {
+		colors = 1
+	}
+	if bpc == 0 {
+		bpc = 8
+	}
+	if columns == 0 {
+		columns = 1
+	}
+	pred := int(p)
+	if pred == 0 {
+		pred = 1
+	}
+	return &predict.Params{
+		Colors:           colors,
+		BitsPerComponent: bpc,
+		Columns:          columns,
+		Predictor:        pred,
+	}
 }
 
 const maxInt = int(^uint(0) >> 1)

@@ -207,7 +207,7 @@ var roundTripCases = []roundTripCase{
 		sound: &Sound{
 			SampleRate: 22050,
 			Data: &InlineSource{
-				Filter: []pdf.Filter{pdf.FilterFlate(nil)},
+				Filter: []pdf.Filter{pdf.FilterFlate{}},
 			},
 		},
 	},
@@ -394,7 +394,7 @@ func TestStreamSourcePreservesFilter(t *testing.T) {
 				_, err := w.Write(sample)
 				return err
 			},
-			Filter: []pdf.Filter{pdf.FilterFlate(nil)},
+			Filter: []pdf.Filter{pdf.FilterFlate{}},
 		},
 	}
 	obj, err := rm.Embed(original)

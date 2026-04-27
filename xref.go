@@ -543,8 +543,8 @@ func (w *Writer) writeXRefStream(xRefDict Dict) error {
 	// Compress the xref stream in memory, to make sure we know the size of the
 	// stream before writing the xref stream object.
 	filter := FilterFlate{
-		"Predictor": Integer(12),
-		"Columns":   Integer(1 + w2 + w3),
+		Predictor: FlatePredictorPNGUp,
+		Columns:   1 + w2 + w3,
 	}
 	xRefBuf := &bytes.Buffer{}
 	wxRaw, err := filter.Encode(w.meta.Version, withDummyClose{xRefBuf})

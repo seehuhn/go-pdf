@@ -277,8 +277,8 @@ func (d *CIDFontType2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if c2gRef != 0 {
 		c2gStm, err := w.OpenStream(c2gRef, nil,
 			pdf.FilterCompress{
-				"Predictor": pdf.Integer(12),
-				"Columns":   pdf.Integer(2),
+				Predictor: pdf.FlatePredictorPNGUp,
+				Columns:   2,
 			})
 		if err != nil {
 			return nil, err

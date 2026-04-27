@@ -213,12 +213,12 @@ func (img *testImage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	ref := rm.Alloc()
 	compress := pdf.FilterFlate{
-		"Predictor": pdf.Integer(img.predictor),
+		Predictor: pdf.FlatePredictor(img.predictor),
 	}
 	if img.predictor > 1 {
-		compress["Colors"] = pdf.Integer(nChannels)
-		compress["BitsPerComponent"] = pdf.Integer(img.bpc)
-		compress["Columns"] = pdf.Integer(size)
+		compress.Colors = nChannels
+		compress.BitsPerComponent = img.bpc
+		compress.Columns = size
 	}
 	stm, err := rm.Out().OpenStream(ref, dict, compress)
 	if err != nil {
