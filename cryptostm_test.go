@@ -722,7 +722,7 @@ func TestFilterCryptRoundTrip(t *testing.T) {
 
 	// Create encryption info
 	id := []byte("0123456789ABCDEF")
-	sec, err := createStdSecHandler(id, "test", "test", PermAll, 128, 4)
+	sec, err := createStdSecHandler(id, "test", "test", PermAll, 128, 4, false)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
+	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/xmp"
 )
 
@@ -64,46 +65,20 @@ func run() error {
 	xmpInfo := &xmp.Basic{}
 	xmpInfo.CreateDate = xmp.NewDate(now)
 	xmpInfo.ModifyDate = xmp.NewDate(now)
-	pdfInfo := &PDF{}
+	pdfInfo := &xmp.PDF{}
 	pdfInfo.Keywords = xmp.NewText("test, XMP, metadata")
 	pdfInfo.Producer = xmp.NewAgentName("seehuhn.de/go/pdf/examples/metadata")
 
-	metadata := xmp.NewPacket()
-	metadata.Set(dc, xmpInfo, pdfInfo)
-
-	stmRef := doc.Out.Alloc()
-	stmDict := pdf.Dict{
-		"Type":    pdf.Name("Metadata"),
-		"Subtype": pdf.Name("XML"),
-	}
-	stm, err := doc.Out.OpenStream(stmRef, stmDict)
-	if err != nil {
-		return err
-	}
-	xmlOpt := &xmp.PacketOptions{
-		Pretty: true, // TODO(voss): tie to the pdf.HumanReadable flag
-	}
-	err = metadata.Write(stm, xmlOpt)
-	if err != nil {
-		return err
-	}
-	err = stm.Close()
-	if err != nil {
+	packet := xmp.NewPacket()
+	if err := packet.Set(dc, xmpInfo, pdfInfo); err != nil {
 		return err
 	}
 
-	doc.Out.GetMeta().Catalog.Metadata = stmRef
+	ref, err := doc.RM.Embed(&metadata.Stream{Data: packet})
+	if err != nil {
+		return err
+	}
+	doc.Out.GetMeta().Catalog.Metadata = ref.(pdf.Reference)
 
 	return doc.Close()
-}
-
-// PDF is the XMP namespace for PDF metadata.
-// See https://developer.adobe.com/xmp/docs/XMPNamespaces/pdf/
-type PDF struct {
-	_          xmp.Namespace `xmp:"http://ns.adobe.com/pdf/1.3/"`
-	_          xmp.Prefix    `xmp:"pdf"`
-	Keywords   xmp.Text
-	PDFVersion xmp.Text
-	Producer   xmp.AgentName
-	Trapped    xmp.Text
 }

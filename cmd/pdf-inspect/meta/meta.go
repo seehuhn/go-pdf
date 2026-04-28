@@ -127,9 +127,9 @@ func showXMP(r pdf.Getter, ref pdf.Reference) error {
 	packet.Get(basic)
 	showXMPStruct(packet, basic)
 
-	pdf := &PDF{}
-	packet.Get(pdf)
-	showXMPStruct(packet, pdf)
+	pdfNS := &xmp.PDF{}
+	packet.Get(pdfNS)
+	showXMPStruct(packet, pdfNS)
 
 	xmpMM := &xmp.MediaManagement{}
 	packet.Get(xmpMM)
@@ -323,15 +323,4 @@ func getXMPQualifiers(Q []xmp.Qualifier) []string {
 		res = append(res, ll...)
 	}
 	return res
-}
-
-// PDF is the XMP namespace for PDF metadata.
-// See https://developer.adobe.com/xmp/docs/XMPNamespaces/pdf/
-type PDF struct {
-	_          xmp.Namespace `xmp:"http://ns.adobe.com/pdf/1.3/"`
-	_          xmp.Prefix    `xmp:"pdf"`
-	Keywords   xmp.Text
-	PDFVersion xmp.Text
-	Producer   xmp.AgentName
-	Trapped    xmp.Text
 }

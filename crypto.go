@@ -233,19 +233,28 @@ func (enc *encryptInfo) AsDict(version Version) (Dict, error) {
 		return nil, errors.New("not implemented: mixed key ciphers")
 	}
 
+	// /Length values throughout the encrypt dict (top level and inside
+	// /CF/StdCF) are written in bits — 256 for AES-256, 128 for AES-128.
+	// ISO 32000-2 Table 21 says the top-level /Length is in bits, but
+	// Table 27 says /Length inside a crypt-filter dict is in bytes (range
+	// 5–16).  The two specs disagree, and Acrobat Reader empirically
+	// rejects V=5 files when /CF/StdCF/Length is in bytes (32) rather than
+	// bits (256).  Sticking with bits for both keeps Acrobat happy and
+	// matches the convention used by Adobe's own writers.
 	if cipher == cipherAES && length == 256 && version >= V2_0 {
 		dict["V"] = Integer(5)
 		dict["StmF"] = Name("StdCF")
 		dict["StrF"] = Name("StdCF")
+		dict["Length"] = Integer(256)
 		dict["CF"] = Dict{
-			"StdCF": Dict{"Length": Integer(32), "CFM": Name("AESV3")},
+			"StdCF": Dict{"Length": Integer(256), "CFM": Name("AESV3")},
 		}
 	} else if cipher == cipherAES && length == 128 && version >= V1_6 {
 		dict["V"] = Integer(4)
 		dict["StmF"] = Name("StdCF")
 		dict["StrF"] = Name("StdCF")
 		dict["CF"] = Dict{
-			"StdCF": Dict{"Length": Integer(16), "CFM": Name("AESV2")},
+			"StdCF": Dict{"Length": Integer(128), "CFM": Name("AESV2")},
 		}
 	} else if cipher == cipherRC4 && length == 40 && version >= V1_1 {
 		dict["V"] = Integer(1)
@@ -580,7 +589,7 @@ func tryCrop(s String, l int) String {
 
 // createStdSecHandler allocates a new, pre-authenticated PDF Standard Security
 // Handler.  This is used when creating new PDF documents.
-func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, length, V int) (*stdSecHandler, error) {
+func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, length, V int, unencryptedMetadata bool) (*stdSecHandler, error) {
 	if ownerPwd == "" {
 		ownerPwd = userPwd
 	}
@@ -603,10 +612,11 @@ func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, length,
 	keyBytes := length / 8
 
 	sec := &stdSecHandler{
-		ID:       id,
-		keyBytes: keyBytes,
-		R:        R,
-		P:        stdSecPermToP(perm),
+		ID:                  id,
+		keyBytes:            keyBytes,
+		R:                   R,
+		P:                   stdSecPermToP(perm),
+		unencryptedMetadata: unencryptedMetadata,
 	}
 
 	switch R {

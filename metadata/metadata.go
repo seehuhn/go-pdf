@@ -31,6 +31,20 @@ import (
 // individual objects within the document.
 type Stream struct {
 	Data *xmp.Packet
+
+	// PadToLength, if positive, pads the encoded XMP packet with whitespace
+	// so the resulting PDF stream has exactly the given length in bytes.
+	// The XMP trailer is then written as <?xpacket end="w"?>, signalling
+	// that the packet may be edited in place inside the host PDF.
+	//
+	// When PadToLength is positive, the metadata stream is written
+	// uncompressed so the on-disk length is predictable.  If document-level
+	// encryption would otherwise apply to the stream, FilterCryptIdentity is
+	// used to keep the bytes plaintext on disk.
+	//
+	// If the encoded packet does not fit in PadToLength bytes, Embed returns
+	// xmp.ErrPacketTooLong.
+	PadToLength int
 }
 
 func Extract(x *pdf.Extractor, path *pdf.CycleCheck, ref pdf.Object, _ bool) (*Stream, error) {
@@ -66,21 +80,32 @@ func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		"Type":    pdf.Name("Metadata"),
 		"Subtype": pdf.Name("XML"),
 	}
-	body, err := w.OpenStream(ref, dict, pdf.FilterFlate{})
+
+	var filters []pdf.Filter
+	info := rm.GetInfo()
+	// per-stream Identity overrides the document encryption
+	if info.DocumentEncrypted && (s.PadToLength > 0 || !info.MetadataEncrypted) {
+		filters = append(filters, pdf.FilterCryptIdentity{})
+	}
+	if s.PadToLength == 0 {
+		filters = append(filters, pdf.FilterFlate{})
+	}
+
+	body, err := w.OpenStream(ref, dict, filters...)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.Data.Write(body, nil)
-	if err != nil {
+	opts := &xmp.PacketOptions{
+		PadToLength: s.PadToLength,
+		Pretty:      w.GetOptions().HasAny(pdf.OptPretty),
+	}
+	if err := s.Data.Write(body, opts); err != nil {
 		return nil, err
 	}
-
-	err = body.Close()
-	if err != nil {
+	if err := body.Close(); err != nil {
 		return nil, err
 	}
-
 	return ref, nil
 }
 

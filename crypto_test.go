@@ -201,7 +201,7 @@ func TestAuth(t *testing.T) {
 	}
 	for i, test := range cases {
 		id := []byte("0123456789ABCDEF")
-		sec, err := createStdSecHandler(id, test.user, test.owner, PermModify, 128, 4)
+		sec, err := createStdSecHandler(id, test.user, test.owner, PermModify, 128, 4, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -259,7 +259,7 @@ func TestAuth(t *testing.T) {
 func TestAuth2(t *testing.T) {
 	id := []byte{0xfb, 0xa6, 0x25, 0xd9, 0xcd, 0xfb, 0x88, 0x11,
 		0x9a, 0xd5, 0xa0, 0x94, 0x33, 0x68, 0x42, 0x95}
-	sec, err := createStdSecHandler(id, "", "test", PermCopy, 128, 4)
+	sec, err := createStdSecHandler(id, "", "test", PermCopy, 128, 4, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,7 +303,7 @@ func TestAuth3(t *testing.T) {
 		default:
 			t.Fatalf("unsupported V: %d", test.V)
 		}
-		sec, err := createStdSecHandler(id, userPasswd, ownerPasswd, test.perm, L, test.V)
+		sec, err := createStdSecHandler(id, userPasswd, ownerPasswd, test.perm, L, test.V, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -402,7 +402,7 @@ func TestEncryptBytes(t *testing.T) {
 			ref := NewReference(1, 2)
 			for _, msg := range []string{"", "pssst!!!", "0123456789ABCDE",
 				"0123456789ABCDEF", "0123456789ABCDEF0"} {
-				sec, err := createStdSecHandler(id, "secret", "supersecret", PermPrint, 128, 4)
+				sec, err := createStdSecHandler(id, "secret", "supersecret", PermPrint, 128, 4, false)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -438,7 +438,7 @@ func TestEncryptStream(t *testing.T) {
 			ref := NewReference(1, 2)
 			for _, msg := range []string{"", "pssst!!!", "0123456789ABCDE",
 				"0123456789ABCDEF", "0123456789ABCDEF0"} {
-				sec, err := createStdSecHandler(id, "secret", "supersecret", PermAll, 128, 4)
+				sec, err := createStdSecHandler(id, "secret", "supersecret", PermAll, 128, 4, false)
 				if err != nil {
 					t.Fatal(err)
 				}

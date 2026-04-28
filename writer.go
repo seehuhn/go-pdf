@@ -36,6 +36,23 @@ type WriterOptions struct {
 	OwnerPassword   string
 	UserPermissions Perm
 
+	// UnencryptedMetadata, if true, marks XMP metadata streams as exempt
+	// from document encryption.  The /Encrypt dictionary in the resulting
+	// PDF will carry /EncryptMetadata false, and metadata streams written
+	// through [seehuhn.de/go/pdf/metadata.Stream] are wrapped in an
+	// Identity Crypt filter so their bytes are stored in plaintext on
+	// disk.  Setting this option requires that document encryption is
+	// configured (UserPassword or OwnerPassword is set) and that the PDF
+	// version is 1.6 or later; otherwise NewWriter returns an error.
+	//
+	// Reading unencrypted metadata streams from encrypted documents is not
+	// yet implemented.
+	//
+	// The field name is the negation of the PDF spec's /EncryptMetadata key
+	// so that the Go zero value (false) corresponds to the spec default
+	// (metadata is encrypted).
+	UnencryptedMetadata bool
+
 	// If this flag is true, the writer tries to generate a PDF file which is
 	// more human-readable, at the expense of increased file size.
 	HumanReadable bool
@@ -100,6 +117,14 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 	useEncryption := opt.UserPassword != "" || opt.OwnerPassword != ""
 	if useEncryption && v == V1_0 {
 		return nil, &VersionError{Operation: "PDF encryption", Earliest: V1_1}
+	}
+	if opt.UnencryptedMetadata {
+		if !useEncryption {
+			return nil, errors.New("UnencryptedMetadata requires encryption to be configured")
+		}
+		if v < V1_6 {
+			return nil, &VersionError{Operation: "UnencryptedMetadata", Earliest: V1_6}
+		}
 	}
 	needID := opt.ID != nil || useEncryption || v >= V2_0
 	if needID && v == V1_0 {
@@ -168,7 +193,8 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 			V = 1
 		}
 		sec, err := createStdSecHandler(ID[0], opt.UserPassword,
-			opt.OwnerPassword, opt.UserPermissions, cf.Length, V)
+			opt.OwnerPassword, opt.UserPermissions, cf.Length, V,
+			opt.UnencryptedMetadata)
 		if err != nil {
 			return nil, err
 		}

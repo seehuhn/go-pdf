@@ -12,7 +12,7 @@ require (
 	seehuhn.de/go/icc v0.7.1-0.20260326065957-ea5a1dd01da2
 	seehuhn.de/go/postscript v0.7.1
 	seehuhn.de/go/sfnt v0.7.1
-	seehuhn.de/go/xmp v0.7.1
+	seehuhn.de/go/xmp v0.7.2-0.20260428195016-0c85b256bc31
 )
 
 require (
