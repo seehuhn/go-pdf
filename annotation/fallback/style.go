@@ -128,6 +128,8 @@ func (s *Style) AddAppearance(a annotation.Annotation) error {
 		normal = s.addStampAppearance(a)
 	case *annotation.FileAttachment:
 		normal = s.addFileAttachmentAppearance(a)
+	case *annotation.Sound:
+		normal = s.addSoundAppearance(a)
 	default:
 		return fmt.Errorf("unsupported annotation type: %T", a)
 	}
