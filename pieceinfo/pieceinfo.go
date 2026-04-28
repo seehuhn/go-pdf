@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/opaque"
 )
 
 // PDF 2.0 sections: 14.5
@@ -127,11 +128,13 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bo
 				return nil, err
 			}
 		} else {
-			data = &unknown{
+			u := &unknown{
 				lastModified: time.Time(lastModified),
-				sourceReader: r,
-				Private:      privateObj,
 			}
+			if privateObj != nil {
+				u.private = opaque.Extract(x, privateObj)
+			}
+			data = u
 		}
 
 		info.Entries[key] = data
@@ -141,15 +144,13 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bo
 }
 
 // unknown represents the value of one entry in a page-piece dictionary.
-// The class does not interpret the data in any way.
-// On embedding, it just copies the data from the source PDF to the target PDF.
-// This is the default handler, used when no registered handler matches the name of the entry.
+// The class does not interpret the data in any way; on embedding, it
+// copies the /Private value from the source PDF to the target PDF via
+// [opaque.Object].  This is the default handler, used when no
+// registered handler matches the name of the entry.
 type unknown struct {
 	lastModified time.Time
-	sourceReader pdf.Getter
-
-	// Private holds the /Private entry of the data dictionary in the source PDF.
-	Private pdf.Object
+	private      *opaque.Object
 }
 
 func (u *unknown) LastModified() time.Time {
@@ -157,17 +158,10 @@ func (u *unknown) LastModified() time.Time {
 }
 
 func (u *unknown) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-	if u.Private == nil {
+	if u.private == nil {
 		return nil, nil
 	}
-
-	// copy the private object using pdfcopy
-	copier := pdf.NewCopier(rm.Out(), u.sourceReader)
-	copied, err := copier.Copy(u.Private.AsPDF(rm.Out().GetOptions()))
-	if err != nil {
-		return nil, err
-	}
-	return copied, nil
+	return rm.Embed(u.private)
 }
 
 // Register installs a handler for page-piece dictionary entries with the given

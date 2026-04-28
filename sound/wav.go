@@ -22,8 +22,38 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 )
+
+// CanWriteWAV reports whether [WriteWAV] can structurally produce a WAV
+// from s based on its metadata.  It returns nil if the metadata is
+// compatible, or a non-nil error describing the first incompatibility.
+//
+// The checks are metadata-only: runtime failures from malformed sample
+// bytes or stream I/O are still possible.  In addition to the basic
+// validity checks performed by [Sound.Validate], CanWriteWAV rejects
+// compressed sample data, external-file sources, and Raw/Signed sample
+// data outside the 8- and 16-bit widths supported by the WAV writer.
+func (s *Sound) CanWriteWAV() error {
+	if err := s.Validate(); err != nil {
+		return err
+	}
+	if s.CompressionFormat != "" {
+		return fmt.Errorf("sound: WriteWAV: unsupported CompressionFormat %q", string(s.CompressionFormat))
+	}
+	if _, ok := s.Data.(*ExternalFileSource); ok {
+		return errors.New("sound: WriteWAV: external-file source not supported")
+	}
+	encoding := s.Encoding
+	if encoding == "" {
+		encoding = EncodingRaw
+	}
+	if encoding == EncodingRaw || encoding == EncodingSigned {
+		if s.BitsPerSample != 8 && s.BitsPerSample != 16 {
+			return fmt.Errorf("sound: WriteWAV: unsupported BitsPerSample=%d for %s", s.BitsPerSample, encoding)
+		}
+	}
+	return nil
+}
 
 // WriteWAV writes the sample data of s to w as a RIFF/WAVE container
 // with 16-bit signed little-endian PCM samples — the standard
@@ -35,52 +65,18 @@ import (
 // input is supported.
 //
 // Compressed sounds (where s.CompressionFormat is non-empty) and
-// external-file sources are not supported.
+// external-file sources are not supported.  Use [Sound.CanWriteWAV] to
+// pre-check structural compatibility without reading sample bytes.
 func WriteWAV(w io.Writer, s *Sound) error {
-	if s == nil {
-		return errors.New("sound: WriteWAV: nil Sound")
-	}
-	if s.SampleRate <= 0 || math.IsNaN(s.SampleRate) || math.IsInf(s.SampleRate, 0) {
-		return errors.New("sound: WriteWAV: invalid SampleRate")
-	}
-	if s.SampleRate > math.MaxUint32 {
-		return errors.New("sound: WriteWAV: SampleRate too large for WAV")
-	}
-	if s.CompressionFormat != "" {
-		return fmt.Errorf("sound: WriteWAV: unsupported CompressionFormat %q", string(s.CompressionFormat))
-	}
-	if s.Data == nil {
-		return errors.New("sound: WriteWAV: nil Data")
+	if err := s.CanWriteWAV(); err != nil {
+		return err
 	}
 
-	channels := uint(1)
-	if c, ok := s.Channels.Get(); ok {
-		channels = c
-	}
-	if channels == 0 || channels > math.MaxUint16 {
-		return fmt.Errorf("sound: WriteWAV: invalid Channels=%d", channels)
-	}
-
-	bits := uint(8)
-	if b, ok := s.BitsPerSample.Get(); ok {
-		bits = b
-	}
-
+	channels := uint(s.Channels)
+	bits := uint(s.BitsPerSample)
 	encoding := s.Encoding
 	if encoding == "" {
 		encoding = EncodingRaw
-	}
-	switch encoding {
-	case EncodingRaw, EncodingSigned:
-		if bits != 8 && bits != 16 {
-			return fmt.Errorf("sound: WriteWAV: unsupported BitsPerSample=%d for %s", bits, encoding)
-		}
-	case EncodingMuLaw, EncodingALaw:
-		if bits != 8 {
-			return fmt.Errorf("sound: WriteWAV: %s requires BitsPerSample=8 (got %d)", encoding, bits)
-		}
-	default:
-		return fmt.Errorf("sound: WriteWAV: unknown Encoding %q", string(encoding))
 	}
 
 	rc, err := s.Data.Reader()

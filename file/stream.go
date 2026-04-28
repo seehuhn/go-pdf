@@ -192,11 +192,8 @@ func (s *Stream) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 // Equal compares two Stream objects for equality.
 // It compares all fields and the output of WriteData functions.
 func (s *Stream) Equal(other *Stream) bool {
-	if s == nil && other == nil {
-		return true
-	}
 	if s == nil || other == nil {
-		return false
+		return s == other
 	}
 
 	// Compare basic fields

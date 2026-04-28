@@ -67,7 +67,7 @@ type TransparencyAttributes struct {
 // Equal reports whether two TransparencyAttributes are equal.
 func (a *TransparencyAttributes) Equal(other *TransparencyAttributes) bool {
 	if a == nil || other == nil {
-		return a == nil && other == nil
+		return a == other
 	}
 	return color.SpacesEqual(a.CS, other.CS) &&
 		a.Isolated == other.Isolated &&

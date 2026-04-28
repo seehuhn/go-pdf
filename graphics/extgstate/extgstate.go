@@ -160,7 +160,7 @@ var extGStateBits = graphics.StateTextFont | graphics.StateTextKnockout | graphi
 // Equal reports whether two ExtGState values are equal.
 func (e *ExtGState) Equal(other *ExtGState) bool {
 	if e == nil || other == nil {
-		return e == nil && other == nil
+		return e == other
 	}
 
 	if e.Set != other.Set || e.SingleUse != other.SingleUse {

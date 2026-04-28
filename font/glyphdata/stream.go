@@ -257,11 +257,8 @@ func determineType(x *pdf.Extractor, path *pdf.CycleCheck, dictType, fdKey pdf.N
 // This is primarily useful for testing purposes.  For normal usage,
 // equal font file streams should be represented by equal pointer values.
 func (s *Stream) Equal(other *Stream) bool {
-	if s == nil && other == nil {
-		return true
-	}
 	if s == nil || other == nil {
-		return false
+		return s == other
 	}
 
 	if s.Type != other.Type {

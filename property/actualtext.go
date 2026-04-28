@@ -112,7 +112,7 @@ func (a *ActualText) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return dict, nil
 	}
 
-	ref := rm.AllocSelf()
+	ref := rm.Alloc()
 	err := rm.Out().Put(ref, dict)
 	if err != nil {
 		return nil, err

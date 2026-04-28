@@ -33,6 +33,7 @@ import (
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/oc"
+	"seehuhn.de/go/pdf/opaque"
 	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/webcapture"
 )
@@ -425,7 +426,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	}
 
 	// lazily read from the original stream, preserving the encoding
-	img.Data = &streamData{getter: x.R, stream: stream}
+	img.Data = &streamData{inner: opaque.ExtractStream(x, stream)}
 
 	return img, nil
 }
@@ -717,7 +718,7 @@ func (d *Dict) check(out *pdf.Writer) error {
 		return fmt.Errorf("invalid image height %d", d.Height)
 	}
 	if d.Data == nil {
-		return errors.New("Source cannot be nil")
+		return errors.New("source cannot be nil")
 	}
 
 	if fam := d.ColorSpace.Family(); fam == color.FamilyPattern {
@@ -837,7 +838,7 @@ func (d *Dict) check(out *pdf.Writer) error {
 			}
 			// Validate Matte length matches color space channels
 			if len(d.SMask.Matte) != d.ColorSpace.Channels() {
-				return fmt.Errorf("Matte array length %d doesn't match color space channels %d",
+				return fmt.Errorf("matte array length %d does not match color space channels %d",
 					len(d.SMask.Matte), d.ColorSpace.Channels())
 			}
 		}

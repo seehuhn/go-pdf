@@ -18,13 +18,16 @@ package property
 
 import (
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/opaque"
 )
 
+// proxyList adapts a [opaque.Object] to the [List] interface so a
+// property list extracted from a PDF file can be re-embedded
+// (translating cross-file references) and re-interpreted via
+// [ListGet].
 type proxyList struct {
-	x         *pdf.Extractor
-	path      *pdf.CycleCheck
-	obj       pdf.Object
-	wasInline bool
+	inner *opaque.Object
+	path  *pdf.CycleCheck
 }
 
 // ExtractList extracts a property list from a PDF object.
@@ -44,64 +47,33 @@ func ExtractList(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirec
 		return nil, nil
 	}
 
-	p := &proxyList{
-		x:         x,
-		path:      path,
-		obj:       obj,
-		wasInline: isDirect,
-	}
-	return p, nil
+	return &proxyList{
+		inner: opaque.Extract(x, obj),
+		path:  path,
+	}, nil
 }
 
-// AsDirectDict returns the property list as a direct dictionary if it can
-// be embedded inline in a content stream.  Returns nil for indirect
+// AsDirectDict returns the property list as a direct dictionary if it
+// can be embedded inline in a content stream.  Returns nil for indirect
 // property lists or if the dictionary contains indirect references.
 func (p *proxyList) AsDirectDict() pdf.Dict {
-	if !p.wasInline {
-		return nil
-	}
-	dict, _ := p.obj.(pdf.Dict)
-	if !pdf.IsDirect(dict) {
-		return nil
-	}
-	return dict
+	return p.inner.AsDirectDict()
 }
 
-// Equal reports whether two property lists are semantically equal.
+// Equal reports whether two property lists are semantically equal,
+// resolving any indirect references through their respective source
+// extractors.  The comparison is structural except for streams and
+// placeholders, which are compared by pointer identity (inherited from
+// [pdf.Equal]).
 func (p *proxyList) Equal(other List) bool {
 	q, ok := other.(*proxyList)
 	if !ok {
 		return false
 	}
-	resolvedA, errA := p.x.DeepResolve(p.obj)
-	resolvedB, errB := q.x.DeepResolve(q.obj)
-	if errA != nil || errB != nil {
-		return false
-	}
-	return pdf.Equal(resolvedA, resolvedB)
+	return p.inner.Equal(q.inner)
 }
 
 // Embed converts the property list into a PDF object.
 func (p *proxyList) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
-	dict, err := p.x.GetDict(p.path, p.obj)
-	if err != nil {
-		return nil, err
-	}
-
-	copier := e.CopierFrom(p.x)
-	dictOut, err := copier.CopyDict(dict)
-	if err != nil {
-		return nil, err
-	}
-
-	if p.wasInline {
-		return dictOut, nil
-	}
-
-	ref := e.AllocSelf()
-	err = e.Out().Put(ref, dictOut)
-	if err != nil {
-		return nil, err
-	}
-	return ref, nil
+	return e.Embed(p.inner)
 }

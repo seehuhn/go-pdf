@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/debug/mock"
+	"seehuhn.de/go/pdf/opaque"
 )
 
 func TestExtract(t *testing.T) {
@@ -121,8 +122,52 @@ func TestExtractWithValidData(t *testing.T) {
 		t.Errorf("Entry is not *unknown type: %T", data)
 	}
 
-	if string(unknown.Private.(pdf.String)) != string(privateData) {
-		t.Errorf("Private data mismatch: got %v, want %v", unknown.Private, privateData)
+	if !unknown.private.Equal(opaque.Direct(privateData)) {
+		t.Errorf("Private data mismatch: extracted Object does not match %v", privateData)
+	}
+}
+
+// TestExtractMissingPrivate verifies that a data dict without a
+// /Private entry can be extracted and re-embedded without panicking.
+// The unknown handler must tolerate a missing /Private and emit no
+// Private entry on write.
+func TestExtractMissingPrivate(t *testing.T) {
+	now := pdf.Date(time.Now())
+	dataDict := pdf.Dict{
+		"LastModified": now,
+		// no /Private
+	}
+	pieceDict := pdf.Dict{
+		"NoPrivate": dataDict,
+	}
+
+	x := pdf.NewExtractor(mock.Getter)
+	info, err := pdf.ExtractorGet(x, nil, pieceDict, Extract)
+	if err != nil {
+		t.Fatalf("Extract: %v", err)
+	}
+
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+	embedded, err := rm.Embed(info)
+	if err != nil {
+		t.Fatalf("Embed: %v", err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatalf("rm.Close: %v", err)
+	}
+
+	out, ok := embedded.(pdf.Dict)
+	if !ok {
+		// SingleUse=true was set because pieceDict was passed inline.
+		t.Fatalf("Embed result = %T, want pdf.Dict", embedded)
+	}
+	noPrivate, ok := out["NoPrivate"].(pdf.Dict)
+	if !ok {
+		t.Fatalf("NoPrivate entry = %T, want pdf.Dict", out["NoPrivate"])
+	}
+	if _, present := noPrivate["Private"]; present {
+		t.Errorf("destination data dict has /Private = %v, want absent", noPrivate["Private"])
 	}
 }
 

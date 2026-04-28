@@ -17,6 +17,15 @@ weight = 100
 - Finalise the font API.
 - Is the distinction between `pdf.Native` and `pdf.Object` really useful?
   Maybe we should just use `pdf.Object` everywhere?
+- `pdf.Equal` falls back to pointer identity for `*Stream` and
+  `*Placeholder` because content comparison would require I/O,
+  decryption, and filter decoding. This leaks identity semantics into
+  every caller that resolves references and then compares (e.g.
+  `property.proxyList.Equal`, `generic.Object.Equal`). Introduce a
+  `pdf.StreamsContentEqual(getter, a, b *Stream) (bool, error)` (or a
+  pair `pdf.EqualShallow` / `pdf.EqualDeep`) and migrate the few
+  callers that want true value equality, so the library has one
+  consistent answer to "are these the same PDF value?".
 
 ## General
 

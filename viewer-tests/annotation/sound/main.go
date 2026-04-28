@@ -34,7 +34,6 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/shading"
-	"seehuhn.de/go/pdf/optional"
 	pdfpage "seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/sound"
 )
@@ -320,9 +319,11 @@ func buildSound(rate float64, channels, bits uint, enc sound.Encoding) *sound.So
 		}
 	}
 
-	snd := &sound.Sound{
-		SampleRate: rate,
-		Encoding:   enc,
+	return &sound.Sound{
+		SampleRate:    rate,
+		Channels:      int(channels),
+		BitsPerSample: int(bits),
+		Encoding:      enc,
 		Data: &sound.InlineSource{
 			WriteData: func(w io.Writer) error {
 				_, err := w.Write(data)
@@ -330,13 +331,6 @@ func buildSound(rate float64, channels, bits uint, enc sound.Encoding) *sound.So
 			},
 		},
 	}
-	if channels != 1 {
-		snd.Channels = optional.NewUInt(channels)
-	}
-	if bits != 8 {
-		snd.BitsPerSample = optional.NewUInt(bits)
-	}
-	return snd
 }
 
 // muLawEncode converts a 16-bit signed sample to a single G.711 µ-law

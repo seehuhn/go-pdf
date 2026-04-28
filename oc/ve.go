@@ -278,7 +278,7 @@ func (n *VisibilityExpressionNot) Embed(e *pdf.EmbedHelper) (pdf.Native, error) 
 // veEqual reports whether two visibility expressions are semantically equal.
 func veEqual(a, b VisibilityExpression) bool {
 	if a == nil || b == nil {
-		return a == nil && b == nil
+		return a == b
 	}
 	switch a := a.(type) {
 	case *VisibilityExpressionGroup:

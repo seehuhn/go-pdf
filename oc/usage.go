@@ -603,7 +603,7 @@ const (
 // usageEqual compares two Usage pointers for equality.
 func usageEqual(a, b *Usage) bool {
 	if a == nil || b == nil {
-		return a == nil && b == nil
+		return a == b
 	}
 	if a.SingleUse != b.SingleUse {
 		return false

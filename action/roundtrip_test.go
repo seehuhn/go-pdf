@@ -38,8 +38,8 @@ import (
 // defaults.
 var testSound = &sound.Sound{
 	SampleRate:    22050,
-	Channels:      optional.NewUInt(1),
-	BitsPerSample: optional.NewUInt(8),
+	Channels:      1,
+	BitsPerSample: 8,
 	Encoding:      sound.EncodingRaw,
 	Data: &sound.InlineSource{
 		WriteData: func(w io.Writer) error {

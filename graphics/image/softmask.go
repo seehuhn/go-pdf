@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/opaque"
 )
 
 // PDF 2.0 sections: 11.6.5 8.9.5
@@ -219,7 +220,7 @@ func (sm *SoftMask) check(out *pdf.Writer) error {
 		return fmt.Errorf("invalid soft mask height %d", sm.Height)
 	}
 	if sm.Source == nil {
-		return errors.New("Source cannot be nil")
+		return errors.New("source cannot be nil")
 	}
 
 	// Validate BitsPerComponent
@@ -347,7 +348,7 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 		}
 	}
 
-	softMask.Source = &streamData{getter: x.R, stream: stm}
+	softMask.Source = &streamData{inner: opaque.ExtractStream(x, stm)}
 
 	return softMask, nil
 }

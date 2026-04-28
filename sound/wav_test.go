@@ -21,15 +21,15 @@ import (
 	"encoding/binary"
 	"io"
 	"testing"
-
-	"seehuhn.de/go/pdf/optional"
 )
 
 // makeSound returns a Sound whose inline data is the given bytes.
-func makeSound(rate float64, channels, bits uint, enc Encoding, data []byte) *Sound {
-	s := &Sound{
-		SampleRate: rate,
-		Encoding:   enc,
+func makeSound(rate float64, channels, bits int, enc Encoding, data []byte) *Sound {
+	return &Sound{
+		SampleRate:    rate,
+		Channels:      channels,
+		BitsPerSample: bits,
+		Encoding:      enc,
 		Data: &InlineSource{
 			WriteData: func(w io.Writer) error {
 				_, err := w.Write(data)
@@ -37,13 +37,6 @@ func makeSound(rate float64, channels, bits uint, enc Encoding, data []byte) *So
 			},
 		},
 	}
-	if channels != 1 {
-		s.Channels = optional.NewUInt(channels)
-	}
-	if bits != 8 {
-		s.BitsPerSample = optional.NewUInt(bits)
-	}
-	return s
 }
 
 func parseHeader(t *testing.T, b []byte) (channels uint16, rate uint32, bits uint16, dataSize uint32) {

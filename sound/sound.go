@@ -21,15 +21,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"math"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/file"
-	"seehuhn.de/go/pdf/optional"
+	"seehuhn.de/go/pdf/opaque"
 )
 
-// PDF 2.0 section: 13.3
+// PDF 2.0 sections: 13.3
 
 // Sound represents a PDF sound object: a stream containing audio sample data
 // to be played by a sound annotation or sound action.
@@ -51,13 +50,16 @@ type Sound struct {
 	// Must be greater than zero.
 	SampleRate float64
 
-	// Channels (optional) is the number of sound channels.
-	// When unset, the PDF default of 1 is used.
-	Channels optional.UInt
+	// Channels is the number of sound channels.  Must be set to a
+	// positive value.  In the PDF representation a missing /C entry
+	// stands for 1, but the Go field always carries an explicit count.
+	Channels int
 
-	// BitsPerSample (optional) is the number of bits per sample value
-	// per channel.  When unset, the PDF default of 8 is used.
-	BitsPerSample optional.UInt
+	// BitsPerSample is the number of bits per sample value per channel.
+	// Must be set to a positive value.  In the PDF representation a
+	// missing /B entry stands for 8, but the Go field always carries an
+	// explicit count.
+	BitsPerSample int
 
 	// Encoding specifies the sample encoding format.  It must be one of
 	// the named [Encoding] constants or the zero value (treated as
@@ -70,8 +72,9 @@ type Sound struct {
 	CompressionFormat pdf.Name
 
 	// CompressionParams (optional) holds parameters specific to the
-	// sound compression format.  Stored verbatim.
-	CompressionParams pdf.Object
+	// sound compression format.  References inside the wrapped value
+	// are translated when the Sound is embedded into a different file.
+	CompressionParams *opaque.Object
 
 	// Data is the source of the sample bytes.  Use [InlineSource] for
 	// samples stored inside the PDF file or [ExternalFileSource] for
@@ -172,62 +175,34 @@ func (s *ExternalFileSource) WriteStream(e *pdf.EmbedHelper, ref pdf.Reference, 
 }
 
 // streamSource is the [Source] implementation returned by [Extract] for
-// sounds read from a PDF file.  Reader decodes the source stream
-// through its filter chain; WriteStream copies the raw, still-encoded
-// bytes verbatim to the destination, preserving the original /Filter
-// and /DecodeParms entries.
+// sounds read from a PDF file.  It delegates to [opaque.Stream] for
+// both decoded reads and verbatim cross-file re-emission, so internal
+// references in /Filter and /DecodeParms are translated correctly
+// when the sound moves between files.
 type streamSource struct {
-	getter pdf.Getter
-	stream *pdf.Stream
+	inner *opaque.Stream
 }
 
 // Reader implements [Source] by decoding the source stream through its
 // filter chain.
 func (s *streamSource) Reader() (io.ReadCloser, error) {
-	return pdf.DecodeStream(s.getter, s.stream, 0)
+	return s.inner.Reader()
 }
 
 // WriteStream implements [Source] by copying the raw, still-encoded
-// stream bytes verbatim to the destination, along with the original
-// /Filter and /DecodeParms entries.
+// stream bytes verbatim to the destination.
 func (s *streamSource) WriteStream(e *pdf.EmbedHelper, ref pdf.Reference, dict pdf.Dict) error {
-	dict = maps.Clone(dict)
-
-	if filter := s.stream.Dict["Filter"]; filter != nil {
-		resolved, err := pdf.Resolve(s.getter, filter)
-		if err != nil {
-			return err
-		}
-		dict["Filter"] = resolved
-	}
-	if dp := s.stream.Dict["DecodeParms"]; dp != nil {
-		resolved, err := pdf.Resolve(s.getter, dp)
-		if err != nil {
-			return err
-		}
-		dict["DecodeParms"] = resolved
-	}
-
-	raw, err := pdf.RawStreamReader(s.getter, s.stream)
-	if err != nil {
-		return err
-	}
-	defer raw.Close()
-
-	w, err := e.Out().OpenStream(ref, dict)
-	if err != nil {
-		return err
-	}
-	if _, err := io.Copy(w, raw); err != nil {
-		w.Close()
-		return err
-	}
-	return w.Close()
+	return s.inner.WriteAt(e, ref, dict)
 }
 
 // Extract reads a sound object from the PDF file.  The isDirect parameter
 // is accepted for signature uniformity but ignored, because sound objects
 // are always indirect stream objects.
+//
+// Extract aborts with an error if the sound has obviously invalid
+// metadata (negative or non-finite SampleRate, zero or absurdly large
+// Channels or BitsPerSample, etc.).  Unknown Encoding values are
+// substituted with the default EncodingRaw.
 func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Sound, error) {
 	stream, err := x.GetStream(path, obj)
 	if err != nil {
@@ -240,32 +215,44 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*S
 	}
 
 	res := &Sound{
-		Channels:      optional.NewUInt(1),
-		BitsPerSample: optional.NewUInt(8),
+		Channels:      1, // PDF default for missing /C
+		BitsPerSample: 8, // PDF default for missing /B
 		Encoding:      EncodingRaw,
 	}
 
 	// SampleRate (R) — required.
 	if r, err := pdf.Optional(x.GetNumber(path, stream.Dict["R"])); err != nil {
 		return nil, err
-	} else if r > 0 && !math.IsInf(r, 0) && !math.IsNaN(r) {
-		res.SampleRate = r
 	} else {
-		return nil, pdf.Error("sound: missing or invalid R entry")
+		res.SampleRate = r
 	}
 
-	// Channels (C) — optional, default 1.
-	if c, err := pdf.Optional(x.GetInteger(path, stream.Dict["C"])); err != nil {
-		return nil, err
-	} else if c > 0 && c <= math.MaxUint32 {
-		res.Channels = optional.NewUInt(uint(c))
+	// Channels (C) — optional in PDF, default 1.  When present, the
+	// value must be a positive integer in the supported range;
+	// non-integer or out-of-range values are rejected rather than
+	// silently fixed.
+	if cObj := stream.Dict["C"]; cObj != nil {
+		c, err := x.GetInteger(path, cObj)
+		if err != nil {
+			return nil, err
+		}
+		if c <= 0 || c > maxChannels {
+			return nil, pdf.Errorf("sound: invalid C entry %d", c)
+		}
+		res.Channels = int(c)
 	}
 
-	// BitsPerSample (B) — optional, default 8.
-	if b, err := pdf.Optional(x.GetInteger(path, stream.Dict["B"])); err != nil {
-		return nil, err
-	} else if b > 0 && b <= math.MaxUint32 {
-		res.BitsPerSample = optional.NewUInt(uint(b))
+	// BitsPerSample (B) — optional in PDF, default 8.  Same strictness
+	// as /C: non-integer or out-of-range values are rejected.
+	if bObj := stream.Dict["B"]; bObj != nil {
+		b, err := x.GetInteger(path, bObj)
+		if err != nil {
+			return nil, err
+		}
+		if b <= 0 || b > maxBitsPerSample {
+			return nil, pdf.Errorf("sound: invalid B entry %d", b)
+		}
+		res.BitsPerSample = int(b)
 	}
 
 	// Encoding (E) — optional, default Raw; unknown names ignored.
@@ -285,9 +272,10 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*S
 		res.CompressionFormat = co
 	}
 
-	// CompressionParams (CP) — optional, opaque (stored verbatim).
+	// CompressionParams (CP) — optional, opaque.  References inside CP
+	// are translated to the destination on Embed.
 	if cp := stream.Dict["CP"]; cp != nil {
-		res.CompressionParams = cp
+		res.CompressionParams = opaque.Extract(x, cp)
 	}
 
 	// ExternalFile (F) — optional.  When present, the sample data lives
@@ -299,10 +287,69 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*S
 	if externalFile != nil {
 		res.Data = &ExternalFileSource{File: externalFile}
 	} else {
-		res.Data = &streamSource{getter: x.R, stream: stream}
+		res.Data = &streamSource{inner: opaque.ExtractStream(x, stream)}
 	}
 
+	if err := res.Validate(); err != nil {
+		return nil, err
+	}
 	return res, nil
+}
+
+// Plausibility limits for sound metadata.  These are tighter than the
+// WAV-format limits: any real sound annotation falls well inside them,
+// so values outside indicate a malformed or hostile file.
+const (
+	// maxChannels accommodates immersive audio layouts (Dolby Atmos and
+	// similar) up to 16 channels, well beyond the 7.1 ceiling of common
+	// surround formats and the 1–2 channels recommended by the PDF
+	// specification.  This is a sanity bound, not a spec limit.
+	maxChannels      = 16
+	maxBitsPerSample = 32      // covers all common PCM bit depths
+	maxSampleRate    = 1 << 20 // 1 MHz, well above any consumer audio rate
+)
+
+// Validate reports whether s holds plausible metadata for a PDF sound
+// object.  It checks that SampleRate is positive, finite, and within
+// realistic bounds, that Channels lies in 1–16, that BitsPerSample
+// lies in 1–32, that Encoding is one of the named constants (or empty,
+// treated as Raw on write), and that Data is non-nil.  When Encoding
+// is [EncodingMuLaw] or [EncodingALaw], BitsPerSample must be 8: those
+// are 8-bit-by-definition G.711 codecs.
+//
+// Validate is called by both [Sound.Embed] (to refuse writing a
+// malformed sound) and [Extract] (to refuse loading one).  External
+// callers may use it to pre-validate a sound built in memory.
+func (s *Sound) Validate() error {
+	if s == nil {
+		return errors.New("sound: nil Sound")
+	}
+	if s.SampleRate <= 0 || math.IsNaN(s.SampleRate) || math.IsInf(s.SampleRate, 0) {
+		return errors.New("sound: SampleRate must be positive and finite")
+	}
+	if s.SampleRate > maxSampleRate {
+		return fmt.Errorf("sound: implausible SampleRate %g", s.SampleRate)
+	}
+	if s.Channels <= 0 || s.Channels > maxChannels {
+		return fmt.Errorf("sound: invalid Channels %d", s.Channels)
+	}
+	if s.BitsPerSample <= 0 || s.BitsPerSample > maxBitsPerSample {
+		return fmt.Errorf("sound: invalid BitsPerSample %d", s.BitsPerSample)
+	}
+	switch s.Encoding {
+	case "", EncodingRaw, EncodingSigned:
+		// valid; bit depth unconstrained at the object level
+	case EncodingMuLaw, EncodingALaw:
+		if s.BitsPerSample != 8 {
+			return fmt.Errorf("sound: %s requires BitsPerSample=8 (got %d)", s.Encoding, s.BitsPerSample)
+		}
+	default:
+		return fmt.Errorf("sound: invalid Encoding %q", string(s.Encoding))
+	}
+	if s.Data == nil {
+		return errors.New("sound: Data is required")
+	}
+	return nil
 }
 
 // Embed writes the sound object to the PDF file as an indirect stream
@@ -311,24 +358,8 @@ func (s *Sound) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	if err := pdf.CheckVersion(e.Out(), "sound object", pdf.V1_2); err != nil {
 		return nil, err
 	}
-
-	if s.SampleRate <= 0 {
-		return nil, errors.New("sound: SampleRate must be greater than zero")
-	}
-	if c, ok := s.Channels.Get(); ok && c == 0 {
-		return nil, errors.New("sound: Channels must be greater than zero")
-	}
-	if b, ok := s.BitsPerSample.Get(); ok && b == 0 {
-		return nil, errors.New("sound: BitsPerSample must be greater than zero")
-	}
-	if s.Data == nil {
-		return nil, errors.New("sound: Data is required")
-	}
-	switch s.Encoding {
-	case "", EncodingRaw, EncodingSigned, EncodingMuLaw, EncodingALaw:
-		// valid
-	default:
-		return nil, fmt.Errorf("sound: invalid Encoding %q", string(s.Encoding))
+	if err := s.Validate(); err != nil {
+		return nil, err
 	}
 
 	dict := pdf.Dict{
@@ -337,11 +368,11 @@ func (s *Sound) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	if e.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Sound")
 	}
-	if c, ok := s.Channels.Get(); ok && c != 1 {
-		dict["C"] = pdf.Integer(c)
+	if s.Channels != 1 {
+		dict["C"] = pdf.Integer(s.Channels)
 	}
-	if b, ok := s.BitsPerSample.Get(); ok && b != 8 {
-		dict["B"] = pdf.Integer(b)
+	if s.BitsPerSample != 8 {
+		dict["B"] = pdf.Integer(s.BitsPerSample)
 	}
 	if s.Encoding != "" && s.Encoding != EncodingRaw {
 		dict["E"] = pdf.Name(s.Encoding)
@@ -350,7 +381,11 @@ func (s *Sound) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["CO"] = s.CompressionFormat
 	}
 	if s.CompressionParams != nil {
-		dict["CP"] = s.CompressionParams
+		cp, err := e.Embed(s.CompressionParams)
+		if err != nil {
+			return nil, err
+		}
+		dict["CP"] = cp
 	}
 
 	ref := e.Alloc()

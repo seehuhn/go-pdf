@@ -126,7 +126,7 @@ const (
 // TODO(voss): implement a more specific comparison.
 func InstancesEqual(a, b Instance) bool {
 	if a == nil || b == nil {
-		return a == nil && b == nil
+		return a == b
 	}
 
 	if a.PostScriptName() != b.PostScriptName() {

@@ -30,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/pdf/oc"
+	"seehuhn.de/go/pdf/opaque"
 	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/webcapture"
 )
@@ -322,7 +323,7 @@ func ExtractMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 		}
 	}
 
-	mask.Source = &streamData{getter: x.R, stream: stream}
+	mask.Source = &streamData{inner: opaque.ExtractStream(x, stream)}
 
 	return mask, nil
 }
@@ -503,7 +504,7 @@ func (m *Mask) check(out *pdf.Writer) error {
 		return fmt.Errorf("invalid image mask height %d", m.Height)
 	}
 	if m.Source == nil {
-		return errors.New("Source cannot be nil")
+		return errors.New("source cannot be nil")
 	}
 
 	if m.Alternates != nil {

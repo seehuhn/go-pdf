@@ -2434,8 +2434,7 @@ types:
     - fn:Eval(@R>0)
     notes: sampling per second
   - goName: Channels
-    goType: "optional.UInt"
-    goPresenceTracking: true
+    goType: int
     pdfKey: C
     pdfType: integer
     required: false
@@ -2444,10 +2443,9 @@ types:
     deprecated: '2.0'
     possibleValues:
     - fn:Eval(@C>0)
-    notes: number of sound channels
+    notes: number of sound channels; the Go field always carries an explicit count, the PDF default 1 is applied on read and omitted on write
   - goName: BitsPerSample
-    goType: "optional.UInt"
-    goPresenceTracking: true
+    goType: int
     pdfKey: B
     pdfType: integer
     required: false
@@ -2456,7 +2454,7 @@ types:
     deprecated: '2.0'
     possibleValues:
     - fn:Eval(@B>0)
-    notes: bits per sample value per channel
+    notes: bits per sample value per channel; the Go field always carries an explicit count, the PDF default 8 is applied on read and omitted on write
   - goName: Encoding
     goType: "sound.Encoding"
     pdfKey: E
@@ -2479,7 +2477,7 @@ types:
     introduced: '1.2'
     deprecated: '2.0'
   - goName: CompressionParams
-    goType: "pdf.Object"
+    goType: "*opaque.Object"
     pdfKey: CP
     pdfType: array;dictionary;stream
     required: false
@@ -2487,7 +2485,8 @@ types:
     deprecated: '2.0'
     refTypes:
     - Stream
-    notes: various
+    notes: opaque to the library; references inside CP are translated
+      across files via the embed-time copier
   - goName:
     pdfKey: Length
     pdfType: integer

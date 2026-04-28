@@ -27,7 +27,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
-	"seehuhn.de/go/pdf/optional"
+	"seehuhn.de/go/pdf/opaque"
 )
 
 // inlineSourceWith returns an *InlineSource whose WriteData emits the
@@ -61,8 +61,10 @@ func TestEmbedMinimal(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	s := &Sound{
-		SampleRate: 22050,
-		Data:       inlineSourceWith(bytes.Repeat([]byte{0x80}, 16)),
+		SampleRate:    22050,
+		Channels:      1,
+		BitsPerSample: 8,
+		Data:          inlineSourceWith(bytes.Repeat([]byte{0x80}, 16)),
 	}
 
 	obj, err := rm.Embed(s)
@@ -86,8 +88,10 @@ func TestExtractMinimal(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	original := &Sound{
-		SampleRate: 22050,
-		Data:       inlineSourceWith(bytes.Repeat([]byte{0x80}, 16)),
+		SampleRate:    22050,
+		Channels:      1,
+		BitsPerSample: 8,
+		Data:          inlineSourceWith(bytes.Repeat([]byte{0x80}, 16)),
 	}
 	obj, err := rm.Embed(original)
 	if err != nil {
@@ -109,8 +113,8 @@ func TestExtractMinimal(t *testing.T) {
 
 	want := &Sound{
 		SampleRate:    22050,
-		Channels:      optional.NewUInt(1),
-		BitsPerSample: optional.NewUInt(8),
+		Channels:      1,
+		BitsPerSample: 8,
 		Encoding:      EncodingRaw,
 	}
 	if diff := cmp.Diff(want, got, cmpopts.IgnoreFields(Sound{}, "Data")); diff != "" {
@@ -135,7 +139,9 @@ var roundTripCases = []roundTripCase{
 		version: pdf.V1_7,
 		sample:  bytes.Repeat([]byte{0x80}, 16),
 		sound: &Sound{
-			SampleRate: 22050,
+			SampleRate:    22050,
+			Channels:      1,
+			BitsPerSample: 8,
 		},
 	},
 	{
@@ -143,7 +149,9 @@ var roundTripCases = []roundTripCase{
 		version: pdf.V2_0,
 		sample:  bytes.Repeat([]byte{0x80}, 16),
 		sound: &Sound{
-			SampleRate: 22050,
+			SampleRate:    22050,
+			Channels:      1,
+			BitsPerSample: 8,
 		},
 	},
 	{
@@ -152,8 +160,8 @@ var roundTripCases = []roundTripCase{
 		sample:  bytes.Repeat([]byte{0x00}, 16),
 		sound: &Sound{
 			SampleRate:    22050,
-			Channels:      optional.NewUInt(1),
-			BitsPerSample: optional.NewUInt(8),
+			Channels:      1,
+			BitsPerSample: 8,
 			Encoding:      EncodingRaw,
 		},
 	},
@@ -163,8 +171,8 @@ var roundTripCases = []roundTripCase{
 		sample:  bytes.Repeat([]byte{0x01, 0x02, 0x03, 0x04}, 8),
 		sound: &Sound{
 			SampleRate:    44100,
-			Channels:      optional.NewUInt(2),
-			BitsPerSample: optional.NewUInt(16),
+			Channels:      2,
+			BitsPerSample: 16,
 			Encoding:      EncodingSigned,
 		},
 	},
@@ -174,8 +182,8 @@ var roundTripCases = []roundTripCase{
 		sample:  bytes.Repeat([]byte{0x7f}, 32),
 		sound: &Sound{
 			SampleRate:    8000,
-			Channels:      optional.NewUInt(1),
-			BitsPerSample: optional.NewUInt(8),
+			Channels:      1,
+			BitsPerSample: 8,
 			Encoding:      EncodingMuLaw,
 		},
 	},
@@ -185,8 +193,8 @@ var roundTripCases = []roundTripCase{
 		sample:  bytes.Repeat([]byte{0xaa, 0x55}, 16),
 		sound: &Sound{
 			SampleRate:    8000,
-			Channels:      optional.NewUInt(2),
-			BitsPerSample: optional.NewUInt(8),
+			Channels:      2,
+			BitsPerSample: 8,
 			Encoding:      EncodingALaw,
 		},
 	},
@@ -196,8 +204,10 @@ var roundTripCases = []roundTripCase{
 		sample:  []byte("opaque-encoded-bytes"),
 		sound: &Sound{
 			SampleRate:        22050,
+			Channels:          1,
+			BitsPerSample:     8,
 			CompressionFormat: "ExampleCodec",
-			CompressionParams: pdf.Dict{"Quality": pdf.Integer(5)},
+			CompressionParams: opaque.Direct(pdf.Dict{"Quality": pdf.Integer(5)}),
 		},
 	},
 	{
@@ -205,7 +215,9 @@ var roundTripCases = []roundTripCase{
 		version: pdf.V1_7,
 		sample:  bytes.Repeat([]byte{0x80, 0x81, 0x82, 0x83}, 64),
 		sound: &Sound{
-			SampleRate: 22050,
+			SampleRate:    22050,
+			Channels:      1,
+			BitsPerSample: 8,
 			Data: &InlineSource{
 				Filter: []pdf.Filter{pdf.FilterFlate{}},
 			},
@@ -216,7 +228,9 @@ var roundTripCases = []roundTripCase{
 		version: pdf.V1_7,
 		sample:  nil,
 		sound: &Sound{
-			SampleRate: 22050,
+			SampleRate:    22050,
+			Channels:      1,
+			BitsPerSample: 8,
 			Data: &ExternalFileSource{
 				File: &file.Specification{
 					FileName:       "samples.au",
@@ -265,11 +279,11 @@ func roundTripTest(t *testing.T, tc roundTripCase) {
 	}
 
 	want := *tc.sound
-	if _, ok := want.Channels.Get(); !ok {
-		want.Channels = optional.NewUInt(1)
+	if want.Channels == 0 {
+		want.Channels = 1
 	}
-	if _, ok := want.BitsPerSample.Get(); !ok {
-		want.BitsPerSample = optional.NewUInt(8)
+	if want.BitsPerSample == 0 {
+		want.BitsPerSample = 8
 	}
 	if want.Encoding == "" {
 		want.Encoding = EncodingRaw
@@ -302,6 +316,107 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
+// TestCompressionParamsCrossFile verifies that a /CP dict containing an
+// indirect reference to another object in the source file survives a
+// cross-file embed: references are translated, the destination has no
+// dangling pointers, and the round-tripped Sound compares equal.
+func TestCompressionParamsCrossFile(t *testing.T) {
+	// Build source: an inner dict referenced from the /CP dict of a Sound.
+	src, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	if err := memfile.AddBlankPage(src); err != nil {
+		t.Fatalf("AddBlankPage: %v", err)
+	}
+	innerRef := src.Alloc()
+	if err := src.Put(innerRef, pdf.Dict{"Quality": pdf.Integer(7)}); err != nil {
+		t.Fatalf("Put inner: %v", err)
+	}
+	cp := pdf.Dict{
+		"Profile": innerRef,
+		"Tag":     pdf.Name("ExampleProfile"),
+	}
+
+	srcRM := pdf.NewResourceManager(src)
+	original := &Sound{
+		SampleRate:        22050,
+		Channels:          1,
+		BitsPerSample:     8,
+		CompressionFormat: "ExampleCodec",
+		CompressionParams: opaque.Direct(cp),
+		Data:              inlineSourceWith([]byte("opaque-encoded-bytes")),
+	}
+	srcSoundRef, err := srcRM.Embed(original)
+	if err != nil {
+		t.Fatalf("src Embed: %v", err)
+	}
+	if err := srcRM.Close(); err != nil {
+		t.Fatalf("srcRM.Close: %v", err)
+	}
+	src.GetMeta().Trailer["Quir:E"] = srcSoundRef
+	if err := src.Close(); err != nil {
+		t.Fatalf("src.Close: %v", err)
+	}
+
+	// Read the Sound from the source.
+	srcX := pdf.NewExtractor(src)
+	srcSnd, err := Extract(srcX, nil, src.GetMeta().Trailer["Quir:E"], false)
+	if err != nil {
+		t.Fatalf("src Extract: %v", err)
+	}
+	if srcSnd.CompressionParams == nil {
+		t.Fatal("source CompressionParams is nil after Extract")
+	}
+
+	// Re-embed into a different file.
+	dst, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	dstRM := pdf.NewResourceManager(dst)
+	dstSoundRef, err := dstRM.Embed(srcSnd)
+	if err != nil {
+		t.Fatalf("dst Embed: %v", err)
+	}
+	if err := dstRM.Close(); err != nil {
+		t.Fatalf("dstRM.Close: %v", err)
+	}
+	dst.GetMeta().Trailer["Quir:E"] = dstSoundRef
+	if err := dst.Close(); err != nil {
+		t.Fatalf("dst.Close: %v", err)
+	}
+
+	// Verify the destination's /CP entry: the inner reference must be
+	// fresh (not the source's), and resolve to the expected payload.
+	dstX := pdf.NewExtractor(dst)
+	dstStream, err := dstX.GetStream(nil, dst.GetMeta().Trailer["Quir:E"])
+	if err != nil {
+		t.Fatalf("dst GetStream: %v", err)
+	}
+	dstCP, err := dstX.GetDict(nil, dstStream.Dict["CP"])
+	if err != nil {
+		t.Fatalf("dst /CP GetDict: %v", err)
+	}
+	dstProfileRef, ok := dstCP["Profile"].(pdf.Reference)
+	if !ok {
+		t.Fatalf("dst /CP/Profile is %T, want pdf.Reference", dstCP["Profile"])
+	}
+	if dstProfileRef == innerRef {
+		t.Error("dst reused the source-file reference for /CP/Profile")
+	}
+	dstProfile, err := dstX.GetDict(nil, dstProfileRef)
+	if err != nil {
+		t.Fatalf("dst Profile GetDict: %v", err)
+	}
+	if dstProfile["Quality"] != pdf.Integer(7) {
+		t.Errorf("dst Profile.Quality = %v, want 7", dstProfile["Quality"])
+	}
+
+	// Round-trip equality of the wrapped CompressionParams.
+	dstSnd, err := Extract(dstX, nil, dst.GetMeta().Trailer["Quir:E"], false)
+	if err != nil {
+		t.Fatalf("dst Extract: %v", err)
+	}
+	if !srcSnd.CompressionParams.Equal(dstSnd.CompressionParams) {
+		t.Error("CompressionParams.Equal across files = false")
+	}
+}
+
 func TestEmbedValidation(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -310,58 +425,109 @@ func TestEmbedValidation(t *testing.T) {
 		{
 			name: "missing SampleRate",
 			sound: &Sound{
-				Data: inlineSourceWith(nil),
+				Channels:      1,
+				BitsPerSample: 8,
+				Data:          inlineSourceWith(nil),
 			},
 		},
 		{
 			name: "negative SampleRate",
 			sound: &Sound{
-				SampleRate: -1,
-				Data:       inlineSourceWith(nil),
+				SampleRate:    -1,
+				Channels:      1,
+				BitsPerSample: 8,
+				Data:          inlineSourceWith(nil),
+			},
+		},
+		{
+			name: "implausible SampleRate",
+			sound: &Sound{
+				SampleRate:    2 << 20, // > maxSampleRate
+				Channels:      1,
+				BitsPerSample: 8,
+				Data:          inlineSourceWith(nil),
 			},
 		},
 		{
 			name: "explicit zero Channels",
 			sound: &Sound{
-				SampleRate: 22050,
-				Channels:   optional.NewUInt(0),
-				Data:       inlineSourceWith(nil),
+				SampleRate:    22050,
+				Channels:      0,
+				BitsPerSample: 8,
+				Data:          inlineSourceWith(nil),
+			},
+		},
+		{
+			name: "channels above limit",
+			sound: &Sound{
+				SampleRate:    22050,
+				Channels:      maxChannels + 1,
+				BitsPerSample: 8,
+				Data:          inlineSourceWith(nil),
 			},
 		},
 		{
 			name: "explicit zero BitsPerSample",
 			sound: &Sound{
 				SampleRate:    22050,
-				BitsPerSample: optional.NewUInt(0),
+				Channels:      1,
+				BitsPerSample: 0,
+				Data:          inlineSourceWith(nil),
+			},
+		},
+		{
+			name: "bits above limit",
+			sound: &Sound{
+				SampleRate:    22050,
+				Channels:      1,
+				BitsPerSample: maxBitsPerSample + 1,
 				Data:          inlineSourceWith(nil),
 			},
 		},
 		{
 			name: "missing Data",
 			sound: &Sound{
-				SampleRate: 22050,
+				SampleRate:    22050,
+				Channels:      1,
+				BitsPerSample: 8,
 			},
 		},
 		{
 			name: "InlineSource missing WriteData",
 			sound: &Sound{
-				SampleRate: 22050,
-				Data:       &InlineSource{},
+				SampleRate:    22050,
+				Channels:      1,
+				BitsPerSample: 8,
+				Data:          &InlineSource{},
 			},
 		},
 		{
 			name: "ExternalFileSource missing File",
 			sound: &Sound{
-				SampleRate: 22050,
-				Data:       &ExternalFileSource{},
+				SampleRate:    22050,
+				Channels:      1,
+				BitsPerSample: 8,
+				Data:          &ExternalFileSource{},
 			},
 		},
 		{
 			name: "unknown Encoding",
 			sound: &Sound{
-				SampleRate: 22050,
-				Encoding:   "MP3",
-				Data:       inlineSourceWith(nil),
+				SampleRate:    22050,
+				Channels:      1,
+				BitsPerSample: 8,
+				Encoding:      "MP3",
+				Data:          inlineSourceWith(nil),
+			},
+		},
+		{
+			name: "muLaw with non-8-bit",
+			sound: &Sound{
+				SampleRate:    22050,
+				Channels:      1,
+				BitsPerSample: 16,
+				Encoding:      EncodingMuLaw,
+				Data:          inlineSourceWith(nil),
 			},
 		},
 	}
@@ -388,7 +554,9 @@ func TestStreamSourcePreservesFilter(t *testing.T) {
 	src, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(src)
 	original := &Sound{
-		SampleRate: 22050,
+		SampleRate:    22050,
+		Channels:      1,
+		BitsPerSample: 8,
 		Data: &InlineSource{
 			WriteData: func(w io.Writer) error {
 				_, err := w.Write(sample)
@@ -482,8 +650,10 @@ func TestEmbedVersionRequirement(t *testing.T) {
 	defer rm.Close()
 
 	s := &Sound{
-		SampleRate: 22050,
-		Data:       inlineSourceWith(nil),
+		SampleRate:    22050,
+		Channels:      1,
+		BitsPerSample: 8,
+		Data:          inlineSourceWith(nil),
 	}
 	_, err := rm.Embed(s)
 	if err == nil {

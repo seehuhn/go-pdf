@@ -67,13 +67,15 @@ type Object interface {
 
 // Equal reports whether two Objects have the same PDF representation.
 // Arrays and Dicts are compared recursively.
-// Stream and Placeholder objects are compared by pointer identity.
+//
+// Stream and Placeholder objects are compared by pointer identity: this
+// is a deliberate compromise to avoid the I/O and decoding required for
+// content comparison.  Callers needing "same content" semantics should
+// use a typed Equal method (e.g., [file.Stream.Equal]) that already
+// holds the decoded bytes.
 func Equal(a, b Object) bool {
-	if a == nil && b == nil {
-		return true
-	}
 	if a == nil || b == nil {
-		return false
+		return a == b
 	}
 
 	aN := a.AsPDF(0)
@@ -141,11 +143,8 @@ func Equal(a, b Object) bool {
 // Unlike [Equal], nil and empty Arrays/Dicts/Strings are considered equal,
 // and numeric types (Integer and Real) are compared with tolerance eps.
 func NearlyEqual(a, b Object, eps float64) bool {
-	if a == nil && b == nil {
-		return true
-	}
 	if a == nil || b == nil {
-		return false
+		return a == b
 	}
 
 	aN := a.AsPDF(0)

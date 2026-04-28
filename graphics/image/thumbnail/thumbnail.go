@@ -21,12 +21,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/opaque"
 )
 
 // PDF 2.0 sections: 8.9.5 12.3.4
@@ -146,7 +146,7 @@ func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 		thumb.Decode = decode
 	}
 
-	thumb.Source = &thumbnailStreamData{getter: x.R, stream: stm}
+	thumb.Source = &thumbnailStreamData{inner: opaque.ExtractStream(x, stm)}
 
 	return thumb, nil
 }
@@ -189,14 +189,14 @@ func (s *readThumbnailSource) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference
 }
 
 // thumbnailStreamData lazily reads a thumbnail from a PDF stream,
-// preserving the original encoding.
+// delegating to [opaque.Stream] for both decoding (Pixels) and
+// verbatim cross-file re-emission (WriteStream).
 type thumbnailStreamData struct {
-	getter pdf.Getter
-	stream *pdf.Stream
+	inner *opaque.Stream
 }
 
 func (s *thumbnailStreamData) Pixels() ([]byte, error) {
-	r, err := pdf.DecodeStream(s.getter, s.stream, 0)
+	r, err := s.inner.Reader()
 	if err != nil {
 		return nil, err
 	}
@@ -205,37 +205,7 @@ func (s *thumbnailStreamData) Pixels() ([]byte, error) {
 }
 
 func (s *thumbnailStreamData) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference, dict pdf.Dict) error {
-	dict = maps.Clone(dict)
-	if filter := s.stream.Dict["Filter"]; filter != nil {
-		resolved, err := pdf.Resolve(s.getter, filter)
-		if err != nil {
-			return err
-		}
-		dict["Filter"] = resolved
-	}
-	if dp := s.stream.Dict["DecodeParms"]; dp != nil {
-		resolved, err := pdf.Resolve(s.getter, dp)
-		if err != nil {
-			return err
-		}
-		dict["DecodeParms"] = resolved
-	}
-
-	raw, err := pdf.RawStreamReader(s.getter, s.stream)
-	if err != nil {
-		return err
-	}
-	defer raw.Close()
-
-	w, err := rm.Out().OpenStream(ref, dict)
-	if err != nil {
-		return err
-	}
-	if _, err := io.Copy(w, raw); err != nil {
-		w.Close()
-		return err
-	}
-	return w.Close()
+	return s.inner.WriteAt(rm, ref, dict)
 }
 
 var _ graphics.ImageData = (*thumbnailStreamData)(nil)
@@ -363,7 +333,7 @@ func (t *Thumbnail) check(out *pdf.Writer) error {
 		return fmt.Errorf("invalid thumbnail height %d", t.Height)
 	}
 	if t.Source == nil {
-		return errors.New("Source cannot be nil")
+		return errors.New("source cannot be nil")
 	}
 
 	switch t.BitsPerComponent {
