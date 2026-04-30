@@ -28,7 +28,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/group"
 	"seehuhn.de/go/pdf/measure"
-	"seehuhn.de/go/pdf/metadata"
+
 	"seehuhn.de/go/pdf/oc"
 	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/pieceinfo"
@@ -58,7 +58,7 @@ type Form struct {
 	Group *group.TransparencyAttributes
 
 	// Metadata is an optional reference to metadata for this form.
-	Metadata *metadata.Stream
+	Metadata *pdf.MetadataStream
 
 	// PieceInfo contains private application data.
 	PieceInfo *pieceinfo.PieceInfo

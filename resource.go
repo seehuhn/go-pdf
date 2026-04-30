@@ -70,32 +70,6 @@ func (e *EmbedHelper) Out() *Writer {
 	return e.rm.Out
 }
 
-// EmbedderInfo describes runtime properties of the file being written,
-// visible to Embedders.
-type EmbedderInfo struct {
-	// DocumentEncrypted reports whether the PDF being written has
-	// document-level encryption configured.
-	DocumentEncrypted bool
-
-	// MetadataEncrypted reports whether the document-level XMP metadata
-	// stream would be encrypted by the document encryption.  This is true
-	// only when DocumentEncrypted is true and /EncryptMetadata is true (the
-	// PDF default).
-	MetadataEncrypted bool
-}
-
-// GetInfo returns information about the file being written.
-func (e *EmbedHelper) GetInfo() EmbedderInfo {
-	enc := e.rm.Out.w.enc
-	if enc == nil {
-		return EmbedderInfo{}
-	}
-	return EmbedderInfo{
-		DocumentEncrypted: true,
-		MetadataEncrypted: !enc.sec.unencryptedMetadata,
-	}
-}
-
 func (e *EmbedHelper) Defer(fn func(*EmbedHelper) error) {
 	e.rm.deferred = append(e.rm.deferred, fn)
 }

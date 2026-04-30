@@ -217,16 +217,31 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 			return nil, err
 		}
 	}
-	r.meta.Catalog = &Catalog{}
-	err = DecodeDict(r, r.meta.Catalog, catalogDict)
+
+	// mark the catalog metadata stream as exempt from document-level
+	// encryption when /EncryptMetadata is false — the spec exempts it
+	// from default StmF encryption in that case.  Must happen before
+	// ExtractCatalog reads the stream below.  Mutating r.unencrypted
+	// is safe because we are still inside NewReader.
+	if metaRef, ok := catalogDict["Metadata"].(Reference); ok && metaRef != 0 {
+		if r.enc != nil && r.enc.sec.unencryptedMetadata {
+			r.unencrypted[metaRef] = true
+		}
+	}
+
+	x := NewExtractor(r)
+	r.meta.Catalog, err = ExtractCatalog(x, nil, catalogDict, true)
 	if shouldExit(err) {
 		return nil, err
-	} else if r.meta.Catalog.Pages == 0 {
+	} else if r.meta.Catalog == nil || r.meta.Catalog.Pages == 0 {
 		err := &MalformedFileError{
 			Err: errors.New("no pages in PDF document catalog"),
 		}
 		if opt.ErrorHandling == ErrorHandlingReport {
 			r.Errors = append(r.Errors, err)
+			if r.meta.Catalog == nil {
+				r.meta.Catalog = &Catalog{}
+			}
 		} else {
 			return nil, err
 		}
@@ -239,7 +254,6 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 		r.meta.ID = nil
 	}
 
-	x := NewExtractor(r)
 	r.meta.Info, err = ExtractInfo(x, nil, trailer["Info"])
 	if shouldExit(err) {
 		return nil, err

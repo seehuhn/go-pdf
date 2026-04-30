@@ -30,7 +30,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/graphics/group"
 	"seehuhn.de/go/pdf/measure"
-	"seehuhn.de/go/pdf/metadata"
+
 	"seehuhn.de/go/pdf/oc"
 	"seehuhn.de/go/pdf/pieceinfo"
 )
@@ -81,7 +81,7 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*form
 	}
 
 	// Metadata (optional)
-	if meta, err := pdf.ExtractorGetOptional(x, path, dict["Metadata"], metadata.Extract); err != nil {
+	if meta, err := pdf.ExtractorGetOptional(x, path, dict["Metadata"], pdf.ExtractMetadataStream); err != nil {
 		return nil, err
 	} else {
 		f.Metadata = meta

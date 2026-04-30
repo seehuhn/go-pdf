@@ -391,27 +391,39 @@ func TestCatalog(t *testing.T) {
 	if len(d1) != 2 {
 		t.Errorf("wrong Catalog dict: %s", AsString(d1))
 	}
-	cat1 := &Catalog{}
-	err := DecodeDict(nil, cat1, d1)
+	cat1, err := ExtractCatalog(NewExtractor(nil), nil, d1, true)
 	if err != nil {
-		t.Error(err)
-	} else if *cat0 != *cat1 {
+		t.Fatal(err)
+	}
+	if *cat0 != *cat1 {
 		t.Errorf("Catalog wrongly decoded: %v", cat1)
 	}
 }
 
 func TestCatalogReadMissingPages(t *testing.T) {
-	ref := NewReference(123, 0)
 	catalogDict := Dict{
-		"Metadata": ref,
+		"Outlines": NewReference(123, 0),
 	}
-	catalog := &Catalog{}
-	err := DecodeDict(nil, catalog, catalogDict)
-	if err == nil {
+	if _, err := ExtractCatalog(NewExtractor(nil), nil, catalogDict, true); err == nil {
 		t.Errorf("missing Pages not detected")
 	}
-	if catalog.Metadata != ref {
-		t.Errorf("wrong Metadata: %v", catalog.Metadata)
+}
+
+// TestCatalogVersionPermissive checks that ExtractCatalog accepts the
+// Version entry as a Name (per the PDF spec) and as Real or String
+// (invalid forms found in the wild).
+func TestCatalogVersionPermissive(t *testing.T) {
+	pages := NewReference(1, 0)
+	for _, version := range []Object{Name("1.5"), Real(1.5), String("1.5")} {
+		dict := Dict{"Version": version, "Pages": pages}
+		cat, err := ExtractCatalog(NewExtractor(nil), nil, dict, true)
+		if err != nil {
+			t.Errorf("version %v: %v", version, err)
+			continue
+		}
+		if cat.Version != V1_5 {
+			t.Errorf("version %v: got %s, want %s", version, cat.Version, V1_5)
+		}
 	}
 }
 

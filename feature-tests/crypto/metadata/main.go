@@ -23,7 +23,7 @@
 //   - WriterOptions.UnencryptedMetadata=true tells the standard security
 //     handler to set /EncryptMetadata false in the encrypt dictionary,
 //     exempting the document-level metadata stream from document encryption.
-//   - metadata.Stream.PadToLength=N pads the XMP packet to N bytes (no
+//   - xmp.Packet.PadToLength=N pads the XMP packet to N bytes (no
 //     compression) and emits the writable trailer <?xpacket end="w"?>.
 //
 // External tools can locate the XMP packet by scanning for its marker
@@ -39,7 +39,6 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
-	"seehuhn.de/go/pdf/metadata"
 	"seehuhn.de/go/xmp"
 )
 
@@ -83,14 +82,8 @@ func run() error {
 		return err
 	}
 
-	ref, err := doc.RM.Embed(&metadata.Stream{
-		Data:        packet,
-		PadToLength: 2048,
-	})
-	if err != nil {
-		return err
-	}
-	doc.Out.GetMeta().Catalog.Metadata = ref.(pdf.Reference)
+	packet.PadToLength = 2048
+	doc.Out.GetMeta().Catalog.Metadata = &pdf.MetadataStream{Data: packet}
 
 	return doc.Close()
 }

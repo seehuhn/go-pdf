@@ -224,27 +224,3 @@ func (c *Copier) CopyReference(obj Reference) (Reference, error) {
 func (c *Copier) Redirect(origRef, newRef Reference) {
 	c.trans[origRef] = newRef
 }
-
-// CopierCopyStruct copies a struct from the source file to the target file.
-// For this to work, `data` must be a pointer to a struct, and must be
-// a valid argument to [AsDict].  Otherwise, the function panics.
-//
-// Once Go supports methods with type parameters, this function can be turned
-// into a method on [Copier].
-//
-// Deprecated: This function will be removed.
-//
-// TODO(voss): remove
-func CopierCopyStruct[T any](c *Copier, data *T) (*T, error) {
-	oldDict := AsDict(data)
-	newDict, err := c.CopyDict(oldDict)
-	if err != nil {
-		return nil, err
-	}
-	newData := new(T)
-	err = DecodeDict(c.r, newData, newDict)
-	if err != nil {
-		return nil, err
-	}
-	return newData, nil
-}

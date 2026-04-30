@@ -45,11 +45,8 @@ func ShowMetadata(r pdf.Getter) error {
 		showInfo(m.Trailer["Info"], m.Info)
 	}
 
-	if m.Catalog.Metadata != 0 {
-		err := showXMP(r, m.Catalog.Metadata)
-		if err != nil {
-			return err
-		}
+	if m.Catalog.Metadata != nil {
+		showXMP(m.Catalog.Metadata)
 	}
 
 	return nil
@@ -103,21 +100,13 @@ func showInfo(obj pdf.Object, info *pdf.Info) {
 	fmt.Println()
 }
 
-func showXMP(r pdf.Getter, ref pdf.Reference) error {
-	title := fmt.Sprintf("XMP Metadata stream (%s)", ref)
+func showXMP(md *pdf.MetadataStream) {
+	title := "XMP Metadata stream"
 	fmt.Println(title)
 	fmt.Println(strings.Repeat("-", len(title)))
 	fmt.Println()
 
-	body, err := pdf.GetStreamReader(r, ref)
-	if err != nil {
-		return err
-	}
-
-	packet, err := xmp.Read(body)
-	if err != nil {
-		return err
-	}
+	packet := md.Data
 
 	dc := &xmp.DublinCore{}
 	packet.Get(dc)
@@ -140,24 +129,6 @@ func showXMP(r pdf.Getter, ref pdf.Reference) error {
 	showXMPStruct(packet, xmpRights)
 
 	fmt.Println()
-
-	// names := maps.Keys(packet.Properties)
-	// sort.Slice(names, func(i, j int) bool {
-	// 	if names[i].Space != names[j].Space {
-	// 		return names[i].Space < names[j].Space
-	// 	}
-	// 	return names[i].Local < names[j].Local
-	// })
-	// for _, name := range names {
-	// 	label := fmt.Sprintf("%s %s:", name.Space, name.Local)
-	// 	raw := packet.Properties[name]
-	// 	lines := getXMPRaw(label, raw)
-	// 	for _, line := range lines {
-	// 		fmt.Println(line)
-	// 	}
-	// }
-
-	return nil
 }
 
 func showXMPStruct(p *xmp.Packet, v any) {

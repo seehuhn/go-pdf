@@ -32,7 +32,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/group"
 	"seehuhn.de/go/pdf/graphics/image/thumbnail"
 	"seehuhn.de/go/pdf/measure"
-	"seehuhn.de/go/pdf/metadata"
+
 	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/page/boxcolor"
 	"seehuhn.de/go/pdf/page/navnode"
@@ -175,7 +175,7 @@ type Page struct {
 	AA *triggers.Page
 
 	// Metadata (optional) is a metadata stream for the page.
-	Metadata *metadata.Stream
+	Metadata *pdf.MetadataStream
 
 	// LastModified (optional) is when the page contents were last modified.
 	// Required if PieceInfo is present.
@@ -849,7 +849,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 	}
 
 	// Metadata (optional)
-	if meta, err := pdf.Optional(metadata.Extract(x, path, dict["Metadata"], false)); err != nil {
+	if meta, err := pdf.Optional(pdf.ExtractMetadataStream(x, path, dict["Metadata"], false)); err != nil {
 		return nil, err
 	} else {
 		p.Metadata = meta

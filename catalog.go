@@ -18,13 +18,16 @@ package pdf
 
 import (
 	"errors"
+	"fmt"
 
 	"golang.org/x/text/language"
 )
 
 // Catalog represents a PDF Document Catalog.  The only required field in this
 // structure is Pages, which specifies the root of the page tree.
-// This struct can be used with the [DecodeDict] and [AsDict] functions.
+//
+// Use [ExtractCatalog] to read a catalog from a PDF file and [AsDict] to
+// produce its dictionary form for writing.
 //
 // The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
 type Catalog struct {
@@ -90,8 +93,12 @@ type Catalog struct {
 	// dictionary.
 	AcroForm Object `pdf:"optional"`
 
-	// Metadata (optional, PDF 1.4) contains metadata for the document.
-	Metadata Reference `pdf:"optional"`
+	// Metadata (optional, PDF 1.4) contains the document-level XMP metadata
+	// stream.  Populated by [ExtractCatalog] (eager decode).  When writing,
+	// [Writer.Close] embeds the stream and injects the resulting reference
+	// into the catalog dict; [AsDict] does not serialise this field
+	// (the `pdf:"-"` tag).
+	Metadata *MetadataStream `pdf:"-"`
 
 	// StructTreeRoot (optional, PDF 1.3) is the document's structure tree root
 	// dictionary.
@@ -152,8 +159,14 @@ type Catalog struct {
 	DPartRoot Object `pdf:"optional"`
 }
 
-func ExtractCatalog(r Getter, obj Object) (*Catalog, error) {
-	dict, err := GetDictTyped(r, obj, "Catalog")
+// ExtractCatalog reads the document catalog dictionary and returns its
+// Go representation.
+//
+// The Metadata stream, if present, is decoded eagerly so that the
+// returned [Catalog.Metadata] field is populated with a typed
+// [*MetadataStream].
+func ExtractCatalog(x *Extractor, path *CycleCheck, obj Object, _ bool) (*Catalog, error) {
+	dict, err := x.GetDictTyped(path, obj, "Catalog")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -179,9 +192,28 @@ func ExtractCatalog(r Getter, obj Object) (*Catalog, error) {
 		pages = 0
 	}
 
+	// Extract Version (optional, PDF 1.4)
+	var version Version
+	if dict["Version"] != nil {
+		var vString string
+		switch v := dict["Version"].(type) {
+		case Name:
+			vString = string(v)
+		case String:
+			vString = string(v)
+		case Real:
+			vString = fmt.Sprintf("%.1f", v)
+		}
+		if vString != "" {
+			if v, err := ParseVersion(vString); err == nil {
+				version = v
+			}
+		}
+	}
+
 	// Extract optional fields
-	pageLayout, _ := GetName(r, dict["PageLayout"])
-	pageMode, _ := GetName(r, dict["PageMode"])
+	pageLayout, _ := x.GetName(path, dict["PageLayout"])
+	pageMode, _ := x.GetName(path, dict["PageMode"])
 
 	var outlines Reference
 	if ref, ok := dict["Outlines"].(Reference); ok {
@@ -193,24 +225,27 @@ func ExtractCatalog(r Getter, obj Object) (*Catalog, error) {
 		threads = ref
 	}
 
-	var metadata Reference
-	if ref, ok := dict["Metadata"].(Reference); ok {
-		metadata = ref
-	}
-
 	// Extract Lang field
 	var lang language.Tag
 	if dict["Lang"] != nil {
-		langStr, err := GetTextString(r, dict["Lang"])
+		langStr, err := GetTextString(x.R, dict["Lang"])
 		if err == nil && langStr != "" {
 			lang, _ = language.Parse(string(langStr))
 		}
 	}
 
 	// Extract NeedsRendering
-	needsRendering, _ := GetBoolean(r, dict["NeedsRendering"])
+	needsRendering, _ := x.GetBoolean(path, dict["NeedsRendering"])
+
+	// Extract Metadata stream (eager decode; PDF 1.4)
+	metadata, err := ExtractorGetOptional(x, path, dict["Metadata"], ExtractMetadataStream)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Catalog{
+		Version:           version,
+		Extensions:        dict["Extensions"],
 		Pages:             pages,
 		PageLabels:        dict["PageLabels"],
 		Names:             dict["Names"],

@@ -26,9 +26,15 @@ import (
 
 // AsDict creates a PDF Dict object, encoding the fields of a Go struct.
 //
-// If the argument is nil, the result is nil.
+// Field tags control encoding:
+//   - "optional": skip the field when its value is the Go zero value.
+//   - "extra": the field is a map[string]string whose entries are emitted
+//     as additional dict entries.
+//   - "-": skip the field entirely; manual handling owns the corresponding
+//     dict key.
+//   - A "Key=Value" tag on a struct{} dummy field emits the literal pair.
 //
-// This is the converse of [DecodeDict].
+// If the argument is nil, the result is nil.
 func AsDict(s any) Dict {
 	if s == nil {
 		return nil
@@ -51,6 +57,8 @@ fieldLoop:
 			switch t {
 			case "":
 				// pass
+			case "-":
+				continue fieldLoop
 			case "optional":
 				optional = true
 			case "extra":
@@ -108,188 +116,7 @@ fieldLoop:
 	return res
 }
 
-// DecodeDict initialises a struct using the data from a PDF dictionary.
-// The argument dst must be a pointer to a struct, or the function will panic.
-//
-// Go struct tags can be used to control the decoding process.  The following
-// tags are supported:
-//
-//   - "optional": the field is optional and may be omitted from the PDF
-//     dictionary.  Omitted fields default to the Go zero value for the
-//     field type.
-//   - "allowstring": the field is a Name, but the PDF dictionary may contain
-//     a String instead.  If a String is found, it will be converted to a Name.
-//   - "extra": the field is a map[string]string which contains all
-//     entries in the PDF dictionary which are not otherwise decoded.
-//
-// This function is the converse of [AsDict].
-//
-// Deprecated: This function will be removed.
-//
-// TODO(voss): remove
-func DecodeDict(r Getter, dst any, src Dict) error {
-	v := reflect.Indirect(reflect.ValueOf(dst))
-	vt := v.Type()
-
-	// To allow parsing malformed PDF files, we don't abort on error.  Instead,
-	// we fill all struct fields we can and then return the first error
-	// encountered.
-	var firstErr error
-
-	seen := map[string]bool{}
-	extra := -1
-fieldLoop:
-	for i := 0; i < vt.NumField(); i++ {
-		fVal := v.Field(i)
-		if !fVal.CanSet() {
-			continue
-		}
-		fInfo := vt.Field(i)
-		seen[fInfo.Name] = true
-		fVal.Set(reflect.Zero(fInfo.Type)) // zero all fields
-
-		// read the struct tags
-		optional := false
-		allowstring := false
-		for t := range strings.SplitSeq(fInfo.Tag.Get("pdf"), ",") {
-			switch t {
-			case "optional":
-				optional = true
-			case "allowstring":
-				allowstring = true
-			case "extra":
-				extra = i
-				continue fieldLoop
-			}
-		}
-
-		// get and fix up the value from the Dict
-		dictVal := src[Name(fInfo.Name)]
-		if fInfo.Type != objectType && fInfo.Type != referenceType {
-			// Follow references to indirect objects where needed.
-			// As a side effect, this calls .AsPDF() on the object.
-			obj, err := Resolve(r, dictVal)
-			if err != nil {
-				if firstErr == nil {
-					firstErr = err
-				}
-				continue
-			}
-			dictVal = obj
-		}
-		if dictVal == nil {
-			if !optional && firstErr == nil {
-				firstErr = fmt.Errorf("required Dict entry /%s not found",
-					fInfo.Name)
-			}
-			continue
-		}
-		if allowstring && fInfo.Type == nameType {
-			if s, ok := dictVal.(String); ok {
-				dictVal = Name(s)
-			}
-		}
-
-		// finally, assign the value to the field
-		switch {
-		case fInfo.Type.Kind() == reflect.Bool:
-			fVal.SetBool(dictVal == Boolean(true))
-		case fInfo.Type == textStringType:
-			if v, ok := dictVal.(asTextStringer); ok {
-				s := v.AsTextString()
-				fVal.Set(reflect.ValueOf(s))
-			} else if firstErr == nil {
-				firstErr = fmt.Errorf("/%s: expected TextString but got %T",
-					fInfo.Name, dictVal)
-			}
-		case fInfo.Type == dateType:
-			if v, ok := dictVal.(asDater); ok {
-				s, err := v.AsDate()
-				if err != nil {
-					if firstErr == nil {
-						firstErr = fmt.Errorf("/%s: %s", fInfo.Name, err)
-					}
-				} else {
-					fVal.Set(reflect.ValueOf(s))
-				}
-			} else if firstErr == nil {
-				firstErr = fmt.Errorf("/%s: expected pdf.String but got %T",
-					fInfo.Name, dictVal)
-			}
-		case fInfo.Type == languageType:
-			tagString, err := GetTextString(r, dictVal)
-			if err != nil {
-				if firstErr == nil {
-					firstErr = fmt.Errorf("/%s: %s", fInfo.Name, err)
-				}
-			} else {
-				tag, err := language.Parse(string(tagString))
-				if err == nil {
-					fVal.Set(reflect.ValueOf(tag))
-				} else if tagString != "" && firstErr == nil {
-					firstErr = fmt.Errorf("/%s: %s: %s",
-						fInfo.Name, tagString, err)
-				}
-			}
-		case fInfo.Type == versionType:
-			var vString string
-			switch x := dictVal.(type) {
-			case Name:
-				vString = string(x)
-			case String:
-				vString = string(x)
-			case Real:
-				vString = fmt.Sprintf("%.1f", x)
-			default:
-				if firstErr == nil {
-					firstErr = fmt.Errorf("/%s: expected pdf.Name but got %T",
-						fInfo.Name, dictVal)
-				}
-			}
-			version, err := ParseVersion(vString)
-			if err == nil {
-				fVal.Set(reflect.ValueOf(version))
-			} else if firstErr == nil {
-				firstErr = fmt.Errorf("/%s: %s: %s", fInfo.Name, vString, err)
-			}
-		case reflect.TypeOf(dictVal).AssignableTo(fInfo.Type):
-			fVal.Set(reflect.ValueOf(dictVal))
-		default:
-			if firstErr == nil {
-				firstErr = fmt.Errorf("/%s: expected %T but got %T",
-					fInfo.Name, fVal.Interface(), dictVal)
-			}
-		}
-	}
-
-	if extra >= 0 {
-		extraDict := make(map[string]string)
-		for keyName, valObj := range src {
-			key := string(keyName)
-			if seen[key] {
-				continue
-			}
-			if valObj, ok := valObj.(asTextStringer); ok {
-				s := valObj.AsTextString()
-				if len(s) > 0 {
-					extraDict[key] = string(s)
-				}
-			}
-		}
-		if len(extraDict) > 0 {
-			v.Field(extra).Set(reflect.ValueOf(extraDict))
-		}
-	}
-
-	if firstErr != nil {
-		return &MalformedFileError{Err: firstErr}
-	}
-	return nil
-}
-
 var (
-	nameType      = reflect.TypeFor[Name]()
-	objectType    = reflect.TypeFor[Object]()
 	referenceType = reflect.TypeFor[Reference]()
 
 	textStringType = reflect.TypeFor[TextString]()

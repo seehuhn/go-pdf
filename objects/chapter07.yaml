@@ -348,8 +348,9 @@ types:
     introduced: '1.4'
     refTypes:
     - Metadata
-    goType: Reference
-    purpose: Metadata (optional, PDF 1.4) contains metadata for the document.
+    goType: '*MetadataStream'
+    purpose: Metadata (optional, PDF 1.4) contains the document-level XMP metadata
+      stream.  Populated eagerly by NewReader; set directly when writing.
   - goName: StructTreeRoot
     pdfKey: StructTreeRoot
     pdfType: dictionary
@@ -2329,7 +2330,7 @@ types:
     introduced: '1.4'
     refTypes:
     - Metadata
-    goType: '*metadata.Stream'
+    goType: '*MetadataStream'
     purpose: Metadata (optional) is a metadata stream for the page.
   - goName: PieceInfo
     pdfKey: PieceInfo
@@ -2740,7 +2741,7 @@ types:
   goRepr: struct
 - name: Stream
   purpose: entries common to all stream dictionaries
-  goType: metadata.Stream
+  goType: Stream
   pdfRepr: stream
   fields:
   - goName:

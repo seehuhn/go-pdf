@@ -25,7 +25,6 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
-	"seehuhn.de/go/pdf/metadata"
 )
 
 // Space represents a PDF color space which can be embedded in a PDF file.
@@ -152,9 +151,9 @@ func ExtractSpace(x *pdf.Extractor, path *pdf.CycleCheck, desc pdf.Object, _ boo
 		}
 
 	case FamilyICCBased:
-		var meta *metadata.Stream
+		var meta *pdf.MetadataStream
 		if ref, ok := d.dict["Metadata"]; ok {
-			meta, err = pdf.Optional(metadata.Extract(x, path, ref, false))
+			meta, err = pdf.Optional(pdf.ExtractMetadataStream(x, path, ref, false))
 			if err != nil {
 				d.SetError(err)
 			}
@@ -565,7 +564,7 @@ func floatSlicesEqual(a, b []float64, eps float64) bool {
 }
 
 // metadataEqual compares two metadata streams for equality.
-func metadataEqual(a, b *metadata.Stream) bool {
+func metadataEqual(a, b *pdf.MetadataStream) bool {
 	if a == nil || b == nil {
 		return a == b
 	}

@@ -3753,7 +3753,7 @@ types:
     introduced: '1.4'
     refTypes:
     - Metadata
-    goType: '*metadata.Stream'
+    goType: '*MetadataStream'
     purpose: Metadata is an optional reference to metadata for this form.
   - goName: PieceInfo
     pdfKey: PieceInfo
@@ -4197,7 +4197,7 @@ types:
     introduced: '1.4'
     refTypes:
     - Metadata
-    goType: '*metadata.Stream'
+    goType: '*MetadataStream'
     purpose: Metadata (optional) is a metadata stream containing metadata for the image.
   - goName: OptionalContent
     pdfKey: OC
@@ -4528,7 +4528,7 @@ types:
     introduced: '1.4'
     refTypes:
     - Metadata
-    goType: '*metadata.Stream'
+    goType: '*MetadataStream'
     purpose: Metadata (optional) is a metadata stream containing metadata for the image.
   - goName: OptionalContent
     pdfKey: OC

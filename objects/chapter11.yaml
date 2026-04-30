@@ -227,7 +227,7 @@ types:
     introduced: '1.4'
     refTypes:
     - Metadata
-    goType: '*metadata.Stream'
+    goType: '*MetadataStream'
     purpose: Metadata (optional) is a metadata stream containing metadata for the image.
   - goName:
     pdfKey: Length

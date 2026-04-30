@@ -25,7 +25,6 @@ import (
 
 	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/metadata"
 )
 
 // PDF 2.0 sections: 8.6.5.5
@@ -35,7 +34,7 @@ type SpaceICCBased struct {
 	N        int
 	Ranges   []float64
 	Profile  *icc.Profile
-	Metadata *metadata.Stream
+	Metadata *pdf.MetadataStream
 
 	def []float64
 
@@ -49,7 +48,7 @@ type SpaceICCBased struct {
 }
 
 // ICCBased returns a new ICC-based color space.
-func ICCBased(profile []byte, metadata *metadata.Stream) (*SpaceICCBased, error) {
+func ICCBased(profile []byte, metadata *pdf.MetadataStream) (*SpaceICCBased, error) {
 	if len(profile) == 0 {
 		return nil, errors.New("ICCBased: missing profile")
 	}

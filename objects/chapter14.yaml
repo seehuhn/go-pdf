@@ -2896,7 +2896,7 @@ types:
     introduced: '1.3'
 - name: Metadata
   purpose: "XMP metadata stream"
-  goType: metadata.Stream
+  goType: MetadataStream
   pdfType: Metadata
   pdfRepr: stream
   introduced: '1.4'

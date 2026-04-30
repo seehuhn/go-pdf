@@ -99,11 +99,15 @@ func copyPDF(inFile, outFile string) (retErr error) {
 	if err != nil {
 		return err
 	}
-	newCatalog, err := pdf.ExtractCatalog(w, newDict)
+	newCatalog, err := pdf.ExtractCatalog(pdf.NewExtractor(w), nil, newDict, false)
 	if err != nil {
 		return err
 	}
 	w.GetMeta().Catalog = newCatalog
+	// AsDict skips the typed Metadata field (`pdf:"-"`), so it never
+	// reaches CopyDict; propagate the typed value across explicitly.
+	// Writer.Close re-embeds it.
+	w.GetMeta().Catalog.Metadata = r.GetMeta().Catalog.Metadata
 
 	w.GetMeta().Info = r.GetMeta().Info
 

@@ -111,7 +111,7 @@ color.ExtractSpace -> ...
   ... -> *color.SpaceDeviceN -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
   ... -> *color.SpaceIndexed -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
   ... -> *color.SpaceSeparation -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
-metadata.ExtractStream -> *metadata.Stream -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
+pdf.ExtractMetadataStream -> *pdf.MetadataStream -> Embed(rm *pdf.EmbedHelper) (pdf.Native, error)
 
 TODO:
 ./go-pdf/graphics/image/dict.go:func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {

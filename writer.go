@@ -36,21 +36,17 @@ type WriterOptions struct {
 	OwnerPassword   string
 	UserPermissions Perm
 
-	// UnencryptedMetadata, if true, marks XMP metadata streams as exempt
-	// from document encryption.  The /Encrypt dictionary in the resulting
-	// PDF will carry /EncryptMetadata false, and metadata streams written
-	// through [seehuhn.de/go/pdf/metadata.Stream] are wrapped in an
-	// Identity Crypt filter so their bytes are stored in plaintext on
-	// disk.  Setting this option requires that document encryption is
+	// UnencryptedMetadata, if true, embeds the document-level XMP metadata
+	// stream (Catalog.Metadata) without encryption, even when the rest of
+	// the document is encrypted.  The XMP packet is written as raw bytes
+	// so external tools can locate and read it without the document
+	// password.  Setting this option requires that document encryption is
 	// configured (UserPassword or OwnerPassword is set) and that the PDF
 	// version is 1.6 or later; otherwise NewWriter returns an error.
 	//
-	// Reading unencrypted metadata streams from encrypted documents is not
-	// yet implemented.
-	//
-	// The field name is the negation of the PDF spec's /EncryptMetadata key
-	// so that the Go zero value (false) corresponds to the spec default
-	// (metadata is encrypted).
+	// The field name is the negation of the PDF spec's /EncryptMetadata
+	// key so that the Go zero value (false) corresponds to the spec
+	// default (metadata is encrypted).
 	UnencryptedMetadata bool
 
 	// If this flag is true, the writer tries to generate a PDF file which is
@@ -74,6 +70,22 @@ type Writer struct {
 	afterStream []allocatedObject
 
 	outputOptions OutputOptions
+
+	// unencryptedMetadata mirrors WriterOptions.UnencryptedMetadata; used
+	// by Close to decide whether to skip encryption on the catalog
+	// metadata stream.
+	unencryptedMetadata bool
+
+	// refIsPlaintext lists references for which OpenStream must skip the
+	// document-level encryption wrap.  Currently used only for the
+	// catalog metadata stream when unencryptedMetadata is set.
+	refIsPlaintext map[Reference]bool
+}
+
+// isEncrypted reports whether the file being written has document-level
+// encryption configured.
+func (w *Writer) isEncrypted() bool {
+	return w.w.enc != nil
 }
 
 // TODO(voss): is this more generally useful?
@@ -251,6 +263,9 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 		xref:    xref,
 
 		outputOptions: outOpt,
+
+		unencryptedMetadata: opt.UnencryptedMetadata,
+		refIsPlaintext:      map[Reference]bool{},
 	}
 
 	_, err = fmt.Fprintf(pdf.w, "%%PDF-%s\n%%\x80\x80\x80\x80\n", versionString)
@@ -277,16 +292,44 @@ func (w *Writer) Close() error {
 
 	trailer := w.meta.Trailer.Clone()
 
+	// build the catalog dict; AsDict skips the typed Metadata field
+	// (pdf:"-"), and we inject the Reference manually below
+	catalogDict := AsDict(w.meta.Catalog)
+
+	// pre-allocate a reference for the metadata stream so the catalog
+	// can mention it; the actual stream is embedded after the catalog
+	// has been written
+	var metaRef Reference
+	if w.meta.Catalog.Metadata != nil {
+		if w.meta.Catalog.Metadata.Data.PadToLength > 0 &&
+			w.isEncrypted() && !w.unencryptedMetadata {
+			return errors.New("padded XMP metadata streams require WriterOptions.UnencryptedMetadata in encrypted documents")
+		}
+		metaRef = w.Alloc()
+		if w.unencryptedMetadata {
+			w.refIsPlaintext[metaRef] = true
+		}
+		catalogDict["Metadata"] = metaRef
+	}
+
 	catRef := w.Alloc()
-	err := w.Put(catRef, AsDict(w.meta.Catalog))
+	err := w.Put(catRef, catalogDict)
 	if err != nil {
 		return fmt.Errorf("failed to write document catalog: %w", err)
 	}
 	trailer["Root"] = catRef
 
+	// shared end-of-life ResourceManager for Info and Metadata embeds
+	var rm *ResourceManager
+	endRM := func() *ResourceManager {
+		if rm == nil {
+			rm = NewResourceManager(w)
+		}
+		return rm
+	}
+
 	if w.meta.Info != nil {
-		rm := NewResourceManager(w)
-		infoRef, err := rm.Embed(w.meta.Info)
+		infoRef, err := endRM().Embed(w.meta.Info)
 		if err != nil {
 			return err
 		}
@@ -297,6 +340,19 @@ func (w *Writer) Close() error {
 		}
 	} else {
 		delete(trailer, "Info")
+	}
+
+	if metaRef != 0 {
+		e := &EmbedHelper{rm: endRM(), copiers: map[*Extractor]*Copier{}}
+		if _, err := e.EmbedAt(metaRef, w.meta.Catalog.Metadata); err != nil {
+			return err
+		}
+	}
+
+	if rm != nil {
+		if err := rm.Close(); err != nil {
+			return err
+		}
 	}
 
 	if w.meta.ID != nil {
@@ -667,12 +723,15 @@ func (w *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.Wri
 		length:     length,
 	}
 
-	// Skip the document-level encryption wrap when the stream's wire form
-	// declares a Crypt filter at position 0 of /Filter — either passed in
-	// via filters... or already present in dict["Filter"] (e.g. for a
-	// copied stream being written through Writer.Put).  Per PDF spec
-	// §7.4.10 the explicit Crypt filter overrides the default StmF.
-	skipDefaultEncrypt := leadingCrypt != nil
+	// Skip the document-level encryption wrap when:
+	//   - the writer has explicitly marked this ref as plaintext (catalog
+	//     metadata stream when /EncryptMetadata false), or
+	//   - the stream's wire form declares a Crypt filter at position 0 of
+	//     /Filter — either passed in via filters... or already present in
+	//     dict["Filter"] (e.g. for a copied stream being written through
+	//     Writer.Put).  Per PDF spec §7.4.10 the explicit Crypt filter
+	//     overrides the default StmF.
+	skipDefaultEncrypt := w.refIsPlaintext[ref] || leadingCrypt != nil
 	if !skipDefaultEncrypt {
 		startsWithCrypt, err := filterChainStartsWithCrypt(w, streamDict["Filter"])
 		if err != nil {

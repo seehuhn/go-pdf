@@ -28,7 +28,7 @@ import (
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/measure"
-	"seehuhn.de/go/pdf/metadata"
+
 	"seehuhn.de/go/pdf/oc"
 	"seehuhn.de/go/pdf/opaque"
 	"seehuhn.de/go/pdf/optional"
@@ -69,7 +69,7 @@ type Mask struct {
 	StructParent optional.UInt
 
 	// Metadata (optional) is a metadata stream containing metadata for the image.
-	Metadata *metadata.Stream
+	Metadata *pdf.MetadataStream
 
 	// AssociatedFiles (optional; PDF 2.0) is an array of files associated with
 	// the mask. The relationship that the associated files have to the
@@ -264,7 +264,7 @@ func ExtractMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 
 	// Extract Metadata
 	if metaObj, ok := dict["Metadata"]; ok {
-		meta, err := metadata.Extract(x, path, metaObj, false)
+		meta, err := pdf.ExtractMetadataStream(x, path, metaObj, false)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Metadata: %w", err)
 		}
