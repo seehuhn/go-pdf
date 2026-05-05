@@ -36,29 +36,16 @@ func main() {
 }
 
 func run() error {
-	doc, err := document.CreateSinglePage("test.pdf", document.A4r, pdf.V2_0, nil)
-	if err != nil {
-		return err
-	}
-
-	font := font.Must(standard.HelveticaBold.New())
-
-	doc.TextSetFont(font, 50)
-	doc.TextBegin()
-	doc.TextFirstLine(50, 420)
-	doc.TextShow("Hello, World!")
-	doc.TextEnd()
-
 	now := time.Now()
 
 	dc := &xmp.DublinCore{}
-	dc.Title.Set(language.MustParse("x-default"), "Test Document")
+	dc.Title.Default = xmp.NewText("Test Document")
 	dc.Title.Set(language.English, "Test Document")
 	dc.Title.Set(language.German, "Testdatei")
 	dc.Creator.Append(xmp.NewProperName("John Doe"))
 	dc.Creator.Append(xmp.NewProperName("Jane Smith"))
 	dc.Creator.Append(xmp.NewProperName("Michael Lee"))
-	dc.Description.Set(language.MustParse("x-default"), "This is a test document.")
+	dc.Description.Default = xmp.NewText("This is a test document.")
 	dc.Description.Set(language.English, "This is a test document.")
 	dc.Description.Set(language.German, "Dies ist eine Testdatei.")
 	xmpInfo := &xmp.Basic{}
@@ -73,7 +60,21 @@ func run() error {
 		return err
 	}
 
-	doc.Out.GetMeta().Catalog.Metadata = &pdf.MetadataStream{Data: packet}
+	opt := &pdf.WriterOptions{
+		DocumentMetadata: &pdf.MetadataStream{Data: packet},
+	}
+	doc, err := document.CreateSinglePage("test.pdf", document.A4r, pdf.V2_0, opt)
+	if err != nil {
+		return err
+	}
+
+	font := font.Must(standard.HelveticaBold.New())
+
+	doc.TextSetFont(font, 50)
+	doc.TextBegin()
+	doc.TextFirstLine(50, 420)
+	doc.TextShow("Hello, World!")
+	doc.TextEnd()
 
 	return doc.Close()
 }

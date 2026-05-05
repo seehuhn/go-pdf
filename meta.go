@@ -17,6 +17,7 @@
 package pdf
 
 import (
+	"fmt"
 	"strconv"
 )
 
@@ -46,6 +47,38 @@ type MetaInfo struct {
 	// Permissions records the access permissions granted when the file
 	// was opened.  For unencrypted files this is PermAll.
 	Permissions Perm
+
+	// Encryption describes the encryption configuration of the file, or
+	// nil if the file is unencrypted.
+	Encryption *Encryption
+}
+
+// Encryption describes the encryption configuration of a PDF file.
+type Encryption struct {
+	// Cipher names the bulk-encryption algorithm: "RC4" or "AES".
+	Cipher string
+
+	// KeyLength is the encryption key length in bits.  For RC4 it is a
+	// multiple of 8 between 40 and 128; for AES it is 128 or 256.
+	KeyLength int
+}
+
+// String returns a short, human-readable label for the encryption
+// configuration, e.g. "RC4 (40-bit)", "AES-128", or "AES-256".
+// A nil receiver returns "None" so callers can format the unencrypted case
+// without an explicit nil check.
+func (e *Encryption) String() string {
+	if e == nil {
+		return "None"
+	}
+
+	switch e.Cipher {
+	case "":
+		return "Unknown"
+	case "RC4":
+		return fmt.Sprintf("RC4 (%d-bit)", e.KeyLength)
+	}
+	return fmt.Sprintf("%s-%d", e.Cipher, e.KeyLength)
 }
 
 // Version represents a version of the PDF standard.

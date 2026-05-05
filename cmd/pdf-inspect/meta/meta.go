@@ -20,6 +20,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"maps"
+	"os"
 	"reflect"
 	"slices"
 	"strings"
@@ -109,26 +110,35 @@ func showXMP(md *pdf.MetadataStream) {
 	packet := md.Data
 
 	dc := &xmp.DublinCore{}
-	packet.Get(dc)
+	reportXMPDecodeErr(packet.Get(dc))
 	showXMPStruct(packet, dc)
 
 	basic := &xmp.Basic{}
-	packet.Get(basic)
+	reportXMPDecodeErr(packet.Get(basic))
 	showXMPStruct(packet, basic)
 
 	pdfNS := &xmp.PDF{}
-	packet.Get(pdfNS)
+	reportXMPDecodeErr(packet.Get(pdfNS))
 	showXMPStruct(packet, pdfNS)
 
 	xmpMM := &xmp.MediaManagement{}
-	packet.Get(xmpMM)
+	reportXMPDecodeErr(packet.Get(xmpMM))
 	showXMPStruct(packet, xmpMM)
 
 	xmpRights := &xmp.RightsManagement{}
-	packet.Get(xmpRights)
+	reportXMPDecodeErr(packet.Get(xmpRights))
 	showXMPStruct(packet, xmpRights)
 
 	fmt.Println()
+}
+
+// reportXMPDecodeErr writes per-property decode failures from
+// [xmp.Packet.Get] to stderr without aborting the dump.
+func reportXMPDecodeErr(err error) {
+	if err == nil {
+		return
+	}
+	fmt.Fprintln(os.Stderr, err)
 }
 
 func showXMPStruct(p *xmp.Packet, v any) {
@@ -181,7 +191,9 @@ func showXMPValue(p *xmp.Packet, label string, value xmp.Value) {
 		}
 	case xmp.Localized:
 		fmt.Println(label)
-		showXMPValue(p, "  [x-default]", value.Default)
+		if !value.Default.IsZero() {
+			showXMPValue(p, "  [x-default]", value.Default)
+		}
 		for key, elem := range value.V {
 			lab := fmt.Sprintf("  [%s]", key)
 			showXMPValue(p, lab, elem)
@@ -191,7 +203,11 @@ func showXMPValue(p *xmp.Packet, label string, value xmp.Value) {
 			fmt.Println("  " + q)
 		}
 	default:
-		raw := value.EncodeXMP(p)
+		raw, err := value.EncodeXMP(p)
+		if err != nil {
+			fmt.Println(label + " <invalid: " + err.Error() + ">")
+			return
+		}
 		lines := getXMPRaw(label, raw)
 		for _, line := range lines {
 			fmt.Println(line)
@@ -285,7 +301,7 @@ func getXMPQualifiers(Q []xmp.Qualifier) []string {
 	var res []string
 	for _, q := range Q {
 		var key string
-		if q.Name.Space == "http://www.w3.org/XML/1998/namespace" {
+		if q.Name.Space == xmp.NSXML {
 			key = fmt.Sprintf("xml:%s", q.Name.Local)
 		} else {
 			key = fmt.Sprintf("%s %s:", q.Name.Space, q.Name.Local)

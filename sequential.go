@@ -163,6 +163,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 			return nil, Wrap(err, "encryption dictionary")
 		}
 		r.meta.Permissions = perm
+		r.meta.Encryption = r.enc.publicInfo()
 	} else {
 		r.meta.Permissions = PermAll
 	}
@@ -205,6 +206,12 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 	if r.meta.Catalog.Version > r.meta.Version {
 		// if unset, r.meta.Catalog.Version is zero and thus smaller than r.Version
 		r.meta.Version = r.meta.Catalog.Version
+	}
+
+	// /EncryptMetadata=false exempts only the catalog metadata stream;
+	// record that on the typed value so a rewrite preserves the policy
+	if r.enc != nil && r.enc.sec.unencryptedMetadata && r.meta.Catalog.Metadata != nil {
+		r.meta.Catalog.Metadata.Plaintext = true
 	}
 
 	r.meta.Info, err = ExtractInfo(x, nil, trailer["Info"])

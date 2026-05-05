@@ -176,17 +176,20 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 		var perm Perm
 		r.enc, perm, err = r.parseEncryptDict(encObj, opt.Password)
 		if err != nil {
-			// AuthenticationError should not be swallowed by shouldExit
+			// An /Encrypt entry we cannot parse means we cannot decrypt
+			// the file's streams, so the rest of the document would be
+			// unreadable.  Surface the error regardless of
+			// ErrorHandling — the file is unsalvageable in any mode.
+			// AuthenticationError is returned unwrapped so callers can
+			// detect it cleanly via errors.As.
 			var authErr *AuthenticationError
 			if errors.As(err, &authErr) {
 				return nil, err
 			}
-			err = Wrap(err, "encryption dictionary")
-			if shouldExit(err) {
-				return nil, err
-			}
+			return nil, Wrap(err, "encryption dictionary")
 		}
 		r.meta.Permissions = perm
+		r.meta.Encryption = r.enc.publicInfo()
 	} else {
 		r.meta.Permissions = PermAll
 	}
@@ -248,6 +251,12 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 	}
 	if r.meta.Catalog.Version > r.meta.Version {
 		r.meta.Version = r.meta.Catalog.Version
+	}
+
+	// /EncryptMetadata=false exempts only the catalog metadata stream;
+	// record that on the typed value so a rewrite preserves the policy
+	if r.enc != nil && r.enc.sec.unencryptedMetadata && r.meta.Catalog.Metadata != nil {
+		r.meta.Catalog.Metadata.Plaintext = true
 	}
 
 	if r.meta.Version == V1_0 {

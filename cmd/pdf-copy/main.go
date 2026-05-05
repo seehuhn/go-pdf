@@ -83,7 +83,13 @@ func copyPDF(inFile, outFile string) (retErr error) {
 	}
 	defer r.Close()
 
-	w, err := pdf.Create(outFile, pdf.GetVersion(r), nil)
+	// the source's catalog metadata is known at this point and goes into
+	// WriterOptions.DocumentMetadata so the writer can commit it during
+	// NewWriter, before the rest of the document is copied
+	opt := &pdf.WriterOptions{
+		DocumentMetadata: r.GetMeta().Catalog.Metadata,
+	}
+	w, err := pdf.Create(outFile, pdf.GetVersion(r), opt)
 	if err != nil {
 		return err
 	}
@@ -103,11 +109,12 @@ func copyPDF(inFile, outFile string) (retErr error) {
 	if err != nil {
 		return err
 	}
+	// preserve the eagerly-committed metadata across the catalog
+	// replacement; AsDict skips the typed Metadata field on the source
+	// side, so newCatalog.Metadata is nil and would otherwise drop the
+	// pointer locked in at NewWriter
+	newCatalog.Metadata = w.GetMeta().Catalog.Metadata
 	w.GetMeta().Catalog = newCatalog
-	// AsDict skips the typed Metadata field (`pdf:"-"`), so it never
-	// reaches CopyDict; propagate the typed value across explicitly.
-	// Writer.Close re-embeds it.
-	w.GetMeta().Catalog.Metadata = r.GetMeta().Catalog.Metadata
 
 	w.GetMeta().Info = r.GetMeta().Info
 

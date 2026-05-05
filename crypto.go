@@ -42,6 +42,39 @@ type encryptInfo struct {
 	efF  *cryptFilter // embedded files
 }
 
+// publicInfo returns the user-facing description of this encryption
+// configuration.  Returns nil if e is nil.
+func (e *encryptInfo) publicInfo() *Encryption {
+	if e == nil {
+		return nil
+	}
+	// Pick the first non-nil slot as the canonical cipher.  Per spec
+	// (ISO 32000-2 Table 21), StmF/StrF/EFF may individually reference
+	// different crypt filters or default to /Identity, so any slot may
+	// legitimately be nil.  In files we produce all three point to the
+	// same *cryptFilter, and in files we accept every non-nil slot is
+	// built from the single /StdCF entry (the parser rejects other
+	// named filters), so cipher and length agree across non-nil slots.
+	cf := e.stmF
+	if cf == nil {
+		cf = e.strF
+	}
+	if cf == nil {
+		cf = e.efF
+	}
+	pub := &Encryption{}
+	if cf != nil {
+		switch cf.Cipher {
+		case cipherRC4:
+			pub.Cipher = "RC4"
+		case cipherAES:
+			pub.Cipher = "AES"
+		}
+		pub.KeyLength = cf.Length
+	}
+	return pub
+}
+
 // filterCrypt is the internal default-StmF stream encryption layer.
 // Unlike regular filters which are stored in the PDF file's stream dictionary,
 // this filter is applied transparently based on the document's encryption

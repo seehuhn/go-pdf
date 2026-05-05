@@ -61,5 +61,8 @@ weight = 100
 - implement Crypt filters
 - allow for incremental updates to PDF files
 - add a way to repair broken xref tables?
-- implement public key encryption?
+- implement public-key encryption (PDF spec §7.6.5).
+  Currently the only supported `/Encrypt /Filter` is `Standard`; files
+  using `Adobe.PubSec` (X.509-certificate-based encryption used in some
+  enterprise workflows) are rejected by the reader.
 - should the library support FDF files?

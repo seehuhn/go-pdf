@@ -240,11 +240,6 @@ func (x String) AsDate() (Date, error) {
 	return zero, errNoDate
 }
 
-// TODO(voss): remove
-type asDater interface {
-	AsDate() (Date, error)
-}
-
 // Rectangle represents a PDF rectangle.
 type Rectangle struct {
 	LLx, LLy, URx, URy float64

@@ -20,9 +20,11 @@
 //
 // Two pieces work together:
 //
-//   - WriterOptions.UnencryptedMetadata=true tells the standard security
-//     handler to set /EncryptMetadata false in the encrypt dictionary,
-//     exempting the document-level metadata stream from document encryption.
+//   - MetadataStream.Plaintext=true on the catalog metadata stream
+//     declared via WriterOptions.DocumentMetadata tells the standard
+//     security handler to set /EncryptMetadata false in the encrypt
+//     dictionary, exempting the document-level metadata stream from
+//     document encryption.
 //   - xmp.Packet.PadToLength=N pads the XMP packet to N bytes (no
 //     compression) and emits the writable trailer <?xpacket end="w"?>.
 //
@@ -49,22 +51,7 @@ func main() {
 }
 
 func run() error {
-	opt := &pdf.WriterOptions{
-		UserPassword:        "user",
-		OwnerPassword:       "owner",
-		UnencryptedMetadata: true,
-	}
-	doc, err := document.CreateSinglePage("test.pdf", document.A4r, pdf.V2_0, opt)
-	if err != nil {
-		return err
-	}
-
-	doc.TextSetFont(font.Must(standard.HelveticaBold.New()), 50)
-	doc.TextBegin()
-	doc.TextFirstLine(50, 420)
-	doc.TextShow("Editable metadata demo")
-	doc.TextEnd()
-
+	// finalize the XMP packet before the writer is created
 	dc := &xmp.DublinCore{}
 	dc.Title.Set(language.English, "Editable Metadata Demo")
 	dc.Creator.Append(xmp.NewProperName("Quire"))
@@ -76,14 +63,30 @@ func run() error {
 		Keywords: xmp.NewText("encrypted, padded, editable, XMP"),
 		Producer: xmp.NewAgentName("seehuhn.de/go/pdf/feature-tests/crypto/metadata"),
 	}
-
 	packet := xmp.NewPacket()
+	packet.PadToLength = 2048
 	if err := packet.Set(dc, xmpInfo, pdfInfo); err != nil {
 		return err
 	}
 
-	packet.PadToLength = 2048
-	doc.Out.GetMeta().Catalog.Metadata = &pdf.MetadataStream{Data: packet}
+	opt := &pdf.WriterOptions{
+		UserPassword:  "user",
+		OwnerPassword: "owner",
+		DocumentMetadata: &pdf.MetadataStream{
+			Data:      packet,
+			Plaintext: true,
+		},
+	}
+	doc, err := document.CreateSinglePage("test.pdf", document.A4r, pdf.V2_0, opt)
+	if err != nil {
+		return err
+	}
+
+	doc.TextSetFont(font.Must(standard.HelveticaBold.New()), 50)
+	doc.TextBegin()
+	doc.TextFirstLine(50, 420)
+	doc.TextShow("Editable metadata demo")
+	doc.TextEnd()
 
 	return doc.Close()
 }

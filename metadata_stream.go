@@ -32,7 +32,8 @@ import (
 // [Embedder] for metadata streams attached to other objects.
 //
 // Padding for in-place editing is controlled by [xmp.Packet.PadToLength]
-// on the embedded packet, not by this wrapper.
+// on the embedded packet; using padding requires Plaintext to be set on
+// this wrapper.
 type MetadataStream struct {
 	// Data is the XMP packet carried by this stream.  It must be non-nil:
 	// [ExtractMetadataStream] always returns a stream whose Data is set,
@@ -40,6 +41,13 @@ type MetadataStream struct {
 	// before passing the value to [ResourceManager.Embed] or assigning it
 	// to [Catalog.Metadata].
 	Data *xmp.Packet
+
+	// Plaintext, if true, requests that the stream's bytes be written raw on
+	// disk so external tools can locate them via byte-scanning.
+	// This prevents compression and encryption of the metadata stream.
+	//
+	// If Data.PadToLength is non-zero, Plaintext must be true.
+	Plaintext bool
 }
 
 // ExtractMetadataStream reads an XMP metadata stream from a PDF file.
@@ -77,11 +85,27 @@ func ExtractMetadataStream(x *Extractor, path *CycleCheck, ref Object, _ bool) (
 		return nil, err
 	}
 
-	// Reset PadToLength when the source was Flate-wrapped — the on-disk
-	// length the xmp parser observed is the decoded length, not the
-	// stored length, so it's not a meaningful pad target on rewrite.
-	if packet.PadToLength > 0 {
-		if filters, ferr := GetFilters(x.R, stream.Dict); ferr == nil {
+	// inspect the on-disk filter chain so we can preserve plaintext
+	// semantics on rewrite and reset PadToLength when the source was
+	// Flate-wrapped (the on-disk length the xmp parser observed is the
+	// decoded length, not the stored length, so it's not a meaningful
+	// pad target on rewrite).
+	plaintext := false
+	if filters, ferr := GetFilters(x.R, stream.Dict); ferr == nil {
+		// the bytes on disk are raw XMP iff:
+		//   - in an unencrypted file: there are no filters at all
+		//   - in an encrypted file: the chain is exactly /Crypt /Identity,
+		//     which bypasses document encryption without transforming
+		//     the data; any additional filter (e.g. /FlateDecode) means
+		//     the on-disk bytes are not raw XMP.
+		// the catalog /EncryptMetadata=false case is handled by the
+		// reader after extraction (it sets Plaintext on the typed value).
+		if x.R.GetMeta().Encryption == nil {
+			plaintext = len(filters) == 0
+		} else if len(filters) == 1 {
+			_, plaintext = filters[0].(FilterCryptIdentity)
+		}
+		if packet.PadToLength > 0 {
 			for _, f := range filters {
 				if _, ok := f.(FilterFlate); ok {
 					packet.PadToLength = 0
@@ -91,7 +115,7 @@ func ExtractMetadataStream(x *Extractor, path *CycleCheck, ref Object, _ bool) (
 		}
 	}
 
-	return &MetadataStream{Data: packet}, nil
+	return &MetadataStream{Data: packet, Plaintext: plaintext}, nil
 }
 
 // Embed adds the XMP metadata stream to the PDF file.
@@ -101,6 +125,9 @@ func (s *MetadataStream) Embed(rm *EmbedHelper) (Native, error) {
 	if err := CheckVersion(w, "XMP metadata stream", V1_4); err != nil {
 		return nil, err
 	}
+	if s.Data.PadToLength > 0 && !s.Plaintext {
+		return nil, errors.New("MetadataStream: PadToLength requires Plaintext")
+	}
 	ref := rm.AllocSelf()
 
 	dict := Dict{
@@ -108,19 +135,19 @@ func (s *MetadataStream) Embed(rm *EmbedHelper) (Native, error) {
 		"Subtype": Name("XML"),
 	}
 
+	// refIsPlaintext is set by the writer for the catalog metadata stream
+	// when DocumentMetadata.Plaintext is true; in that case OpenStream
+	// skips encryption and no per-stream filter is needed.  Other
+	// plaintext streams need /Filter /Crypt /Identity to bypass document
+	// encryption.
 	var filters []Filter
-	// non-catalog padded streams need an explicit Crypt /Identity to keep
-	// their bytes plaintext on disk; the catalog-metadata path marks ref
-	// as plaintext on the writer, in which case we skip the redundant filter
-	if s.Data.PadToLength > 0 && w.isEncrypted() && !w.refIsPlaintext[ref] {
+	if s.Plaintext && w.isEncrypted() && !w.refIsPlaintext[ref] {
+		if err := CheckVersion(w, "plaintext metadata stream", V1_5); err != nil {
+			return nil, err
+		}
 		filters = append(filters, FilterCryptIdentity{})
 	}
-	// Flate is skipped in two cases:
-	//   - PadToLength > 0: compression would change the on-disk length and
-	//     defeat the pad target.
-	//   - the ref is marked plaintext: raw XMP keeps the <?xpacket markers
-	//     visible to external tools that scan unencrypted metadata streams.
-	if s.Data.PadToLength == 0 && !w.refIsPlaintext[ref] {
+	if !s.Plaintext && !w.refIsPlaintext[ref] {
 		filters = append(filters, FilterFlate{})
 	}
 
@@ -142,8 +169,8 @@ func (s *MetadataStream) Embed(rm *EmbedHelper) (Native, error) {
 }
 
 // Equal reports whether s and other represent the same XMP metadata.
-// PadToLength is a serialization concern (carried on the inner Packet)
-// and does not affect equality.
+// Serialization concerns — PadToLength on the inner packet, and the
+// Plaintext flag on this wrapper — do not affect equality.
 func (s *MetadataStream) Equal(other *MetadataStream) bool {
 	if s == nil || other == nil {
 		return s == other

@@ -36,18 +36,12 @@ type WriterOptions struct {
 	OwnerPassword   string
 	UserPermissions Perm
 
-	// UnencryptedMetadata, if true, embeds the document-level XMP metadata
-	// stream (Catalog.Metadata) without encryption, even when the rest of
-	// the document is encrypted.  The XMP packet is written as raw bytes
-	// so external tools can locate and read it without the document
-	// password.  Setting this option requires that document encryption is
-	// configured (UserPassword or OwnerPassword is set) and that the PDF
-	// version is 1.6 or later; otherwise NewWriter returns an error.
-	//
-	// The field name is the negation of the PDF spec's /EncryptMetadata
-	// key so that the Go zero value (false) corresponds to the spec
-	// default (metadata is encrypted).
-	UnencryptedMetadata bool
+	// DocumentMetadata (optional) is the document-level XMP metadata stream
+	// embedded in the document catalog.  If DocumentMetadata.Plaintext is
+	// true, the stream is embedded in the PDF file without any encryption or
+	// compression.  The MetadataStream must not be modified after NewWriter
+	// has been called.
+	DocumentMetadata *MetadataStream
 
 	// If this flag is true, the writer tries to generate a PDF file which is
 	// more human-readable, at the expense of increased file size.
@@ -71,15 +65,31 @@ type Writer struct {
 
 	outputOptions OutputOptions
 
-	// unencryptedMetadata mirrors WriterOptions.UnencryptedMetadata; used
-	// by Close to decide whether to skip encryption on the catalog
-	// metadata stream.
-	unencryptedMetadata bool
+	// documentMetadata captures the *MetadataStream pointer supplied
+	// via WriterOptions.DocumentMetadata at NewWriter time.  The
+	// stream's bytes are committed to the file during NewWriter, and
+	// the resulting reference is cached on w.rm.  Close enforces that
+	// w.meta.Catalog.Metadata still equals this pointer (or is nil if
+	// none was supplied) — replacing or clearing the field after
+	// NewWriter is rejected, since the file already references the
+	// committed stream.
+	documentMetadata *MetadataStream
 
 	// refIsPlaintext lists references for which OpenStream must skip the
 	// document-level encryption wrap.  Currently used only for the
-	// catalog metadata stream when unencryptedMetadata is set.
+	// catalog metadata stream when /EncryptMetadata=false is in effect.
 	refIsPlaintext map[Reference]bool
+
+	// rm is the Writer-owned ResourceManager used for any embedding
+	// driven by the Writer itself: the eager NewWriter-time embed of
+	// Catalog.Metadata (so the encryption key derivation sees the
+	// plaintext policy) and the Close-time embed of Info.  At Close,
+	// Catalog.Metadata is re-embedded as a cache hit to recover the
+	// reference for the catalog dict.  Created at NewWriter and closed
+	// during Writer.Close so callers cannot accidentally close it
+	// early.  Callers that need their own embedding scope still
+	// construct their own ResourceManager via NewResourceManager.
+	rm *ResourceManager
 }
 
 // isEncrypted reports whether the file being written has document-level
@@ -130,12 +140,10 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 	if useEncryption && v == V1_0 {
 		return nil, &VersionError{Operation: "PDF encryption", Earliest: V1_1}
 	}
-	if opt.UnencryptedMetadata {
-		if !useEncryption {
-			return nil, errors.New("UnencryptedMetadata requires encryption to be configured")
-		}
+	unencryptedMetadata := opt.DocumentMetadata != nil && opt.DocumentMetadata.Plaintext
+	if unencryptedMetadata && useEncryption {
 		if v < V1_6 {
-			return nil, &VersionError{Operation: "UnencryptedMetadata", Earliest: V1_6}
+			return nil, &VersionError{Operation: "plaintext document metadata", Earliest: V1_6}
 		}
 	}
 	needID := opt.ID != nil || useEncryption || v >= V2_0
@@ -206,7 +214,7 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 		}
 		sec, err := createStdSecHandler(ID[0], opt.UserPassword,
 			opt.OwnerPassword, opt.UserPermissions, cf.Length, V,
-			opt.UnencryptedMetadata)
+			unencryptedMetadata)
 		if err != nil {
 			return nil, err
 		}
@@ -246,11 +254,12 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 
 	pdf := &Writer{
 		meta: MetaInfo{
-			Version: v,
-			Catalog: &Catalog{},
-			Info:    &Info{},
-			ID:      ID,
-			Trailer: trailer,
+			Version:    v,
+			Catalog:    &Catalog{Metadata: opt.DocumentMetadata},
+			Info:       &Info{},
+			ID:         ID,
+			Trailer:    trailer,
+			Encryption: enc.publicInfo(),
 		},
 
 		w: &posWriter{
@@ -264,9 +273,10 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 
 		outputOptions: outOpt,
 
-		unencryptedMetadata: opt.UnencryptedMetadata,
-		refIsPlaintext:      map[Reference]bool{},
+		documentMetadata: opt.DocumentMetadata,
+		refIsPlaintext:   map[Reference]bool{},
 	}
+	pdf.rm = NewResourceManager(pdf)
 
 	_, err = fmt.Fprintf(pdf.w, "%%PDF-%s\n%%\x80\x80\x80\x80\n", versionString)
 	if err != nil {
@@ -276,6 +286,21 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 	if outOpt.HasAny(OptPretty) {
 		_, err := pdf.w.Write([]byte("\n"))
 		if err != nil {
+			return nil, err
+		}
+	}
+
+	// commit the document-level metadata stream now, while opt is still
+	// in scope and Plaintext is the value the user signed up for.  The
+	// reference is cached on pdf.rm and re-used in Close to wire the
+	// catalog dict.
+	if opt.DocumentMetadata != nil {
+		metaRef := pdf.Alloc()
+		if unencryptedMetadata {
+			pdf.refIsPlaintext[metaRef] = true
+		}
+		e := &EmbedHelper{rm: pdf.rm, copiers: map[*Extractor]*Copier{}}
+		if _, err := e.EmbedAt(metaRef, opt.DocumentMetadata); err != nil {
 			return nil, err
 		}
 	}
@@ -296,20 +321,21 @@ func (w *Writer) Close() error {
 	// (pdf:"-"), and we inject the Reference manually below
 	catalogDict := AsDict(w.meta.Catalog)
 
-	// pre-allocate a reference for the metadata stream so the catalog
-	// can mention it; the actual stream is embedded after the catalog
-	// has been written
-	var metaRef Reference
-	if w.meta.Catalog.Metadata != nil {
-		if w.meta.Catalog.Metadata.Data.PadToLength > 0 &&
-			w.isEncrypted() && !w.unencryptedMetadata {
-			return errors.New("padded XMP metadata streams require WriterOptions.UnencryptedMetadata in encrypted documents")
+	// the document metadata stream was committed during NewWriter and
+	// its reference cached on w.rm; here we just look it up and wire it
+	// into the catalog dict.  The Catalog.Metadata pointer must still
+	// match the locked-in value — replacing or clearing it after
+	// NewWriter is invalid because the file already references the
+	// committed stream.
+	if w.meta.Catalog.Metadata != w.documentMetadata {
+		return errors.New("Catalog.Metadata changed after NewWriter")
+	}
+	if md := w.meta.Catalog.Metadata; md != nil {
+		ref, err := w.rm.Embed(md)
+		if err != nil {
+			return err
 		}
-		metaRef = w.Alloc()
-		if w.unencryptedMetadata {
-			w.refIsPlaintext[metaRef] = true
-		}
-		catalogDict["Metadata"] = metaRef
+		catalogDict["Metadata"] = ref
 	}
 
 	catRef := w.Alloc()
@@ -319,17 +345,8 @@ func (w *Writer) Close() error {
 	}
 	trailer["Root"] = catRef
 
-	// shared end-of-life ResourceManager for Info and Metadata embeds
-	var rm *ResourceManager
-	endRM := func() *ResourceManager {
-		if rm == nil {
-			rm = NewResourceManager(w)
-		}
-		return rm
-	}
-
 	if w.meta.Info != nil {
-		infoRef, err := endRM().Embed(w.meta.Info)
+		infoRef, err := w.rm.Embed(w.meta.Info)
 		if err != nil {
 			return err
 		}
@@ -342,17 +359,8 @@ func (w *Writer) Close() error {
 		delete(trailer, "Info")
 	}
 
-	if metaRef != 0 {
-		e := &EmbedHelper{rm: endRM(), copiers: map[*Extractor]*Copier{}}
-		if _, err := e.EmbedAt(metaRef, w.meta.Catalog.Metadata); err != nil {
-			return err
-		}
-	}
-
-	if rm != nil {
-		if err := rm.Close(); err != nil {
-			return err
-		}
+	if err := w.rm.Close(); err != nil {
+		return err
 	}
 
 	if w.meta.ID != nil {
