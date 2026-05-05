@@ -193,6 +193,7 @@ func TestWriterGet(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			w.GetMeta().Catalog.Pages = w.Alloc() // pretend we have pages
 
 			testObjects := []Object{
 				nil,

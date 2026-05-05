@@ -58,7 +58,7 @@ type Info struct {
 // ExtractInfo reads an Info dictionary from a PDF file.
 //
 // If obj is nil, the function returns nil.
-func ExtractInfo(x *Extractor, path *CycleCheck, obj Object) (*Info, error) {
+func ExtractInfo(x *Extractor, path *CycleCheck, obj Object, _ bool) (*Info, error) {
 	if obj == nil {
 		return nil, nil
 	}

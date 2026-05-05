@@ -224,7 +224,7 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 	// mark the catalog metadata stream as exempt from document-level
 	// encryption when /EncryptMetadata is false — the spec exempts it
 	// from default StmF encryption in that case.  Must happen before
-	// ExtractCatalog reads the stream below.  Mutating r.unencrypted
+	// DecodeCatalog reads the stream below.  Mutating r.unencrypted
 	// is safe because we are still inside NewReader.
 	if metaRef, ok := catalogDict["Metadata"].(Reference); ok && metaRef != 0 {
 		if r.enc != nil && r.enc.sec.unencryptedMetadata {
@@ -233,7 +233,7 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 	}
 
 	x := NewExtractor(r)
-	r.meta.Catalog, err = ExtractCatalog(x, nil, catalogDict, true)
+	r.meta.Catalog, err = ExtractorGet(x, nil, catalogDict, DecodeCatalog)
 	if shouldExit(err) {
 		return nil, err
 	} else if r.meta.Catalog == nil || r.meta.Catalog.Pages == 0 {
@@ -263,7 +263,7 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 		r.meta.ID = nil
 	}
 
-	r.meta.Info, err = ExtractInfo(x, nil, trailer["Info"])
+	r.meta.Info, err = ExtractorGet(x, nil, trailer["Info"], ExtractInfo)
 	if shouldExit(err) {
 		return nil, err
 	}

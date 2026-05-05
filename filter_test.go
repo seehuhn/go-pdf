@@ -70,6 +70,7 @@ func TestFilterChaining(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			w.GetMeta().Catalog.Pages = w.Alloc() // pretend we have pages
 
 			ref := w.Alloc()
 
@@ -183,6 +184,7 @@ func filterRoundTrip(t *testing.T, version Version, f Filter) Filter {
 	if err != nil {
 		t.Fatal(err)
 	}
+	w.GetMeta().Catalog.Pages = w.Alloc() // pretend we have pages
 
 	ref := w.Alloc()
 	stm, err := w.OpenStream(ref, nil, f)

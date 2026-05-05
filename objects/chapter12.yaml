@@ -3390,7 +3390,7 @@ types:
     refTypes:
     - ActionECMAScript
     notes: Table 200 - did print
-  readFunc: pdf.ExtractCatalog
+  readFunc: triggers.DecodeCatalog
   fileDependent: true
   writeMethod: (*Catalog).Encode
   goPackage: triggers

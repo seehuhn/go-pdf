@@ -49,8 +49,8 @@ func run() error {
 	dc.Description.Set(language.English, "This is a test document.")
 	dc.Description.Set(language.German, "Dies ist eine Testdatei.")
 	xmpInfo := &xmp.Basic{}
-	xmpInfo.CreateDate = xmp.NewDate(now)
-	xmpInfo.ModifyDate = xmp.NewDate(now)
+	xmpInfo.CreateDate = xmp.NewDate(now, xmp.PrecisionSecond)
+	xmpInfo.ModifyDate = xmp.NewDate(now, xmp.PrecisionSecond)
 	pdfInfo := &xmp.PDF{}
 	pdfInfo.Keywords = xmp.NewText("test, XMP, metadata")
 	pdfInfo.Producer = xmp.NewAgentName("seehuhn.de/go/pdf/examples/metadata")

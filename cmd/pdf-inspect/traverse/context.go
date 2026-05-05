@@ -134,7 +134,10 @@ func (c *fileCtx) Next() []Step {
 			Match: regexp.MustCompile(`^catalog$`),
 			Desc:  "`catalog`",
 			Next: func(key string) (Context, error) {
-				obj := pdf.AsDict(meta.Catalog)
+				obj, err := pdf.GetDict(c.r, meta.Trailer["Root"])
+				if err != nil {
+					return nil, err
+				}
 				return &objectCtx{r: c.r, obj: obj}, nil
 			},
 		},
@@ -142,7 +145,10 @@ func (c *fileCtx) Next() []Step {
 			Match: regexp.MustCompile(`^info$`),
 			Desc:  "`info`",
 			Next: func(key string) (Context, error) {
-				obj := pdf.AsDict(meta.Info)
+				obj, err := pdf.GetDict(c.r, meta.Trailer["Info"])
+				if err != nil {
+					return nil, err
+				}
 				return &objectCtx{r: c.r, obj: obj}, nil
 			},
 		},
@@ -183,7 +189,11 @@ func (c *fileCtx) Next() []Step {
 			Match: regexp.MustCompile(`^.+$`),
 			Desc:  "catalog key",
 			Next: func(key string) (Context, error) {
-				cat := &objectCtx{r: c.r, obj: pdf.AsDict(meta.Catalog)}
+				obj, err := pdf.GetDict(c.r, meta.Trailer["Root"])
+				if err != nil {
+					return nil, err
+				}
+				cat := &objectCtx{r: c.r, obj: obj}
 				steps := cat.Next()
 				for _, step := range steps {
 					if step.Match.MatchString(key) {

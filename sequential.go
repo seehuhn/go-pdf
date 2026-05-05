@@ -189,7 +189,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 
 	// mark the catalog metadata stream as exempt from document-level
 	// encryption when /EncryptMetadata is false; must happen before
-	// ExtractCatalog reads the stream
+	// DecodeCatalog reads the stream
 	if metaRef, ok := catalogDict["Metadata"].(Reference); ok && metaRef != 0 {
 		if r.enc != nil && r.enc.sec.unencryptedMetadata {
 			r.unencrypted[metaRef] = true
@@ -197,7 +197,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 	}
 
 	x := NewExtractor(r)
-	r.meta.Catalog, err = ExtractCatalog(x, nil, catalogDict, true)
+	r.meta.Catalog, err = ExtractorGet(x, nil, catalogDict, DecodeCatalog)
 	if shouldExit(err) {
 		return nil, err
 	} else if r.meta.Catalog == nil || r.meta.Catalog.Pages == 0 {
@@ -214,7 +214,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 		r.meta.Catalog.Metadata.Plaintext = true
 	}
 
-	r.meta.Info, err = ExtractInfo(x, nil, trailer["Info"])
+	r.meta.Info, err = ExtractorGet(x, nil, trailer["Info"], ExtractInfo)
 	if shouldExit(err) {
 		return nil, err
 	}

@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 
 	"seehuhn.de/go/pdf"
@@ -101,18 +102,28 @@ func copyPDF(inFile, outFile string) (retErr error) {
 
 	trans := pdf.NewCopier(w, r)
 
-	newDict, err := trans.CopyDict(pdf.AsDict(r.GetMeta().Catalog))
+	// copy the source catalog dict directly, then decode into a new
+	// Catalog struct in writer space.  Going via the source dict
+	// preserves entries that DecodeCatalog/Encode don't model.
+	srcDict, err := pdf.GetDict(r, r.GetMeta().Trailer["Root"])
 	if err != nil {
 		return err
 	}
-	newCatalog, err := pdf.ExtractCatalog(pdf.NewExtractor(w), nil, newDict, false)
+	// Drop the catalog's Metadata reference before copying: the source
+	// stream has already been committed to the writer via
+	// WriterOptions.DocumentMetadata, and Catalog.Encode re-emits the
+	// entry from newCatalog.Metadata below.  Without this, CopyDict would
+	// embed a second, orphan copy of the metadata stream into the file.
+	srcDict = maps.Clone(srcDict)
+	delete(srcDict, "Metadata")
+	newDict, err := trans.CopyDict(srcDict)
 	if err != nil {
 		return err
 	}
-	// preserve the eagerly-committed metadata across the catalog
-	// replacement; AsDict skips the typed Metadata field on the source
-	// side, so newCatalog.Metadata is nil and would otherwise drop the
-	// pointer locked in at NewWriter
+	newCatalog, err := pdf.ExtractorGet(pdf.NewExtractor(w), nil, newDict, pdf.DecodeCatalog)
+	if err != nil {
+		return err
+	}
 	newCatalog.Metadata = w.GetMeta().Catalog.Metadata
 	w.GetMeta().Catalog = newCatalog
 

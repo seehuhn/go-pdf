@@ -277,6 +277,9 @@ func TestContentStream_Embed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := memfile.AddBlankPage(w); err != nil {
+		t.Fatal(err)
+	}
 
 	rm := pdf.NewResourceManager(w)
 	ref, err := embedPageContent(rm, ops)

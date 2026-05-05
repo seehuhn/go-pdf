@@ -56,8 +56,8 @@ func run() error {
 	dc.Title.Set(language.English, "Editable Metadata Demo")
 	dc.Creator.Append(xmp.NewProperName("Quire"))
 	xmpInfo := &xmp.Basic{
-		CreateDate: xmp.NewDate(time.Now()),
-		ModifyDate: xmp.NewDate(time.Now()),
+		CreateDate: xmp.NewDate(time.Now(), xmp.PrecisionSecond),
+		ModifyDate: xmp.NewDate(time.Now(), xmp.PrecisionSecond),
 	}
 	pdfInfo := &xmp.PDF{
 		Keywords: xmp.NewText("encrypted, padded, editable, XMP"),

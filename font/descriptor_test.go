@@ -153,7 +153,7 @@ func embedFD(fd *Descriptor, v pdf.Version) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// w.GetMeta().Catalog.Pages = pdf.NewReference(2, 0)
+	w.GetMeta().Catalog.Pages = w.Alloc() // pretend we have pages
 	err = w.Close()
 	if err != nil {
 		return nil, err

@@ -100,10 +100,25 @@ func (w *Walker) walk(yield func([]pdf.Object, pdf.Native) bool, preOrder bool) 
 		d.visited[ref] = struct{}{}
 	}
 
+	// resolve the info and catalog dicts directly from the file rather
+	// than going through the typed Go representations, so the walker
+	// reflects what is actually stored in the file.
+	infoDict, err := pdf.GetDict(w, meta.Trailer["Info"])
+	if err != nil {
+		w.Err = err
+		return
+	}
 	d.path = append(d.path[:0], pdf.Name("info"))
-	d.walkObject(pdf.AsDict(meta.Info))
+	d.walkObject(infoDict)
+
+	catalogDict, err := pdf.GetDict(w, meta.Trailer["Root"])
+	if err != nil {
+		w.Err = err
+		return
+	}
 	d.path = append(d.path[:0], pdf.Name("catalog"))
-	d.walkObject(pdf.AsDict(meta.Catalog))
+	d.walkObject(catalogDict)
+
 	d.path = append(d.path[:0], pdf.Name("trailer"))
 	d.walkObject(meta.Trailer)
 

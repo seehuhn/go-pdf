@@ -20,10 +20,17 @@ import "seehuhn.de/go/pdf"
 
 // NewPDFWriter creates a new PDF writer which writes to a MemFile.
 // The returned writer can still be used as a reader after it has been closed.
+//
+// A minimal page tree is added automatically so the resulting document
+// has a valid catalog without further setup.  Tests that need a different
+// page tree can overwrite [Catalog.Pages] themselves.
 func NewPDFWriter(v pdf.Version, opt *pdf.WriterOptions) (*pdf.Writer, *MemFile) {
 	tmpFile := New()
 	w, err := pdf.NewWriter(tmpFile, v, opt)
 	if err != nil {
+		panic(err)
+	}
+	if err := AddBlankPage(w); err != nil {
 		panic(err)
 	}
 	return w, tmpFile

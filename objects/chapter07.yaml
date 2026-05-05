@@ -514,7 +514,7 @@ types:
       this PDF document.'
   goPackage: pdf
   goRepr: struct
-  readFunc: pdf.ExtractCatalog
+  readFunc: pdf.DecodeCatalog
   fileDependent: true
   writeMethod: (*Catalog).Encode
 - name: DPart

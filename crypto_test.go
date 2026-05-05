@@ -540,6 +540,7 @@ func TestAuthEmbed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	w.GetMeta().Catalog.Pages = w.Alloc() // pretend we have pages
 	err = w.Put(ref, TextString("Hello, World!"))
 	if err != nil {
 		t.Fatal(err)

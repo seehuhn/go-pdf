@@ -179,7 +179,7 @@ func showXMPStruct(p *xmp.Packet, v any) {
 func showXMPValue(p *xmp.Packet, label string, value xmp.Value) {
 	switch value := value.(type) {
 	case xmp.Date:
-		line := label + " " + value.V.String()
+		line := label + " " + value.String()
 		ll := getXMPQualifiers(value.Q)
 		if len(ll) == 1 {
 			fmt.Println(line + " [" + ll[0] + "]")

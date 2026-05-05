@@ -106,6 +106,9 @@ func FuzzType3Dict(f *testing.F) {
 			if err != nil {
 				f.Fatal(err)
 			}
+			if err := memfile.AddBlankPage(w); err != nil {
+				f.Fatal(err)
+			}
 
 			d := clone(d)
 			rm := pdf.NewResourceManager(w)

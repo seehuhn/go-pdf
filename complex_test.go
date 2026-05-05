@@ -387,11 +387,23 @@ func TestCatalog(t *testing.T) {
 	cat0 := &Catalog{
 		Pages: pRef,
 	}
-	d1 := AsDict(cat0)
+	w, err := NewWriter(&bytes.Buffer{}, V2_0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rm := NewResourceManager(w)
+	native, err := cat0.Encode(rm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d1, ok := native.(Dict)
+	if !ok {
+		t.Fatalf("expected Dict, got %T", native)
+	}
 	if len(d1) != 2 {
 		t.Errorf("wrong Catalog dict: %s", AsString(d1))
 	}
-	cat1, err := ExtractCatalog(NewExtractor(nil), nil, d1, true)
+	cat1, err := DecodeCatalog(NewExtractor(nil), nil, d1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -404,19 +416,19 @@ func TestCatalogReadMissingPages(t *testing.T) {
 	catalogDict := Dict{
 		"Outlines": NewReference(123, 0),
 	}
-	if _, err := ExtractCatalog(NewExtractor(nil), nil, catalogDict, true); err == nil {
+	if _, err := DecodeCatalog(NewExtractor(nil), nil, catalogDict, true); err == nil {
 		t.Errorf("missing Pages not detected")
 	}
 }
 
-// TestCatalogVersionPermissive checks that ExtractCatalog accepts the
+// TestCatalogVersionPermissive checks that DecodeCatalog accepts the
 // Version entry as a Name (per the PDF spec) and as Real or String
 // (invalid forms found in the wild).
 func TestCatalogVersionPermissive(t *testing.T) {
 	pages := NewReference(1, 0)
 	for _, version := range []Object{Name("1.5"), Real(1.5), String("1.5")} {
 		dict := Dict{"Version": version, "Pages": pages}
-		cat, err := ExtractCatalog(NewExtractor(nil), nil, dict, true)
+		cat, err := DecodeCatalog(NewExtractor(nil), nil, dict, true)
 		if err != nil {
 			t.Errorf("version %v: %v", version, err)
 			continue
@@ -428,9 +440,12 @@ func TestCatalogVersionPermissive(t *testing.T) {
 }
 
 func TestCatalogWriteMissingPages(t *testing.T) {
-	catalog := &Catalog{}
-	dict := AsDict(catalog)
-	if _, present := dict["Pages"]; present {
-		t.Errorf("missing Pages not ignored")
+	w, err := NewWriter(&bytes.Buffer{}, V2_0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rm := NewResourceManager(w)
+	if _, err := (&Catalog{}).Encode(rm); err == nil {
+		t.Errorf("missing Pages not rejected")
 	}
 }

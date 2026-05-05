@@ -317,29 +317,15 @@ func (w *Writer) Close() error {
 
 	trailer := w.meta.Trailer.Clone()
 
-	// build the catalog dict; AsDict skips the typed Metadata field
-	// (pdf:"-"), and we inject the Reference manually below
-	catalogDict := AsDict(w.meta.Catalog)
-
-	// the document metadata stream was committed during NewWriter and
-	// its reference cached on w.rm; here we just look it up and wire it
-	// into the catalog dict.  The Catalog.Metadata pointer must still
-	// match the locked-in value — replacing or clearing it after
-	// NewWriter is invalid because the file already references the
-	// committed stream.
+	// the document metadata stream was committed during NewWriter and its
+	// reference cached on w.rm; Catalog.Encode picks it up via rm.Embed()
+	// dedup.  Replacing or clearing Metadata after NewWriter is invalid
+	// because the file already references the committed stream.
 	if w.meta.Catalog.Metadata != w.documentMetadata {
 		return errors.New("Catalog.Metadata changed after NewWriter")
 	}
-	if md := w.meta.Catalog.Metadata; md != nil {
-		ref, err := w.rm.Embed(md)
-		if err != nil {
-			return err
-		}
-		catalogDict["Metadata"] = ref
-	}
 
-	catRef := w.Alloc()
-	err := w.Put(catRef, catalogDict)
+	catRef, err := w.rm.Store(w.meta.Catalog)
 	if err != nil {
 		return fmt.Errorf("failed to write document catalog: %w", err)
 	}

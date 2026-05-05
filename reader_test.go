@@ -478,6 +478,9 @@ func FuzzReader(f *testing.F) {
 			}
 			err = w.Close()
 			if err != nil {
+				if IsWrongVersion(err) {
+					continue
+				}
 				f.Fatal(err)
 			}
 
