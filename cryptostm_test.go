@@ -127,7 +127,7 @@ func testEncryptedStreamMultipleReads(t *testing.T, version Version) {
 
 	// Read the stream multiple times - this should work with the new architecture
 	for i := range 3 {
-		decoded, err := DecodeStream(r, stream, 0)
+		decoded, err := DecodeStream(r, nil, stream, 0)
 		if err != nil {
 			t.Fatalf("DecodeStream failed on read %d: %v", i+1, err)
 		}
@@ -215,7 +215,7 @@ func TestEncryptedStreamWithFilters(t *testing.T) {
 	// Read the stream twice - the filter chain (crypt + flate) should work
 	// correctly both times
 	for i := range 2 {
-		decoded, err := DecodeStream(r, stream, 0)
+		decoded, err := DecodeStream(r, nil, stream, 0)
 		if err != nil {
 			t.Fatalf("DecodeStream failed on read %d: %v", i+1, err)
 		}
@@ -300,7 +300,7 @@ func TestUnencryptedStreamMultipleReads(t *testing.T) {
 
 	// Read multiple times
 	for i := range 3 {
-		decoded, err := DecodeStream(r, stream, 0)
+		decoded, err := DecodeStream(r, nil, stream, 0)
 		if err != nil {
 			t.Fatalf("DecodeStream failed on read %d: %v", i+1, err)
 		}
@@ -437,7 +437,7 @@ func TestCopierEncryptedStream(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			got, err := ReadAll(dstR, stream)
+			got, err := ReadAll(dstR, nil, stream)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -514,7 +514,7 @@ func testEncryptedStreamWithIdentityCrypt(t *testing.T, version Version) {
 		t.Fatal(err)
 	}
 
-	decoded, err := DecodeStream(r, stream, 0)
+	decoded, err := DecodeStream(r, nil, stream, 0)
 	if err != nil {
 		t.Fatalf("DecodeStream: %v", err)
 	}
@@ -632,7 +632,7 @@ func TestCopyEncryptedStreamWithIdentityCrypt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	decoded, err := DecodeStream(dstR, dstStream, 0)
+	decoded, err := DecodeStream(dstR, nil, dstStream, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

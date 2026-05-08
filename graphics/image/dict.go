@@ -180,7 +180,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	}
 
 	hasJPX := false
-	if filters, err := pdf.Optional(pdf.GetFilters(x.R, dict)); err != nil {
+	if filters, err := pdf.Optional(pdf.GetFilters(x.R, path, dict)); err != nil {
 		return nil, err
 	} else {
 		for _, f := range filters {

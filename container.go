@@ -229,14 +229,14 @@ func CheckDictType(r Getter, obj Dict, wantType Name) error {
 // If ref is nil, the function returns an error which wraps os.ErrNotExist.
 //
 // This is a convenience function, combining [GetStream] and [DecodeStream].
-func GetStreamReader(r Getter, ref Object) (io.ReadCloser, error) {
+func GetStreamReader(r Getter, path *CycleCheck, ref Object) (io.ReadCloser, error) {
 	stm, err := GetStream(r, ref)
 	if err != nil {
 		return nil, err
 	} else if stm == nil {
 		return nil, fmt.Errorf("no stream found: %w", os.ErrNotExist)
 	}
-	return DecodeStream(r, stm, 0)
+	return DecodeStream(r, path, stm, 0)
 }
 
 // RawStreamReader returns a reader for the raw stream data after decryption
@@ -315,7 +315,7 @@ func streamCryptRecipe(r Getter, x *Stream) (cryptRecipe, error) {
 	if !startsWithCrypt {
 		return cryptDefault, nil
 	}
-	filters, err := GetFilters(r, x.Dict)
+	filters, err := GetFilters(r, nil, x.Dict)
 	if err != nil {
 		return 0, err
 	}
@@ -372,8 +372,8 @@ func filterChainStartsWithCrypt(r Getter, filter Object) (bool, error) {
 // layer would otherwise have transformed them (e.g. flate emitting
 // [io.ErrUnexpectedEOF]), because a sticky source-error tracker promotes
 // the original error at the top of the stack.
-func DecodeStream(r Getter, x *Stream, numFilters int) (io.ReadCloser, error) {
-	filters, err := GetFilters(r, x.Dict)
+func DecodeStream(r Getter, path *CycleCheck, x *Stream, numFilters int) (io.ReadCloser, error) {
+	filters, err := GetFilters(r, path, x.Dict)
 	if err != nil {
 		return nil, err
 	}
@@ -474,7 +474,7 @@ func (s *sourceAwareReader) Close() error { return s.inner.Close() }
 
 // GetFilters extracts the information contained in the /Filter and
 // /DecodeParms entries of a stream dictionary.
-func GetFilters(r Getter, dict Dict) ([]Filter, error) {
+func GetFilters(r Getter, path *CycleCheck, dict Dict) ([]Filter, error) {
 	decodeParams, err := resolve(r, dict["DecodeParms"], false)
 	if err != nil {
 		return nil, err
@@ -555,7 +555,7 @@ func GetFilters(r Getter, dict Dict) ([]Filter, error) {
 	// resolve JBIG2Globals for any JBIG2Decode filters
 	for _, f := range res {
 		if jf, ok := f.(*FilterJBIG2); ok {
-			if err := resolveJBIG2Globals(r, jf); err != nil {
+			if err := resolveJBIG2Globals(r, path, jf); err != nil {
 				return nil, err
 			}
 		}
@@ -570,9 +570,20 @@ func GetFilters(r Getter, dict Dict) ([]Filter, error) {
 // f.GlobalsRef is preserved after resolution so that callers writing
 // the stream back out (without going through [Copier]) can decide
 // whether to keep, remap, or drop the reference.
-func resolveJBIG2Globals(r Getter, f *FilterJBIG2) error {
+func resolveJBIG2Globals(r Getter, path *CycleCheck, f *FilterJBIG2) error {
 	if f.GlobalsRef == nil {
 		return nil
+	}
+
+	// detect cycles in chains of /JBIG2Globals references
+	if ref, isRef := f.GlobalsRef.(Reference); isRef {
+		if path.Seen(ref) {
+			return &MalformedFileError{
+				Err: ErrCycle,
+				Loc: []string{"JBIG2Globals " + ref.String()},
+			}
+		}
+		path = &CycleCheck{Ref: ref, Parent: path}
 	}
 
 	// resolve the reference to get the stream
@@ -589,7 +600,7 @@ func resolveJBIG2Globals(r Getter, f *FilterJBIG2) error {
 	if !ok {
 		return nil
 	}
-	stm, err := DecodeStream(r, stream, 0)
+	stm, err := DecodeStream(r, path, stream, 0)
 	if err != nil {
 		return fmt.Errorf("JBIG2Globals stream: %w", err)
 	}

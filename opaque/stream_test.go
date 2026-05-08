@@ -161,7 +161,7 @@ func TestStreamWriteAtCrossFile(t *testing.T) {
 	}
 
 	// Body bytes must be unchanged.
-	rc, err := pdf.DecodeStream(dst, dstStream, 0)
+	rc, err := pdf.DecodeStream(dst, nil, dstStream, 0)
 	if err != nil {
 		t.Fatalf("DecodeStream: %v", err)
 	}
@@ -243,7 +243,7 @@ func TestStreamWriteAtCrossEncryption(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dst GetStream: %v", err)
 	}
-	rc, err := pdf.DecodeStream(dst, dstStream, 0)
+	rc, err := pdf.DecodeStream(dst, nil, dstStream, 0)
 	if err != nil {
 		t.Fatalf("DecodeStream: %v", err)
 	}

@@ -110,7 +110,7 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*F
 			return nil, err
 		}
 
-		stm, err := pdf.DecodeStream(x.R, obj, 0)
+		stm, err := pdf.DecodeStream(x.R, path, obj, 0)
 		if err != nil {
 			return nil, err
 		}

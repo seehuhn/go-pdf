@@ -254,7 +254,7 @@ func TestStreamRead(t *testing.T) {
 	stream := NewStream(Dict{
 		"Length": Integer(len(dataIn)),
 	}, []byte(dataIn))
-	dataOut, err := ReadAll(nil, stream)
+	dataOut, err := ReadAll(nil, nil, stream)
 	if err != nil {
 		t.Fatal(err)
 	}

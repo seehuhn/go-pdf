@@ -269,7 +269,7 @@ func extractType5(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 	}
 
 	// Read stream data to extract vertices
-	stmReader, err := pdf.DecodeStream(x.R, stream, 0)
+	stmReader, err := pdf.DecodeStream(x.R, path, stream, 0)
 	if err != nil {
 		return nil, err
 	}

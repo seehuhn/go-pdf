@@ -113,7 +113,7 @@ func ExtractStream(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ boo
 
 	// Set up WriteData to read from the stream
 	result.WriteData = func(w io.Writer) error {
-		r, err := pdf.GetStreamReader(x.R, stream)
+		r, err := pdf.GetStreamReader(x.R, nil, stream)
 		if err != nil {
 			return err
 		}

@@ -963,8 +963,8 @@ func (x *Stream) AsPDF(opt OutputOptions) Native {
 }
 
 // ReadAll reads the content of a stream and returns it as a byte slice.
-func ReadAll(r Getter, s *Stream) ([]byte, error) {
-	in, err := DecodeStream(r, s, 0)
+func ReadAll(r Getter, path *CycleCheck, s *Stream) ([]byte, error) {
+	in, err := DecodeStream(r, path, s, 0)
 	if err != nil {
 		return nil, err
 	}

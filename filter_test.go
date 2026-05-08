@@ -103,7 +103,7 @@ func TestFilterChaining(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			in, err := DecodeStream(r, stmObj, 0)
+			in, err := DecodeStream(r, nil, stmObj, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -213,7 +213,7 @@ func filterRoundTrip(t *testing.T, version Version, f Filter) Filter {
 	if err != nil {
 		t.Fatal(err)
 	}
-	filters, err := GetFilters(r, stream.Dict)
+	filters, err := GetFilters(r, nil, stream.Dict)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -521,7 +521,7 @@ func TestCryptFilterPositionValidationOnRead(t *testing.T) {
 	dict := Dict{
 		"Filter": Array{Name("FlateDecode"), Name("Crypt")},
 	}
-	_, err := GetFilters(nil, dict)
+	_, err := GetFilters(nil, nil, dict)
 	if err == nil {
 		t.Fatal("expected error for /Crypt at position 1, got nil")
 	}

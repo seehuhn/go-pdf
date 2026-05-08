@@ -171,7 +171,7 @@ func (cr *contentReader) getReader() (io.ReadCloser, error) {
 			return nil, err
 		}
 		if stm != nil {
-			r, err := pdf.DecodeStream(cr.r, stm, 0)
+			r, err := pdf.DecodeStream(cr.r, nil, stm, 0)
 			if err != nil {
 				return nil, err
 			}

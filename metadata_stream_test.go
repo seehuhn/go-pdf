@@ -104,7 +104,7 @@ func TestMetadataRoundTripPadded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetStream: %v", err)
 	}
-	body, err := pdf.DecodeStream(pdfData, stream, 0)
+	body, err := pdf.DecodeStream(pdfData, nil, stream, 0)
 	if err != nil {
 		t.Fatalf("DecodeStream: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestMetadataUnpaddedTrailer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetStream: %v", err)
 	}
-	body, err := pdf.DecodeStream(pdfData, stream, 0)
+	body, err := pdf.DecodeStream(pdfData, nil, stream, 0)
 	if err != nil {
 		t.Fatalf("DecodeStream: %v", err)
 	}
@@ -211,7 +211,7 @@ func TestMetadataCatalogPlaintext(t *testing.T) {
 	// no filter at all on the catalog metadata stream — the encrypt-dict
 	// flag exempts it from encryption, and unpadded plaintext metadata is
 	// stored raw so external scanners can find the <?xpacket markers
-	filters, err := pdf.GetFilters(r, stream.Dict)
+	filters, err := pdf.GetFilters(r, nil, stream.Dict)
 	if err != nil {
 		t.Fatalf("GetFilters: %v", err)
 	}
@@ -220,7 +220,7 @@ func TestMetadataCatalogPlaintext(t *testing.T) {
 	}
 
 	// raw on-disk bytes must contain the XMP packet markers
-	body, err := pdf.DecodeStream(r, stream, 0)
+	body, err := pdf.DecodeStream(r, nil, stream, 0)
 	if err != nil {
 		t.Fatalf("DecodeStream: %v", err)
 	}
@@ -396,7 +396,7 @@ func TestMetadataNonCatalogPlaintext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetStream: %v", err)
 	}
-	filters, err := pdf.GetFilters(r, stream.Dict)
+	filters, err := pdf.GetFilters(r, nil, stream.Dict)
 	if err != nil {
 		t.Fatalf("GetFilters: %v", err)
 	}

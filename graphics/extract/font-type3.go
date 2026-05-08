@@ -118,7 +118,7 @@ func extractFontType3(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*
 		// Parse the content stream
 		glyphStm := stm // capture for closure
 		stream, err := content.ReadStream(func() (io.ReadCloser, error) {
-			return pdf.DecodeStream(x.R, glyphStm, 0)
+			return pdf.DecodeStream(x.R, path, glyphStm, 0)
 		}, v, content.Glyph, res)
 		if err != nil {
 			continue // permissive

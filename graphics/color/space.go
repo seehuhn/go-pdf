@@ -91,7 +91,7 @@ var (
 // The argument desc is typically a value in the ColorSpace sub-dictionary of
 // a Resources dictionary.
 func ExtractSpace(x *pdf.Extractor, path *pdf.CycleCheck, desc pdf.Object, _ bool) (Space, error) {
-	d := newDecoder(x.R, desc)
+	d := newDecoder(x.R, path, desc)
 
 	var res Space
 	var err error
@@ -192,7 +192,7 @@ func ExtractSpace(x *pdf.Extractor, path *pdf.CycleCheck, desc pdf.Object, _ boo
 		case pdf.String:
 			lookup = obj
 		case *pdf.Stream:
-			data, err := pdf.ReadAll(x.R, obj)
+			data, err := pdf.ReadAll(x.R, path, obj)
 			if err != nil {
 				d.SetError(pdf.Wrap(err, "lookup table"))
 				break
@@ -301,7 +301,7 @@ type decoder struct {
 	err  error
 }
 
-func newDecoder(r pdf.Getter, obj pdf.Object) *decoder {
+func newDecoder(r pdf.Getter, path *pdf.CycleCheck, obj pdf.Object) *decoder {
 	d := &decoder{
 		r:    r,
 		obj:  obj,
@@ -348,7 +348,7 @@ func newDecoder(r pdf.Getter, obj pdf.Object) *decoder {
 
 		case *pdf.Stream:
 			d.dict = y.Dict
-			body, err := pdf.ReadAll(r, y)
+			body, err := pdf.ReadAll(r, path, y)
 			if err != nil {
 				d.SetError(err)
 				break

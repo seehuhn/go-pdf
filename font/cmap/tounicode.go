@@ -90,7 +90,7 @@ func ExtractToUnicode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 		return nil, err
 	}
 
-	body, err := pdf.DecodeStream(x.R, stmObj, 0)
+	body, err := pdf.DecodeStream(x.R, path, stmObj, 0)
 	if err != nil {
 		return nil, err
 	}

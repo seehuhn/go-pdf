@@ -47,7 +47,7 @@ func ExtractPostScript(x *pdf.Extractor, path *pdf.CycleCheck, stm *pdf.Stream) 
 	}
 
 	draw := func(w io.Writer) error {
-		r, err := pdf.GetStreamReader(x.R, stm)
+		r, err := pdf.GetStreamReader(x.R, nil, stm)
 		if err != nil {
 			return err
 		}

@@ -58,7 +58,7 @@ func TestWriterReadAfterClose(t *testing.T) {
 	}
 
 	// Decode and read the stream content
-	stm, err := pdf.DecodeStream(writer, streamObj, 0)
+	stm, err := pdf.DecodeStream(writer, nil, streamObj, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

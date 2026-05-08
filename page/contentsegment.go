@@ -103,7 +103,7 @@ func (seg *contentSegment) ensureDecoded() error {
 
 // rawReader returns a reader for the decoded stream bytes.
 func (seg *contentSegment) rawReader() (io.ReadCloser, error) {
-	return pdf.DecodeStream(seg.getter, seg.stream, 0)
+	return pdf.DecodeStream(seg.getter, nil, seg.stream, 0)
 }
 
 // Embed writes the content segment to a PDF file as a stream object.

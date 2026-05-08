@@ -85,7 +85,7 @@ func extractType6(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 
 	// Read threshold data if dimensions are provided
 	if h.Width > 0 && h.Height > 0 {
-		r, err := pdf.GetStreamReader(x.R, stream)
+		r, err := pdf.GetStreamReader(x.R, path, stream)
 		if err != nil {
 			return nil, err
 		}

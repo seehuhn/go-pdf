@@ -36,7 +36,7 @@ func TestGetDictTyped_NilObject(t *testing.T) {
 }
 
 func TestGetStreamReaderNull(t *testing.T) {
-	r, err := GetStreamReader(mockGetter, nil)
+	r, err := GetStreamReader(mockGetter, nil, nil)
 	if !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("expected os.ErrNotExist, got %v", err)
 	}

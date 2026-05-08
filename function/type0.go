@@ -132,7 +132,7 @@ func extractType0(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 		Decode:        decode,
 	}
 
-	stmReader, err := pdf.DecodeStream(x.R, stream, 0)
+	stmReader, err := pdf.DecodeStream(x.R, path, stream, 0)
 	if err != nil {
 		return nil, err
 	}

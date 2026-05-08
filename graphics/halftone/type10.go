@@ -89,7 +89,7 @@ func extractType10(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (
 	// Read threshold data if dimensions are provided
 	if h.Size1 > 0 && h.Size2 > 0 {
 		expectedSize := h.Size1*h.Size1 + h.Size2*h.Size2
-		stmReader, err := pdf.DecodeStream(x.R, stream, 0)
+		stmReader, err := pdf.DecodeStream(x.R, path, stream, 0)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode stream: %w", err)
 		}

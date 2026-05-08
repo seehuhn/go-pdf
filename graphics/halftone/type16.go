@@ -125,7 +125,7 @@ func extractType16(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (
 		}
 		expectedBytes := expectedValues * 2
 
-		stmReader, err := pdf.DecodeStream(x.R, stream, 0)
+		stmReader, err := pdf.DecodeStream(x.R, path, stream, 0)
 		if err != nil {
 			return nil, err
 		}

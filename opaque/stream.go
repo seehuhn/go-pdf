@@ -56,7 +56,7 @@ func ExtractStream(x *pdf.Extractor, stream *pdf.Stream) *Stream {
 // bytes, applying the source's filter chain.  The caller must close
 // the returned reader.
 func (s *Stream) Reader() (io.ReadCloser, error) {
-	return pdf.DecodeStream(s.src.R, s.stream, 0)
+	return pdf.DecodeStream(s.src.R, nil, s.stream, 0)
 }
 
 // WriteAt copies the stream into rm's output writer at ref.

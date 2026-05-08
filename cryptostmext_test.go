@@ -124,7 +124,7 @@ func TestIndirectFilterWriteInlines(t *testing.T) {
 		t.Errorf("/Filter = %v, want [/Crypt /FlateDecode]", filterArr)
 	}
 
-	decoded, err := pdf.DecodeStream(r, stream, 0)
+	decoded, err := pdf.DecodeStream(r, nil, stream, 0)
 	if err != nil {
 		t.Fatalf("DecodeStream: %v", err)
 	}
@@ -202,7 +202,7 @@ func TestIndirectFilterReadResolves(t *testing.T) {
 	// so the read paths must resolve it to classify the stream.
 	stream.Dict["Filter"] = filterRef
 
-	decoded, err := pdf.DecodeStream(r, stream, 0)
+	decoded, err := pdf.DecodeStream(r, nil, stream, 0)
 	if err != nil {
 		t.Fatalf("DecodeStream: %v", err)
 	}
@@ -321,7 +321,7 @@ func TestCopyInlinesIndirectFilter(t *testing.T) {
 		t.Errorf("destination /Filter = %v, want [/Crypt /FlateDecode]", filterArr)
 	}
 
-	decoded, err := pdf.DecodeStream(dstR, dstStream, 0)
+	decoded, err := pdf.DecodeStream(dstR, nil, dstStream, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

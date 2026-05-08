@@ -483,7 +483,7 @@ func getObjStm(r Getter, stream *Stream, getInt getIntFn, enc *encryptInfo) (_ *
 		enc = nil
 	}
 
-	decoded, err := DecodeStream(r, stream, 0)
+	decoded, err := DecodeStream(r, nil, stream, 0)
 	if err != nil {
 		return nil, err
 	}

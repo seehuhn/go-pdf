@@ -151,7 +151,7 @@ func extractFontCIDType2(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 		}
 
 	case *pdf.Stream:
-		in, err := pdf.DecodeStream(x.R, c2g, 0)
+		in, err := pdf.DecodeStream(x.R, path, c2g, 0)
 		if err != nil {
 			return nil, err
 		}

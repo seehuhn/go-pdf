@@ -579,7 +579,7 @@ func extractType7(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 	}
 
 	// Read stream data to extract patches
-	stmReader, err := pdf.DecodeStream(x.R, stream, 0)
+	stmReader, err := pdf.DecodeStream(x.R, path, stream, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode stream: %w", err)
 	}

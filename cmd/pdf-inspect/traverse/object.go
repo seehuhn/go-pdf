@@ -180,7 +180,7 @@ func (c *objectCtx) Next() []Step {
 				if c.r == nil {
 					return nil, errors.New("reader is nil, cannot decode stream")
 				}
-				decoded, err := pdf.DecodeStream(c.r, x, 0)
+				decoded, err := pdf.DecodeStream(c.r, nil, x, 0)
 				if err != nil {
 					return nil, err
 				}
@@ -233,7 +233,7 @@ func (c *objectCtx) Show() error {
 		}
 		fmt.Println()
 
-		if stmData, err := pdf.DecodeStream(c.r, obj, 0); err == nil {
+		if stmData, err := pdf.DecodeStream(c.r, nil, obj, 0); err == nil {
 			buf := make([]byte, 128)
 			n, err := stmData.Read(buf)
 			if err != nil && err != io.EOF {

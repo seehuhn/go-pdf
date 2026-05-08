@@ -164,7 +164,7 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*form
 	res := f.Res
 	f.Content = content.NewScanner(
 		func() (io.ReadCloser, error) {
-			return pdf.DecodeStream(getter, stm, 0)
+			return pdf.DecodeStream(getter, nil, stm, 0)
 		},
 		version, content.Form, res,
 	)

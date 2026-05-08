@@ -88,7 +88,7 @@ func ExtractStream(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, dictT
 	return &Stream{
 		Type: tp,
 		WriteTo: func(w io.Writer, length *Lengths) error {
-			body, err := pdf.DecodeStream(x.R, stm, 0)
+			body, err := pdf.DecodeStream(x.R, nil, stm, 0)
 			if err != nil {
 				return err
 			}

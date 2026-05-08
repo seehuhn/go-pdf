@@ -71,7 +71,7 @@ func ExtractMetadataStream(x *Extractor, path *CycleCheck, ref Object, _ bool) (
 		return nil, nil
 	}
 
-	body, err := DecodeStream(x.R, stream, 0)
+	body, err := DecodeStream(x.R, path, stream, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func ExtractMetadataStream(x *Extractor, path *CycleCheck, ref Object, _ bool) (
 	// decoded length, not the stored length, so it's not a meaningful
 	// pad target on rewrite).
 	plaintext := false
-	if filters, ferr := GetFilters(x.R, stream.Dict); ferr == nil {
+	if filters, ferr := GetFilters(x.R, path, stream.Dict); ferr == nil {
 		// the bytes on disk are raw XMP iff:
 		//   - in an unencrypted file: there are no filters at all
 		//   - in an encrypted file: the chain is exactly /Crypt /Identity,

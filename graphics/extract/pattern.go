@@ -210,7 +210,7 @@ func extractType1(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 	res := pat.Res
 	ops, err := content.ReadStream(
 		func() (io.ReadCloser, error) {
-			return pdf.DecodeStream(getter, stm, 0)
+			return pdf.DecodeStream(getter, path, stm, 0)
 		},
 		version, stmType, res,
 	)
