@@ -72,6 +72,9 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 // DecodePage reads a page object's additional-actions dictionary from
 // a PDF object.
+//
+// Always invoke this via [pdf.ExtractorGet] so that indirect references are
+// resolved and cycle detection covers self- and back-references.
 func DecodePage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Page, error) {
 	dict, err := x.GetDict(path, obj)
 	if err != nil {

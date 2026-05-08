@@ -36,10 +36,12 @@
 //	}
 //	dict, err := action.Encode(rm)
 //
-// Decode an action from a PDF object:
+// Decode an action from a PDF object. Always invoke the decoder via
+// [pdf.ExtractorGet] so that indirect references are resolved and cycle
+// detection is preserved:
 //
-//	action, err := action.Decode(x, obj)
-//	switch a := action.(type) {
+//	a, err := pdf.ExtractorGet(x, nil, obj, action.Decode)
+//	switch a := a.(type) {
 //	case *action.GoTo:
 //	    // handle go-to action
 //	case *action.URI:

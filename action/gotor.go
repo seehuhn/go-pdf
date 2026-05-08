@@ -116,7 +116,7 @@ func decodeGoToR(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*GoToR,
 		return nil, pdf.Error("GoToR action missing F entry")
 	}
 
-	dest, err := destination.Decode(x, path, dict["D"], false)
+	dest, err := pdf.ExtractorGet(x, path, dict["D"], destination.Decode)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func decodeGoToR(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*GoToR,
 		}
 	}
 
-	next, err := DecodeActionList(x, path, dict["Next"], false)
+	next, err := pdf.ExtractorGet(x, path, dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

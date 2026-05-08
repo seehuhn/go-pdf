@@ -59,6 +59,9 @@ var Unset = math.NaN()
 // Decode reads a destination from a PDF object.
 // The object can be an array (explicit destination), a name/string (named destination),
 // or a dictionary with a D entry.
+//
+// Always invoke this via [pdf.ExtractorGet] so that indirect references are
+// resolved and cycle detection covers self- and back-references.
 func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (Destination, error) {
 	obj, err := x.Resolve(path, obj)
 	if err != nil {

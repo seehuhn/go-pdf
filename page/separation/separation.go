@@ -111,6 +111,9 @@ func pagesArray(refs []pdf.Reference) pdf.Array {
 }
 
 // Decode reads a separation dictionary from a PDF object.
+//
+// Always invoke this via [pdf.ExtractorGet] so that indirect references are
+// resolved and cycle detection covers self- and back-references.
 func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Dict, error) {
 	dict, err := x.GetDict(path, obj)
 	if err != nil {

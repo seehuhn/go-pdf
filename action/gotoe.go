@@ -102,7 +102,7 @@ func (a *GoToE) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeGoToE(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*GoToE, error) {
-	dest, err := destination.Decode(x, path, dict["D"], false)
+	dest, err := pdf.ExtractorGet(x, path, dict["D"], destination.Decode)
 	if err != nil {
 		return nil, err
 	}
@@ -127,13 +127,13 @@ func decodeGoToE(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*GoToE,
 
 	var target Target
 	if dict["T"] != nil {
-		target, err = DecodeTarget(x, path, dict["T"], false)
+		target, err = pdf.ExtractorGet(x, path, dict["T"], DecodeTarget)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	next, err := DecodeActionList(x, path, dict["Next"], false)
+	next, err := pdf.ExtractorGet(x, path, dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

@@ -17,6 +17,7 @@
 package action
 
 import (
+	"errors"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -200,5 +201,161 @@ func TestNewWindowMode(t *testing.T) {
 				t.Errorf("decoded NewWindow = %v, want %v", decodedMode, tt.mode)
 			}
 		})
+	}
+}
+
+// TestDecodeActionListNextCycleSelf checks that a URI action with a /Next
+// entry pointing back at itself is rejected with pdf.ErrCycle instead of
+// recursing until the goroutine stack is exhausted.
+func TestDecodeActionListNextCycleSelf(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+	ref := w.Alloc()
+	err := w.Put(ref, pdf.Dict{
+		"S":    pdf.Name("URI"),
+		"URI":  pdf.String("https://example.com/"),
+		"Next": ref,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	_, err = pdf.ExtractorGet(x, nil, ref, Decode)
+	if !errors.Is(err, pdf.ErrCycle) {
+		t.Errorf("expected cycle error, got %v", err)
+	}
+}
+
+// TestDecodeActionListNextCycleMutual checks that two URI actions with
+// /Next entries pointing at each other are rejected with pdf.ErrCycle.
+func TestDecodeActionListNextCycleMutual(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+	refA := w.Alloc()
+	refB := w.Alloc()
+	if err := w.Put(refA, pdf.Dict{
+		"S":    pdf.Name("URI"),
+		"URI":  pdf.String("https://example.com/a"),
+		"Next": refB,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Put(refB, pdf.Dict{
+		"S":    pdf.Name("URI"),
+		"URI":  pdf.String("https://example.com/b"),
+		"Next": refA,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	_, err := pdf.ExtractorGet(x, nil, refA, Decode)
+	if !errors.Is(err, pdf.ErrCycle) {
+		t.Errorf("expected cycle error, got %v", err)
+	}
+}
+
+// TestDecodeActionListNextCycleInlineDict checks that an inline (non-ref)
+// /Next dictionary whose own /Next references the parent action is
+// cycle-protected.
+func TestDecodeActionListNextCycleInlineDict(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+	ref := w.Alloc()
+	err := w.Put(ref, pdf.Dict{
+		"S":   pdf.Name("URI"),
+		"URI": pdf.String("https://example.com/"),
+		"Next": pdf.Dict{
+			"S":    pdf.Name("URI"),
+			"URI":  pdf.String("https://example.com/inner"),
+			"Next": ref,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	_, err = pdf.ExtractorGet(x, nil, ref, Decode)
+	if !errors.Is(err, pdf.ErrCycle) {
+		t.Errorf("expected cycle error, got %v", err)
+	}
+}
+
+// TestDecodeActionListNextCycleDeep checks that a /Next chain that loops
+// between two refs neither of which is the entry ref (A → B → C → B) is
+// detected. This is the case the path-extending ExtractorGet wrapper
+// fixed: a plain x.GetDict cycle check only catches refs already on the
+// entry path, so the old code recursed forever between B and C.
+func TestDecodeActionListNextCycleDeep(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+	refA := w.Alloc()
+	refB := w.Alloc()
+	refC := w.Alloc()
+	if err := w.Put(refA, pdf.Dict{
+		"S":    pdf.Name("URI"),
+		"URI":  pdf.String("https://example.com/a"),
+		"Next": refB,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Put(refB, pdf.Dict{
+		"S":    pdf.Name("URI"),
+		"URI":  pdf.String("https://example.com/b"),
+		"Next": refC,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Put(refC, pdf.Dict{
+		"S":    pdf.Name("URI"),
+		"URI":  pdf.String("https://example.com/c"),
+		"Next": refB,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	_, err := pdf.ExtractorGet(x, nil, refA, Decode)
+	if !errors.Is(err, pdf.ErrCycle) {
+		t.Errorf("expected cycle error, got %v", err)
+	}
+}
+
+// TestDecodeActionListNextCycleArray checks that a /Next entry containing
+// an array of action references is also cycle-protected.
+func TestDecodeActionListNextCycleArray(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+	ref := w.Alloc()
+	err := w.Put(ref, pdf.Dict{
+		"S":    pdf.Name("URI"),
+		"URI":  pdf.String("https://example.com/"),
+		"Next": pdf.Array{ref},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	_, err = pdf.ExtractorGet(x, nil, ref, Decode)
+	if !errors.Is(err, pdf.ErrCycle) {
+		t.Errorf("expected cycle error, got %v", err)
 	}
 }

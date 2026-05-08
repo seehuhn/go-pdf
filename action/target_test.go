@@ -18,6 +18,7 @@ package action
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -216,7 +217,55 @@ func TestTargetCycle(t *testing.T) {
 	t2.Next = t1
 
 	_, err := t1.Encode(rm)
-	if err != errTargetCycle {
+	if !errors.Is(err, pdf.ErrCycle) {
+		t.Errorf("expected cycle error, got %v", err)
+	}
+}
+
+// TestDecodeTargetCycleSelf checks that DecodeTarget rejects a target
+// dictionary that references itself via /T.
+func TestDecodeTargetCycleSelf(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+	ref := w.Alloc()
+	err := w.Put(ref, pdf.Dict{
+		"R": pdf.Name("P"),
+		"T": ref,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	_, err = pdf.ExtractorGet(x, nil, ref, DecodeTarget)
+	if !errors.Is(err, pdf.ErrCycle) {
+		t.Errorf("expected cycle error, got %v", err)
+	}
+}
+
+// TestDecodeTargetCycleMutual checks that DecodeTarget rejects two target
+// dictionaries that reference each other via /T.
+func TestDecodeTargetCycleMutual(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+	refA := w.Alloc()
+	refB := w.Alloc()
+	if err := w.Put(refA, pdf.Dict{"R": pdf.Name("P"), "T": refB}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Put(refB, pdf.Dict{"R": pdf.Name("P"), "T": refA}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	_, err := pdf.ExtractorGet(x, nil, refA, DecodeTarget)
+	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
 	}
 }

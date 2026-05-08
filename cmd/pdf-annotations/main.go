@@ -113,7 +113,7 @@ func processFile(fname string) error {
 		for _, obj := range annotsArray {
 			ref, _ := obj.(pdf.Reference)
 
-			a, err := annotation.Decode(x, nil, obj, false)
+			a, err := pdf.ExtractorGet(x, nil, obj, annotation.Decode)
 			if err != nil {
 				continue
 			}

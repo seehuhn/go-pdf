@@ -112,7 +112,7 @@ func (c *Concat) Append(fname string) error {
 	copy := pdf.NewCopier(c.w, r)
 
 	meta := r.GetMeta()
-	outlineTree, _ := outline.Decode(pdf.NewExtractor(r), nil, r.GetMeta().Catalog.Outlines, false)
+	outlineTree, _ := pdf.ExtractorGetOptional(pdf.NewExtractor(r), nil, r.GetMeta().Catalog.Outlines, outline.Decode)
 
 	var title string
 	if meta.Info != nil && meta.Info.Title != "" {
@@ -222,7 +222,7 @@ func copyDestination(cp *pdf.Copier, rm *pdf.ResourceManager,
 		return nil, err
 	}
 	x := pdf.NewExtractor(rm.Out)
-	return destination.Decode(x, nil, copied, false)
+	return pdf.ExtractorGet(x, nil, copied, destination.Decode)
 }
 
 // copyAction copies an action, translating page references.
@@ -237,5 +237,5 @@ func copyAction(cp *pdf.Copier, rm *pdf.ResourceManager,
 		return nil, err
 	}
 	x := pdf.NewExtractor(rm.Out)
-	return action.Decode(x, nil, copied, false)
+	return pdf.ExtractorGet(x, nil, copied, action.Decode)
 }

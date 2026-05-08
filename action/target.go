@@ -20,8 +20,6 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-var errTargetCycle = pdf.Error("target dictionary contains cycle")
-
 // Target represents a step in navigating through a hierarchy of embedded PDF files.
 // Target dictionaries can be chained via the Next field to specify a path through
 // multiple levels of embedding.
@@ -46,7 +44,7 @@ func (t *TargetParent) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 func (t *TargetParent) encodeTargetSafe(rm *pdf.ResourceManager, visited map[Target]bool) (pdf.Native, error) {
 	if visited[t] {
-		return nil, errTargetCycle
+		return nil, pdf.ErrCycle
 	}
 	visited[t] = true
 
@@ -81,7 +79,7 @@ func (t *TargetNamedChild) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 func (t *TargetNamedChild) encodeTargetSafe(rm *pdf.ResourceManager, visited map[Target]bool) (pdf.Native, error) {
 	if visited[t] {
-		return nil, errTargetCycle
+		return nil, pdf.ErrCycle
 	}
 	visited[t] = true
 
@@ -126,7 +124,7 @@ func (t *TargetAnnotationChild) Encode(rm *pdf.ResourceManager) (pdf.Native, err
 
 func (t *TargetAnnotationChild) encodeTargetSafe(rm *pdf.ResourceManager, visited map[Target]bool) (pdf.Native, error) {
 	if visited[t] {
-		return nil, errTargetCycle
+		return nil, pdf.ErrCycle
 	}
 	visited[t] = true
 
@@ -155,6 +153,9 @@ func (t *TargetAnnotationChild) encodeTargetSafe(rm *pdf.ResourceManager, visite
 }
 
 // DecodeTarget reads a target dictionary from a PDF object.
+//
+// Always invoke this via [pdf.ExtractorGet] so that indirect references are
+// resolved and cycle detection covers self- and back-references.
 func DecodeTarget(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (Target, error) {
 	if obj == nil {
 		return nil, nil
@@ -173,7 +174,7 @@ func DecodeTarget(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool
 	// recursively decode nested target
 	var next Target
 	if dict["T"] != nil {
-		next, err = DecodeTarget(x, path, dict["T"], false)
+		next, err = pdf.ExtractorGet(x, path, dict["T"], DecodeTarget)
 		if err != nil {
 			return nil, err
 		}

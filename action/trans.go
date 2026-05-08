@@ -74,7 +74,7 @@ func decodeTrans(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Trans,
 		return nil, err
 	}
 
-	next, err := DecodeActionList(x, path, dict["Next"], false)
+	next, err := pdf.ExtractorGet(x, path, dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

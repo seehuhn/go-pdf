@@ -631,6 +631,9 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 // Decode reads a page dictionary from a PDF object.
 // The page dictionary should already have inherited attributes resolved
 // (e.g., via [pagetree.Iterator]).
+//
+// Always invoke this via [pdf.ExtractorGet] so that indirect references are
+// resolved and cycle detection covers self- and back-references.
 func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Page, error) {
 	dict, err := x.GetDictTyped(path, obj, "Page")
 	if err != nil {
@@ -815,7 +818,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 			if !ok {
 				continue
 			}
-			annot, err := annotation.Decode(x, path, item, false)
+			annot, err := pdf.ExtractorGet(x, path, item, annotation.Decode)
 			if err != nil {
 				// permissive: skip invalid annotations
 				continue
@@ -842,7 +845,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 	}
 
 	// AA (optional)
-	if aa, err := triggers.DecodePage(x, path, dict["AA"], false); err != nil {
+	if aa, err := pdf.ExtractorGet(x, path, dict["AA"], triggers.DecodePage); err != nil {
 		return nil, err
 	} else {
 		p.AA = aa
@@ -894,7 +897,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 
 	// SeparationInfo (optional)
 	if dict["SeparationInfo"] != nil {
-		sep, err := separation.Decode(x, path, dict["SeparationInfo"], false)
+		sep, err := pdf.ExtractorGet(x, path, dict["SeparationInfo"], separation.Decode)
 		if err != nil {
 			return nil, err
 		}
@@ -921,7 +924,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 	}
 
 	// PresSteps (optional)
-	if presSteps, err := navnode.Decode(x, path, dict["PresSteps"], false); err != nil {
+	if presSteps, err := pdf.ExtractorGet(x, path, dict["PresSteps"], navnode.Decode); err != nil {
 		return nil, pdf.Wrap(err, "PresSteps")
 	} else {
 		p.PresSteps = presSteps

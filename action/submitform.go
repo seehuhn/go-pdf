@@ -84,7 +84,7 @@ func decodeSubmitForm(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*S
 	fields, _ := x.GetArray(path, dict["Fields"])
 	flags, _ := pdf.Optional(x.GetInteger(path, dict["Flags"]))
 
-	next, err := DecodeActionList(x, path, dict["Next"], false)
+	next, err := pdf.ExtractorGet(x, path, dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

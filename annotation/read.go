@@ -21,6 +21,9 @@ import (
 )
 
 // Decode reads an annotation from a PDF file.
+//
+// Always invoke this via [pdf.ExtractorGet] so that indirect references are
+// resolved and cycle detection covers self- and back-references.
 func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (Annotation, error) {
 	dict, err := x.GetDictTyped(path, obj, "Annot")
 	if err != nil {

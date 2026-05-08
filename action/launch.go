@@ -119,7 +119,7 @@ func decodeLaunch(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Launc
 		}
 	}
 
-	next, err := DecodeActionList(x, path, dict["Next"], false)
+	next, err := pdf.ExtractorGet(x, path, dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

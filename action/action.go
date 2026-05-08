@@ -56,6 +56,9 @@ const (
 )
 
 // Decode reads an action from a PDF object.
+//
+// Always invoke this via [pdf.ExtractorGet] so that indirect references are
+// resolved and cycle detection covers self- and back-references.
 func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (pdf.Action, error) {
 	dict, err := x.GetDictTyped(path, obj, "Action")
 	if err != nil {
@@ -140,6 +143,9 @@ func (al ActionList) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 // DecodeActionList reads an action list from a PDF object.
 // Handles both single dictionary and array formats.
+//
+// Always invoke this via [pdf.ExtractorGet] so that indirect references are
+// resolved and cycle detection covers self- and back-references.
 func DecodeActionList(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (ActionList, error) {
 	if obj == nil {
 		return nil, nil
@@ -148,6 +154,9 @@ func DecodeActionList(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 	// try single action dictionary first
 	dict, err := x.GetDict(path, obj)
 	if err == nil && dict != nil {
+		// The dict has already been resolved; any indirect ref it came
+		// from was added to path by the outer ExtractorGet, so calling
+		// Decode directly preserves cycle detection.
 		action, err := Decode(x, path, dict, false)
 		if err != nil {
 			return nil, err
@@ -163,7 +172,7 @@ func DecodeActionList(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 
 	result := make(ActionList, 0, len(arr))
 	for _, item := range arr {
-		action, err := Decode(x, path, item, false)
+		action, err := pdf.ExtractorGet(x, path, item, Decode)
 		if err != nil {
 			return nil, err
 		}
