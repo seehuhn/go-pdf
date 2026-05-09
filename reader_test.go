@@ -576,5 +576,36 @@ func TestReaderWithPreamble(t *testing.T) {
 	}
 }
 
+// TestNewReaderNestedArrayBomb checks that opening a PDF whose catalog
+// contains a deeply nested array is rejected as malformed. Reader-side
+// counterpart to TestReadObjectNestedArrayBomb.
+func TestNewReaderNestedArrayBomb(t *testing.T) {
+	const depth = maxScannerNestDepth + 1
+	var b bytes.Buffer
+	b.WriteString("%PDF-1.7\n")
+	off1 := b.Len()
+	b.WriteString("1 0 obj\n<</Type/Catalog/Pages 2 0 R/X[")
+	b.WriteString(strings.Repeat("[", depth))
+	b.WriteString(strings.Repeat("]", depth))
+	b.WriteString("]>>\nendobj\n")
+	off2 := b.Len()
+	b.WriteString("2 0 obj\n<</Type/Pages/Kids[]/Count 0>>\nendobj\n")
+	xrefOff := b.Len()
+	fmt.Fprintf(&b, "xref\n0 3\n")
+	b.WriteString("0000000000 65535 f\r\n")
+	fmt.Fprintf(&b, "%010d 00000 n\r\n", off1)
+	fmt.Fprintf(&b, "%010d 00000 n\r\n", off2)
+	fmt.Fprintf(&b, "trailer\n<</Size 3/Root 1 0 R>>\nstartxref\n%d\n%%%%EOF\n", xrefOff)
+
+	data := b.Bytes()
+	_, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !IsMalformed(err) {
+		t.Errorf("expected *MalformedFileError, got %T: %v", err, err)
+	}
+}
+
 // compile time test
 var _ Getter = &Reader{}

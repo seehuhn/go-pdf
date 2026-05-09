@@ -139,10 +139,6 @@ func (x Name) AsTextString() TextString {
 	return TextString(x)
 }
 
-type asTextStringer interface {
-	AsTextString() TextString
-}
-
 type Date time.Time
 
 // Now returns the current date and time as a Date object.

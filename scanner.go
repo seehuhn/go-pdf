@@ -29,6 +29,10 @@ import (
 const (
 	scannerBufSize = 1024
 	regexpOverlap  = 64
+
+	// maxScannerNestDepth caps the nesting depth of arrays and dictionaries
+	// the scanner will accept.
+	maxScannerNestDepth = 256
 )
 
 type scanner struct {
@@ -46,6 +50,8 @@ type scanner struct {
 	// GetInt is used to get the length of a stream, when the length is
 	// specified as an indirect object.
 	getInt getIntFn
+
+	nestDepth int
 
 	enc         *encryptInfo
 	encRef      Reference
@@ -460,19 +466,41 @@ func (s *scanner) ReadName() (Name, error) {
 }
 
 // ReadArray reads an array, starting after the opening "[".
-func (s *scanner) ReadArray() (Array, error) {
+func (s *scanner) ReadArray() (array Array, err error) {
+	defer func() {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+		if err == io.ErrUnexpectedEOF {
+			err = &MalformedFileError{
+				Err: errors.New("unexpected EOF while reading Array"),
+			}
+		} else if err != nil {
+			err = Wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
+		}
+	}()
+
+	if s.nestDepth >= maxScannerNestDepth {
+		return nil, &MalformedFileError{
+			Err: errors.New("nesting depth exceeded"),
+		}
+	}
+	s.nestDepth++
+	defer func() { s.nestDepth-- }()
+
 	// At this point we already have read the opening "[",
 	// so we don't want to return nil.
-	array := Array{}
+	array = Array{}
 
 	integersSeen := 0
 	for {
-		err := s.SkipWhiteSpace()
+		err = s.SkipWhiteSpace()
 		if err != nil {
 			return nil, err
 		}
 
-		buf, err := s.Peek(1)
+		var buf []byte
+		buf, err = s.Peek(1)
 		if err != nil {
 			return nil, err
 		}
@@ -493,7 +521,8 @@ func (s *scanner) ReadArray() (Array, error) {
 			continue
 		}
 
-		obj, err := s.ReadObject()
+		var obj Native
+		obj, err = s.ReadObject()
 		if err != nil {
 			return nil, err
 		}
@@ -525,6 +554,14 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 			err = Wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
 		}
 	}()
+
+	if s.nestDepth >= maxScannerNestDepth {
+		return nil, &MalformedFileError{
+			Err: errors.New("nesting depth exceeded"),
+		}
+	}
+	s.nestDepth++
+	defer func() { s.nestDepth-- }()
 
 	err = s.SkipString("<<")
 	if err != nil {

@@ -82,6 +82,38 @@ func TestReadObject(t *testing.T) {
 	}
 }
 
+// TestReadObjectNestedArrayBomb checks that a deeply nested array is
+// rejected as malformed rather than recursing without bound.
+func TestReadObjectNestedArrayBomb(t *testing.T) {
+	const depth = maxScannerNestDepth + 1
+	body := strings.Repeat("[", depth) + strings.Repeat("]", depth)
+	s := testScanner(body)
+
+	_, err := s.ReadObject()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !IsMalformed(err) {
+		t.Errorf("expected *MalformedFileError, got %T: %v", err, err)
+	}
+}
+
+// TestReadObjectNestedDictBomb is the dict variant of
+// TestReadObjectNestedArrayBomb.
+func TestReadObjectNestedDictBomb(t *testing.T) {
+	const depth = maxScannerNestDepth + 1
+	body := strings.Repeat("<</A ", depth) + "null" + strings.Repeat(">>", depth)
+	s := testScanner(body)
+
+	_, err := s.ReadObject()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !IsMalformed(err) {
+		t.Errorf("expected *MalformedFileError, got %T: %v", err, err)
+	}
+}
+
 func TestSkipWhiteSpace(t *testing.T) {
 	cases := []string{
 		"",
