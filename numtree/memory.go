@@ -48,7 +48,11 @@ func ExtractInMemory(r pdf.Getter, root pdf.Object) (*InMemory, error) {
 		Data: make(map[pdf.Integer]pdf.Object),
 	}
 
-	err = extractFromNode(r, node, tree.Data)
+	seen := map[pdf.Reference]bool{}
+	if ref, ok := root.(pdf.Reference); ok {
+		seen[ref] = true
+	}
+	err = extractFromNode(r, node, seen, tree.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +60,7 @@ func ExtractInMemory(r pdf.Getter, root pdf.Object) (*InMemory, error) {
 	return tree, nil
 }
 
-func extractFromNode(r pdf.Getter, node pdf.Dict, data map[pdf.Integer]pdf.Object) error {
+func extractFromNode(r pdf.Getter, node pdf.Dict, seen map[pdf.Reference]bool, data map[pdf.Integer]pdf.Object) error {
 	// check if this is a leaf node with Nums
 	if nums, ok := node["Nums"]; ok {
 		arr, err := pdf.GetArray(r, nums)
@@ -84,12 +88,18 @@ func extractFromNode(r pdf.Getter, node pdf.Dict, data map[pdf.Integer]pdf.Objec
 
 		// recursively extract from all children
 		for _, kid := range arr {
+			if ref, isRef := kid.(pdf.Reference); isRef {
+				if seen[ref] {
+					continue
+				}
+				seen[ref] = true
+			}
 			childNode, err := pdf.GetDict(r, kid)
 			if err != nil {
 				return err
 			}
 
-			err = extractFromNode(r, childNode, data)
+			err = extractFromNode(r, childNode, seen, data)
 			if err != nil {
 				return err
 			}

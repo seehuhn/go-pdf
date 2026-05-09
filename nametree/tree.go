@@ -30,10 +30,14 @@ func Size(r pdf.Getter, root pdf.Object) (int, error) {
 		return 0, err
 	}
 
-	return sizeNode(r, node)
+	seen := map[pdf.Reference]bool{}
+	if ref, ok := root.(pdf.Reference); ok {
+		seen[ref] = true
+	}
+	return sizeNode(r, node, seen)
 }
 
-func sizeNode(r pdf.Getter, node pdf.Dict) (int, error) {
+func sizeNode(r pdf.Getter, node pdf.Dict, seen map[pdf.Reference]bool) (int, error) {
 	// leaf or single-node tree with Names
 	if names, ok := node["Names"]; ok {
 		arr, err := pdf.GetArray(r, names)
@@ -52,11 +56,17 @@ func sizeNode(r pdf.Getter, node pdf.Dict) (int, error) {
 
 		total := 0
 		for _, kid := range arr {
+			if ref, isRef := kid.(pdf.Reference); isRef {
+				if seen[ref] {
+					continue
+				}
+				seen[ref] = true
+			}
 			childNode, err := pdf.GetDict(r, kid)
 			if err != nil {
 				return 0, err
 			}
-			childSize, err := sizeNode(r, childNode)
+			childSize, err := sizeNode(r, childNode, seen)
 			if err != nil {
 				return 0, err
 			}

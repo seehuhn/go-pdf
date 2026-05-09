@@ -159,6 +159,32 @@ func TestExtractNil(t *testing.T) {
 	}
 }
 
+// TestExtractCyclicPageLabels guards against the stack-overflow attack
+// path documented in the security report: a self-referencing /Kids
+// dict planted at Catalog/PageLabels.
+func TestExtractCyclicPageLabels(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	rootRef := w.Alloc()
+	root := pdf.Dict{
+		"Kids":   pdf.Array{rootRef},
+		"Limits": pdf.Array{pdf.Integer(0), pdf.Integer(1 << 30)},
+	}
+	if err := w.Put(rootRef, root); err != nil {
+		t.Fatal(err)
+	}
+
+	labels, err := Extract(w, rootRef)
+	if err != nil {
+		t.Fatalf("Extract: %v", err)
+	}
+	// no real entries in the cyclic tree; Extract installs the default
+	// page-0 range, so we expect exactly one range.
+	if labels.NumRanges() != 1 {
+		t.Errorf("NumRanges() = %d, want 1", labels.NumRanges())
+	}
+}
+
 func TestExtract(t *testing.T) {
 	// build a PageLabels number tree as raw PDF objects
 	obj := pdf.Dict{

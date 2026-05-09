@@ -52,10 +52,14 @@ func (t *FromFile) Lookup(key pdf.Integer) (pdf.Object, error) {
 		return nil, err
 	}
 
-	return t.lookupInNode(node, key)
+	seen := map[pdf.Reference]bool{}
+	if ref, ok := t.root.(pdf.Reference); ok {
+		seen[ref] = true
+	}
+	return t.lookupInNode(node, seen, key)
 }
 
-func (t *FromFile) lookupInNode(node pdf.Dict, key pdf.Integer) (pdf.Object, error) {
+func (t *FromFile) lookupInNode(node pdf.Dict, seen map[pdf.Reference]bool, key pdf.Integer) (pdf.Object, error) {
 	// check if this is a leaf node with Nums
 	if nums, ok := node["Nums"]; ok {
 		arr, err := pdf.GetArray(t.r, nums)
@@ -85,6 +89,12 @@ func (t *FromFile) lookupInNode(node pdf.Dict, key pdf.Integer) (pdf.Object, err
 
 		// find the right child by checking Limits
 		for _, kid := range arr {
+			if ref, isRef := kid.(pdf.Reference); isRef {
+				if seen[ref] {
+					continue
+				}
+				seen[ref] = true
+			}
 			childNode, err := pdf.GetDict(t.r, kid)
 			if err != nil {
 				continue
@@ -111,7 +121,7 @@ func (t *FromFile) lookupInNode(node pdf.Dict, key pdf.Integer) (pdf.Object, err
 
 			// check if key is within this child's range
 			if key >= minKey && key <= maxKey {
-				return t.lookupInNode(childNode, key)
+				return t.lookupInNode(childNode, seen, key)
 			}
 		}
 	}
@@ -130,11 +140,15 @@ func (t *FromFile) All() iter.Seq2[pdf.Integer, pdf.Object] {
 			return
 		}
 
-		t.yieldFromNode(node, yield)
+		seen := map[pdf.Reference]bool{}
+		if ref, ok := t.root.(pdf.Reference); ok {
+			seen[ref] = true
+		}
+		t.yieldFromNode(node, seen, yield)
 	}
 }
 
-func (t *FromFile) yieldFromNode(node pdf.Dict, yield func(pdf.Integer, pdf.Object) bool) bool {
+func (t *FromFile) yieldFromNode(node pdf.Dict, seen map[pdf.Reference]bool, yield func(pdf.Integer, pdf.Object) bool) bool {
 	// check if this is a leaf node with Nums
 	if nums, ok := node["Nums"]; ok {
 		arr, err := pdf.GetArray(t.r, nums)
@@ -164,12 +178,18 @@ func (t *FromFile) yieldFromNode(node pdf.Dict, yield func(pdf.Integer, pdf.Obje
 
 		// recursively yield from all children in order
 		for _, kid := range arr {
+			if ref, isRef := kid.(pdf.Reference); isRef {
+				if seen[ref] {
+					continue
+				}
+				seen[ref] = true
+			}
 			childNode, err := pdf.GetDict(t.r, kid)
 			if err != nil {
 				continue
 			}
 
-			if !t.yieldFromNode(childNode, yield) {
+			if !t.yieldFromNode(childNode, seen, yield) {
 				return false
 			}
 		}
