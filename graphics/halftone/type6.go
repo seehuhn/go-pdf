@@ -57,18 +57,18 @@ func extractType6(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 
 	if width, err := x.GetInteger(path, dict["Width"]); err != nil {
 		return nil, err
-	} else if width > 0 && width <= 1024 {
-		h.Width = int(width)
 	} else {
-		return nil, pdf.Error("invalid Type 6 halftone Width")
+		h.Width = int(width)
 	}
 
 	if height, err := x.GetInteger(path, dict["Height"]); err != nil {
 		return nil, err
-	} else if height > 0 && height <= 1024 {
-		h.Height = int(height)
 	} else {
-		return nil, pdf.Error("invalid Type 6 halftone Height")
+		h.Height = int(height)
+	}
+
+	if err := validateType6Dims(h.Width, h.Height); err != nil {
+		return nil, err
 	}
 
 	if tf, err := pdf.Resolve(x.R, dict["TransferFunction"]); err != nil {
@@ -83,22 +83,18 @@ func extractType6(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 		}
 	}
 
-	// Read threshold data if dimensions are provided
-	if h.Width > 0 && h.Height > 0 {
-		r, err := pdf.GetStreamReader(x.R, path, stream)
-		if err != nil {
-			return nil, err
-		}
-		defer r.Close()
-
-		expectedSize := h.Width * h.Height
-		data := make([]byte, expectedSize)
-		_, err = io.ReadFull(r, data)
-		if err != nil {
-			return nil, err
-		}
-		h.ThresholdData = data
+	r, err := pdf.GetStreamReader(x.R, path, stream)
+	if err != nil {
+		return nil, err
 	}
+	defer r.Close()
+
+	expectedSize := h.Width * h.Height
+	data := make([]byte, expectedSize)
+	if _, err := io.ReadFull(r, data); err != nil {
+		return nil, err
+	}
+	h.ThresholdData = data
 
 	return h, nil
 }
@@ -118,16 +114,10 @@ func (h *Type6) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	dict := pdf.Dict{
 		"HalftoneType": pdf.Integer(6),
+		"Width":        pdf.Integer(h.Width),
+		"Height":       pdf.Integer(h.Height),
 	}
 
-	if h.Width > 0 {
-		dict["Width"] = pdf.Integer(h.Width)
-	}
-	if h.Height > 0 {
-		dict["Height"] = pdf.Integer(h.Height)
-	}
-
-	// Add optional fields
 	opt := rm.Out().GetOptions()
 	if opt.HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Halftone")

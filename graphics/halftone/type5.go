@@ -57,13 +57,12 @@ var _ graphics.Halftone = (*Type5)(nil)
 func extractType5(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Type5, error) {
 	h := &Type5{}
 
-	// TODO(voss): avoid infinite recursion!!!
+	if err := rejectNestedType5(x, path, dict["Default"], "Default"); err != nil {
+		return nil, err
+	}
 	if ht, err := pdf.ExtractorGet(x, path, dict["Default"], Extract); err != nil {
 		return nil, err
 	} else if ht != nil {
-		if ht.HalftoneType() == 5 {
-			return nil, pdf.Error("invalid Default halftone")
-		}
 		h.Default = ht
 	} else {
 		return nil, pdf.Error("missing Default halftone")
@@ -76,13 +75,12 @@ func extractType5(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Type5
 			continue
 		}
 
-		// TODO(voss): avoid infinite recursion!!!
+		if err := rejectNestedType5(x, path, val, fmt.Sprintf("colorant %q", colorant)); err != nil {
+			return nil, err
+		}
 		if ht, err := pdf.ExtractorGet(x, path, val, Extract); err != nil {
 			return nil, err
 		} else if ht != nil {
-			if ht.HalftoneType() == 5 {
-				return nil, pdf.Errorf("invalid colorant halftone for %q", colorant)
-			}
 			h.Colorants[colorant] = ht
 		}
 	}

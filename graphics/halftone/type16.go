@@ -106,45 +106,35 @@ func extractType16(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (
 		}
 	}
 
-	// Validate dimensions
-	if h.Width <= 0 || h.Height <= 0 {
-		return nil, fmt.Errorf("invalid threshold array dimensions %dx%d", h.Width, h.Height)
+	hasSecondRect, err := validateType16Dims(h.Width, h.Height, h.Width2, h.Height2)
+	if err != nil {
+		return nil, err
 	}
 
-	hasSecondRect := h.Width2 > 0 || h.Height2 > 0
-	if hasSecondRect && (h.Width2 <= 0 || h.Height2 <= 0) {
-		return nil, fmt.Errorf("if Width2 or Height2 is specified, both must be positive, got %dx%d", h.Width2, h.Height2)
+	expectedValues := h.Width * h.Height
+	if hasSecondRect {
+		expectedValues += h.Width2 * h.Height2
+	}
+	expectedBytes := expectedValues * 2
+
+	stmReader, err := pdf.DecodeStream(x.R, path, stream, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer stmReader.Close()
+
+	data := make([]byte, expectedBytes)
+	n, err := io.ReadFull(stmReader, data)
+	if err != nil {
+		return nil, err
+	}
+	if n != expectedBytes {
+		return nil, pdf.Errorf("incomplete Type 16 threshold data: expected %d bytes, got %d", expectedBytes, n)
 	}
 
-	// Read threshold data if dimensions are provided
-	if h.Width > 0 && h.Height > 0 {
-		expectedValues := h.Width * h.Height
-		hasSecondRect := h.Width2 > 0 && h.Height2 > 0
-		if hasSecondRect {
-			expectedValues += h.Width2 * h.Height2
-		}
-		expectedBytes := expectedValues * 2
-
-		stmReader, err := pdf.DecodeStream(x.R, path, stream, 0)
-		if err != nil {
-			return nil, err
-		}
-		defer stmReader.Close()
-
-		data := make([]byte, expectedBytes)
-		n, err := io.ReadFull(stmReader, data)
-		if err != nil {
-			return nil, err
-		}
-		if n != expectedBytes {
-			return nil, fmt.Errorf("incomplete threshold data: expected %d bytes, got %d", expectedBytes, n)
-		}
-
-		// Convert big-endian bytes to uint16 values
-		h.ThresholdData = make([]uint16, expectedValues)
-		for i := 0; i < expectedValues; i++ {
-			h.ThresholdData[i] = binary.BigEndian.Uint16(data[i*2:])
-		}
+	h.ThresholdData = make([]uint16, expectedValues)
+	for i := 0; i < expectedValues; i++ {
+		h.ThresholdData[i] = binary.BigEndian.Uint16(data[i*2:])
 	}
 
 	return h, nil
@@ -158,13 +148,11 @@ func (h *Type16) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if h.Width <= 0 || h.Height <= 0 {
 		return nil, fmt.Errorf("invalid threshold array dimensions %dx%d", h.Width, h.Height)
 	}
-
 	hasSecondRect := h.Width2 > 0 || h.Height2 > 0
 	if hasSecondRect && (h.Width2 <= 0 || h.Height2 <= 0) {
 		return nil, fmt.Errorf("if Width2 or Height2 is specified, both must be positive, got %dx%d", h.Width2, h.Height2)
 	}
 
-	// Calculate expected data size (uint16 values)
 	expectedValues := h.Width * h.Height
 	if hasSecondRect {
 		expectedValues += h.Width2 * h.Height2
@@ -176,16 +164,10 @@ func (h *Type16) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	dict := pdf.Dict{
 		"HalftoneType": pdf.Integer(16),
+		"Width":        pdf.Integer(h.Width),
+		"Height":       pdf.Integer(h.Height),
 	}
 
-	if h.Width > 0 {
-		dict["Width"] = pdf.Integer(h.Width)
-	}
-	if h.Height > 0 {
-		dict["Height"] = pdf.Integer(h.Height)
-	}
-
-	// Add optional fields
 	opt := rm.Out().GetOptions()
 	if opt.HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Halftone")

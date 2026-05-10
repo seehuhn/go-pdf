@@ -81,30 +81,26 @@ func extractType10(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (
 		}
 	}
 
-	// Validate dimensions
-	if h.Size1 <= 0 || h.Size2 <= 0 {
-		return nil, fmt.Errorf("invalid square dimensions %dx%d", h.Size1, h.Size2)
+	if err := validateType10Dims(h.Size1, h.Size2); err != nil {
+		return nil, err
 	}
 
-	// Read threshold data if dimensions are provided
-	if h.Size1 > 0 && h.Size2 > 0 {
-		expectedSize := h.Size1*h.Size1 + h.Size2*h.Size2
-		stmReader, err := pdf.DecodeStream(x.R, path, stream, 0)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode stream: %w", err)
-		}
-		defer stmReader.Close()
-
-		data := make([]byte, expectedSize)
-		n, err := io.ReadFull(stmReader, data)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read threshold data: %w", err)
-		}
-		if n != expectedSize {
-			return nil, fmt.Errorf("incomplete threshold data: expected %d bytes, got %d", expectedSize, n)
-		}
-		h.ThresholdData = data
+	expectedSize := h.Size1*h.Size1 + h.Size2*h.Size2
+	stmReader, err := pdf.DecodeStream(x.R, path, stream, 0)
+	if err != nil {
+		return nil, err
 	}
+	defer stmReader.Close()
+
+	data := make([]byte, expectedSize)
+	n, err := io.ReadFull(stmReader, data)
+	if err != nil {
+		return nil, err
+	}
+	if n != expectedSize {
+		return nil, pdf.Errorf("incomplete Type 10 threshold data: expected %d bytes, got %d", expectedSize, n)
+	}
+	h.ThresholdData = data
 
 	return h, nil
 }
@@ -124,16 +120,10 @@ func (h *Type10) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	dict := pdf.Dict{
 		"HalftoneType": pdf.Integer(10),
+		"Xsquare":      pdf.Integer(h.Size1),
+		"Ysquare":      pdf.Integer(h.Size2),
 	}
 
-	if h.Size1 > 0 {
-		dict["Xsquare"] = pdf.Integer(h.Size1)
-	}
-	if h.Size2 > 0 {
-		dict["Ysquare"] = pdf.Integer(h.Size2)
-	}
-
-	// Add optional fields
 	opt := rm.Out().GetOptions()
 	if opt.HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Halftone")

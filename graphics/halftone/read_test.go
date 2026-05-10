@@ -93,6 +93,14 @@ var testCases = map[int][]testCase{
 				TransferFunction: function.Identity,
 			},
 		},
+		{
+			name: "Type6 64x64",
+			halftone: &Type6{
+				Width:         64,
+				Height:        64,
+				ThresholdData: makeBytePattern(64 * 64),
+			},
+		},
 	},
 	10: {
 		{
@@ -110,6 +118,14 @@ var testCases = map[int][]testCase{
 				Size2:            1,
 				ThresholdData:    []byte{0, 255, 127, 128, 64},
 				TransferFunction: function.Identity,
+			},
+		},
+		{
+			name: "Type10 large 32+16",
+			halftone: &Type10{
+				Size1:         32,
+				Size2:         16,
+				ThresholdData: makeBytePattern(32*32 + 16*16),
 			},
 		},
 	},
@@ -141,7 +157,41 @@ var testCases = map[int][]testCase{
 				TransferFunction: function.Identity,
 			},
 		},
+		{
+			name: "Type16 large 64x64",
+			halftone: &Type16{
+				Width:         64,
+				Height:        64,
+				ThresholdData: makeUint16Pattern(64 * 64),
+			},
+		},
+		{
+			name: "Type16 two-rect 32x32 + 16x16",
+			halftone: &Type16{
+				Width:         32,
+				Height:        32,
+				Width2:        16,
+				Height2:       16,
+				ThresholdData: makeUint16Pattern(32*32 + 16*16),
+			},
+		},
 	},
+}
+
+func makeBytePattern(n int) []byte {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = byte(i)
+	}
+	return b
+}
+
+func makeUint16Pattern(n int) []uint16 {
+	v := make([]uint16, n)
+	for i := range v {
+		v[i] = uint16(i)
+	}
+	return v
 }
 
 type testCase struct {
@@ -197,6 +247,153 @@ func roundTripTest(t *testing.T, originalHalftone graphics.Halftone) {
 	// Use cmp.Diff to compare the original and read halftone
 	if diff := cmp.Diff(originalHalftone, readHalftone); diff != "" {
 		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+}
+
+// TestMaliciousInputRejected verifies that malformed halftone PDFs are
+// rejected with an error rather than panicking or recursing without bound.
+// Each subtest constructs a small PDF that would have triggered a DoS in
+// extractType16/extractType10/extractType5 before the fix.
+func TestMaliciousInputRejected(t *testing.T) {
+	t.Run("Type16HugeDims", func(t *testing.T) {
+		w, buf := memfile.NewPDFWriter(pdf.V2_0, nil)
+		if err := memfile.AddBlankPage(w); err != nil {
+			t.Fatal(err)
+		}
+		ref := w.Alloc()
+		dict := pdf.Dict{
+			"Type":         pdf.Name("Halftone"),
+			"HalftoneType": pdf.Integer(16),
+			"Width":        pdf.Integer(1 << 30),
+			"Height":       pdf.Integer(1 << 30),
+		}
+		stm, err := w.OpenStream(ref, dict)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := stm.Close(); err != nil {
+			t.Fatal(err)
+		}
+		w.GetMeta().Trailer["Quir:E"] = ref
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+		assertExtractError(t, buf.Data)
+	})
+
+	t.Run("Type10HugeDims", func(t *testing.T) {
+		w, buf := memfile.NewPDFWriter(pdf.V2_0, nil)
+		if err := memfile.AddBlankPage(w); err != nil {
+			t.Fatal(err)
+		}
+		ref := w.Alloc()
+		dict := pdf.Dict{
+			"Type":         pdf.Name("Halftone"),
+			"HalftoneType": pdf.Integer(10),
+			"Xsquare":      pdf.Integer(1 << 20),
+			"Ysquare":      pdf.Integer(1 << 20),
+		}
+		stm, err := w.OpenStream(ref, dict)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := stm.Close(); err != nil {
+			t.Fatal(err)
+		}
+		w.GetMeta().Trailer["Quir:E"] = ref
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+		assertExtractError(t, buf.Data)
+	})
+
+	t.Run("Type5InlineNesting", func(t *testing.T) {
+		w, buf := memfile.NewPDFWriter(pdf.V2_0, nil)
+		if err := memfile.AddBlankPage(w); err != nil {
+			t.Fatal(err)
+		}
+		inner := pdf.Dict{
+			"Type":         pdf.Name("Halftone"),
+			"HalftoneType": pdf.Integer(1),
+			"Frequency":    pdf.Real(60),
+			"Angle":        pdf.Real(0),
+			"SpotFunction": pdf.Name("SimpleDot"),
+		}
+		middle := pdf.Dict{
+			"Type":         pdf.Name("Halftone"),
+			"HalftoneType": pdf.Integer(5),
+			"Default":      inner,
+		}
+		outer := pdf.Dict{
+			"Type":         pdf.Name("Halftone"),
+			"HalftoneType": pdf.Integer(5),
+			"Default":      middle,
+		}
+		ref := w.Alloc()
+		if err := w.Put(ref, outer); err != nil {
+			t.Fatal(err)
+		}
+		w.GetMeta().Trailer["Quir:E"] = ref
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+		assertExtractError(t, buf.Data)
+	})
+
+	t.Run("Type5DeepLinearChain", func(t *testing.T) {
+		const chainLen = 1000
+		w, buf := memfile.NewPDFWriter(pdf.V2_0, nil)
+		if err := memfile.AddBlankPage(w); err != nil {
+			t.Fatal(err)
+		}
+		// terminating Type 1 halftone
+		leafRef := w.Alloc()
+		if err := w.Put(leafRef, pdf.Dict{
+			"Type":         pdf.Name("Halftone"),
+			"HalftoneType": pdf.Integer(1),
+			"Frequency":    pdf.Real(60),
+			"Angle":        pdf.Real(0),
+			"SpotFunction": pdf.Name("SimpleDot"),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		// chain of distinct Type 5 dicts, each Default -> next via indirect ref
+		prev := pdf.Object(leafRef)
+		for range chainLen {
+			ref := w.Alloc()
+			if err := w.Put(ref, pdf.Dict{
+				"Type":         pdf.Name("Halftone"),
+				"HalftoneType": pdf.Integer(5),
+				"Default":      prev,
+			}); err != nil {
+				t.Fatal(err)
+			}
+			prev = ref
+		}
+		w.GetMeta().Trailer["Quir:E"] = prev
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+		assertExtractError(t, buf.Data)
+	})
+}
+
+// assertExtractError reads the PDF from the trailer's "Quir:E" key, runs
+// halftone.Extract, and reports a failure if no error is returned. The
+// test fails the surrounding goroutine on panic.
+func assertExtractError(t *testing.T, data []byte) {
+	t.Helper()
+	r, err := pdf.NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatalf("NewReader: %v", err)
+	}
+	obj := r.GetMeta().Trailer["Quir:E"]
+	if obj == nil {
+		t.Fatal("missing trailer object")
+	}
+	x := pdf.NewExtractor(r)
+	if _, err := Extract(x, nil, obj, false); err == nil {
+		t.Fatal("expected error, got nil")
 	}
 }
 
