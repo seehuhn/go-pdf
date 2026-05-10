@@ -305,10 +305,6 @@ func (r *Reader) GetMeta() *MetaInfo {
 // object stream.  Normally, this should be set to true.  If canObjStm is false
 // and the object is in an object stream, an error is returned.
 func (r *Reader) Get(ref Reference, canObjStm bool) (_ Native, err error) {
-	if ref.IsInternal() {
-		panic("internal reference") // TODO(voss): return an error instead?
-	}
-
 	defer func() {
 		if err != nil {
 			err = Wrap(err, "object "+ref.String())

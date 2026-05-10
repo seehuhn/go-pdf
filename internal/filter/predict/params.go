@@ -21,7 +21,16 @@ import (
 	"fmt"
 )
 
-const maxColumns = 1 << 20
+const (
+	maxColumns = 1 << 20
+
+	// maxBytesPerRow caps a predictor row at 8 MiB.  The PNG/TIFF
+	// predictors operate row-by-row; with this cap the buffers in
+	// NewReader/NewWriter sum to at most ~32 MiB per stream.  Real PDF
+	// predictor rows are kilobytes — even photographic CMYK 16-bit
+	// (64 bits per pixel) leaves room for ~1 million-pixel-wide rows.
+	maxBytesPerRow = 1 << 23
+)
 
 type Params struct {
 	// Colors is the number of color components per pixel.
@@ -55,52 +64,40 @@ type Params struct {
 }
 
 func (p *Params) Validate() error {
-	if p.Predictor == 1 {
-		// Predictor 1 does not require any parameters
+	// reject unsupported predictors before touching other fields
+	switch p.Predictor {
+	case 1:
 		return nil
-	}
-
-	// Validate Colors
-	if p.Colors < 1 {
-		return errors.New("Colors must be at least 1")
-	}
-
-	// Different limits for different predictors
-	if p.Predictor == 2 {
-		// TIFF predictor limit
-		if p.Colors > 60 {
-			return errors.New("Colors must be at most 60 for TIFF predictor")
+	case 2:
+		if p.Colors < 1 || p.Colors > 60 {
+			return fmt.Errorf("invalid Colors %d for TIFF predictor", p.Colors)
 		}
-	} else if p.Predictor >= 10 && p.Predictor <= 15 {
-		// PNG predictor limit
-		if p.Colors > 256 {
-			return errors.New("Colors must be at most 256 for PNG predictors")
+	case 10, 11, 12, 13, 14, 15:
+		if p.Colors < 1 || p.Colors > 256 {
+			return fmt.Errorf("invalid Colors %d for PNG predictor", p.Colors)
 		}
+	default:
+		return fmt.Errorf("invalid Predictor %d", p.Predictor)
 	}
 
-	// Validate BitsPerComponent
 	switch p.BitsPerComponent {
 	case 1, 2, 4, 8, 16:
-		// Valid values
+		// valid
 	default:
-		return fmt.Errorf("BitsPerComponent must be 1, 2, 4, 8, or 16, got %d", p.BitsPerComponent)
+		return fmt.Errorf("invalid BitsPerComponent %d", p.BitsPerComponent)
 	}
 
-	// validate Columns
-	bitsPerPixel := p.Colors * p.BitsPerComponent
-	maxCols := min(maxColumns, (1<<31-1)/bitsPerPixel)
-	if p.Columns < 1 || p.Columns > maxCols {
-		return errors.New("invalid Columns value")
+	if p.Columns < 1 || p.Columns > maxColumns {
+		return fmt.Errorf("invalid Columns %d", p.Columns)
 	}
 
-	// Validate Predictor
-	switch p.Predictor {
-	case 1, 2: // No prediction, TIFF
-		// Valid
-	case 10, 11, 12, 13, 14, 15: // PNG predictors
-		// Valid
-	default:
-		return fmt.Errorf("Predictor must be 1, 2, or 10-15, got %d", p.Predictor)
+	// Cap the row size to prevent a malicious /DecodeParms from forcing
+	// a multi-gigabyte buffer allocation through individually-legal but
+	// jointly-enormous parameter values.  Colors ≤ 256, BPC ≤ 16,
+	// Columns ≤ 2²⁰, so the int64 product fits with 31 bits of headroom.
+	totalBits := int64(p.Colors) * int64(p.BitsPerComponent) * int64(p.Columns)
+	if (totalBits+7)/8 > maxBytesPerRow {
+		return errors.New("predictor row too large")
 	}
 
 	return nil

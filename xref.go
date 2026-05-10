@@ -42,7 +42,7 @@ func (r *Reader) findXRef(size int64) (int64, error) {
 		return 0, Wrap(err, fmt.Sprintf("byte %d", pos+9))
 	}
 
-	if xRefPos <= 0 || int64(xRefPos)+r.headerOffset >= size {
+	if xRefPos <= 0 || int64(xRefPos) >= size-r.headerOffset {
 		return 0, &MalformedFileError{
 			Err: fmt.Errorf("invalid xref position %d", xRefPos),
 			Loc: []string{fmt.Sprintf("byte %d", pos+9)},
@@ -127,7 +127,7 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 			break
 		}
 		prevStart, ok := prev.(Integer)
-		if !ok || prevStart <= 0 || int64(prevStart)+r.headerOffset >= size {
+		if !ok || prevStart <= 0 || int64(prevStart) >= size-r.headerOffset {
 			return nil, nil, &MalformedFileError{
 				Err: errors.New("invalid /Prev"),
 				Loc: []string{fmt.Sprintf("xref at byte %d", start)},
@@ -250,12 +250,12 @@ func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32
 		case 'f':
 			xref[i-offByOne] = &xRefEntry{
 				Pos:        -1,
-				Generation: uint16(b),
+				Generation: uint32(b),
 			}
 		case 'n':
 			xref[i-offByOne] = &xRefEntry{
 				Pos:        a,
-				Generation: uint16(b),
+				Generation: uint32(b),
 			}
 		default:
 			return &MalformedFileError{
@@ -304,9 +304,16 @@ func (r *Reader) readXRefStream(xref map[uint32]*xRefEntry, s *scanner) (Dict, R
 	return dict, ref, nil
 }
 
+// maxXRefSize caps the value of /Size in an xref stream.  PDF 1.7 set an
+// implementation limit of 8,388,607 indirect objects; PDF 2.0 dropped the
+// limit but no real PDF approaches even that figure.  The cap bounds the
+// number of iterations and map entries decodeXRefStream can produce on
+// adversarial input.
+const maxXRefSize = 1 << 24
+
 func checkXRefStreamDict(dict Dict) ([]int, []*xRefSubSection, error) {
 	size, ok := dict["Size"].(Integer)
-	if !ok || size < 0 || size > math.MaxUint32 {
+	if !ok || size < 0 || size > maxXRefSize {
 		return nil, nil, &MalformedFileError{
 			Err: errInvalidXref,
 		}
@@ -340,21 +347,27 @@ func checkXRefStreamDict(dict Dict) ([]int, []*xRefSubSection, error) {
 	} else {
 		ind, ok := Index.(Array)
 		if !ok || len(ind)%2 != 0 {
-			return nil, nil, &MalformedFileError{}
+			return nil, nil, &MalformedFileError{
+				Err: errInvalidXref,
+			}
 		}
 		for i := 0; i < len(ind); i += 2 {
-			start, ok1 := ind[i].(Integer)
-			size, ok2 := ind[i+1].(Integer)
+			subStart, ok1 := ind[i].(Integer)
+			subSize, ok2 := ind[i+1].(Integer)
 			if !ok1 || !ok2 {
 				return nil, nil, &MalformedFileError{
 					Err: errInvalidXref,
 				}
-			} else if start < 0 || size <= 0 || start > math.MaxUint32 || start+size > math.MaxUint32 {
+			}
+			// each subsection must lie within [0, Size); the
+			// arithmetic stays in int64 since size <= maxXRefSize
+			if subStart < 0 || subSize <= 0 ||
+				subStart > size || subSize > size-subStart {
 				return nil, nil, &MalformedFileError{
 					Err: errInvalidXref,
 				}
 			}
-			ss = append(ss, &xRefSubSection{uint32(start), uint32(size)})
+			ss = append(ss, &xRefSubSection{uint32(subStart), uint32(subSize)})
 		}
 	}
 	return w, ss, nil
@@ -381,12 +394,25 @@ func decodeXRefStream(xref map[uint32]*xRefEntry, r io.Reader, w []int, ss []*xR
 				continue
 			}
 
-			tp := decodeInt(buf[:w0])
-			if w1 == 0 {
+			// silently skip entries whose individual fields overflow
+			// int64; valid PDFs never need 8-byte fields with the high
+			// bit set, so this only affects corrupted or adversarial
+			// files, and the rest of the table is still useful
+			tp, err := decodeInt(buf[:w0])
+			if err != nil {
+				continue
+			}
+			if w0 == 0 {
 				tp = 1
 			}
-			a := decodeInt(buf[w0 : w0+w1])
-			b := decodeInt(buf[w0+w1 : w0+w1+w2])
+			a, err := decodeInt(buf[w0 : w0+w1])
+			if err != nil {
+				continue
+			}
+			b, err := decodeInt(buf[w0+w1 : w0+w1+w2])
+			if err != nil {
+				continue
+			}
 			switch tp {
 			case 0:
 				// free/deleted object
@@ -394,7 +420,7 @@ func decodeXRefStream(xref map[uint32]*xRefEntry, r io.Reader, w []int, ss []*xR
 				// b = generation number to be used if the object is resurrected
 				xref[i] = &xRefEntry{
 					Pos:        -1,
-					Generation: uint16(b),
+					Generation: uint32(b),
 				}
 			case 1:
 				// used object, not compressed
@@ -402,12 +428,15 @@ func decodeXRefStream(xref map[uint32]*xRefEntry, r io.Reader, w []int, ss []*xR
 				// b = generation number
 				xref[i] = &xRefEntry{
 					Pos:        a,
-					Generation: uint16(b),
+					Generation: uint32(b),
 				}
 			case 2:
 				// used object, compressed
 				// a = object number of the compressed stream (generation number 0)
 				// b = index within the stream
+				if a > math.MaxUint32 {
+					continue
+				}
 				xref[i] = &xRefEntry{
 					Pos:      b,
 					InStream: NewReference(uint32(a), 0),
@@ -418,11 +447,18 @@ func decodeXRefStream(xref map[uint32]*xRefEntry, r io.Reader, w []int, ss []*xR
 	return nil
 }
 
-func decodeInt(buf []byte) (res int64) {
+// decodeInt decodes a big-endian unsigned integer of up to 8 bytes from buf.
+// It returns an error if the value would not fit in a non-negative int64.
+// The caller must ensure len(buf) <= 8 (checkXRefStreamDict enforces this).
+func decodeInt(buf []byte) (int64, error) {
+	var res uint64
 	for _, x := range buf {
-		res = res<<8 | int64(x)
+		res = res<<8 | uint64(x)
 	}
-	return res
+	if res > math.MaxInt64 {
+		return 0, errInvalidXref
+	}
+	return int64(res), nil
 }
 
 func (r *Reader) lastOccurence(pat string, size int64) (int64, error) {
@@ -465,6 +501,15 @@ func (w *Writer) setXRef(ref Reference, entry *xRefEntry) error {
 }
 
 func (w *Writer) writeXRefTable(xRefDict Dict) error {
+	// classic xref tables cap generation at 65535 (PDF 1.7 §7.5.4);
+	// reject up front rather than emit a malformed entry
+	for i := uint32(0); i < w.nextRef; i++ {
+		entry := w.xref[i]
+		if entry != nil && entry.Generation > 65535 {
+			return fmt.Errorf("generation %d exceeds xref table limit", entry.Generation)
+		}
+	}
+
 	_, err := fmt.Fprintf(w.w, "xref\n0 %d\n", w.nextRef)
 	if err != nil {
 		return err
@@ -505,28 +550,26 @@ func (w *Writer) writeXRefStream(xRefDict Dict) error {
 	xRefDict["Type"] = Name("XRef")
 	xRefDict["Size"] = Integer(w.nextRef)
 
-	maxField2 := int64(0)
-	maxField3 := uint16(0)
+	maxField2 := uint64(0)
+	maxField3 := uint64(0)
 	for i := uint32(0); i < w.nextRef; i++ {
 		entry := w.xref[i]
 		if entry == nil {
 			continue
 		}
-		var f2 int64
-		var f3 uint16
+		var f2, f3 uint64
 		if entry.InStream != 0 {
-			f2 = int64(entry.InStream.Number())
-			f3 = uint16(entry.Pos)
+			f2 = uint64(entry.InStream.Number())
+			f3 = uint64(entry.Pos)
 		} else if entry.Pos >= 0 {
-			f2 = entry.Pos
-			f3 = entry.Generation
+			f2 = uint64(entry.Pos)
+			f3 = uint64(entry.Generation)
 		} else {
 			gen := entry.Generation
 			if gen == 65535 {
 				gen = 0
 			}
-			f2 = 0
-			f3 = gen
+			f3 = uint64(gen)
 		}
 		if f2 > maxField2 {
 			maxField2 = f2
@@ -535,8 +578,8 @@ func (w *Writer) writeXRefStream(xRefDict Dict) error {
 			maxField3 = f3
 		}
 	}
-	w2 := (bits.Len64(uint64(maxField2)) + 7) / 8
-	w3 := (bits.Len16(maxField3) + 7) / 8
+	w2 := (bits.Len64(maxField2) + 7) / 8
+	w3 := (bits.Len64(maxField3) + 7) / 8
 	W := Array{Integer(1), Integer(w2), Integer(w3)}
 	xRefDict["W"] = W
 
@@ -563,7 +606,7 @@ func (w *Writer) writeXRefStream(xRefDict Dict) error {
 			if err != nil {
 				return err
 			}
-			err = encodeInt16(wx, 0, w3)
+			err = encodeInt64(wx, 0, w3)
 			if err != nil {
 				return err
 			}
@@ -576,7 +619,7 @@ func (w *Writer) writeXRefStream(xRefDict Dict) error {
 			if err != nil {
 				return err
 			}
-			err = encodeInt16(wx, entry.Generation, w3)
+			err = encodeInt64(wx, uint64(entry.Generation), w3)
 			if err != nil {
 				return err
 			}
@@ -589,7 +632,7 @@ func (w *Writer) writeXRefStream(xRefDict Dict) error {
 			if err != nil {
 				return err
 			}
-			err = encodeInt16(wx, entry.Generation, w3)
+			err = encodeInt64(wx, uint64(entry.Generation), w3)
 			if err != nil {
 				return err
 			}
@@ -602,7 +645,7 @@ func (w *Writer) writeXRefStream(xRefDict Dict) error {
 			if err != nil {
 				return err
 			}
-			err = encodeInt16(wx, uint16(entry.Pos), w3)
+			err = encodeInt64(wx, uint64(entry.Pos), w3)
 			if err != nil {
 				return err
 			}
@@ -648,16 +691,6 @@ func encodeInt64(data io.ByteWriter, x uint64, w int) error {
 	return nil
 }
 
-func encodeInt16(data io.ByteWriter, x uint16, w int) error {
-	for i := w - 1; i >= 0; i-- {
-		err := data.WriteByte(byte(x >> (i * 8)))
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 type xRefSubSection struct {
 	Start, Size uint32
 }
@@ -665,7 +698,7 @@ type xRefSubSection struct {
 type xRefEntry struct {
 	InStream   Reference
 	Pos        int64
-	Generation uint16
+	Generation uint32
 }
 
 func (entry *xRefEntry) IsFree() bool {

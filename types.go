@@ -977,8 +977,10 @@ func ReadAll(r Getter, path *CycleCheck, s *Stream) ([]byte, error) {
 }
 
 // Reference represents a reference to an indirect object in a PDF file.
-// The lowest 32 bits represent the object number, the next 16 bits the
-// generation number.
+// The low 32 bits hold the object number, the high 32 bits the generation
+// number.  PDF 1.7 cross-reference tables limit the generation number to
+// 65535, but cross-reference streams (PDF 1.5+) can encode larger values
+// via /W; the wider field avoids silent truncation on input.
 type Reference uint64
 
 func (x Reference) isNative() {}
@@ -988,7 +990,7 @@ func (x Reference) AsPDF(opt OutputOptions) Native {
 }
 
 // NewReference creates a new reference object.
-func NewReference(number uint32, generation uint16) Reference {
+func NewReference(number, generation uint32) Reference {
 	return Reference(uint64(number) | uint64(generation)<<32)
 }
 
@@ -998,13 +1000,8 @@ func (x Reference) Number() uint32 {
 }
 
 // Generation returns the generation number of the reference.
-func (x Reference) Generation() uint16 {
-	return uint16(x >> 32)
-}
-
-// IsInternal returns true if the reference is an internal reference.
-func (x Reference) IsInternal() bool {
-	return x>>48 != 0
+func (x Reference) Generation() uint32 {
+	return uint32(x >> 32)
 }
 
 func (x Reference) String() string {

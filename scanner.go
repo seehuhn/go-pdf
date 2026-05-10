@@ -98,12 +98,12 @@ func (s *scanner) ReadIndirectObject() (Native, Reference, error) {
 		return nil, 0, err
 	}
 
-	if number < 0 || number > math.MaxUint32 || generation < 0 || generation > math.MaxUint16 {
+	if number < 0 || number > math.MaxUint32 || generation < 0 || generation > math.MaxUint32 {
 		return nil, 0, &MalformedFileError{
 			Err: fmt.Errorf("invalid reference %d %d", number, generation),
 		}
 	}
-	ref := NewReference(uint32(number), uint16(generation))
+	ref := NewReference(uint32(number), uint32(generation))
 	if s.unencrypted[ref] {
 		// some objects are not encrypted, e.g. xref dictionaries
 		s.enc = nil
@@ -145,12 +145,12 @@ func (s *scanner) ReadIndirectObject() (Native, Reference, error) {
 				return nil, 0, err
 			}
 
-			if a < 0 || a > math.MaxUint32 || b < 0 || b > math.MaxUint16 {
+			if a < 0 || a > math.MaxUint32 || b < 0 || b > math.MaxUint32 {
 				return nil, 0, &MalformedFileError{
 					Err: fmt.Errorf("invalid reference %d %d", a, b),
 				}
 			}
-			obj = NewReference(uint32(a), uint16(b))
+			obj = NewReference(uint32(a), uint32(b))
 		}
 	}
 
@@ -512,10 +512,10 @@ func (s *scanner) ReadArray() (array Array, err error) {
 			k := len(array)
 			a := array[k-2].(Integer)
 			b := array[k-1].(Integer)
-			if a < 0 || a > math.MaxUint32 || b < 0 || b > math.MaxUint16 {
+			if a < 0 || a > math.MaxUint32 || b < 0 || b > math.MaxUint32 {
 				array = append(array[:k-2], nil)
 			} else {
-				array = append(array[:k-2], NewReference(uint32(a), uint16(b)))
+				array = append(array[:k-2], NewReference(uint32(a), uint32(b)))
 			}
 			integersSeen = 0
 			continue
@@ -631,10 +631,10 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 					return nil, err
 				}
 
-				if a < 0 || a > math.MaxUint32 || b < 0 || b > math.MaxUint16 {
+				if a < 0 || a > math.MaxUint32 || b < 0 || b > math.MaxUint32 {
 					val = nil
 				} else {
-					val = NewReference(uint32(a), uint16(b))
+					val = NewReference(uint32(a), uint32(b))
 				}
 			}
 		}

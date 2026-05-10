@@ -49,31 +49,26 @@ func NewReader(r io.ReadCloser, p *Params) (io.ReadCloser, error) {
 		return r, nil // Identity case - no prediction needed
 	}
 
-	reader := &reader{
-		r:            r,
-		params:       p,
-		outputBuffer: make([]byte, p.bytesPerRow()*2), // Extra space for safety
-	}
+	return &reader{r: r, params: p}, nil
+}
 
-	// Initialize state based on predictor type
+// initBuffers lazily allocates the row buffers on first Read.  Deferring
+// this work means a stream that is parsed but never consumed costs nothing.
+func (r *reader) initBuffers() {
+	p := r.params
+	r.outputBuffer = make([]byte, p.bytesPerRow()*2) // extra space for safety
+
 	if p.Predictor >= 10 && p.Predictor <= 15 {
-		// PNG predictor - need previous row buffer and input for tag bytes
-		bufSize := p.bytesPerPixel() + p.bytesPerRow()
-		reader.prevRow = make([]byte, bufSize)
-		reader.inputBuffer = make([]byte, p.bytesPerRow()+1) // +1 for tag byte
-		reader.needRowData = p.bytesPerRow() + 1
-		// Initialize padding bytes to 0
-		for i := 0; i < p.bytesPerPixel(); i++ {
-			reader.prevRow[i] = 0
-		}
+		// PNG predictor: previous-row buffer plus an input row with tag byte
+		r.prevRow = make([]byte, p.bytesPerPixel()+p.bytesPerRow())
+		r.inputBuffer = make([]byte, p.bytesPerRow()+1)
+		r.needRowData = p.bytesPerRow() + 1
 	} else if p.Predictor == 2 {
-		// TIFF predictor - need previous component values
-		reader.prevValues = make([]uint32, p.Colors)
-		reader.inputBuffer = make([]byte, p.bytesPerRow())
-		reader.needRowData = p.bytesPerRow()
+		// TIFF predictor: previous component values
+		r.prevValues = make([]uint32, p.Colors)
+		r.inputBuffer = make([]byte, p.bytesPerRow())
+		r.needRowData = p.bytesPerRow()
 	}
-
-	return reader, nil
 }
 
 func (r *reader) Close() error {
@@ -82,6 +77,9 @@ func (r *reader) Close() error {
 
 // Read implements the [io.Reader] interface.
 func (r *reader) Read(p []byte) (n int, err error) {
+	if r.outputBuffer == nil {
+		r.initBuffers()
+	}
 	totalRead := 0
 
 	for totalRead < len(p) {

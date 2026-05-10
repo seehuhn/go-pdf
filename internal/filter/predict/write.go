@@ -26,8 +26,6 @@ type writer struct {
 	w      io.WriteCloser
 	params *Params
 
-	// State for processing
-	rowLeft    int      // Bytes remaining in current row
 	prevRow    []byte   // Previous row buffer (PNG predictors)
 	prevValues []uint16 // Previous component values (TIFF predictor)
 	tempBuffer []byte   // Temporary buffer for partial data
@@ -46,34 +44,29 @@ func NewWriter(w io.WriteCloser, p *Params) (io.WriteCloser, error) {
 		return w, nil // Identity case - no prediction needed
 	}
 
-	writer := &writer{
-		w:          w,
-		params:     p,
-		rowLeft:    p.bytesPerRow(),
-		tempBuffer: make([]byte, p.bytesPerRow()*2), // Extra space for safety
-	}
+	return &writer{w: w, params: p}, nil
+}
 
-	// Initialize state based on predictor type
+// initBuffers lazily allocates the row buffers on first Write.  Deferring
+// this work means a writer that is created but never written to costs nothing.
+func (w *writer) initBuffers() {
+	p := w.params
+	w.tempBuffer = make([]byte, p.bytesPerRow()*2) // extra space for safety
+
 	if p.Predictor >= 10 && p.Predictor <= 15 {
-		// PNG predictor - need previous row buffer
-		bufSize := p.bytesPerPixel() + p.bytesPerRow()
-		writer.prevRow = make([]byte, bufSize)
-		// Initialize padding bytes to 0
-		for i := 0; i < p.bytesPerPixel(); i++ {
-			writer.prevRow[i] = 0
-		}
+		w.prevRow = make([]byte, p.bytesPerPixel()+p.bytesPerRow())
 	} else if p.Predictor == 2 {
-		// TIFF predictor - need previous component values
-		writer.prevValues = make([]uint16, p.Colors)
+		w.prevValues = make([]uint16, p.Colors)
 	}
-
-	return writer, nil
 }
 
 // Write implements the [io.Writer] interface.
 func (w *writer) Write(data []byte) (n int, err error) {
 	if len(data) == 0 {
 		return 0, nil
+	}
+	if w.tempBuffer == nil {
+		w.initBuffers()
 	}
 
 	totalWritten := 0

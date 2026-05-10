@@ -266,7 +266,7 @@ scanLoop:
 			if err != nil {
 				continue scanLoop
 			}
-			g, err := strconv.ParseUint(m[3], 10, 16)
+			g, err := strconv.ParseUint(m[3], 10, 32)
 			if err != nil {
 				continue scanLoop
 			}
@@ -276,7 +276,7 @@ scanLoop:
 			}
 			obj := &FileObject{
 				ObjStart:  pos,
-				Reference: NewReference(uint32(n), uint16(g)),
+				Reference: NewReference(uint32(n), uint32(g)),
 			}
 			section.Objects = append(section.Objects, obj)
 			used = true

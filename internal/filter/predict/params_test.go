@@ -258,6 +258,50 @@ func TestParamsValidate(t *testing.T) {
 			},
 			expectError: false,
 		},
+		{
+			// CVE PoC: each field individually within its per-field bound,
+			// but the row would be ~256 MiB.
+			name: "decompression bomb - PoC values",
+			params: Params{
+				Colors:           256,
+				BitsPerComponent: 16,
+				Columns:          524287,
+				Predictor:        12,
+			},
+			expectError: true,
+		},
+		{
+			name: "row size just over 8 MiB",
+			params: Params{
+				Colors:           16,
+				BitsPerComponent: 8,
+				Columns:          maxColumns,
+				Predictor:        12,
+			},
+			expectError: true,
+		},
+		{
+			// 4·16·2²⁰ bits = 8 MiB row exactly
+			name: "row size at 8 MiB boundary",
+			params: Params{
+				Colors:           4,
+				BitsPerComponent: 16,
+				Columns:          maxColumns,
+				Predictor:        12,
+			},
+			expectError: false,
+		},
+		{
+			// realistic CMYK 16-bit photographic data
+			name: "realistic CMYK 16-bit",
+			params: Params{
+				Colors:           4,
+				BitsPerComponent: 16,
+				Columns:          4096,
+				Predictor:        12,
+			},
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {
