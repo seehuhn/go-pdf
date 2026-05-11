@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2026-05-11
+
+### Added
+- **JBIG2 encoder/decoder** in new `graphics/image/jbig2` package: generic, text, refinement, and halftone regions; shared globals; arithmetic and MMR coding; page-local symbol dictionaries; full round-trip back to pixels.
+- **Sound** package and `sound.Sound` objects embedded by sound actions and sound annotations; `sound.WriteWAV` decodes the four PDF sample encodings (Raw, Signed, muLaw, ALaw) to RIFF/WAVE.
+- **`opaque` package** consolidating cross-file copying of PDF values; replaces bespoke reference-copy logic in image, sound, pieceinfo, and property.
+- **`MetadataStream`** (XMP) promoted from `metadata` subpackage to the `pdf` package and stored directly on `Catalog`; `WriterOptions.DocumentMetadata` supplies it at `NewWriter` so encryption-key derivation can see the plaintext policy. Supports unencrypted, padded XMP streams in encrypted PDFs.
+- **Typed filter parameters** (`FilterFlate`, `FilterLZW`, `FilterCCITTFax`, `FilterDCT`, `FilterJBIG2`, `FilterCompress`) replace the previous `Dict` aliases; new `FlatePredictor` and `DCTColorTransform` enums.
+- **`CryptFilter` interface** with `FilterCryptIdentity` (end-to-end plaintext-on-disk override) and round-trip-only `FilterCryptStandard`/`FilterCryptNamed` stubs.
+- **`ImageData` interface** (`FlateSource`, `CCITTFaxSource`, `DCTSource`) preserves the original encoding of extracted images on re-embed, avoiding decode/re-encode for JPEG, JBIG2, CCITT, and Flate streams.
+- **Fallback appearances** for Ink, FileAttachment, and Sound annotations; shared `quire*` palette across all fallback handlers.
+- **Vertical writing mode**: `font.Code.VerticalAdvance` (signed W2/DW2) is populated by Type 0/Type 2 dicts and used by reader and content builder.
+- `MarkupAnnotation` interface for type-asserting markup annotations.
+- `ResourceName()` on `font.Instance` and `graphics.XObject`; the content builder honours the preferred name and the writer enforces PDF 1.0/2.0 rules for image and form `/Name` entries.
+- `MetaInfo.Encryption` exposes a `Cipher` + `KeyLength` summary populated by both `NewReader` and `NewWriter`.
+
+### Changed
+- `Catalog` now has an explicit `Encode` method with per-field `CheckVersion` calls; the reflection-based `pdf.AsDict` and generic `DecodeDict` are gone. `ExtractCatalog` is renamed `DecodeCatalog` with the standard 4-arg extractor signature.
+- Stream-level read errors are now split into `*MalformedFileError` (recoverable content violations, checkable via `pdf.IsMalformed`/`pdf.Optional`) and unwrapped errors for IO, cancellation, and programmer error. `Iter.ClosingOperators()` lets writers close `q`/`Q`/`BT`/`ET`/`BMC`/`EMC` contexts when a scanned stream ends mid-context.
+- Text extraction: `TextEvent` is no longer emitted on positioning operators; instead the reader classifies gaps by device-space distance between consecutive glyphs, eliminating spurious newlines from wrap-every-glyph PDFs. Works in vertical mode by swapping axes.
+- `Ink`, `Polygon`, and `PolyLine` annotations now use `[][]vec.Vec2` instead of `[][]float64` for their `InkList` and PDF 2.0 `Path` fields.
+- `annotation.Sound.Name` renamed to `Icon` (typed `SoundIcon`).
+- Standard and extended font constructors return an error instead of panicking.
+- `Reference.Generation` widened to `uint32` so out-of-spec values from xref streams round-trip; classic xref tables still reject generation > 65535 on write.
+- `/Length` values across the encrypt dictionary now use bits for AES, matching Adobe writers (Acrobat rejects V=5 files when `/CF/StdCF/Length` is in bytes).
+
+### Fixed
+- Cycle detection for `/Kids` chains in name and number trees, `/JBIG2Globals` reference chains, OCG references in OCMD and VE, and indirect targets reached via `Decode*` functions.
+- Hardening on malformed input: scanner nesting depth capped at 256; xref-stream `/Size` and predictor row sizes capped; halftone threshold-array dimensions capped; nested halftone Type 5 rejected; JBIG2 unified memory budget scales with input size; integer-overflow guards across JBIG2 paths.
+- `nametree`/`numtree` are now permissive on read: malformed leaves and unreadable kids drop silently, and `Lookup`, `All`, and `Size` agree on reachability via a shared streaming source.
+- `decodeXRefStream` type-field default keyed on the wrong width; `decodeInt` no longer overflows on 8-byte fields with the high bit set.
+- OCG pointer identity is preserved when groups are extracted via single-OCG `/OCGs` entries or visibility expressions, so `GroupStates` lookups work as expected.
+- A `pieceinfo` data dict without `/Private` no longer panics on re-embed.
+- A malformed `/Encrypt` is now always fatal, since the document streams are otherwise unreadable.
+- JBIG2 encoder fixes: MQ termination marker, halftone bitplane count derived from pattern count, halftone AT positions per Table C.4, single shared MQ state across halftone bitplanes, pattern dictionary AT bytes omitted from segment header, decoded pixels inverted to PDF's 0=black convention.
+- Various font-embedding bugs: advance width (not glyph bbox width) used when registering a CID; CID marked used before code lookup; symbolic flag derived from the font's own glyph names when available.
+
 ## [0.7.1] - 2026-03-31
 
 ### Added
