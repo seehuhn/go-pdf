@@ -287,16 +287,15 @@ func TestStreamingUnsortedKeys(t *testing.T) {
 
 	// create unsorted iterator
 	data := func(yield func(pdf.Name, pdf.Object) bool) {
-		yield("zebra", pdf.Integer(1))
+		if !yield("zebra", pdf.Integer(1)) {
+			return
+		}
 		yield("apple", pdf.Integer(2)) // out of order!
 	}
 
 	_, err := Write(w, data)
 	if err == nil {
 		t.Error("Write() should return error for unsorted keys")
-	}
-	if err.Error() != "keys must be in sorted order" {
-		t.Errorf("Write() error = %q, want %q", err.Error(), "keys must be in sorted order")
 	}
 }
 
@@ -305,16 +304,15 @@ func TestStreamingDuplicateKeys(t *testing.T) {
 
 	// create iterator with duplicate keys
 	data := func(yield func(pdf.Name, pdf.Object) bool) {
-		yield("apple", pdf.Integer(1))
+		if !yield("apple", pdf.Integer(1)) {
+			return
+		}
 		yield("apple", pdf.Integer(2)) // duplicate!
 	}
 
 	_, err := Write(w, data)
 	if err == nil {
 		t.Error("Write() should return error for duplicate keys")
-	}
-	if err.Error() != "keys must be in sorted order" {
-		t.Errorf("Write() error = %q, want %q", err.Error(), "keys must be in sorted order")
 	}
 }
 

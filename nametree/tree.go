@@ -25,57 +25,15 @@ import (
 // Size returns the number of entries in the name tree,
 // without reading the entire tree into memory.
 func Size(r pdf.Getter, root pdf.Object) (int, error) {
-	node, err := pdf.GetDict(r, root)
-	if node == nil {
+	tree, err := ExtractFromFile(r, root)
+	if err != nil {
 		return 0, err
 	}
-
-	seen := map[pdf.Reference]bool{}
-	if ref, ok := root.(pdf.Reference); ok {
-		seen[ref] = true
+	count := 0
+	for range tree.All() {
+		count++
 	}
-	return sizeNode(r, node, seen)
-}
-
-func sizeNode(r pdf.Getter, node pdf.Dict, seen map[pdf.Reference]bool) (int, error) {
-	// leaf or single-node tree with Names
-	if names, ok := node["Names"]; ok {
-		arr, err := pdf.GetArray(r, names)
-		if err != nil {
-			return 0, err
-		}
-		return len(arr) / 2, nil // Names array has key-value pairs
-	}
-
-	// intermediate or root node with Kids
-	if kids, ok := node["Kids"]; ok {
-		arr, err := pdf.GetArray(r, kids)
-		if err != nil {
-			return 0, err
-		}
-
-		total := 0
-		for _, kid := range arr {
-			if ref, isRef := kid.(pdf.Reference); isRef {
-				if seen[ref] {
-					continue
-				}
-				seen[ref] = true
-			}
-			childNode, err := pdf.GetDict(r, kid)
-			if err != nil {
-				return 0, err
-			}
-			childSize, err := sizeNode(r, childNode, seen)
-			if err != nil {
-				return 0, err
-			}
-			total += childSize
-		}
-		return total, nil
-	}
-
-	return 0, nil
+	return count, nil
 }
 
 var ErrKeyNotFound = errors.New("key not found")

@@ -42,14 +42,20 @@ func ExtractFromFile(r pdf.Getter, root pdf.Object) (*FromFile, error) {
 
 var _ pdf.NameTree = (*FromFile)(nil)
 
+// Lookup returns the value for key, or [ErrKeyNotFound] if the key is absent.
+//
+// The search descends through intermediate nodes using their Limits arrays to
+// avoid scanning every leaf.  Children whose Limits entry is missing or
+// malformed are skipped, so in a malformed tree Lookup may return
+// [ErrKeyNotFound] for keys that [FromFile.All] would yield.
 func (t *FromFile) Lookup(key pdf.Name) (pdf.Object, error) {
 	if t == nil {
 		return nil, ErrKeyNotFound
 	}
 
 	node, err := pdf.GetDict(t.r, t.root)
-	if node == nil {
-		return nil, err
+	if err != nil || node == nil {
+		return nil, ErrKeyNotFound
 	}
 
 	seen := map[pdf.Reference]bool{}
@@ -60,15 +66,15 @@ func (t *FromFile) Lookup(key pdf.Name) (pdf.Object, error) {
 }
 
 func (t *FromFile) lookupInNode(node pdf.Dict, seen map[pdf.Reference]bool, key pdf.Name) (pdf.Object, error) {
-	// check if this is a leaf node with Names
+	// leaf node with Names
 	if names, ok := node["Names"]; ok {
 		arr, err := pdf.GetArray(t.r, names)
 		if err != nil {
-			return nil, err
+			return nil, ErrKeyNotFound
 		}
 
 		// search through Names array (key-value pairs)
-		for i := 0; i < len(arr); i += 2 {
+		for i := 0; i+1 < len(arr); i += 2 {
 			keyObj, err := pdf.GetString(t.r, arr[i])
 			if err != nil {
 				continue
@@ -80,11 +86,11 @@ func (t *FromFile) lookupInNode(node pdf.Dict, seen map[pdf.Reference]bool, key 
 		return nil, ErrKeyNotFound
 	}
 
-	// check if this is an intermediate node with Kids
+	// intermediate node with Kids
 	if kids, ok := node["Kids"]; ok {
 		arr, err := pdf.GetArray(t.r, kids)
 		if err != nil {
-			return nil, err
+			return nil, ErrKeyNotFound
 		}
 
 		// find the right child by checking Limits
@@ -157,7 +163,7 @@ func (t *FromFile) yieldFromNode(node pdf.Dict, seen map[pdf.Reference]bool, yie
 		}
 
 		// yield all key-value pairs from Names array
-		for i := 0; i < len(arr); i += 2 {
+		for i := 0; i+1 < len(arr); i += 2 {
 			keyObj, err := pdf.GetString(t.r, arr[i])
 			if err != nil {
 				continue

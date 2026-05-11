@@ -52,41 +52,37 @@ func ExtractInMemory(r pdf.Getter, root pdf.Object) (*InMemory, error) {
 	if ref, ok := root.(pdf.Reference); ok {
 		seen[ref] = true
 	}
-	err = extractFromNode(r, node, seen, tree.Data)
-	if err != nil {
-		return nil, err
-	}
+	extractFromNode(r, node, seen, tree.Data)
 
 	return tree, nil
 }
 
-func extractFromNode(r pdf.Getter, node pdf.Dict, seen map[pdf.Reference]bool, data map[pdf.Integer]pdf.Object) error {
-	// check if this is a leaf node with Nums
+func extractFromNode(r pdf.Getter, node pdf.Dict, seen map[pdf.Reference]bool, data map[pdf.Integer]pdf.Object) {
+	// leaf node with Nums
 	if nums, ok := node["Nums"]; ok {
 		arr, err := pdf.GetArray(r, nums)
 		if err != nil {
-			return err
+			return
 		}
 
 		// extract key-value pairs from Nums array
-		for i := 0; i < len(arr); i += 2 {
+		for i := 0; i+1 < len(arr); i += 2 {
 			keyObj, err := pdf.GetInteger(r, arr[i])
 			if err != nil {
-				return err
+				continue
 			}
 			data[keyObj] = arr[i+1]
 		}
-		return nil
+		return
 	}
 
-	// check if this is an intermediate node with Kids
+	// intermediate node with Kids
 	if kids, ok := node["Kids"]; ok {
 		arr, err := pdf.GetArray(r, kids)
 		if err != nil {
-			return err
+			return
 		}
 
-		// recursively extract from all children
 		for _, kid := range arr {
 			if ref, isRef := kid.(pdf.Reference); isRef {
 				if seen[ref] {
@@ -96,17 +92,11 @@ func extractFromNode(r pdf.Getter, node pdf.Dict, seen map[pdf.Reference]bool, d
 			}
 			childNode, err := pdf.GetDict(r, kid)
 			if err != nil {
-				return err
+				continue
 			}
-
-			err = extractFromNode(r, childNode, seen, data)
-			if err != nil {
-				return err
-			}
+			extractFromNode(r, childNode, seen, data)
 		}
 	}
-
-	return nil
 }
 
 func (t *InMemory) Lookup(key pdf.Integer) (pdf.Object, error) {

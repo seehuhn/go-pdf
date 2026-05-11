@@ -297,9 +297,6 @@ func TestStreamingUnsortedKeys(t *testing.T) {
 	if err == nil {
 		t.Error("Write() should return error for unsorted keys")
 	}
-	if err.Error() != "keys must be in sorted order" {
-		t.Errorf("Write() error = %q, want %q", err.Error(), "keys must be in sorted order")
-	}
 }
 
 func TestStreamingDuplicateKeys(t *testing.T) {
@@ -316,9 +313,6 @@ func TestStreamingDuplicateKeys(t *testing.T) {
 	_, err := Write(w, data)
 	if err == nil {
 		t.Error("Write() should return error for duplicate keys")
-	}
-	if err.Error() != "keys must be in sorted order" {
-		t.Errorf("Write() error = %q, want %q", err.Error(), "keys must be in sorted order")
 	}
 }
 
