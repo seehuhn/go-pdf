@@ -169,13 +169,13 @@ func (c *fileCtx) Next() []Step {
 				if err != nil {
 					return nil, err
 				}
-				var generation uint32
+				var generation uint16
 				if m[2] != "" {
-					tmp, err := strconv.ParseUint(m[2], 10, 32)
+					tmp, err := strconv.ParseUint(m[2], 10, 16)
 					if err != nil {
 						return nil, err
 					}
-					generation = uint32(tmp)
+					generation = uint16(tmp)
 				}
 				ref := pdf.NewReference(uint32(number), generation)
 				obj, err := pdf.Resolve(c.r, ref)

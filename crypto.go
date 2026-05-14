@@ -17,7 +17,6 @@
 package pdf
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/md5"
@@ -25,6 +24,7 @@ import (
 	"crypto/rc4"
 	"crypto/sha256"
 	"crypto/sha512"
+	"crypto/subtle"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -391,11 +391,7 @@ func (enc *encryptInfo) DecryptBytes(ref Reference, buf []byte) ([]byte, error) 
 		cbc := cipher.NewCBCDecrypter(c, iv)
 		cbc.CryptBlocks(buf[16:], buf[16:])
 
-		nPad := int(buf[len(buf)-1])
-		if nPad < 1 || nPad > 16 {
-			return nil, errCorrupted
-		}
-		return buf[16 : len(buf)-nPad], nil
+		return unpadPKCS7(buf[16:])
 	case cipherRC4:
 		c, _ := rc4.NewCipher(key)
 		c.XORKeyStream(buf, buf)
@@ -403,6 +399,38 @@ func (enc *encryptInfo) DecryptBytes(ref Reference, buf []byte) ([]byte, error) 
 	default:
 		panic("unknown cipher")
 	}
+}
+
+// unpadPKCS7 strips PKCS#7 padding from the last 16-byte block of buf, which
+// must be a non-empty multiple of 16 bytes.  The check is constant-time with
+// respect to the plaintext content of the trailing block, so that a caller
+// cannot distinguish "bad padding" from "good padding, downstream parse
+// failure" by timing.  See PDF 32000-2:2020, 7.6.3.1, requiring that all
+// 16-(M mod 16) pad bytes hold the value 16-(M mod 16).
+func unpadPKCS7(buf []byte) ([]byte, error) {
+	n := len(buf)
+	if n < 16 || n%16 != 0 {
+		return nil, errCorrupted
+	}
+
+	padByte := buf[n-1]
+
+	// require 1 <= padByte <= 16
+	good := subtle.ConstantTimeLessOrEq(int(padByte), 16)
+	good &= 1 ^ subtle.ConstantTimeByteEq(padByte, 0)
+
+	// inspect all 16 trailing bytes in fixed time; for each, if it lies in
+	// the padding region (i < padByte) it must equal padByte
+	for i := range 16 {
+		inPad := subtle.ConstantTimeLessOrEq(i+1, int(padByte))
+		eq := subtle.ConstantTimeByteEq(buf[n-1-i], padByte)
+		good &= (1 ^ inPad) | eq
+	}
+
+	if good != 1 {
+		return nil, errCorrupted
+	}
+	return buf[:n-int(padByte)], nil
 }
 
 func (enc *encryptInfo) EncryptStream(ref Reference, w io.WriteCloser) (io.WriteCloser, error) {
@@ -688,7 +716,10 @@ func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, length,
 		if err != nil {
 			return nil, err
 		}
-		sec.Perms = sec.computePerms(sec.key)
+		sec.Perms, err = sec.computePerms(sec.key)
+		if err != nil {
+			return nil, err
+		}
 	default:
 		panic("unreachable")
 	}
@@ -706,6 +737,10 @@ func (sec *stdSecHandler) KeyForRef(cf *cryptFilter, ref Reference) ([]byte, err
 		h.Write(sec.key)
 		num := ref.Number()
 		gen := ref.Generation()
+		// PDF 32000-2 §7.6.3.2 step (b): low 3 bytes of object number and
+		// low 2 bytes of generation, in that order, low-order byte first.
+		// Object numbers are capped at 2^24-1 by [NewReference]; generation
+		// is uint16, capped by the type itself.
 		h.Write([]byte{
 			byte(num), byte(num >> 8), byte(num >> 16),
 			byte(gen), byte(gen >> 8)})
@@ -931,12 +966,12 @@ func (sec *stdSecHandler) authenticateUser(paddedUserPwd []byte) error {
 	U := sec.computeU(key)
 	switch sec.R {
 	case 2:
-		if bytes.Equal(U, sec.U) {
+		if subtle.ConstantTimeCompare(U, sec.U) == 1 {
 			sec.key = key
 			return nil
 		}
 	case 3, 4:
-		if bytes.Equal(U[:16], sec.U[:16]) {
+		if subtle.ConstantTimeCompare(U[:16], sec.U[:16]) == 1 {
 			sec.key = key
 			return nil
 		}
@@ -1027,7 +1062,7 @@ func (sec *stdSecHandler) computeOAndOE(utf8OwnerPwd []byte) ([]byte, []byte, er
 }
 
 // Algorithm 10: Computing the Perms value (Security handlers of revision 6)
-func (sec *stdSecHandler) computePerms(fileEncryptionKey []byte) []byte {
+func (sec *stdSecHandler) computePerms(fileEncryptionKey []byte) ([]byte, error) {
 	buf := make([]byte, 16)
 	binary.LittleEndian.PutUint32(buf, sec.P)
 	buf[4] = 0xFF
@@ -1042,16 +1077,22 @@ func (sec *stdSecHandler) computePerms(fileEncryptionKey []byte) []byte {
 	buf[9] = 'a'
 	buf[10] = 'd'
 	buf[11] = 'b'
+	// bytes 12-15: random fill per §7.6.4.4.9 step (e); ignored on
+	// decoding but required so /Perms is not deterministic across files
+	// with the same (P, EncryptMetadata, fileEncryptionKey)
+	if _, err := rand.Read(buf[12:16]); err != nil {
+		return nil, err
+	}
 
 	c, _ := aes.NewCipher(fileEncryptionKey)
 	c.Encrypt(buf, buf)
-	return buf
+	return buf, nil
 }
 
 // Algorithm 11: Authenticating the user password (Security handlers of revision 6)
 func (sec *stdSecHandler) authenticateUser6(utf8Passwd []byte) error {
 	hash := slowHash(utf8Passwd, sec.U[32:40], nil)
-	if !bytes.Equal(hash, sec.U[:32]) {
+	if subtle.ConstantTimeCompare(hash, sec.U[:32]) != 1 {
 		return &AuthenticationError{sec.ID}
 	}
 
@@ -1073,7 +1114,7 @@ func (sec *stdSecHandler) authenticateUser6(utf8Passwd []byte) error {
 // Algorithm 12: Authenticating the owner password (Security handlers of revision 6)
 func (sec *stdSecHandler) authenticateOwner6(utf8Passwd []byte) error {
 	hash := slowHash(utf8Passwd, sec.O[32:40], sec.U)
-	if !bytes.Equal(hash, sec.O[:32]) {
+	if subtle.ConstantTimeCompare(hash, sec.O[:32]) != 1 {
 		return &AuthenticationError{sec.ID}
 	}
 
@@ -1097,13 +1138,6 @@ func (sec *stdSecHandler) checkPerms(fileEncryptionKey []byte) error {
 
 	c, _ := aes.NewCipher(fileEncryptionKey)
 	c.Decrypt(buf, sec.Perms)
-	if !bytes.Equal(buf[9:12], []byte{'a', 'd', 'b'}) {
-		return &AuthenticationError{sec.ID}
-	}
-	perms := binary.LittleEndian.Uint32(buf[:4])
-	if perms != sec.P {
-		return &AuthenticationError{sec.ID}
-	}
 
 	var emdCode byte
 	if sec.unencryptedMetadata {
@@ -1111,10 +1145,30 @@ func (sec *stdSecHandler) checkPerms(fileEncryptionKey []byte) error {
 	} else {
 		emdCode = 'T'
 	}
-	if buf[8] != emdCode {
+
+	// fold every per-byte mismatch into a single accumulator so that the
+	// function exits at the same point regardless of which field is wrong.
+	// Bytes 4-7 are the high 32 bits of the 64-bit extended permissions
+	// field reserved by §7.6.4.4.5 step (a); the encoder fills them with
+	// 0xFF, and the decoder rejects any other value to detect tampering
+	// with the (currently unused) extension half.  Bytes 12-15 are random
+	// fill and are not checked.
+	var diff byte
+	diff |= buf[0] ^ byte(sec.P)
+	diff |= buf[1] ^ byte(sec.P>>8)
+	diff |= buf[2] ^ byte(sec.P>>16)
+	diff |= buf[3] ^ byte(sec.P>>24)
+	diff |= buf[4] ^ 0xFF
+	diff |= buf[5] ^ 0xFF
+	diff |= buf[6] ^ 0xFF
+	diff |= buf[7] ^ 0xFF
+	diff |= buf[8] ^ emdCode
+	diff |= buf[9] ^ 'a'
+	diff |= buf[10] ^ 'd'
+	diff |= buf[11] ^ 'b'
+	if diff != 0 {
 		return &AuthenticationError{sec.ID}
 	}
-
 	return nil
 }
 
@@ -1300,9 +1354,8 @@ func (r *decryptReader) Read(p []byte) (int, error) {
 		}
 
 		if k < 16 {
-			if k > 0 {
-				panic("unreachable") // TODO(voss): remove
-			}
+			// invariant: r.r == nil here implies k%16 == 0 (enforced
+			// inside the loop), so k < 16 implies k == 0
 			return 0, io.EOF
 		}
 
@@ -1317,15 +1370,14 @@ func (r *decryptReader) Read(p []byte) (int, error) {
 		r.cbc.CryptBlocks(r.ready, r.ready)
 
 		if r.r == nil {
-			// remove the padding
-			if l != k {
-				panic("unreachable") // TODO(voss): remove
+			// invariant: r.r == nil implies k%16 == 0, and we skipped
+			// the l-- branch above, so l == k and we decrypted the
+			// whole buffer; r.reserved is empty
+			unpadded, err := unpadPKCS7(r.ready)
+			if err != nil {
+				return 0, err
 			}
-			nPad := int(r.buf[l-1])
-			if nPad < 1 || nPad > 16 || nPad > l {
-				return 0, errCorrupted
-			}
-			r.ready = r.ready[:l-nPad]
+			r.ready = unpadded
 		}
 	}
 

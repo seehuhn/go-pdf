@@ -263,10 +263,10 @@ scanLoop:
 			// We found an indirect object.
 			// m is of the form ["\n1 0 obj" "1 0 obj" "1" "0"]
 			n, err := strconv.ParseUint(m[2], 10, 32)
-			if err != nil {
+			if err != nil || n >= maxXRefSize {
 				continue scanLoop
 			}
-			g, err := strconv.ParseUint(m[3], 10, 32)
+			g, err := strconv.ParseUint(m[3], 10, 16)
 			if err != nil {
 				continue scanLoop
 			}
@@ -276,7 +276,7 @@ scanLoop:
 			}
 			obj := &FileObject{
 				ObjStart:  pos,
-				Reference: NewReference(uint32(n), uint32(g)),
+				Reference: NewReference(uint32(n), uint16(g)),
 			}
 			section.Objects = append(section.Objects, obj)
 			used = true

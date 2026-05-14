@@ -976,11 +976,13 @@ func ReadAll(r Getter, path *CycleCheck, s *Stream) ([]byte, error) {
 	return data, nil
 }
 
-// Reference represents a reference to an indirect object in a PDF file.
-// The low 32 bits hold the object number, the high 32 bits the generation
-// number.  PDF 1.7 cross-reference tables limit the generation number to
-// 65535, but cross-reference streams (PDF 1.5+) can encode larger values
-// via /W; the wider field avoids silent truncation on input.
+// Reference identifies an indirect object in a PDF file by an object number
+// and a generation number.  Use [NewReference] to construct one and
+// [Reference.Number] / [Reference.Generation] to extract the parts.
+//
+// The zero value refers to PDF object 0, which PDF 32000-2 §7.5.4 reserves
+// as the head of the free-object list; it resolves to the null object and so
+// serves as a "no reference" sentinel.
 type Reference uint64
 
 func (x Reference) isNative() {}
@@ -989,8 +991,15 @@ func (x Reference) AsPDF(opt OutputOptions) Native {
 	return x
 }
 
-// NewReference creates a new reference object.
-func NewReference(number, generation uint32) Reference {
+// NewReference creates a new reference object.  The object number must be
+// less than 2^24: per PDF 32000-2 §7.6.3.2 step (b), only the low 3 bytes
+// of the object number feed the per-object encryption-key derivation, so
+// this library caps object numbers at 2^24-1 to keep that derivation
+// injective.  NewReference panics on out-of-range input.
+func NewReference(number uint32, generation uint16) Reference {
+	if number >= maxXRefSize {
+		panic("pdf.NewReference: object number must be < 2^24")
+	}
 	return Reference(uint64(number) | uint64(generation)<<32)
 }
 
@@ -999,9 +1008,10 @@ func (x Reference) Number() uint32 {
 	return uint32(x)
 }
 
-// Generation returns the generation number of the reference.
-func (x Reference) Generation() uint32 {
-	return uint32(x >> 32)
+// Generation returns the generation number of the reference.  PDF 32000-2
+// §7.5.4 caps this at 65535.
+func (x Reference) Generation() uint16 {
+	return uint16(x >> 32)
 }
 
 func (x Reference) String() string {

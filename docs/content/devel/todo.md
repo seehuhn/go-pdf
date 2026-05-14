@@ -29,7 +29,13 @@ weight = 100
 
 ## General
 
-- fix infinite recursion risk in halftone Type 5 extraction
+- consider removing the `github.com/xdg-go/stringprep` dependency.
+  It is the only third-party (non-Go-team) external module in the tree
+  and has a single call site in `crypto.go` (`utf8Passwd`, SASLprep for
+  AESv5 / PDF 2.0 passwords).  The upstream project is dormant.
+  PDF 2.0 (§7.6.4.3.3) calls for SASLprep (RFC 4013) by name, so
+  replacements have to implement that algorithm; inlining a minimal
+  SASLprep under `internal/` is the most direct option.
 - test that we don't write numbers like `0.6000000000000001` in content streams
 - By more systematic about the use of pdf.MalformedFileError, and in
   particular the `Loc` field there.

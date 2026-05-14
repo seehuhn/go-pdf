@@ -76,7 +76,7 @@ trailer
 
 	type objInfo struct {
 		pos int64
-		gen uint32
+		gen uint16
 	}
 	objs := make(map[uint32]objInfo)
 	for _, sect := range info.Sections {

@@ -167,7 +167,7 @@ func readXRefTable(xref map[uint32]*xRefEntry, s *scanner) (Dict, error) {
 			return nil, Wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
 		}
 
-		if start < 0 || length < 0 || start > math.MaxUint32 || start+length > math.MaxUint32 {
+		if start < 0 || length < 0 || start >= maxXRefSize || start+length > maxXRefSize {
 			return nil, &MalformedFileError{
 				Err: errInvalidXref,
 				Loc: []string{fmt.Sprintf("byte %d", s.currentPos())},
@@ -233,7 +233,7 @@ func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32
 		if err != nil {
 			// fix an error seen in some PDF files
 			if bytes.HasPrefix(buf, []byte("0000000000 65536 ")) {
-				b = 65535
+				b = maxGeneration
 				buf[17] = 'f'
 			} else {
 				return err
@@ -241,7 +241,7 @@ func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32
 		}
 
 		// fix an error seen in some PDF files
-		if i == start && start == 1 && a == 0 && b == 65535 {
+		if i == start && start == 1 && a == 0 && b == maxGeneration {
 			offByOne = 1
 		}
 
@@ -250,12 +250,12 @@ func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32
 		case 'f':
 			xref[i-offByOne] = &xRefEntry{
 				Pos:        -1,
-				Generation: uint32(b),
+				Generation: uint16(b),
 			}
 		case 'n':
 			xref[i-offByOne] = &xRefEntry{
 				Pos:        a,
-				Generation: uint32(b),
+				Generation: uint16(b),
 			}
 		default:
 			return &MalformedFileError{
@@ -304,12 +304,20 @@ func (r *Reader) readXRefStream(xref map[uint32]*xRefEntry, s *scanner) (Dict, R
 	return dict, ref, nil
 }
 
-// maxXRefSize caps the value of /Size in an xref stream.  PDF 1.7 set an
-// implementation limit of 8,388,607 indirect objects; PDF 2.0 dropped the
-// limit but no real PDF approaches even that figure.  The cap bounds the
-// number of iterations and map entries decodeXRefStream can produce on
-// adversarial input.
+// maxXRefSize caps the value of /Size in an xref stream and bounds the
+// maximum object number (the largest legal object number is maxXRefSize-1).
+// PDF 32000-2 §7.6.3.2 step (b) mixes only the low 3 bytes of the object
+// number into the per-object encryption key, so values >= 1<<24 would
+// silently collide on key derivation.  The cap also bounds the number of
+// iterations and map entries decodeXRefStream can produce on adversarial
+// input.
 const maxXRefSize = 1 << 24
+
+// maxGeneration is the largest legal generation number.  PDF 32000-2 §7.5.4
+// caps generations at 65535, and §7.6.3.2 step (b) mixes only the low 2 bytes
+// of the generation into the per-object encryption key, so values > 65535
+// would silently collide on key derivation if this cap were relaxed.
+const maxGeneration = 1<<16 - 1
 
 func checkXRefStreamDict(dict Dict) ([]int, []*xRefSubSection, error) {
 	size, ok := dict["Size"].(Integer)
@@ -418,23 +426,32 @@ func decodeXRefStream(xref map[uint32]*xRefEntry, r io.Reader, w []int, ss []*xR
 				// free/deleted object
 				// a = next free object
 				// b = generation number to be used if the object is resurrected
+				if b > maxGeneration {
+					// dropping this entry leaves a hole in the circular
+					// free list, but neither reader nor writer follows
+					// that chain
+					continue
+				}
 				xref[i] = &xRefEntry{
 					Pos:        -1,
-					Generation: uint32(b),
+					Generation: uint16(b),
 				}
 			case 1:
 				// used object, not compressed
 				// a = byte offset of the object
 				// b = generation number
+				if b > maxGeneration {
+					continue
+				}
 				xref[i] = &xRefEntry{
 					Pos:        a,
-					Generation: uint32(b),
+					Generation: uint16(b),
 				}
 			case 2:
 				// used object, compressed
 				// a = object number of the compressed stream (generation number 0)
 				// b = index within the stream
-				if a > math.MaxUint32 {
+				if a >= maxXRefSize {
 					continue
 				}
 				xref[i] = &xRefEntry{
@@ -501,15 +518,6 @@ func (w *Writer) setXRef(ref Reference, entry *xRefEntry) error {
 }
 
 func (w *Writer) writeXRefTable(xRefDict Dict) error {
-	// classic xref tables cap generation at 65535 (PDF 1.7 §7.5.4);
-	// reject up front rather than emit a malformed entry
-	for i := uint32(0); i < w.nextRef; i++ {
-		entry := w.xref[i]
-		if entry != nil && entry.Generation > 65535 {
-			return fmt.Errorf("generation %d exceeds xref table limit", entry.Generation)
-		}
-	}
-
 	_, err := fmt.Fprintf(w.w, "xref\n0 %d\n", w.nextRef)
 	if err != nil {
 		return err
@@ -566,7 +574,7 @@ func (w *Writer) writeXRefStream(xRefDict Dict) error {
 			f3 = uint64(entry.Generation)
 		} else {
 			gen := entry.Generation
-			if gen == 65535 {
+			if gen == maxGeneration {
 				gen = 0
 			}
 			f3 = uint64(gen)
@@ -698,7 +706,7 @@ type xRefSubSection struct {
 type xRefEntry struct {
 	InStream   Reference
 	Pos        int64
-	Generation uint32
+	Generation uint16
 }
 
 func (entry *xRefEntry) IsFree() bool {

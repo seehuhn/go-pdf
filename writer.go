@@ -240,7 +240,7 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 	xref := make(map[uint32]*xRefEntry)
 	xref[0] = &xRefEntry{
 		Pos:        -1,
-		Generation: 65535,
+		Generation: maxGeneration,
 	}
 
 	outOpt := defaultOutputOptions(v)
@@ -397,8 +397,13 @@ func (w *Writer) GetOptions() OutputOptions {
 	return w.outputOptions
 }
 
-// Alloc allocates an object number for a new indirect object.
+// Alloc allocates an object number for a new indirect object.  PDF 32000-2
+// §7.6.3.2 limits object numbers to 2^24-1; Alloc panics if that ceiling is
+// reached, since the writer cannot mint a valid further reference.
 func (w *Writer) Alloc() Reference {
+	if w.nextRef >= maxXRefSize {
+		panic("pdf.Writer: object-number overflow")
+	}
 	res := NewReference(w.nextRef, 0)
 	w.nextRef++
 	return res

@@ -150,40 +150,58 @@ func TestXRefStreamObjectNumberOverflow(t *testing.T) {
 	}
 }
 
-// TestWideGenerationXRefTable verifies that writing a generation > 65535
-// to a classic xref table is rejected, while the same value round-trips
-// through an xref stream.
-func TestWideGenerationXRefTable(t *testing.T) {
-	tests := []struct {
-		name    string
-		opt     *WriterOptions
-		wantErr bool
-	}{
-		// V1.7 default: xref stream form, accepts wide generation
-		{"stream form", nil, false},
-		// HumanReadable forces classic xref table form, rejects wide generation
-		{"table form", &WriterOptions{HumanReadable: true}, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			buf := &bytes.Buffer{}
-			w, err := NewWriter(buf, V1_7, tt.opt)
-			if err != nil {
-				t.Fatal(err)
-			}
-			w.GetMeta().Catalog.Pages = w.Alloc()
+// TestXRefStreamGenerationOverflow verifies that xref-stream entries whose
+// field-3 (generation) exceeds 65535 are silently dropped rather than
+// truncated.  PDF 32000-2 §7.5.4 caps generations at 65535, and §7.6.3.2
+// reserves only 2 bytes for the generation in per-object key derivation;
+// preserving an out-of-range entry would collide with another object's
+// encryption key.
+func TestXRefStreamGenerationOverflow(t *testing.T) {
+	xref := map[uint32]*xRefEntry{}
+	// W = [1 1 8]: type byte, 1-byte byte-offset, 8-byte generation
+	w := []int{1, 1, 8}
+	ss := []*xRefSubSection{{Start: 5, Size: 1}}
 
-			ref := NewReference(42, 100000)
-			err = w.Put(ref, Integer(1))
-			if err != nil {
-				t.Fatal(err)
-			}
-			err = w.Close()
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("err=%v, wantErr=%v", err, tt.wantErr)
-			}
-		})
+	// type 1 (in-use), byte offset 0, generation 0x1_0000 (> 65535).
+	// Generation is 8 bytes big-endian: 0x00 0x00 0x00 0x00 0x00 0x01 0x00 0x00
+	data := []byte{1, 0, 0, 0, 0, 0, 0, 1, 0, 0}
+	if err := decodeXRefStream(xref, bytes.NewReader(data), w, ss); err != nil {
+		t.Fatalf("decodeXRefStream: %v", err)
 	}
+	if _, ok := xref[5]; ok {
+		t.Errorf("entry with generation > 65535 should have been skipped")
+	}
+}
+
+// TestAllocOverflowPanics verifies that Writer.Alloc panics rather than
+// minting object numbers >= 2^24, which would collide on encryption-key
+// derivation (PDF 32000-2 §7.6.3.2).
+func TestAllocOverflowPanics(t *testing.T) {
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, V1_7, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.nextRef = maxXRefSize
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Alloc at nextRef=maxXRefSize did not panic")
+		}
+	}()
+	w.Alloc()
+}
+
+// TestNewReferenceOverflowPanics verifies that NewReference panics for
+// object numbers >= 2^24, since the encryption-key derivation only uses
+// the low 3 bytes (PDF 32000-2 §7.6.3.2).
+func TestNewReferenceOverflowPanics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("NewReference(maxXRefSize, 0) did not panic")
+		}
+	}()
+	NewReference(maxXRefSize, 0)
 }
 
 func TestLastOccurence(t *testing.T) {

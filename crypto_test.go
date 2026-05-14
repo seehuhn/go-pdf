@@ -478,6 +478,51 @@ func TestEncryptStream(t *testing.T) {
 	}
 }
 
+// TestDecryptBytesRejectsBadAESPadding is a regression test for the padding
+// oracle in DecryptBytes: the AES branch must reject any ciphertext whose last
+// plaintext block does not end in valid PKCS#7 padding, not just any byte in
+// 1..16.  Without per-byte verification, flipping the second-to-last byte of
+// ciphertext leaves the trailing pad-length byte intact and so historically
+// decrypted "successfully" with corrupted plaintext.
+func TestDecryptBytesRejectsBadAESPadding(t *testing.T) {
+	id := []byte("0123456789ABCDEF")
+	ref := NewReference(1, 2)
+	sec, err := createStdSecHandler(id, "secret", "supersecret", PermPrint, 128, 4, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	enc := encryptInfo{
+		strF: &cryptFilter{Cipher: cipherAES, Length: 128},
+		sec:  sec,
+	}
+
+	// pick a message whose last plaintext byte is far from 1..16 so that
+	// flipping bits in the second-to-last ciphertext byte reliably moves
+	// the recovered pad-length byte through invalid values
+	plaintext := []byte("0123456789ABCDEF") // 16 bytes -> full extra pad block of 0x10
+	cipherText, err := enc.EncryptBytes(ref, plaintext)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// in CBC, flipping bit b of ciphertext byte buf[i] flips bit b of
+	// plaintext byte pt[i+16].  We flip buf[len-18], which lives in the
+	// second-to-last ciphertext block and so corrupts the second-to-last
+	// plaintext byte (a pad byte that should equal 0x10) while leaving
+	// the final byte (also 0x10, the pad-length indicator) untouched.
+	// The old buggy code accepts this because it only inspects the
+	// pad-length byte; the new code must reject it.
+	for bit := range 8 {
+		tampered := append([]byte(nil), cipherText...)
+		tampered[len(tampered)-18] ^= byte(1 << bit)
+
+		got, err := enc.DecryptBytes(ref, tampered)
+		if err == nil {
+			t.Errorf("bit %d: tampered ciphertext decrypted to %x, want error", bit, got)
+		}
+	}
+}
+
 func TestPerm(t *testing.T) {
 	// We iterate over all combinations of bits
 	// 3, 4, 5, 6, 9, 11, and 12 (1-based).
