@@ -176,11 +176,6 @@ func (d Date) AsPDF(opt OutputOptions) Native {
 	return String(s)
 }
 
-// TODO(voss): remove
-func (d Date) AsDate() (Date, error) {
-	return d, nil
-}
-
 // AsDate converts a PDF date string to a Date object.
 // If the string does not have the correct format, an error is returned.
 func (x String) AsDate() (Date, error) {

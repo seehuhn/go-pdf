@@ -59,6 +59,13 @@ func (s spacePatternColored) Channels() int {
 	return 0
 }
 
+// ComponentRanges returns nil, nil since colored patterns have no
+// numeric components.
+// This implements the [Space] interface.
+func (s spacePatternColored) ComponentRanges() (lo, hi []float64) {
+	return nil, nil
+}
+
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
 func (s spacePatternColored) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
@@ -130,6 +137,11 @@ func (colorColoredPattern) RGBA() (r, g, b, a uint32) {
 
 // spacePatternUncolored represents the color space for uncolored patterns
 // (where the color is specified separately).
+//
+// The underlying color space is never itself a Pattern color space:
+// both [PatternUncolored] and the PDF reader reject that configuration
+// because the scn operand grammar cannot supply more than one pattern
+// name per call (PDF 2.0 §8.7.3.3).
 type spacePatternUncolored struct {
 	base Space
 }
@@ -144,6 +156,12 @@ func (s spacePatternUncolored) Family() pdf.Name {
 // This implements the [Space] interface.
 func (s spacePatternUncolored) Channels() int {
 	return s.base.Channels()
+}
+
+// ComponentRanges delegates to the underlying color space.
+// This implements the [Space] interface.
+func (s spacePatternUncolored) ComponentRanges() (lo, hi []float64) {
+	return s.base.ComponentRanges()
 }
 
 // Embed adds the pattern color space to the PDF file.
@@ -198,9 +216,17 @@ type colorUncoloredPattern struct {
 
 // PatternUncolored returns a new PDF color which draws the given pattern
 // using the given color.
+//
+// PatternUncolored panics if p is a colored pattern (PaintType != 2), or
+// if col's color space is itself a Pattern color space (PDF 2.0
+// §8.7.3.3 forbids nesting an uncolored pattern over another Pattern
+// color space).
 func PatternUncolored(p Pattern, col Color) Color {
 	if p.PaintType() != 2 {
 		panic("pattern is colored")
+	}
+	if IsPattern(col.ColorSpace()) {
+		panic("uncolored pattern base cannot be a Pattern color space")
 	}
 	return colorUncoloredPattern{Pat: p, Col: col}
 }

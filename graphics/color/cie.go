@@ -89,6 +89,12 @@ func (s *SpaceCalGray) Channels() int {
 	return 1
 }
 
+// ComponentRanges returns the value range of the gray component.
+// This implements the [Space] interface.
+func (s *SpaceCalGray) ComponentRanges() (lo, hi []float64) {
+	return []float64{0}, []float64{1}
+}
+
 // Default returns the black in the CalGray color space.
 // This implements the [Space] interface.
 func (s *SpaceCalGray) Default() Color {
@@ -356,6 +362,12 @@ func (s *SpaceCalRGB) Channels() int {
 	return 3
 }
 
+// ComponentRanges returns the value ranges of the RGB components.
+// This implements the [Space] interface.
+func (s *SpaceCalRGB) ComponentRanges() (lo, hi []float64) {
+	return []float64{0, 0, 0}, []float64{1, 1, 1}
+}
+
 // Default returns the black in the CalRGB color space.
 // This implements the [Space] interface.
 func (s *SpaceCalRGB) Default() Color {
@@ -502,6 +514,15 @@ func (s *SpaceLab) New(l, a, b float64) (Color, error) {
 // This implements the [Space] interface.
 func (s *SpaceLab) Channels() int {
 	return 3
+}
+
+// ComponentRanges returns the value ranges of the L*, a*, and b*
+// components.  L* is in [0, 100]; a* and b* use the Range entry stored
+// on the space.
+// This implements the [Space] interface.
+func (s *SpaceLab) ComponentRanges() (lo, hi []float64) {
+	return []float64{0, s.Ranges[0], s.Ranges[2]},
+		[]float64{100, s.Ranges[1], s.Ranges[3]}
 }
 
 // Convert converts a color to the Lab color space.

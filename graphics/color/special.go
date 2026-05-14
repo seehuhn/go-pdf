@@ -50,23 +50,10 @@ func Indexed(colors []Color) (*SpaceIndexed, error) {
 	}
 
 	space := colors[0].ColorSpace()
-	var min, max []float64
-	switch space := space.(type) {
-	case spaceDeviceGray, *SpaceCalGray:
-		min = []float64{0}
-		max = []float64{1}
-	case spaceDeviceRGB, *SpaceCalRGB:
-		min = []float64{0, 0, 0}
-		max = []float64{1, 1, 1}
-	case spaceDeviceCMYK:
-		min = []float64{0, 0, 0, 0}
-		max = []float64{1, 1, 1, 1}
-	case *SpaceLab:
-		min = []float64{0, space.Ranges[0], space.Ranges[2]}
-		max = []float64{100, space.Ranges[1], space.Ranges[3]}
-	case spacePatternColored, spacePatternUncolored, *SpaceIndexed:
+	if IsPattern(space) || space.Family() == FamilyIndexed {
 		return nil, fmt.Errorf("Indexed: invalid base color space %s", space.Family())
 	}
+	min, max := space.ComponentRanges()
 
 	lookup := make(pdf.String, 0, len(colors)*len(min))
 	for _, color := range colors {
@@ -102,6 +89,13 @@ func (s *SpaceIndexed) Family() pdf.Name {
 // This implements the [Space] interface.
 func (s *SpaceIndexed) Channels() int {
 	return 1
+}
+
+// ComponentRanges returns the valid range of palette indices,
+// [0, NumCol-1].
+// This implements the [Space] interface.
+func (s *SpaceIndexed) ComponentRanges() (lo, hi []float64) {
+	return []float64{0}, []float64{float64(s.NumCol - 1)}
 }
 
 // Embed adds the color space to a PDF file.
@@ -189,24 +183,7 @@ func (s *SpaceIndexed) lookupValues(index int) []float64 {
 		return vals
 	}
 
-	var lo, hi []float64
-	switch space := base.(type) {
-	case spaceDeviceGray, *SpaceCalGray:
-		lo = []float64{0}
-		hi = []float64{1}
-	case spaceDeviceRGB, *SpaceCalRGB:
-		lo = []float64{0, 0, 0}
-		hi = []float64{1, 1, 1}
-	case spaceDeviceCMYK:
-		lo = []float64{0, 0, 0, 0}
-		hi = []float64{1, 1, 1, 1}
-	case *SpaceLab:
-		lo = []float64{0, space.Ranges[0], space.Ranges[2]}
-		hi = []float64{100, space.Ranges[1], space.Ranges[3]}
-	default:
-		vals, _ := Values(base.Default())
-		return vals
-	}
+	lo, hi := base.ComponentRanges()
 
 	vals := make([]float64, n)
 	for i := range n {
@@ -316,6 +293,12 @@ func (s *SpaceSeparation) Family() pdf.Name {
 // This implements the [Space] interface.
 func (s *SpaceSeparation) Channels() int {
 	return 1
+}
+
+// ComponentRanges returns the tint range, [0, 1].
+// This implements the [Space] interface.
+func (s *SpaceSeparation) ComponentRanges() (lo, hi []float64) {
+	return []float64{0}, []float64{1}
 }
 
 // Embed adds the color space to a PDF file.
@@ -503,6 +486,18 @@ func (s *SpaceDeviceN) Channels() int {
 	return len(s.Colorants)
 }
 
+// ComponentRanges returns per-colorant tint ranges, each [0, 1].
+// This implements the [Space] interface.
+func (s *SpaceDeviceN) ComponentRanges() (lo, hi []float64) {
+	n := s.Channels()
+	lo = make([]float64, n)
+	hi = make([]float64, n)
+	for i := range n {
+		hi[i] = 1
+	}
+	return lo, hi
+}
+
 // Embed adds the color space to a PDF file.
 // This implements the [pdf.Embedder] interface.
 func (s *SpaceDeviceN) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
@@ -619,15 +614,6 @@ func (c colorDeviceN) ColorSpace() Space {
 // adapted to the D50 illuminant.
 func (c colorDeviceN) ToXYZ() (X, Y, Z float64) {
 	return c.Space.ToXYZ(c.get())
-}
-
-func (c *colorDeviceN) set(x []float64) {
-	buf := make([]byte, 0, 8*len(x))
-	for _, v := range x {
-		bits := math.Float64bits(v)
-		buf = binary.LittleEndian.AppendUint64(buf, bits)
-	}
-	c.data = string(buf)
 }
 
 func (c colorDeviceN) get() []float64 {

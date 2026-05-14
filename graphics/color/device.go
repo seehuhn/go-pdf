@@ -52,6 +52,12 @@ func (s spaceDeviceGray) Channels() int {
 	return 1
 }
 
+// ComponentRanges returns the value range of the gray component.
+// This implements the [Space] interface.
+func (s spaceDeviceGray) ComponentRanges() (lo, hi []float64) {
+	return []float64{0}, []float64{1}
+}
+
 // Default returns the black in the DeviceGray color space.
 // This implements the [Space] interface.
 func (s spaceDeviceGray) Default() Color {
@@ -138,6 +144,12 @@ func (s spaceDeviceRGB) Channels() int {
 	return 3
 }
 
+// ComponentRanges returns the value ranges of the RGB components.
+// This implements the [Space] interface.
+func (s spaceDeviceRGB) ComponentRanges() (lo, hi []float64) {
+	return []float64{0, 0, 0}, []float64{1, 1, 1}
+}
+
 // Default returns the black in the DeviceRGB color space.
 // This implements the [Space] interface.
 func (s spaceDeviceRGB) Default() Color {
@@ -219,6 +231,12 @@ func (s spaceDeviceCMYK) Family() pdf.Name {
 // This implements the [Space] interface.
 func (s spaceDeviceCMYK) Channels() int {
 	return 4
+}
+
+// ComponentRanges returns the value ranges of the CMYK components.
+// This implements the [Space] interface.
+func (s spaceDeviceCMYK) ComponentRanges() (lo, hi []float64) {
+	return []float64{0, 0, 0, 0}, []float64{1, 1, 1, 1}
 }
 
 // Default returns the black in the DeviceCMYK color space.

@@ -102,6 +102,20 @@ func (s *SpaceICCBased) Channels() int {
 	return s.N
 }
 
+// ComponentRanges returns the per-component value ranges stored in the
+// Range entry of the ICC-based color space.
+// This implements the [Space] interface.
+func (s *SpaceICCBased) ComponentRanges() (lo, hi []float64) {
+	n := s.N
+	lo = make([]float64, n)
+	hi = make([]float64, n)
+	for i := range n {
+		lo[i] = s.Ranges[2*i]
+		hi[i] = s.Ranges[2*i+1]
+	}
+	return lo, hi
+}
+
 // Default returns the default color in an ICC-based color space.
 func (s *SpaceICCBased) Default() Color {
 	c := colorICCBased{Space: s}

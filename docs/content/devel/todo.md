@@ -8,8 +8,6 @@ weight = 100
 
 ## Next Steps
 
-- Make Resource dictionaries file-independent.
-- make dict.Type3 file-independent
 - Get rid of `ResourceManagerEmbedFunc` and `EmbedHelperEmbedFunc`.
 
 ## API

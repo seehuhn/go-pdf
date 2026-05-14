@@ -41,6 +41,12 @@ func (s spaceSRGB) Channels() int {
 	return 3
 }
 
+// ComponentRanges returns the value ranges of the sRGB components.
+// This implements the [Space] interface.
+func (s spaceSRGB) ComponentRanges() (lo, hi []float64) {
+	return []float64{0, 0, 0}, []float64{1, 1, 1}
+}
+
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
 func (s spaceSRGB) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {

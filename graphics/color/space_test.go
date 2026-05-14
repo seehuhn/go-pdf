@@ -132,6 +132,273 @@ func must(space Space, err error) Space {
 	return space
 }
 
+// TestExtractSpaceMalformedSeparationDeviceN verifies that ExtractSpace
+// rejects /Separation and /DeviceN color spaces whose tint transform's
+// arity does not match the colorant count and the alternate space's
+// channel count.  These shapes are rejected by the [Separation] and
+// [DeviceN] factory functions; without routing the read path through
+// them, a malicious PDF can produce a color space whose ToXYZ later
+// panics.
+func TestExtractSpaceMalformedSeparationDeviceN(t *testing.T) {
+	type2 := func(c0, c1 []pdf.Real) pdf.Dict {
+		c0a := make(pdf.Array, len(c0))
+		c1a := make(pdf.Array, len(c1))
+		for i, v := range c0 {
+			c0a[i] = v
+		}
+		for i, v := range c1 {
+			c1a[i] = v
+		}
+		return pdf.Dict{
+			"FunctionType": pdf.Integer(2),
+			"Domain":       pdf.Array{pdf.Real(0), pdf.Real(1)},
+			"C0":           c0a,
+			"C1":           c1a,
+			"N":            pdf.Real(1),
+		}
+	}
+
+	cases := []struct {
+		name string
+		obj  pdf.Object
+	}{
+		{
+			// alternate DeviceRGB has 3 channels; tint transform emits 5
+			name: "separation-wrong-output-arity",
+			obj: pdf.Array{
+				pdf.Name("Separation"),
+				pdf.Name("MyColorant"),
+				pdf.Name("DeviceRGB"),
+				type2([]pdf.Real{0, 0, 0, 0, 0}, []pdf.Real{1, 1, 1, 1, 1}),
+			},
+		},
+		{
+			// two colorants but Type 2 has nIn=1
+			name: "devicen-wrong-input-arity",
+			obj: pdf.Array{
+				pdf.Name("DeviceN"),
+				pdf.Array{pdf.Name("c1"), pdf.Name("c2")},
+				pdf.Name("DeviceRGB"),
+				type2([]pdf.Real{0, 0, 0}, []pdf.Real{1, 1, 1}),
+			},
+		},
+		{
+			// alternate DeviceCMYK has 4 channels; tint transform emits 3
+			name: "devicen-wrong-output-arity",
+			obj: pdf.Array{
+				pdf.Name("DeviceN"),
+				pdf.Array{pdf.Name("c1")},
+				pdf.Name("DeviceCMYK"),
+				type2([]pdf.Real{0, 0, 0}, []pdf.Real{1, 1, 1}),
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			x := pdf.NewExtractor(r)
+			_, err := ExtractSpace(x, nil, tc.obj, false)
+			if err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !pdf.IsMalformed(err) {
+				t.Errorf("expected MalformedFileError, got %T: %v", err, err)
+			}
+		})
+	}
+}
+
+// TestIndexedAcceptsAllNonSpecialBases verifies that the Indexed factory
+// builds palettes over every PDF base color space the spec permits — in
+// particular ICCBased, sRGB, Separation, and DeviceN, which an earlier
+// type-switch silently fell through and then panicked on.
+func TestIndexedAcceptsAllNonSpecialBases(t *testing.T) {
+	tintTransform := func(out int) *function.Type2 {
+		c0 := make([]float64, out)
+		c1 := make([]float64, out)
+		for i := range out {
+			c1[i] = 1
+		}
+		return &function.Type2{XMin: 0, XMax: 1, C0: c0, C1: c1, N: 1}
+	}
+
+	sep := must(Separation("PANTONE", SpaceDeviceRGB, tintTransform(3))).(*SpaceSeparation)
+	dn := must(DeviceN([]pdf.Name{"c1"}, SpaceDeviceCMYK, tintTransform(4), nil)).(*SpaceDeviceN)
+	iccRGB := must(ICCBased(icc.SRGBv2Profile, nil)).(*SpaceICCBased)
+
+	cases := []struct {
+		name   string
+		colors []Color
+	}{
+		{"sRGB", []Color{
+			FromValues(SpaceSRGB, []float64{0, 0, 0}, nil),
+			FromValues(SpaceSRGB, []float64{1, 1, 1}, nil),
+		}},
+		{"ICCBased-RGB", []Color{
+			FromValues(iccRGB, []float64{0, 0, 0}, nil),
+			FromValues(iccRGB, []float64{1, 1, 1}, nil),
+		}},
+		{"Separation", []Color{
+			sep.New(0),
+			sep.New(0.5),
+			sep.New(1),
+		}},
+		{"DeviceN", []Color{
+			dn.New([]float64{0}),
+			dn.New([]float64{1}),
+		}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cs, err := Indexed(tc.colors)
+			if err != nil {
+				t.Fatalf("Indexed: %v", err)
+			}
+			// exercise lookupValues for every palette entry — this would
+			// previously have silently returned Base.Default() for these
+			// bases.
+			for i := range tc.colors {
+				vals := cs.lookupValues(i)
+				if len(vals) != cs.Base.Channels() {
+					t.Errorf("entry %d: got %d components, want %d", i, len(vals), cs.Base.Channels())
+				}
+			}
+		})
+	}
+}
+
+// TestExtractIndexedRejectsSpecialBase verifies that the read path
+// rejects /Indexed color spaces whose base is itself /Pattern or
+// /Indexed.  PDF 2.0 §8.6.6.3 forbids these.
+func TestExtractIndexedRejectsSpecialBase(t *testing.T) {
+	cases := []struct {
+		name string
+		obj  pdf.Object
+	}{
+		{
+			name: "indexed-of-pattern",
+			obj: pdf.Array{
+				pdf.Name("Indexed"),
+				pdf.Name("Pattern"),
+				pdf.Integer(0),
+				pdf.String{0},
+			},
+		},
+		{
+			name: "indexed-of-indexed",
+			obj: pdf.Array{
+				pdf.Name("Indexed"),
+				pdf.Array{
+					pdf.Name("Indexed"),
+					pdf.Name("DeviceGray"),
+					pdf.Integer(0),
+					pdf.String{0},
+				},
+				pdf.Integer(0),
+				pdf.String{0},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			x := pdf.NewExtractor(r)
+			_, err := ExtractSpace(x, nil, tc.obj, false)
+			if err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !pdf.IsMalformed(err) {
+				t.Errorf("expected MalformedFileError, got %T: %v", err, err)
+			}
+		})
+	}
+}
+
+// TestExtractPatternUncoloredRejectsPatternBase verifies that the read
+// path rejects uncolored Pattern color spaces whose underlying space is
+// itself a Pattern color space (colored or uncolored).  PDF 2.0
+// §8.7.3.3 forbids this.
+func TestExtractPatternUncoloredRejectsPatternBase(t *testing.T) {
+	cases := []struct {
+		name string
+		obj  pdf.Object
+	}{
+		{
+			name: "uncolored-over-colored-pattern",
+			obj: pdf.Array{
+				pdf.Name("Pattern"),
+				pdf.Name("Pattern"),
+			},
+		},
+		{
+			name: "uncolored-over-uncolored-pattern",
+			obj: pdf.Array{
+				pdf.Name("Pattern"),
+				pdf.Array{pdf.Name("Pattern"), pdf.Name("DeviceRGB")},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			x := pdf.NewExtractor(r)
+			_, err := ExtractSpace(x, nil, tc.obj, false)
+			if err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !pdf.IsMalformed(err) {
+				t.Errorf("expected MalformedFileError, got %T: %v", err, err)
+			}
+		})
+	}
+}
+
+// testUncoloredPattern is a minimal Pattern with PaintType=2 used to
+// exercise PatternUncolored's input validation.
+type testUncoloredPattern struct{}
+
+func (testUncoloredPattern) PatternType() int                              { return 1 }
+func (testUncoloredPattern) PaintType() int                                { return 2 }
+func (testUncoloredPattern) Equal(other Pattern) bool                      { return false }
+func (testUncoloredPattern) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) { return nil, nil }
+
+// TestPatternUncoloredPanicsOnPatternBase verifies that PatternUncolored
+// rejects a base color whose color space is itself a Pattern color
+// space.
+func TestPatternUncoloredPanicsOnPatternBase(t *testing.T) {
+	pat := testUncoloredPattern{}
+	cases := []struct {
+		name string
+		col  Color
+	}{
+		{
+			name: "base-is-colored-pattern",
+			col:  spacePatternColored{}.Default(), // colorColoredPattern, ColorSpace() == spacePatternColored
+		},
+		{
+			name: "base-is-uncolored-pattern",
+			// Build a legal uncolored-pattern color (base = DeviceRGB),
+			// then feed it as a base — its ColorSpace() is spacePatternUncolored.
+			col: PatternUncolored(pat, DeviceRGB{0, 0, 0}),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r == nil {
+					t.Errorf("expected panic, got none")
+				}
+			}()
+			_ = PatternUncolored(pat, tc.col)
+		})
+	}
+}
+
 func spaceRoundTrip(t *testing.T, version pdf.Version, space Space) {
 	t.Helper()
 

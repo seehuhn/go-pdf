@@ -39,6 +39,12 @@ type Space interface {
 	// This returns 0 for colored tiling patterns and shading patterns.
 	Channels() int
 
+	// ComponentRanges returns the per-component value ranges for colors
+	// in this space.  Component i takes values in [lo[i], hi[i]].
+	// The slices have length Channels(); for color spaces with no
+	// components, both slices are nil.
+	ComponentRanges() (lo, hi []float64)
+
 	// Default returns the default color of the color space.
 	Default() Color
 
@@ -60,6 +66,14 @@ func IsSpecial(s Space) bool {
 	default:
 		return false
 	}
+}
+
+// IsPattern reports whether the color space is a Pattern color space.
+// This covers both colored tiling patterns / shading patterns (the
+// Pattern color space with no underlying space) and uncolored tiling
+// patterns (Pattern color spaces with an underlying space).
+func IsPattern(s Space) bool {
+	return s.Family() == FamilyPattern
 }
 
 // Color space families supported by PDF.
@@ -112,6 +126,10 @@ func ExtractSpace(x *pdf.Extractor, path *pdf.CycleCheck, desc pdf.Object, _ boo
 			base, err := pdf.ExtractorGet(x, path, d.args[0], ExtractSpace)
 			if err != nil {
 				d.SetError(pdf.Wrap(err, "base color space"))
+			} else if IsPattern(base) {
+				// PDF 2.0 §8.7.3.3: the underlying color space cannot be
+				// another Pattern color space.
+				d.MarkAsInvalid()
 			} else {
 				// TODO(voss): do we need to look this up in the resource dictionary?
 				res = spacePatternUncolored{
@@ -173,6 +191,10 @@ func ExtractSpace(x *pdf.Extractor, path *pdf.CycleCheck, desc pdf.Object, _ boo
 			d.SetError(pdf.Wrap(err, "base color space"))
 			break
 		}
+		if IsPattern(base) || base.Family() == FamilyIndexed {
+			d.MarkAsInvalid()
+			break
+		}
 		hiVal, err := x.GetInteger(path, d.args[1])
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "high value"))
@@ -231,10 +253,9 @@ func ExtractSpace(x *pdf.Extractor, path *pdf.CycleCheck, desc pdf.Object, _ boo
 			break
 		}
 
-		res = &SpaceSeparation{
-			Colorant:  colorant,
-			Alternate: alternate,
-			Transform: trfm,
+		res, err = Separation(colorant, alternate, trfm)
+		if err != nil {
+			d.SetError(&pdf.MalformedFileError{Err: err})
 		}
 
 	case FamilyDeviceN:
@@ -270,11 +291,9 @@ func ExtractSpace(x *pdf.Extractor, path *pdf.CycleCheck, desc pdf.Object, _ boo
 			}
 		}
 
-		res = &SpaceDeviceN{
-			Colorants:  colorants,
-			Alternate:  alternate,
-			Transform:  trfm,
-			Attributes: attr,
+		res, err = DeviceN(colorants, alternate, trfm, attr)
+		if err != nil {
+			d.SetError(&pdf.MalformedFileError{Err: err})
 		}
 
 	case "CalCMYK": // deprecated

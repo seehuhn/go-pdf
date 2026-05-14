@@ -259,10 +259,7 @@ func RawStreamReader(r Getter, x *Stream) (io.ReadCloser, error) {
 	case cryptNone, cryptIdentity:
 		return out, nil
 	case cryptDefault:
-		v := V1_2
-		if r != nil {
-			v = GetVersion(r)
-		}
+		v := GetVersion(r)
 		return x.crypt.Decode(v, out)
 	case cryptUnsupportedCF:
 		return nil, errors.New(
@@ -378,10 +375,7 @@ func DecodeStream(r Getter, path *CycleCheck, x *Stream, numFilters int) (io.Rea
 		return nil, err
 	}
 
-	v := V1_2
-	if r != nil { // TODO(voss): is r == nil still possible?
-		v = GetVersion(r)
-	}
+	v := GetVersion(r)
 
 	src := &sourceErrChecker{r: x.NewReader()}
 	var out io.ReadCloser = io.NopCloser(src)
