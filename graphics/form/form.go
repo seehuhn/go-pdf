@@ -41,7 +41,9 @@ type Form struct {
 	// Content is the content stream that draws the form.
 	Content content.Stream
 
-	// Res (required) contains the resources used by the content stream.
+	// Res contains the resources used by the content stream.
+	// Required in PDF 2.0; optional in PDF 1.7 and earlier, where a nil
+	// value means the form inherits resources from the surrounding page.
 	Res *content.Resources
 
 	// BBox is the form's bounding box in form coordinate space.
@@ -117,23 +119,27 @@ func (f *Form) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 
-	// embed resources
-	resObj, err := e.Embed(f.Res)
-	if err != nil {
-		return nil, err
+	v := pdf.GetVersion(e.Out())
+	if f.Res == nil && v >= pdf.V2_0 {
+		return nil, errors.New("missing resources")
 	}
 
 	ref := e.Alloc()
 
 	dict := pdf.Dict{
-		"Subtype":   pdf.Name("Form"),
-		"BBox":      &f.BBox,
-		"Resources": resObj,
+		"Subtype": pdf.Name("Form"),
+		"BBox":    &f.BBox,
+	}
+	if f.Res != nil {
+		resObj, err := e.Embed(f.Res)
+		if err != nil {
+			return nil, err
+		}
+		dict["Resources"] = resObj
 	}
 	if e.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("XObject")
 	}
-	v := pdf.GetVersion(e.Out())
 	if v == pdf.V1_0 {
 		if f.Name == "" {
 			return nil, errors.New("missing form XObject name")
@@ -280,9 +286,6 @@ func (f *Form) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 func (f *Form) validate() error {
 	if f.BBox.IsZero() {
 		return errors.New("missing BBox")
-	}
-	if f.Res == nil {
-		return errors.New("missing resources")
 	}
 	return nil
 }

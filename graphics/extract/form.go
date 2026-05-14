@@ -146,27 +146,33 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*form
 	}
 
 	// extract resources
-	f.Res = &content.Resources{}
+	version := pdf.GetVersion(x.R)
 	if resObj := dict["Resources"]; resObj != nil {
 		res, err := pdf.ExtractorGet(x, path, resObj, Resources)
 		if err != nil {
 			return nil, err
 		}
-		if res != nil {
-			f.Res = res
-		}
+		f.Res = res
+	} else if version >= pdf.V2_0 {
+		// PDF 2.0 requires a Resources entry; normalise the malformed
+		// input to an empty Resources dict.
+		f.Res = &content.Resources{}
 	}
+	// f.Res remains nil for pre-2.0 forms without a Resources entry; the
+	// renderer falls back to the surrounding page's resources.
 
 	// store a reader factory closure so each iteration re-opens the PDF stream
 	stm := stream // capture for closure
 	getter := x.R
-	version := pdf.GetVersion(x.R)
-	res := f.Res
+	scannerRes := f.Res
+	if scannerRes == nil {
+		scannerRes = &content.Resources{}
+	}
 	f.Content = content.NewScanner(
 		func() (io.ReadCloser, error) {
 			return pdf.DecodeStream(getter, nil, stm, 0)
 		},
-		version, content.Form, res,
+		version, content.Form, scannerRes,
 	)
 
 	repairForm(f, x.R)

@@ -357,6 +357,137 @@ func TestFormWithStructParent(t *testing.T) {
 	}
 }
 
+// writeRawForm writes a form XObject dict directly, bypassing form.Embed, so
+// tests can construct dicts without a /Resources entry.
+func writeRawForm(t *testing.T, version pdf.Version, withResources bool) (*pdf.Writer, pdf.Reference) {
+	t.Helper()
+	writer, _ := memfile.NewPDFWriter(version, nil)
+	ref := writer.Alloc()
+	dict := pdf.Dict{
+		"Subtype": pdf.Name("Form"),
+		"BBox":    &pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+	}
+	if withResources {
+		dict["Resources"] = pdf.Dict{}
+	}
+	stm, err := writer.OpenStream(ref, dict)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return writer, ref
+}
+
+// TestExtractFormPre20MissingResources verifies that a pre-2.0 form XObject
+// without a /Resources entry extracts with Res == nil, allowing the renderer
+// to inherit from the page (PDF 2.0 §7.8.3 Note 3).
+func TestExtractFormPre20MissingResources(t *testing.T) {
+	writer, ref := writeRawForm(t, pdf.V1_7, false)
+	x := pdf.NewExtractor(writer)
+	f, err := extract.Form(x, nil, ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Res != nil {
+		t.Errorf("expected nil Res for pre-2.0 form without /Resources, got %#v", f.Res)
+	}
+}
+
+// TestExtractForm20MissingResources verifies that a 2.0 form XObject without a
+// /Resources entry is normalised to an empty Resources, since the spec
+// requires the entry.
+func TestExtractForm20MissingResources(t *testing.T) {
+	writer, ref := writeRawForm(t, pdf.V2_0, false)
+	x := pdf.NewExtractor(writer)
+	f, err := extract.Form(x, nil, ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Res == nil {
+		t.Errorf("expected non-nil empty Res for 2.0 form without /Resources, got nil")
+	}
+}
+
+// TestExtractFormEmptyResources verifies that an explicit empty /Resources
+// entry extracts as a non-nil empty Resources (not nil).
+func TestExtractFormEmptyResources(t *testing.T) {
+	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
+		t.Run(v.String(), func(t *testing.T) {
+			writer, ref := writeRawForm(t, v, true)
+			x := pdf.NewExtractor(writer)
+			f, err := extract.Form(x, nil, ref, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if f.Res == nil {
+				t.Errorf("expected non-nil Res for form with explicit empty /Resources, got nil")
+			}
+		})
+	}
+}
+
+// TestEmbedNilResRejected20 verifies that writing a form with Res == nil at
+// PDF 2.0 fails, because the spec requires a /Resources entry.
+func TestEmbedNilResRejected20(t *testing.T) {
+	writer, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(writer)
+	f := &form.Form{
+		BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+	}
+	if _, err := rm.Embed(f); err == nil {
+		t.Error("expected error embedding nil-Res form at PDF 2.0")
+	}
+	// best-effort cleanup; the failed Embed may leave the writer in a state
+	// where Close also reports an error, which we ignore for this test
+	_ = rm.Close()
+	_ = writer.Close()
+}
+
+// TestEmbedNilResOmitsResources17 verifies that writing a form with Res == nil
+// at PDF 1.7 is accepted, and the resulting stream dict has no /Resources
+// entry.  Round-trip extraction yields Res == nil again.
+func TestEmbedNilResOmitsResources17(t *testing.T) {
+	writer, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(writer)
+	f := &form.Form{
+		BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+	}
+	ref, err := rm.Embed(f)
+	if err != nil {
+		t.Fatalf("embedding nil-Res form at PDF 1.7: %v", err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// verify the written dict has no /Resources entry
+	stm, err := pdf.GetStream(writer, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := stm.Dict["Resources"]; ok {
+		t.Error("expected no /Resources entry for nil-Res form at PDF 1.7")
+	}
+
+	// round trip
+	x := pdf.NewExtractor(writer)
+	f2, err := extract.Form(x, nil, ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f2.Res != nil {
+		t.Errorf("round trip: expected nil Res, got %#v", f2.Res)
+	}
+}
+
 // TestFormWithAssociatedFiles verifies that AssociatedFiles (AF) are properly
 // handled during form XObject read/write cycles.
 func TestFormWithAssociatedFiles(t *testing.T) {
