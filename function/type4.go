@@ -17,9 +17,7 @@
 package function
 
 import (
-	"errors"
 	"fmt"
-	"io"
 	"sync"
 
 	"seehuhn.de/go/pdf"
@@ -84,22 +82,10 @@ func extractType4(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 		Range:  rangeArray,
 	}
 
-	// read PostScript program from stream
-	stmReader, err := pdf.DecodeStream(x.R, path, stream, 0)
-	if err != nil {
-		return nil, err
-	}
-	defer stmReader.Close()
-
 	const maxProgramSize = 16 * 1024
-	programBytes, err := io.ReadAll(io.LimitReader(stmReader, maxProgramSize+1))
+	programBytes, err := pdf.ReadAll(x.R, path, stream, maxProgramSize)
 	if err != nil {
 		return nil, err
-	}
-	if len(programBytes) > maxProgramSize {
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("Type 4 function program too large"),
-		}
 	}
 
 	program := string(programBytes)

@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/internal/streamlimits"
 	"seehuhn.de/go/pdf/measure"
 
 	"seehuhn.de/go/pdf/oc"
@@ -196,6 +197,9 @@ func ExtractMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	if width <= 0 {
 		return nil, pdf.Errorf("invalid image mask width %d", width)
 	}
+	if width > streamlimits.MaxImageWidth {
+		return nil, pdf.Errorf("image mask width %d exceeds limit", width)
+	}
 
 	height, err := x.GetInteger(path, dict["Height"])
 	if err != nil {
@@ -203,6 +207,9 @@ func ExtractMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	}
 	if height <= 0 {
 		return nil, pdf.Errorf("invalid image mask height %d", height)
+	}
+	if height > streamlimits.MaxImageHeight {
+		return nil, pdf.Errorf("image mask height %d exceeds limit", height)
 	}
 
 	mask := &Mask{
@@ -323,7 +330,10 @@ func ExtractMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 		}
 	}
 
-	mask.Source = &streamData{inner: opaque.ExtractStream(x, stream)}
+	mask.Source = &streamData{
+		inner:    opaque.ExtractStream(x, stream),
+		maxBytes: imageMaskDataLimit(mask.Width, mask.Height),
+	}
 
 	return mask, nil
 }

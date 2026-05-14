@@ -22,6 +22,8 @@ import (
 	"io"
 	"math"
 	"os"
+
+	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
 // Getter represents a PDF file opened for reading.
@@ -594,17 +596,10 @@ func resolveJBIG2Globals(r Getter, path *CycleCheck, f *FilterJBIG2) error {
 	if !ok {
 		return nil
 	}
-	stm, err := DecodeStream(r, path, stream, 0)
-	if err != nil {
-		return fmt.Errorf("JBIG2Globals stream: %w", err)
-	}
-	defer stm.Close()
-
-	data, err := io.ReadAll(stm)
+	data, err := ReadAll(r, path, stream, streamlimits.MaxJBIG2GlobalsBytes)
 	if err != nil {
 		return fmt.Errorf("reading JBIG2Globals: %w", err)
 	}
-
 	f.Globals = data
 	return nil
 }

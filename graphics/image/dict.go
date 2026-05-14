@@ -30,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/internal/streamlimits"
 	"seehuhn.de/go/pdf/measure"
 
 	"seehuhn.de/go/pdf/oc"
@@ -203,6 +204,9 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	if width <= 0 {
 		return nil, pdf.Errorf("invalid image width %d", width)
 	}
+	if width > streamlimits.MaxImageWidth {
+		return nil, pdf.Errorf("image width %d exceeds limit", width)
+	}
 
 	height, err := x.GetInteger(path, dict["Height"])
 	if err != nil {
@@ -210,6 +214,9 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	}
 	if height <= 0 {
 		return nil, pdf.Errorf("invalid image height %d", height)
+	}
+	if height > streamlimits.MaxImageHeight {
+		return nil, pdf.Errorf("image height %d exceeds limit", height)
 	}
 
 	img := &Dict{
@@ -426,7 +433,10 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	}
 
 	// lazily read from the original stream, preserving the encoding
-	img.Data = &streamData{inner: opaque.ExtractStream(x, stream)}
+	img.Data = &streamData{
+		inner:    opaque.ExtractStream(x, stream),
+		maxBytes: ImageDataLimit(img.Width, img.Height, img.BitsPerComponent, img.ColorSpace),
+	}
 
 	return img, nil
 }

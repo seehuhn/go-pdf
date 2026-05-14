@@ -63,8 +63,11 @@ const (
 	// decoder may allocate per byte of input data.
 	budgetMultiplier = 1024
 
-	// budgetHardCap is the absolute upper bound on the memory budget,
-	// regardless of input size.
+	// budgetHardCap is the absolute upper bound on the memory budget for
+	// decoded bitmaps, regardless of input size.  The encoded input
+	// buffer is bounded separately by streamlimits.MaxJBIG2PageBytes;
+	// the two caps protect different resources (decoded bitmap working
+	// set vs. encoded buffer footprint) and must be tuned together.
 	budgetHardCap = 64 << 20 // 64 MB
 )
 

@@ -25,6 +25,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
+	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
 // Space represents a PDF color space which can be embedded in a PDF file.
@@ -214,7 +215,7 @@ func ExtractSpace(x *pdf.Extractor, path *pdf.CycleCheck, desc pdf.Object, _ boo
 		case pdf.String:
 			lookup = obj
 		case *pdf.Stream:
-			data, err := pdf.ReadAll(x.R, path, obj)
+			data, err := pdf.ReadAll(x.R, path, obj, streamlimits.MaxIndexedLookupBytes)
 			if err != nil {
 				d.SetError(pdf.Wrap(err, "lookup table"))
 				break
@@ -367,7 +368,7 @@ func newDecoder(r pdf.Getter, path *pdf.CycleCheck, obj pdf.Object) *decoder {
 
 		case *pdf.Stream:
 			d.dict = y.Dict
-			body, err := pdf.ReadAll(r, path, y)
+			body, err := pdf.ReadAll(r, path, y, streamlimits.MaxICCProfileBytes)
 			if err != nil {
 				d.SetError(err)
 				break

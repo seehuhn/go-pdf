@@ -19,7 +19,6 @@ package shading
 import (
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"slices"
 
@@ -27,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
 // PDF 2.0 sections: 8.7.4.3 8.7.4.5.6
@@ -269,13 +269,7 @@ func extractType5(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 	}
 
 	// Read stream data to extract vertices
-	stmReader, err := pdf.DecodeStream(x.R, path, stream, 0)
-	if err != nil {
-		return nil, err
-	}
-	defer stmReader.Close()
-
-	data, err := io.ReadAll(stmReader)
+	data, err := pdf.ReadAll(x.R, path, stream, streamlimits.MaxShadingBytes)
 	if err != nil {
 		return nil, err
 	}

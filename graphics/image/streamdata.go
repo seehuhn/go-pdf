@@ -17,6 +17,7 @@
 package image
 
 import (
+	"errors"
 	"io"
 
 	"seehuhn.de/go/pdf"
@@ -30,15 +31,8 @@ import (
 // nested-reference translation in /DecodeParms (JBIG2Globals etc.) is
 // handled correctly by [pdf.Copier] under the hood.
 type streamData struct {
-	inner *opaque.Stream
-}
-
-// NewStreamData returns an [graphics.ImageData] that lazily reads from
-// the given PDF stream.  On [graphics.ImageData.WriteStream], the
-// stream is copied with its original encoding.  On
-// [graphics.ImageData.Pixels], the stream is fully decoded.
-func NewStreamData(x *pdf.Extractor, stream *pdf.Stream) graphics.ImageData {
-	return &streamData{inner: opaque.ExtractStream(x, stream)}
+	inner    *opaque.Stream
+	maxBytes int64 // per-image decoded-size cap
 }
 
 // Pixels returns the fully decoded pixel data from the stream.
@@ -48,7 +42,14 @@ func (s *streamData) Pixels() ([]byte, error) {
 		return nil, err
 	}
 	defer r.Close()
-	return io.ReadAll(r)
+	data, err := io.ReadAll(io.LimitReader(r, s.maxBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > s.maxBytes {
+		return nil, &pdf.MalformedFileError{Err: errors.New("image data exceeds size limit")}
+	}
+	return data, nil
 }
 
 // WriteStream copies the stream to the destination PDF, preserving the

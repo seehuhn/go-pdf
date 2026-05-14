@@ -437,7 +437,7 @@ func TestCopierEncryptedStream(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			got, err := ReadAll(dstR, nil, stream)
+			got, err := ReadAll(dstR, nil, stream, 1<<20)
 			if err != nil {
 				t.Fatal(err)
 			}

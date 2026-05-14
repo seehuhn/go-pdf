@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/color"
 )
 
 func TestDecodeInlineImageNoFilter(t *testing.T) {
@@ -30,7 +31,7 @@ func TestDecodeInlineImageNoFilter(t *testing.T) {
 		Name: OpInlineImage,
 		Args: []pdf.Object{pdf.Dict{}, pdf.String(raw)},
 	}
-	got, err := DecodeInlineImage(op)
+	got, err := DecodeInlineImage(op, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +51,7 @@ func TestDecodeInlineImageFlateDecode(t *testing.T) {
 			pdf.String(compressed),
 		},
 	}
-	got, err := DecodeInlineImage(op)
+	got, err := DecodeInlineImage(op, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +71,7 @@ func TestDecodeInlineImageAbbreviatedFilter(t *testing.T) {
 			pdf.String(compressed),
 		},
 	}
-	got, err := DecodeInlineImage(op)
+	got, err := DecodeInlineImage(op, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +88,7 @@ func TestDecodeInlineImageUnknownFilter(t *testing.T) {
 			pdf.String("data"),
 		},
 	}
-	_, err := DecodeInlineImage(op)
+	_, err := DecodeInlineImage(op, nil)
 	if err == nil {
 		t.Fatal("expected error for unknown filter")
 	}
@@ -106,12 +107,178 @@ func TestDecodeInlineImageFilterArray(t *testing.T) {
 			pdf.String(compressed),
 		},
 	}
-	got, err := DecodeInlineImage(op)
+	got, err := DecodeInlineImage(op, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(got, original) {
 		t.Errorf("expected %q, got %q", original, got)
+	}
+}
+
+func TestDecodeInlineImageForbiddenFilter(t *testing.T) {
+	for _, name := range []pdf.Name{"JBIG2Decode", "JPXDecode", "Crypt"} {
+		t.Run(string(name), func(t *testing.T) {
+			op := Operator{
+				Name: OpInlineImage,
+				Args: []pdf.Object{
+					pdf.Dict{"Filter": name},
+					pdf.String("data"),
+				},
+			}
+			if _, err := DecodeInlineImage(op, nil); err == nil {
+				t.Errorf("expected error for forbidden filter %s", name)
+			}
+		})
+	}
+}
+
+func TestDecodeInlineImageForbiddenFilterInArray(t *testing.T) {
+	op := Operator{
+		Name: OpInlineImage,
+		Args: []pdf.Object{
+			pdf.Dict{"Filter": pdf.Array{pdf.Name("Fl"), pdf.Name("JBIG2Decode")}},
+			pdf.String("data"),
+		},
+	}
+	if _, err := DecodeInlineImage(op, nil); err == nil {
+		t.Fatal("expected error for forbidden filter inside array")
+	}
+}
+
+func TestInlineImageColorSpaceDeviceNames(t *testing.T) {
+	cases := []struct {
+		name pdf.Name
+		want color.Space
+	}{
+		{"G", color.SpaceDeviceGray},
+		{"DeviceGray", color.SpaceDeviceGray},
+		{"RGB", color.SpaceDeviceRGB},
+		{"DeviceRGB", color.SpaceDeviceRGB},
+		{"CMYK", color.SpaceDeviceCMYK},
+		{"DeviceCMYK", color.SpaceDeviceCMYK},
+	}
+	for _, c := range cases {
+		t.Run(string(c.name), func(t *testing.T) {
+			// abbreviated key
+			got := InlineImageColorSpace(pdf.Dict{"CS": c.name}, nil)
+			if got != c.want {
+				t.Errorf("CS=%s: got %v, want %v", c.name, got, c.want)
+			}
+			// full key
+			got = InlineImageColorSpace(pdf.Dict{"ColorSpace": c.name}, nil)
+			if got != c.want {
+				t.Errorf("ColorSpace=%s: got %v, want %v", c.name, got, c.want)
+			}
+		})
+	}
+}
+
+func TestInlineImageColorSpaceAbbreviationTakesPrecedence(t *testing.T) {
+	// per §8.9.7: when both abbreviated and full key are present, the
+	// abbreviated key takes precedence.
+	dict := pdf.Dict{
+		"CS":         pdf.Name("RGB"),
+		"ColorSpace": pdf.Name("DeviceGray"),
+	}
+	got := InlineImageColorSpace(dict, nil)
+	if got != color.SpaceDeviceRGB {
+		t.Errorf("got %v, want SpaceDeviceRGB", got)
+	}
+}
+
+func TestInlineImageColorSpaceIndexedArray(t *testing.T) {
+	// [/I /RGB 1 <0102030405060708>] — 2-entry Indexed over DeviceRGB,
+	// hival=1, 6 bytes of lookup data (2 entries × 3 channels).
+	dict := pdf.Dict{
+		"CS": pdf.Array{
+			pdf.Name("I"),
+			pdf.Name("RGB"),
+			pdf.Integer(1),
+			pdf.String{0x01, 0x02, 0x03, 0x04, 0x05, 0x06},
+		},
+	}
+	got := InlineImageColorSpace(dict, nil)
+	idx, ok := got.(*color.SpaceIndexed)
+	if !ok {
+		t.Fatalf("got %T, want *color.SpaceIndexed", got)
+	}
+	if idx.Channels() != 1 {
+		t.Errorf("Channels() = %d, want 1", idx.Channels())
+	}
+	if idx.NumCol != 2 {
+		t.Errorf("NumCol = %d, want 2", idx.NumCol)
+	}
+	if idx.Base != color.SpaceDeviceRGB {
+		t.Errorf("Base = %v, want SpaceDeviceRGB", idx.Base)
+	}
+}
+
+func TestInlineImageColorSpaceIndexedFullName(t *testing.T) {
+	dict := pdf.Dict{
+		"ColorSpace": pdf.Array{
+			pdf.Name("Indexed"),
+			pdf.Name("DeviceCMYK"),
+			pdf.Integer(3),
+			pdf.String(bytes.Repeat([]byte{0}, 16)), // 4 entries × 4 channels
+		},
+	}
+	got := InlineImageColorSpace(dict, nil)
+	if _, ok := got.(*color.SpaceIndexed); !ok {
+		t.Fatalf("got %T, want *color.SpaceIndexed", got)
+	}
+}
+
+func TestInlineImageColorSpaceIndexedBadBase(t *testing.T) {
+	// CIE-based base is not permitted in inline image Indexed CS.
+	dict := pdf.Dict{
+		"CS": pdf.Array{
+			pdf.Name("Indexed"),
+			pdf.Name("CalGray"),
+			pdf.Integer(1),
+			pdf.String{0, 0},
+		},
+	}
+	if got := InlineImageColorSpace(dict, nil); got != nil {
+		t.Errorf("got %v, want nil", got)
+	}
+}
+
+func TestInlineImageColorSpaceResourceRef(t *testing.T) {
+	custom := color.SpaceDeviceRGB
+	res := &Resources{
+		ColorSpace: map[pdf.Name]color.Space{"CS1": custom},
+	}
+	got := InlineImageColorSpace(pdf.Dict{"CS": pdf.Name("CS1")}, res)
+	if got != custom {
+		t.Errorf("got %v, want resource entry", got)
+	}
+}
+
+func TestInlineImageColorSpaceResourceRefMissing(t *testing.T) {
+	res := &Resources{ColorSpace: map[pdf.Name]color.Space{}}
+	got := InlineImageColorSpace(pdf.Dict{"CS": pdf.Name("CS1")}, res)
+	if got != nil {
+		t.Errorf("got %v, want nil for missing resource", got)
+	}
+}
+
+func TestInlineImageColorSpaceResourceRefNoRes(t *testing.T) {
+	// non-device Name with no resources at all → nil.
+	got := InlineImageColorSpace(pdf.Dict{"CS": pdf.Name("CS1")}, nil)
+	if got != nil {
+		t.Errorf("got %v, want nil", got)
+	}
+}
+
+func TestInlineImageColorSpaceMissing(t *testing.T) {
+	// no CS / ColorSpace entry.  Returns nil regardless of ImageMask;
+	// callers decide whether nil is acceptable based on IM.
+	if got := InlineImageColorSpace(pdf.Dict{}, nil); got != nil {
+		t.Errorf("got %v, want nil", got)
+	}
+	if got := InlineImageColorSpace(pdf.Dict{"IM": pdf.Boolean(true)}, nil); got != nil {
+		t.Errorf("got %v, want nil for image mask", got)
 	}
 }
 

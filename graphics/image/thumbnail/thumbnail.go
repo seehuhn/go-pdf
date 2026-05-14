@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/internal/streamlimits"
 	"seehuhn.de/go/pdf/opaque"
 )
 
@@ -94,6 +95,8 @@ func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 		return nil, err
 	} else if width <= 0 {
 		return nil, pdf.Error("invalid thumbnail width")
+	} else if width > streamlimits.MaxImageWidth {
+		return nil, pdf.Errorf("thumbnail width %d exceeds limit", width)
 	}
 	thumb.Width = int(width)
 
@@ -103,6 +106,8 @@ func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 		return nil, err
 	} else if height <= 0 {
 		return nil, pdf.Error("invalid thumbnail height")
+	} else if height > streamlimits.MaxImageHeight {
+		return nil, pdf.Errorf("thumbnail height %d exceeds limit", height)
 	}
 	thumb.Height = int(height)
 
@@ -146,7 +151,10 @@ func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 		thumb.Decode = decode
 	}
 
-	thumb.Source = &thumbnailStreamData{inner: opaque.ExtractStream(x, stm)}
+	thumb.Source = &thumbnailStreamData{
+		inner:    opaque.ExtractStream(x, stm),
+		maxBytes: streamlimits.ImageDataLimit(thumb.Width, thumb.Height, thumb.ColorSpace.Channels(), thumb.BitsPerComponent),
+	}
 
 	return thumb, nil
 }
@@ -192,7 +200,8 @@ func (s *readThumbnailSource) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference
 // delegating to [opaque.Stream] for both decoding (Pixels) and
 // verbatim cross-file re-emission (WriteStream).
 type thumbnailStreamData struct {
-	inner *opaque.Stream
+	inner    *opaque.Stream
+	maxBytes int64 // per-thumbnail decoded-size cap
 }
 
 func (s *thumbnailStreamData) Pixels() ([]byte, error) {
@@ -201,7 +210,14 @@ func (s *thumbnailStreamData) Pixels() ([]byte, error) {
 		return nil, err
 	}
 	defer r.Close()
-	return io.ReadAll(r)
+	data, err := io.ReadAll(io.LimitReader(r, s.maxBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > s.maxBytes {
+		return nil, &pdf.MalformedFileError{Err: errors.New("image data exceeds size limit")}
+	}
+	return data, nil
 }
 
 func (s *thumbnailStreamData) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference, dict pdf.Dict) error {

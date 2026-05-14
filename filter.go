@@ -32,6 +32,7 @@ import (
 	"seehuhn.de/go/pdf/internal/filter/lzw"
 	"seehuhn.de/go/pdf/internal/filter/predict"
 	"seehuhn.de/go/pdf/internal/filter/runlength"
+	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
 // Frequencies of filter types used in the PDF files on my system:
@@ -731,9 +732,12 @@ func (f *FilterJBIG2) Encode(_ Version, _ io.WriteCloser) (io.WriteCloser, error
 
 // Decode implements the [Filter] interface.
 func (f *FilterJBIG2) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
-	pageData, err := io.ReadAll(r)
+	pageData, err := io.ReadAll(io.LimitReader(r, streamlimits.MaxJBIG2PageBytes+1))
 	if err != nil {
 		return nil, err
+	}
+	if int64(len(pageData)) > streamlimits.MaxJBIG2PageBytes {
+		return nil, &MalformedFileError{Err: errors.New("JBIG2 page data exceeds size limit")}
 	}
 
 	bm, err := jbig2.Decode(f.Globals, pageData)

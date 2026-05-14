@@ -962,16 +962,23 @@ func (x *Stream) AsPDF(opt OutputOptions) Native {
 	return x
 }
 
-// ReadAll reads the content of a stream and returns it as a byte slice.
-func ReadAll(r Getter, path *CycleCheck, s *Stream) ([]byte, error) {
+// ReadAll reads the decoded content of a stream and returns it as a
+// byte slice.  At most maxBytes are read; if the decoded stream is
+// longer the function returns a *MalformedFileError.  Callers must
+// pick maxBytes based on what is reasonable for the kind of stream
+// being read; see package streamlimits for shared values.
+func ReadAll(r Getter, path *CycleCheck, s *Stream, maxBytes int64) ([]byte, error) {
 	in, err := DecodeStream(r, path, s, 0)
 	if err != nil {
 		return nil, err
 	}
 	defer in.Close()
-	data, err := io.ReadAll(in)
+	data, err := io.ReadAll(io.LimitReader(in, maxBytes+1))
 	if err != nil {
 		return nil, err
+	}
+	if int64(len(data)) > maxBytes {
+		return nil, &MalformedFileError{Err: errors.New("stream exceeds size limit")}
 	}
 	return data, nil
 }

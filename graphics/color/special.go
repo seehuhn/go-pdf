@@ -40,6 +40,66 @@ type SpaceIndexed struct {
 	lookup pdf.String
 }
 
+// ParseInlineDeviceName returns the device colour space matching one of the
+// device-space names or inline abbreviations permitted in inline images per
+// PDF 2.0 §8.9.7: G, RGB, CMYK and the corresponding full forms DeviceGray,
+// DeviceRGB, DeviceCMYK.  It returns nil for any other name.
+func ParseInlineDeviceName(name pdf.Name) Space {
+	switch name {
+	case "G", "DeviceGray":
+		return SpaceDeviceGray
+	case "RGB", "DeviceRGB":
+		return SpaceDeviceRGB
+	case "CMYK", "DeviceCMYK":
+		return SpaceDeviceCMYK
+	}
+	return nil
+}
+
+// ParseInlineIndexed parses the limited Indexed array form
+// [/Indexed base hival lookup-string] permitted in inline images per PDF
+// 2.0 §8.9.7.  The base entry must be one of the inline device names
+// recognised by [ParseInlineDeviceName].  Returns nil if the array is
+// malformed.
+func ParseInlineIndexed(arr pdf.Array) Space {
+	if len(arr) != 4 {
+		return nil
+	}
+	name, ok := arr[0].(pdf.Name)
+	if !ok || (name != "Indexed" && name != "I") {
+		return nil
+	}
+	baseName, ok := arr[1].(pdf.Name)
+	if !ok {
+		return nil
+	}
+	base := ParseInlineDeviceName(baseName)
+	if base == nil {
+		return nil
+	}
+	var hival int
+	switch h := arr[2].(type) {
+	case pdf.Integer:
+		hival = int(h)
+	case pdf.Real:
+		hival = int(h)
+	default:
+		return nil
+	}
+	if hival < 0 || hival > 255 {
+		return nil
+	}
+	lookup, ok := arr[3].(pdf.String)
+	if !ok {
+		return nil
+	}
+	return &SpaceIndexed{
+		Base:   base,
+		NumCol: hival + 1,
+		lookup: lookup,
+	}
+}
+
 // Indexed returns a new indexed color space.
 //
 // The colors must all use the same color space, and the number of colors must

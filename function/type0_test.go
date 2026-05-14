@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"math"
 	"testing"
+
+	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
 func TestType0BitDepthExtraction(t *testing.T) {
@@ -405,5 +407,71 @@ func TestType0Constant(t *testing.T) {
 	}
 	if result[0] != 0 {
 		t.Errorf("expected output 0, got %f", result[0])
+	}
+}
+
+// TestSampleTableBytes checks that sampleTableBytes returns an error for
+// every malformed input shape rather than panicking on division by zero
+// or returning a wrong byte count.
+func TestSampleTableBytes(t *testing.T) {
+	tests := []struct {
+		name          string
+		size          []int
+		n             int
+		bitsPerSample int
+		wantBytes     int
+		wantErr       bool
+	}{
+		// success cases
+		{"empty size 8bpc", []int{}, 1, 8, 1, false},
+		{"1d size=4 n=1 bpc=8", []int{4}, 1, 8, 4, false},
+		{"1d size=4 n=3 bpc=8", []int{4}, 3, 8, 12, false},
+		{"2d size=4x4 n=1 bpc=8", []int{4, 4}, 1, 8, 16, false},
+		{"1d size=8 n=1 bpc=1", []int{8}, 1, 1, 1, false},
+		{"1d size=1 n=1 bpc=12", []int{1}, 1, 12, 2, false},
+
+		// invalid Size entries
+		{"size has zero entry", []int{0}, 1, 8, 0, true},
+		{"size has zero entry mid", []int{4, 0, 4}, 1, 8, 0, true},
+		{"size has negative entry", []int{-1}, 1, 8, 0, true},
+		{"size has negative entry mid", []int{4, -2, 4}, 1, 8, 0, true},
+
+		// invalid bitsPerSample
+		{"bps zero", []int{4}, 1, 0, 0, true},
+		{"bps negative", []int{4}, 1, -1, 0, true},
+		{"bps 3", []int{4}, 1, 3, 0, true},
+		{"bps 7", []int{4}, 1, 7, 0, true},
+		{"bps 64", []int{4}, 1, 64, 0, true},
+
+		// invalid n
+		{"n zero", []int{4}, 0, 8, 0, true},
+		{"n negative", []int{4}, -1, 8, 0, true},
+
+		// overflow / too-large
+		{"sample count overflow", []int{1 << 30, 1 << 30, 1 << 30}, 1, 8, 0, true},
+		{"sample table at limit", []int{streamlimits.MaxSampleBytes}, 1, 8, streamlimits.MaxSampleBytes, false},
+		{"sample table over limit", []int{streamlimits.MaxSampleBytes + 1}, 1, 8, 0, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("sampleTableBytes panicked: %v", r)
+				}
+			}()
+			got, err := sampleTableBytes(tc.size, tc.n, tc.bitsPerSample)
+			if tc.wantErr {
+				if err == nil {
+					t.Errorf("got (%d, nil), want error", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if got != tc.wantBytes {
+				t.Errorf("got %d bytes, want %d", got, tc.wantBytes)
+			}
+		})
 	}
 }

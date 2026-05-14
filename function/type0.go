@@ -20,13 +20,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/streamlimits"
 )
-
-const maxSampleBits = 1 << 23 // 1MB
 
 // PDF 2.0 sections: 7.10.2
 
@@ -122,6 +120,17 @@ func extractType0(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 		return nil, err
 	}
 
+	// compute expected sample buffer size before reading the stream,
+	// so a decompression bomb cannot allocate unbounded memory
+	m, n := len(domain)/2, len(rangeArray)/2
+	if m <= 0 || n <= 0 {
+		return nil, &pdf.MalformedFileError{Err: errors.New("Type 0 function has invalid shape")}
+	}
+	totalBytes, err := sampleTableBytes(size, n, int(bitsPerSample))
+	if err != nil {
+		return nil, &pdf.MalformedFileError{Err: err}
+	}
+
 	f := &Type0{
 		Domain:        domain,
 		Range:         rangeArray,
@@ -132,13 +141,7 @@ func extractType0(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 		Decode:        decode,
 	}
 
-	stmReader, err := pdf.DecodeStream(x.R, path, stream, 0)
-	if err != nil {
-		return nil, err
-	}
-	defer stmReader.Close()
-
-	f.Samples, err = io.ReadAll(stmReader)
+	f.Samples, err = pdf.ReadAll(x.R, path, stream, int64(totalBytes))
 	if err != nil {
 		return nil, err
 	}
@@ -228,17 +231,6 @@ func (f *Type0) validate() error {
 	if len(f.Size) != m {
 		return newInvalidFunctionError(0, "Size", "invalid length %d != %d", len(f.Size), m)
 	}
-	for i, size := range f.Size {
-		if size < 1 {
-			return newInvalidFunctionError(0, "Size", "invalid size[%d] = %d < 1", i, size)
-		}
-	}
-
-	switch f.BitsPerSample {
-	case 1, 2, 4, 8, 12, 16, 24, 32:
-	default:
-		return newInvalidFunctionError(0, "BitsPerSample", "invalid value %d", f.BitsPerSample)
-	}
 
 	if len(f.Encode) != 2*m {
 		return newInvalidFunctionError(0, "Encode", "invalid length %d != %d", len(f.Encode), 2*m)
@@ -260,29 +252,50 @@ func (f *Type0) validate() error {
 		}
 	}
 
-	totalSamples := 1
-	for _, size := range f.Size {
-		next := totalSamples * size
-		if totalSamples != next/size {
-			return errors.New("sample size overflow")
-		}
-		totalSamples = next
+	totalBytes, err := sampleTableBytes(f.Size, n, f.BitsPerSample)
+	if err != nil {
+		return err
 	}
-	totalBits := totalSamples * (n * f.BitsPerSample)
-	if totalSamples != totalBits/(n*f.BitsPerSample) {
-		return errors.New("sample size overflow")
-	}
-
-	if totalBits > maxSampleBits {
-		return errors.New("too many samples in Type 0 function")
-	}
-
-	totalBytes := (totalBits + 7) / 8
 	if len(f.Samples) != totalBytes {
 		return newInvalidFunctionError(0, "Samples", "invalid length %d != %d", len(f.Samples), totalBytes)
 	}
 
 	return nil
+}
+
+// sampleTableBytes computes the byte count of a Type 0 sample table
+// using overflow-safe arithmetic and rejects sizes above
+// [streamlimits.MaxSampleBytes].  All arguments are validated, so the
+// helper is safe to call on untrusted input.
+func sampleTableBytes(size []int, n, bitsPerSample int) (int, error) {
+	switch bitsPerSample {
+	case 1, 2, 4, 8, 12, 16, 24, 32:
+	default:
+		return 0, fmt.Errorf("Type 0 function: invalid BitsPerSample %d", bitsPerSample)
+	}
+	if n <= 0 {
+		return 0, fmt.Errorf("Type 0 function: invalid output count %d", n)
+	}
+	totalSamples := 1
+	for _, sz := range size {
+		if sz <= 0 {
+			return 0, fmt.Errorf("Type 0 function: invalid Size entry %d", sz)
+		}
+		next := totalSamples * sz
+		if totalSamples != next/sz {
+			return 0, errors.New("Type 0 function sample count overflow")
+		}
+		totalSamples = next
+	}
+	totalBits := totalSamples * (n * bitsPerSample)
+	if totalSamples != totalBits/(n*bitsPerSample) {
+		return 0, errors.New("Type 0 function sample count overflow")
+	}
+	totalBytes := (totalBits + 7) / 8
+	if totalBytes > streamlimits.MaxSampleBytes {
+		return 0, errors.New("Type 0 function sample table too large")
+	}
+	return totalBytes, nil
 }
 
 // Embed embeds the function into a PDF file.

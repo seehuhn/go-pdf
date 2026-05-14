@@ -57,5 +57,9 @@ func (b *Builder) DrawInlineImageRaw(dict pdf.Dict, data []byte) {
 		b.Err = errors.New("inline images not allowed in this context")
 		return
 	}
+	if err := content.ValidateInlineImageFilter(dict); err != nil {
+		b.Err = err
+		return
+	}
 	b.emit(content.OpInlineImage, dict, pdf.String(data))
 }

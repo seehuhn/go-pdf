@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/internal/streamlimits"
 	"seehuhn.de/go/pdf/opaque"
 )
 
@@ -292,6 +293,9 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 	if width <= 0 {
 		return nil, pdf.Errorf("invalid soft mask width %d", width)
 	}
+	if width > streamlimits.MaxImageWidth {
+		return nil, pdf.Errorf("soft mask width %d exceeds limit", width)
+	}
 
 	height, err := x.GetInteger(path, dict["Height"])
 	if err != nil {
@@ -299,6 +303,9 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 	}
 	if height <= 0 {
 		return nil, pdf.Errorf("invalid soft mask height %d", height)
+	}
+	if height > streamlimits.MaxImageHeight {
+		return nil, pdf.Errorf("soft mask height %d exceeds limit", height)
 	}
 
 	bpc, err := x.GetInteger(path, dict["BitsPerComponent"])
@@ -348,7 +355,10 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 		}
 	}
 
-	softMask.Source = &streamData{inner: opaque.ExtractStream(x, stm)}
+	softMask.Source = &streamData{
+		inner:    opaque.ExtractStream(x, stm),
+		maxBytes: ImageDataLimit(softMask.Width, softMask.Height, softMask.BitsPerComponent, color.SpaceDeviceGray),
+	}
 
 	return softMask, nil
 }

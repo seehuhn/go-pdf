@@ -19,7 +19,6 @@ package extract
 import (
 	"errors"
 	"fmt"
-	"io"
 
 	"seehuhn.de/go/postscript/cid"
 
@@ -31,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
 // extractFontCIDType2 reads a Type 2 CIDFont dictionary from the PDF file.
@@ -151,18 +151,14 @@ func extractFontCIDType2(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 		}
 
 	case *pdf.Stream:
-		in, err := pdf.DecodeStream(x.R, path, c2g, 0)
+		cid2gidData, err := pdf.ReadAll(x.R, path, c2g, streamlimits.MaxCIDToGIDMapBytes)
 		if err != nil {
 			return nil, err
 		}
-		cid2gidData, err := io.ReadAll(in)
-		if err == nil && len(cid2gidData)%2 != 0 {
-			err = &pdf.MalformedFileError{
+		if len(cid2gidData)%2 != 0 {
+			return nil, &pdf.MalformedFileError{
 				Err: errors.New("odd length CIDToGIDMap"),
 			}
-		}
-		if err != nil {
-			return nil, err
 		}
 		d.CIDToGID = make([]glyph.ID, len(cid2gidData)/2)
 		for i := range d.CIDToGID {
