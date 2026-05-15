@@ -62,12 +62,20 @@ func TestString(t *testing.T) {
 		{"(a (and b))", "a (and b)"},
 		{"(a\nb)", "a\nb"},
 		{"(a\\nb)", "a\nb"},
-		{"(a\rb)", "a\rb"},
+		// PDF 7.3.4.2: an unescaped end-of-line marker inside a literal
+		// string is normalised to a single LF, regardless of whether it
+		// is CR, LF, or CR-LF.
+		{"(a\rb)", "a\nb"},
+		{"(a\r\nb)", "a\nb"},
+		{"(a\n\rb)", "a\n\nb"},
+		{"(a\r\rb)", "a\n\nb"},     // two bare CRs are two EOLs
+		{"(a\r\n\nb)", "a\n\nb"},   // CR-LF then LF is two EOLs
+		{"(a\r\n\r\nb)", "a\n\nb"}, // two CR-LFs are two EOLs
 		{"(a\\rb)", "a\rb"},
 		{"(a\\\rb)", "ab"},
 		{"(a\\\nb)", "ab"},
-		{"(a\\\r\nb)", "ab"},   // CR LF is one line ending
-		{"(a\\\n\rb)", "a\rb"}, // LF CR is two line endings
+		{"(a\\\r\nb)", "ab"},   // backslash + CR-LF is one continuation
+		{"(a\\\n\rb)", "a\nb"}, // backslash + LF is a continuation; bare CR then normalises to LF
 		{"(\0053)", "\0053"},
 		{"<414243>", "ABC"},
 		{"< 4 1 4 2 4 3 >", "ABC"},
@@ -111,6 +119,15 @@ func TestName(t *testing.T) {
 		{"/paired#28#29parentheses", "paired()parentheses"},
 		{"/The_Key_of_F#23_Minor", "The_Key_of_F#_Minor"},
 		{"/A#42", "AB"},
+		{"/A#aF", "A\xaf"},
+		// PDF 7.3.5: when "#" is not followed by two hex digits, treat "#"
+		// as a literal character rather than erroring.
+		{"/A#Z9", "A#Z9"},
+		{"/A#9Z", "A#9Z"},
+		{"/A#", "A#"},
+		{"/A#9", "A#9"},
+		{"/##41", "#A"},
+		{"/#00", "\x00"},
 	}
 
 	for i, c := range cases {
@@ -243,9 +260,11 @@ var testCases = []struct {
 	{`(he(ll)o)`, pdf.String("he(ll)o"), true},
 	{`(he\)ll\(o)`, pdf.String("he)ll(o"), true},
 	{"(hello\n)", pdf.String("hello\n"), true},
-	{"(hello\r)", pdf.String("hello\r"), true},
-	{"(hello\r\n)", pdf.String("hello\r\n"), true},
-	{"(hello\n\r)", pdf.String("hello\n\r"), true},
+	// PDF 7.3.4.2: an unescaped end-of-line marker inside a literal
+	// string is normalised to a single LF.
+	{"(hello\r)", pdf.String("hello\n"), true},
+	{"(hello\r\n)", pdf.String("hello\n"), true},
+	{"(hello\n\r)", pdf.String("hello\n\n"), true},
 	{"(hell\\\no)", pdf.String("hello"), true},
 	{"(hell\\\ro)", pdf.String("hello"), true},
 	{"(hell\\\r\no)", pdf.String("hello"), true},

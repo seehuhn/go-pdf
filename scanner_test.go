@@ -40,17 +40,17 @@ func TestRefill(t *testing.T) {
 	s := newScanner(bytes.NewReader(buf), nil, nil)
 
 	for _, inc := range []int{0, 1, scannerBufSize, 1} {
-		s.bufPos += inc
+		s.pos += inc
 		err := s.refill()
-		total := int(s.filePos) + s.bufPos
+		total := int(s.filePos) + s.pos
 		expectUsed := min(scannerBufSize, n-total)
-		if err != nil || s.bufPos != 0 || s.bufEnd != expectUsed {
+		if err != nil || s.pos != 0 || s.used != expectUsed {
 			errStr := "nil"
 			if err != nil {
 				errStr = err.Error()
 			}
 			t.Errorf("%d: s.pos = %d, s.used = %d, %s",
-				total, s.bufPos, s.bufEnd, errStr)
+				total, s.pos, s.used, errStr)
 		}
 	}
 }
@@ -136,7 +136,7 @@ func TestSkipWhiteSpace(t *testing.T) {
 			if err != nil {
 				t.Errorf("%q: unexpected error: %s", body, err)
 			}
-			total := int(s.filePos) + s.bufPos
+			total := int(s.filePos) + s.pos
 			if total != len(test) {
 				t.Errorf("%q: wrong position %d", body, total)
 			}
@@ -146,7 +146,7 @@ func TestSkipWhiteSpace(t *testing.T) {
 
 func TestReadHeaderVersion(t *testing.T) {
 	s := newScanner(strings.NewReader("%PDF-1.7\n1 0 obj\n"), nil, nil)
-	version, err := s.readHeaderVersion()
+	version, err := s.ReadHeaderVersion()
 	if err != nil {
 		t.Errorf("unexpected error %q", err)
 	}
@@ -156,7 +156,7 @@ func TestReadHeaderVersion(t *testing.T) {
 
 	for _, in := range []string{"", "%PEF-1.7\n", "%PDF-0.1\n"} {
 		s = newScanner(strings.NewReader(in), nil, nil)
-		_, err = s.readHeaderVersion()
+		_, err = s.ReadHeaderVersion()
 		if err == nil {
 			t.Errorf("%q: missing error", in)
 		}
@@ -164,7 +164,7 @@ func TestReadHeaderVersion(t *testing.T) {
 
 	for _, in := range []string{"%PDF-1.9\n", "%PDF-1.50\n"} {
 		s = newScanner(strings.NewReader(in), nil, nil)
-		_, err = s.readHeaderVersion()
+		_, err = s.ReadHeaderVersion()
 		if !errors.Is(err, errVersion) {
 			t.Errorf("%q: wrong error %q", in, err)
 		}
@@ -312,6 +312,15 @@ var testCases = []struct {
 	{"/A#42", Name("AB"), true},
 	{"/F#23#20minor", Name("F# minor"), true},
 	{"/1#2E5", Name("1.5"), true},
+	{"/A#aF", Name("A\xaf"), true},
+	// PDF 7.3.5: when "#" is not followed by two hex digits, treat "#"
+	// as a literal character rather than corrupting the name.
+	{"/A#Z9", Name("A#Z9"), true},
+	{"/A#9Z", Name("A#9Z"), true},
+	{"/A#", Name("A#"), true},
+	{"/A#9", Name("A#9"), true},
+	{"/##41", Name("#A"), true},
+	{"/#00", Name("\x00"), true},
 	{"/ß", Name("ß"), true},
 	{"/", Name(""), true},
 
@@ -321,14 +330,25 @@ var testCases = []struct {
 	{`(he(ll)o)`, String("he(ll)o"), true},
 	{`(he\)ll\(o)`, String("he)ll(o"), true},
 	{"(hello\n)", String("hello\n"), true},
-	{"(hello\r)", String("hello\r"), true},
-	{"(hello\r\n)", String("hello\r\n"), true},
-	{"(hello\n\r)", String("hello\n\r"), true},
+	// PDF 7.3.4.2: an unescaped end-of-line marker inside a literal
+	// string is normalised to a single LF, regardless of whether it
+	// is CR, LF, or CR-LF.
+	{"(hello\r)", String("hello\n"), true},
+	{"(hello\r\n)", String("hello\n"), true},
+	{"(hello\n\r)", String("hello\n\n"), true},
+	{"(a\rb\rc)", String("a\nb\nc"), true},
+	{"(a\r\nb\r\nc)", String("a\nb\nc"), true},
 	{"(hell\\\no)", String("hello"), true},
 	{"(hell\\\ro)", String("hello"), true},
 	{"(hell\\\r\no)", String("hello"), true},
 	{`(h\145llo)`, String("hello"), true},
 	{`(\0612)`, String("12"), true},
+	// PDF 7.3.4.2: an octal escape ends as soon as a non-octal digit is
+	// seen, even if fewer than three digits have been read.
+	{`(a\17X)`, String("a\x0fX"), true},
+	{`(a\1X)`, String("a\x01X"), true},
+	{`(a\78)`, String("a\x078"), true},
+	{`(a\1\2)`, String("a\x01\x02"), true},
 
 	{"<>", String(nil), true},
 	{"<68656c6c6f>", String("hello"), true},

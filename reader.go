@@ -130,7 +130,7 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 	if err != nil {
 		return nil, err
 	}
-	version, err := s.readHeaderVersion()
+	version, err := s.ReadHeaderVersion()
 	if err != nil {
 		// TODO(voss): A PDF processor shall attempt to read any PDF file, even
 		// if the PDF file’s version is more recent than that for which the PDF
@@ -389,7 +389,7 @@ func getFromObjStm(r Getter, number uint32, sRef Reference, getInt getIntFn, enc
 
 	info := contents.idx[m]
 
-	delta := int64(info.offs) - contents.s.currentPos()
+	delta := int64(info.offs) - contents.s.CurrentPos()
 	if delta < 0 {
 		return nil, nil
 	}
@@ -502,7 +502,7 @@ func getObjStm(r Getter, stream *Stream, getInt getIntFn, enc *encryptInfo) (_ *
 		idx[i].offs = int(offs)
 	}
 
-	pos := s.currentPos()
+	pos := s.CurrentPos()
 	first, ok := stream.Dict["First"].(Integer)
 	firstInt := int(first)
 	if !ok || first < Integer(pos) || first != Integer(firstInt) {
@@ -520,7 +520,7 @@ func getObjStm(r Getter, stream *Stream, getInt getIntFn, enc *encryptInfo) (_ *
 }
 
 func (s *objStm) Close() error {
-	rc, ok := s.s.r.(io.Closer)
+	rc, ok := s.s.src.(io.Closer)
 	if ok {
 		return rc.Close()
 	}

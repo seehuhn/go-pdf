@@ -728,7 +728,7 @@ func (x String) AsPDF(opt OutputOptions) Native {
 // the surrounding parentheses or angle brackets.
 func ParseString(buf []byte) (String, error) {
 	scanner := newScanner(bytes.NewReader(buf), nil, nil)
-	b, _ := scanner.Peek(1)
+	b, _ := scanner.PeekN(1)
 	if len(b) < 1 {
 		return nil, errInvalidString
 	}
@@ -736,10 +736,10 @@ func ParseString(buf []byte) (String, error) {
 	var err error
 	switch b[0] {
 	case '(':
-		scanner.bufPos++
-		s, err = scanner.ReadQuotedString()
+		scanner.pos++
+		s, err = scanner.ReadString()
 	case '<':
-		scanner.bufPos++
+		scanner.pos++
 		s, err = scanner.ReadHexString()
 	default:
 		err = errInvalidString
@@ -747,7 +747,7 @@ func ParseString(buf []byte) (String, error) {
 	if err != nil {
 		return nil, err
 	}
-	if scanner.currentPos() != int64(len(buf)) {
+	if scanner.CurrentPos() != int64(len(buf)) {
 		return nil, errInvalidString
 	}
 	return s, nil
@@ -782,7 +782,7 @@ func (x Name) isThirdClassName() bool {
 // the leading slash.
 func ParseName(buf []byte) (Name, error) {
 	scanner := newScanner(bytes.NewReader(buf), nil, nil)
-	b, _ := scanner.Peek(1)
+	b, _ := scanner.PeekN(1)
 	if len(b) < 1 || b[0] != '/' {
 		return "", errInvalidName
 	}
@@ -790,7 +790,7 @@ func ParseName(buf []byte) (Name, error) {
 	if err != nil {
 		return "", err
 	}
-	if scanner.currentPos() != int64(len(buf)) {
+	if scanner.CurrentPos() != int64(len(buf)) {
 		return "", errInvalidString
 	}
 	return n, nil

@@ -35,11 +35,11 @@ const (
 )
 
 type scanner struct {
-	r       io.Reader
+	src     io.Reader
 	filePos int64 // how far into the reader the start of buf is
 	buf     []byte
-	bufPos  int // current position within buf
-	bufEnd  int // end of valid data within buf
+	pos     int // current position within buf
+	used    int // end of valid data within buf
 
 	// fileReader, if set, is the underlying io.ReaderAt for the whole file.
 	// This is used to create streamReader instances that can read at
@@ -59,19 +59,18 @@ type scanner struct {
 
 type getIntFn func(Object) (Integer, error)
 
-func newScanner(r io.Reader, getInt getIntFn,
-	dec *encryptInfo) *scanner {
+func newScanner(r io.Reader, getInt getIntFn, enc *encryptInfo) *scanner {
 	return &scanner{
-		r:      r,
+		src:    r,
 		buf:    make([]byte, scannerBufSize),
 		getInt: getInt,
-		enc:    dec,
+		enc:    enc,
 	}
 }
 
-// currentPos returns the current position in the file.
-func (s *scanner) currentPos() int64 {
-	return s.filePos + int64(s.bufPos)
+// CurrentPos returns the current position in the file.
+func (s *scanner) CurrentPos() int64 {
+	return s.filePos + int64(s.pos)
 }
 
 func (s *scanner) ReadIndirectObject() (Native, Reference, error) {
@@ -122,7 +121,7 @@ func (s *scanner) ReadIndirectObject() (Native, Reference, error) {
 	if a, ok := obj.(Integer); ok {
 		// Check whether this is the start of a reference to an indirect
 		// object.
-		buf, err := s.Peek(6)
+		buf, err := s.PeekN(6)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -162,7 +161,7 @@ func (s *scanner) ReadIndirectObject() (Native, Reference, error) {
 }
 
 func (s *scanner) ReadObject() (Native, error) {
-	buf, err := s.Peek(5) // len("false") == 5
+	buf, err := s.PeekN(5) // len("false") == 5
 	if err != nil {
 		return nil, err
 	}
@@ -172,13 +171,13 @@ func (s *scanner) ReadObject() (Native, error) {
 		// Test this first, so that we can use buf[0] in the following cases.
 		return nil, &MalformedFileError{Err: io.EOF}
 	case bytes.HasPrefix(buf, []byte("null")):
-		s.bufPos += 4
+		s.pos += 4
 		return nil, nil
 	case bytes.HasPrefix(buf, []byte("true")):
-		s.bufPos += 4
+		s.pos += 4
 		return Boolean(true), nil
 	case bytes.HasPrefix(buf, []byte("false")):
-		s.bufPos += 5
+		s.pos += 5
 		return Boolean(false), nil
 	case buf[0] == '/':
 		return s.ReadName()
@@ -198,19 +197,19 @@ func (s *scanner) ReadObject() (Native, error) {
 		if err != nil && err != io.EOF {
 			return nil, err
 		}
-		buf, _ = s.Peek(6) // len("stream") == 6
+		buf, _ = s.PeekN(6) // len("stream") == 6
 		if !bytes.HasPrefix(buf, []byte("stream")) {
 			return dict, nil
 		}
 		return s.ReadStreamData(dict)
 	case buf[0] == '(':
-		s.bufPos++
-		return s.ReadQuotedString()
+		s.pos++
+		return s.ReadString()
 	case buf[0] == '<':
-		s.bufPos++
+		s.pos++
 		return s.ReadHexString()
 	case buf[0] == '[':
-		s.bufPos++
+		s.pos++
 		return s.ReadArray()
 	}
 
@@ -228,11 +227,11 @@ func (s *scanner) ReadInteger() (Integer, error) {
 
 	first := true
 	var res []byte
-	err = s.ScanBytes(func(c byte) bool {
-		if first && (c == '+' || c == '-') {
-			res = append(res, c)
-		} else if c >= '0' && c <= '9' {
-			res = append(res, c)
+	err = s.ScanBytes(func(b byte) bool {
+		if first && (b == '+' || b == '-') {
+			res = append(res, b)
+		} else if b >= '0' && b <= '9' {
+			res = append(res, b)
 		} else {
 			return false
 		}
@@ -258,14 +257,14 @@ func (s *scanner) ReadNumber() (Native, error) {
 	hasDot := false
 	first := true
 	var res []byte
-	err := s.ScanBytes(func(c byte) bool {
-		if !hasDot && c == '.' {
+	err := s.ScanBytes(func(b byte) bool {
+		if !hasDot && b == '.' {
 			hasDot = true
-			res = append(res, c)
-		} else if first && (c == '+' || c == '-') {
-			res = append(res, c)
-		} else if c >= '0' && c <= '9' {
-			res = append(res, c)
+			res = append(res, b)
+		} else if first && (b == '+' || b == '-') {
+			res = append(res, b)
+		} else if b >= '0' && b <= '9' {
+			res = append(res, b)
 		} else {
 			return false
 		}
@@ -291,86 +290,84 @@ func (s *scanner) ReadNumber() (Native, error) {
 	return Integer(x), nil
 }
 
-// ReadQuotedString reads a ()-delimited string, starting after the opening
-// bracket.
-func (s *scanner) ReadQuotedString() (String, error) {
+// ReadString reads a ()-delimited string, starting after the opening bracket.
+func (s *scanner) ReadString() (String, error) {
 	var res []byte
-	parentCount := 0
-	escape := false
+	bracketLevel := 1 // we are already inside the opening "("
 	ignoreLF := false
-	isOctal := 0
-	octalVal := byte(0)
-	err := s.ScanBytes(func(c byte) bool {
-		if ignoreLF {
-			ignoreLF = false
-			if c == '\n' {
-				return true
-			}
-		}
-		if isOctal > 0 {
-			octalVal = octalVal*8 + (c - '0')
-			isOctal--
-			if isOctal == 0 {
-				res = append(res, octalVal)
-			}
-			return true
-		}
-		if escape {
-			escape = false
-			switch c {
-			case '\n':
-				return true
-			case '\r':
-				ignoreLF = true
-				return true
-			case 'n':
-				c = '\n'
-			case 'r':
-				c = '\r'
-			case 't':
-				c = '\t'
-			case 'b':
-				c = '\b'
-			case 'f':
-				c = '\f'
-			}
-			if c >= '0' && c <= '7' {
-				isOctal = 2
-				octalVal = c - '0'
-				return true
-			}
-		} else if c == '\\' {
-			escape = true
-			return true
-		} else if c == '(' {
-			parentCount++
-		} else if c == ')' {
-			if parentCount > 0 {
-				parentCount--
-			} else {
-				return false
-			}
-		}
-		res = append(res, c)
-		return true
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.SkipString(")")
-	if err != nil {
-		return nil, err
-	}
-
-	if s.enc != nil && s.encRef != 0 {
-		res, err = s.enc.DecryptBytes(s.encRef, res)
+	for {
+		b, err := s.ReadByte()
 		if err != nil {
 			return nil, err
 		}
+		if ignoreLF {
+			ignoreLF = false
+			if b == '\n' {
+				continue
+			}
+		}
+		switch b {
+		case '(':
+			bracketLevel++
+			res = append(res, b)
+		case ')':
+			bracketLevel--
+			if bracketLevel == 0 {
+				if s.enc != nil && s.encRef != 0 {
+					res, err = s.enc.DecryptBytes(s.encRef, res)
+					if err != nil {
+						return nil, err
+					}
+				}
+				return String(res), nil
+			}
+			res = append(res, b)
+		case '\\':
+			esc, err := s.ReadByte()
+			if err != nil {
+				return nil, err
+			}
+			switch esc {
+			case 'n':
+				res = append(res, '\n')
+			case 'r':
+				res = append(res, '\r')
+			case 't':
+				res = append(res, '\t')
+			case 'b':
+				res = append(res, '\b')
+			case 'f':
+				res = append(res, '\f')
+			case '\n':
+				// line continuation
+			case '\r':
+				// line continuation; ignore an immediately following LF
+				ignoreLF = true
+			case '0', '1', '2', '3', '4', '5', '6', '7':
+				oct := esc - '0'
+				for range 2 {
+					buf, err := s.PeekN(1)
+					if err != nil && err != io.EOF {
+						return nil, err
+					}
+					if len(buf) == 0 || buf[0] < '0' || buf[0] > '7' {
+						break
+					}
+					oct = oct*8 + (buf[0] - '0')
+					s.pos++
+				}
+				res = append(res, oct)
+			default:
+				res = append(res, esc)
+			}
+		case '\r':
+			// unescaped CR or CR+LF, normalised to LF per PDF 7.3.4.2
+			res = append(res, '\n')
+			ignoreLF = true
+		default:
+			res = append(res, b)
+		}
 	}
-
-	return String(res), nil
 }
 
 // ReadHexString reads a <>-delimited string, starting after the opening
@@ -379,15 +376,15 @@ func (s *scanner) ReadHexString() (String, error) {
 	var res []byte
 	var hexVal byte
 	first := true
-	err := s.ScanBytes(func(c byte) bool {
+	err := s.ScanBytes(func(b byte) bool {
 		var d byte
-		if c >= '0' && c <= '9' {
-			d = c - '0'
-		} else if c >= 'A' && c <= 'F' {
-			d = c - 'A' + 10
-		} else if c >= 'a' && c <= 'f' {
-			d = c - 'a' + 10
-		} else if c == '>' {
+		if b >= '0' && b <= '9' {
+			d = b - '0'
+		} else if b >= 'A' && b <= 'F' {
+			d = b - 'A' + 10
+		} else if b >= 'a' && b <= 'f' {
+			d = b - 'a' + 10
+		} else if b == '>' {
 			return false
 		} else {
 			return true
@@ -429,39 +426,62 @@ func (s *scanner) ReadName() (Name, error) {
 		return "", err
 	}
 
-	hex := 0
-	var hexByte byte
 	var res []byte
-	err = s.ScanBytes(func(c byte) bool {
-		if hex > 0 {
-			var val byte
-			if c >= '0' && c <= '9' {
-				val = c - '0'
-			} else if c >= 'A' && c <= 'F' {
-				val = c - 'A' + 10
-			} else if c >= 'a' && c <= 'f' {
-				val = c - 'a' + 10
-			}
-			hexByte = 16*hexByte + val
-			hex--
-			if hex == 0 {
-				res = append(res, hexByte)
-			}
-		} else if c == '#' {
-			hexByte = 0
-			hex = 2
-		} else if isSpace[c] || isDelimiter[c] {
-			return false
-		} else {
-			res = append(res, c)
+	for {
+		buf, err := s.PeekN(1)
+		if err != nil && err != io.EOF {
+			return "", err
 		}
-		return true
-	})
-	if err != nil && err != io.EOF {
-		return "", err
+		if len(buf) == 0 {
+			break
+		}
+		b := buf[0]
+		if b == '#' {
+			if b, ok := s.tryHex(); ok {
+				res = append(res, b)
+				continue
+			}
+			// PDF 7.3.5: when "#" is not followed by two hex digits,
+			// treat the "#" as a literal character.
+			res = append(res, '#')
+		} else if isSpace[b] || isDelimiter[b] {
+			break
+		} else {
+			res = append(res, b)
+		}
+		s.pos++
 	}
 
 	return Name(res), nil
+}
+
+// tryHex peeks at "#" and the two bytes after it. If both are valid hex
+// digits it consumes all three bytes and returns the decoded byte. Otherwise
+// it returns (0, false) without consuming.
+func (s *scanner) tryHex() (byte, bool) {
+	buf, _ := s.PeekN(3)
+	if len(buf) != 3 {
+		return 0, false
+	}
+	hi := hexDigit(buf[1])
+	lo := hexDigit(buf[2])
+	if hi == 255 || lo == 255 {
+		return 0, false
+	}
+	s.pos += 3
+	return hi<<4 | lo, true
+}
+
+func hexDigit(c byte) byte {
+	switch {
+	case c >= '0' && c <= '9':
+		return c - '0'
+	case c >= 'A' && c <= 'F':
+		return c - 'A' + 10
+	case c >= 'a' && c <= 'f':
+		return c - 'a' + 10
+	}
+	return 255
 }
 
 // ReadArray reads an array, starting after the opening "[".
@@ -475,7 +495,7 @@ func (s *scanner) ReadArray() (array Array, err error) {
 				Err: errors.New("unexpected EOF while reading Array"),
 			}
 		} else if err != nil {
-			err = Wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
+			err = Wrap(err, fmt.Sprintf("byte %d", s.CurrentPos()))
 		}
 	}()
 
@@ -499,7 +519,7 @@ func (s *scanner) ReadArray() (array Array, err error) {
 		}
 
 		var buf []byte
-		buf, err = s.Peek(1)
+		buf, err = s.PeekN(1)
 		if err != nil {
 			return nil, err
 		}
@@ -507,7 +527,7 @@ func (s *scanner) ReadArray() (array Array, err error) {
 			break
 		}
 		if integersSeen >= 2 && buf[0] == 'R' {
-			s.bufPos++
+			s.pos++
 			k := len(array)
 			a := array[k-2].(Integer)
 			b := array[k-1].(Integer)
@@ -534,7 +554,7 @@ func (s *scanner) ReadArray() (array Array, err error) {
 
 		array = append(array, obj)
 	}
-	s.bufPos++ // we have already seen the closing "]"
+	s.pos++ // we have already seen the closing "]"
 
 	return array, nil
 }
@@ -550,7 +570,7 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 				Err: errors.New("unexpected EOF while reading Dict"),
 			}
 		} else if err != nil {
-			err = Wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
+			err = Wrap(err, fmt.Sprintf("byte %d", s.CurrentPos()))
 		}
 	}()
 
@@ -599,7 +619,7 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 		// If we found an integer, check whether this is a reference to an
 		// indirect object.
 		if a, isInt := val.(Integer); isInt {
-			buf, err := s.Peek(1)
+			buf, err := s.PeekN(1)
 			if err != nil {
 				return nil, err
 			}
@@ -617,14 +637,14 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 					return nil, err
 				}
 
-				buf, err := s.Peek(1)
+				buf, err := s.PeekN(1)
 				if err != nil {
 					return nil, err
 				}
 				if buf[0] != 'R' {
 					return nil, &MalformedFileError{Err: errors.New("expected /Name but found Integer")}
 				}
-				s.bufPos++
+				s.pos++
 				err = s.SkipWhiteSpace()
 				if err != nil {
 					return nil, err
@@ -659,7 +679,7 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 				Err: errors.New("unexpected EOF while reading Stream"),
 			}
 		} else if err != nil {
-			err = Wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
+			err = Wrap(err, fmt.Sprintf("byte %d", s.CurrentPos()))
 		}
 	}()
 
@@ -677,17 +697,17 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 		return nil, err
 	}
 
-	buf, err := s.Peek(2)
+	buf, err := s.PeekN(2)
 	if err != nil {
 		return nil, err
 	}
 	if len(buf) >= 1 && buf[0] == '\n' {
-		s.bufPos++
+		s.pos++
 	} else if len(buf) >= 2 && buf[0] == '\r' && buf[1] == '\n' {
-		s.bufPos += 2
+		s.pos += 2
 	} else if len(buf) >= 1 && buf[0] == '\r' {
 		// not allowed by the spec, but seen in the wild
-		s.bufPos++
+		s.pos++
 	} else {
 		return nil, &MalformedFileError{
 			Err: errors.New("stream does not start with newline"),
@@ -700,7 +720,7 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 			Err: errors.New("cannot read stream data"),
 		}
 	}
-	start := s.currentPos()
+	start := s.CurrentPos()
 	l := int64(length)
 	err = s.Discard(l)
 	if err != nil {
@@ -731,7 +751,7 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 	}, nil
 }
 
-func (s *scanner) readHeaderVersion() (Version, error) {
+func (s *scanner) ReadHeaderVersion() (Version, error) {
 	err := s.SkipString("%PDF-")
 	if err != nil {
 		var e *MalformedFileError
@@ -742,9 +762,9 @@ func (s *scanner) readHeaderVersion() (Version, error) {
 	}
 
 	var buf []byte
-	err = s.ScanBytes(func(c byte) bool {
-		if c >= '0' && c <= '9' || c == '.' {
-			buf = append(buf, c)
+	err = s.ScanBytes(func(b byte) bool {
+		if b >= '0' && b <= '9' || b == '.' {
+			buf = append(buf, b)
 			return true
 		}
 		return false
@@ -764,63 +784,58 @@ func (s *scanner) readHeaderVersion() (Version, error) {
 	return ver, nil
 }
 
-// Refill discards the read part of the buffer and reads as much new data as
-// possible.  Once the end of file is reached, s.bufEnd will be smaller than the
-// buffer size, but no error will be returned.
-func (s *scanner) refill() error {
-	// move the remaining data to the beginning of the buffer
-	s.filePos += int64(s.bufPos)
-	copy(s.buf, s.buf[s.bufPos:s.bufEnd])
-	s.bufEnd -= s.bufPos
-	s.bufPos = 0
-
-	// try to read more data
-	n, err := io.ReadFull(s.r, s.buf[s.bufEnd:])
-	s.bufEnd += n
-
-	if n > 0 || err == io.ErrUnexpectedEOF || err == io.EOF {
-		err = nil
-	}
-	return err
-}
-
-// Peek returns a view of the next n bytes of input from the scanner's buffer.
+// PeekN returns a view of the next n bytes of input from the scanner's buffer.
 // If n is larger than scannerBufSize, the function panics.
 // If an EOF is encountered before n bytes can be read, the function returns
 // the remaining bytes without an error code.
-func (s *scanner) Peek(n int) ([]byte, error) {
+func (s *scanner) PeekN(n int) ([]byte, error) {
 	if n > scannerBufSize {
 		panic("peek window too large")
 	}
 
 	var err error
-	if s.bufPos+n > s.bufEnd {
+	if s.pos+n > s.used {
 		err = s.refill()
 	}
 
-	if s.bufPos+n > s.bufEnd {
-		return s.buf[s.bufPos:s.bufEnd], err
+	if s.pos+n > s.used {
+		return s.buf[s.pos:s.used], err
 	}
 
-	return s.buf[s.bufPos : s.bufPos+n], nil
+	return s.buf[s.pos : s.pos+n], nil
+}
+
+// ReadByte returns the next byte from the input, consuming it. It returns
+// io.EOF if no more input is available.
+func (s *scanner) ReadByte() (byte, error) {
+	buf, err := s.PeekN(1)
+	if err != nil && err != io.EOF {
+		return 0, err
+	}
+	if len(buf) == 0 {
+		return 0, io.EOF
+	}
+	c := buf[0]
+	s.pos++
+	return c, nil
 }
 
 func (s *scanner) Discard(n int64) error {
 	if n < 0 {
 		panic(fmt.Sprintf("negative discard offset %d", n))
 	}
-	unread := int64(s.bufEnd - s.bufPos)
+	unread := int64(s.used - s.pos)
 	if n <= unread {
-		s.bufPos += int(n)
+		s.pos += int(n)
 		return nil
 	}
 
 	n -= unread
-	s.filePos += int64(s.bufEnd)
-	s.bufPos = 0
-	s.bufEnd = 0
+	s.filePos += int64(s.used)
+	s.pos = 0
+	s.used = 0
 
-	n, err := io.CopyN(io.Discard, s.r, n)
+	n, err := io.CopyN(io.Discard, s.src, n)
 	s.filePos += n
 	return err
 }
@@ -830,21 +845,21 @@ func (s *scanner) Discard(n int64) error {
 // returned false; the next read will start with this byte.
 // If the end of the input is reached before `accept()` returns false,
 // `ScanBytes` returns io.EOF.
-func (s *scanner) ScanBytes(accept func(c byte) bool) error {
+func (s *scanner) ScanBytes(accept func(b byte) bool) error {
 	empty := true
 	for {
-		for s.bufPos < s.bufEnd {
-			if !accept(s.buf[s.bufPos]) {
+		for s.pos < s.used {
+			if !accept(s.buf[s.pos]) {
 				return nil
 			}
-			s.bufPos++
+			s.pos++
 			empty = false
 		}
 		err := s.refill()
 		if err == io.EOF && !empty {
 			return nil
 		}
-		if s.bufEnd == 0 {
+		if s.used == 0 {
 			if err == nil {
 				err = io.EOF
 			}
@@ -858,15 +873,15 @@ func (s *scanner) ScanBytes(accept func(c byte) bool) error {
 // returns io.EOF.
 func (s *scanner) SkipWhiteSpace() error {
 	isComment := false
-	return s.ScanBytes(func(c byte) bool {
+	return s.ScanBytes(func(b byte) bool {
 		if isComment {
-			if c == '\r' || c == '\n' {
+			if b == '\r' || b == '\n' {
 				isComment = false
 			}
-		} else if c == '%' {
+		} else if b == '%' {
 			isComment = true
 		} else {
-			return isSpace[c]
+			return isSpace[b]
 		}
 		return true
 	})
@@ -877,7 +892,7 @@ func (s *scanner) SkipWhiteSpace() error {
 func (s *scanner) SkipString(pat string) error {
 	patBytes := []byte(pat)
 	n := len(patBytes)
-	buf, err := s.Peek(n)
+	buf, err := s.PeekN(n)
 	if err != nil {
 		return err
 	}
@@ -886,7 +901,7 @@ func (s *scanner) SkipString(pat string) error {
 			Err: fmt.Errorf("expected %q but found %q", pat, string(buf)),
 		}
 	}
-	s.bufPos += n
+	s.pos += n
 	return nil
 }
 
@@ -898,61 +913,81 @@ func (s *scanner) SkipAfter(pat string) error {
 	}
 
 	for {
-		idx := bytes.Index(s.buf[s.bufPos:s.bufEnd], patBytes)
+		idx := bytes.Index(s.buf[s.pos:s.used], patBytes)
 		if idx >= 0 {
-			s.bufPos += idx + n
+			s.pos += idx + n
 			return nil
 		}
-		s.bufPos = s.bufEnd
+		s.pos = s.used
 		err := s.refill()
 		if err != nil {
 			return err
 		}
-		if s.bufEnd == 0 {
+		if s.used == 0 {
 			return io.EOF
 		}
 	}
 }
 
-// find returns the next non-overlapping occurrence of the regular expression pat
+// Find returns the next non-overlapping occurrence of the regular expression pat
 // in the file. It returns the position of the match, and the submatches as
 // returned by regexp.FindStringSubmatch.
-func (s *scanner) find(pat *regexp.Regexp) (int64, []string, error) {
+func (s *scanner) Find(pat *regexp.Regexp) (int64, []string, error) {
 	for {
 		// search for a match in the current buffer
-		m := pat.FindSubmatchIndex(s.buf[s.bufPos:s.bufEnd])
+		m := pat.FindSubmatchIndex(s.buf[s.pos:s.used])
 		if m != nil {
-			matchPos := s.filePos + int64(s.bufPos+m[0])
+			matchPos := s.filePos + int64(s.pos+m[0])
 
 			// found a match
 			res := make([]string, len(m)/2)
 			for i := range res {
 				a, b := m[2*i], m[2*i+1]
 				if a >= 0 && b > a {
-					res[i] = string(s.buf[s.bufPos+a : s.bufPos+b])
+					res[i] = string(s.buf[s.pos+a : s.pos+b])
 				}
 			}
 
-			s.bufPos += m[1]
+			s.pos += m[1]
 			return matchPos, res, nil
 		}
 
 		// There are no more matches in the current buffer, so we read more data.
 		// We need to be prepared for a partial match at the end of the buffer.
-		nextPos := s.bufEnd - regexpOverlap
-		if nextPos > s.bufPos {
-			s.bufPos = nextPos
+		nextPos := s.used - regexpOverlap
+		if nextPos > s.pos {
+			s.pos = nextPos
 		}
-		endBefore := s.bufEnd
+		endBefore := s.used
 		err := s.refill()
 		if err != nil {
 			return 0, nil, err
 		}
-		endAfter := s.bufEnd
+		endAfter := s.used
 		if endBefore < scannerBufSize && endBefore == endAfter {
 			return 0, nil, io.EOF
 		}
 	}
+}
+
+// refill discards the read part of the buffer and reads as much new data as
+// possible.  Once the end of file is reached, s.used will be smaller than the
+// buffer size, but no error will be returned.
+func (s *scanner) refill() error {
+	// move the remaining data to the beginning of the buffer
+	s.filePos += int64(s.pos)
+	copy(s.buf, s.buf[s.pos:s.used])
+	s.used -= s.pos
+	s.pos = 0
+
+	// try to read more data
+	n, err := io.ReadFull(s.src, s.buf[s.used:])
+	s.used += n
+
+	if n > 0 || err == io.ErrUnexpectedEOF || err == io.EOF {
+		err = nil
+	}
+	return err
 }
 
 type streamReader struct {

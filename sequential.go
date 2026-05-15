@@ -105,7 +105,7 @@ func (fi *FileInfo) doRead(objInfo *FileObject, getInt getIntFn) (Object, int64,
 		panic("unreachable") // TODO(voss): remove
 	}
 
-	return x, s.currentPos(), nil
+	return x, s.CurrentPos(), nil
 }
 
 // MakeReader creates a new reader for the PDF file described by fi.
@@ -226,7 +226,7 @@ func (fi *FileInfo) locateObjects() error {
 	sr := io.NewSectionReader(fi.R, 0, fi.FileSize)
 	s := newScanner(sr, nil, nil)
 
-	pos, m, err := s.find(startRegexp)
+	pos, m, err := s.Find(startRegexp)
 	if err == io.EOF {
 		return errNoPDF
 	} else if err != nil {
@@ -250,7 +250,7 @@ func (fi *FileInfo) locateObjects() error {
 
 scanLoop:
 	for {
-		pos, m, err = s.find(markerRegexp)
+		pos, m, err = s.Find(markerRegexp)
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -305,7 +305,7 @@ scanLoop:
 	if err != nil && err != io.EOF {
 		return err
 	}
-	fi.PDFEnd = s.currentPos()
+	fi.PDFEnd = s.CurrentPos()
 
 	if len(fi.Sections) == 0 {
 		return &MalformedFileError{

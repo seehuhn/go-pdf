@@ -72,7 +72,7 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 			return nil, nil, err
 		}
 
-		buf, err := s.Peek(4)
+		buf, err := s.PeekN(4)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -150,7 +150,7 @@ func readXRefTable(xref map[uint32]*xRefEntry, s *scanner) (Dict, error) {
 	}
 
 	for {
-		buf, err := s.Peek(1)
+		buf, err := s.PeekN(1)
 		if err != nil {
 			return nil, err
 		}
@@ -160,17 +160,17 @@ func readXRefTable(xref map[uint32]*xRefEntry, s *scanner) (Dict, error) {
 
 		start, err := s.ReadInteger()
 		if err != nil {
-			return nil, Wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
+			return nil, Wrap(err, fmt.Sprintf("byte %d", s.CurrentPos()))
 		}
 		length, err := s.ReadInteger()
 		if err != nil {
-			return nil, Wrap(err, fmt.Sprintf("byte %d", s.currentPos()))
+			return nil, Wrap(err, fmt.Sprintf("byte %d", s.CurrentPos()))
 		}
 
 		if start < 0 || length < 0 || start >= maxXRefSize || start+length > maxXRefSize {
 			return nil, &MalformedFileError{
 				Err: errInvalidXref,
-				Loc: []string{fmt.Sprintf("byte %d", s.currentPos())},
+				Loc: []string{fmt.Sprintf("byte %d", s.CurrentPos())},
 			}
 		}
 
@@ -215,7 +215,7 @@ func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32
 			continue
 		}
 
-		buf, err := s.Peek(20)
+		buf, err := s.PeekN(20)
 		if err != nil {
 			return err
 		}
@@ -260,16 +260,16 @@ func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32
 		default:
 			return &MalformedFileError{
 				Err: errInvalidXref,
-				Loc: []string{fmt.Sprintf("byte %d", s.currentPos())},
+				Loc: []string{fmt.Sprintf("byte %d", s.CurrentPos())},
 			}
 		}
 
 		if buf[19] == '\n' || buf[19] == '\r' {
-			s.bufPos += 20
+			s.pos += 20
 		} else {
 			// Some mal-formed PDF files use one-byte line endings.
 			// Try to fix this up ...
-			s.bufPos += 19
+			s.pos += 19
 		}
 	}
 	return nil

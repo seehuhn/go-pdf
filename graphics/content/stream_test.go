@@ -238,6 +238,34 @@ func TestReadValue(t *testing.T) {
 			input: "[/DeviceRGB]",
 			want:  pdf.Array{pdf.Name("DeviceRGB")},
 		},
+		// PDF 7.3.5: when "#" is not followed by two hex digits, treat
+		// the "#" as a literal character. Mirrors the same edge cases
+		// covered by the pdf and content scanners.
+		{
+			name:  "name with valid hex escape",
+			input: "/A#42",
+			want:  pdf.Name("AB"),
+		},
+		{
+			name:  "name with invalid first hex digit",
+			input: "/A#Z9",
+			want:  pdf.Name("A#Z9"),
+		},
+		{
+			name:  "name with invalid second hex digit",
+			input: "/A#9Z",
+			want:  pdf.Name("A#9Z"),
+		},
+		{
+			name:  "name with trailing hash",
+			input: "/A#",
+			want:  pdf.Name("A#"),
+		},
+		{
+			name:  "name with double hash",
+			input: "/##41",
+			want:  pdf.Name("#A"),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
