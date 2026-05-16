@@ -55,6 +55,36 @@ func TestRefill(t *testing.T) {
 	}
 }
 
+// erroringReader returns a fixed error on every Read and counts the calls.
+type erroringReader struct {
+	calls int
+	err   error
+}
+
+func (r *erroringReader) Read(p []byte) (int, error) {
+	r.calls++
+	return 0, r.err
+}
+
+func TestRefillStickyError(t *testing.T) {
+	sentinel := errors.New("read failed")
+	r := &erroringReader{err: sentinel}
+	s := newScanner(r, nil, nil)
+
+	if err := s.refill(); err != sentinel {
+		t.Fatalf("first refill: want sentinel, got %v", err)
+	}
+	callsAfterFirst := r.calls
+
+	if err := s.refill(); err != sentinel {
+		t.Fatalf("second refill: want sentinel, got %v", err)
+	}
+	if r.calls != callsAfterFirst {
+		t.Errorf("expected no extra Read calls after error latched, got %d more",
+			r.calls-callsAfterFirst)
+	}
+}
+
 func TestReadObject(t *testing.T) {
 	for _, test := range testCases {
 		for _, suffix := range []string{">>", " 1\n"} {
@@ -110,6 +140,98 @@ func TestReadObjectNestedDictBomb(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	if !IsMalformed(err) {
+		t.Errorf("expected *MalformedFileError, got %T: %v", err, err)
+	}
+}
+
+// withSizeBound temporarily replaces a package-level size bound for the
+// duration of a test, so size-limit checks can be exercised without
+// allocating the production limit.
+func withSizeBound(t *testing.T, p *int, val int) {
+	t.Helper()
+	orig := *p
+	*p = val
+	t.Cleanup(func() { *p = orig })
+}
+
+func TestReadStringBomb(t *testing.T) {
+	withSizeBound(t, &maxStringBytes, 100)
+	body := "(" + strings.Repeat("a", maxStringBytes+1) + ")"
+	s := testScanner(body)
+	if _, err := s.ReadObject(); err == nil {
+		t.Fatal("expected error, got nil")
+	} else if !IsMalformed(err) {
+		t.Errorf("expected *MalformedFileError, got %T: %v", err, err)
+	}
+}
+
+func TestReadHexStringBomb(t *testing.T) {
+	withSizeBound(t, &maxStringBytes, 100)
+	body := "<" + strings.Repeat("00", maxStringBytes+1) + ">"
+	s := testScanner(body)
+	if _, err := s.ReadObject(); err == nil {
+		t.Fatal("expected error, got nil")
+	} else if !IsMalformed(err) {
+		t.Errorf("expected *MalformedFileError, got %T: %v", err, err)
+	}
+}
+
+func TestReadNameBomb(t *testing.T) {
+	withSizeBound(t, &maxNameBytes, 100)
+	body := "/" + strings.Repeat("a", maxNameBytes+1) + " "
+	s := testScanner(body)
+	if _, err := s.ReadObject(); err == nil {
+		t.Fatal("expected error, got nil")
+	} else if !IsMalformed(err) {
+		t.Errorf("expected *MalformedFileError, got %T: %v", err, err)
+	}
+}
+
+func TestReadIntegerBomb(t *testing.T) {
+	withSizeBound(t, &maxNameBytes, 100)
+	body := strings.Repeat("9", maxNameBytes+50) + " "
+	s := testScanner(body)
+	if _, err := s.ReadInteger(); err == nil {
+		t.Fatal("expected error, got nil")
+	} else if !IsMalformed(err) {
+		t.Errorf("expected *MalformedFileError, got %T: %v", err, err)
+	}
+}
+
+func TestReadNumberBomb(t *testing.T) {
+	withSizeBound(t, &maxNameBytes, 100)
+	body := strings.Repeat("9", maxNameBytes+50) + ".0 "
+	s := testScanner(body)
+	if _, err := s.ReadObject(); err == nil {
+		t.Fatal("expected error, got nil")
+	} else if !IsMalformed(err) {
+		t.Errorf("expected *MalformedFileError, got %T: %v", err, err)
+	}
+}
+
+func TestReadArrayBomb(t *testing.T) {
+	withSizeBound(t, &maxArrayLen, 100)
+	body := "[" + strings.Repeat("1 ", maxArrayLen+1) + "]"
+	s := testScanner(body)
+	if _, err := s.ReadObject(); err == nil {
+		t.Fatal("expected error, got nil")
+	} else if !IsMalformed(err) {
+		t.Errorf("expected *MalformedFileError, got %T: %v", err, err)
+	}
+}
+
+func TestReadDictBomb(t *testing.T) {
+	withSizeBound(t, &maxDictLen, 100)
+	var b strings.Builder
+	b.WriteString("<<")
+	for i := 0; i < maxDictLen+1; i++ {
+		fmt.Fprintf(&b, "/k%d 1 ", i)
+	}
+	b.WriteString(">>")
+	s := testScanner(b.String())
+	if _, err := s.ReadObject(); err == nil {
+		t.Fatal("expected error, got nil")
+	} else if !IsMalformed(err) {
 		t.Errorf("expected *MalformedFileError, got %T: %v", err, err)
 	}
 }

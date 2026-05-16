@@ -271,9 +271,9 @@ func ReadStream(open func() (io.ReadCloser, error), v pdf.Version, ct Type, res 
 	return ops, nil
 }
 
-// scanner is the immutable [Stream] implementation that creates independent
-// iterators via [scanner.NewIter].
-type scanner struct {
+// streamFactory is the immutable [Stream] implementation that creates independent
+// iterators via [streamFactory.NewIter].
+type streamFactory struct {
 	open    func() (io.ReadCloser, error)
 	version pdf.Version
 	ct      Type
@@ -288,7 +288,7 @@ type scanner struct {
 // buffer and are only valid for the current iteration step. Callers that
 // need to retain args must clone them.
 func NewScanner(open func() (io.ReadCloser, error), v pdf.Version, ct Type, res *Resources) Stream {
-	return &scanner{
+	return &streamFactory{
 		open:    open,
 		version: v,
 		ct:      ct,
@@ -297,7 +297,7 @@ func NewScanner(open func() (io.ReadCloser, error), v pdf.Version, ct Type, res 
 }
 
 // NewIter creates a new iterator over the content stream.
-func (sc *scanner) NewIter() Iter {
+func (sc *streamFactory) NewIter() Iter {
 	return &scannerIter{
 		open:    sc.open,
 		version: sc.version,
@@ -308,7 +308,7 @@ func (sc *scanner) NewIter() Iter {
 
 // scannerIter is a single-use [Iter] that scans operators from a reader.
 type scannerIter struct {
-	s       *streamScanner
+	s       *scanner
 	state   *State
 	version pdf.Version
 	ct      Type
@@ -337,7 +337,7 @@ func (si *scannerIter) All() iter.Seq2[OpName, []pdf.Object] {
 			return
 		}
 		defer r.Close()
-		si.s = &streamScanner{
+		si.s = &scanner{
 			buf: make([]byte, 512),
 			src: r,
 		}
@@ -369,7 +369,7 @@ func (si *scannerIter) scanLoop(yield func(OpName, []pdf.Object) bool) bool {
 	hasSavedArgs := len(savedArgs) > 0
 
 	for {
-		op, err := si.s.scan()
+		op, err := si.s.Scan()
 		switch {
 		case err == nil:
 			opName := op.Name
@@ -456,7 +456,13 @@ func (si *scannerIter) scanLoop(yield func(OpName, []pdf.Object) bool) bool {
 			return true
 		case errors.Is(err, parseError{}):
 			// scanner-level parse error: non-sticky, so we skip the
-			// offending token and keep scanning.
+			// offending token and keep scanning.  Reset the composite
+			// stack so that an aborted mid-composite parse does not
+			// leave orphan frames that would silently swallow
+			// subsequent operator arguments.  This discards any
+			// outer composites we were mid-way through too, which is
+			// the correct fail-fast-and-resync behaviour.
+			si.s.stack = si.s.stack[:0]
 		case pdf.IsMalformed(err):
 			// filter-level content error (corrupt flate, invalid ASCII85
 			// char, …).  These are sticky — the reader will keep returning
@@ -485,7 +491,7 @@ type PageScanner struct {
 func NewPageScanner(v pdf.Version, res *Resources) *PageScanner {
 	return &PageScanner{
 		si: &scannerIter{
-			s: &streamScanner{
+			s: &scanner{
 				buf: make([]byte, 512),
 				src: eofReader{},
 			},
@@ -509,7 +515,7 @@ func (ps *PageScanner) SetInitialArgs(args []pdf.Object) {
 // Returns true if the reader was fully consumed, false if yield returned false
 // or an IO error occurred.
 func (ps *PageScanner) ScanReader(r io.Reader, yield func(OpName, []pdf.Object) bool) bool {
-	ps.si.s = &streamScanner{
+	ps.si.s = &scanner{
 		buf:   make([]byte, 512),
 		src:   r,
 		args:  ps.si.s.args,
@@ -561,14 +567,30 @@ func fixupOperatorName(state *State, opName OpName) []OpName {
 	return nil
 }
 
-// streamScanner is an internal scanner for content streams
-type streamScanner struct {
-	line  int // 0-based
-	col   int // 0-based
+// scanner is an internal scanner for content streams.
+//
+// Composite values (arrays and dictionaries) are assembled on an explicit
+// data stack (s.stack) rather than via recursive readArray/readDict
+// calls.  The more obvious recursive design is rejected because
+// PageScanner needs to suspend parsing in the middle of an open
+// composite at the end of one content stream segment and resume in the
+// next.  Per PDF 32000-1 §7.8.2 a /Contents array is parsed as if its
+// streams were concatenated, and conforming writers do split clipping
+// paths and image objects across streams, so a dict or array may
+// legitimately span a stream boundary.  A recursive parser cannot pause
+// across that boundary; an explicit stack can simply be carried over by
+// PageScanner.ScanReader.
+//
+// The cost is one error-recovery rule: when a parseError escapes Scan,
+// scanLoop must reset s.stack so an aborted mid-composite parse cannot
+// poison the next call by silently swallowing its tokens.
+type scanner struct {
+	Line  int // 0-based
+	Col   int // 0-based
 	stack []*scanStackFrame
 	args  []pdf.Object
 
-	srcErr error
+	err error
 
 	src       io.Reader
 	buf       []byte
@@ -583,14 +605,19 @@ type scanStackFrame struct {
 	isDict bool
 }
 
-// scan reads the next operator from the content stream
-func (s *streamScanner) scan() (Operator, error) {
+// Scan reads the next operator from the content stream
+func (s *scanner) Scan() (Operator, error) {
 	s.args = s.args[:0]
 
 	// check for comments first
-	s.skipWhiteSpaceExceptComments()
-	if bb := s.peekN(1); len(bb) > 0 && bb[0] == '%' {
-		comment := s.readComment()
+	if err := s.skipWhiteSpaceExceptComments(); err != nil {
+		return Operator{}, err
+	}
+	if bb := s.PeekN(1); len(bb) > 0 && bb[0] == '%' {
+		comment, err := s.ReadComment()
+		if err != nil {
+			return Operator{}, err
+		}
 		return Operator{
 			Name: OpRawContent,
 			Args: []pdf.Object{pdf.String(comment)},
@@ -599,13 +626,16 @@ func (s *streamScanner) scan() (Operator, error) {
 
 tokenLoop:
 	for {
-		obj, err := s.nextToken()
+		obj, err := s.ScanToken()
 		if err != nil {
 			return Operator{}, err
 		}
 
 		switch obj {
 		case pdf.Operator("<<"):
+			if len(s.stack) >= maxContentNestDepth {
+				return Operator{}, parseError{}
+			}
 			s.stack = append(s.stack, &scanStackFrame{isDict: true})
 			continue tokenLoop
 		case pdf.Operator(">>"):
@@ -634,6 +664,9 @@ tokenLoop:
 			}
 			obj = dict
 		case pdf.Operator("["):
+			if len(s.stack) >= maxContentNestDepth {
+				return Operator{}, parseError{}
+			}
 			s.stack = append(s.stack, &scanStackFrame{})
 			continue tokenLoop
 		case pdf.Operator("]"):
@@ -641,12 +674,26 @@ tokenLoop:
 				// unexpected "]"
 				continue tokenLoop
 			}
-			obj = pdf.Array(s.stack[len(s.stack)-1].data)
+			// avoid pdf.Array(nil) for "[]"; pdf.Format would emit it as "null"
+			arr := pdf.Array(s.stack[len(s.stack)-1].data)
+			if arr == nil {
+				arr = pdf.Array{}
+			}
+			obj = arr
 			s.stack = s.stack[:len(s.stack)-1]
 		}
 
 		if len(s.stack) > 0 { // we are inside a dict or array
-			s.stack[len(s.stack)-1].data = append(s.stack[len(s.stack)-1].data, obj)
+			top := s.stack[len(s.stack)-1]
+			limit := maxArrayLen
+			if top.isDict {
+				// data holds interleaved keys+values, so 2× the entry cap
+				limit = 2 * maxDictLen
+			}
+			if len(top.data) >= limit {
+				return Operator{}, parseError{}
+			}
+			top.data = append(top.data, obj)
 		} else if op, ok := obj.(pdf.Operator); ok {
 			// skip operators with too many arguments
 			if len(s.args) >= maxOperatorArgs {
@@ -667,6 +714,80 @@ tokenLoop:
 				s.args = append(s.args, obj)
 			}
 		}
+	}
+}
+
+func (s *scanner) ScanToken() (pdf.Native, error) {
+	if err := s.SkipWhiteSpace(); err != nil {
+		return nil, err
+	}
+	bb := s.PeekN(2)
+	if len(bb) == 0 {
+		return nil, s.err
+	}
+
+	switch {
+	case bb[0] == '/':
+		s.SkipByte()
+		return s.ReadName()
+	case bb[0] == '(':
+		s.SkipByte()
+		return s.ReadString()
+	case string(bb) == "<<":
+		s.SkipN(2)
+		return pdf.Operator("<<"), nil
+	case bb[0] == '<':
+		s.SkipByte()
+		return s.ReadHexString()
+	case string(bb) == ">>":
+		s.SkipN(2)
+		return pdf.Operator(">>"), nil
+	default:
+		firstByte := bb[0]
+		s.tokenBuf = append(s.tokenBuf[:0], firstByte)
+		s.ReadByte()
+		overflow := false
+		if class[firstByte] == regular {
+			for {
+				b, err := s.Peek()
+				if err == io.EOF {
+					break
+				} else if err != nil {
+					return nil, err
+				}
+				if class[b] != regular {
+					break
+				}
+				s.ReadByte() // skip b
+				if len(s.tokenBuf) < maxNameBytes {
+					s.tokenBuf = append(s.tokenBuf, b)
+				} else {
+					overflow = true
+				}
+			}
+		}
+		if overflow {
+			return nil, parseError{}
+		}
+
+		if s.tokenBuf[0] >= '0' && s.tokenBuf[0] <= '9' || s.tokenBuf[0] == '.' || s.tokenBuf[0] == '-' || s.tokenBuf[0] == '+' {
+			if x := parseNumber(s.tokenBuf); x != nil {
+				return x, nil
+			}
+		}
+
+		switch string(s.tokenBuf) {
+		case "false":
+			return pdf.Boolean(false), nil
+		case "true":
+			return pdf.Boolean(true), nil
+		case "null":
+			return nil, nil
+		}
+		if op, ok := operatorTable[string(s.tokenBuf)]; ok {
+			return op, nil
+		}
+		return pdf.Operator(s.tokenBuf), nil
 	}
 }
 
@@ -730,15 +851,15 @@ func isASCIIFilter(filter pdf.Name) bool {
 
 // readValue reads one complete PDF value (atomic or composite) from the stream.
 // It handles arrays ([...]) and dictionaries (<<...>>) recursively.
-func (s *streamScanner) readValue() (pdf.Object, error) {
+func (s *scanner) readValue() (pdf.Object, error) {
 	return s.readValueDepth(0)
 }
 
 // maxValueDepth limits nesting of arrays and dicts to prevent stack overflow.
 const maxValueDepth = 10
 
-func (s *streamScanner) readValueDepth(depth int) (pdf.Object, error) {
-	tok, err := s.nextToken()
+func (s *scanner) readValueDepth(depth int) (pdf.Object, error) {
+	tok, err := s.ScanToken()
 	if err != nil {
 		return nil, err
 	}
@@ -750,10 +871,15 @@ func (s *streamScanner) readValueDepth(depth int) (pdf.Object, error) {
 		}
 		var arr pdf.Array
 		for {
-			s.skipWhiteSpace()
-			if s.peekString("]") {
-				s.skipN(1)
+			if err := s.SkipWhiteSpace(); err != nil {
+				return nil, err
+			}
+			if s.LookingAt("]") {
+				s.SkipByte()
 				return arr, nil
+			}
+			if len(arr) >= maxArrayLen {
+				return nil, parseError{}
 			}
 			elem, err := s.readValueDepth(depth + 1)
 			if err != nil {
@@ -765,67 +891,56 @@ func (s *streamScanner) readValueDepth(depth int) (pdf.Object, error) {
 		if depth >= maxValueDepth {
 			return nil, parseError{}
 		}
-		dict := pdf.Dict{}
-		for {
-			s.skipWhiteSpace()
-			if s.peekString(">>") {
-				s.skipN(2)
-				return dict, nil
-			}
-			// read key (must be a name)
-			keyObj, err := s.readValueDepth(depth + 1)
-			if err != nil {
-				return nil, err
-			}
-			key, ok := keyObj.(pdf.Name)
-			if !ok {
-				return nil, parseError{}
-			}
-			// read value
-			val, err := s.readValueDepth(depth + 1)
-			if err != nil {
-				return nil, err
-			}
-			if val != nil {
-				dict[key] = val
-			}
-		}
+		return s.readDictBody(">>", depth+1)
 	}
 
 	return tok, nil
 }
 
-// readInlineImage reads a BI...ID...EI sequence and returns it as a %image% pseudo-operator
-func (s *streamScanner) readInlineImage() (Operator, error) {
-	// read image dictionary (between BI and ID)
+// readDictBody reads key-value pairs until term is encountered, consuming
+// term.  Each key and value is read via readValueDepth(valueDepth), so
+// callers control whether the entries count against the depth budget.
+// Used by both the <<...>> branch of readValueDepth and by readInlineImage
+// (which uses "ID" as its terminator).
+func (s *scanner) readDictBody(term string, valueDepth int) (pdf.Dict, error) {
 	dict := pdf.Dict{}
 	for {
-		s.skipWhiteSpace()
-
-		// check if we hit ID
-		if s.peekString("ID") {
-			s.skipN(2)
-			break
+		if err := s.SkipWhiteSpace(); err != nil {
+			return nil, err
 		}
-
+		if s.LookingAt(term) {
+			s.SkipN(len(term))
+			return dict, nil
+		}
 		// read key (must be a name)
-		keyObj, err := s.readValue()
+		keyObj, err := s.readValueDepth(valueDepth)
 		if err != nil {
-			return Operator{}, err
+			return nil, err
 		}
 		key, ok := keyObj.(pdf.Name)
 		if !ok {
-			return Operator{}, parseError{}
+			return nil, parseError{}
 		}
-
 		// read value
-		val, err := s.readValue()
+		val, err := s.readValueDepth(valueDepth)
 		if err != nil {
-			return Operator{}, err
+			return nil, err
 		}
 		if val != nil {
+			if _, exists := dict[key]; !exists && len(dict) >= maxDictLen {
+				return nil, parseError{}
+			}
 			dict[key] = val
 		}
+	}
+}
+
+// readInlineImage reads a BI...ID...EI sequence and returns it as a %image% pseudo-operator
+func (s *scanner) readInlineImage() (Operator, error) {
+	// read image dictionary (between BI and ID)
+	dict, err := s.readDictBody("ID", 0)
+	if err != nil {
+		return Operator{}, err
 	}
 
 	// validate image dimensions (defense against resource exhaustion)
@@ -845,12 +960,14 @@ func (s *streamScanner) readInlineImage() (Operator, error) {
 	// skip whitespace after ID
 	// spec: "the ID operator shall be followed by a single white-space character"
 	// for ASCII filters, we may need to skip additional whitespace
-	b, _ := s.peek()
-	if b <= 32 {
-		s.readByte()
+	b, _ := s.Peek()
+	if class[b] == space {
+		s.ReadByte()
 	}
 	if isASCIIFilter(filter) {
-		s.skipWhiteSpace()
+		if err := s.SkipWhiteSpace(); err != nil {
+			return Operator{}, err
+		}
 	}
 
 	var imageData []byte
@@ -862,14 +979,16 @@ func (s *streamScanner) readInlineImage() (Operator, error) {
 		}
 		imageData = make([]byte, length)
 		for i := range length {
-			b, err := s.readByte()
+			b, err := s.ReadByte()
 			if err != nil {
 				return Operator{}, err
 			}
 			imageData[i] = b
 		}
 		// skip optional whitespace before EI
-		s.skipWhiteSpace()
+		if err := s.SkipWhiteSpace(); err != nil {
+			return Operator{}, err
+		}
 	} else {
 		// no Length key: read until we find [\r\n]EI pattern
 		var prevByte byte
@@ -883,7 +1002,7 @@ func (s *streamScanner) readInlineImage() (Operator, error) {
 				break
 			}
 
-			b, err := s.readByte()
+			b, err := s.ReadByte()
 			if err != nil {
 				return Operator{}, err
 			}
@@ -898,14 +1017,13 @@ func (s *streamScanner) readInlineImage() (Operator, error) {
 	}
 
 	// consume the EI operator
-	if !s.peekString("EI") {
-		return Operator{}, parseError{}
+	if err := s.SkipString("EI"); err != nil {
+		return Operator{}, err
 	}
-	s.skipN(2)
 
 	// verify EI is followed by whitespace, delimiter, or EOF
-	nextByte, err := s.peek()
-	if err != io.EOF && nextByte > 32 && class[nextByte] != delimiter {
+	nextByte, err := s.Peek()
+	if err != io.EOF && class[nextByte] == regular {
 		return Operator{}, parseError{}
 	}
 
@@ -917,8 +1035,8 @@ func (s *streamScanner) readInlineImage() (Operator, error) {
 
 // checkEI checks if we're at a valid EI terminator.
 // Returns true if the next bytes are "EI" followed by whitespace, delimiter, or EOF.
-func (s *streamScanner) checkEI() bool {
-	buf := s.peekN(3)
+func (s *scanner) checkEI() bool {
+	buf := s.PeekN(3)
 	if len(buf) < 2 {
 		return false
 	}
@@ -929,107 +1047,65 @@ func (s *streamScanner) checkEI() bool {
 		return true // EOF after EI is valid
 	}
 	// EI must be followed by whitespace or delimiter
-	return buf[2] <= 32 || class[buf[2]] == delimiter
+	return class[buf[2]] != regular
 }
 
-// peekString checks if the next n bytes match the given string
-func (s *streamScanner) peekString(str string) bool {
-	buf := s.peekN(len(str))
+// LookingAt checks if the next n bytes match the given string
+func (s *scanner) LookingAt(str string) bool {
+	buf := s.PeekN(len(str))
 	return string(buf) == str
 }
 
-func (s *streamScanner) nextToken() (pdf.Native, error) {
-	s.skipWhiteSpace()
-	bb := s.peekN(2)
-	if len(bb) == 0 {
-		return nil, s.srcErr
-	}
+const (
+	maxInlineImageBytes  = 4096       // spec recommendation for inline image data
+	maxInlineImagePixels = 256 * 1024 // ~512×512 max
+	maxInlineImageDim    = 65536      // max width or height
+)
 
-	switch {
-	case bb[0] == '/':
-		s.skipN(1)
-		return s.readName(), nil
-	case bb[0] == '(':
-		s.skipN(1)
-		return s.readString()
-	case string(bb) == "<<":
-		s.skipN(2)
-		return pdf.Operator("<<"), nil
-	case bb[0] == '<':
-		s.skipN(1)
-		return s.readHexString()
-	case string(bb) == ">>":
-		s.skipN(2)
-		return pdf.Operator(">>"), nil
-	default:
-		firstByte := bb[0]
-		s.tokenBuf = append(s.tokenBuf[:0], firstByte)
-		s.readByte()
-		if class[firstByte] == regular {
-			for {
-				b, err := s.peek()
-				if err == io.EOF {
-					break
-				} else if err != nil {
-					return nil, err
-				}
-				if class[b] != regular {
-					break
-				}
-				s.readByte() // skip b
-				s.tokenBuf = append(s.tokenBuf, b)
-			}
-		}
-
-		if s.tokenBuf[0] >= '0' && s.tokenBuf[0] <= '9' || s.tokenBuf[0] == '.' || s.tokenBuf[0] == '-' || s.tokenBuf[0] == '+' {
-			if x := parseNumber(s.tokenBuf); x != nil {
-				return x, nil
-			}
-		}
-
-		switch string(s.tokenBuf) {
-		case "false":
-			return pdf.Boolean(false), nil
-		case "true":
-			return pdf.Boolean(true), nil
-		case "null":
-			return nil, nil
-		}
-		if op, ok := operatorTable[string(s.tokenBuf)]; ok {
-			return op, nil
-		}
-		return pdf.Operator(s.tokenBuf), nil
-	}
-}
-
-// readComment reads a comment line and returns it as a byte slice
-func (s *streamScanner) readComment() []byte {
+// ReadComment reads a comment line and returns it as a byte slice.
+// A comment longer than maxNameBytes is rejected with parseError; the
+// surplus bytes up to the line terminator are drained first so the
+// scanner resyncs at the start of the next line.
+func (s *scanner) ReadComment() ([]byte, error) {
 	var comment []byte
+	overflow := false
 	for {
-		b, err := s.peek()
+		b, err := s.Peek()
 		if err != nil || b == 10 || b == 13 {
 			break
 		}
-		s.readByte()
-		comment = append(comment, b)
+		s.ReadByte()
+		if len(comment) < maxNameBytes {
+			comment = append(comment, b)
+		} else {
+			overflow = true
+		}
 	}
-	return comment
+	if overflow {
+		return nil, parseError{}
+	}
+	return comment, nil
 }
 
 // Reads a PDF string (not including the leading parenthesis).
-func (s *streamScanner) readString() (pdf.String, error) {
+func (s *scanner) ReadString() (pdf.String, error) {
 	var res []byte
 	bracketLevel := 1
 	ignoreLF := false
 	for {
-		b, err := s.readByte()
+		if len(res) >= maxStringBytes {
+			return nil, parseError{}
+		}
+		b, err := s.ReadByte()
 		if err != nil {
 			return nil, err
 		}
-		if ignoreLF && b == 10 {
-			continue
+		if ignoreLF {
+			ignoreLF = false
+			if b == 10 {
+				continue
+			}
 		}
-		ignoreLF = false
 		switch b {
 		case '(':
 			bracketLevel++
@@ -1041,7 +1117,7 @@ func (s *streamScanner) readString() (pdf.String, error) {
 			}
 			res = append(res, b)
 		case '\\':
-			b, err = s.readByte()
+			b, err = s.ReadByte()
 			if err != nil {
 				return nil, err
 			}
@@ -1056,21 +1132,15 @@ func (s *streamScanner) readString() (pdf.String, error) {
 				res = append(res, '\b')
 			case 'f':
 				res = append(res, '\f')
-			case '(': // literal (
-				res = append(res, '(')
-			case ')': // literal )
-				res = append(res, ')')
-			case '\\': // literal \
-				res = append(res, '\\')
 			case 10: // LF
-				// ignore
+				// line continuation
 			case 13: // CR or CR+LF
-				// ignore
+				// line continuation; ignore an immediately following LF
 				ignoreLF = true
 			case '0', '1', '2', '3', '4', '5', '6', '7': // octal
 				oct := b - '0'
 				for range 2 {
-					b, err = s.peek()
+					b, err = s.Peek()
 					if err == io.EOF {
 						break
 					} else if err != nil {
@@ -1079,26 +1149,29 @@ func (s *streamScanner) readString() (pdf.String, error) {
 					if b < '0' || b > '7' {
 						break
 					}
-					s.readByte()
+					s.ReadByte()
 					oct = oct*8 + (b - '0')
 				}
 				res = append(res, oct)
 			default:
 				res = append(res, b)
 			}
+		case 13: // unescaped CR or CR+LF, normalised to LF per PDF 7.3.4.2
+			res = append(res, '\n')
+			ignoreLF = true
 		default:
 			res = append(res, b)
 		}
 	}
 }
 
-func (s *streamScanner) readHexString() (pdf.String, error) {
+func (s *scanner) ReadHexString() (pdf.String, error) {
 	var res []byte
 	first := true
 	var hi byte
 readLoop:
 	for {
-		b, err := s.readByte()
+		b, err := s.ReadByte()
 		if err != nil {
 			return nil, err
 		}
@@ -1106,7 +1179,7 @@ readLoop:
 		switch {
 		case b == '>':
 			break readLoop
-		case b <= 32:
+		case class[b] == space:
 			continue
 		case b >= '0' && b <= '9':
 			lo = b - '0'
@@ -1121,6 +1194,9 @@ readLoop:
 			hi = lo << 4
 			first = false
 		} else {
+			if len(res) >= maxStringBytes {
+				return nil, parseError{}
+			}
 			res = append(res, hi|lo)
 			first = true
 		}
@@ -1132,33 +1208,48 @@ readLoop:
 	return pdf.String(res), nil
 }
 
-// readName reads a PDF name object (not including the leading slash).
-func (s *streamScanner) readName() pdf.Name {
+// ReadName reads a PDF name object (not including the leading slash).
+// Names longer than maxNameBytes are rejected with parseError; the
+// surplus regular bytes are drained first so the scanner resyncs at
+// the next token boundary when the caller recovers.
+func (s *scanner) ReadName() (pdf.Name, error) {
 	var name []byte
+	overflow := false
 	for {
-		b, err := s.peek()
+		b, err := s.Peek()
 		if err != nil {
 			break
 		}
-
-		if b == '#' {
-			if b, ok := s.tryHex(); ok {
-				name = append(name, b)
-				continue
-			}
-			name = append(name, '#')
-		} else if class[b] != regular {
+		if class[b] != regular {
 			break
-		} else {
-			name = append(name, b)
 		}
-		s.readByte()
+
+		var c byte
+		if b == '#' {
+			if h, ok := s.tryHex(); ok {
+				c = h
+			} else {
+				c = '#'
+				s.ReadByte()
+			}
+		} else {
+			c = b
+			s.ReadByte()
+		}
+		if len(name) < maxNameBytes {
+			name = append(name, c)
+		} else {
+			overflow = true
+		}
 	}
-	return pdf.Name(name)
+	if overflow {
+		return "", parseError{}
+	}
+	return pdf.Name(name), nil
 }
 
-func (s *streamScanner) tryHex() (byte, bool) {
-	digits := s.peekN(3)
+func (s *scanner) tryHex() (byte, bool) {
+	digits := s.PeekN(3)
 	if len(digits) != 3 {
 		return 0, false
 	}
@@ -1167,58 +1258,58 @@ func (s *streamScanner) tryHex() (byte, bool) {
 	if high == 255 || low == 255 {
 		return 0, false
 	}
-	s.skipN(3)
+	s.SkipN(3)
 	return high<<4 | low, true
 }
 
-// skipWhiteSpace skips all input (including comments) until a non-whitespace
+// SkipWhiteSpace skips all input (including comments) until a non-whitespace
 // character is found.
-func (s *streamScanner) skipWhiteSpace() {
+func (s *scanner) SkipWhiteSpace() error {
 	for {
-		b, err := s.peek()
+		b, err := s.Peek()
 		if err != nil {
-			break
+			return err
 		}
-		if b <= 32 {
-			s.readByte()
+		if class[b] == space {
+			s.SkipByte()
 		} else if b == '%' {
-			s.skipToEOL()
+			s.SkipToEOL()
 		} else {
-			break
+			return nil
 		}
 	}
 }
 
-// skipWhiteSpaceExceptComments skips whitespace but not comments
-func (s *streamScanner) skipWhiteSpaceExceptComments() {
+// skipWhiteSpaceExceptComments skips whitespace but not comments.
+func (s *scanner) skipWhiteSpaceExceptComments() error {
 	for {
-		b, err := s.peek()
+		b, err := s.Peek()
 		if err != nil {
-			break
+			return err
 		}
-		if b <= 32 {
-			s.readByte()
+		if class[b] == space {
+			s.SkipByte()
 		} else {
-			break
+			return nil
 		}
 	}
 }
 
-// skipToEOL skips everything up to (but not including) the end of the line.
-func (s *streamScanner) skipToEOL() {
+// SkipToEOL skips everything up to (but not including) the end of the line.
+func (s *scanner) SkipToEOL() {
 	for {
-		b, err := s.peek()
+		b, err := s.Peek()
 		if b == 10 || b == 13 || err != nil {
 			break
 		}
-		s.readByte()
+		s.ReadByte()
 	}
 }
 
-// readByte consumes and returns the next byte of the input stream.
+// ReadByte consumes and returns the next byte of the input stream.
 // The function updates the line and column numbers.
-func (s *streamScanner) readByte() (byte, error) {
-	b, err := s.peek()
+func (s *scanner) ReadByte() (byte, error) {
+	b, err := s.Peek()
 	if err != nil {
 		return 0, err
 	}
@@ -1227,10 +1318,10 @@ func (s *streamScanner) readByte() (byte, error) {
 	if s.crSeen && b == 10 {
 		// LF after CR does not start a new line
 	} else if b == 10 || b == 13 {
-		s.line++
-		s.col = 0
+		s.Line++
+		s.Col = 0
 	} else {
-		s.col++
+		s.Col++
 	}
 	s.crSeen = (b == 13)
 
@@ -1238,7 +1329,7 @@ func (s *streamScanner) readByte() (byte, error) {
 }
 
 // Peek returns the next byte from the input stream without consuming it.
-func (s *streamScanner) peek() (byte, error) {
+func (s *scanner) Peek() (byte, error) {
 	for s.pos >= s.used {
 		err := s.refill()
 		if err != nil {
@@ -1253,7 +1344,7 @@ func (s *streamScanner) peek() (byte, error) {
 //
 // The returned slice is owned by the scanner and is only valid until the next
 // read.
-func (s *streamScanner) peekN(n int) []byte {
+func (s *scanner) PeekN(n int) []byte {
 	for s.pos+n > s.used {
 		err := s.refill()
 		if err != nil {
@@ -1266,29 +1357,38 @@ func (s *streamScanner) peekN(n int) []byte {
 	return s.buf[a:b]
 }
 
-// skipN consumes n bytes from the input stream.
-func (s *streamScanner) skipN(n int) {
-	for n > 0 {
-		if s.pos >= s.used {
-			err := s.refill()
-			if err != nil {
-				break
-			}
-		}
-		if s.pos+n <= s.used {
-			s.pos += n
-			break
-		}
-		n -= s.used - s.pos
-		s.pos = s.used
+// SkipN consumes n bytes from the input stream.
+func (s *scanner) SkipN(n int) {
+	for range n {
+		s.ReadByte()
 	}
+}
+
+// SkipByte consumes a single byte from the input.
+func (s *scanner) SkipByte() {
+	s.ReadByte()
+}
+
+// SkipString consumes pat from the input. It returns parseError if the next
+// bytes do not match pat, or the underlying read error if input is exhausted
+// before pat can be checked.
+func (s *scanner) SkipString(pat string) error {
+	buf := s.PeekN(len(pat))
+	if string(buf) == pat {
+		s.SkipN(len(pat))
+		return nil
+	}
+	if len(buf) < len(pat) && s.err != nil {
+		return s.err
+	}
+	return parseError{}
 }
 
 // refill reads more data from the underlying reader into the buffer.
 // This is the only place where the underlying reader is called.
-func (s *streamScanner) refill() error {
-	if s.srcErr != nil {
-		return s.srcErr
+func (s *scanner) refill() error {
+	if s.err != nil {
+		return s.err
 	}
 
 	s.used = copy(s.buf, s.buf[s.pos:s.used])
@@ -1296,7 +1396,7 @@ func (s *streamScanner) refill() error {
 
 	n, err := s.src.Read(s.buf[s.used:])
 	s.used += n
-	s.srcErr = err
+	s.err = err
 
 	if n == 0 {
 		return err
@@ -1368,10 +1468,23 @@ func (parseError) Error() string { return "content stream parse error" }
 
 // limits for defense against resource exhaustion
 const (
-	maxInlineImageBytes  = 4096       // spec recommendation for inline image data
-	maxInlineImagePixels = 256 * 1024 // ~512×512 max
-	maxInlineImageDim    = 65536      // max width or height
-	maxOperatorArgs      = 64         // PDF spec requires support for 32 DeviceN colorants
+	maxOperatorArgs     = 64  // PDF spec requires support for 32 DeviceN colorants
+	maxContentNestDepth = 256 // cap on `[`/`<<` nesting in scan()
+)
+
+// Per-object size bounds, declared as variables so tests can substitute
+// smaller values when exercising the bound checks.  In production, all
+// are set well above any value seen in legitimate PDF content streams.
+var (
+	// maxStringBytes caps the byte length of string and hex-string objects.
+	maxStringBytes = 16 * 1024 * 1024
+	// maxNameBytes caps the byte length of name, operator, and number
+	// tokens.  PDF 1.7 requires at least 127 bytes for names.
+	maxNameBytes = 4096
+	// maxArrayLen caps the number of entries in an array.
+	maxArrayLen = 1 << 20
+	// maxDictLen caps the number of entries in a dictionary.
+	maxDictLen = 64 << 10
 )
 
 type characterClass byte
@@ -1412,149 +1525,23 @@ var operatorTable = map[string]pdf.Operator{
 	"'": "'", "\"": "\"",
 }
 
+// class classifies each byte per PDF 7.2.3 (whitespace + delimiters).
+// regular is the zero value, so unlisted bytes are regular by default.
 var class = [256]characterClass{
-	space,     // 0
-	regular,   // 1
-	regular,   // 2
-	regular,   // 3
-	regular,   // 4
-	regular,   // 5
-	regular,   // 6
-	regular,   // 7
-	regular,   // 8
-	space,     // 9 '\t'
-	space,     // 10 '\n'
-	regular,   // 11
-	space,     // 12 '\f'
-	space,     // 13 '\r'
-	regular,   // 14
-	regular,   // 15
-	regular,   // 16
-	regular,   // 17
-	regular,   // 18
-	regular,   // 19
-	regular,   // 20
-	regular,   // 21
-	regular,   // 22
-	regular,   // 23
-	regular,   // 24
-	regular,   // 25
-	regular,   // 26
-	regular,   // 27
-	regular,   // 28
-	regular,   // 29
-	regular,   // 30
-	regular,   // 31
-	space,     // 32 ' '
-	regular,   // 33 '!'
-	regular,   // 34 '"'
-	regular,   // 35 '#'
-	regular,   // 36 '$'
-	delimiter, // 37 '%'
-	regular,   // 38 '&'
-	regular,   // 39 '\''
-	delimiter, // 40 '('
-	delimiter, // 41 ')'
-	regular,   // 42 '*'
-	regular,   // 43 '+'
-	regular,   // 44 ','
-	regular,   // 45 '-'
-	regular,   // 46 '.'
-	delimiter, // 47 '/'
-	regular,   // 48 '0'
-	regular,   // 49 '1'
-	regular,   // 50 '2'
-	regular,   // 51 '3'
-	regular,   // 52 '4'
-	regular,   // 53 '5'
-	regular,   // 54 '6'
-	regular,   // 55 '7'
-	regular,   // 56 '8'
-	regular,   // 57 '9'
-	regular,   // 58 ':'
-	regular,   // 59 ';'
-	delimiter, // 60 '<'
-	regular,   // 61 '='
-	delimiter, // 62 '>'
-	regular,   // 63 '?'
-	regular,   // 64 '@'
-	regular,   // 65 'A'
-	regular,   // 66 'B'
-	regular,   // 67 'C'
-	regular,   // 68 'D'
-	regular,   // 69 'E'
-	regular,   // 70 'F'
-	regular,   // 71 'G'
-	regular,   // 72 'H'
-	regular,   // 73 'I'
-	regular,   // 74 'J'
-	regular,   // 75 'K'
-	regular,   // 76 'L'
-	regular,   // 77 'M'
-	regular,   // 78 'N'
-	regular,   // 79 'O'
-	regular,   // 80 'P'
-	regular,   // 81 'Q'
-	regular,   // 82 'R'
-	regular,   // 83 'S'
-	regular,   // 84 'T'
-	regular,   // 85 'U'
-	regular,   // 86 'V'
-	regular,   // 87 'W'
-	regular,   // 88 'X'
-	regular,   // 89 'Y'
-	regular,   // 90 'Z'
-	delimiter, // 91 '['
-	regular,   // 92 '\\'
-	delimiter, // 93 ']'
-	regular,   // 94 '^'
-	regular,   // 95 '_'
-	regular,   // 96 '`'
-	regular,   // 97 'a'
-	regular,   // 98 'b'
-	regular,   // 99 'c'
-	regular,   // 100 'd'
-	regular,   // 101 'e'
-	regular,   // 102 'f'
-	regular,   // 103 'g'
-	regular,   // 104 'h'
-	regular,   // 105 'i'
-	regular,   // 106 'j'
-	regular,   // 107 'k'
-	regular,   // 108 'l'
-	regular,   // 109 'm'
-	regular,   // 110 'n'
-	regular,   // 111 'o'
-	regular,   // 112 'p'
-	regular,   // 113 'q'
-	regular,   // 114 'r'
-	regular,   // 115 's'
-	regular,   // 116 't'
-	regular,   // 117 'u'
-	regular,   // 118 'v'
-	regular,   // 119 'w'
-	regular,   // 120 'x'
-	regular,   // 121 'y'
-	regular,   // 122 'z'
-	regular,   // 123 '{'
-	regular,   // 124 '|'
-	regular,   // 125 '}'
-	regular,   // 126 '~'
-	regular,   // 127
-	regular,   // 128-255 (all regular)
-	regular, regular, regular, regular, regular, regular, regular, regular,
-	regular, regular, regular, regular, regular, regular, regular, regular,
-	regular, regular, regular, regular, regular, regular, regular, regular,
-	regular, regular, regular, regular, regular, regular, regular, regular,
-	regular, regular, regular, regular, regular, regular, regular, regular,
-	regular, regular, regular, regular, regular, regular, regular, regular,
-	regular, regular, regular, regular, regular, regular, regular, regular,
-	regular, regular, regular, regular, regular, regular, regular, regular,
-	regular, regular, regular, regular, regular, regular, regular, regular,
-	regular, regular, regular, regular, regular, regular, regular, regular,
-	regular, regular, regular, regular, regular, regular, regular, regular,
-	regular, regular, regular, regular, regular, regular, regular, regular,
-	regular, regular, regular, regular, regular, regular, regular, regular,
-	regular, regular, regular, regular, regular, regular, regular, regular,
-	regular, regular, regular, regular, regular, regular, regular, regular,
+	0:   space,
+	9:   space,
+	10:  space,
+	12:  space,
+	13:  space,
+	32:  space,
+	'(': delimiter,
+	')': delimiter,
+	'<': delimiter,
+	'>': delimiter,
+	'[': delimiter,
+	']': delimiter,
+	'{': delimiter,
+	'}': delimiter,
+	'/': delimiter,
+	'%': delimiter,
 }

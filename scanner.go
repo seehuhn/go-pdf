@@ -34,6 +34,21 @@ const (
 	maxScannerNestDepth = 256
 )
 
+// Per-object size bounds, declared as variables so tests can substitute
+// smaller values when exercising the bound checks.  In production, all
+// are set well above any value seen in legitimate PDF input.
+var (
+	// maxStringBytes caps the byte length of string and hex-string objects.
+	maxStringBytes = 16 * 1024 * 1024
+	// maxNameBytes caps the byte length of name and number tokens.
+	// PDF 1.7 requires at least 127 bytes for names.
+	maxNameBytes = 4096
+	// maxArrayLen caps the number of entries in an array.
+	maxArrayLen = 1 << 20
+	// maxDictLen caps the number of entries in a dictionary.
+	maxDictLen = 64 << 10
+)
+
 type scanner struct {
 	src     io.Reader
 	filePos int64 // how far into the reader the start of buf is
@@ -55,6 +70,10 @@ type scanner struct {
 	enc         *encryptInfo
 	encRef      Reference
 	unencrypted map[Reference]bool // objects with no encryption
+
+	// err latches the first non-EOF error returned by src.Read.
+	// Once set, refill returns it without re-reading from src.
+	err error
 }
 
 type getIntFn func(Object) (Integer, error)
@@ -226,28 +245,34 @@ func (s *scanner) ReadInteger() (Integer, error) {
 	}
 
 	first := true
+	overflow := false
 	var res []byte
 	err = s.ScanBytes(func(b byte) bool {
 		if first && (b == '+' || b == '-') {
-			res = append(res, b)
+			// ok
 		} else if b >= '0' && b <= '9' {
-			res = append(res, b)
+			// ok
 		} else {
 			return false
 		}
 		first = false
+		if len(res) < maxNameBytes {
+			res = append(res, b)
+		} else {
+			overflow = true
+		}
 		return true
 	})
 	if err != nil && err != io.EOF {
 		return 0, err
 	}
+	if overflow {
+		return 0, &MalformedFileError{Err: errors.New("integer too long")}
+	}
 
 	x, err := strconv.ParseInt(string(res), 10, 64)
 	if err != nil {
-		return 0, &MalformedFileError{
-			Err: err,
-			Loc: []string{"ReadInteger"},
-		}
+		return 0, &MalformedFileError{Err: err}
 	}
 	return Integer(x), nil
 }
@@ -256,38 +281,45 @@ func (s *scanner) ReadInteger() (Integer, error) {
 func (s *scanner) ReadNumber() (Native, error) {
 	hasDot := false
 	first := true
+	overflow := false
 	var res []byte
 	err := s.ScanBytes(func(b byte) bool {
 		if !hasDot && b == '.' {
 			hasDot = true
-			res = append(res, b)
 		} else if first && (b == '+' || b == '-') {
-			res = append(res, b)
+			// ok
 		} else if b >= '0' && b <= '9' {
-			res = append(res, b)
+			// ok
 		} else {
 			return false
 		}
 		first = false
+		if len(res) < maxNameBytes {
+			res = append(res, b)
+		} else {
+			overflow = true
+		}
 		return true
 	})
 	if err != nil && err != io.EOF {
 		return nil, err
 	}
-
-	if hasDot {
-		x, err := strconv.ParseFloat(string(res), 64)
-		if err != nil {
-			return nil, &MalformedFileError{Err: err}
-		}
-		return Real(x), nil
+	if overflow {
+		return nil, &MalformedFileError{Err: errors.New("number too long")}
 	}
 
-	x, err := strconv.ParseInt(string(res), 10, 64)
+	if !hasDot {
+		if x, err := strconv.ParseInt(string(res), 10, 64); err == nil {
+			return Integer(x), nil
+		}
+		// fall through: very large integer literals are returned as Real
+	}
+
+	x, err := strconv.ParseFloat(string(res), 64)
 	if err != nil {
 		return nil, &MalformedFileError{Err: err}
 	}
-	return Integer(x), nil
+	return Real(x), nil
 }
 
 // ReadString reads a ()-delimited string, starting after the opening bracket.
@@ -296,6 +328,11 @@ func (s *scanner) ReadString() (String, error) {
 	bracketLevel := 1 // we are already inside the opening "("
 	ignoreLF := false
 	for {
+		if len(res) >= maxStringBytes {
+			return nil, &MalformedFileError{
+				Err: errors.New("string too long"),
+			}
+		}
 		b, err := s.ReadByte()
 		if err != nil {
 			return nil, err
@@ -376,6 +413,7 @@ func (s *scanner) ReadHexString() (String, error) {
 	var res []byte
 	var hexVal byte
 	first := true
+	tooLong := false
 	err := s.ScanBytes(func(b byte) bool {
 		var d byte
 		if b >= '0' && b <= '9' {
@@ -392,6 +430,10 @@ func (s *scanner) ReadHexString() (String, error) {
 		if first {
 			hexVal = d
 		} else {
+			if len(res) >= maxStringBytes {
+				tooLong = true
+				return false
+			}
 			res = append(res, 16*hexVal+d)
 		}
 		first = !first
@@ -399,6 +441,11 @@ func (s *scanner) ReadHexString() (String, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+	if tooLong {
+		return nil, &MalformedFileError{
+			Err: errors.New("hex string too long"),
+		}
 	}
 	if !first {
 		res = append(res, 16*hexVal)
@@ -435,6 +482,11 @@ func (s *scanner) ReadName() (Name, error) {
 		if len(buf) == 0 {
 			break
 		}
+		if len(res) >= maxNameBytes {
+			return "", &MalformedFileError{
+				Err: errors.New("name too long"),
+			}
+		}
 		b := buf[0]
 		if b == '#' {
 			if b, ok := s.tryHex(); ok {
@@ -444,7 +496,7 @@ func (s *scanner) ReadName() (Name, error) {
 			// PDF 7.3.5: when "#" is not followed by two hex digits,
 			// treat the "#" as a literal character.
 			res = append(res, '#')
-		} else if isSpace[b] || isDelimiter[b] {
+		} else if class[b] != regular {
 			break
 		} else {
 			res = append(res, b)
@@ -552,6 +604,11 @@ func (s *scanner) ReadArray() (array Array, err error) {
 			integersSeen = 0
 		}
 
+		if len(array) >= maxArrayLen {
+			return nil, &MalformedFileError{
+				Err: errors.New("array too long"),
+			}
+		}
 		array = append(array, obj)
 	}
 	s.pos++ // we have already seen the closing "]"
@@ -658,6 +715,11 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 			}
 		}
 
+		if _, exists := dict[key]; !exists && len(dict) >= maxDictLen {
+			return nil, &MalformedFileError{
+				Err: errors.New("dictionary too large"),
+			}
+		}
 		dict[key] = val
 	}
 	err = s.SkipString(">>")
@@ -881,7 +943,7 @@ func (s *scanner) SkipWhiteSpace() error {
 		} else if b == '%' {
 			isComment = true
 		} else {
-			return isSpace[b]
+			return class[b] == space
 		}
 		return true
 	})
@@ -972,8 +1034,13 @@ func (s *scanner) Find(pat *regexp.Regexp) (int64, []string, error) {
 
 // refill discards the read part of the buffer and reads as much new data as
 // possible.  Once the end of file is reached, s.used will be smaller than the
-// buffer size, but no error will be returned.
+// buffer size, but no error will be returned.  Non-EOF errors from src.Read
+// are latched in s.err and returned on every subsequent call.
 func (s *scanner) refill() error {
+	if s.err != nil {
+		return s.err
+	}
+
 	// move the remaining data to the beginning of the buffer
 	s.filePos += int64(s.pos)
 	copy(s.buf, s.buf[s.pos:s.used])
@@ -984,8 +1051,13 @@ func (s *scanner) refill() error {
 	n, err := io.ReadFull(s.src, s.buf[s.used:])
 	s.used += n
 
-	if n > 0 || err == io.ErrUnexpectedEOF || err == io.EOF {
+	if err == io.EOF || err == io.ErrUnexpectedEOF {
 		err = nil
+	} else if err != nil {
+		s.err = err
+		if n > 0 {
+			err = nil
+		}
 	}
 	return err
 }
@@ -1037,25 +1109,31 @@ func (r *streamReader) Seek(offset int64, whence int) (int64, error) {
 	return abs - r.start, nil
 }
 
-var (
-	isSpace = map[byte]bool{
-		0:  true,
-		9:  true,
-		10: true,
-		12: true,
-		13: true,
-		32: true,
-	}
-	isDelimiter = map[byte]bool{
-		'(': true,
-		')': true,
-		'<': true,
-		'>': true,
-		'[': true,
-		']': true,
-		'{': true,
-		'}': true,
-		'/': true,
-		'%': true,
-	}
+type characterClass byte
+
+const (
+	regular characterClass = iota
+	space
+	delimiter
 )
+
+// class classifies each byte per PDF 7.2.3 (whitespace + delimiters).
+// regular is the zero value, so unlisted bytes are regular by default.
+var class = [256]characterClass{
+	0:   space,
+	9:   space,
+	10:  space,
+	12:  space,
+	13:  space,
+	32:  space,
+	'(': delimiter,
+	')': delimiter,
+	'<': delimiter,
+	'>': delimiter,
+	'[': delimiter,
+	']': delimiter,
+	'{': delimiter,
+	'}': delimiter,
+	'/': delimiter,
+	'%': delimiter,
+}

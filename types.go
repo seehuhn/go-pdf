@@ -465,7 +465,7 @@ func formatName(w io.Writer, name Name) error {
 
 	var funny []int
 	for i, c := range l {
-		if isSpace[c] || isDelimiter[c] || c < 0x21 || c > 0x7e || c == '#' {
+		if class[c] != regular || c < 0x21 || c > 0x7e || c == '#' {
 			funny = append(funny, i)
 		}
 	}

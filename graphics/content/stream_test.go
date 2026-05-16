@@ -19,8 +19,10 @@ package content
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -92,6 +94,8 @@ func FuzzStreamRoundTrip(f *testing.F) {
 	for _, tc := range roundTripTestCases {
 		f.Add([]byte(tc.stream))
 	}
+	f.Add([]byte(strings.Repeat("[", 1000)))
+	f.Add([]byte(strings.Repeat("<<", 1000)))
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		// first read - permissive, may skip malformed content
@@ -266,10 +270,48 @@ func TestReadValue(t *testing.T) {
 			input: "/##41",
 			want:  pdf.Name("#A"),
 		},
+		// PDF 7.3.4.2: an unescaped end-of-line marker inside a literal
+		// string is normalised to a single LF, regardless of whether it
+		// is CR, LF, or CR-LF.
+		{
+			name:  "string with bare CR",
+			input: "(a\rb)",
+			want:  pdf.String("a\nb"),
+		},
+		{
+			name:  "string with CR+LF",
+			input: "(a\r\nb)",
+			want:  pdf.String("a\nb"),
+		},
+		{
+			name:  "string with two bare CRs",
+			input: "(a\r\rb)",
+			want:  pdf.String("a\n\nb"),
+		},
+		{
+			name:  "string with CR+LF then LF",
+			input: "(a\r\n\nb)",
+			want:  pdf.String("a\n\nb"),
+		},
+		{
+			name:  "string with two CR+LFs",
+			input: "(a\r\n\r\nb)",
+			want:  pdf.String("a\n\nb"),
+		},
+		{
+			name:  "string with backslash + CR continuation",
+			input: "(a\\\rb)",
+			want:  pdf.String("ab"),
+		},
+		{
+			name:  "string with backslash + CR+LF continuation",
+			input: "(a\\\r\nb)",
+			want:  pdf.String("ab"),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &streamScanner{
+			s := &scanner{
 				buf: make([]byte, 512),
 				src: bytes.NewReader([]byte(tt.input)),
 			}
@@ -284,6 +326,234 @@ func TestReadValue(t *testing.T) {
 	}
 }
 
+func TestScanLoopNestingDepthCap(t *testing.T) {
+	// Many unmatched opening brackets must not exhaust memory or CPU:
+	// scan() rejects each push past the cap with parseError{}, and
+	// scanLoop skips it, so the call must terminate cleanly.
+	input := strings.Repeat("[", maxContentNestDepth*4)
+	if _, err := ReadStream(bytesOpener([]byte(input)), pdf.V2_0, Page, &Resources{}); err != nil {
+		t.Fatalf("ReadStream error: %v", err)
+	}
+}
+
+// withSizeBound temporarily replaces a package-level size bound for the
+// duration of a test, so size-limit checks can be exercised without
+// allocating the production limit.
+func withSizeBound(t *testing.T, p *int, val int) {
+	t.Helper()
+	orig := *p
+	*p = val
+	t.Cleanup(func() { *p = orig })
+}
+
+func TestContentReadCommentBomb(t *testing.T) {
+	withSizeBound(t, &maxNameBytes, 100)
+	// a comment with no end-of-line marker longer than maxNameBytes
+	// must be rejected with parseError, and the next operator after a
+	// LF must still be emitted (the bad comment's surplus bytes are
+	// drained up to the EOL, where Scan resyncs).
+	input := "%" + strings.Repeat("a", maxNameBytes+50) + "\n10 j"
+	ops, err := ReadStream(bytesOpener([]byte(input)), pdf.V2_0, Page, &Resources{})
+	if err != nil {
+		t.Fatalf("ReadStream: %v", err)
+	}
+	var names []string
+	for _, op := range ops {
+		names = append(names, string(op.Name))
+	}
+	want := []string{"j"}
+	if !slices.Equal(names, want) {
+		t.Errorf("operator names: got %v, want %v", names, want)
+	}
+}
+
+func TestContentReadStringBomb(t *testing.T) {
+	withSizeBound(t, &maxStringBytes, 100)
+	// ReadString is called after the opening '('.
+	body := strings.Repeat("a", maxStringBytes+1) + ")"
+	s := &scanner{buf: make([]byte, 512), src: strings.NewReader(body)}
+	if _, err := s.ReadString(); err == nil {
+		t.Fatal("expected error, got nil")
+	} else if !errors.Is(err, parseError{}) {
+		t.Errorf("expected parseError, got %T: %v", err, err)
+	}
+}
+
+func TestContentReadHexStringBomb(t *testing.T) {
+	withSizeBound(t, &maxStringBytes, 100)
+	// ReadHexString is called after the opening '<'.
+	body := strings.Repeat("00", maxStringBytes+1) + ">"
+	s := &scanner{buf: make([]byte, 512), src: strings.NewReader(body)}
+	if _, err := s.ReadHexString(); err == nil {
+		t.Fatal("expected error, got nil")
+	} else if !errors.Is(err, parseError{}) {
+		t.Errorf("expected parseError, got %T: %v", err, err)
+	}
+}
+
+func TestContentReadNameBomb(t *testing.T) {
+	withSizeBound(t, &maxNameBytes, 100)
+	// ReadName is called after the leading '/'.  Over-long names return
+	// parseError, and the surplus regular bytes must have been drained
+	// so the scanner resyncs on the next token.
+	body := strings.Repeat("a", maxNameBytes+50) + " next"
+	s := &scanner{buf: make([]byte, 512), src: strings.NewReader(body)}
+	if _, err := s.ReadName(); !errors.Is(err, parseError{}) {
+		t.Fatalf("ReadName: got %v, want parseError", err)
+	}
+	if err := s.SkipWhiteSpace(); err != nil {
+		t.Fatalf("SkipWhiteSpace: %v", err)
+	}
+	next, err := s.ReadName()
+	if err != nil {
+		t.Fatalf("ReadName (next): %v", err)
+	}
+	if string(next) != "next" {
+		t.Errorf("token after over-long name = %q, want \"next\"", next)
+	}
+}
+
+func TestContentReadNameBombStreamRecovery(t *testing.T) {
+	withSizeBound(t, &maxNameBytes, 100)
+	// An over-long name must be dropped by scanLoop's parseError
+	// recovery, but the surplus bytes must have been drained so the
+	// scanner resyncs on the following operator — otherwise the cs
+	// token here would be glued onto the tail of the bad name and
+	// lost.
+	input := "/" + strings.Repeat("a", maxNameBytes+50) + " cs\n5 j 10 J"
+	ops, err := ReadStream(bytesOpener([]byte(input)), pdf.V2_0, Page, &Resources{})
+	if err != nil {
+		t.Fatalf("ReadStream: %v", err)
+	}
+	var names []string
+	for _, op := range ops {
+		names = append(names, string(op.Name))
+	}
+	want := []string{"cs", "j", "J"}
+	if !slices.Equal(names, want) {
+		t.Errorf("operator names: got %v, want %v", names, want)
+	}
+}
+
+func TestContentScanTokenOperatorBomb(t *testing.T) {
+	withSizeBound(t, &maxNameBytes, 100)
+	// A run of regular characters at the start of a token longer than
+	// maxNameBytes must be rejected with parseError, with the surplus
+	// drained so subsequent operators are still emitted.
+	input := strings.Repeat("z", maxNameBytes+50) + " j 10 J"
+	ops, err := ReadStream(bytesOpener([]byte(input)), pdf.V2_0, Page, &Resources{})
+	if err != nil {
+		t.Fatalf("ReadStream: %v", err)
+	}
+	var names []string
+	for _, op := range ops {
+		names = append(names, string(op.Name))
+	}
+	want := []string{"j", "J"}
+	if !slices.Equal(names, want) {
+		t.Errorf("operator names: got %v, want %v", names, want)
+	}
+}
+
+func TestContentScanTokenNumberBomb(t *testing.T) {
+	withSizeBound(t, &maxNameBytes, 100)
+	// A digit run longer than maxNameBytes must be rejected with
+	// parseError, surplus drained, and the trailing operator emitted.
+	input := strings.Repeat("9", maxNameBytes+50) + " j"
+	ops, err := ReadStream(bytesOpener([]byte(input)), pdf.V2_0, Page, &Resources{})
+	if err != nil {
+		t.Fatalf("ReadStream: %v", err)
+	}
+	var names []string
+	for _, op := range ops {
+		names = append(names, string(op.Name))
+	}
+	want := []string{"j"}
+	if !slices.Equal(names, want) {
+		t.Errorf("operator names: got %v, want %v", names, want)
+	}
+}
+
+func TestContentScanArrayBomb(t *testing.T) {
+	withSizeBound(t, &maxArrayLen, 100)
+	body := "[" + strings.Repeat("1 ", maxArrayLen+1) + "]"
+	s := &scanner{buf: make([]byte, 512), src: strings.NewReader(body)}
+	if _, err := s.Scan(); err == nil {
+		t.Fatal("expected error, got nil")
+	} else if !errors.Is(err, parseError{}) {
+		t.Errorf("expected parseError, got %T: %v", err, err)
+	}
+}
+
+func TestContentScanDictBomb(t *testing.T) {
+	withSizeBound(t, &maxDictLen, 100)
+	var b strings.Builder
+	b.WriteString("<<")
+	for i := 0; i < maxDictLen+1; i++ {
+		fmt.Fprintf(&b, "/k%d 1 ", i)
+	}
+	b.WriteString(">>")
+	s := &scanner{buf: make([]byte, 512), src: strings.NewReader(b.String())}
+	if _, err := s.Scan(); err == nil {
+		t.Fatal("expected error, got nil")
+	} else if !errors.Is(err, parseError{}) {
+		t.Errorf("expected parseError, got %T: %v", err, err)
+	}
+}
+
+func TestContentReadValueArrayBomb(t *testing.T) {
+	withSizeBound(t, &maxArrayLen, 100)
+	body := "[" + strings.Repeat("1 ", maxArrayLen+1) + "]"
+	s := &scanner{buf: make([]byte, 512), src: strings.NewReader(body)}
+	if _, err := s.readValue(); err == nil {
+		t.Fatal("expected error, got nil")
+	} else if !errors.Is(err, parseError{}) {
+		t.Errorf("expected parseError, got %T: %v", err, err)
+	}
+}
+
+func TestContentReadValueDictBomb(t *testing.T) {
+	withSizeBound(t, &maxDictLen, 100)
+	var b strings.Builder
+	b.WriteString("<<")
+	for i := 0; i < maxDictLen+1; i++ {
+		fmt.Fprintf(&b, "/k%d 1 ", i)
+	}
+	b.WriteString(">>")
+	s := &scanner{buf: make([]byte, 512), src: strings.NewReader(b.String())}
+	if _, err := s.readValue(); err == nil {
+		t.Fatal("expected error, got nil")
+	} else if !errors.Is(err, parseError{}) {
+		t.Errorf("expected parseError, got %T: %v", err, err)
+	}
+}
+
+func TestParseErrorResetsCompositeStack(t *testing.T) {
+	// A parseError that escapes Scan() while a <<...>> or [...] frame is
+	// open must reset the composite stack, otherwise subsequent tokens are
+	// silently appended to the orphan frame instead of being treated as
+	// operator arguments.
+	//
+	// Here <Z> is malformed (Z is not a hex digit), so ReadHexString
+	// returns parseError partway through the open <<. Without the reset,
+	// the still-open dict frame swallows "5 j 10 J" entirely and no
+	// operators are emitted.
+	input := "<<<Z 5 j 10 J"
+	ops, err := ReadStream(bytesOpener([]byte(input)), pdf.V2_0, Page, &Resources{})
+	if err != nil {
+		t.Fatalf("ReadStream error: %v", err)
+	}
+
+	var names []string
+	for _, op := range ops {
+		names = append(names, string(op.Name))
+	}
+	want := []string{"j", "J"}
+	if !slices.Equal(names, want) {
+		t.Errorf("operator names: got %v, want %v", names, want)
+	}
+}
+
 func TestReadValueDepthLimit(t *testing.T) {
 	// nesting deeper than maxValueDepth should fail
 	var buf bytes.Buffer
@@ -294,7 +564,7 @@ func TestReadValueDepthLimit(t *testing.T) {
 	for range maxValueDepth + 1 {
 		buf.WriteByte(']')
 	}
-	s := &streamScanner{
+	s := &scanner{
 		buf: make([]byte, 512),
 		src: bytes.NewReader(buf.Bytes()),
 	}

@@ -503,7 +503,7 @@ func (fi *FileInfo) readTrailer(sect *FileSection) (Dict, error) {
 // countLeadingSpaces returns the number of leading whitespace characters in s.
 func countLeadingSpaces(s string) int64 {
 	var n int64
-	for n < int64(len(s)) && isSpace[s[n]] {
+	for n < int64(len(s)) && class[s[n]] == space {
 		n++
 	}
 	return n
