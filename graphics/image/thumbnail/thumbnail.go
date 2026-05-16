@@ -110,6 +110,9 @@ func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 		return nil, pdf.Errorf("thumbnail height %d exceeds limit", height)
 	}
 	thumb.Height = int(height)
+	if streamlimits.ImagePixelsExceedLimit(int(width), int(height)) {
+		return nil, pdf.Error("thumbnail pixel count exceeds limit")
+	}
 
 	// color space (required)
 	cs, err := color.ExtractSpace(x, path, dict["ColorSpace"], false)

@@ -18,10 +18,12 @@ package glyphdata
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
 // PDF 2.0 sections: 9.9
@@ -100,8 +102,15 @@ func ExtractStream(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, dictT
 				length.Length3 = length3
 			}
 
-			_, err = io.Copy(w, body)
-			return err
+			const limit = int64(streamlimits.MaxFontProgramBytes)
+			n, err := io.Copy(w, io.LimitReader(body, limit+1))
+			if err != nil {
+				return err
+			}
+			if n > limit {
+				return &pdf.MalformedFileError{Err: errors.New("font program exceeds size limit")}
+			}
+			return nil
 		},
 	}, nil
 }

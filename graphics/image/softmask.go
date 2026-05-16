@@ -307,6 +307,9 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 	if height > streamlimits.MaxImageHeight {
 		return nil, pdf.Errorf("soft mask height %d exceeds limit", height)
 	}
+	if streamlimits.ImagePixelsExceedLimit(int(width), int(height)) {
+		return nil, pdf.Error("soft mask pixel count exceeds limit")
+	}
 
 	bpc, err := x.GetInteger(path, dict["BitsPerComponent"])
 	if err != nil {

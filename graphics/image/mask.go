@@ -211,6 +211,9 @@ func ExtractMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	if height > streamlimits.MaxImageHeight {
 		return nil, pdf.Errorf("image mask height %d exceeds limit", height)
 	}
+	if streamlimits.ImagePixelsExceedLimit(int(width), int(height)) {
+		return nil, pdf.Error("image mask pixel count exceeds limit")
+	}
 
 	mask := &Mask{
 		Width:  int(width),

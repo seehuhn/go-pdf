@@ -32,6 +32,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
 var _ pdf.Embedder = (*File)(nil)
@@ -659,5 +660,36 @@ func TestCMapTemplate(t *testing.T) {
 		if !strings.Contains(body, line) {
 			t.Errorf("expected line %q not found in output", line)
 		}
+	}
+}
+
+// TestExtractCMapOversize verifies that a CMap stream larger than
+// streamlimits.MaxCMapBytes is rejected, blocking a decompression-bomb
+// attack on CMap loading.
+func TestExtractCMapOversize(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+	ref := w.Alloc()
+	stm, err := w.OpenStream(ref, pdf.Dict{
+		"Type":     pdf.Name("CMap"),
+		"CMapName": pdf.Name("TestH"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// write more than MaxCMapBytes of payload
+	body := make([]byte, streamlimits.MaxCMapBytes+1)
+	if _, err := stm.Write(body); err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Extract(pdf.NewExtractor(w), nil, ref, false); err == nil {
+		t.Fatal("expected error for oversize CMap, got nil")
 	}
 }

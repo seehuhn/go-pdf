@@ -258,3 +258,47 @@ func TestDecodeColorTransform(t *testing.T) {
 func closeEnough(a, b uint8) bool {
 	return math.Abs(float64(a)-float64(b)) <= 1
 }
+
+// TestDecodeOversizeSOF verifies that a JPEG declaring dimensions whose
+// product exceeds streamlimits.MaxImageBytes is rejected by the SOF
+// parser before any large allocation happens.
+func TestDecodeOversizeSOF(t *testing.T) {
+	// build a minimal SOI + SOF0 + EOI sequence claiming the given size
+	build := func(nComp int, w, h uint16) []byte {
+		hi := func(v uint16) byte { return byte(v >> 8) }
+		lo := func(v uint16) byte { return byte(v) }
+		sof := []byte{
+			0xFF, 0xC0, // SOF0
+			0x00, byte(8 + 3*nComp), // length
+			0x08,         // precision = 8
+			hi(h), lo(h), // height
+			hi(w), lo(w), // width
+			byte(nComp), // number of components
+		}
+		// per-component spec: id, sampling (0x11 = 1x1), quant table index
+		for i := range nComp {
+			sof = append(sof, byte(i+1), 0x11, 0x00)
+		}
+		out := []byte{0xFF, 0xD8} // SOI
+		out = append(out, sof...)
+		out = append(out, 0xFF, 0xD9) // EOI
+		return out
+	}
+
+	for _, tc := range []struct {
+		name  string
+		nComp int
+	}{
+		{"grayscale", 1},
+		{"ycbcr", 3},
+		{"cmyk", 4},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			payload := build(tc.nComp, 65535, 65535)
+			_, err := Decode(bytes.NewReader(payload), nil)
+			if err == nil {
+				t.Fatal("expected error for oversize SOF, got nil")
+			}
+		})
+	}
+}

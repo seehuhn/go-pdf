@@ -55,6 +55,12 @@ func Resolve(r Getter, obj Object) (Native, error) {
 
 const maxRefDepth = 16
 
+// maxFilterChainLength bounds the number of entries in a stream's
+// /Filter array.  Legitimate PDFs rarely exceed two or three; the cap
+// blocks malformed inputs that stack hundreds of decoders to amplify
+// per-wrapper overhead.
+const maxFilterChainLength = 16
+
 func resolve(r Getter, obj Object, canObjStm bool) (Native, error) {
 	if obj == nil {
 		return nil, nil
@@ -499,6 +505,11 @@ func GetFilters(r Getter, path *CycleCheck, dict Dict) ([]Filter, error) {
 		}
 		res = append(res, filter)
 	case Array:
+		if len(f) > maxFilterChainLength {
+			return nil, &MalformedFileError{
+				Err: fmt.Errorf("filter chain length %d exceeds limit", len(f)),
+			}
+		}
 		pa, ok := decodeParams.(Array)
 		if !ok && decodeParams != nil {
 			return nil, errors.New("invalid /DecodeParms field")

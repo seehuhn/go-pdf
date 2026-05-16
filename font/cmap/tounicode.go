@@ -34,6 +34,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
 // ToUnicodeFile represents the contents of a ToUnicode CMap.
@@ -90,12 +91,12 @@ func ExtractToUnicode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 		return nil, err
 	}
 
-	body, err := pdf.DecodeStream(x.R, path, stmObj, 0)
+	body, err := pdf.ReadAll(x.R, path, stmObj, streamlimits.MaxCMapBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	res, err := readToUnicode(body)
+	res, err := readToUnicode(bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}

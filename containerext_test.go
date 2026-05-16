@@ -120,3 +120,31 @@ func TestGetFiltersJBIG2GlobalsValid(t *testing.T) {
 		t.Errorf("globals = %q, want %q", jf.Globals, "globals body")
 	}
 }
+
+// TestGetFiltersChainTooLong verifies that GetFilters rejects a /Filter
+// array longer than the per-stream cap, preventing attackers from
+// stacking many decoder wrappers on a single read.
+func TestGetFiltersChainTooLong(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	ref := w.Alloc()
+
+	chain := make(pdf.Array, 17)
+	for i := range chain {
+		chain[i] = pdf.Name("FlateDecode")
+	}
+	stm := pdf.NewStream(pdf.Dict{"Filter": chain}, nil)
+	if err := w.Put(ref, stm); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	stream, err := pdf.GetStream(w, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pdf.GetFilters(w, nil, stream.Dict); err == nil {
+		t.Fatal("expected error for oversized filter chain, got nil")
+	}
+}

@@ -94,7 +94,63 @@ func (o *Object) resolve() (pdf.Native, error) {
 	if o.src == nil {
 		return o.obj.AsPDF(0), nil
 	}
-	return o.src.DeepResolve(o.obj)
+	return deepResolve(o.src, nil, 0, o.obj)
+}
+
+// maxDeepResolveDepth caps the recursion depth of [deepResolve],
+// rejecting adversarially deep object trees before they exhaust the Go
+// call stack.
+const maxDeepResolveDepth = 256
+
+// deepResolve recursively resolves all references in a PDF object tree.
+// References are resolved through the extractor, and the values within
+// Dicts and Arrays are resolved recursively.  The returned object
+// contains no References.
+//
+// path threads cycle detection across the recursion so that reference
+// loops that cross structural boundaries (e.g. dict A holds a reference
+// to dict B which holds a reference back to A) are detected.  depth
+// bounds the recursion against adversarial nesting.
+func deepResolve(x *pdf.Extractor, path *pdf.CycleCheck, depth int, obj pdf.Object) (pdf.Native, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	if depth >= maxDeepResolveDepth {
+		return nil, &pdf.MalformedFileError{Err: errors.New("nesting depth exceeded")}
+	}
+	native := obj.AsPDF(0)
+	if ref, ok := native.(pdf.Reference); ok {
+		resolved, err := x.Resolve(path, ref)
+		if err != nil {
+			return nil, err
+		}
+		path = &pdf.CycleCheck{Ref: ref, Parent: path}
+		native = resolved
+	}
+	switch v := native.(type) {
+	case pdf.Dict:
+		res := make(pdf.Dict, len(v))
+		for k, val := range v {
+			r, err := deepResolve(x, path, depth+1, val)
+			if err != nil {
+				return nil, err
+			}
+			res[k] = r
+		}
+		return res, nil
+	case pdf.Array:
+		res := make(pdf.Array, len(v))
+		for i, val := range v {
+			r, err := deepResolve(x, path, depth+1, val)
+			if err != nil {
+				return nil, err
+			}
+			res[i] = r
+		}
+		return res, nil
+	default:
+		return native, nil
+	}
 }
 
 // AsDirectDict checks whether the wrapped value is a PDF dictionary,

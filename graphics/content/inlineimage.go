@@ -95,7 +95,7 @@ func DecodeInlineImage(op Operator, res *Resources) ([]byte, error) {
 		return nil, fmt.Errorf("inline image: expected String, got %T", op.Args[1])
 	}
 
-	if err := checkInlineImageDimensions(dict); err != nil {
+	if err := checkInlineImageDimensions(dict, res); err != nil {
 		return nil, err
 	}
 	if err := ValidateInlineImageFilter(dict); err != nil {
@@ -220,9 +220,11 @@ func InlineImageColorSpace(dict pdf.Dict, res *Resources) color.Space {
 }
 
 // checkInlineImageDimensions rejects inline images whose W/H values exceed
-// [streamlimits.MaxImageWidth] or [streamlimits.MaxImageHeight], matching
-// the dimension caps enforced for image XObjects.
-func checkInlineImageDimensions(dict pdf.Dict) error {
+// [streamlimits.MaxImageWidth] or [streamlimits.MaxImageHeight], whose
+// pixel count exceeds [streamlimits.MaxImagePixels], or whose declared
+// pixel data exceeds [streamlimits.MaxImageBytes].  These checks match
+// the dimension and product caps enforced for image XObjects.
+func checkInlineImageDimensions(dict pdf.Dict, res *Resources) error {
 	width := getInlineImageInt(dict, "W", "Width")
 	height := getInlineImageInt(dict, "H", "Height")
 	if width > streamlimits.MaxImageWidth {
@@ -230,6 +232,23 @@ func checkInlineImageDimensions(dict pdf.Dict) error {
 	}
 	if height > streamlimits.MaxImageHeight {
 		return &pdf.MalformedFileError{Err: fmt.Errorf("inline image height %d exceeds limit", height)}
+	}
+	if streamlimits.ImagePixelsExceedLimit(width, height) {
+		return &pdf.MalformedFileError{Err: errors.New("inline image pixel count exceeds limit")}
+	}
+
+	// byte-count refinement when ColorSpace and BPC are known
+	channels, bpc := 0, 0
+	if isImageMask(dict) {
+		channels, bpc = 1, 1
+	} else {
+		bpc = getInlineImageInt(dict, "BPC", "BitsPerComponent")
+		if cs := InlineImageColorSpace(dict, res); cs != nil {
+			channels = cs.Channels()
+		}
+	}
+	if streamlimits.ImageBytesExceedLimit(width, height, channels, bpc) {
+		return &pdf.MalformedFileError{Err: errors.New("inline image data exceeds size limit")}
 	}
 	return nil
 }

@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/streamlimits"
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/oc"
 	"seehuhn.de/go/pdf/optional"
@@ -848,4 +849,36 @@ func FuzzDictRoundTrip(f *testing.F) {
 
 		roundTripTest(t, pdf.GetVersion(r), objGo)
 	})
+}
+
+// TestExtractDictJPXOversizePixels verifies that a JPXDecode image
+// whose pixel count exceeds streamlimits.MaxImagePixels is rejected
+// even though ColorSpace and BitsPerComponent are absent.  The
+// byte-count cap does not fire on its own for JPX (channels and bit
+// depth live in the JP2 codestream), so the pixel-count cap is the
+// only defence at the dictionary level.
+func TestExtractDictJPXOversizePixels(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	ref := w.Alloc()
+	body, err := w.OpenStream(ref, pdf.Dict{
+		"Type":    pdf.Name("XObject"),
+		"Subtype": pdf.Name("Image"),
+		"Width":   pdf.Integer(streamlimits.MaxImageWidth),
+		"Height":  pdf.Integer(streamlimits.MaxImageHeight),
+		"Filter":  pdf.Name("JPXDecode"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	if _, err := ExtractDict(x, nil, ref, false); err == nil {
+		t.Fatal("expected error for oversize JPX image dict, got nil")
+	}
 }

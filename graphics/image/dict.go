@@ -218,6 +218,9 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	if height > streamlimits.MaxImageHeight {
 		return nil, pdf.Errorf("image height %d exceeds limit", height)
 	}
+	if streamlimits.ImagePixelsExceedLimit(int(width), int(height)) {
+		return nil, pdf.Error("image pixel count exceeds limit")
+	}
 
 	img := &Dict{
 		Width:  int(width),
@@ -251,6 +254,18 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 		}
 	} else if !hasJPX {
 		return nil, pdf.Error("missing BitsPerComponent")
+	}
+
+	// Refine the pixel-count cap above with a byte-count check when
+	// ColorSpace and BitsPerComponent are known, since up-front-allocating
+	// filters bypass the downstream LimitReader.  JPXDecode images do not
+	// reach this branch (ColorSpace is optional and may be nil) and are
+	// covered by the pixel-count cap alone; their decoder is responsible
+	// for honouring channel and bit-depth bounds from the JP2 codestream.
+	if img.ColorSpace != nil && img.BitsPerComponent > 0 &&
+		streamlimits.ImageBytesExceedLimit(img.Width, img.Height,
+			img.ColorSpace.Channels(), img.BitsPerComponent) {
+		return nil, pdf.Error("image data exceeds size limit")
 	}
 
 	// Extract optional fields

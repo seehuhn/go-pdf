@@ -268,3 +268,55 @@ func TestEqualNil(t *testing.T) {
 		t.Error("nil.Equal(o) = true")
 	}
 }
+
+// TestEqualCycle checks that a reference cycle that crosses structural
+// boundaries (two indirect dicts that point at each other) does not
+// blow the Go call stack.  Equal returns false because deepResolve
+// reports a MalformedFileError.
+func TestEqualCycle(t *testing.T) {
+	src, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	aRef := src.Alloc()
+	bRef := src.Alloc()
+	if err := src.Put(aRef, pdf.Dict{"K": bRef}); err != nil {
+		t.Fatalf("Put a: %v", err)
+	}
+	if err := src.Put(bRef, pdf.Dict{"K": aRef}); err != nil {
+		t.Fatalf("Put b: %v", err)
+	}
+
+	srcX := pdf.NewExtractor(src)
+	cyclic := Extract(srcX, aRef)
+	other := Direct(pdf.Dict{"K": pdf.Name("anything")})
+
+	if cyclic.Equal(other) {
+		t.Error("cyclic.Equal(other) = true, want false")
+	}
+}
+
+// TestEqualDeepChain checks that an adversarially long chain of
+// indirect references does not exhaust the Go stack.  The chain has
+// no cycle, so only the depth cap protects against stack overflow.
+func TestEqualDeepChain(t *testing.T) {
+	src, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	const n = maxDeepResolveDepth + 10
+	refs := make([]pdf.Reference, n)
+	for i := range refs {
+		refs[i] = src.Alloc()
+	}
+	for i := range n - 1 {
+		if err := src.Put(refs[i], pdf.Dict{"K": refs[i+1]}); err != nil {
+			t.Fatalf("Put %d: %v", i, err)
+		}
+	}
+	if err := src.Put(refs[n-1], pdf.Dict{"K": pdf.Name("leaf")}); err != nil {
+		t.Fatalf("Put leaf: %v", err)
+	}
+
+	srcX := pdf.NewExtractor(src)
+	deep := Extract(srcX, refs[0])
+	other := Direct(pdf.Dict{"K": pdf.Name("anything")})
+
+	if deep.Equal(other) {
+		t.Error("deep.Equal(other) = true, want false")
+	}
+}

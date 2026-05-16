@@ -32,13 +32,46 @@ func ImageDataLimit(width, height, channels, bpc int) int64 {
 	if width <= 0 || height <= 0 || channels <= 0 || bpc <= 0 {
 		return MaxImageBytes
 	}
-	bitsPerRow := int64(width) * int64(channels) * int64(bpc)
-	bytesPerRow := (bitsPerRow + 7) / 8
-	size := bytesPerRow * int64(height)
+	size := imageDecodedBytes(width, height, channels, bpc)
 	if size < 0 || size > MaxImageBytes {
 		return MaxImageBytes
 	}
 	return size
+}
+
+// ImageBytesExceedLimit reports whether an image with the given parameters
+// would have a decoded byte count exceeding MaxImageBytes.  It returns
+// false if any argument is non-positive; callers must validate those
+// separately.
+func ImageBytesExceedLimit(width, height, channels, bpc int) bool {
+	if width <= 0 || height <= 0 || channels <= 0 || bpc <= 0 {
+		return false
+	}
+	size := imageDecodedBytes(width, height, channels, bpc)
+	return size < 0 || size > MaxImageBytes
+}
+
+// ImagePixelsExceedLimit reports whether an image with the given pixel
+// dimensions exceeds MaxImagePixels.  Unlike [ImageBytesExceedLimit],
+// it does not depend on the channel count or bit depth, so it applies
+// even when those values are unknown at the dictionary level (e.g. for
+// JPXDecode images, where they live in the codestream).  It returns
+// false if either argument is non-positive.
+func ImagePixelsExceedLimit(width, height int) bool {
+	if width <= 0 || height <= 0 {
+		return false
+	}
+	return int64(width)*int64(height) > MaxImagePixels
+}
+
+// imageDecodedBytes returns ⌈W × channels × bpc / 8⌉ × H, the decoded
+// byte count of an image with the given parameters.  The result may
+// overflow int64 (returning a negative value); callers must treat a
+// negative return as "exceeds any sane limit".
+func imageDecodedBytes(width, height, channels, bpc int) int64 {
+	bitsPerRow := int64(width) * int64(channels) * int64(bpc)
+	bytesPerRow := (bitsPerRow + 7) / 8
+	return bytesPerRow * int64(height)
 }
 
 const (
@@ -51,6 +84,14 @@ const (
 	// MaxImageBytes caps the decoded byte count of a single image
 	// XObject, inline image, or thumbnail.
 	MaxImageBytes = 256 << 20
+
+	// MaxImagePixels caps the pixel count (width × height) of a single
+	// image.  This bound is independent of channel count and bit depth,
+	// so it applies even when those are unknown at extract time (e.g.
+	// JPXDecode images, where they live in the JP2 codestream).  At
+	// 128 Mpx it covers 8K UHD and most document scans while rejecting
+	// the 4 Gpx that the per-axis caps alone would admit.
+	MaxImagePixels = 128 << 20
 
 	// MaxSampleBytes caps the decoded byte count of a Type 0 sampled
 	// function's sample table.
@@ -66,7 +107,7 @@ const (
 
 	// MaxJBIG2GlobalsBytes caps the decoded byte count of a JBIG2
 	// globals stream.
-	MaxJBIG2GlobalsBytes = 4 << 20
+	MaxJBIG2GlobalsBytes = 8 << 20
 
 	// MaxJBIG2PageBytes caps the decoded byte count of a JBIG2
 	// per-page stream.  The jbig2 decoder applies its own internal
@@ -77,6 +118,17 @@ const (
 	// MaxCIDToGIDMapBytes caps the decoded byte count of a font's
 	// CIDToGIDMap stream (= 65536 CIDs * 2 bytes/entry).
 	MaxCIDToGIDMapBytes = 128 << 10
+
+	// MaxCMapBytes caps the decoded byte count of a CMap or ToUnicode
+	// stream.  Realistic CMaps are well under 100 KiB; 4 MiB leaves
+	// generous slack for unusually verbose mappings.
+	MaxCMapBytes = 4 << 20
+
+	// MaxFontProgramBytes caps the decoded byte count of an embedded
+	// font program (FontFile, FontFile2, FontFile3).  Large TrueType
+	// or OpenType fonts can reach several MiB; 16 MiB allows headroom
+	// for CJK fonts while bounding decompression amplification.
+	MaxFontProgramBytes = 16 << 20
 
 	// MaxIndexedLookupBytes caps the decoded byte count of an Indexed
 	// color space lookup table.  PDF 32000-2 §8.6.6.3 bounds the

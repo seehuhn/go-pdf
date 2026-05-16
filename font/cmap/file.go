@@ -34,6 +34,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
 // References:
@@ -110,12 +111,12 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*F
 			return nil, err
 		}
 
-		stm, err := pdf.DecodeStream(x.R, path, obj, 0)
+		data, err := pdf.ReadAll(x.R, path, obj, streamlimits.MaxCMapBytes)
 		if err != nil {
 			return nil, err
 		}
 
-		body = io.NopCloser(stm)
+		body = bytes.NewReader(data)
 
 	default:
 		return nil, pdf.Errorf("invalid CMap object type: %T", obj)
