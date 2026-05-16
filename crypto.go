@@ -827,7 +827,7 @@ func slowHash(passwd, salt, U []byte) []byte {
 	K1 := make([]byte, 64*(len(passwd)+64+len(U)))
 
 	// Perform the following steps (a)-(d) 64 times:
-	for i := 0; i < 64 || K1[len(K1)-1] > byte(i-32); i++ {
+	for i := 0; i < 64 || int(K1[len(K1)-1]) > i-32; i++ {
 		// a) Make a new string, K1, consisting of 64 repetitions of the sequence:
 		// input password, K, the 48-byte user key. The 48 byte user key is only
 		// used when checking the owner password or creating the owner key. If

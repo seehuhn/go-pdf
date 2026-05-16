@@ -102,15 +102,15 @@ func (r *reader) Read(p []byte) (n int, err error) {
 		needed := r.needRowData
 		bytesRead, readErr := io.ReadFull(r.r, r.inputBuffer[:needed])
 		if readErr != nil {
-			if readErr == io.EOF || readErr == io.ErrUnexpectedEOF {
+			if readErr == io.EOF && bytesRead == 0 {
 				r.eof = true
-				if bytesRead == 0 {
-					break
-				}
-				// Process partial data if available
-			} else {
-				return totalRead, readErr
+				break
 			}
+			if readErr == io.EOF || readErr == io.ErrUnexpectedEOF {
+				// a partial row cannot be decoded under any predictor
+				return totalRead, io.ErrUnexpectedEOF
+			}
+			return totalRead, readErr
 		}
 
 		// Decode the row
@@ -291,7 +291,7 @@ func (r *reader) decodeTIFF16Bit(data []byte) {
 	}
 
 	// Apply reverse differencing to subsequent components
-	for i := r.params.Colors * 2; i < len(data); i += 2 {
+	for i := r.params.Colors * 2; i+1 < len(data); i += 2 {
 		componentIdx := (i / 2) % r.params.Colors
 		diff := uint32(data[i])<<8 | uint32(data[i+1])
 		current := diff + r.prevValues[componentIdx]

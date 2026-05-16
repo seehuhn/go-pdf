@@ -360,6 +360,62 @@ func TestEOFHandling(t *testing.T) {
 	}
 }
 
+// TestTruncatedRow checks that a stream which ends mid-row is rejected
+// with io.ErrUnexpectedEOF instead of panicking on an OOB slice access
+// or silently producing a short row.
+func TestTruncatedRow(t *testing.T) {
+	cases := []struct {
+		name   string
+		params Params
+		// raw bytes fed to the reader: less than one full row
+		input []byte
+	}{
+		{
+			name: "TIFF predictor 2, BPC 16",
+			params: Params{
+				Predictor:        2,
+				BitsPerComponent: 16,
+				Colors:           1,
+				Columns:          2,
+			},
+			input: []byte{0x00, 0x00, 0x00}, // row needs 4 bytes
+		},
+		{
+			name: "TIFF predictor 2, BPC 8",
+			params: Params{
+				Predictor:        2,
+				BitsPerComponent: 8,
+				Colors:           3,
+				Columns:          2,
+			},
+			input: []byte{0x00, 0x00, 0x00}, // row needs 6 bytes
+		},
+		{
+			name: "PNG predictor 10",
+			params: Params{
+				Predictor:        10,
+				BitsPerComponent: 8,
+				Colors:           3,
+				Columns:          2,
+			},
+			input: []byte{0x00, 0x01, 0x02}, // row needs 1 tag + 6 data
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r, err := NewReader(io.NopCloser(bytes.NewReader(tc.input)), &tc.params)
+			if err != nil {
+				t.Fatalf("NewReader: %v", err)
+			}
+			_, err = io.ReadAll(r)
+			if !errors.Is(err, io.ErrUnexpectedEOF) {
+				t.Errorf("got err = %v, want io.ErrUnexpectedEOF", err)
+			}
+		})
+	}
+}
+
 func TestStreamStatePreservation(t *testing.T) {
 	params := Params{
 		Colors:           1,
