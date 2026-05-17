@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
 // color.Space implements pdf.Embedder
@@ -206,6 +207,43 @@ func TestExtractSpaceMalformedSeparationDeviceN(t *testing.T) {
 				t.Errorf("expected MalformedFileError, got %T: %v", err, err)
 			}
 		})
+	}
+}
+
+// TestExtractDeviceNTooManyColorants verifies that ExtractSpace rejects
+// a /DeviceN color space whose colorant list exceeds
+// streamlimits.MaxImageChannels.  Without this cap, the scanner-level
+// maxArrayLen of 1<<20 entries would let a malicious PDF carry up to
+// ~1M colorant names and amplify the later per-channel float64
+// allocation in image decoding by ~64×.
+func TestExtractDeviceNTooManyColorants(t *testing.T) {
+	names := make(pdf.Array, streamlimits.MaxImageChannels+1)
+	for i := range names {
+		names[i] = pdf.Name(fmt.Sprintf("c%d", i))
+	}
+	obj := pdf.Array{
+		pdf.Name("DeviceN"),
+		names,
+		pdf.Name("DeviceRGB"),
+		// tint transform shape is irrelevant — the colorant-count cap
+		// must fire before the transform is parsed.
+		pdf.Dict{
+			"FunctionType": pdf.Integer(2),
+			"Domain":       pdf.Array{pdf.Real(0), pdf.Real(1)},
+			"C0":           pdf.Array{pdf.Real(0), pdf.Real(0), pdf.Real(0)},
+			"C1":           pdf.Array{pdf.Real(1), pdf.Real(1), pdf.Real(1)},
+			"N":            pdf.Real(1),
+		},
+	}
+
+	r, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	x := pdf.NewExtractor(r)
+	_, err := ExtractSpace(x, nil, obj, false)
+	if err == nil {
+		t.Fatal("expected error for oversize DeviceN colorant list, got nil")
+	}
+	if !pdf.IsMalformed(err) {
+		t.Errorf("expected MalformedFileError, got %T: %v", err, err)
 	}
 }
 

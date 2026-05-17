@@ -22,22 +22,6 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-func getNames(r pdf.Getter, obj pdf.Object) ([]pdf.Name, error) {
-	a, err := pdf.GetArray(r, obj)
-	if err != nil {
-		return nil, err
-	}
-	res := make([]pdf.Name, len(a))
-	for i, obj := range a {
-		name, err := pdf.GetName(r, obj)
-		if err != nil {
-			return nil, err
-		}
-		res[i] = name
-	}
-	return res, nil
-}
-
 func toPDF(x []float64) pdf.Array {
 	res := make(pdf.Array, len(x))
 	for i, xi := range x {

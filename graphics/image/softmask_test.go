@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
 var softMaskTests = []struct {
@@ -182,6 +183,65 @@ var softMaskTests = []struct {
 			}},
 		},
 	},
+}
+
+// TestExtractSoftMaskMatteOversize verifies that when the Matte array
+// exceeds streamlimits.MaxImageChannels the whole Matte is dropped
+// silently.  Realistic Matte arrays carry one entry per parent-image
+// colorant; a matte that exceeds the channel cap can only come from a
+// malformed or hostile file and would otherwise allow up to ~8 MiB of
+// float64s to be allocated from an attacker-controlled array length.
+func TestExtractSoftMaskMatteOversize(t *testing.T) {
+	for _, kind := range []string{"under cap", "over cap"} {
+		t.Run(kind, func(t *testing.T) {
+			n := streamlimits.MaxImageChannels
+			if kind == "over cap" {
+				n = streamlimits.MaxImageChannels + 1
+			}
+			matte := make(pdf.Array, n)
+			for i := range matte {
+				matte[i] = pdf.Number(0.5)
+			}
+
+			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			ref := w.Alloc()
+			body, err := w.OpenStream(ref, pdf.Dict{
+				"Type":             pdf.Name("XObject"),
+				"Subtype":          pdf.Name("Image"),
+				"Width":            pdf.Integer(2),
+				"Height":           pdf.Integer(2),
+				"BitsPerComponent": pdf.Integer(8),
+				"ColorSpace":       pdf.Name("DeviceGray"),
+				"Matte":            matte,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := body.Write([]byte{0, 0, 0, 0}); err != nil {
+				t.Fatal(err)
+			}
+			if err := body.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			x := pdf.NewExtractor(w)
+			sm, err := ExtractSoftMask(x, nil, ref, false)
+			if err != nil {
+				t.Fatalf("ExtractSoftMask failed: %v", err)
+			}
+
+			want := n
+			if kind == "over cap" {
+				want = 0
+			}
+			if got := len(sm.Matte); got != want {
+				t.Errorf("len(Matte) = %d, want %d", got, want)
+			}
+		})
+	}
 }
 
 func TestSoftMaskRoundTrip(t *testing.T) {

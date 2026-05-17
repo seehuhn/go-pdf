@@ -344,10 +344,14 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 		softMask.Interpolate = bool(interp)
 	}
 
-	// Extract Matte array (specific to soft masks)
+	// Extract Matte array (specific to soft masks); drop wholesale if it
+	// exceeds the largest plausible parent-image channel count rather
+	// than allocate up to maxArrayLen floats from an attacker-controlled
+	// array.  Parity with the actual parent ncomp is validated by the
+	// writer in (*Dict).check and defensively by renderers.
 	if matteArray, err := pdf.Optional(x.GetArray(path, dict["Matte"])); err != nil {
 		return nil, err
-	} else if matteArray != nil {
+	} else if matteArray != nil && len(matteArray) <= streamlimits.MaxImageChannels {
 		softMask.Matte = make([]float64, len(matteArray))
 		for i, val := range matteArray {
 			if num, err := x.GetNumber(path, val); err != nil {

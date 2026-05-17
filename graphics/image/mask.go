@@ -252,9 +252,11 @@ func ExtractMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 		mask.Interpolate = bool(interp)
 	}
 
+	// drop the whole Alternates list if it exceeds MaxAlternates rather
+	// than silently truncate
 	if alts, err := pdf.Optional(x.GetArray(path, dict["Alternates"])); err != nil {
 		return nil, err
-	} else {
+	} else if len(alts) <= streamlimits.MaxAlternates {
 		for i, altObj := range alts {
 			alt, err := pdf.ExtractorGetOptional(x, path, altObj, ExtractAlternate)
 			if err != nil {
@@ -303,10 +305,11 @@ func ExtractMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 		mask.PtData = ptData
 	}
 
-	// Extract AssociatedFiles (AF)
+	// Extract AssociatedFiles (AF); drop the whole list if it exceeds
+	// MaxAssociatedFiles rather than silently truncate
 	if afArray, err := pdf.Optional(x.GetArray(path, dict["AF"])); err != nil {
 		return nil, err
-	} else if afArray != nil {
+	} else if afArray != nil && len(afArray) <= streamlimits.MaxAssociatedFiles {
 		mask.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
 		for _, afObj := range afArray {
 			if spec, err := pdf.ExtractorGetOptional(x, path, afObj, file.ExtractSpecification); err != nil {

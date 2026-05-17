@@ -18,6 +18,7 @@ package color
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	gocolor "image/color"
 	"math"
@@ -265,9 +266,29 @@ func ExtractSpace(x *pdf.Extractor, path *pdf.CycleCheck, desc pdf.Object, _ boo
 			break
 		}
 
-		colorants, err := getNames(x.R, d.args[0])
+		// cap the colorant-array length before materialising the names,
+		// so an attacker can't force ~maxArrayLen Name allocations
+		colorantsArr, err := pdf.GetArray(x.R, d.args[0])
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "colorant names"))
+			break
+		}
+		if len(colorantsArr) > streamlimits.MaxImageChannels {
+			d.SetError(&pdf.MalformedFileError{
+				Err: errors.New("DeviceN: too many colorants"),
+			})
+			break
+		}
+		colorants := make([]pdf.Name, len(colorantsArr))
+		var nameErr error
+		for i, obj := range colorantsArr {
+			colorants[i], nameErr = pdf.GetName(x.R, obj)
+			if nameErr != nil {
+				break
+			}
+		}
+		if nameErr != nil {
+			d.SetError(pdf.Wrap(nameErr, "colorant names"))
 			break
 		}
 

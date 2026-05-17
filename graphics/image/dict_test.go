@@ -851,6 +851,328 @@ func FuzzDictRoundTrip(f *testing.F) {
 	})
 }
 
+// TestExtractDictDecodedFloat64Oversize verifies that an image dict
+// whose per-channel float64 decode buffer would exceed
+// streamlimits.MaxImageDecodedFloat64Bytes is rejected, even when the
+// encoded-byte and pixel-count caps both pass.  At bpc=1 the float64
+// expansion ratio is 64×, so a CMYK image just under the pixel cap
+// passes ImageBytesExceedLimit (~64 MiB encoded) yet would allocate
+// ~4 GiB of float64s in Load().
+func TestExtractDictDecodedFloat64Oversize(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	ref := w.Alloc()
+	body, err := w.OpenStream(ref, pdf.Dict{
+		"Type":             pdf.Name("XObject"),
+		"Subtype":          pdf.Name("Image"),
+		"Width":            pdf.Integer(16384),
+		"Height":           pdf.Integer(8191),
+		"BitsPerComponent": pdf.Integer(1),
+		"ColorSpace":       pdf.Name("DeviceCMYK"),
+		"Filter":           pdf.Name("FlateDecode"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	if _, err := ExtractDict(x, nil, ref, false); err == nil {
+		t.Fatal("expected error for float64-oversize image dict, got nil")
+	}
+}
+
+// TestExtractDictTooManyAlternates verifies that when an image's
+// Alternates array exceeds streamlimits.MaxAlternates, every entry is
+// silently dropped — not truncated.  An over-long Alternates list is a
+// strong signal of a malicious construction (the spec describes
+// Alternates as a small set of variants), so the safer choice is to
+// surface no alternates at all rather than make an arbitrary cut.
+func TestExtractDictTooManyAlternates(t *testing.T) {
+	for _, kind := range []string{"under cap", "over cap"} {
+		t.Run(kind, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+			// build a single small alternate-target image XObject
+			altRef := w.Alloc()
+			altBody, err := w.OpenStream(altRef, pdf.Dict{
+				"Type":             pdf.Name("XObject"),
+				"Subtype":          pdf.Name("Image"),
+				"Width":            pdf.Integer(2),
+				"Height":           pdf.Integer(2),
+				"ColorSpace":       pdf.Name("DeviceGray"),
+				"BitsPerComponent": pdf.Integer(8),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := altBody.Write([]byte{0, 0, 0, 0}); err != nil {
+				t.Fatal(err)
+			}
+			if err := altBody.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			n := streamlimits.MaxAlternates
+			if kind == "over cap" {
+				n = streamlimits.MaxAlternates + 1
+			}
+			alts := make(pdf.Array, n)
+			for i := range alts {
+				alts[i] = pdf.Dict{"Image": altRef}
+			}
+
+			ref := w.Alloc()
+			body, err := w.OpenStream(ref, pdf.Dict{
+				"Type":             pdf.Name("XObject"),
+				"Subtype":          pdf.Name("Image"),
+				"Width":            pdf.Integer(4),
+				"Height":           pdf.Integer(4),
+				"ColorSpace":       pdf.Name("DeviceGray"),
+				"BitsPerComponent": pdf.Integer(8),
+				"Alternates":       alts,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := body.Write(make([]byte, 16)); err != nil {
+				t.Fatal(err)
+			}
+			if err := body.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			x := pdf.NewExtractor(w)
+			img, err := ExtractDict(x, nil, ref, false)
+			if err != nil {
+				t.Fatalf("ExtractDict failed: %v", err)
+			}
+
+			want := n
+			if kind == "over cap" {
+				want = 0
+			}
+			if got := len(img.Alternates); got != want {
+				t.Errorf("len(Alternates) = %d, want %d", got, want)
+			}
+		})
+	}
+}
+
+// TestExtractMaskTooManyAlternates verifies the same all-or-nothing
+// cap on Alternates for image masks.  See [TestExtractDictTooManyAlternates].
+func TestExtractMaskTooManyAlternates(t *testing.T) {
+	for _, kind := range []string{"under cap", "over cap"} {
+		t.Run(kind, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+			altRef := w.Alloc()
+			altBody, err := w.OpenStream(altRef, pdf.Dict{
+				"Type":             pdf.Name("XObject"),
+				"Subtype":          pdf.Name("Image"),
+				"Width":            pdf.Integer(8),
+				"Height":           pdf.Integer(8),
+				"ImageMask":        pdf.Boolean(true),
+				"BitsPerComponent": pdf.Integer(1),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := altBody.Write(make([]byte, 8)); err != nil {
+				t.Fatal(err)
+			}
+			if err := altBody.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			n := streamlimits.MaxAlternates
+			if kind == "over cap" {
+				n = streamlimits.MaxAlternates + 1
+			}
+			alts := make(pdf.Array, n)
+			for i := range alts {
+				alts[i] = pdf.Dict{"Image": altRef}
+			}
+
+			ref := w.Alloc()
+			body, err := w.OpenStream(ref, pdf.Dict{
+				"Type":             pdf.Name("XObject"),
+				"Subtype":          pdf.Name("Image"),
+				"Width":            pdf.Integer(8),
+				"Height":           pdf.Integer(8),
+				"ImageMask":        pdf.Boolean(true),
+				"BitsPerComponent": pdf.Integer(1),
+				"Alternates":       alts,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := body.Write(make([]byte, 8)); err != nil {
+				t.Fatal(err)
+			}
+			if err := body.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			x := pdf.NewExtractor(w)
+			mask, err := ExtractMask(x, nil, ref, false)
+			if err != nil {
+				t.Fatalf("ExtractMask failed: %v", err)
+			}
+
+			want := n
+			if kind == "over cap" {
+				want = 0
+			}
+			if got := len(mask.Alternates); got != want {
+				t.Errorf("len(Alternates) = %d, want %d", got, want)
+			}
+		})
+	}
+}
+
+// TestExtractDictTooManyAssociatedFiles verifies that when an image's
+// AF (associated-files) array exceeds streamlimits.MaxAssociatedFiles,
+// every entry is silently dropped — not truncated.  An over-long AF
+// list is a strong signal of a malicious construction; dropping the
+// list rather than capping it avoids silently presenting only a prefix.
+func TestExtractDictTooManyAssociatedFiles(t *testing.T) {
+	for _, kind := range []string{"under cap", "over cap"} {
+		t.Run(kind, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+			// build a single tiny file-spec object referenced many times
+			specRef := w.Alloc()
+			if err := w.Put(specRef, pdf.Dict{
+				"Type": pdf.Name("Filespec"),
+				"F":    pdf.String("attachment.txt"),
+			}); err != nil {
+				t.Fatal(err)
+			}
+
+			n := streamlimits.MaxAssociatedFiles
+			if kind == "over cap" {
+				n = streamlimits.MaxAssociatedFiles + 1
+			}
+			afs := make(pdf.Array, n)
+			for i := range afs {
+				afs[i] = specRef
+			}
+
+			ref := w.Alloc()
+			body, err := w.OpenStream(ref, pdf.Dict{
+				"Type":             pdf.Name("XObject"),
+				"Subtype":          pdf.Name("Image"),
+				"Width":            pdf.Integer(2),
+				"Height":           pdf.Integer(2),
+				"ColorSpace":       pdf.Name("DeviceGray"),
+				"BitsPerComponent": pdf.Integer(8),
+				"AF":               afs,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := body.Write([]byte{0, 0, 0, 0}); err != nil {
+				t.Fatal(err)
+			}
+			if err := body.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			x := pdf.NewExtractor(w)
+			img, err := ExtractDict(x, nil, ref, false)
+			if err != nil {
+				t.Fatalf("ExtractDict failed: %v", err)
+			}
+
+			want := n
+			if kind == "over cap" {
+				want = 0
+			}
+			if got := len(img.AssociatedFiles); got != want {
+				t.Errorf("len(AssociatedFiles) = %d, want %d", got, want)
+			}
+		})
+	}
+}
+
+// TestExtractMaskTooManyAssociatedFiles verifies the same all-or-nothing
+// cap on AF for image masks.  See [TestExtractDictTooManyAssociatedFiles].
+func TestExtractMaskTooManyAssociatedFiles(t *testing.T) {
+	for _, kind := range []string{"under cap", "over cap"} {
+		t.Run(kind, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+			specRef := w.Alloc()
+			if err := w.Put(specRef, pdf.Dict{
+				"Type": pdf.Name("Filespec"),
+				"F":    pdf.String("attachment.txt"),
+			}); err != nil {
+				t.Fatal(err)
+			}
+
+			n := streamlimits.MaxAssociatedFiles
+			if kind == "over cap" {
+				n = streamlimits.MaxAssociatedFiles + 1
+			}
+			afs := make(pdf.Array, n)
+			for i := range afs {
+				afs[i] = specRef
+			}
+
+			ref := w.Alloc()
+			body, err := w.OpenStream(ref, pdf.Dict{
+				"Type":             pdf.Name("XObject"),
+				"Subtype":          pdf.Name("Image"),
+				"Width":            pdf.Integer(8),
+				"Height":           pdf.Integer(8),
+				"ImageMask":        pdf.Boolean(true),
+				"BitsPerComponent": pdf.Integer(1),
+				"AF":               afs,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := body.Write(make([]byte, 8)); err != nil {
+				t.Fatal(err)
+			}
+			if err := body.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			x := pdf.NewExtractor(w)
+			mask, err := ExtractMask(x, nil, ref, false)
+			if err != nil {
+				t.Fatalf("ExtractMask failed: %v", err)
+			}
+
+			want := n
+			if kind == "over cap" {
+				want = 0
+			}
+			if got := len(mask.AssociatedFiles); got != want {
+				t.Errorf("len(AssociatedFiles) = %d, want %d", got, want)
+			}
+		})
+	}
+}
+
 // TestExtractDictJPXOversizePixels verifies that a JPXDecode image
 // whose pixel count exceeds streamlimits.MaxImagePixels is rejected
 // even though ColorSpace and BitsPerComponent are absent.  The

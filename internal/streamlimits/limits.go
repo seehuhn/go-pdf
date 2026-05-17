@@ -64,10 +64,27 @@ func ImagePixelsExceedLimit(width, height int) bool {
 	return int64(width)*int64(height) > MaxImagePixels
 }
 
+// ImageDecodedFloat64ExceedsLimit reports whether decoding an image with
+// the given dimensions into a per-channel float64 buffer would exceed
+// MaxImageDecodedFloat64Bytes.  The buffer size is width × height ×
+// channels × 8 bytes.  The check guards against amplification: the
+// encoded-bytes cap [ImageBytesExceedLimit] allows decoded float64
+// buffers up to 64× larger than the encoded stream at bpc=1, so a
+// stand-alone cap on the decoded form is needed.  Returns false if any
+// argument is non-positive.
+func ImageDecodedFloat64ExceedsLimit(width, height, channels int) bool {
+	if width <= 0 || height <= 0 || channels <= 0 {
+		return false
+	}
+	// multiply in float64 to avoid integer overflow
+	return float64(width)*float64(height)*float64(channels) > MaxImageDecodedFloat64Bytes/8
+}
+
 // imageDecodedBytes returns ⌈W × channels × bpc / 8⌉ × H, the decoded
-// byte count of an image with the given parameters.  The result may
-// overflow int64 (returning a negative value); callers must treat a
-// negative return as "exceeds any sane limit".
+// byte count of an image with the given parameters.  Callers must
+// supply pre-bounded inputs (width ≤ [MaxImageWidth], height ≤
+// [MaxImageHeight], channels ≤ [MaxImageChannels], bpc ≤ 16); under
+// those bounds the product stays well inside int64.
 func imageDecodedBytes(width, height, channels, bpc int) int64 {
 	bitsPerRow := int64(width) * int64(channels) * int64(bpc)
 	bytesPerRow := (bitsPerRow + 7) / 8
@@ -85,6 +102,14 @@ const (
 	// XObject, inline image, or thumbnail.
 	MaxImageBytes = 256 << 20
 
+	// MaxImageDecodedFloat64Bytes caps the size of a per-channel float64
+	// pixel buffer obtained by fully expanding an image's bit-packed
+	// samples into floats.  At bpc=1 the expansion ratio over the encoded
+	// form is 64×, so the [MaxImageBytes] cap on encoded data is not
+	// sufficient.  At 2 GiB this admits 8K UHD CMYK (~1 GiB) with
+	// headroom while rejecting clearly malicious amplification.
+	MaxImageDecodedFloat64Bytes = 2 << 30
+
 	// MaxImagePixels caps the pixel count (width × height) of a single
 	// image.  This bound is independent of channel count and bit depth,
 	// so it applies even when those are unknown at extract time (e.g.
@@ -92,6 +117,16 @@ const (
 	// 128 Mpx it covers 8K UHD and most document scans while rejecting
 	// the 4 Gpx that the per-axis caps alone would admit.
 	MaxImagePixels = 128 << 20
+
+	// MaxImageChannels caps the number of colour components in any image
+	// colour space.  All built-in spaces have a fixed channel count
+	// (1, 3, or 4); only /DeviceN is open-ended, and no realistic ink
+	// set exceeds a handful of components (Hexachrome uses 6, NChannel
+	// extends CMYK with a small number of spot colorants).  The cap
+	// stops a malicious /DeviceN declaration from amplifying the
+	// per-channel float64 buffer that image decoding allocates, and
+	// also bounds the soft-mask Matte array (one entry per channel).
+	MaxImageChannels = 32
 
 	// MaxSampleBytes caps the decoded byte count of a Type 0 sampled
 	// function's sample table.
@@ -135,4 +170,19 @@ const (
 	// table at (hival+1) * n bytes with hival <= 255 and n <= 32 in
 	// any realistic base color space, so 64 KB leaves generous slack.
 	MaxIndexedLookupBytes = 64 << 10
+
+	// MaxAlternates caps the number of entries in an image XObject's
+	// Alternates array (PDF 32000-2 §8.9.5.4 Table 89).  The spec
+	// describes Alternates as a small set of variants of the same
+	// image; realistic counts are single-digit.  A list longer than
+	// this is treated as malformed and the whole list is dropped, so
+	// callers never see a silently truncated set.
+	MaxAlternates = 8
+
+	// MaxAssociatedFiles caps the number of entries in an object's AF
+	// (associated-files) array (PDF 32000-2 §14.13).  Realistic counts
+	// are a handful of attachments per object.  Lists longer than this
+	// are dropped wholesale rather than truncated, matching the
+	// all-or-nothing semantics of [MaxAlternates].
+	MaxAssociatedFiles = 64
 )

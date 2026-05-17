@@ -262,10 +262,18 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	// reach this branch (ColorSpace is optional and may be nil) and are
 	// covered by the pixel-count cap alone; their decoder is responsible
 	// for honouring channel and bit-depth bounds from the JP2 codestream.
-	if img.ColorSpace != nil && img.BitsPerComponent > 0 &&
-		streamlimits.ImageBytesExceedLimit(img.Width, img.Height,
-			img.ColorSpace.Channels(), img.BitsPerComponent) {
-		return nil, pdf.Error("image data exceeds size limit")
+	if img.ColorSpace != nil && img.BitsPerComponent > 0 {
+		channels := img.ColorSpace.Channels()
+		if streamlimits.ImageBytesExceedLimit(img.Width, img.Height,
+			channels, img.BitsPerComponent) {
+			return nil, pdf.Error("image data exceeds size limit")
+		}
+		// the encoded-bytes cap admits up to 64× expansion into the
+		// per-channel float64 buffer at bpc=1; cap the decoded form
+		// separately to bound decoder memory use
+		if streamlimits.ImageDecodedFloat64ExceedsLimit(img.Width, img.Height, channels) {
+			return nil, pdf.Error("image decoded data exceeds size limit")
+		}
 	}
 
 	// Extract optional fields
@@ -343,10 +351,11 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 		img.Interpolate = bool(interp)
 	}
 
-	// extract alternates (Table 89)
+	// extract alternates (Table 89); drop the whole list if it exceeds
+	// MaxAlternates rather than silently truncate
 	if alts, err := pdf.Optional(x.GetArray(path, dict["Alternates"])); err != nil {
 		return nil, err
-	} else {
+	} else if len(alts) <= streamlimits.MaxAlternates {
 		for i, altObj := range alts {
 			alt, err := pdf.ExtractorGetOptional(x, path, altObj, ExtractAlternate)
 			if err != nil {
@@ -426,10 +435,11 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 		}
 	}
 
-	// Extract AssociatedFiles (AF)
+	// Extract AssociatedFiles (AF); drop the whole list if it exceeds
+	// MaxAssociatedFiles rather than silently truncate
 	if afArray, err := pdf.Optional(x.GetArray(path, dict["AF"])); err != nil {
 		return nil, err
-	} else if afArray != nil {
+	} else if afArray != nil && len(afArray) <= streamlimits.MaxAssociatedFiles {
 		img.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
 		for _, afObj := range afArray {
 			if spec, err := pdf.ExtractorGetOptional(x, path, afObj, file.ExtractSpecification); err != nil {
