@@ -51,7 +51,6 @@
 package jpeg
 
 import (
-	"image"
 	"io"
 
 	"seehuhn.de/go/pdf/internal/streamlimits"
@@ -133,8 +132,38 @@ type bits struct {
 	n int32  // the number of unread bits in a.
 }
 
-type decoder struct {
-	r    io.Reader
+// headerInfo collects everything the marker-parsing phase fills in
+// before SOS body decoding starts: image dimensions, component
+// metadata, frame mode flags, restart interval, and the lookup tables
+// (Huffman and quantisation) that the entropy decoder consults.
+// These values are immutable for the rest of the decode.
+type headerInfo struct {
+	width, height int
+	nComp         int
+
+	// As per section 4.5, there are four modes of operation (selected by the
+	// SOF? markers): sequential DCT, progressive DCT, lossless and
+	// hierarchical, although this implementation does not support the latter
+	// two non-DCT modes. Sequential DCT is further split into baseline and
+	// extended, as per section 4.11.
+	baseline    bool
+	progressive bool
+
+	jfif                bool
+	adobeTransformValid bool
+	adobeTransform      uint8
+
+	ri    int // Restart Interval.
+	comp  [maxComponents]component
+	huff  [maxTc + 1][maxTh + 1]huffman
+	quant [maxTq + 1]block // Quantization tables, in zig-zag order.
+}
+
+// entropyState collects the working state of the entropy decoder: the
+// bit-level reader, the byte-stuffed input buffer, the EOB-run
+// counter, the per-component saved coefficients for progressive
+// scans, and a small scratch buffer for marker-segment reads.
+type entropyState struct {
 	bits bits
 	// bytes is a byte buffer, similar to a bufio.Reader, except that it
 	// has to be able to unread more than 1 byte, due to byte stuffing.
@@ -148,34 +177,47 @@ type decoder struct {
 		// overshooting. It can be 0, 1 or 2.
 		nUnreadable int
 	}
-	width, height int
-
-	img1        *image.Gray
-	img3        *image.YCbCr
-	blackPix    []byte
-	blackStride int
-
-	ri    int // Restart Interval.
-	nComp int
-
-	// As per section 4.5, there are four modes of operation (selected by the
-	// SOF? markers): sequential DCT, progressive DCT, lossless and
-	// hierarchical, although this implementation does not support the latter
-	// two non-DCT modes. Sequential DCT is further split into baseline and
-	// extended, as per section 4.11.
-	baseline    bool
-	progressive bool
-
-	jfif                bool
-	adobeTransformValid bool
-	adobeTransform      uint8
-	eobRun              uint16 // End-of-Band run, specified in section G.1.2.2.
-
-	comp       [maxComponents]component
+	eobRun     uint16                 // End-of-Band run, specified in section G.1.2.2.
 	progCoeffs [maxComponents][]block // Saved state between progressive-mode scans.
-	huff       [maxTc + 1][maxTh + 1]huffman
-	quant      [maxTq + 1]block // Quantization tables, in zig-zag order.
 	tmp        [2 * blockSize]byte
+}
+
+// outputState holds the pixel plane storage and the per-stripe
+// emission machinery.  y is non-nil after SOS for every supported
+// nComp; cb/cr only for nComp >= 3; blackPix only for nComp == 4.
+// hRatio / vRatio are the chroma subsample factors (1 for 4:4:4; 2
+// for 4:2:0; etc.) — equal to d.comp[0].h / d.comp[1].h and
+// d.comp[0].v / d.comp[1].v.
+type outputState struct {
+	y, cb, cr        []byte
+	yStride, cStride int
+	hRatio, vRatio   int
+	blackPix         []byte
+	blackStride      int
+
+	// streaming is set in processSOS when the decoder can use a stripe-
+	// sized internal buffer instead of full-image buffers — i.e. for
+	// single-scan baseline (emit during processSOS) and progressive
+	// (emit during reconstructProgressiveImage).  For non-interleaved
+	// multi-scan baseline this stays false and the post-decode pass in
+	// [decoder.decode] walks the full buffer.
+	streaming bool
+
+	// stripeYStart[i] is the global block-y offset of the current MCU
+	// stripe for component i; subtracted from by when addressing the
+	// stripe buffer in [reconstructBlock].  Zero (and therefore a
+	// harmless no-op) in full-buffer mode.
+	stripeYStart [maxComponents]int
+
+	// emit is bound at SOS time once nComp and the colour-transform
+	// decision are known; it writes the pixel rows of one MCU stripe
+	// (or of the full image, in the multi-scan baseline fallback) to
+	// its io.Writer argument.
+	emit func(w io.Writer, yStart, yEnd int) error
+}
+
+type decoder struct {
+	r io.Reader
 
 	// colorTransformOverride, if non-nil, overrides the APP14-based
 	// color transform decision. 0 = no transform, 1 = YCbCr/YCCK.
@@ -185,25 +227,9 @@ type decoder struct {
 	// at the start of [decoder.decode] from the DecodeStream argument.
 	streamOut io.Writer
 
-	// streaming is set in processSOS when the decoder can use a stripe-
-	// sized internal buffer instead of full-image buffers — i.e. for
-	// single-scan baseline (emit during processSOS) and progressive
-	// (emit during reconstructProgressiveImage).  For non-interleaved
-	// multi-scan baseline this stays false and the post-decode pass in
-	// [decoder.decode] walks the full buffer via emitFull.
-	streaming bool
-
-	// emit is bound by selectEmitter once nComp and the colour-transform
-	// decision are known; it writes the pixel rows of one MCU stripe (or
-	// of the full image, in the multi-scan baseline fallback) to its
-	// io.Writer argument.
-	emit func(w io.Writer, yStart, yEnd int) error
-
-	// stripeYStart[i] is the global block-y offset of the current MCU
-	// stripe for component i; subtracted from by when addressing the
-	// stripe buffer in [reconstructBlock].  Only meaningful when
-	// streaming is true.
-	stripeYStart [maxComponents]int
+	headerInfo
+	entropyState
+	outputState
 }
 
 // fill fills up the d.bytes.buf buffer from the underlying io.Reader. It
@@ -700,6 +726,12 @@ func (d *decoder) decode(r io.Reader) error {
 		}
 	}
 
+	if d.y == nil {
+		// the marker loop completed without processing an SOS (the SOS
+		// marker was malformed enough to be treated as extraneous data
+		// and skipped); no pixels are available
+		return FormatError("missing SOS marker")
+	}
 	if d.progressive {
 		if err := d.reconstructProgressiveImage(); err != nil {
 			return err
@@ -709,9 +741,6 @@ func (d *decoder) decode(r io.Reader) error {
 		// emission already happened during processSOS (baseline) or
 		// reconstructProgressiveImage (progressive)
 		return nil
-	}
-	if d.img1 == nil && d.img3 == nil {
-		return FormatError("missing SOS marker")
 	}
 	return d.emit(d.streamOut, 0, d.height)
 }

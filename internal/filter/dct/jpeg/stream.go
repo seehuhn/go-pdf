@@ -63,33 +63,9 @@ func (d *decoder) useYCCK() bool {
 	return false
 }
 
-// selectEmitter binds d.emit to the per-stripe emission function
-// implied by d.nComp and the colour-transform decision.  Called from
-// processSOS once nComp, APP14, and the SOS itself have all been
-// parsed; after that the function is constant for the rest of the
-// decode.
-func (d *decoder) selectEmitter() {
-	switch d.nComp {
-	case 1:
-		d.emit = d.emitGray
-	case 3:
-		if d.isRGB() {
-			d.emit = d.emitYCbCrAsRGB
-		} else {
-			d.emit = d.emitYCbCr
-		}
-	default: // nComp == 4
-		if d.useYCCK() {
-			d.emit = d.emitYCCK
-		} else {
-			d.emit = d.emitRawCMYK
-		}
-	}
-}
-
 // emitStripe converts and writes one MCU stripe (the contents of
-// d.img1/d.img3/d.blackPix after the inner loops of [decoder.processSOS]
-// finish MCU row `my`) to d.streamOut.
+// d.y/d.cb/d.cr/d.blackPix after the inner loops of
+// [decoder.processSOS] finish MCU row `my`) to d.streamOut.
 func (d *decoder) emitStripe(my int) error {
 	v0 := d.comp[0].v
 	yStart := 8 * v0 * my
@@ -101,8 +77,8 @@ func (d *decoder) emitStripe(my int) error {
 func (d *decoder) emitGray(w io.Writer, yStart, yEnd int) error {
 	width := d.width
 	for y := yStart; y < yEnd; y++ {
-		off := (y - yStart) * d.img1.Stride
-		if _, err := w.Write(d.img1.Pix[off : off+width]); err != nil {
+		off := (y - yStart) * d.yStride
+		if _, err := w.Write(d.y[off : off+width]); err != nil {
 			return err
 		}
 	}
@@ -110,19 +86,19 @@ func (d *decoder) emitGray(w io.Writer, yStart, yEnd int) error {
 }
 
 // emitYCbCr applies the YCbCr → RGB conversion per pixel and writes
-// 3-bytes-per-pixel RGB rows.  The buffer's Rect.Min is (0, 0) (see
-// [decoder.makeImg]), so y - yStart is the correct stripe-local row
-// index for both the streaming and full-buffer paths.
+// 3-bytes-per-pixel RGB rows.  Chroma plane offsets are computed from
+// the stripe-local row (y - yStart) and the recorded chroma subsample.
 func (d *decoder) emitYCbCr(w io.Writer, yStart, yEnd int) error {
 	width := d.width
 	row := make([]byte, width*3)
 	for y := yStart; y < yEnd; y++ {
 		ly := y - yStart
+		yRow := ly * d.yStride
+		cRow := (ly / d.vRatio) * d.cStride
 		i := 0
 		for x := range width {
-			yOff := d.img3.YOffset(x, ly)
-			cOff := d.img3.COffset(x, ly)
-			r, g, b := color.YCbCrToRGB(d.img3.Y[yOff], d.img3.Cb[cOff], d.img3.Cr[cOff])
+			cOff := cRow + x/d.hRatio
+			r, g, b := color.YCbCrToRGB(d.y[yRow+x], d.cb[cOff], d.cr[cOff])
 			row[i] = r
 			row[i+1] = g
 			row[i+2] = b
@@ -143,13 +119,14 @@ func (d *decoder) emitYCbCrAsRGB(w io.Writer, yStart, yEnd int) error {
 	row := make([]byte, width*3)
 	for y := yStart; y < yEnd; y++ {
 		ly := y - yStart
+		yRow := ly * d.yStride
+		cRow := (ly / d.vRatio) * d.cStride
 		i := 0
 		for x := range width {
-			yOff := d.img3.YOffset(x, ly)
-			cOff := d.img3.COffset(x, ly)
-			row[i] = d.img3.Y[yOff]
-			row[i+1] = d.img3.Cb[cOff]
-			row[i+2] = d.img3.Cr[cOff]
+			cOff := cRow + x/d.hRatio
+			row[i] = d.y[yRow+x]
+			row[i+1] = d.cb[cOff]
+			row[i+2] = d.cr[cOff]
 			i += 3
 		}
 		if _, err := w.Write(row); err != nil {
@@ -169,15 +146,17 @@ func (d *decoder) emitYCCK(w io.Writer, yStart, yEnd int) error {
 	row := make([]byte, width*4)
 	for y := yStart; y < yEnd; y++ {
 		ly := y - yStart
+		yRow := ly * d.yStride
+		cRow := (ly / d.vRatio) * d.cStride
+		bRow := ly * d.blackStride
 		i := 0
 		for x := range width {
-			yOff := d.img3.YOffset(x, ly)
-			cOff := d.img3.COffset(x, ly)
-			r, g, b := color.YCbCrToRGB(d.img3.Y[yOff], d.img3.Cb[cOff], d.img3.Cr[cOff])
+			cOff := cRow + x/d.hRatio
+			r, g, b := color.YCbCrToRGB(d.y[yRow+x], d.cb[cOff], d.cr[cOff])
 			row[i] = 255 - r
 			row[i+1] = 255 - g
 			row[i+2] = 255 - b
-			row[i+3] = d.blackPix[ly*d.blackStride+x]
+			row[i+3] = d.blackPix[bRow+x]
 			i += 4
 		}
 		if _, err := w.Write(row); err != nil {
@@ -197,14 +176,16 @@ func (d *decoder) emitRawCMYK(w io.Writer, yStart, yEnd int) error {
 	row := make([]byte, width*4)
 	for y := yStart; y < yEnd; y++ {
 		ly := y - yStart
+		yRow := ly * d.yStride
+		cRow := (ly / d.vRatio) * d.cStride
+		bRow := ly * d.blackStride
 		i := 0
 		for x := range width {
-			yOff := d.img3.YOffset(x, ly)
-			cOff := d.img3.COffset(x, ly)
-			row[i] = d.img3.Y[yOff]
-			row[i+1] = d.img3.Cb[cOff]
-			row[i+2] = d.img3.Cr[cOff]
-			row[i+3] = d.blackPix[ly*d.blackStride+x]
+			cOff := cRow + x/d.hRatio
+			row[i] = d.y[yRow+x]
+			row[i+1] = d.cb[cOff]
+			row[i+2] = d.cr[cOff]
+			row[i+3] = d.blackPix[bRow+x]
 			i += 4
 		}
 		if _, err := w.Write(row); err != nil {

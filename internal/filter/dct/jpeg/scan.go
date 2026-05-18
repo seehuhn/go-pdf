@@ -49,80 +49,49 @@
 package jpeg
 
 import (
-	"image"
-
 	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
-// makeImg allocates and initializes the destination image.  When
-// d.streaming is true, only one MCU stripe is allocated (myy is ignored
-// and treated as 1) and the SubImage crop covers the full stripe width
-// at the MCU-aligned size.
-//
-// IMPORTANT: every SubImage created here has Min == (0, 0).  The plane
-// addressing in [reconstructBlock] and the emit* helpers passes the
-// local row index (y - yStart) straight to [image.YCbCr.YOffset] and
-// [image.YCbCr.COffset], which only happen to be correct because those
-// methods subtract Rect.Min from their argument before computing the
-// offset.  If a future change shifts Rect.Min away from the origin,
-// both the stripe and the full-buffer paths will silently produce
-// wrong addresses.
+// bytesPerProgBlock is the size in bytes of one entry in the
+// per-component progressive coefficient buffer ([blockSize]int32).
+const bytesPerProgBlock = blockSize * 4
+
+// maxProgressiveBlocks caps the total number of [block] entries the
+// progressive scans may allocate across all components, summed.  The
+// cap is in [streamlimits.MaxImageBytes] units to bound amplification
+// beyond the pixel/byte caps the SOF parser already enforces.
+const maxProgressiveBlocks = streamlimits.MaxImageBytes / bytesPerProgBlock
+
+// makeImg allocates the destination pixel planes.  When d.streaming is
+// true only one MCU stripe is allocated (the storeMyy override below
+// reduces the buffer height); otherwise full-image planes are
+// allocated for the multi-scan baseline fallback.  All planes are
+// dimensioned in MCU-aligned units, so 8*comp[i].h*mxx wide and
+// 8*comp[i].v*storeMyy tall for component i.
 func (d *decoder) makeImg(mxx, myy int) {
 	storeMyy := myy
-	subImgH := d.height
 	if d.streaming {
 		storeMyy = 1
-		// in streaming mode each emitted stripe is up to 8*v0 pixel rows
-		// (Y) or 8*v_i pixel rows per component; SubImage's height bounds
-		// the cropped view to the stripe, not the full image
-	}
-
-	if d.nComp == 1 {
-		m := image.NewGray(image.Rect(0, 0, 8*mxx, 8*storeMyy))
-		w := d.width
-		h := subImgH
-		if d.streaming {
-			w = 8 * mxx
-			h = 8 * storeMyy
-		}
-		d.img1 = m.SubImage(image.Rect(0, 0, w, h)).(*image.Gray)
-		return
 	}
 
 	h0 := d.comp[0].h
 	v0 := d.comp[0].v
-	hRatio := h0 / d.comp[1].h
-	vRatio := v0 / d.comp[1].v
-	var subsampleRatio image.YCbCrSubsampleRatio
-	switch hRatio<<4 | vRatio {
-	case 0x11:
-		subsampleRatio = image.YCbCrSubsampleRatio444
-	case 0x12:
-		subsampleRatio = image.YCbCrSubsampleRatio440
-	case 0x21:
-		subsampleRatio = image.YCbCrSubsampleRatio422
-	case 0x22:
-		subsampleRatio = image.YCbCrSubsampleRatio420
-	case 0x41:
-		subsampleRatio = image.YCbCrSubsampleRatio411
-	case 0x42:
-		subsampleRatio = image.YCbCrSubsampleRatio410
-	default:
-		panic("unreachable")
+	d.yStride = 8 * h0 * mxx
+	d.y = make([]byte, d.yStride*8*v0*storeMyy)
+	if d.nComp == 1 {
+		// d.hRatio / d.vRatio / d.cStride remain zero
+		return
 	}
-	m := image.NewYCbCr(image.Rect(0, 0, 8*h0*mxx, 8*v0*storeMyy), subsampleRatio)
-	w := d.width
-	h := subImgH
-	if d.streaming {
-		w = 8 * h0 * mxx
-		h = 8 * v0 * storeMyy
-	}
-	d.img3 = m.SubImage(image.Rect(0, 0, w, h)).(*image.YCbCr)
+
+	d.hRatio = h0 / d.comp[1].h
+	d.vRatio = v0 / d.comp[1].v
+	d.cStride = 8 * d.comp[1].h * mxx
+	d.cb = make([]byte, d.cStride*8*d.comp[1].v*storeMyy)
+	d.cr = make([]byte, d.cStride*8*d.comp[1].v*storeMyy)
 
 	if d.nComp == 4 {
-		h3, v3 := d.comp[3].h, d.comp[3].v
-		d.blackPix = make([]byte, 8*h3*mxx*8*v3*storeMyy)
-		d.blackStride = 8 * h3 * mxx
+		d.blackStride = 8 * d.comp[3].h * mxx
+		d.blackPix = make([]byte, d.blackStride*8*d.comp[3].v*storeMyy)
 	}
 }
 
@@ -225,7 +194,7 @@ func (d *decoder) processSOS(n int) error {
 	h0, v0 := d.comp[0].h, d.comp[0].v // The h and v values from the Y components.
 	mxx := (d.width + 8*h0 - 1) / (8 * h0)
 	myy := (d.height + 8*v0 - 1) / (8 * v0)
-	if d.img1 == nil && d.img3 == nil {
+	if d.y == nil {
 		// streaming uses stripe-sized output buffers; for baseline the
 		// stripe is filled and emitted during the scan, so it requires a
 		// single interleaved scan (the SOS lists every component) — a
@@ -238,7 +207,24 @@ func (d *decoder) processSOS(n int) error {
 			d.streaming = true
 		}
 		d.makeImg(mxx, myy)
-		d.selectEmitter()
+		// bind the per-stripe emission function: stable from here on
+		// since d.nComp, isRGB(), and useYCCK() are all set before SOS
+		switch d.nComp {
+		case 1:
+			d.emit = d.emitGray
+		case 3:
+			if d.isRGB() {
+				d.emit = d.emitYCbCrAsRGB
+			} else {
+				d.emit = d.emitYCbCr
+			}
+		default: // nComp == 4
+			if d.useYCCK() {
+				d.emit = d.emitYCCK
+			} else {
+				d.emit = d.emitRawCMYK
+			}
+		}
 	} else if d.streaming && !d.progressive {
 		// a second SOS appeared after the first baseline scan was
 		// streamed; we cannot un-emit those rows, so reject the file
@@ -250,10 +236,6 @@ func (d *decoder) processSOS(n int) error {
 		// budget enforced for decoded image data, since the per-image
 		// pixel/byte caps at SOF time admit a ~4× amplification into the
 		// coefficient buffer
-		const (
-			bytesPerProgBlock    = blockSize * 4
-			maxProgressiveBlocks = streamlimits.MaxImageBytes / bytesPerProgBlock
-		)
 		for i := range nComp {
 			compIndex := scan[i].compIndex
 			if d.progCoeffs[compIndex] == nil {
@@ -567,59 +549,42 @@ func (d *decoder) refineNonZeroes(b *block, zig, zigEnd, nz, delta int32) (int32
 	return zig, nil
 }
 
+// reconstructProgressiveImage walks the per-component coefficient
+// buffers built during the SOS marker loop and IDCT-reconstructs each
+// block into the stripe-sized pixel planes, emitting one MCU row at a
+// time.  Progressive decodes always use stripe mode (DecodeStream
+// always sets streamOut, and the SOS detection enables streaming
+// whenever d.progressive is true), so there is no full-buffer fallback
+// path here.
 func (d *decoder) reconstructProgressiveImage() error {
-	// The h0, mxx, by and bx variables have the same meaning as in the
-	// processSOS method.
 	h0 := d.comp[0].h
 	v0 := d.comp[0].v
 	mxx := (d.width + 8*h0 - 1) / (8 * h0)
 	myy := (d.height + 8*v0 - 1) / (8 * v0)
 
-	if d.streaming {
-		// stripe path: process one MCU row of blocks at a time across
-		// all components, emit the resulting stripe, then reuse the
-		// buffer for the next MCU row
-		for my := range myy {
-			for i := range d.nComp {
-				d.stripeYStart[i] = d.comp[i].v * my
+	for my := range myy {
+		for i := range d.nComp {
+			d.stripeYStart[i] = d.comp[i].v * my
+		}
+		for i := 0; i < d.nComp; i++ {
+			if d.progCoeffs[i] == nil {
+				continue
 			}
-			for i := 0; i < d.nComp; i++ {
-				if d.progCoeffs[i] == nil {
-					continue
-				}
-				v := 8 * v0 / d.comp[i].v
-				h := 8 * h0 / d.comp[i].h
-				stride := mxx * d.comp[i].h
-				byStart := d.comp[i].v * my
-				byEnd := byStart + d.comp[i].v
-				for by := byStart; by < byEnd && by*v < d.height; by++ {
-					for bx := 0; bx*h < d.width; bx++ {
-						if err := d.reconstructBlock(&d.progCoeffs[i][by*stride+bx], bx, by, i); err != nil {
-							return err
-						}
+			v := 8 * v0 / d.comp[i].v
+			h := 8 * h0 / d.comp[i].h
+			stride := mxx * d.comp[i].h
+			byStart := d.comp[i].v * my
+			byEnd := byStart + d.comp[i].v
+			for by := byStart; by < byEnd && by*v < d.height; by++ {
+				for bx := 0; bx*h < d.width; bx++ {
+					if err := d.reconstructBlock(&d.progCoeffs[i][by*stride+bx], bx, by, i); err != nil {
+						return err
 					}
 				}
 			}
-			if err := d.emitStripe(my); err != nil {
-				return err
-			}
 		}
-		return nil
-	}
-
-	for i := 0; i < d.nComp; i++ {
-		if d.progCoeffs[i] == nil {
-			continue
-		}
-		v := 8 * v0 / d.comp[i].v
-		h := 8 * h0 / d.comp[i].h
-		stride := mxx * d.comp[i].h
-		for by := 0; by*v < d.height; by++ {
-			for bx := 0; bx*h < d.width; bx++ {
-				if err := d.reconstructBlock(&d.progCoeffs[i][by*stride+bx], bx, by, i); err != nil {
-					return err
-				}
-			}
+		if err := d.emitStripe(my); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -633,26 +598,23 @@ func (d *decoder) reconstructBlock(b *block, bx, by, compIndex int) error {
 		b[unzig[zig]] *= qt[zig]
 	}
 	idct(b)
-	localBy := by
-	if d.streaming {
-		localBy = by - d.stripeYStart[compIndex]
-	}
-	dst, stride := []byte(nil), 0
-	if d.nComp == 1 {
-		dst, stride = d.img1.Pix[8*(localBy*d.img1.Stride+bx):], d.img1.Stride
-	} else {
-		switch compIndex {
-		case 0:
-			dst, stride = d.img3.Y[8*(localBy*d.img3.YStride+bx):], d.img3.YStride
-		case 1:
-			dst, stride = d.img3.Cb[8*(localBy*d.img3.CStride+bx):], d.img3.CStride
-		case 2:
-			dst, stride = d.img3.Cr[8*(localBy*d.img3.CStride+bx):], d.img3.CStride
-		case 3:
-			dst, stride = d.blackPix[8*(localBy*d.blackStride+bx):], d.blackStride
-		default:
-			return UnsupportedError("too many components")
-		}
+	// stripeYStart[i] is v_i*my in stripe mode and zero in full-buffer
+	// mode (where the buffer covers all MCU rows), so unconditionally
+	// subtracting it gives the correct local block-y in both cases
+	localBy := by - d.stripeYStart[compIndex]
+	var dst []byte
+	var stride int
+	switch compIndex {
+	case 0:
+		dst, stride = d.y[8*(localBy*d.yStride+bx):], d.yStride
+	case 1:
+		dst, stride = d.cb[8*(localBy*d.cStride+bx):], d.cStride
+	case 2:
+		dst, stride = d.cr[8*(localBy*d.cStride+bx):], d.cStride
+	case 3:
+		dst, stride = d.blackPix[8*(localBy*d.blackStride+bx):], d.blackStride
+	default:
+		return UnsupportedError("too many components")
 	}
 	// Level shift by +128, clip to [0, 255], and write to dst.
 	for y := range 8 {
