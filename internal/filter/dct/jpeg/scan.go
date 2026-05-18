@@ -58,6 +58,15 @@ import (
 // d.streaming is true, only one MCU stripe is allocated (myy is ignored
 // and treated as 1) and the SubImage crop covers the full stripe width
 // at the MCU-aligned size.
+//
+// IMPORTANT: every SubImage created here has Min == (0, 0).  The plane
+// addressing in [reconstructBlock] and [emitRows]/[emitStripe] pass
+// the local row index (y - yStart) straight to [image.YCbCr.YOffset]
+// and [image.YCbCr.COffset], which only happen to be correct because
+// those methods subtract Rect.Min from their argument before
+// computing the offset.  If a future change shifts Rect.Min away from
+// the origin, both the stripe and the full-buffer paths will silently
+// produce wrong addresses.
 func (d *decoder) makeImg(mxx, myy int) {
 	storeMyy := myy
 	subImgH := d.height
