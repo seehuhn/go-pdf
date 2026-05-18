@@ -231,13 +231,10 @@ func (d *decoder) processSOS(n int) error {
 		// single interleaved scan (the SOS lists every component) — a
 		// second SOS would try to refine MCU rows that have already been
 		// emitted.  Progressive scans fill progCoeffs and emit during
-		// reconstructProgressiveImage; they always tolerate stripes
-		switch {
-		case d.streamOut == nil:
-			// caller wants image.Image, keep full-buffer behaviour
-		case d.progressive:
-			d.streaming = true
-		case nComp == d.nComp:
+		// reconstructProgressiveImage; they always tolerate stripes.
+		// Multi-scan baseline (the rare non-interleaved encoding) falls
+		// through to full-buffer mode and emits at the end of decode.
+		if d.progressive || nComp == d.nComp {
 			d.streaming = true
 		}
 		d.makeImg(mxx, myy)
@@ -411,13 +408,14 @@ func (d *decoder) processSOS(n int) error {
 					if d.progressive {
 						// Save the coefficients.
 						d.progCoeffs[compIndex][by*mxx*hi+bx] = b
-						// At this point, we could call reconstructBlock to dequantize and perform the
-						// inverse DCT, to save early stages of a progressive image to the *image.YCbCr
-						// buffers (the whole point of progressive encoding), but in Go, the jpeg.Decode
-						// function does not return until the entire image is decoded, so we "continue"
-						// here to avoid wasted computation. Instead, reconstructBlock is called on each
-						// accumulated block by the reconstructProgressiveImage method after all of the
-						// SOS markers are processed.
+						// We could call reconstructBlock here to dequantize and
+						// perform the inverse DCT, materialising the partial
+						// progressive image (the whole point of progressive
+						// encoding), but since DecodeStream does not emit any
+						// pixels until every scan has been consumed there is
+						// nothing to do with the partial image.  Defer the
+						// reconstruction to reconstructProgressiveImage after
+						// all SOS markers have been processed.
 						continue
 					}
 					if err := d.reconstructBlock(&b, bx, by, int(compIndex)); err != nil {

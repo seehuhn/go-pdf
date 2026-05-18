@@ -52,7 +52,6 @@ package jpeg
 
 import (
 	"image"
-	"image/draw"
 	"io"
 
 	"seehuhn.de/go/pdf/internal/streamlimits"
@@ -182,16 +181,16 @@ type decoder struct {
 	// color transform decision. 0 = no transform, 1 = YCbCr/YCCK.
 	colorTransformOverride *int
 
-	// streamOut, when non-nil, instructs the decoder to emit decoded
-	// pixel bytes to this writer instead of (or in addition to) building
-	// an in-memory image.  Used by DecodeStream.
+	// streamOut is the destination writer for decoded pixel bytes; set
+	// at the start of [decoder.decode] from the DecodeStream argument.
 	streamOut io.Writer
 
-	// streaming is set in processSOS when the decoder can emit one MCU
-	// row at a time directly from a stripe-sized internal buffer.  When
-	// false, the internal buffers are full-image-sized as before; the
-	// post-decode pass walks them row-by-row and emits to streamOut (if
-	// non-nil) or returns the image.Image from decode (Decode path).
+	// streaming is set in processSOS when the decoder can use a stripe-
+	// sized internal buffer instead of full-image buffers — i.e. for
+	// single-scan baseline (emit during processSOS) and progressive
+	// (emit during reconstructProgressiveImage).  For non-interleaved
+	// multi-scan baseline this stays false and the post-decode pass in
+	// [decoder.decode] walks the full buffer via emitFull.
 	streaming bool
 
 	// stripeYStart[i] is the global block-y offset of the current MCU
@@ -455,7 +454,8 @@ func (d *decoder) processSOF(n int) error {
 			// hv vectors: [0x11 0x11 0x11 0x11] and [0x22 0x11 0x11 0x22].
 			// Theoretically, 4-component JPEG images could mix and match hv values
 			// but in practice, those two combinations are the only ones in use,
-			// and it simplifies the applyBlack code below if we can assume that:
+			// and it simplifies the 4-component emission code in stream.go if we
+			// can assume that:
 			//	- for CMYK, the C and K channels have full samples, and if the M
 			//	  and Y channels subsample, they subsample both horizontally and
 			//	  vertically.
@@ -577,23 +577,28 @@ func (d *decoder) processApp14Marker(n int) error {
 	return nil
 }
 
-// decode reads a JPEG image from r and returns it as an image.Image.
-func (d *decoder) decode(r io.Reader, configOnly bool) (image.Image, error) {
+// decode reads a JPEG image from r and writes decoded pixel bytes to
+// d.streamOut.  For single-scan baseline and progressive JPEGs the
+// internal buffers are stripe-sized and emission happens during
+// processSOS / reconstructProgressiveImage; for non-interleaved
+// (multi-scan) baseline JPEGs the buffers are full-image-sized and
+// emission happens after the marker loop via emitFull.
+func (d *decoder) decode(r io.Reader) error {
 	d.r = r
 
 	// Check for the Start Of Image marker.
 	if err := d.readFull(d.tmp[:2]); err != nil {
-		return nil, err
+		return err
 	}
 	if d.tmp[0] != 0xff || d.tmp[1] != soiMarker {
-		return nil, FormatError("missing SOI marker")
+		return FormatError("missing SOI marker")
 	}
 
 	// Process the remaining segments until the End Of Image marker.
 	for {
 		err := d.readFull(d.tmp[:2])
 		if err != nil {
-			return nil, err
+			return err
 		}
 		for d.tmp[0] != 0xff {
 			// Strictly speaking, this is a format error. However, libjpeg is
@@ -619,7 +624,7 @@ func (d *decoder) decode(r io.Reader, configOnly bool) (image.Image, error) {
 			d.tmp[0] = d.tmp[1]
 			d.tmp[1], err = d.readByte()
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
 		marker := d.tmp[1]
@@ -632,7 +637,7 @@ func (d *decoder) decode(r io.Reader, configOnly bool) (image.Image, error) {
 			// number of fill bytes, which are bytes assigned code X'FF'".
 			marker, err = d.readByte()
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
 		if marker == eoiMarker { // End Of Image.
@@ -651,11 +656,11 @@ func (d *decoder) decode(r io.Reader, configOnly bool) (image.Image, error) {
 		// Read the 16-bit length of the segment. The value includes the 2 bytes for the
 		// length itself, so we subtract 2 to get the number of remaining bytes.
 		if err = d.readFull(d.tmp[:2]); err != nil {
-			return nil, err
+			return err
 		}
 		n := int(d.tmp[0])<<8 + int(d.tmp[1]) - 2
 		if n < 0 {
-			return nil, FormatError("short segment length")
+			return FormatError("short segment length")
 		}
 
 		switch marker {
@@ -663,32 +668,14 @@ func (d *decoder) decode(r io.Reader, configOnly bool) (image.Image, error) {
 			d.baseline = marker == sof0Marker
 			d.progressive = marker == sof2Marker
 			err = d.processSOF(n)
-			if configOnly && d.jfif {
-				return nil, err
-			}
 		case dhtMarker:
-			if configOnly {
-				err = d.ignore(n)
-			} else {
-				err = d.processDHT(n)
-			}
+			err = d.processDHT(n)
 		case dqtMarker:
-			if configOnly {
-				err = d.ignore(n)
-			} else {
-				err = d.processDQT(n)
-			}
+			err = d.processDQT(n)
 		case sosMarker:
-			if configOnly {
-				return nil, nil
-			}
 			err = d.processSOS(n)
 		case driMarker:
-			if configOnly {
-				err = d.ignore(n)
-			} else {
-				err = d.processDRI(n)
-			}
+			err = d.processDRI(n)
 		case app0Marker:
 			err = d.processApp0Marker(n)
 		case app14Marker:
@@ -703,104 +690,26 @@ func (d *decoder) decode(r io.Reader, configOnly bool) (image.Image, error) {
 			}
 		}
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	if d.progressive {
 		if err := d.reconstructProgressiveImage(); err != nil {
-			return nil, err
+			return err
 		}
 	}
-	if d.img1 != nil {
-		return d.img1, nil
+	if d.streaming {
+		// emission already happened during processSOS (baseline) or
+		// reconstructProgressiveImage (progressive)
+		return nil
 	}
-	if d.img3 != nil {
-		if d.blackPix != nil {
-			return d.applyBlack()
-		} else if d.isRGB() {
-			return d.convertToRGB()
-		}
-		return d.img3, nil
-	}
-	return nil, FormatError("missing SOS marker")
+	return d.emitFull(d.streamOut)
 }
 
-// applyBlack combines d.img3 and d.blackPix into a CMYK image. The formula
-// used depends on whether the JPEG image is stored as CMYK or YCbCrK,
-// indicated by the APP14 (Adobe) metadata.
-//
-// Adobe CMYK JPEG images are inverted, where 255 means no ink instead of full
-// ink, so we apply "v = 255 - v" at various points. Note that a double
-// inversion is a no-op, so inversions might be implicit in the code below.
-func (d *decoder) applyBlack() (image.Image, error) {
-	// determine whether YCCK transform applies
-	ycck := false
-	if d.colorTransformOverride != nil {
-		ycck = *d.colorTransformOverride != 0
-	} else if d.adobeTransformValid {
-		ycck = d.adobeTransform != adobeTransformUnknown
-	} else {
-		// PDF default for 4-component without APP14: raw CMYK (no transform).
-		ycck = false
-	}
-
-	if ycck {
-		// Convert the YCbCr part of the YCbCrK to RGB, invert the RGB to get
-		// CMY, and patch in the original K. The RGB to CMY inversion cancels
-		// out the 'Adobe inversion' described in the applyBlack doc comment
-		// above, so in practice, only the fourth channel (black) is inverted.
-		bounds := d.img3.Bounds()
-		img := image.NewRGBA(bounds)
-		draw.Draw(img, bounds, d.img3, bounds.Min, draw.Src)
-		for iBase, y := 0, bounds.Min.Y; y < bounds.Max.Y; iBase, y = iBase+img.Stride, y+1 {
-			for i, x := iBase+3, bounds.Min.X; x < bounds.Max.X; i, x = i+4, x+1 {
-				img.Pix[i] = 255 - d.blackPix[(y-bounds.Min.Y)*d.blackStride+(x-bounds.Min.X)]
-			}
-		}
-		return &image.CMYK{
-			Pix:    img.Pix,
-			Stride: img.Stride,
-			Rect:   img.Rect,
-		}, nil
-	}
-
-	// The first three channels (cyan, magenta, yellow) of the CMYK
-	// were decoded into d.img3, but each channel was decoded into a separate
-	// []byte slice, and some channels may be subsampled. We interleave the
-	// separate channels into an image.CMYK's single []byte slice containing 4
-	// contiguous bytes per pixel.
-	bounds := d.img3.Bounds()
-	img := image.NewCMYK(bounds)
-
-	translations := [4]struct {
-		src    []byte
-		stride int
-	}{
-		{d.img3.Y, d.img3.YStride},
-		{d.img3.Cb, d.img3.CStride},
-		{d.img3.Cr, d.img3.CStride},
-		{d.blackPix, d.blackStride},
-	}
-	for t, translation := range translations {
-		subsample := d.comp[t].h != d.comp[0].h || d.comp[t].v != d.comp[0].v
-		for iBase, y := 0, bounds.Min.Y; y < bounds.Max.Y; iBase, y = iBase+img.Stride, y+1 {
-			sy := y - bounds.Min.Y
-			if subsample {
-				sy /= 2
-			}
-			for i, x := iBase+t, bounds.Min.X; x < bounds.Max.X; i, x = i+4, x+1 {
-				sx := x - bounds.Min.X
-				if subsample {
-					sx /= 2
-				}
-				img.Pix[i] = 255 - translation.src[sy*translation.stride+sx]
-			}
-		}
-	}
-	return img, nil
-}
-
+// isRGB reports whether 3-component output should pass the YCbCr
+// component planes through positionally as RGB rather than applying
+// the YCbCr→RGB matrix.  Used by the per-stripe emitter in stream.go.
 func (d *decoder) isRGB() bool {
 	if d.colorTransformOverride != nil {
 		return *d.colorTransformOverride == 0
@@ -812,38 +721,4 @@ func (d *decoder) isRGB() bool {
 		return true
 	}
 	return d.comp[0].c == 'R' && d.comp[1].c == 'G' && d.comp[2].c == 'B'
-}
-
-func (d *decoder) convertToRGB() (image.Image, error) {
-	cScale := d.comp[0].h / d.comp[1].h
-	bounds := d.img3.Bounds()
-	img := image.NewRGBA(bounds)
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		po := img.PixOffset(bounds.Min.X, y)
-		yo := d.img3.YOffset(bounds.Min.X, y)
-		co := d.img3.COffset(bounds.Min.X, y)
-		for i, iMax := 0, bounds.Max.X-bounds.Min.X; i < iMax; i++ {
-			img.Pix[po+4*i+0] = d.img3.Y[yo+i]
-			img.Pix[po+4*i+1] = d.img3.Cb[co+i/cScale]
-			img.Pix[po+4*i+2] = d.img3.Cr[co+i/cScale]
-			img.Pix[po+4*i+3] = 255
-		}
-	}
-	return img, nil
-}
-
-// Decode reads a JPEG image from r and returns it as an [image.Image].
-func Decode(r io.Reader) (image.Image, error) {
-	var d decoder
-	return d.decode(r, false)
-}
-
-// DecodeWithOptions reads a JPEG image from r, applying the given options.
-// If colorTransform is non-nil, it overrides the color transform that would
-// normally be determined from the JPEG's APP14 marker.
-// Values: 0 = no transform, 1 = YCbCr/YCCK transform.
-func DecodeWithOptions(r io.Reader, colorTransform *int) (image.Image, error) {
-	var d decoder
-	d.colorTransformOverride = colorTransform
-	return d.decode(r, false)
 }

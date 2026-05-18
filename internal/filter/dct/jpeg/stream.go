@@ -47,18 +47,13 @@ func DecodeStream(r io.Reader, colorTransform *int, w io.Writer) error {
 	var d decoder
 	d.colorTransformOverride = colorTransform
 	d.streamOut = w
-	if _, err := d.decode(r, false); err != nil {
-		return err
-	}
-	if d.streaming {
-		return nil
-	}
-	return d.emitFull(w)
+	return d.decode(r)
 }
 
 // useYCCK reports whether 4-component output should go through the YCCK
 // path (YCbCr → RGB inverted to CMY, with raw K) rather than being
-// emitted as raw CMYK planes.  Mirrors the decision in [applyBlack].
+// emitted as raw CMYK planes.  Encodes the APP14 + colorTransformOverride
+// decision per PDF spec table 13.
 func (d *decoder) useYCCK() bool {
 	if d.colorTransformOverride != nil {
 		return *d.colorTransformOverride != 0
@@ -178,10 +173,10 @@ func emitYCbCrPlanesAsRGBRows(w io.Writer, img *image.YCbCr, yStart, yEnd, width
 }
 
 // emitYCCKRows applies the YCCK → CMYK conversion (YCbCr → RGB, then
-// invert RGB to obtain CMY) and writes 4-bytes-per-pixel CMYK rows
-// where K is taken from blackPix without inversion.  This matches the
-// net result of the existing applyBlack YCCK path composed with the
-// outer dct CMYK inversion.
+// invert RGB to obtain CMY) and writes 4-bytes-per-pixel CMYK rows in
+// PDF convention (0 = no ink); K is taken from blackPix without
+// inversion since the Adobe-stored K is already PDF-convention after
+// the implicit double-inversion through the YCbCr/RGB matrix.
 func emitYCCKRows(w io.Writer, img *image.YCbCr, blackPix []byte, blackStride, yStart, yEnd, width int) error {
 	row := make([]byte, width*4)
 	for y := yStart; y < yEnd; y++ {
@@ -205,9 +200,10 @@ func emitYCCKRows(w io.Writer, img *image.YCbCr, blackPix []byte, blackStride, y
 }
 
 // emitRawCMYKRows writes the four component planes (Y, Cb, Cr, blackPix)
-// as raw CMYK bytes without any inversion.  This matches the net result
-// of the existing applyBlack non-YCCK path composed with the outer dct
-// CMYK inversion (the two inversions cancel out).
+// as raw CMYK bytes without any inversion: Adobe CMYK JPEGs store
+// pixel values in PDF convention (0 = no ink) once the Adobe sign
+// convention is reconciled with PDF, so a positional pass-through
+// produces the correct output.
 func emitRawCMYKRows(w io.Writer, img *image.YCbCr, blackPix []byte, blackStride, yStart, yEnd, width int) error {
 	row := make([]byte, width*4)
 	for y := yStart; y < yEnd; y++ {
