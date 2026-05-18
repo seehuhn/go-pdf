@@ -413,10 +413,13 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 		img.SMask = smask
 	}
 
-	// Extract SMaskInData (valid values are 0, 1, 2; invalid values default to 0)
+	// Extract SMaskInData (valid values are 0, 1, 2; invalid values default to 0).
+	// Per spec §8.9.5.1 the entry is only meaningful for JPXDecode
+	// images; drop it for any other filter so that round-trip via
+	// [Dict.Embed] does not fail its consistency check.
 	if smd, err := pdf.Optional(x.GetInteger(path, dict["SMaskInData"])); err != nil {
 		return nil, err
-	} else if smd == 1 || smd == 2 {
+	} else if hasJPX && (smd == 1 || smd == 2) {
 		img.SMaskInData = int(smd)
 		// Per spec: if SMaskInData is non-zero, SMask should be ignored
 		if img.SMask != nil {
