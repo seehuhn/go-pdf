@@ -804,10 +804,10 @@ func FuzzDictRoundTrip(f *testing.F) {
 		f.Add(buf.Data)
 	}
 
-	// Seed: JPXDecode image without /ColorSpace, the case from
-	// report.txt that previously panicked.  We do not embed via the
-	// ResourceManager because there is no JPXSource for API-side
-	// construction; instead, write the dict directly.
+	// Seed: JPXDecode image without /ColorSpace, a case that previously
+	// panicked.  We do not embed via the ResourceManager because there
+	// is no JPXSource for API-side construction; instead, write the
+	// dict directly.
 	{
 		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
 		_ = memfile.AddBlankPage(w)
@@ -1206,9 +1206,9 @@ func writeJPXImage(t *testing.T, version pdf.Version, extras pdf.Dict) (*Dict, e
 	return ExtractDict(x, nil, ref, false)
 }
 
-// TestExtractDictJPXNoColorSpace covers the minimal reproducer from
-// report.txt: a JPXDecode image XObject without /ColorSpace.  Prior to
-// the fix this panicked at dict.go:328 with a nil pointer dereference.
+// TestExtractDictJPXNoColorSpace covers a JPXDecode image XObject
+// without /ColorSpace, which previously panicked at dict.go:328 with a
+// nil pointer dereference.
 func TestExtractDictJPXNoColorSpace(t *testing.T) {
 	img, err := writeJPXImage(t, pdf.V1_7, nil)
 	if err != nil {

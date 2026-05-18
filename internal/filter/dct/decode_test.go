@@ -259,6 +259,49 @@ func closeEnough(a, b uint8) bool {
 	return math.Abs(float64(a)-float64(b)) <= 1
 }
 
+// TestDecodeProgressiveBudget verifies that a progressive JPEG whose
+// SOF dimensions fit the per-image pixel/byte caps but would push the
+// internal coefficient buffer above the budget is rejected before any
+// large allocation happens.
+func TestDecodeProgressiveBudget(t *testing.T) {
+	// build a minimal SOI + SOF2 + SOS sequence; entropy data is not
+	// required because the cap fires at the progCoeffs allocation in
+	// scan.go before any Huffman decoding
+	build := func(w, h uint16) []byte {
+		hi := func(v uint16) byte { return byte(v >> 8) }
+		lo := func(v uint16) byte { return byte(v) }
+		return []byte{
+			0xFF, 0xD8, // SOI
+			0xFF, 0xC2, // SOF2 (progressive)
+			0x00, 0x0B, // length = 11
+			0x08,         // precision = 8
+			hi(h), lo(h), // height
+			hi(w), lo(w), // width
+			0x01,       // nComp = 1
+			0x01,       // component id
+			0x11,       // sampling h=1 v=1
+			0x00,       // quant table 0
+			0xFF, 0xDA, // SOS
+			0x00, 0x08, // length = 8
+			0x01, // nComp in scan = 1
+			0x01, // component selector
+			0x00, // td=0, ta=0
+			0x00, // Ss = 0 (DC-only scan, valid for progressive)
+			0x00, // Se = 0
+			0x00, // Ah = 0, Al = 0
+		}
+	}
+
+	// dimensions chosen to pass ImagePixelsExceedLimit (128 Mpx) and
+	// ImageBytesExceedLimit (256 MiB) at SOF parse time, but to require
+	// > 1 Mi progressive blocks (= 256 MiB at 256 B/block)
+	payload := build(10000, 10000)
+	_, err := Decode(bytes.NewReader(payload), nil)
+	if err == nil {
+		t.Fatal("expected error for oversize progressive scan, got nil")
+	}
+}
+
 // TestDecodeOversizeSOF verifies that a JPEG declaring dimensions whose
 // product exceeds streamlimits.MaxImageBytes is rejected by the SOF
 // parser before any large allocation happens.

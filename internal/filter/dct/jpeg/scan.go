@@ -50,6 +50,8 @@ package jpeg
 
 import (
 	"image"
+
+	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
 // makeImg allocates and initializes the destination image.
@@ -194,10 +196,26 @@ func (d *decoder) processSOS(n int) error {
 		d.makeImg(mxx, myy)
 	}
 	if d.progressive {
+		// cap total progressive coefficient memory against the same byte
+		// budget enforced for decoded image data, since the per-image
+		// pixel/byte caps at SOF time admit a ~4× amplification into the
+		// coefficient buffer
+		const (
+			bytesPerProgBlock    = blockSize * 4
+			maxProgressiveBlocks = streamlimits.MaxImageBytes / bytesPerProgBlock
+		)
 		for i := range nComp {
 			compIndex := scan[i].compIndex
 			if d.progCoeffs[compIndex] == nil {
-				d.progCoeffs[compIndex] = make([]block, mxx*myy*d.comp[compIndex].h*d.comp[compIndex].v)
+				nBlocks := int64(mxx) * int64(myy) * int64(d.comp[compIndex].h) * int64(d.comp[compIndex].v)
+				var existing int64
+				for j := range d.progCoeffs {
+					existing += int64(len(d.progCoeffs[j]))
+				}
+				if existing+nBlocks > maxProgressiveBlocks {
+					return FormatError("progressive coefficient buffer exceeds budget")
+				}
+				d.progCoeffs[compIndex] = make([]block, nBlocks)
 			}
 		}
 	}
