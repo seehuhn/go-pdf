@@ -217,18 +217,25 @@ func (d *decoder) processSOS(n int) error {
 	mxx := (d.width + 8*h0 - 1) / (8 * h0)
 	myy := (d.height + 8*v0 - 1) / (8 * v0)
 	if d.img1 == nil && d.img3 == nil {
-		// streaming is feasible only when the entire image arrives in a
-		// single interleaved baseline scan: the SOS lists every component
-		// and there is no second pass that would refine earlier MCU rows
-		// after they have already been emitted
-		if d.streamOut != nil && !d.progressive && nComp == d.nComp {
+		// streaming uses stripe-sized output buffers; for baseline the
+		// stripe is filled and emitted during the scan, so it requires a
+		// single interleaved scan (the SOS lists every component) — a
+		// second SOS would try to refine MCU rows that have already been
+		// emitted.  Progressive scans fill progCoeffs and emit during
+		// reconstructProgressiveImage; they always tolerate stripes
+		switch {
+		case d.streamOut == nil:
+			// caller wants image.Image, keep full-buffer behaviour
+		case d.progressive:
+			d.streaming = true
+		case nComp == d.nComp:
 			d.streaming = true
 		}
 		d.makeImg(mxx, myy)
-	} else if d.streaming {
-		// a second SOS appeared after the first scan was streamed; we
-		// cannot un-emit those rows, so reject the file rather than
-		// silently producing wrong output
+	} else if d.streaming && !d.progressive {
+		// a second SOS appeared after the first baseline scan was
+		// streamed; we cannot un-emit those rows, so reject the file
+		// rather than silently producing wrong output
 		return FormatError("multi-scan baseline not supported in streaming mode")
 	}
 	if d.progressive {
@@ -433,7 +440,10 @@ func (d *decoder) processSOS(n int) error {
 				d.eobRun = 0
 			}
 		} // for mx
-		if d.streaming {
+		if d.streaming && !d.progressive {
+			// for baseline, the stripe holds the full pixel data for
+			// this MCU row; for progressive we instead emit later from
+			// reconstructProgressiveImage
 			if err := d.emitStripe(my, mxx, myy); err != nil {
 				return err
 			}
@@ -553,13 +563,48 @@ func (d *decoder) reconstructProgressiveImage() error {
 	// The h0, mxx, by and bx variables have the same meaning as in the
 	// processSOS method.
 	h0 := d.comp[0].h
+	v0 := d.comp[0].v
 	mxx := (d.width + 8*h0 - 1) / (8 * h0)
+	myy := (d.height + 8*v0 - 1) / (8 * v0)
+
+	if d.streaming {
+		// stripe path: process one MCU row of blocks at a time across
+		// all components, emit the resulting stripe, then reuse the
+		// buffer for the next MCU row
+		for my := range myy {
+			for i := range d.nComp {
+				d.stripeYStart[i] = d.comp[i].v * my
+			}
+			for i := 0; i < d.nComp; i++ {
+				if d.progCoeffs[i] == nil {
+					continue
+				}
+				v := 8 * v0 / d.comp[i].v
+				h := 8 * h0 / d.comp[i].h
+				stride := mxx * d.comp[i].h
+				byStart := d.comp[i].v * my
+				byEnd := byStart + d.comp[i].v
+				for by := byStart; by < byEnd && by*v < d.height; by++ {
+					for bx := 0; bx*h < d.width; bx++ {
+						if err := d.reconstructBlock(&d.progCoeffs[i][by*stride+bx], bx, by, i); err != nil {
+							return err
+						}
+					}
+				}
+			}
+			if err := d.emitStripe(my, mxx, myy); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	for i := 0; i < d.nComp; i++ {
 		if d.progCoeffs[i] == nil {
 			continue
 		}
-		v := 8 * d.comp[0].v / d.comp[i].v
-		h := 8 * d.comp[0].h / d.comp[i].h
+		v := 8 * v0 / d.comp[i].v
+		h := 8 * h0 / d.comp[i].h
 		stride := mxx * d.comp[i].h
 		for by := 0; by*v < d.height; by++ {
 			for bx := 0; bx*h < d.width; bx++ {
