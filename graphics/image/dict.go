@@ -51,10 +51,17 @@ type Dict struct {
 
 	// ColorSpace is the color space in which image samples are specified.
 	// It can be any type of color space except Pattern.
+	//
+	// May be nil only for JPXDecode images, where the colour space
+	// description lives in the JPEG 2000 codestream.
 	ColorSpace color.Space
 
-	// BitsPerComponent is the number of bits used to represent each color component.
-	// The value must be 1, 2, 4, 8, or (from PDF 1.5) 16.
+	// BitsPerComponent is the number of bits used to represent each
+	// colour component.  The value must be 1, 2, 4, 8, or (from PDF 1.5)
+	// 16.
+	//
+	// May be 0 only for JPXDecode images, where the bit depth lives in
+	// the JPEG 2000 codestream and may differ per channel.
 	BitsPerComponent int
 
 	// Decode (optional) is an array of numbers describing how to map pixel
@@ -81,6 +88,11 @@ type Dict struct {
 	// Each value must be in the range 0 to (2^BitsPerComponent - 1) and
 	// represents raw color values before any Decode array processing. Pixels
 	// with all components in their respective ranges become transparent.
+	//
+	// For JPXDecode images without an explicit ColorSpace, the channel
+	// count is determined by the JPEG 2000 codestream and only a
+	// length-only check is performed at read and write time:
+	// 1 ≤ len(MaskColors)/2 ≤ streamlimits.MaxImageChannels.
 	//
 	// Only one of MaskImage or MaskColors may be specified.
 	MaskColors []uint16
@@ -180,19 +192,19 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 		return nil, pdf.Error("use ExtractImageMask for image masks")
 	}
 
-	hasJPX := false
-	if filters, err := pdf.Optional(pdf.GetFilters(x.R, path, dict)); err != nil {
+	filters, err := pdf.Optional(pdf.GetFilters(x.R, path, dict))
+	if err != nil {
 		return nil, err
-	} else {
-		for _, f := range filters {
-			name, _, err := f.Info(pdf.GetVersion(x.R))
-			if err != nil {
-				return nil, err
-			}
-			if name == "JPXDecode" {
-				hasJPX = true
-				break
-			}
+	}
+	hasJPX := false
+	for _, f := range filters {
+		name, _, err := f.Info(pdf.GetVersion(x.R))
+		if err != nil {
+			return nil, err
+		}
+		if name == "JPXDecode" {
+			hasJPX = true
+			break
 		}
 	}
 
@@ -241,18 +253,22 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 		return nil, pdf.Error("missing ColorSpace for non-JPXDecode image")
 	}
 
-	// Extract BitsPerComponent (required except for JPXDecode)
-	if bpc, err := pdf.Optional(x.GetInteger(path, dict["BitsPerComponent"])); err != nil {
+	// Extract BitsPerComponent.  For JPXDecode images the entry is
+	// optional and shall be ignored if present (spec §8.9.5); drop any
+	// value to keep round-trip parity with check() which requires
+	// img.BitsPerComponent == 0 for JPX.
+	if hasJPX {
+		img.BitsPerComponent = 0
+	} else if bpc, err := pdf.Optional(x.GetInteger(path, dict["BitsPerComponent"])); err != nil {
 		return nil, err
 	} else if bpc != 0 {
-		// Validate it's a valid value
 		switch bpc {
 		case 1, 2, 4, 8, 16:
 			img.BitsPerComponent = int(bpc)
 		default:
 			return nil, pdf.Errorf("invalid BitsPerComponent %d", bpc)
 		}
-	} else if !hasJPX {
+	} else {
 		return nil, pdf.Error("missing BitsPerComponent")
 	}
 
@@ -296,54 +312,75 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 			img.MaskImage = maskImg
 		}
 	case pdf.Array: // color key mask array
-		numChannels := img.ColorSpace.Channels()
-		if len(maskObj) == 2*numChannels {
-			maskColors := make([]uint16, len(maskObj))
-			valid := true
-			for i, val := range maskObj {
-				if num, err := x.GetInteger(path, val); err != nil {
-					valid = false
-					break
-				} else if img.BitsPerComponent < 16 {
-					maskColors[i] = uint16(num) % (1 << img.BitsPerComponent)
-				} else {
-					maskColors[i] = uint16(num)
-				}
+		var numChannels int
+		if img.ColorSpace != nil {
+			numChannels = img.ColorSpace.Channels()
+			if len(maskObj) != 2*numChannels {
+				break
 			}
-			// check min_i <= max_i for each pair
-			for i := 0; valid && i < numChannels; i++ {
-				if maskColors[2*i] > maskColors[2*i+1] {
-					valid = false
-				}
+		} else {
+			// JPX channel count lives in the codestream; bound the
+			// pair count instead of matching it exactly.
+			if len(maskObj) < 2 ||
+				len(maskObj) > 2*streamlimits.MaxImageChannels ||
+				len(maskObj)%2 != 0 {
+				break
 			}
-			if valid {
-				img.MaskColors = maskColors
+			numChannels = len(maskObj) / 2
+		}
+
+		maskColors := make([]uint16, len(maskObj))
+		valid := true
+		for i, val := range maskObj {
+			num, err := x.GetInteger(path, val)
+			if err != nil || num < 0 || num > 0xFFFF {
+				valid = false
+				break
 			}
+			if img.BitsPerComponent > 0 && img.BitsPerComponent < 16 {
+				maskColors[i] = uint16(num) % (1 << img.BitsPerComponent)
+			} else {
+				maskColors[i] = uint16(num)
+			}
+		}
+		for i := 0; valid && i < numChannels; i++ {
+			if maskColors[2*i] > maskColors[2*i+1] {
+				valid = false
+			}
+		}
+		if valid {
+			img.MaskColors = maskColors
 		}
 	}
 
-	// extract Decode array, substituting the default if not present
-	if decodeArray, err := pdf.Optional(x.GetArray(path, dict["Decode"])); err != nil {
-		return nil, err
-	} else if len(decodeArray) == 2*img.ColorSpace.Channels() {
-		decode := make([]float64, len(decodeArray))
-		valid := true
-		for i, val := range decodeArray {
-			num, err := x.GetNumber(path, val)
-			if pdf.IsMalformed(err) {
-				valid = false
-				break
-			} else if err != nil {
-				return nil, err
+	// Extract Decode array, substituting the default if not present.
+	// For JPXDecode images without an explicit ColorSpace, the spec
+	// (§7.4.9, §8.9.5) says the Decode array shall be ignored unless
+	// ImageMask is true.  Skip extraction entirely in that case and
+	// leave img.Decode nil.
+	if img.ColorSpace != nil {
+		if decodeArray, err := pdf.Optional(x.GetArray(path, dict["Decode"])); err != nil {
+			return nil, err
+		} else if len(decodeArray) == 2*img.ColorSpace.Channels() {
+			decode := make([]float64, len(decodeArray))
+			valid := true
+			for i, val := range decodeArray {
+				num, err := x.GetNumber(path, val)
+				if pdf.IsMalformed(err) {
+					valid = false
+					break
+				} else if err != nil {
+					return nil, err
+				}
+				decode[i] = num
 			}
-			decode[i] = num
+			if valid {
+				img.Decode = decode
+			}
 		}
-		if valid {
-			img.Decode = decode
+		if img.Decode == nil {
+			img.Decode = DefaultDecode(img.ColorSpace, img.BitsPerComponent)
 		}
-	}
-	if img.Decode == nil {
-		img.Decode = DefaultDecode(img.ColorSpace, img.BitsPerComponent)
 	}
 
 	// Extract Interpolate
@@ -460,6 +497,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	// lazily read from the original stream, preserving the encoding
 	img.Data = &streamData{
 		inner:    opaque.ExtractStream(x, stream),
+		isJPX:    hasJPX,
 		maxBytes: ImageDataLimit(img.Width, img.Height, img.BitsPerComponent, img.ColorSpace),
 	}
 
@@ -576,17 +614,20 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 
-	csEmbedded, err := rm.Embed(d.ColorSpace)
-	if err != nil {
-		return nil, err
-	}
-
 	dict := pdf.Dict{
-		"Subtype":          pdf.Name("Image"),
-		"Width":            pdf.Integer(d.Width),
-		"Height":           pdf.Integer(d.Height),
-		"ColorSpace":       csEmbedded,
-		"BitsPerComponent": pdf.Integer(d.BitsPerComponent),
+		"Subtype": pdf.Name("Image"),
+		"Width":   pdf.Integer(d.Width),
+		"Height":  pdf.Integer(d.Height),
+	}
+	if d.ColorSpace != nil {
+		csEmbedded, err := rm.Embed(d.ColorSpace)
+		if err != nil {
+			return nil, err
+		}
+		dict["ColorSpace"] = csEmbedded
+	}
+	if d.BitsPerComponent != 0 {
+		dict["BitsPerComponent"] = pdf.Integer(d.BitsPerComponent)
 	}
 	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("XObject")
@@ -607,7 +648,8 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 		dict["Mask"] = mask
 	}
-	if d.Decode != nil && !slices.Equal(d.Decode, DefaultDecode(d.ColorSpace, d.BitsPerComponent)) {
+	if d.Decode != nil && d.ColorSpace != nil &&
+		!slices.Equal(d.Decode, DefaultDecode(d.ColorSpace, d.BitsPerComponent)) {
 		var decode pdf.Array
 		for _, v := range d.Decode {
 			decode = append(decode, pdf.Number(v))
@@ -756,11 +798,26 @@ func (d *Dict) check(out *pdf.Writer) error {
 		return errors.New("source cannot be nil")
 	}
 
-	if fam := d.ColorSpace.Family(); fam == color.FamilyPattern {
-		return fmt.Errorf("invalid image color space %q", fam)
+	isJPX := d.Data.IsJPX()
+
+	if d.ColorSpace != nil {
+		if fam := d.ColorSpace.Family(); fam == color.FamilyPattern {
+			return fmt.Errorf("invalid image color space %q", fam)
+		}
+	} else if !isJPX {
+		return errors.New("missing ColorSpace for non-JPXDecode image")
 	}
 
+	// JPXDecode images carry their bit depth in the JP2 codestream;
+	// spec §8.9.5 says the dict entry is ignored if present.
+	if isJPX && d.BitsPerComponent != 0 {
+		return errors.New("BitsPerComponent must be 0 for JPXDecode images")
+	}
 	switch d.BitsPerComponent {
+	case 0:
+		if !isJPX {
+			return errors.New("missing BitsPerComponent")
+		}
 	case 1, 2, 4, 8:
 		// pass
 	case 16:
@@ -777,7 +834,10 @@ func (d *Dict) check(out *pdf.Writer) error {
 		}
 	}
 
-	numChannels := d.ColorSpace.Channels()
+	var numChannels int
+	if d.ColorSpace != nil {
+		numChannels = d.ColorSpace.Channels()
+	}
 	if d.MaskImage != nil || d.MaskColors != nil {
 		if err := pdf.CheckVersion(out, "image masks", pdf.V1_3); err != nil {
 			return err
@@ -785,15 +845,26 @@ func (d *Dict) check(out *pdf.Writer) error {
 		if d.MaskImage != nil && d.MaskColors != nil {
 			return errors.New("only one of MaskImage or MaskColors may be specified")
 		}
-		if d.MaskColors != nil && len(d.MaskColors) != 2*numChannels {
-			return fmt.Errorf("wrong MaskColors length: expected %d, got %d",
-				2*numChannels, len(d.MaskColors))
-		}
 		if d.MaskColors != nil {
-			maxVal := uint16(1<<d.BitsPerComponent - 1)
-			for i, v := range d.MaskColors {
-				if v > maxVal {
-					return fmt.Errorf("MaskColors[%d] value %d exceeds maximum %d", i, v, maxVal)
+			if d.ColorSpace != nil {
+				if len(d.MaskColors) != 2*numChannels {
+					return fmt.Errorf("wrong MaskColors length: expected %d, got %d",
+						2*numChannels, len(d.MaskColors))
+				}
+			} else {
+				if len(d.MaskColors) < 2 ||
+					len(d.MaskColors) > 2*streamlimits.MaxImageChannels ||
+					len(d.MaskColors)%2 != 0 {
+					return fmt.Errorf("invalid MaskColors length %d", len(d.MaskColors))
+				}
+				numChannels = len(d.MaskColors) / 2
+			}
+			if d.BitsPerComponent > 0 {
+				maxVal := uint16(1<<d.BitsPerComponent - 1)
+				for i, v := range d.MaskColors {
+					if v > maxVal {
+						return fmt.Errorf("MaskColors[%d] value %d exceeds maximum %d", i, v, maxVal)
+					}
 				}
 			}
 			for i := range numChannels {
@@ -803,9 +874,14 @@ func (d *Dict) check(out *pdf.Writer) error {
 			}
 		}
 	}
-	if d.Decode != nil && len(d.Decode) != 2*numChannels {
-		return fmt.Errorf("wrong Decode length: expected %d, got %d",
-			2*numChannels, len(d.Decode))
+	if d.Decode != nil {
+		if d.ColorSpace == nil {
+			return errors.New("Decode array not permitted when ColorSpace is absent")
+		}
+		if len(d.Decode) != 2*numChannels {
+			return fmt.Errorf("wrong Decode length: expected %d, got %d",
+				2*numChannels, len(d.Decode))
+		}
 	}
 
 	if d.Alternates != nil {
@@ -828,9 +904,15 @@ func (d *Dict) check(out *pdf.Writer) error {
 
 	switch v := pdf.GetVersion(out); {
 	case v == pdf.V1_0 && d.Name == "":
-		return errors.New("missing image /Name field")
+		return &pdf.VersionError{
+			Operation: "image XObject without /Name field",
+			Earliest:  pdf.V1_1,
+		}
 	case v >= pdf.V2_0 && d.Name != "":
-		return errors.New("unexpected /Name field")
+		return &pdf.VersionError{
+			Operation: "image XObject /Name field",
+			Latest:    pdf.V1_7,
+		}
 	}
 
 	if d.Metadata != nil {
@@ -851,14 +933,15 @@ func (d *Dict) check(out *pdf.Writer) error {
 	}
 
 	if d.SMaskInData != 0 {
+		if !isJPX {
+			return errors.New("SMaskInData only permitted on JPXDecode images")
+		}
 		if d.SMaskInData < 0 || d.SMaskInData > 2 {
 			return fmt.Errorf("invalid SMaskInData value %d (must be 0, 1, or 2)", d.SMaskInData)
 		}
 		if err := pdf.CheckVersion(out, "SMaskInData", pdf.V1_5); err != nil {
 			return err
 		}
-		// Note: SMaskInData is only meaningful for JPXDecode filter
-		// Full validation would require filter information
 	}
 
 	if d.SMask != nil {
@@ -871,10 +954,16 @@ func (d *Dict) check(out *pdf.Writer) error {
 			if d.SMask.Width != d.Width || d.SMask.Height != d.Height {
 				return errors.New("soft mask dimensions mismatch")
 			}
-			// Validate Matte length matches color space channels
-			if len(d.SMask.Matte) != d.ColorSpace.Channels() {
-				return fmt.Errorf("matte array length %d does not match color space channels %d",
-					len(d.SMask.Matte), d.ColorSpace.Channels())
+			// Validate Matte length matches color space channels.  When
+			// ColorSpace is absent (JPX), we only bound the length.
+			if d.ColorSpace != nil {
+				if len(d.SMask.Matte) != numChannels {
+					return fmt.Errorf("matte array length %d does not match color space channels %d",
+						len(d.SMask.Matte), numChannels)
+				}
+			} else if len(d.SMask.Matte) < 1 ||
+				len(d.SMask.Matte) > streamlimits.MaxImageChannels {
+				return fmt.Errorf("invalid Matte length %d", len(d.SMask.Matte))
 			}
 		}
 	}

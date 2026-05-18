@@ -75,6 +75,9 @@ func (s *DCTSource) Pixels() ([]byte, error) {
 	}
 }
 
+// IsJPX implements [graphics.ImageData].
+func (s *DCTSource) IsJPX() bool { return false }
+
 // WriteStream implements [graphics.ImageData].
 func (s *DCTSource) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference, dict pdf.Dict) error {
 	if s.Image == nil {

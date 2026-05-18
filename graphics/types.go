@@ -68,6 +68,13 @@ type ImageData interface {
 	// bytes; within a row, each pixel is a sequence of component
 	// values, one per colour channel, each BitsPerComponent bits wide.
 	Pixels() ([]byte, error)
+
+	// IsJPX reports whether the image data is JPXDecode-encoded.  JPX
+	// images carry their colour space and bit depth inside the JPEG
+	// 2000 codestream, so PDF-level /ColorSpace and /BitsPerComponent
+	// entries are absent for them; callers writing image dictionaries
+	// use this to decide whether those entries are required.
+	IsJPX() bool
 }
 
 // ImageMask is an optional interface implemented by XObjects that are

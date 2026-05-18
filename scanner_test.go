@@ -28,6 +28,9 @@ import (
 func testScanner(contents string) *scanner {
 	buf := bytes.NewReader([]byte(contents))
 	s := newScanner(buf, func(o Object) (Integer, error) {
+		if o == nil {
+			return 0, nil
+		}
 		return o.(Integer), nil
 	}, nil)
 	s.fileReader = buf
@@ -233,6 +236,58 @@ func TestReadDictBomb(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	} else if !IsMalformed(err) {
 		t.Errorf("expected *MalformedFileError, got %T: %v", err, err)
+	}
+}
+
+// TestReadStreamDataLengthRecovery exercises the recovery path
+// taken by ReadStreamData when the stream dictionary is missing
+// /Length.  The regex-based search requires an EOL before the
+// "endstream" keyword (PDF 7.3.8.2), so a substring "endstream"
+// embedded in the stream content (without a preceding EOL) must
+// not cut the stream short.
+func TestReadStreamDataLengthRecovery(t *testing.T) {
+	cases := []struct {
+		name    string
+		content string
+	}{
+		{
+			"trailing LF only",
+			"some bytes",
+		},
+		{
+			"trailing CRLF",
+			"some bytes",
+		},
+		{
+			"substring endstream mid-content",
+			"abc endstream def", // no EOL before "endstream"
+		},
+		{
+			"empty content",
+			"",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			eol := "\n"
+			if tc.name == "trailing CRLF" {
+				eol = "\r\n"
+			}
+			body := "<< /Type /XObject >>stream\n" +
+				tc.content + eol + "endstream\n"
+			s := testScanner(body)
+			obj, err := s.ReadObject()
+			if err != nil {
+				t.Fatalf("ReadObject: %v", err)
+			}
+			stream, ok := obj.(*Stream)
+			if !ok {
+				t.Fatalf("got %T, want *Stream", obj)
+			}
+			if int(stream.length) != len(tc.content) {
+				t.Errorf("length = %d, want %d", stream.length, len(tc.content))
+			}
+		})
 	}
 }
 

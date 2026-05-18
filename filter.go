@@ -48,24 +48,26 @@ import (
 
 // Filter represents a PDF stream filter.
 //
-// Currently, the following filter types are implemented by this library:
-// [FilterASCII85], [FilterASCIIHex], [FilterCCITTFax], [FilterDCT],
-// [FilterFlate], [FilterJBIG2], [FilterLZW], [FilterRunLength].
+// The library provides the following filter types:
 //
-// The [FilterDCT] and [FilterJBIG2] filters support decoding only.
-// The [FilterJPX] type is present so that PDF files using this filter
-// survive a read/write cycle, but encoding and decoding through the
-// filter interface are not supported.
+//   - General compression: [FilterASCII85], [FilterASCIIHex],
+//     [FilterFlate], [FilterLZW], [FilterRunLength].  These support
+//     encoding and decoding through the Filter interface.
+//   - Image-oriented: [FilterCCITTFax] (encode and decode);
+//     [FilterDCT], [FilterJBIG2] (decode only through this interface —
+//     JBIG2 encoding is available via [seehuhn.de/go/pdf/graphics/image/jbig2]);
+//     [FilterJPX] (neither encode nor decode through this interface,
+//     present so that PDF files using JPXDecode survive a read/write
+//     cycle).
+//   - [FilterCompress]: a meta-filter that selects the best available
+//     general compression filter when writing — [FilterFlate] for
+//     PDF 1.2+, [FilterLZW] otherwise.
 //
 // The Crypt filter is represented by three variants implementing
 // [CryptFilter]: [FilterCryptIdentity], [FilterCryptStandard], and
 // [FilterCryptNamed].  Of these, only [FilterCryptIdentity] is
 // implemented end-to-end; the other two round-trip the wire form but
 // do not yet support encoding or decoding.
-//
-// In addition, [FilterCompress] can be used to select the best available
-// general compression filter when writing PDF streams.  This is FilterFlate
-// for PDF versions 1.2 and above, and FilterLZW for older versions.
 type Filter interface {
 	// Info returns the name and parameters of the filter,
 	// as they should be written to the PDF file.

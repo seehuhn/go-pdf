@@ -27,7 +27,10 @@ import (
 // The returned array has 2*cs.Channels() entries, with pairs
 // [Dmin, Dmax] for each channel.
 func DefaultDecode(cs color.Space, bpc int) []float64 {
-	n := cs.Channels()
+	var n int
+	if cs != nil {
+		n = cs.Channels()
+	}
 	d := make([]float64, 2*n)
 	switch cs := cs.(type) {
 	case *color.SpaceLab:

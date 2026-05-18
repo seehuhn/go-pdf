@@ -870,6 +870,9 @@ func (im *Image) Pixels() ([]byte, error) {
 	return out, nil
 }
 
+// IsJPX implements [graphics.ImageData].
+func (im *Image) IsJPX() bool { return false }
+
 // WriteStream implements [graphics.ImageData].  It writes the JBIG2
 // encoded data to the PDF stream and embeds any referenced globals
 // stream.

@@ -315,6 +315,14 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 	if err != nil {
 		return nil, err
 	}
+	// spec restricts BitsPerComponent to {1, 2, 4, 8, 16}; silently fall back
+	// to 8 for malformed values so the soft mask round-trips.
+	switch bpc {
+	case 1, 2, 4, 8, 16:
+		// pass
+	default:
+		bpc = 8
+	}
 
 	softMask := &SoftMask{
 		Width:            int(width),

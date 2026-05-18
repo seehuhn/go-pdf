@@ -155,6 +155,102 @@ func TestNumberFormatExtractDefaults(t *testing.T) {
 	}
 }
 
+// TestNumberFormatExtractFallback verifies that malformed values in /C and /D
+// are silently replaced with safe defaults on read, so the dictionary can
+// be re-embedded without error.
+func TestNumberFormatExtractFallback(t *testing.T) {
+	tests := []struct {
+		name          string
+		dict          pdf.Dict
+		wantConv      float64
+		wantPrecision int
+	}{
+		{
+			name: "zero conversion factor",
+			dict: pdf.Dict{
+				"U": pdf.String("mi"),
+				"C": pdf.Number(0),
+			},
+			wantConv:      1,
+			wantPrecision: 100,
+		},
+		{
+			name: "missing conversion factor",
+			dict: pdf.Dict{
+				"U": pdf.String("mi"),
+			},
+			wantConv:      1,
+			wantPrecision: 100,
+		},
+		{
+			name: "negative decimal precision",
+			dict: pdf.Dict{
+				"U": pdf.String("mi"),
+				"C": pdf.Number(1),
+				"F": pdf.Name("D"),
+				"D": pdf.Integer(-5),
+			},
+			wantConv:      1,
+			wantPrecision: 100,
+		},
+		{
+			name: "decimal precision not multiple of ten",
+			dict: pdf.Dict{
+				"U": pdf.String("mi"),
+				"C": pdf.Number(1),
+				"F": pdf.Name("D"),
+				"D": pdf.Integer(7),
+			},
+			wantConv:      1,
+			wantPrecision: 100,
+		},
+		{
+			name: "decimal precision one is valid",
+			dict: pdf.Dict{
+				"U": pdf.String("mi"),
+				"C": pdf.Number(1),
+				"F": pdf.Name("D"),
+				"D": pdf.Integer(1),
+			},
+			wantConv:      1,
+			wantPrecision: 1,
+		},
+		{
+			name: "fraction precision negative",
+			dict: pdf.Dict{
+				"U": pdf.String("in"),
+				"C": pdf.Number(12),
+				"F": pdf.Name("F"),
+				"D": pdf.Integer(-3),
+			},
+			wantConv:      12,
+			wantPrecision: 16,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			x := pdf.NewExtractor(w)
+			nf, err := pdf.ExtractorGet(x, nil, tt.dict, ExtractNumberFormat)
+			if err != nil {
+				t.Fatalf("extract failed: %v", err)
+			}
+			if nf.ConversionFactor != tt.wantConv {
+				t.Errorf("ConversionFactor = %v, want %v", nf.ConversionFactor, tt.wantConv)
+			}
+			if nf.Precision != tt.wantPrecision {
+				t.Errorf("Precision = %d, want %d", nf.Precision, tt.wantPrecision)
+			}
+			// round trip: must re-embed without error
+			rm := pdf.NewResourceManager(w)
+			if _, err := rm.Embed(nf); err != nil {
+				t.Errorf("re-embed failed: %v", err)
+			}
+		})
+	}
+}
+
 func TestFractionalValueFormatConstants(t *testing.T) {
 	// Test that constants have expected values
 	if FractionDecimal != 0 {

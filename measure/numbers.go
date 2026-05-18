@@ -17,6 +17,9 @@
 package measure
 
 import (
+	"errors"
+	"fmt"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -103,6 +106,11 @@ func ExtractNumberFormat(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object,
 		return nil, err
 	}
 	nf.ConversionFactor = float64(conversion)
+	if nf.ConversionFactor == 0 {
+		// spec requires a non-zero conversion factor; silently fall back to
+		// an identity factor so the dictionary round-trips
+		nf.ConversionFactor = 1
+	}
 
 	// Extract optional fields with defaults
 	if f, err := pdf.Optional(x.GetName(path, dict["F"])); err != nil {
@@ -125,17 +133,22 @@ func ExtractNumberFormat(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object,
 	// Extract Precision - conditional based on FractionFormat
 	precisionMeaningful := nf.FractionFormat == FractionDecimal || nf.FractionFormat == FractionFraction
 	if precisionMeaningful {
-		if precision, err := pdf.Optional(x.GetInteger(path, dict["D"])); err != nil {
+		precision, err := pdf.Optional(x.GetInteger(path, dict["D"]))
+		if err != nil {
 			return nil, err
-		} else if precision != 0 {
+		}
+		// spec requires a positive integer; for decimal format also 1 or a
+		// multiple of 10. Substitute the default for any malformed value.
+		valid := precision > 0
+		if valid && nf.FractionFormat == FractionDecimal && precision != 1 && precision%10 != 0 {
+			valid = false
+		}
+		if valid {
 			nf.Precision = int(precision)
+		} else if nf.FractionFormat == FractionDecimal {
+			nf.Precision = 100
 		} else {
-			// Use default values when not present
-			if nf.FractionFormat == FractionDecimal {
-				nf.Precision = 100 // default for decimal
-			} else {
-				nf.Precision = 16 // default for fraction
-			}
+			nf.Precision = 16
 		}
 	} else {
 		nf.Precision = 0 // not meaningful for round/truncate
@@ -191,24 +204,24 @@ func ExtractNumberFormat(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object,
 func (nf *NumberFormat) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// Validate required fields
 	if nf.Unit == "" {
-		return nil, pdf.Errorf("missing required Unit")
+		return nil, errors.New("missing required Unit")
 	}
 	if nf.ConversionFactor == 0 {
-		return nil, pdf.Errorf("ConversionFactor cannot be zero")
+		return nil, errors.New("ConversionFactor cannot be zero")
 	}
 
 	// Validate Precision based on FractionFormat
 	precisionMeaningful := nf.FractionFormat == FractionDecimal || nf.FractionFormat == FractionFraction
 	if precisionMeaningful {
 		if nf.Precision <= 0 {
-			return nil, pdf.Errorf("Precision must be positive when FractionFormat is decimal or fraction")
+			return nil, fmt.Errorf("invalid Precision %d for fractional format", nf.Precision)
 		}
 		if nf.FractionFormat == FractionDecimal && nf.Precision%10 != 0 && nf.Precision != 1 {
-			return nil, pdf.Errorf("Precision must be 1 or a multiple of 10 for decimal format")
+			return nil, fmt.Errorf("invalid Precision %d for decimal format", nf.Precision)
 		}
 	} else {
 		if nf.Precision != 0 {
-			return nil, pdf.Errorf("Precision must be 0 when FractionFormat is round or truncate")
+			return nil, fmt.Errorf("invalid Precision %d for round/truncate format", nf.Precision)
 		}
 	}
 

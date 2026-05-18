@@ -202,10 +202,21 @@ func clampInt(v, lo, hi int) int {
 }
 
 // Load decodes the pixel data from a Dict into a Data image.
+//
+// Load is unsupported for JPXDecode images: their pixel data, colour
+// space and bit depth live in the JPEG 2000 codestream and must be
+// decoded by a JPX-aware consumer, not via PDF-level sample
+// decomposition.
 func (d *Dict) Load() (*Data, error) {
+	if d.Data != nil && d.Data.IsJPX() {
+		return nil, errors.New("JPXDecode decoding not supported")
+	}
 	cs := d.ColorSpace
 	if cs == nil {
-		return nil, errors.New("missing color space")
+		return nil, errors.New("missing ColorSpace")
+	}
+	if d.BitsPerComponent == 0 {
+		return nil, errors.New("missing BitsPerComponent")
 	}
 	ncomp := cs.Channels()
 	if ncomp == 0 {

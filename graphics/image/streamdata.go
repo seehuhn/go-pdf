@@ -32,6 +32,7 @@ import (
 // handled correctly by [pdf.Copier] under the hood.
 type streamData struct {
 	inner    *opaque.Stream
+	isJPX    bool  // set at extraction time when the source filter chain is JPXDecode
 	maxBytes int64 // per-image decoded-size cap
 }
 
@@ -50,6 +51,11 @@ func (s *streamData) Pixels() ([]byte, error) {
 		return nil, &pdf.MalformedFileError{Err: errors.New("image data exceeds size limit")}
 	}
 	return data, nil
+}
+
+// IsJPX implements [graphics.ImageData].
+func (s *streamData) IsJPX() bool {
+	return s.isJPX
 }
 
 // WriteStream copies the stream to the destination PDF, preserving the

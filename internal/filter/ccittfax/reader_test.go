@@ -69,6 +69,28 @@ func TestSimpleRead(t *testing.T) {
 	}
 }
 
+// TestInvalidRunCode verifies that the decoder terminates with an error
+// (rather than hanging) when fed bit patterns that do not match any entry
+// in the run-length tables.
+func TestInvalidRunCode(t *testing.T) {
+	// 12-bit value 0x00F (binary 000000001111) is an S_Null entry in
+	// whiteTable. Without the malformed-code guard, decodeRun would
+	// consume zero bits and the surrounding loop would spin forever.
+	data := []byte{0x00, 0xff, 0x00, 0x00}
+	p := &Params{
+		Columns: 8,
+		K:       0,
+	}
+	r, err := NewReader(bytes.NewReader(data), p)
+	if err != nil {
+		t.Fatalf("failed to create reader: %v", err)
+	}
+	_, err = io.ReadAll(r)
+	if err == nil {
+		t.Fatal("expected error on invalid run-length code, got nil")
+	}
+}
+
 func TestFillRowBits(t *testing.T) {
 	cases := []struct {
 		name       string

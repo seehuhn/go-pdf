@@ -64,6 +64,9 @@ func (s *FlateSource) Pixels() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// IsJPX implements [graphics.ImageData].
+func (s *FlateSource) IsJPX() bool { return false }
+
 // WriteStream implements [graphics.ImageData].
 func (s *FlateSource) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference, dict pdf.Dict) error {
 	if s.WriteData == nil {
@@ -129,6 +132,9 @@ func (s *CCITTFaxSource) Pixels() ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
+
+// IsJPX implements [graphics.ImageData].
+func (s *CCITTFaxSource) IsJPX() bool { return false }
 
 // WriteStream implements [graphics.ImageData].
 func (s *CCITTFaxSource) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference, dict pdf.Dict) error {

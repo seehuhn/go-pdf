@@ -49,6 +49,12 @@ var (
 	maxDictLen = 64 << 10
 )
 
+// endstreamPat matches the spec-conformant terminator for a stream
+// whose dictionary is missing /Length: a single EOL byte followed by
+// the keyword endstream (PDF 7.3.8.2).  Used by
+// [scanner.ReadStreamData] in the recovery path.
+var endstreamPat = regexp.MustCompile(`[\r\n]endstream`)
+
 type scanner struct {
 	src     io.Reader
 	filePos int64 // how far into the reader the start of buf is
@@ -745,6 +751,10 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 		}
 	}()
 
+	// /Length is required, but real-world PDFs (and fuzz mutations) omit
+	// it.  Treat a missing entry as "unknown" and recover by scanning
+	// ahead for endstream below.
+	_, hasLength := dict["Length"]
 	length, err := s.getInt(dict["Length"])
 	if err != nil {
 		return nil, Wrap(err, "reading Length")
@@ -783,25 +793,38 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 		}
 	}
 	start := s.CurrentPos()
-	l := int64(length)
-	err = s.Discard(l)
-	if err != nil {
-		return nil, err
-	}
 
 	var crypt *filterCrypt
 	if s.enc != nil {
 		crypt = &filterCrypt{enc: s.enc, ref: s.encRef}
 	}
 
-	err = s.SkipWhiteSpace()
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.SkipString("endstream")
-	if err != nil {
-		return nil, err
+	var l int64
+	if hasLength {
+		l = int64(length)
+		err = s.Discard(l)
+		if err != nil {
+			return nil, err
+		}
+		err = s.SkipWhiteSpace()
+		if err != nil {
+			return nil, err
+		}
+		err = s.SkipString("endstream")
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// recover by scanning forward for a spec-conformant
+		// EOL+endstream (PDF 7.3.8.2); matching only when preceded by
+		// an EOL byte avoids cutting streams whose content contains
+		// the substring "endstream"
+		eolPos, _, err := s.Find(endstreamPat)
+		if err != nil {
+			return nil, err
+		}
+		l = eolPos - start
+		l = trimTrailingEOL(origReader, start, l)
 	}
 
 	return &Stream{
@@ -811,6 +834,37 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 		length: l,
 		crypt:  crypt,
 	}, nil
+}
+
+// trimTrailingEOL returns length with any single trailing \n, \r, or
+// \r\n removed.  The bytes before "endstream" are an EOL per spec
+// (PDF 7.3.8.2) and must not be considered part of the stream
+// content.
+func trimTrailingEOL(r io.ReaderAt, start, length int64) int64 {
+	if length <= 0 {
+		return length
+	}
+	var probe [2]byte
+	readAt := start + length - int64(len(probe))
+	readLen := len(probe)
+	if readAt < start {
+		readAt = start
+		readLen = int(length)
+	}
+	n, _ := r.ReadAt(probe[:readLen], readAt)
+	if n == 0 {
+		return length
+	}
+	switch probe[n-1] {
+	case '\n':
+		length--
+		if n >= 2 && probe[n-2] == '\r' {
+			length--
+		}
+	case '\r':
+		length--
+	}
+	return length
 }
 
 func (s *scanner) ReadHeaderVersion() (Version, error) {

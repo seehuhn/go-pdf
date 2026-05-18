@@ -141,12 +141,16 @@ func IsReadError(err error) bool {
 	return err != nil && !IsMalformed(err)
 }
 
-// VersionError is returned when trying to use a feature in a PDF file which is
-// not supported by the PDF version used.  Use [CheckVersion] to create
-// VersionError objects.
+// VersionError is returned when an operation cannot be performed because
+// the PDF file's version is outside the operation's supported range.
+// Earliest and Latest bound the supported range; the zero value of either
+// field means "no bound on that side".  Use [CheckVersion] or
+// [CheckVersionAtMost] to create VersionError objects, or construct
+// directly for cases with both bounds set.
 type VersionError struct {
 	Operation string
-	Earliest  Version
+	Earliest  Version // zero means no lower bound
+	Latest    Version // zero means no upper bound
 }
 
 // CheckVersion checks whether the PDF file being written has version
@@ -162,9 +166,36 @@ func CheckVersion(pdf *Writer, operation string, minVersion Version) error {
 	}
 }
 
+// CheckVersionAtMost checks whether the PDF file being written has
+// version maxVersion or earlier.  If the version is old enough, nil is
+// returned.  Otherwise a [VersionError] for the given operation is
+// returned.
+func CheckVersionAtMost(pdf *Writer, operation string, maxVersion Version) error {
+	if pdf.GetMeta().Version <= maxVersion {
+		return nil
+	}
+	return &VersionError{
+		Latest:    maxVersion,
+		Operation: operation,
+	}
+}
+
 func (err *VersionError) Error() string {
-	return (err.Operation + " requires PDF version " +
-		err.Earliest.String() + " or later")
+	switch {
+	case err.Earliest != 0 && err.Latest != 0 && err.Earliest == err.Latest:
+		return err.Operation + " requires PDF version " + err.Earliest.String()
+	case err.Earliest != 0 && err.Latest != 0:
+		return err.Operation + " requires PDF version between " +
+			err.Earliest.String() + " and " + err.Latest.String()
+	case err.Latest != 0:
+		return err.Operation + " requires PDF version " +
+			err.Latest.String() + " or earlier"
+	case err.Earliest != 0:
+		return err.Operation + " requires PDF version " +
+			err.Earliest.String() + " or later"
+	default:
+		return err.Operation + " version error"
+	}
 }
 
 // IsWrongVersion returns true if the error or any of its wrapped errors is a

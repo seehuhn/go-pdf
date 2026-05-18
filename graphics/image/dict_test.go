@@ -19,6 +19,7 @@ package image
 import (
 	"bytes"
 	"io"
+	"maps"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -246,29 +247,6 @@ var testCases = []struct {
 					r := uint8(200)
 					g := uint8(150)
 					b := uint8(100)
-					if _, err := w.Write([]byte{r, g, b}); err != nil {
-						return err
-					}
-				}
-				return nil
-			}},
-		},
-	},
-	{
-		name:    "with SMaskInData",
-		version: pdf.V1_5,
-		data: &Dict{
-			Width:            6,
-			Height:           6,
-			ColorSpace:       color.SpaceDeviceRGB,
-			BitsPerComponent: 8,
-			SMaskInData:      1, // image data includes encoded soft-mask values
-			Data: &FlateSource{Predictor: 15, Width: 6, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
-				// RGB data (SMaskInData would normally be for JPXDecode)
-				for i := range 36 {
-					r := uint8(i * 7)
-					g := uint8(100)
-					b := uint8(200 - i*5)
 					if _, err := w.Write([]byte{r, g, b}); err != nil {
 						return err
 					}
@@ -826,6 +804,31 @@ func FuzzDictRoundTrip(f *testing.F) {
 		f.Add(buf.Data)
 	}
 
+	// Seed: JPXDecode image without /ColorSpace, the case from
+	// report.txt that previously panicked.  We do not embed via the
+	// ResourceManager because there is no JPXSource for API-side
+	// construction; instead, write the dict directly.
+	{
+		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+		_ = memfile.AddBlankPage(w)
+		ref := w.Alloc()
+		body, err := w.OpenStream(ref, pdf.Dict{
+			"Type":    pdf.Name("XObject"),
+			"Subtype": pdf.Name("Image"),
+			"Width":   pdf.Integer(10),
+			"Height":  pdf.Integer(10),
+			"Filter":  pdf.Name("JPXDecode"),
+			"Mask":    pdf.Array{pdf.Integer(0), pdf.Integer(255)},
+		})
+		if err == nil {
+			body.Close()
+			w.GetMeta().Trailer["Quir:E"] = ref
+			if err := w.Close(); err == nil {
+				f.Add(buf.Data)
+			}
+		}
+	}
+
 	f.Fuzz(func(t *testing.T, fileData []byte) {
 		r, err := pdf.NewReader(bytes.NewReader(fileData), int64(len(fileData)), nil)
 		if err != nil {
@@ -1168,6 +1171,253 @@ func TestExtractMaskTooManyAssociatedFiles(t *testing.T) {
 			}
 			if got := len(mask.AssociatedFiles); got != want {
 				t.Errorf("len(AssociatedFiles) = %d, want %d", got, want)
+			}
+		})
+	}
+}
+
+// writeJPXImage embeds a JPXDecode image XObject with the given extra
+// dictionary entries and an empty payload, then re-extracts it.  It is a
+// helper for JPX-no-ColorSpace tests where we exercise the dict-level
+// rules without needing valid JP2 codestream bytes.
+func writeJPXImage(t *testing.T, version pdf.Version, extras pdf.Dict) (*Dict, error) {
+	t.Helper()
+	w, _ := memfile.NewPDFWriter(version, nil)
+	ref := w.Alloc()
+	dict := pdf.Dict{
+		"Type":    pdf.Name("XObject"),
+		"Subtype": pdf.Name("Image"),
+		"Width":   pdf.Integer(10),
+		"Height":  pdf.Integer(10),
+		"Filter":  pdf.Name("JPXDecode"),
+	}
+	maps.Copy(dict, extras)
+	body, err := w.OpenStream(ref, dict)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	x := pdf.NewExtractor(w)
+	return ExtractDict(x, nil, ref, false)
+}
+
+// TestExtractDictJPXNoColorSpace covers the minimal reproducer from
+// report.txt: a JPXDecode image XObject without /ColorSpace.  Prior to
+// the fix this panicked at dict.go:328 with a nil pointer dereference.
+func TestExtractDictJPXNoColorSpace(t *testing.T) {
+	img, err := writeJPXImage(t, pdf.V1_7, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if img.ColorSpace != nil {
+		t.Errorf("ColorSpace = %v, want nil", img.ColorSpace)
+	}
+	if img.BitsPerComponent != 0 {
+		t.Errorf("BitsPerComponent = %d, want 0", img.BitsPerComponent)
+	}
+	if img.Decode != nil {
+		t.Errorf("Decode = %v, want nil (spec §7.4.9 ignores Decode when ColorSpace absent)", img.Decode)
+	}
+}
+
+// TestExtractDictJPXMaskArray exercises the colour-key /Mask Array path
+// for a JPX image without /ColorSpace, where the channel count is
+// unknown until the JP2 codestream is parsed.
+func TestExtractDictJPXMaskArray(t *testing.T) {
+	tests := []struct {
+		name   string
+		mask   pdf.Array
+		expect []uint16 // expected MaskColors, or nil if dropped
+	}{
+		{
+			name:   "valid 1-channel pair",
+			mask:   pdf.Array{pdf.Integer(0), pdf.Integer(255)},
+			expect: []uint16{0, 255},
+		},
+		{
+			name:   "valid 4-channel",
+			mask:   pdf.Array{pdf.Integer(0), pdf.Integer(10), pdf.Integer(0), pdf.Integer(10), pdf.Integer(0), pdf.Integer(10), pdf.Integer(0), pdf.Integer(10)},
+			expect: []uint16{0, 10, 0, 10, 0, 10, 0, 10},
+		},
+		{
+			name:   "odd length dropped",
+			mask:   pdf.Array{pdf.Integer(0), pdf.Integer(255), pdf.Integer(100)},
+			expect: nil,
+		},
+		{
+			name:   "empty dropped",
+			mask:   pdf.Array{},
+			expect: nil,
+		},
+		{
+			name:   "out-of-uint16-range dropped",
+			mask:   pdf.Array{pdf.Integer(0), pdf.Integer(100000)},
+			expect: nil,
+		},
+		{
+			name:   "min greater than max dropped",
+			mask:   pdf.Array{pdf.Integer(200), pdf.Integer(100)},
+			expect: nil,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			img, err := writeJPXImage(t, pdf.V1_7, pdf.Dict{"Mask": tc.mask})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.expect, img.MaskColors); diff != "" {
+				t.Errorf("MaskColors (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestExtractDictJPXMaskOverLength verifies that a colour-key /Mask
+// Array with more pairs than streamlimits.MaxImageChannels is dropped
+// rather than allocated.
+func TestExtractDictJPXMaskOverLength(t *testing.T) {
+	mask := make(pdf.Array, 2*streamlimits.MaxImageChannels+2)
+	for i := range mask {
+		mask[i] = pdf.Integer(0)
+	}
+	img, err := writeJPXImage(t, pdf.V1_7, pdf.Dict{"Mask": mask})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if img.MaskColors != nil {
+		t.Errorf("MaskColors = %v, want nil (over-length array should be dropped)", img.MaskColors)
+	}
+}
+
+// TestExtractDictJPXBPCIgnored verifies that an explicit
+// /BitsPerComponent on a JPXDecode image is dropped on extract, matching
+// the check()-time requirement that JPX images carry BPC=0.  Without
+// this, a JPX source dict with BPC=8 extracted to BPC=8 and then failed
+// to re-embed.
+func TestExtractDictJPXBPCIgnored(t *testing.T) {
+	for _, bpc := range []pdf.Integer{1, 2, 4, 8, 16, 7, 99} {
+		img, err := writeJPXImage(t, pdf.V1_7, pdf.Dict{
+			"BitsPerComponent": bpc,
+		})
+		if err != nil {
+			t.Fatalf("BPC=%d: unexpected error: %v", bpc, err)
+		}
+		if img.BitsPerComponent != 0 {
+			t.Errorf("BPC=%d in source: extracted BitsPerComponent=%d, want 0",
+				bpc, img.BitsPerComponent)
+		}
+
+		// re-embed must succeed, demonstrating round-trip parity
+		w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+		rm := pdf.NewResourceManager(w)
+		if _, err := rm.Embed(img); err != nil {
+			t.Errorf("BPC=%d in source: re-embed failed: %v", bpc, err)
+		}
+	}
+}
+
+// TestExtractDictJPXDecodeIgnored verifies that a /Decode array on a
+// JPX-no-ColorSpace image is silently dropped per spec §7.4.9.
+func TestExtractDictJPXDecodeIgnored(t *testing.T) {
+	img, err := writeJPXImage(t, pdf.V1_7, pdf.Dict{
+		"Decode": pdf.Array{pdf.Number(0), pdf.Number(1), pdf.Number(0), pdf.Number(1), pdf.Number(0), pdf.Number(1)},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if img.Decode != nil {
+		t.Errorf("Decode = %v, want nil", img.Decode)
+	}
+}
+
+// TestDictJPXRoundTrip verifies that a JPX-no-ColorSpace Dict survives
+// Embed → ExtractDict.
+func TestDictJPXRoundTrip(t *testing.T) {
+	orig, err := writeJPXImage(t, pdf.V1_7, pdf.Dict{
+		"Mask": pdf.Array{pdf.Integer(0), pdf.Integer(255)},
+	})
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+
+	w2, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w2)
+	ref, err := rm.Embed(orig)
+	if err != nil {
+		t.Fatalf("Embed: %v", err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatalf("rm.Close: %v", err)
+	}
+	if err := w2.Close(); err != nil {
+		t.Fatalf("w2.Close: %v", err)
+	}
+
+	x := pdf.NewExtractor(w2)
+	got, err := ExtractDict(x, nil, ref, false)
+	if err != nil {
+		t.Fatalf("ExtractDict: %v", err)
+	}
+	if got.ColorSpace != nil {
+		t.Errorf("ColorSpace = %v, want nil", got.ColorSpace)
+	}
+	if got.BitsPerComponent != 0 {
+		t.Errorf("BitsPerComponent = %d, want 0", got.BitsPerComponent)
+	}
+	if got.Decode != nil {
+		t.Errorf("Decode = %v, want nil", got.Decode)
+	}
+	if diff := cmp.Diff(orig.MaskColors, got.MaskColors); diff != "" {
+		t.Errorf("MaskColors (-want +got):\n%s", diff)
+	}
+}
+
+// TestDictRejectInvalidWriteCombinations confirms the spec-derived
+// write-time rejections.
+func TestDictRejectInvalidWriteCombinations(t *testing.T) {
+	rgbData := &FlateSource{
+		Predictor: 15, Width: 1, Colors: 3, BitsPerComponent: 8,
+		WriteData: func(w io.Writer) error {
+			_, err := w.Write([]byte{0, 0, 0})
+			return err
+		},
+	}
+
+	tests := []struct {
+		name string
+		d    *Dict
+	}{
+		{
+			name: "nil ColorSpace + non-JPX data",
+			d: &Dict{
+				Width: 1, Height: 1,
+				BitsPerComponent: 8,
+				Data:             rgbData,
+			},
+		},
+		{
+			name: "non-JPX + non-zero SMaskInData",
+			d: &Dict{
+				Width: 1, Height: 1,
+				ColorSpace:       color.SpaceDeviceRGB,
+				BitsPerComponent: 8,
+				SMaskInData:      1,
+				Data:             rgbData,
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			rm := pdf.NewResourceManager(w)
+			if _, err := rm.Embed(tc.d); err == nil {
+				t.Error("expected Embed to fail, got nil error")
 			}
 		})
 	}

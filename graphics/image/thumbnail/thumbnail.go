@@ -187,6 +187,8 @@ func (s *readThumbnailSource) Pixels() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func (s *readThumbnailSource) IsJPX() bool { return false }
+
 func (s *readThumbnailSource) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference, dict pdf.Dict) error {
 	w, err := rm.Out().OpenStream(ref, dict, pdf.FilterCompress{})
 	if err != nil {
@@ -206,6 +208,8 @@ type thumbnailStreamData struct {
 	inner    *opaque.Stream
 	maxBytes int64 // per-thumbnail decoded-size cap
 }
+
+func (s *thumbnailStreamData) IsJPX() bool { return false }
 
 func (s *thumbnailStreamData) Pixels() ([]byte, error) {
 	r, err := s.inner.Reader()

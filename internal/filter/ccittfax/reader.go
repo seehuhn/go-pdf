@@ -175,7 +175,7 @@ func (r *Reader) decodeG3ScanLine1D() {
 
 // decodeG3ScanLine2D decodes a Group 3 2D scanline (K > 0).
 func (r *Reader) decodeG3ScanLine2D() {
-	for r.peekBits(11) == 0 {
+	for r.err == nil && r.peekBits(11) == 0 {
 		r.consumeBits(11)
 		r.waitForOne() // allow for fill bits
 	}
@@ -218,6 +218,11 @@ func (r *Reader) decodeRun(isWhite bool) (int, state) {
 	} else {
 		value := r.peekBits(13)
 		entry = blackTable[value]
+	}
+	if entry.Width == 0 {
+		// invalid bit pattern: no table entry matches
+		r.err = errors.New("ccittfax: invalid run-length code")
+		return 0, entry.State
 	}
 	r.consumeBits(int(entry.Width))
 
