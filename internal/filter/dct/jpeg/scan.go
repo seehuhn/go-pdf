@@ -60,13 +60,13 @@ import (
 // at the MCU-aligned size.
 //
 // IMPORTANT: every SubImage created here has Min == (0, 0).  The plane
-// addressing in [reconstructBlock] and [emitRows]/[emitStripe] pass
-// the local row index (y - yStart) straight to [image.YCbCr.YOffset]
-// and [image.YCbCr.COffset], which only happen to be correct because
-// those methods subtract Rect.Min from their argument before
-// computing the offset.  If a future change shifts Rect.Min away from
-// the origin, both the stripe and the full-buffer paths will silently
-// produce wrong addresses.
+// addressing in [reconstructBlock] and the emit* helpers passes the
+// local row index (y - yStart) straight to [image.YCbCr.YOffset] and
+// [image.YCbCr.COffset], which only happen to be correct because those
+// methods subtract Rect.Min from their argument before computing the
+// offset.  If a future change shifts Rect.Min away from the origin,
+// both the stripe and the full-buffer paths will silently produce
+// wrong addresses.
 func (d *decoder) makeImg(mxx, myy int) {
 	storeMyy := myy
 	subImgH := d.height
@@ -238,6 +238,7 @@ func (d *decoder) processSOS(n int) error {
 			d.streaming = true
 		}
 		d.makeImg(mxx, myy)
+		d.selectEmitter()
 	} else if d.streaming && !d.progressive {
 		// a second SOS appeared after the first baseline scan was
 		// streamed; we cannot un-emit those rows, so reject the file
@@ -451,7 +452,7 @@ func (d *decoder) processSOS(n int) error {
 			// for baseline, the stripe holds the full pixel data for
 			// this MCU row; for progressive we instead emit later from
 			// reconstructProgressiveImage
-			if err := d.emitStripe(my, mxx, myy); err != nil {
+			if err := d.emitStripe(my); err != nil {
 				return err
 			}
 		}
@@ -599,7 +600,7 @@ func (d *decoder) reconstructProgressiveImage() error {
 					}
 				}
 			}
-			if err := d.emitStripe(my, mxx, myy); err != nil {
+			if err := d.emitStripe(my); err != nil {
 				return err
 			}
 		}

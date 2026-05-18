@@ -193,6 +193,12 @@ type decoder struct {
 	// [decoder.decode] walks the full buffer via emitFull.
 	streaming bool
 
+	// emit is bound by selectEmitter once nComp and the colour-transform
+	// decision are known; it writes the pixel rows of one MCU stripe (or
+	// of the full image, in the multi-scan baseline fallback) to its
+	// io.Writer argument.
+	emit func(w io.Writer, yStart, yEnd int) error
+
 	// stripeYStart[i] is the global block-y offset of the current MCU
 	// stripe for component i; subtracted from by when addressing the
 	// stripe buffer in [reconstructBlock].  Only meaningful when
@@ -704,7 +710,10 @@ func (d *decoder) decode(r io.Reader) error {
 		// reconstructProgressiveImage (progressive)
 		return nil
 	}
-	return d.emitFull(d.streamOut)
+	if d.img1 == nil && d.img3 == nil {
+		return FormatError("missing SOS marker")
+	}
+	return d.emit(d.streamOut, 0, d.height)
 }
 
 // isRGB reports whether 3-component output should pass the YCbCr

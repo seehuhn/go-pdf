@@ -17,7 +17,6 @@
 package jpeg
 
 import (
-	"image"
 	"image/color"
 	"io"
 )
@@ -64,78 +63,66 @@ func (d *decoder) useYCCK() bool {
 	return false
 }
 
+// selectEmitter binds d.emit to the per-stripe emission function
+// implied by d.nComp and the colour-transform decision.  Called from
+// processSOS once nComp, APP14, and the SOS itself have all been
+// parsed; after that the function is constant for the rest of the
+// decode.
+func (d *decoder) selectEmitter() {
+	switch d.nComp {
+	case 1:
+		d.emit = d.emitGray
+	case 3:
+		if d.isRGB() {
+			d.emit = d.emitYCbCrAsRGB
+		} else {
+			d.emit = d.emitYCbCr
+		}
+	default: // nComp == 4
+		if d.useYCCK() {
+			d.emit = d.emitYCCK
+		} else {
+			d.emit = d.emitRawCMYK
+		}
+	}
+}
+
 // emitStripe converts and writes one MCU stripe (the contents of
 // d.img1/d.img3/d.blackPix after the inner loops of [decoder.processSOS]
 // finish MCU row `my`) to d.streamOut.
-func (d *decoder) emitStripe(my, mxx, myy int) error {
-	_ = mxx
-	_ = myy
-	v0 := 1
-	if d.nComp >= 1 {
-		v0 = d.comp[0].v
-	}
+func (d *decoder) emitStripe(my int) error {
+	v0 := d.comp[0].v
 	yStart := 8 * v0 * my
 	yEnd := min(yStart+8*v0, d.height)
-	return d.emitRows(d.streamOut, yStart, yEnd)
+	return d.emit(d.streamOut, yStart, yEnd)
 }
 
-// emitFull walks the full-image buffer that the (non-streaming) decode
-// path built and writes pixel bytes to w.
-func (d *decoder) emitFull(w io.Writer) error {
-	if d.img1 == nil && d.img3 == nil {
-		return FormatError("missing SOS marker")
-	}
-	return d.emitRows(w, 0, d.height)
-}
-
-// emitRows writes image rows in the half-open range [yStart, yEnd) to w.
-// The plane offsets are computed from y - yStart, which matches stripe-
-// local coordinates in streaming mode and global coordinates in full
-// mode (where yStart is 0).
-func (d *decoder) emitRows(w io.Writer, yStart, yEnd int) error {
+// emitGray writes grayscale bytes for rows [yStart, yEnd) to w.
+func (d *decoder) emitGray(w io.Writer, yStart, yEnd int) error {
 	width := d.width
-	if d.nComp == 1 {
-		return emitGrayRows(w, d.img1.Pix, d.img1.Stride, yStart, yEnd, width)
-	}
-	if d.nComp == 3 {
-		if d.isRGB() {
-			return emitYCbCrPlanesAsRGBRows(w, d.img3, yStart, yEnd, width)
-		}
-		return emitYCbCrAsRGBRows(w, d.img3, yStart, yEnd, width)
-	}
-	if d.useYCCK() {
-		return emitYCCKRows(w, d.img3, d.blackPix, d.blackStride, yStart, yEnd, width)
-	}
-	return emitRawCMYKRows(w, d.img3, d.blackPix, d.blackStride, yStart, yEnd, width)
-}
-
-// emitGrayRows writes grayscale bytes for rows [yStart, yEnd) to w.
-// pix is the underlying *image.Gray Pix slice; stride is the row stride
-// of that buffer.  Each output row is `width` bytes.
-func emitGrayRows(w io.Writer, pix []byte, stride, yStart, yEnd, width int) error {
 	for y := yStart; y < yEnd; y++ {
-		off := (y - yStart) * stride
-		if _, err := w.Write(pix[off : off+width]); err != nil {
+		off := (y - yStart) * d.img1.Stride
+		if _, err := w.Write(d.img1.Pix[off : off+width]); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// emitYCbCrAsRGBRows applies the YCbCr → RGB conversion per pixel and
-// writes 3-bytes-per-pixel RGB rows to w.  The image's bounds are
-// expected to begin at (0, 0); local row index inside the buffer is
-// y - yStart so the same function serves both full-image and stripe
-// buffers.
-func emitYCbCrAsRGBRows(w io.Writer, img *image.YCbCr, yStart, yEnd, width int) error {
+// emitYCbCr applies the YCbCr → RGB conversion per pixel and writes
+// 3-bytes-per-pixel RGB rows.  The buffer's Rect.Min is (0, 0) (see
+// [decoder.makeImg]), so y - yStart is the correct stripe-local row
+// index for both the streaming and full-buffer paths.
+func (d *decoder) emitYCbCr(w io.Writer, yStart, yEnd int) error {
+	width := d.width
 	row := make([]byte, width*3)
 	for y := yStart; y < yEnd; y++ {
 		ly := y - yStart
 		i := 0
 		for x := range width {
-			yOff := img.YOffset(x, ly)
-			cOff := img.COffset(x, ly)
-			r, g, b := color.YCbCrToRGB(img.Y[yOff], img.Cb[cOff], img.Cr[cOff])
+			yOff := d.img3.YOffset(x, ly)
+			cOff := d.img3.COffset(x, ly)
+			r, g, b := color.YCbCrToRGB(d.img3.Y[yOff], d.img3.Cb[cOff], d.img3.Cr[cOff])
 			row[i] = r
 			row[i+1] = g
 			row[i+2] = b
@@ -148,21 +135,21 @@ func emitYCbCrAsRGBRows(w io.Writer, img *image.YCbCr, yStart, yEnd, width int) 
 	return nil
 }
 
-// emitYCbCrPlanesAsRGBRows emits Y, Cb, Cr as R, G, B respectively,
-// i.e. without colour conversion.  This is the ColorTransform=0 / RGB
-// pass-through case described in [decoder.isRGB].  Plane bytes use the
-// chroma stride and subsample for Cb/Cr addressing.
-func emitYCbCrPlanesAsRGBRows(w io.Writer, img *image.YCbCr, yStart, yEnd, width int) error {
+// emitYCbCrAsRGB emits Y, Cb, Cr as R, G, B respectively, with no
+// colour conversion.  This is the ColorTransform=0 / RGB pass-through
+// case described in [decoder.isRGB].
+func (d *decoder) emitYCbCrAsRGB(w io.Writer, yStart, yEnd int) error {
+	width := d.width
 	row := make([]byte, width*3)
 	for y := yStart; y < yEnd; y++ {
 		ly := y - yStart
 		i := 0
 		for x := range width {
-			yOff := img.YOffset(x, ly)
-			cOff := img.COffset(x, ly)
-			row[i] = img.Y[yOff]
-			row[i+1] = img.Cb[cOff]
-			row[i+2] = img.Cr[cOff]
+			yOff := d.img3.YOffset(x, ly)
+			cOff := d.img3.COffset(x, ly)
+			row[i] = d.img3.Y[yOff]
+			row[i+1] = d.img3.Cb[cOff]
+			row[i+2] = d.img3.Cr[cOff]
 			i += 3
 		}
 		if _, err := w.Write(row); err != nil {
@@ -172,24 +159,25 @@ func emitYCbCrPlanesAsRGBRows(w io.Writer, img *image.YCbCr, yStart, yEnd, width
 	return nil
 }
 
-// emitYCCKRows applies the YCCK → CMYK conversion (YCbCr → RGB, then
+// emitYCCK applies the YCCK → CMYK conversion (YCbCr → RGB, then
 // invert RGB to obtain CMY) and writes 4-bytes-per-pixel CMYK rows in
 // PDF convention (0 = no ink); K is taken from blackPix without
 // inversion since the Adobe-stored K is already PDF-convention after
 // the implicit double-inversion through the YCbCr/RGB matrix.
-func emitYCCKRows(w io.Writer, img *image.YCbCr, blackPix []byte, blackStride, yStart, yEnd, width int) error {
+func (d *decoder) emitYCCK(w io.Writer, yStart, yEnd int) error {
+	width := d.width
 	row := make([]byte, width*4)
 	for y := yStart; y < yEnd; y++ {
 		ly := y - yStart
 		i := 0
 		for x := range width {
-			yOff := img.YOffset(x, ly)
-			cOff := img.COffset(x, ly)
-			r, g, b := color.YCbCrToRGB(img.Y[yOff], img.Cb[cOff], img.Cr[cOff])
+			yOff := d.img3.YOffset(x, ly)
+			cOff := d.img3.COffset(x, ly)
+			r, g, b := color.YCbCrToRGB(d.img3.Y[yOff], d.img3.Cb[cOff], d.img3.Cr[cOff])
 			row[i] = 255 - r
 			row[i+1] = 255 - g
 			row[i+2] = 255 - b
-			row[i+3] = blackPix[ly*blackStride+x]
+			row[i+3] = d.blackPix[ly*d.blackStride+x]
 			i += 4
 		}
 		if _, err := w.Write(row); err != nil {
@@ -199,23 +187,24 @@ func emitYCCKRows(w io.Writer, img *image.YCbCr, blackPix []byte, blackStride, y
 	return nil
 }
 
-// emitRawCMYKRows writes the four component planes (Y, Cb, Cr, blackPix)
+// emitRawCMYK writes the four component planes (Y, Cb, Cr, blackPix)
 // as raw CMYK bytes without any inversion: Adobe CMYK JPEGs store
 // pixel values in PDF convention (0 = no ink) once the Adobe sign
 // convention is reconciled with PDF, so a positional pass-through
 // produces the correct output.
-func emitRawCMYKRows(w io.Writer, img *image.YCbCr, blackPix []byte, blackStride, yStart, yEnd, width int) error {
+func (d *decoder) emitRawCMYK(w io.Writer, yStart, yEnd int) error {
+	width := d.width
 	row := make([]byte, width*4)
 	for y := yStart; y < yEnd; y++ {
 		ly := y - yStart
 		i := 0
 		for x := range width {
-			yOff := img.YOffset(x, ly)
-			cOff := img.COffset(x, ly)
-			row[i] = img.Y[yOff]
-			row[i+1] = img.Cb[cOff]
-			row[i+2] = img.Cr[cOff]
-			row[i+3] = blackPix[ly*blackStride+x]
+			yOff := d.img3.YOffset(x, ly)
+			cOff := d.img3.COffset(x, ly)
+			row[i] = d.img3.Y[yOff]
+			row[i+1] = d.img3.Cb[cOff]
+			row[i+2] = d.img3.Cr[cOff]
+			row[i+3] = d.blackPix[ly*d.blackStride+x]
 			i += 4
 		}
 		if _, err := w.Write(row); err != nil {
