@@ -181,6 +181,24 @@ type decoder struct {
 	// colorTransformOverride, if non-nil, overrides the APP14-based
 	// color transform decision. 0 = no transform, 1 = YCbCr/YCCK.
 	colorTransformOverride *int
+
+	// streamOut, when non-nil, instructs the decoder to emit decoded
+	// pixel bytes to this writer instead of (or in addition to) building
+	// an in-memory image.  Used by DecodeStream.
+	streamOut io.Writer
+
+	// streaming is set in processSOS when the decoder can emit one MCU
+	// row at a time directly from a stripe-sized internal buffer.  When
+	// false, the internal buffers are full-image-sized as before; the
+	// post-decode pass walks them row-by-row and emits to streamOut (if
+	// non-nil) or returns the image.Image from decode (Decode path).
+	streaming bool
+
+	// stripeYStart[i] is the global block-y offset of the current MCU
+	// stripe for component i; subtracted from by when addressing the
+	// stripe buffer in [reconstructBlock].  Only meaningful when
+	// streaming is true.
+	stripeYStart [maxComponents]int
 }
 
 // fill fills up the d.bytes.buf buffer from the underlying io.Reader. It

@@ -296,7 +296,11 @@ func TestDecodeProgressiveBudget(t *testing.T) {
 	// ImageBytesExceedLimit (256 MiB) at SOF parse time, but to require
 	// > 1 Mi progressive blocks (= 256 MiB at 256 B/block)
 	payload := build(10000, 10000)
-	_, err := Decode(bytes.NewReader(payload), nil)
+	rc, err := Decode(bytes.NewReader(payload), nil)
+	if err == nil {
+		_, err = io.ReadAll(rc)
+		rc.Close()
+	}
 	if err == nil {
 		t.Fatal("expected error for oversize progressive scan, got nil")
 	}
@@ -338,7 +342,11 @@ func TestDecodeOversizeSOF(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			payload := build(tc.nComp, 65535, 65535)
-			_, err := Decode(bytes.NewReader(payload), nil)
+			rc, err := Decode(bytes.NewReader(payload), nil)
+			if err == nil {
+				_, err = io.ReadAll(rc)
+				rc.Close()
+			}
 			if err == nil {
 				t.Fatal("expected error for oversize SOF, got nil")
 			}

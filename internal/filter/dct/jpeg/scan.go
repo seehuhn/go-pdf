@@ -54,11 +54,29 @@ import (
 	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
-// makeImg allocates and initializes the destination image.
+// makeImg allocates and initializes the destination image.  When
+// d.streaming is true, only one MCU stripe is allocated (myy is ignored
+// and treated as 1) and the SubImage crop covers the full stripe width
+// at the MCU-aligned size.
 func (d *decoder) makeImg(mxx, myy int) {
+	storeMyy := myy
+	subImgH := d.height
+	if d.streaming {
+		storeMyy = 1
+		// in streaming mode each emitted stripe is up to 8*v0 pixel rows
+		// (Y) or 8*v_i pixel rows per component; SubImage's height bounds
+		// the cropped view to the stripe, not the full image
+	}
+
 	if d.nComp == 1 {
-		m := image.NewGray(image.Rect(0, 0, 8*mxx, 8*myy))
-		d.img1 = m.SubImage(image.Rect(0, 0, d.width, d.height)).(*image.Gray)
+		m := image.NewGray(image.Rect(0, 0, 8*mxx, 8*storeMyy))
+		w := d.width
+		h := subImgH
+		if d.streaming {
+			w = 8 * mxx
+			h = 8 * storeMyy
+		}
+		d.img1 = m.SubImage(image.Rect(0, 0, w, h)).(*image.Gray)
 		return
 	}
 
@@ -83,12 +101,18 @@ func (d *decoder) makeImg(mxx, myy int) {
 	default:
 		panic("unreachable")
 	}
-	m := image.NewYCbCr(image.Rect(0, 0, 8*h0*mxx, 8*v0*myy), subsampleRatio)
-	d.img3 = m.SubImage(image.Rect(0, 0, d.width, d.height)).(*image.YCbCr)
+	m := image.NewYCbCr(image.Rect(0, 0, 8*h0*mxx, 8*v0*storeMyy), subsampleRatio)
+	w := d.width
+	h := subImgH
+	if d.streaming {
+		w = 8 * h0 * mxx
+		h = 8 * v0 * storeMyy
+	}
+	d.img3 = m.SubImage(image.Rect(0, 0, w, h)).(*image.YCbCr)
 
 	if d.nComp == 4 {
 		h3, v3 := d.comp[3].h, d.comp[3].v
-		d.blackPix = make([]byte, 8*h3*mxx*8*v3*myy)
+		d.blackPix = make([]byte, 8*h3*mxx*8*v3*storeMyy)
 		d.blackStride = 8 * h3 * mxx
 	}
 }
@@ -193,7 +217,19 @@ func (d *decoder) processSOS(n int) error {
 	mxx := (d.width + 8*h0 - 1) / (8 * h0)
 	myy := (d.height + 8*v0 - 1) / (8 * v0)
 	if d.img1 == nil && d.img3 == nil {
+		// streaming is feasible only when the entire image arrives in a
+		// single interleaved baseline scan: the SOS lists every component
+		// and there is no second pass that would refine earlier MCU rows
+		// after they have already been emitted
+		if d.streamOut != nil && !d.progressive && nComp == d.nComp {
+			d.streaming = true
+		}
 		d.makeImg(mxx, myy)
+	} else if d.streaming {
+		// a second SOS appeared after the first scan was streamed; we
+		// cannot un-emit those rows, so reject the file rather than
+		// silently producing wrong output
+		return FormatError("multi-scan baseline not supported in streaming mode")
 	}
 	if d.progressive {
 		// cap total progressive coefficient memory against the same byte
@@ -232,6 +268,14 @@ func (d *decoder) processSOS(n int) error {
 		blockCount int
 	)
 	for my := range myy {
+		if d.streaming {
+			// the stripe buffer addresses block rows in [0, v_i); update
+			// the per-component stripe origin so reconstructBlock can
+			// translate global by to stripe-local by
+			for i := range d.nComp {
+				d.stripeYStart[i] = d.comp[i].v * my
+			}
+		}
 		for mx := range mxx {
 			for i := range nComp {
 				compIndex := scan[i].compIndex
@@ -389,6 +433,11 @@ func (d *decoder) processSOS(n int) error {
 				d.eobRun = 0
 			}
 		} // for mx
+		if d.streaming {
+			if err := d.emitStripe(my, mxx, myy); err != nil {
+				return err
+			}
+		}
 	} // for my
 
 	return nil
@@ -531,19 +580,23 @@ func (d *decoder) reconstructBlock(b *block, bx, by, compIndex int) error {
 		b[unzig[zig]] *= qt[zig]
 	}
 	idct(b)
+	localBy := by
+	if d.streaming {
+		localBy = by - d.stripeYStart[compIndex]
+	}
 	dst, stride := []byte(nil), 0
 	if d.nComp == 1 {
-		dst, stride = d.img1.Pix[8*(by*d.img1.Stride+bx):], d.img1.Stride
+		dst, stride = d.img1.Pix[8*(localBy*d.img1.Stride+bx):], d.img1.Stride
 	} else {
 		switch compIndex {
 		case 0:
-			dst, stride = d.img3.Y[8*(by*d.img3.YStride+bx):], d.img3.YStride
+			dst, stride = d.img3.Y[8*(localBy*d.img3.YStride+bx):], d.img3.YStride
 		case 1:
-			dst, stride = d.img3.Cb[8*(by*d.img3.CStride+bx):], d.img3.CStride
+			dst, stride = d.img3.Cb[8*(localBy*d.img3.CStride+bx):], d.img3.CStride
 		case 2:
-			dst, stride = d.img3.Cr[8*(by*d.img3.CStride+bx):], d.img3.CStride
+			dst, stride = d.img3.Cr[8*(localBy*d.img3.CStride+bx):], d.img3.CStride
 		case 3:
-			dst, stride = d.blackPix[8*(by*d.blackStride+bx):], d.blackStride
+			dst, stride = d.blackPix[8*(localBy*d.blackStride+bx):], d.blackStride
 		default:
 			return UnsupportedError("too many components")
 		}
