@@ -17,7 +17,6 @@
 package image
 
 import (
-	"errors"
 	"io"
 
 	"seehuhn.de/go/pdf"
@@ -36,21 +35,21 @@ type streamData struct {
 	maxBytes int64 // per-image decoded-size cap
 }
 
-// Pixels returns the fully decoded pixel data from the stream.
+// Pixels returns the fully decoded pixel data from the stream.  The
+// read is capped at the per-image budget computed from the dict's
+// declared /Width, /Height, /BitsPerComponent and /ColorSpace, with
+// any extra bytes the filter produces silently discarded.  This
+// matches Adobe Acrobat Reader / Ghostscript for the case where the
+// filter (notably DCTDecode) emits more bytes than the dict declares;
+// the short-read case is handled by [normalizeData] padding.  See
+// viewer-tests/image/jpeg-mismatch for the documented behaviour.
 func (s *streamData) Pixels() ([]byte, error) {
 	r, err := s.inner.Reader()
 	if err != nil {
 		return nil, err
 	}
 	defer r.Close()
-	data, err := io.ReadAll(io.LimitReader(r, s.maxBytes+1))
-	if err != nil {
-		return nil, err
-	}
-	if int64(len(data)) > s.maxBytes {
-		return nil, &pdf.MalformedFileError{Err: errors.New("image data exceeds size limit")}
-	}
-	return data, nil
+	return io.ReadAll(io.LimitReader(r, s.maxBytes))
 }
 
 // IsJPX implements [graphics.ImageData].

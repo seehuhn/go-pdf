@@ -18,6 +18,9 @@ package image
 
 import (
 	"bytes"
+	stdimage "image"
+	stdcolor "image/color"
+	"image/jpeg"
 	"io"
 	"maps"
 	"testing"
@@ -1452,5 +1455,66 @@ func TestExtractDictJPXOversizePixels(t *testing.T) {
 	x := pdf.NewExtractor(w)
 	if _, err := ExtractDict(x, nil, ref, false); err == nil {
 		t.Fatal("expected error for oversize JPX image dict, got nil")
+	}
+}
+
+// TestExtractDictDCTDimensionMismatch documents the behaviour for an
+// Image XObject whose /Width and /Height differ from the dimensions
+// declared in the embedded JPEG's SOF marker.  DCTDecode is treated as
+// a generic byte-stream filter: the consumer reads
+// W·H·nComp·bpc/8 bytes from the decoded stream, regardless of the
+// JPEG's intrinsic size.  This matches Adobe Acrobat Reader and
+// Ghostscript; see viewer-tests/image/jpeg-mismatch.
+func TestExtractDictDCTDimensionMismatch(t *testing.T) {
+	// build a 64×64 baseline RGB JPEG, then embed it as an XObject with
+	// /Width 32 /Height 32
+	src := stdimage.NewRGBA(stdimage.Rect(0, 0, 64, 64))
+	for y := range 64 {
+		for x := range 64 {
+			src.Set(x, y, stdcolor.RGBA{R: uint8(x * 4), G: uint8(y * 4), B: 128, A: 255})
+		}
+	}
+	var jpegBuf bytes.Buffer
+	if err := jpeg.Encode(&jpegBuf, src, &jpeg.Options{Quality: 90}); err != nil {
+		t.Fatal(err)
+	}
+
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	ref := w.Alloc()
+	body, err := w.OpenStream(ref, pdf.Dict{
+		"Type":             pdf.Name("XObject"),
+		"Subtype":          pdf.Name("Image"),
+		"Width":            pdf.Integer(32),
+		"Height":           pdf.Integer(32),
+		"ColorSpace":       pdf.Name("DeviceRGB"),
+		"BitsPerComponent": pdf.Integer(8),
+		"Filter":           pdf.Name("DCTDecode"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := body.Write(jpegBuf.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	if err := body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	img, err := ExtractDict(x, nil, ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pixels, err := img.Data.Pixels()
+	if err != nil {
+		t.Fatal(err)
+	}
+	const want = 32 * 32 * 3
+	if len(pixels) != want {
+		t.Errorf("Pixels() returned %d bytes, want %d (W·H·nComp = 32·32·3)", len(pixels), want)
 	}
 }
