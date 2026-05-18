@@ -259,6 +259,54 @@ func closeEnough(a, b uint8) bool {
 	return math.Abs(float64(a)-float64(b)) <= 1
 }
 
+// TestDecodeProgressive decodes a small multi-scan progressive JPEG
+// and compares the result against Go's stdlib decoder.  This exercises
+// the streaming progressive path (allocate a stripe, fill progCoeffs
+// across all scans, then walk progCoeffs MCU-row by MCU-row, emitting
+// converted pixels into the destination writer).
+func TestDecodeProgressive(t *testing.T) {
+	jpegBytes, err := os.ReadFile("testdata/progressive.jpg")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rc, err := Decode(bytes.NewReader(jpegBytes), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rc.Close()
+	data, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ref, err := jpeg.Decode(bytes.NewReader(jpegBytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bounds := ref.Bounds()
+	w := bounds.Dx()
+	h := bounds.Dy()
+	if len(data) != w*h*3 {
+		t.Fatalf("got %d bytes, want %d", len(data), w*h*3)
+	}
+
+	i := 0
+	for y := range h {
+		for x := range w {
+			r, g, b, _ := ref.At(x+bounds.Min.X, y+bounds.Min.Y).RGBA()
+			wantR := uint8(r >> 8)
+			wantG := uint8(g >> 8)
+			wantB := uint8(b >> 8)
+			if !closeEnough(data[i], wantR) || !closeEnough(data[i+1], wantG) || !closeEnough(data[i+2], wantB) {
+				t.Errorf("pixel (%d,%d): got (%d,%d,%d), want (%d,%d,%d)",
+					x, y, data[i], data[i+1], data[i+2], wantR, wantG, wantB)
+			}
+			i += 3
+		}
+	}
+}
+
 // TestDecodeProgressiveBudget verifies that a progressive JPEG whose
 // SOF dimensions fit the per-image pixel/byte caps but would push the
 // internal coefficient buffer above the budget is rejected before any
@@ -352,4 +400,26 @@ func TestDecodeOversizeSOF(t *testing.T) {
 			}
 		})
 	}
+}
+
+// FuzzDecode feeds arbitrary bytes to Decode and asserts only that
+// neither Decode itself nor draining the returned reader panics.  Real
+// JPEGs are accepted via the existing testdata seeds; everything else
+// is expected to fail with a typed error.
+func FuzzDecode(f *testing.F) {
+	for _, path := range []string{"testdata/cmyk.jpg", "testdata/progressive.jpg"} {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			f.Fatal(err)
+		}
+		f.Add(data)
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		rc, err := Decode(bytes.NewReader(data), nil)
+		if err != nil {
+			return
+		}
+		_, _ = io.Copy(io.Discard, rc)
+		rc.Close()
+	})
 }
