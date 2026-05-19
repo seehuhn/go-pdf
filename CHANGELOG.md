@@ -5,6 +5,87 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.3] - 2026-05-19
+
+This release hardens the reader against memory-exhaustion attacks via
+malicious PDF files.  Every code path that previously did unbounded
+allocation on attacker-controlled input is now bounded, either by a
+per-stream byte cap or by a cumulative memory budget threaded through
+the filter chain.
+
+### Changed
+- `Filter.Decode` takes an additional `*membudget.Budget` argument;
+  callers must supply a non-nil budget.  The budget is shared across
+  the whole filter chain so each stream's total decoded allocation is
+  capped.
+- `pdf.ReadAll` takes a `maxBytes` argument so callers choose the cap
+  per stream kind.
+- `Reference.Generation` narrowed back to `uint16`; object numbers
+  capped at 2²⁴−1 to match the per-object key derivation in §7.6.3.2.
+  `NewReference` panics on out-of-range input; `Writer.Alloc` panics
+  if the ceiling is reached; xref-stream entries with out-of-range
+  generation are silently dropped.
+- Filter chains are capped at 16 entries.  `Extractor.DeepResolve` is
+  removed; the equivalent recursion in the `opaque` package is
+  bounded by depth (256) and uses `pdf.CycleCheck` for cross-structure
+  cycle detection.
+- `graphics/form`: `/Resources` may be omitted at PDF 1.x (the form
+  inherits from the surrounding content); required at PDF 2.0+.
+- `graphics/color`: new `Space.ComponentRanges` method.  A malformed
+  PDF can no longer construct a `Separation` or `DeviceN` colour
+  space whose tint transform has the wrong arity.  Nested Pattern
+  colour spaces (Pattern over Pattern, Indexed over Pattern, Indexed
+  over Indexed) are rejected per §§8.6.6.3 and 8.7.3.3.
+- Tokeniser tightened to PDF 7.3: bare CR and CR-LF inside literal
+  strings normalise to LF; octal escapes end at the first non-octal
+  digit; `#` in names is literal unless followed by two hex digits.
+  Over-long strings, hex strings, names, numbers, arrays, dicts, and
+  comments are now bounded; the scanner resyncs at the next boundary.
+- DCTDecode: filter output past the dict-declared image budget is
+  silently truncated (matching Acrobat and Ghostscript byte-positional
+  behaviour) instead of erroring; `SMaskInData` is dropped on read for
+  non-JPXDecode images per §8.9.5.1.
+- The redundant top-level `content` package is removed; its public
+  scanner API is now part of `graphics/content`.
+
+### Fixed
+- AES decryption uses constant-time PKCS#7 unpad, closing a padding
+  oracle that previously only inspected the trailing length byte.
+  Password validation (R 2-6) and Algorithm 13 `/Perms` checks are
+  now constant-time, and Algorithm 10 fills bytes 12-15 of `/Perms`
+  with random data as required by §7.6.4.4.9.
+- Predict reader rejects truncated final rows.  Password hashing
+  (Algorithm 2.B) no longer wraps its round counter once `i-32`
+  exceeds 255.
+- JBIG2 rejects extreme image dimensions up front so the subsequent
+  `int64` multiplications cannot wrap silently.
+- JPEG: progressive coefficient buffers are rejected when their
+  requested block count would exceed the image-byte cap, closing a
+  ~4× amplification gap between the encoded image and the
+  intermediate buffer.  Baseline JPEG plane allocations are charged
+  against the per-stream budget.  Frames whose declared pixel or byte
+  count exceeds the image caps are rejected before any allocation.
+- Streaming JPEG decoder.  Baseline and progressive JPEGs now decode
+  one MCU row at a time, dropping peak working set from O(W·H) to
+  O(W·8·v0) — bounded by image width alone.
+- Image-decode amplification: per-channel `float64` decoded-buffer
+  cap (2 GiB) closes the ~64× gap between the encoded image cap and
+  the expanded sample buffer at bpc = 1.  DeviceN colorant count
+  (32), image `Alternates` (8), `AssociatedFiles` (64), and soft-mask
+  `Matte` arrays are bounded so a single dictionary cannot force
+  millions of allocations.
+- Inline images: filters forbidden by PDF 2.0 §8.9.7 (`JBIG2Decode`,
+  `JPXDecode`, `Crypt`) are rejected on both read and write; inline
+  images now share the XObject image dimension policy.
+- Scanner recovers from streams whose dictionary is missing
+  `/Length` by scanning forward for `EOL endstream` per §7.3.8.2;
+  the CCITTFax reader terminates rather than looping forever on bit
+  patterns matching no run-length table entry; soft-mask and measure
+  dictionaries fall back to safe defaults on malformed
+  `BitsPerComponent`, `ConversionFactor`, and `Precision` values.
+- JPXDecode images that omit `/ColorSpace` and `/BitsPerComponent`
+  (data lives in the JP2 codestream) are now accepted.
+
 ## [0.7.2] - 2026-05-11
 
 ### Added

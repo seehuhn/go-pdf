@@ -8,12 +8,12 @@ require (
 	golang.org/x/image v0.38.0
 	golang.org/x/term v0.40.0
 	golang.org/x/text v0.35.0
-	seehuhn.de/go/geom v0.7.2
-	seehuhn.de/go/icc v0.7.2
-	seehuhn.de/go/membudget v0.0.0-20260519103959-d13c2074f08b
-	seehuhn.de/go/postscript v0.7.3-0.20260515105123-23cd206f06ee
-	seehuhn.de/go/sfnt v0.7.2
-	seehuhn.de/go/xmp v0.7.2
+	seehuhn.de/go/geom v0.7.3
+	seehuhn.de/go/icc v0.7.3
+	seehuhn.de/go/membudget v0.7.3
+	seehuhn.de/go/postscript v0.7.3
+	seehuhn.de/go/sfnt v0.7.3
+	seehuhn.de/go/xmp v0.7.3
 )
 
 require (
