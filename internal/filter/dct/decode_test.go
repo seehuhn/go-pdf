@@ -406,6 +406,85 @@ func TestDecodeOversizeSOF(t *testing.T) {
 	}
 }
 
+// TestDecodeMultiScanBaselineBudget verifies that a baseline JPEG with
+// a non-interleaved first SOS (forcing the full-buffer multi-scan
+// fallback in scan.go) is rejected if the per-stream memory budget
+// cannot accommodate the pixel planes makeImg would allocate.
+func TestDecodeMultiScanBaselineBudget(t *testing.T) {
+	hi := func(v uint16) byte { return byte(v >> 8) }
+	lo := func(v uint16) byte { return byte(v) }
+
+	// SOI + SOF0 (nComp=3, 8192x8192, all components 1x1) + SOS that
+	// lists only one component (nComp_sos=1, subset of 3) so neither
+	// d.progressive nor nComp_sos == d.nComp is true; d.streaming
+	// stays false and makeImg attempts the full ~192 MiB allocation.
+	const w, h uint16 = 8192, 8192
+	payload := []byte{
+		0xFF, 0xD8, // SOI
+		0xFF, 0xC0, // SOF0
+		0x00, 0x11, // length = 17
+		0x08,         // precision = 8
+		hi(h), lo(h), // height
+		hi(w), lo(w), // width
+		0x03,             // nComp = 3
+		0x01, 0x11, 0x00, // component 1: id=1, h=v=1, Tq=0
+		0x02, 0x11, 0x00, // component 2
+		0x03, 0x11, 0x00, // component 3
+		0xFF, 0xDA, // SOS
+		0x00, 0x08, // length = 8
+		0x01,       // nComp_sos = 1 (subset)
+		0x01, 0x00, // selector=1, td/ta=0
+		0x00, 0x3F, 0x00, // Ss, Se, Ah/Al
+		0xFF, 0xD9, // EOI
+	}
+
+	// budget is tight enough that the full-buffer 192 MiB allocation
+	// fails, but the storeMyy=1 stripe (~192 KiB) fits — so the SOF
+	// probe passes and the makeImg charge is what trips
+	rc, err := Decode(bytes.NewReader(payload), nil, membudget.New(1<<20))
+	if err == nil {
+		_, err = io.ReadAll(rc)
+		rc.Close()
+	}
+	if err == nil {
+		t.Fatal("expected error for multi-scan baseline over budget, got nil")
+	}
+}
+
+// TestDecodeSOFStripeOverBudget verifies that a JPEG whose SOF passes
+// the absolute pixel and byte caps but whose single-stripe pixel plane
+// alone would exceed the per-stream budget is rejected during SOF
+// parsing, before any SOS work begins.
+func TestDecodeSOFStripeOverBudget(t *testing.T) {
+	hi := func(v uint16) byte { return byte(v >> 8) }
+	lo := func(v uint16) byte { return byte(v) }
+
+	// 65535 wide x 1000 tall, 1 component: ~65 Mpx and ~65 MiB (both
+	// inside the absolute caps), but the single-stripe Y plane is
+	// 8*8192*8 = 512 KiB — exceeds the 256 KiB budget below.
+	const w, h uint16 = 65535, 1000
+	payload := []byte{
+		0xFF, 0xD8, // SOI
+		0xFF, 0xC0, // SOF0
+		0x00, 0x0B, // length = 11
+		0x08,         // precision = 8
+		hi(h), lo(h), // height
+		hi(w), lo(w), // width
+		0x01,             // nComp = 1
+		0x01, 0x11, 0x00, // component 1
+		0xFF, 0xD9, // EOI
+	}
+
+	rc, err := Decode(bytes.NewReader(payload), nil, membudget.New(256<<10))
+	if err == nil {
+		_, err = io.ReadAll(rc)
+		rc.Close()
+	}
+	if err == nil {
+		t.Fatal("expected error for elongated SOF over budget, got nil")
+	}
+}
+
 // FuzzDecode feeds arbitrary bytes to Decode and asserts only that
 // neither Decode itself nor draining the returned reader panics.  Real
 // JPEGs are accepted via the existing testdata seeds; everything else

@@ -93,7 +93,7 @@ func (d *decoder) emitGray(w io.Writer, yStart, yEnd int) error {
 // the stripe-local row (y - yStart) and the recorded chroma subsample.
 func (d *decoder) emitYCbCr(w io.Writer, yStart, yEnd int) error {
 	width := d.width
-	row := make([]byte, width*3)
+	row := d.row
 	for y := yStart; y < yEnd; y++ {
 		ly := y - yStart
 		yRow := ly * d.yStride
@@ -119,7 +119,7 @@ func (d *decoder) emitYCbCr(w io.Writer, yStart, yEnd int) error {
 // case described in [decoder.isRGB].
 func (d *decoder) emitYCbCrAsRGB(w io.Writer, yStart, yEnd int) error {
 	width := d.width
-	row := make([]byte, width*3)
+	row := d.row
 	for y := yStart; y < yEnd; y++ {
 		ly := y - yStart
 		yRow := ly * d.yStride
@@ -146,7 +146,7 @@ func (d *decoder) emitYCbCrAsRGB(w io.Writer, yStart, yEnd int) error {
 // the implicit double-inversion through the YCbCr/RGB matrix.
 func (d *decoder) emitYCCK(w io.Writer, yStart, yEnd int) error {
 	width := d.width
-	row := make([]byte, width*4)
+	row := d.row
 	for y := yStart; y < yEnd; y++ {
 		ly := y - yStart
 		yRow := ly * d.yStride
@@ -176,7 +176,7 @@ func (d *decoder) emitYCCK(w io.Writer, yStart, yEnd int) error {
 // produces the correct output.
 func (d *decoder) emitRawCMYK(w io.Writer, yStart, yEnd int) error {
 	width := d.width
-	row := make([]byte, width*4)
+	row := d.row
 	for y := yStart; y < yEnd; y++ {
 		ly := y - yStart
 		yRow := ly * d.yStride

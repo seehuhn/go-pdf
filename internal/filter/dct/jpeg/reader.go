@@ -196,6 +196,12 @@ type outputState struct {
 	blackPix         []byte
 	blackStride      int
 
+	// row is the scratch buffer the emit functions fill one image row
+	// at a time before writing it to the output.  Allocated only when
+	// the emit function needs colour conversion or component
+	// interleaving (nComp >= 3); emitGray writes directly from d.y.
+	row []byte
+
 	// streaming is set in processSOS when the decoder can use a stripe-
 	// sized internal buffer instead of full-image buffers — i.e. for
 	// single-scan baseline (emit during processSOS) and progressive
@@ -515,6 +521,17 @@ func (d *decoder) processSOF(n int) error {
 
 		d.comp[i].h = h
 		d.comp[i].v = v
+	}
+
+	// fail fast if even a single-stripe pixel-plane allocation (the
+	// smallest mode makeImg ever uses) would exceed the per-stream
+	// budget.  This catches highly elongated images whose stripe alone
+	// is enormous; the full-buffer multi-scan baseline path is caught
+	// later by the per-allocation charge in makeImg.
+	h0 := d.comp[0].h
+	mxx := (d.width + 8*h0 - 1) / (8 * h0)
+	if d.pixelPlaneBytes(mxx, 1) > d.budget.Available() {
+		return FormatError("pixel-plane allocation exceeds budget")
 	}
 	return nil
 }

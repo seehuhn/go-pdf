@@ -52,16 +52,47 @@ package jpeg
 // per-component progressive coefficient buffer ([blockSize]int32).
 const bytesPerProgBlock = blockSize * 4
 
+// pixelPlaneBytes returns the total byte count for the buffers
+// [decoder.makeImg] will allocate for an MCU grid of mxx columns and
+// storeMyy rows.  Pass storeMyy = myy for full-buffer mode and
+// storeMyy = 1 for streaming (single-stripe) mode.  The result
+// includes the per-row emit scratch buffer for nComp >= 3.
+func (d *decoder) pixelPlaneBytes(mxx, storeMyy int) int64 {
+	h0 := d.comp[0].h
+	v0 := d.comp[0].v
+	yStride := int64(8 * h0 * mxx)
+	cost := yStride * int64(8*v0*storeMyy)
+	if d.nComp >= 3 {
+		cStride := int64(8 * d.comp[1].h * mxx)
+		cost += 2 * cStride * int64(8*d.comp[1].v*storeMyy)
+	}
+	if d.nComp == 4 {
+		blackStride := int64(8 * d.comp[3].h * mxx)
+		cost += blackStride * int64(8*d.comp[3].v*storeMyy)
+	}
+	if d.nComp >= 3 {
+		// emit scratch row: width * (3 or 4) bytes per pixel
+		cost += int64(d.width) * int64(d.nComp)
+	}
+	return cost
+}
+
 // makeImg allocates the destination pixel planes.  When d.streaming is
 // true only one MCU stripe is allocated (the storeMyy override below
 // reduces the buffer height); otherwise full-image planes are
 // allocated for the multi-scan baseline fallback.  All planes are
 // dimensioned in MCU-aligned units, so 8*comp[i].h*mxx wide and
-// 8*comp[i].v*storeMyy tall for component i.
-func (d *decoder) makeImg(mxx, myy int) {
+// 8*comp[i].v*storeMyy tall for component i.  The total allocation is
+// charged to d.budget so that a tiny stream whose SOF declares large
+// dimensions cannot bypass the per-stream memory limit.
+func (d *decoder) makeImg(mxx, myy int) error {
 	storeMyy := myy
 	if d.streaming {
 		storeMyy = 1
+	}
+
+	if err := d.budget.Charge(int(d.pixelPlaneBytes(mxx, storeMyy))); err != nil {
+		return FormatError("pixel-plane allocation exceeds budget")
 	}
 
 	h0 := d.comp[0].h
@@ -70,7 +101,7 @@ func (d *decoder) makeImg(mxx, myy int) {
 	d.y = make([]byte, d.yStride*8*v0*storeMyy)
 	if d.nComp == 1 {
 		// d.hRatio / d.vRatio / d.cStride remain zero
-		return
+		return nil
 	}
 
 	d.hRatio = h0 / d.comp[1].h
@@ -83,6 +114,8 @@ func (d *decoder) makeImg(mxx, myy int) {
 		d.blackStride = 8 * d.comp[3].h * mxx
 		d.blackPix = make([]byte, d.blackStride*8*d.comp[3].v*storeMyy)
 	}
+	d.row = make([]byte, d.width*d.nComp)
+	return nil
 }
 
 // Specified in section B.2.3.
@@ -196,7 +229,9 @@ func (d *decoder) processSOS(n int) error {
 		if d.progressive || nComp == d.nComp {
 			d.streaming = true
 		}
-		d.makeImg(mxx, myy)
+		if err := d.makeImg(mxx, myy); err != nil {
+			return err
+		}
 		// bind the per-stripe emission function: stable from here on
 		// since d.nComp, isRGB(), and useYCCK() are all set before SOS
 		switch d.nComp {
