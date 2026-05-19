@@ -56,11 +56,14 @@ const (
 )
 
 // checkBitmapSize returns an error if dimensions are negative, if
-// width*height exceeds maxPixels, or if the byte cost exceeds
-// maxBitmapBytes.
+// either dimension exceeds maxPixels, if width*height exceeds
+// maxPixels, or if the byte cost exceeds maxBitmapBytes.
 func checkBitmapSize(width, height int) error {
 	if width < 0 || height < 0 {
 		return fmt.Errorf("negative bitmap dimensions: %d x %d", width, height)
+	}
+	if width > maxPixels || height > maxPixels {
+		return fmt.Errorf("bitmap too large: %d x %d", width, height)
 	}
 	if width == 0 || height == 0 {
 		return nil
