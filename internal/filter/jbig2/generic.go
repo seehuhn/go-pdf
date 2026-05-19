@@ -64,8 +64,8 @@ func getPixel(bm *bitmap.Bitmap, x, y int) int {
 	return 0
 }
 
-func decodeGenericRegion(budget *int64, dec *mqDecoder, p *genericRegionParams, cx []byte) (*bitmap.Bitmap, error) {
-	bm, err := allocBitmap(budget, p.Width, p.Height)
+func decodeGenericRegion(pool *bitmapPool, dec *mqDecoder, p *genericRegionParams, cx []byte) (*bitmap.Bitmap, error) {
+	bm, err := pool.allocBitmap(p.Width, p.Height)
 	if err != nil {
 		return nil, err
 	}

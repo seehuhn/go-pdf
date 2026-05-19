@@ -19,6 +19,8 @@ package jpeg
 import (
 	"image/color"
 	"io"
+
+	"seehuhn.de/go/membudget"
 )
 
 // DecodeStream decodes a JPEG image from r and writes raw pixel bytes
@@ -42,10 +44,11 @@ import (
 // is bounded by the image width.  For progressive JPEGs and the rare
 // multi-scan baseline case it falls back to the full-buffer path and
 // emits the result after the entire JPEG has been parsed.
-func DecodeStream(r io.Reader, colorTransform *int, w io.Writer) error {
+func DecodeStream(r io.Reader, colorTransform *int, w io.Writer, budget *membudget.Budget) error {
 	var d decoder
 	d.colorTransformOverride = colorTransform
 	d.streamOut = w
+	d.budget = budget
 	return d.decode(r)
 }
 

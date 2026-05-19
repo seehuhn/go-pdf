@@ -48,19 +48,9 @@
 
 package jpeg
 
-import (
-	"seehuhn.de/go/pdf/internal/streamlimits"
-)
-
 // bytesPerProgBlock is the size in bytes of one entry in the
 // per-component progressive coefficient buffer ([blockSize]int32).
 const bytesPerProgBlock = blockSize * 4
-
-// maxProgressiveBlocks caps the total number of [block] entries the
-// progressive scans may allocate across all components, summed.  The
-// cap is in [streamlimits.MaxImageBytes] units to bound amplification
-// beyond the pixel/byte caps the SOF parser already enforces.
-const maxProgressiveBlocks = streamlimits.MaxImageBytes / bytesPerProgBlock
 
 // makeImg allocates the destination pixel planes.  When d.streaming is
 // true only one MCU stripe is allocated (the storeMyy override below
@@ -232,19 +222,14 @@ func (d *decoder) processSOS(n int) error {
 		return FormatError("multi-scan baseline not supported in streaming mode")
 	}
 	if d.progressive {
-		// cap total progressive coefficient memory against the same byte
-		// budget enforced for decoded image data, since the per-image
-		// pixel/byte caps at SOF time admit a ~4× amplification into the
-		// coefficient buffer
+		// charge progressive coefficient buffers to the per-stream
+		// budget; the per-image pixel/byte caps at SOF time admit a
+		// ~4× amplification into the coefficient buffer
 		for i := range nComp {
 			compIndex := scan[i].compIndex
 			if d.progCoeffs[compIndex] == nil {
 				nBlocks := int64(mxx) * int64(myy) * int64(d.comp[compIndex].h) * int64(d.comp[compIndex].v)
-				var existing int64
-				for j := range d.progCoeffs {
-					existing += int64(len(d.progCoeffs[j]))
-				}
-				if existing+nBlocks > maxProgressiveBlocks {
+				if err := d.budget.Charge(int(nBlocks) * bytesPerProgBlock); err != nil {
 					return FormatError("progressive coefficient buffer exceeds budget")
 				}
 				d.progCoeffs[compIndex] = make([]block, nBlocks)

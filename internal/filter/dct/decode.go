@@ -40,6 +40,7 @@ import (
 	"bufio"
 	"io"
 
+	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf/internal/filter/dct/jpeg"
 )
 
@@ -58,11 +59,11 @@ import (
 // Decode itself.  Callers should Close the reader when they stop
 // consuming; otherwise the producer goroutine remains blocked on the
 // pipe.
-func Decode(r io.Reader, colorTransform *int) (io.ReadCloser, error) {
+func Decode(r io.Reader, colorTransform *int, budget *membudget.Budget) (io.ReadCloser, error) {
 	pr, pw := io.Pipe()
 	go func() {
 		bw := bufio.NewWriter(pw)
-		if err := jpeg.DecodeStream(r, colorTransform, bw); err != nil {
+		if err := jpeg.DecodeStream(r, colorTransform, bw, budget); err != nil {
 			pw.CloseWithError(err)
 			return
 		}

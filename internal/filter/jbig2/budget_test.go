@@ -19,13 +19,24 @@ package jbig2
 import (
 	"testing"
 
+	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf/graphics/bitmap"
 )
 
+func newTestPool(remaining int64) *bitmapPool {
+	return &bitmapPool{budget: membudget.New(remaining)}
+}
+
+// testBudget returns a budget large enough for tests to never trip
+// the cap.
+func testBudget() *membudget.Budget {
+	return membudget.New(1 << 30)
+}
+
 func TestAllocBitmap(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
-		budget := int64(10000)
-		bm, err := allocBitmap(&budget, 16, 8)
+		p := newTestPool(10000)
+		bm, err := p.allocBitmap(16, 8)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -33,77 +44,82 @@ func TestAllocBitmap(t *testing.T) {
 			t.Fatalf("got %dx%d, want 16x8", bm.Width(), bm.Height())
 		}
 		// 16 pixels wide = 2 bytes stride, 8 rows = 16 bytes
-		if budget != 10000-16 {
-			t.Fatalf("budget = %d, want %d", budget, 10000-16)
+		if p.live != 16 || p.peak != 16 {
+			t.Fatalf("live=%d peak=%d, want 16/16", p.live, p.peak)
 		}
 	})
 
 	t.Run("exceeded", func(t *testing.T) {
-		budget := int64(10)
-		_, err := allocBitmap(&budget, 100, 100)
+		p := newTestPool(10)
+		_, err := p.allocBitmap(100, 100)
 		if err == nil {
 			t.Fatal("expected error")
 		}
-		// budget unchanged on failure
-		if budget != 10 {
-			t.Fatalf("budget changed to %d on failure", budget)
+		if p.live != 0 {
+			t.Fatalf("live = %d on failure, want 0", p.live)
 		}
 	})
 
 	t.Run("negative_dims", func(t *testing.T) {
-		budget := int64(10000)
-		_, err := allocBitmap(&budget, -1, 10)
+		p := newTestPool(10000)
+		_, err := p.allocBitmap(-1, 10)
 		if err == nil {
 			t.Fatal("expected error for negative width")
 		}
 	})
 
 	t.Run("zero_dims", func(t *testing.T) {
-		budget := int64(10000)
-		bm, err := allocBitmap(&budget, 0, 10)
+		p := newTestPool(10000)
+		bm, err := p.allocBitmap(0, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if bm.Width() != 0 {
 			t.Fatalf("got width %d, want 0", bm.Width())
 		}
-		if budget != 10000 {
-			t.Fatalf("budget changed for zero-size bitmap")
+		if p.live != 0 {
+			t.Fatalf("live changed to %d for zero-size bitmap", p.live)
 		}
 	})
 }
 
 func TestFreeBitmap(t *testing.T) {
-	budget := int64(10000)
-	bm, err := allocBitmap(&budget, 16, 8)
+	p := newTestPool(10000)
+	bm, err := p.allocBitmap(16, 8)
 	if err != nil {
 		t.Fatal(err)
 	}
-	after := budget
-	freeBitmap(&budget, bm)
-	if budget != 10000 {
-		t.Fatalf("budget after free = %d, want 10000 (was %d after alloc)", budget, after)
+	p.freeBitmap(bm)
+	if p.live != 0 {
+		t.Fatalf("live after free = %d, want 0", p.live)
+	}
+	// peak survives so a second alloc of the same size charges nothing
+	if p.peak != 16 {
+		t.Fatalf("peak after free = %d, want 16", p.peak)
+	}
+	if _, err := p.allocBitmap(16, 8); err != nil {
+		t.Fatalf("re-alloc after free: %v", err)
 	}
 }
 
 func TestAllocInts(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
-		budget := int64(1000)
-		s, err := allocInts(&budget, 10)
+		p := newTestPool(1000)
+		s, err := p.allocInts(10)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(s) != 10 {
 			t.Fatalf("got len %d, want 10", len(s))
 		}
-		if budget != 1000-80 {
-			t.Fatalf("budget = %d, want %d", budget, 1000-80)
+		if p.live != 80 {
+			t.Fatalf("live = %d, want 80", p.live)
 		}
 	})
 
 	t.Run("exceeded", func(t *testing.T) {
-		budget := int64(10)
-		_, err := allocInts(&budget, 100)
+		p := newTestPool(10)
+		_, err := p.allocInts(100)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -125,9 +141,8 @@ func TestBudgetExceeded_LargeRegion(t *testing.T) {
 
 	// give a budget that's too small for the 256x256 page + 256x256 region
 	d := &decoder{
-		segments:  make(map[uint32]segmentResult),
-		inputSize: len(stream),
-		memBudget: 100, // way too small
+		segments: make(map[uint32]segmentResult),
+		pool:     bitmapPool{budget: membudget.New(100)}, // way too small
 	}
 	err := d.processStream(stream)
 	if err == nil {
@@ -136,7 +151,7 @@ func TestBudgetExceeded_LargeRegion(t *testing.T) {
 }
 
 func TestBudgetSufficient_Normal(t *testing.T) {
-	// verify that Decode works with the normal budget formula
+	// verify that Decode works with a generous budget
 	bm := makeCheckerboard(32, 32)
 	segData := EncodeGenericRegionSegment(bm, 0, 0, 1, bitmap.CombOpOR, false, false)
 	pageData := WritePageInfo(nil, 32, 32)
@@ -147,7 +162,7 @@ func TestBudgetSufficient_Normal(t *testing.T) {
 	stream = WriteSegmentHeader(stream, 1, segImmediateGeneric, 1, nil, uint32(len(segData)))
 	stream = append(stream, segData...)
 
-	got, err := Decode(nil, stream)
+	got, err := Decode(nil, stream, membudget.New(8<<20))
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -158,8 +173,8 @@ func TestBudgetSufficient_Normal(t *testing.T) {
 
 func TestMaxBitplanes(t *testing.T) {
 	// verify that gsbpp > maxBitplanes is rejected
-	budget := int64(1 << 30)
-	_, err := decodeGrayScaleImage(&budget, nil, false, 0, 17, 4, 4, false, nil)
+	p := newTestPool(1 << 30)
+	_, err := decodeGrayScaleImage(p, nil, false, 0, 17, 4, 4, false, nil)
 	if err == nil {
 		t.Fatal("expected error for 17 bitplanes")
 	}

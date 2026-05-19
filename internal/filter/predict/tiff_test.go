@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/membudget"
 )
 
 func TestTIFFPredictorHorizontalDifferencing(t *testing.T) {
@@ -140,7 +141,7 @@ func TestTIFFPredictorHorizontalDifferencing(t *testing.T) {
 			}
 
 			// Test decoding
-			reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &tt.params)
+			reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &tt.params, membudget.New(1<<30))
 			if err != nil {
 				t.Fatalf("failed to create reader: %v", err)
 			}
@@ -214,7 +215,7 @@ func TestTIFFPredictorMultipleRows(t *testing.T) {
 	}
 
 	// Test decoding
-	reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &params)
+	reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &params, membudget.New(1<<30))
 	if err != nil {
 		t.Fatalf("failed to create reader: %v", err)
 	}
@@ -311,7 +312,7 @@ func TestTIFFPredictorBoundaryConditions(t *testing.T) {
 				}
 			}
 
-			reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedBuf.Bytes())), &tt.params)
+			reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedBuf.Bytes())), &tt.params, membudget.New(1<<30))
 			if err != nil {
 				t.Fatalf("failed to create reader: %v", err)
 			}
@@ -384,7 +385,7 @@ func TestTIFFPredictorSubByteRoundTrip(t *testing.T) {
 			}
 
 			// Decode
-			reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedBuf.Bytes())), &params)
+			reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedBuf.Bytes())), &params, membudget.New(1<<30))
 			if err != nil {
 				t.Fatalf("failed to create reader: %v", err)
 			}

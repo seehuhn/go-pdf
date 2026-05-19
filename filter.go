@@ -24,6 +24,7 @@ import (
 	"io"
 	"sync"
 
+	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf/internal/filter/ascii85"
 	"seehuhn.de/go/pdf/internal/filter/asciihex"
 	"seehuhn.de/go/pdf/internal/filter/ccittfax"
@@ -78,7 +79,12 @@ type Filter interface {
 	Encode(Version, io.WriteCloser) (io.WriteCloser, error)
 
 	// Decode returns a reader which decodes data read from it.
-	Decode(Version, io.Reader) (io.ReadCloser, error)
+	//
+	// Working-memory allocations made by the filter are charged against
+	// budget; an exhausted budget causes the decode to fail with
+	// [*MalformedFileError].  budget must be non-nil; size it with
+	// [streamlimits.StreamBudget].
+	Decode(v Version, r io.Reader, budget *membudget.Budget) (io.ReadCloser, error)
 }
 
 // MakeFilter constructs a [Filter] for the given filter name and parameters.
@@ -156,7 +162,7 @@ func (f *filterNotImplemented) Encode(Version, io.WriteCloser) (io.WriteCloser, 
 	return nil, fmt.Errorf("filter %s not implemented", f.Name)
 }
 
-func (f *filterNotImplemented) Decode(Version, io.Reader) (io.ReadCloser, error) {
+func (f *filterNotImplemented) Decode(_ Version, _ io.Reader, _ *membudget.Budget) (io.ReadCloser, error) {
 	return nil, Errorf("filter %s not implemented", f.Name)
 }
 
@@ -175,7 +181,7 @@ func (f FilterASCII85) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, erro
 }
 
 // Decode implements the [Filter] interface.
-func (f FilterASCII85) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
+func (f FilterASCII85) Decode(_ Version, r io.Reader, _ *membudget.Budget) (io.ReadCloser, error) {
 	return asMalformedFilter(ascii85.Decode(r), nil)
 }
 
@@ -194,7 +200,7 @@ func (f FilterASCIIHex) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, err
 }
 
 // Decode implements the [Filter] interface.
-func (f FilterASCIIHex) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
+func (f FilterASCIIHex) Decode(_ Version, r io.Reader, _ *membudget.Budget) (io.ReadCloser, error) {
 	return asMalformedFilter(asciihex.Decode(r), nil)
 }
 
@@ -213,7 +219,7 @@ func (f FilterRunLength) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, er
 }
 
 // Decode implements the [Filter] interface.
-func (f FilterRunLength) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
+func (f FilterRunLength) Decode(_ Version, r io.Reader, _ *membudget.Budget) (io.ReadCloser, error) {
 	return asMalformedFilter(runlength.Decode(r), nil)
 }
 
@@ -298,8 +304,8 @@ func (f FilterFlate) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error)
 }
 
 // Decode implements the [Filter] interface.
-func (f FilterFlate) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
-	return asMalformedFilter(decodeFlateLZW(r, f.Predictor, f.Colors, f.BitsPerComponent, f.Columns, false, false))
+func (f FilterFlate) Decode(_ Version, r io.Reader, budget *membudget.Budget) (io.ReadCloser, error) {
+	return asMalformedFilter(decodeFlateLZW(r, f.Predictor, f.Colors, f.BitsPerComponent, f.Columns, false, false, budget))
 }
 
 func (f FilterFlate) validate(v Version) error {
@@ -398,8 +404,8 @@ func (f FilterLZW) Encode(v Version, w io.WriteCloser) (io.WriteCloser, error) {
 }
 
 // Decode implements the [Filter] interface.
-func (f FilterLZW) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
-	return asMalformedFilter(decodeFlateLZW(r, f.Predictor, f.Colors, f.BitsPerComponent, f.Columns, true, f.OffByOne))
+func (f FilterLZW) Decode(_ Version, r io.Reader, budget *membudget.Budget) (io.ReadCloser, error) {
+	return asMalformedFilter(decodeFlateLZW(r, f.Predictor, f.Colors, f.BitsPerComponent, f.Columns, true, f.OffByOne, budget))
 }
 
 func (f FilterLZW) validate(v Version) error {
@@ -455,11 +461,11 @@ func (f FilterCompress) Encode(v Version, w io.WriteCloser) (io.WriteCloser, err
 }
 
 // Decode implements the [Filter] interface.
-func (f FilterCompress) Decode(v Version, r io.Reader) (io.ReadCloser, error) {
+func (f FilterCompress) Decode(v Version, r io.Reader, budget *membudget.Budget) (io.ReadCloser, error) {
 	if v >= V1_2 {
-		return f.toFlate().Decode(v, r)
+		return f.toFlate().Decode(v, r, budget)
 	}
-	return f.toLZW().Decode(v, r)
+	return f.toLZW().Decode(v, r, budget)
 }
 
 func (f FilterCompress) toFlate() FilterFlate {
@@ -580,8 +586,12 @@ func (f FilterCCITTFax) Encode(v Version, w io.WriteCloser) (io.WriteCloser, err
 }
 
 // Decode implements the [Filter] interface.
-func (f FilterCCITTFax) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
-	reader, err := ccittfax.NewReader(r, f.toParams())
+func (f FilterCCITTFax) Decode(_ Version, r io.Reader, budget *membudget.Budget) (io.ReadCloser, error) {
+	params := f.toParams()
+	if err := budget.Charge(ccittfax.BufferBytes(params)); err != nil {
+		return asMalformedFilter(nil, err)
+	}
+	reader, err := ccittfax.NewReader(r, params)
 	if err != nil {
 		return asMalformedFilter(nil, err)
 	}
@@ -676,7 +686,7 @@ func (f FilterDCT) Encode(_ Version, _ io.WriteCloser) (io.WriteCloser, error) {
 }
 
 // Decode implements the [Filter] interface.
-func (f FilterDCT) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
+func (f FilterDCT) Decode(_ Version, r io.Reader, budget *membudget.Budget) (io.ReadCloser, error) {
 	var ct *int
 	switch f.ColorTransform {
 	case DCTColorTransformNone:
@@ -686,7 +696,7 @@ func (f FilterDCT) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
 		v := 1
 		ct = &v
 	}
-	return asMalformedFilter(dct.Decode(r, ct))
+	return asMalformedFilter(dct.Decode(r, ct, budget))
 }
 
 // FilterJBIG2 is the JBIG2Decode filter for bi-level image compression.
@@ -733,16 +743,34 @@ func (f *FilterJBIG2) Encode(_ Version, _ io.WriteCloser) (io.WriteCloser, error
 }
 
 // Decode implements the [Filter] interface.
-func (f *FilterJBIG2) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
-	pageData, err := io.ReadAll(io.LimitReader(r, streamlimits.MaxJBIG2PageBytes+1))
+func (f *FilterJBIG2) Decode(_ Version, r io.Reader, budget *membudget.Budget) (io.ReadCloser, error) {
+	// Cap the read at the lesser of the budget's current headroom and the
+	// JBIG2-specific size limit, so a tight budget cannot be drained by
+	// allocating the full 64 MiB before the charge fails.  Distinguish
+	// the two truncation causes after the read so the caller sees either
+	// a size-limit error or a budget-exhausted error, not a downstream
+	// parse failure on garbage.
+	limit := min(budget.Available(), int64(streamlimits.MaxJBIG2PageBytes)+1)
+	pageData, err := io.ReadAll(io.LimitReader(r, limit))
 	if err != nil {
 		return nil, err
 	}
 	if int64(len(pageData)) > streamlimits.MaxJBIG2PageBytes {
 		return nil, &MalformedFileError{Err: errors.New("JBIG2 page data exceeds size limit")}
 	}
+	if int64(len(pageData)) == limit {
+		// Hit the budget-imposed cap (not the size cap); if the upstream
+		// stream still has bytes, the truncation is a budget exhaustion.
+		var probe [1]byte
+		if n, _ := r.Read(probe[:]); n > 0 {
+			return asMalformedFilter(nil, membudget.ErrExceeded)
+		}
+	}
+	if err := budget.Charge(len(pageData)); err != nil {
+		return asMalformedFilter(nil, err)
+	}
 
-	bm, err := jbig2.Decode(f.Globals, pageData)
+	bm, err := jbig2.Decode(f.Globals, pageData, budget)
 	if err != nil {
 		return asMalformedFilter(nil, err)
 	}
@@ -778,7 +806,7 @@ func (f FilterJPX) Encode(_ Version, _ io.WriteCloser) (io.WriteCloser, error) {
 
 // Decode implements the [Filter] interface.
 // JPXDecode decoding is not supported.
-func (f FilterJPX) Decode(_ Version, _ io.Reader) (io.ReadCloser, error) {
+func (f FilterJPX) Decode(_ Version, _ io.Reader, _ *membudget.Budget) (io.ReadCloser, error) {
 	return asMalformedFilter(nil, errors.New("JPXDecode decoding not supported"))
 }
 
@@ -822,7 +850,7 @@ func (FilterCryptIdentity) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, 
 // For [FilterCryptIdentity] this is a pass-through: the stream's bytes
 // are read unchanged.  The document-level decryption is bypassed for
 // this stream by [DecodeStream].
-func (FilterCryptIdentity) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
+func (FilterCryptIdentity) Decode(_ Version, r io.Reader, _ *membudget.Budget) (io.ReadCloser, error) {
 	return io.NopCloser(r), nil
 }
 
@@ -851,7 +879,7 @@ func (FilterCryptStandard) Encode(_ Version, _ io.WriteCloser) (io.WriteCloser, 
 }
 
 // Decode implements the [Filter] interface.
-func (FilterCryptStandard) Decode(_ Version, _ io.Reader) (io.ReadCloser, error) {
+func (FilterCryptStandard) Decode(_ Version, _ io.Reader, _ *membudget.Budget) (io.ReadCloser, error) {
 	return asMalformedFilter(nil, errors.New("FilterCryptStandard decoding not yet supported"))
 }
 
@@ -894,7 +922,7 @@ func (FilterCryptNamed) Encode(_ Version, _ io.WriteCloser) (io.WriteCloser, err
 }
 
 // Decode implements the [Filter] interface.
-func (FilterCryptNamed) Decode(_ Version, _ io.Reader) (io.ReadCloser, error) {
+func (FilterCryptNamed) Decode(_ Version, _ io.Reader, _ *membudget.Budget) (io.ReadCloser, error) {
 	return asMalformedFilter(nil, errors.New("FilterCryptNamed decoding not yet supported"))
 }
 
@@ -1096,7 +1124,7 @@ func encodeFlateLZW(w io.WriteCloser, p FlatePredictor, colors, bpc, columns int
 
 // decodeFlateLZW returns a reader that decompresses Flate/LZW data,
 // optionally followed by a predictor decoding step.
-func decodeFlateLZW(r io.Reader, p FlatePredictor, colors, bpc, columns int, isLZW, lzwOffByOne bool) (io.ReadCloser, error) {
+func decodeFlateLZW(r io.Reader, p FlatePredictor, colors, bpc, columns int, isLZW, lzwOffByOne bool, budget *membudget.Budget) (io.ReadCloser, error) {
 	var inner io.ReadCloser
 	var err error
 	if isLZW {
@@ -1107,7 +1135,7 @@ func decodeFlateLZW(r io.Reader, p FlatePredictor, colors, bpc, columns int, isL
 			return nil, err
 		}
 	}
-	return predict.NewReader(inner, predictParams(p, colors, bpc, columns))
+	return predict.NewReader(inner, predictParams(p, colors, bpc, columns), budget)
 }
 
 func predictParams(p FlatePredictor, colors, bpc, columns int) *predict.Params {

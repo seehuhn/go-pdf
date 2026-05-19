@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"seehuhn.de/go/membudget"
 )
 
 // All filter types currently implemented by this library.
@@ -142,7 +143,7 @@ func TestFlateLZWEncodeDecode(t *testing.T) {
 		if err := w.Close(); err != nil {
 			t.Fatal(err)
 		}
-		r, err := f.Decode(V2_0, buf)
+		r, err := f.Decode(V2_0, buf, membudget.New(1<<30))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -552,7 +553,7 @@ func TestFilterCryptStandardUnimplemented(t *testing.T) {
 	if _, err := f.Encode(V2_0, nil); err == nil {
 		t.Error("FilterCryptStandard.Encode: expected error, got nil")
 	}
-	if _, err := f.Decode(V2_0, bytes.NewReader(nil)); err == nil {
+	if _, err := f.Decode(V2_0, bytes.NewReader(nil), membudget.New(1<<20)); err == nil {
 		t.Error("FilterCryptStandard.Decode: expected error, got nil")
 	}
 }
@@ -564,7 +565,7 @@ func TestFilterCryptNamedUnimplemented(t *testing.T) {
 	if _, err := f.Encode(V2_0, nil); err == nil {
 		t.Error("FilterCryptNamed.Encode: expected error, got nil")
 	}
-	if _, err := f.Decode(V2_0, bytes.NewReader(nil)); err == nil {
+	if _, err := f.Decode(V2_0, bytes.NewReader(nil), membudget.New(1<<20)); err == nil {
 		t.Error("FilterCryptNamed.Decode: expected error, got nil")
 	}
 }

@@ -53,6 +53,7 @@ package jpeg
 import (
 	"io"
 
+	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
@@ -226,6 +227,10 @@ type decoder struct {
 	// streamOut is the destination writer for decoded pixel bytes; set
 	// at the start of [decoder.decode] from the DecodeStream argument.
 	streamOut io.Writer
+
+	// budget charges progressive-coefficient and full-buffer pixel
+	// allocations.  Must be non-nil.
+	budget *membudget.Budget
 
 	headerInfo
 	entropyState

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"testing"
 
+	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf/graphics/bitmap"
 	"seehuhn.de/go/pdf/internal/filter/ccittfax"
 )
@@ -34,7 +35,7 @@ func TestGrayScaleSingleBitplane(t *testing.T) {
 	}
 	tmpl := 1
 	encoded := encodeGrayScaleImage(grayValues, gsw, gsh, 1, tmpl, nil)
-	decoded, err := decodeGrayScaleImage(testBudget(), encoded, false, tmpl, 1, gsw, gsh, false, nil)
+	decoded, err := decodeGrayScaleImage(testPool(), encoded, false, tmpl, 1, gsw, gsh, false, nil)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -108,7 +109,7 @@ func TestGrayScaleMMRRoundTrip(t *testing.T) {
 	}
 
 	// decode using MMR mode
-	decoded, err := decodeGrayScaleImage(testBudget(), mmrData, true, 0, gsbpp, gsw, gsh, false, nil)
+	decoded, err := decodeGrayScaleImage(testPool(), mmrData, true, 0, gsbpp, gsw, gsh, false, nil)
 	if err != nil {
 		t.Fatalf("decodeGrayScaleImage: %v", err)
 	}
@@ -131,7 +132,7 @@ func TestGrayScaleRoundTrip(t *testing.T) {
 	for _, tmpl := range []int{0, 1, 2, 3} {
 		t.Run(fmt.Sprintf("T%d", tmpl), func(t *testing.T) {
 			encoded := encodeGrayScaleImage(grayValues, gsw, gsh, 2, tmpl, nil)
-			decoded, err := decodeGrayScaleImage(testBudget(), encoded, false, tmpl, 2, gsw, gsh, false, nil)
+			decoded, err := decodeGrayScaleImage(testPool(), encoded, false, tmpl, 2, gsw, gsh, false, nil)
 			if err != nil {
 				t.Fatalf("decode failed: %v", err)
 			}
@@ -174,9 +175,8 @@ func patternDictRoundTrip(t *testing.T, patterns []*bitmap.Bitmap, tmpl int) {
 	stream = append(stream, pageData...)
 
 	d := &decoder{
-		segments:  make(map[uint32]segmentResult),
-		inputSize: len(stream),
-		memBudget: 1 << 30,
+		segments: make(map[uint32]segmentResult),
+		pool:     bitmapPool{budget: membudget.New(1 << 30)},
 	}
 	if err := d.processStream(stream); err != nil {
 		t.Fatalf("decode failed: %v", err)
@@ -219,8 +219,8 @@ func FuzzPatternDictRoundTrip(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		d1 := &decoder{
-			segments:  make(map[uint32]segmentResult),
-			inputSize: len(data),
+			segments: make(map[uint32]segmentResult),
+			pool:     bitmapPool{budget: testBudget()},
 		}
 		if err := d1.processStream(data); err != nil {
 			return
@@ -240,8 +240,8 @@ func FuzzPatternDictRoundTrip(f *testing.F) {
 		stream = append(stream, pageData...)
 
 		d2 := &decoder{
-			segments:  make(map[uint32]segmentResult),
-			inputSize: len(stream),
+			segments: make(map[uint32]segmentResult),
+			pool:     bitmapPool{budget: testBudget()},
 		}
 		if err := d2.processStream(stream); err != nil {
 			t.Fatalf("re-decode failed: %v", err)
@@ -326,7 +326,7 @@ func TestHalftoneRoundTrip(t *testing.T) {
 			stream = append(stream, htData...)
 
 			// decode
-			got, err := Decode(nil, stream)
+			got, err := Decode(nil, stream, testBudget())
 			if err != nil {
 				t.Fatalf("decode failed: %v", err)
 			}
@@ -404,7 +404,7 @@ func TestHalftoneRoundTripSparseGray(t *testing.T) {
 	stream = WriteSegmentHeader(stream, 2, segImmediateHalftone, 1, []uint32{0}, uint32(len(htData)))
 	stream = append(stream, htData...)
 
-	got, err := Decode(nil, stream)
+	got, err := Decode(nil, stream, testBudget())
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -481,7 +481,7 @@ func TestIntermediateHalftoneRoundTrip(t *testing.T) {
 	stream = WriteSegmentHeader(stream, 3, segImmediateRefinement, 1, []uint32{2}, uint32(len(refinData)))
 	stream = append(stream, refinData...)
 
-	got, err := Decode(nil, stream)
+	got, err := Decode(nil, stream, testBudget())
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}

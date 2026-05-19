@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf/graphics/bitmap"
 )
 
@@ -44,7 +45,7 @@ func TestEncodeMMRRoundTrip(t *testing.T) {
 			if err != nil {
 				t.Fatalf("encode: %v", err)
 			}
-			got, _, err := decodeMMR(testBudget(), data, tc.bm.Width(), tc.bm.Height())
+			got, _, err := decodeMMR(testPool(), data, tc.bm.Width(), tc.bm.Height())
 			if err != nil {
 				t.Fatalf("decode: %v", err)
 			}
@@ -73,7 +74,7 @@ func TestEncodeMMRNonByteAligned(t *testing.T) {
 			if err != nil {
 				t.Fatalf("encode: %v", err)
 			}
-			got, _, err := decodeMMR(testBudget(), data, w, 10)
+			got, _, err := decodeMMR(testPool(), data, w, 10)
 			if err != nil {
 				t.Fatalf("decode: %v", err)
 			}
@@ -113,7 +114,7 @@ func TestGenericRegionMMRRoundTrip(t *testing.T) {
 			stream = WriteSegmentHeader(stream, 1, segImmediateGeneric, 1, nil, uint32(len(segData)))
 			stream = append(stream, segData...)
 
-			got, err := Decode(nil, stream)
+			got, err := Decode(nil, stream, testBudget())
 			if err != nil {
 				t.Fatalf("decode: %v", err)
 			}
@@ -136,7 +137,7 @@ func TestGrayScaleMMREncodeRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode: %v", err)
 	}
-	decoded, err := decodeGrayScaleImage(testBudget(), encoded, true, 0, 2, gsw, gsh, false, nil)
+	decoded, err := decodeGrayScaleImage(testPool(), encoded, true, 0, 2, gsw, gsh, false, nil)
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -171,9 +172,8 @@ func TestPatternDictMMRRoundTrip(t *testing.T) {
 	stream = append(stream, pageData...)
 
 	d := &decoder{
-		segments:  make(map[uint32]segmentResult),
-		inputSize: len(stream),
-		memBudget: 1 << 30,
+		segments: make(map[uint32]segmentResult),
+		pool:     bitmapPool{budget: membudget.New(1 << 30)},
 	}
 	if err := d.processStream(stream); err != nil {
 		t.Fatalf("decode: %v", err)
@@ -248,7 +248,7 @@ func TestHalftoneMMRRoundTrip(t *testing.T) {
 	stream = WriteSegmentHeader(stream, 2, segImmediateHalftone, 1, []uint32{0}, uint32(len(htData)))
 	stream = append(stream, htData...)
 
-	got, err := Decode(nil, stream)
+	got, err := Decode(nil, stream, testBudget())
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -335,8 +335,8 @@ func FuzzPatternDictMMRRoundTrip(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		d1 := &decoder{
-			segments:  make(map[uint32]segmentResult),
-			inputSize: len(data),
+			segments: make(map[uint32]segmentResult),
+			pool:     bitmapPool{budget: testBudget()},
 		}
 		if err := d1.processStream(data); err != nil {
 			return
@@ -358,8 +358,8 @@ func FuzzPatternDictMMRRoundTrip(f *testing.F) {
 		stream = append(stream, pageData...)
 
 		d2 := &decoder{
-			segments:  make(map[uint32]segmentResult),
-			inputSize: len(stream),
+			segments: make(map[uint32]segmentResult),
+			pool:     bitmapPool{budget: testBudget()},
 		}
 		if err := d2.processStream(stream); err != nil {
 			t.Fatalf("re-decode failed: %v", err)
@@ -478,7 +478,7 @@ func FuzzMMRRoundTrip(f *testing.F) {
 		if err != nil {
 			t.Fatalf("encode failed: %v", err)
 		}
-		got, _, err := decodeMMR(testBudget(), data, width, height)
+		got, _, err := decodeMMR(testPool(), data, width, height)
 		if err != nil {
 			t.Fatalf("decode failed: %v", err)
 		}

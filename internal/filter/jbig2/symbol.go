@@ -109,7 +109,7 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 
 	// arithmetic symbol dictionary decoding
 	dec := newMQDecoder(data[offset:])
-	newSymbols, err := allocPointers(&d.memBudget, sdNumNewSyms)
+	newSymbols, err := d.pool.allocPointers(sdNumNewSyms)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +178,7 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 				copy(p.ATX[:], sdATX[:])
 				copy(p.ATY[:], sdATY[:])
 				var err error
-				newSymbols[nDecoded], err = decodeGenericRegion(&d.memBudget, dec, p, gbCx)
+				newSymbols[nDecoded], err = decodeGenericRegion(&d.pool, dec, p, gbCx)
 				if err != nil {
 					return nil, err
 				}
@@ -211,7 +211,7 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 					}
 					copy(rp.ATX[:], sdrATX[:])
 					copy(rp.ATY[:], sdrATY[:])
-					sym, err := decodeRefinementRegion(&d.memBudget, dec, rp, grCx)
+					sym, err := decodeRefinementRegion(&d.pool, dec, rp, grCx)
 					if err != nil {
 						return nil, err
 					}
@@ -236,7 +236,7 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 						CombOp:       bitmap.CombOpOR,
 						RefCorner:    cornerBottomLeft,
 					}
-					sym, err := decodeTextRegion(&d.memBudget, dec, tp)
+					sym, err := decodeTextRegion(&d.pool, dec, tp)
 					if err != nil {
 						return nil, fmt.Errorf("multi-instance aggregation: %w", err)
 					}
@@ -385,11 +385,11 @@ func (d *decoder) decodeSymbolDictHuffman(
 	}
 
 	hr := newHuffReader(data)
-	newSymbols, err := allocPointers(&d.memBudget, sdNumNewSyms)
+	newSymbols, err := d.pool.allocPointers(sdNumNewSyms)
 	if err != nil {
 		return nil, err
 	}
-	newSymWidths, err := allocInts(&d.memBudget, sdNumNewSyms)
+	newSymWidths, err := d.pool.allocInts(sdNumNewSyms)
 	if err != nil {
 		return nil, err
 	}
@@ -467,7 +467,7 @@ func (d *decoder) decodeSymbolDictHuffman(
 						hr.offset(), rawSize, iTotWidth, iHcHeight, len(data))
 				}
 				rawData := data[hr.offset() : hr.offset()+rawSize]
-				collectiveBM, err = allocBitmap(&d.memBudget, iTotWidth, iHcHeight)
+				collectiveBM, err = d.pool.allocBitmap(iTotWidth, iHcHeight)
 				if err != nil {
 					return nil, err
 				}
@@ -485,7 +485,7 @@ func (d *decoder) decodeSymbolDictHuffman(
 				}
 				mmrData := data[hr.offset() : hr.offset()+bmSize]
 				var err error
-				collectiveBM, _, err = decodeMMR(&d.memBudget, mmrData, iTotWidth, iHcHeight)
+				collectiveBM, _, err = decodeMMR(&d.pool, mmrData, iTotWidth, iHcHeight)
 				if err != nil {
 					return nil, err
 				}
@@ -494,8 +494,8 @@ func (d *decoder) decodeSymbolDictHuffman(
 			}
 
 			// split collective bitmap into individual symbols
-			parts, err := splitBitmapH(&d.memBudget, collectiveBM, newSymWidths[hcFirstSym:nDecoded])
-			freeBitmap(&d.memBudget, collectiveBM)
+			parts, err := splitBitmapH(&d.pool, collectiveBM, newSymWidths[hcFirstSym:nDecoded])
+			d.pool.freeBitmap(collectiveBM)
 			if err != nil {
 				return nil, err
 			}
@@ -555,7 +555,7 @@ func (d *decoder) decodeSymbolDictHuffman(
 					}
 					copy(rp.ATX[:], sdrATX[:])
 					copy(rp.ATY[:], sdrATY[:])
-					sym, err := decodeRefinementRegion(&d.memBudget, dec, rp, grCx)
+					sym, err := decodeRefinementRegion(&d.pool, dec, rp, grCx)
 					if err != nil {
 						return nil, err
 					}
@@ -596,7 +596,7 @@ func (d *decoder) decodeSymbolDictHuffman(
 						DTTable:      huffTableB11,
 						SymIDTable:   symIDTable,
 					}
-					sym, err := decodeTextRegionHuffman(&d.memBudget, hr, tp)
+					sym, err := decodeTextRegionHuffman(&d.pool, hr, tp)
 					if err != nil {
 						return nil, fmt.Errorf("multi-instance aggregation: %w", err)
 					}
@@ -606,7 +606,7 @@ func (d *decoder) decodeSymbolDictHuffman(
 		}
 	}
 
-	freeInts(&d.memBudget, newSymWidths)
+	d.pool.freeInts(newSymWidths)
 
 	if hr.err != nil {
 		return nil, hr.err

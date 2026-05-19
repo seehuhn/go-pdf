@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/membudget"
 )
 
 func TestRoundTrip(t *testing.T) {
@@ -198,7 +199,7 @@ func TestRoundTrip(t *testing.T) {
 			encodedData := encodedBuf.Bytes()
 
 			// Decode: compressed data -> predictor -> original data
-			reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &tt.params)
+			reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedData)), &tt.params, membudget.New(1<<30))
 			if err != nil {
 				t.Fatalf("failed to create reader: %v", err)
 			}
@@ -262,7 +263,7 @@ func TestRoundTripLargeImage(t *testing.T) {
 	}
 
 	// Decode
-	reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedBuf.Bytes())), &params)
+	reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedBuf.Bytes())), &params, membudget.New(1<<30))
 	if err != nil {
 		t.Fatalf("failed to create reader: %v", err)
 	}
@@ -388,7 +389,7 @@ func TestRoundTripRandomData(t *testing.T) {
 			}
 
 			// Decode
-			reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedBuf.Bytes())), &params)
+			reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedBuf.Bytes())), &params, membudget.New(1<<30))
 			if err != nil {
 				t.Fatalf("failed to create reader: %v", err)
 			}
@@ -535,7 +536,7 @@ func TestRoundTripEdgeCases(t *testing.T) {
 			}
 
 			// Decode
-			reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedBuf.Bytes())), &tt.params)
+			reader, err := NewReader(io.NopCloser(bytes.NewReader(encodedBuf.Bytes())), &tt.params, membudget.New(1<<30))
 			if err != nil {
 				t.Fatalf("failed to create reader: %v", err)
 			}

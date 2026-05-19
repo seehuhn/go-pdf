@@ -25,6 +25,9 @@ import (
 	"math"
 	"os"
 	"testing"
+
+	"seehuhn.de/go/membudget"
+	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
 func TestDecodeRGB(t *testing.T) {
@@ -49,7 +52,7 @@ func TestDecodeRGB(t *testing.T) {
 	jpegBytes := buf.Bytes()
 
 	// decode using our function
-	rc, err := Decode(bytes.NewReader(jpegBytes), nil)
+	rc, err := Decode(bytes.NewReader(jpegBytes), nil, membudget.New(1<<30))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +106,7 @@ func TestDecodeGrayscale(t *testing.T) {
 	}
 	jpegBytes := buf.Bytes()
 
-	rc, err := Decode(bytes.NewReader(jpegBytes), nil)
+	rc, err := Decode(bytes.NewReader(jpegBytes), nil, membudget.New(1<<30))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +146,7 @@ func TestDecodeCMYK(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rc, err := Decode(bytes.NewReader(jpegBytes), nil)
+	rc, err := Decode(bytes.NewReader(jpegBytes), nil, membudget.New(1<<30))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +213,7 @@ func TestDecodeColorTransform(t *testing.T) {
 	jpegBytes := buf.Bytes()
 
 	// decode with default (nil) ColorTransform — should give RGB
-	rcDefault, err := Decode(bytes.NewReader(jpegBytes), nil)
+	rcDefault, err := Decode(bytes.NewReader(jpegBytes), nil, membudget.New(1<<30))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +225,7 @@ func TestDecodeColorTransform(t *testing.T) {
 
 	// decode with ColorTransform=1 (YCbCr→RGB) — same as default
 	ct1 := 1
-	rcCT1, err := Decode(bytes.NewReader(jpegBytes), &ct1)
+	rcCT1, err := Decode(bytes.NewReader(jpegBytes), &ct1, membudget.New(1<<30))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +241,7 @@ func TestDecodeColorTransform(t *testing.T) {
 
 	// decode with ColorTransform=0 (no transform) — raw YCbCr values
 	ct0 := 0
-	rcCT0, err := Decode(bytes.NewReader(jpegBytes), &ct0)
+	rcCT0, err := Decode(bytes.NewReader(jpegBytes), &ct0, membudget.New(1<<30))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +273,7 @@ func TestDecodeProgressive(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rc, err := Decode(bytes.NewReader(jpegBytes), nil)
+	rc, err := Decode(bytes.NewReader(jpegBytes), nil, membudget.New(1<<30))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,9 +345,10 @@ func TestDecodeProgressiveBudget(t *testing.T) {
 
 	// dimensions chosen to pass ImagePixelsExceedLimit (128 Mpx) and
 	// ImageBytesExceedLimit (256 MiB) at SOF parse time, but to require
-	// > 1 Mi progressive blocks (= 256 MiB at 256 B/block)
+	// > 1 Mi progressive blocks (= 256 MiB at 256 B/block) which
+	// exceeds a MaxImageBytes-sized budget
 	payload := build(10000, 10000)
-	rc, err := Decode(bytes.NewReader(payload), nil)
+	rc, err := Decode(bytes.NewReader(payload), nil, membudget.New(streamlimits.MaxImageBytes))
 	if err == nil {
 		_, err = io.ReadAll(rc)
 		rc.Close()
@@ -390,7 +394,7 @@ func TestDecodeOversizeSOF(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			payload := build(tc.nComp, 65535, 65535)
-			rc, err := Decode(bytes.NewReader(payload), nil)
+			rc, err := Decode(bytes.NewReader(payload), nil, membudget.New(1<<30))
 			if err == nil {
 				_, err = io.ReadAll(rc)
 				rc.Close()
@@ -415,7 +419,7 @@ func FuzzDecode(f *testing.F) {
 		f.Add(data)
 	}
 	f.Fuzz(func(t *testing.T, data []byte) {
-		rc, err := Decode(bytes.NewReader(data), nil)
+		rc, err := Decode(bytes.NewReader(data), nil, membudget.New(1<<30))
 		if err != nil {
 			return
 		}

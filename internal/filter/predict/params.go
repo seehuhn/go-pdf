@@ -19,18 +19,17 @@ package predict
 import (
 	"errors"
 	"fmt"
+
+	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
-const (
-	maxColumns = 1 << 20
-
-	// maxBytesPerRow caps a predictor row at 8 MiB.  The PNG/TIFF
-	// predictors operate row-by-row; with this cap the buffers in
-	// NewReader/NewWriter sum to at most ~32 MiB per stream.  Real PDF
-	// predictor rows are kilobytes — even photographic CMYK 16-bit
-	// (64 bits per pixel) leaves room for ~1 million-pixel-wide rows.
-	maxBytesPerRow = 1 << 23
-)
+// maxBytesPerRow caps a predictor row at the worst-case legitimate
+// image row: an image at [streamlimits.MaxImageWidth] pixels with
+// [streamlimits.MaxImageChannels] components at 16 bpc.  Any image
+// XObject the library accepts thus has a row that fits, and the
+// per-stream working memory the predict reader allocates is bounded
+// at ~4×maxBytesPerRow per layer in the filter chain.
+const maxBytesPerRow = streamlimits.MaxImageWidth * streamlimits.MaxImageChannels * 16 / 8
 
 type Params struct {
 	// Colors is the number of color components per pixel.
@@ -87,14 +86,13 @@ func (p *Params) Validate() error {
 		return fmt.Errorf("invalid BitsPerComponent %d", p.BitsPerComponent)
 	}
 
-	if p.Columns < 1 || p.Columns > maxColumns {
+	if p.Columns < 1 || p.Columns > streamlimits.MaxImageWidth {
 		return fmt.Errorf("invalid Columns %d", p.Columns)
 	}
 
-	// Cap the row size to prevent a malicious /DecodeParms from forcing
+	// cap the row size to prevent a malicious /DecodeParms from forcing
 	// a multi-gigabyte buffer allocation through individually-legal but
-	// jointly-enormous parameter values.  Colors ≤ 256, BPC ≤ 16,
-	// Columns ≤ 2²⁰, so the int64 product fits with 31 bits of headroom.
+	// jointly-enormous parameter values
 	totalBits := int64(p.Colors) * int64(p.BitsPerComponent) * int64(p.Columns)
 	if (totalBits+7)/8 > maxBytesPerRow {
 		return errors.New("predictor row too large")

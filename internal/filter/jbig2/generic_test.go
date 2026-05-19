@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"testing"
 
+	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf/graphics/bitmap"
 )
 
@@ -83,10 +84,9 @@ func makeCenterBlock(w, h int) *bitmap.Bitmap {
 	return bm
 }
 
-// testBudget returns a generous memory budget for tests.
-func testBudget() *int64 {
-	b := int64(1 << 30)
-	return &b
+// testPool returns a bitmapPool with a generous memory budget for tests.
+func testPool() *bitmapPool {
+	return &bitmapPool{budget: membudget.New(1 << 30)}
 }
 
 func bitmapsEqual(a, b *bitmap.Bitmap) bool {
@@ -154,7 +154,7 @@ func TestGenericRegionRoundTrip(t *testing.T) {
 				data := enc.bytes()
 
 				dec := newMQDecoder(data)
-				got, err := decodeGenericRegion(testBudget(), dec, p, nil)
+				got, err := decodeGenericRegion(testPool(), dec, p, nil)
 				if err != nil {
 					t.Fatalf("decode error: %v", err)
 				}
@@ -184,7 +184,7 @@ func TestGenericRegionTPGDON(t *testing.T) {
 			stream = WriteSegmentHeader(stream, 1, segImmediateGeneric, 1, nil, uint32(len(with)))
 			stream = append(stream, with...)
 
-			got, err := Decode(nil, stream)
+			got, err := Decode(nil, stream, testBudget())
 			if err != nil {
 				t.Fatalf("decode failed: %v", err)
 			}
@@ -230,7 +230,7 @@ func TestGenericRegionExtTemplate(t *testing.T) {
 		stream = WriteSegmentHeader(stream, 1, segImmediateGeneric, 1, nil, uint32(len(segData)))
 		stream = append(stream, segData...)
 
-		got, err := Decode(nil, stream)
+		got, err := Decode(nil, stream, testBudget())
 		if err != nil {
 			t.Fatalf("decode failed: %v", err)
 		}
@@ -245,7 +245,7 @@ func TestGenericRegionExtTemplate(t *testing.T) {
 func fuzzBitmapRoundTrip(t *testing.T, data []byte) {
 	t.Helper()
 
-	bm1, err := Decode(nil, data)
+	bm1, err := Decode(nil, data, testBudget())
 	if err != nil || bm1 == nil {
 		return
 	}
@@ -261,7 +261,7 @@ func fuzzBitmapRoundTrip(t *testing.T, data []byte) {
 	stream = WriteSegmentHeader(stream, 1, segImmediateGeneric, 1, nil, uint32(len(segData)))
 	stream = append(stream, segData...)
 
-	bm2, err := Decode(nil, stream)
+	bm2, err := Decode(nil, stream, testBudget())
 	if err != nil {
 		t.Fatalf("re-decode failed: %v", err)
 	}

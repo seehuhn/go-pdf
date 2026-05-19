@@ -38,7 +38,27 @@ type Reader struct {
 	numRows int
 }
 
+// BufferBytes returns the working-memory size [NewReader] will allocate
+// for these parameters: the line buffer plus, for 2D modes (K != 0),
+// the reference line buffer.  Callers should charge their memory
+// budget for this amount before calling [NewReader] or [NewReaderRaw].
+func BufferBytes(p *Params) int {
+	columns := p.Columns
+	if columns == 0 {
+		columns = 1728
+	}
+	if columns < 0 {
+		return 0
+	}
+	lineBufSize := (columns + 7) / 8
+	if p.K != 0 {
+		return 2 * lineBufSize
+	}
+	return lineBufSize
+}
+
 // NewReader creates a new CCITT Fax decoder.
+//
 // The reader is buffered internally; callers that need to continue reading
 // from r after decoding should use [NewReaderRaw] with a [bytes.Reader]
 // or similar [io.ByteReader] instead.

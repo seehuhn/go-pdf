@@ -83,7 +83,7 @@ func (d *decoder) processHalftoneRegion(hdr *segmentHeader, data []byte) error {
 	var hskip *bitmap.Bitmap
 	if henableSkip {
 		var err error
-		hskip, err = allocBitmap(&d.memBudget, hgw, hgh)
+		hskip, err = d.pool.allocBitmap(hgw, hgh)
 		if err != nil {
 			return err
 		}
@@ -99,13 +99,13 @@ func (d *decoder) processHalftoneRegion(hdr *segmentHeader, data []byte) error {
 	}
 
 	// decode gray-scale image (Annex C)
-	grayImage, err := decodeGrayScaleImage(&d.memBudget, data[offset:], hmmr, htemplate, hbpp, hgw, hgh, henableSkip, hskip)
+	grayImage, err := decodeGrayScaleImage(&d.pool, data[offset:], hmmr, htemplate, hbpp, hgw, hgh, henableSkip, hskip)
 	if err != nil {
 		return err
 	}
 
 	// fill region with default pixel (§6.6.5.2 step 1)
-	bm, err := allocBitmap(&d.memBudget, int(rsi.Width), int(rsi.Height))
+	bm, err := d.pool.allocBitmap(int(rsi.Width), int(rsi.Height))
 	if err != nil {
 		return err
 	}
@@ -135,14 +135,14 @@ func (d *decoder) processHalftoneRegion(hdr *segmentHeader, data []byte) error {
 		}
 	}
 
-	freeBitmap(&d.memBudget, hskip)
-	freeInts(&d.memBudget, grayImage)
+	d.pool.freeBitmap(hskip)
+	d.pool.freeInts(grayImage)
 
 	// composite onto page (skip for intermediate segments)
 	if hdr.Type != segIntermediateHalftone && d.pageBitmap != nil {
 		op := bitmap.CombOp(rsi.CombOp)
 		d.pageBitmap.Combine(bm, int(rsi.X), int(rsi.Y), op)
-		freeBitmap(&d.memBudget, bm)
+		d.pool.freeBitmap(bm)
 		bm = nil
 	}
 
@@ -153,7 +153,7 @@ func (d *decoder) processHalftoneRegion(hdr *segmentHeader, data []byte) error {
 // decodeGrayScaleImage decodes a gray-scale image from bitplanes (Annex C).
 // Returns a flat array of gray-scale values, row-major [hgh][hgw].
 func decodeGrayScaleImage(
-	budget *int64,
+	pool *bitmapPool,
 	data []byte,
 	gsmmr bool, gstemplate int,
 	gsbpp, gsw, gsh int,
@@ -167,7 +167,7 @@ func decodeGrayScaleImage(
 	if err != nil {
 		return nil, err
 	}
-	result, err := allocInts(budget, n)
+	result, err := pool.allocInts(n)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,7 @@ func decodeGrayScaleImage(
 		var current *bitmap.Bitmap
 		if gsmmr {
 			var n int
-			current, n, err = decodeMMR(budget, data[dataOffset:], gsw, gsh)
+			current, n, err = decodeMMR(pool, data[dataOffset:], gsw, gsh)
 			if err != nil {
 				return nil, err
 			}
@@ -211,7 +211,7 @@ func decodeGrayScaleImage(
 			copy(p.ATX[:], atx[:])
 			copy(p.ATY[:], aty[:])
 
-			current, err = decodeGenericRegion(budget, arithDec, p, arithCx)
+			current, err = decodeGenericRegion(pool, arithDec, p, arithCx)
 			if err != nil {
 				return nil, err
 			}
@@ -224,7 +224,7 @@ func decodeGrayScaleImage(
 			for i := range running.Pix {
 				running.Pix[i] ^= current.Pix[i]
 			}
-			freeBitmap(budget, current)
+			pool.freeBitmap(current)
 		}
 
 		// accumulate bit j into gray-scale values (§C.5.1 step 4)
@@ -236,7 +236,7 @@ func decodeGrayScaleImage(
 			}
 		}
 	}
-	freeBitmap(budget, running)
+	pool.freeBitmap(running)
 
 	return result, nil
 }

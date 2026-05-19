@@ -24,6 +24,7 @@ import (
 	"io"
 	"slices"
 
+	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf/graphics/bitmap"
 )
 
@@ -41,12 +42,6 @@ const (
 	// yields ≤ 2 MB) while rejecting pathological cases.
 	maxBitmapBytes = 4 << 20
 
-	// baseBudget is the minimum memory budget for every decode,
-	// regardless of input size.  Region segments are decoded into a
-	// temporary bitmap and composited onto the page, so both the
-	// page bitmap and one region bitmap coexist at peak.
-	baseBudget = 2 * maxBitmapBytes
-
 	// maximum IAID code length (limits context array to 1 MB)
 	maxIAIDCodeLen = 20
 
@@ -58,17 +53,6 @@ const (
 
 	// maximum halftone bitplanes (65536 grey levels)
 	maxBitplanes = 16
-
-	// budgetMultiplier is the number of bytes of bitmap data the
-	// decoder may allocate per byte of input data.
-	budgetMultiplier = 1024
-
-	// budgetHardCap is the absolute upper bound on the memory budget for
-	// decoded bitmaps, regardless of input size.  The encoded input
-	// buffer is bounded separately by streamlimits.MaxJBIG2PageBytes;
-	// the two caps protect different resources (decoded bitmap working
-	// set vs. encoded buffer footprint) and must be tuned together.
-	budgetHardCap = 64 << 20 // 64 MB
 )
 
 // checkBitmapSize returns an error if dimensions are negative, if
@@ -90,67 +74,108 @@ func checkBitmapSize(width, height int) error {
 	return nil
 }
 
-// allocBitmap validates dimensions, checks the memory budget, and allocates
-// a new bitmap. The budget is decremented by the bitmap's Pix size.
-func allocBitmap(budget *int64, w, h int) (*bitmap.Bitmap, error) {
+// bitmapPool tracks the live and peak working memory of a single JBIG2
+// decode.  Allocations call [bitmapPool.allocBitmap] (or one of the
+// other helpers); the matching [bitmapPool.freeBitmap] (or freeInts)
+// decrements only the live counter, not the budget.  Only the peak —
+// the high-water mark of live bytes — is charged against the shared
+// [*membudget.Budget], so reused temporaries (e.g. per-region working
+// bitmaps that are composited then freed) do not waste budget on each
+// alloc-free cycle.
+type bitmapPool struct {
+	budget *membudget.Budget
+	live   int // bytes currently allocated (post-free)
+	peak   int // peak live; what has been charged against budget
+}
+
+// charge bumps the live counter by n and, if it grows above the peak,
+// charges the delta against the membudget.
+func (p *bitmapPool) charge(n int) error {
+	if n < 0 {
+		return errors.New("jbig2: negative allocation size")
+	}
+	p.live += n
+	if p.live > p.peak {
+		delta := p.live - p.peak
+		if err := p.budget.Charge(delta); err != nil {
+			p.live -= n // rollback
+			return err
+		}
+		p.peak = p.live
+	}
+	return nil
+}
+
+// release returns n bytes to the live counter (does not touch the
+// budget).  Releasing more than was charged signals a mismatched
+// alloc/free pair and panics: the peak/live invariant would otherwise
+// be silently broken.
+func (p *bitmapPool) release(n int) {
+	if n > p.live {
+		panic(fmt.Sprintf("jbig2: bitmapPool release of %d exceeds live %d", n, p.live))
+	}
+	p.live -= n
+}
+
+// allocBitmap validates dimensions, charges the budget, and allocates a
+// new bitmap.  See [bitmapPool] for accounting semantics.
+func (p *bitmapPool) allocBitmap(w, h int) (*bitmap.Bitmap, error) {
 	if err := checkBitmapSize(w, h); err != nil {
 		return nil, err
 	}
 	if w <= 0 || h <= 0 {
 		return bitmap.New(w, h), nil
 	}
-	cost := int64(w+7) / 8 * int64(h)
-	if *budget < cost {
-		return nil, errors.New("jbig2: memory budget exceeded")
+	cost := (w + 7) / 8 * h
+	if err := p.charge(cost); err != nil {
+		return nil, err
 	}
-	*budget -= cost
 	return bitmap.New(w, h), nil
 }
 
-// freeBitmap returns a bitmap's Pix budget. Use this when a temporary
-// bitmap (e.g. a per-instance refinement bitmap) is no longer needed.
-func freeBitmap(budget *int64, bm *bitmap.Bitmap) {
+// freeBitmap returns a bitmap's bytes to the live counter.  Use this
+// when a temporary bitmap (e.g. a per-instance refinement bitmap) is no
+// longer needed.
+func (p *bitmapPool) freeBitmap(bm *bitmap.Bitmap) {
 	if bm != nil {
-		*budget += int64(len(bm.Pix))
+		p.release(len(bm.Pix))
 	}
 }
 
-// freeInts returns a []int slice's budget.
-func freeInts(budget *int64, s []int) {
-	*budget += int64(len(s)) * 8
+// freeInts returns a []int slice's bytes to the live counter.
+func (p *bitmapPool) freeInts(s []int) {
+	p.release(len(s) * 8)
 }
 
-// allocInts checks the memory budget and allocates a []int slice.
-// The budget is decremented by n * 8 bytes (size of int on 64-bit).
-func allocInts(budget *int64, n int) ([]int, error) {
+// allocInts charges the budget and allocates a []int slice.  Each entry
+// counts as 8 bytes (size of int on 64-bit).
+func (p *bitmapPool) allocInts(n int) ([]int, error) {
 	if n < 0 {
 		return nil, errors.New("jbig2: negative allocation size")
 	}
-	cost := int64(n) * 8
-	if cost/8 != int64(n) {
+	cost := n * 8
+	if cost/8 != n {
 		return nil, errors.New("jbig2: allocation size overflow")
 	}
-	if *budget < cost {
-		return nil, errors.New("jbig2: memory budget exceeded")
+	if err := p.charge(cost); err != nil {
+		return nil, err
 	}
-	*budget -= cost
 	return make([]int, n), nil
 }
 
-// allocPointers checks the memory budget and allocates a []*bitmap.Bitmap slice.
-// The budget is decremented by n * 8 bytes (pointer size on 64-bit).
-func allocPointers(budget *int64, n int) ([]*bitmap.Bitmap, error) {
+// allocPointers charges the budget and allocates a []*bitmap.Bitmap
+// slice.  Each entry counts as 8 bytes (pointer size on 64-bit).
+func (p *bitmapPool) allocPointers(n int) ([]*bitmap.Bitmap, error) {
 	if n < 0 {
 		return nil, errors.New("jbig2: negative allocation size")
 	}
-	cost := int64(n) * 8
-	if cost/8 != int64(n) {
+	cost := n * 8
+	if cost/8 != n {
 		return nil, errors.New("jbig2: allocation size overflow")
 	}
-	if *budget < cost {
-		return nil, errors.New("jbig2: memory budget exceeded")
+	if err := p.charge(cost); err != nil {
+		return nil, err
 	}
-	*budget -= cost
 	return make([]*bitmap.Bitmap, n), nil
 }
 
@@ -172,16 +197,14 @@ func checkedMul(a, b int) (int, error) {
 	return c, nil
 }
 
-// Decode decodes a JBIG2 image from PDF globals and page streams.
-// The globals stream may be nil if there are no global segments.
-func Decode(globals, page []byte) (*bitmap.Bitmap, error) {
-	inputSize := len(globals) + len(page)
-	budget := int64(baseBudget) + min(int64(budgetMultiplier)*int64(inputSize), budgetHardCap)
+// Decode decodes a JBIG2 image from PDF globals and page streams.  The
+// globals stream may be nil if there are no global segments.  Working
+// memory is charged against budget.
+func Decode(globals, page []byte, budget *membudget.Budget) (*bitmap.Bitmap, error) {
 	d := &decoder{
 		segments:         make(map[uint32]segmentResult),
-		inputSize:        inputSize,
 		prescannedHeight: prescanPageHeight(page),
-		memBudget:        budget,
+		pool:             bitmapPool{budget: budget},
 	}
 
 	// parse global segments (page association 0)
@@ -251,9 +274,8 @@ type decoder struct {
 	pageBitmap       *bitmap.Bitmap
 	pageWidth        int
 	pageHeight       int
-	inputSize        int   // total input bytes (globals + page)
-	prescannedHeight int   // from prescanPageHeight; -1 if not available
-	memBudget        int64 // remaining memory budget in bytes
+	prescannedHeight int        // from prescanPageHeight; -1 if not available
+	pool             bitmapPool // bitmap working-memory accounting
 }
 
 func (d *decoder) processStream(data []byte) error {
@@ -344,7 +366,7 @@ func (d *decoder) processPageInfo(data []byte) error {
 
 	if d.pageHeight > 0 {
 		var err error
-		d.pageBitmap, err = allocBitmap(&d.memBudget, d.pageWidth, d.pageHeight)
+		d.pageBitmap, err = d.pool.allocBitmap(d.pageWidth, d.pageHeight)
 		if err != nil {
 			return err
 		}
@@ -431,13 +453,13 @@ func (d *decoder) processGenericRegion(hdr *segmentHeader, data []byte) error {
 	var bm *bitmap.Bitmap
 	var err error
 	if mmr {
-		bm, _, err = decodeMMR(&d.memBudget, data[offset:], p.Width, p.Height)
+		bm, _, err = decodeMMR(&d.pool, data[offset:], p.Width, p.Height)
 		if err != nil {
 			return err
 		}
 	} else {
 		dec := newMQDecoder(data[offset:])
-		bm, err = decodeGenericRegion(&d.memBudget, dec, p, nil)
+		bm, err = decodeGenericRegion(&d.pool, dec, p, nil)
 		if err != nil {
 			return err
 		}
@@ -446,7 +468,7 @@ func (d *decoder) processGenericRegion(hdr *segmentHeader, data []byte) error {
 	// composite onto page (skip for intermediate segments)
 	if hdr.Type != segIntermediateGeneric && d.pageBitmap != nil {
 		d.pageBitmap.Combine(bm, int(rsi.X), int(rsi.Y), rsi.CombOp)
-		freeBitmap(&d.memBudget, bm)
+		d.pool.freeBitmap(bm)
 		bm = nil
 	}
 
@@ -498,7 +520,7 @@ func (d *decoder) processRefinementRegion(hdr *segmentHeader, data []byte) error
 		x0 := int(rsi.X)
 		y0 := int(rsi.Y)
 		var err error
-		ref, err = allocBitmap(&d.memBudget, w, h)
+		ref, err = d.pool.allocBitmap(w, h)
 		if err != nil {
 			return err
 		}
@@ -521,9 +543,9 @@ func (d *decoder) processRefinementRegion(hdr *segmentHeader, data []byte) error
 	copy(p.ATY[:], aty[:])
 
 	dec := newMQDecoder(data[offset:])
-	bm, err := decodeRefinementRegion(&d.memBudget, dec, p, nil)
+	bm, err := decodeRefinementRegion(&d.pool, dec, p, nil)
 	if freeRef {
-		freeBitmap(&d.memBudget, ref)
+		d.pool.freeBitmap(ref)
 	}
 	if err != nil {
 		return err
@@ -538,7 +560,7 @@ func (d *decoder) processRefinementRegion(hdr *segmentHeader, data []byte) error
 			// case c: replace the page buffer region
 			d.pageBitmap.Combine(bm, int(rsi.X), int(rsi.Y), bitmap.CombOpReplace)
 		}
-		freeBitmap(&d.memBudget, bm)
+		d.pool.freeBitmap(bm)
 		bm = nil
 	}
 
@@ -776,7 +798,7 @@ func (d *decoder) processTextRegion(hdr *segmentHeader, data []byte) error {
 		copy(hp.RATX[:], ratx[:])
 		copy(hp.RATY[:], raty[:])
 
-		bm, err = decodeTextRegionHuffman(&d.memBudget, hr, hp)
+		bm, err = decodeTextRegionHuffman(&d.pool, hr, hp)
 		if err != nil {
 			return err
 		}
@@ -803,7 +825,7 @@ func (d *decoder) processTextRegion(hdr *segmentHeader, data []byte) error {
 
 		dec := newMQDecoder(data[offset:])
 		var err error
-		bm, err = decodeTextRegion(&d.memBudget, dec, p)
+		bm, err = decodeTextRegion(&d.pool, dec, p)
 		if err != nil {
 			return err
 		}
@@ -812,7 +834,7 @@ func (d *decoder) processTextRegion(hdr *segmentHeader, data []byte) error {
 	// composite onto page (skip for intermediate segments)
 	if hdr.Type != segIntermediateTextRegion && d.pageBitmap != nil {
 		d.pageBitmap.Combine(bm, int(rsi.X), int(rsi.Y), rsi.CombOp)
-		freeBitmap(&d.memBudget, bm)
+		d.pool.freeBitmap(bm)
 		bm = nil
 	}
 
@@ -822,11 +844,11 @@ func (d *decoder) processTextRegion(hdr *segmentHeader, data []byte) error {
 
 // splitBitmapH splits a collective bitmap horizontally into sub-bitmaps
 // with the given widths. All sub-bitmaps have the same height as src.
-func splitBitmapH(budget *int64, src *bitmap.Bitmap, widths []int) ([]*bitmap.Bitmap, error) {
+func splitBitmapH(pool *bitmapPool, src *bitmap.Bitmap, widths []int) ([]*bitmap.Bitmap, error) {
 	result := make([]*bitmap.Bitmap, len(widths))
 	xOff := 0
 	for i, w := range widths {
-		sub, err := allocBitmap(budget, w, src.Height())
+		sub, err := pool.allocBitmap(w, src.Height())
 		if err != nil {
 			return nil, err
 		}

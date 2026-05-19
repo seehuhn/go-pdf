@@ -92,6 +92,40 @@ func imageDecodedBytes(width, height, channels, bpc int) int64 {
 }
 
 const (
+	// StreamBudgetBase is the minimum memory budget any stream decode
+	// starts with, independent of input size, so that the largest
+	// individual filter buffer fits even for tiny inputs.
+	StreamBudgetBase = 8 << 20 // 8 MiB
+
+	// StreamBudgetMultiplier is the maximum number of bytes of working
+	// memory the filter chain may allocate per byte of raw input.
+	StreamBudgetMultiplier = 1024
+
+	// StreamBudgetHardCap caps the input-proportional part of the
+	// budget at the same scale as [MaxImageBytes], so a small malicious
+	// stream cannot unlock unlimited working memory.
+	StreamBudgetHardCap = 256 << 20 // 256 MiB
+)
+
+// StreamBudget returns the cumulative memory budget for decoding a
+// PDF stream of rawLen on-disk bytes.  The budget is sized as
+// [StreamBudgetBase] + min([StreamBudgetMultiplier]·rawLen, [StreamBudgetHardCap])
+// so that small streams still get a usable working set while a malicious
+// stream cannot unlock unlimited memory through a header claim.
+func StreamBudget(rawLen int64) int64 {
+	if rawLen < 0 {
+		rawLen = 0
+	}
+	var add int64
+	if rawLen > StreamBudgetHardCap/StreamBudgetMultiplier {
+		add = StreamBudgetHardCap
+	} else {
+		add = StreamBudgetMultiplier * rawLen
+	}
+	return StreamBudgetBase + add
+}
+
+const (
 	// MaxImageWidth and MaxImageHeight are absolute sanity caps on the pixel
 	// dimensions of a single image.  Downstream arithmetic uses int64, so
 	// this is not an overflow defense; it just bounds resource use.

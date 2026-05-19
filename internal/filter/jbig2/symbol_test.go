@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf/graphics/bitmap"
 )
 
@@ -112,9 +113,8 @@ func symbolDictRoundTrip(t *testing.T, tc symbolDictTestCase) {
 
 	// decode
 	d := &decoder{
-		segments:  make(map[uint32]segmentResult),
-		inputSize: len(stream),
-		memBudget: 1 << 30,
+		segments: make(map[uint32]segmentResult),
+		pool:     bitmapPool{budget: membudget.New(1 << 30)},
 	}
 	if err := d.processStream(stream); err != nil {
 		t.Fatalf("decode failed: %v", err)
@@ -226,9 +226,8 @@ func huffRefAggRoundTrip(t *testing.T, tc huffRefAggTestCase) {
 	}
 
 	d := &decoder{
-		segments:  make(map[uint32]segmentResult),
-		inputSize: len(stream),
-		memBudget: 1 << 30,
+		segments: make(map[uint32]segmentResult),
+		pool:     bitmapPool{budget: membudget.New(1 << 30)},
 	}
 	if err := d.processStream(stream); err != nil {
 		t.Fatalf("decode failed: %v", err)
@@ -279,8 +278,8 @@ func FuzzSymbolDictRoundTrip(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		// first read
 		d1 := &decoder{
-			segments:  make(map[uint32]segmentResult),
-			inputSize: len(data),
+			segments: make(map[uint32]segmentResult),
+			pool:     bitmapPool{budget: testBudget()},
 		}
 		if err := d1.processStream(data); err != nil {
 			return
@@ -307,8 +306,8 @@ func FuzzSymbolDictRoundTrip(f *testing.F) {
 
 		// second read
 		d2 := &decoder{
-			segments:  make(map[uint32]segmentResult),
-			inputSize: len(stream),
+			segments: make(map[uint32]segmentResult),
+			pool:     bitmapPool{budget: testBudget()},
 		}
 		if err := d2.processStream(stream); err != nil {
 			t.Fatalf("re-decode failed: %v", err)
@@ -343,8 +342,8 @@ func FuzzHuffRefAggSymbolDict(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		// first read: decode the fuzzed stream
 		d1 := &decoder{
-			segments:  make(map[uint32]segmentResult),
-			inputSize: len(data),
+			segments: make(map[uint32]segmentResult),
+			pool:     bitmapPool{budget: testBudget()},
 		}
 		if err := d1.processStream(data); err != nil {
 			return
@@ -373,8 +372,8 @@ func FuzzHuffRefAggSymbolDict(f *testing.F) {
 		stream = append(stream, pageData...)
 
 		d2 := &decoder{
-			segments:  make(map[uint32]segmentResult),
-			inputSize: len(stream),
+			segments: make(map[uint32]segmentResult),
+			pool:     bitmapPool{budget: testBudget()},
 		}
 		if err := d2.processStream(stream); err != nil {
 			t.Fatalf("re-decode failed: %v", err)
@@ -446,9 +445,8 @@ func TestMultiInstanceAggregation(t *testing.T) {
 
 	// decode to get the symbols
 	d := &decoder{
-		segments:  make(map[uint32]segmentResult),
-		inputSize: len(stream),
-		memBudget: 1 << 30,
+		segments: make(map[uint32]segmentResult),
+		pool:     bitmapPool{budget: membudget.New(1 << 30)},
 	}
 	err := d.processStream(stream)
 	if err != nil {

@@ -19,6 +19,7 @@ package jbig2
 import (
 	"testing"
 
+	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf/graphics/bitmap"
 )
 
@@ -275,7 +276,7 @@ func customTableTextRegionRoundTrip(t *testing.T, refCorner int, transposed bool
 		[]uint32{0, 1}, uint32(len(trData)))
 	stream = append(stream, trData...)
 
-	got, err := Decode(nil, stream)
+	got, err := Decode(nil, stream, testBudget())
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -322,9 +323,8 @@ func TestCustomTableSymbolDict(t *testing.T) {
 
 	// decode — this verifies type-53 segments are parsed without error
 	d := &decoder{
-		segments:  make(map[uint32]segmentResult),
-		inputSize: len(stream),
-		memBudget: 1 << 30,
+		segments: make(map[uint32]segmentResult),
+		pool:     bitmapPool{budget: membudget.New(1 << 30)},
 	}
 	if err := d.processStream(stream); err != nil {
 		t.Fatalf("decode failed: %v", err)

@@ -52,7 +52,7 @@ func (d *decoder) processPatternDict(hdr *segmentHeader, data []byte) error {
 	var collectiveBM *bitmap.Bitmap
 	if hdmmr {
 		var err error
-		collectiveBM, _, err = decodeMMR(&d.memBudget, data[offset:], collectiveWidth, hdph)
+		collectiveBM, _, err = decodeMMR(&d.pool, data[offset:], collectiveWidth, hdph)
 		if err != nil {
 			return err
 		}
@@ -84,23 +84,23 @@ func (d *decoder) processPatternDict(hdr *segmentHeader, data []byte) error {
 
 		dec := newMQDecoder(data[offset:])
 		var err error
-		collectiveBM, err = decodeGenericRegion(&d.memBudget, dec, p, nil)
+		collectiveBM, err = decodeGenericRegion(&d.pool, dec, p, nil)
 		if err != nil {
 			return err
 		}
 	}
 
 	// split collective bitmap into individual patterns (§6.7.5 step 4)
-	widths, err := allocInts(&d.memBudget, grayMax+1)
+	widths, err := d.pool.allocInts(grayMax + 1)
 	if err != nil {
 		return err
 	}
 	for i := range widths {
 		widths[i] = hdpw
 	}
-	patterns, err := splitBitmapH(&d.memBudget, collectiveBM, widths)
-	freeBitmap(&d.memBudget, collectiveBM)
-	freeInts(&d.memBudget, widths)
+	patterns, err := splitBitmapH(&d.pool, collectiveBM, widths)
+	d.pool.freeBitmap(collectiveBM)
+	d.pool.freeInts(widths)
 	if err != nil {
 		return err
 	}

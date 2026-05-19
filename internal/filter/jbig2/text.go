@@ -54,8 +54,8 @@ type textRegionParams struct {
 }
 
 // decodeTextRegion decodes a text region bitmap using arithmetic coding.
-func decodeTextRegion(budget *int64, dec *mqDecoder, p *textRegionParams) (*bitmap.Bitmap, error) {
-	bm, err := allocBitmap(budget, p.Width, p.Height)
+func decodeTextRegion(pool *bitmapPool, dec *mqDecoder, p *textRegionParams) (*bitmap.Bitmap, error) {
+	bm, err := pool.allocBitmap(p.Width, p.Height)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +150,7 @@ func decodeTextRegion(budget *int64, dec *mqDecoder, p *textRegionParams) (*bitm
 				copy(rp.ATX[:], p.RATX[:])
 				copy(rp.ATY[:], p.RATY[:])
 				var err error
-				ib, err = decodeRefinementRegion(budget, dec, rp, nil)
+				ib, err = decodeRefinementRegion(pool, dec, rp, nil)
 				if err != nil {
 					return nil, err
 				}
@@ -203,7 +203,7 @@ func decodeTextRegion(budget *int64, dec *mqDecoder, p *textRegionParams) (*bitm
 			// composite symbol (§6.4.5 step 3c-ix)
 			bm.Combine(ib, int(px), int(py), p.CombOp)
 			if ri != 0 {
-				freeBitmap(budget, ib)
+				pool.freeBitmap(ib)
 			}
 
 			// update CURS after placement (§6.4.5 step 3c-x)
@@ -259,8 +259,8 @@ type textRegionHuffParams struct {
 }
 
 // decodeTextRegionHuffman decodes a Huffman-coded text region.
-func decodeTextRegionHuffman(budget *int64, hr *huffReader, p *textRegionHuffParams) (*bitmap.Bitmap, error) {
-	bm, err := allocBitmap(budget, p.Width, p.Height)
+func decodeTextRegionHuffman(pool *bitmapPool, hr *huffReader, p *textRegionHuffParams) (*bitmap.Bitmap, error) {
+	bm, err := pool.allocBitmap(p.Width, p.Height)
 	if err != nil {
 		return nil, err
 	}
@@ -351,7 +351,7 @@ func decodeTextRegionHuffman(budget *int64, hr *huffReader, p *textRegionHuffPar
 
 				dec := newMQDecoder(hr.data[offset : offset+rsize])
 				var err error
-				ib, err = decodeRefinementRegion(budget, dec, rp, nil)
+				ib, err = decodeRefinementRegion(pool, dec, rp, nil)
 				if err != nil {
 					return nil, err
 				}
@@ -405,7 +405,7 @@ func decodeTextRegionHuffman(budget *int64, hr *huffReader, p *textRegionHuffPar
 
 			bm.Combine(ib, int(px), int(py), p.CombOp)
 			if ri != 0 {
-				freeBitmap(budget, ib)
+				pool.freeBitmap(ib)
 			}
 
 			// CURS post-update (§6.4.5 step 3c-x)

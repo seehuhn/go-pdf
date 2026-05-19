@@ -178,7 +178,7 @@ func textRegionRoundTrip(t *testing.T, tc textRegionTestCase) {
 	stream = append(stream, trData...)
 
 	// decode
-	got, err := Decode(nil, stream)
+	got, err := Decode(nil, stream, testBudget())
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -225,7 +225,7 @@ func textRegionHuffmanRoundTrip(t *testing.T, tc textRegionTestCase) {
 	stream = append(stream, trData...)
 
 	// decode
-	got, err := Decode(nil, stream)
+	got, err := Decode(nil, stream, testBudget())
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -365,7 +365,7 @@ func textRegionRefineRoundTrip(t *testing.T, tc textRegionTestCase, huffman bool
 	stream = WriteSegmentHeader(stream, 2, segImmediateTextRegion, 1, []uint32{0}, uint32(len(trData)))
 	stream = append(stream, trData...)
 
-	got, err := Decode(nil, stream)
+	got, err := Decode(nil, stream, testBudget())
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -482,7 +482,7 @@ func TestIntermediateTextRegionRoundTrip(t *testing.T) {
 	stream = WriteSegmentHeader(stream, 3, segImmediateRefinement, 1, []uint32{2}, uint32(len(refinData)))
 	stream = append(stream, refinData...)
 
-	got, err := Decode(nil, stream)
+	got, err := Decode(nil, stream, testBudget())
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -504,7 +504,7 @@ func decodeTextRegionStream(t *testing.T, sdData, trData []byte, width, height i
 	stream = append(stream, pageData...)
 	stream = WriteSegmentHeader(stream, 2, segImmediateTextRegion, 1, []uint32{0}, uint32(len(trData)))
 	stream = append(stream, trData...)
-	bm, err := Decode(nil, stream)
+	bm, err := Decode(nil, stream, testBudget())
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}

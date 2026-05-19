@@ -18,6 +18,8 @@ package predict
 
 import (
 	"io"
+
+	"seehuhn.de/go/membudget"
 )
 
 // reader applies undoes the effects of a prediction filter on the data read from it.
@@ -25,6 +27,7 @@ import (
 type reader struct {
 	r      io.ReadCloser
 	params *Params
+	budget *membudget.Budget
 
 	// State for processing
 	prevRow      []byte   // Previous row buffer (PNG predictors)
@@ -35,12 +38,15 @@ type reader struct {
 	outputLen    int      // Length of valid data in output buffer
 	needRowData  int      // Bytes needed to complete current row
 	eof          bool     // End of file reached
+	initErr      error    // sticky error from a failed budget charge
 }
 
 // NewReader creates a new io.Reader that applies the prediction filter with the
 // given parameters. The function returns an error if the parameters are
 // invalid. For predictor 1 (no prediction), it returns the original reader.
-func NewReader(r io.ReadCloser, p *Params) (io.ReadCloser, error) {
+// The lazily-allocated row buffers are charged against budget on the
+// first Read.
+func NewReader(r io.ReadCloser, p *Params, budget *membudget.Budget) (io.ReadCloser, error) {
 	if err := p.Validate(); err != nil {
 		return nil, err
 	}
@@ -49,26 +55,43 @@ func NewReader(r io.ReadCloser, p *Params) (io.ReadCloser, error) {
 		return r, nil // Identity case - no prediction needed
 	}
 
-	return &reader{r: r, params: p}, nil
+	return &reader{r: r, params: p, budget: budget}, nil
 }
 
 // initBuffers lazily allocates the row buffers on first Read.  Deferring
 // this work means a stream that is parsed but never consumed costs nothing.
-func (r *reader) initBuffers() {
+//
+// Predictor 1 (identity) is handled by [NewReader] returning the inner
+// reader directly, and [Params.Validate] rejects all values outside
+// {1, 2, 10..15}, so only PNG (10..15) and TIFF (2) reach this point.
+func (r *reader) initBuffers() error {
 	p := r.params
-	r.outputBuffer = make([]byte, p.bytesPerRow()*2) // extra space for safety
+	rowBytes := p.bytesPerRow()
 
+	// outputBuffer holds exactly one decoded row; each Read call
+	// overwrites it from position 0.
 	if p.Predictor >= 10 && p.Predictor <= 15 {
 		// PNG predictor: previous-row buffer plus an input row with tag byte
-		r.prevRow = make([]byte, p.bytesPerPixel()+p.bytesPerRow())
-		r.inputBuffer = make([]byte, p.bytesPerRow()+1)
-		r.needRowData = p.bytesPerRow() + 1
-	} else if p.Predictor == 2 {
-		// TIFF predictor: previous component values
+		prevRowLen := p.bytesPerPixel() + rowBytes
+		inputBufLen := rowBytes + 1
+		if err := r.budget.Charge(rowBytes + prevRowLen + inputBufLen); err != nil {
+			return err
+		}
+		r.outputBuffer = make([]byte, rowBytes)
+		r.prevRow = make([]byte, prevRowLen)
+		r.inputBuffer = make([]byte, inputBufLen)
+		r.needRowData = inputBufLen
+	} else {
+		// TIFF predictor (Predictor 2): previous component values plus input row
+		if err := r.budget.Charge(rowBytes + p.Colors*4 + rowBytes); err != nil {
+			return err
+		}
+		r.outputBuffer = make([]byte, rowBytes)
 		r.prevValues = make([]uint32, p.Colors)
-		r.inputBuffer = make([]byte, p.bytesPerRow())
-		r.needRowData = p.bytesPerRow()
+		r.inputBuffer = make([]byte, rowBytes)
+		r.needRowData = rowBytes
 	}
+	return nil
 }
 
 func (r *reader) Close() error {
@@ -77,8 +100,14 @@ func (r *reader) Close() error {
 
 // Read implements the [io.Reader] interface.
 func (r *reader) Read(p []byte) (n int, err error) {
+	if r.initErr != nil {
+		return 0, r.initErr
+	}
 	if r.outputBuffer == nil {
-		r.initBuffers()
+		if err := r.initBuffers(); err != nil {
+			r.initErr = err
+			return 0, err
+		}
 	}
 	totalRead := 0
 

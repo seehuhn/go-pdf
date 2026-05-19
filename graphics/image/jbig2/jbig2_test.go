@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"testing"
 
+	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf/graphics/bitmap"
 	internaljbig2 "seehuhn.de/go/pdf/internal/filter/jbig2"
 )
@@ -42,7 +43,7 @@ func decodeImage(t *testing.T, g *Globals, im *Image) *bitmap.Bitmap {
 	if err != nil {
 		t.Fatalf("image encode: %v", err)
 	}
-	bm, err := internaljbig2.Decode(globalsData, pageData)
+	bm, err := internaljbig2.Decode(globalsData, pageData, membudget.New(1<<30))
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}

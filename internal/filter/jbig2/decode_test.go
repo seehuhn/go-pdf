@@ -41,7 +41,7 @@ func TestDecodeGenericRegions(t *testing.T) {
 	for _, name := range genericTests {
 		t.Run(name, func(t *testing.T) {
 			globals, page, expected := loadTestCase(t, name)
-			got, err := Decode(globals, page)
+			got, err := Decode(globals, page, testBudget())
 			if err != nil {
 				t.Fatalf("decode error: %v", err)
 			}
@@ -110,7 +110,7 @@ func TestDecodeAllTestCases(t *testing.T) {
 		base := strings.TrimSuffix(filepath.Base(pagePath), ".page")
 		t.Run(base, func(t *testing.T) {
 			globals, page, expected := loadTestCase(t, base)
-			got, err := Decode(globals, page)
+			got, err := Decode(globals, page, testBudget())
 			if err != nil {
 				t.Fatalf("decode error: %v", err)
 			}

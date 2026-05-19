@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"io"
 	"testing"
+
+	"seehuhn.de/go/membudget"
+	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
 // writeCloser wraps a bytes.Buffer to implement io.WriteCloser
@@ -203,7 +206,7 @@ func TestParamsValidate(t *testing.T) {
 			params: Params{
 				Colors:           1,
 				BitsPerComponent: 8,
-				Columns:          maxColumns,
+				Columns:          streamlimits.MaxImageWidth,
 				Predictor:        2,
 			},
 			expectError: false,
@@ -213,7 +216,7 @@ func TestParamsValidate(t *testing.T) {
 			params: Params{
 				Colors:           1,
 				BitsPerComponent: 8,
-				Columns:          maxColumns + 1,
+				Columns:          streamlimits.MaxImageWidth + 1,
 				Predictor:        2,
 			},
 			expectError: true,
@@ -260,33 +263,33 @@ func TestParamsValidate(t *testing.T) {
 		},
 		{
 			// CVE PoC: each field individually within its per-field bound,
-			// but the row would be ~256 MiB.
+			// but the row exceeds the row-bytes cap.
 			name: "decompression bomb - PoC values",
 			params: Params{
 				Colors:           256,
 				BitsPerComponent: 16,
-				Columns:          524287,
+				Columns:          8193,
 				Predictor:        12,
 			},
 			expectError: true,
 		},
 		{
-			name: "row size just over 8 MiB",
+			name: "row size just over cap",
 			params: Params{
-				Colors:           16,
-				BitsPerComponent: 8,
-				Columns:          maxColumns,
-				Predictor:        12,
-			},
-			expectError: true,
-		},
-		{
-			// 4·16·2²⁰ bits = 8 MiB row exactly
-			name: "row size at 8 MiB boundary",
-			params: Params{
-				Colors:           4,
+				Colors:           33,
 				BitsPerComponent: 16,
-				Columns:          maxColumns,
+				Columns:          streamlimits.MaxImageWidth,
+				Predictor:        12,
+			},
+			expectError: true,
+		},
+		{
+			// MaxImageChannels·16·MaxImageWidth bits = maxBytesPerRow exactly
+			name: "row size at cap boundary",
+			params: Params{
+				Colors:           streamlimits.MaxImageChannels,
+				BitsPerComponent: 16,
+				Columns:          streamlimits.MaxImageWidth,
 				Predictor:        12,
 			},
 			expectError: false,
@@ -354,7 +357,7 @@ func TestNewReaderWithInvalidParams(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := io.NopCloser(bytes.NewReader([]byte{1, 2, 3}))
-			_, err := NewReader(r, &tt.params)
+			_, err := NewReader(r, &tt.params, membudget.New(1<<30))
 			if err == nil {
 				t.Error("expected error from NewReader with invalid params")
 			}
@@ -426,7 +429,7 @@ func TestNewReaderWriterWithValidParams(t *testing.T) {
 		t.Run(params.String(), func(t *testing.T) {
 			// Test NewReader
 			r := io.NopCloser(bytes.NewReader([]byte{1, 2, 3, 4, 5}))
-			reader, err := NewReader(r, &params)
+			reader, err := NewReader(r, &params, membudget.New(1<<30))
 			if err != nil {
 				t.Errorf("test %d: unexpected error from NewReader: %v", i, err)
 			}

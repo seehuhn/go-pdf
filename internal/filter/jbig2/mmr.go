@@ -27,30 +27,37 @@ import (
 
 // decodeMMR decodes an MMR-coded (CCITT Group 4) generic region.
 // It returns the decoded bitmap and the number of bytes consumed from data.
-func decodeMMR(budget *int64, data []byte, width, height int) (*bitmap.Bitmap, int, error) {
+func decodeMMR(pool *bitmapPool, data []byte, width, height int) (*bitmap.Bitmap, int, error) {
 	if width <= 0 || height <= 0 {
 		return bitmap.New(0, 0), 0, nil
 	}
-	stride := (width + 7) / 8
 
-	br := bytes.NewReader(data)
 	params := &ccittfax.Params{
 		Columns:  width,
 		K:        -1, // Group 4
 		BlackIs1: true,
 	}
 
+	// route CCITT's per-line buffers through the pool so they share the
+	// peak-only accounting with the JBIG2 bitmap allocations
+	ccittBuf := ccittfax.BufferBytes(params)
+	if err := pool.charge(ccittBuf); err != nil {
+		return nil, 0, err
+	}
+	defer pool.release(ccittBuf)
+
+	br := bytes.NewReader(data)
 	reader, err := ccittfax.NewReaderRaw(br, params)
 	if err != nil {
 		return nil, 0, fmt.Errorf("MMR decode: %w", err)
 	}
 
-	bm, err := allocBitmap(budget, width, height)
+	bm, err := pool.allocBitmap(width, height)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	buf := make([]byte, stride)
+	buf := make([]byte, (width+7)/8)
 	for y := range height {
 		_, err := io.ReadFull(reader, buf)
 		copy(bm.Pix[y*bm.Stride:], buf[:bm.Stride])

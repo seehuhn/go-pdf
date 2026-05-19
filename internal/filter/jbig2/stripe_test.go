@@ -67,7 +67,7 @@ func TestUnknownPageHeightRoundTrip(t *testing.T) {
 		segNum++
 	}
 
-	got, err := Decode(nil, stream)
+	got, err := Decode(nil, stream, testBudget())
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestUnknownPageHeightSingleStripe(t *testing.T) {
 	stream = WriteSegmentHeader(stream, 2, segEndOfStripe, 1, nil, uint32(len(eosData)))
 	stream = append(stream, eosData...)
 
-	got, err := Decode(nil, stream)
+	got, err := Decode(nil, stream, testBudget())
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}

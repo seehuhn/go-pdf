@@ -21,6 +21,8 @@ import (
 	"compress/zlib"
 	"io"
 	"testing"
+
+	"seehuhn.de/go/membudget"
 )
 
 // TestEncryptedStreamMultipleReads verifies that encrypted streams can be
@@ -750,7 +752,7 @@ func TestFilterCryptRoundTrip(t *testing.T) {
 	}
 
 	// Decode (decrypt) the data
-	decoder, err := filter.Decode(V1_6, bytes.NewReader(encryptedBuf.Bytes()))
+	decoder, err := filter.Decode(V1_6, bytes.NewReader(encryptedBuf.Bytes()), membudget.New(1<<20))
 	if err != nil {
 		t.Fatalf("Decode failed: %v", err)
 	}

@@ -41,7 +41,7 @@ func TestRefinementDecodeTemplate1(t *testing.T) {
 		RefDX:     1,
 		RefDY:     -2,
 	}
-	got, err := decodeRefinementRegion(testBudget(), dec, p, nil)
+	got, err := decodeRefinementRegion(testPool(), dec, p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func refinementRoundTrip(t *testing.T, ref, target *bitmap.Bitmap, tmpl int) {
 	data := encodeRefinementRegion(target, p)
 
 	dec := newMQDecoder(data)
-	got, err := decodeRefinementRegion(testBudget(), dec, p, nil)
+	got, err := decodeRefinementRegion(testPool(), dec, p, nil)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestRefinementMQFlush(t *testing.T) {
 		RefDY:     0,
 	}
 	dec := newMQDecoder(fuzzData)
-	bm1, err := decodeRefinementRegion(testBudget(), dec, p, nil)
+	bm1, err := decodeRefinementRegion(testPool(), dec, p, nil)
 	if err != nil {
 		t.Fatalf("initial decode failed: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestRefinementMQFlush(t *testing.T) {
 	encoded := encodeRefinementRegion(bm1, p)
 
 	dec2 := newMQDecoder(encoded)
-	bm2, err := decodeRefinementRegion(testBudget(), dec2, p, nil)
+	bm2, err := decodeRefinementRegion(testPool(), dec2, p, nil)
 	if err != nil {
 		t.Fatalf("re-decode failed: %v", err)
 	}
@@ -224,7 +224,7 @@ func FuzzRefinementRoundTrip(f *testing.F) {
 			RefDY:     0,
 		}
 		dec := newMQDecoder(data)
-		bm1, err := decodeRefinementRegion(testBudget(), dec, p, nil)
+		bm1, err := decodeRefinementRegion(testPool(), dec, p, nil)
 		if err != nil {
 			return
 		}
@@ -232,7 +232,7 @@ func FuzzRefinementRoundTrip(f *testing.F) {
 		encoded := encodeRefinementRegion(bm1, p)
 
 		dec2 := newMQDecoder(encoded)
-		bm2, err := decodeRefinementRegion(testBudget(), dec2, p, nil)
+		bm2, err := decodeRefinementRegion(testPool(), dec2, p, nil)
 		if err != nil {
 			t.Fatalf("re-decode failed: %v", err)
 		}
@@ -266,7 +266,7 @@ func TestRefinementRegionTPGRON(t *testing.T) {
 			stream = WriteSegmentHeader(stream, 2, segImmediateRefinement, 1, []uint32{1}, uint32(len(refinData)))
 			stream = append(stream, refinData...)
 
-			got, err := Decode(nil, stream)
+			got, err := Decode(nil, stream, testBudget())
 			if err != nil {
 				t.Fatalf("decode failed: %v", err)
 			}
@@ -302,7 +302,7 @@ func TestRefinementRegionSegmentRoundTrip(t *testing.T) {
 			stream = WriteSegmentHeader(stream, 2, segImmediateRefinement, 1, []uint32{1}, uint32(len(refinData)))
 			stream = append(stream, refinData...)
 
-			got, err := Decode(nil, stream)
+			got, err := Decode(nil, stream, testBudget())
 			if err != nil {
 				t.Fatalf("decode failed: %v", err)
 			}
@@ -339,7 +339,7 @@ func TestRefinementRegionPageBuffer(t *testing.T) {
 			stream = WriteSegmentHeader(stream, 2, segImmediateRefinement, 1, nil, uint32(len(refinData)))
 			stream = append(stream, refinData...)
 
-			got, err := Decode(nil, stream)
+			got, err := Decode(nil, stream, testBudget())
 			if err != nil {
 				t.Fatalf("decode failed: %v", err)
 			}
@@ -374,7 +374,7 @@ func FuzzRefinementRegionSegmentRoundTrip(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		bm1, err := Decode(nil, data)
+		bm1, err := Decode(nil, data, testBudget())
 		if err != nil || bm1 == nil {
 			return
 		}
@@ -391,7 +391,7 @@ func FuzzRefinementRegionSegmentRoundTrip(f *testing.F) {
 		stream = WriteSegmentHeader(stream, 1, segImmediateGeneric, 1, nil, uint32(len(segData)))
 		stream = append(stream, segData...)
 
-		bm2, err := Decode(nil, stream)
+		bm2, err := Decode(nil, stream, testBudget())
 		if err != nil {
 			t.Fatalf("re-decode failed: %v", err)
 		}
@@ -434,7 +434,7 @@ func TestIntermediateRefinementRoundTrip(t *testing.T) {
 			stream = WriteSegmentHeader(stream, 3, segImmediateRefinement, 1, []uint32{2}, uint32(len(refin2)))
 			stream = append(stream, refin2...)
 
-			got, err := Decode(nil, stream)
+			got, err := Decode(nil, stream, testBudget())
 			if err != nil {
 				t.Fatalf("decode failed: %v", err)
 			}

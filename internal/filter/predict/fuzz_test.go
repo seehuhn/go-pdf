@@ -21,6 +21,7 @@ import (
 	"io"
 	"testing"
 
+	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf/internal/filter/predict"
 )
 
@@ -50,7 +51,7 @@ func FuzzReader(f *testing.F) {
 			return
 		}
 
-		r, err := predict.NewReader(io.NopCloser(bytes.NewReader(data)), p)
+		r, err := predict.NewReader(io.NopCloser(bytes.NewReader(data)), p, membudget.New(1<<30))
 		if err != nil {
 			return
 		}

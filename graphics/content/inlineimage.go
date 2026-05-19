@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 
+	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/streamlimits"
@@ -158,6 +159,9 @@ func DecodeInlineImage(op Operator, res *Resources) ([]byte, error) {
 		return nil, fmt.Errorf("inline image: unexpected filter type %T", filterObj)
 	}
 
+	// per-decode working-memory budget, sized to the raw inline data
+	budget := membudget.New(streamlimits.StreamBudget(int64(len(data))))
+
 	// chain filters
 	var r io.Reader = bytes.NewReader(data)
 	var closers []io.Closer
@@ -166,7 +170,7 @@ func DecodeInlineImage(op Operator, res *Resources) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		rc, err := f.Decode(pdf.V2_0, r)
+		rc, err := f.Decode(pdf.V2_0, r, budget)
 		if err != nil {
 			return nil, err
 		}

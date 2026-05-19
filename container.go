@@ -23,6 +23,7 @@ import (
 	"math"
 	"os"
 
+	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
@@ -59,7 +60,7 @@ const maxRefDepth = 16
 // /Filter array.  Legitimate PDFs rarely exceed two or three; the cap
 // blocks malformed inputs that stack hundreds of decoders to amplify
 // per-wrapper overhead.
-const maxFilterChainLength = 16
+const maxFilterChainLength = 8
 
 func resolve(r Getter, obj Object, canObjStm bool) (Native, error) {
 	if obj == nil {
@@ -268,7 +269,8 @@ func RawStreamReader(r Getter, x *Stream) (io.ReadCloser, error) {
 		return out, nil
 	case cryptDefault:
 		v := GetVersion(r)
-		return x.crypt.Decode(v, out)
+		budget := membudget.New(streamlimits.StreamBudget(x.length))
+		return x.crypt.Decode(v, out, budget)
 	case cryptUnsupportedCF:
 		return nil, errors.New(
 			"RawStreamReader: stream uses non-Identity /Crypt filter; not yet supported")
@@ -388,6 +390,9 @@ func DecodeStream(r Getter, path *CycleCheck, x *Stream, numFilters int) (io.Rea
 	src := &sourceErrChecker{r: x.NewReader()}
 	var out io.ReadCloser = io.NopCloser(src)
 
+	// per-decode working-memory budget, sized to the raw stream length
+	budget := membudget.New(streamlimits.StreamBudget(x.length))
+
 	// Skip the document-level decryption when the stream's filter chain
 	// declares its own per-stream Crypt filter at position 0.  Per PDF
 	// spec §7.4.10, an explicit /Crypt entry overrides the document's
@@ -401,7 +406,7 @@ func DecodeStream(r Getter, path *CycleCheck, x *Stream, numFilters int) (io.Rea
 		}
 	}
 	if applyCrypt {
-		out, err = x.crypt.Decode(v, out)
+		out, err = x.crypt.Decode(v, out, budget)
 		if err != nil {
 			return nil, src.promote(err)
 		}
@@ -411,7 +416,7 @@ func DecodeStream(r Getter, path *CycleCheck, x *Stream, numFilters int) (io.Rea
 		if numFilters > 0 && i >= numFilters {
 			break
 		}
-		out, err = fi.Decode(v, out)
+		out, err = fi.Decode(v, out, budget)
 		if err != nil {
 			return nil, src.promote(err)
 		}

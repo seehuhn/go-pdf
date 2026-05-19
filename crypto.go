@@ -32,6 +32,7 @@ import (
 	"io"
 
 	"github.com/xdg-go/stringprep"
+	"seehuhn.de/go/membudget"
 )
 
 type encryptInfo struct {
@@ -108,7 +109,7 @@ func (f *filterCrypt) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, error
 }
 
 // Decode implements the [Filter] interface.
-func (f *filterCrypt) Decode(_ Version, r io.Reader) (io.ReadCloser, error) {
+func (f *filterCrypt) Decode(_ Version, r io.Reader, _ *membudget.Budget) (io.ReadCloser, error) {
 	decrypted, err := f.enc.DecryptStream(f.ref, r)
 	if err != nil {
 		return nil, err
