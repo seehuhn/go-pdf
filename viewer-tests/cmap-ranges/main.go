@@ -137,7 +137,7 @@ func makeTestFont() (font.Instance, error) {
 	subsetFont := origFont.Subset(subsetGlyphs)
 
 	// Create a PDF font dictionary for the font.
-	qv := subsetFont.FontMatrix[3] * 1000
+	qv := 1000 / float64(subsetFont.UnitsPerEm)
 	ascent := math.Round(float64(subsetFont.Ascent) * qv)
 	descent := math.Round(float64(subsetFont.Descent) * qv)
 	capHeight := math.Round(float64(subsetFont.CapHeight) * qv)

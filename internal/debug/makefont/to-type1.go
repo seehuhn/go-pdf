@@ -131,8 +131,7 @@ func toAFM(info *sfnt.Font) (*afm.Metrics, error) {
 	info = clone(info)
 	info.EnsureGlyphNames()
 
-	qh := info.FontMatrix[0] * 1000
-	qv := info.FontMatrix[3] * 1000
+	q := 1000 / float64(info.UnitsPerEm)
 
 	n := info.NumGlyphs()
 	newGlyphs := make(map[string]*afm.GlyphInfo, n)
@@ -140,11 +139,11 @@ func toAFM(info *sfnt.Font) (*afm.Metrics, error) {
 		gid := glyph.ID(i)
 		name := info.GlyphName(gid)
 		bbox := info.GlyphBBox(gid)
-		bboxAFM := rect.Rect{ // TODO(voss): use the font matrix
-			LLx: float64(bbox.LLx) * qh,
-			LLy: float64(bbox.LLy) * qh,
-			URx: float64(bbox.URx) * qh,
-			URy: float64(bbox.URy) * qh,
+		bboxAFM := rect.Rect{
+			LLx: float64(bbox.LLx) * q,
+			LLy: float64(bbox.LLy) * q,
+			URx: float64(bbox.URx) * q,
+			URy: float64(bbox.URy) * q,
 		}
 		newGlyphs[name] = &afm.GlyphInfo{
 			WidthX: info.GlyphWidthPDF(gid),
@@ -168,12 +167,12 @@ func toAFM(info *sfnt.Font) (*afm.Metrics, error) {
 		Encoding:           encoding,
 		FontName:           info.PostScriptName(),
 		FullName:           info.FullName(),
-		CapHeight:          info.CapHeight.AsFloat(qv),
-		XHeight:            info.XHeight.AsFloat(qv),
-		Ascent:             info.Ascent.AsFloat(qv),
-		Descent:            info.Descent.AsFloat(qv),
-		UnderlinePosition:  float64(info.UnderlinePosition) * qv,
-		UnderlineThickness: float64(info.UnderlineThickness) * qv,
+		CapHeight:          info.CapHeight.AsFloat(q),
+		XHeight:            info.XHeight.AsFloat(q),
+		Ascent:             info.Ascent.AsFloat(q),
+		Descent:            info.Descent.AsFloat(q),
+		UnderlinePosition:  float64(info.UnderlinePosition) * q,
+		UnderlineThickness: float64(info.UnderlineThickness) * q,
 		ItalicAngle:        info.ItalicAngle,
 		IsFixedPitch:       info.IsFixedPitch(),
 		// TODO(voss): kerning

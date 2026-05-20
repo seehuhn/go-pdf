@@ -156,13 +156,13 @@ func (f *CompositeGlyf) Layout(seq *font.GlyphSeq, ptSize float64, s string) *fo
 		seq = &font.GlyphSeq{}
 	}
 
-	qh := ptSize * f.Font.FontMatrix[0]
-	qv := ptSize * f.Font.FontMatrix[3]
+	// Layouter advances/offsets are in UnitsPerEm; scale uniformly to points.
+	q := ptSize / float64(f.Font.UnitsPerEm)
 
 	buf := f.layouter.Layout(s)
 	seq.Seq = slices.Grow(seq.Seq, len(buf))
 	for _, g := range buf {
-		xOffset := float64(g.XOffset) * qh
+		xOffset := float64(g.XOffset) * q
 		if len(seq.Seq) == 0 {
 			seq.Skip += xOffset
 		} else {
@@ -170,8 +170,8 @@ func (f *CompositeGlyf) Layout(seq *font.GlyphSeq, ptSize float64, s string) *fo
 		}
 		seq.Seq = append(seq.Seq, font.Glyph{
 			GID:     g.GID,
-			Advance: float64(g.Advance) * qh,
-			Rise:    float64(g.YOffset) * qv,
+			Advance: float64(g.Advance) * q,
+			Rise:    float64(g.YOffset) * q,
 			Text:    string(g.Text),
 		})
 	}

@@ -62,6 +62,10 @@ type OptionsComposite struct {
 type Composite struct {
 	*cff.Font
 
+	// unitsPerEm caches the source sfnt.Font's UnitsPerEm so Layout can scale
+	// layouter output (which is in these units) without holding the sfnt.Font.
+	unitsPerEm uint16
+
 	Stretch  os2.Width
 	Weight   os2.Weight
 	IsSerif  bool
@@ -106,7 +110,7 @@ func NewComposite(info *sfnt.Font, opt *OptionsComposite) (*Composite, error) {
 		return nil, errors.New("no CFF outlines in font")
 	}
 
-	qv := info.FontMatrix[3] * 1000
+	qv := 1000 / float64(info.UnitsPerEm)
 	ascent := math.Round(float64(info.Ascent) * qv)
 	descent := math.Round(float64(info.Descent) * qv)
 	leading := math.Round(float64(info.Ascent-info.Descent+info.LineGap) * qv)
@@ -150,7 +154,8 @@ func NewComposite(info *sfnt.Font, opt *OptionsComposite) (*Composite, error) {
 	notdefWidth := math.Round(info.GlyphWidthPDF(0))
 
 	f := &Composite{
-		Font: cffFont,
+		Font:       cffFont,
+		unitsPerEm: info.UnitsPerEm,
 
 		Stretch:  info.Width,
 		Weight:   info.Weight,
@@ -236,13 +241,13 @@ func (f *Composite) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.G
 		seq = &font.GlyphSeq{}
 	}
 
-	qh := ptSize * f.Font.FontMatrix[0]
-	qv := ptSize * f.Font.FontMatrix[3]
+	// Layouter advances/offsets are in UnitsPerEm; scale uniformly to points.
+	q := ptSize / float64(f.unitsPerEm)
 
 	buf := f.layouter.Layout(s)
 	seq.Seq = slices.Grow(seq.Seq, len(buf))
 	for _, g := range buf {
-		xOffset := float64(g.XOffset) * qh
+		xOffset := float64(g.XOffset) * q
 		if len(seq.Seq) == 0 {
 			seq.Skip += xOffset
 		} else {
@@ -250,8 +255,8 @@ func (f *Composite) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.G
 		}
 		seq.Seq = append(seq.Seq, font.Glyph{
 			GID:     g.GID,
-			Advance: float64(g.Advance) * qh,
-			Rise:    float64(g.YOffset) * qv,
+			Advance: float64(g.Advance) * q,
+			Rise:    float64(g.YOffset) * q,
 			Text:    string(g.Text),
 		})
 	}
@@ -372,8 +377,11 @@ func (f *Composite) makeDict() (*dict.CIDFontType0, error) {
 		}
 	}
 
-	qh := subsetFont.FontMatrix[0] * 1000 // TODO(voss): is this correct for CID-keyed fonts?
-	qv := subsetFont.FontMatrix[3] * 1000
+	// StemV/StemH are in FD 0's CFF coordinate system; convert to PDF glyph
+	// space via FD 0's effective font matrix.
+	fd0Matrix := subsetOutlines.FDMatrix(0, subsetFont.FontMatrix)
+	qhStem := fd0Matrix[0] * 1000
+	qvStem := fd0Matrix[3] * 1000
 
 	italicAngle := math.Round(subsetFont.ItalicAngle*10) / 10
 
@@ -395,8 +403,8 @@ func (f *Composite) makeDict() (*dict.CIDFontType0, error) {
 		Leading:      f.Leading,
 		CapHeight:    f.CapHeight,
 		XHeight:      f.XHeight,
-		StemV:        math.Round(subsetOutlines.Private[0].StdVW * qh),
-		StemH:        math.Round(subsetOutlines.Private[0].StdHW * qv),
+		StemV:        math.Round(subsetOutlines.Private[0].StdVW * qhStem),
+		StemH:        math.Round(subsetOutlines.Private[0].StdHW * qvStem),
 	}
 
 	fontDict := &dict.CIDFontType0{

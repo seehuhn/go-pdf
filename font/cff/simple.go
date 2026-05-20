@@ -54,6 +54,10 @@ type OptionsSimple struct {
 type Simple struct {
 	*cff.Font
 
+	// unitsPerEm caches the source sfnt.Font's UnitsPerEm so Layout can scale
+	// layouter output (which is in these units) without holding the sfnt.Font.
+	unitsPerEm uint16
+
 	Stretch  os2.Width
 	Weight   os2.Weight
 	IsSerif  bool
@@ -102,7 +106,7 @@ func NewSimple(info *sfnt.Font, opt *OptionsSimple) (*Simple, error) {
 		return nil, errors.New("no CFF outlines in font")
 	}
 
-	qv := info.FontMatrix[3] * 1000
+	qv := 1000 / float64(info.UnitsPerEm)
 	ascent := math.Round(float64(info.Ascent) * qv)
 	descent := math.Round(float64(info.Descent) * qv)
 	leading := math.Round(float64(info.Ascent-info.Descent+info.LineGap) * qv)
@@ -138,7 +142,8 @@ func NewSimple(info *sfnt.Font, opt *OptionsSimple) (*Simple, error) {
 	notdefWidth := math.Round(info.GlyphWidthPDF(0))
 
 	f := &Simple{
-		Font: cffFont,
+		Font:       cffFont,
+		unitsPerEm: info.UnitsPerEm,
 
 		Stretch:  info.Width,
 		Weight:   info.Weight,
@@ -205,13 +210,13 @@ func (f *Simple) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Glyp
 		seq = &font.GlyphSeq{}
 	}
 
-	qh := ptSize * f.Font.FontMatrix[0]
-	qv := ptSize * f.Font.FontMatrix[3]
+	// Layouter advances/offsets are in UnitsPerEm; scale uniformly to points.
+	q := ptSize / float64(f.unitsPerEm)
 
 	buf := f.layouter.Layout(s)
 	seq.Seq = slices.Grow(seq.Seq, len(buf))
 	for _, g := range buf {
-		xOffset := float64(g.XOffset) * qh
+		xOffset := float64(g.XOffset) * q
 		if len(seq.Seq) == 0 {
 			seq.Skip += xOffset
 		} else {
@@ -219,8 +224,8 @@ func (f *Simple) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Glyp
 		}
 		seq.Seq = append(seq.Seq, font.Glyph{
 			GID:     g.GID,
-			Advance: float64(g.Advance) * qh,
-			Rise:    float64(g.YOffset) * qv,
+			Advance: float64(g.Advance) * q,
+			Rise:    float64(g.YOffset) * q,
 			Text:    string(g.Text),
 		})
 	}
@@ -316,6 +321,9 @@ func (f *Simple) makeFontDict() (*dict.Type1, error) {
 		}
 	}
 
+	// StemV/StemH come from the CFF Private dict in CFF coordinates; the
+	// per-FD matrix (if any) has already been composed into subsetCFF.FontMatrix
+	// above.
 	qh := subsetCFF.FontMatrix[0] * 1000
 	qv := subsetCFF.FontMatrix[3] * 1000
 

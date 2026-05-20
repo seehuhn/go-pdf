@@ -162,10 +162,13 @@ func (f *Simple) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Glyp
 		seq = &font.GlyphSeq{}
 	}
 
+	// Layouter advances/offsets are in UnitsPerEm; scale uniformly to points.
+	q := ptSize / float64(f.Font.UnitsPerEm)
+
 	buf := f.layouter.Layout(s)
 	seq.Seq = slices.Grow(seq.Seq, len(buf))
 	for _, g := range buf {
-		xOffset := float64(g.XOffset) * ptSize * f.Font.FontMatrix[0]
+		xOffset := float64(g.XOffset) * q
 		if len(seq.Seq) == 0 {
 			seq.Skip += xOffset
 		} else {
@@ -173,8 +176,8 @@ func (f *Simple) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Glyp
 		}
 		seq.Seq = append(seq.Seq, font.Glyph{
 			GID:     g.GID,
-			Advance: float64(g.Advance) * ptSize * f.Font.FontMatrix[0],
-			Rise:    float64(g.YOffset) * ptSize * f.Font.FontMatrix[3],
+			Advance: float64(g.Advance) * q,
+			Rise:    float64(g.YOffset) * q,
 			Text:    string(g.Text),
 		})
 	}
@@ -329,7 +332,7 @@ func (f *Simple) makeDict() (*dict.TrueType, error) {
 		}
 	}
 
-	qv := subsetFont.FontMatrix[3] * 1000
+	qv := 1000 / float64(subsetFont.UnitsPerEm)
 	ascent := math.Round(float64(subsetFont.Ascent) * qv)
 	descent := math.Round(float64(subsetFont.Descent) * qv)
 	leading := math.Round(float64(subsetFont.Ascent-subsetFont.Descent+subsetFont.LineGap) * qv)

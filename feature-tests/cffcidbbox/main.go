@@ -273,7 +273,7 @@ func makeTestFonts() (*testFonts, error) {
 	}
 
 	// build the font dictionary
-	q := orig.FontMatrix[3] * 1000
+	q := 1000 / float64(orig.UnitsPerEm)
 	fd := &font.Descriptor{
 		FontName:   testCFF.FontName,
 		IsSymbolic: true,

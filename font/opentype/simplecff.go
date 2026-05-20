@@ -23,8 +23,6 @@ import (
 	"slices"
 
 	"seehuhn.de/go/geom/matrix"
-	"seehuhn.de/go/geom/rect"
-	"seehuhn.de/go/postscript/funit"
 
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
@@ -73,15 +71,21 @@ func newSimpleCFF(info *sfnt.Font, opt *OptionsSimple) (*SimpleCFF, error) {
 		return nil, errors.New("no CFF outlines in font")
 	}
 
+	glyphExtents := info.GlyphBBoxesPDF()
+	for i := range glyphExtents {
+		glyphExtents[i].Scale(1.0 / 1000)
+	}
+
+	q := 1 / float64(info.UnitsPerEm)
 	geometry := &font.Geometry{
-		GlyphExtents: scaleBoxesCFF(info.GlyphBBoxes(), info.FontMatrix[:]),
+		GlyphExtents: glyphExtents,
 		Widths:       info.WidthsPDF(),
 
-		Ascent:             float64(info.Ascent) * info.FontMatrix[3],
-		Descent:            float64(info.Descent) * info.FontMatrix[3],
-		Leading:            float64(info.Ascent-info.Descent+info.LineGap) * info.FontMatrix[3],
-		UnderlinePosition:  float64(info.UnderlinePosition) * info.FontMatrix[3],
-		UnderlineThickness: float64(info.UnderlineThickness) * info.FontMatrix[3],
+		Ascent:             float64(info.Ascent) * q,
+		Descent:            float64(info.Descent) * q,
+		Leading:            float64(info.Ascent-info.Descent+info.LineGap) * q,
+		UnderlinePosition:  float64(info.UnderlinePosition) * q,
+		UnderlineThickness: float64(info.UnderlineThickness) * q,
 	}
 
 	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
@@ -152,10 +156,13 @@ func (f *SimpleCFF) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.G
 		seq = &font.GlyphSeq{}
 	}
 
+	// Layouter advances/offsets are in UnitsPerEm; scale uniformly to points.
+	q := ptSize / float64(f.Font.UnitsPerEm)
+
 	buf := f.layouter.Layout(s)
 	seq.Seq = slices.Grow(seq.Seq, len(buf))
 	for _, g := range buf {
-		xOffset := float64(g.XOffset) * ptSize * f.Font.FontMatrix[0]
+		xOffset := float64(g.XOffset) * q
 		if len(seq.Seq) == 0 {
 			seq.Skip += xOffset
 		} else {
@@ -163,8 +170,8 @@ func (f *SimpleCFF) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.G
 		}
 		seq.Seq = append(seq.Seq, font.Glyph{
 			GID:     g.GID,
-			Advance: float64(g.Advance) * ptSize * f.Font.FontMatrix[0],
-			Rise:    float64(g.YOffset) * ptSize * f.Font.FontMatrix[3],
+			Advance: float64(g.Advance) * q,
+			Rise:    float64(g.YOffset) * q,
 			Text:    string(g.Text),
 		})
 	}
@@ -259,6 +266,16 @@ func (f *SimpleCFF) makeDict() (*dict.Type1, error) {
 		widths[code] = info.Width
 	}
 
+	// Ascent, Descent, etc. come from the OpenType OS/2/hhea tables and are
+	// measured in UnitsPerEm.  PDF descriptor entries use 1/1000 em.
+	qv := 1000 / float64(f.Font.UnitsPerEm)
+
+	// StemV/StemH come from the CFF Private dict in CFF coordinates; the
+	// per-FD matrix (if any) has already been composed into subsetCFF.FontMatrix
+	// above.
+	qhStem := subsetCFF.FontMatrix[0] * 1000
+	qvStem := subsetCFF.FontMatrix[3] * 1000
+
 	fd := &font.Descriptor{
 		FontName:     subset.Join(subsetTag, f.Font.PostScriptName()),
 		FontFamily:   subsetCFF.FamilyName,
@@ -271,13 +288,13 @@ func (f *SimpleCFF) makeDict() (*dict.Type1, error) {
 		IsItalic:     f.Font.IsItalic,
 		FontBBox:     subsetCFF.FontBBoxPDF().Rounded(),
 		ItalicAngle:  subsetCFF.ItalicAngle,
-		Ascent:       float64(f.Font.Ascent),
-		Descent:      float64(f.Font.Descent),
-		Leading:      0,
-		CapHeight:    float64(f.Font.CapHeight),
-		XHeight:      float64(f.Font.XHeight),
-		StemV:        0, // not specified
-		StemH:        0, // not specified
+		Ascent:       math.Round(float64(f.Font.Ascent) * qv),
+		Descent:      math.Round(float64(f.Font.Descent) * qv),
+		Leading:      math.Round(float64(f.Font.Ascent-f.Font.Descent+f.Font.LineGap) * qv),
+		CapHeight:    math.Round(float64(f.Font.CapHeight) * qv),
+		XHeight:      math.Round(float64(f.Font.XHeight) * qv),
+		StemV:        math.Round(subsetCFF.Private[0].StdVW * qhStem),
+		StemH:        math.Round(subsetCFF.Private[0].StdHW * qvStem),
 		AvgWidth:     0, // not specified
 		MaxWidth:     0, // not specified
 		MissingWidth: f.Simple.DefaultWidth(),
@@ -295,35 +312,6 @@ func (f *SimpleCFF) makeDict() (*dict.Type1, error) {
 	}
 
 	return fontDict, nil
-}
-
-func scaleBoxesCFF(bboxes []funit.Rect16, M []float64) []rect.Rect {
-	res := make([]rect.Rect, len(bboxes))
-	for i, b := range bboxes {
-		bPDF := rect.Rect{
-			LLx: math.Inf(+1),
-			LLy: math.Inf(+1),
-			URx: math.Inf(-1),
-			URy: math.Inf(-1),
-		}
-		corners := []struct{ x, y funit.Int16 }{
-			{b.LLx, b.LLy},
-			{b.LLx, b.URy},
-			{b.URx, b.LLy},
-			{b.URx, b.URy},
-		}
-		for _, c := range corners {
-			xf := float64(c.x)
-			yf := float64(c.y)
-			x, y := M[0]*xf+M[2]*yf+M[4], M[1]*xf+M[3]*yf+M[5]
-			bPDF.LLx = min(bPDF.LLx, x)
-			bPDF.LLy = min(bPDF.LLy, y)
-			bPDF.URx = max(bPDF.URx, x)
-			bPDF.URy = max(bPDF.URy, y)
-		}
-		res[i] = bPDF
-	}
-	return res
 }
 
 func clone[T any](obj *T) *T {
