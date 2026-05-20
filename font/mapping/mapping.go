@@ -63,12 +63,11 @@ func GetCIDTextMapping(registry, ordering string) (map[cid.CID]string, error) {
 	}
 	defer cmapFile.Close()
 
-	cmapData, err := postscript.ReadCMap(cmapFile)
+	_, codeMap, err := postscript.ReadCMap(cmapFile)
 	if err != nil {
 		return nil, err
 	}
 
-	codeMap := cmapData["CodeMap"].(*postscript.CMapInfo)
 	if codeMap.UseCMap != "" {
 		return nil, errors.New("not implemented: chained PDF mapping resources")
 	}

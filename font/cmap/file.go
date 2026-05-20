@@ -168,7 +168,7 @@ func sanitizeName(s string) string {
 // readCMap reads and parses a CMap from a PostScript stream.
 // It returns the parsed CMap, the parent CMap name (if any), and any error.
 func readCMap(r io.Reader) (*File, pdf.Name, error) {
-	raw, err := postscript.ReadCMap(r)
+	raw, codeMap, err := postscript.ReadCMap(r)
 	if err != nil {
 		return nil, "", err
 	}
@@ -206,7 +206,6 @@ func readCMap(r io.Reader) (*File, pdf.Name, error) {
 		}
 	}
 
-	codeMap := raw["CodeMap"].(*postscript.CMapInfo)
 	if codeMap.UseCMap != "" {
 		parent = pdf.Name(codeMap.UseCMap)
 	}

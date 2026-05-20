@@ -213,7 +213,7 @@ func TestMakeName(t *testing.T) {
 }
 
 func BenchmarkMakeName(b *testing.B) {
-	for range b.N {
+	for b.Loop() {
 		testToUniInfoChild.MakeName()
 	}
 }

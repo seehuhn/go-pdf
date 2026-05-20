@@ -113,7 +113,7 @@ func ExtractToUnicode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 }
 
 func readToUnicode(r io.Reader) (*ToUnicodeFile, error) {
-	raw, err := postscript.ReadCMap(r)
+	raw, codeMap, err := postscript.ReadCMap(r)
 	if err != nil {
 		return nil, err
 	}
@@ -123,8 +123,6 @@ func readToUnicode(r io.Reader) (*ToUnicodeFile, error) {
 	}
 
 	res := &ToUnicodeFile{}
-
-	codeMap := raw["CodeMap"].(*postscript.CMapInfo)
 
 	for _, entry := range codeMap.CodeSpaceRanges {
 		if len(entry.Low) != len(entry.High) || len(entry.Low) == 0 {
