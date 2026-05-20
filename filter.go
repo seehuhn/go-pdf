@@ -469,12 +469,7 @@ func (f FilterCompress) Decode(v Version, r io.Reader, budget *membudget.Budget)
 }
 
 func (f FilterCompress) toFlate() FilterFlate {
-	return FilterFlate{
-		Predictor:        f.Predictor,
-		Colors:           f.Colors,
-		BitsPerComponent: f.BitsPerComponent,
-		Columns:          f.Columns,
-	}
+	return FilterFlate(f)
 }
 
 func (f FilterCompress) toLZW() FilterLZW {

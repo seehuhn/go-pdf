@@ -155,7 +155,7 @@ func TestType1Encoding(t *testing.T) {
 	r := &MockGetter{}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			enc, err := ExtractType1(r, c.encoding, c.nonSymbolicExt)
+			enc, err := ExtractSimple(r, c.encoding, c.nonSymbolicExt)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -218,7 +218,7 @@ func TestType1Roundtrip(t *testing.T) {
 	for i, enc1 := range cases {
 		for _, nonSymbolicExt := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%d/%v", i, nonSymbolicExt), func(t *testing.T) {
-				obj, err := enc1.AsPDFType1(nonSymbolicExt, 0)
+				obj, err := enc1.AsPDFSimple(nonSymbolicExt, 0)
 				if err == errInvalidEncoding {
 					t.Skip("encoding cannot be represented as PDF object")
 				}
@@ -226,7 +226,7 @@ func TestType1Roundtrip(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				enc2, err := ExtractType1(&MockGetter{}, obj, nonSymbolicExt)
+				enc2, err := ExtractSimple(&MockGetter{}, obj, nonSymbolicExt)
 				if err != nil {
 					t.Fatal(err)
 				}

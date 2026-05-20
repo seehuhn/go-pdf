@@ -142,7 +142,7 @@ func (d *TrueType) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	isNonSymbolic := !d.Descriptor.IsSymbolic
 	isExternal := d.FontFile == nil
 	// TODO(voss): implement TrueType constraints
-	encodingObj, err := d.Encoding.AsPDFType1(isNonSymbolic && isExternal, w.GetOptions())
+	encodingObj, err := d.Encoding.AsPDFSimple(isNonSymbolic && isExternal, w.GetOptions())
 	if err != nil {
 		return nil, err
 	}

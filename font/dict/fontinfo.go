@@ -28,7 +28,18 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 )
 
-// FontInfoSimple holds information about a simple font (Type1 or TrueType).
+// FontInfoSimple holds information about a simple font (Type 1, TrueType,
+// or simple CFF).
+//
+// To resolve a code byte to a specific glyph in the embedded font, dispatch
+// on FontFile.Type and use the matching helper:
+//
+//   - Type1:                        [type1glyphs.FromStream]
+//   - CFFSimple, OpenTypeCFFSimple: [cffglyphs.FromStream]
+//   - TrueType, OpenTypeGlyf:       [sfntglyphs.NewTrueTypeSelector]
+//
+// Codes for which Encoding(code) returns [encoding.UseBuiltin] are resolved
+// through that helper.
 type FontInfoSimple struct {
 	// PostScriptName is the PostScript name of the font.
 	PostScriptName string
@@ -40,6 +51,8 @@ type FontInfoSimple struct {
 	// Encoding is the font's character encoding.
 	Encoding encoding.Simple
 
+	// IsSymbolic is true if some glyphs are outside the Adobe Standard Latin
+	// character set (see [pdfenc.StandardLatin]).
 	IsSymbolic bool
 }
 

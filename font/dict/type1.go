@@ -159,7 +159,7 @@ func (d *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		// standard fonts.
 		baseIsStd = false
 	}
-	encodingObj, err := d.Encoding.AsPDFType1(baseIsStd, w.GetOptions())
+	encodingObj, err := d.Encoding.AsPDFSimple(baseIsStd, w.GetOptions())
 	if err != nil {
 		return nil, err
 	}

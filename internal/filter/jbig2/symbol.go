@@ -148,10 +148,7 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 		// the T.88 reference encoder omits the trailing OOB, so we
 		// check the count before attempting to read another DW.
 		prevDecoded := nDecoded
-		for {
-			if sdrefagg && nDecoded >= sdNumNewSyms {
-				break
-			}
+		for !sdrefagg || nDecoded < sdNumNewSyms {
 			dw := iadw.decode(dec)
 			if dw == oobResult {
 				break // end of height class

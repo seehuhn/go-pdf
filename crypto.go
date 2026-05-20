@@ -44,9 +44,9 @@ type encryptInfo struct {
 }
 
 // publicInfo returns the user-facing description of this encryption
-// configuration.  Returns nil if e is nil.
-func (e *encryptInfo) publicInfo() *Encryption {
-	if e == nil {
+// configuration.  Returns nil if enc is nil.
+func (enc *encryptInfo) publicInfo() *Encryption {
+	if enc == nil {
 		return nil
 	}
 	// Pick the first non-nil slot as the canonical cipher.  Per spec
@@ -56,12 +56,12 @@ func (e *encryptInfo) publicInfo() *Encryption {
 	// same *cryptFilter, and in files we accept every non-nil slot is
 	// built from the single /StdCF entry (the parser rejects other
 	// named filters), so cipher and length agree across non-nil slots.
-	cf := e.stmF
+	cf := enc.stmF
 	if cf == nil {
-		cf = e.strF
+		cf = enc.strF
 	}
 	if cf == nil {
-		cf = e.efF
+		cf = enc.efF
 	}
 	pub := &Encryption{}
 	if cf != nil {

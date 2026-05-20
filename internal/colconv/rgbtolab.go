@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+// Package colconv converts colour values between DeviceGray, DeviceRGB,
+// DeviceCMYK and the CIE LAB colour space.
 package colconv
 
 import (

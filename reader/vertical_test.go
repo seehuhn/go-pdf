@@ -231,6 +231,20 @@ func TestHorizontalGapClassifier(t *testing.T) {
 			jumpToX: 100, jumpToY: 700 - 14,
 			want: []TextEvent{TextEventNL},
 		},
+		{
+			// A small backward step (well under one em) is in the
+			// range of pair kerning and must not trigger an event.
+			name:    "backward kerning",
+			jumpToX: 100 + 12 - 3, jumpToY: 700,
+			want: nil,
+		},
+		{
+			// A backward jump of more than one em on the same
+			// baseline indicates a new region.
+			name:    "backward jump",
+			jumpToX: 50, jumpToY: 700,
+			want: []TextEvent{TextEventNL},
+		},
 	}
 
 	for _, tc := range cases {

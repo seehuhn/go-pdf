@@ -490,6 +490,12 @@ func (r *Reader) processText(s pdf.String) error {
 			effSize := math.Hypot(trm[2], trm[3])
 			gapThresh := 0.5 * effSize
 			alongThresh := 0.3 * r.spaceWidthDevice(p, effSize)
+			// A backward jump along the writing direction by a full em
+			// or more is far beyond any plausible kerning adjustment
+			// (typical pair kerns peak around 0.3 em) and indicates a
+			// move to a new region — a separate column, header, or
+			// out-of-order glyph cluster on the same baseline.
+			backThresh := effSize
 			dx := startX - r.prevEndX
 			dy := startY - r.prevEndY
 			var along, across float64
@@ -504,6 +510,8 @@ func (r *Reader) processText(s pdf.String) error {
 			}
 			switch {
 			case math.Abs(across) >= gapThresh:
+				r.TextEvent(TextEventNL, 0)
+			case along <= -backThresh:
 				r.TextEvent(TextEventNL, 0)
 			case along >= alongThresh:
 				r.TextEvent(TextEventSpace, along)

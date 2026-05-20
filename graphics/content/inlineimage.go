@@ -107,18 +107,18 @@ func DecodeInlineImage(op Operator, res *Resources) ([]byte, error) {
 	data := []byte(rawData)
 
 	// extract filter name(s)
-	filterObj, _ := dict["F"]
+	filterObj := dict["F"]
 	if filterObj == nil {
-		filterObj, _ = dict["Filter"]
+		filterObj = dict["Filter"]
 	}
 	if filterObj == nil {
 		return data, nil
 	}
 
 	// extract decode parameters
-	parmsObj, _ := dict["DP"]
+	parmsObj := dict["DP"]
 	if parmsObj == nil {
-		parmsObj, _ = dict["DecodeParms"]
+		parmsObj = dict["DecodeParms"]
 	}
 
 	type filterSpec struct {

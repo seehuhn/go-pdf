@@ -51,8 +51,8 @@ var (
 	}
 )
 
-// ExtractType1 extracts the encoding from the /Encoding entry of a Type1
-// font dictionary.
+// ExtractSimple extracts the encoding from the /Encoding entry of a simple
+// font dictionary (Type 1 or TrueType).
 //
 // If the argument nonSymbolicExt is true, the function assumes that the font
 // has the non-symbolic flag set in the font descriptor and that the font is
@@ -60,7 +60,7 @@ var (
 //
 // If /Encoding is malformed, the font's built-in encoding is used as a
 // fallback.
-func ExtractType1(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Simple, error) {
+func ExtractSimple(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Simple, error) {
 	obj, err := pdf.Resolve(r, obj)
 	if err != nil {
 		return nil, err
@@ -142,7 +142,8 @@ func ExtractType1(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Simple, er
 	}, nil
 }
 
-// AsPDFType1 returns the /Encoding entry for Type1 font dictionary.
+// AsPDFSimple returns the /Encoding entry for a simple font dictionary
+// (Type 1 or TrueType).
 //
 // If the argument baseIsStd is true, Differences arrays record changes from
 // the standard encoding. Otherwise, Differences arrays record changes from the
@@ -153,7 +154,7 @@ func ExtractType1(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Simple, er
 // The resulting PDF object describes an encoding which maps all characters
 // mapped by e to the given glyph name, but it may also imply glyph names for
 // the unmapped codes.
-func (e Simple) AsPDFType1(baseIsStd bool, opt pdf.OutputOptions) (pdf.Object, error) {
+func (e Simple) AsPDFSimple(baseIsStd bool, opt pdf.OutputOptions) (pdf.Object, error) {
 	type candInfo struct {
 		encName     pdf.Native
 		enc         []string

@@ -919,15 +919,15 @@ func NewStream(dict Dict, data []byte) *Stream {
 // NewReader returns a new, independent reader over the raw stream data.
 // Each call returns a reader with its own cursor, starting at position 0.
 // Concurrent calls are safe.
-func (s *Stream) NewReader() io.ReadSeeker {
-	if s.data == nil {
+func (x *Stream) NewReader() io.ReadSeeker {
+	if x.data == nil {
 		return &streamReader{}
 	}
 	return &streamReader{
-		r:     s.data,
-		start: s.start,
-		pos:   s.start,
-		end:   s.start + s.length,
+		r:     x.data,
+		start: x.start,
+		pos:   x.start,
+		end:   x.start + x.length,
 	}
 }
 

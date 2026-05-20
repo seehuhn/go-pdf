@@ -112,7 +112,7 @@ func extractFontType1(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*
 	isNonSymbolic := fd != nil && !fd.IsSymbolic
 	isExternal := d.FontFile == nil
 	nonSymbolicExt := isNonSymbolic && isExternal
-	enc, err := encoding.ExtractType1(x.R, fontDict["Encoding"], nonSymbolicExt)
+	enc, err := encoding.ExtractSimple(x.R, fontDict["Encoding"], nonSymbolicExt)
 	if err != nil {
 		return nil, err
 	}
