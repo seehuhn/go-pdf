@@ -35,11 +35,11 @@ type Screen struct {
 
 	// Action (optional; PDF 1.1) is an action that is performed when the
 	// annotation is activated.
-	Action pdf.Reference
+	Action pdf.Object
 
 	// AA (optional; PDF 1.2) is an additional-actions dictionary defining
 	// the screen annotation's behaviour in response to various trigger events.
-	AA pdf.Reference
+	AA pdf.Object
 }
 
 var _ Annotation = (*Screen)(nil)
@@ -71,12 +71,12 @@ func decodeScreen(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Scree
 	}
 
 	// A (optional)
-	if a, ok := dict["A"].(pdf.Reference); ok {
+	if a := dict["A"]; a != nil {
 		screen.Action = a
 	}
 
 	// AA (optional)
-	if aa, ok := dict["AA"].(pdf.Reference); ok {
+	if aa := dict["AA"]; aa != nil {
 		screen.AA = aa
 	}
 
@@ -109,12 +109,12 @@ func (s *Screen) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// A (optional)
-	if s.Action != 0 {
+	if s.Action != nil {
 		dict["A"] = s.Action
 	}
 
 	// AA (optional)
-	if s.AA != 0 {
+	if s.AA != nil {
 		dict["AA"] = s.AA
 	}
 

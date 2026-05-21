@@ -5764,7 +5764,7 @@ types:
       of this dictionary provides the icon used in generating the appearance
 
       referred to by the screen annotation''s AP entry.'
-  - goName:
+  - goName: Action
     pdfKey: A
     pdfType: dictionary
     required: false
@@ -5794,6 +5794,10 @@ types:
     - ActionECMAScript
     - type: ActionRichMediaExecute
       since: '2.0'
+    goType: pdf.Object
+    purpose: 'Action (optional; PDF 1.1) is an action that is performed when the
+
+      annotation is activated.'
   - goName: AA
     pdfKey: AA
     pdfType: dictionary
@@ -5801,7 +5805,7 @@ types:
     introduced: '1.5'
     refTypes:
     - AddActionScreenAnnotation
-    goType: pdf.Reference
+    goType: pdf.Object
     purpose: 'AA (optional; PDF 1.2) is an additional-actions dictionary defining
 
       the screen annotation''s behaviour in response to various trigger events.'
@@ -6492,7 +6496,7 @@ types:
       since: '1.3'
     - type: ActionRichMediaExecute
       since: '2.0'
-    goType: pdf.Reference
+    goType: pdf.Object
     purpose: 'A (optional; PDF 1.1) is an action that is performed when the
 
       annotation is activated.'
@@ -6503,7 +6507,7 @@ types:
     introduced: '1.2'
     refTypes:
     - AddActionWidgetAnnotation
-    goType: pdf.Reference
+    goType: pdf.Object
     purpose: 'AA (optional; PDF 1.2) is an additional-actions dictionary defining
 
       the annotation''s behaviour in response to various trigger events.'

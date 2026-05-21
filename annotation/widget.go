@@ -49,11 +49,11 @@ type Widget struct {
 
 	// A (optional; PDF 1.1) is an action that is performed when the
 	// annotation is activated.
-	A pdf.Reference
+	A pdf.Object
 
 	// AA (optional; PDF 1.2) is an additional-actions dictionary defining
 	// the annotation's behaviour in response to various trigger events.
-	AA pdf.Reference
+	AA pdf.Object
 
 	// BorderStyle (optional; PDF 1.2) is a border style dictionary specifying
 	// the width and dash pattern that is used in drawing the annotation's
@@ -101,12 +101,12 @@ func decodeWidget(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Widge
 	}
 
 	// A (optional)
-	if a, ok := dict["A"].(pdf.Reference); ok {
+	if a := dict["A"]; a != nil {
 		widget.A = a
 	}
 
 	// AA (optional)
-	if aa, ok := dict["AA"].(pdf.Reference); ok {
+	if aa := dict["AA"]; aa != nil {
 		widget.AA = aa
 	}
 
@@ -159,12 +159,12 @@ func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// A (optional)
-	if w.A != 0 {
+	if w.A != nil {
 		dict["A"] = w.A
 	}
 
 	// AA (optional)
-	if w.AA != 0 {
+	if w.AA != nil {
 		dict["AA"] = w.AA
 	}
 
