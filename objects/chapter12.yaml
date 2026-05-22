@@ -2294,8 +2294,8 @@ types:
     deprecated: '2.0'
     refTypes:
     - AnnotMovie
-    goType: pdf.Object
-    purpose: Annotation is the movie annotation to play.
+    goType: pdf.Reference
+    purpose: Annotation is an indirect reference to the movie annotation to play.
   - goName: T
     pdfKey: T
     pdfType: text-string
@@ -2318,6 +2318,86 @@ types:
     - Resume
     goType: MovieOperation
     purpose: Operation specifies the operation to perform.
+  - goName: Start
+    goType: "*movie.Timestamp"
+    pdfKey: Start
+    pdfType: array;integer;byte-string
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    notes: override of MovieActivation Start; nil means no override
+  - goName: Duration
+    goType: "*movie.Timestamp"
+    pdfKey: Duration
+    pdfType: array;integer;byte-string
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    notes: override of MovieActivation Duration; nil means no override
+  - goName: Rate
+    goType: float64
+    pdfKey: Rate
+    pdfType: number
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    notes: override of MovieActivation Rate; zero means no override (any other value, including 1.0, is written)
+  - goName: Volume
+    goType: "optional.Float64"
+    pdfKey: Volume
+    pdfType: number
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    possibleValues:
+    - fn:Eval((@Volume>=-1) && (@Volume<=1))
+    notes: override of MovieActivation Volume; unset means no override
+  - goName: ShowControls
+    goType: "optional.Bool"
+    pdfKey: ShowControls
+    pdfType: boolean
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    notes: override of MovieActivation ShowControls; unset means no override
+  - goName: Mode
+    goType: "movie.Mode"
+    pdfKey: Mode
+    pdfType: name
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    enum: Mode
+    possibleValues:
+    - Once
+    - Open
+    - Repeat
+    - Palindrome
+    notes: override of MovieActivation Mode; empty string means no override
+  - goName: Synchronous
+    goType: "optional.Bool"
+    pdfKey: Synchronous
+    pdfType: boolean
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    notes: override of MovieActivation Synchronous; unset means no override
+  - goName: FWScale
+    goType: "*movie.Scale"
+    pdfKey: FWScale
+    pdfType: array
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    notes: override of MovieActivation FWScale; nil means no override
+  - goName: FWPosition
+    goType: "*movie.Position"
+    pdfKey: FWPosition
+    pdfType: array
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    notes: override of MovieActivation FWPosition; nil means no override
   goPackage: action
   goRepr: struct
   specSection: 12.6.2 12.6.4.10
@@ -5186,11 +5266,11 @@ types:
     deprecated: '2.0'
     refTypes:
     - Movie
-    goType: pdf.Reference
+    goType: "*movie.Movie"
     purpose: 'Movie (required) is a movie dictionary that describes the movie''s
 
       static characteristics.'
-  - goName: A
+  - goName: Activation
     pdfKey: A
     pdfType: boolean;dictionary
     required: false
@@ -5198,18 +5278,13 @@ types:
     deprecated: '2.0'
     refTypes:
     - MovieActivation
-    goType: pdf.Object
-    purpose: 'A (optional) is a flag or dictionary specifying whether and how to play
-
-      the movie when the annotation is activated. If this value is a dictionary,
-
-      it is a movie activation dictionary specifying how to play the movie.
-
-      If the value is the boolean true, the movie is played using default
-
-      activation parameters. If the value is false, the movie is not played.
-
-      Default value: true.'
+    goType: "*movie.Activation"
+    purpose: |
+      Activation controls whether and how the movie shall be played when the
+      annotation is activated.  nil means do not play (encoded as A=false).
+      movie.DefaultActivation (by identity) means play with PDF defaults
+      (encoded as A=true or omitted).  Any other value supplies an explicit
+      activation dictionary.
   goPackage: annotation
   goRepr: struct
   specSection: 12.5.2
@@ -8284,10 +8359,17 @@ types:
 - name: Movie
   purpose: movie data and display properties
   deprecated: '2.0'
+  goType: "movie.Movie"
+  fileDependent: false
+  readFunc: "movie.Extract"
+  writeMethod: "(*Movie).Embed"
   pdfRepr: dict
   introduced: '1.2'
+  specSection: '13.4'
+  specTable: Table 306
   fields:
-  - goName:
+  - goName: File
+    goType: "*file.Specification"
     pdfKey: F
     pdfType: dictionary;string
     required: true
@@ -8296,13 +8378,16 @@ types:
     refTypes:
     - FileSpecification
     notes: Table 306
-  - goName:
+  - goName: Aspect
+    goType: "movie.Aspect"
     pdfKey: Aspect
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    notes: zero value means the entry is omitted (e.g. for sound-only movies)
+  - goName: Rotate
+    goType: int
     pdfKey: Rotate
     pdfType: integer
     required: false
@@ -8311,7 +8396,8 @@ types:
     deprecated: '2.0'
     possibleValues:
     - fn:Eval((@Rotate mod 90)==0)
-  - goName:
+  - goName: Poster
+    goType: "graphics.Image"
     pdfKey: Poster
     pdfType: boolean;stream
     required: false
@@ -8320,39 +8406,51 @@ types:
     deprecated: '2.0'
     refTypes:
     - XObjectImage
-  goPackage: annotation
-  goRepr: struct
-  specSection: 12.5.2
+    notes: |
+      nil means the entry is omitted (no poster);
+      the sentinel value movie.PosterFromMovieFile encodes as boolean true
+      (retrieve poster from the movie file); any other value supplies an
+      image XObject to use as the poster.
 - name: MovieActivation
   purpose: parameters for movie playback activation
   deprecated: '2.0'
-  goType:
+  goType: "movie.Activation"
+  fileDependent: false
+  readFunc: "movie.ExtractActivation"
+  writeMethod: "(*Activation).Embed"
   pdfRepr: dict
   introduced: '1.2'
+  specSection: '13.4'
+  specTable: Table 307
   fields:
-  - goName:
+  - goName: Start
+    goType: "movie.Timestamp"
     pdfKey: Start
     pdfType: array;integer;byte-string
     required: false
     default: '[];[0];[]'
     introduced: '1.2'
     deprecated: '2.0'
-    notes: Table 307
-  - goName:
+    notes: zero Timestamp means the entry is omitted (start from the beginning)
+  - goName: Duration
+    goType: "movie.Timestamp"
     pdfKey: Duration
     pdfType: array;integer;byte-string
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    notes: zero Timestamp means the entry is omitted (play to the end)
+  - goName: Rate
+    goType: float64
     pdfKey: Rate
     pdfType: number
     required: false
     default: '1.0'
     introduced: '1.2'
     deprecated: '2.0'
-    notes: negative means play backwards
-  - goName:
+    notes: negative means play backwards; a zero value is treated as 1.0 on both read and write
+  - goName: Volume
+    goType: float64
     pdfKey: Volume
     pdfType: number
     required: false
@@ -8361,39 +8459,46 @@ types:
     deprecated: '2.0'
     possibleValues:
     - fn:Eval((@Volume>=-1) && (@Volume<=1))
-  - goName:
+  - goName: ShowControls
+    goType: bool
     pdfKey: ShowControls
     pdfType: boolean
     required: false
     default: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+  - goName: Mode
+    goType: "movie.Mode"
     pdfKey: Mode
     pdfType: name
     required: false
     default: Once
     introduced: '1.2'
     deprecated: '2.0'
+    enum: Mode
     possibleValues:
     - Once
     - Open
     - Repeat
     - Palindrome
-  - goName:
+  - goName: Synchronous
+    goType: bool
     pdfKey: Synchronous
     pdfType: boolean
     required: false
     default: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+  - goName: FWScale
+    goType: "movie.Scale"
     pdfKey: FWScale
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    notes: zero value means play in the annotation rectangle (no floating window)
+  - goName: FWPosition
+    goType: "*movie.Position"
     pdfKey: FWPosition
     pdfType: array
     required: false

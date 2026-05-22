@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/movie"
 	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/page/transition"
 	"seehuhn.de/go/pdf/sound"
@@ -120,14 +121,36 @@ var actionTestCases = []pdf.Action{
 	&Sound{Sound: testSound, Volume: 1.0, Mix: true},
 	&Sound{Sound: testSound, Volume: 0.75, Synchronous: true, Repeat: true, Mix: true},
 
-	// Movie
+	// Movie — bare actions with no overrides
 	&Movie{T: pdf.String("movie1"), Operation: MovieOperationPlay},
 	&Movie{Annotation: pdf.Reference(1), Operation: MovieOperationPlay},
-	// raw strings to verify they round-trip correctly
+	// raw operation strings round-trip correctly
 	&Movie{T: pdf.String("intro"), Operation: "Play"},
 	&Movie{T: pdf.String("video"), Operation: "Stop"},
 	&Movie{T: pdf.String("clip"), Operation: "Pause"},
 	&Movie{T: pdf.String("movie"), Operation: "Resume"},
+	// fully-populated overrides
+	&Movie{T: pdf.String("trailer"), Operation: MovieOperationPlay,
+		Start:        &movie.Timestamp{Value: 100},
+		Duration:     &movie.Timestamp{Value: 500, TimeScale: 30},
+		Rate:         0.5,
+		Volume:       optional.NewFloat64(-1.0),
+		ShowControls: optional.NewBool(true),
+		Mode:         movie.ModeRepeat,
+		Synchronous:  optional.NewBool(true),
+		FWScale:      &movie.Scale{Numerator: 2, Denominator: 1},
+		FWPosition:   &movie.Position{Horizontal: 0.25, Vertical: 0.75},
+	},
+	// overrides that previously couldn't be represented:
+	// each value equals the PDF default but must still appear on the wire
+	&Movie{T: pdf.String("force-defaults"), Operation: MovieOperationPlay,
+		Start:        &movie.Timestamp{},
+		Rate:         1.0,
+		Volume:       optional.NewFloat64(1.0),
+		ShowControls: optional.NewBool(false),
+		Mode:         movie.ModeOnce,
+		Synchronous:  optional.NewBool(false),
+	},
 
 	// Hide
 	&Hide{T: pdf.String("annotation1"), H: true},

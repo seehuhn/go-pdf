@@ -30,8 +30,18 @@ import (
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/measure"
+	"seehuhn.de/go/pdf/movie"
 	"seehuhn.de/go/pdf/sound"
 )
+
+// testMovie is the shared movie object used by movie annotation test
+// cases.  It points to an external movie file.
+var testMovie = &movie.Movie{
+	File: &file.Specification{
+		FileName:       "video.mov",
+		AFRelationship: file.RelationshipUnspecified,
+	},
+}
 
 // testSound is the shared sound object used by sound annotation test
 // cases.  Its Channels, BitsPerSample, and Encoding fields are
@@ -1197,25 +1207,25 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 300, URy: 200},
 					Contents: "Educational video",
 				},
-				Title: "Introduction Video",
-				Movie: pdf.NewReference(500, 0), // Movie dictionary reference
-				A:     pdf.Boolean(true),        // Default activation
+				Title:      "Introduction Video",
+				Movie:      testMovie,
+				Activation: movie.DefaultActivation,
 			},
 		},
 		{
-			name: "movie annotation with title",
+			name: "movie annotation, do not play",
 			annotation: &Movie{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 200, LLy: 200, URx: 400, URy: 300},
 					Name: "movie-001",
 				},
 				Title: "Training Module 1",
-				Movie: pdf.NewReference(600, 0), // Movie dictionary reference
-				A:     pdf.Boolean(false),       // Do not play automatically
+				Movie: testMovie,
+				// Activation nil: do not play on activation (A=false)
 			},
 		},
 		{
-			name: "movie annotation with activation dictionary",
+			name: "movie annotation with custom activation",
 			annotation: &Movie{
 				Common: Common{
 					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 250, URy: 150},
@@ -1223,8 +1233,13 @@ var testCases = map[pdf.Name][]testCase{
 					Color:    color.DeviceRGB{0.7, 0.6, 0.5}, // brown
 				},
 				Title: "Interactive Demo",
-				Movie: pdf.NewReference(700, 0), // Movie dictionary reference
-				A:     pdf.NewReference(800, 0), // Movie activation dictionary
+				Movie: testMovie,
+				Activation: &movie.Activation{
+					Rate:         1.0,
+					Volume:       0.75,
+					Mode:         movie.ModeRepeat,
+					ShowControls: true,
+				},
 			},
 		},
 		{
@@ -1233,8 +1248,8 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 300, LLy: 300, URx: 500, URy: 400},
 				},
-				Movie: pdf.NewReference(900, 0), // Movie dictionary reference
-				A:     pdf.Boolean(true),        // Explicit default value
+				Movie:      testMovie,
+				Activation: movie.DefaultActivation,
 			},
 		},
 		{
@@ -1243,8 +1258,8 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
 				},
-				Movie: pdf.NewReference(1000, 0), // Required movie dictionary
-				A:     pdf.Boolean(true),         // Default value
+				Movie:      testMovie,
+				Activation: movie.DefaultActivation,
 			},
 		},
 	},

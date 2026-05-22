@@ -16,7 +16,12 @@
 
 package annotation
 
-import "seehuhn.de/go/pdf"
+import (
+	"errors"
+
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/movie"
+)
 
 // PDF 2.0 sections: 12.5.2 12.5.6.17
 
@@ -33,17 +38,19 @@ type Movie struct {
 	// use this title to reference the movie annotation.
 	Title string
 
-	// Movie (required) is a movie dictionary that describes the movie's
-	// static characteristics.
-	Movie pdf.Reference
+	// Movie is the movie dictionary that describes the movie's static
+	// characteristics.
+	Movie *movie.Movie
 
-	// A (optional) is a flag or dictionary specifying whether and how to play
-	// the movie when the annotation is activated. If this value is a dictionary,
-	// it is a movie activation dictionary specifying how to play the movie.
-	// If the value is the boolean true, the movie is played using default
-	// activation parameters. If the value is false, the movie is not played.
-	// Default value: true.
-	A pdf.Object
+	// Activation controls whether and how the movie shall be played
+	// when the annotation is activated.
+	//
+	// nil means the movie shall not be played on activation
+	// (encoded as A=false on the wire).
+	// [movie.DefaultActivation] (compared by identity) means play with
+	// the PDF specification defaults (encoded as A=true or omitted).
+	// Any other value supplies an explicit activation dictionary.
+	Activation *movie.Activation
 }
 
 var _ Annotation = (*Movie)(nil)
@@ -56,35 +63,54 @@ func (m *Movie) AnnotationType() pdf.Name {
 
 func decodeMovie(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Movie, error) {
 	r := x.R
-	movie := &Movie{}
+	annot := &Movie{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &movie.Common, dict); err != nil {
+	if err := decodeCommon(x, path, &annot.Common, dict); err != nil {
 		return nil, err
 	}
 
-	// Extract movie-specific fields
 	// T (optional)
 	if t, err := pdf.GetTextString(r, dict["T"]); err == nil && t != "" {
-		movie.Title = string(t)
+		annot.Title = string(t)
 	}
 
 	// Movie (required)
-	if movieRef, ok := dict["Movie"].(pdf.Reference); ok {
-		movie.Movie = movieRef
-	}
-
-	// A (optional) - can be boolean or dictionary, default is true
-	if a, ok := dict["A"]; ok {
-		movie.A = a
+	if m, err := pdf.Optional(pdf.ExtractorGet(x, path, dict["Movie"], movie.Extract)); err != nil {
+		return nil, err
 	} else {
-		movie.A = pdf.Boolean(true) // PDF default value
+		annot.Movie = m
 	}
 
-	return movie, nil
+	// A (optional) — bool, dict, or absent (PDF default true)
+	if aObj, ok := dict["A"]; ok {
+		resolved, _ := pdf.Resolve(r, aObj)
+		switch v := resolved.(type) {
+		case pdf.Boolean:
+			if bool(v) {
+				annot.Activation = movie.DefaultActivation
+			}
+			// false → leave Activation nil (do not play)
+		default:
+			if act, err := pdf.Optional(pdf.ExtractorGet(x, path, aObj, movie.ExtractActivation)); err != nil {
+				return nil, err
+			} else if act != nil {
+				annot.Activation = act
+			} else {
+				annot.Activation = movie.DefaultActivation
+			}
+		}
+	} else {
+		annot.Activation = movie.DefaultActivation
+	}
+
+	return annot, nil
 }
 
 func (m *Movie) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
+	if m.Movie == nil {
+		return nil, errors.New("movie annotation must have a Movie")
+	}
 	if err := pdf.CheckVersion(rm.Out, "movie annotation", pdf.V1_2); err != nil {
 		return nil, err
 	}
@@ -98,22 +124,30 @@ func (m *Movie) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 
-	// Add movie-specific fields
 	// T (optional)
 	if m.Title != "" {
 		dict["T"] = pdf.TextString(m.Title)
 	}
 
 	// Movie (required)
-	if m.Movie != 0 {
-		dict["Movie"] = m.Movie
+	movieObj, err := rm.Embed(m.Movie)
+	if err != nil {
+		return nil, err
 	}
+	dict["Movie"] = movieObj
 
-	// A (optional) - only write if not the default value true
-	if m.A != nil {
-		if b, isBool := m.A.(pdf.Boolean); !isBool || !bool(b) {
-			dict["A"] = m.A
+	// A (optional) — sentinel-based dispatch
+	switch m.Activation {
+	case nil:
+		dict["A"] = pdf.Boolean(false)
+	case movie.DefaultActivation:
+		// omit — PDF default is true (play with defaults)
+	default:
+		actObj, err := rm.Embed(m.Activation)
+		if err != nil {
+			return nil, err
 		}
+		dict["A"] = actObj
 	}
 
 	return dict, nil
