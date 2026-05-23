@@ -23,13 +23,16 @@ import (
 )
 
 // RawBytes returns a reader over the page's raw content-stream bytes.
-// Segments are concatenated with a single newline between them (PDF
-// 32000-1 §7.8.2).  The returned reader yields bytes only, with no
-// parsing or operator-level processing — see [Page.NewIter] for a
-// tokenised view that threads scanner state across segment boundaries.
-// The caller is responsible for closing the returned [io.ReadCloser].
-func (p *Page) RawBytes() io.ReadCloser {
-	return SegmentsReader(p.Contents)
+// Segments are concatenated with a single newline between them.  The
+// returned reader yields bytes only, with no parsing or operator-level
+// processing — see [Page.NewIter] for a tokenised view that threads
+// scanner state across segment boundaries.  The caller is responsible
+// for closing the returned [io.ReadCloser].
+//
+// The error return matches the Stream interface and is always nil; the
+// underlying reader opens segments lazily.
+func (p *Page) RawBytes() (io.ReadCloser, error) {
+	return SegmentsReader(p.Contents), nil
 }
 
 // SegmentsReader returns a reader over the concatenated raw bytes of the

@@ -54,6 +54,11 @@ type Resources struct {
 	SingleUse bool
 }
 
+// ProcSet describes the legacy procedure-set declaration for a resource
+// dictionary.  Each field corresponds to one of the PDF 1.x ProcSet
+// names; setting any of them causes the corresponding name to be emitted
+// in the resource dictionary's /ProcSet entry.  Deprecated and not
+// permitted in PDF 2.0.
 type ProcSet struct {
 	PDF    bool
 	Text   bool
@@ -64,6 +69,9 @@ type ProcSet struct {
 
 var _ pdf.Embedder = (*Resources)(nil)
 
+// Embed writes r to the PDF file as a resource dictionary.  Returns the
+// dictionary directly when [Resources.SingleUse] is set, or an indirect
+// reference otherwise.
 func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// validate PDF version constraints
 	if len(r.Shading) > 0 {

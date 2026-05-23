@@ -23,21 +23,6 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Write serialises every operator in s to out via [Operator.Format].
-// No validation is performed; callers must ensure the stream is
-// well-formed (typically by constructing it through
-// [seehuhn.de/go/pdf/graphics/content/builder.Builder]).
-func Write(out io.Writer, s Stream) error {
-	it := s.NewIter()
-	for name, args := range it.All() {
-		op := Operator{Name: name, Args: args}
-		if err := op.Format(out); err != nil {
-			return err
-		}
-	}
-	return it.Err()
-}
-
 // Format writes op's PDF representation to out (its args followed by the
 // operator name, with the appropriate separators).  The pseudo-operators
 // [OpRawContent] and [OpInlineImage] have dedicated handling.

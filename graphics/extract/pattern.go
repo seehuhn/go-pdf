@@ -199,18 +199,14 @@ func extractType1(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 		}
 	}
 
-	// parse the content stream
+	// store a reader factory closure so each iteration re-opens the PDF stream
 	stm := stream // capture for closure
 	getter := x.R
-	ops, err := content.ReadStream(
+	pat.Content = content.NewScanner(
 		func() (io.ReadCloser, error) {
 			return pdf.DecodeStream(getter, path, stm, 0)
 		},
 	)
-	if err != nil {
-		return nil, &pdf.MalformedFileError{Err: err}
-	}
-	pat.Content = &content.Operators{Ops: ops}
 
 	return pat, nil
 }

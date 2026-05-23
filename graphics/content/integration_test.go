@@ -17,7 +17,6 @@
 package content_test
 
 import (
-	"bytes"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -34,8 +33,7 @@ func TestMultiSegmentPage(t *testing.T) {
 	b.MoveTo(0, 0)
 	b.LineTo(100, 100)
 	b.Stroke()
-	stream1, err := b.Harvest()
-	if err != nil {
+	if _, err := b.Harvest(); err != nil {
 		t.Fatalf("Harvest stream1: %v", err)
 	}
 
@@ -59,15 +57,6 @@ func TestMultiSegmentPage(t *testing.T) {
 	// Validate
 	if err := b.Close(); err != nil {
 		t.Fatalf("Validate: %v", err)
-	}
-
-	// Write both segments
-	var buf1, buf2 bytes.Buffer
-	if err := content.Write(&buf1, stream1); err != nil {
-		t.Fatalf("Write stream1: %v", err)
-	}
-	if err := content.Write(&buf2, stream2); err != nil {
-		t.Fatalf("Write stream2: %v", err)
 	}
 }
 
@@ -106,16 +95,7 @@ func TestType3FontGlyphs(t *testing.T) {
 		t.Fatalf("Validate glyph B: %v", err)
 	}
 
-	// Write both
-	var bufA, bufB bytes.Buffer
-	if err := content.Write(&bufA, streamA); err != nil {
-		t.Fatalf("Write glyph A: %v", err)
-	}
-	if err := content.Write(&bufB, streamB); err != nil {
-		t.Fatalf("Write glyph B: %v", err)
-	}
-
-	if bufA.Len() == 0 || bufB.Len() == 0 {
+	if len(streamA.Ops) == 0 || len(streamB.Ops) == 0 {
 		t.Error("Glyph streams should not be empty")
 	}
 }

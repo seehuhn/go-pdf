@@ -24,15 +24,13 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Operators is an in-memory [Stream] backed by an [Operator] slice.
-// Two pages embedding the same *Operators value via [pdf.ResourceManager]
-// share a single PDF stream object (pointer-identity deduplication).
-//
-// Wrapped operators are treated as pre-validated builder output;
-// [Operators.NewIter] yields them verbatim, without applying any fix-ups.
+// Operators is a sequence of PDF content stream operators.
+// This implements both [Stream] and [seehuhn.de/go/pdf/page.Segment].
 type Operators struct {
 	Ops []Operator
 }
+
+var _ Stream = (*Operators)(nil)
 
 // Equal reports whether two streams contain the same operator sequence.
 // Two nil values compare equal; nil vs non-nil are unequal.
@@ -54,54 +52,11 @@ func (m *Operators) Equal(other *Operators) bool {
 	return true
 }
 
-// NewIter returns an iterator over the wrapped operators.
+// NewIter returns an iterator over the individual operators.
+//
+// This is used to implement the [Stream] interface.
 func (m *Operators) NewIter() Iter {
 	return &operatorsIter{ops: m.Ops}
-}
-
-// Embed writes the wrapped operators to a new PDF stream object and
-// returns a reference to it.  Repeated embeds of the same *Operators
-// value via [pdf.ResourceManager] dedup to a single object.
-func (m *Operators) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
-	ref := e.Out().Alloc()
-
-	var filters []pdf.Filter
-	if !e.Out().GetOptions().HasAny(pdf.OptPretty) {
-		filters = append(filters, pdf.FilterCompress{})
-	}
-
-	stm, err := e.Out().OpenStream(ref, nil, filters...)
-	if err != nil {
-		return nil, err
-	}
-	if err := m.writeOperators(stm); err != nil {
-		stm.Close()
-		return nil, err
-	}
-	if err := stm.Close(); err != nil {
-		return nil, err
-	}
-	return ref, nil
-}
-
-// RawBytes serialises the wrapped operators into an in-memory buffer
-// and returns a reader over it.  It is used by [seehuhn.de/go/pdf/page.Page.NewIter]
-// to thread in-memory segments through the unified content-stream scanner.
-func (m *Operators) RawBytes() (io.ReadCloser, error) {
-	var buf bytes.Buffer
-	if err := m.writeOperators(&buf); err != nil {
-		return nil, err
-	}
-	return io.NopCloser(&buf), nil
-}
-
-func (m *Operators) writeOperators(w io.Writer) error {
-	for _, op := range m.Ops {
-		if err := op.Format(w); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // operatorsIter is the single-use [Iter] returned by [Operators.NewIter].
@@ -120,3 +75,75 @@ func (mi *operatorsIter) All() iter.Seq2[OpName, []pdf.Object] {
 }
 
 func (mi *operatorsIter) Err() error { return nil }
+
+// RawBytes returns a reader over the serialized operator sequence.
+//
+// The reader serialises operators lazily: peak transient memory is
+// bounded by the largest single operator's serialised size.
+//
+// This is used to implement both the [Stream]
+// and the [seehuhn.de/go/pdf/page.Segment] interfaces.
+func (m *Operators) RawBytes() (io.ReadCloser, error) {
+	return &operatorsReader{ops: m.Ops}, nil
+}
+
+// operatorsReader is the lazy [io.ReadCloser] returned by [Operators.RawBytes].
+// It formats one operator at a time into pending and drains pending into the
+// caller's buffer, so the serialised byte stream never has to be materialised
+// in full.
+type operatorsReader struct {
+	ops     []Operator
+	idx     int
+	pending bytes.Buffer
+}
+
+func (r *operatorsReader) Read(p []byte) (n int, err error) {
+	for n < len(p) {
+		if r.pending.Len() > 0 {
+			k, _ := r.pending.Read(p[n:])
+			n += k
+			continue
+		}
+		if r.idx >= len(r.ops) {
+			if n > 0 {
+				return n, nil
+			}
+			return 0, io.EOF
+		}
+		if err := r.ops[r.idx].Format(&r.pending); err != nil {
+			return n, err
+		}
+		r.idx++
+	}
+	return n, nil
+}
+
+func (*operatorsReader) Close() error { return nil }
+
+// Embed writes the wrapped operators to a new PDF stream object and
+// returns a reference to it.
+//
+// This is used to implement the [seehuhn.de/go/pdf/page.Segment] interface.
+func (m *Operators) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
+	ref := e.Out().Alloc()
+
+	var filters []pdf.Filter
+	if !e.Out().GetOptions().HasAny(pdf.OptPretty) {
+		filters = append(filters, pdf.FilterCompress{})
+	}
+
+	stm, err := e.Out().OpenStream(ref, nil, filters...)
+	if err != nil {
+		return nil, err
+	}
+	for _, op := range m.Ops {
+		if err := op.Format(stm); err != nil {
+			stm.Close()
+			return nil, err
+		}
+	}
+	if err := stm.Close(); err != nil {
+		return nil, err
+	}
+	return ref, nil
+}

@@ -304,15 +304,14 @@ func TestGlyphWidths(t *testing.T) {
 	}
 
 	buf := &bytes.Buffer{}
-	err := content.Write(buf, &content.Operators{Ops: b.Stream})
-	if err != nil {
+	if err := writeOps(buf, b.Stream); err != nil {
 		t.Fatal(err)
 	}
 
 	in := reader.New(pdf.NewExtractor(data))
 	var xxOut []float64
 	in.Character = func(c font.Code) error {
-		x, _ := in.GetTextPositionDevice()
+		x, _ := in.State.GState.GetTextPositionDevice()
 		xxOut = append(xxOut, x)
 		return nil
 	}
@@ -321,8 +320,7 @@ func TestGlyphWidths(t *testing.T) {
 	open := func() (io.ReadCloser, error) {
 		return io.NopCloser(bytes.NewReader(bufData)), nil
 	}
-	err = in.ProcessIter(content.NewScanner(open).NewIter())
-	if err != nil {
+	if err := in.ProcessIter(content.NewScanner(open).NewIter()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -556,3 +554,13 @@ const sampleText1 = "I was weary of sight, weary of acquaintance, weary of famil
 
 // This one is from the actual Moby Dick novel.
 const sampleText2 = "With a philosophical flourish Cato throws himself upon his sword; I quietly take to the ship."
+
+// writeOps serialises ops into out via [content.Operator.Format].
+func writeOps(out io.Writer, ops []content.Operator) error {
+	for _, op := range ops {
+		if err := op.Format(out); err != nil {
+			return err
+		}
+	}
+	return nil
+}

@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 	"seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/pagetree"
@@ -70,8 +71,8 @@ func TestExtractText(t *testing.T) {
 
 			var pieces []string
 			contents := New(pdf.NewExtractor(r))
-			contents.Text = func(text string) error {
-				pieces = append(pieces, text)
+			contents.Character = func(c font.Code) error {
+				pieces = append(pieces, c.Text)
 				return nil
 			}
 

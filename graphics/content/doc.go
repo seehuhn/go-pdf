@@ -39,9 +39,10 @@
 // The rest of the package trusts that the operator stream it sees is
 // well-formed:
 //
-//   - [Writer] is a thin serialiser; it does not validate.
-//   - [NewScanner] and [ReadStream] yield the raw operator stream the
-//     scanner saw, without any rewrites, drops, or synthesised closers.
+//   - [Operator.Format], [Operators.RawBytes] and [Operators.Embed] are
+//     thin serialisers; they do not validate.
+//   - [NewScanner] yields the raw operator stream the scanner saw,
+//     without any rewrites, drops, or synthesised closers.
 //   - [Iter] reports IO errors via [Iter.Err]; it does not synthesise
 //     closing operators for unbalanced contexts.
 //

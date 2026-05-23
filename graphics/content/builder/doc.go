@@ -18,7 +18,8 @@
 //
 // The [Builder] type offers methods corresponding to PDF graphics operators.
 // It tracks graphics state, manages resources, and produces a
-// [*content.Operators] segment that can be serialised using [content.Write].
+// [*content.Operators] segment.  Use [*content.Operators.RawBytes] to obtain
+// a reader over the formatted content-stream bytes.
 // Errors are reported using the [Builder.Err] field. Once an error occurs,
 // all methods return immediately without doing anything.
 //
@@ -37,6 +38,6 @@
 //	if err != nil {
 //		log.Fatal(err)
 //	}
-//	// Use content.Write to serialise the stream.
+//	// Use stream.RawBytes() to obtain the formatted content-stream bytes.
 //	// Use b.Resources for the associated resource dictionary.
 package builder

@@ -107,7 +107,7 @@ func (e *TextExtractor) setupCallbacks() {
 
 		text = remapPUA(text)
 
-		xDev, _ := e.reader.GetTextPositionDevice()
+		xDev, _ := e.reader.State.GState.GetTextPositionDevice()
 		if xDev < e.XRangeMin || xDev >= e.XRangeMax {
 			return nil
 		}

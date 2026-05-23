@@ -169,9 +169,9 @@ func TestBuilder_ResetClearsError(t *testing.T) {
 // TestBuilder_FailingOperatorRecordedInStream verifies that when an
 // operator fails validation in [Builder.emit] the failing operator is
 // still appended to [Builder.Stream].  This lets a downstream consumer
-// such as [content.Writer] replay the stream, re-trigger the same error,
-// and report the root cause rather than a cascading "unclosed operators"
-// failure caused by suppressed matching closers.
+// replay the stream, re-trigger the same error, and report the root
+// cause rather than a cascading "unclosed operators" failure caused by
+// suppressed matching closers.
 func TestBuilder_FailingOperatorRecordedInStream(t *testing.T) {
 	b := New(content.Form, nil, pdf.V2_0)
 

@@ -87,13 +87,19 @@ func TestType3Roundtrip(t *testing.T) {
 				d1.Encoding = nil
 				d2.Encoding = nil
 
-				if d := cmp.Diff(d1, d2); d != "" {
+				if d := cmp.Diff(d1, d2, contentStreamOpt); d != "" {
 					t.Fatal(d)
 				}
 			})
 		}
 	}
 }
+
+// contentStreamOpt compares content.Stream interface values semantically
+// (by operator sequence) rather than by concrete type, so a materialised
+// *content.Operators in test data round-trips against the lazy
+// *streamFactory produced by extract.
+var contentStreamOpt = cmp.Comparer(content.StreamsEqual)
 
 func FuzzType3Dict(f *testing.F) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
@@ -205,7 +211,7 @@ func FuzzType3Dict(f *testing.F) {
 		d1.Encoding = nil
 		d2.Encoding = nil
 
-		if d := cmp.Diff(d1, d2); d != "" {
+		if d := cmp.Diff(d1, d2, contentStreamOpt); d != "" {
 			t.Fatal(d)
 		}
 	})

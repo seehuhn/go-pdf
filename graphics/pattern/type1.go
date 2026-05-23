@@ -18,6 +18,7 @@ package pattern
 
 import (
 	"fmt"
+	"io"
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
@@ -139,14 +140,20 @@ func (p *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	if p.Content != nil {
-		err = content.Write(stm, p.Content)
+		rc, err := p.Content.RawBytes()
 		if err != nil {
+			stm.Close()
+			return nil, err
+		}
+		_, err = io.Copy(stm, rc)
+		rc.Close()
+		if err != nil {
+			stm.Close()
 			return nil, err
 		}
 	}
 
-	err = stm.Close()
-	if err != nil {
+	if err := stm.Close(); err != nil {
 		return nil, err
 	}
 

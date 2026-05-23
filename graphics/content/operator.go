@@ -23,21 +23,6 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 )
 
-var (
-	// ErrUnknown is returned when an operator is not recognized.
-	ErrUnknown = errors.New("unknown operator")
-
-	// ErrVersion is returned when an operator is only available in later PDF versions.
-	ErrVersion = errors.New("operator not available in PDF version")
-
-	// ErrDeprecated is returned when an operator has been deprecated in the target PDF version.
-	ErrDeprecated = errors.New("deprecated operator")
-
-	// ErrInvalidContext is returned when an operator is used in a context
-	// (page/path/text/…) where it is not permitted.
-	ErrInvalidContext = errors.New("operator not allowed in current context")
-)
-
 // Operator represents a content stream operator with its arguments
 type Operator struct {
 	Name OpName
@@ -58,6 +43,13 @@ func (o Operator) Equal(other Operator) bool {
 		}
 	}
 	return true
+}
+
+// Known reports whether name is a recognised PDF content-stream operator
+// (including the pseudo-operators [OpRawContent] and [OpInlineImage]).
+func Known(name OpName) bool {
+	_, ok := operators[name]
+	return ok
 }
 
 // CheckOperatorVersion reports whether the operator is available in the
@@ -334,4 +326,19 @@ const (
 	opBeginInlineImage OpName = "BI"
 	opInlineImageData  OpName = "ID"
 	opEndInlineImage   OpName = "EI"
+)
+
+var (
+	// ErrUnknown is returned when an operator is not recognized.
+	ErrUnknown = errors.New("unknown operator")
+
+	// ErrVersion is returned when an operator is only available in later PDF versions.
+	ErrVersion = errors.New("operator not available in PDF version")
+
+	// ErrDeprecated is returned when an operator has been deprecated in the target PDF version.
+	ErrDeprecated = errors.New("deprecated operator")
+
+	// ErrInvalidContext is returned when an operator is used in a context
+	// (page/path/text/…) where it is not permitted.
+	ErrInvalidContext = errors.New("operator not allowed in current context")
 )

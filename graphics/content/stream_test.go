@@ -28,14 +28,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/font"
 )
-
-// testResources provides resources for round-trip tests.
-// Font F1 is referenced by "text operators" and "mixed content" test cases.
-var testResources = &Resources{
-	Font: map[pdf.Name]font.Instance{"F1": nil},
-}
 
 // bytesOpener returns a reader factory that opens the given data as a stream.
 func bytesOpener(data []byte) func() (io.ReadCloser, error) {
@@ -68,12 +61,14 @@ var roundTripTestCases = []struct {
 func roundTripTest(t *testing.T, _ pdf.Version, stream1 []Operator) {
 	t.Helper()
 
+	rc, _ := (&Operators{Ops: stream1}).RawBytes()
 	var buf bytes.Buffer
-	if err := Write(&buf, &Operators{Ops: stream1}); err != nil {
+	if _, err := io.Copy(&buf, rc); err != nil {
 		t.Fatalf("write: %v", err)
 	}
+	rc.Close()
 
-	stream2, err := ReadStream(bytesOpener(buf.Bytes()))
+	stream2, err := collectStream(NewScanner(bytesOpener(buf.Bytes())))
 	if err != nil {
 		t.Fatalf("second read: %v", err)
 	}
@@ -89,9 +84,9 @@ func roundTripTest(t *testing.T, _ pdf.Version, stream1 []Operator) {
 // [State.applyOperatorToParams] folds it into the CTM (see also
 // [TestCmInsideText_AppliesToCTM] in state_test.go).
 func TestCmInsideText(t *testing.T) {
-	got, err := ReadStream(bytesOpener([]byte(
+	got, err := collectStream(NewScanner(bytesOpener([]byte(
 		"BT\n1 0 0 1 50 100 cm\n/F1 12 Tf\n(Hi) Tj\nET\n",
-	)))
+	))))
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -113,7 +108,7 @@ func TestCmInsideText(t *testing.T) {
 func TestStreamRoundTrip(t *testing.T) {
 	for _, tt := range roundTripTestCases {
 		t.Run(tt.name, func(t *testing.T) {
-			stream1, err := ReadStream(bytesOpener([]byte(tt.stream)))
+			stream1, err := collectStream(NewScanner(bytesOpener([]byte(tt.stream))))
 			if err != nil {
 				t.Fatalf("first read: %v", err)
 			}
@@ -130,7 +125,7 @@ func FuzzStreamRoundTrip(f *testing.F) {
 	f.Add([]byte(strings.Repeat("<<", 1000)))
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		stream1, err := ReadStream(bytesOpener(data))
+		stream1, err := collectStream(NewScanner(bytesOpener(data)))
 		if err != nil {
 			return // permissive read; malformed input is not a contract violation
 		}
@@ -188,9 +183,9 @@ func TestInlineImageLimits(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stream, err := ReadStream(bytesOpener([]byte(tt.stream)))
+			stream, err := collectStream(NewScanner(bytesOpener([]byte(tt.stream))))
 			if err != nil {
-				t.Fatalf("ReadStream error: %v", err)
+				t.Fatalf("collectStream error: %v", err)
 			}
 
 			hasImage := false
@@ -341,8 +336,8 @@ func TestScanLoopNestingDepthCap(t *testing.T) {
 	// scan() rejects each push past the cap with parseError{}, and
 	// scanLoop skips it, so the call must terminate cleanly.
 	input := strings.Repeat("[", maxContentNestDepth*4)
-	if _, err := ReadStream(bytesOpener([]byte(input))); err != nil {
-		t.Fatalf("ReadStream error: %v", err)
+	if _, err := collectStream(NewScanner(bytesOpener([]byte(input)))); err != nil {
+		t.Fatalf("collectStream error: %v", err)
 	}
 }
 
@@ -363,9 +358,9 @@ func TestContentReadCommentBomb(t *testing.T) {
 	// LF must still be emitted (the bad comment's surplus bytes are
 	// drained up to the EOL, where Scan resyncs).
 	input := "%" + strings.Repeat("a", maxNameBytes+50) + "\n10 j"
-	ops, err := ReadStream(bytesOpener([]byte(input)))
+	ops, err := collectStream(NewScanner(bytesOpener([]byte(input))))
 	if err != nil {
-		t.Fatalf("ReadStream: %v", err)
+		t.Fatalf("collectStream: %v", err)
 	}
 	var names []string
 	for _, op := range ops {
@@ -431,9 +426,9 @@ func TestContentReadNameBombStreamRecovery(t *testing.T) {
 	// token here would be glued onto the tail of the bad name and
 	// lost.
 	input := "/" + strings.Repeat("a", maxNameBytes+50) + " cs\n5 j 10 J"
-	ops, err := ReadStream(bytesOpener([]byte(input)))
+	ops, err := collectStream(NewScanner(bytesOpener([]byte(input))))
 	if err != nil {
-		t.Fatalf("ReadStream: %v", err)
+		t.Fatalf("collectStream: %v", err)
 	}
 	var names []string
 	for _, op := range ops {
@@ -451,9 +446,9 @@ func TestContentScanTokenOperatorBomb(t *testing.T) {
 	// maxNameBytes must be rejected with parseError, with the surplus
 	// drained so subsequent operators are still emitted.
 	input := strings.Repeat("z", maxNameBytes+50) + " j 10 J"
-	ops, err := ReadStream(bytesOpener([]byte(input)))
+	ops, err := collectStream(NewScanner(bytesOpener([]byte(input))))
 	if err != nil {
-		t.Fatalf("ReadStream: %v", err)
+		t.Fatalf("collectStream: %v", err)
 	}
 	var names []string
 	for _, op := range ops {
@@ -470,9 +465,9 @@ func TestContentScanTokenNumberBomb(t *testing.T) {
 	// A digit run longer than maxNameBytes must be rejected with
 	// parseError, surplus drained, and the trailing operator emitted.
 	input := strings.Repeat("9", maxNameBytes+50) + " j"
-	ops, err := ReadStream(bytesOpener([]byte(input)))
+	ops, err := collectStream(NewScanner(bytesOpener([]byte(input))))
 	if err != nil {
-		t.Fatalf("ReadStream: %v", err)
+		t.Fatalf("collectStream: %v", err)
 	}
 	var names []string
 	for _, op := range ops {
@@ -549,9 +544,9 @@ func TestParseErrorResetsCompositeStack(t *testing.T) {
 	// the still-open dict frame swallows "5 j 10 J" entirely and no
 	// operators are emitted.
 	input := "<<<Z 5 j 10 J"
-	ops, err := ReadStream(bytesOpener([]byte(input)))
+	ops, err := collectStream(NewScanner(bytesOpener([]byte(input))))
 	if err != nil {
-		t.Fatalf("ReadStream error: %v", err)
+		t.Fatalf("collectStream error: %v", err)
 	}
 
 	var names []string
@@ -587,11 +582,11 @@ func TestReadValueDepthLimit(t *testing.T) {
 func TestInlineImageWithArrayValue(t *testing.T) {
 	// inline image with /D [1 0] — this previously failed because
 	// readInlineImage used nextToken which couldn't parse arrays
-	stream, err := ReadStream(
+	stream, err := collectStream(NewScanner(
 		bytesOpener([]byte("BI\n/W 10\n/H 10\n/D [1 0]\nID\nimagedata\nEI\n")),
-	)
+	))
 	if err != nil {
-		t.Fatalf("ReadStream error: %v", err)
+		t.Fatalf("collectStream error: %v", err)
 	}
 
 	hasImage := false
@@ -618,11 +613,11 @@ func TestInlineImageWithArrayValue(t *testing.T) {
 
 func TestInlineImageWithDictValue(t *testing.T) {
 	// inline image with a dict value in the header
-	stream, err := ReadStream(
+	stream, err := collectStream(NewScanner(
 		bytesOpener([]byte("BI\n/W 10\n/H 10\n/DP <</K -1>>\nID\nimagedata\nEI\n")),
-	)
+	))
 	if err != nil {
-		t.Fatalf("ReadStream error: %v", err)
+		t.Fatalf("collectStream error: %v", err)
 	}
 
 	hasImage := false
@@ -657,9 +652,9 @@ func TestOperatorArgLimit(t *testing.T) {
 	buf.WriteString("q\n") // save graphics state (should be parsed)
 	buf.WriteString("Q\n") // restore graphics state
 
-	stream, err := ReadStream(bytesOpener(buf.Bytes()))
+	stream, err := collectStream(NewScanner(bytesOpener(buf.Bytes())))
 	if err != nil {
-		t.Fatalf("ReadStream error: %v", err)
+		t.Fatalf("collectStream error: %v", err)
 	}
 
 	// the operator with too many args should be skipped
@@ -671,18 +666,6 @@ func TestOperatorArgLimit(t *testing.T) {
 	}
 }
 
-// appendClosingOps tracks state on ops and appends any closing operators.
-func appendClosingOps(ops []Operator, ct Type, res *Resources) []Operator {
-	state := NewState(ct, res)
-	for _, op := range ops {
-		state.ApplyStateChanges(op.Name, op.Args)
-	}
-	for _, name := range state.ClosingOperators() {
-		ops = append(ops, Operator{Name: name})
-	}
-	return ops
-}
-
 // collectStream collects all operators from a Stream into an Operators slice.
 func collectStream(s Stream) ([]Operator, error) {
 	it := s.NewIter()
@@ -691,59 +674,6 @@ func collectStream(s Stream) ([]Operator, error) {
 		ops = append(ops, Operator{Name: name, Args: slices.Clone(args)})
 	}
 	return ops, it.Err()
-}
-
-func TestNewScannerMatchesReadStream(t *testing.T) {
-	for _, tt := range roundTripTestCases {
-		t.Run(tt.name, func(t *testing.T) {
-			data := []byte(tt.stream)
-
-			// ReadStream result (includes closing ops)
-			want, err := ReadStream(bytesOpener(data))
-			if err != nil {
-				t.Fatalf("ReadStream: %v", err)
-			}
-
-			// NewScanner result (no closing ops); append them manually
-			s := NewScanner(bytesOpener(data))
-			got, err := collectStream(s)
-			if err != nil {
-				t.Fatalf("NewScanner: %v", err)
-			}
-			got = appendClosingOps(got, Page, testResources)
-
-			if diff := cmp.Diff(want, got, cmpopts.EquateEmpty()); diff != "" {
-				t.Errorf("mismatch (-ReadStream +NewScanner):\n%s", diff)
-			}
-		})
-	}
-}
-
-func FuzzNewScannerMatchesReadStream(f *testing.F) {
-	for _, tc := range roundTripTestCases {
-		f.Add([]byte(tc.stream))
-	}
-
-	f.Fuzz(func(t *testing.T, data []byte) {
-		want, err1 := ReadStream(bytesOpener(data))
-
-		s := NewScanner(bytesOpener(data))
-		got, err2 := collectStream(s)
-
-		// both should either succeed or fail
-		if (err1 != nil) != (err2 != nil) {
-			t.Fatalf("error mismatch: ReadStream=%v, NewScanner=%v", err1, err2)
-		}
-		if err1 != nil {
-			return
-		}
-
-		got = appendClosingOps(got, Page, testResources)
-
-		if diff := cmp.Diff(want, got, cmpopts.EquateEmpty()); diff != "" {
-			t.Errorf("mismatch (-ReadStream +NewScanner):\n%s", diff)
-		}
-	})
 }
 
 func TestScannerRewind(t *testing.T) {
@@ -762,6 +692,72 @@ func TestScannerRewind(t *testing.T) {
 
 	if diff := cmp.Diff(first, second, cmpopts.EquateEmpty()); diff != "" {
 		t.Errorf("rewind mismatch (-first +second):\n%s", diff)
+	}
+}
+
+// TestOperatorsRawBytesStreaming pins the per-byte streaming behaviour
+// of [Operators.RawBytes]: each [io.Reader.Read] call returns at most
+// the requested byte count, but the final concatenated output must be
+// identical to a single-shot read.  This catches regressions that
+// re-introduce buffer-the-whole-stream behaviour.
+func TestOperatorsRawBytesStreaming(t *testing.T) {
+	m := &Operators{Ops: []Operator{
+		{Name: OpPushGraphicsState},
+		{Name: OpTransform, Args: []pdf.Object{
+			pdf.Integer(1), pdf.Integer(0), pdf.Integer(0), pdf.Integer(1),
+			pdf.Integer(100), pdf.Integer(200),
+		}},
+		{Name: OpTextBegin},
+		{Name: OpTextSetFont, Args: []pdf.Object{pdf.Name("F1"), pdf.Integer(12)}},
+		{Name: OpTextShow, Args: []pdf.Object{pdf.String("hello world")}},
+		{Name: OpTextEnd},
+		{Name: OpPopGraphicsState},
+	}}
+
+	// reference: read everything in one Read call.
+	refRC, _ := m.RawBytes()
+	var refBuf bytes.Buffer
+	if _, err := io.Copy(&refBuf, refRC); err != nil {
+		t.Fatalf("reference io.Copy: %v", err)
+	}
+	refRC.Close()
+
+	// per-byte: force a fresh Read for every byte.  A materialising
+	// implementation passes too, but any regression that forgets to
+	// honour len(p)=1 will fail.
+	rc, _ := m.RawBytes()
+	var oneByteBuf bytes.Buffer
+	one := make([]byte, 1)
+	for {
+		n, err := rc.Read(one)
+		if n > 0 {
+			oneByteBuf.WriteByte(one[0])
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("per-byte Read: %v", err)
+		}
+	}
+	rc.Close()
+
+	if !bytes.Equal(refBuf.Bytes(), oneByteBuf.Bytes()) {
+		t.Errorf("per-byte streaming mismatch:\nfull:    %q\nperbyte: %q",
+			refBuf.String(), oneByteBuf.String())
+	}
+
+	// independent readers: a second RawBytes call must yield the same
+	// bytes (no shared state with the first reader).
+	rc2, _ := m.RawBytes()
+	var secondBuf bytes.Buffer
+	if _, err := io.Copy(&secondBuf, rc2); err != nil {
+		t.Fatalf("second io.Copy: %v", err)
+	}
+	rc2.Close()
+	if !bytes.Equal(refBuf.Bytes(), secondBuf.Bytes()) {
+		t.Errorf("second reader mismatch:\nfirst:  %q\nsecond: %q",
+			refBuf.String(), secondBuf.String())
 	}
 }
 
@@ -814,7 +810,7 @@ func TestParseNumber(t *testing.T) {
 func TestStreamsEqual(t *testing.T) {
 	data := []byte("q\n1 0 0 1 100 200 cm\nQ\n")
 
-	ops, err := ReadStream(bytesOpener(data))
+	ops, err := collectStream(NewScanner(bytesOpener(data)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -827,7 +823,7 @@ func TestStreamsEqual(t *testing.T) {
 	}
 
 	// Memory vs Memory
-	ops2, _ := ReadStream(bytesOpener(data))
+	ops2, _ := collectStream(NewScanner(bytesOpener(data)))
 	if !StreamsEqual(&Operators{Ops: ops}, &Operators{Ops: ops2}) {
 		t.Error("expected two Operators to be equal")
 	}
@@ -851,25 +847,25 @@ func TestStreamsEqual(t *testing.T) {
 	}
 
 	// different streams
-	other, _ := ReadStream(bytesOpener([]byte("q\nQ\n")))
+	other, _ := collectStream(NewScanner(bytesOpener([]byte("q\nQ\n"))))
 	if StreamsEqual(&Operators{Ops: ops}, &Operators{Ops: other}) {
 		t.Error("expected different streams to be unequal")
 	}
 }
 
-// TestReadStreamRaw confirms ReadStream yields the operator sequence
-// verbatim and does not synthesise closers for unbalanced contexts.
-// Closer synthesis is now the consumer's job — see [State.ClosingOperators]
-// and [seehuhn.de/go/pdf/reader.Reader.ProcessIter].
-func TestReadStreamRaw(t *testing.T) {
+// TestScannerNoCloserSynthesis confirms the scanner yields the operator
+// sequence verbatim and does not synthesise closers for unbalanced
+// contexts.  Closer synthesis is the consumer's job — see
+// [State.ClosingOperators] and [seehuhn.de/go/pdf/reader.Reader.ProcessIter].
+func TestScannerNoCloserSynthesis(t *testing.T) {
 	input := []byte("q\n1 0 0 1 0 0 cm\n")
-	ops, err := ReadStream(bytesOpener(input))
+	ops, err := collectStream(NewScanner(bytesOpener(input)))
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, op := range ops {
 		if op.Name == OpPopGraphicsState {
-			t.Errorf("ReadStream should not synthesise Q; got %v", op)
+			t.Errorf("scanner should not synthesise Q; got %v", op)
 		}
 	}
 }

@@ -74,7 +74,7 @@ func TestTextPos(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			x, y := page.GetTextPositionDevice()
+			x, y := page.State.GState.GetTextPositionDevice()
 
 			expected := testcases.AllGhostscript[i]
 			if math.Abs(x-expected.X) > 1 || math.Abs(y-expected.Y) > 1 {

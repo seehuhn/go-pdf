@@ -59,32 +59,26 @@ func TestReaderMarkedContentFields(t *testing.T) {
 		t.Error("MarkedContent callback should be nil by default")
 	}
 
-	// Verify stack field exists and is empty
-	if r.MarkedContentStack == nil {
-		t.Fatal("MarkedContentStack should be initialized (empty slice, not nil)")
-	}
-	if len(r.MarkedContentStack) != 0 {
-		t.Errorf("MarkedContentStack length = %d, want 0", len(r.MarkedContentStack))
+	// Verify marked-content stack is empty
+	if d := r.State.MarkedContentDepth(); d != 0 {
+		t.Errorf("MarkedContentDepth = %d, want 0", d)
 	}
 }
 
 func TestResetClearsMarkedContentStack(t *testing.T) {
-	r := New(nil)
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	r := New(pdf.NewExtractor(w))
 
-	// Add something to the stack
-	r.MarkedContentStack = append(r.MarkedContentStack, &graphics.MarkedContent{
-		Tag: "Test",
-	})
-
-	if len(r.MarkedContentStack) != 1 {
-		t.Fatal("Setup failed: stack should have 1 element")
+	r.State.MarkedContentBegin()
+	r.State.AttachMarkedContent(&graphics.MarkedContent{Tag: "Test"})
+	if d := r.State.MarkedContentDepth(); d != 1 {
+		t.Fatalf("setup failed: depth = %d, want 1", d)
 	}
 
-	// Reset should clear the stack
 	r.Reset()
 
-	if len(r.MarkedContentStack) != 0 {
-		t.Errorf("After Reset(), MarkedContentStack length = %d, want 0", len(r.MarkedContentStack))
+	if d := r.State.MarkedContentDepth(); d != 0 {
+		t.Errorf("After Reset(), MarkedContentDepth = %d, want 0", d)
 	}
 }
 
@@ -132,8 +126,8 @@ func TestMPOperator(t *testing.T) {
 	}
 
 	// Stack should still be empty (MP doesn't push)
-	if len(r.MarkedContentStack) != 0 {
-		t.Errorf("MarkedContentStack length = %d, want 0", len(r.MarkedContentStack))
+	if r.State.MarkedContentDepth() != 0 {
+		t.Errorf("MarkedContentDepth() = %d, want 0", r.State.MarkedContentDepth())
 	}
 }
 
@@ -184,8 +178,8 @@ func TestBMCOperator(t *testing.T) {
 	}
 
 	// Stack should be empty after auto-close
-	if len(r.MarkedContentStack) != 0 {
-		t.Errorf("MarkedContentStack length = %d, want 0", len(r.MarkedContentStack))
+	if r.State.MarkedContentDepth() != 0 {
+		t.Errorf("MarkedContentDepth() = %d, want 0", r.State.MarkedContentDepth())
 	}
 }
 
@@ -291,8 +285,8 @@ func TestBDCOperator(t *testing.T) {
 	}
 
 	// Stack should be empty after auto-close
-	if len(r.MarkedContentStack) != 0 {
-		t.Errorf("MarkedContentStack length = %d, want 0", len(r.MarkedContentStack))
+	if r.State.MarkedContentDepth() != 0 {
+		t.Errorf("MarkedContentDepth() = %d, want 0", r.State.MarkedContentDepth())
 	}
 
 	// verify Lang value via AsDirectDict
@@ -342,8 +336,8 @@ func TestEMCOperator(t *testing.T) {
 	}
 
 	// Stack should be empty after EMC
-	if len(r.MarkedContentStack) != 0 {
-		t.Errorf("MarkedContentStack length = %d, want 0", len(r.MarkedContentStack))
+	if r.State.MarkedContentDepth() != 0 {
+		t.Errorf("MarkedContentDepth() = %d, want 0", r.State.MarkedContentDepth())
 	}
 }
 
@@ -407,8 +401,8 @@ func TestMarkedContentStackOverflow(t *testing.T) {
 	}
 
 	// Stack should be empty after auto-close
-	if len(r.MarkedContentStack) != 0 {
-		t.Errorf("MarkedContentStack length = %d, want 0", len(r.MarkedContentStack))
+	if r.State.MarkedContentDepth() != 0 {
+		t.Errorf("MarkedContentDepth() = %d, want 0", r.State.MarkedContentDepth())
 	}
 }
 
@@ -428,7 +422,7 @@ func TestNestedMarkedContent(t *testing.T) {
 		records = append(records, eventRecord{
 			event: event,
 			tag:   mc.Tag,
-			depth: len(r.MarkedContentStack),
+			depth: r.State.MarkedContentDepth(),
 		})
 		return nil
 	}
@@ -485,5 +479,5 @@ func TestMalformedPropertyExtraction(t *testing.T) {
 	// This test documents current behavior
 
 	// Stack should be empty (malformed BDC was skipped or had nil properties)
-	t.Logf("Stack depth: %d, callback count: %d", len(r.MarkedContentStack), callCount)
+	t.Logf("Stack depth: %d, callback count: %d", r.State.MarkedContentDepth(), callCount)
 }

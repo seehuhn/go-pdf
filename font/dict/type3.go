@@ -19,6 +19,7 @@ package dict
 import (
 	"errors"
 	"fmt"
+	"io"
 	"iter"
 
 	"seehuhn.de/go/geom/matrix"
@@ -163,12 +164,13 @@ func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 			return nil, err
 		}
 
-		// Use per-glyph resources if present, else fall back to font-level resources
-		res := cp.Resources
-		if res == nil {
-			res = d.Resources
+		rc, err := cp.Content.RawBytes()
+		if err != nil {
+			stm.Close()
+			return nil, fmt.Errorf("glyph %q: %w", name, err)
 		}
-		err = content.Write(stm, cp.Content)
+		_, err = io.Copy(stm, rc)
+		rc.Close()
 		if err != nil {
 			stm.Close()
 			return nil, fmt.Errorf("glyph %q: %w", name, err)

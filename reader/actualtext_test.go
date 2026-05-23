@@ -151,10 +151,10 @@ func TestInActualText(t *testing.T) {
 	}
 
 	// Sample InActualText() at three positions: before BDC, between BDC and
-	// EMC, and after EMC.  We use UnknownOp on a sentinel operator name to
+	// EMC, and after EMC.  We use EveryOp on a sentinel operator name to
 	// surface the snapshots in order.
 	var samples []bool
-	r.UnknownOp = func(op string, args []pdf.Object) error {
+	r.EveryOp = func(op string, args []pdf.Object) error {
 		if op == "Probe" {
 			samples = append(samples, r.InActualText())
 		}

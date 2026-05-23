@@ -203,7 +203,7 @@ func (b *Builder) TextNextLine() {
 //
 // This implements the PDF graphics operator "Tj".
 func (b *Builder) TextShowRaw(s pdf.String) {
-	b.updateTextPosition(s)
+	b.advanceText(s)
 	// Clone the string to avoid aliasing if caller reuses the slice
 	b.emit(content.OpTextShow, cloneString(s))
 }
@@ -218,7 +218,7 @@ func (b *Builder) TextShowNextLineRaw(s pdf.String) {
 	// emit() handles line matrix update via applyOperatorToParams
 	b.emit(content.OpTextShowMoveNextLine, cloneString(s))
 	// Then advance for glyph widths
-	b.updateTextPosition(s)
+	b.advanceText(s)
 }
 
 // TextShowSpacedRaw adjusts word and character spacing and then shows an
@@ -233,7 +233,7 @@ func (b *Builder) TextShowSpacedRaw(wordSpacing, charSpacing float64, s pdf.Stri
 	b.emit(content.OpTextShowMoveNextLineSetSpacing,
 		pdf.Number(wordSpacing), pdf.Number(charSpacing), cloneString(s))
 	// Then advance for glyph widths (using the new spacing values)
-	b.updateTextPosition(s)
+	b.advanceText(s)
 }
 
 // TextShowKernedRaw shows an already encoded text in the PDF file, using
@@ -247,25 +247,21 @@ func (b *Builder) TextShowKernedRaw(args ...pdf.Object) {
 	if b.Err != nil {
 		return
 	}
-	wMode := font.Horizontal
-	if b.State.GState.TextFont != nil {
-		wMode = b.State.GState.TextFont.WritingMode()
-	}
 	// Clone strings to avoid aliasing if caller reuses slices
 	clonedArgs := make(pdf.Array, len(args))
 	for i, arg := range args {
 		switch arg := arg.(type) {
 		case pdf.String:
-			b.updateTextPosition(arg)
+			b.advanceText(arg)
 			clonedArgs[i] = cloneString(arg)
 		case pdf.Real:
-			b.applyTextKern(float64(arg), wMode)
+			b.State.GState.ApplyTextKern(float64(arg))
 			clonedArgs[i] = arg
 		case pdf.Integer:
-			b.applyTextKern(float64(arg), wMode)
+			b.State.GState.ApplyTextKern(float64(arg))
 			clonedArgs[i] = arg
 		case pdf.Number:
-			b.applyTextKern(float64(arg), wMode)
+			b.State.GState.ApplyTextKern(float64(arg))
 			clonedArgs[i] = arg
 		default:
 			b.Err = fmt.Errorf("TextShowKernedRaw: invalid argument type %T", arg)
@@ -275,79 +271,15 @@ func (b *Builder) TextShowKernedRaw(args ...pdf.Object) {
 	b.emit(content.OpTextShowArray, clonedArgs)
 }
 
-// applyTextKern applies a kerning adjustment to the text matrix.
-func (b *Builder) applyTextKern(delta float64, wMode font.WritingMode) {
-	if delta == 0 {
-		return
-	}
-	delta *= -b.State.GState.TextFontSize / 1000
-	if wMode == font.Horizontal {
-		b.State.GState.TextMatrix = matrix.Translate(delta*b.State.GState.TextHorizontalScaling, 0).Mul(b.State.GState.TextMatrix)
-	} else {
-		b.State.GState.TextMatrix = matrix.Translate(0, delta).Mul(b.State.GState.TextMatrix)
-	}
-}
-
-// updateTextPosition advances the text matrix based on the glyphs in the string.
-//
-// TODO(voss): in vertical writing mode, the per-glyph (vx, vy) origin
-// offset from W2/DW2 should be applied so that GetTextPositionUser
-// reports the position the next glyph will be painted at, not the bare
-// text position.  Currently the offsets are not tracked.
-func (b *Builder) updateTextPosition(s pdf.String) {
+// advanceText advances the text matrix for every glyph in s.
+func (b *Builder) advanceText(s pdf.String) {
 	p := b.State.GState
 	if p.TextFont == nil {
 		return
 	}
-
-	wmode := p.TextFont.WritingMode()
 	for info := range p.TextFont.Codes(s) {
-		switch wmode {
-		case font.Horizontal:
-			advance := info.Width*p.TextFontSize + p.TextCharacterSpacing
-			if info.UseWordSpacing {
-				advance += p.TextWordSpacing
-			}
-			advance *= p.TextHorizontalScaling
-			p.TextMatrix = matrix.Translate(advance, 0).Mul(p.TextMatrix)
-		case font.Vertical:
-			vAdv := info.VerticalAdvance
-			if vAdv == 0 {
-				// spec default DW2 is [880 -1000]
-				vAdv = -1
-			}
-			advance := vAdv*p.TextFontSize + p.TextCharacterSpacing
-			if info.UseWordSpacing {
-				advance += p.TextWordSpacing
-			}
-			p.TextMatrix = matrix.Translate(0, advance).Mul(p.TextMatrix)
-		}
+		p.AdvanceTextMatrix(&info)
 	}
-}
-
-// GetTextPositionUser returns the current text position in user coordinates.
-func (b *Builder) GetTextPositionUser() (float64, float64) {
-	p := b.State.GState
-	M := matrix.Matrix{
-		p.TextFontSize * p.TextHorizontalScaling, 0,
-		0, p.TextFontSize,
-		0, p.TextRise,
-	}
-	M = M.Mul(p.TextMatrix)
-	return M[4], M[5]
-}
-
-// GetTextPositionDevice returns the current text position in device coordinates.
-func (b *Builder) GetTextPositionDevice() (float64, float64) {
-	p := b.State.GState
-	M := matrix.Matrix{
-		p.TextFontSize * p.TextHorizontalScaling, 0,
-		0, p.TextFontSize,
-		0, p.TextRise,
-	}
-	M = M.Mul(p.TextMatrix)
-	M = M.Mul(p.CTM)
-	return M[4], M[5]
 }
 
 // cloneString creates a copy of a pdf.String to avoid aliasing issues

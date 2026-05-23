@@ -382,6 +382,65 @@ func (s *State) GetTextPositionUser() (float64, float64) {
 	return M[4], M[5]
 }
 
+// AdvanceTextMatrix updates [State.TextMatrix] to account for the displacement
+// of a single decoded glyph.  The advance combines the font's glyph metric
+// (Width for horizontal writing mode, VerticalAdvance for vertical) with the
+// current font size, character spacing, word spacing (when
+// [font.Code.UseWordSpacing] is set), and — in horizontal writing mode —
+// horizontal scaling.
+//
+// In vertical writing mode the per-glyph (vx, vy) origin offset from
+// W2/DW2 is not applied.
+//
+// Calling this without a font set is a no-op, matching the permissive
+// behaviour of content-stream consumers that may not have seen a Tf
+// operator yet.
+func (s *State) AdvanceTextMatrix(info *font.Code) {
+	if s.TextFont == nil {
+		return
+	}
+	switch s.TextFont.WritingMode() {
+	case font.Horizontal:
+		advance := info.Width*s.TextFontSize + s.TextCharacterSpacing
+		if info.UseWordSpacing {
+			advance += s.TextWordSpacing
+		}
+		advance *= s.TextHorizontalScaling
+		s.TextMatrix = matrix.Translate(advance, 0).Mul(s.TextMatrix)
+	case font.Vertical:
+		vAdv := info.VerticalAdvance
+		if vAdv == 0 {
+			// spec default DW2 is [880 -1000]
+			vAdv = -1
+		}
+		advance := vAdv*s.TextFontSize + s.TextCharacterSpacing
+		if info.UseWordSpacing {
+			advance += s.TextWordSpacing
+		}
+		s.TextMatrix = matrix.Translate(0, advance).Mul(s.TextMatrix)
+	}
+}
+
+// ApplyTextKern applies a kerning adjustment to [State.TextMatrix].  delta is
+// the raw numeric value from a TJ-array element, in thousandths of an em;
+// positive values shrink the gap, negative values widen it (Table 107).
+//
+// Calling this without a font set is a no-op, matching the permissive
+// behaviour of content-stream consumers that may not have seen a Tf
+// operator yet.
+func (s *State) ApplyTextKern(delta float64) {
+	if delta == 0 || s.TextFont == nil {
+		return
+	}
+	delta *= -s.TextFontSize / 1000
+	switch s.TextFont.WritingMode() {
+	case font.Horizontal:
+		s.TextMatrix = matrix.Translate(delta*s.TextHorizontalScaling, 0).Mul(s.TextMatrix)
+	case font.Vertical:
+		s.TextMatrix = matrix.Translate(0, delta).Mul(s.TextMatrix)
+	}
+}
+
 func (s *State) mustBeSet(bits Bits) error {
 	missing := ^s.Set & bits
 	if missing == 0 {

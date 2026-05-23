@@ -22,15 +22,18 @@ import (
 	"io"
 	"iter"
 	"math"
-	"slices"
 	"strconv"
 
 	"seehuhn.de/go/pdf"
 )
 
-// Stream is an immutable factory for content stream iterators.
-// Each call to NewIter creates an independent [Iter] that can be used
-// to iterate over the operators in the stream.
+// Stream is an immutable content stream exposed in two views: an
+// operator iterator and a byte reader.  Both views describe the same
+// content stream and parse to the same operator sequence; the exact byte
+// form returned by [Stream.RawBytes] is implementation-dependent (see
+// [NewScanner] and [Operators.RawBytes] for the two concrete cases).
+//
+// Each call to NewIter or RawBytes returns an independent reader.
 //
 // Content streams can occur in the following places:
 //   - Page contents
@@ -41,6 +44,10 @@ import (
 type Stream interface {
 	// NewIter creates a new iterator over the operators in the stream.
 	NewIter() Iter
+
+	// RawBytes returns a reader over the stream's content-stream bytes.
+	// The caller is responsible for closing the returned reader.
+	RawBytes() (io.ReadCloser, error)
 }
 
 // Iter is a single-use iterator over content stream operators.
@@ -51,15 +58,16 @@ type Stream interface {
 // unclosed contexts (q/Q, BT/ET, BMC/EMC, BX/EX, open paths) should
 // drive [State.ClosingOperators] from their own [State] (as
 // [seehuhn.de/go/pdf/reader.Reader.ProcessIter] does).  The args slice
-// yielded by All shares the iterator's internal buffer and is only
-// valid until the next step (like [bufio.Scanner.Bytes]); callers that
+// yielded by All may be reused on the next step (the scanner backend
+// shares its internal buffer, like [bufio.Scanner.Bytes]); callers that
 // need to retain args must clone them.
 type Iter interface {
 	// All iterates the operators in the stream.
 	All() iter.Seq2[OpName, []pdf.Object]
 
 	// Err returns any IO error encountered during iteration.
-	// It is always nil for [Operators].
+	// It is always nil for in-memory iterators (e.g. the one returned by
+	// [Operators.NewIter]).
 	Err() error
 }
 
@@ -161,29 +169,13 @@ func (ct Type) String() string {
 	}
 }
 
-// ReadStream reads a PDF content stream and returns its raw operator
-// sequence.  Parse errors in the stream are handled permissively
-// (malformed tokens are skipped and parsing continues); IO errors are
-// returned to the caller.  No fix-ups, no version filtering, and no
-// closer synthesis happen here — see [reader.Reader] for the consumer
-// path that adds State-based context handling on top.
-func ReadStream(open func() (io.ReadCloser, error)) ([]Operator, error) {
-	it := NewScanner(open).NewIter()
-	var ops []Operator
-	for name, args := range it.All() {
-		ops = append(ops, Operator{Name: name, Args: slices.Clone(args)})
-	}
-	if err := it.Err(); err != nil {
-		return nil, err
-	}
-	return ops, nil
-}
-
 // streamFactory is the immutable [Stream] implementation that creates independent
 // iterators via [streamFactory.NewIter].
 type streamFactory struct {
 	open func() (io.ReadCloser, error)
 }
+
+var _ Stream = (*streamFactory)(nil)
 
 // NewScanner returns a [Stream] that lazily scans a content stream.
 // The open function is called each time [Stream.NewIter] creates a new
@@ -191,8 +183,9 @@ type streamFactory struct {
 //
 // The yielded operator stream is verbatim — no version filtering, no
 // context fix-ups, no missing-resource drops.  Consumers are responsible
-// for handling malformed input safely (see e.g. [reader.Reader], which
-// drops operators rejected by [State.ApplyOperator] before dispatch).
+// for handling malformed input safely (see e.g.
+// [seehuhn.de/go/pdf/reader.Reader], which drops operators rejected by
+// [State.ApplyOperator] before dispatch).
 //
 // The args yielded by All are transient: they share the scanner's internal
 // buffer and are only valid for the current iteration step. Callers that
@@ -204,6 +197,50 @@ func NewScanner(open func() (io.ReadCloser, error)) Stream {
 // NewIter creates a new iterator over the content stream.
 func (sc *streamFactory) NewIter() Iter {
 	return &scannerIter{open: sc.open}
+}
+
+// RawBytes returns a reader over the scanner's underlying content-stream
+// bytes.  The reader follows the same permissive policy as [NewIter]:
+// malformed input (corrupt flate, unknown filter, …) yields an empty or
+// truncated byte sequence rather than a propagated error.
+func (sc *streamFactory) RawBytes() (io.ReadCloser, error) {
+	rc, err := sc.open()
+	if err != nil {
+		if pdf.IsMalformed(err) {
+			return io.NopCloser(emptyReader{}), nil
+		}
+		return nil, err
+	}
+	return &permissiveReader{rc: rc}, nil
+}
+
+// emptyReader is an io.Reader that always returns EOF.
+type emptyReader struct{}
+
+func (emptyReader) Read(_ []byte) (int, error) { return 0, io.EOF }
+
+// permissiveReader wraps a content-stream byte reader and converts
+// mid-read malformed-input errors into a clean EOF, matching the
+// permissive scanner policy in [pumpScanner].
+type permissiveReader struct {
+	rc  io.ReadCloser
+	eof bool
+}
+
+func (p *permissiveReader) Read(buf []byte) (int, error) {
+	if p.eof {
+		return 0, io.EOF
+	}
+	n, err := p.rc.Read(buf)
+	if err != nil && err != io.EOF && pdf.IsMalformed(err) {
+		p.eof = true
+		return n, io.EOF
+	}
+	return n, err
+}
+
+func (p *permissiveReader) Close() error {
+	return p.rc.Close()
 }
 
 // scannerIter is a single-use [Iter] that yields the raw operator

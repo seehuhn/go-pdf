@@ -80,7 +80,7 @@ func Show(b *builder.Builder, args ...any) {
 				}
 			}
 		case RecordPos:
-			x, y := b.GetTextPositionUser()
+			x, y := b.State.GState.GetTextPositionUser()
 			if v.UserX != nil {
 				*v.UserX = x
 			}

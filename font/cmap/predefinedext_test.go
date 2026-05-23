@@ -136,8 +136,8 @@ func TestPredefined(t *testing.T) {
 	}
 	rd := reader.New(x)
 	allText := ""
-	rd.Text = func(text string) error {
-		allText += text
+	rd.Character = func(c font.Code) error {
+		allText += c.Text
 		return nil
 	}
 	err = rd.ProcessPage(pg)

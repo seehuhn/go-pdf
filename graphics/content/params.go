@@ -24,9 +24,9 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
-// applyOperatorToParams updates the graphics state parameters based on the operator.
-// This is called by ApplyOperator after structural state changes (q/Q, BT/ET, etc.)
-// have been handled.
+// applyOperatorToParams updates the graphics state parameters based on the
+// operator. This is called by [State.ApplyStateChanges] after structural state
+// changes (q/Q, BT/ET, etc.) have been handled.
 func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 	p := s.GState
 
@@ -217,8 +217,8 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 		p.TextMatrix = p.TextLineMatrix
 
 	// Text showing operators (Table 107)
-	// Note: These don't update text position here - that requires font info
-	// and is done by reader/builder with updateTextPosition()
+	// Note: per-glyph advance requires font info and is done by the
+	// consumer via [graphics.State.AdvanceTextMatrix].
 
 	case OpTextShowMoveNextLine: // '
 		p.TextLineMatrix = matrix.Translate(0, -p.TextLeading).Mul(p.TextLineMatrix)

@@ -66,8 +66,7 @@ func TestParameters(t *testing.T) {
 
 	// Write the content stream to a buffer
 	buf := &bytes.Buffer{}
-	err := content.Write(buf, &content.Operators{Ops: b.Stream})
-	if err != nil {
+	if err := writeOps(buf, b.Stream); err != nil {
 		t.Fatal(err)
 	}
 
@@ -80,8 +79,7 @@ func TestParameters(t *testing.T) {
 	open := func() (io.ReadCloser, error) {
 		return io.NopCloser(bytes.NewReader(data2)), nil
 	}
-	err = r.ProcessIter(content.NewScanner(open).NewIter())
-	if err != nil {
+	if err := r.ProcessIter(content.NewScanner(open).NewIter()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -284,3 +282,13 @@ type noopGetter struct{}
 
 func (noopGetter) Get(pdf.Reference, bool) (pdf.Native, error) { return nil, nil }
 func (noopGetter) GetMeta() *pdf.MetaInfo                      { return &pdf.MetaInfo{Version: pdf.V2_0} }
+
+// writeOps serialises ops into out via [content.Operator.Format].
+func writeOps(out io.Writer, ops []content.Operator) error {
+	for _, op := range ops {
+		if err := op.Format(out); err != nil {
+			return err
+		}
+	}
+	return nil
+}

@@ -39,7 +39,6 @@ type Reader struct {
 	State *content.State
 
 	// User callbacks.
-	// TODO(voss): clean up this list
 
 	// Character is called for each character code decoded from a text-showing
 	// operator.  The [font.Code] argument describes the decoded character:
@@ -49,21 +48,17 @@ type Reader struct {
 	//
 	// The text matrix is at the start position of the character when this
 	// callback fires; the matrix advance happens after.  Use
-	// [Reader.GetTextPositionDevice] for the start position.
+	// [content.State.GetTextPositionDevice] (via r.State.GState) for the
+	// start position.
 	Character func(c font.Code) error
 
 	TextEvent func(event TextEvent, arg float64)
 
-	Text func(text string) error
-
-	// UnknownOp is called for operators not handled by typed callbacks.
-	// The args slice may be transient (shared with scanner buffers);
-	// callers that need to retain args must clone them.
-	UnknownOp func(op string, args []pdf.Object) error
-
 	// EveryOp is called for every operator after all other processing.
-	// The args slice may be transient (shared with scanner buffers);
-	// callers that need to retain args must clone them.
+	// To act only on operators that the reader does not handle itself, gate
+	// the callback on [content.Known].  The args slice may be transient
+	// (shared with scanner buffers); callers that need to retain args must
+	// clone them.
 	EveryOp func(op string, args []pdf.Object) error
 
 	GraphicsStateSaved    func() error
@@ -71,8 +66,7 @@ type Reader struct {
 	XObject               func(obj graphics.XObject, ctm matrix.Matrix) error
 	InlineImage           func(op content.Operator, ctm matrix.Matrix) error
 
-	MarkedContent      func(event MarkedContentEvent, mc *graphics.MarkedContent) error
-	MarkedContentStack []*graphics.MarkedContent
+	MarkedContent func(event MarkedContentEvent, mc *graphics.MarkedContent) error
 
 	// ActualText is called at the start and end of each ActualText region
 	// (a marked-content span whose property list carries an ActualText
@@ -151,7 +145,6 @@ func New(x *pdf.Extractor) *Reader {
 	return &Reader{
 		x:                    x,
 		State:                content.NewState(content.Page, &content.Resources{}),
-		MarkedContentStack:   make([]*graphics.MarkedContent, 0, 8),
 		actualTextStartDepth: -1,
 	}
 }
@@ -160,7 +153,6 @@ func New(x *pdf.Extractor) *Reader {
 // This should be used before parsing a new page.
 func (r *Reader) Reset() {
 	r.State = content.NewState(content.Page, &content.Resources{})
-	r.MarkedContentStack = r.MarkedContentStack[:0]
 	r.actualTextStartDepth = -1
 	r.actualTextValue = ""
 	r.prevEndValid = false
@@ -189,7 +181,6 @@ func (r *Reader) ProcessPage(pg *page.Page) error {
 // processing begins.  After iteration, ProcessIter emits closing operators
 // for any open contexts (unbalanced q/Q, BT/ET, BMC/EMC, or BX/EX).
 func (r *Reader) ProcessIter(it content.Iter) error {
-	r.MarkedContentStack = r.MarkedContentStack[:0]
 	r.actualTextStartDepth = -1
 	r.actualTextValue = ""
 	r.prevEndValid = false
@@ -218,6 +209,13 @@ func (r *Reader) ProcessIter(it content.Iter) error {
 // callback fires, matching how real-world viewers tolerate malformed
 // content streams.
 func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
+	// Pre-state-change peek: EMC will pop the top BMC frame from State.
+	// Capture its attached MC payload now so we can fire MarkedContentEnd.
+	var endingMC *graphics.MarkedContent
+	if name == content.OpEndMarkedContent {
+		endingMC = r.State.MarkedContentTop()
+	}
+
 	// permissive reader: advance state best-effort; ignore any error
 	_ = r.State.ApplyStateChanges(name, args)
 
@@ -260,27 +258,17 @@ func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
 	case content.OpTextShowArray: // TJ
 		if a, ok := getArray(args, 0); ok && p.TextFont != nil {
 			for _, ai := range a {
-				var d float64
 				switch ai := ai.(type) {
 				case pdf.String:
 					if err := r.processText(ai); err != nil {
 						return err
 					}
 				case pdf.Integer:
-					d = float64(ai)
+					p.ApplyTextKern(float64(ai))
 				case pdf.Real:
-					d = float64(ai)
+					p.ApplyTextKern(float64(ai))
 				case pdf.Number:
-					d = float64(ai)
-				}
-				if d != 0 {
-					d = d / 1000 * p.TextFontSize
-					switch p.TextFont.WritingMode() {
-					case font.Horizontal:
-						p.TextMatrix = matrix.Translate(-d*p.TextHorizontalScaling, 0).Mul(p.TextMatrix)
-					case font.Vertical:
-						p.TextMatrix = matrix.Translate(0, -d).Mul(p.TextMatrix)
-					}
+					p.ApplyTextKern(float64(ai))
 				}
 			}
 		}
@@ -288,22 +276,16 @@ func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
 	// marked-content operators
 	case content.OpMarkedContentPoint: // MP
 		if tag, ok := getName(args, 0); ok && r.MarkedContent != nil {
-			mc := &graphics.MarkedContent{
-				Tag:        tag,
-				Properties: nil,
-			}
+			mc := &graphics.MarkedContent{Tag: tag}
 			if err := r.MarkedContent(MarkedContentPoint, mc); err != nil {
 				return err
 			}
 		}
 
 	case content.OpBeginMarkedContent: // BMC
-		if tag, ok := getName(args, 0); ok && len(r.MarkedContentStack) < maxMarkedContentDepth {
-			mc := &graphics.MarkedContent{
-				Tag:        tag,
-				Properties: nil,
-			}
-			r.MarkedContentStack = append(r.MarkedContentStack, mc)
+		if tag, ok := getName(args, 0); ok && r.State.MarkedContentDepth() <= maxMarkedContentDepth {
+			mc := &graphics.MarkedContent{Tag: tag}
+			r.State.AttachMarkedContent(mc)
 			if r.MarkedContent != nil {
 				if err := r.MarkedContent(MarkedContentBegin, mc); err != nil {
 					return err
@@ -339,7 +321,7 @@ func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
 		}
 
 		tag, ok1 := args[0].(pdf.Name)
-		if !ok1 || len(r.MarkedContentStack) >= maxMarkedContentDepth {
+		if !ok1 || r.State.MarkedContentDepth() > maxMarkedContentDepth {
 			break
 		}
 
@@ -350,7 +332,7 @@ func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
 			return err
 		}
 
-		r.MarkedContentStack = append(r.MarkedContentStack, mc)
+		r.State.AttachMarkedContent(mc)
 		if r.MarkedContent != nil {
 			if err := r.MarkedContent(MarkedContentBegin, mc); err != nil {
 				return err
@@ -358,7 +340,7 @@ func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
 		}
 		if r.actualTextStartDepth == -1 && mc.Properties != nil {
 			if at, err := property.ListGet(mc.Properties, property.ExtractActualText); err == nil {
-				r.actualTextStartDepth = len(r.MarkedContentStack)
+				r.actualTextStartDepth = r.State.MarkedContentDepth()
 				r.actualTextValue = at.Text
 				if r.ActualText != nil {
 					if err := r.ActualText(ActualTextBegin, at.Text); err != nil {
@@ -369,15 +351,13 @@ func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
 		}
 
 	case content.OpEndMarkedContent: // EMC
-		if len(r.MarkedContentStack) > 0 {
-			mc := r.MarkedContentStack[len(r.MarkedContentStack)-1]
-			r.MarkedContentStack = r.MarkedContentStack[:len(r.MarkedContentStack)-1]
+		if endingMC != nil {
 			if r.MarkedContent != nil {
-				if err := r.MarkedContent(MarkedContentEnd, mc); err != nil {
+				if err := r.MarkedContent(MarkedContentEnd, endingMC); err != nil {
 					return err
 				}
 			}
-			if r.actualTextStartDepth != -1 && len(r.MarkedContentStack) < r.actualTextStartDepth {
+			if r.actualTextStartDepth != -1 && r.State.MarkedContentDepth() < r.actualTextStartDepth {
 				text := r.actualTextValue
 				r.actualTextStartDepth = -1
 				r.actualTextValue = ""
@@ -389,16 +369,6 @@ func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
 			}
 		}
 
-	// handled by typed callbacks below
-	case content.OpPushGraphicsState, content.OpPopGraphicsState,
-		content.OpXObject, content.OpInlineImage:
-
-	default:
-		if r.UnknownOp != nil {
-			if err := r.UnknownOp(string(name), args); err != nil {
-				return err
-			}
-		}
 	}
 
 	// typed callbacks
@@ -477,12 +447,6 @@ func (r *Reader) extractMarkedContent(tag pdf.Name, propArg pdf.Object) (*graphi
 }
 
 func (r *Reader) processText(s pdf.String) error {
-	// TODO(voss): can this be merged with the corresponding code in op-text.go?
-	//
-	// TODO(voss): in vertical writing mode, the per-glyph (vx, vy) origin
-	// offset from W2/DW2 should be applied when reporting the glyph
-	// position to consumers — currently the offsets in dict.VMetrics are
-	// extracted but never used.
 	p := r.State.GState
 
 	wmode := p.TextFont.WritingMode()
@@ -496,29 +460,6 @@ func (r *Reader) processText(s pdf.String) error {
 	trmValid := false
 
 	for info := range p.TextFont.Codes(s) {
-		// The displacement applied to the text matrix after painting the
-		// glyph; in vertical writing mode this is signed (typically
-		// negative).
-		var advance float64
-		switch wmode {
-		case font.Horizontal:
-			advance = info.Width*p.TextFontSize + p.TextCharacterSpacing
-			if info.UseWordSpacing {
-				advance += p.TextWordSpacing
-			}
-			advance *= p.TextHorizontalScaling
-		case font.Vertical:
-			vAdv := info.VerticalAdvance
-			if vAdv == 0 {
-				// spec default DW2 is [880 -1000]
-				vAdv = -1
-			}
-			advance = vAdv*p.TextFontSize + p.TextCharacterSpacing
-			if info.UseWordSpacing {
-				advance += p.TextWordSpacing
-			}
-		}
-
 		// Classify the gap between the previous text-show end position
 		// and the start of this character.  The writing direction
 		// determines which axis represents "along" (potential
@@ -566,20 +507,7 @@ func (r *Reader) processText(s pdf.String) error {
 				return err
 			}
 		}
-		if r.Text != nil && visible {
-			err := r.Text(info.Text)
-			if err != nil {
-				return err
-			}
-		}
-
-		// Apply the advance; the cached trm is now stale.
-		switch wmode {
-		case font.Horizontal:
-			p.TextMatrix = matrix.Translate(advance, 0).Mul(p.TextMatrix)
-		case font.Vertical:
-			p.TextMatrix = matrix.Translate(0, advance).Mul(p.TextMatrix)
-		}
+		p.AdvanceTextMatrix(&info)
 		trmValid = false
 
 		if visible {
@@ -634,11 +562,6 @@ func getArray(args []pdf.Object, idx int) (pdf.Array, bool) {
 		return a, true
 	}
 	return nil, false
-}
-
-// GetTextPositionDevice returns the current text position in device coordinates.
-func (r *Reader) GetTextPositionDevice() (float64, float64) {
-	return r.State.GState.GetTextPositionDevice()
 }
 
 func (r *Reader) getSpaceWidth(f font.Instance) float64 {

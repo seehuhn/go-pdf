@@ -19,6 +19,7 @@ package form
 import (
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"seehuhn.de/go/geom/matrix"
@@ -265,14 +266,20 @@ func (f *Form) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	if f.Content != nil {
-		err = content.Write(stm, f.Content)
+		rc, err := f.Content.RawBytes()
 		if err != nil {
+			stm.Close()
+			return nil, err
+		}
+		_, err = io.Copy(stm, rc)
+		rc.Close()
+		if err != nil {
+			stm.Close()
 			return nil, err
 		}
 	}
 
-	err = stm.Close()
-	if err != nil {
+	if err := stm.Close(); err != nil {
 		return nil, err
 	}
 

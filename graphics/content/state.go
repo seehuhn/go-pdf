@@ -55,7 +55,9 @@ type State struct {
 	stack []savedState
 
 	// nesting tracks paired operators (q/Q, BT/ET, BMC/EMC, BX/EX).
-	nesting []pairType
+	// pairBMC frames carry an optional [graphics.MarkedContent] payload,
+	// attached by consumers via [State.AttachMarkedContent].
+	nesting []nestingFrame
 
 	// compatibilityDepth counts BX/EX nesting for fast "inside compatibility" checks.
 	compatibilityDepth int
@@ -98,6 +100,14 @@ const (
 	pairBMC                     // BMC/BDC ... EMC
 	pairBX                      // BX ... EX
 )
+
+// nestingFrame is one entry on [State.nesting].  The MC field is only
+// meaningful when Kind == pairBMC; it carries the marked-content payload
+// attached by the consumer via [State.AttachMarkedContent].
+type nestingFrame struct {
+	Kind pairType
+	MC   *graphics.MarkedContent
+}
 
 // savedState holds state saved by the q operator.
 type savedState struct {
@@ -181,7 +191,7 @@ func (s *State) Push() error {
 	if len(s.stack) > s.MaxStackDepth {
 		s.MaxStackDepth = len(s.stack)
 	}
-	s.nesting = append(s.nesting, pairQ)
+	s.nesting = append(s.nesting, nestingFrame{Kind: pairQ})
 	return nil
 }
 
@@ -190,7 +200,7 @@ func (s *State) Pop() error {
 	if s.Version > 0 && s.Version < pdf.V2_0 && s.CurrentObject == ObjText {
 		return fmt.Errorf("Q in text object: %w", ErrInvalidContext)
 	}
-	if err := s.expectNesting(pairQ, "Q"); err != nil {
+	if _, err := s.popNesting(pairQ, "Q"); err != nil {
 		return err
 	}
 	saved := s.stack[len(s.stack)-1]
@@ -208,13 +218,13 @@ func (s *State) TextBegin() error {
 		return fmt.Errorf("BT in %s context: %w", s.CurrentObject, ErrInvalidContext)
 	}
 	s.CurrentObject = ObjText
-	s.nesting = append(s.nesting, pairBT)
+	s.nesting = append(s.nesting, nestingFrame{Kind: pairBT})
 	return nil
 }
 
 // TextEnd transitions from text object context (for the ET operator).
 func (s *State) TextEnd() error {
-	if err := s.expectNesting(pairBT, "ET"); err != nil {
+	if _, err := s.popNesting(pairBT, "ET"); err != nil {
 		return err
 	}
 	s.CurrentObject = ObjPage
@@ -224,25 +234,84 @@ func (s *State) TextEnd() error {
 	return nil
 }
 
-// MarkedContentBegin starts a marked content section (for the BMC/BDC operators).
+// MarkedContentBegin starts a marked content section (for the BMC/BDC
+// operators).  The MarkedContent payload starts out empty; a consumer that
+// has decoded the operator's tag/properties may attach it via
+// [State.AttachMarkedContent].
 func (s *State) MarkedContentBegin() {
-	s.nesting = append(s.nesting, pairBMC)
+	s.nesting = append(s.nesting, nestingFrame{Kind: pairBMC})
 }
 
 // MarkedContentEnd ends a marked content section (for the EMC operator).
-func (s *State) MarkedContentEnd() error {
-	return s.expectNesting(pairBMC, "EMC")
+// On success it returns the popped [graphics.MarkedContent] payload, or
+// nil when no payload was attached to the popped frame.  When no matching
+// BMC frame is open it returns (nil, non-nil error) and leaves the stack
+// untouched.
+func (s *State) MarkedContentEnd() (*graphics.MarkedContent, error) {
+	return s.popNesting(pairBMC, "EMC")
+}
+
+// AttachMarkedContent associates mc with the innermost open BMC/BDC frame
+// on the nesting stack.  Intervening non-BMC frames (e.g. a q pushed after
+// the BMC) are skipped; the attach lands on the first BMC frame below
+// them.  It is a no-op only when no BMC frame is open at all.  Callers
+// should call it immediately after the corresponding BMC/BDC operator.
+func (s *State) AttachMarkedContent(mc *graphics.MarkedContent) {
+	for i := len(s.nesting) - 1; i >= 0; i-- {
+		if s.nesting[i].Kind == pairBMC {
+			s.nesting[i].MC = mc
+			return
+		}
+	}
+}
+
+// MarkedContentStack returns the [graphics.MarkedContent] payloads attached
+// to the currently open BMC/BDC frames, in opening order (outermost first).
+// Frames without an attached payload are omitted.  The returned slice is
+// freshly allocated; callers may retain it.
+func (s *State) MarkedContentStack() []*graphics.MarkedContent {
+	var out []*graphics.MarkedContent
+	for _, f := range s.nesting {
+		if f.Kind == pairBMC && f.MC != nil {
+			out = append(out, f.MC)
+		}
+	}
+	return out
+}
+
+// MarkedContentTop returns the payload of the innermost open BMC/BDC
+// frame, or nil if no BMC frame is open or no payload has been attached.
+// Consumers can call this before [State.ApplyStateChanges] processes an
+// EMC operator to capture the MC that is about to be popped.
+func (s *State) MarkedContentTop() *graphics.MarkedContent {
+	for i := len(s.nesting) - 1; i >= 0; i-- {
+		if s.nesting[i].Kind == pairBMC {
+			return s.nesting[i].MC
+		}
+	}
+	return nil
+}
+
+// MarkedContentDepth returns the number of currently open BMC/BDC frames.
+func (s *State) MarkedContentDepth() int {
+	n := 0
+	for _, f := range s.nesting {
+		if f.Kind == pairBMC {
+			n++
+		}
+	}
+	return n
 }
 
 // CompatibilityBegin starts a compatibility section (for the BX operator).
 func (s *State) CompatibilityBegin() {
-	s.nesting = append(s.nesting, pairBX)
+	s.nesting = append(s.nesting, nestingFrame{Kind: pairBX})
 	s.compatibilityDepth++
 }
 
 // CompatibilityEnd ends a compatibility section (for the EX operator).
 func (s *State) CompatibilityEnd() error {
-	if err := s.expectNesting(pairBX, "EX"); err != nil {
+	if _, err := s.popNesting(pairBX, "EX"); err != nil {
 		return err
 	}
 	s.compatibilityDepth--
@@ -255,9 +324,9 @@ func (s *State) InCompatibilitySection() bool {
 }
 
 // CheckOperatorAllowed verifies that the given operator can be used in
-// the current state.  Used by [Builder] to reject construction-time
-// errors; permissive consumers (e.g. the reader) skip this check by
-// calling [State.ApplyStateChanges] directly.
+// the current state.  Used by [seehuhn.de/go/pdf/graphics/content/builder.Builder]
+// to reject construction-time errors; permissive consumers (e.g. the
+// reader) skip this check by calling [State.ApplyStateChanges] directly.
 func (s *State) CheckOperatorAllowed(name OpName) error {
 	info, ok := operators[name]
 	if !ok {
@@ -345,13 +414,15 @@ func isStrokeOp(name OpName) bool {
 	return false
 }
 
-// ApplyStateChanges applies state-modifying changes for an operator.
-// This updates the Usable / Set bits, then handles q/Q, BT/ET, BMC/EMC,
-// BX/EX, d1, path state, and dash pattern tracking.
+// ApplyStateChanges applies all state-modifying effects of an operator
+// without context or required-state validation: structural transitions
+// (q/Q, BT/ET, BMC/EMC, BX/EX, d0/d1, path state), and the per-operator
+// updates to the graphics-state parameters (text state, colour, CTM,
+// dash, line width, …) and to the Usable / Set bits.
 //
-// Permissive consumers (e.g. the reader) call this directly to advance
-// state without context or required-state validation.  Builders should
-// instead use [State.ApplyOperator], which runs both checks first.
+// Permissive consumers (e.g. the reader) call this directly.  Builders
+// should instead use [State.ApplyOperator], which runs the context and
+// required-state checks first.
 func (s *State) ApplyStateChanges(name OpName, args []pdf.Object) error {
 	if info := operators[name]; info != nil && info.Sets != 0 {
 		s.Usable |= info.Sets
@@ -370,7 +441,7 @@ func (s *State) ApplyStateChanges(name OpName, args []pdf.Object) error {
 	case OpBeginMarkedContent, OpBeginMarkedContentWithProperties:
 		s.MarkedContentBegin()
 	case OpEndMarkedContent:
-		err = s.MarkedContentEnd()
+		_, err = s.MarkedContentEnd()
 	case OpBeginCompatibility:
 		s.CompatibilityBegin()
 	case OpEndCompatibility:
@@ -485,28 +556,31 @@ func (s *State) applyTransition(name OpName) {
 	}
 }
 
-// expectNesting finds and removes the innermost entry of the expected type
-// from the nesting stack.  If the entry is not at the top, it is still
-// removed, tolerating cross-nested operator pairs (e.g. q BDC Q EMC).
-// Intervening entries of other types are left in place.
+// popNesting finds and removes the innermost entry of the expected type
+// from the nesting stack and returns its [graphics.MarkedContent] payload
+// (only ever non-nil for pairBMC frames where a payload was attached).  If
+// the entry is not at the top, it is still removed, tolerating cross-nested
+// operator pairs (e.g. q BDC Q EMC).  Intervening entries of other types
+// are left in place.
 //
 // TODO(voss): investigate what PDF viewers actually do with cross-nested
 // operator pairs, and whether the writer needs to ensure proper nesting
 // for PDF 2.0 conformance.
-func (s *State) expectNesting(expected pairType, opName string) error {
+func (s *State) popNesting(expected pairType, opName string) (*graphics.MarkedContent, error) {
 	for i := len(s.nesting) - 1; i >= 0; i-- {
-		if s.nesting[i] == expected {
+		if s.nesting[i].Kind == expected {
+			mc := s.nesting[i].MC
 			s.nesting = append(s.nesting[:i], s.nesting[i+1:]...)
-			return nil
+			return mc, nil
 		}
 	}
-	return errors.New(opName + ": no matching opening operator")
+	return nil, errors.New(opName + ": no matching opening operator")
 }
 
 // CanClose returns an error if paired operators are unbalanced.
 func (s *State) CanClose() error {
 	if len(s.nesting) > 0 {
-		return errors.New("unclosed operators: " + s.nesting[len(s.nesting)-1].String())
+		return errors.New("unclosed operators: " + s.nesting[len(s.nesting)-1].Kind.String())
 	}
 	if s.CurrentObject != ObjPage {
 		return errors.New("invalid end state: " + s.CurrentObject.String())
@@ -526,7 +600,7 @@ func (s *State) ClosingOperators() []OpName {
 
 	// close paired operators in reverse order
 	for i := len(s.nesting) - 1; i >= 0; i-- {
-		switch s.nesting[i] {
+		switch s.nesting[i].Kind {
 		case pairQ:
 			ops = append(ops, OpPopGraphicsState)
 		case pairBT:

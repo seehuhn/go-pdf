@@ -79,11 +79,11 @@ func extractFontType3(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*
 		return nil, pdf.Wrap(err, "CharProcs")
 	}
 
-	// Extract font-level resources (PDF spec 7.8: search order is glyph stream,
-	// then font dict, then page dict). We can access glyph and font resources here.
-	var fontRes *content.Resources
+	// font-level resources (PDF spec 7.8 search order: glyph stream,
+	// font dict, page dict — the last is unavailable here).  Stored on
+	// d.Resources below, and used as the per-glyph fallback in the loop.
 	if fontDict["Resources"] != nil {
-		fontRes, _ = pdf.ExtractorGet(x, path, fontDict["Resources"], Resources)
+		d.Resources, _ = pdf.ExtractorGet(x, path, fontDict["Resources"], Resources)
 	}
 
 	charProcs := make(map[pdf.Name]*dict.CharProc, len(charProcsDict))
@@ -96,38 +96,40 @@ func extractFontType3(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*
 			continue
 		}
 
-		// Extract glyph resources per PDF spec 7.8 search order:
-		// 1. glyph stream dict, 2. font dict, 3. page dict (not available here).
-		// foundRes is what we store in CharProc (nil when no resources were
-		// found); only the stored copy matters now that the post-extract
-		// validation (which previously also needed a `res` for lookups) is
-		// gone.
+		// glyph resources (spec 7.8): glyph stream wins, otherwise fall
+		// back to the font-level dict; nil when neither is present.
 		var foundRes *content.Resources
 		if stm.Dict["Resources"] != nil {
 			foundRes, _ = pdf.ExtractorGet(x, path, stm.Dict["Resources"], Resources)
-		} else if fontRes != nil {
-			foundRes = fontRes
+		} else if d.Resources != nil {
+			foundRes = d.Resources
 		}
 
-		// Parse the content stream
+		// store a reader factory closure so each iteration re-opens the PDF stream
 		glyphStm := stm // capture for closure
-		stream, err := content.ReadStream(func() (io.ReadCloser, error) {
+		stream := content.NewScanner(func() (io.ReadCloser, error) {
 			return pdf.DecodeStream(x.R, path, glyphStm, 0)
 		})
-		if err != nil {
-			continue // permissive
-		}
 
 		// Cheap shape check: a Type 3 glyph procedure must start with
 		// either d0 (colored) or d1 (uncolored).  Anything else is
-		// rejected here; later operators are not validated.
-		if len(stream) == 0 ||
-			(stream[0].Name != content.OpType3ColoredGlyph && stream[0].Name != content.OpType3UncoloredGlyph) {
+		// rejected here; later operators are not validated.  Break after
+		// the first operator closes the underlying reader; subsequent
+		// painting reopens via a fresh iterator.
+		var firstName content.OpName
+		var firstOK bool
+		for name := range stream.NewIter().All() {
+			firstName = name
+			firstOK = true
+			break
+		}
+		if !firstOK ||
+			(firstName != content.OpType3ColoredGlyph && firstName != content.OpType3UncoloredGlyph) {
 			continue
 		}
 
 		charProcs[name] = &dict.CharProc{
-			Content:   &content.Operators{Ops: stream},
+			Content:   stream,
 			Resources: foundRes, // nil if no resources found in PDF
 		}
 	}
@@ -139,11 +141,6 @@ func extractFontType3(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*
 	}
 
 	d.FontMatrix, _ = pdf.GetMatrix(x.R, fontDict["FontMatrix"])
-
-	// Extract font-level resources (only if present)
-	if fontDict["Resources"] != nil {
-		d.Resources, _ = pdf.ExtractorGet(x, path, fontDict["Resources"], Resources)
-	}
 
 	repairType3(d, x.R)
 
