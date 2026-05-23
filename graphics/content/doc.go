@@ -16,9 +16,47 @@
 
 // Package content implements PDF content streams and resource dictionaries.
 //
-// A content stream is a sequence of PDF operators that describe the graphical
-// elements to be painted on a page. Content streams depend on an associated
-// resource dictionary that provides named resources (fonts, images, etc.)
-// referenced by operators. Together, a content stream and its resource
-// dictionary form a self-contained entity.
+// A content stream is a sequence of PDF operators describing what to paint
+// on a page (or inside a Form XObject, tiling pattern, Type 3 glyph
+// procedure, etc.).  Each content stream depends on a resource dictionary
+// that supplies the named resources (fonts, images, patterns, ExtGStates,
+// …) the operators reference.
+//
+// # Validation responsibility
+//
+// All construction-time validation lives in the
+// [seehuhn.de/go/pdf/graphics/content/builder.Builder] type:
+//
+//   - operators unknown or unavailable in the chosen PDF version are
+//     rejected at emit time;
+//   - deprecated operators (e.g. F) are rejected — callers must use the
+//     modern typed helper (Fill);
+//   - structural rules (q/Q stack depth, q/Q-in-text-object for pre-2.0)
+//     are enforced at the offending operator;
+//   - operators that fail [State.ApplyOperator] (improper nesting, wrong
+//     graphics-object context, required state not set) are rejected.
+//
+// The rest of the package trusts that the operator stream it sees is
+// well-formed:
+//
+//   - [Writer] is a thin serialiser; it does not validate.
+//   - [NewScanner] and [ReadStream] yield the raw operator stream the
+//     scanner saw, without any rewrites, drops, or synthesised closers.
+//   - [Iter] reports IO errors via [Iter.Err]; it does not synthesise
+//     closing operators for unbalanced contexts.
+//
+// # Reading malformed content
+//
+// The library aims to be permissive when reading.  Consumers advance
+// their [State] by calling [State.ApplyStateChanges] directly, which
+// skips the context and required-state checks that
+// [State.ApplyOperator] performs for the builder.  Consumers that want
+// the stream to look well-formed after the fact can drain
+// [State.ClosingOperators] at end-of-stream to emit synthetic closers
+// for any contexts left open.  [seehuhn.de/go/pdf/reader.Reader] does
+// exactly this.
+//
+// The one Builder bypass is the [OpRawContent] pseudo-operator and any
+// Builder method that emits it directly: bytes injected this way are
+// written verbatim and not validated.
 package content

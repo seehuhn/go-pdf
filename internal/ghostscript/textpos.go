@@ -59,7 +59,7 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 	c := M.Apply(vec.Vec2{})
 
 	// Build the marker glyph content stream
-	b := builder.New(content.Glyph, nil)
+	b := builder.New(content.Glyph, nil, pdf.V2_0)
 	b.Type3ColoredGlyph(0, 0) // d0: colored glyph with zero width
 	b.SetFillColor(color.DeviceRGB{1.0, 0, 0})
 	A := M.Inv()

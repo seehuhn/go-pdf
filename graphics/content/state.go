@@ -44,6 +44,13 @@ type State struct {
 	// MaxStackDepth tracks the highest nesting depth reached.
 	MaxStackDepth int
 
+	// Version, if non-zero, enables version-gated structural checks:
+	// pre-PDF-2.0, the q/Q stack is bounded to 28 frames and q/Q cannot
+	// appear inside a text object.  When zero, the checks are skipped.
+	// Set by [seehuhn.de/go/pdf/graphics/content/builder.Builder]; left
+	// zero in permissive consumers (reader, renderer).
+	Version pdf.Version
+
 	// stack holds saved states for q/Q operators.
 	stack []savedState
 
@@ -99,10 +106,10 @@ type savedState struct {
 }
 
 // NewState creates a State initialized for the given content type.
-// The res argument is mandatory and must not be nil.
+// A nil res is equivalent to an empty [Resources].
 func NewState(ct Type, res *Resources) *State {
 	if res == nil {
-		panic("NewState: res must not be nil")
+		res = &Resources{}
 	}
 
 	gstate := graphics.NewState()
@@ -158,6 +165,15 @@ func (s *State) IsSet(bits graphics.Bits) bool {
 
 // Push saves the current graphics state (for the q operator).
 func (s *State) Push() error {
+	if s.Version > 0 && s.Version < pdf.V2_0 {
+		if s.CurrentObject == ObjText {
+			return fmt.Errorf("q in text object: %w", ErrInvalidContext)
+		}
+		if len(s.stack) >= 28 {
+			return fmt.Errorf("q stack depth %d exceeds PDF 1.x limit of 28",
+				len(s.stack)+1)
+		}
+	}
 	s.stack = append(s.stack, savedState{
 		Usable: s.Usable,
 		GState: s.GState.Clone(),
@@ -171,6 +187,9 @@ func (s *State) Push() error {
 
 // Pop restores the previous graphics state (for the Q operator).
 func (s *State) Pop() error {
+	if s.Version > 0 && s.Version < pdf.V2_0 && s.CurrentObject == ObjText {
+		return fmt.Errorf("Q in text object: %w", ErrInvalidContext)
+	}
 	if err := s.expectNesting(pairQ, "Q"); err != nil {
 		return err
 	}
@@ -235,7 +254,10 @@ func (s *State) InCompatibilitySection() bool {
 	return s.compatibilityDepth > 0
 }
 
-// CheckOperatorAllowed verifies that the given operator can be used in the current state.
+// CheckOperatorAllowed verifies that the given operator can be used in
+// the current state.  Used by [Builder] to reject construction-time
+// errors; permissive consumers (e.g. the reader) skip this check by
+// calling [State.ApplyStateChanges] directly.
 func (s *State) CheckOperatorAllowed(name OpName) error {
 	info, ok := operators[name]
 	if !ok {
@@ -249,8 +271,10 @@ func (s *State) CheckOperatorAllowed(name OpName) error {
 }
 
 // ApplyOperator validates and applies all state changes for an operator.
-// It checks if the operator is allowed, validates required state,
-// applies state-modifying changes (q/Q, BT/ET, etc.), and updates state bits.
+// It checks that the operator is allowed in the current context, that
+// any state required for the operator has been set, and then applies the
+// operator's state effect.  Permissive consumers that do not want the
+// validation (e.g. the reader) call [State.ApplyStateChanges] directly.
 func (s *State) ApplyOperator(name OpName, args []pdf.Object) error {
 	if err := s.CheckOperatorAllowed(name); err != nil {
 		return err
@@ -265,18 +289,11 @@ func (s *State) ApplyOperator(name OpName, args []pdf.Object) error {
 			requires &^= graphics.StateLineCap
 		}
 
-		// Validate requirements
 		if requires != 0 {
 			missing := requires &^ s.Usable
 			if missing != 0 {
 				return fmt.Errorf("%s: required state not set: %v", name, missing)
 			}
-		}
-
-		// Update state bits
-		if info.Sets != 0 {
-			s.Usable |= info.Sets
-			s.GState.Set |= info.Sets
 		}
 	}
 
@@ -329,10 +346,17 @@ func isStrokeOp(name OpName) bool {
 }
 
 // ApplyStateChanges applies state-modifying changes for an operator.
-// This handles q/Q, BT/ET, BMC/EMC, BX/EX, d1, path state, and dash pattern tracking.
+// This updates the Usable / Set bits, then handles q/Q, BT/ET, BMC/EMC,
+// BX/EX, d1, path state, and dash pattern tracking.
 //
-// Call this after the operator has been validated with CheckOperatorAllowed.
+// Permissive consumers (e.g. the reader) call this directly to advance
+// state without context or required-state validation.  Builders should
+// instead use [State.ApplyOperator], which runs both checks first.
 func (s *State) ApplyStateChanges(name OpName, args []pdf.Object) error {
+	if info := operators[name]; info != nil && info.Sets != 0 {
+		s.Usable |= info.Sets
+		s.GState.Set |= info.Sets
+	}
 	var err error
 	switch name {
 	case OpPushGraphicsState:

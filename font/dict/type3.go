@@ -36,7 +36,9 @@ import (
 // CharProc represents a Type 3 glyph procedure (content stream).
 type CharProc struct {
 	// Content is the parsed content stream for the glyph.
-	Content content.Operators
+	// A typical value is a [*content.Operators] holding the parsed
+	// operators of the glyph procedure.
+	Content content.Stream
 
 	// Resources (optional) holds named resources used by this glyph's content
 	// stream. If nil, resources are looked up from the font's Resources field.
@@ -138,7 +140,6 @@ func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	compressedRefs := []pdf.Reference{ref}
 
 	// Write CharProc streams and build the CharProcs dictionary.
-	v := pdf.GetVersion(w)
 	charProcsDict := make(pdf.Dict, len(d.CharProcs))
 	for name, cp := range d.CharProcs {
 		if cp == nil {
@@ -167,7 +168,7 @@ func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		if res == nil {
 			res = d.Resources
 		}
-		err = content.Write(stm, cp.Content, v, content.Glyph, res)
+		err = content.Write(stm, cp.Content)
 		if err != nil {
 			stm.Close()
 			return nil, fmt.Errorf("glyph %q: %w", name, err)
@@ -233,7 +234,7 @@ func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return nil, fmt.Errorf("Type 3 font dict: %w", err)
+		return nil, fmt.Errorf("type 3 font dict: %w", err)
 	}
 
 	return ref, nil

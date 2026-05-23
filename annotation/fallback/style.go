@@ -55,6 +55,12 @@ type Style struct {
 	// for example for FreeText annotations.
 	ContentFont font.Layouter
 
+	// Version is the PDF version targeted by appearance streams built
+	// via this Style.  It is passed through to [builder.New] so that
+	// version-restricted operators (e.g. `gs` on pre-1.2) are rejected
+	// at build time.  Defaults to [pdf.V2_0] in [NewStyle].
+	Version pdf.Version
+
 	// iconFont is the font used to render symbols inside some of the icons for
 	// text annotations.  If this is changed to be different from
 	// extended.NimbusRomanBold, the layout of some text icons may need to be
@@ -67,6 +73,8 @@ type Style struct {
 }
 
 // NewStyle returns a new Style with default fonts and graphics state.
+// The default [Style.Version] is [pdf.V2_0]; callers writing to an older
+// PDF should set Version explicitly.
 func NewStyle() *Style {
 	reset := &extgstate.ExtGState{
 		Set: graphics.StateTextKnockout |
@@ -87,6 +95,7 @@ func NewStyle() *Style {
 	// Allocate fonts once here, to make sure that at most one instance of each
 	// font is embedded in an output file.
 	return &Style{
+		Version:     pdf.V2_0,
 		iconFont:    font.Must(extended.NimbusRomanBold.New()),
 		ContentFont: font.Must(standard.Helvetica.New()),
 		reset:       reset,

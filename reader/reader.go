@@ -165,20 +165,17 @@ func (r *Reader) ParsePage(page pdf.Object, ctm matrix.Matrix) error {
 }
 
 // ParseContentStream parses a PDF content stream.
-// The open function is called each time the stream needs to be read,
-// allowing multiple independent iterations.
+// The open function is called each time the stream needs to be read.
 func (r *Reader) ParseContentStream(open func() (io.ReadCloser, error)) error {
-	v := pdf.GetVersion(r.x.R)
-	stream := content.NewScanner(open, v, content.Page, r.State.Resources)
-	return r.ProcessStream(stream)
+	stream := content.NewScanner(open)
+	return r.ProcessIter(stream.NewIter())
 }
 
-// ProcessStream processes a parsed content stream, calling the appropriate
-// callback functions for each operator. After iteration, ProcessStream
-// emits closing operators for any open contexts (unbalanced q/Q, BT/ET,
-// BMC/EMC, or BX/EX).
-func (r *Reader) ProcessStream(stream content.Stream) error {
-	it := stream.NewIter()
+// ProcessIter processes a single-use content-stream iterator, calling the
+// appropriate callback functions for each operator.  After iteration,
+// ProcessIter emits closing operators for any open contexts (unbalanced
+// q/Q, BT/ET, BMC/EMC, or BX/EX).
+func (r *Reader) ProcessIter(it content.Iter) error {
 	for name, args := range it.All() {
 		if err := r.processOperator(name, args); err != nil {
 			return err
@@ -196,9 +193,15 @@ func (r *Reader) ProcessStream(stream content.Stream) error {
 }
 
 // processOperator handles a single content stream operator.
+//
+// The Reader is permissive: it calls [content.State.ApplyStateChanges]
+// directly (bypassing [content.State.CheckOperatorAllowed] and the
+// required-state check) so that every operator advances state and every
+// callback fires, matching how real-world viewers tolerate malformed
+// content streams.
 func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
-	// apply state changes first
-	_ = r.State.ApplyOperator(name, args) // ignore errors in permissive reader
+	// permissive reader: advance state best-effort; ignore any error
+	_ = r.State.ApplyStateChanges(name, args)
 
 	// get current graphics state (may have changed after ApplyOperator)
 	p := r.State.GState

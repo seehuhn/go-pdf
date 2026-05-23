@@ -264,12 +264,8 @@ func (f *Form) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 
-	ct := content.Form
-	if f.Group != nil {
-		ct = content.TransparencyGroup
-	}
 	if f.Content != nil {
-		err = content.Write(stm, f.Content, pdf.GetVersion(e.Out()), ct, f.Res)
+		err = content.Write(stm, f.Content)
 		if err != nil {
 			return nil, err
 		}

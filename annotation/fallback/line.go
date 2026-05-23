@@ -35,7 +35,7 @@ func (s *Style) addLineAppearance(a *annotation.Line) *form.Form {
 	bbox := calculateLineBBox(a, lw)
 	a.Rect = bbox
 
-	b := builder.New(content.Form, nil)
+	b := builder.New(content.Form, nil, s.Version)
 
 	b.SetExtGState(s.reset)
 	b.SetLineWidth(lw)
@@ -49,7 +49,7 @@ func (s *Style) addLineAppearance(a *annotation.Line) *form.Form {
 	}
 
 	return &form.Form{
-		Content: b.Stream,
+		Content: builder.Must(b.Harvest()),
 		Res:     b.Resources,
 		BBox:    bbox,
 	}

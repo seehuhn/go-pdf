@@ -259,7 +259,7 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 	h := w * math.Sqrt(3)
 	r := 0.3 * w
 
-	b := builder.New(content.PatternUncolored, nil)
+	b := builder.New(content.PatternUncolored, nil, pdf.V2_0)
 	b.Circle(0, 0, r)
 	b.Circle(w, 0, r)
 	b.Circle(w/2, h/2, r)
@@ -274,7 +274,7 @@ func showTilingPatternUncolored(doc *document.MultiPage, F font.Layouter) error 
 		YStep:      h,
 		Matrix:     matrix.Identity,
 		Color:      false,
-		Content:    b.Stream,
+		Content:    &content.Operators{Ops: b.Stream},
 		Res:        b.Resources,
 	}
 	col := color.PatternUncolored(pat, color.DeviceRGB{1, 0, 0})
@@ -307,7 +307,7 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 	h := w * math.Sqrt(3)
 	r := 0.3 * w
 
-	b := builder.New(content.PatternColored, nil)
+	b := builder.New(content.PatternColored, nil, pdf.V2_0)
 	b.SetFillColor(color.DeviceGray(0.5))
 	b.Circle(0, 0, r)
 	b.Circle(w, 0, r)
@@ -325,7 +325,7 @@ func showTilingPatternColored(doc *document.MultiPage, F font.Layouter) error {
 		YStep:      h,
 		Matrix:     matrix.Identity,
 		Color:      true,
-		Content:    b.Stream,
+		Content:    &content.Operators{Ops: b.Stream},
 		Res:        b.Resources,
 	}
 	col := color.PatternColored(pat)

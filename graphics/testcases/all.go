@@ -76,7 +76,7 @@ var All = []TestCase{
 			FontMatrix: matrix.Matrix{q, 0, 0, q, 0, 0},
 		}
 		// Build content stream for the glyph
-		bld := builder.New(content.Glyph, nil)
+		bld := builder.New(content.Glyph, nil, pdf.V2_0)
 		bld.Type3UncoloredGlyph(unitsPerEm, 0, 0, 0, unitsPerEm, unitsPerEm)
 		a := 0.05 * unitsPerEm
 		dim := 0.90 * unitsPerEm

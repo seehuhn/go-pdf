@@ -55,7 +55,7 @@ func main() {
 			}
 		}
 
-		g := builder.New(content.Page, nil)
+		g := builder.New(content.Page, nil, pdf.V2_0)
 
 		g.TextBegin()
 		g.TextSetFont(font, 12)
@@ -70,7 +70,7 @@ func main() {
 		p := &page.Page{
 			MediaBox:  mediaBox,
 			Resources: g.Resources,
-			Contents:  []content.Stream{g.Stream},
+			Contents:  []content.Segment{&content.Operators{Ops: g.Stream}},
 		}
 		err = pageTree.AppendPage(p)
 		if err != nil {
@@ -79,7 +79,7 @@ func main() {
 	}
 
 	{
-		g := builder.New(content.Page, nil)
+		g := builder.New(content.Page, nil, pdf.V2_0)
 
 		g.TextBegin()
 		g.TextSetFont(font, 12)
@@ -90,7 +90,7 @@ func main() {
 		p := &page.Page{
 			MediaBox:  mediaBox,
 			Resources: g.Resources,
-			Contents:  []content.Stream{g.Stream},
+			Contents:  []content.Segment{&content.Operators{Ops: g.Stream}},
 		}
 		err = frontMatter.AppendPage(p)
 		if err != nil {
@@ -99,7 +99,7 @@ func main() {
 	}
 
 	{
-		g := builder.New(content.Page, nil)
+		g := builder.New(content.Page, nil, pdf.V2_0)
 
 		g.TextBegin()
 		g.TextSetFont(font, 12)
@@ -110,7 +110,7 @@ func main() {
 		p := &page.Page{
 			MediaBox:  mediaBox,
 			Resources: g.Resources,
-			Contents:  []content.Stream{g.Stream},
+			Contents:  []content.Segment{&content.Operators{Ops: g.Stream}},
 		}
 		err = extra.AppendPage(p)
 		if err != nil {

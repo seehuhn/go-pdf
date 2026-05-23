@@ -122,13 +122,13 @@ func LoadFigure(fname string) (graphics.XObject, *pdf.Rectangle, error) {
 		return nil, nil, err
 	}
 
-	stream, err := content.ReadStream(open, pdf.GetVersion(r), content.Form, res)
+	stream, err := content.ReadStream(open)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	obj := &form.Form{
-		Content: stream,
+		Content: &content.Operators{Ops: stream},
 		Res:     res,
 		BBox:    *bbox,
 	}

@@ -1,0 +1,94 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2026  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+package page
+
+import (
+	"io"
+
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/content"
+)
+
+// A contentReader concatenates the raw bytes of all segments,
+// separated by single newline bytes.  Per the library's permissive-reader
+// policy, a segment whose [content.Segment.RawBytes] returns a malformed
+// error is silently skipped — its absence shows up as a gap in the
+// content stream rather than as a read failure.
+type contentReader struct {
+	parts []content.Segment
+	idx   int           // index of next segment to open
+	cur   io.ReadCloser // current segment reader, nil when between segments
+	sep   bool          // true when a newline separator is pending
+}
+
+func (r *contentReader) Read(p []byte) (n int, err error) {
+	for n < len(p) {
+		// emit a newline separator between segments
+		if r.sep {
+			p[n] = '\n'
+			n++
+			r.sep = false
+			continue
+		}
+
+		// open the next segment if no current reader
+		if r.cur == nil {
+			if r.idx >= len(r.parts) {
+				return n, io.EOF
+			}
+			rc, openErr := r.parts[r.idx].RawBytes()
+			r.idx++
+			if openErr != nil {
+				if pdf.IsMalformed(openErr) {
+					// permissive-reader policy: skip the broken
+					// segment and keep going.  The separator before
+					// this segment, if any, was already emitted by
+					// the sep branch above; no fresh one is needed.
+					continue
+				}
+				return n, openErr
+			}
+			r.cur = rc
+		}
+
+		// read from the current segment
+		nn, err := r.cur.Read(p[n:])
+		n += nn
+		if err == io.EOF {
+			r.cur.Close()
+			r.cur = nil
+			// insert a separator before the next segment
+			if r.idx < len(r.parts) {
+				r.sep = true
+			} else {
+				return n, io.EOF
+			}
+		} else if err != nil {
+			return n, err
+		}
+	}
+	return n, nil
+}
+
+func (r *contentReader) Close() error {
+	if r.cur != nil {
+		err := r.cur.Close()
+		r.cur = nil
+		return err
+	}
+	return nil
+}

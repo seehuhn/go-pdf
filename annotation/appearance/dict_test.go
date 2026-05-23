@@ -31,12 +31,12 @@ import (
 )
 
 func makeTestAppearance(gray float64) *form.Form {
-	b := builder.New(content.Form, nil)
+	b := builder.New(content.Form, nil, pdf.V2_0)
 	b.SetFillColor(color.DeviceGray(gray))
 	b.Rectangle(0, 0, 24, 24)
 	b.Fill()
 	return &form.Form{
-		Content: b.Stream,
+		Content: &content.Operators{Ops: b.Stream},
 		Res:     b.Resources,
 		BBox:    pdf.Rectangle{LLx: 0, LLy: 0, URx: 24, URy: 24},
 		Matrix:  matrix.Identity,

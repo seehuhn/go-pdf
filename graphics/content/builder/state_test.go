@@ -19,6 +19,7 @@ package builder
 import (
 	"testing"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/extgstate"
@@ -35,7 +36,7 @@ func TestSliceNearlyEqual(t *testing.T) {
 }
 
 func TestSetExtGState(t *testing.T) {
-	b := New(content.Page, nil)
+	b := New(content.Page, nil, pdf.V2_0)
 
 	gs := &extgstate.ExtGState{
 		Set:       graphics.StateLineWidth | graphics.StateFillAlpha,
@@ -67,14 +68,14 @@ func TestSetExtGState(t *testing.T) {
 
 func TestBuilder_ElisionWithKnown(t *testing.T) {
 	// Page: defaults are Known, elision works
-	b := New(content.Page, nil)
+	b := New(content.Page, nil, pdf.V2_0)
 	b.SetLineWidth(1.0) // default value
 	if len(b.Stream) != 0 {
 		t.Errorf("Page: setting default should elide, got %d ops", len(b.Stream))
 	}
 
 	// Form: defaults are Set-Unknown, no elision
-	b2 := New(content.Form, nil)
+	b2 := New(content.Form, nil, pdf.V2_0)
 	b2.SetLineWidth(1.0) // same value but not Known
 	if len(b2.Stream) != 1 {
 		t.Errorf("Form: should not elide Set-Unknown, got %d ops", len(b2.Stream))
@@ -82,7 +83,7 @@ func TestBuilder_ElisionWithKnown(t *testing.T) {
 }
 
 func TestBuilder_ElisionAfterSet(t *testing.T) {
-	b := New(content.Form, nil)
+	b := New(content.Form, nil, pdf.V2_0)
 
 	// First set: should emit (not Known)
 	b.SetLineWidth(5.0)

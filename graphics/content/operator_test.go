@@ -63,7 +63,7 @@ func TestIsValidName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.op.isValidName(tt.version)
+			err := CheckOperatorVersion(tt.op, tt.version)
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("IsValidName() error = %v, want %v", err, tt.wantErr)
 			}
@@ -82,7 +82,7 @@ func TestAllOperators(t *testing.T) {
 		if info.Deprecated != 0 {
 			continue
 		}
-		if err := name.isValidName(pdf.V2_0); err != nil {
+		if err := CheckOperatorVersion(name, pdf.V2_0); err != nil {
 			t.Errorf("operator %s should be valid in PDF 2.0, got error: %v", name, err)
 		}
 	}

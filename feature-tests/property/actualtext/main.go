@@ -67,7 +67,7 @@ func writeTestPage(w *pdf.Writer) error {
 	pageTree := pagetree.NewWriter(w, rm)
 
 	// Create a builder to accumulate drawing operations
-	b := builder.New(content.Page, nil)
+	b := builder.New(content.Page, nil, pdf.V2_0)
 
 	writeTestContent(b, F)
 
@@ -75,7 +75,7 @@ func writeTestPage(w *pdf.Writer) error {
 	p := &page.Page{
 		MediaBox:  &pdf.Rectangle{URx: 595, URy: 842},
 		Resources: b.Resources,
-		Contents:  []content.Stream{b.Stream},
+		Contents:  []content.Segment{&content.Operators{Ops: b.Stream}},
 	}
 	err := pageTree.AppendPage(p)
 	if err != nil {

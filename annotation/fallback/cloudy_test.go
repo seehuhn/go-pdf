@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/geom/vec"
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 )
@@ -33,7 +34,7 @@ var unitSquare = []vec.Vec2{
 	{X: 0, Y: 100},
 }
 
-func hasCurveOps(ops content.Operators) bool {
+func hasCurveOps(ops []content.Operator) bool {
 	for _, op := range ops {
 		switch op.Name {
 		case content.OpCurveTo, content.OpCurveToV, content.OpCurveToY:
@@ -43,7 +44,7 @@ func hasCurveOps(ops content.Operators) bool {
 	return false
 }
 
-func hasOp(ops content.Operators, name content.OpName) bool {
+func hasOp(ops []content.Operator, name content.OpName) bool {
 	for _, op := range ops {
 		if op.Name == name {
 			return true
@@ -59,7 +60,7 @@ func TestCloudyBorderSmallPolygon(t *testing.T) {
 		{X: 2, Y: 0},
 		{X: 1, Y: 1.7},
 	}
-	b := builder.New(content.Form, nil)
+	b := builder.New(content.Form, nil, pdf.V2_0)
 	drawCloudyBorder(b, tiny, 1, 1, true, true)
 
 	if hasCurveOps(b.Stream) {
@@ -71,7 +72,7 @@ func TestCloudyBorderSmallPolygon(t *testing.T) {
 }
 
 func TestCloudyBorderRectangle(t *testing.T) {
-	b := builder.New(content.Form, nil)
+	b := builder.New(content.Form, nil, pdf.V2_0)
 	bbox := drawCloudyBorder(b, unitSquare, 1, 1, true, true)
 
 	if !hasCurveOps(b.Stream) {
@@ -91,10 +92,10 @@ func TestCloudyBorderCWReversal(t *testing.T) {
 		{X: 100, Y: 0},
 	}
 
-	b1 := builder.New(content.Form, nil)
+	b1 := builder.New(content.Form, nil, pdf.V2_0)
 	bbox1 := drawCloudyBorder(b1, unitSquare, 1, 1, true, false)
 
-	b2 := builder.New(content.Form, nil)
+	b2 := builder.New(content.Form, nil, pdf.V2_0)
 	bbox2 := drawCloudyBorder(b2, cw, 1, 1, true, false)
 
 	// bounding boxes should be similar (tolerance accounts for bulge placement shift)
@@ -104,7 +105,7 @@ func TestCloudyBorderCWReversal(t *testing.T) {
 }
 
 func TestCloudyBorderBBox(t *testing.T) {
-	b := builder.New(content.Form, nil)
+	b := builder.New(content.Form, nil, pdf.V2_0)
 	bbox := drawCloudyBorder(b, unitSquare, 1, 1, true, false)
 
 	// bbox must include the polygon
@@ -123,7 +124,7 @@ func TestCloudyBorderTriangle(t *testing.T) {
 		{X: 100, Y: 86.6},
 		{X: 0, Y: 86.6},
 	}
-	b := builder.New(content.Form, nil)
+	b := builder.New(content.Form, nil, pdf.V2_0)
 	bbox := drawCloudyBorder(b, tri, 1, 1, true, true)
 
 	if !hasCurveOps(b.Stream) {

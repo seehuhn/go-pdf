@@ -112,7 +112,7 @@ func createDocument(fname string) error {
 // line.
 func makeMarkerFont() font.Instance {
 	// Build content stream for marker glyph
-	b := builder.New(content.Glyph, nil)
+	b := builder.New(content.Glyph, nil, pdf.V2_0)
 	b.Type3ColoredGlyph(50, 0) // d0: colored glyph
 	b.SetFillColor(color.DeviceGray(0.5))
 	b.Rectangle(0, -500, 50, 2000)

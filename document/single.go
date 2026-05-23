@@ -53,7 +53,7 @@ func singlePage(w *pdf.Writer, pageSize *pdf.Rectangle) (*Page, error) {
 	// Create shared resources between page and builder
 	res := &content.Resources{}
 
-	b := builder.New(content.Page, res)
+	b := builder.New(content.Page, res, pdf.GetVersion(w))
 	pg := &page.Page{
 		MediaBox:  pageSize,
 		Resources: res,

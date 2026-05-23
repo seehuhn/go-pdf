@@ -25,11 +25,12 @@ import (
 	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
 func TestBuilder_NewForContent(t *testing.T) {
-	b := New(content.Page, nil)
+	b := New(content.Page, nil, pdf.V2_0)
 
 	// Page: line width is Known (can elide)
 	if !b.State.IsSet(graphics.StateLineWidth) {
@@ -43,7 +44,7 @@ func TestBuilder_NewForContent(t *testing.T) {
 }
 
 func TestBuilder_FormNoElision(t *testing.T) {
-	b := New(content.Form, nil)
+	b := New(content.Form, nil, pdf.V2_0)
 
 	// Form: line width is Set but not Known (cannot elide)
 	if !b.State.IsUsable(graphics.StateLineWidth) {
@@ -55,7 +56,7 @@ func TestBuilder_FormNoElision(t *testing.T) {
 }
 
 func TestBuilder_Harvest(t *testing.T) {
-	b := New(content.Page, nil)
+	b := New(content.Page, nil, pdf.V2_0)
 
 	b.SetLineWidth(5.0)
 	b.MoveTo(0, 0)
@@ -67,8 +68,8 @@ func TestBuilder_Harvest(t *testing.T) {
 		t.Fatalf("Harvest failed: %v", err)
 	}
 
-	if len(stream) != 4 {
-		t.Errorf("Harvest returned %d ops, want 4", len(stream))
+	if len(stream.Ops) != 4 {
+		t.Errorf("Harvest returned %d ops, want 4", len(stream.Ops))
 	}
 
 	// Stream should be cleared
@@ -78,7 +79,7 @@ func TestBuilder_Harvest(t *testing.T) {
 }
 
 func TestBuilder_HarvestError(t *testing.T) {
-	b := New(content.Page, nil)
+	b := New(content.Page, nil, pdf.V2_0)
 	b.Err = errors.New("test error")
 
 	_, err := b.Harvest()
@@ -93,7 +94,7 @@ func TestBuilder_HarvestError(t *testing.T) {
 }
 
 func TestBuilder_Validate(t *testing.T) {
-	b := New(content.Page, nil)
+	b := New(content.Page, nil, pdf.V2_0)
 
 	// Valid state
 	if err := b.Close(); err != nil {
@@ -115,7 +116,7 @@ func TestBuilder_Validate(t *testing.T) {
 
 func TestBuilder_Reset(t *testing.T) {
 	res := &content.Resources{}
-	b := New(content.Page, res)
+	b := New(content.Page, res, pdf.V2_0)
 
 	// build some content
 	b.SetLineWidth(5.0)
@@ -155,7 +156,7 @@ func TestBuilder_Reset(t *testing.T) {
 }
 
 func TestBuilder_ResetClearsError(t *testing.T) {
-	b := New(content.Page, nil)
+	b := New(content.Page, nil, pdf.V2_0)
 	b.Err = errors.New("test error")
 
 	b.Reset()
@@ -172,7 +173,7 @@ func TestBuilder_ResetClearsError(t *testing.T) {
 // and report the root cause rather than a cascading "unclosed operators"
 // failure caused by suppressed matching closers.
 func TestBuilder_FailingOperatorRecordedInStream(t *testing.T) {
-	b := New(content.Form, nil)
+	b := New(content.Form, nil, pdf.V2_0)
 
 	b.PushGraphicsState() // q  (valid, pushes pairQ)
 	b.LineTo(1, 2)        // l  (invalid: outside Path context — sets Err)
@@ -182,7 +183,9 @@ func TestBuilder_FailingOperatorRecordedInStream(t *testing.T) {
 		t.Fatal("expected Err to be set by LineTo without MoveTo")
 	}
 
-	// The failing operator must be preserved in the stream.
+	// The failing operator must be preserved in the stream so a
+	// diagnostic replay reproduces the root-cause error rather than
+	// a downstream "unclosed q" or similar.
 	if len(b.Stream) != 2 {
 		t.Fatalf("expected 2 ops in stream (q, l), got %d", len(b.Stream))
 	}
@@ -190,11 +193,9 @@ func TestBuilder_FailingOperatorRecordedInStream(t *testing.T) {
 		t.Errorf("expected last op to be %q, got %q", content.OpLineTo, b.Stream[1].Name)
 	}
 
-	// When the stream is replayed through the writer, it should surface
-	// the root-cause error — not a balance-check failure.
-	err := content.NewWriter(pdf.V2_0, content.Form, b.Resources).Validate(b.Stream)
-	if !errors.Is(err, content.ErrInvalidContext) {
-		t.Errorf("expected ErrInvalidContext, got %v", err)
+	// b.Err carries the root-cause failure.
+	if !errors.Is(b.Err, content.ErrInvalidContext) {
+		t.Errorf("expected ErrInvalidContext, got %v", b.Err)
 	}
 }
 
@@ -216,7 +217,7 @@ func makeType3(t *testing.T, name pdf.Name) font.Layouter {
 // TestBuilder_FontNameUsesResourceName verifies that FontName picks up the
 // font's configured ResourceName instead of auto-allocating.
 func TestBuilder_FontNameUsesResourceName(t *testing.T) {
-	b := New(content.Page, nil)
+	b := New(content.Page, nil, pdf.V2_0)
 	f := makeType3(t, "MyFont")
 	if got := b.FontName(f); got != "MyFont" {
 		t.Errorf("FontName = %q, want %q", got, "MyFont")
@@ -229,7 +230,7 @@ func TestBuilder_FontNameUsesResourceName(t *testing.T) {
 // TestBuilder_FontNameCollision tests that registering two different fonts
 // under the same name surfaces an error.
 func TestBuilder_FontNameCollision(t *testing.T) {
-	b := New(content.Page, nil)
+	b := New(content.Page, nil, pdf.V2_0)
 	f1 := makeType3(t, "F")
 	f2 := makeType3(t, "F")
 	b.FontName(f1)
@@ -245,9 +246,19 @@ func TestBuilder_FontNameCollision(t *testing.T) {
 // TestBuilder_SetFontNameInternalMismatch tests that SetFontNameInternal
 // refuses a name that disagrees with the font's own ResourceName.
 func TestBuilder_SetFontNameInternalMismatch(t *testing.T) {
-	b := New(content.Page, nil)
+	b := New(content.Page, nil, pdf.V2_0)
 	f := makeType3(t, "F1")
 	if err := b.SetFontNameInternal(f, "F2"); err == nil {
+		t.Error("expected error for mismatch between dict Name and requested key")
+	}
+}
+
+// TestBuilder_RegisterFontMismatch tests that RegisterFont refuses a name
+// that disagrees with the font's own ResourceName.
+func TestBuilder_RegisterFontMismatch(t *testing.T) {
+	b := New(content.Page, nil, pdf.V2_0)
+	f := makeType3(t, "F1")
+	if err := b.RegisterFont("F2", f); err == nil {
 		t.Error("expected error for mismatch between dict Name and requested key")
 	}
 }
@@ -259,7 +270,7 @@ func TestBuilder_PrefillMismatch(t *testing.T) {
 	res := &content.Resources{
 		Font: map[pdf.Name]font.Instance{"F1": f},
 	}
-	b := New(content.Page, res)
+	b := New(content.Page, res, pdf.V2_0)
 	if b.Err == nil {
 		t.Error("expected Err for dict-key vs Name mismatch in Resources.Font")
 	}
@@ -275,8 +286,68 @@ func TestBuilder_PrefillXObjectMismatch(t *testing.T) {
 	res := &content.Resources{
 		XObject: map[pdf.Name]graphics.XObject{"X1": f},
 	}
-	b := New(content.Page, res)
+	b := New(content.Page, res, pdf.V2_0)
 	if b.Err == nil {
 		t.Error("expected Err for dict-key vs Name mismatch in Resources.XObject")
+	}
+}
+
+// TestBuilder_VersionRejectsTooNewOperator pins that emitting a PDF 1.2+
+// operator on a PDF 1.1 builder is rejected with ErrVersion.
+func TestBuilder_VersionRejectsTooNewOperator(t *testing.T) {
+	b := New(content.Page, nil, pdf.V1_1)
+	b.SetExtGState(&extgstate.ExtGState{Set: graphics.StateLineWidth, LineWidth: 1})
+	if b.Err == nil {
+		t.Fatal("expected Err for gs on PDF 1.1, got nil")
+	}
+	if !errors.Is(b.Err, content.ErrVersion) {
+		t.Errorf("expected ErrVersion, got %v", b.Err)
+	}
+}
+
+// TestBuilder_RejectsQStackOverflow pins the pre-PDF-2.0 q stack limit
+// of 28 frames.
+func TestBuilder_RejectsQStackOverflow(t *testing.T) {
+	b := New(content.Page, nil, pdf.V1_7)
+	for range 28 {
+		b.PushGraphicsState()
+	}
+	if b.Err != nil {
+		t.Fatalf("expected 28 pushes to succeed, got Err: %v", b.Err)
+	}
+	b.PushGraphicsState() // 29th — must fail
+	if b.Err == nil {
+		t.Fatal("expected Err for 29th push, got nil")
+	}
+}
+
+// TestBuilder_RejectsQInText pins the pre-PDF-2.0 "no q inside BT/ET" rule.
+func TestBuilder_RejectsQInText(t *testing.T) {
+	b := New(content.Page, nil, pdf.V1_7)
+	if err := b.RegisterFont("F1", makeType3(t, "F1")); err != nil {
+		t.Fatalf("RegisterFont: %v", err)
+	}
+	b.TextBegin()
+	b.PushGraphicsState() // q inside text — must fail
+	if b.Err == nil {
+		t.Fatal("expected Err for q inside text object on PDF 1.7")
+	}
+	if !errors.Is(b.Err, content.ErrInvalidContext) {
+		t.Errorf("expected ErrInvalidContext, got %v", b.Err)
+	}
+}
+
+// TestBuilder_AllowsQInTextOnV2 confirms PDF 2.0 lifts the restriction.
+func TestBuilder_AllowsQInTextOnV2(t *testing.T) {
+	b := New(content.Page, nil, pdf.V2_0)
+	if err := b.RegisterFont("F1", makeType3(t, "F1")); err != nil {
+		t.Fatalf("RegisterFont: %v", err)
+	}
+	b.TextBegin()
+	b.PushGraphicsState()
+	b.PopGraphicsState()
+	b.TextEnd()
+	if b.Err != nil {
+		t.Errorf("expected q-in-text to succeed on PDF 2.0, got %v", b.Err)
 	}
 }

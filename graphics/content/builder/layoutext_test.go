@@ -43,7 +43,7 @@ import (
 func TestGetQuadPointsSimple(t *testing.T) {
 	F := squarefont.All[0].MakeFont()
 
-	b := builder.New(content.Page, nil)
+	b := builder.New(content.Page, nil, pdf.V2_0)
 
 	b.TextBegin()
 	b.TextSetFont(F, 10)
@@ -132,7 +132,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 			testFont := squarefont.All[0].MakeFont()
 
 			// Create builder
-			b := builder.New(content.Page, nil)
+			b := builder.New(content.Page, nil, pdf.V2_0)
 
 			// Start text object and set font
 			b.TextBegin()
@@ -222,7 +222,7 @@ func TestGetGlyphQuadPointsStateValidation(t *testing.T) {
 	// Test that function returns nil when required text state is not set
 	testFont := squarefont.All[0].MakeFont()
 
-	b := builder.New(content.Page, nil)
+	b := builder.New(content.Page, nil, pdf.V2_0)
 
 	// Create a glyph sequence without setting up text state
 	glyphSeq := testFont.Layout(nil, 12.0, "A")
@@ -238,7 +238,7 @@ func TestGetGlyphQuadPointsTextMatrixTransform(t *testing.T) {
 	// Test combined text matrix and CTM transformation
 	testFont := squarefont.All[0].MakeFont()
 
-	b := builder.New(content.Page, nil)
+	b := builder.New(content.Page, nil, pdf.V2_0)
 
 	// Set up text state
 	b.TextSetFont(testFont, 10.0)
@@ -278,7 +278,7 @@ func TestGlyphWidths(t *testing.T) {
 		t.Fatal("wrong number of glyphs")
 	}
 
-	b := builder.New(content.Page, nil)
+	b := builder.New(content.Page, nil, pdf.V2_0)
 	b.TextBegin()
 	b.TextSetHorizontalScaling(2)
 	b.TextSetFont(F, 50)
@@ -304,7 +304,7 @@ func TestGlyphWidths(t *testing.T) {
 	}
 
 	buf := &bytes.Buffer{}
-	err := content.Write(buf, b.Stream, pdf.V1_7, content.Page, b.Resources)
+	err := content.Write(buf, &content.Operators{Ops: b.Stream})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -466,7 +466,7 @@ func TestTextLayout1(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			b := builder.New(content.Page, nil)
+			b := builder.New(content.Page, nil, pdf.V2_0)
 			b.TextSetFont(F, 10)
 
 			var testCases = []string{
@@ -501,7 +501,7 @@ func TestTextLayout2(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			b := builder.New(content.Page, nil)
+			b := builder.New(content.Page, nil, pdf.V2_0)
 			b.TextSetFont(F, 10)
 
 			// First make sure the font uses ligatures:
@@ -534,7 +534,7 @@ func TestTextLayout3(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b := builder.New(content.Page, nil)
+	b := builder.New(content.Page, nil, pdf.V2_0)
 
 	b.TextSetFont(F, 10)
 	L1 := b.TextLayout(nil, "hello world!").TotalWidth()

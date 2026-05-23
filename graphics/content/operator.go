@@ -60,11 +60,11 @@ func (o Operator) Equal(other Operator) bool {
 	return true
 }
 
-// isValidName checks whether the operator name is valid for the given PDF version.
-// It returns ErrUnknown if the operator is not recognized, ErrDeprecated if
-// the operator is deprecated in the given version, or ErrVersion if the
-// operator was not yet available in the given version.
-func (name OpName) isValidName(v pdf.Version) error {
+// CheckOperatorVersion reports whether the operator is available in the
+// given PDF version.  It returns [ErrUnknown] if the operator name is not
+// recognised, [ErrVersion] if the operator was added in a later version,
+// or [ErrDeprecated] if the operator is deprecated in the given version.
+func CheckOperatorVersion(name OpName, v pdf.Version) error {
 	info, ok := operators[name]
 	if !ok {
 		return ErrUnknown
@@ -193,16 +193,16 @@ var operators = map[OpName]*opInfo{
 	OpSetStrokeCMYK:       {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateStrokeColor},
 	OpSetFillCMYK:         {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateFillColor},
 
-	// Shading Patterns (allowed in page and text contexts)
-	OpShading: {Since: pdf.V1_3, Allowed: ObjPage | ObjText},
+	// Shading Patterns (page only per ISO 32000-2 §9.4.1)
+	OpShading: {Since: pdf.V1_3, Allowed: ObjPage},
 
-	// Inline Images (internal use, allowed in page and text)
-	opBeginInlineImage: {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
-	opInlineImageData:  {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
-	opEndInlineImage:   {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	// Inline Images (page only per ISO 32000-2 §9.4.1)
+	opBeginInlineImage: {Since: pdf.V1_0, Allowed: ObjPage},
+	opInlineImageData:  {Since: pdf.V1_0, Allowed: ObjPage},
+	opEndInlineImage:   {Since: pdf.V1_0, Allowed: ObjPage},
 
-	// XObjects (allowed in page and text contexts)
-	OpXObject: {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	// XObjects (page only per ISO 32000-2 §9.4.1)
+	OpXObject: {Since: pdf.V1_0, Allowed: ObjPage},
 
 	// Marked Content (allowed in page and text contexts)
 	OpMarkedContentPoint:               {Since: pdf.V1_2, Allowed: ObjPage | ObjText},
@@ -217,7 +217,7 @@ var operators = map[OpName]*opInfo{
 
 	// Pseudo-operators (internal use, allowed in any context)
 	OpRawContent:  {Since: pdf.V1_0, Allowed: ObjAny},
-	OpInlineImage: {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
+	OpInlineImage: {Since: pdf.V1_0, Allowed: ObjPage},
 }
 
 type OpName pdf.Name

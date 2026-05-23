@@ -17,15 +17,15 @@
 // Package builder provides a type-safe API for constructing PDF content streams.
 //
 // The [Builder] type offers methods corresponding to PDF graphics operators.
-// It tracks graphics state, manages resources, and produces a [content.Operators]
-// that can be written using [content.Writer]. Errors are reported using the
-// Builder.Err field. Once an error occurs, all methods return immediately
-// without doing anything.
+// It tracks graphics state, manages resources, and produces a
+// [*content.Operators] segment that can be serialised using [content.Write].
+// Errors are reported using the [Builder.Err] field. Once an error occurs,
+// all methods return immediately without doing anything.
 //
 // The following code illustrates how to use a Builder to draw a red
 // square with a black outline:
 //
-//	b := builder.New(content.Page, nil)
+//	b := builder.New(content.Page, nil, pdf.V2_0)
 //
 //	b.SetLineWidth(2)
 //	b.SetFillColor(color.DeviceRGB.New(1, 0, 0))
@@ -37,6 +37,6 @@
 //	if err != nil {
 //		log.Fatal(err)
 //	}
-//	// Use content.Writer to write the stream.
+//	// Use content.Write to serialise the stream.
 //	// Use b.Resources for the associated resource dictionary.
 package builder

@@ -86,7 +86,6 @@ func extractFontType3(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*
 		fontRes, _ = pdf.ExtractorGet(x, path, fontDict["Resources"], Resources)
 	}
 
-	v := pdf.GetVersion(x.R)
 	charProcs := make(map[pdf.Name]*dict.CharProc, len(charProcsDict))
 	for name, obj := range charProcsDict {
 		stm, err := x.GetStream(path, obj)
@@ -98,43 +97,37 @@ func extractFontType3(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*
 		}
 
 		// Extract glyph resources per PDF spec 7.8 search order:
-		// 1. glyph stream dict, 2. font dict, 3. page dict (not available here)
-		// We track foundRes separately to store nil in CharProc when no resources were found.
-		var res *content.Resources
+		// 1. glyph stream dict, 2. font dict, 3. page dict (not available here).
+		// foundRes is what we store in CharProc (nil when no resources were
+		// found); only the stored copy matters now that the post-extract
+		// validation (which previously also needed a `res` for lookups) is
+		// gone.
 		var foundRes *content.Resources
 		if stm.Dict["Resources"] != nil {
 			foundRes, _ = pdf.ExtractorGet(x, path, stm.Dict["Resources"], Resources)
-			res = foundRes
 		} else if fontRes != nil {
 			foundRes = fontRes
-			res = fontRes
-		} else {
-			// TODO(voss): ideally we should use page resources here per PDF spec 7.8,
-			// but we don't have access to the page context during font extraction.
-			res = &content.Resources{}
-			// foundRes stays nil - we didn't find actual resources
 		}
 
 		// Parse the content stream
 		glyphStm := stm // capture for closure
 		stream, err := content.ReadStream(func() (io.ReadCloser, error) {
 			return pdf.DecodeStream(x.R, path, glyphStm, 0)
-		}, v, content.Glyph, res)
+		})
 		if err != nil {
 			continue // permissive
 		}
 
-		// Validate the stream is embeddable
-		w := content.NewWriter(v, content.Glyph, res)
-		if err := w.Validate(stream); err != nil {
-			continue // invalid stream, skip this CharProc
-		}
-		if err := w.Close(); err != nil {
-			continue // invalid end state
+		// Cheap shape check: a Type 3 glyph procedure must start with
+		// either d0 (colored) or d1 (uncolored).  Anything else is
+		// rejected here; later operators are not validated.
+		if len(stream) == 0 ||
+			(stream[0].Name != content.OpType3ColoredGlyph && stream[0].Name != content.OpType3UncoloredGlyph) {
+			continue
 		}
 
 		charProcs[name] = &dict.CharProc{
-			Content:   stream,
+			Content:   &content.Operators{Ops: stream},
 			Resources: foundRes, // nil if no resources found in PDF
 		}
 	}

@@ -27,7 +27,7 @@ import (
 
 func TestMultiSegmentPage(t *testing.T) {
 	// Build two segments
-	b := builder.New(content.Page, nil)
+	b := builder.New(content.Page, nil, pdf.V2_0)
 
 	// First segment
 	b.SetLineWidth(2)
@@ -50,7 +50,7 @@ func TestMultiSegmentPage(t *testing.T) {
 	}
 
 	// stream2 should not have SetLineWidth (elided)
-	for _, op := range stream2 {
+	for _, op := range stream2.Ops {
 		if op.Name == content.OpSetLineWidth {
 			t.Error("SetLineWidth should have been elided in stream2")
 		}
@@ -63,15 +63,11 @@ func TestMultiSegmentPage(t *testing.T) {
 
 	// Write both segments
 	var buf1, buf2 bytes.Buffer
-	w := content.NewWriter(pdf.V1_7, content.Page, b.Resources)
-	if err := w.Write(&buf1, stream1); err != nil {
+	if err := content.Write(&buf1, stream1); err != nil {
 		t.Fatalf("Write stream1: %v", err)
 	}
-	if err := w.Write(&buf2, stream2); err != nil {
+	if err := content.Write(&buf2, stream2); err != nil {
 		t.Fatalf("Write stream2: %v", err)
-	}
-	if err := w.Close(); err != nil {
-		t.Fatalf("Writer.Validate: %v", err)
 	}
 }
 
@@ -79,7 +75,7 @@ func TestType3FontGlyphs(t *testing.T) {
 	sharedRes := &content.Resources{}
 
 	// Glyph 'A' with d0 (colored)
-	bA := builder.New(content.Glyph, sharedRes)
+	bA := builder.New(content.Glyph, sharedRes, pdf.V2_0)
 	bA.Type3ColoredGlyph(500, 0)
 	bA.MoveTo(0, 0)
 	bA.LineTo(250, 700)
@@ -94,7 +90,7 @@ func TestType3FontGlyphs(t *testing.T) {
 	}
 
 	// Glyph 'B' with d1 (inherits color)
-	bB := builder.New(content.Glyph, sharedRes)
+	bB := builder.New(content.Glyph, sharedRes, pdf.V2_0)
 	bB.Type3UncoloredGlyph(600, 0, 0, 0, 600, 700)
 	// No color operators allowed
 	bB.MoveTo(0, 0)
@@ -112,12 +108,10 @@ func TestType3FontGlyphs(t *testing.T) {
 
 	// Write both
 	var bufA, bufB bytes.Buffer
-	wA := content.NewWriter(pdf.V1_7, content.Glyph, sharedRes)
-	if err := wA.Write(&bufA, streamA); err != nil {
+	if err := content.Write(&bufA, streamA); err != nil {
 		t.Fatalf("Write glyph A: %v", err)
 	}
-	wB := content.NewWriter(pdf.V1_7, content.Glyph, sharedRes)
-	if err := wB.Write(&bufB, streamB); err != nil {
+	if err := content.Write(&bufB, streamB); err != nil {
 		t.Fatalf("Write glyph B: %v", err)
 	}
 
@@ -128,7 +122,7 @@ func TestType3FontGlyphs(t *testing.T) {
 
 func TestFormInheritedState(t *testing.T) {
 	// Form: all params are Set-Unknown, no elision
-	b := builder.New(content.Form, nil)
+	b := builder.New(content.Form, nil, pdf.V2_0)
 
 	// First set: should emit (not Known)
 	b.SetLineWidth(5.0)
@@ -152,29 +146,11 @@ func TestFormInheritedState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Harvest: %v", err)
 	}
-	if len(stream) != 2 {
-		t.Errorf("Expected 2 ops in stream, got %d", len(stream))
+	if len(stream.Ops) != 2 {
+		t.Errorf("Expected 2 ops in stream, got %d", len(stream.Ops))
 	}
 }
 
-func TestWriterVersionValidation(t *testing.T) {
-	b := builder.New(content.Page, nil)
-	b.SetRenderingIntent("Perceptual")
-	stream, _ := b.Harvest()
-
-	// PDF 1.0 doesn't support ri
-	var buf bytes.Buffer
-	w := content.NewWriter(pdf.V1_0, content.Page, b.Resources)
-	err := w.Write(&buf, stream)
-	if err == nil {
-		t.Error("ri should fail for PDF 1.0")
-	}
-
-	// PDF 1.1+ supports ri
-	buf.Reset()
-	w2 := content.NewWriter(pdf.V1_1, content.Page, b.Resources)
-	err = w2.Write(&buf, stream)
-	if err != nil {
-		t.Errorf("ri should work for PDF 1.1: %v", err)
-	}
-}
+// (Version validation lives at construction time in [builder.Builder] —
+// see TestBuilder_VersionRejectsTooNewOperator.  The Writer no longer
+// validates, so a former TestWriterVersionValidation test was removed.)

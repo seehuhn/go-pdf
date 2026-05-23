@@ -164,15 +164,10 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*form
 	// store a reader factory closure so each iteration re-opens the PDF stream
 	stm := stream // capture for closure
 	getter := x.R
-	scannerRes := f.Res
-	if scannerRes == nil {
-		scannerRes = &content.Resources{}
-	}
 	f.Content = content.NewScanner(
 		func() (io.ReadCloser, error) {
 			return pdf.DecodeStream(getter, nil, stm, 0)
 		},
-		version, content.Form, scannerRes,
 	)
 
 	repairForm(f, x.R)

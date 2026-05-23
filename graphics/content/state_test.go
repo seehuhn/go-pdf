@@ -443,3 +443,34 @@ func TestClipPathReset(t *testing.T) {
 		t.Errorf("current path not cleared: %d commands remain", len(s.currentPath.Cmds))
 	}
 }
+
+// TestCmInsideText_AppliesToCTM pins the contract: cm encountered inside
+// a BT/ET text object is applied to CTM, not to TextMatrix/TextLineMatrix.
+// Text rendering uses Tm × CTM, so the affected glyphs render at the
+// transformed device position, and the CTM change persists past ET —
+// matching how mutool, pdf.js, and similar viewers handle this
+// malformed-but-common pattern (e.g. mutool link annotations).
+func TestCmInsideText_AppliesToCTM(t *testing.T) {
+	s := NewState(Page, &Resources{})
+	origCTM := s.GState.CTM
+	wantTm := matrix.Matrix{1, 0, 0, 1, 5, 5}
+
+	applyOps(s,
+		OpTextBegin, []pdf.Object{},
+		OpTextSetMatrix, []pdf.Object{n(1), n(0), n(0), n(1), n(5), n(5)},
+		OpTransform, []pdf.Object{n(2), n(0), n(0), n(2), n(10), n(20)},
+	)
+
+	wantCTM := matrix.Matrix{2, 0, 0, 2, 10, 20}.Mul(origCTM)
+	if s.GState.CTM != wantCTM {
+		t.Errorf("CTM = %v, want %v", s.GState.CTM, wantCTM)
+	}
+	if s.GState.TextMatrix != wantTm {
+		t.Errorf("TextMatrix changed: got %v, want %v (Tm untouched by cm)",
+			s.GState.TextMatrix, wantTm)
+	}
+	if s.GState.TextLineMatrix != wantTm {
+		t.Errorf("TextLineMatrix changed: got %v, want %v (Tlm untouched by cm)",
+			s.GState.TextLineMatrix, wantTm)
+	}
+}

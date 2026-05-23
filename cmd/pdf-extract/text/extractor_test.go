@@ -42,7 +42,7 @@ func TestTextExtractorBasic(t *testing.T) {
 
 	pageTree := pagetree.NewWriter(w, rm)
 
-	b := builder.New(content.Page, nil)
+	b := builder.New(content.Page, nil, pdf.V2_0)
 	b.TextBegin()
 	b.TextFirstLine(100, 700)
 	b.TextSetFont(F, 12)
@@ -56,7 +56,7 @@ func TestTextExtractorBasic(t *testing.T) {
 	p := &page.Page{
 		MediaBox:  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 595, URy: 842},
 		Resources: b.Resources,
-		Contents:  []content.Stream{b.Stream},
+		Contents:  []content.Segment{&content.Operators{Ops: b.Stream}},
 	}
 	err := pageTree.AppendPage(p)
 	if err != nil {
@@ -107,7 +107,7 @@ func TestTextExtractorActualTextIndirect(t *testing.T) {
 
 	pageTree := pagetree.NewWriter(w, rm)
 
-	b := builder.New(content.Page, nil)
+	b := builder.New(content.Page, nil, pdf.V2_0)
 
 	b.TextBegin()
 	b.TextFirstLine(100, 700)
@@ -136,7 +136,7 @@ func TestTextExtractorActualTextIndirect(t *testing.T) {
 	p := &page.Page{
 		MediaBox:  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 595, URy: 842},
 		Resources: b.Resources,
-		Contents:  []content.Stream{b.Stream},
+		Contents:  []content.Segment{&content.Operators{Ops: b.Stream}},
 	}
 	err := pageTree.AppendPage(p)
 	if err != nil {
@@ -190,7 +190,7 @@ func TestTextExtractorActualText(t *testing.T) {
 
 	pageTree := pagetree.NewWriter(w, rm)
 
-	b := builder.New(content.Page, nil)
+	b := builder.New(content.Page, nil, pdf.V2_0)
 
 	// The string "the original text" is rendered as three text objects so
 	// that the MarkedContent / ActualText boundary lies outside the BT/ET
@@ -244,7 +244,7 @@ func TestTextExtractorActualText(t *testing.T) {
 	p := &page.Page{
 		MediaBox:  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 595, URy: 842},
 		Resources: b.Resources,
-		Contents:  []content.Stream{b.Stream},
+		Contents:  []content.Segment{&content.Operators{Ops: b.Stream}},
 	}
 	err := pageTree.AppendPage(p)
 	if err != nil {

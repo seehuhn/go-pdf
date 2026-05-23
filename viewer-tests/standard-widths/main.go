@@ -67,7 +67,7 @@ func createDocument(filename string) error {
 	markerDescent := descent / fontSize * 1000
 
 	// Build content stream for marker glyph
-	b := builder.New(content.Glyph, nil)
+	b := builder.New(content.Glyph, nil, pdf.V2_0)
 	b.Type3UncoloredGlyph(markerWidth, 0, 0, markerDescent, markerWidth, markerAscent)
 	b.Rectangle(0, markerDescent, markerWidth, markerAscent-markerDescent)
 	b.Fill()

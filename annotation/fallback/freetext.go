@@ -69,7 +69,7 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 	a.DefaultStyle = ""
 
 	// generate the appearance stream
-	b := builder.New(content.Form, nil)
+	b := builder.New(content.Form, nil, s.Version)
 
 	b.SetExtGState(s.reset)
 
@@ -208,7 +208,7 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 		quireInk[0], quireInk[1], quireInk[2])
 
 	return &form.Form{
-		Content: b.Stream,
+		Content: builder.Must(b.Harvest()),
 		Res:     b.Resources,
 		BBox:    outer,
 	}

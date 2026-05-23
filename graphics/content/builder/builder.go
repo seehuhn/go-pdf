@@ -29,11 +29,33 @@ import (
 )
 
 // Builder constructs PDF content streams using a type-safe API.
+//
+// Builder is the only API in this package that produces validated content
+// streams.  Each emit-time check uses the builder's target PDF version and
+// content-type context: operators unknown or unavailable in the chosen
+// version are rejected, deprecated operators are rejected (callers must use
+// the modern typed helper instead, e.g. Fill rather than the "F" operator),
+// and structural constraints such as the pre-PDF-2.0 q/Q stack depth limit
+// and q/Q-in-text-object prohibition are enforced when q or Q is emitted.
+// The first failure becomes a sticky [Builder.Err]; subsequent emits become
+// no-ops.  The failing operator is appended to the stream once so that
+// diagnostic round-tripping still surfaces the root-cause operator rather
+// than a cascading nesting failure.
+//
+// To retrieve the built-up content as a [*content.Operators] segment,
+// call [Builder.Harvest] (or [Builder.Build] for a one-shot
+// reset-then-build pattern); [Must] makes the common error-free path a
+// one-liner: builder.Must(b.Harvest()).
+//
+// [Builder.RawContent] is the one bypass: bytes written through it are
+// inserted verbatim and not validated.  Callers using RawContent are
+// responsible for their content's correctness.
 type Builder struct {
 	contentType content.Type
+	version     pdf.Version
 
 	Resources *content.Resources
-	Stream    content.Operators
+	Stream    []content.Operator
 	State     *content.State
 	Err       error
 
@@ -62,16 +84,23 @@ const (
 	resXObject    pdf.Name = "X"
 )
 
-// New creates a Builder for the given content type.
+// New creates a Builder targeting the given PDF version and content-type
+// context.  The version is used to reject operators that are unknown or
+// unavailable in that version (e.g. `ri` on PDF 1.0, `gs` on pre-1.2,
+// the deprecated `F` at any version) and to enforce structural limits
+// (q/Q stack depth and q/Q-in-text-object) for pre-PDF-2.0.
 // If res is nil, the function allocates a new Resources object.
-func New(ct content.Type, res *content.Resources) *Builder {
+func New(ct content.Type, res *content.Resources, version pdf.Version) *Builder {
 	if res == nil {
 		res = &content.Resources{}
 	}
+	state := content.NewState(ct, res)
+	state.Version = version
 	b := &Builder{
 		contentType: ct,
+		version:     version,
 		Resources:   res,
-		State:       content.NewState(ct, res),
+		State:       state,
 		resName:     make(map[resKey]pdf.Name),
 	}
 
@@ -110,16 +139,17 @@ func New(ct content.Type, res *content.Resources) *Builder {
 	return b
 }
 
-// Harvest returns the stream built so far and clears it.
-// State continues for building the next segment.
-// Returns error if Err is set (error is sticky, not cleared).
-func (b *Builder) Harvest() (content.Operators, error) {
+// Harvest returns the stream built so far as a [*content.Operators]
+// segment and clears the builder's accumulator.  Graphics state continues
+// for building the next segment.  Returns the sticky error if Err is set
+// (the error is not cleared).
+func (b *Builder) Harvest() (*content.Operators, error) {
 	if b.Err != nil {
 		return nil, b.Err
 	}
 	stream := b.Stream
 	b.Stream = nil
-	return stream, nil
+	return &content.Operators{Ops: stream}, nil
 }
 
 // Close checks that all q/Q, BT/ET, BMC/EMC groups are correctly closed.
@@ -136,6 +166,7 @@ func (b *Builder) Close() error {
 func (b *Builder) Reset() {
 	b.Stream = nil
 	b.State = content.NewState(b.contentType, b.Resources)
+	b.State.Version = b.version
 	b.Err = nil
 }
 
@@ -144,17 +175,22 @@ func (b *Builder) Reset() {
 // State tracking for q/Q, BT/ET, and BMC/EMC is handled via State methods.
 // Individual methods update Known bits and Builder.Param values as needed.
 //
-// If an error occurs, it is stored in b.Err and subsequent calls become
-// no-ops.  The failing operator itself is still appended to the stream so
-// that a downstream consumer (e.g. [content.Writer]) re-encounters and
-// reports the same root-cause error rather than a cascading failure such
-// as "unclosed operators: q/Q" caused by suppressed matching closers.
+// If an error occurs, it is stored in [Builder.Err] and subsequent calls
+// become no-ops.  The failing operator itself is still appended to the
+// stream so that a diagnostic replay of [Builder.Stream] reproduces the
+// same root-cause error rather than a cascading failure such as
+// "unclosed operators: q/Q" caused by suppressed matching closers.
 func (b *Builder) emit(name content.OpName, args ...pdf.Object) {
 	if b.Err != nil {
 		return
 	}
 
 	op := content.Operator{Name: name, Args: args}
+	if err := content.CheckOperatorVersion(name, b.version); err != nil {
+		b.Err = fmt.Errorf("operator %s: %w", name, err)
+		b.Stream = append(b.Stream, op)
+		return
+	}
 	if err := b.State.ApplyOperator(name, args); err != nil {
 		b.Err = err
 		b.Stream = append(b.Stream, op)

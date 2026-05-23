@@ -63,7 +63,7 @@ func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 		}
 	}
 
-	b := builder.New(content.Form, nil)
+	b := builder.New(content.Form, nil, s.Version)
 
 	switch style {
 	case "U": // underline
@@ -137,7 +137,7 @@ func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 	}
 
 	return &form.Form{
-		Content: b.Stream,
+		Content: builder.Must(b.Harvest()),
 		Res:     b.Resources,
 		BBox:    bbox,
 	}

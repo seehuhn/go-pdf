@@ -19,12 +19,13 @@ package builder
 import (
 	"testing"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
 )
 
 func TestBuilder_Type3SetWidthOnly(t *testing.T) {
-	b := New(content.Glyph, nil)
+	b := New(content.Glyph, nil, pdf.V2_0)
 
 	b.Type3ColoredGlyph(500, 0)
 	if b.Err != nil {
@@ -37,7 +38,7 @@ func TestBuilder_Type3SetWidthOnly(t *testing.T) {
 }
 
 func TestBuilder_Type3SetWidthAndBBox(t *testing.T) {
-	b := New(content.Glyph, nil)
+	b := New(content.Glyph, nil, pdf.V2_0)
 
 	b.Type3UncoloredGlyph(600, 0, 0, 0, 500, 700)
 	if b.Err != nil {
@@ -50,7 +51,7 @@ func TestBuilder_Type3SetWidthAndBBox(t *testing.T) {
 }
 
 func TestBuilder_Type3ColorRestriction(t *testing.T) {
-	b := New(content.Glyph, nil)
+	b := New(content.Glyph, nil, pdf.V2_0)
 
 	// d1 mode
 	b.Type3UncoloredGlyph(600, 0, 0, 0, 500, 700)
@@ -66,7 +67,7 @@ func TestBuilder_Type3ColorRestriction(t *testing.T) {
 }
 
 func TestBuilder_Type3NotFirstOp(t *testing.T) {
-	b := New(content.Glyph, nil)
+	b := New(content.Glyph, nil, pdf.V2_0)
 
 	// Some other operator first
 	b.SetLineWidth(1.0)
@@ -79,7 +80,7 @@ func TestBuilder_Type3NotFirstOp(t *testing.T) {
 }
 
 func TestBuilder_Type3D0AllowsColor(t *testing.T) {
-	b := New(content.Glyph, nil)
+	b := New(content.Glyph, nil, pdf.V2_0)
 
 	// d0 mode
 	b.Type3ColoredGlyph(500, 0)

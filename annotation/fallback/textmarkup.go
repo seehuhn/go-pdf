@@ -41,10 +41,10 @@ func (s *Style) addTextMarkupAppearance(a *annotation.TextMarkup) *form.Form {
 	}
 
 	if col == nil {
-		b := builder.New(content.Form, nil)
+		b := builder.New(content.Form, nil, s.Version)
 		b.SetExtGState(s.reset)
 		return &form.Form{
-			Content: b.Stream,
+			Content: builder.Must(b.Harvest()),
 			Res:     b.Resources,
 			BBox:    a.Rect,
 		}
@@ -84,7 +84,7 @@ func (s *Style) addTextMarkupAppearance(a *annotation.TextMarkup) *form.Form {
 	bbox.IRound(2)
 	a.Rect = bbox
 
-	b := builder.New(content.Form, nil)
+	b := builder.New(content.Form, nil, s.Version)
 	b.SetExtGState(s.reset)
 
 	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
@@ -158,7 +158,7 @@ func (s *Style) addTextMarkupAppearance(a *annotation.TextMarkup) *form.Form {
 	}
 
 	return &form.Form{
-		Content: b.Stream,
+		Content: builder.Must(b.Harvest()),
 		Res:     b.Resources,
 		BBox:    bbox,
 	}

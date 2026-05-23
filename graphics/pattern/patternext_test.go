@@ -38,7 +38,7 @@ type testCase struct {
 }
 
 func makeType1Colored() *pattern.Type1 {
-	b := builder.New(content.PatternColored, nil)
+	b := builder.New(content.PatternColored, nil, pdf.V2_0)
 	b.SetFillColor(color.DeviceGray(0.5))
 	b.Rectangle(0, 0, 5, 5)
 	b.Fill()
@@ -48,13 +48,13 @@ func makeType1Colored() *pattern.Type1 {
 		XStep:      10,
 		YStep:      10,
 		Color:      true,
-		Content:    b.Stream,
+		Content:    &content.Operators{Ops: b.Stream},
 		Res:        b.Resources,
 	}
 }
 
 func makeType1Uncolored() *pattern.Type1 {
-	b := builder.New(content.PatternUncolored, nil)
+	b := builder.New(content.PatternUncolored, nil, pdf.V2_0)
 	b.Rectangle(5, 5, 10, 10)
 	b.Fill()
 	return &pattern.Type1{
@@ -63,7 +63,7 @@ func makeType1Uncolored() *pattern.Type1 {
 		XStep:      20,
 		YStep:      20,
 		Color:      false,
-		Content:    b.Stream,
+		Content:    &content.Operators{Ops: b.Stream},
 		Res:        b.Resources,
 	}
 }

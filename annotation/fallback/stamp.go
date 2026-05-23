@@ -50,7 +50,7 @@ func (s *Style) addStampAppearance(a *annotation.Stamp) *form.Form {
 		}
 	}
 
-	b := builder.New(content.Form, nil)
+	b := builder.New(content.Form, nil, s.Version)
 
 	b.SetExtGState(s.reset)
 	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
@@ -138,7 +138,7 @@ func (s *Style) addStampAppearance(a *annotation.Stamp) *form.Form {
 	b.PopGraphicsState()
 
 	return &form.Form{
-		Content: b.Stream,
+		Content: builder.Must(b.Harvest()),
 		Res:     b.Resources,
 		BBox:    rect,
 	}

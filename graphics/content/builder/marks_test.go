@@ -51,7 +51,7 @@ func TestMarkedContentInline(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("test%02d", i), func(t *testing.T) {
-			b := New(content.Page, nil)
+			b := New(content.Page, nil, pdf.V2_0)
 			mc := &graphics.MarkedContent{
 				Tag:        "test",
 				Properties: tc.Prop,
@@ -66,7 +66,7 @@ func TestMarkedContentInline(t *testing.T) {
 			if tc.out != "" {
 				buf := &bytes.Buffer{}
 				for _, op := range b.Stream {
-					content.WriteOperator(buf, op)
+					op.Format(buf)
 				}
 				if !strings.Contains(buf.String(), tc.out) {
 					t.Errorf("expected %q, got %q", tc.out, buf.String())

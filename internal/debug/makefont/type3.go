@@ -22,6 +22,7 @@ import (
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/pdf/graphics/content"
@@ -67,7 +68,7 @@ func Type3() (font.Layouter, error) {
 		width := info.GlyphWidth(gid)
 
 		// Build content stream for the glyph
-		b := builder.New(content.Glyph, nil)
+		b := builder.New(content.Glyph, nil, pdf.V2_0)
 
 		if origGlyph != nil {
 			bbox := origGlyph.Rect16

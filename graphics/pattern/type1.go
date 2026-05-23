@@ -138,12 +138,8 @@ func (p *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 
-	ct := content.PatternColored
-	if !p.Color {
-		ct = content.PatternUncolored
-	}
 	if p.Content != nil {
-		err = content.Write(stm, p.Content, pdf.GetVersion(rm.Out()), ct, p.Res)
+		err = content.Write(stm, p.Content)
 		if err != nil {
 			return nil, err
 		}

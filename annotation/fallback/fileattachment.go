@@ -49,7 +49,7 @@ func (s *Style) addFileAttachmentAppearance(a *annotation.FileAttachment) *form.
 		col = quireInk2
 	}
 
-	b := builder.New(content.Form, nil)
+	b := builder.New(content.Form, nil, s.Version)
 	b.SetExtGState(s.reset)
 
 	// card background: hairline slate-3 border + slate-1 fill.  Cool
@@ -74,7 +74,7 @@ func (s *Style) addFileAttachmentAppearance(a *annotation.FileAttachment) *form.
 	}
 
 	return &form.Form{
-		Content: b.Stream,
+		Content: builder.Must(b.Harvest()),
 		Res:     b.Resources,
 		BBox:    pdf.Rectangle{LLx: 0, LLy: 0, URx: 24, URy: 24},
 	}

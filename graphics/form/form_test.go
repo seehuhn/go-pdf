@@ -50,12 +50,12 @@ func (t *testData) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 // makeTestForm creates a simple test form with a gray rectangle
 func makeTestForm() *form.Form {
-	b := builder.New(content.Form, nil)
+	b := builder.New(content.Form, nil, pdf.V2_0)
 	b.SetFillColor(color.DeviceGray(0.5))
 	b.Rectangle(0, 0, 100, 100)
 	b.Fill()
 	return &form.Form{
-		Content: b.Stream,
+		Content: &content.Operators{Ops: b.Stream},
 		Res:     b.Resources,
 		BBox:    pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
 	}

@@ -42,7 +42,7 @@ func TestParameters(t *testing.T) {
 	m := matrix.Matrix{1, 2, 3, 4, 5, 6}
 
 	// Build a content stream where we set various graphics parameters.
-	b := builder.New(content.Page, nil)
+	b := builder.New(content.Page, nil, pdf.V2_0)
 	b.SetLineWidth(12.3)
 	b.SetLineCap(graphics.LineCapRound)
 	b.SetLineJoin(graphics.LineJoinBevel)
@@ -65,7 +65,7 @@ func TestParameters(t *testing.T) {
 
 	// Write the content stream to a buffer
 	buf := &bytes.Buffer{}
-	err := content.Write(buf, b.Stream, pdf.V1_7, content.Page, b.Resources)
+	err := content.Write(buf, &content.Operators{Ops: b.Stream})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,3 +235,44 @@ func TestParsePage(t *testing.T) {
 		t.Errorf("operations mismatch (-want +got):\n%s", diff)
 	}
 }
+
+// TestReader_PermissiveDispatch pins the contract: the Reader performs
+// no validity checks, so every operator the scanner sees is dispatched
+// to EveryOp regardless of context.  Here, a stray Tj at page level (no
+// surrounding BT/ET) is malformed PDF, yet the Reader still emits it.
+// The Character callback only fires when a font is set, which is a
+// natural consequence of how a Tj is interpreted, not a validity gate.
+func TestReader_PermissiveDispatch(t *testing.T) {
+	rawStream := "q\n100 100 50 50 re\nf\n(stray Tj) Tj\nQ\n"
+
+	x := pdf.NewExtractor(noopGetter{})
+	reader := New(x)
+	reader.State = content.NewState(content.Page, &content.Resources{})
+
+	var saw []string
+	reader.EveryOp = func(op string, args []pdf.Object) error {
+		saw = append(saw, op)
+		return nil
+	}
+	reader.Character = func(c font.Code) error {
+		t.Errorf("Character should not fire without a font, got code %v", c)
+		return nil
+	}
+
+	open := func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader([]byte(rawStream))), nil }
+	if err := reader.ParseContentStream(open); err != nil {
+		t.Fatalf("ParseContentStream: %v", err)
+	}
+
+	want := []string{"q", "re", "f", "Tj", "Q"}
+	if diff := cmp.Diff(want, saw); diff != "" {
+		t.Errorf("ops (-want +got):\n%s", diff)
+	}
+}
+
+// noopGetter is a minimal pdf.Getter for tests that don't dereference any
+// indirect objects.
+type noopGetter struct{}
+
+func (noopGetter) Get(pdf.Reference, bool) (pdf.Native, error) { return nil, nil }
+func (noopGetter) GetMeta() *pdf.MetaInfo                      { return &pdf.MetaInfo{Version: pdf.V2_0} }

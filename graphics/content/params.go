@@ -34,6 +34,12 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 	// Graphics state operators (Table 56)
 
 	case OpTransform: // cm
+		// cm inside BT/ET is malformed per spec but appears in real files
+		// (e.g. mutool link annotations).  Apply it to CTM unconditionally:
+		// text rendering uses Tm × CTM, so subsequent glyphs in the same
+		// text object pick up the transform, and the CTM change persists
+		// past ET — matching the behaviour of mutool, pdf.js, and other
+		// permissive viewers.
 		if m, ok := getMatrix(args); ok {
 			p.CTM = m.Mul(p.CTM)
 		}

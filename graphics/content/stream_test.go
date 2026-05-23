@@ -55,37 +55,69 @@ var roundTripTestCases = []struct {
 	{name: "comments", stream: "% this is a comment\nq\nQ\n"},
 	{name: "inline image", stream: "BI\n/W 10\n/H 10\nID\nimagedata\nEI\n"},
 	{name: "mixed content", stream: "q\n% save state\n1 0 0 1 0 0 cm\nBT\n/F1 12 Tf\n(Text) Tj\nET\nQ\n"},
+	{name: "cm in text", stream: "BT\n1 0 0 1 50 100 cm\n/F1 12 Tf\n1 0 0 1 100 200 Tm\n(Hi) Tj\nET\n"},
+	{name: "cm before text end", stream: "BT\n/F1 12 Tf\n1 0 0 1 100 200 Tm\n(Hi) Tj\n1 0 0 1 50 0 cm\nET\n"},
+}
+
+// roundTripTest verifies the content-stream round-trip contract:
+//   - C1: write must succeed whenever the read succeeded;
+//   - C2: re-reading the writer's output yields the same operator sequence.
+//
+// The caller is responsible for the first read; this helper performs
+// write + re-read + compare.
+func roundTripTest(t *testing.T, _ pdf.Version, stream1 []Operator) {
+	t.Helper()
+
+	var buf bytes.Buffer
+	if err := Write(&buf, &Operators{Ops: stream1}); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	stream2, err := ReadStream(bytesOpener(buf.Bytes()))
+	if err != nil {
+		t.Fatalf("second read: %v", err)
+	}
+
+	if diff := cmp.Diff(stream1, stream2, cmpopts.EquateEmpty()); diff != "" {
+		t.Errorf("round trip failed (-first +second):\n%s", diff)
+	}
+}
+
+// TestCmInsideText pins that the scanner preserves a cm operator that
+// appears inside a BT/ET text object verbatim (no hoist out, no rewrite,
+// no drop).  Application of the matrix is the consumer's responsibility:
+// [State.applyOperatorToParams] folds it into the CTM (see also
+// [TestCmInsideText_AppliesToCTM] in state_test.go).
+func TestCmInsideText(t *testing.T) {
+	got, err := ReadStream(bytesOpener([]byte(
+		"BT\n1 0 0 1 50 100 cm\n/F1 12 Tf\n(Hi) Tj\nET\n",
+	)))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	want := []Operator{
+		{Name: OpTextBegin},
+		{Name: OpTransform, Args: []pdf.Object{
+			pdf.Integer(1), pdf.Integer(0), pdf.Integer(0), pdf.Integer(1),
+			pdf.Integer(50), pdf.Integer(100),
+		}},
+		{Name: OpTextSetFont, Args: []pdf.Object{pdf.Name("F1"), pdf.Integer(12)}},
+		{Name: OpTextShow, Args: []pdf.Object{pdf.String("Hi")}},
+		{Name: OpTextEnd},
+	}
+	if diff := cmp.Diff(want, got, cmpopts.EquateEmpty()); diff != "" {
+		t.Errorf("cm-in-text (-want +got):\n%s", diff)
+	}
 }
 
 func TestStreamRoundTrip(t *testing.T) {
 	for _, tt := range roundTripTestCases {
 		t.Run(tt.name, func(t *testing.T) {
-			// first read
-			stream1, err := ReadStream(bytesOpener([]byte(tt.stream)), pdf.V2_0, Page, testResources)
+			stream1, err := ReadStream(bytesOpener([]byte(tt.stream)))
 			if err != nil {
 				t.Fatalf("first read: %v", err)
 			}
-
-			// write using Writer
-			var buf bytes.Buffer
-			w := NewWriter(pdf.V2_0, Page, testResources)
-			if err := w.Write(&buf, stream1); err != nil {
-				t.Fatalf("write: %v", err)
-			}
-			if err := w.Close(); err != nil {
-				t.Fatalf("writer close: %v", err)
-			}
-
-			// second read
-			stream2, err := ReadStream(bytesOpener(buf.Bytes()), pdf.V2_0, Page, testResources)
-			if err != nil {
-				t.Fatalf("second read: %v", err)
-			}
-
-			// compare
-			if diff := cmp.Diff(stream1, stream2, cmpopts.EquateEmpty()); diff != "" {
-				t.Errorf("round trip failed (-first +second):\n%s", diff)
-			}
+			roundTripTest(t, pdf.V2_0, stream1)
 		})
 	}
 }
@@ -98,33 +130,11 @@ func FuzzStreamRoundTrip(f *testing.F) {
 	f.Add([]byte(strings.Repeat("<<", 1000)))
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		// first read - permissive, may skip malformed content
-		stream1, err := ReadStream(bytesOpener(data), pdf.V2_0, Page, testResources)
+		stream1, err := ReadStream(bytesOpener(data))
 		if err != nil {
-			return
+			return // permissive read; malformed input is not a contract violation
 		}
-
-		// write - must succeed if read succeeded
-		var buf bytes.Buffer
-		w := NewWriter(pdf.V2_0, Page, testResources)
-		if err := w.Write(&buf, stream1); err != nil {
-			// Fuzzed input may reference resources we don't have - skip these
-			return
-		}
-		if err := w.Close(); err != nil {
-			t.Fatalf("writer close: %v", err)
-		}
-
-		// second read
-		stream2, err := ReadStream(bytesOpener(buf.Bytes()), pdf.V2_0, Page, testResources)
-		if err != nil {
-			t.Fatalf("second read failed: %v", err)
-		}
-
-		// compare
-		if diff := cmp.Diff(stream1, stream2, cmpopts.EquateEmpty()); diff != "" {
-			t.Errorf("round trip failed (-first +second):\n%s", diff)
-		}
+		roundTripTest(t, pdf.V2_0, stream1)
 	})
 }
 
@@ -178,7 +188,7 @@ func TestInlineImageLimits(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stream, err := ReadStream(bytesOpener([]byte(tt.stream)), pdf.V2_0, Page, &Resources{})
+			stream, err := ReadStream(bytesOpener([]byte(tt.stream)))
 			if err != nil {
 				t.Fatalf("ReadStream error: %v", err)
 			}
@@ -331,7 +341,7 @@ func TestScanLoopNestingDepthCap(t *testing.T) {
 	// scan() rejects each push past the cap with parseError{}, and
 	// scanLoop skips it, so the call must terminate cleanly.
 	input := strings.Repeat("[", maxContentNestDepth*4)
-	if _, err := ReadStream(bytesOpener([]byte(input)), pdf.V2_0, Page, &Resources{}); err != nil {
+	if _, err := ReadStream(bytesOpener([]byte(input))); err != nil {
 		t.Fatalf("ReadStream error: %v", err)
 	}
 }
@@ -353,7 +363,7 @@ func TestContentReadCommentBomb(t *testing.T) {
 	// LF must still be emitted (the bad comment's surplus bytes are
 	// drained up to the EOL, where Scan resyncs).
 	input := "%" + strings.Repeat("a", maxNameBytes+50) + "\n10 j"
-	ops, err := ReadStream(bytesOpener([]byte(input)), pdf.V2_0, Page, &Resources{})
+	ops, err := ReadStream(bytesOpener([]byte(input)))
 	if err != nil {
 		t.Fatalf("ReadStream: %v", err)
 	}
@@ -421,7 +431,7 @@ func TestContentReadNameBombStreamRecovery(t *testing.T) {
 	// token here would be glued onto the tail of the bad name and
 	// lost.
 	input := "/" + strings.Repeat("a", maxNameBytes+50) + " cs\n5 j 10 J"
-	ops, err := ReadStream(bytesOpener([]byte(input)), pdf.V2_0, Page, &Resources{})
+	ops, err := ReadStream(bytesOpener([]byte(input)))
 	if err != nil {
 		t.Fatalf("ReadStream: %v", err)
 	}
@@ -441,7 +451,7 @@ func TestContentScanTokenOperatorBomb(t *testing.T) {
 	// maxNameBytes must be rejected with parseError, with the surplus
 	// drained so subsequent operators are still emitted.
 	input := strings.Repeat("z", maxNameBytes+50) + " j 10 J"
-	ops, err := ReadStream(bytesOpener([]byte(input)), pdf.V2_0, Page, &Resources{})
+	ops, err := ReadStream(bytesOpener([]byte(input)))
 	if err != nil {
 		t.Fatalf("ReadStream: %v", err)
 	}
@@ -460,7 +470,7 @@ func TestContentScanTokenNumberBomb(t *testing.T) {
 	// A digit run longer than maxNameBytes must be rejected with
 	// parseError, surplus drained, and the trailing operator emitted.
 	input := strings.Repeat("9", maxNameBytes+50) + " j"
-	ops, err := ReadStream(bytesOpener([]byte(input)), pdf.V2_0, Page, &Resources{})
+	ops, err := ReadStream(bytesOpener([]byte(input)))
 	if err != nil {
 		t.Fatalf("ReadStream: %v", err)
 	}
@@ -539,7 +549,7 @@ func TestParseErrorResetsCompositeStack(t *testing.T) {
 	// the still-open dict frame swallows "5 j 10 J" entirely and no
 	// operators are emitted.
 	input := "<<<Z 5 j 10 J"
-	ops, err := ReadStream(bytesOpener([]byte(input)), pdf.V2_0, Page, &Resources{})
+	ops, err := ReadStream(bytesOpener([]byte(input)))
 	if err != nil {
 		t.Fatalf("ReadStream error: %v", err)
 	}
@@ -579,7 +589,6 @@ func TestInlineImageWithArrayValue(t *testing.T) {
 	// readInlineImage used nextToken which couldn't parse arrays
 	stream, err := ReadStream(
 		bytesOpener([]byte("BI\n/W 10\n/H 10\n/D [1 0]\nID\nimagedata\nEI\n")),
-		pdf.V2_0, Page, &Resources{},
 	)
 	if err != nil {
 		t.Fatalf("ReadStream error: %v", err)
@@ -611,7 +620,6 @@ func TestInlineImageWithDictValue(t *testing.T) {
 	// inline image with a dict value in the header
 	stream, err := ReadStream(
 		bytesOpener([]byte("BI\n/W 10\n/H 10\n/DP <</K -1>>\nID\nimagedata\nEI\n")),
-		pdf.V2_0, Page, &Resources{},
 	)
 	if err != nil {
 		t.Fatalf("ReadStream error: %v", err)
@@ -649,7 +657,7 @@ func TestOperatorArgLimit(t *testing.T) {
 	buf.WriteString("q\n") // save graphics state (should be parsed)
 	buf.WriteString("Q\n") // restore graphics state
 
-	stream, err := ReadStream(bytesOpener(buf.Bytes()), pdf.V2_0, Page, &Resources{})
+	stream, err := ReadStream(bytesOpener(buf.Bytes()))
 	if err != nil {
 		t.Fatalf("ReadStream error: %v", err)
 	}
@@ -664,7 +672,7 @@ func TestOperatorArgLimit(t *testing.T) {
 }
 
 // appendClosingOps tracks state on ops and appends any closing operators.
-func appendClosingOps(ops Operators, ct Type, res *Resources) Operators {
+func appendClosingOps(ops []Operator, ct Type, res *Resources) []Operator {
 	state := NewState(ct, res)
 	for _, op := range ops {
 		state.ApplyStateChanges(op.Name, op.Args)
@@ -676,9 +684,9 @@ func appendClosingOps(ops Operators, ct Type, res *Resources) Operators {
 }
 
 // collectStream collects all operators from a Stream into an Operators slice.
-func collectStream(s Stream) (Operators, error) {
+func collectStream(s Stream) ([]Operator, error) {
 	it := s.NewIter()
-	var ops Operators
+	var ops []Operator
 	for name, args := range it.All() {
 		ops = append(ops, Operator{Name: name, Args: slices.Clone(args)})
 	}
@@ -691,13 +699,13 @@ func TestNewScannerMatchesReadStream(t *testing.T) {
 			data := []byte(tt.stream)
 
 			// ReadStream result (includes closing ops)
-			want, err := ReadStream(bytesOpener(data), pdf.V2_0, Page, testResources)
+			want, err := ReadStream(bytesOpener(data))
 			if err != nil {
 				t.Fatalf("ReadStream: %v", err)
 			}
 
 			// NewScanner result (no closing ops); append them manually
-			s := NewScanner(bytesOpener(data), pdf.V2_0, Page, testResources)
+			s := NewScanner(bytesOpener(data))
 			got, err := collectStream(s)
 			if err != nil {
 				t.Fatalf("NewScanner: %v", err)
@@ -717,9 +725,9 @@ func FuzzNewScannerMatchesReadStream(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		want, err1 := ReadStream(bytesOpener(data), pdf.V2_0, Page, testResources)
+		want, err1 := ReadStream(bytesOpener(data))
 
-		s := NewScanner(bytesOpener(data), pdf.V2_0, Page, testResources)
+		s := NewScanner(bytesOpener(data))
 		got, err2 := collectStream(s)
 
 		// both should either succeed or fail
@@ -740,7 +748,7 @@ func FuzzNewScannerMatchesReadStream(f *testing.F) {
 
 func TestScannerRewind(t *testing.T) {
 	input := []byte("q\n1 0 0 1 100 200 cm\nQ\n")
-	s := NewScanner(bytesOpener(input), pdf.V2_0, Page, &Resources{})
+	s := NewScanner(bytesOpener(input))
 
 	first, err := collectStream(s)
 	if err != nil {
@@ -806,27 +814,27 @@ func TestParseNumber(t *testing.T) {
 func TestStreamsEqual(t *testing.T) {
 	data := []byte("q\n1 0 0 1 100 200 cm\nQ\n")
 
-	ops, err := ReadStream(bytesOpener(data), pdf.V2_0, Page, &Resources{})
+	ops, err := ReadStream(bytesOpener(data))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	scanner := NewScanner(bytesOpener(data), pdf.V2_0, Page, &Resources{})
+	scanner := NewScanner(bytesOpener(data))
 
-	// Operators vs Scanner
-	if !StreamsEqual(ops, scanner) {
+	// Memory(Operators) vs Scanner
+	if !StreamsEqual(&Operators{Ops: ops}, scanner) {
 		t.Error("expected Operators and Scanner to be equal")
 	}
 
-	// Operators vs Operators
-	ops2, _ := ReadStream(bytesOpener(data), pdf.V2_0, Page, &Resources{})
-	if !StreamsEqual(ops, ops2) {
+	// Memory vs Memory
+	ops2, _ := ReadStream(bytesOpener(data))
+	if !StreamsEqual(&Operators{Ops: ops}, &Operators{Ops: ops2}) {
 		t.Error("expected two Operators to be equal")
 	}
 
 	// Scanner vs Scanner
-	s1 := NewScanner(bytesOpener(data), pdf.V2_0, Page, &Resources{})
-	s2 := NewScanner(bytesOpener(data), pdf.V2_0, Page, &Resources{})
+	s1 := NewScanner(bytesOpener(data))
+	s2 := NewScanner(bytesOpener(data))
 	if !StreamsEqual(s1, s2) {
 		t.Error("expected two Scanners to be equal")
 	}
@@ -835,35 +843,34 @@ func TestStreamsEqual(t *testing.T) {
 	if !StreamsEqual(nil, nil) {
 		t.Error("expected nil == nil")
 	}
-	if StreamsEqual(ops, nil) {
+	if StreamsEqual(&Operators{Ops: ops}, nil) {
 		t.Error("expected non-nil != nil")
 	}
-	if StreamsEqual(nil, ops) {
+	if StreamsEqual(nil, &Operators{Ops: ops}) {
 		t.Error("expected nil != non-nil")
 	}
 
 	// different streams
-	other, _ := ReadStream(bytesOpener([]byte("q\nQ\n")), pdf.V2_0, Page, &Resources{})
-	if StreamsEqual(ops, other) {
+	other, _ := ReadStream(bytesOpener([]byte("q\nQ\n")))
+	if StreamsEqual(&Operators{Ops: ops}, &Operators{Ops: other}) {
 		t.Error("expected different streams to be unequal")
 	}
 }
 
-func TestReadStreamUnbalancedQ(t *testing.T) {
-	// a single unbalanced q should produce exactly one closing Q
+// TestReadStreamRaw confirms ReadStream yields the operator sequence
+// verbatim and does not synthesise closers for unbalanced contexts.
+// Closer synthesis is now the consumer's job — see [State.ClosingOperators]
+// and [seehuhn.de/go/pdf/reader.Reader.ProcessIter].
+func TestReadStreamRaw(t *testing.T) {
 	input := []byte("q\n1 0 0 1 0 0 cm\n")
-	ops, err := ReadStream(bytesOpener(input), pdf.V2_0, Page, &Resources{})
+	ops, err := ReadStream(bytesOpener(input))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var qCount int
 	for _, op := range ops {
 		if op.Name == OpPopGraphicsState {
-			qCount++
+			t.Errorf("ReadStream should not synthesise Q; got %v", op)
 		}
-	}
-	if qCount != 1 {
-		t.Errorf("expected 1 closing Q, got %d", qCount)
 	}
 }
 
@@ -875,7 +882,7 @@ func TestScannerOpenError(t *testing.T) {
 	t.Run("malformed", func(t *testing.T) {
 		s := NewScanner(func() (io.ReadCloser, error) {
 			return nil, pdf.Error("malformed open failure")
-		}, pdf.V2_0, Page, &Resources{})
+		})
 
 		it := s.NewIter()
 		for range it.All() {
@@ -893,7 +900,7 @@ func TestScannerOpenError(t *testing.T) {
 		diskErr := errors.New("disk read failed")
 		s := NewScanner(func() (io.ReadCloser, error) {
 			return nil, diskErr
-		}, pdf.V2_0, Page, &Resources{})
+		})
 
 		it := s.NewIter()
 		for range it.All() {
@@ -936,7 +943,7 @@ func TestScannerReadError(t *testing.T) {
 				data: []byte("q\n1 0 0 1 0 0 cm\n"),
 				err:  pdf.Error("corrupt filter body"),
 			}, nil
-		}, pdf.V2_0, Page, &Resources{})
+		})
 
 		it := s.NewIter()
 		ops := 0
@@ -959,7 +966,7 @@ func TestScannerReadError(t *testing.T) {
 				data: []byte("q\n1 0 0 1 0 0 cm\n"),
 				err:  diskErr,
 			}, nil
-		}, pdf.V2_0, Page, &Resources{})
+		})
 
 		it := s.NewIter()
 		for range it.All() {

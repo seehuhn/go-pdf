@@ -53,12 +53,12 @@ var testCases = []testCase{
 			Resources: &content.Resources{
 				SingleUse: true,
 			},
-			Contents: []content.Stream{
-				content.Operators{
+			Contents: []content.Segment{
+				&content.Operators{Ops: []content.Operator{
 					{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
 					{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(200), pdf.Number(200)}},
 					{Name: content.OpStroke},
-				},
+				}},
 			},
 		},
 	},
@@ -69,23 +69,23 @@ var testCases = []testCase{
 			Resources: &content.Resources{
 				SingleUse: true,
 			},
-			Contents: []content.Stream{
+			Contents: []content.Segment{
 				// first stream: self-balanced graphics state
-				content.Operators{
+				&content.Operators{Ops: []content.Operator{
 					{Name: content.OpPushGraphicsState},
 					{Name: content.OpPopGraphicsState},
-				},
+				}},
 				// second stream: draw operations
-				content.Operators{
+				&content.Operators{Ops: []content.Operator{
 					{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(50), pdf.Number(50)}},
 					{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
 					{Name: content.OpStroke},
-				},
+				}},
 				// third stream: another self-balanced operation
-				content.Operators{
+				&content.Operators{Ops: []content.Operator{
 					{Name: content.OpPushGraphicsState},
 					{Name: content.OpPopGraphicsState},
-				},
+				}},
 			},
 		},
 	},
@@ -99,14 +99,14 @@ var testCases = []testCase{
 					"F1": font.Must(standard.TimesRoman.New()),
 				},
 			},
-			Contents: []content.Stream{
-				content.Operators{
+			Contents: []content.Segment{
+				&content.Operators{Ops: []content.Operator{
 					{Name: content.OpTextBegin},
 					{Name: content.OpTextSetFont, Args: []pdf.Object{pdf.Name("F1"), pdf.Number(12)}},
 					{Name: content.OpTextMoveOffset, Args: []pdf.Object{pdf.Number(72), pdf.Number(720)}},
 					{Name: content.OpTextShow, Args: []pdf.Object{pdf.String("Hello")}},
 					{Name: content.OpTextEnd},
-				},
+				}},
 			},
 		},
 	},
@@ -155,21 +155,21 @@ var testCases = []testCase{
 	},
 }
 
-// collectOps collects all operators from a content.Stream into an Operators slice.
-func collectOps(t *testing.T, s content.Stream) content.Operators {
+// collectOps collects all operators yielded by it (plus any closing
+// operators) into an [*content.Operators].
+func collectOps(t *testing.T, it content.Iter) *content.Operators {
 	t.Helper()
-	if s == nil {
-		return nil
+	if it == nil {
+		return &content.Operators{}
 	}
-	it := s.NewIter()
-	var ops content.Operators
+	var ops []content.Operator
 	for name, args := range it.All() {
 		ops = append(ops, content.Operator{Name: name, Args: slices.Clone(args)})
 	}
 	if err := it.Err(); err != nil {
 		t.Fatal(err)
 	}
-	return ops
+	return &content.Operators{Ops: ops}
 }
 
 // roundTripTest encodes a page, decodes it back, and verifies the result.
@@ -220,13 +220,11 @@ func roundTripTest(t *testing.T, v pdf.Version, p1 *Page) {
 	}
 
 	// Collect operators from both pages for comparison.
-	// The original may have multiple content streams; the decoded page
-	// preserves per-stream identity, so compare the combined content.
-	var wantOps content.Operators
-	for _, s := range p1.Contents {
-		wantOps = append(wantOps, collectOps(t, s)...)
-	}
-	gotOps := collectOps(t, p2.ContentStream())
+	// The original may have multiple content-stream segments; compare
+	// the combined content on both sides so that segment boundaries do
+	// not affect the comparison.
+	wantOps := collectOps(t, p1.NewIter())
+	gotOps := collectOps(t, p2.NewIter())
 
 	if !wantOps.Equal(gotOps) {
 		t.Errorf("content stream mismatch:\nwant: %v\n got: %v", wantOps, gotOps)
@@ -265,8 +263,8 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
-func TestContentStream_Embed(t *testing.T) {
-	ops := content.Operators{
+func TestOperators_Embed(t *testing.T) {
+	ops := []content.Operator{
 		{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
 		{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(200), pdf.Number(200)}},
 		{Name: content.OpStroke},
@@ -282,7 +280,7 @@ func TestContentStream_Embed(t *testing.T) {
 	}
 
 	rm := pdf.NewResourceManager(w)
-	ref, err := embedPageContent(rm, ops)
+	ref, err := rm.Embed(&content.Operators{Ops: ops})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,8 +301,8 @@ func TestContentStream_Embed(t *testing.T) {
 	}
 }
 
-func TestContentSegment_Deduplication(t *testing.T) {
-	// encode a page with content to get a contentSegment via round-trip
+func TestSource_Deduplication(t *testing.T) {
+	// encode a page with content to get a Source via round-trip
 	w1, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	parentRef := w1.Alloc()
 	p := &Page{
@@ -313,12 +311,12 @@ func TestContentSegment_Deduplication(t *testing.T) {
 		Resources: &content.Resources{
 			SingleUse: true,
 		},
-		Contents: []content.Stream{
-			content.Operators{
+		Contents: []content.Segment{
+			&content.Operators{Ops: []content.Operator{
 				{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(0), pdf.Number(0)}},
 				{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
 				{Name: content.OpStroke},
-			},
+			}},
 		},
 	}
 	rm1 := pdf.NewResourceManager(w1)
@@ -330,7 +328,7 @@ func TestContentSegment_Deduplication(t *testing.T) {
 	w1.Put(parentRef, pdf.Dict{"Type": pdf.Name("Pages")})
 	w1.Close()
 
-	// decode back to get a contentSegment
+	// decode back to get a Source
 	decoded, err := Decode(pdf.NewExtractor(w1), nil, dict, false)
 	if err != nil {
 		t.Fatal(err)
@@ -340,15 +338,15 @@ func TestContentSegment_Deduplication(t *testing.T) {
 	}
 	seg := decoded.Contents[0]
 
-	// embedding the same contentSegment twice should produce the same reference
+	// embedding the same segment twice should produce the same reference
 	w2, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm2 := pdf.NewResourceManager(w2)
 
-	ref1, err := embedPageContent(rm2, seg)
+	ref1, err := rm2.Embed(seg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ref2, err := embedPageContent(rm2, seg)
+	ref2, err := rm2.Embed(seg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -361,36 +359,11 @@ func TestContentSegment_Deduplication(t *testing.T) {
 	w2.Close()
 }
 
-func TestPage_Encode_ValidationError(t *testing.T) {
-	buf := &bytes.Buffer{}
-	w, err := pdf.NewWriter(buf, pdf.V1_7, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	parentRef := w.Alloc()
-
-	// page with unbalanced q/Q
-	page := &Page{
-		Parent:   parentRef,
-		MediaBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792},
-		Resources: &content.Resources{
-			SingleUse: true,
-		},
-		Contents: []content.Stream{
-			content.Operators{
-				{Name: content.OpPushGraphicsState},
-				// missing Q
-			},
-		},
-	}
-
-	rm := pdf.NewResourceManager(w)
-	_, err = page.Encode(rm)
-	if err == nil {
-		t.Fatal("expected validation error for unbalanced q/Q")
-	}
-}
+// (TestPage_Encode_ValidationError was removed.  Per-segment validation
+// has moved into [builder.Builder] — Page.Encode now serialises in-memory
+// segments verbatim and trusts the caller to have constructed them with
+// Builder.  Constructing a *content.Operators by hand bypasses validation,
+// as documented on the [content.Operators] type.)
 
 func TestPage_VersionChecks(t *testing.T) {
 	tests := []struct {

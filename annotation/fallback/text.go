@@ -41,7 +41,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		bgCol = stickyYellow
 	}
 
-	b := builder.New(content.Form, nil)
+	b := builder.New(content.Form, nil, s.Version)
 
 	switch a.Icon {
 	case annotation.TextIconComment:
@@ -249,7 +249,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 	}
 
 	return &form.Form{
-		Content: b.Stream,
+		Content: builder.Must(b.Harvest()),
 		Res:     b.Resources,
 		BBox:    pdf.Rectangle{LLx: 0, LLy: 0, URx: 24, URy: 24},
 	}

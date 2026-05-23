@@ -141,7 +141,7 @@ func makeTestFont(unitsPerEm float64, rotate bool) font.Layouter {
 	}
 
 	// Build content stream for the glyph
-	b := builder.New(content.Glyph, nil)
+	b := builder.New(content.Glyph, nil, pdf.V2_0)
 	b.Type3UncoloredGlyph(unitsPerEm, 0, 0, 0, unitsPerEm, unitsPerEm)
 	a := 0.05 * unitsPerEm
 	dim := 0.90 * unitsPerEm

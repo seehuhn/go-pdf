@@ -54,7 +54,7 @@ func (s *Style) addPolyLineAppearance(a *annotation.PolyLine) *form.Form {
 	bbox := openPolylineBBox(points, lw, startLE, endLE)
 	a.Rect = bbox
 
-	b := builder.New(content.Form, nil)
+	b := builder.New(content.Form, nil, s.Version)
 
 	b.SetExtGState(s.reset)
 	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
@@ -76,7 +76,7 @@ func (s *Style) addPolyLineAppearance(a *annotation.PolyLine) *form.Form {
 	drawOpenPolyline(b, points, startLE, endLE, a.FillColor)
 
 	return &form.Form{
-		Content: b.Stream,
+		Content: builder.Must(b.Harvest()),
 		Res:     b.Resources,
 		BBox:    bbox,
 	}

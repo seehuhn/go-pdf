@@ -106,7 +106,7 @@ func TestToUnicodeSimple1(t *testing.T) {
 			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(buf)
 
-			b := builder.New(content.Page, nil)
+			b := builder.New(content.Page, nil, pdf.V2_0)
 			err := b.SetFontNameInternal(F, fontName)
 			if err != nil {
 				t.Fatal(err)
@@ -163,7 +163,7 @@ func TestToUnicodeSimple2(t *testing.T) {
 			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(buf)
 
-			b := builder.New(content.Page, nil)
+			b := builder.New(content.Page, nil, pdf.V2_0)
 			err := b.SetFontNameInternal(F, fontName)
 			if err != nil {
 				t.Fatal(err)

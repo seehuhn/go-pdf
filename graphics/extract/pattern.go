@@ -200,24 +200,17 @@ func extractType1(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 	}
 
 	// parse the content stream
-	stmType := content.PatternColored
-	if !pat.Color {
-		stmType = content.PatternUncolored
-	}
 	stm := stream // capture for closure
 	getter := x.R
-	version := pdf.GetVersion(x.R)
-	res := pat.Res
 	ops, err := content.ReadStream(
 		func() (io.ReadCloser, error) {
 			return pdf.DecodeStream(getter, path, stm, 0)
 		},
-		version, stmType, res,
 	)
 	if err != nil {
 		return nil, &pdf.MalformedFileError{Err: err}
 	}
-	pat.Content = ops
+	pat.Content = &content.Operators{Ops: ops}
 
 	return pat, nil
 }

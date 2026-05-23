@@ -114,10 +114,13 @@ type Page struct {
 	// Resources (inheritable) contains resources required by the page contents.
 	Resources *content.Resources
 
-	// Contents (optional) holds content streams describing the page's appearance.
-	// From-scratch pages typically store [content.Operators] values.
-	// Pages read from file store *contentSegment values (unexported).
-	Contents []content.Stream
+	// Contents (optional) holds the segments of the page's content stream.
+	// Pages read from file store *Source values (one per /Contents stream
+	// object); from-scratch pages typically store [*content.Operators] values.
+	// Multiple entries are parsed as if their bytes were concatenated
+	// (PDF 32000-1 §7.8.2); use [Page.NewIter] to walk the combined
+	// content stream across all segments.
+	Contents []content.Segment
 
 	// CropBox (optional; inheritable) defines the visible region of the page.
 	// Default: MediaBox.
@@ -250,22 +253,6 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	w := rm.Out
 	v := pdf.GetVersion(w)
 
-	// Validate all content streams as concatenation
-	if len(p.Contents) > 0 {
-		cw := content.NewWriter(v, content.Page, p.Resources)
-		for _, s := range p.Contents {
-			if ops, ok := s.(content.Operators); ok {
-				if err := cw.Validate(ops); err != nil {
-					return nil, err
-				}
-			}
-			// contentSegments from read files are already validated
-		}
-		if err := cw.Close(); err != nil {
-			return nil, err
-		}
-	}
-
 	// Build the page dictionary
 	dict := pdf.Dict{
 		"Type":   pdf.Name("Page"),
@@ -286,7 +273,7 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// Contents
 	if len(p.Contents) == 1 {
-		ref, err := embedPageContent(rm, p.Contents[0])
+		ref, err := rm.Embed(p.Contents[0])
 		if err != nil {
 			return nil, err
 		}
@@ -294,7 +281,7 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	} else if len(p.Contents) > 1 {
 		arr := make(pdf.Array, len(p.Contents))
 		for i, s := range p.Contents {
-			ref, err := embedPageContent(rm, s)
+			ref, err := rm.Embed(s)
 			if err != nil {
 				return nil, err
 			}
@@ -672,15 +659,13 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 		}
 		switch c := resolved.(type) {
 		case *pdf.Stream:
-			seg := &contentSegment{
+			seg := &Source{
 				stream: c,
 				getter: x.R,
-				res:    p.Resources,
 			}
-			p.Contents = []content.Stream{seg}
+			p.Contents = []content.Segment{seg}
 		case pdf.Array:
-			segments := make([]content.Stream, 0, len(c))
-			var prev *contentSegment
+			segments := make([]content.Segment, 0, len(c))
 			for _, item := range c {
 				stm, err := pdf.GetStream(x.R, item)
 				if err != nil {
@@ -689,14 +674,11 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 				if stm == nil {
 					continue
 				}
-				seg := &contentSegment{
-					prev:   prev,
+				seg := &Source{
 					stream: stm,
 					getter: x.R,
-					res:    p.Resources,
 				}
 				segments = append(segments, seg)
-				prev = seg
 			}
 			p.Contents = segments
 		}
@@ -971,23 +953,18 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 	return p, nil
 }
 
-// ContentStream returns a single content.Stream that concatenates all
-// content streams of the page, carrying scanner state across stream
-// boundaries. For pages read from file with multiple content streams,
-// this correctly handles operators and paths split across streams.
-// For pages with zero or one content stream, this returns nil or the
-// single stream directly.
-func (p *Page) ContentStream() content.Stream {
-	switch len(p.Contents) {
-	case 0:
-		return nil
-	case 1:
-		return p.Contents[0]
-	default:
-		return &combinedPageStream{
-			parts: p.Contents,
-		}
-	}
+// NewIter returns a single-use iterator over the page's combined content
+// stream.  All segments are concatenated (with a newline separator between
+// adjacent segments, per PDF 32000-1 §7.8.2) and parsed by a single
+// scanner, so operator args and any composite token state that straddles
+// a stream-object boundary are reassembled correctly.  The yielded
+// operator stream is raw — consumers are responsible for handling
+// malformed input (see e.g. [seehuhn.de/go/pdf/reader.Reader]).
+//
+// The returned iterator always emits zero operators for a page with no
+// content, never nil.
+func (p *Page) NewIter() content.Iter {
+	return &pageIter{parts: p.Contents}
 }
 
 func validateBox(name string, box *pdf.Rectangle) error {

@@ -46,7 +46,7 @@ func (s *Style) addInkAppearance(a *annotation.Ink) *form.Form {
 	bbox := inkBBox(a.InkList, lw)
 	a.Rect = bbox
 
-	b := builder.New(content.Form, nil)
+	b := builder.New(content.Form, nil, s.Version)
 
 	b.SetExtGState(s.reset)
 	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
@@ -88,7 +88,7 @@ func (s *Style) addInkAppearance(a *annotation.Ink) *form.Form {
 	b.Stroke()
 
 	return &form.Form{
-		Content: b.Stream,
+		Content: builder.Must(b.Harvest()),
 		Res:     b.Resources,
 		BBox:    bbox,
 	}

@@ -183,7 +183,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 	}
 
 	for i, g := range fnt.Glyphs {
-		b := builder.New(content.Page, nil)
+		b := builder.New(content.Page, nil, pdf.V2_0)
 
 		// show the glyph extent as a shaded rectangle
 		bbox := g.Extent()
@@ -306,7 +306,7 @@ func (ctx *illustrator) Show(fnt *cff.Font, pageSize *pdf.Rectangle) error {
 		pg := &page.Page{
 			MediaBox:  pageSize,
 			Resources: b.Resources,
-			Contents:  []content.Stream{b.Stream},
+			Contents:  []content.Segment{&content.Operators{Ops: b.Stream}},
 		}
 		err := ctx.pageTree.AppendPage(pg)
 		if err != nil {

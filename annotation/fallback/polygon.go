@@ -51,7 +51,7 @@ func (s *Style) addPolygonAppearance(a *annotation.Polygon) *form.Form {
 		}
 	}
 
-	b := builder.New(content.Form, nil)
+	b := builder.New(content.Form, nil, s.Version)
 
 	b.SetExtGState(s.reset)
 	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
@@ -104,7 +104,7 @@ func (s *Style) addPolygonAppearance(a *annotation.Polygon) *form.Form {
 	}
 
 	return &form.Form{
-		Content: b.Stream,
+		Content: builder.Must(b.Harvest()),
 		Res:     b.Resources,
 		BBox:    bbox,
 	}

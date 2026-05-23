@@ -97,8 +97,10 @@ type Glyph struct {
 
 	// Content is the glyph's content stream.
 	// It must start with either the d0 or d1 operator.
-	// Use [content/builder.Builder] to construct content streams.
-	Content content.Operators
+	// Use [content/builder.Builder] to construct content streams; its
+	// [content/builder.Builder.Build] / [content/builder.Builder.Harvest]
+	// methods return a [*content.Operators] that satisfies [content.Stream].
+	Content content.Stream
 
 	// Resources (optional) holds named resources used by this glyph's content
 	// stream. If set, the resources are embedded in the glyph's stream
@@ -107,70 +109,137 @@ type Glyph struct {
 	Resources *content.Resources
 }
 
-// Width returns the glyph's advance width in glyph coordinate units.
-// The width is extracted from the first operator (d0 or d1).
-func (g *Glyph) Width() float64 {
-	if len(g.Content) == 0 || len(g.Content[0].Args) < 1 {
-		return 0
+// extract iterates the glyph's content stream once and returns its
+// advance width, bounding box, and any validation error.  For glyphs
+// loaded from PDF files, Content may be backed by a file stream;
+// this method ensures the stream is read at most once per glyph.
+func (g *Glyph) extract() (width float64, bbox rect.Rect, err error) {
+	if g.Content == nil {
+		return 0, rect.Rect{}, nil
 	}
-	wx, _ := getNumber(g.Content[0].Args[0])
-	return wx
+
+	it := g.Content.NewIter()
+	first := true
+	var firstName content.OpName
+	// d0 path-bbox accumulator
+	pathBBox := rect.Rect{
+		LLx: math.Inf(+1),
+		LLy: math.Inf(+1),
+		URx: math.Inf(-1),
+		URy: math.Inf(-1),
+	}
+	hasPoints := false
+	addPoint := func(x, y float64) {
+		hasPoints = true
+		pathBBox.LLx = min(pathBBox.LLx, x)
+		pathBBox.LLy = min(pathBBox.LLy, y)
+		pathBBox.URx = max(pathBBox.URx, x)
+		pathBBox.URy = max(pathBBox.URy, y)
+	}
+	for name, args := range it.All() {
+		if first {
+			first = false
+			firstName = name
+			width, bbox, err = parseGlyphMetricsOp(name, args)
+			if err != nil {
+				return 0, rect.Rect{}, err
+			}
+			if firstName == content.OpType3UncoloredGlyph {
+				// d1: bbox came from the args; the remaining content
+				// has no metric significance, so stop reading.
+				return width, bbox, nil
+			}
+			continue
+		}
+		switch name {
+		case content.OpMoveTo, content.OpLineTo:
+			if len(args) >= 2 {
+				x, _ := getNumber(args[0])
+				y, _ := getNumber(args[1])
+				addPoint(x, y)
+			}
+		case content.OpCurveTo:
+			for i := 0; i+1 < len(args) && i < 6; i += 2 {
+				x, _ := getNumber(args[i])
+				y, _ := getNumber(args[i+1])
+				addPoint(x, y)
+			}
+		case content.OpCurveToV, content.OpCurveToY:
+			for i := 0; i+1 < len(args) && i < 4; i += 2 {
+				x, _ := getNumber(args[i])
+				y, _ := getNumber(args[i+1])
+				addPoint(x, y)
+			}
+		case content.OpRectangle:
+			if len(args) >= 4 {
+				x, _ := getNumber(args[0])
+				y, _ := getNumber(args[1])
+				w, _ := getNumber(args[2])
+				h, _ := getNumber(args[3])
+				addPoint(x, y)
+				addPoint(x+w, y+h)
+			}
+		}
+	}
+	if first {
+		return 0, rect.Rect{}, nil
+	}
+	if hasPoints {
+		bbox = pathBBox
+	}
+	return width, bbox, nil
+}
+
+// parseGlyphMetricsOp reads the leading d0/d1 operator and returns the
+// glyph's advance width and (for d1) the explicit bounding box.
+func parseGlyphMetricsOp(name content.OpName, args []pdf.Object) (float64, rect.Rect, error) {
+	switch name {
+	case content.OpType3ColoredGlyph: // d0
+		if len(args) < 2 {
+			return 0, rect.Rect{}, errors.New("d0 requires 2 arguments (wx, wy)")
+		}
+		wy, _ := getNumber(args[1])
+		if wy != 0 {
+			return 0, rect.Rect{}, errors.New("wy must be 0")
+		}
+		wx, _ := getNumber(args[0])
+		return wx, rect.Rect{}, nil
+	case content.OpType3UncoloredGlyph: // d1
+		if len(args) < 6 {
+			return 0, rect.Rect{}, errors.New("d1 requires 6 arguments (wx, wy, llx, lly, urx, ury)")
+		}
+		wy, _ := getNumber(args[1])
+		if wy != 0 {
+			return 0, rect.Rect{}, errors.New("wy must be 0")
+		}
+		wx, _ := getNumber(args[0])
+		llx, _ := getNumber(args[2])
+		lly, _ := getNumber(args[3])
+		urx, _ := getNumber(args[4])
+		ury, _ := getNumber(args[5])
+		return wx, rect.Rect{LLx: llx, LLy: lly, URx: urx, URy: ury}, nil
+	default:
+		return 0, rect.Rect{}, fmt.Errorf("content must start with d0 or d1, got %s", name)
+	}
+}
+
+// Width returns the glyph's advance width in glyph coordinate units.
+// The width is extracted from the first operator (d0 or d1).  This
+// iterates the content stream — type3.Font.New caches per-glyph
+// widths so callers should not need to invoke this on a hot path.
+func (g *Glyph) Width() float64 {
+	w, _, _ := g.extract()
+	return w
 }
 
 // BBox returns the glyph's bounding box in glyph coordinate units.
 // For d1 glyphs, the bounding box is taken from the operator arguments.
 // For d0 glyphs, the bounding box is computed from path control points.
+// This iterates the content stream — type3.Font.New caches per-glyph
+// bounding boxes so callers should not need to invoke this on a hot path.
 func (g *Glyph) BBox() rect.Rect {
-	if len(g.Content) == 0 {
-		return rect.Rect{}
-	}
-	op := g.Content[0]
-
-	if op.Name == content.OpType3UncoloredGlyph { // d1
-		if len(op.Args) >= 6 {
-			llx, _ := getNumber(op.Args[2])
-			lly, _ := getNumber(op.Args[3])
-			urx, _ := getNumber(op.Args[4])
-			ury, _ := getNumber(op.Args[5])
-			return rect.Rect{LLx: llx, LLy: lly, URx: urx, URy: ury}
-		}
-		return rect.Rect{}
-	}
-
-	// d0: compute from path operators
-	return computeBBoxFromPath(g.Content[1:])
-}
-
-// validateContent checks that the glyph content stream is valid.
-func (g *Glyph) validateContent() error {
-	if len(g.Content) == 0 {
-		return nil // empty content is allowed (e.g., for .notdef)
-	}
-
-	firstOp := g.Content[0].Name
-	if firstOp != content.OpType3ColoredGlyph && firstOp != content.OpType3UncoloredGlyph {
-		return fmt.Errorf("content must start with d0 or d1, got %s", firstOp)
-	}
-
-	if firstOp == content.OpType3ColoredGlyph {
-		if len(g.Content[0].Args) < 2 {
-			return errors.New("d0 requires 2 arguments (wx, wy)")
-		}
-	} else {
-		if len(g.Content[0].Args) < 6 {
-			return errors.New("d1 requires 6 arguments (wx, wy, llx, lly, urx, ury)")
-		}
-	}
-
-	// Per PDF spec Table 111: "The number wy shall be 0"
-	if len(g.Content[0].Args) >= 2 {
-		wy, _ := getNumber(g.Content[0].Args[1])
-		if wy != 0 {
-			return errors.New("wy must be 0")
-		}
-	}
-
-	return nil
+	_, b, _ := g.extract()
+	return b
 }
 
 // getNumber extracts a float64 from a pdf.Object.
@@ -186,62 +255,6 @@ func getNumber(obj pdf.Object) (float64, bool) {
 	return 0, false
 }
 
-// computeBBoxFromPath computes a bounding box from path control points.
-func computeBBoxFromPath(stream content.Operators) rect.Rect {
-	bbox := rect.Rect{
-		LLx: math.Inf(+1),
-		LLy: math.Inf(+1),
-		URx: math.Inf(-1),
-		URy: math.Inf(-1),
-	}
-	hasPoints := false
-
-	addPoint := func(x, y float64) {
-		hasPoints = true
-		bbox.LLx = min(bbox.LLx, x)
-		bbox.LLy = min(bbox.LLy, y)
-		bbox.URx = max(bbox.URx, x)
-		bbox.URy = max(bbox.URy, y)
-	}
-
-	for _, op := range stream {
-		switch op.Name {
-		case content.OpMoveTo, content.OpLineTo: // m, l: x y
-			if len(op.Args) >= 2 {
-				x, _ := getNumber(op.Args[0])
-				y, _ := getNumber(op.Args[1])
-				addPoint(x, y)
-			}
-		case content.OpCurveTo: // c: x1 y1 x2 y2 x3 y3
-			for i := 0; i+1 < len(op.Args) && i < 6; i += 2 {
-				x, _ := getNumber(op.Args[i])
-				y, _ := getNumber(op.Args[i+1])
-				addPoint(x, y)
-			}
-		case content.OpCurveToV, content.OpCurveToY: // v, y: 4 args
-			for i := 0; i+1 < len(op.Args) && i < 4; i += 2 {
-				x, _ := getNumber(op.Args[i])
-				y, _ := getNumber(op.Args[i+1])
-				addPoint(x, y)
-			}
-		case content.OpRectangle: // re: x y w h
-			if len(op.Args) >= 4 {
-				x, _ := getNumber(op.Args[0])
-				y, _ := getNumber(op.Args[1])
-				w, _ := getNumber(op.Args[2])
-				h, _ := getNumber(op.Args[3])
-				addPoint(x, y)
-				addPoint(x+w, y+h)
-			}
-		}
-	}
-
-	if !hasPoints {
-		return rect.Rect{}
-	}
-	return bbox
-}
-
 var _ font.Layouter = (*instance)(nil)
 
 // instance represents a Type 3 font instance ready for embedding.
@@ -251,6 +264,11 @@ type instance struct {
 
 	// CMap maps Unicode code points to glyph IDs.
 	CMap map[rune]glyph.ID
+
+	// rawWidths caches each glyph's advance width in glyph-space units.
+	// Computed once in [Font.New] so layout, encoding, and embedding do
+	// not have to re-iterate the glyph content stream.
+	rawWidths []float64
 
 	*font.Geometry
 
@@ -263,11 +281,18 @@ func (f *Font) New() (font.Layouter, error) {
 		return nil, errors.New("invalid glyph 0")
 	}
 
-	// check that all glyphs have valid content streams
+	// extract per-glyph width and bbox once, then derive everything else
+	// from the cached values; this avoids re-iterating Content streams
+	// that may be backed by file streams.
+	rawWidths := make([]float64, len(f.Glyphs))
+	rawBBoxes := make([]rect.Rect, len(f.Glyphs))
 	for i, g := range f.Glyphs {
-		if err := g.validateContent(); err != nil {
+		w, bbox, err := g.extract()
+		if err != nil {
 			return nil, fmt.Errorf("glyph %d (%q): %w", i, g.Name, err)
 		}
+		rawWidths[i] = w
+		rawBBoxes[i] = bbox
 	}
 
 	cmap := make(map[rune]glyph.ID)
@@ -282,9 +307,9 @@ func (f *Font) New() (font.Layouter, error) {
 	qh := f.FontMatrix[0]
 	ee := make([]rect.Rect, len(f.Glyphs))
 	ww := make([]float64, len(f.Glyphs))
-	for i, g := range f.Glyphs {
+	for i := range f.Glyphs {
 		// transform bounding box from glyph space to text space
-		bbox := g.BBox()
+		bbox := rawBBoxes[i]
 		if !bbox.IsZero() {
 			corners := []struct{ x, y float64 }{
 				{bbox.LLx, bbox.LLy},
@@ -308,7 +333,7 @@ func (f *Font) New() (font.Layouter, error) {
 				ee[i].URy = max(ee[i].URy, y)
 			}
 		}
-		ww[i] = g.Width() * qh
+		ww[i] = rawWidths[i] * qh
 	}
 	geom := &font.Geometry{
 		Ascent:             f.Ascent * qv,
@@ -329,10 +354,11 @@ func (f *Font) New() (font.Layouter, error) {
 	)
 
 	res := &instance{
-		Font:     f,
-		CMap:     cmap,
-		Geometry: geom,
-		Simple:   simple,
+		Font:      f,
+		CMap:      cmap,
+		rawWidths: rawWidths,
+		Geometry:  geom,
+		Simple:    simple,
 	}
 	return res, nil
 }
@@ -364,7 +390,7 @@ func (f *instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 		seq.Seq = append(seq.Seq, font.Glyph{
 			GID:     gid,
 			Text:    string(r),
-			Advance: f.Font.Glyphs[gid].Width() * q,
+			Advance: f.rawWidths[gid] * q,
 		})
 	}
 	return seq
@@ -400,7 +426,7 @@ func (f *instance) Encode(gid glyph.ID, text string) (charcode.Code, bool) {
 
 	// Allocate new code
 	glyphName := f.Font.Glyphs[gid].Name
-	width := math.Round(f.Font.Glyphs[gid].Width())
+	width := math.Round(f.rawWidths[gid])
 
 	c, err := f.Simple.Encode(gid, glyphName, text, width)
 	return charcode.Code(c), err == nil

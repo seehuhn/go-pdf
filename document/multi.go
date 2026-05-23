@@ -117,7 +117,7 @@ func (doc *MultiPage) AddPage() *Page {
 	// Create shared resources between page and builder
 	res := &content.Resources{}
 
-	b := builder.New(content.Page, res)
+	b := builder.New(content.Page, res, pdf.GetVersion(doc.Out))
 	p := &page.Page{
 		MediaBox:  doc.mediaBox,
 		Resources: res,

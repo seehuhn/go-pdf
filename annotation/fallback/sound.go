@@ -47,7 +47,7 @@ func (s *Style) addSoundAppearance(a *annotation.Sound) *form.Form {
 		col = quireInk2
 	}
 
-	b := builder.New(content.Form, nil)
+	b := builder.New(content.Form, nil, s.Version)
 	b.SetExtGState(s.reset)
 
 	// slate card backdrop, identical to file attachments
@@ -66,7 +66,7 @@ func (s *Style) addSoundAppearance(a *annotation.Sound) *form.Form {
 	}
 
 	return &form.Form{
-		Content: b.Stream,
+		Content: builder.Must(b.Harvest()),
 		Res:     b.Resources,
 		BBox:    pdf.Rectangle{LLx: 0, LLy: 0, URx: 24, URy: 24},
 	}
