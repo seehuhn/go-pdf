@@ -32,7 +32,7 @@ import (
 // [content.Scanner].  Operator args and any composite token state
 // thus flow naturally across segment boundaries.
 type pageIter struct {
-	parts []content.Segment
+	parts []Segment
 	inner content.Iter
 }
 

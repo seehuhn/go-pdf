@@ -20,7 +20,6 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics/content"
 )
 
 // RawBytes returns a reader over the page's raw content-stream bytes.
@@ -37,17 +36,17 @@ func (p *Page) RawBytes() io.ReadCloser {
 // given content-stream segments.  Segments are joined with a single
 // newline (PDF 32000-1 §7.8.2).  The caller is responsible for closing
 // the returned [io.ReadCloser].
-func SegmentsReader(segments []content.Segment) io.ReadCloser {
+func SegmentsReader(segments []Segment) io.ReadCloser {
 	return &contentReader{parts: segments}
 }
 
 // A contentReader concatenates the raw bytes of all segments,
 // separated by single newline bytes.  Per the library's permissive-reader
-// policy, a segment whose [content.Segment.RawBytes] returns a malformed
+// policy, a segment whose [Segment.RawBytes] returns a malformed
 // error is silently skipped — its absence shows up as a gap in the
 // content stream rather than as a read failure.
 type contentReader struct {
-	parts []content.Segment
+	parts []Segment
 	idx   int           // index of next segment to open
 	cur   io.ReadCloser // current segment reader, nil when between segments
 	sep   bool          // true when a newline separator is pending

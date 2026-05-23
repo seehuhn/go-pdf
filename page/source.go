@@ -23,7 +23,10 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 )
 
-var _ content.Segment = (*Source)(nil)
+var (
+	_ Segment = (*Source)(nil)
+	_ Segment = (*content.Operators)(nil)
+)
 
 // NewSource creates a file-backed content stream segment wrapping the
 // given PDF stream object.  The getter is used to resolve indirect
@@ -37,12 +40,12 @@ func NewSource(stream *pdf.Stream, getter pdf.Getter) *Source {
 // reference resolved (see [pdf.Resolve]); array entries are resolved
 // internally.  A nil or unrecognised object yields a nil segment list,
 // matching the permissive-reader policy.
-func ExtractContents(r pdf.Getter, contents pdf.Object) ([]content.Segment, error) {
+func ExtractContents(r pdf.Getter, contents pdf.Object) ([]Segment, error) {
 	switch c := contents.(type) {
 	case *pdf.Stream:
-		return []content.Segment{NewSource(c, r)}, nil
+		return []Segment{NewSource(c, r)}, nil
 	case pdf.Array:
-		segments := make([]content.Segment, 0, len(c))
+		segments := make([]Segment, 0, len(c))
 		for _, item := range c {
 			stm, err := pdf.GetStream(r, item)
 			if err != nil {

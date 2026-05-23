@@ -70,7 +70,7 @@ func main() {
 		p := &page.Page{
 			MediaBox:  mediaBox,
 			Resources: g.Resources,
-			Contents:  []content.Segment{&content.Operators{Ops: g.Stream}},
+			Contents:  []page.Segment{&content.Operators{Ops: g.Stream}},
 		}
 		err = pageTree.AppendPage(p)
 		if err != nil {
@@ -90,7 +90,7 @@ func main() {
 		p := &page.Page{
 			MediaBox:  mediaBox,
 			Resources: g.Resources,
-			Contents:  []content.Segment{&content.Operators{Ops: g.Stream}},
+			Contents:  []page.Segment{&content.Operators{Ops: g.Stream}},
 		}
 		err = frontMatter.AppendPage(p)
 		if err != nil {
@@ -110,7 +110,7 @@ func main() {
 		p := &page.Page{
 			MediaBox:  mediaBox,
 			Resources: g.Resources,
-			Contents:  []content.Segment{&content.Operators{Ops: g.Stream}},
+			Contents:  []page.Segment{&content.Operators{Ops: g.Stream}},
 		}
 		err = extra.AppendPage(p)
 		if err != nil {

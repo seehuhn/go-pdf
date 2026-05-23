@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package content
+package page
 
 import (
 	"io"
@@ -22,21 +22,21 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Segment is one element of a page's /Contents array.
+// Segment is one element of a [Page.Contents] list.
 //
-// A PDF page's content can be split across multiple stream objects which
-// the viewer parses as if their decoded bytes were concatenated (PDF
-// 32000-1 §7.8.2). Each stream object corresponds to one Segment.
-// Iterating a single Segment in isolation is therefore not generally
-// meaningful: an operator, a path, or a text object may straddle the
-// boundary to the next segment. Use [seehuhn.de/go/pdf/page.Page.NewIter]
-// to obtain a unified iterator that threads scanner state across all
-// segments of a page.
+// A page's content can be split across multiple stream objects which the
+// viewer parses as if their decoded bytes were concatenated (PDF 32000-1
+// §7.8.2).  Each stream object corresponds to one Segment.  Iterating a
+// single Segment in isolation is therefore not generally meaningful: an
+// operator, a path, or a text object may straddle the boundary to the
+// next segment.  Use [Page.NewIter] to obtain a unified iterator that
+// threads scanner state across all segments of a page.
 //
 // Implementations:
-//   - [*Operators] is an in-memory segment built from an [Operator] slice.
-//   - [seehuhn.de/go/pdf/page.Source] is a file-backed segment that
-//     copies its bytes verbatim when re-embedded.
+//   - [seehuhn.de/go/pdf/graphics/content.Operators] is an in-memory
+//     segment built from an operator slice.
+//   - [*Source] is a file-backed segment that copies its bytes verbatim
+//     when re-embedded.
 //
 // Two segments compare as equal via [pdf.ResourceManager] when they are
 // the same Go pointer; this gives pointer-identity deduplication when
@@ -50,7 +50,8 @@ type Segment interface {
 	//
 	// The bytes returned here are the same bytes that [pdf.Embedder.Embed]
 	// would write into the segment's PDF stream object, except for
-	// stream-object framing and filters. They are intended for feeding
-	// into a [Scanner] when iterating a page's combined content stream.
+	// stream-object framing and filters.  They are intended for feeding
+	// into a content-stream scanner when iterating a page's combined
+	// content stream.
 	RawBytes() (io.ReadCloser, error)
 }

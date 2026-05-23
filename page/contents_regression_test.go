@@ -241,7 +241,7 @@ func TestEncode_MixedContents_AllowsCrossStreamPairs(t *testing.T) {
 			SingleUse: true,
 			Font:      map[pdf.Name]font.Instance{"F1": timesRoman},
 		},
-		Contents: []content.Segment{
+		Contents: []Segment{
 			&content.Operators{Ops: []content.Operator{
 				{Name: content.OpPushGraphicsState},
 				{Name: content.OpPopGraphicsState},
@@ -277,7 +277,7 @@ func TestEncode_MixedContents_AllowsCrossStreamPairs(t *testing.T) {
 		Resources: &content.Resources{
 			SingleUse: true,
 		},
-		Contents: []content.Segment{
+		Contents: []Segment{
 			&content.Operators{Ops: []content.Operator{
 				{Name: content.OpPushGraphicsState},
 				{Name: content.OpPopGraphicsState},
@@ -291,7 +291,7 @@ func TestEncode_MixedContents_AllowsCrossStreamPairs(t *testing.T) {
 	}
 }
 
-// brokenSegment is a [content.Segment] whose RawBytes always reports a
+// brokenSegment is a [Segment] whose RawBytes always reports a
 // pdf.MalformedFileError, modelling a corrupt-filter stream object.
 // It is never embedded back to a file, only iterated, so [Embed] is a stub.
 type brokenSegment struct{}
@@ -312,7 +312,7 @@ func TestIter_SkipsMalformedSegment(t *testing.T) {
 	p := &Page{
 		MediaBox:  &pdf.Rectangle{URx: 100, URy: 100},
 		Resources: &content.Resources{SingleUse: true},
-		Contents: []content.Segment{
+		Contents: []Segment{
 			&content.Operators{Ops: []content.Operator{
 				{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Integer(1), pdf.Integer(2)}},
 			}},

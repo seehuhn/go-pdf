@@ -75,7 +75,7 @@ func writeTestPage(w *pdf.Writer) error {
 	p := &page.Page{
 		MediaBox:  &pdf.Rectangle{URx: 595, URy: 842},
 		Resources: b.Resources,
-		Contents:  []content.Segment{&content.Operators{Ops: b.Stream}},
+		Contents:  []page.Segment{&content.Operators{Ops: b.Stream}},
 	}
 	err := pageTree.AppendPage(p)
 	if err != nil {

@@ -104,8 +104,6 @@ func (m *Operators) writeOperators(w io.Writer) error {
 	return nil
 }
 
-var _ Segment = (*Operators)(nil)
-
 // operatorsIter is the single-use [Iter] returned by [Operators.NewIter].
 type operatorsIter struct {
 	ops []Operator

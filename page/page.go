@@ -120,7 +120,7 @@ type Page struct {
 	// Multiple entries are parsed as if their bytes were concatenated
 	// (PDF 32000-1 §7.8.2); use [Page.NewIter] to walk the combined
 	// content stream across all segments.
-	Contents []content.Segment
+	Contents []Segment
 
 	// CropBox (optional; inheritable) defines the visible region of the page.
 	// Default: MediaBox.

@@ -57,7 +57,7 @@ type Page struct {
 	// the builder's output when the page is closed.  Populated by
 	// [Page.AppendContent]; each entry becomes a separate stream object
 	// in the page's /Contents array.
-	appended []content.Segment
+	appended []page.Segment
 }
 
 func (p *Page) SetPageSize(paper *pdf.Rectangle) {
@@ -70,13 +70,13 @@ func (p *Page) GetPageSize() *pdf.Rectangle {
 
 // AppendContent queues s to be emitted as an additional content-stream
 // segment after the builder's output when this page is closed.  The same
-// [content.Segment] value can be appended to many pages to share one PDF
+// [page.Segment] value can be appended to many pages to share one PDF
 // stream object across them (pointer-identity deduplication); this is
 // useful for headers, footers, watermarks, and similar shared boilerplate.
 //
 // Each call to AppendContent adds one entry; segments appear in the order
 // they were appended.
-func (p *Page) AppendContent(s content.Segment) {
+func (p *Page) AppendContent(s page.Segment) {
 	p.appended = append(p.appended, s)
 }
 
@@ -97,7 +97,7 @@ func (p *Page) Close() error {
 	// queued via AppendContent.  The builder's operator slice is wrapped
 	// in a [*content.Operators] so the segment also acts as a [pdf.Embedder]
 	// (for pointer-identity deduplication when shared across pages).
-	contents := make([]content.Segment, 0, 1+len(p.appended))
+	contents := make([]page.Segment, 0, 1+len(p.appended))
 	contents = append(contents, &content.Operators{Ops: p.Builder.Stream})
 	contents = append(contents, p.appended...)
 	p.Page.Contents = contents

@@ -53,7 +53,7 @@ var testCases = []testCase{
 			Resources: &content.Resources{
 				SingleUse: true,
 			},
-			Contents: []content.Segment{
+			Contents: []Segment{
 				&content.Operators{Ops: []content.Operator{
 					{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
 					{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(200), pdf.Number(200)}},
@@ -69,7 +69,7 @@ var testCases = []testCase{
 			Resources: &content.Resources{
 				SingleUse: true,
 			},
-			Contents: []content.Segment{
+			Contents: []Segment{
 				// first stream: self-balanced graphics state
 				&content.Operators{Ops: []content.Operator{
 					{Name: content.OpPushGraphicsState},
@@ -99,7 +99,7 @@ var testCases = []testCase{
 					"F1": font.Must(standard.TimesRoman.New()),
 				},
 			},
-			Contents: []content.Segment{
+			Contents: []Segment{
 				&content.Operators{Ops: []content.Operator{
 					{Name: content.OpTextBegin},
 					{Name: content.OpTextSetFont, Args: []pdf.Object{pdf.Name("F1"), pdf.Number(12)}},
@@ -311,7 +311,7 @@ func TestSource_Deduplication(t *testing.T) {
 		Resources: &content.Resources{
 			SingleUse: true,
 		},
-		Contents: []content.Segment{
+		Contents: []Segment{
 			&content.Operators{Ops: []content.Operator{
 				{Name: content.OpMoveTo, Args: []pdf.Object{pdf.Number(0), pdf.Number(0)}},
 				{Name: content.OpLineTo, Args: []pdf.Object{pdf.Number(100), pdf.Number(100)}},
