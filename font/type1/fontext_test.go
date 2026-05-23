@@ -20,8 +20,6 @@ import (
 	"strings"
 	"testing"
 
-	"seehuhn.de/go/geom/matrix"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/dict"
@@ -30,6 +28,7 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/makefont"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/fonttypes"
+	pdfpage "seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/reader"
 )
 
@@ -112,7 +111,8 @@ func TestTextContent(t *testing.T) {
 
 	// step 2: extract the encoded string from the content stream
 	var textString pdf.String
-	r := reader.New(pdf.NewExtractor(page.Out))
+	x := pdf.NewExtractor(page.Out)
+	r := reader.New(x)
 	r.EveryOp = func(op string, args []pdf.Object) error {
 		switch op {
 		case "Tj":
@@ -128,10 +128,15 @@ func TestTextContent(t *testing.T) {
 		}
 		return nil
 	}
-	r.ParsePage(pageRef, matrix.Identity)
+	pg, err := pdf.ExtractorGet(x, nil, pageRef, pdfpage.Decode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.ProcessPage(pg); err != nil {
+		t.Fatal(err)
+	}
 
 	// step 3: read back the font dictionary to inspect it.
-	x := pdf.NewExtractor(page.Out)
 	dictObj, err := extract.Dict(x, nil, ref, false)
 	if err != nil {
 		t.Fatal(err)

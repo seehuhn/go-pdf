@@ -21,8 +21,6 @@ import (
 	"io"
 	"math"
 
-	"seehuhn.de/go/geom/matrix"
-
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/type1/names"
 
@@ -30,21 +28,20 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/textextract"
-	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/property"
+	"seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/reader"
 )
 
 // TextExtractor extracts text from PDF pages.
 type TextExtractor struct {
 	reader *reader.Reader
+	x      *pdf.Extractor
 	writer io.Writer
 
 	XRangeMin float64
 	XRangeMax float64
 
-	extraTextCache       map[font.Instance]map[cid.CID]string
-	actualTextStartDepth int // -1 if not in ActualText region
+	extraTextCache map[font.Instance]map[cid.CID]string
 
 	// lastWasWhitespace tracks whether the most recently emitted character
 	// was whitespace, so that an adjacent space can be collapsed.
@@ -57,15 +54,16 @@ type TextExtractor struct {
 
 // New creates a new TextExtractor that writes to w.
 func New(doc pdf.Getter, w io.Writer) *TextExtractor {
+	x := pdf.NewExtractor(doc)
 	e := &TextExtractor{
-		reader:               reader.New(pdf.NewExtractor(doc)),
-		writer:               w,
-		XRangeMin:            math.Inf(-1),
-		XRangeMax:            math.Inf(1),
-		extraTextCache:       make(map[font.Instance]map[cid.CID]string),
-		actualTextStartDepth: -1,
-		lastWasWhitespace:    true,
-		lastWasNewline:       true,
+		reader:            reader.New(x),
+		x:                 x,
+		writer:            w,
+		XRangeMin:         math.Inf(-1),
+		XRangeMax:         math.Inf(1),
+		extraTextCache:    make(map[font.Instance]map[cid.CID]string),
+		lastWasWhitespace: true,
+		lastWasNewline:    true,
 	}
 
 	e.setupCallbacks()
@@ -73,19 +71,10 @@ func New(doc pdf.Getter, w io.Writer) *TextExtractor {
 }
 
 func (e *TextExtractor) setupCallbacks() {
-	// ActualText handling uses depth-based suppression:
-	// - When first ActualText encountered: emit replacement text, save stack depth
-	// - While stack depth >= saved depth: suppress all character output
-	// - When stack depth < saved depth: exit region, reset to -1
-	// This naturally handles nested ActualText (outer wins) and nested content.
-	e.reader.MarkedContent = func(event reader.MarkedContentEvent, mc *graphics.MarkedContent) error {
-		switch event {
-		case reader.MarkedContentBegin:
-			e.handleActualTextBegin(mc)
-		case reader.MarkedContentEnd:
-			e.handleActualTextEnd()
+	e.reader.ActualText = func(event reader.ActualTextEvent, text string) error {
+		if event == reader.ActualTextBegin {
+			e.writeText(text)
 		}
-
 		return nil
 	}
 
@@ -99,8 +88,9 @@ func (e *TextExtractor) setupCallbacks() {
 	}
 
 	e.reader.Character = func(c font.Code) error {
-		// suppress character output when inside ActualText region
-		if e.actualTextStartDepth != -1 && len(e.reader.MarkedContentStack) >= e.actualTextStartDepth {
+		// inside an ActualText region the replacement text has already
+		// been emitted; suppress per-glyph text
+		if e.reader.InActualText() {
 			return nil
 		}
 
@@ -164,32 +154,6 @@ func (e *TextExtractor) writeText(text string) {
 	e.lastWasNewline = last == '\n'
 }
 
-func (e *TextExtractor) handleActualTextBegin(mc *graphics.MarkedContent) {
-	// already in ActualText region - inner ActualText is suppressed
-	if e.actualTextStartDepth != -1 {
-		return
-	}
-
-	if mc.Properties == nil {
-		return
-	}
-
-	at, err := property.ListGet(mc.Properties, property.ExtractActualText)
-	if err != nil {
-		return
-	}
-	text := at.Text
-
-	e.writeText(text)
-	e.actualTextStartDepth = len(e.reader.MarkedContentStack)
-}
-
-func (e *TextExtractor) handleActualTextEnd() {
-	if len(e.reader.MarkedContentStack) < e.actualTextStartDepth {
-		e.actualTextStartDepth = -1
-	}
-}
-
 // remapPUA replaces Private Use Area codepoints (U+F020–U+F0FF) with their
 // Unicode equivalents.  Some PDF generators (notably older Microsoft tools)
 // map Symbol font characters to this PUA range instead of real Unicode.
@@ -228,8 +192,12 @@ func remapPUA(text string) string {
 func (e *TextExtractor) ExtractPage(pageDict pdf.Dict) error {
 	// reset per-page state.  extraTextCache is keyed by font.Instance and
 	// CID, so it persists across pages without risk of stale data.
-	e.actualTextStartDepth = -1
 	e.lastWasWhitespace = true
 	e.lastWasNewline = true
-	return e.reader.ParsePage(pageDict, matrix.Identity)
+
+	pg, err := pdf.ExtractorGet(e.x, nil, pageDict, page.Decode)
+	if err != nil {
+		return err
+	}
+	return e.reader.ProcessPage(pg)
 }

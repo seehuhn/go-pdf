@@ -23,14 +23,15 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-// stringOpener returns a reader factory for a string content stream.
-func stringOpener(s string) func() (io.ReadCloser, error) {
-	return func() (io.ReadCloser, error) {
+// stringStream returns a [content.Stream] over the given source text.
+func stringStream(s string) content.Stream {
+	return content.NewScanner(func() (io.ReadCloser, error) {
 		return io.NopCloser(strings.NewReader(s)), nil
-	}
+	})
 }
 
 func TestMarkedContentEventConstants(t *testing.T) {
@@ -96,7 +97,6 @@ func TestMaxMarkedContentDepthConstant(t *testing.T) {
 func TestMPOperator(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	r := New(pdf.NewExtractor(w))
-	r.Reset()
 
 	var called bool
 	var gotEvent MarkedContentEvent
@@ -110,9 +110,9 @@ func TestMPOperator(t *testing.T) {
 	}
 
 	// Parse: MP /Caption
-	err := r.ParseContentStream(stringOpener("/Caption MP"))
+	err := r.ProcessIter(stringStream("/Caption MP").NewIter())
 	if err != nil {
-		t.Fatalf("ParseContentStream failed: %v", err)
+		t.Fatalf("ProcessIter failed: %v", err)
 	}
 
 	if !called {
@@ -140,7 +140,6 @@ func TestMPOperator(t *testing.T) {
 func TestBMCOperator(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	r := New(pdf.NewExtractor(w))
-	r.Reset()
 
 	var events []MarkedContentEvent
 	var mcs []*graphics.MarkedContent
@@ -152,10 +151,10 @@ func TestBMCOperator(t *testing.T) {
 	}
 
 	// Parse: BMC /Artifact
-	// Note: ParseContentStream auto-closes unclosed BMC with EMC at EOF
-	err := r.ParseContentStream(stringOpener("/Artifact BMC"))
+	// Note: ProcessIter auto-closes unclosed BMC with EMC at EOF
+	err := r.ProcessIter(stringStream("/Artifact BMC").NewIter())
 	if err != nil {
-		t.Fatalf("ParseContentStream failed: %v", err)
+		t.Fatalf("ProcessIter failed: %v", err)
 	}
 
 	// Should get Begin and End events (due to auto-close)
@@ -193,7 +192,6 @@ func TestBMCOperator(t *testing.T) {
 func TestDPOperatorInline(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	r := New(pdf.NewExtractor(w))
-	r.Reset()
 
 	var called bool
 	var gotEvent MarkedContentEvent
@@ -207,9 +205,9 @@ func TestDPOperatorInline(t *testing.T) {
 	}
 
 	// Parse: DP /Artifact <</Type /Pagination>>
-	err := r.ParseContentStream(stringOpener("/Artifact <</Type /Pagination>> DP"))
+	err := r.ProcessIter(stringStream("/Artifact <</Type /Pagination>> DP").NewIter())
 	if err != nil {
-		t.Fatalf("ParseContentStream failed: %v", err)
+		t.Fatalf("ProcessIter failed: %v", err)
 	}
 
 	if !called {
@@ -245,7 +243,6 @@ func TestDPOperatorInline(t *testing.T) {
 func TestBDCOperator(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	r := New(pdf.NewExtractor(w))
-	r.Reset()
 
 	var events []MarkedContentEvent
 	var mcs []*graphics.MarkedContent
@@ -257,10 +254,10 @@ func TestBDCOperator(t *testing.T) {
 	}
 
 	// Parse: BDC /Span <</Lang (en-US)>>
-	// Note: ParseContentStream auto-closes unclosed BDC with EMC at EOF
-	err := r.ParseContentStream(stringOpener("/Span <</Lang (en-US)>> BDC"))
+	// Note: ProcessIter auto-closes unclosed BDC with EMC at EOF
+	err := r.ProcessIter(stringStream("/Span <</Lang (en-US)>> BDC").NewIter())
 	if err != nil {
-		t.Fatalf("ParseContentStream failed: %v", err)
+		t.Fatalf("ProcessIter failed: %v", err)
 	}
 
 	// Should get Begin and End events (due to auto-close)
@@ -311,7 +308,6 @@ func TestBDCOperator(t *testing.T) {
 func TestEMCOperator(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	r := New(pdf.NewExtractor(w))
-	r.Reset()
 
 	var events []MarkedContentEvent
 	var mcs []*graphics.MarkedContent
@@ -323,9 +319,9 @@ func TestEMCOperator(t *testing.T) {
 	}
 
 	// Parse: BMC /Artifact EMC
-	err := r.ParseContentStream(stringOpener("/Artifact BMC\nEMC"))
+	err := r.ProcessIter(stringStream("/Artifact BMC\nEMC").NewIter())
 	if err != nil {
-		t.Fatalf("ParseContentStream failed: %v", err)
+		t.Fatalf("ProcessIter failed: %v", err)
 	}
 
 	if len(events) != 2 {
@@ -354,7 +350,6 @@ func TestEMCOperator(t *testing.T) {
 func TestUnmatchedEMC(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	r := New(pdf.NewExtractor(w))
-	r.Reset()
 
 	var callCount int
 	r.MarkedContent = func(event MarkedContentEvent, mc *graphics.MarkedContent) error {
@@ -363,9 +358,9 @@ func TestUnmatchedEMC(t *testing.T) {
 	}
 
 	// Parse: EMC without BMC/BDC
-	err := r.ParseContentStream(stringOpener("EMC"))
+	err := r.ProcessIter(stringStream("EMC").NewIter())
 	if err != nil {
-		t.Fatalf("ParseContentStream should not fail on unmatched EMC: %v", err)
+		t.Fatalf("ProcessIter should not fail on unmatched EMC: %v", err)
 	}
 
 	// Callback should not be called (stack was empty)
@@ -377,7 +372,6 @@ func TestUnmatchedEMC(t *testing.T) {
 func TestMarkedContentStackOverflow(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	r := New(pdf.NewExtractor(w))
-	r.Reset()
 
 	var beginCount, endCount int
 	r.MarkedContent = func(event MarkedContentEvent, mc *graphics.MarkedContent) error {
@@ -391,15 +385,15 @@ func TestMarkedContentStackOverflow(t *testing.T) {
 	}
 
 	// Try to push 100 levels (should stop at maxMarkedContentDepth = 64)
-	// Note: ReadStream auto-closes at EOF, so all pushed items will be popped
-	var content strings.Builder
+	// Note: ProcessIter auto-closes at EOF, so all pushed items will be popped
+	var buf strings.Builder
 	for range 100 {
-		content.WriteString("/Test BMC\n")
+		buf.WriteString("/Test BMC\n")
 	}
 
-	err := r.ParseContentStream(stringOpener(content.String()))
+	err := r.ProcessIter(stringStream(buf.String()).NewIter())
 	if err != nil {
-		t.Fatalf("ParseContentStream failed: %v", err)
+		t.Fatalf("ProcessIter failed: %v", err)
 	}
 
 	// Should only have called begin callback 64 times (depth limit)
@@ -421,7 +415,6 @@ func TestMarkedContentStackOverflow(t *testing.T) {
 func TestNestedMarkedContent(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	r := New(pdf.NewExtractor(w))
-	r.Reset()
 
 	type eventRecord struct {
 		event MarkedContentEvent
@@ -445,9 +438,9 @@ func TestNestedMarkedContent(t *testing.T) {
 	//   /Inner BMC
 	//   EMC
 	// EMC
-	err := r.ParseContentStream(stringOpener("/Outer BMC\n/Inner BMC\nEMC\nEMC"))
+	err := r.ProcessIter(stringStream("/Outer BMC\n/Inner BMC\nEMC\nEMC").NewIter())
 	if err != nil {
-		t.Fatalf("ParseContentStream failed: %v", err)
+		t.Fatalf("ProcessIter failed: %v", err)
 	}
 
 	expected := []eventRecord{
@@ -473,7 +466,6 @@ func TestNestedMarkedContent(t *testing.T) {
 func TestMalformedPropertyExtraction(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	r := New(pdf.NewExtractor(w))
-	r.Reset()
 
 	var callCount int
 	r.MarkedContent = func(event MarkedContentEvent, mc *graphics.MarkedContent) error {
@@ -483,9 +475,9 @@ func TestMalformedPropertyExtraction(t *testing.T) {
 
 	// Try to parse BDC with non-dict, non-name operand (should be skipped)
 	// This is malformed according to PDF spec
-	err := r.ParseContentStream(stringOpener("/Test 123 BDC"))
+	err := r.ProcessIter(stringStream("/Test 123 BDC").NewIter())
 	if err != nil {
-		t.Fatalf("ParseContentStream should not fail on malformed properties: %v", err)
+		t.Fatalf("ProcessIter should not fail on malformed properties: %v", err)
 	}
 
 	// The BDC should still process (with properties as the integer)

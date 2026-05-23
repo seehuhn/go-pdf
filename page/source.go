@@ -25,6 +25,39 @@ import (
 
 var _ content.Segment = (*Source)(nil)
 
+// NewSource creates a file-backed content stream segment wrapping the
+// given PDF stream object.  The getter is used to resolve indirect
+// references when the segment's bytes are read or re-embedded.
+func NewSource(stream *pdf.Stream, getter pdf.Getter) *Source {
+	return &Source{stream: stream, getter: getter}
+}
+
+// ExtractContents builds the [Page.Contents] segment list from a resolved
+// /Contents object.  The argument must already have any top-level indirect
+// reference resolved (see [pdf.Resolve]); array entries are resolved
+// internally.  A nil or unrecognised object yields a nil segment list,
+// matching the permissive-reader policy.
+func ExtractContents(r pdf.Getter, contents pdf.Object) ([]content.Segment, error) {
+	switch c := contents.(type) {
+	case *pdf.Stream:
+		return []content.Segment{NewSource(c, r)}, nil
+	case pdf.Array:
+		segments := make([]content.Segment, 0, len(c))
+		for _, item := range c {
+			stm, err := pdf.GetStream(r, item)
+			if err != nil {
+				return nil, err
+			}
+			if stm == nil {
+				continue
+			}
+			segments = append(segments, NewSource(stm, r))
+		}
+		return segments, nil
+	}
+	return nil, nil
+}
+
 // Source is a lazy file-backed page content-stream segment.
 //
 // When a page is decoded from a PDF file, each of its /Contents stream

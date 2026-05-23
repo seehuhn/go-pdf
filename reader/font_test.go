@@ -21,10 +21,10 @@ import (
 	"strings"
 	"testing"
 
-	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/internal/fonttypes"
+	"seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
@@ -79,7 +79,12 @@ func TestExtractText(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = contents.ParsePage(pageDict, matrix.Identity)
+			x := pdf.NewExtractor(r)
+			pg, err := pdf.ExtractorGet(x, nil, pageDict, page.Decode)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = contents.ProcessPage(pg)
 			if err != nil {
 				t.Fatal(err)
 			}

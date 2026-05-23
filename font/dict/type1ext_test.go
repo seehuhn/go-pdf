@@ -20,8 +20,6 @@ import (
 	"bytes"
 	"testing"
 
-	"seehuhn.de/go/geom/matrix"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/dict"
@@ -29,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font/glyphdata/type1glyphs"
 	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/internal/fonttypes"
+	"seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/reader"
 )
@@ -119,13 +118,17 @@ func TestType1Embedding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	reader := reader.New(pdf.NewExtractor(r))
+	pg, err := pdf.ExtractorGet(x, nil, pageDict, page.Decode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rd := reader.New(x)
 	allText := ""
-	reader.Text = func(text string) error {
+	rd.Text = func(text string) error {
 		allText += text
 		return nil
 	}
-	err = reader.ParsePage(pageDict, matrix.Identity)
+	err = rd.ProcessPage(pg)
 	if err != nil {
 		t.Fatal(err)
 	}

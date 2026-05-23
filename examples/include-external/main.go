@@ -19,6 +19,7 @@ package main
 import (
 	"log"
 	"math"
+	"slices"
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
@@ -27,8 +28,8 @@ import (
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
-	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/graphics/form"
+	pdfpage "seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
@@ -103,32 +104,28 @@ func LoadFigure(fname string) (graphics.XObject, *pdf.Rectangle, error) {
 		return nil, nil, err
 	}
 
-	// extract resources
 	x := pdf.NewExtractor(r)
-	var res *content.Resources
-	if resObj := pageDict["Resources"]; resObj != nil {
-		res, err = pdf.ExtractorGet(x, nil, resObj, extract.Resources)
-		if err != nil {
-			return nil, nil, err
-		}
+	pg, err := pdf.ExtractorGet(x, nil, pageDict, pdfpage.Decode)
+	if err != nil {
+		return nil, nil, err
 	}
+	res := pg.Resources
 	if res == nil {
 		res = &content.Resources{}
 	}
 
-	// read content stream
-	open, err := pagetree.ContentStreamOpener(r, pageDict)
-	if err != nil {
-		return nil, nil, err
+	// materialise the page's content stream into an Operators slice
+	var ops []content.Operator
+	it := pg.NewIter()
+	for name, args := range it.All() {
+		ops = append(ops, content.Operator{Name: name, Args: slices.Clone(args)})
 	}
-
-	stream, err := content.ReadStream(open)
-	if err != nil {
+	if err := it.Err(); err != nil {
 		return nil, nil, err
 	}
 
 	obj := &form.Form{
-		Content: &content.Operators{Ops: stream},
+		Content: &content.Operators{Ops: ops},
 		Res:     res,
 		BBox:    *bbox,
 	}

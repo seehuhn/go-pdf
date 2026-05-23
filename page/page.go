@@ -657,31 +657,11 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 		if err != nil {
 			return nil, err
 		}
-		switch c := resolved.(type) {
-		case *pdf.Stream:
-			seg := &Source{
-				stream: c,
-				getter: x.R,
-			}
-			p.Contents = []content.Segment{seg}
-		case pdf.Array:
-			segments := make([]content.Segment, 0, len(c))
-			for _, item := range c {
-				stm, err := pdf.GetStream(x.R, item)
-				if err != nil {
-					return nil, err
-				}
-				if stm == nil {
-					continue
-				}
-				seg := &Source{
-					stream: stm,
-					getter: x.R,
-				}
-				segments = append(segments, seg)
-			}
-			p.Contents = segments
+		segments, err := ExtractContents(x.R, resolved)
+		if err != nil {
+			return nil, err
 		}
+		p.Contents = segments
 	}
 
 	// CropBox (optional, inheritable)

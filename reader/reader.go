@@ -17,7 +17,6 @@
 package reader
 
 import (
-	"io"
 	"math"
 
 	"seehuhn.de/go/geom/matrix"
@@ -27,8 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font/textextract"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
-	"seehuhn.de/go/pdf/graphics/extract"
-	"seehuhn.de/go/pdf/pagetree"
+	"seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/property"
 )
 
@@ -76,6 +74,20 @@ type Reader struct {
 	MarkedContent      func(event MarkedContentEvent, mc *graphics.MarkedContent) error
 	MarkedContentStack []*graphics.MarkedContent
 
+	// ActualText is called at the start and end of each ActualText region
+	// (a marked-content span whose property list carries an ActualText
+	// entry).  Nested ActualText regions are flattened: only the outermost
+	// Begin/End pair is reported.  Inside such a region [Reader.InActualText]
+	// returns true; consumers typically suppress per-glyph text in their
+	// [Reader.Character] callback because the replacement text already
+	// conveys the textual content.
+	ActualText func(event ActualTextEvent, text string) error
+
+	// actualTextStartDepth is the marked-content stack depth at which the
+	// current ActualText region began, or -1 outside any region.
+	actualTextStartDepth int
+	actualTextValue      string
+
 	spaceWidthCache map[font.Instance]float64
 
 	// Position in device coordinates where the next character would naturally
@@ -117,11 +129,30 @@ const (
 	MarkedContentEnd
 )
 
-// New creates a new Reader.
+// ActualTextEvent indicates the boundary of an ActualText region.
+type ActualTextEvent uint8
+
+const (
+	// ActualTextBegin fires when the reader enters a marked-content span
+	// whose property list carries an ActualText entry.  The text argument
+	// is the replacement text.
+	ActualTextBegin ActualTextEvent = iota + 1
+	// ActualTextEnd fires when the reader leaves the marked-content span
+	// that began the current ActualText region.  The text argument is the
+	// same replacement text reported at Begin.
+	ActualTextEnd
+)
+
+// New creates a new Reader.  The returned Reader carries a default
+// page-context graphics state with an empty resource dictionary;
+// callers typically replace [Reader.State] before each page, either
+// directly or via [Reader.ProcessPage].
 func New(x *pdf.Extractor) *Reader {
 	return &Reader{
-		x:                  x,
-		MarkedContentStack: make([]*graphics.MarkedContent, 0, 8),
+		x:                    x,
+		State:                content.NewState(content.Page, &content.Resources{}),
+		MarkedContentStack:   make([]*graphics.MarkedContent, 0, 8),
+		actualTextStartDepth: -1,
 	}
 }
 
@@ -130,52 +161,39 @@ func New(x *pdf.Extractor) *Reader {
 func (r *Reader) Reset() {
 	r.State = content.NewState(content.Page, &content.Resources{})
 	r.MarkedContentStack = r.MarkedContentStack[:0]
+	r.actualTextStartDepth = -1
+	r.actualTextValue = ""
 	r.prevEndValid = false
 }
 
-// ParsePage parses a page, and calls the appropriate callback functions.
-func (r *Reader) ParsePage(page pdf.Object, ctm matrix.Matrix) error {
-	pageDict, err := r.x.GetDictTyped(nil, page, "Page")
-	if err != nil {
-		return err
-	}
-
-	// TODO(voss): do we need to worry about inherited resources? There is some
-	// code in seehuhn.de/go/pdf/pagetree that copies inherited resources from
-	// the parent, but this needs to be checked and documented.  Also, it
-	// reduces generality of the ParsePage method.
-	res, err := pdf.ExtractorGet(r.x, nil, pageDict["Resources"], extract.Resources)
-	if err != nil {
-		return err
-	}
-	if res == nil {
-		res = &content.Resources{}
-	}
-
-	r.State = content.NewState(content.Page, res)
-	r.State.GState.CTM = ctm
-	r.MarkedContentStack = r.MarkedContentStack[:0]
-	r.prevEndValid = false
-
-	open, err := pagetree.ContentStreamOpener(r.x.R, page)
-	if err != nil {
-		return err
-	}
-	return r.ParseContentStream(open)
+// InActualText reports whether the reader is currently inside an
+// ActualText region whose replacement text has already been reported via
+// the [Reader.ActualText] callback.  Consumers can use this from a
+// [Reader.Character] callback to decide whether to emit per-glyph text.
+func (r *Reader) InActualText() bool {
+	return r.actualTextStartDepth != -1
 }
 
-// ParseContentStream parses a PDF content stream.
-// The open function is called each time the stream needs to be read.
-func (r *Reader) ParseContentStream(open func() (io.ReadCloser, error)) error {
-	stream := content.NewScanner(open)
-	return r.ProcessIter(stream.NewIter())
+// ProcessPage processes a decoded page's content stream.  It installs a
+// fresh page-context graphics state populated with the page's resources
+// and then delegates to [Reader.ProcessIter] over the page's combined
+// operator iterator.
+func (r *Reader) ProcessPage(pg *page.Page) error {
+	r.State = content.NewState(content.Page, pg.Resources)
+	return r.ProcessIter(pg.NewIter())
 }
 
 // ProcessIter processes a single-use content-stream iterator, calling the
-// appropriate callback functions for each operator.  After iteration,
-// ProcessIter emits closing operators for any open contexts (unbalanced
-// q/Q, BT/ET, BMC/EMC, or BX/EX).
+// appropriate callback functions for each operator.  Per-stream event
+// state (marked-content stack, text-position memory) is reset before
+// processing begins.  After iteration, ProcessIter emits closing operators
+// for any open contexts (unbalanced q/Q, BT/ET, BMC/EMC, or BX/EX).
 func (r *Reader) ProcessIter(it content.Iter) error {
+	r.MarkedContentStack = r.MarkedContentStack[:0]
+	r.actualTextStartDepth = -1
+	r.actualTextValue = ""
+	r.prevEndValid = false
+
 	for name, args := range it.All() {
 		if err := r.processOperator(name, args); err != nil {
 			return err
@@ -338,6 +356,17 @@ func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
 				return err
 			}
 		}
+		if r.actualTextStartDepth == -1 && mc.Properties != nil {
+			if at, err := property.ListGet(mc.Properties, property.ExtractActualText); err == nil {
+				r.actualTextStartDepth = len(r.MarkedContentStack)
+				r.actualTextValue = at.Text
+				if r.ActualText != nil {
+					if err := r.ActualText(ActualTextBegin, at.Text); err != nil {
+						return err
+					}
+				}
+			}
+		}
 
 	case content.OpEndMarkedContent: // EMC
 		if len(r.MarkedContentStack) > 0 {
@@ -346,6 +375,16 @@ func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
 			if r.MarkedContent != nil {
 				if err := r.MarkedContent(MarkedContentEnd, mc); err != nil {
 					return err
+				}
+			}
+			if r.actualTextStartDepth != -1 && len(r.MarkedContentStack) < r.actualTextStartDepth {
+				text := r.actualTextValue
+				r.actualTextStartDepth = -1
+				r.actualTextValue = ""
+				if r.ActualText != nil {
+					if err := r.ActualText(ActualTextEnd, text); err != nil {
+						return err
+					}
 				}
 			}
 		}

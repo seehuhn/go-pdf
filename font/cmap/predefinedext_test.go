@@ -23,13 +23,13 @@ import (
 
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/text/language"
-	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding/cidenc"
 	"seehuhn.de/go/pdf/font/truetype"
+	"seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/reader"
 	"seehuhn.de/go/sfnt"
@@ -129,13 +129,18 @@ func TestPredefined(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	reader := reader.New(pdf.NewExtractor(r))
+	x := pdf.NewExtractor(r)
+	pg, err := pdf.ExtractorGet(x, nil, pageDict, page.Decode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rd := reader.New(x)
 	allText := ""
-	reader.Text = func(text string) error {
+	rd.Text = func(text string) error {
 		allText += text
 		return nil
 	}
-	err = reader.ParsePage(pageDict, matrix.Identity)
+	err = rd.ProcessPage(pg)
 	if err != nil {
 		t.Fatal(err)
 	}

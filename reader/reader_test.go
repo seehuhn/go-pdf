@@ -31,6 +31,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/page"
 )
 
 // TestParameters verifies that the graphics state is correctly updated by the
@@ -76,9 +77,10 @@ func TestParameters(t *testing.T) {
 	r.State = content.NewState(content.Page, b.Resources)
 	r.State.GState.Set = 0
 	data2 := buf.Bytes()
-	err = r.ParseContentStream(func() (io.ReadCloser, error) {
+	open := func() (io.ReadCloser, error) {
 		return io.NopCloser(bytes.NewReader(data2)), nil
-	})
+	}
+	err = r.ProcessIter(content.NewScanner(open).NewIter())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,8 +153,9 @@ func TestParameters(t *testing.T) {
 	}
 }
 
-// TestParsePage verifies that Reader.ParsePage correctly handles split content streams.
-func TestParsePage(t *testing.T) {
+// TestProcessSplitContentStream verifies that the reader correctly handles
+// a page whose /Contents is an array of streams.
+func TestProcessSplitContentStream(t *testing.T) {
 	pdfData, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 
 	stream1Ref := pdfData.Alloc()
@@ -218,7 +221,12 @@ func TestParsePage(t *testing.T) {
 		return nil
 	}
 
-	err = reader.ParsePage(pageRef, matrix.Identity)
+	x := pdf.NewExtractor(pdfData)
+	pg, err := pdf.ExtractorGet(x, nil, pageRef, page.Decode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = reader.ProcessPage(pg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,8 +268,8 @@ func TestReader_PermissiveDispatch(t *testing.T) {
 	}
 
 	open := func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader([]byte(rawStream))), nil }
-	if err := reader.ParseContentStream(open); err != nil {
-		t.Fatalf("ParseContentStream: %v", err)
+	if err := reader.ProcessIter(content.NewScanner(open).NewIter()); err != nil {
+		t.Fatalf("ProcessIter: %v", err)
 	}
 
 	want := []string{"q", "re", "f", "Tj", "Q"}

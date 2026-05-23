@@ -18,31 +18,19 @@ package pagetree
 
 import (
 	"io"
-	"slices"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/page"
 )
 
-// ContentStream creates a reader for the content stream of a PDF page. The
-// pageDict is the dictionary of the page object. If Contents is an array of
-// streams, the streams are concatenated, separated by newline characters.
+// ContentStream returns a reader over a page's raw content-stream bytes.
+// If /Contents is an array of streams, the streams are concatenated with
+// single newlines between them (PDF 32000-1 §7.8.2).
+//
+// The returned reader yields bytes only, with no parsing or operator-level
+// processing.  To iterate operators, decode the page with [page.Decode]
+// and call [page.Page.NewIter] instead.
 func ContentStream(r pdf.Getter, pageDict pdf.Object) (io.ReadCloser, error) {
-	open, err := ContentStreamOpener(r, pageDict)
-	if err != nil {
-		return nil, err
-	}
-	rc, err := open()
-	if err != nil {
-		return nil, err
-	}
-	return rc, nil
-}
-
-// ContentStreamOpener returns a factory that creates readers for the content
-// stream of a PDF page.  Each call to the returned function creates an
-// independent reader.  If the page has no content, the returned function
-// produces readers that immediately return io.EOF.
-func ContentStreamOpener(r pdf.Getter, pageDict pdf.Object) (func() (io.ReadCloser, error), error) {
 	dict, err := pdf.GetDictTyped(r, pageDict, "Page")
 	if err != nil {
 		return nil, err
@@ -51,134 +39,11 @@ func ContentStreamOpener(r pdf.Getter, pageDict pdf.Object) (func() (io.ReadClos
 	contents, err := pdf.Resolve(r, dict["Contents"])
 	if err != nil {
 		return nil, err
-	} else if contents == nil {
-		// empty page
-		return func() (io.ReadCloser, error) {
-			return io.NopCloser(eofReader{}), nil
-		}, nil
 	}
 
-	var a pdf.Array
-	switch contents := contents.(type) {
-	case pdf.Array:
-		if len(contents) == 0 {
-			return func() (io.ReadCloser, error) {
-				return io.NopCloser(eofReader{}), nil
-			}, nil
-		}
-		a = contents
-	default:
-		a = pdf.Array{contents}
-	}
-
-	return func() (io.ReadCloser, error) {
-		return &contentReader{
-			r: r,
-			a: slices.Clone(a),
-		}, nil
-	}, nil
-}
-
-type eofReader struct{}
-
-func (eofReader) Read(_ []byte) (int, error) {
-	return 0, io.EOF
-}
-
-// contentReader reads from the content stream of a PDF page.
-type contentReader struct {
-	r           pdf.Getter    // PDF reader containing the data
-	a           pdf.Array     // stream objects to read from
-	err         error         // first error encountered, or io.EOF when exhausted
-	current     io.ReadCloser // reader for the currently active stream
-	needNewline bool          // true if a newline should be prepended before the next read
-}
-
-func (cr *contentReader) Read(p []byte) (int, error) {
-	if cr.err != nil {
-		return 0, cr.err
-	}
-
-	if len(p) == 0 {
-		return 0, nil
-	}
-
-	r, err := cr.getReader()
+	segments, err := page.ExtractContents(r, contents)
 	if err != nil {
-		cr.err = err
-		return 0, err
+		return nil, err
 	}
-
-	extra := 0
-	if cr.needNewline {
-		p[0] = '\n'
-		extra = 1
-		p = p[1:]
-		cr.needNewline = false
-
-		if len(p) == 0 {
-			return extra, nil
-		}
-	}
-
-	n, err := r.Read(p)
-	if err == io.EOF {
-		if closeErr := cr.current.Close(); closeErr != nil {
-			cr.err = closeErr
-			return extra + n, closeErr
-		}
-		cr.current = nil
-
-		if len(cr.a) > 0 {
-			cr.needNewline = true
-			err = nil
-		} else {
-			cr.err = io.EOF
-			if extra+n > 0 {
-				err = nil
-			}
-		}
-	} else if err != nil {
-		cr.err = err
-		cr.current.Close() // ignore errors, since we already have an error
-		cr.current = nil
-	}
-
-	return extra + n, err
-}
-
-// Close closes the current stream reader, if any.
-func (cr *contentReader) Close() error {
-	if cr.current != nil {
-		err := cr.current.Close()
-		cr.current = nil
-		return err
-	}
-	return nil
-}
-
-func (cr *contentReader) getReader() (io.ReadCloser, error) {
-	if cr.current != nil {
-		return cr.current, nil
-	}
-
-	for len(cr.a) > 0 {
-		ref := cr.a[0]
-		cr.a = cr.a[1:]
-
-		stm, err := pdf.GetStream(cr.r, ref)
-		if err != nil {
-			return nil, err
-		}
-		if stm != nil {
-			r, err := pdf.DecodeStream(cr.r, nil, stm, 0)
-			if err != nil {
-				return nil, err
-			}
-			cr.current = r
-			return r, nil
-		}
-	}
-
-	return nil, io.EOF
+	return page.SegmentsReader(segments), nil
 }

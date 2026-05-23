@@ -23,6 +23,24 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 )
 
+// RawBytes returns a reader over the page's raw content-stream bytes.
+// Segments are concatenated with a single newline between them (PDF
+// 32000-1 §7.8.2).  The returned reader yields bytes only, with no
+// parsing or operator-level processing — see [Page.NewIter] for a
+// tokenised view that threads scanner state across segment boundaries.
+// The caller is responsible for closing the returned [io.ReadCloser].
+func (p *Page) RawBytes() io.ReadCloser {
+	return SegmentsReader(p.Contents)
+}
+
+// SegmentsReader returns a reader over the concatenated raw bytes of the
+// given content-stream segments.  Segments are joined with a single
+// newline (PDF 32000-1 §7.8.2).  The caller is responsible for closing
+// the returned [io.ReadCloser].
+func SegmentsReader(segments []content.Segment) io.ReadCloser {
+	return &contentReader{parts: segments}
+}
+
 // A contentReader concatenates the raw bytes of all segments,
 // separated by single newline bytes.  Per the library's permissive-reader
 // policy, a segment whose [content.Segment.RawBytes] returns a malformed
