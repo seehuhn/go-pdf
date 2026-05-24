@@ -86,6 +86,57 @@ func TestToUnicodeRangeIter(t *testing.T) {
 	}
 }
 
+// TestToUnicodeLookupEmpty checks that Lookup does not panic on ranges with an
+// empty destination string or no destination values.
+func TestToUnicodeLookupEmpty(t *testing.T) {
+	type testCase struct {
+		name string
+		r    ToUnicodeRange
+		code []byte
+		want string
+		ok   bool
+	}
+	cases := []testCase{
+		{
+			// empty destination string, e.g. <0000> <00FF> <>
+			name: "empty string at range start",
+			r:    ToUnicodeRange{First: []byte{0x00, 0x00}, Last: []byte{0x00, 0xFF}, Values: []string{""}},
+			code: []byte{0x00, 0x00},
+			want: "",
+			ok:   true,
+		},
+		{
+			// past the range start, exercises the increment branch
+			name: "empty string past range start",
+			r:    ToUnicodeRange{First: []byte{0x00, 0x00}, Last: []byte{0x00, 0xFF}, Values: []string{""}},
+			code: []byte{0x00, 0x05},
+			want: "",
+			ok:   true,
+		},
+		{
+			// empty destination array, e.g. <0000> <00FF> []
+			name: "no values",
+			r:    ToUnicodeRange{First: []byte{0x00, 0x00}, Last: []byte{0x00, 0xFF}, Values: []string{}},
+			code: []byte{0x00, 0x05},
+			want: "",
+			ok:   false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			tu := &ToUnicodeFile{
+				CodeSpaceRange: []charcode.Range{{Low: []byte{0x00, 0x00}, High: []byte{0xFF, 0xFF}}},
+				Ranges:         []ToUnicodeRange{c.r},
+			}
+			got, ok := tu.Lookup(c.code)
+			if got != c.want || ok != c.ok {
+				t.Errorf("Lookup = %q, %v; want %q, %v", got, ok, c.want, c.ok)
+			}
+		})
+	}
+}
+
 // The following variabes contain test CMap data used in the tests below.
 var (
 	testToUniCMapParent = []byte(`/CIDInit /ProcSet findresource begin

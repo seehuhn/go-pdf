@@ -255,7 +255,7 @@ func (d *CIDFontType0) Codec() *charcode.Codec {
 func (d *CIDFontType0) Characters() iter.Seq2[charcode.Code, font.Code] {
 	return func(yield func(charcode.Code, font.Code) bool) {
 		codec := d.Codec()
-		textMap := d.makeTextMap(codec)
+		defaultText, _ := mapping.GetCIDTextMapping(d.ROS.Registry, d.ROS.Ordering)
 		var buf []byte
 		for code, cid := range d.CMap.All(codec) {
 			buf = codec.AppendCode(buf[:0], code)
@@ -267,7 +267,7 @@ func (d *CIDFontType0) Characters() iter.Seq2[charcode.Code, font.Code] {
 				CID:            cid,
 				Notdef:         d.CMap.LookupNotdefCID(buf),
 				Width:          width / 1000,
-				Text:           textMap[code],
+				Text:           d.lookupText(defaultText, cid, buf),
 				UseWordSpacing: len(buf) == 1 && buf[0] == 0x20,
 			}
 			if !yield(code, info) {
@@ -294,25 +294,19 @@ func (d *CIDFontType0) FontInfo() any {
 	}
 }
 
-func (d *CIDFontType0) makeTextMap(codec *charcode.Codec) map[charcode.Code]string {
-	defaultTextMap, _ := mapping.GetCIDTextMapping(d.ROS.Registry, d.ROS.Ordering)
-
-	textMap := make(map[charcode.Code]string)
-	for code, cid := range d.CMap.All(codec) {
-		text := defaultTextMap[cid]
-		if text != "" {
-			textMap[code] = text
-		}
-	}
+// lookupText returns the text content for a single character code, given the
+// CID it maps to.  It combines the registry/ordering default text mapping with
+// any ToUnicode override.  Looking up per code keeps text extraction
+// proportional to the codes that actually appear, rather than materializing a
+// mapping for every code the CMap can encode.
+func (d *CIDFontType0) lookupText(defaultText map[cmap.CID]string, c cmap.CID, code []byte) string {
+	text := defaultText[c]
 	if d.ToUnicode != nil {
-		for code, text := range d.ToUnicode.All(codec) {
-			if text != "" {
-				textMap[code] = text
-			}
+		if t, ok := d.ToUnicode.Lookup(code); ok && t != "" {
+			text = t
 		}
 	}
-
-	return textMap
+	return text
 }
 
 // MakeFont returns a new font object that can be used to typeset text.
@@ -320,11 +314,11 @@ func (d *CIDFontType0) makeTextMap(codec *charcode.Codec) map[charcode.Code]stri
 // can be defined via the returned font object.
 func (d *CIDFontType0) MakeFont() font.Instance {
 	codec := d.Codec()
-	textMap := d.makeTextMap(codec)
+	defaultText, _ := mapping.GetCIDTextMapping(d.ROS.Registry, d.ROS.Ordering)
 	return &t0Font{
 		CIDFontType0: d,
 		codec:        codec,
-		text:         textMap,
+		defaultText:  defaultText,
 		cache:        make(map[charcode.Code]font.Code),
 	}
 }
@@ -335,10 +329,10 @@ var (
 
 type t0Font struct {
 	*CIDFontType0
-	codec *charcode.Codec
-	text  map[charcode.Code]string
-	mu    sync.Mutex
-	cache map[charcode.Code]font.Code
+	codec       *charcode.Codec
+	defaultText map[cmap.CID]string
+	mu          sync.Mutex
+	cache       map[charcode.Code]font.Code
 }
 
 func (f *t0Font) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
@@ -408,7 +402,9 @@ func (f *t0Font) Codes(str pdf.String) iter.Seq[font.Code] {
 					}
 				}
 				res.UseWordSpacing = k == 1 && code == 0x20
-				res.Text = f.text[code]
+				if isValid {
+					res.Text = f.lookupText(f.defaultText, res.CID, codeBytes)
+				}
 				f.cache[code] = res
 			}
 			f.mu.Unlock()

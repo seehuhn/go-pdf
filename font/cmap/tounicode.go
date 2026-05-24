@@ -265,12 +265,19 @@ func (tu *ToUnicodeFile) All(codec *charcode.Codec) iter.Seq2[charcode.Code, str
 	slices.Reverse(chain)
 
 	return func(yield func(charcode.Code, string) bool) {
+		// bound total enumeration so a wide range cannot spin or grow a
+		// consumer's map disproportionately to the input size
+		budget := streamlimits.MaxCMapMappings
 		for _, g := range chain {
 			for _, r := range g.Ranges {
 				if len(r.Values) == 0 {
 					continue
 				}
 				for i, codeBytes := range codesInRange(r.First, r.Last) {
+					if budget <= 0 {
+						return
+					}
+					budget--
 					code, k, valid := codec.Decode(codeBytes)
 					if !valid || k != len(codeBytes) {
 						continue
@@ -288,6 +295,10 @@ func (tu *ToUnicodeFile) All(codec *charcode.Codec) iter.Seq2[charcode.Code, str
 				}
 			}
 			for _, single := range g.Singles {
+				if budget <= 0 {
+					return
+				}
+				budget--
 				code, k, valid := codec.Decode(single.Code)
 				if !valid || k != len(single.Code) {
 					continue
@@ -316,6 +327,9 @@ func (tu *ToUnicodeFile) Lookup(code []byte) (string, bool) {
 
 rangesLoop:
 	for _, r := range tu.Ranges {
+		if len(r.Values) == 0 {
+			continue
+		}
 		if len(r.First) != len(code) || len(r.Last) != len(code) {
 			continue
 		}
@@ -330,11 +344,8 @@ rangesLoop:
 
 		if index < len(r.Values) {
 			return r.Values[index], true
-		} else {
-			rr := []rune(r.Values[0])
-			rr[len(rr)-1] += rune(index)
-			return string(rr), true
 		}
+		return nextString(r.Values[0], index), true
 	}
 
 	if tu.Parent != nil {

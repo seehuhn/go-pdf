@@ -19,8 +19,9 @@
 // attacker-controlled streams whose decoded size is grossly
 // disproportionate to the input file size.
 //
-// Each constant is the maximum number of bytes a particular kind of
-// decoded stream may produce.
+// Most constants cap the number of bytes a particular kind of decoded
+// stream may produce; a few cap a derived item count where the byte
+// size is not the limiting resource.
 package streamlimits
 
 // ImageDataLimit returns an upper bound on the decoded byte count for an
@@ -192,6 +193,15 @@ const (
 	// stream.  Realistic CMaps are well under 100 KiB; 4 MiB leaves
 	// generous slack for unusually verbose mappings.
 	MaxCMapBytes = 4 << 20
+
+	// MaxCMapMappings caps the number of code-to-CID or code-to-Unicode
+	// mappings enumerated from a single CMap or ToUnicode CMap.  A wide
+	// multi-byte cidrange/bfrange can claim up to 2^32 mappings from a
+	// handful of input bytes, so enumerating every code is grossly
+	// disproportionate to the input.  The largest predefined CMaps map
+	// well under 2^16 codes, so 2^20 leaves generous slack; enumeration
+	// stops silently once the bound is reached.
+	MaxCMapMappings = 1 << 20
 
 	// MaxFontProgramBytes caps the decoded byte count of an embedded
 	// font program (FontFile, FontFile2, FontFile3).  Large TrueType

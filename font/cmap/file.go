@@ -374,9 +374,16 @@ func (f *File) All(codec *charcode.Codec) iter.Seq2[charcode.Code, cid.CID] {
 	slices.Reverse(chain)
 
 	return func(yield func(charcode.Code, cid.CID) bool) {
+		// bound total enumeration so a wide range cannot spin or grow a
+		// consumer's map disproportionately to the input size
+		budget := streamlimits.MaxCMapMappings
 		for _, g := range chain {
 			for _, r := range g.CIDRanges {
 				for i, codeBytes := range codesInRange(r.First, r.Last) {
+					if budget <= 0 {
+						return
+					}
+					budget--
 					code, k, valid := codec.Decode(codeBytes)
 					if !valid || k != len(codeBytes) {
 						continue
@@ -387,6 +394,10 @@ func (f *File) All(codec *charcode.Codec) iter.Seq2[charcode.Code, cid.CID] {
 				}
 			}
 			for _, single := range g.CIDSingles {
+				if budget <= 0 {
+					return
+				}
+				budget--
 				code, k, valid := codec.Decode(single.Code)
 				if !valid || k != len(single.Code) {
 					continue
