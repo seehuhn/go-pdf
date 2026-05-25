@@ -123,11 +123,28 @@ func TestCheckXRefStreamDict(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := checkXRefStreamDict(tc.dict)
+			_, _, err := checkXRefStreamDict(tc.dict, 1<<20)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("err=%v, wantErr=%v", err, tc.wantErr)
 			}
 		})
+	}
+}
+
+// TestXRefStreamEntryCountCap verifies that the number of declared entries is
+// bounded in proportion to the stream's raw size: the same /Size is rejected
+// for a tiny stream but accepted once the raw length is large enough.
+func TestXRefStreamEntryCountCap(t *testing.T) {
+	dict := Dict{
+		"Size": Integer(100000),
+		"W":    Array{Integer(1), Integer(2), Integer(1)},
+	}
+
+	if _, _, err := checkXRefStreamDict(dict, 10); err == nil {
+		t.Error("100000 entries from a 10-byte stream should be rejected")
+	}
+	if _, _, err := checkXRefStreamDict(dict, 100000); err != nil {
+		t.Errorf("100000 entries from a 100000-byte stream should be accepted: %v", err)
 	}
 }
 

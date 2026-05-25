@@ -127,6 +127,36 @@ func StreamBudget(rawLen int64) int64 {
 }
 
 const (
+	// XRefEntriesBase is the number of cross-reference entries allowed
+	// regardless of stream size, so small files with an xref stream are
+	// never rejected.
+	XRefEntriesBase = 8192
+
+	// XRefEntriesPerByte bounds how many cross-reference entries a stream of
+	// a given raw size may declare.  A real xref stream stores high-entropy
+	// byte offsets that flate compresses only modestly, so the decoded entry
+	// count cannot greatly exceed the compressed size.  The generous factor
+	// keeps valid files well clear of the cap while denying the >1000x
+	// amplification an all-repeating flate body would otherwise unlock.
+	XRefEntriesPerByte = 32
+)
+
+// MaxXRefEntries returns the maximum number of entries a cross-reference
+// stream of rawLen on-disk bytes may declare.  Decoding allocates one heap
+// entry per declared object, so without this bound a tiny FlateDecode body
+// could force memory use grossly disproportionate to the input size.  The
+// caller is expected to clamp the result against any absolute object-number
+// ceiling.
+func MaxXRefEntries(rawLen int64) int64 {
+	if rawLen < 0 {
+		rawLen = 0
+	}
+	// rawLen is an on-disk byte count bounded by the file size, so the
+	// product stays well inside int64
+	return XRefEntriesBase + XRefEntriesPerByte*rawLen
+}
+
+const (
 	// MaxImageWidth and MaxImageHeight are absolute sanity caps on the pixel
 	// dimensions of a single image.  Downstream arithmetic uses int64, so
 	// this is not an overflow defense; it just bounds resource use.

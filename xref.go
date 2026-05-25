@@ -25,6 +25,8 @@ import (
 	"math"
 	"math/bits"
 	"strconv"
+
+	"seehuhn.de/go/pdf/internal/streamlimits"
 )
 
 func (r *Reader) findXRef(size int64) (int64, error) {
@@ -288,7 +290,7 @@ func (r *Reader) readXRefStream(xref map[uint32]*xRefEntry, s *scanner) (Dict, R
 	}
 	dict := stream.Dict
 
-	w, ss, err := checkXRefStreamDict(dict)
+	w, ss, err := checkXRefStreamDict(dict, stream.length)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -319,7 +321,12 @@ const maxXRefSize = 1 << 24
 // would silently collide on key derivation if this cap were relaxed.
 const maxGeneration = 1<<16 - 1
 
-func checkXRefStreamDict(dict Dict) ([]int, []*xRefSubSection, error) {
+// checkXRefStreamDict validates the dictionary of a cross-reference stream
+// and returns the field widths W and the subsections to read.  rawLen is the
+// stream's on-disk (encoded) byte length; it bounds the number of entries the
+// stream may declare so that a small, highly compressible body cannot force
+// memory use disproportionate to the input size.
+func checkXRefStreamDict(dict Dict, rawLen int64) ([]int, []*xRefSubSection, error) {
 	size, ok := dict["Size"].(Integer)
 	if !ok || size < 0 || size > maxXRefSize {
 		return nil, nil, &MalformedFileError{
@@ -378,6 +385,20 @@ func checkXRefStreamDict(dict Dict) ([]int, []*xRefSubSection, error) {
 			ss = append(ss, &xRefSubSection{uint32(subStart), uint32(subSize)})
 		}
 	}
+
+	// reject entry counts disproportionate to the input size; decoding
+	// allocates one heap entry per declared object
+	maxEntries := min(int64(maxXRefSize), streamlimits.MaxXRefEntries(rawLen))
+	var total int64
+	for _, sec := range ss {
+		total += int64(sec.Size)
+	}
+	if total > maxEntries {
+		return nil, nil, &MalformedFileError{
+			Err: errInvalidXref,
+		}
+	}
+
 	return w, ss, nil
 }
 

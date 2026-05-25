@@ -44,3 +44,27 @@ func TestImageDecodedFloat64ExceedsLimit(t *testing.T) {
 		})
 	}
 }
+
+func TestMaxXRefEntries(t *testing.T) {
+	cases := []struct {
+		name   string
+		rawLen int64
+		want   int64
+	}{
+		{"negative", -1, XRefEntriesBase},
+		{"zero", 0, XRefEntriesBase},
+		{"small", 1000, XRefEntriesBase + 32000},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := MaxXRefEntries(tc.rawLen); got != tc.want {
+				t.Errorf("MaxXRefEntries(%d) = %d, want %d", tc.rawLen, got, tc.want)
+			}
+		})
+	}
+
+	// the bound grows with the input size
+	if MaxXRefEntries(1<<20) <= MaxXRefEntries(0) {
+		t.Error("bound does not grow with input size")
+	}
+}
