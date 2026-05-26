@@ -200,27 +200,16 @@ func (d *TrueType) Codec() *charcode.Codec {
 	return codec
 }
 
-func (d *TrueType) Characters() iter.Seq2[charcode.Code, font.Code] {
-	return func(yield func(charcode.Code, font.Code) bool) {
-		textMap := SimpleTextMap(d.PostScriptName, d.Encoding, d.ToUnicode)
-		for c := range 256 {
-			code := byte(c)
-			var info font.Code
-			if d.Encoding(code) != "" {
-				info = font.Code{
-					CID:            cid.CID(code) + 1,
-					Width:          d.Width[code] / 1000,
-					Text:           textMap[code],
-					UseWordSpacing: code == 0x20,
-				}
-			} else {
-				continue
-			}
-			if !yield(charcode.Code(code), info) {
-				return
-			}
+// GlyphWidth implements the [Dict] interface.
+func (d *TrueType) GlyphWidth(text string) (float64, bool) {
+	textMap := SimpleTextMap(d.PostScriptName, d.Encoding, d.ToUnicode)
+	for c := range 256 {
+		code := byte(c)
+		if d.Encoding(code) != "" && textMap[code] == text {
+			return d.Width[code] / 1000, true
 		}
 	}
+	return 0, false
 }
 
 // FontInfo returns information about the embedded font file.

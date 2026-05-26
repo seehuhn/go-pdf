@@ -73,17 +73,6 @@ func TestCIDFontType0Text(t *testing.T) {
 	if got[6] != "" {
 		t.Errorf("code 0x42: got text %q, want empty", got[6])
 	}
-
-	chars := map[cmap.CID]string{}
-	for _, info := range d.Characters() {
-		chars[info.CID] = info.Text
-	}
-	if chars[5] != "A" {
-		t.Errorf("Characters code 0x41: got text %q, want %q", chars[5], "A")
-	}
-	if chars[6] != "" {
-		t.Errorf("Characters code 0x42: got text %q, want empty", chars[6])
-	}
 }
 
 // TestCIDFontType2Text pins the same behavior for CIDFontType2.

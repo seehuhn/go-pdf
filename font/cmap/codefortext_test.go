@@ -1,0 +1,165 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2026  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+package cmap
+
+import (
+	"bytes"
+	"testing"
+	"time"
+)
+
+func TestCodeForTextSingles(t *testing.T) {
+	tu := &ToUnicodeFile{
+		Singles: []ToUnicodeSingle{
+			{Code: []byte{0x41}, Value: "A"},
+			{Code: []byte{0x05}, Value: "A"},
+			{Code: []byte{0x42}, Value: "B"},
+		},
+	}
+
+	// smallest code wins when several map to the same text
+	code, ok := tu.CodeForText("A")
+	if !ok || !bytes.Equal(code, []byte{0x05}) {
+		t.Errorf("CodeForText(A) = % x, %v; want 05, true", code, ok)
+	}
+
+	code, ok = tu.CodeForText("B")
+	if !ok || !bytes.Equal(code, []byte{0x42}) {
+		t.Errorf("CodeForText(B) = % x, %v; want 42, true", code, ok)
+	}
+
+	if _, ok := tu.CodeForText("Z"); ok {
+		t.Error("CodeForText(Z) = true; want false")
+	}
+}
+
+func TestCodeForTextRange(t *testing.T) {
+	// base "x" increments the last rune: 0x10->"x", 0x11->"y", 0x12->"z"
+	tu := &ToUnicodeFile{
+		Ranges: []ToUnicodeRange{
+			{First: []byte{0x10}, Last: []byte{0x12}, Values: []string{"x"}},
+		},
+	}
+
+	code, ok := tu.CodeForText("y")
+	if !ok || !bytes.Equal(code, []byte{0x11}) {
+		t.Errorf("CodeForText(y) = % x, %v; want 11, true", code, ok)
+	}
+}
+
+func TestCodeForTextChildShadowsParent(t *testing.T) {
+	// the child overrides code 0x20: effectively 0x20 renders "B", not "A"
+	parent := &ToUnicodeFile{
+		Singles: []ToUnicodeSingle{{Code: []byte{0x20}, Value: "A"}},
+	}
+	tu := &ToUnicodeFile{
+		Singles: []ToUnicodeSingle{{Code: []byte{0x20}, Value: "B"}},
+		Parent:  parent,
+	}
+
+	// the shadowed parent entry must not be returned for "A"
+	if code, ok := tu.CodeForText("A"); ok {
+		t.Errorf("CodeForText(A) = % x, true; want false (shadowed)", code)
+	}
+	// the child's own mapping is returned for "B"
+	if code, ok := tu.CodeForText("B"); !ok || !bytes.Equal(code, []byte{0x20}) {
+		t.Errorf("CodeForText(B) = % x, %v; want 20, true", code, ok)
+	}
+}
+
+func TestCodeForTextParentFallback(t *testing.T) {
+	// the child does not define 0x30, so the parent's mapping is effective
+	parent := &ToUnicodeFile{
+		Singles: []ToUnicodeSingle{{Code: []byte{0x30}, Value: "A"}},
+	}
+	tu := &ToUnicodeFile{
+		Singles: []ToUnicodeSingle{{Code: []byte{0x20}, Value: "B"}},
+		Parent:  parent,
+	}
+
+	if code, ok := tu.CodeForText("A"); !ok || !bytes.Equal(code, []byte{0x30}) {
+		t.Errorf("CodeForText(A) = % x, %v; want 30, true", code, ok)
+	}
+}
+
+func TestCodeForTextShorterPreferred(t *testing.T) {
+	tu := &ToUnicodeFile{
+		Singles: []ToUnicodeSingle{
+			{Code: []byte{0x00, 0x41}, Value: "A"},
+			{Code: []byte{0x41}, Value: "A"},
+		},
+	}
+	code, ok := tu.CodeForText("A")
+	if !ok || !bytes.Equal(code, []byte{0x41}) {
+		t.Errorf("CodeForText(A) = % x, %v; want 41 (shorter), true", code, ok)
+	}
+}
+
+// TestCodeForTextManyRanges checks that the search stays linear when many
+// ranges each map a code to the queried text in descending code order, the
+// shape that would make a per-candidate Lookup quadratic.
+func TestCodeForTextManyRanges(t *testing.T) {
+	const n = 50000
+	ranges := make([]ToUnicodeRange, n)
+	for i := range ranges {
+		// descending codes: range i covers code n-i
+		c := n - i
+		first := []byte{byte(c >> 8), byte(c)}
+		ranges[i] = ToUnicodeRange{First: first, Last: first, Values: []string{"x"}}
+	}
+	tu := &ToUnicodeFile{Ranges: ranges}
+
+	done := make(chan struct{})
+	go func() {
+		code, ok := tu.CodeForText("x")
+		// smallest code among all matches is the last range's (code 1)
+		if !ok || !bytes.Equal(code, []byte{0x00, 0x01}) {
+			t.Errorf("CodeForText(x) = % x, %v; want 00 01, true", code, ok)
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("CodeForText did not finish promptly with many ranges")
+	}
+}
+
+// TestCodeForTextWideRange checks that a missing text is reported promptly even
+// when a range spans an enormous code space: the scan is bounded.
+func TestCodeForTextWideRange(t *testing.T) {
+	tu := &ToUnicodeFile{
+		Ranges: []ToUnicodeRange{
+			{
+				First:  []byte{0, 0, 0, 0},
+				Last:   []byte{0xFF, 0xFF, 0xFF, 0xFF},
+				Values: []string{"a"},
+			},
+		},
+	}
+
+	done := make(chan struct{})
+	go func() {
+		tu.CodeForText("this text does not appear")
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("CodeForText did not finish on a wide range")
+	}
+}

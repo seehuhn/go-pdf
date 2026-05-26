@@ -252,29 +252,38 @@ func (d *CIDFontType0) Codec() *charcode.Codec {
 	return makeCodec(d.CMap, d.ToUnicode)
 }
 
-func (d *CIDFontType0) Characters() iter.Seq2[charcode.Code, font.Code] {
-	return func(yield func(charcode.Code, font.Code) bool) {
-		codec := d.Codec()
-		defaultText, _ := mapping.GetCIDTextMapping(d.ROS.Registry, d.ROS.Ordering)
-		var buf []byte
-		for code, cid := range d.CMap.All(codec) {
-			buf = codec.AppendCode(buf[:0], code)
-			width, ok := d.Width[cid]
-			if !ok {
-				width = d.DefaultWidth
-			}
-			info := font.Code{
-				CID:            cid,
-				Notdef:         d.CMap.LookupNotdefCID(buf),
-				Width:          width / 1000,
-				Text:           d.lookupText(defaultText, cid, buf),
-				UseWordSpacing: len(buf) == 1 && buf[0] == 0x20,
-			}
-			if !yield(code, info) {
-				return
-			}
+// GlyphWidth implements the [Dict] interface.
+func (d *CIDFontType0) GlyphWidth(text string) (float64, bool) {
+	c, ok := cidForText(d.ROS, d.CMap, d.ToUnicode, text)
+	if !ok {
+		return 0, false
+	}
+	return cidWidth(d.Width, d.DefaultWidth, c), true
+}
+
+// cidForText returns the CID of a glyph whose text is text.  The ToUnicode
+// mapping takes precedence over the registry/ordering default mapping.
+func cidForText(ros *cid.SystemInfo, cmapFile *cmap.File, toUnicode *cmap.ToUnicodeFile, text string) (cmap.CID, bool) {
+	if toUnicode != nil {
+		if code, ok := toUnicode.CodeForText(text); ok {
+			return cmapFile.LookupCID(code), true
 		}
 	}
+	if reverse, err := mapping.GetTextToCIDMapping(ros.Registry, ros.Ordering); err == nil {
+		if c, ok := reverse[text]; ok {
+			return c, true
+		}
+	}
+	return 0, false
+}
+
+// cidWidth returns the width of CID c in text space units.
+func cidWidth(widths map[cmap.CID]float64, defaultWidth float64, c cmap.CID) float64 {
+	w, ok := widths[c]
+	if !ok {
+		w = defaultWidth
+	}
+	return w / 1000
 }
 
 // FontInfo returns information about the embedded font file.

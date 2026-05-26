@@ -305,29 +305,13 @@ func (d *CIDFontType2) Codec() *charcode.Codec {
 	return makeCodec(d.CMap, d.ToUnicode)
 }
 
-func (d *CIDFontType2) Characters() iter.Seq2[charcode.Code, font.Code] {
-	return func(yield func(charcode.Code, font.Code) bool) {
-		codec := d.Codec()
-		defaultText, _ := mapping.GetCIDTextMapping(d.ROS.Registry, d.ROS.Ordering)
-		var buf []byte
-		for code, cid := range d.CMap.All(codec) {
-			buf = codec.AppendCode(buf[:0], code)
-			width, ok := d.Width[cid]
-			if !ok {
-				width = d.DefaultWidth
-			}
-			info := font.Code{
-				CID:            cid,
-				Notdef:         d.CMap.LookupNotdefCID(buf),
-				Width:          width / 1000,
-				Text:           d.lookupText(defaultText, cid, buf),
-				UseWordSpacing: len(buf) == 1 && buf[0] == 0x20,
-			}
-			if !yield(code, info) {
-				return
-			}
-		}
+// GlyphWidth implements the [Dict] interface.
+func (d *CIDFontType2) GlyphWidth(text string) (float64, bool) {
+	c, ok := cidForText(d.ROS, d.CMap, d.ToUnicode, text)
+	if !ok {
+		return 0, false
 	}
+	return cidWidth(d.Width, d.DefaultWidth, c), true
 }
 
 // FontInfo returns information about the embedded font file.

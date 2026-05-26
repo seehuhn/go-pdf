@@ -17,8 +17,6 @@
 package dict
 
 import (
-	"iter"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -50,6 +48,10 @@ type Dict interface {
 	// Codec allows to interpret character codes for the font.
 	Codec() *charcode.Codec
 
-	// TODO(voss): remove? keep?
-	Characters() iter.Seq2[charcode.Code, font.Code]
+	// GlyphWidth returns the advance width, in the same units as
+	// [font.Code.Width], of a glyph in this font that renders text.  The flag
+	// is false if the font defines no glyph for text.  When several glyphs
+	// render the same text, the one with the smallest character code or CID is
+	// used.
+	GlyphWidth(text string) (width float64, ok bool)
 }

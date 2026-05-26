@@ -35,6 +35,7 @@ var resources embed.FS
 var (
 	resourceMutex sync.Mutex
 	cache         = make(map[string]map[cid.CID]string)
+	reverseCache  = make(map[string]map[string]cid.CID)
 )
 
 // GetCIDTextMapping returns a mapping from CID to text for the given registry
@@ -134,6 +135,36 @@ rangeLoop:
 
 	cache[fileName] = mapping
 	return mapping, nil
+}
+
+// GetTextToCIDMapping returns a mapping from text to CID for the given registry
+// and ordering.  It is the inverse of [GetCIDTextMapping]; where several CIDs
+// share the same text, the smallest CID is used.  If no mapping is known, an
+// error is returned which wraps [fs.ErrNotExist].
+//
+// The returned mapping is read-only and must not be modified by the caller.
+func GetTextToCIDMapping(registry, ordering string) (map[string]cid.CID, error) {
+	forward, err := GetCIDTextMapping(registry, ordering)
+	if err != nil {
+		return nil, err
+	}
+
+	resourceMutex.Lock()
+	defer resourceMutex.Unlock()
+
+	key := registry + "-" + ordering
+	if reverse, ok := reverseCache[key]; ok {
+		return reverse, nil
+	}
+
+	reverse := make(map[string]cid.CID, len(forward))
+	for c, text := range forward {
+		if prev, ok := reverse[text]; !ok || c < prev {
+			reverse[text] = c
+		}
+	}
+	reverseCache[key] = reverse
+	return reverse, nil
 }
 
 func getCID(s []byte) (cid.CID, error) {

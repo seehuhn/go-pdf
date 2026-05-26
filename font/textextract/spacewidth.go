@@ -71,9 +71,9 @@ var commonCharacters = map[string]affine{
 
 func spaceWidthHeuristic(d dict.Dict) float64 {
 	guesses := []float64{280}
-	for _, info := range d.Characters() {
-		if coef, ok := commonCharacters[info.Text]; ok && info.Width > 0 {
-			guesses = append(guesses, coef.intercept+coef.slope*info.Width*1000)
+	for text, coef := range commonCharacters {
+		if w, ok := d.GlyphWidth(text); ok && w > 0 {
+			guesses = append(guesses, coef.intercept+coef.slope*w*1000)
 		}
 	}
 	slices.Sort(guesses)

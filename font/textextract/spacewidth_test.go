@@ -35,14 +35,13 @@ func (d *mockDict) Embed(*pdf.EmbedHelper) (pdf.Native, error) { return nil, nil
 func (d *mockDict) MakeFont() font.Instance                    { return nil }
 func (d *mockDict) FontInfo() any                              { return nil }
 func (d *mockDict) Codec() *charcode.Codec                     { return nil }
-func (d *mockDict) Characters() iter.Seq2[charcode.Code, font.Code] {
-	return func(yield func(charcode.Code, font.Code) bool) {
-		for i, c := range d.chars {
-			if !yield(charcode.Code(i), c) {
-				return
-			}
+func (d *mockDict) GlyphWidth(text string) (float64, bool) {
+	for _, c := range d.chars {
+		if c.Text == text {
+			return c.Width, true
 		}
 	}
+	return 0, false
 }
 
 // mockFontWithDict implements font.Instance and has a GetDict method.

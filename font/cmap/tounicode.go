@@ -354,6 +354,71 @@ rangesLoop:
 	return "", false
 }
 
+// CodeForText returns a character code whose text is exactly text.  If several
+// codes map to text, the smallest one is returned.  The flag is false if no
+// code maps to text.
+//
+// The search is bounded, so on malformed input some matches may be missed.
+func (tu *ToUnicodeFile) CodeForText(text string) ([]byte, bool) {
+	var best []byte
+	// codes already resolved by a more specific file, honoring the same
+	// child-shadows-parent precedence as Lookup
+	seen := make(map[string]struct{})
+
+	// bound the total work so a wide range cannot spin
+	budget := streamlimits.MaxCMapMappings
+	emit := func(code []byte, value string) bool {
+		if budget <= 0 {
+			return false
+		}
+		budget--
+		key := string(code)
+		if _, dup := seen[key]; dup {
+			return true
+		}
+		seen[key] = struct{}{}
+		if value == text && (best == nil || codeLess(code, best)) {
+			best = bytes.Clone(code)
+		}
+		return true
+	}
+
+	// child first, and within a file singles before ranges, matching Lookup
+	for g := tu; g != nil; g = g.Parent {
+		for _, single := range g.Singles {
+			if !emit(single.Code, single.Value) {
+				return best, best != nil
+			}
+		}
+		for _, r := range g.Ranges {
+			if len(r.Values) == 0 {
+				continue
+			}
+			for i, codeBytes := range codesInRange(r.First, r.Last) {
+				var value string
+				if i < len(r.Values) {
+					value = r.Values[i]
+				} else {
+					value = nextString(r.Values[0], i)
+				}
+				if !emit(codeBytes, value) {
+					return best, best != nil
+				}
+			}
+		}
+	}
+	return best, best != nil
+}
+
+// codeLess reports whether character code a sorts before b, shorter codes
+// first and then lexicographically.
+func codeLess(a, b []byte) bool {
+	if len(a) != len(b) {
+		return len(a) < len(b)
+	}
+	return bytes.Compare(a, b) < 0
+}
+
 func (tu *ToUnicodeFile) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	opt := rm.Out().GetOptions()
 
