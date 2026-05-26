@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/media"
 	"seehuhn.de/go/pdf/movie"
 	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/page/transition"
@@ -205,7 +206,22 @@ var actionTestCases = []pdf.Action{
 	},
 
 	// Rendition
-	&Rendition{OP: func() optional.UInt { var u optional.UInt; u.Set(0); return u }()},
+	// OP 1 (stop) needs no rendition R, but OP still requires AN.
+	&Rendition{
+		OP: func() optional.UInt { var u optional.UInt; u.Set(1); return u }(),
+		AN: pdf.NewReference(1, 0),
+	},
+	&Rendition{
+		OP: func() optional.UInt { var u optional.UInt; u.Set(0); return u }(),
+		AN: pdf.NewReference(1, 0),
+		R: &media.MediaRendition{
+			Clip: &media.MediaClipData{
+				DataFile:  &file.Specification{FileName: "movie.mp4", AFRelationship: file.RelationshipUnspecified},
+				SingleUse: true,
+			},
+			SingleUse: true,
+		},
+	},
 
 	// Trans
 	&Trans{Trans: &transition.Transition{Style: transition.StyleSplit}},

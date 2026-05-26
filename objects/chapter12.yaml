@@ -5869,7 +5869,7 @@ types:
     - ActionECMAScript
     - type: ActionRichMediaExecute
       since: '2.0'
-    goType: pdf.Object
+    goType: pdf.Action
     purpose: 'Action (optional; PDF 1.1) is an action that is performed when the
 
       annotation is activated.'
@@ -5880,7 +5880,7 @@ types:
     introduced: '1.5'
     refTypes:
     - AddActionScreenAnnotation
-    goType: pdf.Object
+    goType: '*triggers.Annotation'
     purpose: 'AA (optional; PDF 1.2) is an additional-actions dictionary defining
 
       the screen annotation''s behaviour in response to various trigger events.'
@@ -9482,150 +9482,6 @@ types:
   goPackage: annotation
   goRepr: struct
   specSection: 12.5.2
-- name: RenditionBE
-  purpose: best-effort media rendition parameters
-  goType:
-  pdfRepr: dict
-  introduced: '1.5'
-  fields:
-  - goName:
-    pdfKey: C
-    pdfType: dictionary
-    required: false
-    introduced: '1.5'
-    refTypes:
-    - MediaCriteria
-    notes: Table 278
-- name: RenditionMH
-  purpose: must-honour media rendition parameters
-  goType:
-  pdfRepr: dict
-  introduced: '1.5'
-  fields:
-  - goName:
-    pdfKey: C
-    pdfType: dictionary
-    required: false
-    introduced: '1.5'
-    refTypes:
-    - MediaCriteria
-    notes: Table 278
-- name: RenditionMedia
-  purpose: media clip rendition
-  goType:
-  pdfType: Rendition
-  pdfRepr: dict
-  introduced: '1.5'
-  specTable: Table 277
-  fields:
-  - goName:
-    pdfKey: Type
-    pdfType: name
-    required: false
-    introduced: '1.5'
-    possibleValues:
-    - Rendition
-    notes: Table 277 and Table 282
-  - goName:
-    pdfKey: S
-    pdfType: name
-    required: true
-    introduced: '1.5'
-    possibleValues:
-    - MR
-  - goName:
-    pdfKey: N
-    pdfType: text-string
-    required: false
-    introduced: '1.5'
-    notes: https://github.com/pdf-association/pdf-issues/issues/214
-  - goName:
-    pdfKey: MH
-    pdfType: dictionary
-    required: false
-    introduced: '1.5'
-    refTypes:
-    - RenditionMH
-  - goName:
-    pdfKey: BE
-    pdfType: dictionary
-    required: false
-    introduced: '1.5'
-    refTypes:
-    - RenditionBE
-  - goName:
-    pdfKey: C
-    pdfType: dictionary
-    required: false
-    introduced: '1.5'
-    refTypes:
-    - MediaClipSection
-    - MediaClipData
-  - goName:
-    pdfKey: P
-    pdfType: dictionary
-    required: fn:IsRequired(fn:Not(fn:IsPresent(C)))
-    introduced: '1.5'
-    refTypes:
-    - MediaPlayParameters
-  - goName:
-    pdfKey: SP
-    pdfType: dictionary
-    required: false
-    introduced: '1.5'
-    refTypes:
-    - MediaScreenParameters
-- name: RenditionSelector
-  purpose: selector rendition choosing among alternatives
-  goType:
-  pdfType: Rendition
-  pdfRepr: dict
-  introduced: '1.5'
-  specTable: Table 277
-  fields:
-  - goName:
-    pdfKey: Type
-    pdfType: name
-    required: false
-    introduced: '1.5'
-    possibleValues:
-    - Rendition
-    notes: Table 277 and Table 283
-  - goName:
-    pdfKey: S
-    pdfType: name
-    required: true
-    introduced: '1.5'
-    possibleValues:
-    - SR
-  - goName:
-    pdfKey: N
-    pdfType: text-string
-    required: false
-    introduced: '1.5'
-    notes: https://github.com/pdf-association/pdf-issues/issues/214
-  - goName:
-    pdfKey: MH
-    pdfType: dictionary
-    required: false
-    introduced: '1.5'
-    refTypes:
-    - RenditionMH
-  - goName:
-    pdfKey: BE
-    pdfType: dictionary
-    required: false
-    introduced: '1.5'
-    refTypes:
-    - RenditionBE
-  - goName:
-    pdfKey: R
-    pdfType: array
-    required: true
-    introduced: '1.5'
-    refTypes:
-    - type: Rendition
-      collection: array
 - name: RichMediaActivation
   purpose: activation conditions for rich media
   goType:

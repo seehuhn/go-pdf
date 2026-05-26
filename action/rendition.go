@@ -18,6 +18,7 @@ package action
 
 import (
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/media"
 	"seehuhn.de/go/pdf/optional"
 )
 
@@ -25,8 +26,8 @@ import (
 
 // Rendition represents a rendition action that controls multimedia playback.
 type Rendition struct {
-	// R is the rendition object.
-	R pdf.Object
+	// R (optional) is the rendition to play.  It is required when OP is 0 or 4.
+	R media.Rendition
 
 	// AN is the screen annotation for playback.
 	AN pdf.Reference
@@ -68,7 +69,11 @@ func (a *Rendition) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	if a.R != nil {
-		dict["R"] = a.R
+		r, err := rm.Embed(a.R)
+		if err != nil {
+			return nil, err
+		}
+		dict["R"] = r
 	}
 
 	if a.AN != 0 {
@@ -78,6 +83,12 @@ func (a *Rendition) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if op, ok := a.OP.Get(); ok {
 		if op > 4 {
 			return nil, pdf.Error("Rendition action OP must be 0-4")
+		}
+		if a.AN == 0 {
+			return nil, pdf.Error("Rendition action requires AN when OP is present")
+		}
+		if (op == 0 || op == 4) && a.R == nil {
+			return nil, pdf.Error("Rendition action requires R when OP is 0 or 4")
 		}
 		dict["OP"] = pdf.Integer(op)
 	} else if a.JS == nil {
@@ -100,6 +111,11 @@ func (a *Rendition) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 func decodeRendition(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Rendition, error) {
 	an, _ := dict["AN"].(pdf.Reference)
 
+	r, err := pdf.ExtractorGetOptional(x, path, dict["R"], media.ExtractRendition)
+	if err != nil {
+		return nil, err
+	}
+
 	var op optional.UInt
 	if dict["OP"] != nil {
 		if opVal, err := x.GetInteger(path, dict["OP"]); err == nil && opVal >= 0 && opVal <= 4 {
@@ -107,9 +123,22 @@ func decodeRendition(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Re
 		}
 		// else: invalid OP value, treat as absent
 	}
-	// if OP is not set (absent or invalid) and JS is also absent, default to 0
+	// An OP value requires AN, and OP 0 and 4 additionally require R.  Drop any
+	// OP that cannot be honoured, so the decoded action stays encodable.
+	if v, ok := op.Get(); ok && (an == 0 || ((v == 0 || v == 4) && r == nil)) {
+		op = optional.UInt{}
+	}
+	// OP is required when JS is absent, and OP needs AN.  Without AN the action
+	// can only be carried by JS; if JS is missing too, it cannot be salvaged.
 	if _, ok := op.Get(); !ok && dict["JS"] == nil {
-		op.Set(0)
+		switch {
+		case an == 0:
+			return nil, pdf.Error("rendition action without AN, OP or JS")
+		case r != nil:
+			op.Set(0)
+		default:
+			op.Set(1)
+		}
 	}
 
 	next, err := pdf.ExtractorGet(x, path, dict["Next"], DecodeActionList)
@@ -118,7 +147,7 @@ func decodeRendition(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Re
 	}
 
 	return &Rendition{
-		R:    dict["R"],
+		R:    r,
 		AN:   an,
 		OP:   op,
 		JS:   dict["JS"],

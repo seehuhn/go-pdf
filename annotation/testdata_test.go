@@ -26,6 +26,7 @@ import (
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/action"
+	"seehuhn.de/go/pdf/action/triggers"
 	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -1294,7 +1295,7 @@ var testCases = map[pdf.Name][]testCase{
 					Color:    color.DeviceGray(0),
 				},
 				Title:  "Action Trigger",
-				Action: pdf.NewReference(1200, 0), // Action dictionary
+				Action: &action.URI{URI: "https://example.com/play"},
 			},
 		},
 		{
@@ -1304,7 +1305,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect: pdf.Rectangle{LLx: 300, LLy: 300, URx: 600, URy: 500},
 				},
 				Title: "Advanced Media Control",
-				AA:    pdf.NewReference(1300, 0), // Additional-actions dictionary
+				AA:    &triggers.Annotation{Enter: &action.URI{URI: "https://example.com/enter"}},
 			},
 		},
 		{
@@ -1317,8 +1318,8 @@ var testCases = map[pdf.Name][]testCase{
 				},
 				Title:  "Complete Media Player",
 				MK:     pdf.NewReference(1400, 0), // Appearance characteristics
-				Action: pdf.NewReference(1500, 0), // Action dictionary
-				AA:     pdf.NewReference(1600, 0), // Additional-actions dictionary
+				Action: &action.URI{URI: "https://example.com/media"},
+				AA:     &triggers.Annotation{Exit: &action.URI{URI: "https://example.com/exit"}},
 			},
 		},
 		{

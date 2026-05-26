@@ -16,30 +16,44 @@
 
 package annotation
 
-import "seehuhn.de/go/pdf"
+import (
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/action"
+	"seehuhn.de/go/pdf/action/triggers"
+)
 
 // PDF 2.0 sections: 12.5.2 12.5.6.18
 
 // Screen specifies a region of a page upon which media clips may be played. It
-// also serves as an object from which actions can be triggered.
+// also serves as an object from which actions can be triggered. It is
+// typically the target of a rendition action.
 type Screen struct {
 	Common
 
 	// Title (optional) is the title of the screen annotation.
+	//
+	// This corresponds to the /T entry in the PDF annotation dictionary.
 	Title string
 
-	// MK (optional) is an appearance characteristics dictionary. The I entry
-	// of this dictionary provides the icon used in generating the appearance
-	// referred to by the screen annotation's AP entry.
+	// MK (optional) is a reference to an appearance characteristics
+	// dictionary. The I entry of this dictionary provides the icon used in
+	// generating the appearance referred to by the screen annotation's AP
+	// entry.
+	//
+	// This corresponds to the /MK entry in the PDF annotation dictionary.
 	MK pdf.Reference
 
 	// Action (optional; PDF 1.1) is an action that is performed when the
 	// annotation is activated.
-	Action pdf.Object
+	//
+	// This corresponds to the /A entry in the PDF annotation dictionary.
+	Action pdf.Action
 
 	// AA (optional; PDF 1.2) is an additional-actions dictionary defining
 	// the screen annotation's behaviour in response to various trigger events.
-	AA pdf.Object
+	//
+	// This corresponds to the /AA entry in the PDF annotation dictionary.
+	AA *triggers.Annotation
 }
 
 var _ Annotation = (*Screen)(nil)
@@ -51,7 +65,6 @@ func (s *Screen) AnnotationType() pdf.Name {
 }
 
 func decodeScreen(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Screen, error) {
-	r := x.R
 	screen := &Screen{}
 
 	// Extract common annotation fields
@@ -61,7 +74,9 @@ func decodeScreen(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Scree
 
 	// Extract screen-specific fields
 	// T (optional)
-	if t, err := pdf.GetTextString(r, dict["T"]); err == nil && t != "" {
+	if t, err := pdf.Optional(pdf.GetTextString(x.R, dict["T"])); err != nil {
+		return nil, err
+	} else {
 		screen.Title = string(t)
 	}
 
@@ -71,12 +86,20 @@ func decodeScreen(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Scree
 	}
 
 	// A (optional)
-	if a := dict["A"]; a != nil {
-		screen.Action = a
+	if dict["A"] != nil {
+		act, err := pdf.ExtractorGetOptional(x, path, dict["A"], action.Decode)
+		if err != nil {
+			return nil, err
+		}
+		screen.Action = act
 	}
 
 	// AA (optional)
-	if aa := dict["AA"]; aa != nil {
+	if dict["AA"] != nil {
+		aa, err := pdf.ExtractorGet(x, path, dict["AA"], triggers.DecodeAnnotation)
+		if err != nil {
+			return nil, err
+		}
 		screen.AA = aa
 	}
 
@@ -110,12 +133,25 @@ func (s *Screen) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// A (optional)
 	if s.Action != nil {
-		dict["A"] = s.Action
+		if err := pdf.CheckVersion(rm.Out, "screen annotation A entry", pdf.V1_1); err != nil {
+			return nil, err
+		}
+		encoded, err := s.Action.Encode(rm)
+		if err != nil {
+			return nil, err
+		}
+		dict["A"] = encoded
 	}
 
 	// AA (optional)
 	if s.AA != nil {
-		dict["AA"] = s.AA
+		aa, err := s.AA.Encode(rm)
+		if err != nil {
+			return nil, err
+		}
+		if aa != nil {
+			dict["AA"] = aa
+		}
 	}
 
 	return dict, nil
