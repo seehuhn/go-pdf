@@ -20,6 +20,7 @@ import (
 	"errors"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/annotation/colorenc"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/measure"
 )
@@ -180,7 +181,7 @@ func decodeLine(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Line, e
 	}
 
 	// IC (optional; PDF 1.4)
-	if ic, err := pdf.Optional(extractColor(x.R, dict["IC"])); err != nil {
+	if ic, err := pdf.Optional(colorenc.Extract(x.R, dict["IC"])); err != nil {
 		return nil, err
 	} else {
 		line.FillColor = ic
@@ -297,7 +298,7 @@ func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out, "line annotation IC entry", pdf.V1_4); err != nil {
 			return nil, err
 		}
-		if icArray, err := encodeColor(l.FillColor); err != nil {
+		if icArray, err := colorenc.Encode(l.FillColor); err != nil {
 			return nil, err
 		} else if icArray != nil {
 			dict["IC"] = icArray

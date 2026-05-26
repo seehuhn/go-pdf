@@ -498,10 +498,11 @@ func (s *scanner) ScanToken() (pdf.Native, error) {
 		if class[firstByte] == regular {
 			for {
 				b, err := s.Peek()
-				if err == io.EOF {
+				if err != nil {
+					// end of available input: the token bytes are already
+					// read, so finalize it.  Any sticky error (EOF or
+					// malformed filter) resurfaces on the next Scan.
 					break
-				} else if err != nil {
-					return nil, err
 				}
 				if class[b] != regular {
 					break

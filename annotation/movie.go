@@ -42,14 +42,12 @@ type Movie struct {
 	// characteristics.
 	Movie *movie.Movie
 
-	// Activation controls whether and how the movie shall be played
-	// when the annotation is activated.
+	// Activation controls whether and how the movie shall be played when the
+	// annotation is activated.
 	//
-	// nil means the movie shall not be played on activation
-	// (encoded as A=false on the wire).
-	// [movie.DefaultActivation] (compared by identity) means play with
-	// the PDF specification defaults (encoded as A=true or omitted).
-	// Any other value supplies an explicit activation dictionary.
+	// The value nil means to not play the movie on activation.
+	// [movie.DefaultActivation] means play with the default parameters. Any
+	// other value supplies an explicit activation dictionary.
 	Activation *movie.Activation
 }
 
@@ -71,7 +69,9 @@ func decodeMovie(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Movie,
 	}
 
 	// T (optional)
-	if t, err := pdf.GetTextString(r, dict["T"]); err == nil && t != "" {
+	if t, err := pdf.Optional(pdf.GetTextString(r, dict["T"])); err != nil {
+		return nil, err
+	} else if t != "" {
 		annot.Title = string(t)
 	}
 

@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/action"
 	"seehuhn.de/go/pdf/action/triggers"
+	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -1283,7 +1284,11 @@ var testCases = map[pdf.Name][]testCase{
 					Name: "screen-001",
 				},
 				Title: "Interactive Media",
-				MK:    pdf.NewReference(1100, 0), // Appearance characteristics dictionary
+				MK: &appearance.Characteristics{
+					BorderColor:     color.DeviceRGB{0, 0, 1},
+					BackgroundColor: color.DeviceGray(0.5),
+					Rotation:        90,
+				},
 			},
 		},
 		{
@@ -1316,8 +1321,20 @@ var testCases = map[pdf.Name][]testCase{
 					Contents: "Full-featured media player",
 					Color:    color.DeviceRGB{0.9, 0.9, 0.9},
 				},
-				Title:  "Complete Media Player",
-				MK:     pdf.NewReference(1400, 0), // Appearance characteristics
+				Title: "Complete Media Player",
+				MK: &appearance.Characteristics{
+					BorderColor:     color.DeviceCMYK{0, 0, 0, 1},
+					Caption:         "Play",
+					RolloverCaption: "Hover",
+					DownCaption:     "Pressed",
+					TextPosition:    appearance.TextPositionCaptionBelowIcon,
+					IconFit: &appearance.IconFit{
+						ScaleWhen:     appearance.IconScaleWhenBigger,
+						Scaling:       appearance.IconScalingProportional,
+						LeftoverSpace: &[2]float64{0.5, 0.5},
+						FitToBounds:   true,
+					},
+				},
 				Action: &action.URI{URI: "https://example.com/media"},
 				AA:     &triggers.Annotation{Exit: &action.URI{URI: "https://example.com/exit"}},
 			},
@@ -1360,8 +1377,13 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 250, URy: 80},
 					Contents: "Button with custom appearance",
 				},
-				Highlight: "O",                       // Outline highlighting
-				MK:        pdf.NewReference(1700, 0), // Appearance characteristics dictionary
+				Highlight: "O", // Outline highlighting
+				MK: &appearance.Characteristics{
+					BorderColor:     color.DeviceGray(0),
+					BackgroundColor: color.DeviceRGB{1, 1, 0},
+					Caption:         "OK",
+					SingleUse:       true,
+				},
 			},
 		},
 		{
@@ -1409,10 +1431,18 @@ var testCases = map[pdf.Name][]testCase{
 					Contents: "Complete widget annotation",
 					Color:    color.DeviceRGB{0.8, 0.9, 1.0},
 				},
-				Highlight: "P",                       // Push highlighting
-				MK:        pdf.NewReference(2200, 0), // Appearance characteristics
-				A:         pdf.NewReference(2300, 0), // Action dictionary
-				AA:        pdf.NewReference(2400, 0), // Additional-actions dictionary
+				Highlight: "P", // Push highlighting
+				MK: &appearance.Characteristics{
+					Rotation:     180,
+					BorderColor:  color.DeviceRGB{0.25, 0.5, 0.75},
+					TextPosition: appearance.TextPositionIconOnly,
+					IconFit: &appearance.IconFit{
+						ScaleWhen: appearance.IconScaleNever,
+						SingleUse: true,
+					},
+				},
+				A:  pdf.NewReference(2300, 0), // Action dictionary
+				AA: pdf.NewReference(2400, 0), // Additional-actions dictionary
 				BorderStyle: &BorderStyle{
 					Width:     1.5,
 					Style:     "D",

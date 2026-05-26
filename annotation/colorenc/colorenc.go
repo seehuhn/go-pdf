@@ -14,7 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package annotation
+// Package colorenc converts between the device-colour arrays used in annotation
+// dictionaries and the [color.Color] representation.
+//
+// Several annotation entries encode a colour as an array of 0, 1, 3, or 4
+// numbers, where the number of components selects the colour space (none for
+// transparent, DeviceGray, DeviceRGB, or DeviceCMYK respectively).
+package colorenc
 
 import (
 	"fmt"
@@ -23,7 +29,12 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
-func extractColor(r pdf.Getter, obj pdf.Object) (color.Color, error) {
+// Extract converts a device-colour array into a [color.Color].
+//
+// The number of array elements selects the colour space: 1 for DeviceGray,
+// 3 for DeviceRGB, and 4 for DeviceCMYK. A missing object or an empty array
+// yields a nil colour.
+func Extract(r pdf.Getter, obj pdf.Object) (color.Color, error) {
 	c, _ := pdf.GetArray(r, obj)
 	if c == nil {
 		return nil, nil
@@ -46,11 +57,15 @@ func extractColor(r pdf.Getter, obj pdf.Object) (color.Color, error) {
 	case 4:
 		return color.DeviceCMYK{colors[0], colors[1], colors[2], colors[3]}, nil
 	default:
-		return nil, fmt.Errorf("invalid color array length: %d", len(colors))
+		return nil, pdf.Errorf("invalid color array length: %d", len(colors))
 	}
 }
 
-func encodeColor(c color.Color) (pdf.Array, error) {
+// Encode converts a [color.Color] into a device-colour array.
+//
+// The colour must use the DeviceGray, DeviceRGB, or DeviceCMYK colour space.
+// A nil colour yields a nil array.
+func Encode(c color.Color) (pdf.Array, error) {
 	if c == nil {
 		return nil, nil
 	}
@@ -78,9 +93,10 @@ func encodeColor(c color.Color) (pdf.Array, error) {
 	return colorArray, nil
 }
 
-// extractColorRGB extracts a DeviceRGB color from a PDF array.
-// Only accepts 3-element arrays (RGB colors) or nil/empty arrays.
-func extractColorRGB(r pdf.Getter, obj pdf.Object) (color.Color, error) {
+// ExtractRGB converts a 3-element device-colour array into a DeviceRGB
+// [color.Color]. A missing object or an empty array yields a nil colour;
+// arrays of any other length are rejected.
+func ExtractRGB(r pdf.Getter, obj pdf.Object) (color.Color, error) {
 	c, _ := pdf.GetArray(r, obj)
 	if c == nil {
 		return nil, nil
@@ -91,7 +107,7 @@ func extractColorRGB(r pdf.Getter, obj pdf.Object) (color.Color, error) {
 	}
 
 	if len(c) != 3 {
-		return nil, fmt.Errorf("color array must have 3 components for RGB, got %d", len(c))
+		return nil, pdf.Errorf("color array must have 3 components for RGB, got %d", len(c))
 	}
 
 	colors := make([]float64, 3)
@@ -104,9 +120,10 @@ func extractColorRGB(r pdf.Getter, obj pdf.Object) (color.Color, error) {
 	return color.DeviceRGB{colors[0], colors[1], colors[2]}, nil
 }
 
-// encodeColorRGB encodes a DeviceRGB color to a PDF array.
-// Only accepts DeviceRGB colors or nil.
-func encodeColorRGB(c color.Color) (pdf.Array, error) {
+// EncodeRGB converts a DeviceRGB [color.Color] into a 3-element colour array.
+// A nil colour yields a nil array; colours in any other colour space are
+// rejected.
+func EncodeRGB(c color.Color) (pdf.Array, error) {
 	if c == nil {
 		return nil, nil
 	}

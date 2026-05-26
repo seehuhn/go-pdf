@@ -954,6 +954,27 @@ func TestScannerReadError(t *testing.T) {
 		}
 	})
 
+	// A regular token whose final byte abuts a sticky malformed error (no
+	// trailing delimiter) must still be emitted: its bytes are fully read,
+	// so dropping it would lose data that RawBytes preserves, breaking the
+	// read-write-read round trip.
+	t.Run("malformed abutting trailing token", func(t *testing.T) {
+		s := NewScanner(func() (io.ReadCloser, error) {
+			return &errReader{
+				data: []byte("q\nQ"),
+				err:  pdf.Error("corrupt filter body"),
+			}, nil
+		})
+
+		ops, err := collectStream(s)
+		if err != nil {
+			t.Errorf("expected nil error (permissive), got %v", err)
+		}
+		if len(ops) != 2 {
+			t.Errorf("expected 2 operators, got %d: %v", len(ops), ops)
+		}
+	})
+
 	// A real read error mid-stream must reach the caller.
 	t.Run("real mid-stream error", func(t *testing.T) {
 		diskErr := errors.New("disk read failed")

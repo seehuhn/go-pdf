@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/annotation/colorenc"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -92,7 +93,7 @@ func decodeRedact(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Redac
 	}
 
 	// IC (optional) - RGB color components
-	if ic, err := pdf.Optional(extractColorRGB(r, dict["IC"])); err != nil {
+	if ic, err := pdf.Optional(colorenc.ExtractRGB(r, dict["IC"])); err != nil {
 		return nil, err
 	} else {
 		redact.FillColor = ic
@@ -164,7 +165,7 @@ func (r *Redact) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// IC (optional) - RGB color components
 	if r.FillColor != nil {
-		if icArray, err := encodeColorRGB(r.FillColor); err != nil {
+		if icArray, err := colorenc.EncodeRGB(r.FillColor); err != nil {
 			return nil, err
 		} else if icArray != nil {
 			dict["IC"] = icArray

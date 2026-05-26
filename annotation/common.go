@@ -379,7 +379,7 @@ func decodeCommon(x *pdf.Extractor, path *pdf.CycleCheck, common *Common, dict p
 	}
 
 	// AP (optional)
-	if ap, err := pdf.ExtractorGetOptional(x, path, dict["AP"], appearance.Extract); err != nil {
+	if ap, err := pdf.ExtractorGetOptional(x, path, dict["AP"], appearance.ExtractDict); err != nil {
 		return err
 	} else {
 		common.Appearance = ap

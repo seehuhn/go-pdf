@@ -5287,7 +5287,7 @@ types:
       activation dictionary.
   goPackage: annotation
   goRepr: struct
-  specSection: 12.5.2
+  specSection: 12.5.2 12.5.6.17
   fileDependent: true
   writeMethod: (*Movie).Encode
   embeds:
@@ -5833,7 +5833,7 @@ types:
     introduced: '1.5'
     refTypes:
     - AppearanceCharacteristics
-    goType: pdf.Reference
+    goType: '*appearance.Characteristics'
     purpose: 'MK (optional) is an appearance characteristics dictionary. The I entry
 
       of this dictionary provides the icon used in generating the appearance
@@ -6531,7 +6531,7 @@ types:
     introduced: '1.2'
     refTypes:
     - AppearanceCharacteristics
-    goType: pdf.Reference
+    goType: '*appearance.Characteristics'
     purpose: 'MK (optional) is an appearance characteristics dictionary that is
 
       used in constructing a dynamic appearance stream specifying the
@@ -6716,78 +6716,87 @@ types:
   specSection: 12.5.5
 - name: AppearanceCharacteristics
   purpose: visual characteristics of a widget annotation
-  goType:
+  goType: annotation/appearance.Characteristics
   pdfRepr: dict
+  introduced: '1.2'
   fields:
-  - goName:
+  - goName: Rotation
     pdfKey: R
     pdfType: integer
     required: false
     default: '0'
     introduced: '1.2'
+    goType: int
     notes: Table 192
-  - goName:
+  - goName: BorderColor
     pdfKey: BC
     pdfType: array
     required: false
     introduced: '1.2'
-  - goName:
+    goType: color.Color
+  - goName: BackgroundColor
     pdfKey: BG
     pdfType: array
     required: false
     introduced: '1.2'
-  - goName:
+    goType: color.Color
+  - goName: Caption
     pdfKey: CA
     pdfType: text-string
     required: false
     introduced: '1.2'
-  - goName:
+    goType: string
+  - goName: RolloverCaption
     pdfKey: RC
     pdfType: text-string
     required: false
     introduced: '1.2'
-  - goName:
+    goType: string
+  - goName: DownCaption
     pdfKey: AC
     pdfType: text-string
     required: false
     introduced: '1.2'
-  - goName:
+    goType: string
+  - goName: Icon
     pdfKey: I
     pdfType: stream
     required: false
     introduced: '1.2'
+    goType: '*form.Form'
     refTypes:
     - XObjectFormType1
-    - XObjectImage
-  - goName:
+  - goName: RolloverIcon
     pdfKey: RI
     pdfType: stream
     required: false
     introduced: '1.2'
+    goType: '*form.Form'
     refTypes:
     - XObjectFormType1
-    - XObjectImage
-  - goName:
+  - goName: DownIcon
     pdfKey: IX
     pdfType: stream
     required: false
     introduced: '1.2'
+    goType: '*form.Form'
     refTypes:
     - XObjectFormType1
-    - XObjectImage
-  - goName:
+  - goName: IconFit
     pdfKey: IF
     pdfType: dictionary
     required: false
     introduced: '1.3'
+    goType: '*IconFit'
     refTypes:
     - IconFit
-  - goName:
+  - goName: TextPosition
     pdfKey: TP
     pdfType: integer
     required: false
     default: '0'
     introduced: '1.2'
+    goType: TextPosition
     possibleValues:
     - '0'
     - '1'
@@ -6796,6 +6805,12 @@ types:
     - '4'
     - '5'
     - '6'
+  readFunc: Extract
+  fileDependent: false
+  writeMethod: (*Characteristics).Embed
+  goPackage: appearance
+  goRepr: struct
+  specSection: 12.5.6.19
 - name: AppearancePrinterMark
   purpose: appearance of a printer mark annotation
   goType:
@@ -8015,42 +8030,53 @@ types:
   writeMethod: (*CoordinateSystem).Embed
 - name: IconFit
   purpose: how to fit an icon within an annotation rectangle
-  goType:
+  goType: annotation/appearance.IconFit
   pdfRepr: dict
+  introduced: '1.3'
   fields:
-  - goName:
+  - goName: ScaleWhen
     pdfKey: SW
     pdfType: name
     required: false
     default: A
     introduced: '1.3'
+    goType: IconScaleWhen
     possibleValues:
     - A
     - B
     - S
     - N
     notes: Table 250
-  - goName:
+  - goName: Scaling
     pdfKey: S
     pdfType: name
     required: false
     default: P
     introduced: '1.3'
+    goType: IconScaling
     possibleValues:
     - A
     - P
-  - goName:
+  - goName: LeftoverSpace
     pdfKey: A
     pdfType: array
     required: false
     default: '[0.5 0.5]'
     introduced: '1.3'
-  - goName:
+    goType: '*[2]float64'
+  - goName: FitToBounds
     pdfKey: FB
     pdfType: boolean
     required: false
     default: false
     introduced: '1.5'
+    goType: bool
+  readFunc: Extract
+  fileDependent: false
+  writeMethod: (*IconFit).Embed
+  goPackage: appearance
+  goRepr: struct
+  specSection: 12.7.8.3.2
 - name: InteractiveForm
   purpose: document-wide interactive form properties
   goType:

@@ -24,47 +24,51 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// PDF 2.0 sections: 13.4
+
 // Activation describes how a movie shall be played when its annotation
-// is activated.
+// is activated.  This represents a PDF movie activation dictionary.
 //
 // Deprecated in PDF 2.0.
 type Activation struct {
-	// Start (optional) is the starting time within the movie.
+	// Start is the starting time within the movie.
 	// The zero value indicates that playback starts at the beginning of the
 	// movie.
 	Start Timestamp
 
-	// Duration (optional) is the length of the segment to be played.
+	// Duration is the length of the segment to be played.
 	// The zero value indicates that playback continues to the end of the
 	// movie.
 	Duration Timestamp
 
-	// Rate is the initial speed at which to play the movie.  Negative
-	// values play the movie backward with respect to Start and
-	// Duration.  The PDF default is 1.0; a zero value is also treated
-	// as 1.0 on both read and write.
+	// Rate is the initial speed at which to play the movie, 1.0 means normal
+	// speed, 2.0 means twice normal speed, and so on.  Negative values play
+	// the movie backward with respect to Start and Duration.
+	//
+	// On write, 0 can be used as a shorthand for 1.
 	Rate float64
 
-	// Volume is the initial sound volume in the range -1.0 to 1.0.
-	// Negative values mute the sound.  The PDF default is 1.0.
+	// Volume is the initial sound volume in the range -1.0 to 1.0. The
+	// absolute value of the volume is the fraction of the original sound
+	// volume, and the sign determines whether to play the sound at all
+	// (positive) or mute it (negative).
 	Volume float64
 
-	// ShowControls (optional) specifies whether to display a movie
-	// controller bar while playing.
+	// ShowControls specifies whether to display a movie controller bar while
+	// playing.
 	ShowControls bool
 
 	// Mode is the play mode for the movie.  An empty Mode is treated
 	// as [ModeOnce] on encode.
 	Mode Mode
 
-	// Synchronous (optional), when true, requires the movie player to
+	// Synchronous, when true, requires the movie player to
 	// retain control until the movie is completed or dismissed.
 	Synchronous bool
 
-	// FWScale (optional) specifies the magnification factor at which
-	// the movie shall be played in a floating window.  The zero value
-	// indicates that the movie shall be played in the annotation
-	// rectangle (no floating window).
+	// FWScale specifies the magnification factor at which the movie shall be
+	// played in a floating window.  The zero value indicates that the movie
+	// shall be played in the annotation rectangle (no floating window).
 	FWScale Scale
 
 	// FWPosition (optional) specifies the relative position of the

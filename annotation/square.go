@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/annotation/colorenc"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -126,7 +127,7 @@ func decodeSquare(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Squar
 	}
 
 	// IC (optional)
-	if ic, err := pdf.Optional(extractColor(r, dict["IC"])); err != nil {
+	if ic, err := pdf.Optional(colorenc.Extract(r, dict["IC"])); err != nil {
 		return nil, err
 	} else {
 		square.FillColor = ic
@@ -206,7 +207,7 @@ func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out, "square annotation IC entry", pdf.V1_4); err != nil {
 			return nil, err
 		}
-		if icArray, err := encodeColor(s.FillColor); err != nil {
+		if icArray, err := colorenc.Encode(s.FillColor); err != nil {
 			return nil, err
 		} else if icArray != nil {
 			dict["IC"] = icArray

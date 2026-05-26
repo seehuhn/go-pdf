@@ -60,10 +60,10 @@ type Dict struct {
 
 var _ pdf.Embedder = (*Dict)(nil)
 
-// Extract reads an annotation appearance dictionary from the PDF object obj.
-// If obj is absent or resolves to null, Extract returns (nil, nil); callers
+// ExtractDict reads an annotation appearance dictionary from the PDF object obj.
+// If obj is absent or resolves to null, ExtractDict returns (nil, nil); callers
 // can treat the missing entry as "no appearance".
-func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Dict, error) {
+func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Dict, error) {
 	dict, err := x.GetDict(path, obj)
 	if err != nil {
 		return nil, err

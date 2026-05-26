@@ -163,7 +163,7 @@ func roundTripTest(t *testing.T, version pdf.Version, data *Dict) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := pdf.ExtractorGet(x, nil, ref, Extract)
+	decoded, err := pdf.ExtractorGet(x, nil, ref, ExtractDict)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -223,7 +223,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		objGo, _ := pdf.ExtractorGet(x, nil, objPDF, Extract)
+		objGo, _ := pdf.ExtractorGet(x, nil, objPDF, ExtractDict)
 		if objGo == nil {
 			t.Skip("no appearance dictionary")
 		}

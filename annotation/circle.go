@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/annotation/colorenc"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -125,7 +126,7 @@ func decodeCircle(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Circl
 	}
 
 	// IC (optional)
-	if ic, err := pdf.Optional(extractColor(r, dict["IC"])); err != nil {
+	if ic, err := pdf.Optional(colorenc.Extract(r, dict["IC"])); err != nil {
 		return nil, err
 	} else {
 		circle.FillColor = ic
@@ -201,7 +202,7 @@ func (c *Circle) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out, "circle annotation IC entry", pdf.V1_4); err != nil {
 			return nil, err
 		}
-		if icArray, err := encodeColor(c.FillColor); err != nil {
+		if icArray, err := colorenc.Encode(c.FillColor); err != nil {
 			return nil, err
 		} else if icArray != nil {
 			dict["IC"] = icArray

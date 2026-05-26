@@ -20,6 +20,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/action"
 	"seehuhn.de/go/pdf/action/triggers"
+	"seehuhn.de/go/pdf/annotation/appearance"
 )
 
 // PDF 2.0 sections: 12.5.2 12.5.6.18
@@ -35,13 +36,12 @@ type Screen struct {
 	// This corresponds to the /T entry in the PDF annotation dictionary.
 	Title string
 
-	// MK (optional) is a reference to an appearance characteristics
-	// dictionary. The I entry of this dictionary provides the icon used in
-	// generating the appearance referred to by the screen annotation's AP
-	// entry.
+	// MK (optional) is an appearance characteristics dictionary. Its Icon
+	// provides the icon used in generating the appearance referred to by the
+	// screen annotation's AP entry.
 	//
 	// This corresponds to the /MK entry in the PDF annotation dictionary.
-	MK pdf.Reference
+	MK *appearance.Characteristics
 
 	// Action (optional; PDF 1.1) is an action that is performed when the
 	// annotation is activated.
@@ -81,7 +81,9 @@ func decodeScreen(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Scree
 	}
 
 	// MK (optional)
-	if mk, ok := dict["MK"].(pdf.Reference); ok {
+	if mk, err := pdf.ExtractorGetOptional(x, path, dict["MK"], appearance.ExtractCharacteristics); err != nil {
+		return nil, err
+	} else {
 		screen.MK = mk
 	}
 
@@ -127,8 +129,12 @@ func (s *Screen) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// MK (optional)
-	if s.MK != 0 {
-		dict["MK"] = s.MK
+	if s.MK != nil {
+		mk, err := rm.Embed(s.MK)
+		if err != nil {
+			return nil, err
+		}
+		dict["MK"] = mk
 	}
 
 	// A (optional)

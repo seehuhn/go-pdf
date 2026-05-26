@@ -21,6 +21,7 @@ import (
 
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/annotation/colorenc"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/measure"
 )
@@ -154,7 +155,7 @@ func decodePolyline(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Pol
 	}
 
 	// IC (optional)
-	if ic, err := pdf.Optional(extractColor(x.R, dict["IC"])); err != nil {
+	if ic, err := pdf.Optional(colorenc.Extract(x.R, dict["IC"])); err != nil {
 		return nil, err
 	} else {
 		polyline.FillColor = ic
@@ -252,7 +253,7 @@ func (p *PolyLine) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// IC (optional)
 	if p.FillColor != nil {
-		if icArray, err := encodeColor(p.FillColor); err != nil {
+		if icArray, err := colorenc.Encode(p.FillColor); err != nil {
 			return nil, err
 		} else if icArray != nil {
 			dict["IC"] = icArray

@@ -20,6 +20,7 @@ import (
 	"errors"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/annotation/appearance"
 )
 
 // PDF 2.0 sections: 12.5.2 12.5.6.19
@@ -45,7 +46,7 @@ type Widget struct {
 	// MK (optional) is an appearance characteristics dictionary that is
 	// used in constructing a dynamic appearance stream specifying the
 	// annotation's visual presentation on the page.
-	MK pdf.Reference
+	MK *appearance.Characteristics
 
 	// A (optional; PDF 1.1) is an action that is performed when the
 	// annotation is activated.
@@ -96,7 +97,9 @@ func decodeWidget(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Widge
 	}
 
 	// MK (optional)
-	if mk, ok := dict["MK"].(pdf.Reference); ok {
+	if mk, err := pdf.ExtractorGetOptional(x, path, dict["MK"], appearance.ExtractCharacteristics); err != nil {
+		return nil, err
+	} else {
 		widget.MK = mk
 	}
 
@@ -154,8 +157,12 @@ func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// MK (optional)
-	if w.MK != 0 {
-		dict["MK"] = w.MK
+	if w.MK != nil {
+		mk, err := rm.Embed(w.MK)
+		if err != nil {
+			return nil, err
+		}
+		dict["MK"] = mk
 	}
 
 	// A (optional)
