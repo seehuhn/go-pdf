@@ -67,7 +67,7 @@ func extractCriteria(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*M
 	if err != nil || dict == nil {
 		return nil, err
 	}
-	return pdf.Optional(pdf.ExtractorGet(x, path, dict["C"], ExtractMediaCriteria))
+	return pdf.ExtractorGetOptional(x, path, dict["C"], ExtractMediaCriteria)
 }
 
 func (c *RenditionCommon) fillDict(e *pdf.EmbedHelper, dict pdf.Dict) error {
@@ -140,13 +140,13 @@ func extractMediaRendition(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict
 	}
 
 	var err error
-	if r.Clip, err = pdf.Optional(pdf.ExtractorGet(x, path, dict["C"], ExtractMediaClip)); err != nil {
+	if r.Clip, err = pdf.ExtractorGetOptional(x, path, dict["C"], ExtractMediaClip); err != nil {
 		return nil, err
 	}
-	if r.Play, err = pdf.Optional(pdf.ExtractorGet(x, path, dict["P"], ExtractMediaPlayParameters)); err != nil {
+	if r.Play, err = pdf.ExtractorGetOptional(x, path, dict["P"], ExtractMediaPlayParameters); err != nil {
 		return nil, err
 	}
-	if r.Screen, err = pdf.Optional(pdf.ExtractorGet(x, path, dict["SP"], ExtractMediaScreenParameters)); err != nil {
+	if r.Screen, err = pdf.ExtractorGetOptional(x, path, dict["SP"], ExtractMediaScreenParameters); err != nil {
 		return nil, err
 	}
 
@@ -226,7 +226,7 @@ func extractSelectorRendition(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.D
 		return nil, err
 	}
 	for _, elem := range arr {
-		child, err := pdf.Optional(pdf.ExtractorGet(x, path, elem, ExtractRendition))
+		child, err := pdf.ExtractorGetOptional(x, path, elem, ExtractRendition)
 		if err != nil {
 			return nil, err
 		}

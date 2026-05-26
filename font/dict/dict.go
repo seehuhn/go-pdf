@@ -31,6 +31,9 @@ import (
 //   - [seehuhn.de/go/pdf/font/dict.Type3]
 //   - [seehuhn.de/go/pdf/font/dict.CIDFontType0]
 //   - [seehuhn.de/go/pdf/font/dict.CIDFontType2]
+//
+// To extract a font dictionary from a PDF file, use
+// [seehuhn.de/go/pdf/graphics/extract.Dict].
 type Dict interface {
 	pdf.Embedder
 

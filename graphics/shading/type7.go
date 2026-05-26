@@ -520,7 +520,7 @@ func extractType7(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 
 	// Read optional Function
 	if fnObj, ok := d["Function"]; ok {
-		if fn, err := pdf.Optional(pdf.ExtractorGet(x, path, fnObj, function.Extract)); err != nil {
+		if fn, err := pdf.ExtractorGetOptional(x, path, fnObj, function.Extract); err != nil {
 			return nil, err
 		} else if fn != nil {
 			s.F = fn

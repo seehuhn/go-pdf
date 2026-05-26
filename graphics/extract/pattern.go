@@ -108,7 +108,7 @@ func extractType2(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, isDirec
 	}
 
 	// extract optional ExtGState
-	if extGState, err := pdf.Optional(ExtGState(x, path, dict["ExtGState"], false)); err != nil {
+	if extGState, err := pdf.ExtractorGetOptional(x, path, dict["ExtGState"], ExtGState); err != nil {
 		return nil, err
 	} else {
 		pat.ExtGState = extGState

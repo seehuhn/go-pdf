@@ -75,7 +75,7 @@ func SoftMaskDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool
 			Err: errors.New("soft mask: missing G entry"),
 		}
 	}
-	g, err := Form(x, path, gObj, false)
+	g, err := pdf.ExtractorGet(x, path, gObj, Form)
 	if err != nil {
 		return nil, err
 	}

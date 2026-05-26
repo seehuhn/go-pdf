@@ -828,7 +828,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 	}
 
 	// PieceInfo (optional)
-	if piece, err := pdf.Optional(pieceinfo.Extract(x, path, dict["PieceInfo"], false)); err != nil {
+	if piece, err := pdf.ExtractorGetOptional(x, path, dict["PieceInfo"], pieceinfo.Extract); err != nil {
 		return nil, err
 	} else {
 		p.PieceInfo = piece

@@ -42,6 +42,9 @@ import (
 // PDF 2.0 sections: 8.9.5
 
 // Dict represents a PDF image XObject dictionary.
+//
+// To extract an image from a PDF file, use
+// [seehuhn.de/go/pdf/graphics/extract.Image].
 type Dict struct {
 	// Width is the width of the image in pixels.
 	Width int

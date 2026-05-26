@@ -140,7 +140,7 @@ func extractMediaClipData(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict,
 		}
 	}
 
-	if p, err := pdf.Optional(pdf.ExtractorGet(x, path, dict["P"], ExtractMediaPermissions)); err != nil {
+	if p, err := pdf.ExtractorGetOptional(x, path, dict["P"], ExtractMediaPermissions); err != nil {
 		return nil, err
 	} else {
 		c.Permissions = p
@@ -150,7 +150,7 @@ func extractMediaClipData(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict,
 		return nil, err
 	}
 
-	if pl, err := pdf.Optional(pdf.ExtractorGet(x, path, dict["PL"], ExtractMediaPlayers)); err != nil {
+	if pl, err := pdf.ExtractorGetOptional(x, path, dict["PL"], ExtractMediaPlayers); err != nil {
 		return nil, err
 	} else {
 		c.Players = pl
@@ -309,10 +309,10 @@ func extractSectionOffsets(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Objec
 	if err != nil || dict == nil {
 		return nil, nil, err
 	}
-	if begin, err = pdf.Optional(pdf.ExtractorGet(x, path, dict["B"], ExtractMediaOffset)); err != nil {
+	if begin, err = pdf.ExtractorGetOptional(x, path, dict["B"], ExtractMediaOffset); err != nil {
 		return nil, nil, err
 	}
-	if end, err = pdf.Optional(pdf.ExtractorGet(x, path, dict["E"], ExtractMediaOffset)); err != nil {
+	if end, err = pdf.ExtractorGetOptional(x, path, dict["E"], ExtractMediaOffset); err != nil {
 		return nil, nil, err
 	}
 	return begin, end, nil

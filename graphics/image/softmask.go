@@ -36,6 +36,9 @@ import (
 // SoftMask represents a soft-mask image used for graduated transparency.
 // Soft-mask images are subsidiary image XObjects that provide alpha values for
 // smooth transparency effects.
+//
+// To extract a soft-mask image from a PDF file, use
+// [seehuhn.de/go/pdf/graphics/extract.SoftMaskImage].
 type SoftMask struct {
 	// Width is the width of the soft mask in pixels.
 	// If Matte is present, this must match the parent image width.

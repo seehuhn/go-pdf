@@ -69,7 +69,7 @@ func extractPlayerInfoArray(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Obje
 	}
 	var out []*MediaPlayerInfo
 	for _, elem := range arr {
-		info, err := pdf.Optional(pdf.ExtractorGet(x, path, elem, ExtractMediaPlayerInfo))
+		info, err := pdf.ExtractorGetOptional(x, path, elem, ExtractMediaPlayerInfo)
 		if err != nil {
 			return nil, err
 		}

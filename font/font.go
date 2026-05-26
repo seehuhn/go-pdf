@@ -32,6 +32,9 @@ import (
 // Instances returned by the extractor cache may be shared across
 // goroutines. Implementations used for reading must be safe for
 // concurrent use.
+//
+// To extract a font from a PDF file, use
+// [seehuhn.de/go/pdf/graphics/extract.Font].
 type Instance interface {
 	// PostScriptName returns a human-readable name for the font.
 	// For most font types, this is the PostScript name of the font.

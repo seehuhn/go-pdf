@@ -168,7 +168,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			res.StrokeAdjustment = bool(val)
 			set |= graphics.StateStrokeAdjustment
 		case "BM":
-			bm, err := BlendMode(x, path, v)
+			bm, err := extractBlendMode(x, path, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -179,7 +179,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 				set |= graphics.StateBlendMode
 			}
 		case "SMask":
-			sMask, err := pdf.Optional(SoftMaskDict(x, path, v, false))
+			sMask, err := pdf.ExtractorGetOptional(x, path, v, SoftMaskDict)
 			if err != nil {
 				return nil, err
 			}
@@ -291,6 +291,8 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			yCoord, err := x.GetNumber(path, a[1])
 			if pdf.IsMalformed(err) {
 				break
+			} else if err != nil {
+				return nil, err
 			}
 			res.HalftoneOriginX = xCoord
 			res.HalftoneOriginY = yCoord
@@ -396,9 +398,9 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 	return res, nil
 }
 
-// BlendMode extracts a blend mode from a PDF object.
+// extractBlendMode extracts a blend mode from a PDF object.
 // Handles both name and array forms (array deprecated in PDF 2.0).
-func BlendMode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (graphics.BlendMode, error) {
+func extractBlendMode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (graphics.BlendMode, error) {
 	obj, err := x.Resolve(path, obj)
 	if err != nil {
 		return nil, err

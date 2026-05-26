@@ -143,7 +143,7 @@ func ExtractMediaPlayParameters(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.
 
 	p := &MediaPlayParameters{SingleUse: isDirect}
 
-	if pl, err := pdf.Optional(pdf.ExtractorGet(x, path, dict["PL"], ExtractMediaPlayers)); err != nil {
+	if pl, err := pdf.ExtractorGetOptional(x, path, dict["PL"], ExtractMediaPlayers); err != nil {
 		return nil, err
 	} else {
 		p.Players = pl
@@ -190,7 +190,7 @@ func extractPlayEntries(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) 
 			p.Fit = fitFromPDF(f)
 		}
 	}
-	if d, err := pdf.Optional(pdf.ExtractorGet(x, path, dict["D"], ExtractMediaDuration)); err != nil {
+	if d, err := pdf.ExtractorGetOptional(x, path, dict["D"], ExtractMediaDuration); err != nil {
 		return nil, err
 	} else {
 		p.Duration = d

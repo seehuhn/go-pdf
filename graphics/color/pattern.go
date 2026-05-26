@@ -26,6 +26,9 @@ import (
 //
 // Use the functions in [seehuhn.de/go/pdf/graphics/pattern] to create pattern
 // objects.
+//
+// To extract a pattern from a PDF file, use
+// [seehuhn.de/go/pdf/graphics/extract.Pattern].
 type Pattern interface {
 	// PatternType returns 1 for tiling patterns and 2 for shading patterns.
 	PatternType() int

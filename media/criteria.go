@@ -102,12 +102,12 @@ func ExtractMediaCriteria(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object
 		}
 	}
 
-	if d, err := pdf.Optional(pdf.ExtractorGet(x, path, dict["D"], ExtractMinBitDepth)); err != nil {
+	if d, err := pdf.ExtractorGetOptional(x, path, dict["D"], ExtractMinBitDepth); err != nil {
 		return nil, err
 	} else {
 		c.MinBitDepth = d
 	}
-	if z, err := pdf.Optional(pdf.ExtractorGet(x, path, dict["Z"], ExtractMinScreenSize)); err != nil {
+	if z, err := pdf.ExtractorGetOptional(x, path, dict["Z"], ExtractMinScreenSize); err != nil {
 		return nil, err
 	} else {
 		c.MinScreenSize = z
@@ -117,7 +117,7 @@ func ExtractMediaCriteria(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object
 		return nil, err
 	} else {
 		for _, elem := range v {
-			id, err := pdf.Optional(pdf.ExtractorGet(x, path, elem, ExtractSoftwareIdentifier))
+			id, err := pdf.ExtractorGetOptional(x, path, elem, ExtractSoftwareIdentifier)
 			if err != nil {
 				return nil, err
 			}

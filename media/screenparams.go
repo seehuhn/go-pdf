@@ -164,7 +164,7 @@ func extractScreenEntries(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object
 	} else if MonitorSpecifier(m).isValid() {
 		s.Monitor = MonitorSpecifier(m)
 	}
-	if f, err := pdf.Optional(pdf.ExtractorGet(x, path, dict["F"], ExtractFloatingWindowParameters)); err != nil {
+	if f, err := pdf.ExtractorGetOptional(x, path, dict["F"], ExtractFloatingWindowParameters); err != nil {
 		return nil, err
 	} else {
 		s.FloatingWindow = f

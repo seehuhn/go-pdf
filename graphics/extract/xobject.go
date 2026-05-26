@@ -26,7 +26,7 @@ import (
 )
 
 // XObject extracts an XObject from a PDF file.
-func XObject(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (graphics.XObject, error) {
+func XObject(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (graphics.XObject, error) {
 	stm, err := x.GetStream(path, obj)
 	if err != nil {
 		return nil, err
@@ -48,12 +48,12 @@ func XObject(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (gr
 	switch subtype {
 	case "Image":
 		if isImageMask, _ := x.GetBoolean(path, stm.Dict["ImageMask"]); isImageMask {
-			return image.ExtractMask(x, path, obj, false)
+			return image.ExtractMask(x, path, obj, isDirect)
 		}
-		img, err := image.ExtractDict(x, path, stm, false)
+		img, err := image.ExtractDict(x, path, stm, isDirect)
 		return img, err
 	case "Form":
-		f, err := Form(x, path, stm, false)
+		f, err := Form(x, path, stm, isDirect)
 		return f, err
 	case "PS":
 		ps, err := xobject.ExtractPostScript(x, path, stm)

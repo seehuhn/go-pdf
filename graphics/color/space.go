@@ -33,6 +33,9 @@ import (
 //
 // This interface extends Go's standard [gocolor.Model] interface, allowing
 // PDF color spaces to be used with Go's image package.
+//
+// To extract a color space from a PDF file, use
+// [seehuhn.de/go/pdf/graphics/extract.ColorSpace].
 type Space interface {
 	// Family returns the family of the color space.
 	Family() pdf.Name

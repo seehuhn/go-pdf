@@ -76,7 +76,7 @@ func decodeMovie(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Movie,
 	}
 
 	// Movie (required)
-	if m, err := pdf.Optional(pdf.ExtractorGet(x, path, dict["Movie"], movie.Extract)); err != nil {
+	if m, err := pdf.ExtractorGetOptional(x, path, dict["Movie"], movie.Extract); err != nil {
 		return nil, err
 	} else {
 		annot.Movie = m
@@ -92,7 +92,7 @@ func decodeMovie(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Movie,
 			}
 			// false → leave Activation nil (do not play)
 		default:
-			if act, err := pdf.Optional(pdf.ExtractorGet(x, path, aObj, movie.ExtractActivation)); err != nil {
+			if act, err := pdf.ExtractorGetOptional(x, path, aObj, movie.ExtractActivation); err != nil {
 				return nil, err
 			} else if act != nil {
 				annot.Activation = act

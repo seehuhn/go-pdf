@@ -28,6 +28,9 @@ import (
 //
 // See [seehuhn.de/go/pdf/graphics/image] and [seehuhn.de/go/pdf/graphics/form]
 // for implementations.
+//
+// To extract an XObject from a PDF file, use
+// [seehuhn.de/go/pdf/graphics/extract.XObject].
 type XObject interface {
 	Subtype() pdf.Name
 
@@ -101,6 +104,9 @@ func IsImageMask(xobj XObject) bool {
 // Shadings can be drawn directly or used as the basis of a shading pattern.
 //
 // See [seehuhn.de/go/pdf/graphics/shading] for implementations.
+//
+// To extract a shading from a PDF file, use
+// [seehuhn.de/go/pdf/graphics/extract.Shading].
 type Shading interface {
 	ShadingType() int
 	Equal(other Shading) bool
@@ -116,6 +122,9 @@ type Shading interface {
 // computed color to a single-component luminosity value).
 //
 // See PDF 32000-1:2008, 11.6.5 "Specifying soft masks".
+//
+// To extract a soft mask from a PDF file, use
+// [seehuhn.de/go/pdf/graphics/extract.SoftMaskDict].
 type SoftClip interface {
 	pdf.Embedder
 	Equal(other SoftClip) bool

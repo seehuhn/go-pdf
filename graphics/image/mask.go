@@ -38,6 +38,11 @@ import (
 
 // PDF 2.0 sections: 8.9.5 8.9.6
 
+// Mask represents a stencil mask image XObject, used to mask out areas when
+// painting an image.
+//
+// To extract an image mask from a PDF file, use
+// [seehuhn.de/go/pdf/graphics/extract.ImageMask].
 type Mask struct {
 	// Width is the width of the image mask in pixels.
 	Width int

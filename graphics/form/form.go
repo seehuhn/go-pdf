@@ -38,6 +38,9 @@ import (
 // PDF 2.0 sections: 8.10
 
 // Form represents a PDF form XObject that can contain reusable graphics content.
+//
+// To extract a form XObject from a PDF file, use
+// [seehuhn.de/go/pdf/graphics/extract.Form].
 type Form struct {
 	// Content is the content stream that draws the form.
 	Content content.Stream

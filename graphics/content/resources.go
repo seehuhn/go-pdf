@@ -39,6 +39,9 @@ import (
 // The scope of resource names is local to a particular content stream.
 // Different content streams may use different names for the same resource,
 // or the same name for different resources.
+//
+// To extract a resource dictionary from a PDF file, use
+// [seehuhn.de/go/pdf/graphics/extract.Resources].
 type Resources struct {
 	ExtGState  map[pdf.Name]*extgstate.ExtGState
 	ColorSpace map[pdf.Name]color.Space

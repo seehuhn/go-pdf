@@ -37,6 +37,9 @@ import (
 // parameters in the [graphics.State] struct.  Parameters not present in the
 // ExtGState struct, for example colors, cannot be controlled using an extended
 // graphics state.
+//
+// To extract an extended graphics state from a PDF file, use
+// [seehuhn.de/go/pdf/graphics/extract.ExtGState].
 type ExtGState struct {
 	// Set indicates which parameters in this ExtGState are active.
 	Set graphics.Bits

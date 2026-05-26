@@ -98,7 +98,7 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bo
 	m := &Movie{SingleUse: isDirect}
 
 	// F (required)
-	if f, err := pdf.Optional(pdf.ExtractorGet(x, path, dict["F"], file.ExtractSpecification)); err != nil {
+	if f, err := pdf.ExtractorGetOptional(x, path, dict["F"], file.ExtractSpecification); err != nil {
 		return nil, err
 	} else {
 		m.File = f
@@ -134,7 +134,9 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bo
 				m.Poster = PosterFromMovieFile
 			}
 		case *pdf.Stream:
-			if img, _ := pdf.Optional(pdf.ExtractorGet(x, path, posterObj, image.ExtractDict)); img != nil {
+			if img, err := pdf.ExtractorGetOptional(x, path, posterObj, image.ExtractDict); err != nil {
+				return nil, err
+			} else if img != nil {
 				m.Poster = img
 			}
 		}
