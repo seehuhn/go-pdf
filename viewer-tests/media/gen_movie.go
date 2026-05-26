@@ -16,16 +16,20 @@
 
 //go:build ignore
 
-// gen_movie.go renders the test movie (751 frames at 25 fps, 320x240,
-// showing the playback timestamp as text on each frame) and encodes it
-// to H.264/MP4 via ffmpeg.  Run via `go generate` in this directory.
+// gen_movie.go renders the test movie (751 frames at 25 fps, 1280x720,
+// 16:9, showing the playback timestamp on each frame) together with an
+// audio track that emits a short tick at the start of every second (30 s
+// total), and muxes them to H.264 + AAC / MP4 via ffmpeg.  Run via
+// `go generate` in this directory.
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
+	"math"
 	"os"
 	"os/exec"
 
@@ -36,12 +40,20 @@ import (
 )
 
 const (
-	width      = 320
-	height     = 240
+	width      = 1280
+	height     = 720
 	fps        = 25
 	totalFrame = 751 // 0..750 inclusive, t = 0.00 .. 30.00 s
-	fontSize   = 64
+	fontSize   = 200
 	outputName = "movie.mp4"
+
+	audioRate = 44100
+	// One second longer than the video (30.04 s); -shortest then trims the
+	// muxed output to the video length, so the final 30.00 frame is kept and
+	// there is a tick at every whole second through 30.
+	durationSec = 31
+	tickFreq    = 1000.0 // Hz
+	tickLen     = 0.04   // seconds
 )
 
 func main() {
@@ -57,6 +69,12 @@ func main() {
 }
 
 func run() error {
+	audioPath, cleanup, err := writeTickWAV()
+	if err != nil {
+		return fmt.Errorf("audio: %w", err)
+	}
+	defer cleanup()
+
 	face, err := makeFace()
 	if err != nil {
 		return fmt.Errorf("font: %w", err)
@@ -71,11 +89,16 @@ func run() error {
 		"-video_size", fmt.Sprintf("%dx%d", width, height),
 		"-framerate", fmt.Sprintf("%d", fps),
 		"-i", "-",
+		"-i", audioPath,
 		"-c:v", "libx264",
 		"-pix_fmt", "yuv420p",
 		"-preset", "medium",
 		"-crf", "23",
-		"-an",
+		"-c:a", "aac",
+		"-b:a", "96k",
+		"-map", "0:v:0",
+		"-map", "1:a:0",
+		"-shortest",
 		"-movflags", "+faststart",
 		outputName,
 	)
@@ -102,7 +125,7 @@ func run() error {
 	for i := range totalFrame {
 		draw.Draw(img, img.Bounds(), black, image.Point{}, draw.Src)
 
-		text := fmt.Sprintf("%.2f", float64(i)*0.04)
+		text := fmt.Sprintf("%.2f", float64(i)/fps)
 		advance := drawer.MeasureString(text)
 		drawer.Dot = fixed.Point26_6{
 			X: (fixed.I(width) - advance) / 2,
@@ -129,8 +152,90 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stderr, "wrote %s (%d bytes, %d frames)\n", outputName, fi.Size(), totalFrame)
+	fmt.Fprintf(os.Stderr, "wrote %s (%d bytes, %d frames @ %d fps = %.2f s)\n",
+		outputName, fi.Size(), totalFrame, fps, float64(totalFrame)/fps)
 	return nil
+}
+
+// writeTickWAV synthesises a mono 16-bit PCM WAV: a short decaying 1 kHz
+// tone at the start of each second.  It returns the temp-file path and a
+// cleanup function.
+func writeTickWAV() (string, func(), error) {
+	f, err := os.CreateTemp("", "tick-*.wav")
+	if err != nil {
+		return "", func() {}, err
+	}
+	path := f.Name()
+	cleanup := func() { _ = os.Remove(path) }
+
+	total := audioRate * durationSec
+	samples := make([]int16, total)
+	tickSamples := int(tickLen * audioRate)
+	for sec := range durationSec {
+		start := sec * audioRate
+		for i := 0; i < tickSamples && start+i < total; i++ {
+			t := float64(i) / audioRate
+			env := math.Exp(-t * 40) // fast decay
+			v := 0.5 * env * math.Sin(2*math.Pi*tickFreq*t)
+			samples[start+i] = int16(v * 32767)
+		}
+	}
+
+	if err := writeWAVHeader(f, len(samples)); err != nil {
+		f.Close()
+		cleanup()
+		return "", func() {}, err
+	}
+	if err := binary.Write(f, binary.LittleEndian, samples); err != nil {
+		f.Close()
+		cleanup()
+		return "", func() {}, err
+	}
+	if err := f.Close(); err != nil {
+		cleanup()
+		return "", func() {}, err
+	}
+	return path, cleanup, nil
+}
+
+// writeWAVHeader writes a canonical 44-byte RIFF/WAVE header for mono
+// 16-bit PCM at audioRate, for sampleCount samples.
+func writeWAVHeader(f *os.File, sampleCount int) error {
+	const (
+		channels      = 1
+		bitsPerSample = 16
+	)
+	byteRate := audioRate * channels * bitsPerSample / 8
+	blockAlign := channels * bitsPerSample / 8
+	dataSize := sampleCount * bitsPerSample / 8
+
+	w := func(v any) error { return binary.Write(f, binary.LittleEndian, v) }
+	if _, err := f.WriteString("RIFF"); err != nil {
+		return err
+	}
+	if err := w(uint32(36 + dataSize)); err != nil {
+		return err
+	}
+	if _, err := f.WriteString("WAVEfmt "); err != nil {
+		return err
+	}
+	for _, v := range []any{
+		uint32(16),            // fmt chunk size
+		uint16(1),             // PCM
+		uint16(channels),      //
+		uint32(audioRate),     //
+		uint32(byteRate),      //
+		uint16(blockAlign),    //
+		uint16(bitsPerSample), //
+	} {
+		if err := w(v); err != nil {
+			return err
+		}
+	}
+	if _, err := f.WriteString("data"); err != nil {
+		return err
+	}
+	return w(uint32(dataSize))
 }
 
 func makeFace() (font.Face, error) {

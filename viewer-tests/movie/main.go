@@ -85,7 +85,7 @@ func createDocument(filename string) error {
 	annot := &annotation.Movie{
 		Common: annotation.Common{
 			Rect:     rect,
-			Contents: "Timestamp counter (1501 frames @ 25 fps).",
+			Contents: "Timestamp counter (751 frames @ 25 fps).",
 			Border:   annotation.PDFDefaultBorder,
 			Flags:    annotation.FlagPrint,
 		},
@@ -115,7 +115,7 @@ func newTestMovie() *movie.Movie {
 	spec := &file.Specification{
 		FileName:        "movie.mp4",
 		FileNameUnicode: "movie.mp4",
-		Description:     "Timestamp counter movie (1501 frames at 25 fps, 320x240, H.264/MP4)",
+		Description:     "Timestamp counter movie (751 frames at 25 fps, 320x240, H.264/MP4)",
 		EmbeddedFiles:   map[string]*file.Stream{"F": stream, "UF": stream},
 	}
 	return &movie.Movie{
