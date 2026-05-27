@@ -28,26 +28,12 @@ import (
 
 // PDF 2.0 sections: 12.5.6.19
 
-// TextPosition specifies where the caption of a button annotation is
-// positioned relative to its icon.
-type TextPosition int
-
-const (
-	TextPositionCaptionOnly        TextPosition = 0 // no icon; caption only
-	TextPositionIconOnly           TextPosition = 1 // no caption; icon only
-	TextPositionCaptionBelowIcon   TextPosition = 2 // caption below the icon
-	TextPositionCaptionAboveIcon   TextPosition = 3 // caption above the icon
-	TextPositionCaptionRightOfIcon TextPosition = 4 // caption to the right of the icon
-	TextPositionCaptionLeftOfIcon  TextPosition = 5 // caption to the left of the icon
-	TextPositionCaptionOverIcon    TextPosition = 6 // caption overlaid on the icon
-)
-
 // Characteristics is an appearance characteristics dictionary, holding
 // information for constructing the dynamic appearance of a widget or screen
 // annotation. It corresponds to the /MK entry of such annotations.
 type Characteristics struct {
-	// Rotation (optional) is the number of degrees by which the annotation is
-	// rotated counterclockwise relative to the page. It is a multiple of 90.
+	// Rotation is the number of degrees by which the annotation is rotated
+	// counterclockwise relative to the page. It is a multiple of 90.
 	Rotation int
 
 	// BorderColor (optional) is the colour of the annotation's border. It uses
@@ -58,17 +44,16 @@ type Characteristics struct {
 	// It uses the DeviceGray, DeviceRGB, or DeviceCMYK colour space.
 	BackgroundColor color.Color
 
-	// Caption (optional) is the annotation's normal caption, displayed when it
-	// is not interacting with the user.
+	// Caption is the annotation's normal caption, displayed when it is not
+	// interacting with the user.
 	Caption string
 
-	// RolloverCaption (optional) is the caption displayed when the user rolls
-	// the cursor into the annotation's active area without pressing the mouse
-	// button.
+	// RolloverCaption is the caption displayed when the user rolls the cursor
+	// into the annotation's active area without pressing the mouse button.
 	RolloverCaption string
 
-	// DownCaption (optional) is the caption displayed when the mouse button is
-	// pressed within the annotation's active area.
+	// DownCaption is the caption displayed when the mouse button is pressed
+	// within the annotation's active area.
 	DownCaption string
 
 	// Icon (optional) is the annotation's normal icon, displayed when it is not
@@ -88,8 +73,8 @@ type Characteristics struct {
 	// within the annotation rectangle.
 	IconFit *IconFit
 
-	// TextPosition (optional) indicates where to position the caption relative
-	// to the icon. It is one of the TextPosition constants.
+	// TextPosition indicates where to position the caption relative to the
+	// icon. It is one of the TextPosition constants.
 	TextPosition TextPosition
 
 	// SingleUse determines if Embed returns a dictionary (true) or
@@ -265,3 +250,17 @@ func (c *Characteristics) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	return ref, nil
 }
+
+// TextPosition specifies where the caption of a button annotation is
+// positioned relative to its icon.
+type TextPosition int
+
+const (
+	TextPositionCaptionOnly        TextPosition = 0 // no icon; caption only
+	TextPositionIconOnly           TextPosition = 1 // no caption; icon only
+	TextPositionCaptionBelowIcon   TextPosition = 2 // caption below the icon
+	TextPositionCaptionAboveIcon   TextPosition = 3 // caption above the icon
+	TextPositionCaptionRightOfIcon TextPosition = 4 // caption to the right of the icon
+	TextPositionCaptionLeftOfIcon  TextPosition = 5 // caption to the left of the icon
+	TextPositionCaptionOverIcon    TextPosition = 6 // caption overlaid on the icon
+)

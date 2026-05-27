@@ -135,13 +135,16 @@ func createDocument(filename string) error {
 		if b.op == 0 || b.op == 4 {
 			actionRend = rend
 		}
-		btn := &annotation.Screen{
+		// the button face is drawn into the page content by drawButton; the
+		// annotation is just an invisible hotspot that fires the rendition
+		// action, so a borderless Link is the right type (a Screen would
+		// reserve a playback region it does not have).
+		btn := &annotation.Link{
 			Common: annotation.Common{
-				Rect:   r,
-				Border: annotation.PDFDefaultBorder,
-				Flags:  annotation.FlagPrint,
+				Rect:     r,
+				Contents: b.label,
+				Flags:    annotation.FlagPrint,
 			},
-			Title:  b.label,
 			Action: renditionAction(actionRend, screenRef, b.op),
 		}
 		page.Page.Annots = append(page.Page.Annots, pdfpage.AnnotInfo{
