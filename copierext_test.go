@@ -17,6 +17,7 @@
 package pdf_test
 
 import (
+	"errors"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -57,5 +58,51 @@ func TestCopyReference(t *testing.T) {
 	}
 	if obj != pdf.Integer(42) {
 		t.Fatalf("expected 42, got %v", obj)
+	}
+}
+
+// malformedGetter is a [pdf.Getter] whose every object is unreadable, as if
+// the source file were corrupt.  It models a reference to an object whose
+// body cannot be parsed.
+type malformedGetter struct {
+	meta *pdf.MetaInfo
+}
+
+func (g malformedGetter) GetMeta() *pdf.MetaInfo { return g.meta }
+
+func (g malformedGetter) Get(ref pdf.Reference, canObjStm bool) (pdf.Native, error) {
+	return nil, &pdf.MalformedFileError{Err: errors.New("unparsable object")}
+}
+
+// A reference to a malformed source object must copy as a reference to null
+// (PDF 2.0, 7.3.10), not abort the whole copy.  This mirrors a corrupt PDF
+// whose stream dict carries a stray indirect reference to an unparsable
+// object.
+func TestCopyReferenceMalformedBecomesNull(t *testing.T) {
+	dest, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	src := malformedGetter{meta: dest.GetMeta()}
+	copier := pdf.NewCopier(dest, src)
+
+	badRef := pdf.NewReference(1, 0)
+	in := pdf.Dict{"Junk": badRef, "Width": pdf.Integer(10)}
+	out, err := copier.CopyDict(in)
+	if err != nil {
+		t.Fatalf("copy failed: %v", err)
+	}
+
+	if out["Width"] != pdf.Integer(10) {
+		t.Errorf("Width = %v, want 10", out["Width"])
+	}
+
+	ref, ok := out["Junk"].(pdf.Reference)
+	if !ok {
+		t.Fatalf("Junk = %T, want Reference", out["Junk"])
+	}
+	val, err := dest.Get(ref, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val != nil {
+		t.Errorf("resolved value = %v, want null", val)
 	}
 }

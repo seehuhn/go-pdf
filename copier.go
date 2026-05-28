@@ -205,9 +205,11 @@ func (c *Copier) CopyReference(obj Reference) (Reference, error) {
 	c.trans[obj] = newRef
 
 	val, err := Resolve(c.r, obj)
-	if err != nil {
+	if IsReadError(err) {
 		return 0, err
 	}
+	// a reference to a malformed or undefined source object resolves to
+	// null (PDF 2.0, 7.3.10); leave val nil and copy null in its place
 	trans, err := c.Copy(val)
 	if err != nil {
 		return 0, err
