@@ -29,11 +29,16 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
+// clamp01 restricts a colour component to the valid range 0.0 to 1.0.
+func clamp01(v float64) float64 {
+	return min(1, max(0, v))
+}
+
 // Extract converts a device-colour array into a [color.Color].
 //
 // The number of array elements selects the colour space: 1 for DeviceGray,
 // 3 for DeviceRGB, and 4 for DeviceCMYK. A missing object or an empty array
-// yields a nil colour.
+// yields a nil colour. Component values are clamped to the range 0.0 to 1.0.
 func Extract(r pdf.Getter, obj pdf.Object) (color.Color, error) {
 	c, _ := pdf.GetArray(r, obj)
 	if c == nil {
@@ -43,7 +48,7 @@ func Extract(r pdf.Getter, obj pdf.Object) (color.Color, error) {
 	colors := make([]float64, len(c))
 	for i, colorVal := range c {
 		if num, err := pdf.GetNumber(r, colorVal); err == nil {
-			colors[i] = float64(num)
+			colors[i] = clamp01(float64(num))
 		}
 	}
 
@@ -63,7 +68,8 @@ func Extract(r pdf.Getter, obj pdf.Object) (color.Color, error) {
 
 // Encode converts a [color.Color] into a device-colour array.
 //
-// The colour must use the DeviceGray, DeviceRGB, or DeviceCMYK colour space.
+// The colour must use the DeviceGray, DeviceRGB, or DeviceCMYK colour space,
+// and all component values must lie in the range 0.0 to 1.0.
 // A nil colour yields a nil array.
 func Encode(c color.Color) (pdf.Array, error) {
 	if c == nil {
@@ -88,6 +94,9 @@ func Encode(c color.Color) (pdf.Array, error) {
 
 	colorArray := make(pdf.Array, len(x))
 	for i, v := range x {
+		if v < 0 || v > 1 {
+			return nil, fmt.Errorf("color component %g out of range", v)
+		}
 		colorArray[i] = pdf.Number(v)
 	}
 	return colorArray, nil
@@ -95,7 +104,8 @@ func Encode(c color.Color) (pdf.Array, error) {
 
 // ExtractRGB converts a 3-element device-colour array into a DeviceRGB
 // [color.Color]. A missing object or an empty array yields a nil colour;
-// arrays of any other length are rejected.
+// arrays of any other length are rejected. Component values are clamped to
+// the range 0.0 to 1.0.
 func ExtractRGB(r pdf.Getter, obj pdf.Object) (color.Color, error) {
 	c, _ := pdf.GetArray(r, obj)
 	if c == nil {
@@ -113,7 +123,7 @@ func ExtractRGB(r pdf.Getter, obj pdf.Object) (color.Color, error) {
 	colors := make([]float64, 3)
 	for i, colorVal := range c {
 		if num, err := pdf.GetNumber(r, colorVal); err == nil {
-			colors[i] = float64(num)
+			colors[i] = clamp01(float64(num))
 		}
 	}
 
@@ -122,7 +132,7 @@ func ExtractRGB(r pdf.Getter, obj pdf.Object) (color.Color, error) {
 
 // EncodeRGB converts a DeviceRGB [color.Color] into a 3-element colour array.
 // A nil colour yields a nil array; colours in any other colour space are
-// rejected.
+// rejected. All component values must lie in the range 0.0 to 1.0.
 func EncodeRGB(c color.Color) (pdf.Array, error) {
 	if c == nil {
 		return nil, nil
@@ -145,6 +155,9 @@ func EncodeRGB(c color.Color) (pdf.Array, error) {
 
 	colorArray := make(pdf.Array, 3)
 	for i, v := range x {
+		if v < 0 || v > 1 {
+			return nil, fmt.Errorf("color component %g out of range", v)
+		}
 		colorArray[i] = pdf.Number(v)
 	}
 	return colorArray, nil

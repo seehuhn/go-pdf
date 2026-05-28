@@ -44,7 +44,8 @@ import (
 //  - LE: line ending style for FreeText, Line, Polyline
 //  - LL: "leader lines" for Line
 //  - LLE: "leader line extension" for Line
-//  - MK: "appearance characteristics dictionary" for Screen, Widget
+//  - MK: "appearance characteristics dictionary" for Widget; for Screen its
+//    Icon is used as the appearance-generation input by addScreenAppearance
 //  - Sy: "symbol" for Caret
 
 // Style controls the visual appearance of fallback annotation streams.
@@ -139,6 +140,10 @@ func (s *Style) AddAppearance(a annotation.Annotation) error {
 		normal = s.addFileAttachmentAppearance(a)
 	case *annotation.Sound:
 		normal = s.addSoundAppearance(a)
+	case *annotation.Movie:
+		normal = s.addMovieAppearance(a)
+	case *annotation.Screen:
+		normal = s.addScreenAppearance(a)
 	default:
 		return fmt.Errorf("unsupported annotation type: %T", a)
 	}

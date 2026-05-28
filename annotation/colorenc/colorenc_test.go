@@ -50,6 +50,37 @@ func TestExtract(t *testing.T) {
 	}
 }
 
+func TestExtractClampsRange(t *testing.T) {
+	// out-of-range components are clamped to 0.0 to 1.0
+	got, err := Extract(mock.Getter, pdf.Array{pdf.Number(-0.5), pdf.Number(0.5), pdf.Number(2)})
+	if err != nil {
+		t.Fatalf("Extract failed: %v", err)
+	}
+	if diff := cmp.Diff(color.Color(color.DeviceRGB{0, 0.5, 1}), got); diff != "" {
+		t.Errorf("Extract mismatch (-want +got):\n%s", diff)
+	}
+
+	rgb, err := ExtractRGB(mock.Getter, pdf.Array{pdf.Number(5), pdf.Number(-1), pdf.Number(0.25)})
+	if err != nil {
+		t.Fatalf("ExtractRGB failed: %v", err)
+	}
+	if diff := cmp.Diff(color.Color(color.DeviceRGB{1, 0, 0.25}), rgb); diff != "" {
+		t.Errorf("ExtractRGB mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestEncodeRange(t *testing.T) {
+	if _, err := Encode(color.DeviceRGB{0, 0, 2}); err == nil {
+		t.Error("expected error for component above 1.0")
+	}
+	if _, err := Encode(color.DeviceGray(-0.5)); err == nil {
+		t.Error("expected error for component below 0.0")
+	}
+	if _, err := EncodeRGB(color.DeviceRGB{0, 1.5, 0}); err == nil {
+		t.Error("expected error for RGB component above 1.0")
+	}
+}
+
 func TestExtractInvalidLength(t *testing.T) {
 	// a 2-element array is not a valid device colour
 	_, err := Extract(mock.Getter, pdf.Array{pdf.Number(0), pdf.Number(1)})

@@ -31,7 +31,7 @@ import (
 type Screen struct {
 	Common
 
-	// Title (optional) is the title of the screen annotation.
+	// Title is the title of the screen annotation.
 	//
 	// This corresponds to the /T entry in the PDF annotation dictionary.
 	Title string
@@ -88,20 +88,16 @@ func decodeScreen(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Scree
 	}
 
 	// A (optional)
-	if dict["A"] != nil {
-		act, err := pdf.ExtractorGetOptional(x, path, dict["A"], action.Decode)
-		if err != nil {
-			return nil, err
-		}
+	if act, err := pdf.ExtractorGetOptional(x, path, dict["A"], action.Decode); err != nil {
+		return nil, err
+	} else {
 		screen.Action = act
 	}
 
 	// AA (optional)
-	if dict["AA"] != nil {
-		aa, err := pdf.ExtractorGet(x, path, dict["AA"], triggers.DecodeAnnotation)
-		if err != nil {
-			return nil, err
-		}
+	if aa, err := pdf.ExtractorGetOptional(x, path, dict["AA"], triggers.DecodeAnnotation); err != nil {
+		return nil, err
+	} else {
 		screen.AA = aa
 	}
 
@@ -139,9 +135,6 @@ func (s *Screen) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// A (optional)
 	if s.Action != nil {
-		if err := pdf.CheckVersion(rm.Out, "screen annotation A entry", pdf.V1_1); err != nil {
-			return nil, err
-		}
 		encoded, err := s.Action.Encode(rm)
 		if err != nil {
 			return nil, err

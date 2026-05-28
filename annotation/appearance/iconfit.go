@@ -24,26 +24,6 @@ import (
 
 // PDF 2.0 sections: 12.7.8.3.2
 
-// IconScaleWhen specifies the circumstances under which a button icon is
-// scaled to fit the annotation rectangle.
-type IconScaleWhen pdf.Name
-
-const (
-	IconScaleAlways      IconScaleWhen = "A" // always scale
-	IconScaleWhenBigger  IconScaleWhen = "B" // scale only when bigger than the rectangle
-	IconScaleWhenSmaller IconScaleWhen = "S" // scale only when smaller than the rectangle
-	IconScaleNever       IconScaleWhen = "N" // never scale
-)
-
-// IconScaling specifies the type of scaling used to fit a button icon into
-// the annotation rectangle.
-type IconScaling pdf.Name
-
-const (
-	IconScalingAnamorphic   IconScaling = "A" // fill the rectangle, ignoring aspect ratio
-	IconScalingProportional IconScaling = "P" // preserve the icon's aspect ratio
-)
-
 // IconFit describes how a button annotation's icon is positioned and scaled
 // within its annotation rectangle.
 type IconFit struct {
@@ -157,3 +137,23 @@ func (f *IconFit) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	return ref, nil
 }
+
+// IconScaleWhen specifies the circumstances under which a button icon is
+// scaled to fit the annotation rectangle.
+type IconScaleWhen pdf.Name
+
+const (
+	IconScaleAlways      IconScaleWhen = "A" // always scale
+	IconScaleWhenBigger  IconScaleWhen = "B" // scale only when bigger than the rectangle
+	IconScaleWhenSmaller IconScaleWhen = "S" // scale only when smaller than the rectangle
+	IconScaleNever       IconScaleWhen = "N" // never scale
+)
+
+// IconScaling specifies the type of scaling used to fit a button icon into
+// the annotation rectangle.
+type IconScaling pdf.Name
+
+const (
+	IconScalingAnamorphic   IconScaling = "A" // fill the rectangle, ignoring aspect ratio
+	IconScalingProportional IconScaling = "P" // preserve the icon's aspect ratio
+)

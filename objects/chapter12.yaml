@@ -5826,7 +5826,7 @@ types:
     required: false
     introduced: '1.5'
     goType: string
-    purpose: Title (optional) is the title of the screen annotation.
+    purpose: Title is the title of the screen annotation.
   - goName: MK
     pdfKey: MK
     pdfType: dictionary
@@ -6806,7 +6806,7 @@ types:
     - '4'
     - '5'
     - '6'
-  readFunc: Extract
+  readFunc: appearance.ExtractCharacteristics
   fileDependent: false
   writeMethod: (*Characteristics).Embed
   goPackage: appearance
@@ -8072,7 +8072,7 @@ types:
     default: false
     introduced: '1.5'
     goType: bool
-  readFunc: Extract
+  readFunc: appearance.ExtractIconFit
   fileDependent: false
   writeMethod: (*IconFit).Embed
   goPackage: appearance
