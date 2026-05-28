@@ -325,23 +325,14 @@ func (tu *ToUnicodeFile) Lookup(code []byte) (string, bool) {
 		}
 	}
 
-rangesLoop:
 	for _, r := range tu.Ranges {
 		if len(r.Values) == 0 {
 			continue
 		}
-		if len(r.First) != len(code) || len(r.Last) != len(code) {
+		index, ok := rangeIndex(r.First, r.Last, code)
+		if !ok {
 			continue
 		}
-
-		var index int
-		for i, b := range code {
-			if b < r.First[i] || b > r.Last[i] {
-				continue rangesLoop
-			}
-			index = index*int(r.Last[i]-r.First[i]+1) + int(b-r.First[i])
-		}
-
 		if index < len(r.Values) {
 			return r.Values[index], true
 		}
