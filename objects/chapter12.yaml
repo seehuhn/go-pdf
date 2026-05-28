@@ -4743,7 +4743,7 @@ types:
     required: false
     default: '0'
     introduced: '1.4'
-    goType: TextAlign
+    goType: pdf.TextAlign
     possibleValues:
     - '0'
     - '1'
@@ -5721,11 +5721,12 @@ types:
     notes: https://github.com/pdf-association/pdf-issues/issues/318
     goType: string
     purpose: DA (required if OverlayText present) - appearance string for formatting overlay text
-  - goName:
+  - goName: Align
     pdfKey: Q
     pdfType: integer
     required: false
     introduced: '1.7'
+    goType: pdf.TextAlign
     possibleValues:
     - '0'
     - '1'
@@ -8079,69 +8080,85 @@ types:
   specSection: 12.7.8.3.2
 - name: InteractiveForm
   purpose: document-wide interactive form properties
-  goType:
+  goType: acroform.InteractiveForm
+  goPackage: acroform
+  goRepr: struct
   pdfRepr: dict
+  introduced: '1.2'
+  specSection: 12.7.3
+  specTable: Table 224
+  fileDependent: true
+  writeMethod: (*InteractiveForm).Encode
+  readFunc: acroform.DecodeInteractiveForm
   fields:
-  - goName:
+  - goName: Fields
     pdfKey: Fields
     pdfType: array
     required: true
     introduced: '1.2'
+    goType: '[]pdf.Reference'
     refTypes:
     - type: Field
       collection: array
     notes: Table 224
-  - goName:
+  - goName: NeedAppearances
     pdfKey: NeedAppearances
     pdfType: boolean
     required: false
     default: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: bool
+  - goName: SigFlags
     pdfKey: SigFlags
     pdfType: bitmask
     required: false
     default: '0'
     introduced: '1.3'
+    goType: SignatureFlags
     notes: Table 225
-  - goName:
+  - goName: CalculationOrder
     pdfKey: CO
     pdfType: array
     required: false
     introduced: '1.3'
+    goType: '[]pdf.Reference'
     refTypes:
     - type: Field
       collection: array
-  - goName:
+  - goName: DefaultResources
     pdfKey: DR
     pdfType: dictionary
     required: false
     introduced: '1.2'
+    goType: '*content.Resources'
     refTypes:
     - Resource
     notes: At a minimum, this dictionary shall contain a Font entry specifying the resource name and font dictionary of the default font for displaying text.
-  - goName:
+  - goName: DefaultAppearance
     pdfKey: DA
     pdfType: byte-string
     required: false
     introduced: '1.2'
+    goType: string
     notes: https://github.com/pdf-association/pdf-issues/issues/318
-  - goName:
+  - goName: Align
     pdfKey: Q
     pdfType: integer
     required: false
     introduced: '1.2'
+    goType: pdf.TextAlign
     possibleValues:
     - '0'
     - '1'
     - '2'
-  - goName:
+  - goName: XFA
     pdfKey: XFA
     pdfType: fn:SinceVersion(1.6,array);stream
     required: false
     introduced: '1.5'
     deprecated: '2.0'
+    goType: pdf.Object
     refTypes:
     - Stream
 - name: Mac

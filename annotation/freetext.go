@@ -44,11 +44,11 @@ type FreeText struct {
 	DefaultStyle string
 
 	// Align specifies the text alignment used for the annotation's text.
-	// The zero value is [TextAlignLeft].
-	// The other allowed values are [TextAlignCenter] and [TextAlignRight].
+	// The zero value is [pdf.TextAlignLeft].
+	// The other allowed values are [pdf.TextAlignCenter] and [pdf.TextAlignRight].
 	//
 	// This corresponds to the /Q entry in the PDF annotation dictionary.
-	Align TextAlign
+	Align pdf.TextAlign
 
 	// Margin (optional) describes the numerical differences between the
 	// Common.Rect entry and an inner rectangle where the text should be
@@ -122,7 +122,7 @@ func decodeFreeText(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Fre
 	if q, err := pdf.Optional(x.GetInteger(path, dict["Q"])); err != nil {
 		return nil, err
 	} else if q >= 0 && q <= 2 {
-		f.Align = TextAlign(q)
+		f.Align = pdf.TextAlign(q)
 	}
 
 	if ds, err := pdf.Optional(pdf.GetTextString(x.R, dict["DS"])); err != nil {
@@ -226,7 +226,10 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	// Add free text-specific fields
 	dict["DA"] = pdf.String(f.DefaultAppearance)
 
-	if f.Align != TextAlignLeft {
+	if f.Align != pdf.TextAlignLeft {
+		if f.Align < pdf.TextAlignLeft || f.Align > pdf.TextAlignRight {
+			return nil, fmt.Errorf("invalid text alignment %d", f.Align)
+		}
 		if err := pdf.CheckVersion(rm.Out, "free text annotation Q entry", pdf.V1_4); err != nil {
 			return nil, err
 		}
@@ -323,16 +326,6 @@ func (f *FreeText) BorderWidth() float64 {
 	}
 	return 0 // Go default = no border
 }
-
-// TextAlign represents the text justification options for free text
-// annotations.
-type TextAlign int
-
-const (
-	TextAlignLeft   TextAlign = 0
-	TextAlignCenter TextAlign = 1
-	TextAlignRight  TextAlign = 2
-)
 
 // These constants represent the allowed values for the Markup.Intent
 // field in free text annotations.

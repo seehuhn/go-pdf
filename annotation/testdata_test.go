@@ -195,7 +195,7 @@ var testCases = map[pdf.Name][]testCase{
 					Contents: "Free text content",
 				},
 				DefaultAppearance: "/Helvetica 12 Tf 0 g",
-				Align:             TextAlignLeft, // Left justified
+				Align:             pdf.TextAlignLeft, // Left justified
 			},
 		},
 		{
@@ -211,7 +211,7 @@ var testCases = map[pdf.Name][]testCase{
 					Intent:  "FreeTextCallout",
 				},
 				DefaultAppearance: "/Arial 10 Tf 0 0 1 rg",
-				Align:             TextAlignCenter,                                                  // Centered
+				Align:             pdf.TextAlignCenter,                                              // Centered
 				CalloutLine:       []vec.Vec2{{X: 100, Y: 150}, {X: 125, Y: 175}, {X: 150, Y: 200}}, // 3-point callout line
 				LineEndingStyle:   "OpenArrow",
 			},
@@ -229,7 +229,7 @@ var testCases = map[pdf.Name][]testCase{
 					CreationDate: time.Date(2023, 6, 1, 14, 0, 0, 0, time.UTC),
 				},
 				DefaultAppearance: "/Times-Roman 14 Tf 0.2 0.2 0.8 rg",
-				Align:             TextAlignRight, // Right justified
+				Align:             pdf.TextAlignRight, // Right justified
 				DefaultStyle:      "font-size:14pt;color:#3333CC;",
 				Margin:            []float64{5.0, 3.0, 5.0, 3.0}, // Inner rectangle margins
 			},
@@ -1854,9 +1854,9 @@ var testCases = map[pdf.Name][]testCase{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 100, LLy: 300, URx: 500, URy: 350},
 				},
-				OverlayText: "CONFIDENTIAL",
-				DA:          "/Helvetica 12 Tf 1 0 0 rg", // Red text appearance
-				Align:       TextAlignCenter,             // Centered
+				OverlayText:       "CONFIDENTIAL",
+				DefaultAppearance: "/Helvetica 12 Tf 1 0 0 rg", // Red text appearance
+				Align:             pdf.TextAlignCenter,         // Centered
 			},
 		},
 		{
@@ -1866,10 +1866,10 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:     pdf.Rectangle{LLx: 50, LLy: 400, URx: 550, URy: 450},
 					Contents: "Large redacted area",
 				},
-				OverlayText: "REDACTED",
-				DA:          "/Arial 10 Tf 0.5 0.5 0.5 rg", // Gray text
-				Repeat:      true,
-				Align:       TextAlignRight, // Right-justified
+				OverlayText:       "REDACTED",
+				DefaultAppearance: "/Arial 10 Tf 0.5 0.5 0.5 rg", // Gray text
+				Repeat:            true,
+				Align:             pdf.TextAlignRight, // Right-justified
 			},
 		},
 		{
@@ -1901,11 +1901,11 @@ var testCases = map[pdf.Name][]testCase{
 					200, 620, 300, 620, 300, 640, 200, 640, // Second quad
 					325, 620, 425, 620, 425, 640, 325, 640, // Third quad
 				},
-				FillColor:   color.DeviceRGB{0.8, 0.8, 0.8}, // Light gray background
-				OverlayText: "CLASSIFIED",
-				DA:          "/Times-Bold 14 Tf 1 0 0 rg", // Bold red text
-				Repeat:      false,
-				Align:       TextAlignCenter, // Centered
+				FillColor:         color.DeviceRGB{0.8, 0.8, 0.8}, // Light gray background
+				OverlayText:       "CLASSIFIED",
+				DefaultAppearance: "/Times-Bold 14 Tf 1 0 0 rg", // Bold red text
+				Repeat:            false,
+				Align:             pdf.TextAlignCenter, // Centered
 			},
 		},
 		{

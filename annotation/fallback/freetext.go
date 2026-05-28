@@ -65,7 +65,7 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 		a.BorderEffect = nil
 	}
 
-	a.Align = annotation.TextAlignLeft
+	a.Align = pdf.TextAlignLeft
 	a.DefaultStyle = ""
 
 	// generate the appearance stream
@@ -170,9 +170,9 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 			}
 
 			switch a.Align {
-			case annotation.TextAlignCenter:
+			case pdf.TextAlignCenter:
 				line.Align(clipWidth, 0.5)
-			case annotation.TextAlignRight:
+			case pdf.TextAlignRight:
 				line.Align(clipWidth, 1.0)
 			default:
 				// no adjustment needed for left alignment

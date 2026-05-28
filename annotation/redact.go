@@ -52,15 +52,17 @@ type Redact struct {
 	// Repeat (optional) - whether overlay text should repeat to fill region
 	Repeat bool
 
-	// DA (required if OverlayText present) - appearance string for formatting overlay text
-	DA string
+	// DefaultAppearance (required if OverlayText present) - appearance string for formatting overlay text
+	//
+	// This corresponds to the /DA entry in the PDF annotation dictionary.
+	DefaultAppearance string
 
 	// Align specifies the text alignment used for the annotation's text.
-	// The zero value if [TextAlignLeft].
-	// The other allowed values are [TextAlignCenter] and [TextAlignRight].
+	// The zero value is [pdf.TextAlignLeft].
+	// The other allowed values are [pdf.TextAlignCenter] and [pdf.TextAlignRight].
 	//
 	// This corresponds to the /Q entry in the PDF annotation dictionary.
-	Align TextAlign
+	Align pdf.TextAlign
 }
 
 var _ Annotation = (*Redact)(nil)
@@ -116,20 +118,20 @@ func decodeRedact(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Redac
 
 	// DA (required if OverlayText present)
 	if da, err := pdf.GetString(r, dict["DA"]); err == nil {
-		redact.DA = string(da)
+		redact.DefaultAppearance = string(da)
 	}
 
 	// If OverlayText is present but DA is missing/empty, provide a reasonable default
-	if redact.OverlayText != "" && redact.DA == "" {
+	if redact.OverlayText != "" && redact.DefaultAppearance == "" {
 		// Default to 12pt Helvetica black text
-		redact.DA = "/Helvetica 12 Tf 0 0 0 rg"
+		redact.DefaultAppearance = "/Helvetica 12 Tf 0 0 0 rg"
 	}
 
 	// Q (optional) - default 0 (left-justified)
 	if q, err := pdf.Optional(pdf.GetInteger(r, dict["Q"])); err != nil {
 		return nil, err
 	} else if q >= 0 && q <= 2 {
-		redact.Align = TextAlign(q)
+		redact.Align = pdf.TextAlign(q)
 	}
 
 	return redact, nil
@@ -182,14 +184,14 @@ func (r *Redact) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["OverlayText"] = pdf.TextString(r.OverlayText)
 
 		// DA (required if OverlayText present)
-		if r.DA == "" {
+		if r.DefaultAppearance == "" {
 			return nil, fmt.Errorf("DA field is required when OverlayText is present")
 		}
 	}
 
 	// DA (write if present)
-	if r.DA != "" {
-		dict["DA"] = pdf.String(r.DA)
+	if r.DefaultAppearance != "" {
+		dict["DA"] = pdf.String(r.DefaultAppearance)
 	}
 
 	// Repeat (optional) - default false
@@ -198,7 +200,10 @@ func (r *Redact) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Q (optional) - default 0 (left-justified)
-	if r.Align != TextAlignLeft {
+	if r.Align != pdf.TextAlignLeft {
+		if r.Align < pdf.TextAlignLeft || r.Align > pdf.TextAlignRight {
+			return nil, fmt.Errorf("invalid text alignment %d", r.Align)
+		}
 		dict["Q"] = pdf.Integer(r.Align)
 	}
 
