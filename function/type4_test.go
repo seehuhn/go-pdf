@@ -730,3 +730,32 @@ func TestType4StackOverflow(t *testing.T) {
 		t.Errorf("expected stack overflow error, got %v", err)
 	}
 }
+
+// TestType4ApplyOutputAliasesInputs verifies that Apply produces correct
+// results when the out slice shares its backing array with the inputs slice.
+// This can happen when a caller reuses a single scratch buffer for both the
+// tint values and the alternate-space values (e.g. an Indexed colour space
+// whose base is a DeviceN space).
+func TestType4ApplyOutputAliasesInputs(t *testing.T) {
+	// maps (a, b) -> (a, b, 0.5); 2 inputs, 3 outputs
+	f := &Type4{
+		Domain:  []float64{0, 1, 0, 1},
+		Range:   []float64{0, 1, 0, 1, 0, 1},
+		Program: "0.5",
+	}
+
+	in := []float64{0.25, 0.75}
+
+	want := make([]float64, 3)
+	f.Apply(want, in...)
+
+	// aliased call: out and inputs are views into one backing array
+	buf := []float64{0.25, 0.75, 0}
+	f.Apply(buf[:3], buf[:2]...)
+
+	for i := range want {
+		if buf[i] != want[i] {
+			t.Errorf("aliased Apply[%d] = %v, want %v", i, buf[i], want[i])
+		}
+	}
+}

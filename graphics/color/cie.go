@@ -22,6 +22,7 @@ import (
 	stdcolor "image/color"
 	"math"
 
+	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
 )
 
@@ -159,7 +160,7 @@ func (s *SpaceCalGray) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 // ToXYZ converts a CalGray value to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
-func (s *SpaceCalGray) ToXYZ(values []float64) (X, Y, Z float64) {
+func (s *SpaceCalGray) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
 	A := math.Pow(values[0], s.Gamma)
 	X = s.WhitePoint[0] * A
 	Y = s.WhitePoint[1] * A
@@ -180,7 +181,7 @@ func (c colorCalGray) ColorSpace() Space {
 // ToXYZ converts a CalGray color to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorCalGray) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ([]float64{c.Value})
+	return c.Space.ToXYZ([]float64{c.Value}, nil)
 }
 
 // RGBA implements the color.Color interface.
@@ -382,7 +383,7 @@ func (s *SpaceCalRGB) Family() pdf.Name {
 
 // ToXYZ converts CalRGB values to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
-func (s *SpaceCalRGB) ToXYZ(values []float64) (X, Y, Z float64) {
+func (s *SpaceCalRGB) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
 	A := math.Pow(values[0], s.Gamma[0])
 	B := math.Pow(values[1], s.Gamma[1])
 	C := math.Pow(values[2], s.Gamma[2])
@@ -407,7 +408,7 @@ func (c colorCalRGB) ColorSpace() Space {
 // ToXYZ converts a CalRGB color to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorCalRGB) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ(c.Values[:])
+	return c.Space.ToXYZ(c.Values[:], nil)
 }
 
 // RGBA implements the color.Color interface.
@@ -579,7 +580,7 @@ func (s *SpaceLab) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 // ToXYZ converts Lab values to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
-func (s *SpaceLab) ToXYZ(values []float64) (X, Y, Z float64) {
+func (s *SpaceLab) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
 	LStar, aStar, bStar := values[0], values[1], values[2]
 	XW, YW, ZW := s.WhitePoint[0], s.WhitePoint[1], s.WhitePoint[2]
 
@@ -607,7 +608,7 @@ func (c colorLab) ColorSpace() Space {
 // ToXYZ converts a Lab color to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorLab) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ(c.Values[:])
+	return c.Space.ToXYZ(c.Values[:], nil)
 }
 
 // RGBA implements the color.Color interface.

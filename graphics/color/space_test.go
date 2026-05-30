@@ -21,7 +21,6 @@ import (
 	"fmt"
 	stdcolor "image/color"
 	"math"
-	"reflect"
 	"testing"
 
 	"seehuhn.de/go/icc"
@@ -100,7 +99,26 @@ var testColorSpaces = []Space{
 		C1:   []float64{0, 1, 0},
 		N:    1,
 	}, nil)),
-	// TODO(voss): DeviceN colour spaces
+
+	// Indexed colour space whose base is a multi-component DeviceN with a
+	// Type 4 tint transform.  This exercises the nested
+	// Indexed→DeviceN→Type4 path through ToXYZ with and without a Workspace.
+	indexedDeviceNType4(),
+}
+
+// indexedDeviceNType4 builds an Indexed colour space over a two-colorant
+// DeviceN whose alternate is DeviceRGB and whose tint transform is a Type 4
+// function mapping (a, b) to (a, b, 0.5).
+func indexedDeviceNType4() Space {
+	dn := must(DeviceN([]pdf.Name{"a", "b"}, SpaceDeviceRGB, &function.Type4{
+		Domain:  []float64{0, 1, 0, 1},
+		Range:   []float64{0, 1, 0, 1, 0, 1},
+		Program: "0.5",
+	}, nil)).(*SpaceDeviceN)
+	return must(Indexed([]Color{
+		dn.New([]float64{0.2, 0.8}),
+		dn.New([]float64{0.6, 0.3}),
+	}))
 }
 
 func TestDecodeSpace(t *testing.T) {
@@ -119,7 +137,7 @@ func TestDecodeSpace(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(space, space2) {
+			if !SpacesEqual(space, space2) {
 				t.Errorf("got %#v, want %#v", space2, space)
 			}
 		})
@@ -298,7 +316,7 @@ func TestIndexedAcceptsAllNonSpecialBases(t *testing.T) {
 			// previously have silently returned Base.Default() for these
 			// bases.
 			for i := range tc.colors {
-				vals := cs.lookupValues(i)
+				vals := cs.lookupValues(i, nil)
 				if len(vals) != cs.Base.Channels() {
 					t.Errorf("entry %d: got %d components, want %d", i, len(vals), cs.Base.Channels())
 				}

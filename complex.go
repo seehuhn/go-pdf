@@ -467,6 +467,9 @@ type Function interface {
 
 	// Apply applies the function to the given m input values
 	// and writes the n output values into out.
+	//
+	// The out slice may share storage with in; an implementation must read
+	// all of in before writing any element of out.
 	Apply(out []float64, in ...float64)
 }
 

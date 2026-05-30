@@ -23,7 +23,9 @@ import (
 	stdcolor "image/color"
 	"math"
 	"slices"
+	"sync"
 
+	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
 )
 
@@ -232,7 +234,7 @@ func (s *SpaceIndexed) Convert(c stdcolor.Color) stdcolor.Color {
 
 // lookupValues decodes the palette entry at the given index into color values
 // for the base color space.
-func (s *SpaceIndexed) lookupValues(index int) []float64 {
+func (s *SpaceIndexed) lookupValues(index int, ws *icc.Workspace) []float64 {
 	base := s.Base
 	n := base.Channels()
 	offset := index * n
@@ -245,7 +247,7 @@ func (s *SpaceIndexed) lookupValues(index int) []float64 {
 
 	lo, hi := base.ComponentRanges()
 
-	vals := make([]float64, n)
+	vals := ws.Scratch(slotIdx, n)
 	for i := range n {
 		b := float64(s.lookup[offset+i])
 		vals[i] = lo[i] + (b/255.0)*(hi[i]-lo[i])
@@ -255,15 +257,15 @@ func (s *SpaceIndexed) lookupValues(index int) []float64 {
 
 // ToXYZ converts an indexed color value to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
-func (s *SpaceIndexed) ToXYZ(values []float64) (X, Y, Z float64) {
+func (s *SpaceIndexed) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
 	index := int(math.Round(values[0]))
 	if index < 0 {
 		index = 0
 	} else if index >= s.NumCol {
 		index = s.NumCol - 1
 	}
-	baseVals := s.lookupValues(index)
-	return s.Base.ToXYZ(baseVals)
+	baseVals := s.lookupValues(index, ws)
+	return s.Base.ToXYZ(baseVals, ws)
 }
 
 type colorIndexed struct {
@@ -278,7 +280,7 @@ func (c colorIndexed) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorIndexed) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ([]float64{float64(c.Index)})
+	return c.Space.ToXYZ([]float64{float64(c.Index)}, nil)
 }
 
 // RGBA implements the color.Color interface.
@@ -288,7 +290,7 @@ func (c colorIndexed) RGBA() (r, g, b, a uint32) {
 
 // getBaseColor returns the color from the palette at the given index.
 func (c colorIndexed) getBaseColor() Color {
-	vals := c.Space.lookupValues(c.Index)
+	vals := c.Space.lookupValues(c.Index, nil)
 	return FromValues(c.Space.Base, vals, nil)
 }
 
@@ -415,11 +417,11 @@ func (s *SpaceSeparation) Convert(c stdcolor.Color) stdcolor.Color {
 
 // ToXYZ converts a separation tint value to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
-func (s *SpaceSeparation) ToXYZ(values []float64) (X, Y, Z float64) {
+func (s *SpaceSeparation) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
 	_, n := s.Transform.Shape()
-	var altValues [4]float64
-	s.Transform.Apply(altValues[:n], values[0])
-	return s.Alternate.ToXYZ(altValues[:n])
+	alt := ws.Scratch(slotAlt, n)
+	s.Transform.Apply(alt, values[0])
+	return s.Alternate.ToXYZ(alt, ws)
 }
 
 type colorSeparation struct {
@@ -436,7 +438,7 @@ func (c colorSeparation) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorSeparation) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ([]float64{c.Tint})
+	return c.Space.ToXYZ([]float64{c.Tint}, nil)
 }
 
 // RGBA implements the color.Color interface.
@@ -481,6 +483,10 @@ type SpaceDeviceN struct {
 	// about the color space components (Subtype, Colorants, Process, MixingHints).
 	// If Subtype is "NChannel", additional entries are required.
 	Attributes pdf.Dict
+
+	// cached, immutable component ranges (see ComponentRanges)
+	rangesOnce         sync.Once
+	rangesLo, rangesHi []float64
 }
 
 // DeviceN returns a new DeviceN color space.
@@ -548,14 +554,18 @@ func (s *SpaceDeviceN) Channels() int {
 
 // ComponentRanges returns per-colorant tint ranges, each [0, 1].
 // This implements the [Space] interface.
+//
+// The returned slices are cached and shared; callers must not modify them.
 func (s *SpaceDeviceN) ComponentRanges() (lo, hi []float64) {
-	n := s.Channels()
-	lo = make([]float64, n)
-	hi = make([]float64, n)
-	for i := range n {
-		hi[i] = 1
-	}
-	return lo, hi
+	s.rangesOnce.Do(func() {
+		n := s.Channels()
+		s.rangesLo = make([]float64, n)
+		s.rangesHi = make([]float64, n)
+		for i := range n {
+			s.rangesHi[i] = 1
+		}
+	})
+	return s.rangesLo, s.rangesHi
 }
 
 // Embed adds the color space to a PDF file.
@@ -649,11 +659,11 @@ func (s *SpaceDeviceN) New(x []float64) Color {
 
 // ToXYZ converts DeviceN tint values to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
-func (s *SpaceDeviceN) ToXYZ(values []float64) (X, Y, Z float64) {
+func (s *SpaceDeviceN) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
 	_, n := s.Transform.Shape()
-	var altValues [4]float64
-	s.Transform.Apply(altValues[:n], values...)
-	return s.Alternate.ToXYZ(altValues[:n])
+	alt := ws.Scratch(slotAlt, n)
+	s.Transform.Apply(alt, values...)
+	return s.Alternate.ToXYZ(alt, ws)
 }
 
 type colorDeviceN struct {
@@ -673,7 +683,7 @@ func (c colorDeviceN) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorDeviceN) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ(c.get())
+	return c.Space.ToXYZ(c.get(), nil)
 }
 
 func (c colorDeviceN) get() []float64 {

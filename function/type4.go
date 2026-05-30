@@ -226,18 +226,22 @@ func (f *Type4) Apply(out []float64, inputs ...float64) {
 		f.compiled, f.compileErr = compile(f.Program)
 	})
 
-	clear(out)
-
+	// Read all inputs onto the stack (allocated on the goroutine stack)
+	// before clearing out, so out may share storage with inputs
+	// (see the Function.Apply contract).
+	var buf [32]value
+	stack := buf[:0]
 	if f.compileErr == nil {
-		// stack allocated on the goroutine stack
-		var buf [32]value
-		stack := buf[:0]
 		for i := range m {
 			min := f.Domain[2*i]
 			max := f.Domain[2*i+1]
 			stack = append(stack, realVal(clip(inputs[i], min, max)))
 		}
+	}
 
+	clear(out)
+
+	if f.compileErr == nil {
 		var err error
 		stack, err = execute(f.compiled, stack)
 		if err == nil {

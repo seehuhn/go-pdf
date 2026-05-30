@@ -19,6 +19,7 @@ package color
 import (
 	stdcolor "image/color"
 
+	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
 )
 
@@ -98,7 +99,7 @@ func (s spacePatternColored) Convert(c stdcolor.Color) stdcolor.Color {
 // ToXYZ returns a placeholder mid-gray in CIE XYZ tristimulus values
 // adapted to the D50 illuminant, since the actual color depends on the
 // pattern content.
-func (s spacePatternColored) ToXYZ(values []float64) (X, Y, Z float64) {
+func (s spacePatternColored) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
 	return srgbToXYZ(0.5, 0.5, 0.5)
 }
 
@@ -208,8 +209,8 @@ func (s spacePatternUncolored) Convert(c stdcolor.Color) stdcolor.Color {
 
 // ToXYZ converts the base color values to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
-func (s spacePatternUncolored) ToXYZ(values []float64) (X, Y, Z float64) {
-	return s.base.ToXYZ(values)
+func (s spacePatternUncolored) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
+	return s.base.ToXYZ(values, ws)
 }
 
 type colorUncoloredPattern struct {

@@ -24,6 +24,7 @@ import (
 	"math"
 	"slices"
 
+	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/internal/streamlimits"
@@ -55,7 +56,11 @@ type Space interface {
 
 	// ToXYZ converts component values to CIE XYZ tristimulus values
 	// adapted to the D50 illuminant (the ICC Profile Connection Space).
-	ToXYZ(values []float64) (X, Y, Z float64)
+	//
+	// The optional ws supplies reusable scratch buffers to avoid per-call
+	// allocation in a hot loop; pass nil to allocate internally. A Workspace
+	// must not be used from more than one goroutine at a time.
+	ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64)
 
 	pdf.Embedder
 

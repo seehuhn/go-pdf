@@ -38,6 +38,10 @@ type SpaceICCBased struct {
 
 	def []float64
 
+	// cached, immutable component ranges (see ComponentRanges)
+	rangesOnce         sync.Once
+	rangesLo, rangesHi []float64
+
 	// cached transform for Convert() (PCSToDevice)
 	transformOnce sync.Once
 	transform     *icc.Transform
@@ -105,15 +109,19 @@ func (s *SpaceICCBased) Channels() int {
 // ComponentRanges returns the per-component value ranges stored in the
 // Range entry of the ICC-based color space.
 // This implements the [Space] interface.
+//
+// The returned slices are cached and shared; callers must not modify them.
 func (s *SpaceICCBased) ComponentRanges() (lo, hi []float64) {
-	n := s.N
-	lo = make([]float64, n)
-	hi = make([]float64, n)
-	for i := range n {
-		lo[i] = s.Ranges[2*i]
-		hi[i] = s.Ranges[2*i+1]
-	}
-	return lo, hi
+	s.rangesOnce.Do(func() {
+		n := s.N
+		s.rangesLo = make([]float64, n)
+		s.rangesHi = make([]float64, n)
+		for i := range n {
+			s.rangesLo[i] = s.Ranges[2*i]
+			s.rangesHi[i] = s.Ranges[2*i+1]
+		}
+	})
+	return s.rangesLo, s.rangesHi
 }
 
 // Default returns the default color in an ICC-based color space.
@@ -262,11 +270,11 @@ func (s *SpaceICCBased) New(values []float64) (Color, error) {
 
 // ToXYZ converts ICC-based color values to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
-func (s *SpaceICCBased) ToXYZ(values []float64) (X, Y, Z float64) {
-	// normalise values from Ranges to [0,1] using stack allocation
-	var buf [4]float64
-	norm := buf[:s.N]
+func (s *SpaceICCBased) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
+	// normalise values from Ranges to [0,1] using caller-provided scratch
+	norm := ws.Scratch(slotNorm, s.N)
 	for i := range s.N {
+		norm[i] = 0
 		lo, hi := s.Ranges[2*i], s.Ranges[2*i+1]
 		if hi > lo {
 			norm[i] = (values[i] - lo) / (hi - lo)
@@ -278,7 +286,7 @@ func (s *SpaceICCBased) ToXYZ(values []float64) (X, Y, Z float64) {
 		s.fwdTransform, _ = icc.NewTransform(s.Profile, icc.DeviceToPCS, icc.Perceptual)
 	})
 	if s.fwdTransform != nil {
-		return s.fwdTransform.ToXYZ(norm)
+		return s.fwdTransform.ToXYZ(norm, ws)
 	}
 
 	// fallback without profile: treat as sRGB-like
@@ -315,7 +323,7 @@ func (c colorICCBased) Components() []float64 {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorICCBased) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ(c.Values[:c.Space.N])
+	return c.Space.ToXYZ(c.Values[:c.Space.N], nil)
 }
 
 // RGBA implements the color.Color interface.
