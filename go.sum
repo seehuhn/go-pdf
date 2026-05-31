@@ -38,8 +38,8 @@ seehuhn.de/go/dag v0.0.0-20250630092703-dd0e13308cb3 h1:92lIrrSNr7FAJj4PIXyPrpxX
 seehuhn.de/go/dag v0.0.0-20250630092703-dd0e13308cb3/go.mod h1:se0NAaAL9aI9pRBRK0EvlY3572GJTsF0J7RwMXEiKz4=
 seehuhn.de/go/geom v0.7.3 h1:Fwp/YAtiix/XrbAZaWrUhbUItsuIh9mxnS7d5t29JGI=
 seehuhn.de/go/geom v0.7.3/go.mod h1:0diHpKsEzgxI6SC1YY7525/TXIkXj0W2EjBvDXXN+Vc=
-seehuhn.de/go/icc v0.7.4-0.20260530173512-f2618b4be364 h1:0TJkeHes2VD297lgnQ/YUfV/APCAsTuSSnEhxdniWd8=
-seehuhn.de/go/icc v0.7.4-0.20260530173512-f2618b4be364/go.mod h1:vwM70nMfKIda8ltIFZAzQbHvDO6QZcWf1Fvfg9PA/tQ=
+seehuhn.de/go/icc v0.7.4-0.20260531104325-d203e9d3568f h1:byX+JP8ukxOAOLO6m8j6sHGA60QCSNoR9mt5g2G8NHY=
+seehuhn.de/go/icc v0.7.4-0.20260531104325-d203e9d3568f/go.mod h1:vwM70nMfKIda8ltIFZAzQbHvDO6QZcWf1Fvfg9PA/tQ=
 seehuhn.de/go/membudget v0.7.3 h1:ZgHxSnUNMuY5sP2Vd/jeAM3+rFBvIB+6YY5TehFBZQ8=
 seehuhn.de/go/membudget v0.7.3/go.mod h1:iDiUmeAojPjk77vwdxBBBEF7bFuwz/ggMjEuACvU8UQ=
 seehuhn.de/go/postscript v0.7.4-0.20260520102231-413bfbf7c8d0 h1:Wu8Xhmv8v9ufPgYxtE2D1w1eyqNshQ6ZrSG9jTUrgkU=

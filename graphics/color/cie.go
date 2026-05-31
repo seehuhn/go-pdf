@@ -181,7 +181,7 @@ func (c colorCalGray) ColorSpace() Space {
 // ToXYZ converts a CalGray color to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorCalGray) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ([]float64{c.Value}, nil)
+	return c.Space.ToXYZ([]float64{c.Value}, &icc.Workspace{})
 }
 
 // RGBA implements the color.Color interface.
@@ -408,7 +408,7 @@ func (c colorCalRGB) ColorSpace() Space {
 // ToXYZ converts a CalRGB color to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorCalRGB) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ(c.Values[:], nil)
+	return c.Space.ToXYZ(c.Values[:], &icc.Workspace{})
 }
 
 // RGBA implements the color.Color interface.
@@ -608,7 +608,7 @@ func (c colorLab) ColorSpace() Space {
 // ToXYZ converts a Lab color to CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorLab) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ(c.Values[:], nil)
+	return c.Space.ToXYZ(c.Values[:], &icc.Workspace{})
 }
 
 // RGBA implements the color.Color interface.

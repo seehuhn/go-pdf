@@ -280,7 +280,7 @@ func (c colorIndexed) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorIndexed) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ([]float64{float64(c.Index)}, nil)
+	return c.Space.ToXYZ([]float64{float64(c.Index)}, &icc.Workspace{})
 }
 
 // RGBA implements the color.Color interface.
@@ -290,7 +290,7 @@ func (c colorIndexed) RGBA() (r, g, b, a uint32) {
 
 // getBaseColor returns the color from the palette at the given index.
 func (c colorIndexed) getBaseColor() Color {
-	vals := c.Space.lookupValues(c.Index, nil)
+	vals := c.Space.lookupValues(c.Index, &icc.Workspace{})
 	return FromValues(c.Space.Base, vals, nil)
 }
 
@@ -438,7 +438,7 @@ func (c colorSeparation) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorSeparation) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ([]float64{c.Tint}, nil)
+	return c.Space.ToXYZ([]float64{c.Tint}, &icc.Workspace{})
 }
 
 // RGBA implements the color.Color interface.
@@ -683,7 +683,7 @@ func (c colorDeviceN) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c colorDeviceN) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ(c.get(), nil)
+	return c.Space.ToXYZ(c.get(), &icc.Workspace{})
 }
 
 func (c colorDeviceN) get() []float64 {

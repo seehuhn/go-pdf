@@ -316,7 +316,7 @@ func TestIndexedAcceptsAllNonSpecialBases(t *testing.T) {
 			// previously have silently returned Base.Default() for these
 			// bases.
 			for i := range tc.colors {
-				vals := cs.lookupValues(i, nil)
+				vals := cs.lookupValues(i, &icc.Workspace{})
 				if len(vals) != cs.Base.Channels() {
 					t.Errorf("entry %d: got %d components, want %d", i, len(vals), cs.Base.Channels())
 				}

@@ -24,11 +24,15 @@ import (
 	"seehuhn.de/go/pdf/function"
 )
 
-// TestToXYZWorkspaceEquivalence checks that Space.ToXYZ produces identical
-// results whether a Workspace is supplied or not, across every space type
-// (including the nested Indexed/Separation/DeviceN paths).
+// TestToXYZWorkspaceEquivalence checks that a reused (dirtied) Workspace yields
+// the same results as a fresh one, across every space type (including the
+// nested Indexed/Separation/DeviceN paths). A fresh Workspace zeroes its
+// buffers via make, whereas a reused one carries stale contents from prior
+// conversions; both must agree, proving reuse never leaks stale data.
 func TestToXYZWorkspaceEquivalence(t *testing.T) {
-	ws := &icc.Workspace{}
+	// dirty is reused across every iteration, so after the first conversion it
+	// carries stale buffer contents (including the nested scratch slots).
+	dirty := &icc.Workspace{}
 	for _, cs := range testColorSpaces {
 		n := cs.Channels()
 		if n == 0 {
@@ -40,10 +44,10 @@ func TestToXYZWorkspaceEquivalence(t *testing.T) {
 			for i := range n {
 				values[i] = lo[i] + frac*(hi[i]-lo[i])
 			}
-			wantX, wantY, wantZ := cs.ToXYZ(values, nil)
-			gotX, gotY, gotZ := cs.ToXYZ(values, ws)
+			wantX, wantY, wantZ := cs.ToXYZ(values, &icc.Workspace{})
+			gotX, gotY, gotZ := cs.ToXYZ(values, dirty)
 			if gotX != wantX || gotY != wantY || gotZ != wantZ {
-				t.Errorf("%s ToXYZ(%v): with ws (%v,%v,%v) != without (%v,%v,%v)",
+				t.Errorf("%s ToXYZ(%v): reused ws (%v,%v,%v) != fresh (%v,%v,%v)",
 					cs.Family(), values, gotX, gotY, gotZ, wantX, wantY, wantZ)
 			}
 		}
@@ -101,10 +105,10 @@ func BenchmarkSpaceICCBasedToXYZ(b *testing.B) {
 	cs := must(ICCBased(icc.CMYKProfile, nil)).(*SpaceICCBased)
 	in := []float64{0.1, 0.2, 0.3, 0.4}
 
-	b.Run("nil", func(b *testing.B) {
+	b.Run("fresh", func(b *testing.B) {
 		b.ReportAllocs()
 		for range b.N {
-			cs.ToXYZ(in, nil)
+			cs.ToXYZ(in, &icc.Workspace{})
 		}
 	})
 	b.Run("workspace", func(b *testing.B) {

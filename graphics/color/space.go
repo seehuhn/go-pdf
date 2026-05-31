@@ -57,9 +57,9 @@ type Space interface {
 	// ToXYZ converts component values to CIE XYZ tristimulus values
 	// adapted to the D50 illuminant (the ICC Profile Connection Space).
 	//
-	// The optional ws supplies reusable scratch buffers to avoid per-call
-	// allocation in a hot loop; pass nil to allocate internally. A Workspace
-	// must not be used from more than one goroutine at a time.
+	// ws supplies reusable scratch buffers to avoid per-call allocation in a
+	// hot loop; it must be non-nil (the zero value &icc.Workspace{} is valid)
+	// and must not be used from more than one goroutine at a time.
 	ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64)
 
 	pdf.Embedder

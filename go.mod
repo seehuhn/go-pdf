@@ -9,7 +9,7 @@ require (
 	golang.org/x/term v0.40.0
 	golang.org/x/text v0.35.0
 	seehuhn.de/go/geom v0.7.3
-	seehuhn.de/go/icc v0.7.4-0.20260530173512-f2618b4be364
+	seehuhn.de/go/icc v0.7.4-0.20260531104325-d203e9d3568f
 	seehuhn.de/go/membudget v0.7.3
 	seehuhn.de/go/postscript v0.7.4-0.20260520102231-413bfbf7c8d0
 	seehuhn.de/go/sfnt v0.7.4-0.20260520203640-d0b8e8de62c2

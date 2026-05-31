@@ -196,7 +196,7 @@ func (c DeviceRGB) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 func (c DeviceRGB) ToXYZ() (X, Y, Z float64) {
-	return spaceDeviceRGB{}.ToXYZ(c[:], nil)
+	return spaceDeviceRGB{}.ToXYZ(c[:], &icc.Workspace{})
 }
 
 // RGBA implements the color.Color interface.
@@ -289,21 +289,29 @@ func (s spaceDeviceCMYK) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z flo
 }
 
 var (
-	cmykInvOnce      sync.Once
-	cmykInvTransform *icc.Transform
+	cmykOnce      sync.Once
+	cmykTransform *icc.Transform
 )
 
-// FromXYZ converts D50-adapted CIE XYZ to DeviceCMYK component values.
-func (s spaceDeviceCMYK) FromXYZ(X, Y, Z float64) []float64 {
-	cmykInvOnce.Do(func() {
+// cmykXform returns the cached bidirectional transform for the built-in CMYK
+// profile, or nil if it cannot be decoded.
+func cmykXform() *icc.Transform {
+	cmykOnce.Do(func() {
 		p, err := icc.Decode(icc.CMYKProfile)
 		if err != nil {
 			return
 		}
-		cmykInvTransform, _ = icc.NewTransform(p, icc.PCSToDevice, icc.Perceptual)
+		cmykTransform, _ = icc.NewTransform(p, icc.Perceptual)
 	})
-	if cmykInvTransform != nil {
-		return cmykInvTransform.FromXYZ(X, Y, Z)
+	return cmykTransform
+}
+
+// FromXYZ converts D50-adapted CIE XYZ to DeviceCMYK component values.
+func (s spaceDeviceCMYK) FromXYZ(X, Y, Z float64) []float64 {
+	if t := cmykXform(); t != nil && t.CanFromXYZ() {
+		out := make([]float64, 4)
+		t.FromXYZ(X, Y, Z, out, &icc.Workspace{})
+		return out
 	}
 	// fallback: naive sRGB to CMYK
 	r, g, b := xyzToSRGB(X, Y, Z)
@@ -325,30 +333,17 @@ func (c DeviceCMYK) ColorSpace() Space {
 	return spaceDeviceCMYK{}
 }
 
-var (
-	cmykFwdOnce      sync.Once
-	cmykFwdTransform *icc.Transform
-)
-
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the D50 illuminant.
 // It uses the built-in CMYK profile when available, otherwise falls back
 // to a naive CMYK to sRGB conversion.
 func (c DeviceCMYK) ToXYZ() (X, Y, Z float64) {
-	return deviceCMYKToXYZ(c[:], nil)
+	return deviceCMYKToXYZ(c[:], &icc.Workspace{})
 }
 
 func deviceCMYKToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
-	cmykFwdOnce.Do(func() {
-		p, err := icc.Decode(icc.CMYKProfile)
-		if err != nil {
-			return
-		}
-		cmykFwdTransform, _ = icc.NewTransform(p, icc.DeviceToPCS, icc.Perceptual)
-	})
-
-	if cmykFwdTransform != nil {
-		return cmykFwdTransform.ToXYZ(values, ws)
+	if t := cmykXform(); t != nil && t.CanToXYZ() {
+		return t.ToXYZ(values, ws)
 	}
 
 	// fallback: naive CMYK -> sRGB -> XYZ
