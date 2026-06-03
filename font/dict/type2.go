@@ -327,6 +327,10 @@ func (d *CIDFontType2) FontInfo() any {
 	return &FontInfoGlyfExternal{
 		PostScriptName: d.PostScriptName,
 		ROS:            d.ROS,
+		IsSerif:        d.Descriptor.IsSerif,
+		IsFixedPitch:   d.Descriptor.IsFixedPitch,
+		IsItalic:       d.Descriptor.IsItalic,
+		FontWeight:     d.Descriptor.FontWeight,
 	}
 }
 

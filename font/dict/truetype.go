@@ -220,6 +220,10 @@ func (d *TrueType) FontInfo() any {
 		FontFile:       d.FontFile,
 		Encoding:       d.Encoding,
 		IsSymbolic:     d.Descriptor.IsSymbolic,
+		IsSerif:        d.Descriptor.IsSerif,
+		IsFixedPitch:   d.Descriptor.IsFixedPitch,
+		IsItalic:       d.Descriptor.IsItalic,
+		FontWeight:     d.Descriptor.FontWeight,
 	}
 }
 

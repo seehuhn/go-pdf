@@ -21,6 +21,7 @@ import (
 	"seehuhn.de/go/postscript/cid"
 
 	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/os2"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/encoding"
@@ -54,6 +55,19 @@ type FontInfoSimple struct {
 	// IsSymbolic is true if some glyphs are outside the Adobe Standard Latin
 	// character set (see [pdfenc.StandardLatin]).
 	IsSymbolic bool
+
+	// IsSerif is true if the glyphs have serifs.
+	IsSerif bool
+
+	// IsFixedPitch is true if all glyphs have the same width.
+	IsFixedPitch bool
+
+	// IsItalic is true if the glyphs are slanted.
+	IsItalic bool
+
+	// FontWeight is the visual weight (thickness) of the glyphs.
+	// A value of 0 means the weight is unknown.
+	FontWeight os2.Weight
 }
 
 // FontInfoCID holds information about a CID-keyed font,
@@ -66,8 +80,18 @@ type FontInfoCID struct {
 	// If the font is not embedded, this is nil.
 	FontFile *glyphdata.Stream
 
-	// CIDIsUsed maps CIDs to a boolean indicating if the CID is used in the font.
-	CIDIsUsed map[cid.CID]bool
+	// IsSerif is true if the glyphs have serifs.
+	IsSerif bool
+
+	// IsFixedPitch is true if all glyphs have the same width.
+	IsFixedPitch bool
+
+	// IsItalic is true if the glyphs are slanted.
+	IsItalic bool
+
+	// FontWeight is the visual weight (thickness) of the glyphs.
+	// A value of 0 means the weight is unknown.
+	FontWeight os2.Weight
 }
 
 // FontInfoGlyfEmbedded holds information about an embedded TrueType font
@@ -92,6 +116,19 @@ type FontInfoGlyfExternal struct {
 	// ROS describes the character collection (Registry, Ordering, Supplement)
 	// covered by the font. This must correspond to one of the predefined PDF CMaps.
 	ROS *cid.SystemInfo
+
+	// IsSerif is true if the glyphs have serifs.
+	IsSerif bool
+
+	// IsFixedPitch is true if all glyphs have the same width.
+	IsFixedPitch bool
+
+	// IsItalic is true if the glyphs are slanted.
+	IsItalic bool
+
+	// FontWeight is the visual weight (thickness) of the glyphs.
+	// A value of 0 means the weight is unknown.
+	FontWeight os2.Weight
 }
 
 // FontInfoType3 holds information specific to a Type 3 font.

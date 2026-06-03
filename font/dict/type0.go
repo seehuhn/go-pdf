@@ -289,17 +289,13 @@ func cidWidth(widths map[cmap.CID]float64, defaultWidth float64, c cmap.CID) flo
 // FontInfo returns information about the embedded font file.
 // The returned value is of type [*FontInfoCID].
 func (d *CIDFontType0) FontInfo() any {
-	cidIsUsed := make(map[cid.CID]bool)
-	codec := d.Codec()
-	cidIsUsed[0] = true
-	for _, cid := range d.CMap.All(codec) {
-		cidIsUsed[cid] = true
-	}
-
 	return &FontInfoCID{
 		PostScriptName: d.PostScriptName,
 		FontFile:       d.FontFile,
-		CIDIsUsed:      cidIsUsed,
+		IsSerif:        d.Descriptor.IsSerif,
+		IsFixedPitch:   d.Descriptor.IsFixedPitch,
+		IsItalic:       d.Descriptor.IsItalic,
+		FontWeight:     d.Descriptor.FontWeight,
 	}
 }
 
