@@ -20,6 +20,7 @@ import (
 	"errors"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/action/triggers"
 	"seehuhn.de/go/pdf/annotation/appearance"
 )
 
@@ -54,7 +55,9 @@ type Widget struct {
 
 	// AA (optional; PDF 1.2) is an additional-actions dictionary defining
 	// the annotation's behaviour in response to various trigger events.
-	AA pdf.Object
+	//
+	// This corresponds to the /AA entry in the PDF annotation dictionary.
+	AA *triggers.Annotation
 
 	// BorderStyle (optional; PDF 1.2) is a border style dictionary specifying
 	// the width and dash pattern that is used in drawing the annotation's
@@ -78,6 +81,11 @@ var _ Annotation = (*Widget)(nil)
 func (w *Widget) AnnotationType() pdf.Name {
 	return "Widget"
 }
+
+// IsFieldNode marks a widget annotation as a possible child in an AcroForm
+// field hierarchy. It lets a widget be used as a child node of a form field
+// without the annotation package depending on the form package.
+func (w *Widget) IsFieldNode() {}
 
 func decodeWidget(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Widget, error) {
 	r := x.R
@@ -109,7 +117,9 @@ func decodeWidget(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Widge
 	}
 
 	// AA (optional)
-	if aa := dict["AA"]; aa != nil {
+	if aa, err := pdf.ExtractorGetOptional(x, path, dict["AA"], triggers.DecodeAnnotation); err != nil {
+		return nil, err
+	} else {
 		widget.AA = aa
 	}
 
@@ -172,7 +182,11 @@ func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// AA (optional)
 	if w.AA != nil {
-		dict["AA"] = w.AA
+		aa, err := w.AA.Encode(rm)
+		if err != nil {
+			return nil, err
+		}
+		dict["AA"] = aa
 	}
 
 	// BS (optional)

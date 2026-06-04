@@ -71,6 +71,13 @@ type Annotation struct {
 
 var _ pdf.Encoder = (*Annotation)(nil)
 
+// IsEmpty reports whether the additional-actions dictionary defines no actions.
+func (a *Annotation) IsEmpty() bool {
+	return a.Enter == nil && a.Exit == nil && a.Down == nil && a.Up == nil &&
+		a.Focus == nil && a.Blur == nil && a.PageOpen == nil && a.PageClose == nil &&
+		a.PageVisible == nil && a.PageInvisible == nil
+}
+
 // Encode converts the Annotation to a PDF dictionary.
 func (a *Annotation) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{}

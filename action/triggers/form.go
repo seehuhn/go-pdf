@@ -50,6 +50,11 @@ type Form struct {
 
 var _ pdf.Encoder = (*Form)(nil)
 
+// IsEmpty reports whether the additional-actions dictionary defines no actions.
+func (f *Form) IsEmpty() bool {
+	return f.Keystroke == nil && f.Format == nil && f.Validate == nil && f.Calculate == nil
+}
+
 // Encode converts the Form to a PDF dictionary.
 func (f *Form) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{}

@@ -1395,7 +1395,7 @@ var testCases = map[pdf.Name][]testCase{
 				},
 				Highlight: "I",                       // Default highlighting
 				A:         pdf.NewReference(1800, 0), // Action dictionary
-				AA:        pdf.NewReference(1900, 0), // Additional-actions dictionary
+				AA:        &triggers.Annotation{Up: &action.URI{URI: "https://example.com/widget-up"}},
 			},
 		},
 		{
@@ -1442,7 +1442,7 @@ var testCases = map[pdf.Name][]testCase{
 					},
 				},
 				A:  pdf.NewReference(2300, 0), // Action dictionary
-				AA: pdf.NewReference(2400, 0), // Additional-actions dictionary
+				AA: &triggers.Annotation{Focus: &action.URI{URI: "https://example.com/focus"}},
 				BorderStyle: &BorderStyle{
 					Width:     1.5,
 					Style:     "D",

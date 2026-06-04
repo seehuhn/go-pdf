@@ -144,6 +144,8 @@ func (s *Style) AddAppearance(a annotation.Annotation) error {
 		normal = s.addMovieAppearance(a)
 	case *annotation.Screen:
 		normal = s.addScreenAppearance(a)
+	case *annotation.Widget:
+		normal = s.addWidgetAppearance(a)
 	default:
 		return fmt.Errorf("unsupported annotation type: %T", a)
 	}
