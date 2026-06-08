@@ -29,7 +29,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/page"
 )
 
 var paper = document.A4
@@ -140,7 +139,7 @@ func (w *writer) addCloudySquare(rect pdf.Rectangle, lw, intensity float64, stro
 		},
 	}
 	w.style.AddAppearance(a)
-	w.page.Page.Annots = append(w.page.Page.Annots, page.AnnotInfo{Annot: a, Ref: w.doc.Out.Alloc()})
+	w.page.Page.Annots = append(w.page.Page.Annots, a)
 
 	// overlay: thin gray outline of the original rectangle
 	outline := &annotation.Square{
@@ -156,7 +155,7 @@ func (w *writer) addCloudySquare(rect pdf.Rectangle, lw, intensity float64, stro
 		},
 	}
 	w.style.AddAppearance(outline)
-	w.page.Page.Annots = append(w.page.Page.Annots, page.AnnotInfo{Annot: outline, Ref: w.doc.Out.Alloc()})
+	w.page.Page.Annots = append(w.page.Page.Annots, outline)
 }
 
 func (w *writer) addCloudyCircle(rect pdf.Rectangle, lw, intensity float64, strokeCol, fillCol color.Color) {
@@ -179,7 +178,7 @@ func (w *writer) addCloudyCircle(rect pdf.Rectangle, lw, intensity float64, stro
 		},
 	}
 	w.style.AddAppearance(a)
-	w.page.Page.Annots = append(w.page.Page.Annots, page.AnnotInfo{Annot: a, Ref: w.doc.Out.Alloc()})
+	w.page.Page.Annots = append(w.page.Page.Annots, a)
 
 	// overlay: thin gray outline of the original ellipse
 	outline := &annotation.Circle{
@@ -195,7 +194,7 @@ func (w *writer) addCloudyCircle(rect pdf.Rectangle, lw, intensity float64, stro
 		},
 	}
 	w.style.AddAppearance(outline)
-	w.page.Page.Annots = append(w.page.Page.Annots, page.AnnotInfo{Annot: outline, Ref: w.doc.Out.Alloc()})
+	w.page.Page.Annots = append(w.page.Page.Annots, outline)
 }
 
 func (w *writer) addCloudyPolygon(rect pdf.Rectangle, verts []float64, lw, intensity float64, strokeCol, fillCol color.Color) {
@@ -219,7 +218,7 @@ func (w *writer) addCloudyPolygon(rect pdf.Rectangle, verts []float64, lw, inten
 		},
 	}
 	w.style.AddAppearance(a)
-	w.page.Page.Annots = append(w.page.Page.Annots, page.AnnotInfo{Annot: a, Ref: w.doc.Out.Alloc()})
+	w.page.Page.Annots = append(w.page.Page.Annots, a)
 
 	// overlay: thin gray outline of the original polygon
 	outline := &annotation.Polygon{
@@ -236,7 +235,7 @@ func (w *writer) addCloudyPolygon(rect pdf.Rectangle, verts []float64, lw, inten
 		},
 	}
 	w.style.AddAppearance(outline)
-	w.page.Page.Annots = append(w.page.Page.Annots, page.AnnotInfo{Annot: outline, Ref: w.doc.Out.Alloc()})
+	w.page.Page.Annots = append(w.page.Page.Annots, outline)
 }
 
 // pageVaryingSizes shows cloudy squares in different sizes.

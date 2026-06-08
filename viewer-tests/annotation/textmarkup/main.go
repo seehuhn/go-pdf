@@ -31,7 +31,6 @@ import (
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content/builder"
-	pdfpage "seehuhn.de/go/pdf/page"
 )
 
 const (
@@ -146,7 +145,7 @@ type writer struct {
 }
 
 func (w *writer) addAnnotation(a annotation.Annotation) {
-	w.page.Page.Annots = append(w.page.Page.Annots, pdfpage.AnnotInfo{Annot: a, Ref: w.page.Out.Alloc()})
+	w.page.Page.Annots = append(w.page.Page.Annots, a)
 }
 
 // addRowWithBorder is like addRow but sets Border.Width on both annotations.

@@ -39,7 +39,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/movie"
-	pdfpage "seehuhn.de/go/pdf/page"
 )
 
 //go:embed movie.mp4
@@ -93,10 +92,7 @@ func createDocument(filename string) error {
 		Movie:      newTestMovie(),
 		Activation: movie.DefaultActivation,
 	}
-	page.Page.Annots = append(page.Page.Annots, pdfpage.AnnotInfo{
-		Annot: annot,
-		Ref:   page.Out.Alloc(),
-	})
+	page.Page.Annots = append(page.Page.Annots, annot)
 
 	return page.Close()
 }

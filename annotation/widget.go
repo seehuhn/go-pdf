@@ -68,10 +68,18 @@ type Widget struct {
 	// This corresponds to the /BS entry in the PDF annotation dictionary.
 	BorderStyle *BorderStyle
 
-	// Parent (required if this widget annotation is one of multiple children
-	// in a field; optional otherwise) is an indirect reference to the widget
-	// annotation's parent field. A widget annotation may have at most one parent.
-	Parent pdf.Reference
+	// Parent is the form field this widget belongs to, or nil if the widget is
+	// not part of an interactive form. It is the back-edge of the field/widget
+	// hierarchy: the field's [FieldCommon.Kids] holds this widget, and this
+	// widget's Parent holds that field. It is set when the field tree is decoded
+	// (see [DecodeInteractiveForm], which page decoding triggers automatically)
+	// and is used on encode to write the widget's /Parent entry and, for a
+	// single-widget field merged into this widget, to fold in the field's own
+	// dictionary entries.
+	//
+	// Because it forms a cycle with [FieldCommon.Kids], round-trip comparisons
+	// must ignore it; the field tree is the authoritative representation.
+	Parent Field
 }
 
 var _ Annotation = (*Widget)(nil)
@@ -87,7 +95,22 @@ func (w *Widget) AnnotationType() pdf.Name {
 // without the annotation package depending on the form package.
 func (w *Widget) IsFieldNode() {}
 
+// decodeWidget decodes a widget annotation. A merged field/widget dictionary
+// (a Widget that also carries field entries) is decoded as a linked field+widget
+// pair by [decodeMergedField]; this returns the widget half so that the page's
+// /Annots and the field tree's /Kids share one object.
 func decodeWidget(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Widget, error) {
+	if path != nil && isMergedFieldDict(dict) {
+		_, w, err := decodeMergedField(x, path, path.Ref, dict)
+		return w, err
+	}
+	return decodeWidgetBody(x, path, dict)
+}
+
+// decodeWidgetBody decodes the annotation-level half of a widget dictionary (the
+// entries that pertain to a widget annotation, not to a form field). It never
+// sets Parent: the field tree owns that linkage.
+func decodeWidgetBody(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Widget, error) {
 	r := x.R
 	widget := &Widget{}
 
@@ -134,9 +157,13 @@ func decodeWidget(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Widge
 		}
 	}
 
-	// Parent (optional)
-	if parent, ok := dict["Parent"].(pdf.Reference); ok {
-		widget.Parent = parent
+	// /Parent is intentionally not read here: the field tree owns the linkage
+	// and sets Widget.Parent when the form is decoded.
+
+	// the widget half of a shared /AA keeps only the annotation-level triggers;
+	// drop an empty remnant left by the field/widget split
+	if widget.AA != nil && widget.AA.IsEmpty() {
+		widget.AA = nil
 	}
 
 	return widget, nil
@@ -198,9 +225,11 @@ func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["BS"] = bs
 	}
 
-	// Parent (optional)
-	if w.Parent != 0 {
-		dict["Parent"] = w.Parent
+	// tie the widget to its form field: for a field whose single widget this is,
+	// fold the field's own entries in here (one merged field/widget dictionary);
+	// otherwise write /Parent pointing at the field's object.
+	if w.Parent != nil {
+		return foldFieldIntoWidget(rm, w, dict)
 	}
 
 	return dict, nil

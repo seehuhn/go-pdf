@@ -200,8 +200,8 @@ func readChildren(x *pdf.Extractor, path *pdf.CycleCheck, visited map[pdf.Refere
 	return res, nil
 }
 
-// Encode writes the outline to a PDF file and returns the root reference.
-// Returns nil if the outline is nil or empty.
+// Encode writes the outline's items to the PDF file and returns the root
+// outline dictionary.  Returns nil if the outline is nil or empty.
 func (o *Outline) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if o == nil || len(o.Items) == 0 {
 		return nil, nil
@@ -218,7 +218,7 @@ func (o *Outline) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		rootCount += ww.getCount(item)
 	}
 
-	rootRef := rm.Out.Alloc()
+	rootRef := rm.GetReference(o)
 	rootDict := pdf.Dict{}
 	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
 		rootDict["Type"] = pdf.Name("Outlines")
@@ -237,9 +237,6 @@ func (o *Outline) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		rootDict["Count"] = pdf.Integer(rootCount)
 	}
 
-	ww.objs = append(ww.objs, rootDict)
-	ww.refs = append(ww.refs, rootRef)
-
 	err := ww.writeChildren(rootRef, first, last, o.Items)
 	if err != nil {
 		return nil, err
@@ -250,7 +247,7 @@ func (o *Outline) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 
-	return rootRef, nil
+	return rootDict, nil
 }
 
 type writer struct {

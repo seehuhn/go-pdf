@@ -544,23 +544,24 @@ func TestAnnotInfoRoundTrip(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
 			w, _ := memfile.NewPDFWriter(v, nil)
+			rm := pdf.NewResourceManager(w)
+
 			parentRef := w.Alloc()
-			annotRef := w.Alloc()
 
 			annot := &annotation.Link{
 				Common: annotation.Common{
 					Rect: pdf.Rectangle{LLx: 10, LLy: 10, URx: 100, URy: 50},
 				},
 			}
+			annotRef := rm.GetReference(annot)
 
 			p1 := &Page{
 				Parent:    parentRef,
 				MediaBox:  &pdf.Rectangle{URx: 612, URy: 792},
 				Resources: &content.Resources{SingleUse: true},
-				Annots:    []AnnotInfo{{Annot: annot, Ref: annotRef}},
+				Annots:    []annotation.Annotation{annot},
 			}
 
-			rm := pdf.NewResourceManager(w)
 			dict, err := p1.Encode(rm)
 			if err != nil {
 				t.Fatal(err)
@@ -584,11 +585,15 @@ func TestAnnotInfoRoundTrip(t *testing.T) {
 			if len(p2.Annots) != 1 {
 				t.Fatalf("got %d annotations, want 1", len(p2.Annots))
 			}
-			if p2.Annots[0].Ref != annotRef {
-				t.Errorf("ref = %v, want %v", p2.Annots[0].Ref, annotRef)
+			a, err := pdf.ExtractorGet(x, nil, annotRef, annotation.Decode)
+			if err != nil {
+				t.Fatalf("failed to get annotation by reference: %v", err)
 			}
-			if _, ok := p2.Annots[0].Annot.(*annotation.Link); !ok {
-				t.Errorf("annotation type = %T, want *annotation.Link", p2.Annots[0].Annot)
+			if p2.Annots[0] != a {
+				t.Errorf("annotation mismatch: got %v, want %v", p2.Annots[0], a)
+			}
+			if _, ok := p2.Annots[0].(*annotation.Link); !ok {
+				t.Errorf("annotation type = %T, want *annotation.Link", p2.Annots[0])
 			}
 		})
 	}
@@ -685,47 +690,73 @@ func TestAnnotInfoIRTFiltering(t *testing.T) {
 		t.Fatalf("got %d annotations, want 3", len(p.Annots))
 	}
 
-	// the on-page reply should keep its InReplyTo
+	// the on-page reply should keep its InReplyTo; the off-page orphan
+	// should have it cleared.  Resolving each reference through the same
+	// extractor returns the annotation already decoded by the page.
 	type hasMarkup interface {
 		GetMarkup() *annotation.Markup
 	}
-	for _, ai := range p.Annots {
-		m, ok := ai.Annot.(hasMarkup)
-		if !ok {
-			continue
-		}
-		irt := m.GetMarkup().InReplyTo
-		if ai.Ref == replyRef && irt != textRef {
+	reply, err := pdf.ExtractorGet(x, nil, replyRef, annotation.Decode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m, ok := reply.(hasMarkup); ok {
+		if irt := m.GetMarkup().InReplyTo; irt != textRef {
 			t.Errorf("on-page reply: InReplyTo = %v, want %v", irt, textRef)
 		}
-		if ai.Ref == orphanRef && irt != 0 {
+	}
+	orphan, err := pdf.ExtractorGet(x, nil, orphanRef, annotation.Decode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m, ok := orphan.(hasMarkup); ok {
+		if irt := m.GetMarkup().InReplyTo; irt != 0 {
 			t.Errorf("off-page orphan: InReplyTo = %v, want 0", irt)
 		}
 	}
 }
 
-func TestAnnotInfoEncodeZeroRef(t *testing.T) {
+// an annotation added without a reserved reference is auto-allocated by Store
+func TestAnnotEncodeWithoutReservedRef(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
 	parentRef := w.Alloc()
 
 	p := &Page{
 		Parent:    parentRef,
 		MediaBox:  &pdf.Rectangle{URx: 612, URy: 792},
 		Resources: &content.Resources{SingleUse: true},
-		Annots: []AnnotInfo{{
-			Annot: &annotation.Link{
-				Common: annotation.Common{
-					Rect: pdf.Rectangle{URx: 100, URy: 50},
-				},
+		Annots: []annotation.Annotation{&annotation.Link{
+			Common: annotation.Common{
+				Rect: pdf.Rectangle{URx: 100, URy: 50},
 			},
-			// Ref intentionally left as zero
 		}},
 	}
 
-	rm := pdf.NewResourceManager(w)
-	_, err := p.Encode(rm)
-	if err == nil {
-		t.Fatal("expected error for zero annotation reference")
+	dict, err := p.Encode(rm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Put(parentRef, pdf.Dict{"Type": pdf.Name("Pages")}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	p2, err := Decode(x, nil, dict, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p2.Annots) != 1 {
+		t.Fatalf("got %d annotations, want 1", len(p2.Annots))
+	}
+	if _, ok := p2.Annots[0].(*annotation.Link); !ok {
+		t.Errorf("annotation type = %T, want *annotation.Link", p2.Annots[0])
 	}
 }
 

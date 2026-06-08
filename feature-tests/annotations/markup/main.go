@@ -26,7 +26,6 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/page"
 )
 
 var paper = document.A4
@@ -79,11 +78,6 @@ func date(year, month, day int) time.Time {
 func pageReplyThreading(doc *document.MultiPage) error {
 	p := doc.AddPage()
 
-	// allocate references for threading
-	parentRef := doc.Out.Alloc()
-	reply1Ref := doc.Out.Alloc()
-	reply2Ref := doc.Out.Alloc()
-
 	parent := &annotation.Text{
 		Common: annotation.Common{
 			Rect:     pdf.Rectangle{LLx: 72, LLy: 700, URx: 96, URy: 724},
@@ -97,6 +91,9 @@ func pageReplyThreading(doc *document.MultiPage) error {
 		},
 		Icon: annotation.TextIconComment,
 	}
+
+	// reserve the parent's reference so the replies can target it via IRT
+	parentRef := p.RM.GetReference(parent)
 
 	reply1 := &annotation.Text{
 		Common: annotation.Common{
@@ -126,24 +123,13 @@ func pageReplyThreading(doc *document.MultiPage) error {
 		Icon: annotation.TextIconComment,
 	}
 
-	p.Page.Annots = append(p.Page.Annots,
-		page.AnnotInfo{Annot: parent, Ref: parentRef},
-		page.AnnotInfo{Annot: reply1, Ref: reply1Ref},
-		page.AnnotInfo{Annot: reply2, Ref: reply2Ref},
-	)
+	p.Page.Annots = append(p.Page.Annots, parent, reply1, reply2)
 	return p.Close()
 }
 
 // pageGroupingAndNesting creates a page with grouped annotations and nested replies.
 func pageGroupingAndNesting(doc *document.MultiPage) error {
 	p := doc.AddPage()
-
-	// allocate references
-	caretRef := doc.Out.Alloc()
-	strikeoutRef := doc.Out.Alloc()
-	replyToCaretRef := doc.Out.Alloc()
-	nestedReplyRef := doc.Out.Alloc()
-	stateRef := doc.Out.Alloc()
 
 	// caret + strikeout group: a replacement edit
 	caret := &annotation.Caret{
@@ -158,6 +144,9 @@ func pageGroupingAndNesting(doc *document.MultiPage) error {
 			Subject:      "Replacement",
 		},
 	}
+
+	// reserve the caret's reference so the group members can target it via IRT
+	caretRef := p.RM.GetReference(caret)
 
 	strikeout := &annotation.TextMarkup{
 		Common: annotation.Common{
@@ -194,6 +183,9 @@ func pageGroupingAndNesting(doc *document.MultiPage) error {
 		Icon: annotation.TextIconHelp,
 	}
 
+	// reserve the reply's reference so the nested reply can target it via IRT
+	replyToCaretRef := p.RM.GetReference(replyToCaret)
+
 	// nested reply (reply to the reply)
 	nestedReply := &annotation.Text{
 		Common: annotation.Common{
@@ -223,11 +215,7 @@ func pageGroupingAndNesting(doc *document.MultiPage) error {
 	}
 
 	p.Page.Annots = append(p.Page.Annots,
-		page.AnnotInfo{Annot: caret, Ref: caretRef},
-		page.AnnotInfo{Annot: strikeout, Ref: strikeoutRef},
-		page.AnnotInfo{Annot: replyToCaret, Ref: replyToCaretRef},
-		page.AnnotInfo{Annot: nestedReply, Ref: nestedReplyRef},
-		page.AnnotInfo{Annot: stateAnnot, Ref: stateRef},
+		caret, strikeout, replyToCaret, nestedReply, stateAnnot,
 	)
 	return p.Close()
 }
@@ -239,7 +227,6 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 	y := 750.0
 
 	// highlight
-	hlRef := doc.Out.Alloc()
 	hl := &annotation.TextMarkup{
 		Common: annotation.Common{
 			Rect:     pdf.Rectangle{LLx: 72, LLy: y - 12, URx: 300, URy: y},
@@ -257,7 +244,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 			{X: 300, Y: y}, {X: 72, Y: y},
 		},
 	}
-	p.Page.Annots = append(p.Page.Annots, page.AnnotInfo{Annot: hl, Ref: hlRef})
+	p.Page.Annots = append(p.Page.Annots, hl)
 	y -= 50
 
 	// underline
@@ -278,7 +265,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 			{X: 250, Y: y}, {X: 72, Y: y},
 		},
 	}
-	p.Page.Annots = append(p.Page.Annots, page.AnnotInfo{Annot: ul, Ref: doc.Out.Alloc()})
+	p.Page.Annots = append(p.Page.Annots, ul)
 	y -= 50
 
 	// squiggly
@@ -299,7 +286,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 			{X: 220, Y: y}, {X: 72, Y: y},
 		},
 	}
-	p.Page.Annots = append(p.Page.Annots, page.AnnotInfo{Annot: sq, Ref: doc.Out.Alloc()})
+	p.Page.Annots = append(p.Page.Annots, sq)
 	y -= 50
 
 	// freetext
@@ -315,7 +302,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 		},
 		DefaultAppearance: "/Helvetica 10 Tf 0 0 0 rg",
 	}
-	p.Page.Annots = append(p.Page.Annots, page.AnnotInfo{Annot: ft, Ref: doc.Out.Alloc()})
+	p.Page.Annots = append(p.Page.Annots, ft)
 	y -= 70
 
 	// stamp
@@ -332,7 +319,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 		},
 		Icon: "Approved",
 	}
-	p.Page.Annots = append(p.Page.Annots, page.AnnotInfo{Annot: st, Ref: doc.Out.Alloc()})
+	p.Page.Annots = append(p.Page.Annots, st)
 	y -= 70
 
 	// line
@@ -349,7 +336,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 		},
 		Coords: [4]float64{72, y - 15, 300, y - 15},
 	}
-	p.Page.Annots = append(p.Page.Annots, page.AnnotInfo{Annot: ln, Ref: doc.Out.Alloc()})
+	p.Page.Annots = append(p.Page.Annots, ln)
 	y -= 60
 
 	// square
@@ -365,7 +352,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 			Subject:      "Box",
 		},
 	}
-	p.Page.Annots = append(p.Page.Annots, page.AnnotInfo{Annot: sqr, Ref: doc.Out.Alloc()})
+	p.Page.Annots = append(p.Page.Annots, sqr)
 	y -= 80
 
 	// ink
@@ -384,7 +371,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 			{{X: 80, Y: y - 10}, {X: 100, Y: y - 30}, {X: 120, Y: y - 10}, {X: 140, Y: y - 30}},
 		},
 	}
-	p.Page.Annots = append(p.Page.Annots, page.AnnotInfo{Annot: ink, Ref: doc.Out.Alloc()})
+	p.Page.Annots = append(p.Page.Annots, ink)
 
 	return p.Close()
 }
@@ -394,7 +381,6 @@ func pageEdgeCases(doc *document.MultiPage) error {
 	p := doc.AddPage()
 
 	// annotation without a date (should sort first)
-	nodateRef := doc.Out.Alloc()
 	nodate := &annotation.Text{
 		Common: annotation.Common{
 			Rect:     pdf.Rectangle{LLx: 72, LLy: 700, URx: 96, URy: 724},
@@ -407,8 +393,10 @@ func pageEdgeCases(doc *document.MultiPage) error {
 		Icon: annotation.TextIconNote,
 	}
 
+	// reserve the undated annotation's reference so the reply can target it
+	nodateRef := p.RM.GetReference(nodate)
+
 	// annotation with long multi-paragraph text
-	longRef := doc.Out.Alloc()
 	longText := &annotation.Text{
 		Common: annotation.Common{
 			Rect: pdf.Rectangle{LLx: 72, LLy: 650, URx: 96, URy: 674},
@@ -430,7 +418,6 @@ func pageEdgeCases(doc *document.MultiPage) error {
 	}
 
 	// annotation with empty contents but with subject
-	emptyRef := doc.Out.Alloc()
 	empty := &annotation.Text{
 		Common: annotation.Common{
 			Rect: pdf.Rectangle{LLx: 72, LLy: 600, URx: 96, URy: 624},
@@ -444,7 +431,6 @@ func pageEdgeCases(doc *document.MultiPage) error {
 	}
 
 	// reply to the undated annotation
-	replyRef := doc.Out.Alloc()
 	reply := &annotation.Text{
 		Common: annotation.Common{
 			Rect:     pdf.Rectangle{LLx: 72, LLy: 700, URx: 96, URy: 724},
@@ -459,10 +445,7 @@ func pageEdgeCases(doc *document.MultiPage) error {
 	}
 
 	p.Page.Annots = append(p.Page.Annots,
-		page.AnnotInfo{Annot: nodate, Ref: nodateRef},
-		page.AnnotInfo{Annot: longText, Ref: longRef},
-		page.AnnotInfo{Annot: empty, Ref: emptyRef},
-		page.AnnotInfo{Annot: reply, Ref: replyRef},
+		nodate, longText, empty, reply,
 	)
 	return p.Close()
 }

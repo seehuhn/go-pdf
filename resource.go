@@ -26,8 +26,12 @@ import (
 
 // Encoder represents a PDF object which is tied to a specific PDF file.
 type Encoder interface {
-	// Encode converts the Go representation of the object into the PDF
-	// representation.
+	// Encode converts the Go representation of the object into its inline PDF
+	// representation (a Dict, Array, stream, etc.).  It must not return a
+	// Reference; allocating and writing the indirect object is the job of
+	// [ResourceManager.Store].  An object that needs its own reference while
+	// encoding (for example to let its children point back at it) obtains it
+	// via [ResourceManager.GetReference].
 	Encode(rm *ResourceManager) (Native, error)
 }
 
@@ -142,6 +146,7 @@ func EmbedHelperEmbedFunc[T any](e *EmbedHelper, f func(*EmbedHelper, T) (Native
 type ResourceManager struct {
 	Out      *Writer
 	embedded map[any]Native
+	reserved map[any]bool
 	deferred []func(*EmbedHelper) error
 	isClosed bool
 }
@@ -151,6 +156,7 @@ func NewResourceManager(w *Writer) *ResourceManager {
 	return &ResourceManager{
 		Out:      w,
 		embedded: make(map[any]Native),
+		reserved: make(map[any]bool),
 	}
 }
 
@@ -179,41 +185,64 @@ func ResourceManagerEmbedFunc[T any](rm *ResourceManager, f func(*EmbedHelper, T
 	return EmbedHelperEmbedFunc(e, f, obj)
 }
 
-// Store encodes an Encoder object and stores it in the PDF file.
+// GetReference returns the reference associated with enc, assigning one if
+// necessary.  If no reference has been assigned yet, it allocates and reserves
+// one, so that a later [ResourceManager.Store] still encodes enc at that
+// reference.
 //
-// If the encoder was previously stored (via Store or StoreAt), the cached
-// reference is returned without encoding again.
-func (rm *ResourceManager) Store(enc Encoder) (Reference, error) {
+// This is useful when a reference must be obtained before encoding, such as
+// when two objects need to reference each other (e.g. a widget annotation and
+// its parent field).
+func (rm *ResourceManager) GetReference(enc Encoder) Reference {
 	if ref, ok := rm.embedded[enc].(Reference); ok {
-		return ref, nil
+		return ref
 	}
 	ref := rm.Out.Alloc()
-	if err := rm.StoreAt(ref, enc); err != nil {
-		return 0, err
-	}
-	return ref, nil
+	rm.embedded[enc] = ref
+	rm.reserved[enc] = true
+	return ref
 }
 
-// StoreAt encodes an Encoder object and stores it at a specific reference.
+// Store encodes enc and stores it in the PDF file, returning its reference.
 //
-// This is useful when references must be allocated before encoding, such as
-// when two objects need to reference each other (e.g., popup and text annotations).
+// If enc was previously stored, the cached reference is returned without
+// encoding again.  If a reference was reserved for enc via
+// [ResourceManager.GetReference], enc is encoded at that reference.
 //
-// Returns an error if enc.Encode returns a Reference, since that would conflict
-// with the explicitly provided reference.
-func (rm *ResourceManager) StoreAt(ref Reference, enc Encoder) error {
+// [Encoder.Encode] must return the object's inline representation, never a
+// reference; allocating and writing the object is the job of Store.  An encoder
+// that returns a nil object writes nothing; Store then returns the zero
+// reference, which callers treat as "unset".
+func (rm *ResourceManager) Store(enc Encoder) (Reference, error) {
+	ref, isSet := rm.embedded[enc].(Reference)
+	if isSet && !rm.reserved[enc] {
+		return ref, nil
+	}
+
 	native, err := enc.Encode(rm)
 	if err != nil {
-		return err
+		return 0, err
+	}
+	if native == nil {
+		// the encoder chose to write nothing (e.g. an empty outline); report
+		// this as the zero reference, which callers treat as "unset"
+		return 0, nil
 	}
 	if _, isRef := native.(Reference); isRef {
-		return errors.New("cannot use StoreAt: Encode returned a Reference")
+		return 0, errors.New("encode must not return a reference")
+	}
+
+	// Encode may have reserved its own reference via GetReference.
+	ref, isSet = rm.embedded[enc].(Reference)
+	if !isSet {
+		ref = rm.Out.Alloc()
+		rm.embedded[enc] = ref
 	}
 	if err := rm.Out.Put(ref, native); err != nil {
-		return err
+		return 0, err
 	}
-	rm.embedded[enc] = ref
-	return nil
+	delete(rm.reserved, enc)
+	return ref, nil
 }
 
 // Close runs all defered calls registered with [EmbedHelper.Defer].

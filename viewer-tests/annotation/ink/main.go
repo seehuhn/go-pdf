@@ -33,7 +33,6 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/shading"
-	pdfpage "seehuhn.de/go/pdf/page"
 )
 
 const (
@@ -242,7 +241,7 @@ type writer struct {
 }
 
 func (w *writer) addAnnotation(a annotation.Annotation) {
-	w.page.Page.Annots = append(w.page.Page.Annots, pdfpage.AnnotInfo{Annot: a, Ref: w.page.Out.Alloc()})
+	w.page.Page.Annots = append(w.page.Page.Annots, a)
 }
 
 // inkShape builds an InkList that fits inside the given bounding rectangle.

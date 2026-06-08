@@ -31,7 +31,6 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/oc"
-	pdfpage "seehuhn.de/go/pdf/page"
 )
 
 // This viewer test generates a PDF showing an interactive logic circuit.
@@ -303,7 +302,7 @@ func addToggleLink(page *document.Page, x, y, size float64, ref pdf.Native) {
 		},
 		Highlight: annotation.LinkHighlightNone,
 	}
-	page.Page.Annots = append(page.Page.Annots, pdfpage.AnnotInfo{Annot: link, Ref: page.Out.Alloc()})
+	page.Page.Annots = append(page.Page.Annots, link)
 }
 
 // drawAND draws an AND gate (D-shape): flat left + semicircular right.

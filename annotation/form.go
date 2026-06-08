@@ -14,15 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package acroform implements PDF interactive forms (AcroForms).
-//
-// A PDF document has at most one interactive form, referenced from the
-// AcroForm entry of the document catalog. The form is a collection of fields,
-// gathering information interactively from the user, that may appear on any
-// combination of pages.
-package acroform
+package annotation
 
 import (
+	"errors"
 	"fmt"
 
 	"seehuhn.de/go/pdf"
@@ -30,14 +25,45 @@ import (
 	"seehuhn.de/go/pdf/graphics/extract"
 )
 
+// decodeFieldRefs decodes an array of field references (the /Fields or /CO entry)
+// into the matching fields. The same extractor resolves both, so a reference
+// shared between the two yields the same field value.
+func decodeFieldRefs(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]Field, error) {
+	arr, err := pdf.Optional(x.GetArray(path, obj))
+	if err != nil {
+		return nil, err
+	}
+	var fields []Field
+	for _, el := range arr {
+		ref, ok := el.(pdf.Reference)
+		if !ok {
+			continue
+		}
+		fld, err := pdf.Optional(pdf.ExtractorGet(x, path, ref, DecodeField))
+		if err != nil {
+			return nil, err
+		}
+		if fld != nil {
+			fields = append(fields, fld)
+		}
+	}
+	return fields, nil
+}
+
 // PDF 2.0 sections: 12.7.3
 
 // InteractiveForm represents a document's interactive form, referenced from
 // the AcroForm entry in the document catalog.
 type InteractiveForm struct {
 	// Fields are the document's root fields, those with no ancestors in the
-	// field hierarchy. Each entry is a reference to a field dictionary.
-	Fields []pdf.Reference
+	// field hierarchy. Encoding the form writes each field, and the whole
+	// subtree rooted at it, to the file.
+	//
+	// A field's single widget annotation is merged into it and written as part
+	// of that widget when the widget's page is written; such a widget must
+	// therefore appear in some page's annotation list, and that page must be
+	// written after the form is stored.
+	Fields []Field
 
 	// NeedAppearances indicates that the viewer must construct appearance
 	// streams and appearance dictionaries for all widget annotations in the
@@ -51,12 +77,13 @@ type InteractiveForm struct {
 	// related to signature fields.
 	SigFlags SignatureFlags
 
-	// CalculationOrder (optional) lists field dictionaries with calculation
-	// actions, in the order their values are recalculated when the value of
-	// any field changes. Each entry is a reference to a field dictionary.
+	// CalculationOrder (optional) lists the fields with calculation actions, in
+	// the order their values are recalculated when the value of any field
+	// changes. Each entry must also appear in the field tree reachable from
+	// Fields.
 	//
 	// This corresponds to the /CO entry in the interactive form dictionary.
-	CalculationOrder []pdf.Reference
+	CalculationOrder []Field
 
 	// DefaultResources (optional) contains resources, such as fonts, that are
 	// used by form field appearance streams.
@@ -117,14 +144,10 @@ func DecodeInteractiveForm(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Objec
 	form := &InteractiveForm{}
 
 	// Fields (required)
-	if fields, err := pdf.Optional(x.GetArray(path, dict["Fields"])); err != nil {
+	if fields, err := decodeFieldRefs(x, path, dict["Fields"]); err != nil {
 		return nil, err
 	} else {
-		for _, el := range fields {
-			if ref, ok := el.(pdf.Reference); ok {
-				form.Fields = append(form.Fields, ref)
-			}
-		}
+		form.Fields = fields
 	}
 
 	// NeedAppearances (optional)
@@ -141,15 +164,12 @@ func DecodeInteractiveForm(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Objec
 		form.SigFlags = SignatureFlags(sf)
 	}
 
-	// CO (optional)
-	if co, err := pdf.Optional(x.GetArray(path, dict["CO"])); err != nil {
+	// CO (optional); resolved through the same extractor, so each entry is the
+	// same field value as in the Fields tree
+	if co, err := decodeFieldRefs(x, path, dict["CO"]); err != nil {
 		return nil, err
 	} else {
-		for _, el := range co {
-			if ref, ok := el.(pdf.Reference); ok {
-				form.CalculationOrder = append(form.CalculationOrder, ref)
-			}
-		}
+		form.CalculationOrder = co
 	}
 
 	// DR (optional)
@@ -181,9 +201,8 @@ func DecodeInteractiveForm(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Objec
 	return form, nil
 }
 
-// Encode writes the interactive form to a PDF file and returns a reference to
-// the form dictionary, suitable for use as the AcroForm entry in the document
-// catalog.
+// Encode returns the interactive form dictionary, suitable for use as the
+// AcroForm entry in the document catalog.
 //
 // This implements the [pdf.Encoder] interface.
 func (f *InteractiveForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
@@ -193,10 +212,31 @@ func (f *InteractiveForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	dict := pdf.Dict{}
 
-	// Fields (required)
-	fields := make(pdf.Array, len(f.Fields))
-	for i, ref := range f.Fields {
-		fields[i] = ref
+	// the set of fields in the tree, so /CO can be validated to reference them
+	inTree := map[Field]bool{}
+	var walk func(Field)
+	walk = func(fld Field) {
+		inTree[fld] = true
+		for _, kid := range fld.GetFieldCommon().Kids {
+			if k, ok := kid.(Field); ok {
+				walk(k)
+			}
+		}
+	}
+	for _, fld := range f.Fields {
+		walk(fld)
+	}
+
+	// Fields (required); each is named by fieldRef, which writes the field (or,
+	// for a single-widget leaf, defers to its widget) and is idempotent, so /CO
+	// can call it again to obtain the same references
+	fields := make(pdf.Array, 0, len(f.Fields))
+	for _, fld := range f.Fields {
+		ref, err := fieldRef(rm, fld)
+		if err != nil {
+			return nil, err
+		}
+		fields = append(fields, ref)
 	}
 	dict["Fields"] = fields
 
@@ -218,9 +258,16 @@ func (f *InteractiveForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out, "interactive form CO entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		co := make(pdf.Array, len(f.CalculationOrder))
-		for i, ref := range f.CalculationOrder {
-			co[i] = ref
+		co := make(pdf.Array, 0, len(f.CalculationOrder))
+		for _, fld := range f.CalculationOrder {
+			if !inTree[fld] {
+				return nil, errors.New("CalculationOrder field is not in the form")
+			}
+			ref, err := fieldRef(rm, fld)
+			if err != nil {
+				return nil, err
+			}
+			co = append(co, ref)
 		}
 		dict["CO"] = co
 	}
@@ -262,9 +309,5 @@ func (f *InteractiveForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["XFA"] = f.XFA
 	}
 
-	ref := rm.Out.Alloc()
-	if err := rm.Out.Put(ref, dict); err != nil {
-		return nil, err
-	}
-	return ref, nil
+	return dict, nil
 }

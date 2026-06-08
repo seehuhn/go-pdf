@@ -53,7 +53,7 @@ type Dict struct {
 
 var _ pdf.Encoder = (*Dict)(nil)
 
-// Encode writes the separation dictionary to a PDF file.
+// Encode returns the separation dictionary.
 func (d *Dict) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "separation dictionaries", pdf.V1_3); err != nil {
 		return nil, err

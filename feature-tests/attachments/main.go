@@ -32,7 +32,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/nametree"
-	pdfpage "seehuhn.de/go/pdf/page"
 )
 
 var paper = document.A5
@@ -202,10 +201,7 @@ func addFileAttachment(page *document.Page, style *fallback.Style,
 	if err := style.AddAppearance(fa); err != nil {
 		return err
 	}
-	page.Page.Annots = append(page.Page.Annots, pdfpage.AnnotInfo{
-		Annot: fa,
-		Ref:   page.Out.Alloc(),
-	})
+	page.Page.Annots = append(page.Page.Annots, fa)
 	return nil
 }
 

@@ -34,7 +34,6 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/shading"
-	pdfpage "seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/sound"
 )
 
@@ -162,7 +161,7 @@ type writer struct {
 }
 
 func (w *writer) addAnnotation(a annotation.Annotation) {
-	w.page.Page.Annots = append(w.page.Page.Annots, pdfpage.AnnotInfo{Annot: a, Ref: w.page.Out.Alloc()})
+	w.page.Page.Annots = append(w.page.Page.Annots, a)
 }
 
 func (w *writer) addPair(left *annotation.Sound, label string) error {

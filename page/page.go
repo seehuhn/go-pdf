@@ -92,13 +92,6 @@ func (r Rotation) degrees() int {
 	}
 }
 
-// AnnotInfo pairs a decoded annotation with its indirect object reference.
-// The PDF spec requires annotations to be indirect objects in the Annots array.
-type AnnotInfo struct {
-	Annot annotation.Annotation
-	Ref   pdf.Reference
-}
-
 // Page represents a PDF page object (Table 31 in the PDF spec).
 // It implements [pdf.Encoder] for file-dependent embedding.
 //
@@ -172,7 +165,7 @@ type Page struct {
 	// Annots (optional) lists annotations associated with the page.
 	// The PDF spec requires annotation dictionaries to be indirect objects,
 	// so each entry includes the object reference.
-	Annots []AnnotInfo
+	Annots []annotation.Annotation
 
 	// AA (optional) defines additional actions for page open/close events.
 	AA *triggers.Page
@@ -415,13 +408,11 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if len(p.Annots) > 0 {
 		arr := make(pdf.Array, len(p.Annots))
 		for i, ai := range p.Annots {
-			if ai.Ref == 0 {
-				return nil, errors.New("page annotation without reference")
-			}
-			if err := rm.StoreAt(ai.Ref, ai.Annot); err != nil {
+			ref, err := rm.Store(ai)
+			if err != nil {
 				return nil, err
 			}
-			arr[i] = ai.Ref
+			arr[i] = ref
 		}
 		dict["Annots"] = arr
 	}
@@ -785,7 +776,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 				// permissive: skip invalid annotations
 				continue
 			}
-			p.Annots = append(p.Annots, AnnotInfo{Annot: annot, Ref: ref})
+			p.Annots = append(p.Annots, annot)
 			pageRefs[ref] = true
 		}
 		// Clear InReplyTo for markup annotations whose IRT target is
@@ -794,14 +785,30 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 		type hasMarkup interface {
 			GetMarkup() *annotation.Markup
 		}
+		hasWidget := false
 		for _, ai := range p.Annots {
-			m, ok := ai.Annot.(hasMarkup)
+			if _, ok := ai.(*annotation.Widget); ok {
+				hasWidget = true
+			}
+			m, ok := ai.(hasMarkup)
 			if !ok {
 				continue
 			}
 			markup := m.GetMarkup()
 			if markup.InReplyTo != 0 && !pageRefs[markup.InReplyTo] {
 				markup.InReplyTo = 0
+			}
+		}
+
+		// A widget annotation belongs to a form field. Decoding the interactive
+		// form links each widget to its field (annotation.Widget.Parent); the
+		// page's widgets are already cached, so the form's top-down walk links
+		// them via cache hits without a cycle. ExtractorGetExclusive single-flights
+		// so concurrent page decodes share one field tree. Errors are non-fatal: a
+		// malformed form must not break page decoding.
+		if hasWidget {
+			if m := x.R.GetMeta(); m != nil && m.Catalog != nil && m.Catalog.AcroForm != nil {
+				_, _ = pdf.ExtractorGetExclusive(x, nil, m.Catalog.AcroForm, annotation.DecodeInteractiveForm)
 			}
 		}
 	}

@@ -6608,9 +6608,7 @@ types:
     introduced: '1.2'
     refTypes:
     - FieldTx
-    - FieldBtnPush
-    - FieldBtnCheckbox
-    - FieldBtnRadio
+    - FieldBtn
     - FieldChoice
     - type: FieldSig
       since: '1.3'
@@ -7162,17 +7160,17 @@ types:
     - 3DMeasurePD3
     - 3DMeasureRD3
 - name: Field
-  purpose: interactive form field base properties
-  goType: acroform.Field
-  goPackage: acroform
+  purpose: interactive form field properties common to all field types
+  goType: annotation.FieldCommon
+  goPackage: annotation
   goRepr: struct
   pdfRepr: dict
   introduced: '1.2'
   specSection: 12.7.4.1 12.7.4.2
   specTable: Table 226
   fileDependent: true
-  writeMethod: (*Field).Encode
-  readFunc: acroform.DecodeField
+  writeMethod: (*FieldCommon).Encode
+  readFunc: annotation.DecodeField
   fields:
   - goName: FT
     pdfKey: FT
@@ -7193,9 +7191,7 @@ types:
     introduced: '1.2'
     refTypes:
     - FieldTx
-    - FieldBtnPush
-    - FieldBtnCheckbox
-    - FieldBtnRadio
+    - FieldBtn
     - FieldChoice
     - type: FieldSig
       since: '1.3'
@@ -7206,7 +7202,7 @@ types:
     pdfType: array
     required: false
     introduced: '1.2'
-    goType: '[]acroform.Node'
+    goType: '[]annotation.Node'
     refTypes:
     - type: Field
       collection: array
@@ -7236,22 +7232,6 @@ types:
     goType: optional.UInt
     goPresenceTracking: true
     inheritable: true
-  - goName: V
-    pdfKey: V
-    pdfType: array;dictionary;name;stream;text-string
-    required: false
-    introduced: '1.2'
-    goType: pdf.Object
-    inheritable: true
-    purpose: field value; the concrete type depends on the field type
-  - goName: DV
-    pdfKey: DV
-    pdfType: array;dictionary;name;stream;text-string
-    required: false
-    introduced: '1.2'
-    goType: pdf.Object
-    inheritable: true
-    purpose: default field value, used on form reset; the concrete type depends on the field type
   - goName: AA
     pdfKey: AA
     pdfType: dictionary
@@ -7260,10 +7240,64 @@ types:
     goType: '*action/triggers.Form'
     refTypes:
     - AddActionFormField
-- name: FieldBtnCheckbox
-  purpose: checkbox form field
-  goType:
+- name: VariableText
+  purpose: variable-text attributes shared by terminal field types (DA/Q/DS/RV)
+  goType: annotation.VariableText
+  goPackage: annotation
+  goRepr: struct
   pdfRepr: dict
+  introduced: '1.2'
+  specSection: 12.7.4.3
+  specTable: Table 228
+  fields:
+  - goName: DefaultAppearance
+    pdfKey: DA
+    pdfType: byte-string
+    required: false
+    introduced: '1.2'
+    goType: string
+    inheritable: true
+  - goName: Align
+    pdfKey: Q
+    pdfType: integer
+    required: false
+    default: '0'
+    introduced: '1.2'
+    goType: pdf.TextAlign
+    inheritable: true
+    possibleValues:
+    - '0'
+    - '1'
+    - '2'
+  - goName: DefaultStyle
+    pdfKey: DS
+    pdfType: text-string
+    required: false
+    introduced: '1.5'
+    goType: string
+  - goName: RichValue
+    pdfKey: RV
+    pdfType: stream;text-string
+    required: false
+    introduced: '1.5'
+    goType: pdf.Object
+    refTypes:
+    - Stream
+- name: FieldBtn
+  purpose: button form field (check box, radio button, or push button)
+  goType: annotation.FieldBtn
+  goPackage: annotation
+  goRepr: struct
+  pdfRepr: dict
+  introduced: '1.2'
+  specSection: 12.7.4.2.2
+  specTable: Table 226 and Table 229 and Table 230
+  fileDependent: true
+  readFunc: annotation.DecodeField
+  writeMethod: (*FieldBtn).Encode
+  embeds:
+  - Field
+  - VariableText
   fields:
   - goName:
     pdfKey: FT
@@ -7273,330 +7307,43 @@ types:
     possibleValues:
     - Btn
     inheritable: true
-    notes: Table 226
-  - goName:
-    pdfKey: Parent
-    pdfType: dictionary
-    required: false
-    introduced: '1.2'
-    refTypes:
-    - FieldTx
-    - FieldBtnPush
-    - FieldBtnCheckbox
-    - FieldBtnRadio
-    - FieldChoice
-    - type: FieldSig
-      since: '1.3'
-    - Field
-  - goName:
-    pdfKey: Kids
-    pdfType: array
-    required: false
-    introduced: '1.2'
-    refTypes:
-    - type: Field
-      collection: array
-  - goName:
-    pdfKey: T
-    pdfType: text-string
-    required: false
-    introduced: '1.2'
-  - goName:
-    pdfKey: TU
-    pdfType: text-string
-    required: false
-    introduced: '1.3'
-  - goName:
-    pdfKey: TM
-    pdfType: text-string
-    required: false
-    introduced: '1.3'
-  - goName:
-    pdfKey: Ff
-    pdfType: bitmask
-    required: false
-    introduced: '1.2'
-    inheritable: true
-    notes: Table 227 and Table 229
-  - goName:
-    pdfKey: AA
-    pdfType: dictionary
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - AddActionFormField
-  - goName:
-    pdfKey: DA
-    pdfType: byte-string
-    required: true
-    introduced: '1.2'
-    inheritable: true
-    notes: https://github.com/pdf-association/pdf-issues/issues/318
-  - goName:
-    pdfKey: Q
-    pdfType: integer
-    required: false
-    default: '0'
-    introduced: '1.2'
-    possibleValues:
-    - '0'
-    - '1'
-    - '2'
-  - goName:
-    pdfKey: DS
-    pdfType: text-string
-    required: false
-    introduced: '1.5'
-  - goName:
-    pdfKey: RV
-    pdfType: stream;text-string
-    required: false
-    introduced: '1.5'
-    refTypes:
-    - Stream
-  - goName:
+    discriminator: true
+  - goName: Opt
     pdfKey: Opt
     pdfType: array
     required: false
     introduced: '1.4'
+    goType: '[]string'
     inheritable: true
-    notes: Table 227 and Table 230
-  - goName:
+  - goName: V
     pdfKey: V
     pdfType: name
     required: false
     introduced: '1.2'
+    goType: pdf.Name
     inheritable: true
-  - goName:
+  - goName: DV
     pdfKey: DV
     pdfType: name
     required: false
     introduced: '1.2'
-    inheritable: true
-- name: FieldBtnPush
-  purpose: push button form field
-  goType:
-  pdfRepr: dict
-  fields:
-  - goName:
-    pdfKey: FT
-    pdfType: name
-    required: true
-    introduced: '1.2'
-    possibleValues:
-    - Btn
-    inheritable: true
-    notes: Table 226
-  - goName:
-    pdfKey: Parent
-    pdfType: dictionary
-    required: false
-    introduced: '1.2'
-    refTypes:
-    - FieldTx
-    - FieldBtnPush
-    - FieldBtnCheckbox
-    - FieldBtnRadio
-    - FieldChoice
-    - type: FieldSig
-      since: '1.3'
-    - Field
-  - goName:
-    pdfKey: Kids
-    pdfType: array
-    required: false
-    introduced: '1.2'
-    refTypes:
-    - type: Field
-      collection: array
-  - goName:
-    pdfKey: T
-    pdfType: text-string
-    required: false
-    introduced: '1.2'
-  - goName:
-    pdfKey: TU
-    pdfType: text-string
-    required: false
-    introduced: '1.3'
-  - goName:
-    pdfKey: TM
-    pdfType: text-string
-    required: false
-    introduced: '1.3'
-  - goName:
-    pdfKey: Ff
-    pdfType: bitmask
-    required: false
-    introduced: '1.2'
-    inheritable: true
-    notes: Table 227 and Table 229
-  - goName:
-    pdfKey: AA
-    pdfType: dictionary
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - AddActionFormField
-  - goName:
-    pdfKey: DA
-    pdfType: byte-string
-    required: true
-    introduced: '1.2'
-    inheritable: true
-    notes: https://github.com/pdf-association/pdf-issues/issues/318
-  - goName:
-    pdfKey: Q
-    pdfType: integer
-    required: false
-    default: '0'
-    introduced: '1.2'
-    possibleValues:
-    - '0'
-    - '1'
-    - '2'
-  - goName:
-    pdfKey: DS
-    pdfType: text-string
-    required: false
-    introduced: '1.5'
-  - goName:
-    pdfKey: RV
-    pdfType: stream;text-string
-    required: false
-    introduced: '1.5'
-    refTypes:
-    - Stream
-  - goName:
-    pdfKey: V
-    pdfType: name
-    required: false
-    introduced: '1.2'
-    inheritable: true
-  - goName:
-    pdfKey: DV
-    pdfType: name
-    required: false
-    introduced: '1.2'
-    inheritable: true
-- name: FieldBtnRadio
-  purpose: radio button form field
-  goType:
-  pdfRepr: dict
-  fields:
-  - goName:
-    pdfKey: FT
-    pdfType: name
-    required: true
-    introduced: '1.2'
-    possibleValues:
-    - Btn
-    inheritable: true
-    notes: Table 226
-  - goName:
-    pdfKey: Parent
-    pdfType: dictionary
-    required: false
-    introduced: '1.2'
-    refTypes:
-    - FieldTx
-    - FieldBtnPush
-    - FieldBtnCheckbox
-    - FieldBtnRadio
-    - FieldChoice
-    - type: FieldSig
-      since: '1.3'
-    - Field
-  - goName:
-    pdfKey: Kids
-    pdfType: array
-    required: false
-    introduced: '1.2'
-    refTypes:
-    - type: Field
-      collection: array
-  - goName:
-    pdfKey: T
-    pdfType: text-string
-    required: false
-    introduced: '1.2'
-  - goName:
-    pdfKey: TU
-    pdfType: text-string
-    required: false
-    introduced: '1.3'
-  - goName:
-    pdfKey: TM
-    pdfType: text-string
-    required: false
-    introduced: '1.3'
-  - goName:
-    pdfKey: Ff
-    pdfType: bitmask
-    required: false
-    introduced: '1.2'
-    inheritable: true
-    notes: Table 227 and Table 229
-  - goName:
-    pdfKey: AA
-    pdfType: dictionary
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - AddActionFormField
-  - goName:
-    pdfKey: DA
-    pdfType: byte-string
-    required: true
-    introduced: '1.2'
-    inheritable: true
-    notes: https://github.com/pdf-association/pdf-issues/issues/318
-  - goName:
-    pdfKey: Q
-    pdfType: integer
-    required: false
-    default: '0'
-    introduced: '1.2'
-    possibleValues:
-    - '0'
-    - '1'
-    - '2'
-  - goName:
-    pdfKey: DS
-    pdfType: text-string
-    required: false
-    introduced: '1.5'
-  - goName:
-    pdfKey: RV
-    pdfType: stream;text-string
-    required: false
-    introduced: '1.5'
-    refTypes:
-    - Stream
-  - goName:
-    pdfKey: Opt
-    pdfType: array
-    required: false
-    introduced: '1.4'
-    inheritable: true
-    notes: Table 227 and Table 230
-  - goName:
-    pdfKey: V
-    pdfType: name
-    required: false
-    default: 'Off'
-    introduced: '1.2'
-    inheritable: true
-  - goName:
-    pdfKey: DV
-    pdfType: name
-    required: false
-    introduced: '1.2'
+    goType: pdf.Name
     inheritable: true
 - name: FieldChoice
   purpose: choice (list or combo box) form field
-  goType:
+  goType: annotation.FieldChoice
+  goPackage: annotation
+  goRepr: struct
   pdfRepr: dict
+  introduced: '1.2'
+  specSection: 12.7.4.4
+  specTable: Table 226 and Table 234
+  fileDependent: true
+  readFunc: annotation.DecodeField
+  writeMethod: (*FieldChoice).Encode
+  embeds:
+  - Field
+  - VariableText
   fields:
   - goName:
     pdfKey: FT
@@ -7606,123 +7353,44 @@ types:
     possibleValues:
     - Ch
     inheritable: true
-    notes: Table 226 and Table 234
-  - goName:
-    pdfKey: Parent
-    pdfType: dictionary
-    required: false
-    introduced: '1.2'
-    refTypes:
-    - FieldTx
-    - FieldBtnPush
-    - FieldBtnCheckbox
-    - FieldBtnRadio
-    - FieldChoice
-    - type: FieldSig
-      since: '1.3'
-    - Field
-  - goName:
-    pdfKey: Kids
-    pdfType: array
-    required: false
-    introduced: '1.2'
-    refTypes:
-    - type: Field
-      collection: array
-  - goName:
-    pdfKey: T
-    pdfType: text-string
-    required: false
-    introduced: '1.2'
-  - goName:
-    pdfKey: TU
-    pdfType: text-string
-    required: false
-    introduced: '1.3'
-  - goName:
-    pdfKey: TM
-    pdfType: text-string
-    required: false
-    introduced: '1.3'
-  - goName:
-    pdfKey: Ff
-    pdfType: bitmask
-    required: false
-    introduced: '1.2'
-    inheritable: true
-    notes: Table 233
-  - goName:
-    pdfKey: V
-    pdfType: array;text-string
-    required: false
-    introduced: '1.2'
-    inheritable: true
-  - goName:
-    pdfKey: DV
-    pdfType: array;text-string
-    required: false
-    introduced: '1.2'
-    inheritable: true
-  - goName:
-    pdfKey: AA
-    pdfType: dictionary
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - AddActionFormField
-  - goName:
-    pdfKey: DA
-    pdfType: byte-string
-    required: true
-    introduced: '1.2'
-    inheritable: true
-    notes: https://github.com/pdf-association/pdf-issues/issues/318
-  - goName:
-    pdfKey: Q
-    pdfType: integer
-    required: false
-    default: '0'
-    introduced: '1.2'
-    possibleValues:
-    - '0'
-    - '1'
-    - '2'
-  - goName:
-    pdfKey: DS
-    pdfType: text-string
-    required: false
-    introduced: '1.5'
-  - goName:
-    pdfKey: RV
-    pdfType: stream;text-string
-    required: false
-    introduced: '1.5'
-    refTypes:
-    - Stream
-  - goName:
+    discriminator: true
+  - goName: Opt
     pdfKey: Opt
     pdfType: array
     required: false
     introduced: '1.2'
+    goType: '[]annotation.ChoiceOption'
     inheritable: true
     notes: Table 234
-  - goName:
+  - goName: TopIndex
     pdfKey: TI
     pdfType: integer
     required: false
     default: '0'
     introduced: '1.2'
-    possibleValues:
-    - fn:Eval((@TI>=0) && (@TI<fn:ArrayLength(Opt)))
+    goType: int
     inheritable: true
-  - goName:
+  - goName: Selected
     pdfKey: I
     pdfType: array
     required: false
     introduced: '1.4'
+    goType: '[]int'
     inheritable: true
-    notes: This entry shall be used when two or more elements in the Opt array have different names but the same export value or when the value of the choice field is an array. If the items identified
-      by this entry differ from those in the V entry of the field dictionary (see discussion following this Table), the V entry shall be used
+  - goName: V
+    pdfKey: V
+    pdfType: array;text-string
+    required: false
+    introduced: '1.2'
+    goType: pdf.Object
+    inheritable: true
+  - goName: DV
+    pdfKey: DV
+    pdfType: array;text-string
+    required: false
+    introduced: '1.2'
+    goType: pdf.Object
+    inheritable: true
 - name: FieldMDPTransformParameters
   purpose: transform parameters for MDP signature fields
   goType:
@@ -7763,8 +7431,19 @@ types:
     - '1.2'
 - name: FieldSig
   purpose: digital signature form field
-  goType:
+  goType: annotation.FieldSig
+  goPackage: annotation
+  goRepr: struct
   pdfRepr: dict
+  introduced: '1.3'
+  specSection: 12.7.4.5
+  specTable: Table 226 and Table 228 and Table 235
+  fileDependent: true
+  readFunc: annotation.DecodeField
+  writeMethod: (*FieldSig).Encode
+  embeds:
+  - Field
+  - VariableText
   fields:
   - goName:
     pdfKey: FT
@@ -7774,123 +7453,58 @@ types:
     possibleValues:
     - Sig
     inheritable: true
-    notes: Table 226, Table 228 and Table 235
-  - goName:
-    pdfKey: Parent
-    pdfType: dictionary
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - FieldTx
-    - FieldBtnPush
-    - FieldBtnCheckbox
-    - FieldBtnRadio
-    - FieldChoice
-    - FieldSig
-    - Field
-  - goName:
-    pdfKey: Kids
-    pdfType: array
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - type: Field
-      collection: array
-  - goName:
-    pdfKey: T
-    pdfType: text-string
-    required: false
-    introduced: '1.3'
-  - goName:
-    pdfKey: TU
-    pdfType: text-string
-    required: false
-    introduced: '1.3'
-  - goName:
-    pdfKey: TM
-    pdfType: text-string
-    required: false
-    introduced: '1.3'
-  - goName:
-    pdfKey: Ff
-    pdfType: bitmask
-    required: false
-    introduced: '1.3'
-    inheritable: true
-  - goName:
+    discriminator: true
+  - goName: V
     pdfKey: V
     pdfType: dictionary
     required: false
     introduced: '1.3'
+    goType: pdf.Object
     inheritable: true
     refTypes:
     - Signature
     - type: DocTimeStamp
       since: '1.7'
-  - goName:
+  - goName: DV
     pdfKey: DV
     pdfType: dictionary
     required: false
     introduced: '1.3'
+    goType: pdf.Object
     inheritable: true
     refTypes:
     - Signature
     - type: DocTimeStamp
       since: '1.7'
-  - goName:
-    pdfKey: AA
-    pdfType: dictionary
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - AddActionFormField
-  - goName:
-    pdfKey: DA
-    pdfType: byte-string
-    required: false
-    introduced: '1.3'
-    inheritable: true
-    notes: required if field contains variable text. https://github.com/pdf-association/pdf-issues/issues/318
-  - goName:
-    pdfKey: Q
-    pdfType: integer
-    required: false
-    default: '0'
-    introduced: '1.3'
-    possibleValues:
-    - '0'
-    - '1'
-    - '2'
-  - goName:
-    pdfKey: DS
-    pdfType: text-string
-    required: false
-    introduced: '1.5'
-  - goName:
-    pdfKey: RV
-    pdfType: stream;text-string
-    required: false
-    introduced: '1.5'
-    refTypes:
-    - Stream
-  - goName:
+  - goName: Lock
     pdfKey: Lock
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - SigFieldLock
-  - goName:
+  - goName: SV
     pdfKey: SV
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
-    - SigFieldSeedValue
+    - SigSeedValue
 - name: FieldTx
   purpose: text input form field
-  goType:
+  goType: annotation.FieldTx
+  goPackage: annotation
+  goRepr: struct
   pdfRepr: dict
+  introduced: '1.2'
+  specSection: 12.7.4.3
+  specTable: Table 226 and Table 228 and Table 231
+  fileDependent: true
+  readFunc: annotation.DecodeField
+  writeMethod: (*FieldTx).Encode
+  embeds:
+  - Field
+  - VariableText
   fields:
   - goName:
     pdfKey: FT
@@ -7900,108 +7514,31 @@ types:
     possibleValues:
     - Tx
     inheritable: true
-    notes: Table 226, Table 228 and Table 231
-  - goName:
-    pdfKey: Parent
-    pdfType: dictionary
-    required: false
-    introduced: '1.2'
-    refTypes:
-    - FieldTx
-    - FieldBtnPush
-    - FieldBtnCheckbox
-    - FieldBtnRadio
-    - FieldChoice
-    - type: FieldSig
-      since: '1.3'
-    - Field
-  - goName:
-    pdfKey: Kids
-    pdfType: array
-    required: false
-    introduced: '1.2'
-    refTypes:
-    - type: Field
-      collection: array
-  - goName:
-    pdfKey: T
-    pdfType: text-string
-    required: false
-    introduced: '1.2'
-  - goName:
-    pdfKey: TU
-    pdfType: text-string
-    required: false
-    introduced: '1.3'
-  - goName:
-    pdfKey: TM
-    pdfType: text-string
-    required: false
-    introduced: '1.3'
-  - goName:
-    pdfKey: Ff
-    pdfType: bitmask
-    required: false
-    introduced: '1.2'
-    inheritable: true
-    notes: Table 231
-  - goName:
+    discriminator: true
+  - goName: V
     pdfKey: V
     pdfType: fn:SinceVersion(1.5,stream);text-string
     required: false
     introduced: '1.2'
+    goType: pdf.Object
     inheritable: true
     refTypes:
     - Stream
-  - goName:
+  - goName: DV
     pdfKey: DV
     pdfType: stream;text-string
     required: false
     introduced: '1.2'
+    goType: pdf.Object
     inheritable: true
     refTypes:
     - Stream
-  - goName:
-    pdfKey: AA
-    pdfType: dictionary
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - AddActionFormField
-  - goName:
-    pdfKey: DA
-    pdfType: byte-string
-    required: true
-    introduced: '1.2'
-    inheritable: true
-    notes: https://github.com/pdf-association/pdf-issues/issues/318
-  - goName:
-    pdfKey: Q
-    pdfType: integer
-    required: false
-    default: '0'
-    introduced: '1.2'
-    possibleValues:
-    - '0'
-    - '1'
-    - '2'
-  - goName:
-    pdfKey: DS
-    pdfType: text-string
-    required: false
-    introduced: '1.5'
-  - goName:
-    pdfKey: RV
-    pdfType: stream;text-string
-    required: false
-    introduced: '1.5'
-    refTypes:
-    - Stream
-  - goName:
+  - goName: MaxLen
     pdfKey: MaxLen
     pdfType: integer
     required: false
     introduced: '1.2'
+    goType: int
     inheritable: true
     notes: Table 232 and https://github.com/pdf-association/pdf-issues/issues/191
 - name: FixedPrint
@@ -8124,8 +7661,8 @@ types:
   specSection: 12.7.8.3.2
 - name: InteractiveForm
   purpose: document-wide interactive form properties
-  goType: acroform.InteractiveForm
-  goPackage: acroform
+  goType: annotation.InteractiveForm
+  goPackage: annotation
   goRepr: struct
   pdfRepr: dict
   introduced: '1.2'
@@ -8133,7 +7670,7 @@ types:
   specTable: Table 224
   fileDependent: true
   writeMethod: (*InteractiveForm).Encode
-  readFunc: acroform.DecodeInteractiveForm
+  readFunc: annotation.DecodeInteractiveForm
   fields:
   - goName: Fields
     pdfKey: Fields

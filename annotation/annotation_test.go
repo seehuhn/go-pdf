@@ -141,6 +141,9 @@ func roundTripTest(t *testing.T, v pdf.Version, a1 Annotation) {
 	opts := []cmp.Option{
 		cmp.AllowUnexported(language.Tag{}),
 		cmpopts.EquateComparable(language.Tag{}),
+		// a widget's Parent (its form field) is the back-edge of the field/widget
+		// cycle and is set by the field tree, not on a standalone widget; ignore it
+		cmpopts.IgnoreFields(Widget{}, "Parent"),
 		// Sound sample data is supplied through closures or stream
 		// wrappers; round-trip of the bytes is exercised by the sound
 		// package's own tests.

@@ -1727,13 +1727,18 @@ types:
     introduced: fn:Extension(ISO_21812,1.7)
     refTypes:
     - DPart
-- name: CertSeedValue
+- name: SigCertSeedValue
   purpose: "certificate requirements for a signature field"
-  goType:
-  pdfType: SVCert
+  goType: annotation.SigCertSeedValue
+  goPackage: annotation
+  goRepr: struct
   pdfRepr: dict
   introduced: '1.5'
+  specSection: 12.7.5.5
   specTable: Table 238
+  fileDependent: false
+  readFunc: annotation.ExtractSigCertSeedValue
+  writeMethod: (*SigCertSeedValue).Embed
   fields:
   - goName:
     pdfKey: Type
@@ -1743,32 +1748,38 @@ types:
     possibleValues:
     - SVCert
     notes: Table 238
-  - goName:
+    discriminator: true
+  - goName: Flags
     pdfKey: Ff
     pdfType: bitmask
     required: false
     default: '0'
     introduced: '1.5'
-  - goName:
+    goType: annotation.SigCertSeedValueFlags
+  - goName: Subject
     pdfKey: Subject
     pdfType: array
     required: false
     introduced: '1.5'
-  - goName:
+    goType: '[][]byte'
+  - goName: SignaturePolicyOID
     pdfKey: SignaturePolicyOID
     pdfType: ascii-string
     required: false
     introduced: '2.0'
-  - goName:
+    goType: string
+  - goName: SignaturePolicyHashValue
     pdfKey: SignaturePolicyHashValue
     pdfType: string
     required: false
     introduced: '2.0'
-  - goName:
+    goType: '[]byte'
+  - goName: SignaturePolicyHashAlgorithm
     pdfKey: SignaturePolicyHashAlgorithm
     pdfType: name
     required: false
     introduced: '2.0'
+    goType: pdf.Name
     possibleValues:
     - adbe.pkcs7.detached
     - fn:Deprecated(2.0,adbe.pkcs7.sha1)
@@ -1776,49 +1787,59 @@ types:
     - ETSI.CAdES.detached
     - ETSI.RFC3161
     notes: Table 260
-  - goName:
+  - goName: SignaturePolicyCommitmentType
     pdfKey: SignaturePolicyCommitmentType
     pdfType: array
     required: false
     introduced: '2.0'
-  - goName:
+    goType: '[]string'
+  - goName: SubjectDN
     pdfKey: SubjectDN
     pdfType: array
     required: false
     introduced: '1.7'
-    refTypes:
-    - type: SubjectDN
-      collection: array
-  - goName:
+    goType: '[]map[pdf.Name]string'
+  - goName: KeyUsage
     pdfKey: KeyUsage
     pdfType: array
     required: false
     introduced: '1.7'
+    goType: '[]string'
     notes: RFC 5280
-  - goName:
+  - goName: Issuer
     pdfKey: Issuer
     pdfType: array
     required: false
     introduced: '1.5'
-  - goName:
+    goType: '[][]byte'
+  - goName: OID
     pdfKey: OID
     pdfType: array
     required: false
     introduced: '1.5'
-  - goName:
+    goType: '[][]byte'
+  - goName: URL
     pdfKey: URL
     pdfType: ascii-string
     required: false
     introduced: '1.5'
-  - goName:
+    goType: string
+  - goName: URLType
     pdfKey: URLType
     pdfType: name
     required: false
     default: Browser
     introduced: '1.7'
+    goType: pdf.Name
     possibleValues:
     - Browser
     - '*'
+  - goName: SingleUse
+    pdfKey:
+    pdfType:
+    required: false
+    goType: bool
+    notes: controls direct vs indirect embedding; not a PDF entry
 - name: Collection
   purpose: "portable collection (PDF portfolio) properties"
   goType:
@@ -3570,11 +3591,16 @@ types:
   specSection: 14.11.4
 - name: SigFieldLock
   purpose: "fields to lock when a signature field is signed"
-  goType:
-  pdfType: SigFieldLock
+  goType: annotation.SigFieldLock
+  goPackage: annotation
+  goRepr: struct
   pdfRepr: dict
   introduced: '1.5'
+  specSection: 12.7.5.5
   specTable: Table 236
+  fileDependent: false
+  readFunc: annotation.ExtractSigFieldLock
+  writeMethod: (*SigFieldLock).Embed
   fields:
   - goName:
     pdfKey: Type
@@ -3584,36 +3610,45 @@ types:
     possibleValues:
     - SigFieldLock
     notes: Table 236
-  - goName:
+    discriminator: true
+  - goName: Action
     pdfKey: Action
     pdfType: name
     required: true
     introduced: '1.5'
+    goType: annotation.SigFieldLockAction
     possibleValues:
     - All
     - Include
     - Exclude
-  - goName:
+  - goName: Fields
     pdfKey: Fields
     pdfType: array
     required: fn:IsRequired((@Action==Include) || (@Action==Exclude))
     introduced: '1.5'
-  - goName:
+    goType: '[]string'
+  - goName: P
     pdfKey: P
     pdfType: number
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
+    goType: int
     possibleValues:
     - '1'
     - '2'
     - '3'
-- name: SigFieldSeedValue
+- name: SigSeedValue
   purpose: "seed values for a signature form field"
-  goType:
-  pdfType: SV
+  goType: annotation.SigSeedValue
+  goPackage: annotation
+  goRepr: struct
   pdfRepr: dict
   introduced: '1.5'
+  specSection: 12.7.5.5
   specTable: Table 237
+  fileDependent: false
+  readFunc: annotation.ExtractSigSeedValue
+  writeMethod: (*SigSeedValue).Embed
   fields:
   - goName:
     pdfKey: Type
@@ -3623,88 +3658,98 @@ types:
     possibleValues:
     - SV
     notes: Table 237
-  - goName:
+    discriminator: true
+  - goName: Flags
     pdfKey: Ff
     pdfType: bitmask
     required: false
     default: '0'
-    introduced: '1.7'
-  - goName:
+    introduced: '1.5'
+    goType: annotation.SigSeedValueFlags
+  - goName: Filter
     pdfKey: Filter
     pdfType: name
     required: false
     introduced: '1.5'
-  - goName:
+    goType: pdf.Name
+  - goName: SubFilter
     pdfKey: SubFilter
     pdfType: array
     required: false
     introduced: '1.5'
-  - goName:
+    goType: '[]pdf.Name'
+  - goName: DigestMethod
     pdfKey: DigestMethod
     pdfType: array
     required: false
     introduced: '1.7'
+    goType: '[]pdf.Name'
     notes: https://github.com/pdf-association/pdf-issues/issues/159
-  - goName:
+  - goName: V
     pdfKey: V
     pdfType: integer
     required: false
     introduced: '1.5'
+    goType: int
     possibleValues:
-    - '0'
     - '1'
     - '2'
     - '3'
-  - goName:
+  - goName: Cert
     pdfKey: Cert
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
-    - CertSeedValue
-  - goName:
+    - SigCertSeedValue
+  - goName: Reasons
     pdfKey: Reasons
     pdfType: array
     required: false
     introduced: '1.5'
-  - goName:
+    goType: '[]string'
+  - goName: MDP
     pdfKey: MDP
     pdfType: dictionary
     required: false
     introduced: '1.6'
-    refTypes:
-    - MDPDict
-  - goName:
+    goType: optional.UInt
+    goPresenceTracking: true
+  - goName: TimeStamp
     pdfKey: TimeStamp
     pdfType: dictionary
     required: false
     introduced: '1.6'
     refTypes:
-    - TimeStampDict
-  - goName:
+    - SigSeedValueTimeStamp
+  - goName: LegalAttestation
     pdfKey: LegalAttestation
     pdfType: array
     required: false
     introduced: '1.6'
-  - goName:
+    goType: '[]string'
+  - goName: AddRevInfo
     pdfKey: AddRevInfo
     pdfType: boolean
     required: false
     introduced: '1.7'
-  - goName:
+    goType: bool
+  - goName: LockDocument
     pdfKey: LockDocument
     pdfType: name
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
+    goType: pdf.Name
     possibleValues:
     - 'true'
     - 'false'
     - auto
-  - goName:
+  - goName: AppearanceFilter
     pdfKey: AppearanceFilter
     pdfType: text-string
     required: false
-    introduced: '1.7'
+    introduced: '2.0'
+    goType: string
 - name: Signature
   purpose: "digital signature dictionary"
   goType:
@@ -5155,24 +5200,31 @@ types:
     required: false
     introduced: '1.7'
     notes: Table 238, SubjectDN cell
-- name: TimeStampDict
+- name: SigSeedValueTimeStamp
   purpose: "time stamp dictionary"
-  goType:
+  goType: annotation.SigSeedValueTimeStamp
+  goPackage: annotation
+  goRepr: struct
   pdfRepr: dict
   introduced: '1.6'
+  specSection: 12.7.5.5
+  specTable: Table 237
+  notes: encoded inline within SigSeedValue; not embedded separately
   fields:
-  - goName:
+  - goName: URL
     pdfKey: URL
     pdfType: ascii-string
     required: true
     introduced: '1.6'
+    goType: string
     notes: Table 237, TimeStamp cell
-  - goName:
+  - goName: Required
     pdfKey: Ff
     pdfType: integer
     required: true
     default: '0'
     introduced: '1.6'
+    goType: bool
     possibleValues:
     - '0'
     - '1'

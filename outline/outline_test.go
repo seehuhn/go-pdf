@@ -207,14 +207,14 @@ func testRoundTrip(t *testing.T, v pdf.Version, o *Outline) {
 	}
 
 	rm := pdf.NewResourceManager(w)
-	outlineRef, err := o.Encode(rm)
+	outlineRef, err := rm.Store(o)
 	if err != nil {
 		if pdf.IsWrongVersion(err) {
 			t.Skip("version not supported")
 		}
 		t.Fatalf("write outline: %v", err)
 	}
-	w.GetMeta().Catalog.Outlines, _ = outlineRef.(pdf.Reference)
+	w.GetMeta().Catalog.Outlines = outlineRef
 
 	err = rm.Close()
 	if err != nil {
@@ -263,11 +263,11 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		rm := pdf.NewResourceManager(w)
-		outlineRef, err := tc.outline.Encode(rm)
+		outlineRef, err := rm.Store(tc.outline)
 		if err != nil {
 			continue
 		}
-		w.GetMeta().Catalog.Outlines, _ = outlineRef.(pdf.Reference)
+		w.GetMeta().Catalog.Outlines = outlineRef
 
 		err = rm.Close()
 		if err != nil {
@@ -325,11 +325,11 @@ func TestStructEntry(t *testing.T) {
 	}
 
 	rm := pdf.NewResourceManager(w)
-	outlineRef, err := o.Encode(rm)
+	outlineRef, err := rm.Store(o)
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.GetMeta().Catalog.Outlines, _ = outlineRef.(pdf.Reference)
+	w.GetMeta().Catalog.Outlines = outlineRef
 
 	err = rm.Close()
 	if err != nil {

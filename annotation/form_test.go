@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package acroform
+package annotation
 
 import (
 	"bytes"
@@ -31,25 +31,32 @@ import (
 // the fuzz seed corpus.
 var testVersions = []pdf.Version{pdf.V1_7, pdf.V2_0}
 
-// testCases holds representative interactive forms. The Fields and
+// formTestCases holds representative interactive forms. The Fields and
 // CalculationOrder entries reference field dictionaries that are not part of
 // the InteractiveForm object itself; the round trip only needs to preserve the
 // reference values, so fixed references are used rather than allocating real
 // objects.
-var testCases = []struct {
+// coField0 and coField1 are shared between a form's Fields and its
+// CalculationOrder so the round trip exercises the same field appearing in both.
+var (
+	coField0 = &FieldTx{FieldCommon: FieldCommon{T: "calc0"}}
+	coField1 = &FieldTx{FieldCommon: FieldCommon{T: "calc1"}}
+)
+
+var formTestCases = []struct {
 	name string
 	form *InteractiveForm
 }{
 	{
 		name: "minimal",
 		form: &InteractiveForm{
-			Fields: []pdf.Reference{pdf.NewReference(100, 0)},
+			Fields: []Field{&FieldTx{FieldCommon: FieldCommon{T: "f0"}}},
 		},
 	},
 	{
 		name: "flags and text defaults",
 		form: &InteractiveForm{
-			Fields:            []pdf.Reference{pdf.NewReference(100, 0), pdf.NewReference(101, 0)},
+			Fields:            []Field{&FieldTx{FieldCommon: FieldCommon{T: "f0"}}, &FieldTx{FieldCommon: FieldCommon{T: "f1"}}},
 			NeedAppearances:   true,
 			SigFlags:          SignaturesExist | AppendOnly,
 			DefaultAppearance: "/Helv 0 Tf 0 g",
@@ -59,28 +66,28 @@ var testCases = []struct {
 	{
 		name: "calculation order",
 		form: &InteractiveForm{
-			Fields:           []pdf.Reference{pdf.NewReference(100, 0), pdf.NewReference(101, 0)},
-			CalculationOrder: []pdf.Reference{pdf.NewReference(101, 0), pdf.NewReference(100, 0)},
+			Fields:           []Field{coField0, coField1},
+			CalculationOrder: []Field{coField1, coField0},
 			Align:            pdf.TextAlignRight,
 		},
 	},
 	{
 		name: "xfa",
 		form: &InteractiveForm{
-			Fields: []pdf.Reference{pdf.NewReference(100, 0)},
+			Fields: []Field{&FieldTx{FieldCommon: FieldCommon{T: "f0"}}},
 			XFA:    pdf.Array{pdf.String("template"), pdf.String("<xdp/>")},
 		},
 	},
 	{
 		name: "default resources",
 		form: &InteractiveForm{
-			Fields:           []pdf.Reference{pdf.NewReference(100, 0)},
+			Fields:           []Field{&FieldTx{FieldCommon: FieldCommon{T: "f0"}}},
 			DefaultResources: &content.Resources{SingleUse: true},
 		},
 	},
 }
 
-func roundTripTest(t *testing.T, version pdf.Version, want *InteractiveForm) {
+func formRoundTripTest(t *testing.T, version pdf.Version, want *InteractiveForm) {
 	t.Helper()
 
 	w, buf := memfile.NewPDFWriter(version, nil)
@@ -90,7 +97,7 @@ func roundTripTest(t *testing.T, version pdf.Version, want *InteractiveForm) {
 	}
 
 	rm := pdf.NewResourceManager(w)
-	ref, err := want.Encode(rm)
+	ref, err := rm.Store(want)
 	if err != nil {
 		if pdf.IsWrongVersion(err) {
 			t.Skip("version not supported")
@@ -118,26 +125,26 @@ func roundTripTest(t *testing.T, version pdf.Version, want *InteractiveForm) {
 		t.Fatalf("decode failed: %v", err)
 	}
 
-	if diff := cmp.Diff(want, got); diff != "" {
+	if diff := cmp.Diff(want, got, fieldCmpOptions()...); diff != "" {
 		t.Errorf("round trip failed (-want +got):\n%s", diff)
 	}
 }
 
-func TestRoundTrip(t *testing.T) {
+func TestFormRoundTrip(t *testing.T) {
 	for _, version := range testVersions {
-		for _, tc := range testCases {
+		for _, tc := range formTestCases {
 			t.Run(tc.name+"-"+version.String(), func(t *testing.T) {
-				roundTripTest(t, version, tc.form)
+				formRoundTripTest(t, version, tc.form)
 			})
 		}
 	}
 }
 
-func FuzzRoundTrip(f *testing.F) {
+func FuzzFormRoundTrip(f *testing.F) {
 	opt := &pdf.WriterOptions{HumanReadable: true}
 
 	for _, version := range testVersions {
-		for _, tc := range testCases {
+		for _, tc := range formTestCases {
 			w, buf := memfile.NewPDFWriter(version, opt)
 
 			if err := memfile.AddBlankPage(w); err != nil {
@@ -145,7 +152,7 @@ func FuzzRoundTrip(f *testing.F) {
 			}
 
 			rm := pdf.NewResourceManager(w)
-			ref, err := tc.form.Encode(rm)
+			ref, err := rm.Store(tc.form)
 			if err != nil {
 				continue
 			}
@@ -178,7 +185,7 @@ func FuzzRoundTrip(f *testing.F) {
 			t.Skip("no interactive form")
 		}
 
-		roundTripTest(t, pdf.GetVersion(r), form)
+		formRoundTripTest(t, pdf.GetVersion(r), form)
 	})
 }
 
@@ -187,7 +194,7 @@ func TestEncodeInvalidAlign(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	form := &InteractiveForm{
-		Fields: []pdf.Reference{rm.Out.Alloc()},
+		Fields: []Field{&FieldTx{FieldCommon: FieldCommon{T: "f"}}},
 		Align:  pdf.TextAlign(99),
 	}
 
@@ -202,7 +209,7 @@ func TestEncodeVersionGating(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	form := &InteractiveForm{
-		Fields: []pdf.Reference{rm.Out.Alloc()},
+		Fields: []Field{&FieldTx{FieldCommon: FieldCommon{T: "f"}}},
 		XFA:    pdf.Array{pdf.String("x")},
 	}
 
@@ -219,7 +226,7 @@ func TestEncodeXFAStreamForm(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	form := &InteractiveForm{
-		Fields: []pdf.Reference{rm.Out.Alloc()},
+		Fields: []Field{&FieldTx{FieldCommon: FieldCommon{T: "f"}}},
 		XFA:    rm.Out.Alloc(), // reference to a stream
 	}
 
@@ -235,24 +242,24 @@ func TestEncodeVersionGatingEntries(t *testing.T) {
 		build   func(rm *pdf.ResourceManager) *InteractiveForm
 	}{
 		{"form requires 1.2", pdf.V1_1, func(rm *pdf.ResourceManager) *InteractiveForm {
-			return &InteractiveForm{Fields: []pdf.Reference{rm.Out.Alloc()}}
+			return &InteractiveForm{Fields: []Field{&FieldTx{FieldCommon: FieldCommon{T: "f"}}}}
 		}},
 		{"SigFlags requires 1.3", pdf.V1_2, func(rm *pdf.ResourceManager) *InteractiveForm {
 			return &InteractiveForm{
-				Fields:   []pdf.Reference{rm.Out.Alloc()},
+				Fields:   []Field{&FieldTx{FieldCommon: FieldCommon{T: "f"}}},
 				SigFlags: SignaturesExist,
 			}
 		}},
 		{"CO requires 1.3", pdf.V1_2, func(rm *pdf.ResourceManager) *InteractiveForm {
-			ref := rm.Out.Alloc()
+			f := &FieldTx{FieldCommon: FieldCommon{T: "f"}}
 			return &InteractiveForm{
-				Fields:           []pdf.Reference{ref},
-				CalculationOrder: []pdf.Reference{ref},
+				Fields:           []Field{f},
+				CalculationOrder: []Field{f},
 			}
 		}},
 		{"XFA array requires 1.6", pdf.V1_5, func(rm *pdf.ResourceManager) *InteractiveForm {
 			return &InteractiveForm{
-				Fields: []pdf.Reference{rm.Out.Alloc()},
+				Fields: []Field{&FieldTx{FieldCommon: FieldCommon{T: "f"}}},
 				XFA:    pdf.Array{pdf.String("template"), pdf.String("<xdp/>")},
 			}
 		}},
@@ -273,6 +280,9 @@ func TestDecodeValues(t *testing.T) {
 	x := pdf.NewExtractor(w)
 
 	ref := w.Alloc()
+	if err := w.Put(ref, pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.TextString("f0")}); err != nil {
+		t.Fatal(err)
+	}
 	dict := pdf.Dict{
 		// the second element is not a reference and must be skipped
 		"Fields":          pdf.Array{ref, pdf.Integer(7)},
@@ -287,8 +297,8 @@ func TestDecodeValues(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(form.Fields) != 1 || form.Fields[0] != ref {
-		t.Errorf("Fields = %v, want [%v]", form.Fields, ref)
+	if len(form.Fields) != 1 || form.Fields[0].GetFieldCommon().T != "f0" {
+		t.Errorf("Fields = %v, want one field named f0", form.Fields)
 	}
 	if !form.NeedAppearances {
 		t.Error("NeedAppearances = false, want true")

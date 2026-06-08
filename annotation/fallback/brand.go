@@ -33,6 +33,7 @@ var (
 	quireSlate3 = color.DeviceRGB{0.851, 0.851, 0.867} // --slate-3 #d9d9dd
 
 	// amber accents (editorial only)
+	quireAmber50  = color.DeviceRGB{0.992, 0.961, 0.902} // --amber-50  #fdf5e6
 	quireAmber100 = color.DeviceRGB{0.965, 0.898, 0.749} // --amber-100 #f6e5bf
 	quireAmber400 = color.DeviceRGB{0.761, 0.459, 0.094} // --amber-400 #c27518
 

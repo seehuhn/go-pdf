@@ -27,7 +27,6 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
-	pdfpage "seehuhn.de/go/pdf/page"
 )
 
 // This test creates a Polygon annotation with both Vertices and Path entries,
@@ -72,7 +71,7 @@ func run() error {
 	page.TextEnd()
 
 	// polygon annotation with both Vertices and Path
-	page.Page.Annots = append(page.Page.Annots, pdfpage.AnnotInfo{Annot: &rawPolygon{}, Ref: page.Out.Alloc()})
+	page.Page.Annots = append(page.Page.Annots, &rawPolygon{})
 
 	return page.Close()
 }

@@ -17,47 +17,648 @@
 package fallback
 
 import (
+	"strconv"
+	"strings"
+	"unicode/utf8"
+
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/annotation/appearance"
+	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/graphics/text"
+	"seehuhn.de/go/postscript/type1/names"
 )
 
-// addWidgetAppearance generates a fallback appearance for a widget annotation.
-//
-// This is a placeholder: it fills the field area with a light panel and a
-// hairline border. It does not yet render the field's value or use the
-// appearance characteristics (MK). A complete implementation will draw the
-// field according to its type and value.
-func (s *Style) addWidgetAppearance(a *annotation.Widget) *form.Form {
-	// hairline border, inset by half the line width so it stays inside the Rect
-	const lw = 0.5
+// field flag bits (a subset of the AcroForm Ff flags), mirrored here so the
+// generator works from a plain [WidgetField] without resolving the field tree.
+const (
+	ffMultiline  uint32 = 1 << 12
+	ffPassword   uint32 = 1 << 13
+	ffRadio      uint32 = 1 << 15
+	ffPushbutton uint32 = 1 << 16
+	ffCombo      uint32 = 1 << 17
+	ffComb       uint32 = 1 << 24
+)
 
-	rect := a.Rect
-	w := rect.Dx()
-	h := rect.Dy()
-	if w < lw || h < lw {
-		return &form.Form{Content: nil, Res: &content.Resources{}, BBox: rect}
+// WidgetField carries the form-field context that a widget annotation does not
+// itself hold but that its appearance depends on. The caller fills it from the
+// widget's form field; a nil *WidgetField yields the MK chrome only.
+type WidgetField struct {
+	// FieldType is the field type: "Btn", "Tx", "Ch", or "Sig".
+	FieldType pdf.Name
+
+	// Flags is the field's effective flag bit set (the /Ff value).
+	Flags uint32
+
+	// Value is the field's value rendered as text: the contents of a text
+	// field, or the selected display string of a choice field.
+	Value string
+
+	// OnState is the on-state name of a check box or radio button widget (the
+	// key under which its "on" appearance is stored). An empty value defaults
+	// to "On".
+	OnState pdf.Name
+
+	// DefaultAppearance is the field's effective /DA string. It sets the font
+	// size and colour of rendered text; a size of zero requests auto-sizing.
+	DefaultAppearance string
+
+	// Align is the text justification (the /Q value).
+	Align pdf.TextAlign
+
+	// Options holds the display strings of a choice field's items.
+	Options []string
+
+	// Selected holds the indices into Options of a choice field's selected
+	// items.
+	Selected []int
+
+	// TopIndex is the index into Options of the first visible item of a
+	// scrollable list box.
+	TopIndex int
+
+	// MaxLen is the comb-cell count of a text field with the comb flag set.
+	MaxLen int
+}
+
+// AddWidgetAppearance generates the appearance stream(s) for a form-field widget
+// annotation and stores them in the widget's appearance dictionary. The field
+// context is taken from fld; a nil fld draws only the MK chrome.
+//
+// Check boxes and radio buttons receive two appearances, keyed by the on-state
+// name and "Off"; all other field types receive a single normal appearance.
+func (s *Style) AddWidgetAppearance(w *annotation.Widget, fld *WidgetField) error {
+	if fld == nil {
+		fld = &WidgetField{}
 	}
 
-	b := builder.New(content.Form, nil, s.Version)
+	if fld.FieldType == "Btn" && fld.Flags&ffPushbutton == 0 {
+		// check box or radio button: an on and an off appearance
+		on := s.drawToggle(w, fld, true)
+		off := s.drawToggle(w, fld, false)
+		onState := fld.OnState
+		if onState == "" {
+			onState = "On"
+		}
+		w.Appearance = &appearance.Dict{
+			SingleUse: true,
+			NormalMap: map[pdf.Name]*form.Form{onState: on, "Off": off},
+		}
+		if w.AppearanceState == "" {
+			w.AppearanceState = "Off"
+		}
+		return nil
+	}
+
+	var normal *form.Form
+	switch fld.FieldType {
+	case "Btn":
+		normal = s.drawPushButton(w)
+	case "Tx":
+		normal = s.drawTextField(w, fld)
+	case "Ch":
+		normal = s.drawChoiceField(w, fld)
+	default: // Sig and anything else: chrome only
+		normal = s.drawChromeField(w)
+	}
+
+	w.Appearance = &appearance.Dict{SingleUse: true, Normal: normal}
+	w.AppearanceState = ""
+	return nil
+}
+
+// addWidgetAppearance generates a fallback appearance for a widget annotation
+// without field context, drawing only the MK chrome. It is the dispatch target
+// of [Style.AddAppearance].
+func (s *Style) addWidgetAppearance(a *annotation.Widget) *form.Form {
+	return s.drawChromeField(a)
+}
+
+// fieldContext sets up a content builder for a widget's appearance and returns
+// the local drawing box (always rooted at the origin), the placement matrix
+// that maps it onto the widget rectangle with the MK rotation applied, and the
+// builder.
+func (s *Style) fieldContext(w *annotation.Widget) (b *builder.Builder, width, height float64, m matrix.Matrix) {
+	rot := 0
+	if w.MK != nil {
+		rot = ((w.MK.Rotation % 360) + 360) % 360
+	}
+	rw := w.Rect.Dx()
+	rh := w.Rect.Dy()
+	llx, lly := w.Rect.LLx, w.Rect.LLy
+
+	switch rot {
+	case 90:
+		width, height = rh, rw
+		m = matrix.Matrix{0, 1, -1, 0, llx + rw, lly}
+	case 180:
+		width, height = rw, rh
+		m = matrix.Matrix{-1, 0, 0, -1, llx + rw, lly + rh}
+	case 270:
+		width, height = rh, rw
+		m = matrix.Matrix{0, -1, 1, 0, llx, lly + rh}
+	default:
+		width, height = rw, rh
+		m = matrix.Matrix{1, 0, 0, 1, llx, lly}
+	}
+
+	b = builder.New(content.Form, nil, s.Version)
 	b.SetExtGState(s.reset)
+	return b, width, height, m
+}
 
-	// panel
-	b.SetFillColor(quireSlate1)
-	b.Rectangle(rect.LLx, rect.LLy, w, h)
-	b.Fill()
-
-	b.SetLineWidth(lw)
-	b.SetStrokeColor(quireSlate3)
-	b.Rectangle(rect.LLx+lw/2, rect.LLy+lw/2, w-lw, h-lw)
-	b.Stroke()
-
+func (s *Style) finishForm(b *builder.Builder, width, height float64, m matrix.Matrix) *form.Form {
 	return &form.Form{
 		Content: builder.Must(b.Harvest()),
 		Res:     b.Resources,
-		BBox:    rect,
-		Matrix:  matrix.Identity,
+		BBox:    pdf.Rectangle{LLx: 0, LLy: 0, URx: width, URy: height},
+		Matrix:  m,
 	}
+}
+
+// drawChromeField draws background and border only.
+func (s *Style) drawChromeField(w *annotation.Widget) *form.Form {
+	b, width, height, m := s.fieldContext(w)
+	drawChrome(b, width, height, w)
+	return s.finishForm(b, width, height, m)
+}
+
+func borderWidth(w *annotation.Widget) float64 {
+	if w.BorderStyle != nil {
+		return w.BorderStyle.Width
+	}
+	if w.Border != nil {
+		return w.Border.Width
+	}
+	return 1
+}
+
+func borderStyleName(w *annotation.Widget) pdf.Name {
+	if w.BorderStyle != nil && w.BorderStyle.Style != "" {
+		return w.BorderStyle.Style
+	}
+	return "S"
+}
+
+// drawChrome fills the background and strokes the border of a rectangular field
+// according to the widget's MK and border-style entries.
+func drawChrome(b *builder.Builder, width, height float64, w *annotation.Widget) {
+	mk := w.MK
+	if mk != nil && mk.BackgroundColor != nil {
+		b.SetFillColor(mk.BackgroundColor)
+		b.Rectangle(0, 0, width, height)
+		b.Fill()
+	}
+
+	lw := borderWidth(w)
+	if mk == nil || mk.BorderColor == nil || lw <= 0 {
+		return
+	}
+
+	style := borderStyleName(w)
+	switch style {
+	case "U": // underline: a single rule along the bottom edge
+		b.SetLineWidth(lw)
+		b.SetStrokeColor(mk.BorderColor)
+		b.MoveTo(0, lw/2)
+		b.LineTo(width, lw/2)
+		b.Stroke()
+	case "B", "I": // beveled (raised) or inset (sunken)
+		// the 3-D shading is derived from the field's surface (background)
+		// colour; fall back to the border colour when there is no background
+		surface := mk.BackgroundColor
+		if surface == nil {
+			surface = mk.BorderColor
+		}
+		drawBeveledBorder(b, pdf.Rectangle{URx: width, URy: height}, lw, surface, style == "B")
+	default: // "S" solid, "D" dashed
+		b.SetLineWidth(lw)
+		b.SetStrokeColor(mk.BorderColor)
+		if style == "D" {
+			dash := []float64{3}
+			if w.BorderStyle != nil && len(w.BorderStyle.DashArray) > 0 {
+				dash = w.BorderStyle.DashArray
+			}
+			b.SetLineDash(dash, 0)
+		}
+		b.Rectangle(lw/2, lw/2, width-lw, height-lw)
+		b.Stroke()
+	}
+}
+
+// drawToggle draws one appearance of a check box or radio button: the on-glyph
+// when on is true, chrome only otherwise. Radio buttons use a circular border.
+func (s *Style) drawToggle(w *annotation.Widget, fld *WidgetField, on bool) *form.Form {
+	b, width, height, m := s.fieldContext(w)
+	isRadio := fld.Flags&ffRadio != 0
+
+	if isRadio {
+		drawCircleChrome(b, width, height, w)
+	} else {
+		drawChrome(b, width, height, w)
+	}
+
+	if on {
+		glyph := ""
+		if w.MK != nil {
+			glyph = w.MK.Caption
+		}
+		if glyph == "" {
+			if isRadio {
+				glyph = "l" // ZapfDingbats filled circle
+			} else {
+				glyph = "4" // ZapfDingbats check mark
+			}
+		}
+		s.drawDingbat(b, width, height, glyph)
+	}
+
+	return s.finishForm(b, width, height, m)
+}
+
+// drawCircleChrome fills and strokes a circular field background and border.
+func drawCircleChrome(b *builder.Builder, width, height float64, w *annotation.Widget) {
+	mk := w.MK
+	cx, cy := width/2, height/2
+	outer := min(width, height) / 2
+	lw := borderWidth(w)
+
+	if mk != nil && mk.BackgroundColor != nil {
+		b.SetFillColor(mk.BackgroundColor)
+		b.Circle(cx, cy, outer)
+		b.Fill()
+	}
+	if mk != nil && mk.BorderColor != nil && lw > 0 {
+		b.SetLineWidth(lw)
+		b.SetStrokeColor(mk.BorderColor)
+		b.Circle(cx, cy, outer-lw/2)
+		b.Stroke()
+	}
+}
+
+// drawDingbat centres a ZapfDingbats glyph in the field box. The marker is named
+// by its code in the ZapfDingbats encoding (the MK.CA convention, e.g. "4" for a
+// check mark); it is translated to the glyph's Unicode value so that the font's
+// character map selects the intended glyph.
+func (s *Style) drawDingbat(b *builder.Builder, width, height float64, marker string) {
+	glyph := dingbatText(marker)
+	if glyph == "" {
+		return
+	}
+	size := min(width, height) * 0.62
+	b.TextBegin()
+	b.TextSetFont(s.dingbatsFont, size)
+	b.SetFillColor(quireInk)
+	b.TextFirstLine(0, height/2-size*0.33)
+	b.TextShowAligned(glyph, width, 0.5)
+	b.TextEnd()
+}
+
+// dingbatText translates a marker given as ZapfDingbats encoding codes (the
+// MK.CA convention) into the corresponding Unicode text.
+func dingbatText(marker string) string {
+	var sb strings.Builder
+	for i := 0; i < len(marker); i++ {
+		name := pdfenc.ZapfDingbats.Encoding[marker[i]]
+		if name == "" || name == ".notdef" {
+			continue
+		}
+		sb.WriteString(names.ToUnicode(name, "ZapfDingbats"))
+	}
+	return sb.String()
+}
+
+// drawPushButton draws a push button's chrome and centred caption.
+func (s *Style) drawPushButton(w *annotation.Widget) *form.Form {
+	b, width, height, m := s.fieldContext(w)
+	drawChrome(b, width, height, w)
+
+	if w.MK != nil && w.MK.Caption != "" {
+		size := captionSize(height)
+		b.TextBegin()
+		b.TextSetFont(s.ContentFont, size)
+		b.SetFillColor(quireInk)
+		b.TextFirstLine(0, height/2-size*0.33)
+		b.TextShowAligned(w.MK.Caption, width, 0.5)
+		b.TextEnd()
+	}
+
+	return s.finishForm(b, width, height, m)
+}
+
+// drawTextField draws a text field's chrome and value.
+func (s *Style) drawTextField(w *annotation.Widget, fld *WidgetField) *form.Form {
+	b, width, height, m := s.fieldContext(w)
+	drawChrome(b, width, height, w)
+
+	lw := borderWidth(w)
+	const pad = 2.0
+
+	switch {
+	case fld.Flags&ffPassword != 0:
+		// the value is masked: one bullet per character
+		s.drawSingleLine(b, width, height, lw, pad, fld, strings.Repeat("*", utf8.RuneCountInString(fld.Value)))
+	case fld.Flags&ffComb != 0 && fld.MaxLen > 0:
+		s.drawComb(b, width, height, lw, fld)
+	case fld.Flags&ffMultiline != 0:
+		s.drawMultiline(b, width, height, lw, pad, fld)
+	case fld.Value != "":
+		s.drawSingleLine(b, width, height, lw, pad, fld, fld.Value)
+	}
+
+	return s.finishForm(b, width, height, m)
+}
+
+// drawSingleLine draws text as a single, vertically centred line.
+func (s *Style) drawSingleLine(b *builder.Builder, width, height, lw, pad float64, fld *WidgetField, text string) {
+	if text == "" {
+		return
+	}
+	size, col := parseDA(fld.DefaultAppearance)
+	if size == 0 {
+		size = autoSize(height - 2*lw)
+	}
+	left := lw + pad
+	contentWidth := width - 2*(lw+pad)
+
+	b.PushGraphicsState()
+	b.Rectangle(left, lw, contentWidth, height-2*lw)
+	b.ClipNonZero()
+	b.EndPath()
+
+	b.TextBegin()
+	b.TextSetFont(s.ContentFont, size)
+	b.SetFillColor(col)
+	b.TextFirstLine(left, height/2-size*0.33)
+	b.TextShowAligned(text, contentWidth, quadFraction(fld.Align))
+	b.TextEnd()
+
+	b.PopGraphicsState()
+}
+
+// drawMultiline draws word-wrapped, top-aligned field text.
+func (s *Style) drawMultiline(b *builder.Builder, width, height, lw, pad float64, fld *WidgetField) {
+	if fld.Value == "" {
+		return
+	}
+	F := s.ContentFont
+	size, col := parseDA(fld.DefaultAppearance)
+	if size == 0 {
+		size = 11
+	}
+	left := lw + pad
+	contentWidth := width - 2*(lw+pad)
+	lineHeight := pdf.Round(F.GetGeometry().Leading*size, 2)
+
+	b.PushGraphicsState()
+	b.Rectangle(left, lw, contentWidth, height-2*lw)
+	b.ClipNonZero()
+	b.EndPath()
+
+	b.TextBegin()
+	b.TextSetFont(F, size)
+	b.SetFillColor(col)
+	yPos := height - lw - pad - size
+	lineNo := 0
+	wrapper := text.Wrap(contentWidth, fld.Value)
+	for line := range wrapper.Lines(F, size) {
+		switch lineNo {
+		case 0:
+			b.TextFirstLine(left, yPos)
+		case 1:
+			b.TextSecondLine(0, -lineHeight)
+		default:
+			b.TextNextLine()
+		}
+		switch fld.Align {
+		case pdf.TextAlignCenter:
+			line.Align(contentWidth, 0.5)
+		case pdf.TextAlignRight:
+			line.Align(contentWidth, 1.0)
+		}
+		b.TextShowGlyphs(line)
+		lineNo++
+	}
+	b.TextEnd()
+	b.PopGraphicsState()
+}
+
+// drawComb lays the value out into MaxLen equal cells separated by hairline
+// rules, one character per cell.
+func (s *Style) drawComb(b *builder.Builder, width, height, lw float64, fld *WidgetField) {
+	n := fld.MaxLen
+	if n <= 0 {
+		return
+	}
+	cellW := (width - 2*lw) / float64(n)
+
+	b.SetLineWidth(0.6)
+	b.SetStrokeColor(quireInk3)
+	for i := 1; i < n; i++ {
+		x := lw + cellW*float64(i)
+		b.MoveTo(x, lw)
+		b.LineTo(x, height-lw)
+		b.Stroke()
+	}
+
+	size, col := parseDA(fld.DefaultAppearance)
+	if size == 0 {
+		size = autoSize(height - 2*lw)
+	}
+	baseline := height/2 - size*0.33
+	runes := []rune(fld.Value)
+	for i := 0; i < n && i < len(runes); i++ {
+		cellLeft := lw + cellW*float64(i)
+		b.TextBegin()
+		b.TextSetFont(s.ContentFont, size)
+		b.SetFillColor(col)
+		b.TextFirstLine(cellLeft, baseline)
+		b.TextShowAligned(string(runes[i]), cellW, 0.5)
+		b.TextEnd()
+	}
+}
+
+// drawChoiceField draws a list box or, when the combo flag is set, a combo box.
+func (s *Style) drawChoiceField(w *annotation.Widget, fld *WidgetField) *form.Form {
+	b, width, height, m := s.fieldContext(w)
+	drawChrome(b, width, height, w)
+	lw := borderWidth(w)
+	const pad = 2.0
+
+	if fld.Flags&ffCombo != 0 {
+		s.drawCombo(b, width, height, lw, pad, fld)
+	} else {
+		s.drawListBox(b, width, height, lw, pad, fld)
+	}
+
+	return s.finishForm(b, width, height, m)
+}
+
+// drawCombo draws the selected value as a single line plus a divider and a
+// disclosure chevron at the right edge.
+func (s *Style) drawCombo(b *builder.Builder, width, height, lw, pad float64, fld *WidgetField) {
+	chevronW := height
+	divX := width - chevronW
+
+	b.SetLineWidth(0.6)
+	b.SetStrokeColor(quireInk3)
+	b.MoveTo(divX, lw)
+	b.LineTo(divX, height-lw)
+	b.Stroke()
+
+	cx := divX + chevronW/2
+	cy := height / 2
+	d := min(chevronW, height) * 0.18
+	b.SetLineWidth(1)
+	b.SetStrokeColor(quireInk2)
+	b.MoveTo(cx-d, cy+d/2)
+	b.LineTo(cx, cy-d/2)
+	b.LineTo(cx+d, cy+d/2)
+	b.Stroke()
+
+	if fld.Value != "" {
+		size, col := parseDA(fld.DefaultAppearance)
+		if size == 0 {
+			size = autoSize(height - 2*lw)
+		}
+		left := lw + pad
+		b.TextBegin()
+		b.TextSetFont(s.ContentFont, size)
+		b.SetFillColor(col)
+		b.TextFirstLine(left, height/2-size*0.33)
+		b.TextShowAligned(fld.Value, divX-left-pad, quadFraction(fld.Align))
+		b.TextEnd()
+	}
+}
+
+// drawListBox draws the option items, scrolled to TopIndex, with the selected
+// rows highlighted in the Quire selection treatment (amber wash and indicator).
+func (s *Style) drawListBox(b *builder.Builder, width, height, lw, pad float64, fld *WidgetField) {
+	size, col := parseDA(fld.DefaultAppearance)
+	if size == 0 {
+		size = 11
+	}
+	rowH := pdf.Round(s.ContentFont.GetGeometry().Leading*size, 2)
+	if rowH <= 0 {
+		rowH = size * 1.3
+	}
+	left := lw + pad
+
+	selected := map[int]bool{}
+	for _, i := range fld.Selected {
+		selected[i] = true
+	}
+
+	b.PushGraphicsState()
+	b.Rectangle(lw, lw, width-2*lw, height-2*lw)
+	b.ClipNonZero()
+	b.EndPath()
+
+	top := height - lw
+	for i := fld.TopIndex; i < len(fld.Options); i++ {
+		rowTop := top - rowH*float64(i-fld.TopIndex)
+		rowBottom := rowTop - rowH
+		if rowTop < lw {
+			break
+		}
+		if selected[i] {
+			b.SetFillColor(quireAmber50)
+			b.Rectangle(lw, rowBottom, width-2*lw, rowH)
+			b.Fill()
+			b.SetFillColor(quireAmber400)
+			b.Rectangle(lw, rowBottom, 2, rowH)
+			b.Fill()
+		}
+		b.TextBegin()
+		b.TextSetFont(s.ContentFont, size)
+		b.SetFillColor(col)
+		b.TextFirstLine(left, rowBottom+(rowH-size)/2+size*0.2)
+		b.TextShow(fld.Options[i])
+		b.TextEnd()
+	}
+
+	b.PopGraphicsState()
+}
+
+// quadFraction maps a text alignment to the fraction used by TextShowAligned.
+func quadFraction(q pdf.TextAlign) float64 {
+	switch q {
+	case pdf.TextAlignCenter:
+		return 0.5
+	case pdf.TextAlignRight:
+		return 1.0
+	default:
+		return 0.0
+	}
+}
+
+// captionSize chooses a push-button caption size that fits the field height.
+func captionSize(height float64) float64 {
+	return clampFloat(height*0.5, 6, 12)
+}
+
+// autoSize chooses a text size for a single line in a field of the given inner
+// height, used when the DA font size is zero.
+func autoSize(innerHeight float64) float64 {
+	return clampFloat(innerHeight*0.72, 6, 12)
+}
+
+func clampFloat(v, lo, hi float64) float64 {
+	return max(lo, min(hi, v))
+}
+
+// parseDA extracts the text size and colour from a default-appearance string.
+// Unrecognised input yields a zero size (auto) and the default ink colour.
+func parseDA(da string) (size float64, col color.Color) {
+	col = quireInk
+	fields := strings.Fields(da)
+	for i, tok := range fields {
+		switch tok {
+		case "Tf":
+			if i >= 1 {
+				if v, ok := daFloat(fields[i-1]); ok && v >= 0 {
+					size = v
+				}
+			}
+		case "g":
+			if i >= 1 {
+				if g, ok := daFloat(fields[i-1]); ok {
+					col = color.DeviceGray(g)
+				}
+			}
+		case "rg":
+			if i >= 3 {
+				r, ok1 := daFloat(fields[i-3])
+				g, ok2 := daFloat(fields[i-2])
+				bl, ok3 := daFloat(fields[i-1])
+				if ok1 && ok2 && ok3 {
+					col = color.DeviceRGB{r, g, bl}
+				}
+			}
+		case "k":
+			if i >= 4 {
+				c, ok1 := daFloat(fields[i-4])
+				mm, ok2 := daFloat(fields[i-3])
+				y, ok3 := daFloat(fields[i-2])
+				kk, ok4 := daFloat(fields[i-1])
+				if ok1 && ok2 && ok3 && ok4 {
+					col = color.DeviceCMYK{c, mm, y, kk}
+				}
+			}
+		}
+	}
+	return size, col
+}
+
+func daFloat(s string) (float64, bool) {
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, false
+	}
+	return v, true
 }

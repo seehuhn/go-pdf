@@ -68,6 +68,10 @@ type Style struct {
 	// adjusted.
 	iconFont font.Layouter
 
+	// dingbatsFont is ZapfDingbats, used to draw the on-glyphs of check box and
+	// radio button widgets (the marker named by the MK.CA characteristic).
+	dingbatsFont font.Layouter
+
 	// reset is used to set a default graphics state at the beginning of each
 	// appearance stream.
 	reset *extgstate.ExtGState
@@ -96,10 +100,11 @@ func NewStyle() *Style {
 	// Allocate fonts once here, to make sure that at most one instance of each
 	// font is embedded in an output file.
 	return &Style{
-		Version:     pdf.V2_0,
-		iconFont:    font.Must(extended.NimbusRomanBold.New()),
-		ContentFont: font.Must(standard.Helvetica.New()),
-		reset:       reset,
+		Version:      pdf.V2_0,
+		iconFont:     font.Must(extended.NimbusRomanBold.New()),
+		dingbatsFont: font.Must(standard.ZapfDingbats.New()),
+		ContentFont:  font.Must(standard.Helvetica.New()),
+		reset:        reset,
 	}
 }
 

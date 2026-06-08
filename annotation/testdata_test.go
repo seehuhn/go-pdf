@@ -1413,14 +1413,15 @@ var testCases = map[pdf.Name][]testCase{
 			},
 		},
 		{
-			name: "widget with parent field",
+			// a widget's /Parent is owned by the field tree, not round-tripped on a
+			// standalone widget, so it is not set here (see the form tests).
+			name: "widget without parent",
 			annotation: &Widget{
 				Common: Common{
 					Rect: pdf.Rectangle{LLx: 250, LLy: 250, URx: 450, URy: 290},
 					Name: "child-widget-001",
 				},
-				Highlight: "T",                       // Toggle highlighting (same as Push)
-				Parent:    pdf.NewReference(2100, 0), // Parent field reference
+				Highlight: "T", // Toggle highlighting (same as Push)
 			},
 		},
 		{
@@ -1448,7 +1449,6 @@ var testCases = map[pdf.Name][]testCase{
 					Style:     "D",
 					DashArray: []float64{5, 2},
 				},
-				Parent: pdf.NewReference(2600, 0), // Parent field reference
 			},
 		},
 		{

@@ -85,45 +85,11 @@ func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 			pdf.Round(bbox.URy-bbox.LLy-borderWidth, 2))
 		b.Stroke()
 	case "B":
-		dark, light := getDarkLightCol(col)
 		b.SetExtGState(s.reset)
-		b.SetFillColor(dark)
-		b.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy, 2))
-		b.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.LLy, 2))
-		b.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.URy, 2))
-		b.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
-		b.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
-		b.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
-		b.Fill()
-
-		b.SetFillColor(light)
-		b.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy, 2))
-		b.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
-		b.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
-		b.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
-		b.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.URy, 2))
-		b.LineTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.URy, 2))
-		b.Fill()
+		drawBeveledBorder(b, bbox, borderWidth, col, true)
 	case "I":
-		dark, light := getDarkLightCol(col)
 		b.SetExtGState(s.reset)
-		b.SetFillColor(light)
-		b.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy, 2))
-		b.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.LLy, 2))
-		b.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.URy, 2))
-		b.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
-		b.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
-		b.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
-		b.Fill()
-
-		b.SetFillColor(dark)
-		b.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy, 2))
-		b.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.LLy+borderWidth, 2))
-		b.LineTo(pdf.Round(bbox.LLx+borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
-		b.LineTo(pdf.Round(bbox.URx-borderWidth, 2), pdf.Round(bbox.URy-borderWidth, 2))
-		b.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.URy, 2))
-		b.LineTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.URy, 2))
-		b.Fill()
+		drawBeveledBorder(b, bbox, borderWidth, col, false)
 	default: // solid or unknown
 		b.SetExtGState(s.reset)
 		b.SetStrokeColor(col)
@@ -141,6 +107,38 @@ func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 		Res:     b.Resources,
 		BBox:    bbox,
 	}
+}
+
+// drawBeveledBorder fills a raised ("B" beveled) or, when raised is false, an
+// inset ("I") 3-D border of the given width inside rect. The light and dark
+// shades are derived from col: a raised border is lit from the top-left, an
+// inset one from the bottom-right.
+func drawBeveledBorder(b *builder.Builder, rect pdf.Rectangle, borderWidth float64, col color.Color, raised bool) {
+	dark, light := getDarkLightCol(col)
+	bottomRight, topLeft := dark, light
+	if !raised {
+		bottomRight, topLeft = light, dark
+	}
+
+	// bottom and right band
+	b.SetFillColor(bottomRight)
+	b.MoveTo(pdf.Round(rect.LLx, 2), pdf.Round(rect.LLy, 2))
+	b.LineTo(pdf.Round(rect.URx, 2), pdf.Round(rect.LLy, 2))
+	b.LineTo(pdf.Round(rect.URx, 2), pdf.Round(rect.URy, 2))
+	b.LineTo(pdf.Round(rect.URx-borderWidth, 2), pdf.Round(rect.URy-borderWidth, 2))
+	b.LineTo(pdf.Round(rect.URx-borderWidth, 2), pdf.Round(rect.LLy+borderWidth, 2))
+	b.LineTo(pdf.Round(rect.LLx+borderWidth, 2), pdf.Round(rect.LLy+borderWidth, 2))
+	b.Fill()
+
+	// top and left band
+	b.SetFillColor(topLeft)
+	b.MoveTo(pdf.Round(rect.LLx, 2), pdf.Round(rect.LLy, 2))
+	b.LineTo(pdf.Round(rect.LLx+borderWidth, 2), pdf.Round(rect.LLy+borderWidth, 2))
+	b.LineTo(pdf.Round(rect.LLx+borderWidth, 2), pdf.Round(rect.URy-borderWidth, 2))
+	b.LineTo(pdf.Round(rect.URx-borderWidth, 2), pdf.Round(rect.URy-borderWidth, 2))
+	b.LineTo(pdf.Round(rect.URx, 2), pdf.Round(rect.URy, 2))
+	b.LineTo(pdf.Round(rect.LLx, 2), pdf.Round(rect.URy, 2))
+	b.Fill()
 }
 
 func getDarkLightCol(col color.Color) (dark, light color.Color) {

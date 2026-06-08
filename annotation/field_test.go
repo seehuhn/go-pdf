@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package acroform
+package annotation
 
 import (
 	"bytes"
@@ -27,128 +27,235 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/action"
 	"seehuhn.de/go/pdf/action/triggers"
-	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/annotation/fallback"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/optional"
 )
 
-// widgetStyle generates fallback appearances for the test widgets. Appearance
-// streams are required on widgets in PDF 2.0.
-var widgetStyle = fallback.NewStyle()
-
 // testWidget returns a minimal widget annotation suitable for use as a field
-// child, with a generated fallback appearance. Highlight is set to "I" to
-// match the value substituted on decode.
-func testWidget(llx, lly, urx, ury float64) *annotation.Widget {
-	w := &annotation.Widget{
-		Common:    annotation.Common{Rect: pdf.Rectangle{LLx: llx, LLy: lly, URx: urx, URy: ury}},
+// child, with an appearance. Highlight is set to "I" to match the value
+// substituted on decode.
+func testWidget(llx, lly, urx, ury float64) *Widget {
+	w := &Widget{
+		Common:    Common{Rect: pdf.Rectangle{LLx: llx, LLy: lly, URx: urx, URy: ury}},
 		Highlight: "I",
 	}
 	ensureWidgetAppearance(w)
 	return w
 }
 
-// ensureWidgetAppearance gives a widget a generated fallback appearance if it
-// lacks one, as PDF 2.0 requires for widgets with a non-empty rectangle. Normal
-// is mirrored into RollOver and Down because an absent /R or /D appearance
-// defaults to /N on read, keeping the round trip exact.
-func ensureWidgetAppearance(w *annotation.Widget) {
+// ensureWidgetAppearance gives a widget an appearance if it lacks one, as PDF
+// 2.0 requires for widgets with a non-empty rectangle. The shared
+// defaultAppearanceDict sets Normal, RollOver and Down to the same stream,
+// keeping the round trip exact (an absent /R or /D defaults to /N on read).
+func ensureWidgetAppearance(w *Widget) {
 	if w.Appearance != nil {
 		return
 	}
 	if w.Rect.LLx == w.Rect.URx && w.Rect.LLy == w.Rect.URy {
 		return // single-point widgets are exempt from the requirement
 	}
-	if err := widgetStyle.AddAppearance(w); err != nil {
-		panic(err)
-	}
-	w.Appearance.RollOver = w.Appearance.Normal
-	w.Appearance.Down = w.Appearance.Normal
+	w.Appearance = defaultAppearanceDict
 }
 
 // ensureFieldAppearances supplies fallback appearances for every widget in a
 // field tree, as required when writing to PDF 2.0.
-func ensureFieldAppearances(f *Field) {
-	if f.Merged && f.Widget != nil {
-		ensureWidgetAppearance(f.Widget)
-	}
-	for _, kid := range f.Kids {
+func ensureFieldAppearances(f Field) {
+	c := f.GetFieldCommon()
+	for _, kid := range c.Kids {
 		switch k := kid.(type) {
-		case *Field:
+		case Field:
 			ensureFieldAppearances(k)
-		case *annotation.Widget:
+		case *Widget:
 			ensureWidgetAppearance(k)
 		}
 	}
 }
 
 // withAA attaches an annotation additional-actions dictionary to a widget.
-func withAA(w *annotation.Widget, aa *triggers.Annotation) *annotation.Widget {
+func withAA(w *Widget, aa *triggers.Annotation) *Widget {
 	w.AA = aa
 	return w
 }
 
 var fieldTestCases = []struct {
 	name  string
-	field *Field
+	field Field
 }{
 	{
 		name:  "minimal text",
-		field: &Field{FT: "Tx", T: "name"},
+		field: &FieldTx{FieldCommon: FieldCommon{T: "name"}},
 	},
 	{
 		name:  "flags",
-		field: &Field{FT: "Tx", T: "locked", Ff: optional.NewUInt(uint(FieldReadOnly | FieldRequired | FieldNoExport))},
+		field: &FieldTx{FieldCommon: FieldCommon{T: "locked", Ff: optional.NewUInt(uint(FieldReadOnly | FieldRequired | FieldNoExport))}},
 	},
 	{
 		// an explicit Ff of zero must round-trip as present, not absent: it
 		// blocks inheritance of an ancestor's flags
 		name:  "explicit zero flags",
-		field: &Field{FT: "Tx", T: "unlocked", Ff: optional.NewUInt(0)},
+		field: &FieldTx{FieldCommon: FieldCommon{T: "unlocked", Ff: optional.NewUInt(0)}},
 	},
 	{
 		name:  "direct values",
-		field: &Field{FT: "Tx", T: "v", V: pdf.String("hello"), DV: pdf.String("world")},
+		field: &FieldTx{FieldCommon: FieldCommon{T: "v"}, V: pdf.String("hello"), DV: pdf.String("world")},
 	},
 	{
 		name:  "reference value",
-		field: &Field{FT: "Tx", T: "vr", V: pdf.NewReference(100, 0)},
+		field: &FieldTx{FieldCommon: FieldCommon{T: "vr"}, V: pdf.NewReference(100, 0)},
+	},
+	{
+		name:  "text variable text",
+		field: &FieldTx{FieldCommon: FieldCommon{T: "vt"}, VariableText: VariableText{DefaultAppearance: "/Helv 12 Tf 0 g", Align: pdf.TextAlignCenter}, MaxLen: 24},
+	},
+	{
+		name:  "comb",
+		field: &FieldTx{FieldCommon: FieldCommon{T: "comb", Ff: optional.NewUInt(uint(FieldComb))}, MaxLen: 6},
 	},
 	{
 		name:  "alternate names",
-		field: &Field{FT: "Ch", T: "choice", TU: "Choose one", TM: "choice_map"},
+		field: &FieldChoice{FieldCommon: FieldCommon{T: "choice", TU: "Choose one", TM: "choice_map"}},
 	},
 	{
-		name:  "data passthrough",
-		field: &Field{FT: "Tx", T: "d", Data: pdf.Dict{"MaxLen": pdf.Integer(20)}},
+		name: "choice options",
+		field: &FieldChoice{
+			FieldCommon: FieldCommon{T: "fonts", Ff: optional.NewUInt(uint(FieldCombo))},
+			Opt:         []ChoiceOption{{Export: "h", Display: "Helvetica"}, {Export: "Times", Display: "Times"}},
+			TopIndex:    0,
+			Selected:    []int{1},
+			V:           pdf.String("Times"),
+		},
+	},
+	{
+		name: "checkbox",
+		field: &FieldBtn{
+			FieldCommon: FieldCommon{T: "agree"},
+			V:           "Yes",
+			DV:          "Off",
+		},
+	},
+	{
+		name: "radio with export values",
+		field: &FieldBtn{
+			FieldCommon: FieldCommon{T: "size", Ff: optional.NewUInt(uint(FieldRadio))},
+			Opt:         []string{"small", "large"},
+			V:           "small",
+		},
+	},
+	{
+		name:  "push button",
+		field: &FieldBtn{FieldCommon: FieldCommon{T: "submit", Ff: optional.NewUInt(uint(FieldPushbutton))}},
+	},
+	{
+		name:  "signature",
+		field: &FieldSig{FieldCommon: FieldCommon{T: "sig"}},
+	},
+	{
+		name: "signature with lock all",
+		field: &FieldSig{
+			FieldCommon: FieldCommon{T: "siglockall"},
+			Lock:        &SigFieldLock{Action: SigFieldLockAll},
+		},
+	},
+	{
+		name: "signature with lock include",
+		field: &FieldSig{
+			FieldCommon: FieldCommon{T: "siglock"},
+			Lock: &SigFieldLock{
+				Action: SigFieldLockInclude,
+				Fields: []string{"name", "address"},
+			},
+		},
+	},
+	{
+		name: "signature with seed value",
+		field: &FieldSig{
+			FieldCommon: FieldCommon{T: "sigsv"},
+			SV: &SigSeedValue{
+				Flags:            SigSeedFilter | SigSeedSubFilter | SigSeedReasons,
+				Filter:           "Adobe.PPKLite",
+				SubFilter:        []pdf.Name{"adbe.pkcs7.detached", "ETSI.CAdES.detached"},
+				DigestMethod:     []pdf.Name{"SHA256", "SHA512"},
+				V:                2,
+				Reasons:          []string{"I agree", "I approve"},
+				MDP:              optional.NewUInt(2),
+				TimeStamp:        &SigSeedValueTimeStamp{URL: "https://ts.example.com", Required: true},
+				LegalAttestation: []string{"attestation"},
+				AddRevInfo:       true,
+			},
+		},
+	},
+	{
+		name: "signature with cert seed value",
+		field: &FieldSig{
+			FieldCommon: FieldCommon{T: "sigcert"},
+			SV: &SigSeedValue{
+				Filter: "Adobe.PPKLite",
+				Cert: &SigCertSeedValue{
+					Flags:     SigCertSubject | SigCertKeyUsage,
+					Subject:   [][]byte{{0x30, 0x82, 0x01}, {0x00, 0xff}},
+					Issuer:    [][]byte{{0x30, 0x10}},
+					OID:       [][]byte{[]byte("2.16.840.1.113733.1.7.1.1")},
+					SubjectDN: []map[pdf.Name]string{{"cn": "Example", "o": "Example Org"}},
+					KeyUsage:  []string{"1XXXXXXXX"},
+					URL:       "https://ca.example.com",
+					URLType:   "Browser",
+				},
+			},
+		},
+	},
+	{
+		name: "signature with pdf 2.0 seed value",
+		field: &FieldSig{
+			FieldCommon: FieldCommon{T: "sigsv20"},
+			Lock: &SigFieldLock{
+				Action: SigFieldLockExclude,
+				Fields: []string{"sig"},
+				P:      2,
+			},
+			SV: &SigSeedValue{
+				Flags:            SigSeedLockDocument | SigSeedAppearanceFilter,
+				LockDocument:     "true",
+				AppearanceFilter: "MyAppearance",
+				Cert: &SigCertSeedValue{
+					SignaturePolicyOID:            "1.2.3.4",
+					SignaturePolicyHashValue:      []byte{0xde, 0xad, 0xbe, 0xef},
+					SignaturePolicyHashAlgorithm:  "SHA256",
+					SignaturePolicyCommitmentType: []string{"1.2.840.113549.1.9.16.6.1"},
+				},
+			},
+		},
 	},
 	{
 		name: "additional actions",
-		field: &Field{
-			FT: "Tx", T: "calc",
-			AA: &triggers.Form{
-				Calculate: &action.JavaScript{JS: pdf.String("event.value = 0;")},
+		field: &FieldTx{
+			FieldCommon: FieldCommon{
+				T: "calc",
+				AA: &triggers.Form{
+					Calculate: &action.JavaScript{JS: pdf.String("event.value = 0;")},
+				},
 			},
 		},
 	},
 	{
 		name: "non-terminal tree",
-		field: &Field{
-			FT: "Tx", T: "address",
-			Kids: []Node{
-				&Field{T: "street"},
-				&Field{T: "zip"},
+		field: &FieldTx{
+			FieldCommon: FieldCommon{
+				T: "address",
+				Kids: []Node{
+					&FieldCommon{T: "street"},
+					&FieldCommon{T: "zip"},
+				},
 			},
 		},
 	},
 	{
 		name: "merged widget",
-		field: &Field{
-			FT: "Btn", T: "submit",
-			Merged: true,
-			Widget: testWidget(0, 0, 72, 24),
+		field: &FieldBtn{
+			FieldCommon: FieldCommon{
+				T:    "submit",
+				Kids: []Node{testWidget(0, 0, 72, 24)},
+			},
 		},
 	},
 	{
@@ -156,13 +263,14 @@ var fieldTestCases = []struct {
 		// annotation-level trigger (Fo) on the widget; both halves must
 		// survive the split/merge round trip
 		name: "merged widget with mixed AA",
-		field: &Field{
-			FT: "Btn", T: "submitAA",
-			Merged: true,
-			Widget: withAA(testWidget(0, 0, 72, 24),
-				&triggers.Annotation{Focus: &action.JavaScript{JS: pdf.String("focus();")}}),
-			AA: &triggers.Form{
-				Calculate: &action.JavaScript{JS: pdf.String("calc();")},
+		field: &FieldBtn{
+			FieldCommon: FieldCommon{
+				T: "submitAA",
+				Kids: []Node{withAA(testWidget(0, 0, 72, 24),
+					&triggers.Annotation{Focus: &action.JavaScript{JS: pdf.String("focus();")}})},
+				AA: &triggers.Form{
+					Calculate: &action.JavaScript{JS: pdf.String("calc();")},
+				},
 			},
 		},
 	},
@@ -170,12 +278,13 @@ var fieldTestCases = []struct {
 		// only a field-level trigger; the widget half of the shared /AA is
 		// empty and must decode back to a nil widget AA
 		name: "merged widget field-only AA",
-		field: &Field{
-			FT: "Btn", T: "calcOnly",
-			Merged: true,
-			Widget: testWidget(0, 0, 72, 24),
-			AA: &triggers.Form{
-				Calculate: &action.JavaScript{JS: pdf.String("calc();")},
+		field: &FieldBtn{
+			FieldCommon: FieldCommon{
+				T:    "calcOnly",
+				Kids: []Node{testWidget(0, 0, 72, 24)},
+				AA: &triggers.Form{
+					Calculate: &action.JavaScript{JS: pdf.String("calc();")},
+				},
 			},
 		},
 	},
@@ -183,28 +292,33 @@ var fieldTestCases = []struct {
 		// only an annotation-level trigger; the field half of the shared /AA
 		// is empty and must decode back to a nil field AA
 		name: "merged widget annotation-only AA",
-		field: &Field{
-			FT: "Btn", T: "focusOnly",
-			Merged: true,
-			Widget: withAA(testWidget(0, 0, 72, 24),
-				&triggers.Annotation{Focus: &action.JavaScript{JS: pdf.String("focus();")}}),
+		field: &FieldBtn{
+			FieldCommon: FieldCommon{
+				T: "focusOnly",
+				Kids: []Node{withAA(testWidget(0, 0, 72, 24),
+					&triggers.Annotation{Focus: &action.JavaScript{JS: pdf.String("focus();")}})},
+			},
 		},
 	},
 	{
 		name: "multiple widgets",
-		field: &Field{
-			FT: "Btn", T: "color",
-			Kids: []Node{
-				testWidget(0, 0, 20, 20),
-				testWidget(30, 0, 50, 20),
+		field: &FieldBtn{
+			FieldCommon: FieldCommon{
+				T:    "color",
+				Ff:   optional.NewUInt(uint(FieldRadio)),
+				Kids: []Node{testWidget(0, 0, 20, 20), testWidget(30, 0, 50, 20)},
 			},
+			Opt: []string{"red", "green"},
 		},
 	},
 }
 
 func fieldCmpOptions() []cmp.Option {
 	return []cmp.Option{
-		cmpopts.IgnoreUnexported(Field{}),
+		cmpopts.IgnoreUnexported(FieldCommon{}),
+		// Widget.Parent is transient encode-time state, set while a merged field
+		// is written; a decoded tree-owned widget has it nil
+		cmpopts.IgnoreFields(Widget{}, "Parent"),
 		cmp.AllowUnexported(language.Tag{}),
 		cmpopts.EquateComparable(language.Tag{}),
 		// form.Equal handles nil-vs-empty and resource differences
@@ -217,7 +331,39 @@ func fieldCmpOptions() []cmp.Option {
 	}
 }
 
-func fieldRoundTripTest(t *testing.T, version pdf.Version, want *Field) {
+// storeFieldTree writes a single field's subtree the way [InteractiveForm.Encode]
+// does, then writes its widget annotations as their pages would, so a field can
+// be round-tripped on its own. It returns the reference naming f.
+func storeFieldTree(rm *pdf.ResourceManager, f Field) (pdf.Reference, error) {
+	ref, err := fieldRef(rm, f)
+	if err != nil {
+		return 0, err
+	}
+	if err := storeFieldWidgets(rm, f); err != nil {
+		return 0, err
+	}
+	return ref, nil
+}
+
+// storeFieldWidgets stores every widget annotation in f's subtree, standing in
+// for the pages that would normally write them.
+func storeFieldWidgets(rm *pdf.ResourceManager, f Field) error {
+	for _, kid := range f.GetFieldCommon().Kids {
+		switch k := kid.(type) {
+		case *Widget:
+			if _, err := rm.Store(k); err != nil {
+				return err
+			}
+		case Field:
+			if err := storeFieldWidgets(rm, k); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func fieldRoundTripTest(t *testing.T, version pdf.Version, want Field) {
 	t.Helper()
 
 	// PDF 2.0 requires widgets to carry an appearance stream; supply fallbacks
@@ -232,7 +378,7 @@ func fieldRoundTripTest(t *testing.T, version pdf.Version, want *Field) {
 	}
 
 	rm := pdf.NewResourceManager(w)
-	ref, err := want.Encode(rm)
+	ref, err := storeFieldTree(rm, want)
 	if err != nil {
 		if pdf.IsWrongVersion(err) {
 			t.Skip("version not supported")
@@ -286,7 +432,7 @@ func FuzzFieldRoundTrip(f *testing.F) {
 			}
 
 			rm := pdf.NewResourceManager(w)
-			ref, err := tc.field.Encode(rm)
+			ref, err := storeFieldTree(rm, tc.field)
 			if err != nil {
 				continue
 			}
@@ -324,33 +470,68 @@ func FuzzFieldRoundTrip(f *testing.F) {
 }
 
 func TestFieldResolvedAttributes(t *testing.T) {
-	parent := &Field{FT: "Tx", Ff: optional.NewUInt(uint(FieldRequired)), V: pdf.String("pv"), DV: pdf.Name("Off")}
-	child := &Field{T: "c"}
+	parent := &FieldTx{
+		FieldCommon: FieldCommon{Ff: optional.NewUInt(uint(FieldRequired))},
+		V:           pdf.String("pv"),
+		DV:          pdf.String("dv"),
+	}
+	child := &FieldCommon{T: "c"}
 	child.parent = parent
 
-	if got := child.ResolvedFT(); got != "Tx" {
+	if got := ResolvedFT(child); got != "Tx" {
 		t.Errorf("ResolvedFT = %q, want %q", got, "Tx")
 	}
-	if got := child.ResolvedFf(); got != FieldRequired {
+	if got := ResolvedFf(child); got != FieldRequired {
 		t.Errorf("ResolvedFf = %d, want %d", got, FieldRequired)
 	}
-	if got, ok := child.ResolvedV().(pdf.String); !ok || string(got) != "pv" {
-		t.Errorf("ResolvedV = %v, want %q", child.ResolvedV(), "pv")
+	if got, ok := ResolvedV(child).(pdf.String); !ok || string(got) != "pv" {
+		t.Errorf("ResolvedV = %v, want %q", ResolvedV(child), "pv")
 	}
-	if got, ok := child.ResolvedDV().(pdf.Name); !ok || got != "Off" {
-		t.Errorf("ResolvedDV = %v, want %q", child.ResolvedDV(), "Off")
+	if got, ok := ResolvedDV(child).(pdf.String); !ok || string(got) != "dv" {
+		t.Errorf("ResolvedDV = %v, want %q", ResolvedDV(child), "dv")
 	}
 
 	// a local value overrides the inherited one
-	child.FT = "Btn"
-	if got := child.ResolvedFT(); got != "Btn" {
+	typedChild := &FieldBtn{FieldCommon: FieldCommon{T: "c"}}
+	typedChild.parent = parent
+	if got := ResolvedFT(typedChild); got != "Btn" {
 		t.Errorf("ResolvedFT after override = %q, want %q", got, "Btn")
 	}
 
 	// an explicit zero blocks inheritance of the ancestor's flags
 	child.Ff = optional.NewUInt(0)
-	if got := child.ResolvedFf(); got != 0 {
+	if got := ResolvedFf(child); got != 0 {
 		t.Errorf("ResolvedFf with explicit zero = %d, want 0", got)
+	}
+}
+
+func TestFieldBtnVariant(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		ff   FieldFlags
+		want ButtonVariant
+	}{
+		{"checkbox", 0, ButtonCheckbox},
+		{"radio", FieldRadio, ButtonRadio},
+		{"push", FieldPushbutton, ButtonPush},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &FieldBtn{}
+			if tt.ff != 0 {
+				f.Ff = optional.NewUInt(uint(tt.ff))
+			}
+			if got := f.Variant(); got != tt.want {
+				t.Errorf("Variant() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+
+	// the variant flag may be inherited: a button sub-field with no flags of its
+	// own takes the Radio flag from its parent
+	child := &FieldBtn{}
+	child.parent = &FieldCommon{Ff: optional.NewUInt(uint(FieldRadio))}
+	if got := child.Variant(); got != ButtonRadio {
+		t.Errorf("inherited Variant() = %d, want ButtonRadio (%d)", got, ButtonRadio)
 	}
 }
 
@@ -359,10 +540,13 @@ func TestFieldResolvedAttributes(t *testing.T) {
 // presence, the zero value was indistinguishable from absent and was dropped
 // on encode, causing the child to inherit FieldRequired after the round trip.
 func TestFieldExplicitZeroFlagsRoundTrip(t *testing.T) {
-	want := &Field{
-		FT: "Tx", T: "parent", Ff: optional.NewUInt(uint(FieldRequired)),
-		Kids: []Node{
-			&Field{T: "child", Ff: optional.NewUInt(0)},
+	want := &FieldTx{
+		FieldCommon: FieldCommon{
+			T:  "parent",
+			Ff: optional.NewUInt(uint(FieldRequired)),
+			Kids: []Node{
+				&FieldCommon{T: "child", Ff: optional.NewUInt(0)},
+			},
 		},
 	}
 
@@ -371,7 +555,7 @@ func TestFieldExplicitZeroFlagsRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	rm := pdf.NewResourceManager(w)
-	ref, err := want.Encode(rm)
+	ref, err := storeFieldTree(rm, want)
 	if err != nil {
 		t.Fatalf("encode failed: %v", err)
 	}
@@ -394,26 +578,27 @@ func TestFieldExplicitZeroFlagsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
-	if len(got.Kids) != 1 {
-		t.Fatalf("expected one kid, got %d", len(got.Kids))
+	kids := got.GetFieldCommon().Kids
+	if len(kids) != 1 {
+		t.Fatalf("expected one kid, got %d", len(kids))
 	}
-	child, ok := got.Kids[0].(*Field)
+	child, ok := kids[0].(*FieldCommon)
 	if !ok {
-		t.Fatalf("expected a *Field kid, got %T", got.Kids[0])
+		t.Fatalf("expected a *FieldCommon kid, got %T", kids[0])
 	}
 	if _, set := child.Ff.Get(); !set {
 		t.Error("child Ff lost its explicit-present status after round trip")
 	}
-	if rff := child.ResolvedFf(); rff != 0 {
+	if rff := ResolvedFf(child); rff != 0 {
 		t.Errorf("child ResolvedFf = %d, want 0 (explicit zero blocks inheritance)", rff)
 	}
 }
 
 func TestFieldFullyQualifiedName(t *testing.T) {
-	root := &Field{T: "PersonalData"}
-	mid := &Field{T: "Address"}
+	root := &FieldCommon{T: "PersonalData"}
+	mid := &FieldCommon{T: "Address"}
 	mid.parent = root
-	leaf := &Field{T: "ZipCode"}
+	leaf := &FieldCommon{T: "ZipCode"}
 	leaf.parent = mid
 
 	if got := leaf.FullyQualifiedName(); got != "PersonalData.Address.ZipCode" {
@@ -421,9 +606,9 @@ func TestFieldFullyQualifiedName(t *testing.T) {
 	}
 
 	// an ancestor without a partial name is skipped
-	anon := &Field{}
+	anon := &FieldCommon{}
 	anon.parent = root
-	leaf2 := &Field{T: "Phone"}
+	leaf2 := &FieldCommon{T: "Phone"}
 	leaf2.parent = anon
 	if got := leaf2.FullyQualifiedName(); got != "PersonalData.Phone" {
 		t.Errorf("FullyQualifiedName with anonymous ancestor = %q, want %q", got, "PersonalData.Phone")
@@ -464,8 +649,8 @@ func TestDecodeFieldKidsSelfCycle(t *testing.T) {
 	if field == nil {
 		t.Fatal("expected a field")
 	}
-	if len(field.Kids) != 0 {
-		t.Errorf("expected no kids (self-reference dropped), got %d", len(field.Kids))
+	if kids := field.GetFieldCommon().Kids; len(kids) != 0 {
+		t.Errorf("expected no kids (self-reference dropped), got %d", len(kids))
 	}
 }
 
@@ -490,35 +675,16 @@ func TestDecodeFieldKidsMutualCycle(t *testing.T) {
 		t.Fatal("expected a field")
 	}
 	// A has one child B; B's back-reference to A is broken by cycle detection.
-	if len(field.Kids) != 1 {
-		t.Fatalf("expected one kid, got %d", len(field.Kids))
+	kids := field.GetFieldCommon().Kids
+	if len(kids) != 1 {
+		t.Fatalf("expected one kid, got %d", len(kids))
 	}
-	b, ok := field.Kids[0].(*Field)
+	b, ok := kids[0].(*FieldCommon)
 	if !ok {
-		t.Fatalf("expected a sub-field kid, got %T", field.Kids[0])
+		t.Fatalf("expected a sub-field kid, got %T", kids[0])
 	}
 	if len(b.Kids) != 0 {
 		t.Errorf("expected B to have no kids after cycle break, got %d", len(b.Kids))
-	}
-}
-
-func TestEncodeFieldInvalidType(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	rm := pdf.NewResourceManager(w)
-
-	field := &Field{FT: "Bogus", T: "x"}
-	if _, err := field.Encode(rm); err == nil {
-		t.Error("expected error for invalid field type, got nil")
-	}
-}
-
-func TestEncodeFieldDataCollision(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
-	rm := pdf.NewResourceManager(w)
-
-	field := &Field{FT: "Tx", T: "x", Data: pdf.Dict{"V": pdf.String("clash")}}
-	if _, err := field.Encode(rm); err == nil {
-		t.Error("expected error for Data colliding with a modeled key, got nil")
 	}
 }
 
@@ -526,8 +692,8 @@ func TestEncodeFieldNameWithPeriod(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
-	field := &Field{FT: "Tx", T: "a.b"}
-	if _, err := field.Encode(rm); err == nil {
+	field := &FieldTx{FieldCommon: FieldCommon{T: "a.b"}}
+	if _, err := fieldEntries(rm, field); err == nil {
 		t.Error("expected error for partial name containing a period, got nil")
 	}
 }
@@ -561,13 +727,13 @@ func TestDecodeFieldNameStripsPeriod(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if field.T != "abc" {
-		t.Errorf("partial name = %q, want %q", field.T, "abc")
+	if name := field.GetFieldCommon().T; name != "abc" {
+		t.Errorf("partial name = %q, want %q", name, "abc")
 	}
 
 	// the snapped name must re-encode without error
 	rm := pdf.NewResourceManager(w)
-	if _, err := field.Encode(rm); err != nil {
+	if _, err := fieldEntries(rm, field); err != nil {
 		t.Errorf("re-encode of snapped name failed: %v", err)
 	}
 }
@@ -576,21 +742,23 @@ func TestEncodeFieldVersionGating(t *testing.T) {
 	tests := []struct {
 		name    string
 		version pdf.Version
-		field   *Field
+		field   Field
 	}{
-		{"field requires 1.2", pdf.V1_1, &Field{FT: "Tx", T: "x"}},
-		{"TU requires 1.3", pdf.V1_2, &Field{FT: "Tx", T: "x", TU: "label"}},
-		{"TM requires 1.3", pdf.V1_2, &Field{FT: "Tx", T: "x", TM: "map"}},
-		{"AA requires 1.3", pdf.V1_2, &Field{
-			FT: "Tx", T: "x",
-			AA: &triggers.Form{Calculate: &action.JavaScript{JS: pdf.String("0;")}},
+		{"field requires 1.2", pdf.V1_1, &FieldTx{FieldCommon: FieldCommon{T: "x"}}},
+		{"TU requires 1.3", pdf.V1_2, &FieldTx{FieldCommon: FieldCommon{T: "x", TU: "label"}}},
+		{"TM requires 1.3", pdf.V1_2, &FieldTx{FieldCommon: FieldCommon{T: "x", TM: "map"}}},
+		{"AA requires 1.3", pdf.V1_2, &FieldTx{
+			FieldCommon: FieldCommon{
+				T:  "x",
+				AA: &triggers.Form{Calculate: &action.JavaScript{JS: pdf.String("0;")}},
+			},
 		}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			w, _ := memfile.NewPDFWriter(tc.version, nil)
 			rm := pdf.NewResourceManager(w)
-			if _, err := tc.field.Encode(rm); !pdf.IsWrongVersion(err) {
+			if _, err := fieldEntries(rm, tc.field); !pdf.IsWrongVersion(err) {
 				t.Errorf("expected version error, got %v", err)
 			}
 		})
@@ -619,7 +787,8 @@ func TestIsWidgetKid(t *testing.T) {
 
 // a kid that is a sub-field without FT, T, or Kids (and without a Widget
 // subtype) must be decoded as a field, not misclassified as a widget and
-// silently dropped.
+// silently dropped. Its common attributes (here Ff) survive, and it inherits
+// its type from the parent.
 func TestDecodeFieldAnonymousSubField(t *testing.T) {
 	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
 	if err := memfile.AddBlankPage(w); err != nil {
@@ -628,7 +797,7 @@ func TestDecodeFieldAnonymousSubField(t *testing.T) {
 
 	parent := w.Alloc()
 	kid := w.Alloc()
-	if err := w.Put(kid, pdf.Dict{"V": pdf.String("x"), "Ff": pdf.Integer(2)}); err != nil {
+	if err := w.Put(kid, pdf.Dict{"Ff": pdf.Integer(2)}); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.Put(parent, pdf.Dict{
@@ -654,17 +823,18 @@ func TestDecodeFieldAnonymousSubField(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(field.Kids) != 1 {
-		t.Fatalf("expected the anonymous sub-field to be preserved, got %d kids", len(field.Kids))
+	kids := field.GetFieldCommon().Kids
+	if len(kids) != 1 {
+		t.Fatalf("expected the anonymous sub-field to be preserved, got %d kids", len(kids))
 	}
-	child, ok := field.Kids[0].(*Field)
+	child, ok := kids[0].(*FieldCommon)
 	if !ok {
-		t.Fatalf("expected a *Field kid, got %T", field.Kids[0])
+		t.Fatalf("expected a *FieldCommon kid, got %T", kids[0])
 	}
-	if got, ok := child.V.(pdf.String); !ok || string(got) != "x" {
-		t.Errorf("sub-field value = %v, want %q", child.V, "x")
+	if got, set := child.Ff.Get(); !set || FieldFlags(got) != FieldRequired {
+		t.Errorf("sub-field Ff = %v (set %v), want %d", got, set, FieldRequired)
 	}
-	if child.ResolvedFT() != "Tx" {
-		t.Errorf("sub-field ResolvedFT = %q, want Tx (inherited)", child.ResolvedFT())
+	if ResolvedFT(child) != "Tx" {
+		t.Errorf("sub-field ResolvedFT = %q, want Tx (inherited)", ResolvedFT(child))
 	}
 }

@@ -47,7 +47,6 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/media"
 	"seehuhn.de/go/pdf/optional"
-	pdfpage "seehuhn.de/go/pdf/page"
 )
 
 //go:embed movie.mp4
@@ -82,10 +81,9 @@ func createDocument(filename string) error {
 	page.TextEnd()
 
 	// the screen annotation that hosts playback (16:9, below the caption and
-	// above the button row); allocate its reference up front so the rendition
+	// above the button row); reserve its reference up front so the rendition
 	// actions can target it via AN
 	screenRect := pdf.Rectangle{LLx: 180, LLy: 107.5, URx: 780, URy: 445}
-	screenRef := page.Out.Alloc()
 
 	// one shared rendition: embedded once, referenced by every play action
 	rend := newRendition()
@@ -97,13 +95,11 @@ func createDocument(filename string) error {
 			Border:   annotation.PDFDefaultBorder,
 			Flags:    annotation.FlagPrint,
 		},
-		Title:  "Tick movie",
-		Action: renditionAction(rend, screenRef, 0), // play
+		Title: "Tick movie",
 	}
-	page.Page.Annots = append(page.Page.Annots, pdfpage.AnnotInfo{
-		Annot: screen,
-		Ref:   screenRef,
-	})
+	screenRef := page.RM.GetReference(screen)
+	screen.Action = renditionAction(rend, screenRef, 0) // play
+	page.Page.Annots = append(page.Page.Annots, screen)
 
 	// control buttons; OP 0 and 4 need a rendition, the rest act on the
 	// active player
@@ -147,10 +143,7 @@ func createDocument(filename string) error {
 			},
 			Action: renditionAction(actionRend, screenRef, b.op),
 		}
-		page.Page.Annots = append(page.Page.Annots, pdfpage.AnnotInfo{
-			Annot: btn,
-			Ref:   page.Out.Alloc(),
-		})
+		page.Page.Annots = append(page.Page.Annots, btn)
 
 		x += btnW + gap
 	}

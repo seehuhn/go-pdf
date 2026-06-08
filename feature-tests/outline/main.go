@@ -80,12 +80,12 @@ func main() {
 		}
 	}
 
-	outlineRef, err := ol.Encode(page.RM)
+	outlineRef, err := page.RM.Store(ol)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if ref, ok := outlineRef.(pdf.Reference); ok {
-		page.Out.GetMeta().Catalog.Outlines = ref
+	if outlineRef != 0 {
+		page.Out.GetMeta().Catalog.Outlines = outlineRef
 	}
 
 	err = page.Close()
