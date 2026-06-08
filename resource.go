@@ -268,11 +268,19 @@ type Extractor struct {
 	R     Getter
 	mu    sync.Mutex
 	cache map[extractorKey]any
+	wip   map[extractorKey]*pending // decodes in progress (ExtractorGetExclusive)
 }
 
 type extractorKey struct {
 	ref Reference
 	tp  reflect.Type
+}
+
+// pending is a decode that one goroutine is running while others wait on it.
+type pending struct {
+	done chan struct{}
+	val  any
+	err  error
 }
 
 // NewExtractor creates a new Extractor using the given Getter to read PDF
@@ -281,6 +289,7 @@ func NewExtractor(r Getter) *Extractor {
 	return &Extractor{
 		R:     r,
 		cache: make(map[extractorKey]any),
+		wip:   make(map[extractorKey]*pending),
 	}
 }
 
@@ -291,10 +300,25 @@ func (x *Extractor) cacheGet(key extractorKey) (any, bool) {
 	return v, ok
 }
 
-func (x *Extractor) cachePut(key extractorKey, val any) {
+// cacheStoreOrLoad publishes res under every reference in refs and returns res.
+// If the first reference is already cached — another goroutine decoded the same
+// object concurrently — it stores nothing and returns the existing value, so
+// every caller ends up with one shared object. The first writer for a reference
+// wins; later racers adopt its result and discard their own.
+//
+// Publishing this way (rather than waiting on an in-flight marker) keeps decode
+// deadlock-free: two goroutines decoding mutually-referential objects never wait
+// on each other, so a malformed file cannot hang the reader.
+func (x *Extractor) cacheStoreOrLoad(refs []Reference, tp reflect.Type, res any) any {
 	x.mu.Lock()
-	x.cache[key] = val
-	x.mu.Unlock()
+	defer x.mu.Unlock()
+	if v, ok := x.cache[extractorKey{ref: refs[0], tp: tp}]; ok {
+		return v
+	}
+	for _, ref := range refs {
+		x.cache[extractorKey{ref: ref, tp: tp}] = res
+	}
+	return res
 }
 
 // ExtractorGet resolves indirect references and extracts a typed object.
@@ -340,10 +364,10 @@ func ExtractorGet[T any](x *Extractor, path *CycleCheck, obj Object, extract fun
 		return zero, err
 	}
 
-	// cache under all refs
-	for _, ref := range refs {
-		key := extractorKey{ref: ref, tp: tp}
-		x.cachePut(key, res)
+	// publish under all refs; adopt a concurrent decoder's result on a race so
+	// callers share one object (see cacheStoreOrLoad)
+	if len(refs) > 0 {
+		res = x.cacheStoreOrLoad(refs, tp, res).(T)
 	}
 
 	return res, nil
@@ -353,6 +377,78 @@ func ExtractorGet[T any](x *Extractor, path *CycleCheck, obj Object, extract fun
 // acceptable rather than as an error.
 func ExtractorGetOptional[T any](x *Extractor, path *CycleCheck, obj Object, extract func(*Extractor, *CycleCheck, Object, bool) (T, error)) (T, error) {
 	return Optional(ExtractorGet(x, path, obj, extract))
+}
+
+// ExtractorGetExclusive is like [ExtractorGet] but runs the extract function at
+// most once per reference: concurrent callers for the same reference wait for
+// the first to finish and share its result.
+//
+// Use this ONLY for decodes that cannot participate in a cross-goroutine
+// reference cycle — that is, a document "sink" such as the interactive form,
+// whose decode never waits on an object that might be waiting on it. For
+// anything that can be mutually referential, use [ExtractorGet], whose
+// load-or-store publishing never waits and so cannot deadlock.
+func ExtractorGetExclusive[T any](x *Extractor, path *CycleCheck, obj Object, extract func(*Extractor, *CycleCheck, Object, bool) (T, error)) (T, error) {
+	var zero T
+	ref, ok := obj.(Reference)
+	if !ok {
+		return extract(x, path, obj, true) // direct object: not shared
+	}
+	key := extractorKey{ref: ref, tp: reflect.TypeFor[T]()}
+
+	x.mu.Lock()
+	if v, ok := x.cache[key]; ok {
+		x.mu.Unlock()
+		return v.(T), nil
+	}
+	if p, ok := x.wip[key]; ok {
+		x.mu.Unlock()
+		<-p.done
+		if p.err != nil {
+			return zero, p.err
+		}
+		return p.val.(T), nil
+	}
+	p := &pending{done: make(chan struct{})}
+	x.wip[key] = p
+	x.mu.Unlock()
+
+	res, err := ExtractorGet(x, path, obj, extract)
+
+	x.mu.Lock()
+	p.val, p.err = res, err
+	delete(x.wip, key)
+	x.mu.Unlock()
+	close(p.done)
+
+	return res, err
+}
+
+// StoreOrLoadPair publishes two typed views of a single PDF object — for
+// example the field half and the widget half of a merged field/widget
+// dictionary — under one object reference, atomically. If the reference is
+// already populated (another goroutine decoded the same object), it returns the
+// existing pair and stores nothing, so every caller shares one consistent pair.
+//
+// The two views are cached under their respective Go types, exactly as
+// [ExtractorGet] would cache them, so a later ExtractorGet for either type finds
+// the published value.
+func StoreOrLoadPair[A, B any](x *Extractor, ref Reference, a A, b B) (A, B) {
+	ka := extractorKey{ref: ref, tp: reflect.TypeFor[A]()}
+	kb := extractorKey{ref: ref, tp: reflect.TypeFor[B]()}
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if v, ok := x.cache[ka]; ok {
+		a = v.(A)
+	} else {
+		x.cache[ka] = a
+	}
+	if v, ok := x.cache[kb]; ok {
+		b = v.(B)
+	} else {
+		x.cache[kb] = b
+	}
+	return a, b
 }
 
 // Resolve resolves references to indirect objects with cycle detection.
