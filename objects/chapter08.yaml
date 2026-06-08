@@ -381,385 +381,6 @@ types:
     possibleValues:
     - DeviceRGB
     notes: Clause 8.6.3 and https://github.com/pdf-association/pdf-issues/issues/552
-- name: FunctionType0
-  purpose: "sampled function"
-  goType: function.Type0
-  pdfRepr: stream
-  fields:
-  - goName:
-    pdfKey: FunctionType
-    pdfType: integer
-    required: true
-    introduced: '1.2'
-    possibleValues:
-    - '0'
-    notes: Table 5, Table 38 and Table 39
-  - goName: Domain
-    pdfKey: Domain
-    pdfType: array
-    required: true
-    introduced: '1.2'
-    goType: '[]float64'
-    purpose: 'Domain defines the valid input ranges as [min0, max0, min1, max1, ...].
-
-      The length must be 2*m, where m is the number of input variables.'
-  - goName: Range
-    pdfKey: Range
-    pdfType: array
-    required: true
-    introduced: '1.2'
-    goType: '[]float64'
-    purpose: 'Range gives clipping ranges for the output variables as [min0, max0, min1, max1, ...].
-
-      The length must be 2*n, where n is the number of output variables.'
-  - goName: Size
-    pdfKey: Size
-    pdfType: array
-    required: true
-    introduced: '1.2'
-    notes: array of m positive integers
-    goType: '[]int'
-    purpose: 'Size specifies the number of samples in each input dimension.
-
-      The length must be m, where m is the number of input variables.'
-  - goName: BitsPerSample
-    pdfKey: BitsPerSample
-    pdfType: integer
-    required: true
-    introduced: '1.2'
-    possibleValues:
-    - '1'
-    - '2'
-    - '4'
-    - '8'
-    - '12'
-    - '16'
-    - '24'
-    - '32'
-    goType: int
-    purpose: BitsPerSample is the number of bits per sample value (1, 2, 4, 8, 12, 16, 24, 32).
-  - goName:
-    pdfKey: Order
-    pdfType: integer
-    required: false
-    default: '1'
-    introduced: '1.2'
-    possibleValues:
-    - '1'
-    - '3'
-  - goName: Encode
-    pdfKey: Encode
-    pdfType: array
-    required: false
-    introduced: '1.2'
-    goType: '[]float64'
-    purpose: 'Encode maps inputs to sample table indices as [min0, max0, min1, max1, ...].
-
-      The length must be 2*m, where m is the number of input variables.'
-  - goName: Decode
-    pdfKey: Decode
-    pdfType: array
-    required: false
-    default: '@Range'
-    introduced: '1.2'
-    goType: '[]float64'
-    purpose: 'Decode maps samples to output range as [min0, max0, min1, max1, ...].
-
-      The length must be 2*n, where n is the number of output variables.'
-  - goName:
-    pdfKey: Length
-    pdfType: integer
-    required: true
-    introduced: '1.3'
-  - goName:
-    pdfKey: Filter
-    pdfType: array;name
-    required: false
-    introduced: '1.3'
-    possibleValues:
-    - ASCIIHexDecode
-    - ASCII85Decode
-    - LZWDecode
-    - FlateDecode
-    - RunLengthDecode
-    - fn:SinceVersion(1.5,Crypt)
-  - goName:
-    pdfKey: DecodeParms
-    pdfType: array;dictionary
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - FilterLZWDecode
-    - FilterFlateDecode
-    - type: FilterCrypt
-      since: '1.5'
-  - goName:
-    pdfKey: F
-    pdfType: dictionary;string
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - FileSpecification
-  - goName:
-    pdfKey: FFilter
-    pdfType: array;name
-    required: false
-    introduced: '1.3'
-    possibleValues:
-    - ASCIIHexDecode
-    - ASCII85Decode
-    - LZWDecode
-    - FlateDecode
-    - RunLengthDecode
-    - fn:SinceVersion(1.5,Crypt)
-  - goName:
-    pdfKey: FDecodeParms
-    pdfType: array;dictionary
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - FilterLZWDecode
-    - FilterFlateDecode
-    - type: FilterCrypt
-      since: '1.5'
-  - goName:
-    pdfKey: DL
-    pdfType: integer
-    required: false
-    introduced: '1.5'
-  goPackage: function
-  goRepr: struct
-  specSection: 7.10.2
-  fileDependent: false
-  writeMethod: (*Type0).Embed
-- name: FunctionType2
-  purpose: "exponential interpolation function"
-  goType: function.Type2
-  pdfRepr: dict
-  introduced: '1.3'
-  fields:
-  - goName:
-    pdfKey: FunctionType
-    pdfType: integer
-    required: true
-    introduced: '1.3'
-    possibleValues:
-    - '2'
-    notes: Table 38 and Table 40
-  - goName:
-    pdfKey: Domain
-    pdfType: array
-    required: true
-    introduced: '1.3'
-  - goName: Range
-    pdfKey: Range
-    pdfType: array
-    required: false
-    introduced: '1.3'
-    goType: '[]float64'
-    purpose: 'Range (optional) defines clipping ranges for the outputs, in the form
-
-      [min0, max0, min1, max1, ...]. It this is missing, no clipping is
-
-      applied.  If present, this must have the same length as C0 and C1.'
-  - goName: C0
-    pdfKey: C0
-    pdfType: array
-    required: false
-    default: '[0.0]'
-    introduced: '1.3'
-    goType: '[]float64'
-    purpose: 'C0 defines function result when x = 0.
-
-      This must have the same length as C1.'
-  - goName: C1
-    pdfKey: C1
-    pdfType: array
-    required: false
-    default: '[1.0]'
-    introduced: '1.3'
-    goType: '[]float64'
-    purpose: 'C1 defines function result when x = 1.
-
-      This must have the same length as C0.'
-  - goName: N
-    pdfKey: N
-    pdfType: number
-    required: true
-    introduced: '1.3'
-    goType: float64
-    purpose: N is the interpolation exponent.
-  goPackage: function
-  goRepr: struct
-  specSection: 7.10.3
-  fileDependent: false
-  writeMethod: (*Type2).Embed
-- name: FunctionType3
-  purpose: "stitched function"
-  goType: function.Type3
-  pdfRepr: dict
-  introduced: '1.3'
-  fields:
-  - goName:
-    pdfKey: FunctionType
-    pdfType: integer
-    required: true
-    introduced: '1.3'
-    possibleValues:
-    - '3'
-    notes: Table 38 and Table 41
-  - goName:
-    pdfKey: Domain
-    pdfType: array
-    required: true
-    introduced: '1.3'
-  - goName: Range
-    pdfKey: Range
-    pdfType: array
-    required: false
-    introduced: '1.3'
-    goType: '[]float64'
-    purpose: 'Range (optional) defines the valid output ranges as [min0, max0, min1,
-
-      max1, ...].'
-  - goName: Functions
-    pdfKey: Functions
-    pdfType: array
-    required: true
-    introduced: '1.3'
-    refTypes:
-    - type: Function
-      collection: array
-    goType: '[]pdf.Function'
-    purpose: 'Functions is the array of k functions to be combined.
-
-      All functions must have 1 input and the same number of outputs.'
-  - goName: Bounds
-    pdfKey: Bounds
-    pdfType: array
-    required: true
-    introduced: '1.3'
-    goType: '[]float64'
-    purpose: 'Bounds defines the boundaries between subdomains.
-
-      It must have k-1 elements, in increasing order, within the input range.
-
-      The first function applies to the range [XMin, Bounds[0]),
-
-      the second to [Bounds[0], Bounds[1]), ..., the last to
-
-      [Bounds[k-2], XMax].'
-  - goName: Encode
-    pdfKey: Encode
-    pdfType: array
-    required: true
-    introduced: '1.3'
-    goType: '[]float64'
-    purpose: 'Encode maps each subdomain to corresponding function''s domain as
-
-      [min0, max0, min1, max1, ...].'
-  goPackage: function
-  goRepr: struct
-  specSection: 7.10.4
-  fileDependent: false
-  writeMethod: (*Type3).Embed
-- name: FunctionType4
-  purpose: "PostScript calculator function"
-  goType: function.Type4
-  pdfRepr: stream
-  fields:
-  - goName:
-    pdfKey: FunctionType
-    pdfType: integer
-    required: true
-    introduced: '1.3'
-    possibleValues:
-    - '4'
-    notes: Table 5 and Table 38 and Clause 7.10.5
-  - goName: Domain
-    pdfKey: Domain
-    pdfType: array
-    required: true
-    introduced: '1.3'
-    goType: '[]float64'
-    purpose: 'Domain defines the valid input ranges as [min0, max0, min1, max1, ...].
-
-      The length must be 2*m, where m is the number of input variables.'
-  - goName: Range
-    pdfKey: Range
-    pdfType: array
-    required: true
-    introduced: '1.3'
-    goType: '[]float64'
-    purpose: 'Range gives clipping ranges for the output variables as [min0, max0, min1, max1, ...].
-
-      The length must be 2*n, where n is the number of output variables.'
-  - goName:
-    pdfKey: Length
-    pdfType: integer
-    required: true
-    introduced: '1.3'
-  - goName:
-    pdfKey: Filter
-    pdfType: array;name
-    required: false
-    introduced: '1.3'
-    possibleValues:
-    - ASCIIHexDecode
-    - ASCII85Decode
-    - LZWDecode
-    - FlateDecode
-    - RunLengthDecode
-    - fn:SinceVersion(1.5,Crypt)
-  - goName:
-    pdfKey: DecodeParms
-    pdfType: array;dictionary
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - FilterLZWDecode
-    - FilterFlateDecode
-    - type: FilterCrypt
-      since: '1.5'
-  - goName:
-    pdfKey: F
-    pdfType: dictionary;string
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - FileSpecification
-  - goName:
-    pdfKey: FFilter
-    pdfType: array;name
-    required: false
-    introduced: '1.3'
-    possibleValues:
-    - ASCIIHexDecode
-    - ASCII85Decode
-    - LZWDecode
-    - FlateDecode
-    - RunLengthDecode
-    - fn:SinceVersion(1.5,Crypt)
-  - goName:
-    pdfKey: FDecodeParms
-    pdfType: array;dictionary
-    required: false
-    introduced: '1.3'
-    refTypes:
-    - FilterLZWDecode
-    - FilterFlateDecode
-    - type: FilterCrypt
-      since: '1.5'
-  - goName:
-    pdfKey: DL
-    pdfType: integer
-    required: false
-    introduced: '1.5'
-  goPackage: function
-  goRepr: struct
-  specSection: 7.10.5
-  fileDependent: false
-  writeMethod: (*Type4).Embed
 - name: GraphicsStateParameter
   purpose: "graphics state parameter"
   goType: graphics/extgstate.ExtGState
@@ -776,14 +397,16 @@ types:
     possibleValues:
     - ExtGState
     notes: Table 57
-  - goName:
+  - goName: LineWidth
+    goType: float64
     pdfKey: LW
     pdfType: number
     required: false
     introduced: '1.3'
     possibleValues:
     - fn:Eval(@LW>=0)
-  - goName:
+  - goName: LineCap
+    goType: graphics.LineCapStyle
     pdfKey: LC
     pdfType: integer
     required: false
@@ -791,7 +414,8 @@ types:
     possibleValues:
     - fn:Eval((@LC>=0) && (@LC<=2))
     notes: Table 53
-  - goName:
+  - goName: LineJoin
+    goType: graphics.LineJoinStyle
     pdfKey: LJ
     pdfType: integer
     required: false
@@ -799,19 +423,22 @@ types:
     possibleValues:
     - fn:Eval((@LJ>=0) && (@LJ<=2))
     notes: Table 54
-  - goName:
+  - goName: MiterLimit
+    goType: float64
     pdfKey: ML
     pdfType: number
     required: false
     introduced: '1.3'
     possibleValues:
     - fn:Eval(@ML>=1)
-  - goName:
+  - goName: DashPattern
+    goType: '[]float64'
     pdfKey: D
     pdfType: array
     required: false
     introduced: '1.3'
-  - goName:
+  - goName: RenderingIntent
+    goType: graphics.RenderingIntent
     pdfKey: RI
     pdfType: name
     required: false
@@ -822,29 +449,34 @@ types:
     - Saturation
     - Perceptual
     notes: Table 69
-  - goName:
+  - goName: OverprintStroke
+    goType: bool
     pdfKey: OP
     pdfType: boolean
     required: false
     introduced: '1.2'
-  - goName:
+  - goName: OverprintFill
+    goType: bool
     pdfKey: op
     pdfType: boolean
     required: false
     introduced: '1.3'
-  - goName:
+  - goName: OverprintMode
+    goType: int
     pdfKey: OPM
     pdfType: integer
     required: false
     introduced: '1.3'
     possibleValues:
     - fn:Eval((@OPM>=0) && (@OPM<=1))
-  - goName:
+  - goName: TextFont
+    goType: font.Instance
     pdfKey: Font
     pdfType: array
     required: false
     introduced: '1.3'
-  - goName:
+  - goName: BlackGeneration
+    goType: pdf.Function
     pdfKey: BG
     pdfType: fn:SinceVersion(1.3,dictionary);stream
     required: false
@@ -857,7 +489,8 @@ types:
     - FunctionType0
     - type: FunctionType4
       since: '1.3'
-  - goName:
+  - goName: BlackGeneration
+    goType: pdf.Function
     pdfKey: BG2
     pdfType: dictionary;name;stream
     required: false
@@ -868,7 +501,8 @@ types:
     - FunctionType3
     - FunctionType0
     - FunctionType4
-  - goName:
+  - goName: UndercolorRemoval
+    goType: pdf.Function
     pdfKey: UCR
     pdfType: fn:SinceVersion(1.3,dictionary);stream
     required: false
@@ -881,7 +515,8 @@ types:
     - FunctionType0
     - type: FunctionType4
       since: '1.3'
-  - goName:
+  - goName: UndercolorRemoval
+    goType: pdf.Function
     pdfKey: UCR2
     pdfType: dictionary;name;stream
     required: false
@@ -892,7 +527,8 @@ types:
     - FunctionType3
     - FunctionType0
     - FunctionType4
-  - goName:
+  - goName: TransferFunctions
+    goType: graphics.TransferFunctions
     pdfKey: TR
     pdfType: array;fn:SinceVersion(1.3,dictionary);name;stream
     required: false
@@ -908,7 +544,8 @@ types:
     - FunctionType0
     - type: FunctionType4
       since: '1.3'
-  - goName:
+  - goName: TransferFunctions
+    goType: graphics.TransferFunctions
     pdfKey: TR2
     pdfType: array;dictionary;name;stream
     required: false
@@ -922,7 +559,8 @@ types:
     - FunctionType3
     - FunctionType0
     - FunctionType4
-  - goName:
+  - goName: Halftone
+    goType: graphics.Halftone
     pdfKey: HT
     pdfType: dictionary;name;stream
     required: false
@@ -934,21 +572,24 @@ types:
     - HalftoneType10
     - type: HalftoneType16
       since: '1.3'
-  - goName:
+  - goName: FlatnessTolerance
+    goType: float64
     pdfKey: FL
     pdfType: number
     required: false
     introduced: '1.3'
     possibleValues:
     - fn:Eval(@FL>0)
-  - goName:
+  - goName: SmoothnessTolerance
+    goType: float64
     pdfKey: SM
     pdfType: number
     required: false
     introduced: '1.3'
     possibleValues:
     - fn:Eval((@SM>=0) && (@SM<=1))
-  - goName:
+  - goName: StrokeAdjustment
+    goType: bool
     pdfKey: SA
     pdfType: boolean
     required: false
@@ -979,7 +620,8 @@ types:
     notes: Table 134 and Table 135
     goType: graphics.BlendMode
     purpose: BlendMode is the blend mode for the transparent imaging model.
-  - goName:
+  - goName: SoftMask
+    goType: graphics.SoftClip
     pdfKey: SMask
     pdfType: dictionary;name
     required: false
@@ -989,31 +631,36 @@ types:
     refTypes:
     - SoftMaskAlpha
     - SoftMaskLuminosity
-  - goName:
+  - goName: StrokeAlpha
+    goType: float64
     pdfKey: CA
     pdfType: number
     required: false
     introduced: '1.4'
     possibleValues:
     - fn:Eval((@CA>=0) && (@CA<=1))
-  - goName:
+  - goName: FillAlpha
+    goType: float64
     pdfKey: ca
     pdfType: number
     required: false
     introduced: '1.4'
     possibleValues:
     - fn:Eval((@ca>=0) && (@ca<=1))
-  - goName:
+  - goName: AlphaSourceFlag
+    goType: bool
     pdfKey: AIS
     pdfType: boolean
     required: false
     introduced: '1.4'
-  - goName:
+  - goName: TextKnockout
+    goType: bool
     pdfKey: TK
     pdfType: boolean
     required: false
     introduced: '1.4'
-  - goName:
+  - goName: BlackPointCompensation
+    goType: pdf.Name
     pdfKey: UseBlackPtComp
     pdfType: name
     required: false
@@ -1023,7 +670,8 @@ types:
     - 'OFF'
     - 'ON'
     - Default
-  - goName:
+  - goName: HalftoneOriginX
+    goType: float64
     pdfKey: HTO
     pdfType: array
     required: false
@@ -1109,13 +757,15 @@ types:
       Special color spaces (Pattern, Indexed, Separation, DeviceN) and
 
       Lab color spaces are not allowed.'
-  - goName:
+  - goName: Isolated
+    goType: bool
     pdfKey: I
     pdfType: boolean
     required: false
     default: false
     introduced: '1.4'
-  - goName:
+  - goName: Knockout
+    goType: bool
     pdfKey: K
     pdfType: boolean
     required: false
@@ -1551,7 +1201,8 @@ types:
     introduced: '1.2'
     goType: float64
     purpose: YStep is the vertical spacing between pattern cells.
-  - goName:
+  - goName: Res
+    goType: '*content.Resources'
     pdfKey: Resources
     pdfType: dictionary
     required: true
@@ -1782,7 +1433,8 @@ types:
     purpose: 'Matrix (optional) transforms domain coordinates to target coordinate
 
       space. Default: identity matrix [1 0 0 1 0 0].'
-  - goName:
+  - goName: F
+    goType: pdf.Function
     pdfKey: Function
     pdfType: array;dictionary;stream
     required: true
@@ -1879,7 +1531,8 @@ types:
     default: '[0.0 1.0]'
     introduced: '1.3'
     notes: Maps to TMin and TMax in Go struct
-  - goName:
+  - goName: F
+    goType: pdf.Function
     pdfKey: Function
     pdfType: array;dictionary;stream
     required: true
@@ -1983,7 +1636,8 @@ types:
     required: false
     default: '[0 1]'
     introduced: '1.3'
-  - goName:
+  - goName: F
+    goType: pdf.Function
     pdfKey: Function
     pdfType: array;dictionary;stream
     required: true
@@ -2117,7 +1771,8 @@ types:
     purpose: 'Decode specifies how to map vertex coordinates and color components into
 
       the appropriate ranges of values.'
-  - goName:
+  - goName: F
+    goType: pdf.Function
     pdfKey: Function
     pdfType: array;dictionary;stream
     required: false
@@ -2308,7 +1963,8 @@ types:
     purpose: 'Decode specifies how to map vertex coordinates and color components into
 
       the appropriate ranges of values.'
-  - goName:
+  - goName: F
+    goType: pdf.Function
     pdfKey: Function
     pdfType: array;dictionary;stream
     required: false
@@ -2495,7 +2151,8 @@ types:
     purpose: 'Decode specifies how to map coordinates and color components into
 
       the appropriate ranges of values.'
-  - goName:
+  - goName: F
+    goType: pdf.Function
     pdfKey: Function
     pdfType: array;dictionary;stream
     required: false
@@ -2682,7 +2339,8 @@ types:
     purpose: 'Decode specifies how to map coordinates and color components into
 
       the appropriate ranges of values.'
-  - goName:
+  - goName: F
+    goType: pdf.Function
     pdfKey: Function
     pdfType: array;dictionary;stream
     required: false
@@ -3721,7 +3379,8 @@ types:
       When writing forms to a PDF file, the zero matrix can be used as an
 
       alternative to the identity matrix for convenience.'
-  - goName:
+  - goName: Res
+    goType: '*content.Resources'
     pdfKey: Resources
     pdfType: dictionary
     required: true
@@ -3808,7 +3467,8 @@ types:
     - OptContentMembership
     goType: oc.Conditional
     purpose: OptionalContent (optional) allows to control the visibility of the form.
-  - goName:
+  - goName: Name
+    goType: pdf.Name
     pdfKey: Name
     pdfType: name
     required: fn:IsRequired(fn:BeforeVersion(1.3))
@@ -4359,7 +4019,7 @@ types:
     notes: PDF/VT-2
 - name: XObjectImageMask
   purpose: "image mask XObject"
-  goType: graphics/image.Dict
+  goType: graphics/image.Mask
   pdfType: XObject
   pdfRepr: stream
   introduced: '1.3'
@@ -4394,23 +4054,21 @@ types:
     introduced: '1.3'
     goType: int
     purpose: Height is the height of the image in pixels.
-  - goName: BitsPerComponent
+  - goName:
     pdfKey: BitsPerComponent
     pdfType: integer
     required: false
     introduced: '1.3'
     possibleValues:
     - '1'
-    goType: int
     purpose: 'BitsPerComponent is the number of bits used to represent each color component.
 
       The value must be 1, 2, 4, 8, or (from PDF 1.5) 16.'
-  - goName: Intent
+  - goName:
     pdfKey: Intent
     pdfType: name
     required: false
     introduced: '1.3'
-    goType: graphics.RenderingIntent
     purpose: 'Intent (optional) is the name of a color rendering intent to be used in
 
       rendering the image.'
@@ -4420,7 +4078,8 @@ types:
     required: true
     default: true
     introduced: '1.3'
-  - goName: Decode
+  - goName: Inverted
+    goType: bool
     pdfKey: Decode
     pdfType: array
     required: false
@@ -4429,7 +4088,6 @@ types:
     possibleValues:
     - '[0 1]'
     - '[1 0]'
-    goType: '[]float64'
     purpose: 'Decode (optional) is an array of numbers describing how to map image
 
       samples into the range of values appropriate for the image''s color
@@ -4457,23 +4115,21 @@ types:
       collection: array
     goType: '[]*Alternate'
     purpose: Alternates (optional) is an array of alternate image dictionaries for this mask.
-  - goName: SMask
+  - goName:
     pdfKey: SMask
     pdfType: stream
     required: false
     introduced: '1.4'
     refTypes:
     - XObjectImageSoftMask
-    goType: '*SoftMask'
     purpose: 'SMask (optional; PDF 1.4) is a subsidiary image XObject defining a
 
       soft-mask image for transparency effects.'
-  - goName: SMaskInData
+  - goName:
     pdfKey: SMaskInData
     pdfType: integer
     required: false
     introduced: '1.5'
-    goType: int
     purpose: 'SMaskInData (optional for JPXDecode; PDF 1.5) specifies how soft-mask
 
       information encoded with image samples should be used:
@@ -4505,7 +4161,8 @@ types:
     purpose: 'StructParent (required if the image is a structural content item)
 
       is the integer key of the image''s entry in the structural parent tree.'
-  - goName:
+  - goName: WebCaptureID
+    goType: '*webcapture.Identifier'
     pdfKey: ID
     pdfType: byte-string
     required: false
@@ -4655,23 +4312,607 @@ types:
     pdfType: integer
     required: false
     introduced: '1.5'
+- name: OptContentGroup
+  purpose: optional content group (layer)
+  goType: oc.Group
+  pdfType: OCG
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 96
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - OCG
+    notes: Table 96
+  - goName: Name
+    pdfKey: Name
+    pdfType: text-string
+    required: true
+    introduced: '1.5'
+    goType: string
+    purpose: 'Name specifies the name of the optional content group, suitable for
+
+      presentation in an interactive PDF processor''s user interface.'
+  - goName: Intent
+    pdfKey: Intent
+    pdfType: array;name
+    required: false
+    introduced: '1.5'
+    goType: '[]pdf.Name'
+    purpose: 'Intent (optional) represents the intended use of the graphics in the group.
+
+      Common values include "View" and "Design". Default is ["View"].'
+  - goName: Usage
+    pdfKey: Usage
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - OptContentUsage
+    goType: '*Usage'
+    purpose: 'Usage (optional) describes the nature of the content controlled by the group.
+
+      It may be used by features that automatically control the group state.'
+  - goName:
+    pdfKey: GTS_Metadata
+    pdfType: dictionary
+    required: false
+    introduced: fn:Extension(ISO_19593,1.7)
+    refTypes:
+    - GTS_ProcStepsGroup
+    notes: ISO 19593-1
+  goPackage: oc
+  goRepr: struct
+  specSection: 8.11.2
+  readFunc: oc.ExtractGroup
+  fileDependent: false
+  writeMethod: (*Group).Embed
+- name: OptContentMembership
+  purpose: visibility policy referencing optional content groups
+  goType: oc.Membership
+  pdfType: OCMD
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 97
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - OCMD
+    notes: Table 97
+  - goName: OCGs
+    pdfKey: OCGs
+    pdfType: array;dictionary;null
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - type: OptContentGroup
+      collection: array
+    - OptContentGroup
+    goType: '[]*Group'
+    purpose: 'OCGs (optional) specifies the optional content groups whose states
+
+      determine the visibility of content controlled by this membership dictionary.
+
+
+      If VE is present, this entry is ignored.'
+  - goName: Policy
+    goType: MembershipPolicy
+    pdfKey: P
+    pdfType: name
+    required: false
+    default: AnyOn
+    introduced: '1.5'
+    possibleValues:
+    - AllOn
+    - AnyOn
+    - AnyOff
+    - AllOff
+  - goName: VE
+    pdfKey: VE
+    pdfType: array
+    required: false
+    introduced: '1.6'
+    goType: VisibilityExpression
+    purpose: 'VE (optional) specifies a visibility expression for computing
+
+      visibility based on a set of optional content groups.
+
+
+      If present, this takes precedence over OCGs and Policy.'
+  goPackage: oc
+  goRepr: struct
+  specSection: 8.11.2
+  readFunc: oc.ExtractMembership
+  fileDependent: false
+  writeMethod: (*Membership).Embed
+- name: OptContentUsage
+  purpose: usage conditions for an optional content group
+  goType: oc.Usage
+  pdfRepr: dict
+  introduced: '1.5'
+  fields:
+  - goName: Creator
+    goType: '*UsageCreator'
+    pdfKey: CreatorInfo
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - OptContentCreatorInfo
+    notes: Table 100
+  - goName: Language
+    goType: '*UsageLanguage'
+    pdfKey: Language
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - OptContentLanguage
+  - goName: Export
+    goType: '*UsageExport'
+    pdfKey: Export
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - OptContentExport
+  - goName: Zoom
+    goType: '*UsageZoom'
+    pdfKey: Zoom
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - OptContentZoom
+  - goName: Print
+    goType: '*UsagePrint'
+    pdfKey: Print
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - OptContentPrint
+  - goName: View
+    goType: '*UsageView'
+    pdfKey: View
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - OptContentView
+  - goName: User
+    goType: '*UsageUser'
+    pdfKey: User
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - OptContentUser
+  - goName: PageElement
+    goType: '*UsagePageElement'
+    pdfKey: PageElement
+    pdfType: dictionary
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - OptContentPageElement
+  goPackage: oc
+  goRepr: struct
+  specSection: 8.11.4
+  readFunc: oc.ExtractUsage
+  fileDependent: false
+  writeMethod: (*Usage).Embed
+- name: OptContentProperties
+  purpose: document-wide optional content properties
+  goType: oc.Properties
+  pdfRepr: dict
+  introduced: '1.5'
+  fileDependent: false
+  readFunc: oc.ExtractProperties
+  writeMethod: (*Properties).Embed
+  specSection: '8.11.4.2'
+  specTable: Table 98
+  fields:
+  - goName: OCGs
+    goType: '[]*Group'
+    pdfKey: OCGs
+    pdfType: array
+    required: true
+    introduced: '1.5'
+    refTypes:
+    - type: OptContentGroup
+      collection: array
+    notes: Table 98
+  - goName: D
+    goType: '*Configuration'
+    pdfKey: D
+    pdfType: dictionary
+    required: true
+    introduced: '1.5'
+    refTypes:
+    - OptContentConfig
+  - goName: Configs
+    goType: '[]*Configuration'
+    pdfKey: Configs
+    pdfType: array
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - type: OptContentConfig
+      collection: array
+- name: OptContentConfig
+  purpose: optional content configuration
+  goType: oc.Configuration
+  pdfRepr: dict
+  introduced: '1.5'
+  fileDependent: false
+  readFunc: oc.ExtractConfiguration
+  writeMethod: (*Configuration).Embed
+  specSection: '8.11.4.3'
+  specTable: Table 99
+  fields:
+  - goName: Name
+    goType: string
+    pdfKey: Name
+    pdfType: text-string
+    required: false
+    introduced: '1.5'
+    notes: Table 99
+  - goName: Creator
+    goType: string
+    pdfKey: Creator
+    pdfType: text-string
+    required: false
+    introduced: '1.5'
+  - goName: BaseState
+    goType: BaseState
+    pdfKey: BaseState
+    pdfType: name
+    required: false
+    default: 'ON'
+    introduced: '1.5'
+    possibleValues:
+    - 'ON'
+    - 'OFF'
+    - Unchanged
+  - goName: 'ON'
+    goType: '[]*Group'
+    pdfKey: 'ON'
+    pdfType: array
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - type: OptContentGroup
+      collection: array
+  - goName: 'OFF'
+    goType: '[]*Group'
+    pdfKey: 'OFF'
+    pdfType: array
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - type: OptContentGroup
+      collection: array
+  - goName: Intent
+    goType: '[]pdf.Name'
+    pdfKey: Intent
+    pdfType: array;name
+    required: false
+    default: '[];[View]'
+    introduced: '1.5'
+    possibleValues:
+    - All
+    - Design
+    - View
+  - goName: AS
+    goType: '[]*UsageApplication'
+    pdfKey: AS
+    pdfType: array
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - type: OptContentUsageApplication
+      collection: array
+  - goName: Order
+    goType: '[]OrderItem'
+    pdfKey: Order
+    pdfType: array
+    required: false
+    introduced: '1.5'
+  - goName: ListMode
+    goType: ListMode
+    pdfKey: ListMode
+    pdfType: name
+    required: false
+    default: AllPages
+    introduced: '1.5'
+    possibleValues:
+    - AllPages
+    - VisiblePages
+  - goName: RBGroups
+    goType: '[][]*Group'
+    pdfKey: RBGroups
+    pdfType: array
+    required: false
+    introduced: '1.5'
+  - goName: Locked
+    goType: '[]*Group'
+    pdfKey: Locked
+    pdfType: array
+    required: false
+    default: '[]'
+    introduced: '1.6'
+    refTypes:
+    - type: OptContentGroup
+      collection: array
+- name: OptContentUsageApplication
+  purpose: application-specific usage of optional content
+  goType: oc.UsageApplication
+  goPackage: oc
+  goRepr: struct
+  pdfRepr: dict
+  introduced: '1.5'
+  specSection: 8.11.4.4
+  readFunc: oc.ExtractUsageApplication
+  fileDependent: false
+  writeMethod: (*UsageApplication).Embed
+  fields:
+  - goName: Event
+    pdfKey: Event
+    pdfType: name
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - View
+    - Print
+    - Export
+    notes: Table 101
+  - goName: OCGs
+    pdfKey: OCGs
+    pdfType: array
+    required: false
+    introduced: '1.5'
+    refTypes:
+    - type: OptContentGroup
+      collection: array
+  - goName: Category
+    pdfKey: Category
+    pdfType: array
+    required: true
+    introduced: '1.5'
+- name: OptContentCreatorInfo
+  purpose: creator information for an optional content group
+  goType:
+  pdfRepr: dict
+  introduced: '1.5'
+  fields:
+  - goName:
+    pdfKey: Creator
+    pdfType: text-string
+    required: true
+    introduced: '1.5'
+    notes: Table 100, CreatorInfo cell
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - Artwork
+    - Technical
+    - '*'
+  - goName:
+    pdfKey: SubType
+    pdfType: name
+    required: false
+    introduced: fn:Extension(Malforms,1.5)
+    possibleValues:
+    - Artwork
+    - Technical
+    - '*'
+- name: OptContentExport
+  purpose: export state for an optional content group
+  goType:
+  pdfRepr: dict
+  introduced: '1.5'
+  fields:
+  - goName:
+    pdfKey: ExportState
+    pdfType: name
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - 'ON'
+    - 'OFF'
+    notes: Table 100, Export cell
+- name: OptContentLanguage
+  purpose: language preference for an optional content group
+  goType:
+  pdfRepr: dict
+  introduced: '1.5'
+  fields:
+  - goName:
+    pdfKey: Lang
+    pdfType: string
+    required: true
+    introduced: '1.5'
+    notes: Table 100, Language cell
+  - goName:
+    pdfKey: Preferred
+    pdfType: name
+    required: false
+    default: 'OFF'
+    introduced: '1.5'
+    possibleValues:
+    - 'ON'
+    - 'OFF'
+- name: OptContentPageElement
+  purpose: page element type for an optional content group
+  goType:
+  pdfSubtype: HF
+  pdfRepr: dict
+  introduced: '1.5'
+  fields:
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - HF
+    - FG
+    - BG
+    - L
+    notes: Table 100, PageElement cell
+- name: OptContentPrint
+  purpose: print state for an optional content group
+  goType:
+  pdfRepr: dict
+  introduced: '1.5'
+  fields:
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    notes: Table 100, Print cell
+  - goName:
+    pdfKey: PrintState
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - 'ON'
+    - 'OFF'
+- name: OptContentUser
+  purpose: user type for an optional content group
+  goType:
+  pdfType: Ind
+  pdfRepr: dict
+  introduced: '1.5'
+  specTable: Table 100
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.5'
+    possibleValues:
+    - Ind
+    - Ttl
+    - Org
+    notes: Table 100, User cell
+  - goName:
+    pdfKey: Name
+    pdfType: array;text-string
+    required: false
+    introduced: '1.5'
+- name: OptContentView
+  purpose: view state for an optional content group
+  goType:
+  pdfRepr: dict
+  introduced: '1.5'
+  fields:
+  - goName:
+    pdfKey: ViewState
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - 'ON'
+    - 'OFF'
+    notes: Table 100, View cell
+- name: OptContentZoom
+  purpose: zoom range for an optional content group
+  goType:
+  pdfRepr: dict
+  introduced: '1.5'
+  fields:
+  - goName:
+    pdfKey: min
+    pdfType: number
+    required: fn:IsRequired(fn:Not(fn:IsPresent(max)))
+    default: '0.0'
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval((@min>=0.0) && (@min<=@max))
+    notes: Table 100, Zoom cell
+  - goName:
+    pdfKey: max
+    pdfType: number
+    required: fn:IsRequired(fn:Not(fn:IsPresent(min)))
+    default: '999999.9'
+    introduced: '1.5'
+    possibleValues:
+    - fn:Eval((@max>=0.0) && (@max>=@min))
+    notes: Default is really infinity
+- name: AAPL_ST
+  purpose: "Apple-specific structure tree attributes"
+  goType:
+  pdfType: Style
+  pdfRepr: dict
+  introduced: fn:Extension(AAPL,1.2)
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: fn:Extension(AAPL,1.2)
+    possibleValues:
+    - Style
+    notes: AAPL:ST in Graphics State
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: false
+    introduced: fn:Extension(AAPL,1.2)
+    possibleValues:
+    - Shadow
+  - goName:
+    pdfKey: Offset
+    pdfType: array
+    required: false
+    introduced: fn:Extension(AAPL,1.2)
+    notes: X,Y offset for drop shadow
+  - goName:
+    pdfKey: Radius
+    pdfType: number
+    required: false
+    introduced: fn:Extension(AAPL,1.2)
+  - goName:
+    pdfKey: ColorSpace
+    pdfType: array;name
+    required: false
+    introduced: fn:Extension(AAPL,1.2)
+    possibleValues:
+    - DeviceCMYK
+    - DeviceRGB
+    - DeviceGray
+    refTypes:
+    - type: CalGrayColorSpace
+      since: '1.1'
+    - type: CalRGBColorSpace
+      since: '1.1'
+    - type: LabColorSpace
+      since: '1.1'
+    - type: ICCBasedColorSpace
+      since: '1.3'
+    - IndexedColorSpace
+    notes: unknown if supports array form for Device color spaces but never seen so not indicated as supported
+  - goName:
+    pdfKey: Color
+    pdfType: array
+    required: false
+    introduced: fn:Extension(AAPL,1.2)
 interfaces:
-- name: Function
-  purpose: "function dictionary"
-  goType: pdf.Function
-  goPackage: seehuhn.de/go/pdf
-  extractFunc: function.Extract
-  discriminatorKey: FunctionType
-  discriminatorType: integer
-  implementations:
-  - type: FunctionType0
-    value: 0
-  - type: FunctionType2
-    value: 2
-  - type: FunctionType3
-    value: 3
-  - type: FunctionType4
-    value: 4
 - name: ColorSpace
   purpose: "color space dictionary"
   goType: color.Space

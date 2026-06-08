@@ -159,14 +159,16 @@ types:
     pdfType: byte-string
     required: false
     introduced: '1.2'
-  - goName:
+  - goName: Size1
+    goType: int
     pdfKey: Xsquare
     pdfType: integer
     required: true
     introduced: '1.2'
     possibleValues:
     - fn:Eval(@Xsquare>0)
-  - goName:
+  - goName: Size2
+    goType: int
     pdfKey: Ysquare
     pdfType: integer
     required: true
@@ -451,7 +453,8 @@ types:
     purpose: 'Default is the halftone for colorants without specific entries.
 
       Must not be Type 5. Required to have transfer function if nonprimary colorants exist.'
-  - goName:
+  - goName: Colorants
+    goType: map[pdf.Name]graphics.Halftone
     pdfKey: '*'
     pdfType: dictionary;stream
     required: false
@@ -598,106 +601,6 @@ types:
   goPackage: halftone
   goRepr: struct
   specSection: 10.6.4
-- name: Transition
-  purpose: "page transition effect for presentations"
-  goType: page/transition.Transition
-  pdfType: Trans
-  pdfRepr: dict
-  introduced: '1.1'
-  specTable: Table 164
-  fields:
-  - goName:
-    pdfKey: Type
-    pdfType: name
-    required: false
-    introduced: '1.1'
-    possibleValues:
-    - Trans
-    notes: Table 164
-  - goName: Style
-    pdfKey: S
-    pdfType: name
-    required: false
-    default: R
-    introduced: '1.1'
-    possibleValues:
-    - Split
-    - Blinds
-    - Box
-    - Wipe
-    - Dissolve
-    - Glitter
-    - R
-    - Fly
-    - Push
-    - Cover
-    - Uncover
-    - Fade
-    goType: Style
-    purpose: 'Style specifies the transition style.
-
-      Default: StyleReplace (no effect).'
-  - goName: Duration
-    pdfKey: D
-    pdfType: number
-    required: false
-    default: '1'
-    introduced: '1.1'
-    possibleValues:
-    - fn:Eval(@D>=0)
-    goType: float64
-    purpose: 'Duration is the duration of the transition effect in seconds.
-
-      Default: 1.0.'
-  - goName:
-    pdfKey: Dm
-    pdfType: name
-    required: false
-    default: H
-    introduced: '1.1'
-    possibleValues:
-    - H
-    - V
-  - goName:
-    pdfKey: M
-    pdfType: name
-    required: false
-    default: I
-    introduced: '1.1'
-    possibleValues:
-    - I
-    - O
-  - goName:
-    pdfKey: Di
-    pdfType: integer;name
-    required: false
-    default: '[0];[]'
-    introduced: '1.1'
-    possibleValues:
-    - '0'
-    - '90'
-    - '180'
-    - '270'
-    - '315'
-    - None
-  - goName:
-    pdfKey: SS
-    pdfType: number
-    required: false
-    default: '1.0'
-    introduced: '1.5'
-  - goName:
-    pdfKey: B
-    pdfType: boolean
-    required: false
-    default: false
-    introduced: '1.5'
-  readFunc: transition.Extract
-  fileDependent: false
-  writeMethod: (*Transition).Embed
-  goPackage: transition
-  goRepr: struct
-  specSection: 12.4.4
 - name: TrapRegion
   purpose: "trap region for print trapping"
   goType:

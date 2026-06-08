@@ -140,12 +140,14 @@ types:
     possibleValues:
     - CMap
     notes: Table 5 and Table 118
-  - goName:
+  - goName: Name
+    goType: string
     pdfKey: CMapName
     pdfType: name
     required: true
     introduced: '1.2'
-  - goName:
+  - goName: ROS
+    goType: '*cid.SystemInfo'
     pdfKey: CIDSystemInfo
     pdfType: dictionary
     required: true
@@ -162,7 +164,8 @@ types:
     - '1'
     - '0'
     goType: font.WritingMode
-  - goName:
+  - goName: Parent
+    goType: '*File'
     pdfKey: UseCMap
     pdfType: name;stream
     required: false
@@ -356,14 +359,16 @@ types:
     pdfType: name
     required: true
     introduced: '1.2'
-  - goName:
+  - goName: ROS
+    goType: '*cid.SystemInfo'
     pdfKey: CIDSystemInfo
     pdfType: dictionary
     required: true
     introduced: '1.2'
     refTypes:
     - CIDSystemInfo
-  - goName:
+  - goName: Descriptor
+    goType: '*font.Descriptor'
     pdfKey: FontDescriptor
     pdfType: dictionary
     required: true
@@ -371,25 +376,29 @@ types:
     refTypes:
     - FontDescriptorCIDType0
     notes: https://github.com/pdf-association/pdf-issues/issues/106
-  - goName:
+  - goName: DefaultWidth
+    goType: float64
     pdfKey: DW
     pdfType: integer;fn:SinceVersion(2.0,number)
     required: false
     default: '[1000];[1000]'
     introduced: '1.2'
     notes: https://github.com/pdf-association/arlington-pdf-model/issues/125
-  - goName:
+  - goName: Width
+    goType: map[cmap.CID]float64
     pdfKey: W
     pdfType: array
     required: false
     introduced: '1.2'
-  - goName:
+  - goName: DefaultVMetrics
+    goType: DefaultVMetrics
     pdfKey: DW2
     pdfType: array
     required: false
     default: '[880 -1000]'
     introduced: '1.2'
-  - goName:
+  - goName: VMetrics
+    goType: map[cmap.CID]VMetrics
     pdfKey: W2
     pdfType: array
     required: false
@@ -446,14 +455,16 @@ types:
     pdfType: name
     required: true
     introduced: '1.2'
-  - goName:
+  - goName: ROS
+    goType: '*cid.SystemInfo'
     pdfKey: CIDSystemInfo
     pdfType: dictionary
     required: true
     introduced: '1.2'
     refTypes:
     - CIDSystemInfo
-  - goName:
+  - goName: Descriptor
+    goType: '*font.Descriptor'
     pdfKey: FontDescriptor
     pdfType: dictionary
     required: true
@@ -461,30 +472,35 @@ types:
     refTypes:
     - FontDescriptorCIDType2
     notes: https://github.com/pdf-association/pdf-issues/issues/106
-  - goName:
+  - goName: DefaultWidth
+    goType: float64
     pdfKey: DW
     pdfType: integer;fn:SinceVersion(2.0,number)
     required: false
     default: '[1000];[1000]'
     introduced: '1.2'
     notes: https://github.com/pdf-association/arlington-pdf-model/issues/125
-  - goName:
+  - goName: Width
+    goType: map[cmap.CID]float64
     pdfKey: W
     pdfType: array
     required: false
     introduced: '1.2'
-  - goName:
+  - goName: DefaultVMetrics
+    goType: DefaultVMetrics
     pdfKey: DW2
     pdfType: array
     required: false
     default: '[880 -1000]'
     introduced: '1.2'
-  - goName:
+  - goName: VMetrics
+    goType: map[cmap.CID]VMetrics
     pdfKey: W2
     pdfType: array
     required: false
     introduced: '1.2'
-  - goName:
+  - goName: CIDToGID
+    goType: '[]glyph.ID'
     pdfKey: CIDToGIDMap
     pdfType: name;stream
     required: fn:IsRequired(fn:SinceVersion(2.0) && fn:IsPresent(FontDescriptor::FontFile2))
@@ -571,7 +587,16 @@ types:
     - fn:Eval((@FontWeight>=1) && (@FontWeight<=1000))
     notes: https://github.com/pdf-association/pdf-issues/issues/474
     goType: os2.Weight
-  - goName:
+  - mapping: bitfield
+    goFields:
+    - {name: IsFixedPitch, type: bool, bit: 0}
+    - {name: IsSerif, type: bool, bit: 1}
+    - {name: IsSymbolic, type: bool, bit: 2}
+    - {name: IsScript, type: bool, bit: 3}
+    - {name: IsItalic, type: bool, bit: 6}
+    - {name: IsAllCap, type: bool, bit: 16}
+    - {name: IsSmallCap, type: bool, bit: 17}
+    - {name: ForceBold, type: bool, bit: 18}
     pdfKey: Flags
     pdfType: bitmask
     required: true
@@ -769,7 +794,16 @@ types:
     - fn:Eval((@FontWeight>=1) && (@FontWeight<=1000))
     notes: https://github.com/pdf-association/pdf-issues/issues/474
     goType: os2.Weight
-  - goName:
+  - mapping: bitfield
+    goFields:
+    - {name: IsFixedPitch, type: bool, bit: 0}
+    - {name: IsSerif, type: bool, bit: 1}
+    - {name: IsSymbolic, type: bool, bit: 2}
+    - {name: IsScript, type: bool, bit: 3}
+    - {name: IsItalic, type: bool, bit: 6}
+    - {name: IsAllCap, type: bool, bit: 16}
+    - {name: IsSmallCap, type: bool, bit: 17}
+    - {name: ForceBold, type: bool, bit: 18}
     pdfKey: Flags
     pdfType: bitmask
     required: true
@@ -972,7 +1006,16 @@ types:
     - fn:Eval((@FontWeight>=1) && (@FontWeight<=1000))
     notes: https://github.com/pdf-association/pdf-issues/issues/474
     goType: os2.Weight
-  - goName:
+  - mapping: bitfield
+    goFields:
+    - {name: IsFixedPitch, type: bool, bit: 0}
+    - {name: IsSerif, type: bool, bit: 1}
+    - {name: IsSymbolic, type: bool, bit: 2}
+    - {name: IsScript, type: bool, bit: 3}
+    - {name: IsItalic, type: bool, bit: 6}
+    - {name: IsAllCap, type: bool, bit: 16}
+    - {name: IsSmallCap, type: bool, bit: 17}
+    - {name: ForceBold, type: bool, bit: 18}
     pdfKey: Flags
     pdfType: bitmask
     required: true
@@ -1148,7 +1191,16 @@ types:
     - fn:Eval((@FontWeight>=1) && (@FontWeight<=1000))
     notes: https://github.com/pdf-association/pdf-issues/issues/474
     goType: os2.Weight
-  - goName:
+  - mapping: bitfield
+    goFields:
+    - {name: IsFixedPitch, type: bool, bit: 0}
+    - {name: IsSerif, type: bool, bit: 1}
+    - {name: IsSymbolic, type: bool, bit: 2}
+    - {name: IsScript, type: bool, bit: 3}
+    - {name: IsItalic, type: bool, bit: 6}
+    - {name: IsAllCap, type: bool, bit: 16}
+    - {name: IsSmallCap, type: bool, bit: 17}
+    - {name: ForceBold, type: bool, bit: 18}
     pdfKey: Flags
     pdfType: bitmask
     required: true
@@ -1324,7 +1376,16 @@ types:
     - fn:Eval((@FontWeight>=1) && (@FontWeight<=1000))
     notes: https://github.com/pdf-association/pdf-issues/issues/474
     goType: os2.Weight
-  - goName:
+  - mapping: bitfield
+    goFields:
+    - {name: IsFixedPitch, type: bool, bit: 0}
+    - {name: IsSerif, type: bool, bit: 1}
+    - {name: IsSymbolic, type: bool, bit: 2}
+    - {name: IsScript, type: bool, bit: 3}
+    - {name: IsItalic, type: bool, bit: 6}
+    - {name: IsAllCap, type: bool, bit: 16}
+    - {name: IsSmallCap, type: bool, bit: 17}
+    - {name: ForceBold, type: bool, bit: 18}
     pdfKey: Flags
     pdfType: bitmask
     required: true
@@ -1513,7 +1574,6 @@ types:
     refTypes:
     - Metadata
     notes: Adobe PDF 1.x references
-  goPackage: cmap
   goRepr: struct
 - name: FontFile2
   purpose: embedded TrueType font program stream
@@ -2127,12 +2187,14 @@ types:
     pdfType: integer
     required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
     introduced: '1.0'
-  - goName:
+  - goName: Width
+    goType: '[256]float64'
     pdfKey: Widths
     pdfType: array
     required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
     introduced: '1.0'
-  - goName:
+  - goName: Descriptor
+    goType: '*font.Descriptor'
     pdfKey: FontDescriptor
     pdfType: dictionary
     required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
@@ -2276,9 +2338,8 @@ types:
     introduced: '1.2'
     refTypes:
     - ToUnicodeCMapStream
-  goPackage: function
   goRepr: struct
-  specSection: 7.10.2
+  specSection: 9.7.6
 - name: FontType1
   purpose: simple font using Type 1 outlines
   goType: font/dict.Type1
@@ -2328,12 +2389,14 @@ types:
     pdfType: integer
     required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
     introduced: '1.0'
-  - goName:
+  - goName: Width
+    goType: '[256]float64'
     pdfKey: Widths
     pdfType: array
     required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
     introduced: '1.0'
-  - goName:
+  - goName: Descriptor
+    goType: '*font.Descriptor'
     pdfKey: FontDescriptor
     pdfType: dictionary
     required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
@@ -2444,12 +2507,14 @@ types:
     pdfType: integer
     required: true
     introduced: '1.0'
-  - goName:
+  - goName: Width
+    goType: '[256]float64'
     pdfKey: Widths
     pdfType: array
     required: true
     introduced: '1.0'
-  - goName:
+  - goName: Descriptor
+    goType: '*font.Descriptor'
     pdfKey: FontDescriptor
     pdfType: dictionary
     required: fn:IsRequired(fn:IsPDFTagged())
@@ -2520,7 +2585,8 @@ types:
     possibleValues:
     - '1'
     - '0'
-  - goName:
+  - goName: Parent
+    goType: '*ToUnicodeFile'
     pdfKey: UseCMap
     pdfType: name;stream
     required: false
@@ -2657,6 +2723,20 @@ types:
   goPackage: cmap
   goRepr: struct
 
+- name: FDDict
+  purpose: "FDF (Forms Data Format) dictionary"
+  goType:
+  pdfRepr: dict
+  introduced: '1.2'
+  fields:
+  - goName:
+    pdfKey: '*'
+    pdfType: dictionary
+    required: false
+    introduced: '1.2'
+    refTypes:
+    - CIDFontDescriptorMetrics
+    notes: Table 122 and Clause 9.8.3.3
 interfaces:
 - name: Font
   discriminatorKey: Subtype

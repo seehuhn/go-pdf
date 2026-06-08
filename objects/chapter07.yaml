@@ -863,7 +863,8 @@ types:
     pdfType: name
     required: true
     introduced: '2.0'
-  - goName:
+  - goName: Version
+    goType: string
     pdfKey: Version
     pdfType: name
     required: false
@@ -1198,7 +1199,8 @@ types:
     possibleValues:
     - Filespec
     notes: Table 43 and https://github.com/pdf-association/pdf-issues/issues/298
-  - goName:
+  - goName: NameSpace
+    goType: pdf.Name
     pdfKey: FS
     pdfType: name
     required: false
@@ -1211,24 +1213,28 @@ types:
     pdfType: string
     required: fn:IsRequired(fn:Not(fn:IsPresent(DOS)) && fn:Not(fn:IsPresent(Mac)) && fn:Not(fn:IsPresent(Unix)))
     introduced: '1.1'
-  - goName:
+  - goName: FileNameUnicode
+    goType: string
     pdfKey: UF
     pdfType: text-string
     required: false
     introduced: '1.7'
-  - goName:
+  - goName: FileNameDOS
+    goType: pdf.String
     pdfKey: DOS
     pdfType: byte-string
     required: false
     introduced: '1.1'
     deprecated: '2.0'
-  - goName:
+  - goName: FileNameMac
+    goType: pdf.String
     pdfKey: Mac
     pdfType: byte-string
     required: false
     introduced: '1.1'
     deprecated: '2.0'
-  - goName:
+  - goName: FileNameUnix
+    goType: pdf.String
     pdfKey: Unix
     pdfType: byte-string
     required: false
@@ -1241,39 +1247,45 @@ types:
     introduced: '1.1'
     goType: '[]string'
     purpose: ID contains an identifier for the described file, as two byte strings.
-  - goName:
+  - goName: Volatile
+    goType: bool
     pdfKey: V
     pdfType: boolean
     required: false
     default: false
     introduced: '1.2'
-  - goName:
+  - goName: EmbeddedFiles
+    goType: map[string]*Stream
     pdfKey: EF
     pdfType: dictionary
     required: fn:IsRequired(fn:IsPresent(RF))
     introduced: '1.3'
     refTypes:
     - FileSpecEF
-  - goName:
+  - goName: RelatedFiles
+    goType: map[string][]RelatedFile
     pdfKey: RF
     pdfType: dictionary
     required: false
     introduced: '1.3'
     refTypes:
     - FileSpecRF
-  - goName:
+  - goName: Description
+    goType: string
     pdfKey: Desc
     pdfType: string
     required: false
     introduced: '1.6'
-  - goName:
+  - goName: CollectionItem
+    goType: '*collection.ItemDict'
     pdfKey: CI
     pdfType: dictionary
     required: false
     introduced: '1.7'
     refTypes:
     - CollectionItem
-  - goName:
+  - goName: Thumbnail
+    goType: '*thumbnail.Thumbnail'
     pdfKey: Thumb
     pdfType: stream
     required: false
@@ -1305,7 +1317,8 @@ types:
       When writing file specifications, and empty name can be used as a
 
       shorthand for [RelationshipUnspecified].'
-  - goName:
+  - goName: EncryptedPayload
+    goType: '*EncryptedPayload'
     pdfKey: EP
     pdfType: dictionary
     required: false
@@ -1464,7 +1477,8 @@ types:
     introduced: '1.0'
     possibleValues:
     - fn:Eval(@DamagedRowsBeforeError>=0)
-  - goName:
+  - goName: BlackIs1
+    goType: bool
     pdfKey: Blackls1
     pdfType: boolean
     required: false
@@ -2741,7 +2755,7 @@ types:
   goRepr: struct
 - name: Stream
   purpose: entries common to all stream dictionaries
-  goType: Stream
+  goType: pdf.Stream
   pdfRepr: stream
   fields:
   - goName:
@@ -2824,51 +2838,9 @@ types:
     pdfType: integer
     required: false
     introduced: '1.5'
-  goPackage: metadata
+  goPackage: pdf
   goRepr: struct
-  specSection: '14.3'
-  readFunc: metadata.Extract
-  fileDependent: false
-  writeMethod: (*Stream).Embed
-- name: Thread
-  purpose: article thread linking related content across pages
-  pdfType: Thread
-  pdfRepr: dict
-  introduced: '1.1'
-  specTable: Table 162
-  fields:
-  - goName:
-    pdfKey: Type
-    pdfType: name
-    required: false
-    introduced: '1.1'
-    possibleValues:
-    - Thread
-    notes: Table 162
-  - goName:
-    pdfKey: F
-    pdfType: dictionary
-    required: true
-    introduced: '1.1'
-    refTypes:
-    - BeadFirst
-  - goName:
-    pdfKey: I
-    pdfType: dictionary
-    required: false
-    introduced: '1.1'
-    refTypes:
-    - DocInfo
-  - goName:
-    pdfKey: Metadata
-    pdfType: stream
-    required: false
-    introduced: '2.0'
-    refTypes:
-    - Metadata
-  goPackage: action
-  goRepr: struct
-  specSection: 12.6.2
+  specSection: 7.3.8
 - name: ViewerPreferences
   purpose: viewer display preferences
   goType:
@@ -3253,6 +3225,901 @@ types:
   refTypes:
   - XObject
 
+- name: AFFileSpecification
+  purpose: "associated file specification"
+  goType: file.Specification
+  pdfType: Filespec
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 43
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - Filespec
+    notes: Table 43 and https://github.com/pdf-association/pdf-issues/issues/298
+  - goName: NameSpace
+    goType: pdf.Name
+    pdfKey: FS
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - URL
+    - '*'
+  - goName:
+    pdfKey: F
+    pdfType: string
+    required: fn:IsRequired(fn:Not(fn:IsPresent(DOS)) && fn:Not(fn:IsPresent(Mac)) && fn:Not(fn:IsPresent(Unix)))
+    introduced: '1.7'
+  - goName: FileNameUnicode
+    goType: string
+    pdfKey: UF
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName: FileNameDOS
+    goType: pdf.String
+    pdfKey: DOS
+    pdfType: byte-string
+    required: false
+    introduced: '1.7'
+    deprecated: '2.0'
+  - goName: FileNameMac
+    goType: pdf.String
+    pdfKey: Mac
+    pdfType: byte-string
+    required: false
+    introduced: '1.7'
+    deprecated: '2.0'
+  - goName: FileNameUnix
+    goType: pdf.String
+    pdfKey: Unix
+    pdfType: byte-string
+    required: false
+    introduced: '1.7'
+    deprecated: '2.0'
+  - goName: ID
+    pdfKey: ID
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    goType: '[]string'
+    purpose: ID contains an identifier for the described file, as two byte strings.
+  - goName: Volatile
+    goType: bool
+    pdfKey: V
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.7'
+  - goName: EmbeddedFiles
+    goType: map[string]*Stream
+    pdfKey: EF
+    pdfType: dictionary
+    required: true
+    introduced: '1.7'
+    refTypes:
+    - AFFileSpecEF
+  - goName: RelatedFiles
+    goType: map[string][]RelatedFile
+    pdfKey: RF
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - FileSpecRF
+  - goName: Description
+    goType: string
+    pdfKey: Desc
+    pdfType: string
+    required: false
+    introduced: '1.7'
+  - goName: CollectionItem
+    goType: '*collection.ItemDict'
+    pdfKey: CI
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - CollectionItem
+  - goName: Thumbnail
+    goType: '*thumbnail.Thumbnail'
+    pdfKey: Thumb
+    pdfType: stream
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - Thumbnail
+  - goName: AFRelationship
+    pdfKey: AFRelationship
+    pdfType: name
+    required: true
+    default: Unspecified
+    introduced: '1.7'
+    possibleValues:
+    - Source
+    - Data
+    - Alternative
+    - Supplement
+    - fn:SinceVersion(2.0,EncryptedPayload)
+    - fn:SinceVersion(2.0,FormData)
+    - fn:SinceVersion(2.0,Schema)
+    - Unspecified
+    - fn:Extension(C2PA,C2PA_Manifest)
+    goType: Relationship
+    purpose: 'AFRelationship (PDF 2.0) specifies the relationship between the
+
+      referencing component and the associated file.
+
+
+      When writing file specifications, and empty name can be used as a
+
+      shorthand for [RelationshipUnspecified].'
+  - goName: EncryptedPayload
+    goType: '*EncryptedPayload'
+    pdfKey: EP
+    pdfType: dictionary
+    required: fn:IsRequired(@AFRelationship==EncryptedPayload)
+    introduced: '2.0'
+    refTypes:
+    - EncryptedPayload
+  goPackage: file
+  goRepr: struct
+  specSection: 7.11.3
+  readFunc: file.ExtractSpecification
+  fileDependent: false
+  writeMethod: (*Specification).Embed
+- name: CollectionItem
+  purpose: "item data for a file in a portable collection"
+  goType: collection.ItemDict
+  pdfType: CollectionItem
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 46
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - CollectionItem
+    notes: Table 46
+  - goName:
+    pdfKey: '*'
+    pdfType: date;dictionary;number;text-string
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - CollectionSubitem
+  goPackage: collection
+  goRepr: struct
+  specSection: 7.11.6
+  readFunc: collection.ExtractItemDict
+  fileDependent: false
+  writeMethod: (*ItemDict).Embed
+- name: CollectionSubitem
+  purpose: "sub-item in a portable collection item"
+  goType:
+  pdfType: CollectionSubitem
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 47
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - CollectionSubitem
+    notes: Table 47
+  - goName:
+    pdfKey: D
+    pdfType: date;number;text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: P
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+- name: AFEmbeddedFileParameter
+  purpose: "parameters for an associated embedded file"
+  goType:
+  pdfRepr: dict
+  introduced: '1.7'
+  fields:
+  - goName:
+    pdfKey: Size
+    pdfType: integer
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - fn:Eval(@Size>=0)
+    notes: Table 45
+  - goName:
+    pdfKey: CreationDate
+    pdfType: date
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: ModDate
+    pdfType: date
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: Mac
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    deprecated: '2.0'
+    refTypes:
+    - Mac
+  - goName:
+    pdfKey: CheckSum
+    pdfType: byte-string
+    required: false
+    introduced: '1.7'
+    notes: MD5 checksum - https://github.com/pdf-association/pdf-issues/issues/382
+- name: AFEmbeddedFileStream
+  purpose: "stream containing an associated embedded file"
+  goType:
+  pdfType: EmbeddedFile
+  pdfRepr: stream
+  introduced: '1.7'
+  specTable: Table 5
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - EmbeddedFile
+    notes: Table 5 and Table 44
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    notes: https://github.com/pdf-association/pdf-issues/issues/155, https://github.com/pdf-association/pdf-issues/issues/156 - also check every page/Annots/RichMediaContent/Assets
+  - goName:
+    pdfKey: Params
+    pdfType: dictionary
+    required: true
+    introduced: '1.7'
+    refTypes:
+    - AFEmbeddedFileParameter
+  - goName:
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - CCITTFaxDecode
+    - fn:SinceVersion(1.4,JBIG2Decode)
+    - DCTDecode
+    - fn:SinceVersion(1.5,JPXDecode)
+    - fn:SinceVersion(1.5,Crypt)
+  - goName:
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - FilterCCITTFaxDecode
+    - type: FilterJBIG2Decode
+      since: '1.4'
+    - FilterDCTDecode
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - FileSpecification
+  - goName:
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - CCITTFaxDecode
+    - fn:SinceVersion(1.4,JBIG2Decode)
+    - DCTDecode
+    - fn:SinceVersion(1.5,JPXDecode)
+    - fn:SinceVersion(1.5,Crypt)
+  - goName:
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - FilterCCITTFaxDecode
+    - type: FilterJBIG2Decode
+      since: '1.4'
+    - FilterDCTDecode
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: Mail_MediaTypeParameters
+    pdfType: text-string
+    required: false
+    introduced: fn:Extension(EAPDF_1,1.7)
+    notes: EA=PDF 1.0 and https://github.com/pdf-association/pdf-issues/issues/155
+- name: AFFileSpecEF
+  purpose: "embedded file streams in an associated file specification"
+  goType:
+  pdfRepr: dict
+  introduced: '1.7'
+  fields:
+  - goName:
+    pdfKey: F
+    pdfType: stream
+    required: fn:IsRequired(fn:Not(fn:IsPresent(UF)))
+    introduced: '1.7'
+    refTypes:
+    - AFEmbeddedFileStream
+    notes: Table 43, EF cell
+  - goName:
+    pdfKey: UF
+    pdfType: stream
+    required: fn:IsRequired(fn:Not(fn:IsPresent(F)))
+    introduced: '1.7'
+    refTypes:
+    - AFEmbeddedFileStream
+- name: CryptFilter
+  purpose: "encryption filter for a document"
+  goType:
+  pdfType: CryptFilter
+  pdfRepr: stream
+  introduced: '1.5'
+  specTable: Table 25
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - CryptFilter
+    notes: 'Table 25 '
+  - goName:
+    pdfKey: CFM
+    pdfType: name
+    required: false
+    default: None
+    introduced: '1.5'
+    possibleValues:
+    - None
+    - fn:Deprecated(2.0,V2)
+    - fn:Deprecated(2.0,fn:SinceVersion(1.6,AESV2))
+    - fn:Deprecated(2.0,fn:IsPDFVersion(1.7,fn:Extension(ADBE_Extn3,AESV3)))
+    - fn:SinceVersion(2.0,AESV3)
+    - fn:SinceVersion(2.0,fn:Extension(ISO_TS_32003,AESV4))
+  - goName:
+    pdfKey: AuthEvent
+    pdfType: name
+    required: false
+    default: DocOpen
+    introduced: '1.5'
+    possibleValues:
+    - DocOpen
+    - EFOpen
+  - goName:
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.5'
+    deprecated: '2.0'
+    possibleValues:
+    - fn:RequiredValue(@CFM==AESV2,16)
+    - fn:RequiredValue(@CFM==AESV3,32)
+    - fn:Eval((@Length>=5) && (@Length<=16))
+    notes: Expressed in BYTES. https://github.com/pdf-association/pdf-issues/issues/184
+- name: CryptFilterPublicKey
+  purpose: "public-key encryption filter"
+  goType:
+  pdfType: CryptFilter
+  pdfRepr: stream
+  introduced: '1.5'
+  fields:
+  - goName:
+    pdfKey: Recipients
+    pdfType: array;byte-string
+    required: true
+    introduced: '1.5'
+    notes: Table 25 and Table 27, https://github.com/pdf-association/pdf-issues/issues/16
+  - goName:
+    pdfKey: EncryptMetadata
+    pdfType: boolean
+    required: false
+    default: true
+    introduced: '1.5'
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.5'
+    possibleValues:
+    - CryptFilter
+  - goName:
+    pdfKey: CFM
+    pdfType: name
+    required: false
+    default: None
+    introduced: '1.5'
+    possibleValues:
+    - None
+    - fn:Deprecated(2.0,V2)
+    - fn:Deprecated(2.0,fn:SinceVersion(1.6,AESV2))
+    - fn:Deprecated(2.0,fn:IsPDFVersion(1.7,fn:Extension(ADBE_Extn3,AESV3)))
+    - fn:SinceVersion(2.0,AESV3)
+    - fn:SinceVersion(2.0,fn:Extension(ISO_TS_32003,AESV4))
+  - goName:
+    pdfKey: AuthEvent
+    pdfType: name
+    required: false
+    default: DocOpen
+    introduced: '1.5'
+    possibleValues:
+    - DocOpen
+    - EFOpen
+  - goName:
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.5'
+    deprecated: '2.0'
+    possibleValues:
+    - fn:RequiredValue(@CFM==AESV2,128)
+    - fn:RequiredValue(@CFM==AESV3,256)
+    - fn:Eval((@Length>=40) && (@Length<=128) && ((@Length mod 8)==0))
+    notes: Expressed in BITS. https://github.com/pdf-association/pdf-issues/issues/184
+- name: AuthCode
+  purpose: "authorization code for a document"
+  goType:
+  pdfRepr: dict
+  introduced: fn:Extension(ISO_TS_32004,2.0)
+  fields:
+  - goName:
+    pdfKey: MACLocation
+    pdfType: name
+    required: true
+    introduced: fn:Extension(ISO_TS_32004,2.0)
+    possibleValues:
+    - Standalone
+    - AttachedToSig
+    notes: ISO/TS 32004 Integrity protection, clause 5.2.3, Table 2
+  - goName:
+    pdfKey: ByteRange
+    pdfType: array
+    required: fn:IsRequired(@MACLocation==Standalone)
+    introduced: fn:Extension(ISO_TS_32004,2.0)
+  - goName:
+    pdfKey: MAC
+    pdfType: byte-string
+    required: fn:IsRequired(@MACLocation==Standalone)
+    introduced: fn:Extension(ISO_TS_32004,2.0)
+  - goName:
+    pdfKey: SigObjRef
+    pdfType: dictionary
+    required: fn:IsRequired(@MACLocation==AttachedToSig)
+    introduced: fn:Extension(ISO_TS_32004,2.0)
+    refTypes:
+    - Signature
+    - DocTimeStamp
+- name: FunctionType0
+  purpose: "sampled function"
+  goType: function.Type0
+  pdfRepr: stream
+  fields:
+  - goName:
+    pdfKey: FunctionType
+    pdfType: integer
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - '0'
+    notes: Table 5, Table 38 and Table 39
+  - goName: Domain
+    pdfKey: Domain
+    pdfType: array
+    required: true
+    introduced: '1.2'
+    goType: '[]float64'
+    purpose: 'Domain defines the valid input ranges as [min0, max0, min1, max1, ...].
+
+      The length must be 2*m, where m is the number of input variables.'
+  - goName: Range
+    pdfKey: Range
+    pdfType: array
+    required: true
+    introduced: '1.2'
+    goType: '[]float64'
+    purpose: 'Range gives clipping ranges for the output variables as [min0, max0, min1, max1, ...].
+
+      The length must be 2*n, where n is the number of output variables.'
+  - goName: Size
+    pdfKey: Size
+    pdfType: array
+    required: true
+    introduced: '1.2'
+    notes: array of m positive integers
+    goType: '[]int'
+    purpose: 'Size specifies the number of samples in each input dimension.
+
+      The length must be m, where m is the number of input variables.'
+  - goName: BitsPerSample
+    pdfKey: BitsPerSample
+    pdfType: integer
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - '1'
+    - '2'
+    - '4'
+    - '8'
+    - '12'
+    - '16'
+    - '24'
+    - '32'
+    goType: int
+    purpose: BitsPerSample is the number of bits per sample value (1, 2, 4, 8, 12, 16, 24, 32).
+  - goName: UseCubic
+    goType: bool
+    pdfKey: Order
+    pdfType: integer
+    required: false
+    default: '1'
+    introduced: '1.2'
+    possibleValues:
+    - '1'
+    - '3'
+  - goName: Encode
+    pdfKey: Encode
+    pdfType: array
+    required: false
+    introduced: '1.2'
+    goType: '[]float64'
+    purpose: 'Encode maps inputs to sample table indices as [min0, max0, min1, max1, ...].
+
+      The length must be 2*m, where m is the number of input variables.'
+  - goName: Decode
+    pdfKey: Decode
+    pdfType: array
+    required: false
+    default: '@Range'
+    introduced: '1.2'
+    goType: '[]float64'
+    purpose: 'Decode maps samples to output range as [min0, max0, min1, max1, ...].
+
+      The length must be 2*n, where n is the number of output variables.'
+  - goName:
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+  - goName:
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+  - goName:
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FileSpecification
+  - goName:
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+  - goName:
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  goPackage: function
+  goRepr: struct
+  specSection: 7.10.2
+  fileDependent: false
+  writeMethod: (*Type0).Embed
+- name: FunctionType2
+  purpose: "exponential interpolation function"
+  goType: function.Type2
+  pdfRepr: dict
+  introduced: '1.3'
+  fields:
+  - goName:
+    pdfKey: FunctionType
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '2'
+    notes: Table 38 and Table 40
+  - goName:
+    pdfKey: Domain
+    pdfType: array
+    required: true
+    introduced: '1.3'
+  - goName: Range
+    pdfKey: Range
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    goType: '[]float64'
+    purpose: 'Range (optional) defines clipping ranges for the outputs, in the form
+
+      [min0, max0, min1, max1, ...]. It this is missing, no clipping is
+
+      applied.  If present, this must have the same length as C0 and C1.'
+  - goName: C0
+    pdfKey: C0
+    pdfType: array
+    required: false
+    default: '[0.0]'
+    introduced: '1.3'
+    goType: '[]float64'
+    purpose: 'C0 defines function result when x = 0.
+
+      This must have the same length as C1.'
+  - goName: C1
+    pdfKey: C1
+    pdfType: array
+    required: false
+    default: '[1.0]'
+    introduced: '1.3'
+    goType: '[]float64'
+    purpose: 'C1 defines function result when x = 1.
+
+      This must have the same length as C0.'
+  - goName: N
+    pdfKey: N
+    pdfType: number
+    required: true
+    introduced: '1.3'
+    goType: float64
+    purpose: N is the interpolation exponent.
+  goPackage: function
+  goRepr: struct
+  specSection: 7.10.3
+  fileDependent: false
+  writeMethod: (*Type2).Embed
+- name: FunctionType3
+  purpose: "stitched function"
+  goType: function.Type3
+  pdfRepr: dict
+  introduced: '1.3'
+  fields:
+  - goName:
+    pdfKey: FunctionType
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '3'
+    notes: Table 38 and Table 41
+  - goName:
+    pdfKey: Domain
+    pdfType: array
+    required: true
+    introduced: '1.3'
+  - goName: Range
+    pdfKey: Range
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    goType: '[]float64'
+    purpose: 'Range (optional) defines the valid output ranges as [min0, max0, min1,
+
+      max1, ...].'
+  - goName: Functions
+    pdfKey: Functions
+    pdfType: array
+    required: true
+    introduced: '1.3'
+    refTypes:
+    - type: Function
+      collection: array
+    goType: '[]pdf.Function'
+    purpose: 'Functions is the array of k functions to be combined.
+
+      All functions must have 1 input and the same number of outputs.'
+  - goName: Bounds
+    pdfKey: Bounds
+    pdfType: array
+    required: true
+    introduced: '1.3'
+    goType: '[]float64'
+    purpose: 'Bounds defines the boundaries between subdomains.
+
+      It must have k-1 elements, in increasing order, within the input range.
+
+      The first function applies to the range [XMin, Bounds[0]),
+
+      the second to [Bounds[0], Bounds[1]), ..., the last to
+
+      [Bounds[k-2], XMax].'
+  - goName: Encode
+    pdfKey: Encode
+    pdfType: array
+    required: true
+    introduced: '1.3'
+    goType: '[]float64'
+    purpose: 'Encode maps each subdomain to corresponding function''s domain as
+
+      [min0, max0, min1, max1, ...].'
+  goPackage: function
+  goRepr: struct
+  specSection: 7.10.4
+  fileDependent: false
+  writeMethod: (*Type3).Embed
+- name: FunctionType4
+  purpose: "PostScript calculator function"
+  goType: function.Type4
+  pdfRepr: stream
+  fields:
+  - goName:
+    pdfKey: FunctionType
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - '4'
+    notes: Table 5 and Table 38 and Clause 7.10.5
+  - goName: Domain
+    pdfKey: Domain
+    pdfType: array
+    required: true
+    introduced: '1.3'
+    goType: '[]float64'
+    purpose: 'Domain defines the valid input ranges as [min0, max0, min1, max1, ...].
+
+      The length must be 2*m, where m is the number of input variables.'
+  - goName: Range
+    pdfKey: Range
+    pdfType: array
+    required: true
+    introduced: '1.3'
+    goType: '[]float64'
+    purpose: 'Range gives clipping ranges for the output variables as [min0, max0, min1, max1, ...].
+
+      The length must be 2*n, where n is the number of output variables.'
+  - goName:
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.3'
+  - goName:
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+  - goName:
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FileSpecification
+  - goName:
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.3'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - fn:SinceVersion(1.5,Crypt)
+  - goName:
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - type: FilterCrypt
+      since: '1.5'
+  - goName:
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.5'
+  goPackage: function
+  goRepr: struct
+  specSection: 7.10.5
+  fileDependent: false
+  writeMethod: (*Type4).Embed
 enums:
 - name: FlatePredictor
   goType: pdf.FlatePredictor
@@ -3281,3 +4148,21 @@ enums:
     parameter dictionary, leaving the choice to the JPEG markers.
     The Go constant values do not match the PDF wire integers; the
     mapping is performed in FilterDCT.Info and parseDCT.
+
+interfaces:
+- name: Function
+  purpose: "function dictionary"
+  goType: pdf.Function
+  goPackage: seehuhn.de/go/pdf
+  extractFunc: function.Extract
+  discriminatorKey: FunctionType
+  discriminatorType: integer
+  implementations:
+  - type: FunctionType0
+    value: 0
+  - type: FunctionType2
+    value: 2
+  - type: FunctionType3
+    value: 3
+  - type: FunctionType4
+    value: 4

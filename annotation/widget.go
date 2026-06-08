@@ -20,6 +20,7 @@ import (
 	"errors"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/action"
 	"seehuhn.de/go/pdf/action/triggers"
 	"seehuhn.de/go/pdf/annotation/appearance"
 )
@@ -41,7 +42,7 @@ type Widget struct {
 	// - "O" (Outline): Stroke the colors used to display the annotation border
 	// - "P" (Push): Display the annotation's down appearance
 	// - "T" (Toggle): Same as P (which is preferred)
-	// Default value: "I"
+	// An empty value selects the Invert mode ("I").
 	Highlight pdf.Name
 
 	// MK (optional) is an appearance characteristics dictionary that is
@@ -49,9 +50,9 @@ type Widget struct {
 	// annotation's visual presentation on the page.
 	MK *appearance.Characteristics
 
-	// A (optional; PDF 1.1) is an action that is performed when the
+	// Action (optional; PDF 1.1) is an action that is performed when the
 	// annotation is activated.
-	A pdf.Object
+	Action pdf.Action
 
 	// AA (optional; PDF 1.2) is an additional-actions dictionary defining
 	// the annotation's behaviour in response to various trigger events.
@@ -68,8 +69,8 @@ type Widget struct {
 	// This corresponds to the /BS entry in the PDF annotation dictionary.
 	BorderStyle *BorderStyle
 
-	// Parent is the form field this widget belongs to, or nil if the widget is
-	// not part of an interactive form. It is the back-edge of the field/widget
+	// Parent (optional) is the form field this widget belongs to, or nil if the
+	// widget is not part of an interactive form. It is the back-edge of the field/widget
 	// hierarchy: the field's [FieldCommon.Kids] holds this widget, and this
 	// widget's Parent holds that field. It is set when the field tree is decoded
 	// (see [DecodeInteractiveForm], which page decoding triggers automatically)
@@ -135,8 +136,10 @@ func decodeWidgetBody(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*W
 	}
 
 	// A (optional)
-	if a := dict["A"]; a != nil {
-		widget.A = a
+	if a, err := pdf.ExtractorGetOptional(x, path, dict["A"], action.Decode); err != nil {
+		return nil, err
+	} else {
+		widget.Action = a
 	}
 
 	// AA (optional)
@@ -203,8 +206,15 @@ func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// A (optional)
-	if w.A != nil {
-		dict["A"] = w.A
+	if w.Action != nil {
+		if err := pdf.CheckVersion(rm.Out, "widget annotation A entry", pdf.V1_1); err != nil {
+			return nil, err
+		}
+		encoded, err := w.Action.Encode(rm)
+		if err != nil {
+			return nil, err
+		}
+		dict["A"] = encoded
 	}
 
 	// AA (optional)

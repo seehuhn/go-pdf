@@ -120,7 +120,8 @@ types:
     pdfType: text-string
     required: false
     introduced: '1.5'
-  - goName:
+  - goName: DataFile
+    goType: '*file.Specification'
     pdfKey: D
     pdfType: dictionary;stream;string
     required: true
@@ -153,14 +154,16 @@ types:
     introduced: '1.5'
     refTypes:
     - MediaPlayers
-  - goName:
+  - goName: MustHonourBaseURL
+    goType: string
     pdfKey: MH
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - MediaClipDataMHBE
-  - goName:
+  - goName: BestEffortBaseURL
+    goType: string
     pdfKey: BE
     pdfType: dictionary
     required: false
@@ -223,14 +226,16 @@ types:
     pdfType: array
     required: false
     introduced: '1.5'
-  - goName:
+  - goName: MustHonourBegin
+    goType: MediaOffset
     pdfKey: MH
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - MediaClipSectionMHBE
-  - goName:
+  - goName: BestEffortBegin
+    goType: MediaOffset
     pdfKey: BE
     pdfType: dictionary
     required: false
@@ -885,7 +890,8 @@ types:
     possibleValues:
     - MinScreenSize
     notes: Table 281
-  - goName:
+  - goName: Width
+    goType: int
     pdfKey: V
     pdfType: array
     required: true
@@ -1061,14 +1067,16 @@ types:
     required: false
     introduced: '1.5'
     notes: https://github.com/pdf-association/pdf-issues/issues/214
-  - goName:
+  - goName: MustHonourCriteria
+    goType: '*MediaCriteria'
     pdfKey: MH
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - RenditionMH
-  - goName:
+  - goName: BestEffortCriteria
+    goType: '*MediaCriteria'
     pdfKey: BE
     pdfType: dictionary
     required: false
@@ -1129,14 +1137,16 @@ types:
     required: false
     introduced: '1.5'
     notes: https://github.com/pdf-association/pdf-issues/issues/214
-  - goName:
+  - goName: MustHonourCriteria
+    goType: '*MediaCriteria'
     pdfKey: MH
     pdfType: dictionary
     required: false
     introduced: '1.5'
     refTypes:
     - RenditionMH
-  - goName:
+  - goName: BestEffortCriteria
+    goType: '*MediaCriteria'
     pdfKey: BE
     pdfType: dictionary
     required: false
@@ -2784,6 +2794,2245 @@ types:
     required: true
     introduced: '1.5'
 
+- name: Movie
+  purpose: movie data and display properties
+  deprecated: '2.0'
+  goType: "movie.Movie"
+  fileDependent: false
+  readFunc: "movie.Extract"
+  writeMethod: "(*Movie).Embed"
+  pdfRepr: dict
+  introduced: '1.2'
+  specSection: '13.4'
+  specTable: Table 306
+  fields:
+  - goName: File
+    goType: "*file.Specification"
+    pdfKey: F
+    pdfType: dictionary;string
+    required: true
+    introduced: '1.2'
+    deprecated: '2.0'
+    refTypes:
+    - FileSpecification
+    notes: Table 306
+  - goName: Aspect
+    goType: "movie.Aspect"
+    pdfKey: Aspect
+    pdfType: array
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    notes: zero value means the entry is omitted (e.g. for sound-only movies)
+  - goName: Rotate
+    goType: int
+    pdfKey: Rotate
+    pdfType: integer
+    required: false
+    default: '0'
+    introduced: '1.2'
+    deprecated: '2.0'
+    possibleValues:
+    - fn:Eval((@Rotate mod 90)==0)
+  - goName: Poster
+    goType: "graphics.Image"
+    pdfKey: Poster
+    pdfType: boolean;stream
+    required: false
+    default: '[false];[]'
+    introduced: '1.2'
+    deprecated: '2.0'
+    refTypes:
+    - XObjectImage
+    notes: |
+      nil means the entry is omitted (no poster);
+      the sentinel value movie.PosterFromMovieFile encodes as boolean true
+      (retrieve poster from the movie file); any other value supplies an
+      image XObject to use as the poster.
+- name: MovieActivation
+  purpose: parameters for movie playback activation
+  deprecated: '2.0'
+  goType: "movie.Activation"
+  fileDependent: false
+  readFunc: "movie.ExtractActivation"
+  writeMethod: "(*Activation).Embed"
+  pdfRepr: dict
+  introduced: '1.2'
+  specSection: '13.4'
+  specTable: Table 307
+  fields:
+  - goName: Start
+    goType: "movie.Timestamp"
+    pdfKey: Start
+    pdfType: array;integer;byte-string
+    required: false
+    default: '[];[0];[]'
+    introduced: '1.2'
+    deprecated: '2.0'
+    notes: zero Timestamp means the entry is omitted (start from the beginning)
+  - goName: Duration
+    goType: "movie.Timestamp"
+    pdfKey: Duration
+    pdfType: array;integer;byte-string
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    notes: zero Timestamp means the entry is omitted (play to the end)
+  - goName: Rate
+    goType: float64
+    pdfKey: Rate
+    pdfType: number
+    required: false
+    default: '1.0'
+    introduced: '1.2'
+    deprecated: '2.0'
+    notes: negative means play backwards; a zero value is treated as 1.0 on both read and write
+  - goName: Volume
+    goType: float64
+    pdfKey: Volume
+    pdfType: number
+    required: false
+    default: '1.0'
+    introduced: '1.2'
+    deprecated: '2.0'
+    possibleValues:
+    - fn:Eval((@Volume>=-1) && (@Volume<=1))
+  - goName: ShowControls
+    goType: bool
+    pdfKey: ShowControls
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.2'
+    deprecated: '2.0'
+  - goName: Mode
+    goType: "movie.Mode"
+    pdfKey: Mode
+    pdfType: name
+    required: false
+    default: Once
+    introduced: '1.2'
+    deprecated: '2.0'
+    enum: Mode
+    possibleValues:
+    - Once
+    - Open
+    - Repeat
+    - Palindrome
+  - goName: Synchronous
+    goType: bool
+    pdfKey: Synchronous
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.2'
+    deprecated: '2.0'
+  - goName: FWScale
+    goType: "movie.Scale"
+    pdfKey: FWScale
+    pdfType: array
+    required: false
+    introduced: '1.2'
+    deprecated: '2.0'
+    notes: zero value means play in the annotation rectangle (no floating window)
+  - goName: FWPosition
+    goType: "*movie.Position"
+    pdfKey: FWPosition
+    pdfType: array
+    required: false
+    default: '[0.5 0.5]'
+    introduced: '1.2'
+    deprecated: '2.0'
+- name: SlideShow
+  purpose: slideshow settings for a presentation
+  goType:
+  pdfType: SlideShow
+  pdfRepr: dict
+  introduced: '1.4'
+  specTable: Table 308
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.4'
+    deprecated: '2.0'
+    possibleValues:
+    - SlideShow
+    notes: Table 308
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.4'
+    deprecated: '2.0'
+    possibleValues:
+    - Embedded
+  - goName:
+    pdfKey: Resources
+    pdfType: name-tree
+    required: true
+    introduced: '1.4'
+    deprecated: '2.0'
+    refTypes:
+    - XObjectImage
+    - FileSpecification
+    notes: https://github.com/pdf-association/pdf-issues/issues/481
+  - goName:
+    pdfKey: StartResource
+    pdfType: byte-string
+    required: true
+    introduced: '1.4'
+    deprecated: '2.0'
+- name: 3DActivation
+  purpose: conditions for activating a 3D annotation
+  goType:
+  pdfRepr: dict
+  fields:
+  - goName:
+    pdfKey: A
+    pdfType: name
+    required: false
+    default: XA
+    introduced: '1.6'
+    possibleValues:
+    - PO
+    - PV
+    - XA
+    notes: Table 310
+  - goName:
+    pdfKey: AIS
+    pdfType: name
+    required: false
+    default: L
+    introduced: '1.6'
+    possibleValues:
+    - I
+    - L
+  - goName:
+    pdfKey: D
+    pdfType: name
+    required: false
+    default: PI
+    introduced: '1.6'
+    possibleValues:
+    - PC
+    - PI
+    - XD
+  - goName:
+    pdfKey: DIS
+    pdfType: name
+    required: false
+    default: U
+    introduced: '1.6'
+    possibleValues:
+    - U
+    - I
+    - L
+  - goName:
+    pdfKey: TB
+    pdfType: boolean
+    required: false
+    default: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: NP
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: Style
+    pdfType: name
+    required: false
+    default: Embedded
+    introduced: '1.7'
+    possibleValues:
+    - Embedded
+    - Windowed
+  - goName:
+    pdfKey: Window
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - RichMediaWindow
+  - goName:
+    pdfKey: Transparent
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.7'
+- name: 3DAnimationStyle
+  purpose: animation style for 3D content
+  goType:
+  pdfType: 3DAnimationStyle
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 312
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - 3DAnimationStyle
+    notes: Table 312
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: false
+    default: None
+    introduced: '1.7'
+    possibleValues:
+    - None
+    - Linear
+    - Oscillating
+    notes: Table 313
+  - goName:
+    pdfKey: PC
+    pdfType: integer
+    required: false
+    default: '0'
+    introduced: '1.7'
+  - goName:
+    pdfKey: TM
+    pdfType: number
+    required: false
+    default: '1'
+    introduced: '1.7'
+    possibleValues:
+    - fn:Eval(@TM>0)
+- name: 3DBackground
+  purpose: background appearance of a 3D annotation
+  goType:
+  pdfType: 3DBG
+  pdfRepr: dict
+  introduced: '1.6'
+  specTable: Table 317
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - 3DBG
+    notes: Table 317
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: false
+    default: SC
+    introduced: '1.6'
+    possibleValues:
+    - SC
+  - goName:
+    pdfKey: CS
+    pdfType: name
+    required: false
+    default: DeviceRGB
+    introduced: '1.6'
+    possibleValues:
+    - DeviceRGB
+  - goName:
+    pdfKey: C
+    pdfType: array
+    required: false
+    default: '[1 1 1]'
+    introduced: '1.6'
+  - goName:
+    pdfKey: EA
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.6'
+- name: 3DCrossSection
+  purpose: cross-section plane for 3D content
+  goType:
+  pdfType: 3DCrossSection
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 322
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - 3DCrossSection
+    notes: Table 322
+  - goName:
+    pdfKey: C
+    pdfType: array
+    required: false
+    default: '[0 0 0]'
+    introduced: '1.7'
+  - goName:
+    pdfKey: O
+    pdfType: array
+    required: true
+    default: '[null 0 0]'
+    introduced: '1.7'
+  - goName:
+    pdfKey: PO
+    pdfType: number
+    required: false
+    default: '0.5'
+    introduced: '1.7'
+    possibleValues:
+    - fn:Eval((@PO>=0) && (@PO<=1))
+  - goName:
+    pdfKey: PC
+    pdfType: array
+    required: false
+    default: '[DeviceRGB 1 1 1]'
+    introduced: '1.7'
+  - goName:
+    pdfKey: IV
+    pdfType: boolean
+    required: false
+    default: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: PV
+    pdfType: boolean
+    required: false
+    default: true
+    introduced: '1.7'
+    notes: See https://github.com/pdf-association/pdf-issues/issues/49
+  - goName:
+    pdfKey: IC
+    pdfType: array
+    required: false
+    default: '[DeviceRGB 0 1 0]'
+    introduced: '1.7'
+  - goName:
+    pdfKey: ST
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '2.0'
+  - goName:
+    pdfKey: SC
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '2.0'
+- name: 3DLightingScheme
+  purpose: lighting scheme for 3D content
+  goType:
+  pdfType: 3DLightingScheme
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 320
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - 3DLightingScheme
+    notes: Table 320
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - Artwork
+    - None
+    - White
+    - Day
+    - Night
+    - Hard
+    - Primary
+    - Blue
+    - Red
+    - Cube
+    - CAD
+    - Headlamp
+    notes: Table 321
+- name: 3DMeasure3DC
+  purpose: 3D comment measurement for 3D content
+  goType:
+  pdfType: 3DMeasure
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 326
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - 3DMeasure
+    notes: Table 326 and Table 331 3D comment note
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - 3DC
+  - goName:
+    pdfKey: TRL
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: A1
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: N1
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: TP
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: TB
+    pdfType: array
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: TS
+    pdfType: number
+    required: false
+    default: '12'
+    introduced: '1.7'
+    notes: text point size
+  - goName:
+    pdfKey: C
+    pdfType: array
+    required: false
+    default: '[1 1 1]'
+    introduced: '1.7'
+  - goName:
+    pdfKey: UT
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: S
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - AnnotProjection
+- name: 3DMeasureAD3
+  purpose: angular dimension measurement for 3D content
+  goType:
+  pdfType: 3DMeasure
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 326
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - 3DMeasure
+    notes: Table 326 and Table 329 angular measurement
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - AD3
+  - goName:
+    pdfKey: TRL
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: AP
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: A1
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: D1
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: N1
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: A2
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: D2
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: N2
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: TP
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: TX
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: TY
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: TS
+    pdfType: number
+    required: false
+    default: '12'
+    introduced: '1.7'
+    notes: text point size
+  - goName:
+    pdfKey: C
+    pdfType: array
+    required: false
+    default: '[1 1 1]'
+    introduced: '1.7'
+  - goName:
+    pdfKey: V
+    pdfType: number
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: P
+    pdfType: integer
+    required: false
+    default: '3'
+    introduced: '1.7'
+    possibleValues:
+    - fn:Eval(@P>=0)
+    notes: precision digits
+  - goName:
+    pdfKey: UT
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: DR
+    pdfType: boolean
+    required: false
+    default: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: S
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - AnnotProjection
+- name: 3DMeasureLD3
+  purpose: linear dimension measurement for 3D content
+  goType:
+  pdfType: 3DMeasure
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 326
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - 3DMeasure
+    notes: Table 326 and Table 327 Linear measurement
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - LD3
+  - goName:
+    pdfKey: TRL
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: AP
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: A1
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: N1
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: A2
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: N2
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: TP
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: TY
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: TS
+    pdfType: number
+    required: false
+    default: '12'
+    introduced: '1.7'
+    notes: text point size
+  - goName:
+    pdfKey: C
+    pdfType: array
+    required: false
+    default: '[1 1 1]'
+    introduced: '1.7'
+  - goName:
+    pdfKey: V
+    pdfType: number
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: U
+    pdfType: text-string
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: P
+    pdfType: integer
+    required: false
+    default: '3'
+    introduced: '1.7'
+    possibleValues:
+    - fn:Eval(@P>=0)
+    notes: precision digits
+  - goName:
+    pdfKey: UT
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: S
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - AnnotProjection
+- name: 3DMeasurePD3
+  purpose: perpendicular dimension measurement for 3D content
+  goType:
+  pdfType: 3DMeasure
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 326
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - 3DMeasure
+    notes: Table 326 and Table 328 perpendicular measurement
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - PD3
+  - goName:
+    pdfKey: TRL
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: AP
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: A1
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: N1
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: A2
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: N2
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: D1
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: TP
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: TY
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: TS
+    pdfType: number
+    required: false
+    default: '12'
+    introduced: '1.7'
+    notes: text point size
+  - goName:
+    pdfKey: C
+    pdfType: array
+    required: false
+    default: '[1 1 1]'
+    introduced: '1.7'
+  - goName:
+    pdfKey: V
+    pdfType: number
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: U
+    pdfType: text-string
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: P
+    pdfType: integer
+    required: false
+    default: '3'
+    introduced: '1.7'
+    possibleValues:
+    - fn:Eval(@P>=0)
+    notes: precision digits
+  - goName:
+    pdfKey: UT
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: S
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - AnnotProjection
+- name: 3DMeasureRD3
+  purpose: radial dimension measurement for 3D content
+  goType:
+  pdfType: 3DMeasure
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 326
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - 3DMeasure
+    notes: Table 326 and Table 330 - radial measurement
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - RD3
+  - goName:
+    pdfKey: TRL
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: AP
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: A1
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: A2
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: N2
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: A3
+    pdfType: array
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: A4
+    pdfType: array
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: TP
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: TX
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: TY
+    pdfType: array
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: EL
+    pdfType: number
+    required: false
+    default: '60'
+    introduced: '1.7'
+    notes: line length in points
+  - goName:
+    pdfKey: TS
+    pdfType: number
+    required: false
+    default: '12'
+    introduced: '1.7'
+    notes: text point size
+  - goName:
+    pdfKey: C
+    pdfType: array
+    required: false
+    default: '[1 1 1]'
+    introduced: '1.7'
+  - goName:
+    pdfKey: V
+    pdfType: number
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: U
+    pdfType: text-string
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: P
+    pdfType: integer
+    required: false
+    default: '3'
+    introduced: '1.7'
+    possibleValues:
+    - fn:Eval(@P>=0)
+    notes: precision digits
+  - goName:
+    pdfKey: UT
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: SC
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: R
+    pdfType: boolean
+    required: false
+    default: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: S
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - AnnotProjection
+- name: 3DNode
+  purpose: properties of a node in a 3D scene
+  goType:
+  pdfType: 3DNode
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 323
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - 3DNode
+    notes: Table 323
+  - goName:
+    pdfKey: N
+    pdfType: string
+    required: true
+    introduced: '1.7'
+    notes: See also ISO/TS 32007
+  - goName:
+    pdfKey: O
+    pdfType: number
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - fn:Eval((@O>=0) && (@O<=1))
+  - goName:
+    pdfKey: V
+    pdfType: boolean
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: M
+    pdfType: array
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: Instance
+    pdfType: dictionary
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - RichMediaInstance
+  - goName:
+    pdfKey: Data
+    pdfType: stream;text-string
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Stream
+  - goName:
+    pdfKey: RM
+    pdfType: dictionary
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - 3DRenderMode
+- name: 3DReference
+  purpose: reference to external 3D data
+  goType:
+  pdfType: 3DRef
+  pdfRepr: dict
+  introduced: '1.6'
+  specTable: Table 314
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - 3DRef
+    notes: Table 314
+  - goName:
+    pdfKey: 3DD
+    pdfType: stream
+    required: true
+    introduced: '1.6'
+    refTypes:
+    - Stream
+- name: 3DRenderMode
+  purpose: rendering mode for 3D content
+  goType:
+  pdfType: 3DRenderMode
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 318
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - 3DRenderMode
+    notes: Table 318
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - Solid
+    - SolidWireframe
+    - Transparent
+    - TransparentWireframe
+    - BoundingBox
+    - TransparentBoundingBox
+    - TransparentBoundingBoxOutline
+    - Wireframe
+    - ShadedWireframe
+    - HiddenWireframe
+    - Vertices
+    - ShadedVertices
+    - Illustration
+    - SolidOutline
+    - ShadedIllustration
+  - goName:
+    pdfKey: AC
+    pdfType: array
+    required: false
+    default: '[DeviceRGB 0 0 0]'
+    introduced: '1.7'
+    notes: Table 319
+  - goName:
+    pdfKey: FC
+    pdfType: array;name
+    required: false
+    default: '[];[BG]'
+    introduced: '1.7'
+    possibleValues:
+    - BG
+  - goName:
+    pdfKey: O
+    pdfType: number
+    required: false
+    default: '0.5'
+    introduced: '1.7'
+    possibleValues:
+    - fn:Eval((@O>=0) && (@O<=1))
+    notes: Opacity
+  - goName:
+    pdfKey: CV
+    pdfType: number
+    required: false
+    default: '45'
+    introduced: '1.7'
+- name: 3DStream
+  purpose: stream containing 3D artwork data
+  goType:
+  pdfType: 3D
+  pdfRepr: stream
+  introduced: '1.6'
+  specTable: Table 5
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - 3D
+    notes: Table 5 and Table 311
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.6'
+    possibleValues:
+    - U3D
+    - PRC
+    - fn:SinceVersion(2.0,fn:Extension(ISO_TS_24064,STEP))
+  - goName:
+    pdfKey: VA
+    pdfType: array
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - type: 3DView
+      collection: array
+  - goName:
+    pdfKey: DV
+    pdfType: dictionary;integer;name;string
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - fn:Eval((@DV>=0) && (@DV<fn:ArrayLength(VA)))
+    - F
+    - L
+    refTypes:
+    - 3DView
+  - goName:
+    pdfKey: Resources
+    pdfType: name-tree
+    required: false
+    introduced: '1.6'
+    deprecated: '2.0'
+    notes: https://github.com/pdf-association/pdf-issues/issues/362
+  - goName:
+    pdfKey: OnInstantiate
+    pdfType: stream
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - Stream
+  - goName:
+    pdfKey: AN
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - 3DAnimationStyle
+  - goName:
+    pdfKey: ColorSpace
+    pdfType: array;name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - DeviceRGB
+    refTypes:
+    - DeviceRGBColorSpace
+    - CalRGBColorSpace
+    - ICCBasedColorSpace
+  - goName:
+    pdfKey: Length
+    pdfType: integer
+    required: true
+    introduced: '1.6'
+  - goName:
+    pdfKey: Filter
+    pdfType: array;name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - Crypt
+  - goName:
+    pdfKey: DecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - FilterCrypt
+  - goName:
+    pdfKey: F
+    pdfType: dictionary;string
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - FileSpecification
+  - goName:
+    pdfKey: FFilter
+    pdfType: array;name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - ASCIIHexDecode
+    - ASCII85Decode
+    - LZWDecode
+    - FlateDecode
+    - RunLengthDecode
+    - Crypt
+  - goName:
+    pdfKey: FDecodeParms
+    pdfType: array;dictionary
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - FilterLZWDecode
+    - FilterFlateDecode
+    - FilterCrypt
+  - goName:
+    pdfKey: DL
+    pdfType: integer
+    required: false
+    introduced: '1.6'
+- name: 3DUnits
+  purpose: units of measurement for 3D content
+  goType:
+  pdfRepr: dict
+  introduced: '1.7'
+  fields:
+  - goName:
+    pdfKey: TSm
+    pdfType: number
+    required: false
+    default: '1'
+    introduced: '1.7'
+    notes: Table 325
+  - goName:
+    pdfKey: TSn
+    pdfType: number
+    required: false
+    default: '1'
+    introduced: '1.7'
+  - goName:
+    pdfKey: TU
+    pdfType: text-string
+    required: fn:IsRequired(fn:IsPresent(TSm) || fn:IsPresent(TSn))
+    introduced: '1.7'
+  - goName:
+    pdfKey: USm
+    pdfType: number
+    required: false
+    default: '1'
+    introduced: '1.7'
+  - goName:
+    pdfKey: USn
+    pdfType: number
+    required: false
+    default: '1'
+    introduced: '1.7'
+  - goName:
+    pdfKey: UU
+    pdfType: text-string
+    required: fn:IsRequired(fn:IsPresent(USm) || fn:IsPresent(USn))
+    introduced: '1.7'
+  - goName:
+    pdfKey: DSm
+    pdfType: number
+    required: false
+    default: '1'
+    introduced: '1.7'
+  - goName:
+    pdfKey: DSn
+    pdfType: number
+    required: false
+    default: '1'
+    introduced: '1.7'
+  - goName:
+    pdfKey: DU
+    pdfType: text-string
+    required: fn:IsRequired(fn:IsPresent(DSm) || fn:IsPresent(DSn))
+    introduced: '1.7'
+- name: 3DView
+  purpose: named view of a 3D scene
+  goType:
+  pdfType: 3DView
+  pdfRepr: dict
+  introduced: '1.6'
+  specTable: Table 315
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - 3DView
+    notes: Table 315
+  - goName:
+    pdfKey: XN
+    pdfType: text-string
+    required: true
+    introduced: '1.6'
+  - goName:
+    pdfKey: IN
+    pdfType: text-string
+    required: false
+    introduced: '1.6'
+  - goName:
+    pdfKey: MS
+    pdfType: name
+    required: false
+    introduced: '1.6'
+    possibleValues:
+    - M
+    - U3D
+  - goName:
+    pdfKey: MA
+    pdfType: array
+    required: false
+    introduced: '2.0'
+  - goName:
+    pdfKey: C2W
+    pdfType: array
+    required: fn:IsRequired(@MS==M)
+    introduced: '1.6'
+  - goName:
+    pdfKey: U3DPath
+    pdfType: array;text-string
+    required: fn:IsRequired(@MS==U3D)
+    introduced: '1.6'
+  - goName:
+    pdfKey: CO
+    pdfType: number
+    required: false
+    introduced: '1.6'
+  - goName:
+    pdfKey: P
+    pdfType: dictionary
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - Projection
+  - goName:
+    pdfKey: O
+    pdfType: stream
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - XObjectFormType1
+  - goName:
+    pdfKey: BG
+    pdfType: dictionary
+    required: false
+    introduced: '1.6'
+    refTypes:
+    - 3DBackground
+  - goName:
+    pdfKey: RM
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - 3DRenderMode
+  - goName:
+    pdfKey: LS
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - 3DLightingScheme
+  - goName:
+    pdfKey: SA
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - type: 3DCrossSection
+      collection: array
+  - goName:
+    pdfKey: NA
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - type: 3DNode
+      collection: array
+  - goName:
+    pdfKey: NR
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.7'
+- name: 3DViewAddEntries
+  purpose: additional entries for a 3D view
+  goType:
+  pdfType: 3DView
+  pdfRepr: dict
+  introduced: '2.0'
+  specTable: Table 315
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '2.0'
+    possibleValues:
+    - 3DView
+    notes: Table 315 and Table 344 - for rich media only
+  - goName:
+    pdfKey: XN
+    pdfType: string
+    required: true
+    introduced: '2.0'
+  - goName:
+    pdfKey: IN
+    pdfType: string
+    required: false
+    default: '@XN'
+    introduced: '2.0'
+  - goName:
+    pdfKey: MS
+    pdfType: name
+    required: false
+    introduced: '2.0'
+  - goName:
+    pdfKey: MA
+    pdfType: array
+    required: false
+    introduced: '2.0'
+  - goName:
+    pdfKey: C2W
+    pdfType: array
+    required: fn:IsRequired(@MS==M)
+    introduced: '2.0'
+  - goName:
+    pdfKey: U3DPath
+    pdfType: array;string
+    required: fn:IsRequired(@MS==U3D)
+    introduced: '2.0'
+  - goName:
+    pdfKey: CO
+    pdfType: number
+    required: false
+    introduced: '2.0'
+  - goName:
+    pdfKey: P
+    pdfType: dictionary
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - Projection
+  - goName:
+    pdfKey: O
+    pdfType: stream
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - XObjectFormType1
+  - goName:
+    pdfKey: BG
+    pdfType: dictionary
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - 3DBackground
+  - goName:
+    pdfKey: RM
+    pdfType: dictionary
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - 3DRenderMode
+  - goName:
+    pdfKey: LS
+    pdfType: dictionary
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - 3DLightingScheme
+  - goName:
+    pdfKey: SA
+    pdfType: array
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - type: 3DCrossSection
+      collection: array
+  - goName:
+    pdfKey: NA
+    pdfType: array
+    required: false
+    introduced: '2.0'
+    refTypes:
+    - type: 3DNode
+      collection: array
+  - goName:
+    pdfKey: NR
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '2.0'
+  - goName:
+    pdfKey: Snapshot
+    pdfType: stream
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - XObjectImage
+  - goName:
+    pdfKey: Params
+    pdfType: array
+    required: false
+    introduced: '1.7'
+- name: ExData3DMarkup
+  purpose: external data for a 3D markup annotation
+  goType:
+  pdfType: ExData
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 324
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - ExData
+    notes: Table 324
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - Markup3D
+  - goName:
+    pdfKey: 3DA
+    pdfType: dictionary;text-string
+    required: true
+    introduced: '1.7'
+    refTypes:
+    - Annot3D
+  - goName:
+    pdfKey: 3DV
+    pdfType: dictionary
+    required: true
+    introduced: '1.7'
+    refTypes:
+    - 3DView
+  - goName:
+    pdfKey: MD5
+    pdfType: byte-string
+    required: false
+    introduced: '1.7'
+- name: RichMediaActivation
+  purpose: activation conditions for rich media
+  goType:
+  pdfType: RichMediaActivation
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 335
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - RichMediaActivation
+    notes: Table 335
+  - goName:
+    pdfKey: Condition
+    pdfType: name
+    required: false
+    default: XA
+    introduced: '1.7'
+    possibleValues:
+    - XA
+    - PO
+    - PV
+  - goName:
+    pdfKey: Animation
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - RichMediaAnimation
+  - goName:
+    pdfKey: View
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - 3DViewAddEntries
+  - goName:
+    pdfKey: Configuration
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - RichMediaConfiguration
+    notes: https://github.com/pdf-association/pdf-issues/issues/166
+  - goName:
+    pdfKey: Presentation
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - RichMediaPresentation
+  - goName:
+    pdfKey: Scripts
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - type: FileSpecification
+      collection: array
+    notes: https://github.com/pdf-association/pdf-issues/issues/59
+- name: RichMediaAnimation
+  purpose: animation parameters for rich media
+  goType:
+  pdfType: RichMediaAnimation
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 337
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - RichMediaAnimation
+    notes: Table 337
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: false
+    default: None
+    introduced: '1.7'
+    possibleValues:
+    - None
+    - Linear
+    - Oscillating
+    notes: Table 313
+  - goName:
+    pdfKey: PlayCount
+    pdfType: integer
+    required: false
+    default: '-1'
+    introduced: '1.7'
+  - goName:
+    pdfKey: Speed
+    pdfType: number
+    required: false
+    default: '1'
+    introduced: '1.7'
+    possibleValues:
+    - fn:Eval(@Speed>0)
+  - goName:
+    pdfKey: AO
+    pdfType: integer
+    required: false
+    default: '0'
+    introduced: fn:Extension(ISO_TS_32007,2.0)
+    notes: ISO/TS 32007
+- name: RichMediaCommand
+  purpose: command to send to rich media content
+  goType:
+  pdfType: RichMediaCommand
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 223
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - RichMediaCommand
+    notes: Table 223
+  - goName:
+    pdfKey: C
+    pdfType: text-string
+    required: true
+    introduced: '1.7'
+  - goName:
+    pdfKey: A
+    pdfType: array;boolean;integer;number;text-string
+    required: false
+    introduced: '1.7'
+- name: RichMediaConfiguration
+  purpose: configuration of rich media content
+  goType:
+  pdfType: RichMediaConfiguration
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 342
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - RichMediaConfiguration
+    notes: Table 342
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - 3D
+    - Sound
+    - Video
+  - goName:
+    pdfKey: Name
+    pdfType: text-string
+    required: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: Instances
+    pdfType: array
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - type: RichMediaInstance
+      collection: array
+- name: RichMediaCuePoint
+  purpose: cue point in rich media playback
+  goType:
+  pdfType: CuePoint
+  pdfRepr: dict
+  introduced: fn:Extension(ADBE_Extn3,1.7)
+  specTable: Table 9
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: fn:Extension(ADBE_Extn3,1.7)
+    deprecated: '2.0'
+    possibleValues:
+    - CuePoint
+    notes: Adobe Extension Level 3, Table 9.51e
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: false
+    introduced: fn:Extension(ADBE_Extn3,1.7)
+    deprecated: '2.0'
+    possibleValues:
+    - Navigation
+    - Event
+  - goName:
+    pdfKey: Name
+    pdfType: text-string
+    required: true
+    introduced: fn:Extension(ADBE_Extn3,1.7)
+    deprecated: '2.0'
+  - goName:
+    pdfKey: Time
+    pdfType: number
+    required: true
+    introduced: fn:Extension(ADBE_Extn3,1.7)
+    deprecated: '2.0'
+  - goName:
+    pdfKey: A
+    pdfType: dictionary
+    required: true
+    introduced: fn:Extension(ADBE_Extn3,1.7)
+    deprecated: '2.0'
+    refTypes:
+    - ActionGoTo
+    - ActionGoToR
+    - ActionGoToE
+    - ActionLaunch
+    - ActionThread
+    - ActionURI
+    - ActionSound
+    - ActionMovie
+    - ActionHide
+    - ActionNamed
+    - ActionSubmitForm
+    - ActionResetForm
+    - ActionImportData
+    - ActionSetOCGState
+    - ActionRendition
+    - ActionTransition
+    - ActionGoTo3DView
+    - ActionECMAScript
+    - ActionRichMediaExecute
+- name: RichMediaDeactivation
+  purpose: deactivation conditions for rich media
+  goType:
+  pdfType: RichMediaDeactivation
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 336
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - RichMediaDeactivation
+    notes: Table 336
+  - goName:
+    pdfKey: Condition
+    pdfType: name
+    required: false
+    default: XD
+    introduced: '1.7'
+    possibleValues:
+    - XD
+    - PC
+    - PI
+- name: RichMediaHeight
+  purpose: height parameters for rich media display
+  goType:
+  pdfRepr: dict
+  introduced: '1.7'
+  fields:
+  - goName:
+    pdfKey: Default
+    pdfType: integer
+    required: false
+    default: '216'
+    introduced: '1.7'
+    possibleValues:
+    - fn:Eval(@Default>0)
+    notes: Table 339
+  - goName:
+    pdfKey: Max
+    pdfType: integer
+    required: false
+    default: '432'
+    introduced: '1.7'
+    possibleValues:
+    - fn:Eval(@Max>0)
+  - goName:
+    pdfKey: Min
+    pdfType: integer
+    required: false
+    default: '72'
+    introduced: '1.7'
+    possibleValues:
+    - fn:Eval(@Min>0)
+- name: RichMediaInstance
+  purpose: instance of a rich media asset
+  goType:
+  pdfType: RichMediaInstance
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 343
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - RichMediaInstance
+    notes: Table 343
+  - goName:
+    pdfKey: Subtype
+    pdfType: name
+    required: true
+    introduced: '1.7'
+    possibleValues:
+    - 3D
+    - Sound
+    - Video
+    - fn:IsPDFVersion(1.7,fn:Extension(ADBE_Extn3,Flash))
+  - goName:
+    pdfKey: Asset
+    pdfType: dictionary
+    required: true
+    introduced: '1.7'
+    refTypes:
+    - FileSpecification
+  - goName:
+    pdfKey: Params
+    pdfType: dictionary
+    required: false
+    introduced: fn:Extension(ADBE_Extn3,1.7)
+    deprecated: '2.0'
+    refTypes:
+    - RichMediaParams
+    notes: Adobe Extension Level 3, Table 9.51b
+  - goName:
+    pdfKey: Scene
+    pdfType: integer
+    required: false
+    introduced: fn:Extension(ISO_TS_32007,2.0)
+    possibleValues:
+    - fn:Eval(@Scene>=0)
+    notes: ISO/TS 32007
+- name: RichMediaParams
+  purpose: parameters for a rich media instance
+  goType:
+  pdfType: RichMediaParams
+  pdfRepr: dict
+  introduced: fn:Extension(ADBE_Extn3,1.7)
+  specTable: Table 9
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: fn:Extension(ADBE_Extn3,1.7)
+    deprecated: '2.0'
+    possibleValues:
+    - RichMediaParams
+    notes: Adobe Extension Level 3, Table 9.51c
+  - goName:
+    pdfKey: FlashVars
+    pdfType: stream;text-string
+    required: false
+    introduced: fn:Extension(ADBE_Extn3,1.7)
+    deprecated: '2.0'
+    refTypes:
+    - Stream
+  - goName:
+    pdfKey: Binding
+    pdfType: name
+    required: false
+    default: None
+    introduced: fn:Extension(ADBE_Extn3,1.7)
+    deprecated: '2.0'
+    possibleValues:
+    - None
+    - Foreground
+    - Background
+    - Material
+  - goName:
+    pdfKey: BindingMaterial
+    pdfType: text-string
+    required: fn:IsRequired(@Binding==Material)
+    introduced: fn:Extension(ADBE_Extn3,1.7)
+    deprecated: '2.0'
+  - goName:
+    pdfKey: CuePoints
+    pdfType: array
+    required: false
+    introduced: fn:Extension(ADBE_Extn3,1.7)
+    deprecated: '2.0'
+    refTypes:
+    - type: RichMediaCuePoint
+      collection: array
+  - goName:
+    pdfKey: Settings
+    pdfType: stream;text-string
+    required: false
+    introduced: fn:Extension(ADBE_Extn3,1.7)
+    deprecated: '2.0'
+    refTypes:
+    - Stream
+- name: RichMediaPosition
+  purpose: position of rich media content
+  goType:
+  pdfType: RichMediaPosition
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 340
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - RichMediaPosition
+    notes: Table 340
+  - goName:
+    pdfKey: HAlign
+    pdfType: name
+    required: false
+    default: Far
+    introduced: '1.7'
+    possibleValues:
+    - Near
+    - Center
+    - Far
+  - goName:
+    pdfKey: VAlign
+    pdfType: name
+    required: false
+    default: Near
+    introduced: '1.7'
+    possibleValues:
+    - Near
+    - Center
+    - Far
+  - goName:
+    pdfKey: HOffset
+    pdfType: number
+    required: false
+    default: '18'
+    introduced: '1.7'
+  - goName:
+    pdfKey: VOffset
+    pdfType: number
+    required: false
+    default: '18'
+    introduced: '1.7'
+- name: RichMediaPresentation
+  purpose: presentation parameters for rich media
+  goType:
+  pdfType: RichMediaPresentation
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 338
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - RichMediaPresentation
+    notes: Table 338
+  - goName:
+    pdfKey: Style
+    pdfType: name
+    required: false
+    default: Embedded
+    introduced: '1.7'
+    possibleValues:
+    - Embedded
+    - Windowed
+  - goName:
+    pdfKey: Window
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - RichMediaWindow
+  - goName:
+    pdfKey: Transparent
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: NavigationPane
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: Toolbar
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.7'
+  - goName:
+    pdfKey: PassContextClick
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.7'
+- name: RichMediaSettings
+  purpose: settings for rich media activation
+  goType:
+  pdfType: RichMediaSettings
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 334
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - RichMediaSettings
+    notes: Table 334
+  - goName:
+    pdfKey: Activation
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - RichMediaActivation
+  - goName:
+    pdfKey: Deactivation
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - RichMediaDeactivation
+- name: RichMediaWidth
+  purpose: width parameters for rich media display
+  goType:
+  pdfRepr: dict
+  introduced: '1.7'
+  fields:
+  - goName:
+    pdfKey: Default
+    pdfType: integer
+    required: false
+    default: '288'
+    introduced: '1.7'
+    possibleValues:
+    - fn:Eval(@Default>0)
+    notes: Table 339
+  - goName:
+    pdfKey: Max
+    pdfType: integer
+    required: false
+    default: '576'
+    introduced: '1.7'
+    possibleValues:
+    - fn:Eval(@Max>0)
+  - goName:
+    pdfKey: Min
+    pdfType: integer
+    required: false
+    default: '72'
+    introduced: '1.7'
+    possibleValues:
+    - fn:Eval(@Min>0)
+- name: RichMediaWindow
+  purpose: window parameters for rich media display
+  goType:
+  pdfType: RichMediaWindow
+  pdfRepr: dict
+  introduced: '1.7'
+  specTable: Table 339
+  fields:
+  - goName:
+    pdfKey: Type
+    pdfType: name
+    required: false
+    introduced: '1.7'
+    possibleValues:
+    - RichMediaWindow
+    notes: Table 339
+  - goName:
+    pdfKey: Width
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - RichMediaWidth
+  - goName:
+    pdfKey: Height
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - RichMediaHeight
+  - goName:
+    pdfKey: Position
+    pdfType: dictionary
+    required: false
+    introduced: '1.7'
+    refTypes:
+    - RichMediaPosition
 enums:
 - name: SoundEncoding
   goType: "sound.Encoding"

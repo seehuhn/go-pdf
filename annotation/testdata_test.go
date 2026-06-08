@@ -1393,8 +1393,8 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:  pdf.Rectangle{LLx: 300, LLy: 300, URx: 500, URy: 340},
 					Color: color.DeviceCMYK{0.1, 0.2, 0.3, 0.4},
 				},
-				Highlight: "I",                       // Default highlighting
-				A:         pdf.NewReference(1800, 0), // Action dictionary
+				Highlight: "I", // Default highlighting
+				Action:    &action.URI{URI: "https://example.com/widget-activate"},
 				AA:        &triggers.Annotation{Up: &action.URI{URI: "https://example.com/widget-up"}},
 			},
 		},
@@ -1442,8 +1442,8 @@ var testCases = map[pdf.Name][]testCase{
 						SingleUse: true,
 					},
 				},
-				A:  pdf.NewReference(2300, 0), // Action dictionary
-				AA: &triggers.Annotation{Focus: &action.URI{URI: "https://example.com/focus"}},
+				Action: &action.Named{N: "NextPage"},
+				AA:     &triggers.Annotation{Focus: &action.URI{URI: "https://example.com/focus"}},
 				BorderStyle: &BorderStyle{
 					Width:     1.5,
 					Style:     "D",
