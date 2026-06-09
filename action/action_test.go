@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 func TestActionListEncode_Empty(t *testing.T) {
@@ -357,5 +358,34 @@ func TestDecodeActionListNextCycleArray(t *testing.T) {
 	_, err = pdf.ExtractorGet(x, nil, ref, Decode)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
+	}
+}
+
+// TestDecodeActionListNextDeepChainBounded guards against a stack-overflow
+// DoS: a /Next chain of distinct URI actions is acyclic, so the cycle guard
+// never trips, yet recursing one frame per level would exhaust the Go stack.
+// The ExtractorGet depth cap must turn this into a malformed-file error
+// rather than a crash.
+func TestDecodeActionListNextDeepChainBounded(t *testing.T) {
+	depth := limits.MaxExtractDepth + 10
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+	refs := make([]pdf.Reference, depth)
+	for i := range refs {
+		refs[i] = w.Alloc()
+	}
+	for i, ref := range refs {
+		d := pdf.Dict{"S": pdf.Name("URI"), "URI": pdf.String("https://example.com/")}
+		if i+1 < depth {
+			d["Next"] = refs[i+1]
+		}
+		if err := w.Put(ref, d); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	x := pdf.NewExtractor(w)
+	if _, err := pdf.ExtractorGet(x, nil, refs[0], Decode); !pdf.IsMalformed(err) {
+		t.Errorf("err = %v, want malformed", err)
 	}
 }

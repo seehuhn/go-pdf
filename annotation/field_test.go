@@ -18,6 +18,7 @@ package annotation
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -29,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf/action/triggers"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/limits"
 	"seehuhn.de/go/pdf/optional"
 )
 
@@ -836,5 +838,83 @@ func TestDecodeFieldAnonymousSubField(t *testing.T) {
 	}
 	if ResolvedFT(child) != "Tx" {
 		t.Errorf("sub-field ResolvedFT = %q, want Tx (inherited)", ResolvedFT(child))
+	}
+}
+
+// TestDecodeFieldKidsDeepChainBounded guards against a stack-overflow DoS: a
+// /Kids chain of distinct fields is acyclic, so the cycle guard never trips,
+// yet recursing one frame per level would exhaust the Go stack. The
+// ExtractorGet depth cap makes decodeKids (which decodes each kid via
+// pdf.Optional) silently truncate the over-deep tail, keeping the fields
+// above the cap.
+func TestDecodeFieldKidsDeepChainBounded(t *testing.T) {
+	depth := limits.MaxExtractDepth + 10
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	refs := make([]pdf.Reference, depth)
+	for i := range refs {
+		refs[i] = w.Alloc()
+	}
+	for i, ref := range refs {
+		d := pdf.Dict{"T": pdf.String(fmt.Sprintf("f%d", i))}
+		if i+1 < depth {
+			d["Kids"] = pdf.Array{refs[i+1]}
+		}
+		if err := w.Put(ref, d); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	x := pdf.NewExtractor(w)
+	field, err := pdf.ExtractorGet(x, nil, refs[0], DecodeField)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if field == nil {
+		t.Fatal("expected a field")
+	}
+
+	// the chain must be truncated at the cap, not read in full
+	levels := 1
+	fc := field.GetFieldCommon()
+	for len(fc.Kids) > 0 {
+		next, ok := fc.Kids[0].(*FieldCommon)
+		if !ok {
+			break
+		}
+		levels++
+		fc = next
+	}
+	if levels > limits.MaxExtractDepth {
+		t.Errorf("chain depth = %d, want at most %d", levels, limits.MaxExtractDepth)
+	}
+}
+
+// TestDecodeFieldKidsWide verifies that the depth cap bounds nesting depth,
+// not sibling breadth: a single field with many kids is read in full.
+func TestDecodeFieldKidsWide(t *testing.T) {
+	n := 2*limits.MaxExtractDepth + 50
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	kids := make(pdf.Array, n)
+	for i := range kids {
+		ref := w.Alloc()
+		if err := w.Put(ref, pdf.Dict{"T": pdf.String(fmt.Sprintf("k%d", i))}); err != nil {
+			t.Fatal(err)
+		}
+		kids[i] = ref
+	}
+	rootRef := w.Alloc()
+	if err := w.Put(rootRef, pdf.Dict{"T": pdf.String("root"), "Kids": kids}); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	field, err := pdf.ExtractorGet(x, nil, rootRef, DecodeField)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := len(field.GetFieldCommon().Kids); got != n {
+		t.Errorf("kids = %d, want %d", got, n)
 	}
 }

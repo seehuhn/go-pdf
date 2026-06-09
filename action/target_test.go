@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 var targetTestCases = []Target{
@@ -267,5 +268,34 @@ func TestDecodeTargetCycleMutual(t *testing.T) {
 	_, err := pdf.ExtractorGet(x, nil, refA, DecodeTarget)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
+	}
+}
+
+// TestDecodeTargetDeepChainBounded guards against a stack-overflow DoS: a /T
+// target chain of distinct dictionaries is acyclic, so the cycle guard never
+// trips, yet recursing one frame per level would exhaust the Go stack. The
+// ExtractorGet depth cap must turn this into a malformed-file error rather
+// than a crash.
+func TestDecodeTargetDeepChainBounded(t *testing.T) {
+	depth := limits.MaxExtractDepth + 10
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+	refs := make([]pdf.Reference, depth)
+	for i := range refs {
+		refs[i] = w.Alloc()
+	}
+	for i, ref := range refs {
+		d := pdf.Dict{"R": pdf.Name("P")}
+		if i+1 < depth {
+			d["T"] = refs[i+1]
+		}
+		if err := w.Put(ref, d); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	x := pdf.NewExtractor(w)
+	if _, err := pdf.ExtractorGet(x, nil, refs[0], DecodeTarget); !pdf.IsMalformed(err) {
+		t.Errorf("err = %v, want malformed", err)
 	}
 }

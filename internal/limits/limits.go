@@ -280,4 +280,12 @@ const (
 	// MaxNumberTreeDepth caps the nesting depth of a number tree's
 	// /Kids chain (PDF 32000-2 §7.9.7).  See [MaxNameTreeDepth].
 	MaxNumberTreeDepth = 256
+
+	// MaxExtractDepth caps the depth of nested indirect-reference
+	// resolution performed by pdf.ExtractorGet, stopping an adversarially
+	// deep acyclic chain of distinct objects (e.g. Separation-of-Separation
+	// color spaces, a long /Next action chain, or a deep field /Kids tree)
+	// before it exhausts the Go call stack.  Legitimate composed nesting
+	// stays far below this; only a degenerate or malicious chain reaches it.
+	MaxExtractDepth = 256
 )

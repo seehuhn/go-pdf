@@ -710,3 +710,41 @@ func FuzzSpaceRoundTrip(f *testing.F) {
 		spaceRoundTrip(t, pdf.GetVersion(r), space)
 	})
 }
+
+// TestExtractSpaceDeepChainBounded guards against a stack-overflow DoS: a
+// chain of distinct Separation color spaces, each whose alternate is the
+// next, is acyclic, so the cycle guard never trips, yet recursing one frame
+// per level would exhaust the Go stack. The ExtractorGet depth cap must turn
+// this into a malformed-file error rather than a crash.
+func TestExtractSpaceDeepChainBounded(t *testing.T) {
+	depth := limits.MaxExtractDepth + 10
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+	tint := pdf.Dict{
+		"FunctionType": pdf.Integer(2),
+		"Domain":       pdf.Array{pdf.Real(0), pdf.Real(1)},
+		"C0":           pdf.Array{pdf.Real(0)},
+		"C1":           pdf.Array{pdf.Real(1)},
+		"N":            pdf.Real(1),
+	}
+
+	refs := make([]pdf.Reference, depth)
+	for i := range refs {
+		refs[i] = w.Alloc()
+	}
+	for i, ref := range refs {
+		var alt pdf.Object = pdf.Name("DeviceRGB")
+		if i+1 < depth {
+			alt = refs[i+1]
+		}
+		obj := pdf.Array{pdf.Name("Separation"), pdf.Name("c"), alt, tint}
+		if err := w.Put(ref, obj); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	x := pdf.NewExtractor(w)
+	if _, err := ExtractSpace(x, nil, refs[0], false); !pdf.IsMalformed(err) {
+		t.Errorf("err = %v, want malformed", err)
+	}
+}

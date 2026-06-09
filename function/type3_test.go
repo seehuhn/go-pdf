@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 func TestType3BoundaryHandling(t *testing.T) {
@@ -239,5 +241,49 @@ func TestType3ApplyWithBoundaries(t *testing.T) {
 					tt.input, expectedResult, result[0])
 			}
 		})
+	}
+}
+
+// TestExtractType3DeepChainBounded guards against a stack-overflow DoS: a
+// chain of distinct Type 3 stitching functions, each whose /Functions holds
+// the next, is acyclic, so the cycle guard never trips, yet recursing one
+// frame per level would exhaust the Go stack. The ExtractorGet depth cap must
+// turn this into a malformed-file error rather than a crash.
+func TestExtractType3DeepChainBounded(t *testing.T) {
+	depth := limits.MaxExtractDepth + 10
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	refs := make([]pdf.Reference, depth)
+	for i := range refs {
+		refs[i] = w.Alloc()
+	}
+	for i, ref := range refs {
+		var obj pdf.Object
+		if i+1 < depth {
+			obj = pdf.Dict{
+				"FunctionType": pdf.Integer(3),
+				"Domain":       pdf.Array{pdf.Real(0), pdf.Real(1)},
+				"Functions":    pdf.Array{refs[i+1]},
+				"Bounds":       pdf.Array{},
+				"Encode":       pdf.Array{pdf.Real(0), pdf.Real(1)},
+				"Range":        pdf.Array{pdf.Real(0), pdf.Real(1)},
+			}
+		} else {
+			obj = pdf.Dict{
+				"FunctionType": pdf.Integer(2),
+				"Domain":       pdf.Array{pdf.Real(0), pdf.Real(1)},
+				"C0":           pdf.Array{pdf.Real(0)},
+				"C1":           pdf.Array{pdf.Real(1)},
+				"N":            pdf.Real(1),
+			}
+		}
+		if err := w.Put(ref, obj); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	x := pdf.NewExtractor(w)
+	if _, err := Extract(x, nil, refs[0], false); !pdf.IsMalformed(err) {
+		t.Errorf("err = %v, want malformed", err)
 	}
 }

@@ -22,6 +22,8 @@ import (
 	"math"
 	"reflect"
 	"sync"
+
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // Encoder represents a PDF object which is tied to a specific PDF file.
@@ -268,7 +270,12 @@ func (rm *ResourceManager) Close() error {
 	return nil
 }
 
+// ErrCycle reports that a chain of indirect references loops back on itself.
 var ErrCycle = errors.New("cycle in recursive structure")
+
+// ErrDepth reports that indirect-reference nesting exceeded
+// [limits.MaxExtractDepth].
+var ErrDepth = errors.New("reference nesting too deep")
 
 // CycleCheck tracks which references are currently being resolved on the call
 // stack, forming an immutable linked list. Each level of recursion extends
@@ -287,6 +294,15 @@ func (p *CycleCheck) Seen(ref Reference) bool {
 		}
 	}
 	return false
+}
+
+// depth reports the number of references on the path.
+func (p *CycleCheck) depth() int {
+	n := 0
+	for ; p != nil; p = p.Parent {
+		n++
+	}
+	return n
 }
 
 // Extractor caches extracted PDF objects to ensure that extracting the same
@@ -379,6 +395,15 @@ func ExtractorGet[T any](x *Extractor, path *CycleCheck, obj Object, extract fun
 
 		refs = append(refs, ref)
 		path = &CycleCheck{Ref: ref, Parent: path}
+
+		// reject an adversarially deep acyclic reference chain before the
+		// recursive extractor exhausts the Go call stack
+		if path.depth() > limits.MaxExtractDepth {
+			return zero, &MalformedFileError{
+				Err: ErrDepth,
+				Loc: []string{"object " + ref.String()},
+			}
+		}
 
 		var err error
 		obj, err = x.R.Get(ref, true)
