@@ -413,7 +413,16 @@ func (w *Writer) Alloc() Reference {
 //
 // If the underlying io.Writer does not support seeking, Get will return an
 // error.
-func (w *Writer) Get(ref Reference, canObjStm bool) (obj Native, err error) {
+func (w *Writer) Get(ref Reference, canObjStm bool) (Native, error) {
+	return w.get(ref, canObjStm, false)
+}
+
+// get implements [Writer.Get].  If scalarOnly is set, the object is read in
+// scalar-only mode, in which composite objects are refused.  This is used to
+// resolve an indirect stream /Length, where the value must be a scalar
+// integer; refusing composites prevents unbounded recursion on a cyclic
+// /Length.
+func (w *Writer) get(ref Reference, canObjStm, scalarOnly bool) (obj Native, err error) {
 	r, ok := w.origW.(io.ReadSeeker)
 	if !ok {
 		return nil, errors.New("Get() not supported by the underlying io.Writer")
@@ -431,7 +440,7 @@ func (w *Writer) Get(ref Reference, canObjStm bool) (obj Native, err error) {
 				Loc: []string{"object " + ref.String()},
 			}
 		}
-		getInt := safeGetInteger(w, true)
+		getInt := safeGetInteger(writerLengthGetter{w}, true)
 		return getFromObjStm(w, ref.Number(), entry.InStream, getInt, w.w.enc)
 	}
 
@@ -455,6 +464,7 @@ func (w *Writer) Get(ref Reference, canObjStm bool) (obj Native, err error) {
 	if err != nil {
 		return nil, err
 	}
+	s.scalarOnly = scalarOnly
 
 	obj, fileRef, err := s.ReadIndirectObject()
 	if err != nil {
@@ -469,9 +479,19 @@ func (w *Writer) Get(ref Reference, canObjStm bool) (obj Native, err error) {
 	return obj, nil
 }
 
+// writerLengthGetter wraps a Writer so that Get reads objects in scalar-only
+// mode.  It is used to resolve an indirect stream /Length: the value must be a
+// scalar integer, and refusing composite objects prevents a cyclic /Length
+// from causing unbounded recursion.
+type writerLengthGetter struct{ *Writer }
+
+func (g writerLengthGetter) Get(ref Reference, canObjStm bool) (Native, error) {
+	return g.Writer.get(ref, canObjStm, true)
+}
+
 func (w *Writer) scannerFrom(pos int64, canObjStm bool) (*scanner, error) {
 	r := w.origW.(io.ReadSeeker)
-	getInt := safeGetInteger(w, canObjStm)
+	getInt := safeGetInteger(writerLengthGetter{w}, canObjStm)
 	s := newScanner(r, getInt, w.w.enc)
 	if ra, ok := w.origW.(io.ReaderAt); ok {
 		s.fileReader = ra

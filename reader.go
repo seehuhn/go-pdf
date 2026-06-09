@@ -304,7 +304,16 @@ func (r *Reader) GetMeta() *MetaInfo {
 // The argument canObjStm specifies whether the object may be read from an
 // object stream.  Normally, this should be set to true.  If canObjStm is false
 // and the object is in an object stream, an error is returned.
-func (r *Reader) Get(ref Reference, canObjStm bool) (_ Native, err error) {
+func (r *Reader) Get(ref Reference, canObjStm bool) (Native, error) {
+	return r.get(ref, canObjStm, false)
+}
+
+// get implements [Reader.Get].  If scalarOnly is set, the object is read in
+// scalar-only mode, in which composite objects are refused.  This is used to
+// resolve an indirect stream /Length, where the value must be a scalar
+// integer; refusing composites prevents unbounded recursion on a cyclic
+// /Length.
+func (r *Reader) get(ref Reference, canObjStm, scalarOnly bool) (_ Native, err error) {
 	defer func() {
 		if err != nil {
 			err = Wrap(err, "object "+ref.String())
@@ -323,7 +332,7 @@ func (r *Reader) Get(ref Reference, canObjStm bool) (_ Native, err error) {
 				Loc: []string{"object " + ref.String()},
 			}
 		}
-		getInt := safeGetInteger(r, true)
+		getInt := safeGetInteger(lengthGetter{r}, true)
 		return getFromObjStm(r, ref.Number(), entry.InStream, getInt, r.enc)
 	}
 
@@ -331,6 +340,7 @@ func (r *Reader) Get(ref Reference, canObjStm bool) (_ Native, err error) {
 	if err != nil {
 		return nil, err
 	}
+	s.scalarOnly = scalarOnly
 	obj, fileRef, err := s.ReadIndirectObject()
 	if err != nil {
 		return nil, err
@@ -342,6 +352,16 @@ func (r *Reader) Get(ref Reference, canObjStm bool) (_ Native, err error) {
 		}
 	}
 	return obj, nil
+}
+
+// lengthGetter wraps a Reader so that Get reads objects in scalar-only mode.
+// It is used to resolve an indirect stream /Length: the value must be a scalar
+// integer, and refusing composite objects prevents a cyclic /Length from
+// causing unbounded recursion.
+type lengthGetter struct{ *Reader }
+
+func (g lengthGetter) Get(ref Reference, canObjStm bool) (Native, error) {
+	return g.Reader.get(ref, canObjStm, true)
 }
 
 func getFromObjStm(r Getter, number uint32, sRef Reference, getInt getIntFn, enc *encryptInfo) (obj Native, err error) {
@@ -561,7 +581,7 @@ func findHeaderOffset(data io.ReaderAt, size int64) (int64, error) {
 }
 
 func (r *Reader) scannerFrom(pos int64, canObjStm bool) (*scanner, error) {
-	getInt := safeGetInteger(r, canObjStm)
+	getInt := safeGetInteger(lengthGetter{r}, canObjStm)
 	sr := io.NewSectionReader(r.r, pos, r.size-pos)
 	s := newScanner(sr, getInt, r.enc)
 	s.fileReader = r.r

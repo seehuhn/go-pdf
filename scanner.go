@@ -71,6 +71,14 @@ type scanner struct {
 	// specified as an indirect object.
 	getInt getIntFn
 
+	// scalarOnly, when set, makes ReadObject refuse composite objects
+	// (dict, array, stream).  It is used while resolving an indirect
+	// /Length, where the result must be a scalar integer.  Refusing
+	// composites stops ReadObject before it can read a stream body, which
+	// prevents the unbounded recursion a cyclic /Length would otherwise
+	// cause.
+	scalarOnly bool
+
 	nestDepth int
 
 	enc         *encryptInfo
@@ -212,6 +220,9 @@ func (s *scanner) ReadObject() (Native, error) {
 		// of a reference.
 
 	case bytes.HasPrefix(buf, []byte("<<")):
+		if s.scalarOnly {
+			return nil, &MalformedFileError{Err: errors.New("integer expected, got composite object")}
+		}
 		dict, err := s.ReadDict()
 		if err != nil {
 			return nil, err
@@ -234,6 +245,9 @@ func (s *scanner) ReadObject() (Native, error) {
 		s.pos++
 		return s.ReadHexString()
 	case buf[0] == '[':
+		if s.scalarOnly {
+			return nil, &MalformedFileError{Err: errors.New("integer expected, got composite object")}
+		}
 		s.pos++
 		return s.ReadArray()
 	}

@@ -428,6 +428,68 @@ func TestStreamLengthCycle2(t *testing.T) {
 	}
 }
 
+// TestStreamLengthStreamCycle checks that a regular stream whose indirect
+// /Length resolves, through a cycle, to a stream object yields a malformed
+// file error instead of recursing without bound.  Unlike the reference-chain
+// cycles in TestStreamLengthCycle, resolving the length here re-enters the
+// stream reader, which the maxRefDepth guard does not catch.
+func TestStreamLengthStreamCycle(t *testing.T) {
+	// build returns a PDF in which objects 1..len(targets) are all streams;
+	// stream i declares "/Length (targets[i-1]) 0 R", so every /Length
+	// reference points at another stream.
+	build := func(targets []int) []byte {
+		n := len(targets)
+		catalog := n + 1
+		pages := n + 2
+		offsets := make([]int, n+3) // 1-based; index 0 unused
+		var b bytes.Buffer
+		b.WriteString("%PDF-1.7\n")
+		for i := 1; i <= n; i++ {
+			offsets[i] = b.Len()
+			fmt.Fprintf(&b, "%d 0 obj\n<< /Length %d 0 R >>\nstream\nXX\nendstream\nendobj\n",
+				i, targets[i-1])
+		}
+		offsets[catalog] = b.Len()
+		fmt.Fprintf(&b, "%d 0 obj\n<< /Type /Catalog /Pages %d 0 R >>\nendobj\n", catalog, pages)
+		offsets[pages] = b.Len()
+		fmt.Fprintf(&b, "%d 0 obj\n<< /Type /Pages /Kids [] /Count 0 >>\nendobj\n", pages)
+		xrefOff := b.Len()
+		fmt.Fprintf(&b, "xref\n0 %d\n0000000000 65535 f\r\n", n+3)
+		for i := 1; i <= n+2; i++ {
+			fmt.Fprintf(&b, "%010d 00000 n\r\n", offsets[i])
+		}
+		fmt.Fprintf(&b, "trailer\n<< /Size %d /Root %d 0 R >>\nstartxref\n%d\n%%%%EOF\n",
+			n+3, catalog, xrefOff)
+		return b.Bytes()
+	}
+
+	cases := []struct {
+		name    string
+		targets []int
+	}{
+		{"self", []int{1}},        // 1 -> 1
+		{"mutual", []int{2, 1}},   // 1 -> 2 -> 1
+		{"chain", []int{2, 3, 1}}, // 1 -> 2 -> 3 -> 1
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			data := build(tc.targets)
+			r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+			if err != nil {
+				t.Fatalf("NewReader: %v", err)
+			}
+			// reading the stream resolves its cyclic /Length; this must
+			// fail gracefully rather than overflow the stack
+			_, err = r.Get(NewReference(1, 0), true)
+			if err == nil {
+				t.Error("cyclic stream /Length not detected")
+			} else if !IsMalformed(err) {
+				t.Errorf("expected *MalformedFileError, got %T: %v", err, err)
+			}
+		})
+	}
+}
+
 func TestReaderGoFuzz(t *testing.T) {
 	// found by go-fuzz - check that the reader doesn't panic
 	cases := []string{
